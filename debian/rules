@@ -35,6 +35,8 @@ install: build
 	dh_clean -k 
 	dh_installdirs
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	-find $(CURDIR)/debian -follow -type f -name "*.exe" -exec chmod +x {} \;
+	-find $(CURDIR)/debian -follow -type f -name "*.dll" -exec chmod -x {} \;
 
 binary-arch: build install
 	dh_testdir -s
@@ -47,17 +49,12 @@ binary-arch: build install
 	  s,mono ,LD_LIBRARY_PATH=/usr/lib/monodevelop:\$$LD_LIBRARY_PATH MONO_PATH=/usr/share/dotnet/lib /usr/bin/cli ,; \
 	  s, --debug,,; \
 	  ' -i $(CURDIR)/debian/monodevelop/usr/bin/monodevelop
-	chmod +x $(CURDIR)/debian/monodevelop/usr/share/dotnet/monodevelop/bin/MonoDevelop.exe
 	chmod -x $(CURDIR)/debian/monodevelop/usr/share/pixmaps/monodevelop.png
 	cp $(CURDIR)/ChangeLog $(CURDIR)/changelog
 	dh_installchangelogs -s
 	dh_installdocs -s
 	dh_installexamples -s
 	dh_installmenu -s
-	dh_installman -s
-#	dh_installdebconf -s
-#	dh_installinfo -s
-#	dh_undocumented -s
 	dh_installman -s
 	dh_strip -s
 	dh_compress -s
