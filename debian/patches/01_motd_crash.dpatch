@@ -1,0 +1,43 @@
+#! /bin/sh -e
+## 02_soname_map.dpatch by Eduard Bloch <blade@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Fix for the crash on displaying the MOTD
+
+if [ $# -lt 1 ]; then
+    echo "`basename $0`: script expects -patch|-unpatch as argument" >&2
+    exit 1
+fi
+
+[ -f debian/patches/00patch-opts ] && . debian/patches/00patch-opts
+patch_opts="${patch_opts:--f --no-backup-if-mismatch} ${2:+-d $2}"
+
+case "$1" in
+    -patch) patch -p0 ${patch_opts} < $0;;
+    -unpatch) patch -R -p0 ${patch_opts} < $0;;
+    *)
+        echo "`basename $0`: script expects -patch|-unpatch as argument" >&2
+        exit 1;;
+esac
+
+exit 0
+
+@DPATCH@
+Index: src/Main/Base/Commands/AutostartCommands.cs
+===================================================================
+--- src/Main/Base/Commands/AutostartCommands.cs	(revision 1799)
++++ src/Main/Base/Commands/AutostartCommands.cs	(revision 1800)
+@@ -197,10 +197,10 @@
+ 			((Gtk.Window)WorkbenchSingleton.Workbench).Present ();
+ 		
+ 			// Give Gtk time to display the workbench window before showing the TOTD.
+-			while (Gtk.Application.EventsPending ())
+-				Gtk.Application.RunIteration ();
++			//while (Gtk.Application.EventsPending ())
++			//	Gtk.Application.RunIteration ();
+ 		
+-			ShowTipOfTheDay (null, null);
++			//ShowTipOfTheDay (null, null);
+ 		
+ 			// finally run the workbench window ...
+ 			Gtk.Application.Run ();

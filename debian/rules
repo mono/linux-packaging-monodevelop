@@ -3,9 +3,10 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 export MONO_SHARED_DIR=$(CURDIR)
+include /usr/share/dpatch/dpatch.make
 
 configure: configure-stamp
-configure-stamp:
+configure-stamp: patch
 	dh_testdir
 	# piece of crap
 	perl -pe ' \
@@ -21,7 +22,7 @@ build-stamp: configure-stamp
 	$(MAKE)
 	touch build-stamp
 
-clean:
+clean: unpatch
 	dh_testdir
 	dh_testroot
 	rm -f configure-stamp
