@@ -6,6 +6,8 @@ monodevelop (0.4-0pre1v3) unstable; urgency=low
     + added libglade-cil and monodoc-manual dependecy
       (Closes: #253983, #255168)
     + now using dh_makenetlib and dh_netdeps
+    + since monodevelop 0.3 the monodoc documenation is embedded, added
+      "Provides: monodoc-viewer"
   * Eduard Bloch
     + dependency tuning
 
