@@ -1,4 +1,4 @@
-monodevelop (0.4-2) unstable; urgency=low
+monodevelop (0.5-0pre1v1) unstable; urgency=low
 
   * Mirco 'meebey' Bauer
     + FTBFS: added libmono-dev to Build-Depends
@@ -7,7 +7,7 @@ monodevelop (0.4-2) unstable; urgency=low
     + added x-terminal-emulator dependency (plus patching the source to run
       "x-terminal-emulator")
 
- -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Sat, 19 Jun 2004  04:15:18 +0200
+ -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Wed, 30 Jun 2004 14:22:26 +0200
 
 monodevelop (0.4-1) unstable; urgency=low
 
