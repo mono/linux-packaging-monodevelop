@@ -12,6 +12,7 @@ configure-stamp:
 	  s,update-mime-database \$$\(gnome_data\)/mime,# update-mime-database \$$\(gnome_data\)/mime,; \
 	  ' -i $(CURDIR)/Makefile.in
 	./configure --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
+	grep xterm . -rl | xargs perl -pe 's,xterm,x-terminal-emulator,g' -i 
 	touch configure-stamp
 
 build: build-stamp
