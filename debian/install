@@ -1,5 +1,7 @@
+debian/tmp/usr/bin/monodevelop
+debian/tmp/usr/share/locale
 debian/tmp/usr/lib/monodevelop/bin/*.so*		usr/lib/monodevelop
-debian/tmp/usr/lib/monodevelop/bin/MonoDevelop.exe	usr/share/dotnet/monodevelop/bin
+debian/tmp/usr/lib/monodevelop/bin/*.exe		usr/share/dotnet/monodevelop/bin
 debian/tmp/usr/lib/monodevelop/bin/*.dll		usr/share/dotnet/monodevelop/bin
 debian/tmp/usr/lib/monodevelop/bin/*.dll.config		usr/share/dotnet/monodevelop/bin
 debian/tmp/usr/lib/monodevelop/bin/*.png		usr/share/dotnet/monodevelop/bin
