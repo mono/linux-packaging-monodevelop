@@ -43,6 +43,7 @@ binary-arch: build install
 	  ' -i $(CURDIR)/debian/monodevelop/usr/bin/monodevelop
 	chmod +x $(CURDIR)/debian/monodevelop/usr/share/dotnet/monodevelop/bin/MonoDevelop.exe
 	chmod -x $(CURDIR)/debian/monodevelop/usr/share/pixmaps/monodevelop.png
+	cp $(CURDIR)/ChangeLog $(CURDIR)/changelog
 	dh_installchangelogs -s
 	dh_installdocs -s
 	dh_installexamples -s
