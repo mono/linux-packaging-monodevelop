@@ -1,9 +1,10 @@
-monodevelop (0.4-0pre1v2) unstable; urgency=low
+monodevelop (0.4-0pre1v3) unstable; urgency=low
 
   * NOT RELEASED YET
   * Mirco 'meebey' Bauer
     + new upstream release
-    + added libglade-cil dependecy (Closes: #253983)
+    + added libglade-cil and monodoc-manual dependecy
+      (Closes: #253983, #255168)
     + now using dh_makenetlib and dh_netdeps
   * Eduard Bloch
     + dependency tuning
