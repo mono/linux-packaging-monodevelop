@@ -3,7 +3,7 @@ Section: devel
 Priority: optional
 Maintainer: Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>
 Uploaders: Eduard Bloch <blade@debian.org>, Mirco 'meebey' Bauer <mail@meebey.net>, Michael Schiansky <ms@debian.org>
-Build-Depends: debhelper (>= 4.0.0), mono-mcs (>= 0.95) | c-sharp-compiler, mono-mint [powerpc], mono-utils (>= 0.95), libgnome2-dev, libgtksourceview-dev (>= 0.7), libgnomevfs2-dev (>= 2.0), liborbit2-dev (>= 2.8.3), intltool, mozilla-dev, gtk-sharp-gapi (>= 0.93), libgtk-cil (>= 0.93), libgnome-cil (>= 0.93), libgconf-cil (>= 0.93), libgtkhtml-cil (>= 0.93), libglade-cil, libgtksourceview-cil (>= 0.3), libgecko-cil (>= 0.4), monodoc-base (>= 0.16)
+Build-Depends: debhelper (>= 4.0.0), mono-mcs (>= 0.95) | c-sharp-compiler, mono-mint [powerpc], mono-utils (>= 0.95), libgnome2-dev, libgtksourceview-dev (>= 0.7), libgnomevfs2-dev (>= 2.0), liborbit2-dev (>= 2.8.3), intltool, mozilla-dev, gtk-sharp-gapi (>= 0.93), libgtk-cil (>= 0.93), libgnome-cil (>= 0.93), libgconf-cil (>= 0.93), libgnome-cil (>= 0.93) | libgtkhtml-cil (>= 0.93), libglade-cil, libgtksourceview-cil (>= 0.3), libgecko-cil (>= 0.4), monodoc-base (>= 0.16)
 Standards-Version: 3.6.1
 
 Package: monodevelop
