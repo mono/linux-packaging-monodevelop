@@ -47,6 +47,7 @@ binary-arch: build install
 	dh_installdocs -s
 	dh_installexamples -s
 	dh_installmenu -s
+	dh_installman -s
 #	dh_installdebconf -s
 #	dh_installinfo -s
 #	dh_undocumented -s
