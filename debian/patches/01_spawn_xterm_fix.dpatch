@@ -5,23 +5,18 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/CSharpBinding/CSharpBindingExecutionManager.cs.in /tmp/dpep.e26u1W/monodevelop-0.5.1/src/AddIns/BackendBindings/CSharpBinding/CSharpBindingExecutionManager.cs.in
+diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/CSharpBinding/CSharpBindingExecutionManager.cs.in /tmp/dpep.lPf036/monodevelop-0.5.1/src/AddIns/BackendBindings/CSharpBinding/CSharpBindingExecutionManager.cs.in
 --- monodevelop-0.5.1/src/AddIns/BackendBindings/CSharpBinding/CSharpBindingExecutionManager.cs.in	2004-07-06 01:23:59.000000000 +0200
-+++ /tmp/dpep.e26u1W/monodevelop-0.5.1/src/AddIns/BackendBindings/CSharpBinding/CSharpBindingExecutionManager.cs.in	2004-10-09 17:40:32.000000000 +0200
-@@ -69,11 +69,11 @@
++++ /tmp/dpep.lPf036/monodevelop-0.5.1/src/AddIns/BackendBindings/CSharpBinding/CSharpBindingExecutionManager.cs.in	2004-12-05 21:18:46.000000000 +0100
+@@ -69,7 +69,7 @@
  				psi = new ProcessStartInfo("\"" + parameters.ExecuteScript + "\"");
  				psi.UseShellExecute = false;
  			} else {
 -				string runtimeStarter = "mono --debug ";
-+				string runtimeStarter = "/usr/bin/cli ";
++				string runtimeStarter = "/usr/bin/cli --debug ";
  				
  				switch (parameters.NetRuntime) {
  					case NetRuntime.Mono:
--						runtimeStarter = "mono --debug ";
-+						runtimeStarter = "mono ";
- 						break;
- 					case NetRuntime.MonoInterpreter:
- 						runtimeStarter = "mint ";
 @@ -81,9 +81,9 @@
  				}
  				
@@ -34,9 +29,9 @@ diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/CSharpBinding/CSharpBin
  						runtimeStarter, directory, exe, args));
  					psi.UseShellExecute = false;
  				//} else {
-diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/ILAsmBinding/ILAsmExecutionManager.cs /tmp/dpep.e26u1W/monodevelop-0.5.1/src/AddIns/BackendBindings/ILAsmBinding/ILAsmExecutionManager.cs
---- monodevelop-0.5.1/src/AddIns/BackendBindings/ILAsmBinding/ILAsmExecutionManager.cs	2004-10-09 17:26:59.000000000 +0200
-+++ /tmp/dpep.e26u1W/monodevelop-0.5.1/src/AddIns/BackendBindings/ILAsmBinding/ILAsmExecutionManager.cs	2004-10-09 17:42:38.000000000 +0200
+diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/ILAsmBinding/ILAsmExecutionManager.cs /tmp/dpep.lPf036/monodevelop-0.5.1/src/AddIns/BackendBindings/ILAsmBinding/ILAsmExecutionManager.cs
+--- monodevelop-0.5.1/src/AddIns/BackendBindings/ILAsmBinding/ILAsmExecutionManager.cs	2004-06-27 06:52:07.000000000 +0200
++++ /tmp/dpep.lPf036/monodevelop-0.5.1/src/AddIns/BackendBindings/ILAsmBinding/ILAsmExecutionManager.cs	2004-12-05 21:14:50.000000000 +0100
 @@ -45,9 +45,9 @@
  			FileUtilityService fileUtilityService = (FileUtilityService)ServiceManager.GetService(typeof(FileUtilityService));
  			
@@ -49,9 +44,9 @@ diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/ILAsmBinding/ILAsmExecu
  			psi.WorkingDirectory = Path.GetDirectoryName (exe);
  			psi.UseShellExecute  = false;
  			Process p = Process.Start (psi);
-diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/JavaBinding/JavaBindingExecutionServices.cs /tmp/dpep.e26u1W/monodevelop-0.5.1/src/AddIns/BackendBindings/JavaBinding/JavaBindingExecutionServices.cs
---- monodevelop-0.5.1/src/AddIns/BackendBindings/JavaBinding/JavaBindingExecutionServices.cs	2004-10-09 17:26:59.000000000 +0200
-+++ /tmp/dpep.e26u1W/monodevelop-0.5.1/src/AddIns/BackendBindings/JavaBinding/JavaBindingExecutionServices.cs	2004-10-09 17:43:33.000000000 +0200
+diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/JavaBinding/JavaBindingExecutionServices.cs /tmp/dpep.lPf036/monodevelop-0.5.1/src/AddIns/BackendBindings/JavaBinding/JavaBindingExecutionServices.cs
+--- monodevelop-0.5.1/src/AddIns/BackendBindings/JavaBinding/JavaBindingExecutionServices.cs	2004-07-07 00:36:06.000000000 +0200
++++ /tmp/dpep.lPf036/monodevelop-0.5.1/src/AddIns/BackendBindings/JavaBinding/JavaBindingExecutionServices.cs	2004-12-05 21:14:50.000000000 +0100
 @@ -39,8 +39,8 @@
  				return;
  			}
@@ -63,9 +58,9 @@ diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/JavaBinding/JavaBinding
  
              try
              {
-diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/NemerleBinding/NemerleBindingExecutionServices.cs.in /tmp/dpep.e26u1W/monodevelop-0.5.1/src/AddIns/BackendBindings/NemerleBinding/NemerleBindingExecutionServices.cs.in
+diff -urNad monodevelop-0.5.1/src/AddIns/BackendBindings/NemerleBinding/NemerleBindingExecutionServices.cs.in /tmp/dpep.lPf036/monodevelop-0.5.1/src/AddIns/BackendBindings/NemerleBinding/NemerleBindingExecutionServices.cs.in
 --- monodevelop-0.5.1/src/AddIns/BackendBindings/NemerleBinding/NemerleBindingExecutionServices.cs.in	2004-07-05 21:32:35.000000000 +0200
-+++ /tmp/dpep.e26u1W/monodevelop-0.5.1/src/AddIns/BackendBindings/NemerleBinding/NemerleBindingExecutionServices.cs.in	2004-10-09 17:44:59.000000000 +0200
++++ /tmp/dpep.lPf036/monodevelop-0.5.1/src/AddIns/BackendBindings/NemerleBinding/NemerleBindingExecutionServices.cs.in	2004-12-05 21:14:50.000000000 +0100
 @@ -40,9 +40,9 @@
  			exe += " " + p.OutputAssembly + ".exe " + p.Parameters;
  			
