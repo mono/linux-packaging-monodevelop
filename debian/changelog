@@ -1,0 +1,14 @@
+monodevelop (0.1-0pre2) unstable; urgency=low
+
+  * fixed installation of the doc/ directory
+    (thanks to Nicholas Penree for spotting this)
+
+ -- Mirco 'meebey' Bauer <mail@meebey.net>  Mon, 21 Mar 2004 18:40:45 +0100
+
+monodevelop (0.1-0pre1) unstable; urgency=low
+
+  * Initial Release.
+    (closes: Bug#238126)
+
+ -- Mirco 'meebey' Bauer <mail@meebey.net>  Mon, 15 Mar 2004 18:41:55 +0100
+

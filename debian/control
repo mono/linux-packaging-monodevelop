@@ -1,0 +1,14 @@
+Source: monodevelop
+Section: devel
+Priority: optional
+Maintainer: Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>
+Uploaders: Mirco 'meebey' Bauer <mail@meebey.net>
+Build-Depends: debhelper (>= 4.0.0), mono-mcs (>= 0.30) | c-sharp-compiler, gtk-sharp (>= 0.17), libgtksourceview1.0-0 (>= 0.7), gtksourceview-sharp (>= 0.1), mozilla-dev
+Standards-Version: 3.6.0
+
+Package: monodevelop
+Architecture: any
+Depends: ${shlibs:Depends}, mono-jit (>= 0.30) | cli-virtual-machine, libgnomecanvas2-0 (>= 2.4.0), libgnomevfs2-0 (>= 2.4.1), gtk-sharp (>= 0.17), gtk-sharp (<< 0.18), gnome-sharp (>= 0.17), gnome-sharp (<< 0.18), glib-sharp (>= 0.17), glib-sharp (<< 0.18), gtksourceview-sharp (>= 0.1)
+Description: A C# Development Environment
+ MonoDevelop is a project to port SharpDevelop to GTK#.
+ It's a C# IDE.

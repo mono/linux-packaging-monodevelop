@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+config.status: configure
+	dh_testdir
+	./configure --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
+
+build: build-stamp
+build-stamp:  config.status
+	dh_testdir
+	$(MAKE)
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp 
+	-$(MAKE) distclean
+	dh_clean 
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k 
+	dh_installdirs
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+
+binary-arch: build install
+	dh_testdir -s
+	dh_testroot -s
+	dh_movefiles -s
+	dh_link -s
+	dh_install -s
+	perl -pe ' \
+	  s,/usr/lib/monodevelop/bin,/usr/share/dotnet/monodevelop/bin,; \
+	  s,mono ,LD_LIBRARY_PATH=/usr/lib/monodevelop:\$$LD_LIBRARY_PATH MONO_PATH=/usr/share/dotnet/lib /usr/bin/cli ,; \
+	  s, --debug,,; \
+	  ' -i $(CURDIR)/debian/monodevelop/usr/bin/monodevelop
+	chmod +x $(CURDIR)/debian/monodevelop/usr/share/dotnet/monodevelop/bin/MonoDevelop.exe
+	chmod -x $(CURDIR)/debian/monodevelop/usr/share/pixmaps/monodevelop.png
+	dh_installchangelogs -s
+	dh_installdocs -s
+	dh_installexamples -s
+	dh_installmenu -s
+#	dh_installdebconf -s
+#	dh_installinfo -s
+#	dh_undocumented -s
+	dh_installman -s
+	dh_strip -s
+	dh_compress -s
+	dh_fixperms -s
+	dh_installdeb -s
+	dh_shlibdeps -s
+	dh_gencontrol -s
+	dh_md5sums -s
+	dh_builddeb -s
+
+binary: binary-arch
+.PHONY: build clean binary-arch binary install 
