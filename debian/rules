@@ -3,9 +3,11 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-config.status: configure
+configure: configure-stamp
+configure-stamp:
 	dh_testdir
 	./configure --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
+	touch configure-stamp
 
 build: build-stamp
 build-stamp:  config.status
