@@ -1,3 +1,10 @@
+monodevelop (0.3-0pre1) unstable; urgency=low
+
+  * New upstream release
+  * Updated package long description
+
+ -- Mirco 'meebey' Bauer <mail@meebey.net>  Wed, 25 May 2004 21:05:55 +0200
+
 monodevelop (0.2-0pre1) unstable; urgency=low
 
   * New upstream release
