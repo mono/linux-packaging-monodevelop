@@ -37,8 +37,8 @@ install: build
 	dh_clean -k 
 	dh_installdirs
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
-	-find $(CURDIR)/debian -follow -type f -name "*.exe" -exec chmod +x {} \;
-	-find $(CURDIR)/debian -follow -type f -name "*.dll" -exec chmod -x {} \;
+	-cd $(CURDIR)/debian && find -type f -name "*.exe" -exec chmod +x {} \;
+	-cd $(CURDIR)/debian && find -type f -name "*.dll" -exec chmod -x {} \;
 
 binary-arch: build install
 	dh_testdir -s
