@@ -62,8 +62,6 @@ binary-arch: build install
 	dh_strip -s
 	dh_compress -s
 	dh_fixperms -s
-	dh_makeshlibs -s
-	dh_makenetlibs -s -r
 	dh_installdeb -s
 	dh_shlibdeps -s
 	dh_netdeps -s -d
