@@ -26,6 +26,7 @@ clean:
 	rm -f configure-stamp
 	rm -f build-stamp
 	-$(MAKE) distclean
+	rm -rf $(CURDIR)/.wapi
 	dh_clean 
 
 install: build
