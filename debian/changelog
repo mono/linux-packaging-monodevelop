@@ -1,10 +1,12 @@
-monodevelop (0.5-3) unstable; urgency=low
+monodevelop (0.5.1-1) unstable; urgency=high
 
   * NOT RELEASED YET
+  * New upstream release
+    + FTBFS fixed (Closes: #270026)
   * Mirco 'meebey' Bauer
     + fixed xterm dependency
 
- -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Thu, 19 Aug 2004 15:24:25 +0200
+ -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Thu, 09 Oct 2004 17:20:13 +0200
 
 monodevelop (0.5-2) unstable; urgency=low
 
