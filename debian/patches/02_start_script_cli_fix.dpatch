@@ -1,0 +1,65 @@
+#! /bin/sh -e
+## 02_start_script_cli_fix.dpatch by  <meebey@redbull.qnetp.net>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+if [ $# -lt 1 ]; then
+    echo "`basename $0`: script expects -patch|-unpatch as argument" >&2
+    exit 1
+fi
+
+[ -f debian/patches/00patch-opts ] && . debian/patches/00patch-opts
+patch_opts="${patch_opts:--f --no-backup-if-mismatch} ${2:+-d $2}"
+
+case "$1" in
+    -patch) patch -p1 ${patch_opts} < $0;;
+    -unpatch) patch -R -p1 ${patch_opts} < $0;;
+    *)
+        echo "`basename $0`: script expects -patch|-unpatch as argument" >&2
+        exit 1;;
+esac
+
+exit 0
+
+@DPATCH@
+diff -urNad /home/meebey/data/projects/debian/pkg-mono/monodevelop/monodevelop-0.5/monodevelop.in monodevelop-0.5/monodevelop.in
+--- /home/meebey/data/projects/debian/pkg-mono/monodevelop/monodevelop-0.5/monodevelop.in	2004-06-27 06:03:48.000000000 +0200
++++ monodevelop-0.5/monodevelop.in	2004-08-08 16:10:33.000000000 +0200
+@@ -27,7 +27,7 @@
+ 	exit 1
+ fi
+  
+-MD_BIN_PATH=@prefix@/lib/monodevelop/bin
++MD_BIN_PATH=/usr/share/dotnet/monodevelop/bin
+ 
+ if [ -n $LD_LIBRARY_PATH ]; then
+ 	export LD_LIBRARY_PATH=$MOZILLA_HOME:$MD_BIN_PATH:$LD_LIBRARY_PATH
+@@ -48,21 +48,23 @@
+ 
+ cd $MD_BIN_PATH
+ 
++export LD_LIBRARY_PATH=/usr/lib/monodevelop:$LD_LIBRARY_PATH
++RUNTIME=/usr/bin/cli
+ case x$1 in
+     x--profile)
+-    mono --profile ./MonoDevelop.exe $@
++    $RUNTIME --profile ./MonoDevelop.exe $@
+ 	exit 0
+     ;;
+     x--debug)
+-    mono --debug ./MonoDevelop.exe $@
++    $RUNTIME --debug ./MonoDevelop.exe $@
+ 	exit 0
+     ;;
+ 	x--trace)
+-    mono --trace ./MonoDevelop.exe $@
++    $RUNTIME --trace ./MonoDevelop.exe $@
+ 	exit 0;
+ 	;;
+ esac
+ 
+ # should not use --debug when we are more stable
+-mono --debug ./MonoDevelop.exe $@
++$RUNTIME --debug ./MonoDevelop.exe $@
+ 
