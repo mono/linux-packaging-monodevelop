@@ -1,8 +1,8 @@
-monodevelop (0.2-1) unstable; urgency=low
+monodevelop (0.2-0pre1) unstable; urgency=low
 
-  * New upstream release (to upload to Debian, closes: #238126)
+  * New upstream release
 
- -- Eduard Bloch <blade@debian.org>  Tue,  6 Apr 2004 00:02:07 +0200
+ -- Mirco 'meebey' Bauer <mail@meebey.net>  Sat, 17 Apr 2004 00:17:05 +0200
 
 monodevelop (0.1-0pre2) unstable; urgency=low
 
