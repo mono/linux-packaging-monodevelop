@@ -3,7 +3,7 @@ Section: devel
 Priority: optional
 Maintainer: Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>
 Uploaders: Mirco 'meebey' Bauer <mail@meebey.net>
-Build-Depends: debhelper (>= 4.0.0), mono-mcs (>= 0.91) | c-sharp-compiler, libgtksourceview-dev (>= 0.7), libgnomevfs2-dev (>= 2.4.1), mozilla-dev, gtk-sharp (>= 0.91), gtk-sharp (<< 0.92), gtksourceview-sharp (>= 0.2)
+Build-Depends: debhelper (>= 4.0.0), mono-mcs (>= 0.91) | c-sharp-compiler, libgtksourceview-dev (>= 0.7), libgnomevfs2-dev (>= 2.0), liborbit2-dev (>= 2.8.3), mozilla-dev, gtk-sharp (>= 0.91), gtk-sharp (<< 0.92), gtksourceview-sharp (>= 0.2)
 Standards-Version: 3.6.0
 
 Package: monodevelop
