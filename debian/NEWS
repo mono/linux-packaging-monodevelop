@@ -2,7 +2,7 @@ monodevelop (0.4-1) unstable; urgency=low
 
   * there is a known problem with MonoDevelop 0.4:
     MonoDevelop crashes when the GUI appears, shortly after the splash screen
-    on startup. The most likely the problem is the window manager that
+    on startup. The problem is most likely caused by a window manager that
     confuses Gdk (eg. IceWM). The problem needs further investigation.
 
   * this release of MonoDevelop has a new code completion database, and it
