@@ -1,0 +1,19 @@
+monodevelop (0.4-1) unstable; urgency=low
+
+  * there is a known problem with MonoDevelop 0.4:
+    MonoDevelop crashes when the GUI appears, shortly after the splash screen
+    on startup. The most likely the problem is the window manager that
+    confuses Gdk (eg. IceWM). The problem needs further investigation.
+
+  * this release of MonoDevelop has a new code completion database, and it
+    breaks old project files.
+    To fix this read the following release notes:
+    ...
+    In order to work properly with the GAC, when loading an old project for
+    the first time under MonoDevelop 0.4, you will have to remove and readd
+    all of your references. Until you do so, many pieces of MonoDevelop wil
+    not function correctly.
+    ...
+  * Full release notes: http://www.monodevelop.com/release_notes/0.4.html
+
+ -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Sat, 19 Jun 2004  17:12:04 +0200
