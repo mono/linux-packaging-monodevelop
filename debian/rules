@@ -13,7 +13,6 @@ configure-stamp: patch
 	  s,update-mime-database \$$\(gnome_data\)/mime,# update-mime-database \$$\(gnome_data\)/mime,; \
 	  ' -i $(CURDIR)/Makefile.in
 	./configure --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
-	grep xterm $(CURDIR)/src/AddIns/BackendBindings -rl | xargs perl -pe 's,xterm,x-terminal-emulator,g' -i 
 	touch configure-stamp
 
 build: build-stamp
@@ -46,11 +45,6 @@ binary-arch: build install
 	dh_movefiles -s
 	dh_link -s
 	dh_install -s
-	perl -pe ' \
-	  s,/usr/lib/monodevelop/bin,/usr/share/dotnet/monodevelop/bin,; \
-	  s,mono ,LD_LIBRARY_PATH=/usr/lib/monodevelop:\$$LD_LIBRARY_PATH MONO_PATH=/usr/share/dotnet/lib /usr/bin/cli ,; \
-	  s, --debug,,; \
-	  ' -i $(CURDIR)/debian/monodevelop/usr/bin/monodevelop
 	chmod -x $(CURDIR)/debian/monodevelop/usr/share/pixmaps/monodevelop.png
 	cp $(CURDIR)/ChangeLog $(CURDIR)/changelog
 	dh_installchangelogs -s
