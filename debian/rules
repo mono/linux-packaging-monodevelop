@@ -12,13 +12,13 @@ configure-stamp: patch
 	perl -pe ' \
 	  s,update-mime-database \$$\(gnome_data\)/mime,# update-mime-database \$$\(gnome_data\)/mime,; \
 	  ' -i $(CURDIR)/Makefile.in
-	./configure --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
+	./configure --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info RUNTIME=/usr/bin/cli
 	touch configure-stamp
 
 build: build-stamp
 build-stamp: configure-stamp
 	dh_testdir
-	$(MAKE)
+	$(MAKE) RUNTIME=/usr/bin/cli
 	touch build-stamp
 
 clean: unpatch
@@ -35,7 +35,7 @@ install: build
 	dh_testroot
 	dh_clean -k 
 	dh_installdirs
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp RUNTIME=/usr/bin/cli
 	-cd $(CURDIR)/debian && find -type f -name "*.exe" -exec chmod +x {} \;
 	-cd $(CURDIR)/debian && find -type f -name "*.dll" -exec chmod -x {} \;
 

@@ -1,5 +1,5 @@
 #! /bin/sh -e
-## 02_start_script_cli_fix.dpatch by  <meebey@redbull.qnetp.net>
+## 02_start_script_cli_fix.dpatch by Mirco Bauer <meebey@meebey.net>
 ##
 ## All lines beginning with `## DP:' are a description of the patch.
 ## DP: No description.
@@ -23,9 +23,9 @@ esac
 exit 0
 
 @DPATCH@
-diff -urNad /home/meebey/data/projects/debian/pkg-mono/monodevelop/monodevelop-0.5/monodevelop.in monodevelop-0.5/monodevelop.in
---- /home/meebey/data/projects/debian/pkg-mono/monodevelop/monodevelop-0.5/monodevelop.in	2004-06-27 06:03:48.000000000 +0200
-+++ monodevelop-0.5/monodevelop.in	2004-08-08 16:10:33.000000000 +0200
+diff -urNad monodevelop-0.5.1/monodevelop.in /tmp/dpep.5VzLzM/monodevelop-0.5.1/monodevelop.in
+--- monodevelop-0.5.1/monodevelop.in	2004-10-09 18:27:28.000000000 +0200
++++ /tmp/dpep.5VzLzM/monodevelop-0.5.1/monodevelop.in	2004-10-09 18:42:57.000000000 +0200
 @@ -27,7 +27,7 @@
  	exit 1
  fi
@@ -35,31 +35,12 @@ diff -urNad /home/meebey/data/projects/debian/pkg-mono/monodevelop/monodevelop-0
  
  if [ -n $LD_LIBRARY_PATH ]; then
  	export LD_LIBRARY_PATH=$MOZILLA_HOME:$MD_BIN_PATH:$LD_LIBRARY_PATH
-@@ -48,21 +48,23 @@
+@@ -47,7 +47,7 @@
+ set -- $ARGS
  
  cd $MD_BIN_PATH
- 
+-
 +export LD_LIBRARY_PATH=/usr/lib/monodevelop:$LD_LIBRARY_PATH
-+RUNTIME=/usr/bin/cli
  case x$1 in
-     x--profile)
--    mono --profile ./MonoDevelop.exe $@
-+    $RUNTIME --profile ./MonoDevelop.exe $@
- 	exit 0
-     ;;
-     x--debug)
--    mono --debug ./MonoDevelop.exe $@
-+    $RUNTIME --debug ./MonoDevelop.exe $@
- 	exit 0
-     ;;
- 	x--trace)
--    mono --trace ./MonoDevelop.exe $@
-+    $RUNTIME --trace ./MonoDevelop.exe $@
- 	exit 0;
- 	;;
- esac
- 
- # should not use --debug when we are more stable
--mono --debug ./MonoDevelop.exe $@
-+$RUNTIME --debug ./MonoDevelop.exe $@
- 
+ 	x--profile)
+ 		@RUNTIME@ --profile ./MonoDevelop.exe $@

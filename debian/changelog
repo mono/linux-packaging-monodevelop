@@ -2,9 +2,11 @@ monodevelop (0.5.1-1) unstable; urgency=high
 
   * NOT RELEASED YET
   * New upstream release
-    + FTBFS fixed (Closes: #270026)
+    + FTBFS fixed, thus urgency set to high (Closes: #270026)
   * Mirco 'meebey' Bauer
     + fixed xterm dependency
+    + added RUNTIME variable to debian/rules calls
+    + updated 01_spawn_xterm_fix and 02_start_script_cli_fix for this release
 
  -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Thu, 09 Oct 2004 17:20:13 +0200
 
