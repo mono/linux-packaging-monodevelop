@@ -1,6 +1,5 @@
 monodevelop (0.5.1-1) unstable; urgency=high
 
-  * NOT RELEASED YET
   * New upstream release
     + FTBFS fixed, thus urgency set to high (Closes: #270026)
   * Mirco 'meebey' Bauer
