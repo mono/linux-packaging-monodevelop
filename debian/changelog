@@ -1,7 +1,8 @@
-monodevelop (0.4-0pre1) unstable; urgency=low
+monodevelop (0.4-0pre1v1) unstable; urgency=low
 
   * NOT RELEASED YET
     + new upstream release
+    + dependency tunning
 
  -- Debian Mono Groupr <pkg-mono-group@lists.alioth.debian.org>  Tue, 8 Jun 2004 10:08:15 +0200
 
