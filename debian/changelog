@@ -1,3 +1,11 @@
+monodevelop (0.5-2) unstable; urgency=low
+
+  * NOT RELEASED YET
+  * Mirco 'meebey' Bauer
+    + added pkg-config dependency (Closes: #262491)
+
+ -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Sat, 03 Jul 2004 16:34:14 +0200
+
 monodevelop (0.5-1) unstable; urgency=low
 
   * New upstream release

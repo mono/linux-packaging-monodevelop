@@ -8,7 +8,7 @@ Standards-Version: 3.6.1
 
 Package: monodevelop
 Architecture: any
-Depends: ${net:Depends}, ${shlibs:Depends}, xterm | x-terminal-emulator, mono-mcs, monodoc-manual, gnome-icon-theme (>= 1.1.3)
+Depends: ${net:Depends}, ${shlibs:Depends}, xterm | x-terminal-emulator, mono-mcs, monodoc-manual, pkg-config, gnome-icon-theme (>= 1.1.3)
 Provides: monodoc-viewer
 Description: C#/Java/Nermele/ILasm Development Environment
  MonoDevelop is a GNOME IDE primarily designed for C# and other .NET
