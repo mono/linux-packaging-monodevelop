@@ -1,6 +1,5 @@
 monodevelop (0.5-2) unstable; urgency=low
 
-  * NOT RELEASED YET
   * Mono BSP
   * Mirco 'meebey' Bauer
     + added pkg-config dependency (Closes: #262491)
