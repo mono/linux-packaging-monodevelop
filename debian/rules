@@ -2,10 +2,15 @@
 
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
+export MONO_SHARED_DIR=$(CURDIR)
 
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
+	perl -pe ' \
+	  s,ENABLE_XDGMIME_FALSE = @ENABLE_XDGMIME_FALSE@,ENABLE_XDGMIME_FALSE =,; \
+	  s,ENABLE_XDGMIME_TRUE = @ENABLE_XDGMIME_TRUE@,ENABLE_XDGMIME_TRUE = #,; \
+	  ' -i $(CURDIR)/Makefile.in
 	./configure --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
 	touch configure-stamp
 
@@ -56,8 +61,11 @@ binary-arch: build install
 	dh_strip -s
 	dh_compress -s
 	dh_fixperms -s
+	dh_makeshlib -s
+	dh_makenetlib -r
 	dh_installdeb -s
 	dh_shlibdeps -s
+	dh_netdeps
 	dh_gencontrol -s
 	dh_md5sums -s
 	dh_builddeb -s
