@@ -1,8 +1,11 @@
 monodevelop (0.5-0pre1v1) unstable; urgency=low
 
+  * NOT RELEASED YET
+  * New upstream release
   * Mirco 'meebey' Bauer
     + FTBFS: added libmono-dev to Build-Depends
     + added mono-mcs dependency (Closes: #255429)
+    + updated Build-Deps for 0.5 release
   * Eduard Bloch
     + added x-terminal-emulator dependency (plus patching the source to run
       "x-terminal-emulator")
