@@ -1,4 +1,4 @@
-monodevelop (0.4-0pre1v1) unstable; urgency=low
+monodevelop (0.4-0pre1v5) unstable; urgency=low
 
   * NOT RELEASED YET
   * Mirco 'meebey' Bauer
@@ -7,7 +7,6 @@ monodevelop (0.4-0pre1v1) unstable; urgency=low
     + now using dh_makenetlib and dh_netdeps
   * Eduard Bloch
     + dependency tuning
-  FIXME: add dbgen.exe!
 
  -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Tue, 8 Jun 2004 10:08:15 +0200
 
