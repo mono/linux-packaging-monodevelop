@@ -2,6 +2,7 @@ monodevelop (0.4-2) unstable; urgency=low
 
   * Mirco 'meebey' Bauer
     + FTBFS: added libmono-dev to Build-Depends
+    + added mono-mcs dependency (Closes: #255429)
 
  -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Sat, 19 Jun 2004  04:15:18 +0200
 
