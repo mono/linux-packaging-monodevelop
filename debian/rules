@@ -7,9 +7,9 @@ export MONO_SHARED_DIR=$(CURDIR)
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
+	# piece of crap
 	perl -pe ' \
-	  s,ENABLE_XDGMIME_FALSE = @ENABLE_XDGMIME_FALSE@,ENABLE_XDGMIME_FALSE =,; \
-	  s,ENABLE_XDGMIME_TRUE = @ENABLE_XDGMIME_TRUE@,ENABLE_XDGMIME_TRUE = #,; \
+	  s,update-mime-database \$$\(gnome_data\)/mime,# update-mime-database \$$\(gnome_data\)/mime,; \
 	  ' -i $(CURDIR)/Makefile.in
 	./configure --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
 	touch configure-stamp
