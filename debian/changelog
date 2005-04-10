@@ -1,9 +1,13 @@
 monodevelop (0.6-0pre1) experimental; urgency=low
 
    * New upstream release
+    + Edit->Undo problems are solved (Closes: #258265)
+    + "Xlib: unexpected async reply" problems solved (Closes: #297469)
+    + Dialog's OK buttons didn't do anything solved (Closes: #300528)
    * Mirco 'meebey' Bauer
     + fixed typo in description. (Closes: #295692)
     + /usr/share/dotnet to /usr/lib transition
+    + added hack to get around update-mime-db in debian/rules
 
  -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Sun, 10 Apr 2005 17:11:31 +0200
 
