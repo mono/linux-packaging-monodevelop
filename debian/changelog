@@ -1,3 +1,12 @@
+monodevelop (0.6-0pre1) experimental; urgency=low
+
+   * New upstream release
+   * Mirco 'meebey' Bauer
+    + fixed typo in description. (Closes: #295692)
+    + /usr/share/dotnet to /usr/lib transition
+
+ -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Sun, 10 Apr 2005 17:11:31 +0200
+
 monodevelop (0.5.1-2) unstable; urgency=low
 
   * Mirco 'meebey' Bauer

@@ -8,11 +8,14 @@ include /usr/share/dpatch/dpatch.make
 configure: configure-stamp
 configure-stamp: patch
 	dh_testdir
-	# piece of crap
+	./configure --prefix=/usr \
+	  --mandir=\$${prefix}/share/man \
+	  --infodir=\$${prefix}/share/info \
+	  --disable-update-mimedb \
+	  RUNTIME=/usr/bin/cli
 	perl -pe ' \
-	  s,update-mime-database \$$\(gnome_data\)/mime,# update-mime-database \$$\(gnome_data\)/mime,; \
-	  ' -i $(CURDIR)/Makefile.in
-	./configure --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info RUNTIME=/usr/bin/cli
+	  s,\$$\(UPDATE_MIME_DB\),/bin/true,; \
+	  ' -i Makefile
 	touch configure-stamp
 
 build: build-stamp
@@ -57,7 +60,7 @@ binary-arch: build install
 	dh_fixperms -s
 	dh_installdeb -s
 	dh_shlibdeps -s
-	dh_netdeps -s -d
+	dh_clideps -s -d
 	dh_gencontrol -s
 	dh_md5sums -s
 	dh_builddeb -s
