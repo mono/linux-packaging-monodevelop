@@ -1,4 +1,4 @@
-monodevelop (0.6-0pre1) experimental; urgency=low
+monodevelop (0.6-1) experimental; urgency=low
 
    * New upstream release
     + Edit->Undo problems are solved (Closes: #258265)
@@ -7,9 +7,12 @@ monodevelop (0.6-0pre1) experimental; urgency=low
    * Mirco 'meebey' Bauer
     + fixed typo in description. (Closes: #295692)
     + /usr/share/dotnet to /usr/lib transition
+    + added build-dep for cli-common.
     + added hack to get around update-mime-db in debian/rules
+    + changed Maintainer to myself, this package is not in the scope of the
+      Debian Mono Group.
 
- -- Debian Mono Group <pkg-mono-group@lists.alioth.debian.org>  Sun, 10 Apr 2005 17:11:31 +0200
+ -- Mirco Bauer <meebey@meebey.net>  Sat, 23 Apr 2005 13:16:39 +0200
 
 monodevelop (0.5.1-2) unstable; urgency=low
 

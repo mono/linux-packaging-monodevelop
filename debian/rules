@@ -11,7 +11,7 @@ configure-stamp: patch
 	./configure --prefix=/usr \
 	  --mandir=\$${prefix}/share/man \
 	  --infodir=\$${prefix}/share/info \
-	  --disable-update-mimedb \
+	  --disable-update-mimedb
 	  RUNTIME=/usr/bin/cli
 	perl -pe ' \
 	  s,\$$\(UPDATE_MIME_DB\),/bin/true,; \
