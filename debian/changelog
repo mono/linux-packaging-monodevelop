@@ -4,10 +4,12 @@ monodevelop (0.6-1) experimental; urgency=low
     + Edit->Undo problems are solved (Closes: #258265)
     + "Xlib: unexpected async reply" problems solved (Closes: #297469)
     + Dialog's OK buttons didn't do anything solved (Closes: #300528)
+    + Provides now own monodevelop.desktop (Closes: #307676)
    * Mirco 'meebey' Bauer
     + fixed typo in description. (Closes: #295692)
     + /usr/share/dotnet to /usr/lib transition
     + added build-dep for cli-common.
+    + removed build-dep for mono-utils.
     + added hack to get around update-mime-db in debian/rules
     + changed Maintainer to myself, this package is not in the scope of the
       Debian Mono Group.
