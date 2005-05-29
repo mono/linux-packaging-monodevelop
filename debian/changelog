@@ -1,12 +1,13 @@
-monodevelop (0.7-0pre1) experimental; urgency=low
+monodevelop (0.7-1) unstable; urgency=low
 
-   * NOT RELEASED YET
    * new upstream release
    * updated mono-mcs build-dep to >= 1.1.2 (Closes: #310117)
    * updated Gtk#2 buil-dep to >= 1.9.5
    * debian/rules:
      + removed update-mime-db hack
      + added --disable-update-desktopdb to ./configure call
+   * debian/control:
+     + changed arch to all, MonoDevelop is 100% C# code now
 
  -- Mirco Bauer <meebey@meebey.net>  Fri, 20 May 2005 17:12:38 +0200
 

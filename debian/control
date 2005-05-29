@@ -7,8 +7,8 @@ Build-Depends: debhelper (>= 4.0.0), cli-common (>= 0.1.3), dpatch, mono-mcs (>=
 Standards-Version: 3.6.1
 
 Package: monodevelop
-Architecture: any
-Depends:  xterm | x-terminal-emulator, mono-mcs, monodoc-manual, pkg-config, gnome-icon-theme (>= 1.1.3), ${cli:Depends}, ${shlibs:Depends}
+Architecture: all
+Depends: mono-mcs, monodoc-manual, pkg-config, gnome-icon-theme (>= 1.1.3), xterm | x-terminal-emulator, ${cli:Depends}, ${shlibs:Depends}
 Provides: monodoc-viewer
 Description: C#/Java/Nemerle/ILasm Development Environment
  MonoDevelop is a GNOME IDE primarily designed for C# and other .NET
