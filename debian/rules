@@ -41,28 +41,28 @@ install: build
 	-cd $(CURDIR)/debian && find -type f -name "*.exe" -exec chmod +x {} \;
 	-cd $(CURDIR)/debian && find -type f -name "*.dll" -exec chmod -x {} \;
 
-binary-arch: build install
-	dh_testdir -s
-	dh_testroot -s
-	dh_movefiles -s
-	dh_link -s
-	dh_install -s
+binary-indep: build install
+	dh_testdir -i
+	dh_testroot -i
+	dh_movefiles -i
+	dh_link -i
+	dh_install -i
 	chmod -x $(CURDIR)/debian/monodevelop/usr/share/pixmaps/monodevelop.png
 	cp $(CURDIR)/ChangeLog $(CURDIR)/changelog
-	dh_installchangelogs -s
-	dh_installdocs -s
-	dh_installexamples -s
-	dh_installmenu -s
-	dh_installman -s
-	dh_strip -s
-	dh_compress -s
-	dh_fixperms -s
-	dh_installdeb -s
-	dh_shlibdeps -s
-	dh_clideps -s -d
-	dh_gencontrol -s
-	dh_md5sums -s
-	dh_builddeb -s
+	dh_installchangelogs -i
+	dh_installdocs -i
+	dh_installexamples -i
+	dh_installmenu -i
+	dh_installman -i
+	dh_strip -i
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_shlibdeps -i
+	dh_clideps -i -d
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
 
-binary: binary-arch
-.PHONY: build clean binary-arch binary install 
+binary: binary-indep
+.PHONY: build clean binary-indep binary install 
