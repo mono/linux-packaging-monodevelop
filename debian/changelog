@@ -1,3 +1,10 @@
+monodevelop (0.7-2) unstable; urgency=low
+
+   * NOT RELEASED YET
+   * created 01_fix_startup_script.dpatch to fix bashism (Closes: #311672).
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 29 May 2005 20:17:47 +0200
+
 monodevelop (0.7-1) unstable; urgency=low
 
    * upload to unstable
