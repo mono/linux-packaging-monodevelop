@@ -26,12 +26,3 @@ Description: Boo plugin for MonoDevelop
  languages.
  .
  This package enables boo integration for MonoDevelop.
-
-Package: monodevelop-java
-Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${cli:Depends}, monodevelop (= ${Source-Version}), ikvm (>= 0.10)
-Description: Java plugin for MonoDevelop
- MonoDevelop is a GNOME IDE primarily designed for C# and other .NET
- languages.
- .
- This package enables Java integration for MonoDevelop.
