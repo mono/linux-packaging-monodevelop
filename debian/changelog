@@ -1,9 +1,23 @@
 monodevelop (0.7-2) unstable; urgency=low
 
-   * NOT RELEASED YET
-   * created 01_fix_startup_script.dpatch to fix bashism (Closes: #311672).
+   * Created 01_fix_startup_script.dpatch to fix bashism (Closes: #311672).
+   * Enabled Boo and Java support (Closes: #311730).
+   * Created monodevelop-boo and monodevelop-java package.
+     (building monodevelop-java package is disabled though, the integration
+      is currently buggy in 0.7)
+   * debian/control:
+     + Removed libmono-dev, libglade2-dev, libgnome2-dev, libgtksourceview-dev,
+       libgnomevfs2-dev and liborbit2-dev from build-deps. They are not
+       required anymore because monodevelop uses the C# bindings now.
+     + Removed "Uploaders" field, it's optional.
+     + Added boo and ikvm to build-deps.
+     + Added ${misc:Depends} to "Depends".
+   * debian/rules:
+     + Added --enable-boo and --enable-ikvm to configure call.
+     + Added dh_installmime and dh_desktop call.
+     + Removed all "-i" from dh_* calls, whole package is arch indep.
 
- -- Mirco Bauer <meebey@meebey.net>  Sun, 29 May 2005 20:17:47 +0200
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 19 Jun 2005 16:27:59 +0200
 
 monodevelop (0.7-1) unstable; urgency=low
 

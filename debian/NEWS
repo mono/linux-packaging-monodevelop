@@ -1,3 +1,21 @@
+monodevelop (0.7-2) unstable; urgency=low
+
+  * The 0.7 release of MonoDevelop has some major changes:
+  * MonoDevelop uses now a different project file format (.mdp instead of
+    .cmbx), it will convert your old project files automatic when you open them.
+  * It uses Gtk#2 (1.9.x) now, means you can also develop Gtk#2 projects now.
+    But Gtk#1 projects will _not_ work anymore, problem is that Gtk#2 (by
+    MonoDevelop) and Gtk#1 (by your project) can't be loaded at the same time!
+    If you try this, MonoDevelop will just crash, so please update your project
+    to use Gtk#2.
+  * The source code of MonoDevelop is 100% C# now, means the package will
+    now run on all Mono architectures (x86, ppc, amd64).
+  * The configuration files of MonoDevelop are not backwards compatible, it
+    may happen that MonoDevelop just crashes on starup! Please delete
+    ~/.config/MonoDevelop if that happens and try again.
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 10 Jul 2005  22:46:40 +0200
+
 monodevelop (0.4-1) unstable; urgency=low
 
   * this release of MonoDevelop has a new code completion database, and it

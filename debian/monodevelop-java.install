@@ -1,0 +1,4 @@
+debian/tmp/usr/lib/monodevelop/AddIns/BackendBindings/Java*
+debian/tmp/usr/lib/monodevelop/AddIns/BackendBindings/templates/Java*
+debian/tmp/usr/lib/monodevelop/AddIns/BackendBindings/templates/EmptyJava*
+debian/tmp/usr/lib/monodevelop/AddIns/BackendBindings/templates/Ikvm*

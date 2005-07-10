@@ -1,8 +1,0 @@
-debian/tmp/usr/bin/monodevelop
-debian/tmp/usr/share/locale
-debian/tmp/usr/share/mime/packages/monodevelop.xml
-debian/tmp/usr/share/applications/monodevelop.desktop
-debian/tmp/usr/share/pixmaps/monodevelop.png
-debian/tmp/usr/lib/monodevelop/bin/
-debian/tmp/usr/lib/monodevelop/AddIns/
-debian/tmp/usr/lib/monodevelop/data/

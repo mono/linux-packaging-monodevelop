@@ -12,7 +12,7 @@ configure-stamp: patch
 	  --mandir=\$${prefix}/share/man \
 	  --infodir=\$${prefix}/share/info \
 	  --disable-update-mimedb --disable-update-desktopdb \
-	  RUNTIME=/usr/bin/cli
+	  --enable-boo --enable-java
 	# debugger is not ready yet, needs mono from SVN
 	#  --enable-debugger
 	touch configure-stamp
@@ -37,32 +37,42 @@ install: build
 	dh_testroot
 	dh_clean -k 
 	dh_installdirs
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp RUNTIME=/usr/bin/cli
-	-cd $(CURDIR)/debian && find -type f -name "*.exe" -exec chmod +x {} \;
-	-cd $(CURDIR)/debian && find -type f -name "*.dll" -exec chmod -x {} \;
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	-cd $(CURDIR)/debian && find -type f -name "*.exe" | xargs chmod +x
+	-cd $(CURDIR)/debian && find -type f -name "*.dll" | xargs chmod -x
+	chmod -x debian/tmp/usr/share/pixmaps/monodevelop.png
 
 binary-indep: build install
-	dh_testdir -i
-	dh_testroot -i
-	dh_movefiles -i
-	dh_link -i
-	dh_install -i
-	chmod -x $(CURDIR)/debian/monodevelop/usr/share/pixmaps/monodevelop.png
+	dh_testdir
+	dh_testroot
+	dh_link
+	dh_install
+	# remove boo files (shipped in monodevelop-boo)
+	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/Boo*
+	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/Boo*
+	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/EmptyBoo*
+	# remove java files (shipped in monodevelop-java)
+	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/Java*
+	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/Java*
+	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/EmptyJava*
+	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/Ikvm*
 	cp $(CURDIR)/ChangeLog $(CURDIR)/changelog
-	dh_installchangelogs -i
-	dh_installdocs -i
-	dh_installexamples -i
-	dh_installmenu -i
-	dh_installman -i
-	dh_strip -i
-	dh_compress -i
-	dh_fixperms -i
-	dh_installdeb -i
-	dh_shlibdeps -i
-	dh_clideps -i -d
-	dh_gencontrol -i
-	dh_md5sums -i
-	dh_builddeb -i
+	dh_installchangelogs
+	dh_installdocs
+	dh_installexamples
+	dh_installmenu
+	dh_installman
+	dh_installmime
+	dh_desktop
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_clideps -d
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb -Nmonodevelop-java
 
 binary: binary-indep
 .PHONY: build clean binary-indep binary install 
