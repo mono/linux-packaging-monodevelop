@@ -5,6 +5,8 @@ monodevelop (0.7-2) unstable; urgency=low
    * Created monodevelop-boo and monodevelop-java package.
      (building monodevelop-java package is disabled though, the integration
       is currently buggy in 0.7)
+   * debian/NEWS:
+     + Updated for 0.4 -> 0.7 problems/news, please read!
    * debian/control:
      + Removed libmono-dev, libglade2-dev, libgnome2-dev, libgtksourceview-dev,
        libgnomevfs2-dev and liborbit2-dev from build-deps. They are not
