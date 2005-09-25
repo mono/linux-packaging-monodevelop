@@ -1,3 +1,21 @@
+monodevelop (0.7-3) unstable; urgency=low
+
+   * Rebuilt against MonoDoc 1.1.9
+   * Rebuilt against Gtk# 2.3.91
+   * Rebuilt against Boo 0.6.0.1858
+   * Updated versioned build-dep on Gtk# to >= 2.3.91.
+   * Updated versioned build-dep on boo to >= 0.6.0.1858.
+   * Updated versioned build-dep on monodoc-base to >= 1.1.9.
+   * Updated versioned build-dep on cli-common to >= 0.2.0.
+   * Created parsing_mcs_1.1.9_output.dpatch, backport of upstream's SVN r2727.
+   * Added boo_0.6.0_compat.dpatch
+     (thanks to Peter Johanson <latexer@gentoo.org> for the patch)
+   * Really fix bashism, updated 01_fix_startup_script.dpatch
+     (Closes: #311672)
+   * Updated to Standards Version 3.6.2.1 (no changes).
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 25 Sep 2005 19:54:34 +0200
+
 monodevelop (0.7-2) unstable; urgency=low
 
    * Created 01_fix_startup_script.dpatch to fix bashism (Closes: #311672).

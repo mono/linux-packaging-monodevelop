@@ -1,1 +1,4 @@
-01_fix_startup_script
+01_remove_bashism
+parsing_mcs_1.1.9_output
+update_templates_for_gtk_sharp_2.3.x
+boo_0.6.0_compat

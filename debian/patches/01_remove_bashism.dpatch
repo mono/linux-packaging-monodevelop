@@ -5,14 +5,14 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad --exclude=CVS --exclude=.svn ./monodevelop.in /tmp/dpep-work.ieh6GU/monodevelop-0.7/monodevelop.in
---- ./monodevelop.in	2005-05-15 20:54:27.000000000 +0200
-+++ /tmp/dpep-work.ieh6GU/monodevelop-0.7/monodevelop.in	2005-06-08 16:52:51.000000000 +0200
+diff -urNad --exclude=CVS --exclude=.svn ./monodevelop.in /tmp/dpep-work.BbGgsz/monodevelop-0.7/monodevelop.in
+--- ./monodevelop.in	2005-07-29 08:36:55.000000000 +0200
++++ /tmp/dpep-work.BbGgsz/monodevelop-0.7/monodevelop.in	2005-07-29 08:37:17.000000000 +0200
 @@ -1,6 +1,6 @@
  #!/bin/sh
  
 -function reWrite {
-+function reWrite() {
++reWrite() {
      ret=""
      WD=`pwd`
      for arg in $*
