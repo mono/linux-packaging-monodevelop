@@ -1,3 +1,23 @@
+monodevelop (0.8-0pre1) unstable; urgency=low
+
+   * New upstream release
+   * debian/rules:
+     - Enabled NUnit support.
+     - Enabled VersionControl (SVN) support.
+   * debian/control:
+     - Added libnunit-cil (>= 1.1.8) to build-deps.
+     - Added monodevelop-java, monodevelop-nunit and monodevelop-versioncontrol
+       package.
+   * debian/patches/00list:
+     - Removed 01_remove_bashism, parsing_mcs_1.1.9_output,
+       update_templates_for_gtk_sharp_2.3.x and boo_0.6.0_compat, they are
+       already applied upstream.
+     - Added 01_use_real_nunit.
+   * debian/patches/01_use_real_nunit.dpatch:
+     - Created patch to use nunit instead of mono-nunit.
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 16 Oct 2005 21:26:16 +0200
+
 monodevelop (0.7-3) unstable; urgency=low
 
    * Rebuilt against MonoDoc 1.1.9

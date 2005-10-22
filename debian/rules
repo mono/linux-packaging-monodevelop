@@ -12,7 +12,7 @@ configure-stamp: patch
 	  --mandir=\$${prefix}/share/man \
 	  --infodir=\$${prefix}/share/info \
 	  --disable-update-mimedb --disable-update-desktopdb \
-	  --enable-boo --enable-java
+	  --enable-boo --enable-java --enable-nunit --enable-versioncontrol
 	# debugger is not ready yet, needs mono from SVN
 	#  --enable-debugger
 	touch configure-stamp
@@ -56,6 +56,10 @@ binary-indep: build install
 	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/Java*
 	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/EmptyJava*
 	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/Ikvm*
+	# remove nunit files (shipped in monodevelop-nunit)
+	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/NUnit
+	# remove versioncontrol files (shipped in monodevelop-versioncontrol)
+	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/VersionControl
 	cp $(CURDIR)/ChangeLog $(CURDIR)/changelog
 	dh_installchangelogs
 	dh_installdocs
@@ -72,7 +76,7 @@ binary-indep: build install
 	dh_clideps -d
 	dh_gencontrol
 	dh_md5sums
-	dh_builddeb -Nmonodevelop-java
+	dh_builddeb
 
 binary: binary-indep
 .PHONY: build clean binary-indep binary install 
