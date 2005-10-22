@@ -1,4 +1,4 @@
-monodevelop (0.8-0pre1) unstable; urgency=low
+monodevelop (0.8-1) unstable; urgency=low
 
    * New upstream release
    * debian/rules:
