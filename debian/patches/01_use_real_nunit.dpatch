@@ -17,6 +17,7 @@ diff -urNad monodevelop-0.8~/Extras/MonoDeveloperExtensions/Makefile.in monodeve
         $(GTK_SHARP_LIBS) \
         $(GLADE_SHARP_LIBS) \
         $(GCONF_SHARP_LIBS) \
+
 diff -urNad monodevelop-0.8~/Extras/NUnit/Makefile.in monodevelop-0.8/Extras/NUnit/Makefile.in
 --- monodevelop-0.8~/Extras/NUnit/Makefile.in	2005-10-12 18:55:18.000000000 +0200
 +++ monodevelop-0.8/Extras/NUnit/Makefile.in	2005-10-16 22:18:44.000000000 +0200
@@ -30,6 +31,19 @@ diff -urNad monodevelop-0.8~/Extras/NUnit/Makefile.in monodevelop-0.8/Extras/NUn
  	/r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
  	/r:$(top_builddir)/build/bin/MonoDevelop.Base.dll \
  	/r:$(top_builddir)/build/bin/MonoDevelop.Gui.Widgets.dll \
+diff -urNad monodevelop-0.8~/configure.in monodevelop-0.8/configure.in
+--- monodevelop-0.8~/configure.in	2005-10-12 18:52:47.000000000 +0200
++++ monodevelop-0.8/configure.in	2005-10-16 22:18:44.000000000 +0200
+@@ -130,7 +130,7 @@
+ AC_ARG_ENABLE(nunit,
+ 	AC_HELP_STRING([--enable-nunit],
+ 		[enable support for NUnit [default=no]]),
+-		[PKG_CHECK_MODULES(MONO_NUNIT, mono-nunit >= $MONO_NUNIT_REQUIRED_VERSION, enable_nunit=yes, enable_nunit=no)],
++		[PKG_CHECK_MODULES(MONO_NUNIT, nunit >= $MONO_NUNIT_REQUIRED_VERSION, enable_nunit=yes, enable_nunit=no)],
+ 		enable_nunit=no)
+ 
+ AM_CONDITIONAL(ENABLE_NUNIT, test x$enable_nunit = xyes)
+
 diff -urNad monodevelop-0.8~/configure monodevelop-0.8/configure
 --- monodevelop-0.8~/configure	2005-10-12 18:55:21.000000000 +0200
 +++ monodevelop-0.8/configure	2005-10-16 22:18:44.000000000 +0200
@@ -71,15 +85,3 @@ diff -urNad monodevelop-0.8~/configure monodevelop-0.8/configure
  
          fi
  
-diff -urNad monodevelop-0.8~/configure.in monodevelop-0.8/configure.in
---- monodevelop-0.8~/configure.in	2005-10-12 18:52:47.000000000 +0200
-+++ monodevelop-0.8/configure.in	2005-10-16 22:18:44.000000000 +0200
-@@ -130,7 +130,7 @@
- AC_ARG_ENABLE(nunit,
- 	AC_HELP_STRING([--enable-nunit],
- 		[enable support for NUnit [default=no]]),
--		[PKG_CHECK_MODULES(MONO_NUNIT, mono-nunit >= $MONO_NUNIT_REQUIRED_VERSION, enable_nunit=yes, enable_nunit=no)],
-+		[PKG_CHECK_MODULES(MONO_NUNIT, nunit >= $MONO_NUNIT_REQUIRED_VERSION, enable_nunit=yes, enable_nunit=no)],
- 		enable_nunit=no)
- 
- AM_CONDITIONAL(ENABLE_NUNIT, test x$enable_nunit = xyes)

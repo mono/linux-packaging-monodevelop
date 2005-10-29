@@ -1,6 +1,5 @@
 #!/usr/bin/make -f
 
-# Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 export MONO_SHARED_DIR=$(CURDIR)
 include /usr/share/dpatch/dpatch.make
@@ -23,7 +22,8 @@ build-stamp: configure-stamp
 	$(MAKE) RUNTIME=/usr/bin/cli
 	touch build-stamp
 
-clean: unpatch
+clean: clean-patched unpatch
+clean-patched:
 	dh_testdir
 	dh_testroot
 	rm -f configure-stamp

@@ -6,6 +6,7 @@ monodevelop (0.8-1) unstable; urgency=low
      - Enabled VersionControl (SVN) support.
    * debian/control:
      - Added libnunit-cil (>= 1.1.8) to build-deps.
+     - Removed mozilla-dev from build-deps.
      - Added monodevelop-java, monodevelop-nunit and monodevelop-versioncontrol
        package.
    * debian/patches/00list:
