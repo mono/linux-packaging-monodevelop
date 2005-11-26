@@ -11,7 +11,8 @@ configure-stamp: patch
 	  --mandir=\$${prefix}/share/man \
 	  --infodir=\$${prefix}/share/info \
 	  --disable-update-mimedb --disable-update-desktopdb \
-	  --enable-boo --enable-java --enable-nunit --enable-versioncontrol
+	  --enable-boo --enable-java --enable-nunit --enable-versioncontrol \
+	  --disable-monoextensions
 	# debugger is not ready yet, needs mono from SVN
 	#  --enable-debugger
 	touch configure-stamp

@@ -1,3 +1,19 @@
+monodevelop (0.9-1) unstable; urgency=low
+
+   * New upstream release
+   * debian/control:
+     - Added libvte2.0-cil to build-deps.
+     - Added mozilla-dev again to build-deps.
+     - Updated versioned build-dep on Gtk# to >= 2.4.0.
+   * debian/patches/01_use_real_nunit.dpatch:
+     - Updated for MonoDevelop 0.9.
+   * debian/patches/remove_unused_icon.dpatch:
+     - Removes a reference to an icon which doesn't exist,  caused exception
+       on PPC. (Closes: #338053)
+       (thanks to Sebastian 'slomo' Dröge <slomo@ubuntu.com> for the patch)
+
+ -- Mirco Bauer <meebey@meebey.net>  Sat, 26 Nov 2005 15:16:10 +0100
+
 monodevelop (0.8-1) unstable; urgency=low
 
    * New upstream release
