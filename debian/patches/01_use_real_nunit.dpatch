@@ -5,9 +5,46 @@
 ## DP: No description.
 
 @DPATCH@
+diff -urNad monodevelop-0.9~/Extras/MonoDeveloperExtensions/Makefile.am monodevelop-0.9/Extras/MonoDeveloperExtensions/Makefile.am
+--- monodevelop-0.9~/Extras/MonoDeveloperExtensions/Makefile.am	2005-09-28 02:40:25.000000000 +0200
++++ monodevelop-0.9/Extras/MonoDeveloperExtensions/Makefile.am	2005-11-26 19:48:53.000000000 +0100
+@@ -15,7 +15,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Components.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+        /r:$(top_builddir)/build/AddIns/NUnit/MonoDevelop.NUnit.dll \
+-       /r:nunit.core.dll \
++       $(MONO_NUNIT_LIBS) \
+        $(GTK_SHARP_LIBS) \
+        $(GLADE_SHARP_LIBS) \
+        $(GCONF_SHARP_LIBS) \
+diff -urNad monodevelop-0.9~/Extras/MonoDeveloperExtensions/Makefile.in monodevelop-0.9/Extras/MonoDeveloperExtensions/Makefile.in
+--- monodevelop-0.9~/Extras/MonoDeveloperExtensions/Makefile.in	2005-11-23 21:45:17.000000000 +0100
++++ monodevelop-0.9/Extras/MonoDeveloperExtensions/Makefile.in	2005-11-26 19:48:42.000000000 +0100
+@@ -255,7 +255,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Components.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+        /r:$(top_builddir)/build/AddIns/NUnit/MonoDevelop.NUnit.dll \
+-       /r:nunit.core.dll \
++       $(MONO_NUNIT_LIBS) \
+        $(GTK_SHARP_LIBS) \
+        $(GLADE_SHARP_LIBS) \
+        $(GCONF_SHARP_LIBS) \
+diff -urNad monodevelop-0.9~/Extras/NUnit/Makefile.am monodevelop-0.9/Extras/NUnit/Makefile.am
+--- monodevelop-0.9~/Extras/NUnit/Makefile.am	2005-09-28 02:40:25.000000000 +0200
++++ monodevelop-0.9/Extras/NUnit/Makefile.am	2005-11-26 19:46:51.000000000 +0100
+@@ -2,8 +2,7 @@
+ ADDIN_BUILD = $(top_builddir)/build/AddIns/NUnit
+ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.NUnit.dll
+ 
+-DLLS = /r:nunit.framework.dll \
+-	/r:nunit.core.dll \
++DLLS =	$(MONO_NUNIT_LIBS) \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
 diff -urNad monodevelop-0.9~/Extras/NUnit/Makefile.in monodevelop-0.9/Extras/NUnit/Makefile.in
---- monodevelop-0.9~/Extras/NUnit/Makefile.in	2005-11-26 18:33:44.000000000 +0100
-+++ monodevelop-0.9/Extras/NUnit/Makefile.in	2005-11-26 18:33:48.000000000 +0100
+--- monodevelop-0.9~/Extras/NUnit/Makefile.in	2005-11-23 21:45:19.000000000 +0100
++++ monodevelop-0.9/Extras/NUnit/Makefile.in	2005-11-26 19:46:13.000000000 +0100
 @@ -240,8 +240,7 @@
  target_alias = @target_alias@
  ADDIN_BUILD = $(top_builddir)/build/AddIns/NUnit
@@ -18,22 +55,47 @@ diff -urNad monodevelop-0.9~/Extras/NUnit/Makefile.in monodevelop-0.9/Extras/NUn
  	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+diff -urNad monodevelop-0.9~/Extras/WelcomePage/Makefile.am monodevelop-0.9/Extras/WelcomePage/Makefile.am
+--- monodevelop-0.9~/Extras/WelcomePage/Makefile.am	2005-11-16 18:13:23.000000000 +0100
++++ monodevelop-0.9/Extras/WelcomePage/Makefile.am	2005-11-26 19:49:31.000000000 +0100
+@@ -2,8 +2,7 @@
+ ADDIN_BUILD = $(top_builddir)/build/AddIns/WelcomePage
+ ASSEMBLY = $(ADDIN_BUILD)/WelcomePage.dll
+ 
+-DLLS = /r:nunit.framework.dll \
+-	/r:nunit.core.dll \
++DLLS =	$(MONO_NUNIT_LIBS) \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
 diff -urNad monodevelop-0.9~/Extras/WelcomePage/Makefile.in monodevelop-0.9/Extras/WelcomePage/Makefile.in
---- monodevelop-0.9~/Extras/WelcomePage/Makefile.in	2005-11-26 18:33:44.000000000 +0100
-+++ monodevelop-0.9/Extras/WelcomePage/Makefile.in	2005-11-26 18:33:48.000000000 +0100
+--- monodevelop-0.9~/Extras/WelcomePage/Makefile.in	2005-11-23 21:45:21.000000000 +0100
++++ monodevelop-0.9/Extras/WelcomePage/Makefile.in	2005-11-26 19:49:19.000000000 +0100
 @@ -240,8 +240,7 @@
  target_alias = @target_alias@
  ADDIN_BUILD = $(top_builddir)/build/AddIns/WelcomePage
  ASSEMBLY = $(ADDIN_BUILD)/WelcomePage.dll
 -DLLS = /r:nunit.framework.dll \
 -	/r:nunit.core.dll \
-+DLLS =	$(NUNIT_LIBS) \
++DLLS =	$(MONO_NUNIT_LIBS) \
  	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+diff -urNad monodevelop-0.9~/configure.in monodevelop-0.9/configure.in
+--- monodevelop-0.9~/configure.in	2005-11-23 21:36:28.000000000 +0100
++++ monodevelop-0.9/configure.in	2005-11-26 19:46:13.000000000 +0100
+@@ -137,7 +137,7 @@
+ AC_ARG_ENABLE(nunit,
+ 	AC_HELP_STRING([--enable-nunit],
+ 		[enable support for NUnit [default=yes]]),
+-	[PKG_CHECK_MODULES(MONO_NUNIT, mono-nunit >= $MONO_NUNIT_REQUIRED_VERSION, enable_nunit=${enableval}, enable_nunit=no)],
++	[PKG_CHECK_MODULES(MONO_NUNIT, nunit >= $MONO_NUNIT_REQUIRED_VERSION, enable_nunit=${enableval}, enable_nunit=no)],
+ 	enable_nunit=yes)
+ 
+ AM_CONDITIONAL(ENABLE_NUNIT, test x$enable_nunit = xyes)
 diff -urNad monodevelop-0.9~/configure monodevelop-0.9/configure
 --- monodevelop-0.9~/configure	2005-11-23 21:45:25.000000000 +0100
-+++ monodevelop-0.9/configure	2005-11-26 18:34:34.000000000 +0100
++++ monodevelop-0.9/configure	2005-11-26 19:46:13.000000000 +0100
 @@ -4365,23 +4365,23 @@
    else
       PKG_CONFIG_MIN_VERSION=0.9.0
@@ -72,15 +134,3 @@ diff -urNad monodevelop-0.9~/configure monodevelop-0.9/configure
  
          fi
  
-diff -urNad monodevelop-0.9~/configure.in monodevelop-0.9/configure.in
---- monodevelop-0.9~/configure.in	2005-11-26 18:33:44.000000000 +0100
-+++ monodevelop-0.9/configure.in	2005-11-26 18:33:48.000000000 +0100
-@@ -137,7 +137,7 @@
- AC_ARG_ENABLE(nunit,
- 	AC_HELP_STRING([--enable-nunit],
- 		[enable support for NUnit [default=yes]]),
--	[PKG_CHECK_MODULES(MONO_NUNIT, mono-nunit >= $MONO_NUNIT_REQUIRED_VERSION, enable_nunit=${enableval}, enable_nunit=no)],
-+	[PKG_CHECK_MODULES(MONO_NUNIT, nunit >= $MONO_NUNIT_REQUIRED_VERSION, enable_nunit=${enableval}, enable_nunit=no)],
- 	enable_nunit=yes)
- 
- AM_CONDITIONAL(ENABLE_NUNIT, test x$enable_nunit = xyes)
