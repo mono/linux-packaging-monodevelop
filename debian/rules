@@ -13,13 +13,14 @@ configure-stamp: patch
 	  --disable-update-mimedb --disable-update-desktopdb \
 	  --enable-boo --enable-java --enable-nunit --enable-versioncontrol \
 	  --disable-monoextensions
-	# debugger is not ready yet, needs mono from SVN
+	# debugger is not ready yet, monodevelop 0.10 maybe?
 	#  --enable-debugger
 	touch configure-stamp
 
 build: build-stamp
 build-stamp: configure-stamp
 	dh_testdir
+	mkdir -p build/AddIns
 	$(MAKE) RUNTIME=/usr/bin/cli
 	touch build-stamp
 
@@ -49,18 +50,15 @@ binary-indep: build install
 	dh_link
 	dh_install
 	# remove boo files (shipped in monodevelop-boo)
-	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/Boo*
-	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/Boo*
-	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/EmptyBoo*
+	rm debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/Boo*
 	# remove java files (shipped in monodevelop-java)
-	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/Java*
-	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/Java*
-	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/EmptyJava*
-	rm -f debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/templates/Ikvm*
+	rm debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/Java*
 	# remove nunit files (shipped in monodevelop-nunit)
-	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/NUnit
+	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/NUnit/
 	# remove versioncontrol files (shipped in monodevelop-versioncontrol)
-	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/VersionControl
+	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/VersionControl/
+	# remove query files (shipped in monodevelop-query)
+	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/MonoQuery/
 	cp $(CURDIR)/ChangeLog $(CURDIR)/changelog
 	dh_installchangelogs
 	dh_installdocs

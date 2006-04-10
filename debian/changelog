@@ -1,3 +1,34 @@
+monodevelop (0.10-0pre1) unstable; urgency=low
+
+   * New upstream release
+     + Fixed fr.po encoding (Closes: #343889)
+   * debian/patches/01_use_real_nunit.dpatch
+     debian/patches/02_fix_mono.unix_api_breakage.dpatch
+     debian/patches/remove_unused_icon.dpatch:
+     + Removed, already applied upstream.
+   * debian/control:
+     + Added libnunit2.2-cil, libmono-oracle1.0-cil, libmono-bytefx0.7.6.1-cil,
+       libmono-npgsql1.0-cil, libmono-cecil0.3-cil, liblog4net1.2-cil,
+       libmono-firebirdsql1.7-cil to build-deps.
+     + Added monodevelop-query package, because it pulls firebird libraries in
+       which doesn't exist for all architectures.
+     + Updated debhelper build-dep to >= 5.0.0
+     + Updated mono-mcs build-dep to >= 1.1.10
+   * debian/compat:
+     + Bumped to 5
+   * debian/copyright:
+     + Updated author list.
+     + Added URL for the source of stetic.
+   * debian/patches/use_real_libs.dpatch:
+     + Use real log4net, cecil and FirebirdSql.Data.Firebird instead of the
+       bundled versions.
+       (thanks to Sebastian 'slomo' Dröge <slomo@ubuntu.com> for the patch)
+   * debian/patches/update_templates_for_gtk_sharp_2.8.x.dpatch:
+     + Updates the references to Gtk# 2 libraries in the templates.
+       (thanks to Sebastian 'slomo' Dröge <slomo@ubuntu.com> for the patch)
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 19 Mar 2006 15:36:34 +0100
+
 monodevelop (0.9-1) unstable; urgency=low
 
    * New upstream release

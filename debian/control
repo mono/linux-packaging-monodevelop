@@ -2,13 +2,13 @@ Source: monodevelop
 Section: devel
 Priority: optional
 Maintainer: Mirco Bauer <meebey@meebey.net>
-Build-Depends-Indep: debhelper (>= 4.0.0), cli-common (>= 0.2.0), dpatch, mono-mcs (>= 1.1.4) | c-sharp-compiler, libmono-dev (>= 1.1.4), boo (>= 0.6.0.1858), ikvm (>= 0.10), monodoc-base (>= 1.1.9), intltool, gtk-sharp2-gapi (>= 2.4.0), libgtk2.0-cil (>= 2.4.0), libgnome2.0-cil (>= 2.4.0), libgconf2.0-cil (>= 2.4.0), libglade2.0-cil (>= 2.4.0), libvte2.0-cil (>= 2.4.0), libgtksourceview2.0-cil (>= 0.10), libgecko2.0-cil (>= 0.10), libnunit-cil (>= 1.1.8), mozilla-dev
+Build-Depends-Indep: debhelper (>= 5.0.0), cli-common (>= 0.2.0), dpatch, mono-mcs (>= 1.1.10) | c-sharp-compiler, libmono-dev (>= 1.1.10), boo (>= 0.7.5.2013), ikvm (>= 0.10), monodoc-base (>= 1.1.9), intltool, mozilla-dev, gtk-sharp2-gapi (>= 2.4.0), libgtk2.0-cil (>= 2.4.0), libgnome2.0-cil (>= 2.4.0), libgconf2.0-cil (>= 2.4.0), libglade2.0-cil (>= 2.4.0), libvte2.0-cil (>= 2.4.0), libgtksourceview2.0-cil (>= 0.10), libgecko2.0-cil (>= 0.10), libnunit2.2-cil (>= 2.2.0), libmono-oracle1.0-cil, libmono-bytefx0.7.6.1-cil, libmono-npgsql1.0-cil, libmono-cecil0.3-cil, liblog4net1.2-cil, libmono-firebirdsql1.7-cil
 Standards-Version: 3.6.2.1
 
 Package: monodevelop
 Architecture: all
-Suggests: monodevelop-boo, monodevelop-java, monodevelop-nunit, monodevelop-versioncontrol
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${cli:Depends}, mono-mcs (>= 1.1.4), monodoc-manual (>= 1.1.9), pkg-config, gnome-icon-theme (>= 1.1.3), xterm | x-terminal-emulator
+Suggests: monodevelop-boo, monodevelop-java, monodevelop-nunit, monodevelop-versioncontrol, monodevelop-query
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${cli:Depends}, mono-mcs (>= 1.1.10), monodoc-manual (>= 1.1.9), pkg-config, gnome-icon-theme (>= 1.1.3), xterm | x-terminal-emulator
 Provides: monodoc-viewer
 Description: C#/Boo/Java/Nemerle/ILasm Development Environment
  MonoDevelop is a GNOME IDE primarily designed for C# and other .NET
@@ -54,3 +54,13 @@ Description: VersionControl plugin for MonoDevelop
  .
  This package enables version control integration (currently only Subversion)
  for MonoDevelop.
+
+Package: monodevelop-query
+Architecture: all
+Replaces: monodevelop (<< 0.10)
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${cli:Depends}, monodevelop (= ${Source-Version})
+Description: MonoQuery plugin for MonoDevelop
+ MonoDevelop is a GNOME IDE primarily designed for C# and other .NET
+ languages.
+ .
+ This package enables database SQL query features for MonoDevelop.

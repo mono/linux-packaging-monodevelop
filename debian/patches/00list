@@ -1,2 +1,3 @@
-01_use_real_nunit
-remove_unused_icon
+use_nunit2.2
+use_real_libs
+update_templates_for_gtk_sharp_2.8.x
