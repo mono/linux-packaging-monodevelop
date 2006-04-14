@@ -7,7 +7,7 @@ Standards-Version: 3.6.2.1
 
 Package: monodevelop
 Architecture: all
-Suggests: monodevelop-boo, monodevelop-java, monodevelop-nunit, monodevelop-versioncontrol, monodevelop-query
+Suggests: monodevelop-boo, monodevelop-java, monodevelop-nunit, monodevelop-versioncontrol, monodevelop-query, nemerle
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${cli:Depends}, mono-mcs (>= 1.1.10), monodoc-manual (>= 1.1.9), pkg-config, gnome-icon-theme (>= 1.1.3), xterm | x-terminal-emulator
 Provides: monodoc-viewer
 Description: C#/Boo/Java/Nemerle/ILasm Development Environment

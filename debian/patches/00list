@@ -1,3 +1,8 @@
 use_nunit2.2
 use_real_libs
 update_templates_for_gtk_sharp_2.8.x
+boo_mimetype
+remove_gtk-sharp-1.0_support
+add_new_file_null
+glade_no-gnome
+glade_wrong_file_extension

@@ -1,0 +1,15 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+
+@DPATCH@
+
+--- monodevelop-0.10/Core/src/MonoDevelop.Ide/MonoDevelop.Ide.Gui.BrowserDisplayBinding/BrowserDisplayBinding.cs.old	2006-04-13 14:00:10.096000000 +0200
++++ monodevelop-0.10/Core/src/MonoDevelop.Ide/MonoDevelop.Ide.Gui.BrowserDisplayBinding/BrowserDisplayBinding.cs	2006-04-13 14:00:11.700000000 +0200
+@@ -50,6 +50,8 @@
+ 		public bool CanAttachTo (IViewContent parent)
+ 		{
+ 			string filename = parent.ContentName;
++			if (filename == null)
++				return false;
+ 			string mimetype = Gnome.Vfs.MimeType.GetMimeTypeForUri (filename);
+ 			if (mimetype == "text/html")
+ 				return true;

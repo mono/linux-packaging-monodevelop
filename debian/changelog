@@ -1,4 +1,4 @@
-monodevelop (0.10-0pre1) unstable; urgency=low
+monodevelop (0.10-0pre2) unstable; urgency=low
 
    * New upstream release
      + Fixed fr.po encoding (Closes: #343889)
@@ -19,13 +19,23 @@ monodevelop (0.10-0pre1) unstable; urgency=low
    * debian/copyright:
      + Updated author list.
      + Added URL for the source of stetic.
+   * debian/patches/*.dpatch:
+     + Thanks to Sebastian 'slomo' Dröge <slomo@ubuntu.com> for all patches.
    * debian/patches/use_real_libs.dpatch:
      + Use real log4net, cecil and FirebirdSql.Data.Firebird instead of the
        bundled versions.
-       (thanks to Sebastian 'slomo' Dröge <slomo@ubuntu.com> for the patch)
    * debian/patches/update_templates_for_gtk_sharp_2.8.x.dpatch:
      + Updates the references to Gtk# 2 libraries in the templates.
-       (thanks to Sebastian 'slomo' Dröge <slomo@ubuntu.com> for the patch)
+   * debian/patches/glade_wrong_file_extension.dpatch:
+     + Fixes bug that used .cs instead of .glade
+   * debian/patches/remove_gtk-sharp-1.0_support.dpatch:
+     + Removes Gtk# 1.0 support because it can't work.
+   * debian/patches/boo_mimetype.dpatch:
+     + Adds missing .boo extension entry needed for syntax highlighting
+   * debian/patches/add_new_file_null.dpatch:
+     + Fixes a crash for new files.
+   * debian/patches/glade_no-gnome.dpatch:
+     + Glade templates should not depend on GNOME.
 
  -- Mirco Bauer <meebey@meebey.net>  Sun, 19 Mar 2006 15:36:34 +0100
 
