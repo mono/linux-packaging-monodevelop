@@ -2,7 +2,7 @@ Source: monodevelop
 Section: devel
 Priority: optional
 Maintainer: Mirco Bauer <meebey@meebey.net>
-Build-Depends-Indep: debhelper (>= 5.0.0), cli-common (>= 0.2.0), dpatch, mono-mcs (>= 1.1.10) | c-sharp-compiler, libmono-dev (>= 1.1.10), boo (>= 0.7.5.2013), ikvm (>= 0.10), monodoc-base (>= 1.1.9), intltool, mozilla-dev, gtk-sharp2-gapi (>= 2.4.0), libgtk2.0-cil (>= 2.4.0), libgnome2.0-cil (>= 2.4.0), libgconf2.0-cil (>= 2.4.0), libglade2.0-cil (>= 2.4.0), libvte2.0-cil (>= 2.4.0), libgtksourceview2.0-cil (>= 0.10), libgecko2.0-cil (>= 0.10), libnunit2.2-cil (>= 2.2.0), libmono-oracle1.0-cil, libmono-bytefx0.7.6.1-cil, libmono-npgsql1.0-cil, libmono-cecil0.3-cil, liblog4net1.2-cil, libmono-firebirdsql1.7-cil
+Build-Depends-Indep: debhelper (>= 5.0.0), cli-common-dev (>= 0.4.0), dpatch, mono-mcs (>= 1.1.10) | c-sharp-compiler, libmono-dev (>= 1.1.10), boo (>= 0.7.5.2013), ikvm (>= 0.10), monodoc-base (>= 1.1.9), intltool, mozilla-dev, gtk-sharp2-gapi (>= 2.4.0), libgtk2.0-cil (>= 2.4.0), libgnome2.0-cil (>= 2.4.0), libgconf2.0-cil (>= 2.4.0), libglade2.0-cil (>= 2.4.0), libvte2.0-cil (>= 2.4.0), libgtksourceview2.0-cil (>= 0.10), libgecko2.0-cil (>= 0.10), libnunit2.2-cil (>= 2.2.0), libmono-oracle1.0-cil, libmono-bytefx0.7.6.1-cil, libmono-npgsql1.0-cil, libmono-cecil0.3-cil, liblog4net1.2-cil, libmono-firebirdsql1.7-cil
 Standards-Version: 3.6.2.1
 
 Package: monodevelop

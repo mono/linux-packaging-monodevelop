@@ -1,4 +1,4 @@
-monodevelop (0.10-0pre2) unstable; urgency=low
+monodevelop (0.10-1) unstable; urgency=low
 
    * New upstream release
      + Fixed fr.po encoding (Closes: #343889)
@@ -14,6 +14,7 @@ monodevelop (0.10-0pre2) unstable; urgency=low
        which doesn't exist for all architectures.
      + Updated debhelper build-dep to >= 5.0.0
      + Updated mono-mcs build-dep to >= 1.1.10
+     + Changed cli-common build-dep to cli-common-dev >= 0.4.0
    * debian/compat:
      + Bumped to 5
    * debian/copyright:
