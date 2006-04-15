@@ -1,7 +1,14 @@
-monodevelop (0.10-1) unstable; urgency=low
+monodevelop (0.10-1) unstable; urgency=medium
 
    * New upstream release
      + Fixed fr.po encoding (Closes: #343889)
+     + Shows now a status indicator for library indexing, needed for the
+       intellisense feature. (Closes: #286598)
+     + Doesn't crash anymore when directory names contain "#" (Closes: #342493)
+     + Fixes FTBFS because of Mono.Unix namespace change. (Closes: #360218)
+       Thus using urgency=medium
+   * Rebuild against libnunit2.2-cil (Closes: #353984, #351344)
+   * Rebuild against boo 0.7.5.2013 (Closes: #343750)
    * debian/patches/01_use_real_nunit.dpatch
      debian/patches/02_fix_mono.unix_api_breakage.dpatch
      debian/patches/remove_unused_icon.dpatch:
@@ -14,6 +21,7 @@ monodevelop (0.10-1) unstable; urgency=low
        which doesn't exist for all architectures.
      + Updated debhelper build-dep to >= 5.0.0
      + Updated mono-mcs build-dep to >= 1.1.10
+     + Updated boo build-dep to >= 0.7.5.2013
      + Changed cli-common build-dep to cli-common-dev >= 0.4.0
    * debian/compat:
      + Bumped to 5
