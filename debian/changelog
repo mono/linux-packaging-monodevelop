@@ -1,3 +1,16 @@
+monodevelop (0.10-2) unstable; urgency=medium
+
+   * Moved debhelper and dpatch from build-dep-indep to build-dep.
+   * Added libmetacity0 dependency to monodevelop. (Closes: #365949)
+   * Updated libmono-cecil0.3-cil buil-dep to libmono-cecil0.4-cil
+   * Updated cli-common build-dep to cli-common-dev
+   * Added libmono-sqlite1.0-cil to build-deps. (Closes: #374211)
+   * debian/patches/use_xulrunner.dpatch:
+     + Patches monodevelop start script to set the correct MOZILLA_FIVE_HOME
+       environment variable.
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 18 Jun 2006 17:48:11 +0200
+
 monodevelop (0.10-1) unstable; urgency=medium
 
    * New upstream release

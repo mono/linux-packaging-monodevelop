@@ -6,3 +6,4 @@ remove_gtk-sharp-1.0_support
 add_new_file_null
 glade_no-gnome
 glade_wrong_file_extension
+use_xulrunner
