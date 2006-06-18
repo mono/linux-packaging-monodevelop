@@ -5,6 +5,8 @@ monodevelop (0.10-2) unstable; urgency=medium
    * Updated libmono-cecil0.3-cil buil-dep to libmono-cecil0.4-cil
    * Updated cli-common build-dep to cli-common-dev
    * Added libmono-sqlite1.0-cil to build-deps. (Closes: #374211)
+   * Rebuild against Gecko# 0.11-3
+   * Updated libgecko2.0-cil build-dep to >= 0.11-3
    * debian/patches/use_xulrunner.dpatch:
      + Patches monodevelop start script to set the correct MOZILLA_FIVE_HOME
        environment variable.
