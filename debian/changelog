@@ -10,6 +10,7 @@ monodevelop (0.10-2) unstable; urgency=medium
    * debian/patches/use_xulrunner.dpatch:
      + Patches monodevelop start script to set the correct MOZILLA_FIVE_HOME
        environment variable.
+   * Removed mozilla-dev from build-deps.
 
  -- Mirco Bauer <meebey@meebey.net>  Sun, 18 Jun 2006 17:48:11 +0200
 
