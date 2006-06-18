@@ -1,10 +1,9 @@
 #! /bin/sh /usr/share/dpatch/dpatch-run
 
 @DPATCH@
-
-diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/CSharpBinding.addin.xml monodevelop-0.10/Extras/CSharpBinding/CSharpBinding.addin.xml
---- tmp/monodevelop-0.10/Extras/CSharpBinding/CSharpBinding.addin.xml	2006-04-04 21:29:34.000000000 +0200
-+++ monodevelop-0.10/Extras/CSharpBinding/CSharpBinding.addin.xml	2006-04-13 12:22:11.496000000 +0200
+diff -urNad monodevelop-0.11~/Extras/CSharpBinding/CSharpBinding.addin.xml monodevelop-0.11/Extras/CSharpBinding/CSharpBinding.addin.xml
+--- monodevelop-0.11~/Extras/CSharpBinding/CSharpBinding.addin.xml	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/CSharpBinding/CSharpBinding.addin.xml	2006-05-06 16:58:54.000000000 +0200
 @@ -34,11 +34,8 @@
  	<Extension path = "/MonoDevelop/ProjectTemplates">
  		<ProjectTemplate id = "ConsoleProject" resource = "ConsoleProject.xpt.xml"/>
@@ -17,9 +16,9 @@ diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/CSharpBinding.addin.xml mon
  		<ProjectTemplate id = "GtkSharp2Project" resource = "GtkSharp2Project.xpt.xml"/>
  		<ProjectTemplate id = "Library" resource = "Library.xpt.xml"/>
  	</Extension>
-diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/Makefile.am monodevelop-0.10/Extras/CSharpBinding/Makefile.am
---- tmp/monodevelop-0.10/Extras/CSharpBinding/Makefile.am	2006-04-04 21:29:34.000000000 +0200
-+++ monodevelop-0.10/Extras/CSharpBinding/Makefile.am	2006-04-13 12:21:01.732000000 +0200
+diff -urNad monodevelop-0.11~/Extras/CSharpBinding/Makefile.am monodevelop-0.11/Extras/CSharpBinding/Makefile.am
+--- monodevelop-0.11~/Extras/CSharpBinding/Makefile.am	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/CSharpBinding/Makefile.am	2006-05-06 16:58:54.000000000 +0200
 @@ -49,12 +49,9 @@
  templates/ConsoleProject.xpt.xml \
  templates/EmptyCSharpFile.xft.xml \
@@ -33,9 +32,9 @@ diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/Makefile.am monodevelop-0.1
  templates/GtkSharp2Project.xpt.xml \
  templates/GtkSharpWindow.xft.xml \
  templates/Library.xpt.xml \
-diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/Makefile.in monodevelop-0.10/Extras/CSharpBinding/Makefile.in
---- tmp/monodevelop-0.10/Extras/CSharpBinding/Makefile.in	2006-04-04 23:55:45.000000000 +0200
-+++ monodevelop-0.10/Extras/CSharpBinding/Makefile.in	2006-04-13 12:21:27.924000000 +0200
+diff -urNad monodevelop-0.11~/Extras/CSharpBinding/Makefile.in monodevelop-0.11/Extras/CSharpBinding/Makefile.in
+--- monodevelop-0.11~/Extras/CSharpBinding/Makefile.in	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/CSharpBinding/Makefile.in	2006-05-06 16:58:54.000000000 +0200
 @@ -289,12 +289,9 @@
  templates/ConsoleProject.xpt.xml \
  templates/EmptyCSharpFile.xft.xml \
@@ -49,10 +48,10 @@ diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/Makefile.in monodevelop-0.1
  templates/GtkSharp2Project.xpt.xml \
  templates/GtkSharpWindow.xft.xml \
  templates/Library.xpt.xml \
-diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GladeSharpProject.xpt.xml monodevelop-0.10/Extras/CSharpBinding/templates/GladeSharpProject.xpt.xml
---- tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GladeSharpProject.xpt.xml	2006-04-04 21:29:34.000000000 +0200
-+++ monodevelop-0.10/Extras/CSharpBinding/templates/GladeSharpProject.xpt.xml	1970-01-01 01:00:00.000000000 +0100
-@@ -1,136 +0,0 @@
+diff -urNad monodevelop-0.11~/Extras/CSharpBinding/templates/GladeSharpProject.xpt.xml monodevelop-0.11/Extras/CSharpBinding/templates/GladeSharpProject.xpt.xml
+--- monodevelop-0.11~/Extras/CSharpBinding/templates/GladeSharpProject.xpt.xml	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/CSharpBinding/templates/GladeSharpProject.xpt.xml	1970-01-01 01:00:00.000000000 +0100
+@@ -1,135 +0,0 @@
 -<?xml version="1.0"?>
 -<Template originator   = "Erik Dasque"
 -          created      = "03/10/2004"
@@ -96,7 +95,6 @@ diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GladeSharpProject
 -<!DOCTYPE glade-interface SYSTEM "http://glade.gnome.org/glade-2.0.dtd">
 - 
 -<glade-interface>
--<requires lib="gnome"/>
 - 
 -<widget class="GtkWindow" id="window1">
 -  <property name="visible">True</property>
@@ -189,9 +187,9 @@ diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GladeSharpProject
 -		</Project>
 -	</Combine>
 -</Template>
-diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GnomeSharpProject.xpt.xml monodevelop-0.10/Extras/CSharpBinding/templates/GnomeSharpProject.xpt.xml
---- tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GnomeSharpProject.xpt.xml	2006-04-04 21:29:34.000000000 +0200
-+++ monodevelop-0.10/Extras/CSharpBinding/templates/GnomeSharpProject.xpt.xml	1970-01-01 01:00:00.000000000 +0100
+diff -urNad monodevelop-0.11~/Extras/CSharpBinding/templates/GnomeSharpProject.xpt.xml monodevelop-0.11/Extras/CSharpBinding/templates/GnomeSharpProject.xpt.xml
+--- monodevelop-0.11~/Extras/CSharpBinding/templates/GnomeSharpProject.xpt.xml	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/CSharpBinding/templates/GnomeSharpProject.xpt.xml	1970-01-01 01:00:00.000000000 +0100
 @@ -1,107 +0,0 @@
 -<?xml version="1.0"?>
 -<Template originator   = "John Luke"
@@ -300,9 +298,9 @@ diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GnomeSharpProject
 -		</Project>
 -	</Combine>
 -</Template>
-diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GtkSharpProject.xpt.xml monodevelop-0.10/Extras/CSharpBinding/templates/GtkSharpProject.xpt.xml
---- tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GtkSharpProject.xpt.xml	2006-04-04 21:29:34.000000000 +0200
-+++ monodevelop-0.10/Extras/CSharpBinding/templates/GtkSharpProject.xpt.xml	1970-01-01 01:00:00.000000000 +0100
+diff -urNad monodevelop-0.11~/Extras/CSharpBinding/templates/GtkSharpProject.xpt.xml monodevelop-0.11/Extras/CSharpBinding/templates/GtkSharpProject.xpt.xml
+--- monodevelop-0.11~/Extras/CSharpBinding/templates/GtkSharpProject.xpt.xml	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/CSharpBinding/templates/GtkSharpProject.xpt.xml	1970-01-01 01:00:00.000000000 +0100
 @@ -1,106 +0,0 @@
 -<?xml version="1.0"?>
 -<Template originator   = "John Luke"
@@ -410,9 +408,9 @@ diff -Naur tmp/monodevelop-0.10/Extras/CSharpBinding/templates/GtkSharpProject.x
 -		</Project>
 -	</Combine>
 -</Template>
-diff -Naur tmp/monodevelop-0.10/Extras/VBNetBinding/Makefile.am monodevelop-0.10/Extras/VBNetBinding/Makefile.am
---- tmp/monodevelop-0.10/Extras/VBNetBinding/Makefile.am	2006-04-04 21:29:34.000000000 +0200
-+++ monodevelop-0.10/Extras/VBNetBinding/Makefile.am	2006-04-13 12:19:04.196000000 +0200
+diff -urNad monodevelop-0.11~/Extras/VBNetBinding/Makefile.am monodevelop-0.11/Extras/VBNetBinding/Makefile.am
+--- monodevelop-0.11~/Extras/VBNetBinding/Makefile.am	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/VBNetBinding/Makefile.am	2006-05-06 16:58:54.000000000 +0200
 @@ -45,7 +45,6 @@
  templates/EmptyVBFile.xft.xml \
  templates/EmptyVBProject.xpt.xml \
@@ -421,9 +419,9 @@ diff -Naur tmp/monodevelop-0.10/Extras/VBNetBinding/Makefile.am monodevelop-0.10
  templates/VBGtkSharp2Project.xpt.xml \
  icons/VB.File.EmptyFile \
  icons/VB.File.Form \
-diff -Naur tmp/monodevelop-0.10/Extras/VBNetBinding/Makefile.in monodevelop-0.10/Extras/VBNetBinding/Makefile.in
---- tmp/monodevelop-0.10/Extras/VBNetBinding/Makefile.in	2006-04-04 23:55:47.000000000 +0200
-+++ monodevelop-0.10/Extras/VBNetBinding/Makefile.in	2006-04-13 12:19:12.144000000 +0200
+diff -urNad monodevelop-0.11~/Extras/VBNetBinding/Makefile.in monodevelop-0.11/Extras/VBNetBinding/Makefile.in
+--- monodevelop-0.11~/Extras/VBNetBinding/Makefile.in	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/VBNetBinding/Makefile.in	2006-05-06 16:58:54.000000000 +0200
 @@ -293,7 +293,6 @@
  templates/EmptyVBFile.xft.xml \
  templates/EmptyVBProject.xpt.xml \
@@ -432,9 +430,20 @@ diff -Naur tmp/monodevelop-0.10/Extras/VBNetBinding/Makefile.in monodevelop-0.10
  templates/VBGtkSharp2Project.xpt.xml \
  icons/VB.File.EmptyFile \
  icons/VB.File.Form \
-diff -Naur tmp/monodevelop-0.10/Extras/VBNetBinding/templates/VBGtkSharpProject.xpt.xml monodevelop-0.10/Extras/VBNetBinding/templates/VBGtkSharpProject.xpt.xml
---- tmp/monodevelop-0.10/Extras/VBNetBinding/templates/VBGtkSharpProject.xpt.xml	2006-04-04 21:29:34.000000000 +0200
-+++ monodevelop-0.10/Extras/VBNetBinding/templates/VBGtkSharpProject.xpt.xml	1970-01-01 01:00:00.000000000 +0100
+diff -urNad monodevelop-0.11~/Extras/VBNetBinding/VBNetBinding.addin.xml monodevelop-0.11/Extras/VBNetBinding/VBNetBinding.addin.xml
+--- monodevelop-0.11~/Extras/VBNetBinding/VBNetBinding.addin.xml	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/VBNetBinding/VBNetBinding.addin.xml	2006-05-06 16:58:54.000000000 +0200
+@@ -33,7 +33,6 @@
+   <Extension path = "/MonoDevelop/ProjectTemplates">
+     <ProjectTemplate id = "EmptyVBProject" resource = "EmptyVBProject.xpt.xml"/>
+     <ProjectTemplate id = "VBConsoleApplicationProject" resource = "VBConsoleApplicationProject.xpt.xml"/>
+-    <ProjectTemplate id = "VBGtkSharpProject" resource = "VBGtkSharpProject.xpt.xml"/>
+     <ProjectTemplate id = "VBGtkSharp2Project" resource = "VBGtkSharp2Project.xpt.xml"/>
+   </Extension>
+   
+diff -urNad monodevelop-0.11~/Extras/VBNetBinding/templates/VBGtkSharpProject.xpt.xml monodevelop-0.11/Extras/VBNetBinding/templates/VBGtkSharpProject.xpt.xml
+--- monodevelop-0.11~/Extras/VBNetBinding/templates/VBGtkSharpProject.xpt.xml	2006-05-06 16:57:07.000000000 +0200
++++ monodevelop-0.11/Extras/VBNetBinding/templates/VBGtkSharpProject.xpt.xml	1970-01-01 01:00:00.000000000 +0100
 @@ -1,107 +0,0 @@
 -<?xml version="1.0"?>
 -<Template originator   = "Ben Motmans" 
@@ -543,14 +552,3 @@ diff -Naur tmp/monodevelop-0.10/Extras/VBNetBinding/templates/VBGtkSharpProject.
 -		</Project>
 -	</Combine>
 -</Template>
-diff -Naur tmp/monodevelop-0.10/Extras/VBNetBinding/VBNetBinding.addin.xml monodevelop-0.10/Extras/VBNetBinding/VBNetBinding.addin.xml
---- tmp/monodevelop-0.10/Extras/VBNetBinding/VBNetBinding.addin.xml	2006-04-04 21:29:34.000000000 +0200
-+++ monodevelop-0.10/Extras/VBNetBinding/VBNetBinding.addin.xml	2006-04-13 12:19:26.616000000 +0200
-@@ -33,7 +33,6 @@
-   <Extension path = "/MonoDevelop/ProjectTemplates">
-     <ProjectTemplate id = "EmptyVBProject" resource = "EmptyVBProject.xpt.xml"/>
-     <ProjectTemplate id = "VBConsoleApplicationProject" resource = "VBConsoleApplicationProject.xpt.xml"/>
--    <ProjectTemplate id = "VBGtkSharpProject" resource = "VBGtkSharpProject.xpt.xml"/>
-     <ProjectTemplate id = "VBGtkSharp2Project" resource = "VBGtkSharp2Project.xpt.xml"/>
-   </Extension>
-   

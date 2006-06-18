@@ -1,3 +1,16 @@
+monodevelop (0.11-0pre1) unstable; urgency=low
+
+   * New upstream release
+   * debian/patches/add_new_file_null.dpatch
+     debian/patches/glade_no-gnome.dpatch:
+     + Removed, already applied upstream.
+   * Moved debhelper and dpatch from build-dep-indep to build-dep.
+   * Added libmetacity0 dependency to monodevelop. (Closes: #365949)
+   * Updated libmono-cecil0.3-cil buil-dep to libmono-cecil0.4-cil
+   * Updated cli-common build-dep to cli-common-dev
+
+ -- Mirco Bauer <meebey@meebey.net>  Sat, 6 May 2006 16:41:52 +0200
+
 monodevelop (0.10-1) unstable; urgency=medium
 
    * New upstream release
