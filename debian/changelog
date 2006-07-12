@@ -1,19 +1,28 @@
-monodevelop (0.11-0pre1) unstable; urgency=low
+monodevelop (0.11-1) unstable; urgency=low
 
    * New upstream release
+   * Updated libmono-cecil0.4-cil build-dep to >= 0.4.1+svn20060703-2
    * debian/patches/add_new_file_null.dpatch
      debian/patches/glade_no-gnome.dpatch:
      + Removed, already applied upstream.
+
+ -- Mirco Bauer <meebey@meebey.net>  Wed, 12 Jul 2006 22:15:41 +0200
+
+monodevelop (0.10-2) unstable; urgency=medium
+
    * Moved debhelper and dpatch from build-dep-indep to build-dep.
    * Added libmetacity0 dependency to monodevelop. (Closes: #365949)
    * Updated libmono-cecil0.3-cil buil-dep to libmono-cecil0.4-cil
    * Updated cli-common build-dep to cli-common-dev
    * Added libmono-sqlite1.0-cil to build-deps. (Closes: #374211)
+   * Rebuild against Gecko# 0.11-3
+   * Updated libgecko2.0-cil build-dep to >= 0.11-3
    * debian/patches/use_xulrunner.dpatch:
      + Patches monodevelop start script to set the correct MOZILLA_FIVE_HOME
        environment variable.
+   * Removed mozilla-dev from build-deps.
 
- -- Mirco Bauer <meebey@meebey.net>  Sun, 18 Jun 2006 21:15:47 +0200
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 18 Jun 2006 17:48:11 +0200
 
 monodevelop (0.10-1) unstable; urgency=medium
 
