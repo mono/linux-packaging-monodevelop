@@ -1,3 +1,19 @@
+monodevelop (0.11-1pre1) unstable; urgency=medium
+
+   * debian/patches/fix_registering_2.0_system_assemblies.dpatch:
+     + When the /usr/lib/mono/2.0 directory doesn't exist, the
+       initialization of the references failed. (Closes: #381598)
+   * debian/patches/libstetic-dllmap.dpatch:
+     + Adds libmetacity-private.so.0 to dllmap
+       (thanks to Sebastian 'slomo' Dröge)
+   * debian/control:
+     + Added libmetactiy-dev to build-deps
+     + Added boo (= 0.7.6.2237-3) to Build-Conflicts-Indep, as that version
+       accidentlly links against CLR 2.0 which breaks the monodevelop-boo
+       plugin. (for more details check this boo bugreport: #382700)
+
+ -- Mirco Bauer <meebey@meebey.net>  Sat, 12 Aug 2006 20:14:18 +0200
+
 monodevelop (0.11-1) unstable; urgency=low
 
    * New upstream release
