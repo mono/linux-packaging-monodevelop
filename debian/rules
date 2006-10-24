@@ -15,7 +15,7 @@ configure-stamp: patch
 	  --enable-boo --enable-java \
 	  --enable-nunit --enable-versioncontrol \
 	  --enable-aspnet \
-	  --disable-monoextensions BOOC=$(PWD)/debian/booc2
+	  --disable-monoextensions BOOC=$(CURDIR)/debian/booc2
 	# needs nemerle >= 0.9.3.99
 	#  --enable-nemerle
 	# needs too buggy libjscall0.0-cil
