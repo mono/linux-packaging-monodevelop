@@ -23,7 +23,7 @@ monodevelop (0.12+dfsg-1) unstable; urgency=low
      + Added libsvn-dev and libapr1-dev to build-deps.
        (dh_clideps needs the shlibs for dep tracking)
      + Removed hardcoded libsvn0 and libapr0 dependencies from
-       monodevelop-versioncontrol (current dh_clideps tracks this now).
+       monodevelop-versioncontrol (dh_clideps tracks this now, Closes: #391747)
 
  -- Mirco Bauer <meebey@meebey.net>  Sat, 9 Sep 2006 23:23:45 +0200
 
