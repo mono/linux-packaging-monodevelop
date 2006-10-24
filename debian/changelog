@@ -12,6 +12,8 @@ monodevelop (0.12+dfsg-1) unstable; urgency=low
    * debian/patches/00list:
      + Disabled use_xulrunner.dpatch, startup script supports xulrunner by
        default now.
+   * debian/rules:
+     + Fixed configure target dependencies.
    * debian/control:
      + Updated mono-mcs build-dep to mono-gmcs and CLI 1.0 packages to 2.0,
        MonoDevelop now uses C# 2.0 (gmcs).

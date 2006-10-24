@@ -4,8 +4,7 @@
 export MONO_SHARED_DIR=$(CURDIR)
 include /usr/share/dpatch/dpatch.make
 
-configure: configure-stamp
-configure-stamp: patch
+configure: patch configure-stamp
 	dh_testdir
 	ln -s /usr/lib/boo/booc.exe debian/booc2.exe
 	./configure --prefix=/usr \
