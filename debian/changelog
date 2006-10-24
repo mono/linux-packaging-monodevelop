@@ -1,3 +1,32 @@
+monodevelop (0.12+dfsg-1~pre1) unstable; urgency=low
+
+   * DFSG version of MonoDevelop 0.12
+     (deleted all precompiled binaries from the tarball)
+   * New upstream release
+     + Added support for C# 2.0 (as supporting C# 1.0)
+     + Added support for ASP.NET
+     + ASP.NET designer support not enabled, it's pre-alpha and not usable.
+       (and needs additional packages which I created for testing)
+   * debian/watch:
+     + Updated
+   * debian/patches/00list:
+     + Disabled use_xulrunner.dpatch, startup script supports xulrunner by
+       default now.
+   * debian/control:
+     + Updated mono-mcs build-dep to mono-gmcs and CLI 1.0 packages to 2.0,
+       MonoDevelop now uses C# 2.0 (gmcs).
+     + Added libmono-system-runtime2.0-cil to build-deps.
+     + Added stetic to build-deps.
+     + Added mono-xsp and mono-xsp2 to build-deps (needed for ASP.NET support)
+     + Added ASP.NET to package description.
+     + Removed boo from Build-Conflicts-Indep, not needed anymore.
+     + Added libsvn-dev and libapr1-dev to build-deps.
+       (dh_clideps needs the shlibs for dep tracking)
+     + Removed hardcoded libsvn0 and libapr0 dependencies from
+       monodevelop-versioncontrol (current dh_clideps tracks this now).
+
+ -- Mirco Bauer <meebey@meebey.net>  Sat, 9 Sep 2006 23:23:45 +0200
+
 monodevelop (0.11-2) unstable; urgency=medium
 
    * debian/patches/fix_registering_2.0_system_assemblies.dpatch:

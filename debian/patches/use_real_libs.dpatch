@@ -1,10 +1,10 @@
 #! /bin/sh /usr/share/dpatch/dpatch-run
 
 @DPATCH@
-diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Core/Makefile.am monodevelop-0.11/Core/src/MonoDevelop.Core/Makefile.am
---- monodevelop-0.11~/Core/src/MonoDevelop.Core/Makefile.am	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/Core/src/MonoDevelop.Core/Makefile.am	2006-07-12 19:15:53.000000000 +0200
-@@ -139,8 +139,8 @@
+diff -urNad monodevelop-0.12~/Core/src/MonoDevelop.Core/Makefile.am monodevelop-0.12/Core/src/MonoDevelop.Core/Makefile.am
+--- monodevelop-0.12~/Core/src/MonoDevelop.Core/Makefile.am	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Core/src/MonoDevelop.Core/Makefile.am	2006-09-17 01:26:35.000000000 +0200
+@@ -141,8 +141,8 @@
  	-r:System.Xml \
  	-r:System.Runtime.Remoting \
  	-r:ICSharpCode.SharpZipLib.dll \
@@ -15,10 +15,10 @@ diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Core/Makefile.am monodevelop-
  
  all: $(ASSEMBLY) $(ADDIN_BUILD)/$(ADDIN)
  
-diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Core/Makefile.in monodevelop-0.11/Core/src/MonoDevelop.Core/Makefile.in
---- monodevelop-0.11~/Core/src/MonoDevelop.Core/Makefile.in	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/Core/src/MonoDevelop.Core/Makefile.in	2006-07-12 19:15:53.000000000 +0200
-@@ -379,8 +379,8 @@
+diff -urNad monodevelop-0.12~/Core/src/MonoDevelop.Core/Makefile.in monodevelop-0.12/Core/src/MonoDevelop.Core/Makefile.in
+--- monodevelop-0.12~/Core/src/MonoDevelop.Core/Makefile.in	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Core/src/MonoDevelop.Core/Makefile.in	2006-09-17 01:26:35.000000000 +0200
+@@ -402,8 +402,8 @@
  	-r:System.Xml \
  	-r:System.Runtime.Remoting \
  	-r:ICSharpCode.SharpZipLib.dll \
@@ -29,9 +29,9 @@ diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Core/Makefile.in monodevelop-
  
  ADDIN = MonoDevelop.Core.addin.xml
  ADDIN_BUILD = $(top_builddir)/build/AddIns
-diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Ide/Makefile.am monodevelop-0.11/Core/src/MonoDevelop.Ide/Makefile.am
---- monodevelop-0.11~/Core/src/MonoDevelop.Ide/Makefile.am	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/Core/src/MonoDevelop.Ide/Makefile.am	2006-07-12 19:15:53.000000000 +0200
+diff -urNad monodevelop-0.12~/Core/src/MonoDevelop.Ide/Makefile.am monodevelop-0.12/Core/src/MonoDevelop.Ide/Makefile.am
+--- monodevelop-0.12~/Core/src/MonoDevelop.Ide/Makefile.am	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Core/src/MonoDevelop.Ide/Makefile.am	2006-09-17 01:26:35.000000000 +0200
 @@ -14,7 +14,7 @@
  	-r:Mono.Posix \
  	-r:Mono.GetOptions \
@@ -41,10 +41,10 @@ diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Ide/Makefile.am monodevelop-0
  	$(GTK_SHARP_LIBS) \
  	$(GNOME_SHARP_LIBS) \
  	$(GNOME_VFS_SHARP_LIBS) \
-diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Ide/Makefile.in monodevelop-0.11/Core/src/MonoDevelop.Ide/Makefile.in
---- monodevelop-0.11~/Core/src/MonoDevelop.Ide/Makefile.in	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/Core/src/MonoDevelop.Ide/Makefile.in	2006-07-12 19:15:53.000000000 +0200
-@@ -259,7 +259,7 @@
+diff -urNad monodevelop-0.12~/Core/src/MonoDevelop.Ide/Makefile.in monodevelop-0.12/Core/src/MonoDevelop.Ide/Makefile.in
+--- monodevelop-0.12~/Core/src/MonoDevelop.Ide/Makefile.in	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Core/src/MonoDevelop.Ide/Makefile.in	2006-09-17 01:26:35.000000000 +0200
+@@ -280,7 +280,7 @@
  	-r:Mono.Posix \
  	-r:Mono.GetOptions \
  	-r:System.Runtime.Remoting \
@@ -53,33 +53,57 @@ diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Ide/Makefile.in monodevelop-0
  	$(GTK_SHARP_LIBS) \
  	$(GNOME_SHARP_LIBS) \
  	$(GNOME_VFS_SHARP_LIBS) \
-diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Projects/Makefile.am monodevelop-0.11/Core/src/MonoDevelop.Projects/Makefile.am
---- monodevelop-0.11~/Core/src/MonoDevelop.Projects/Makefile.am	2006-05-06 01:26:22.000000000 +0200
-+++ monodevelop-0.11/Core/src/MonoDevelop.Projects/Makefile.am	2006-07-12 19:17:09.000000000 +0200
-@@ -6,7 +6,7 @@
+diff -urNad monodevelop-0.12~/Core/src/MonoDevelop.Projects/Makefile.am monodevelop-0.12/Core/src/MonoDevelop.Projects/Makefile.am
+--- monodevelop-0.12~/Core/src/MonoDevelop.Projects/Makefile.am	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Core/src/MonoDevelop.Projects/Makefile.am	2006-09-17 01:26:35.000000000 +0200
+@@ -7,7 +7,7 @@
   	-r:System.Xml \
   	-r:System.Drawing \
   	-r:Mono.Posix \
 - 	-r:$(top_builddir)/build/bin/Mono.Cecil.dll \
 + 	`pkg-config --libs mono-cecil` \
-  	-r:$(top_builddir)/build/AddIns/ICSharpCode.SharpRefactory.dll \
   	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
   	$(MONODOC_LIBS)
-diff -urNad monodevelop-0.11~/Core/src/MonoDevelop.Projects/Makefile.in monodevelop-0.11/Core/src/MonoDevelop.Projects/Makefile.in
---- monodevelop-0.11~/Core/src/MonoDevelop.Projects/Makefile.in	2006-05-06 01:27:25.000000000 +0200
-+++ monodevelop-0.11/Core/src/MonoDevelop.Projects/Makefile.in	2006-07-12 19:17:29.000000000 +0200
-@@ -247,7 +247,7 @@
+ 
+diff -urNad monodevelop-0.12~/Core/src/MonoDevelop.Projects/Makefile.in monodevelop-0.12/Core/src/MonoDevelop.Projects/Makefile.in
+--- monodevelop-0.12~/Core/src/MonoDevelop.Projects/Makefile.in	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Core/src/MonoDevelop.Projects/Makefile.in	2006-09-17 01:26:35.000000000 +0200
+@@ -271,7 +271,7 @@
   	-r:System.Xml \
   	-r:System.Drawing \
   	-r:Mono.Posix \
 - 	-r:$(top_builddir)/build/bin/Mono.Cecil.dll \
 + 	`pkg-config --libs mono-cecil` \
-  	-r:$(top_builddir)/build/AddIns/ICSharpCode.SharpRefactory.dll \
   	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
   	$(MONODOC_LIBS)
-diff -urNad monodevelop-0.11~/Extras/MonoDevelop.GtkCore/Makefile.am monodevelop-0.11/Extras/MonoDevelop.GtkCore/Makefile.am
---- monodevelop-0.11~/Extras/MonoDevelop.GtkCore/Makefile.am	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/Extras/MonoDevelop.GtkCore/Makefile.am	2006-07-12 19:15:53.000000000 +0200
+ 
+diff -urNad monodevelop-0.12~/Extras/MonoDevelop.Autotools/Makefile.am monodevelop-0.12/Extras/MonoDevelop.Autotools/Makefile.am
+--- monodevelop-0.12~/Extras/MonoDevelop.Autotools/Makefile.am	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Extras/MonoDevelop.Autotools/Makefile.am	2006-09-17 01:26:35.000000000 +0200
+@@ -4,7 +4,7 @@
+ 
+ REFS = -r:Mono.Posix \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_builddir)/build/bin/log4net.dll  \
++	`pkg-config --libs log4net`  \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+diff -urNad monodevelop-0.12~/Extras/MonoDevelop.Autotools/Makefile.in monodevelop-0.12/Extras/MonoDevelop.Autotools/Makefile.in
+--- monodevelop-0.12~/Extras/MonoDevelop.Autotools/Makefile.in	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Extras/MonoDevelop.Autotools/Makefile.in	2006-09-17 01:26:35.000000000 +0200
+@@ -265,7 +265,7 @@
+ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.Autotools.dll
+ REFS = -r:Mono.Posix \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_builddir)/build/bin/log4net.dll  \
++	`pkg-config --libs log4net`  \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+diff -urNad monodevelop-0.12~/Extras/MonoDevelop.GtkCore/Makefile.am monodevelop-0.12/Extras/MonoDevelop.GtkCore/Makefile.am
+--- monodevelop-0.12~/Extras/MonoDevelop.GtkCore/Makefile.am	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Extras/MonoDevelop.GtkCore/Makefile.am	2006-09-17 01:26:35.000000000 +0200
 @@ -11,7 +11,7 @@
  	-r:$(srcdir)/lib/libstetic.dll \
  	-r:$(srcdir)/lib/libsteticui.dll \
@@ -89,10 +113,10 @@ diff -urNad monodevelop-0.11~/Extras/MonoDevelop.GtkCore/Makefile.am monodevelop
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Components.dll \
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
-diff -urNad monodevelop-0.11~/Extras/MonoDevelop.GtkCore/Makefile.in monodevelop-0.11/Extras/MonoDevelop.GtkCore/Makefile.in
---- monodevelop-0.11~/Extras/MonoDevelop.GtkCore/Makefile.in	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/Extras/MonoDevelop.GtkCore/Makefile.in	2006-07-12 19:15:53.000000000 +0200
-@@ -251,7 +251,7 @@
+diff -urNad monodevelop-0.12~/Extras/MonoDevelop.GtkCore/Makefile.in monodevelop-0.12/Extras/MonoDevelop.GtkCore/Makefile.in
+--- monodevelop-0.12~/Extras/MonoDevelop.GtkCore/Makefile.in	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Extras/MonoDevelop.GtkCore/Makefile.in	2006-09-17 01:26:35.000000000 +0200
+@@ -272,7 +272,7 @@
  	-r:$(srcdir)/lib/libstetic.dll \
  	-r:$(srcdir)/lib/libsteticui.dll \
  	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
@@ -101,33 +125,33 @@ diff -urNad monodevelop-0.11~/Extras/MonoDevelop.GtkCore/Makefile.in monodevelop
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Components.dll \
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
-diff -urNad monodevelop-0.11~/Extras/MonoQuery/Mono.Data.Sql/Makefile.am monodevelop-0.11/Extras/MonoQuery/Mono.Data.Sql/Makefile.am
---- monodevelop-0.11~/Extras/MonoQuery/Mono.Data.Sql/Makefile.am	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/Extras/MonoQuery/Mono.Data.Sql/Makefile.am	2006-07-12 19:15:53.000000000 +0200
+diff -urNad monodevelop-0.12~/Extras/MonoQuery/Mono.Data.Sql/Makefile.am monodevelop-0.12/Extras/MonoQuery/Mono.Data.Sql/Makefile.am
+--- monodevelop-0.12~/Extras/MonoQuery/Mono.Data.Sql/Makefile.am	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Extras/MonoQuery/Mono.Data.Sql/Makefile.am	2006-09-17 01:28:25.000000000 +0200
 @@ -42,7 +42,7 @@
  -r:Mono.Data.SqliteClient \
  -r:System.Data.OracleClient \
  -r:Mono.Data.SybaseClient \
 --r:$(top_srcdir)/contrib/FirebirdSql.Data.Firebird.dll
-+-r:FirebirdSql.Data.Firebird
++-r:/usr/lib/mono/1.0/FirebirdSql.Data.Firebird.dll
  
  ADDIN_BUILD = $(top_builddir)/build/AddIns/MonoQuery
  
-diff -urNad monodevelop-0.11~/Extras/MonoQuery/Mono.Data.Sql/Makefile.in monodevelop-0.11/Extras/MonoQuery/Mono.Data.Sql/Makefile.in
---- monodevelop-0.11~/Extras/MonoQuery/Mono.Data.Sql/Makefile.in	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/Extras/MonoQuery/Mono.Data.Sql/Makefile.in	2006-07-12 19:15:53.000000000 +0200
-@@ -284,7 +284,7 @@
+diff -urNad monodevelop-0.12~/Extras/MonoQuery/Mono.Data.Sql/Makefile.in monodevelop-0.12/Extras/MonoQuery/Mono.Data.Sql/Makefile.in
+--- monodevelop-0.12~/Extras/MonoQuery/Mono.Data.Sql/Makefile.in	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/Extras/MonoQuery/Mono.Data.Sql/Makefile.in	2006-09-17 01:28:36.000000000 +0200
+@@ -305,7 +305,7 @@
  -r:Mono.Data.SqliteClient \
  -r:System.Data.OracleClient \
  -r:Mono.Data.SybaseClient \
 --r:$(top_srcdir)/contrib/FirebirdSql.Data.Firebird.dll
-+-r:FirebirdSql.Data.Firebird
++-r:/usr/lib/mono/1.0/FirebirdSql.Data.Firebird.dll
  
  ADDIN_BUILD = $(top_builddir)/build/AddIns/MonoQuery
  ASSEMBLY = $(ADDIN_BUILD)/Mono.Data.Sql.dll
-diff -urNad monodevelop-0.11~/contrib/Makefile.am monodevelop-0.11/contrib/Makefile.am
---- monodevelop-0.11~/contrib/Makefile.am	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/contrib/Makefile.am	2006-07-12 19:15:53.000000000 +0200
+diff -urNad monodevelop-0.12~/contrib/Makefile.am monodevelop-0.12/contrib/Makefile.am
+--- monodevelop-0.12~/contrib/Makefile.am	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/contrib/Makefile.am	2006-09-17 01:26:35.000000000 +0200
 @@ -1,34 +1,8 @@
  
  BINDIR=$(top_builddir)/build/bin
@@ -165,10 +189,10 @@ diff -urNad monodevelop-0.11~/contrib/Makefile.am monodevelop-0.11/contrib/Makef
 +CLEANFILES = 
  EXTRA_DIST = $(LOG4NET_DLL) $(CECIL_DLL) $(FIREBIRD_DLL)
  
-diff -urNad monodevelop-0.11~/contrib/Makefile.in monodevelop-0.11/contrib/Makefile.in
---- monodevelop-0.11~/contrib/Makefile.in	2006-07-12 19:15:39.000000000 +0200
-+++ monodevelop-0.11/contrib/Makefile.in	2006-07-12 19:15:53.000000000 +0200
-@@ -240,19 +240,7 @@
+diff -urNad monodevelop-0.12~/contrib/Makefile.in monodevelop-0.12/contrib/Makefile.in
+--- monodevelop-0.12~/contrib/Makefile.in	2006-09-17 01:26:25.000000000 +0200
++++ monodevelop-0.12/contrib/Makefile.in	2006-09-17 01:26:35.000000000 +0200
+@@ -261,19 +261,7 @@
  sysconfdir = @sysconfdir@
  target_alias = @target_alias@
  BINDIR = $(top_builddir)/build/bin
@@ -188,7 +212,7 @@ diff -urNad monodevelop-0.11~/contrib/Makefile.in monodevelop-0.11/contrib/Makef
  CLEANFILES = $(LOG4NET) $(CECIL) $(FIREBIRD)
  EXTRA_DIST = $(LOG4NET_DLL) $(CECIL_DLL) $(FIREBIRD_DLL)
  all: all-am
-@@ -428,19 +416,8 @@
+@@ -449,19 +437,8 @@
  	uninstall-info-am
  
  

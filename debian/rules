@@ -11,8 +11,14 @@ configure-stamp: patch
 	  --mandir=\$${prefix}/share/man \
 	  --infodir=\$${prefix}/share/info \
 	  --disable-update-mimedb --disable-update-desktopdb \
-	  --enable-boo --enable-java --enable-nunit --enable-versioncontrol \
-	  --disable-monoextensions
+	  --enable-boo --enable-java \
+	  --enable-nunit --enable-versioncontrol \
+	  --enable-aspnet \
+	  --disable-monoextensions BOOC=/usr/bin/booc2
+	# needs nemerle >= 0.9.3.99
+	#  --enable-nemerle
+	# needs too buggy libjscall0.0-cil
+	#  --enable-aspnetedit
 	# debugger is not ready yet, monodevelop 0.10 maybe?
 	#  --enable-debugger
 	touch configure-stamp
@@ -20,6 +26,7 @@ configure-stamp: patch
 build: build-stamp
 build-stamp: configure-stamp
 	dh_testdir
+	cp /usr/lib/stetic/libstetic* ./Extras/MonoDevelop.GtkCore/lib/
 	mkdir -p build/AddIns
 	$(MAKE) RUNTIME=/usr/bin/cli
 	touch build-stamp

@@ -4,6 +4,7 @@ update_templates_for_gtk_sharp_2.8.x
 boo_mimetype
 remove_gtk-sharp-1.0_support
 glade_wrong_file_extension
-use_xulrunner
+#use_xulrunner
 fix_registering_2.0_system_assemblies
-libstetic-dllmap
+#libstetic-dllmap
+fix_aspnetedit_build_system
