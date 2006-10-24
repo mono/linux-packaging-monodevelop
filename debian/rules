@@ -7,6 +7,7 @@ include /usr/share/dpatch/dpatch.make
 configure: configure-stamp
 configure-stamp: patch
 	dh_testdir
+	ln -s /usr/lib/boo/booc.exe debian/booc2.exe
 	./configure --prefix=/usr \
 	  --mandir=\$${prefix}/share/man \
 	  --infodir=\$${prefix}/share/info \
@@ -14,7 +15,7 @@ configure-stamp: patch
 	  --enable-boo --enable-java \
 	  --enable-nunit --enable-versioncontrol \
 	  --enable-aspnet \
-	  --disable-monoextensions BOOC=/usr/bin/booc2
+	  --disable-monoextensions BOOC=$(PWD)/debian/booc2
 	# needs nemerle >= 0.9.3.99
 	#  --enable-nemerle
 	# needs too buggy libjscall0.0-cil
@@ -39,6 +40,7 @@ clean-patched:
 	rm -f build-stamp
 	-$(MAKE) distclean
 	rm -rf $(CURDIR)/.wapi
+	rm -f debian/booc2.exe
 	dh_clean 
 
 install: build
