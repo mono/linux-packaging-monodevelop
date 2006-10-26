@@ -5,8 +5,10 @@ export MONO_SHARED_DIR=$(CURDIR)
 include /usr/share/dpatch/dpatch.make
 
 configure: patch configure-stamp
+configure-stamp:
 	dh_testdir
 	ln -s /usr/lib/boo/booc.exe debian/booc2.exe
+	chmod +x debian/booc2
 	./configure --prefix=/usr \
 	  --mandir=\$${prefix}/share/man \
 	  --infodir=\$${prefix}/share/info \
@@ -23,8 +25,8 @@ configure: patch configure-stamp
 	#  --enable-debugger
 	touch configure-stamp
 
-build: build-stamp
-build-stamp: configure-stamp
+build: configure build-stamp
+build-stamp:
 	dh_testdir
 	cp /usr/lib/stetic/libstetic* ./Extras/MonoDevelop.GtkCore/lib/
 	mkdir -p build/AddIns
@@ -86,4 +88,4 @@ binary-indep: build install
 	dh_builddeb
 
 binary: binary-indep
-.PHONY: build clean binary-indep binary install 
+.PHONY: build clean binary-indep binary install configure patch unpatch
