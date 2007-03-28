@@ -1,3 +1,40 @@
+monodevelop (0.13.1+dfsg-1~pre3) unstable; urgency=low
+
+   * DFSG version of MonoDevelop 0.13.1
+     (deleted all precompiled binaries from the tarball)
+     - For the record here a list of the deleted files:
+       Extras/NUnit/lib/nunit.core.dll  
+       Extras/NUnit/lib/nunit.framework.dll  
+       Extras/MonoDevelop.GtkCore/lib/libstetic.dll  
+       Extras/MonoDevelop.GtkCore/lib/libsteticui.dll  
+       contrib/log4net.dll 
+       contrib/Mono.Cecil.dll
+       contrib/FirebirdSql.Data.Firebird.dll
+   * New upstream release (Closes: #414019)
+     + Supports method parameters and constructors for auto-completion now.
+       (Closes: #350084)
+     + Fixes a crash problem with Gecko.WebControl on startup.
+       (Closes: #400239)
+   * debian/control:
+     + Using my Debian email address now.
+     + Updated cli-common-dev build dependency to >= 0.4.4
+     + Updates stetic build dependency to >= 0.1.0~svn.74962
+     + Added Replaces: monodevelop << 0.13.1 to monodevelop-versioncontrol
+     + Removed hardcoded unneeded metacity dependency (Closes: #400816)
+   * debian/patches/00list:
+     + Disabled remove_gtk-sharp-1.0_support, already applied upstream.
+   * debian/patches/use_nunit2.2.dpatch
+     debian/patches/use_real_libs.dpatch:
+     + Updated for MonoDevelop 0.13.1
+   * debian/patches/fix_dllmaps.dpatch:
+     + Added DLL map for glibsharpglue-2 to
+       MonoDevelop.SourceEditor.dll.config.in.
+   * debian/monodevelop-versioncontrol.install:
+     + Added ChangeLogAddIn (moved from monodevelop package), as this plugin
+       requires the VersionControl plugin.
+
+ -- Mirco Bauer <meebey@debian.org>  Thu, 15 Mar 2007 22:13:56 +0200
+
 monodevelop (0.12+dfsg-1) unstable; urgency=low
 
    * DFSG version of MonoDevelop 0.12

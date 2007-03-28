@@ -5,56 +5,51 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad monodevelop-0.10~/configure monodevelop-0.10/configure
---- monodevelop-0.10~/configure	2006-04-09 15:51:49.000000000 +0200
-+++ monodevelop-0.10/configure	2006-04-09 16:11:59.000000000 +0200
-@@ -4381,23 +4381,23 @@
-   else
-      PKG_CONFIG_MIN_VERSION=0.9.0
-      if $PKG_CONFIG --atleast-pkgconfig-version $PKG_CONFIG_MIN_VERSION; then
--        echo "$as_me:$LINENO: checking for nunit >= 2.2.0" >&5
--echo $ECHO_N "checking for nunit >= 2.2.0... $ECHO_C" >&6
-+        echo "$as_me:$LINENO: checking for nunit-2.2 >= 2.2.0" >&5
-+echo $ECHO_N "checking for nunit-2.2 >= 2.2.0... $ECHO_C" >&6
+diff -urNad monodevelop-0.13.1~/Extras/NUnit/Makefile.am monodevelop-0.13.1/Extras/NUnit/Makefile.am
+--- monodevelop-0.13.1~/Extras/NUnit/Makefile.am	2007-03-08 00:02:21.000000000 +0100
++++ monodevelop-0.13.1/Extras/NUnit/Makefile.am	2007-03-15 22:32:48.000000000 +0100
+@@ -10,8 +10,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:./lib/nunit.core.dll \
+-	-r:./lib/nunit.framework.dll \
++	`pkg-config --libs nunit` \
+ 	-r:System \
+ 	-r:System.Xml
  
--        if $PKG_CONFIG --exists "nunit >= 2.2.0" ; then
-+        if $PKG_CONFIG --exists "nunit-2.2 >= 2.2.0" ; then
-             echo "$as_me:$LINENO: result: yes" >&5
- echo "${ECHO_T}yes" >&6
-             succeeded=yes
+@@ -68,9 +67,7 @@
+ 	templates/NUnitTestClass.xft.xml
  
-             echo "$as_me:$LINENO: checking NUNIT_CFLAGS" >&5
- echo $ECHO_N "checking NUNIT_CFLAGS... $ECHO_C" >&6
--            NUNIT_CFLAGS=`$PKG_CONFIG --cflags "nunit >= 2.2.0"`
-+            NUNIT_CFLAGS=`$PKG_CONFIG --cflags "nunit-2.2 >= 2.2.0"`
-             echo "$as_me:$LINENO: result: $NUNIT_CFLAGS" >&5
- echo "${ECHO_T}$NUNIT_CFLAGS" >&6
  
-             echo "$as_me:$LINENO: checking NUNIT_LIBS" >&5
- echo $ECHO_N "checking NUNIT_LIBS... $ECHO_C" >&6
--            NUNIT_LIBS=`$PKG_CONFIG --libs "nunit >= 2.2.0"`
-+            NUNIT_LIBS=`$PKG_CONFIG --libs "nunit-2.2 >= 2.2.0"`
-             echo "$as_me:$LINENO: result: $NUNIT_LIBS" >&5
- echo "${ECHO_T}$NUNIT_LIBS" >&6
-         else
-@@ -4405,7 +4405,7 @@
-             NUNIT_LIBS=""
-             ## If we have a custom action on failure, don't print errors, but
-             ## do set a variable so people can do so.
--            NUNIT_PKG_ERRORS=`$PKG_CONFIG --errors-to-stdout --print-errors "nunit >= 2.2.0"`
-+            NUNIT_PKG_ERRORS=`$PKG_CONFIG --errors-to-stdout --print-errors "nunit-2.2 >= 2.2.0"`
+-NUNIT_FILES = \
+-nunit.core.dll \
+-nunit.framework.dll
++NUNIT_FILES =
  
-         fi
+ SRC_NUNIT_FILES = $(addprefix $(srcdir)/lib/, $(NUNIT_FILES))
+ BUILD_NUNIT_FILES = $(addprefix $(ADDIN_BUILD)/, $(NUNIT_FILES))
+diff -urNad monodevelop-0.13.1~/Extras/NUnit/Makefile.in monodevelop-0.13.1/Extras/NUnit/Makefile.in
+--- monodevelop-0.13.1~/Extras/NUnit/Makefile.in	2007-03-08 00:03:06.000000000 +0100
++++ monodevelop-0.13.1/Extras/NUnit/Makefile.in	2007-03-15 22:32:48.000000000 +0100
+@@ -269,8 +269,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:./lib/nunit.core.dll \
+-	-r:./lib/nunit.framework.dll \
++	`pkg-config --libs nunit` \
+ 	-r:System \
+ 	-r:System.Xml
  
-diff -urNad monodevelop-0.10~/configure.in monodevelop-0.10/configure.in
---- monodevelop-0.10~/configure.in	2006-04-09 16:04:22.000000000 +0200
-+++ monodevelop-0.10/configure.in	2006-04-09 16:12:18.000000000 +0200
-@@ -147,7 +147,7 @@
-     AC_HELP_STRING([--enable-nunit],[enable support for NUnit [default=yes]]),
- 	enable_nunit=${enableval}, enable_nunit=yes)
- if test "x$enable_nunit" = "xyes"; then
--	PKG_CHECK_MODULES(NUNIT, nunit >= 2.2.0, [],
-+	PKG_CHECK_MODULES(NUNIT, nunit-2.2 >= 2.2.0, [],
- 	[PKG_CHECK_MODULES(MONO_NUNIT, mono-nunit >= 1.1.9)
- 		NUNIT_LIBS="$MONO_NUNIT_LIBS"
- 	])
+@@ -326,9 +325,7 @@
+ 	templates/NUnitProject.xpt.xml \
+ 	templates/NUnitTestClass.xft.xml
+ 
+-NUNIT_FILES = \
+-nunit.core.dll \
+-nunit.framework.dll
++NUNIT_FILES =
+ 
+ SRC_NUNIT_FILES = $(addprefix $(srcdir)/lib/, $(NUNIT_FILES))
+ BUILD_NUNIT_FILES = $(addprefix $(ADDIN_BUILD)/, $(NUNIT_FILES))
