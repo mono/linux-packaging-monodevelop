@@ -1,8 +1,8 @@
-monodevelop (0.13.1+dfsg-1~pre3) unstable; urgency=low
+monodevelop (0.13.1+dfsg-1~pre6) unstable; urgency=low
 
    * DFSG version of MonoDevelop 0.13.1
      (deleted all precompiled binaries from the tarball)
-     - For the record here a list of the deleted files:
+     + For the record here a list of the deleted files:
        Extras/NUnit/lib/nunit.core.dll  
        Extras/NUnit/lib/nunit.framework.dll  
        Extras/MonoDevelop.GtkCore/lib/libstetic.dll  
@@ -21,6 +21,10 @@ monodevelop (0.13.1+dfsg-1~pre3) unstable; urgency=low
      + Updates stetic build dependency to >= 0.1.0~svn.74962
      + Added Replaces: monodevelop << 0.13.1 to monodevelop-versioncontrol
      + Removed hardcoded unneeded metacity dependency (Closes: #400816)
+     + Updated libnunit2.2-cil build dependency to libnunit2.2.6-cil.
+     + Updated booc build dependency to >= 0.7.6.2237-6
+   * debian/rules:
+     + Using /usr/bin/booc2 in configure call instead of debian/booc2.
    * debian/patches/00list:
      + Disabled remove_gtk-sharp-1.0_support, already applied upstream.
    * debian/patches/use_nunit2.2.dpatch
@@ -29,11 +33,15 @@ monodevelop (0.13.1+dfsg-1~pre3) unstable; urgency=low
    * debian/patches/fix_dllmaps.dpatch:
      + Added DLL map for glibsharpglue-2 to
        MonoDevelop.SourceEditor.dll.config.in.
+   * debian/patches/use_x-terminal-emulator.dpatch:
+     + Use x-terminal-emulator instead of xterm when using external console
+       as application output.
+       (disabled though, because multi-gnome-terminal doesn't like it)
    * debian/monodevelop-versioncontrol.install:
      + Added ChangeLogAddIn (moved from monodevelop package), as this plugin
        requires the VersionControl plugin.
 
- -- Mirco Bauer <meebey@debian.org>  Thu, 15 Mar 2007 22:13:56 +0200
+ -- Mirco Bauer <meebey@debian.org>  Sun, 25 Mar 2007 22:13:56 +0200
 
 monodevelop (0.12+dfsg-1) unstable; urgency=low
 

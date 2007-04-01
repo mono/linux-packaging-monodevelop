@@ -1,2 +1,0 @@
-#!/bin/sh
-env /usr/bin/mono "$0".exe "$@"
