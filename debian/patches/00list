@@ -1,6 +1,6 @@
 use_nunit2.2
 use_real_libs
-use_x-terminal-emulator
+#use_x-terminal-emulator
 cecil_0.4_backport
 update_templates_for_gtk_sharp_2.8.x
 boo_mimetype

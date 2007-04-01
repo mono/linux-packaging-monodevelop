@@ -1,4 +1,4 @@
-monodevelop (0.13.1+dfsg-1~pre6) unstable; urgency=low
+monodevelop (0.13.1+dfsg-1) unstable; urgency=low
 
    * DFSG version of MonoDevelop 0.13.1
      (deleted all precompiled binaries from the tarball)
