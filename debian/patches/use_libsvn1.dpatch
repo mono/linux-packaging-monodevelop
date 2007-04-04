@@ -1,0 +1,19 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## use_libsvn1.dpatch by Mirco Bauer <meebey@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad monodevelop-0.13.1+dfsg~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/SvnClient.cs monodevelop-0.13.1+dfsg/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/SvnClient.cs
+--- monodevelop-0.13.1+dfsg~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/SvnClient.cs	2007-03-08 00:02:18.000000000 +0100
++++ monodevelop-0.13.1+dfsg/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/SvnClient.cs	2007-04-04 21:45:27.000000000 +0200
+@@ -752,7 +752,7 @@
+ 		const int APR_CREATE = 4;
+ 		const int APR_TRUNCATE = 16;
+ 
+-		private const string svnclientlib = "libsvn_client-1.so.0";
++		private const string svnclientlib = "libsvn_client-1.so.1";
+ 		
+ 		private struct svn_error_t {
+ 			public int apr_err;
