@@ -49,8 +49,6 @@ install: build
 	dh_clean -k 
 	dh_installdirs
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
-	-cd $(CURDIR)/debian && find -type f -name "*.exe" | xargs chmod +x
-	-cd $(CURDIR)/debian && find -type f -name "*.dll" | xargs chmod -x
 	chmod -x debian/tmp/usr/share/pixmaps/monodevelop.png
 
 binary-indep: build install
@@ -81,6 +79,7 @@ binary-indep: build install
 	dh_strip
 	dh_compress
 	dh_fixperms
+	dh_clifixperms
 	dh_installdeb
 	dh_shlibdeps
 	dh_clideps -d

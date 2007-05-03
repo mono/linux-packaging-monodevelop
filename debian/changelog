@@ -1,3 +1,15 @@
+monodevelop (0.13.1+dfsg-3) unstable; urgency=low
+
+  * Rebuild against libmono-cecil0.5-cil. (Closes: #421616)
+  * debian/control:
+    + Updated libmono-cecil0.4-cil build-dependency to libmono-cecil0.5-cil.
+  * debian/rules:
+    + Added call for dh_clifixperms in binary-indep target.
+  * debian/patches/cecil_0.4_backport.dpatch:
+    + Disabled, as we build against cecil 0.5 now.
+
+ -- Mirco Bauer <meebey@debian.org>  Thu, 03 May 2007 19:43:50 +0200
+
 monodevelop (0.13.1+dfsg-2) unstable; urgency=low
 
   * debian/patches/use_libsvn1.dpatch:
