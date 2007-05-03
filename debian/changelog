@@ -3,6 +3,7 @@ monodevelop (0.13.1+dfsg-3) unstable; urgency=low
   * Rebuild against libmono-cecil0.5-cil. (Closes: #421616)
   * debian/control:
     + Updated libmono-cecil0.4-cil build-dependency to libmono-cecil0.5-cil.
+    + Bumped Standards-Version to 3.7.2 (no changes required).
   * debian/rules:
     + Added call for dh_clifixperms in binary-indep target.
   * debian/patches/cecil_0.4_backport.dpatch:

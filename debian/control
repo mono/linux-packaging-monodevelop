@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Mirco Bauer <meebey@debian.org>
 Build-Depends: debhelper (>= 5), dpatch
 Build-Depends-Indep: cli-common-dev (>= 0.4.4), mono-gmcs (>= 1.1.10) | c-sharp-2.0-compiler, libmono-dev (>= 1.1.10), boo (>= 0.7.6.2237-6), ikvm (>= 0.10), monodoc-base (>= 1.1.9), intltool, gtk-sharp2-gapi (>= 2.4.0), libgtk2.0-cil (>= 2.4.0), libgnome2.0-cil (>= 2.4.0), libgconf2.0-cil (>= 2.4.0), libglade2.0-cil (>= 2.4.0), libvte2.0-cil (>= 2.4.0), libgtksourceview2.0-cil (>= 0.10), libgecko2.0-cil (>= 0.10), libnunit2.2.6-cil, libmono-system-runtime2.0-cil, libmono-oracle2.0-cil, libmono-bytefx0.7.6.2-cil, libmono-npgsql2.0-cil, libmono-sqlite2.0-cil, libmono-cecil0.5-cil, liblog4net1.2-cil, libmono-firebirdsql1.7-cil, libmetacity-dev, libsvn-dev, libapr1-dev, stetic (>= 0.1.0~svn.74962), mono-xsp, mono-xsp2
-Standards-Version: 3.6.2.1
+Standards-Version: 3.7.2
 
 Package: monodevelop
 Architecture: all
