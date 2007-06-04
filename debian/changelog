@@ -1,3 +1,11 @@
+monodevelop (0.13.1+dfsg-4) unstable; urgency=low
+
+  * debian/control:
+    + Build depend explicitly on libmono-cairo2.0-cil. (Closes: #424075)
+      (needed because of a Mono runtime 'remap' 1.0 to 2.0 hack)
+
+ -- Mirco Bauer <meebey@debian.org>  Mon, 04 Jun 2007 22:02:51 +0200
+
 monodevelop (0.13.1+dfsg-3) unstable; urgency=low
 
   * Rebuild against libmono-cecil0.5-cil. (Closes: #421616)
