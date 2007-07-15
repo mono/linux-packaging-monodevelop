@@ -1,2 +1,2 @@
 version=2
-http://www.monodevelop.com/Download .+/monodevelop-([\d\.]+)\.tar\.gz
+http://www.monodevelop.com/Download .+/monodevelop-([\d\.]+)\.tar\.bz2

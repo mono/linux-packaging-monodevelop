@@ -5,20 +5,20 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad monodevelop-0.13.1~/Extras/NUnit/Makefile.am monodevelop-0.13.1/Extras/NUnit/Makefile.am
---- monodevelop-0.13.1~/Extras/NUnit/Makefile.am	2007-04-01 22:19:05.000000000 +0200
-+++ monodevelop-0.13.1/Extras/NUnit/Makefile.am	2007-04-01 22:19:14.000000000 +0200
-@@ -10,8 +10,7 @@
- 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+diff -urNad monodevelop-0.14~/Extras/NUnit/Makefile.am monodevelop-0.14/Extras/NUnit/Makefile.am
+--- monodevelop-0.14~/Extras/NUnit/Makefile.am	2007-07-07 15:46:07.000000000 +0200
++++ monodevelop-0.14/Extras/NUnit/Makefile.am	2007-07-07 15:46:52.000000000 +0200
+@@ -11,8 +11,7 @@
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
  	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
--	-r:./lib/nunit.core.dll \
--	-r:./lib/nunit.framework.dll \
-+	`pkg-config --libs nunit` \
+ 	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/Extras/NUnit/lib/nunit.core.dll \
+-	-r:$(top_srcdir)/Extras/NUnit/lib/nunit.framework.dll \
++	$(shell pkg-config --libs nunit) \
  	-r:System \
  	-r:System.Xml
  
-@@ -68,9 +67,7 @@
+@@ -69,9 +68,7 @@
  	templates/NUnitTestClass.xft.xml
  
  
@@ -29,20 +29,20 @@ diff -urNad monodevelop-0.13.1~/Extras/NUnit/Makefile.am monodevelop-0.13.1/Extr
  
  SRC_NUNIT_FILES = $(addprefix $(srcdir)/lib/, $(NUNIT_FILES))
  BUILD_NUNIT_FILES = $(addprefix $(ADDIN_BUILD)/, $(NUNIT_FILES))
-diff -urNad monodevelop-0.13.1~/Extras/NUnit/Makefile.in monodevelop-0.13.1/Extras/NUnit/Makefile.in
---- monodevelop-0.13.1~/Extras/NUnit/Makefile.in	2007-04-01 22:19:05.000000000 +0200
-+++ monodevelop-0.13.1/Extras/NUnit/Makefile.in	2007-04-01 22:19:14.000000000 +0200
-@@ -269,8 +269,7 @@
- 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+diff -urNad monodevelop-0.14~/Extras/NUnit/Makefile.in monodevelop-0.14/Extras/NUnit/Makefile.in
+--- monodevelop-0.14~/Extras/NUnit/Makefile.in	2007-07-07 15:46:07.000000000 +0200
++++ monodevelop-0.14/Extras/NUnit/Makefile.in	2007-07-07 15:46:58.000000000 +0200
+@@ -287,8 +287,7 @@
  	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
  	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
--	-r:./lib/nunit.core.dll \
--	-r:./lib/nunit.framework.dll \
-+	`pkg-config --libs nunit` \
+ 	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/Extras/NUnit/lib/nunit.core.dll \
+-	-r:$(top_srcdir)/Extras/NUnit/lib/nunit.framework.dll \
++	$(shell pkg-config --libs nunit) \
  	-r:System \
  	-r:System.Xml
  
-@@ -326,9 +325,7 @@
+@@ -344,9 +343,7 @@
  	templates/NUnitProject.xpt.xml \
  	templates/NUnitTestClass.xft.xml
  
@@ -53,10 +53,10 @@ diff -urNad monodevelop-0.13.1~/Extras/NUnit/Makefile.in monodevelop-0.13.1/Extr
  
  SRC_NUNIT_FILES = $(addprefix $(srcdir)/lib/, $(NUNIT_FILES))
  BUILD_NUNIT_FILES = $(addprefix $(ADDIN_BUILD)/, $(NUNIT_FILES))
-diff -urNad monodevelop-0.13.1~/Extras/NUnit/MonoDevelopNUnit.addin.xml monodevelop-0.13.1/Extras/NUnit/MonoDevelopNUnit.addin.xml
---- monodevelop-0.13.1~/Extras/NUnit/MonoDevelopNUnit.addin.xml	2007-03-08 00:02:21.000000000 +0100
-+++ monodevelop-0.13.1/Extras/NUnit/MonoDevelopNUnit.addin.xml	2007-04-01 22:19:26.000000000 +0200
-@@ -9,8 +9,6 @@
+diff -urNad monodevelop-0.14~/Extras/NUnit/MonoDevelopNUnit.addin.xml monodevelop-0.14/Extras/NUnit/MonoDevelopNUnit.addin.xml
+--- monodevelop-0.14~/Extras/NUnit/MonoDevelopNUnit.addin.xml	2007-07-07 15:46:07.000000000 +0200
++++ monodevelop-0.14/Extras/NUnit/MonoDevelopNUnit.addin.xml	2007-07-07 15:46:22.000000000 +0200
+@@ -10,8 +10,6 @@
  
  	<Runtime>
  		<Import assembly="MonoDevelop.NUnit.dll" />

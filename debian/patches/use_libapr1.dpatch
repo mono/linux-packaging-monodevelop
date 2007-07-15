@@ -5,22 +5,22 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad monodevelop-0.13.1+dfsg~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs monodevelop-0.13.1+dfsg/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
---- monodevelop-0.13.1+dfsg~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-03-08 00:02:18.000000000 +0100
-+++ monodevelop-0.13.1+dfsg/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-04-04 21:47:01.000000000 +0200
-@@ -8,10 +8,6 @@
- 	{
+diff -urNad monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
+--- monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-06-12 01:11:00.000000000 +0200
++++ monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-07-07 14:36:01.000000000 +0200
+@@ -13,10 +13,6 @@
+ 		
  		public static LibApr GetLib ()
  		{
 -			try {
 -				return new LibApr0 ();
 -			} catch {}
--
+-			
  			return new LibApr1 ();
  		}
  		
-@@ -33,35 +29,6 @@
- 		public abstract int file_close (IntPtr file);
+@@ -52,37 +48,6 @@
+ 		public const int APR_OS_START_USEERR = APR_OS_START_USERERR;
  	}
  
 -	public class LibApr0: LibApr
@@ -36,6 +36,7 @@ diff -urNad monodevelop-0.13.1+dfsg~/Extras/VersionControl/MonoDevelop.VersionCo
 -		public override IntPtr array_make(IntPtr pool, int nelts, int elt_size) { return apr_array_make(pool, nelts, elt_size); }
 -		public override IntPtr array_push(IntPtr arr) { return apr_array_push (arr); }
 -		public override IntPtr pstrdup(IntPtr pool, string s) { return apr_pstrdup(pool, s); }
+-		public override IntPtr pcalloc (IntPtr pool, [MarshalAs (UnmanagedType.SysInt)] int size) { return apr_pcalloc (pool, size); }
 -		public override int file_open(ref IntPtr newf, string fname, int flag, int perm, IntPtr pool) { return apr_file_open(ref newf, fname, flag, perm, pool); } 
 -		public override int file_close (IntPtr file) { return apr_file_close (file); } 	
 -
@@ -48,6 +49,7 @@ diff -urNad monodevelop-0.13.1+dfsg~/Extras/VersionControl/MonoDevelop.VersionCo
 -		[DllImport(aprlib)] static extern IntPtr apr_array_make(IntPtr pool, int nelts, int elt_size);
 -		[DllImport(aprlib)] static extern IntPtr apr_array_push(IntPtr arr);
 -		[DllImport(aprlib)] static extern IntPtr apr_pstrdup(IntPtr pool, string s);
+-		[DllImport(aprlib)] static extern IntPtr apr_pcalloc(IntPtr pool, [MarshalAs (UnmanagedType.SysInt)] int size);
 -		[DllImport(aprlib)] static extern int apr_file_open(ref IntPtr newf, string fname, int flag, int perm, IntPtr pool); 
 -		[DllImport(aprlib)] static extern int apr_file_close (IntPtr file); 	
 -	}
