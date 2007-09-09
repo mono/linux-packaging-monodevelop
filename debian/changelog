@@ -1,42 +1,48 @@
+monodevelop (0.14+dfsg-2) unstable; urgency=low
+
+  * Rebuilt against libgtksourceview2.0-cil 0.11-1 (Closes: #441367)
+
+ -- Mirco Bauer <meebey@debian.org>  Sun, 09 Sep 2007 12:35:48 +0200
+
 monodevelop (0.14+dfsg-1) unstable; urgency=low
 
-   * DFSG version of MonoDevelop 0.14
-     (deleted all pre-compiled binaries from the tarball)
-     + For the record here a list of the deleted files:
-       Extras/MonoDevelop.GtkCore/lib/libsteticui.dll
-       Extras/MonoDevelop.GtkCore/lib/libstetic.dll
-       Extras/NUnit/lib/nunit.core.dll
-       Extras/NUnit/lib/nunit.framework.dll
-       Extras/AspNetEdit/libs/jscall.dll
-       contrib/Mono.Addins.dll
-       contrib/Mono.Addins.Gui.dll
-       contrib/Mono.Addins.Setup.dll
-       contrib/log4net.dll
-       contrib/FirebirdSql.Data.Firebird.dll
-       contrib/Mono.Cecil.dll
-   * New upstream release
-     + GTK# resource cleanup is now correctly handled. (Closes: #430033)
-     + This version builds cleanly against stetic 0.1.0~svn.81552.
-       (Closes: #432365)
-     + Environment variables are not tampered. (Closes: #399921)
-   * debian/patches/use_nunit2.2.dpatch
-     debian/patches/use_real_libs.dpatch
-     debian/patches/use_libsvn1.dpatch
-     debian/patches/use_libapr1.dpatch:
-     + Updated for MonoDevelop 0.14
-   * debian/patches/fix_aspnetedit_build_system.dpatch:
-     + Removed, already applied upstream.
-   * debian/patches/mono-addins0.2_forwardport.dpatch:
-     + Ported MonoDevelop 0.14 to compile against Mono.Addins 0.2
-   * debian/patches/cecil_0.5_backport.dpatch:
-     + Ported MonoDevelop 0.14 to compile against Cecil 0.5
-   * debian/control:
-     + Updated stetic build dependency to >= 0.1.0~svn.81552
-     + Added libmono-addins0.2-cil and libmono-addins-gui0.2-cil to build
-       dependencies.
-     + Replaced ${Source-Version} with ${source:Version}
-   * debian/watch:
-     + Updated
+  * DFSG version of MonoDevelop 0.14
+    (deleted all pre-compiled binaries from the tarball)
+    + For the record here a list of the deleted files:
+      Extras/MonoDevelop.GtkCore/lib/libsteticui.dll
+      Extras/MonoDevelop.GtkCore/lib/libstetic.dll
+      Extras/NUnit/lib/nunit.core.dll
+      Extras/NUnit/lib/nunit.framework.dll
+      Extras/AspNetEdit/libs/jscall.dll
+      contrib/Mono.Addins.dll
+      contrib/Mono.Addins.Gui.dll
+      contrib/Mono.Addins.Setup.dll
+      contrib/log4net.dll
+      contrib/FirebirdSql.Data.Firebird.dll
+      contrib/Mono.Cecil.dll
+  * New upstream release
+    + GTK# resource cleanup is now correctly handled. (Closes: #430033)
+    + This version builds cleanly against stetic 0.1.0~svn.81552.
+      (Closes: #432365)
+    + Environment variables are not tampered. (Closes: #399921)
+  * debian/patches/use_nunit2.2.dpatch
+    debian/patches/use_real_libs.dpatch
+    debian/patches/use_libsvn1.dpatch
+    debian/patches/use_libapr1.dpatch:
+    + Updated for MonoDevelop 0.14
+  * debian/patches/fix_aspnetedit_build_system.dpatch:
+    + Removed, already applied upstream.
+  * debian/patches/mono-addins0.2_forwardport.dpatch:
+    + Ported MonoDevelop 0.14 to compile against Mono.Addins 0.2
+  * debian/patches/cecil_0.5_backport.dpatch:
+    + Ported MonoDevelop 0.14 to compile against Cecil 0.5
+  * debian/control:
+    + Updated stetic build dependency to >= 0.1.0~svn.81552
+    + Added libmono-addins0.2-cil and libmono-addins-gui0.2-cil to build
+      dependencies.
+    + Replaced ${Source-Version} with ${source:Version}
+  * debian/watch:
+    + Updated
 
  -- Mirco Bauer <meebey@debian.org>  Sun, 15 Jul 2007 21:50:31 +0200
 
