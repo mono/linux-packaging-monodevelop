@@ -1,3 +1,9 @@
+monodevelop (0.14+dfsg-3) unstable; urgency=low
+
+  * Added desktop-file-utils to build dependencies. (Closes. #443778)
+
+ -- Mirco Bauer <meebey@debian.org>  Fri, 05 Oct 2007 19:33:51 +0200
+
 monodevelop (0.14+dfsg-2) unstable; urgency=low
 
   * Rebuilt against libgtksourceview2.0-cil 0.11-1 (Closes: #441367)
