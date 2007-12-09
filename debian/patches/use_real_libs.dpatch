@@ -1,0 +1,1330 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+
+@DPATCH@
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Components/Makefile.am monodevelop-0.14/Core/src/MonoDevelop.Components/Makefile.am
+--- monodevelop-0.14~/Core/src/MonoDevelop.Components/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Components/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -7,8 +7,8 @@
+ 	$(GNOME_SHARP_LIBS) \
+ 	$(GTK_SHARP_LIBS) \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Components/Makefile.in monodevelop-0.14/Core/src/MonoDevelop.Components/Makefile.in
+--- monodevelop-0.14~/Core/src/MonoDevelop.Components/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Components/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -282,8 +282,8 @@
+ 	$(GNOME_SHARP_LIBS) \
+ 	$(GTK_SHARP_LIBS) \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Core/Makefile.am monodevelop-0.14/Core/src/MonoDevelop.Core/Makefile.am
+--- monodevelop-0.14~/Core/src/MonoDevelop.Core/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Core/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -78,9 +78,9 @@
+ RES =                                                          
+ 
+ REFS =  \
+-	-r:$(top_srcdir)/contrib/log4net.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
++	$(shell pkg-config --libs log4net) \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
+ 	-r:ICSharpCode.SharpZipLib \
+ 	-r:Mono.Posix \
+ 	-r:System \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Core/Makefile.in monodevelop-0.14/Core/src/MonoDevelop.Core/Makefile.in
+--- monodevelop-0.14~/Core/src/MonoDevelop.Core/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Core/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -353,9 +353,9 @@
+ 
+ RES = 
+ REFS = \
+-	-r:$(top_srcdir)/contrib/log4net.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
++	$(shell pkg-config --libs log4net) \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
+ 	-r:ICSharpCode.SharpZipLib \
+ 	-r:Mono.Posix \
+ 	-r:System \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Core.Gui/Makefile.am monodevelop-0.14/Core/src/MonoDevelop.Core.Gui/Makefile.am
+--- monodevelop-0.14~/Core/src/MonoDevelop.Core.Gui/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Core.Gui/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -9,9 +9,9 @@
+ 	$(GTK_SHARP_LIBS) \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Components.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Gui.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Gui.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
+ 	-r:ICSharpCode.SharpZipLib \
+ 	-r:System \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Core.Gui/Makefile.in monodevelop-0.14/Core/src/MonoDevelop.Core.Gui/Makefile.in
+--- monodevelop-0.14~/Core/src/MonoDevelop.Core.Gui/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Core.Gui/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -285,9 +285,9 @@
+ 	$(GTK_SHARP_LIBS) \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Components.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Gui.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Gui.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
+ 	-r:ICSharpCode.SharpZipLib \
+ 	-r:System \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Ide/Makefile.am monodevelop-0.14/Core/src/MonoDevelop.Ide/Makefile.am
+--- monodevelop-0.14~/Core/src/MonoDevelop.Ide/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Ide/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -16,10 +16,10 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/log4net.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Gui.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
++	$(shell pkg-config --libs log4net) \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Gui.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
+ 	-r:ICSharpCode.SharpZipLib \
+ 	-r:Mono.GetOptions \
+ 	-r:Mono.Posix \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Ide/Makefile.in monodevelop-0.14/Core/src/MonoDevelop.Ide/Makefile.in
+--- monodevelop-0.14~/Core/src/MonoDevelop.Ide/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Ide/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -294,10 +294,10 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/log4net.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Gui.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
++	$(shell pkg-config --libs log4net) \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Gui.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
+ 	-r:ICSharpCode.SharpZipLib \
+ 	-r:Mono.GetOptions \
+ 	-r:Mono.Posix \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Projects/Makefile.am monodevelop-0.14/Core/src/MonoDevelop.Projects/Makefile.am
+--- monodevelop-0.14~/Core/src/MonoDevelop.Projects/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Projects/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -6,8 +6,8 @@
+ REFS =  \
+ 	$(MONODOC_LIBS) \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Cecil.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	$(shell pkg-config --libs mono-cecil) \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Projects/Makefile.in monodevelop-0.14/Core/src/MonoDevelop.Projects/Makefile.in
+--- monodevelop-0.14~/Core/src/MonoDevelop.Projects/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Projects/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -283,8 +283,8 @@
+ REFS = \
+ 	$(MONODOC_LIBS) \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Cecil.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	$(shell pkg-config --libs mono-cecil) \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Projects.Gui/Makefile.am monodevelop-0.14/Core/src/MonoDevelop.Projects.Gui/Makefile.am
+--- monodevelop-0.14~/Core/src/MonoDevelop.Projects.Gui/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Projects.Gui/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -9,7 +9,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Projects.Gui/Makefile.in monodevelop-0.14/Core/src/MonoDevelop.Projects.Gui/Makefile.in
+--- monodevelop-0.14~/Core/src/MonoDevelop.Projects.Gui/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Projects.Gui/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -285,7 +285,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Startup/Makefile.am monodevelop-0.14/Core/src/MonoDevelop.Startup/Makefile.am
+--- monodevelop-0.14~/Core/src/MonoDevelop.Startup/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Startup/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -12,7 +12,7 @@
+ 
+ REFS =  \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll
+ 
+ $(ASSEMBLY): $(build_sources) $(build_resources)
+ 	$(CSC) $(CSC_FLAGS) -out:$@ $(REFS) $(build_resources:%=/resource:%) $(build_sources)
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Startup/Makefile.in monodevelop-0.14/Core/src/MonoDevelop.Startup/Makefile.in
+--- monodevelop-0.14~/Core/src/MonoDevelop.Startup/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Startup/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -283,7 +283,7 @@
+ 
+ REFS = \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll
+ 
+ assemblydir = $(MD_ASSEMBLY_DIR)
+ assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).config $(ASSEMBLY).addins
+diff -urNad monodevelop-0.14~/Core/src/Tools/mdhost/Makefile.am monodevelop-0.14/Core/src/Tools/mdhost/Makefile.am
+--- monodevelop-0.14~/Core/src/Tools/mdhost/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/Tools/mdhost/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -8,7 +8,7 @@
+ 
+ REFS = -r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:System.Runtime.Remoting \
+-	-r:$(top_builddir)/build/bin/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix
+ 	
+ $(ASSEMBLY): $(build_sources)
+diff -urNad monodevelop-0.14~/Core/src/Tools/mdhost/Makefile.in monodevelop-0.14/Core/src/Tools/mdhost/Makefile.in
+--- monodevelop-0.14~/Core/src/Tools/mdhost/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/Tools/mdhost/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -281,7 +281,7 @@
+ 
+ REFS = -r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:System.Runtime.Remoting \
+-	-r:$(top_builddir)/build/bin/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix
+ 
+ assemblydir = $(MD_ASSEMBLY_DIR)
+diff -urNad monodevelop-0.14~/Core/src/Tools/mdrun/Makefile.am monodevelop-0.14/Core/src/Tools/mdrun/Makefile.am
+--- monodevelop-0.14~/Core/src/Tools/mdrun/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/Tools/mdrun/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -7,7 +7,7 @@
+ all: $(ASSEMBLY) $(ASSEMBLY).config
+ 
+ REFS = -r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_builddir)/build/bin/Mono.Addins.dll
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll
+ 	
+ $(ASSEMBLY): $(build_sources)
+ 	$(CSC) $(CSC_FLAGS) $(build_sources) $(REFS) /out:$(ASSEMBLY)
+diff -urNad monodevelop-0.14~/Core/src/Tools/mdrun/Makefile.in monodevelop-0.14/Core/src/Tools/mdrun/Makefile.in
+--- monodevelop-0.14~/Core/src/Tools/mdrun/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Core/src/Tools/mdrun/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -280,7 +280,7 @@
+ src/mdrun.cs
+ 
+ REFS = -r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_builddir)/build/bin/Mono.Addins.dll
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll
+ 
+ assemblydir = $(MD_ASSEMBLY_DIR)
+ assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).config
+diff -urNad monodevelop-0.14~/Extras/AspNetAddIn/Makefile.am monodevelop-0.14/Extras/AspNetAddIn/Makefile.am
+--- monodevelop-0.14~/Extras/AspNetAddIn/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/AspNetAddIn/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -13,7 +13,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Design \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Extras/AspNetAddIn/Makefile.in monodevelop-0.14/Extras/AspNetAddIn/Makefile.in
+--- monodevelop-0.14~/Extras/AspNetAddIn/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/AspNetAddIn/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -289,7 +289,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Design \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Extras/AspNetEdit/Makefile.am monodevelop-0.14/Extras/AspNetEdit/Makefile.am
+--- monodevelop-0.14~/Extras/AspNetEdit/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/AspNetEdit/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -20,7 +20,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:$(top_srcdir)/build/AddIns/AspNetEdit/jscall.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Design \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Extras/AspNetEdit/Makefile.in monodevelop-0.14/Extras/AspNetEdit/Makefile.in
+--- monodevelop-0.14~/Extras/AspNetEdit/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/AspNetEdit/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -302,7 +302,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:$(top_srcdir)/build/AddIns/AspNetEdit/jscall.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Design \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Extras/BooBinding/BooShell/Makefile.am monodevelop-0.14/Extras/BooBinding/BooShell/Makefile.am
+--- monodevelop-0.14~/Extras/BooBinding/BooShell/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/BooBinding/BooShell/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -6,8 +6,8 @@
+ 	$(GTK_SHARP_LIBS) \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll
+ 
+ RES =                                                         
+  
+diff -urNad monodevelop-0.14~/Extras/BooBinding/BooShell/Makefile.in monodevelop-0.14/Extras/BooBinding/BooShell/Makefile.in
+--- monodevelop-0.14~/Extras/BooBinding/BooShell/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/BooBinding/BooShell/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -283,8 +283,8 @@
+ 	$(GTK_SHARP_LIBS) \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll
+ 
+ RES = 
+ FILES = BooShell.boo
+diff -urNad monodevelop-0.14~/Extras/BooBinding/Makefile.am monodevelop-0.14/Extras/BooBinding/Makefile.am
+--- monodevelop-0.14~/Extras/BooBinding/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/BooBinding/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -17,9 +17,9 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Cecil.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
++	$(shell pkg-config --libs mono-cecil) \
+ 	-r:System.Drawing \
+ 	-r:System.Runtime.Remoting \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Extras/BooBinding/Makefile.in monodevelop-0.14/Extras/BooBinding/Makefile.in
+--- monodevelop-0.14~/Extras/BooBinding/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/BooBinding/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -301,9 +301,9 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.Setup.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Cecil.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.Setup.dll \
++	$(shell pkg-config --libs mono-cecil) \
+ 	-r:System.Drawing \
+ 	-r:System.Runtime.Remoting \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Extras/CSharpBinding/Makefile.am monodevelop-0.14/Extras/CSharpBinding/Makefile.am
+--- monodevelop-0.14~/Extras/CSharpBinding/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/CSharpBinding/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -15,7 +15,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+-	-r:$(top_builddir)/build/bin/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:$(top_builddir)/build/bin/NRefactory.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Components.dll  \
+ 	$(GTK_SHARP_LIBS) \
+diff -urNad monodevelop-0.14~/Extras/CSharpBinding/Makefile.in monodevelop-0.14/Extras/CSharpBinding/Makefile.in
+--- monodevelop-0.14~/Extras/CSharpBinding/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/CSharpBinding/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -298,7 +298,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+-	-r:$(top_builddir)/build/bin/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:$(top_builddir)/build/bin/NRefactory.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Components.dll  \
+ 	$(GTK_SHARP_LIBS) \
+diff -urNad monodevelop-0.14~/Extras/ChangeLogAddIn/Makefile.am monodevelop-0.14/Extras/ChangeLogAddIn/Makefile.am
+--- monodevelop-0.14~/Extras/ChangeLogAddIn/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/ChangeLogAddIn/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -9,7 +9,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/VersionControl/VersionControlAddIn.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix
+ 
+ FILES =  \
+diff -urNad monodevelop-0.14~/Extras/ChangeLogAddIn/Makefile.in monodevelop-0.14/Extras/ChangeLogAddIn/Makefile.in
+--- monodevelop-0.14~/Extras/ChangeLogAddIn/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/ChangeLogAddIn/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -285,7 +285,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/VersionControl/VersionControlAddIn.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix
+ 
+ FILES = \
+diff -urNad monodevelop-0.14~/Extras/Deployment/MonoDevelop.Deployment/Makefile.am monodevelop-0.14/Extras/Deployment/MonoDevelop.Deployment/Makefile.am
+--- monodevelop-0.14~/Extras/Deployment/MonoDevelop.Deployment/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/Deployment/MonoDevelop.Deployment/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -12,7 +12,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:ICSharpCode.SharpZipLib \
+ 	-r:Mono.Posix \
+ 	-r:System \
+diff -urNad monodevelop-0.14~/Extras/Deployment/MonoDevelop.Deployment/Makefile.in monodevelop-0.14/Extras/Deployment/MonoDevelop.Deployment/Makefile.in
+--- monodevelop-0.14~/Extras/Deployment/MonoDevelop.Deployment/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/Deployment/MonoDevelop.Deployment/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -287,7 +287,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:ICSharpCode.SharpZipLib \
+ 	-r:Mono.Posix \
+ 	-r:System \
+diff -urNad monodevelop-0.14~/Extras/Deployment/MonoDevelop.Deployment.Linux/Makefile.am monodevelop-0.14/Extras/Deployment/MonoDevelop.Deployment.Linux/Makefile.am
+--- monodevelop-0.14~/Extras/Deployment/MonoDevelop.Deployment.Linux/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/Deployment/MonoDevelop.Deployment.Linux/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -13,7 +13,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Xml 
+diff -urNad monodevelop-0.14~/Extras/Deployment/MonoDevelop.Deployment.Linux/Makefile.in monodevelop-0.14/Extras/Deployment/MonoDevelop.Deployment.Linux/Makefile.in
+--- monodevelop-0.14~/Extras/Deployment/MonoDevelop.Deployment.Linux/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/Deployment/MonoDevelop.Deployment.Linux/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -288,7 +288,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Xml 
+diff -urNad monodevelop-0.14~/Extras/ILAsmBinding/Makefile.am monodevelop-0.14/Extras/ILAsmBinding/Makefile.am
+--- monodevelop-0.14~/Extras/ILAsmBinding/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/ILAsmBinding/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -8,7 +8,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Xml
+ 
+diff -urNad monodevelop-0.14~/Extras/ILAsmBinding/Makefile.in monodevelop-0.14/Extras/ILAsmBinding/Makefile.in
+--- monodevelop-0.14~/Extras/ILAsmBinding/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/ILAsmBinding/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -284,7 +284,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Xml
+ 
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.Autotools/Makefile.am monodevelop-0.14/Extras/MonoDevelop.Autotools/Makefile.am
+--- monodevelop-0.14~/Extras/MonoDevelop.Autotools/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.Autotools/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -13,8 +13,8 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/log4net.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	$(shell pkg-config --libs log4net) \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix \
+ 	-r:System 
+ 
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.Autotools/Makefile.in monodevelop-0.14/Extras/MonoDevelop.Autotools/Makefile.in
+--- monodevelop-0.14~/Extras/MonoDevelop.Autotools/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.Autotools/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -288,8 +288,8 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/log4net.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	$(shell pkg-config --libs log4net) \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix \
+ 	-r:System 
+ 
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.DesignerSupport/Makefile.am monodevelop-0.14/Extras/MonoDevelop.DesignerSupport/Makefile.am
+--- monodevelop-0.14~/Extras/MonoDevelop.DesignerSupport/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.DesignerSupport/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -9,7 +9,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Design \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.DesignerSupport/Makefile.in monodevelop-0.14/Extras/MonoDevelop.DesignerSupport/Makefile.in
+--- monodevelop-0.14~/Extras/MonoDevelop.DesignerSupport/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.DesignerSupport/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -286,7 +286,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Design \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.GtkCore/Makefile.am monodevelop-0.14/Extras/MonoDevelop.GtkCore/Makefile.am
+--- monodevelop-0.14~/Extras/MonoDevelop.GtkCore/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.GtkCore/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -16,8 +16,8 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Cecil.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	$(shell pkg-config --libs mono-cecil) \
+ 	-r:$(top_srcdir)/Extras/MonoDevelop.GtkCore/lib/libstetic.dll \
+ 	-r:$(top_srcdir)/Extras/MonoDevelop.GtkCore/lib/libsteticui.dll \
+ 	-r:Mono.Posix \
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.GtkCore/Makefile.in monodevelop-0.14/Extras/MonoDevelop.GtkCore/Makefile.in
+--- monodevelop-0.14~/Extras/MonoDevelop.GtkCore/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.GtkCore/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -291,8 +291,8 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Cecil.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
++	$(shell pkg-config --libs mono-cecil) \
+ 	-r:$(top_srcdir)/Extras/MonoDevelop.GtkCore/lib/libstetic.dll \
+ 	-r:$(top_srcdir)/Extras/MonoDevelop.GtkCore/lib/libsteticui.dll \
+ 	-r:Mono.Posix \
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.SourceEditor/Makefile.am monodevelop-0.14/Extras/MonoDevelop.SourceEditor/Makefile.am
+--- monodevelop-0.14~/Extras/MonoDevelop.SourceEditor/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.SourceEditor/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -47,7 +47,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Cairo \
+ 	-r:System \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.SourceEditor/Makefile.in monodevelop-0.14/Extras/MonoDevelop.SourceEditor/Makefile.in
+--- monodevelop-0.14~/Extras/MonoDevelop.SourceEditor/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.SourceEditor/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -327,7 +327,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Cairo \
+ 	-r:System \
+ 	-r:System.Drawing \
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.WebReferences/Makefile.am monodevelop-0.14/Extras/MonoDevelop.WebReferences/Makefile.am
+--- monodevelop-0.14~/Extras/MonoDevelop.WebReferences/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.WebReferences/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -10,7 +10,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Web \
+diff -urNad monodevelop-0.14~/Extras/MonoDevelop.WebReferences/Makefile.in monodevelop-0.14/Extras/MonoDevelop.WebReferences/Makefile.in
+--- monodevelop-0.14~/Extras/MonoDevelop.WebReferences/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDevelop.WebReferences/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -286,7 +286,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+ 	-r:System.Web \
+diff -urNad monodevelop-0.14~/Extras/MonoDeveloperExtensions/Makefile.am monodevelop-0.14/Extras/MonoDeveloperExtensions/Makefile.am
+--- monodevelop-0.14~/Extras/MonoDeveloperExtensions/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDeveloperExtensions/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -20,7 +20,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Data
+ 
+diff -urNad monodevelop-0.14~/Extras/MonoDeveloperExtensions/Makefile.in monodevelop-0.14/Extras/MonoDeveloperExtensions/Makefile.in
+--- monodevelop-0.14~/Extras/MonoDeveloperExtensions/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoDeveloperExtensions/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -305,7 +305,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Data
+ 
+diff -urNad monodevelop-0.14~/Extras/MonoQuery/Mono.Data.Sql/Makefile.am monodevelop-0.14/Extras/MonoQuery/Mono.Data.Sql/Makefile.am
+--- monodevelop-0.14~/Extras/MonoQuery/Mono.Data.Sql/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoQuery/Mono.Data.Sql/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -62,7 +62,7 @@
+ 	Schema/UserSchema.cs \
+ 	Schema/ViewSchema.cs
+ 
+-REFS = -r:System -r:System.Data -r:$(top_srcdir)/contrib/FirebirdSql.Data.Firebird.dll $(COND_REFS)
++REFS = -r:System -r:System.Data -r:/usr/lib/mono/1.0/FirebirdSql.Data.Firebird.dll $(COND_REFS)
+ 
+ ADDIN_BUILD = $(top_builddir)/build/AddIns/MonoQuery
+ 
+diff -urNad monodevelop-0.14~/Extras/MonoQuery/Mono.Data.Sql/Makefile.in monodevelop-0.14/Extras/MonoQuery/Mono.Data.Sql/Makefile.in
+--- monodevelop-0.14~/Extras/MonoQuery/Mono.Data.Sql/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoQuery/Mono.Data.Sql/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -322,7 +322,7 @@
+ 	Schema/UserSchema.cs \
+ 	Schema/ViewSchema.cs
+ 
+-REFS = -r:System -r:System.Data -r:$(top_srcdir)/contrib/FirebirdSql.Data.Firebird.dll $(COND_REFS)
++REFS = -r:System -r:System.Data -r:/usr/lib/mono/1.0/FirebirdSql.Data.Firebird.dll $(COND_REFS)
+ ADDIN_BUILD = $(top_builddir)/build/AddIns/MonoQuery
+ ASSEMBLY = $(ADDIN_BUILD)/Mono.Data.Sql.dll
+ CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
+diff -urNad monodevelop-0.14~/Extras/MonoQuery/MonoQuery/Makefile.am monodevelop-0.14/Extras/MonoQuery/MonoQuery/Makefile.am
+--- monodevelop-0.14~/Extras/MonoQuery/MonoQuery/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoQuery/MonoQuery/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -77,7 +77,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoQuery/Mono.Data.Sql.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Data \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Extras/MonoQuery/MonoQuery/Makefile.in monodevelop-0.14/Extras/MonoQuery/MonoQuery/Makefile.in
+--- monodevelop-0.14~/Extras/MonoQuery/MonoQuery/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/MonoQuery/MonoQuery/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -351,7 +351,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Ide.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoQuery/Mono.Data.Sql.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Data \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Extras/NUnit/Makefile.am monodevelop-0.14/Extras/NUnit/Makefile.am
+--- monodevelop-0.14~/Extras/NUnit/Makefile.am	2007-07-07 16:29:44.000000000 +0200
++++ monodevelop-0.14/Extras/NUnit/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -10,7 +10,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	$(shell pkg-config --libs nunit) \
+ 	-r:System \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Extras/NUnit/Makefile.in monodevelop-0.14/Extras/NUnit/Makefile.in
+--- monodevelop-0.14~/Extras/NUnit/Makefile.in	2007-07-07 16:29:44.000000000 +0200
++++ monodevelop-0.14/Extras/NUnit/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -286,7 +286,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	$(shell pkg-config --libs nunit) \
+ 	-r:System \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Extras/VBNetBinding/Makefile.am monodevelop-0.14/Extras/VBNetBinding/Makefile.am
+--- monodevelop-0.14~/Extras/VBNetBinding/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/VBNetBinding/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -11,7 +11,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:$(top_builddir)/build/bin/NRefactory.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Drawing \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Extras/VBNetBinding/Makefile.in monodevelop-0.14/Extras/VBNetBinding/Makefile.in
+--- monodevelop-0.14~/Extras/VBNetBinding/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/VBNetBinding/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -286,7 +286,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:$(top_builddir)/build/bin/NRefactory.dll \
+-	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:System \
+ 	-r:System.Drawing \
+ 	-r:System.Xml
+diff -urNad monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl/Makefile.am monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl/Makefile.am
+--- monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl/Makefile.am	2007-07-07 16:29:45.000000000 +0200
+@@ -48,7 +48,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/VersionControl/Diff.dll \
+ 	-r:$(top_builddir)/build/AddIns/VersionControl/DiffWidget.dll \
+-	-r:$(top_builddir)/build/bin/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+diff -urNad monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl/Makefile.in monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl/Makefile.in
+--- monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl/Makefile.in	2007-07-07 16:29:45.000000000 +0200
+@@ -324,7 +324,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.dll \
+ 	-r:$(top_builddir)/build/AddIns/VersionControl/Diff.dll \
+ 	-r:$(top_builddir)/build/AddIns/VersionControl/DiffWidget.dll \
+-	-r:$(top_builddir)/build/bin/Mono.Addins.dll \
++	-r:/usr/lib/cli/mono-addins-0.2/Mono.Addins.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:Mono.Posix \
+ 	-r:System \
+diff -urNad monodevelop-0.14~/contrib/Makefile.am monodevelop-0.14/contrib/Makefile.am
+--- monodevelop-0.14~/contrib/Makefile.am	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/contrib/Makefile.am	2007-07-07 16:30:02.000000000 +0200
+@@ -1,53 +1,4 @@
+ 
+-BINDIR=$(top_builddir)/build/bin
+-LOG4NET_DLL=log4net.dll
+-LOG4NET = $(BINDIR)/$(LOG4NET_DLL)
+-CECIL_DLL=Mono.Cecil.dll
+-CECIL = $(BINDIR)/$(CECIL_DLL)
+-MONO_ADDINS_DLL=Mono.Addins.dll
+-MONO_ADDINS = $(BINDIR)/$(MONO_ADDINS_DLL)
+-MONO_ADDINS_SETUP_DLL=Mono.Addins.Setup.dll
+-MONO_ADDINS_SETUP = $(BINDIR)/$(MONO_ADDINS_SETUP_DLL)
+-MONO_ADDINS_GUI_DLL=Mono.Addins.Gui.dll
+-MONO_ADDINS_GUI = $(BINDIR)/$(MONO_ADDINS_GUI_DLL)
+-
+-# We need to copy Firebird to the same directory as where
+-# mono.data.sql builds. otherwise, mono.data.sql cant find the
+-# firebird provider when monoquery links against mono.data.sql.
+-FIREBIRDDIR=$(top_builddir)/build/AddIns/MonoQuery
+-FIREBIRD_DLL=FirebirdSql.Data.Firebird.dll
+-FIREBIRD = $(FIREBIRDDIR)/$(FIREBIRD_DLL)
+-
+-all: $(LOG4NET) $(CECIL) $(FIREBIRD) $(MONO_ADDINS) $(MONO_ADDINS_SETUP) $(MONO_ADDINS_GUI)
+-
+-$(LOG4NET): $(srcdir)/$(LOG4NET_DLL)
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(LOG4NET_DLL) $(LOG4NET)
+-
+-$(CECIL): $(srcdir)/$(CECIL_DLL)
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(CECIL_DLL) $(CECIL)
+-
+-$(MONO_ADDINS): $(srcdir)/$(MONO_ADDINS_DLL) $(srcdir)/$(MONO_ADDINS_DLL).config
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(MONO_ADDINS_DLL) $(MONO_ADDINS)
+-	cp $(srcdir)/$(MONO_ADDINS_DLL).config $(MONO_ADDINS).config
+-
+-$(MONO_ADDINS_GUI): $(srcdir)/$(MONO_ADDINS_GUI_DLL)
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(MONO_ADDINS_GUI_DLL) $(MONO_ADDINS_GUI)
+-
+-$(MONO_ADDINS_SETUP): $(srcdir)/$(MONO_ADDINS_SETUP_DLL)
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(MONO_ADDINS_SETUP_DLL) $(MONO_ADDINS_SETUP)
+-
+-$(FIREBIRD): $(srcdir)/$(FIREBIRD_DLL)
+-	mkdir -p $(FIREBIRDDIR)
+-	cp $(srcdir)/$(FIREBIRD_DLL) $(FIREBIRD)
+-
+-assemblydir = $(MD_ASSEMBLY_DIR)
+-assembly_DATA = $(LOG4NET) $(CECIL) $(FIREBIRD) $(MONO_ADDINS) $(MONO_ADDINS).config $(MONO_ADDINS_SETUP) $(MONO_ADDINS_GUI)
+-
+-CLEANFILES = $(LOG4NET) $(CECIL) $(FIREBIRD) $(MONO_ADDINS) $(MONO_ADDINS).config
+-EXTRA_DIST = $(LOG4NET_DLL) $(CECIL_DLL) $(FIREBIRD_DLL) $(MONO_ADDINS_DLL) $(MONO_ADDINS_DLL).config $(MONO_ADDINS_SETUP_DLL) $(MONO_ADDINS_GUI_DLL)
++all:
+ 
++install:
+diff -urNad monodevelop-0.14~/contrib/Makefile.in monodevelop-0.14/contrib/Makefile.in
+--- monodevelop-0.14~/contrib/Makefile.in	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/contrib/Makefile.in	2007-07-07 16:30:06.000000000 +0200
+@@ -1,500 +1,4 @@
+-# Makefile.in generated by automake 1.9.6 from Makefile.am.
+-# @configure_input@
+-
+-# Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+-# 2003, 2004, 2005  Free Software Foundation, Inc.
+-# This Makefile.in is free software; the Free Software Foundation
+-# gives unlimited permission to copy and/or distribute it,
+-# with or without modifications, as long as this notice is preserved.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY, to the extent permitted by law; without
+-# even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+-# PARTICULAR PURPOSE.
+-
+-@SET_MAKE@
+-
+-srcdir = @srcdir@
+-top_srcdir = @top_srcdir@
+-VPATH = @srcdir@
+-pkgdatadir = $(datadir)/@PACKAGE@
+-pkglibdir = $(libdir)/@PACKAGE@
+-pkgincludedir = $(includedir)/@PACKAGE@
+-top_builddir = ..
+-am__cd = CDPATH="$${ZSH_VERSION+.}$(PATH_SEPARATOR)" && cd
+-INSTALL = @INSTALL@
+-install_sh_DATA = $(install_sh) -c -m 644
+-install_sh_PROGRAM = $(install_sh) -c
+-install_sh_SCRIPT = $(install_sh) -c
+-INSTALL_HEADER = $(INSTALL_DATA)
+-transform = $(program_transform_name)
+-NORMAL_INSTALL = :
+-PRE_INSTALL = :
+-POST_INSTALL = :
+-NORMAL_UNINSTALL = :
+-PRE_UNINSTALL = :
+-POST_UNINSTALL = :
+-subdir = contrib
+-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+-ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
+-am__aclocal_m4_deps = $(top_srcdir)/configure.in
+-am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
+-	$(ACLOCAL_M4)
+-mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
+-CONFIG_CLEAN_FILES =
+-SOURCES =
+-DIST_SOURCES =
+-am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+-am__vpath_adj = case $$p in \
+-    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+-    *) f=$$p;; \
+-  esac;
+-am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
+-am__installdirs = "$(DESTDIR)$(assemblydir)"
+-assemblyDATA_INSTALL = $(INSTALL_DATA)
+-DATA = $(assembly_DATA)
+-DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+-ACLOCAL = @ACLOCAL@
+-ALL_LINGUAS = @ALL_LINGUAS@
+-AMDEP_FALSE = @AMDEP_FALSE@
+-AMDEP_TRUE = @AMDEP_TRUE@
+-AMTAR = @AMTAR@
+-ASSEMBLY_VERSION = @ASSEMBLY_VERSION@
+-AUTOCONF = @AUTOCONF@
+-AUTOHEADER = @AUTOHEADER@
+-AUTOMAKE = @AUTOMAKE@
+-AWK = @AWK@
+-BOOC = @BOOC@
+-BOO_CFLAGS = @BOO_CFLAGS@
+-BOO_LIBS = @BOO_LIBS@
+-CATALOGS = @CATALOGS@
+-CATOBJEXT = @CATOBJEXT@
+-CC = @CC@
+-CCDEPMODE = @CCDEPMODE@
+-CFLAGS = @CFLAGS@
+-CPP = @CPP@
+-CPPFLAGS = @CPPFLAGS@
+-CSC = @CSC@
+-CSC_FLAGS = @CSC_FLAGS@
+-CYGPATH_W = @CYGPATH_W@
+-DATADIRNAME = @DATADIRNAME@
+-DEFS = @DEFS@
+-DEPDIR = @DEPDIR@
+-ECHO_C = @ECHO_C@
+-ECHO_N = @ECHO_N@
+-ECHO_T = @ECHO_T@
+-EGREP = @EGREP@
+-ENABLE_ASPNETEDIT_FALSE = @ENABLE_ASPNETEDIT_FALSE@
+-ENABLE_ASPNETEDIT_TRUE = @ENABLE_ASPNETEDIT_TRUE@
+-ENABLE_ASPNET_FALSE = @ENABLE_ASPNET_FALSE@
+-ENABLE_ASPNET_TRUE = @ENABLE_ASPNET_TRUE@
+-ENABLE_BOO_FALSE = @ENABLE_BOO_FALSE@
+-ENABLE_BOO_TRUE = @ENABLE_BOO_TRUE@
+-ENABLE_DEBUGGER_FALSE = @ENABLE_DEBUGGER_FALSE@
+-ENABLE_DEBUGGER_TRUE = @ENABLE_DEBUGGER_TRUE@
+-ENABLE_JAVA_FALSE = @ENABLE_JAVA_FALSE@
+-ENABLE_JAVA_TRUE = @ENABLE_JAVA_TRUE@
+-ENABLE_MONOEXTENSIONS_FALSE = @ENABLE_MONOEXTENSIONS_FALSE@
+-ENABLE_MONOEXTENSIONS_TRUE = @ENABLE_MONOEXTENSIONS_TRUE@
+-ENABLE_MONOQUERY_FALSE = @ENABLE_MONOQUERY_FALSE@
+-ENABLE_MONOQUERY_TRUE = @ENABLE_MONOQUERY_TRUE@
+-ENABLE_MYSQL_FALSE = @ENABLE_MYSQL_FALSE@
+-ENABLE_MYSQL_TRUE = @ENABLE_MYSQL_TRUE@
+-ENABLE_NEMERLE_FALSE = @ENABLE_NEMERLE_FALSE@
+-ENABLE_NEMERLE_TRUE = @ENABLE_NEMERLE_TRUE@
+-ENABLE_ORACLE_FALSE = @ENABLE_ORACLE_FALSE@
+-ENABLE_ORACLE_TRUE = @ENABLE_ORACLE_TRUE@
+-ENABLE_POSTGRES_FALSE = @ENABLE_POSTGRES_FALSE@
+-ENABLE_POSTGRES_TRUE = @ENABLE_POSTGRES_TRUE@
+-ENABLE_SQLITE_FALSE = @ENABLE_SQLITE_FALSE@
+-ENABLE_SQLITE_TRUE = @ENABLE_SQLITE_TRUE@
+-ENABLE_SQLSERV_FALSE = @ENABLE_SQLSERV_FALSE@
+-ENABLE_SQLSERV_TRUE = @ENABLE_SQLSERV_TRUE@
+-ENABLE_SUBVERSION_FALSE = @ENABLE_SUBVERSION_FALSE@
+-ENABLE_SUBVERSION_TRUE = @ENABLE_SUBVERSION_TRUE@
+-ENABLE_SYBASE_FALSE = @ENABLE_SYBASE_FALSE@
+-ENABLE_SYBASE_TRUE = @ENABLE_SYBASE_TRUE@
+-ENABLE_UPDATE_DESKTOPDB_FALSE = @ENABLE_UPDATE_DESKTOPDB_FALSE@
+-ENABLE_UPDATE_DESKTOPDB_TRUE = @ENABLE_UPDATE_DESKTOPDB_TRUE@
+-ENABLE_UPDATE_MIMEDB_FALSE = @ENABLE_UPDATE_MIMEDB_FALSE@
+-ENABLE_UPDATE_MIMEDB_TRUE = @ENABLE_UPDATE_MIMEDB_TRUE@
+-ENABLE_VERSIONCONTROL_FALSE = @ENABLE_VERSIONCONTROL_FALSE@
+-ENABLE_VERSIONCONTROL_TRUE = @ENABLE_VERSIONCONTROL_TRUE@
+-EXEEXT = @EXEEXT@
+-GCONF_SHARP_CFLAGS = @GCONF_SHARP_CFLAGS@
+-GCONF_SHARP_LIBS = @GCONF_SHARP_LIBS@
+-GECKO_SHARP_CFLAGS = @GECKO_SHARP_CFLAGS@
+-GECKO_SHARP_LIBS = @GECKO_SHARP_LIBS@
+-GETTEXT_PACKAGE = @GETTEXT_PACKAGE@
+-GLADE_SHARP_CFLAGS = @GLADE_SHARP_CFLAGS@
+-GLADE_SHARP_LIBS = @GLADE_SHARP_LIBS@
+-GLIB_SHARP_CFLAGS = @GLIB_SHARP_CFLAGS@
+-GLIB_SHARP_LIBS = @GLIB_SHARP_LIBS@
+-GMOFILES = @GMOFILES@
+-GMSGFMT = @GMSGFMT@
+-GNOME_SHARP_CFLAGS = @GNOME_SHARP_CFLAGS@
+-GNOME_SHARP_LIBS = @GNOME_SHARP_LIBS@
+-GNOME_VFS_SHARP_CFLAGS = @GNOME_VFS_SHARP_CFLAGS@
+-GNOME_VFS_SHARP_LIBS = @GNOME_VFS_SHARP_LIBS@
+-GREP = @GREP@
+-GTKHTML_SHARP_CFLAGS = @GTKHTML_SHARP_CFLAGS@
+-GTKHTML_SHARP_LIBS = @GTKHTML_SHARP_LIBS@
+-GTKSOURCEVIEW_SHARP_CFLAGS = @GTKSOURCEVIEW_SHARP_CFLAGS@
+-GTKSOURCEVIEW_SHARP_LIBS = @GTKSOURCEVIEW_SHARP_LIBS@
+-GTK_SHARP_CFLAGS = @GTK_SHARP_CFLAGS@
+-GTK_SHARP_LIBS = @GTK_SHARP_LIBS@
+-IKVM_CFLAGS = @IKVM_CFLAGS@
+-IKVM_LIBS = @IKVM_LIBS@
+-INSTALL_DATA = @INSTALL_DATA@
+-INSTALL_PROGRAM = @INSTALL_PROGRAM@
+-INSTALL_SCRIPT = @INSTALL_SCRIPT@
+-INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+-INSTOBJEXT = @INSTOBJEXT@
+-INTLLIBS = @INTLLIBS@
+-INTLTOOL_CAVES_RULE = @INTLTOOL_CAVES_RULE@
+-INTLTOOL_DESKTOP_RULE = @INTLTOOL_DESKTOP_RULE@
+-INTLTOOL_DIRECTORY_RULE = @INTLTOOL_DIRECTORY_RULE@
+-INTLTOOL_EXTRACT = @INTLTOOL_EXTRACT@
+-INTLTOOL_ICONV = @INTLTOOL_ICONV@
+-INTLTOOL_KBD_RULE = @INTLTOOL_KBD_RULE@
+-INTLTOOL_KEYS_RULE = @INTLTOOL_KEYS_RULE@
+-INTLTOOL_MERGE = @INTLTOOL_MERGE@
+-INTLTOOL_MSGFMT = @INTLTOOL_MSGFMT@
+-INTLTOOL_MSGMERGE = @INTLTOOL_MSGMERGE@
+-INTLTOOL_OAF_RULE = @INTLTOOL_OAF_RULE@
+-INTLTOOL_PERL = @INTLTOOL_PERL@
+-INTLTOOL_PONG_RULE = @INTLTOOL_PONG_RULE@
+-INTLTOOL_PROP_RULE = @INTLTOOL_PROP_RULE@
+-INTLTOOL_SCHEMAS_RULE = @INTLTOOL_SCHEMAS_RULE@
+-INTLTOOL_SERVER_RULE = @INTLTOOL_SERVER_RULE@
+-INTLTOOL_SERVICE_RULE = @INTLTOOL_SERVICE_RULE@
+-INTLTOOL_SHEET_RULE = @INTLTOOL_SHEET_RULE@
+-INTLTOOL_SOUNDLIST_RULE = @INTLTOOL_SOUNDLIST_RULE@
+-INTLTOOL_THEME_RULE = @INTLTOOL_THEME_RULE@
+-INTLTOOL_UI_RULE = @INTLTOOL_UI_RULE@
+-INTLTOOL_UPDATE = @INTLTOOL_UPDATE@
+-INTLTOOL_XAM_RULE = @INTLTOOL_XAM_RULE@
+-INTLTOOL_XGETTEXT = @INTLTOOL_XGETTEXT@
+-INTLTOOL_XML_NOMERGE_RULE = @INTLTOOL_XML_NOMERGE_RULE@
+-INTLTOOL_XML_RULE = @INTLTOOL_XML_RULE@
+-LDFLAGS = @LDFLAGS@
+-LD_LIBRARY_PATH = @LD_LIBRARY_PATH@
+-LIBOBJS = @LIBOBJS@
+-LIBS = @LIBS@
+-LIB_PREFIX = @LIB_PREFIX@
+-LIB_SUFFIX = @LIB_SUFFIX@
+-LTLIBOBJS = @LTLIBOBJS@
+-MAINT = @MAINT@
+-MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
+-MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
+-MAKEINFO = @MAKEINFO@
+-MCS = @MCS@
+-MD_ADDIN_DIR = @MD_ADDIN_DIR@
+-MD_ASSEMBLY_DIR = @MD_ASSEMBLY_DIR@
+-MD_DIR = @MD_DIR@
+-MONO = @MONO@
+-MONODOC_CFLAGS = @MONODOC_CFLAGS@
+-MONODOC_LIBS = @MONODOC_LIBS@
+-MONO_CAIRO_CFLAGS = @MONO_CAIRO_CFLAGS@
+-MONO_CAIRO_LIBS = @MONO_CAIRO_LIBS@
+-MONO_DEBUGGER_CFLAGS = @MONO_DEBUGGER_CFLAGS@
+-MONO_DEBUGGER_LIBS = @MONO_DEBUGGER_LIBS@
+-MOZILLA_EXTENSION_TYPE = @MOZILLA_EXTENSION_TYPE@
+-MOZILLA_EXTENSION_TYPE_TEXTFILE_FALSE = @MOZILLA_EXTENSION_TYPE_TEXTFILE_FALSE@
+-MOZILLA_EXTENSION_TYPE_TEXTFILE_TRUE = @MOZILLA_EXTENSION_TYPE_TEXTFILE_TRUE@
+-MOZILLA_HOME = @MOZILLA_HOME@
+-MSGFMT = @MSGFMT@
+-NCC = @NCC@
+-NEMERLE_CFLAGS = @NEMERLE_CFLAGS@
+-NEMERLE_LIBS = @NEMERLE_LIBS@
+-OBJEXT = @OBJEXT@
+-PACKAGE = @PACKAGE@
+-PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
+-PACKAGE_NAME = @PACKAGE_NAME@
+-PACKAGE_STRING = @PACKAGE_STRING@
+-PACKAGE_TARNAME = @PACKAGE_TARNAME@
+-PACKAGE_VERSION = @PACKAGE_VERSION@
+-PATH = @PATH@
+-PATH_SEPARATOR = @PATH_SEPARATOR@
+-PKG_CONFIG = @PKG_CONFIG@
+-POFILES = @POFILES@
+-POSUB = @POSUB@
+-PO_IN_DATADIR_FALSE = @PO_IN_DATADIR_FALSE@
+-PO_IN_DATADIR_TRUE = @PO_IN_DATADIR_TRUE@
+-RUNTIME = @RUNTIME@
+-SET_MAKE = @SET_MAKE@
+-SHELL = @SHELL@
+-SQLITE_XML = @SQLITE_XML@
+-STRIP = @STRIP@
+-UNMANAGED_DEPENDENCIES_MINT_CFLAGS = @UNMANAGED_DEPENDENCIES_MINT_CFLAGS@
+-UNMANAGED_DEPENDENCIES_MINT_LIBS = @UNMANAGED_DEPENDENCIES_MINT_LIBS@
+-UNMANAGED_DEPENDENCIES_MONO_CFLAGS = @UNMANAGED_DEPENDENCIES_MONO_CFLAGS@
+-UNMANAGED_DEPENDENCIES_MONO_LIBS = @UNMANAGED_DEPENDENCIES_MONO_LIBS@
+-UPDATE_DESKTOP_DB = @UPDATE_DESKTOP_DB@
+-UPDATE_MIME_DB = @UPDATE_MIME_DB@
+-USE_NLS = @USE_NLS@
+-VERSION = @VERSION@
+-XGETTEXT = @XGETTEXT@
+-XSP_CFLAGS = @XSP_CFLAGS@
+-XSP_LIBS = @XSP_LIBS@
+-ZIP = @ZIP@
+-ac_ct_CC = @ac_ct_CC@
+-am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
+-am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
+-am__include = @am__include@
+-am__leading_dot = @am__leading_dot@
+-am__quote = @am__quote@
+-am__tar = @am__tar@
+-am__untar = @am__untar@
+-bindir = @bindir@
+-build_alias = @build_alias@
+-datadir = @datadir@
+-datarootdir = @datarootdir@
+-docdir = @docdir@
+-dvidir = @dvidir@
+-exec_prefix = @exec_prefix@
+-gtksharp_prefix = @gtksharp_prefix@
+-host_alias = @host_alias@
+-htmldir = @htmldir@
+-includedir = @includedir@
+-infodir = @infodir@
+-install_sh = @install_sh@
+-libdir = @libdir@
+-libexecdir = @libexecdir@
+-localedir = @localedir@
+-localstatedir = @localstatedir@
+-mandir = @mandir@
+-mkdir_p = @mkdir_p@
+-oldincludedir = @oldincludedir@
+-pdfdir = @pdfdir@
+-prefix = @prefix@
+-program_transform_name = @program_transform_name@
+-psdir = @psdir@
+-sbindir = @sbindir@
+-sharedstatedir = @sharedstatedir@
+-sysconfdir = @sysconfdir@
+-target_alias = @target_alias@
+-BINDIR = $(top_builddir)/build/bin
+-LOG4NET_DLL = log4net.dll
+-LOG4NET = $(BINDIR)/$(LOG4NET_DLL)
+-CECIL_DLL = Mono.Cecil.dll
+-CECIL = $(BINDIR)/$(CECIL_DLL)
+-MONO_ADDINS_DLL = Mono.Addins.dll
+-MONO_ADDINS = $(BINDIR)/$(MONO_ADDINS_DLL)
+-MONO_ADDINS_SETUP_DLL = Mono.Addins.Setup.dll
+-MONO_ADDINS_SETUP = $(BINDIR)/$(MONO_ADDINS_SETUP_DLL)
+-MONO_ADDINS_GUI_DLL = Mono.Addins.Gui.dll
+-MONO_ADDINS_GUI = $(BINDIR)/$(MONO_ADDINS_GUI_DLL)
+-
+-# We need to copy Firebird to the same directory as where
+-# mono.data.sql builds. otherwise, mono.data.sql cant find the
+-# firebird provider when monoquery links against mono.data.sql.
+-FIREBIRDDIR = $(top_builddir)/build/AddIns/MonoQuery
+-FIREBIRD_DLL = FirebirdSql.Data.Firebird.dll
+-FIREBIRD = $(FIREBIRDDIR)/$(FIREBIRD_DLL)
+-assemblydir = $(MD_ASSEMBLY_DIR)
+-assembly_DATA = $(LOG4NET) $(CECIL) $(FIREBIRD) $(MONO_ADDINS) $(MONO_ADDINS).config $(MONO_ADDINS_SETUP) $(MONO_ADDINS_GUI)
+-CLEANFILES = $(LOG4NET) $(CECIL) $(FIREBIRD) $(MONO_ADDINS) $(MONO_ADDINS).config
+-EXTRA_DIST = $(LOG4NET_DLL) $(CECIL_DLL) $(FIREBIRD_DLL) $(MONO_ADDINS_DLL) $(MONO_ADDINS_DLL).config $(MONO_ADDINS_SETUP_DLL) $(MONO_ADDINS_GUI_DLL)
+-all: all-am
+-
+-.SUFFIXES:
+-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
+-	@for dep in $?; do \
+-	  case '$(am__configure_deps)' in \
+-	    *$$dep*) \
+-	      cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh \
+-		&& exit 0; \
+-	      exit 1;; \
+-	  esac; \
+-	done; \
+-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  contrib/Makefile'; \
+-	cd $(top_srcdir) && \
+-	  $(AUTOMAKE) --gnu  contrib/Makefile
+-.PRECIOUS: Makefile
+-Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
+-	@case '$?' in \
+-	  *config.status*) \
+-	    cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh;; \
+-	  *) \
+-	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)'; \
+-	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe);; \
+-	esac;
+-
+-$(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
+-	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
+-
+-$(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
+-	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
+-$(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
+-	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
+-uninstall-info-am:
+-install-assemblyDATA: $(assembly_DATA)
+-	@$(NORMAL_INSTALL)
+-	test -z "$(assemblydir)" || $(mkdir_p) "$(DESTDIR)$(assemblydir)"
+-	@list='$(assembly_DATA)'; for p in $$list; do \
+-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+-	  f=$(am__strip_dir) \
+-	  echo " $(assemblyDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(assemblydir)/$$f'"; \
+-	  $(assemblyDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(assemblydir)/$$f"; \
+-	done
+-
+-uninstall-assemblyDATA:
+-	@$(NORMAL_UNINSTALL)
+-	@list='$(assembly_DATA)'; for p in $$list; do \
+-	  f=$(am__strip_dir) \
+-	  echo " rm -f '$(DESTDIR)$(assemblydir)/$$f'"; \
+-	  rm -f "$(DESTDIR)$(assemblydir)/$$f"; \
+-	done
+-tags: TAGS
+-TAGS:
+-
+-ctags: CTAGS
+-CTAGS:
+-
+-
+-distdir: $(DISTFILES)
+-	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
+-	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
+-	list='$(DISTFILES)'; for file in $$list; do \
+-	  case $$file in \
+-	    $(srcdir)/*) file=`echo "$$file" | sed "s|^$$srcdirstrip/||"`;; \
+-	    $(top_srcdir)/*) file=`echo "$$file" | sed "s|^$$topsrcdirstrip/|$(top_builddir)/|"`;; \
+-	  esac; \
+-	  if test -f $$file || test -d $$file; then d=.; else d=$(srcdir); fi; \
+-	  dir=`echo "$$file" | sed -e 's,/[^/]*$$,,'`; \
+-	  if test "$$dir" != "$$file" && test "$$dir" != "."; then \
+-	    dir="/$$dir"; \
+-	    $(mkdir_p) "$(distdir)$$dir"; \
+-	  else \
+-	    dir=''; \
+-	  fi; \
+-	  if test -d $$d/$$file; then \
+-	    if test -d $(srcdir)/$$file && test $$d != $(srcdir); then \
+-	      cp -pR $(srcdir)/$$file $(distdir)$$dir || exit 1; \
+-	    fi; \
+-	    cp -pR $$d/$$file $(distdir)$$dir || exit 1; \
+-	  else \
+-	    test -f $(distdir)/$$file \
+-	    || cp -p $$d/$$file $(distdir)/$$file \
+-	    || exit 1; \
+-	  fi; \
+-	done
+-check-am: all-am
+-check: check-am
+-all-am: Makefile $(DATA)
+-installdirs:
+-	for dir in "$(DESTDIR)$(assemblydir)"; do \
+-	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
+-	done
+-install: install-am
+-install-exec: install-exec-am
+-install-data: install-data-am
+-uninstall: uninstall-am
+-
+-install-am: all-am
+-	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
+-
+-installcheck: installcheck-am
+-install-strip:
+-	$(MAKE) $(AM_MAKEFLAGS) INSTALL_PROGRAM="$(INSTALL_STRIP_PROGRAM)" \
+-	  install_sh_PROGRAM="$(INSTALL_STRIP_PROGRAM)" INSTALL_STRIP_FLAG=-s \
+-	  `test -z '$(STRIP)' || \
+-	    echo "INSTALL_PROGRAM_ENV=STRIPPROG='$(STRIP)'"` install
+-mostlyclean-generic:
+-
+-clean-generic:
+-	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
+ 
+-distclean-generic:
+-	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
+-
+-maintainer-clean-generic:
+-	@echo "This command is intended for maintainers to use"
+-	@echo "it deletes files that may require special tools to rebuild."
+-clean: clean-am
+-
+-clean-am: clean-generic mostlyclean-am
+-
+-distclean: distclean-am
+-	-rm -f Makefile
+-distclean-am: clean-am distclean-generic
+-
+-dvi: dvi-am
+-
+-dvi-am:
+-
+-html: html-am
+-
+-info: info-am
+-
+-info-am:
+-
+-install-data-am: install-assemblyDATA
+-
+-install-exec-am:
+-
+-install-info: install-info-am
+-
+-install-man:
+-
+-installcheck-am:
+-
+-maintainer-clean: maintainer-clean-am
+-	-rm -f Makefile
+-maintainer-clean-am: distclean-am maintainer-clean-generic
+-
+-mostlyclean: mostlyclean-am
+-
+-mostlyclean-am: mostlyclean-generic
+-
+-pdf: pdf-am
+-
+-pdf-am:
+-
+-ps: ps-am
+-
+-ps-am:
+-
+-uninstall-am: uninstall-assemblyDATA uninstall-info-am
+-
+-.PHONY: all all-am check check-am clean clean-generic distclean \
+-	distclean-generic distdir dvi dvi-am html html-am info info-am \
+-	install install-am install-assemblyDATA install-data \
+-	install-data-am install-exec install-exec-am install-info \
+-	install-info-am install-man install-strip installcheck \
+-	installcheck-am installdirs maintainer-clean \
+-	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
+-	pdf-am ps ps-am uninstall uninstall-am uninstall-assemblyDATA \
+-	uninstall-info-am
+-
+-
+-all: $(LOG4NET) $(CECIL) $(FIREBIRD) $(MONO_ADDINS) $(MONO_ADDINS_SETUP) $(MONO_ADDINS_GUI)
+-
+-$(LOG4NET): $(srcdir)/$(LOG4NET_DLL)
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(LOG4NET_DLL) $(LOG4NET)
+-
+-$(CECIL): $(srcdir)/$(CECIL_DLL)
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(CECIL_DLL) $(CECIL)
+-
+-$(MONO_ADDINS): $(srcdir)/$(MONO_ADDINS_DLL) $(srcdir)/$(MONO_ADDINS_DLL).config
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(MONO_ADDINS_DLL) $(MONO_ADDINS)
+-	cp $(srcdir)/$(MONO_ADDINS_DLL).config $(MONO_ADDINS).config
+-
+-$(MONO_ADDINS_GUI): $(srcdir)/$(MONO_ADDINS_GUI_DLL)
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(MONO_ADDINS_GUI_DLL) $(MONO_ADDINS_GUI)
+-
+-$(MONO_ADDINS_SETUP): $(srcdir)/$(MONO_ADDINS_SETUP_DLL)
+-	mkdir -p $(BINDIR)
+-	cp $(srcdir)/$(MONO_ADDINS_SETUP_DLL) $(MONO_ADDINS_SETUP)
++all:
+ 
+-$(FIREBIRD): $(srcdir)/$(FIREBIRD_DLL)
+-	mkdir -p $(FIREBIRDDIR)
+-	cp $(srcdir)/$(FIREBIRD_DLL) $(FIREBIRD)
+-# Tell versions [3.59,3.63) of GNU make to not export all variables.
+-# Otherwise a system limit (for SysV at least) may be exceeded.
+-.NOEXPORT:
++install:
+diff -urNad monodevelop-0.14~/contrib/Mono.Addins.dll.config monodevelop-0.14/contrib/Mono.Addins.dll.config
+--- monodevelop-0.14~/contrib/Mono.Addins.dll.config	2007-07-07 16:29:36.000000000 +0200
++++ monodevelop-0.14/contrib/Mono.Addins.dll.config	1970-01-01 01:00:00.000000000 +0100
+@@ -1,6 +0,0 @@
+-<?xml version="1.0" encoding="utf-8" ?>
+-<configuration>
+-  <startup>
+-    <supportedRuntime version="v2.0.50727" /> 
+-  </startup>
+-</configuration>

@@ -1,0 +1,30 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## cecil_0.5_backport.dpatch by Mirco Bauer <meebey@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad monodevelop-0.14~/Core/src/MonoDevelop.Projects/MonoDevelop.Projects.Parser.Cecil/MdbWriter.cs monodevelop-0.14/Core/src/MonoDevelop.Projects/MonoDevelop.Projects.Parser.Cecil/MdbWriter.cs
+--- monodevelop-0.14~/Core/src/MonoDevelop.Projects/MonoDevelop.Projects.Parser.Cecil/MdbWriter.cs	2007-07-07 15:17:22.000000000 +0200
++++ monodevelop-0.14/Core/src/MonoDevelop.Projects/MonoDevelop.Projects.Parser.Cecil/MdbWriter.cs	2007-07-07 15:17:40.000000000 +0200
+@@ -28,6 +28,7 @@
+ 
+ namespace Mono.Cecil.Mdb {
+ 
++	using System;
+ 	using System.Collections;
+ 	using SDS = System.Diagnostics.SymbolStore;
+ 	using Mono.CompilerServices.SymbolWriter;
+@@ -44,6 +45,11 @@
+ 			m_documents = new Hashtable ();
+ 		}
+ 
++		public void Write (MethodBody body)
++		{
++			throw new NotImplementedException ();
++		}
++
+ 		public void Write (MethodBody body, byte [][] variables)
+ 		{
+ 			Document document = CreateDocuments (body);

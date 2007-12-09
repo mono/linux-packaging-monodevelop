@@ -1,30 +1,40 @@
 #!/usr/bin/make -f
 
-# Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 export MONO_SHARED_DIR=$(CURDIR)
 include /usr/share/dpatch/dpatch.make
 
-configure: configure-stamp
-configure-stamp: patch
+configure: patch configure-stamp
+configure-stamp:
 	dh_testdir
 	./configure --prefix=/usr \
 	  --mandir=\$${prefix}/share/man \
 	  --infodir=\$${prefix}/share/info \
-	  --disable-update-mimedb
-	  RUNTIME=/usr/bin/cli
-	perl -pe ' \
-	  s,\$$\(UPDATE_MIME_DB\),/bin/true,; \
-	  ' -i Makefile
+	  --disable-update-mimedb --disable-update-desktopdb \
+	  --enable-boo --enable-java \
+	  --enable-nunit \
+	  --enable-versioncontrol --enable-subversion \
+	  --enable-aspnet \
+	  --disable-monoextensions \
+	  BOOC=/usr/bin/booc2
+	# needs nemerle >= 0.9.3.99
+	#  --enable-nemerle
+	# needs too buggy libjscall0.0-cil
+	#  --enable-aspnetedit
+	# debugger is not ready yet, monodevelop 0.10 maybe?
+	#  --enable-debugger
 	touch configure-stamp
 
-build: build-stamp
-build-stamp: configure-stamp
+build: configure build-stamp
+build-stamp:
 	dh_testdir
+	cp /usr/lib/stetic/libstetic* ./Extras/MonoDevelop.GtkCore/lib/
+	mkdir -p build/AddIns
 	$(MAKE) RUNTIME=/usr/bin/cli
 	touch build-stamp
 
-clean: unpatch
+clean: clean-patched unpatch
+clean-patched:
 	dh_testdir
 	dh_testroot
 	rm -f configure-stamp
@@ -38,32 +48,46 @@ install: build
 	dh_testroot
 	dh_clean -k 
 	dh_installdirs
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp RUNTIME=/usr/bin/cli
-	-cd $(CURDIR)/debian && find -type f -name "*.exe" -exec chmod +x {} \;
-	-cd $(CURDIR)/debian && find -type f -name "*.dll" -exec chmod -x {} \;
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	chmod -x debian/tmp/usr/share/pixmaps/monodevelop.png
 
-binary-arch: build install
-	dh_testdir -s
-	dh_testroot -s
-	dh_movefiles -s
-	dh_link -s
-	dh_install -s
-	chmod -x $(CURDIR)/debian/monodevelop/usr/share/pixmaps/monodevelop.png
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_link
+	dh_install
+	# remove boo files (shipped in monodevelop-boo)
+	rm debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/Boo*
+	# remove java files (shipped in monodevelop-java)
+	rm debian/monodevelop/usr/lib/monodevelop/AddIns/BackendBindings/Java*
+	# remove nunit files (shipped in monodevelop-nunit)
+	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/NUnit/
+	# remove versioncontrol files (shipped in monodevelop-versioncontrol)
+	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/VersionControl/
+	# remove ChangeLogAddIn files (shipped in monodevelop-versioncontrol)
+	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/ChangeLogAddIn/
+	# remove query files (shipped in monodevelop-query)
+	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/MonoQuery/
 	cp $(CURDIR)/ChangeLog $(CURDIR)/changelog
-	dh_installchangelogs -s
-	dh_installdocs -s
-	dh_installexamples -s
-	dh_installmenu -s
-	dh_installman -s
-	dh_strip -s
-	dh_compress -s
-	dh_fixperms -s
-	dh_installdeb -s
-	dh_shlibdeps -s
-	dh_clideps -s -d
-	dh_gencontrol -s
-	dh_md5sums -s
-	dh_builddeb -s
+	dh_installchangelogs
+	dh_installdocs
+	dh_installexamples
+	dh_installmenu
+	dh_installman
+	dh_installmime
+	dh_desktop
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_clifixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_clideps -d
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
 
-binary: binary-arch
-.PHONY: build clean binary-arch binary install 
+binary-arch:
+
+binary: binary-indep
+.PHONY: build clean binary-indep binary-arch binary install configure patch unpatch

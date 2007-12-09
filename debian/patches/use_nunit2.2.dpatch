@@ -1,0 +1,67 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## use_nunit2.2.dpatch by Mirco Bauer <meebey@meebey.net>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad monodevelop-0.14~/Extras/NUnit/Makefile.am monodevelop-0.14/Extras/NUnit/Makefile.am
+--- monodevelop-0.14~/Extras/NUnit/Makefile.am	2007-07-07 15:46:07.000000000 +0200
++++ monodevelop-0.14/Extras/NUnit/Makefile.am	2007-07-07 15:46:52.000000000 +0200
+@@ -11,8 +11,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/Extras/NUnit/lib/nunit.core.dll \
+-	-r:$(top_srcdir)/Extras/NUnit/lib/nunit.framework.dll \
++	$(shell pkg-config --libs nunit) \
+ 	-r:System \
+ 	-r:System.Xml
+ 
+@@ -69,9 +68,7 @@
+ 	templates/NUnitTestClass.xft.xml
+ 
+ 
+-NUNIT_FILES = \
+-nunit.core.dll \
+-nunit.framework.dll
++NUNIT_FILES =
+ 
+ SRC_NUNIT_FILES = $(addprefix $(srcdir)/lib/, $(NUNIT_FILES))
+ BUILD_NUNIT_FILES = $(addprefix $(ADDIN_BUILD)/, $(NUNIT_FILES))
+diff -urNad monodevelop-0.14~/Extras/NUnit/Makefile.in monodevelop-0.14/Extras/NUnit/Makefile.in
+--- monodevelop-0.14~/Extras/NUnit/Makefile.in	2007-07-07 15:46:07.000000000 +0200
++++ monodevelop-0.14/Extras/NUnit/Makefile.in	2007-07-07 15:46:58.000000000 +0200
+@@ -287,8 +287,7 @@
+ 	-r:$(top_builddir)/build/AddIns/MonoDevelop.Projects.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+ 	-r:$(top_srcdir)/contrib/Mono.Addins.dll \
+-	-r:$(top_srcdir)/Extras/NUnit/lib/nunit.core.dll \
+-	-r:$(top_srcdir)/Extras/NUnit/lib/nunit.framework.dll \
++	$(shell pkg-config --libs nunit) \
+ 	-r:System \
+ 	-r:System.Xml
+ 
+@@ -344,9 +343,7 @@
+ 	templates/NUnitProject.xpt.xml \
+ 	templates/NUnitTestClass.xft.xml
+ 
+-NUNIT_FILES = \
+-nunit.core.dll \
+-nunit.framework.dll
++NUNIT_FILES =
+ 
+ SRC_NUNIT_FILES = $(addprefix $(srcdir)/lib/, $(NUNIT_FILES))
+ BUILD_NUNIT_FILES = $(addprefix $(ADDIN_BUILD)/, $(NUNIT_FILES))
+diff -urNad monodevelop-0.14~/Extras/NUnit/MonoDevelopNUnit.addin.xml monodevelop-0.14/Extras/NUnit/MonoDevelopNUnit.addin.xml
+--- monodevelop-0.14~/Extras/NUnit/MonoDevelopNUnit.addin.xml	2007-07-07 15:46:07.000000000 +0200
++++ monodevelop-0.14/Extras/NUnit/MonoDevelopNUnit.addin.xml	2007-07-07 15:46:22.000000000 +0200
+@@ -10,8 +10,6 @@
+ 
+ 	<Runtime>
+ 		<Import assembly="MonoDevelop.NUnit.dll" />
+-		<Import assembly="nunit.core.dll" />
+-		<Import assembly="nunit.framework.dll" />
+ 	</Runtime>
+ 	
+ 	<Dependencies>

@@ -1,13 +1,360 @@
+monodevelop (0.14+dfsg-3) unstable; urgency=low
+
+  * Added desktop-file-utils to build dependencies. (Closes. #443778)
+
+ -- Mirco Bauer <meebey@debian.org>  Fri, 05 Oct 2007 19:33:51 +0200
+
+monodevelop (0.14+dfsg-2) unstable; urgency=low
+
+  * Rebuilt against libgtksourceview2.0-cil 0.11-1 (Closes: #441367)
+
+ -- Mirco Bauer <meebey@debian.org>  Sun, 09 Sep 2007 12:35:48 +0200
+
+monodevelop (0.14+dfsg-1) unstable; urgency=low
+
+  * DFSG version of MonoDevelop 0.14
+    (deleted all pre-compiled binaries from the tarball)
+    + For the record here a list of the deleted files:
+      Extras/MonoDevelop.GtkCore/lib/libsteticui.dll
+      Extras/MonoDevelop.GtkCore/lib/libstetic.dll
+      Extras/NUnit/lib/nunit.core.dll
+      Extras/NUnit/lib/nunit.framework.dll
+      Extras/AspNetEdit/libs/jscall.dll
+      contrib/Mono.Addins.dll
+      contrib/Mono.Addins.Gui.dll
+      contrib/Mono.Addins.Setup.dll
+      contrib/log4net.dll
+      contrib/FirebirdSql.Data.Firebird.dll
+      contrib/Mono.Cecil.dll
+  * New upstream release
+    + GTK# resource cleanup is now correctly handled. (Closes: #430033)
+    + This version builds cleanly against stetic 0.1.0~svn.81552.
+      (Closes: #432365)
+    + Environment variables are not tampered. (Closes: #399921)
+  * debian/patches/use_nunit2.2.dpatch
+    debian/patches/use_real_libs.dpatch
+    debian/patches/use_libsvn1.dpatch
+    debian/patches/use_libapr1.dpatch:
+    + Updated for MonoDevelop 0.14
+  * debian/patches/fix_aspnetedit_build_system.dpatch:
+    + Removed, already applied upstream.
+  * debian/patches/mono-addins0.2_forwardport.dpatch:
+    + Ported MonoDevelop 0.14 to compile against Mono.Addins 0.2
+  * debian/patches/cecil_0.5_backport.dpatch:
+    + Ported MonoDevelop 0.14 to compile against Cecil 0.5
+  * debian/control:
+    + Updated stetic build dependency to >= 0.1.0~svn.81552
+    + Added libmono-addins0.2-cil and libmono-addins-gui0.2-cil to build
+      dependencies.
+    + Replaced ${Source-Version} with ${source:Version}
+  * debian/watch:
+    + Updated
+
+ -- Mirco Bauer <meebey@debian.org>  Sun, 15 Jul 2007 21:50:31 +0200
+
+monodevelop (0.13.1+dfsg-4) unstable; urgency=low
+
+  * debian/control:
+    + Build depend explicitly on libmono-cairo2.0-cil. (Closes: #424075)
+      (needed because of a Mono runtime 'remap' 1.0 to 2.0 hack)
+
+ -- Mirco Bauer <meebey@debian.org>  Mon, 04 Jun 2007 22:02:51 +0200
+
+monodevelop (0.13.1+dfsg-3) unstable; urgency=low
+
+  * Rebuild against libmono-cecil0.5-cil. (Closes: #421616)
+  * debian/control:
+    + Updated libmono-cecil0.4-cil build-dependency to libmono-cecil0.5-cil.
+    + Bumped Standards-Version to 3.7.2 (no changes required).
+  * debian/rules:
+    + Added call for dh_clifixperms in binary-indep target.
+  * debian/patches/cecil_0.4_backport.dpatch:
+    + Disabled, as we build against cecil 0.5 now.
+
+ -- Mirco Bauer <meebey@debian.org>  Thu, 03 May 2007 19:43:50 +0200
+
+monodevelop (0.13.1+dfsg-2) unstable; urgency=low
+
+  * debian/patches/use_libsvn1.dpatch:
+    debian/patches/use_libapr1.dpatch:
+    + Remove references in the code that pulls libsvn0 and libapr0 in.
+      (Closes: #417763)
+
+ -- Mirco Bauer <meebey@debian.org>  Wed, 04 Apr 2007 22:00:22 +0200
+
+monodevelop (0.13.1+dfsg-1) unstable; urgency=low
+
+   * DFSG version of MonoDevelop 0.13.1
+     (deleted all precompiled binaries from the tarball)
+     + For the record here a list of the deleted files:
+       Extras/NUnit/lib/nunit.core.dll  
+       Extras/NUnit/lib/nunit.framework.dll  
+       Extras/MonoDevelop.GtkCore/lib/libstetic.dll  
+       Extras/MonoDevelop.GtkCore/lib/libsteticui.dll  
+       contrib/log4net.dll 
+       contrib/Mono.Cecil.dll
+       contrib/FirebirdSql.Data.Firebird.dll
+   * New upstream release (Closes: #414019)
+     + Supports method parameters and constructors for auto-completion now.
+       (Closes: #350084)
+     + Fixes a crash problem with Gecko.WebControl on startup.
+       (Closes: #400239)
+   * debian/control:
+     + Using my Debian email address now.
+     + Updated cli-common-dev build dependency to >= 0.4.4
+     + Updates stetic build dependency to >= 0.1.0~svn.74962
+     + Added Replaces: monodevelop << 0.13.1 to monodevelop-versioncontrol
+     + Removed hardcoded unneeded metacity dependency (Closes: #400816)
+     + Updated libnunit2.2-cil build dependency to libnunit2.2.6-cil.
+     + Updated booc build dependency to >= 0.7.6.2237-6
+   * debian/rules:
+     + Using /usr/bin/booc2 in configure call instead of debian/booc2.
+   * debian/patches/00list:
+     + Disabled remove_gtk-sharp-1.0_support, already applied upstream.
+   * debian/patches/use_nunit2.2.dpatch
+     debian/patches/use_real_libs.dpatch:
+     + Updated for MonoDevelop 0.13.1
+   * debian/patches/fix_dllmaps.dpatch:
+     + Added DLL map for glibsharpglue-2 to
+       MonoDevelop.SourceEditor.dll.config.in.
+   * debian/patches/use_x-terminal-emulator.dpatch:
+     + Use x-terminal-emulator instead of xterm when using external console
+       as application output.
+       (disabled though, because multi-gnome-terminal doesn't like it)
+   * debian/monodevelop-versioncontrol.install:
+     + Added ChangeLogAddIn (moved from monodevelop package), as this plugin
+       requires the VersionControl plugin.
+
+ -- Mirco Bauer <meebey@debian.org>  Sun, 25 Mar 2007 22:13:56 +0200
+
+monodevelop (0.12+dfsg-1) unstable; urgency=low
+
+   * DFSG version of MonoDevelop 0.12
+     (deleted all precompiled binaries from the tarball)
+   * New upstream release
+     + Added support for C# 2.0 (as supporting C# 1.0)
+     + Added support for ASP.NET
+     + ASP.NET designer support not enabled, it's pre-alpha and not usable.
+       (and needs additional packages which I created for testing)
+   * debian/watch:
+     + Updated
+   * debian/patches/00list:
+     + Disabled use_xulrunner.dpatch, startup script supports xulrunner by
+       default now.
+   * debian/rules:
+     + Fixed configure target dependencies.
+   * debian/control:
+     + Updated mono-mcs build-dep to mono-gmcs and CLI 1.0 packages to 2.0,
+       MonoDevelop now uses C# 2.0 (gmcs).
+     + Added libmono-system-runtime2.0-cil to build-deps.
+     + Added stetic to build-deps.
+     + Added mono-xsp and mono-xsp2 to build-deps (needed for ASP.NET support)
+     + Added ASP.NET to package description.
+     + Removed boo from Build-Conflicts-Indep, not needed anymore.
+     + Added libsvn-dev and libapr1-dev to build-deps.
+       (dh_clideps needs the shlibs for dep tracking)
+     + Removed hardcoded libsvn0 and libapr0 dependencies from
+       monodevelop-versioncontrol (dh_clideps tracks this now, Closes: #391747)
+
+ -- Mirco Bauer <meebey@meebey.net>  Sat, 9 Sep 2006 23:23:45 +0200
+
+monodevelop (0.11-2) unstable; urgency=medium
+
+   * debian/patches/fix_registering_2.0_system_assemblies.dpatch:
+     + When the /usr/lib/mono/2.0 directory doesn't exist, the
+       initialization of the references failed. (Closes: #381598)
+   * debian/patches/libstetic-dllmap.dpatch:
+     + Adds libmetacity-private.so.0 to dllmap
+       (thanks to Sebastian 'slomo' Dröge)
+   * debian/control:
+     + Added libmetactiy-dev to build-deps
+     + Added boo (= 0.7.6.2237-3) to Build-Conflicts-Indep, as that version
+       accidentlly links against CLR 2.0 which breaks the monodevelop-boo
+       plugin. (for more details check this boo bugreport: #382700)
+
+ -- Mirco Bauer <meebey@meebey.net>  Sat, 12 Aug 2006 20:14:18 +0200
+
+monodevelop (0.11-1) unstable; urgency=low
+
+   * New upstream release
+   * Updated libmono-cecil0.4-cil build-dep to >= 0.4.1+svn20060703-2
+   * debian/patches/add_new_file_null.dpatch
+     debian/patches/glade_no-gnome.dpatch:
+     + Removed, already applied upstream.
+
+ -- Mirco Bauer <meebey@meebey.net>  Wed, 12 Jul 2006 22:15:41 +0200
+
+monodevelop (0.10-2) unstable; urgency=medium
+
+   * Moved debhelper and dpatch from build-dep-indep to build-dep.
+   * Added libmetacity0 dependency to monodevelop. (Closes: #365949)
+   * Updated libmono-cecil0.3-cil buil-dep to libmono-cecil0.4-cil
+   * Updated cli-common build-dep to cli-common-dev
+   * Added libmono-sqlite1.0-cil to build-deps. (Closes: #374211)
+   * Rebuild against Gecko# 0.11-3
+   * Updated libgecko2.0-cil build-dep to >= 0.11-3
+   * debian/patches/use_xulrunner.dpatch:
+     + Patches monodevelop start script to set the correct MOZILLA_FIVE_HOME
+       environment variable.
+   * Removed mozilla-dev from build-deps.
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 18 Jun 2006 17:48:11 +0200
+
+monodevelop (0.10-1) unstable; urgency=medium
+
+   * New upstream release
+     + Fixed fr.po encoding (Closes: #343889)
+     + Shows now a status indicator for library indexing, needed for the
+       intellisense feature. (Closes: #286598)
+     + Doesn't crash anymore when directory names contain "#" (Closes: #342493)
+     + Fixes FTBFS because of Mono.Unix namespace change. (Closes: #360218)
+       Thus using urgency=medium
+   * Rebuild against libnunit2.2-cil (Closes: #353984, #351344)
+   * Rebuild against boo 0.7.5.2013 (Closes: #343750)
+   * debian/patches/01_use_real_nunit.dpatch
+     debian/patches/02_fix_mono.unix_api_breakage.dpatch
+     debian/patches/remove_unused_icon.dpatch:
+     + Removed, already applied upstream.
+   * debian/control:
+     + Added libnunit2.2-cil, libmono-oracle1.0-cil, libmono-bytefx0.7.6.1-cil,
+       libmono-npgsql1.0-cil, libmono-cecil0.3-cil, liblog4net1.2-cil,
+       libmono-firebirdsql1.7-cil to build-deps.
+     + Added monodevelop-query package, because it pulls firebird libraries in
+       which doesn't exist for all architectures.
+     + Updated debhelper build-dep to >= 5.0.0
+     + Updated mono-mcs build-dep to >= 1.1.10
+     + Updated boo build-dep to >= 0.7.5.2013
+     + Changed cli-common build-dep to cli-common-dev >= 0.4.0
+   * debian/compat:
+     + Bumped to 5
+   * debian/copyright:
+     + Updated author list.
+     + Added URL for the source of stetic.
+   * debian/patches/*.dpatch:
+     + Thanks to Sebastian 'slomo' Dröge <slomo@ubuntu.com> for all patches.
+   * debian/patches/use_real_libs.dpatch:
+     + Use real log4net, cecil and FirebirdSql.Data.Firebird instead of the
+       bundled versions.
+   * debian/patches/update_templates_for_gtk_sharp_2.8.x.dpatch:
+     + Updates the references to Gtk# 2 libraries in the templates.
+   * debian/patches/glade_wrong_file_extension.dpatch:
+     + Fixes bug that used .cs instead of .glade
+   * debian/patches/remove_gtk-sharp-1.0_support.dpatch:
+     + Removes Gtk# 1.0 support because it can't work.
+   * debian/patches/boo_mimetype.dpatch:
+     + Adds missing .boo extension entry needed for syntax highlighting
+   * debian/patches/add_new_file_null.dpatch:
+     + Fixes a crash for new files.
+   * debian/patches/glade_no-gnome.dpatch:
+     + Glade templates should not depend on GNOME.
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 19 Mar 2006 15:36:34 +0100
+
+monodevelop (0.9-1) unstable; urgency=low
+
+   * New upstream release
+   * debian/control:
+     - Added libvte2.0-cil to build-deps.
+     - Added mozilla-dev again to build-deps.
+     - Updated versioned build-dep on Gtk# to >= 2.4.0.
+   * debian/patches/01_use_real_nunit.dpatch:
+     - Updated for MonoDevelop 0.9.
+   * debian/patches/remove_unused_icon.dpatch:
+     - Removes a reference to an icon which doesn't exist,  caused exception
+       on PPC. (Closes: #338053)
+       (thanks to Sebastian 'slomo' Dröge <slomo@ubuntu.com> for the patch)
+
+ -- Mirco Bauer <meebey@meebey.net>  Sat, 26 Nov 2005 15:16:10 +0100
+
+monodevelop (0.8-1) unstable; urgency=low
+
+   * New upstream release
+   * debian/rules:
+     - Enabled NUnit support.
+     - Enabled VersionControl (SVN) support.
+   * debian/control:
+     - Added libnunit-cil (>= 1.1.8) to build-deps.
+     - Removed mozilla-dev from build-deps.
+     - Added monodevelop-java, monodevelop-nunit and monodevelop-versioncontrol
+       package.
+   * debian/patches/00list:
+     - Removed 01_remove_bashism, parsing_mcs_1.1.9_output,
+       update_templates_for_gtk_sharp_2.3.x and boo_0.6.0_compat, they are
+       already applied upstream.
+     - Added 01_use_real_nunit.
+   * debian/patches/01_use_real_nunit.dpatch:
+     - Created patch to use nunit instead of mono-nunit.
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 16 Oct 2005 21:26:16 +0200
+
+monodevelop (0.7-3) unstable; urgency=low
+
+   * Rebuilt against MonoDoc 1.1.9
+   * Rebuilt against Gtk# 2.3.91
+   * Rebuilt against Boo 0.6.0.1858
+   * Updated versioned build-dep on Gtk# to >= 2.3.91.
+   * Updated versioned build-dep on boo to >= 0.6.0.1858.
+   * Updated versioned build-dep on monodoc-base to >= 1.1.9.
+   * Updated versioned build-dep on cli-common to >= 0.2.0.
+   * Created parsing_mcs_1.1.9_output.dpatch, backport of upstream's SVN r2727.
+   * Added boo_0.6.0_compat.dpatch
+     (thanks to Peter Johanson <latexer@gentoo.org> for the patch)
+   * Really fix bashism, updated 01_fix_startup_script.dpatch
+     (Closes: #311672)
+   * Updated to Standards Version 3.6.2.1 (no changes).
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 25 Sep 2005 19:54:34 +0200
+
+monodevelop (0.7-2) unstable; urgency=low
+
+   * Created 01_fix_startup_script.dpatch to fix bashism (Closes: #311672).
+   * Enabled Boo and Java support (Closes: #311730).
+   * Created monodevelop-boo and monodevelop-java package.
+     (building monodevelop-java package is disabled though, the integration
+      is currently buggy in 0.7)
+   * debian/NEWS:
+     + Updated for 0.4 -> 0.7 problems/news, please read!
+   * debian/control:
+     + Removed libmono-dev, libglade2-dev, libgnome2-dev, libgtksourceview-dev,
+       libgnomevfs2-dev and liborbit2-dev from build-deps. They are not
+       required anymore because monodevelop uses the C# bindings now.
+     + Removed "Uploaders" field, it's optional.
+     + Added boo and ikvm to build-deps.
+     + Added ${misc:Depends} to "Depends".
+   * debian/rules:
+     + Added --enable-boo and --enable-ikvm to configure call.
+     + Added dh_installmime and dh_desktop call.
+     + Removed all "-i" from dh_* calls, whole package is arch indep.
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 19 Jun 2005 16:27:59 +0200
+
+monodevelop (0.7-1) unstable; urgency=low
+
+   * upload to unstable
+   * new upstream release
+   * updated mono-mcs build-dep to >= 1.1.2 (Closes: #310117)
+   * updated Gtk#2 buil-dep to >= 1.9.5
+   * debian/rules:
+     + removed update-mime-db hack
+     + added --disable-update-desktopdb to ./configure call
+   * debian/control:
+     + changed arch from any to all, MonoDevelop is 100% C# code now
+     + updated cli-common build-dep to >= 0.1.3
+
+ -- Mirco Bauer <meebey@meebey.net>  Sun, 29 May 2005 20:17:47 +0200
+
 monodevelop (0.6-1) experimental; urgency=low
 
    * New upstream release
     + Edit->Undo problems are solved (Closes: #258265)
     + "Xlib: unexpected async reply" problems solved (Closes: #297469)
     + Dialog's OK buttons didn't do anything solved (Closes: #300528)
+    + Provides now own monodevelop.desktop (Closes: #307676)
    * Mirco 'meebey' Bauer
     + fixed typo in description. (Closes: #295692)
     + /usr/share/dotnet to /usr/lib transition
     + added build-dep for cli-common.
+    + removed build-dep for mono-utils.
     + added hack to get around update-mime-db in debian/rules
     + changed Maintainer to myself, this package is not in the scope of the
       Debian Mono Group.
