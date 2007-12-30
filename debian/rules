@@ -4,8 +4,8 @@
 export MONO_SHARED_DIR=$(CURDIR)
 include /usr/share/dpatch/dpatch.make
 
-configure: patch configure-stamp
-configure-stamp:
+configure: configure-stamp
+configure-stamp: patch-stamp
 	dh_testdir
 	./configure --prefix=/usr \
 	  --mandir=\$${prefix}/share/man \
@@ -16,8 +16,8 @@ configure-stamp:
 	  --enable-aspnet --enable-gnomeplatform --enable-c
 	touch configure-stamp
 
-build: configure build-stamp
-build-stamp:
+build: build-stamp
+build-stamp: configure-stamp
 	dh_testdir
 	$(MAKE) RUNTIME=/usr/bin/cli
 	touch build-stamp
@@ -28,7 +28,7 @@ clean-patched:
 	dh_testroot
 	rm -f configure-stamp
 	rm -f build-stamp
-	-$(MAKE) distclean
+	[ ! -f Makefile ] || $(MAKE) distclean
 	rm -rf $(CURDIR)/.wapi
 	dh_clean 
 
@@ -75,5 +75,6 @@ binary-indep: build install
 
 binary-arch:
 
-binary: binary-indep
+binary: binary-arch binary-indep
+
 .PHONY: build clean binary-indep binary-arch binary install configure patch unpatch

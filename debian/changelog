@@ -19,6 +19,7 @@ monodevelop (0.18.1+dfsg-1) unstable; urgency=low
   * debian/rules:
     + Enabled C/C++ project support and GNOME platform support in configure
       call.
+    + Enhanced "make clean" error handling.
   * debian/control:
     + Added C and C++ to package descriptions.
     + Changed suggests monodevelop-query to monodevelop-database.
