@@ -5,30 +5,45 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs
---- monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2007-06-12 01:11:00.000000000 +0200
-+++ monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2007-07-07 14:31:46.000000000 +0200
-@@ -21,10 +21,6 @@
- 		
+diff -urNad monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs
+--- monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2007-12-20 20:04:42.000000000 +0100
++++ monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2007-12-25 18:54:53.000000000 +0100
+@@ -22,10 +22,6 @@
  		public static LibSvnClient GetLib ()
  		{
--			try {
+ 			try {
 -				return new LibSvnClient0 ();
 -			} catch {}
 -			
- 			return new LibSvnClient1 ();
- 		}
- 		
-@@ -494,273 +490,6 @@
+-			try {
+ 				return new LibSvnClient1 ();
+ 			} catch {}
+ 			
+@@ -501,291 +497,6 @@
  		                                                    IntPtr baton, IntPtr pool);
  	}
  	
 -	public class LibSvnClient0 : LibSvnClient {
 -		private const string svnclientlib = "libsvn_client-1.so.0";
 -		
+-		public override void config_ensure (string config_dir, IntPtr pool)
+-		{
+-			svn_config_ensure (config_dir, pool);
+-		}
+-		
 -		public override void auth_open (out IntPtr auth_baton, IntPtr providers, IntPtr pool)	
 -		{
 -			svn_auth_open (out auth_baton, providers, pool);
+-		}
+-		
+-		public override void auth_set_parameter (IntPtr auth_baton, string name, IntPtr value)
+-		{
+-			svn_auth_set_parameter (auth_baton, name, value);
+-		}
+-		
+-		public override IntPtr auth_get_parameter (IntPtr auth_baton, string name)
+-		{
+-			return svn_auth_get_parameter (auth_baton, name);
 -		}
 -		
 -		public override void client_get_simple_provider (IntPtr item, IntPtr pool)
@@ -187,10 +202,10 @@ diff -urNad monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl.S
 -			return svn_client_move (ref commit_info_p, srcPath, ref rev, destPath, force, ctx, pool);
 -		}
 -		
--		public override IntPtr client_checkout (out Rev revision, string url, string path, ref Rev rev, 
+-		public override IntPtr client_checkout (IntPtr result_rev, string url, string path, ref Rev rev, 
 -		                                        int recurse, IntPtr ctx, IntPtr pool)
 -		{
--			return svn_client_checkout (out revision, url, path, ref rev, recurse, ctx, pool);
+-			return svn_client_checkout (result_rev, url, path, ref rev, recurse, ctx, pool);
 -		}
 -		
 -		public override IntPtr client_mkdir2 (ref IntPtr commit_info, IntPtr apr_array_paths, IntPtr ctx, IntPtr pool)
@@ -208,7 +223,10 @@ diff -urNad monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl.S
 -			                        no_diff_deleted, outfile, errfile, ctx, pool);
 -		}
 -		
+-		[DllImport(svnclientlib)] static extern void svn_config_ensure (string config_dir, IntPtr pool);
 -		[DllImport(svnclientlib)] static extern void svn_auth_open (out IntPtr auth_baton, IntPtr providers, IntPtr pool);
+-		[DllImport(svnclientlib)] static extern void svn_auth_set_parameter (IntPtr auth_baton, string name, IntPtr value);
+-		[DllImport(svnclientlib)] static extern IntPtr svn_auth_get_parameter (IntPtr auth_baton, string name);
 -		[DllImport(svnclientlib)] static extern void svn_client_get_simple_provider (IntPtr item, IntPtr pool);
 -		[DllImport(svnclientlib)] static extern void svn_client_get_simple_prompt_provider (IntPtr item, svn_auth_simple_prompt_func_t prompt_func, IntPtr prompt_batton, [MarshalAs (UnmanagedType.SysInt)] int retry_limit, IntPtr pool);
 -		[DllImport(svnclientlib)] static extern void svn_client_get_username_provider (IntPtr item, IntPtr pool);
@@ -274,7 +292,7 @@ diff -urNad monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl.S
 -		[DllImport(svnclientlib)] static extern IntPtr svn_client_move (ref IntPtr commit_info_p, string srcPath, ref Rev rev,
 -		                                                                string destPath, int force, IntPtr ctx, IntPtr pool);
 -		
--		[DllImport(svnclientlib)] static extern IntPtr svn_client_checkout (out Rev revision, string url, string path, ref Rev rev, 
+-		[DllImport(svnclientlib)] static extern IntPtr svn_client_checkout (IntPtr result_rev, string url, string path, ref Rev rev, 
 -		                                                                    int recurse, IntPtr ctx, IntPtr pool);
 -		
 -		[DllImport(svnclientlib)] static extern IntPtr svn_client_mkdir2 (ref IntPtr commit_info, IntPtr apr_array_paths, IntPtr ctx, IntPtr pool);

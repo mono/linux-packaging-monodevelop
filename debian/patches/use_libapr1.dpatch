@@ -5,21 +5,26 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
---- monodevelop-0.14~/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-06-12 01:11:00.000000000 +0200
-+++ monodevelop-0.14/Extras/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-07-07 14:36:01.000000000 +0200
-@@ -13,10 +13,6 @@
- 		
- 		public static LibApr GetLib ()
+diff -urNad monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
+--- monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-12-20 20:04:42.000000000 +0100
++++ monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-12-25 18:56:29.000000000 +0100
+@@ -14,15 +14,6 @@
+ 		public static LibApr GetLib (int ver)
  		{
--			try {
--				return new LibApr0 ();
--			} catch {}
--			
- 			return new LibApr1 ();
- 		}
- 		
-@@ -52,37 +48,6 @@
+ 			try {
+-				if (ver == 0)
+-					return new LibApr0 ();
+-				else if (ver == 1)
+-					return new LibApr1 ();
+-				
+-				try {
+-					return new LibApr0 ();
+-				} catch {}
+-				
+ 				return new LibApr1 ();
+ 			}
+ 			catch {
+@@ -63,37 +54,6 @@
  		public const int APR_OS_START_USEERR = APR_OS_START_USERERR;
  	}
  

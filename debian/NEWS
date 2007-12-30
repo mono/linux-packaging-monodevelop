@@ -1,3 +1,24 @@
+monodevelop (0.18.1-1) unstable; urgency=low
+
+  * Upgrading MonoDevelop 0.14 to 0.18.1 is not updating the addins database
+    correctly resulting in a crash with the folling console output:
+
+    Add-in error (MonoDevelop.Core,0.18.0): Add-in could not be loaded: Could
+    not read add-in file: $HOME/.config/MonoDevelop/addin-db-001/addin-data/1/
+    MonoDevelop.Core,0.18.0.maddin
+    ...
+    Unhandled Exception: System.InvalidOperationException: Could not read
+    add-in description
+
+    You can fix this issue by running (at least that worked for me):
+    mdtool setup reg-build
+
+    If you are still getting that InvalidOperationException, then you can try
+    to delete the addin database (monodevelop will rebuild it then) using:
+    rm -r ~/.config/MonoDevelop/addin-db-*/
+
+ -- Mirco Bauer <meebey@debian.org>  Sun, 30 Dec 2007 16:49:19 +0100
+
 monodevelop (0.7-2) unstable; urgency=low
 
   * The 0.7 release of MonoDevelop has some major changes:

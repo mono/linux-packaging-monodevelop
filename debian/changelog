@@ -1,3 +1,55 @@
+monodevelop (0.18.1-1) unstable; urgency=low
+
+  * The "With a lot of Love: Merry Christmas!" release
+  * DFSG version of MonoDevelop 0.18.1
+    (deleted all pre-compiled binaries from the tarball)
+    + For the record here a list of the deleted files:
+      src/addins/NUnit/lib/nunit.core.dll
+      src/addins/NUnit/lib/nunit.framework.dll
+  * New upstream release
+    + Upstream split MonoDevelop into 4 tarballs:
+      - monodevelop
+      - monodevelop-boo
+      - monodevelop-database
+      - monodevelop-java
+      thus we split up the monodevelop source package into 4 pieces too.
+  * debian/rules:
+    + Enabled C/C++ project support and GNOME platform support in configure
+      call.
+  * debian/control:
+    + Added C and C++ to package descriptions.
+    + Changed suggests monodevelop-query to monodevelop-database.
+  * debian/control
+    debian/monodevelop-boo.install
+    debian/monodevelop-java.install
+    debian/monodevelop-query.install:
+    + Removed monodevelop-boo, monodevelop-java and monodevelop-query packages.
+  * debian/patches/use_nunit2.2.dpatch:
+    + Updated and renamed to link_system_nunit2.2.6.dpatch
+  * debian/patches/use_real_libs.dpatch:
+    + Dropped, the only lib that is included is Mono.Cecil(.Mdb), which is
+      has no public releases and is bundled in source form.
+  * debian/patches/use_libsvn1.dpatch
+    debian/patches/use_libapr1.dpatch:
+    + Updated
+  * debian/patches/update_templates_for_gtk_sharp_2.8.x.dpatch:
+    + Updated and renamed to update_templates_for_gtk-sharp_2.10.dpatch
+  * debian/patches/fix_registering_2.0_system_assemblies.dpatch:
+    + Dropped, unneeded as MonoDevelop runs on a CLI 2.0 runtime, and thus it
+      must be present.
+  * debian/patches/fix_dllmaps.dpatch:
+    + Dropped, upstream doesn't ship a dllmap anymore, thus we need to provide
+      it completly.
+  * debian/MonoDevelop.Gettext.dll.config
+    debian/MonoDevelop.SourceEditor.dll.config:
+    + Added dllmaps so MonoDevelop uses the right libraries at runtime.
+  * debian/patches/mono-addins0.2_forwardport.dpatch:
+    + Dropped, already applied upstream.
+  * debian/monodevelop.menu:
+    + Updated, Apps -> Applications
+
+ -- Mirco Bauer <meebey@debian.org>  Tue, 25 Dec 2007 18:58:51 +0100
+
 monodevelop (0.14+dfsg-3) unstable; urgency=low
 
   * Added desktop-file-utils to build dependencies. (Closes. #443778)
