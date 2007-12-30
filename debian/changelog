@@ -6,13 +6,15 @@ monodevelop (0.18.1+dfsg-1) unstable; urgency=low
     + For the record here a list of the deleted files:
       src/addins/NUnit/lib/nunit.core.dll
       src/addins/NUnit/lib/nunit.framework.dll
-  * New upstream release
+  * New upstream release (Closes: #445545)
     + Upstream split MonoDevelop into 4 tarballs:
       - monodevelop
       - monodevelop-boo
       - monodevelop-database
       - monodevelop-java
       thus we split up the monodevelop source package into 4 pieces too.
+    + MonoDevelop doesn't crash anymore on startup if TMPDIR points to an
+      invalid directory. (Closes: #455822)
   * debian/NEWS:
     + Added an important warning / upgrade hints for users upgrading from
       MonoDevelop 0.14 to 0.18.1.
@@ -28,6 +30,9 @@ monodevelop (0.18.1+dfsg-1) unstable; urgency=low
       libmono-firebirdsql1.7-cil from build-dependencies.
       Those libraries are used now by the other monodevelop source packages.
     + Added libgtkspell-dev and libmono-winforms2.0-cil to build-dependencies.
+    + Changed mono-xsp(2) build dependencies to mono-xsp(2)-base, as those are
+      sufficient to build the package. (Closes: #447342)
+      (thanks to Cesare Tirabassi <norsetto@ubuntu.com> for the investigation)
   * debian/control
     debian/monodevelop-boo.install
     debian/monodevelop-java.install
