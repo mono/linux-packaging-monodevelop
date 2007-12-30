@@ -13,6 +13,9 @@ monodevelop (0.18.1-1) unstable; urgency=low
       - monodevelop-database
       - monodevelop-java
       thus we split up the monodevelop source package into 4 pieces too.
+  * debian/NEWS:
+    + Added an important warning / upgrade hints for users upgrading from
+      MonoDevelop 0.14 to 0.18.1.
   * debian/rules:
     + Enabled C/C++ project support and GNOME platform support in configure
       call.
