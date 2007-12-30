@@ -53,8 +53,10 @@ monodevelop (0.18.1+dfsg-1) unstable; urgency=low
     + Added dllmaps so MonoDevelop uses the right libraries at runtime.
   * debian/patches/mono-addins0.2_forwardport.dpatch:
     + Dropped, already applied upstream.
-  * debian/monodevelop.menu:
-    + Updated, Apps -> Applications
+  * debain/control
+    debian/monodevelop.menu:
+    + Updated Standards-Version to 3.7.3
+    + Updated menu section Apps -> Applications
 
  -- Mirco Bauer <meebey@debian.org>  Tue, 25 Dec 2007 18:58:51 +0100
 
