@@ -22,6 +22,10 @@ monodevelop (0.18.1-1) unstable; urgency=low
   * debian/control:
     + Added C and C++ to package descriptions.
     + Changed suggests monodevelop-query to monodevelop-database.
+    + Removed boo, ikvm, libmono-oracle2.0-cil, libmono-bytefx0.7.6.2-cil,
+      libmono-npgsql2.0-cil, libmono-sqlite2.0-cil, liblog4net1.2-cil and
+      libmono-firebirdsql1.7-cil from build-dependencies.
+      Those libraries are used now by the other monodevelop source packages.
   * debian/control
     debian/monodevelop-boo.install
     debian/monodevelop-java.install
