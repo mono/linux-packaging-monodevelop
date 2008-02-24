@@ -1,3 +1,24 @@
+monodevelop (0.19+dfsg-1) unstable; urgency=low
+
+  * DFSG version of MonoDevelop 0.19
+    (deleted all pre-compiled binaries from the tarball)
+    + For the record here a list of the deleted files:
+      src/addins/NUnit/lib/nunit.core.dll
+      src/addins/NUnit/lib/nunit.framework.dll
+  * New upstream (bugfix) release
+  * debian/rules:
+    + Fixed permissions of .mo files.
+    + Using dh_clistrip now to handle (strip) .mdb files.
+  * debian/control:
+    + Updated cli-common-dev build dependency to >= 0.5.4, as we need
+      dh_clistrip from it now.
+    + Moved mono-mcs dependency to recommends as mono-gmcs | mono-mcs,
+      MonoDevelop uses by default the C# 2.0 compiler now.
+  * debian/copyright:
+    + Updated author list.
+
+ -- Mirco Bauer <meebey@debian.org>  Sun, 30 Dec 2007 19:46:06 +0100
+
 monodevelop (0.18.1+dfsg-1) unstable; urgency=low
 
   * The "With a lot of Love: Merry Christmas!" release

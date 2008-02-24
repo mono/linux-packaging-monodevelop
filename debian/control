@@ -3,13 +3,39 @@ Section: devel
 Priority: optional
 Maintainer: Mirco Bauer <meebey@debian.org>
 Build-Depends: debhelper (>= 5), dpatch
-Build-Depends-Indep: cli-common-dev (>= 0.4.4), mono-gmcs (>= 1.1.10) | c-sharp-2.0-compiler, libmono-dev (>= 1.1.10), monodoc-base (>= 1.1.9), intltool, gtk-sharp2-gapi (>= 2.8), libgtk2.0-cil (>= 2.8), libmono-cairo2.0-cil, libgnome2.0-cil (>= 2.4.0), libgconf2.0-cil (>= 2.4.0), libglade2.0-cil (>= 2.4.0), libvte2.0-cil (>= 2.4.0), libgtksourceview2.0-cil (>= 0.10), libgecko2.0-cil (>= 0.10), libnunit2.2.6-cil, libmono-winforms2.0-cil, libmono-system-runtime2.0-cil, libmono-cecil0.5-cil, libmono-addins0.2-cil (>= 0.3), libmono-addins-gui0.2-cil (>= 0.3), libmetacity-dev, libsvn-dev, libapr1-dev, libgtkspell-dev, mono-xsp-base, mono-xsp2-base, desktop-file-utils
+Build-Depends-Indep: cli-common-dev (>= 0.5.4),
+ mono-gmcs (>= 1.1.10) | c-sharp-2.0-compiler,
+ libmono-dev (>= 1.1.10),
+ monodoc-base (>= 1.1.9),
+ intltool,
+ gtk-sharp2-gapi (>= 2.8),
+ libgtk2.0-cil (>= 2.8),
+ libmono-cairo2.0-cil,
+ libgnome2.0-cil (>= 2.4.0),
+ libgconf2.0-cil (>= 2.4.0),
+ libglade2.0-cil (>= 2.4.0),
+ libvte2.0-cil (>= 2.4.0),
+ libgtksourceview2.0-cil (>= 0.10),
+ libgecko2.0-cil (>= 0.10),
+ libnunit2.2.6-cil,
+ libmono-winforms2.0-cil,
+ libmono-system-runtime2.0-cil,
+ libmono-cecil0.5-cil,
+ libmono-addins0.2-cil (>= 0.3),
+ libmono-addins-gui0.2-cil (>= 0.3),
+ libmetacity-dev,
+ libsvn-dev,
+ libapr1-dev,
+ libgtkspell-dev,
+ mono-xsp-base,
+ mono-xsp2-base,
+ desktop-file-utils
 Standards-Version: 3.7.3
 
 Package: monodevelop
 Architecture: all
 Suggests: monodevelop-boo, monodevelop-java, monodevelop-nunit, monodevelop-versioncontrol, monodevelop-database, nemerle, mono-xsp, mono-xsp2
-Recommends: mono-gmcs | mono-mcs, 
+Recommends: mono-gmcs | mono-mcs
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${cli:Depends}, mono-mcs (>= 1.1.10), monodoc-manual (>= 1.1.9), pkg-config, gnome-icon-theme (>= 1.1.3), xterm | x-terminal-emulator
 Provides: monodoc-viewer
 Description: C/C++/C#/Boo/Java/Nemerle/ILasm/ASP.NET Development Environment

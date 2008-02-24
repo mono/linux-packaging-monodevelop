@@ -1,41 +1,64 @@
 This package was debianized by Mirco Bauer <meebey@meebey.net> on
 Mon, 15 Mar 2004 18:41:55 +0100.
 
-It was downloaded from http://www.monodevelop.com/
+It was downloaded from:
+http://www.monodevelop.com/
 
-Upstream Authors: 
-Todd Berman
-Pedro Abelleira Seco
-John Luke
-Daniel Kornhauser
+Authors: 
+Alberto Paro
+Alejandro Serrano
+Alexandre Gomes
 Alex Graveley
-nricciar
-John Bou Antoun
+Andrés G. Aragoneses
+Antonio Ognio
+Ankit Jain
 Ben Maurer
-Jeroen Zwartepoorte
-Gustavo Giráldez
-Miguel de Icaza
-Nick Drochak
-Pawel Rozanski
-Vincent Daron
+Ben Motmans
+Christian Hergert
+Daniel Kornhauser
+Daniel Morgan
+David Makovský
+Eric Butler
 Erik Dasque
+Franciso Martinez "Paco"
+Gustavo Giráldez
 Iain McCoy
 Inigo Illan
-Richard Torkar
-Paco Martinez
-Atsushi Enomoto
-Martin Willemoes Hansen
-Antonio Ognio
-Andre Filipe de Assuncao e Brito
-Maurício de Lemos Rodrigues Collares Neto
-Christian Hergert
-Ankit Jain
 Jacob Ilsø Christensen
+James Fitzsimons
+Jeff Stedfast
+Jérémie Laval
+Jeroen Zwartepoorte
+John BouAnton
+John Luke
+Joshua Tauberer
+Jonathan Hernández Velasco
+Levi Bard
+Lluis Sanchez Gual
+Marcos David Marín Amador
+Martin Willemoes Hansen
+Marek Sieradzki
+Matej Urbas
+Michael Hutchinson
+Miguel de Icaza
+Mike Krüger
+Muthiah Annamalai
+Nick Drochak
+nricciar
+Pawel Rozanski
+Pedro Abelleira Seco
+Peter Johanson
+Philip Turnbull
+Richard Torkar
+Scott Ellington
+Todd Berman
+Vincent Daron
+Wade Berrier
+Yan-ren Tsai
+Zach Lute
+and the SharpDevelop team
 
-and Mike Krueger and the SharpDevelop team
-
-Copyright:
-
+License:
    This package is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; version 2 dated June, 1991.
@@ -51,7 +74,4 @@ Copyright:
    02111-1307, USA.
 
 On Debian systems, the complete text of the GNU General
-Public License can be found in `/usr/share/common-licenses/GPL'.
-
-The source of the stetic library can be found here:
-http://svn.myrealbox.com/viewcvs/trunk/stetic/
+Public License can be found in `/usr/share/common-licenses/GPL-2'.
