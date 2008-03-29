@@ -8,6 +8,8 @@ monodevelop (1.0+dfsg-1) unstable; urgency=low
   * New upstream (bugfix) release
   * debian/patches/bashism.dpatch:
     + Use bash instead of sh in mdtool. (Closes: #468688)
+  * debian/control:
+    + Removed unneeded build-dependency on libvte2.0-cil.
 
  -- Mirco Bauer <meebey@debian.org>  Sun, 24 Feb 2008 19:28:54 +0100
 
