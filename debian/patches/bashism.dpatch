@@ -1,0 +1,16 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## bashism.dpatch by Mirco Bauer <meebey@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad monodevelop-1.0+dfsg~/mdtool.in monodevelop-1.0+dfsg/mdtool.in
+--- monodevelop-1.0+dfsg~/mdtool.in	2008-03-11 03:22:00.000000000 +0100
++++ monodevelop-1.0+dfsg/mdtool.in	2008-03-29 15:08:10.000000000 +0100
+@@ -1,4 +1,4 @@
+-#!/bin/sh
++#!/bin/bash
+ 
+ reWrite() {
+     ret=""

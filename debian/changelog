@@ -1,3 +1,16 @@
+monodevelop (1.0+dfsg-1) unstable; urgency=low
+
+  * DFSG version of MonoDevelop 1.0
+    (deleted all pre-compiled binaries from the tarball)
+    + For the record here a list of the deleted files:
+      src/addins/NUnit/lib/nunit.core.dll
+      src/addins/NUnit/lib/nunit.framework.dll
+  * New upstream (bugfix) release
+  * debian/patches/bashism.dpatch:
+    + Use bash instead of sh in mdtool. (Closes: #468688)
+
+ -- Mirco Bauer <meebey@debian.org>  Sun, 24 Feb 2008 19:28:54 +0100
+
 monodevelop (0.19+dfsg-1) unstable; urgency=low
 
   * DFSG version of MonoDevelop 0.19
