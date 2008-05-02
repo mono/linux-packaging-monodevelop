@@ -1,3 +1,10 @@
+monodevelop (1.0+dfsg-2) unstable; urgency=low
+
+  * Rebuild against liblog4net1.2-cil 1.2.10+dfsg-1 and
+    libgtksourceview2.0-cil 0.12-1
+
+ -- Mirco Bauer <meebey@debian.org>  Fri, 02 May 2008 13:30:06 +0200
+
 monodevelop (1.0+dfsg-1) unstable; urgency=low
 
   * DFSG version of MonoDevelop 1.0
