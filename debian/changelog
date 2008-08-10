@@ -1,3 +1,25 @@
+monodevelop (1.0+dfsg-3) unstable; urgency=medium
+
+  * debian/control:
+    + Removed libxul-dev from build-dependencies, as monodevelop is not using
+      it anymore. (Closes: #480797)
+    + Build against libmono-nunit2.2-cil instead of libnunit2.2.6-cil.
+    + Added mono-2.0-devel to recommends and mono-1.0-devel to suggests, as
+      monodevelop invokes resgen(2) and al(2) when needed for *.resx files.
+      (Closes: #485797)
+    + Updated debhelper build-dependency to >= 7.
+    + Updated cli-common-dev build-dependency to >= 0.5.7
+      (needed for cli.make)
+  * debian/patches/link_system_mono-nunit.dpatch:
+    + Link against mono-nunit instead of bundled nunit.
+  * debian/rules:
+    + Include /usr/share/cli-common/cli.make
+    + Migrated to debhelper v7 minimalistic style.
+  * debian/compat:
+    + Bumped to 7
+
+ -- Mirco Bauer <meebey@debian.org>  Sat, 09 Aug 2008 20:31:49 +0200
+
 monodevelop (1.0+dfsg-2) unstable; urgency=low
 
   * Rebuild against libgtksourceview2.0-cil 0.12-1

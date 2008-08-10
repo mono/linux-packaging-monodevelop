@@ -1,0 +1,141 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## nunit_2.4_port.dpatch by Mirco Bauer <meebey@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad monodevelop-1.0+dfsg~/src/addins/NUnit/Services/ExternalTestRunner.cs monodevelop-1.0+dfsg/src/addins/NUnit/Services/ExternalTestRunner.cs
+--- monodevelop-1.0+dfsg~/src/addins/NUnit/Services/ExternalTestRunner.cs	2008-06-28 15:03:19.000000000 +0200
++++ monodevelop-1.0+dfsg/src/addins/NUnit/Services/ExternalTestRunner.cs	2008-06-28 15:03:19.000000000 +0200
+@@ -36,6 +36,7 @@
+ using MonoDevelop.Core;
+ using MonoDevelop.Core.Execution;
+ using NUnit.Core;
++using NUnit.Core.Filters;
+ using NF = NUnit.Framework;
+ 
+ namespace MonoDevelop.NUnit
+@@ -47,7 +48,7 @@
+ 		StringWriter stdout = new StringWriter ();
+ 		StringWriter stderr = new StringWriter ();
+ 		
+-		public TestResult Run (EventListener listener, IFilter filter, string path, string suiteName)
++		public TestResult Run (EventListener listener, ITestFilter filter, string path, string suiteName)
+ 		{
+ 			TestSuite rootTS = LoadTestSuite (path, suiteName);
+ 			if (rootTS == null)
+@@ -180,11 +181,11 @@
+ 			get { return runningTest; }
+ 		}
+ 		
+-		void EventListener.RunStarted (Test [] tests)
++		void EventListener.RunStarted (string name, int testCount)
+ 		{
+ 		}
+ 
+-		void EventListener.RunFinished (TestResult [] results)
++		void EventListener.RunFinished (TestResult result)
+ 		{
+ 		}
+ 
+@@ -196,12 +197,12 @@
+ 		{
+ 		}
+ 
+-		void EventListener.TestStarted (TestCase testCase)
++		void EventListener.TestStarted (TestName testName)
+ 		{
+ 			if (singleTestRun)
+ 				return;
+ 			
+-			UnitTest t = GetLocalTest (testCase);
++			UnitTest t = GetLocalTest (testName);
+ 			if (t == null)
+ 				return;
+ 			
+@@ -234,12 +235,12 @@
+ 			runningTest = null;
+ 		}
+ 
+-		void EventListener.SuiteStarted (TestSuite suite)
++		void EventListener.SuiteStarted (TestName testName)
+ 		{
+ 			if (singleTestRun)
+ 				return;
+ 			
+-			UnitTest t = GetLocalTest (suite);
++			UnitTest t = GetLocalTest (testName);
+ 			if (t == null)
+ 				return;
+ 			
+diff -urNad monodevelop-1.0+dfsg~/src/addins/NUnit/Services/NUnitAssemblyTestSuite.cs monodevelop-1.0+dfsg/src/addins/NUnit/Services/NUnitAssemblyTestSuite.cs
+--- monodevelop-1.0+dfsg~/src/addins/NUnit/Services/NUnitAssemblyTestSuite.cs	2008-06-28 15:03:19.000000000 +0200
++++ monodevelop-1.0+dfsg/src/addins/NUnit/Services/NUnitAssemblyTestSuite.cs	2008-06-28 15:03:19.000000000 +0200
+@@ -37,6 +37,7 @@
+ using MonoDevelop.Projects;
+ using MonoDevelop.Core;
+ using NUnit.Core;
++using NUnit.Core.Filters;
+ 
+ namespace MonoDevelop.NUnit
+ {
+@@ -257,7 +258,7 @@
+ 			ExternalTestRunner runner = (ExternalTestRunner) Runtime.ProcessService.CreateExternalProcessObject (typeof(ExternalTestRunner), false);
+ 			LocalTestMonitor localMonitor = new LocalTestMonitor (testContext, runner, test, suiteName, testName != null);
+ 			
+-			IFilter filter = null;
++			ITestFilter filter = null;
+ 			
+ 			if (testName != null) {
+ 				filter = new TestNameFilter (testName);
+@@ -266,7 +267,10 @@
+ 				if (categoryOptions.EnableFilter && categoryOptions.Categories.Count > 0) {
+ 					string[] cats = new string [categoryOptions.Categories.Count];
+ 					categoryOptions.Categories.CopyTo (cats, 0);
+-					filter = new CategoryFilter (cats, categoryOptions.Exclude);
++					filter = new CategoryFilter (cats);
++					if (categoryOptions.Exclude) {
++						filter = new NotFilter (filter);
++					}
+ 				}
+ 			}
+ 			
+@@ -413,28 +417,32 @@
+ 		}
+ 		
+ 		[Serializable]
+-		public class TestNameFilter: IFilter
++		public class TestNameFilter: ITestFilter
+ 		{
+ 			string name;
+ 			
++			public bool IsEmpty {
++				get { return false; }
++			}
++
+ 			public TestNameFilter (string name)
+ 			{
+ 				this.name = name;
+ 			}
+ 			
+-			public bool Pass (TestSuite suite)
++			public bool Pass (ITest test)
+ 			{
+ 				return true;
+ 			}
+ 			
+-			public bool Pass (TestCase test)
++			public bool Pass (TestName test)
+ 			{
+ 				return test.Name == name;
+ 			}
+ 
+-			public bool Exclude
++			public bool Match(ITest test)
+ 			{
+-				get { return false; }
++				return true;
+ 			}
+ 		}
+ 	}

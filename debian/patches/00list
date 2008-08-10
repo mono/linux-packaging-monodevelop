@@ -1,4 +1,7 @@
-link_system_nunit2.2.6
+#link_system_nunit
+#nunit_2.4_port
+link_system_mono-nunit
+nunit_2.2_backport
 use_libsvn1
 use_libapr1
 #use_x-terminal-emulator

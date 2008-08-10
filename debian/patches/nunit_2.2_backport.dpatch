@@ -1,0 +1,22 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## nunit_2.2_backport.dpatch by Mirco Bauer <meebey@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad monodevelop-1.0+dfsg~/src/addins/NUnit/Services/ExternalTestRunner.cs monodevelop-1.0+dfsg/src/addins/NUnit/Services/ExternalTestRunner.cs
+--- monodevelop-1.0+dfsg~/src/addins/NUnit/Services/ExternalTestRunner.cs	2008-03-11 03:20:12.000000000 +0100
++++ monodevelop-1.0+dfsg/src/addins/NUnit/Services/ExternalTestRunner.cs	2008-08-09 20:46:01.000000000 +0200
+@@ -262,11 +262,6 @@
+ 			context.Monitor.EndTest (t, res);
+ 		}
+ 		
+-		public void TestOutput (TestOutput testOutput)
+-		{
+-		}
+-
+-
+ 		UnitTest GetLocalTest (Test t)
+ 		{
+ 			if (t == null) return null;

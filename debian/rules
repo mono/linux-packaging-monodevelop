@@ -1,83 +1,49 @@
 #!/usr/bin/make -f
+export DH_VERBOSE=1
 
-#export DH_VERBOSE=1
-export MONO_SHARED_DIR=$(CURDIR)
-
+include /usr/share/cli-common/cli.make
 include /usr/share/dpatch/dpatch.make
 
-configure: configure-stamp
-configure-stamp: patch-stamp
-	dh_testdir
-	./configure --prefix=/usr \
-	  --mandir=\$${prefix}/share/man \
-	  --infodir=\$${prefix}/share/info \
-	  --disable-update-mimedb --disable-update-desktopdb \
+build: build-stamp
+build-stamp: patch-stamp
+	dh build --before configure
+	dh_auto_configure -- \
+	  --disable-update-mimedb \
+	  --disable-update-desktopdb \
 	  --disable-monoextensions \
 	  --enable-versioncontrol --enable-subversion \
-	  --enable-aspnet --enable-gnomeplatform --enable-c
-	touch configure-stamp
-
-build: build-stamp
-build-stamp: configure-stamp
-	dh_testdir
-	$(MAKE) RUNTIME=/usr/bin/cli
+	  --enable-aspnet \
+	  --enable-gnomeplatform \
+	  --enable-c
+	dh build --after configure
 	touch build-stamp
 
 clean: clean-patched unpatch
 clean-patched:
-	dh_testdir
-	dh_testroot
-	[ ! -f Makefile ] || $(MAKE) distclean
-	rm -rf $(CURDIR)/.wapi
-	rm -f $(CURDIR)/changelog
-	rm -f configure-stamp build-stamp
-	dh_clean 
+	dh clean
 
 install: build
-	dh_testdir
-	dh_testroot
-	dh_clean -k 
-	dh_installdirs
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	dh $@ --before dh_install
 	# install missing DLL maps
 	cp debian/MonoDevelop.SourceEditor.dll.config debian/tmp/usr/lib/monodevelop/AddIns/
 	cp debian/MonoDevelop.Gettext.dll.config debian/tmp/usr/lib/monodevelop/AddIns/MonoDevelop.Gettext/
 	# fix permissions of .mo files
-	find $(CURDIR)/debian/tmp/usr/share/locale -name "*.mo" -exec chmod -x {} \;
-
-binary-indep: build install
-	dh_testdir
-	dh_testroot
-	dh_link -i
-	dh_install -i
-	# remove nunit files (shipped in monodevelop-nunit)
-	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/NUnit/
-	# remove versioncontrol files (shipped in monodevelop-versioncontrol)
-	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/VersionControl/
-	# remove ChangeLogAddIn files (shipped in monodevelop-versioncontrol)
-	rm -r debian/monodevelop/usr/lib/monodevelop/AddIns/ChangeLogAddIn/
-	cp $(CURDIR)/ChangeLog $(CURDIR)/changelog
-	dh_installchangelogs -i
-	dh_installdocs -i
-	dh_installexamples -i
-	dh_installmenu -i
-	dh_installman -i
-	dh_installmime -i
-	dh_desktop -i
-	dh_strip -i
-	dh_clistrip -i
-	dh_compress -i
-	dh_fixperms -i
-	dh_clifixperms -i
-	dh_installdeb -i
-	dh_shlibdeps -i
-	dh_clideps -i -d
-	dh_gencontrol -i
-	dh_md5sums -i
-	dh_builddeb -i
-
-binary-arch:
+	cd $(CURDIR)/debian/tmp/usr/share/locale && find -name "*.mo" -exec chmod -x {} \;
+	dh $@ --remaining
 
 binary: binary-arch binary-indep
 
-.PHONY: build clean binary-indep binary-arch binary install configure patch unpatch
+binary-arch:
+
+binary-indep: build install
+	dh $@ --until dh_install
+	# remove nunit files (shipped in monodevelop-nunit)
+	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/NUnit/
+	# remove versioncontrol files (shipped in monodevelop-versioncontrol)
+	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/VersionControl/
+	# remove ChangeLogAddIn files (shipped in monodevelop-versioncontrol)
+	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/ChangeLogAddIn/
+	dh $@ --after dh_install
+
+%:
+	dh $@

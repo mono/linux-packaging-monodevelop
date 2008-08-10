@@ -2,8 +2,8 @@ Source: monodevelop
 Section: devel
 Priority: optional
 Maintainer: Mirco Bauer <meebey@debian.org>
-Build-Depends: debhelper (>= 5), dpatch
-Build-Depends-Indep: cli-common-dev (>= 0.5.4),
+Build-Depends: debhelper (>= 7), dpatch
+Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  mono-gmcs (>= 1.1.10) | c-sharp-2.0-compiler,
  libmono-dev (>= 1.1.10),
  monodoc-base (>= 1.1.9),
@@ -14,7 +14,7 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.4),
  libgconf2.0-cil (>= 2.8),
  libglade2.0-cil (>= 2.8),
  libgtksourceview2.0-cil (>= 0.10),
- libnunit2.2.6-cil,
+ libmono-nunit2.2-cil,
  libmono-cairo2.0-cil (>= 1.2),
  libmono-winforms2.0-cil,
  libmono-system-runtime2.0-cil,
@@ -25,7 +25,6 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.4),
  libsvn-dev,
  libapr1-dev,
  libgtkspell-dev,
- libxul-dev,
  mono-xsp-base,
  mono-xsp2-base,
  desktop-file-utils
@@ -33,9 +32,25 @@ Standards-Version: 3.7.3
 
 Package: monodevelop
 Architecture: all
-Suggests: monodevelop-boo, monodevelop-java, monodevelop-nunit, monodevelop-versioncontrol, monodevelop-database, nemerle, mono-xsp, mono-xsp2, mono-mcs
-Recommends: mono-gmcs
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${cli:Depends}, libxul0d, monodoc-manual (>= 1.1.9), pkg-config, gnome-icon-theme (>= 1.1.3), xterm | x-terminal-emulator
+Suggests: monodevelop-boo,
+ monodevelop-java,
+ monodevelop-nunit,
+ monodevelop-versioncontrol,
+ monodevelop-database,
+ nemerle,
+ mono-xsp,
+ mono-xsp2,
+ mono-mcs,
+ mono-1.0-devel
+Recommends: mono-gmcs,
+ mono-2.0-devel
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ ${cli:Depends},
+ monodoc-manual (>= 1.1.9),
+ pkg-config,
+ gnome-icon-theme (>= 1.1.3),
+ xterm | x-terminal-emulator
 Provides: monodoc-viewer
 Description: C/C++/C#/Boo/Java/Nemerle/ILasm/ASP.NET Development Environment
  MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
@@ -48,7 +63,10 @@ Description: C/C++/C#/Boo/Java/Nemerle/ILasm/ASP.NET Development Environment
 
 Package: monodevelop-nunit
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${cli:Depends}, monodevelop (= ${source:Version})
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ ${cli:Depends},
+ monodevelop (= ${source:Version})
 Description: NUnit plugin for MonoDevelop
  MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
  languages.
@@ -58,7 +76,10 @@ Description: NUnit plugin for MonoDevelop
 Package: monodevelop-versioncontrol
 Architecture: all
 Replaces: monodevelop (<< 0.13.1)
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${cli:Depends}, monodevelop (= ${source:Version})
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ ${cli:Depends},
+ monodevelop (= ${source:Version})
 Description: VersionControl plugin for MonoDevelop
  MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
  languages.

@@ -1,0 +1,91 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## use_nunit2.2.dpatch by Mirco Bauer <meebey@meebey.net>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad monodevelop-0.18.1+dfsg~/src/addins/NUnit/Makefile.am monodevelop-0.18.1+dfsg/src/addins/NUnit/Makefile.am
+--- monodevelop-0.18.1+dfsg~/src/addins/NUnit/Makefile.am	2007-12-25 20:06:18.000000000 +0100
++++ monodevelop-0.18.1+dfsg/src/addins/NUnit/Makefile.am	2007-12-25 20:06:53.000000000 +0100
+@@ -10,8 +10,8 @@
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.core.dll \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.framework.dll \
++	$(shell pkg-config --libs mono-nunit) \
++	$(shell pkg-config --libs mono-nunit) \
+ 	-r:System \
+ 	-r:System.Xml
+ 
+@@ -78,7 +78,7 @@
+ SRC_NUNIT_FILES = $(addprefix $(srcdir)/lib/, $(NUNIT_FILES))
+ BUILD_NUNIT_FILES = $(addprefix $(ADDIN_BUILD)/, $(NUNIT_FILES))
+ 
+-all: $(ASSEMBLY) $(BUILD_NUNIT_FILES)
++all: $(ASSEMBLY)
+ 
+ $(ADDIN_BUILD)/%: $(srcdir)/lib/%
+ 	mkdir -p $(ADDIN_BUILD)
+@@ -90,9 +90,9 @@
+ 
+ 
+ assemblydir = $(MD_ADDIN_DIR)/NUnit
+-assembly_DATA = $(ASSEMBLY) $(SRC_NUNIT_FILES)
++assembly_DATA = $(ASSEMBLY)
+ 
+-CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb $(BUILD_NUNIT_FILES)
+-EXTRA_DIST = $(FILES) $(RES) $(SRC_NUNIT_FILES)
++CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
++EXTRA_DIST = $(FILES) $(RES)
+ 
+ include $(top_srcdir)/Makefile.include
+diff -urNad monodevelop-0.18.1+dfsg~/src/addins/NUnit/Makefile.in monodevelop-0.18.1+dfsg/src/addins/NUnit/Makefile.in
+--- monodevelop-0.18.1+dfsg~/src/addins/NUnit/Makefile.in	2007-12-25 20:06:18.000000000 +0100
++++ monodevelop-0.18.1+dfsg/src/addins/NUnit/Makefile.in	2007-12-25 20:07:34.000000000 +0100
+@@ -249,8 +249,8 @@
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
+ 	-r:$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.core.dll \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.framework.dll \
++	$(shell pkg-config --libs mono-nunit) \
++	$(shell pkg-config --libs mono-nunit) \
+ 	-r:System \
+ 	-r:System.Xml
+ 
+@@ -316,9 +316,9 @@
+ SRC_NUNIT_FILES = $(addprefix $(srcdir)/lib/, $(NUNIT_FILES))
+ BUILD_NUNIT_FILES = $(addprefix $(ADDIN_BUILD)/, $(NUNIT_FILES))
+ assemblydir = $(MD_ADDIN_DIR)/NUnit
+-assembly_DATA = $(ASSEMBLY) $(SRC_NUNIT_FILES)
+-CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb $(BUILD_NUNIT_FILES)
+-EXTRA_DIST = $(FILES) $(RES) $(SRC_NUNIT_FILES)
++assembly_DATA = $(ASSEMBLY)
++CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
++EXTRA_DIST = $(FILES) $(RES)
+ build_sources = $(addprefix $(srcdir)/, $(FILES)) $(GENERATED_FILES)
+ build_resources = $(addprefix $(srcdir)/, $(RES))
+ build_test_sources = $(addprefix $(srcdir)/, $(TESTFILES)) $(GENERATED_FILES)
+@@ -504,7 +504,7 @@
+ 	pdf-am ps ps-am uninstall uninstall-am uninstall-assemblyDATA
+ 
+ 
+-all: $(ASSEMBLY) $(BUILD_NUNIT_FILES)
++all: $(ASSEMBLY)
+ 
+ $(ADDIN_BUILD)/%: $(srcdir)/lib/%
+ 	mkdir -p $(ADDIN_BUILD)
+diff -urNad monodevelop-0.18.1+dfsg~/src/addins/NUnit/MonoDevelopNUnit.addin.xml monodevelop-0.18.1+dfsg/src/addins/NUnit/MonoDevelopNUnit.addin.xml
+--- monodevelop-0.18.1+dfsg~/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2007-12-25 20:06:18.000000000 +0100
++++ monodevelop-0.18.1+dfsg/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2007-12-25 20:06:26.000000000 +0100
+@@ -10,8 +10,6 @@
+ 
+ 	<Runtime>
+ 		<Import assembly="MonoDevelop.NUnit.dll" />
+-		<Import assembly="nunit.core.dll" />
+-		<Import assembly="nunit.framework.dll" />
+ 	</Runtime>
+ 	
+ 	<Dependencies>
