@@ -1,2 +1,3 @@
 version=2
-http://www.monodevelop.com/Download .+/monodevelop-([\d\.]+)\.tar\.bz2
+opts=dversionmangle=s/\+dfsg// \
+	http://www.monodevelop.com/Download .+/monodevelop-([\d\.]+)\.tar\.bz2
