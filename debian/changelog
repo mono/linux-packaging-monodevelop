@@ -1,8 +1,10 @@
 monodevelop (1.0+dfsg-4) UNRELEASED; urgency=low
 
   * debian/watch: correctly mangle Debian version.
+  * debian/control:
+    - Standards-Version bumped to 3.8.0 (no changes needed)
 
- -- David Paleino <d.paleino@gmail.com>  Sat, 08 Nov 2008 22:50:37 +0100
+ -- David Paleino <d.paleino@gmail.com>  Sat, 08 Nov 2008 22:52:38 +0100
 
 monodevelop (1.0+dfsg-3) unstable; urgency=medium
 

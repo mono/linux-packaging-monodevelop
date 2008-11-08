@@ -28,7 +28,7 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  mono-xsp-base,
  mono-xsp2-base,
  desktop-file-utils
-Standards-Version: 3.7.3
+Standards-Version: 3.8.0
 
 Package: monodevelop
 Architecture: all
