@@ -14,7 +14,7 @@ build-stamp: patch-stamp
 	  --enable-versioncontrol --enable-subversion \
 	  --enable-aspnet \
 	  --enable-gnomeplatform \
-	  --enable-c
+	  --enable-c MCS=/usr/bin/csc CSC=/usr/bin/csc
 	dh build --after configure
 	touch build-stamp
 

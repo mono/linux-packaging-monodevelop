@@ -1,10 +1,20 @@
-monodevelop (1.0+dfsg-4) UNRELEASED; urgency=low
+monodevelop (1.0+dfsg-4) experimental; urgency=low
 
+  [ David Paleino ]
   * debian/watch: correctly mangle Debian version.
   * debian/control:
     - Standards-Version bumped to 3.8.0 (no changes needed)
 
- -- David Paleino <d.paleino@gmail.com>  Sat, 08 Nov 2008 22:52:38 +0100
+  [ Mirco Bauer ]
+  * debian/control:
+    + Replaced mono-gmcs build-dep with mono-devel >= 2.0 as part of the
+      Mono 2.0 transition.
+    + Removed mono-mcs and mono-gmcs from Suggests/Recommends as
+      mono-1.0/2.0-devel does that job already.
+  * debian/rules:
+    + Pass "csc" as C# compiler to configure
+
+ -- Mirco Bauer <meebey@debian.org>  Mon, 15 Dec 2008 21:49:52 +0100
 
 monodevelop (1.0+dfsg-3) unstable; urgency=medium
 
