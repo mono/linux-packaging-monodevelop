@@ -7,6 +7,9 @@ include /usr/share/dpatch/dpatch.make
 build: build-stamp
 build-stamp: patch-stamp
 	dh build --before configure
+	aclocal -I.
+	autoconf
+	automake --add-missing --copy
 	dh_auto_configure -- \
 	  --disable-update-mimedb \
 	  --disable-update-desktopdb \
@@ -21,6 +24,8 @@ build-stamp: patch-stamp
 clean: clean-patched unpatch
 clean-patched:
 	dh clean
+	rm -rf configure config.sub config.guess ltmain.sh aclocal.m4 autom4te.cache/
+	find . -name "Makefile.in" -delete
 
 install: build
 	dh $@ --before dh_install

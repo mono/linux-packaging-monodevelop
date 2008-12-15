@@ -11,8 +11,12 @@ monodevelop (1.0+dfsg-4) experimental; urgency=low
       Mono 2.0 transition.
     + Removed mono-mcs and mono-gmcs from Suggests/Recommends as
       mono-1.0/2.0-devel does that job already.
+    + Added autoconf, automake and autotools-dev to build-deps.
   * debian/rules:
     + Pass "csc" as C# compiler to configure
+    + Refresh build-system as we patch parts of it.
+  * debian/patches/use_csc.dpatch:
+    + This patch replaces hardcoded mcs and gmcs calls with csc.
 
  -- Mirco Bauer <meebey@debian.org>  Mon, 15 Dec 2008 21:49:52 +0100
 
