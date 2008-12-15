@@ -43,7 +43,7 @@ Suggests: monodevelop-boo,
           nemerle,
           mono-xsp | mono-xsp2,
           mono-1.0-devel
-Recommends: mono-2.0-devel
+Recommends: mono-devel
 Depends: ${shlibs:Depends},
          ${misc:Depends},
          ${cli:Depends},
