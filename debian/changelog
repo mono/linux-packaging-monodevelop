@@ -1,3 +1,11 @@
+monodevelop (1.0+dfsg-5) UNRELEASED; urgency=low
+
+  * NOT RELEASED YET
+  * debian/control:
+    + Added Homepage, Vcs-Browser and Vcs-Svn fields.
+
+ -- Mirco Bauer <meebey@debian.org>  Tue, 16 Dec 2008 00:49:08 +0100
+
 monodevelop (1.0+dfsg-4) experimental; urgency=low
 
   [ David Paleino ]

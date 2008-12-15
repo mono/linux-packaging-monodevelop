@@ -32,6 +32,9 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  mono-xsp2-base,
  desktop-file-utils
 Standards-Version: 3.8.0
+Homepage: http://www.monodevelop.com/
+Vcs-Svn: svn://svn.debian.org/svn/pkg-cli-apps/packages/monodevelop/trunk/
+Vcs-Browser: http://svn.debian.org/wsvn/pkg-cli-apps/packages/monodevelop/trunk/
 
 Package: monodevelop
 Architecture: all
