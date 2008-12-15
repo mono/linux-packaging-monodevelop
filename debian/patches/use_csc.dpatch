@@ -10,7 +10,7 @@ diff -urNad monodevelop-1.0+dfsg~/contrib/Mono.Cecil/Makefile.am monodevelop-1.0
 +++ monodevelop-1.0+dfsg/contrib/Mono.Cecil/Makefile.am	2008-12-15 22:15:39.000000000 +0100
 @@ -1,4 +1,5 @@
  BINDIR=$(top_builddir)/build/bin
-+MCS=@CS@
++MCS=@CSC@
  
  all: $(CECIL)
  
