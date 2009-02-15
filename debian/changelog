@@ -15,6 +15,10 @@ monodevelop (1.9.2+dfsg-1~pre1) UNRELEASED; urgency=low
     + Added monodevelop-debugger-mdb, monodevelop-debugger-gdb and
       monodevelop-vala to suggests.
     + Replaced libmono-nunit2.2-cil build-dep with libnunit2.4-cil.
+    + Added exuberant-ctags to suggests as the C/C++ support can use it.
+      (Closes: #494743)
+    + Added mono-vbnc, monodoc-browser, gcc, make, zip and gettext to
+      suggests as monodevelop can make use of them.
   * debian/rules:
     + Implemented get-orig-source target.
   * debian/watch:
@@ -26,6 +30,8 @@ monodevelop (1.9.2+dfsg-1~pre1) UNRELEASED; urgency=low
     + Updated.
   * debian/patches/bashism.dpatch:
     + Dropped, already applied upstream.
+  * debian/monodevelop.menu:
+    + Updated to use the new SVG icon.
 
  -- Mirco Bauer <meebey@debian.org>  Sat, 14 Feb 2009 18:23:51 +0100
 

@@ -46,9 +46,16 @@ Suggests: monodevelop-boo,
           monodevelop-database,
           monodevelop-debugger-mdb,
           monodevelop-debugger-gdb,
-          nemerle,
           mono-xsp | mono-xsp2,
-          mono-1.0-devel
+          mono-1.0-devel,
+          nemerle,
+          mono-vbnc,
+          monodoc-browser,
+          exuberant-ctags,
+          gcc,
+          make,
+          zip,
+          gettext
 Recommends: mono-devel
 Depends: ${shlibs:Depends},
          ${misc:Depends},
