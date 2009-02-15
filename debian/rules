@@ -1,6 +1,14 @@
 #!/usr/bin/make -f
 export DH_VERBOSE=1
 
+MAKEFILE = $(firstword $(MAKEFILE_LIST))
+DEBIAN_DIR = $(dir $(MAKEFILE))
+SOURCE_DIR = $(DEBIAN_DIR)/..
+
+DEB_VERSION = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^Version | cut -d" " -f2)   
+DEB_SOURCE_NAME = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^Source | cut -d" " -f2)
+VERSION = $(shell echo $(DEB_VERSION) | cut -d"-" -f1 | sed 's/+dfsg.*//')
+
 include /usr/share/cli-common/cli.make
 include /usr/share/dpatch/dpatch.make
 
@@ -18,7 +26,9 @@ build-stamp: patch-stamp
 	  --enable-aspnet \
 	  --enable-gnomeplatform \
 	  --enable-c MCS=/usr/bin/csc CSC=/usr/bin/csc
-	dh build --after configure
+	# skip "make test"
+	dh build --before dh_auto_test
+	dh build --after dh_auto_test
 	touch build-stamp
 
 clean: clean-patched unpatch
@@ -50,5 +60,23 @@ binary-indep: build install
 	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/ChangeLogAddIn/
 	dh $@ --after dh_install
 
+get-orig-source:
+	uscan \
+		--package $(DEB_SOURCE_NAME) \
+		--watchfile $(DEBIAN_DIR)/watch \
+		--upstream-version $(VERSION) \
+		--download-version $(VERSION) \
+		--destdir . \
+		--force-download \
+		--rename \
+		--repack
+	if [ -d $(DEB_SOURCE_NAME)-$(VERSION) ]; then \
+		echo "$(DEB_SOURCE_NAME)-$(VERSION) is in the way, bailing out!"; \
+		exit 1; \
+	fi
+	tar -xzf $(DEB_SOURCE_NAME)_$(VERSION).orig.tar.gz
+	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.dll" -delete
+	tar -czf $(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar.gz $(DEB_SOURCE_NAME)-$(VERSION)
+	rm -rf $(DEB_SOURCE_NAME)-$(VERSION)
 %:
 	dh $@

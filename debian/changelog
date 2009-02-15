@@ -1,10 +1,33 @@
-monodevelop (1.0+dfsg-5) UNRELEASED; urgency=low
+monodevelop (1.9.2+dfsg-1~pre1) UNRELEASED; urgency=low
 
   * NOT RELEASED YET
+  * DFSG version of MonoDevelop 1.9.2
+    (deleted all pre-compiled binaries from the tarball)
+    + For the record here a list of the deleted files:
+      src/addins/NUnit/lib/nunit.framework.dll
+      src/addins/NUnit/lib/nunit.core.dll
+      src/addins/NUnit/lib/nunit.util.dll
+      src/addins/NUnit/lib/nunit.core.interfaces.dll
+  * New upstream release
   * debian/control:
     + Added Homepage, Vcs-Browser and Vcs-Svn fields.
+    + Enhanced package descriptions.
+    + Added monodevelop-debugger-mdb, monodevelop-debugger-gdb and
+      monodevelop-vala to suggests.
+    + Replaced libmono-nunit2.2-cil build-dep with libnunit2.4-cil.
+  * debian/rules:
+    + Implemented get-orig-source target.
+  * debian/watch:
+    + Updated for the unstable releases.
+  * debian/patches/link_system_mono-nunit.dpatch:
+    + Dropped as we link against non-mono nunit again.
+  * debian/patches/link_system_nunit.dpatch
+    debian/patches/use_libsvn1.dpatch:
+    + Updated.
+  * debian/patches/bashism.dpatch:
+    + Dropped, already applied upstream.
 
- -- Mirco Bauer <meebey@debian.org>  Tue, 16 Dec 2008 00:49:08 +0100
+ -- Mirco Bauer <meebey@debian.org>  Sat, 14 Feb 2009 18:23:51 +0100
 
 monodevelop (1.0+dfsg-4) experimental; urgency=low
 

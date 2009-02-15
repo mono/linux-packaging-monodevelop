@@ -5,9 +5,9 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad monodevelop-1.0+dfsg~/contrib/Mono.Cecil/Makefile.am monodevelop-1.0+dfsg/contrib/Mono.Cecil/Makefile.am
---- monodevelop-1.0+dfsg~/contrib/Mono.Cecil/Makefile.am	2008-03-11 03:21:32.000000000 +0100
-+++ monodevelop-1.0+dfsg/contrib/Mono.Cecil/Makefile.am	2008-12-15 22:15:39.000000000 +0100
+diff -urNad monodevelop-1.9.2~/contrib/Mono.Cecil/Makefile.am monodevelop-1.9.2/contrib/Mono.Cecil/Makefile.am
+--- monodevelop-1.9.2~/contrib/Mono.Cecil/Makefile.am	2009-02-04 22:50:58.000000000 +0100
++++ monodevelop-1.9.2/contrib/Mono.Cecil/Makefile.am	2009-02-14 17:44:07.000000000 +0100
 @@ -1,4 +1,5 @@
  BINDIR=$(top_builddir)/build/bin
 +MCS=@CSC@
@@ -31,16 +31,4 @@ diff -urNad monodevelop-1.0+dfsg~/contrib/Mono.Cecil/Makefile.am monodevelop-1.0
 +	$(CSC) $(CECIL_MDB_CSFILES) /debug /target:library /r:$(CECIL) /d:CECIL /out:$(CECIL_MDB)
  
  $(CECIL_MDB_DEBUG): $(CECIL_MDB)
- 
-diff -urNad monodevelop-1.0+dfsg~/src/addins/MonoDevelop.GtkCore/lib/Makefile.am monodevelop-1.0+dfsg/src/addins/MonoDevelop.GtkCore/lib/Makefile.am
---- monodevelop-1.0+dfsg~/src/addins/MonoDevelop.GtkCore/lib/Makefile.am	2008-03-11 03:19:54.000000000 +0100
-+++ monodevelop-1.0+dfsg/src/addins/MonoDevelop.GtkCore/lib/Makefile.am	2008-12-15 22:15:18.000000000 +0100
-@@ -6,7 +6,7 @@
- libsteticui: $(libsteticui)
- 
- ### Common settings ###
--MCS = gmcs
-+MCS = @CSC@
- EXTRACT_VARS = $(top_srcdir)/contrib/extract_makefile_variable.sh
- 
  
