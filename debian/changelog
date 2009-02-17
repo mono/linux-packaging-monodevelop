@@ -1,6 +1,5 @@
-monodevelop (1.9.2+dfsg-1~pre1) UNRELEASED; urgency=low
+monodevelop (1.9.2+dfsg-1) experimental; urgency=low
 
-  * NOT RELEASED YET
   * DFSG version of MonoDevelop 1.9.2
     (deleted all pre-compiled binaries from the tarball)
     + For the record here a list of the deleted files:
