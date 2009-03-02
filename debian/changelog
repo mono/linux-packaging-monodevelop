@@ -1,6 +1,8 @@
 monodevelop (1.9.2+dfsg-2) unstable; urgency=low
 
   * Upload to unstable.
+  * debian/control:
+    + Added build-dep on libmono-cairo1.0-cil as we configure wants it.
 
  -- Mirco Bauer <meebey@debian.org>  Mon, 02 Mar 2009 21:32:29 +0100
 
