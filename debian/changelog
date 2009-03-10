@@ -1,3 +1,9 @@
+monodevelop (1.9.2+dfsg-3) unstable; urgency=low
+
+  * Rebuild against libmetacity-dev 1:2.24.0-2.
+
+ -- Mirco Bauer <meebey@debian.org>  Tue, 10 Mar 2009 01:48:31 +0100
+
 monodevelop (1.9.2+dfsg-2) unstable; urgency=low
 
   * Upload to unstable.
