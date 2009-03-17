@@ -82,3 +82,5 @@ get-orig-source:
 
 %:
 	dh $@
+
+.PHONY: patch clean clean-patched binary binary-arch binary-indep get-orig-source install
