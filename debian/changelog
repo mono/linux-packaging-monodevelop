@@ -1,3 +1,10 @@
+monodevelop (1.9.3+dfsg-2) UNRELEASED; urgency=low
+
+  * Update libgnome-cil build-dependency for gnome-sharp transitions
+  * Bump Standards version to 3.8.1 
+
+ -- Stefan Ebner <sebner@ubuntu.com>  Sun, 22 Mar 2009 14:36:55 +0100
+
 monodevelop (1.9.3+dfsg-1) unstable; urgency=low
 
   * DFSG version of MonoDevelop 1.9.3

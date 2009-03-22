@@ -14,7 +14,7 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  gtk-sharp2-gapi (>= 2.8),
  libgtk2.0-cil (>= 2.8),
  libglade2.0-cil (>= 2.8),
- libgnome2.0-cil (>= 2.8),
+ libgnome2.24-cil (>= 2.24),
  libgconf2.0-cil (>= 2.8),
  libgtksourceview2.0-cil (>= 0.10),
  libnunit2.4-cil,
@@ -32,7 +32,7 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  mono-xsp-base,
  mono-xsp2-base,
  desktop-file-utils
-Standards-Version: 3.8.0
+Standards-Version: 3.8.1
 Homepage: http://www.monodevelop.com/
 Vcs-Svn: svn://svn.debian.org/svn/pkg-cli-apps/packages/monodevelop/trunk/
 Vcs-Browser: http://svn.debian.org/wsvn/pkg-cli-apps/packages/monodevelop/trunk/
