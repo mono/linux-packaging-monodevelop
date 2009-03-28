@@ -1,9 +1,12 @@
-monodevelop (1.9.3+dfsg-2) UNRELEASED; urgency=low
+monodevelop (1.9.3+dfsg-2) unstable; urgency=low
 
-  * Update libgnome-cil build-dependency for gnome-sharp transition
-  * Bump Standards version to 3.8.1 
+  * Rebuild against libgnome2.24-cil
+  * debian/control:
+    + Replaced libgnome2.0-cil build-dep with libgnome2.24-cil.
+    + Bumped Standards-Version to 3.8.1 (no changes needed)
+    + Removed libgtksourceview2.0-cil build-dep as unused.
 
- -- Stefan Ebner <sebner@ubuntu.com>  Sun, 22 Mar 2009 14:36:55 +0100
+ -- Mirco Bauer <meebey@debian.org>  Sat, 28 Mar 2009 14:56:22 +0100
 
 monodevelop (1.9.3+dfsg-1) unstable; urgency=low
 
