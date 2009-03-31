@@ -1,3 +1,11 @@
+monodevelop (1.0+dfsg-5~squeeze+1) testing; urgency=low
+
+  * Upload to testing with permission from dato.
+  * debian/control:
+    + Added libmono-cairo1.0-cil to build-deps.
+
+ -- Mirco Bauer <meebey@debian.org>  Tue, 31 Mar 2009 23:10:57 +0200
+
 monodevelop (1.0+dfsg-4) experimental; urgency=low
 
   [ David Paleino ]
