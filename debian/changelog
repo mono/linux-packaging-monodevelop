@@ -1,3 +1,11 @@
+monodevelop (1.9.3+dfsg-3) UNRELEASED; urgency=low
+
+  * debian/control:
+    + Tweak build-deps to allow building against libgconf2.24-cil due to 
+      broken ABI bump in Ubuntu
+
+ -- Jo Shields <directhex@apebox.org>  Tue, 31 Mar 2009 13:36:18 +0100
+
 monodevelop (1.9.3+dfsg-2) unstable; urgency=low
 
   * Rebuild against libgnome2.24-cil
