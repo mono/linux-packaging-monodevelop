@@ -1,10 +1,22 @@
-monodevelop (1.9.3+dfsg-3) UNRELEASED; urgency=low
+monodevelop (2.0+dfsg-1) UNRELEASED; urgency=low
 
+  * New upstream release
+  * DFSG version of MonoDevelop 2.0
+    (deleted all pre-compiled binaries from the tarball)
+    + For the record here a list of the deleted files:
+      src/addins/NUnit/lib/nunit.framework.dll
+      src/addins/NUnit/lib/nunit.core.dll
+      src/addins/NUnit/lib/nunit.util.dll
+      src/addins/NUnit/lib/nunit.core.interfaces.dll
   * debian/control:
     + Tweak build-deps to allow building against libgconf2.24-cil due to 
       broken ABI bump in Ubuntu
+  * debian/patches/update_templates_for_gtk-sharp_2.10.dpatch,
+    debian/patches/update_templates_for_gtk-sharp_2.12.dpatch:
+    + Refresh patch to ensure new projects are created using the correct
+      version of GTK#
 
- -- Jo Shields <directhex@apebox.org>  Tue, 31 Mar 2009 13:36:18 +0100
+ -- Jo Shields <directhex@apebox.org>  Thu,  2 Apr 2009 20:50:18 +0100
 
 monodevelop (1.9.3+dfsg-2) unstable; urgency=low
 
