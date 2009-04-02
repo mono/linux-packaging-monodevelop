@@ -1,0 +1,10 @@
+The upstream tarball for this application has been altered to remove 
+(unneeded) binary-only components. The list of files removed is as follows:
+
+      src/addins/NUnit/lib/nunit.framework.dll
+      src/addins/NUnit/lib/nunit.core.dll
+      src/addins/NUnit/lib/nunit.util.dll
+      src/addins/NUnit/lib/nunit.core.interfaces.dll
+
+To create your own copy of this modified tarball, use the "get-orig-source" 
+rule in the debian/rules makefile.
