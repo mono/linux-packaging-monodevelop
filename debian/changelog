@@ -1,4 +1,4 @@
-monodevelop (2.0+dfsg-1) UNRELEASED; urgency=low
+monodevelop (2.0+dfsg-1) unstable; urgency=low
 
   * New upstream release
   * DFSG version of MonoDevelop 2.0
