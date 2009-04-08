@@ -1,3 +1,11 @@
+monodevelop (2.0+dfsg-2) UNRELEASED; urgency=low
+
+  * debian/patches/monodevelop_fix_addin_highlights_r130904.dpatch:
+    + Backported fix from 2.0 branch to fix breakage in highlighting 
+      for addins (and possible resource leakage with them too)
+
+ -- Jo Shields <directhex@apebox.org>  Wed, 08 Apr 2009 19:18:29 +0100
+
 monodevelop (2.0+dfsg-1) unstable; urgency=low
 
   * New upstream release
