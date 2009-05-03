@@ -1,5 +1,10 @@
 monodevelop (2.0+dfsg-3) UNRELEASED; urgency=low
 
+  [ Jo Shields ]
+  * debian/rules:
+    + Deterministic get-orig-source rule (creates persistent md5sum)
+
+  [ Stefan Ebner ]
   * debian/control: 
     + Delete the optional dependency on libgconf2-24-cil
       since Ubuntu fixed this issue		

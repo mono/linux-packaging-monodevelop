@@ -78,7 +78,8 @@ get-orig-source:
 	rm $(DEB_SOURCE_NAME)_$(VERSION).orig.tar.gz
 	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.dll"
 	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.dll" -delete
-	tar -czf $(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar.gz $(DEB_SOURCE_NAME)-$(VERSION)
+	tar --mtime=@0 -cf $(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar $(DEB_SOURCE_NAME)-$(VERSION)
+	gzip -9fn $(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar
 	rm -r $(DEB_SOURCE_NAME)-$(VERSION)
 
 %:
