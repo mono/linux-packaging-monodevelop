@@ -7,7 +7,8 @@ monodevelop (2.0+dfsg-3) UNRELEASED; urgency=low
   [ Stefan Ebner ]
   * debian/control: 
     + Delete the optional dependency on libgconf2-24-cil
-      since Ubuntu fixed this issue		
+      since Ubuntu fixed this issue
+    + Bump Standards-Version to 3.8.2		
 
  -- Stefan Ebner <sebner@ubuntu.com>  Sat, 02 May 2009 13:13:56 +0200
 
