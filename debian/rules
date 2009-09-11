@@ -25,7 +25,7 @@ build-stamp: patch-stamp
 	  --enable-versioncontrol --enable-subversion \
 	  --enable-aspnet \
 	  --enable-gnomeplatform \
-	  --enable-c MCS=/usr/bin/csc CSC=/usr/bin/csc
+	  --enable-c MCS=/usr/bin/mono-csc CSC=/usr/bin/mono-csc
 	# skip "make test"
 	dh build --before dh_auto_test
 	dh build --after dh_auto_test
@@ -61,6 +61,7 @@ binary-indep: build install
 	dh $@ --after dh_install
 
 get-orig-source:
+	mkdir -p ../tarballs
 	uscan \
 		--package $(DEB_SOURCE_NAME) \
 		--watchfile $(DEBIAN_DIR)/watch \
@@ -78,8 +79,8 @@ get-orig-source:
 	rm $(DEB_SOURCE_NAME)_$(VERSION).orig.tar.gz
 	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.dll"
 	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.dll" -delete
-	tar --mtime=@0 -cf $(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar $(DEB_SOURCE_NAME)-$(VERSION)
-	gzip -9fn $(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar
+	tar --mtime=@1252623600 -cf ../tarballs/$(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar $(DEB_SOURCE_NAME)-$(VERSION)
+	gzip -9fn ../tarballs/$(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar
 	rm -r $(DEB_SOURCE_NAME)-$(VERSION)
 
 %:

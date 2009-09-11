@@ -5,9 +5,9 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad monodevelop-1.9.2~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs monodevelop-1.9.2/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs
---- monodevelop-1.9.2~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2009-02-04 22:47:19.000000000 +0100
-+++ monodevelop-1.9.2/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2009-02-14 17:39:14.000000000 +0100
+diff -urNad monodevelop-2.1.0~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs monodevelop-2.1.0/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs
+--- monodevelop-2.1.0~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2009-09-11 09:43:09.807796091 +0100
++++ monodevelop-2.1.0/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2009-09-11 09:44:56.076602736 +0100
 @@ -22,10 +22,6 @@
  		public static LibSvnClient GetLib ()
  		{
@@ -19,8 +19,8 @@ diff -urNad monodevelop-1.9.2~/src/addins/VersionControl/MonoDevelop.VersionCont
  				return new LibSvnClient1 ();
  			} catch {}
  			
-@@ -598,358 +594,6 @@
- 		                                                    IntPtr baton, IntPtr pool);
+@@ -578,366 +574,6 @@
+ 		public delegate IntPtr svn_client_blame_receiver_t (IntPtr baton, long line_no, int revision, string author, string date, string line, IntPtr pool);
  	}
  	
 -	public class LibSvnClient0 : LibSvnClient {
@@ -268,6 +268,12 @@ diff -urNad monodevelop-1.9.2~/src/addins/VersionControl/MonoDevelop.VersionCont
 -			return svn_client_prop_get (out value, name, target, ref revision, recurse, ctx, pool);
 -		}
 -		
+-		public override IntPtr client_blame (string path, ref Rev rev_start, ref Rev rev_end, svn_client_blame_receiver_t receiver, System.IntPtr baton, System.IntPtr ctx, System.IntPtr pool)
+-		{
+-			return svn_client_blame (path, ref rev_start, ref rev_end, receiver, baton, ctx, pool);
+-		}
+-
+-		
 -		[DllImport(svnclientlib)] static extern void svn_config_ensure (string config_dir, IntPtr pool);
 -		[DllImport(svnclientlib)] static extern void svn_config_get_config (ref IntPtr cfg_hash, string config_dir, IntPtr pool);
 -		[DllImport(svnclientlib)] static extern void svn_auth_open (out IntPtr auth_baton, IntPtr providers, IntPtr pool);
@@ -373,6 +379,8 @@ diff -urNad monodevelop-1.9.2~/src/addins/VersionControl/MonoDevelop.VersionCont
 -		[DllImport(svnclientlib)] static extern IntPtr svn_client_unlock (IntPtr apr_array_header_t_targets, int break_lock, IntPtr ctx, IntPtr pool);
 -		
 -		[DllImport(svnclientlib)] static extern IntPtr svn_client_prop_get (out IntPtr value, string name, string target, ref Rev revision, int recurse, IntPtr ctx, IntPtr pool);
+-
+-		[DllImport(svnclientlib)] static extern IntPtr svn_client_blame (string path, ref Rev rev_start, ref Rev rev_end, svn_client_blame_receiver_t receiver, IntPtr baton, IntPtr ctx, IntPtr pool);
 -	}
 -	
  	public class LibSvnClient1 : LibSvnClient {

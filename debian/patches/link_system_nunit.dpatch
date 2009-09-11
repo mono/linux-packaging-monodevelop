@@ -5,9 +5,9 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad monodevelop-1.9.3~/src/addins/NUnit/Makefile.am monodevelop-1.9.3/src/addins/NUnit/Makefile.am
---- monodevelop-1.9.3~/src/addins/NUnit/Makefile.am	2009-03-06 16:21:02.000000000 +0100
-+++ monodevelop-1.9.3/src/addins/NUnit/Makefile.am	2009-03-17 00:44:53.000000000 +0100
+diff -urNad monodevelop-2.1.0~/src/addins/NUnit/Makefile.am monodevelop-2.1.0/src/addins/NUnit/Makefile.am
+--- monodevelop-2.1.0~/src/addins/NUnit/Makefile.am	2009-09-11 09:35:08.628794292 +0100
++++ monodevelop-2.1.0/src/addins/NUnit/Makefile.am	2009-09-11 09:37:57.567794632 +0100
 @@ -16,10 +16,7 @@
  	$(GLIB_SHARP_LIBS) \
  	$(GTK_SHARP_LIBS) \
@@ -17,10 +17,10 @@ diff -urNad monodevelop-1.9.3~/src/addins/NUnit/Makefile.am monodevelop-1.9.3/sr
 -	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.framework.dll \
 -	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.util.dll \
 +	$(shell pkg-config --libs nunit) \
+ 	-r:Mono.Cairo \
  	-r:Mono.Posix \
  	-r:System \
- 	-r:System.Xml
-@@ -85,16 +82,7 @@
+@@ -86,16 +83,7 @@
  	templates/NUnitTestClass.xft.xml
  
  
@@ -38,7 +38,7 @@ diff -urNad monodevelop-1.9.3~/src/addins/NUnit/Makefile.am monodevelop-1.9.3/sr
  
  $(ADDIN_BUILD)/%: $(srcdir)/lib/%
  	mkdir -p $(ADDIN_BUILD)
-@@ -107,9 +95,9 @@
+@@ -108,9 +96,9 @@
  $(ASSEMBLY).mdb: $(ASSEMBLY)
  
  assemblydir = $(MD_ADDIN_DIR)/NUnit
@@ -51,9 +51,9 @@ diff -urNad monodevelop-1.9.3~/src/addins/NUnit/Makefile.am monodevelop-1.9.3/sr
 +EXTRA_DIST = $(FILES) $(RES)
  
  include $(top_srcdir)/Makefile.include
-diff -urNad monodevelop-1.9.3~/src/addins/NUnit/MonoDevelopNUnit.addin.xml monodevelop-1.9.3/src/addins/NUnit/MonoDevelopNUnit.addin.xml
---- monodevelop-1.9.3~/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2009-03-06 16:21:02.000000000 +0100
-+++ monodevelop-1.9.3/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2009-03-17 00:45:26.000000000 +0100
+diff -urNad monodevelop-2.1.0~/src/addins/NUnit/MonoDevelopNUnit.addin.xml monodevelop-2.1.0/src/addins/NUnit/MonoDevelopNUnit.addin.xml
+--- monodevelop-2.1.0~/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2009-09-11 09:35:08.628794292 +0100
++++ monodevelop-2.1.0/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2009-09-11 09:38:41.715795575 +0100
 @@ -10,10 +10,6 @@
  
  	<Runtime>
@@ -82,9 +82,9 @@ diff -urNad monodevelop-1.9.3~/src/addins/NUnit/MonoDevelopNUnit.addin.xml monod
  	<Extension path = "/MonoDevelop/Ide/Pads">
  		<SolutionPad id = "MonoDevelop.NUnit.TestPad" defaultPlacement = "Left" _label = "Unit Tests" icon = "nunit-pad-icon" class = "MonoDevelop.NUnit.TestPad">
  			<PadOption id = "ShowTestTime" _label = "Show Test Time" defaultValue = "False" />
-diff -urNad monodevelop-1.9.3~/src/addins/NUnit/NUnitRunner/Makefile.am monodevelop-1.9.3/src/addins/NUnit/NUnitRunner/Makefile.am
---- monodevelop-1.9.3~/src/addins/NUnit/NUnitRunner/Makefile.am	2009-03-06 16:21:02.000000000 +0100
-+++ monodevelop-1.9.3/src/addins/NUnit/NUnitRunner/Makefile.am	2009-03-17 00:44:53.000000000 +0100
+diff -urNad monodevelop-2.1.0~/src/addins/NUnit/NUnitRunner/Makefile.am monodevelop-2.1.0/src/addins/NUnit/NUnitRunner/Makefile.am
+--- monodevelop-2.1.0~/src/addins/NUnit/NUnitRunner/Makefile.am	2009-09-11 09:35:08.628794292 +0100
++++ monodevelop-2.1.0/src/addins/NUnit/NUnitRunner/Makefile.am	2009-09-11 09:39:13.959795707 +0100
 @@ -1,9 +1,7 @@
  FILES = NUnitTestRunner.cs
  

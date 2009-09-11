@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Mirco Bauer <meebey@debian.org>
 Build-Depends: debhelper (>= 7), dpatch
 Build-Depends-Indep: cli-common-dev (>= 0.5.7),
- mono-devel (>= 2.0),
+ mono-devel (>= 2.4.2.3),
  libmono-dev (>= 1.1.10),
  monodoc-base (>= 1.1.9),
  intltool,
@@ -24,6 +24,7 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  libmono-cecil0.5-cil,
  libmono-addins0.2-cil (>= 0.3),
  libmono-addins-gui0.2-cil (>= 0.3),
+ libmono-microsoft-build2.0-cil,
  libmetacity-dev,
  libsvn-dev,
  libapr1-dev,

@@ -1,8 +1,30 @@
-monodevelop (2.0+dfsg-3) UNRELEASED; urgency=low
+monodevelop (2.1.0+dfsg-1) UNRELEASED; urgency=low
 
   [ Jo Shields ]
+  * New upstream release
+  * DFSG version of MonoDevelop 2.2 beta 1
+    (deleted all pre-compiled binaries from the tarball)
+    + For the record here a list of the deleted files:
+      src/addins/NUnit/lib/nunit.framework.dll
+      src/addins/NUnit/lib/nunit.core.dll
+      src/addins/NUnit/lib/nunit.util.dll
+      src/addins/NUnit/lib/nunit.core.interfaces.dll
   * debian/rules:
     + Deterministic get-orig-source rule (creates persistent md5sum)
+    + Set mtime to 2009-09-11 (epoch 0 is easier but causes lots of
+      console spew)
+    + Ensure tarball is placed in the policy-specified folder
+  * debian/patches/link_system_nunit.dpatch,
+    debian/patches/use_libsvn1.dpatch,
+    debian/patches/update_templates_for_gtk-sharp_2.12.dpatch:
+    + Refreshed
+  * debian/patches/monodevelop_fix_addin_highlights_r130904:
+    + Removed, no longer needed
+  * debian/control,
+    debian/rules:
+    + Use mono-csc from mono-devel >=2.4.2.3, as csc command needs to go
+  * debian/control:
+    + Add dependency on libmono-microsoft-build2.0-cil
 
   [ Stefan Ebner ]
   * debian/control: 
@@ -10,7 +32,7 @@ monodevelop (2.0+dfsg-3) UNRELEASED; urgency=low
       since Ubuntu fixed this issue
     + Bump Standards-Version to 3.8.3		
 
- -- Stefan Ebner <sebner@ubuntu.com>  Sat, 02 May 2009 13:13:56 +0200
+ -- Jo Shields <directhex@apebox.org>  Fri, 11 Sep 2009 09:31:26 +0100
 
 monodevelop (2.0+dfsg-2) unstable; urgency=low
 
