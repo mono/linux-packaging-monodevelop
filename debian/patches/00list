@@ -1,8 +1,0 @@
-link_system_nunit
-use_libsvn1
-use_libapr1
-#use_x-terminal-emulator
-update_templates_for_gtk-sharp_2.12
-boo_mimetype
-use_csc
-#monodevelop_fix_addin_highlights_r130904
