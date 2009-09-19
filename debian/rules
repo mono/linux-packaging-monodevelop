@@ -10,11 +10,9 @@ DEB_SOURCE_NAME = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^
 VERSION = $(shell echo $(DEB_VERSION) | cut -d"-" -f1 | sed 's/+dfsg.*//')
 
 include /usr/share/cli-common/cli.make
-include /usr/share/dpatch/dpatch.make
+include /usr/share/quilt/quilt.make
 
-build: build-stamp
-build-stamp: patch-stamp
-	dh build --before configure
+override_dh_auto_configure:
 	aclocal -I.
 	autoconf
 	automake --add-missing --copy
@@ -26,39 +24,31 @@ build-stamp: patch-stamp
 	  --enable-aspnet \
 	  --enable-gnomeplatform \
 	  --enable-c MCS=/usr/bin/mono-csc CSC=/usr/bin/mono-csc
-	# skip "make test"
-	dh build --before dh_auto_test
-	dh build --after dh_auto_test
-	touch build-stamp
 
-clean: clean-patched unpatch
-clean-patched:
-	dh clean
+
+override_dh_auto_test:
+	# skip "make test"
+
+override_dh_clean:
+	dh_clean
 	rm -rf configure config.sub config.guess ltmain.sh aclocal.m4 autom4te.cache/
 	find . -name "Makefile.in" -delete
 
-install: build
-	dh $@ --before dh_install
+override_dh_auto_install:
+	dh_auto_install
 	# install missing DLL maps
 	cp debian/MonoDevelop.SourceEditor.dll.config debian/tmp/usr/lib/monodevelop/AddIns/
 	cp debian/MonoDevelop.Gettext.dll.config debian/tmp/usr/lib/monodevelop/AddIns/MonoDevelop.Gettext/
 	# fix permissions of .mo files
 	cd $(CURDIR)/debian/tmp/usr/share/locale && find -name "*.mo" -exec chmod -x {} \;
-	dh $@ --remaining
 
-binary: binary-arch binary-indep
-
-binary-arch:
-
-binary-indep: build install
-	dh $@ --until dh_install
+override_dh_install:
 	# remove nunit files (shipped in monodevelop-nunit)
 	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/NUnit/
 	# remove versioncontrol files (shipped in monodevelop-versioncontrol)
 	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/VersionControl/
 	# remove ChangeLogAddIn files (shipped in monodevelop-versioncontrol)
 	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/ChangeLogAddIn/
-	dh $@ --after dh_install
 
 get-orig-source:
 	mkdir -p ../tarballs
@@ -84,6 +74,6 @@ get-orig-source:
 	rm -r $(DEB_SOURCE_NAME)-$(VERSION)
 
 %:
-	dh $@
+	dh --with quilt $@
 
-.PHONY: patch clean clean-patched binary binary-arch binary-indep get-orig-source install
+.PHONY: get-orig-source

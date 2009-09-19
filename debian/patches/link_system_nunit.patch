@@ -1,0 +1,98 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## link_system_nunit.dpatch by Mirco Bauer <meebey@meebey.net>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad monodevelop-2.1.0~/src/addins/NUnit/Makefile.am monodevelop-2.1.0/src/addins/NUnit/Makefile.am
+--- monodevelop-2.1.0~/src/addins/NUnit/Makefile.am	2009-09-11 09:35:08.628794292 +0100
++++ monodevelop-2.1.0/src/addins/NUnit/Makefile.am	2009-09-11 09:37:57.567794632 +0100
+@@ -16,10 +16,7 @@
+ 	$(GLIB_SHARP_LIBS) \
+ 	$(GTK_SHARP_LIBS) \
+ 	$(MONO_ADDINS_LIBS) \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.core.dll \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.core.interfaces.dll \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.framework.dll \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.util.dll \
++	$(shell pkg-config --libs nunit) \
+ 	-r:Mono.Cairo \
+ 	-r:Mono.Posix \
+ 	-r:System \
+@@ -86,16 +83,7 @@
+ 	templates/NUnitTestClass.xft.xml
+ 
+ 
+-NUNIT_FILES = \
+-nunit.core.dll \
+-nunit.framework.dll \
+-nunit.core.interfaces.dll \
+-nunit.util.dll
+-
+-SRC_NUNIT_FILES = $(addprefix $(srcdir)/lib/, $(NUNIT_FILES))
+-BUILD_NUNIT_FILES = $(addprefix $(ADDIN_BUILD)/, $(NUNIT_FILES))
+-
+-all: $(ASSEMBLY) $(ASSEMBLY).mdb $(BUILD_NUNIT_FILES)
++all: $(ASSEMBLY) $(ASSEMBLY).mdb
+ 
+ $(ADDIN_BUILD)/%: $(srcdir)/lib/%
+ 	mkdir -p $(ADDIN_BUILD)
+@@ -108,9 +96,9 @@
+ $(ASSEMBLY).mdb: $(ASSEMBLY)
+ 
+ assemblydir = $(MD_ADDIN_DIR)/NUnit
+-assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb $(SRC_NUNIT_FILES)
++assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
+ 
+-CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb $(BUILD_NUNIT_FILES)
+-EXTRA_DIST = $(FILES) $(RES) $(SRC_NUNIT_FILES)
++CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
++EXTRA_DIST = $(FILES) $(RES)
+ 
+ include $(top_srcdir)/Makefile.include
+diff -urNad monodevelop-2.1.0~/src/addins/NUnit/MonoDevelopNUnit.addin.xml monodevelop-2.1.0/src/addins/NUnit/MonoDevelopNUnit.addin.xml
+--- monodevelop-2.1.0~/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2009-09-11 09:35:08.628794292 +0100
++++ monodevelop-2.1.0/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2009-09-11 09:38:41.715795575 +0100
+@@ -10,10 +10,6 @@
+ 
+ 	<Runtime>
+ 		<Import assembly="MonoDevelop.NUnit.dll" />
+-		<Import assembly="nunit.core.dll" />
+-		<Import assembly="nunit.core.interfaces.dll" />
+-		<Import assembly="nunit.framework.dll" />
+-		<Import assembly="nunit.util.dll" />
+ 	</Runtime>
+ 	
+ 	<Dependencies>
+@@ -67,16 +63,6 @@
+ 
+ 	<!-- Extensions -->
+ 
+-	<Extension path="/MonoDevelop/Core/SupportPackages">
+-		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.4">
+-			<Package name="nunit" version="2.4" clrVersion="Default">
+-				<Assembly file="nunit.core.dll" />
+-				<Assembly file="nunit.core.interfaces.dll" />
+-				<Assembly file="nunit.framework.dll" />
+-			</Package>
+-		</Condition>
+-	</Extension>
+-
+ 	<Extension path = "/MonoDevelop/Ide/Pads">
+ 		<SolutionPad id = "MonoDevelop.NUnit.TestPad" defaultPlacement = "Left" _label = "Unit Tests" icon = "nunit-pad-icon" class = "MonoDevelop.NUnit.TestPad">
+ 			<PadOption id = "ShowTestTime" _label = "Show Test Time" defaultValue = "False" />
+diff -urNad monodevelop-2.1.0~/src/addins/NUnit/NUnitRunner/Makefile.am monodevelop-2.1.0/src/addins/NUnit/NUnitRunner/Makefile.am
+--- monodevelop-2.1.0~/src/addins/NUnit/NUnitRunner/Makefile.am	2009-09-11 09:35:08.628794292 +0100
++++ monodevelop-2.1.0/src/addins/NUnit/NUnitRunner/Makefile.am	2009-09-11 09:39:13.959795707 +0100
+@@ -1,9 +1,7 @@
+ FILES = NUnitTestRunner.cs
+ 
+ REFS =  \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.core.dll \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.core.interfaces.dll \
+-	-r:$(top_srcdir)/src/addins/NUnit/lib/nunit.framework.dll \
++	$(shell pkg-config --libs nunit) \
+ 	-r:System \
+ 	-r:System.Xml
+ 

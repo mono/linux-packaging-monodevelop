@@ -27,12 +27,18 @@ monodevelop (2.1.0+dfsg-1) UNRELEASED; urgency=low
     + Add dependency on libmono-microsoft-build2.0-cil
 
   [ Stefan Ebner ]
-  * debian/control: 
+  * debian/control:
     + Delete the optional dependency on libgconf2-24-cil
       since Ubuntu fixed this issue
-    + Bump Standards-Version to 3.8.3		
+    + Bump Standards-Version to 3.8.3
+    + Bump debhelper versioning to >= 7.0.50
+    + Replace dpatch build-dependecy with versioned quilt one
+  * debian/patch:
+    + Convert everything from dpatch to quilt
+  * debian/rules:
+    + Rewrite with new dh7 features (e.g dh_override, --with quilt)
 
- -- Jo Shields <directhex@apebox.org>  Fri, 11 Sep 2009 09:31:26 +0100
+ -- Jo Shields <directhex@apebox.org>  Sat, 19 Sep 2009 17:45:49 +0200
 
 monodevelop (2.0+dfsg-2) unstable; urgency=low
 

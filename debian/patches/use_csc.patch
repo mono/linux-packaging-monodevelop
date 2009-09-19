@@ -1,0 +1,34 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## use_csc.dpatch by Mirco Bauer <meebey@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad monodevelop-1.9.2~/contrib/Mono.Cecil/Makefile.am monodevelop-1.9.2/contrib/Mono.Cecil/Makefile.am
+--- monodevelop-1.9.2~/contrib/Mono.Cecil/Makefile.am	2009-02-04 22:50:58.000000000 +0100
++++ monodevelop-1.9.2/contrib/Mono.Cecil/Makefile.am	2009-02-14 17:44:07.000000000 +0100
+@@ -1,4 +1,5 @@
+ BINDIR=$(top_builddir)/build/bin
++MCS=@CSC@
+ 
+ all: $(CECIL)
+ 
+@@ -11,7 +12,7 @@
+ 
+ $(CECIL): $(CECIL_CSFILES)
+ 	mkdir -p $(BINDIR)
+-	mcs $(CECIL_CSFILES) /debug /target:library /out:$(CECIL)
++	$(MCS) $(CECIL_CSFILES) /debug /target:library /out:$(CECIL)
+ 
+ $(CECIL_DEBUG): $(CECIL)
+ 
+@@ -24,7 +25,7 @@
+ 
+ $(CECIL_MDB): $(CECIL_MDB_CSFILES) $(CECIL)
+ 	mkdir -p $(BINDIR)
+-	mcs $(CECIL_MDB_CSFILES) /debug /target:library /r:$(CECIL) /d:CECIL /out:$(CECIL_MDB)
++	$(CSC) $(CECIL_MDB_CSFILES) /debug /target:library /r:$(CECIL) /d:CECIL /out:$(CECIL_MDB)
+ 
+ $(CECIL_MDB_DEBUG): $(CECIL_MDB)
+ 
