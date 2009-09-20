@@ -1,10 +1,5 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## use_libapr1.dpatch by Mirco Bauer <meebey@debian.org>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: No description.
-
-@DPATCH@
+Index: monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
+===================================================================
 diff -urNad monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
 --- monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-12-20 20:04:42.000000000 +0100
 +++ monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-12-25 18:56:29.000000000 +0100

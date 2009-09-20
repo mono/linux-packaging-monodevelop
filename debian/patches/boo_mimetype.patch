@@ -1,7 +1,5 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-
-@DPATCH@
-
+Index: monodevelop-0.10/monodevelop.xml
+===================================================================
 --- monodevelop-0.10/monodevelop.xml.old	2006-04-13 12:12:05.676000000 +0200
 +++ monodevelop-0.10/monodevelop.xml	2006-04-13 12:12:54.376000000 +0200
 @@ -12,6 +12,10 @@

@@ -1,11 +1,3 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## monodevelop_fix_addin_highlights_r130904.dpatch by Jo Shields <directhex@apebox.org>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: Backport from 2.0 branch to fix highlights (and possible resource leakage
-## DP: in addin highlighing)
-
-@DPATCH@
 Index: 2.0/src/addins/MonoDevelop.SourceEditor2/MonoDevelop.SourceEditor.Extension/TemplateCodon.cs
 ===================================================================
 --- 2.0/src/addins/MonoDevelop.SourceEditor2/MonoDevelop.SourceEditor.Extension/TemplateCodon.cs	(revision 130903)

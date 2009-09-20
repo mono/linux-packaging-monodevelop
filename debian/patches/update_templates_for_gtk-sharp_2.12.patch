@@ -1,12 +1,5 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## update_templates_for_gtk-sharp_2.12.dpatch by Jo Shields <directhex@apebox.org>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: Update projects to ensure the version of GTK# it uses for new projects matches
-## DP: the version we ship in the archive
-
-
-@DPATCH@
+Index: monodevelop-2.1.0/src/addins/CSharpBinding/templates/GladeSharp2Project.xpt.xml
+===================================================================
 diff -urNad monodevelop-2.1.0~/src/addins/CSharpBinding/templates/GladeSharp2Project.xpt.xml monodevelop-2.1.0/src/addins/CSharpBinding/templates/GladeSharp2Project.xpt.xml
 --- monodevelop-2.1.0~/src/addins/CSharpBinding/templates/GladeSharp2Project.xpt.xml	2009-09-11 09:47:09.839797641 +0100
 +++ monodevelop-2.1.0/src/addins/CSharpBinding/templates/GladeSharp2Project.xpt.xml	2009-09-11 09:48:07.519797259 +0100
