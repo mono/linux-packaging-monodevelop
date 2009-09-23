@@ -1,4 +1,6 @@
 Index: 2.0/src/addins/MonoDevelop.SourceEditor2/MonoDevelop.SourceEditor.Extension/TemplateCodon.cs
+Description: Backport from 2.0 branch to fix highlights (and possible resource leakage in addin highlighing)
+Patch created by Jo Shields <directhex@apebox.org>
 ===================================================================
 --- 2.0/src/addins/MonoDevelop.SourceEditor2/MonoDevelop.SourceEditor.Extension/TemplateCodon.cs	(revision 130903)
 +++ 2.0/src/addins/MonoDevelop.SourceEditor2/MonoDevelop.SourceEditor.Extension/TemplateCodon.cs	(revision 130904)

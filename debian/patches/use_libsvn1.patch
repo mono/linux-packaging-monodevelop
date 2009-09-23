@@ -1,4 +1,6 @@
 Index: monodevelop-2.1.0/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs
+Description: Only make use of libsvnclien1 so removing libsvnclient0 code
+Patch created by Mirco Bauer <meebey@debian.org>
 ===================================================================
 diff -urNad monodevelop-2.1.0~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs monodevelop-2.1.0/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs
 --- monodevelop-2.1.0~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2009-09-11 09:43:09.807796091 +0100

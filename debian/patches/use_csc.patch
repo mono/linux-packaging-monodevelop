@@ -1,4 +1,6 @@
 Index: monodevelop-1.9.2/contrib/Mono.Cecil/Makefile.am
+Description: Replace hardcoded mcs compiler with CSC
+Patch created by Mirco Bauer <meebey@debian.org>
 ===================================================================
 diff -urNad monodevelop-1.9.2~/contrib/Mono.Cecil/Makefile.am monodevelop-1.9.2/contrib/Mono.Cecil/Makefile.am
 --- monodevelop-1.9.2~/contrib/Mono.Cecil/Makefile.am	2009-02-04 22:50:58.000000000 +0100

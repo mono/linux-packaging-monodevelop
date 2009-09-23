@@ -1,4 +1,6 @@
 Index: monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
+Description: Only make use of libapr1, so removing libapr code
+Patch created by Mirco Bauer <meebey@debian.org>
 ===================================================================
 diff -urNad monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
 --- monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-12-20 20:04:42.000000000 +0100

@@ -1,4 +1,6 @@
 Index: monodevelop-2.1.0/src/addins/NUnit/Makefile.am
+Description: Use system nunit libs instead of shipped ones
+Patch created by Mirco Bauer <meebey@meebey.net>
 ===================================================================
 diff -urNad monodevelop-2.1.0~/src/addins/NUnit/Makefile.am monodevelop-2.1.0/src/addins/NUnit/Makefile.am
 --- monodevelop-2.1.0~/src/addins/NUnit/Makefile.am	2009-09-11 09:35:08.628794292 +0100

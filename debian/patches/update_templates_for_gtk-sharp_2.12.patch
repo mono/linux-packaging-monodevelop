@@ -1,4 +1,6 @@
 Index: monodevelop-2.1.0/src/addins/CSharpBinding/templates/GladeSharp2Project.xpt.xml
+Description: Update projects to ensure the version of GTK# it uses for new projects matches the version we ship in the archive
+Patch created by Jo Shields <directhex@apebox.org>
 ===================================================================
 diff -urNad monodevelop-2.1.0~/src/addins/CSharpBinding/templates/GladeSharp2Project.xpt.xml monodevelop-2.1.0/src/addins/CSharpBinding/templates/GladeSharp2Project.xpt.xml
 --- monodevelop-2.1.0~/src/addins/CSharpBinding/templates/GladeSharp2Project.xpt.xml	2009-09-11 09:47:09.839797641 +0100
