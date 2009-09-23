@@ -37,6 +37,8 @@ monodevelop (2.1.0+dfsg-1) UNRELEASED; urgency=low
     + Convert everything from dpatch to quilt
   * debian/rules:
     + Rewrite with new dh7 features (e.g dh_override, --with quilt)
+  * Renamed old README.source to README.debian and added new README.source
+    containing information about quilt
 
  -- Jo Shields <directhex@apebox.org>  Sat, 19 Sep 2009 17:45:49 +0200
 
