@@ -14,6 +14,8 @@ monodevelop (2.1.0+dfsg-1) UNRELEASED; urgency=low
     + Set mtime to 2009-09-11 (epoch 0 is easier but causes lots of
       console spew)
     + Ensure tarball is placed in the policy-specified folder
+    + Remove Moonlight support until a later date (when we ship the
+      Moonlight SDK)
   * debian/patches/link_system_nunit.dpatch,
     debian/patches/use_libsvn1.dpatch,
     debian/patches/update_templates_for_gtk-sharp_2.12.dpatch:
@@ -40,7 +42,7 @@ monodevelop (2.1.0+dfsg-1) UNRELEASED; urgency=low
   * Renamed old README.source to README.debian and added new README.source
     containing information about quilt
 
- -- Jo Shields <directhex@apebox.org>  Sat, 19 Sep 2009 17:45:49 +0200
+ -- Jo Shields <directhex@apebox.org>  Mon, 12 Oct 2009 10:44:21 +0100
 
 monodevelop (2.0+dfsg-2) unstable; urgency=low
 

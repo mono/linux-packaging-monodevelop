@@ -50,6 +50,9 @@ override_dh_install:
 	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/VersionControl/
 	# remove ChangeLogAddIn files (shipped in monodevelop-versioncontrol)
 	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/ChangeLogAddIn/
+	# remove Moonlight stuff, since we don't have packages
+	# for the Moonlight SDK yet
+	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/MonoDevelop.Moonlight/
 
 get-orig-source:
 	mkdir -p ../tarballs
