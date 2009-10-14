@@ -1,8 +1,8 @@
-monodevelop (2.1.0+dfsg-1) UNRELEASED; urgency=low
+monodevelop (2.1.1+dfsg-1) UNRELEASED; urgency=low
 
   [ Jo Shields ]
   * New upstream release
-  * DFSG version of MonoDevelop 2.2 beta 1
+  * DFSG version of MonoDevelop 2.2 beta 2
     (deleted all pre-compiled binaries from the tarball)
     + For the record here a list of the deleted files:
       src/addins/NUnit/lib/nunit.framework.dll
