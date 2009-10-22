@@ -1,4 +1,4 @@
-monodevelop (2.1.1+dfsg-1) UNRELEASED; urgency=low
+monodevelop (2.1.1+dfsg-1) unstable; urgency=low
 
   [ Jo Shields ]
   * New upstream release
@@ -42,7 +42,14 @@ monodevelop (2.1.1+dfsg-1) UNRELEASED; urgency=low
   * Renamed old README.source to README.debian and added new README.source
     containing information about quilt
 
- -- Jo Shields <directhex@apebox.org>  Mon, 12 Oct 2009 10:44:21 +0100
+  [ Mirco Bauer ]
+  * debian/control:
+    + Bumped libmono-dev build-dep to >= 2.4.2
+    + Bumped GTK/GNOME# build-deps to >= 2.12.8
+    + Bumped libmono-addins*-cil build-deps to 0.4
+    + Removed unneeded libcairo1.0-cil build-dep
+
+ -- Mirco Bauer <meebey@debian.org>  Thu, 22 Oct 2009 20:25:00 +0200
 
 monodevelop (2.0+dfsg-2) unstable; urgency=low
 
