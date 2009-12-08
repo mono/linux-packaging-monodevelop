@@ -1,3 +1,11 @@
+monodevelop (2.1.1+dfsg-2) unstable; urgency=low
+
+  * debian/patches/stetic_widget_corruption_r144546.patch:
+    + Fixes an annoying issue with the GUI designer that renames suddenly
+      widgets to bin1 and the like.
+
+ -- Mirco Bauer <meebey@debian.org>  Tue, 08 Dec 2009 23:14:37 +0100
+
 monodevelop (2.1.1+dfsg-1) unstable; urgency=low
 
   [ Jo Shields ]
