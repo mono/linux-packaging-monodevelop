@@ -1,0 +1,12 @@
+Index: monodevelop-2.2/src/addins/Makefile.am
+===================================================================
+--- monodevelop-2.2.orig/src/addins/Makefile.am	2010-01-07 19:33:24.000000000 +0000
++++ monodevelop-2.2/src/addins/Makefile.am	2010-01-07 19:33:34.000000000 +0000
+@@ -27,7 +27,5 @@
+ 	MonoDevelop.RegexToolkit \
+ 	CBinding \
+ 	MonoDevelop.AssemblyBrowser \
+-	MonoDevelop.Moonlight \
+ 	MonoDevelop.CodeMetrics \
+-	MonoDevelop.Debugger.Soft \
+ 	WindowsPlatform

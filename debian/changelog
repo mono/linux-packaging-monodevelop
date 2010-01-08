@@ -1,3 +1,21 @@
+monodevelop (2.2+dfsg-1) UNRELEASED; urgency=low
+
+  * New upstream release
+  * DFSG version of MonoDevelop 2.2 beta 2
+    (deleted all pre-compiled binaries from the tarball)
+    + For the record here a list of the deleted files:
+      src/addins/NUnit/lib/nunit.framework.dll
+      src/addins/NUnit/lib/nunit.core.dll
+      src/addins/NUnit/lib/nunit.util.dll
+      src/addins/NUnit/lib/nunit.core.interfaces.dll
+      src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/Mono.Debugger.Soft.dll
+  * debian/patches/remove_support_for_non_debian_functionality.patch:
+    + Remove Mono Soft Debugger support until we ship Mono 2.6+
+  * debian/patches/update_templates_for_gtk-sharp_2.12.patch:
+    + Refreshed
+
+ -- Jo Shields <directhex@apebox.org>  Thu, 07 Jan 2010 19:06:58 +0000
+
 monodevelop (2.1.1+dfsg-2) unstable; urgency=low
 
   * debian/patches/stetic_widget_corruption_r144546.patch:

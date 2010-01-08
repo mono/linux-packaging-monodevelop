@@ -1,4 +1,4 @@
-stetic_widget_corruption_r144546.patch -p3
+#stetic_widget_corruption_r144546.patch -p3
 link_system_nunit.patch
 use_libsvn1.patch
 use_libapr1.patch
@@ -7,3 +7,4 @@ update_templates_for_gtk-sharp_2.12.patch
 boo_mimetype.patch
 use_csc.patch
 #monodevelop_fix_addin_highlights_r130904.patch
+remove_support_for_non_debian_functionality.patch
