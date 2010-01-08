@@ -13,6 +13,9 @@ monodevelop (2.2+dfsg-1) UNRELEASED; urgency=low
     + Remove Mono Soft Debugger support until we ship Mono 2.6+
   * debian/patches/update_templates_for_gtk-sharp_2.12.patch:
     + Refreshed
+  * debian/control:
+    + Use -dev packages for things now
+    + Change to group-maintained, and add myself as an Uploader
 
  -- Jo Shields <directhex@apebox.org>  Thu, 07 Jan 2010 19:06:58 +0000
 
