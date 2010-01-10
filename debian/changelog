@@ -1,3 +1,11 @@
+monodevelop (2.2+dfsg-2) unreleased; urgency=low
+
+  * debian/rules/remove_support_for_non_debian_functionality.patch:
+    + Also fix monodevelop-core-addins.pc to remove links to the
+      addins we remove in Debian
+
+ -- Jo Shields <directhex@apebox.org>  Sun, 10 Jan 2010 14:25:59 +0000
+
 monodevelop (2.2+dfsg-1) unstable; urgency=low
 
   * New upstream release
