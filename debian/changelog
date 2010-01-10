@@ -1,4 +1,4 @@
-monodevelop (2.2+dfsg-2) unreleased; urgency=low
+monodevelop (2.2+dfsg-2) unstable; urgency=low
 
   * debian/rules/remove_support_for_non_debian_functionality.patch:
     + Also fix monodevelop-core-addins.pc to remove links to the
