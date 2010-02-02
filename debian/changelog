@@ -1,3 +1,20 @@
+monodevelop (2.2+dfsg-3) UNRELEASED; urgency=low
+
+  * debian/patches/remove_support_for_non_debian_functionality.patch,
+    debian/patches/remove_support_for_soft_debugger.patch,
+    debian/patches/remove_support_for_moonlight.patch,
+    debian/rules:
+    + Split patch into two pieces, to make it easier to enable either
+      SDB or Moonlight support with a rebuild
+  * debian/monodevelop-moonlight.install,
+    debian/monodevelop-debugger-sdb.install,
+    debian/control:
+    + Create packaging data for the Soft Debugger addin and Moonlight addin -
+      and comment them out of debian/control as we can't provide them on
+      Debian for now
+
+ -- Jo Shields <directhex@apebox.org>  Tue, 02 Feb 2010 11:39:59 +0000
+
 monodevelop (2.2+dfsg-2) unstable; urgency=low
 
   * debian/rules/remove_support_for_non_debian_functionality.patch:
