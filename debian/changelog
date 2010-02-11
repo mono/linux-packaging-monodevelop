@@ -1,4 +1,4 @@
-monodevelop (2.2.1+dfsg-1) UNRELEASED; urgency=low
+monodevelop (2.2.1+dfsg-1) unstable; urgency=low
 
   * New upstream release
   * debian/control:
