@@ -1,5 +1,8 @@
-monodevelop (2.2+dfsg-3) UNRELEASED; urgency=low
+monodevelop (2.2.1+dfsg-1) UNRELEASED; urgency=low
 
+  * New upstream release
+  * debian/control:
+    + Standards version 3.8.4 (no changes needed)
   * debian/patches/remove_support_for_non_debian_functionality.patch,
     debian/patches/remove_support_for_soft_debugger.patch,
     debian/patches/remove_support_for_moonlight.patch,
