@@ -1,3 +1,21 @@
+2010-02-05  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CodeGeneration/CodeGenerationCommands.cs: Only
+	  enable command when text editor has input focus. 
+
+	* MonoDevelop.Refactoring.addin.xml: Insert the Code
+	  Generation command into edit menu and editor context menu.
+
+2010-02-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.DeclareLocal/DeclareLocalCodeGenerator.cs:
+	  fixed some bugs in the declare local code generator.
+
+2010-01-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.Rename/RenameRefactoring.cs: fixed
+	  'Bug 574924 - Find references doesn't work for constructor'.
+
 2010-01-13  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.Refactoring.Rename/RenameRefactoring.cs: Fix NRE

@@ -1,3 +1,15 @@
+2010-02-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* frameworks/framework_NET_4_0.xml:
+	* frameworks/framework_NET_2_0.xml:
+	* frameworks/framework_NET_1_1.xml: Add missing assemblies.
+
+2010-02-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Core.Assemblies/MonoRuntimeInfo.cs: Don't
+	  inherit the MONO_PATH var from the current process
+	  environment.
+
 2010-01-25  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.Core.Assemblies/TargetFrameworkBackend.cs:

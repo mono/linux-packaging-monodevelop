@@ -88,6 +88,7 @@ am__remove_distdir = \
 DIST_ARCHIVES = $(distdir).tar.gz
 GZIP_ENV = --best
 ACLOCAL = @ACLOCAL@
+ACLOCAL_FLAGS = @ACLOCAL_FLAGS@
 ALL_LINGUAS = @ALL_LINGUAS@
 AMTAR = @AMTAR@
 ASSEMBLY_VERSION = @ASSEMBLY_VERSION@
@@ -210,6 +211,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = contrib src po man theme-icons build tests
+
+#capture aclocal flags for autoreconf
+ACLOCAL_AMFLAGS = $(ACLOCAL_FLAGS)
 bin_SCRIPTS = monodevelop mdtool
 buildinfo = $(top_builddir)/build/bin/buildinfo
 buildinfodir = $(MD_ASSEMBLY_DIR)

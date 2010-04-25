@@ -1,10 +1,10 @@
 // 
-// VariableValueReference.cs
+// PrintSettingsWidget.cs
 //  
 // Author:
-//       Lluis Sanchez Gual <lluis@novell.com>
+//       Michael Hutchinson <mhutchinson@novell.com>
 // 
-// Copyright (c) 2009 Novell, Inc (http://www.novell.com)
+// Copyright (c) 2010 Novell, Inc. (http://www.novell.com)
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,53 +23,15 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-
 using System;
-using System.Collections.Generic;
-using Mono.Debugging.Evaluation;
-using Mono.Debugging.Client;
-using Mono.Debugger.Soft;
-
-namespace MonoDevelop.Debugger.Soft
+namespace MonoDevelop.SourceEditor
 {
-	public class VariableValueReference : ValueReference
+	partial class PrintSettingsWidget : Gtk.Bin
 	{
-		string name;
-		LocalVariable variable;
-		
-		public VariableValueReference (EvaluationContext ctx, string name, LocalVariable variable): base (ctx)
+		public PrintSettingsWidget ()
 		{
-			this.name = name;
-			this.variable = variable;
-		}
-		
-		public override ObjectValueFlags Flags {
-			get {
-				return ObjectValueFlags.Variable;
-			}
-		}
-
-		public override string Name {
-			get {
-				return name;
-			}
-		}
-
-		public override object Type {
-			get {
-				return variable.Type;
-			}
-		}
-
-		public override object Value {
-			get {
-				SoftEvaluationContext ctx = (SoftEvaluationContext) Context;
-				return ctx.Frame.GetValue (variable);
-			}
-			set {
-				SoftEvaluationContext ctx = (SoftEvaluationContext) Context;
-				ctx.Frame.SetValue (variable, (Value) value);
-			}
+			this.Build ();
 		}
 	}
 }
+
