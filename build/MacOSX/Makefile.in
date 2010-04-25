@@ -41,6 +41,7 @@ SOURCES =
 DIST_SOURCES =
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
+ACLOCAL_FLAGS = @ACLOCAL_FLAGS@
 ALL_LINGUAS = @ALL_LINGUAS@
 AMTAR = @AMTAR@
 ASSEMBLY_VERSION = @ASSEMBLY_VERSION@
@@ -342,7 +343,7 @@ clean-local:
 	rm -f MonoDevelop.dmg
 	rm -f MonoDevelop.app.zip
 
-MonoDevelop.app: ../AddIns/* ../AddIns/*/* ../AddIns/*/*/* ../bin/* ../data/*/* ../locale/*/*/* mdtool monodevelop 
+MonoDevelop.app: 
 	mkdir -p $(MAC_APP_DIR)/Contents/{MacOS,Resources}
 	mkdir -p $(MAC_APP_DIR)/Contents/MacOS/{lib,share}
 	mkdir -p $(MAC_APP_LIB_DIR)
@@ -382,11 +383,11 @@ MonoDevelop.app: ../AddIns/* ../AddIns/*/* ../AddIns/*/*/* ../bin/* ../data/*/* 
 	  $(MACOS)/lib/monodevelop/bin/repository-cache* \
 	  $(MACOS)/lib/monodevelop/AddIns/MonoDevelop.TextTemplating/Mono.TextTemplating.Tests*
 
-#emit the update marker file
-	if test -d ../.git/svn; then svn_info="git log --no-color --first-parent -n1 --grep=git-svn-id: --pretty=format:%b | sed -n -e 's,git-svn-id: \(.*\)@\(.*\) .*,URL: \1 Revision: \2,p'"; fi; \
-	if test -d ./.svn; then svn_info='svn info'; fi; \
+# update revision in updateinfo
+	if test -d ../../.git/svn; then svn_info="git log --no-color --first-parent -n1 --grep=git-svn-id: --pretty=format:%b | sed -n -e 's,git-svn-id: \(.*\)@\(.*\) .*,URL: \1 Revision: \2,p'"; fi; \
+	if test -d ./../../.svn; then svn_info='svn info'; fi; \
 	if test -n "$$svn_info"; then \
-		version=$$(cd ..; \
+		version=$$(cd ../..; \
 			LANG=C; export LANG; \
 			eval $$svn_info | sed -n -e '/Last Changed Rev/ s/.*: //p'; \
 		); \
@@ -398,6 +399,8 @@ MonoDevelop.app: ../AddIns/* ../AddIns/*/* ../AddIns/*/*/* ../bin/* ../data/*/* 
 
 MonoDevelop.app.zip: MonoDevelop.app
 	zip -r9uq MonoDevelop.app.zip MonoDevelop.app
+
+.PHONY: MonoDevelop.app
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

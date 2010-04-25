@@ -29,9 +29,9 @@ using System.Linq;
 using System.Threading;
 using System.Collections.Generic;
 using Mono.Debugging.Client;
-using Mono.Debugger;
+using Mono.Debugger.Soft;
 using Mono.Debugging.Evaluation;
-using MDB = Mono.Debugger;
+using MDB = Mono.Debugger.Soft;
 using System.Net.Sockets;
 using MonoDevelop.Core;
 using System.IO;
@@ -104,7 +104,8 @@ namespace MonoDevelop.Debugger.Soft
 					var vars = new Dictionary<string, string> ();
 					foreach (string k in psi.EnvironmentVariables.Keys)
 						vars [k] = psi.EnvironmentVariables [k];
-					return Runtime.ProcessService.StartConsoleProcess (psi.FileName, psi.Arguments, psi.WorkingDirectory, vars, ExternalConsoleFactory.Instance.CreateConsole (dsi.CloseExternalConsoleOnExit), null);
+					return Runtime.ProcessService.StartConsoleProcess (psi.FileName, psi.Arguments, psi.WorkingDirectory,
+						vars, ExternalConsoleFactory.Instance.CreateConsole (dsi.CloseExternalConsoleOnExit), null);
 				};
 			}
 			
@@ -444,8 +445,10 @@ namespace MonoDevelop.Debugger.Soft
 				bi.Location = FindLocation (bp.FileName, bp.Line);
 				if (bi.Location != null)
 					InsertBreakpoint (bp, bi);
-				else
+				else {
 					pending_bes.Add (bp);
+					SetBreakEventStatus (be, false);
+				}
 			} else if (be is Catchpoint) {
 				var cp = (Catchpoint) be;
 				TypeMirror type;
@@ -453,6 +456,7 @@ namespace MonoDevelop.Debugger.Soft
 					InsertCatchpoint (cp, bi, type);
 				} else {
 					pending_bes.Add (be);
+					SetBreakEventStatus (be, false);
 				}
 			}
 			return bi;
@@ -581,7 +585,7 @@ namespace MonoDevelop.Debugger.Soft
 			}
 		}
 		
-		void HandleEvent  (Event e, bool dequeuing)
+		void HandleEvent (Event e, bool dequeuing)
 		{
 			if (dequeuing && exited)
 				return;
@@ -602,8 +606,24 @@ namespace MonoDevelop.Debugger.Soft
 				OnDebuggerOutput (false, string.Format ("Loaded assembly: {0}{1}\n", ae.Assembly.Location, flagExt));
 			}
 			
+			if (e is VMStartEvent) {
+				//HACK: 2.6.1 VM doesn't emit type load event, so work around it
+				var t = vm.RootDomain.Corlib.GetType ("System.Exception", false, false);
+				if (t != null)
+					ResolveBreakpoints (t);
+			}
+			
 			if (e is TypeLoadEvent) {
-				ResolveBreakpoints ((TypeLoadEvent)e);
+				var t = ((TypeLoadEvent)e).Type;
+				
+				string typeName = t.FullName;
+				
+				if (types.ContainsKey (typeName)) {
+					if (typeName != "System.Exception")
+						LoggingService.LogError ("Type '" + typeName + "' loaded more than once");
+				} else {
+					ResolveBreakpoints (t);
+				}
 			}
 			
 			if (e is BreakpointEvent) {
@@ -616,6 +636,9 @@ namespace MonoDevelop.Debugger.Soft
 			
 			if (e is ExceptionEvent) {
 				etype = TargetEventType.ExceptionThrown;
+				//FIXME: we should do something with the exception object 
+				//var ev = (ExceptionEvent)e;
+				//ev.Exception
 				resume = false;
 			}
 			
@@ -807,36 +830,39 @@ namespace MonoDevelop.Debugger.Soft
 			}
 		}
 		
-		void ResolveBreakpoints (TypeLoadEvent te)
+		void ResolveBreakpoints (TypeMirror t)
 		{
-			string typeName = te.Type.FullName;
-			types [typeName] = te.Type;
+			string typeName = t.FullName;
+			types [typeName] = t;
 			
 			/* Handle pending breakpoints */
 			
 			var resolved = new List<BreakEvent> ();
 			
-			foreach (string s in te.Type.GetSourceFiles ()) {
+			foreach (string s in t.GetSourceFiles ()) {
 				List<TypeMirror> typesList;
 				
 				if (source_to_type.TryGetValue (s, out typesList)) {
-					typesList.Add (te.Type);
+					typesList.Add (t);
 				} else {
 					typesList = new List<TypeMirror> ();
-					typesList.Add (te.Type);
+					typesList.Add (t);
 					source_to_type[s] = typesList;
 				}
 				
 				
 				foreach (var bp in pending_bes.OfType<Breakpoint> ()) {
 					if (System.IO.Path.GetFileName (bp.FileName) == s) {
-						Location l = GetLocFromType (te.Type, s, bp.Line);
+						Location l = GetLocFromType (t, s, bp.Line);
 						if (l != null) {
-							OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint at '{0}:{1}' to {2}:{3}.\n", s, bp.Line, l.Method.FullName, l.ILOffset));
+							OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint at '{0}:{1}' to {2}:{3}.\n",
+							                                        s, bp.Line, l.Method.FullName, l.ILOffset));
 							ResolvePendingBreakpoint (bp, l);
 							resolved.Add (bp);
 						} else {
-							OnDebuggerOutput (true, string.Format ("Could not insert pending breakpoint at '{0}:{1}'. Perhaps the source line does not contain any statements, or the source does not correspond to the current binary.\n", s, bp.Line));
+							OnDebuggerOutput (true, string.Format ("Could not insert pending breakpoint at '{0}:{1}'. " +
+								"Perhaps the source line does not contain any statements, or the source does not correspond " +
+								"to the current binary.\n", s, bp.Line));
 						}
 					}
 				}
@@ -850,7 +876,7 @@ namespace MonoDevelop.Debugger.Soft
 			
 			foreach (var cp in pending_bes.OfType<Catchpoint> ()) {
 				if (cp.ExceptionName == typeName) {
-					ResolvePendingCatchpoint (cp, te.Type);
+					ResolvePendingCatchpoint (cp, t);
 					resolved.Add (cp);
 				}
 			}
@@ -881,6 +907,7 @@ namespace MonoDevelop.Debugger.Soft
 			if (bi != null) {
 				bi.Location = l;
 				InsertBreakpoint (bp, bi);
+				SetBreakEventStatus (bp, true);
 			}
 		}
 				
@@ -888,6 +915,7 @@ namespace MonoDevelop.Debugger.Soft
 		{
 			BreakInfo bi = GetBreakInfo (cp);
 			InsertCatchpoint (cp, bi, type);
+			SetBreakEventStatus (cp, true);
 		}
 		
 		bool UpdateAssemblyFilters (AssemblyMirror asm)
@@ -1007,7 +1035,7 @@ namespace MonoDevelop.Debugger.Soft
 				return null;
 		}
 		
-		public bool IsExternalCode (Mono.Debugger.StackFrame frame)
+		public bool IsExternalCode (Mono.Debugger.Soft.StackFrame frame)
 		{
 			return frame.Method == null || string.IsNullOrEmpty (frame.FileName)
 				|| (assemblyFilters != null && !assemblyFilters.Contains (frame.Method.DeclaringType.Assembly));

@@ -1,3 +1,47 @@
+2010-02-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* SoftDebuggerSession.cs: Force-load System.Exception to work
+	  around sdb currently not giving a type load for this. Warn
+	  on duplicate type loads - they could cause problems because
+	  we can't handle them and they currently might happen e.g.
+	  with appdomains. Shorten stupidly long lines.
+
+	* LoggingService.cs: Only insert newline if exception is not
+	  null.
+
+2010-02-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* SoftDebuggerAdaptor.cs: Implemented GetTypeArgs. Report the
+	  correct exception name when an exception is thrown in the
+	  target. Fixes bug #576427 - Debugger hides any user
+	  exception.
+
+2010-02-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* SoftDebuggerSession.cs: When a breakpoint can't be resolved,
+	  set it as invalid. Set it to valid when resolved. Fixes bug
+	  #564541 - Set breakpoint should work on expressions and not
+	  lines.
+
+2010-02-02  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* RemoteSoftDebuggerSession.cs: Use the new namespace for the
+	  soft debugger. Updated the sdb client library.
+
+2010-02-02  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* ArrayAdaptor.cs:
+	* Mono.Debugger.Soft.dll:
+	* SoftDebuggerAdaptor.cs:
+	* FieldValueReference.cs:
+	* SoftDebuggerSession.cs:
+	* SoftEvaluationContext.cs:
+	* SoftDebuggerBacktrace.cs:
+	* VariableValueReference.cs:
+	* PropertyValueReference.cs:
+	* Mono.Debugger.Soft.dll.mdb: Use the new namespace for the
+	  soft debugger. Updated the sdb client library.
+
 2010-01-25  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* SoftDebuggerSession.cs: Write a message to the debugger
