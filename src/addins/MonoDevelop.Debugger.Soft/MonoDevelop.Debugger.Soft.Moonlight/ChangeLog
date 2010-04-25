@@ -1,0 +1,62 @@
+2009-12-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MoonlightSoftDebuggerSession.cs: Create the
+	  monodevelop-moonlight-debug Firefox profile if necessary.
+
+2009-11-20  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MoonlightSoftDebuggerEngine.cs: Set UserAssemblyPaths.
+
+2009-11-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MoonlightSoftDebuggerEngine.cs: Implement ID member.
+
+2009-11-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MoonlightSoftDebuggerEngine.cs: Fix OS check.
+
+2009-11-13  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MoonlightSoftDebuggerEngine.cs:
+	* MoonlightSoftDebuggerSession.cs: Track AppName API, and fix
+	  the moonlight app name.
+
+2009-11-12  Geoff Norton  <gnorton@novell.com>
+
+	* MoonlightSoftDebuggerEngine.cs: Dont try to hook up a 
+	Console output.
+	* MoonlightSoftDebuggerSession.cs: UseShellExecute = false is
+	required to redirect the stdout and stderr.  Don't try to 
+	Kill an exited process.  Fix a typo in Substring
+
+2009-11-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MoonlightSoftDebuggerEngine.cs:
+	* MoonlightSoftDebuggerSession.cs: First stab at implementing
+	  the Moonlight debug session.
+
+2009-11-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Debugger.Soft.Moonlight.csproj: Add makefiles to
+	  project files.
+
+2009-11-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Debugger.Soft.Moonlight.csproj: Don't local-copy
+	  project refs.
+
+2009-11-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.Debugger.Soft.Moonlight.csproj: Wire the soft
+	  debug addin into the build.
+
+2009-11-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Debugger.Soft.Moonlight.csproj: Moved soft debug
+	  addin from extras.
+
+2009-11-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Debugger.Soft.Moonlight.csproj: Updated.
+
