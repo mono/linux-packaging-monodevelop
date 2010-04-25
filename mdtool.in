@@ -1,0 +1,9 @@
+#!/bin/bash
+
+#this script should be in $PREFIX/bin
+MONO_EXEC="exec -a mdtool mono"
+EXE_PATH="${0%%/bin/mdtool}/lib/monodevelop/bin/mdrun.exe"
+
+_MONO_OPTIONS=$MONO_OPTIONS
+
+$MONO_EXEC $_MONO_OPTIONS "$EXE_PATH" "$@"
