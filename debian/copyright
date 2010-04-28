@@ -20,7 +20,7 @@ Ben Motmans
 Christian Hergert
 Daniel Kornhauser
 Daniel Morgan
-David MakovskÃ½
+David Makovskü
 Eric Butler
 Erik Dasque
 Franciso Martinez "Paco"
@@ -44,7 +44,7 @@ Marek Sieradzki
 Matej Urbas
 Michael Hutchinson
 Miguel de Icaza
-Mike KrÃ¼ger
+Mike Krüger
 Muthiah Annamalai
 Nick Drochak
 nricciar
@@ -61,6 +61,27 @@ Yan-ren Tsai
 Zach Lute
 and the SharpDevelop team
 
+Files: src/addins/MonoDevelop.Autotools/AutotoolsContext.cs
+       src/addins/MonoDevelop.Autotools/Commands.cs
+       src/addins/MonoDevelop.Autotools/SimpleProjectMakefileHandler.cs
+       src/addins/MonoDevelop.Autotools/SolutionDeployer.cs
+       src/addins/MonoDevelop.Autotools/SolutionMakefileHandler.cs
+       src/addins/MonoDevelop.Autotools/TemplateEngine.cs
+       src/addins/MonoDevelop.Autotools/Set.cs
+Copyright: (C) 2006  Matthias Braun <matze@braunis.de>
+License: LGPLv2+
+
+Files: src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DefaultWorkbench.cs
+       src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/SdiWorkspaceLayout.cs
+       src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IWorkbenchLayout.cs
+       src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/SdiWorkspaceWindow.cs
+       src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IWorkbench.cs
+       src/addins/CSharpBinding/MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs
+Copyright: Copyright (C) 2001-2007 Mike KrÃüger <mkrueger@novell.com>
+	   Copyright (C) 2001-2007 Daniel Grunwald <daniel@danielgrunwald.de
+License: LGPLv2.1+
+
+Files: *
 Copyright:
 src/tools/*
 Copyright (C) 2005 Novell, Inc (http://www.novell.com)
@@ -72,7 +93,7 @@ src/addins/CBinding/*
 Copyright (C) 2007 Marcos David Marin Amador
 
 src/addins/ILAsmBinding/*
-Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 
 src/addins/GnomePlatform/*
 src/addins/MacPlatform/*
@@ -130,7 +151,7 @@ src/addins/CSharpBinding/FormattingStrategy/CSharpFormattingStrategy.cs
 src/addins/CSharpBinding/Gui/CodeGenerationPanel.cs
 src/addins/CSharpBinding/Gui/CompilerOptionsPanelWidget.cs
 src/addins/CSharpBinding/Project/CSharpCompilerParameters.cs
-Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 
 src/addins/CSharpBinding/CSharpEnhancedCodeProvider.cs
 Copyright (C) 2006 Michael Hutchinson
@@ -201,15 +222,6 @@ Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 
 src/addins/MonoDevelop.Autotools/
 -------------------------------------------------------------------------------
-src/addins/MonoDevelop.Autotools/AutotoolsContext.cs
-src/addins/MonoDevelop.Autotools/Commands.cs
-src/addins/MonoDevelop.Autotools/SimpleProjectMakefileHandler.cs
-src/addins/MonoDevelop.Autotools/SolutionDeployer.cs
-src/addins/MonoDevelop.Autotools/SolutionMakefileHandler.cs
-src/addins/MonoDevelop.Autotools/TemplateEngine.cs
-src/addins/MonoDevelop.Autotools/Set.cs
-Copyright (C) 2006  Matthias Braun <matze@braunis.de>
-
 src/addins/MonoDevelop.Autotools/ConfigSection.cs
 src/addins/MonoDevelop.Autotools/CustomMakefile.cs
 src/addins/MonoDevelop.Autotools/MakefileData.cs
@@ -340,12 +352,12 @@ Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 
 BEAUTIFY ME:
 ./src/addins/MonoDevelop.Gettext/Commands.cs:// Copyright (C) 2006 Rafael 'Monoman' Teixeira
-./src/addins/MonoDevelop.Gettext/Commands.cs:// Copyright (C) 2007 David MakovskÃ½
+./src/addins/MonoDevelop.Gettext/Commands.cs:// Copyright (C) 2007 David Makovskü
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/CatalogEditor.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
-./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/CatalogEditor.cs:// Copyright (C) 2007 David MakovskÃ½
-./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/CatalogHeadersWidget.cs:// Copyright (C) 2007 David MakovskÃ½
-./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/GettextEditorDisplayBinding.cs:// Copyright (C) 2007 David MakovskÃ½
-./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/GtkSpell.cs:// Copyright (C) 2007 David MakovskÃ½
+./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/CatalogEditor.cs:// Copyright (C) 2007 David Makovskü
+./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/CatalogHeadersWidget.cs:// Copyright (C) 2007 David Makovskü
+./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/GettextEditorDisplayBinding.cs:// Copyright (C) 2007 David Makovskü
+./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/GtkSpell.cs:// Copyright (C) 2007 David Makovskü
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Editor/POEditorWidget.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.ExtensionNodes/ExcludeRegex.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.ExtensionNodes/IncludeExtensionNode.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
@@ -354,7 +366,7 @@ BEAUTIFY ME:
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.ExtensionNodes/XmlRegexScannerExtensionNode.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.NodeBuilders/TranslationNodeBuilder.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.NodeBuilders/TranslationProjectNodeBuilder.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Translator/LanguageChooserDialog.cs:// Copyright (C) 2007 David MakovskÃ½
+./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext.Translator/LanguageChooserDialog.cs:// Copyright (C) 2007 David Makovskü
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext/Catalog.cs:// Copyright (C) 1999-2006 Vaclav Slavik (Code and design inspiration - poedit.org)
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext/Catalog.cs:// Copyright (C) 2007 David Makovský
 ./src/addins/MonoDevelop.Gettext/MonoDevelop.Gettext/CatalogDeletedEntry.cs:// Copyright (C) 1999-2006 Vaclav Slavik (Code and design inspiration - poedit.org)
@@ -420,14 +432,14 @@ BEAUTIFY ME:
 ./src/addins/MonoDevelop.RegexToolkit/MonoDevelop.RegexToolkit/RegexLibraryWindow.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/addins/MonoDevelop.RegexToolkit/MonoDevelop.RegexToolkit/RegexToolkitWindow.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/addins/MonoDevelop.RegexToolkit/MonoDevelop.RegexToolkit/UpdateInProgressDialog.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Actions/IEditAction.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Codons/EditActionCodon.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.FormattingStrategy/DefaultFormattingStrategy.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.Dialogs/EditTemplateGroupDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.Dialogs/GotoLineNumberDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.OptionPanels/BehaviorTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.OptionPanels/GeneralTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.OptionPanels/MarkersTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Actions/IEditAction.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Codons/EditActionCodon.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.FormattingStrategy/DefaultFormattingStrategy.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.Dialogs/EditTemplateGroupDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.Dialogs/GotoLineNumberDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.OptionPanels/BehaviorTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.OptionPanels/GeneralTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor.Gui.OptionPanels/MarkersTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/addins/MonoDevelop.SourceEditor/MonoDevelop.SourceEditor/EditorCommands.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/addins/MonoDeveloperExtensions/AssemblyInfo.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/addins/MonoDeveloperExtensions/AssemblyInfo.cs:[assembly: AssemblyCopyright("Copyright (C) 2005 Novell, Inc")]
@@ -474,21 +486,21 @@ BEAUTIFY ME:
 ./src/addins/NUnit/Services/UnitTestResultsStore.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/addins/NUnit/Services/UnitTestStatus.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/addins/NUnit/Services/XmlResultsStore.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Actions/IEditAction.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Codons/EditActionCodon.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/SourceEditor2/MonoDevelop.SourceEditor.FormattingStrategy/DefaultFormattingStrategy.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.Dialogs/EditTemplateGroupDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.Dialogs/GotoLineNumberDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.OptionPanels/BehaviorTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.OptionPanels/GeneralTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.OptionPanels/MarkersTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Actions/IEditAction.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Codons/EditActionCodon.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/SourceEditor2/MonoDevelop.SourceEditor.FormattingStrategy/DefaultFormattingStrategy.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.Dialogs/EditTemplateGroupDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.Dialogs/GotoLineNumberDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.OptionPanels/BehaviorTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.OptionPanels/GeneralTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/addins/SourceEditor2/MonoDevelop.SourceEditor.Gui.OptionPanels/MarkersTextEditorPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/addins/SourceEditor2/MonoDevelop.SourceEditor/EditorCommands.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/addins/VBNetBinding/Gui/CodeGenerationPanel.cs://  Copyright (C) 2001-2007 Markus Palme <MarkusPalme@gmx.de>
 ./src/addins/VBNetBinding/Parser/ExpressionFinder.cs://  Copyright (C) 2001-2007 Markus Palme <MarkusPalme@gmx.de>
 ./src/addins/VBNetBinding/Parser/Parser.cs://  Copyright (C) 2001-2007 Andrea Paatz <andrea@icsharpcode.net>
 ./src/addins/VBNetBinding/Parser/Resolver.cs://  Copyright (C) 2001-2007 Andrea Paatz <andrea@icsharpcode.net>
 ./src/addins/VBNetBinding/Project/VBCompilerParameters.cs://  Copyright (C) 2001-2007 Markus Palme <MarkusPalme@gmx.de>
-./src/addins/VBNetBinding/VBAmbience.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/addins/VBNetBinding/VBAmbience.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/addins/VBNetBinding/VBBindingCompilerServices.cs://  Copyright (C) 2001-2007 Markus Palme <MarkusPalme@gmx.de>
 ./src/addins/VBNetBinding/VBLanguageBinding.cs://  Copyright (C) 2001-2007 Markus Palme <MarkusPalme@gmx.de>
 ./src/addins/VersionControl/Diff/Diff.cs: * Parts Copyright (c) 2000-2004 Ned Konz.  All rights reserved.
@@ -576,18 +588,18 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Components/MonoDevelop.Components/IconView.cs:// Copyright (c) 2007 John Luke, nricciar
 ./src/core/MonoDevelop.Components/MonoDevelop.Components/Navbar.cs:// Copyright (c) 2004 John Luke
 ./src/core/MonoDevelop.Components/MonoDevelop.Components/TreeViewCellContainer.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Codons/DialogPanelCodon.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Codons/DialogPanelCodon.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Codons/StockIconCodon.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Components/MenuButtonEntry.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/AbstractOptionPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/DefaultDialogPanelDescriptor.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/AbstractOptionPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/DefaultDialogPanelDescriptor.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/ErrorDialog.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/IDialogPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/IDialogPanelDescriptor.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/IDialogPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/IDialogPanelDescriptor.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/MultiTaskProgressDialog.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/ProgressDialog.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/SetupApp.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/TreeViewOptions.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.Dialogs/TreeViewOptions.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.ProgressMonitoring/BaseProgressMonitor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.ProgressMonitoring/MessageDialogProgressMonitor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui.ProgressMonitoring/MultiTaskDialogProgressMonitor.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
@@ -608,14 +620,14 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/GuiSyncAbstractService.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/GuiSyncContext.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/GuiSyncObject.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/IMementoCapable.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/IMessageService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/ITextBufferStrategy.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/MessageService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/IMementoCapable.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/IMessageService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/ITextBufferStrategy.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/MessageService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/PlatformService.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/RecentFileStorage.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/RecentItem.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/RecentOpen.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/RecentOpen.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/StockIcons.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/SyncContext.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core.Gui/MonoDevelop.Core.Gui/SyncContextAttribute.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
@@ -661,7 +673,7 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Core/MonoDevelop.Core.ProgressMonitoring/NullProgressMonitor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core.ProgressMonitoring/ProgressTracker.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core.ProgressMonitoring/SynchronizedProgressMonitor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Core/MonoDevelop.Core/AbstractService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core/MonoDevelop.Core/AbstractService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/ClrVersion.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/DefaultAddinLocalizer.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/FileEventArgs.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
@@ -670,13 +682,13 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/IAsyncOperation.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/ICustomXmlSerializer.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/IProgressMonitor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Core/MonoDevelop.Core/IService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core/MonoDevelop.Core/IService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/LoggingService.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/Properties.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/PropertyChangedEventArgs.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/PropertyService.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/Runtime.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Core/MonoDevelop.Core/ServiceManager.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Core/MonoDevelop.Core/ServiceManager.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/StringParserService.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/SystemAssemblyService.cs:// Copyright (C) 2004 Todd Berman
 ./src/core/MonoDevelop.Core/MonoDevelop.Core/SystemAssemblyService.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
@@ -686,19 +698,19 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Documentation/MonoDevelop.Documentation/DocumentationService.cs:// Copyright (c) 2004 Todd Berman  <tberman@off.net>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/CodeTemplate.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/CodeTemplateGroup.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/CodeTemplatePanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/CodeTemplatePanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/CodeTemplateService.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/EditTemplateDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/EditTemplateGroupDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/TemplateCompletionDataProvider.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/EditTemplateDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/EditTemplateGroupDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.CodeTemplates/TemplateCompletionDataProvider.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/CombineOpenCondition.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/ContextPadCodon.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/DisplayBindingCodon.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/FileFilterCodon.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/DisplayBindingCodon.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/FileFilterCodon.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/FileTemplateConditionTypeCodon.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/FileTemplateTypeCodon.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/IDisplayBinding.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/ISubDisplayBinding.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/IDisplayBinding.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/ISubDisplayBinding.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/LanguageActiveCondition.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/NodeBuilderCodon.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/PadCodon.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
@@ -706,74 +718,74 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/ProjectActiveCondition.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/ProjectTemplateCodon.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/SolutionPadCodon.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/TaskListViewCodon.cs:// Copyright (C) 2006 David MakovskÃ½
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/WindowActiveCondition.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/TaskListViewCodon.cs:// Copyright (C) 2006 David Makovskü
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/WindowActiveCondition.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/WorkbenchContextCodon.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Codons/WorkbenchContextCondition.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/CustomStringTagProvider.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/CustomStringTagProvider.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/DebugCommands.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/EditCommands.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/FileCommands.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/FileCommands.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/FileTabCommands.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/HelpCommands.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/HelpCommands.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/NavigationCommands.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/ProjectCommands.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/ProjectCommands.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/RefactoryCommands.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/SearchCommands.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/SearchCommands.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/TextEditorCommands.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/ToolsCommands.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/ViewCommands.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/WindowCommands.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/ToolsCommands.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/ViewCommands.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Commands/WindowCommands.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.ExternalTools/ExternalTool.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.ExternalTools/ExternalToolService.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.BrowserDisplayBinding/BrowserDisplayBinding.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.BrowserDisplayBinding/HtmlViewPane.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.BrowserDisplayBinding/BrowserDisplayBinding.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.BrowserDisplayBinding/HtmlViewPane.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/CompletionTextEditorExtension.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IBookmarkBuffer.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IClipboardHandler.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IClipboardHandler.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/ICodeStyleOperations.cs:// Copyright (c) 2007 Alexandre Gomes
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/ICustomizedCommands.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IEditable.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/ICustomizedCommands.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IEditable.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IEncodedTextContent.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IExtensibleTextEditor.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IParsableContent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IPositionable.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IPrintable.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IParsableContent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IPositionable.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IPrintable.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/ITextBuffer.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IViewHistory.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/IndentStyle.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Content/TextEditorExtension.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/AddinLoadErrorDialog.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/AssemblyReferencePanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/AssemblyReferencePanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/CombineEntryFeatureSelector.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/CommonAboutDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/CommonAboutDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/DeleteFileDialog.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/EncapsulateFieldDialog.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/ExportProjectDialog.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/FeatureSelectorDialog.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/FileSelectorDialog.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/GacReferencePanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/IncludeFilesDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/NewFileDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/NewProjectDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/GacReferencePanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/IncludeFilesDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/NewFileDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/NewProjectDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/OpenFileInSolutionDialog.cs:// Copyright (C) 2007 Zach Lute
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/ProjectReferencePanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/ProjectReferencePanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/RenameItemDialog.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/ReplaceDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/ReplaceInFilesDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/ReplaceDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/ReplaceInFilesDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/SelectEncodingsDialog.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/SelectReferenceDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/SharpDevelopAboutPanels.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/TipOfTheDay.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/WordCountDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/SelectReferenceDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/SharpDevelopAboutPanels.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/TipOfTheDay.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Dialogs/WordCountDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/AddInsOptionsPanel.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/BuildPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/CodeGenerationPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/ExternalToolPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/BuildPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/CodeGenerationPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/ExternalToolPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/KeyBindingsPanel.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/LoadSavePanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/SelectStylePanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/TasksOptionsPanel.cs:// Copyright (C) 2006 David MakovskÃ½
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/LoadSavePanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/SelectStylePanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.OptionPanels/TasksOptionsPanel.cs:// Copyright (C) 2006 David Makovskü
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads.ClassPad/ClassData.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads.ClassPad/ClassNodeBuilder.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads.ClassPad/CombineNodeBuilder.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
@@ -805,8 +817,8 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads.ProjectPad/UnknownEntryNodeBuilder.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/DefaultMonitorPad.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/DragOperation.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/ErrorListPad.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/FileList.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/ErrorListPad.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/FileList.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/FileListItem.cs:// Copyright (c) 2007 John Luke
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/FileScout.cs:// Copyright (c) 2004 John Luke
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/ILocationListPad.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
@@ -821,80 +833,80 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/NodeBuilderExtension.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/NodeCommandHandler.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/NodeState.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/SearchResultPad.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/SearchResultPad.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/SolutionPad.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/TaskListPad.cs:// Copyright (C) 2006 David MakovskÃ½
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/TaskListPad.cs:// Copyright (C) 2006 David Makovskü
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/TreePadOption.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/TreeViewItem.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/TreeViewPad.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Pads/TypeNodeBuilder.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/AllOpenDocumentIterator.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/BruteForceSearchStrategy.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/CurrentDocumentIterator.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/DefaultFind.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/DefaultSearchResult.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/DirectoryDocumentIterator.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/AllOpenDocumentIterator.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/BruteForceSearchStrategy.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/CurrentDocumentIterator.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/DefaultFind.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/DefaultSearchResult.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/DirectoryDocumentIterator.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ExtendedStreamReader.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/FileDocumentInformation.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/FileDocumentInformation.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ForwardTextFileIterator.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ForwardTextIterator.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ForwardTextIterator.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/IDocumentInformation.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/IDocumentIterator.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/IFind.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/IDocumentIterator.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/IFind.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ISearchProgressMonitor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ISearchResult.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ISearchStrategy.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ITextIterator.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ISearchResult.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ISearchStrategy.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ITextIterator.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/KMPSearchStrategy.cs://  Copyright (C) 2001-2007 Andrea Paatz <andrea@icsharpcode.net>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/RegExSearchStrategy.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ReverseDocumentIterator.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/SearchOptions.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/RegExSearchStrategy.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/ReverseDocumentIterator.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/SearchOptions.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/SearchProgressMonitor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/SearchReplaceInFilesManager.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/SearchReplaceManager.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/SearchReplaceUtilities.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/WholeProjectDocumentIterator.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/WildcardSearchStrategy.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AbstractBaseViewContent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AbstractPadContent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AbstractSecondaryViewContent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AbstractViewContent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/SearchReplaceInFilesManager.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/SearchReplaceManager.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/SearchReplaceUtilities.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/WholeProjectDocumentIterator.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui.Search/WildcardSearchStrategy.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AbstractBaseViewContent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AbstractPadContent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AbstractSecondaryViewContent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AbstractViewContent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AddEntryEventHandler.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/AddinUpdateHandler.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/BackgroundProgressMonitor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/ConfigurationComboBox.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DefaultDisplayBinding.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DefaultStatusBarService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DefaultWorkbench.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DisplayBindingService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DefaultStatusBarService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DefaultWorkbench.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DisplayBindingService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/Document.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DragNotebook.cs:// Copyright (c) 2004 Todd Berman
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/ExitEventHandler.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/FileViewer.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/HelpOperations.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/HelpViewer.cs:// Copyright (c) 2007 Todd Berman
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IBaseViewContent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IBaseViewContent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IPadContainer.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IPadContent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/ISecondaryViewContent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IStatusBarService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IPadContent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/ISecondaryViewContent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IStatusBarService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IStatusIcon.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IViewContent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IWorkbench.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IWorkbenchLayout.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IWorkbenchWindow.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IViewContent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IWorkbench.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IWorkbenchLayout.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IWorkbenchWindow.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/Ide.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IdeStartup.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/InternalLog.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/LayoutComboBox.cs:// Copyright (C) 2006 David MakovskÃ½
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/LayoutComboBox.cs:// Copyright (C) 2006 David Makovskü
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/NavigationHistory.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/OutputProgressMonitor.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/Pad.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/ProgressMonitors.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/ProjectOperations.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/SdStatusBar.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/SdiWorkspaceLayout.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/SdiWorkspaceWindow.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/SdStatusBar.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/SdiWorkspaceLayout.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/SdiWorkspaceWindow.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/StartupInfo.cs:// Copyright (C) 2005, Christian Hergert
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/StatusProgressMonitor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/TextEditor.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
@@ -902,24 +914,24 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/ToolbarComboBox.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/ViewCommandHandlers.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/Workbench.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/WorkbenchMemento.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/WorkbenchMemento.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.StandardHeader/NewHeaderTemplateDialog.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.StandardHeader/StandardHeaderPanel.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.StandardHeader/StandardHeaderService.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/CommentTasksView.cs:// Copyright (C) 2006 David MakovskÃ½
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/ITaskListView.cs:// Copyright (C) 2006 David MakovskÃ½
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/Task.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/TaskPriority.cs:// Copyright (C) 2006 David MakovskÃ½
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/TaskService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/UserTask.cs:// Copyright (C) 2006 David MakovskÃ½
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/UserTasksView.cs:// Copyright (C) 2006 David MakovskÃ½
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/CommentTasksView.cs:// Copyright (C) 2006 David Makovskü
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/ITaskListView.cs:// Copyright (C) 2006 David Makovskü
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/Task.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/TaskPriority.cs:// Copyright (C) 2006 David Makovskü
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/TaskService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/UserTask.cs:// Copyright (C) 2006 David Makovskü
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Tasks/UserTasksView.cs:// Copyright (C) 2006 David Makovskü
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/ClrVersionFileTemplateCondition.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/CodeDomFileDescriptionTemplate.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/CodeTranslationFileDescriptionTemplate.cs:// Copyright (C) 2006 Michael Hutchinson
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/CombineDescriptor.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/CombineDescriptor.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/CombineEntryDescriptor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/FileDescriptionTemplate.cs:// Copyright (c) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/FileTemplate.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/FileTemplate.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/FileTemplateCondition.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/FileTemplateReference.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/ICombineEntryDescriptor.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
@@ -927,51 +939,51 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/INewFileCreator.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/ParentProjectFileTemplateCondition.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/PartialTypeFileTemplateCondition.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/ProjectDescriptor.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/ProjectTemplate.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/ProjectDescriptor.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/ProjectTemplate.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/ResourceFileDescriptionTemplate.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/SingleFileDescriptionTemplate.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/TextFileDescriptionTemplate.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/TextTemplate.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Ide/MonoDevelop.Ide.Templates/TextTemplate.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Ide/MonoDevelop.Ide/Services.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/CodeCompletionData.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/CodeCompletionDataProvider.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/CodeCompletionData.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/CodeCompletionDataProvider.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/CompletionListWindow.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/DeclarationViewWindow.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/ICompletionData.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/ICompletionDataProvider.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/DeclarationViewWindow.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/ICompletionData.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/ICompletionDataProvider.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/ICompletionWidget.cs:// Copyright (c) 2007 Peter Johanson
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/IParameterDataProvider.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/ListWindow.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/MethodParameterDataProvider.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/ParameterInformationWindow.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/ParameterInformationWindowManager.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/TextUtilities.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CombineBuildOptions.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Completion/TextUtilities.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CombineBuildOptions.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CombineConfigurationPanel.cs:// Copyright (c) 2004 Todd Berman
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CombineEntryConfigurationsPanel.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CombineInformationPanel.cs:Copyright (c) 2006 Scott Ellington
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CombineStartupPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CombineStartupPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CommonAssemblySigningPreferences.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CompileFileProjectOptions.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CompileFileProjectOptions.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CustomCommandPanel.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CustomCommandPanelWidget.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/CustomCommandWidget.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/GeneralProjectOptions.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/OutputOptionsPanel.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/GeneralProjectOptions.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/OutputOptionsPanel.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs.OptionPanels/RuntimeOptionsPanel.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs/CombineOptionsDialog.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs/DeleteConfigDialog.cs://Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs/NewConfigurationDialog.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs/ProjectOptionsDialog.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs/ProjectOptionsDialog.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui.Dialogs/RenameConfigDialog.cs://Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui/IconCodon.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui/IconService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui/IconCodon.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui/IconService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects.Gui/MonoDevelop.Projects.Gui/ProjectsGuiServices.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Ambience/Ambience.cs:// Copyright (c) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Ambience/AmbienceService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Ambience/ConversionFlags.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Ambience/NetAmbience.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Ambience/AmbienceService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Ambience/ConversionFlags.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Ambience/NetAmbience.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.CodeGeneration/BaseRefactorer.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.CodeGeneration/CodeRefactorer.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.CodeGeneration/IRefactorer.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
@@ -983,102 +995,102 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Extensions/ItemPropertyCodon.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Extensions/LanguageBindingCodon.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Extensions/ProjectBindingCodon.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AbstractDecoration.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AbstractDecoration.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AbstractMember.cs://  Copyright (C) 2001-2007 http://www.icsharpcode.net/ <#Develop>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AbstractNamedEntity.cs://  Copyright (C) 2001-2007 http://www.icsharpcode.net/ <#Develop>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AbstractUsing.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AbstractUsing.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AssemblyCodeCompletionDatabase.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AssemblyInformation.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AssemblyInformation.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AssemblyInformationEventHandler.cs:// Copyright (c) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AttributeCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AttributeSectionCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ClassCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AttributeCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/AttributeSectionCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ClassCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ClassEntry.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ClassInformationEventHandler.cs:// Copyright (c) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ClassType.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ClassType.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ClassWrapper.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/CodeCompletionDatabase.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/Comment.cs://  Copyright (C) 2001-2007 Andrea Paatz <andrea@icsharpcode.net>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/CommentCollection.cs://  Copyright (C) 2001-2007 Andrea Paatz <andrea@icsharpcode.net>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/CommentTasksChangedEventHandler.cs:// Copyright (c) 2007 David MakovskÃ½
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/CommentTasksChangedEventHandler.cs:// Copyright (c) 2007 David Makovskü
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/CompoundClass.cs://  Copyright (C) Daniel Grunwald <daniel@danielgrunwald.de>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DatabaseGeneratorTool.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultAttribute.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultClass.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultComment.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultCompilationUnit.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultEvent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultField.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultIndexer.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultMethod.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultParameter.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultParserService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultProperty.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultRegion.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultReturnType.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/EventCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultAttribute.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultClass.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultComment.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultCompilationUnit.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultEvent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultField.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultIndexer.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultMethod.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultParameter.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultParserService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultProperty.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultRegion.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/DefaultReturnType.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/EventCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ExpressionContext.cs://  Copyright (C) Daniel Grunwald <daniel@danielgrunwald.de>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/FieldCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/FieldCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/FileEntry.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IAttribute.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IClass.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IComment.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ICompilationUnit.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ICompilationUnitBase.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IDecoration.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IEvent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IAttribute.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IClass.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IComment.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ICompilationUnit.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ICompilationUnitBase.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IDecoration.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IEvent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IExpressionFinder.cs://  Copyright (C) Daniel Grunwald <daniel@danielgrunwald.de>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IField.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IIndexer.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IField.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IIndexer.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ILanguageItem.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IMember.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IMethod.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IParameter.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IParser.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IParserService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IProperty.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IRegion.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IReturnType.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IMember.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IMethod.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IParameter.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IParser.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IParserService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IProperty.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IRegion.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IReturnType.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ITypeNameResolver.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IUsing.cs://  Copyright (C) 2001-2007 Daniel Grunwald <daniel@danielgrunwald.de>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IUsingCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/IUsingCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/LanguageItemCollection.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/LocalVariable.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/MemberCollectionBase.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/MethodCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ModifierEnum.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/MethodCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ModifierEnum.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/Namespace.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/NamespaceEntry.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ParameterCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ParameterModifier.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ParseInformation.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ParseInformationEventHandler.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ParameterCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ParameterModifier.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ParseInformation.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ParseInformationEventHandler.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentAttribute.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentAttributeSection.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentClass.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentEvent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentField.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentIndexer.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentMethod.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentParameter.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentProperty.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentReturnType.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentClass.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentEvent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentField.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentIndexer.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentMethod.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentParameter.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentProperty.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PersistentReturnType.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ProjectCodeCompletionDatabase.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PropertyCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/PropertyCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReferenceEntry.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionClass.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionEvent.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionField.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionIndexer.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionMethod.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionParameter.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionProperty.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionReturnType.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionClass.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionEvent.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionField.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionIndexer.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionMethod.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionParameter.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionProperty.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/ReflectionReturnType.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/SimpleCodeCompletionDatabase.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/Tag.cs://  Copyright (C) 2001-2007 Andrea Paatz <andrea@icsharpcode.net>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/TagCollection.cs://  Copyright (C) 2001-2007 Andrea Paatz <andrea@icsharpcode.net>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/TypeNameResolver.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/TypedCSharpCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Parser/TypedCSharpCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Serialization/ArrayHandler.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Serialization/ArrayListHandler.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Serialization/ClassDataType.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
@@ -1109,80 +1121,119 @@ BEAUTIFY ME:
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Text/TextFile.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Text/TextFileReader.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects.Text/TextFileService.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/AbstractConfiguration.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/AbstractProjectConfiguration.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/AbstractConfiguration.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/AbstractProjectConfiguration.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/BuildEventHandler.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/BuildTool.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CmbxFileFormat.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/Combine.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineConfiguration.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineEntry.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/Combine.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineConfiguration.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineEntry.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineEntryCollection.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineEntryEventArgs.cs:// Copyright (c) 2004 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineEntryRenamedEventArgs.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineEventArgs.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineExecuteDefinition.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineEventArgs.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CombineExecuteDefinition.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ConfigurationCollection.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ConfigurationEventHandler.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ConvertXml.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ConvertXml.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CustomCommand.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CustomCommandCollection.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CustomCommandExtension.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CustomCommandType.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CyclicBuildOrderException.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/DefaultCompilerResult.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/CyclicBuildOrderException.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/DefaultCompilerResult.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/DefaultFileFormat.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/DotNetProject.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/DotNetProject.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/DotNetProjectBinding.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/DotNetProjectConfiguration.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ExecutionContext.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/FileFormatManager.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/GenericProject.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/GenericProjectBinding.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ICompilerResult.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/IConfiguration.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/IDotNetLanguageBinding.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ICompilerResult.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/IConfiguration.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/IDotNetLanguageBinding.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/IFileFormat.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ILanguageBinding.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ILanguageBinding.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/IProjectBinding.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/IProjectService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/LanguageBindingService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/IProjectService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/LanguageBindingService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/MonoDevelopFileFormat.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/PrjxFileFormat.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/Project.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/Project.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectConvertTool.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectCreateInformation.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectEventArgs.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectFile.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectFileCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectCreateInformation.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectEventArgs.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectFile.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectFileCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectPathItemPropertyAttribute.cs:// Copyright (C) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectReference.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectReferenceCollection.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectReference.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectReferenceCollection.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectReferenceEventArgs.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectRenameEventArgs.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectService.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectRenameEventArgs.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectService.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectServiceExtension.cs:// Copyright (c) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/ProjectsServices.cs:// Copyright (c) 2005 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/SharpDevelopFileFormat.cs:// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/UnknownCombineEntry.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/UnknownConfiguration.cs:// Copyright (c) 2006 Novell, Inc (http://www.novell.com)
-./src/core/MonoDevelop.Projects/MonoDevelop.Projects/UnknownProjectVersionException.cs://  Copyright (C) 2001-2007 Mike KrÃ¼ger <mkrueger@novell.com>
+./src/core/MonoDevelop.Projects/MonoDevelop.Projects/UnknownProjectVersionException.cs://  Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 ./src/core/MonoDevelop.Projects/MonoDevelop.Projects/Workspace.cs:// Copyright (C) 2006 Novell, Inc (http://www.novell.com)
+License: MIT/X11
 
 License:
-   This package is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 dated June, 1991.
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Library General Public
+    License as published by the Free Software Foundation; either
+    version 2 of the License, or (at your option) any later version.
 
-   This package is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Library General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this package; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-   02111-1307, USA.
+    You should have received a copy of the GNU Library General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA  02110-1301 USA
 
 On Debian systems, the complete text of the GNU General
-Public License can be found in `/usr/share/common-licenses/GPL-2'.
+Public License can be found in `/usr/share/common-licenses/LGPL-2'.
+
+License:
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+On Debian systems, the complete text of the GNU General
+Public License can be found in `/usr/share/common-licenses/LGPL-2.1'.
+
+License: MIT/X11
+ Permission is hereby granted, free of charge, to any person obtaining
+ a copy of this software and associated documentation files (the
+ "Software"), to deal in the Software without restriction, including
+ without limitation the rights to use, copy, modify, merge, publish,
+ distribute, sublicense, and/or sell copies of the Software, and to
+ permit persons to whom the Software is furnished to do so, subject to
+ the following conditions:
+
+ The above copyright notice and this permission notice shall be
+ included in all copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

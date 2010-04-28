@@ -1,8 +1,9 @@
 monodevelop (2.2.2+dfsg-1) UNRELEASED; urgency=low
 
   * New upstream release
+  * debian/copyright: Updated
 
- -- Stefan Ebner <sebner@ubuntu.com>  Sun, 25 Apr 2010 20:24:44 +0200
+ -- Stefan Ebner <sebner@ubuntu.com>  Wed, 28 Apr 2010 19:35:37 +0200
 
 monodevelop (2.2.1+dfsg-1) unstable; urgency=low
 
