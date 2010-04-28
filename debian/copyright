@@ -20,7 +20,7 @@ Ben Motmans
 Christian Hergert
 Daniel Kornhauser
 Daniel Morgan
-David Makovskü
+David Makovský
 Eric Butler
 Erik Dasque
 Franciso Martinez "Paco"
@@ -77,7 +77,7 @@ Files: src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/DefaultWorkbench.cs
        src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/SdiWorkspaceWindow.cs
        src/core/MonoDevelop.Ide/MonoDevelop.Ide.Gui/IWorkbench.cs
        src/addins/CSharpBinding/MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs
-Copyright: Copyright (C) 2001-2007 Mike KrÃüger <mkrueger@novell.com>
+Copyright: Copyright (C) 2001-2007 Mike Krüger <mkrueger@novell.com>
 	   Copyright (C) 2001-2007 Daniel Grunwald <daniel@danielgrunwald.de
 License: LGPLv2.1+
 
