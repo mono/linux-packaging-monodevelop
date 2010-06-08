@@ -1,7 +1,11 @@
 monodevelop (2.2.2+dfsg-1) UNRELEASED; urgency=low
 
+  [ Stefan Ebner ]
   * New upstream release
   * debian/copyright: Updated
+
+  [ Jo Shields ]
+  * Fix up get-orig-source rule to not use ../tarballs
 
  -- Stefan Ebner <sebner@ubuntu.com>  Wed, 28 Apr 2010 19:35:37 +0200
 
