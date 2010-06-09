@@ -1,3 +1,15 @@
+monodevelop (2.3.1+dfsg-1) UNRELEASED; urgency=low
+
+  * New upstream release
+  * DFSG version of MonoDevelop 2.4 beta 2. Removed files:
+    + src/addins/NUnit/lib/nunit.core.interfaces.dll
+    + src/addins/NUnit/lib/nunit.framework.dll
+    + src/addins/NUnit/lib/nunit.core.dll
+    + src/addins/NUnit/lib/nunit.util.dll
+    + src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Mono.Debugger.Soft.dll
+
+ -- Jo Shields <directhex@apebox.org>  Wed, 09 Jun 2010 15:17:58 +0100
+
 monodevelop (2.2.2+dfsg-1) unstable; urgency=low
 
   [ Stefan Ebner ]
