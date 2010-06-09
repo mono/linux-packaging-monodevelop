@@ -28,13 +28,12 @@ using System;
 using System.Collections.Generic;
 using Gtk;
 using Gdk;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
-using Algorithm.Diff;
+ 
+using MonoDevelop.Components.Diff;
 using MonoDevelop.Core;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Projects.CodeGeneration;
 using Mono.TextEditor;
+using MonoDevelop.Ide;
 
 
 namespace MonoDevelop.Refactoring
@@ -59,7 +58,7 @@ namespace MonoDevelop.Refactoring
 			TreeViewColumn column = new TreeViewColumn ();
 
 			// pixbuf column
-			CellRendererPixbuf pixbufCellRenderer = new CellRendererPixbuf ();
+			var pixbufCellRenderer = new CellRendererPixbuf ();
 			column.PackStart (pixbufCellRenderer, false);
 			column.SetAttributes (pixbufCellRenderer, "pixbuf", pixbufColumn);
 			column.AddAttribute (pixbufCellRenderer, "visible", statusVisibleColumn);
@@ -117,13 +116,8 @@ namespace MonoDevelop.Refactoring
 			if (treeviewPreview.Selection.IterIsSelected (iter)) {
 				cellRendererText.Text = text;
 			} else {
-				cellRendererText.Markup = "<span foreground=\"" + GetColorString (Style.Text (StateType.Insensitive)) + "\">" + text + "</span>";
+				cellRendererText.Markup = "<span foreground=\"" + MonoDevelop.Components.PangoCairoHelper.GetColorString (Style.Text (StateType.Insensitive)) + "\">" + text + "</span>";
 			}
-		}
-		
-		static string GetColorString (Gdk.Color color)
-		{
-			return string.Format ("#{0:X02}{1:X02}{2:X02}", color.Red / 256, color.Green / 256, color.Blue / 256);
 		}
 		
 		void SetDiffCellData (Gtk.TreeViewColumn tree_column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
@@ -144,21 +138,21 @@ namespace MonoDevelop.Refactoring
 				doc.Text = System.IO.File.ReadAllText (replaceChange.FileName);
 				List<string> before = new List<string> ();
 				foreach (var line in doc.Lines) {
-					before.Add (doc.GetTextAt (line));
+					before.Add (doc.GetTextAt (line.Offset, line.EditableLength));
 				}
 				
 				((Mono.TextEditor.IBuffer)doc).Replace (replaceChange.Offset, replaceChange.RemovedChars, replaceChange.InsertedText);
 				
 				List<string> after = new List<string> ();
 				foreach (var line in doc.Lines) {
-					after.Add (doc.GetTextAt (line));
+					after.Add (doc.GetTextAt (line.Offset, line.EditableLength));
 				}
 				
 				Diff diff = new Diff (before.ToArray (), after.ToArray (), true, true);
 				
 				System.IO.StringWriter w = new System.IO.StringWriter();
 				UnifiedDiff.WriteUnifiedDiff (diff, w, replaceChange.FileName, replaceChange.FileName, 2);
-				cellRendererDiff.InitCell (treeviewPreview, true, w.ToString (), replaceChange.FileName);
+				cellRendererDiff.InitCell (treeviewPreview, true, w.ToString ().Trim (), replaceChange.FileName);
 			} catch (Exception e) {
 				Console.WriteLine (e);
 			}
@@ -182,9 +176,9 @@ namespace MonoDevelop.Refactoring
 			foreach (Change change in changes) {
 				TreeIter iter = GetFile (change);
 				if (iter.Equals (TreeIter.Zero)) {
-					iter = store.AppendValues (ImageService.GetPixbuf (MonoDevelop.Core.Gui.Stock.ReplaceIcon, IconSize.Menu), change.Description, change, true);
+					iter = store.AppendValues (ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.ReplaceIcon, IconSize.Menu), change.Description, change, true);
 				} else {
-					iter = store.AppendValues (iter, ImageService.GetPixbuf (MonoDevelop.Core.Gui.Stock.ReplaceIcon, IconSize.Menu), change.Description, change, true);
+					iter = store.AppendValues (iter, ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.ReplaceIcon, IconSize.Menu), change.Description, change, true);
 				}
 				TextReplaceChange replaceChange = change as TextReplaceChange;
 				if (replaceChange != null && replaceChange.Offset >= 0)

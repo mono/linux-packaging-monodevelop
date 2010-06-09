@@ -30,11 +30,10 @@ using System;
 using System.Text.RegularExpressions;
 using Mono.TextEditor;
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.SourceEditor
 {
-	
-	
 	public class IdeViMode : Mono.TextEditor.Vi.ViEditMode
 	{
 		ExtensibleTextEditor editor;
@@ -50,7 +49,8 @@ namespace MonoDevelop.SourceEditor
 			get { return base.Status; }
 			protected set {
 				base.Status = value;
-				IdeApp.Workbench.StatusBar.ShowMessage (value);
+				// For the (recording) display.
+				IdeApp.Workbench.StatusBar.ShowMessage (base.Status);
 			}
 		}
 		

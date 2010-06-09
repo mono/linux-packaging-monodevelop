@@ -1,7 +1,1200 @@
+2010-05-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed local lookup for ASP.NET.
+
+2010-05-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Disabled paste formatting (Bug 606041 - Additional blank
+	  line after every text line then text is pasted from
+	  clipboard).
+
+2010-05-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Fixed 'Bug 606884 - Control-enter in doc comments doesn't
+	  prefix the new line'.
+
+2010-05-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs: Fixed
+	  'Bug 606959 - switch case completion doesn't handle
+	  namespaces properly'.
+
+2010-05-20  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Completion/CompletionTextLinkMode.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Completion/EventCreationCompletionData.cs:
+	  Implemented request in 'Bug 607366 - Text link mode can
+	  break texteditor badly'.
+
+2010-05-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Improved semicolon auto placement.
+
+2010-05-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 534680 - LINQ keywords missing from
+	  Intellisense'.
+
+2010-05-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs: Fixed 'Bug 606506
+	  - Types of fields are not shown'
+
+2010-05-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Completion/EventCreationCompletionData.cs:
+	  Fixed 'Bug 606212 - Allow delegate renaming straight after
+	  creation'.
+
+2010-05-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Implemented 'Bug 606227 - Search reodering not available for
+	  "override" completions.'.
+
+
+2010-05-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Unsubscribe editor events.
+
+2010-05-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  catch exception in highighit usages extension.
+
+2010-05-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Fixed 'Bug 606217 - Auto-placed semi-colon doesn't take
+	  account of comments'
+
+2010-05-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 606048 - Parameter insight re-shows on every
+	  newline even when disabled'.
+
+2010-05-14  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fixed 'Bug
+	  605235 - Inaccessible functions do not show "Goto
+	  Declaration" in context menu'.
+
+2010-05-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 604593 - Autocomplete list sorting wrong when
+	  grouping by class.'.
+
+2010-05-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/NRefactoryParameterDataProvider.cs:
+	  fixed 'Bug 605134 - NRE when using (an abstract class ctor?)
+	  MulticastDelegate ctor'.
+
+2010-05-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Added some bounds checking.
+
+2010-05-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs: Set
+	  obsolete flag for obsolete members.
+
+2010-05-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/MoveToUsagesHandler.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Implemented 'Bug 605009 - Control-shift-up/down do not work
+	  until highlight triggers'.
+
+2010-05-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Fixed 'Bug 605008 - Weird symbol highlighting'.
+
+2010-05-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  set text editor for the resolver.
+
+2010-05-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs:
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Completion/EventCreationCompletionData.cs:
+	  Track API changes.
+
+2010-05-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/QueryExpression.cs: Fixed
+	  compile warnings.
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Optimized highlight usages extension & find member visitor.
+
+2010-05-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightCSharpSemanticRule.cs:
+	  Fixed 'Bug 604558 - Wrong code syntax highlighting when
+	  previous line have a comment'.
+
+2010-05-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Fixed 'Bug 603971 - Symbol highlight combined with search
+	  highlight looks ugly'.
+
+2010-05-07  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 603733 - Pressing '!' with the autocomplete
+	  window open breaks'.
+
+2010-05-07  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  speed up the findmemberastvisitor.
+
+2010-05-07  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Only re-indent if there is need.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Make use of the new Document.Dom property.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Completion/EventCreationCompletionData.cs:
+	  Fixed 'Bug 603282 - Autogenerated method name is invalid'.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  fixed 'Bug 603344 - Matching in completion list'.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  fixed find member references for local variables.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: Fixed
+	  local variable off by 1 error.
+
+2010-05-04  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* CSharpBinding.addin.xml:
+	* templates/GladeSharp2Project.xpt.xml:
+	* templates/GnomeSharp2Project.xpt.xml:
+	* templates/GtkSharp2ProjectMac.xpt.xml: Remove deprecated
+	  Gnome# and Glade# project types, and add a Mac-specific GTK
+	  template that doesn't use Stetic.
+
+2010-05-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs: Fixed
+	  'Bug 596609 - Parameters tooltips not escaping generics in
+	  markup'.
+
+2010-05-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs:
+	  Dispose the lexer after use.
+
+2010-05-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoCSharpPolicy.xml: Added attribute to explicitly allow
+	  differential serialization for a policy (which is disabled
+	  by default).
+
+2010-05-03  Mike Krüger  <mkrueger@novell.com>
+
+	* CSharpBinding.addin.xml: Set mac shortcut.
+
+2010-05-03  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* CSharpBinding.addin.xml:
+	* MonoDevelop.CSharp.Highlighting/MoveToUsagesHandler.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Fixed 'Bug 601436 - Command to cycle through highlighted
+	  references'.
+
+2010-05-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fixed 'Bug
+	  601350 - Null ref in highlighting/tooltips'.
+
+2010-04-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  Fixed 'Bug 600994 - Method highlight should match all
+	  methods of the generic class'.
+
+2010-04-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Fixed 'Bug 601028 - Move line reindenting flattens indents'.
+
+2010-04-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  Fixed 'Bug 601007 - Error in highlight usages extension.'.
+
+2010-04-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  fixed 'Bug 601021 - Identifier highlighting assumes
+	  constructors but draws box incorrectly'.
+
+2010-04-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: fixed
+	  'Bug 601169 - IntelliSense ignores inner classes'.
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs:
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	  fixed 'Bug 600617 - Generic params in override completion
+	  are doubly escaped'.
+
+2010-04-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.CSharp.Formatting\CSharpFormatter.cs: Use the
+	  correct EOL marker.
+
+2010-04-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs: Track
+	  API changes.
+
+2010-04-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  fixed 'Bug 600273 - as/is completion too restrictive'.
+
+2010-04-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  fixed 'Bug 599632 – Completion list should be in suggest
+	  mode for generic parameter declaration'.
+
+2010-04-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CodeGenerator.cs: Fixed 'Bug
+	  599627 - Implement implicit interface generated wrong code'.
+
+2010-04-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: fixed
+	  code completion issue.
+
+2010-04-26  Mike Krüger  <mkrueger@novell.com>
+
+	* templates/GladeSharp2Project.xpt.xml:
+	* templates/GnomeSharp2Project.xpt.xml: Fixed some templates.
+
+2010-04-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Fixed 'Bug 598831 - Symbol highlight should not activate
+	  while there is a selection'.
+
+2010-04-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  Fixed 'Bug 598822 - Symbol highlight has wrong position with
+	  qualified names'.
+
+2010-04-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  Fixed possible null reference.
+
+2010-04-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CSharpNRefactoryASTProvider.cs:
+	  Fixed 'Bug 598563 - NRE right-clicking on symbol in
+	  standalone file'.
+
+2010-04-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Worked on ASP.NET completion.
+
+2010-04-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Raised highlight usages delay.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 597671 - The += completion does not handle inner
+	  class eventargs properly'.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Patch applied from Tom Spink <tspink@gmail.com>: Where
+	  Constraint Completion
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Fixed 'Bug 597717 - Incorrect indentation using smart
+	  indent'.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Fixed 'Bug 597663 - Symbol highlight hides and re-shows at
+	  end of word'.
+
+2010-04-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: Added
+	  null check.
+
+2010-04-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/NRefactoryParser.cs:
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Optimized HighlightUsagesExtension (no additional re-parse).
+
+2010-04-14  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: Fixed
+	  code completion bug.
+
+2010-04-14  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: fixed
+	  possible null ref.
+
+2010-04-13  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Implemented 'Bug 595598 - Intelligent placing of
+	  semi-colons'.
+
+
+2010-04-13  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs:
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Implemented 'Bug 595587 - Move code block to correct depth
+	  when Alt+arrow moving'.
+
+2010-04-13  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  Fixed 'Bug 595606 - Refactoring (renaming) can alter
+	  unrelated classes'.
+
+2010-04-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  de-activated usage highlighting in text link mode.
+
+2010-04-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Made usage highlighter more robust.
+
+2010-04-12  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* CSharpBinding.addin.xml:
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	* MonoDevelop.CSharp.Completion/EventCreationCompletionData.cs:
+	  Implemented 'Bug 595230 - Highlight all usages of symbol
+	  under cursor'.
+
+2010-04-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Implemented 'Bug 595198 - Override completion should select
+	  body so it can be deleted'.
+
+2010-04-09  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fix NRE when opening a file with no open project.
+
+2010-04-09  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/TextEditorResolverProvider.cs:
+	  Fixed 'Bug 578195 - Wrong ctor shown on base() call'.
+
+2010-04-09  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpIndentEngine.cs: Fixed
+	  'Bug 415469 - return ternary in a switch is not tabbed
+	  properly'.
+
+2010-04-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CSharpNRefactoryASTProvider.cs:
+	  Added a 'last errors' property.
+
+2010-04-08  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* CSharpBinding.csproj:
+	* CSharpBinding.addin.xml:
+	* MonoDevelop.CSharp.Formatting/FormattingPanel.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpIndentEngine.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpIndentEngineStack.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingProperties.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	* gtk-gui/MonoDevelop.CSharp.Formatting.FormattingPanelWidget.cs:
+	* MonoDevelop.CSharp.Completion/NRefactoryParameterDataProvider.cs:
+	  Fixed 'Bug 579358 - Smart indenter does not use policies,
+	  separate prefs confusing'.
+
+2010-04-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: Fixed
+	  'Bug 576354 - Type inference failure'.
+
+2010-04-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/OnTheFlyFormatter.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.xml:
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Added option for 'Bug 593635 - Auto-formatting doesn't allow
+	  single-line if statements'.
+
+2010-04-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs: fixed
+	  possible null ref.
+
+2010-04-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fixed 'Bug
+	  592120 - Type resolver bug with this.Property[]'.
+
+2010-03-29  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.CSharp\CSharpBindingCompilerManager.cs: On
+	  windows, make sure the compiler output is written and read
+	  using utf8.
+
+2010-03-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  handled cast exception.
+
+2010-03-24  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Formatting/DomSpacingVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/OnTheFlyFormatter.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Worked on new formatter.
+
+2010-03-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/TypeMembers/AbstractMember.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/CastExpression.cs:
+	* MonoDevelop.CSharp.Dom/Statements/ForeachStatement.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/QueryExpression.cs:
+	* MonoDevelop.CSharp.Dom/Statements/TryCatchStatement.cs:
+	* MonoDevelop.CSharp.Dom/GeneralScope/DelegateDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ObjectCreateExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/MemberReferenceExpression.cs:
+	* MonoDevelop.CSharp.Dom/Statements/VariableDeclarationStatement.cs:
+	  Changed return type properties.
+
+2010-03-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/QueryExpression.cs:
+	  Worked on LINQ expressions.
+
+2010-03-23  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Dom/FullTypeName.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/ICSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/GeneralScope/Constraint.cs:
+	* MonoDevelop.CSharp.Dom/GeneralScope/TypeDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/MethodDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/IdentifierExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/MemberReferenceExpression.cs:
+	  Handled templates & constraints.
+
+2010-03-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/TextEditorResolverProvider.cs:
+	  Removed duplicate section.
+
+2010-03-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/TextEditorResolverProvider.cs:
+	  Submittet patch send by ' Eugene Kulabuhov
+	  <eugene.kulabuhov@gmail.com>': Fixed MemberResolveResult
+	  clause incorrectly handling MethodResolveResult type as
+	  well.
+
+2010-03-23  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/ICSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomSpacingVisitor.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/FieldDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/LambdaExpression.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/MethodDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ArgListExpression.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/IndexerDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/ArgumentDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/OperatorDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/StackAllocExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/InvocationExpression.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/ConstructorDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/BaseReferenceExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/AnonymousMethodExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ArrayObjectCreateExpression.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/ParameterDeclarationExpression.cs:
+	  Worked on new DOM.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* CSharpBinding.addin.xml: Bumped MD version.
+
+2010-03-22  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/ICSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomSpacingVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/IndexerExpression.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.xml:
+	* MonoDevelop.CSharp.Dom/TypeMembers/IndexerDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/OperatorDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ObjectCreateExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ArrayObjectCreateExpression.cs:
+	  Worked on new dom/parser/formatter.
+
+2010-03-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Formatting/DomSpacingVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Statements/WhileStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/IfElseStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/SwitchStatement.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/EventDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/GeneralScope/TypeDeclaration.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Statements/TryCatchStatement.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/PropertyDeclaration.cs:
+	  Worked on new formatting engine/parser/dom.
+
+2010-03-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/Statements/IfElseStatement.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	  Worked on indenter.
+
+2010-03-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.CSharp/CSharpBindingCompilerManager.cs: Always
+	  use the full file name for assembly references. Some
+	  assemblies from core packages are not located in the
+	  compiler directory, so a full file name is required.
+
+2010-03-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/Indent.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/Statements/BlockStatement.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.xml:
+	  Worked on indenter.
+
+2010-03-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: fixed
+	  potential ms build problem.
+
+2010-03-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fixed failing
+	  unit test.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* CSharpBinding.csproj: Remove import off mono.addins targets.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* CSharpBinding.csproj:
+	* CSharpBinding.addin.xml:
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs:
+	* MonoDevelop.CSharp.Formatting/FormattingPanel.cs:
+	* MonoDevelop.CSharp.Project/CodeGenerationPanel.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs:
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs:
+	* MonoDevelop.CSharp.Project/CSharpCompilerParameters.cs:
+	* MonoDevelop.CSharp.Project/CompilerOptionsPanelWidget.cs:
+	* MonoDevelop.CSharp.Resolver/TextEditorResolverProvider.cs:
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Completion/EventCreationCompletionData.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicyPanel.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightCSharpSemanticRule.cs:
+	* MonoDevelop.CSharp.Completion/NRefactoryParameterDataProvider.cs:
+	* MonoDevelop.CSharp.Completion/NRefactoryIndexerParameterDataProvider.cs:
+	* MonoDevelop.CSharp.Completion/NRefactoryTemplateParameterDataProvider.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fixed 'Bug
+	  588223 - Intellisense does not recognize nested generics
+	  correctly.'.
+
+2010-03-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs:
+	* MonoDevelop.CSharp.Completion/NRefactoryTemplateParameterDataProvider.cs:
+	  Fixed 'Bug 588366 - Intellisense broken for nested generic
+	  types'.
+
+2010-03-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs:
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Completion/NRefactoryTemplateParameterDataProvider.cs:
+	  Fixed 'Bug 588220 - No intellisense for generic methods.'.
+
+2010-03-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightCSharpSemanticRule.cs:
+	* MonoDevelop.CSharp.Completion/NRefactoryParameterDataProvider.cs:
+	  Track API changes.
+
+2010-03-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  Fixed 'Bug 587530 – for/foreach rename refactoring ignores
+	  the scope'.
+
+2010-03-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs: Handled generated
+	  blocks/fixed some unit tests.
+
+2010-03-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/Statements/ForStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/LockStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/YieldStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/FixedStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/UsingStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/WhileStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/EmptyStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/CheckedStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/ForeachStatement.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Statements/UncheckedStatement.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/PointerReferenceExpression.cs:
+	  Worked on new indenter/dom.
+
+2010-03-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/NRefactoryParser.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: Fixed 2nd
+	  bug described in 'Bug 586304 - Intellisense does not show
+	  several linq extenion methods when using nested generic
+	  type'.
+
+2010-03-10  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/CSharpTokenNode.cs:
+	* MonoDevelop.CSharp.Dom/ICSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/CSharpModifierToken.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/PropertyDeclaration.cs:
+	  Worked on indenting engine.
+
+2010-03-09  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Formatting/Indent.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomSpacingVisitor.cs:
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ThisReferenceExpression.cs:
+	  Worked on new formatter/parser.
+
+2010-03-05  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* CSharpBinding.csproj: Don't local-copy project refs, as it
+	  duplicates assemblies and breaks running on .NET.
+
+2010-03-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs:
+	  Removed debug message.
+
+2010-03-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/Statements/SwitchStatement.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/TypeOfExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/SizeOfExpression.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/MethodDeclaration.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/CheckedExpression.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.xml:
+	* MonoDevelop.CSharp.Dom/Expressions/UncheckedExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/AssignmentExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ParenthesizedExpression.cs:
+	  Worked on dom/formatter/parser.
+
+2010-03-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  Fixed 'Bug 585454 - Lacking one reference to an enum type'.
+
+2010-03-03  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Project/CSharpResourceIdBuilder.cs: Track
+	  ProjectFile Link API.
+
+2010-03-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/TextEditorResolverProvider.cs:
+	  fixed bug in resolver provider.
+
+2010-03-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs:
+	  fix unit test.
+
+2010-03-03  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* CSharpBinding.addin.xml:
+	* MonoDevelop.CSharp.Resolver/TextEditorResolverProvider.cs:
+	  Refactored text editor resolve providers. Language bindings
+	  now can provide own providers.
+
+2010-03-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs:
+	  Fixed 'FindExpression' in expression finder.
+
+2010-03-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpTokenNode.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/Statements/UsingStatement.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	  Worked on DOM formatter/parser.
+
+2010-03-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs: Convert operator
+	  declaration bodies.
+
+2010-03-01  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fix the rest
+	  of the failing DomProperty tests.
+
+2010-03-01  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Parser/NRefactoryParser.cs: Fix indexer
+	  assignment that caused failing unit tests.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/NRefactoryParser.cs: Fixed 'Bug
+	  583515 - No code completion for set-only properties'.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: When a member
+	  can't be resolved, a special resolve result is created.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs: Ambiences can now
+	  format delegates & take formatting policies.
+
+2010-02-26  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Dom/Identifier.cs:
+	* MonoDevelop.CSharp.Dom/ICSharpNode.cs:
+	* MonoDevelop.CSharp.Dom/FullTypeName.cs:
+	* MonoDevelop.CSharp.Dom/CSharpTokenNode.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/AbstractCSharpNode.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/CastExpression.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/PrimitiveExpression.cs:
+	  Worked on formatting visitor/dom.
+
+2010-02-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	  Now using the BaseRefactorer.IsMonoTouchModelMember method.
+
+2010-02-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/NRefactoryParser.cs:
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	* gtk-gui/MonoDevelop.CSharp.Formatting.FormattingPanelWidget.cs:
+	  Worked on 'Bug 583014 - Need a way to stop override
+	  generating base call'.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/Statements/LockStatement.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Statements/TryCatchStatement.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
+	* gtk-gui/MonoDevelop.CSharp.Formatting.FormattingPanelWidget.cs:
+	  Worked on formatting visitor/dom.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: fixed failing
+	  unit test.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/Statements/ForStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/WhileStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/IfElseStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/ForeachStatement.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/PrimitiveExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/InvocationExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ConditionalExpression.cs:
+	  Worked on DOM & formatting visitor.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	  Fixed 'Bug 583014 - Need a way to stop override generating
+	  base call'.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs: Fixed 'Bug 583006
+	  - Enum members are prefixed with an enum name, in the
+	  Document Outline pad' / applied patch from Alexander
+	  Cherniuk <ts33kr@gmail.com>
+
+2010-02-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/Identifier.cs:
+	* MonoDevelop.CSharp.Dom/FullTypeName.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/ICSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/BinaryOperatorExpression.cs:
+	  Worked on c# formatter & dom.
+
+2010-02-23  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp/CSharpBindingCompilerManager.cs: Fix
+	  skipping duplicate refs.
+
+2010-02-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpIndentEngine.cs:
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Implemented 'Bug 429265 - #region reindentation does not
+	  work with autocompletion'
+
+2010-02-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: fixed
+	  'Bug 582016 – Switching build configuration does not
+	  re-highlight conditional comments'.
+
+2010-02-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpIndentEngine.cs: fixed
+	  'Bug 429265 - #region reindentation does not work with
+	  autocompletion'.
+
+2010-02-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: fixed
+	  pre processor tag highlighting.
+
+2010-02-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: fixed
+	  'Bug 582021 - parsing of nested conditional comments is
+	  broken'.
+
+
+2010-02-23  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj: Fix build.
+
+2010-02-23  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: Fixed
+	  'Bug 582017 - C# Generic Type Constraints'.
+
+2010-02-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/Statements/FixedStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/ForeachStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/TryCatchStatement.cs:
+	  Worked on dom.
+
+2010-02-22  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs: fixed 'Bug
+	  578439 - Return key acts crazy in MonoDevelop'.
+
+2010-02-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fixed bug in
+	  array item lookup.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AspNet:
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* CSharpBinding.addin.xml:
+	* MonoDevelop.CSharp.Completion/AspLanguageBuilder.cs: Moved
+	  AspLanguageBuilder to its own assembly and module. Dropped
+	  Asp.Net dependency.
+
+	* MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs:
+	  Filtering by extension is now done by the document.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs: Track
+	  api changes.
+
 2010-02-17  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: Fixed
 	  'Bug 580427 - Exception, then crash while editing text.'.
+
+2010-02-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Categories are now sorted.
+
+2010-02-16  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Dom/Identifier.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/ICSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Statements/GotoStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/WhileStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/IfElseStatement.cs:
+	* MonoDevelop.CSharp.Dom/Statements/ExpressionStatement.cs:
+	  Worked on new C# DOM.
+
+2010-02-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Completion/NRefactoryParameterDataProvider.cs:
+	  Fixed 'Bug 576336 - Parameter tooltip window stops working'.
+
+2010-02-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: Fixed
+	  'Bug 577225 - Inconsistent autocomplete on returned value of
+	  generic method.'.
+
+2010-02-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	  worked on c# parser.
+
+2010-02-08  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/ICSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/IsExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/AsExpression.cs:
+	* MonoDevelop.CSharp.Dom/Statements/EmptyStatement.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/TypeOfExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/SizeOfExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ConditionalExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/DefaultValueExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/UnaryOperatorExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/ThisReferenceExpression.cs:
+	* MonoDevelop.CSharp.Dom/Expressions/BinaryOperatorExpression.cs:
+	  Worked on parser/new dom.
+
+2010-02-07  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Dom/FullTypeName.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/OperatorDeclaration.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/PropertyDeclaration.cs:
+	  worked on mcs based parser/new dom.
+
+2010-02-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	  Worked on DOM visitor.
+
+2010-02-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/ICSharpNode.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/CompilationUnit.cs:
+	* MonoDevelop.CSharp.Dom/ICSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	  Worked on mcs parser/dom.
+
+2010-02-02  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Dom/Identifier.cs:
+	* MonoDevelop.CSharp.Dom/CSharpTokenNode.cs:
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Dom/CompilationUnit.cs:
+	* MonoDevelop.CSharp.Dom/AbtractCSharpDomVisitor.cs:
+	* MonoDevelop.CSharp.Formatting/DomFormattingVisitor.cs:
+	* MonoDevelop.CSharp.Dom/GeneralScope/TypeDeclaration.cs:
+	  Worked on new dom/gmcs based parser.
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  fixed code completion activation in some cases.
+
+2010-02-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  added completion context for boolean variables (case:
+	  "varName = ").
 
 2010-01-29  Mike Krüger  <mkrueger@novell.com>
 
@@ -12,6 +1205,26 @@
 
 	* MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs:
 	  fixed intellisense bug found by Marek.
+
+2010-01-27  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Kill debug code that spammed MD's stdout.
+
+2010-01-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/MemberCompletionData.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Track API changes.
+
+2010-01-21  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* CSharpBinding.addin.xml: Remove unused extension.
+
+2010-01-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Added '!' as special closing key.
 
 2010-01-20  Mike Krüger  <mkrueger@novell.com>
 
@@ -35,22 +1248,73 @@
 	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
 	  brace forcement is now saved.
 
+2010-01-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs:
+	* MonoDevelop.CSharp.Refactoring/CSharpNRefactoryASTProvider.cs:
+	  Track api changes.
+
 2010-01-16  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
 	  fixed 'Bug 571175 - ArgumentNullException in C# code
 	  completion'.
 
+2010-01-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj: Fix NRefactory project reference
+	  AGAIN.
+
+2010-01-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs: removed
+	  debug messages.
+
 2010-01-15  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.CSharp.Formatting/CSharpFormatter.cs: fixed 'Bug
 	  569545 - [Windows] TextEditor sometimes adds LF on Windows'.
+
+2010-01-06  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: fixed 'Bug
+	  568484 - NRE in resolver'.
+
+2010-01-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: fixed
+	  'Bug 566544 - Locals and parameters are often not
+	  completed'.
+
+2010-01-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: Fixed
+	  'Bug 568204 - Inconsistency in resolution'.
+
+2010-01-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs: Fixed 'Bug 567906
+	  - Given error of .NET 3.0 in .NET 3.5 project'.
+
+2010-01-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: defines
+	  get updated by the source editor on parse event.
 
 2010-01-04  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: fixed 'Bug
 	  561964 - Wrong type in tooltip when there are two properties
 	  with the same name'.
+
+2010-01-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: fixed
+	  'Bug 561589 - Infinite loop throwing an exception crashes
+	  system'.
 
 2010-01-04  Mike Krüger  <mkrueger@novell.com>
 
@@ -74,6 +1338,28 @@
 	  deleting them. Fixes "Bug 515013 - Compiling; a method call
 	  on an object that does not exist produces incomprehensible
 	  /tmp/*.tmp error".
+
+2009-12-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:
+	* MonoDevelop.CSharp.Completion/AspLanguageBuilder.cs: Worked
+	  on ASP.NET support.
+
+2009-12-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: fixed
+	  unit test.
+
+2009-12-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* CSharpBinding.addin.xml:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:
+	* MonoDevelop.CSharp.Completion/AspLanguageBuilder.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Worked on ASP.NET completion.
 
 2009-12-01  Lluis Sanchez Gual  <lluis@novell.com>
 

@@ -24,8 +24,7 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.Core.Gui.Dialogs;
-using MonoDevelop.Core.Gui;
+using MonoDevelop.Ide.Gui.Dialogs;
 
 namespace MonoDevelop.SourceEditor.OptionPanels
 {
@@ -43,7 +42,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			this.underlineErrorsCheckbutton.Active = DefaultSourceEditorOptions.Instance.UnderlineErrors;
 			this.highlightMatchingBracketCheckbutton.Active = DefaultSourceEditorOptions.Instance.HighlightMatchingBracket;
 			this.highlightCurrentLineCheckbutton.Active = DefaultSourceEditorOptions.Instance.HighlightCaretLine;
-			this.enableAnimationCheckbutton1.Active = DefaultSourceEditorOptions.Instance.ShowRuler;
+			this.showRulerCheckbutton.Active = DefaultSourceEditorOptions.Instance.ShowRuler;
 			this.showInvLinesCheckbutton.Active = DefaultSourceEditorOptions.Instance.ShowInvalidLines;
 			this.showSpacesCheckbutton.Active = DefaultSourceEditorOptions.Instance.ShowSpaces;
 			this.showTabsCheckbutton.Active = DefaultSourceEditorOptions.Instance.ShowTabs;
@@ -58,7 +57,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			DefaultSourceEditorOptions.Instance.UnderlineErrors = this.underlineErrorsCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.HighlightMatchingBracket = this.highlightMatchingBracketCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.HighlightCaretLine = this.highlightCurrentLineCheckbutton.Active;
-			DefaultSourceEditorOptions.Instance.ShowRuler = this.enableAnimationCheckbutton1.Active;
+			DefaultSourceEditorOptions.Instance.ShowRuler = this.showRulerCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.ShowInvalidLines = this.showInvLinesCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.ShowSpaces = this.showSpacesCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.ShowTabs = this.showTabsCheckbutton.Active;

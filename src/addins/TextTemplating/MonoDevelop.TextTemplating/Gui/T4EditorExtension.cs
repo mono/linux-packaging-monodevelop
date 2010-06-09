@@ -25,11 +25,12 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.DesignerSupport;
 using MonoDevelop.TextTemplating.Parser;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.TextTemplating.Gui
 {
@@ -42,11 +43,6 @@ namespace MonoDevelop.TextTemplating.Gui
 		
 		public T4EditorExtension ()
 		{
-		}
-		
-		public override bool ExtendsEditor (MonoDevelop.Ide.Gui.Document doc, MonoDevelop.Ide.Gui.Content.IEditableTextBuffer editor)
-		{
-			return doc.Name.EndsWith (".tt");
 		}
 		
 		public override void Initialize ()
@@ -174,8 +170,7 @@ namespace MonoDevelop.TextTemplating.Gui
 			};
 			
 			RefillOutlineStore ();
-			
-			Gtk.ScrolledWindow sw = new Gtk.ScrolledWindow ();
+			var sw = new MonoDevelop.Components.CompactScrolledWindow ();;
 			sw.Add (outlineTreeView);
 			sw.ShowAll ();
 			return sw;
@@ -248,7 +243,7 @@ namespace MonoDevelop.TextTemplating.Gui
 		
 		void RefillOutlineStore ()
 		{
-			MonoDevelop.Core.Gui.DispatchService.AssertGuiThread ();
+			DispatchService.AssertGuiThread ();
 			Gdk.Threads.Enter ();
 			refreshingOutline = false;
 			if (outlineTreeStore == null || !outlineTreeView.IsRealized)

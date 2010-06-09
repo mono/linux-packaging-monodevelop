@@ -29,10 +29,9 @@ using System.Collections.Generic;
 using Gtk;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Serialization;
-using MonoDevelop.Projects.Gui.Dialogs;
+using MonoDevelop.Ide.Projects;
 using MonoDevelop.Projects.Text;
 using MonoDevelop.Projects;
-using MonoDevelop.Core.Gui;
 
 
 
@@ -135,20 +134,20 @@ namespace MonoDevelop.Ide.CodeFormatting
 		{
 			object o = store.GetValue (iter, objectColumn);
 			if (o is CodeFormatCategory) {
-				pixbufCellRenderer.Pixbuf = ImageService.GetPixbuf (TreeviewCategories.GetRowExpanded (store.GetPath (iter)) ? MonoDevelop.Core.Gui.Stock.OpenFolder : MonoDevelop.Core.Gui.Stock.ClosedFolder, IconSize.Menu);
+				pixbufCellRenderer.Pixbuf = ImageService.GetPixbuf (TreeviewCategories.GetRowExpanded (store.GetPath (iter)) ? MonoDevelop.Ide.Gui.Stock.OpenFolder : MonoDevelop.Ide.Gui.Stock.ClosedFolder, IconSize.Menu);
 			} else {
-				pixbufCellRenderer.Pixbuf = ImageService.GetPixbuf (MonoDevelop.Core.Gui.Stock.Property, IconSize.Menu);
+				pixbufCellRenderer.Pixbuf = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.Property, IconSize.Menu);
 			}
 		}
 		
 		void UpdateExample ()
 		{
-			IPrettyPrinter printer = TextFileService.GetPrettyPrinter (description.MimeType);
-			if (printer == null)
+			Formatter formatter = TextFileService.GetFormatter (description.MimeType);
+			if (formatter == null)
 				return;
 			DotNetAssemblyProject parent = new DotNetAssemblyProject ();
 			parent.Policies.Set<T> (settings, description.MimeType);
-			texteditor1.Document.Text  = printer.FormatText (parent, description.MimeType, texteditor1.Document.Text);
+			texteditor1.Document.Text  = formatter.FormatText (parent.Policies, texteditor1.Document.Text);
 		}
 		
 		protected override void HandleChanged (object sender, EditedArgs e)

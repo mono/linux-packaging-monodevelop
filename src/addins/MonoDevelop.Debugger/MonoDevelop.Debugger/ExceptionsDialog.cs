@@ -28,13 +28,12 @@
 using System;
 using System.Collections.Generic;
 using Gtk;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core;
-using MonoDevelop.Projects;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Components;
 using Mono.Debugging.Client;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Debugger
 {
@@ -43,7 +42,7 @@ namespace MonoDevelop.Debugger
 		ListStore storeExceptions;
 		ListStore storeSelection;
 		bool systemLoaded;
-		List<string> classes = new List<string> ();
+		HashSet<string> classes = new HashSet<string> ();
 		TreeViewState tstateExc;
 		TreeViewState tstateSel;
 		bool updateScheduled;

@@ -28,13 +28,8 @@
 
 using System;
 
-using Mono.Cecil;
-
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Ide.Gui.Components;
 
 namespace MonoDevelop.AssemblyBrowser
@@ -43,6 +38,10 @@ namespace MonoDevelop.AssemblyBrowser
 	{
 		public override Type NodeDataType {
 			get { return typeof(IReturnType); }
+		}
+		
+		public override Type CommandHandlerType {
+			get { return typeof(DomReturnTypeNodeCommandHandler); }
 		}
 		
 		public DomReturnTypeNodeBuilder (AssemblyBrowserWidget widget) : base (widget)
@@ -59,7 +58,18 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			IReturnType returnType = (IReturnType)dataObject;
 			label = Ambience.GetString (returnType, OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup);
-			icon = Context.GetIcon (Stock.Class);
+			icon = Context.GetIcon (MonoDevelop.Ide.Gui.Stock.Class);
 		}
 	}
+	
+	public class DomReturnTypeNodeCommandHandler : NodeCommandHandler
+	{
+		public override void ActivateItem ()
+		{
+			DomReturnTypeNodeBuilder nodeBuilder = CurrentNode.TypeNodeBuilder as DomReturnTypeNodeBuilder;
+			IReturnType returnType = CurrentNode.DataItem as IReturnType;
+			if (nodeBuilder != null && returnType != null)
+				nodeBuilder.Widget.Open ("T:" + returnType.DecoratedFullName);
+		}
+	}	
 }

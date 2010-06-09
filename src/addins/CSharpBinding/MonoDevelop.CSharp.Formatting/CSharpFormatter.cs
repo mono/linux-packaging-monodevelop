@@ -38,10 +38,11 @@ using Mono.TextEditor;
 using MonoDevelop.CSharp.Formatting;
 using MonoDevelop.CSharp.Resolver;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Projects;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Text;
+using MonoDevelop.Projects.Policies;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.CSharp.Formatting
 {
@@ -133,6 +134,43 @@ namespace MonoDevelop.CSharp.Formatting
 			}
 		}
 		
+		public override void CorrectIndenting (object textEditorData, int line)
+		{
+			TextEditorData data = (TextEditorData)textEditorData;
+			LineSegment lineSegment = data.Document.GetLine (line);
+			if (lineSegment == null)
+				return;
+			IEnumerable<string> types = MonoDevelop.Ide.DesktopService.GetMimeTypeInheritanceChain (CSharpFormatter.MimeType);
+			var policy = MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<CSharpFormattingPolicy> (types);
+			DocumentStateTracker<CSharpIndentEngine> tracker = new DocumentStateTracker<CSharpIndentEngine> (new CSharpIndentEngine (policy), data);
+			tracker.UpdateEngine (lineSegment.Offset);
+			for (int i = lineSegment.Offset; i < lineSegment.Offset + lineSegment.EditableLength; i++) {
+				tracker.Engine.Push (data.Document.GetCharAt (i));
+			}
+			
+			string curIndent = lineSegment.GetIndentation (data.Document);
+			
+			int nlwsp = curIndent.Length;
+//			int cursor = data.Caret.Offset;
+//			int pos = lineSegment.Offset;
+//			int offset = cursor > pos + nlwsp ? cursor - (pos + nlwsp) : 0;
+			if (!tracker.Engine.LineBeganInsideMultiLineComment || (nlwsp < lineSegment.Length && data.Document.GetCharAt (lineSegment.Offset + nlwsp) == '*')) {
+				// Possibly replace the indent
+				string newIndent = tracker.Engine.ThisLineIndent;
+//				int newIndentLength = newIndent.Length;
+				if (newIndent != curIndent) 
+					data.Replace (lineSegment.Offset, nlwsp, newIndent);
+			}
+			
+/*			
+			string endIndent = tracker.Engine.ThisLineIndent;
+			string indent = endIndent.Length < beginIndent.Length ? endIndent : beginIndent;
+			if (indent != curIndent)
+				data.Replace (lineSegment.Offset, curIndent.Length, indent);
+						 */
+			tracker.Dispose ();
+		}
+		
 		public override void OnTheFlyFormat (object textEditorData, IType type, IMember member, ProjectDom dom, ICompilationUnit unit, DomLocation caretLocation)
 		{
 			Format ((TextEditorData)textEditorData, type, member, dom, unit, caretLocation);
@@ -143,7 +181,7 @@ namespace MonoDevelop.CSharp.Formatting
 			IType type = NRefactoryResolver.GetTypeAtCursor (unit, unit.FileName, caretLocation);
 			if (type == null)
 				return;
-			Format (data, type, NRefactoryResolver.GetMemberAt (type, caretLocation), dom, unit, caretLocation);
+			Format (data, type, NRefactoryResolver.GetMemberAt (type, unit.FileName, caretLocation), dom, unit, caretLocation);
 		}
 		
 		static string GetIndent (string text)
@@ -209,7 +247,7 @@ namespace MonoDevelop.CSharp.Formatting
 			CSharpFormatter formatter = new CSharpFormatter ();
 			formatter.startIndentLevel = System.Math.Max (0, col / data.Options.TabSize - 1);
 			
-			string formattedText = formatter.InternalFormat (dom.Project, MimeType, wrapper, 0, wrapper.Length);
+			string formattedText = formatter.InternalFormat (dom != null && dom.Project != null ? dom.Project.Policies : null, MimeType, wrapper, 0, wrapper.Length);
 			
 			if (formatter.hasErrors)
 				return;
@@ -240,7 +278,7 @@ namespace MonoDevelop.CSharp.Formatting
 			doc.Text = formattedText;
 			for (int i = doc.LineCount - 1; i >= 0; i--) {
 				LineSegment lineSegment = doc.GetLine (i);
-				if (IsEmptyLine (doc, lineSegment))
+				if (doc.IsEmptyLine (lineSegment))
 					((IBuffer)doc).Remove (lineSegment.Offset, lineSegment.Length);
 			}
 			formattedText = doc.Text;
@@ -257,15 +295,6 @@ namespace MonoDevelop.CSharp.Formatting
 			InFormat = false;
 		}
 
-		static bool IsEmptyLine (Document doc, LineSegment line)
-		{
-			for (int i = 0; i < line.EditableLength; i++) {
-				char ch = doc.GetCharAt (line.Offset + i);
-				if (!Char.IsWhiteSpace (ch)) 
-					return false;
-			}
-			return true;
-		}
 		static int CanInsertFormattedText (TextEditorData data, int offset, int endOffset, string formattedText)
 		{
 			int textOffset = 0;
@@ -360,7 +389,7 @@ namespace MonoDevelop.CSharp.Formatting
 					continue;
 				} else if (isCh1Eol) {
 					
-					//int firstWhitespace = 0;
+				//	int firstWhitespace = 0;
 					
 					 // skip all white spaces in formatted text - we had a line break
 					int firstWhitespace = -1;
@@ -369,7 +398,6 @@ namespace MonoDevelop.CSharp.Formatting
 							firstWhitespace = textOffset;
 						textOffset++;
 					}
-					
 					if (firstWhitespace >= 0 && firstWhitespace != textOffset && formattedText[textOffset] == '\n') {
 						int length = textOffset - firstWhitespace - 1;
 						data.Insert (offset, formattedText.Substring (firstWhitespace, length) + data.EolMarker);
@@ -440,7 +468,7 @@ namespace MonoDevelop.CSharp.Formatting
 					offset++;
 					continue;
 				}
-//				Console.WriteLine ("BAIL OUT");
+				Console.WriteLine ("BAIL OUT");
 				break;
 			}
 			data.Caret.Offset = caretOffset;
@@ -468,15 +496,16 @@ namespace MonoDevelop.CSharp.Formatting
 			return (result / tabSize) * tabSize;
 		}
 
-		public static void SetFormatOptions (CSharpOutputVisitor outputVisitor, SolutionItem policyParent)
+		public static void SetFormatOptions (CSharpOutputVisitor outputVisitor, PolicyContainer policyParent)
 		{
-			IEnumerable<string> types = MonoDevelop.Core.Gui.DesktopService.GetMimeTypeInheritanceChain (MimeType);
-			TextStylePolicy currentPolicy = policyParent != null ? policyParent.Policies.Get<TextStylePolicy> (types) : MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<TextStylePolicy> (types);
-			CSharpFormattingPolicy codePolicy = policyParent != null ? policyParent.Policies.Get<CSharpFormattingPolicy> (types) : MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<CSharpFormattingPolicy> (types);
+			IEnumerable<string> types = DesktopService.GetMimeTypeInheritanceChain (MimeType);
+			TextStylePolicy currentPolicy = policyParent != null ? policyParent.Get<TextStylePolicy> (types) : MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<TextStylePolicy> (types);
+			CSharpFormattingPolicy codePolicy = policyParent != null ? policyParent.Get<CSharpFormattingPolicy> (types) : MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<CSharpFormattingPolicy> (types);
 
 			outputVisitor.Options.IndentationChar = currentPolicy.TabsToSpaces ? ' ' : '\t';
 			outputVisitor.Options.TabSize = currentPolicy.TabWidth;
 			outputVisitor.Options.IndentSize = currentPolicy.TabWidth;
+			outputVisitor.Options.EolMarker = TextStylePolicy.GetEolMarker(currentPolicy.EolMarker);
 
 			CodeFormatDescription descr = CSharpFormattingPolicyPanel.CodeFormatDescription;
 			Type optionType = outputVisitor.Options.GetType ();
@@ -504,7 +533,7 @@ namespace MonoDevelop.CSharp.Formatting
 		
 		bool hasErrors = false;
 		int startIndentLevel = 0;
-		protected override string InternalFormat (SolutionItem policyParent, string mimeType, string input, int startOffset, int endOffset)
+		protected override string InternalFormat (PolicyContainer policyParent, string mimeType, string input, int startOffset, int endOffset)
 		{
 			string text = GetFormattedText (policyParent, input);
 			if (startOffset == 0 && endOffset >= input.Length - 1)
@@ -541,7 +570,7 @@ namespace MonoDevelop.CSharp.Formatting
 			return j;
 		}
 		
-		string GetFormattedText (SolutionItem policyParent, string input)
+		string GetFormattedText (PolicyContainer policyParent, string input)
 		{
 			hasErrors = false;
 			if (string.IsNullOrEmpty (input))

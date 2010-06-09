@@ -214,9 +214,9 @@ namespace MonoDevelop.CSharp.Parser
 
 				ParsedDocument result = new ParsedDocument (fileName);
 				result.CompilationUnit = new MonoDevelop.Projects.Dom.CompilationUnit (fileName);
-
+				
 				parser.Errors.Error += delegate(int line, int col, string message) { result.Add (new Error (ErrorType.Error, line, col, message)); };
-				parser.Lexer.SpecialCommentTags = ProjectDomService.SpecialCommentTags.GetNames ();
+				parser.Lexer.SpecialCommentTags = LexerTags;
 				parser.Lexer.EvaluateConditionalCompilation = true;
 				if (dom != null && dom.Project != null) {
 					DotNetProjectConfiguration conf = dom.Project.DefaultConfiguration as DotNetProjectConfiguration;
@@ -225,7 +225,7 @@ namespace MonoDevelop.CSharp.Parser
 						parser.Lexer.SetConditionalCompilationSymbols (par.DefineSymbols);
 				}
 				parser.Parse ();
-
+				
 				SpecialTracker tracker = new SpecialTracker (result);
 				foreach (ICSharpCode.NRefactory.ISpecial special in parser.Lexer.SpecialTracker.CurrentSpecials) {
 					special.AcceptVisitor (tracker, null);
@@ -236,6 +236,7 @@ namespace MonoDevelop.CSharp.Parser
 				}
 				ConversionVisitior visitor = new ConversionVisitior (result, parser.Lexer.SpecialTracker.CurrentSpecials);
 				visitor.VisitCompilationUnit (parser.CompilationUnit, null);
+				result.CompilationUnit.Tag = parser.CompilationUnit;
 				LastUnit = parser.CompilationUnit;
 				return result;
 			}
@@ -315,6 +316,7 @@ namespace MonoDevelop.CSharp.Parser
 						DomAttribute domAttribute = new DomAttribute ();
 						domAttribute.Name = attribute.Name;
 						domAttribute.Region = ConvertRegion (attribute.StartLocation, attribute.EndLocation);
+						domAttribute.AttributeType = new DomReturnType (attribute.Name);
 						member.Add (domAttribute);
 						foreach (ICSharpCode.NRefactory.Ast.Expression exp in attribute.PositionalArguments)
 							domAttribute.AddPositionalArgument ((CodeExpression)exp.AcceptVisitor (domVisitor, null));
@@ -491,7 +493,12 @@ namespace MonoDevelop.CSharp.Parser
 				foreach (DomParameter p in parameter) {
 					p.DeclaringMember = delegateType;
 				}
-
+				
+				if (delegateDeclaration.Templates != null && delegateDeclaration.Templates.Count > 0) {
+					foreach (ICSharpCode.NRefactory.Ast.TemplateDefinition template in delegateDeclaration.Templates) {
+						delegateType.AddTypeParameter (ConvertTemplateDefinition (template));
+					}
+				}
 				AddType (delegateType);
 
 				return null;
@@ -691,16 +698,20 @@ namespace MonoDevelop.CSharp.Parser
 				property.Documentation = RetrieveDocumentation (propertyDeclaration.StartLocation.Line);
 				property.Location = ConvertLocation (propertyDeclaration.StartLocation);
 				property.BodyRegion = ConvertRegion (propertyDeclaration.EndLocation, propertyDeclaration.BodyEnd);
-				property.Modifiers = ConvertModifiers (propertyDeclaration.Modifier);
+				property.GetterModifier = property.SetterModifier = ConvertModifiers (propertyDeclaration.Modifier);
 				property.ReturnType = ConvertReturnType (propertyDeclaration.TypeReference);
 				AddAttributes (property, propertyDeclaration.Attributes);
 				AddExplicitInterfaces (property, propertyDeclaration.InterfaceImplementations);
 				if (propertyDeclaration.HasGetRegion) {
 					property.PropertyModifier |= PropertyModifier.HasGet;
+					if (propertyDeclaration.GetRegion.Modifier != ICSharpCode.NRefactory.Ast.Modifiers.None)
+						property.GetterModifier = ConvertModifiers (propertyDeclaration.GetRegion.Modifier);
 					property.GetRegion = ConvertRegion (propertyDeclaration.GetRegion.StartLocation, propertyDeclaration.GetRegion.EndLocation);
 				}
 				if (propertyDeclaration.HasSetRegion) {
 					property.PropertyModifier |= PropertyModifier.HasSet;
+					if (propertyDeclaration.SetRegion.Modifier != ICSharpCode.NRefactory.Ast.Modifiers.None)
+						property.SetterModifier = ConvertModifiers (propertyDeclaration.SetRegion.Modifier);
 					property.SetRegion = ConvertRegion (propertyDeclaration.SetRegion.StartLocation, propertyDeclaration.SetRegion.EndLocation);
 				}
 				property.DeclaringType = typeStack.Peek ();
@@ -716,7 +727,7 @@ namespace MonoDevelop.CSharp.Parser
 				indexer.PropertyModifier |= PropertyModifier.IsIndexer;
 				indexer.Location = ConvertLocation (indexerDeclaration.StartLocation);
 				indexer.BodyRegion = ConvertRegion (indexerDeclaration.EndLocation, indexerDeclaration.BodyEnd);
-				indexer.Modifiers = ConvertModifiers (indexerDeclaration.Modifier);
+				indexer.GetterModifier = indexer.SetterModifier = ConvertModifiers (indexerDeclaration.Modifier);
 				indexer.ReturnType = ConvertReturnType (indexerDeclaration.TypeReference);
 				indexer.Add (ConvertParameterList (indexer, indexerDeclaration.Parameters));
 
@@ -725,10 +736,14 @@ namespace MonoDevelop.CSharp.Parser
 
 				if (indexerDeclaration.HasGetRegion) {
 					indexer.PropertyModifier |= PropertyModifier.HasGet;
+					if (indexerDeclaration.GetRegion.Modifier != ICSharpCode.NRefactory.Ast.Modifiers.None)
+						indexer.GetterModifier = ConvertModifiers (indexerDeclaration.GetRegion.Modifier);
 					indexer.GetRegion = ConvertRegion (indexerDeclaration.GetRegion.StartLocation, indexerDeclaration.GetRegion.EndLocation);
 				}
 				if (indexerDeclaration.HasSetRegion) {
 					indexer.PropertyModifier |= PropertyModifier.HasSet;
+					if (indexerDeclaration.SetRegion.Modifier != ICSharpCode.NRefactory.Ast.Modifiers.None)
+						indexer.SetterModifier = ConvertModifiers (indexerDeclaration.SetRegion.Modifier);
 					indexer.SetRegion = ConvertRegion (indexerDeclaration.SetRegion.StartLocation, indexerDeclaration.SetRegion.EndLocation);
 				}
 				indexer.DeclaringType = typeStack.Peek ();

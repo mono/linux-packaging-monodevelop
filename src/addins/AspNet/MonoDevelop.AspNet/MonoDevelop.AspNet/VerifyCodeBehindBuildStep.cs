@@ -46,13 +46,15 @@ namespace MonoDevelop.AspNet
 	
 	public class VerifyCodeBehindBuildStep : ProjectServiceExtension
 	{
+		public override bool SupportsItem (IBuildTarget item)
+		{
+			AspNetAppProject aspProject = item as AspNetAppProject;
+			return aspProject != null && aspProject.LanguageBinding != null;
+		}
 		
 		protected override BuildResult Build (IProgressMonitor monitor, SolutionEntityItem project, ConfigurationSelector configuration)
 		{
 			AspNetAppProject aspProject = project as AspNetAppProject;
-			
-			if (aspProject == null || aspProject.LanguageBinding == null)
-				return base.Build (monitor, project, configuration);
 			
 			//get the config object and validate
 			AspNetAppProjectConfiguration config = (AspNetAppProjectConfiguration) aspProject.GetConfiguration (configuration);
@@ -115,12 +117,11 @@ namespace MonoDevelop.AspNet
 				}
 				
 				//parse the ASP.NET file
-				AspNetParsedDocument parsedDocument = ProjectDomService.Parse (aspProject, file.FilePath, null)
-					as AspNetParsedDocument;
-				if (parsedDocument == null || parsedDocument.Document == null)
+				var parsedDocument = ProjectDomService.Parse (aspProject, file.FilePath, null) as AspNetParsedDocument;
+				if (parsedDocument == null)
 					continue;
 				
-				System.CodeDom.CodeCompileUnit ccu = CodeBehind.GenerateCodeBehind (aspProject, parsedDocument, errors);
+				var ccu = CodeBehind.GenerateCodeBehind (aspProject, parsedDocument, errors);
 				if (ccu == null)
 					continue;
 				

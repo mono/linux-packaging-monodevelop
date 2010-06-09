@@ -32,6 +32,7 @@ using System.Collections.Generic;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components.Commands;
+using MonoDevelop.Ide.Navigation;
 
 namespace MonoDevelop.Ide.Commands
 {
@@ -73,7 +74,7 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Run (object ob)
 		{
-			NavigationPoint nav = ob as NavigationPoint;
+			NavigationHistoryItem nav = ob as NavigationHistoryItem;
 			if (nav != null)
 				NavigationHistoryService.MoveTo (nav);
 		}
@@ -81,7 +82,7 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Update (CommandArrayInfo info)
 		{
 			int currentIndex;
-			IList<NavigationPoint> points = NavigationHistoryService.GetNavigationList (15, out currentIndex);
+			IList<NavigationHistoryItem> points = NavigationHistoryService.GetNavigationList (15, out currentIndex);
 			
 			if (points.Count < 1) {
 				Document doc = IdeApp.Workbench.ActiveDocument;

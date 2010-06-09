@@ -2065,10 +2065,10 @@ namespace ICSharpCode.NRefactory.PrettyPrinter
 		
 		internal static string ToCSharpString(PrimitiveExpression primitiveExpression)
 		{
-			if (primitiveExpression.Value == null) {
+			if (primitiveExpression.Value == null) 
 				return "null";
-			}
-			
+			if (primitiveExpression.HasStringValue)
+				return primitiveExpression.StringValue;
 			object val = primitiveExpression.Value;
 			
 			if (val is bool) {

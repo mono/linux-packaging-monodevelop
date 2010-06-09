@@ -33,11 +33,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-using MonoDevelop.Core.Gui;
+ 
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 
 using CBinding.Parser;
+using MonoDevelop.Core;
 
 namespace CBinding
 {
@@ -59,7 +60,7 @@ namespace CBinding
 			string currentFile = document.FileName;
 			
 			if (info.IncludedFiles.ContainsKey (currentFile)) {
-				foreach (FileInformation fi in info.IncludedFiles[currentFile]) {
+				foreach (CBinding.Parser.FileInformation fi in info.IncludedFiles[currentFile]) {
 					foreach (Function f in fi.Functions) {
 						if (f.Name == functionName) {
 							functions.Add (f);
@@ -141,9 +142,9 @@ namespace CBinding
 		}
 	}
 	
-	public class CompletionData : ICompletionData
+	public class CompletionData : MonoDevelop.Ide.CodeCompletion.CompletionData
 	{
-		private string image;
+		private IconId image;
 		private string text;
 		private string description;
 		private string completion_string;
@@ -180,24 +181,20 @@ namespace CBinding
 			this.description = string.Empty;
 		}
 		
-		public string Icon {
+		public override IconId Icon {
 			get { return image; }
 		}
 		
-		public string DisplayText {
+		public override string DisplayText {
 			get { return text; }
 		}
 		
-		public string Description {
+		public override string Description {
 			get { return description; }
 		}
-
-		public string CompletionText {
-			get { return completion_string; }
-		}
 		
-		public DisplayFlags DisplayFlags {
-			get { return DisplayFlags.None; }
+		public override string CompletionText {
+			get { return completion_string; }
 		}
 	}
 

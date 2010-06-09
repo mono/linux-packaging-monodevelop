@@ -14,6 +14,7 @@ FILES =  \
 	MonoDevelop.VersionControl.Dialogs/VersionControlPolicyPanel.cs \
 	MonoDevelop.VersionControl.Views/AnnotateView.cs \
 	MonoDevelop.VersionControl.Views/CellRendererDiff.cs \
+	MonoDevelop.VersionControl.Views/DiffParser.cs \
 	MonoDevelop.VersionControl.Views/DiffView.cs \
 	MonoDevelop.VersionControl.Views/LogView.cs \
 	MonoDevelop.VersionControl.Views/StatusView.cs \
@@ -56,18 +57,13 @@ FILES =  \
 	MonoDevelop.VersionControl/VersionStatus.cs
 
 DEPS =  \
+	$(top_builddir)/build/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor2.dll \
-	$(top_builddir)/build/AddIns/VersionControl/Diff.dll \
-	$(top_builddir)/build/AddIns/VersionControl/DiffWidget.dll \
 	$(top_builddir)/build/bin/Mono.Debugging.dll \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
@@ -80,17 +76,7 @@ REFS =  \
 	-r:System.Xml
 
 RES =  \
-	comment.png \
-	menu_add.png \
-	menu_commit.png \
-	menu_diff.png \
-	menu_log.png \
-	menu_remote_status.png \
-	menu_remove.png \
-	menu_resolve.png \
-	menu_revert.png \
-	menu_status.png \
-	menu_update.png \
+	gtk-gui/gui.stetic \
 	overlay_added.png \
 	overlay_conflicted.png \
 	overlay_controled.png \
@@ -103,22 +89,36 @@ RES =  \
 	overlay_unversioned.png \
 	Policies.xml \
 	repository.png \
-	VersionControl.addin.xml
+	VersionControl.addin.xml \
+	version-control-16.png
+
+DATA_FILES =  \
+	comment.png \
+	menu_add.png \
+	menu_commit.png \
+	menu_diff.png \
+	menu_log.png \
+	menu_remote_status.png \
+	menu_remove.png \
+	menu_resolve.png \
+	menu_revert.png \
+	menu_status.png \
+	menu_update.png
 
 ADDIN_BUILD = $(top_builddir)/build/AddIns/VersionControl
 
+DATA_FILE_BUILD = $(addprefix $(ADDIN_BUILD)/, $(DATA_FILES))
+
 DLL = $(ADDIN_BUILD)/MonoDevelop.VersionControl.dll
 
-if ENABLE_VERSIONCONTROL
-all: $(DLL) $(DLL).mdb
-else
-all:
-endif
+all: $(DLL) $(DLL).mdb $(DATA_FILE_BUILD)
 
-if ENABLE_VERSIONCONTROL
 addindir = $(MD_ADDIN_DIR)/VersionControl
-addin_DATA = $(DLL) $(DLL).mdb
-endif
+addin_DATA = $(DLL) $(DLL).mdb $(DATA_FILES)
+
+$(DATA_FILE_BUILD): $(srcdir)/$(notdir $@)
+	mkdir -p $(ADDIN_BUILD)
+	cp $(srcdir)/$(notdir $@) $(ADDIN_BUILD)/.
 
 $(DLL): $(build_sources) $(build_resources) $(DEPS)
 	mkdir -p $(ADDIN_BUILD)
@@ -126,9 +126,9 @@ $(DLL): $(build_sources) $(build_resources) $(DEPS)
 
 $(DLL).mdb: $(DLL)
 
-CLEANFILES = $(DLL) $(DLL).mdb
+CLEANFILES = $(DLL) $(DLL).mdb $(DATA_FILE_BUILD)
 
-EXTRA_DIST = $(build_sources) $(RES)
+EXTRA_DIST = $(build_sources) $(RES) $(DATA_FILES)
 
 include $(top_srcdir)/Makefile.include
 

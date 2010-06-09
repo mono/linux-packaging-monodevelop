@@ -32,11 +32,11 @@ using System.Collections;
 using System.Collections.Generic;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
+using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Components.Commands;
 using Mono.Addins;
 using Gtk;
+using MonoDevelop.Ide.Gui.Components;
 
 namespace MonoDevelop.Ide.Gui.OptionPanels
 {
@@ -75,7 +75,7 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			TreeViewColumn col = new TreeViewColumn ();
 			col.Title = GettextCatalog.GetString ("Command");
 			col.Spacing = 4;
-			CellRendererPixbuf crp = new CellRendererPixbuf ();
+			CellRendererIcon crp = new CellRendererIcon ();
 			col.PackStart (crp, false);
 			col.AddAttribute (crp, "stock-id", iconCol);
 			col.AddAttribute (crp, "visible", iconVisibleCol);
@@ -226,7 +226,7 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			
 			foreach (object c in IdeApp.CommandService.GetCommands ()) {
 				ActionCommand cmd = c as ActionCommand;
-				if (cmd == null || cmd.CommandArray)
+				if (cmd == null || cmd.CommandArray || cmd.Category == GettextCatalog.GetString ("Hidden"))
 					continue;
 				
 				string key;
@@ -265,7 +265,7 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 					icat = keyStore.AppendValues (null, name, String.Empty, String.Empty, (int) Pango.Weight.Bold, null, false, true);
 				}
 				string label = cmd.Text.Replace ("_", String.Empty);
-				keyStore.AppendValues (icat, cmd, label, cmd.AccelKey != null ? cmd.AccelKey : String.Empty, cmd.Description, (int) Pango.Weight.Normal, cmd.Icon, true, true);
+				keyStore.AppendValues (icat, cmd, label, cmd.AccelKey != null ? cmd.AccelKey : String.Empty, cmd.Description, (int) Pango.Weight.Normal, (string)cmd.Icon, true, true);
 			}
 			UpdateGlobalWarningLabel ();
 			Refilter ();

@@ -39,10 +39,12 @@ using System.Collections.Generic;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide.Gui.Content;
+using MonoDevelop.Ide.Navigation;
 
 namespace MonoDevelop.Ide.Tasks
 {
-	public class TaskStore: IEnumerable<Task>
+	public class TaskStore: IEnumerable<Task>, ILocationList
 	{
 		int taskUpdateCount;
 		List<Task> tasks = new List<Task> ();
@@ -167,6 +169,10 @@ namespace MonoDevelop.Ide.Tasks
 			} finally {
 				EndTaskUpdates ();
 			}
+		}
+		
+		public int Count {
+			get { return tasks.Count; }
 		}
 		
 		public IEnumerator<Task> GetEnumerator ()
@@ -331,6 +337,151 @@ namespace MonoDevelop.Ide.Tasks
 				EndTaskUpdates ();
 			}
 		}
+		
+		#region ILocationList implementation
+		
+		Task currentLocationTask;
+		TaskSeverity iteratingSeverity;
+		
+		public void ResetLocationList ()
+		{
+			currentLocationTask = null;
+			iteratingSeverity = TaskSeverity.Error;
+		}
+		
+		public event EventHandler CurrentLocationTaskChanged;
+		
+		public Task CurrentLocationTask {
+			get { return currentLocationTask; }
+			set {
+				currentLocationTask = value;
+				iteratingSeverity = value != null ? value.Severity : TaskSeverity.Error;
+			}
+		}
+		
+		public NavigationPoint GetNextLocation ()
+		{
+			return GetNextLocation (false);
+		}
+		
+		class TaskNavigationPoint : TextFileNavigationPoint
+		{
+			Task task;
+			
+			public TaskNavigationPoint (Task task) : base (task.FileName, task.Line, task.Column)
+			{
+				this.task = task;
+			}
+			
+			protected override Document DoShow ()
+			{
+				Document result = base.DoShow ();
+				TaskService.InformJumpToTask (task);
+				return result;
+			}
+		}
+		
+		NavigationPoint GetNextLocation (bool followSeverity)
+		{
+			int n;
+			if (currentLocationTask == null) {
+				n = 0;
+				if (!followSeverity)
+					iteratingSeverity = TaskSeverity.Error;
+			}
+			else {
+				n = IndexOfTask (currentLocationTask);
+				if (n != -1)
+					n++;
+			}
+			
+			// Jump over tasks with different severity or with no file name
+			while (n != -1 && n < tasks.Count && (iteratingSeverity != tasks [n].Severity || string.IsNullOrEmpty (tasks [n].FileName)))
+				n++;
+			
+			Task ct = n != -1 && n < tasks.Count ? tasks [n] : null;
+			if (ct == null) {
+				if (iteratingSeverity != TaskSeverity.Comment) {
+					iteratingSeverity++;
+					currentLocationTask = null;
+					return GetNextLocation (true);
+				}
+			}
+			
+			currentLocationTask = ct;
+			if (CurrentLocationTaskChanged != null)
+				CurrentLocationTaskChanged (this, EventArgs.Empty);
+			
+			if (currentLocationTask != null) {
+				TaskService.ShowStatus (currentLocationTask);
+				return new TaskNavigationPoint (currentLocationTask);
+			}
+			else {
+				IdeApp.Workbench.StatusBar.ShowMessage (GettextCatalog.GetString ("End of list"));
+				return null;
+			}
+		}
+		
+		
+		public NavigationPoint GetPreviousLocation ()
+		{
+			return GetPreviousLocation (false);
+		}
+		
+		NavigationPoint GetPreviousLocation (bool followSeverity)
+		{
+			int n;
+			if (currentLocationTask == null) {
+				n = tasks.Count - 1;
+				if (!followSeverity)
+					iteratingSeverity = TaskSeverity.Comment;
+			}
+			else {
+				n = IndexOfTask (currentLocationTask);
+				if (n != -1)
+					n--;
+			}
+			
+			while (n != -1 && n < tasks.Count && (iteratingSeverity != tasks [n].Severity || string.IsNullOrEmpty (tasks [n].FileName)))
+				n--;
+			
+			Task ct = n != -1 && n < tasks.Count ? tasks [n] : null;
+			if (ct == null) {
+				if (iteratingSeverity != TaskSeverity.Error) {
+					iteratingSeverity--;
+					currentLocationTask = null;
+					return GetPreviousLocation (true);
+				}
+			}
+			
+			currentLocationTask = ct;
+			if (CurrentLocationTaskChanged != null)
+				CurrentLocationTaskChanged (this, EventArgs.Empty);
+			
+			if (currentLocationTask != null) {
+				TaskService.ShowStatus (currentLocationTask);
+				return new TaskNavigationPoint (currentLocationTask);
+			}
+			else {
+				IdeApp.Workbench.StatusBar.ShowMessage (GettextCatalog.GetString ("End of list"));
+				return null;
+			}
+		}
+		
+		int IndexOfTask (Task t)
+		{
+			for (int n=0; n<tasks.Count; n++) {
+				if (tasks [n] == t)
+					return n;
+			}
+			return -1;
+		}
+		
+		public string ItemName {
+			get; set;
+		}
+		
+		#endregion
 	}
 		
 	public delegate void TaskEventHandler (object sender, TaskEventArgs e);
@@ -338,6 +489,10 @@ namespace MonoDevelop.Ide.Tasks
 	public class TaskEventArgs : EventArgs
 	{
 		IEnumerable<Task> tasks;
+		
+		public TaskEventArgs (Task task) : this (new Task[] { task })
+		{
+		}
 		
 		public TaskEventArgs (IEnumerable<Task> tasks)
 		{

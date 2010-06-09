@@ -180,33 +180,35 @@ DEPS = \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor2.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.TextTemplating/Mono.TextTemplating.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS = \
 	$(GLIB_SHARP_LIBS) \
 	$(GTK_SHARP_LIBS) \
-	-r:System
+	-r:System \
+	-r:System.Core
 
 FILES = \
 	AssemblyInfo.cs \
 	Gui/T4EditorExtension.cs \
 	Parser/T4ParsedDocument.cs \
 	Parser/T4Parser.cs \
-	TextTemplatingService.cs
+	TextTemplatingService.cs \
+	TextTemplatingTool.cs
 
 RES = \
 	MonoDevelop.TextTemplating.addin.xml \
 	T4SyntaxMode.xml
 
+DATA_FILES = \
+	Templates/T4TemplateCSharp.xft.xml
+
+DATA_FILE_BUILD = $(addprefix $(ADDIN_BUILD)/, $(DATA_FILES))
 assemblydir = $(MD_ADDIN_DIR)/MonoDevelop.TextTemplating
 assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
-CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
-EXTRA_DIST = $(FILES) $(RES)
+CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb $(DATA_FILE_BUILD)
+EXTRA_DIST = $(FILES) $(RES) $(DATA_FILES)
 build_deps = $(addprefix -r:, $(DEPS))
 build_sources = $(addprefix $(srcdir)/, $(FILES)) $(GENERATED_FILES)
 build_resources = $(addprefix $(srcdir)/, $(RES))
@@ -351,6 +353,8 @@ info: info-am
 info-am:
 
 install-data-am: install-assemblyDATA
+	@$(NORMAL_INSTALL)
+	$(MAKE) $(AM_MAKEFLAGS) install-data-hook
 
 install-dvi: install-dvi-am
 
@@ -385,19 +389,22 @@ ps: ps-am
 ps-am:
 
 uninstall-am: uninstall-assemblyDATA
+	@$(NORMAL_INSTALL)
+	$(MAKE) $(AM_MAKEFLAGS) uninstall-hook
 
-.MAKE: install-am install-strip
+.MAKE: install-am install-data-am install-strip uninstall-am
 
 .PHONY: all all-am check check-am clean clean-generic distclean \
 	distclean-generic distdir dvi dvi-am html html-am info info-am \
 	install install-am install-assemblyDATA install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
+	install-data-am install-data-hook install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
-	pdf-am ps ps-am uninstall uninstall-am uninstall-assemblyDATA
+	pdf-am ps ps-am uninstall uninstall-am uninstall-assemblyDATA \
+	uninstall-hook
 
 
 all: $(ASSEMBLY) $(ASSEMBLY).mdb $(DATA_FILE_BUILD)
@@ -407,9 +414,24 @@ $(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS)
 	$(CSC) $(CSC_FLAGS) -debug -out:$@ -target:library $(REFS) $(build_deps) \
 		$(build_resources:%=/resource:%) $(build_sources)
 
+$(DATA_FILE_BUILD): $(ADDIN_BUILD)/% : $(srcdir)/%
+	mkdir -p $(dir $@)
+	cp $^ $@
+
 $(ASSEMBLY).mdb: $(ASSEMBLY)
 
 check: all
+
+install-data-hook:
+	for F in $(DATA_FILES); do \
+		mkdir -p "$(DESTDIR)$(assemblydir)/$$(dirname $$F)/"; \
+		$(INSTALL) -c -m 0644 $(srcdir)/$$F "$(DESTDIR)$(assemblydir)/$$(dirname $$F)/"; \
+	done
+
+uninstall-hook:
+	for F in $(DATA_FILES); do \
+		rm -f "$(DESTDIR)$(assemblydir)/$$F"; \
+	done
 
 # workaroundfor lack of abs_top_builddir variable in automake < 1.10. Will break if mdtool isn't 
 # launched from top_srcdir (i.e. where this script is located)

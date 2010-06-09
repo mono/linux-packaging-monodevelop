@@ -48,12 +48,15 @@ namespace Mono.Debugging.Evaluation
 		{
 			RawViewSource src = new RawViewSource (ctx, objectSource, obj);
 			src.Connect ();
-			return ObjectValue.CreateObject (src, new ObjectPath ("Raw View"), "", "", ObjectValueFlags.Group|ObjectValueFlags.ReadOnly|ObjectValueFlags.NoRefresh, null);
+			ObjectValue val = ObjectValue.CreateObject (src, new ObjectPath ("Raw View"), "", "", ObjectValueFlags.Group|ObjectValueFlags.ReadOnly|ObjectValueFlags.NoRefresh, null);
+			val.ChildSelector = "";
+			return val;
 		}
 		
-		public ObjectValue[] GetChildren (ObjectPath path, int index, int count)
+		public ObjectValue[] GetChildren (ObjectPath path, int index, int count, EvaluationOptions options)
 		{
-			return ctx.Adapter.GetObjectValueChildren (ctx, objectSource, ctx.Adapter.GetValueType (ctx, obj), obj, index, count, false);
+			EvaluationContext cctx = ctx.WithOptions (options);
+			return cctx.Adapter.GetObjectValueChildren (cctx, objectSource, cctx.Adapter.GetValueType (cctx, obj), obj, index, count, false);
 		}
 		
 		public ObjectValue GetValue (ObjectPath path, EvaluationOptions options)
@@ -61,9 +64,19 @@ namespace Mono.Debugging.Evaluation
 			throw new NotSupportedException ();
 		}
 		
-		public EvaluationResult SetValue (ObjectPath path, string value)
+		public EvaluationResult SetValue (ObjectPath path, string value, EvaluationOptions options)
 		{
 			throw new NotSupportedException ();
+		}
+		
+		public void SetRawValue (ObjectPath path, object value, EvaluationOptions options)
+		{
+			throw new System.NotImplementedException ();
+		}
+		
+		public object GetRawValue (ObjectPath path, EvaluationOptions options)
+		{
+			throw new System.NotImplementedException ();
 		}
 	}
 }

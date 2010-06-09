@@ -29,14 +29,10 @@
 using System;
 using System.Text;
 
-using Mono.Cecil;
-
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.AssemblyBrowser
 {
@@ -136,12 +132,25 @@ namespace MonoDevelop.AssemblyBrowser
 			result.Append ("{");result.AppendLine ();
 			DomCecilProperty cecilProperty = property as DomCecilProperty;
 			if (property.HasGet) {
-				result.Append ("\t<b>get</b> {");result.AppendLine ();
+				result.Append ("\t");
+				if (property.GetterModifier != property.Modifiers) {
+					result.Append ("<span style=\"keyword.modifier\">");
+					result.Append (Ambience.GetString (property.GetterModifier));
+					result.Append ("</span> ");
+				}
+				result.Append ("<b>get</b> {");result.AppendLine ();
 				result.Append (DomMethodNodeBuilder.Decompile (cecilProperty.GetMethod as DomCecilMethod, true).Replace ("\t", "\t\t"));
 				result.Append ("\t}");result.AppendLine ();
 			}
 			if (property.HasSet) {
-				result.Append ("\t<b>set</b> {");result.AppendLine ();
+				result.Append ("\t");
+				if (property.SetterModifier != property.Modifiers) {
+					result.Append ("<span style=\"keyword.modifier\">");
+					result.Append (Ambience.GetString (property.SetterModifier));
+					result.Append ("</span> ");
+				}
+				result.Append ("<b>set</b> {");result.AppendLine ();
+				
 				result.Append (DomMethodNodeBuilder.Decompile (cecilProperty.SetMethod as DomCecilMethod, true).Replace ("\t", "\t\t"));
 				result.Append ("\t}");result.AppendLine ();
 			}

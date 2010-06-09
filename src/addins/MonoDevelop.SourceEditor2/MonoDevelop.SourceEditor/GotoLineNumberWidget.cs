@@ -27,6 +27,8 @@
 //
 
 using System;
+using Gtk;
+
 using Mono.TextEditor;
 
 namespace MonoDevelop.SourceEditor
@@ -39,12 +41,34 @@ namespace MonoDevelop.SourceEditor
 		DocumentLocation caretSave;
 		bool cleanExit = false;
 		
-		public GotoLineNumberWidget (SourceEditorWidget widget)
+		Widget container;
+		void HandleViewTextEditorhandleSizeAllocated (object o, SizeAllocatedArgs args)
 		{
+			int newX = widget.TextEditor.Allocation.Width - this.Allocation.Width - 8;
+			TextEditorContainer.EditorContainerChild containerChild = ((Mono.TextEditor.TextEditorContainer.EditorContainerChild)widget.TextEditorContainer[container]);
+			if (newX != containerChild.X) {
+				this.entryLineNumber.WidthRequest = widget.Vbox.Allocation.Width / 4;
+				containerChild.X = newX;
+				widget.TextEditorContainer.QueueResize ();
+			}
+		}
+		
+		public GotoLineNumberWidget (SourceEditorWidget widget, Widget container)
+		{
+			this.container = container;
 			this.Build ();
+			
 			this.widget = widget;
 			StoreWidgetState ();
+			widget.TextEditorContainer.SizeAllocated += HandleViewTextEditorhandleSizeAllocated;
 			
+			//HACK: GTK rendering issue on Mac, images don't repaint unless we put them in visible eventboxes
+			if (Platform.IsMac) {
+				foreach (var eb in new [] { eventbox1, eventbox2 }) {
+					eb.VisibleWindow = true;
+					eb.ModifyBg (StateType.Normal, new Gdk.Color (230, 230, 230));
+				}
+			}
 			this.closeButton.Clicked += delegate {
 				RestoreWidgetState ();
 				widget.RemoveSearchWidget ();
@@ -83,6 +107,14 @@ namespace MonoDevelop.SourceEditor
 				widget.RemoveSearchWidget ();
 			};
 		}
+		
+		protected override void OnDestroyed ()
+		{
+			base.OnDestroyed ();
+			widget.TextEditorContainer.SizeAllocated -= HandleViewTextEditorhandleSizeAllocated;
+			
+		}
+
 		
 		void StoreWidgetState ()
 		{
@@ -123,7 +155,7 @@ namespace MonoDevelop.SourceEditor
 		}
 		
 		internal static readonly Gdk.Color warningColor = new Gdk.Color (210, 210, 32);
-		internal static readonly Gdk.Color errorColor   = new Gdk.Color (210, 32, 32);
+		internal static readonly Gdk.Color errorColor   = new Gdk.Color (255, 102, 102);
 		
 		void PreviewLine ()
 		{

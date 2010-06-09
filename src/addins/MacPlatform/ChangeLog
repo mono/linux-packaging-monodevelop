@@ -1,3 +1,171 @@
+2010-05-19  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MacPlatform.cs: More Macification.
+
+2010-05-19  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MacPlatform.cs: Macify some command names.
+
+2010-05-12  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Menus/OSXMenu.cs: Attempt to fix keyval->menu accel mapping
+	  for non-English keyboards.
+
+2010-05-11  Levi Bard  <levi@unity3d.com>
+
+	* Framework/AppleEvent.cs: Off-by-one.
+
+2010-05-11  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Menus/OSXMenu.cs: Track api changes.
+
+2010-05-04  Jonathan Pobst  <monkey@jpobst.com>
+
+	* Framework/AppleScript.cs: csc can't do Enum->Struct cast,
+	make it an Enum->int->Struct cast.
+
+2010-04-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MacPlatform.cs:
+	* MacPlatform.csproj:
+	* Framework/AppleScript.cs:
+	* ExternalConsoleProcess.cs: Implemented Mac external console,
+	  somewhat hackily.
+
+2010-04-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MacPlatform.cs:
+	* Menus/OSXMenu.cs: Cleaner OpenUrl implementation.
+
+2010-04-27  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MacPlatform.cs:
+	* MacPlatform.csproj: Call 'open' directly when opening urls
+	  to avoid the -W argument that mono adds, which leaves us
+	  with lots of zombie 'open' processes.
+
+2010-04-25  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Framework/Carbon.cs:
+	* Framework/AppleEvent.cs:
+	* Framework/AppleScript.cs: Moved all the AE stuff from Carbon
+	  to AppleEvents.
+
+2010-04-25  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Framework/Carbon.cs:
+	* Framework/AppleEvent.cs:
+	* Framework/AppleScript.cs:
+	* Framework/ComponentManager.cs: Finally, working support for
+	  running AppleScript directly.
+
+2010-04-23  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MacPlatform.csproj:
+	* Framework/Carbon.cs:
+	* Framework/NavDialog.cs:
+	* Framework/AppleEvent.cs:
+	* Framework/AppleScript.cs:
+	* Framework/ComponentManager.cs: Bind some OSA/AppleScript
+	  stuff.
+
+2010-04-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MacPlatform.cs: Track API.
+
+2010-04-19  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Menus/OSXMenu.cs: Remove debug code.
+
+2010-04-18  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Menus/OSXMenu.cs: Pass source type to command dispatch. Use
+	  command dispatch event to flash menubar when commands are
+	  triggered from a keybinding.
+
+	* MacPlatform.cs: Convert enum command IDs to strings in a
+	  compatible way so they can be matched against the values we
+	  get from the command service.
+
+	* Framework/HIToolbox.cs: Add P/Invoke sigs.
+
+2010-03-27  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MacPlatform.cs:
+	* Framework/Carbon.cs:
+	* Framework/ApplicationEvents.cs: Don't crash when the user
+	  cancels quitting.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MacPlatform.addin.xml: Bumped MD version.
+
+2010-03-18  Levi Bard  <levi@unity3d.com>
+
+	* MacPlatform.cs: Track API changes.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* Commands.cs:
+	* MacPlatform.cs:
+	* Menus/OSXMenu.cs:
+	* MacPlatform.csproj:
+	* gtk-gui/gui.stetic:
+	* MacPlatform.addin.xml:
+	* Updater/UpdateResult.cs:
+	* Updater/UpdateDialog.cs:
+	* Updater/UpdateService.cs: Merged MD.Projects into MD.Core,
+	  and MD.Projects.Gui, MD.Core.Gui and MD.Components into
+	  MD.Ide.
+
+2010-03-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MacPlatform.cs: Unbreak the OpenDocuments handler - the
+	  position handling changes stopped it from working when
+	  starting MD and when opening solutions.
+
+2010-03-16  Levi Bard  <levi@unity3d.com>
+
+	* MacPlatform/MacPlatform.cs
+	* MacPlatform/Framework/Carbon.cs
+	* MacPlatform/Framework/ApplicationEvents.cs: Enable position 
+	  to be passed in OpenDocuments call.
+
+2010-02-23  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MacPlatform.csproj:
+	* Framework/NavDialog.cs:
+	* Framework/HIToolbox.cs:
+	* Framework/AppleEvent.cs:
+	* Framework/CoreFoundation.cs:
+	* MacSelectFileDialogHandler.cs: More work on native dialogs.
+
+2010-02-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MacPlatform.addin.xml: Fix extensions.
+
+	* MacSelectFileDialogHandler.cs: Stub other dialog handlers.
+
+2010-02-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Framework/Carbon.cs: Better errors in exceptions.
+
+2010-02-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MacPlatform.csproj:
+	* Framework/Carbon.cs:
+	* MacPlatform.addin.xml:
+	* Framework/NavDialog.cs:
+	* MacSelectFileDialogHandler.cs: First shot at implementing
+	  Mac native dialogs.
+
 2010-01-28  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* Updater/UpdateService.cs: Send env flags to the update
@@ -45,6 +213,39 @@
 2010-01-26  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* Updater/UpdateDialog.cs: Tidy up the update list a little.
+
+2010-01-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Framework/Carbon.cs:
+	* Framework/ApplicationEvents.cs: Fix HandleOpenUrls event
+	  class and string marshalling. Also fix event uninstallation.
+
+2010-01-20  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Framework/ApplicationEvents.cs: Fix event IDs. Use
+	  GetUrlListFromEventRef.
+
+	* Framework/Carbon.cs: New GetUrlListFromEventRef and
+	  GetStringFromAEPtr methods.
+
+2010-01-20  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MacPlatform.cs:
+	* Framework/ApplicationEvents.cs: Remove OpenContents event
+	  since it didn't really work.
+
+2010-01-20  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Framework/ApplicationEvents.cs: Fix locking.
+
+2010-01-20  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MacPlatform.cs:
+	* MacPlatform.csproj:
+	* Framework/Carbon.cs:
+	* Framework/ApplicationEvents.cs: Refactor out
+	  ApplicationEvents code.
 
 2010-01-14  Michael Hutchinson  <mhutchinson@novell.com>
 

@@ -29,10 +29,10 @@ using NUnit.Framework;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 
 namespace MonoDevelop.Projects.Gui
 {
@@ -75,7 +75,9 @@ namespace MonoDevelop.Projects.Gui
 			{
 				this.CompletedWord = complete_word;
 			}
-			
+			public void Replace (int offset, int count, string text)
+			{
+			}
 			public int TextLength {
 				get {
 					return 0;
@@ -171,7 +173,7 @@ namespace MonoDevelop.Projects.Gui
 			dataList.AutoSelect = settings.AutoSelect;
 			dataList.AddRange (settings.CompletionData);
 			dataList.DefaultCompletionString = settings.DefaultCompletionString;
-			
+			ListWindow.ClearHistory ();
 			CompletionListWindow listWindow = new CompletionListWindow {
 				CompletionDataList = dataList,
 				CompletionWidget = new TestCompletionWidget (),
@@ -538,6 +540,19 @@ namespace MonoDevelop.Projects.Gui
 		{
 			string output = RunSimulation ("", "foo b ", true, true, false, "foo bar", "foo bar baz");
 			Assert.AreEqual ("foo bar", output);
+		}
+		
+		[Test]
+		public void TestBug595240 ()
+		{
+			string output = RunSimulation ("", "A\t", true, true, false, "AbCdEf");
+			Assert.AreEqual ("AbCdEf", output);
+			
+			output = RunSimulation ("", "Cd\t", true, true, false, "AbCdEf");
+			Assert.AreEqual ("AbCdEf", output);
+			
+			output = RunSimulation ("", "bC\t", true, true, false, "AbCdEf");
+			Assert.AreNotEqual ("AbCdEf", output);
 		}
 		
 		[TestFixtureSetUp] 

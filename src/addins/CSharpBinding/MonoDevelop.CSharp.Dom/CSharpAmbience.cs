@@ -31,6 +31,8 @@ using System.Text;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
 using System.CodeDom;
+using MonoDevelop.CSharp.Formatting;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.CSharp.Dom
 {
@@ -165,16 +167,23 @@ namespace MonoDevelop.CSharp.Dom
 			result.Append (settings.EmitName (property, Format (property.Name)));
 			if (settings.IncludeParameters && property.Parameters.Count > 0) {
 				result.Append (settings.Markup ("["));
-				bool first = true;
-				foreach (IParameter parameter in property.Parameters) {
-					if (!first)
-						result.Append (settings.Markup (", "));
-					AppendParameter (settings, result, parameter);
-					first = false;
-				}
+				AppendParameterList (result, settings, property.Parameters);
 				result.Append (settings.Markup ("]"));
 			}
 			return result.ToString ();
+		}
+		
+		void AppendParameterList (StringBuilder result, OutputSettings settings, IEnumerable<IParameter> parameterList)
+		{
+			if (parameterList == null)
+				return;
+			bool first = true;
+			foreach (IParameter parameter in parameterList) {
+				if (!first)
+					result.Append (settings.Markup (", "));
+				AppendParameter (settings, result, parameter);
+				first = false;
+			}
 		}
 		
 		void AppendParameter (OutputSettings settings, StringBuilder result, IParameter parameter)
@@ -196,8 +205,8 @@ namespace MonoDevelop.CSharp.Dom
 		{
 			StringBuilder result = new StringBuilder ();
 			result.Append (settings.EmitModifiers (base.GetString (field.Modifiers)));
-			
-			if (settings.IncludeReturnType && !(field.IsLiteral && field.DeclaringType != null && field.DeclaringType.ClassType == ClassType.Enum)) {
+			bool isEnum = field.DeclaringType != null && field.DeclaringType.ClassType == ClassType.Enum;
+			if (settings.IncludeReturnType && !isEnum) {
 				result.Append (GetString (field.ReturnType, settings));
 				result.Append (settings.Markup (" "));
 			}
@@ -219,22 +228,23 @@ namespace MonoDevelop.CSharp.Dom
 					result.Append (settings.EmitName (returnType, Format (NormalizeTypeName (returnType.Namespace))));
 				
 				foreach (ReturnTypePart part in returnType.Parts) {
+					if (part.IsGenerated)
+						continue;
 					if (result.Length > 0)
 						result.Append (settings.EmitName (returnType, "."));
 					result.Append (settings.EmitName (returnType, Format (NormalizeTypeName (part.Name))));
 					if (settings.IncludeGenerics && part.GenericArguments.Count > 0) {
 						result.Append (settings.Markup ("<"));
-						if (!settings.HideGenericParameterNames) {
-							bool hideArrays = settings.HideArrayBrackets;
-							settings.OutputFlags &= ~OutputFlags.HideArrayBrackets;
-							for (int i = 0; i < part.GenericArguments.Count; i++) {
-								if (i > 0)
-									result.Append (settings.Markup (", "));
+						bool hideArrays = settings.HideArrayBrackets;
+						settings.OutputFlags &= ~OutputFlags.HideArrayBrackets;
+						for (int i = 0; i < part.GenericArguments.Count; i++) {
+							if (i > 0)
+								result.Append (settings.Markup (settings.HideGenericParameterNames ? "," : ", "));
+							if (!settings.HideGenericParameterNames) 
 								result.Append (GetString (part.GenericArguments[i], settings));
-							}
-							if (hideArrays)
-								settings.OutputFlags |= OutputFlags.HideArrayBrackets;
 						}
+						if (hideArrays)
+							settings.OutputFlags |= OutputFlags.HideArrayBrackets;
 						result.Append (settings.Markup (">"));
 					}
 				}
@@ -283,12 +293,12 @@ namespace MonoDevelop.CSharp.Dom
 				if (method.TypeParameters.Count > 0) {
 					result.Append (settings.Markup ("<"));
 					
-					if (!settings.HideGenericParameterNames) {
-						InstantiatedMethod instantiatedMethod = method as InstantiatedMethod;
-						
-						for (int i = 0; i < method.TypeParameters.Count; i++) {
-							if (i > 0)
-								result.Append (settings.Markup (", "));
+					InstantiatedMethod instantiatedMethod = method as InstantiatedMethod;
+					
+					for (int i = 0; i < method.TypeParameters.Count; i++) {
+						if (i > 0)
+							result.Append (settings.Markup (settings.HideGenericParameterNames ? "," : ", "));
+						if (!settings.HideGenericParameterNames) {
 							if (instantiatedMethod != null) {
 								result.Append (this.GetString (instantiatedMethod.GenericParameters[i], settings));
 							} else {
@@ -301,9 +311,12 @@ namespace MonoDevelop.CSharp.Dom
 			}
 			
 			if (settings.IncludeParameters) {
+				CSharpFormattingPolicy policy = GetPolicy (settings);
+				if (policy.BeforeMethodCallParentheses)
+					result.Append (settings.Markup (" "));
+				
 				result.Append (settings.Markup ("("));
 				bool first = true;
-				
 				if (method.Parameters != null) {
 					foreach (IParameter parameter in method.Parameters) {
 						if (settings.HideExtensionsParameter && method.IsExtension && parameter == method.Parameters[0])
@@ -352,6 +365,13 @@ namespace MonoDevelop.CSharp.Dom
 			return result.ToString ();
 		}
 		
+		
+		public CSharpFormattingPolicy GetPolicy (OutputSettings settings)
+		{
+			IEnumerable<string> types = DesktopService.GetMimeTypeInheritanceChain (MonoDevelop.CSharp.Formatting.CSharpFormatter.MimeType);
+			return settings.PolicyParent != null ? settings.PolicyParent.Get<CSharpFormattingPolicy> (types) : MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<CSharpFormattingPolicy> (types);
+		}
+		
 		public string Visit (IType type, OutputSettings settings)
 		{
 			StringBuilder result = new StringBuilder ();
@@ -370,13 +390,14 @@ namespace MonoDevelop.CSharp.Dom
 				return result.ToString ();
 			}
 			
+			
 			InstantiatedType instantiatedType = type as InstantiatedType;
 			string modStr = base.GetString (type.ClassType == ClassType.Enum ? (type.Modifiers & ~Modifiers.Sealed) :  type.Modifiers);
 			string modifiers = !String.IsNullOrEmpty (modStr) ? settings.EmitModifiers (modStr) : "";
 			string keyword = settings.EmitKeyword (GetString (type.ClassType));
 			
 			string name = null;
-			if (type.Name.EndsWith("[]")) {
+			if (instantiatedType == null && type.Name.EndsWith("[]")) {
 				List<IMember> member = type.SearchMember ("Item", true);
 				if (member != null && member.Count >0)
 					name = Visit (member[0].ReturnType, settings);
@@ -393,37 +414,64 @@ namespace MonoDevelop.CSharp.Dom
 			}
 			int parameterCount = type.TypeParameters.Count;
 			if (instantiatedType != null) 
-				parameterCount = instantiatedType.GenericParameters.Count;
-			
-			
-			if (modifiers.Length == 0 && keyword.Length == 0 && (!settings.IncludeGenerics || parameterCount == 0) && (!settings.IncludeBaseTypes || !type.BaseTypes.Any ()))
-				return settings.UseFullName && type.DeclaringType != null ? GetString (type.DeclaringType, OutputFlags.UseFullName) + "." + name : name;
+				parameterCount = instantiatedType.UninstantiatedType.TypeParameters.Count;
 			
 			result.Append (modifiers);
 			result.Append (keyword);
 			if (result.Length > 0 && !result.ToString ().EndsWith (" "))
 				result.Append (settings.Markup (" "));
+			
+			
+			if (type.ClassType == ClassType.Delegate && settings.ReformatDelegates) {
+				IMethod invoke = type.SearchMember ("Invoke", true).FirstOrDefault () as IMethod;
+				if (invoke != null) {
+					result.Append (this.GetString (invoke.ReturnType, settings));
+					result.Append (settings.Markup (" "));
+				}
+			}
+			
 			if (settings.UseFullName && type.DeclaringType != null) {
-				result.Append (GetString (type.DeclaringType, OutputFlags.UseFullName));
+				bool includeGenerics = settings.IncludeGenerics;
+				settings.OutputFlags |= OutputFlags.IncludeGenerics;
+				string typeString = GetString (type.DeclaringType, settings);
+				if (!includeGenerics)
+					settings.OutputFlags &= ~OutputFlags.IncludeGenerics;
+				result.Append (typeString);
 				result.Append (settings.Markup ("."));
 			}
 			
 			result.Append (settings.EmitName (type, name));
-			
 			if (settings.IncludeGenerics && parameterCount > 0) {
 				result.Append (settings.Markup ("<"));
-				if (!settings.HideGenericParameterNames) {
-					for (int i = 0; i < parameterCount; i++) {
-						if (i > 0)
-							result.Append (settings.Markup (", "));
+				for (int i = 0; i < parameterCount; i++) {
+					if (i > 0)
+						result.Append (settings.Markup (settings.HideGenericParameterNames ? "," : ", "));
+					if (!settings.HideGenericParameterNames) {
 						if (instantiatedType != null) {
-							result.Append (this.GetString (instantiatedType.GenericParameters[i], settings));
+							if (i < instantiatedType.GenericParameters.Count) {
+								result.Append (this.GetString (instantiatedType.GenericParameters[i], settings));
+							} else {
+								result.Append (instantiatedType.UninstantiatedType.TypeParameters[i].Name);
+							}
 						} else {
 							result.Append (NetToCSharpTypeName (type.TypeParameters[i].Name));
 						}
 					}
 				}
 				result.Append (settings.Markup (">"));
+			}
+			
+			
+			if (type.ClassType == ClassType.Delegate && settings.ReformatDelegates) {
+				CSharpFormattingPolicy policy = GetPolicy (settings);
+				if (policy.BeforeMethodCallParentheses)
+					result.Append (settings.Markup (" "));
+				result.Append (settings.Markup ("("));
+				IMethod invoke = type.SearchMember ("Invoke", true).FirstOrDefault () as IMethod;
+				if (invoke != null) 
+					AppendParameterList (result, settings, invoke.Parameters);
+				result.Append (settings.Markup (");"));
+				return result.ToString ();
 			}
 			
 			if (settings.IncludeBaseTypes && type.BaseTypes.Any ()) {
@@ -466,6 +514,9 @@ namespace MonoDevelop.CSharp.Dom
 			if (attrName.EndsWith ("Attribute"))
 				attrName = attrName.Substring (0, attrName.Length - "Attribute".Length);
 			result.Append (attrName);
+			CSharpFormattingPolicy policy = GetPolicy (settings);
+			if (policy.BeforeMethodCallParentheses)
+				result.Append (settings.Markup (" "));
 			result.Append (settings.Markup ("("));
 			bool first = true;
 			if (attribute.PositionalArguments != null) {

@@ -26,11 +26,7 @@
 //
 
 using System;
-using System.Xml;
-using System.Collections.Generic;
 using Gtk;
-using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
 using Mono.Debugging.Client;
 
@@ -73,6 +69,7 @@ namespace MonoDevelop.Debugger
 			DebuggingService.PausedEvent += OnDebuggerPaused;
 			DebuggingService.ResumedEvent += OnDebuggerResumed;
 			DebuggingService.StoppedEvent += OnDebuggerStopped;
+			DebuggingService.EvaluationOptionsChanged += OnEvaluationOptionsChanged;
 			
 			needsUpdate = true;
 			initialResume = true;
@@ -89,6 +86,7 @@ namespace MonoDevelop.Debugger
 			DebuggingService.PausedEvent -= OnDebuggerPaused;
 			DebuggingService.ResumedEvent -= OnDebuggerResumed;
 			DebuggingService.StoppedEvent -= OnDebuggerStopped;
+			DebuggingService.EvaluationOptionsChanged -= OnEvaluationOptionsChanged;
 		}
 
 		public void Initialize (IPadWindow container)
@@ -139,6 +137,17 @@ namespace MonoDevelop.Debugger
 			tree.ResetChangeTracking ();
 			tree.Sensitive = false;
 			initialResume = true;
+		}
+		
+		void OnEvaluationOptionsChanged (object s, EventArgs a)
+		{
+			if (!DebuggingService.IsRunning) {
+				lastFrame = null;
+				if (container != null && container.ContentVisible)
+					OnUpdateList ();
+				else
+					needsUpdate = true;
+			}
 		}
 	}
 }

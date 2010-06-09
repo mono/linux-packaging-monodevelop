@@ -31,23 +31,16 @@
 //
 
 
-using System;
-using System.Linq;
 using System.Threading;
-using MonoDevelop.Core.Gui.Dialogs;
 using MonoDevelop.Core;
-using Mono.Addins;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
-using MonoDevelop.Ide.Gui.Dialogs;
-using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Core.Gui;
 using System.IO;
-using Gtk;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Ide.Execution;
 using CustomCommand = MonoDevelop.Projects.CustomCommand;
+using System.Linq;
 
 namespace MonoDevelop.Ide.Commands
 {
@@ -276,6 +269,8 @@ namespace MonoDevelop.Ide.Commands
         public static void RunMethod (IExecutionHandler executionHandler)
         {
             if (!IdeApp.ProjectOperations.CurrentRunOperation.IsCompleted) {
+				if (!MessageService.Confirm (GettextCatalog.GetString ("An application is already running. Do you want to stop it?"), AlertButton.Stop))
+					return;
                 StopHandler.StopBuildOperations ();
                 IdeApp.ProjectOperations.CurrentRunOperation.WaitForCompleted ();
             }

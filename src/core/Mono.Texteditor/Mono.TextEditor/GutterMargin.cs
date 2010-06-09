@@ -41,7 +41,7 @@ namespace Mono.TextEditor
 		public GutterMargin (TextEditor editor)
 		{
 			this.editor = editor;
-			layout = new Pango.Layout (editor.PangoContext);
+			layout = PangoUtil.CreateLayout (editor, null);
 			base.cursor = new Gdk.Cursor (Gdk.CursorType.RightPtr);
 			this.editor.Document.LineChanged += UpdateWidth;
 			this.editor.Document.TextSet += delegate {
@@ -87,13 +87,15 @@ namespace Mono.TextEditor
 			
 			if (args.Button != 1)
 				return;
+			editor.LockedMargin = this;
 			int lineNumber       = args.LineNumber;
 			bool extendSelection = (args.ModifierState & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask;
 			if (lineNumber < editor.Document.LineCount) {
 				DocumentLocation loc = new DocumentLocation (lineNumber, 0);
 				LineSegment line = args.LineSegment;
 				if (args.Type == EventType.TwoButtonPress) {
-					editor.MainSelection = new Selection (loc, new DocumentLocation (lineNumber, line.EditableLength));
+					if (line != null)
+						editor.MainSelection = new Selection (loc, GetLineEndLocation (editor.GetTextEditorData (), lineNumber));
 				} else if (extendSelection) {
 					if (!editor.IsSomethingSelected) {
 						editor.MainSelection = new Selection (loc, loc);
@@ -107,6 +109,30 @@ namespace Mono.TextEditor
 				editor.Caret.Location = loc;
 				editor.Caret.PreserveSelection = false;
 			}
+		}
+		
+		internal protected override void MouseReleased (MarginMouseEventArgs args)
+		{
+			editor.LockedMargin = null;
+			base.MouseReleased (args);
+		}
+		
+		public static DocumentLocation GetLineEndLocation (TextEditorData data, int lineNumber)
+		{
+			LineSegment line = data.Document.GetLine (lineNumber);
+			
+			DocumentLocation result = new DocumentLocation (lineNumber, line.EditableLength);
+			
+			FoldSegment segment = null;
+			foreach (FoldSegment folding in data.Document.GetStartFoldings (line)) {
+				if (folding.IsFolded && folding.Contains (data.Document.LocationToOffset (result))) {
+					segment = folding;
+					break;
+				}
+			}
+			if (segment != null) 
+				result = data.Document.OffsetToLocation (segment.EndLine.Offset + segment.EndColumn); 
+			return result;
 		}
 		
 		internal protected override void MouseHover (MarginMouseEventArgs args)
@@ -162,9 +188,9 @@ namespace Mono.TextEditor
 			lineNumberHighlightGC.RgbFgColor = editor.ColorStyle.LineNumberFgHighlighted;
 		}
 		
-		internal protected override void Draw (Gdk.Drawable win, Gdk.Rectangle area, int line, int x, int y)
+		internal protected override void Draw (Gdk.Drawable win, Gdk.Rectangle area, int line, int x, int y, int lineHeight)
 		{
-			Gdk.Rectangle drawArea = new Rectangle (x, y, Width, editor.LineHeight);
+			Gdk.Rectangle drawArea = new Rectangle (x, y, Width, lineHeight);
 			win.DrawRectangle (lineNumberBgGC, true, drawArea);
 			if (line < editor.Document.LineCount) {
 				layout.SetText ((line + 1).ToString ());

@@ -27,16 +27,15 @@
 //
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using Gtk;
 
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Projects.Dom;
-using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Dom.Output;
-using MonoDevelop.Core.Gui;
+using MonoDevelop.Ide;
+using MonoDevelop.Components;
 
 
 namespace MonoDevelop.DesignerSupport
@@ -82,7 +81,7 @@ namespace MonoDevelop.DesignerSupport
 			outlineTreeStore = new TreeStore (typeof(object));
 			outlineTreeView = new MonoDevelop.Ide.Gui.Components.PadTreeView (outlineTreeStore);
 
-			CellRendererPixbuf pixRenderer = new CellRendererPixbuf ();
+			var pixRenderer = new CellRendererPixbuf ();
 			pixRenderer.Xpad = 0;
 			pixRenderer.Ypad = 0;
 
@@ -119,9 +118,10 @@ namespace MonoDevelop.DesignerSupport
 			};
 
 			this.lastCU = Document.ParsedDocument;
+			
 			outlineTreeView.Realized += delegate { RefillOutlineStore (); };
 
-			ScrolledWindow sw = new ScrolledWindow ();
+			var sw = new CompactScrolledWindow ();
 			sw.Add (outlineTreeView);
 			sw.ShowAll ();
 			return sw;
@@ -129,7 +129,7 @@ namespace MonoDevelop.DesignerSupport
 
 		void OutlineTreeIconFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
-			CellRendererPixbuf pixRenderer = (CellRendererPixbuf)cell;
+			var pixRenderer = (CellRendererPixbuf)cell;
 			object o = model.GetValue (iter, 0);
 			if (o is IMember) {
 				pixRenderer.Pixbuf = ImageService.GetPixbuf (((IMember)o).StockIcon, IconSize.Menu);
@@ -157,10 +157,8 @@ namespace MonoDevelop.DesignerSupport
 		{
 			if (outlineTreeView == null)
 				return;
-
 			ScrolledWindow w = (ScrolledWindow)outlineTreeView.Parent;
-			w.Dispose ();
-			outlineTreeView.Destroy ();
+			w.Destroy ();
 			outlineTreeStore.Dispose ();
 			outlineTreeStore = null;
 			outlineTreeView = null;
@@ -168,17 +166,22 @@ namespace MonoDevelop.DesignerSupport
 
 		void UpdateDocumentOutline (object sender, EventArgs args)
 		{
+			bool refreshNow = lastCU == null;
 			lastCU = Document.ParsedDocument;
-			//limit update rate to 5s
 			if (!refreshingOutline) {
 				refreshingOutline = true;
-				GLib.Timeout.Add (5000, new GLib.TimeoutHandler (RefillOutlineStore));
+				if (refreshNow) {
+					RefillOutlineStore (); 
+				} else {
+					//limit update rate to 1s
+					GLib.Timeout.Add (1000, new GLib.TimeoutHandler (RefillOutlineStore));
+				}
 			}
 		}
 
 		bool RefillOutlineStore ()
 		{
-			MonoDevelop.Core.Gui.DispatchService.AssertGuiThread ();
+			DispatchService.AssertGuiThread ();
 			Gdk.Threads.Enter ();
 			refreshingOutline = false;
 			if (outlineTreeStore == null || !outlineTreeView.IsRealized)

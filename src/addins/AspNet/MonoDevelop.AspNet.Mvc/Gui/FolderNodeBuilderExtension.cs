@@ -27,11 +27,10 @@
 using System;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide.Gui.Pads.ProjectPad;
 using MonoDevelop.AspNet.Mvc.TextTemplating;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.AspNet.Mvc.Gui
 {
@@ -122,6 +121,8 @@ namespace MonoDevelop.AspNet.Mvc.Gui
 				AppDomainSetup info = new AppDomainSetup ();
 				info.ApplicationBase  = System.IO.Path.GetDirectoryName (typeof (MvcTextTemplateHost).Assembly.Location);
 				domain = AppDomain.CreateDomain ("AspMvcGenerationDomain", null, info);
+				domain.AssemblyResolve += new Mono.TextTemplating.CrossAppDomainAssemblyResolver ().Resolve;
+				
 				host = MvcTextTemplateHost.Create (domain);
 				
 				if (dialog.HasMaster) {
@@ -152,7 +153,7 @@ namespace MonoDevelop.AspNet.Mvc.Gui
 			
 			if (System.IO.File.Exists (outputFile)) {
 				project.AddFile (outputFile);
-				MonoDevelop.Ide.Gui.IdeApp.ProjectOperations.Save (project);
+				IdeApp.ProjectOperations.Save (project);
 			}
 		}
 		
@@ -168,8 +169,8 @@ namespace MonoDevelop.AspNet.Mvc.Gui
 			ProjectFolder folder = CurrentNode.GetParentDataItem (typeof(ProjectFolder), true) as ProjectFolder;
 			string path = folder != null? folder.Path : project.BaseDirectory;
 
-			MonoDevelop.Ide.Gui.IdeApp.ProjectOperations.CreateProjectFile (project, path, id);
-			MonoDevelop.Ide.Gui.IdeApp.ProjectOperations.Save (project);
+			IdeApp.ProjectOperations.CreateProjectFile (project, path, id);
+			IdeApp.ProjectOperations.Save (project);
 			
 			ITreeNavigator nav = Tree.GetNodeAtObject (currentItem);
 			if (nav != null)

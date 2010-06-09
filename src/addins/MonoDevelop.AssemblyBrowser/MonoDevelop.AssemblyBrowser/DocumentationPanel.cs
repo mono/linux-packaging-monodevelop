@@ -31,8 +31,6 @@ using MonoDevelop.Core;
 
 namespace MonoDevelop.AssemblyBrowser
 {
-
-
 	[System.ComponentModel.ToolboxItem(true)]
 	public partial class DocumentationPanel : Gtk.DrawingArea
 	{
@@ -48,6 +46,7 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			layout = new Pango.Layout (PangoContext);
 			layout.Wrap = Pango.WrapMode.Word;
+			layout.FontDescription = Pango.FontDescription.FromString (PropertyService.Get<string> ("FontName"));
 		}
 		
 		protected override void OnDestroyed ()

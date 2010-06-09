@@ -27,7 +27,7 @@
 
 
 using System;
-using MonoDevelop.Core.Gui.Dialogs;
+using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Core;
 using Mono.Addins;
 using MonoDevelop.Components.Commands;
@@ -61,7 +61,15 @@ namespace MonoDevelop.Ide.Commands
 		
 		ToggleFolding,
 		ToggleAllFoldings,
-		FoldDefinitions
+		FoldDefinitions,
+		
+		/// <summary>
+		/// The DeleteKey command can be used to easily bind the Delete key to a command handler
+		/// Notice that the EditCommands.Delete command is not bound to the Delete key since it is not always
+		/// convenient to fire the Delete command when pressing Delete (for example, while editing the name of
+		/// a file in the solution pad.
+		/// </summary>
+		DeleteKey
 	}
 	
 	internal class MonodevelopPreferencesHandler: CommandHandler
@@ -77,6 +85,20 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Run ()
 		{
 			IdeApp.Workbench.ShowDefaultPoliciesDialog (null);
+		}
+	}
+	
+	internal class DefaultDeleteKeyHandler: CommandHandler
+	{
+		protected override void Run ()
+		{
+			// Nothing. Will be forwarded to gtk
+		}
+
+		protected override void Update (CommandInfo info)
+		{
+			// Forward to gtk
+			info.Bypass = true;
 		}
 	}
 	
@@ -121,7 +143,7 @@ namespace MonoDevelop.Ide.Commands
 			else if (focus is Gtk.TextView)
 				info.Enabled =  ((Gtk.TextView)focus).Editable;
 			else
-				info.Enabled = false;
+				info.Bypass = true;
 		}
 	}
 	
@@ -147,7 +169,7 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Update (CommandInfo info)
 		{
 			object focus = IdeApp.Workbench.RootWindow.HasToplevelFocus ? IdeApp.Workbench.RootWindow.Focus : null;
-			info.Enabled = (focus is Gtk.Editable || focus is Gtk.TextView); 
+			info.Bypass = !(focus is Gtk.Editable || focus is Gtk.TextView); 
 		}
 	}	
 	
@@ -178,7 +200,7 @@ namespace MonoDevelop.Ide.Commands
 			else if (focus is Gtk.TextView)
 				info.Enabled =  ((Gtk.TextView)focus).Editable;
 			else
-				info.Enabled = false;
+				info.Bypass = true;
 		}
 	}
 	
@@ -207,9 +229,9 @@ namespace MonoDevelop.Ide.Commands
 			if (focus is Gtk.Editable)
 				info.Enabled = ((Gtk.Editable)focus).IsEditable;
 			else if (focus is Gtk.TextView)
-				info.Enabled =  ((Gtk.TextView)focus).Editable;
+				info.Enabled = ((Gtk.TextView)focus).Editable;
 			else
-				info.Enabled = false;
+				info.Bypass = true;
 		}
 	}
 	
@@ -218,8 +240,7 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Run ()
 		{
 			Document doc = IdeApp.Workbench.ActiveDocument;
-			ILanguageBinding lang = LanguageBindingService.GetBindingPerFileName (doc.Name);
-			string header = MonoDevelop.Ide.StandardHeader.StandardHeaderService.GetHeader (doc.Project, lang.Language, doc.Name, false);
+			string header = MonoDevelop.Ide.StandardHeader.StandardHeaderService.GetHeader (doc.Project, doc.Name, false);
 			doc.TextEditor.InsertText (0, header + "\n");
 		}
 		
@@ -227,8 +248,7 @@ namespace MonoDevelop.Ide.Commands
 		{
 			Document doc = IdeApp.Workbench.ActiveDocument;
 			if (doc != null && doc.Name != null && doc.TextEditor != null && doc.TextEditor.HasInputFocus) {
-				ILanguageBinding lang = LanguageBindingService.GetBindingPerFileName (doc.Name);
-				info.Enabled = lang != null;
+				info.Enabled = TextEditor.GetCommentTags (doc.Name) != null;
 			} else
 				info.Enabled = false;
 		}

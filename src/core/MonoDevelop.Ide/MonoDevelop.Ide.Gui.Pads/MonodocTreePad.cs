@@ -32,7 +32,6 @@ using System.Collections;
 using Gtk;
 using Monodoc;
 
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects.Dom.Parser;
@@ -59,7 +58,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			tree_view.Model = store;
 			tree_view.HeadersVisible = false;
 			
-			scroller = new ScrolledWindow ();
+			scroller = new MonoDevelop.Components.CompactScrolledWindow ();
 			scroller.ShadowType = Gtk.ShadowType.None;
 			scroller.Add (tree_view);
 			

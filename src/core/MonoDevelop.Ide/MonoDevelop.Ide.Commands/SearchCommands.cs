@@ -24,13 +24,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Components.Commands;
 
 namespace MonoDevelop.Ide.Commands
@@ -49,6 +45,9 @@ namespace MonoDevelop.Ide.Commands
 		FindBox,
 		ReplaceInFiles,
 		
+		UseSelectionForFind,
+		UseSelectionForReplace,
+		
 		GotoType,
 		GotoFile,
 		GotoLineNumber,
@@ -57,34 +56,5 @@ namespace MonoDevelop.Ide.Commands
 		PrevBookmark,
 		NextBookmark,
 		ClearBookmarks,
-	}
-	
-	class GotoTypeHandler : CommandHandler
-	{
-		protected override void Run ()
-		{
-			if (IdeApp.Workbench.ActiveDocument != null && IdeApp.Workbench.ActiveDocument.TextEditor != null)
-				GoToDialog.Run (false, IdeApp.Workbench.ActiveDocument.TextEditor.SelectedText);
-			else
-				GoToDialog.Run (false);
-		}
-		
-		protected override void Update (CommandInfo info)
-		{
-			info.Enabled = IdeApp.Workspace.IsOpen || IdeApp.Workbench.Documents.Count != 0;
-		}
-	}
-	
-	class GotoFileHandler : CommandHandler
-	{
-		protected override void Run ()
-		{
-			GoToDialog.Run (true);
-		}
-		
-		protected override void Update (CommandInfo info)
-		{
-			info.Enabled = IdeApp.Workspace.IsOpen || IdeApp.Workbench.Documents.Count != 0;
-		}
 	}
 }

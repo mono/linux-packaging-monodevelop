@@ -7,6 +7,7 @@ using System.Threading;
 using System.Runtime.InteropServices;
 using MonoDevelop.Core;
 using MonoDevelop.VersionControl.Subversion.Gui;
+using System.Text;
 
 namespace MonoDevelop.VersionControl.Subversion.Unix
 {
@@ -317,9 +318,14 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			return ver.major + "." + ver.minor + "." + ver.patch;
 		}
 
-		public override IEnumerable<DirectoryEntry> List (FilePath pathorurl, bool recurse, SvnRevision rev)
+		public override IEnumerable<DirectoryEntry> List (FilePath path, bool recurse, SvnRevision rev)
 		{
-			if (pathorurl == FilePath.Null)
+			return ListUrl (path, recurse, rev);
+		}
+		
+		public override IEnumerable<DirectoryEntry> ListUrl (string pathorurl, bool recurse, SvnRevision rev)
+		{
+			if (pathorurl == null)
 				throw new ArgumentNullException ();
 			
 			LibSvnClient.Rev revision = (LibSvnClient.Rev) rev;
@@ -917,9 +923,9 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			while (error != IntPtr.Zero) {
 				LibSvnClient.svn_error_t error_t = (LibSvnClient.svn_error_t) Marshal.PtrToStructure (error, typeof (LibSvnClient.svn_error_t));
 				if (msg != null)
-					msg += "\n" + error_t.message;
+					msg += "\n" + GetErrorMessage (error_t);
 				else
-					msg = error_t.message;
+					msg = GetErrorMessage (error_t);
 				error = error_t.svn_error_t_child;
 			}
 			
@@ -927,6 +933,17 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 				msg = GettextCatalog.GetString ("Unknown error");
 			
 			throw new SubversionException (msg);
+		}
+		
+		string GetErrorMessage (LibSvnClient.svn_error_t error)
+		{
+			if (error.message != null)
+				return error.message;
+			else {
+				byte[] buf = new byte [300];
+				svn.strerror (error.apr_err, buf, buf.Length);
+				return Encoding.UTF8.GetString (buf);
+			}
 		}
 		
 		private VersionInfo CreateNode (LibSvnClient.StatusEnt ent, Repository repo) 
@@ -1140,6 +1157,9 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 				break;
 			case LibSvnClient.NotifyAction.Unlocked: 
 				actiondesc = string.Format (GettextCatalog.GetString ("'{0}' unlocked."), file);
+				break;
+			case LibSvnClient.NotifyAction.BlameRevision:
+				actiondesc = string.Format (GettextCatalog.GetString ("Get annotations {0}"), file);
 				break;
 //			case LibSvnClient.NotifyAction.ChangeListSet: 
 //				actiondesc = string.Format (GettextCatalog.GetString ("Path '{0}' is now a member of changelist '{1}'."), file, Marshal.PtrToStringAuto (data.changelist_name));

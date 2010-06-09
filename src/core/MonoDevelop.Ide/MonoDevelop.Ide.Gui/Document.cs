@@ -39,13 +39,13 @@ using MonoDevelop.Core.Execution;
 using MonoDevelop.Components;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.Text;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Ide.Tasks;
 using Mono.Addins;
+using MonoDevelop.Ide.Extensions;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -69,6 +69,10 @@ namespace MonoDevelop.Ide.Gui
 		internal DateTime LastTimeActive {
 			get;
 			set;
+		}
+		
+		public TextEditorExtension EditorExtension {
+			get { return this.editorExtension; }
 		}
  		
 		public object GetContent (Type type)
@@ -137,6 +141,19 @@ namespace MonoDevelop.Ide.Gui
 			get { return Window.ViewContent.Project; }
 		}
 		
+		ProjectDom fileDom;
+		public ProjectDom Dom {
+			get {
+				ProjectDom result = ProjectDomService.GetProjectDom (Project);
+				if (result != null)
+					return result;
+				
+				if (fileDom == null) 
+					fileDom = ProjectDomService.GetFileDom (FileName);
+				return fileDom ?? ProjectDom.Empty;
+			}
+		}
+		
 		public string PathRelativeToProject {
 			get { return Window.ViewContent.PathRelativeToProject; }
 		}
@@ -170,6 +187,21 @@ namespace MonoDevelop.Ide.Gui
 				return textEditor;
 			}
 		}
+		
+		Mono.TextEditor.TextEditorData data = null;
+		public Mono.TextEditor.TextEditorData TextEditorData {
+			get {
+				if (data == null) {
+					Mono.TextEditor.ITextEditorDataProvider view = GetContent <Mono.TextEditor.ITextEditorDataProvider> ();
+					if (view != null) {
+						data = view.GetTextEditorData ();
+						data.Document.Tag = this;
+					}
+				}
+				return data;
+			}
+		}
+		
 		
 		public bool IsViewOnly {
 			get { return Window.ViewContent.IsViewOnly; }
@@ -269,9 +301,8 @@ namespace MonoDevelop.Ide.Gui
 			}
 			// detect preexisting file
 			if(File.Exists(filename)){
-				if(MessageService.Confirm (GettextCatalog.GetString ("File {0} already exists. Overwrite?", filename), AlertButton.OverwriteFile)) {
+				if (!MessageService.Confirm (GettextCatalog.GetString ("File {0} already exists. Overwrite?", filename), AlertButton.OverwriteFile))
 					return;
-				}
 			}
 			
 			// save backup first
@@ -391,6 +422,11 @@ namespace MonoDevelop.Ide.Gui
 					ProjectDomService.Parse (curentParseProject, currentParseFile, DesktopService.GetMimeTypeForUri (currentParseFile));
 				});
 			}
+			if (fileDom != null) {
+				ProjectDomService.RemoveFileDom (FileName);
+				fileDom = null;
+			}
+			
 			Counters.OpenDocuments--;
 		}
 #region document tasks
@@ -467,12 +503,15 @@ namespace MonoDevelop.Ide.Gui
 
 			// If the new document is a text editor, attach the extensions
 			
-			TextEditorExtension[] extensions = (TextEditorExtension[]) AddinManager.GetExtensionObjects ("/MonoDevelop/Ide/TextEditorExtensions", typeof(TextEditorExtension), false);
+			ExtensionNodeList extensions = AddinManager.GetExtensionNodes ("/MonoDevelop/Ide/TextEditorExtensions", typeof(TextEditorExtensionNode));
 			
 			editorExtension = null;
 			TextEditorExtension last = null;
 			
-			foreach (TextEditorExtension ext in extensions) {
+			foreach (TextEditorExtensionNode extNode in extensions) {
+				if (!extNode.Supports (FileName))
+					continue;
+				TextEditorExtension ext = (TextEditorExtension) extNode.CreateInstance ();
 				if (ext.ExtendsEditor (this, editor)) {
 					if (editorExtension == null)
 						editorExtension = ext;

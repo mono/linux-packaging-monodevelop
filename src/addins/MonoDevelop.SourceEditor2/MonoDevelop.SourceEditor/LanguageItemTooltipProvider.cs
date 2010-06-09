@@ -41,19 +41,35 @@ namespace MonoDevelop.SourceEditor
 
 		#region ITooltipProvider implementation 
 		
-		public object GetItem (Mono.TextEditor.TextEditor editor, int offset)
+		public TooltipItem GetItem (Mono.TextEditor.TextEditor editor, int offset)
 		{
 			ExtensibleTextEditor ed = (ExtensibleTextEditor) editor;
 			
-			return ed.GetLanguageItem (offset);
+			ResolveResult resolveResult = ed.GetLanguageItem (offset);
+			if (resolveResult == null)
+				return null;
+			int startOffset = editor.Document.LocationToOffset (resolveResult.ResolvedExpression.Region.Start.Line - 1, 
+			                                                    resolveResult.ResolvedExpression.Region.Start.Column - 1);
+			int endOffset = editor.Document.LocationToOffset (resolveResult.ResolvedExpression.Region.End.Line - 1, 
+			                                                    resolveResult.ResolvedExpression.Region.End.Column - 1);
+			return new TooltipItem (resolveResult, startOffset, endOffset - startOffset);
 		}
 		
-		public Gtk.Window CreateTooltipWindow (Mono.TextEditor.TextEditor editor, Gdk.ModifierType modifierState, object item)
+		ResolveResult lastResult = null;
+		LanguageItemWindow lastWindow = null;
+		
+		public Gtk.Window CreateTooltipWindow (Mono.TextEditor.TextEditor editor, int offset, Gdk.ModifierType modifierState, TooltipItem item)
 		{
 			ExtensibleTextEditor ed = (ExtensibleTextEditor) editor;
 			ParsedDocument doc = ProjectDomService.GetParsedDocument (null, ed.Document.FileName);
 			
-			LanguageItemWindow result = new LanguageItemWindow (ed.ProjectDom, modifierState, AmbienceService.GetAmbience (ed.Document.MimeType), (ResolveResult)item, null, doc != null ? doc.CompilationUnit : null);
+			ResolveResult resolveResult = (ResolveResult)item.Item;
+			if (lastResult != null && lastResult.ResolvedExpression != null && lastWindow.IsRealized && 
+			    resolveResult != null && resolveResult.ResolvedExpression != null &&  lastResult.ResolvedExpression.Expression == resolveResult.ResolvedExpression.Expression)
+				return lastWindow;
+			LanguageItemWindow result = new LanguageItemWindow (ed, modifierState, resolveResult, null, doc != null ? doc.CompilationUnit : null);
+			lastWindow = result;
+			lastResult = resolveResult;
 			if (result.IsEmpty)
 				return null;
 			return result;

@@ -26,24 +26,17 @@
 // THE SOFTWARE.
 
 
-using GLib;
 using Gtk;
-using GtkSharp;
 
 using System;
-using System.Text;
-using System.IO;
-using System.Collections;
-using System.Globalization;
-using System.Runtime.InteropServices;
 
-using Stock = MonoDevelop.Core.Gui.Stock;
+using Stock = MonoDevelop.Ide.Gui.Stock;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components;
-
 using Mono.Debugging.Client;
+using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Ide;
 
 
 namespace MonoDevelop.Debugger
@@ -77,7 +70,7 @@ namespace MonoDevelop.Debugger
 			treeViewState = new TreeViewState (tree, (int)Columns.Object);
 			
 			TreeViewColumn col = new TreeViewColumn ();
-			CellRenderer crp = new CellRendererPixbuf ();
+			CellRenderer crp = new CellRendererIcon ();
 			col.PackStart (crp, false);
 			col.AddAttribute (crp, "stock_id", (int) Columns.Icon);
 			tree.AppendColumn (col);
@@ -135,8 +128,6 @@ namespace MonoDevelop.Debugger
 		
 		void IPadContent.Initialize (IPadWindow window)
 		{
-			window.Title = GettextCatalog.GetString ("Threads List");
-			window.Icon = Stock.OutputIcon;
 		}
 		
 		public void UpdateDisplay ()

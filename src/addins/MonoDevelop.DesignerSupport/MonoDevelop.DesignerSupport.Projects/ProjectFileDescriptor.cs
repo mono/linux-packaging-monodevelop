@@ -30,8 +30,7 @@ using System.ComponentModel;
 
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
-using System.Reflection;
-using System.IO;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.DesignerSupport
 {
@@ -63,8 +62,8 @@ namespace MonoDevelop.DesignerSupport
 		[LocalizedDescription ("Type of the file.")]
 		public string FileType {
 			get {
-				string type = MonoDevelop.Core.Gui.DesktopService.GetMimeTypeForUri (file.Name);
-				return MonoDevelop.Core.Gui.DesktopService.GetMimeTypeDescription (type); 
+				string type = DesktopService.GetMimeTypeForUri (file.Name);
+				return DesktopService.GetMimeTypeDescription (type); 
 			}
 		}
 		
@@ -91,6 +90,22 @@ namespace MonoDevelop.DesignerSupport
 		public FileCopyMode CopyToOutputDirectory {
 			get { return file.CopyToOutputDirectory; }
 			set { file.CopyToOutputDirectory = value; }
+		}
+		
+		[LocalizedCategory ("Build")]
+		[LocalizedDisplayName ("Custom Tool")]
+		[LocalizedDescription ("The ID of a custom code generator.")]
+		public string Generator {
+			get { return file.Generator; }
+			set { file.Generator = value; }
+		}
+		
+		[LocalizedCategory ("Build")]
+		[LocalizedDisplayName ("Custom Tool Namespace")]
+		[LocalizedDescription ("Overrides the namespace in which the custom code generator should generate code.")]
+		public string CustomToolNamespace {
+			get { return file.CustomToolNamespace; }
+			set { file.CustomToolNamespace = value; }
 		}
 		
 		protected override bool IsReadOnly (string propertyName)

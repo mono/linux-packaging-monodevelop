@@ -6,7 +6,7 @@
        url         = "http://md-xed.sourceforge.net"
        description = "XML Editor"
        category    = "IDE extensions"
-       version     = "2.2">
+       version     = "2.4">
 	<Runtime>
 		<Import assembly="MonoDevelop.XmlEditor.dll" />
 		<Import file="schemas/appconfig.xsd" />
@@ -20,14 +20,10 @@
 	</Runtime>
 
 	<Dependencies>
-		<Addin id="Core" version="2.2"/>
-		<Addin id="Core.Gui" version="2.2"/>
-		<Addin id="Projects" version="2.2"/>
-		<Addin id="Projects.Gui" version="2.2"/>
-		<Addin id="Ide" version="2.2"/>
-		<Addin id="Components" version="2.2"/>
-		<Addin id="DesignerSupport" version="2.2"/>
-		<Addin id="SourceEditor2" version="2.2"/>
+		<Addin id="Core" version="2.4"/>
+		<Addin id="Ide" version="2.4"/>
+		<Addin id="DesignerSupport" version="2.4"/>
+		<Addin id="SourceEditor2" version="2.4"/>
 	</Dependencies>
 
 	<!-- Defines the Xml file extension node -->
@@ -108,7 +104,7 @@
 		</ItemSet>
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/Ide/GlobalOptionsDialog/TextEditor/Formatting">
+	<Extension path = "/MonoDevelop/Ide/GlobalOptionsDialog/TextEditor/Behavior">
 		<Section id = "XmlFormattingOptions" insertbefore="Formatting" _label = "XML" fill="true" class = "MonoDevelop.XmlEditor.Gui.XmlEditorOptionsPanel"/>
 	</Extension>
 	<Extension path = "/MonoDevelop/Ide/GlobalOptionsDialog/Other">
@@ -136,6 +132,18 @@
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/TextPrettyPrinters">
-		<Class class="MonoDevelop.XmlEditor.XmlFormatter" />
+		<Class class="MonoDevelop.Xml.Formatting.XmlFormatter" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/ProjectModel/PolicyTypes" >
+		<PolicyType class="MonoDevelop.Xml.Formatting.XmlFormattingPolicy" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/ProjectModel/PolicySets/Mono" >
+		<Policies resource="MonoXmlPolicy.xml" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/ProjectModel/Gui/MimeTypePolicyPanels">
+		<Panel id = "XmlFormatting" _label = "XML Format" mimeType="application/xml" class = "MonoDevelop.Xml.Formatting.XmlFormattingPolicyPanel" />
 	</Extension>
 </Addin>

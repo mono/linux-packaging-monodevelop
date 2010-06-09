@@ -43,16 +43,8 @@ namespace MonoDevelop.AspNet.Parser.Dom
 	{
 		string fileName;
 		List<ParseException> errors = new List<ParseException> ();
-		
-		public RootNode (string fileName, StreamReader textStream)
-			: base (null)
-		{
-			Parse (fileName, textStream);
-			this.fileName = fileName;
-		}
-		
-		public RootNode ()
-			: base (null)
+				
+		public RootNode () : base (null)
 		{
 		}
 		
@@ -90,11 +82,12 @@ namespace MonoDevelop.AspNet.Parser.Dom
 		
 		public void Parse (string fileName, TextReader textStream)
 		{
-			AspParser parser = new AspParser (fileName, textStream);
+			var parser = new AspParser (fileName, textStream);
+			fileName = fileName;
 			
-			parser.Error += new ParseErrorHandler (ParseError);
-			parser.TagParsed += new TagParsedHandler (TagParsed);
-			parser.TextParsed += new TextParsedHandler (TextParsed);
+			parser.Error      += ParseError;
+			parser.TagParsed  += TagParsed;
+			parser.TextParsed += TextParsed;
 			
 			currentNode = this;
 			
@@ -126,7 +119,7 @@ namespace MonoDevelop.AspNet.Parser.Dom
 			case TagType.CodeRenderExpression:
 			case TagType.DataBinding:
 				try {
-					AddtoCurrent (location, new ExpressionNode (location, tagId));
+					AddtoCurrent (location, new ExpressionNode (location, tagId, tagtype == TagType.CodeRenderExpression));
 				} catch (ParseException ex) {
 					errors.Add (ex);
 				}

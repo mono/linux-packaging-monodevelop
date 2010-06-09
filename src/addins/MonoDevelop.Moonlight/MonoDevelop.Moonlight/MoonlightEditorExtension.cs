@@ -31,7 +31,7 @@ using System.Collections.Generic;
 
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Xml.StateEngine; 
 
 namespace MonoDevelop.Moonlight
@@ -43,12 +43,6 @@ namespace MonoDevelop.Moonlight
 		
 		public MoonlightEditorExtension ()
 		{
-		}
-		
-		protected override IEnumerable<string> SupportedExtensions {
-			get {
-				yield return ".xaml";
-			}
 		}
 		
 		#region Code completion
@@ -123,11 +117,7 @@ namespace MonoDevelop.Moonlight
 		
 		ProjectDom GetDb ()
 		{
-			if (this.Document.Project != null)
-				return ProjectDomService.GetProjectDom (this.Document.Project);
-			else
-				//FIXME: add fallback
-				return null;
+			return Document.Dom;
 		}
 		
 		void GetType (IAttributedXObject attributedOb, Action<IType, ProjectDom> action)

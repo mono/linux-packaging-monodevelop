@@ -25,13 +25,13 @@
 // THE SOFTWARE.
 
 using System;
-using System.Linq;
-using System.IO;
-using System.Text;
-using MonoDevelop.Core;
-using System.Net;
-using MonoDevelop.Core.Gui;
 using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Text;
+using System.Linq;
+using MonoDevelop.Core;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Platform.Updater
 {
@@ -171,8 +171,8 @@ namespace MonoDevelop.Platform.Updater
 				query.Append (level.ToString ().ToLower ());
 			}
 			
-			if (Directory.Exists ("/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator3.2.sdk")) {
-				query.Append ("&env=iphsdk3.2");
+			if (Directory.Exists ("/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator4.0.sdk")) {
+				query.Append ("&env=iphsdk4.0");
 			}
 			
 			var request = (HttpWebRequest) WebRequest.Create (query.ToString ());

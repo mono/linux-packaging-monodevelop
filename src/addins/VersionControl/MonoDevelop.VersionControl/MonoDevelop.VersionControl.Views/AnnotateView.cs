@@ -28,19 +28,14 @@
 
 using System;
 using System.Threading;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 
 using Gtk;
-
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.SourceEditor;
-
 using Mono.TextEditor;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -83,7 +78,7 @@ namespace MonoDevelop.VersionControl.Views
 				return false;
 			}
 			
-			MonoDevelop.Ide.Gui.Document doc = MonoDevelop.Ide.Gui.IdeApp.Workbench.OpenDocument (file, true);
+			MonoDevelop.Ide.Gui.Document doc = IdeApp.Workbench.OpenDocument (file, true);
 			SourceEditorView view = doc.ActiveView as SourceEditorView;
 			if (view != null) {
 				if (view.TextEditor.HasMargin (typeof (AnnotationMargin))) { 
@@ -116,7 +111,7 @@ namespace MonoDevelop.VersionControl.Views
 		{
 			if (test){ return (null != repo && repo.CanGetAnnotations (file) && !Show (repo, file, test)); }
 			
-			MonoDevelop.Ide.Gui.Document doc = MonoDevelop.Ide.Gui.IdeApp.Workbench.OpenDocument (file, true);
+			MonoDevelop.Ide.Gui.Document doc = IdeApp.Workbench.OpenDocument (file, true);
 			SourceEditorView view = doc.ActiveView as SourceEditorView;
 			if (view != null && view.TextEditor.HasMargin (typeof (AnnotationMargin))) { 
 				view.TextEditor.GetMargin (typeof (AnnotationMargin)).IsVisible = false;
@@ -134,9 +129,11 @@ namespace MonoDevelop.VersionControl.Views
 	{
 		Repository repo;
 		List<string> annotations;
+		Revision[] history;
 		Pango.Layout layout;
 		Gdk.GC lineNumberBgGC, lineNumberGC, lineNumberHighlightGC, locallyModifiedGC;
 		Mono.TextEditor.TextEditor editor;
+		AnnotationTooltipProvider tooltipProvider;
 		
 		private static readonly string locallyModified = "*****";
 		
@@ -165,9 +162,12 @@ namespace MonoDevelop.VersionControl.Views
 			annotations = new List<string> ();
 			UpdateAnnotations (null, null);
 			
+			tooltipProvider = new AnnotationTooltipProvider (this);
+			
 			editor.Document.TextReplacing += EditorDocumentTextReplacing;
 			editor.Document.LineChanged += EditorDocumentLineChanged;
 			editor.Caret.PositionChanged += EditorCarethandlePositionChanged;
+			editor.TooltipProviders.Add (tooltipProvider);
 
 			doc.Saved += UpdateAnnotations;
 			
@@ -192,10 +192,22 @@ namespace MonoDevelop.VersionControl.Views
 		/// </summary>
 		private void UpdateAnnotations (object sender, EventArgs e)
 		{
+			StatusBarContext ctx = IdeApp.Workbench.StatusBar.CreateContext ();
+			ctx.AutoPulse = true;
+			ctx.ShowMessage (ImageService.GetImage ("md-version-control", IconSize.Menu), "Retrieving history");
+			
 			ThreadPool.QueueUserWorkItem (delegate {
-				annotations = new List<string> (repo.GetAnnotations (editor.Document.FileName));
+				try {
+					annotations = new List<string> (repo.GetAnnotations (editor.Document.FileName));
+					if (null == history)
+						history = repo.GetHistory (editor.Document.FileName, null);
+				} catch (Exception ex) {
+					LoggingService.LogError ("Error retrieving history", ex);
+				}
+				
 				bool redrawAll = (0 == width);
 				DispatchService.GuiDispatch (delegate {
+					ctx.Dispose ();
 					UpdateWidth ();
 					if (redrawAll) {
 						editor.RedrawFromLine (0);
@@ -297,6 +309,7 @@ namespace MonoDevelop.VersionControl.Views
 		{
 			editor.Document.TextReplacing -= EditorDocumentTextReplacing;
 			editor.Document.LineChanged -= EditorDocumentLineChanged;
+			editor.TooltipProviders.Remove (tooltipProvider);
 			layout.Dispose ();
 			lineNumberBgGC.Dispose ();
 			lineNumberGC.Dispose ();
@@ -308,10 +321,10 @@ namespace MonoDevelop.VersionControl.Views
 		/// <summary>
 		/// Render an annotation on each line
 		/// </summary>
-		protected override void Draw (Gdk.Drawable drawable, Gdk.Rectangle area, int line, int x, int y)
+		protected override void Draw (Gdk.Drawable drawable, Gdk.Rectangle area, int line, int x, int y, int lineHeight)
 		{
 			string ann = (line < annotations.Count)? annotations[line]: string.Empty;
-			Gdk.Rectangle drawArea = new Gdk.Rectangle (x, y, Width, editor.LineHeight);
+			Gdk.Rectangle drawArea = new Gdk.Rectangle (x, y, Width, lineHeight);
 			drawable.DrawRectangle (locallyModified.Equals (ann, StringComparison.Ordinal)? locallyModifiedGC: lineNumberBgGC, true, drawArea);
 			
 			if (!locallyModified.Equals (ann, StringComparison.Ordinal) &&
@@ -344,5 +357,70 @@ namespace MonoDevelop.VersionControl.Views
 				annotations.Add (text);
 			}
 		}
+		
+		/// <summary>
+		/// Gets the commit message matching a given annotation index.
+		/// </summary>
+		internal string GetCommitMessage (int index)
+		{
+			string annotation = (index < annotations.Count)? annotations[index]: null;
+			
+			if (null != history && !string.IsNullOrEmpty (annotation))
+			{
+				string[] tokens = annotation.Split (new char[]{' '}, StringSplitOptions.RemoveEmptyEntries);
+				if (1 < tokens.Length) {
+					foreach (Revision rev in history) {
+						if (rev.ToString ().Equals (tokens[0], StringComparison.Ordinal)) {
+							return rev.Message;
+						}
+					}
+				}
+			}
+			
+			return null;
+		}
+	}
+	
+	/// <summary>
+	/// Tooltip provider for annotation margins
+	/// </summary>
+	class AnnotationTooltipProvider: ITooltipProvider
+	{
+		AnnotationMargin margin;
+		
+		public AnnotationTooltipProvider (AnnotationMargin margin)
+		{
+			this.margin = margin;
+		}
+		
+		#region ITooltipProvider implementation
+		
+		public TooltipItem GetItem (Mono.TextEditor.TextEditor editor, int offset)
+		{
+			DocumentLocation location = editor.Document.OffsetToLocation (offset);
+			return (0 >= location.Column)? new TooltipItem (margin.GetCommitMessage (location.Line), editor.Document.GetLine (location.Line)) : null;
+		}
+		
+		
+		public Window CreateTooltipWindow (Mono.TextEditor.TextEditor editor, int offset, Gdk.ModifierType modifierState, TooltipItem item)
+		{
+			return new LanguageItemWindow (editor as ExtensibleTextEditor, modifierState,  null, item.Item as string, null);
+		}
+		
+		
+		public void GetRequiredPosition (Mono.TextEditor.TextEditor editor, Window tipWindow, out int requiredWidth, out double xalign)
+		{
+			LanguageItemWindow win = (LanguageItemWindow) tipWindow;
+			requiredWidth = win.SetMaxWidth (win.Screen.Width);
+			xalign = 0.5;
+		}
+		
+		
+		public bool IsInteractive (Mono.TextEditor.TextEditor editor, Window tipWindow)
+		{
+			return false;
+		}
+		
+		#endregion
 	}
 }

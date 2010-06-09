@@ -25,19 +25,26 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Dom;
-using MonoDevelop.Ide.Gui;
 using System.Collections.Generic;
 using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory;
-using MonoDevelop.Core.Gui;
+ 
 using MonoDevelop.Core;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 {
 	public class IntegrateTemporaryVariableRefactoring : RefactoringOperation
 	{
+		public override string AccelKey {
+			get {
+				var cmdInfo = IdeApp.CommandService.GetCommandInfo (RefactoryCommands.IntegrateTemporaryVariable);
+				if (cmdInfo != null && cmdInfo.AccelKey != null)
+					return cmdInfo.AccelKey.Replace ("dead_circumflex", "^");
+				return null;
+			}
+		}
+		
 		public IntegrateTemporaryVariableRefactoring ()
 		{
 			Name = "Integrate Temporary Variable";
@@ -47,7 +54,6 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 		{
 			return GettextCatalog.GetString ("_Integrate Temporary Variable");
 		}
-		
 		
 		ICSharpCode.NRefactory.Ast.INode GetMemberBodyNode (MonoDevelop.Refactoring.RefactoringOptions options)
 		{
@@ -81,6 +87,8 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 		{
 			ICSharpCode.NRefactory.Ast.INode memberNode = GetMemberBodyNode (options);
 			List<Change> changes = new List<Change> ();
+			if (memberNode == null)
+				return null;
 			try {
 				//				Console.WriteLine ("AcceptVisitor");
 				//				Console.WriteLine ("Start: " + memberNode.StartLocation.ToString () + " - End: " + memberNode.EndLocation.ToString ());

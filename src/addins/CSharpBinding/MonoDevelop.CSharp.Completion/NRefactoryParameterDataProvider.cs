@@ -31,7 +31,7 @@ using System.Xml;
 
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
 using MonoDevelop.Projects.Dom.Parser;
@@ -103,7 +103,7 @@ namespace MonoDevelop.CSharp.Completion
 			if (resolveResult.CallingType != null) {
 				IType resolvedType = resolver.Dom.GetType (resolveResult.ResolvedType);
 				foreach (IReturnType rt in resolveResult.CallingType.BaseTypes) {
-					IType baseType = resolver.Dom.SearchType (new SearchTypeRequest (resolver.Unit, rt, resolver.CallingType));
+					IType baseType = resolver.SearchType (rt);
 					bool includeProtected = DomType.IncludeProtected (resolver.Dom, baseType, resolvedType);
 					
 					if (baseType != null) {
@@ -136,7 +136,11 @@ namespace MonoDevelop.CSharp.Completion
 					} else {
 						this.delegateName = type.Name;
 					}
-					methods.Add (invokeMethod);
+					if (invokeMethod != null) {
+						methods.Add (invokeMethod);
+					} else {
+						// no invoke method -> tried to create an abstract delegate
+					}
 					return;
 				}
 				bool includeProtected = DomType.IncludeProtected (resolver.Dom, type, resolver.CallingType);
@@ -166,6 +170,7 @@ namespace MonoDevelop.CSharp.Completion
 				if (method.Name == "Invoke")
 					return method;
 			}
+			
 			return null;
 		}
 		
@@ -195,17 +200,30 @@ namespace MonoDevelop.CSharp.Completion
 				return -1;
 			if (i == cursor) 
 				return 1; // parameters are 1 based
-			CSharpIndentEngine engine = new CSharpIndentEngine ();
+			IEnumerable<string> types = MonoDevelop.Ide.DesktopService.GetMimeTypeInheritanceChain (CSharpFormatter.MimeType);
+			CSharpIndentEngine engine = new CSharpIndentEngine (MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<CSharpFormattingPolicy> (types));
 			int index = memberStart + 1;
+			int bracket = 0;
 			do {
 				char c = editor.GetCharAt (i - 1);
 				engine.Push (c);
-				if (c == ',' && engine.StackDepth == 1)
-					index++;
+				switch (c) {
+				case '(':
+					if (!engine.IsInsideOrdinaryCommentOrString)
+						bracket++;
+					break;
+				case ')':
+					if (!engine.IsInsideOrdinaryCommentOrString)
+						bracket--;
+					break;
+				case ',':
+					if (!engine.IsInsideOrdinaryCommentOrString && bracket == 1)
+						index++;
+					break;
+				}
 				i++;
-			} while (i <= cursor && engine.StackDepth > 0);
-			
-			return engine.StackDepth != 1 ? -1 : index;
+			} while (i <= cursor && bracket >= 0);
+			return bracket != 1 ? -1 : index;
 		}
 		
 		public string GetMethodMarkup (int overload, string[] parameterMarkup, int currentParameter)
@@ -282,12 +300,15 @@ namespace MonoDevelop.CSharp.Completion
 		
 		public int GetParameterCount (int overload)
 		{
-			return methods[overload].Parameters.Count;
+			if (overload >= OverloadCount)
+				return -1;
+			IMethod method = methods[overload];
+			return method != null && method.Parameters != null ? method.Parameters.Count : 0;
 		}
 		
 		public int OverloadCount {
 			get {
-				return methods.Count;
+				return methods != null ? methods.Count : 0;
 			}
 		}
 

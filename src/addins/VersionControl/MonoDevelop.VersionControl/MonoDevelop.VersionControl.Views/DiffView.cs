@@ -1,22 +1,16 @@
 using System;
-using System.Collections;
 using System.IO;
-
 using Gtk;
 
-using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
-using MonoDevelop.Ide.Gui;
-
-using Algorithm.Diff.Gtk;
+using MonoDevelop.Components.Diff;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl.Views
 {
 	internal class DiffView : BaseView 
 	{
 		object left, right;
-		Algorithm.Diff.Diff diff;
+		Diff diff;
 		HBox box = new HBox(true, 0);
 		DiffWidget widget;
 		ThreadNotify threadnotify;
@@ -43,7 +37,7 @@ namespace MonoDevelop.VersionControl.Views
 						Path.GetFileName (item.Path),
 						item.Repository.GetPathToBaseText (item.Path),
 						item.Path);
-					MonoDevelop.Ide.Gui.IdeApp.Workbench.OpenDocument (d, true);
+					IdeApp.Workbench.OpenDocument (d, true);
 				}
 			}
 			return found;
@@ -56,7 +50,7 @@ namespace MonoDevelop.VersionControl.Views
 			
 		public static void Show(string name, string lefttext, string righttext) {
 			DiffView d = new DiffView(name, split(lefttext), split(righttext));
-			MonoDevelop.Ide.Gui.IdeApp.Workbench.OpenDocument(d, true);
+			IdeApp.Workbench.OpenDocument(d, true);
 		}
 		
 		public DiffView(string name, string left, string right) 
@@ -114,9 +108,9 @@ namespace MonoDevelop.VersionControl.Views
 			
 			try {
 				if (left is string)
-					diff = new Algorithm.Diff.Diff((string)left, (string)right, true, true);
+					diff = new Diff((string)left, (string)right, true, true);
 				else if (left is string[])
-					diff = new Algorithm.Diff.Diff((string[])left, (string[])right, null, null);
+					diff = new Diff((string[])left, (string[])right, null, null);
 			} catch (Exception e) {
 				Console.Error.WriteLine(e.ToString());
 				return;
@@ -150,7 +144,7 @@ namespace MonoDevelop.VersionControl.Views
 			if (!(left is string)) return;
 		
 			using (StreamWriter writer = new StreamWriter(fileName)) {
-				Algorithm.Diff.UnifiedDiff.WriteUnifiedDiff(
+				UnifiedDiff.WriteUnifiedDiff(
 					diff,
 					writer,
 					Path.GetFileName((string)right) + "    (repository)",

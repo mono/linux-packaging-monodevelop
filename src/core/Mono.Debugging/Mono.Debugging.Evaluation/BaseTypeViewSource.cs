@@ -50,17 +50,20 @@ namespace Mono.Debugging.Evaluation
 			BaseTypeViewSource src = new BaseTypeViewSource (ctx, objectSource, type, obj);
 			src.Connect ();
 			string tname = ctx.Adapter.GetDisplayTypeName (ctx, type);
-			return ObjectValue.CreateObject (src, new ObjectPath ("base"), tname, "{" + tname + "}", ObjectValueFlags.Type|ObjectValueFlags.ReadOnly|ObjectValueFlags.NoRefresh, null);
+			ObjectValue val = ObjectValue.CreateObject (src, new ObjectPath ("base"), tname, "{" + tname + "}", ObjectValueFlags.Type|ObjectValueFlags.ReadOnly|ObjectValueFlags.NoRefresh, null);
+			val.ChildSelector = "";
+			return val;
 		}
 		
 		#region IObjectValueSource implementation
-		public ObjectValue[] GetChildren (ObjectPath path, int index, int count)
+		public ObjectValue[] GetChildren (ObjectPath path, int index, int count, EvaluationOptions options)
 		{
-			return ctx.Adapter.GetObjectValueChildren (ctx, objectSource, type, obj, index, count, false);
+			EvaluationContext cctx = ctx.WithOptions (options);
+			return cctx.Adapter.GetObjectValueChildren (cctx, objectSource, type, obj, index, count, false);
 		}
 		
 		
-		public EvaluationResult SetValue (ObjectPath path, string value)
+		public EvaluationResult SetValue (ObjectPath path, string value, EvaluationOptions options)
 		{
 			throw new NotSupportedException();
 		}
@@ -69,6 +72,16 @@ namespace Mono.Debugging.Evaluation
 		public ObjectValue GetValue (ObjectPath path, EvaluationOptions options)
 		{
 			throw new NotSupportedException();
+		}
+		
+		public object GetRawValue (ObjectPath path, EvaluationOptions options)
+		{
+			throw new System.NotImplementedException ();
+		}
+		
+		public void SetRawValue (ObjectPath path, object value, EvaluationOptions options)
+		{
+			throw new System.NotImplementedException ();
 		}
 		
 		#endregion

@@ -179,12 +179,10 @@ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.CBinding.dll
 DEPS = \
 	$(top_builddir)/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
+	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
+	$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor2.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS = \
 	$(GLIB_SHARP_LIBS) \
@@ -222,7 +220,6 @@ FILES = \
 	Gui/GeneralOptionsPanel.cs \
 	Gui/OutputOptionsPanel.cs \
 	Gui/PackageDetails.cs \
-	Gui/SwapSourceHeaderCommand.cs \
 	Navigation/ClassNodeBuilder.cs \
 	Navigation/ClassPadEventArgs.cs \
 	Navigation/EnumerationNodeBuilder.cs \
@@ -311,8 +308,8 @@ RES = \
 	templates/StaticLibraryCppProject.xpt.xml \
 	templates/StaticLibraryCProject.xpt.xml
 
-@ENABLE_C_TRUE@cbindinglibdir = $(MD_ADDIN_DIR)/BackendBindings
-@ENABLE_C_TRUE@cbindinglib_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
+cbindinglibdir = $(MD_ADDIN_DIR)/BackendBindings
+cbindinglib_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
 CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
 EXTRA_DIST = $(FILES) $(RES)
 build_deps = $(addprefix -r:, $(DEPS))
@@ -509,8 +506,7 @@ uninstall-am: uninstall-cbindinglibDATA
 	uninstall-cbindinglibDATA
 
 
-@ENABLE_C_TRUE@all: $(ASSEMBLY) $(ASSEMBLY).mdb
-@ENABLE_C_FALSE@all:
+all: $(ASSEMBLY) $(ASSEMBLY).mdb
 
 $(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS)
 	mkdir -p $(ADDIN_BUILD)

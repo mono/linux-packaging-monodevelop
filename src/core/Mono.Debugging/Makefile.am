@@ -1,10 +1,12 @@
 	
 ASSEMBLY_BUILD_DIR = $(top_builddir)/build/bin
 ASSEMBLY = $(ASSEMBLY_BUILD_DIR)/Mono.Debugging.dll
-  
+
+SIGNING_KEY=$(srcdir)/mono.debugging.snk
+
+DEPS = $(top_builddir)/build/bin/NRefactory.dll
 
 REFS =  \
-	-r:../../../build/bin/NRefactory.dll \
 	-r:System \
 	-r:System.Core \
 	-r:System.Xml
@@ -33,11 +35,14 @@ FILES =  \
 	Mono.Debugging.Client/DebuggerSessionOptions.cs \
 	Mono.Debugging.Client/DebuggerStartInfo.cs \
 	Mono.Debugging.Client/EvaluationOptions.cs \
+	Mono.Debugging.Client/ExceptionInfo.cs \
+	Mono.Debugging.Client/IExpressionEvaluator.cs \
 	Mono.Debugging.Client/ObjectPath.cs \
 	Mono.Debugging.Client/ObjectValue.cs \
 	Mono.Debugging.Client/ObjectValueFlags.cs \
 	Mono.Debugging.Client/ProcessEventArgs.cs \
 	Mono.Debugging.Client/ProcessInfo.cs \
+	Mono.Debugging.Client/RawValue.cs \
 	Mono.Debugging.Client/SourceLocation.cs \
 	Mono.Debugging.Client/StackFrame.cs \
 	Mono.Debugging.Client/TargetEventArgs.cs \
@@ -51,6 +56,7 @@ FILES =  \
 	Mono.Debugging.Evaluation/BaseBacktrace.cs \
 	Mono.Debugging.Evaluation/BaseTypeViewSource.cs \
 	Mono.Debugging.Evaluation/EvaluationContext.cs \
+	Mono.Debugging.Evaluation/ExceptionInfoSource.cs \
 	Mono.Debugging.Evaluation/ExpressionEvaluator.cs \
 	Mono.Debugging.Evaluation/FilteredMembersSource.cs \
 	Mono.Debugging.Evaluation/ICollectionAdaptor.cs \
@@ -63,6 +69,7 @@ FILES =  \
 	Mono.Debugging.Evaluation/ObjectValueAdaptor.cs \
 	Mono.Debugging.Evaluation/RawViewSource.cs \
 	Mono.Debugging.Evaluation/RemoteFrameObject.cs \
+	Mono.Debugging.Evaluation/RemoteRawValue.cs \
 	Mono.Debugging.Evaluation/TimedEvaluator.cs \
 	Mono.Debugging.Evaluation/TimeOutException.cs \
 	Mono.Debugging.Evaluation/TypeValueReference.cs \
@@ -73,9 +80,9 @@ RES =
 
 all: $(ASSEMBLY) $(ASSEMBLY).mdb
 
-$(ASSEMBLY): $(build_sources) $(build_resources)
+$(ASSEMBLY): $(build_sources) $(build_resources) $(SIGNING_KEY) $(DEPS)
 	mkdir -p $(ASSEMBLY_BUILD_DIR)
-	$(CSC) $(CSC_FLAGS) -debug -out:$@ -target:library $(REFS) $(build_resources:%=/resource:%) $(build_sources)
+	$(CSC) $(CSC_FLAGS) -debug -out:$@ /keycontainer:$(SIGNING_KEY) -target:library $(REFS) $(build_deps) $(build_resources:%=/resource:%) $(build_sources)
 
 $(ASSEMBLY).mdb: $(ASSEMBLY)
 
@@ -84,6 +91,6 @@ assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
 
 CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
 
-EXTRA_DIST = $(FILES) $(RES)
+EXTRA_DIST = $(FILES) $(RES) $(SIGNING_KEY)
 
 include $(top_srcdir)/Makefile.include

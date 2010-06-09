@@ -35,12 +35,12 @@ using System.Xml.Schema;
 
 using MonoDevelop.Core;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Projects.Gui;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.XmlEditor.Completion;
 using MonoDevelop.Xml.StateEngine;
 using MonoDevelop.Ide.Tasks;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.XmlEditor
 {
@@ -69,24 +69,17 @@ namespace MonoDevelop.XmlEditor
 			return IsFileNameHandled (doc.Name);
 		}
 		
-		protected override IEnumerable<string> SupportedExtensions {
-			get { throw new System.InvalidOperationException (); }
-		}
- 
-		
 		public override void Initialize ()
 		{
 			base.Initialize ();
-			XmlEditorAddInOptions.PropertyChanged += XmlEditorPropertyChanged;
+			XmlEditorOptions.XmlSchemaAssociationChanged += HandleXmlSchemaAssociationChanged;
 			XmlSchemaManager.UserSchemaAdded += UserSchemaAdded;
 			XmlSchemaManager.UserSchemaRemoved += UserSchemaRemoved;
-			SetInitialValues();
+			SetDefaultSchema (FileExtension);
 			
-			MonoDevelop.SourceEditor.SourceEditorView view = 
-				Document.GetContent<MonoDevelop.SourceEditor.SourceEditorView> ();
+			var view = Document.GetContent<MonoDevelop.SourceEditor.SourceEditorView> ();
 			if (view != null && string.IsNullOrEmpty (view.Document.SyntaxMode.MimeType)) {
-				Mono.TextEditor.Highlighting.SyntaxMode mode = 
-					Mono.TextEditor.Highlighting.SyntaxModeService.GetSyntaxMode (ApplicationXmlMimeType);
+				var mode = Mono.TextEditor.Highlighting.SyntaxModeService.GetSyntaxMode (ApplicationXmlMimeType);
 				if (mode != null)
 					view.Document.SyntaxMode = mode;
 				else
@@ -94,13 +87,19 @@ namespace MonoDevelop.XmlEditor
 					    + ApplicationXmlMimeType + "'.");
 			}
 		}
+
+		void HandleXmlSchemaAssociationChanged (object sender, XmlSchemaAssociationChangedEventArgs e)
+		{
+			if (e.Extension == FileExtension)
+				SetDefaultSchema (FileExtension);
+		}
 		
 		bool disposed;
 		public override void Dispose()
 		{
 			if (!disposed) {
 				disposed = false;
-				XmlEditorAddInOptions.PropertyChanged -= XmlEditorPropertyChanged;
+				XmlEditorOptions.XmlSchemaAssociationChanged -= HandleXmlSchemaAssociationChanged;
 				XmlSchemaManager.UserSchemaAdded -= UserSchemaAdded;
 				XmlSchemaManager.UserSchemaRemoved -= UserSchemaRemoved;
 				base.Dispose ();
@@ -155,7 +154,7 @@ namespace MonoDevelop.XmlEditor
 				if (schema == null)
 					schema = inferredCompletionData;
 				if (schema != null) {
-					ICompletionData[] completionData = schema.GetChildElementCompletionData (path);
+					CompletionData[] completionData = schema.GetChildElementCompletionData (path);
 					if (completionData != null)
 						list.AddRange (completionData);
 				}
@@ -175,7 +174,7 @@ namespace MonoDevelop.XmlEditor
 				if (schema == null)
 					schema = inferredCompletionData;
 				if (schema != null) {
-					ICompletionData[] completionData = schema.GetAttributeCompletionData (path);
+					CompletionData[] completionData = schema.GetAttributeCompletionData (path);
 					if (completionData != null)
 						return new CompletionDataList (completionData);
 				}
@@ -189,7 +188,7 @@ namespace MonoDevelop.XmlEditor
 			if (path.Elements.Count > 0) {
 				XmlSchemaCompletionData schema = FindSchema (path);
 				if (schema != null) {
-					ICompletionData[] completionData = schema.GetAttributeValueCompletionData (path, att.Name.FullName);
+					CompletionData[] completionData = schema.GetAttributeValueCompletionData (path, att.Name.FullName);
 					if (completionData != null)
 						return new CompletionDataList (completionData);
 				}
@@ -396,12 +395,18 @@ namespace MonoDevelop.XmlEditor
 		
 		#region Settings handling
 		
-		void SetDefaultSchema (string fileName)
-		{
-			if (fileName == null) {
-				return;
+		string FileExtension {
+			get {
+				var docName = Document.Name;
+				return string.IsNullOrEmpty (docName)? null : System.IO.Path.GetExtension (docName).ToLowerInvariant ();
 			}
-			string extension = System.IO.Path.GetExtension (fileName).ToLower ();
+		}
+		
+		void SetDefaultSchema (string extension)
+		{
+			if (extension == null)
+				return;
+			
 			defaultSchemaCompletionData = XmlSchemaManager.GetSchemaCompletionData (extension);
 			if (defaultSchemaCompletionData != null)
 				inferredCompletionData = null;
@@ -413,40 +418,13 @@ namespace MonoDevelop.XmlEditor
 		/// Updates the default schema association since the schema may have been added.
 		void UserSchemaAdded (object source, EventArgs e)
 		{	
-			SetDefaultSchema (Document.Name);
+			SetDefaultSchema (FileExtension);
 		}
 		
 		// Updates the default schema association since the schema may have been removed.
 		void UserSchemaRemoved (object source, EventArgs e)
 		{
-			SetDefaultSchema (Document.Name);
-		}
-		
-		void XmlEditorPropertyChanged (object sender, PropertyChangedEventArgs args)
- 		{
-			switch (args.Key) {
-			case "AutoCompleteElements":
-				AutoCompleteClosingTags = XmlEditorAddInOptions.AutoCompleteElements;
-				break;
-			case "ShowSchemaAnnotation":
-//				showSchemaAnnotation = XmlEditorAddInOptions.ShowSchemaAnnotation;
-				break;
-			default:
-				string extension = System.IO.Path.GetExtension (Document.Name).ToLower ();
-				if (args.Key == extension) {
-					SetDefaultSchema (Document.Name);
-				} else {
-					LoggingService.LogError ("Unhandled property change in XmlTextEditorExtension: " + args.Key);
-				}
-				break;
-			}
-		}
-		
-		void SetInitialValues()
-		{
-//			showSchemaAnnotation = XmlEditorAddInOptions.ShowSchemaAnnotation;
-			AutoCompleteClosingTags = XmlEditorAddInOptions.AutoCompleteElements;
-			SetDefaultSchema (Document.Name);
+			SetDefaultSchema (FileExtension);
 		}
 		
 		#endregion
@@ -485,7 +463,7 @@ namespace MonoDevelop.XmlEditor
 			
 			if (System.IO.Path.IsPathRooted (fileName)) {
 				string vfsname = fileName.Replace ("%", "%25").Replace ("#", "%23").Replace ("?", "%3F");
-				string mimeType = MonoDevelop.Core.Gui.DesktopService.GetMimeTypeForUri (vfsname);
+				string mimeType = DesktopService.GetMimeTypeForUri (vfsname);
 				if (IsMimeTypeHandled (mimeType))
 					return true;
 			}
@@ -630,7 +608,7 @@ namespace MonoDevelop.XmlEditor
 					try {
 						string schema = XmlEditorService.CreateSchema (xml);
 						string fileName = XmlEditorService.GenerateFileName (FileName, "{0}.xsd");
-						MonoDevelop.Ide.Gui.IdeApp.Workbench.NewDocument (fileName, "application/xml", schema);
+						IdeApp.Workbench.NewDocument (fileName, "application/xml", schema);
 						monitor.ReportSuccess (GettextCatalog.GetString ("Schema created."));
 					} catch (Exception ex) {
 						string msg = GettextCatalog.GetString ("Error creating XML schema.");
@@ -639,7 +617,7 @@ namespace MonoDevelop.XmlEditor
 					}
 				}
 			} catch (Exception ex) {
-				MonoDevelop.Core.Gui.MessageService.ShowError(ex.Message);
+				MessageService.ShowError(ex.Message);
 			}
 		}
 		
@@ -648,10 +626,10 @@ namespace MonoDevelop.XmlEditor
 		{
 			if (!string.IsNullOrEmpty (stylesheetFileName)) {
 				try {
-					MonoDevelop.Ide.Gui.IdeApp.Workbench.OpenDocument (stylesheetFileName);
+					IdeApp.Workbench.OpenDocument (stylesheetFileName);
 				} catch (Exception ex) {
 					MonoDevelop.Core.LoggingService.LogError ("Could not open document.", ex);
-					MonoDevelop.Core.Gui.MessageService.ShowException (ex, "Could not open document.");
+					MessageService.ShowException (ex, "Could not open document.");
 				}
 			}
 		}
@@ -673,14 +651,14 @@ namespace MonoDevelop.XmlEditor
 				// Open schema if resolved
 				if (schemaObject != null && schemaObject.SourceUri != null && schemaObject.SourceUri.Length > 0) {
 					string schemaFileName = schemaObject.SourceUri.Replace ("file:/", String.Empty);
-					MonoDevelop.Ide.Gui.IdeApp.Workbench.OpenDocument (
+					IdeApp.Workbench.OpenDocument (
 					    schemaFileName,
 					    Math.Max (1, schemaObject.LineNumber),
 					    Math.Max (1, schemaObject.LinePosition), true);
 				}
 			} catch (Exception ex) {
 				MonoDevelop.Core.LoggingService.LogError ("Could not open document.", ex);
-				MonoDevelop.Core.Gui.MessageService.ShowException (ex, "Could not open document.");
+				MessageService.ShowException (ex, "Could not open document.");
 			}
 		}
 		
@@ -738,7 +716,7 @@ namespace MonoDevelop.XmlEditor
 					monitor.BeginTask (GettextCatalog.GetString ("Executing transform..."), 1);
 					using (XmlTextWriter output = XmlEditorService.CreateXmlTextWriter()) {
 						xslt.Transform (doc, null, output);
-						MonoDevelop.Ide.Gui.IdeApp.Workbench.NewDocument (
+						IdeApp.Workbench.NewDocument (
 						    newFileName, "application/xml", output.ToString ());
 					}
 					monitor.ReportSuccess (GettextCatalog.GetString ("Transform completed."));

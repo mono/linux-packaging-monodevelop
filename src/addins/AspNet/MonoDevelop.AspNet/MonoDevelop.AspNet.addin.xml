@@ -6,7 +6,7 @@
        url         = "http://www.monodevelop.com/"
        description = "Support for ASP.NET projects, including editing, compiling, previewing and deploying to remote servers."
        category    = "Web Development"
-       version     = "2.2">
+       version     = "2.4">
 	
 	<Runtime>
 		<Import file="Schemas/xhtml1-strict.xsd" />
@@ -15,15 +15,12 @@
 	</Runtime>
 	
 	<Dependencies>
-		<Addin id="Core" version="2.2"/>
-		<Addin id="Core.Gui" version="2.2"/>
-		<Addin id="Projects" version="2.2"/>
-		<Addin id="Projects.Gui" version="2.2"/>
-		<Addin id="Ide" version="2.2"/>
-		<Addin id="DesignerSupport" version="2.2"/>
-		<Addin id="Deployment" version="2.2"/>
-		<Addin id="XmlEditor" version="2.2" />
-		<Addin id="SourceEditor2" version="2.2"/>
+		<Addin id="Core" version="2.4"/>
+		<Addin id="Ide" version="2.4"/>
+		<Addin id="DesignerSupport" version="2.4"/>
+		<Addin id="Deployment" version="2.4"/>
+		<Addin id="XmlEditor" version="2.4" />
+		<Addin id="SourceEditor2" version="2.4"/>
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/MSBuildItemTypes">
@@ -35,6 +32,10 @@
 	
 	<ExtensionPoint path = "/MonoDevelop/Html/DocTypes">
 		<ExtensionNode name = "DocType" type = "MonoDevelop.Html.DocTypeExtensionNode" />
+	</ExtensionPoint>
+	
+	<ExtensionPoint path = "/MonoDevelop/Asp/CompletionBuilders">
+		<ExtensionNode name="Class" />
 	</ExtensionPoint>
 
 	<Extension path = "/MonoDevelop/Ide/FileTemplates">
@@ -148,7 +149,9 @@
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/ProjectServiceExtensions">
-		<Class class = "MonoDevelop.AspNet.VerifyCodeBehindBuildStep" insertafter="MidStep" />
+		<Condition id="ItemType" value="MonoDevelop.AspNet.AspNetAppProject">
+			<Class class = "MonoDevelop.AspNet.VerifyCodeBehindBuildStep" insertafter="MidStep" />
+		</Condition>
 	</Extension>
 
 	<Extension path = "/MonoDevelop/DesignerSupport/ToolboxLoaders">
@@ -227,8 +230,8 @@
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
-		<Class class = "MonoDevelop.AspNet.Gui.AspNetEditorExtension" />
-		<Class class = "MonoDevelop.AspNet.Gui.HtmlEditorExtension" />
+		<Class fileExtensions=".aspx, .ascx, .master" class = "MonoDevelop.AspNet.Gui.AspNetEditorExtension" />
+		<Class fileExtensions=".html, .htm" class = "MonoDevelop.AspNet.Gui.HtmlEditorExtension" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Html/DocTypes">

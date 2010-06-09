@@ -33,7 +33,6 @@ using System;
 using System.Collections;
 using MonoDevelop.Core;
 using Mono.Addins;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Pads;
 using System.ComponentModel;
@@ -89,8 +88,9 @@ namespace MonoDevelop.Ide.Codons
 			} else
 				pad = new SolutionPad ();
 
-			pad.Initialize (builders, options, contextMenuPath);
-//			pad.DefaultPlacement = placement;
+			pad.Initializer = delegate {
+				pad.Initialize (builders, options, contextMenuPath);
+			};
 			pad.Id = Id;
 			return pad;
 		}

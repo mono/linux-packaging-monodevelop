@@ -1,13 +1,9 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
-
 using MonoDevelop.VersionControl.Dialogs;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl 
 {
@@ -95,7 +91,8 @@ namespace MonoDevelop.VersionControl
 		
 		protected override void Run ()
 		{
-			vc.Publish (moduleName, path, files, message, GetProgressMonitor ());
+			vc.Publish (moduleName, path, files, message, Monitor);
+			Monitor.ReportSuccess (GettextCatalog.GetString ("Publish operation completed."));
 			
 			Gtk.Application.Invoke (delegate {
 				VersionControlService.NotifyFileStatusChanged (vc, path, true);

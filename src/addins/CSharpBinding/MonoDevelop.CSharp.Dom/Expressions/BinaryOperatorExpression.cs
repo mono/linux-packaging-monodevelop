@@ -33,10 +33,15 @@ namespace MonoDevelop.CSharp.Dom
 	{
 		public const int LeftExpressionRole = 100;
 		public const int RightExpressionRole = 101;
+		public const int OperatorRole = 102;
 		
 		public BinaryOperatorType BinaryOperatorType {
 			get;
 			set;
+		}
+		
+		public CSharpTokenNode Operator {
+			get { return (CSharpTokenNode)GetChildByRole (OperatorRole); }
 		}
 		
 		public INode Left {

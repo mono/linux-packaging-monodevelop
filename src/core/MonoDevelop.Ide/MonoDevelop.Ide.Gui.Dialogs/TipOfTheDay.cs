@@ -1,12 +1,10 @@
 using System;
-using Mono.GetOptions;
 using Gtk;
 using System.Reflection;
 using System.Xml;
 using MonoDevelop.Core;
 using System.Collections.Generic;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Core.Gui;
 
 namespace MonoDevelop.Ide.Gui.Dialogs
 {

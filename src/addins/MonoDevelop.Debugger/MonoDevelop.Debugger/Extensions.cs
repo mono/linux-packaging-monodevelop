@@ -25,14 +25,12 @@
 //
 //
 
-using System;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Core;
-using MonoDevelop.Projects;
 using Mono.Debugging.Client;
-using MonoDevelop.Core.Gui;
+using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
-using MonoDevelop.Core.Gui.ProgressMonitoring;
+using MonoDevelop.Ide;
+using MonoDevelop.Ide.Gui;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.Debugger
 {
@@ -97,7 +95,7 @@ namespace MonoDevelop.Debugger
 			return opers.CurrentRunOperation;
 		}
 		
-		public static IAsyncOperation AttachToProcess (this ProjectOperations opers, IDebuggerEngine debugger, ProcessInfo proc)
+		public static IAsyncOperation AttachToProcess (this ProjectOperations opers, DebuggerEngine debugger, ProcessInfo proc)
 		{
 			if (opers.CurrentRunOperation != null && !opers.CurrentRunOperation.IsCompleted)
 				return opers.CurrentRunOperation;

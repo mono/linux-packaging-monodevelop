@@ -31,22 +31,46 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class WhileStatement : AbstractCSharpNode
 	{
+		public const int DoKeywordRole = 101;
+		public const int WhileKeywordRole = 102;
+		
 		public WhilePosition WhilePosition {
 			get;
 			set;
 		}
 		
-		public INode EmbeddedStatement {
-			get { return GetChildByRole (Roles.EmbeddedStatement); }
+		public ICSharpNode EmbeddedStatement {
+			get { return (ICSharpNode)GetChildByRole (Roles.EmbeddedStatement); }
 		}
 		
 		public INode Condition {
 			get { return GetChildByRole (Roles.Condition); }
 		}
 		
+		public CSharpTokenNode DoKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (DoKeywordRole); }
+		}
+		
+		public CSharpTokenNode WhileKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (WhileKeywordRole); }
+		}
+		
+		public CSharpTokenNode LPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.LPar); }
+		}
+		
+		public CSharpTokenNode RPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.RPar); }
+		}
+		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)
 		{
 			return visitor.VisitWhileStatement (this, data);
+		}
+		
+		public WhileStatement (WhilePosition whilePosition)
+		{
+			this.WhilePosition = whilePosition;
 		}
 	}
 	

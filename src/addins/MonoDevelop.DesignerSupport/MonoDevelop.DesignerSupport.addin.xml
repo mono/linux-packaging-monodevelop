@@ -7,19 +7,15 @@
        description = "Supporting services and pads for visual design tools."
 	   category    = "MonoDevelop Core"
        flags = "Hidden"
-       version     = "2.2">
+       version     = "2.4">
 	
 	<Runtime>
 		<Import assembly = "MonoDevelop.DesignerSupport.dll"/>
 	</Runtime>
 	
 	<Dependencies>
-	    <Addin id="Core" version="2.2"/>
-	    <Addin id="Core.Gui" version="2.2"/>
-    	<Addin id="Projects" version="2.2"/>
-		<Addin id="Projects.Gui" version="2.2"/>
-		<Addin id="Ide" version="2.2"/>
-		<Addin id="Components" version="2.2"/>
+		<Addin id="Core" version="2.4"/>
+		<Addin id="Ide" version="2.4"/>
 	</Dependencies>
 
 	<!-- Extension points -->
@@ -55,32 +51,48 @@
 		<DataType class = "MonoDevelop.DesignerSupport.Toolbox.ToolboxItemToolboxNode" />
 		<DataType class = "MonoDevelop.DesignerSupport.Toolbox.TextToolboxNode" />
 		<DataType class = "MonoDevelop.DesignerSupport.Toolbox.TypeToolboxNode" />
-		<DataType class = "MonoDevelop.DesignerSupport.Toolbox.ItemToolboxNode" />
+		<DataType class = "MonoDevelop.DesignerSupport.Toolbox.ItemToolboxNode" name = "item" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/Pads">
 		<Pad id = "MonoDevelop.DesignerSupport.ToolboxPad" 
 			class = "MonoDevelop.DesignerSupport.ToolboxPad" 
-			_label="Toolbox" 
+			_label="Toolbox"
 			icon = "md-toolbox-pad"
-			defaultPlacement="right"/>
+			defaultLayout="*"
+			defaultPlacement="Right"
+			defaultStatus="AutoHide"
+			/>
 		<Pad id = "MonoDevelop.DesignerSupport.PropertyPad" 
 			class = "MonoDevelop.DesignerSupport.PropertyPad" 
 			_label="Properties"
 			icon = "md-properties-pad"
-			defaultPlacement="MonoDevelop.DesignerSupport.ToolboxPad/bottom; right" />
+			defaultLayout="*"
+			defaultPlacement="MonoDevelop.DesignerSupport.ToolboxPad/bottom; right"
+			defaultStatus="AutoHide"
+			/>
 		<Pad id = "MonoDevelop.DesignerSupport.DocumentOutlinePad" 
 			class = "MonoDevelop.DesignerSupport.DocumentOutlinePad" 
 			_label="Document Outline"
 			icon="md-pad-document-outline"
+			defaultLayout="*"
 			defaultPlacement="MonoDevelop.DesignerSupport.PropertyPad/center; bottom"
+			defaultStatus="AutoHide"
 			/>
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/Ide/WorkbenchContexts/Edit">
-		<ContextPad id = "MonoDevelop.DesignerSupport.ToolboxPad" />
-		<ContextPad id = "MonoDevelop.DesignerSupport.PropertyPad" />
-		<ContextPad id = "MonoDevelop.DesignerSupport.DocumentOutlinePad" />
+	<Extension path="/MonoDevelop/Ide/WorkbenchLayouts">
+		<Layout id="VisualDesign" _name="Visual Design">
+			<LayoutPad id="MonoDevelop.DesignerSupport.ToolboxPad" status="Dockable" />
+			<LayoutPad id="MonoDevelop.DesignerSupport.PropertyPad" status="Dockable" />
+			<LayoutPad id="MonoDevelop.DesignerSupport.DocumentOutlinePad" status="Dockable" />
+		</Layout>
+	</Extension>
+	
+	<Extension path="/MonoDevelop/Ide/WorkbenchLayouts/Solution">
+		<LayoutPad id="MonoDevelop.DesignerSupport.ToolboxPad" placement="Right" status="AutoHide" />
+		<LayoutPad id="MonoDevelop.DesignerSupport.PropertyPad" placement="Right" status="AutoHide" />
+		<LayoutPad id="MonoDevelop.DesignerSupport.DocumentOutlinePad" placement="Right" status="AutoHide" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Core/StockIcons">
@@ -103,7 +115,15 @@
 		<Command id = "MonoDevelop.DesignerSupport.Commands.SelectItems"
 				defaultHandler = "MonoDevelop.DesignerSupport.SelectItemsCommandHandler"
 				_label = "Add Items..." />
+		<Command id = "MonoDevelop.DesignerSupport.Commands.SwitchBetweenRelatedFiles" 
+		         _label = "Switch between related files "
+		         _description = "Switch between related files, such as CodeBehind, headers, etc."
+		         defaultHandler="MonoDevelop.DesignerSupport.SwitchBetweenRelatedFilesCommand" />
 	</Extension>
+	
+	<Extension path="/MonoDevelop/Ide/ContextMenu/DocumentTab">
+		<CommandItem id = "MonoDevelop.DesignerSupport.Commands.SwitchBetweenRelatedFiles" />
+	</Extension>	
 	
 	<Extension path = "/MonoDevelop/DesignerSupport/ToolboxItemContextMenu">
 		<CommandItem id = "MonoDevelop.DesignerSupport.Commands.SelectItems" />

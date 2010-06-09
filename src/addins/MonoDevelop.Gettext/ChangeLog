@@ -1,3 +1,94 @@
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Gettext.Editor/CatalogEditorView.cs: ViewContent
+	  widgets are now destroyed by the workspace window.
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Gettext.Editor/POEditorWidget.cs: call destroy
+	  instead of dispose.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.Gettext.addin.xml: Bumped MD version.
+
+2010-03-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Gettext.Editor/POEditorWidget.cs: Use the new
+	  status bar model.
+
+	* gtk-gui/objects.xml: Flush.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Commands.cs:
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* gtk-gui/objects.xml:
+	* MonoDevelop.Gettext.csproj:
+	* MonoDevelop.Gettext.addin.xml:
+	* MonoDevelop.Gettext/Catalog.cs:
+	* MonoDevelop.Gettext/TranslationProject.cs:
+	* MonoDevelop.Gettext/GettextFeatureWidget.cs:
+	* MonoDevelop.Gettext.Editor/POEditorWidget.cs:
+	* gtk-gui/MonoDevelop.Gettext.POEditorWidget.cs:
+	* MonoDevelop.Gettext/TranslationProjectOptionsDialog.cs:
+	* MonoDevelop.Gettext.NodeBuilders/TranslationNodeBuilder.cs:
+	* MonoDevelop.Gettext.NodeBuilders/TranslationProjectNodeBuilder.cs:
+	* MonoDevelop.Gettext.NodeBuilders/ProjectFileNodeBuilderExtension.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Gettext.Editor/POEditorWidget.cs: Alexander
+	  Cherniuk <ts33kr@gmail.com>: Make the font inside the editor
+	  to be configurable, rather that being hardcoded.
+
+2010-03-09  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.Gettext.Editor/POEditorWidget.cs:
+	* gtk-gui/MonoDevelop.Gettext.POEditorWidget.cs: Improved
+	  gettext addin gui.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Gettext.Editor/POEditorWidget.cs: Track api
+	  changes.
+
+2010-02-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Gettext.addin.xml:
+	* templates/TranslationProject.xpt.xml:
+	* MonoDevelop.Gettext/TranslationService.cs: Removed useless
+	  startup handler.
+
+2010-02-09  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Gettext.Editor/POEditorWidget.cs: Track API
+	  changes for lazy loading images.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Gettext/GettextFeature.cs: Track api changes.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.Gettext.POEditorWidget.cs:
+	* gtk-gui/MonoDevelop.Gettext.GettextFeatureWidget.cs:
+	* gtk-gui/MonoDevelop.Gettext.Editor.CatalogHeadersWidget.cs:
+	* gtk-gui/MonoDevelop.Gettext.TranslationProjectOptionsDialog.cs:
+	* gtk-gui/MonoDevelop.Gettext.Translator.LanguageChooserDialog.cs:
+	  Flush.
+
+2010-01-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Gettext.Editor/GettextEditorDisplayBinding.cs:
+	  Track DisplayBinding API.
+
 2009-12-01  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* MonoDevelop.Gettext/Translation.cs:

@@ -27,7 +27,7 @@
 using System;
 using System.Text;
 using System.Linq;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
 
@@ -36,10 +36,11 @@ using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.CSharp.Formatting;
 using MonoDevelop.CSharp.Parser;
 using Mono.TextEditor;
+using System.Collections.Generic;
 
 namespace MonoDevelop.CSharp.Completion
 {
-	public class EventCreationCompletionData : CompletionData, IActionCompletionData
+	public class EventCreationCompletionData : CompletionData
 	{
 		string parameterList;
 		IMember callingMember;
@@ -48,9 +49,11 @@ namespace MonoDevelop.CSharp.Completion
 		
 		public EventCreationCompletionData (TextEditorData editor, string varName, IType delegateType, IEvent evt, string parameterList, IMember callingMember, IType declaringType) : base (null)
 		{
-			if (string.IsNullOrEmpty (varName))
-				varName = "handle";
-			this.DisplayText   = "Handle" + Char.ToUpper (varName[0]) + varName.Substring (1) + evt.Name;
+			if (string.IsNullOrEmpty (varName)) {
+				this.DisplayText   = "Handle" + evt.Name;
+			} else {
+				this.DisplayText   = "Handle" + Char.ToUpper (varName[0]) + varName.Substring (1) + evt.Name;
+			}
 			
 			if (declaringType.SearchMember (this.DisplayText, true).Count > 0) {
 				for (int i = 1; i < 10000; i++) {
@@ -67,13 +70,13 @@ namespace MonoDevelop.CSharp.Completion
 			this.initialOffset = editor.Caret.Offset;
 		}
 		
-		public void InsertCompletionText (ICompletionWidget widget, CodeCompletionContext context)
+		public override void InsertCompletionText (CompletionListWindow window)
 		{
 			// insert add/remove event handler code after +=/-=
 			editor.Replace (initialOffset, editor.Caret.Offset - initialOffset, this.DisplayText + ";");
 			
 			// Search opening bracket of member
-			int pos = editor.Document.LocationToOffset (callingMember.BodyRegion.Start.Line - 1, callingMember.BodyRegion.Start.Column - 1);
+			int pos = callingMember != null ? editor.Document.LocationToOffset (callingMember.BodyRegion.Start.Line - 1, callingMember.BodyRegion.Start.Column - 1) : initialOffset;
 			while (pos < editor.Document.Length && editor.Document.GetCharAt (pos) != '{') {
 				pos++;
 			}
@@ -92,7 +95,9 @@ namespace MonoDevelop.CSharp.Completion
 			sb.Append (indent);
 			if (callingMember.IsStatic)
 				sb.Append ("static ");
-			sb.Append ("void ");sb.Append (this.DisplayText);sb.Append (' ');sb.Append (this.parameterList);sb.AppendLine ();
+			sb.Append ("void ");
+			int pos2 = sb.Length;
+			sb.Append (this.DisplayText);sb.Append (' ');sb.Append (this.parameterList);sb.AppendLine ();
 			sb.Append (indent);sb.Append ("{");sb.AppendLine ();
 			sb.Append (indent);sb.Append (TextEditorProperties.IndentString);
 			int cursorPos = pos + sb.Length;
@@ -100,7 +105,24 @@ namespace MonoDevelop.CSharp.Completion
 			sb.Append (indent);sb.Append ("}");
 			editor.Insert (pos, sb.ToString ());
 			editor.Caret.Offset = cursorPos;
+			
+			// start text link mode after insert
+			List<TextLink> links = new List<TextLink> ();
+			TextLink link = new TextLink ("name");
+			
+			link.AddLink (new Segment (0, this.DisplayText.Length));
+			link.AddLink (new Segment (pos + pos2 - initialOffset, this.DisplayText.Length));
+			links.Add (link);
+			
+			CompletionTextLinkMode tle = new CompletionTextLinkMode (editor.Parent, initialOffset, links);
+			tle.TriggerCodeCompletion = false;
+			tle.SetCaretPosition = true;
+			tle.SelectPrimaryLink = true;
+			tle.OldMode = editor.CurrentMode;
+			tle.StartMode ();
+			editor.CurrentMode = tle;
 		}
-		
 	}
+	
+
 }

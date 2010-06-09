@@ -29,14 +29,47 @@ using System;
 namespace MonoDevelop.CSharp.Dom
 {
 	public enum OperatorType {
-		Unary,
-		Binary,
+		// Unary operators
+		LogicalNot,
+		OnesComplement,
+		Increment,
+		Decrement,
+		True,
+		False,
+
+		// Unary and Binary operators
+		Addition,
+		Subtraction,
+
+		UnaryPlus,
+		UnaryNegation,
+		
+		// Binary operators
+		Multiply,
+		Division,
+		Modulus,
+		BitwiseAnd,
+		BitwiseOr,
+		ExclusiveOr,
+		LeftShift,
+		RightShift,
+		Equality,
+		Inequality,
+		GreaterThan,
+		LessThan,
+		GreaterThanOrEqual,
+		LessThanOrEqual,
+
+		// Implicit and Explicit
 		Implicit,
 		Explicit
 	}
 	
 	public class OperatorDeclaration : MethodDeclaration
 	{
+		public const int OperatorKeywordRole = 100;
+		public const int OperatorTypeRole = 101;
+		
 		public OperatorType OperatorType {
 			get;
 			set;
@@ -45,6 +78,14 @@ namespace MonoDevelop.CSharp.Dom
 		public string OverloadOperator {
 			get;
 			set;
+		}
+		
+		public CSharpTokenNode OperatorKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (OperatorKeywordRole); }
+		}
+		
+		public CSharpTokenNode OperatorTypeKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (OperatorTypeRole); }
 		}
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)

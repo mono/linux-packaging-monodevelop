@@ -26,24 +26,19 @@
 
 using GLib;
 using Gtk;
-using GtkSharp;
-
 using System;
-using System.Text;
-using System.IO;
-using System.Collections;
-using System.Globalization;
-using System.Runtime.InteropServices;
 
-using Stock = MonoDevelop.Core.Gui.Stock;
+using Stock = MonoDevelop.Ide.Gui.Stock;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Commands;
 using MonoDevelop.Components;
 using MonoDevelop.Components.Commands;
 using Mono.Debugging.Client;
+using MonoDevelop.Components.Docking;
+using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Debugger
 {
@@ -53,7 +48,7 @@ namespace MonoDevelop.Debugger
 		
 		BreakpointsTreeView tree;
 		Gtk.TreeStore store;
-		VBox control;
+		Widget control;
 		ScrolledWindow sw;
 		CommandEntrySet menuSet;
 		TreeViewState treeState;
@@ -78,14 +73,12 @@ namespace MonoDevelop.Debugger
 			Properties
 		}
 		
-		public BreakpointPad()
+		public void Initialize (IPadWindow window)
 		{
-			control = new VBox ();
-			
 			// Toolbar and menu definitions
 			
-			LocalCommandEntry gotoCmd = new LocalCommandEntry (LocalCommands.GoToFile, GettextCatalog.GetString ("Go to File"));
-			LocalCommandEntry propertiesCmd = new LocalCommandEntry (LocalCommands.Properties, GettextCatalog.GetString ("Properties"), Gtk.Stock.Properties);
+			ActionCommand gotoCmd = new ActionCommand (LocalCommands.GoToFile, GettextCatalog.GetString ("Go to File"));
+			ActionCommand propertiesCmd = new ActionCommand (LocalCommands.Properties, GettextCatalog.GetString ("Properties"), Gtk.Stock.Properties);
 			
 			menuSet = new CommandEntrySet ();
 			menuSet.Add (gotoCmd);
@@ -105,13 +98,6 @@ namespace MonoDevelop.Debugger
 			toolbarSet.AddSeparator ();
 			toolbarSet.Add (propertiesCmd);
 			
-			Gtk.Toolbar toolbar = IdeApp.CommandService.CreateToolbar ("bps", toolbarSet, control);
-			toolbar.IconSize = IconSize.Menu;
-			toolbar.ToolbarStyle = ToolbarStyle.BothHoriz;
-			toolbar.ShowArrow = false;
-			
-			control.PackStart (toolbar, false, false, 0);
-			
 			// The breakpoint list
 			
 			store = new TreeStore (typeof(string), typeof (bool), typeof(string), typeof(object), typeof(string), typeof(string), typeof(string), typeof(string));
@@ -124,7 +110,7 @@ namespace MonoDevelop.Debugger
 			treeState = new TreeViewState (tree, (int) Columns.Breakpoint);
 							
 			TreeViewColumn col = new TreeViewColumn ();
-			CellRenderer crp = new CellRendererPixbuf ();
+			CellRenderer crp = new CellRendererIcon ();
 			col.PackStart (crp, false);
 			col.AddAttribute (crp, "stock_id", (int) Columns.Icon);
 			tree.AppendColumn (col);
@@ -158,10 +144,10 @@ namespace MonoDevelop.Debugger
 			col.Resizable = true;
 			
 			sw = new Gtk.ScrolledWindow ();
-			sw.ShadowType = ShadowType.In;
+			sw.ShadowType = ShadowType.None;
 			sw.Add (tree);
 			
-			control.PackStart (sw, true, true, 0);
+			control = sw;
 			
 			control.ShowAll ();
 			
@@ -183,7 +169,10 @@ namespace MonoDevelop.Debugger
 			DebuggingService.StoppedEvent += OnDebuggerStatusCheck;
 			
 			tree.RowActivated += OnRowActivated;
-			tree.KeyPressEvent += OnKeyPressed;
+			
+			DockItemToolbar toolbar = window.GetToolbar (PositionType.Top);
+			toolbar.Add (toolbarSet, sw);
+			toolbar.ShowAll ();
 		}
 		
 		public void Dispose ()
@@ -240,6 +229,7 @@ namespace MonoDevelop.Debugger
 		}
 		
 		[CommandHandler (EditCommands.Delete)]
+		[CommandHandler (EditCommands.DeleteKey)]
 		protected void OnDeleted ()
 		{
 			TreeIter iter;
@@ -250,6 +240,7 @@ namespace MonoDevelop.Debugger
 		}
 		
 		[CommandUpdateHandler (EditCommands.Delete)]
+		[CommandUpdateHandler (EditCommands.DeleteKey)]
 		[CommandUpdateHandler (LocalCommands.GoToFile)]
 		[CommandUpdateHandler (LocalCommands.Properties)]
 		[CommandUpdateHandler (DebugCommands.EnableDisableBreakpoint)]
@@ -269,12 +260,6 @@ namespace MonoDevelop.Debugger
 				bp.Enabled = !bp.Enabled;
 			}
 			
-		}
-		
-		void IPadContent.Initialize (IPadWindow window)
-		{
-			window.Title = GettextCatalog.GetString ("Breakpoints");
-			window.Icon = Stock.OutputIcon;
 		}
 		
 		public void UpdateDisplay ()
@@ -357,16 +342,6 @@ namespace MonoDevelop.Debugger
 		public void RedrawContent ()
 		{
 			UpdateDisplay ();
-		}
-				
-		[GLib.ConnectBefore]
-		void OnKeyPressed (object o, Gtk.KeyPressEventArgs e)
-		{
-			if (e.Event.Key != Gdk.Key.Delete){
-				return;
-			}
-			OnDeleted();
-			e.RetVal = true;
 		}
 		
 		protected void OnDeleteClicked (object o, EventArgs args)

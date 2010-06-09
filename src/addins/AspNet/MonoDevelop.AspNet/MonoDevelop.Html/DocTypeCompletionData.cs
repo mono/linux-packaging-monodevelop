@@ -28,13 +28,13 @@
 
 using System;
 using MonoDevelop.Core;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 
 namespace MonoDevelop.Html
 {
 	
 	
-	public class DocTypeCompletionData : IActionCompletionData
+	public class DocTypeCompletionData : CompletionData
 	{
 		string name;
 		string text;
@@ -52,37 +52,33 @@ namespace MonoDevelop.Html
 			this.name = name;
 		}
 		
-		public string Icon {
+		public override IconId Icon {
 			get { return "md-literal"; }
 		}
 
-		public string DisplayText {
+		public override string DisplayText {
 			get { return name; }
 		}
 		
-		public string CompletionText {
+		public override string CompletionText {
 			get { return name; }
 		}
 
-		public string Description {
+		public override string Description {
 			get { return description; }
 		}
 		
-		public DisplayFlags DisplayFlags {
-			get { return DisplayFlags.None; }
-		}
-
-		public void InsertCompletionText (ICompletionWidget widget, CodeCompletionContext context)
+		public override void InsertCompletionText (CompletionListWindow window)
 		{
-			MonoDevelop.Ide.Gui.Content.IEditableTextBuffer buf = widget as MonoDevelop.Ide.Gui.Content.IEditableTextBuffer;
+			MonoDevelop.Ide.Gui.Content.IEditableTextBuffer buf = window.CompletionWidget as MonoDevelop.Ide.Gui.Content.IEditableTextBuffer;
 			if (buf != null) {
 				buf.BeginAtomicUndo ();
 				
-				int deleteStartOffset = context.TriggerOffset;
+				int deleteStartOffset = window.CodeCompletionContext.TriggerOffset;
 				if (text.StartsWith (docTypeStart)) {
-					int start = context.TriggerOffset - docTypeStart.Length;
+					int start = window.CodeCompletionContext.TriggerOffset - docTypeStart.Length;
 					if (start >= 0) {
-						string readback = buf.GetText (start, context.TriggerOffset);
+						string readback = buf.GetText (start, window.CodeCompletionContext.TriggerOffset);
 						if (string.Compare (readback, docTypeStart, StringComparison.OrdinalIgnoreCase) == 0)
 							deleteStartOffset -= docTypeStart.Length;
 					}
@@ -92,6 +88,6 @@ namespace MonoDevelop.Html
 				buf.InsertText (buf.CursorPosition, text);
 				buf.EndAtomicUndo ();
 			}
-		}		
+		}
 	}
 }

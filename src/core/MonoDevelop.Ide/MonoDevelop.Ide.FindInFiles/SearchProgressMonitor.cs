@@ -27,31 +27,24 @@
 //
 
 using System;
-using System.Collections;
-using System.CodeDom.Compiler;
-using System.IO;
-using System.Diagnostics;
-
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.ProgressMonitoring;
-using MonoDevelop.Ide.Gui.Pads;
-
-using Gtk;
-using Pango;
+using MonoDevelop.Ide.ProgressMonitoring;
+using MonoDevelop.Ide.Gui;
 
 namespace MonoDevelop.Ide.FindInFiles
 {
-	public class SearchProgressMonitor : BaseProgressMonitor, ISearchProgressMonitor
+	class SearchProgressMonitor : BaseProgressMonitor, ISearchProgressMonitor
 	{
 		SearchResultPad outputPad;
+		IProgressMonitor statusMonitor;
 		event EventHandler stopRequested;
 		
-		public SearchProgressMonitor (SearchResultPad pad, string title)
+		public SearchProgressMonitor (Pad pad)
 		{
-			pad.AsyncOperation = this.AsyncOperation;
-			outputPad = pad;
-			outputPad.BeginProgress (title);
+			outputPad = (SearchResultPad) pad.Content;
+			outputPad.AsyncOperation = this.AsyncOperation;
+			outputPad.BeginProgress (pad.Title);
+			statusMonitor = IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (GettextCatalog.GetString ("Searching..."), Stock.FindIcon, false, true, false, pad);
 		}
 		
 		[FreeDispatch]
@@ -90,6 +83,8 @@ namespace MonoDevelop.Ide.FindInFiles
 		
 		protected override void OnCompleted ()
 		{
+			statusMonitor.Dispose ();
+			
 			if (outputPad == null) throw GetDisposedException ();
 			outputPad.WriteText ("\n");
 			
@@ -118,6 +113,48 @@ namespace MonoDevelop.Ide.FindInFiles
 			base.OnCancelRequested ();
 			if (stopRequested != null)
 				stopRequested (this, null);
+		}
+		
+		public override void ReportError (string message, Exception ex)
+		{
+			base.ReportError (message, ex);
+			statusMonitor.ReportError (message, ex);
+		}
+		
+		public override void ReportSuccess (string message)
+		{
+			base.ReportSuccess (message);
+			statusMonitor.ReportSuccess (message);
+		}
+		
+		public override void ReportWarning (string message)
+		{
+			base.ReportWarning (message);
+			statusMonitor.ReportWarning (message);
+		}
+		
+		public override void Step (int work)
+		{
+			base.Step (work);
+			statusMonitor.Step (work);
+		}
+		
+		public override void BeginStepTask (string name, int totalWork, int stepSize)
+		{
+			base.BeginStepTask (name, totalWork, stepSize);
+			statusMonitor.BeginStepTask (name, totalWork, stepSize);
+		}
+		
+		public override void BeginTask (string name, int totalWork)
+		{
+			base.BeginTask (name, totalWork);
+			statusMonitor.BeginTask (name, totalWork);
+		}
+		
+		public override void EndTask ()
+		{
+			base.EndTask ();
+			statusMonitor.EndTask ();
 		}
 	}
 }

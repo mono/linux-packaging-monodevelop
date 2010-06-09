@@ -81,11 +81,9 @@ namespace MonoDevelop.CSharp
 							monitor.ReportWarning (msg);
 							continue;
 						}
-						string referencedName = pkg.IsCorePackage ? Path.GetFileName (fileName) : fileName;
-						if (!alreadyAddedReference.Contains (referencedName)) {
-							alreadyAddedReference.Add (referencedName);
-							AppendQuoted (sb, "/r:", referencedName);
-						}
+
+						if (alreadyAddedReference.Add (fileName))
+							AppendQuoted (sb, "/r:", fileName);
 						
 						if (pkg.GacRoot != null && !gacRoots.Contains (pkg.GacRoot))
 							gacRoots.Add (pkg.GacRoot);
@@ -95,16 +93,15 @@ namespace MonoDevelop.CSharp
 								if (rpkg == null)
 									continue;
 								foreach (SystemAssembly assembly in rpkg.Assemblies) {
-									if (alreadyAddedReference.Contains (assembly.Location))
-										continue;
-									alreadyAddedReference.Add (assembly.Location);
-									AppendQuoted (sb, "/r:", assembly.Location);
+									if (alreadyAddedReference.Add (assembly.Location))
+										AppendQuoted (sb, "/r:", assembly.Location);
 								}
 							}
 						}
 						break;
 					default:
-						AppendQuoted (sb, "/r:", fileName);
+						if (alreadyAddedReference.Add (fileName))
+							AppendQuoted (sb, "/r:", fileName);
 						break;
 					}
 				}
@@ -243,9 +240,11 @@ namespace MonoDevelop.CSharp
 			
 			if (!string.IsNullOrEmpty (compilerParameters.NoWarnings)) 
 				AppendQuoted (sb, "/nowarn:", compilerParameters.NoWarnings);
-			
-			if (runtime.RuntimeId == "MS.NET")
-				sb.AppendLine ("/fullpaths");
+
+			if (runtime.RuntimeId == "MS.NET") {
+				sb.AppendLine("/fullpaths");
+				sb.AppendLine("/utf8output");
+			}
 
 			string output = "";
 			string error  = "";
@@ -370,6 +369,8 @@ namespace MonoDevelop.CSharp
 			StreamWriter errwr = new StreamWriter (error);
 			
 			ProcessStartInfo pinfo = new ProcessStartInfo (compilerName, compilerArgs);
+			pinfo.StandardErrorEncoding = Encoding.UTF8;
+			pinfo.StandardOutputEncoding = Encoding.UTF8;
 			pinfo.WorkingDirectory = working_dir;
 			
 			if (gacRoots.Count > 0) {

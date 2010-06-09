@@ -26,22 +26,23 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace MonoDevelop.Core.Instrumentation
 {
-	public class Counter
+	[Serializable]
+	public class Counter: MarshalByRefObject
 	{
-		int count;
+		internal int count;
 		int totalCount;
 		string name;
+		bool logMessages;
 		CounterCategory category;
-		List<CounterValue> values = new List<CounterValue> ();
+		protected List<CounterValue> values = new List<CounterValue> ();
 		TimeSpan resolution = TimeSpan.FromMilliseconds (0);
 		DateTime lastValueTime = DateTime.MinValue;
 		CounterDisplayMode displayMode = CounterDisplayMode.Block;
-		
-		[ThreadStaticAttribute]
-		static TimeCounter lastTimer;
+		bool disposed;
 		
 		internal Counter (string name, CounterCategory category)
 		{
@@ -61,6 +62,11 @@ namespace MonoDevelop.Core.Instrumentation
 			get { return resolution; }
 			set { resolution = value; }
 		}
+
+		public bool LogMessages {
+			get { return this.logMessages; }
+			set { this.logMessages = value; }
+		}
 		
 		public int Count {
 			get { return count; }
@@ -73,6 +79,11 @@ namespace MonoDevelop.Core.Instrumentation
 			}
 		}
 		
+		public bool Disposed {
+			get { return disposed; }
+			internal set { disposed = value; }
+		}
+		
 		public int TotalCount {
 			get { return totalCount; }
 		}
@@ -81,7 +92,6 @@ namespace MonoDevelop.Core.Instrumentation
 			get { return this.displayMode; }
 			set { this.displayMode = value; }
 		}
-		
 		
 		public IEnumerable<CounterValue> GetValues ()
 		{
@@ -103,6 +113,23 @@ namespace MonoDevelop.Core.Instrumentation
 				}
 			}
 			res.Reverse ();
+			return res;
+		}
+		
+		public IEnumerable<CounterValue> GetValuesBetween (DateTime startTime, DateTime endTime)
+		{
+			List<CounterValue> res = new List<CounterValue> ();
+			lock (values) {
+				if (values.Count == 0 || startTime > values[values.Count - 1].TimeStamp)
+					return res;
+				for (int n=0; n<values.Count; n++) {
+					CounterValue val = values[n];
+					if (val.TimeStamp > endTime)
+						break;
+					if (val.TimeStamp >= startTime)
+						res.Add (val);
+				}
+			}
 			return res;
 		}
 		
@@ -132,30 +159,54 @@ namespace MonoDevelop.Core.Instrumentation
 			}
 		}
 		
-		void StoreValue ()
+		internal int StoreValue (string message, TimerTraceList traces)
 		{
 			DateTime now = DateTime.Now;
 			if (resolution.Ticks != 0) {
 				if (now - lastValueTime < resolution)
-					return;
+					return -1;
 			}
-			values.Add (new CounterValue (count, totalCount, now));
+			values.Add (new CounterValue (count, totalCount, now, message, traces));
+			return values.Count - 1;
+		}
+		
+		internal void RemoveValue (int index)
+		{
+			lock (values) {
+				values.RemoveAt (index);
+				for (int n=index; n<values.Count; n++) {
+					CounterValue val = values [n];
+					val.UpdateValueIndex (n);
+				}
+			}
 		}
 		
 		public void Inc ()
 		{
-			Inc (1);
+			Inc (1, null);
+		}
+		
+		public void Inc (string message)
+		{
+			Inc (1, message);
 		}
 		
 		public void Inc (int n)
 		{
-			if (!InstrumentationService.Enabled)
-				return;
-			lock (values) {
-				count += n;
-				totalCount += n;
-				StoreValue ();
+			Inc (n, null);
+		}
+		
+		public void Inc (int n, string message)
+		{
+			if (InstrumentationService.Enabled) {
+				lock (values) {
+					count += n;
+					totalCount += n;
+					StoreValue (message, null);
+				}
 			}
+			if (logMessages && message != null)
+				InstrumentationService.LogMessage (message);
 		}
 		
 		public void Dec ()
@@ -163,35 +214,54 @@ namespace MonoDevelop.Core.Instrumentation
 			Dec (1);
 		}
 		
+		public void Dec (string message)
+		{
+			Dec (1, message);
+		}
+		
 		public void Dec (int n)
 		{
-			if (!InstrumentationService.Enabled)
-				return;
-			lock (values) {
-				count -= n;
-				StoreValue ();
+			Dec (n, null);
+		}
+		
+		public void Dec (int n, string message)
+		{
+			if (InstrumentationService.Enabled) {
+				lock (values) {
+					count -= n;
+					StoreValue (message, null);
+				}
 			}
+			if (logMessages && message != null)
+				InstrumentationService.LogMessage (message);
 		}
 		
 		public void SetValue (int value)
 		{
-			if (!InstrumentationService.Enabled)
-				return;
-			lock (values) {
-				count = value;
-				StoreValue ();
+			SetValue (value, null);
+		}
+		
+		public void SetValue (int value, string message)
+		{
+			if (InstrumentationService.Enabled) {
+				lock (values) {
+					count = value;
+					StoreValue (message, null);
+				}
 			}
+			if (logMessages && message != null)
+				InstrumentationService.LogMessage (message);
 		}
 		
 		public static Counter operator ++ (Counter c)
 		{
-			c.Inc ();
+			c.Inc (1, null);
 			return c;
 		}
 		
 		public static Counter operator -- (Counter c)
 		{
-			c.Dec ();
+			c.Dec (1, null);
 			return c;
 		}
 		
@@ -200,29 +270,52 @@ namespace MonoDevelop.Core.Instrumentation
 			return new MemoryProbe (this);
 		}
 		
-		public TimeCounter BeginTiming ()
+		public virtual void Trace (string message)
 		{
-			return lastTimer = new TimeCounter (this);
+			if (InstrumentationService.Enabled) {
+				lock (values) {
+					StoreValue (message, null);
+				}
+			}
+			if (logMessages && message != null)
+				InstrumentationService.LogMessage (message);
 		}
 		
-		public void EndTiming ()
+		public override object InitializeLifetimeService ()
 		{
-			if (lastTimer != null)
-				lastTimer.End ();
+			return null;
 		}
+
 	}
 	
+	[Serializable]
 	public struct CounterValue
 	{
 		int value;
 		int totalCount;
 		DateTime timestamp;
+		string message;
+		TimerTraceList traces;
+		int threadId;
 		
-		public CounterValue (int value, int totalCount, DateTime timestamp)
+		internal CounterValue (int value, int totalCount, DateTime timestamp)
 		{
 			this.value = value;
 			this.timestamp = timestamp;
 			this.totalCount = totalCount;
+			this.message = null;
+			traces = null;
+			threadId = 0;
+		}
+		
+		internal CounterValue (int value, int totalCount, DateTime timestamp, string message, TimerTraceList traces)
+		{
+			this.value = value;
+			this.timestamp = timestamp;
+			this.totalCount = totalCount;
+			this.message = message;
+			this.traces = traces;
+			this.threadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
 		}
 		
 		public DateTime TimeStamp {
@@ -235,6 +328,44 @@ namespace MonoDevelop.Core.Instrumentation
 		
 		public int TotalCount {
 			get { return totalCount; }
+		}
+		
+		public int ThreadId {
+			get { return this.threadId; }
+		}
+		
+		public string Message {
+			get { return message; }
+		}
+		
+		public bool HasTimerTraces {
+			get { return traces != null; }
+		}
+		
+		public TimeSpan Duration {
+			get {
+				if (traces == null)
+					return new TimeSpan (0);
+				else
+					return traces.TotalTime;
+			}
+		}
+		
+		public IEnumerable<TimerTrace> GetTimerTraces ()
+		{
+			if (traces == null)
+				yield break;
+			TimerTrace trace = traces.FirstTrace;
+			while (trace != null) {
+				yield return trace;
+				trace = trace.Next;
+			}
+		}
+		
+		internal void UpdateValueIndex (int newIndex)
+		{
+			if (traces != null)
+				traces.ValueIndex = newIndex;
 		}
 	}
 	

@@ -3,14 +3,11 @@ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.Moonlight.dll
 
 DEPS =  \
 	$(top_builddir)/build/AddIns/MonoDevelop.AspNet/MonoDevelop.AspNet.dll \
+	$(top_builddir)/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
@@ -42,15 +39,15 @@ FILES =  \
 RES =  \
 	gtk-gui/gui.stetic \
 	MonoDevelop.Moonlight.addin.xml \
-	MonoDevelop.Moonlight/framework_SL_2_0.xml \
-	MonoDevelop.Moonlight/framework_SL_3_0.xml \
 	Templates/Moonlight-ApplicationProject.xpt.xml \
 	Templates/Moonlight-ApplicationXaml.xft.xml \
 	Templates/Moonlight-LibraryProject.xpt.xml \
 	Templates/Moonlight-UserControlXaml.xft.xml \
 	Templates/PreviewTemplate.html
 
-DATA_FILES = \
+DATA_FILES =  \
+	Templates/framework_SL_2_0.xml \
+	Templates/framework_SL_3_0.xml \
 	Templates/Silverlight.js
 
 DATA_FILE_BUILD = $(addprefix $(ADDIN_BUILD)/Templates/, $(notdir $(DATA_FILES)))

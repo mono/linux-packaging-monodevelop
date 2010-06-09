@@ -16,7 +16,7 @@ namespace Stetic.Wrapper {
 			TextAndIcon
 		};
 
-		public static new Gtk.ToolButton CreateInstance ()
+		public static Gtk.ToolButton CreateInstance ()
 		{
 			return new Gtk.ToolButton (Gtk.Stock.New);
 		}
@@ -75,7 +75,7 @@ namespace Stetic.Wrapper {
 		internal protected override CodeExpression GenerateObjectCreation (GeneratorContext ctx)
 		{
 			return new CodeObjectCreateExpression (
-				ClassDescriptor.WrappedTypeName, 
+				ClassDescriptor.WrappedTypeName.ToGlobalTypeRef (), 
 				new CodePrimitiveExpression (null), 
 				new CodePrimitiveExpression (null)
 			);

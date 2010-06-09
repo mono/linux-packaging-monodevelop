@@ -178,16 +178,13 @@ top_srcdir = @top_srcdir@
 ADDIN_BUILD = $(top_builddir)/build/AddIns/MonoDevelop.XmlEditor
 ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.XmlEditor.dll
 DEPS = \
+	$(top_builddir)/build/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor2.dll \
 	$(top_builddir)/build/bin/Mono.Debugging.dll \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS = \
 	$(GLADE_SHARP_LIBS) \
@@ -203,11 +200,14 @@ REFS = \
 FILES = \
 	AssemblyInfo.cs \
 	gtk-gui/generated.cs \
+	gtk-gui/MonoDevelop.Xml.Formatting.XmlFormattingPolicyPanelWidget.cs \
 	gtk-gui/MonoDevelop.XmlEditor.Gui.XmlEditorOptionsPanelWidget.cs \
 	gtk-gui/MonoDevelop.XmlEditor.Gui.XmlSchemasPanelWidget.cs \
 	MonoDevelop.Xml.Formatting/XmlFormatter.cs \
 	MonoDevelop.Xml.Formatting/XmlFormatterWriter.cs \
 	MonoDevelop.Xml.Formatting/XmlFormattingPolicy.cs \
+	MonoDevelop.Xml.Formatting/XmlFormattingPolicyPanel.cs \
+	MonoDevelop.Xml.Formatting/XmlFormattingPolicyPanelWidget.cs \
 	MonoDevelop.Xml.StateEngine/Parser.cs \
 	MonoDevelop.Xml.StateEngine/State.cs \
 	MonoDevelop.Xml.StateEngine/XDom.cs \
@@ -244,7 +244,7 @@ FILES = \
 	MonoDevelop.XmlEditor/QualifiedName.cs \
 	MonoDevelop.XmlEditor/QualifiedNameCollection.cs \
 	MonoDevelop.XmlEditor/XmlDocumentParser.cs \
-	MonoDevelop.XmlEditor/XmlEditorAddInOptions.cs \
+	MonoDevelop.XmlEditor/XmlEditorOptions.cs \
 	MonoDevelop.XmlEditor/XmlEditorService.cs \
 	MonoDevelop.XmlEditor/XmlElementPath.cs \
 	MonoDevelop.XmlEditor/XmlFileExtensionNode.cs \
@@ -269,6 +269,7 @@ DATA_FILES = \
 RES = \
 	gtk-gui/gui.stetic \
 	gtk-gui/objects.xml \
+	MonoDevelop.Xml.Formatting/MonoXmlPolicy.xml \
 	MonoDevelop.XmlEditor.addin.xml \
 	XmlEditor.glade
 

@@ -24,24 +24,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.CodeDom;
-using System.Threading;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Projects;
-using MonoDevelop.Projects.Text;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Projects.Dom.Output;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Projects.CodeGeneration;
-using MonoDevelop.Ide.Gui.Dialogs;
-using MonoDevelop.Ide.FindInFiles;
 using MonoDevelop.Refactoring;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Refactoring
 {
@@ -57,9 +47,8 @@ namespace MonoDevelop.Refactoring
 				return;
 			int line, column;
 			editor.GetLineColumnFromPosition (editor.CursorPosition, out line, out column);
-			ProjectDom ctx = doc.Project != null ? ProjectDomService.GetProjectDom (doc.Project) : ProjectDom.Empty;
-			if (ctx == null)
-				return;
+			ProjectDom ctx = doc.Dom;
+			
 			ResolveResult resolveResult;
 			INode item;
 			CurrentRefactoryOperationsHandler.GetItem (ctx, doc, editor, out resolveResult, out item);

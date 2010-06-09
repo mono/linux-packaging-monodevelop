@@ -36,7 +36,7 @@ namespace MonoDevelop.Ide.Gui
 {
 	static class InternalLog
 	{
-		static MonoDevelopStatusBar.StatusIcon errorIcon;
+		static StatusBarIcon errorIcon;
 		static bool errorNotificationEnabled;
 		
 		static InternalLogger logger;
@@ -90,7 +90,7 @@ namespace MonoDevelop.Ide.Gui
 			if (!errorNotificationEnabled)
 				return;
 			ClearErrorIcon ();
-			Gdk.Pixbuf pix = MonoDevelop.Core.Gui.ImageService.GetPixbuf (Gtk.Stock.DialogError, Gtk.IconSize.Menu);
+			Gdk.Pixbuf pix = ImageService.GetPixbuf (Gtk.Stock.DialogError, Gtk.IconSize.Menu);
 			errorIcon = IdeApp.Workbench.StatusBar.ShowStatusIcon (pix);
 			errorIcon.EventBox.ButtonPressEvent += new Gtk.ButtonPressEventHandler (OnShowLogPad);
 			errorIcon.SetAlertMode (5);

@@ -30,6 +30,7 @@ using System;
 
 using Gdk;
 using Gtk;
+using System.Collections.Generic;
 
 namespace Mono.TextEditor
 {
@@ -40,16 +41,31 @@ namespace Mono.TextEditor
 		TextEditor editor;
 		Pango.FontDescription fontDescription;
 		Pango.Layout layout;
+		Pango.Layout informLayout;
 		
-		public CodeSegmentPreviewWindow (TextEditor editor, ISegment segment) : this (editor, segment, DefaultPreviewWindowWidth, DefaultPreviewWindowHeight)
+		public static string CodeSegmentPreviewInformString {
+			get;
+			set;
+		}
+		
+		public bool HideCodeSegmentPreviewInformString {
+			get;
+			private set;
+		}
+		
+		public CodeSegmentPreviewWindow (TextEditor editor, bool hideCodeSegmentPreviewInformString, ISegment segment) : this(editor, hideCodeSegmentPreviewInformString, segment, DefaultPreviewWindowWidth, DefaultPreviewWindowHeight)
 		{
 		}
 		
-		public CodeSegmentPreviewWindow (TextEditor editor, ISegment segment, int width, int height) : base (Gtk.WindowType.Popup)
+		public CodeSegmentPreviewWindow (TextEditor editor, bool hideCodeSegmentPreviewInformString, ISegment segment, int width, int height) : base (Gtk.WindowType.Popup)
 		{
+			this.HideCodeSegmentPreviewInformString = hideCodeSegmentPreviewInformString;
 			this.editor = editor;
 			this.AppPaintable = true;
-			layout = new Pango.Layout (this.PangoContext);
+			layout = PangoUtil.CreateLayout (this);
+			informLayout = PangoUtil.CreateLayout (this);
+			informLayout.SetText (CodeSegmentPreviewInformString);
+			
 			fontDescription = Pango.FontDescription.FromString (editor.Options.FontName);
 			fontDescription.Size = (int)(fontDescription.Size * 0.8f);
 			layout.FontDescription = fontDescription;
@@ -71,39 +87,71 @@ namespace Mono.TextEditor
 			                                                        true) + (pushedLineLimit ? Environment.NewLine + "..." : ""));
 			CalculateSize ();
 		}
-		
+		public int PreviewInformStringHeight {
+			get; private set;
+		}
 		public void CalculateSize ()
 		{
 			int w, h;
 			layout.GetPixelSize (out w, out h);
 			
-			this.SetSizeRequest (System.Math.Max (1, System.Math.Min (w + 3, Screen.Width * 2 / 5)), 
-			                     System.Math.Max (1, System.Math.Min (h + 3, Screen.Height * 2 / 5)));
+			if (!HideCodeSegmentPreviewInformString) {
+				int w2, h2;
+				informLayout.GetPixelSize (out w2, out h2); 
+				PreviewInformStringHeight = h2;
+				w = System.Math.Max (w, w2);
+				h += h2;
+			}
+			Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtWindow (editor.GdkWindow));
+			this.SetSizeRequest (System.Math.Max (1, System.Math.Min (w + 3, geometry.Width * 2 / 5)), 
+			                     System.Math.Max (1, System.Math.Min (h + 3, geometry.Height * 2 / 5)));
 		}
 		
 		protected override void OnDestroyed ()
 		{
 			layout = layout.Kill ();
+			informLayout = informLayout.Kill ();
 			fontDescription = fontDescription.Kill ();
-			gc = gc.Kill ();
+			if (textGC != null) {
+				textGC.Dispose ();
+				textBgGC.Dispose ();
+				foldGC.Dispose ();
+				foldBgGC.Dispose ();
+				textGC = textBgGC = foldGC = foldBgGC = null;
+			}
 			base.OnDestroyed ();
 		}
-
 		
-		Gdk.GC gc = null;
+		protected override bool OnKeyPressEvent (EventKey evnt)
+		{
+			Console.WriteLine (evnt.Key);
+			return base.OnKeyPressEvent (evnt);
+		}
+		
+		Gdk.GC textGC, foldGC, textBgGC, foldBgGC;
+		
 		protected override bool OnExposeEvent (Gdk.EventExpose ev)
 		{
-			if (gc == null) {
-				gc = new Gdk.GC (ev.Window);
+			if (textGC == null) {
+				textGC = editor.ColorStyle.Default.CreateFgGC (ev.Window);
+				textBgGC = editor.ColorStyle.Default.CreateBgGC (ev.Window);
+				foldGC = editor.ColorStyle.FoldLine.CreateFgGC (ev.Window);
+				foldBgGC = editor.ColorStyle.FoldLine.CreateBgGC (ev.Window);
 			}
 			
-			gc.RgbFgColor = editor.ColorStyle.Default.BackgroundColor;
-			ev.Window.DrawRectangle (gc, true, ev.Area);
-			ev.Window.DrawLayout (Style.TextGC (StateType.Normal), 1, 1, layout);
-		
-			ev.Window.DrawRectangle (gc, false, 1, 1, this.Allocation.Width - 3, this.Allocation.Height - 3);
-			gc.RgbFgColor = editor.ColorStyle.FoldLine.Color;
-			ev.Window.DrawRectangle (gc, false, 0, 0, this.Allocation.Width - 1, this.Allocation.Height - 1);
+			ev.Window.DrawRectangle (textBgGC, true, ev.Area);
+			ev.Window.DrawLayout (textGC, 1, 1, layout);
+			ev.Window.DrawRectangle (textBgGC, false, 1, 1, this.Allocation.Width - 3, this.Allocation.Height - 3);
+			ev.Window.DrawRectangle (foldGC, false, 0, 0, this.Allocation.Width - 1, this.Allocation.Height - 1);
+			
+			if (!HideCodeSegmentPreviewInformString) {
+				informLayout.SetText (CodeSegmentPreviewInformString);
+				int w, h;
+				informLayout.GetPixelSize (out w, out h); 
+				PreviewInformStringHeight = h;
+				ev.Window.DrawRectangle (foldBgGC, true, Allocation.Width - w - 3, Allocation.Height - h, w + 2, h - 1);
+				ev.Window.DrawLayout (foldGC, Allocation.Width - w - 3, Allocation.Height - h, informLayout);
+			}
 			return true;
 		}
 	}

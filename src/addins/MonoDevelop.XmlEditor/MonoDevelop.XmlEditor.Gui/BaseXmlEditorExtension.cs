@@ -28,7 +28,6 @@
 
 
 using System;
-using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -36,9 +35,10 @@ using MonoDevelop.Core;
 using MonoDevelop.DesignerSupport;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Xml.StateEngine;
 using MonoDevelop.XmlEditor.Completion;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.XmlEditor.Gui
 {
@@ -61,28 +61,17 @@ namespace MonoDevelop.XmlEditor.Gui
 			return new XmlFreeState ();
 		}
 		
-		protected abstract IEnumerable<string> SupportedExtensions { get; }
-
 		public override void Initialize ()
 		{
 			base.Initialize ();
 			Parser parser = new Parser (CreateRootState (), false);
-			tracker = new DocumentStateTracker<Parser> (parser, Editor);
+			tracker = new DocumentStateTracker<Parser> (parser, TextEditorData);
 			MonoDevelop.Projects.Dom.Parser.ProjectDomService.ParsedDocumentUpdated += OnParseInformationChanged;
 			
-			lastCU = Document.ParsedDocument;
-			if (lastCU != null) {
-				RefreshOutline ();
+			if (Document.ParsedDocument != null) {
+				lastCU = Document.ParsedDocument;
+				OnParsedDocumentUpdated ();
 			}
-		}
-
-		public override bool ExtendsEditor (MonoDevelop.Ide.Gui.Document doc, IEditableTextBuffer editor)
-		{
-			string title = doc.Name;
-			foreach (string ext in SupportedExtensions )
-				if (title.EndsWith (ext))
-					return true;
-			return false;
 		}
 
 		public override void Dispose ()
@@ -99,32 +88,31 @@ namespace MonoDevelop.XmlEditor.Gui
 		{
 			if (this.FileName == args.FileName && args.ParsedDocument != null) {
 				lastCU = args.ParsedDocument;
-				RefreshOutline ();
-				
-				//use the doctype to select a completion schema
-				XmlParsedDocument doc = CU as XmlParsedDocument;
-				bool found = false;
-				if (doc != null && doc.XDocument != null) {
-					foreach (XNode node in doc.XDocument.Nodes) {
-						if (node is XDocType) {
-							DocType = (XDocType)node;
-							found = true;
-							break;
-						}
-						//cannot validly have a doctype after these nodes
-						if (node is XElement || node is XCData)
-							break;
-					}
-					if (!found)
-						DocType = null;
-				}
-				
 				OnParsedDocumentUpdated ();
 			}
 		}
 		
 		protected virtual void OnParsedDocumentUpdated ()
 		{
+			RefreshOutline ();
+			
+			//use the doctype to select a completion schema
+			var doc = CU as XmlParsedDocument;
+			bool found = false;
+			if (doc != null && doc.XDocument != null) {
+				foreach (XNode node in doc.XDocument.Nodes) {
+					if (node is XDocType) {
+						DocType = (XDocType)node;
+						found = true;
+						break;
+					}
+					//cannot validly have a doctype after these nodes
+					if (node is XElement || node is XCData)
+						break;
+				}
+				if (!found)
+					DocType = null;
+			}
 		}
 
 		#endregion
@@ -182,8 +170,6 @@ namespace MonoDevelop.XmlEditor.Gui
 		{
 		}
 		
-		protected bool AutoCompleteClosingTags { get; set; }
-
 		#region Code completion
 
 		public override ICompletionDataList CodeCompletionCommand (CodeCompletionContext completionContext)
@@ -231,7 +217,7 @@ namespace MonoDevelop.XmlEditor.Gui
 				XElement el = tracker.Engine.Nodes.Peek () as XElement;
 				if (el != null && el.Region.End >= currentLocation && !el.IsClosed && el.IsNamed) {
 					string tag = String.Concat ("</", el.Name.FullName, ">");
-					if (AutoCompleteClosingTags) {
+					if (XmlEditorOptions.AutoCompleteElements) {
 						buf.BeginAtomicUndo ();
 						buf.InsertText (buf.CursorPosition, tag);
 						buf.CursorPosition -= tag.Length;
@@ -245,8 +231,10 @@ namespace MonoDevelop.XmlEditor.Gui
 				}
 				return null;
 			}
+			
 			// Auto insert '>' when '/' is typed inside tag state (for quick tag closing)
-			if (tracker.Engine.CurrentState is XmlTagState && currentChar == '/') {
+			//FIXME: avoid doing this when the next non-whitespace char is ">" or ignore the next ">" typed
+			if (XmlEditorOptions.AutoInsertFragments && tracker.Engine.CurrentState is XmlTagState && currentChar == '/') {
 				buf.BeginAtomicUndo ();
 				buf.InsertText (buf.CursorPosition, ">");
 				buf.EndAtomicUndo ();
@@ -267,7 +255,7 @@ namespace MonoDevelop.XmlEditor.Gui
 			{
 				CompletionDataList list = new CompletionDataList ();
 				
-				//todo: need to tweak semicolon insertion
+				//TODO: need to tweak semicolon insertion
 				list.Add ("apos").Description = "'";
 				list.Add ("quot").Description = "\"";
 				list.Add ("lt").Description = "<";
@@ -706,7 +694,7 @@ namespace MonoDevelop.XmlEditor.Gui
 			
 			refillOutlineStore ();
 			
-			Gtk.ScrolledWindow sw = new Gtk.ScrolledWindow ();
+			var sw = new MonoDevelop.Components.CompactScrolledWindow ();
 			sw.Add (outlineTreeView);
 			sw.ShowAll ();
 			return sw;
@@ -749,7 +737,7 @@ namespace MonoDevelop.XmlEditor.Gui
 		
 		void refillOutlineStore ()
 		{
-			MonoDevelop.Core.Gui.DispatchService.AssertGuiThread ();
+			DispatchService.AssertGuiThread ();
 			Gdk.Threads.Enter ();
 			refreshingOutline = false;
 			if (outlineTreeStore == null || !outlineTreeView.IsRealized)

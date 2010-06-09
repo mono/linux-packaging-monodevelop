@@ -25,16 +25,14 @@
 // THE SOFTWARE.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Collections.Generic;
 using ICSharpCode.NRefactory.Ast;
 using MonoDevelop.Core;
 using Mono.TextEditor;
-using Mono.TextEditor.Highlighting;
-using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.CodeGeneration;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Refactoring.ConvertPropery
 {
@@ -95,6 +93,8 @@ namespace MonoDevelop.Refactoring.ConvertPropery
 						InsertedText = property.Name
 					});
 				}
+				
+				result.RemoveAll (c => backinStoreStart <= ((TextReplaceChange)c).Offset  && ((TextReplaceChange)c).Offset <= backinStoreEnd);
 				result.Add (new TextReplaceChange () {
 					FileName = options.Document.FileName,
 					Offset = backinStoreStart,
@@ -107,6 +107,8 @@ namespace MonoDevelop.Refactoring.ConvertPropery
 				int endOffset = data.Document.LocationToOffset (property.GetRegion.End.ToDocumentLocation (data.Document));
 				
 				string text = astProvider.OutputNode (options.Dom, new PropertyGetRegion (null, null), options.GetIndent (property) + "\t").Trim ();
+				
+				result.RemoveAll (c => startOffset <= ((TextReplaceChange)c).Offset  && ((TextReplaceChange)c).Offset <= endOffset);
 				result.Add (new TextReplaceChange () {
 					FileName = options.Document.FileName,
 					Offset = startOffset,
@@ -128,7 +130,7 @@ namespace MonoDevelop.Refactoring.ConvertPropery
 				setRegion.Modifier = ICSharpCode.NRefactory.Ast.Modifiers.Private;
 				setText = Environment.NewLine + astProvider.OutputNode (options.Dom, setRegion, options.GetIndent (property) + "\t").TrimEnd ();
 			}
-			
+			result.RemoveAll (c => setStartOffset <= ((TextReplaceChange)c).Offset  && ((TextReplaceChange)c).Offset <= setEndOffset);
 			result.Add (new TextReplaceChange () {
 				FileName = options.Document.FileName,
 				Offset = setStartOffset,
@@ -151,8 +153,8 @@ namespace MonoDevelop.Refactoring.ConvertPropery
 			foreach (IMember member in members) {
 				if (member.MemberType == MemberType.Field) {
 					DocumentLocation location = member.Location.ToDocumentLocation (data.Document);
-					backinStoreStart = data.Document.LocationToOffset (location);
 					LineSegment line = data.Document.GetLine (location.Line);
+					backinStoreStart = line.Offset;
 					backinStoreEnd = line.Offset + line.EditableLength;
 					backingStore = member;
 					break;

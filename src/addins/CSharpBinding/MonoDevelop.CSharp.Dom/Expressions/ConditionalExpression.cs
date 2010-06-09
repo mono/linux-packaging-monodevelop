@@ -34,8 +34,8 @@ namespace MonoDevelop.CSharp.Dom
 	/// </summary>
 	public class ConditionalExpression : AbstractCSharpNode
 	{
-		const int TrueExpressionRole = 100;
-		const int FalseExpressionRole = 101;
+		public const int TrueExpressionRole = 100;
+		public const int FalseExpressionRole = 101;
 		
 		public INode TrueExpression {
 			get { return GetChildByRole (TrueExpressionRole); }
@@ -47,6 +47,14 @@ namespace MonoDevelop.CSharp.Dom
 
 		public INode Condition {
 			get { return GetChildByRole (Roles.Condition); }
+		}
+		
+		public CSharpTokenNode QuestionMark {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.QuestionMark); }
+		}
+		
+		public CSharpTokenNode Colon {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.Colon); }
 		}
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)

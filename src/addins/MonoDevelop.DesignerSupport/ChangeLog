@@ -1,7 +1,180 @@
+2010-05-19  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.DesignerSupport.Toolbox/TextToolboxNode.cs:
+	* MonoDevelop.DesignerSupport.Toolbox/ITextToolboxNode.cs:
+	* MonoDevelop.DesignerSupport.Toolbox/TemplateToolboxNode.cs:
+	  Give text toolbox nodes more control over how they insert
+	  text into the document. 
+
+2010-05-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.DesignerSupport.csproj:
+	* MonoDevelop.DesignerSupport/SwapCodeBehindCommand.cs:
+	* MonoDevelop.DesignerSupport/SwitchBetweenRelatedFilesCommand.cs:
+	  Rename file to match class.
+
+2010-05-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.DesignerSupport.csproj:
+	* MonoDevelop.DesignerSupport.addin.xml:
+	* MonoDevelop.DesignerSupport/Commands.cs:
+	* MonoDevelop.DesignerSupport/CodeBehind.cs:
+	* MonoDevelop.DesignerSupport/SwapCodeBehindCommand.cs:
+	  Implemented a command for cycling between grouped files,
+	  based on a patch from Curtis Wensley
+	  <curtis.wensley@gmail.com>.
+
+2010-05-03  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.DesignerSupport.Toolbox/ToolboxWidget.cs: Reduce
+	  the number of unnecessary redraws.
+
+2010-05-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.DesignerSupport.Toolbox/Toolbox.cs: Fix crash in
+	  toolbox. Fixes bug #586776 - Toolbox search widget broken.
+
+2010-04-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.DesignerSupport.Toolbox/Toolbox.cs: moved code
+	  from Dispose -> OnDestroyed
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.DesignerSupport/WrapperDesignView.cs:
+	  ViewContent widgets are now destroyed by the workspace
+	  window.
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.DesignerSupport.Toolbox/ToolboxWidget.cs:
+	  removed unnecessary dispose call.
+
+2010-04-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.DesignerSupport/DocumentOutlinePad.cs:
+	* MonoDevelop.DesignerSupport/ClassOutlineTextEditorExtension.cs:
+	  Fixed 'GLib.MissingIntPtrCtorException: GLib.Object subclass
+	  MonoDevelop.Components.CompactScrolledWindow must provide a
+	  protected or public IntPtr ctor to support wrapping of
+	  native object handles.' exception.
+
+
+2010-04-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.DesignerSupport/ClassOutlineTextEditorExtension.cs:
+	  Free up wasted space between scrollbars and treeview
+	  contents.
+
+	* MonoDevelop.DesignerSupport.Toolbox/Toolbox.cs: Free up
+	  wasted space between scrollbars and contents.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.DesignerSupport.addin.xml: Bumped MD version.
+
+2010-03-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.DesignerSupport.addin.xml: Set the default
+	  location for designer pads. Register a new Visual Design
+	  layout.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.DesignerSupport.csproj:
+	* MonoDevelop.DesignerSupport.addin.xml:
+	* MonoDevelop.DesignerSupport/BindingService.cs:
+	* MonoDevelop.DesignerSupport/ToolboxService.cs:
+	* MonoDevelop.DesignerSupport.Toolbox/Toolbox.cs:
+	* MonoDevelop.DesignerSupport/CodeBehindWriter.cs:
+	* MonoDevelop.DesignerSupport/WrapperDesignView.cs:
+	* MonoDevelop.DesignerSupport/DocumentOutlinePad.cs:
+	* MonoDevelop.DesignerSupport/DesignerSupportService.cs:
+	* MonoDevelop.DesignerSupport/OpenDocumentFileProvider.cs:
+	* MonoDevelop.DesignerSupport.Projects/ComponentNodeBuilder.cs:
+	* MonoDevelop.DesignerSupport.Projects/ProjectFileDescriptor.cs:
+	* MonoDevelop.DesignerSupport.Projects/SolutionItemDescriptor.cs:
+	* MonoDevelop.DesignerSupport/ClassOutlineTextEditorExtension.cs:
+	* MonoDevelop.DesignerSupport.Toolbox/ComponentSelectorDialog.cs:
+	* MonoDevelop.DesignerSupport.Projects/WorkspaceItemDescriptor.cs:
+	* MonoDevelop.DesignerSupport.Projects/ProjectReferenceDescriptor.cs:
+	* MonoDevelop.DesignerSupport.Toolbox/CodeTemplateToolboxProvider.cs:
+	* MonoDevelop.DesignerSupport.Projects/PropertyPadTextEditorExtension.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-08  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.DesignerSupport.csproj:
+	* MonoDevelop.DesignerSupport/ToolboxPad.cs:
+	* MonoDevelop.DesignerSupport/PropertyPad.cs:
+	* MonoDevelop.DesignerSupport.Toolbox/Toolbox.cs: Use the new
+	  DockItemToolbar class for showing toolbar commands.
+
+2010-03-03  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.DesignerSupport.Projects/ProjectFileDescriptor.cs:
+	  Display CustomTool/CustomToolNamespace.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.DesignerSupport/ClassOutlineTextEditorExtension.cs:
+	  changed update delay to 1s.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.DesignerSupport/ClassOutlineTextEditorExtension.cs:
+	  Refresh sooner than the 5sec timer, if the document wasn't
+	  parsed at the start.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.DesignerSupport.csproj: Flush.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.DesignerSupport/ClassOutlineTextEditorExtension.cs:
+	* MonoDevelop.DesignerSupport.Toolbox/ComponentSelectorDialog.cs:
+	  Track api changes.
+
+2010-02-12  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.DesignerSupport.addin.xml: Set correct
+	  serializable type name.
+
 2010-02-10  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.DesignerSupport.Toolbox/Toolbox.cs: Add tooltips
 	  to toolbar items.
+
+2010-02-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.DesignerSupport.Toolbox/Toolbox.cs: Use the
+	  image service to get icons.
+
+2010-02-09  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.DesignerSupport.Toolbox/ComponentSelectorDialog.cs:
+	* MonoDevelop.DesignerSupport/ClassOutlineTextEditorExtension.cs:
+	  Track API changes for lazy loading images.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.DesignerSupport.Toolbox.ComponentSelectorDialog.cs:
+	  Flush.
+
+2010-01-12  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.DesignerSupport.Projects/ProjectFileDescriptor.cs:
+	  Added an accessor for the Generator property.
 
 2009-12-11  Michael Hutchinson  <mhutchinson@novell.com>
 

@@ -66,7 +66,7 @@ namespace MonoDevelop.Refactoring.Tests
 				
 				text = text.Substring (0, idx) + text.Substring (idx + 2);
 				if (cursorPosition < 0)
-					cursorPosition = selectionEnd;
+					cursorPosition = selectionEnd - 1;
 			}
 			
 			TestWorkbenchWindow tww = new TestWorkbenchWindow ();
@@ -76,8 +76,8 @@ namespace MonoDevelop.Refactoring.Tests
 			DotNetProject project = new DotNetAssemblyProject ("C#");
 			Solution solution = new Solution ();
 			solution.RootFolder.Items.Add (project);
-			project.FileName = "/tmp/a" + pcount + ".csproj";
-			string file = "/tmp/test-file-" + (pcount++) + ".cs";
+			project.FileName = GetTempFile (".csproj");
+			string file = GetTempFile (".cs");
 			project.AddFile (file);
 			string parsedText = text;
 			string editorText = text;
@@ -106,9 +106,17 @@ namespace MonoDevelop.Refactoring.Tests
 			NRefactoryResolver resolver = new NRefactoryResolver (dom, 
 			                                                      doc.ParsedDocument.CompilationUnit, 
 			                                                      MonoDevelop.Ide.Gui.TextEditor.GetTextEditor (sev), 
-			                                                      "a.cs");
+			                                                      file);
 			
-			ResolveResult resolveResult = endPos >= 0 ? resolver.Resolve (new NewCSharpExpressionFinder (dom).FindFullExpression (editorText, cursorPosition + 1), new DomLocation (doc.TextEditor.CursorLine, doc .TextEditor.CursorColumn)) : null;
+			ExpressionResult expressionResult;
+			if (selectionStart >= 0) {
+				expressionResult = new ExpressionResult (editorText.Substring (selectionStart, selectionEnd - selectionStart).Trim ());
+				endPos = selectionEnd;
+			} else {
+				expressionResult = new NewCSharpExpressionFinder (dom).FindFullExpression (editorText, cursorPosition + 1);
+			}
+			ResolveResult resolveResult = endPos >= 0 ? resolver.Resolve (expressionResult, new DomLocation (doc.TextEditor.CursorLine, doc .TextEditor.CursorColumn)) : null;
+			
 			RefactoringOptions result = new RefactoringOptions {
 				Document = doc,
 				Dom = dom,
