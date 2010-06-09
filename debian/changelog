@@ -9,6 +9,7 @@ monodevelop (2.3.1+dfsg-1) UNRELEASED; urgency=low
     + src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Mono.Debugger.Soft.dll
   * debian/control:
     + Bump mono build-deps to 2.6.1, to reflect configure.in
+    + Bump Mono.Addins build-deps to 0.5, to reflect configure.in
   * debian/patches/use_libsvn1.patch,
     debian/patches/update_templates_for_gtk-sharp_2.12.patch,
     debian/patches/use_csc.patch,
