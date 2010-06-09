@@ -1,10 +1,7 @@
-Index: monodevelop-2.1.0/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs
-Description: Only make use of libsvnclien1 so removing libsvnclient0 code
-Patch created by Mirco Bauer <meebey@debian.org>
+Index: monodevelop.git/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs
 ===================================================================
-diff -urNad monodevelop-2.1.0~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs monodevelop-2.1.0/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs
---- monodevelop-2.1.0~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2009-09-11 09:43:09.807796091 +0100
-+++ monodevelop-2.1.0/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2009-09-11 09:44:56.076602736 +0100
+--- monodevelop.git.orig/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2010-06-09 15:22:48.000000000 +0100
++++ monodevelop.git/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibSvnClient.cs	2010-06-09 15:29:35.000000000 +0100
 @@ -22,10 +22,6 @@
  		public static LibSvnClient GetLib ()
  		{
@@ -16,7 +13,7 @@ diff -urNad monodevelop-2.1.0~/src/addins/VersionControl/MonoDevelop.VersionCont
  				return new LibSvnClient1 ();
  			} catch {}
  			
-@@ -578,366 +574,6 @@
+@@ -580,374 +576,6 @@
  		public delegate IntPtr svn_client_blame_receiver_t (IntPtr baton, long line_no, int revision, string author, string date, string line, IntPtr pool);
  	}
  	
@@ -269,6 +266,12 @@ diff -urNad monodevelop-2.1.0~/src/addins/VersionControl/MonoDevelop.VersionCont
 -		{
 -			return svn_client_blame (path, ref rev_start, ref rev_end, receiver, baton, ctx, pool);
 -		}
+-		
+-		public override void strerror (int statcode, byte[] buf, int bufsize)
+-		{
+-			svn_strerror (statcode, buf, bufsize);
+-		}
+-		
 -
 -		
 -		[DllImport(svnclientlib)] static extern void svn_config_ensure (string config_dir, IntPtr pool);
@@ -378,6 +381,8 @@ diff -urNad monodevelop-2.1.0~/src/addins/VersionControl/MonoDevelop.VersionCont
 -		[DllImport(svnclientlib)] static extern IntPtr svn_client_prop_get (out IntPtr value, string name, string target, ref Rev revision, int recurse, IntPtr ctx, IntPtr pool);
 -
 -		[DllImport(svnclientlib)] static extern IntPtr svn_client_blame (string path, ref Rev rev_start, ref Rev rev_end, svn_client_blame_receiver_t receiver, IntPtr baton, IntPtr ctx, IntPtr pool);
+-		
+-		[DllImport(svnclientlib)] static extern void svn_strerror (int statcode, byte[] buf, int bufsize);
 -	}
 -	
  	public class LibSvnClient1 : LibSvnClient {
