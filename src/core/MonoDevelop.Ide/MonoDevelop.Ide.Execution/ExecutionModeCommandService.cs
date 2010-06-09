@@ -30,9 +30,6 @@ using System.Collections.Generic;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Projects;
 using MonoDevelop.Core.Serialization;
 using Mono.Addins;
@@ -244,7 +241,11 @@ namespace MonoDevelop.Ide.Execution
 			public override bool Equals (object obj)
 			{
 				CommandItem other = obj as CommandItem;
-				return other != null && other.Mode.Id == Mode.Id;
+				if (other == null)
+					return false;
+				if ((Mode == null || other.Mode == null) && Mode != other.Mode)
+					return false;
+				return other.Mode.Id == Mode.Id;
 			}
 			
 			public override int GetHashCode ()
@@ -274,7 +275,7 @@ namespace MonoDevelop.Ide.Execution
 			if (cmode.Scope == CustomModeScope.Global)
 				SaveGlobalCustomExecutionModes ();
 			else
-				Ide.Gui.IdeApp.Workspace.SavePreferences ();
+				IdeApp.Workspace.SavePreferences ();
 		}
 		
 		static CustomExecutionModes GetCustomExecutionModeList (SolutionEntityItem project, CustomModeScope scope)
@@ -307,7 +308,7 @@ namespace MonoDevelop.Ide.Execution
 			if (cmode.Scope == CustomModeScope.Global)
 				SaveGlobalCustomExecutionModes ();
 			else
-				Ide.Gui.IdeApp.Workspace.SavePreferences ();
+				IdeApp.Workspace.SavePreferences ();
 		}
 		
 		static CustomExecutionModes GetGlobalCustomExecutionModes ()

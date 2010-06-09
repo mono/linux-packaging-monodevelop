@@ -25,9 +25,10 @@
 using Gdk;
 using Gtk;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using System;
 using MonoDevelop.XmlEditor;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.XmlEditor.Completion
 {
@@ -35,7 +36,7 @@ namespace MonoDevelop.XmlEditor.Completion
 	/// Holds the text for  namespace, child element or attribute 
 	/// autocomplete (intellisense).
 	/// </summary>
-	public class XmlCompletionData : ICompletionData
+	public class XmlCompletionData : CompletionData
 	{
 		string text;
 		DataType dataType = DataType.XmlElement;
@@ -77,23 +78,27 @@ namespace MonoDevelop.XmlEditor.Completion
 			get { return dataType; }
 		}
 		
-		public string Icon {
+		public override IconId Icon {
 			get { return Gtk.Stock.GoForward; }
 		}
 		
-		public string DisplayText {
+		public override string DisplayText {
 			get { return text; }
 		}
 		
-		public string CompletionText {
+		public override string CompletionText {
 			get {
-					if ((dataType == DataType.XmlElement) || (dataType == DataType.XmlAttributeValue))
-						return text;
-					if (dataType == DataType.NamespaceUri)
-						return String.Concat("\"", text, "\"");
-					
-					// Move caret in the middle of the attribute quotes.
-					return String.Concat (text, "=\"|\"");
+				if(!XmlEditorOptions.AutoInsertFragments)
+					return text;
+				
+				if ((dataType == DataType.XmlElement) || (dataType == DataType.XmlAttributeValue))
+					return text;
+				
+				if (dataType == DataType.NamespaceUri)
+					return String.Concat("\"", text, "\"");
+				
+				// Move caret in the middle of the attribute quotes.
+				return String.Concat (text, "=\"|\"");
 			}
 		}
 		
@@ -101,13 +106,8 @@ namespace MonoDevelop.XmlEditor.Completion
 		/// Returns the xml item's documentation as retrieved from
 		/// the xs:annotation/xs:documentation element.
 		/// </summary>
-		public string Description {
+		public override string Description {
 			get { return description; }
 		}
-		
-		public DisplayFlags DisplayFlags {
-			get { return DisplayFlags.None; }
-		}
-		
 	}
 }

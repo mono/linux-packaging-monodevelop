@@ -7,23 +7,19 @@
         url = "http://www.monodevelop.com/"
         description = "Provides refactoring support to MonoDevelop"
         category = "IDE extensions"
-        version = "2.2">
+        version = "2.4">
 
 	<Runtime>
 		<Import assembly = "MonoDevelop.Refactoring.dll"/>
 	</Runtime>
 
 	<Dependencies>
-		<Addin id="Core" version="2.2"/>
-		<Addin id="Core.Gui" version="2.2"/>
-		<Addin id="Projects" version="2.2"/>
-		<Addin id="Projects.Gui" version="2.2"/>
-		<Addin id="Ide" version="2.2"/>
-		<Addin id="Components" version="2.2"/>
-		<Addin id="DesignerSupport" version="2.2"/>
-		<Addin id="Autotools" version="2.2"/>
-		<Addin id="Deployment" version="2.2"/>
-		<Addin id="SourceEditor2" version="2.2"/>
+		<Addin id="Core" version="2.4"/>
+		<Addin id="Ide" version="2.4"/>
+		<Addin id="DesignerSupport" version="2.4"/>
+		<Addin id="Autotools" version="2.4"/>
+		<Addin id="Deployment" version="2.4"/>
+		<Addin id="SourceEditor2" version="2.4"/>
 	</Dependencies>
 	
 	<!-- Extension Points -->
@@ -54,6 +50,7 @@
 		<Class id="IntroduceFormatItem" class = "MonoDevelop.Refactoring.IntroduceFormat.IntroduceFormatItemRefactoring" />
 		<Class id="ImplementImplicit" class = "MonoDevelop.Refactoring.ImplementInterface.ImplementImplicit" />
 		<Class id="ImplementExplicit" class = "MonoDevelop.Refactoring.ImplementInterface.ImplementExplicit" />
+		<Class id="ImplementExplicit" class = "MonoDevelop.Refactoring.ImplementInterface.ImplementAbstractMembers" />
 		<Class id="CreateBackingStore" class = "MonoDevelop.Refactoring.ConvertPropery.CreateBackingStore" />
 		<Class id="RemoveBackingStore" class = "MonoDevelop.Refactoring.ConvertPropery.RemoveBackingStore" />
 	</Extension>
@@ -73,22 +70,28 @@
 	<!-- RefactoryCommands -->
 	<Extension path = "/MonoDevelop/Ide/Commands">
 	
-		<Category _name = "Refactory" id = "Refactory">
+		<Category _name = "Code Navigation" id = "CodeNavigation">
 		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.GotoDeclaration"
 					defaultHandler = "MonoDevelop.Refactoring.GotoDeclarationHandler"
 					_label = "_Go to declaration" 
 					shortcut = "F12"
-					macShortcut = "F12"/>
+					macShortcut = "Meta|D"/>
 		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.FindReferences"
 					defaultHandler = "MonoDevelop.Refactoring.FindReferencesHandler"
 					_label = "_Find references" 
 					shortcut = "Shift|F12"
-					macShortcut = "Shift|F12"/>
+					macShortcut = "Shift|Meta|D"/>
+		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.FindDerivedClasses"
+					defaultHandler = "MonoDevelop.Refactoring.FindDerivedClassesHandler"
+					_label = "Find _derived classes" />
+		</Category>
+		
+		<Category _name = "Refactoring" id = "Refactoring">
 		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.Rename"
 					defaultHandler = "MonoDevelop.Refactoring.Rename.RenameHandler"
 					_label = "_Rename..." 
 					shortcut = "F2"
-					macShortcut = "F2"/>
+					macShortcut = "Meta|R"/>
 		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.CurrentRefactoryOperations"
 				defaultHandler = "MonoDevelop.Refactoring.CurrentRefactoryOperationsHandler"
 				type="array"
@@ -116,6 +119,34 @@
 		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.RemoveSortImports"
 					defaultHandler = "MonoDevelop.Refactoring.RefactorImports.RemoveSortImportsHandler"
 					_label = "R_emove and Sort usings"/>
+		
+		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.ExtractMethod"
+					defaultHandler = "MonoDevelop.Refactoring.ExtractMethod.ExtractMethodHandler"
+					_label = "Extract Method"
+					shortcut = "Control|Alt|M"/>
+		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.CreateMethod"
+					defaultHandler = "MonoDevelop.Refactoring.CreateMethod.CreateMethodHandler"
+					_label = "Create Method"/>
+		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.IntroduceConstant"
+					defaultHandler = "MonoDevelop.Refactoring.CreateMethod.IntroduceConstantHandler"
+					_label = "_Introduce Constant..."/>
+		
+		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.QuickFix"
+					defaultHandler = "MonoDevelop.Refactoring.QuickFixHandler"
+					_label = "Quick fix..."
+					shortcut = "Alt|Return" />
+		
+		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.IntegrateTemporaryVariable"
+					defaultHandler = "MonoDevelop.Refactoring.IntegrateTemporaryVariable.IntegrateTemporaryVariableHandler"
+					_label = "Integrate Temporary Variable"
+					shortcut = "Control|Alt|I" />
+					
+		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.ImportSymbol"
+					defaultHandler = "MonoDevelop.Refactoring.ImportSymbolHandler"
+					_label = "Import Symbol..."
+					shortcut = "Control|Alt|space"
+					macShortcut = "Control|Alt|space" />
+					
 		</Category>
 	</Extension>
 	

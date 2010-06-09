@@ -28,53 +28,59 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 using System;
-using System.Collections;
+using System.IO;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace MonoDevelop.Ide.Gui
 {
-	public class StartupInfo
+	internal class StartupInfo
 	{
-		static ArrayList requestedFileList = new ArrayList();
-		static ArrayList parameterList     = new ArrayList();
+		List<FileOpenInformation> requestedFileList = new List<FileOpenInformation> ();
+		List<string> parameterList = new List<string> ();
 
-		public static string[] GetParameterList()
-		{
-			return GetStringArray(parameterList);
+		public IList<string> ParameterList {
+			get { return parameterList; }
 		}
 		
-		public static string[] GetRequestedFileList()
-		{
-			return GetStringArray(requestedFileList);
+		public IEnumerable<FileOpenInformation> RequestedFileList {
+			get { return requestedFileList; }
 		}
 		
-		public static bool HasFiles {
+		public bool HasFiles {
 			get { return requestedFileList.Count > 0; }
 		}
 		
-		static string[] GetStringArray(ArrayList list)
-		{
-			return (string[])list.ToArray(typeof(string));
-		}
+		/// <summary>
+		/// Matches a filename string with optional line and column 
+		/// (/foo/bar/blah.cs;22;31)
+		/// </summary>
+		public static readonly Regex FileExpression = new Regex (@"^(?<filename>[^;]+)(;(?<line>\d+))?(;(?<column>\d+))?$", RegexOptions.Compiled);
 		
-		public static void SetCommandLineArgs(string[] args)
+		public StartupInfo (IEnumerable<string> args)
 		{
-			requestedFileList.Clear();
-			parameterList.Clear();
-			
 			foreach (string arg in args) {
 				string a = arg;
+				Match fileMatch = FileExpression.Match (a);
+				
 				// this does not yet work with relative paths
 				if (a[0] == '~') {
-					a = System.IO.Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.Personal), a.Substring (1));
+					a = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.Personal), a.Substring (1));
 				}
 				
-				if (System.IO.File.Exists (a)) {
-					a = System.IO.Path.GetFullPath (a);
-					requestedFileList.Add (a);
-					return;
-				}
-	
-				if (a[0] == '-' || a[0] == '/') {
+				if (fileMatch != null && fileMatch.Success) {
+					string filename = fileMatch.Groups["filename"].Value;
+					if (File.Exists (filename)) {
+						int line = 1, column = 1;
+						a = a.Replace (filename, Path.GetFullPath (filename));
+						if (fileMatch.Groups["line"].Success)
+							int.TryParse (fileMatch.Groups["line"].Value, out line);
+						if (fileMatch.Groups["column"].Success)
+							int.TryParse (fileMatch.Groups["column"].Value, out column);
+						var file = new FileOpenInformation (a, line, column, true);
+						requestedFileList.Add (file);
+					}
+				} else if (a[0] == '-' || a[0] == '/') {
 					int markerLength = 1;
 					
 					if (a.Length >= 2 && a[0] == '-' && a[1] == '-') {

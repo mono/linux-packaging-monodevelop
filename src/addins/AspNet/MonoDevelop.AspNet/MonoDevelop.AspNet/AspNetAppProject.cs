@@ -34,7 +34,6 @@ using System.IO;
 using System.Xml;
 using System.Collections.Generic;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Core.ProgressMonitoring;
 using MonoDevelop.Projects;
@@ -130,28 +129,10 @@ namespace MonoDevelop.AspNet
 			}
 		}
 		
-		public override ClrVersion[] SupportedClrVersions {
-			get {
-				ClrVersion[] versions = base.SupportedClrVersions;
-				if (versions == null)
-					return null;
-				
-				bool ver1 = false, ver2 = false;
-				foreach (ClrVersion version in versions) {
-					if (version == ClrVersion.Net_1_1)
-						ver1 = true;
-					if (version == ClrVersion.Net_2_0)
-						ver2 = true;
-				}
-				if (ver1) {
-					if (ver2)
-						return new ClrVersion[] { ClrVersion.Net_1_1, ClrVersion.Net_2_0 };
-					else return new ClrVersion[] { ClrVersion.Net_1_1 };
-				} else if (ver2) {
-					return new ClrVersion[] { ClrVersion.Net_2_0 };
-				}
-				return null;
-			}
+		public override bool SupportsFramework (TargetFramework framework)
+		{
+			//only support 1.1, 2.0, 3.5, 4.0 etc, not monotouch, moonlight and so on
+			return framework.IsCompatibleWithFramework ("1.1") && base.SupportsFramework (framework);
 		}
 		
 		#endregion
@@ -172,18 +153,18 @@ namespace MonoDevelop.AspNet
 		public AspNetAppProject (string languageName, ProjectCreateInformation info, XmlElement projectOptions)
 			: base (languageName, info, projectOptions)
 		{
-			foreach (AspNetAppProjectConfiguration conf in Configurations)
-				conf.OutputDirectory = "bin";
 			Init ();
+			
+			var binPath = info == null? (FilePath)"bin" : info.BinPath;
+			foreach (AspNetAppProjectConfiguration cfg in Configurations)
+				cfg.OutputDirectory = binPath;
 		}	
 		
 		public override SolutionItemConfiguration CreateConfiguration (string name)
 		{
-			AspNetAppProjectConfiguration conf = new AspNetAppProjectConfiguration ();
-			conf.Name = name;
-			conf.OutputDirectory = String.IsNullOrEmpty (BaseDirectory)? "bin" : Path.Combine (BaseDirectory, "bin");
-			if (LanguageBinding != null)
-				conf.CompilationParameters = LanguageBinding.CreateCompilationParameters (null);			
+			var conf = new AspNetAppProjectConfiguration (name);
+			conf.CopyFrom (base.CreateConfiguration (name));
+			conf.OutputDirectory = BaseDirectory.IsNullOrEmpty? "bin" : (string)BaseDirectory.Combine ("bin");			
 			return conf;
 		}
 		
@@ -697,7 +678,7 @@ namespace MonoDevelop.AspNet
 			}
 			return null;
 		}
-
+		
 		public string GetCodebehindTypeName (string fileName)
 		{
 			lock (codebehindTypeNameCache)
@@ -715,9 +696,9 @@ namespace MonoDevelop.AspNet
 			
 			protected override string GenerateInfo (string fileName)
 			{
-				var cu = ProjectDomService.Parse (proj, fileName, null) as AspNetParsedDocument;
-				if (cu != null && !string.IsNullOrEmpty (cu.PageInfo.InheritedClass))
-					return cu.PageInfo.InheritedClass;
+				var doc = ProjectDomService.Parse (proj, fileName, null) as AspNetParsedDocument;
+				if (doc != null && !string.IsNullOrEmpty (doc.Info.InheritedClass))
+					return doc.Info.InheritedClass;
 				return null;
 			}
 			

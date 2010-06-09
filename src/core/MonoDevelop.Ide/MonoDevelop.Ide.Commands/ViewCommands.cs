@@ -27,14 +27,10 @@
 
 
 using System;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
+using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Core;
-using MonoDevelop.Ide;
-using Mono.Addins;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Ide.Gui.Content;
 
 namespace MonoDevelop.Ide.Commands
@@ -123,10 +119,7 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandArrayInfo info)
 		{
-			string[] layouts = IdeApp.Workbench.Layouts;
-			Array.Sort<string> (layouts, StringComparer.CurrentCultureIgnoreCase);
-			for (int i = 0; i < layouts.Length; i++) {
-				string name = layouts[i];
+			foreach (var name in IdeApp.Workbench.Layouts) {
 				CommandInfo item = new CommandInfo(GettextCatalog.GetString (name));
 				item.Checked = IdeApp.Workbench.CurrentLayout == name;
 				item.Description = GettextCatalog.GetString ("Switch to layout '{0}'", name);
@@ -194,11 +187,11 @@ namespace MonoDevelop.Ide.Commands
 
 		protected override void Update (CommandInfo info)
 		{
-			Pad pad = IdeApp.Workbench.GetLocationListPad ();
-			if (pad == null)
+			ILocationList list = IdeApp.Workbench.ActiveLocationList;
+			if (list == null)
 				info.Enabled = false;
 			else
-				info.Text = GettextCatalog.GetString ("Show Next ({0})", pad.Title);
+				info.Text = GettextCatalog.GetString ("Show Next ({0})", list.ItemName);
 		}
 	}
 
@@ -212,11 +205,11 @@ namespace MonoDevelop.Ide.Commands
 
 		protected override void Update (CommandInfo info)
 		{
-			Pad pad = IdeApp.Workbench.GetLocationListPad ();
-			if (pad == null)
+			ILocationList list = IdeApp.Workbench.ActiveLocationList;
+			if (list == null)
 				info.Enabled = false;
 			else
-				info.Text = GettextCatalog.GetString ("Show Previous ({0})", pad.Title);
+				info.Text = GettextCatalog.GetString ("Show Previous ({0})", list.ItemName);
 		}
 	}
 

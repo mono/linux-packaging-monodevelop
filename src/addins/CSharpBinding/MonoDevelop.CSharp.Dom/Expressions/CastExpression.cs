@@ -31,12 +31,20 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class CastExpression : AbstractCSharpNode
 	{
-		public IReturnType CastTo {
-			get { return (IReturnType)GetChildByRole (Roles.ReturnType); }
+		public ICSharpNode CastTo {
+			get { return (ICSharpNode)GetChildByRole (Roles.ReturnType); }
 		}
 		
 		public INode Expression {
 			get { return GetChildByRole (Roles.Expression); }
+		}
+		
+		public CSharpTokenNode LPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.LPar); }
+		}
+		
+		public CSharpTokenNode RPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.RPar); }
 		}
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)

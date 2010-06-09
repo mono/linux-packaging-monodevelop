@@ -31,7 +31,6 @@ using System;
 using System.Collections;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core.Execution;
@@ -49,20 +48,20 @@ namespace MonoDevelop.Ide.Gui
 
 		internal void Initialize ()
 		{
-			CreateMonitorPad (GettextCatalog.GetString ("Build Output"), MonoDevelop.Core.Gui.Stock.BuildCombine, false, true, false);
 		}
 		
 		public IProgressMonitor GetBuildProgressMonitor ()
 		{
-			bool front = IdeApp.Preferences.ShowOutputPadWhenBuildStarts;
-			AggregatedProgressMonitor mon = new AggregatedProgressMonitor (GetOutputProgressMonitor (GettextCatalog.GetString ("Build Output"), MonoDevelop.Core.Gui.Stock.BuildCombine, front, true));
-			mon.AddSlaveMonitor (GetStatusProgressMonitor (GettextCatalog.GetString ("Building..."), MonoDevelop.Core.Gui.Stock.BuildCombine, false));
+			Pad pad = IdeApp.Workbench.GetPad<ErrorListPad> ();
+			ErrorListPad errorPad = (ErrorListPad) pad.Content;
+			AggregatedProgressMonitor mon = new AggregatedProgressMonitor (errorPad.GetBuildProgressMonitor ());
+			mon.AddSlaveMonitor (GetStatusProgressMonitor (GettextCatalog.GetString ("Building..."), Stock.BuildCombine, false, true, false, pad));
 			return mon;
 		}
 		
 		public IProgressMonitor GetRunProgressMonitor ()
 		{
-			return GetOutputProgressMonitor (GettextCatalog.GetString ("Application Output"), MonoDevelop.Core.Gui.Stock.RunProgramIcon, true, true);
+			return GetOutputProgressMonitor (GettextCatalog.GetString ("Application Output"), Stock.RunProgramIcon, true, true);
 		}
 		
 		public IProgressMonitor GetLoadProgressMonitor (bool lockGui)
@@ -77,38 +76,44 @@ namespace MonoDevelop.Ide.Gui
 		
 		public IConsole CreateConsole (bool closeOnDispose)
 		{
-			return (IConsole) GetOutputProgressMonitor (GettextCatalog.GetString ("Application Output"), MonoDevelop.Core.Gui.Stock.RunProgramIcon, true, true);
+			return (IConsole) GetOutputProgressMonitor (GettextCatalog.GetString ("Application Output"), Stock.RunProgramIcon, true, true);
 		}
 		
 		/******************************/
 		
 		
-		public IProgressMonitor GetStatusProgressMonitor (string title, string icon, bool showErrorDialogs)
+		public IProgressMonitor GetStatusProgressMonitor (string title, IconId icon, bool showErrorDialogs)
 		{
-			return new StatusProgressMonitor (title, icon, showErrorDialogs, true, false);
+			return new StatusProgressMonitor (title, icon, showErrorDialogs, true, false, null);
 		}
 		
-		public IProgressMonitor GetStatusProgressMonitor (string title, string icon, bool showErrorDialogs, bool showTaskTitle, bool lockGui)
+		public IProgressMonitor GetStatusProgressMonitor (string title, IconId icon, bool showErrorDialogs, bool showTaskTitle, bool lockGui)
 		{
-			return new StatusProgressMonitor (title, icon, showErrorDialogs, showTaskTitle, lockGui);
+			return new StatusProgressMonitor (title, icon, showErrorDialogs, showTaskTitle, lockGui, null);
 		}
 		
-		public IProgressMonitor GetBackgroundProgressMonitor (string title, string icon)
+		public IProgressMonitor GetStatusProgressMonitor (string title, IconId icon, bool showErrorDialogs, bool showTaskTitle, bool lockGui, Pad statusSourcePad)
+		{
+			return new StatusProgressMonitor (title, icon, showErrorDialogs, showTaskTitle, lockGui, statusSourcePad);
+		}
+		
+		public IProgressMonitor GetBackgroundProgressMonitor (string title, IconId icon)
 		{
 			return new BackgroundProgressMonitor (title, icon);
 		}
 		
-		public IProgressMonitor GetOutputProgressMonitor (string title, string icon, bool bringToFront, bool allowMonitorReuse)
+		public IProgressMonitor GetOutputProgressMonitor (string title, IconId icon, bool bringToFront, bool allowMonitorReuse)
 		{
-			DefaultMonitorPad monitorPad = CreateMonitorPad (title, icon, bringToFront, allowMonitorReuse, true);
-			return new OutputProgressMonitor (monitorPad, title, icon);
+			Pad pad = CreateMonitorPad (title, icon, bringToFront, allowMonitorReuse, true);
+			pad.Visible = true;
+			return ((DefaultMonitorPad) pad.Content).BeginProgress (title);
 		}
 		
-		DefaultMonitorPad CreateMonitorPad (string title, string icon, bool bringToFront, bool allowMonitorReuse, bool show)
+		Pad CreateMonitorPad (string title, string icon, bool bringToFront, bool allowMonitorReuse, bool show)
 		{
 			Pad pad = null;
 			if (icon == null)
-				icon = MonoDevelop.Core.Gui.Stock.OutputIcon;
+				icon = Stock.OutputIcon;
 
 			int instanceCount = -1;
 			if (allowMonitorReuse) {
@@ -129,15 +134,15 @@ namespace MonoDevelop.Ide.Gui
 				}
 				if (pad != null) {
 					if (bringToFront) pad.BringToFront ();
-					return (DefaultMonitorPad) pad.Content;
+					return pad;
 				}
 			}
 
 			instanceCount++;
 			DefaultMonitorPad monitorPad = new DefaultMonitorPad (title, icon, instanceCount);
 			
-			string newPadId = "OutputPad - " + title + " - " + instanceCount;
-			string basePadId = "OutputPad - " + title + " - 0";
+			string newPadId = "OutputPad-" + title.Replace (' ','_') + "-" + instanceCount;
+			string basePadId = "OutputPad-" + title.Replace (' ','_') + "-0";
 			
 			if (instanceCount > 0) {
 				// Translate the title before adding the count
@@ -150,6 +155,7 @@ namespace MonoDevelop.Ide.Gui
 			else
 				pad = IdeApp.Workbench.AddPad (monitorPad, newPadId, title, basePadId + "/Center Bottom", icon);
 			
+			monitorPad.StatusSourcePad = pad;
 			pad.Sticky = true;
 			outputMonitors.Add (pad);
 			
@@ -160,10 +166,15 @@ namespace MonoDevelop.Ide.Gui
 					pad.Destroy ();
 				};
 			}
-			if (bringToFront)
+			
+			pad.AutoHide = true;
+			
+			if (bringToFront) {
+				pad.Visible = true;
 				pad.BringToFront ();
+			}
 
-			return monitorPad;
+			return pad;
 		}
 		
 		public ISearchProgressMonitor GetSearchProgressMonitor (bool bringToFront)
@@ -192,7 +203,7 @@ namespace MonoDevelop.Ide.Gui
 			}
 			if (pad != null) {
 				if (bringToFront) pad.BringToFront (focusPad);
-				return new SearchProgressMonitor ((SearchResultPad) pad.Content, pad.Title);
+				return new SearchProgressMonitor (pad);
 			}
 			
 			instanceNum++;
@@ -205,7 +216,7 @@ namespace MonoDevelop.Ide.Gui
 			
 			SearchResultPad monitorPad = new SearchResultPad (instanceNum) { FocusPad = focusPad };
 			
-			pad = IdeApp.Workbench.ShowPad (monitorPad, newPadId, title, basePadId + "/Center Bottom", MonoDevelop.Core.Gui.Stock.FindIcon);
+			pad = IdeApp.Workbench.ShowPad (monitorPad, newPadId, title, basePadId + "/Center Bottom", Stock.FindIcon);
 			pad.Sticky = true;
 			searchMonitors.Add (pad);
 
@@ -219,8 +230,8 @@ namespace MonoDevelop.Ide.Gui
 			
 			if (bringToFront)
 				pad.BringToFront (focusPad);
-
-			return new SearchProgressMonitor (monitorPad, pad.Title);
+			
+			return new SearchProgressMonitor (pad);
 		}
 	}
 }

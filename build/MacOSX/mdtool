@@ -40,7 +40,12 @@ fi
 ### END MAC-SPECIFIC SETUP
 ### Beyond this, all is from the Linux mdtool.in. Only the values of EXE_PATH and MONO_EXEC differ
 
-_MONO_OPTIONS=$MONO_OPTIONS
+# NOTE: remove this for stable releases
+if [ -z "$MD_NO_DEBUG" ]; then
+	_MONO_OPTIONS=${MONO_OPTIONS:---debug}
+else
+	_MONO_OPTIONS=$MONO_OPTIONS
+fi
 
 $MONO_EXEC $_MONO_OPTIONS "$EXE_PATH" $*
 

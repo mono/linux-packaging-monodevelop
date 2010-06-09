@@ -48,7 +48,7 @@ namespace MonoDevelop.SourceEditor
 		
 		protected override void OnBeginPrint (PrintContext context)
 		{
-			layout = context.CreatePangoLayout ();
+			layout = PangoUtil.CreateLayout (context);
 			layout.FontDescription = settings.Font;
 			
 			layout.FontDescription.Weight = Pango.Weight.Bold;
@@ -205,7 +205,7 @@ namespace MonoDevelop.SourceEditor
 			sb.Replace ("%N", (page + 1).ToString ());
 			sb.Replace ("%Q", totalPages.ToString ());
 			//FIXME: use font width for ellipsizing better 
-			sb.Replace ("%F", SourceEditorWidget.StrMiddleTruncate (filename, 60));
+			sb.Replace ("%F", SourceEditorWidget.EllipsizeMiddle (filename, 60));
 			return sb.ToString ();
 		}
 		

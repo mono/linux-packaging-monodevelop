@@ -1,3 +1,31 @@
+2010-05-13  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* CecilWidgetLibrary.cs: Fix potential null ref. Fixes bug
+	  #583516 - Stetic breaks building MonoDevelop.IPhone.
+
+2010-05-11  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* LibraryCache.cs: Fixed problem with resolution of base
+	  types.
+
+2010-04-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* CecilSignalDescriptor.cs: Cecil uses '/' as separator for
+	  inner classes. Convert to the standard '+' separator.
+
+2010-01-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* CodeGenerator.cs:
+	* libsteticui.csproj:
+	* CodeGeneratorPartialClass.cs:
+	* CodeGeneratorInternalClass.cs: Use global:: for type
+	  references in generated code. 
+
+2010-01-15  Mike Krüger  <mkrueger@novell.com>
+
+	* libsteticui.csproj: upgraded to v3.5 framework.
+
 2009-12-18  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* WidgetDesignerBackend.cs: Disable checkerboard background

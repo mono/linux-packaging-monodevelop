@@ -33,17 +33,20 @@ using System.Collections.Generic;
 using System.Text;
 
 using MonoDevelop.Core;
+using Mono.Addins;
+using MonoDevelop.Core.StringParsing;
 
 namespace MonoDevelop.Core
 {
 	public static class StringParserService
 	{
-		static Dictionary<string, string> properties = new Dictionary<string, string> (StringComparer.InvariantCultureIgnoreCase);
+		static Dictionary<string, object> properties = new Dictionary<string, object> (StringComparer.InvariantCultureIgnoreCase);
 		static Dictionary<string, GenerateString> stringGenerators = new Dictionary<string, GenerateString> (StringComparer.InvariantCultureIgnoreCase);
+		static StringTagModel DefaultStringTagModel = new StringTagModel ();
 		
 		delegate string GenerateString (string tag, string format);
 		
-		public static Dictionary<string, string> Properties {
+		public static Dictionary<string, object> Properties {
 			get {
 				return properties;
 			}
@@ -76,7 +79,7 @@ namespace MonoDevelop.Core
 		
 		public static string Parse (string input)
 		{
-			return Parse (input, (string[,])null);
+			return Parse (input, DefaultStringTagModel);
 		}
 		
 		public static void Parse (ref string[] inputs)
@@ -85,23 +88,8 @@ namespace MonoDevelop.Core
 				inputs[i] = Parse (inputs[i], (string[,])null);
 		}
 		
-		public static void RegisterStringTagProvider (IStringTagProvider tagProvider)
+		static string Replace (string tag, IStringTagModel customTags)
 		{
-			foreach (string providedTag in tagProvider.Tags) { 
-				stringGenerators [providedTag] = delegate (string tag, string format) {
-					return tagProvider.Convert (tag, format);
-				};
-			}
-		}
-		
-		static string Replace (string tag, Dictionary<string, string> customTags)
-		{
-			if (customTags.ContainsKey(tag))
-				return customTags[tag];
-			if (properties.ContainsKey (tag))
-				return properties [tag];
-		
-			GenerateString genString;
 			string tname, tformat;
 			int n = tag.IndexOf (':');
 			if (n != -1) {
@@ -111,6 +99,16 @@ namespace MonoDevelop.Core
 				tname = tag;
 				tformat = string.Empty;
 			}
+			
+			tag = tag.ToUpperInvariant ();
+			object val = customTags.GetValue (tag);
+			if (val != null)
+				return FormatValue (val, tformat);
+			
+			if (properties.ContainsKey (tag))
+				return FormatValue (properties [tag], tformat);
+		
+			GenerateString genString;
 
 			if (stringGenerators.TryGetValue (tname, out genString))
 				return genString (tname, tformat);
@@ -130,7 +128,55 @@ namespace MonoDevelop.Core
 			return null;
 		}
 		
-		public static string Parse (string input, Dictionary<string, string> customTags)
+		static string FormatValue (object val, string format)
+		{
+			if (format.Length == 0)
+				return val.ToString ();
+			if (val is DateTime)
+				return ((DateTime)val).ToString (format);
+			else if (val is int)
+				return ((int)val).ToString (format);
+			else if (val is uint)
+				return ((uint)val).ToString (format);
+			else if (val is long)
+				return ((long)val).ToString (format);
+			else if (val is ulong)
+				return ((ulong)val).ToString (format);
+			else if (val is short)
+				return ((short)val).ToString (format);
+			else if (val is ushort)
+				return ((ushort)val).ToString (format);
+			else if (val is byte)
+				return ((byte)val).ToString (format);
+			else if (val is sbyte)
+				return ((sbyte)val).ToString (format);
+			else if (val is decimal)
+				return ((decimal)val).ToString (format);
+			else if (val is float)
+				return ((float)val).ToString (format);
+			else if (val is double)
+				return ((double)val).ToString (format);
+			else
+				return val.ToString ();
+		}
+		
+		public static string Parse<T> (string input, Dictionary<string,T> customTags)
+		{
+			return Parse (input, new DictionaryStringTagModel<T> (customTags));
+		}
+		
+		public static string Parse (string input, string[,] customTags)
+		{
+			Dictionary<string, object> tags = new Dictionary<string, object> (StringComparer.InvariantCultureIgnoreCase);
+			if (customTags != null) {
+				for (int i = 0; i < customTags.GetLength (0); ++i) {
+					tags.Add (customTags[i, 0].ToUpper (), customTags[i, 1]);
+				}
+			}
+			return Parse (input, tags);
+		}
+		
+		public static string Parse (string input, IStringTagModel customTags)
 		{
 			StringBuilder result = new StringBuilder (input.Length);
 			int i = 0;
@@ -156,23 +202,10 @@ namespace MonoDevelop.Core
 			return result.ToString ();
 		}
 		
-		public static string Parse (string input, string[,] customTags)
+		public static IEnumerable<IStringTagProvider> GetProviders ()
 		{
-			Dictionary<string, string> tags = new Dictionary<string, string> (StringComparer.InvariantCultureIgnoreCase);
-			if (customTags != null) {
-				for (int i = 0; i < customTags.GetLength (0); ++i) {
-					tags.Add (customTags[i, 0].ToUpper (), customTags[i, 1]);
-				}
-			}
-			return Parse (input, tags);
-		}
-		
-		public interface IStringTagProvider 
-		{
-			IEnumerable<string> Tags {
-				get;
-			}
-			string Convert (string tag, string format);
+			foreach (IStringTagProvider provider in AddinManager.GetExtensionObjects (typeof(IStringTagProvider)))
+				yield return provider;
 		}
 	}
 }

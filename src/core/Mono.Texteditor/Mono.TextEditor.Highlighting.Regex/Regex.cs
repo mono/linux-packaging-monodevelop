@@ -23,17 +23,19 @@ namespace Mono.TextEditor.Highlighting
 				int curOffset = offset;
 				bool match = true;
 				for (int i = 0; i < pattern.Length; i++) {
+					if (curOffset >= doc.Length) {
+						match = false;
+						break;
+					}
+					
 					if (doc.GetCharAt (curOffset) != pattern[i]) {
 						match = false;
 						break;
 					}
 					curOffset++;
-					if (curOffset >= doc.Length) {
-						match = i + 1 == pattern.Length;
-						break;
-					}
+					
 				}
-				if (match)
+				if (match) 
 					return new RegexMatch (pattern.Length);
 			}
 			return RegexMatch.NoMatch;

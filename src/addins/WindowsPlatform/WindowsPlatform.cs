@@ -2,11 +2,16 @@ using System;
 using System.IO;
 using System.Drawing;
 using System.Drawing.Imaging;
-using MonoDevelop.Core.Gui;
 using System.Runtime.InteropServices;
 using System.Collections;
 using System.Collections.Generic;
 using Microsoft.Win32;
+using CustomControls.OS;
+using CustomControls.Controls;
+using System.Windows.Forms;
+using MonoDevelop.Ide.Desktop;
+using System.Diagnostics;
+using MonoDevelop.Core.Execution;
 
 namespace MonoDevelop.Platform
 {
@@ -108,5 +113,29 @@ namespace MonoDevelop.Platform
 			ms.Position = 0;
 			return new Gdk.Pixbuf (ms);
 		}
+		
+		public override IProcessAsyncOperation StartConsoleProcess (string command, string arguments, string workingDirectory,
+		                                                            IDictionary<string, string> environmentVariables, 
+		                                                            string title, bool pauseWhenFinished)
+		{
+			string args = "/C \"title " + title + " && \"" + command + "\" " + arguments;
+			if (pauseWhenFinished)
+			    args += " && pause\"";
+			else
+			    args += "\"";
+			
+			var psi = new ProcessStartInfo ("cmd.exe", args) {
+				CreateNoWindow = true,
+				WorkingDirectory = workingDirectory,
+				UseShellExecute = false,
+			};
+			foreach (var env in environmentVariables)
+				psi.EnvironmentVariables [env.Key] = env.Value;
+			
+			ProcessWrapper proc = new ProcessWrapper ();
+			proc.StartInfo = psi;
+			proc.Start ();
+			return proc;
+        }
 	}
 }

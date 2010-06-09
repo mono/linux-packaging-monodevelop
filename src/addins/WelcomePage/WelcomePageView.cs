@@ -22,32 +22,29 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
 OTHER DEALINGS IN THE SOFTWARE. 
 */
+
 using System;
-using System.Reflection;
-using System.Text;
-using System.Text.RegularExpressions;
-
-using Gtk;
-
-using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.WebBrowser;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Commands;
-using MonoDevelop.Components.Commands;
-
-using System.Net;
-using System.Xml;
-using System.IO;
 using System.Collections.Generic;
-
+using System.IO;
+using System.Net;
+using System.Reflection;
+using System.Xml;
+using Gtk;
+using MonoDevelop.Core;
+using MonoDevelop.Ide.Commands;
+using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide.Desktop;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.WelcomePage
 {	
-	public abstract class WelcomePageView : AbstractViewContent
+	class WelcomePageView : AbstractViewContent
 	{
 		bool loadingProject;
 		EventHandler recentChangesHandler;
+		
+		WelcomePageWidget widget;
+		ScrolledWindow scroller;
 		
 		// netNewsXml is where online the news.xml file can be found
 		static string netNewsXml {
@@ -69,6 +66,10 @@ namespace MonoDevelop.WelcomePage
 			get { return false; }
 		}
 		
+		public override Widget Control {
+			get { return scroller;  }
+		}
+		
 		public WelcomePageView () : base ()
 		{
 			this.ContentName = GettextCatalog.GetString ("Welcome");
@@ -79,6 +80,18 @@ namespace MonoDevelop.WelcomePage
 			NewsUpdated += (EventHandler) DispatchService.GuiDispatch (new EventHandler (HandleNewsUpdate));
 			
 			UpdateNews ();
+			
+			Build ();
+		}
+		
+		void Build ()
+		{
+			scroller = new ScrolledWindow ();
+			widget = new WelcomePageWidget (this);
+			scroller.AddWithViewport (widget);
+			scroller.ShadowType = ShadowType.None;
+			scroller.FocusChain = new Widget[] { widget };
+			scroller.Show ();
 		}
 		
 		public XmlDocument GetUpdatedXmlDocument ()
@@ -108,7 +121,7 @@ namespace MonoDevelop.WelcomePage
 			return contentDoc;
 		}
 		
-		static void updateNewsXmlThread ()
+		static void UpdateNewsXmlAsync ()
 		{
 			//check to see if the online news file has been modified since it was last downloaded
 			string netNewsXml = WelcomePageView.netNewsXml;
@@ -121,43 +134,53 @@ namespace MonoDevelop.WelcomePage
 				request.IfModifiedSince = localNewsXml.LastWriteTime;
 			
 			try {
-				HttpWebResponse response = (HttpWebResponse) request.GetResponse ();
-				if (response.StatusCode ==  HttpStatusCode.OK) {
-					Stream responseStream = response.GetResponseStream ();
-					using (FileStream fs = File.Create (localCachedNewsFile)) {
-						long avail = response.ContentLength;
-						int position = 0;
-						int readBytes = -1;
-						byte[] buffer = new byte[2048];
-						while (readBytes != 0) {							
-							readBytes = responseStream.Read
-								(buffer, position, (int) (avail > 2048 ? 2048 : avail));
-							position += readBytes;
-							avail -= readBytes;
-							fs.Write (buffer, 0, readBytes);
+				request.BeginGetResponse (delegate (IAsyncResult ar) {
+					try {
+						var response = (HttpWebResponse) request.EndGetResponse (ar);
+						if (response.StatusCode == HttpStatusCode.OK) {
+							using (var fs = File.Create (localCachedNewsFile))
+								CopyStream (fs, response.GetResponseStream (), response.ContentLength);
 						}
+						NewsUpdated (null, EventArgs.Empty);
+					} catch (System.Net.WebException wex) {
+						var httpResp = wex.Response as HttpWebResponse;
+						if (httpResp != null && httpResp.StatusCode == HttpStatusCode.NotModified) {
+							LoggingService.LogInfo ("Welcome Page already up-to-date.");
+						} else if (httpResp != null && httpResp.StatusCode == HttpStatusCode.NotFound) {
+							LoggingService.LogInfo ("Welcome Page update file not found.", netNewsXml);
+						} else {
+							LoggingService.LogWarning ("Welcome Page news file could not be downloaded.", wex);
+						}
+					} catch (Exception ex) {
+						LoggingService.LogWarning ("Welcome Page news file could not be downloaded.", ex);
+					} finally {
+						lock (updateLock)
+							isUpdating = false;
 					}
-				}
-				NewsUpdated (null, EventArgs.Empty);
-			} catch (System.Net.WebException wex) {
-				HttpWebResponse httpResp = wex.Response as HttpWebResponse;
-				if (httpResp != null && httpResp.StatusCode == HttpStatusCode.NotModified) {
-					LoggingService.LogInfo ("Welcome Page already up-to-date.");
-				} else if (httpResp != null && httpResp.StatusCode == HttpStatusCode.NotFound) {
-					LoggingService.LogInfo ("Welcome Page update file not found.", netNewsXml);
-				} else {
-					LoggingService.LogWarning ("Welcome Page news file could not be downloaded.", wex);
-				}
+				}, null);
 			} catch (Exception ex) {
 				LoggingService.LogWarning ("Welcome Page news file could not be downloaded.", ex);
+				lock (updateLock)
+					isUpdating = false;
 			}
-			lock (updateLock)
-				isUpdating = false;
+		}
+		
+		static void CopyStream (Stream fr, Stream to, long remaining)
+		{
+			int position = 0;
+			int readBytes = -1;
+			byte[] buffer = new byte[2048];
+			while (readBytes != 0) {							
+				readBytes = fr.Read (buffer, position, (int) (remaining > 2048 ? 2048 : remaining));
+				position += readBytes;
+				remaining -= readBytes;
+				to.Write (buffer, 0, readBytes);
+			}
 		}
 		
 		public static void UpdateNews ()
 		{
-			if (!PropertyService.Get<bool>("WelcomePage.UpdateFromInternet", true))
+			if (!WelcomePageOptions.UpdateFromInternet)
 				return;
 			
 			lock (updateLock) {
@@ -166,16 +189,18 @@ namespace MonoDevelop.WelcomePage
 				else
 					isUpdating = true;
 			}
-			System.Threading.ThreadStart ts = new System.Threading.ThreadStart (updateNewsXmlThread);
-			System.Threading.Thread updateThread = new System.Threading.Thread (ts);
-			updateThread.IsBackground = true;
-			updateThread.Start ();
+			
+			UpdateNewsXmlAsync ();
 		}
 		
 		static object updateLock = new object ();
 		static bool isUpdating;
 		static event EventHandler NewsUpdated;
-		protected abstract void HandleNewsUpdate (object sender, EventArgs args);
+		
+		void HandleNewsUpdate (object sender, EventArgs args)
+		{
+			widget.Rebuild ();
+		}
 		
 		public void HandleLinkAction (string uri)
 		{
@@ -232,30 +257,39 @@ namespace MonoDevelop.WelcomePage
 			}
 		}
 		
+		StatusBarContext statusBar;
+		
 		public void SetLinkStatus (string link)
 		{
-			if (String.IsNullOrEmpty (link) || link.IndexOf ("monodevelop://") != -1) {
-				IdeApp.Workbench.StatusBar.ShowMessage (null);
-			} else if (link.IndexOf ("project://") != -1) {
+			if (link == null) {
+				if (statusBar != null) {
+					statusBar.Dispose ();
+					statusBar = null;
+				}
+				return;
+			}
+			if (link.IndexOf ("monodevelop://") != -1)
+				return;
+				
+			if (statusBar == null)
+				statusBar = IdeApp.Workbench.StatusBar.CreateContext ();
+			
+			if (link.IndexOf ("project://") != -1) {
 				string message = link;
 				message = message.Substring (10);
 				string msg = GettextCatalog.GetString ("Open solution {0}", message);
 				if (IdeApp.Workspace.IsOpen)
 					msg += " - " + GettextCatalog.GetString ("Hold Control key to open in current workspace.");
-				IdeApp.Workbench.StatusBar.ShowMessage (msg);
+				statusBar.ShowMessage (msg);
 			} else {
 				string msg = GettextCatalog.GetString ("Open {0}", link);
-				IdeApp.Workbench.StatusBar.ShowMessage (msg);
+				statusBar.ShowMessage (msg);
 			}
 		}
 
-		public static WelcomePageView GetWelcomePage ()
+		void RecentChangesHandler (object sender, EventArgs e)
 		{
-			return new WelcomePageFallbackView ();
-		}
-
-		protected virtual void RecentChangesHandler (object sender, EventArgs e)
-		{
+			widget.LoadRecent ();
 		}
 
 		public override void Dispose ()

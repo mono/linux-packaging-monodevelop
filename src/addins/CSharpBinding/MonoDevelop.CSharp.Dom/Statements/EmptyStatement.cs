@@ -31,8 +31,20 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class EmptyStatement : AbstractCSharpNode
 	{
-		public INode Semicolon {
-			get { return GetChildByRole (Roles.Semicolon); }
+		public DomLocation Location {
+			get;
+			set;
+		}
+		
+		public override DomLocation StartLocation {
+			get {
+				return Location;
+			}
+		}
+		public override DomLocation EndLocation {
+			get {
+				return new DomLocation (Location.Line, Location.Column + 1);
+			}
 		}
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)

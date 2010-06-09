@@ -25,9 +25,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using System.ComponentModel;
 
 using Gtk;
 
@@ -37,13 +34,14 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Projects.CodeGeneration;
 using MonoDevelop.Components.Commands;
 using Mono.TextEditor.Highlighting;
 using MonoDevelop.Ide.CodeTemplates;
 using Mono.Addins;
 using MonoDevelop.Projects.Text;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.SourceEditor
 {
@@ -65,12 +63,10 @@ namespace MonoDevelop.SourceEditor
 			get { return (ISourceEditorOptions)base.Options; }
 		}
 		
-		public ExtensibleTextEditor (SourceEditorView view, ISourceEditorOptions options, Mono.TextEditor.Document doc) : base(doc, null)
+		public ExtensibleTextEditor (SourceEditorView view, ISourceEditorOptions options, Mono.TextEditor.Document doc) : base(doc, options)
 		{
-			base.Options = options;
 			Initialize (view);
 		}
-
 		
 		public ExtensibleTextEditor (SourceEditorView view)
 		{
@@ -155,7 +151,6 @@ namespace MonoDevelop.SourceEditor
 
 		protected override void OnDestroyed ()
 		{
-			Extension = null;
 			view = null;
 			this.ButtonPressEvent -= OnPopupMenu;
 			AddinManager.RemoveExtensionNodeHandler  ("MonoDevelop/SourceEditor2/TooltipProviders", OnTooltipProviderChanged);
@@ -195,34 +190,39 @@ namespace MonoDevelop.SourceEditor
 		protected override void OptionsChanged (object sender, EventArgs args)
 		{
 			if (view.Control != null) {
-				((SourceEditorWidget)view.Control).ShowClassBrowser = Options.EnableQuickFinder;
+				((SourceEditorView)view).SourceEditorWidget.ShowClassBrowser = Options.EnableQuickFinder;
 				if (!Options.ShowFoldMargin)
 					this.Document.ClearFoldSegments ();
 			}
 			UpdateEditMode ();
 			base.OptionsChanged (sender, args);
 		}
-		
+		bool isInKeyStroke = false;
 		protected override bool OnKeyPressEvent (Gdk.EventKey evnt)
 		{
-			// Handle keyboard menu popup
-			if (evnt.Key == Gdk.Key.Menu || (evnt.Key == Gdk.Key.F10 && (evnt.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask)) {
-				this.menuPopupLocation = this.TextViewMargin.LocationToDisplayCoordinates (this.Caret.Location);
-				this.menuPopupLocation.Y += this.TextViewMargin.LineHeight;
-				this.ShowPopup ();
-				return true;
+			isInKeyStroke = true;
+			try {
+				// Handle keyboard menu popup
+				if (evnt.Key == Gdk.Key.Menu || (evnt.Key == Gdk.Key.F10 && (evnt.State & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask)) {
+					this.menuPopupLocation = this.TextViewMargin.LocationToDisplayCoordinates (this.Caret.Location);
+					this.menuPopupLocation.Y += this.TextViewMargin.LineHeight;
+					this.ShowPopup ();
+					return true;
+				}
+				
+				// Handle keyboard toolip popup
+	/*			if ((evnt.Key == Gdk.Key.F1 && (evnt.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask)) {
+					Gdk.Point p = this.TextViewMargin.LocationToDisplayCoordinates (this.Caret.Location);
+					this.mx = p.X;
+					this.my = p.Y;
+					this.ShowTooltip ();
+					return true;
+				}
+	*/			
+				return base.OnKeyPressEvent (evnt);
+			} finally {
+				isInKeyStroke = false;
 			}
-			
-			// Handle keyboard toolip popup
-/*			if ((evnt.Key == Gdk.Key.F1 && (evnt.State & Gdk.ModifierType.ControlMask) == Gdk.ModifierType.ControlMask)) {
-				Gdk.Point p = this.TextViewMargin.LocationToDisplayCoordinates (this.Caret.Location);
-				this.mx = p.X;
-				this.my = p.Y;
-				this.ShowTooltip ();
-				return true;
-			}
-*/			
-			return base.OnKeyPressEvent (evnt);
 		}
 		
 		bool ExtensionKeyPress (Gdk.Key key, uint ch, Gdk.ModifierType state)
@@ -238,7 +238,7 @@ namespace MonoDevelop.SourceEditor
 		void ReportExtensionError (Exception ex) 
 		{
 			MonoDevelop.Core.LoggingService.LogError ("Error in text editor extension chain", ex);
-			MonoDevelop.Core.Gui.MessageService.ShowException (ex, "Error in text editor extension chain");
+			MessageService.ShowException (ex, "Error in text editor extension chain");
 		}
 		
 		IEnumerable<char> TextWithoutCommentsAndStrings {
@@ -307,10 +307,7 @@ namespace MonoDevelop.SourceEditor
 		{
 			bool result = true;
 			if (key == Gdk.Key.Escape) {
-				bool b;
-				if (Extension != null)
-					b = ExtensionKeyPress (key, ch, state); else
-					b = base.OnIMProcessedKeyPressEvent (key, ch, state);
+				bool b = Extension != null ? ExtensionKeyPress (key, ch, state) : base.OnIMProcessedKeyPressEvent (key, ch, state);
 				if (b) {
 					view.SourceEditorWidget.RemoveSearchWidget ();
 					return true;
@@ -326,6 +323,8 @@ namespace MonoDevelop.SourceEditor
 			if (line == null)
 				return true;
 			bool inChar = false;
+			bool inComment = false;
+			bool inString = false;
 //			string escape = "\"";
 			Stack<Span> stack = line.StartSpan != null ? new Stack<Span> (line.StartSpan) : new Stack<Span> ();
 			Mono.TextEditor.Highlighting.SyntaxModeService.ScanSpans (Document, Document.SyntaxMode, Document.SyntaxMode, stack, line.Offset, Caret.Offset);
@@ -335,11 +334,13 @@ namespace MonoDevelop.SourceEditor
 				if (span.Color == "string.single" || span.Color == "string.double" || span.Color.StartsWith ("comment")) {
 					inStringOrComment = true;
 					inChar |= span.Color == "string.single";
+					inComment |= span.Color.StartsWith ("comment");
+					inString = !inChar && !inComment;
 					//escape = span.Escape;
 					break;
 				}
 			}
-
+			
 			Document.BeginAtomicUndo ();
 
 			// insert template when space is typed (currently disabled - it's annoying).
@@ -351,6 +352,7 @@ namespace MonoDevelop.SourceEditor
 			const string closingBrackets = "}])'\"";
 			int braceIndex = openBrackets.IndexOf ((char)ch);
 			SkipChar skipChar = skipChars.Find (sc => sc.Char == (char)ch && sc.Offset == Caret.Offset);
+			
 
 			// special handling for escape chars inside ' and "
 			if (Caret.Offset > 0) {
@@ -375,15 +377,20 @@ namespace MonoDevelop.SourceEditor
 
 					if (count >= 0) {
 						GetTextEditorData ().EnsureCaretIsNotVirtual ();
+						
+						int offset = Caret.Offset;
 						insertionChar = closingBrace;
-						Insert (Caret.Offset, closingBrace.ToString ());
+						Insert (offset, closingBrace.ToString ());
+						Caret.Offset = offset;
 					}
 				} else {
 					char charBefore = Document.GetCharAt (Caret.Offset - 1);
-					if (!inChar && ch == '"' && charBefore != '\\') {
+					if (!inString && !inComment && !inChar && ch == '"' && charBefore != '\\') {
 						GetTextEditorData ().EnsureCaretIsNotVirtual ();
 						insertionChar = '"';
+						int offset = Caret.Offset;
 						Insert (Caret.Offset, "\"");
+						Caret.Offset = offset;
 					}
 				}
 			}
@@ -438,15 +445,10 @@ namespace MonoDevelop.SourceEditor
 		
 		public ProjectDom ProjectDom {
 			get {
-				ProjectDom result = null;
 				MonoDevelop.Ide.Gui.Document doc = IdeApp.Workbench.ActiveDocument;
-				if (doc != null || doc.Project == null) 
-					result = ProjectDomService.GetProjectDom (doc.Project);
-				
-				if (result == null)
-					result = ProjectDomService.GetFileDom (View.ContentName);
-				
-				return result;
+				if (doc != null) 
+					return doc.Dom;
+				return null;
 			}
 		}
 		
@@ -454,116 +456,16 @@ namespace MonoDevelop.SourceEditor
 		ResolveResult resolveResult = null;
 		public ResolveResult GetLanguageItem (int offset)
 		{
-			string txt = this.Document.Text;
-			string fileName = view.ContentName ?? view.UntitledName;
 			
 			// we'll cache old results.
 			if (offset == oldOffset)
 				return this.resolveResult;
 			oldOffset = offset;
 			
-			this.resolveResult = null;
-			MonoDevelop.Ide.Gui.Document doc = IdeApp.Workbench.ActiveDocument;
-			if (doc == null)
-				return null;
-			
-			IParser parser = ProjectDomService.GetParser (fileName, Document.MimeType);
-			if (parser == null)
-				return null;
-
-			ProjectDom        dom      = this.ProjectDom;
-			IResolver         resolver = parser.CreateResolver (dom, doc, fileName);
-			IExpressionFinder expressionFinder = parser.CreateExpressionFinder (dom);
-			if (resolver == null || expressionFinder == null) 
-				return null;
-			int wordEnd = offset;
-			while (wordEnd < txt.Length && (Char.IsLetterOrDigit (txt[wordEnd]) || txt[wordEnd] == '_'))
-				wordEnd++;
-			ExpressionResult expressionResult = expressionFinder.FindExpression (txt, wordEnd);
-			if (expressionResult == null)
-				return null;
-			DocumentLocation loc = Document.OffsetToLocation (offset);
-			string savedExpression = null;
-			// special handling for 'var' "keyword"
-			if (expressionResult.ExpressionContext == ExpressionContext.IdentifierExpected && expressionResult.Expression != null && expressionResult.Expression.Trim () == "var") {
-				int endOffset = Document.LocationToOffset (expressionResult.Region.End.Line - 1, expressionResult.Region.End.Column - 1);
-				StringBuilder identifer = new StringBuilder ();
-				for (int i = endOffset; i >= 0 && i < Document.Length; i++) {
-					char ch = Document.GetCharAt (i);
-					if (Char.IsWhiteSpace (ch))
-						continue;
-					if (ch == '=')
-						break;
-					if (Char.IsLetterOrDigit (ch) || ch =='_') {
-						identifer.Append (ch);
-						continue;
-					}
-					identifer.Length = 0;
-					break;
-				}
-				if (identifer.Length > 0) {
-					expressionResult.Expression = identifer.ToString ();
-					this.resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
-					if (this.resolveResult != null) {
-						this.resolveResult = new MemberResolveResult (dom.GetType (resolveResult.ResolvedType));
-						return this.resolveResult;
-					}
-				}
-			}
-			
-			if (expressionResult.ExpressionContext == ExpressionContext.Attribute) {
-				savedExpression = expressionResult.Expression;
-				expressionResult.Expression += "Attribute";
-				expressionResult.ExpressionContext = ExpressionContext.ObjectCreation;
-			} 
-			this.resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
-			
-			if (savedExpression != null && this.resolveResult == null) {
-				expressionResult.Expression = savedExpression;
-				this.resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
-			}
-			// Search for possible generic parameters.
-//			if (this.resolveResult == null || this.resolveResult.ResolvedType == null || String.IsNullOrEmpty (this.resolveResult.ResolvedType.Name)) {
-			if (!expressionResult.Region.IsEmpty) {
-				int j = Document.LocationToOffset (expressionResult.Region.End.Line - 1, expressionResult.Region.End.Column - 1);
-				int bracket = 0;
-				for (int i = j; i >= 0 && i < Document.Length; i++) {
-					char ch = Document.GetCharAt (i);
-					if (Char.IsWhiteSpace (ch))
-						continue;
-					if (ch == '<') {
-						bracket++;
-					} else if (ch == '>') {
-						bracket--;
-						if (bracket == 0) {
-							expressionResult.Expression += Document.GetTextBetween (j, i + 1);
-							expressionResult.ExpressionContext = ExpressionContext.ObjectCreation;
-							this.resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
-							break;
-						}
-					} else {
-						if (bracket == 0)
-							break;
-					}
-				}
-			}
-			
-			// To resolve method overloads the full expression must be parsed.
-			// ex.: Overload (1)/ Overload("one") - parsing "Overload" gives just a MethodResolveResult
-			// and for constructor initializers it's tried too to to resolve constructor overloads.
-			if (this.resolveResult is ThisResolveResult || 
-			    this.resolveResult is BaseResolveResult || 
-			    this.resolveResult is MethodResolveResult && ((MethodResolveResult)resolveResult).Methods.Count > 1) {
-				// put the search offset at the end of the invocation to be able to find the full expression
-				// the resolver finds it itself if spaces are between the method name and the argument opening parentheses.
-				if (txt[wordEnd] == '(') {
-					int matchingBracket = Document.GetMatchingBracketOffset (wordEnd);
-					if (matchingBracket > 0)
-						wordEnd = matchingBracket;
-				}
-				ResolveResult possibleResult = resolver.Resolve (expressionFinder.FindFullExpression (txt, wordEnd), new DomLocation (loc.Line + 1, loc.Column + 1)) ?? this.resolveResult;
-				if (possibleResult is MethodResolveResult)
-					this.resolveResult = possibleResult;
+			if (textEditorResolverProvider != null) {
+				this.resolveResult = textEditorResolverProvider.GetLanguageItem (this.ProjectDom, GetTextEditorData (), offset);
+			} else {
+				this.resolveResult = null;
 			}
 			
 			return this.resolveResult;
@@ -586,76 +488,23 @@ namespace MonoDevelop.SourceEditor
 			return CodeTemplateContext.Standard;
 		}
 		
+		ITextEditorResolverProvider textEditorResolverProvider;
+		
+		public ITextEditorResolverProvider TextEditorResolverProvider {
+			get { return this.textEditorResolverProvider; }
+			internal set { this.textEditorResolverProvider = value; }
+		}
+		
 		public ResolveResult GetLanguageItem (int offset, string expression)
 		{
-			string txt = this.Document.Text;
-			string fileName = view.ContentName ?? view.UntitledName;
-			
 			oldOffset = offset;
 			
-			this.resolveResult = null;
-			MonoDevelop.Ide.Gui.Document doc = IdeApp.Workbench.ActiveDocument;
-			if (doc == null)
-				return null;
-			
-			IParser parser = ProjectDomService.GetParser (fileName, Document.MimeType);
-			if (parser == null)
-				return null;
-
-			ProjectDom        dom      = this.ProjectDom;
-			IResolver         resolver = parser.CreateResolver (dom, doc, fileName);
-			IExpressionFinder expressionFinder = parser.CreateExpressionFinder (dom);
-			if (resolver == null || expressionFinder == null) 
-				return null;
-			int wordEnd = offset;
-			while (wordEnd < txt.Length && (Char.IsLetterOrDigit (txt[wordEnd]) || txt[wordEnd] == '_'))
-				wordEnd++;
-			ExpressionResult expressionResult = new ExpressionResult (expression);
-			expressionResult.ExpressionContext = ExpressionContext.MethodBody;
-			
-			DocumentLocation loc = Document.OffsetToLocation (offset);
-			string savedExpression = null;
-			
-			if (expressionResult.ExpressionContext == ExpressionContext.Attribute) {
-				savedExpression = expressionResult.Expression;
-				expressionResult.Expression += "Attribute";
-				expressionResult.ExpressionContext = ExpressionContext.ObjectCreation;
-			} 
-			this.resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
-			if (savedExpression != null && this.resolveResult == null) {
-				expressionResult.Expression = savedExpression;
-				this.resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
+			if (textEditorResolverProvider != null) {
+				this.resolveResult = textEditorResolverProvider.GetLanguageItem (this.ProjectDom, GetTextEditorData (), offset, expression);
+			} else {
+				this.resolveResult = null;
 			}
-			// Search for possible generic parameters.
-//			if (this.resolveResult == null || this.resolveResult.ResolvedType == null || String.IsNullOrEmpty (this.resolveResult.ResolvedType.Name)) {
-				int j = Document.LocationToOffset (expressionResult.Region.End.Line - 1, expressionResult.Region.End.Column - 1);
-				int bracket = 0;
-				for (int i = j; i >= 0 && i < Document.Length; i++) {
-					char ch = Document.GetCharAt (i);
-					if (Char.IsWhiteSpace (ch))
-						continue;
-					if (ch == '<') {
-						bracket++;
-					} else if (ch == '>') {
-						bracket--;
-						if (bracket == 0) {
-							expressionResult.Expression += Document.GetTextBetween (j, i + 1);
-							expressionResult.ExpressionContext = ExpressionContext.ObjectCreation;
-							this.resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
-							break;
-						}
-					} else {
-						if (bracket == 0)
-							break;
-					}
-				}
-//			}
-			
-			// To resolve method overloads the full expression must be parsed.
-			// ex.: Overload (1)/ Overload("one") - parsing "Overload" gives just a MethodResolveResult
-			if (this.resolveResult is MethodResolveResult) 
-				this.resolveResult = resolver.Resolve (expressionFinder.FindFullExpression (txt, wordEnd), new DomLocation (loc.Line + 1, loc.Column + 1)) ?? this.resolveResult;
-			
+	
 			return this.resolveResult;
 		}
 
@@ -700,13 +549,6 @@ namespace MonoDevelop.SourceEditor
 			return base.OnFocusOutEvent (evnt); 
 		}
 		
-		protected override bool OnScrollEvent (Gdk.EventScroll evnt)
-		{
-			CompletionWindowManager.HideWindow ();
-			ParameterInformationWindowManager.HideWindow ();
-			return base.OnScrollEvent (evnt);
-		}
-		
 		void ShowPopup ()
 		{
 			HideTooltip ();
@@ -727,8 +569,10 @@ namespace MonoDevelop.SourceEditor
 			x += this.menuPopupLocation.X;
 			y += this.menuPopupLocation.Y;
 			Requisition request = menu.SizeRequest ();
-			y = Math.Min (y, GdkWindow.Screen.Height - request.Height);
-			x = Math.Min (x, GdkWindow.Screen.Width - request.Width);
+			Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtPoint (x, y));
+			
+			y = Math.Max (geometry.Top, Math.Min (y, geometry.Bottom - request.Height));
+			x = Math.Max (geometry.Left, Math.Min (x, geometry.Right - request.Width));
 			pushIn = true;
 		}
 		
@@ -777,10 +621,10 @@ namespace MonoDevelop.SourceEditor
 		void HandleTextPaste (int insertionOffset, string text)
 		{
 			if (PropertyService.Get ("OnTheFlyFormatting", false)) {
-				IPrettyPrinter prettyPrinter = TextFileService.GetPrettyPrinter (Document.MimeType);
+				Formatter prettyPrinter = TextFileService.GetFormatter (Document.MimeType);
 				if (prettyPrinter != null && prettyPrinter.SupportsOnTheFlyFormatting && ProjectDom != null && text != null) {
 					try {
-						string newText = prettyPrinter.FormatText (ProjectDom.Project, Document.MimeType, Document.Text, insertionOffset, insertionOffset + text.Length);
+						string newText = prettyPrinter.FormatText (ProjectDom.Project.Policies, Document.MimeType, Document.Text, insertionOffset, insertionOffset + text.Length);
 						if (!string.IsNullOrEmpty (newText)) {
 							Replace (insertionOffset, text.Length, newText);
 							Caret.Offset = insertionOffset + newText.Length;
@@ -792,19 +636,19 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		
-		public void InsertTemplate (CodeTemplate template, MonoDevelop.Ide.Gui.Document document)
+		internal void InsertTemplate (CodeTemplate template, MonoDevelop.Ide.Gui.Document document)
 		{
 			Document.BeginAtomicUndo ();
-			CodeTemplate.TemplateResult result = template.InsertTemplate (document);
+			var result = template.InsertTemplateContents (document);
 			TextLinkEditMode tle = new TextLinkEditMode (this, 
 			                                             result.InsertPosition,
 			                                             result.TextLinks);
 			
 			if (PropertyService.Get ("OnTheFlyFormatting", false)) {
-				IPrettyPrinter prettyPrinter = TextFileService.GetPrettyPrinter (Document.MimeType);
+				Formatter prettyPrinter = TextFileService.GetFormatter (Document.MimeType);
 				if (prettyPrinter != null && prettyPrinter.SupportsOnTheFlyFormatting) {
 					int endOffset = result.InsertPosition + result.Code.Length;
-					string text = prettyPrinter.FormatText (document.Project, Document.MimeType, Document.Text, result.InsertPosition, endOffset);
+					string text = prettyPrinter.FormatText (document.Project.Policies, Document.MimeType, Document.Text, result.InsertPosition, endOffset);
 					string oldText = Document.GetTextAt (result.InsertPosition, result.Code.Length);
 					//					Console.WriteLine (result.InsertPosition);
 					//					Console.WriteLine ("old:" + oldText);
@@ -849,6 +693,23 @@ namespace MonoDevelop.SourceEditor
 			}
 			return j;
 		}
+		
+		protected override void HAdjustmentValueChanged ()
+		{
+			base.HAdjustmentValueChanged ();
+			if (!isInKeyStroke) {
+				CompletionWindowManager.HideWindow ();
+				ParameterInformationWindowManager.HideWindow ();
+			}
+		}
+		
+		protected override void VAdjustmentValueChanged ()
+		{
+			base.VAdjustmentValueChanged ();
+			CompletionWindowManager.HideWindow ();
+			ParameterInformationWindowManager.HideWindow ();
+		}
+		
 		
 #endregion
 		
@@ -1151,6 +1012,35 @@ namespace MonoDevelop.SourceEditor
 		internal void OnPulseCaretCommand ()
 		{
 			StartCaretPulseAnimation ();
+		}
+		
+		[CommandHandler (MonoDevelop.SourceEditor.SourceEditorCommands.ToggleCodeFocus)]
+		internal void OnToggleCodeFocus ()
+		{
+			foldMarkerMargin.IsInCodeFocusMode = !foldMarkerMargin.IsInCodeFocusMode;
+		}
+		
+		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.TransposeCharacters)]
+		internal void TransposeCharacters ()
+		{
+			RunAction (MiscActions.TransposeCharacters);
+		}
+		
+		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.RecenterEditor)]
+		internal void RecenterEditor ()
+		{
+			RunAction (MiscActions.RecenterEditor);
+		}
+		
+		[CommandHandler (MonoDevelop.Ide.Commands.EditCommands.JoinWithNextLine)]
+		internal void JoinLines ()
+		{
+			try {
+				Document.BeginAtomicUndo ();
+				RunAction (Mono.TextEditor.Vi.ViActions.Join);
+			} finally {
+				Document.EndAtomicUndo ();
+			}
 		}
 		
 #endregion

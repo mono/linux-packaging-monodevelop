@@ -181,7 +181,7 @@ namespace MonoDevelop.CSharp.Resolver
 					if (firstExprs.Expression != null) {
 						IReturnType unresolvedReturnType = NRefactoryResolver.ParseReturnType (firstExprs);
 						if (unresolvedReturnType != null) {
-							IType resolvedType = projectContent.SearchType (new SearchTypeRequest (unit, unresolvedReturnType, callingType));
+							IType resolvedType = projectContent.SearchType ((INode)callingType ?? unit, unresolvedReturnType);
 							return ExpressionContext.TypeDerivingFrom (resolvedType != null ? new DomReturnType (resolvedType) : null, unresolvedReturnType, true);
 						}
 					}
@@ -230,7 +230,7 @@ namespace MonoDevelop.CSharp.Resolver
 			if (firstExprs.Expression != null) {
 				IReturnType unresolvedReturnType = NRefactoryResolver.ParseReturnType (firstExprs);
 				if (unresolvedReturnType != null) {
-					IType resolvedType = projectContent.SearchType (new SearchTypeRequest (unit, unresolvedReturnType, callingType));
+					IType resolvedType = projectContent.SearchType ((INode)callingType ?? unit, unresolvedReturnType);
 					return ExpressionContext.TypeDerivingFrom (resolvedType != null ? new DomReturnType (resolvedType) : null, unresolvedReturnType, true);
 				}
 				
@@ -308,7 +308,7 @@ namespace MonoDevelop.CSharp.Resolver
 			if (firstExprs.Expression != null) {
 				IReturnType unresolvedReturnType = NRefactoryResolver.ParseReturnType (firstExprs);
 				if (unresolvedReturnType != null) {
-					IType resolvedType = projectContent.SearchType (new SearchTypeRequest (unit, unresolvedReturnType, callingType));
+					IType resolvedType = projectContent.SearchType ((INode)callingType ?? unit, unresolvedReturnType);
 					return ExpressionContext.TypeDerivingFrom (resolvedType != null ? new DomReturnType (resolvedType) : null, unresolvedReturnType, true);
 				}
 				
@@ -687,49 +687,61 @@ namespace MonoDevelop.CSharp.Resolver
 		Frame frame;
 		int lastToken;
 
+/*		public ExpressionResult FindExpression (string text, int offset)
+		{
+			int wordEnd = offset;
+			while (wordEnd < text.Length && (Char.IsLetterOrDigit (text[wordEnd]) || text[wordEnd] == '_'))
+				wordEnd++;
+			return InternalFindExpression (text, wordEnd);
+		}*/
+		
 		public ExpressionResult FindExpression (string text, int offset)
 		{
 			Init (text, offset);
-			Token token;
-			Location lastError = Location.Empty;
-			lexer.Errors.Error = delegate(int errorLine, int errorCol, string errorMsg) { lastError = new Location (errorCol, errorLine); };
-			while ((token = lexer.NextToken ()) != null) {
-				if (token.Kind == Tokens.EOF)
-					break;
-				
-				if (targetPosition <= token.Location) {
-					break;
-				}
-				ApplyToken (token);
-				if (targetPosition <= token.EndLocation) {
-					if (token.Kind == Tokens.Literal) {
-						// do not return string literal as expression if offset was inside the literal,
-						// or if it was at the end of the literal when the literal was not terminated correctly.
-						if (targetPosition < token.EndLocation || lastError == token.Location) {
-							frame.lastExpressionStart = Location.Empty;
-						}
+			try {
+				Token token;
+				Location lastError = Location.Empty;
+				lexer.Errors.Error = delegate(int errorLine, int errorCol, string errorMsg) { lastError = new Location (errorCol, errorLine); };
+				while ((token = lexer.NextToken ()) != null) {
+					if (token.Kind == Tokens.EOF)
+						break;
+					
+					if (targetPosition <= token.Location) {
+						break;
 					}
-					break;
+					ApplyToken (token);
+					if (targetPosition <= token.EndLocation) {
+						if (token.Kind == Tokens.Literal) {
+							// do not return string literal as expression if offset was inside the literal,
+							// or if it was at the end of the literal when the literal was not terminated correctly.
+							if (targetPosition < token.EndLocation || lastError == token.Location) {
+								frame.lastExpressionStart = Location.Empty;
+							}
+						}
+						break;
+					}
+					lastToken = token.Kind;
 				}
-				lastToken = token.Kind;
-			}
-			
-			int tokenOffset;
-			if (token == null || token.Kind == Tokens.EOF)
-				tokenOffset = text.Length;
-			else
-				tokenOffset = LocationToOffset (token.Location);
-			int lastExpressionStartOffset = LocationToOffset (frame.lastExpressionStart);
-			if (lastExpressionStartOffset >= 0) {
-				if (offset < tokenOffset) {
-					// offset is in front of this token
-					return MakeResult (text, lastExpressionStartOffset, tokenOffset, frame.contexts);
+				
+				int tokenOffset;
+				if (token == null || token.Kind == Tokens.EOF)
+					tokenOffset = text.Length;
+				else
+					tokenOffset = LocationToOffset (token.Location);
+				int lastExpressionStartOffset = LocationToOffset (frame.lastExpressionStart);
+				if (lastExpressionStartOffset >= 0) {
+					if (offset < tokenOffset) {
+						// offset is in front of this token
+						return MakeResult (text, lastExpressionStartOffset, tokenOffset, frame.contexts);
+					} else {
+						// offset is IN this token
+						return MakeResult (text, lastExpressionStartOffset, offset, frame.contexts);
+					}
 				} else {
-					// offset is IN this token
-					return MakeResult (text, lastExpressionStartOffset, offset, frame.contexts);
+					return new ExpressionResult (null, frame.contexts);
 				}
-			} else {
-				return new ExpressionResult (null, frame.contexts);
+			} finally {
+				lexer.Dispose ();
 			}
 		}
 
@@ -779,6 +791,9 @@ namespace MonoDevelop.CSharp.Resolver
 					frame.type = FrameType.Popped;
 					frame = frame.parent;
 				}
+				break;
+			case Tokens.From:
+				frame.SetContext (ExpressionContext.LinqContext);
 				break;
 			case Tokens.LessThan:
 				if (Tokens.ValidInsideTypeName[lastToken]) {
@@ -1072,7 +1087,7 @@ namespace MonoDevelop.CSharp.Resolver
 			return FindFullExpression (text, offset, methodBody);
 		}
 
-		ExpressionResult FindFullExpression (string text, int offset, Frame initialFrame)
+ 		ExpressionResult FindFullExpression (string text, int offset, Frame initialFrame)
 		{
 			Init (text, offset);
 			
@@ -1125,7 +1140,6 @@ namespace MonoDevelop.CSharp.Resolver
 					if (lastExpressionStartOffset == alternateResultStartOffset && alternateResultStartOffset >= 0)
 						resultStartOffset = lastExpressionStartOffset;
 					if (resultFrame.type == FrameType.Popped || lastExpressionStartOffset != resultStartOffset || token.Kind == Tokens.Dot || token.Kind == Tokens.DoubleColon) {
-						
 						// now we can change the context based on the next token
 						if (frame == resultFrame && Tokens.IdentifierTokens[token.Kind]) {
 							// the expression got aborted because of an identifier. This means the

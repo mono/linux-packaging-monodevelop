@@ -33,9 +33,19 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class TryCatchStatement : AbstractCSharpNode
 	{
-		public const int TryBlockRole     = 100;
-		public const int FinallyBlockRole = 101;
-		public const int CatchClauseRole  = 102;
+		public const int TryKeywordRole     = 100;
+		public const int FinallyKeywordRole = 101;
+		public const int TryBlockRole       = 102;
+		public const int FinallyBlockRole   = 103;
+		public const int CatchClauseRole    = 104;
+		
+		public CSharpTokenNode TryKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (TryKeywordRole); }
+		}
+		
+		public CSharpTokenNode FinallyKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (FinallyKeywordRole); }
+		}
 		
 		public BlockStatement TryBlock {
 			get { return (BlockStatement)GetChildByRole (TryBlockRole); }
@@ -57,8 +67,8 @@ namespace MonoDevelop.CSharp.Dom
 	
 	public class CatchClause : AbstractCSharpNode
 	{
-		public IReturnType ReturnType {
-			get { return (IReturnType)GetChildByRole (Roles.ReturnType); }
+		public ICSharpNode ReturnType {
+			get { return (ICSharpNode)GetChildByRole (Roles.ReturnType); }
 		}
 		
 		public string VariableName {
@@ -71,6 +81,18 @@ namespace MonoDevelop.CSharp.Dom
 		
 		public BlockStatement Block {
 			get { return (BlockStatement)GetChildByRole (Roles.Body); }
+		}
+		
+		public CSharpTokenNode LPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.LPar); }
+		}
+		
+		public CSharpTokenNode RPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.RPar); }
+		}
+		
+		public CSharpTokenNode CatchKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.Keyword); }
 		}
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)

@@ -40,6 +40,8 @@ namespace Mono.Debugging.Client
 	public delegate void ThreadEventHandler(int thread_id);
 	public delegate bool ExceptionHandler (Exception ex);
 	public delegate string TypeResolverHandler (string identifier, SourceLocation location);
+	public delegate void BreakpointTraceHandler (BreakEvent be, string trace);
+	public delegate IExpressionEvaluator GetExpressionEvaluatorHandler (string extension);
 	
 	public abstract class DebuggerSession: IDisposable
 	{
@@ -99,12 +101,12 @@ namespace Mono.Debugging.Client
 		
 		public virtual void Dispose ()
 		{
-			lock (slock) {
+			Dispatch (delegate {
 				if (!disposed) {
 					disposed = true;
 					Breakpoints = null;
 				}
-			}
+			});
 		}
 		
 		public ExceptionHandler ExceptionHandler {
@@ -112,8 +114,12 @@ namespace Mono.Debugging.Client
 			set { exceptionHandler = value; }
 		}
 		
+		public BreakpointTraceHandler BreakpointTraceHandler { get; set; }
+		
 		public TypeResolverHandler TypeResolverHandler { get; set; }
 
+		public GetExpressionEvaluatorHandler GetExpressionEvaluator { get; set; }		
+		
 		public BreakpointStore Breakpoints {
 			get {
 				lock (slock) {
@@ -545,6 +551,7 @@ namespace Mono.Debugging.Client
 
 		public EvaluationOptions EvaluationOptions {
 			get { return options.EvaluationOptions; }
+			set { options.EvaluationOptions = value; }
 		}
 
 		public void Continue ()
@@ -643,14 +650,49 @@ namespace Mono.Debugging.Client
 				string key = expression + " " + location;
 				string resolved;
 				if (!resolvedExpressionCache.TryGetValue (key, out resolved)) {
-					resolved = OnResolveExpression (expression, location);
+					try {
+						resolved = OnResolveExpression (expression, location);
+					} catch (Exception ex) {
+						OnDebuggerOutput (true, "Error while resolving expression: " + ex.Message);
+					}
 					resolvedExpressionCache [key] = resolved;
 				}
-				return resolved;
+				return resolved ?? expression;
 			}
 		}
 		
-		Mono.Debugging.Evaluation.NRefactoryEvaluator defaultResolver = new Mono.Debugging.Evaluation.NRefactoryEvaluator ();
+		Mono.Debugging.Evaluation.ExpressionEvaluator defaultResolver = new Mono.Debugging.Evaluation.NRefactoryEvaluator ();
+		Dictionary <string, IExpressionEvaluator> evaluators = new Dictionary <string, IExpressionEvaluator> ();
+
+		public IExpressionEvaluator FindExpressionEvaluator (StackFrame frame)
+		{
+			if (GetExpressionEvaluator == null)
+				return null;
+
+			string fn = frame.SourceLocation == null ? null : frame.SourceLocation.Filename;
+			if (String.IsNullOrEmpty (fn))
+				return null;
+
+			fn = System.IO.Path.GetExtension (fn);
+			IExpressionEvaluator result;
+			if (evaluators.TryGetValue (fn, out result))
+				return result;
+
+			result = GetExpressionEvaluator(fn);
+
+			evaluators[fn] = result;
+
+			return result;
+		}
+
+		public Mono.Debugging.Evaluation.ExpressionEvaluator GetResolver (StackFrame frame)
+		{
+			IExpressionEvaluator result = FindExpressionEvaluator (frame);
+			if (result == null)
+				return defaultResolver;
+			return result.Evaluator;
+		}
+		
 		
 		protected virtual string OnResolveExpression (string expression, SourceLocation location)
 		{
@@ -840,7 +882,7 @@ namespace Mono.Debugging.Client
 				}
 			}
 		}
-
+		
 		BreakEvent GetBreakEvent (object handle)
 		{
 			foreach (KeyValuePair<BreakEvent,BreakEventInfo> e in breakpoints) {
@@ -879,6 +921,12 @@ namespace Mono.Debugging.Client
 			if (ev != null) {
 				ev.LastTraceValue = value;
 				ev.NotifyUpdate ();
+				if (value != null) {
+					if (BreakpointTraceHandler != null)
+						BreakpointTraceHandler (ev, value);
+					else
+						OnDebuggerOutput (false, value + "\n");
+				}
 			}
 		}
 		

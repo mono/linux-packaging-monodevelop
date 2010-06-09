@@ -31,8 +31,8 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Codons;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -40,12 +40,15 @@ namespace MonoDevelop.Ide.Gui
 	{
 		IPadWindow window;
 		PadCodon content;
-		IWorkbench workbench;
+		DefaultWorkbench workbench;
 		string[] categories;
 		
-		internal Pad (IWorkbench workbench, PadCodon content)
+		internal Pad (DefaultWorkbench workbench, PadCodon content)
 		{
-			this.window    = workbench.WorkbenchLayout.GetPadWindow (content);
+			this.window    = workbench.GetPadWindow (content);
+			this.window.PadHidden += delegate {
+				IsOpenedAutomatically = false;
+			};
 			this.content   = content;
 			this.workbench = workbench;
 		}
@@ -62,7 +65,7 @@ namespace MonoDevelop.Ide.Gui
 			get { return window.Title; }
 		}
 		
-		public string Icon {
+		public IconId Icon {
 			get { return window.Icon; }
 		}
 		
@@ -70,16 +73,25 @@ namespace MonoDevelop.Ide.Gui
 			get { return window.Id; }
 		}
 		
+		public bool IsOpenedAutomatically {
+			get;
+			set;
+		}
+		
 		public string[] Categories {
 			get {
 				if (categories == null) {
-					List<string> list = new List<string> ();
 					CategoryNode cat = content.Parent as CategoryNode;
-					while (cat != null) {
-						list.Insert (0, cat.Name);
-						cat = cat.Parent as CategoryNode;
+					if (cat == null)
+						categories = new string[] { GettextCatalog.GetString ("Pads") };
+					else {
+						List<string> list = new List<string> ();
+						while (cat != null) {
+							list.Insert (0, cat.Name);
+							cat = cat.Parent as CategoryNode;
+						}
+						categories = list.ToArray ();
 					}
-					categories = list.ToArray ();
 				}
 				return categories;
 			}
@@ -92,9 +104,13 @@ namespace MonoDevelop.Ide.Gui
 		
 		public void BringToFront (bool grabFocus)
 		{
-			PadWindow.LastActivePadWindow = window;
 			workbench.BringToFront (content);
 			window.Activate (grabFocus);
+		}
+		
+		public bool AutoHide {
+			get { return window.AutoHide; }
+			set { window.AutoHide = value; }
 		}
 		
 		public bool Visible {

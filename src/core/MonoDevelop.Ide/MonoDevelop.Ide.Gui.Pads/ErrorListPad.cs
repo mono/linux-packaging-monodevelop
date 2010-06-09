@@ -36,31 +36,34 @@ using System.Collections.Generic;
 using System.IO;
 using System.Diagnostics;
 
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Tasks;
+using MonoDevelop.Ide.Gui.Content;
 
 using Gtk;
 using System.Text;
+using MonoDevelop.Components.Docking;
+using MonoDevelop.Ide.Gui.Components;
 
 namespace MonoDevelop.Ide.Gui.Pads
 {
-	public class ErrorListPad : IPadContent, ILocationListPad
+	public class ErrorListPad : IPadContent
 	{
-		VBox control;
+		HPaned control;
 		ScrolledWindow sw;
 		MonoDevelop.Ide.Gui.Components.PadTreeView view;
+		LogView outputView;
 		ListStore store;
 		TreeModelFilter filter;
-		ToggleToolButton errorBtn, warnBtn, msgBtn;
+		TreeModelSort sort;
+		ToggleButton errorBtn, warnBtn, msgBtn, logBtn;
 		Hashtable tasks = new Hashtable ();
-//		IPadWindow window;
-		bool initializeLocation = true;
 		int errorCount;
 		int warningCount;
 		int infoCount;
+		bool initialLogShow = true;
 
 		Menu menu;
 		Dictionary<ToggleAction, int> columnsActions = new Dictionary<ToggleAction, int> ();
@@ -73,29 +76,26 @@ namespace MonoDevelop.Ide.Gui.Pads
 		const string showErrorsPropertyName = "SharpDevelop.TaskList.ShowErrors";
 		const string showWarningsPropertyName = "SharpDevelop.TaskList.ShowWarnings";
 		const string showMessagesPropertyName = "SharpDevelop.TaskList.ShowMessages";
+		const string logSeparatorPositionPropertyName = "SharpDevelop.TaskList.LogSeparatorPosition";
 
-		enum Columns
+		static class DataColumns
 		{
-			Type,
-			Marked,
-			Line,
-			Description,
-			File,
-			Project,
-			Path,
-			Task,
-			Read,
-			Weight,
-			Count
-		}
-
-		void IPadContent.Initialize (IPadWindow window)
-		{
-//			this.window = window;
-			window.Title = GettextCatalog.GetString ("Error List");
-			window.Icon = MonoDevelop.Core.Gui.Stock.Error;
+			internal const int Type = 0;
+			internal const int Read = 1;
+			internal const int Task = 2;
 		}
 		
+		static class VisibleColumns
+		{
+			internal const int Type        = 0;
+			internal const int Marked      = 1;
+			internal const int Line        = 2;
+			internal const int Description = 3;
+			internal const int File        = 4;
+			internal const int Project     = 5;
+			internal const int Path        = 6;
+		}
+
 		public Gtk.Widget Control {
 			get {
 				if (control == null)
@@ -107,83 +107,88 @@ namespace MonoDevelop.Ide.Gui.Pads
 		public string Id {
 			get { return "MonoDevelop.Ide.Gui.Pads.ErrorListPad"; }
 		}
-		
-		public void RedrawContent()
-		{
-			// FIXME
-		}
 
-		public ErrorListPad ()
+		void IPadContent.Initialize (IPadWindow window)
 		{
+			window.Title = GettextCatalog.GetString ("Error List");
+			window.Icon = MonoDevelop.Ide.Gui.Stock.Error;
+			
+			DockItemToolbar toolbar = window.GetToolbar (PositionType.Top);
+			
+			errorBtn = new ToggleButton ();
+			errorBtn.Active = (bool)PropertyService.Get (showErrorsPropertyName, true);
+			errorBtn.Image = new Gtk.Image (Gtk.Stock.DialogError, Gtk.IconSize.Menu);
+			errorBtn.Image.Show ();
+			errorBtn.Toggled += new EventHandler (FilterChanged);
+			errorBtn.TooltipText = GettextCatalog.GetString ("Show Errors");
+			UpdateErrorsNum();
+			toolbar.Add (errorBtn);
+			
+			warnBtn = new ToggleButton ();
+			warnBtn.Active = (bool)PropertyService.Get (showWarningsPropertyName, true);
+			warnBtn.Image = new Gtk.Image (Gtk.Stock.DialogWarning, Gtk.IconSize.Menu);
+			warnBtn.Image.Show ();
+			warnBtn.Toggled += new EventHandler (FilterChanged);
+			warnBtn.TooltipText = GettextCatalog.GetString ("Show Warnings");
+			UpdateWarningsNum();
+			toolbar.Add (warnBtn);
+			
+			msgBtn = new ToggleButton ();
+			msgBtn.Active = (bool)PropertyService.Get (showMessagesPropertyName, true);
+			msgBtn.Image = new Gtk.Image (Gtk.Stock.DialogInfo, Gtk.IconSize.Menu);
+			msgBtn.Image.Show ();
+			msgBtn.Toggled += new EventHandler (FilterChanged);
+			msgBtn.TooltipText = GettextCatalog.GetString ("Show Messages");
+			UpdateMessagesNum();
+			toolbar.Add (msgBtn);
+			
+			toolbar.Add (new SeparatorToolItem ());
+			
+			logBtn = new ToggleButton ();
+			logBtn.Label = GettextCatalog.GetString ("Build Output");
+			logBtn.Image = ImageService.GetImage ("md-message-log", Gtk.IconSize.Menu);
+			logBtn.Image.Show ();
+			logBtn.TooltipText = GettextCatalog.GetString ("Show build output");
+			logBtn.Toggled += HandleLogBtnToggled;
+			toolbar.Add (logBtn);
+			
+			toolbar.ShowAll ();
 		}
 		
 		void CreateControl ()
 		{
-			control = new VBox ();
+			control = new HPaned ();
 
-			Toolbar toolbar = new Toolbar ();
-			toolbar.IconSize = IconSize.Menu;
-			control.PackStart (toolbar, false, false, 0);
-			
-			errorBtn = new ToggleToolButton ();
-			UpdateErrorsNum();
-			errorBtn.Active = (bool)PropertyService.Get (showErrorsPropertyName, true);
-			errorBtn.IconWidget = new Gtk.Image (Gtk.Stock.DialogError, Gtk.IconSize.Button);
-			errorBtn.IsImportant = true;
-			errorBtn.Toggled += new EventHandler (FilterChanged);
-			errorBtn.TooltipText = GettextCatalog.GetString ("Show Errors");
-			toolbar.Insert (errorBtn, -1);
-			
-			toolbar.Insert (new SeparatorToolItem (), -1);
-
-			warnBtn = new ToggleToolButton ();
-			UpdateWarningsNum();
-			warnBtn.Active = (bool)PropertyService.Get (showWarningsPropertyName, true);
-			warnBtn.IconWidget = new Gtk.Image (Gtk.Stock.DialogWarning, Gtk.IconSize.Button);
-			warnBtn.IsImportant = true;
-			warnBtn.Toggled += new EventHandler (FilterChanged);
-			warnBtn.TooltipText = GettextCatalog.GetString ("Show Warnings");
-			toolbar.Insert (warnBtn, -1);
-			
-			toolbar.Insert (new SeparatorToolItem (), -1);
-
-			msgBtn = new ToggleToolButton ();
-			UpdateMessagesNum();
-			msgBtn.Active = (bool)PropertyService.Get (showMessagesPropertyName, true);
-			msgBtn.IconWidget = new Gtk.Image (Gtk.Stock.DialogInfo, Gtk.IconSize.Button);
-			msgBtn.IsImportant = true;
-			msgBtn.Toggled += new EventHandler (FilterChanged);
-			msgBtn.TooltipText = GettextCatalog.GetString ("Show Messages");
-			toolbar.Insert (msgBtn, -1);
-			
 			store = new Gtk.ListStore (typeof (Gdk.Pixbuf), // image - type
-			                           typeof (bool),       // marked?
-			                           typeof (string),        // line
-			                           typeof (string),     // desc
-			                           typeof (string),     // file
-			                           typeof (string),     // project
-			                           typeof (string),     // path
-			                           typeof (Task),       // task
 			                           typeof (bool),       // read?
-			                           typeof (int));       // read? -- use Pango weight
+			                           typeof (Task));       // read? -- use Pango weight
 
 			TreeModelFilterVisibleFunc filterFunct = new TreeModelFilterVisibleFunc (FilterTaskTypes);
 			filter = new TreeModelFilter (store, null);
 			filter.VisibleFunc = filterFunct;
 			
-			view = new MonoDevelop.Ide.Gui.Components.PadTreeView (filter);
+			sort = new TreeModelSort (filter);
+			sort.SetSortFunc (VisibleColumns.Type, SeverityIterSort);
+			sort.SetSortFunc (VisibleColumns.Project, ProjectIterSort);
+			sort.SetSortFunc (VisibleColumns.File, FileIterSort);
+			
+			view = new MonoDevelop.Ide.Gui.Components.PadTreeView (sort);
 			view.RulesHint = true;
 			view.PopupMenu += new PopupMenuHandler (OnPopupMenu);
 			view.ButtonPressEvent += new ButtonPressEventHandler (OnButtonPressed);
 			AddColumns ();
 			LoadColumnsVisibility ();
+			view.Columns[VisibleColumns.Type].SortColumnId = VisibleColumns.Type;
+			view.Columns[VisibleColumns.Project].SortColumnId = VisibleColumns.Project;
+			view.Columns[VisibleColumns.File].SortColumnId = VisibleColumns.File;
 			
-			sw = new Gtk.ScrolledWindow ();
+			sw = new MonoDevelop.Components.CompactScrolledWindow ();
 			sw.ShadowType = ShadowType.None;
 			sw.Add (view);
 			TaskService.Errors.TasksRemoved      += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (ShowResults));
 			TaskService.Errors.TasksAdded        += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (TaskAdded));
 			TaskService.Errors.TasksChanged      += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (TaskChanged));
+			TaskService.Errors.CurrentLocationTaskChanged += HandleTaskServiceErrorsCurrentLocationTaskChanged;
 			
 			IdeApp.Workspace.FirstWorkspaceItemOpened += OnCombineOpen;
 			IdeApp.Workspace.LastWorkspaceItemClosed += OnCombineClosed;
@@ -194,10 +199,19 @@ namespace MonoDevelop.Ide.Gui.Pads
 			iconError = sw.RenderIcon (Gtk.Stock.DialogError, Gtk.IconSize.Menu, "");
 			iconInfo = sw.RenderIcon (Gtk.Stock.DialogInfo, Gtk.IconSize.Menu, "");
 			
-			control.Add (sw);
-			toolbar.ToolbarStyle = ToolbarStyle.BothHoriz;
-			toolbar.ShowArrow = false;
+			control.Add1 (sw);
+			
+			outputView = new LogView ();
+			control.Add2 (outputView);
+			
 			Control.ShowAll ();
+			
+			sw.SizeAllocated += delegate {
+				if (outputView.Visible)
+					PropertyService.Set (logSeparatorPositionPropertyName, (double) ((double) control.Position / (double) control.Allocation.Width));
+			};
+			
+			outputView.Hide ();
 			
 			CreateMenu ();
 
@@ -208,6 +222,35 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 			control.FocusChain = new Gtk.Widget [] { sw };
 		}
+		
+		public IProgressMonitor GetBuildProgressMonitor ()
+		{
+			if (control == null)
+				CreateControl ();
+			return outputView.GetProgressMonitor ();
+		}
+
+		void HandleTaskServiceErrorsCurrentLocationTaskChanged (object sender, EventArgs e)
+		{
+			if (TaskService.Errors.CurrentLocationTask == null) {
+				view.Selection.UnselectAll ();
+				return;
+			}
+			TreeIter it;
+			if (!view.Model.GetIterFirst (out it))
+				return;
+			do {
+				Task t = (Task) view.Model.GetValue (it, DataColumns.Task);
+				if (t == TaskService.Errors.CurrentLocationTask) {
+					view.Selection.SelectIter (it);
+					view.ScrollToCell (view.Model.GetPath (it), view.Columns[0], false, 0, 0);
+					it = filter.ConvertIterToChildIter (sort.ConvertIterToChildIter (it));
+					store.SetValue (it, DataColumns.Read, true);
+					return;
+				}
+			} while (view.Model.IterNext (ref it));
+		}
+		
 		void LoadColumnsVisibility ()
 		{
 			string columns = (string)PropertyService.Get ("Monodevelop.ErrorListColumns", "TRUE;TRUE;TRUE;TRUE;TRUE;TRUE;TRUE");
@@ -226,14 +269,18 @@ namespace MonoDevelop.Ide.Gui.Pads
 		void StoreColumnsVisibility ()
 		{
 			string columns = String.Format ("{0};{1};{2};{3};{4};{5};{6}",
-			                                view.Columns[(int)Columns.Type].Visible,
-			                                view.Columns[(int)Columns.Marked].Visible,
-			                                view.Columns[(int)Columns.Line].Visible,
-			                                view.Columns[(int)Columns.Description].Visible,
-			                                view.Columns[(int)Columns.File].Visible,
-			                                view.Columns[(int)Columns.Project].Visible,
-			                                view.Columns[(int)Columns.Path].Visible);
+			                                view.Columns[VisibleColumns.Type].Visible,
+			                                view.Columns[VisibleColumns.Marked].Visible,
+			                                view.Columns[VisibleColumns.Line].Visible,
+			                                view.Columns[VisibleColumns.Description].Visible,
+			                                view.Columns[VisibleColumns.File].Visible,
+			                                view.Columns[VisibleColumns.Project].Visible,
+			                                view.Columns[VisibleColumns.Path].Visible);
 			PropertyService.Set ("Monodevelop.ErrorListColumns", columns);
+		}
+		
+		public void RedrawContent()
+		{
 		}
 
 		void CreateMenu ()
@@ -263,43 +310,43 @@ namespace MonoDevelop.Ide.Gui.Pads
 				ToggleAction columnType = new ToggleAction ("columnType", GettextCatalog.GetString ("Type"),
 				                                            GettextCatalog.GetString ("Toggle visibility of Type column"), null);
 				columnType.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnType] = (int)Columns.Type;
+				columnsActions[columnType] = VisibleColumns.Type;
 				group.Add (columnType);
 
 				ToggleAction columnValidity = new ToggleAction ("columnValidity", GettextCatalog.GetString ("Validity"),
 				                                                GettextCatalog.GetString ("Toggle visibility of Validity column"), null);
 				columnValidity.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnValidity] = (int)Columns.Marked;
+				columnsActions[columnValidity] = VisibleColumns.Marked;
 				group.Add (columnValidity);
 
 				ToggleAction columnLine = new ToggleAction ("columnLine", GettextCatalog.GetString ("Line"),
 				                                            GettextCatalog.GetString ("Toggle visibility of Line column"), null);
 				columnLine.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnLine] = (int)Columns.Line;
+				columnsActions[columnLine] = VisibleColumns.Line;
 				group.Add (columnLine);
 
 				ToggleAction columnDescription = new ToggleAction ("columnDescription", GettextCatalog.GetString ("Description"),
 				                                                   GettextCatalog.GetString ("Toggle visibility of Description column"), null);
 				columnDescription.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnDescription] = (int)Columns.Description;
+				columnsActions[columnDescription] = VisibleColumns.Description;
 				group.Add (columnDescription);
 
 				ToggleAction columnFile = new ToggleAction ("columnFile", GettextCatalog.GetString ("File"),
 				                                            GettextCatalog.GetString ("Toggle visibility of File column"), null);
 				columnFile.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnFile] = (int)Columns.File;
+				columnsActions[columnFile] = VisibleColumns.File;
 				group.Add (columnFile);
 
 				ToggleAction columnProject = new ToggleAction ("columnProject", GettextCatalog.GetString ("Project"),
 				                                            GettextCatalog.GetString ("Toggle visibility of Project column"), null);
 				columnProject.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnProject] = (int)Columns.Project;
+				columnsActions[columnProject] = VisibleColumns.Project;
 				group.Add (columnProject);
 
 				ToggleAction columnPath = new ToggleAction ("columnPath", GettextCatalog.GetString ("Path"),
 				                                            GettextCatalog.GetString ("Toggle visibility of Path column"), null);
 				columnPath.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnPath] = (int)Columns.Path;
+				columnsActions[columnPath] = VisibleColumns.Path;
 				group.Add (columnPath);
 
 				UIManager uiManager = new UIManager ();
@@ -327,13 +374,13 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 				menu.Shown += delegate (object o, EventArgs args)
 				{
-					columnType.Active = view.Columns[(int)Columns.Type].Visible;
-					columnValidity.Active = view.Columns[(int)Columns.Marked].Visible;
-					columnLine.Active = view.Columns[(int)Columns.Line].Visible;
-					columnDescription.Active = view.Columns[(int)Columns.Description].Visible;
-					columnFile.Active = view.Columns[(int)Columns.File].Visible;
-					columnProject.Active = view.Columns[(int)Columns.Project].Visible;
-					columnPath.Active = view.Columns[(int)Columns.Path].Visible;
+					columnType.Active = view.Columns[VisibleColumns.Type].Visible;
+					columnValidity.Active = view.Columns[VisibleColumns.Marked].Visible;
+					columnLine.Active = view.Columns[VisibleColumns.Line].Visible;
+					columnDescription.Active = view.Columns[VisibleColumns.Description].Visible;
+					columnFile.Active = view.Columns[VisibleColumns.File].Visible;
+					columnProject.Active = view.Columns[VisibleColumns.Project].Visible;
+					columnPath.Active = view.Columns[VisibleColumns.Path].Visible;
 					help.Sensitive = copy.Sensitive = jump.Sensitive =
 						view.Selection != null &&
 						view.Selection.CountSelectedRows () > 0 &&
@@ -366,7 +413,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 				TreeModel model;
 				TreeIter iter;
 				if (view.Selection.GetSelected (out model, out iter)) 
-					return model.GetValue (iter, (int)Columns.Task) as Task;
+					return model.GetValue (iter, DataColumns.Task) as Task;
 				return null; // no one selected
 			}
 		}
@@ -427,12 +474,14 @@ namespace MonoDevelop.Ide.Gui.Pads
 			TreeIter iter;
 			TreeModel model;
 			if (view.Selection.GetSelected (out model, out iter)) {
-				iter = filter.ConvertIterToChildIter (iter);
-				store.SetValue (iter, (int)Columns.Weight, (int) Pango.Weight.Normal);
-				Task task = store.GetValue (iter, (int)Columns.Task) as Task;
+				iter = filter.ConvertIterToChildIter (sort.ConvertIterToChildIter (iter));
+				store.SetValue (iter, DataColumns.Read, true);
+				Task task = store.GetValue (iter, DataColumns.Task) as Task;
 				if (task != null) {
-					DisplayTask (task);
+					TaskService.ShowStatus (task);
 					task.JumpToPosition ();
+					TaskService.Errors.CurrentLocationTask = task;
+					IdeApp.Workbench.ActiveLocationList = TaskService.Errors;
 				}
 			}
 		}
@@ -455,17 +504,112 @@ namespace MonoDevelop.Ide.Gui.Pads
 			toggleRender.Toggled += new ToggledHandler (ItemToggled);
 			
 			TreeViewColumn col;
-			col = view.AppendColumn ("!", iconRender, "pixbuf", Columns.Type);
-			view.AppendColumn ("", toggleRender, "active", Columns.Marked);
-			view.AppendColumn (GettextCatalog.GetString ("Line"), view.TextRenderer, "text", Columns.Line, "weight", Columns.Weight);
-			col = view.AppendColumn (GettextCatalog.GetString ("Description"), view.TextRenderer, "text", Columns.Description, "weight", Columns.Weight, "strikethrough", Columns.Marked);
+			col = view.AppendColumn ("!", iconRender, "pixbuf", DataColumns.Type);
+			
+			col = view.AppendColumn ("", toggleRender);
+			col.SetCellDataFunc (toggleRender, new Gtk.TreeCellDataFunc (ToggleDataFunc));
+			
+			col = view.AppendColumn (GettextCatalog.GetString ("Line"), view.TextRenderer);
+			col.SetCellDataFunc (view.TextRenderer, new Gtk.TreeCellDataFunc (LineDataFunc));
+			
+			col = view.AppendColumn (GettextCatalog.GetString ("Description"), view.TextRenderer);
+			col.SetCellDataFunc (view.TextRenderer, new Gtk.TreeCellDataFunc (DescriptionDataFunc));
 			col.Resizable = true;
-			col = view.AppendColumn (GettextCatalog.GetString ("File"), view.TextRenderer, "text", Columns.File, "weight", Columns.Weight);
+			
+			col = view.AppendColumn (GettextCatalog.GetString ("File"), view.TextRenderer);
+			col.SetCellDataFunc (view.TextRenderer, new Gtk.TreeCellDataFunc (FileDataFunc));
 			col.Resizable = true;
-			col = view.AppendColumn (GettextCatalog.GetString ("Project"), view.TextRenderer, "text", Columns.Project, "weight", Columns.Weight);
+			
+			col = view.AppendColumn (GettextCatalog.GetString ("Project"), view.TextRenderer);
+			col.SetCellDataFunc (view.TextRenderer, new Gtk.TreeCellDataFunc (ProjectDataFunc));
 			col.Resizable = true;
-			col = view.AppendColumn (GettextCatalog.GetString ("Path"), view.TextRenderer, "text", Columns.Path, "weight", Columns.Weight);
+			
+			col = view.AppendColumn (GettextCatalog.GetString ("Path"), view.TextRenderer);
+			col.SetCellDataFunc (view.TextRenderer, new Gtk.TreeCellDataFunc (PathDataFunc));
 			col.Resizable = true;
+		}
+		
+		static void ToggleDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
+		{
+			Gtk.CellRendererToggle toggleRenderer = (Gtk.CellRendererToggle)cell;
+			Task task = model.GetValue (iter, DataColumns.Task) as Task; 
+			if (task == null)
+				return;
+			toggleRenderer.Active = task.Completed;
+		}
+		
+		static void LineDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
+		{
+			Gtk.CellRendererText textRenderer = (Gtk.CellRendererText)cell;
+			Task task = model.GetValue (iter, DataColumns.Task) as Task; 
+			if (task == null)
+				return;
+			SetText (textRenderer, model, iter, task, task.Line != 0 ? task.Line.ToString () : "");
+		}
+		
+		static void DescriptionDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
+		{
+			Gtk.CellRendererText textRenderer = (Gtk.CellRendererText)cell;
+			Task task = model.GetValue (iter, DataColumns.Task) as Task; 
+			if (task == null)
+				return;
+			SetText (textRenderer, model, iter, task, task.Description);
+		}
+		
+		static void FileDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
+		{
+			Gtk.CellRendererText textRenderer = (Gtk.CellRendererText)cell;
+			Task task = model.GetValue (iter, DataColumns.Task) as Task; 
+			if (task == null)
+				return;
+			
+			string tmpPath = GetPath (task);
+			string fileName;
+			try {
+				fileName = Path.GetFileName (tmpPath);
+			} catch (Exception) { 
+				fileName =  tmpPath;
+			}
+			
+			SetText (textRenderer, model, iter, task, fileName);
+		}
+		
+		static string GetPath (Task task)
+		{
+			if (task.WorkspaceObject != null)
+				return FileService.AbsoluteToRelativePath (task.WorkspaceObject.BaseDirectory, task.FileName);
+			
+			return task.FileName;
+		}
+		
+		static void ProjectDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
+		{
+			Gtk.CellRendererText textRenderer = (Gtk.CellRendererText)cell;
+			Task task = model.GetValue (iter, DataColumns.Task) as Task; 
+			if (task == null)
+				return;
+			SetText (textRenderer, model, iter, task, GetProject(task));
+		}
+		
+		static string GetProject (Task task)
+		{
+			return (task != null && task.WorkspaceObject is SolutionItem)? task.WorkspaceObject.Name: string.Empty;
+		}
+		
+		static void PathDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
+		{
+			Gtk.CellRendererText textRenderer = (Gtk.CellRendererText)cell;
+			Task task = model.GetValue (iter, DataColumns.Task) as Task; 
+			if (task == null)
+				return;
+			SetText (textRenderer, model, iter, task, GetPath (task));
+		}
+		
+		static void SetText (CellRendererText textRenderer, TreeModel model, TreeIter iter, Task task, string text)
+		{
+			textRenderer.Text = text;
+			textRenderer.Weight = (int)((bool)model.GetValue (iter, DataColumns.Read) ? Pango.Weight.Normal : Pango.Weight.Bold);
+			textRenderer.Strikethrough = task.Completed;
 		}
 		
 		void OnCombineOpen(object sender, EventArgs e)
@@ -504,7 +648,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			bool canShow = false;
 
 			try {
-				Task task = store.GetValue (iter, (int)Columns.Task) as Task;
+				Task task = store.GetValue (iter, DataColumns.Task) as Task;
 				if (task == null)
 					return true;
 				if (task.Severity == TaskSeverity.Error && errorBtn.Active) canShow = true;
@@ -534,28 +678,11 @@ namespace MonoDevelop.Ide.Gui.Pads
 			UpdateErrorsNum ();
 			UpdateWarningsNum ();
 			UpdateMessagesNum ();
-			initializeLocation = true;
 		}
 		
-				
 		void TaskChanged (object sender, TaskEventArgs e)
 		{
-			TreeIter iter;
-			if (store.GetIterFirst (out iter)) {
-				do {
-					Task curTask = store.GetValue (iter, (int)Columns.Task) as Task;
-					if (curTask == null) {
-						LoggingService.LogWarning ("Error list pad: Can't cast object: " + store.GetValue (iter, (int)Columns.Task) + " - it is not a Task.");
-						continue;
-					}
-					foreach (Task task in e.Tasks) {
-						if (task == curTask) {
-							store.SetValue (iter, (int)Columns.Line, task.Line != 0 ? task.Line.ToString () : "");
-						}
-					}
-					
-				} while (store.IterNext (ref iter));
-			}
+			this.view.QueueDraw ();
 		}
 	
 		void TaskAdded (object sender, TaskEventArgs e)
@@ -606,179 +733,145 @@ namespace MonoDevelop.Ide.Gui.Pads
 					UpdateMessagesNum ();
 					break;
 			}
-		
+			
 			tasks [t] = t;
 			
-			string tmpPath = t.FileName;
-			if (t.WorkspaceObject != null)
-				tmpPath = FileService.AbsoluteToRelativePath (t.WorkspaceObject.BaseDirectory, t.FileName);
-			
-			string fileName = tmpPath;
-			string path     = tmpPath;
-			
-			try {
-				fileName = Path.GetFileName (tmpPath);
-			} catch (Exception) {}
-
-			if (tmpPath != null && tmpPath.Contains (Path.DirectorySeparatorChar.ToString ()))
-			{
-				try{
-					path = Path.GetDirectoryName (tmpPath);
-				}
-				catch (Exception) { }
-			}	
-			string project;
-			if (t.WorkspaceObject is SolutionItem)
-				project = t.WorkspaceObject.Name;
-			else
-				project = string.Empty;
-			
-			store.AppendValues (stock,
-			                    false,
-			                    t.Line != 0 ? t.Line.ToString () : "",
-			                    t.Description,
-			                    fileName,
-			                    project,
-			                    path,
-			                    t,
-			                    false,
-			                    (int) Pango.Weight.Bold
-			                    );
+			store.AppendValues (stock, false, t);
 		}
 
 		void UpdateErrorsNum () 
 		{
 			errorBtn.Label = " " + string.Format(GettextCatalog.GetPluralString("{0} Error", "{0} Errors", errorCount), errorCount);
+			errorBtn.Image.Show ();
 		}
 
 		void UpdateWarningsNum ()
 		{
 			warnBtn.Label = " " + string.Format(GettextCatalog.GetPluralString("{0} Warning", "{0} Warnings", warningCount), warningCount); 
+			warnBtn.Image.Show ();
 		}
 
 		void UpdateMessagesNum ()
 		{
 			msgBtn.Label = " " + string.Format(GettextCatalog.GetPluralString("{0} Message", "{0} Messages", infoCount), infoCount);
+			msgBtn.Image.Show ();
 		}
-
+		
+		public event EventHandler<TaskEventArgs> TaskToggled;
+		protected virtual void OnTaskToggled (TaskEventArgs e)
+		{
+			EventHandler<TaskEventArgs> handler = this.TaskToggled;
+			if (handler != null)
+				handler (this, e);
+		}
+		
 		private void ItemToggled (object o, ToggledArgs args)
 		{
 			Gtk.TreeIter iter;
 			if (store.GetIterFromString(out iter, args.Path)) {
-				bool val = (bool) store.GetValue(iter, (int)Columns.Marked);
-				store.SetValue(iter, (int)Columns.Marked, !val);
+				Task task = (Task) store.GetValue(iter, DataColumns.Task);
+				task.Completed = !task.Completed;
+				OnTaskToggled (new TaskEventArgs (task));
 			}
 		}
 
-		public virtual bool GetNextLocation (out string file, out int line, out int column)
+		static int SeverityIterSort(TreeModel model, TreeIter a, TreeIter z)
 		{
-			bool hasNext;
-			TreeIter iter;
-			TreeModel model;
-			
-			if (!initializeLocation && view.Selection.GetSelected (out model, out iter)) {
-				hasNext = model.IterNext (ref iter);
-			} else {
-				model = view.Model;
-				hasNext = model.GetIterFirst (out iter);
-				initializeLocation = false;
-			}
-			
-			if (!hasNext) {
-				file = null;
-				line = 0;
-				column = 0;
-				view.Selection.UnselectAll ();
-				DisplayTask (null);
-				return false;
-			} else {
-				view.Selection.SelectIter (iter);
-				Task t =  model.GetValue (iter, (int)Columns.Task) as Task;
-				if (t == null) {
-					file = null;
-					line = 0;
-					column = 0;
-					view.Selection.UnselectAll ();
-					DisplayTask (null);
-					return false;
-				}
-				file = t.FileName;
-				if (file == null)
-					return GetNextLocation (out file, out line, out column);
-				line = t.Line;
-				column = t.Column;
-				view.ScrollToCell (view.Model.GetPath (iter), view.Columns[0], false, 0, 0);
-				iter = filter.ConvertIterToChildIter (iter);
-				store.SetValue (iter, (int)Columns.Weight, (int) Pango.Weight.Normal);
-				DisplayTask (t);
-				return true;
-			}
+			Task aTask = model.GetValue(a, DataColumns.Task) as Task,
+			     zTask = model.GetValue(z, DataColumns.Task) as Task;
+			     
+			return (aTask != null && zTask != null) ?
+			       aTask.Severity.CompareTo(zTask.Severity) :
+			       0;
 		}
-
-		public virtual bool GetPreviousLocation (out string file, out int line, out int column)
+		
+		static int ProjectIterSort (TreeModel model, TreeIter a, TreeIter z)
 		{
-			bool hasNext;
-			TreeIter iter;
-			TreeModel model;
-			TreeIter selIter = TreeIter.Zero;
-			TreeIter prevIter = TreeIter.Zero;
-			
-			TreePath selPath = null;
-			
-			if (!initializeLocation && view.Selection.GetSelected (out model, out selIter))
-				selPath = view.Model.GetPath (selIter);
-
-			hasNext = view.Model.GetIterFirst (out iter);
-			initializeLocation = false;
-			
-			while (hasNext) {
-				if (selPath != null && view.Model.GetPath (iter).Equals (selPath))
-					break;
-				prevIter = iter;
-				hasNext = view.Model.IterNext (ref iter);
-			}
-			
-			if (prevIter.Equals (TreeIter.Zero)) {
-				file = null;
-				line = 0;
-				column = 0;
-				view.Selection.UnselectAll ();
-				DisplayTask (null);
-				return false;
-			} else {
-				view.Selection.SelectIter (prevIter);
-				Task t = view.Model.GetValue (prevIter, (int)Columns.Task) as Task;
-				if (t == null) {
-					file = null;
-					line = 0;
-					column = 0;
-					view.Selection.UnselectAll ();
-					DisplayTask (null);
-					return false;
-				}
-				file = t.FileName;
-				if (file == null)
-					return GetPreviousLocation (out file, out line, out column);
-				line = t.Line;
-				column = t.Column;
-				view.ScrollToCell (view.Model.GetPath (prevIter), view.Columns[0], false, 0, 0);
-				prevIter = filter.ConvertIterToChildIter (prevIter);
-				store.SetValue (prevIter, (int)Columns.Weight, (int) Pango.Weight.Normal);
-				DisplayTask (t);
-				return true;
-			}
+			Task aTask = model.GetValue (a, DataColumns.Task) as Task,
+			     zTask = model.GetValue (z, DataColumns.Task) as Task;
+			     
+			return (aTask != null && zTask != null) ?
+			       GetProject (aTask).CompareTo (GetProject (zTask)) :
+			       0;
 		}
-
-		void DisplayTask (Task t)
+		
+		static int FileIterSort (TreeModel model, TreeIter a, TreeIter z)
 		{
-			if (t == null)
-				IdeApp.Workbench.StatusBar.ShowMessage (GettextCatalog.GetString ("No more errors or warnings"));
-			else if (t.Severity == TaskSeverity.Error)
-				IdeApp.Workbench.StatusBar.ShowError (t.Code + " - " + t.Description);
-			else if (t.Severity == TaskSeverity.Warning)
-				IdeApp.Workbench.StatusBar.ShowError (t.Code + " - " + t.Description);
+			Task aTask = model.GetValue (a, DataColumns.Task) as Task,
+			     zTask = model.GetValue (z, DataColumns.Task) as Task;
+			     
+			return (aTask != null && zTask != null) ?
+			       aTask.FileName.CompareTo (zTask.FileName) :
+			       0;
+		}
+		
+		void HandleLogBtnToggled (object sender, EventArgs e)
+		{
+			if (!outputView.Visible && initialLogShow) {
+				double relPos = PropertyService.Get<double> (logSeparatorPositionPropertyName, 0.5d);
+				int pos = (int) (control.Allocation.Width * relPos);
+				if (pos < 30) pos = 30;
+				control.Position = pos;
+				initialLogShow = false;
+			}
+			
+			outputView.Visible = logBtn.Active;
+		}
+	}
+	
+	class ErrorPadLabelProvider: IDockItemLabelProvider
+	{
+		public Widget CreateLabel (Orientation orientation)
+		{
+			Gtk.Box box;
+			if (orientation == Orientation.Horizontal)
+				box = new HBox ();
 			else
-				IdeApp.Workbench.StatusBar.ShowMessage (t.Description);
+				box = new VBox ();
+			box.Spacing = 3;
+			
+			Gdk.Pixbuf errorIcon = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.Error, IconSize.Menu);
+			Gdk.Pixbuf noErrorIcon = ImageService.MakeGrayscale (errorIcon); // creates a new pixbuf instance
+			Gdk.Pixbuf warningIcon = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.Warning, IconSize.Menu);
+			Gdk.Pixbuf noWarningIcon = ImageService.MakeGrayscale (warningIcon); // creates a new pixbuf instance
+			
+			Gtk.Image errorImage = new Gtk.Image (errorIcon);
+			Gtk.Image warningImage = new Gtk.Image (warningIcon);
+			
+			box.PackStart (errorImage, false, false, 0);
+			Label errors = new Gtk.Label ();
+			box.PackStart (errors, false, false, 0);
+			
+			box.PackStart (warningImage, false, false, 0);
+			Label warnings = new Gtk.Label ();
+			box.PackStart (warnings, false, false, 0);
+			
+			TaskEventHandler updateHandler = delegate {
+				int ec=0, wc=0;
+				foreach (Task t in TaskService.Errors) {
+					if (t.Severity == TaskSeverity.Error)
+						ec++;
+					else if (t.Severity == TaskSeverity.Warning)
+						wc++;
+				}
+				errors.Text = ec.ToString ();
+				errorImage.Pixbuf = ec > 0 ? errorIcon : noErrorIcon;
+				warnings.Text = wc.ToString ();
+				warningImage.Pixbuf = wc > 0 ? warningIcon : noWarningIcon;
+			};
+			
+			updateHandler (null, null);
+			
+			TaskService.Errors.TasksAdded += updateHandler;
+			TaskService.Errors.TasksRemoved += updateHandler;
+			
+			box.Destroyed += delegate {
+				noErrorIcon.Dispose ();
+				noWarningIcon.Dispose ();
+				TaskService.Errors.TasksAdded -= updateHandler;
+				TaskService.Errors.TasksRemoved -= updateHandler;
+			};
+			return box;
 		}
 	}
 }

@@ -1,3 +1,214 @@
+2010-05-19  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.Parser/DocumentReferenceManager.cs: Make
+	  prefix generation and directive insertion APIs more
+	  flexible.
+
+	* MonoDevelop.AspNet.Parser/PageInfo.cs: Make it possible to
+	  inject directives to an existing info.
+
+	* Makefile.am:
+	* MonoDevelop.AspNet.csproj:
+	* MonoDevelop.AspNet.Parser/PageDirectiveVisitor.cs: Removed
+	  unneeded class.
+
+	* MonoDevelop.AspNet/AspNetToolboxNode.cs: Use new
+	  ItextToolboxItem and DocumentReferenceManager APIs to insert
+	  new directives into the DOM only when the item is actually
+	  inserted into the editor. Fixes Bug 543721 - Auto-added
+	  control directives sometimes fail.
+
+2010-05-18  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.Parser/PageInfo.cs:
+	* MonoDevelop.AspNet.Parser/AspNetParser.cs:
+	* MonoDevelop.AspNet.Parser.Dom/RootNode.cs:
+	* MonoDevelop.AspNet.Parser/AspNetParsedDocument.cs: Collect
+	  more information from the document for C# completion.
+
+2010-05-18  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.AspNet.csproj:
+	* MonoDevelop.AspNet/CodeBehind.cs:
+	* MonoDevelop.AspNet.Parser/Document.cs:
+	* MonoDevelop.AspNet.Parser/PageInfo.cs:
+	* MonoDevelop.AspNet/AspNetAppProject.cs:
+	* MonoDevelop.AspNet/AspNetSyntaxMode.cs:
+	* MonoDevelop.AspNet/AspNetToolboxNode.cs:
+	* MonoDevelop.AspNet.Parser/AspNetParser.cs:
+	* MonoDevelop.AspNet.Parser.Dom/RootNode.cs:
+	* MonoDevelop.AspNet/AspNetToolboxProvider.cs:
+	* MonoDevelop.AspNet.Parser/PageInfoVisitor.cs:
+	* MonoDevelop.AspNet.Parser/MemberListVisitor.cs:
+	* MonoDevelop.AspNet/VerifyCodeBehindBuildStep.cs:
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs:
+	* MonoDevelop.AspNet.Parser/AspNetParsedDocument.cs:
+	* MonoDevelop.AspNet.Parser/PageDirectiveVisitor.cs:
+	* MonoDevelop.AspNet.Parser/WebFormReferenceManager.cs:
+	* MonoDevelop.AspNet.Parser/DocumentReferenceManager.cs:
+	* MonoDevelop.AspNet/MasterContentFileDescriptionTemplate.cs:
+	  Heavy refactoring and tidying of ASP.NET parser code to
+	  support future changes.
+
+2010-05-12  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/AspNetAppProject.cs:
+	* MonoDevelop.AspNet/AspNetAppProjectConfiguration.cs: Fix Bug
+	  602154 - bin/ directory not created when building ASP.Net
+	  Web Application template.
+
+2010-05-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Html/PathCompletion.cs:
+	* MonoDevelop.Html/DocTypeCompletionData.cs:
+	* MonoDevelop.AspNet.Gui/BaseHtmlEditorExtension.cs:
+	* MonoDevelop.AspNet.Parser/SuggestedHandlerCompletionData.cs:
+	  Track API changes.
+
+2010-05-07  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/AspNetAppProject.cs:
+	* MonoDevelop.AspNet/AspNetExecutionHandler.cs: Fix checks to
+	  allow .NET 4.
+
+2010-04-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Html/PathCompletion.cs:
+	* MonoDevelop.Html/DocTypeCompletionData.cs:
+	* MonoDevelop.AspNet.Parser/SuggestedHandlerCompletionData.cs:
+	  Track API changes.
+
+2010-04-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AspNet/AspNetSyntaxMode.cs:
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs: Worked on
+	  ASP.NET highlighting.
+
+2010-04-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs: Worked on
+	  ASP.NET completion.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs: 
+
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs: Worked on
+	  ASP.NET completion.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs: fixed
+	  ASP.NET completion.
+
+2010-04-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs:
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs: Worked
+	  on ASP.NET completion.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.AspNet.addin.xml: Bumped MD version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.AspNet.csproj: Remove import off mono.addins
+	  targets.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.AspNet.csproj:
+	* MonoDevelop.AspNet.addin.xml:
+	* MonoDevelop.Html/PathCompletion.cs:
+	* MonoDevelop.AspNet/XspParameters.cs:
+	* MonoDevelop.AspNet/WebTypeManager.cs:
+	* MonoDevelop.Html/HtmlSchemaService.cs:
+	* MonoDevelop.AspNet.Parser/Document.cs:
+	* MonoDevelop.AspNet/AspNetAppProject.cs:
+	* MonoDevelop.AspNet.Parser/Directive.cs:
+	* MonoDevelop.AspNet/AspNetToolboxNode.cs:
+	* MonoDevelop.AspNet.Gui/BrowserLauncher.cs:
+	* MonoDevelop.AspNet.Gui/XspOptionsPanel.cs:
+	* MonoDevelop.Html/DocTypeCompletionData.cs:
+	* MonoDevelop.AspNet.Completion/SimpleLists.cs:
+	* MonoDevelop.Html/HtmlCompletionDataProvider.cs:
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs:
+	* MonoDevelop.AspNet.Gui/BaseHtmlEditorExtension.cs:
+	* MonoDevelop.AspNet.Deployment/WebDeployService.cs:
+	* MonoDevelop.AspNet.Deployment/WebDeployCommands.cs:
+	* MonoDevelop.AspNet.Gui/AspNetConfigurationPanel.cs:
+	* MonoDevelop.AspNet/AspNetAppProjectConfiguration.cs:
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs:
+	* MonoDevelop.AspNet.Parser/DocumentReferenceManager.cs:
+	* MonoDevelop.AspNet.Deployment/WebDeployLaunchDialog.cs:
+	* MonoDevelop.AspNet.Deployment/WebDeployOptionsPanel.cs:
+	* MonoDevelop.AspNet/ProjectFolderNodeBuilderExtension.cs:
+	* MonoDevelop.AspNet/MasterContentFileDescriptionTemplate.cs:
+	* MonoDevelop.AspNet.Parser/SuggestedHandlerCompletionData.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-03  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.Parser/Directive.cs:
+	* MonoDevelop.AspNet.Deployment/AspNetDeployServiceExtension.cs:
+	  Track ProjectFile Link API.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Html/PathCompletion.cs:
+	* MonoDevelop.Html/DocTypeCompletionData.cs:
+	* MonoDevelop.AspNet.Parser/SuggestedHandlerCompletionData.cs:
+	  Track api changes.
+
+2010-02-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.AspNet.addin.xml: Added some conditions to avoid
+	  early loading of extensions.
+
+	* MonoDevelop.AspNet.Gui/HtmlEditorExtension.cs:
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs: File
+	  extensions are now declared in the node metadata.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.AspNet.Gui.XspOptionsPanelWidget.cs:
+	* gtk-gui/MonoDevelop.AspNet.Deployment.WebTargetEditor.cs:
+	* gtk-gui/MonoDevelop.AspNet.Deployment.WebDeployTargetEditor.cs:
+	* gtk-gui/MonoDevelop.AspNet.Deployment.WebDeployLaunchDialog.cs:
+	* gtk-gui/MonoDevelop.AspNet.Gui.AspNetConfigurationPanelWidget.cs:
+	* gtk-gui/MonoDevelop.AspNet.Deployment.WebDeployOptionsPanelWidget.cs:
+	  Flush.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.AspNet/AspNetMSBuildImportProvider.cs: Track api
+	  changes.
+
+2010-01-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Html/PathCompletion.cs:
+	* MonoDevelop.Html/DocTypeCompletionData.cs:
+	* MonoDevelop.AspNet.Parser/SuggestedHandlerCompletionData.cs:
+	  Track API changes.
+
+2010-01-14  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.AspNet/VerifyCodeBehindBuildStep.cs: Implement
+	  the new SupportsItem method.
+
+2010-01-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AspNet/LineInterceptingTextWriter.cs: fixed
+	  possible null ref.
+
 2010-01-07  mkrueger  <${AuthorEmail}>
 
 	* MonoDevelop.AspNet/LineInterceptingTextWriter.cs: Fixed null
@@ -34,6 +245,23 @@
 
 	* MonoDevelop.AspNet.Deployment/WebDeployService.cs: Name
 	  threads to make debugging easier.
+
+2009-12-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs:
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs: Worked
+	  on ASP.NET code completion.
+
+2009-12-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.AspNet.csproj:
+	* MonoDevelop.AspNet.addin.xml:
+	* MonoDevelop.AspNet.Parser.Dom/RootNode.cs:
+	* MonoDevelop.AspNet.Parser.Dom/ExpressionNode.cs:
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs:
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs: Worked
+	  on ASP.NET code completion.
 
 2009-12-01  Lluis Sanchez Gual  <lluis@novell.com>
 

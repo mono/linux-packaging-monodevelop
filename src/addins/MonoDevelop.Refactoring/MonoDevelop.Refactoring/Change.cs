@@ -30,10 +30,9 @@ using System.Collections.Generic;
 using MonoDevelop.Core;
 using MonoDevelop.Projects.Text;
 using MonoDevelop.Projects.CodeGeneration;
-using MonoDevelop.Projects.Dom;
-using MonoDevelop.Ide.Gui;
 using Mono.TextEditor;
 using MonoDevelop.Projects;
+using MonoDevelop.Ide;
 
 
 namespace MonoDevelop.Refactoring
@@ -102,9 +101,8 @@ namespace MonoDevelop.Refactoring
 				return null;
 			foreach (var doc in IdeApp.Workbench.Documents) {
 				if (doc.FileName == fileName) {
-					ITextEditorDataProvider data = doc.GetContent<ITextEditorDataProvider> ();
-					if (data != null) {
-						TextEditorData result = data.GetTextEditorData ();
+					TextEditorData result = doc.TextEditorData;
+					if (result != null) {
 						textEditorDatas.Add (result);
 						result.Document.BeginAtomicUndo ();
 						return result;
@@ -113,13 +111,17 @@ namespace MonoDevelop.Refactoring
 			}
 			return null;
 		}
-		
+		protected virtual TextEditorData TextEditorData {
+			get {
+				return GetTextEditorData (FileName);
+			}
+		}
 		public override void PerformChange (IProgressMonitor monitor, RefactorerContext rctx)
 		{
 			if (rctx == null)
 				throw new InvalidOperationException ("Refactory context not available.");
 			
-			TextEditorData textEditorData = GetTextEditorData (FileName);
+			TextEditorData textEditorData = this.TextEditorData;
 			if (textEditorData == null) {
 				IEditableTextFile file = rctx.GetFile (FileName);
 				if (file != null) {
@@ -184,7 +186,7 @@ namespace MonoDevelop.Refactoring
 		
 		public override void PerformChange (IProgressMonitor monitor, RefactorerContext rctx)
 		{
-			IdeApp.OpenFiles (new string[] { FileName });
+			IdeApp.Workbench.OpenDocument (FileName);
 		}
 	}
 	
@@ -210,6 +212,9 @@ namespace MonoDevelop.Refactoring
 		public override void PerformChange (IProgressMonitor monitor, RefactorerContext rctx)
 		{
 			FileService.RenameFile (OldName, NewName);
+			
+			if (rctx.ParserContext.Project != null)
+				IdeApp.ProjectOperations.Save (rctx.ParserContext.Project);
 		}
 	}
 	

@@ -9,7 +9,7 @@ using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Core;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Core.Gui;
+ 
 using MonoDevelop.Components;
 
 namespace MonoDevelop.VersionControl 
@@ -50,7 +50,7 @@ namespace MonoDevelop.VersionControl
 			
 			protected override void Run ()
 			{
-				IProgressMonitor monitor = GetProgressMonitor ();
+				IProgressMonitor monitor = Monitor;
 				
 				foreach (VersionControlItemList list in items.SplitByRepository ())
 					list[0].Repository.Add (list.Paths, true, monitor);
@@ -148,10 +148,10 @@ namespace MonoDevelop.VersionControl
 				foreach (VersionControlItemList list in items.SplitByRepository ()) {
 					VersionControlItemList files = list.GetFiles ();
 					if (files.Count > 0)
-						files[0].Repository.DeleteFiles (files.Paths, true, GetProgressMonitor ());
+						files[0].Repository.DeleteFiles (files.Paths, true, Monitor);
 					VersionControlItemList dirs = list.GetDirectories ();
 					if (dirs.Count > 0)
-						dirs[0].Repository.DeleteDirectories (dirs.Paths, true, GetProgressMonitor ());
+						dirs[0].Repository.DeleteDirectories (dirs.Paths, true, Monitor);
 				}
 				
 				Gtk.Application.Invoke (delegate {

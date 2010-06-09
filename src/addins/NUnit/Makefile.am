@@ -5,11 +5,8 @@ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.NUnit.dll
 
 DEPS =  \
 	$(top_builddir)/build/AddIns/NUnit/NUnitRunner.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLADE_SHARP_LIBS) \
@@ -29,6 +26,7 @@ FILES =  \
 	AssemblyInfo.cs \
 	Commands/NUnitCommands.cs \
 	gtk-gui/generated.cs \
+	gtk-gui/MonoDevelop.NUnit.NUnitOptionsWidget.cs \
 	Gui/CircleImage.cs \
 	Gui/NUnitAssemblyGroupConfigurationNodeBuilder.cs \
 	Gui/NUnitAssemblyGroupNodeBuilder.cs \
@@ -82,7 +80,6 @@ RES =  \
 	Gui/unit-test-24.png \
 	md1format.xml \
 	MonoDevelopNUnit.addin.xml \
-	nunit.glade \
 	templates/NUnitAssemblyGroup.xpt.xml \
 	templates/NUnitProject.xpt.xml \
 	templates/NUnitTestClass.xft.xml

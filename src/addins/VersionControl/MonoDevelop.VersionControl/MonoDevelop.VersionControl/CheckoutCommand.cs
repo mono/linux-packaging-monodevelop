@@ -1,10 +1,7 @@
-using System;
-using System.IO;
-using System.Collections;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core;
 using MonoDevelop.VersionControl.Dialogs;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl
 {
@@ -46,7 +43,7 @@ namespace MonoDevelop.VersionControl
 		
 		protected override void Run () 
 		{
-			vc.Checkout (path, null, true, GetProgressMonitor ());
+			vc.Checkout (path, null, true, Monitor);
 			string projectFn = null;
 			
 			string[] list = System.IO.Directory.GetFiles(path);
@@ -75,6 +72,8 @@ namespace MonoDevelop.VersionControl
 			
 			if (projectFn != null)
 				IdeApp.Workspace.OpenWorkspaceItem (projectFn);
+			
+			Monitor.ReportSuccess (GettextCatalog.GetString ("Solution checked out"));
 		}
 	}
 }

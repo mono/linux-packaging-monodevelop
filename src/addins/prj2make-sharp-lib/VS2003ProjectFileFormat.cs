@@ -28,7 +28,6 @@
 
 using MonoDevelop.Core;
 using MonoDevelop.Core.ProgressMonitoring;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
 
@@ -37,8 +36,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Xml;
-using System.Threading;
 using MonoDevelop.Projects.Extensions;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Prj2Make
 {
@@ -252,15 +251,12 @@ namespace MonoDevelop.Prj2Make
 	{
 		TargetConvert QueryConversion (string text)
 		{
-			AlertButton monodevelop = new AlertButton (GettextCatalog.GetString ("Convert to MonoDevelop"));
 			AlertButton vs2005      = new AlertButton (GettextCatalog.GetString ("Convert to MSBuild"));
 
 			AlertButton choice = MessageService.AskQuestion (text,
-			                                                 GettextCatalog.GetString ("Converting to Visual Studio 2005 format will overwrite existing files."),
-			                                                 AlertButton.Cancel, vs2005, monodevelop);
-			if (choice == monodevelop)
-				return TargetConvert.MonoDevelop;
-			else if (choice == vs2005)
+			                                                 GettextCatalog.GetString ("Converting to MSBuild format will overwrite existing files."),
+			                                                 AlertButton.Cancel, vs2005);
+			if (choice == vs2005)
 				return TargetConvert.VisualStudio;
 			else
 				return TargetConvert.None;
@@ -268,19 +264,19 @@ namespace MonoDevelop.Prj2Make
 		
 		public TargetConvert QueryProjectConversion (string file)
 		{
-			string text = GettextCatalog.GetString ("The project file {0} is a Visual Studio 2003 project. It must be converted to either a MonoDevelop or a Visual Studio 2005 project.", file);
+			string text = GettextCatalog.GetString ("The project file {0} is a Visual Studio 2003 project. It must be converted to a MSBuild project.", file);
 			return QueryConversion (text);
 		}
 		
 		public TargetConvert QuerySolutionConversion (string file)
 		{
-			string text = GettextCatalog.GetString ("The solution file {0} is a Visual Studio 2003 solution. It must be converted to either a MonoDevelop or a Visual Studio 2005 project.", file);
+			string text = GettextCatalog.GetString ("The solution file {0} is a Visual Studio 2003 solution. It must be converted to a MSBuild project.", file);
 			return QueryConversion (text);
 		}
 
 		public IProgressMonitor CreateProgressMonitor ()
 		{
-			return new MonoDevelop.Core.Gui.ProgressMonitoring.MessageDialogProgressMonitor (true, false, true, false);
+			return new MonoDevelop.Ide.ProgressMonitoring.MessageDialogProgressMonitor (true, false, true, false);
 		}
 	}
 }

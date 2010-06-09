@@ -73,11 +73,14 @@ namespace MonoDevelop.CSharp.Formatting
 		
 		int curLineNr;
 		int cursor;
-		
+		CSharpFormattingPolicy policy;
 		// Constructors
-		public CSharpIndentEngine ()
+		public CSharpIndentEngine (CSharpFormattingPolicy policy)
 		{
-			stack = new IndentStack ();
+			if (policy == null)
+				throw new ArgumentNullException ("policy");
+			this.policy = policy;
+			stack = new IndentStack (this);
 			linebuf = new StringBuilder ();
 			Reset ();
 		}
@@ -212,7 +215,7 @@ namespace MonoDevelop.CSharp.Formatting
 		// to test things w/o changing the real indent engine state
 		public object Clone ()
 		{
-			CSharpIndentEngine engine = new CSharpIndentEngine ();
+			CSharpIndentEngine engine = new CSharpIndentEngine (policy);
 			
 			engine.stack = (IndentStack) stack.Clone ();
 			engine.linebuf = new StringBuilder (linebuf.ToString (), linebuf.Capacity);
@@ -293,8 +296,10 @@ namespace MonoDevelop.CSharp.Formatting
 			"if",
 			"base",
 			"this",
-			"="
+			"=",
+			"return"
 		};
+		
 		static readonly int maxKeywordLength = keywords.Max (word => word.Length);
 		
 		// Check to see if linebuf contains a keyword we're interested in (not all keywords)
@@ -387,7 +392,7 @@ namespace MonoDevelop.CSharp.Formatting
 			stack.Push (Inside.PreProcessor, null, curLineNr, 0);
 			
 			curIndent = String.Empty;
-			needsReindent = true;
+			needsReindent = false;
 		}
 		
 		void PushSlash (Inside inside)
@@ -532,7 +537,7 @@ namespace MonoDevelop.CSharp.Formatting
 					}
 				}
 				
-				if (!FormattingProperties.IndentCaseLabels) {
+				if (!policy.IndentSwitchBody) {
 					needsReindent = true;
 					TrimIndent ();
 				}
@@ -855,6 +860,19 @@ namespace MonoDevelop.CSharp.Formatting
 			cursor++;
 		}
 		
+		static string[] preProcessorIndents = new string[] {
+			"if",
+			"else",
+			"elif",
+			"endif",
+			"define",
+			"undef",
+			"warning",
+			"error",
+			"pragma",
+			"line"
+		};
+		
 		// This is the main logic of this class...
 		public void Push (char c)
 		{
@@ -901,6 +919,7 @@ namespace MonoDevelop.CSharp.Formatting
 			switch (c) {
 			case '#':
 				PushHash (inside);
+				lastChar = '#';
 				break;
 			case '/':
 				PushSlash (inside);
@@ -958,6 +977,20 @@ namespace MonoDevelop.CSharp.Formatting
 			}
 			
 			after = stack.PeekInside (0);
+			if ((after & Inside.PreProcessor) == Inside.PreProcessor) {
+				for (int i = 0; i < preProcessorIndents.Length; i++) {
+					int len = preProcessorIndents[i].Length - 1;
+					if (linebuf.Length < len)
+						continue;
+					
+					string str = linebuf.ToString (linebuf.Length - len, len) + c;
+					if (str == preProcessorIndents[i]) {
+						needsReindent = true;
+						break;
+					}
+				}
+			}
+			
 			if ((after & (Inside.PreProcessor | Inside.StringOrChar | Inside.Comment)) == 0) {
 				if (!Char.IsWhiteSpace (c)) {
 					if (firstNonLwsp == -1)

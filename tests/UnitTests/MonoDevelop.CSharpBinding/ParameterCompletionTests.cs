@@ -31,7 +31,7 @@ using NUnit.Framework;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.CSharp.Resolver;
@@ -61,9 +61,9 @@ namespace MonoDevelop.CSharpBinding.Tests
 			TestWorkbenchWindow tww = new TestWorkbenchWindow ();
 			TestViewContent sev = new TestViewContent ();
 			DotNetProject project = new DotNetAssemblyProject ("C#");
-			project.FileName = "/tmp/ap" + pcount + ".csproj";
+			project.FileName = GetTempFile (".csproj");
 			
-			string file = "/tmp/test-pfile-" + (pcount++) + ".cs";
+			string file = GetTempFile (".cs");
 			project.AddFile (file);
 			
 			ProjectDomService.Load (project);

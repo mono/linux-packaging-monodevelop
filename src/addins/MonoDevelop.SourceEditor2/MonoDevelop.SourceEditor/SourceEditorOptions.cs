@@ -24,20 +24,11 @@
 // THE SOFTWARE.
 
 using System;
-using System.Collections.Generic;
-
-using Pango;
 
 using Mono.TextEditor;
-using Mono.TextEditor.Highlighting;
-
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Projects;
-using MonoDevelop.Projects.Dom;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.SourceEditor
 {
@@ -60,7 +51,7 @@ namespace MonoDevelop.SourceEditor
 		
 	}
 	
-	internal class DefaultSourceEditorOptions : TextEditorOptions, ISourceEditorOptions
+	public class DefaultSourceEditorOptions : TextEditorOptions, ISourceEditorOptions
 	{
 		static DefaultSourceEditorOptions instance;
 		//static TextStylePolicy defaultPolicy;
@@ -106,6 +97,8 @@ namespace MonoDevelop.SourceEditor
 		
 		void UpdateStylePolicy (MonoDevelop.Ide.Gui.Content.TextStylePolicy currentPolicy)
 		{
+			this.defaultEolMarker = TextStylePolicy.GetEolMarker (currentPolicy.EolMarker);
+			
 			base.TabsToSpaces          = currentPolicy.TabsToSpaces; // PropertyService.Get ("TabsToSpaces", false);
 			base.IndentationSize       = currentPolicy.TabWidth; //PropertyService.Get ("TabIndent", 4);
 			base.RulerColumn           = currentPolicy.FileWidth; //PropertyService.Get ("RulerColumn", 80);
@@ -118,6 +111,7 @@ namespace MonoDevelop.SourceEditor
 		// massive change event storms.
 		void UpdatePreferences (object sender, PropertyChangedEventArgs args)
 		{
+			try {
 			switch (args.Key) {
 			case "TabIsReindent": 
 				this.TabIsReindent = (bool) args.NewValue;
@@ -207,11 +201,14 @@ namespace MonoDevelop.SourceEditor
 				this.CompleteWithSpaceOrPunctuation = (bool) args.NewValue;
 				break;
 			case "ControlLeftRightMode":
-				this.ControlLeftRightMode = (ControlLeftRightMode)Enum.Parse (typeof(ControlLeftRightMode), (string) args.NewValue);
+				this.ControlLeftRightMode = (ControlLeftRightMode) args.NewValue;
 				break;
 			case "EnableAnimations":
 				base.EnableAnimations =  (bool) args.NewValue;
 				break;
+			}
+			} catch (Exception ex) {
+				LoggingService.LogError ("SourceEditorOptions error with property value for '" + (args.Key ?? "") + "'", ex);
 			}
 		}
 		
@@ -221,6 +218,7 @@ namespace MonoDevelop.SourceEditor
 			this.enableSemanticHighlighting = PropertyService.Get ("EnableSemanticHighlighting", false);
 			//			this.autoInsertTemplates        = PropertyService.Get ("AutoInsertTemplates", false);
 			this.autoInsertMatchingBracket = PropertyService.Get ("AutoInsertMatchingBracket", false);
+			this.smartSemicolonPlacement = PropertyService.Get ("SmartSemicolonPlacement", false);
 			this.enableCodeCompletion = PropertyService.Get ("EnableCodeCompletion", true);
 			this.enableParameterInsight = PropertyService.Get ("EnableParameterInsight", true);
 			this.enableQuickFinder = PropertyService.Get ("EnableQuickFinder", true);
@@ -245,11 +243,15 @@ namespace MonoDevelop.SourceEditor
 			this.onTheFlyFormatting = PropertyService.Get ("OnTheFlyFormatting", false);
 			this.enableAutoCodeCompletion = PropertyService.Get ("EnableAutoCodeCompletion", true);
 			this.completeWithSpaceOrPunctuation = PropertyService.Get ("CompleteWithSpaceOrPunctuation", true);
-			this.ControlLeftRightMode = (ControlLeftRightMode)Enum.Parse (typeof(ControlLeftRightMode), PropertyService.Get ("ControlLeftRightMode", DesktopService.DefaultControlLeftRightBehavior));
+			var defaultControlMode = (ControlLeftRightMode)Enum.Parse (typeof(ControlLeftRightMode), DesktopService.DefaultControlLeftRightBehavior);
+			this.ControlLeftRightMode = PropertyService.Get ("ControlLeftRightMode", defaultControlMode);
 			base.EnableAnimations = PropertyService.Get ("EnableAnimations", true);
+			
 		}
 		
 		#region new options
+		
+		
 		bool enableAutoCodeCompletion;
 		public bool EnableAutoCodeCompletion {
 			get {
@@ -360,6 +362,20 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		
+		bool smartSemicolonPlacement;
+		public bool SmartSemicolonPlacement {
+			get {
+				return smartSemicolonPlacement;
+			}
+			set {
+				if (value != this.smartSemicolonPlacement) {
+					this.smartSemicolonPlacement= value;
+					PropertyService.Set ("SmartSemicolonPlacement", value);
+					OnChanged (EventArgs.Empty);
+				}
+			}
+		}
+		
 		bool enableCodeCompletion;
 		public bool EnableCodeCompletion {
 			get { return enableCodeCompletion; }
@@ -420,7 +436,7 @@ namespace MonoDevelop.SourceEditor
 			set {
 				if (value != this.indentStyle) {
 					this.indentStyle = value;
-					PropertyService.Set ("IndentStyle", value.ToString ());
+					PropertyService.Set ("IndentStyle", value);
 					OnChanged (EventArgs.Empty);
 				}
 			}
@@ -471,6 +487,11 @@ namespace MonoDevelop.SourceEditor
 		}
 		
 		#region old options
+		string defaultEolMarker;
+		public override string DefaultEolMarker {
+			get { return defaultEolMarker; }
+		}
+
 		ControlLeftRightMode controlLeftRightMode = ControlLeftRightMode.MonoDevelop;
 		public ControlLeftRightMode ControlLeftRightMode {
 			get {
@@ -479,7 +500,7 @@ namespace MonoDevelop.SourceEditor
 			set {
 				if (controlLeftRightMode != value) {
 					controlLeftRightMode = value;
-					PropertyService.Set ("ControlLeftRightMode", value.ToString ());
+					PropertyService.Set ("ControlLeftRightMode", value);
 					SetWordFindStrategy ();
 					OnChanged (EventArgs.Empty);
 				}

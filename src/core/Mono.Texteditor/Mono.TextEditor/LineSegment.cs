@@ -193,9 +193,10 @@ namespace Mono.TextEditor
 		public string GetIndentation (Document doc)
 		{
 			StringBuilder result = new StringBuilder ();
-			for (int i = Offset; i < this.EndOffset; i++) {
+			int endOffset = this.Offset + this.EditableLength;
+			for (int i = Offset; i < endOffset; i++) {
 				char ch = doc.GetCharAt (i);
-				if (!char.IsWhiteSpace (ch))
+				if (ch != ' ' && ch != '\t')
 					break;
 				result.Append (ch);
 			}
@@ -206,7 +207,8 @@ namespace Mono.TextEditor
 		{
 			int curVisualColumn = 0;
 			for (int i = 0; i < EditableLength; i++) {
-				if (editor.Document.GetCharAt (Offset + i) == '\t') {
+				int curOffset = Offset + i;
+				if (curOffset < editor.Document.Length && editor.Document.GetCharAt (curOffset) == '\t') {
 					curVisualColumn = TextViewMargin.GetNextTabstop (editor, curVisualColumn);
 				} else {
 					curVisualColumn++;

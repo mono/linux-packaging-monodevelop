@@ -37,10 +37,14 @@ namespace MonoDevelop.CSharp.Dom
 			get { return GetChildByRole (Roles.TargetExpression); }
 		}
 		
-		public IReturnType Identifier {
+		public ICSharpNode Identifier {
 			get {
-				return (IReturnType)GetChildByRole (Roles.Identifier);
+				return (ICSharpNode)GetChildByRole (Roles.Identifier);
 			}
+		}
+		
+		public IEnumerable<ICSharpNode> TypeArguments {
+			get { return GetChildrenByRole (Roles.TypeArgument).Cast<ICSharpNode> (); }
 		}
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)

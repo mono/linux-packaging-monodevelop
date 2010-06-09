@@ -53,6 +53,12 @@ namespace OSXIntegration.Framework
 		internal static extern void DeleteMenu (IntPtr menuRef);
 
 		[DllImport (hiToolboxLib)]
+		internal static extern void FlashMenuBar (uint menuID);
+		
+		[DllImport (hiToolboxLib)]
+		internal static extern uint GetMenuID (IntPtr menuRef);
+		
+		[DllImport (hiToolboxLib)]
 		internal static extern void ClearMenuBar ();
 		
 		[DllImport (hiToolboxLib)]
@@ -143,6 +149,17 @@ namespace OSXIntegration.Framework
 		{
 			IntPtr str = CoreFoundation.CreateString (title);
 			CarbonMenuStatus result = SetMenuTitleWithCFString (menuRef, str);
+			CoreFoundation.Release (str);
+			CheckResult (result);
+		}
+
+		[DllImport (hiToolboxLib)]
+		static extern CarbonMenuStatus SetMenuItemTextWithCFString (IntPtr menuRef, ushort index, IntPtr cfstring);
+		
+		public static void SetMenuItemText (IntPtr menuRef, ushort index, string title)
+		{
+			IntPtr str = CoreFoundation.CreateString (title);
+			CarbonMenuStatus result = SetMenuItemTextWithCFString (menuRef, index, str);
 			CoreFoundation.Release (str);
 			CheckResult (result);
 		}

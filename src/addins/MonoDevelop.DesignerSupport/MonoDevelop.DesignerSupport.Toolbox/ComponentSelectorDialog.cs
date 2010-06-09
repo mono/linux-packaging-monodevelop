@@ -27,15 +27,13 @@
 //
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using Gtk;
 using MonoDevelop.DesignerSupport;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.ProgressMonitoring;
+using MonoDevelop.Ide.ProgressMonitoring;
 using MonoDevelop.Components;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.DesignerSupport.Toolbox
 {
@@ -80,7 +78,7 @@ namespace MonoDevelop.DesignerSupport.Toolbox
 			col = new TreeViewColumn ();
 			col.Spacing = 3;
 			col.Title = GettextCatalog.GetString ("Name");
-			CellRendererPixbuf crp = new CellRendererPixbuf ();
+			var crp = new CellRendererPixbuf ();
 			CellRendererText crx = new CellRendererText ();
 			crx.Width = 150;
 			col.PackStart (crp, false);

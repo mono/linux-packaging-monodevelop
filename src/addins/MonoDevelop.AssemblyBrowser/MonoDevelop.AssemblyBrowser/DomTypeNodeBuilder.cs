@@ -27,20 +27,16 @@
 //
 
 using System;
-using System.Linq;
 using System.Text;
-
+using System.Linq;
 using Mono.Cecil;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Ide.Gui.Components;
 using Mono.TextEditor.Highlighting;
-using MonoDevelop.Components.Commands;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.AssemblyBrowser
 {
@@ -127,7 +123,7 @@ namespace MonoDevelop.AssemblyBrowser
 			IType type = (IType)dataObject;
 			ctx.AddChild (new BaseTypeFolder (type));
 			bool publicOnly = ctx.Options ["PublicApiOnly"];
-			ctx.AddChildren (type.Members.Where (member => !(member.IsSpecialName && !(member is IMethod && ((IMethod)member).IsConstructor)) && !(publicOnly && !member.IsPublic)));
+			ctx.AddChildren (type.Members.Where (member => !(member.IsSpecialName && !(member is IMethod && ((IMethod)member).IsConstructor)) && !(publicOnly && !(member.IsPublic || member.IsProtected))));
 		}
 		
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
@@ -165,6 +161,7 @@ namespace MonoDevelop.AssemblyBrowser
 		
 		public string GetDisassembly (ITreeNavigator navigator)
 		{
+			bool publicOnly = navigator.Options ["PublicApiOnly"];
 			IType type = (IType)navigator.DataItem;
 			StringBuilder result = new StringBuilder ();
 			result.Append (DomMethodNodeBuilder.GetAttributes (Ambience, type.Attributes));
@@ -198,6 +195,8 @@ namespace MonoDevelop.AssemblyBrowser
 //			string commentSpan = String.Format ("<span foreground=\"#{0:X6}\">", comments.Color.Pixel);
 			string commentSpan = "<span style=\"comment\">";
 			foreach (IField field in type.Fields) {
+				if (publicOnly && !(field.IsPublic || field.IsProtected))
+					continue;
 				if ((field.Modifiers & Modifiers.SpecialName) == Modifiers.SpecialName)
 					continue;
 				if (first) {
@@ -216,6 +215,8 @@ namespace MonoDevelop.AssemblyBrowser
 			}
 			first = true;
 			foreach (IEvent evt in type.Events) {
+				if (publicOnly && !(evt.IsPublic || evt.IsProtected))
+					continue;
 				if (first) {
 					result.AppendLine ();
 					result.Append ("\t");
@@ -232,6 +233,8 @@ namespace MonoDevelop.AssemblyBrowser
 			}
 			first = true;
 			foreach (IMethod method in type.Methods) {
+				if (publicOnly && !(method.IsPublic || method.IsProtected))
+					continue;
 				if (!method.IsConstructor)
 					continue;
 				if (first) {
@@ -250,6 +253,8 @@ namespace MonoDevelop.AssemblyBrowser
 			}
 			first = true;
 			foreach (IMethod method in type.Methods) {
+				if (publicOnly && !(method.IsPublic || method.IsProtected))
+					continue;
 				if ((method.Modifiers & Modifiers.SpecialName) == Modifiers.SpecialName || method.IsConstructor)
 					continue;
 				if (first) {
@@ -268,6 +273,8 @@ namespace MonoDevelop.AssemblyBrowser
 			}
 			first = true;
 			foreach (IProperty property in type.Properties) {
+				if (publicOnly && !(property.IsPublic || property.IsProtected))
+					continue;
 				if (first) {
 					result.AppendLine ();
 					result.Append ("\t");
@@ -280,10 +287,22 @@ namespace MonoDevelop.AssemblyBrowser
 				result.Append ("\t");
 				result.Append (Ambience.GetString (property, settings));
 				result.Append (" <span style=\"text\">{</span>");
-				if (property.HasGet)
+				if (property.HasGet) {
+					if (property.GetterModifier != property.Modifiers) {
+						result.Append (" <span style=\"keyword.modifier\">");
+						result.Append (Ambience.GetString (property.GetterModifier));
+						result.Append ("</span>");
+					}
 					result.Append (" <span style=\"keyword.property\">get</span><span style=\"text\">;</span>");
-				if (property.HasSet)
+				}
+				if (property.HasSet) {
+					if (property.SetterModifier != property.Modifiers) {
+						result.Append (" <span style=\"keyword.modifier\">");
+						result.Append (Ambience.GetString (property.SetterModifier));
+						result.Append ("</span>");
+					}
 					result.Append (" <span style=\"keyword.property\">set</span><span style=\"text\">;</span>");
+				}
 				result.Append (" <span style=\"text\">}</span>");
 				result.AppendLine ();
 			}
@@ -292,8 +311,16 @@ namespace MonoDevelop.AssemblyBrowser
 			result.AppendLine ();
 			return result.ToString ();
 		}
+		
 		public string GetDecompiledCode (ITreeNavigator navigator)
 		{
+			IType type = (IType)navigator.DataItem;
+			if (type.ClassType == ClassType.Delegate) {
+				settings.OutputFlags |= OutputFlags.ReformatDelegates;
+				string result =  Ambience.GetString (type, settings);
+				settings.OutputFlags &= ~OutputFlags.ReformatDelegates;
+				return result;
+			}
 			return GetDisassembly (navigator);
 		}
 		

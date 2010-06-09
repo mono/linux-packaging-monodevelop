@@ -1,21 +1,14 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-
-using Gtk;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Commands;
-using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Ide.Gui.Pads.ProjectPad;
 using MonoDevelop.Projects;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui.Components;
-
 using MonoDevelop.VersionControl.Views;
+using MonoDevelop.Ide;
 
 
 namespace MonoDevelop.VersionControl
@@ -362,7 +355,7 @@ namespace MonoDevelop.VersionControl
 						res = DiffView.Show (items, test);
 						break;
 					case Commands.Log:
-						res = LogView.Show (items, null, test);
+						res = MonoDevelop.VersionControl.Views.LogView.Show (items, null, test);
 						break;
 					case Commands.Status:
 						res = StatusView.Show (items, test);

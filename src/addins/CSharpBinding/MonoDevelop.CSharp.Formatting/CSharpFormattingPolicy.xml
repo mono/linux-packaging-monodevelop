@@ -1,6 +1,7 @@
 <CodeStyle version="1.0" mimeType="text/x-csharp">
 
 	<Type name = "BraceStyle">
+		<Value _displayName="Do not change">DoNotChange</Value>
 		<Value _displayName="End of line">EndOfLine</Value>
 		<Value _displayName="End of line without space">EndOfLineWithoutSpace</Value>
 		<Value _displayName="Next line">NextLine</Value>
@@ -306,7 +307,7 @@ class ClassDeclaration {
 	}
 ]]></Example>
 
-	<Example name="simpleArrayInitializer"><![CDATA[
+	m<Example name="simpleArrayInitializer"><![CDATA[
 class ClassDeclaration { 
 		public void Test (object o)
 		{
@@ -445,6 +446,19 @@ class ClassDeclaration {
 	</Category>
 	
 	<Category _displayName="New Lines">
+<!--		<OptionCategory _displayName="Allow one line embedded statements">
+			<Option name="AllowIfBlockInline" _displayName="'if'"><Example><![CDATA[
+class ClassDeclaration { 
+		public void Test ()
+		{
+			if (true) { Console.WriteLine ("Hello World!"); }
+			if (true) Console.WriteLine ("Hello World!");
+			if (true) { Foo (); Bar (); }
+		}
+	}
+]]></Example></Option>
+		</OptionCategory>-->
+	
 		<Category _displayName="Place on new line">
 			<Option name="PlaceElseOnNewLine" _displayName="'else'" example="simpleIf"/>
 			<Option name="PlaceElseIfOnNewLine" _displayName="'else if'" example="simpleIf"/>
@@ -527,7 +541,7 @@ class ClassDeclaration {
 class ClassDeclaration { 
 		public void Test ()
 		{
-			int i =  checked(5 + 3);
+			int i = checked(5 + 3);
 			fixed (int* p1 = &i) {
 				*p1 = 5;
 			}

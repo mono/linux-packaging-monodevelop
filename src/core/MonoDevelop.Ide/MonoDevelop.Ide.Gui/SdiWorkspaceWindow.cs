@@ -31,7 +31,6 @@ using System.IO;
 using Gtk;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Commands;
 using MonoDevelop.Components.Commands;
@@ -40,13 +39,13 @@ namespace MonoDevelop.Ide.Gui
 {
 	internal class SdiWorkspaceWindow : Frame, IWorkbenchWindow, ICommandDelegatorRouter
 	{
-		IWorkbench workbench;
+		DefaultWorkbench workbench;
 		IViewContent content;
 		
 		ArrayList subViewContents = null;
 		Notebook subViewNotebook = null;
 		Toolbar subViewToolbar = null;
-		HBox pathBox = null;
+		PathBar pathBar = null;
 		HBox toolbarBox = null;
 		
 		VBox box;
@@ -65,7 +64,7 @@ namespace MonoDevelop.Ide.Gui
 		
 		ViewCommandHandlers commandHandler;
 		
-		public SdiWorkspaceWindow (IWorkbench workbench, IViewContent content, Notebook tabControl, TabLabel tabLabel) : base ()
+		public SdiWorkspaceWindow (DefaultWorkbench workbench, IViewContent content, Notebook tabControl, TabLabel tabLabel) : base ()
 		{
 			this.workbench = workbench;
 			this.tabControl = tabControl;
@@ -82,15 +81,14 @@ namespace MonoDevelop.Ide.Gui
 			
 			ShadowType = ShadowType.None;
 			box = new VBox ();
-			box.Add (content.Control);
+			box.PackStart (content.Control);
 			Add (box);
-			
-			Show ();
 			box.Show ();
-			content.Control.Show ();
+			
 			SetTitleEvent(null, null);
 			
 			commandHandler = new ViewCommandHandlers (this);
+			Show ();
 		}
 		
 		protected SdiWorkspaceWindow (IntPtr p): base (p)
@@ -255,7 +253,7 @@ namespace MonoDevelop.Ide.Gui
 					myUntitledTitle = baseName + System.IO.Path.GetExtension (content.UntitledName);
 					while (found) {
 						found = false;
-						foreach (IViewContent windowContent in workbench.ViewContentCollection) {
+						foreach (IViewContent windowContent in workbench.InternalViewContentCollection) {
 							string title = windowContent.WorkbenchWindow.Title;
 							if (title.EndsWith("*") || title.EndsWith("+")) {
 								title = title.Substring(0, title.Length - 1);
@@ -297,17 +295,18 @@ namespace MonoDevelop.Ide.Gui
 		
 		public bool CloseWindow (bool force, bool fromMenu, int pageNum)
 		{
-			bool wasActive = workbench.WorkbenchLayout.ActiveWorkbenchwindow == this;
+			bool wasActive = workbench.ActiveWorkbenchWindow == this;
 			WorkbenchWindowEventArgs args = new WorkbenchWindowEventArgs (force, wasActive);
 			args.Cancel = false;
 			OnClosing (args);
 			if (args.Cancel)
 				return false;
 			if (fromMenu == true) {
-				workbench.WorkbenchLayout.RemoveTab (tabControl.PageNum(this));
+				workbench.RemoveTab (tabControl.PageNum(this));
 			} else {
-				workbench.WorkbenchLayout.RemoveTab (pageNum);
+				workbench.RemoveTab (pageNum);
 			}
+			OnClosed (args);
 			
 			content.ContentNameChanged -= new EventHandler(SetTitleEvent);
 			content.DirtyChanged       -= new EventHandler(SetTitleEvent);
@@ -322,23 +321,21 @@ namespace MonoDevelop.Ide.Gui
 				}
 				this.subViewContents = null;
 				subViewNotebook.Remove (content.Control);
-			} else {
-				box.Remove (content.Control);
 			}
+			DetachFromPathedDocument ();
 			content.Dispose ();
-			tabLabel.Dispose ();
+			box.Destroy ();
 			
 			this.subViewToolbar = null;
 			this.separatorItem = null;
-			DetachFromPathedDocument ();
-
-			OnClosed (args);
 			
 			this.content = null;
 			this.subViewNotebook = null;
 			this.tabControl = null;
+			tabLabel.Destroy ();
 			this.tabLabel = null;
 			this.tabPage = null;
+			
 			Destroy ();
 			return true;
 		}
@@ -365,13 +362,13 @@ namespace MonoDevelop.Ide.Gui
 			if (toolbarBox == null || subViewToolbar == null)
 				return;
 
-			if (separatorItem != null && pathBox == null) {
+			if (separatorItem != null && pathBar == null) {
 				subViewToolbar.Remove (separatorItem);
 				separatorItem = null;
-			} else if (separatorItem == null && pathBox != null) {
+			} else if (separatorItem == null && pathBar != null) {
 				separatorItem = new SeparatorToolItem ();
 				subViewToolbar.Insert (separatorItem, -1);
-			} else if (separatorItem != null && pathBox != null) {
+			} else if (separatorItem != null && pathBar != null) {
 				if (subViewToolbar.GetItemIndex(separatorItem) != subViewToolbar.NumChildren - 1) {
 					subViewToolbar.Remove (separatorItem);
 					subViewToolbar.Insert (separatorItem, -1);
@@ -469,80 +466,46 @@ namespace MonoDevelop.Ide.Gui
 		
 		void HandlePathChange (object sender, MonoDevelop.Ide.Gui.Content.DocumentPathChangedEventArgs args)
 		{
-			MonoDevelop.Ide.Gui.Content.IPathedDocument pathDoc = (MonoDevelop.Ide.Gui.Content.IPathedDocument) sender;
-			
-			while (pathBox.Children.Length > 0)
-				pathBox.Remove (pathBox.Children[0]);
-			
-			if (pathDoc.CurrentPath == null || pathDoc.CurrentPath.Length == 0)
-				return;
-			
-			for (int i = 0; i < pathDoc.CurrentPath.Length; i++) {
-				PathMenuButton button = new PathMenuButton (pathDoc, i);
-				button.ArrowType = (i + 1 < pathDoc.CurrentPath.Length)? ArrowType.Right : (ArrowType?) null;
-				
-				if (i == pathDoc.SelectedIndex) {
-					string escaped = GLib.Markup.EscapeText (pathDoc.CurrentPath[i]);
-					button.Markup = string.Concat ("<b>", escaped ,"</b>");
-				} else {
-					button.Label = pathDoc.CurrentPath[i];
-				}
-				pathBox.PackStart (button, false, false, 0);
-			}
-			pathBox.PackEnd (new Label (string.Empty), true, true, 0);
-			pathBox.ShowAll ();
+			var pathDoc = (MonoDevelop.Ide.Gui.Content.IPathedDocument) sender;
+			pathBar.SetPath (pathDoc.CurrentPath);
+			pathBar.SetActive (pathDoc.SelectedIndex);
 		}
 		
 		bool PathWidgetEnabled {
-			get { return (pathBox != null); }
+			get { return (pathBar != null); }
 			set {
 				if (PathWidgetEnabled == value)
 					return;
 				if (value) {
 					CheckCreateToolbarBox ();
-					
-					pathBox = new HBox ();
-					pathBox.Spacing = 0;
-					
-					toolbarBox.PackEnd (pathBox, true, true, 0);
+					pathBar = new PathBar (CreatePathMenu);
+					toolbarBox.PackEnd (pathBar, true, true, 0);
 					toolbarBox.ShowAll ();
 				} else {
-					toolbarBox.Remove (pathBox);
+					toolbarBox.Remove (pathBar);
 					toolbarBox.Destroy ();
+					pathBar = null;
+					toolbarBox = null;
 				}
 				EnsureToolbarBoxSeparator ();
 			}
 		}
 		
-		private class PathMenuButton : MenuButton
+		Menu CreatePathMenu (int index)
 		{
-			MonoDevelop.Ide.Gui.Content.IPathedDocument pathDoc;
-			int index;
-			
-			public PathMenuButton (MonoDevelop.Ide.Gui.Content.IPathedDocument pathDoc, int index)
-			{
-				this.pathDoc = pathDoc;
-				this.index = index;
-				this.MenuCreator = PathMenuCreator;
-				this.Relief = Gtk.ReliefStyle.None;
-			}
-			
-			Menu PathMenuCreator (MenuButton button)	
-			{
-				Menu menu = new Menu ();
-				MenuItem mi = new MenuItem (GettextCatalog.GetString ("Select"));
-				mi.Activated += delegate {
-					pathDoc.SelectPath (index);
-				};
-				menu.Add (mi);
-				mi = new MenuItem (GettextCatalog.GetString ("Select contents"));
-				mi.Activated += delegate {
-					pathDoc.SelectPathContents (index);
-				};
-				menu.Add (mi);
-				menu.ShowAll ();
-				return menu;
-			}
+			Menu menu = new Menu ();
+			MenuItem mi = new MenuItem (GettextCatalog.GetString ("Select"));
+			mi.Activated += delegate {
+				pathDoc.SelectPath (index);
+			};
+			menu.Add (mi);
+			mi = new MenuItem (GettextCatalog.GetString ("Select contents"));
+			mi.Activated += delegate {
+				pathDoc.SelectPathContents (index);
+			};
+			menu.Add (mi);
+			menu.ShowAll ();
+			return menu;
 		}
 		
 		#endregion
@@ -623,7 +586,7 @@ namespace MonoDevelop.Ide.Gui
 
 			try {
 				if (content.StockIconId != null ) {
-					tabLabel.Icon = new Gtk.Image ( content.StockIconId, IconSize.Menu );
+					tabLabel.Icon = new Gtk.Image ((IconId) content.StockIconId, IconSize.Menu );
 				}
 				else if (content.ContentName != null && content.ContentName.IndexOfAny (new char[] { '*', '+'}) == -1) {
 					tabLabel.Icon.Pixbuf = DesktopService.GetPixbufForFile (content.ContentName, Gtk.IconSize.Menu);

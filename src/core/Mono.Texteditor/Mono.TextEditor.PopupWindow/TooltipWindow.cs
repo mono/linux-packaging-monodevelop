@@ -57,15 +57,12 @@ namespace Mono.TextEditor.PopupWindow
 			this.SkipTaskbarHint = true;
 			this.Decorated = false;
 			this.BorderWidth = 2;
-			this.TypeHint = TooltipTypeHint;
+			this.TypeHint = WindowTypeHint.Tooltip;
 			this.AllowShrink = false;
 			this.AllowGrow = false;
 			
 			//fake widget name for stupid theme engines
-			if (Gtk.Global.CheckVersion (2, 12, 0) == null)
-				this.Name = "gtk-tooltip";
-			else
-				this.Name = "gtk-tooltips";
+			this.Name = "gtk-tooltip";
 			
 			label = new FixedWidthWrapLabel ();
 			label.Wrap = Pango.WrapMode.WordChar;
@@ -106,13 +103,13 @@ namespace Mono.TextEditor.PopupWindow
 			}
 		}
 		
-		protected override bool OnExposeEvent (Gdk.EventExpose args)
+		protected override bool OnExposeEvent (Gdk.EventExpose evnt)
 		{
-			base.OnExposeEvent (args);
-			
 			int winWidth, winHeight;
 			this.GetSize (out winWidth, out winHeight);
-			this.GdkWindow.DrawRectangle (this.Style.ForegroundGC (StateType.Insensitive), false, 0, 0, winWidth-1, winHeight-1);
+			Gtk.Style.PaintFlatBox (Style, this.GdkWindow, StateType.Normal, ShadowType.Out, evnt.Area, this, "tooltip", 0, 0, winWidth, winHeight);
+			foreach (var child in this.Children)
+				this.PropagateExpose (child, evnt);
 			return false;
 		}
 		
@@ -135,20 +132,19 @@ namespace Mono.TextEditor.PopupWindow
 //					LimitWidth (fittedWidth);
 //				}
 				
+				Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtPoint (x, y));
 				if (nudgeHorizontal) {
-					int screenW = Screen.Width;
-					if (allocation.Width <= screenW && x + allocation.Width >= screenW - edgeGap)
-						x = (screenW - allocation.Height - edgeGap);
-					if (x <= 0)
-						x = 0;
+					if (allocation.Width <= geometry.Width && x + allocation.Width >= geometry.Width - edgeGap)
+						x = geometry.Left + (geometry.Width - allocation.Height - edgeGap);
+					if (x <= geometry.Left)
+						x = geometry.Left;
 				}
 				
 				if (nudgeVertical) {
-					int screenH = Screen.Height;
-					if (allocation.Height <= screenH && y + allocation.Height >= screenH - edgeGap)
-						y = (screenH - allocation.Height - edgeGap);
-					if (y <= 0)
-						y = 0;
+					if (allocation.Height <= geometry.Height && y + allocation.Height >= geometry.Height - edgeGap)
+						y = geometry.Top + (geometry.Height - allocation.Height - edgeGap);
+					if (y <= geometry.Top)
+						y = geometry.Top;
 				}
 				
 				if (y != oldY || x != oldX)
@@ -170,7 +166,7 @@ namespace Mono.TextEditor.PopupWindow
 //				WidthRequest = width;
 //		}
 		
-		//this is GTK+ >= 2.10 only, so reflect it
+	/*	//this is GTK+ >= 2.10 only, so reflect it
 		static Gdk.WindowTypeHint TooltipTypeHint {
 			get {
 				if (tooltipTypeHint > -1)
@@ -184,9 +180,9 @@ namespace Mono.TextEditor.PopupWindow
 				
 				return (Gdk.WindowTypeHint) tooltipTypeHint;
 			}
-		}
+		}*/
 		
-		static int tooltipTypeHint = -1;
+		//static int tooltipTypeHint = -1;
 		[System.ComponentModel.Category("MonoDevelop.Components")]
 		[System.ComponentModel.ToolboxItem(true)]
 		public class FixedWidthWrapLabel : Widget
@@ -226,7 +222,7 @@ namespace Mono.TextEditor.PopupWindow
 					layout.Dispose ();
 				}
 				
-				layout = new Pango.Layout (PangoContext);
+				layout = PangoUtil.CreateLayout (this, null);
 				if (use_markup) {
 					layout.SetMarkup (brokentext != null? brokentext : (text ?? string.Empty));
 				} else {
@@ -239,6 +235,15 @@ namespace Mono.TextEditor.PopupWindow
 				else
 					layout.Width = int.MaxValue;
 				QueueResize ();
+			}
+			
+			protected override void OnDestroyed ()
+			{
+				base.OnDestroyed ();
+				if (layout != null) {
+					layout.Dispose ();
+					layout = null;
+				}
 			}
 			
 			private void UpdateLayout ()
@@ -450,10 +455,10 @@ namespace Mono.TextEditor.PopupWindow
 		WindowTransparencyDecorator (Gtk.Window window)
 		{
 			this.window = window;
+			//HACK: Workaround for GTK# crasher bug where GC collects internal wrapper delegates
 			snoopFunc = TryBindGtkInternals (this);
 			
-			//FIXME: access this property directly when we use GTK# 2.12
-			if (CanSetOpacity && snoopFunc != null) {
+			if (snoopFunc != null) {
 				window.Shown += ShownHandler;
 				window.Hidden += HiddenHandler;
 				window.Destroyed += DestroyedHandler;
@@ -489,15 +494,17 @@ namespace Mono.TextEditor.PopupWindow
 			if (!snooperInstalled)
 				snooperID = InstallSnooper (snoopFunc);
 			snooperInstalled = true;
+			
+			//NOTE: we unset transparency when showing, instead of when hiding
+			//because the latter case triggers a metacity+compositing bug that shows the window again
+			SemiTransparent = false;
 		}
 		
 		void HiddenHandler (object sender, EventArgs args)
 		{
 			if (snooperInstalled)
 				RemoveSnooper (snooperID);
-			
 			snooperInstalled = false;
-			SemiTransparent = false;
 		}
 		
 		void DestroyedHandler (object sender, EventArgs args)
@@ -523,7 +530,7 @@ namespace Mono.TextEditor.PopupWindow
 			set {
 				if (semiTransparent != value) {
 					semiTransparent = value;
-					TrySetTransparency (window, semiTransparent? opacity : 1.0);
+					window.Opacity = semiTransparent? opacity : 1.0;
 				}
 			}
 		}
@@ -575,56 +582,6 @@ namespace Mono.TextEditor.PopupWindow
 			internalBindingWorks = false;
 			Console.WriteLine ("GTK# API has changed, and control-transparency will not be available for popups");
 			return null;
-		}
-		
-		#endregion
-			
-		#region Static setter reflecting code -- property is only in GTK+ 2.12
-		
-		[DllImport("libgobject-2.0.so.0")]
-		static extern IntPtr g_type_class_peek (IntPtr gtype);
-
-		[DllImport("libgobject-2.0.so.0")]
-		static extern IntPtr g_object_class_find_property (IntPtr klass, string name);
-
-		[DllImport("libgobject-2.0.so.0")]
-		static extern void g_object_set (IntPtr obj, string property, double value, IntPtr nullarg);
-		
-		static bool triedToFindSetters = false;
-		
-		//if we have GTK# 2.12 we can use Mono reflection
-		static System.Reflection.PropertyInfo opacityProp = null;
-		
-		//if we have GTK+ 2.12 but an older GTK#, we can use GObject reflection
-		static IntPtr opacityMeth = IntPtr.Zero;
-		
-		static bool CanSetOpacity {
-			get {
-				if (triedToFindSetters)
-					return (opacityMeth != IntPtr.Zero || opacityProp != null);
-				
-				triedToFindSetters = true;
-				
-				opacityProp = typeof (Gtk.Window).GetProperty ("Opacity");
-				if (opacityProp != null)
-					return true;
-				
-				GLib.GType gtype = (GLib.GType) typeof (Gtk.Window);
-				try {
-					IntPtr klass = g_type_class_peek (gtype.Val);
-					opacityMeth = g_object_class_find_property (klass, "opacity");
-				} catch (DllNotFoundException) {}
-				
-				return opacityMeth != IntPtr.Zero;
-			}
-		}
-		
-		static void TrySetTransparency (Gtk.Window window, double opacity)
-		{
-			if (opacityMeth != IntPtr.Zero)
-				g_object_set (window.Handle, "opacity", opacity, IntPtr.Zero);
-			else if (opacityProp != null)
-				opacityProp.SetValue (window, opacity, null);
 		}
 		
 		#endregion

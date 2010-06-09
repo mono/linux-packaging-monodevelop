@@ -27,16 +27,20 @@
 //
 
 using System;
-using System.IO;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Text.RegularExpressions;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Commands;
+using MonoDevelop.Ide.Desktop;
 using MonoDevelop.Ide.Gui;
 using OSXIntegration.Framework;
-using System.Runtime.InteropServices;
+using MonoDevelop.Ide; 
+using System.Linq;
+using MonoDevelop.Core.Execution;
+using MonoDevelop.Platform.Mac;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Platform
 {
@@ -75,7 +79,7 @@ namespace MonoDevelop.Platform
 					"MonoDevelop requires a newer version of the Mono Framework.",
 					new AlertButton ("Cancel", null), downloadButton))
 				{
-					Process.Start (url);
+					OpenUrl (url);
 				}
 				
 				Environment.Exit (1);
@@ -102,7 +106,14 @@ namespace MonoDevelop.Platform
 
 		public override void ShowUrl (string url)
 		{
-			Process.Start (url);
+			OpenUrl (url);
+		}
+		
+		internal static void OpenUrl (string url)
+		{
+			//WORKAROUND: don't pass URL directly - Mono currently uses 'open -W' which means 'open' hangs until target app exits
+			var psi = new ProcessStartInfo ("open", url) { UseShellExecute = false };
+			Process.Start (psi);
 		}
 
 		public override string DefaultMonospaceFont {
@@ -115,6 +126,8 @@ namespace MonoDevelop.Platform
 		
 		private static void LoadMimeMap ()
 		{
+			LoggingService.Trace ("Mac Platform Service", "Loading MIME map");
+			
 			// All recent Macs should have this file; if not we'll just die silently
 			if (!File.Exists ("/etc/apache2/mime.types")) {
 				MonoDevelop.Core.LoggingService.LogError ("Apache mime database is missing");
@@ -133,13 +146,15 @@ namespace MonoDevelop.Platform
 			} catch (Exception ex){
 				MonoDevelop.Core.LoggingService.LogError ("Could not load Apache mime database", ex);
 			}
+			
+			LoggingService.Trace ("Mac Platform Service", "Loaded MIME map");
 		}
 		
 		HashSet<object> ignoreCommands = new HashSet<object> () {
-			HelpCommands.About,
-			EditCommands.DefaultPolicies,
-			EditCommands.MonodevelopPreferences,
-			FileCommands.Exit,
+			CommandManager.ToCommandId (HelpCommands.About),
+			CommandManager.ToCommandId (EditCommands.DefaultPolicies),
+			CommandManager.ToCommandId (EditCommands.MonodevelopPreferences),
+			CommandManager.ToCommandId (FileCommands.Exit),
 		};
 		
 		public override bool SetGlobalMenu (CommandManager commandManager, string commandMenuAddinPath)
@@ -170,28 +185,37 @@ namespace MonoDevelop.Platform
 			
 			OSXIntegration.OSXMenu.AddCommandIDMappings (new Dictionary<object, CarbonCommandID> ()
 			{
-				{ EditCommands.Copy, CarbonCommandID.Copy },
-				{ EditCommands.Cut, CarbonCommandID.Cut },
+				{ CommandManager.ToCommandId (EditCommands.Copy), CarbonCommandID.Copy },
+				{ CommandManager.ToCommandId (EditCommands.Cut), CarbonCommandID.Cut },
 				//FIXME: for some reason mapping this causes two menu items to be created
-		//		{ EditCommands.MonodevelopPreferences, CarbonCommandID.Preferences }, 
-				{ EditCommands.Redo, CarbonCommandID.Redo },
-				{ EditCommands.Undo, CarbonCommandID.Undo },
-				{ EditCommands.SelectAll, CarbonCommandID.SelectAll },
-				{ FileCommands.NewFile, CarbonCommandID.New },
-				{ FileCommands.OpenFile, CarbonCommandID.Open },
-				{ FileCommands.Save, CarbonCommandID.Save },
-				{ FileCommands.SaveAs, CarbonCommandID.SaveAs },
-				{ FileCommands.CloseFile, CarbonCommandID.Close },
-				{ FileCommands.Exit, CarbonCommandID.Quit },
-				{ FileCommands.ReloadFile, CarbonCommandID.Revert },
-				{ HelpCommands.About, CarbonCommandID.About },
-				{ HelpCommands.Help, CarbonCommandID.AppHelp },
+				// { EditCommands.MonodevelopPreferences, CarbonCommandID.Preferences }, 
+				{ CommandManager.ToCommandId (EditCommands.Redo), CarbonCommandID.Redo },
+				{ CommandManager.ToCommandId (EditCommands.Undo), CarbonCommandID.Undo },
+				{ CommandManager.ToCommandId (EditCommands.SelectAll), CarbonCommandID.SelectAll },
+				{ CommandManager.ToCommandId (FileCommands.NewFile), CarbonCommandID.New },
+				{ CommandManager.ToCommandId (FileCommands.OpenFile), CarbonCommandID.Open },
+				{ CommandManager.ToCommandId (FileCommands.Save), CarbonCommandID.Save },
+				{ CommandManager.ToCommandId (FileCommands.SaveAs), CarbonCommandID.SaveAs },
+				{ CommandManager.ToCommandId (FileCommands.CloseFile), CarbonCommandID.Close },
+				{ CommandManager.ToCommandId (FileCommands.Exit), CarbonCommandID.Quit },
+				{ CommandManager.ToCommandId (FileCommands.ReloadFile), CarbonCommandID.Revert },
+				{ CommandManager.ToCommandId (HelpCommands.About), CarbonCommandID.About },
+				{ CommandManager.ToCommandId (HelpCommands.Help), CarbonCommandID.AppHelp },
 			});
 			
+			//mac-ify these command names
+			commandManager.GetCommand (EditCommands.MonodevelopPreferences).Text = GettextCatalog.GetString ("Preferences...");
+			commandManager.GetCommand (EditCommands.DefaultPolicies).Text = GettextCatalog.GetString ("Default Policies...");
+			commandManager.GetCommand (HelpCommands.About).Text = GettextCatalog.GetString ("About MonoDevelop");
+			
 			initedApp = true;
-			OSXIntegration.OSXMenu.SetAppQuitCommand (FileCommands.Exit);
-			OSXIntegration.OSXMenu.AddAppMenuItems (commandManager, HelpCommands.About, Command.Separator,
-			                                        EditCommands.DefaultPolicies, EditCommands.MonodevelopPreferences);
+			OSXIntegration.OSXMenu.SetAppQuitCommand (CommandManager.ToCommandId (FileCommands.Exit));
+			OSXIntegration.OSXMenu.AddAppMenuItems (
+				commandManager,
+			    CommandManager.ToCommandId (HelpCommands.About),
+				CommandManager.ToCommandId (Command.Separator),
+				CommandManager.ToCommandId (EditCommands.DefaultPolicies),
+				CommandManager.ToCommandId (EditCommands.MonodevelopPreferences));
 			
 			IdeApp.Workbench.RootWindow.DeleteEvent += HandleDeleteEvent;
 		}
@@ -202,51 +226,31 @@ namespace MonoDevelop.Platform
 				return;
 			initedGlobal = true;
 			
+			//FIXME: should we remove these when finalizing?
 			try {
-				//FIXME: remove these when finalizing
-				Carbon.InstallApplicationEventHandler (HandleAppReopen, CarbonEventApple.ReopenApplication);
-				Carbon.InstallApplicationEventHandler (HandleAppQuit, CarbonEventApple.QuitApplication);
-				Carbon.InstallApplicationEventHandler (HandleAppDocOpen, CarbonEventApple.OpenDocuments); //kAEOpenDocuments
+				ApplicationEvents.Quit += delegate (object sender, ApplicationQuitEventArgs e) {
+					if (!IdeApp.Exit ())
+						e.UserCancelled = true;
+					e.Handled = true;
+				};
+				
+				ApplicationEvents.Reopen += delegate (object sender, ApplicationEventArgs e) {
+					if (IdeApp.Workbench != null && IdeApp.Workbench.RootWindow != null) {
+						IdeApp.Workbench.RootWindow.Deiconify ();
+						IdeApp.Workbench.RootWindow.Visible = true;
+						e.Handled = true;
+					}
+				};
+				
+				ApplicationEvents.OpenDocuments += delegate (object sender, ApplicationDocumentEventArgs e) {
+					IdeApp.OpenFiles (e.Documents.Select (doc => new FileOpenInformation (doc.Key, doc.Value, 1, true)));
+					e.Handled = true;
+				};
+				
 			} catch (Exception ex) {
 				MonoDevelop.Core.LoggingService.LogError ("Could not install app event handlers", ex);
 				setupFail = true;
 			}
-		}
-		
-		static CarbonEventHandlerStatus HandleAppReopen (IntPtr callRef, IntPtr eventRef, IntPtr user_data)
-		{
-			if (IdeApp.Workbench == null || IdeApp.Workbench.RootWindow == null)
-				return CarbonEventHandlerStatus.NotHandled;
-			
-			IdeApp.Workbench.RootWindow.Deiconify ();
-			IdeApp.Workbench.RootWindow.Visible = true;
-			return CarbonEventHandlerStatus.Handled;
-		}
-		
-		static CarbonEventHandlerStatus HandleAppQuit (IntPtr callRef, IntPtr eventRef, IntPtr user_data)
-		{
-			IdeApp.Exit ();
-			return CarbonEventHandlerStatus.Handled;
-		}
-		
-		static CarbonEventHandlerStatus HandleAppDocOpen (IntPtr callRef, IntPtr eventRef, IntPtr user_data)
-		{
-			try {
-				AEDesc list = Carbon.GetEventParameter<AEDesc> (eventRef, CarbonEventParameterName.DirectObject, CarbonEventParameterType.AEList);
-				long count = Carbon.AECountItems (ref list);
-				List<string> files = new List<string> ();
-				for (int i = 1; i <= count; i++) {
-					FSRef fsRef = Carbon.AEGetNthPtr<FSRef> (ref list, i, CarbonEventParameterType.FSRef);
-					string file = Carbon.FSRefToPath (ref fsRef);
-					if (!String.IsNullOrEmpty (file))
-						files.Add (file);
-				}
-				IdeApp.OpenFiles (files);
-				Carbon.CheckReturn (Carbon.AEDisposeDesc (ref list));
-			} catch (Exception ex) {
-				System.Console.WriteLine (ex);
-			}
-			return CarbonEventHandlerStatus.Handled;
 		}
 		
 		[GLib.ConnectBefore]
@@ -254,6 +258,14 @@ namespace MonoDevelop.Platform
 		{
 			args.RetVal = true;
 			IdeApp.Workbench.RootWindow.Visible = false;
+		}
+		
+		public override IProcessAsyncOperation StartConsoleProcess (string command, string arguments, string workingDirectory,
+		                                                            IDictionary<string, string> environmentVariables,
+		                                                            string title, bool pauseWhenFinished)
+		{
+			return new ExternalConsoleProcess (command, arguments, workingDirectory, environmentVariables,
+			                                   title, pauseWhenFinished);
 		}
 	}
 }

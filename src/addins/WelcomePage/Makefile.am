@@ -3,11 +3,8 @@ ADDIN_BUILD = $(top_builddir)/build/AddIns/WelcomePage
 ASSEMBLY = $(ADDIN_BUILD)/WelcomePage.dll
 
 DEPS =  \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
@@ -15,30 +12,27 @@ REFS =  \
 	$(MONO_ADDINS_LIBS) \
 	-r:Mono.Posix \
 	-r:System \
+	-r:System.Core \
 	-r:System.Xml
 
 FILES =  \
 	AssemblyInfo.cs \
 	gtk-gui/generated.cs \
-	gtk-gui/MonoDevelop.WelcomePage.WelcomePageFallbackWidget.cs \
+	gtk-gui/MonoDevelop.WelcomePage.WelcomePageWidget.cs \
 	WelcomePageCommands.cs \
-	WelcomePageFallbackWidget.cs \
 	WelcomePageOptionPanel.cs \
 	WelcomePageView.cs \
-	XslGettextCatalog.cs
+	WelcomePageWidget.cs
 
 RES =  \
 	gtk-gui/gui.stetic \
 	gtk-gui/objects.xml \
 	WelcomePage.addin.xml \
-	WelcomePage.xsl \
 	WelcomePageContent.xml
  
 DATA_FILES =  \
-	mono-bg.png \
-	mono-decoration.png \
-	mono-logo.png \
-	WelcomePage.css
+	md-bg.png \
+	md-logo.png
 
 
 DATA_FILE_BUILD = $(addprefix $(ADDIN_BUILD)/, $(DATA_FILES))

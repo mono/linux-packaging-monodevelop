@@ -41,10 +41,9 @@ using System.Text;
 using Mono.Addins;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
-using MonoDevelop.Core.Gui.Dialogs;
+using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Commands;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui.Components;
 
@@ -55,6 +54,8 @@ namespace MonoDevelop.Ide.Gui.Pads
 	/// </summary>
 	public class TreeViewPad : AbstractPadContent, IMementoCapable, ICommandDelegatorRouter
 	{
+		internal Action Initializer;
+		
 		protected ExtensibleTreeView treeView = new ExtensibleTreeView ();
 		
 		public ExtensibleTreeView TreeView {
@@ -72,7 +73,17 @@ namespace MonoDevelop.Ide.Gui.Pads
 		public TreeViewPad ()
 		{
 			treeView.Tree.CursorChanged += new EventHandler (OnSelectionChanged);
+			treeView.Tree.EnableAutoTooltips ();
 		}
+		
+		public override void Initialize (IPadWindow container)
+		{
+			base.Initialize (container);
+			TreeView.Id = Id;
+			if (Initializer != null)
+				Initializer ();
+		}
+
 		
 		protected virtual void OnSelectionChanged (object sender, EventArgs args)
 		{

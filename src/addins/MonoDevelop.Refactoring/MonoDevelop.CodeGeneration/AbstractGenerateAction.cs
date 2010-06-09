@@ -32,8 +32,8 @@ using System.Collections.Generic;
 using ICSharpCode.NRefactory.Ast;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Refactoring;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Projects.Dom.Output;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.CodeGeneration
 {
@@ -66,7 +66,7 @@ namespace MonoDevelop.CodeGeneration
 			column.PackStart (toggleRenderer, false);
 			column.AddAttribute (toggleRenderer, "active", 0);
 
-			CellRendererPixbuf pixbufRenderer = new CellRendererPixbuf ();
+			var pixbufRenderer = new CellRendererPixbuf ();
 			column.PackStart (pixbufRenderer, false);
 			column.AddAttribute (pixbufRenderer, "pixbuf", 1);
 

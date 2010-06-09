@@ -49,6 +49,7 @@ namespace MonoDevelop.Core.Execution
 		DefaultExecutionModeSet defaultExecutionModeSet = new DefaultExecutionModeSet ();
 		IExecutionHandler defaultExecutionHandler = new DefaultExecutionHandler ();
 		IExecutionMode defaultExecutionMode = new DefaultExecutionMode ();
+		ExternalConsoleHandler externalConsoleHandler;
 		
 		Dictionary<string, string> environmentVariableOverrides = null;
 		
@@ -74,6 +75,13 @@ namespace MonoDevelop.Core.Execution
 		
 		internal ProcessService ()
 		{
+		}
+		
+		public void SetExternalConsoleHandler (ExternalConsoleHandler handler)
+		{
+			if (externalConsoleHandler != null)
+				throw new InvalidOperationException ("External console handler already set");
+			externalConsoleHandler = handler;
 		}
 		
 		public ProcessWrapper StartProcess (string command, string arguments, string workingDirectory, EventHandler exited) 
@@ -129,18 +137,27 @@ namespace MonoDevelop.Core.Execution
 				
 			if (errorStreamChanged != null)
 				p.ErrorStreamChanged += errorStreamChanged;
-			
-			if (exited != null)
-				p.Exited += exited;
 
 			startInfo.CreateNoWindow = true;
 			p.StartInfo = startInfo;
 			ProcessEnvironmentVariableOverrides (p.StartInfo);
 			
+			// FIXME: the bug is long gone, but removing the hacks in ProcessWrapper w/o bugs will be tricky
 			// WORKAROUND for "Bug 410743 - wapi leak in System.Diagnostic.Process"
 			// Process leaks when an exit event is registered
 			// instead we use another thread to monitor I/O and wait for exit
+			// if (exited != null)
+			// 	p.Exited += exited;
 			// p.EnableRaisingEvents = true;
+			
+			if (exited != null) {
+				MonoDevelop.Core.OperationHandler handler = null;
+				handler = delegate (MonoDevelop.Core.IAsyncOperation op) {
+					op.Completed -= handler;
+					exited (p, EventArgs.Empty);
+				};
+				((MonoDevelop.Core.IAsyncOperation)p).Completed += handler;
+			}
 			
 			Counters.ProcessesStarted++;
 			p.Start ();
@@ -172,37 +189,48 @@ namespace MonoDevelop.Core.Execution
 			return startInfo;
 		}
 		
-		public ProcessWrapper StartConsoleProcess (string command, string arguments, string workingDirectory, IConsole console, EventHandler exited)
+		public IProcessAsyncOperation StartConsoleProcess (string command, string arguments, string workingDirectory, IConsole console,
+		                                                   EventHandler exited)
 		{
 			return StartConsoleProcess (command, arguments, workingDirectory, null, console, exited);
 		}
 		
-		public ProcessWrapper StartConsoleProcess (string command, string arguments, string workingDirectory, IDictionary<string, string> environmentVariables, IConsole console, EventHandler exited)
+		public IProcessAsyncOperation StartConsoleProcess (string command, string arguments, string workingDirectory,
+		                                                   IDictionary<string, string> environmentVariables, IConsole console, EventHandler exited)
 		{
-			if (console == null || (console is ExternalConsole)) {
-				ProcessStartInfo psi = ExternalConsoleLocator.GetConsoleProcess (command, arguments, workingDirectory, environmentVariables,
-				    GettextCatalog.GetString ("MonoDevelop External Console"), !console.CloseOnDispose);
-
-				ProcessWrapper p = new ProcessWrapper();
+			if ((console == null || (console is ExternalConsole)) && externalConsoleHandler != null) {
 				
-				if (exited != null)
-					p.Exited += exited;
-
-				psi.CreateNoWindow = true;
-				p.StartInfo = psi;
-				ProcessEnvironmentVariableOverrides (p.StartInfo);
-				Counters.ProcessesStarted++;
-				p.Start();
-				return p;
-			} else {
-				ProcessStartInfo psi = CreateProcessStartInfo (command, arguments, workingDirectory, false);
+				var dict = new Dictionary<string,string> ();
 				if (environmentVariables != null)
-					foreach (KeyValuePair<string, string> kvp in environmentVariables)
-						psi.EnvironmentVariables [kvp.Key] = kvp.Value;
-				ProcessWrapper pw = StartProcess (psi, console.Out, console.Error, null);
-				new ProcessMonitor (console, pw, exited);
-				return pw;
+					foreach (var kvp in environmentVariables)
+						dict[kvp.Key] = kvp.Value;
+				if (environmentVariableOverrides != null)
+					foreach (var kvp in environmentVariables)
+						dict[kvp.Key] = kvp.Value;
+				
+				var p = externalConsoleHandler (command, arguments, workingDirectory, dict,
+				                                GettextCatalog.GetString ("MonoDevelop External Console"), 
+				                                console != null ? !console.CloseOnDispose : false);
+
+				if (p != null) {
+					if (exited != null) {
+						p.Completed += delegate {
+							exited (p, EventArgs.Empty);
+						};
+					}
+					Counters.ProcessesStarted++;
+					return p;
+				} else {
+					LoggingService.LogError ("Could not create external console for command: " + command + " " + arguments);
+				}
 			}
+			ProcessStartInfo psi = CreateProcessStartInfo (command, arguments, workingDirectory, false);
+			if (environmentVariables != null)
+				foreach (KeyValuePair<string, string> kvp in environmentVariables)
+					psi.EnvironmentVariables [kvp.Key] = kvp.Value;
+			ProcessWrapper pw = StartProcess (psi, console.Out, console.Error, null);
+			new ProcessMonitor (console, pw, exited);
+			return pw;
 		}
 		
 		public IExecutionHandler GetDefaultExecutionHandler (ExecutionCommand command)
@@ -427,4 +455,6 @@ namespace MonoDevelop.Core.Execution
 			return tw != null ? new ProcessEventHandler(new OutWriter (tw).WriteOut) : null;
 		}
 	}
+	
+	public delegate IProcessAsyncOperation ExternalConsoleHandler (string command, string arguments, string workingDirectory, IDictionary<string, string> environmentVariables, string title, bool pauseWhenFinished);
 }

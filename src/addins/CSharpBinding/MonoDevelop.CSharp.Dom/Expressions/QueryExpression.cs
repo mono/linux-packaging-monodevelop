@@ -33,9 +33,12 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class QueryExpressionFromClause : AbstractCSharpNode
 	{
-		public IReturnType Type {
+		public const int FromKeywordRole = 100;
+		public const int InKeywordRole = 101;
+		
+		public ICSharpNode Type {
 			get {
-				return (IReturnType)GetChildByRole (Roles.ReturnType);
+				return (ICSharpNode)GetChildByRole (Roles.ReturnType);
 			}
 		}
 		
@@ -67,6 +70,29 @@ namespace MonoDevelop.CSharp.Dom
 		public const int EqualsExpressionRole = 101;
 		public const int IntoIdentifierRole   = 102;
 		
+		public const int JoinKeywordRole     = 110;
+		public new const int InKeywordRole       = 111;
+		public const int OnKeywordRole       = 112;
+		public const int EqualsKeywordRole   = 113;
+		public const int IntoKeywordRole     = 114;
+		
+		public CSharpTokenNode JoinKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (JoinKeywordRole); }
+		}
+		public CSharpTokenNode InKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (InKeywordRole); }
+		}
+		public CSharpTokenNode OnKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (OnKeywordRole); }
+		}
+		public CSharpTokenNode EqualsKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (EqualsKeywordRole); }
+		}
+		public CSharpTokenNode IntoKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (IntoKeywordRole); }
+		}
+		
+		
 		public INode OnExpression {
 			get {
 				return GetChildByRole (OnExpressionRole);
@@ -91,6 +117,13 @@ namespace MonoDevelop.CSharp.Dom
 			}
 		}
 		
+		public ICSharpNode InExpression {
+			get {
+				return (ICSharpNode)GetChildByRole (Roles.Expression);
+			}
+		}
+
+		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)
 		{
 			return visitor.VisitQueryExpressionJoinClause (this, data);
@@ -101,6 +134,17 @@ namespace MonoDevelop.CSharp.Dom
 	{
 		public const int ProjectionExpressionRole = 100;
 		public const int GroupByExpressionRole    = 101;
+		
+		public const int GroupKeywordRole    = 102;
+		public const int ByKeywordRole    = 103;
+		
+		public CSharpTokenNode GroupKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (GroupKeywordRole); }
+		}
+		
+		public CSharpTokenNode ByKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (ByKeywordRole); }
+		}
 		
 		public INode Projection {
 			get {
@@ -140,6 +184,16 @@ namespace MonoDevelop.CSharp.Dom
 			}
 		}
 		
+		public CSharpTokenNode LetKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.Keyword); }
+		}
+		
+		public ICSharpNode Assign {
+			get {
+				return (ICSharpNode)GetChildByRole (Roles.Assign);
+			}
+		}
+		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)
 		{
 			return visitor.VisitQueryExpressionLetClause (this, data);
@@ -150,11 +204,21 @@ namespace MonoDevelop.CSharp.Dom
 	{
 		public const int OrderingRole = 100;
 		
-		public IEnumerable<QueryExpressionOrdering> Orderings {
+		public bool OrderAscending {
+			get;
+			set;
+		}
+		
+		public INode Expression {
 			get {
-				return GetChildrenByRole (OrderingRole).Cast<QueryExpressionOrdering> ();
+				return GetChildByRole (Roles.Expression);
 			}
 		}
+		
+		public CSharpTokenNode Keyword {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.Keyword); }
+		}
+		
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)
 		{
@@ -190,9 +254,13 @@ namespace MonoDevelop.CSharp.Dom
 	
 	public class QueryExpressionSelectClause : AbstractCSharpNode 
 	{
-		public INode Projection {
+		public CSharpTokenNode SelectKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.Keyword); }
+		}
+		
+		public ICSharpNode Projection {
 			get {
-				return GetChildByRole (Roles.Expression);
+				return (ICSharpNode)GetChildByRole (Roles.Expression);
 			}
 		}
 		
@@ -204,9 +272,13 @@ namespace MonoDevelop.CSharp.Dom
 	
 	public class QueryExpressionWhereClause : AbstractCSharpNode 
 	{
-		public INode Condition {
+		public CSharpTokenNode WhereKeyword {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.Keyword); }
+		}
+		
+		public ICSharpNode Condition {
 			get {
-				return GetChildByRole (Roles.Condition);
+				return (ICSharpNode)GetChildByRole (Roles.Condition);
 			}
 		}
 		

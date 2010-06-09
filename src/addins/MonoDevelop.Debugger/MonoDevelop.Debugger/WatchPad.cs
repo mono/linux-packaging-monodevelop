@@ -25,14 +25,10 @@
 //
 //
 
-using System;
 using System.Xml;
 using System.Collections.Generic;
-using Gtk;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
-using Mono.Debugging.Client;
 
 namespace MonoDevelop.Debugger
 {
@@ -43,6 +39,11 @@ namespace MonoDevelop.Debugger
 		public WatchPad()
 		{
 			tree.AllowAdding = true;
+		}
+		
+		public void AddWatch (string expression)
+		{
+			tree.AddExpression (expression);
 		}
 		
 		#region IMementoCapable implementation 

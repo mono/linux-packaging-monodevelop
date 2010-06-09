@@ -47,9 +47,33 @@ namespace MonoDevelop.CSharp.Dom
 			}
 		}
 		
+		public IEnumerable<ICSharpNode> TypeArguments {
+			get {
+				return GetChildrenByRole (Roles.TypeArgument).Cast<ICSharpNode> ();
+			}
+		}
+		
+		public IEnumerable<Constraint> Constraints { 
+			get {
+				return base.GetChildrenByRole (Roles.Constraint).Cast <Constraint> ();
+			}
+		}
+		
+		public CSharpTokenNode LBrace {
+			get {
+				return (CSharpTokenNode)GetChildByRole (Roles.LBrace);
+			}
+		}
+		
+		public CSharpTokenNode RBrace {
+			get {
+				return (CSharpTokenNode)GetChildByRole (Roles.RBrace);
+			}
+		}
+		
 		public virtual ClassType ClassType {
 			get;
-			protected set;
+			set;
 		}
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)

@@ -26,8 +26,8 @@
 
 using System;
 using System.Collections.Generic;
-using MonoDevelop.Core.Gui.Dialogs;
 using Mono.Debugging.Client;
+using MonoDevelop.Ide.Gui.Dialogs;
 
 namespace MonoDevelop.Debugger
 {
@@ -70,7 +70,7 @@ namespace MonoDevelop.Debugger
 			engineList.Model = engineStore;
 			engineList.AppendColumn ("", new Gtk.CellRendererText (), "text", 1);
 			
-			foreach (IDebuggerEngine engine in DebuggingService.GetDebuggerEngines ()) {
+			foreach (DebuggerEngine engine in DebuggingService.GetDebuggerEngines ()) {
 				engineStore.AppendValues (engine.Id, engine.Name);
 			}
 			UpdatePriorityButtons ();

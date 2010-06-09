@@ -27,16 +27,17 @@
 using System;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Ide.CodeTemplates
 {
-	public interface ICodeTemplateWidget
+	public interface ICodeTemplateHandler
 	{
 		void InsertTemplate (CodeTemplate template, Document document);
 	}
 	
-	public class CodeTemplateCompletionData : CompletionData, IActionCompletionData
+	public class CodeTemplateCompletionData : CompletionData
 	{
 		Document doc;
 		CodeTemplate template;
@@ -48,17 +49,12 @@ namespace MonoDevelop.Ide.CodeTemplates
 			this.CompletionText = "test";
 			this.Icon        = template.Icon;
 			this.DisplayText = template.Shortcut;
-			this.Description = template.Shortcut + Environment.NewLine + template.Description;
+			this.Description = template.Shortcut + Environment.NewLine + GettextCatalog.GetString (template.Description);
 		}
 		
-		public void InsertCompletionText (ICompletionWidget widget, CodeCompletionContext context)
+		public override void InsertCompletionText (CompletionListWindow window)
 		{
-			if (widget is ICodeTemplateWidget) {
-				((ICodeTemplateWidget)widget).InsertTemplate (template, doc);
-			} else {
-				template.InsertTemplate (doc);
-			}
+			template.Insert (doc);
 		}
-		
 	}
 }

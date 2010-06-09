@@ -110,8 +110,9 @@ namespace Mono.TextEditor
 			
 			if (endLineNr < 0)
 				endLineNr = data.Document.LineCount;
-			LineSegment anchorLine   = data.IsSomethingSelected ? data.Document.GetLine (data.MainSelection.Anchor.Line) : null;
-			int         anchorColumn = data.IsSomethingSelected ? data.MainSelection.Anchor.Column : -1;
+//			LineSegment anchorLine   = data.IsSomethingSelected ? data.Document.GetLine (data.MainSelection.Anchor.Line) : null;
+//			int         anchorColumn = data.IsSomethingSelected ? data.MainSelection.Anchor.Column : -1;
+			
 			data.Document.BeginAtomicUndo ();
 			int first = -1;
 			int last  = 0;
@@ -121,13 +122,8 @@ namespace Mono.TextEditor
 					first = last;
 			}
 			
-			if (data.IsSomethingSelected) {
-				if (data.MainSelection.GetAnchorOffset (data) < data.Caret.Offset) {
-					data.MainSelection.Anchor = data.Document.OffsetToLocation (System.Math.Min (anchorLine.Offset + anchorLine.EditableLength, System.Math.Max (anchorLine.Offset, data.MainSelection.GetAnchorOffset (data) - first)));
-				} else {
-					data.MainSelection.Anchor = data.Document.OffsetToLocation (System.Math.Min (anchorLine.Offset + anchorLine.EditableLength, System.Math.Max (anchorLine.Offset, anchorLine.Offset + anchorColumn - last)));
-				}
-			}
+			if (data.IsSomethingSelected) 
+				SelectLineBlock (data, endLineNr, startLineNr);
 			
 			if (data.Caret.Column != 0) {
 				data.Caret.PreserveSelection = true;
@@ -135,12 +131,15 @@ namespace Mono.TextEditor
 				data.Caret.PreserveSelection = false;
 			}
 			
-			if (data.IsSomethingSelected) 
-				data.ExtendSelectionTo (data.Caret.Location);
-			
 			data.Document.EndAtomicUndo ();
 			data.Document.RequestUpdate (new MultipleLineUpdate (startLineNr, endLineNr));
 			data.Document.CommitDocumentUpdate ();
+		}
+		
+		static void SelectLineBlock (TextEditorData data, int endLineNr, int startLineNr)
+		{
+			LineSegment endLine = data.Document.GetLine (endLineNr);
+			data.MainSelection = new Selection (startLineNr, 0, endLineNr, endLine.Length);
 		}
 		
 		public static void RemoveTab (TextEditorData data)
@@ -175,32 +174,21 @@ namespace Mono.TextEditor
 			int endLineNr   = data.IsSomethingSelected ? data.MainSelection.MaxLine : data.Caret.Line;
 			if (endLineNr < 0)
 				endLineNr = data.Document.LineCount;
-			LineSegment anchorLine   = data.IsSomethingSelected ? data.Document.GetLine (data.MainSelection.Anchor.Line) : null;
-			int         anchorColumn = data.IsSomethingSelected ? data.MainSelection.Anchor.Column : -1;
+//			LineSegment anchorLine   = data.IsSomethingSelected ? data.Document.GetLine (data.MainSelection.Anchor.Line) : null;
+//			int         anchorColumn = data.IsSomethingSelected ? data.MainSelection.Anchor.Column : -1;
 			data.Document.BeginAtomicUndo ();
 			foreach (LineSegment line in data.SelectedLines) {
 				data.Insert (line.Offset, data.Options.IndentationString);
 			}
-			if (data.IsSomethingSelected) {
-				if (data.MainSelection.GetAnchorOffset (data) < data.Caret.Offset) {
-					if (anchorColumn != 0) 
-						data.MainSelection.Anchor = data.Document.OffsetToLocation (System.Math.Min (anchorLine.Offset + anchorLine.EditableLength, System.Math.Max (anchorLine.Offset, data.MainSelection.GetAnchorOffset (data) + data.Options.IndentationString.Length)));
-				} else {
-					if (anchorColumn != 0) {
-						data.MainSelection.Anchor = data.Document.OffsetToLocation (System.Math.Min (anchorLine.Offset + anchorLine.EditableLength, System.Math.Max (anchorLine.Offset, anchorLine.Offset + anchorColumn + data.Options.IndentationString.Length)));
-					} else {
-						data.MainSelection.Anchor = data.Document.OffsetToLocation (anchorLine.Offset);
-					}
-				}
-			}
+			if (data.IsSomethingSelected) 
+				SelectLineBlock (data, endLineNr, startLineNr);
 			
 			if (data.Caret.Column != 0) {
 				data.Caret.PreserveSelection = true;
 				data.Caret.Column++;
 				data.Caret.PreserveSelection = false;
 			}
-			if (data.IsSomethingSelected) 
-				data.ExtendSelectionTo (data.Caret.Offset);
+			
 			data.Document.EndAtomicUndo ();
 			data.Document.RequestUpdate (new MultipleLineUpdate (startLineNr, endLineNr));
 			data.Document.CommitDocumentUpdate ();
@@ -298,13 +286,163 @@ namespace Mono.TextEditor
 		
 		public static void Undo (TextEditorData data)
 		{
+			if (data.Document.ReadOnly)
+				return;
 			data.Document.Undo ();
 		}
 		
 		public static void Redo (TextEditorData data)
 		{
+			if (data.Document.ReadOnly)
+				return;
 			data.Document.Redo ();
 		}
+		
+		public static void MoveBlockUp (TextEditorData data)
+		{
+			int lineStart = data.Caret.Line;
+			int lineEnd = data.Caret.Line;
+			bool setSelection = lineStart != lineEnd;
+			if (data.IsSomethingSelected) {
+				setSelection = true;
+				lineStart = data.MainSelection.MinLine;
+				lineEnd = data.MainSelection.MaxLine;
+			}
+			
+			if (lineStart <= 0)
+				return;
+			
+			Mono.TextEditor.LineSegment startLine = data.Document.GetLine (lineStart);
+			Mono.TextEditor.LineSegment endLine = data.Document.GetLine (lineEnd);
+			Mono.TextEditor.LineSegment prevLine = data.Document.GetLine (lineStart - 1);
+			int relCaretOffset = data.Caret.Offset - startLine.Offset;
+			data.Document.BeginAtomicUndo ();
+			
+			string text = data.Document.GetTextBetween (startLine.Offset, endLine.EndOffset);
+			
+			int delta = endLine.EndOffset - startLine.Offset;
+			int newStartOffset = prevLine.Offset;
+			bool hasEmptyDelimiter = endLine.DelimiterLength == 0;
+			
+			data.Remove (startLine.Offset, delta);
+			
+			// handle the last line case
+			
+			if (hasEmptyDelimiter) {
+				text = text + data.EolMarker;
+				data.Remove (prevLine.Offset + prevLine.EditableLength, prevLine.DelimiterLength);
+			}
+			
+			data.Insert (newStartOffset, text);
+			data.Caret.Offset = newStartOffset + relCaretOffset;
+			if (setSelection)
+				data.SetSelection (newStartOffset, newStartOffset + delta - endLine.DelimiterLength);
+			data.Document.EndAtomicUndo ();
+		}
+		
+		public static void MoveBlockDown (TextEditorData data)
+		{
+			int lineStart = data.Caret.Line;
+			int lineEnd = data.Caret.Line;
+			bool setSelection = lineStart != lineEnd;
+			if (data.IsSomethingSelected) {
+				setSelection = true;
+				lineStart = data.MainSelection.MinLine;
+				lineEnd = data.MainSelection.MaxLine;
+			}
+			
+			if (lineEnd + 1 >= data.Document.LineCount)
+				return;
+			
+			Mono.TextEditor.LineSegment startLine = data.Document.GetLine (lineStart);
+			Mono.TextEditor.LineSegment endLine = data.Document.GetLine (lineEnd);
+			Mono.TextEditor.LineSegment nextLine = data.Document.GetLine (lineEnd + 1);
+			int relCaretOffset = data.Caret.Offset - startLine.Offset;
+			data.Document.BeginAtomicUndo ();
+			string text = data.Document.GetTextBetween (startLine.Offset, endLine.EndOffset);
+			
+			int nextLineOffset = nextLine.EndOffset;
+			int delta = endLine.EndOffset - startLine.Offset;
+			int newStartOffset = nextLineOffset - delta;
+			
+			// handle the last line case
+			if (nextLine.DelimiterLength == 0) {
+				text = data.EolMarker + text.Substring (0, text.Length - endLine.DelimiterLength);
+				newStartOffset += data.EolMarker.Length;
+			}
+			data.Insert (nextLineOffset, text);
+			data.Remove (startLine.Offset, delta);
+			
+			data.Caret.Offset = newStartOffset + relCaretOffset;
+			if (setSelection)
+				data.SetSelection (newStartOffset, newStartOffset + text.Length - endLine.DelimiterLength);
+			data.Document.EndAtomicUndo ();
+		}
+		
+		/// <summary>
+		/// Transpose characters (Emacs C-t)
+		/// </summary>
+		public static void TransposeCharacters (TextEditorData data)
+		{
+			if (data.Caret.Offset == 0)
+				return;
+			LineSegment line = data.Document.GetLine (data.Caret.Line);
+			if (line == null)
+				return;
+			int transposeOffset = data.Caret.Offset - 1;
+			char ch;
+			if (data.Caret.Column == 0) {
+				LineSegment lineAbove = data.Document.GetLine (data.Caret.Line - 1);
+				if (lineAbove.EditableLength == 0 && line.EditableLength == 0) 
+					return;
+				
+				if (line.EditableLength != 0) {
+					ch = data.Document.GetCharAt (data.Caret.Offset);
+					data.Remove (data.Caret.Offset, 1);
+					data.Insert (lineAbove.Offset + lineAbove.EditableLength, ch.ToString ());
+					data.Document.CommitLineUpdate (data.Caret.Line - 1);
+					return;
+				}
+				
+				int lastCharOffset = lineAbove.Offset + lineAbove.EditableLength - 1;
+				ch = data.Document.GetCharAt (lastCharOffset);
+				data.Remove (lastCharOffset, 1);
+				data.Insert (data.Caret.Offset, ch.ToString ());
+				data.Document.CommitLineUpdate (data.Caret.Line - 1);
+				data.Caret.Offset++;
+				return;
+			}
+			
+			int offset = data.Caret.Offset;
+			if (data.Caret.Column >= line.EditableLength) {
+				offset = line.Offset + line.EditableLength - 1;
+				transposeOffset = offset - 1;
+				// case one char in line:
+				if (transposeOffset < line.Offset) {
+					LineSegment lineAbove = data.Document.GetLine (data.Caret.Line - 1);
+					transposeOffset = lineAbove.Offset + lineAbove.EditableLength;
+					ch = data.Document.GetCharAt (offset);
+					data.Remove (offset, 1);
+					data.Insert (transposeOffset, ch.ToString ());
+					data.Caret.Offset = line.Offset;
+					data.Document.CommitLineUpdate (data.Caret.Line - 1);
+					return;
+				}
+			}
+			
+			ch = data.Document.GetCharAt (offset);
+			data.Replace (offset, 1, data.Document.GetCharAt (transposeOffset).ToString ());
+			data.Replace (transposeOffset, 1, ch.ToString ());
+			if (data.Caret.Column < line.EditableLength)
+				data.Caret.Offset = offset + 1;
+		}
+		/// <summary>
+		/// Emacs c-l recenter editor command.
+		/// </summary>
+		public static void RecenterEditor (TextEditorData data)
+		{
+			data.RequestRecenter ();
+		}
+		
 	}
-	
 }

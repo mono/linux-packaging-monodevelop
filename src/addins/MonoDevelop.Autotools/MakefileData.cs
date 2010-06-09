@@ -28,20 +28,16 @@
 
 using System;
 using System.IO;
-using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Execution;
-using MonoDevelop.Core.ProgressMonitoring;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core.Serialization;
 using MonoDevelop.Projects;
 using MonoDevelop.Core.Assemblies;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Autotools
 {
@@ -68,6 +64,7 @@ namespace MonoDevelop.Autotools
 			buildTargetName = "all";
 			cleanTargetName = "clean";
 			executeTargetName = String.Empty;
+			ParallelProcesses = 1;
 			
 			assemblyContext = GetMonoRuntimeContext ();
 			if (assemblyContext == null)
@@ -195,6 +192,12 @@ namespace MonoDevelop.Autotools
 			get { return executeTargetName; }
 			set { executeTargetName = value;}
 		}
+		
+		/// <summary>
+		/// The number of parallel build processes to use
+		/// </summary>
+		[ItemProperty (DefaultValue = 1)]
+		public int ParallelProcesses { get; set; }
 
 		//Makefile variables
 		MakefileVar buildFilesVar;
@@ -480,6 +483,7 @@ namespace MonoDevelop.Autotools
 			data.BuildTargetName = this.BuildTargetName;
 			data.CleanTargetName = this.CleanTargetName;
 			data.ExecuteTargetName = this.ExecuteTargetName;
+			data.ParallelProcesses = this.ParallelProcesses;
 			
 			data.BuildFilesVar = new MakefileVar (this.BuildFilesVar);
 			data.DeployFilesVar = new MakefileVar (this.DeployFilesVar);
@@ -1054,12 +1058,14 @@ namespace MonoDevelop.Autotools
 				refname = ResolveBuildVars (refname, ref varFound);
 				EncodeValues [refVar.Name] |= varFound;
 
-				//if refname is part of a package then add as gac
-				if (refname.IndexOf (Path.DirectorySeparatorChar) < 0 &&
+				string fullpath = Path.GetFullPath (Path.Combine (BaseDirectory, refname));
+				
+				// if refname is part of a package then add as gac
+				// but don't do it if the refname exactly matches a file name in the project dir
+				if (refname.IndexOf (Path.DirectorySeparatorChar) < 0 && !File.Exists (fullpath) &&
 					ParseReferenceAsGac (refname, project) != null)
 					continue;
 				
-				string fullpath = Path.GetFullPath (Path.Combine (BaseDirectory, refname));
 				if (TryGetExistingGacRef (fullpath) != null)
 					continue;
 
@@ -1389,7 +1395,7 @@ namespace MonoDevelop.Autotools
 						//Files are relative to the Makefile
 						str = GetRelativePath (pf.FilePath);
 					else
-						str = pf.RelativePath;
+						str = pf.FilePath.ToRelative (pf.Project.BaseDirectory);
 
 					string unescapedFileName = Path.GetFileName (str);
 
@@ -1611,7 +1617,7 @@ namespace MonoDevelop.Autotools
 			int len = str.Length;
 			for (int i = 0; i < len; i ++) {
 				char c = str [i];
-				if (c == '\\' || c == '#')
+				if (c == '\\' || c == '#' || c == ' ')
 					sb.Append ("\\");
 				
 				sb.Append (c);
@@ -1634,7 +1640,7 @@ namespace MonoDevelop.Autotools
 					continue;
 				}
 				char next = str [i + 1];
-				if (next != '\\' && next != '#')
+				if (next != '\\' && next != '#' && next != ' ')
 					sb.Append ("\\");
 				
 				sb.Append (next);

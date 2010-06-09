@@ -36,7 +36,7 @@ using System.Collections.Generic;
 
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Components.Commands;
 
 using CBinding.Parser;
@@ -71,12 +71,6 @@ namespace CBinding
 			new KeyValuePair<string, GetMembersForExtension>("->", GetInstanceMembers),
 			new KeyValuePair<string, GetMembersForExtension>(".", GetInstanceMembers)
 		};
-		
-		public override bool ExtendsEditor (Document doc, IEditableTextBuffer editor)
-		{
-			return (CProject.IsHeaderFile (doc.Name) || 
-			        (0 <= Array.IndexOf(CProject.SourceExtensions, Path.GetExtension(doc.Name).ToUpper ())));
-		}
 		
 		static bool IsOpenBrace (char c)
 		{
@@ -338,7 +332,7 @@ namespace CBinding
 			}
 			
 			if (!in_project && info.IncludedFiles.ContainsKey (currentFileName)) {
-				foreach (FileInformation fi in info.IncludedFiles[currentFileName]) {
+				foreach (CBinding.Parser.FileInformation fi in info.IncludedFiles[currentFileName]) {
 					foreach (LanguageItem li in fi.Containers ()) {
 						if (itemFullName == li.FullName)
 							container = li;
@@ -352,7 +346,7 @@ namespace CBinding
 			if (in_project) {
 				AddItemsWithParent (list, info.AllItems (), container);
 			} else {
-				foreach (FileInformation fi in info.IncludedFiles[currentFileName]) {
+				foreach (CBinding.Parser.FileInformation fi in info.IncludedFiles[currentFileName]) {
 					AddItemsWithParent (list, fi.AllItems (), container);
 				}
 			}
@@ -423,7 +417,7 @@ namespace CBinding
 			
 			// Search included files
 			if (!in_project && info.IncludedFiles.ContainsKey (currentFileName)) {
-				foreach (FileInformation fi in info.IncludedFiles[currentFileName]) {
+				foreach (CBinding.Parser.FileInformation fi in info.IncludedFiles[currentFileName]) {
 					foreach (Member li in fi.Members) {
 						if (instanceName == li.Name && li.IsPointer == isPointer) {
 							container = li.InstanceType;
@@ -453,7 +447,7 @@ namespace CBinding
 			if (in_project) {
 				AddMembersWithParent (list, info.InstanceMembers (), container);
 			} else {
-				foreach (FileInformation fi in info.IncludedFiles[currentFileName]) {
+				foreach (CBinding.Parser.FileInformation fi in info.IncludedFiles[currentFileName]) {
 					AddMembersWithParent (list, fi.InstanceMembers (), container);
 				}
 			}
@@ -511,7 +505,7 @@ namespace CBinding
 			string currentFileName = Document.FileName;
 			
 			if (info.IncludedFiles.ContainsKey (currentFileName)) {
-				foreach (FileInformation fi in info.IncludedFiles[currentFileName]) {
+				foreach (CBinding.Parser.FileInformation fi in info.IncludedFiles[currentFileName]) {
 					foreach (LanguageItem li in fi.Containers ())
 						if (li.Parent == null)
 							list.Add (new CompletionData (li));
@@ -587,6 +581,24 @@ namespace CBinding
 			}
 			
 			return whitespaces.ToString ();
+		}
+		
+		[CommandHandler (MonoDevelop.DesignerSupport.Commands.SwitchBetweenRelatedFiles)]
+		protected void Run ()
+		{
+			var cp = this.Document.Project as CProject;
+			if (cp != null) {
+				string match = cp.MatchingFile (this.Document.FileName);
+				if (match != null)
+					MonoDevelop.Ide.IdeApp.Workbench.OpenDocument (match, true);
+			}
+		}
+		
+		[CommandUpdateHandler (MonoDevelop.DesignerSupport.Commands.SwitchBetweenRelatedFiles)]
+		protected void Update (CommandInfo info)
+		{
+			var cp = this.Document.Project as CProject;
+			info.Visible = info.Visible = cp != null && cp.MatchingFile (this.Document.FileName) != null;
 		}
 	}
 }

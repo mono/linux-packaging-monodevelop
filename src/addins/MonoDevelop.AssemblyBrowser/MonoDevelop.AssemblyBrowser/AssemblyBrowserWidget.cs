@@ -27,26 +27,20 @@
 //
 
 using System;
-using System.ComponentModel;
 using System.Collections.Generic;
-using System.IO;
+using System.ComponentModel;
 using System.Text;
-using System.Threading;
 using System.Xml;
-using System.Xml.Xsl;
-
 using Gtk;
-using Mono.Cecil;
 
-using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Pads;
-using MonoDevelop.Ide.Commands;
+using Mono.Cecil;
 using MonoDevelop.Components.Commands;
+using MonoDevelop.Core;
+using MonoDevelop.Ide;
+using MonoDevelop.Ide.Commands;
+using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
-using MonoDevelop.Ide.Gui.Components;
 
 namespace MonoDevelop.AssemblyBrowser
 {
@@ -55,6 +49,11 @@ namespace MonoDevelop.AssemblyBrowser
 	partial class AssemblyBrowserWidget : Gtk.Bin
 	{
 		public ExtensibleTreeView TreeView {
+			get;
+			private set;
+		}
+		
+		public bool PublicApiOnly {
 			get;
 			private set;
 		}
@@ -86,14 +85,15 @@ namespace MonoDevelop.AssemblyBrowser
 				new BaseTypeFolderNodeBuilder (this),
 				new DomReturnTypeNodeBuilder (this),
 				new ReferenceNodeBuilder (this),
-				}, new TreePadOption [] {
-					new TreePadOption ("PublicApiOnly", GettextCatalog.GetString ("Show public members only"), PropertyService.Get ("AssemblyBrowser.ShowPublicOnly", true)),
-				});
+				}, new TreePadOption [] {
+				new TreePadOption ("PublicApiOnly", GettextCatalog.GetString ("Show public members only"), true)
+			});
 			TreeView.Tree.Selection.Mode = Gtk.SelectionMode.Single;
 			TreeView.Tree.CursorChanged += HandleCursorChanged;
-				
-			scrolledwindow2.AddWithViewport (TreeView);
-			scrolledwindow2.ShowAll ();
+			
+			TreeView.ShadowType = ShadowType.In;
+			treeViewPlaceholder.Add (TreeView);
+			treeViewPlaceholder.ShowAll ();
 			
 //			this.descriptionLabel.ModifyFont (Pango.FontDescription.FromString ("Sans 9"));
 			this.documentationLabel.ModifyFont (Pango.FontDescription.FromString ("Sans 12"));
@@ -101,7 +101,7 @@ namespace MonoDevelop.AssemblyBrowser
 			this.documentationLabel.Wrap = true;
 			
 			Mono.TextEditor.TextEditorOptions options = new Mono.TextEditor.TextEditorOptions ();
-			options.FontName = "Monospace 10";
+			options.FontName = PropertyService.Get<string> ("FontName");
 			options.ShowFoldMargin = false;
 			options.ShowIconMargin = false;
 			options.ShowInvalidLines = false;
@@ -129,16 +129,44 @@ namespace MonoDevelop.AssemblyBrowser
 			this.languageCombobox.AppendText (GettextCatalog.GetString ("Summary"));
 			this.languageCombobox.AppendText (GettextCatalog.GetString ("IL"));
 			this.languageCombobox.AppendText (GettextCatalog.GetString ("C#"));
-			this.languageCombobox.Active = PropertyService.Get ("AssemblyBrowser.InspectLanguage", 0);
+			this.languageCombobox.Active = PropertyService.Get ("AssemblyBrowser.InspectLanguage", 2);
 			this.languageCombobox.Changed += LanguageComboboxhandleChanged;
+			this.searchentry1.Ready = true;
+			this.searchentry1.WidthRequest = 200;
+			this.searchentry1.Visible = true;
+			this.searchentry1.EmptyMessage = GettextCatalog.GetString ("Search for types or members");
+			this.searchentry1.InnerEntry.Changed += SearchEntryhandleChanged;
 			
-			this.searchInCombobox.AppendText (GettextCatalog.GetString ("Types"));
-			this.searchInCombobox.AppendText (GettextCatalog.GetString ("Members"));
-			this.searchInCombobox.AppendText (GettextCatalog.GetString ("Disassembler"));
-			this.searchInCombobox.AppendText (GettextCatalog.GetString ("Decompiler"));
+			CheckMenuItem checkMenuItem = this.searchentry1.AddFilterOption (0, GettextCatalog.GetString ("Types"));
+			checkMenuItem.Active = true;
+			checkMenuItem.Toggled += delegate {
+				if (checkMenuItem.Active) {
+					searchMode = AssemblyBrowserWidget.SearchMode.Type;
+					CreateColumns ();
+					StartSearch ();
+				}
+			};
+			
+			CheckMenuItem checkMenuItem1 = this.searchentry1.AddFilterOption (1, GettextCatalog.GetString ("Members"));
+			checkMenuItem1.Toggled += delegate {
+				if (checkMenuItem1.Active) {
+					searchMode = AssemblyBrowserWidget.SearchMode.Member;
+					CreateColumns ();
+					StartSearch ();
+				}
+			};
+			comboboxVisibilty.InsertText (0, GettextCatalog.GetString ("Only public members"));
+			comboboxVisibilty.InsertText (1, GettextCatalog.GetString ("All members"));
+			comboboxVisibilty.Active = 0;
+			comboboxVisibilty.Changed += delegate {
+				PublicApiOnly = comboboxVisibilty.Active == 0;
+				this.TreeView.GetRootNode ().Options["PublicApiOnly"] = PublicApiOnly;
+				FillInspectLabel ();
+			};
+			/*
 			this.searchInCombobox.Active = 0;
 			this.searchInCombobox.Changed += SearchInComboboxhandleChanged;
-			
+			*/
 			this.notebook1.SetTabLabel (this.documentationScrolledWindow, new Label (GettextCatalog.GetString ("Documentation")));
 			this.notebook1.SetTabLabel (this.vboxInspect, new Label (GettextCatalog.GetString ("Inspect")));
 			this.notebook1.SetTabLabel (this.searchWidget, new Label (GettextCatalog.GetString ("Search")));
@@ -159,8 +187,12 @@ namespace MonoDevelop.AssemblyBrowser
 			                                  );
 			CreateColumns ();
 			SetInpectWidget ();
-			this.searchEntry.Changed += SearchEntryhandleChanged;
+//			this.searchEntry.Changed += SearchEntryhandleChanged;
 			this.searchTreeview.RowActivated += SearchTreeviewhandleRowActivated;
+			this.searchentry1.ShowAll ();
+			this.buttonBack.Clicked += this.OnNavigateBackwardActionActivated;
+			this.buttonForeward.Clicked += this.OnNavigateForwardActionActivated;
+			
 		}
 
 		void SearchTreeviewhandleRowActivated (object o, RowActivatedArgs args)
@@ -192,16 +224,10 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			StartSearch ();
 		}
-
-		void SearchInComboboxhandleChanged (object sender, EventArgs e)
-		{
-			this.searchMode = (SearchMode)this.searchInCombobox.Active;
-			CreateColumns ();
-			StartSearch ();
-		}
-
+		
 		void LanguageComboboxhandleChanged (object sender, EventArgs e)
 		{
+			this.notebook1.Page = 1;
 			PropertyService.Set ("AssemblyBrowser.InspectLanguage", this.languageCombobox.Active);
 			SetInpectWidget ();
 			FillInspectLabel ();
@@ -360,8 +386,16 @@ namespace MonoDevelop.AssemblyBrowser
 
 		public void StartSearch ()
 		{
+			string query = searchentry1.Query;
 			if (searchBackgoundWorker != null && searchBackgoundWorker.IsBusy)
 				searchBackgoundWorker.CancelAsync ();
+			
+			if (string.IsNullOrEmpty (query)) {
+				notebook1.Page = 1;
+				return;
+			}
+			
+			this.notebook1.Page = 2;
 			
 			switch (searchMode) {
 			case SearchMode.Member:
@@ -388,7 +422,7 @@ namespace MonoDevelop.AssemblyBrowser
 				searchBackgoundWorker = null;
 			};
 			
-			searchBackgoundWorker.RunWorkerAsync (searchEntry.Text);
+			searchBackgoundWorker.RunWorkerAsync (query);
 		}
 	
 		void SearchDoWork (object sender, DoWorkEventArgs e)
@@ -419,7 +453,7 @@ namespace MonoDevelop.AssemblyBrowser
 						}
 					}
 					Gtk.Application.Invoke (delegate {
-						MonoDevelop.Ide.Gui.IdeApp.Workbench.StatusBar.SetProgressFraction ((double)curType / types);
+						IdeApp.Workbench.StatusBar.SetProgressFraction ((double)curType / types);
 						foreach (MonoDevelop.Projects.Dom.IMember member in members) {
 							if (worker.CancellationPending)
 								return;
@@ -454,7 +488,7 @@ namespace MonoDevelop.AssemblyBrowser
 						}
 					}
 					Gtk.Application.Invoke (delegate {
-						MonoDevelop.Ide.Gui.IdeApp.Workbench.StatusBar.SetProgressFraction ((double)curType / types);
+						IdeApp.Workbench.StatusBar.SetProgressFraction ((double)curType / types);
 						foreach (MonoDevelop.Projects.Dom.IMember member in members) {
 							if (worker.CancellationPending)
 								return;
@@ -485,7 +519,7 @@ namespace MonoDevelop.AssemblyBrowser
 						}
 					}
 					Gtk.Application.Invoke (delegate {
-						MonoDevelop.Ide.Gui.IdeApp.Workbench.StatusBar.SetProgressFraction ((double)curType / types);
+						IdeApp.Workbench.StatusBar.SetProgressFraction ((double)curType / types);
 						foreach (MonoDevelop.Projects.Dom.IMember member in members) {
 							if (worker.CancellationPending)
 								return;
@@ -522,7 +556,7 @@ namespace MonoDevelop.AssemblyBrowser
 				}
 			} finally {
 				Gtk.Application.Invoke (delegate {
-					MonoDevelop.Ide.Gui.IdeApp.Workbench.StatusBar.EndProgress ();
+					IdeApp.Workbench.StatusBar.EndProgress ();
 				});
 			}
 		}
@@ -921,23 +955,14 @@ namespace MonoDevelop.AssemblyBrowser
 				inspectEditor.Destroy ();
 				inspectEditor = null;
 			}
-			if (this.NavigateBackwardAction != null) {
-				this.NavigateBackwardAction.Activated -= this.OnNavigateBackwardActionActivated;
-				this.NavigateBackwardAction.Dispose ();
-				this.NavigateBackwardAction = null;
-			}
-			if (this.NavigateForwardAction != null) {
-				this.NavigateForwardAction.Activated -= this.OnNavigateForwardActionActivated;
-				this.NavigateForwardAction.Dispose ();
-				this.NavigateForwardAction = null;
-			}
+			
 			if (this.UIManager != null) {
 				this.UIManager.Dispose ();
 				this.UIManager = null;
 			}
 			this.languageCombobox.Changed -= LanguageComboboxhandleChanged;
-			this.searchInCombobox.Changed -= SearchInComboboxhandleChanged;
-			this.searchEntry.Changed -= SearchEntryhandleChanged;
+//			this.searchInCombobox.Changed -= SearchInComboboxhandleChanged;
+//			this.searchEntry.Changed -= SearchEntryhandleChanged;
 			this.searchTreeview.RowActivated -= SearchTreeviewhandleRowActivated;
 			hpaned1.ExposeEvent -= HPaneExpose;
 			PropertyService.PropertyChanged -= HandlePropertyChanged;
@@ -970,7 +995,7 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			//this.searchWidget.Visible = true;
 			this.notebook1.Page = 2;
-			this.searchEntry.GrabFocus ();
+//			this.searchEntry.GrabFocus ();
 		}
 	
 		#region NavigationHistory
@@ -993,8 +1018,9 @@ namespace MonoDevelop.AssemblyBrowser
 		
 		void UpdateNavigationActions ()
 		{
-			NavigateBackwardAction.Sensitive = navigationBackwardHistory.Count != 0;
-			NavigateForwardAction.Sensitive = navigationForwardHistory.Count != 0;
+			buttonBack.Sensitive = navigationBackwardHistory.Count != 0;
+			buttonForeward.Sensitive = navigationForwardHistory.Count != 0;
+			
 		}
 		
 		protected virtual void OnNavigateBackwardActionActivated (object sender, System.EventArgs e)

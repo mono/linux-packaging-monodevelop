@@ -29,10 +29,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using MonoDevelop.Components.Commands;
 using OSXIntegration.Framework;
 using System.Text;
+using MonoDevelop.Ide;
+using MonoDevelop.Platform;
 
 namespace OSXIntegration
 {
@@ -55,6 +56,7 @@ namespace OSXIntegration
 		static HashSet<IntPtr> mainMenus = new HashSet<IntPtr> ();
 		static Dictionary<uint,object> commands = new Dictionary<uint,object> ();
 		static Dictionary<object,CarbonCommandID> cmdIdMap = new Dictionary<object, CarbonCommandID> ();
+		static Dictionary<object,uint> menuIdMap = new Dictionary<object, uint> ();
 		
 		static List<object> objectsToDestroyOnMenuClose = new List<object> ();
 		static List<string> linkCommands = new List<string> ();
@@ -97,7 +99,11 @@ namespace OSXIntegration
 		{
 			if (manager == null)
 				throw new ArgumentException ("manager");
+			if (OSXMenu.manager != null) {
+				OSXMenu.manager.CommandActivating -= OnCommandActivating;
+			}
 			OSXMenu.manager = manager;
+			OSXMenu.manager.CommandActivating += OnCommandActivating;
 			
 			if (rootMenu == IntPtr.Zero) {
 				rootMenu = HIToolbox.CreateMenu (idSeq++, GetName (entrySet), 0);
@@ -106,6 +112,23 @@ namespace OSXIntegration
 			} else {
 				Destroy (false);
 				CreateChildren (rootMenu, entrySet, ignoreCommands);
+			}
+		}
+
+		static void OnCommandActivating (object sender, CommandActivationEventArgs args)
+		{
+			uint menuId;
+			if (args.Source == CommandSource.Keybinding && menuIdMap.TryGetValue (args.CommandId, out menuId)) {
+				//FIXME: for some reason we have to flash again after a delay to toggle the previous flash off?
+				//some flashes can be unreliable, e.g. minimize, and modal dialogs don't seem to run timeouts, so the flash comes late
+				GLib.Timeout.Add (50, delegate {
+					HIToolbox.FlashMenuBar (menuId);
+					return false;
+				});
+				GLib.Timeout.Add (250, delegate {
+					HIToolbox.FlashMenuBar (menuId);
+					return false;
+				});
 			}
 		}
 		
@@ -120,6 +143,7 @@ namespace OSXIntegration
 
 		static void CreateChildren (IntPtr parentMenu, CommandEntrySet entrySet, HashSet<object> ignoreCommands) 
 		{
+			var menuId = HIToolbox.GetMenuID (parentMenu);
 			foreach (CommandEntry entry in entrySet){
 				CommandEntrySet ces = entry as CommandEntrySet;
 
@@ -129,7 +153,7 @@ namespace OSXIntegration
 					if (ignoreCommands.Contains (entry.CommandId))
 						continue;
 
-					if (entry.CommandId == Command.Separator){
+					if (entry.CommandId == Command.Separator) {
 						HIToolbox.AppendMenuSeparator (parentMenu);
 						continue;
 					}
@@ -155,6 +179,8 @@ namespace OSXIntegration
 						continue;
 					}
 					
+					menuIdMap[entry.CommandId] = menuId;
+					
 					ActionCommand acmd = cmd as ActionCommand;
 					if (acmd == null) {
 						MonoDevelop.Core.LoggingService.LogWarning (
@@ -178,22 +204,26 @@ namespace OSXIntegration
 		
 		static void SetMenuAccelerator (HIMenuItem item, string accelKey)
 		{
-			ushort key;
 			MenuAccelModifier mod;
-			bool isVirtualKeycode;
-			if (GetAcceleratorKeys (accelKey, out key, out mod, out isVirtualKeycode)) {
-				HIToolbox.SetMenuItemCommandKey (item.MenuRef, item.Index, isVirtualKeycode, key);
+			ushort glyphCode, charCode, hardwareCode; 
+			if (GetAcceleratorKeys (accelKey, out glyphCode, out charCode, out hardwareCode, out mod)) {
+				if (glyphCode != 0)
+					HIToolbox.SetMenuItemKeyGlyph (item.MenuRef, item.Index, (short)glyphCode);
+				else if (hardwareCode != 0)
+					HIToolbox.SetMenuItemCommandKey (item.MenuRef, item.Index, true, hardwareCode);
+				else
+					HIToolbox.SetMenuItemCommandKey (item.MenuRef, item.Index, false, charCode);
 				HIToolbox.SetMenuItemModifiers (item.MenuRef, item.Index, mod);
 			}
 		}
 		
 		//FIXME: handle the mode key
-		static bool GetAcceleratorKeys (string accelKey, out ushort outKey, out MenuAccelModifier outMod, out bool isVirtual)
+		static bool GetAcceleratorKeys (string accelKey, out ushort glyphCode, out ushort charCode, out ushort virtualHardwareCode,
+		                                out MenuAccelModifier outMod)
 		{
 			uint modeKey, key;
 			Gdk.ModifierType modeMod, mod;
-			isVirtual = false;
-			outKey = 0;
+			glyphCode = charCode = virtualHardwareCode = 0;
 			outMod = (MenuAccelModifier) 0;
 			
 			if (!KeyBindingManager.BindingToKeys (accelKey, out modeKey, out modeMod, out key, out mod))
@@ -204,17 +234,19 @@ namespace OSXIntegration
 				return false;
 			}
 			
-			MenuGlyphs glyphMapping = GlyphMappings ((Gdk.Key)key);
-			if (glyphMapping != MenuGlyphs.None) {
-				outKey = (ushort)glyphMapping;
-			} else {
-				Gdk.KeymapKey [] map = keymap.GetEntriesForKeyval (key);
-				if (map == null || map.Length == 0) {
-					System.Console.WriteLine("WARNING: Could not map key ({0})", key);
-					return false;
+			glyphCode = (ushort)GlyphMappings ((Gdk.Key)key);
+			if (glyphCode == 0) {
+				charCode = (ushort)Gdk.Keyval.ToUnicode (key);
+				if (charCode == 0) {
+					var map = keymap.GetEntriesForKeyval (key);
+					if (map != null && map.Length > 0)
+						virtualHardwareCode = (ushort) map [0].Keycode;
+					
+					if (virtualHardwareCode == 0) {
+						System.Console.WriteLine("WARNING: Could not map key ({0})", key);
+						return false;
+					}
 				}
-				isVirtual = true;
-				outKey = (ushort) map [0].Keycode;
 			}
 			
 			if ((mod & Gdk.ModifierType.Mod1Mask) != 0) {
@@ -293,7 +325,7 @@ namespace OSXIntegration
 		// We can justify this because safari 3.2.1 does it ("do you want to close all tabs?").
 		static bool IsGloballyDisabled {
 			get {
-				return !MonoDevelop.Ide.Gui.IdeApp.Workbench.HasToplevelFocus;
+				return !IdeApp.Workbench.HasToplevelFocus;
 			}
 		}
 		
@@ -317,16 +349,19 @@ namespace OSXIntegration
 					if (disabled)
 						data.Attributes |= MenuItemAttributes.Disabled;
 					
-					ushort key;
+					ushort glyphCode, charCode, hardwareCode; 
 					MenuAccelModifier mod;
 					bool isVirtual;
-					if (GetAcceleratorKeys (ci.AccelKey, out key, out mod, out isVirtual)) {
+					if (GetAcceleratorKeys (ci.AccelKey, out glyphCode, out charCode, out hardwareCode, out mod)) {
 						data.CommandKeyModifiers = mod;
-						if (isVirtual) {
+						if (glyphCode != 0) {
+							data.CommandKeyGlyph = glyphCode;
+							data.Attributes ^= MenuItemAttributes.UseVirtualKey;
+						} else if (hardwareCode != 0) {
+							data.CommandVirtualKey = (char)hardwareCode;
 							data.Attributes |= MenuItemAttributes.UseVirtualKey;
-							data.CommandVirtualKey = key;
 						} else {
-							data.CommandKeyGlyph = key;
+							data.CommandKey = (char)charCode;
 							data.Attributes ^= MenuItemAttributes.UseVirtualKey;
 						}
 					}
@@ -412,8 +447,9 @@ namespace OSXIntegration
 			
 			HIMenuItem mnu = HIToolbox.GetMenuItem ((uint)CarbonCommandID.Hide);
 			appMenu = mnu.MenuRef;
+			var appMenuId = HIToolbox.GetMenuID (appMenu);
 			for (int i = cmdIds.Length - 1; i >= 0; i--) {
-				object cmdId = cmdIds[i];
+				var cmdId = cmdIds[i];
 				if (cmdId == Command.Separator) {
 					HIToolbox.InsertMenuSeparator (mnu.MenuRef, 0);
 					continue;
@@ -428,6 +464,7 @@ namespace OSXIntegration
 				uint macCmdId = GetNewMenuItemId (cmd);
 				ushort pos = HIToolbox.InsertMenuItem (mnu.MenuRef, (cmd.Text ?? "").Replace ("_", ""), 0, 0, macCmdId);
 				SetMenuAccelerator (new HIMenuItem (mnu.MenuRef, pos), cmd.AccelKey);
+				menuIdMap[cmdId] = appMenuId;
 			}
 		}
 		
@@ -449,6 +486,7 @@ namespace OSXIntegration
 				
 			//	uint cmd = HIToolbox.GetMenuItemCommandID (new HIMenuItem (menuRef, 0));
 				
+				CommandTargetRoute route = new CommandTargetRoute ();
 				ushort count = HIToolbox.CountMenuItems (menuRef);
 				for (ushort i = 1; i <= count; i++) {
 					HIMenuItem mi = new HIMenuItem (menuRef, i);
@@ -468,7 +506,8 @@ namespace OSXIntegration
 					if (!commands.TryGetValue (macCmdID, out cmdID) || cmdID == null)
 						continue;
 					
-					CommandInfo cinfo = manager.GetCommandInfo (cmdID, null);
+					CommandInfo cinfo = manager.GetCommandInfo (cmdID, route);
+					menuIdMap[cmdID] = HIToolbox.GetMenuID (menuRef);
 					UpdateMenuItem (menuRef, menuRef, ref i, ref count, macCmdID, cinfo);
 				}
 			} catch (Exception ex) {
@@ -582,10 +621,10 @@ namespace OSXIntegration
 					string url = "";
 					try {
 						url = linkCommands[(int)refCon];
-						System.Diagnostics.Process.Start (url);
+						MacPlatform.OpenUrl (url);
 					} catch (Exception ex) {
 						Gtk.Application.Invoke (delegate {
-							MonoDevelop.Core.Gui.MessageService.ShowException (ex, MonoDevelop.Core.GettextCatalog.GetString ("Could not open the url {0}", url));
+							MonoDevelop.Ide.MessageService.ShowException (ex, MonoDevelop.Core.GettextCatalog.GetString ("Could not open the url {0}", url));
 						});
 					}
 					DestroyOldMenuObjects ();
@@ -598,9 +637,9 @@ namespace OSXIntegration
 					if (refCon > 0) {
 						object data = objectsToDestroyOnMenuClose[(int)refCon - 1];
 						//need to return before we execute the command, so that the menu unhighlights
-						Gtk.Application.Invoke (delegate { manager.DispatchCommand (cmdID, data); });
+						Gtk.Application.Invoke (delegate { manager.DispatchCommand (cmdID, data, CommandSource.MainMenu); });
 					} else {
-						Gtk.Application.Invoke (delegate { manager.DispatchCommand (cmdID); });
+						Gtk.Application.Invoke (delegate { manager.DispatchCommand (cmdID, CommandSource.MainMenu); });
 					}
 					DestroyOldMenuObjects ();
 					return CarbonEventHandlerStatus.Handled;

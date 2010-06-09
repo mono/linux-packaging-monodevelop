@@ -56,7 +56,8 @@
 	<!-- color styles -->
 	<Style name="text" color="black" bgColor="white">
 		<Style name="background" color="white">
-			<Style name="searchresult" color="yellow"/>
+			<Style name="searchresult-main" color="#f3d647"/>
+			<Style name="searchresult" color="#ffe2b9"/>
 		</Style>
 		<Style name="selection" color="aluminium1" bgColor="skyblue1"/>
 		<Style name="link" color="blue"/>
@@ -93,7 +94,7 @@
 		<Style name="ruler" color="aluminium3"/>
 		<Style name="whitespace" color="aluminium3"/>
 		<Style name="invalidline" color="scarletred2"/>
-		<Style name="bracket" color="aluminium4" bgColor="aluminium1"/>
+		<Style name="bracket" color="aluminium2" bgColor="aluminium1"/>
 		
 		<Style name="bookmark.color1" color="white"/>
 		<Style name="bookmark.color2" color="skyblue1"/>
@@ -109,7 +110,23 @@
 			<Style name="secondary_highlighted_template" color="aluminium3" bgColor="aluminium1"/>
 		</Style>
 	</Style>
-
+	
+	<Style name="warning.light.color1" color="#FAFAEE"/>
+	<Style name="warning.light.color2" color="#F0F0E0"/>
+	<Style name="warning.dark.color1" color="#F0F0E0"/>
+	<Style name="warning.dark.color2" color="#E0E0D0"/>
+	<Style name="warning.line.top" color="#F9F9EC"/>
+	<Style name="warning.line.bottom" color="#EAEADA"/>
+	<Style name="warning.text" color="black"/>
+	
+	<Style name="error.light.color1" color="#FAEEEE"/>
+	<Style name="error.light.color2" color="#F0E0E0"/>
+	<Style name="error.dark.color1" color="#F0E0E0"/>
+	<Style name="error.dark.color2" color="#E0D0D0"/>
+	<Style name="error.line.top" color="#F9ECEC"/>
+	<Style name="error.line.bottom" color="#EADADA"/>
+	<Style name="error.text" color="black"/>
+	
 	<Style name="linenumber" color="aluminium4" bgColor="white">
 		<Style name="highlight" color="aluminium5"/>
 	</Style>

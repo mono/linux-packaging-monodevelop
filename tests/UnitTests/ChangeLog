@@ -1,3 +1,327 @@
+2010-05-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Fixed
+	  unit test.
+
+2010-05-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  test for 'Bug 534680 - LINQ keywords missing from
+	  Intellisense'.
+
+2010-05-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: Added
+	  test for 'Bug 605104 - Highlighter fails to find an instance
+	  of my method'.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: fixed
+	  unit test.
+
+2010-04-30  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Tests.DefaultEditActions/RemoveTabTests.cs:
+	* Mono.TextEditor.Tests.DefaultEditActions/InsertTabTests.cs:
+	  Fixed tests.
+
+2010-04-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* TestBase.cs:
+	* MonoDevelop.Projects\SolutionTests.cs: Fix Windows
+	  compatibility issues.
+
+2010-04-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects/DomPersistenceTests.cs: track api
+	  changes.
+
+2010-04-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs: Fixed unit
+	  tests.
+
+2010-04-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Gui/CompletionListWindowTests.cs: Added
+	  test for 'Bug 595240 - Completion list filtering should
+	  match on words not just at start'.
+
+2010-04-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  test for 'Bug 576354 - Type inference failure'.
+
+2010-04-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestBraceStlye.cs:
+	* MonoDevelop.CSharpBinding/TestTypeLevelIndentation.cs:
+	* MonoDevelop.CSharpBinding/TestStatementIndentation.cs: Added
+	  test for 'Bug 593635 - Auto-formatting doesn't allow
+	  single-line if statements'.
+
+2010-04-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  test for 'Bug 592120 - Type resolver bug with
+	  this.Property[]'.
+
+2010-03-24  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* UnitTests.csproj:
+	* MonoDevelop.CSharpBinding/TestFormattingBugs.cs:
+	* MonoDevelop.CSharpBinding/TestSpacingVisitor.cs:
+	* MonoDevelop.CSharpBinding/TestTypeLevelIndentation.cs:
+	  Worked on formatting unit tests.
+
+2010-03-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestSpacingVisitor.cs:
+	* MonoDevelop.CSharpBinding/TestStatementIndentation.cs: Added
+	  some formatting tests.
+
+2010-03-22  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* UnitTests.csproj:
+	* MonoDevelop.CSharpBinding/TestBraceStlye.cs:
+	* MonoDevelop.CSharpBinding/TestSpacingVisitor.cs:
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs:
+	* MonoDevelop.CSharpBinding/TestStatementIndentation.cs:
+	* MonoDevelop.CSharpBinding/TestTypeLevelIndentation.cs: Added
+	  some formatting unit tests.
+
+2010-03-19  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* UnitTests.csproj:
+	* MonoDevelop.CSharpBinding/TestBraceStlye.cs:
+	* MonoDevelop.CSharpBinding/TestSpacingVisitor.cs:
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs: Added
+	  some indentation tests.
+
+2010-03-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs: Added
+	  some indenter unit tests.
+
+2010-03-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs: Added
+	  some indenter tests.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* TestBase.cs:
+	* Makefile.am:
+	* UnitTests.csproj:
+	* MonoDevelop.AspNet/AspNetTesting.cs:
+	* MonoDevelop.CSharpBinding/ProjectDomTests.cs:
+	* MonoDevelop.CSharpBinding/TestSpacingVisitor.cs:
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs:
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs:
+	* MonoDevelop.Projects.Gui/CompletionListWindowTests.cs:
+	* MonoDevelop.CSharpBinding/ParameterCompletionTests.cs:
+	* MonoDevelop.CSharpBinding/CodeCompletionCSharpTests.cs:
+	* MonoDevelop.CSharpBinding/CodeCompletionCSharp3Tests.cs:
+	* MonoDevelop.CSharpBinding/CodeCompletionOperatorTests.cs:
+	* MonoDevelop.CSharpBinding/CodeCompletionAccessibleTests.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  test for 'Bug 588223 - Intellisense does not recognize
+	  nested generics correctly.'.
+
+2010-03-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects/CompletionDatabaseTests.cs:
+	  Re-activated failing tests.
+
+2010-03-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects/CompletionDatabaseTests.cs: Taken out
+	  the unit tests for now. Seems that the subclass table don't
+	  get updated for types with type parameters.
+
+2010-03-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  test for 'Bug 587549 - Intellisense does not work with
+	  override constraints'.
+
+2010-03-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  test for 'Bug 587543 - Intellisense ignores interface
+	  constraints'.
+
+2010-03-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: Added
+	  test for 'Bug 587530 – for/foreach rename refactoring
+	  ignores the scope'.
+
+2010-03-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: Added
+	  test for 'Bug 587071 - Find references shows a lot of
+	  methods with the same name but not from the correct class'.
+
+2010-03-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs: Fixed
+	  some tests.
+
+2010-03-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs: Added
+	  some unit tests.
+
+2010-03-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs: Worked
+	  on indentation tests.
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  unit test for 2nd bug in Bug 586304 - Intellisense does not
+	  show several linq extenion methods when using nested generic
+	  type.
+
+2010-03-09  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs: Worked
+	  on unit tests.
+
+2010-03-09  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* UnitTests.csproj:
+	* MonoDevelop.CSharpBinding/TestSpacingVisitor.cs:
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs:
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs:
+	* MonoDevelop.CSharpBinding/TestIndentationVisitor.cs: Added
+	  test for 'Bug 586304 - Intellisense does not show several
+	  linq extenion methods when using nested generic type'/Worked
+	  on formatting tests.
+
+2010-03-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs: Worked
+	  on unit tests.
+
+2010-03-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: Added
+	  test for 'Bug 585454 - Lacking one reference to an enum
+	  type'.
+
+2010-03-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs: Fixed
+	  some unit tests
+
+2010-02-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs: Added
+	  some formatting tests.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs: Added
+	  some tests.
+
+2010-02-25  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Projects/DomPersistenceTests.cs: Added attribute
+	  persistence test.
+
+	* TestBase.cs:
+	* MonoDevelop.AspNet/AspNetTesting.cs:
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs:
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs:
+	* MonoDevelop.CSharpBinding/ParameterCompletionTests.cs: Make
+	  sure temp file names are unique in all test fixtures.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs:
+	* Mono.TextEditor.Tests/SyntaxHighlightingTests.cs:
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs:
+	* MonoDevelop.Projects.Gui/CompletionListWindowTests.cs: Fixed
+	  some unit tests.
+
+2010-02-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs: added
+	  binary expression formatting unit test.
+
+2010-02-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  test for 'Bug 582017 - C# Generic Type Constraints'.
+
+2010-02-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Tests/SearchTests.cs: Track API changes.
+
+2010-02-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  unit test for 'Bug 577225 - Inconsistent autocomplete on
+	  returned value of generic method.'.
+
+2010-02-07  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestViewContent.cs:
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs: worked
+	  on unit tests/track api changes.
+
+2010-02-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs: added
+	  some tests.
+
+2010-02-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs: worked
+	  on formatting visitor tests.
+
+2010-02-02  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* UnitTests.csproj:
+	* MonoDevelop.CSharpBinding/TestFormattingVisitor.cs: Added
+	  unit test file for the new formatter.
+
+2010-01-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Gui/CompletionListWindowTests.cs: Track
+	  API changes.
+
+2010-01-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  test for 'Bug 568204 - Inconsistency in resolution'.
+
+2010-01-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: added
+	  test for 'Bug 561964 - Wrong type in tooltip when there are
+	  two properties with the same name'.
+
+2009-12-14  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Projects/CompletionDatabaseTests.cs: Track
+	  numbers of refs in test project. Add a test to confirm that
+	  types can't be resolved from refs of refs. Comment out the
+	  "non deep search" test since deep search is now the same as
+	  shallow search.
+
 2009-12-01  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* MonoDevelop.Projects/MdsTests.cs:

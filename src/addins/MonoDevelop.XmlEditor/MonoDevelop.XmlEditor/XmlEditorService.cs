@@ -23,7 +23,6 @@
 
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
@@ -468,7 +467,7 @@ namespace MonoDevelop.XmlEditor
 			fs.AddFilter(allFiles);
 			
 			fs.Modal = true;
-			fs.TransientFor = MessageService.RootWindow;
+			fs.TransientFor = IdeApp.Workbench.RootWindow;
 			fs.DestroyWithParent = true;
 			int response = fs.Run ();
 			

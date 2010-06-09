@@ -35,6 +35,7 @@ namespace Mono.Debugging.Evaluation
 	public class AsyncOperationManager: IDisposable
 	{
 		List<AsyncOperation> operationsToCancel = new List<AsyncOperation> ();
+		internal bool Disposing;
 
 		public void Invoke (AsyncOperation methodCall, int timeout)
 		{
@@ -61,7 +62,7 @@ namespace Mono.Debugging.Evaluation
 				}
 			}
 			else {
-				methodCall.WaitForCompleted (0);
+				methodCall.WaitForCompleted (System.Threading.Timeout.Infinite);
 			}
 
 			lock (operationsToCancel) {
@@ -79,6 +80,7 @@ namespace Mono.Debugging.Evaluation
 		
 		public void Dispose ()
 		{
+			Disposing = true;
 			lock (operationsToCancel) {
 				foreach (AsyncOperation op in operationsToCancel) {
 					op.InternalShutdown ();
@@ -133,7 +135,7 @@ namespace Mono.Debugging.Evaluation
 			if (Aborting) {
 				// Somebody else is aborting this. Just wait for it to finish.
 				ST.Monitor.Exit (this);
-				WaitForCompleted (0);
+				WaitForCompleted (System.Threading.Timeout.Infinite);
 				return;
 			}
 			
@@ -165,12 +167,17 @@ namespace Mono.Debugging.Evaluation
 					}
 				}
 				ST.Monitor.Exit (this);
-			} while (!Aborted && !WaitForCompleted (abortRetryWait));
+			} while (!Aborted && !WaitForCompleted (abortRetryWait) && !Manager.Disposing);
 			
-			lock (this) {
-				Aborted = true;
-				if (abortState >= 6)
-					Manager.LeaveBusyState (this);
+			if (Manager.Disposing) {
+				InternalShutdown ();
+			}
+			else {
+				lock (this) {
+					Aborted = true;
+					if (abortState >= 6)
+						Manager.LeaveBusyState (this);
+				}
 			}
 		}
 		

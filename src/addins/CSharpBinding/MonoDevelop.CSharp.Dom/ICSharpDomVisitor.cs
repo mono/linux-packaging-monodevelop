@@ -30,6 +30,8 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public interface ICSharpDomVisitor<T, S>
 	{
+		S VisitCompilationUnit (CompilationUnit unit, T data);
+		
 		#region General scope
 		S VisitAttribute (Attribute attribute, T data);
 		S VisitAttributeSection (AttributeSection attributeSection, T data);
@@ -40,6 +42,10 @@ namespace MonoDevelop.CSharp.Dom
 		S VisitEnumMemberDeclaration (EnumMemberDeclaration enumMemberDeclaration, T data);
 		S VisitUsingDeclaration (UsingDeclaration usingDeclaration, T data);
 		S VisitUsingAliasDeclaration (UsingAliasDeclaration usingDeclaration, T data);
+		S VisitFullTypeName (FullTypeName fullTypeName, T data);
+		S VisitIdentifier (Identifier identifier, T data);
+		S VisitParameterDeclarationExpression (ParameterDeclarationExpression parameterDeclarationExpression, T data);
+		S VisitConstraint (Constraint constraint, T data);
 		#endregion
 		
 		#region Type members
@@ -52,12 +58,13 @@ namespace MonoDevelop.CSharp.Dom
 		S VisitMethodDeclaration (MethodDeclaration methodDeclaration, T data);
 		S VisitOperatorDeclaration (OperatorDeclaration operatorDeclaration, T data);
 		S VisitPropertyDeclaration (PropertyDeclaration propertyDeclaration, T data);
+		S VisitAccessorDeclaration (Accessor accessorDeclaration, T data);
 		S VisitVariableInitializer (VariableInitializer variableInitializer, T data);
-		S VisitArgumentDeclaration (ArgumentDeclaration argumentDeclaration, T data);
 		#endregion
 		
 		#region Statements
 		S VisitBlockStatement (BlockStatement blockStatement, T data);
+		S VisitExpressionStatement (ExpressionStatement expressionStatement, T data);
 		S VisitBreakStatement (BreakStatement breakStatement, T data);
 		S VisitCheckedStatement (CheckedStatement checkedStatement, T data);
 		S VisitContinueStatement (ContinueStatement continueStatement, T data);
@@ -88,6 +95,7 @@ namespace MonoDevelop.CSharp.Dom
 		
 		#region Expressions
 		S VisitAnonymousMethodExpression (AnonymousMethodExpression anonymousMethodExpression, T data);
+		S VisitLambdaExpression (LambdaExpression lambdaExpression, T data);
 		S VisitAssignmentExpression (AssignmentExpression assignmentExpression, T data);
 		S VisitBaseReferenceExpression (BaseReferenceExpression baseReferenceExpression, T data);
 		S VisitBinaryOperatorExpression (BinaryOperatorExpression binaryOperatorExpression, T data);
@@ -100,7 +108,8 @@ namespace MonoDevelop.CSharp.Dom
 		S VisitMemberReferenceExpression (MemberReferenceExpression memberReferenceExpression, T data);
 		S VisitNullReferenceExpression (NullReferenceExpression nullReferenceExpression, T data);
 		S VisitObjectCreateExpression (ObjectCreateExpression objectCreateExpression, T data);
-		S VisitCollectionInitializerExpression (CollectionInitializerExpression collectionInitializerExpression, T data);
+		S VisitArrayObjectCreateExpression (ArrayObjectCreateExpression arrayObjectCreateExpression, T data);
+		
 		S VisitParenthesizedExpression (ParenthesizedExpression parenthesizedExpression, T data);
 		S VisitPointerReferenceExpression (PointerReferenceExpression pointerReferenceExpression, T data);
 		S VisitPrimitiveExpression(PrimitiveExpression primitiveExpression, T data);
@@ -110,6 +119,10 @@ namespace MonoDevelop.CSharp.Dom
 		S VisitTypeOfExpression (TypeOfExpression typeOfExpression, T data);
 		S VisitUnaryOperatorExpression (UnaryOperatorExpression unaryOperatorExpression, T data);
 		S VisitUncheckedExpression (UncheckedExpression uncheckedExpression, T data);
+		S VisitAsExpression (AsExpression asExpression, T data);
+		S VisitIsExpression (IsExpression isExpression, T data);
+		S VisitDefaultValueExpression (DefaultValueExpression defaultValueExpression, T data);
+		S VisitArgListExpression (ArgListExpression argListExpression, T data);
 		#endregion
 		
 		#region Query Expressions

@@ -30,26 +30,45 @@ using MonoDevelop.Projects.Dom;
 
 namespace MonoDevelop.CSharp.Dom
 {
-	public class Identifier : AbstractNode
+	public class Identifier : AbstractCSharpNode
 	{
 		public string Name {
 			get;
 			set;
 		}
 		
-		public int Offset {
-			get;
-			set;
+		DomLocation startLocation;
+		public override DomLocation StartLocation {
+			get {
+				return startLocation;
+			}
 		}
 		
+		public override DomLocation EndLocation {
+			get {
+				return new DomLocation (StartLocation.Line, StartLocation.Column + (Name ?? "").Length);
+			}
+		}
+		
+		/*
 		public ISegment Segment {
 			get {
 				return new Segment (Offset, Name != null ? Name.Length : 0);
 			}
-		}
+		}*/
 		
 		public Identifier ()
 		{
+		}
+		public Identifier (string name, DomLocation location)
+		{
+			this.Name = name;
+			this.startLocation = location;
+		}
+		
+		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)
+		{
+			return visitor.VisitIdentifier (this, data);
 		}
 	}
 }

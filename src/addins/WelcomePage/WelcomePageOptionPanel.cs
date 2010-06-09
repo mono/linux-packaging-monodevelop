@@ -1,7 +1,7 @@
 using Gtk;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui.Dialogs;
+using MonoDevelop.Ide.Gui.Dialogs;
 
 namespace MonoDevelop.WelcomePage
 {
@@ -9,17 +9,22 @@ namespace MonoDevelop.WelcomePage
 	{
 		CheckButton showOnStartCheckButton = new CheckButton ();
 		CheckButton internetUpdateCheckButton = new CheckButton ();
+		CheckButton closeOnOpenSlnCheckButton = new CheckButton ();
 		
 		public override Widget CreatePanelWidget ()
 		{
 			VBox vbox = new VBox();
 			showOnStartCheckButton.Label = GettextCatalog.GetString ("Show welcome page on startup");
-			showOnStartCheckButton.Active = PropertyService.Get("WelcomePage.ShowOnStartup", true);
+			showOnStartCheckButton.Active = WelcomePageOptions.ShowOnStartup;
 			vbox.PackStart(showOnStartCheckButton, false, false, 0);
 			
 			internetUpdateCheckButton.Label = GettextCatalog.GetString ("Update welcome page from internet");
-			internetUpdateCheckButton.Active = PropertyService.Get("WelcomePage.UpdateFromInternet", true);
+			internetUpdateCheckButton.Active = WelcomePageOptions.UpdateFromInternet;
 			vbox.PackStart(internetUpdateCheckButton, false, false, 0);
+			
+			closeOnOpenSlnCheckButton.Label = GettextCatalog.GetString ("Close welcome page after opening a solution");
+			closeOnOpenSlnCheckButton.Active = WelcomePageOptions.CloseWhenSolutionOpened;
+			vbox.PackStart(closeOnOpenSlnCheckButton, false, false, 0);
 			
 			vbox.ShowAll ();
 			return vbox;
@@ -27,8 +32,9 @@ namespace MonoDevelop.WelcomePage
 		
 		public override void ApplyChanges ()
 		{
-			PropertyService.Set ("WelcomePage.ShowOnStartup", showOnStartCheckButton.Active);
-			PropertyService.Set ("WelcomePage.UpdateFromInternet", internetUpdateCheckButton.Active);
+			WelcomePageOptions.ShowOnStartup = showOnStartCheckButton.Active;
+			WelcomePageOptions.UpdateFromInternet = internetUpdateCheckButton.Active;
+			WelcomePageOptions.CloseWhenSolutionOpened = closeOnOpenSlnCheckButton.Active;
 		}
 	}
 

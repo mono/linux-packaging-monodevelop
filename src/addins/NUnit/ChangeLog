@@ -1,3 +1,127 @@
+2010-05-05  Mike Krüger  <mkrueger@novell.com>
+
+	* Services/UnitTestResult.cs: handled possible null ref.
+
+2010-05-04  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelopNUnit.addin.xml: Register nunit project as
+	  serializable.
+
+	* Services/NUnitService.cs:
+	* Project/NUnitAssemblyGroupProject.cs: Ensure that tests are
+	  always shown for nunit assembly projects, when created and
+	  when added. Fixes bug #602143 - Unit tests don't show up in
+	  the Unit Tests pane.
+
+2010-04-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Gui/TestResultsPad.cs: Free up wasted space between
+	  scrollbars and treeview contents.
+
+2010-04-14  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Gui/TestResultsPad.cs:
+	* Commands/NUnitCommands.cs:
+	* MonoDevelopNUnit.addin.xml:
+	* Services/UnitTestResult.cs: In the results pad, allow
+	  jumping to a specific line of the call stack. When
+	  double-clicking in a test failure, jump to the location of
+	  the failure, if available.
+
+	* gtk-gui/MonoDevelop.NUnit.NUnitOptionsWidget.cs: Flush.
+
+2010-04-12  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelopNUnit.addin.xml: Fixed node set name.
+
+	* nunit.glade:
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* gtk-gui/generated.cs:
+	* MonoDevelop.NUnit.csproj:
+	* Gui/NUnitOptionsPanel.cs:
+	* gtk-gui/MonoDevelop.NUnit.NUnitOptionsWidget.cs: Ported some
+	  old glade code to stetic.
+
+	* Services/ExternalTestRunner.cs:
+	* Services/NUnitAssemblyTestSuite.cs: Make sure the remote
+	  monitor is not disconnected too early.
+
+	* Gui/TestPad.cs:
+	* Gui/TestResultsPad.cs: Fix warnings.
+
+2010-04-08  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Services/UnitTestGroup.cs:
+	* Services/NUnitTestSuite.cs:
+	* Services/SystemTestProvider.cs:
+	* Services/NUnitAssemblyTestSuite.cs: Don't show projects and
+	  solutions which don't contain unit tests.
+
+2010-04-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Services\ExternalTestRunner.cs: Preload the NUnitRunner
+	  assembly.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelopNUnit.addin.xml: Bumped MD version.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Services/NUnitAssemblyTestSuite.cs: Fill the tests in the
+	  gui thread. Fixes bug #585286 - Collection modified while
+	  iterating.
+
+2010-03-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelopNUnit.addin.xml: Set the default location for
+	  unit tests pads. Register a new Unit Testing layout.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* Gui/TestPad.cs:
+	* Gui/CircleImage.cs:
+	* Gui/TestResultsPad.cs:
+	* Gui/TestNodeBuilder.cs:
+	* MonoDevelop.NUnit.csproj:
+	* Services/NUnitService.cs:
+	* Commands/NUnitCommands.cs:
+	* MonoDevelopNUnit.addin.xml:
+	* Gui/UnitTestOptionsDialog.cs:
+	* Gui/TestAssemblyNodeBuilder.cs:
+	* Services/NUnitProjectTestSuite.cs:
+	* Gui/NUnitAssemblyGroupNodeBuilder.cs:
+	* Services/NUnitProjectServiceExtension.cs:
+	* Gui/NUnitAssemblyGroupConfigurationNodeBuilder.cs: Merged
+	  MD.Projects into MD.Core, and MD.Projects.Gui, MD.Core.Gui
+	  and MD.Components into MD.Ide.
+
+2010-03-08  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* Gui/TestPad.cs:
+	* Gui/TestResultsPad.cs:
+	* MonoDevelop.NUnit.csproj: Use the new DockItemToolbar class
+	  for showing toolbar commands.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Gui/TestPad.cs:
+	* Gui/TestResultsPad.cs: Track api changes.
+
+2010-02-09  Mike Krüger  <mkrueger@novell.com>
+
+	* Gui/TestPad.cs:
+	* Gui/TestResultsPad.cs: Track API changes for lazy loading
+	  images.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs: Flush.
+
 2009-12-11  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* Makefile.am:

@@ -68,56 +68,70 @@ namespace Mono.TextEditor
 		string colorStyle = "text";
 		Pango.FontDescription font;
 		
-		double zoom = 1.0;
+		int zoomPow = 0;
+		double zoom = 1;
 		IWordFindStrategy wordFindStrategy = new EmacsWordFindStrategy (true);
 		
 		
 		public double Zoom {
 			get {
-				return zoom;
-					}
+				 return zoom;
+			}
 			set {
-				if (zoom != value) {
-					zoom = value;
+				ZoomPow = (int) System.Math.Round (System.Math.Log (value) / System.Math.Log (ZOOM_FACTOR));
+			}
+		}
+		
+		int ZoomPow {
+			get {
+				return zoomPow;
+			}
+			set {
+				value = System.Math.Min (ZOOM_MAX, System.Math.Max (ZOOM_MIN, value));
+				if (zoomPow != value) {
+					zoomPow = value;
+					zoom = System.Math.Pow (ZOOM_FACTOR, zoomPow);
 					DisposeFont ();
 					OnChanged (EventArgs.Empty);
 				}
 			}
 		}
 		
+		const int ZOOM_MIN = -4;
+		const int ZOOM_MAX = 8;
+		const double ZOOM_FACTOR = 1.1f;
+		
 		public bool CanZoomIn {
 			get {
-				return zoom < 8.0;
+				return ZoomPow <= ZOOM_MAX;
 			}
 		}
 		
 		public bool CanZoomOut {
 			get {
-				return zoom > 0.7;
+				return ZoomPow >= ZOOM_MIN;
 			}
 		}
 		
 		public bool CanResetZoom {
 			get {
-				return zoom != 1.0;
+				return ZoomPow != 0;
 			}
 		}
 		
 		public void ZoomIn ()
 		{
-			zoom *= 1.1;
-			Zoom = System.Math.Min (8.0, System.Math.Max (0.7, zoom));
+			ZoomPow++;
 		}
 		
 		public void ZoomOut ()
 		{
-			zoom *= 0.9;
-			Zoom = System.Math.Min (8.0, System.Math.Max (0.7, zoom));
+			ZoomPow--;
 		}
 		
 		public void ZoomReset ()
 		{
-			Zoom = 1.0;
+			ZoomPow = 0;
 		}
 		
 		public string IndentationString {

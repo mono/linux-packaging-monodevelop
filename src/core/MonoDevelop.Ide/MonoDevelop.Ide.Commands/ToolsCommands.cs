@@ -26,19 +26,11 @@
 //
 
 
-using System;
-using MonoDevelop.Core.Gui.Dialogs;
-using MonoDevelop.Core;
-using Mono.Addins;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Projects;
-using MonoDevelop.Ide.Gui.Dialogs;
-using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Core.Gui;
-using System.IO;
-using Gtk;
+using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
+using MonoDevelop.Ide.Gui;
+using System;
 
 namespace MonoDevelop.Ide.Commands
 {
@@ -77,7 +69,7 @@ namespace MonoDevelop.Ide.Commands
 		{
 			ExternalTools.ExternalTool tool = (ExternalTools.ExternalTool)dataItem;
 			
-			string argumentsTool = StringParserService.Parse (tool.Arguments);
+			string argumentsTool = StringParserService.Parse (tool.Arguments, IdeApp.Workbench.GetStringTagModel ());
 			
 			//Save current file checkbox
 			if (tool.SaveCurrentFile && IdeApp.Workbench.ActiveDocument != null)
@@ -86,7 +78,7 @@ namespace MonoDevelop.Ide.Commands
 			if (tool.PromptForArguments) {
 				string customerArguments = MessageService.GetTextResponse (GettextCatalog.GetString ("Enter any arguments you want to use while launching tool, {0}:", tool.MenuCommand), GettextCatalog.GetString ("Command Arguments for {0}", tool.MenuCommand), "");
 				if (customerArguments != String.Empty)
-					argumentsTool = StringParserService.Parse (customerArguments);
+					argumentsTool = StringParserService.Parse (customerArguments, IdeApp.Workbench.GetStringTagModel ());
 			}
 
 			DispatchService.BackgroundDispatch (delegate {
@@ -137,9 +129,7 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Run ()
 		{
-			InstrumentationViewerDialog dlg = new InstrumentationViewerDialog ();
-			dlg.TransientFor = IdeApp.Workbench.RootWindow;
-			dlg.Show ();
+			MonoDevelop.Core.Instrumentation.InstrumentationService.StartMonitor ();
 		}
 		
 		protected override void Update (CommandInfo info)

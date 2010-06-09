@@ -28,8 +28,9 @@ using System;
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
-	public interface IProjectBuilder: IDisposable
+	public interface IProjectBuilder
 	{
-		MSBuildResult[] RunTarget (string file, string target, string configuration, string platform, string binPath, ILogWriter logWriter);
+		MSBuildResult[] RunTarget (string target, string configuration, string platform, ILogWriter logWriter);
+		string[] GetAssemblyReferences (string configuration, string platform);
 	}
 }

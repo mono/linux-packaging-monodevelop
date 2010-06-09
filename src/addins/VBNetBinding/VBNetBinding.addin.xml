@@ -6,14 +6,11 @@
        url         = "http://bard.sytes.net/vbnetbinding"
        description = "VB.NET Language Binding"
 	   category    = "Language bindings"
-       version     = "2.2">
+       version     = "2.4">
 
 	<Dependencies>
-	    <Addin id="Core" version="2.2"/>
-	    <Addin id="Core.Gui" version="2.2"/>
-	    <Addin id="Projects" version="2.2"/>
-		<Addin id="Projects.Gui" version="2.2"/>
-		<Addin id="Ide" version="2.2"/>
+		<Addin id="Core" version="2.4"/>
+		<Addin id="Ide" version="2.4"/>
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/MSBuildItemTypes">
@@ -47,14 +44,6 @@
 		<ProjectTemplate id = "VBGtkSharp2Project" resource = "VBGtkSharp2Project.xpt.xml"/>
 	</Extension>
   
-	<Extension path = "/MonoDevelop/ProjectModel/Gui/ItemOptionPanels/Common">
-		<Condition id="ActiveLanguage" value="VBNet">
-			<Section id = "VBNetOutputOptionsPanel"
-				_label = "Output Options" 
-				class = "MonoDevelop.Projects.Gui.Dialogs.OptionPanels.OutputOptionsPanel"/>
-		</Condition>
-	</Extension>
-	
 	<Extension path = "/MonoDevelop/ProjectModel/Gui/ItemOptionPanels/Build/General">
 		<Condition id="ActiveLanguage" value="VBNet">
 			<Panel id = "VBNetProjectOptionsPanel"

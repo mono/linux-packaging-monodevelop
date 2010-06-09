@@ -7,7 +7,7 @@ namespace Stetic.Wrapper {
 
 	public class ComboBox : Container {
 
-		public static new Gtk.ComboBox CreateInstance ()
+		public static Gtk.ComboBox CreateInstance ()
 		{
 			Gtk.ComboBox c = Gtk.ComboBox.NewText ();
 			// Make sure all children are created, so the mouse events can be
@@ -80,7 +80,7 @@ namespace Stetic.Wrapper {
 		{
 			if (textCombo) {
 				return new CodeMethodInvokeExpression (
-					new CodeTypeReferenceExpression ("Gtk.ComboBox"),
+					new CodeTypeReferenceExpression (new CodeTypeReference ("Gtk.ComboBox", CodeTypeReferenceOptions.GlobalReference)),
 					"NewText"
 				);
 			} else

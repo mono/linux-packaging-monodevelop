@@ -24,9 +24,8 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.Core.Gui.Dialogs;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Core;
+using MonoDevelop.Ide.Gui.Dialogs;
 
 namespace MonoDevelop.SourceEditor.OptionPanels
 {
@@ -42,29 +41,43 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			controlLeftRightCombobox.InsertText (0, GettextCatalog.GetString ("MonoDevelop"));
 			controlLeftRightCombobox.InsertText (1, GettextCatalog.GetString ("Emacs"));
 			controlLeftRightCombobox.InsertText (2, GettextCatalog.GetString ("SharpDevelop"));
+			
+			autoInsertBraceCheckbutton.Toggled += HandleAutoInsertBraceCheckbuttonToggled;
 		}
 		
 		public virtual Gtk.Widget CreatePanelWidget ()
 		{
 			//			this.autoInsertTemplateCheckbutton.Active  = DefaultSourceEditorOptions.Options.AutoInsertTemplates;
 			this.autoInsertBraceCheckbutton.Active = DefaultSourceEditorOptions.Instance.AutoInsertMatchingBracket;
+			this.smartSemicolonPlaceCheckbutton.Active = DefaultSourceEditorOptions.Instance.SmartSemicolonPlacement;
+			
 			this.tabAsReindentCheckbutton.Active = DefaultSourceEditorOptions.Instance.TabIsReindent;
 			this.indentationCombobox.Active = (int)DefaultSourceEditorOptions.Instance.IndentStyle;
 			this.controlLeftRightCombobox.Active = (int)DefaultSourceEditorOptions.Instance.ControlLeftRightMode;
 			this.useViModesCheck.Active = DefaultSourceEditorOptions.Instance.UseViModes;
 			this.checkbuttonOnTheFlyFormatting.Active = DefaultSourceEditorOptions.Instance.OnTheFlyFormatting;
+			
+			checkbuttonAutoSetSearchPatternCasing.Active = PropertyService.Get ("AutoSetPatternCasing", true);
+			HandleAutoInsertBraceCheckbuttonToggled (null, null);
 			return this;
+		}
+
+		void HandleAutoInsertBraceCheckbuttonToggled (object sender, EventArgs e)
+		{
+			this.smartSemicolonPlaceCheckbutton.Sensitive = this.autoInsertBraceCheckbutton.Active;
 		}
 		
 		public virtual void ApplyChanges ()
 		{
 			//DefaultSourceEditorOptions.Options.AutoInsertTemplates = this.autoInsertTemplateCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.AutoInsertMatchingBracket = this.autoInsertBraceCheckbutton.Active;
+			DefaultSourceEditorOptions.Instance.SmartSemicolonPlacement = this.smartSemicolonPlaceCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.IndentStyle = (MonoDevelop.Ide.Gui.Content.IndentStyle)this.indentationCombobox.Active;
 			DefaultSourceEditorOptions.Instance.TabIsReindent = this.tabAsReindentCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.ControlLeftRightMode = (ControlLeftRightMode)this.controlLeftRightCombobox.Active;
 			DefaultSourceEditorOptions.Instance.UseViModes = this.useViModesCheck.Active;
 			DefaultSourceEditorOptions.Instance.OnTheFlyFormatting = this.checkbuttonOnTheFlyFormatting.Active;
+			PropertyService.Set ("AutoSetPatternCasing", checkbuttonAutoSetSearchPatternCasing.Active);
 		}
 
 		public void Initialize (OptionsDialog dialog, object dataObject)

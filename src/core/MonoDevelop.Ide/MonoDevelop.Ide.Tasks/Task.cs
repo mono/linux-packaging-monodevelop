@@ -29,7 +29,6 @@ using System;
 using System.Collections;
 using System.CodeDom.Compiler;
 using MonoDevelop.Projects;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide.Gui.Pads.ProjectPad;
@@ -220,6 +219,7 @@ namespace MonoDevelop.Ide.Tasks
 					nav.Expanded = true;
 				}
 			}
+			TaskService.InformJumpToTask (this);
 		}
 		
 		public bool BelongsToItem (IWorkspaceObject item, bool checkHierarchy)

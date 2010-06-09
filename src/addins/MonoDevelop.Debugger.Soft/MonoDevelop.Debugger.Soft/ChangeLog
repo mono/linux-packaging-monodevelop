@@ -1,56 +1,66 @@
-2010-02-10  Michael Hutchinson  <mhutchinson@novell.com>
+2010-04-29  Lluis Sanchez Gual  <lluis@novell.com>
 
-	* SoftDebuggerSession.cs: Force-load System.Exception to work
-	  around sdb currently not giving a type load for this. Warn
-	  on duplicate type loads - they could cause problems because
-	  we can't handle them and they currently might happen e.g.
-	  with appdomains. Shorten stupidly long lines.
+	* SoftDebuggerEngine.cs: Track API changes.
 
-	* LoggingService.cs: Only insert newline if exception is not
-	  null.
+2010-04-26  Lluis Sanchez Gual  <lluis@novell.com>
 
-2010-02-03  Lluis Sanchez Gual  <lluis@novell.com>
+	* SoftDebuggerEngine.cs: External console processes are now
+	  wrapped by a IProcessAsyncOperation interface, instead of a
+	  Process instance. In this way it is possible to create
+	  external consoles which are not directly bound to a process.
 
-	* SoftDebuggerAdaptor.cs: Implemented GetTypeArgs. Report the
-	  correct exception name when an exception is thrown in the
-	  target. Fixes bug #576427 - Debugger hides any user
-	  exception.
+2010-03-30  Lluis Sanchez Gual  <lluis@novell.com>
 
-2010-02-03  Lluis Sanchez Gual  <lluis@novell.com>
+	* SoftDebuggerEngine.cs: Fix external console support again.
 
-	* SoftDebuggerSession.cs: When a breakpoint can't be resolved,
-	  set it as invalid. Set it to valid when resolved. Fixes bug
-	  #564541 - Set breakpoint should work on expressions and not
-	  lines.
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* Manifest.addin.xml: Bumped MD version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* SoftDebuggerEngine.cs:
+	* RemoteSoftDebuggerSession.cs:
+	* MonoDevelop.Debugger.Soft.csproj: Merged MD.Projects into
+	  MD.Core, and MD.Projects.Gui, MD.Core.Gui and MD.Components
+	  into MD.Ide.
+
+2010-03-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* SoftDebuggerEngine.cs: Track logging API.
+
+2010-02-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Manifest.addin.xml:
+	* SoftDebuggerEngine.cs: Track api changes. Some engine info
+	  is now taken from extension node metadata.
 
 2010-02-02  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* RemoteSoftDebuggerSession.cs: Use the new namespace for the
 	  soft debugger. Updated the sdb client library.
 
-2010-02-02  Lluis Sanchez Gual  <lluis@novell.com>
+2010-01-20  Michael Hutchinson  <mhutchinson@novell.com>
 
+	* Makefile.am:
 	* ArrayAdaptor.cs:
-	* Mono.Debugger.Soft.dll:
+	* SoftDebuggerEngine.cs:
+	* SoftDebuggerSession.cs:
 	* SoftDebuggerAdaptor.cs:
 	* FieldValueReference.cs:
-	* SoftDebuggerSession.cs:
-	* SoftEvaluationContext.cs:
+	* Mono.Debugger.Soft.dll:
 	* SoftDebuggerBacktrace.cs:
+	* SoftEvaluationContext.cs:
 	* VariableValueReference.cs:
 	* PropertyValueReference.cs:
-	* Mono.Debugger.Soft.dll.mdb: Use the new namespace for the
-	  soft debugger. Updated the sdb client library.
-
-2010-01-25  Michael Hutchinson  <mhutchinson@novell.com>
-
-	* SoftDebuggerSession.cs: Write a message to the debugger
-	  output if unable to insert a breakpoint.
-
-2010-01-22  Lluis Sanchez Gual  <lluis@novell.com>
-
-	* SoftDebuggerAdaptor.cs: Implement new ForceLoadType
-	  overridable.
+	* Mono.Debugger.Soft.dll.mdb:
+	* RemoteSoftDebuggerSession.cs:
+	* MonoDevelop.Debugger.Soft.csproj: Split out a new dll
+	  Mono.Debugging.Soft from the soft debugger addin. It has the
+	  bits that have with no MD deps apart from Mono.Debugging,
+	  and it's strongnamed so MonoVS can use it.
 
 2010-01-19  Michael Hutchinson  <mhutchinson@novell.com>
 

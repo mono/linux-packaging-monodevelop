@@ -47,14 +47,13 @@ namespace Mono.TextEditor.PopupWindow
 		bool buttonPressed;
 		bool disableSelection;
 
-		public event EventHandler SelectionChanged;
-		
 		protected virtual void OnSelectionChanged (EventArgs e)
 		{
 			EventHandler handler = this.SelectionChanged;
 			if (handler != null)
 				handler (this, e);
 		}
+		public event EventHandler SelectionChanged;
 		
 		public ListWidget (ListWindow<T> win)
 		{
@@ -179,7 +178,7 @@ namespace Mono.TextEditor.PopupWindow
 		protected override bool OnExposeEvent (Gdk.EventExpose args)
 		{
 			base.OnExposeEvent (args);
-			DrawList ();
+			DrawList (args);
 	  		return true;
 		}
 		
@@ -193,14 +192,21 @@ namespace Mono.TextEditor.PopupWindow
 			}
 		}
 
-		void DrawList ()
+		//FIXME: we could use the expose event's clipbox to make the drawing more efficient
+		void DrawList (Gdk.EventExpose args)
 		{
+			var window = args.Window;
+			
 			int winWidth, winHeight;
-			this.GdkWindow.GetSize (out winWidth, out winHeight);
+			window.GetSize (out winWidth, out winHeight);
 			
 			int ypos = margin;
 			int lineWidth = winWidth - margin*2;
 			int xpos = margin + padding;
+			
+			//avoid recreating the GC objects that we use multiple times
+			var textGCNormal = this.Style.TextGC (StateType.Normal);
+			var fgGCNormal = this.Style.ForegroundGC (StateType.Normal);
 				
 			int n = 0;
 			while (ypos < winHeight - margin && (page + n) < win.DataProvider.Count)
@@ -234,25 +240,22 @@ namespace Mono.TextEditor.PopupWindow
 				
 				if (page + n == selection) {
 					if (!disableSelection) {
-						this.GdkWindow.DrawRectangle (this.Style.BaseGC (StateType.Selected),
+						args.Window.DrawRectangle (this.Style.BaseGC (StateType.Selected),
 						                              true, margin, ypos, lineWidth, he + padding);
-						this.GdkWindow.DrawLayout (this.Style.TextGC (StateType.Selected),
+						window.DrawLayout (this.Style.TextGC (StateType.Selected),
 							                           xpos + iconWidth + 2, typos, layout);
 					}
 					else {
-						this.GdkWindow.DrawRectangle (this.Style.BaseGC (StateType.Selected),
+						window.DrawRectangle (this.Style.BaseGC (StateType.Selected),
 						                              false, margin, ypos, lineWidth, he + padding);
-						this.GdkWindow.DrawLayout (this.Style.TextGC (StateType.Normal), 
-						                           xpos + iconWidth + 2, typos, layout);
+						window.DrawLayout (textGCNormal, xpos + iconWidth + 2, typos, layout);
 					}
 				}
 				else
-					this.GdkWindow.DrawLayout (this.Style.TextGC (StateType.Normal),
-					                           xpos + iconWidth + 2, typos, layout);
+					window.DrawLayout (textGCNormal, xpos + iconWidth + 2, typos, layout);
 				
 				if (icon != null)
-					this.GdkWindow.DrawPixbuf (this.Style.ForegroundGC (StateType.Normal), icon, 0, 0,
-					                           xpos, iypos, iconWidth, iconHeight, Gdk.RgbDither.None, 0, 0);
+					window.DrawPixbuf (fgGCNormal, icon, 0, 0, xpos, iypos, iconWidth, iconHeight, Gdk.RgbDither.None, 0, 0);
 				
 				ypos += rowHeight;
 				n++;
@@ -319,7 +322,9 @@ namespace Mono.TextEditor.PopupWindow
 		void UpdateStyle ()
 		{
 			this.GdkWindow.Background = this.Style.Base (StateType.Normal);
-			layout = new Pango.Layout (this.PangoContext);
+			if (layout != null)
+				layout.Dispose ();
+			layout = PangoUtil.CreateLayout (this);
 			layout.Wrap = Pango.WrapMode.Char;
 			
 			FontDescription des = this.Style.FontDescription.Copy();

@@ -28,7 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Xml;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
 
@@ -39,7 +39,7 @@ using MonoDevelop.CSharp.Dom;
 
 namespace MonoDevelop.CSharp.Completion
 {
-	public class MemberCompletionData : IMemberCompletionData, IOverloadedCompletionData
+	public class MemberCompletionData : MonoDevelop.Ide.CodeCompletion.MemberCompletionData
 	{
 		OutputFlags flags;
 		bool hideExtensionParameter = true;
@@ -49,26 +49,21 @@ namespace MonoDevelop.CSharp.Completion
 		string description, completionString;
 		string displayText;
 		
-		Dictionary<string, ICompletionData> overloads;
+		Dictionary<string, CompletionData> overloads;
 		
-		public string Description {
+		public override string Description {
 			get {
 				CheckDescription ();
 				return description;
 			}
 		}
 		
-		public string CompletionText {
+		public override string CompletionText {
 			get { return completionString; }
 			set { completionString = value; }
 		}
 		
-		public INode Member {
-			get;
-			set;
-		}
-		
-		public string DisplayText {
+		public override string DisplayText {
 			get {
 				if (displayText == null) {
 					displayText = ambience.GetString (Member, flags | OutputFlags.HideGenericParameterNames);
@@ -78,7 +73,7 @@ namespace MonoDevelop.CSharp.Completion
 			}
 		}
 		
-		public string Icon {
+		public override IconId Icon {
 			get {
 				if (Member is IMember)
 					return ((IMember)Member).StockIcon;
@@ -89,8 +84,6 @@ namespace MonoDevelop.CSharp.Completion
 				return "md-literal"; 
 			}
 		}
-		
-		public DisplayFlags DisplayFlags { get; set; }
 		
 		public bool HideExtensionParameter {
 			get {
@@ -103,8 +96,8 @@ namespace MonoDevelop.CSharp.Completion
 		
 		public MemberCompletionData (INode member, OutputFlags flags) 
 		{
-			SetMember (member);
 			this.flags = flags;
+			SetMember (member);
 			DisplayFlags = DisplayFlags.DescriptionHasMarkup;
 			IMember m = Member as IMember;
 			if (m != null && m.IsObsolete)
@@ -134,13 +127,14 @@ namespace MonoDevelop.CSharp.Completion
 			if (Member is IMethod && ((IMethod)Member).WasExtended)
 				sb.Append (GettextCatalog.GetString ("(Extension) "));
 			sb.Append (ambience.GetString (Member,
-				OutputFlags.ClassBrowserEntries | OutputFlags.IncludeKeywords | OutputFlags.UseFullName | OutputFlags.IncludeParameterName | OutputFlags.IncludeMarkup
+				OutputFlags.ClassBrowserEntries | OutputFlags.IncludeKeywords | OutputFlags.UseFullName | OutputFlags.IncludeParameterName  | OutputFlags.IncludeMarkup
 					| (HideExtensionParameter ? OutputFlags.HideExtensionsParameter : OutputFlags.None)));
 
 			if (Member is IMember) {
 				if ((Member as IMember).IsObsolete) {
 					sb.AppendLine ();
 					sb.Append (GettextCatalog.GetString ("[Obsolete]"));
+					DisplayFlags |= DisplayFlags.Obsolete;
 				}
 				string docMarkup = AmbienceService.GetDocumentationMarkup ("<summary>" + AmbienceService.GetDocumentationSummary ((IMember)Member) + "</summary>", new AmbienceService.DocumentationFormatOptions {
 					Ambience = ambience
@@ -155,12 +149,12 @@ namespace MonoDevelop.CSharp.Completion
 		
 
 		#region IOverloadedCompletionData implementation 
-		
-		class OverloadSorter : IComparer<ICompletionData>
+	
+		class OverloadSorter : IComparer<CompletionData>
 		{
 			OutputFlags flags = OutputFlags.ClassBrowserEntries | OutputFlags.IncludeParameterName;
 			
-			public int Compare (ICompletionData x, ICompletionData y)
+			public int Compare (CompletionData x, CompletionData y)
 			{
 				INode mx = ((MemberCompletionData)x).Member;
 				INode my = ((MemberCompletionData)y).Member;
@@ -188,26 +182,36 @@ namespace MonoDevelop.CSharp.Completion
 				return result == 0? string.Compare (sx, sy) : result;
 			}
 		}
-		
-		public IEnumerable<ICompletionData> GetOverloadedData ()
-		{
-			if (overloads == null)
-				return new ICompletionData[] { this };
-			
-			List<ICompletionData> sorted = new List<ICompletionData> (overloads.Values);
-			sorted.Add (this);
-			sorted.Sort (new OverloadSorter ());
-			return sorted;
+		public override IEnumerable<CompletionData> OverloadedData {
+			get {
+				if (overloads == null)
+					return new CompletionData[] { this };
+				
+				List<CompletionData> sorted = new List<CompletionData> (overloads.Values);
+				sorted.Add (this);
+				sorted.Sort (new OverloadSorter ());
+				return sorted;
+			}
 		}
 		
-		public bool IsOverloaded {
+		public override bool IsOverloaded {
 			get { return overloads != null && overloads.Count > 0; }
 		}
 		
 		public void AddOverload (MemberCompletionData overload)
 		{
 			if (overloads == null)
-				overloads = new Dictionary<string, ICompletionData> ();
+				overloads = new Dictionary<string, CompletionData> ();
+			
+			// always set the member with the least type parameters as the main member.
+			if (Member is ITypeParameterMember && overload.Member is ITypeParameterMember) {
+				if (((ITypeParameterMember)Member).TypeParameters.Count > ((ITypeParameterMember)overload.Member).TypeParameters.Count) {
+					INode member = Member;
+					SetMember (overload.Member);
+					overload.Member = member;
+				}
+			}
+			
 			if (overload.Member is IMember && Member is IMember) {
 				// filter virtual & overriden members that came from base classes
 				// note that the overload tree is traversed top down.
@@ -224,8 +228,8 @@ namespace MonoDevelop.CSharp.Completion
 				
 				string MemberId = (overload.Member as IMember).HelpUrl;
 				if (Member is IMethod && overload.Member is IMethod) {
-					string signature1 = ambience.GetString (Member, OutputFlags.IncludeParameters);
-					string signature2 = ambience.GetString (overload.Member, OutputFlags.IncludeParameters);
+					string signature1 = ambience.GetString (Member, OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics);
+					string signature2 = ambience.GetString (overload.Member, OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics);
 					if (signature1 == signature2)
 						return;
 				}
@@ -238,14 +242,14 @@ namespace MonoDevelop.CSharp.Completion
 					//if any of the overloads is obsolete, we should not mark the item obsolete
 					if (!(overload.Member as IMember).IsObsolete)
 						DisplayFlags &= ~DisplayFlags.Obsolete;
-					
+/*					
 					//make sure that if there are generic overloads, we show a generic signature
 					if (overload.Member is IType && Member is IType && ((IType)Member).TypeParameters.Count == 0 && ((IType)overload.Member).TypeParameters.Count > 0) {
 						displayText = overload.DisplayText;
 					}
 					if (overload.Member is IMethod && Member is IMethod && ((IMethod)Member).TypeParameters.Count == 0 && ((IMethod)overload.Member).TypeParameters.Count > 0) {
 						displayText = overload.DisplayText;
-					}
+					}*/
 				}
 			}
 		}

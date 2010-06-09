@@ -1,25 +1,21 @@
 <Addin id          = "WelcomePage"
-       namespace   = "MonoDevelop"
-	   name        = "Welcome Page"
-       author      = "Scott Ellington"
-	   copyright   = "MIT X11"
-	   url         = "http://salmonsalvo.net/"
-	   description = "Welcome Page for MonoDevelop"
-	   category    = "MonoDevelop Core"	   
-       version     = "2.2">
+	namespace   = "MonoDevelop"
+	name        = "Welcome Page"
+	author      = "Scott Ellington"
+	copyright   = "MIT X11"
+	url         = "http://salmonsalvo.net/"
+	description = "Welcome Page for MonoDevelop"
+	category    = "MonoDevelop Core"	   
+	version     = "2.4">
 	
 	<Runtime>
-		<Import assembly="WelcomePage.dll"/>
-		<Import file="WelcomePage.css"/>		
-		<Import file="mono-bg.png"/>		
-		<Import file="mono-logo.png"/>		
+		<Import file="md-bg.png"/>		
+		<Import file="md-logo.png"/>		
 	</Runtime>
 
 	<Dependencies>
-	    <Addin id="Core" version="2.2"/>
-	    <Addin id="Core.Gui" version="2.2"/>
-	    <Addin id="Projects" version="2.2"/>
-		<Addin id="Ide" version="2.2"/>
+		<Addin id="Core" version="2.4"/>
+		<Addin id="Ide" version="2.4"/>
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/Ide/Commands">

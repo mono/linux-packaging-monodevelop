@@ -41,9 +41,10 @@ using MonoDevelop.Core.Execution;
 using MonoDevelop.Ide.Commands;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Core.Gui;
+using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Ide.Projects;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
@@ -88,7 +89,11 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				if (file.Subtype != Subtype.Directory) {
 					if (file.DependsOnFile != null)
 						continue;
-					dir = Path.GetDirectoryName (file.Name);
+					
+					dir = file.IsLink
+						? project.BaseDirectory.Combine (file.ProjectVirtualPath).ParentDirectory
+						: file.FilePath.ParentDirectory;
+						
 					if (dir == folder) {
 						files.Add (file);
 						continue;
@@ -139,7 +144,11 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			
 			if (dataObject is ProjectFile) {
 				ProjectFile file = (ProjectFile) dataObject;
-				return (Path.GetDirectoryName (file.Name) != targetPath || operation == DragOperation.Copy) && file.DependsOnFile == null;
+				var srcDir = (file.Project != null && file.IsLink)
+					? file.Project.BaseDirectory.Combine (file.ProjectVirtualPath)
+					: file.FilePath.ParentDirectory;
+				
+				return (srcDir != targetPath || operation == DragOperation.Copy) && file.DependsOnFile == null;
 			}
 			else if (dataObject is ProjectFolder) {
 				return ((ProjectFolder)dataObject).Path != targetPath || operation == DragOperation.Copy;
@@ -179,8 +188,12 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			}
 			else if (dataObject is ProjectFile) {
 				ProjectFile file = (ProjectFile) dataObject;
-				source = file.FilePath;
 				sourceProject = file.Project;
+				if (sourceProject != null && file.IsLink) {
+					source = sourceProject.BaseDirectory.Combine (file.ProjectVirtualPath);
+				} else {
+					source = file.FilePath;
+				}
 				groupedChildren = file.DependentChildren;
 				what = null;
 				ask = false;
@@ -215,7 +228,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			if (ask) {
 				string q;
 				if (operation == DragOperation.Move) {
-					if (targetPath == targetProject.BaseDirectory)
+					if (targetPath.ParentDirectory == targetProject.BaseDirectory)
 						q = GettextCatalog.GetString ("Do you really want to move the folder '{0}' to the root folder of project '{1}'?", what, targetProject.Name);
 					else
 						q = GettextCatalog.GetString ("Do you really want to move the folder '{0}' to the folder '{1}'?", what, targetPath.FileName);
@@ -223,7 +236,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 						return;
 				}
 				else {
-					if (targetPath == targetProject.BaseDirectory)
+					if (targetPath.ParentDirectory == targetProject.BaseDirectory)
 						q = GettextCatalog.GetString ("Do you really want to copy the folder '{0}' to the root folder of project '{1}'?", what, targetProject.Name);
 					else
 						q = GettextCatalog.GetString ("Do you really want to copy the folder '{0}' to the folder '{1}'?", what, targetPath.FileName);
@@ -287,7 +300,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			if (targetProject != null)
 				projectsToSave.Add (targetProject);
 			
-			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (GettextCatalog.GetString("Copying files..."), MonoDevelop.Core.Gui.Stock.CopyIcon, true))
+			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (GettextCatalog.GetString("Copying files..."), MonoDevelop.Ide.Gui.Stock.CopyIcon, true))
 			{
 				bool move = operation == DragOperation.Move;
 				IdeApp.ProjectOperations.TransferFiles (monitor, sourceProject, source, targetProject, targetPath, move, false);
@@ -342,55 +355,31 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		{
 			Project project = (Project) CurrentNode.GetParentDataItem (typeof(Project), true);
 			
-			FileSelector fdiag  = new FileSelector (GettextCatalog.GetString ("Add files"));
-			fdiag.SetCurrentFolder (GetFolderPath (CurrentNode.DataItem));
+			AddFileDialog fdiag  = new AddFileDialog (GettextCatalog.GetString ("Add files"));
+			fdiag.CurrentFolder = GetFolderPath (CurrentNode.DataItem);
 			fdiag.SelectMultiple = true;
 			fdiag.TransientFor = IdeApp.Workbench.RootWindow;
+			fdiag.BuildActions = project.GetBuildActions ();	
 			
-			//add a combo that can be used to override the default build action
-			ComboBox combo = new ComboBox (project.GetBuildActions ());
-			combo.Sensitive = false;
-			combo.Active = 0;
-			combo.RowSeparatorFunc = delegate (TreeModel model, TreeIter iter) {
-				return "--" == ((string) model.GetValue (iter, 0));
-			};
-			
-			CheckButton check = new CheckButton (GettextCatalog.GetString ("Override default build action"));
-			check.Toggled += delegate { combo.Sensitive = check.Active; };
-			
-			HBox box = new HBox ();
-			fdiag.ExtraWidget = box;
-			box.PackStart (check, false, false, 4);
-			box.PackStart (combo, false, false, 4);
-			box.ShowAll ();
-			
-			int result;
 			string[] files;
 			string overrideAction = null;
 			
-			try {
-				result = fdiag.Run ();
-				files = fdiag.Filenames;
-				if (result != (int) ResponseType.Ok)
-					return;
-				if (check.Active)
-					overrideAction = combo.ActiveText;
-			} finally {
-				fdiag.Destroy ();
-			}
+			if (!fdiag.Run ())
+				return;
+			
+			files = fdiag.SelectedFiles;
+			overrideAction = fdiag.OverrideAction;
 			
 			ProjectFolder folder = CurrentNode.GetParentDataItem (typeof(ProjectFolder), true) as ProjectFolder;
-			string baseDirectory = folder != null ? folder.Path : project.BaseDirectory;
+			FilePath baseDirectory = folder != null ? folder.Path : project.BaseDirectory;
 			
-			string[] addedFiles = IdeApp.ProjectOperations.AddFilesToProject (project, files, baseDirectory);
+			var addedFiles = IdeApp.ProjectOperations.AddFilesToProject (project, files, baseDirectory);
 			
 			//override the build action of the added files if needed
 			if (!string.IsNullOrEmpty (overrideAction)) {
-				foreach (string fileName in addedFiles) {
-					ProjectFile pf = project.Files.GetFile (fileName);
+				foreach (var pf in addedFiles)
 					if (pf != null)
 						pf.BuildAction = overrideAction;
-				}
 			}
 			
 			IdeApp.ProjectOperations.Save (project);

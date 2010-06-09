@@ -32,7 +32,6 @@ using System.Collections.ObjectModel;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Projects;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Components.Commands;
 
 namespace MonoDevelop.Ide.Gui
@@ -73,18 +72,22 @@ namespace MonoDevelop.Ide.Gui
 			get { return combo; }
 		}
 		
+		Pango.FontDescription fd;
+		
 		public override void SetToolbarStyle (Gtk.Toolbar toolbar)
 		{
-/*			if (Style != null) {
-				if (toolbar.IconSize == Gtk.IconSize.Menu || toolbar.IconSize == Gtk.IconSize.SmallToolbar) {
-					Pango.FontDescription fd = Style.FontDescription.Copy ();
-					fd.Size = (int) (fd.Size * Pango.Scale.Small);
-					ctx.FontDesc = fd;
-				} else {
-					ctx.FontDesc = Style.FontDescription;
+			if (Style != null) {
+				if (fd != null) {
+					fd.Dispose ();
+					fd = null;
 				}
+				if (toolbar.IconSize == Gtk.IconSize.Menu || toolbar.IconSize == Gtk.IconSize.SmallToolbar) {
+					fd = Style.FontDescription.Copy ();
+					fd.Size = (int) (fd.Size * Pango.Scale.Small);
+				}
+				combo.ModifyLabelFont (fd);
 			}
-*/		}
+		}
 		
 		void Reset ()
 		{
@@ -167,7 +170,7 @@ namespace MonoDevelop.Ide.Gui
 				return;
 
 			foreach (DropDownBox.ComboItem item in configs) {
-				if (item.Label == IdeApp.Workspace.ActiveConfigurationId) {
+				if ((string)(item.Item) == IdeApp.Workspace.ActiveConfigurationId) {
 					configs.CurrentItem = IdeApp.Workspace.ActiveConfigurationId;
 					UpdateLabel ();
 					return;
@@ -264,6 +267,11 @@ namespace MonoDevelop.Ide.Gui
 			Child = hbox;
 		}
 		
+		public void ModifyLabelFont (Pango.FontDescription font)
+		{
+			label.ModifyFont (font);
+		}
+		
 		public string ActiveText {
 			get {
 				return label.Text;
@@ -310,7 +318,7 @@ namespace MonoDevelop.Ide.Gui
 				
 				Gtk.RadioMenuItem grp = new Gtk.RadioMenuItem ("");
 				foreach (ComboItem ci in iset) {
-					Gtk.RadioMenuItem mi = new Gtk.RadioMenuItem (grp, ci.Label);
+					Gtk.RadioMenuItem mi = new Gtk.RadioMenuItem (grp, ci.Label.Replace ("_","__"));
 					if (ci.Item == iset.CurrentItem || ci.Item.Equals (iset.CurrentItem))
 						mi.Active = true;
 					

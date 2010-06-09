@@ -30,15 +30,10 @@ using System;
 using System.Collections.Generic;
 
 using Mono.TextEditor;
-using Mono.TextEditor.Highlighting;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Projects;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Projects.Gui.Completion;
-using System.Text;
-using ICSharpCode.NRefactory.Ast;
 using MonoDevelop.CSharp.Resolver;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.CSharp.Highlighting
 {
@@ -111,6 +106,8 @@ namespace MonoDevelop.CSharp.Highlighting
 					int bracketCount = 0;
 					while (start > 0) {
 						char ch = doc.GetCharAt (start);
+						if (ch == '\n' || ch == '\r')
+							break;
 						if (wasWhitespace && IsNamePart(ch)) {
 							start++;
 							if (start < chunk.Offset)
@@ -197,12 +194,12 @@ namespace MonoDevelop.CSharp.Highlighting
 					
 					IType type = null;
 					if (ctx != null)
-						type = ctx.SearchType (new SearchTypeRequest (unit, returnType, callingType));
+						type = ctx.SearchType ((MonoDevelop.Projects.Dom.INode)callingType ?? unit, returnType);
 					if (type == null && unit != null && returnType != null)
 						type = unit.GetType (returnType.FullName, returnType.GenericArguments.Count);
 					if (ctx != null && type == null && returnType != null) {
 						returnType.Name += "Attribute";
-						type = ctx.SearchType (new SearchTypeRequest (unit, returnType, callingType));
+						type = ctx.SearchType ((MonoDevelop.Projects.Dom.INode)callingType ?? unit, returnType);
 					}
 					if (type != null)
 						nameSegments.ForEach (segment => HighlightSegment (startChunk, segment, "keyword.semantic.type"));

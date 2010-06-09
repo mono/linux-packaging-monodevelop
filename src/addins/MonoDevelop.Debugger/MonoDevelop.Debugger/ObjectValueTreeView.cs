@@ -26,15 +26,18 @@
 //
 
 using System;
-using System.Xml;
-using System.Text;
 using System.Collections.Generic;
+using System.Text;
 using Gtk;
 using Mono.Debugging.Client;
-using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Components;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Core;
+using MonoDevelop.Ide;
+using MonoDevelop.Ide.CodeCompletion;
+using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Components.Commands;
+using MonoDevelop.Ide.Commands;
+
 
 namespace MonoDevelop.Debugger
 {
@@ -51,23 +54,40 @@ namespace MonoDevelop.Debugger
 		string createMsg;
 		bool allowAdding;
 		bool allowEditing;
+		bool allowExpanding = true;
 		bool compact;
 		StackFrame frame;
 		bool disposed;
+		Gdk.Pixbuf noLiveIcon;
+		Gdk.Pixbuf liveIcon;
+		
+		bool columnsAdjusted;
+		bool columnSizesUpdating;
+		bool allowStoreColumnSizes;
+		double expColWidth;
+		double valueColWidth;
+		double typeColWidth;
 		
 		CellRendererText crtExp;
 		CellRendererText crtValue;
 		CellRendererText crtType;
-		CellRendererPixbuf crpButton;
+		CellRendererIcon crpButton;
+		CellRendererIcon crpPin;
+		CellRendererIcon crpLiveUpdate;
+		CellRendererIcon crpViewer;
 		Gtk.Entry editEntry;
 		Mono.Debugging.Client.CompletionData currentCompletionData;
 		
+		TreeViewColumn expCol;
 		TreeViewColumn valueCol;
 		TreeViewColumn typeCol;
+		TreeViewColumn pinCol;
 		
 		string errorColor = "red";
 		string modifiedColor = "blue";
 		string disabledColor = "gray";
+		
+		static CommandEntrySet menuSet;
 		
 		const int NameCol = 0;
 		const int ValueCol = 1;
@@ -79,58 +99,108 @@ namespace MonoDevelop.Debugger
 		const int IconCol = 7;
 		const int NameColorCol = 8;
 		const int ValueColorCol = 9;
-		const int ValueButtonIconCol = 10;
-		const int ValueButtonVisibleCol = 11;
+		const int ValueButtonVisibleCol = 10;
+		const int PinIconCol = 11;
+		const int LiveUpdateIconCol = 12;
+		const int ViewerButtonVisibleCol = 13;
 		
 		public event EventHandler StartEditing;
 		public event EventHandler EndEditing;
+		public event EventHandler PinStatusChanged;
 
+		enum LocalCommands
+		{
+			AddWatch
+		}
+		
+		static ObjectValueTreeView ()
+		{
+			// Context menu definition
+			
+			menuSet = new CommandEntrySet ();
+			menuSet.AddItem (DebugCommands.AddWatch);
+			menuSet.AddSeparator ();
+			menuSet.AddItem (EditCommands.Rename);
+			menuSet.AddItem (EditCommands.Delete);
+		}
+		
 		public ObjectValueTreeView ()
 		{
-			store = new TreeStore (typeof(string), typeof(string), typeof(string), typeof(ObjectValue), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string), typeof(string), typeof(string), typeof(bool));
+			store = new TreeStore (typeof(string), typeof(string), typeof(string), typeof(ObjectValue), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string), typeof(string), typeof(bool), typeof(string), typeof(Gdk.Pixbuf), typeof(bool));
 			Model = store;
 			RulesHint = true;
+			Selection.Mode = SelectionMode.Multiple;
+			ResetColumnSizes ();
 			
 			Pango.FontDescription newFont = this.Style.FontDescription.Copy ();
 			newFont.Size = (newFont.Size * 8) / 10;
 			
-			TreeViewColumn col = new TreeViewColumn ();
-			col.Title = GettextCatalog.GetString ("Name");
-			CellRendererPixbuf crp = new CellRendererPixbuf ();
-			col.PackStart (crp, false);
-			col.AddAttribute (crp, "stock_id", IconCol);
+			liveIcon = ImageService.GetPixbuf (Gtk.Stock.Execute, IconSize.Menu);
+			noLiveIcon = ImageService.MakeTransparent (liveIcon, 0.5);
+			
+			expCol = new TreeViewColumn ();
+			expCol.Title = GettextCatalog.GetString ("Name");
+			CellRendererIcon crp = new CellRendererIcon ();
+			expCol.PackStart (crp, false);
+			expCol.AddAttribute (crp, "stock_id", IconCol);
 			crtExp = new CellRendererText ();
-			col.PackStart (crtExp, true);
-			col.AddAttribute (crtExp, "text", NameCol);
-			col.AddAttribute (crtExp, "editable", NameEditableCol);
-			col.AddAttribute (crtExp, "foreground", NameColorCol);
-			col.Resizable = true;
-			AppendColumn (col);
+			expCol.PackStart (crtExp, true);
+			expCol.AddAttribute (crtExp, "text", NameCol);
+			expCol.AddAttribute (crtExp, "editable", NameEditableCol);
+			expCol.AddAttribute (crtExp, "foreground", NameColorCol);
+			expCol.Resizable = true;
+			expCol.Sizing = TreeViewColumnSizing.Fixed;
+			expCol.MinWidth = 15;
+			expCol.AddNotification ("width", OnColumnWidthChanged);
+//			expCol.Expand = true;
+			AppendColumn (expCol);
 			
 			valueCol = new TreeViewColumn ();
-			valueCol.Expand = true;
 			valueCol.Title = GettextCatalog.GetString ("Value");
+			crpViewer = new CellRendererIcon ();
+			crpViewer.IconId = Gtk.Stock.ZoomIn;
+			valueCol.PackStart (crpViewer, false);
+			valueCol.AddAttribute (crpViewer, "visible", ViewerButtonVisibleCol);
+			crpButton = new CellRendererIcon ();
+			crpButton.StockSize = (uint) Gtk.IconSize.Menu;
+			crpButton.IconId = Gtk.Stock.Refresh;
+			valueCol.PackStart (crpButton, false);
+			valueCol.AddAttribute (crpButton, "visible", ValueButtonVisibleCol);
 			crtValue = new CellRendererText ();
 			valueCol.PackStart (crtValue, true);
 			valueCol.AddAttribute (crtValue, "text", ValueCol);
 			valueCol.AddAttribute (crtValue, "editable", ValueEditableCol);
 			valueCol.AddAttribute (crtValue, "foreground", ValueColorCol);
-			crpButton = new CellRendererPixbuf ();
-			crpButton.StockSize = (uint) Gtk.IconSize.Menu;
-			valueCol.PackStart (crpButton, false);
-			valueCol.AddAttribute (crpButton, "stock_id", ValueButtonIconCol);
-			valueCol.AddAttribute (crpButton, "visible", ValueButtonVisibleCol);
 			valueCol.Resizable = true;
+			valueCol.MinWidth = 15;
+			valueCol.AddNotification ("width", OnColumnWidthChanged);
+//			valueCol.Expand = true;
+			valueCol.Sizing = TreeViewColumnSizing.Fixed;
 			AppendColumn (valueCol);
 			
 			typeCol = new TreeViewColumn ();
-			typeCol.Expand = true;
 			typeCol.Title = GettextCatalog.GetString ("Type");
 			crtType = new CellRendererText ();
 			typeCol.PackStart (crtType, true);
 			typeCol.AddAttribute (crtType, "text", TypeCol);
 			typeCol.Resizable = true;
+			typeCol.Sizing = TreeViewColumnSizing.Fixed;
+			typeCol.MinWidth = 15;
+			typeCol.AddNotification ("width", OnColumnWidthChanged);
+//			typeCol.Expand = true;
 			AppendColumn (typeCol);
+			
+			pinCol = new TreeViewColumn ();
+			crpPin = new CellRendererIcon ();
+			pinCol.PackStart (crpPin, false);
+			pinCol.AddAttribute (crpPin, "stock_id", PinIconCol);
+			crpLiveUpdate = new CellRendererIcon ();
+			pinCol.PackStart (crpLiveUpdate, false);
+			pinCol.AddAttribute (crpLiveUpdate, "pixbuf", LiveUpdateIconCol);
+			pinCol.Resizable = false;
+			pinCol.Visible = false;
+			pinCol.Expand = false;
+			AppendColumn (pinCol);
 			
 			state = new TreeViewState (this, NameCol);
 			
@@ -141,6 +211,8 @@ namespace MonoDevelop.Debugger
 			crtValue.Edited += OnValueEdited;
 			crtValue.EditingCanceled += OnEditingCancelled;
 			
+			this.EnableAutoTooltips ();
+			
 			createMsg = GettextCatalog.GetString ("Click here to add a new watch");
 		}
 
@@ -149,7 +221,79 @@ namespace MonoDevelop.Debugger
 			base.OnDestroyed ();
 			disposed = true;
 		}
+		
+		protected override void OnSizeAllocated (Gdk.Rectangle allocation)
+		{
+			base.OnSizeAllocated (allocation);
+			AdjustColumnSizes ();
+		}
+		
+		protected override void OnShown ()
+		{
+			base.OnShown ();
+			AdjustColumnSizes ();
+		}
+		
+		
+		void OnColumnWidthChanged (object o, GLib.NotifyArgs args)
+		{
+			if (!columnSizesUpdating && allowStoreColumnSizes) {
+				StoreColumnSizes ();
+			}
+		}
+		
+		
+		void AdjustColumnSizes ()
+		{
+			if (!IsRealized || !Visible || Allocation.Width == 0 || columnSizesUpdating || compact)
+				return;
+			
+			columnSizesUpdating = true;
+			
+			double width = (double) Allocation.Width;
+			
+			int texp = (int) (width * expColWidth);
+			if (texp != expCol.FixedWidth) {
+				expCol.FixedWidth = texp;
+			}
+			
+			int ttype = 0;
+			if (typeCol.Visible) {
+				ttype = (int) (width * typeColWidth);
+				if (ttype != typeCol.FixedWidth) {
+					typeCol.FixedWidth = ttype;
+				}
+			}
+			
+			int tval = (int) (width * valueColWidth);
 
+			if (tval != valueCol.FixedWidth) {
+				valueCol.FixedWidth = tval;
+				Application.Invoke (delegate { QueueResize (); });
+			}
+			
+			columnSizesUpdating = false;
+			columnsAdjusted = true;
+		}
+		
+		void StoreColumnSizes ()
+		{
+			if (!IsRealized || !Visible || !columnsAdjusted || compact)
+				return;
+			
+			double width = (double) Allocation.Width;
+			expColWidth = ((double) expCol.Width) / width;
+			valueColWidth = ((double) valueCol.Width) / width;
+			if (typeCol.Visible)
+				typeColWidth = ((double) typeCol.Width) / width;
+		}
+		
+		void ResetColumnSizes ()
+		{
+			expColWidth = 0.3;
+			valueColWidth = 0.5;
+			typeColWidth = 0.2;
+		}
 		
 		public StackFrame Frame {
 			get {
@@ -191,6 +335,22 @@ namespace MonoDevelop.Debugger
 			}
 		}
 		
+		public bool AllowPinning {
+			get { return pinCol.Visible; }
+			set { pinCol.Visible = value; }
+		}
+		
+		public bool AllowExpanding {
+			get { return this.allowExpanding; }
+			set { this.allowExpanding = value; }
+		}
+		
+		
+		public PinnedWatch PinnedWatch { get; set; }
+		
+		public string PinnedWatchFile { get; set; }
+		public int PinnedWatchLine { get; set; }
+		
 		public bool CompactView {
 			get {
 				return compact; 
@@ -201,12 +361,24 @@ namespace MonoDevelop.Debugger
 				if (compact) {
 					newFont = this.Style.FontDescription.Copy ();
 					newFont.Size = (newFont.Size * 8) / 10;
+					expCol.Sizing = TreeViewColumnSizing.Autosize;
+					valueCol.Sizing = TreeViewColumnSizing.Autosize;
+					valueCol.MaxWidth = 800;
+					crpButton.Pixbuf = ImageService.GetPixbuf (Gtk.Stock.Refresh).ScaleSimple (12, 12, Gdk.InterpType.Hyper);
+					crpViewer.Pixbuf = ImageService.GetPixbuf (Gtk.Stock.ZoomIn).ScaleSimple (12, 12, Gdk.InterpType.Hyper);
+					ColumnsAutosize ();
 				} else {
 					newFont = this.Style.FontDescription;
+					expCol.Sizing = TreeViewColumnSizing.Fixed;
+					valueCol.Sizing = TreeViewColumnSizing.Fixed;
+					valueCol.MaxWidth = int.MaxValue;
 				}
+				typeCol.Visible = !compact;
 				crtExp.FontDesc = newFont;
 				crtValue.FontDesc = newFont;
 				crtType.FontDesc = newFont;
+				ResetColumnSizes ();
+				AdjustColumnSizes ();
 			}
 		}
 		
@@ -277,16 +449,27 @@ namespace MonoDevelop.Debugger
 			
 			state.Save ();
 			
+			CleanPinIcon ();
 			store.Clear ();
+			
+			bool showExpanders = AllowAdding;
 
-			foreach (ObjectValue val in values)
+			foreach (ObjectValue val in values) {
 				AppendValue (TreeIter.Zero, null, val);
+				if (val.HasChildren)
+					showExpanders = true;
+			}
 			
 			if (valueNames.Count > 0) {
 				ObjectValue[] expValues = GetValues (valueNames.ToArray ());
-				for (int n=0; n<expValues.Length; n++)
+				for (int n=0; n<expValues.Length; n++) {
 					AppendValue (TreeIter.Zero, valueNames [n], expValues [n]);
+					if (expValues [n].HasChildren)
+						showExpanders = true;
+				}
 			}
+			
+			ShowExpanders = showExpanders;
 			
 			if (AllowAdding)
 				store.AppendValues (createMsg, "", "", null, true, true, null, disabledColor, disabledColor);
@@ -317,6 +500,9 @@ namespace MonoDevelop.Debugger
 			
 			SetValues (parent, it, val.Name, val);
 			RegisterValue (val, it);
+			
+			if (val.HasChildren && !ShowExpanders)
+				ShowExpanders = true;
 		}
 		
 		void RemoveChildren (TreeIter it)
@@ -485,6 +671,10 @@ namespace MonoDevelop.Debugger
 					nameColor = valueColor = modifiedColor;
 			}
 			
+			strval = strval.Replace (Environment.NewLine, " ");
+			
+			bool showViewerButton = DebuggingService.HasValueVisualizers (val);
+			
 			string icon = GetIcon (val.Flags);
 
 			store.SetValue (it, NameCol, name);
@@ -497,17 +687,24 @@ namespace MonoDevelop.Debugger
 			store.SetValue (it, IconCol, icon);
 			store.SetValue (it, NameColorCol, nameColor);
 			store.SetValue (it, ValueColorCol, valueColor);
-			store.SetValue (it, ValueButtonIconCol, valueButton);
 			store.SetValue (it, ValueButtonVisibleCol, valueButton != null);
+			store.SetValue (it, ViewerButtonVisibleCol, showViewerButton);
+			
+			if (!hasParent && PinnedWatch != null) {
+				store.SetValue (it, PinIconCol, "md-pin-down");
+				if (PinnedWatch.LiveUpdate)
+					store.SetValue (it, LiveUpdateIconCol, liveIcon);
+				else
+					store.SetValue (it, LiveUpdateIconCol, noLiveIcon);
+			}
 			
 			if (val.HasChildren) {
 				// Add dummy node
 				it = store.AppendValues (it, "", "", "", null, true);
 			}
-			
 		}
 		
-		internal static string GetIcon (ObjectValueFlags flags)
+		public static string GetIcon (ObjectValueFlags flags)
 		{
 			if ((flags & ObjectValueFlags.Field) != 0 && (flags & ObjectValueFlags.ReadOnly) != 0)
 				return "md-literal";
@@ -537,6 +734,8 @@ namespace MonoDevelop.Debugger
 		
 		protected override bool OnTestExpandRow (TreeIter iter, TreePath path)
 		{
+			if (!allowExpanding)
+				return true;
 			bool expanded = (bool) store.GetValue (iter, ExpandedCol);
 			if (!expanded) {
 				store.SetValue (iter, ExpandedCol, true);
@@ -576,14 +775,6 @@ namespace MonoDevelop.Debugger
 			return sb.ToString ();
 		}
 
-		[MonoDevelop.Components.Commands.CommandHandler (MonoDevelop.Ide.Commands.EditCommands.Rename)]
-		protected void OnStartEditing ()
-		{
-			Gtk.TreeIter it;
-			if (Selection.GetSelected (out it))
-				SetCursor (store.GetPath (it), Columns[0], true);
-		}
-
 		void OnExpEditing (object s, Gtk.EditingStartedArgs args)
 		{
 			TreeIter it;
@@ -621,6 +812,8 @@ namespace MonoDevelop.Debugger
 			}
 		}
 		
+		bool editing;
+		
 		void OnValueEditing (object s, Gtk.EditingStartedArgs args)
 		{
 			TreeIter it;
@@ -652,7 +845,8 @@ namespace MonoDevelop.Debugger
 					MessageService.ShowError (GettextCatalog.GetString ("Unregognized escape sequence."));
 					return;
 				}
-*/				val.Value = newVal;
+*/				if (val.Value != newVal)
+					val.Value = newVal;
 			} catch (Exception ex) {
 				LoggingService.LogError ("Could not set value for object '" + val.Name + "'", ex);
 			}
@@ -680,6 +874,7 @@ namespace MonoDevelop.Debugger
 		
 		void OnStartEditing (Gtk.EditingStartedArgs args)
 		{
+			editing = true;
 			editEntry = (Gtk.Entry) args.Editable;
 			editEntry.KeyPressEvent += OnEditKeyPress;
 			if (StartEditing != null)
@@ -688,6 +883,7 @@ namespace MonoDevelop.Debugger
 		
 		void OnEndEditing ()
 		{
+			editing = false;
 			editEntry.KeyPressEvent -= OnEditKeyPress;
 			CompletionWindowManager.HideWindow ();
 			currentCompletionData = null;
@@ -722,31 +918,201 @@ namespace MonoDevelop.Debugger
 			});
 		}
 		
+		TreeIter lastPinIter;
+		
+		protected override bool OnMotionNotifyEvent (Gdk.EventMotion evnt)
+		{
+			TreePath path;
+			if (!editing && AllowPinning && GetPathAtPos ((int)evnt.X, (int)evnt.Y, out path)) {
+				TreeIter it;
+				if (path.Depth > 1 || PinnedWatch == null) {
+					store.GetIter (out it, path);
+					CleanPinIcon ();
+					store.SetValue (it, PinIconCol, "md-pin-up");
+					lastPinIter = it;
+				}
+			}
+			return base.OnMotionNotifyEvent (evnt);
+		}
+		
+		void CleanPinIcon ()
+		{
+			if (!lastPinIter.Equals (TreeIter.Zero)) {
+				store.SetValue (lastPinIter, PinIconCol, null);
+				lastPinIter = TreeIter.Zero;
+			}
+		}
+		
+		protected override bool OnLeaveNotifyEvent (Gdk.EventCrossing evnt)
+		{
+			if (!editing)
+				CleanPinIcon ();
+			return base.OnLeaveNotifyEvent (evnt);
+		}
+
+
 		protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
 		{
+			allowStoreColumnSizes = true;
 			bool res = base.OnButtonPressEvent (evnt);
 			TreePath path;
 			TreeViewColumn col;
 			CellRenderer cr;
 			
-			if (GetCellAtPos ((int)evnt.X, (int)evnt.Y, out path, out col, out cr)) {
-				if (cr == crpButton) {
-					TreeIter it;
-					store.GetIter (out it, path);
-					RefreshRow (it);
+			if (evnt.Button == 1 && GetCellAtPos ((int)evnt.X, (int)evnt.Y, out path, out col, out cr)) {
+				TreeIter it;
+				store.GetIter (out it, path);
+				if (cr == crpViewer) {
+					ObjectValue val = (ObjectValue) store.GetValue (it, ObjectCol);
+					DebuggingService.ShowValueVisualizer (val);
+				}
+				else if (!editing) {
+					if (cr == crpButton) {
+						RefreshRow (it);
+					} else if (cr == crpPin) {
+						TreeIter pi;
+						if (PinnedWatch != null && !store.IterParent (out pi, it))
+							RemovePinnedWatch (it);
+						else
+							CreatePinnedWatch (it);
+					} else if (cr == crpLiveUpdate) {
+						TreeIter pi;
+						if (PinnedWatch != null && !store.IterParent (out pi, it)) {
+							DebuggingService.SetLiveUpdateMode (PinnedWatch, !PinnedWatch.LiveUpdate);
+							if (PinnedWatch.LiveUpdate)
+								store.SetValue (it, LiveUpdateIconCol, liveIcon);
+							else
+								store.SetValue (it, LiveUpdateIconCol, noLiveIcon);
+						}
+					}
 				}
 			}
+			
+			if (evnt.Button == 3)
+				ShowPopup ();
+			
 			return res;
 		}
+		
+		protected override bool OnButtonReleaseEvent (Gdk.EventButton evnt)
+		{
+			allowStoreColumnSizes = false;
+			return base.OnButtonReleaseEvent (evnt);
+		}
+		
+		
+		protected override bool OnPopupMenu ()
+		{
+			ShowPopup ();
+			return true;
+		}
+		
+		void ShowPopup ()
+		{
+			IdeApp.CommandService.ShowContextMenu (menuSet, this);
+		}
+		
+		[CommandHandler (EditCommands.Delete)]
+		[CommandHandler (EditCommands.DeleteKey)]
+		protected void OnDelete ()
+		{
+			foreach (TreePath tp in Selection.GetSelectedRows ()) {
+				TreeIter it;
+				if (store.GetIter (out it, tp)) {
+					string exp = (string) store.GetValue (it, NameCol);
+					int i = valueNames.IndexOf (exp);
+					if (i != -1)
+						valueNames.RemoveAt (i);
+				}
+			}
+			Refresh ();
+		}
+		
+		[CommandUpdateHandler (EditCommands.Delete)]
+		[CommandUpdateHandler (EditCommands.DeleteKey)]
+		protected void OnUpdateDelete (CommandInfo cinfo)
+		{
+			if (editing) {
+				cinfo.Bypass = true;
+				return;
+			}
+			
+			if (!allowAdding) {
+				cinfo.Visible = false;
+				return;
+			}
+			TreePath[] sel = Selection.GetSelectedRows ();
+			if (sel.Length == 0) {
+				cinfo.Enabled = false;
+				return;
+			}
+			foreach (TreePath tp in sel) {
+				if (tp.Depth > 1) {
+					cinfo.Enabled = false;
+					return;
+				}
+			}
+		}
+		
+		[CommandHandler (DebugCommands.AddWatch)]
+		protected void OnAddWatch ()
+		{
+			List<string> exps = new List<string> ();
+			foreach (TreePath tp in Selection.GetSelectedRows ()) {
+				TreeIter it;
+				if (store.GetIter (out it, tp)) {
+					string exp = GetFullExpression (it);
+					exps.Add (exp);
+				}
+			}
+			foreach (string s in exps) {
+				DebuggingService.AddWatch (s);
+			}
+		}
+
+		[CommandUpdateHandler (DebugCommands.AddWatch)]
+		protected void OnUpdateAddWatch (CommandInfo cinfo)
+		{
+			cinfo.Enabled = Selection.GetSelectedRows ().Length > 0;
+		}
+		
+		[CommandHandler (EditCommands.Rename)]
+		protected void OnRename ()
+		{
+			TreeIter it;
+			if (store.GetIter (out it, Selection.GetSelectedRows ()[0]))
+				SetCursor (store.GetPath (it), Columns[0], true);
+		}
+		
+		[CommandUpdateHandler (EditCommands.Rename)]
+		protected void OnUpdateRename (CommandInfo cinfo)
+		{
+			cinfo.Visible = allowAdding;
+			cinfo.Enabled = Selection.GetSelectedRows ().Length == 1;
+		}
+		
+		protected override void OnRowActivated (TreePath path, TreeViewColumn column)
+		{
+			base.OnRowActivated (path, column);
+			TreeIter it;
+			TreePath[] sel = Selection.GetSelectedRows ();
+			if (store.GetIter (out it, sel[0])) {
+				ObjectValue val = (ObjectValue) store.GetValue (it, ObjectCol);
+				if (val.Name == DebuggingService.DebuggerSession.EvaluationOptions.CurrentExceptionTag)
+					DebuggingService.ShowExceptionCaughtDialog ();
+			}
+		}
+		
 		
 		bool GetCellAtPos (int x, int y, out TreePath path, out TreeViewColumn col, out CellRenderer cellRenderer)
 		{
 			int cx, cy;
 			if (GetPathAtPos (x, y, out path, out col, out cx, out cy)) {
+				GetCellArea (path, col);
 				foreach (CellRenderer cr in col.CellRenderers) {
 					int xo, w;
 					col.CellGetPosition (cr, out xo, out w);
-					if (cx >= xo && cx < xo + w) {
+					if (cr.Visible && cx >= xo && cx < xo + w) {
 						cellRenderer = cr;
 						return true;
 					}
@@ -755,7 +1121,49 @@ namespace MonoDevelop.Debugger
 			cellRenderer = null;
 			return false;
 		}
+		
+		string GetFullExpression (TreeIter it)
+		{
+			string exp = "";
+			while (store.GetPath (it).Depth != 1) {
+				ObjectValue val = (ObjectValue) store.GetValue (it, ObjectCol);
+				exp = val.ChildSelector + exp;
+				store.IterParent (out it, it);
+			}
+			string name = (string) store.GetValue (it, NameCol);
+			return name + exp;
+		}
 
+		void CreatePinnedWatch (TreeIter it)
+		{
+			string exp = GetFullExpression (it);
+			
+			PinnedWatch watch = new PinnedWatch ();
+			if (PinnedWatch != null) {
+				CollapseAll ();
+				watch.File = PinnedWatch.File;
+				watch.Line = PinnedWatch.Line;
+				watch.OffsetX = PinnedWatch.OffsetX;
+				watch.OffsetY = PinnedWatch.OffsetY + SizeRequest ().Height + 5;
+			}
+			else {
+				watch.File = PinnedWatchFile;
+				watch.Line = PinnedWatchLine;
+				watch.OffsetX = -1; // means that the watch should be placed at the line coordinates defined by watch.Line
+				watch.OffsetY = -1;
+			}
+			watch.Expression = exp;
+			DebuggingService.PinnedWatches.Add (watch);
+			if (PinStatusChanged != null)
+				PinStatusChanged (this, EventArgs.Empty);
+		}
+		
+		void RemovePinnedWatch (TreeIter it)
+		{
+			DebuggingService.PinnedWatches.Remove (PinnedWatch);
+			if (PinStatusChanged != null)
+				PinStatusChanged (this, EventArgs.Empty);
+		}
 		
 		bool IsCompletionChar (char c)
 		{
@@ -781,6 +1189,14 @@ namespace MonoDevelop.Debugger
 			if (startOffset < 0) startOffset = 0;
 			if (endOffset > editEntry.Text.Length) endOffset = editEntry.Text.Length;
 			return editEntry.Text.Substring (startOffset, endOffset - startOffset);
+		}
+		
+		void ICompletionWidget.Replace (int offset, int count, string text)
+		{
+			if (count > 0)
+				editEntry.Text = editEntry.Text.Remove (offset, count);
+			if (!string.IsNullOrEmpty (text))
+				editEntry.Text = editEntry.Text.Insert (offset, text);
 		}
 		
 		char ICompletionWidget.GetChar (int offset)
@@ -894,7 +1310,7 @@ namespace MonoDevelop.Debugger
 		}
 	}
 	
-	class DebugCompletionDataList: List<ICompletionData>, ICompletionDataList
+	class DebugCompletionDataList: List<MonoDevelop.Ide.CodeCompletion.CompletionData>, ICompletionDataList
 	{
 		public bool IsSorted { get; set; }
 		public DebugCompletionDataList (Mono.Debugging.Client.CompletionData data)
@@ -922,9 +1338,11 @@ namespace MonoDevelop.Debugger
 			get;
 			set;
 		}
+		static List<ICompletionKeyHandler> keyHandler = new List<ICompletionKeyHandler> ();
+		public IEnumerable<ICompletionKeyHandler> KeyHandler { get { return keyHandler;} }
 	}
 	
-	class DebugCompletionData: ICompletionData
+	class DebugCompletionData : MonoDevelop.Ide.CodeCompletion.CompletionData
 	{
 		CompletionItem item;
 		
@@ -933,32 +1351,22 @@ namespace MonoDevelop.Debugger
 			this.item = item;
 		}
 		
-		public string Icon {
+		public override IconId Icon {
 			get {
 				return ObjectValueTreeView.GetIcon (item.Flags);
 			}
 		}
 		
-		public string DisplayText {
+		public override string DisplayText {
 			get {
 				return item.Name;
 			}
 		}
 		
-		public string Description {
-			get {
-				return string.Empty;
-			}
-		}
-		
-		public string CompletionText {
+		public override string CompletionText {
 			get {
 				return item.Name;
 			}
-		}
-		
-		public DisplayFlags DisplayFlags {
-			get { return DisplayFlags.None; }
 		}
 	}
 }

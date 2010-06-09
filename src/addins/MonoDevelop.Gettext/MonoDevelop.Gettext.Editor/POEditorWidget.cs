@@ -29,22 +29,18 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
-using System.IO;
-using System.Threading;
 using System.Text.RegularExpressions;
 
 using Gtk;
 using Gdk;
 
-using MonoDevelop.Components;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide.Tasks;
-using MonoDevelop.Ide.Commands;
 using MonoDevelop.Gettext.Editor;
 using Mono.TextEditor;
+using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Gettext
 {
@@ -101,7 +97,7 @@ namespace MonoDevelop.Gettext
 		public POEditorWidget (TranslationProject project)
 		{
 			this.project = project;
-			this.Build();
+			this.Build ();
 			this.headersEditor = new CatalogHeadersWidget ();
 			this.notebookPages.AppendPage (headersEditor, new Gtk.Label ());
 			
@@ -109,16 +105,16 @@ namespace MonoDevelop.Gettext
 			AddButton (GettextCatalog.GetString ("Headers")).Active = false;
 			
 			// entries tree view 
-			store = new ListStore (typeof (string), typeof (bool), typeof (string), typeof (string), typeof (CatalogEntry), typeof (Gdk.Color), typeof(int), typeof (Gdk.Color));
+			store = new ListStore (typeof(string), typeof(bool), typeof(string), typeof(string), typeof(CatalogEntry), typeof(Gdk.Color), typeof(int), typeof(Gdk.Color));
 			this.treeviewEntries.Model = store;
 			
-			treeviewEntries.AppendColumn (String.Empty, new CellRendererPixbuf (), "stock_id", Columns.Stock, "cell-background-gdk", Columns.RowColor);
+			treeviewEntries.AppendColumn (String.Empty, new CellRendererIcon (), "stock_id", Columns.Stock, "cell-background-gdk", Columns.RowColor);
 			
 			CellRendererToggle cellRendFuzzy = new CellRendererToggle ();
 			cellRendFuzzy.Toggled += new ToggledHandler (FuzzyToggled);
 			cellRendFuzzy.Activatable = true;
 			treeviewEntries.AppendColumn (GettextCatalog.GetString ("Fuzzy"), cellRendFuzzy, "active", Columns.Fuzzy, "cell-background-gdk", Columns.RowColor);
-			 
+			
 			CellRendererText original = new CellRendererText ();
 			original.Ellipsize = Pango.EllipsizeMode.End;
 			treeviewEntries.AppendColumn (GettextCatalog.GetString ("Original string"), original, "text", Columns.String, "cell-background-gdk", Columns.RowColor, "foreground-gdk", Columns.ForeColor);
@@ -144,11 +140,11 @@ namespace MonoDevelop.Gettext
 			treeviewEntries.GetColumn (3).Resizable = true;
 			treeviewEntries.GetColumn (3).Expand = true;
 			// found in tree view
-			foundInStore = new ListStore (typeof (string), typeof (string), typeof (string), typeof (Pixbuf));
+			foundInStore = new ListStore (typeof(string), typeof(string), typeof(string), typeof(Pixbuf));
 			this.treeviewFoundIn.Model = foundInStore;
 			
 			TreeViewColumn fileColumn = new TreeViewColumn ();
-			CellRendererPixbuf pixbufRenderer = new CellRendererPixbuf ();
+			var pixbufRenderer = new CellRendererPixbuf ();
 			fileColumn.PackStart (pixbufRenderer, false);
 			fileColumn.SetAttributes (pixbufRenderer, "pixbuf", FoundInColumns.Pixbuf);
 			
@@ -161,7 +157,7 @@ namespace MonoDevelop.Gettext
 			treeviewFoundIn.HeadersVisible = false;
 			treeviewFoundIn.GetColumn (1).FixedWidth = 100;
 			
-			treeviewFoundIn.RowActivated += delegate (object sender, RowActivatedArgs e) {
+			treeviewFoundIn.RowActivated += delegate(object sender, RowActivatedArgs e) {
 				Gtk.TreeIter iter;
 				foundInStore.GetIter (out iter, e.Path);
 				string line = foundInStore.GetValue (iter, (int)FoundInColumns.Line) as string;
@@ -169,12 +165,13 @@ namespace MonoDevelop.Gettext
 				int lineNr = 1;
 				try {
 					lineNr = 1 + int.Parse (line);
-				} catch {}
-				MonoDevelop.Ide.Gui.IdeApp.Workbench.OpenDocument (file, lineNr, 1, true);
+				} catch {
+				}
+				IdeApp.Workbench.OpenDocument (file, lineNr, 1, true);
 			};
 			this.notebookTranslated.RemovePage (0);
-			this.entryFilter.Text = "";
-			entryFilter.Changed += delegate {
+			this.searchEntryFilter.Entry.Text = "";
+			searchEntryFilter.Entry.Changed += delegate {
 				UpdateFromCatalog ();
 			};
 			
@@ -203,7 +200,7 @@ namespace MonoDevelop.Gettext
 				if (this.isUpdating)
 					return;
 				if (this.currentEntry != null) {
-					string[] lines = StringEscaping.FromGettextFormat (textviewComments.Buffer.Text).Split (new string[] { System.Environment.NewLine }, System.StringSplitOptions.None);
+					string[] lines = StringEscaping.FromGettextFormat (textviewComments.Buffer.Text).Split (new string[] { System.Environment.NewLine }, System.StringSplitOptions.None);
 					for (int i = 0; i < lines.Length; i++) {
 						if (!lines[i].StartsWith ("#"))
 							lines[i] = "# " + lines[i];
@@ -216,32 +213,40 @@ namespace MonoDevelop.Gettext
 				ShowPopup ();
 			};
 			
-			this.treeviewEntries.ButtonReleaseEvent += delegate (object sender, Gtk.ButtonReleaseEventArgs e) {
+			this.treeviewEntries.ButtonReleaseEvent += delegate(object sender, Gtk.ButtonReleaseEventArgs e) {
 				if (e.Event.Button == 3)
 					ShowPopup ();
 			};
-			this.buttonOptions.Label = GettextCatalog.GetString ("Options");
-			this.buttonOptions.StockImage = Gtk.Stock.Properties;
-			this.buttonOptions.MenuCreator = CreateOptionsMenu;
+			
+			searchEntryFilter.Ready = true;
+			searchEntryFilter.Visible = true;
+			searchEntryFilter.ForceFilterButtonVisible = true;
+			searchEntryFilter.RequestMenu += delegate {
+				searchEntryFilter.Menu = CreateOptionsMenu ();
+			};
+		
+//			this.buttonOptions.Label = GettextCatalog.GetString ("Options");
+			//			this.buttonOptions.StockImage = Gtk.Stock.Properties;
+			//			this.buttonOptions.MenuCreator = ;
 			widgets.Add (this);
 			UpdateTasks ();
-//			this.vpaned2.AcceptPosition += delegate {
-//				PropertyService.Set ("Gettext.SplitPosition", vpaned2.Position / (double)Allocation.Height);
-//				inMove = false;
-//			};
-//			this.vpaned2.CancelPosition += delegate {
-//				inMove = false;
-//			};
-//			this.vpaned2.MoveHandle += delegate {
-//				inMove = true;
-//			};
-//			this.ResizeChecked += delegate {
-//				if (inMove)
-//					return;
-//				int newPosition = (int)(Allocation.Height * PropertyService.Get ("Gettext.SplitPosition", 0.3d));
-//				if (vpaned2.Position != newPosition)
-//					vpaned2.Position = newPosition;
-//			};
+			//			this.vpaned2.AcceptPosition += delegate {
+			//				PropertyService.Set ("Gettext.SplitPosition", vpaned2.Position / (double)Allocation.Height);
+			//				inMove = false;
+			//			};
+			//			this.vpaned2.CancelPosition += delegate {
+			//				inMove = false;
+			//			};
+			//			this.vpaned2.MoveHandle += delegate {
+			//				inMove = true;
+			//			};
+			//			this.ResizeChecked += delegate {
+			//				if (inMove)
+			//					return;
+			//				int newPosition = (int)(Allocation.Height * PropertyService.Get ("Gettext.SplitPosition", 0.3d));
+			//				if (vpaned2.Position != newPosition)
+			//					vpaned2.Position = newPosition;
+			//			};
 			checkbuttonWhiteSpaces.Toggled += CheckbuttonWhiteSpacesToggled;
 			options.ShowLineNumberMargin = false;
 			options.ShowFoldMargin = false;
@@ -249,6 +254,7 @@ namespace MonoDevelop.Gettext
 			options.ShowInvalidLines = false;
 			options.ShowSpaces = options.ShowTabs = options.ShowEolMarkers = false;
 			options.ColorScheme = PropertyService.Get ("ColorScheme", "Default");
+			options.FontName = PropertyService.Get<string> ("FontName");
 			
 			this.scrolledwindowOriginal.Child = this.texteditorOriginal;
 			this.scrolledwindowPlural.Child = this.texteditorPlural;
@@ -335,7 +341,7 @@ namespace MonoDevelop.Gettext
 		}
 		#endregion
 		
-		public Menu CreateOptionsMenu (MenuButton button)
+		public Menu CreateOptionsMenu ()
 		{
 			Menu menu = new Menu ();
 			
@@ -373,21 +379,21 @@ namespace MonoDevelop.Gettext
 				if (DoSearchIn != SearchIn.Both) {
 					DoSearchIn = SearchIn.Both;
 					UpdateFromCatalog ();
-					menu.Dispose ();
+					menu.Destroy ();
 				}
 			};
 			original.Activated += delegate {
 				if (DoSearchIn != SearchIn.Original) {
 					DoSearchIn = SearchIn.Original;
 					UpdateFromCatalog ();
-					menu.Dispose ();
+					menu.Destroy ();
 				}
 			};
 			translated.Activated += delegate {
 				if (DoSearchIn != SearchIn.Translated) {
 					DoSearchIn = SearchIn.Translated;
 					UpdateFromCatalog ();
-					menu.Dispose ();
+					menu.Destroy ();
 				}
 			};
 			
@@ -469,10 +475,10 @@ namespace MonoDevelop.Gettext
 						this.currentEntry.SetTranslation (escapedText, index);
 						AddChange (this.currentEntry, oldText, escapedText, index);
 					}
-					MonoDevelop.Ide.Gui.IdeApp.Workbench.StatusBar.ShowReady ();
+					IdeApp.Workbench.StatusBar.ShowReady ();
 					textView.ModifyBase (Gtk.StateType.Normal, Style.Base (Gtk.StateType.Normal));
 				} catch (System.Exception e) {
-					MonoDevelop.Ide.Gui.IdeApp.Workbench.StatusBar.ShowError (e.Message);
+					IdeApp.Workbench.StatusBar.ShowError (e.Message);
 					textView.ModifyBase (Gtk.StateType.Normal, errorColor);
 				}
 				UpdateProgressBar ();
@@ -524,7 +530,7 @@ namespace MonoDevelop.Gettext
 		
 		void RemoveEntry (CatalogEntry entry)
 		{
-			bool yes = MonoDevelop.Core.Gui.MessageService.AskQuestion (GettextCatalog.GetString ("Do you really want to remove the translation string {0} (It will be removed from all translations)?", entry.String),
+			bool yes = MessageService.AskQuestion (GettextCatalog.GetString ("Do you really want to remove the translation string {0} (It will be removed from all translations)?", entry.String),
 			                                                            AlertButton.Cancel, AlertButton.Remove) == AlertButton.Remove;
 
 			if (yes) {
@@ -855,7 +861,7 @@ namespace MonoDevelop.Gettext
 		
 		void UpdateFromCatalog ()
 		{
-			filter = this.entryFilter.Text;
+			filter = this.searchEntryFilter.Entry.Text;
 			if (!IsCaseSensitive && filter != null)
 				filter = filter.ToUpper ();
 			if (RegexSearch) {
@@ -866,11 +872,11 @@ namespace MonoDevelop.Gettext
 					regex = new Regex (filter, options);
 				} catch (Exception e) {
 					IdeApp.Workbench.StatusBar.ShowError (e.Message);
-					this.entryFilter.ModifyBase (StateType.Normal, errorColor);
+					this.searchEntryFilter.Entry.ModifyBase (StateType.Normal, errorColor);
 					return;
 				}
 			}
-			this.entryFilter.ModifyBase (StateType.Normal, Style.Base (StateType.Normal));
+			this.searchEntryFilter.Entry.ModifyBase (StateType.Normal, Style.Base (StateType.Normal));
 			StopFilterWorkerThread ();
 			updateThread = new FilterWorkerThread (this);
 			updateThread.Start ();
@@ -942,8 +948,10 @@ namespace MonoDevelop.Gettext
 				int number = 1, found = 0;
 				double count = widget.catalog.Count;
 				ListStore newStore = new ListStore (typeof(string), typeof(bool), typeof(string), typeof(string), typeof(CatalogEntry), typeof(Gdk.Color), typeof(int), typeof(Gdk.Color));
+				StatusBarContext statusBar = null;
 				DispatchService.GuiSyncDispatch (delegate {
-					IdeApp.Workbench.StatusBar.BeginProgress (GettextCatalog.GetString ("Update catalog list..."));
+					statusBar = IdeApp.Workbench.StatusBar.CreateContext ();
+					statusBar.BeginProgress (GettextCatalog.GetString ("Update catalog list..."));
 				});
 				
 				try {
@@ -953,7 +961,7 @@ namespace MonoDevelop.Gettext
 						number++;
 						if (number % 50 == 0) {
 							DispatchService.GuiSyncDispatch (delegate {
-								MonoDevelop.Ide.Gui.IdeApp.Workbench.StatusBar.SetProgressFraction (Math.Min (1.0, Math.Max (0.0, number / (double)count)));
+								statusBar.SetProgressFraction (Math.Min (1.0, Math.Max (0.0, number / (double)count)));
 							});
 						}
 						if (!widget.ShouldFilter (entry, widget.filter)) {
@@ -972,11 +980,11 @@ namespace MonoDevelop.Gettext
 				
 				}
 				if (!IsStopping) {
-					MonoDevelop.Core.Gui.DispatchService.GuiSyncDispatch (delegate {
+					DispatchService.GuiSyncDispatch (delegate {
 						widget.store.Dispose ();
 						widget.treeviewEntries.Model = widget.store = newStore;
-						MonoDevelop.Ide.Gui.IdeApp.Workbench.StatusBar.EndProgress ();
-						MonoDevelop.Ide.Gui.IdeApp.Workbench.StatusBar.ShowMessage (string.Format (GettextCatalog.GetPluralString ("Found {0} catalog entry.", "Found {0} catalog entries.", found), found));
+						statusBar.EndProgress ();
+						IdeApp.Workbench.StatusBar.ShowMessage (string.Format (GettextCatalog.GetPluralString ("Found {0} catalog entry.", "Found {0} catalog entries.", found), found));
 					});
 				} /*else {
 					MonoDevelop.Core.Gui.DispatchService.GuiSyncDispatch (delegate {

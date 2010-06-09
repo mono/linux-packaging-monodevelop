@@ -31,10 +31,18 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class TypeOfExpression : AbstractCSharpNode
 	{
-		public IReturnType Type {
+		public FullTypeName Type {
 			get {
-				return (IReturnType)GetChildByRole (Roles.ReturnType);
+				return (FullTypeName)GetChildByRole (Roles.ReturnType);
 			}
+		}
+		
+		public CSharpTokenNode LPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.LPar); }
+		}
+		
+		public CSharpTokenNode RPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.RPar); }
 		}
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)

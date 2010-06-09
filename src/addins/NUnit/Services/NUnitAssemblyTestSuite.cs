@@ -41,6 +41,7 @@ using MonoDevelop.Core.Execution;
 using NUnit.Core;
 using NUnit.Core.Filters;
 using MonoDevelop.NUnit.External;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.NUnit
 {
@@ -73,6 +74,13 @@ namespace MonoDevelop.NUnit
 			} catch {
 			}
 		}
+		
+		public override bool HasTests {
+			get {
+				return true;
+			}
+		}
+
 		
 		protected override void OnActiveConfigurationChanged ()
 		{
@@ -176,7 +184,9 @@ namespace MonoDevelop.NUnit
 			ld.Path = AssemblyPath;
 			ld.TestInfoCachePath = cacheLoaded ? null : TestInfoCachePath;
 			ld.Callback = delegate {
-				AsyncCreateTests (ld);
+				DispatchService.GuiDispatch (delegate {
+					AsyncCreateTests (ld);
+				});
 			};
 			ld.SupportAssemblies = new List<string> (SupportAssemblies);
 			
@@ -370,6 +380,7 @@ namespace MonoDevelop.NUnit
 			} finally {
 				testContext.Monitor.CancelRequested -= new TestHandler (rd.Cancel);
 				runner.Dispose ();
+				System.Runtime.Remoting.RemotingServices.Disconnect (localMonitor);
 			}
 			
 			return result;

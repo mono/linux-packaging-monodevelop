@@ -7,20 +7,26 @@
        description = "A MonoDevelop addin for using version control systems like Subversion"
        category    = "Version Control"
        flags = "Hidden"
-       version   = "2.2">
+       version   = "2.4">
  
 	<Runtime>
-		<Import assembly="Diff.dll"/>
-		<Import assembly="DiffWidget.dll"/>
+		<Import file="comment.png" />
+		<Import file="menu_add.png" />
+		<Import file="menu_commit.png" />
+		<Import file="menu_diff.png" />
+		<Import file="menu_log.png" />
+		<Import file="menu_remote_status.png" />
+		<Import file="menu_remove.png" />
+		<Import file="menu_resolve.png" />
+		<Import file="menu_revert.png" />
+		<Import file="menu_status.png" />
+		<Import file="menu_update.png" />
 	</Runtime>
 
 	<Dependencies>
-	    <Addin id="Core" version="2.2"/>
-	    <Addin id="Core.Gui" version="2.2"/>
-	    <Addin id="Projects" version="2.2"/>
-	    <Addin id="Projects.Gui" version="2.2"/>
-	    <Addin id="Ide" version="2.2"/>
-	    <Addin id="SourceEditor2" version="2.2"/>
+	    <Addin id="Core" version="2.4"/>
+	    <Addin id="Ide" version="2.4"/>
+	    <Addin id="SourceEditor2" version="2.4"/>
 	</Dependencies>
 	
 	<ExtensionPoint path = "/MonoDevelop/VersionControl/VersionControlSystems" name = "Version control systems">
@@ -53,19 +59,18 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Core/StockIcons">
-		<StockIcon stockid = "vc-add" resource = "overlay_added.png" />
-		<StockIcon stockid = "vc-remove" resource = "overlay_removed.png" />
-		<StockIcon stockid = "vc-add-command" resource = "menu_add.png" />
-		<StockIcon stockid = "vc-remove-command" resource = "menu_remove.png" />
-		<StockIcon stockid = "vc-resolve-command" resource = "menu_resolve.png" />
-		<StockIcon stockid = "vc-revert-command" resource = "menu_revert.png" />
-		<StockIcon stockid = "vc-diff" resource = "menu_diff.png" />
-		<StockIcon stockid = "vc-log" resource = "menu_log.png" />
-		<StockIcon stockid = "vc-status" resource = "menu_status.png" />
-		<StockIcon stockid = "vc-update" resource = "menu_update.png" />
-		<StockIcon stockid = "vc-commit" resource = "menu_commit.png" />
-		<StockIcon stockid = "vc-remote-status" resource = "menu_remote_status.png" />
-		<StockIcon stockid = "vc-comment" resource = "comment.png" />
+		<StockIcon stockid = "vc-add-command" file = "menu_add.png" />
+		<StockIcon stockid = "vc-remove-command" file = "menu_remove.png" />
+		<StockIcon stockid = "vc-resolve-command" file = "menu_resolve.png" />
+		<StockIcon stockid = "vc-revert-command" file = "menu_revert.png" />
+		<StockIcon stockid = "vc-diff" file = "menu_diff.png" />
+		<StockIcon stockid = "vc-log" file = "menu_log.png" />
+		<StockIcon stockid = "vc-status" file = "menu_status.png" />
+		<StockIcon stockid = "vc-update" file = "menu_update.png" />
+		<StockIcon stockid = "vc-commit" file = "menu_commit.png" />
+		<StockIcon stockid = "vc-remote-status" file = "menu_remote_status.png" />
+		<StockIcon stockid = "vc-comment" file = "comment.png" />
+		<StockIcon stockid = "md-version-control" resource = "version-control-16.png" />
 	</Extension>
     
 	<Extension path = "/MonoDevelop/Ide/Commands">
@@ -213,6 +218,10 @@
 	
 	<Extension path = "/MonoDevelop/ProjectModel/PolicySets/Mono" >
 		<Policies resource="Policies.xml"/>
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/ProjectModel/DomParser">
+		<Class class = "MonoDevelop.VersionControl.Views.DiffParser" id = "DiffParser" />
 	</Extension>
 </Addin>
 	

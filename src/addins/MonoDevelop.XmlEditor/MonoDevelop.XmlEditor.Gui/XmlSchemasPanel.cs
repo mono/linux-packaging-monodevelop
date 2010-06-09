@@ -22,17 +22,12 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
-using MonoDevelop.XmlEditor;
-
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.IO;
+
 using Gtk;
+using MonoDevelop.Ide.Gui.Dialogs;
+using MonoDevelop.XmlEditor;
 
 namespace MonoDevelop.XmlEditor.Gui
 {
@@ -48,9 +43,9 @@ namespace MonoDevelop.XmlEditor.Gui
 			widget = new XmlSchemasPanelWidget ();
 			widget.LoadUserSchemas (XmlSchemaManager.UserSchemas);
 			
-			List<XmlSchemaAssociation> assocs = new List<XmlSchemaAssociation> ();
-			foreach (string s in XmlFileExtensions.Extensions)
-				assocs.Add (XmlEditorAddInOptions.GetSchemaAssociation (s));
+			var assocs = new List<XmlSchemaAssociation> ();
+			foreach (string s in XmlFileExtensions.GetExtensions ())
+				assocs.Add (XmlEditorOptions.GetSchemaAssociation (s));
 			widget.AddFileExtensions (assocs);
 			
 			return widget;
@@ -66,15 +61,15 @@ namespace MonoDevelop.XmlEditor.Gui
 					
 					// Update schema associations after we have added any new schemas to the schema manager.
 					foreach (string extension in widget.RemovedExtensions)
-						XmlEditorAddInOptions.RemoveSchemaAssociation (extension);
+						XmlEditorOptions.RemoveSchemaAssociation (extension);
 					foreach (XmlSchemaAssociation item in widget.GetChangedXmlSchemaAssociations())
-						XmlEditorAddInOptions.SetSchemaAssociation (item);
+						XmlEditorOptions.SetSchemaAssociation (item);
 					
 				} catch (Exception ex) {
 					string msg = MonoDevelop.Core.GettextCatalog.GetString (
 					    "Unhandled error saving schema changes.");
 					MonoDevelop.Core.LoggingService.LogError (msg, ex);
-					MonoDevelop.Core.Gui.MessageService.ShowException (ex, msg);
+					MonoDevelop.Ide.MessageService.ShowException (ex, msg);
 					return;
 				}
 			}

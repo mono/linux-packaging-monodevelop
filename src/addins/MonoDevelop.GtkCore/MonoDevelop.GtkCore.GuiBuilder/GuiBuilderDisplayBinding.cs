@@ -26,18 +26,15 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-
-using System;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Codons;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.GtkCore.GuiBuilder
 {
-	public class GuiBuilderDisplayBinding : DefaultDisplayBinding
+	public class GuiBuilderDisplayBinding : DisplayBinding
 	{
 		bool excludeThis = false;
 		
@@ -53,7 +50,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 				return false;
 			
 			excludeThis = true;
-			IDisplayBinding db = DisplayBindingService.GetBindingForUri (fileName);
+			var db = DisplayBindingService.GetDefaultBindingForUri (fileName);
 			excludeThis = false;
 			return db != null;
 		}
@@ -61,7 +58,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 		public override IViewContent CreateContentForUri (string fileName)
 		{
 			excludeThis = true;
-			IDisplayBinding db = DisplayBindingService.GetBindingForUri (fileName);
+			var db = DisplayBindingService.GetDefaultBindingForUri (fileName);
 			GuiBuilderView view = new GuiBuilderView (db.CreateContentForUri (fileName), GetWindow (fileName));
 			excludeThis = false;
 			return view;
