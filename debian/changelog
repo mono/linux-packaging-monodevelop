@@ -10,7 +10,8 @@ monodevelop (2.3.1+dfsg-1) UNRELEASED; urgency=low
   * debian/control:
     + Bump mono build-deps to 2.6.1, to reflect configure.in
   * debian/patches/use_libsvn1.patch,
-    debian/patches/update_templates_for_gtk-sharp_2.12.patch:
+    debian/patches/update_templates_for_gtk-sharp_2.12.patch,
+    debian/patches/use_csc.patch:
     + Refreshed
 
  -- Jo Shields <directhex@apebox.org>  Wed, 09 Jun 2010 15:17:58 +0100
