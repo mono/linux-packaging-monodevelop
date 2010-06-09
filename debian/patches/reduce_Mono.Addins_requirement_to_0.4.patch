@@ -1,0 +1,13 @@
+Index: monodevelop.git/configure.in
+===================================================================
+--- monodevelop.git.orig/configure.in	2010-06-09 16:23:00.000000000 +0100
++++ monodevelop.git/configure.in	2010-06-09 16:23:04.000000000 +0100
+@@ -101,7 +101,7 @@
+ 
+ 
+ dnl hard dependencies
+-MONOADDINS_REQUIRED_VERSION=0.5
++MONOADDINS_REQUIRED_VERSION=0.4
+ GTKSHARP_REQUIRED_VERSION=2.12.8
+ MONODOC_REQUIRED_VERSION=1.0
+ 
