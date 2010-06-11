@@ -16,6 +16,8 @@ monodevelop (2.3.1+dfsg-1) UNRELEASED; urgency=low
     + Refreshed
   * debian/patches/reduce_Mono.Addins_requirement_to_0.4.patch:
     + Build against older Mono.Addins, as per MonoDevelop Trunk
+  * debian/rules:
+    + Force XDG_CONFIG_HOME to allow keystores to work
 
  -- Jo Shields <directhex@apebox.org>  Wed, 09 Jun 2010 15:17:58 +0100
 
