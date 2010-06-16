@@ -28,6 +28,8 @@ using System;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Extensions;
 using MonoDevelop.Components.Extensions;
+using System.Collections.Generic;
+using Mono.Addins;
 
 namespace MonoDevelop.Ide.Gui.Dialogs
 {
@@ -38,6 +40,16 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 	{
 		public OpenFileDialog ()
 		{
+		}
+		
+		public OpenFileDialog (string title) : this (title, Gtk.FileChooserAction.Save)
+		{
+		}
+		
+		public OpenFileDialog (string title, Gtk.FileChooserAction action)
+		{
+			Title = title;
+			Action = action;
 		}
 		
 		/// <summary>
@@ -87,20 +99,89 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		public bool Run ()
 		{
 			if (Handler != null)
-				Handler.Run (data);
+				return Handler.Run (data);
+			else
+				return RunDefault ();
+		}
+		
+		bool RunDefault ()
+		{	
+			var win = new FileSelectorDialog (Title, Action);
+			win.Encoding = Encoding;
+			win.ShowEncodingSelector = ShowEncodingSelector;
+			win.ShowViewerSelector = ShowViewerSelector;
 			
-			FileSelectorDialog win = new FileSelectorDialog (data.Title, data.Action);
-			win.Encoding = data.Encoding;
-			win.ShowEncodingSelector = data.ShowEncodingSelector;
-			win.ShowViewerSelector = data.ShowViewerSelector;
-			if (win.Run () == (int) Gtk.ResponseType.Ok) {
-				data.Encoding = win.Encoding;
-				data.CloseCurrentWorkspace = win.CloseCurrentWorkspace;
-				data.SelectedFiles = win.Filenames;
-				data.SelectedViewer = win.SelectedViewer;
-				return true;
-			} else
-				return false;
+			//FIXME: should these be optional? they were hardcoded into the dialog - at least they're factored out now
+			AddDefaultFileFilters ();
+			LoadDefaultFilter ();
+			
+			SetDefaultProperties (win);
+			
+			try {
+				var result = MessageService.RunCustomDialog (win, TransientFor ?? MessageService.RootWindow);
+				if (result == (int) Gtk.ResponseType.Ok) {
+					GetDefaultProperties (win);
+					data.Encoding = win.Encoding;
+					data.CloseCurrentWorkspace = win.CloseCurrentWorkspace;
+					data.SelectedViewer = win.SelectedViewer;
+					SaveDefaultFilter ();
+					return true;
+				} else
+					return false;
+			} finally {
+				win.Destroy ();
+			}
+		}
+		
+		/// <summary>
+		/// Adds the default file filters registered by MD core and addins. Includes the All Files filter.
+		/// </summary>
+		void AddDefaultFileFilters ()
+		{
+			foreach (var f in GetDefaultFilters ())
+				data.Filters.Add (f);
+			AddAllFilesFilter ();
+		}
+		
+		//loads last default filter from MD prefs
+		void LoadDefaultFilter ()
+		{
+			// Load last used filter pattern
+			var lastPattern = PropertyService.Get ("Monodevelop.FileSelector.LastPattern", "*");
+			foreach (var filter in Filters) {
+				if (filter.Patterns != null && filter.Patterns.Contains (lastPattern)) {
+					DefaultFilter = filter;
+					break;
+				}
+			}
+		}
+		
+		//saves last default filter to MD prefs
+		void SaveDefaultFilter ()
+		{
+			// Save active filter
+			//it may be null if e.g. SetSelectedFile was used
+			if (DefaultFilter != null && DefaultFilter.Patterns != null && DefaultFilter.Patterns.Count > 0)
+				PropertyService.Set ("Monodevelop.FileSelector.LastPattern", DefaultFilter.Patterns[0]);
+		}
+		
+		static IEnumerable<SelectFileDialogFilter> GetDefaultFilters ()
+		{
+			foreach (var f in ParseFilters (AddinManager.GetExtensionObjects ("/MonoDevelop/Ide/ProjectFileFilters")))
+				yield return f;
+			foreach (var f in ParseFilters (AddinManager.GetExtensionObjects ("/MonoDevelop/Ide/FileFilters")))
+				yield return f;
+		}
+		
+		static IEnumerable<SelectFileDialogFilter> ParseFilters (System.Collections.IEnumerable filterStrings)
+		{
+			if (filterStrings == null)
+				yield break;
+			foreach (string filterStr in filterStrings) {
+				var parts = filterStr.Split ('|');
+				var f = new SelectFileDialogFilter (parts[0], parts[1].Split (';'));
+				yield return f;
+			}
 		}
 	}
 }

@@ -42,6 +42,7 @@ using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.DesignerSupport;
 
 using MonoDevelop.AspNet.Parser;
+using System.CodeDom;
 
 namespace MonoDevelop.AspNet
 {
@@ -64,7 +65,9 @@ namespace MonoDevelop.AspNet
 					document.FileName, err.Region.Start.Line, err.Region.Start.Column));
 		}
 		
-		public static System.CodeDom.CodeCompileUnit GenerateCodeBehind (AspNetAppProject project, AspNetParsedDocument document, 
+		public static System.CodeDom.CodeCompileUnit GenerateCodeBehind (AspNetAppProject project,
+		                                                                 string filename,
+		                                                                 AspNetParsedDocument document, 
 		                                                                 List<CodeBehindWarning> errors)
 		{
 			string className = document.Info.InheritedClass;
@@ -77,8 +80,8 @@ namespace MonoDevelop.AspNet
 			if (string.IsNullOrEmpty (className))
 				return null;
 			
-			var refman = new DocumentReferenceManager () { Doc = document, Project = project };
-			var memberList = new MemberListVisitor (document, refman );
+			var refman = new DocumentReferenceManager (project) { Doc = document };
+			var memberList = new MemberListVisitor (document, refman);
 			document.RootNode.AcceptVisit (memberList);
 			
 			var err = memberList.Errors.Where (x => x.ErrorType == ErrorType.Error).FirstOrDefault ();
@@ -88,12 +91,13 @@ namespace MonoDevelop.AspNet
 			}
 			
 			//initialise the generated type
-			System.CodeDom.CodeCompileUnit ccu = new System.CodeDom.CodeCompileUnit ();
-			System.CodeDom.CodeNamespace namespac = new System.CodeDom.CodeNamespace ();
+			var ccu = new CodeCompileUnit ();
+			var namespac = new CodeNamespace ();
 			ccu.Namespaces.Add (namespac); 
-			System.CodeDom.CodeTypeDeclaration typeDecl = new System.CodeDom.CodeTypeDeclaration ();
-			typeDecl.IsClass = true;
-			typeDecl.IsPartial = true;
+			var typeDecl = new System.CodeDom.CodeTypeDeclaration () {
+				IsClass = true,
+				IsPartial = true,
+			};
 			namespac.Types.Add (typeDecl);
 			
 			//name the class and namespace
@@ -131,9 +135,9 @@ namespace MonoDevelop.AspNet
 			}
 			
 			if (masterTypeName != null) {
-				var masterProp = new System.CodeDom.CodeMemberProperty () {
+				var masterProp = new CodeMemberProperty () {
 					Name = "Master",
-					Type = new System.CodeDom.CodeTypeReference (masterTypeName),
+					Type = new CodeTypeReference (masterTypeName),
 					HasGet = true,
 					HasSet = false,
 					Attributes = System.CodeDom.MemberAttributes.Public | System.CodeDom.MemberAttributes.New 
@@ -146,11 +150,49 @@ namespace MonoDevelop.AspNet
 				typeDecl.Members.Add (masterProp);
 			}
 			
-			//add fields for each control in the page
-			foreach (var member in memberList.Members.Values)
-				typeDecl.Members.Add (member);
+			//shortcut building the existing members type map
+			if (memberList.Members.Count == 0)
+				return ccu;
 			
+			var dom = refman.TypeCtx.ProjectDom;
+			var cls = dom.GetType (className);
+			var members = GetDesignerMembers (memberList.Members.Values, cls, filename, dom, dom);
+			
+			//add fields for each control in the page
+			
+			foreach (var member in members) {
+				var type = new CodeTypeReference (member.Type.FullName);
+				typeDecl.Members.Add (new CodeMemberField (type, member.Name) { Attributes = MemberAttributes.Family });
+			}
 			return ccu;
+		}
+		
+		/// <summary>Filters out members whose names conflict with existing accessible members</summary>
+		/// <param name="members">Full list of CodeBehind members</param>
+		/// <param name="cls">The class to which these members' partial class will be added.</param>
+		/// <param name="designerFile">Members in this file will be ignored.</param>
+		/// <param name="resolveDom">The ProjectDom to use for resolving base types.</param>
+		/// <param name="internalDom">The ProjectDom to use for checking whether members are accessible as internal.</param>
+		/// <returns>The filtered list of non-conflicting members.</returns>
+		// TODO: check compatibilty with existing members
+		public static IEnumerable<CodeBehindMember> GetDesignerMembers (
+			IEnumerable<CodeBehindMember> members, IType cls, string designerFile, ProjectDom resolveDom,
+			ProjectDom internalDom)
+		{
+			var existingMembers = new HashSet<string> ();
+			while (cls != null) {
+				foreach (var member in cls.Members) {
+					if (member.IsPrivate || (member.IsInternal && member.DeclaringType.SourceProjectDom != internalDom))
+					    continue;
+					if (member.DeclaringType.CompilationUnit.FileName == designerFile)
+						continue;
+					existingMembers.Add (member.Name);
+				}
+				if (cls.BaseType == null)
+					break;
+				cls = resolveDom.GetType (cls.BaseType);
+			}
+			return members.Where (m => !existingMembers.Contains (m.Name));
 		}
 	}
 }

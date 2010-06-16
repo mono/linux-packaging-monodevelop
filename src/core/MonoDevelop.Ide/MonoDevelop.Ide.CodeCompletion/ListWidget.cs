@@ -43,7 +43,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 		ListWindow win;
 		int selection = 0;
 		int page = 0;
-		int visibleRows = -1;
+		
 		int rowHeight;
 		bool buttonPressed;
 		public event EventHandler SelectionChanged;
@@ -192,7 +192,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 		{
 			int current = CurrentCategory ();
 			int next = System.Math.Min (categories.Count - 1, System.Math.Max (0, current + relative));
-				
+			if (next < 0 || next >= categories.Count)
+				return;
 			Category newCategory = categories[next];
 			Selection = newCategory.Items[0];
 			if (next == 0)
@@ -519,8 +520,10 @@ namespace MonoDevelop.Ide.CodeCompletion
 			for (int newSelection = 0; newSelection < text.Length && itemIndex < filterText.Length; newSelection++) {
 				char ch1 = char.ToUpper (text[newSelection]);
 				char ch2 = char.ToUpper (filterText[itemIndex]);
+				bool ch1IsUpper = char.IsUpper (text[newSelection]);
+				bool ch2IsUpper = char.IsUpper (filterText[itemIndex]);
 				
-				if (ch1 == ch2) {
+				if (ch1 == ch2 && !(!ch1IsUpper && ch2IsUpper)) {
 					itemIndex++;
 					matchIndices.Add (newSelection);
 					wasMatch = true;
@@ -600,13 +603,21 @@ namespace MonoDevelop.Ide.CodeCompletion
 			});
 			CalcVisibleRows ();
 			UpdatePage ();
+			
+			OnWordsFiltered (EventArgs.Empty);
 		}
+		
+		protected virtual void OnWordsFiltered (EventArgs e)
+		{
+			EventHandler handler = this.WordsFiltered;
+			if (handler != null)
+				handler (this, e);
+		}
+		
+		public event EventHandler WordsFiltered;
 		
 		int GetRowByPosition (int ypos)
 		{
-			if (visibleRows == -1)
-				CalcVisibleRows ();
-			
 			return GetItem (true, page + (ypos - margin) / rowHeight - (PreviewCompletionString ? 1 : 0));
 		}
 		
@@ -622,19 +633,16 @@ namespace MonoDevelop.Ide.CodeCompletion
 		
 		public int VisibleRows {
 			get {
-				if (visibleRows == -1)
-					CalcVisibleRows ();
-				return visibleRows;
+				int rowWidth;
+				layout.GetPixelSize (out rowWidth, out rowHeight);
+				rowHeight += padding;
+				return Allocation.Height / rowHeight;
 			}
 		}
 		
 		protected override void OnSizeAllocated (Gdk.Rectangle allocation)
 		{
 			base.OnSizeAllocated (allocation);
-			int rowWidth;
-			layout.GetPixelSize (out rowWidth, out rowHeight);
-			rowHeight += padding;
-			visibleRows = Allocation.Height / rowHeight;
 			UpdatePage ();
 		}
 		

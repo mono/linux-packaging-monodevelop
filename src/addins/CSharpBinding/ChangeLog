@@ -1,3 +1,188 @@
+2010-06-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
+	  Remove debug writelines.
+
+2010-06-14  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.CSharp/CSharpBindingCompilerManager.cs: Track
+	  api changes.
+
+2010-06-14  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  update line when removing marker.
+
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Fix build.
+
+2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	  Track API. Fix region offset.
+
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs: Track
+	  API. Include both body regions for properties.
+
+2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs: Track
+	  API. Emit regions for members.
+
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	  Use body regions to select body or place caret, and to
+	  remove generated body when GenerateBody is false.
+
+2010-06-04  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs: Fix
+	  property getter in overrides.
+
+2010-06-04  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* templates/ConsoleProject.xpt.xml: Set the external console
+	  flag for console projects.
+
+2010-06-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: Track
+	  API changes.
+
+2010-06-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	  Fixed LINQ resolve error.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs: handled other case
+	  of unresolveable types.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs: make it clearer
+	  that the type can't be resolved.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs:
+	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs: Handled
+	  unresolved return types
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs:
+	  Corrected base call.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs:
+	  Corrected type name output.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs:
+	  Removed some code duplication.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* MonoDevelop.CSharp.Refactoring/CodeGenerator.cs:
+	* MonoDevelop.CSharp.Refactoring/CSharpRefactorer.cs:
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs:
+	* MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs:
+	  Code generator get's now used by code completion auto
+	  generation & insert code feature.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs:
+	  Worked on code generation.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* CSharpBinding.csproj:
+	* CSharpBinding.addin.xml:
+	* MonoDevelop.CSharp.Refactoring/CodeGenerator.cs:
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs:
+	  Worked on c# code generation.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs: Fixed
+	  'Bug 610241 - #elif Coloring Messed'.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/MoveToUsagesHandler.cs:
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Worked on highight usage extensions & Bug 610048 - Sometimes
+	  symbol highlight is not cleared.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Handled multiple type overloads.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 610011 - Extension methods incorrectly trump real
+	  members'.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fixed 'Bug
+	  610006 - Intellisense gives members of return type of
+	  functions even when that function isn't invoked'.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 609999 - Intellisense confuses Array initializers
+	  with object initializers'.
+
+
+2010-05-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp/CSharpBindingCompilerManager.cs: Fixed
+	  'Bug 608910 - Getting a "File not found" exception in
+	  monodevelop that doesn't allow me to build :('.
+
+2010-05-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/NewCSharpExpressionFinder.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 609528 - No Intellisense for LINQ join'.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs:
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 600624 - Property initializer completion
+	  unreliable'.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Track API changes.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Dom/CSharpAmbience.cs: UseFullName flag
+	  works now for members.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fix grammar.
+
 2010-05-20  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.CSharp.Resolver/NRefactoryResolver.cs:

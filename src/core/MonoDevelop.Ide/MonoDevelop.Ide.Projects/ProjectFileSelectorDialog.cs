@@ -52,7 +52,6 @@ namespace MonoDevelop.Ide.Projects
 		
 		public ProjectFileSelectorDialog (Project project, string defaultFilterName, string defaultFilterPattern)
 		{
-			
 			this.project = project;
 			this.defaultFilterName = defaultFilterName;
 			this.defaultFilterPattern = defaultFilterPattern ?? "*";
@@ -109,6 +108,7 @@ namespace MonoDevelop.Ide.Projects
 			
 			
 			this.DefaultResponse = ResponseType.Cancel;
+			this.Modal = true;
 		}
 
 		[GLib.ConnectBefore]
@@ -220,8 +220,11 @@ namespace MonoDevelop.Ide.Projects
 			fileTypeCombo.AppendText (pattern);
 		}
 		
+		/// <summary>
+		/// Remains valid after the dialog has been destroyed
+		/// </summary>
 		public ProjectFile SelectedFile { get; private set; }
-
+		
 		FilePath GetSelectedDirectory ( )
 		{
 			TreeIter iter;

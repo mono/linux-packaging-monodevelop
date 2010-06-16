@@ -70,8 +70,9 @@ namespace Mono.TextEditor
 			set {
 				EditMode oldMode = this.currentMode;
 				this.currentMode = value;
+				this.currentMode.AddedToEditor (this);
 				if (oldMode != null)
-					oldMode.RemovedFromTextEditor ();
+					oldMode.RemovedFromEditor (this);
 			}
 		}
 		
@@ -279,7 +280,16 @@ namespace Mono.TextEditor
 		{
 			return this.options.WordFindStrategy.FindPrevSubwordOffset (this.Document, offset);
 		}
-
+		
+		public int FindCurrentWordEnd (int offset)
+		{
+			return this.Options.WordFindStrategy.FindCurrentWordEnd (this.Document, offset);
+		}
+		
+		public int FindCurrentWordStart (int offset)
+		{
+			return this.Options.WordFindStrategy.FindCurrentWordStart (this.Document, offset);
+		}
 		
 		public delegate void PasteCallback (int insertionOffset, string text);
 		
@@ -425,15 +435,19 @@ namespace Mono.TextEditor
 				if (mainSelection == null && value == null)
 					return;
 				if (mainSelection == null && value != null || mainSelection != null && value == null || !mainSelection.Equals (value)) {
+					if (mainSelection != null)
+						mainSelection.Changed -= HandleMainSelectionChanged;
 					mainSelection = value;
-					if (mainSelection != null) {
-						mainSelection.Changed += delegate {
-							OnSelectionChanged (EventArgs.Empty);
-						};
-					}
+					if (mainSelection != null) 
+						mainSelection.Changed += HandleMainSelectionChanged;
 					OnSelectionChanged (EventArgs.Empty);
 				}
 			}
+		}
+
+		void HandleMainSelectionChanged (object sender, EventArgs e)
+		{
+			OnSelectionChanged (EventArgs.Empty);
 		}
 		
 		public IEnumerable<Selection> Selections {

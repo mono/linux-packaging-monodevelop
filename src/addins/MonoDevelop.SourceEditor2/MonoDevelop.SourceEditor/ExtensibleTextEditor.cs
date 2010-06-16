@@ -25,6 +25,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using Gtk;
 
@@ -243,41 +244,46 @@ namespace MonoDevelop.SourceEditor
 		
 		IEnumerable<char> TextWithoutCommentsAndStrings {
 			get {
-				bool isInString = false, isInChar = false;
-				bool isInLineComment  = false, isInBlockComment = false;
-				
-				for (int pos = 0; pos < Document.Length; pos++) {
-					char ch = Document.GetCharAt (pos);
-					switch (ch) {
-						case '\r':
-						case '\n':
-							isInLineComment = false;
-							break;
-						case '/':
-							if (isInBlockComment) {
-								if (pos > 0 && Document.GetCharAt (pos - 1) == '*') 
-									isInBlockComment = false;
-							} else  if (!isInString && !isInChar && pos + 1 < Document.Length) {
-								char nextChar = Document.GetCharAt (pos + 1);
-								if (nextChar == '/')
-									isInLineComment = true;
-								if (!isInLineComment && nextChar == '*')
-									isInBlockComment = true;
-							}
-							break;
-						case '"':
-							if (!(isInChar || isInLineComment || isInBlockComment)) 
-								isInString = !isInString;
-							break;
-						case '\'':
-							if (!(isInString || isInLineComment || isInBlockComment)) 
-								isInChar = !isInChar;
-							break;
-						default :
-							if (!(isInString || isInChar || isInLineComment || isInBlockComment))
-								yield return ch;
-							break;
-					}
+				return from p in GetTextWithoutCommentsAndStrings (Document, 0, Document.Length) select p.Key;
+			}
+		}
+		
+		static IEnumerable<KeyValuePair <char, int>> GetTextWithoutCommentsAndStrings (Mono.TextEditor.Document doc, int start, int end) 
+		{
+			bool isInString = false, isInChar = false;
+			bool isInLineComment = false, isInBlockComment = false;
+			
+			for (int pos = start; pos < end; pos++) {
+				char ch = doc.GetCharAt (pos);
+				switch (ch) {
+					case '\r':
+					case '\n':
+						isInLineComment = false;
+						break;
+					case '/':
+						if (isInBlockComment) {
+							if (pos > 0 && doc.GetCharAt (pos - 1) == '*') 
+								isInBlockComment = false;
+						} else  if (!isInString && !isInChar && pos + 1 < doc.Length) {
+							char nextChar = doc.GetCharAt (pos + 1);
+							if (nextChar == '/')
+								isInLineComment = true;
+							if (!isInLineComment && nextChar == '*')
+								isInBlockComment = true;
+						}
+						break;
+					case '"':
+						if (!(isInChar || isInLineComment || isInBlockComment)) 
+							isInString = !isInString;
+						break;
+					case '\'':
+						if (!(isInString || isInLineComment || isInBlockComment)) 
+							isInChar = !isInChar;
+						break;
+					default :
+						if (!(isInString || isInChar || isInLineComment || isInBlockComment))
+							yield return new KeyValuePair<char, int> (ch, pos);
+						break;
 				}
 			}
 		}
@@ -431,16 +437,14 @@ namespace MonoDevelop.SourceEditor
 		{
 			ErrorMarker error;
 			DocumentLocation location = Document.OffsetToLocation (offset);
-			if (errors.TryGetValue (location.Line, out error)) {
+			if (errors != null && errors.TryGetValue (location.Line, out error)) {
 				if (error.Info.ErrorType == ErrorType.Warning)
 					return GettextCatalog.GetString ("<b>Parser Warning</b>: {0}",
 					                                 GLib.Markup.EscapeText (error.Info.Message));
-				else
-					return GettextCatalog.GetString ("<b>Parser Error</b>: {0}",
-					                                 GLib.Markup.EscapeText (error.Info.Message));
+				return GettextCatalog.GetString ("<b>Parser Error</b>: {0}",
+				                                 GLib.Markup.EscapeText (error.Info.Message));
 			}
-			else
-				return null;
+			return null;
 		}
 		
 		public ProjectDom ProjectDom {

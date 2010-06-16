@@ -1,3 +1,28 @@
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs: Fix
+	  incorrect use of ShowCustomDialog/RunCustomDialog.
+
+2010-05-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	  Fix build.
+
+2010-05-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	  Properly destroy the web reference dialog.
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs:
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	  More dialog placing.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am: Flush.
+
 2010-05-20  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* MonoDevelop.WebReferences.WS/WebServiceDiscoveryResultWS.cs:

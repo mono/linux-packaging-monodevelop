@@ -1,3 +1,185 @@
+2010-06-14  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.AspNet/AspNetExecutionHandler.cs: Track api
+	  changes.
+
+2010-06-07  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/AspNetFileDescriptionTemplate.cs: Track
+	  SingleFileDescription template API.
+
+2010-06-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AspNet/AspNetSyntaxMode.cs: Fixed 'Bug 611558 -
+	  Phantom text in editor after typing </script>'.
+
+2010-06-04  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs: Partial
+	  support for HTML encoded expressions and script blocks.
+
+2010-06-04  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.StateEngine/AspNetDom.cs:
+	* MonoDevelop.AspNet.StateEngine/AspNetExpressionState.cs: Add
+	  support for HTML encoded expressions in the state engine.
+
+	* MonoDevelop.AspNet.StateEngine/HtmlTagState.cs:
+	* MonoDevelop.AspNet.StateEngine/HtmlScriptBodyState.cs:
+	  Support for HTML script blocks.
+
+	* Makefile.am:
+	* MonoDevelop.AspNet.csproj: Added file to project.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs:
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs: Worked
+	  on ASP.NET completion.
+
+2010-05-31  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.AspNet.csproj: Don't require a specific M.A
+	  version.
+
+2010-05-30  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/CodeBehind.cs: Moved duplicate field
+	  elimination code into re-usable method.
+
+	* MonoDevelop.AspNet.Gui/AspProjectDom.cs:
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs:
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs: Added
+	  support for CodeBeside members in embedded completion.
+
+	* MonoDevelop.AspNet.Parser/MemberListVisitor.cs: Collect
+	  locations of items.
+
+2010-05-29  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.AspNet.csproj:
+	* MonoDevelop.AspNet/AspNetAppProject.cs:
+	* MonoDevelop.AspNet/RegistrationCache.cs:
+	* MonoDevelop.AspNet/ProjectRegisteredControls.cs: Change the
+	  file info caches so that they don't constantly stat the
+	  disk. Instead, they use the project file events to flush
+	  items.
+
+2010-05-29  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/ProjectRegisteredControls.cs: Fix control
+	  registration.
+
+	* MonoDevelop.AspNet.Parser/DocumentReferenceManager.cs: Use
+	  directory for config search, not filename.
+
+2010-05-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/AspNetAppProject.cs: Get the web.config
+	  name from the project. Fixes Bug 610066 - Adding a reference
+	  to an ASP.NET MVC project causes Web.config to be renamed
+	  "web.config".
+
+
+2010-05-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.Parser/PageInfo.cs: More granular version
+	  of the NRE fix.
+
+2010-05-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.Parser/PageInfo.cs: Fix an NRE.
+
+2010-05-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/WebTypeManager.cs: Cache ProjectDoms.
+
+2010-05-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.AspNet.csproj: Added AspProjectDom to project.
+
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs:
+	  DocumentInfo now contains the usings, ProjectDoms, script
+	  region list, class name, base type.
+
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs: Only
+	  rebuild the DocumentInfo when we get a new
+	  AspNetParsedDocument, not on every keystroke. Track APIs.
+
+	* MonoDevelop.AspNet.Gui/AspProjectDom.cs: Moved from
+	  DomWrapper in AspNetCompletion.cs.
+
+	* MonoDevelop.AspNet.Parser/DocumentReferenceManager.cs: Added
+	  APIs for getting the usings and ProjectDoms for the
+	  document.
+
+2010-05-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/AspNetAppProject.cs: Missed a file in
+	  previous commit.
+
+2010-05-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs:
+	* MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs: Pass
+	  the full list of usings to the ILanguageCompletionBuilder.
+
+	* MonoDevelop.AspNet/WebTypeManager.cs:
+	* MonoDevelop.AspNet/ProjectRegisteredControls.cs:
+	  Registration cache now tracks imports and assembly
+	  registrations.
+
+	* Makefile.am:
+	* MonoDevelop.AspNet.csproj: Add Sysytem.Xml.Linq reference.
+
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Html/PathCompletion.cs:
+	* MonoDevelop.AspNet/MasterContentFileDescriptionTemplate.cs:
+	  Fix incorrect use of ShowCustomDialog/RunCustomDialog.
+
+2010-05-27  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/CodeBehind.cs:
+	* MonoDevelop.AspNet.Parser/MemberListVisitor.cs:
+	* MonoDevelop.AspNet/VerifyCodeBehindBuildStep.cs: Fixed Bug
+	  524051 - .as?x.designer.cs code generated by MonoDevelop
+	  includes fields already present in the main class.
+
+2010-05-27  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/CodeBehind.cs:
+	* MonoDevelop.AspNet/WebTypeManager.cs:
+	* MonoDevelop.AspNet/AspNetToolboxNode.cs:
+	* MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs:
+	* MonoDevelop.AspNet.Parser/WebFormReferenceManager.cs:
+	* MonoDevelop.AspNet.Parser/DocumentReferenceManager.cs: Move
+	  all the WebTypeManager static utility-type methods onto a
+	  WebTypeContext class. Reduces arguments and will make it
+	  easier to cache stuff.
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/WebTypeManager.cs: Added method for
+	  getting the IType for an HTML control. 
+
+	* MonoDevelop.AspNet.Parser/DocumentReferenceManager.cs: Added
+	  method for looking up IType of arbitrary tag.
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/AspNetAppProjectBinding.cs: Fix creating
+	  ASP.NET single file projects. Fixes Bug 603521 - Command
+	  errors opening aspx file.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.Deployment/WebDeployService.cs:
+	* MonoDevelop.AspNet.Deployment/WebDeployOptionsPanelWidget.cs:
+	  Clean up dialog placement.
+
 2010-05-19  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.AspNet.Parser/DocumentReferenceManager.cs: Make

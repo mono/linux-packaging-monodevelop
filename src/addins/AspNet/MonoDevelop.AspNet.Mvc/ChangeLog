@@ -1,3 +1,19 @@
+2010-05-30  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Gui/FolderNodeBuilderExtension.cs: Use the recyclable text
+	  templating domain. Fixes Bug 584067 - ASP.NET MVC: cannot
+	  add a View, uncaught exception.
+
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Gui/AddViewDialog.cs:
+	* Gui/FolderNodeBuilderExtension.cs: Fix incorrect use of
+	  ShowCustomDialog/RunCustomDialog.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Gui/AddViewDialog.cs: Clean up dialog placement.
+
 2010-05-18  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* gtk-gui/gui.stetic:

@@ -138,6 +138,7 @@ namespace MonoDevelop.Projects.Dom
 		public static readonly IReturnType Byte;
 		public static readonly IReturnType SByte;
 		public static readonly IReturnType Bool;
+		public static readonly IReturnType Delegate;
 		
 		public static readonly IReturnType Int16;
 		public static readonly IReturnType Int32;
@@ -231,6 +232,8 @@ namespace MonoDevelop.Projects.Dom
 			CreateTableEntry ("GLib.DefaultSignalHandlerAttribute");
 			CreateTableEntry ("Gtk.Widget");
 			CreateTableEntry ("Gtk.Label");
+			
+			Delegate = CreateTableEntry ("System.Delegate");
 		}
 
 		public List<IReturnTypePart> Parts {
@@ -252,7 +255,8 @@ namespace MonoDevelop.Projects.Dom
 		
 		public ReadOnlyCollection<IReturnType> GenericArguments {
 			get {
-				Debug.Assert (parts.Count > 0);
+				if (parts.Count ==0)
+					return new ReadOnlyCollection<IReturnType> (new IReturnType[0]);
 				return parts[parts.Count - 1].GenericArguments;
 			}
 		}

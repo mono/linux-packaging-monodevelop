@@ -24,7 +24,8 @@ REFS =  \
 	-r:System.Drawing \
 	-r:System.Drawing.Design \
 	-r:System.Web \
-	-r:System.Xml
+	-r:System.Xml \
+	-r:System.Xml.Linq
 
 FILES =  \
 	AssemblyInfo.cs \
@@ -50,6 +51,7 @@ FILES =  \
 	MonoDevelop.AspNet.Gui/AspNetConfigurationPanel.cs \
 	MonoDevelop.AspNet.Gui/AspNetConfigurationPanelWidget.cs \
 	MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs \
+	MonoDevelop.AspNet.Gui/AspProjectDom.cs \
 	MonoDevelop.AspNet.Gui/BaseHtmlEditorExtension.cs \
 	MonoDevelop.AspNet.Gui/BrowserLauncher.cs \
 	MonoDevelop.AspNet.Gui/HtmlEditorExtension.cs \
@@ -96,6 +98,7 @@ FILES =  \
 	MonoDevelop.AspNet.StateEngine/AspNetServerCommentState.cs \
 	MonoDevelop.AspNet.StateEngine/AspNetSpeculativeExpressionState.cs \
 	MonoDevelop.AspNet.StateEngine/HtmlClosingTagState.cs \
+	MonoDevelop.AspNet.StateEngine/HtmlScriptBodyState.cs \
 	MonoDevelop.AspNet.StateEngine/HtmlTagState.cs \
 	MonoDevelop.AspNet/AspNetAppProject.cs \
 	MonoDevelop.AspNet/AspNetAppProjectBinding.cs \
@@ -115,7 +118,7 @@ FILES =  \
 	MonoDevelop.AspNet/LineInterceptingTextWriter.cs \
 	MonoDevelop.AspNet/MasterContentFileDescriptionTemplate.cs \
 	MonoDevelop.AspNet/ProjectFolderNodeBuilderExtension.cs \
-	MonoDevelop.AspNet/ProjectRegisteredControls.cs \
+	MonoDevelop.AspNet/RegistrationCache.cs \
 	MonoDevelop.AspNet/VerifyCodeBehindBuildStep.cs \
 	MonoDevelop.AspNet/WebTypeManager.cs \
 	MonoDevelop.AspNet/XspParameters.cs \

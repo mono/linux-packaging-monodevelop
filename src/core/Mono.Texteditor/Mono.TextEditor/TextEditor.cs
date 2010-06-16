@@ -120,6 +120,8 @@ namespace Mono.TextEditor
 		
 		public TextEditor () : this(new Document ())
 		{
+			// TODO: Enable accessibility factory
+			//			new TextEditorAccessible.Factory ();
 			textEditorData.Document.LineChanged += UpdateLinesOnTextMarkerHeightChange; 
 		}
 		
@@ -261,13 +263,15 @@ namespace Mono.TextEditor
 			iconMargin = new IconMargin (this);
 			gutterMargin = new GutterMargin (this);
 			dashedLineMargin = new DashedLineMargin (this);
+			dashedLineMargin.UseBGColor = false;
 			foldMarkerMargin = new FoldMarkerMargin (this);
 			textViewMargin = new TextViewMargin (this);
 
 			margins.Add (iconMargin);
 			margins.Add (gutterMargin);
-			margins.Add (dashedLineMargin);
 			margins.Add (foldMarkerMargin);
+			margins.Add (dashedLineMargin);
+			
 			margins.Add (textViewMargin);
 			this.textEditorData.SelectionChanged += TextEditorDataSelectionChanged;
 			this.textEditorData.UpdateAdjustmentsRequested += TextEditorDatahandleUpdateAdjustmentsRequested;
@@ -350,6 +354,8 @@ namespace Mono.TextEditor
 //			Rectangle rectangle = textViewMargin.GetCaretRectangle (Caret.Mode);
 			RequestResetCaretBlink ();
 			
+			textEditorData.CurrentMode.InternalCaretPositionChanged (this, textEditorData);
+			
 			if (!IsSomethingSelected) {
 				if (/*Options.HighlightCaretLine && */args.Location.Line != Caret.Line) 
 					RedrawMarginLine (TextViewMargin, args.Location.Line);
@@ -361,10 +367,14 @@ namespace Mono.TextEditor
 		void TextEditorDataSelectionChanged (object sender, EventArgs args)
 		{
 			if (IsSomethingSelected) {
-				ClipboardActions.ClearPrimary ();
 				ISegment selectionRange = MainSelection.GetSelectionRange (textEditorData);
-				if (selectionRange.Offset >= 0 && selectionRange.EndOffset < Document.Length)
+				if (selectionRange.Offset >= 0 && selectionRange.EndOffset < Document.Length) {
 					ClipboardActions.CopyToPrimary (this.textEditorData);
+				} else {
+					ClipboardActions.ClearPrimary ();
+				}
+			} else {
+				ClipboardActions.ClearPrimary ();
 			}
 			// Handle redraw
 			Selection selection = Selection.Clone (MainSelection);
@@ -533,8 +543,6 @@ namespace Mono.TextEditor
 		{
 			if (!this.IsRealized)
 				return;
-			if (EditorOptionsChanged != null)
-				EditorOptionsChanged (this, args);
 			if (currentStyleName != Options.ColorScheme) {
 				currentStyleName = Options.ColorScheme;
 				this.textEditorData.ColorStyle = Options.GetColorStyle (this.Style);
@@ -543,9 +551,16 @@ namespace Mono.TextEditor
 			
 			iconMargin.IsVisible   = Options.ShowIconMargin;
 			gutterMargin.IsVisible     = Options.ShowLineNumberMargin;
-			dashedLineMargin.IsVisible = foldMarkerMargin.IsVisible = Options.ShowFoldMargin;
+			foldMarkerMargin.IsVisible = Options.ShowFoldMargin;
+			dashedLineMargin.IsVisible = foldMarkerMargin.IsVisible || gutterMargin.IsVisible;
 			
+			if (EditorOptionsChanged != null)
+				EditorOptionsChanged (this, args);
+			
+			textViewMargin.OptionsChanged ();
 			foreach (Margin margin in this.margins) {
+				if (margin == textViewMargin)
+					continue;
 				margin.OptionsChanged ();
 			}
 			SetAdjustments (Allocation);
@@ -1171,7 +1186,22 @@ namespace Mono.TextEditor
 		
 		public void CenterToCaret ()
 		{
-			if (isDisposed || Caret.Line < 0 || Caret.Line >= Document.LineCount)
+			CenterTo (Caret.Location);
+		}
+		
+		public void CenterTo (int offset)
+		{
+			CenterTo (Document.OffsetToLocation (offset));
+		}
+		
+		public void CenterTo (int line, int column)
+		{
+			CenterTo (new DocumentLocation (line, column));
+		}
+		
+		public void CenterTo (DocumentLocation p)
+		{
+			if (isDisposed || p.Line < 0 || p.Line >= Document.LineCount)
 				return;
 			SetAdjustments (this.Allocation);
 			//			Adjustment adj;
@@ -1182,13 +1212,13 @@ namespace Mono.TextEditor
 			}
 			
 			//	int yMargin = 1 * this.LineHeight;
-			int caretPosition = LineToVisualY (Caret.Line);
+			int caretPosition = LineToVisualY (p.Line);
 			this.textEditorData.VAdjustment.Value = caretPosition - this.textEditorData.VAdjustment.PageSize / 2;
 			
 			if (this.textEditorData.HAdjustment.Upper < Allocation.Width)  {
 				this.textEditorData.HAdjustment.Value = 0;
 			} else {
-				int caretX = textViewMargin.ColumnToVisualX (Document.GetLine (Caret.Line), Caret.Column);
+				int caretX = textViewMargin.ColumnToVisualX (Document.GetLine (p.Line), p.Column);
 				int textWith = Allocation.Width - textViewMargin.XOffset;
 				if (this.textEditorData.HAdjustment.Value > caretX) {
 					this.textEditorData.HAdjustment.Value = caretX;
@@ -1198,10 +1228,20 @@ namespace Mono.TextEditor
 				}
 			}
 		}
-		bool inCaretScroll = false;
-		public void ScrollToCaret ()
+
+		public void ScrollTo (int offset)
 		{
-			if (isDisposed || Caret.Line < 0 || Caret.Line >= Document.LineCount || inCaretScroll)
+			ScrollTo (Document.OffsetToLocation (offset));
+		}
+		
+		public void ScrollTo (int line, int column)
+		{
+			ScrollTo (new DocumentLocation (line, column));
+		}
+		
+		public void ScrollTo (DocumentLocation p)
+		{
+			if (isDisposed || p.Line < 0 || p.Line >= Document.LineCount || inCaretScroll)
 				return;
 			inCaretScroll = true;
 			try {
@@ -1209,7 +1249,7 @@ namespace Mono.TextEditor
 					this.textEditorData.VAdjustment.Value = 0;
 				} else {
 					int yMargin = 1 * this.LineHeight;
-					int caretPosition = LineToVisualY (Caret.Line);
+					int caretPosition = LineToVisualY (p.Line);
 					if (this.textEditorData.VAdjustment.Value > caretPosition) {
 						this.textEditorData.VAdjustment.Value = caretPosition;
 					} else if (this.textEditorData.VAdjustment.Value + this.textEditorData.VAdjustment.PageSize - this.LineHeight < caretPosition + yMargin) {
@@ -1220,7 +1260,7 @@ namespace Mono.TextEditor
 				if (this.textEditorData.HAdjustment.Upper < Allocation.Width)  {
 					this.textEditorData.HAdjustment.Value = 0;
 				} else {
-					int caretX = textViewMargin.ColumnToVisualX (Document.GetLine (Caret.Line), Caret.Column);
+					int caretX = textViewMargin.ColumnToVisualX (Document.GetLine (p.Line), p.Column);
 					int textWith = Allocation.Width - textViewMargin.XOffset;
 					if (this.textEditorData.HAdjustment.Value > caretX) {
 						this.textEditorData.HAdjustment.Value = caretX;
@@ -1232,6 +1272,12 @@ namespace Mono.TextEditor
 			} finally {
 				inCaretScroll = false;
 			}
+		}
+		
+		bool inCaretScroll = false;
+		public void ScrollToCaret ()
+		{
+			ScrollTo (Caret.Location);
 		}
 		
 		public void TryToResetHorizontalScrollPosition ()
@@ -1329,20 +1375,20 @@ namespace Mono.TextEditor
 			this.TextViewMargin.rulerX = Options.RulerColumn * this.TextViewMargin.CharWidth - (int)this.textEditorData.HAdjustment.Value;
 			int reminder  = (int)this.textEditorData.VAdjustment.Value % LineHeight;
 			int startLine = CalculateLineNumber (area.Top - reminder + (int)this.textEditorData.VAdjustment.Value);
-			
 			int startY = LineToVisualY (startLine);
 			if (area.Top == 0 && startY > 0) {
 				startLine--;
 				startY -= GetLineHeight (Document.GetLine (startLine));
 			}
+			
 			int curX = 0;
 			int curY = startY - (int)this.textEditorData.VAdjustment.Value;
 			bool setLongestLine = false;
 			bool renderFirstLine = true;
 			for (int visualLineNumber = startLine; ; visualLineNumber++) {
 				int logicalLineNumber = visualLineNumber;
-				int lineHeight        = GetLineHeight (logicalLineNumber);
-				LineSegment line = Document.GetLine (logicalLineNumber);
+				LineSegment line      = Document.GetLine (logicalLineNumber);
+				int lineHeight        = GetLineHeight (line);
 				int lastFold = -1;
 				foreach (FoldSegment fs in Document.GetStartFoldings (line).Where (fs => fs.IsFolded)) {
 					lastFold = System.Math.Max (fs.EndOffset, lastFold);
@@ -1375,6 +1421,13 @@ namespace Mono.TextEditor
 				curY += lineHeight;
 				if (curY > area.Bottom)
 					break;
+			}
+			
+			foreach (Margin margin in this.margins) {
+				if (!margin.IsVisible)
+					continue;
+				foreach (var drawer in margin.MarginDrawer)
+					drawer.Draw (win, area);
 			}
 			
 			if (setLongestLine) 
@@ -2515,7 +2568,6 @@ namespace Mono.TextEditor
 			}
 			
 			int visualLine = Document.LogicalToVisualLine (logicalLine);
-			
 			return visualLine * LineHeight + delta;
 		}
 		
@@ -2543,12 +2595,12 @@ namespace Mono.TextEditor
 				return;
 			int currentHeight = GetLineHeight (e.Line);
 			int h;
-			if (lineHeights.TryGetValue (e.Line.Offset, out h) && h != currentHeight) {
+			if (!lineHeights.TryGetValue (e.Line.Offset, out h))
+				h = TextViewMargin.LineHeight;
+			if (h != currentHeight)
 				textEditorData.Document.CommitLineToEndUpdate (textEditorData.Document.OffsetToLineNumber (e.Line.Offset));
-			}
 			lineHeights[e.Line.Offset] = currentHeight;
 		}
-		
 	}
 	
 	public interface ITextEditorDataProvider

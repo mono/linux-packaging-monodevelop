@@ -32,6 +32,8 @@ using System.Linq;
 using Gdk;
 using Gtk;
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Components.Commands;
+using MonoDevelop.Ide.Commands;
 
 
 namespace MonoDevelop.Ide
@@ -89,7 +91,7 @@ namespace MonoDevelop.Ide
 			}
 		}
 		
-		public DocumentSwitcher (Gtk.Window parent, bool startWithNext) : base(Gtk.WindowType.Toplevel)
+		public DocumentSwitcher (Gtk.Window parent, bool startWithNext) : base(Gtk.WindowType.Popup)
 		{
 			this.documents = new List<Document> (IdeApp.Workbench.Documents.OrderByDescending (d => d.LastTimeActive));
 			this.TransientFor = parent;
@@ -293,12 +295,14 @@ namespace MonoDevelop.Ide
 			}
 		}
 		
-		//FIXME: get ctrl(-shift)-tab keybindings from the Switch(Next|Previous)Document commands
+		//FIXME: get ctrl(-shift)-tab keybindings from the Switch(Next|Previous)Document commands?
 		protected override bool OnKeyPressEvent (Gdk.EventKey evnt)
 		{
-			bool next = (evnt.State & Gdk.ModifierType.ShiftMask) != ModifierType.ShiftMask;
-//			System.Console.WriteLine (evnt.Key + " -- " + evnt.State);
-			switch (evnt.Key) {
+			Gdk.Key key;
+			Gdk.ModifierType mod;
+			KeyBindingManager.MapRawKeys (evnt, out key, out mod);
+			
+			switch (key) {
 			case Gdk.Key.Left:
 				SwitchToPad ();
 				break;
@@ -306,26 +310,16 @@ namespace MonoDevelop.Ide
 				SwitchToDocument ();
 				break;
 			case Gdk.Key.Up:
-				if (documentFocus) {
-					SelectDocument (GetPrevDocument (SelectedDocument));
-				} else {
-					SelectPad (GetPrevPad (SelectedPad));
-				}
+				Previous ();
 				break;
 			case Gdk.Key.Down:
-				if (documentFocus) {
-					SelectDocument (GetNextDocument (SelectedDocument));
-				} else {
-					SelectPad (GetNextPad (SelectedPad));
-				}
+				Next ();
 				break;
-			case Gdk.Key.ISO_Left_Tab:
 			case Gdk.Key.Tab:
-				if (documentFocus) {
-					SelectDocument (next ? GetNextDocument (SelectedDocument) : GetPrevDocument (SelectedDocument));
-				} else  {
-					SelectPad (next ? GetNextPad (SelectedPad) : GetPrevPad (SelectedPad));
-				}
+				if ((mod & ModifierType.ShiftMask) == 0)
+					Next ();
+				else
+					Previous ();
 				break;
 			}
 			return true;
@@ -367,6 +361,23 @@ namespace MonoDevelop.Ide
 			this.GdkWindow.DrawRectangle (this.Style.ForegroundGC (StateType.Insensitive), false, 0, 0, winWidth-1, winHeight-1);
 			return false;
 		}
-
+		
+		void Next ()
+		{
+			if (documentFocus) {
+				SelectDocument (GetNextDocument (SelectedDocument));
+			} else {
+				SelectPad (GetNextPad (SelectedPad));
+			}
+		}
+		
+		void Previous ()
+		{
+			if (documentFocus) {
+				SelectDocument (GetPrevDocument (SelectedDocument));
+			} else {
+				SelectPad (GetPrevPad (SelectedPad));
+			}
+		}
 	}
 }

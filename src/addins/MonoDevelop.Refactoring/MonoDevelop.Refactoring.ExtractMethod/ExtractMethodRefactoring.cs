@@ -89,9 +89,7 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 				MessageService.ShowError (GettextCatalog.GetString ("Invalid selection for method extraction."));
 				return;
 			}
-			ExtractMethodDialog dialog = new ExtractMethodDialog (options, this, param);
-			dialog.TransientFor = IdeApp.Workbench.RootWindow;
-			dialog.Run ();
+			MessageService.ShowCustomDialog (new ExtractMethodDialog (options, this, param));
 		}
 		
 		public ExtractMethodParameters CreateParameters (RefactoringOptions options)
@@ -142,6 +140,11 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 			}
 			
 			public bool ReferencesMember {
+				get;
+				set;
+			}
+			
+			public InsertionPoint InsertionPoint {
 				get;
 				set;
 			}
@@ -282,12 +285,24 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 					if (resolveResult != null)
 						param.ExpressionType = resolveResult.ResolvedType;
 				}
+				
+				var startLocation = data.Document.OffsetToLocation (data.SelectionRange.Offset);
+				var endLocation = data.Document.OffsetToLocation (data.SelectionRange.EndOffset);
+//				Console.WriteLine ("startLocation={0}, endLocation={1}", startLocation, endLocation);
+				
 				foreach (VariableDescriptor varDescr in visitor.VariableList.Where (v => !v.IsDefined && v.InitialValueUsed)) {
+					if (startLocation <= varDescr.Location && varDescr.Location < endLocation)
+						continue;
+//					Console.WriteLine (varDescr.Location);
+//					Console.WriteLine (startLocation <= varDescr.Location);
+//					Console.WriteLine (varDescr.Location < endLocation);
 					param.Parameters.Add (varDescr);
 				}
 				param.Variables = new List<VariableDescriptor> (visitor.Variables.Values);
 				foreach (VariableDescriptor varDescr in visitor.VariableList.Where (v => !v.IsDefined && param.Variables.Contains (v))) {
 					if (param.Parameters.Contains (varDescr))
+						continue;
+					if (startLocation <= varDescr.Location && varDescr.Location < endLocation)
 						continue;
 					param.Parameters.Add (varDescr);
 				}
@@ -309,8 +324,21 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 				visitor.MemberLocation = new Location (param.DeclaringMember.Location.Column, param.DeclaringMember.Location.Line);
 				if (parsedNode != null)
 					parsedNode.AcceptVisitor (visitor, null);
-				param.VariablesOutside = visitor.Variables;
-				param.OutsideVariableList = visitor.VariableList;
+				
+				
+				param.VariablesOutside = new Dictionary<string, VariableDescriptor> ();
+				foreach (var pair in visitor.Variables) {
+					if (startLocation < pair.Value.Location || endLocation >= pair.Value.Location) {
+						param.VariablesOutside.Add (pair.Key, pair.Value);
+					}
+				}
+				param.OutsideVariableList = new List<VariableDescriptor> ();
+				foreach (var v in visitor.VariableList) {
+					if (startLocation < v.Location || endLocation >= v.Location)
+						param.OutsideVariableList.Add (v);
+				}
+				
+				
 				
 				param.ChangedVariablesUsedOutside = new List<VariableDescriptor> (param.Variables.Where (v => v.GetsChanged && param.VariablesOutside.ContainsKey (v.Name)));
 				param.OneChangedVariable = result is BlockStatement;
@@ -368,7 +396,6 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 			}
 			//	string mimeType = DesktopService.GetMimeTypeForUri (options.Document.FileName);
 			TypeReference returnType = new TypeReference ("System.Void", true);
-			
 			ICSharpCode.NRefactory.Ast.INode outputNode;
 			if (param.OneChangedVariable) {
 				string name = param.ChangedVariables.First ();
@@ -401,11 +428,12 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 			replacement.InsertedText = options.GetWhitespaces (options.Document.TextEditor.SelectionStartPosition) + provider.OutputNode (options.Dom, outputNode).Trim ();
 			
 			result.Add (replacement);
-			
+
 			TextReplaceChange insertNewMethod = new TextReplaceChange ();
 			insertNewMethod.FileName = options.Document.FileName;
 			insertNewMethod.Description = string.Format (GettextCatalog.GetString ("Create new method {0} from selected statement(s)"), param.Name);
-			insertNewMethod.Offset = options.Document.TextEditor.GetPositionFromLineColumn (param.DeclaringMember.BodyRegion.End.Line, param.DeclaringMember.BodyRegion.End.Column);
+			insertNewMethod.RemovedChars = param.InsertionPoint.LineBefore == NewLineInsertion.Eol ? 0 : param.InsertionPoint.Location.Column;
+			insertNewMethod.Offset = data.Document.LocationToOffset (param.InsertionPoint.Location) - insertNewMethod.RemovedChars;
 			
 			ExtractMethodAstTransformer transformer = new ExtractMethodAstTransformer (param.VariablesToGenerate);
 			node.AcceptVisitor (transformer, null);
@@ -460,9 +488,15 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 			
 			string indent = options.GetIndent (param.DeclaringMember);
 			StringBuilder methodText = new StringBuilder ();
-			methodText.AppendLine ();
-			methodText.Append (indent);
-			methodText.AppendLine ();
+			switch (param.InsertionPoint.LineBefore) {
+			case NewLineInsertion.Eol:
+				methodText.AppendLine ();
+				break;
+			case NewLineInsertion.BlankLine:
+				methodText.Append (indent);
+				methodText.AppendLine ();
+				break;
+			}
 			if (param.GenerateComment) {
 				methodText.Append (indent);
 				methodText.AppendLine ("/// <summary>");
@@ -490,15 +524,9 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 					methodText.AppendLine ("/// </returns>");
 				}
 			}
-			/*		foreach (VariableDescriptor var in variablesToOutput) {
-				TypeReference typeReference = options.ShortenTypeName (var.ReturnType).ConvertToTypeReference ();
-				ParameterDeclarationExpression pde = new ParameterDeclarationExpression (typeReference, var.Name);
-				if (!param.OneChangedVariable && param.ChangedVariables.Contains (var.Name))
-					pde.ParamModifier |= ICSharpCode.NRefactory.Ast.ParameterModifiers.Out;
-				methodDecl.Parameters.Add (pde);
-			}*/			
 			
 			methodText.Append (indent);
+			
 			if (node is BlockStatement) {
 				string text = provider.OutputNode (options.Dom, methodDecl, indent).Trim ();
 				int emptyStatementMarker = text.LastIndexOf (';');
@@ -514,6 +542,16 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 				methodText.Append (provider.OutputNode (options.Dom, methodDecl, options.GetIndent (param.DeclaringMember)).Trim ());
 			}
 			
+			switch (param.InsertionPoint.LineAfter) {
+			case NewLineInsertion.Eol:
+				methodText.AppendLine ();
+				break;
+			case NewLineInsertion.BlankLine:
+				methodText.AppendLine ();
+				methodText.AppendLine ();
+				methodText.Append (indent);
+				break;
+			}
 			insertNewMethod.InsertedText = methodText.ToString ();
 			result.Add (insertNewMethod);
 

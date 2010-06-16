@@ -348,15 +348,40 @@ namespace MonoDevelop.CSharp.Completion
 					return null;
 				}
 				return null;
+//			case '\n':
+//			case '\r': {
+//				if (stateTracker.Engine.IsInsideDocLineComment || stateTracker.Engine.IsInsideOrdinaryCommentOrString)
+//					return null;
+//				result = FindExpression (dom, completionContext);
+//				if (result == null)
+//					return null;
+//					
+//					
+//				int tokenIndex = completionContext.TriggerOffset;
+//				string token = GetPreviousToken (ref tokenIndex, false);
+//				if (result.ExpressionContext == ExpressionContext.ObjectInitializer) {
+//					if (token == "{" || token == ",")
+//						return CreateCtrlSpaceCompletionData (completionContext, result); 
+//				} 
+//				return null;
+//				}
 			case ' ':
 				if (stateTracker.Engine.IsInsideDocLineComment || stateTracker.Engine.IsInsideOrdinaryCommentOrString)
 					return null;
 				result = FindExpression (dom, completionContext);
 				if (result == null)
 					return null;
-				
+					
+					
 				int tokenIndex = completionContext.TriggerOffset;
 				string token = GetPreviousToken (ref tokenIndex, false);
+				if (result.ExpressionContext == ExpressionContext.ObjectInitializer) {
+					resolver = CreateResolver ();
+					ExpressionContext exactContext = new NewCSharpExpressionFinder (dom).FindExactContextForObjectInitializer (Editor, resolver.Unit, Document.FileName, resolver.CallingType);
+					IReturnType objectInitializer = ((ExpressionContext.TypeExpressionContext)exactContext).UnresolvedType;
+					if (objectInitializer != null && objectInitializer.ArrayDimensions == 0 && objectInitializer.PointerNestingLevel == 0 && (token == "{" || token == ","))
+						return CreateCtrlSpaceCompletionData (completionContext, result); 
+				}
 				if (token == "=") {
 					int j = tokenIndex;
 					string prevToken = GetPreviousToken (ref j, false);
@@ -534,7 +559,25 @@ namespace MonoDevelop.CSharp.Completion
 						result = FindExpression (dom, completionContext, -1);
 						if (result == null)
 							return null;
-						if (result.ExpressionContext != ExpressionContext.IdentifierExpected) {
+						if (IsInLinqContext (result)) {
+							tokenIndex = completionContext.TriggerOffset;
+							token = GetPreviousToken (ref tokenIndex, false); // token last typed
+							token = GetPreviousToken (ref tokenIndex, false); // possible linq keyword ?
+							triggerWordLength = 1;
+							
+							if (linqKeywords.Contains (token)) {
+								if (token == "from") // after from no auto code completion.
+									return null;
+								result.Expression = "";
+								return CreateCtrlSpaceCompletionData (completionContext, result);
+							}
+							CompletionDataList dataList = new ProjectDomCompletionDataList ();
+							CompletionDataCollector col = new CompletionDataCollector (dataList, Document.CompilationUnit, new DomLocation (completionContext.TriggerLine, completionContext.TriggerLineOffset));
+							foreach (string kw in linqKeywords) {
+								col.Add (kw, "md-keyword");
+							}
+							return dataList;
+						} else if (result.ExpressionContext != ExpressionContext.IdentifierExpected) {
 							triggerWordLength = 1;
 							bool autoSelect = true;
 							int cpos;
@@ -554,23 +597,6 @@ namespace MonoDevelop.CSharp.Completion
 							CompletionDataList dataList = CreateCtrlSpaceCompletionData (completionContext, result);
 							dataList.AutoSelect = autoSelect;
 							return dataList;
-						} else if (result.Contexts != null && result.Contexts.Any (ctx => ctx == ExpressionContext.LinqContext)) {
-							tokenIndex = completionContext.TriggerOffset;
-							token = GetPreviousToken (ref tokenIndex, false); // token last typed
-							token = GetPreviousToken (ref tokenIndex, false); // possible linq keyword ?
-							triggerWordLength = 1;
-							if (linqKeywords.Contains (token)) {
-								if (token == "from") // after from no auto code completion.
-									return null;
-								result.Expression = "";
-								return CreateCtrlSpaceCompletionData (completionContext, result);
-							}
-							CompletionDataList dataList = new ProjectDomCompletionDataList ();
-							CompletionDataCollector col = new CompletionDataCollector (dataList, Document.CompilationUnit, new DomLocation (completionContext.TriggerLine, completionContext.TriggerLineOffset));
-							foreach (string kw in linqKeywords) {
-								col.Add (kw, "md-keyword");
-							}
-							return dataList;
 						}
 					}
 				}
@@ -584,6 +610,59 @@ namespace MonoDevelop.CSharp.Completion
 			}
 			return null;
 		}
+		
+		public bool IsInLinqContext (ExpressionResult result)
+		{
+			if (result.Contexts == null)
+				return false;
+			var ctx = (ExpressionContext.LinqContext)result.Contexts.FirstOrDefault (c => c is ExpressionContext.LinqContext);
+			if (ctx == null)
+				return false;
+			int offset = this.textEditorData.Document.LocationToOffset (ctx.Line, ctx.Column);
+			return !GetTextWithoutCommentsAndStrings (this.textEditorData.Document, offset, textEditorData.Caret.Offset).Any (p => p.Key == ';');
+		}
+		
+		static IEnumerable<KeyValuePair <char, int>> GetTextWithoutCommentsAndStrings (Mono.TextEditor.Document doc, int start, int end) 
+		{
+			bool isInString = false, isInChar = false;
+			bool isInLineComment = false, isInBlockComment = false;
+			
+			for (int pos = start; pos < end; pos++) {
+				char ch = doc.GetCharAt (pos);
+				switch (ch) {
+					case '\r':
+					case '\n':
+						isInLineComment = false;
+						break;
+					case '/':
+						if (isInBlockComment) {
+							if (pos > 0 && doc.GetCharAt (pos - 1) == '*') 
+								isInBlockComment = false;
+						} else  if (!isInString && !isInChar && pos + 1 < doc.Length) {
+							char nextChar = doc.GetCharAt (pos + 1);
+							if (nextChar == '/')
+								isInLineComment = true;
+							if (!isInLineComment && nextChar == '*')
+								isInBlockComment = true;
+						}
+						break;
+					case '"':
+						if (!(isInChar || isInLineComment || isInBlockComment)) 
+							isInString = !isInString;
+						break;
+					case '\'':
+						if (!(isInString || isInLineComment || isInBlockComment)) 
+							isInChar = !isInChar;
+						break;
+					default :
+						if (!(isInString || isInChar || isInLineComment || isInBlockComment))
+							yield return new KeyValuePair<char, int> (ch, pos);
+						break;
+				}
+			}
+		}
+		
+		
 		
 		static string[] linqKeywords = new string[] { "from", "where", "select", "group", "into", "orderby", "join", "let", "in", "on", "equals", "by", "ascending", "descending" };
 		
@@ -1000,8 +1079,7 @@ namespace MonoDevelop.CSharp.Completion
 				}
 				return whereDataList;
 			}
-			
-			if (result.Contexts != null && result.Contexts.Any (ctx => ctx == ExpressionContext.LinqContext)) {
+			if (IsInLinqContext (result)) {
 				if (linqKeywords.Contains (word)) {
 					if (word == "from") // after from no auto code completion.
 						return null;
@@ -1094,7 +1172,7 @@ namespace MonoDevelop.CSharp.Completion
 				private set;
 			}
 			
-			Dictionary<string, MemberCompletionData> data = new Dictionary<string, MemberCompletionData> ();
+			Dictionary<string, List<MemberCompletionData>> data = new Dictionary<string, List<MemberCompletionData>> ();
 			HashSet<string> namespacesInScope = new HashSet<string> ();
 			internal static CSharpAmbience ambience = new CSharpAmbience ();
 		
@@ -1172,34 +1250,8 @@ namespace MonoDevelop.CSharp.Completion
 					
 					return true;
 				}
-				/*
-				public bool ProcessKey (CompletionListWindow window, Gdk.Key key, char keyChar, Gdk.ModifierType modifier, out KeyActions keyAction)
-				{
-					if (keyChar != '!') {
-						keyAction = KeyActions.None;
-						return false;
-					}
-					
-					keyAction = KeyActions.CloseWindow;
-					
-					CodeCompletionContext ctx = window.CodeCompletionContext;
-					int offset = ctx.TriggerOffset;
-					while (offset > 0) {
-						char ch = window.CompletionWidget.GetChar (offset);
-						if (ch != '.' && ch != '_' && !Char.IsLetterOrDigit (ch)) {
-							keyAction = KeyActions.CloseWindow | KeyActions.Ignore | KeyActions.Complete;
-							window.CompletionWidget.Replace (offset + 1, 0, "!");
-							ctx.TriggerOffset++;
-							ctx.TriggerLineOffset++;
-							break;
-						}
-						offset--;
-					}
-					
-					return true;
-				}*/
-				
 			}
+			
 			public CompletionDataCollector (CompletionDataList completionList, ICompilationUnit unit, DomLocation location)
 			{
 				this.CompletionList = completionList;
@@ -1277,14 +1329,27 @@ namespace MonoDevelop.CSharp.Completion
 				if (member is IMember) {
 					newData.CompletionCategory = GetCompletionCategory (((IMember)member).DeclaringType);
 				}
-				MemberCompletionData existingData;
+				List<MemberCompletionData> existingData;
 				if (data.TryGetValue (memberKey, out existingData)) {
 					if (existingData == null)
 						return null;
-					existingData.AddOverload (newData);
+					IBaseMember a = member as IBaseMember;
+					foreach (MemberCompletionData md in existingData) {
+						IBaseMember b = md.Member as IBaseMember;
+						if (a == null || b == null || a.MemberType == b.MemberType) {
+							md.AddOverload (newData);
+							newData = null;
+							break;
+						} 
+					}
+					if (newData != null) {
+						CompletionList.Add (newData);
+						data[memberKey].Add (newData);
+					}
 				} else {
 					CompletionList.Add (newData);
-					data [memberKey] = newData;
+					data[memberKey] = new List<MemberCompletionData> ();
+					data[memberKey].Add (newData);
 				}
 				return newData;
 			}
@@ -1704,7 +1769,13 @@ namespace MonoDevelop.CSharp.Completion
 				ExpressionContext exactContext = new NewCSharpExpressionFinder (dom).FindExactContextForObjectInitializer (Editor, resolver.Unit, Document.FileName, resolver.CallingType);
 				if (exactContext is ExpressionContext.TypeExpressionContext) {
 					IReturnType objectInitializer = ((ExpressionContext.TypeExpressionContext)exactContext).UnresolvedType;
-					
+					if (objectInitializer.ArrayDimensions > 0 || objectInitializer.PointerNestingLevel > 0) {
+						col.Add ("global", "md-keyword");
+						AddPrimitiveTypes (col);
+						resolver.AddAccessibleCodeCompletionData (expressionResult.ExpressionContext, col);
+						return result;
+					}
+						
 					IType foundType = resolver.SearchType (objectInitializer);
 					if (foundType == null)
 						foundType = dom.GetType (objectInitializer);

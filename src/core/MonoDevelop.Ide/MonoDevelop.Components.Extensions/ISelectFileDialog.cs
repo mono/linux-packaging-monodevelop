@@ -25,6 +25,10 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using MonoDevelop.Core;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Components.Extensions
 {
@@ -42,11 +46,35 @@ namespace MonoDevelop.Components.Extensions
 	/// </summary>
 	public class SelectFileDialogData: PlatformDialogData
 	{
+		List<SelectFileDialogFilter> filters = new List<SelectFileDialogFilter> ();
 		public Gtk.FileChooserAction Action { get; set; }
-		public string CurrentFolder { get; set; }
+		public IList<SelectFileDialogFilter> Filters { get { return filters; } }
+		public FilePath CurrentFolder { get; set; }
 		public bool SelectMultiple { get; set; }
-		public string[] SelectedFiles { get; set; }
+		public FilePath[] SelectedFiles { get; set; }
 		public string InitialFileName { get; set; }
+		public SelectFileDialogFilter DefaultFilter { get; set; }  
+	}	
+			
+	/// <summary>
+	/// Filter option to be displayed in file selector dialogs.
+	/// </summary>
+	public class SelectFileDialogFilter
+	{
+		public SelectFileDialogFilter (string name, params string[] patterns)
+		{
+			this.Name = name;
+			this.Patterns = patterns;
+		}
+		
+		/// <summary>Label for the filter</summary>
+		public string Name { get; private set; }
+		
+		/// <summary>Filename glob patterns permitted by this filter</summary>
+		public IList<string> Patterns { get; private set; }
+		
+		/// <summary>MIME types permitted by this filter</summary>
+		public IList<string> MimeTypes { get; private set; }
 	}
 	
 	/// <summary>
@@ -67,7 +95,7 @@ namespace MonoDevelop.Components.Extensions
 		/// <summary>
 		/// Folder to show by default.
 		/// </summary>
-		public string CurrentFolder {
+		public FilePath CurrentFolder {
 			get { return data.CurrentFolder; }
 			set { data.CurrentFolder = value; }
 		}
@@ -83,14 +111,14 @@ namespace MonoDevelop.Components.Extensions
 		/// <summary>
 		/// List of selected files (or folders).
 		/// </summary>
-		public string[] SelectedFiles {
+		public FilePath[] SelectedFiles {
 			get { return data.SelectedFiles; }
 		}
 		
 		/// <summary>
 		/// Selected file (or folder) when using single selection mode.
 		/// </summary>
-		public string SelectedFile {
+		public FilePath SelectedFile {
 			get { return data.SelectedFiles.Length > 0 ? data.SelectedFiles [0] : null; }
 		}
 		
@@ -103,21 +131,122 @@ namespace MonoDevelop.Components.Extensions
 		}
 		
 		/// <summary>
+		/// File filters that allow the user to choose the kinds of files the dialog displays.
+		/// </summary>
+		public IList<SelectFileDialogFilter> Filters {
+			get { return data.Filters; }
+		}
+		
+		/// <summary>
+		/// The default file filter. If there is only one, the user will not have a choice of file types.
+		/// </summary>
+		public SelectFileDialogFilter DefaultFilter {
+			get { return data.DefaultFilter; }
+			set { data.DefaultFilter = value; }
+		}
+		
+		#region File filter utilities
+				
+		public SelectFileDialogFilter AddFilter (string label, params string[] patterns)
+		{
+			return AddFilter (new SelectFileDialogFilter (label, patterns));
+		}
+		
+		public SelectFileDialogFilter AddFilter (SelectFileDialogFilter filter)
+		{
+			data.Filters.Add (filter);
+			return filter;
+		}
+		
+		public SelectFileDialogFilter AddAllFilesFilter ()
+		{
+			return AddFilter (GettextCatalog.GetString ("All Files"), "*");
+		}
+
+		void SetGtkFileFilters (FileSelector fdiag)
+		{
+			var list = new List<Gtk.FileFilter> ();
+			Gtk.FileFilter defaultGtkFilter = null;
+			
+			foreach (var filter in data.Filters) {
+				var gf = new Gtk.FileFilter ();
+				if (!string.IsNullOrEmpty (filter.Name))
+					gf.Name = filter.Name;
+				if (filter.Patterns != null)
+					foreach (var pattern in filter.Patterns)
+						gf.AddPattern (pattern);
+				if (filter.MimeTypes != null)
+					foreach (var mimetype in filter.MimeTypes)
+						gf.AddMimeType (mimetype);
+				list.Add (gf);
+				if (filter == DefaultFilter)
+					defaultGtkFilter = gf;
+			}
+			
+			foreach (var filter in list)
+				fdiag.AddFilter (filter);
+			
+			if (defaultGtkFilter != null)
+				fdiag.Filter = defaultGtkFilter;
+			
+			fdiag.Destroyed += CaptureDefaultFilter;
+		}
+
+		[GLib.ConnectBefore]
+		void CaptureDefaultFilter (object sender, EventArgs e)
+		{
+			
+		}
+		
+		#endregion
+		
+		/// <summary>
+		/// Utility method to populate a GTK FileSelector from the data properties.
+		/// </summary>
+		internal void SetDefaultProperties (FileSelector fdiag)
+		{
+			fdiag.Title = Title;
+			fdiag.Action = Action;
+			fdiag.LocalOnly = true;
+			fdiag.SelectMultiple = SelectMultiple;
+			fdiag.TransientFor = TransientFor;
+			
+			if (!CurrentFolder.IsNullOrEmpty)
+				fdiag.SetCurrentFolder (CurrentFolder);
+			if (!string.IsNullOrEmpty (InitialFileName))
+				fdiag.CurrentName = InitialFileName;
+			
+			if (!CurrentFolder.IsNullOrEmpty && !string.IsNullOrEmpty (InitialFileName)) {
+				var checkName = data.CurrentFolder.Combine (InitialFileName);
+				if (System.IO.File.Exists (checkName))
+					fdiag.SetFilename (checkName);
+			}
+			
+			SetGtkFileFilters (fdiag);
+		}
+		
+		internal void GetDefaultProperties (FileSelector fdiag)
+		{
+			data.SelectedFiles = fdiag.Filenames.ToFilePathArray ();
+			var currentFilter = fdiag.Filter;
+			if (currentFilter != null) {
+				var name = fdiag.Filter.Name;
+				var def = data.Filters.Where (f => f.Name == name).FirstOrDefault ();
+				if (def != null)
+					DefaultFilter = def;
+			}
+		}
+		
+		/// <summary>
 		/// Runs the default implementation of the dialog.
 		/// </summary>
 		protected bool RunDefault ()
 		{
-			FileSelector fdiag  = new FileSelector (data.Title, data.Action);
-			fdiag.SelectMultiple = data.SelectMultiple;
-			fdiag.TransientFor = data.TransientFor;
-            if (!string.IsNullOrEmpty(data.CurrentFolder))
-                fdiag.SetCurrentFolder(data.CurrentFolder);
-            if (!string.IsNullOrEmpty(data.InitialFileName))
-				fdiag.SetFilename (data.InitialFileName);
-			
+			var fdiag  = new FileSelector ();
+			SetDefaultProperties (fdiag);
 			try {
-				int result = fdiag.Run ();
-				data.SelectedFiles = fdiag.Filenames;
+				int result = MessageService.RunCustomDialog (fdiag, data.TransientFor ?? MessageService.RootWindow);
+				GetDefaultProperties (fdiag);
 				return result == (int) Gtk.ResponseType.Ok;
 			} finally {
 				fdiag.Destroy ();

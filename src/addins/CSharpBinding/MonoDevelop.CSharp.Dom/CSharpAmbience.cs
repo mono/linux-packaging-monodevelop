@@ -163,6 +163,10 @@ namespace MonoDevelop.CSharp.Dom
 				result.Append (GetString (property.ReturnType, settings));
 				result.Append (settings.Markup (" "));
 			}
+			if (!settings.IncludeReturnType && settings.UseFullName) {
+				result.Append (GetString (property.DeclaringType, OutputFlags.UseFullName));
+				result.Append (settings.Markup ("."));
+			}
 			AppendExplicitInterfaces(result, property, settings);
 			result.Append (settings.EmitName (property, Format (property.Name)));
 			if (settings.IncludeParameters && property.Parameters.Count > 0) {
@@ -211,6 +215,10 @@ namespace MonoDevelop.CSharp.Dom
 				result.Append (settings.Markup (" "));
 			}
 			
+			if (!settings.IncludeReturnType && settings.UseFullName) {
+				result.Append (GetString (field.DeclaringType, OutputFlags.UseFullName));
+				result.Append (settings.Markup ("."));
+			}
 			result.Append (settings.EmitName (field, Format (field.Name)));
 			
 			return result.ToString ();
@@ -279,8 +287,11 @@ namespace MonoDevelop.CSharp.Dom
 				result.Append (GetString (method.ReturnType, settings));
 				result.Append (settings.Markup (" "));
 			}
+			if (!settings.IncludeReturnType && settings.UseFullName) {
+				result.Append (GetString (method.DeclaringType, OutputFlags.UseFullName));
+				result.Append (settings.Markup ("."));
+			}
 			AppendExplicitInterfaces (result, method, settings);
-			
 			if (method.IsConstructor) {
 				result.Append (settings.EmitName (method, Format (method.DeclaringType.Name)));
 			} else if (method.IsFinalizer) {
@@ -380,8 +391,12 @@ namespace MonoDevelop.CSharp.Dom
 				foreach (IProperty property in type.Properties) {
 					result.AppendLine ();
 					result.Append ("\t");
-					result.Append (property.ReturnType.AcceptVisitor (this, settings));
-					result.Append (" ");
+					if (property.ReturnType != null && !string.IsNullOrEmpty (property.ReturnType.FullName)) {
+						result.Append (property.ReturnType.AcceptVisitor (this, settings));
+						result.Append (" ");
+					} else {
+						result.Append ("? ");
+					}
 					result.Append (property.Name);
 					result.Append (";");
 				}
@@ -551,6 +566,11 @@ namespace MonoDevelop.CSharp.Dom
 				result.Append (settings.Markup (" "));
 			}
 			
+			if (!settings.IncludeReturnType && settings.UseFullName) {
+				result.Append (GetString (evt.DeclaringType, OutputFlags.UseFullName));
+				result.Append (settings.Markup ("."));
+			}
+
 			AppendExplicitInterfaces(result, evt, settings);
 			result.Append (settings.EmitName (evt, Format (evt.Name)));
 			
