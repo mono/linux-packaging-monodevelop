@@ -18,6 +18,11 @@ monodevelop (2.3.1+dfsg-1) UNRELEASED; urgency=low
     + Build against older Mono.Addins, as per MonoDevelop Trunk
   * debian/rules:
     + Force XDG_CONFIG_HOME to allow keystores to work
+  * debian/patches/inject_Mono.Debugger.Soft_source.patch,
+    debian/patches/remove_support_for_moonlight.patch:
+    + MonoDevelop upstream has a nasty habit of bundling binary versions of
+      libraries. So we're now pulling in Mono.Debugger.Soft as source, from
+      Mono SVN revision r158545, and integrating it into the build system.
 
  -- Jo Shields <directhex@apebox.org>  Wed, 09 Jun 2010 15:17:58 +0100
 

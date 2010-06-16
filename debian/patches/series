@@ -1,4 +1,5 @@
 #stetic_widget_corruption_r144546.patch -p3
+inject_Mono.Debugger.Soft_source.patch
 reduce_Mono.Addins_requirement_to_0.4.patch
 link_system_nunit.patch
 use_libsvn1.patch
