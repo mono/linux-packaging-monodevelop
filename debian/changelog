@@ -14,8 +14,6 @@ monodevelop (2.4+dfsg-1) UNRELEASED; urgency=low
     debian/patches/use_csc.patch,
     debian/patches/remove_support_for_moonlight.patch:
     + Refreshed
-  * debian/patches/reduce_Mono.Addins_requirement_to_0.4.patch:
-    + Build against older Mono.Addins, as per MonoDevelop Trunk
   * debian/rules:
     + Force XDG_CONFIG_HOME to allow keystores to work
   * debian/patches/inject_Mono.Debugger.Soft_source.patch,
