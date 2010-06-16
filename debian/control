@@ -53,7 +53,9 @@ Suggests: monodevelop-boo,
           make,
           zip,
           gettext
-Recommends: mono-devel
+Recommends: mono-devel,
+            libgtk2.0-cil-dev,
+            libglade2.0-cil-dev
 Depends: ${shlibs:Depends},
          ${misc:Depends},
          ${cli:Depends},
