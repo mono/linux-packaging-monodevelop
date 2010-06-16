@@ -115,14 +115,14 @@ Description: VersionControl plugin for MonoDevelop
 # .
 # This package enables Moonlight developnment with MonoDevelop.
 
-#Package: monodevelop-debugger-sdb
-#Architecture: all
-#Depends: ${shlibs:Depends},
-#         ${misc:Depends},
-#         ${cli:Depends},
-#         monodevelop (= ${source:Version})
-#Description: Mono Soft Debugger plugin for MonoDevelop
-# MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
-# languages.
-# .
-# This package enables the Mono Soft Debugger integrationfor MonoDevelop.
+Package: monodevelop-debugger-sdb
+Architecture: all
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         ${cli:Depends},
+         monodevelop (= ${source:Version})
+Description: Mono Soft Debugger plugin for MonoDevelop
+ MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
+ languages.
+ .
+ This package enables the Mono Soft Debugger integrationfor MonoDevelop.
