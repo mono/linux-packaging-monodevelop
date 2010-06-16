@@ -122,7 +122,12 @@ namespace MonoDevelop.Ide.CodeCompletion
 			}
 			
 			if ((ka & KeyActions.Complete) != 0) {
-				CompleteWord ();
+				bool completed = CompleteWord ();
+				//NOTE: this passes the enter keystroke through to the editor if the current item is an exact match
+				//if (!completed) {
+				//	CompletionWindowManager.HideWindow ();
+				//	return false;
+				//}
 			}
 
 			if ((ka & KeyActions.CloseWindow) != 0)
@@ -209,7 +214,6 @@ namespace MonoDevelop.Ide.CodeCompletion
 					initialWordLength = 0;//completionWidget.SelectedLength;
 					ResetSizes ();
 					ShowAll ();
-					SetScrollbarVisibilty ();
 					UpdateWordSelection ();
 					
 					//if there is only one matching result we take it by default
@@ -231,7 +235,6 @@ namespace MonoDevelop.Ide.CodeCompletion
 				} else {
 					ResetSizes ();
 					ShowAll ();
-					SetScrollbarVisibilty ();
 				}
 				return true;
 			}
@@ -316,17 +319,22 @@ namespace MonoDevelop.Ide.CodeCompletion
 		}
 		
 		
-		public void CompleteWord ()
+		public bool CompleteWord ()
 		{
 			if (SelectionIndex == -1 || completionDataList == null)
-				return;
+				return false;
 			CompletionData item = completionDataList[SelectionIndex];
 			if (item == null)
-				return;
-			
+				return false;
+			if (item.CompletionText == CompletionData.GetCurrentWord (this)) {
+				AddWordToHistory (item.CompletionText);
+				OnWordCompleted (new CodeCompletionContextEventArgs (CompletionWidget, CodeCompletionContext, item.CompletionText));
+				return false;
+			}
 			item.InsertCompletionText (this);
 			AddWordToHistory (item.CompletionText);
 			OnWordCompleted (new CodeCompletionContextEventArgs (CompletionWidget, CodeCompletionContext, item.CompletionText));
+			return true;
 		}
 		
 		protected virtual void OnWordCompleted (CodeCompletionContextEventArgs e)
@@ -638,7 +646,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 			HideFooter ();
 			if (Visible) {
 				//don't reset the user-entered word when refilling the list
+				var tmp = this.List.AutoSelect;
 				Reset (false);
+				this.List.AutoSelect = tmp;
 				FillList ();
 				if (last != null )
 					SelectEntry (last);

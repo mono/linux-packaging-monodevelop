@@ -1,3 +1,114 @@
+2010-06-14  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.Core.csproj:
+	* MonoDevelop.Core.Assemblies/TargetRuntime.cs:
+	* MonoDevelop.Core.Execution/ExecutionEnvironment.cs:
+	* MonoDevelop.Core.Assemblies/TargetFrameworkBackend.cs:
+	* MonoDevelop.Projects.Formats.MD1/MD1DotNetProjectHandler.cs:
+	* MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs:
+	  Added ExecutionEnvironment class, which can be used to
+	  customize the environment of a process.
+
+2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Projects/Project.cs: Use a monitor task for the
+	  build so things get indented properly in the build output
+	  pad.
+
+2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Projects.CodeGeneration/CodeGenerator.cs: Use
+	  start & end offset for regions, not start + length.
+
+2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Projects.CodeGeneration/CodeGenerator.cs:
+	  CreateMemberImplementation now returns a
+	  CodeGeneratorMemberResult with body regions.
+
+	* MonoDevelop.Projects.Dom/IDomVisitor.cs:
+	* MonoDevelop.Projects.Dom/DomCecilCompilationUnit.cs: Fix
+	  spelling.
+
+2010-06-04  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Projects/DotNetProject.cs: Added option for
+	  setting a project to use an external console.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Text/Formatter.cs: Fixed 'Bug 611202 -
+	  Move line up/down command fails in aspx files'.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.CodeGeneration/CodeGenerator.cs: Code
+	  generator get's now used by code completion auto generation
+	  & insert code feature.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.CodeGeneration/CodeGenerator.cs: Worked
+	  on code generation.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.CodeGeneration/CodeGenerator.cs: Append
+	  new line between members.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.Core.csproj:
+	* MonoDevelop.Core.addin.xml:
+	* MonoDevelop.Projects.CodeGeneration/CodeGenerator.cs:
+	* MonoDevelop.Projects.CodeGeneration/MimeTypeExtensionNode.cs:
+	  Worked on code generation.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Dom/ResolveResult.cs: Fixed 'Bug 610203
+	  - Go to declaration on a method doesn't go to the correct
+	  overload'.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Dom/DomReturnType.cs:
+	* MonoDevelop.Projects.Dom/ResolveResult.cs: Fixed 'Bug 610006
+	  - Intellisense gives members of return type of functions
+	  even when that function isn't invoked'.
+
+2010-05-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Dom/CompilationUnit.cs: Fixed part of
+	  'Bug 609221 - Refactor->"Create Method" does not infer type
+	  for parameter from LINQ query'.
+
+2010-05-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Dom/ExpressionContext.cs: Changed linq
+	  context.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Dom.Parser/TypeResolverVisitor.cs:
+	  Fixed potential type lookup problem.
+
+2010-05-25  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Core.Assemblies/MonoRuntimeInfo.cs: Update
+	  runtime version parsing.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Dom/DomReturnType.cs: Addad check.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Core/FileService.cs: New ToFilePathArray
+	  extension method.
+
 2010-05-19  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.Projects.Dom/CompilationUnit.cs: fixed

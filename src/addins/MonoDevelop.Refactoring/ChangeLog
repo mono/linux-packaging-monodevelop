@@ -1,3 +1,168 @@
+2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Refactoring/OverridesImplementsDialog.cs:
+	* MonoDevelop.CodeGeneration/OverrideMembersGenerator.cs:
+	  Track API.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	  Improved parameter naming of created methods.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	  added null check.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/HelperMethods.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodRefactoring.cs:
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	  Create method now uses insertion cursor.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	  fixed null reference exception.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/HelperMethods.cs:
+	* MonoDevelop.CodeGeneration/ToStringGenerator.cs:
+	* MonoDevelop.CodeGeneration/PropertyGenerator.cs:
+	* MonoDevelop.CodeGeneration/NullCheckGenerator.cs:
+	* MonoDevelop.CodeGeneration/WriteLineGenerator.cs:
+	* MonoDevelop.Refactoring/EncapsulateFieldDialog.cs:
+	* MonoDevelop.CodeGeneration/AbstractGenerateAction.cs:
+	* MonoDevelop.Refactoring/OverridesImplementsDialog.cs:
+	* MonoDevelop.CodeGeneration/OverrideMembersGenerator.cs:
+	* MonoDevelop.CodeGeneration/EqualityMembersGenerator.cs:
+	* MonoDevelop.CodeGeneration/RaiseEventMethodGenerator.cs:
+	* MonoDevelop.CodeGeneration/CreateConstructorGenerator.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementImplicit.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementExplicit.cs:
+	  Code generator get's now used by code completion auto
+	  generation & insert code feature.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/RefactoryCommands.cs:
+	* MonoDevelop.Refactoring/EncapsulateFieldDialog.cs:
+	* MonoDevelop.Refactoring/OverridesImplementsDialog.cs: Worked
+	  on code generation.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/HelperMethods.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementImplicit.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementExplicit.cs:
+	  Extracted indent level calculation.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/HelperMethods.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementImplicit.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementExplicit.cs:
+	  Worked on refactoring - corrected interface formatting.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/EncapsulateFieldDialog.cs: fixed
+	  compilation error.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/HelperMethods.cs:
+	* MonoDevelop.Refactoring/RefactoryCommands.cs:
+	* MonoDevelop.Refactoring/EncapsulateFieldDialog.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodRefactoring.cs:
+	  Worked on insertioncursor edit mode.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/HelperMethods.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodDialog.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodRefactoring.cs:
+	  Worked on new member positioning.
+
+2010-05-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/HelperMethods.cs:
+	* MonoDevelop.Refactoring.Rename/RenameRefactoring.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodDialog.cs:
+	* MonoDevelop.Refactoring.ConvertPropery/CreateBackingStore.cs:
+	* MonoDevelop.Refactoring.DeclareLocal/DeclareLocalCodeGenerator.cs:
+	  Worked on refactoring.
+
+2010-05-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	  Fixed 'Bug 609221 - Refactor->"Create Method" does not infer
+	  type for parameter from LINQ query'.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	  handle null obj.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.ConvertPropery/CreateBackingStore.cs:
+	  Fixed 'Bug 609278 - Add backing store doesn't remove
+	  namespace from backing field'.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	  Fixed 'Bug 558372 - Code parser is interpreting classname as
+	  method name'.
+
+2010-05-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Refactoring/RefactoryCommands.cs: Use
+	  ShowCustomDialog (which destroys the dialog when done)
+	  instead of RunCustomDialog (which doesn't).
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.Refactoring.Rename/RenameItemDialog.cs:
+	* MonoDevelop.Refactoring.Rename/RenameRefactoring.cs:
+	* gtk-gui/MonoDevelop.Refactoring.EncapsulateFieldDialog.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodDialog.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodRefactoring.cs:
+	* MonoDevelop.Refactoring.IntroduceConstant/IntroduceConstantDialog.cs:
+	* MonoDevelop.Refactoring.IntroduceConstant/IntroduceConstantRefactoring.cs:
+	  Fixed 'Bug 607994 - Cancelling "Extract Method" dialog needs
+	  Esc to be hit twice' & centered refactoring dialogs on the
+	  mac.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.ExtractMethod/VariableLookupVisitor.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodRefactoring.cs:
+	  Fixed 'Bug 607990 - "Extract Method" refactoring sometimes
+	  tries to pass in unnecessary parameter depending on
+	  selection'
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.DeclareLocal/DeclareLocalCodeGenerator.cs:
+	  Fixed 'Bug 607984 - Over-zealous "Declare Local" refactoring
+	  renames within string'.
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Refactoring/RefactoryCommands.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodRefactoring.cs:
+	  More dialog placing.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* gtk-gui/MonoDevelop.Refactoring.EncapsulateFieldDialog.cs:
+	  Flush.
+
 2010-05-20  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.Refactoring.RefactorImports/FindTypeReferencesVisitor.cs:

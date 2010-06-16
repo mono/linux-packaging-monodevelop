@@ -34,33 +34,47 @@ namespace Mono.TextEditor
 	public abstract class EditMode
 	{
 		//NOTE: the behaviour of this class is actually stateless; these variables are used to make the API
-		// friendlier for implementors
+		// friendlier for subclassers of this class
 		TextEditorData textEditorData;
+		TextEditor editor;
 	//	string status;
 		
 		internal void InternalHandleKeypress (TextEditor editor, TextEditorData data, Gdk.Key key, 
 		                                      uint unicodeChar, Gdk.ModifierType modifier)
 		{
-			this.Editor = editor; 
+			this.editor = editor; 
 			this.textEditorData = data;
 			
 			HandleKeypress (key, unicodeChar, modifier);
 			
 			//make sure that nothing funny goes on when the mode should have finished
 			this.textEditorData = null;
-			this.Editor = null;
+			this.editor = null;
 		}
 		
 		internal virtual void InternalSelectionChanged (TextEditor editor, TextEditorData data)
 		{
 			// only trigger SelectionChanged when event is a result of external stimuli, i.e. when 
 			// not already running HandleKeypress
-			if (this.Editor == null) {
-				this.Editor = editor; 
+			if (this.editor == null) {
+				this.editor = editor; 
 				this.textEditorData = data;
 				SelectionChanged ();
 				this.textEditorData = null;
-				this.Editor = null;
+				this.editor = null;
+			}
+		}
+		
+		internal void InternalCaretPositionChanged (TextEditor editor, TextEditorData data)
+		{
+			// only trigger CaretPositionChanged when event is a result of external stimuli, i.e. when 
+			// not already running HandleKeypress
+			if (this.editor == null) {
+				this.editor = editor; 
+				this.textEditorData = data;
+				CaretPositionChanged ();
+				this.textEditorData = null;
+				this.editor = null;
 			}
 		}
 		
@@ -68,9 +82,13 @@ namespace Mono.TextEditor
 		{
 		}
 		
+		protected virtual void CaretPositionChanged ()
+		{
+		}
+		
 		protected Caret Caret { get { return textEditorData.Caret; } }
 		protected Document Document { get { return textEditorData.Document; } }
-		public TextEditor Editor { get; set;  }
+		protected TextEditor Editor { get { return editor; } }
 		protected TextEditorData Data { get { return textEditorData; } }
 		
 		protected abstract void HandleKeypress (Gdk.Key key, uint unicodeKey, Gdk.ModifierType modifier);
@@ -81,9 +99,11 @@ namespace Mono.TextEditor
 		
 		protected void InsertCharacter (uint unicodeKey)
 		{
-			if (!Editor.GetTextEditorData ().CanEdit (Data.Caret.Line))
+			if (!textEditorData.CanEdit (Data.Caret.Line))
 				return;
-			Editor.HideMouseCursor ();
+			
+			HideMouseCursor ();
+			
 			Document.BeginAtomicUndo ();
 			if (textEditorData.IsSomethingSelected && textEditorData.MainSelection.SelectionMode == SelectionMode.Block) {
 				textEditorData.Caret.PreserveSelection = true;
@@ -132,12 +152,28 @@ namespace Mono.TextEditor
 			Document.EndAtomicUndo ();
 			Document.OptimizeTypedUndo ();
 		}
-		public virtual void RemovedFromTextEditor ()
+		
+		internal void AddedToEditor (TextEditorData data)
+		{
+			OnAddedToEditor (data);
+		}
+		
+		protected virtual void OnAddedToEditor (TextEditorData data)
 		{
 		}
+		
+		internal void RemovedFromEditor (TextEditorData data)
+		{
+			OnRemovedFromEditor (data);
+		}
+		
+		protected virtual void OnRemovedFromEditor (TextEditorData data)
+		{
+		}
+		
 		protected void RunAction (Action<TextEditorData> action)
 		{
-			Editor.HideMouseCursor ();
+			HideMouseCursor ();
 			try {
 				Document.BeginAtomicUndo ();
 				action (this.textEditorData);
@@ -148,20 +184,23 @@ namespace Mono.TextEditor
 			}
 		}
 		
-		protected void RunActions (Action<TextEditorData> action1, Action<TextEditorData> action2)
+		protected void RunActions (params Action<TextEditorData>[] actions)
 		{
-			Editor.HideMouseCursor ();
+			HideMouseCursor ();
 			try {
 				Document.BeginAtomicUndo ();
-				action1 (this.textEditorData);
-				action2 (this.textEditorData);
+				foreach (var action in actions)
+					action (this.textEditorData);
 				Document.EndAtomicUndo ();
 			} catch (Exception e) {
-				Console.WriteLine ("Error while executing actions " + action1.ToString () + 
-				                   " & " + action2.ToString () + ": " + e);
+				var sb = new System.Text.StringBuilder ("Error while executing actions ");
+				foreach (var action in actions)
+					sb.AppendFormat (" {0}", action);
+				Console.WriteLine (sb.ToString () + ": " + e);
 			}
 		
 		}
+		
 		static Dictionary<Gdk.Key, Gdk.Key> keyMappings = new Dictionary<Gdk.Key, Gdk.Key> ();
 		static EditMode ()
 		{
@@ -192,5 +231,11 @@ namespace Mono.TextEditor
 			return GetKeyCode (key) | (int)(m << 16);
 		}
 		
+		protected void HideMouseCursor ()
+		{
+			//should only be null during tests
+			if (editor != null)
+				editor.HideMouseCursor ();
+		}
 	}
 }

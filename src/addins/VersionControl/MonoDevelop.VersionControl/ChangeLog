@@ -1,3 +1,47 @@
+2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.VersionControl/Task.cs: Don't bring the VCS
+	  monitor to the front.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Fixed 'Bug
+	  610257 - Text editor does not redraw after toggling
+	  annotations'.
+
+2010-06-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Fix bug
+	  #610262 - After hiding annotations they still refresh on
+	  save.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Added
+	  missing string to translation.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Fixed 'Bug
+	  610257 - Text editor does not redraw after toggling
+	  annotations'.
+
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl/CommitCommand.cs:
+	* MonoDevelop.VersionControl/PublishCommand.cs:
+	* MonoDevelop.VersionControl/CheckoutCommand.cs:
+	* MonoDevelop.VersionControl.Dialogs/SelectRepositoryDialog.cs:
+	  Fix incorrect use of ShowCustomDialog/RunCustomDialog.
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.VersionControl/CommitCommand.cs:
+	* MonoDevelop.VersionControl/PublishCommand.cs:
+	* MonoDevelop.VersionControl/CheckoutCommand.cs:
+	* MonoDevelop.VersionControl.Dialogs/SelectRepositoryDialog.cs:
+	  More dialog placing.
+
 2010-05-20  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Show a

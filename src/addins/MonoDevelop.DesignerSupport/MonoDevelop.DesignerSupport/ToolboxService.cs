@@ -125,14 +125,8 @@ namespace MonoDevelop.DesignerSupport
 		public void AddUserItems ()
 		{
 			ComponentSelectorDialog dlg = new ComponentSelectorDialog (currentConsumer);
-			try {
-				dlg.TransientFor = IdeApp.Workbench.RootWindow;
-				dlg.Fill ();
-				dlg.Run ();
-			}
-			finally {
-				dlg.Destroy ();
-			}
+			dlg.Fill ();
+			MessageService.ShowCustomDialog (dlg);
 		}
 		
 		void AddUserItems (IList<ItemToolboxNode> nodes)

@@ -1,7 +1,423 @@
+2010-06-14  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.TextEditor.Vi/ViKeyNotation.cs: Really fix the windows
+	  build.
+
+2010-06-14  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.TextEditor.Vi/ViKeyNotation.cs: Fix windows build.
+
+2010-06-14  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs:
+	* Mono.TextEditor/TextEditorData.cs: Fixed 'Bug 609674 -
+	  Selection changes on middle-click after selection'.
+
+2010-06-14  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/DeleteActions.cs: Fixed 'Bug 613770 -
+	  Backspace inconsistently deletes entire lines when using
+	  "virtual spaces"'.
+
+2010-06-12  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViKeyNotation.cs: Use explicit
+	  dictionaries instead of switches, to make code more
+	  readable.
+
+2010-06-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViKeyNotation.cs: Added vi key notation
+	  parsing and stringifying.
+
+	* Mono.TextEditor.Vi/ViCommandBuilder.cs: Added vi command
+	  builder stub.
+
+	* Makefile.am:
+	* Mono.TextEditor.csproj: Added files.
+
+2010-06-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs: Fix super for block
+	  select.
+
+2010-06-11  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs:
+	* Mono.TextEditor/CaretMoveActions.cs: Fixed 'Bug 612001 -
+	  "Virtual tab" line spacing is incorrect'.
+
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViActions.cs: Fix some buglets in the
+	  selection line pivoting.
+
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs: Fix mouse selection enabling
+	  visual mode.
+
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs:
+	* Mono.TextEditor.Vi/ViActions.cs: Fix the visual mode
+	  selection when pivoting around the anchor char and anchor
+	  line.
+
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViActions.cs: Fix line end text object.
+
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor/Document.cs: Add RemoveMarker overloads
+	  allowing to skip line updates.
+
+2010-06-10  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/Document.cs:
+	* Mono.TextEditor.Vi/ViMark.cs: Fixed 'Bug 613114 - NRE in
+	  editor means error marker never goes away'.
+
+2010-06-05  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Highlighting/SyntaxMode.cs: Fixed 'Bug
+	  611947 - XML highlighting broken'.
+
+2010-06-04  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor/TextEditorAccessibility.cs: Disabled
+	  accessibility (produces a compile error on linux - on mac it
+	  works - the Atk.ObjectFactory implementation differs between
+	  my two systems).
+
+2010-06-04  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* Mono.TextEditor.csproj:
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor/TextEditorAccessibility.cs: Worked on
+	  accessibility.
+
+2010-06-04  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs: atk impl. improvements
+
+2010-06-04  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs: Added accessibility support.
+
+2010-06-04  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Highlighting/SyntaxMode.cs:
+	* Mono.TextEditor.Highlighting/JaySyntaxMode.cs: Fixed syntax
+	  highlighting bug.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/InsertionCursorEditMode.cs: Don't start
+	  insertion cursor mode without insertion points.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs:
+	* Mono.TextEditor/SelectionActions.cs: Fixed virtual space
+	  drawing.
+
+2010-06-02  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViActions.cs: Fix navigation in visual
+	  mode.
+
+	* Mono.TextEditor/SelectionActions.cs: Fix pivot around origin
+	  for line selection actions.
+
+2010-06-02  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/InsertionCursorEditMode.cs: Corrected
+	  indenting of insertion.
+
+2010-06-01  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs: Fix tests.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor/InsertionCursorEditMode.cs: Worked on
+	  insertion cursor mode.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/InsertionCursorEditMode.cs: Worked on
+	  insertioncursoreditmode.
+
+2010-06-01  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs: Reset on external caret change
+	  if not in insert/replace mode.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs: Better handling of '*'.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs: Improve testability. Fix dd
+	  and cc behaviour.
+
+	* Mono.TextEditor/EditMode.cs: Made RunActions take params,
+	  not just two.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViActionMaps.cs: New EditObject map for
+	  'c' to use word start/end instead of word navigation
+	  boundaries.
+
+	* Mono.TextEditor/EmacsWordFindStrategy.cs:
+	* Mono.TextEditor.Vi/ViWordFindStrategy.cs:
+	* Mono.TextEditor/SharpDevelopWordFindStrategy.cs: Move code
+	  to abstract base class.
+
+	* Mono.TextEditor.Vi/ViActions.cs: Added WordStart and WordEnd
+	  move actions.
+
+	* Mono.TextEditor.Vi/ViMode.cs: Implemented '*'. Also, 'c'
+	  uses the EditObject map.
+
+	* Mono.TextEditor/TextEditorData.cs: Added FindCurrentWordEnd
+	  and FindCurrentWordStart methods that use the
+	  IWordFindStrategy.
+
+	* Mono.TextEditor/IWordFindStrategy.cs: New abstract base
+	  class. Added new FindCurrentWordEnd and FindCurrentWordStart
+	  methods to interface, with default implementation taken from
+	  TextViewMargin.
+
+	* Mono.TextEditor/TextViewMargin.cs: Use the WordFindStrategy
+	  for word selection.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViActions.cs: Fix possible exception.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs: Single-char offset should not
+	  move caret position.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs: Smart casing for searches. Fix
+	  'cw' insertion position.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs: Retreat from line end after x
+	  and on reset. Don't allow x to delete line delimiters.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViActionMaps.cs: Use vi up/down/end
+	  commands with arrow and end keys too.
+
+	* Mono.TextEditor.Vi/ViActions.cs: RetreatFromLineEnd now only
+	  retreats in caret is in block mode.
+
+	* Mono.TextEditor.Vi/ViMode.cs: Retreat after exiting insert
+	  mode. Retreat from line end after caret placed with mouse.
+	  Fix 'a' at line end.
+
+	* Mono.TextEditor/EditMode.cs:
+	* Mono.TextEditor/TextEditor.cs: Added a caret position change
+	  notification for edit modes.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/InsertionCursorEditMode.cs: Worked on
+	  insertion cursor mode.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs: added new scroll to overload.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViMode.cs: Use OnAdded/OnRemoved to
+	  change caret.
+
+	* Mono.TextEditor/TextEditorData.cs: Properly implement the
+	  mode OnAdded/OnRemoved calls.
+
+	* Mono.TextEditor/EditMode.cs: Don't access Editor unless
+	  necessary. Improves testability. Also properly implement the
+	  OnAdded/OnRemoved calls
+
+2010-05-30  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor/InsertionCursorEditMode.cs: Worked on
+	  insertion cursor mode.
+
+2010-05-29  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor/TextViewMargin.cs: Fixed 'Bug 610099 -
+	  Typing in lines with bubbles very slow'.
+
+2010-05-29  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs: Fixed 'Bug 610050 - Ruler
+	  position wrong in unselected text'.
+
+2010-05-29  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/DefaultEditActions.cs: Fixed 'Bug 610045 -
+	  Moving line with url alt-up/down leaves url markers'.
+
+2010-05-29  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs: Changed middle click
+	  paste.
+
+2010-05-28  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/Margin.cs:
+	* Mono.TextEditor/InsertionCursorEditMode.cs: Worked on
+	  insertion cursor edit mode.
+
+2010-05-28  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/Caret.cs:
+	* Mono.TextEditor/TextViewMargin.cs: Fixed 'Bug 609188 -
+	  Middle-click paste jumps to source location'.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Theatrics/SmartScrolledWindow.cs: Provided
+	  intptr constructor.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* Mono.TextEditor.csproj:
+	* Mono.TextEditor/Margin.cs:
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor/MarginDrawer.cs:
+	* Mono.TextEditor/DashedLineMargin.cs:
+	* Mono.TextEditor/InsertionCursorEditMode.cs: Worked on
+	  insertion cursor edit mode.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Theatrics/SmartScrolledWindow.cs: Destroy
+	  smart scrolled window children.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs: Corrected text coordinate
+	  translation.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/Document.cs:
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor/LineSegmentTree.cs: Correctly remove line
+	  markers when the line gets removed.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor/TextViewMargin.cs:
+	* Mono.TextEditor/ClipboardActions.cs: fixed 'Bug 609188 -
+	  Middle-click paste jumps to source location'/improved middle
+	  click paste behavior.-
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Theatrics/BounceFadePopupWindow.cs: Fix some
+	  properties and calculations.
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Theatrics/BounceFadePopupWindow.cs: Added
+	  some properties to control behaviour.
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Theatrics/BounceFadePopupWindow.cs: Fix some
+	  opacity calculations.
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* Mono.TextEditor.csproj:
+	* Mono.TextEditor.Theatrics/BounceFadePopupWindow.cs: New
+	  class extracted from MessageBubbleHighlightPopupWindow.
+	  Tooltip containing an image that "bounces" in size then
+	  fades away.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* Styles/IrBlackStyle.xml: Fixed 'Bug 608974 - [regression]
+	  IrBlack color scheme badly highlights warnings and errors'.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextMarker.cs:
+	* Mono.TextEditor/TextViewMargin.cs:
+	* Mono.TextEditor/TextLinkEditMode.cs: text markers can now
+	  override the selection drawing.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/CodeSegmentPreviewWindow.cs: Removed debug
+	  code.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/GutterMargin.cs:
+	* Mono.TextEditor/FoldMarkerMargin.cs: Fixed gutter drawing
+	  bug/made change marker smaller.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs: Ensure that the lineheight is
+	  up to date in the optionschanged event chain.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* Styles/OblivionStyle.xml:
+	* Styles/TangoLightStyle.xml:
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor/GutterMargin.cs:
+	* Mono.TextEditor/TextViewMargin.cs:
+	* Mono.TextEditor/DashedLineMargin.cs:
+	* Mono.TextEditor/FoldMarkerMargin.cs:
+	* Mono.TextEditor.Highlighting/Style.cs: Worked on text editor
+	  outfit.
+
 2010-05-25  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* Mono.TextEditor/PangoUtil.cs: Fix calling conventions for
 	  gtk/pango on Windows.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Theatrics/SmartScrolledWindow.cs: Did some
+	  minor changes at smartscrolledwindow.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs:
+	* Mono.TextEditor.Theatrics/SmartScrolledWindow.cs: Worked on
+	  scrolled window replacement.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/DocumentLocation.cs: fixed operator.
 
 2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
 

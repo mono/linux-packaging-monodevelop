@@ -40,6 +40,8 @@ using Document = Mono.TextEditor.Document;
 using Services = MonoDevelop.Projects.Services;
 using System.Threading;
 using MonoDevelop.Ide;
+using MonoDevelop.Components;
+using Mono.TextEditor.Theatrics;
 
 namespace MonoDevelop.SourceEditor
 {
@@ -47,7 +49,7 @@ namespace MonoDevelop.SourceEditor
 	class SourceEditorWidget : ITextEditorExtension
 	{
 		SourceEditorView view;
-		ScrolledWindow mainsw;
+		DecoratedScrolledWindow mainsw;
 
 		// We need a reference to TextEditorData to be able to access the
 		// editor document without getting the TextEditor property. This
@@ -179,14 +181,127 @@ namespace MonoDevelop.SourceEditor
 		}
 		#endregion
 		
-		void PrepareEvent (object sender, ButtonPressEventArgs args) 
-		{
-			args.RetVal = true;
-		}
-		
 		Gtk.VBox vbox = new Gtk.VBox ();
 		public Gtk.VBox Vbox {
 			get { return this.vbox; }
+		}
+		
+		public class Border : Gtk.DrawingArea
+		{
+			protected override bool OnExposeEvent (Gdk.EventExpose evnt)
+			{
+				evnt.Window.DrawRectangle (this.Style.DarkGC (State), true, evnt.Area);
+				return true;
+			}
+		}
+		
+		
+		class DecoratedScrolledWindow : VBox
+		{
+			SourceEditorWidget parent;
+			SmartScrolledWindow scrolledWindow;
+			
+			public Adjustment Hadjustment {
+				get {
+					return scrolledWindow.Hadjustment;
+				}
+			}
+			
+			public Adjustment Vadjustment {
+				get {
+					return scrolledWindow.Vadjustment;
+				}
+			}
+			
+			public DecoratedScrolledWindow (SourceEditorWidget parent)
+			{
+				this.parent = parent;
+				/*
+				Border border = new Border ();
+				border.HeightRequest = 1;
+				PackStart (border, false, true, 0);
+								 
+				HBox box = new HBox ();
+				
+				border = new Border ();
+				border.WidthRequest = 1;
+				box.PackStart (border, false, true, 0);
+				
+				scrolledWindow = new ScrolledWindow ();
+				scrolledWindow.BorderWidth = 0;
+				scrolledWindow.ShadowType = ShadowType.None;
+				scrolledWindow.ButtonPressEvent += PrepareEvent;
+				box.PackStart (scrolledWindow, true, true, 0);
+				
+				
+				border = new Border ();
+				border.WidthRequest = 1;
+				box.PackStart (border, false, true, 0);
+				
+				PackStart (box, true, true, 0);
+				
+				border = new Border ();
+				border.HeightRequest = 1;
+				PackStart (border, false, true, 0);*/
+				
+				scrolledWindow = new SmartScrolledWindow ();
+//				scrolledWindow.BorderWidth = 0;
+//				scrolledWindow.ShadowType = ShadowType.In;
+				scrolledWindow.ButtonPressEvent += PrepareEvent;
+				PackStart (scrolledWindow, true, true, 0);
+			}
+			
+			protected override void OnDestroyed ()
+			{
+				if (scrolledWindow.Child != null)
+					RemoveEvents ();
+				scrolledWindow.ButtonPressEvent -= PrepareEvent;
+				base.OnDestroyed ();
+			}
+			
+			void PrepareEvent (object sender, ButtonPressEventArgs args) 
+			{
+				args.RetVal = true;
+			}
+		
+			public void SetTextEditor (TextEditorContainer container)
+			{
+				scrolledWindow.Child = container;
+//				container.TextEditorWidget.EditorOptionsChanged += OptionsChanged;
+				container.TextEditorWidget.Caret.ModeChanged += parent.UpdateLineColOnEventHandler;
+				container.TextEditorWidget.Caret.PositionChanged += parent.CaretPositionChanged;
+				container.TextEditorWidget.SelectionChanged += parent.UpdateLineColOnEventHandler;
+			}
+			
+			void OptionsChanged (object sender, EventArgs e)
+			{
+				TextEditor editor = (TextEditor)sender;
+				scrolledWindow.ModifyBg (StateType.Normal, editor.ColorStyle.Default.BackgroundColor);
+			}
+			
+			void RemoveEvents ()
+			{
+				TextEditorContainer container = scrolledWindow.Child as TextEditorContainer;
+				if (container == null) {
+					LoggingService.LogError ("can't remove events from text editor container.");
+					return;
+				}
+//				container.TextEditorWidget.EditorOptionsChanged -= OptionsChanged;
+				container.TextEditorWidget.Caret.ModeChanged -= parent.UpdateLineColOnEventHandler;
+				container.TextEditorWidget.Caret.PositionChanged -= parent.CaretPositionChanged;
+				container.TextEditorWidget.SelectionChanged -= parent.UpdateLineColOnEventHandler;
+			}
+			
+			public TextEditorContainer RemoveTextEditor ()
+			{
+				TextEditorContainer child = scrolledWindow.Child as TextEditorContainer;
+				if (child == null)
+					return null;
+				RemoveEvents ();
+				scrolledWindow.Remove (child);
+				child.Unparent ();
+				return child;
+			}
 		}
 		
 		TextEditorContainer textEditorContainer;
@@ -195,23 +310,13 @@ namespace MonoDevelop.SourceEditor
 			this.view = view;
 			vbox.SetSizeRequest (32, 32);
 			this.lastActiveEditor = this.textEditor = new MonoDevelop.SourceEditor.ExtensibleTextEditor (view);
-			mainsw = new ScrolledWindow ();
-			mainsw.BorderWidth = 0;
-			mainsw.ShadowType = ShadowType.In;
+			mainsw = new DecoratedScrolledWindow (this);
 			this.textEditorContainer = new TextEditorContainer (textEditor);
-			mainsw.Child = textEditorContainer;
+			mainsw.SetTextEditor (textEditorContainer);
+			
 			vbox.PackStart (mainsw, true, true, 0);
-			this.mainsw.ButtonPressEvent += PrepareEvent;
 			this.textEditor.Errors = errors;
 			options = this.textEditor.Options;
-			
-			this.textEditor.Caret.ModeChanged += delegate {
-				this.UpdateLineCol ();
-			};
-			this.textEditor.Caret.PositionChanged += CaretPositionChanged;
-			this.textEditor.SelectionChanged += delegate {
-				this.UpdateLineCol ();
-			};
 			
 			textEditorData = textEditor.GetTextEditorData ();
 			ResetFocusChain ();
@@ -225,10 +330,9 @@ namespace MonoDevelop.SourceEditor
 				UpdateLineCol ();
 			};
 			vbox.Destroyed += delegate {
-						isDisposed = true;
+				isDisposed = true;
 				StopParseInfoThread ();
 				KillWidgets ();
-				mainsw.ButtonPressEvent -= PrepareEvent;
 				
 				this.textEditor = null;
 				this.lastActiveEditor = null;
@@ -239,6 +343,11 @@ namespace MonoDevelop.SourceEditor
 				IdeApp.Workbench.StatusBar.ClearCaretState ();
 			};
 			vbox.ShowAll ();
+		}
+
+		void UpdateLineColOnEventHandler (object sender, EventArgs e)
+		{
+			this.UpdateLineCol ();
 		}
 		
 		void ResetFocusChain ()
@@ -568,10 +677,13 @@ namespace MonoDevelop.SourceEditor
 			} else {
 				this.mainsw.Destroy ();
 				this.mainsw = secondsw;
+				
 				vadjustment = secondsw.Vadjustment.Value;
 				hadjustment = secondsw.Hadjustment.Value;
 				splitContainer.Remove (secondsw);
+				
 				lastActiveEditor = this.textEditor = splittedTextEditor;
+				
 				splittedTextEditor = null;
 			}
 			vbox.Remove (splitContainer);
@@ -593,8 +705,9 @@ namespace MonoDevelop.SourceEditor
 				this.splittedTextEditor.GrabFocus ();
 			}
 		}
-		ScrolledWindow secondsw;
+		DecoratedScrolledWindow secondsw;
 		TextEditorContainer splittedTextEditorContainer;
+		
 		
 		public void Split (bool vSplit)
 		{
@@ -616,21 +729,12 @@ namespace MonoDevelop.SourceEditor
 					Unsplit ();
 				}
 			};
-			secondsw = new ScrolledWindow ();
-			secondsw.ShadowType = ShadowType.In;
-			secondsw.ButtonPressEvent += PrepareEvent;
+			secondsw = new DecoratedScrolledWindow (this);
 			this.splittedTextEditor = new MonoDevelop.SourceEditor.ExtensibleTextEditor (view, this.textEditor.Options, textEditor.Document);
 			this.splittedTextEditor.Extension = textEditor.Extension;
-			this.splittedTextEditor.Caret.ModeChanged += delegate {
-				this.UpdateLineCol ();
-			};
-			this.splittedTextEditor.SelectionChanged += delegate {
-				this.UpdateLineCol ();
-			};
-			this.splittedTextEditor.Caret.PositionChanged += CaretPositionChanged;
 			
 			this.splittedTextEditorContainer = new TextEditorContainer (this.splittedTextEditor);
-			secondsw.Child = this.splittedTextEditorContainer;
+			secondsw.SetTextEditor (this.splittedTextEditorContainer);
 			splitContainer.Add2 (secondsw);
 			
 			vbox.PackStart (splitContainer, true, true, 0);
@@ -648,14 +752,11 @@ namespace MonoDevelop.SourceEditor
 			double vadjustment = this.mainsw.Vadjustment.Value;
 			double hadjustment = this.mainsw.Hadjustment.Value;
 			
-			this.mainsw.Remove (textEditorContainer);
-			textEditorContainer.Unparent ();
+			var removedTextEditor = this.mainsw.RemoveTextEditor ();
 			this.mainsw.Destroy ();
 			
-			this.mainsw = new ScrolledWindow ();
-			this.mainsw.ShadowType = ShadowType.In;
-			this.mainsw.ButtonPressEvent += PrepareEvent;
-			this.mainsw.Child = textEditorContainer;
+			this.mainsw = new DecoratedScrolledWindow (this);
+			this.mainsw.SetTextEditor (removedTextEditor);
 			this.mainsw.Vadjustment.Value = vadjustment; 
 			this.mainsw.Hadjustment.Value = hadjustment;
 		}
@@ -1098,6 +1199,8 @@ namespace MonoDevelop.SourceEditor
 			if (focus) {
 				TextEditor.GrabFocus ();
 			}
+			if (searchAndReplaceWidget != null)
+				TextEditor.CenterToCaret ();
 			if (result == null) {
 				IdeApp.Workbench.StatusBar.ShowError (GettextCatalog.GetString ("Search pattern not found"));
 			} else if (result.SearchWrapped) {
@@ -1121,6 +1224,8 @@ namespace MonoDevelop.SourceEditor
 			if (focus) {
 				TextEditor.GrabFocus ();
 			}
+			if (searchAndReplaceWidget != null)
+				TextEditor.CenterToCaret ();
 			if (result == null) {
 				IdeApp.Workbench.StatusBar.ShowError (GettextCatalog.GetString ("Search pattern not found"));
 			} else if (result.SearchWrapped) {
@@ -1445,9 +1550,7 @@ namespace MonoDevelop.SourceEditor
 		
 		public void RemoveFromLine (Mono.TextEditor.Document doc)
 		{
-			if (Line != null) {
-				doc.RemoveMarker (Line, marker);
-			}
+			doc.RemoveMarker (marker);
 		}
 	}
 }

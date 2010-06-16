@@ -38,6 +38,7 @@ using System.Collections.Generic;
 using MonoDevelop.CSharp.Dom;
 using MonoDevelop.Projects.CodeGeneration;
 using Mono.TextEditor;
+using MonoDevelop.CSharp.Refactoring;
 
 namespace MonoDevelop.CSharp.Completion
 {
@@ -46,20 +47,10 @@ namespace MonoDevelop.CSharp.Completion
 		TextEditorData editor;
 		IMember member;
 		static Ambience ambience = new CSharpAmbience ();
-		string indent;
-		int    initialOffset;
 		int    declarationBegin;
-		int    targetCaretPositon = -1;
-		int    selectionEndPositon = -1;
-		bool   insertPrivate;
-		bool   insertSealed;
 		IType  type;
-		ICompilationUnit unit;
-		IReturnType returnType;
-		public bool GenerateBody {
-			get;
-			set;
-		}
+		
+		public bool GenerateBody { get; set; }
 		
 		public NewOverrideCompletionData (ProjectDom dom, TextEditorData editor, int declarationBegin, IType type, IMember member) : base (null)
 		{
@@ -67,264 +58,48 @@ namespace MonoDevelop.CSharp.Completion
 			this.type   = type;
 			this.member = member;
 			
-			this.initialOffset = editor.Caret.Offset;
 			this.declarationBegin = declarationBegin;
-			this.unit = type.CompilationUnit;
 			this.GenerateBody = true;
-			string declarationText = editor.Document.GetTextBetween (declarationBegin, initialOffset);
-			insertPrivate = declarationText.Contains ("private");
-			insertSealed  = declarationText.Contains ("sealed");
-			
-			this.indent = editor.Document.GetLineIndent (editor.Caret.Line);
 			this.Icon = member.StockIcon;
 			this.DisplayText = ambience.GetString (member, OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics | OutputFlags.HideExtensionsParameter);
 			this.CompletionText = member.Name;
-			
-			ResolveReturnTypes ();
-		}
-
-		void ResolveReturnTypes ()
-		{
-			returnType = member.ReturnType;
-			foreach (IUsing u in unit.Usings) {
-				foreach (KeyValuePair<string, IReturnType> alias in u.Aliases) {
-					if (alias.Key == member.ReturnType.FullName) {
-						returnType = alias.Value;
-						return;
-					}
-				}
-			}
 		}
 		
 		public override void InsertCompletionText (CompletionListWindow window)
 		{
-			string mod = GetModifiers (member);
-			StringBuilder sb = new StringBuilder ();
-			if (insertPrivate && String.IsNullOrEmpty (mod)) {
-				sb.Append ("private ");
-			} else {
-				sb.Append (mod);
-			}
-
-			if (insertSealed)
-				sb.Append ("sealed ");
-
-			if (member.DeclaringType.ClassType != ClassType.Interface && (member.IsVirtual || member.IsAbstract))
-				sb.Append ("override ");
-
-			if (member is IMethod) {
-				InsertMethod (sb, member as IMethod);
-			} else if (member is IProperty) {
-				InsertProperty (sb, member as IProperty);
-			}
-			editor.Replace (declarationBegin, editor.Caret.Offset - declarationBegin, sb.ToString ());
-			if (selectionEndPositon >= 0) {
-				editor.Caret.Offset = selectionEndPositon;
-				editor.SetSelection (targetCaretPositon, selectionEndPositon);
-			} else {
-				editor.Caret.Offset = targetCaretPositon < 0 ? declarationBegin + sb.Length : targetCaretPositon;
-			}
-		}
-		
-		void GenerateMethodBody (StringBuilder sb, IMethod method)
-		{
-			sb.Append (this.indent);
-			sb.Append (SingleIndent);
-			if (method.Name == "ToString" && (method.Parameters == null || method.Parameters.Count == 0) && method.ReturnType != null && method.ReturnType.FullName == "System.String") {
-				sb.Append ("return string.Format(");
-				sb.Append ("\"[");
-				sb.Append (type.Name);
-				if (type.PropertyCount > 0) 
-					sb.Append (": ");
-				int i = 0;
-				foreach (IProperty property in type.Properties) {
-					if (property.IsStatic || !property.IsPublic)
-						continue;
-					if (i > 0)
-						sb.Append (", ");
-					sb.Append (property.Name);
-					sb.Append ("={");
-					sb.Append (i++);
-					sb.Append ("}");
-				}
-				sb.Append ("]\"");
-				foreach (IProperty property in type.Properties) {
-					if (property.IsStatic || !property.IsPublic)
-						continue;
-					sb.Append (", ");
-					sb.Append (property.Name);
-				}
-				sb.Append (");");
-				sb.AppendLine ();
-				return;
-			}
+			var generator = new CSharpCodeGenerator ();
+			var result = generator.CreateMemberImplementation (type, member, false);
+			string sb = result.Code.TrimStart ();
+			int trimStart = result.Code.Length - sb.Length;
+			sb = sb.TrimEnd ();
 			
-			if (BaseRefactorer.IsMonoTouchModelMember (method)) {
-				sb.Append ("// TODO: Implement - see: http://go-mono.com/docs/index.aspx?link=T%3aMonoTouch.Foundation.ModelAttribute");
-			} else if (!method.IsAbstract && method.DeclaringType.ClassType != ClassType.Interface) {
-				if (method.ReturnType != null && method.ReturnType.FullName != "System.Void")
-					sb.Append ("return ");
-				
-				sb.Append ("base.");
-				sb.Append (method.Name);
-				sb.Append (" (");
-				if (method.Parameters != null) {
-					for (int i = 0; i < method.Parameters.Count; i++) {
-						if (i > 0)
-							sb.Append (", ");
-							
-						// add parameter modifier
-						if (method.Parameters[i].IsOut) {
-							sb.Append ("out ");
-						} else if (method.Parameters[i].IsRef) {
-							sb.Append ("ref ");
-						}
-						
-						sb.Append (method.Parameters[i].Name);
+			var lastRegion = result.BodyRegions.LastOrDefault ();
+			var region = lastRegion == null? null
+				: new CodeGeneratorBodyRegion (lastRegion.StartOffset - trimStart, lastRegion.EndOffset - trimStart);
+			
+			int targetCaretPosition;
+			int selectionEndPosition = -1;
+			if (region != null && region.IsValid) {
+				targetCaretPosition = declarationBegin + region.StartOffset;
+				if (region.Length > 0) {
+					if (GenerateBody) {
+						selectionEndPosition = declarationBegin + region.EndOffset;
+					} else {
+						//FIXME: if there are multiple regions, remove all of them
+						sb = sb.Substring (0, region.StartOffset) + sb.Substring (region.EndOffset); 
 					}
 				}
-				sb.Append (");");
 			} else {
-				targetCaretPositon = declarationBegin + sb.Length;
-				sb.Append ("throw new System.NotImplementedException ();");
-				selectionEndPositon = declarationBegin + sb.Length;
-			} 
-			sb.AppendLine ();
-		}
-		
-		bool NamespaceImported (string namespaceName)
-		{
-			foreach (IUsing u in unit.Usings) {
-				if (!u.IsFromNamespace || u.Region.Contains (editor.Caret.Line, editor.Caret.Column)) {
-					foreach (string n in u.Namespaces) {
-						if (n == namespaceName)
-							return true;
-					}
-				}
+				targetCaretPosition = declarationBegin + sb.Length;
 			}
-			return false;
-		}
-		
-		void InsertMethod (StringBuilder sb, IMethod method)
-		{
-			if (returnType != null) {
-				sb.Append (ambience.GetString (unit.ShortenTypeName (returnType, editor.Caret.Line, editor.Caret.Column), OutputFlags.ClassBrowserEntries | OutputFlags.UseFullName));
-				sb.Append (" ");
-			}
-			sb.Append (method.Name);
-			sb.Append (" (");
-			OutputFlags flags = OutputFlags.ClassBrowserEntries | OutputFlags.IncludeParameterName | OutputFlags.IncludeModifiers | OutputFlags.IncludeKeywords;
-			for (int i = 0; i < method.Parameters.Count; i++) {
-				if (i > 0)
-					sb.Append (", ");
-				sb.Append (ambience.GetString (method.Parameters[i], NamespaceImported (method.Parameters[i].ReturnType.Namespace) ? flags : flags | OutputFlags.UseFullName));
-			}
-			sb.Append (")");
-			sb.AppendLine ();
-			sb.Append (this.indent);
-			sb.AppendLine ("{");
-			if (GenerateBody) {
-				GenerateMethodBody (sb, method);
+			
+			editor.Replace (declarationBegin, editor.Caret.Offset - declarationBegin, sb);
+			if (selectionEndPosition > 0) {
+				editor.Caret.Offset = selectionEndPosition;
+				editor.SetSelection (targetCaretPosition, selectionEndPosition);
 			} else {
-				sb.Append (this.indent);
-				sb.Append (SingleIndent);
-				targetCaretPositon = declarationBegin + sb.Length;
-				sb.AppendLine ();
+				editor.Caret.Offset = targetCaretPosition;
 			}
-			sb.Append (this.indent);
-			sb.Append ("}");
-			sb.AppendLine ();
-			sb.Append (indent);
-		}
-		
-		string SingleIndent {
-			get {
-				if (TextEditorProperties.ConvertTabsToSpaces) 
-					return new string (' ', TextEditorProperties.TabIndent);
-				return "\t";
-			}
-		}
-			
-		void GeneratePropertyBody (StringBuilder sb, IProperty property)
-		{
-			if (property.HasGet) {
-				sb.Append (this.indent);
-				sb.Append (SingleIndent);
-				sb.AppendLine ("get {");
-				sb.Append (this.indent);
-				sb.Append (SingleIndent);
-				sb.Append (SingleIndent);
-
-				if (BaseRefactorer.IsMonoTouchModelMember (property)) {
-					sb.Append ("// TODO: Implement - see: http://go-mono.com/docs/index.aspx?link=T%3aMonoTouch.Foundation.ModelAttribute");
-				} else if (!property.IsAbstract && property.DeclaringType.ClassType != ClassType.Interface) {
-					sb.Append ("return base.");
-					sb.Append (property.Name);
-					sb.Append (";");
-				} else {
-					targetCaretPositon = declarationBegin + sb.Length;
-					sb.Append ("throw new System.NotImplementedException ();");
-					selectionEndPositon = declarationBegin + sb.Length;
-				}
-				sb.AppendLine ();
-				sb.Append (this.indent);
-				sb.Append (SingleIndent);
-				sb.AppendLine ("}");
-			}
-			
-			if (property.HasSet) {
-				sb.Append (this.indent);
-				sb.Append (SingleIndent);
-				sb.AppendLine ("set {");
-				sb.Append (this.indent);
-				sb.Append (SingleIndent);
-				sb.Append (SingleIndent);
-				if (BaseRefactorer.IsMonoTouchModelMember (property)) {
-					sb.Append ("// TODO: Implement - see: http://go-mono.com/docs/index.aspx?link=T%3aMonoTouch.Foundation.ModelAttribute");
-				} else if (!property.IsAbstract && property.DeclaringType.ClassType != ClassType.Interface) {
-					sb.Append ("base.");
-					sb.Append (property.Name);
-					sb.AppendLine (" = value;");
-				} else {
-					sb.AppendLine ("throw new System.NotImplementedException ();");
-				}
-				sb.Append (this.indent);
-				sb.Append (SingleIndent);
-				sb.AppendLine ("}");
-			}
-		}
-		void InsertProperty (StringBuilder sb, IProperty property)
-		{
-			sb.Append (ambience.GetString (unit.ShortenTypeName (returnType, editor.Caret.Line, editor.Caret.Column), OutputFlags.ClassBrowserEntries | OutputFlags.UseFullName));
-			sb.Append (" ");
-			sb.Append (property.Name);
-			sb.AppendLine (" {");
-			if (GenerateBody)
-				GeneratePropertyBody (sb, property);
-			sb.Append (this.indent);
-			sb.Append ("}"); 
-			sb.AppendLine ();
-			sb.Append (indent);
-		}
-		
-		string GetModifiers (IMember member)
-		{
-			if (member.IsPublic || member.DeclaringType.ClassType == ClassType.Interface) 
-				return "public ";
-			if (member.IsPrivate) 
-				return "";
-				
-			if (member.IsProtectedAndInternal) 
-				return "protected internal ";
-			if (member.IsProtectedOrInternal && type.SourceProjectDom == member.DeclaringType.SourceProjectDom) 
-				return "internal protected ";
-			
-			if (member.IsProtected) 
-				return "protected ";
-			if (member.IsInternal) 
-				return "internal ";
-				
-			return "";
 		}
 	}
 }

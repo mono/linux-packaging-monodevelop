@@ -1,3 +1,44 @@
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* icons/debug-overlay-24.png:
+	* MonoDevelop.Debugger.csproj:
+	* MonoDevelop.Debugger.addin.xml: Fix icon composition
+	  warning.
+
+2010-06-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Debugger/DisassemblyView.cs: Track API changes.
+
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Debugger/DebuggingService.cs: Fix incorrect use
+	  of ShowCustomDialog/RunCustomDialog.
+
+2010-05-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Debugger/DebuggingService.cs: Use
+	  ShowCustomDialog (which destroys the dialog when done)
+	  instead of RunCustomDialog (which doesn't).
+
+2010-05-25  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Debugger/DebugCommands.cs: More dialog placement
+	  cleanup.
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Debugger/DebuggingService.cs: More dialog
+	  placing.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Debugger/DebugCommands.cs: Clean up dialog
+	  placement.
+
+	* gtk-gui/MonoDevelop.Debugger.BreakpointPropertiesDialog.cs:
+	  Flush.
+
 2010-05-20  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* MonoDevelop.Debugger/DebuggingService.cs:

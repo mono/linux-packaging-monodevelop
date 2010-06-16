@@ -88,7 +88,7 @@ namespace Mono.TextEditor
 			buffer = new GapBuffer ();
 			splitter = new LineSplitter (buffer);
 			splitter.LineSegmentTree.LineChanged += SplitterLineSegmentTreeLineChanged;
-			
+			splitter.LineSegmentTree.LineRemoved += HandleSplitterLineSegmentTreeLineRemoved;
 		/*	splitter.LineSegmentTree.LineInserted += delegate (object sender, LineEventArgs args) {
 				if (LineInserted != null) 
 					LineInserted (this, args);
@@ -232,8 +232,6 @@ namespace Mono.TextEditor
 		
 		protected virtual void OnTextReplaced (ReplaceEventArgs args)
 		{
-			extendingTextMarkers.RemoveAll (em => args.Offset <= em.LineSegment.Offset && em.LineSegment.EndOffset < args.Offset + args.Count);
-				
 			if (TextReplaced != null)
 				TextReplaced (this, args);
 		}
@@ -1193,14 +1191,14 @@ namespace Mono.TextEditor
 			return left.LineSegment.Offset.CompareTo (right.LineSegment.Offset);
 		}
 		
-		public void RemoveMarker (int lineNumber, TextMarker marker)
+		public void RemoveMarker (TextMarker marker)
 		{
-			RemoveMarker (this.GetLine (lineNumber), marker);
+			RemoveMarker (marker, true);
 		}
 		
-		public void RemoveMarker (LineSegment line, TextMarker marker)
+		public void RemoveMarker (TextMarker marker, bool updateLine)
 		{
-			if (line == null || marker == null)
+			if (marker == null || marker.LineSegment == null)
 				return;
 			if (marker is IExtendingTextMarker) {
 				lock (extendingTextMarkers) {
@@ -1208,8 +1206,10 @@ namespace Mono.TextEditor
 					extendingTextMarkers.Remove (marker);
 				}
 			}
-			line.RemoveMarker (marker);
-			this.CommitLineUpdate (line);
+			var line = marker.LineSegment;
+			marker.LineSegment.RemoveMarker (marker);
+			if (updateLine)
+				this.CommitLineUpdate (line);
 		}
 		
 		public void RemoveMarker (int lineNumber, Type type)
@@ -1218,6 +1218,11 @@ namespace Mono.TextEditor
 		}
 		
 		public void RemoveMarker (LineSegment line, Type type)
+		{
+			RemoveMarker (line, type, true);
+		}
+		
+		public void RemoveMarker (LineSegment line, Type type, bool updateLine)
 		{
 			if (line == null || type == null)
 				return;
@@ -1230,7 +1235,21 @@ namespace Mono.TextEditor
 				}
 			}
 			line.RemoveMarker (type);
-			this.CommitLineUpdate (line);
+			if (updateLine)
+				this.CommitLineUpdate (line);
+		}
+		
+		void HandleSplitterLineSegmentTreeLineRemoved (object sender, LineEventArgs e)
+		{
+			foreach (TextMarker marker in e.Line.Markers) {
+				if (marker is IExtendingTextMarker) {
+					lock (extendingTextMarkers) {
+						HeightChanged = true;
+						extendingTextMarkers.Remove (marker);
+					}
+					UnRegisterVirtualTextMarker ((IExtendingTextMarker)marker);
+				}
+			}
 		}
 		
 		public bool Contains (int offset)
@@ -1496,7 +1515,13 @@ namespace Mono.TextEditor
 				return result;
 			return null;
 		}
-
+		
+		/// <summary>
+		/// un register virtual text marker.
+		/// </summary>
+		/// <param name='marker'>
+		/// marker.
+		/// </param>
 		public void UnRegisterVirtualTextMarker (IExtendingTextMarker marker)
 		{
 			List<int> keys = new List<int> (from pair in virtualTextMarkers where pair.Value == marker select pair.Key);

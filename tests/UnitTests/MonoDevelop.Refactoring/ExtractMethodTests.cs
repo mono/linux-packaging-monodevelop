@@ -39,6 +39,7 @@ using MonoDevelop.Projects.Dom;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.CSharp.Resolver;
 using MonoDevelop.CSharp.Parser;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Refactoring.Tests
 {
@@ -93,7 +94,7 @@ namespace MonoDevelop.Refactoring.Tests
 			sev.CursorPosition = cursorPosition;
 			
 			tww.ViewContent = sev;
-			Document doc = new Document (tww);
+			var doc = new MonoDevelop.Ide.Gui.Document (tww);
 			
 			doc.ParsedDocument = new NRefactoryParser ().Parse (null, sev.ContentName, parsedText);
 			foreach (var e in doc.ParsedDocument.Errors)
@@ -179,8 +180,8 @@ namespace MonoDevelop.Refactoring.Tests
 			ExtractMethodRefactoring.ExtractMethodParameters parameters = refactoring.CreateParameters (options);
 			Assert.IsNotNull (parameters);
 			parameters.Name = "NewMethod";
+			parameters.InsertionPoint = new Mono.TextEditor.InsertionPoint (new DocumentLocation (options.ResolveResult.CallingMember.BodyRegion.End.Line, 0), NewLineInsertion.BlankLine, NewLineInsertion.None);
 			List<Change> changes = refactoring.PerformChanges (options, parameters);
-			
 			string output = GetOutput (options, changes);
 			Assert.IsTrue (CompareSource (output, outputString), "Expected:" + Environment.NewLine + outputString + Environment.NewLine + "was:" + Environment.NewLine + output);
 		}
@@ -338,6 +339,39 @@ namespace MonoDevelop.Refactoring.Tests
 }
 ");
 		}
+		
+		/// <summary>
+		/// Bug 607990 - "Extract Method" refactoring sometimes tries to pass in unnecessary parameter depending on selection
+		/// </summary>
+		[Test()]
+		public void TestBug607990 ()
+		{
+			TestExtractMethod (@"class TestClass
+{
+	void TestMethod ()
+	{
+		<-
+		Object obj1 = new Object();
+		obj1.ToString();
+		->
+	}
+}
+", @"class TestClass
+{
+	void TestMethod ()
+	{
+		NewMethod ();
+	}
+	
+	static void NewMethod ()
+	{
+		Object obj1 = new Object();
+		obj1.ToString();
+	}
+}
+");
+		}
+		
 		/* Currently not possible to implement, would cause serve bugs:
 		[Test()]
 		public void ExtractMethodMultiVariableWithLocalReturnVariableTest ()

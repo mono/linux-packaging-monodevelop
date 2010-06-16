@@ -1,3 +1,31 @@
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Gettext.addin.xml: Fix icon size names.
+
+2010-06-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* templates/TranslationProject.xpt.xml: Don't include the
+	  assembly name in the project type name since it doesn't work
+	  well when running on .NET
+
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Gettext/GettextFeatureWidget.cs:
+	* MonoDevelop.Gettext.NodeBuilders/TranslationProjectNodeBuilder.cs:
+	  Fix incorrect use of ShowCustomDialog/RunCustomDialog.
+
+2010-05-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Gettext.NodeBuilders/TranslationProjectNodeBuilder.cs:
+	  Use ShowCustomDialog (which destroys the dialog when done)
+	  instead of RunCustomDialog (which doesn't).
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Gettext/GettextFeatureWidget.cs:
+	* MonoDevelop.Gettext.NodeBuilders/TranslationProjectNodeBuilder.cs:
+	  More dialog placing.
+
 2010-04-29  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.Gettext.Editor/CatalogEditorView.cs: ViewContent

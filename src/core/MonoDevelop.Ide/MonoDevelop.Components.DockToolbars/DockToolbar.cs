@@ -190,6 +190,11 @@ namespace MonoDevelop.Components.DockToolbars
 			
 			gettingSize = true;
 			bool olda = ShowArrow;
+			int oldw = WidthRequest;
+			int oldh = HeightRequest;
+			WidthRequest = -1;
+			HeightRequest = -1;
+			
 			ShowArrow = false;
 			Requisition r = SizeRequest ();
 			if (Orientation == Orientation.Horizontal) {
@@ -211,6 +216,8 @@ namespace MonoDevelop.Components.DockToolbars
 					calculatedSizes [w] = w.Allocation.Height;
 			}
 			
+			WidthRequest = oldw;
+			HeightRequest = oldh;
 			ShowArrow = olda;
 			gotSize = true;
 			gettingSize = false;
@@ -261,7 +268,7 @@ namespace MonoDevelop.Components.DockToolbars
 			return base.OnButtonReleaseEvent (e);
 		}
 		
-		protected override bool OnExposeEvent (EventExpose evnt)
+/*		protected override bool OnExposeEvent (EventExpose evnt)
 		{
 			//use the base class to paint the background like a toolbar, which may be a gradient
 			// but only if horizontal, else the gradient usually looks really ugly
@@ -282,7 +289,7 @@ namespace MonoDevelop.Components.DockToolbars
             }
 		
 		    return true;
-		}
+		}*/
 		
 		bool firstRealized;
 		protected override void OnRealized ()

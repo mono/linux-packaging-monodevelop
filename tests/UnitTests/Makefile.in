@@ -216,6 +216,7 @@ FILES = \
 	Mono.TextEditor.Tests/SelectionTests.cs \
 	Mono.TextEditor.Tests/SyntaxHighlightingTests.cs \
 	Mono.TextEditor.Tests/UndoRedoTests.cs \
+	Mono.TextEditor.Tests/ViTests.cs \
 	MonoDevelop.AspNet/AspNetCompletionTests.cs \
 	MonoDevelop.AspNet/AspNetTesting.cs \
 	MonoDevelop.CSharpBinding/CodeCompletionAccessibleTests.cs \
@@ -255,6 +256,7 @@ FILES = \
 	MonoDevelop.Refactoring/CreateBackingStoreTests.cs \
 	MonoDevelop.Refactoring/DeclareLocalTests.cs \
 	MonoDevelop.Refactoring/ExtractMethodTests.cs \
+	MonoDevelop.Refactoring/GenerateNewMemberTests.cs \
 	MonoDevelop.Refactoring/IntegrateTemporaryVariableTests.cs \
 	MonoDevelop.Refactoring/IntroduceConstantRefactoringTests.cs \
 	MonoDevelop.Refactoring/IntroduceFormatItemRefactoringTests.cs \

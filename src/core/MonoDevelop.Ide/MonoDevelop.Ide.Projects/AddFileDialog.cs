@@ -42,6 +42,7 @@ namespace MonoDevelop.Ide.Projects
 		public AddFileDialog (string title)
 		{
 			Title = title;
+			Action = FileChooserAction.Open;
 			data.SelectMultiple = true;
 		}
 		
@@ -72,9 +73,6 @@ namespace MonoDevelop.Ide.Projects
 				return Handler.Run (data);
 			
 			FileSelector fdiag  = new FileSelector (data.Title);
-			fdiag.SetCurrentFolder (data.CurrentFolder);
-			fdiag.SelectMultiple = data.SelectMultiple;
-			fdiag.TransientFor = data.TransientFor;
 			
 			//add a combo that can be used to override the default build action
 			ComboBox combo = new ComboBox (data.BuildActions ?? new string[0]);
@@ -93,11 +91,13 @@ namespace MonoDevelop.Ide.Projects
 			box.PackStart (combo, false, false, 4);
 			box.ShowAll ();
 			
+			SetDefaultProperties (fdiag);
+			
 			int result;
 			
 			try {
-				result = fdiag.Run ();
-				data.SelectedFiles = fdiag.Filenames;
+				result = MessageService.RunCustomDialog (fdiag, data.TransientFor ?? MessageService.RootWindow);
+				GetDefaultProperties (fdiag);
 				if (check.Active)
 					data.OverrideAction = combo.ActiveText;
 				else

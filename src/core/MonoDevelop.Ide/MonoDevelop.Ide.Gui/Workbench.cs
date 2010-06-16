@@ -113,6 +113,7 @@ namespace MonoDevelop.Ide.Gui
 			workbench.Memento = memento;
 			Counters.Initialization.Trace ("Making Visible");
 			RootWindow.Visible = true;
+			workbench.CurrentLayout = "Default";
 			
 			// now we have an layout set notify it
 			Counters.Initialization.Trace ("Setting layout");
@@ -496,8 +497,8 @@ namespace MonoDevelop.Ide.Gui
 			try {
 				if (panelId != null)
 					ops.SelectPanel (panelId);
-				ops.TransientFor = RootWindow;
-				if (ops.Run () == (int) Gtk.ResponseType.Ok) {
+				
+				if (MessageService.RunCustomDialog (ops, parentWindow) == (int) Gtk.ResponseType.Ok) {
 					PropertyService.SaveProperties ();
 				}
 			} finally {
@@ -515,14 +516,13 @@ namespace MonoDevelop.Ide.Gui
 			if (parentWindow == null)
 				parentWindow = IdeApp.Workbench.RootWindow;
 
-			DefaultPolicyOptionsDialog ops
-				= new DefaultPolicyOptionsDialog (parentWindow);
+			var ops = new DefaultPolicyOptionsDialog (parentWindow);
 
 			try {
 				if (panelId != null)
 					ops.SelectPanel (panelId);
-				ops.TransientFor = RootWindow;
-				if (ops.Run () == (int) Gtk.ResponseType.Ok) {
+				
+				if (MessageService.RunCustomDialog (ops, parentWindow) == (int) Gtk.ResponseType.Ok) {
 					MonoDevelop.Projects.Policies.PolicyService.SaveDefaultPolicies ();
 				}
 			} finally {

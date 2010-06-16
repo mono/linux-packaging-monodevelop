@@ -56,10 +56,9 @@ namespace MonoDevelop.AspNet.Gui
 	{
 		AspNetParsedDocument aspDoc;
 		AspNetAppProject project;
-		DocumentReferenceManager refman = new DocumentReferenceManager ();
+		DocumentReferenceManager refman;
 		
 		bool HasDoc { get { return aspDoc != null; } }
-		bool HasProject { get { return project != null; } }
 		 
 		Regex DocTypeRegex = new Regex (@"(?:PUBLIC|public)\s+""(?<fpi>[^""]*)""\s+""(?<uri>[^""]*)""");
 		
@@ -76,86 +75,59 @@ namespace MonoDevelop.AspNet.Gui
 		{
 			base.OnParsedDocumentUpdated ();
 			aspDoc = CU as AspNetParsedDocument;
-			project = base.Document.Project as AspNetAppProject;
-			if (HasProject)
-				refman.Project = project;
+			
+			var newProj = (AspNetAppProject)base.Document.Project;
+			if (newProj == null)
+				throw new InvalidOperationException ("Document has no project");
+			
+			if (project != newProj) {
+				project = newProj;
+				refman = new DocumentReferenceManager (project);
+			}
+			
 			if (HasDoc)
 				refman.Doc = aspDoc;
+			
+			documentBuilder = HasDoc? LanguageCompletionBuilderService.GetBuilder (aspDoc.Info.Language) : null;
+			
+			if (documentBuilder != null) {
+				var usings = refman.GetUsings ();
+				documentInfo = new DocumentInfo (aspDoc, usings, refman.GetDoms ());
+				documentInfo.ParsedDocument = documentBuilder.BuildDocument (documentInfo, TextEditorData);
+				documentInfo.CodeBesideClass = CreateCodeBesideClass (documentInfo, refman);
+			}
 		}
 		
-		/// <summary>
-		/// This wraps a project dom and adds the compilation information from the ASP.NET page to the DOM to lookup members
-		/// on the page.
-		/// </summary>
-		class DomWrapper : ProjectDomDecorator
+		static IType CreateCodeBesideClass (DocumentInfo info, DocumentReferenceManager refman)
 		{
-			ParsedDocument doc, localDoc;
-			
-			public DomWrapper (ProjectDom decorated, ParsedDocument doc, ParsedDocument localDoc) : base (decorated)
-			{
-				this.doc = doc;
-				this.localDoc = localDoc;
-			}
-			IType constructedType = null;
-			MonoDevelop.Projects.Dom.IType CheckType (MonoDevelop.Projects.Dom.IType type)
-			{
-				if (type == null)
-					return null;
-				if (type.IsPartial && doc.CompilationUnit.Types[0].FullName == type.FullName) {
-					if (constructedType == null) 
-						constructedType = CompoundType.Merge (CompoundType.Merge (doc.CompilationUnit.Types[0], type), localDoc.CompilationUnit.Types[0]);
-					constructedType.SourceProjectDom = this;
-					return constructedType;
-				}
-				return type;
-			}
-			
-			public override IType ResolveType (IType type)
-			{
-				if (type == constructedType)
-					return type;
-				return CheckType (base.ResolveType (type));
-			}
-			
-			public override MonoDevelop.Projects.Dom.IType GetType (IReturnType returnType)
-			{
-				return CheckType (base.GetType (returnType));
-			}
-
-			public override MonoDevelop.Projects.Dom.IType GetType (string typeName, IList<IReturnType> genericArguments, bool deepSearchReferences, bool caseSensitive)
-			{
-				return CheckType (base.GetType (typeName, genericArguments, deepSearchReferences, caseSensitive));
-			}
-
-			public override MonoDevelop.Projects.Dom.IType GetType (string typeName, int genericArgumentsCount, bool deepSearchReferences, bool caseSensitive)
-			{
-				return CheckType (base.GetType (typeName, genericArgumentsCount, deepSearchReferences, caseSensitive));
-			}
-			
-			public override System.Collections.Generic.IEnumerable<MonoDevelop.Projects.Dom.IType> GetInheritanceTree (IType type)
-			{
-				foreach (IType t in base.GetInheritanceTree (type)) {
-					yield return CheckType (t);
-				}
-			}
+			var v = new MemberListVisitor (info.AspNetDocument, refman);
+			info.AspNetDocument.RootNode.AcceptVisit (v);
+			var t = new DomType (info.ClassName);
+			t.CompilationUnit = new CompilationUnit (info.AspNetDocument.FileName);
+			var dom = refman.TypeCtx.ProjectDom;
+			var baseType = dom.GetType (info.BaseType);
+			foreach (var m in CodeBehind.GetDesignerMembers (v.Members.Values, baseType, null, dom, null))
+				t.Add (new DomField (m.Name, Modifiers.Protected, m.Location, new DomReturnType (m.Type)));
+			return t;
 		}
 		
 		ILanguageCompletionBuilder documentBuilder;
 		MonoDevelop.Ide.Gui.Document hiddenDocument;
 		LocalDocumentInfo localDocumentInfo;
+		DocumentInfo documentInfo;
+		
 		
 		protected override ICompletionDataList HandleCodeCompletion (CodeCompletionContext completionContext,
 		                                                            bool forced, ref int triggerWordLength)
 		{
 			ITextBuffer buf = this.Buffer;
-			
 			// completionChar may be a space even if the current char isn't, when ctrl-space is fired t
 			char currentChar = completionContext.TriggerOffset < 1? ' ' : buf.GetCharAt (completionContext.TriggerOffset - 1);
 			//char previousChar = completionContext.TriggerOffset < 2? ' ' : buf.GetCharAt (completionContext.TriggerOffset - 2);
 			
 			//directive names
 			if (Tracker.Engine.CurrentState is AspNetDirectiveState) {
-				AspNetDirective directive = Tracker.Engine.Nodes.Peek () as AspNetDirective;
+				var directive = Tracker.Engine.Nodes.Peek () as AspNetDirective;
 				if (HasDoc && directive != null && directive.Region.Start.Line == completionContext.TriggerLine &&
 				    directive.Region.Start.Column + 4 == completionContext.TriggerLineOffset)
 				{
@@ -163,7 +135,7 @@ namespace MonoDevelop.AspNet.Gui
 				}
 				return null;
 			} else if (Tracker.Engine.CurrentState is S.XmlNameState && Tracker.Engine.CurrentState.Parent is AspNetDirectiveState) {
-				AspNetDirective directive = Tracker.Engine.Nodes.Peek () as AspNetDirective;
+				var directive = Tracker.Engine.Nodes.Peek () as AspNetDirective;
 				if (HasDoc && directive != null && directive.Region.Start.Line == completionContext.TriggerLine &&
 				    directive.Region.Start.Column + 5 == completionContext.TriggerLineOffset && char.IsLetter (currentChar))
 				{
@@ -172,14 +144,16 @@ namespace MonoDevelop.AspNet.Gui
 				}
 				return null;
 			}
-
+			
+			bool isAspExprState =  Tracker.Engine.CurrentState is AspNetExpressionState;
+			
 			//non-xml tag completion
-			if (currentChar == '<' && !(Tracker.Engine.CurrentState is S.XmlFreeState)) {
+			if (currentChar == '<' && !(isAspExprState || Tracker.Engine.CurrentState is S.XmlFreeState)) {
 				var list = new CompletionDataList ();
 				AddAspBeginExpressions (list);
 				return list;
 			}
-
+			
 			if (!HasDoc || aspDoc.Info.DocType == null) {
 				//FIXME: get doctype from master page
 				DocType = null;
@@ -190,49 +164,95 @@ namespace MonoDevelop.AspNet.Gui
 				DocType.Uri = matches.Groups["uri"].Value;
 			}
 			
-			//simple completion for ASP.NET expressions
-			documentBuilder = HasDoc? LanguageCompletionBuilderService.GetBuilder (aspDoc.Info.Language) : null;
+			//completion for ASP.NET expressions
+			if (documentBuilder != null && isAspExprState) {
+				InitializeCodeCompletion ();
+				return documentBuilder.HandleCompletion (hiddenDocument, documentInfo, localDocumentInfo, 
+					 new AspProjectDomWrapper (documentInfo), currentChar, ref triggerWordLength);
+			}
 			
-			// TODO: Detect <script> state here !!!
-			if (documentBuilder != null && Tracker.Engine.CurrentState is AspNetExpressionState) {
-				int start = Document.TextEditor.CursorPosition - Tracker.Engine.CurrentStateLength;
-				if (Document.TextEditor.GetCharAt (start) == '=') {
-					start++;
+			if (Tracker.Engine.CurrentState is HtmlScriptBodyState) {
+				var el = Tracker.Engine.Nodes.Peek () as S.XElement;
+				if (el != null) {
+					var att = GetHtmlAtt (el, "runat");
+					if (att != null && "server".Equals (att.Value, StringComparison.OrdinalIgnoreCase)) {
+						if (documentBuilder != null) {
+							// TODO: C# completion
+						}
+					}
+					/*
+					else {
+						att = GetHtmlAtt (el, "language");
+						if (att == null || "javascript".Equals (att.Value, StringComparison.OrdinalIgnoreCase)) {
+						    att = GetHtmlAtt (el, "type");
+							if (att == null || "text/javascript".Equals (att.Value, StringComparison.OrdinalIgnoreCase)) {
+								// TODO: JS completion
+							}
+						}
+					}*/
 				}
 				
-				string sourceText = Document.TextEditor.GetText (start, Document.TextEditor.CursorPosition);
-
-				MonoDevelop.AspNet.Parser.Internal.Location loc = new MonoDevelop.AspNet.Parser.Internal.Location ();
-				int line, col;
- 				Document.TextEditor.GetLineColumnFromPosition (start, out line, out col);
-				loc.EndLine = loc.BeginLine = line;
-				loc.EndColumn = loc.BeginColumn = col;
-				
-				var documentInfo = documentBuilder.BuildDocument (aspDoc, TextEditorData);
-				
-				localDocumentInfo = documentBuilder.BuildLocalDocument (documentInfo, TextEditorData, sourceText, true);
-				
-				MonoDevelop.Ide.Gui.HiddenTextEditorViewContent viewContent = new MonoDevelop.Ide.Gui.HiddenTextEditorViewContent ();
-				viewContent.Project = Document.Project;
-				viewContent.ContentName = localDocumentInfo.ParsedLocalDocument.FileName;
-				
-				viewContent.Text = localDocumentInfo.LocalDocument;
-				viewContent.GetTextEditorData ().Caret.Offset = localDocumentInfo.CaretPosition;
-				MonoDevelop.Ide.Gui.HiddenWorkbenchWindow workbenchWindow = new MonoDevelop.Ide.Gui.HiddenWorkbenchWindow ();
-				workbenchWindow.ViewContent = viewContent;
-				hiddenDocument = new MonoDevelop.Ide.Gui.Document (workbenchWindow);
-				
-				hiddenDocument.ParsedDocument = localDocumentInfo.ParsedLocalDocument;
-				return documentBuilder.HandleCompletion (hiddenDocument, localDocumentInfo, new DomWrapper (ProjectDomService.GetProjectDom (Document.Project), documentInfo.ParsedDocument, localDocumentInfo.ParsedLocalDocument), currentChar, ref triggerWordLength);
 			}
 			
 			return base.HandleCodeCompletion (completionContext, forced, ref triggerWordLength);
 		}
 		
+		//case insensitive, no prefix
+		static S.XAttribute GetHtmlAtt (S.XElement el, string name)
+		{
+			return el.Attributes
+				.Where (a => a.IsNamed && !a.Name.HasPrefix && a.Name.Name.Equals (name, StringComparison.OrdinalIgnoreCase))
+				.FirstOrDefault ();
+		}
+		
+		public void InitializeCodeCompletion ()
+		{
+			int caretOffset = Document.TextEditorData.Caret.Offset;
+			int start = caretOffset - Tracker.Engine.CurrentStateLength;
+			if (Document.TextEditor.GetCharAt (start) == '=') 
+				start++;
+			
+			string sourceText = Document.TextEditor.GetText (start, caretOffset);
+			string textAfterCaret = Document.TextEditor.GetText (caretOffset, Tracker.Engine.Position + Tracker.Engine.CurrentStateLength - start);
+			
+			var loc = new MonoDevelop.AspNet.Parser.Internal.Location ();
+			var docLoc = Document.TextEditorData.Document.OffsetToLocation (start);
+			loc.EndLine = loc.BeginLine = docLoc.Line;
+			loc.EndColumn = loc.BeginColumn = docLoc.Column;
+			
+			localDocumentInfo = documentBuilder.BuildLocalDocument (documentInfo, TextEditorData, sourceText, textAfterCaret, true);
+			
+			var viewContent = new MonoDevelop.Ide.Gui.HiddenTextEditorViewContent ();
+			viewContent.Project = Document.Project;
+			viewContent.ContentName = localDocumentInfo.ParsedLocalDocument.FileName;
+			
+			viewContent.Text = localDocumentInfo.LocalDocument;
+			viewContent.GetTextEditorData ().Caret.Offset = localDocumentInfo.CaretPosition;
+
+			var workbenchWindow = new MonoDevelop.Ide.Gui.HiddenWorkbenchWindow ();
+			workbenchWindow.ViewContent = viewContent;
+			hiddenDocument = new MonoDevelop.Ide.Gui.Document (workbenchWindow);
+			
+			hiddenDocument.ParsedDocument = localDocumentInfo.ParsedLocalDocument;
+		}
+		
+		
+		public override ICompletionDataList CodeCompletionCommand (CodeCompletionContext completionContext)
+		{
+			//completion for ASP.NET expressions
+			// TODO: Detect <script> state here !!!
+			if (documentBuilder != null && Tracker.Engine.CurrentState is AspNetExpressionState) {
+				InitializeCodeCompletion ();
+				return documentBuilder.HandlePopupCompletion (hiddenDocument, documentInfo, localDocumentInfo, new AspProjectDomWrapper (documentInfo));
+			}
+			return base.CodeCompletionCommand (completionContext);
+		}
+		
 		public override IParameterDataProvider HandleParameterCompletion (CodeCompletionContext completionContext, char completionChar)
 		{
 			if (Tracker.Engine.CurrentState is AspNetExpressionState && documentBuilder != null && localDocumentInfo != null && hiddenDocument != null)
-				return documentBuilder.HandleParameterCompletion (hiddenDocument, localDocumentInfo, new DomWrapper (ProjectDomService.GetProjectDom (Document.Project), hiddenDocument.ParsedDocument, localDocumentInfo.ParsedLocalDocument), completionChar);
+				return documentBuilder.HandleParameterCompletion (hiddenDocument, documentInfo, localDocumentInfo,
+					new AspProjectDomWrapper (documentInfo), completionChar);
 			
 			return base.HandleParameterCompletion (completionContext, completionChar);
 		}
@@ -245,7 +265,7 @@ namespace MonoDevelop.AspNet.Gui
 			if (!HasDoc) {
 				AddAspBeginExpressions (list);
 				string aspPrefix = "asp:";
-				foreach (IType cls in WebTypeManager.ListSystemControlClasses (new DomType ("System.Web.UI.Control"), project))
+				foreach (IType cls in WebTypeContext.ListSystemControlClasses (new DomType ("System.Web.UI.Control"), project))
 					list.Add (new AspTagCompletionData (aspPrefix, cls));
 				
 				base.GetElementCompletions (list);
@@ -431,7 +451,7 @@ namespace MonoDevelop.AspNet.Gui
 		}
 		
 		ClrVersion ProjClrVersion {
-			get { return HasProject? project.TargetFramework.ClrVersion : ClrVersion.Net_2_0; }
+			get { return project.TargetFramework.ClrVersion; }
 		}
 		
 		CompletionDataList HandleExpressionCompletion (AspNetExpression expr)
@@ -462,7 +482,7 @@ namespace MonoDevelop.AspNet.Gui
 			codeBehindClass = null;
 			projectDatabase = null;
 			
-			if (HasDoc && HasProject && !string.IsNullOrEmpty (aspDoc.Info.InheritedClass)) {
+			if (HasDoc && !string.IsNullOrEmpty (aspDoc.Info.InheritedClass)) {
 				projectDatabase = ProjectDomService.GetProjectDom (project);
 				if (projectDatabase != null)
 					codeBehindClass = projectDatabase.GetType (aspDoc.Info.InheritedClass, false, false);
@@ -480,8 +500,14 @@ namespace MonoDevelop.AspNet.Gui
 			list.Add ("%--", "md-literal", GettextCatalog.GetString ("ASP.NET server-side comment"));
 			
 			//valid on 2.0+ runtime only
-			if (ProjClrVersion != ClrVersion.Net_1_1)
+			if (ProjClrVersion != ClrVersion.Net_1_1) {
 				list.Add ("%$", "md-literal", GettextCatalog.GetString ("ASP.NET resource expression"));
+			}
+			
+			//valid on 2.0+ runtime only
+			if (ProjClrVersion != ClrVersion.Net_4_0) {
+				list.Add ("%:", "md-literal", GettextCatalog.GetString ("ASP.NET HTML encoded expression"));
+			}
 		}
 		
 		void AddAspAttributeCompletionData (CompletionDataList list, S.XName name, Dictionary<string, string> existingAtts)
@@ -489,8 +515,7 @@ namespace MonoDevelop.AspNet.Gui
 			Debug.Assert (name.IsValid);
 			Debug.Assert (name.HasPrefix);
 			
-			//get a parser database
-			var database = HasProject? ProjectDomService.GetProjectDom (project) : WebTypeManager.GetSystemWebDom (null);
+			var database = ProjectDomService.GetProjectDom (project);
 			
 			if (database == null) {
 				LoggingService.LogWarning ("Could not obtain project DOM in AddAspAttributeCompletionData");
@@ -536,7 +561,7 @@ namespace MonoDevelop.AspNet.Gui
 			if (controlClass == null) {
 				LoggingService.LogWarning ("Could not obtain IType for {0}", tagName.FullName);
 				
-				var database = WebTypeManager.GetSystemWebDom (project);
+				var database = WebTypeContext.GetSystemWebDom (project);
 				controlClass = database.GetType ("System.Web.UI.WebControls.WebControl", true, false);
 
 				if (controlClass == null) {
@@ -589,7 +614,7 @@ namespace MonoDevelop.AspNet.Gui
 			}
 			
 			if (projectDatabase == null) {
-				projectDatabase = WebTypeManager.GetSystemWebDom (project);
+				projectDatabase = WebTypeContext.GetSystemWebDom (project);
 				
 				if (projectDatabase == null) {
 					LoggingService.LogWarning ("Could not obtain type database in AddAspAttributeCompletionData");
@@ -866,7 +891,5 @@ namespace MonoDevelop.AspNet.Gui
 		}
 		#endregion
 	}
-	
-	
 		
 }

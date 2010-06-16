@@ -657,9 +657,7 @@ namespace MonoDevelop.Ide.Gui
 			if (showDirtyDialog) {
 				DirtyFilesDialog dlg = new DirtyFilesDialog ();
 				dlg.Modal = true;
-				dlg.TransientFor = this;
-				int response = dlg.Run ();
-				if (response != (int)Gtk.ResponseType.Ok)
+				if (MessageService.ShowCustomDialog (dlg, this) != (int)Gtk.ResponseType.Ok)
 					return false;
 			}
 			
@@ -867,7 +865,6 @@ namespace MonoDevelop.Ide.Gui
 			} catch (Exception ex) {
 				LoggingService.LogError (ex.ToString ());
 			}
-			CurrentLayout = "Default";
 		}
 		
 		void InitializeLayout (string name)

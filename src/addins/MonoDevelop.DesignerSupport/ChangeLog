@@ -1,3 +1,18 @@
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.DesignerSupport/ToolboxService.cs: Fix incorrect
+	  use of ShowCustomDialog/RunCustomDialog.
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.DesignerSupport/ToolboxService.cs: More dialog
+	  placing.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.DesignerSupport.Toolbox/ComponentSelectorDialog.cs:
+	  Clean up dialog placement.
+
 2010-05-19  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.DesignerSupport.Toolbox/TextToolboxNode.cs:

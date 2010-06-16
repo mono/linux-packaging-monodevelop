@@ -32,6 +32,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using MonoDevelop.Projects.Dom.Parser;
 using System.Diagnostics;
+using System.Linq;
 
 namespace MonoDevelop.Projects.Dom
 {
@@ -385,6 +386,7 @@ namespace MonoDevelop.Projects.Dom
 				return methods.AsReadOnly ();
 			}
 		}
+		
 		public override IMember ResolvedMember {
 			get {
 				return MostLikelyMethod;
@@ -417,13 +419,23 @@ namespace MonoDevelop.Projects.Dom
 					return null;
 				IMethod result = methods [0];
 				foreach (IMethod method in methods) {
-					if (method.TypeParameters.Count != genericArguments.Count || method.Parameters.Count != arguments.Count)
-						continue;
+					if (method.Parameters.Any (p => p.IsParams)) {
+						if (method.TypeParameters.Count != genericArguments.Count || method.Parameters.Count - 1 > arguments.Count)
+							continue;
+					} else {
+						if (method.TypeParameters.Count != genericArguments.Count || method.Parameters.Count != arguments.Count)
+							continue;
+					}
 					bool match = true;
-					for (int i = 0; i < method.Parameters.Count; i++) {
-						if (method.Parameters[i].ReturnType.ToInvariantString () != arguments[i].ToInvariantString ()) {
+					for (int i = 0; i < arguments.Count; i++) {
+						if (method.Parameters.Count == 0) { // should never happen
 							match = false;
+							break;
 						}
+						
+						IParameter parameter = method.Parameters[System.Math.Min (i, method.Parameters.Count - 1)];
+						if (IsCompatible (parameter.ReturnType, arguments[i]))
+							match = false;
 					}
 					if (match)
 						return method;
@@ -431,6 +443,21 @@ namespace MonoDevelop.Projects.Dom
 				}
 				return result;
 			}
+		}
+		
+		public bool IsCompatible (IReturnType baseType, IReturnType type)
+		{
+			if (baseType.ToInvariantString () == type.ToInvariantString ())
+				return true;
+			ProjectDom dom = null;
+			if (CallingType == null) 
+				return false;
+			dom = CallingType.SourceProjectDom;
+			IType b = dom.SearchType (CallingType, baseType);
+			IType t = dom.SearchType (CallingType, type);
+			if (b == null || t == null)
+				return false;
+			return dom.GetInheritanceTree (t).Any (tBase => tBase.DecoratedFullName == b.DecoratedFullName);
 		}
 		
 		public override IReturnType ResolvedType {
@@ -448,6 +475,14 @@ namespace MonoDevelop.Projects.Dom
 			get {
 				return ResolvedType;
 			}
+		}
+		
+		/// <summary>
+		/// Flags, if the return type should be completed or this result is in 'delegate' state.
+		/// </summary>
+		public bool GetsInvoked {
+			get;
+			set;
 		}
 
 		public ReadOnlyCollection<IReturnType> GenericArguments {
@@ -523,7 +558,7 @@ namespace MonoDevelop.Projects.Dom
 		public override IEnumerable<object> CreateResolveResult (ProjectDom dom, IMember callingMember)
 		{
 			List<object> result = new List<object> ();
-			MemberResolveResult.AddType (dom, result, ResolvedType, callingMember, StaticResolve);
+			MemberResolveResult.AddType (dom, result, GetsInvoked ? ResolvedType : DomReturnType.Delegate , callingMember, StaticResolve);
 			return result;
 		}
 		

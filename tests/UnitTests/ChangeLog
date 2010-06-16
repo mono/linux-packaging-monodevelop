@@ -1,3 +1,91 @@
+2010-06-14  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Gui/CompletionListWindowTests.cs: Added
+	  unit test for 'Bug 613539 - DOBa does not complete to
+	  DynamicObjectBase'.
+
+2010-06-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Tests/ViTests.cs: Added vi key notation
+	  parser roundtrip test.
+
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Tests/ViTests.cs: Add a test for visual mode
+	  motion.
+
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Tests/ViTests.cs: Add a test for deleting to
+	  line home/start/zero.
+
+2010-06-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: Track
+	  API spelling.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/GenerateNewMemberTests.cs: Added
+	  some insertion cursor tests.
+
+2010-06-02  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Tests/ViTests.cs: Added visual line
+	  navigation/deletion/paste test.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/GenerateNewMemberTests.cs: Added
+	  unit test.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs:
+	* MonoDevelop.Refactoring/GenerateNewMemberTests.cs: Worked on
+	  insertioncursor unit tests.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Tests/ViTests.cs: Added tests for dd and cc.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Tests/ViTests.cs: More tests.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs:
+	* MonoDevelop.Refactoring/GenerateNewMemberTests.cs: Worked on
+	  unit tests.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* UnitTests.csproj:
+	* Mono.TextEditor.Tests/ViTests.cs: Started adding tests for
+	  vi mode.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  test for 'Bug 610006 - Intellisense gives members of return
+	  type of functions even when that function isn't invoked'.
+
+2010-05-30  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* UnitTests.csproj:
+	* MonoDevelop.Refactoring/GenerateNewMemberTests.cs: Added
+	  some tests.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs: Added test
+	  for 'Bug 607990 - "Extract Method" refactoring sometimes
+	  tries to pass in unnecessary parameter depending on
+	  selection'.
+
 2010-05-20  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Fixed

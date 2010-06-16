@@ -161,15 +161,14 @@ namespace MonoDevelop.AspNet.Mvc.Gui
 	
 		protected virtual void ShowMasterSelectionDialog (object sender, System.EventArgs e)
 		{
-			//MonoDevelop.AspNet.Gui.
-			using (var dialog = new MonoDevelop.Ide.Projects.ProjectFileSelectorDialog (project, null, "*.master")) {
-				dialog.Title = MonoDevelop.Core.GettextCatalog.GetString ("Select a Master Page...");
-				dialog.Modal = true;
-				dialog.TransientFor = this;
-				dialog.DestroyWithParent = true;
-				int response = dialog.Run ();
-				if (response == (int)Gtk.ResponseType.Ok)
+			var dialog = new MonoDevelop.Ide.Projects.ProjectFileSelectorDialog (project, null, "*.master") {
+				Title = MonoDevelop.Core.GettextCatalog.GetString ("Select a Master Page..."),
+				TransientFor = this,
+			};
+			try {
+				if (MessageService.RunCustomDialog (dialog) == (int) Gtk.ResponseType.Ok)
 					masterEntry.Text = project.LocalToVirtualPath (dialog.SelectedFile.FilePath);
+			} finally {
 				dialog.Destroy ();
 			}
 		}

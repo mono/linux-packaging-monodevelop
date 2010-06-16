@@ -45,6 +45,7 @@ FILES =  \
 	Mono.TextEditor.Theatrics/AnimatedVBox.cs \
 	Mono.TextEditor.Theatrics/AnimatedWidget.cs \
 	Mono.TextEditor.Theatrics/Animation.cs \
+	Mono.TextEditor.Theatrics/BounceFadePopupWindow.cs \
 	Mono.TextEditor.Theatrics/Choreographer.cs \
 	Mono.TextEditor.Theatrics/Pulsator.cs \
 	Mono.TextEditor.Theatrics/SingleActorStage.cs \
@@ -52,6 +53,8 @@ FILES =  \
 	Mono.TextEditor.Theatrics/Stage.cs \
 	Mono.TextEditor.Vi/ViActionMaps.cs \
 	Mono.TextEditor.Vi/ViActions.cs \
+	Mono.TextEditor.Vi/ViCommandBuilder.cs \
+	Mono.TextEditor.Vi/ViKeyNotation.cs \
 	Mono.TextEditor.Vi/ViMacro.cs \
 	Mono.TextEditor.Vi/ViMark.cs \
 	Mono.TextEditor.Vi/ViMode.cs \
@@ -86,6 +89,7 @@ FILES =  \
 	Mono.TextEditor/IBracketMatcher.cs \
 	Mono.TextEditor/IBuffer.cs \
 	Mono.TextEditor/IconMargin.cs \
+	Mono.TextEditor/InsertionCursorEditMode.cs \
 	Mono.TextEditor/ISearchEngine.cs \
 	Mono.TextEditor/ISegment.cs \
 	Mono.TextEditor/ITextEditorOptions.cs \
@@ -97,6 +101,7 @@ FILES =  \
 	Mono.TextEditor/LineSplitter.cs \
 	Mono.TextEditor/LinkEventArgs.cs \
 	Mono.TextEditor/Margin.cs \
+	Mono.TextEditor/MarginDrawer.cs \
 	Mono.TextEditor/PangoUtil.cs \
 	Mono.TextEditor/PieceTable.cs \
 	Mono.TextEditor/Platform.cs \
@@ -110,6 +115,7 @@ FILES =  \
 	Mono.TextEditor/SharpDevelopWordFindStrategy.cs \
 	Mono.TextEditor/SimpleEditMode.cs \
 	Mono.TextEditor/TextEditor.cs \
+	Mono.TextEditor/TextEditorAccessibility.cs \
 	Mono.TextEditor/TextEditorContainer.cs \
 	Mono.TextEditor/TextEditorData.cs \
 	Mono.TextEditor/TextEditorOptions.cs \

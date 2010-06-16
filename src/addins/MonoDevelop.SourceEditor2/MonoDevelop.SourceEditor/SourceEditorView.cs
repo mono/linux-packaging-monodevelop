@@ -67,11 +67,6 @@ namespace MonoDevelop.SourceEditor
 		
 		TextMarker currentDebugLineMarker;
 		TextMarker debugStackLineMarker;
-		TextMarker breakpointMarker;
-		TextMarker breakpointDisabledMarker;
-		TextMarker tracepointMarker;
-		TextMarker tracepointDisabledMarker;
-		TextMarker breakpointInvalidMarker;
 		
 		int lastDebugLine = -1;
 		EventHandler currentFrameChanged;
@@ -153,15 +148,14 @@ namespace MonoDevelop.SourceEditor
 			
 			widget.TextEditor.Document.LineChanged += delegate(object sender, LineEventArgs e) {
 				UpdateBreakpoints ();
-				int oldHeight;
-				if (MessageBubbleTextMarker.RemoveLine (e.Line, out oldHeight)) {
+				if (MessageBubbleTextMarker.RemoveLine (e.Line)) {
 					MessageBubbleTextMarker marker = currentErrorMarkers.FirstOrDefault (m => m.LineSegment == e.Line);
 					if (marker != null) {
+						int oldHeight = marker.lastHeight;
 						widget.TextEditor.TextViewMargin.RemoveCachedLine (e.Line); // ensure that the line cache is renewed
 						int newHeight = marker.GetLineHeight (widget.TextEditor);
-						if (oldHeight != newHeight) {
+						if (oldHeight != newHeight)
 							widget.Document.CommitLineToEndUpdate (widget.TextEditor.Document.OffsetToLineNumber (e.Line.Offset));
-						}
 					}
 				}
 			};
@@ -191,12 +185,6 @@ namespace MonoDevelop.SourceEditor
 			
 			debugStackLineMarker = new DebugStackLineTextMarker (widget.TextEditor);
 			currentDebugLineMarker = new CurrentDebugLineTextMarker (widget.TextEditor);
-			breakpointMarker = new BreakpointTextMarker (widget.TextEditor, false);
-			breakpointDisabledMarker = new DisabledBreakpointTextMarker (widget.TextEditor, false);
-			tracepointMarker = new BreakpointTextMarker (widget.TextEditor, true);
-			tracepointDisabledMarker = new DisabledBreakpointTextMarker (widget.TextEditor, true);
-			breakpointInvalidMarker = new InvalidBreakpointTextMarker (widget.TextEditor);
-			
 			
 			fileSystemWatcher = new FileSystemWatcher ();
 			fileSystemWatcher.Created += (FileSystemEventHandler)DispatchService.GuiDispatch (new FileSystemEventHandler (OnFileChanged));
@@ -264,13 +252,17 @@ namespace MonoDevelop.SourceEditor
 			if (marker == null)
 				return;
 			
-			if (messageBubbleHighlightPopupWindow != null)
-				messageBubbleHighlightPopupWindow.Destroy ();
-			messageBubbleHighlightPopupWindow = new MessageBubbleHighlightPopupWindow (this, marker);
-			messageBubbleHighlightPopupWindow.Destroyed += delegate {
-				messageBubbleHighlightPopupWindow = null;
-			};
-			messageBubbleHighlightPopupWindow.Popup ();
+			marker.SetPrimaryError (task.Description);
+			
+			if (TextEditor.IsComposited) {
+				if (messageBubbleHighlightPopupWindow != null)
+					messageBubbleHighlightPopupWindow.Destroy ();
+				messageBubbleHighlightPopupWindow = new MessageBubbleHighlightPopupWindow (this, marker);
+				messageBubbleHighlightPopupWindow.Destroyed += delegate {
+					messageBubbleHighlightPopupWindow = null;
+				};
+				messageBubbleHighlightPopupWindow.Popup ();
+			}
 		}
 
 		void HandleIdeAppPreferencesDefaultHideMessageBubblesChanged (object sender, PropertyChangedEventArgs e)
@@ -312,7 +304,6 @@ namespace MonoDevelop.SourceEditor
 						marker.AddError (task.Severity == TaskSeverity.Error, task.Description);
 						continue;
 					}
-					
 					MessageBubbleTextMarker errorTextMarker = new MessageBubbleTextMarker (widget.TextEditor, task, lineSegment, task.Severity == TaskSeverity.Error, task.Description);
 					currentErrorMarkers.Add (errorTextMarker);
 					
@@ -327,7 +318,7 @@ namespace MonoDevelop.SourceEditor
 		void DisposeErrorMarkers ()
 		{
 			currentErrorMarkers.ForEach (em => {
-				widget.Document.RemoveMarker (em.LineSegment, em);
+				widget.Document.RemoveMarker (em);
 				em.Dispose ();
 			});
 			currentErrorMarkers.Clear ();
@@ -551,9 +542,6 @@ namespace MonoDevelop.SourceEditor
 			
 			debugStackLineMarker = null;
 			currentDebugLineMarker = null;
-			breakpointMarker = null;
-			breakpointDisabledMarker = null;
-			breakpointInvalidMarker = null;
 			
 			currentFrameChanged = null;
 			breakpointAdded = null;
@@ -688,11 +676,11 @@ namespace MonoDevelop.SourceEditor
 		void RemoveDebugMarkers ()
 		{
 			if (currentLineSegment != null) {
-				widget.TextEditor.Document.RemoveMarker (currentLineSegment, currentDebugLineMarker);
+				widget.TextEditor.Document.RemoveMarker (currentDebugLineMarker);
 				currentLineSegment = null;
 			}
 			if (debugStackSegment != null) {
-				widget.TextEditor.Document.RemoveMarker (debugStackSegment, debugStackLineMarker);
+				widget.TextEditor.Document.RemoveMarker (debugStackLineMarker);
 				debugStackSegment = null;
 			}
 		}
@@ -803,13 +791,11 @@ namespace MonoDevelop.SourceEditor
 			HashSet<int> lineNumbers = new HashSet<int> ();
 			foreach (LineSegment line in breakpointSegments) {
 				lineNumbers.Add (Document.OffsetToLineNumber (line.Offset));
-				widget.TextEditor.Document.RemoveMarker (line, breakpointMarker);
-				widget.TextEditor.Document.RemoveMarker (line, breakpointDisabledMarker);
-				widget.TextEditor.Document.RemoveMarker (line, breakpointInvalidMarker);
-				widget.TextEditor.Document.RemoveMarker (line, tracepointMarker);
-				widget.TextEditor.Document.RemoveMarker (line, tracepointDisabledMarker);
+				widget.TextEditor.Document.RemoveMarker (line, typeof (BreakpointTextMarker));
+				widget.TextEditor.Document.RemoveMarker (line, typeof (DisabledBreakpointTextMarker));
+				widget.TextEditor.Document.RemoveMarker (line, typeof (InvalidBreakpointTextMarker));
 			}
-			
+	
 			breakpointSegments.Clear ();
 			foreach (Breakpoint bp in DebuggingService.Breakpoints.GetBreakpoints ()) {
 				lineNumbers.Add (bp.Line - 1);
@@ -834,24 +820,23 @@ namespace MonoDevelop.SourceEditor
 			FilePath fp = Name;
 			if (fp.FullPath == bp.FileName) {
 				LineSegment line = widget.TextEditor.Document.GetLine (bp.Line-1);
-
+				
 				if (line == null)
-
 					return;
 				if (!bp.Enabled) {
 					if (bp.HitAction == HitAction.Break)
-						widget.TextEditor.Document.AddMarker (line, breakpointDisabledMarker);
+						widget.TextEditor.Document.AddMarker (line, new DisabledBreakpointTextMarker (widget.TextEditor, false));
 					else
-						widget.TextEditor.Document.AddMarker (line, tracepointDisabledMarker);
+						widget.TextEditor.Document.AddMarker (line, new DisabledBreakpointTextMarker (widget.TextEditor, true));
 				}
 				else if (bp.IsValid (DebuggingService.DebuggerSession)) {
 					if (bp.HitAction == HitAction.Break)
-						widget.TextEditor.Document.AddMarker (line, breakpointMarker);
+						widget.TextEditor.Document.AddMarker (line, new BreakpointTextMarker (widget.TextEditor, false));
 					else
-						widget.TextEditor.Document.AddMarker (line, tracepointMarker);
+						widget.TextEditor.Document.AddMarker (line, new BreakpointTextMarker (widget.TextEditor, true));
 				}
 				else
-					widget.TextEditor.Document.AddMarker (line, breakpointInvalidMarker);
+					widget.TextEditor.Document.AddMarker (line, new InvalidBreakpointTextMarker (widget.TextEditor));
 				widget.TextEditor.QueueDraw ();
 				breakpointSegments.Add (line);
 			}
@@ -947,7 +932,8 @@ namespace MonoDevelop.SourceEditor
 		
 		public void Undo()
 		{
-			if (this.Document.GetCurrentUndoDepth () > 0 && !this.Document.IsDirty) {
+			// TODO: Maybe make this feature optional ?
+/*			if (this.Document.GetCurrentUndoDepth () > 0 && !this.Document.IsDirty) {
 				var buttonCancel = new AlertButton (GettextCatalog.GetString ("Don't Undo")); 
 				var buttonOk = new AlertButton (GettextCatalog.GetString ("Undo")); 
 				var question = GettextCatalog.GetString ("You are about to undo past the last point this file was saved. Do you want to do this?");
@@ -955,7 +941,7 @@ namespace MonoDevelop.SourceEditor
 				                                          question, 1, buttonCancel, buttonOk);
 				if (result != buttonOk)
 					return;
-			}
+			}*/
 			
 			this.Document.Undo ();
 		}
@@ -1782,6 +1768,8 @@ namespace MonoDevelop.SourceEditor
 		void CorrectIndenting ()
 		{
 			Formatter formatter = TextFileService.GetFormatter (Document.MimeType);
+			if (formatter == null || !formatter.SupportsCorrectIndenting)
+				return;
 			if (TextEditor.IsSomethingSelected) {
 				TextEditor.Document.BeginAtomicUndo ();
 				int max = TextEditor.MainSelection.MaxLine;
