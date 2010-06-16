@@ -18,8 +18,6 @@ monodevelop (2.4+dfsg-1) UNRELEASED; urgency=low
     + Force DebSrc 1.0
   * debian/rules:
     + Force XDG_CONFIG_HOME to allow keystores to work
-  * debian/monodevelop-debugger-sdb.install:
-    + Put Soft Debugger addin into a package
   * debian/patches/inject_Mono.Debugger.Soft_source.patch,
     debian/patches/remove_support_for_moonlight.patch:
     + MonoDevelop upstream has a nasty habit of bundling binary versions of
