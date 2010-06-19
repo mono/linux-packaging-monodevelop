@@ -30,8 +30,8 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  desktop-file-utils
 Standards-Version: 3.8.4
 Homepage: http://www.monodevelop.com/
-Vcs-Svn: svn://svn.debian.org/svn/pkg-cli-apps/packages/monodevelop/trunk/
-Vcs-Browser: http://svn.debian.org/wsvn/pkg-cli-apps/packages/monodevelop/trunk/
+Vcs-Git: git://git.debian.org/pkg-cli-apps/packages/monodevelop.git
+Vcs-Browser: http://git.debian.org/?p=pkg-cli-apps/packages/monodevelop.git
 
 Package: monodevelop
 Architecture: all

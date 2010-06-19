@@ -1,3 +1,10 @@
+monodevelop (2.2.2+dfsg-2) UNRELEASED; urgency=low
+
+  * debian/control: 
+    + We are using git instead of svn now, update VCS-* locations
+
+ -- Stefan Ebner <sebner@ubuntu.com>  Sat, 19 Jun 2010 20:04:18 +0200
+
 monodevelop (2.2.2+dfsg-1) unstable; urgency=low
 
   [ Stefan Ebner ]
