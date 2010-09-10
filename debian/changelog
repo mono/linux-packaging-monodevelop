@@ -1,3 +1,13 @@
+monodevelop (2.4+dfsg-2) UNRELEASED; urgency=low
+
+  * debian/patches/inject_Mono.Debugger.Soft_source.patch,
+    debian/patches/use_system_Mono.Debugger.Soft.patch,
+    debian/control:
+    + Build against system Soft Debugger, since we now have a new
+      enough Mono to match MonoDevelop's required API
+
+ -- Jo Shields <directhex@apebox.org>  Fri, 10 Sep 2010 16:54:48 +0100
+
 monodevelop (2.4+dfsg-1) experimental; urgency=low
 
   * New upstream release

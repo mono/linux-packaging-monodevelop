@@ -1,0 +1,94 @@
+Index: monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Makefile.am
+===================================================================
+--- monodevelop.git.orig/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Makefile.am	2010-09-10 19:21:37.624328300 +0100
++++ monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Makefile.am	2010-09-10 19:48:06.716850531 +0100
+@@ -2,16 +2,14 @@
+ ASSEMBLY = $(ADDIN_BUILD)/Mono.Debugging.Soft.dll
+ 
+ DBG_ASM = $(ADDIN_BUILD)/Mono.Debugger.Soft.dll
+-DBG_ASM_SRC = $(top_srcdir)/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Mono.Debugger.Soft.dll
+-DBG_MDB = $(DBG_ASM).mdb
+-DBG_MDB_SRC = $(DBG_ASM_SRC).mdb
++DBG_ASM_SRC = /usr/lib/mono/2.0/Mono.Debugger.Soft.dll
+ 
+ SIGNING_KEY=$(top_srcdir)/src/core/Mono.Debugging/mono.debugging.snk
+ 
+ DEPS = $(top_builddir)/build/bin/Mono.Debugging.dll
+ 
+ REFS =  \
+-	-r:$(top_srcdir)/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Mono.Debugger.Soft.dll \
++	-r:$(DBG_ASM) \
+ 	-r:System \
+ 	-r:System.Core
+ 
+@@ -32,7 +30,7 @@
+ 
+ all: $(ASSEMBLY) $(ASSEMBLY).mdb $(DATA_FILE_BUILD) $(SIGNING_KEY)
+ 
+-$(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS) $(DBG_ASM) $(DBG_MDB)
++$(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS) $(DBG_ASM)
+ 	mkdir -p $(ADDIN_BUILD)
+ 	$(CSC) $(CSC_FLAGS) -debug -out:$@ -keycontainer:$(SIGNING_KEY) -target:library $(REFS) $(build_deps) \
+ 		$(build_resources:%=/resource:%) $(build_sources)
+@@ -41,19 +39,15 @@
+ 	mkdir -p $(ADDIN_BUILD)
+ 	cp $^ $@ 
+ 
+-$(DBG_MDB): $(DBG_MDB_SRC)
+-	mkdir -p $(ADDIN_BUILD)
+-	cp $^ $@
+-
+ $(ASSEMBLY).mdb: $(ASSEMBLY)
+ 
+ check: all
+ 
+ assemblydir = $(MD_ADDIN_DIR)/MonoDevelop.Debugger.Soft
+-assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb $(DBG_ASM) $(DBG_MDB)
++assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb $(DBG_ASM)
+ 
+-CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb $(DBG_ASM) $(DBG_MDB)
+-EXTRA_DIST = $(FILES) $(RES) $(DBG_ASM_SRC) $(DBG_MDB_SRC)
++CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb $(DBG_ASM)
++EXTRA_DIST = $(FILES) $(RES)
+ 
+ include $(top_srcdir)/Makefile.include
+ 
+Index: monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet/Makefile.am
+===================================================================
+--- monodevelop.git.orig/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet/Makefile.am	2010-09-10 19:21:37.594331820 +0100
++++ monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet/Makefile.am	2010-09-10 19:48:06.726850824 +0100
+@@ -14,7 +14,7 @@
+ REFS =  \
+ 	$(GLIB_SHARP_LIBS) \
+ 	$(GTK_SHARP_LIBS) \
+-	-r:$(top_srcdir)/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Mono.Debugger.Soft.dll \
++	-r:$(ADDIN_BUILD)/Mono.Debugger.Soft.dll \
+ 	-r:System \
+ 	-r:System.Core
+ 
+Index: monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.Moonlight/Makefile.am
+===================================================================
+--- monodevelop.git.orig/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.Moonlight/Makefile.am	2010-09-10 19:21:37.574328440 +0100
++++ monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.Moonlight/Makefile.am	2010-09-10 19:48:06.736850838 +0100
+@@ -14,7 +14,7 @@
+ REFS =  \
+ 	$(GLIB_SHARP_LIBS) \
+ 	$(GTK_SHARP_LIBS) \
+-	-r:$(top_srcdir)/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Mono.Debugger.Soft.dll \
++	-r:$(ADDIN_BUILD)/Mono.Debugger.Soft.dll \
+ 	-r:System \
+ 	-r:System.Core
+ 
+Index: monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/Makefile.am
+===================================================================
+--- monodevelop.git.orig/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/Makefile.am	2010-09-10 19:48:32.926829600 +0100
++++ monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/Makefile.am	2010-09-10 19:48:48.805040862 +0100
+@@ -13,7 +13,7 @@
+ REFS =  \
+ 	$(GLIB_SHARP_LIBS) \
+ 	$(GTK_SHARP_LIBS) \
+-	-r:$(top_srcdir)/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Mono.Debugger.Soft.dll \
++	-r:$(ADDIN_BUILD)/Mono.Debugger.Soft.dll \
+ 	-r:System \
+ 	-r:System.Core
+ 
