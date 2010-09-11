@@ -1,4 +1,4 @@
-monodevelop (2.4+dfsg-2) UNRELEASED; urgency=low
+monodevelop (2.4+dfsg-2) unstable; urgency=low
 
   * debian/patches/inject_Mono.Debugger.Soft_source.patch,
     debian/patches/use_system_Mono.Debugger.Soft.patch,
