@@ -5,11 +5,6 @@ monodevelop (2.4+dfsg-2) UNRELEASED; urgency=low
     debian/control:
     + Build against system Soft Debugger, since we now have a new
       enough Mono to match MonoDevelop's required API
-  * debian/monodevelop.links:
-    + Fix hard debugger by symlinking Mono.Debugger.dll into the addin's
-      directory. This is needed because the hard debugger is launched by
-      a debugger host process, which would otherwise not find Mono.Debugger.dll
-      in MonoDevelop's bin/ folder.
 
  -- Jo Shields <directhex@apebox.org>  Fri, 10 Sep 2010 16:54:48 +0100
 
