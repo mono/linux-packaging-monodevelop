@@ -1,4 +1,4 @@
-monodevelop (2.4+dfsg-3) UNRELEASED; urgency=low
+monodevelop (2.4+dfsg-3) unstable; urgency=low
 
   * debian/patches/use_keyfile_not_keycontainer.patch:
     + Two assemblies, Mono.Debugging.dll and MonoDevelop.Debugger.Soft.dll, 
