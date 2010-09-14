@@ -1,3 +1,15 @@
+monodevelop (2.4+dfsg-3) UNRELEASED; urgency=low
+
+  * debian/patches/use_keyfile_not_keycontainer.patch:
+    + Two assemblies, Mono.Debugging.dll and MonoDevelop.Debugger.Soft.dll, 
+      are built specifying -keycontainer on their compiler command line. 
+      Unfortunately, -keycontainer usually fails to function as expected, 
+      and instead generates a random key. This causes major problems for
+      extensions built against these assemblies. This patch uses -keyfile
+      instead, which removes the problem.
+
+ -- Jo Shields <directhex@apebox.org>  Tue, 14 Sep 2010 16:40:37 +0100
+
 monodevelop (2.4+dfsg-2) unstable; urgency=low
 
   * debian/patches/inject_Mono.Debugger.Soft_source.patch,
