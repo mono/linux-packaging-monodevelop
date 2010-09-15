@@ -1,6 +1,7 @@
 
 using System;
 using MonoDevelop.Core;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl.Subversion.Gui
 {
@@ -35,8 +36,7 @@ namespace MonoDevelop.VersionControl.Subversion.Gui
 			EventHandler del = delegate {
 					ClientCertificatePasswordDialog dlg = new ClientCertificatePasswordDialog (realm, may_save);
 					try {
-						dlg.TransientFor = MonoDevelop.Ide.Gui.IdeApp.Workbench.RootWindow;
-						res = (dlg.Run () == (int) Gtk.ResponseType.Ok);
+						res = (MessageService.RunCustomDialog (dlg) == (int) Gtk.ResponseType.Ok);
 						if (res) {
 							local_save = dlg.Save;
 							local_password = dlg.Password;

@@ -1,17 +1,8 @@
 using System;
-using System.Collections;
-using System.IO;
 
-using Gtk;
-
-using MonoDevelop.Projects;
-using MonoDevelop.Ide.Gui.Pads;
-using MonoDevelop.Projects.Dom;
 using MonoDevelop.Core;
-using MonoDevelop.Components.Commands;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Components;
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl
 {
@@ -69,8 +60,9 @@ namespace MonoDevelop.VersionControl
 			protected override void Run ()
 			{
 				foreach (VersionControlItemList list in items.SplitByRepository ())
-					list[0].Repository.Revert (list.Paths, true, GetProgressMonitor ());
+					list[0].Repository.Revert (list.Paths, true, Monitor);
 				
+				Monitor.ReportSuccess (GettextCatalog.GetString ("Revert operation completed."));
 				Gtk.Application.Invoke (delegate {
 					foreach (VersionControlItem item in items) {
 						if (!item.IsDirectory) {

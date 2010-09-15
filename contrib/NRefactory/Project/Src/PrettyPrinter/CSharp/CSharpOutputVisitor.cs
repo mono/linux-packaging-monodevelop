@@ -2065,10 +2065,10 @@ namespace ICSharpCode.NRefactory.PrettyPrinter
 		
 		internal static string ToCSharpString(PrimitiveExpression primitiveExpression)
 		{
-			if (primitiveExpression.Value == null) {
+			if (primitiveExpression.Value == null) 
 				return "null";
-			}
-			
+			if (primitiveExpression.HasStringValue)
+				return primitiveExpression.StringValue;
 			object val = primitiveExpression.Value;
 			
 			if (val is bool) {
@@ -3131,7 +3131,9 @@ namespace ICSharpCode.NRefactory.PrettyPrinter
 			if (this.prettyPrintOptions.AroundAssignmentParentheses) {
 				outputFormatter.Space();
 			}
-			return letClause.Expression.AcceptVisitor(this, data);
+			var result = letClause.Expression.AcceptVisitor(this, data);
+			outputFormatter.Space();
+			return result;
 		}
 		
 		public override object TrackedVisitQueryExpressionGroupClause(QueryExpressionGroupClause groupClause, object data)

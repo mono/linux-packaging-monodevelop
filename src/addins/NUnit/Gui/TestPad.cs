@@ -28,20 +28,18 @@
 
 using System;
 using System.Collections;
-using System.Threading;
 using Gtk;
 using Gdk;
 
 using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Pads;
-using MonoDevelop.Projects;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.NUnit.Commands;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide.Execution;
+using MonoDevelop.Components.Docking;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.NUnit
 {
@@ -77,7 +75,8 @@ namespace MonoDevelop.NUnit
 		
 		ArrayList testNavigationHistory = new ArrayList ();
 
-		ToolButton buttonRunAll, buttonRun, buttonStop;
+		Button buttonRunAll, buttonRun, buttonStop;
+		
 		public override void Initialize (NodeBuilder[] builders, TreePadOption[] options, string menuPath)
 		{
 			base.Initialize (builders, options, menuPath);
@@ -87,39 +86,26 @@ namespace MonoDevelop.NUnit
 			paned = new VPaned ();
 			
 			VBox vbox = new VBox ();
-			Toolbar topToolbar = new Toolbar ();
-			topToolbar.IconSize = IconSize.Menu;
-			topToolbar.ToolbarStyle = ToolbarStyle.Icons;
-			vbox.PackStart (topToolbar, false, false, 0);
+			DockItemToolbar topToolbar = Window.GetToolbar (PositionType.Top);
 			
-			Gdk.Pixbuf pixbuf  = Gtk.IconTheme.Default.LoadIcon (Gtk.Stock.GoUp, 16, (Gtk.IconLookupFlags) 0);
-//			Gdk.Pixbuf pixbuf2 = Gtk.IconTheme.Default.LoadIcon (Gtk.Stock.Execute, 16, (Gtk.IconLookupFlags) 0);
-//			pixbuf2.CopyArea (0, 0, 15, 16, pixbuf, 1, 0);
-//			Gtk.Image image = new Gtk.Image (Gtk.Stock.Execute, IconSize.Menu);
-//			Gdk.Pixmap pixbuf, mask;
-//			image.GetPixmap (out pixbuf, out mask);
-//			
-//			pixbuf.DrawDrawable (vbox.Style.BaseGC (StateType.Normal), pixbuf, 5, 5 , 0, 0, image.WidthRequest, image.HeightRequest);
-			
-			buttonRunAll = new ToolButton (new Gtk.Image (pixbuf), null);
-			buttonRunAll.IsImportant = true;
+			buttonRunAll = new Button (new Gtk.Image (Gtk.Stock.GoUp, IconSize.Menu));
 			buttonRunAll.Clicked += new EventHandler (OnRunAllClicked);
 			buttonRunAll.Sensitive = true;
 			buttonRunAll.TooltipText = GettextCatalog.GetString ("Run all tests");
-			topToolbar.Insert (buttonRunAll, -1);
+			topToolbar.Add (buttonRunAll);
 			
-			buttonRun = new ToolButton (new Gtk.Image (Gtk.Stock.Execute, IconSize.Menu), null);
-			buttonRun.IsImportant = true;
+			buttonRun = new Button (new Gtk.Image (Gtk.Stock.Execute, IconSize.Menu));
 			buttonRun.Clicked += new EventHandler (OnRunClicked);
 			buttonRun.Sensitive = true;
 			buttonRun.TooltipText = GettextCatalog.GetString ("Run test");
-			topToolbar.Insert (buttonRun, -1);
+			topToolbar.Add (buttonRun);
 			
-			buttonStop = new ToolButton (Gtk.Stock.Stop);
+			buttonStop = new Button (new Gtk.Image (Gtk.Stock.Stop, IconSize.Menu));
 			buttonStop.Clicked += new EventHandler (OnStopClicked);
 			buttonStop.Sensitive = false;
 			buttonStop.TooltipText = GettextCatalog.GetString ("Cancel running test");
-			topToolbar.Insert (buttonStop, -1);
+			topToolbar.Add (buttonStop);
+			topToolbar.ShowAll ();
 			
 			vbox.PackEnd (base.Control, true, true, 0);
 			vbox.FocusChain = new Gtk.Widget [] { base.Control };
@@ -270,7 +256,7 @@ namespace MonoDevelop.NUnit
 			regressionStore = new ListStore (typeof(object), typeof(string), typeof (Pixbuf));
 			
 			CellRendererText trtest2 = new CellRendererText ();
-			CellRendererPixbuf pr = new CellRendererPixbuf ();
+			var pr = new CellRendererPixbuf ();
 			
 			TreeViewColumn col = new TreeViewColumn ();
 			col.PackStart (pr, false);

@@ -30,8 +30,6 @@
 using System;
 using System.IO;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Components;
 using MonoDevelop.Core.ProgressMonitoring;
 using Gtk;
 
@@ -40,12 +38,12 @@ namespace MonoDevelop.Ide.Gui
 	internal class BackgroundProgressMonitor: SimpleProgressMonitor
 	{
 		string title;
-		MonoDevelopStatusBar.StatusIcon icon;
+		StatusBarIcon icon;
 		
-		public BackgroundProgressMonitor (string title, string iconName)
+		public BackgroundProgressMonitor (string title, IconId iconName)
 		{
 			this.title = title;
-			if (!string.IsNullOrEmpty (iconName)) {
+			if (!iconName.IsNull) {
 				Application.Invoke (delegate {
 					Gdk.Pixbuf img = ImageService.GetPixbuf (iconName, Gtk.IconSize.Menu);
 					icon = IdeApp.Workbench.StatusBar.ShowStatusIcon (img);

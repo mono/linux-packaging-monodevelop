@@ -1,16 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <stetic-interface>
   <configuration>
     <images-root-path>..</images-root-path>
     <target-gtk-version>2.12</target-gtk-version>
   </configuration>
   <import>
-    <widget-library name="../../../../build/bin/MonoDevelop.Components.dll" />
     <widget-library name="../../../../build/bin/MonoDevelop.Ide.dll" />
     <widget-library name="../../../../build/AddIns/WelcomePage/WelcomePage.dll" internal="true" />
   </import>
-  <widget class="Gtk.Bin" id="MonoDevelop.WelcomePage.WelcomePageFallbackWidget" design-size="658 421">
+  <widget class="Gtk.Bin" id="MonoDevelop.WelcomePage.WelcomePageWidget" design-size="658 421">
     <property name="MemberName" />
+    <property name="GeneratePublic">False</property>
     <child>
       <widget class="Gtk.Alignment" id="alignment1">
         <property name="MemberName" />
@@ -26,7 +26,6 @@
                   <widget class="Gtk.Label" id="headerActions">
                     <property name="MemberName" />
                     <property name="Xalign">0</property>
-                    <property name="LabelProp" translatable="yes" />
                     <property name="UseMarkup">True</property>
                   </widget>
                   <packing>
@@ -44,7 +43,6 @@
                       <widget class="Gtk.Label" id="label1">
                         <property name="MemberName" />
                         <property name="WidthRequest">10</property>
-                        <property name="LabelProp" translatable="yes" />
                       </widget>
                       <packing>
                         <property name="Position">0</property>
@@ -84,7 +82,6 @@
                     <property name="MemberName" />
                     <property name="WidthRequest">10</property>
                     <property name="HeightRequest">10</property>
-                    <property name="LabelProp" translatable="yes" />
                   </widget>
                   <packing>
                     <property name="Position">2</property>
@@ -98,7 +95,6 @@
                     <property name="MemberName" />
                     <property name="WidthRequest">200</property>
                     <property name="Xalign">0</property>
-                    <property name="LabelProp" translatable="yes" />
                     <property name="UseMarkup">True</property>
                   </widget>
                   <packing>
@@ -112,7 +108,6 @@
                   <widget class="Gtk.Label" id="filler2">
                     <property name="MemberName" />
                     <property name="HeightRequest">3</property>
-                    <property name="LabelProp" translatable="yes" />
                   </widget>
                   <packing>
                     <property name="Position">4</property>
@@ -129,7 +124,6 @@
                       <widget class="Gtk.Label" id="label5">
                         <property name="MemberName" />
                         <property name="WidthRequest">10</property>
-                        <property name="LabelProp" translatable="yes" />
                       </widget>
                       <packing>
                         <property name="Position">0</property>
@@ -173,7 +167,6 @@
                               <widget class="Gtk.Label" id="projNameLabel">
                                 <property name="MemberName" />
                                 <property name="Xalign">0</property>
-                                <property name="LabelProp" translatable="yes" />
                               </widget>
                               <packing>
                                 <property name="AutoSize">False</property>
@@ -190,7 +183,6 @@
                               <widget class="Gtk.Label" id="projTimeLabel">
                                 <property name="MemberName" />
                                 <property name="Xalign">1</property>
-                                <property name="LabelProp" translatable="yes" />
                               </widget>
                               <packing>
                                 <property name="LeftAttach">1</property>
@@ -249,7 +241,6 @@
                   <widget class="Gtk.Label" id="headerSupportLinks">
                     <property name="MemberName" />
                     <property name="Xalign">0</property>
-                    <property name="LabelProp" translatable="yes" />
                     <property name="UseMarkup">True</property>
                   </widget>
                   <packing>
@@ -267,7 +258,6 @@
                       <widget class="Gtk.Label" id="label6">
                         <property name="MemberName" />
                         <property name="WidthRequest">10</property>
-                        <property name="LabelProp" translatable="yes" />
                       </widget>
                       <packing>
                         <property name="Position">0</property>
@@ -304,7 +294,6 @@
                     <property name="MemberName" />
                     <property name="WidthRequest">10</property>
                     <property name="HeightRequest">10</property>
-                    <property name="LabelProp" translatable="yes" />
                   </widget>
                   <packing>
                     <property name="Position">2</property>
@@ -318,7 +307,6 @@
                     <property name="MemberName" />
                     <property name="WidthRequest">200</property>
                     <property name="Xalign">0</property>
-                    <property name="LabelProp" translatable="yes" />
                     <property name="UseMarkup">True</property>
                   </widget>
                   <packing>
@@ -336,7 +324,6 @@
                       <widget class="Gtk.Label" id="label8">
                         <property name="MemberName" />
                         <property name="WidthRequest">10</property>
-                        <property name="LabelProp" translatable="yes" />
                       </widget>
                       <packing>
                         <property name="Position">0</property>
@@ -373,7 +360,6 @@
                     <property name="MemberName" />
                     <property name="WidthRequest">200</property>
                     <property name="Xalign">0</property>
-                    <property name="LabelProp" translatable="yes" />
                     <property name="UseMarkup">True</property>
                   </widget>
                   <packing>
@@ -391,7 +377,6 @@
                       <widget class="Gtk.Label" id="label9">
                         <property name="MemberName" />
                         <property name="WidthRequest">10</property>
-                        <property name="LabelProp" translatable="yes" />
                       </widget>
                       <packing>
                         <property name="Position">0</property>

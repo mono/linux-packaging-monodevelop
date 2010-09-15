@@ -126,13 +126,28 @@ namespace Mono.TextEditor
 			if (!data.CanEditSelection)
 				return;
 			if (data.IsSomethingSelected) {
-				data.DeleteSelectedText ();
+				if (!data.MainSelection.IsDirty) {
+					data.DeleteSelectedText (data.MainSelection.SelectionMode != SelectionMode.Block);
+				} else {
+					bool preserve = data.Caret.PreserveSelection;
+					data.Caret.PreserveSelection = true;
+					for (int lineNumber = data.MainSelection.MinLine; lineNumber <= data.MainSelection.MaxLine; lineNumber++) {
+						data.Remove (data.Document.GetLine (lineNumber).Offset + data.Caret.Column - 1, 1);
+					}
+					data.Caret.Column--;
+					data.MainSelection.Lead = new DocumentLocation (data.MainSelection.Lead.Line, data.Caret.Column);
+					data.MainSelection.IsDirty = true;
+					data.Caret.PreserveSelection = preserve;
+					data.Document.CommitMultipleLineUpdate (data.MainSelection.MinLine, data.MainSelection.MaxLine);
+				}
 				return;
 			}
 			if (data.Caret.Offset == 0)
 				return;
 			LineSegment line = data.Document.GetLine (data.Caret.Line);
-			if (data.Caret.Offset == line.Offset) {
+			if (data.Caret.Column > line.EditableLength) {
+				data.Caret.Column = line.EditableLength;
+			} else if (data.Caret.Offset == line.Offset) {
 				LineSegment lineAbove = data.Document.GetLine (data.Caret.Line - 1);
 				data.Caret.Location = new DocumentLocation (data.Caret.Line - 1, lineAbove.EditableLength);
 				data.Remove (lineAbove.EndOffset - lineAbove.DelimiterLength, lineAbove.DelimiterLength);
@@ -143,7 +158,10 @@ namespace Mono.TextEditor
 		
 		public static void RemoveCharBeforeCaret (TextEditorData data)
 		{
-			data.Remove (data.Caret.Offset - 1, 1);
+			int offset = data.Caret.Offset;
+			if (offset <= 0)
+				return;
+			data.Remove (offset - 1, 1);
 			data.Caret.Column--;
 		}
 		

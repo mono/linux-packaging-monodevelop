@@ -25,11 +25,19 @@
 // THE SOFTWARE.
 
 using System;
+using MonoDevelop.Projects.Dom;
 
 namespace MonoDevelop.CSharp.Dom
 {
-	public interface ICSharpNode
+	public interface ICSharpNode : INode
 	{
+		DomLocation StartLocation {
+			get;
+		}
+		DomLocation EndLocation {
+			get;
+		}
+		
 		S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data);
 	}
 }

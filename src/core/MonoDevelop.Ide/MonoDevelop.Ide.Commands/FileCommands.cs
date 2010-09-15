@@ -27,17 +27,16 @@
 
 
 using System;
-using MonoDevelop.Core.Gui.Dialogs;
+using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Core;
-using Mono.Addins;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
-using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Core.Gui;
 using System.IO;
 using Gtk;
+using MonoDevelop.Ide.Projects;
+using MonoDevelop.Ide.Desktop;
 
 namespace MonoDevelop.Ide.Commands
 {
@@ -79,41 +78,26 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Run ()
 		{
-			FileSelectorDialog dlg = new FileSelectorDialog (GettextCatalog.GetString ("File to Open"));
-			string filename;
-			FileViewer viewer;
-			string encoding = null;
-			try {
-				dlg.TransientFor = IdeApp.Workbench.RootWindow;
-				if(((ResponseType)dlg.Run ()) == ResponseType.Ok) {
-					filename = dlg.Filename;
-					viewer = dlg.SelectedViewer;
-					encoding = dlg.Encoding;
-					if (string.IsNullOrEmpty (filename)) {
-						if(dlg.Uri != null)
-							MessageService.ShowError (GettextCatalog.GetString ("Only local files can be opened."));
-						else
-							MessageService.ShowError (GettextCatalog.GetString ("The provided file could not be loaded."));
-						return;
-					}
-				}
-				else return;
+			var dlg = new OpenFileDialog (GettextCatalog.GetString ("File to Open"), Gtk.FileChooserAction.Open) {
+				TransientFor = IdeApp.Workbench.RootWindow,
+				ShowEncodingSelector = true,
+				ShowViewerSelector = true,
+			};
+			if (!dlg.Run ())
+				return;
+			
+			var file = dlg.SelectedFile;
+			
+			if (dlg.SelectedViewer != null) {
+				dlg.SelectedViewer.OpenFile (file, dlg.Encoding);
+				return;
 			}
-			finally {
-				dlg.Destroy (); // destroy, as dispose doesn't actually remove the window.
+			
+			if (Services.ProjectService.IsWorkspaceItemFile (file) || Services.ProjectService.IsSolutionItemFile (file)) {
+				IdeApp.Workspace.OpenWorkspaceItem (file, dlg.CloseCurrentWorkspace);
 			}
-			// Have to make sure that the FileSelectordialog is not a top level window, else it throws MissingMethodException errors deep in GTK.
-			if (viewer == null) {
-				if(Services.ProjectService.IsWorkspaceItemFile (filename) || Services.ProjectService.IsSolutionItemFile (filename)) {
-					IdeApp.Workspace.OpenWorkspaceItem (filename, dlg.CloseCurrentWorkspace);
-				}
-				else
-					IdeApp.Workbench.OpenDocument (filename, encoding);
-			}
-			else {
-				viewer.OpenFile (filename, encoding);
-			}
-
+			else
+				IdeApp.Workbench.OpenDocument (file, dlg.Encoding);
 		}
 		
 	}
@@ -122,14 +106,8 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Run ()
 		{
-			NewFileDialog dlg = new NewFileDialog (null, null); // new file seems to fail if I pass the project IdeApp.ProjectOperations.CurrentSelectedProject
-			dlg.TransientFor = IdeApp.Workbench.RootWindow;
-			try {
-				dlg.Run ();
-			}
-			finally {
-				dlg.Destroy ();
-			}
+			var dlg = new NewFileDialog (null, null); // new file seems to fail if I pass the project IdeApp.ProjectOperations.CurrentSelectedProject
+			MessageService.ShowCustomDialog (dlg, IdeApp.Workbench.RootWindow);
 		}
 	}
 
@@ -318,7 +296,7 @@ namespace MonoDevelop.Ide.Commands
 			int i = 0;
 			foreach (RecentItem ri in recentOpen.RecentProjects) {
 				//getting the icon requires probing the file, so handle IO errors
-				string icon;
+				IconId icon;
 				try {
 					if (!File.Exists (ri.LocalPath))
 						continue;

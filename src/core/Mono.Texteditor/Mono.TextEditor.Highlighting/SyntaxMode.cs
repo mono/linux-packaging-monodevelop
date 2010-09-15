@@ -75,12 +75,36 @@ namespace Mono.TextEditor.Highlighting
 		{
 			SpanParser spanParser = CreateSpanParser (doc, this, line, null);
 			ChunkParser chunkParser = CreateChunkParser (spanParser, doc, style, this, line);
-			Chunk result = chunkParser.GetChunks (offset, length);
+			Chunk result = chunkParser.GetChunks (line.Offset, line.EditableLength);
 			if (SemanticRules != null) {
 				foreach (SemanticRule sematicRule in SemanticRules) {
 					sematicRule.Analyze (doc, line, result, offset, offset + length);
 				}
 			}
+			if (result != null) {
+				// crop to begin
+				if (result.Offset != offset) {
+					while (result != null && result.EndOffset < offset)
+						result = result.Next;
+					if (result != null) {
+						int endOffset = result.EndOffset;
+						result.Offset = offset;
+						result.Length = endOffset - offset;
+					}
+				}
+				if (result != null && offset + length != line.Offset + line.EditableLength) {
+					// crop to end
+					Chunk cur = result;
+					while (cur != null && cur.EndOffset < offset + length) {
+						cur = cur.Next;
+					}
+					if (cur != null) {
+						cur.Length = offset + length - cur.Offset;
+						cur.Next = null;
+					}
+				}
+			}
+			
 			return result;
 		}
 		
@@ -101,14 +125,8 @@ namespace Mono.TextEditor.Highlighting
 		
 		public string GetMarkup (Document doc, ITextEditorOptions options, Style style, int offset, int length, bool removeIndent, bool useColors, bool replaceTabs)
 		{
+			int indentLength = GetIndentLength (doc, offset, length, false);
 			int curOffset = offset;
-			int indentLength = int.MaxValue;
-			while (curOffset < offset + length) {
-				LineSegment line = doc.GetLineByOffset (curOffset);
-				indentLength = System.Math.Min (indentLength, line.GetIndentation (doc).Length);
-				curOffset = line.EndOffset + 1;
-			}
-			curOffset = offset;
 			
 			StringBuilder result = new StringBuilder ();
 			while (curOffset < offset + length && curOffset < doc.Length) {
@@ -146,7 +164,7 @@ namespace Mono.TextEditor.Highlighting
 						styleStack.Push (chunkStyle);
 					}
 					
-					for (int i = 0; i < chunk.Length; i++) {
+					for (int i = 0; i < chunk.Length && chunk.Offset + i < doc.Length; i++) {
 						char ch = chunk.GetCharAt (doc, chunk.Offset + i);
 						switch (ch) {
 						case '&':
@@ -183,6 +201,22 @@ namespace Mono.TextEditor.Highlighting
 					result.AppendLine ();
 			}
 			return result.ToString ();
+		}
+		
+		public static int GetIndentLength (Document doc, int offset, int length, bool skipFirstLine)
+		{
+			int curOffset = offset;
+			int indentLength = int.MaxValue;
+			while (curOffset < offset + length) {
+				LineSegment line = doc.GetLineByOffset (curOffset);
+				if (!skipFirstLine) {
+					indentLength = System.Math.Min (indentLength, line.GetIndentation (doc).Length);
+				} else {
+					skipFirstLine = false;
+				}
+				curOffset = line.EndOffset + 1;
+			}
+			return indentLength == int.MaxValue ? 0 : indentLength;
 		}
 		
 		public virtual SpanParser CreateSpanParser (Document doc, SyntaxMode mode, LineSegment line, Stack<Span> spanStack)
@@ -325,7 +359,7 @@ namespace Mono.TextEditor.Highlighting
 				}
 			}
 			
-			protected virtual bool ScanSpanEnd (Span cur, int i)
+			protected virtual bool ScanSpanEnd (Span cur, ref int i)
 			{
 				if (cur.End != null) {
 					RegexMatch match = cur.End.TryMatch (doc, i);
@@ -372,7 +406,7 @@ namespace Mono.TextEditor.Highlighting
 								continue;
 							}
 						}
-						if (ScanSpanEnd (cur, i))
+						if (ScanSpanEnd (cur, ref i))
 							continue;
 					}
 					
@@ -503,7 +537,10 @@ namespace Mono.TextEditor.Highlighting
 				curChunk.Length = length;
 				curChunk.Style  = GetChunkStyle (span);
 				AddChunk (ref curChunk, 0, curChunk.Style);
-				foreach (SemanticRule semanticRule in spanParser.GetRule (span).SemanticRules) {
+				Rule spanRule = spanParser.GetRule (span);
+				if (spanRule == null)
+					throw new Exception ("Rule " + span.Rule + " not found in " + span);
+				foreach (SemanticRule semanticRule in spanRule.SemanticRules) {
 					semanticRule.Analyze (this.doc, line, curChunk, offset, line.EndOffset);
 				}
 			}
@@ -670,7 +707,7 @@ namespace Mono.TextEditor.Highlighting
 				case Node:
 					string extends = reader.GetAttribute ("extends");
 					if (!String.IsNullOrEmpty (extends)) {
-						result = SyntaxModeService.GetSyntaxMode (extends);
+						result = (SyntaxMode)SyntaxModeService.GetSyntaxMode (extends).MemberwiseClone ();
 					}
 					result.Name       = reader.GetAttribute ("name");
 					result.MimeType   = reader.GetAttribute (MimeTypesAttribute);

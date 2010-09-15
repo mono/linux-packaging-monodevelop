@@ -4,12 +4,10 @@ using System.IO;
 using System.Collections.Generic;
 using System.Collections;
 using System.Text;
-using MonoDevelop.Core.Serialization;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.VersionControl.Subversion.Gui;
 using MonoDevelop.Core.Collections;
-using Algorithm.Diff;
+using MonoDevelop.Components.Diff;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl.Subversion
 {
@@ -33,7 +31,7 @@ namespace MonoDevelop.VersionControl.Subversion
 			get {
 				List<Repository> list = new List<Repository> ();
 				
-				foreach (DirectoryEntry ent in Svn.List (Url, false)) {
+				foreach (DirectoryEntry ent in Svn.ListUrl (Url, false)) {
 					if (ent.IsDirectory) {
 						SubversionRepository rep = new SubversionRepository (Svn, Url + "/" + ent.Name);
 						rep.Name = ent.Name;
@@ -439,6 +437,12 @@ namespace MonoDevelop.VersionControl.Subversion
 				else
 					Directory.Delete (path, true);
 			}
+		}
+		
+		public override DiffInfo[] PathDiff (FilePath localPath, Revision fromRevision, Revision toRevision)
+		{
+			string diff = Svn.GetUnifiedDiff (localPath, (SvnRevision)fromRevision, localPath, (SvnRevision)toRevision, true);
+			return GenerateUnifiedDiffInfo (diff, localPath, null);
 		}
 
 		public override DiffInfo[] PathDiff (FilePath baseLocalPath, FilePath[] localPaths, bool remoteDiff)

@@ -50,13 +50,17 @@ namespace MonoDevelop.CSharp.Refactoring
 		public string OutputNode (ProjectDom dom, INode node, string indent)
 		{
 			CSharpOutputVisitor outputVisitor = new CSharpOutputVisitor ();
-			CSharpFormatter.SetFormatOptions (outputVisitor, dom.Project);
+			CSharpFormatter.SetFormatOptions (outputVisitor, dom != null && dom.Project != null ? dom.Project.Policies : null);
 			int col = CSharpFormatter.GetColumn (indent, 0, 4);
 			outputVisitor.OutputFormatter.IndentationLevel = System.Math.Max (0, col / 4);
 			node.AcceptVisitor (outputVisitor, null);
 			return outputVisitor.Text;
 		}
 		
+		public ICSharpCode.NRefactory.Parser.Errors LastErrors {
+			get;
+			private set;
+		}
 		public Expression ParseExpression (string expressionText)
 		{
 			expressionText = expressionText.Trim ();
@@ -64,6 +68,7 @@ namespace MonoDevelop.CSharp.Refactoring
 				Expression result = null;
 				try {
 					result = parser.ParseExpression ();
+					LastErrors = parser.Errors;
 				} catch (Exception) {
 				}
 				return result;
@@ -78,6 +83,7 @@ namespace MonoDevelop.CSharp.Refactoring
 					BlockStatement block = null ;
 					try {
 						block = parser.ParseBlock ();
+						LastErrors = parser.Errors;
 					} catch (Exception) {
 					}
 					if (block != null)
@@ -92,6 +98,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			using (ICSharpCode.NRefactory.IParser parser = ICSharpCode.NRefactory.ParserFactory.CreateParser (SupportedLanguage.CSharp, new StringReader (content))) {
 				try {
 					parser.Parse ();
+					LastErrors = parser.Errors;
 				} catch (Exception) {
 				}
 				return parser.CompilationUnit;
@@ -103,7 +110,9 @@ namespace MonoDevelop.CSharp.Refactoring
 			content = content.Trim ();
 			using (ICSharpCode.NRefactory.IParser parser = ICSharpCode.NRefactory.ParserFactory.CreateParser (SupportedLanguage.CSharp, new StringReader (content))) {
 				try {
-					return parser.ParseTypeReference ();
+					var result = parser.ParseTypeReference ();
+					LastErrors = parser.Errors;
+					return result;
 				} catch (Exception) {
 				}
 			}

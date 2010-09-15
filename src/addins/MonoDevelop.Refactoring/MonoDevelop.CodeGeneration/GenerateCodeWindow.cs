@@ -27,10 +27,10 @@
 using System;
 using MonoDevelop.Components;
 using Gtk;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Refactoring;
 using System.Collections.Generic;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.CodeGeneration
 {
@@ -73,7 +73,7 @@ namespace MonoDevelop.CodeGeneration
 		IGenerateAction curInitializeObject = null;
 		CodeGenerationOptions options;
 		
-		GenerateCodeWindow (CodeGenerationOptions options, MonoDevelop.Projects.Gui.Completion.CodeCompletionContext completionContext) : base(Gtk.WindowType.Toplevel)
+		GenerateCodeWindow (CodeGenerationOptions options, MonoDevelop.Ide.CodeCompletion.CodeCompletionContext completionContext) : base(Gtk.WindowType.Toplevel)
 		{
 			this.options = options;
 			this.Build ();
@@ -109,7 +109,7 @@ namespace MonoDevelop.CodeGeneration
 			treeviewGenerateActions.HeadersVisible = false;
 			treeviewGenerateActions.Model = generateActionsStore;
 			TreeViewColumn column = new TreeViewColumn ();
-			CellRendererPixbuf pixbufRenderer = new CellRendererPixbuf ();
+			var pixbufRenderer = new CellRendererPixbuf ();
 			column.PackStart (pixbufRenderer, false);
 			column.AddAttribute (pixbufRenderer, "pixbuf", 0);
 			
@@ -125,7 +125,23 @@ namespace MonoDevelop.CodeGeneration
 			messageArea.Add (vbox1);
 			this.Add (messageArea);
 			this.ShowAll ();
-			Move (completionContext.TriggerXCoord, completionContext.TriggerYCoord);
+			
+			int x = completionContext.TriggerXCoord;
+			int y = completionContext.TriggerYCoord;
+
+			int w, h;
+			GetSize (out w, out h);
+			
+			int myMonitor = Screen.GetMonitorAtPoint (x, y);
+			Gdk.Rectangle geometry = Screen.GetMonitorGeometry (myMonitor);
+
+			if (x + w > geometry.Right)
+				x = geometry.Right - w;
+
+			if (y + h > geometry.Bottom)
+				y = y - completionContext.TriggerTextHeight - h;
+			
+			Move (x, y);
 		}
 		
 		void Populate (List<ICodeGenerator> validGenerators)
@@ -157,7 +173,7 @@ namespace MonoDevelop.CodeGeneration
 			}
 		}
 		
-		public static void ShowIfValid (Document document, MonoDevelop.Projects.Gui.Completion.CodeCompletionContext completionContext)
+		public static void ShowIfValid (Document document, MonoDevelop.Ide.CodeCompletion.CodeCompletionContext completionContext)
 		{
 			var options = CodeGenerationOptions.CreateCodeGenerationOptions (document);
 			

@@ -31,18 +31,27 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class ForeachStatement : AbstractCSharpNode
 	{
-		const int VariableExpressionRole = 100;
-		
-		public INode EmbeddedStatement {
-			get { return GetChildByRole (Roles.EmbeddedStatement); }
+		public const int ForEachKeywordRole = 100;
+		public const int InKeywordRole = 101;
+			
+		public ICSharpNode EmbeddedStatement {
+			get { return (ICSharpNode)GetChildByRole (Roles.EmbeddedStatement); }
 		}
 		
 		public INode Expression {
-			get { return GetChildByRole (VariableExpressionRole); }
+			get { return GetChildByRole (Roles.Initializer); }
 		}
 		
-		public IReturnType VariableType {
-			get { return (IReturnType)GetChildByRole (Roles.ReturnType); }
+		public ICSharpNode VariableType {
+			get { return (ICSharpNode)GetChildByRole (Roles.ReturnType); }
+		}
+		
+		public CSharpTokenNode LPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.LPar); }
+		}
+		
+		public CSharpTokenNode RPar {
+			get { return (CSharpTokenNode)GetChildByRole (Roles.RPar); }
 		}
 		
 		public string VariableName {

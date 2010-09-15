@@ -40,6 +40,7 @@ using MonoDevelop.Projects;
 
 using Gtk;
 using Gdk;
+using MonoDevelop.Components.Docking;
 
 namespace MonoDevelop.Ide.Gui.Pads
 {
@@ -50,17 +51,13 @@ namespace MonoDevelop.Ide.Gui.Pads
 		ITaskListView activeView;
 		
 		//toolbar
-		Toolbar toolbar;
+		DockItemToolbar toolbar;
 		ComboBox switcherCombo;
 		ListStore switcherComboList;
-		SeparatorToolItem separator;
+		VSeparator separator;
 		
 		//content view
 		ScrolledWindow sw;
-		
-		void IPadContent.Initialize (IPadWindow window)
-		{
-		}
 		
 		public Gtk.Widget Control {
 			get {
@@ -88,8 +85,6 @@ namespace MonoDevelop.Ide.Gui.Pads
 		public TaskListPad ()
 		{	
 			VBox vbox = new VBox ();
-			toolbar = new Toolbar ();
-			toolbar.IconSize = IconSize.SmallToolbar;
 			
 			switcherComboList = new ListStore (typeof (string), typeof (ITaskListView), typeof (string));
 			try
@@ -110,19 +105,9 @@ namespace MonoDevelop.Ide.Gui.Pads
 			switcherCombo.PackStart (cr, true);
 			switcherCombo.AddAttribute (cr, "text", 0);
 			
-			switcherCombo.Changed += new EventHandler (OnContentSwitched);
-
-			ToolItem comboswitcherCombo = new ToolItem ();
-			comboswitcherCombo.Add (switcherCombo);
-			toolbar.Insert (comboswitcherCombo, -1);
-			
-			separator = new SeparatorToolItem ();
-			
-			sw = new Gtk.ScrolledWindow ();
+			sw = new MonoDevelop.Components.CompactScrolledWindow ();
 			sw.ShadowType = ShadowType.None;
 			
-			toolbar.ToolbarStyle = ToolbarStyle.BothHoriz;
-			vbox.PackStart (toolbar, false, false, 0);
 			vbox.Add (sw);
 			
 			control = vbox;
@@ -141,6 +126,17 @@ namespace MonoDevelop.Ide.Gui.Pads
 				i++;
 			}
 			switcherCombo.Active = pos; 
+		}
+		
+		void IPadContent.Initialize (IPadWindow window)
+		{
+			toolbar = window.GetToolbar (PositionType.Top);
+			toolbar.Add (switcherCombo);
+			toolbar.ShowAll ();
+			switcherCombo.Changed += new EventHandler (OnContentSwitched);
+			OnContentSwitched (null, null);
+			
+			separator = new VSeparator ();
 		}
 		
 		void OnContentSwitched (object obj, EventArgs e)
@@ -162,10 +158,12 @@ namespace MonoDevelop.Ide.Gui.Pads
 				
 				if (view != null && view.ToolBarItems != null && view.ToolBarItems.Length > 0)
 				{
-					toolbar.Insert (separator, -1);
-					foreach (ToolItem w in view.ToolBarItems)
-						toolbar.Insert (w, -1);
+					toolbar.Add (separator);
+					foreach (Widget w in view.ToolBarItems)
+						toolbar.Add (w);
 				}
+				if (toolbar != null)
+					toolbar.ShowAll ();
 				
 				activeView = view;
 				control.ShowAll ();

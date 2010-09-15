@@ -1,16 +1,130 @@
+2010-06-14  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* configure.in: Bump MD version.
+
+2010-05-31  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* configure.in: Reverted Mono.Addins dependency for now,
+	  as it causes problems for people building on Mac where 
+	  Mono.Addins 0.5 has not been packaged.
+
+2010-05-21  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* configure.in: Bumped Mono.Addins dependency.
+
+2010-05-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* configure.in: Bump MD version.
+
+2010-04-29  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* monodevelop.desktop: Fixed exec command and added mimetypes.
+	  Thanks to Alexander M. Batishchev.
+
+2010-04-28  Lluis Sanchez Gual  <lluis@novell.com> 
+
+	* monodevelop-core-addins.pc.in: Add Mono.Debugger.Soft.dll
+
+2010-04-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* configure.in: Require Mono 2.6.1. Updated version label.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* configure.in: Bumped MD version.
+
+2010-03-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Main.sln: Don't build gnome and mac platforms on windows.
+
+2010-03-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Main.sln: Fix startup project.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Main.sln:
+	* configure.in:
+	* monodevelop.pc.in: Merged MD.Projects into MD.Core, and
+	  MD.Projects.Gui, MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* configure.in: Configure new tool.
+
+2010-03-05  Levi Bard  <levi@unity3d.com>
+
+	* Main.sln: Don't build GnomePlatform in MacDebug configuration.
+
+2010-03-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Main.sln: The invariant policy can't be used anymore as base
+	  policy set.
+
+2010-02-25  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* configure.in: Properly initialize the subversion build switch.
+
+2010-02-23  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* main: Remove stray folder.
+
+2010-02-23  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Main.sln:
+	* configure.in: Moved diff widget and algorithm to
+	  MonoDevelop.Components.
+
+2010-02-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Main.sln: Don't compile the gnome and mac platforms on
+	  windows.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Main.sln:
+	* configure.in: Moved AspLanguageBuilder to its own assembly
+	  and module. Dropped Asp.Net dependency.
+
+2010-02-08  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am: Add trace targets.
+
 2010-02-03  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* Makefile.am:
 	* configure.in: Capture ACLOCAL_FLAGS for autoreconf
 	  so building is less painful on Mac.
 
-2009-12-11  Lluis Sanchez Gual  <lluis@novell.com>
+2010-01-27  Michael Hutchinson  <mhutchinson@novell.com>
 
-	* configure.in: Bump MD version.
+	* Main.sln: Exclude GnomePlatform from Mac again.
 
-2009-12-10  Lluis Sanchez Gual  <lluis@novell.com>
+2010-01-21  Lluis Sanchez Gual  <lluis@novell.com>
 
-	* configure.in: Bump MD version.
+	* Main.sln: Disable the gnome platform on windows.
+
+2010-01-20  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Main.sln:
+	* configure.in:
+	* monodevelop-core-addins.pc.in: Add the new dll.
+
+2010-01-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Main.sln: Update. The GUID for the Cecil.Decompiler project
+	  was wrong.
+
+2010-01-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Main.sln: Fix reference to decompiler project.
+
+2010-01-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Main.sln: Fix the Cecil decompiler in the build. Make
+	  building MD with Makefiles work again, and puts the
+	  decompiler properly in its own dll instead of merging it
+	  into a franken-Cecil.
 
 2009-12-16  Lluis Sanchez Gual  <lluis@novell.com>
 
@@ -24,6 +138,11 @@
 
 	* theme-icons/Makefile.am: dist all Mac icns files.
 	* theme-icons/Mac/monodevelop.sln.icns: Added sln icons.
+
+2009-11-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Main.sln:
+	* configure.in: Added hex editor display binding.
 
 2009-11-09  Michael Hutchinson  <mhutchinson@novell.com>
 

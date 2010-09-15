@@ -4,13 +4,13 @@
 	<!-- Template Header -->
 	<TemplateConfiguration>
 		<_Name>Workspace</_Name>
-		<_Category>MonoDevelop</_Category>
+		<_Category>Other</_Category>
 		<Icon>md-workspace</Icon>
 		<LanguageName/>
 		<_Description>A blank workspace</_Description>
 	</TemplateConfiguration>
 	
 	<!-- Template Content -->
-	<Combine name = "${ProjectName}" directory = "." type = "MonoDevelop.Projects.Workspace, MonoDevelop.Projects" />
+	<Combine name = "${ProjectName}" directory = "." type = "MonoDevelop.Projects.Workspace, MonoDevelop.Core" />
 	
 </Template>

@@ -29,7 +29,6 @@ using System.Linq;
 
 using MonoDevelop.Components;
 using Gtk;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects.Dom;
 using System.Collections.Generic;
@@ -85,7 +84,7 @@ namespace MonoDevelop.CodeGeneration
 				foreach (IEvent e in Options.EnclosingType.Events) {
 					if (e.IsSpecialName)
 						continue;
-					IType type = Options.Dom.SearchType (new SearchTypeRequest (Options.Document.ParsedDocument.CompilationUnit, e.ReturnType, Options.EnclosingType));
+					IType type = Options.Dom.SearchType (e, e.ReturnType);
 					if (type == null)
 						continue;
 					IMethod invokeMethod = type.Methods.FirstOrDefault ();
@@ -95,7 +94,7 @@ namespace MonoDevelop.CodeGeneration
 				}
 			}
 			
-			protected override IEnumerable<ICSharpCode.NRefactory.Ast.INode> GenerateCode (List<IBaseMember> includedMembers)
+			protected override IEnumerable<string> GenerateCode (INRefactoryASTProvider astProvider, string indent, List<IBaseMember> includedMembers)
 			{
 				foreach (IMember member in includedMembers) {
 					MethodDeclaration methodDeclaration = new MethodDeclaration ();
@@ -104,7 +103,7 @@ namespace MonoDevelop.CodeGeneration
 					methodDeclaration.Modifier = ICSharpCode.NRefactory.Ast.Modifiers.Protected | ICSharpCode.NRefactory.Ast.Modifiers.Virtual;
 					methodDeclaration.Body = new BlockStatement ();
 
-					IType type = Options.Dom.SearchType (new SearchTypeRequest (Options.Document.ParsedDocument.CompilationUnit, member.ReturnType, Options.EnclosingType));
+					IType type = Options.Dom.SearchType (member, member.ReturnType);
 					IMethod invokeMethod = type.Methods.First ();
 
 					methodDeclaration.Parameters.Add (new ParameterDeclarationExpression (Options.ShortenTypeName (invokeMethod.Parameters[1].ReturnType.ConvertToTypeReference ()), invokeMethod.Parameters[1].Name));
@@ -121,7 +120,7 @@ namespace MonoDevelop.CodeGeneration
 					arguments.Add (new IdentifierExpression (invokeMethod.Parameters[1].Name));
 					ifStatement.TrueStatement.Add (new ExpressionStatement (new InvocationExpression (new IdentifierExpression (handlerName), arguments)));
 					methodDeclaration.Body.AddChild (ifStatement);
-					yield return methodDeclaration;
+					yield return astProvider.OutputNode (this.Options.Dom, methodDeclaration, indent);
 				}
 			}
 		}

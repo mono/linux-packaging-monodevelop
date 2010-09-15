@@ -36,19 +36,15 @@ using System.IO;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.ComponentModel.Design;
-using System.Drawing.Design;
+using Mono.Addins;
 
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Execution;
 using MonoDevelop.Core.Assemblies;
-using Mono.Addins;
 using MonoDevelop.Projects;
 using MonoDevelop.Core.Serialization;
-
 using MonoDevelop.DesignerSupport.Toolbox;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.DesignerSupport
 {
@@ -129,14 +125,8 @@ namespace MonoDevelop.DesignerSupport
 		public void AddUserItems ()
 		{
 			ComponentSelectorDialog dlg = new ComponentSelectorDialog (currentConsumer);
-			try {
-				dlg.TransientFor = IdeApp.Workbench.RootWindow;
-				dlg.Fill ();
-				dlg.Run ();
-			}
-			finally {
-				dlg.Destroy ();
-			}
+			dlg.Fill ();
+			MessageService.ShowCustomDialog (dlg);
 		}
 		
 		void AddUserItems (IList<ItemToolboxNode> nodes)
@@ -385,7 +375,7 @@ namespace MonoDevelop.DesignerSupport
 				MonoDevelop.Core.LoggingService.LogError ("Error dragging toolbox item.", ex);
 				//run this dialog on a timeout so it doesn't block the drag completing
 				GLib.Timeout.Add (100, delegate {
-					MonoDevelop.Core.Gui.MessageService.ShowException (ex, "Error dragging toolbox item.");
+					MessageService.ShowException (ex, "Error dragging toolbox item.");
 					return false;
 				});
 			}

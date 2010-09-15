@@ -31,15 +31,10 @@
 
 
 using System;
-using MonoDevelop.Core.Gui.Dialogs;
 using MonoDevelop.Core;
 using Mono.Addins;
-using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
-using MonoDevelop.Ide.Gui.Dialogs;
-using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Core.Gui;
 using System.IO;
 using Gtk;
 using System.Collections.Generic;
@@ -75,7 +70,7 @@ namespace MonoDevelop.Ide.Templates
         }
 
         private string icon = String.Empty;
-        public string Icon
+        public IconId Icon
         {
             get { return icon; }
         }
@@ -278,15 +273,15 @@ namespace MonoDevelop.Ide.Templates
             }
         }
 
-		internal static ArrayList GetFileTemplates (Project project, string projectPath)
-        {
-            ArrayList list = new ArrayList ();
-            foreach (FileTemplate t in fileTemplates) {
-                if (t.IsValidForProject (project, projectPath))
-                    list.Add (t);
-            }
-            return list;
-        }
+		internal static List<FileTemplate> GetFileTemplates (Project project, string projectPath)
+		{
+			var list = new List<FileTemplate> ();
+			foreach (var t in fileTemplates) {
+				if (t.IsValidForProject (project, projectPath))
+					list.Add (t);
+			}
+			return list;
+		}
 
 		internal static FileTemplate GetFileTemplateByID (string templateID)
         {
@@ -349,7 +344,7 @@ namespace MonoDevelop.Ide.Templates
                     }
 				} else {
                     string fileName = singleFile.GetFileName (policyParent, project, language, directory, name);
-                    Stream stream = singleFile.CreateFileContent (policyParent, project, language, fileName);
+                    Stream stream = singleFile.CreateFileContent (policyParent, project, language, fileName, name);
 
                     // Guess the mime type of the new file
                     string fn = Path.GetTempFileName ();

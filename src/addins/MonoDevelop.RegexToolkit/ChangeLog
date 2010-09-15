@@ -1,3 +1,59 @@
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.RegexToolkit/Commands.cs: Dialog placement.
+
+2010-05-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.RegexToolkit/RegexToolkitWindow.cs: Added multi
+	  monitor support.
+
+2010-05-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.RegexToolkit.addin.xml: On Windows, show the
+	  global options command in the Tools menu.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.RegexToolkit.addin.xml: Bumped MD version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.RegexToolkit.csproj:
+	* MonoDevelop.RegexToolkit.addin.xml:
+	* MonoDevelop.RegexToolkit/RegexLibraryWindow.cs:
+	* MonoDevelop.RegexToolkit/RegexToolkitWindow.cs: Merged
+	  MD.Projects into MD.Core, and MD.Projects.Gui, MD.Core.Gui
+	  and MD.Components into MD.Ide.
+
+2010-02-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.RegexToolkit/RegexToolkitWindow.cs: disabled
+	  elements list.
+
+2010-02-05  Levi Bard  <taktaktaktaktaktaktaktaktaktak@gmail.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.RegexToolkit/RegexToolkitWindow.cs:
+	* gtk-gui/MonoDevelop.RegexToolkit.RegexToolkitWindow.cs:
+	  Avoid unhandled exception on invalid expression.
+
+2010-01-24  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* gtk-gui/generated.cs:
+	* MonoDevelop.RegexToolkit.csproj:
+	* MonoDevelop.RegexToolkit/RegexLibraryWindow.cs:
+	* MonoDevelop.RegexToolkit/RegexToolkitWindow.cs:
+	* MonoDevelop.RegexToolkit/UpdateInProgressDialog.cs:
+	* gtk-gui/MonoDevelop.RegexToolkit.RegexLibraryWindow.cs:
+	* gtk-gui/MonoDevelop.RegexToolkit.RegexToolkitWindow.cs:
+	* gtk-gui/MonoDevelop.RegexToolkit.UpdateInProgressDialog.cs:
+	  Made the regex toolkit a bit nicer.
+
 2009-12-03  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.RegexToolkit/RegexToolkitWindow.cs: Set button

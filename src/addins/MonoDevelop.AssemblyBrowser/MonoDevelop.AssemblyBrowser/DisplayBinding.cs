@@ -28,14 +28,13 @@
 
 using System;
 using System.IO;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Codons;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core;
 
 namespace MonoDevelop.AssemblyBrowser
 {
-	public class DisplayBinding : DefaultDisplayBinding
+	public class AssemblyBrowserDisplayBinding : DisplayBinding
 	{
 		public override string Name {
 			get {
@@ -58,7 +57,7 @@ namespace MonoDevelop.AssemblyBrowser
 		
 		public override bool CanCreateContentForMimeType (string mimeType)
 		{
-			return mimeType == "application/x-ms-dos-executable" || mimeType == "application/x-executable";
+			return mimeType == "application/x-ms-dos-executable" || mimeType == "application/x-executable" || mimeType == "application/x-msdownload";
 		}
 		
 		public override IViewContent CreateContentForMimeType (string mimeType, System.IO.Stream content)

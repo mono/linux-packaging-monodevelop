@@ -2,19 +2,15 @@ ADDIN_BUILD = $(top_builddir)/build/AddIns/MonoDevelop.AspNet
 ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.AspNet.dll
 
 DEPS =  \
-	$(top_builddir)/build/AddIns/BackendBindings/MonoDevelop.CSharpBinding.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll \
+	$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor2.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll \
 	$(top_builddir)/build/bin/NRefactory.dll
 
 REFS =  \
@@ -28,7 +24,8 @@ REFS =  \
 	-r:System.Drawing \
 	-r:System.Drawing.Design \
 	-r:System.Web \
-	-r:System.Xml
+	-r:System.Xml \
+	-r:System.Xml.Linq
 
 FILES =  \
 	AssemblyInfo.cs \
@@ -54,9 +51,11 @@ FILES =  \
 	MonoDevelop.AspNet.Gui/AspNetConfigurationPanel.cs \
 	MonoDevelop.AspNet.Gui/AspNetConfigurationPanelWidget.cs \
 	MonoDevelop.AspNet.Gui/AspNetEditorExtension.cs \
+	MonoDevelop.AspNet.Gui/AspProjectDom.cs \
 	MonoDevelop.AspNet.Gui/BaseHtmlEditorExtension.cs \
 	MonoDevelop.AspNet.Gui/BrowserLauncher.cs \
 	MonoDevelop.AspNet.Gui/HtmlEditorExtension.cs \
+	MonoDevelop.AspNet.Gui/ILanguageCompletionBuilder.cs \
 	MonoDevelop.AspNet.Gui/XspOptionsPanel.cs \
 	MonoDevelop.AspNet.Gui/XspOptionsPanelWidget.cs \
 	MonoDevelop.AspNet.MD1Serialization/MD1AspNetCustomDataItem.cs \
@@ -85,13 +84,10 @@ FILES =  \
 	MonoDevelop.AspNet.Parser/ContentPlaceHolderVisitor.cs \
 	MonoDevelop.AspNet.Parser/DebugStringVisitor.cs \
 	MonoDevelop.AspNet.Parser/Directive.cs \
-	MonoDevelop.AspNet.Parser/Document.cs \
 	MonoDevelop.AspNet.Parser/DocumentReferenceManager.cs \
 	MonoDevelop.AspNet.Parser/LocatedParserException.cs \
 	MonoDevelop.AspNet.Parser/MemberListVisitor.cs \
-	MonoDevelop.AspNet.Parser/PageDirectiveVisitor.cs \
 	MonoDevelop.AspNet.Parser/PageInfo.cs \
-	MonoDevelop.AspNet.Parser/PageInfoVisitor.cs \
 	MonoDevelop.AspNet.Parser/Regexes.cs \
 	MonoDevelop.AspNet.Parser/SuggestedHandlerCompletionData.cs \
 	MonoDevelop.AspNet.Parser/WebFormReferenceManager.cs \
@@ -102,6 +98,7 @@ FILES =  \
 	MonoDevelop.AspNet.StateEngine/AspNetServerCommentState.cs \
 	MonoDevelop.AspNet.StateEngine/AspNetSpeculativeExpressionState.cs \
 	MonoDevelop.AspNet.StateEngine/HtmlClosingTagState.cs \
+	MonoDevelop.AspNet.StateEngine/HtmlScriptBodyState.cs \
 	MonoDevelop.AspNet.StateEngine/HtmlTagState.cs \
 	MonoDevelop.AspNet/AspNetAppProject.cs \
 	MonoDevelop.AspNet/AspNetAppProjectBinding.cs \
@@ -121,7 +118,7 @@ FILES =  \
 	MonoDevelop.AspNet/LineInterceptingTextWriter.cs \
 	MonoDevelop.AspNet/MasterContentFileDescriptionTemplate.cs \
 	MonoDevelop.AspNet/ProjectFolderNodeBuilderExtension.cs \
-	MonoDevelop.AspNet/ProjectRegisteredControls.cs \
+	MonoDevelop.AspNet/RegistrationCache.cs \
 	MonoDevelop.AspNet/VerifyCodeBehindBuildStep.cs \
 	MonoDevelop.AspNet/WebTypeManager.cs \
 	MonoDevelop.AspNet/XspParameters.cs \

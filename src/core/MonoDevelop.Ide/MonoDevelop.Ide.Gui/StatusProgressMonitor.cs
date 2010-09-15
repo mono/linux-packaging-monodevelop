@@ -27,14 +27,9 @@
 //
 
 
-using System;
 using System.Collections.Generic;
-using System.IO;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
-using MonoDevelop.Core.Gui.ProgressMonitoring;
-using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Dialogs;
+using MonoDevelop.Ide.ProgressMonitoring;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -45,44 +40,43 @@ namespace MonoDevelop.Ide.Gui
 		bool showTaskTitles;
 		bool lockGui;
 		string title;
+		StatusBarContext statusBar;
+		Pad statusSourcePad;
 		
-		static List<StatusProgressMonitor> monitorQueue = new List<StatusProgressMonitor> ();
-		
-		public StatusProgressMonitor (string title, string iconName, bool showErrorDialogs, bool showTaskTitles, bool lockGui)
+		public StatusProgressMonitor (string title, string iconName, bool showErrorDialogs, bool showTaskTitles, bool lockGui, Pad statusSourcePad)
 		{
 			this.lockGui = lockGui;
 			this.showErrorDialogs = showErrorDialogs;
 			this.showTaskTitles = showTaskTitles;
 			this.title = title;
+			this.statusSourcePad = statusSourcePad;
 			icon = ImageService.GetImage (iconName, Gtk.IconSize.Menu);
-			IdeApp.Workbench.StatusBar.BeginProgress (title);
-			IdeApp.Workbench.StatusBar.ShowMessage (icon, title);
+			statusBar = IdeApp.Workbench.StatusBar.CreateContext ();
+			statusBar.StatusSourcePad = statusSourcePad;
+			statusBar.BeginProgress (icon, title);
 			if (lockGui)
 				IdeApp.Workbench.LockGui ();
-			monitorQueue.Add (this);
 		}
 		
 		protected override void OnProgressChanged ()
 		{
-			if (monitorQueue [monitorQueue.Count - 1] != this)
-				return;
 			if (showTaskTitles)
-				IdeApp.Workbench.StatusBar.ShowMessage (icon, CurrentTask);
+				statusBar.ShowMessage (icon, CurrentTask);
 			if (!UnknownWork)
-				IdeApp.Workbench.StatusBar.SetProgressFraction (GlobalWork);
+				statusBar.SetProgressFraction (GlobalWork);
 			DispatchService.RunPendingEvents ();
 		}
 		
 		public void UpdateStatusBar ()
 		{
 			if (showTaskTitles)
-				IdeApp.Workbench.StatusBar.ShowMessage (icon, CurrentTask);
+				statusBar.ShowMessage (icon, CurrentTask);
 			else
-				IdeApp.Workbench.StatusBar.ShowMessage (icon, title);
+				statusBar.ShowMessage (icon, title);
 			if (!UnknownWork)
-				IdeApp.Workbench.StatusBar.SetProgressFraction (GlobalWork);
+				statusBar.SetProgressFraction (GlobalWork);
 			else
-				IdeApp.Workbench.StatusBar.SetProgressFraction (0);
+				statusBar.SetProgressFraction (0);
 		}
 		
 		protected override void OnCompleted ()
@@ -90,25 +84,15 @@ namespace MonoDevelop.Ide.Gui
 			if (lockGui)
 				IdeApp.Workbench.UnlockGui ();
 			
-			int i = monitorQueue.IndexOf (this);
-			bool uniqueMonitor = monitorQueue.Count == 1;
-			
-			if (uniqueMonitor)
-				IdeApp.Workbench.StatusBar.EndProgress ();
-			else if (i == monitorQueue.Count - 1)
-				monitorQueue [i - 1].UpdateStatusBar ();
-			
-			monitorQueue.RemoveAt (i);
+			statusBar.Dispose ();
 
 			if (Errors.Count > 0 || Warnings.Count > 0) {
-				if (uniqueMonitor) {
-					if (Errors.Count > 0) {
-						Gtk.Image img = ImageService.GetImage (Stock.Error, Gtk.IconSize.Menu);
-						IdeApp.Workbench.StatusBar.ShowMessage (img, Errors [Errors.Count - 1]);
-					} else if (SuccessMessages.Count == 0) {
-						Gtk.Image img = ImageService.GetImage (Stock.Warning, Gtk.IconSize.Menu);
-						IdeApp.Workbench.StatusBar.ShowMessage (img, Warnings [Warnings.Count - 1]);
-					}
+				if (Errors.Count > 0) {
+					Gtk.Image img = ImageService.GetImage (Stock.Error, Gtk.IconSize.Menu);
+					IdeApp.Workbench.StatusBar.ShowMessage (img, Errors [Errors.Count - 1]);
+				} else if (SuccessMessages.Count == 0) {
+					Gtk.Image img = ImageService.GetImage (Stock.Warning, Gtk.IconSize.Menu);
+					IdeApp.Workbench.StatusBar.ShowMessage (img, Warnings [Warnings.Count - 1]);
 				}
 				
 				base.OnCompleted ();
@@ -123,16 +107,14 @@ namespace MonoDevelop.Ide.Gui
 					resultDialog.Run ();
 					resultDialog.Destroy ();
 				}
+				IdeApp.Workbench.StatusBar.SetMessageSourcePad (statusSourcePad);
 				return;
 			}
-
-			if (uniqueMonitor) {
-				if (SuccessMessages.Count > 0)
-					IdeApp.Workbench.StatusBar.ShowMessage (SuccessMessages [SuccessMessages.Count - 1]);
-				else
-					IdeApp.Workbench.StatusBar.ShowReady ();
-			}
 			
+			if (SuccessMessages.Count > 0)
+				IdeApp.Workbench.StatusBar.ShowMessage (SuccessMessages [SuccessMessages.Count - 1]);
+			
+			IdeApp.Workbench.StatusBar.SetMessageSourcePad (statusSourcePad);
 			base.OnCompleted ();
 		}
 	}

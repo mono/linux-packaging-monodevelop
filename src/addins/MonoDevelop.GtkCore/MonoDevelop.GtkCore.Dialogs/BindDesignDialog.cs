@@ -33,7 +33,7 @@ using Glade;
 using Gtk;
 using MonoDevelop.Core;
 using MonoDevelop.Components;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.GtkCore.Dialogs
 {
@@ -106,8 +106,7 @@ namespace MonoDevelop.GtkCore.Dialogs
 		
 		public bool Run ()
 		{
-			dialog.TransientFor = IdeApp.Workbench.RootWindow;
-			return dialog.Run () == (int) ResponseType.Ok;
+			return MessageService.ShowCustomDialog (dialog) == (int) ResponseType.Ok;
 		}
 		
 		public bool CreateNew {

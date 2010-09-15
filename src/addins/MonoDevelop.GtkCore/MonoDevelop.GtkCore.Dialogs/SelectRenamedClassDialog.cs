@@ -32,8 +32,7 @@ using Gtk;
 using Gdk;
 using Glade;
 using MonoDevelop.Projects.Dom;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Core.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.GtkCore.Dialogs
 {
@@ -53,7 +52,7 @@ namespace MonoDevelop.GtkCore.Dialogs
 			
 			TreeViewColumn column = new TreeViewColumn ();
 		
-			CellRendererPixbuf pr = new CellRendererPixbuf ();
+			var pr = new CellRendererPixbuf ();
 			column.PackStart (pr, false);
 			column.AddAttribute (pr, "pixbuf", 0);
 			
@@ -71,8 +70,7 @@ namespace MonoDevelop.GtkCore.Dialogs
 		
 		public bool Run ()
 		{
-			dialog.TransientFor = MonoDevelop.Ide.Gui.IdeApp.Workbench.RootWindow;
-			return dialog.Run () == (int) ResponseType.Ok;
+			return MessageService.ShowCustomDialog (dialog) == (int) ResponseType.Ok;
 		}
 		
 		public string SelectedClass {

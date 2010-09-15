@@ -25,11 +25,11 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using System.Text.RegularExpressions;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Html
 {
@@ -68,7 +68,7 @@ namespace MonoDevelop.Html
 			return list;
 		}
 		
-		class FileCompletionData : ICompletionData, IComparable<ICompletionData>
+		class FileCompletionData : CompletionData, IComparable<CompletionData>
 		{
 			ProjectFile file;
 			Func<ProjectFile,string> pathFunc;
@@ -79,33 +79,21 @@ namespace MonoDevelop.Html
 				this.pathFunc = pathFunc;
 			}
 			
-			public string Icon {
-				get { return null; }
-			}
-			
-			public string DisplayText {
+			public override string DisplayText {
 				get { return file.FilePath.FileName; }
 			}
 			
-			public string Description {
-				get { return null; }
-			}
-			
-			public string CompletionText {
+			public override string CompletionText {
 				get { return pathFunc (file); }
 			}
 			
-			public DisplayFlags DisplayFlags {
-				get { return DisplayFlags.None; }
-			}
-			
-			public int CompareTo (ICompletionData other)
+			public int CompareTo (CompletionData other)
 			{
 				return DisplayText.CompareTo (other.DisplayText);
 			}
 		}
 		
-		class FilePickerCompletionData : IActionCompletionData
+		class FilePickerCompletionData : CompletionData
 		{
 			Project proj;
 			string pattern;
@@ -118,15 +106,11 @@ namespace MonoDevelop.Html
 				this.pathFunc = pathFunc;
 			}
 			
-			public string Icon {
-				get { return null; }
-			}
-			
-			public string DisplayText {
+			public override string DisplayText {
 				get { return GettextCatalog.GetString ("Choose file..."); }
 			}
 			
-			public string Description {
+			public override string Description {
 				get { return GettextCatalog.GetString ("Choose a file from the project.");; }
 			}
 			
@@ -134,19 +118,19 @@ namespace MonoDevelop.Html
 				get { throw new InvalidOperationException (); }
 			}
 			
-			public DisplayFlags DisplayFlags {
-				get { return DisplayFlags.None; }
-			}
-			
-			public void InsertCompletionText (ICompletionWidget widget, CodeCompletionContext context)
+			public override void InsertCompletionText (CompletionListWindow window)
 			{
 				string text;
-				using (var dialog = new MonoDevelop.Projects.Gui.Dialogs.ProjectFileSelectorDialog (proj, "", pattern)) {
-					if (MessageService.ShowCustomDialog (dialog) != (int)Gtk.ResponseType.Ok || dialog.SelectedFile == null)
+				var dialog = new MonoDevelop.Ide.Projects.ProjectFileSelectorDialog (proj, "", pattern);
+				try {
+					if (MessageService.RunCustomDialog (dialog) != (int)Gtk.ResponseType.Ok || dialog.SelectedFile == null)
 						return;
 					text = pathFunc (dialog.SelectedFile);
 				}
-				widget.SetCompletionText (context, "", text);
+				finally {
+					dialog.Destroy ();
+				}
+				window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, "", text);
 			}
 		}
 	}

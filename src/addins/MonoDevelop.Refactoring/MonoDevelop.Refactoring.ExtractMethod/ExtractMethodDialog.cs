@@ -30,10 +30,10 @@ using Gtk;
 
 using MonoDevelop.Core;
 using MonoDevelop.Projects.Dom;
-using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.CodeGeneration;
 using System.Collections.Generic;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Refactoring.ExtractMethod
 {
@@ -122,11 +122,11 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 				return true;
 			ValidationResult result = nameValidator.ValidateName (new DomMethod (), entry.Text);
 			if (!result.IsValid) {
-				imageWarning.IconName = Stock.DialogError;
+				imageWarning.IconName = Gtk.Stock.DialogError;
 			} else if (result.HasWarning) {
-				imageWarning.IconName = Stock.DialogWarning;
+				imageWarning.IconName = Gtk.Stock.DialogWarning;
 			} else {
-				imageWarning.IconName = Stock.Apply;
+				imageWarning.IconName = Gtk.Stock.Apply;
 			}
 			labelWarning.Text = result.Message;
 			return result.IsValid;
@@ -163,10 +163,32 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 		
 		void OnOKClicked (object sender, EventArgs e)
 		{
-			SetProperties ();
-			List<Change> changes = extractMethod.PerformChanges (options, properties);
-			IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetBackgroundProgressMonitor (this.Title, null);
-			RefactoringService.AcceptChanges (monitor, options.Dom, changes);
+			TextEditorData data = options.GetTextEditorData ();
+			Mono.TextEditor.TextEditor editor = data.Parent;
+// Insertion cursor mode test:
+			if (editor != null) {
+				IType type = properties.DeclaringMember.DeclaringType;
+				
+				InsertionCursorEditMode mode = new InsertionCursorEditMode (editor, HelperMethods.GetInsertionPoints (editor.Document, type));
+				for (int i = 0; i < mode.InsertionPoints.Count; i++) {
+					var point = mode.InsertionPoints[i];
+					if (point.Location < editor.Caret.Location) {
+						mode.CurIndex = i;
+					} else {
+						break;
+					}
+				}
+				mode.StartMode ();
+				mode.Exited += delegate(object s, InsertionCursorEventArgs args) {
+					if (args.Success) {
+						SetProperties ();
+						properties.InsertionPoint = args.InsertionPoint;
+						List<Change> changes = extractMethod.PerformChanges (options, properties);
+						IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetBackgroundProgressMonitor (this.Title, null);
+						RefactoringService.AcceptChanges (monitor, options.Dom, changes);
+					}
+				};
+			}
 			
 			((Widget)this).Destroy ();
 		}
@@ -176,8 +198,7 @@ namespace MonoDevelop.Refactoring.ExtractMethod
 			SetProperties ();
 			List<Change> changes = extractMethod.PerformChanges (options, properties);
 			((Widget)this).Destroy ();
-			RefactoringPreviewDialog refactoringPreviewDialog = new RefactoringPreviewDialog (options.Dom, changes);
-			refactoringPreviewDialog.Show ();
+			MessageService.ShowCustomDialog (new RefactoringPreviewDialog (options.Dom, changes));
 		}
 	}
 }

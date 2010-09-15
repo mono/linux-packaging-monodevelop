@@ -31,14 +31,8 @@
 
 using System;
 
-using MonoDevelop.Core;
-using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Commands;
-using MonoDevelop.Components.Commands;
-using MonoDevelop.Core.Execution;
-using MonoDevelop.Projects.Text;
-using MonoDevelop.Projects.Dom;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.DesignerSupport
 {
@@ -99,7 +93,6 @@ namespace MonoDevelop.DesignerSupport
 			content.ContentChanged -= new EventHandler (OnTextContentChanged);
 			content.DirtyChanged -= new EventHandler (OnTextDirtyChanged);
 			IdeApp.Workbench.ActiveDocumentChanged -= new EventHandler (OnActiveDocumentChanged);
-			content.Dispose ();
 			base.Dispose ();
 		}
 		

@@ -28,11 +28,9 @@
 
 using System;
 
-using MonoDevelop.Core.Gui.Components;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui.Components;
 
 namespace MonoDevelop.Ide.Gui.Pads.ClassBrowser
@@ -47,9 +45,11 @@ namespace MonoDevelop.Ide.Gui.Pads.ClassBrowser
 			}
 		}
 		
-		public ClassBrowserPad ()
+		public override void Initialize (IPadWindow container)
 		{
-			this.widget = new ClassBrowserPadWidget (base.TreeView); 
+			base.Initialize (container);
+			this.widget = new ClassBrowserPadWidget (base.TreeView, container); 
 		}
+
 	}
 }

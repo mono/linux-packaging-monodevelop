@@ -1,9 +1,54 @@
-monodevelop (2.2.2+dfsg-2) UNRELEASED; urgency=low
+monodevelop (2.4+dfsg-3) unstable; urgency=low
 
-  * debian/control: 
-    + We are using git instead of svn now, update VCS-* locations
+  * debian/patches/use_keyfile_not_keycontainer.patch:
+    + Two assemblies, Mono.Debugging.dll and MonoDevelop.Debugger.Soft.dll, 
+      are built specifying -keycontainer on their compiler command line. 
+      Unfortunately, -keycontainer usually fails to function as expected, 
+      and instead generates a random key. This causes major problems for
+      extensions built against these assemblies. This patch uses -keyfile
+      instead, which removes the problem.
 
- -- Stefan Ebner <sebner@ubuntu.com>  Sat, 19 Jun 2010 20:04:18 +0200
+ -- Jo Shields <directhex@apebox.org>  Tue, 14 Sep 2010 16:40:37 +0100
+
+monodevelop (2.4+dfsg-2) unstable; urgency=low
+
+  * debian/patches/inject_Mono.Debugger.Soft_source.patch,
+    debian/patches/use_system_Mono.Debugger.Soft.patch,
+    debian/control:
+    + Build against system Soft Debugger, since we now have a new
+      enough Mono to match MonoDevelop's required API
+
+ -- Jo Shields <directhex@apebox.org>  Fri, 10 Sep 2010 16:54:48 +0100
+
+monodevelop (2.4+dfsg-1) experimental; urgency=low
+
+  * New upstream release
+  * DFSG version of MonoDevelop 2.4. Removed files:
+    + src/addins/NUnit/lib/nunit.core.interfaces.dll
+    + src/addins/NUnit/lib/nunit.framework.dll
+    + src/addins/NUnit/lib/nunit.core.dll
+    + src/addins/NUnit/lib/nunit.util.dll
+    + src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Mono.Debugger.Soft.dll
+  * debian/control:
+    + Bump mono build-deps to 2.6.1, to reflect configure.in
+    + Add GTK# development packages to Recommends, since most people want
+      MonoDevelop in order to write GTK# apps
+  * debian/patches/use_libsvn1.patch,
+    debian/patches/update_templates_for_gtk-sharp_2.12.patch,
+    debian/patches/use_csc.patch,
+    debian/patches/remove_support_for_moonlight.patch:
+    + Refreshed
+  * debian/source/format:
+    + Force DebSrc 1.0
+  * debian/rules:
+    + Force XDG_CONFIG_HOME to allow keystores to work
+  * debian/patches/inject_Mono.Debugger.Soft_source.patch,
+    debian/patches/remove_support_for_moonlight.patch:
+    + MonoDevelop upstream has a nasty habit of bundling binary versions of
+      libraries. So we're now pulling in Mono.Debugger.Soft as source, from
+      Mono SVN revision r158545, and integrating it into the build system.
+
+ -- Jo Shields <directhex@apebox.org>  Wed, 09 Jun 2010 15:17:58 +0100
 
 monodevelop (2.2.2+dfsg-1) unstable; urgency=low
 

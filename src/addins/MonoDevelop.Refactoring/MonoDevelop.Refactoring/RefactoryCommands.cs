@@ -27,10 +27,8 @@
 //
 
 using System;
-using System.Linq;
 using System.Collections.Generic;
 using System.Text;
-using System.CodeDom;
 using System.Threading;
 
 using MonoDevelop.Core;
@@ -47,6 +45,9 @@ using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Ide.FindInFiles;
 using MonoDevelop.Refactoring;
 using MonoDevelop.Refactoring.RefactorImports;
+using MonoDevelop.Ide;
+using System.Linq;
+using MonoDevelop.Ide.CodeCompletion;
 
 namespace MonoDevelop.Refactoring
 {
@@ -55,12 +56,21 @@ namespace MonoDevelop.Refactoring
 		CurrentRefactoryOperations,
 		GotoDeclaration,
 		FindReferences,
+		FindDerivedClasses,
 		DeclareLocal,
 		Rename,
 		RemoveUnusedImports,
 		SortImports,
-		RemoveSortImports
+		RemoveSortImports,
+		ExtractMethod,
+		CreateMethod,
+		IntroduceConstant,
+		IntegrateTemporaryVariable,
+		ImportSymbol
 	}
+	
+	
+	
 	
 	public class CurrentRefactoryOperationsHandler: CommandHandler
 	{
@@ -139,9 +149,7 @@ namespace MonoDevelop.Refactoring
 			bool added = false;
 			int line, column;
 			editor.GetLineColumnFromPosition (editor.CursorPosition, out line, out column);
-			ProjectDom ctx = doc.Project != null ? ProjectDomService.GetProjectDom (doc.Project) : ProjectDom.Empty;
-			if (ctx == null)
-				return;
+			ProjectDom ctx = doc.Dom;
 			ResolveResult resolveResult;
 			INode item;
 			GetItem (ctx, doc, editor, out resolveResult, out item);
@@ -172,54 +180,66 @@ namespace MonoDevelop.Refactoring
 				}
 			}
 			
-			if (resolveResult != null  && resolveResult.ResolvedExpression != null && !string.IsNullOrEmpty (resolveResult.ResolvedExpression.Expression)) {
-				
-				IReturnType returnType = null; 
-				INRefactoryASTProvider astProvider = RefactoringService.GetASTProvider (MonoDevelop.Core.Gui.DesktopService.GetMimeTypeForUri (doc.FileName));
-				if (astProvider != null) 
-					returnType = astProvider.ParseTypeReference (resolveResult.ResolvedExpression.Expression).ConvertToReturnType ();
-				if (returnType == null)
-					returnType = DomReturnType.FromInvariantString (resolveResult.ResolvedExpression.Expression);
-				List<string> namespaces = new List<string> (ctx.ResolvePossibleNamespaces (returnType));
-				if (item == null || namespaces.Count > 1) {
-					CommandInfoSet resolveMenu = new CommandInfoSet ();
-					resolveMenu.Text = GettextCatalog.GetString ("Resolve");
-					if (item == null) {
-						foreach (string ns in namespaces) {
-							CommandInfo info = resolveMenu.CommandInfos.Add ("using " + ns + ";", new RefactoryOperation (new ResolveNameOperation (ctx, doc, resolveResult, ns).AddImport));
-							info.Icon = MonoDevelop.Core.Gui.Stock.AddNamespace;
-						}
-						resolveMenu.CommandInfos.AddSeparator ();
-					} else {
-						// remove all unused namespaces (for resolving conflicts)
-						namespaces.RemoveAll (ns => !doc.CompilationUnit.IsNamespaceUsedAt (ns, resolveResult.ResolvedExpression.Region.Start));
-					}
-					
-					foreach (string ns in namespaces) {
-						resolveMenu.CommandInfos.Add (ns, new RefactoryOperation (new ResolveNameOperation (ctx, doc, resolveResult, ns).ResolveName));
-					}
-					if (namespaces.Count > (item == null ? 0 : 1))
-						ainfo.Add (resolveMenu, null);
-				}
+			INode realItem = item;
+			if (item is InstantiatedType)
+				realItem = ((InstantiatedType)item).UninstantiatedType;
+			if (realItem is CompoundType) {
+				editor.GetLineColumnFromPosition (editor.CursorPosition, out line, out column);
+				((CompoundType)realItem).SetMainPart (doc.FileName, line, column);
+				item = realItem;
 			}
 			
 			RefactoringOptions options = new RefactoringOptions () {
 				Document = doc,
 				Dom = ctx,
 				ResolveResult = resolveResult,
-				SelectedItem = null
+				SelectedItem = realItem
 			};
+			
+			if (resolveResult != null  && resolveResult.ResolvedExpression != null && !string.IsNullOrEmpty (resolveResult.ResolvedExpression.Expression)) {
+				bool resolveDirect;
+				List<string> namespaces = QuickFixHandler.GetResolveableNamespaces (options, out resolveDirect);
+			
+				if (item == null || namespaces.Count > 1) {
+					CommandInfoSet resolveMenu = new CommandInfoSet ();
+					resolveMenu.Text = GettextCatalog.GetString ("Resolve");
+					if (item == null) {
+						foreach (string ns in namespaces) {
+							// remove used namespaces for conflict resolving. 
+							if (options.Document.CompilationUnit.IsNamespaceUsedAt (ns, options.ResolveResult.ResolvedExpression.Region.Start))
+								continue;
+							CommandInfo info = resolveMenu.CommandInfos.Add ("using " + ns + ";", new RefactoryOperation (new ResolveNameOperation (ctx, doc, resolveResult, ns).AddImport));
+							info.Icon = MonoDevelop.Ide.Gui.Stock.AddNamespace;
+						}
+						if (!(resolveResult is UnresolvedMemberResolveResult))
+							resolveMenu.CommandInfos.AddSeparator ();
+					} else {
+						// remove all unused namespaces (for resolving conflicts)
+						namespaces.RemoveAll (ns => !doc.CompilationUnit.IsNamespaceUsedAt (ns, resolveResult.ResolvedExpression.Region.Start));
+					}
+					
+					if (resolveDirect) {
+						foreach (string ns in namespaces) {
+							resolveMenu.CommandInfos.Add (ns, new RefactoryOperation (new ResolveNameOperation (ctx, doc, resolveResult, ns).ResolveName));
+						}
+					}
+					if (namespaces.Count > (item == null ? 0 : 1))
+						ainfo.Add (resolveMenu, null);
+				}
+			}
+			
+			
 			
 			if (doc.CompilationUnit != null && doc.CompilationUnit.Usings.Any (u => !u.IsFromNamespace && u.Region.Contains (line, column))) {
 				CommandInfoSet organizeUsingsMenu = new CommandInfoSet ();
 				organizeUsingsMenu.Text = GettextCatalog.GetString ("_Organize Usings");
-				organizeUsingsMenu.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.RemoveUnusedImports, null), new RefactoryOperation (delegate {
+				organizeUsingsMenu.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.RemoveUnusedImports), new RefactoryOperation (delegate {
 					new RemoveUnusedImportsHandler ().Start (options);
 				}));
-				organizeUsingsMenu.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (MonoDevelop.Refactoring.RefactoryCommands.SortImports, null), new RefactoryOperation (delegate {
+				organizeUsingsMenu.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (MonoDevelop.Refactoring.RefactoryCommands.SortImports), new RefactoryOperation (delegate {
 					new SortImportsHandler ().Start (options);
 				}));
-				organizeUsingsMenu.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (MonoDevelop.Refactoring.RefactoryCommands.RemoveSortImports, null), new RefactoryOperation (delegate {
+				organizeUsingsMenu.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (MonoDevelop.Refactoring.RefactoryCommands.RemoveSortImports), new RefactoryOperation (delegate {
 					new RemoveSortImportsHandler ().Start (options);
 				}));
 				ainfo.Add (organizeUsingsMenu, null);
@@ -235,10 +255,161 @@ namespace MonoDevelop.Refactoring
 					ciset.CommandInfos.Add (info, new RefactoryOperation (new RefactoringOperationWrapper (refactoring, options).Operation));
 				}
 			}
+			
 			if (ciset.CommandInfos.Count > 0) {
 				ainfo.Add (ciset, null);
 				added = true;
 			}
+			ICompilationUnit pinfo = doc.CompilationUnit;
+			if (pinfo == null)
+				return;
+			
+			
+			Refactorer refactorer = new Refactorer (ctx, pinfo, eclass, realItem, null);
+			
+			if (IdeApp.ProjectOperations.CanJumpToDeclaration (item)) {
+				if (item is CompoundType) {
+					CommandInfoSet declSet = new CommandInfoSet ();
+					declSet.Text = GettextCatalog.GetString ("_Go to declaration");
+					CompoundType ct = (CompoundType)item;
+					foreach (IType part in ct.Parts) {
+						Refactorer partRefactorer = new Refactorer (ctx, pinfo, eclass, part, null);
+						declSet.CommandInfos.Add (string.Format (GettextCatalog.GetString ("{0}, Line {1}"), FormatFileName (part.CompilationUnit.FileName), part.Location.Line), new RefactoryOperation (partRefactorer.GoToDeclaration));
+					}
+					ainfo.Add (declSet);
+				} else {
+					ainfo.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.GotoDeclaration), new RefactoryOperation (refactorer.GoToDeclaration));
+				}
+				added = true;
+			}
+			
+			if ((item is IMember || item is LocalVariable || item is IParameter) && !(item is IType))
+				ainfo.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.FindReferences), new RefactoryOperation (refactorer.FindReferences));
+			
+			Ambience ambience = AmbienceService.GetAmbienceForFile (pinfo.FileName);
+			bool includeModifyCommands = this.IsModifiable (item);
+			
+			bool canRename;
+			if ((item is LocalVariable) || (item is IParameter)) {
+				canRename = true; 
+			} else if (item is IType) { 
+				canRename = ((IType)item).SourceProject != null; 
+			} else if (item is IMember) {
+				IType cls = ((IMember)item).DeclaringType;
+				canRename = cls != null && cls.SourceProject != null;
+			} else {
+				canRename = false;
+			}
+			
+			// case: clicked on base in "constructor" - so pointing to the base constructor using argument count
+			// not 100% correct, but it's the fastest thing to do.
+			if (resolveResult is BaseResolveResult && eitem is IMethod && ((IMethod)eitem).IsConstructor) {
+				IType type = item as IType;
+				IMethod baseConstructor = null;
+				int idx1 = resolveResult.ResolvedExpression.Expression.IndexOf ('(');
+				int idx2 = resolveResult.ResolvedExpression.Expression.IndexOf (')');
+				int paramCount = 0;
+				if (idx1 > 0 && idx2 > 0) {
+					if (idx2 - idx1 > 1)
+						paramCount++;
+					for (int i=idx1; i < idx2; i++) {
+						if (resolveResult.ResolvedExpression.Expression[i] == ',') 
+							paramCount++;
+					}
+				}
+				foreach (IMethod m in type.Methods) {
+					if (m.IsConstructor && m.Parameters.Count == paramCount)
+						baseConstructor = m;
+				}
+				Refactorer refactorer2 = new Refactorer (ctx, pinfo, baseConstructor.DeclaringType, baseConstructor, null);
+				ainfo.Add (GettextCatalog.GetString ("Go to _base"), new RefactoryOperation (refactorer2.GoToBase));
+			}
+			
+			if (item is IType) {
+				IType cls = (IType) item;
+				if (cls.BaseType != null && cls.ClassType == ClassType.Class) {
+					foreach (IReturnType rt in cls.BaseTypes) {
+						IType bc = ctx.GetType (rt);
+						if (bc != null && bc.ClassType != ClassType.Interface/* TODO: && IdeApp.ProjectOperations.CanJumpToDeclaration (bc)*/) {
+							ainfo.Add (GettextCatalog.GetString ("Go to _base"), new RefactoryOperation (refactorer.GoToBase));
+							break;
+						}
+					}
+				}
+				
+				if ((cls.ClassType == ClassType.Class && !cls.IsSealed) || cls.ClassType == ClassType.Interface) {
+					ainfo.Add (cls.ClassType != ClassType.Interface ? GettextCatalog.GetString ("Find _derived classes") : GettextCatalog.GetString ("Find _implementor classes"), new RefactoryOperation (refactorer.FindDerivedClasses));
+				}
+
+				if (cls.SourceProject != null && includeModifyCommands && ((cls.ClassType == ClassType.Class) || (cls.ClassType == ClassType.Struct))) {
+					ciset.CommandInfos.Add (GettextCatalog.GetString ("_Encapsulate Fields..."), new RefactoryOperation (refactorer.EncapsulateField));
+					ciset.CommandInfos.Add (GettextCatalog.GetString ("Override/Implement members..."), new RefactoryOperation (refactorer.OverrideOrImplementMembers));
+				}
+				
+				ainfo.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.FindReferences), new RefactoryOperation (refactorer.FindReferences));
+				
+//				if (canRename)
+//					ciset.CommandInfos.Add (GettextCatalog.GetString ("_Rename"), new RefactoryOperation (refactorer.Rename));
+				
+				if (canRename && cls.ClassType == ClassType.Interface && eclass != null) {
+					// An interface is selected, so just need to provide these 2 submenu items
+					ciset.CommandInfos.Add (GettextCatalog.GetString ("Implement Interface (implicit)"), new RefactoryOperation (refactorer.ImplementImplicitInterface));
+					ciset.CommandInfos.Add (GettextCatalog.GetString ("Implement Interface (explicit)"), new RefactoryOperation (refactorer.ImplementExplicitInterface));
+				} else if (canRename && includeModifyCommands && cls.BaseType != null && cls.ClassType != ClassType.Interface && cls == eclass) {
+					// Class might have interfaces... offer to implement them
+					CommandInfoSet impset = new CommandInfoSet ();
+					CommandInfoSet expset = new CommandInfoSet ();
+					CommandInfoSet abstactset = new CommandInfoSet ();
+					bool ifaceAdded = false;
+					bool abstractAdded = false;
+					
+					foreach (IReturnType rt in cls.BaseTypes) {
+						IType iface = ctx.GetType (rt);
+						if (iface == null)
+							continue;
+						if (iface.ClassType == ClassType.Interface) {
+							Refactorer ifaceRefactorer = new Refactorer (ctx, pinfo, cls, iface, rt);
+							impset.CommandInfos.Add (ambience.GetString (rt, OutputFlags.IncludeGenerics), new RefactoryOperation (ifaceRefactorer.ImplementImplicitInterface));
+							expset.CommandInfos.Add (ambience.GetString (rt, OutputFlags.IncludeGenerics), new RefactoryOperation (ifaceRefactorer.ImplementExplicitInterface));
+							ifaceAdded = true;
+						} else if (ContainsAbstractMembers (iface)) {
+							Refactorer ifaceRefactorer = new Refactorer (ctx, pinfo, cls, iface, rt);
+							abstactset.CommandInfos.Add (ambience.GetString (rt, OutputFlags.IncludeGenerics), new RefactoryOperation (ifaceRefactorer.ImplementAbstractMembers));
+							abstractAdded = true;
+						}
+					}
+					
+					if (ifaceAdded) {
+						impset.Text = GettextCatalog.GetString ("Implement Interface (implicit)");
+						ciset.CommandInfos.Add (impset, null);
+						
+						expset.Text = GettextCatalog.GetString ("Implement Interface (explicit)");
+						ciset.CommandInfos.Add (expset, null);
+					}
+					if (abstractAdded) {
+						abstactset.Text = GettextCatalog.GetString ("Implement abstract members");
+						ciset.CommandInfos.Add (abstactset, null);
+					}
+				}
+			} else if (item is IField) {
+				if (includeModifyCommands) {
+					if (canRename)
+						ciset.CommandInfos.Add (GettextCatalog.GetString ("_Encapsulate Field..."), new RefactoryOperation (refactorer.EncapsulateField));
+				}
+			} else if (item is IMethod) {
+				IMethod method = item as IMethod;
+				if (method.IsOverride) {
+					ainfo.Add (GettextCatalog.GetString ("Go to _base"), new RefactoryOperation (refactorer.GoToBase));
+					added = true;
+				}
+			}
+			
+			if (added)
+				ainfo.AddSeparator ();
+			
+			
+			
+			/*
 			while (item != null) {
 				CommandInfo ci;
 
@@ -298,7 +469,7 @@ namespace MonoDevelop.Refactoring
 			}
 			
 			if (added)
-				ainfo.AddSeparator ();
+				ainfo.AddSeparator ();*/
 		}
 		
 		class RefactoringOperationWrapper
@@ -318,7 +489,7 @@ namespace MonoDevelop.Refactoring
 			}
 		}
 		
-		class ResolveNameOperation
+		public class ResolveNameOperation
 		{
 			ProjectDom ctx;
 			Document doc;
@@ -386,7 +557,7 @@ namespace MonoDevelop.Refactoring
 			return null;
 		}
 		
-		string EscapeName (string name)
+	/*	string EscapeName (string name)
 		{
 			if (name.IndexOf ('_') == -1)
 				return name;
@@ -399,7 +570,7 @@ namespace MonoDevelop.Refactoring
 			}
 			
 			return sb.ToString ();
-		}
+		}*/
 		
 		static string FormatFileName (string fileName)
 		{
@@ -413,7 +584,7 @@ namespace MonoDevelop.Refactoring
 				return "..." + fileName.Substring (idx);
 			return fileName;
 		}
-		
+		/*
 		CommandInfo BuildRefactoryMenuForItem (ProjectDom ctx, ICompilationUnit pinfo, IType eclass, INode item, bool includeModifyCommands)
 		{
 			INode realItem = item;
@@ -453,18 +624,21 @@ namespace MonoDevelop.Refactoring
 					}
 					ciset.CommandInfos.Add (declSet);
 				} else {
-					ciset.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.GotoDeclaration, null), new RefactoryOperation (refactorer.GoToDeclaration));
+					ciset.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.GotoDeclaration), new RefactoryOperation (refactorer.GoToDeclaration));
 				}
 			}
+			
 
 			if ((item is IMember || item is LocalVariable || item is IParameter) && !(item is IType))
-				ciset.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.FindReferences, null), new RefactoryOperation (refactorer.FindReferences));
+				ciset.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.FindReferences), new RefactoryOperation (refactorer.FindReferences));
 			
 			// We can rename local variables (always), method params (always), 
 			// or class/members (if they belong to a project)
-			if ((item is LocalVariable) || (item is IParameter))
-				canRename = true; else if (item is IType)
-				canRename = ((IType)item).SourceProject != null; else if (item is IMember) {
+			if ((item is LocalVariable) || (item is IParameter)) {
+				canRename = true; 
+			} else if (item is IType) { 
+				canRename = ((IType)item).SourceProject != null; 
+			} else if (item is IMember) {
 				IType cls = ((IMember)item).DeclaringType;
 				canRename = cls != null && cls.SourceProject != null;
 			}
@@ -473,7 +647,7 @@ namespace MonoDevelop.Refactoring
 				Document = doc,
 				Dom = ctx,
 				ResolveResult = null,
-				SelectedItem = item
+				SelectedItem = item is InstantiatedType ? ((InstantiatedType)item).UninstantiatedType : item
 			};
 			foreach (var refactoring in RefactoringService.Refactorings) {
 				if (refactoring.IsValid (options)) {
@@ -504,7 +678,7 @@ namespace MonoDevelop.Refactoring
 				if (cls.BaseType != null && cls.ClassType == ClassType.Class) {
 					foreach (IReturnType rt in cls.BaseTypes) {
 						IType bc = ctx.GetType (rt);
-						if (bc != null && bc.ClassType != ClassType.Interface/* TODO: && IdeApp.ProjectOperations.CanJumpToDeclaration (bc)*/) {
+						if (bc != null && bc.ClassType != ClassType.Interface) {
 							ciset.CommandInfos.Add (GettextCatalog.GetString ("Go to _base"), new RefactoryOperation (refactorer.GoToBase));
 							break;
 						}
@@ -520,7 +694,7 @@ namespace MonoDevelop.Refactoring
 					ciset.CommandInfos.Add (GettextCatalog.GetString ("Override/Implement members..."), new RefactoryOperation (refactorer.OverrideOrImplementMembers));
 				}
 				
-				ciset.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.FindReferences, null), new RefactoryOperation (refactorer.FindReferences));
+				ciset.CommandInfos.Add (IdeApp.CommandService.GetCommandInfo (RefactoryCommands.FindReferences), new RefactoryOperation (refactorer.FindReferences));
 				
 //				if (canRename)
 //					ciset.CommandInfos.Add (GettextCatalog.GetString ("_Rename"), new RefactoryOperation (refactorer.Rename));
@@ -533,24 +707,36 @@ namespace MonoDevelop.Refactoring
 					// Class might have interfaces... offer to implement them
 					CommandInfoSet impset = new CommandInfoSet ();
 					CommandInfoSet expset = new CommandInfoSet ();
-					bool added = false;
+					CommandInfoSet abstactset = new CommandInfoSet ();
+					bool ifaceAdded = false;
+					bool abstractAdded = false;
 					
 					foreach (IReturnType rt in cls.BaseTypes) {
 						IType iface = ctx.GetType (rt);
-						if (iface != null && iface.ClassType == ClassType.Interface) {
+						if (iface == null)
+							continue;
+						if (iface.ClassType == ClassType.Interface) {
 							Refactorer ifaceRefactorer = new Refactorer (ctx, pinfo, cls, iface, rt);
 							impset.CommandInfos.Add (ambience.GetString (rt, OutputFlags.IncludeGenerics), new RefactoryOperation (ifaceRefactorer.ImplementImplicitInterface));
 							expset.CommandInfos.Add (ambience.GetString (rt, OutputFlags.IncludeGenerics), new RefactoryOperation (ifaceRefactorer.ImplementExplicitInterface));
-							added = true;
+							ifaceAdded = true;
+						} else if (ContainsAbstractMembers (iface)) {
+							Refactorer ifaceRefactorer = new Refactorer (ctx, pinfo, cls, iface, rt);
+							abstactset.CommandInfos.Add (ambience.GetString (rt, OutputFlags.IncludeGenerics), new RefactoryOperation (ifaceRefactorer.ImplementAbstractMembers));
+							abstractAdded = true;
 						}
 					}
 					
-					if (added) {
+					if (ifaceAdded) {
 						impset.Text = GettextCatalog.GetString ("Implement Interface (implicit)");
 						ciset.CommandInfos.Add (impset, null);
 						
 						expset.Text = GettextCatalog.GetString ("Implement Interface (explicit)");
 						ciset.CommandInfos.Add (expset, null);
+					}
+					if (abstractAdded) {
+						abstactset.Text = GettextCatalog.GetString ("Implement abstract members");
+						ciset.CommandInfos.Add (abstactset, null);
 					}
 				}
 			} else if (item is IField) {
@@ -594,8 +780,19 @@ namespace MonoDevelop.Refactoring
 			ciset.UseMarkup = true;
 			return ciset;
 		}
+		*/
+		public static bool ContainsAbstractMembers (MonoDevelop.Projects.Dom.IType cls)
+		{
+			if (cls == null)
+				return false;
+			foreach (IMember member in cls.Members) {
+				if (member.IsAbstract)
+					return true;
+			}
+			return false;
+		}
 		
-		void AddRefactoryMenuForClass (ProjectDom ctx, ICompilationUnit pinfo, CommandInfoSet ciset, string className)
+	/*	void AddRefactoryMenuForClass (ProjectDom ctx, ICompilationUnit pinfo, CommandInfoSet ciset, string className)
 		{
 			IType cls = ctx.GetType (className, null, true, true);
 			if (cls != null) {
@@ -603,9 +800,9 @@ namespace MonoDevelop.Refactoring
 				if (ci != null)
 					ciset.CommandInfos.Add (ci, null);
 			}
-		}
+		}*/
 		
-		delegate void RefactoryOperation ();
+		public delegate void RefactoryOperation ();
 	}
 	
 	public class Refactorer
@@ -676,16 +873,14 @@ namespace MonoDevelop.Refactoring
 					references = refactorer.FindParameterReferences (monitor, (IParameter)item, true);
 				} else if (item is IMember) {
 					IMember member = (IMember)item;
-		//			if (member.DeclaringType.ClassType == ClassType.Interface || member.IsAbstract || member.IsVirtual) {
-						references = new MemberReferenceCollection ();
-						foreach (IMember m in MonoDevelop.Refactoring.Rename.RenameRefactoring.CollectMembers (member.DeclaringType.SourceProjectDom, member)) {
-							foreach (MemberReference r in refactorer.FindMemberReferences (monitor, m.DeclaringType, m, true)) {
-								references.Add (r);
-							}
+/*					references = new MemberReferenceCollection ();
+					foreach (IMember m in MonoDevelop.Refactoring.Rename.RenameRefactoring.CollectMembers (member.DeclaringType.SourceProjectDom, member)) {
+						foreach (MemberReference r in refactorer.FindMemberReferences (monitor, m.DeclaringType, m, true)) {
+							references.Add (r);
 						}
-		/*			} else {
-						references = refactorer.FindMemberReferences (monitor, member.DeclaringType, member, true);
 					}*/
+					
+					references = refactorer.FindMemberReferences (monitor, member.DeclaringType, member, true);
 				}
 				if (references != null) {
 					foreach (MemberReference mref in references) {
@@ -798,43 +993,48 @@ namespace MonoDevelop.Refactoring
 			ImplementInterface (true);
 		}
 		
-		public void EncapsulateField ()
+		public void ImplementAbstractMembers ()
 		{
+			CodeRefactorer refactorer = IdeApp.Workspace.GetCodeRefactorer (IdeApp.ProjectOperations.CurrentSelectedSolution);
+			IType aclass = item as IType;
+			
+			if (klass == null)
+				return;
+			
+			if (aclass == null)
+				return;
+				
 			IEditableTextBuffer editor = IdeApp.Workbench.ActiveDocument.GetContent <IEditableTextBuffer>();
 			if (editor != null)
 				editor.BeginAtomicUndo ();
 				
 			try {
-				EncapsulateFieldDialog dialog;
-				if (item is IField) {
-					dialog = new EncapsulateFieldDialog (ctx, (IField) item);
-				} else {
-					
-					dialog = new EncapsulateFieldDialog (ctx, (IType) item);
+				List<KeyValuePair<IMember,IReturnType>> members = new List<KeyValuePair<IMember, IReturnType>> ();
+				foreach (IMember member in aclass.Members) {
+					if (member.IsAbstract && !klass.Members.Any (m => member.Name == m.Name)) 
+						members.Add (new KeyValuePair<IMember,IReturnType> (member, null));
 				}
-				
-				dialog.Show ();
+				refactorer.ImplementMembers (klass, members, "implemented abstract members of " + aclass.FullName);
 			} finally {
 				if (editor != null)
 					editor.EndAtomicUndo ();
 			}
-			
+		}
+		
+		public void EncapsulateField ()
+		{
+			EncapsulateFieldDialog dialog;
+			if (item is IField) {
+				dialog = new EncapsulateFieldDialog (IdeApp.Workbench.ActiveDocument.TextEditorData.Parent, ctx, (IField) item);
+			} else {
+				dialog = new EncapsulateFieldDialog (IdeApp.Workbench.ActiveDocument.TextEditorData.Parent, ctx, (IType) item);
+			}
+			MessageService.ShowCustomDialog (dialog);
 		}
 		
 		public void OverrideOrImplementMembers ()
 		{
-			IEditableTextBuffer editor = IdeApp.Workbench.ActiveDocument.GetContent <IEditableTextBuffer>();
-			if (editor != null) 
-				editor.BeginAtomicUndo ();
-			
-			try {
-				MonoDevelop.Ide.OverridesImplementsDialog dialog = new MonoDevelop.Ide.OverridesImplementsDialog ((IType)item);
-				dialog.TransientFor = IdeApp.Workbench.RootWindow;
-				dialog.Run ();
-			} finally {
-				if (editor != null)
-					editor.EndAtomicUndo ();
-			}
+			MessageService.ShowCustomDialog (new OverridesImplementsDialog (IdeApp.Workbench.ActiveDocument.TextEditorData.Parent, (IType)item));
 		}
 		
 		public void Rename ()

@@ -33,6 +33,7 @@ using System.Text;
 
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
+using MonoDevelop.Core.Execution;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.CSharp.Project;
 
@@ -81,11 +82,9 @@ namespace MonoDevelop.CSharp
 							monitor.ReportWarning (msg);
 							continue;
 						}
-						string referencedName = pkg.IsCorePackage ? Path.GetFileName (fileName) : fileName;
-						if (!alreadyAddedReference.Contains (referencedName)) {
-							alreadyAddedReference.Add (referencedName);
-							AppendQuoted (sb, "/r:", referencedName);
-						}
+
+						if (alreadyAddedReference.Add (fileName))
+							AppendQuoted (sb, "/r:", fileName);
 						
 						if (pkg.GacRoot != null && !gacRoots.Contains (pkg.GacRoot))
 							gacRoots.Add (pkg.GacRoot);
@@ -95,16 +94,15 @@ namespace MonoDevelop.CSharp
 								if (rpkg == null)
 									continue;
 								foreach (SystemAssembly assembly in rpkg.Assemblies) {
-									if (alreadyAddedReference.Contains (assembly.Location))
-										continue;
-									alreadyAddedReference.Add (assembly.Location);
-									AppendQuoted (sb, "/r:", assembly.Location);
+									if (alreadyAddedReference.Add (assembly.Location))
+										AppendQuoted (sb, "/r:", assembly.Location);
 								}
 							}
 						}
 						break;
 					default:
-						AppendQuoted (sb, "/r:", fileName);
+						if (alreadyAddedReference.Add (fileName))
+							AppendQuoted (sb, "/r:", fileName);
 						break;
 					}
 				}
@@ -243,9 +241,11 @@ namespace MonoDevelop.CSharp
 			
 			if (!string.IsNullOrEmpty (compilerParameters.NoWarnings)) 
 				AppendQuoted (sb, "/nowarn:", compilerParameters.NoWarnings);
-			
-			if (runtime.RuntimeId == "MS.NET")
-				sb.AppendLine ("/fullpaths");
+
+			if (runtime.RuntimeId == "MS.NET") {
+				sb.AppendLine("/fullpaths");
+				sb.AppendLine("/utf8output");
+			}
 
 			string output = "";
 			string error  = "";
@@ -276,7 +276,7 @@ namespace MonoDevelop.CSharp
 
 			LoggingService.LogInfo (compilerName + " " + sb.ToString ());
 			
-			Dictionary<string,string> envVars = runtime.GetToolsEnvironmentVariables (project.TargetFramework);
+			ExecutionEnvironment envVars = runtime.GetToolsExecutionEnvironment (project.TargetFramework);
 			string cargs = "/noconfig @\"" + responseFileName + "\"";
 
 			int exitCode = DoCompilation (compilerName, cargs, workingDir, envVars, gacRoots, ref output, ref error);
@@ -361,7 +361,7 @@ namespace MonoDevelop.CSharp
 			return result;
 		}
 		
-		static int DoCompilation (string compilerName, string compilerArgs, string working_dir, Dictionary<string, string> envVars, List<string> gacRoots, ref string output, ref string error) 
+		static int DoCompilation (string compilerName, string compilerArgs, string working_dir, ExecutionEnvironment envVars, List<string> gacRoots, ref string output, ref string error) 
 		{
 			output = Path.GetTempFileName();
 			error = Path.GetTempFileName();
@@ -370,6 +370,8 @@ namespace MonoDevelop.CSharp
 			StreamWriter errwr = new StreamWriter (error);
 			
 			ProcessStartInfo pinfo = new ProcessStartInfo (compilerName, compilerArgs);
+			pinfo.StandardErrorEncoding = Encoding.UTF8;
+			pinfo.StandardOutputEncoding = Encoding.UTF8;
 			pinfo.WorkingDirectory = working_dir;
 			
 			if (gacRoots.Count > 0) {
@@ -381,12 +383,7 @@ namespace MonoDevelop.CSharp
 				pinfo.EnvironmentVariables ["MONO_GAC_PREFIX"] = gacPrefix;
 			}
 			
-			foreach (KeyValuePair<string,string> ev in envVars) {
-				if (ev.Value == null)
-					pinfo.EnvironmentVariables.Remove (ev.Key);
-				else
-					pinfo.EnvironmentVariables [ev.Key] = ev.Value;
-			}
+			envVars.MergeTo (pinfo);
 			
 			pinfo.UseShellExecute = false;
 			pinfo.RedirectStandardOutput = true;
@@ -403,7 +400,7 @@ namespace MonoDevelop.CSharp
 		
 		// Snatched from our codedom code, with some changes to make it compatible with csc
 		// (the line+column group is optional is csc)
-		static Regex regexError = new Regex (@"^(\s*(?<file>[^\(]+)(\((?<line>\d*)(,(?<column>\d*[\+]*))?\))?:\s+)*(?<level>\w+)\s+(?<number>.*\d):\s*(?<message>.*)", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+		static Regex regexError = new Regex (@"^(\s*(?<file>[^\(]+)(\((?<line>\d*)(,(?<column>\d*[\+]*))?\))?:\s+)*(?<level>\w+)\s+(?<number>..\d+):\s*(?<message>.*)", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
 		static BuildError CreateErrorFromString (string error_string)
 		{
 			// When IncludeDebugInformation is true, prevents the debug symbols stats from braeking this.

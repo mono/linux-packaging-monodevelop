@@ -32,18 +32,13 @@
 using System;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Diagnostics;
 using System.CodeDom.Compiler;
-using System.Threading;
 
 using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Components;
-using MonoDevelop.Core.Serialization;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.Text;
 
@@ -262,7 +257,7 @@ namespace MonoDevelop.VBNetBinding {
 				workingDir = configuration.ParentItem.BaseDirectory;
 			int exitCode;
 			
-			Dictionary<string,string> envVars = configuration.TargetRuntime.GetToolsEnvironmentVariables (configuration.TargetFramework);
+			var envVars = configuration.TargetRuntime.GetToolsExecutionEnvironment (configuration.TargetFramework);
 			
 			monitor.Log.WriteLine (Path.GetFileName (compilerName) + " " + string.Join (" ", File.ReadAllLines (responseFileName)));
 			exitCode = DoCompilation (outstr, tf, workingDir, envVars, ref output);
@@ -365,7 +360,7 @@ namespace MonoDevelop.VBNetBinding {
 			return null;
 		}
 		
-		private int DoCompilation (string outstr, TempFileCollection tf, string working_dir, Dictionary<string,string> envVars, ref string output)
+		private int DoCompilation (string outstr, TempFileCollection tf, string working_dir, ExecutionEnvironment envVars, ref string output)
 		{
 			StringWriter outwr = new StringWriter ();
 			string[] tokens = outstr.Split (' ');			
@@ -374,13 +369,7 @@ namespace MonoDevelop.VBNetBinding {
 				
 				ProcessStartInfo pinfo = new ProcessStartInfo (tokens[0], "\"" + outstr + "\"");
 				pinfo.WorkingDirectory = working_dir;
-				
-				foreach (KeyValuePair<string,string> ev in envVars) {
-					if (ev.Value == null)
-						pinfo.EnvironmentVariables.Remove (ev.Key);
-					else
-						pinfo.EnvironmentVariables [ev.Key] = ev.Value;
-				}
+				envVars.MergeTo (pinfo);
 			
 				pinfo.UseShellExecute = false;
 				pinfo.RedirectStandardOutput = true;

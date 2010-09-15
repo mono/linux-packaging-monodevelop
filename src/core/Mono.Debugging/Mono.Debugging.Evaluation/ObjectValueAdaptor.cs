@@ -6,16 +6,17 @@ using System.Reflection;
 using Mono.Debugging.Client;
 using Mono.Debugging.Backend;
 using System.Diagnostics;
+using System.Collections;
 
 namespace Mono.Debugging.Evaluation
 {
 	public abstract class ObjectValueAdaptor: IDisposable
 	{
-		static Dictionary<string, TypeDisplayData> typeDisplayData = new Dictionary<string, TypeDisplayData> ();
+		Dictionary<string, TypeDisplayData> typeDisplayData = new Dictionary<string, TypeDisplayData> ();
 
 		// Time to wait while evaluating before switching to async mode
 		public int DefaultEvaluationWaitTime = 100;
-
+		
 		public event EventHandler<BusyStateEventArgs> BusyStateChanged;
 		
 		AsyncEvaluationTracker asyncEvaluationTracker = new AsyncEvaluationTracker ();
@@ -210,8 +211,10 @@ namespace Mono.Debugging.Evaluation
 		{
 			object longType = GetType (ctx, "System.Int64");
 			TypeValueReference tref = new TypeValueReference (ctx, type);
-			foreach (ValueReference cr in tref.GetChildReferences ()) {
-				object c = Cast (ctx, cr.Value, longType);
+			foreach (ValueReference cr in tref.GetChildReferences (ctx.Options)) {
+				object c = TryCast (ctx, cr.Value, longType);
+				if (c == null)
+					continue;
 				long val = (long) TargetObjectToObject (ctx, c);
 				EnumMember em = new EnumMember () { Name = cr.Name, Value = val };
 				yield return em;
@@ -257,7 +260,7 @@ namespace Mono.Debugging.Evaluation
 		
 		public virtual object ForceLoadType (EvaluationContext ctx, string typeName)
 		{
-			return null;
+			return GetType (ctx, typeName);
 		}
 
 		public abstract object CreateValue (EvaluationContext ctx, object value);
@@ -325,7 +328,7 @@ namespace Mono.Debugging.Evaluation
 		{
 			if (IsArray (ctx, obj)) {
 				ArrayElementGroup agroup = new ArrayElementGroup (ctx, CreateArrayAdaptor (ctx, obj));
-				return agroup.GetChildren ();
+				return agroup.GetChildren (ctx.Options);
 			}
 
 			if (IsPrimitive (ctx, obj))
@@ -400,7 +403,7 @@ namespace Mono.Debugging.Evaluation
 					ObjectValue val = ObjectValue.CreateObject (null, new ObjectPath ("Raw View"), "", "", ObjectValueFlags.ReadOnly, values.ToArray ());
 					values = new List<ObjectValue> ();
 					values.Add (val);
-					values.AddRange (agroup.GetChildren ());
+					values.AddRange (agroup.GetChildren (ctx.Options));
 				}
 				else {
 					if (ctx.Options.GroupStaticMembers && HasMembers (ctx, type, proxy, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | flattenFlag)) {
@@ -452,7 +455,7 @@ namespace Mono.Debugging.Evaluation
 			}
 		}
 
-		public virtual ValueReference GetIndexerReference (EvaluationContext ctx, object target, object index)
+		public virtual ValueReference GetIndexerReference (EvaluationContext ctx, object target, object[] indices)
 		{
 			return null;
 		}
@@ -490,6 +493,11 @@ namespace Mono.Debugging.Evaluation
 			return null;
 		}
 
+		public virtual ValueReference GetCurrentException (EvaluationContext ctx)
+		{
+			return null;
+		}
+
 		public virtual object GetEnclosingType (EvaluationContext ctx)
 		{
 			return null;
@@ -510,7 +518,7 @@ namespace Mono.Debugging.Evaluation
 						vr = ctx.Evaluator.Evaluate (ctx, exp.Substring (i), null);
 						if (vr != null) {
 							CompletionData data = new CompletionData ();
-							foreach (ValueReference cv in vr.GetChildReferences ())
+							foreach (ValueReference cv in vr.GetChildReferences (ctx.Options))
 								data.Items.Add (new CompletionItem (cv.Name, cv.Flags));
 							data.ExpressionLenght = 0;
 							return data;
@@ -625,10 +633,73 @@ namespace Mono.Debugging.Evaluation
 		/// BindingFlags.Static, BindingFlags.Instance, BindingFlags.Public, BindingFlags.NonPublic, BindingFlags.DeclareOnly
 		/// </summary>
 		protected abstract IEnumerable<ValueReference> GetMembers (EvaluationContext ctx, object t, object co, BindingFlags bindingFlags);
-
+		
 		public virtual IEnumerable<object> GetNestedTypes (EvaluationContext ctx, object type)
 		{
 			yield break;
+		}
+		
+		public virtual object CreateArray (EvaluationContext ctx, object type, object[] values)
+		{
+			object arrType = GetType (ctx, "System.Collections.ArrayList");
+			object arrayList = CreateValue (ctx, arrType, new object[0]);
+			object[] objTypes = new object[] { GetType (ctx, "System.Object") };
+			foreach (object value in values)
+				RuntimeInvoke (ctx, arrType, arrayList, "Add", objTypes, new object[] { value });
+			
+			object typof = CreateTypeObject (ctx, type);
+			objTypes = new object[] { GetType (ctx, "System.Type") };
+			return RuntimeInvoke (ctx, arrType, arrayList, "ToArray", objTypes, new object[] { typof });
+		}
+		
+		public virtual object ToRawValue (EvaluationContext ctx, IObjectSource source, object obj)
+		{
+			if (IsEnum (ctx, obj)) {
+				object longType = GetType (ctx, "System.Int64");
+				object c = Cast (ctx, obj, longType);
+				return TargetObjectToObject (ctx, c);
+			}
+			if (IsPrimitive (ctx, obj))
+				return TargetObjectToObject (ctx, obj);
+				
+			if (IsArray (ctx, obj)) {
+				ICollectionAdaptor adaptor = CreateArrayAdaptor (ctx, obj);
+				return new RawValueArray (new RemoteRawValueArray (ctx, source, adaptor, obj));
+			}
+			return new RawValue (new RemoteRawValue (ctx, source, obj));
+		}
+		
+		public virtual object FromRawValue (EvaluationContext ctx, object obj)
+		{
+			if (obj is RawValue) {
+				RemoteRawValue val = ((RawValue)obj).Source as RemoteRawValue;
+				if (val == null)
+					throw new InvalidOperationException ("Unknown RawValue source: " + ((RawValue)obj).Source);
+				return val.TargetObject;
+			}
+			else if (obj is RawValueArray) {
+				RemoteRawValueArray val = ((RawValueArray)obj).Source as RemoteRawValueArray;
+				if (val == null)
+					throw new InvalidOperationException ("Unknown RawValue source: " + ((RawValueArray)obj).Source);
+				return val.TargetObject;
+			}
+			else {
+				if (obj is Array) {
+					Array arr = (Array) obj;
+					if (obj.GetType ().GetElementType () == typeof(RawValue)) {
+						throw new NotSupportedException ();
+					} else {
+						object elemType = GetType (ctx, obj.GetType ().GetElementType ().FullName);
+						if (elemType == null)
+							throw new EvaluatorException ("Unknown target type: {0}", obj.GetType ().GetElementType ().FullName);
+						object[] values = new object [arr.Length];
+						for (int n=0; n<values.Length; n++)
+							values [n] = FromRawValue (ctx, arr.GetValue (n));
+						return CreateArray (ctx, elemType, values);
+					}
+				}
+				return CreateValue (ctx, obj);
+			}
 		}
 		
 		public virtual object TargetObjectToObject (EvaluationContext ctx, object obj)
@@ -667,7 +738,7 @@ namespace Mono.Debugging.Evaluation
 					if (em.Value == val)
 						return new EvaluationResult (typeName + "." + em.Name, em.Name);
 					else {
-						if ((rest & em.Value) == em.Value) {
+						if (em.Value != 0 && (rest & em.Value) == em.Value) {
 							rest &= ~em.Value;
 							if (composed.Length > 0) {
 								composed += "|";
@@ -857,7 +928,7 @@ namespace Mono.Debugging.Evaluation
 			try {
 				ValueReference var = ctx.Evaluator.Evaluate (ctx, exp);
 				if (var != null) {
-					return var.CreateObjectValue ();
+					return var.CreateObjectValue (ctx.Options);
 				}
 				else
 					return ObjectValue.CreateUnknown (exp);
@@ -897,6 +968,11 @@ namespace Mono.Debugging.Evaluation
 		public virtual object RuntimeInvoke (EvaluationContext ctx, object targetType, object target, string methodName, object[] argTypes, object[] argValues)
 		{
 			return null;
+		}
+		
+		public virtual ValidationResult ValidateExpression (EvaluationContext ctx, string expression)
+		{
+			return ctx.Evaluator.ValidateExpression (ctx, expression);
 		}
 	}
 

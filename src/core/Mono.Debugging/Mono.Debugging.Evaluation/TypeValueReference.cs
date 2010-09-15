@@ -37,18 +37,26 @@ namespace Mono.Debugging.Evaluation
 	{
 		object type;
 		string name;
+		string fullName;
 
 		public TypeValueReference (EvaluationContext ctx, object type)
 			: base (ctx)
 		{
 			this.type = type;
-			name = GetTypeName (ctx.Adapter.GetTypeName (ctx, type));
+			fullName = ctx.Adapter.GetDisplayTypeName (ctx, type);
+			name = GetTypeName (fullName);
 		}
 		
 		internal static string GetTypeName (string tname)
 		{
 			tname = tname.Replace ('+','.');
-			int i = tname.LastIndexOf ('.');
+			int sep1 = tname.IndexOf ('<');
+			int sep2 = tname.IndexOf ('[');
+			if (sep2 != -1 && (sep2 < sep1 || sep1 == -1))
+				sep1 = sep2;
+			if (sep1 == -1)
+				sep1 = tname.Length - 1;
+			int i = tname.LastIndexOf ('.', sep1);
 			if (i != -1)
 				return tname.Substring (i + 1);
 			else
@@ -91,58 +99,60 @@ namespace Mono.Debugging.Evaluation
 			}
 		}
 
-		protected override ObjectValue OnCreateObjectValue ()
+		protected override ObjectValue OnCreateObjectValue (EvaluationOptions options)
 		{
-			return Mono.Debugging.Client.ObjectValue.CreateObject (this, new ObjectPath (Name), "<type>", Name, Flags, null);
+			return Mono.Debugging.Client.ObjectValue.CreateObject (this, new ObjectPath (Name), "<type>", fullName, Flags, null);
 		}
 
-		public override ValueReference GetChild (string name)
+		public override ValueReference GetChild (string name, EvaluationOptions options)
 		{
-			foreach (ValueReference val in Context.Adapter.GetMembers (Context, this, type, null)) {
+			EvaluationContext ctx = GetContext (options);
+			foreach (ValueReference val in ctx.Adapter.GetMembers (ctx, this, type, null)) {
 				if (val.Name == name)
 					return val;
 			}
-			foreach (object t in Context.Adapter.GetNestedTypes (Context, type)) {
-				string tn = Context.Adapter.GetTypeName (Context, t);
+			foreach (object t in ctx.Adapter.GetNestedTypes (ctx, type)) {
+				string tn = ctx.Adapter.GetTypeName (ctx, t);
 				if (GetTypeName (tn) == name)
-					return new TypeValueReference (Context, t);
+					return new TypeValueReference (ctx, t);
 			}
 			return null;
 		}
 
-		public override ObjectValue[] GetChildren (ObjectPath path, int index, int count)
+		public override ObjectValue[] GetChildren (ObjectPath path, int index, int count, EvaluationOptions options)
 		{
+			EvaluationContext ctx = GetContext (options);
 			try {
 				List<ObjectValue> list = new List<ObjectValue> ();
-				BindingFlags flattenFlag = Context.Options.FlattenHierarchy ? (BindingFlags)0 : BindingFlags.DeclaredOnly;
+				BindingFlags flattenFlag = options.FlattenHierarchy ? (BindingFlags)0 : BindingFlags.DeclaredOnly;
 				BindingFlags flags = BindingFlags.Static | BindingFlags.Public | flattenFlag;
-				bool groupPrivateMembers = Context.Options.GroupPrivateMembers && (Context.Options.GroupUserPrivateMembers || Context.Adapter.IsExternalType (Context, type));
+				bool groupPrivateMembers = options.GroupPrivateMembers && (options.GroupUserPrivateMembers || ctx.Adapter.IsExternalType (ctx, type));
 				if (!groupPrivateMembers)
 					flags |= BindingFlags.NonPublic;
 				
-				ObjectValueNameTracker names = new ObjectValueNameTracker (Context);
+				ObjectValueNameTracker names = new ObjectValueNameTracker (ctx);
 				
-				TypeDisplayData tdata = Context.Adapter.GetTypeDisplayData (Context, type);
+				TypeDisplayData tdata = ctx.Adapter.GetTypeDisplayData (ctx, type);
 				object tdataType = type;
 				
-				foreach (ValueReference val in Context.Adapter.GetMembersSorted (Context, this, type, null, flags)) {
+				foreach (ValueReference val in ctx.Adapter.GetMembersSorted (ctx, this, type, null, flags)) {
 					object decType = val.DeclaringType;
 					if (decType != null && decType != tdataType) {
 						tdataType = decType;
-						tdata = Context.Adapter.GetTypeDisplayData (Context, decType);
+						tdata = ctx.Adapter.GetTypeDisplayData (ctx, decType);
 					}
 					DebuggerBrowsableState state = tdata.GetMemberBrowsableState (val.Name);
 					if (state == DebuggerBrowsableState.Never)
 						continue;
 
-					ObjectValue oval = val.CreateObjectValue ();
+					ObjectValue oval = val.CreateObjectValue (options);
 					names.FixName (val, oval);
 					list.Add (oval);
 				}
 				
 				List<ObjectValue> nestedTypes = new List<ObjectValue> ();
-				foreach (object t in Context.Adapter.GetNestedTypes (Context, type))
-					nestedTypes.Add (new TypeValueReference (Context, t).CreateObjectValue ());
+				foreach (object t in ctx.Adapter.GetNestedTypes (ctx, type))
+					nestedTypes.Add (new TypeValueReference (ctx, t).CreateObjectValue (options));
 				
 				nestedTypes.Sort (delegate (ObjectValue v1, ObjectValue v2) {
 					return v1.Name.CompareTo (v2.Name);
@@ -151,12 +161,12 @@ namespace Mono.Debugging.Evaluation
 				list.AddRange (nestedTypes);
 				
 				if (groupPrivateMembers)
-					list.Add (FilteredMembersSource.CreateNonPublicsNode (Context, this, type, null, BindingFlags.NonPublic | BindingFlags.Static | flattenFlag));
+					list.Add (FilteredMembersSource.CreateNonPublicsNode (ctx, this, type, null, BindingFlags.NonPublic | BindingFlags.Static | flattenFlag));
 				
-				if (!Context.Options.FlattenHierarchy) {
-					object baseType = Context.Adapter.GetBaseType (Context, type, false);
+				if (!options.FlattenHierarchy) {
+					object baseType = ctx.Adapter.GetBaseType (ctx, type, false);
 					if (baseType != null) {
-						TypeValueReference baseRef = new TypeValueReference (Context, baseType);
+						TypeValueReference baseRef = new TypeValueReference (ctx, baseType);
 						ObjectValue baseVal = baseRef.CreateObjectValue (false);
 						baseVal.Name = "base";
 						list.Insert (0, baseVal);
@@ -167,20 +177,21 @@ namespace Mono.Debugging.Evaluation
 			}
 			catch (Exception ex) {
 				Console.WriteLine (ex);
-				Context.WriteDebuggerOutput (ex.Message);
+				ctx.WriteDebuggerOutput (ex.Message);
 				return new ObjectValue [0];
 			}
 		}
 
-		public override IEnumerable<ValueReference> GetChildReferences ( )
+		public override IEnumerable<ValueReference> GetChildReferences (EvaluationOptions options)
 		{
+			EvaluationContext ctx = GetContext (options);
 			try {
 				List<ValueReference> list = new List<ValueReference> ();
-				list.AddRange (Context.Adapter.GetMembersSorted (Context, this, type, null, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static));
+				list.AddRange (ctx.Adapter.GetMembersSorted (ctx, this, type, null, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static));
 				
 				List<ValueReference> nestedTypes = new List<ValueReference> ();
-				foreach (object t in Context.Adapter.GetNestedTypes (Context, type))
-					nestedTypes.Add (new TypeValueReference (Context, t));
+				foreach (object t in ctx.Adapter.GetNestedTypes (ctx, type))
+					nestedTypes.Add (new TypeValueReference (ctx, t));
 				
 				nestedTypes.Sort (delegate (ValueReference v1, ValueReference v2) {
 					return v1.Name.CompareTo (v2.Name);
@@ -189,7 +200,7 @@ namespace Mono.Debugging.Evaluation
 				return list;
 			} catch (Exception ex) {
 				Console.WriteLine (ex);
-				Context.WriteDebuggerOutput (ex.Message);
+				ctx.WriteDebuggerOutput (ex.Message);
 				return new ValueReference[0];
 			}
 		}

@@ -34,13 +34,14 @@ using System.Collections;
 using System.ComponentModel;
 using MonoDevelop.Core;
 using Mono.Addins;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Components.Docking;
+using System.Collections.Generic;
 
 namespace MonoDevelop.Ide.Codons
 {
 	[ExtensionNode ("Pad", "Registers a pad to be shown in the workbench.")]
-	public class PadCodon : ExtensionNode
+	public class PadCodon : ExtensionNode, IDockItemLabelProvider
 	{
 		IPadContent content;
 		string id;
@@ -64,16 +65,38 @@ namespace MonoDevelop.Ide.Codons
 		               )]
 		string defaultPlacement = "left";
 		
-		string[] contexts;
+		[NodeAttribute ("defaultStatus", "Default status ofthe pad. It can be 'Dockable', 'Floating', 'AutoHide'.")]
+		DockItemStatus defaultStatus = DockItemStatus.Dockable;
+		
+		[NodeAttribute("dockLabelProvider", "Name of a class implementing IDockItemLabelProvider. " +
+			"Using this class it is possible to use a custom widget as label when the item" +
+			"is docked in auto-hide mode.")]
+		string dockLabelProvider = null;
+		
+		[NodeAttribute ("defaultLayout", "Name of the layouts (comma separated list) on which this pad should be visible by default")]
+		string[] defaultLayouts;
+		
+		IDockItemLabelProvider cachedDockLabelProvider;
+		bool initializeCalled;
 		
 		public IPadContent PadContent {
 			get {
-				if (content == null)
-					content = CreatePad ();
 				return content; 
 			}
 		}
 		
+		public IPadContent InitializePadContent (IPadWindow window)
+		{
+			if (content == null) {
+				content = CreatePad ();
+				content.Initialize (window);
+			} else if (!initializeCalled)
+				content.Initialize (window);
+			
+			initializeCalled = true;
+			return content;
+		}
+			
 		public string PadId {
 			get { return id != null ? id : base.Id; }
 			set { id = value; }
@@ -83,13 +106,17 @@ namespace MonoDevelop.Ide.Codons
 			get { return label; }
 		}
 		
-		public string Icon {
-			get { return icon; }
+		public IconId Icon {
+			get { return !string.IsNullOrEmpty (icon) ? icon : "md-output-icon"; }
 		}
 		
 		public string ClassName {
 			get { return className; }
 		}
+		
+		public IList<string> DefaultLayouts {
+			get { return this.defaultLayouts; }
+		}		
 		
 		/// <summary>
 		/// Returns the default placement of the pad: left, right, top, bottom.
@@ -103,8 +130,8 @@ namespace MonoDevelop.Ide.Codons
 			get { return defaultPlacement; }
 		}
 		
-		public string[] Contexts {
-			get { return contexts; }
+		public DockItemStatus DefaultStatus {
+			get { return defaultStatus; }
 		}
 		
 		public bool Initialized {
@@ -132,5 +159,13 @@ namespace MonoDevelop.Ide.Codons
 			return (IPadContent) Addin.CreateInstance (className, true);
 		}
 		
+		Gtk.Widget IDockItemLabelProvider.CreateLabel (Gtk.Orientation orientation)
+		{
+			if (dockLabelProvider == null)
+				return null;
+			if (cachedDockLabelProvider == null)
+				cachedDockLabelProvider = (IDockItemLabelProvider) Addin.CreateInstance (dockLabelProvider, true);
+			return cachedDockLabelProvider.CreateLabel (orientation);
+		}
 	}
 }

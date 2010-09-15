@@ -1,3 +1,71 @@
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CodeMetrics/CodeMetricsView.cs: IViewContent
+	  widgets are now destroyed by the workspace window.
+
+2010-04-07  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.CodeMetrics.csproj: Add system.core reference.
+
+2010-04-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am: Fixed build.
+
+2010-04-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.CodeMetrics.csproj:
+	* MonoDevelop.CodeMetrics/Commands.cs:
+	* MonoDevelop.CodeMetrics/Cohesion.cs:
+	* MonoDevelop.CodeMetrics/Coupling.cs:
+	* MonoDevelop.CodeMetrics/ASTVisitor.cs:
+	* MonoDevelop.CodeMetrics/LOCEvaluate.cs:
+	* MonoDevelop.CodeMetrics/IProperties.cs:
+	* MonoDevelop.CodeMetrics/MetricsContext.cs:
+	* MonoDevelop.CodeMetrics/EnumProperties.cs:
+	* MonoDevelop.CodeMetrics/FieldProperties.cs:
+	* MonoDevelop.CodeMetrics/InheritanceTree.cs:
+	* MonoDevelop.CodeMetrics/CodeMetricsView.cs:
+	* MonoDevelop.CodeMetrics/ClassProperties.cs:
+	* MonoDevelop.CodeMetrics/StructProperties.cs:
+	* MonoDevelop.CodeMetrics/MethodProperties.cs:
+	* MonoDevelop.CodeMetrics/ComplexityMetrics.cs:
+	* MonoDevelop.CodeMetrics/ProjectProperties.cs:
+	* MonoDevelop.CodeMetrics/CodeMetricsWidget.cs:
+	* MonoDevelop.CodeMetrics/DelegateProperties.cs:
+	* MonoDevelop.CodeMetrics/NamespaceProperties.cs:
+	* MonoDevelop.CodeMetrics/InterfaceProperties.cs:
+	* MonoDevelop.CodeMetrics/CodeMetricsServices.cs:
+	* MonoDevelop.CodeMetrics/ObjectOrientedMetrics.cs:
+	* MonoDevelop.CodeMetrics/CodeMetricsNodeExtension.cs:
+	* MonoDevelop.CodeMetrics/AssociationBetweenClasses.cs: Added
+	  the code metrics addin from 'nikhil sarda
+	  <diff.operator@gmail.com>'.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.CodeMetrics.addin.xml: Bumped MD version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.CodeMetrics.csproj:
+	* MonoDevelop.CodeMetrics.addin.xml:
+	* MonoDevelop.CodeMetrics/Commands.cs:
+	* MonoDevelop.CodeMetrics/CodeMetricsView.cs:
+	* MonoDevelop.CodeMetrics/CodeMetricsWidget.cs:
+	* MonoDevelop.CodeMetrics/CodeMetricsNodeExtension.cs: Merged
+	  MD.Projects into MD.Core, and MD.Projects.Gui, MD.Core.Gui
+	  and MD.Components into MD.Ide.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.CodeMetrics.CodeMetricsWidget.cs: Flush.
+
 2009-10-30  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* AssemblyInfo.cs:

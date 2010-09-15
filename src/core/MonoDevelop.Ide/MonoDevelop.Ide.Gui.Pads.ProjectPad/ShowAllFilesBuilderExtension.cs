@@ -34,7 +34,6 @@ using System.Collections.Generic;
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui.Components;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
@@ -136,9 +135,14 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			if (builder.Options ["ShowAllFiles"] && Directory.Exists (path))
 			{
 				Project project = (Project) builder.GetParentDataItem (typeof(Project), true);
+				SolutionFolderFileCollection folderFiles = null;
+				if (dataObject is Solution)
+					folderFiles = ((Solution)dataObject).RootFolder.Files;
+				else if (dataObject is SolutionFolder)
+					folderFiles = ((SolutionFolder)dataObject).Files;
 				
 				foreach (string file in Directory.GetFiles (path)) {
-					if (project == null || project.Files.GetFile (file) == null)
+					if ((project == null || project.Files.GetFile (file) == null) && (folderFiles == null || !folderFiles.Contains (file)))
 						builder.AddChild (new SystemFile (file, project));
 				}
 				
@@ -160,7 +164,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		
 		void OnAddFile (object sender, ProjectFileEventArgs e)
 		{
-			if (!e.ProjectFile.IsExternalToProject) {
+			if (!e.ProjectFile.IsLink) {
 				object target;
 				if (e.ProjectFile.Subtype == Subtype.Directory) {
 					target = new ProjectFolder (e.ProjectFile.FilePath, e.Project);
@@ -187,7 +191,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		void OnRemoveFile (object sender, ProjectFileEventArgs e)
 		{
 			if (e.ProjectFile.Subtype != Subtype.Directory && 
-				!e.ProjectFile.IsExternalToProject &&
+				!e.ProjectFile.IsLink &&
 				File.Exists (e.ProjectFile.Name)
 			) {
 				AddFile (e.ProjectFile.Name, e.Project);

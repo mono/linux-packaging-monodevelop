@@ -29,6 +29,7 @@ using System;
 using System.Text;
 using Mono.Debugging.Backend;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Mono.Debugging.Client
 {
@@ -41,16 +42,21 @@ namespace Mono.Debugging.Client
 		string value;
 		string typeName;
 		string displayValue;
+		string childSelector;
 		ObjectValueFlags flags;
 		IObjectValueSource source;
 		IObjectValueUpdater updater;
 		List<ObjectValue> children;
+		ManualResetEvent evaluatedEvent;
 
 		[NonSerialized]
 		UpdateCallback updateCallback;
 		
 		[NonSerialized]
 		EventHandler valueChanged;
+		
+		[NonSerialized]
+		StackFrame parentFrame;
 		
 		static ObjectValue Create (IObjectValueSource source, ObjectPath path, string typeName)
 		{
@@ -184,12 +190,52 @@ namespace Mono.Debugging.Client
 			set {
 				if (IsReadOnly || source == null)
 					throw new InvalidOperationException ("Value is not editable");
-				EvaluationResult res = source.SetValue (path, value);
+				EvaluationResult res = source.SetValue (path, value, null);
 				if (res != null) {
 					this.value = res.Value;
 					displayValue = res.DisplayValue;
 				}
 			}
+		}
+		
+		public void SetValue (string value)
+		{
+			SetValue (value, parentFrame.DebuggerSession.EvaluationOptions);
+		}
+		
+		public void SetValue (string value, EvaluationOptions options)
+		{
+			if (IsReadOnly || source == null)
+				throw new InvalidOperationException ("Value is not editable");
+			EvaluationResult res = source.SetValue (path, value, options);
+			if (res != null) {
+				this.value = res.Value;
+				displayValue = res.DisplayValue;
+			}
+		}
+		
+		public object GetRawValue ()
+		{
+			return GetRawValue (parentFrame.DebuggerSession.EvaluationOptions);
+		}
+		
+		public object GetRawValue (EvaluationOptions options)
+		{
+			object res = source.GetRawValue (path, options);
+			RawValue val = res as RawValue;
+			if (val != null)
+				val.options = options;
+			return res;
+		}
+		
+		public void SetRawValue (object value)
+		{
+			SetRawValue (value, parentFrame.DebuggerSession.EvaluationOptions);
+		}
+		
+		public void SetRawValue (object value, EvaluationOptions options)
+		{
+			source.SetRawValue (path, value, options);
 		}
 		
 		public string DisplayValue {
@@ -200,6 +246,22 @@ namespace Mono.Debugging.Client
 		public string TypeName {
 			get { return typeName; }
 			set { typeName = value; }
+		}
+		
+		/// <summary>
+		/// The expression to concatenate to a parent expression to get this child
+		/// (for example ".foo" if this object represents a "foo" field of an object
+		/// </summary>
+		public string ChildSelector {
+			get {
+				if (childSelector != null)
+					return childSelector;
+				if ((flags & ObjectValueFlags.ArrayElement) != 0)
+					return Name;
+				else
+					return "." + Name;
+			}
+			set { childSelector = value; }
 		}
 		
 		public bool HasChildren {
@@ -221,6 +283,11 @@ namespace Mono.Debugging.Client
 		
 		public ObjectValue GetChild (string name)
 		{
+			return GetChild (name, parentFrame.DebuggerSession.EvaluationOptions);
+		}
+		
+		public ObjectValue GetChild (string name, EvaluationOptions options)
+		{
 			if (IsArray)
 				throw new InvalidOperationException ("Object is an array.");
 			if (IsEvaluating)
@@ -229,8 +296,8 @@ namespace Mono.Debugging.Client
 			if (children == null) {
 				children = new List<ObjectValue> ();
 				try {
-					ObjectValue[] cs = source.GetChildren (path, -1, -1);
-					ConnectCallbacks (cs);
+					ObjectValue[] cs = source.GetChildren (path, -1, -1, options);
+					ConnectCallbacks (parentFrame, cs);
 					children.AddRange (cs);
 				} catch (Exception ex) {
 					children = null;
@@ -245,6 +312,11 @@ namespace Mono.Debugging.Client
 		
 		public ObjectValue[] GetAllChildren ()
 		{
+			return GetAllChildren (parentFrame.DebuggerSession.EvaluationOptions);
+		}
+		
+		public ObjectValue[] GetAllChildren (EvaluationOptions options)
+		{
 			if (IsEvaluating)
 				return new ObjectValue[0];
 			
@@ -255,8 +327,8 @@ namespace Mono.Debugging.Client
 				if (children == null) {
 					children = new List<ObjectValue> ();
 					try {
-						ObjectValue[] cs = source.GetChildren (path, -1, -1);
-						ConnectCallbacks (cs);
+						ObjectValue[] cs = source.GetChildren (path, -1, -1, options);
+						ConnectCallbacks (parentFrame, cs);
 						children.AddRange (cs);
 					} catch (Exception ex) {
 						Console.WriteLine (ex);
@@ -268,6 +340,11 @@ namespace Mono.Debugging.Client
 		}
 		
 		public ObjectValue GetArrayItem (int index)
+		{
+			return GetArrayItem (index, parentFrame.DebuggerSession.EvaluationOptions);
+		}
+		
+		public ObjectValue GetArrayItem (int index, EvaluationOptions options)
 		{
 			if (!IsArray)
 				throw new InvalidOperationException ("Object is not an array.");
@@ -281,8 +358,8 @@ namespace Mono.Debugging.Client
 				if (nc > arrayCount) nc = arrayCount;
 				nc = nc - children.Count;
 				try {
-					ObjectValue[] items = source.GetChildren (path, children.Count, nc);
-					ConnectCallbacks (items);
+					ObjectValue[] items = source.GetChildren (path, children.Count, nc, options);
+					ConnectCallbacks (parentFrame, items);
 					children.AddRange (items);
 				} catch (Exception ex) {
 					return CreateFatalError ("", ex.Message, ObjectValueFlags.ArrayElement | ObjectValueFlags.ReadOnly);
@@ -362,12 +439,27 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		public void Refresh ()
+		{
+			Refresh (parentFrame.DebuggerSession.EvaluationOptions);
+		}
+		
 		public void Refresh (EvaluationOptions options)
 		{
 			if (!CanRefresh)
 				return;
 			ObjectValue val = source.GetValue (path, options);
 			UpdateFrom (val, false);
+		}
+		
+		public WaitHandle WaitHandle {
+			get {
+				lock (this) {
+					if (evaluatedEvent == null)
+						evaluatedEvent = new ManualResetEvent (!IsEvaluating);
+					return evaluatedEvent;
+				}
+			}
 		}
 
 		internal IObjectValueUpdater Updater {
@@ -388,7 +480,9 @@ namespace Mono.Debugging.Client
 				children = val.children;
 				path = val.path;
 				updater = val.updater;
-				ConnectCallbacks (this);
+				ConnectCallbacks (parentFrame, this);
+				if (evaluatedEvent != null)
+					evaluatedEvent.Set ();
 				if (notify && valueChanged != null)
 					valueChanged (this, EventArgs.Empty);
 			}
@@ -410,10 +504,13 @@ namespace Mono.Debugging.Client
 				System.Runtime.Remoting.RemotingServices.Disconnect ((UpdateCallbackProxy)updateCallback.Callback);
 		}
 		
-		internal static void ConnectCallbacks (params ObjectValue[] values)
+		internal static void ConnectCallbacks (StackFrame parentFrame, params ObjectValue[] values)
 		{
 			Dictionary<IObjectValueUpdater, List<UpdateCallback>> callbacks = null;
-			foreach (ObjectValue val in values) {
+			List<ObjectValue> valueList = new List<ObjectValue> (values);
+			for (int n=0; n<valueList.Count; n++) {
+				ObjectValue val = valueList [n];
+				val.parentFrame = parentFrame;
 				UpdateCallback cb = val.GetUpdateCallback ();
 				if (cb != null) {
 					if (callbacks == null)
@@ -425,6 +522,8 @@ namespace Mono.Debugging.Client
 					}
 					list.Add (cb);
 				}
+				if (val.children != null)
+					valueList.AddRange (val.children);
 			}
 			if (callbacks != null) {
 				// Do the callback connection in a background thread

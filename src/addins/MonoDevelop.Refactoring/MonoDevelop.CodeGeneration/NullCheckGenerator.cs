@@ -34,6 +34,7 @@ using MonoDevelop;
 using MonoDevelop.CodeGeneration;
 using MonoDevelop.Core;
 using MonoDevelop.Projects.Dom;
+using MonoDevelop.Refactoring;
 
 namespace MonoDevelop.CodeGeneration
 {
@@ -81,16 +82,18 @@ namespace MonoDevelop.CodeGeneration
 					yield break;
 				
 				foreach (var parameter in Options.EnclosingMember.Parameters) {
-					IType type = Options.Dom.SearchType (new SearchTypeRequest (Options.Document.CompilationUnit, parameter.Location.Line, parameter.Location.Column, parameter.ReturnType.FullName, parameter.ReturnType.GenericArguments));
+					if (parameter == null || parameter.ReturnType == null)
+						continue;
+					IType type = Options.Dom.SearchType (Options.EnclosingMember, parameter.ReturnType);
 					if (type != null && (type.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface || type.ClassType == MonoDevelop.Projects.Dom.ClassType.Class))
 						yield return parameter;
 				}
 			}
 			
-			protected override IEnumerable<ICSharpCode.NRefactory.Ast.INode> GenerateCode (List<IBaseMember> includedMembers)
+			protected override IEnumerable<string> GenerateCode (INRefactoryASTProvider astProvider, string indent, List<IBaseMember> includedMembers)
 			{
 				foreach (var member in includedMembers) {
-					yield return new IfElseStatement (
+					yield return indent + astProvider.OutputNode (this.Options.Dom, new IfElseStatement (
 						new BinaryOperatorExpression (
 					    	new IdentifierExpression (member.Name),
 					        BinaryOperatorType.Equality,
@@ -101,7 +104,7 @@ namespace MonoDevelop.CodeGeneration
 					            new List<Expression> { new PrimitiveExpression (member.Name) }
 							)
 					    )
-					);
+					), indent);
 				}
 			}
 		}

@@ -38,14 +38,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.CodeDom.Compiler;
 
-using Mono.Addins;
-
 using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Core.ProgressMonitoring;
-using MonoDevelop.Core.Gui.Components;
 using MonoDevelop.Projects;
-using MonoDevelop.Ide.Gui;
 
 namespace CBinding
 {
@@ -656,7 +652,7 @@ namespace CBinding
 			while ((next = reader.ReadLine ()) != null) {
 				CompilerError error = CreateErrorFromErrorString (next, reader);
 				if (error != null)
-					cr.Errors.Insert (0, error);
+					cr.Errors.Add (error);
 			}
 			
 			reader.Close ();
@@ -675,7 +671,8 @@ namespace CBinding
 		private CompilerError CreateErrorFromErrorString (string errorString, TextReader reader)
 		{
 			CompilerError error = new CompilerError ();
-			string warning = GettextCatalog.GetString("warning");
+			string warning = GettextCatalog.GetString ("warning");
+			string note = GettextCatalog.GetString ("note");
 			
 			Match match = withColRegex.Match (errorString);
 			
@@ -684,7 +681,8 @@ namespace CBinding
 				error.FileName = match.Groups["file"].Value;
 				error.Line = int.Parse (match.Groups["line"].Value);
 				error.Column = int.Parse (match.Groups["column"].Value);
-				error.IsWarning = match.Groups["level"].Value.Equals (warning, StringComparison.Ordinal);
+				error.IsWarning = (match.Groups["level"].Value.Equals (warning, StringComparison.Ordinal) ||
+				                   match.Groups["level"].Value.Equals (note, StringComparison.Ordinal));
 				error.ErrorText = match.Groups["message"].Value;
 				
 				return error;
@@ -696,24 +694,18 @@ namespace CBinding
 			{
 				error.FileName = match.Groups["file"].Value;
 				error.Line = int.Parse (match.Groups["line"].Value);
-				error.IsWarning = match.Groups["level"].Value.Equals (warning, StringComparison.Ordinal);
+				error.IsWarning = (match.Groups["level"].Value.Equals (warning, StringComparison.Ordinal) ||
+				                   match.Groups["level"].Value.Equals (note, StringComparison.Ordinal));
 				error.ErrorText = match.Groups["message"].Value;
 				
-				// Multi-line error message? attempt to parse it into a single error.
-				if (error.ErrorText.StartsWith ("(") && !error.ErrorText.EndsWith (")"))
-				{
-					string error_continued = reader.ReadLine ();
-					
-					// Unexpected result?  just return the error.
-					if (error_continued == null)
-						return error;
-					
-					// Get the rest of the error message.
-					CompilerError error_fragment = CreateErrorFromErrorString (error_continued, reader);
-					if (error_fragment != null)
-					{
-						error.ErrorText += " " + error_fragment.ErrorText;
-					}
+				// Skip messages that begin with ( and end with ), since they're generic.
+				//Attempt to capture multi-line versions too.
+				if (error.ErrorText.StartsWith ("(")) {
+					string error_continued = error.ErrorText;
+					do {
+						if (error_continued.EndsWith (")"))
+							return null;
+					} while ((error_continued = reader.ReadLine ()) != null);
 				}
 				
 				return error;

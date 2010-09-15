@@ -33,7 +33,6 @@
 using System;
 using System.Text;
 
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 
@@ -132,6 +131,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			"Mitchell Wheeler",
 			"Muthiah Annamalai",
 			"Nick Drochak",
+			"Nikhil Sarda",
 			"nricciar",
 			"Paco Martínez",
 			"Pawel Rozanski",
@@ -141,6 +141,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			"Richard Torkar",
 			"Rolf Bjarne Kvinge",
 			"Rusty Howell",
+			"Sanjoy Das",
 			"Scott Ellington",
 			"Thomas Wiest",
 			"Todd Berman",

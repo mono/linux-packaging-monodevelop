@@ -24,16 +24,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
-using System.Collections.Generic;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Dom;
-using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Core.Gui;
+ 
 using System.Text;
 using MonoDevelop.Projects.Text;
 using ICSharpCode.NRefactory.Ast;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Refactoring
 {
@@ -73,11 +71,7 @@ namespace MonoDevelop.Refactoring
 		
 		public Mono.TextEditor.TextEditorData GetTextEditorData ()
 		{
-			Mono.TextEditor.ITextEditorDataProvider view = Document.GetContent<Mono.TextEditor.ITextEditorDataProvider> ();
-			if (view == null)
-				return null;
-
-			return view.GetTextEditorData ();
+			return Document.TextEditorData;
 		}
 		
 		public INRefactoryASTProvider GetASTProvider ()

@@ -1,3 +1,165 @@
+2010-06-04  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Project/CProject.cs: Allow setting the External Console flag
+	  in the options.
+
+	* templates/ConsoleCProject.xpt.xml:
+	* templates/ConsoleCppProject.xpt.xml: Set the external
+	  console flag for console projects.
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Project/CProjectBinding.cs: Only create single file projects
+	  for C/C++ files.
+
+2010-05-25  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Compiler/GNUCompiler.cs: Don't include the generic () errors
+	  in the errors list. Don't reverse order of errors from
+	  compiler.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* CBinding.csproj:
+	* gtk-gui/gui.stetic:
+	* Gui/AddPathDialog.cs:
+	* Gui/AddLibraryDialog.cs:
+	* Gui/OutputOptionsPanel.cs:
+	* Gui/CodeGenerationPanel.cs:
+	* gtk-gui/CBinding.AddPathDialog.cs:
+	* gtk-gui/CBinding.AddLibraryDialog.cs:
+	* gtk-gui/CBinding.OutputOptionsPanel.cs:
+	* gtk-gui/CBinding.CodeGenerationPanel.cs:
+	* ProjectPad/ProjectPackagesFolderNodeBuilder.cs: Clean up
+	  dialog placement.
+
+2010-05-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* CBinding.csproj:
+	* CBinding.addin.xml:
+	* Project/CProject.cs:
+	* Gui/CTextEditorExtension.cs:
+	* Gui/SwapSourceHeaderCommand.cs: Replaced the 'Swap
+	  Source/Header' command by a handler for the 'Switch between
+	  related files' command.
+
+2010-05-11  Mike Krüger  <mkrueger@novell.com>
+
+	* Gui/DataProvider.cs: Track API changes.
+
+2010-04-28  Mike Krüger  <mkrueger@novell.com>
+
+	* Gui/DataProvider.cs: Track API changes.
+
+2010-03-26  Levi Bard  <levi@unity3d.com>
+
+	* Project/CProject.cs: Fix linking for library projects whose
+	  names are prefixed with lib. Fixes #587298.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* CBinding.addin.xml: Bumped MD version.
+
+2010-03-18  Levi Bard  <levi@unity3d.com>
+
+	* Gui/DataProvider.cs: 
+	* Gui/CTextEditorExtension.cs: Track API changes.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* CBinding.csproj: Remove import off mono.addins targets.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* CBinding.csproj:
+	* CBinding.addin.xml:
+	* gtk-gui/gui.stetic:
+	* Project/CProject.cs:
+	* Gui/DataProvider.cs:
+	* Gui/CompilerPanel.cs:
+	* Compiler/CCompiler.cs:
+	* Parser/LanguageItem.cs:
+	* Compiler/GppCompiler.cs:
+	* Compiler/GNUCompiler.cs:
+	* Compiler/GccCompiler.cs:
+	* Gui/EditPackagesDialog.cs:
+	* Gui/OutputOptionsPanel.cs:
+	* Parser/CDocumentParser.cs:
+	* Gui/GeneralOptionsPanel.cs:
+	* Gui/CodeGenerationPanel.cs:
+	* Gui/CTextEditorExtension.cs:
+	* Navigation/UnionNodeBuilder.cs:
+	* Navigation/MacroNodeBuilder.cs:
+	* Navigation/ClassNodeBuilder.cs:
+	* Gui/SwapSourceHeaderCommand.cs:
+	* Navigation/MemberNodeBuilder.cs:
+	* Navigation/GlobalsNodeBuilder.cs:
+	* Navigation/TypedefNodeBuilder.cs:
+	* Navigation/FunctionNodeBuilder.cs:
+	* Navigation/VariableNodeBuilder.cs:
+	* Navigation/StructureNodeBuilder.cs:
+	* Navigation/NamespaceNodeBuilder.cs:
+	* Navigation/EnumeratorNodeBuilder.cs:
+	* Navigation/EnumerationNodeBuilder.cs:
+	* ProjectPad/ProjectPackageNodeBuilder.cs:
+	* gtk-gui/CBinding.CodeGenerationPanel.cs:
+	* Navigation/LanguageItemCommandHandler.cs:
+	* Navigation/MacroDefinitionsNodeBuilder.cs:
+	* Navigation/ProjectNodeBuilderExtension.cs:
+	* ProjectPad/ProjectPackagesFolderNodeBuilder.cs: Merged
+	  MD.Projects into MD.Core, and MD.Projects.Gui, MD.Core.Gui
+	  and MD.Components into MD.Ide.
+
+2010-03-03  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Project/CProject.cs: Track ProjectFile Link API.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Gui/DataProvider.cs: Track api changes.
+
+2010-02-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* CBinding.addin.xml: Added some conditions to avoid early
+	  loading of extensions.
+
+	* Gui/CTextEditorExtension.cs: File extensions are now
+	  declared in the node metadata.
+
+2010-02-04  Levi Bard  <taktaktaktaktaktaktaktaktaktak@gmail.com>
+
+	* Compiler/GNUCompiler.cs: Support gcc "note" errortype.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/CBinding.CompilerPanel.cs:
+	* gtk-gui/CBinding.AddPathDialog.cs:
+	* gtk-gui/CBinding.PackageDetails.cs:
+	* gtk-gui/CBinding.AddLibraryDialog.cs:
+	* gtk-gui/CBinding.OutputOptionsPanel.cs:
+	* gtk-gui/CBinding.EditPackagesDialog.cs:
+	* gtk-gui/CBinding.CodeGenerationPanel.cs:
+	* gtk-gui/CBinding.GeneralOptionsPanel.cs: Flush.
+
+2010-01-27  Mike Krüger  <mkrueger@novell.com>
+
+	* Gui/DataProvider.cs: Track API changes.
+
+2010-01-14  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Project/CProjectServiceExtension.cs: Enable extension only
+	  for C projects.
+
+2010-01-07  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* CBinding.addin.xml: Reverted the fix for Bug 468416 because
+	  it marked .h as c++ headers, which is the wrong mimetype.
+
 2010-01-04  Levi Bard  <taktaktaktaktaktaktaktaktaktak@gmail.com>
 
 	* Parser/TagDatabaseManager.cs: Allow parsing of headers

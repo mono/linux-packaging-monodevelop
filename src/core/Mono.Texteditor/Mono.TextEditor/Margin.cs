@@ -26,6 +26,7 @@
 //
 
 using System;
+using System.Collections.Generic;
 
 namespace Mono.TextEditor
 {
@@ -51,9 +52,26 @@ namespace Mono.TextEditor
 			}
 		}
 		
+		List<MarginDrawer> marginDrawer = new List<MarginDrawer> ();
+		public IEnumerable<MarginDrawer> MarginDrawer {
+			get {
+				return marginDrawer;
+			}
+		}
+		
 		protected Margin ()
 		{
 			IsVisible = true;
+		}
+		
+		public void AddDrawer (MarginDrawer drawer)
+		{
+			marginDrawer.Add (drawer);
+		}
+		
+		public void RemoveDrawer (MarginDrawer drawer)
+		{
+			marginDrawer.Remove (drawer);
 		}
 
 		internal protected virtual void BeginRender (Gdk.Drawable drawable, Gdk.Rectangle area, int x)
@@ -64,7 +82,7 @@ namespace Mono.TextEditor
 		{
 		}
 		
-		internal protected abstract void Draw (Gdk.Drawable drawable, Gdk.Rectangle area, int line, int x, int y);
+		internal protected abstract void Draw (Gdk.Drawable drawable, Gdk.Rectangle area, int line, int x, int y, int lineHeight);
 		
 		internal protected virtual void OptionsChanged ()
 		{
@@ -136,7 +154,7 @@ namespace Mono.TextEditor
 		public int LineNumber {
 			get {
 				if (lineNumber == -2) {
-					lineNumber = Editor.Document.VisualToLogicalLine ((int)((Y + Editor.VAdjustment.Value) / Editor.LineHeight));
+					lineNumber = Editor.CalculateLineNumber ((int)(Editor.VAdjustment.Value + Y));
 					if (lineNumber >= Editor.Document.LineCount)
 						lineNumber = -1;
 				}

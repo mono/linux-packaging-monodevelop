@@ -26,24 +26,52 @@
 //
 
 using System;
+using System.Linq;
 using Mono.Debugging.Client;
 using MonoDevelop.Debugger;
 using MonoDevelop.Components;
 using Gtk;
 using Mono.TextEditor;
+using Gdk;
 
 namespace MonoDevelop.SourceEditor
 {
-	public class DebugValueWindow: TooltipWindow
+	public class BaseWindow : Gtk.Window
+	{
+		public BaseWindow () : base(Gtk.WindowType.Toplevel)
+		{
+			this.SkipPagerHint = true;
+			this.SkipTaskbarHint = true;
+			this.Decorated = false;
+			this.BorderWidth = 2;
+			this.TypeHint = WindowTypeHint.Tooltip;
+			this.AllowShrink = false;
+			this.AllowGrow = false;
+		}
+		
+		protected override bool OnExposeEvent (Gdk.EventExpose evnt)
+		{
+			int winWidth, winHeight;
+			this.GetSize (out winWidth, out winHeight);
+			evnt.Window.DrawRectangle (Style.BaseGC (StateType.Normal), true, 0, 0, winWidth - 1, winHeight - 1);
+			evnt.Window.DrawRectangle (Style.MidGC (StateType.Normal), false, 0, 0, winWidth - 1, winHeight - 1);
+			foreach (var child in this.Children)
+				this.PropagateExpose (child, evnt);
+			return false;
+		}
+	}
+	
+	public class DebugValueWindow : BaseWindow
 	{
 		ObjectValueTreeView tree;
 		ScrolledWindow sw;
-		bool resetSelection = true;
 		
-		public DebugValueWindow (Mono.TextEditor.TextEditor editor, StackFrame frame, ObjectValue value)
+		public DebugValueWindow (Mono.TextEditor.TextEditor editor, int offset, StackFrame frame, ObjectValue value, PinnedWatch watch)
 		{
 			TransientFor = (Gtk.Window) editor.Toplevel;
-			AcceptFocus = true;
+			
+			// Avoid getting the focus when the window is shown. We'll get it when the mouse enters the window
+			AcceptFocus = false;
 			
 			sw = new ScrolledWindow ();
 			sw.HscrollbarPolicy = PolicyType.Never;
@@ -58,10 +86,18 @@ namespace MonoDevelop.SourceEditor
 			tree.AllowAdding = false;
 			tree.AllowEditing = true;
 			tree.HeadersVisible = false;
+			tree.AllowPinning = true;
+			tree.PinnedWatch = watch;
+			DocumentLocation location = editor.Document.OffsetToLocation (offset);
+			tree.PinnedWatchLine = location.Line + 1;
+			tree.PinnedWatchFile = ((ExtensibleTextEditor)editor).View.ContentName;
 			
 			tree.AddValue (value);
 			tree.Selection.UnselectAll ();
 			tree.SizeAllocated += OnTreeSizeChanged;
+			tree.PinStatusChanged += delegate {
+				Destroy ();
+			};
 			
 			sw.ShowAll ();
 			
@@ -72,14 +108,15 @@ namespace MonoDevelop.SourceEditor
 			tree.EndEditing += delegate {
 				Modal = false;
 			};
-
-			tree.Selection.Changed += delegate {
-				if (resetSelection) {
-					resetSelection = false;
-					tree.Selection.UnselectAll ();
-				}
-			};
 		}
+		
+		protected override bool OnEnterNotifyEvent (EventCrossing evnt)
+		{
+			if (!AcceptFocus)
+				AcceptFocus = true;
+			return base.OnEnterNotifyEvent (evnt);
+		}
+		
 		
 		void OnTreeSizeChanged (object s, SizeAllocatedArgs a)
 		{

@@ -1,3 +1,68 @@
+2010-06-01  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* TextTemplatingTool.cs: Make ThreadAsyncOperation public.
+
+2010-05-25  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* TextTemplatingService.cs: Allow RecyclableAppDomain to
+	  resolve assemblies from MD appdomain. Should fix issues
+	  running ASP.NET MVC templates.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.TextTemplating.csproj: Added missing core
+	  reference (required for System.Action).
+
+2010-05-04  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* TextTemplatingTool.cs: Make cancellable, so bad user code
+	  can be aborted.
+
+2010-04-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Gui/T4EditorExtension.cs: Free up wasted space between
+	  scrollbars and treeview contents.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.TextTemplating.addin.xml: Bumped MD version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* Gui/T4EditorExtension.cs:
+	* MonoDevelop.TextTemplating.csproj:
+	* MonoDevelop.TextTemplating.addin.xml: Merged MD.Projects
+	  into MD.Core, and MD.Projects.Gui, MD.Core.Gui and
+	  MD.Components into MD.Ide.
+
+2010-03-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* TextTemplatingTool.cs: Remove dead code.
+
+2010-03-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* TextTemplatingService.cs: Added shared templating appdomain.
+
+	* TextTemplatingTool.cs: Added text templating tool.
+
+	* Templates:
+	* Templates/T4TemplateCSharp.xft.xml:
+	* MonoDevelop.TextTemplating.addin.xml: Added T4 template.
+
+	* Makefile.am:
+	* MonoDevelop.TextTemplating.csproj: Updated.
+
+2010-02-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Gui/T4EditorExtension.cs: File extensions are now declared
+	  in the node metadata.
+
+	* MonoDevelop.TextTemplating.addin.xml: Added some conditions
+	  to avoid early loading of extensions.
+
 2009-10-30  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* AssemblyInfo.cs:

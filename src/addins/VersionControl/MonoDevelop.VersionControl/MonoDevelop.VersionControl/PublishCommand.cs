@@ -1,13 +1,9 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
-
 using MonoDevelop.VersionControl.Dialogs;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl 
 {
@@ -41,9 +37,8 @@ namespace MonoDevelop.VersionControl
 			try {
 				dlg.ModuleName = moduleName;
 				dlg.Message = GettextCatalog.GetString ("Initial check-in of module {0}", moduleName);
-				dlg.TransientFor = IdeApp.Workbench.RootWindow;
 				do {
-					if (dlg.Run () == (int) Gtk.ResponseType.Ok && dlg.Repository != null) {
+					if (MessageService.RunCustomDialog (dlg) == (int) Gtk.ResponseType.Ok && dlg.Repository != null) {
 						AlertButton publishButton = new AlertButton ("_Publish");					
 						if (MessageService.AskQuestion (GettextCatalog.GetString ("Are you sure you want to publish the project?"), GettextCatalog.GetString ("The project will be published to the repository '{0}', module '{1}'.", dlg.Repository.Name, dlg.ModuleName), AlertButton.Cancel, publishButton) == publishButton) {
 							PublishWorker w = new PublishWorker (dlg.Repository, dlg.ModuleName, localPath, files.ToArray (), dlg.Message);
@@ -95,7 +90,8 @@ namespace MonoDevelop.VersionControl
 		
 		protected override void Run ()
 		{
-			vc.Publish (moduleName, path, files, message, GetProgressMonitor ());
+			vc.Publish (moduleName, path, files, message, Monitor);
+			Monitor.ReportSuccess (GettextCatalog.GetString ("Publish operation completed."));
 			
 			Gtk.Application.Invoke (delegate {
 				VersionControlService.NotifyFileStatusChanged (vc, path, true);

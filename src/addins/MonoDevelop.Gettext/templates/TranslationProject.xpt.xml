@@ -4,7 +4,7 @@
 	<!-- Template Header -->
 	<TemplateConfiguration>
 		<_Name>Translation Project</_Name>
-		<_Category>MonoDevelop</_Category>
+		<_Category>Other</_Category>
 		<Icon>md-project|res:gettext-overlay-32.png</Icon>
 		<_Description>Creates a translation project.</_Description>
 	</TemplateConfiguration>
@@ -13,7 +13,7 @@
 	<Combine name = "${ProjectName}" directory = ".">
 		<CombineEntry name = "${ProjectName}" 
 		              directory = "." 
-		              type = "MonoDevelop.Gettext.TranslationProject, MonoDevelop.Gettext"
+		              type = "MonoDevelop.Gettext.TranslationProject"
 		              packageName="i8n1" 
 		              outputType="RelativeToOutput" 
 		              relPath="locale" />

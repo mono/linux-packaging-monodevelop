@@ -1,3 +1,215 @@
+2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.VersionControl/Task.cs: Don't bring the VCS
+	  monitor to the front.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Fixed 'Bug
+	  610257 - Text editor does not redraw after toggling
+	  annotations'.
+
+2010-06-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Fix bug
+	  #610262 - After hiding annotations they still refresh on
+	  save.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Added
+	  missing string to translation.
+
+2010-05-31  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Fixed 'Bug
+	  610257 - Text editor does not redraw after toggling
+	  annotations'.
+
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl/CommitCommand.cs:
+	* MonoDevelop.VersionControl/PublishCommand.cs:
+	* MonoDevelop.VersionControl/CheckoutCommand.cs:
+	* MonoDevelop.VersionControl.Dialogs/SelectRepositoryDialog.cs:
+	  Fix incorrect use of ShowCustomDialog/RunCustomDialog.
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.VersionControl/CommitCommand.cs:
+	* MonoDevelop.VersionControl/PublishCommand.cs:
+	* MonoDevelop.VersionControl/CheckoutCommand.cs:
+	* MonoDevelop.VersionControl.Dialogs/SelectRepositoryDialog.cs:
+	  More dialog placing.
+
+2010-05-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Show a
+	  status message while getting annotations.
+
+2010-05-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Track API
+	  changes.
+
+2010-05-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Policies.xml: Added attribute to explicitly allow
+	  differential serialization for a policy (which is disabled
+	  by default).
+
+2010-04-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.VersionControl/BaseView.cs:
+	* MonoDevelop.VersionControl.Views/StatusView.cs: Use icon.
+
+2010-04-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl/ChangeSet.cs:
+	* MonoDevelop.VersionControl.Views/StatusView.cs: After
+	  updating status, remove from the changeset the files/folders
+	  which have been deleted. Fixes bug #582514 - VCS status view
+	  sometimes has hidden invalid items that obstruct commit.
+
+2010-04-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Views/StatusView.cs: Don't show
+	  an output pad when updating the status view.
+
+	* MonoDevelop.VersionControl/Task.cs:
+	* MonoDevelop.VersionControl/LockCommand.cs:
+	* MonoDevelop.VersionControl/UnlockCommand.cs:
+	* MonoDevelop.VersionControl/UpdateCommand.cs:
+	* MonoDevelop.VersionControl/CommitCommand.cs:
+	* MonoDevelop.VersionControl/RevertCommand.cs:
+	* MonoDevelop.VersionControl/PublishCommand.cs:
+	* MonoDevelop.VersionControl/CheckoutCommand.cs:
+	* MonoDevelop.VersionControl/AddRemoveMoveCommand.cs:
+	* MonoDevelop.VersionControl/RevertRevisionsCommands.cs:
+	  Improve success message. Small api simplification.
+
+2010-03-23  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* VersionControl.addin.xml: Register data files.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* VersionControl.addin.xml: Bumped MD version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* VersionControl.addin.xml:
+	* MonoDevelop.VersionControl.csproj:
+	* MonoDevelop.VersionControl/Task.cs:
+	* MonoDevelop.VersionControl/BaseView.cs:
+	* MonoDevelop.VersionControl/UpdateCommand.cs:
+	* MonoDevelop.VersionControl/CommitCommand.cs:
+	* MonoDevelop.VersionControl/RevertCommand.cs:
+	* MonoDevelop.VersionControl.Views/LogView.cs:
+	* MonoDevelop.VersionControl/PublishCommand.cs:
+	* MonoDevelop.VersionControl.Views/DiffView.cs:
+	* MonoDevelop.VersionControl/AnnotateCommand.cs:
+	* MonoDevelop.VersionControl/CheckoutCommand.cs:
+	* MonoDevelop.VersionControl.Views/StatusView.cs:
+	* MonoDevelop.VersionControl/CreatePatchCommand.cs:
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs:
+	* MonoDevelop.VersionControl/AddRemoveMoveCommand.cs:
+	* MonoDevelop.VersionControl.Dialogs/CommitDialog.cs:
+	* MonoDevelop.VersionControl/VersionControlService.cs:
+	* MonoDevelop.VersionControl.Views/CellRendererDiff.cs:
+	* MonoDevelop.VersionControl/RevertRevisionsCommands.cs:
+	* MonoDevelop.VersionControl/VersionControlNodeExtension.cs:
+	* MonoDevelop.VersionControl.Dialogs/VersionControlPolicyPanel.cs:
+	* MonoDevelop.VersionControl/VersionControlFileSystemExtension.cs:
+	* MonoDevelop.VersionControl.Dialogs/CommitMessageStylePanelWidget.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-08  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* version-control-16.png:
+	* VersionControl.addin.xml:
+	* MonoDevelop.VersionControl.csproj:
+	* MonoDevelop.VersionControl/Task.cs: Added version control
+	  icon.
+
+	* MonoDevelop.VersionControl/VersionControlNodeExtension.cs:
+	  Fix type reference ambiguity.
+
+2010-03-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: fix build.
+
+2010-02-23  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* VersionControl.addin.xml:
+	* MonoDevelop.VersionControl.csproj:
+	* MonoDevelop.VersionControl.Views/DiffView.cs: Track moved
+	  diff component.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Views/LogView.cs:
+	* MonoDevelop.VersionControl.Views/StatusView.cs:
+	* MonoDevelop.VersionControl.Dialogs/CommitDialog.cs: Track
+	  api changes.
+
+2010-02-12  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Views/StatusView.cs: Fix parsing
+	  of command id. We are not using enums as ids anymore.
+
+2010-02-12  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* VersionControl.addin.xml:
+	* MonoDevelop.VersionControl.csproj: Move the icon resources
+	  into files, which can be loaded without loading the whole
+	  add-in.
+
+2010-02-10  Levi Bard  <taktaktaktaktaktaktaktaktaktak@gmail.com>
+
+	* Makefile.am:
+	* VersionControl.addin.xml:
+	* MonoDevelop.VersionControl.csproj:
+	* MonoDevelop.VersionControl.Views/DiffParser.cs: Add
+	  quickfinder and folding support for unified diffs.
+
+2010-02-09  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/LogView.cs:
+	* MonoDevelop.VersionControl.Views/StatusView.cs:
+	* MonoDevelop.VersionControl.Dialogs/CommitDialog.cs: Track
+	  API changes for lazy loading images.
+
+2010-02-04  Levi Bard  <taktaktaktaktaktaktaktaktaktak@gmail.com>
+
+	* MonoDevelop.VersionControl.Views/LogView.cs: Allow viewing
+	  of historical, recursive directory diffs.
+
+	* MonoDevelop.VersionControl/Repository.cs: Add support for
+	  revision-range-based recursive diffing.
+
+2010-02-04  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.VersionControl.csproj: Add indirect reference.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.VersionControl.Dialogs.CommitDialog.cs:
+	* gtk-gui/MonoDevelop.VersionControl.UrlBasedRepositoryEditor.cs:
+	* gtk-gui/MonoDevelop.VersionControl.Dialogs.EditRepositoryDialog.cs:
+	* gtk-gui/MonoDevelop.VersionControl.CommitMessageStylePanelWidget.cs:
+	* gtk-gui/MonoDevelop.VersionControl.Dialogs.SelectRepositoryDialog.cs:
+	  Flush.
+
 2009-12-09  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.VersionControl.Views/StatusView.cs: Track the
@@ -18,10 +230,20 @@
 	* MonoDevelop.VersionControl.Dialogs/SelectRepositoryDialog.cs:
 	  Name threads to make debugging easier.
 
+2009-11-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Track API
+	  changes.
+
 2009-11-20  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* VersionControl.addin.xml: Move the annotate command to a
 	  more convenient location in the context menu.
+
+2009-11-19  Levi Bard  <taktaktaktaktaktaktaktaktaktak@gmail.com>
+
+	* MonoDevelop.VersionControl.Views/AnnotateView.cs: Show
+	  commit message on mouseover. Implements #545521.
 
 2009-11-13  Lluis Sanchez Gual  <lluis@novell.com>
 

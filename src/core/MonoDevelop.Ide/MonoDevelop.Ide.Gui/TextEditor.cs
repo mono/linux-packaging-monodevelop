@@ -28,7 +28,9 @@
 
 using System;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
+using Mono.TextEditor.Highlighting;
+using System.Collections.Generic;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -129,6 +131,11 @@ namespace MonoDevelop.Ide.Gui
 		public event EventHandler<TextChangedEventArgs> TextChanged {
 			add { textBuffer.TextChanged += value; }
 			remove { textBuffer.TextChanged -= value; }
+		}
+		
+		public event EventHandler CursorPositionChanged {
+			add { textBuffer.CaretPositionSet += value; }
+			remove { textBuffer.CaretPositionSet -= value; }
 		}
 		
 		public int CursorPosition { 
@@ -329,7 +336,7 @@ namespace MonoDevelop.Ide.Gui
 		
 		public int SearchChar (int startPos, char searchChar)
 		{
-			bool isInString = false, isInChar = false;
+			bool isInString = false, isInChar = false, isVerbatimString = false;
 			bool isInLineComment  = false, isInBlockComment = false;
 			
 			for (int pos = startPos; pos < TextLength; pos++) {
@@ -338,6 +345,8 @@ namespace MonoDevelop.Ide.Gui
 					case '\r':
 					case '\n':
 						isInLineComment = false;
+						if (!isVerbatimString)
+							isInString = false;
 						break;
 					case '/':
 						if (isInBlockComment) {
@@ -351,9 +360,26 @@ namespace MonoDevelop.Ide.Gui
 								isInBlockComment = true;
 						}
 						break;
+					case '\\':
+						if (isInChar || (isInString && !isVerbatimString))
+							pos++;
+						break;
+					case '@':
+						if (!(isInString || isInChar || isInLineComment || isInBlockComment) && pos + 1 < TextLength && GetCharAt (pos + 1) == '"') {
+							isInString = true;
+							isVerbatimString = true;
+							pos++;
+						}
+						break;
 					case '"':
-						if (!(isInChar || isInLineComment || isInBlockComment)) 
-							isInString = !isInString;
+						if (!(isInChar || isInLineComment || isInBlockComment)) {
+							if (isInString && isVerbatimString && pos + 1 < TextLength && GetCharAt (pos + 1) == '"') {
+								pos++;
+							} else {
+								isInString = !isInString;
+								isVerbatimString = false;
+							}
+						}
 						break;
 					case '\'':
 						if (!(isInString || isInLineComment || isInBlockComment)) 
@@ -369,6 +395,37 @@ namespace MonoDevelop.Ide.Gui
 			}
 			return -1;
 		}
+		
+		public static string[] GetCommentTags (string fileName)
+		{
+			//Document doc = IdeApp.Workbench.ActiveDocument;
+			string loadedMimeType = DesktopService.GetMimeTypeForUri (fileName);
+			
+			SyntaxMode mode = null;
+			foreach (string mt in DesktopService.GetMimeTypeInheritanceChain (loadedMimeType)) {
+				mode = SyntaxModeService.GetSyntaxMode (mt);
+				if (mode != null)
+					break;
+			}
+			
+			if (mode == null)
+				return null;
+			
+			List<string> ctags;
+			if (mode.Properties.TryGetValue ("LineComment", out ctags) && ctags.Count > 0) {
+				return new string [] { ctags [0] };
+			}
+			List<string> tags = new List<string> ();
+			if (mode.Properties.TryGetValue ("BlockCommentStart", out ctags))
+				tags.Add (ctags [0]);
+			if (mode.Properties.TryGetValue ("BlockCommentEnd", out ctags))
+				tags.Add (ctags [0]);
+			if (tags.Count == 2)
+				return tags.ToArray ();
+			else
+				return null;
+		}
+		
 		/*
 		public void GotoMatchingBrace ()
 		{

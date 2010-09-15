@@ -31,8 +31,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui.Components;
-using MonoDevelop.Core.Gui.Dialogs;
+using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Tasks;
 using MonoDevelop.Projects.Dom.Parser;
@@ -181,6 +180,8 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			foreach (object[] row in tokensStore)
 				tags.Add (new CommentTag ((string)row[0], (int)row[1]));
 
+			ProjectDomService.SpecialCommentTags = new CommentTagSet (tags);
+			
 			PropertyService.Set ("Monodevelop.UserTasksHighPrioColor", ColorToString (colorbuttonHighPrio.Color));
 			PropertyService.Set ("Monodevelop.UserTasksNormalPrioColor", ColorToString (colorbuttonNormalPrio.Color));
 			PropertyService.Set ("Monodevelop.UserTasksLowPrioColor", ColorToString (colorbuttonLowPrio.Color));

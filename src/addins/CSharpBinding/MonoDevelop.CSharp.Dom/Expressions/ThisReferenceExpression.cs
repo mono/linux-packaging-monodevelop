@@ -31,6 +31,23 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class ThisReferenceExpression : AbstractCSharpNode
 	{
+		public DomLocation Location {
+			get;
+			set;
+		}
+		
+		public override DomLocation StartLocation {
+			get {
+				return Location;
+			}
+		}
+		public override DomLocation EndLocation {
+			get {
+				return new DomLocation (Location.Line, Location.Column + "this".Length);
+			}
+		}
+
+
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)
 		{
 			return visitor.VisitThisReferenceExpression (this, data);

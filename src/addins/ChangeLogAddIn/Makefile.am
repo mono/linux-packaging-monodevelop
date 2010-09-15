@@ -3,12 +3,8 @@ ASSEMBLY = $(ADDIN_BUILD)/ChangeLogAddIn.dll
 
 DEPS =  \
 	$(top_builddir)/build/AddIns/VersionControl/MonoDevelop.VersionControl.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
@@ -35,11 +31,7 @@ RES =  \
 	gtk-gui/gui.stetic \
 	Policies.xml
 
-if ENABLE_VERSIONCONTROL
 all: $(ASSEMBLY) $(ASSEMBLY).mdb
-else
-  all:
-endif
 
 $(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS)
 	mkdir -p $(ADDIN_BUILD)
@@ -47,10 +39,8 @@ $(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS)
 
 $(ASSEMBLY).mdb: $(ASSEMBLY)
 
-if ENABLE_VERSIONCONTROL
 assemblydir = $(MD_ADDIN_DIR)/ChangeLogAddIn
 assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
-endif
 
 CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
 EXTRA_DIST = $(FILES) $(RES)

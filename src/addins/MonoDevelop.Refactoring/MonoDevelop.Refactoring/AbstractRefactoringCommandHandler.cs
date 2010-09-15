@@ -24,12 +24,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Projects.Dom;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Refactoring
 {
@@ -50,9 +50,7 @@ namespace MonoDevelop.Refactoring
 			if (editor == null)
 				return;
 			
-			ProjectDom dom = doc.Project != null ? ProjectDomService.GetProjectDom (doc.Project) : ProjectDom.Empty;
-			if (dom == null)
-				return;
+			ProjectDom dom = doc.Dom;
 			
 			ResolveResult result;
 			INode item;
@@ -62,7 +60,7 @@ namespace MonoDevelop.Refactoring
 				Document = doc,
 				Dom = dom,
 				ResolveResult = result,
-				SelectedItem = item
+				SelectedItem = item is InstantiatedType ? ((InstantiatedType)item).UninstantiatedType : item
 			};
 			Run (options);
 		}

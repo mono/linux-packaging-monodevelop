@@ -1,4 +1,4 @@
-﻿// IBaseViewContent.cs
+// IBaseViewContent.cs
 //
 // Author:
 //   Viktoria Dudka (viktoriad@remobjects.com)

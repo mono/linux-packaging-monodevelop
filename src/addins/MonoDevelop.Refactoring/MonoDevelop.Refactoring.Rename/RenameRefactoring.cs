@@ -28,14 +28,12 @@ using System;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Dom;
 using System.Collections.Generic;
-using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Projects.CodeGeneration;
 using MonoDevelop.Core;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Content;
 using Mono.TextEditor;
-using Mono.TextEditor.PopupWindow;
 using System.Text;
+using MonoDevelop.Ide;
+using System.Linq;
 
 namespace MonoDevelop.Refactoring.Rename
 {
@@ -43,7 +41,7 @@ namespace MonoDevelop.Refactoring.Rename
 	{
 		public override string AccelKey {
 			get {
-				var key = IdeApp.CommandService.GetCommandInfo (RefactoryCommands.Rename, null).AccelKey;
+				var key = IdeApp.CommandService.GetCommandInfo (RefactoryCommands.Rename).AccelKey;
 				return key == null ? null : key.Replace ("dead_circumflex", "^");
 			}
 		}
@@ -70,22 +68,7 @@ namespace MonoDevelop.Refactoring.Rename
 		
 		public override string GetMenuDescription (RefactoringOptions options)
 		{
-			return IdeApp.CommandService.GetCommandInfo (RefactoryCommands.Rename, null).Text;
-		}
-		
-		internal static Mono.TextEditor.TextEditor GetEditor (Gtk.Widget widget)
-		{
-			if (widget is Mono.TextEditor.TextEditor)
-				return (Mono.TextEditor.TextEditor)widget;
-			Gtk.Container container = widget as Gtk.Container;
-			if (container != null) {
-				foreach (var child in container.Children) {
-					Mono.TextEditor.TextEditor editor = GetEditor (child);
-					if (editor != null)
-						return editor;
-				}
-			}
-			return null;
+			return IdeApp.CommandService.GetCommandInfo (RefactoryCommands.Rename).Text;
 		}
 		
 		public override void Run (RefactoringOptions options)
@@ -95,12 +78,9 @@ namespace MonoDevelop.Refactoring.Rename
 				if (col == null)
 					return;
 				TextEditorData data = options.GetTextEditorData ();
-
-				Mono.TextEditor.TextEditor editor = GetEditor (options.Document.ActiveView.Control);
+				Mono.TextEditor.TextEditor editor = data.Parent;
 				if (editor == null) {
-					RenameItemDialog dialog = new RenameItemDialog (options, this);
-					dialog.TransientFor = MonoDevelop.Ide.Gui.IdeApp.Workbench.RootWindow;
-					dialog.Show ();
+					MessageService.ShowCustomDialog (new RenameItemDialog (options, this));
 					return;
 				}
 
@@ -112,21 +92,25 @@ namespace MonoDevelop.Refactoring.Rename
 					baseOffset = Math.Min (baseOffset, data.Document.LocationToOffset (r.Line - 1, r.Column - 1));
 				}
 				foreach (MemberReference r in col) {
-					link.AddLink (new Segment (data.Document.LocationToOffset (r.Line - 1, r.Column - 1) - baseOffset, r.Name.Length));
+					Segment segment = new Segment (data.Document.LocationToOffset (r.Line - 1, r.Column - 1) - baseOffset, r.Name.Length);
+					if (segment.Offset <= data.Caret.Offset - baseOffset && data.Caret.Offset - baseOffset <= segment.EndOffset) {
+						link.Links.Insert (0, segment); 
+					} else {
+						link.AddLink (segment);
+					}
 				}
-
+				
 				links.Add (link);
 				TextLinkEditMode tle = new TextLinkEditMode (editor, baseOffset, links);
 				tle.SetCaretPosition = false;
+				tle.SelectPrimaryLink = true;
 				if (tle.ShouldStartTextLinkMode) {
 					tle.OldMode = data.CurrentMode;
 					tle.StartMode ();
 					data.CurrentMode = tle;
 				}
 			} else {
-				RenameItemDialog dialog = new RenameItemDialog (options, this);
-				dialog.TransientFor = MonoDevelop.Ide.Gui.IdeApp.Workbench.RootWindow;
-				dialog.Show ();
+				MessageService.ShowCustomDialog (new RenameItemDialog (options, this));
 			}
 		}
 		
@@ -157,6 +141,8 @@ namespace MonoDevelop.Refactoring.Rename
 				int currentPart = 1;
 				HashSet<string> alreadyRenamed = new HashSet<string> ();
 				foreach (IType part in cls.Parts) {
+					if (part.CompilationUnit.FileName != options.Document.FileName && System.IO.Path.GetFileNameWithoutExtension (part.CompilationUnit.FileName) != System.IO.Path.GetFileNameWithoutExtension (options.Document.FileName))
+						continue;
 					if (alreadyRenamed.Contains (part.CompilationUnit.FileName))
 						continue;
 					alreadyRenamed.Add (part.CompilationUnit.FileName);
@@ -218,10 +204,16 @@ namespace MonoDevelop.Refactoring.Rename
 				return refactorer.FindParameterReferences (monitor, (IParameter)options.SelectedItem, true);
 			} else if (options.SelectedItem is IMember) {
 				IMember member = (IMember)options.SelectedItem;
-				
+				Dictionary<string, HashSet<DomLocation>> foundLocations = new Dictionary <string, HashSet<DomLocation>> ();
 				MemberReferenceCollection result = new MemberReferenceCollection ();
 				foreach (IMember m in CollectMembers (member.DeclaringType.SourceProjectDom, member)) {
 					foreach (MemberReference r in refactorer.FindMemberReferences (monitor, m.DeclaringType, m, true)) {
+						DomLocation location = new DomLocation (r.Line, r.Column);
+						if (!foundLocations.ContainsKey (r.FileName))
+							foundLocations[r.FileName] = new HashSet<DomLocation> ();
+						if (foundLocations[r.FileName].Contains (location))
+							continue;
+						foundLocations[r.FileName].Add (location);
 						result.Add (r);
 					}
 				}
@@ -235,10 +227,12 @@ namespace MonoDevelop.Refactoring.Rename
 			if (member is IMethod && ((IMethod)member).IsConstructor) {
 				yield return member;
 			} else {
+				bool isOverrideable = member.DeclaringType.ClassType == ClassType.Interface || member.IsOverride || member.IsVirtual || member.IsAbstract;
+				bool isLastMember = false;
 				// for members we need to collect the whole 'class' of members (overloads & implementing types)
 				HashSet<string> alreadyVisitedTypes = new HashSet<string> ();
 				foreach (IType type in dom.GetInheritanceTree (member.DeclaringType)) {
-					if (type.ClassType == ClassType.Interface || member.IsOverride || member.IsVirtual || member.IsAbstract || type.DecoratedFullName == member.DeclaringType.DecoratedFullName) {
+					if (type.ClassType == ClassType.Interface || isOverrideable || type.DecoratedFullName == member.DeclaringType.DecoratedFullName) {
 						// search in the class for the member
 						foreach (IMember interfaceMember in type.SearchMember (member.Name, true)) {
 							if (interfaceMember.MemberType == member.MemberType)
@@ -246,16 +240,23 @@ namespace MonoDevelop.Refactoring.Rename
 						}
 						
 						// now search in all subclasses of this class for the member
+						isLastMember = !member.IsOverride;
 						foreach (IType implementingType in dom.GetSubclasses (type)) {
 							string name = implementingType.DecoratedFullName;
 							if (alreadyVisitedTypes.Contains (name))
 								continue;
 							alreadyVisitedTypes.Add (name);
 							foreach (IMember typeMember in implementingType.SearchMember (member.Name, true)) {
-								if (typeMember.MemberType == member.MemberType)
+								if (typeMember.MemberType == member.MemberType) {
+									isLastMember = type.ClassType != ClassType.Interface && (typeMember.IsVirtual || typeMember.IsAbstract || !typeMember.IsOverride);
 									yield return typeMember;
+								}
 							}
+							if (!isOverrideable)
+								break;
 						}
+						if (isLastMember)
+							break;
 					}
 				}
 			}

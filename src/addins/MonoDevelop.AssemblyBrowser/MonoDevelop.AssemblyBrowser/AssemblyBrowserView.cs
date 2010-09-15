@@ -26,14 +26,13 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-using System;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Codons;
+using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
-using Mono.Cecil;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Refactoring;
+using System;
+ 
 
 namespace MonoDevelop.AssemblyBrowser
 {
@@ -92,6 +91,19 @@ namespace MonoDevelop.AssemblyBrowser
 				return;
 			Refactorer refactorer = new Refactorer (dom, null, null, member, null);
 			refactorer.FindReferences ();
+		}
+		
+		[MonoDevelop.Components.Commands.CommandHandler(MonoDevelop.Refactoring.RefactoryCommands.FindDerivedClasses)]
+		public void FindDerivedClasses ()
+		{
+			IMember member = widget.ActiveMember;
+			if (member == null)
+				return;
+			ProjectDom dom = ProjectDomService.GetProjectDom (IdeApp.ProjectOperations.CurrentSelectedProject);
+			if (dom == null)
+				return;
+			Refactorer refactorer = new Refactorer (dom, null, null, member, null);
+			refactorer.FindDerivedClasses ();
 		}
 	}
 }

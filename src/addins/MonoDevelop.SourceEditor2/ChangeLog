@@ -1,3 +1,1025 @@
+2010-06-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed
+	  breakpoint text markers.
+
+2010-06-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Fixed 'Bug
+	  613114 - NRE in editor means error marker never goes away'.
+
+2010-06-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Use a
+	  system font for bubbles.
+
+2010-06-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed 'Bug
+	  611202 - Move line up/down command fails in aspx files'.
+
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: check if
+	  search&replace widget is open.
+
+2010-06-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Fixed 'Bug
+	  610204 - Find-as-you-type-bar with Chrome style broke a good
+	  use case of the find-bar with Firefox style'.
+
+2010-05-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Fixed
+	  'Bug 610099 - Typing in lines with bubbles very slow'.
+
+
+2010-05-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs:
+	  Generalized method.
+
+2010-05-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs:
+	  Generalized method.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Worked
+	  on message bubbles.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Removed
+	  the message bubble focus inactive toggle (it's still
+	  inactive, if the line has changed).
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Removed
+	  debug message.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Removed
+	  message box which informs of undo past save point.
+
+2010-05-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: fixed
+	  little selection drawing issue.
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  Fix text alignment.
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  Track API.
+
+2010-05-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  Use new BounceFadePopupWindow class.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Fixed
+	  some drawing issues.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  Worked on message bubble popups
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs:
+	  Corrected some minor drawing issues.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Clip
+	  selection region.
+
+2010-05-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  The message bubbles can now draw selected regions.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Removed debug
+	  code.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Ensures
+	  that the layout is created.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Fixed
+	  some issues with message bubbles.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  Worked on text editor styling.
+
+2010-05-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.GeneralOptionsPanel.cs:
+	  Used smartscrolledwindow.
+
+2010-05-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Used the
+	  standard scrolled window again.
+
+2010-05-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Added
+	  border around the text editor & fixed some splitting issues.
+
+2010-05-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Used compact
+	  scrolled window.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorDisplayBinding.cs: Clea
+	  up path API.
+
+	* MonoDevelop.SourceEditor.OptionPanels/HighlightingPanel.cs:
+	  Clean up dialog placement.
+
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.GeneralOptionsPanel.cs:
+	  Flush.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Disable the
+	  search result animation as it looks rather ugly right now.
+
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  Tweak.
+
+2010-05-21  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Unsubscribe
+	  options change event.
+
+	* MonoDevelop.SourceEditor/StyledSourceEditorOptions.cs:
+	  Subscribe the options changed event only once.
+
+2010-05-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  Speed up animation & made it a bit smaller.
+
+2010-05-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  Tweaked error bubble popup drawing a bit.
+
+2010-05-21  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs:
+	  Added message bubble popup animation/fixed bug in message
+	  bubble calculation.
+
+2010-05-21  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs: Worked
+	  on message bubbles.
+
+2010-05-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: Fixed 'Bug
+	  607311 - MouseOver cause MD to crash'.
+
+2010-05-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed 'Bug
+	  533918 - Scroll position "jumps" first time editor tab is
+	  shown'.
+
+2010-05-19  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor.addin.xml: Fix keybindings.
+
+2010-05-19  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Escape in a
+	  'do you want to continue' dialog should cancel.
+
+2010-05-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: Provide
+	  tooltips for message bubbles.
+
+2010-05-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Improved the
+	  error bubble drawing.
+
+2010-05-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Expanded
+	  message bubbles now overdraw lines instead of inserting
+	  virtual space.
+
+2010-05-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Implemented
+	  'Bug 606978 - Warning message when undoing past save point'.
+
+2010-05-19  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Track code
+	  template API.
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Track code
+	  template API and toolbox API.
+
+2010-05-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DropDownBox.cs:
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs:
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs: Improved
+	  multi monitor support.
+
+2010-05-17  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Use
+	  ViActions.Join as EditorCommands.JoinWithNextLine, since
+	  it's more efficient and supports joining multiple lines.
+
+2010-05-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Removed debug
+	  message.
+
+2010-05-14  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/LanguageItemWindow.cs: Display
+	  resolve errors in the tooltip.
+
+2010-05-14  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: Fixed selection
+	  drawing error.
+
+2010-05-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Optimized
+	  speed of message bubbles.
+
+2010-05-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Fixed
+	  'Bug 605000 - Search history does not include recent
+	  searches in current editor'.
+
+2010-05-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorPrintOperation.cs: Use
+	  PangoUtil to create the PangoLayout to avoid a leak.
+
+2010-05-10  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/StatusBox.cs: Nullify editor
+	  reference to help tracking leaks.
+
+2010-05-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/LanguageItemTooltipProvider.cs:
+	  Removed debug message/handled null case.
+
+2010-05-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueTooltipProvider.cs:
+	* MonoDevelop.SourceEditor/LanguageItemTooltipProvider.cs:
+	* MonoDevelop.SourceEditor/CompileErrorTooltipProvider.cs:
+	  Track API changes.
+
+2010-05-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: implemented
+	  'Bug 603984 - Control-f with selection while search open
+	  should use selection'.
+
+2010-05-07  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Check for
+	  empty and null.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Make use
+	  of the new Document.Dom property.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Fix auto
+	  insert bracket issue.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: fixed
+	  possible null ref.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Auto expand
+	  multiple error bubbles when the caret is in a line that
+	  contains a multi error bubble.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Fixed 'Bug
+	  603113 - Automatic window scrolling hides completion
+	  window'.
+
+2010-05-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed
+	  breakpoint update.
+
+2010-05-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Added bounds
+	  check.
+
+2010-05-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed update
+	  breakpoint slowness problem.
+
+2010-05-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor.addin.xml: Removed some duplicate
+	  entries/put toggle code focus command into the text editor
+	  context menu.
+
+2010-05-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/StyledSourceEditorOptions.cs: free
+	  delegate reference.
+
+2010-05-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Track
+	  API changes.
+
+2010-05-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/LanguageItemWindow.cs: Ensure that
+	  created font description is destroyed.
+
+2010-04-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Moved the
+	  command handlers to the view.
+
+2010-04-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/GotoLineNumberWidget.cs:
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Fixed
+	  IntPtr exception.
+
+2010-04-30  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Always fire
+	  the CaretPositionSet event when the caret position changes.
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Widgets from
+	  views are now destroyed by the workspace window.
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed 'Bug
+	  600671 - Text painting gets into a weird state'.
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor.addin.xml: added the toggle message
+	  bubble command to the main menu message bubble submenu.
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor.addin.xml:
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SourceEditorCommands.cs: Fixed 'Bug
+	  600622 – Can't set a breakpoint on line with inline
+	  error/warning'.
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Fixed 'Bug
+	  600609 - Parameter tooltips should hide when scrolling
+	  editor'.
+
+2010-04-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueWindow.cs: Accept getting
+	  the focus only when the mouse is moved inside the window.
+
+2010-04-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/LanguageItemTooltipProvider.cs:
+	  Added some null checks.
+
+2010-04-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/GotoLineNumberWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Added
+	  some HACK comments.
+
+2010-04-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/GotoLineNumberWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Worked
+	  on mac bugfix.
+
+2010-04-22  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* gtk-gui/generated.cs:
+	* MonoDevelop.SourceEditor/GotoLineNumberWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.GotoLineNumberWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	  Take back last commit. 
+
+2010-04-22  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* gtk-gui/generated.cs:
+	* MonoDevelop.SourceEditor/GotoLineNumberWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.GotoLineNumberWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	  Found other solution to mac drawing problem.
+
+2010-04-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/LanguageItemTooltipProvider.cs:
+	  Fixed 'Bug 598203 - Tooltip shows too fast, follows mouse,
+	  and flickers'.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Removed
+	  intptr constructor.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: fixed find
+	  issue.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: provided int
+	  ptr constructor.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/GotoLineNumberWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Worked
+	  on mac disappearing buttons work around.
+
+2010-04-20  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* gtk-gui/MonoDevelop.SourceEditor.GotoLineNumberWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	  Fixed 'Bug 597672 - Search bar icons vanish when moving
+	  across them mouse right to left'.
+
+2010-04-19  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor.addin.xml:
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/MessageBubbleCommands.cs: Worked on
+	  message bubbles/Added some bubble commands to the view menu.
+
+2010-04-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Unregister
+	  pinned watch control when the watch is removed.
+
+	* MonoDevelop.SourceEditor/PinnedWatchWidget.cs: Embed an
+	  ObjectValueTreeView instance instead of a custom value
+	  viewer.
+
+2010-04-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: fixed warning.
+
+2010-04-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Optimized
+	  error bubbles.
+
+2010-04-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: checked
+	  document == null.
+
+2010-04-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Levi Bard
+	  <levi@unity3d.com> Cache selection mode.
+
+2010-04-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed 'Bug
+	  596511 - Code completion removes block selection and only
+	  affects 1 line'
+
+2010-04-13  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: ContentName
+	  can be null if the file is not saved.
+
+2010-04-13  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Added some
+	  checks to avoid updating breakpoints when the editor has
+	  been disposed.
+
+2010-04-13  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.SourceEditor/SourceEditorOptions.cs:
+	* MonoDevelop.SourceEditor.OptionPanels/BehaviorPanel.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.BehaviorPanel.cs:
+	  Implemented 'Bug 595598 - Intelligent placing of
+	  semi-colons'.
+
+2010-04-13  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Implemented
+	  'Bug 595587 - Move code block to correct depth when
+	  Alt+arrow moving'.
+
+2010-04-13  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed 'Bug
+	  595584 - Code completion leaves the cursor in the wrong
+	  place'.
+
+2010-04-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Fixed 'Bug
+	  595601 - Make "add matching quote" aware of whether or not
+	  it is within a string already'.
+
+2010-04-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Text
+	  editor extension is disposed in Document.
+
+2010-04-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Dispose
+	  text editor extensions.
+
+2010-04-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Implemented
+	  command for 'Bug 595228 - Block selection should be usable
+	  from keyboard'
+
+2010-04-09  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/DebugValueMarker.cs: Removed
+	  debugvaluemarker (it's now done by pinnedquickwatch).
+
+2010-04-08  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueWindow.cs: Removed
+	  unnecessary unselection code.
+
+2010-04-08  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueWindow.cs: Converted to a
+	  TopLevel window, so that it can get proper focus and the
+	  value entry works as expected.
+
+2010-04-07  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: 
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed 'Bug
+	  594370 - NRE in source editor crashed MD'.
+
+2010-04-07  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	  Implemented use selection for find/replace commands.
+
+2010-04-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed auto
+	  save creation.
+
+2010-03-30  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fix bug 569417
+	  - Exception in SourceEditorView.CheckFrameIsInFile.
+
+2010-03-23  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/PinnedWatchWidget.cs: Improve
+	  visual style.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.SourceEditor.addin.xml: Bumped MD version.
+
+2010-03-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/StatusBox.cs:
+	* MonoDevelop.SourceEditor/DropDownBox.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Optimized
+	  text editor caret movement/selection speed.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor.addin.xml:
+	* MonoDevelop.SourceEditor/StatusBox.cs:
+	* MonoDevelop.SourceEditor/IdeViMode.cs:
+	* MonoDevelop.SourceEditor/NavigationBar.cs:
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/DebugValueMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/DebugValueWindow.cs:
+	* MonoDevelop.SourceEditor/DefaultFormatter.cs:
+	* MonoDevelop.SourceEditor/PinnedWatchWidget.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SourceEditorOptions.cs:
+	* MonoDevelop.SourceEditor/DynamicAbbrevHandler.cs:
+	* MonoDevelop.SourceEditor/ISourceEditorOptions.cs:
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs:
+	* MonoDevelop.SourceEditor/NavigationBarCommands.cs:
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	* MonoDevelop.SourceEditor/MarkerOperationsHandler.cs:
+	* MonoDevelop.SourceEditor.OptionPanels/MarkerPanel.cs:
+	* MonoDevelop.SourceEditor/StyledSourceEditorOptions.cs:
+	* MonoDevelop.SourceEditor/DebugValueTooltipProvider.cs:
+	* MonoDevelop.SourceEditor.OptionPanels/BehaviorPanel.cs:
+	* MonoDevelop.SourceEditor/SourceEditorDisplayBinding.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	* MonoDevelop.SourceEditor.OptionPanels/HighlightingPanel.cs:
+	* MonoDevelop.SourceEditor.OptionPanels/GeneralOptionsPanel.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/LanguageItemWindow.cs: Don't modify
+	  the style's default font, because that affects other parts
+	  of the MD GUI. Make a copy instead, and track style updates.
+
+2010-03-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DropDownBox.cs:
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs: Fixed
+	  'Bug 586479 - GTK and GLib criticals from
+	  DropDownBox.PositionListWindow'.
+
+2010-03-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs: fixed
+	  scrolling bar bug.
+
+2010-03-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Added repaint
+	  after task update.
+
+2010-03-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Optimized
+	  error bubble speed.
+
+2010-03-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/NavigationBarCommands.cs: When the
+	  caret panel is shown the toggle command is renamed to 'hide
+	  caret panel'.
+
+2010-03-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/StatusBox.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Optimized
+	  caret state box.
+
+2010-03-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor.OptionPanels/MarkerPanel.cs: Fixed
+	  the show column ruler option.
+
+2010-03-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: fixed 'Bug
+	  585770 - Matching brace should not be inserted in comments'.
+
+2010-03-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Don't add
+	  tasks to invalid lines. May happen when the file is reloaded
+	  and changed from outside or when the task is invalid.
+
+2010-03-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/LanguageItemWindow.cs: Fixed 'Bug
+	  585305 - NRE in text editor when hiding annotations'.
+
+2010-03-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs: Fixed
+	  'Bug 584883 - Layout issue in quick finder dropdowns'.
+
+2010-03-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/NavigationBar.cs: Navigation bar
+	  now controls the visibility of the containing panels.
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: 
+
+2010-03-03  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor.addin.xml:
+	* MonoDevelop.SourceEditor/StatusBox.cs:
+	* MonoDevelop.SourceEditor/DropDownBox.cs:
+	* MonoDevelop.SourceEditor/NavigationBar.cs:
+	* MonoDevelop.SourceEditor/ClassQuickFinder.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/NavigationBarCommands.cs: Worked on
+	  navigation panel (it's now possible to show the caret
+	  position there).
+
+2010-03-03  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/StatusBox.cs:
+	* MonoDevelop.SourceEditor/DropDownBox.cs:
+	* MonoDevelop.SourceEditor/TinyDropDownBox.cs:
+	* MonoDevelop.SourceEditor/ClassQuickFinder.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/LanguageItemWindow.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs:
+	* MonoDevelop.SourceEditor/LanguageItemTooltipProvider.cs:
+	* MonoDevelop.SourceEditor/CompileErrorTooltipProvider.cs:
+	  Refactored text editor resolve providers. Language bindings
+	  now can provide own providers.
+
+2010-03-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: fix build
+
+2010-03-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Moved find
+	  expression code into the language binding.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: up/down
+	  only reacts when search entry has the focus.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	  Implemented 'Bug 584244 - key binding (up/down arrow) to
+	  cycle through recent searches'.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Fixed
+	  'Bug 584235 - New search widget causes text to be
+	  overrwritten when it shouldn't'.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/LanguageItemWindow.cs: Handled
+	  unresolved member resolve result.
+
+2010-02-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Fixed
+	  'Bug 583495 - Clicking on search result briefly selects
+	  result'.
+
+2010-02-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Fixed 'Bug
+	  583461 - Fold preview scrolling is strange'.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/PinnedWatchWidget.cs: setting
+	  minimum height to 18.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/PinnedWatchWidget.cs: Fixed 'Bug
+	  583026 - Font and aligning issues with the
+	  PinnedWatchWidget'/Applied patch from Alexander Cherniuk
+	  <ts33kr@gmail.com>
+
+2010-02-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: added
+	  selection check.
+
+2010-02-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Fixed
+	  'Bug 582050 - Cannot see selection while search box is
+	  visible, even if editor has focus'
+
+2010-02-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: BOM is now
+	  remembered.
+
+2010-02-23  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Add
+	  command handlers for RecenterEditor and TransposeCharacters.
+
+2010-02-23  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/IdeViMode.cs: Missed file in
+	  previous commit.
+
+2010-02-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Track API
+	  changes.
+
+2010-02-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Improved
+	  keyboard navigation in search & replace widget.
+
+2010-02-22  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	  Fixed 'Bug 581629 - Search and replace should not trim the
+	  search/replace term'.
+
+2010-02-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Worked
+	  on search & replace.
+
+2010-02-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Worked
+	  on search & replace.
+
+2010-02-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	  Fixed search update bug.
+
+2010-02-16  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/GotoLineNumberWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.GotoLineNumberWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	  Worked on the search box/goto line number box.
+
+2010-02-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Fixed
+	  search & replace widget flickering problem.
+
+2010-02-15  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/searchoptions.png:
+	* MonoDevelop.SourceEditor/searchoptions.svg:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Added
+	  search options icon.
+
+2010-02-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ClassQuickFinder.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/PinnedWatchWidget.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Worked
+	  on search & replace widget.
+
+2010-02-12  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/DropDownBox.cs:
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs: Remove
+	  dead code.
+
+2010-02-12  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: fixed
+	  flickering in inform label update.
+
+2010-02-12  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/GotoLineNumberWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	  Overworked the search & replace widget.
+
+2010-02-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs:
+	  re-implemented intptr constructor.
+
+2010-02-10  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: fixed 'Bug
+	  577848 - MissingIntPtrCtorException appears randomly'.
+
 2010-02-08  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: 
@@ -46,20 +1068,216 @@
 	* MonoDevelop.SourceEditor/SourceEditorView.cs: Added method
 	  to check whether text editor has input focus.
 
+2010-02-04  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/DebugValueMarker.cs:
+	* MonoDevelop.SourceEditor/PinnedWatchWidget.cs: Added first
+	  version of widget based pinned watches.
+
+2010-02-04  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueWindow.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/DebugValueMarker.cs:
+	* MonoDevelop.SourceEditor/DebugValueTooltipProvider.cs: Use
+	  the new pinned watch infrastructure.
+
+2010-01-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueWindow.cs:
+	* MonoDevelop.SourceEditor/DebugValueMarker.cs:
+	* MonoDevelop.SourceEditor/DebugValueTooltipProvider.cs:
+	  Display mouse over widget for pin watches.
+
 2010-01-29  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: fixed 'Bug
 	  574362 - Matching brace shouldn't be added inside comments'.
+
+2010-01-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueWindow.cs: fixed 'Bug
+	  574994 - Pinned quick watch issues'.
+
+2010-01-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueMarker.cs: handles h
+	  scrolling & clipping.
+
+2010-01-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs: Don't
+	  show the window in the ctor. This means the creator can move
+	  it before showing it, and we don't get a flicker. Also means
+	  we have to grab/ungrab in map/unmap.
+
+2010-01-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueMarker.cs: hide close
+	  pins, when mouse is not in the right line.
+
+2010-01-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DebugValueWindow.cs:
+	* MonoDevelop.SourceEditor/DebugValueMarker.cs: Worked on
+	  pinnable watches.
+
+2010-01-26  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/DebugValueWindow.cs:
+	* MonoDevelop.SourceEditor/DebugValueMarker.cs:
+	* MonoDevelop.SourceEditor/DebugValueTooltipProvider.cs:
+	* MonoDevelop.SourceEditor/LanguageItemTooltipProvider.cs:
+	* MonoDevelop.SourceEditor/CompileErrorTooltipProvider.cs:
+	  Implemented 'quick watches'.
+
+2010-01-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorDisplayBinding.cs:
+	  Track DisplayBinding API.
 
 2010-01-22  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Track
 	  HelpService API.
 
-2010-01-04  Mike Krüger  <mkrueger@novell.com>
+2010-01-21  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/generated.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.GotoLineNumberWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.MarkerPanel.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.BehaviorPanel.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.HighlightingPanel.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.GeneralOptionsPanel.cs:
+	  Added support for custom key actions in completion list.
+
+2010-01-20  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/LanguageItemWindow.cs: fixed 'Bug
+	  366110 - Accessibility issue regarding tooltips font'.
+
+2010-01-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Implemented
+	  'Bug 433318 - Allow scrolling the text boxes that appear
+	  when hovering over a folded region'.
+
+2010-01-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.SourceEditor/DefaultFormatter.cs:
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs: Track api
+	  changes.
+
+2010-01-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/TinyDropDownBox.cs:
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs:
+	  implemented 'Bug 571252 - Quick finder dropdowns should take
+	  mouse grab'.
+
+2010-01-14  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor.OptionPanels/BehaviorPanel.cs:
+	  fixed bug with on the fly formatting check button.
+
+2010-01-13  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: icon is no
+	  longer drawn over the left margins.
+
+2010-01-13  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: fixed bug in
+	  error text marker collapsing sign.
+
+2010-01-13  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: fixed 'Bug
+	  569665 - Moving entire lines of code with Alt + Up/Down
+	  causes the editor to behave erratically.'.
+
+2010-01-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs: Track
+	  selection during mouse scroll events. Fix page size.
+
+2010-01-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorOptions.cs: Use the eol
+	  marker from the policy.
+
+2010-01-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: Worked on
+	  collapsible error bubbles.
+
+2010-01-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: added case
+	  check.
+
+2010-01-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: fixed auto
+	  set pattern casing for selection.
+
+2010-01-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: fixed 'Bug
+	  568979 - Hruler paints over error text'.
+
+2010-01-08  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: Fixed 'Bug
+	  568966 - Error bubbles wrapped lines have wrong bg in ruler
+	  area'.
+
+2010-01-07  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: fixed selection
+	  drawing bug.
+
+2010-01-07  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Added support
+	  for multiple errors/warnings in one line.
+
+2010-01-05  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	* MonoDevelop.SourceEditor.OptionPanels/BehaviorPanel.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.BehaviorPanel.cs:
+	  fixed "Bug 561572 - Search keeps defaulting to case
+	  sensitive" & "Bug 564384 - Can't turn off case sensitivity".
+
+2010-01-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: fixed Bug 
+	  564855 - Pressing Enter at the end of a line with a breakpoint 
+	  on it causes the line to be drawn as a not "breakpointed" line.
+
+2010-01-05  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: fixed 'Bug
-	  560510 - Preprocessor enabled code shows as comment anyway'.
+	  567335 - Split Horizontal View Jumps Both Panes to the Start
+	  of the File instead of displaying the same place'.
+
+2010-01-04  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/TinyDropDownBox.cs: Constrain the
+	  text layout so it doesn't ever render under the dropdown
+	  arrows.
 
 2010-01-04  Mike Krüger  <mkrueger@novell.com>
 
@@ -67,25 +1285,79 @@
 	  debug messages for 'Bug 566249 - InvalidCastException when
 	  deleting some text in the text editor'.
 
+2010-01-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: fixed 'Bug
+	  560510 - Preprocessor enabled code shows as comment anyway'.
+
+2010-01-04  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/TinyDropDownBox.cs: Render as the
+	  inside of a button, so it matches button styling. Use
+	  depressed state when popup active.
+
+2009-12-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorOptions.cs: Use proper
+	  enums for values instead of letting them get cached as
+	  strings and having to reparse them every time.
+
 2009-12-11  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.SourceEditor.addin.xml: Use some of the new
 	  icons.
+
+2009-12-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Re-enable
+	  syntax error underlining. No idea why Mike disabled it, but
+	  it's far more useful than error bubbles.
 
 2009-12-08  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.SourceEditor/SourceEditorView.cs: Check that
 	  file exists before getting its old attributes.
 
-2009-12-02  Mike Krüger  <mkrueger@novell.com>
+2009-12-04  Mike Krüger  <mkrueger@novell.com>
 
-	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Fixed 'Bug
-	  559822 - comments are folded with incorrect match'.
+	* MonoDevelop.SourceEditor/TinyDropDownBox.cs: Escape now
+	  closes drop down.
+
+2009-12-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/TinyDropDownBox.cs: Improved the
+	  drawing of the tiny drop down box.
+
+2009-12-04  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/TinyDropDownBox.cs: Keyboard now
+	  works in tiny drop down.
+
+2009-12-03  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/TinyDropDownBox.cs: Added spacing
+	  for the right arrows.
+
+2009-12-03  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/objects.xml:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/DropDownBox.cs:
+	* MonoDevelop.SourceEditor/TinyDropDownBox.cs:
+	* MonoDevelop.SourceEditor/ClassQuickFinder.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Added tiny
+	  drop down box.
 
 2009-12-02  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.SourceEditor/AutoSave.cs: Name threads to make
 	  debugging easier.
+
+2009-12-02  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Fixed 'Bug
+	  559822 - comments are folded with incorrect match'.
 
 2009-12-02  Michael Hutchinson  <mhutchinson@novell.com>
 
@@ -102,6 +1374,29 @@
 	  could cause lots of unnecessary work and slowdowns
 	  elsewhere.
 
+2009-11-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs: Fixed
+	  search & replace speed issue.
+
+2009-11-26  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	  Worked on search & replace popup.
+
+2009-11-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Cleanly take
+	  out event handler.
+
+2009-11-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs: only set the
+	  color styles, when an editor color style is available.
+
 2009-11-25  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.SourceEditor/SourceEditorView.cs: Try to display
@@ -116,6 +1411,19 @@
 	  when comparing files, since it is case insensitive in
 	  windows.
 
+2009-11-25  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/generated.cs:
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.GotoLineNumberWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.MarkerPanel.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.BehaviorPanel.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.HighlightingPanel.cs:
+	* gtk-gui/MonoDevelop.SourceEditor.OptionPanels.GeneralOptionsPanel.cs:
+	  Worked on message bubbles.
+
 2009-11-25  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.SourceEditor/SourceEditorView.cs: When debugging 
@@ -126,6 +1434,33 @@
 	* MonoDevelop.SourceEditor/SourceEditorView.cs: Use the new
 	  tracepoint markers.
 
+2009-11-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorView.cs: Disabled error
+	  bubbles by request from lluis.
+
+2009-11-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs:
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs: Used the
+	  correct screen for the screen height. 
+
+2009-11-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/DropDownBoxListWindow.cs: Increased
+	  the number of maximum items in the quick class browser
+	  dropdown.
+
+2009-11-24  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.SourceEditor.csproj:
+	* MonoDevelop.SourceEditor/ErrorTextMarker.cs:
+	* MonoDevelop.SourceEditor/SourceEditorView.cs:
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Worked on
+	  error markers
+
 2009-11-23  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.SourceEditor/SourceEditorView.cs: Implement
@@ -134,6 +1469,24 @@
 2009-11-20  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* Makefile.am: Use correct cairo lib.
+
+2009-11-19  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor.addin.xml:
+	* MonoDevelop.SourceEditor/SourceEditorCommands.cs:
+	* MonoDevelop.SourceEditor/ExtensibleTextEditor.cs:
+	  Implemented 'Code focus toggle and follow-cursor'.
+
+2009-11-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorOptions.cs: Source
+	  editor options are now public.
+
+2009-11-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.SourceEditor/SourceEditorWidget.cs: Move common
+	  infobar code to new widget in MonoDevelop.Components.
+	  Attempt to make messages clearer and more usable.
 
 2009-11-04  Mike Krüger  <mkrueger@novell.com>
 
@@ -2359,11 +3712,13 @@
 	  MonoDevelop.SourceEditor/SourceEditorView.cs: Worked on code
 	  completion/new dom.
 
+=======
 2008-07-28  Lluis Sanchez Gual <lluis@novell.com> 
 
 	* MonoDevelop.SourceEditor/SourceEditorView.cs: Don't escape file names
 	  for VFS here. It is done in the platform service.
 
+>>>>>>> .merge-right.r109767
 2008-07-16  Lluis Sanchez Gual <lluis@novell.com> 
 
 	* MonoDevelop.SourceEditor/DebugValueWindow.cs: Make sure no rows are

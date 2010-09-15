@@ -49,7 +49,7 @@ namespace MonoDevelop.Refactoring.RefactorImports
 		{
 			List<Change> result = new List<Change> ();
 			ICSharpCode.NRefactory.Ast.CompilationUnit unit = options.GetASTProvider ().ParseFile (options.Document.TextEditor.Text);
-			FindTypeReferencesVisitor visitor = new FindTypeReferencesVisitor (options.GetResolver ());
+			FindTypeReferencesVisitor visitor = new FindTypeReferencesVisitor (options.GetTextEditorData (), options.GetResolver ());
 			visitor.VisitCompilationUnit (unit, null);
 
 			ProjectDom dom = options.Dom;
@@ -59,7 +59,7 @@ namespace MonoDevelop.Refactoring.RefactorImports
 			foreach (TypeReference r in visitor.PossibleTypeReferences) {
 				if (r.IsKeyword)
 					continue;
-				IType type = dom.SearchType (new SearchTypeRequest (compilationUnit, r.ConvertToReturnType (), null));
+				IType type = dom.SearchType (compilationUnit, r.ConvertToReturnType ());
 				if (type != null) {
 					usedUsings.Add (type.Namespace);
 				}

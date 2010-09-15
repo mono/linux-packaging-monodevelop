@@ -63,6 +63,11 @@ namespace Mono.TextEditor
 			set;
 		}
 		
+		public bool HeightChanged {
+			get;
+			set;
+		}
+		
 		public SyntaxMode SyntaxMode {
 			get {
 				return syntaxMode ?? new SyntaxMode ();
@@ -73,12 +78,17 @@ namespace Mono.TextEditor
 			}
 		}
 		
+		public object Tag {
+			get;
+			set;
+		}
+		
 		public Document ()
 		{
 			buffer = new GapBuffer ();
 			splitter = new LineSplitter (buffer);
 			splitter.LineSegmentTree.LineChanged += SplitterLineSegmentTreeLineChanged;
-			
+			splitter.LineSegmentTree.LineRemoved += HandleSplitterLineSegmentTreeLineRemoved;
 		/*	splitter.LineSegmentTree.LineInserted += delegate (object sender, LineEventArgs args) {
 				if (LineInserted != null) 
 					LineInserted (this, args);
@@ -107,6 +117,7 @@ namespace Mono.TextEditor
 				return this.buffer.Text;
 			}
 			set {
+				Mono.TextEditor.Highlighting.SyntaxModeService.WaitUpdate (this);
 				splitter.Clear ();
 				int oldLength = Length;
 				ReplaceEventArgs args = new ReplaceEventArgs (0, oldLength, value);
@@ -126,7 +137,6 @@ namespace Mono.TextEditor
 		{
 			if (this.syntaxMode != null) {
 				Mono.TextEditor.Highlighting.SyntaxModeService.StartUpdate (this, this.syntaxMode, 0, buffer.Length);
-			//	Mono.TextEditor.Highlighting.SyntaxModeService.WaitForUpdate ();
 			}
 		}
 		
@@ -136,31 +146,41 @@ namespace Mono.TextEditor
 		}
 		
 		void IBuffer.Insert (int offset, string text)
+
 		{
 			((IBuffer)this).Replace (offset, 0, text);
 		}
 		
+
 		void IBuffer.Remove (int offset, int count)
+
 		{
+
 			((IBuffer)this).Replace (offset, count, null);
+
 		}
 		
+
 		void IBuffer.Replace (int offset, int count, string value)
 		{
+			if (atomicUndoLevel == 0) {
+				if (this.syntaxMode != null)
+					Mono.TextEditor.Highlighting.SyntaxModeService.WaitUpdate (this);
+			}
 			InterruptFoldWorker ();
-//			Mono.TextEditor.Highlighting.SyntaxModeService.WaitForUpdate (true);
-//			Debug.Assert (count >= 0);
-//			Debug.Assert (0 <= offset && offset + count <= Length);
+			//			Mono.TextEditor.Highlighting.SyntaxModeService.WaitForUpdate (true);
+		//			Debug.Assert (count >= 0);
+		//			Debug.Assert (0 <= offset && offset + count <= Length);
 			int oldLineCount = this.LineCount;
 			ReplaceEventArgs args = new ReplaceEventArgs (offset, count, value);
 			OnTextReplacing (args);
 			value = args.Value;
-/* insert/repla
+			/* insert/repla
 			lock (syncObject) {
 				int endOffset = offset + count;
 				foldSegments = new List<FoldSegment> (foldSegments.Where (s => (s.Offset < offset || s.Offset >= endOffset) && 
 				                                                               (s.EndOffset <= offset || s.EndOffset >= endOffset)));
-			}*/
+			}*/			
 			UndoOperation operation = null;
 			if (!isInUndo) {
 				operation = new UndoOperation (args, count > 0 ? GetTextAt (offset, count) : "");
@@ -175,14 +195,16 @@ namespace Mono.TextEditor
 			}
 			
 			buffer.Replace (offset, count, value);
-			OnTextReplaced (args);
 			splitter.TextReplaced (this, args);
+			OnTextReplaced (args);
 			
 			UpdateUndoStackOnReplace (args);
 			if (operation != null)
 				operation.Setup (this, args);
-			if (this.syntaxMode != null)
+			
+			if (this.syntaxMode != null) {
 				Mono.TextEditor.Highlighting.SyntaxModeService.StartUpdate (this, this.syntaxMode, offset, value != null ? offset + value.Length : offset + count);
+			}
 			if (oldLineCount != LineCount)
 				this.CommitLineToEndUpdate (this.OffsetToLocation (offset).Line);
 		}
@@ -200,6 +222,7 @@ namespace Mono.TextEditor
 		public string GetTextAt (ISegment segment)
 		{
 			return GetTextAt (segment.Offset, segment.Length);
+
 		}
 		
 		public char GetCharAt (int offset)
@@ -248,22 +271,46 @@ namespace Mono.TextEditor
 		{
 			return LocationToOffset (new DocumentLocation (line, column));
 		}
+
 		
 		public int LocationToOffset (DocumentLocation location)
+
 		{
 			if (location.Line >= this.splitter.LineCount) 
+
 				return -1;
+
 			LineSegment line = GetLine (location.Line);
+
 			return System.Math.Min (Length, line.Offset + System.Math.Min (line.EditableLength, location.Column));
+
 		}
 		
 		public DocumentLocation OffsetToLocation (int offset)
+
 		{
+
 			int lineNr = splitter.OffsetToLineNumber (offset);
+
 			if (lineNr < 0)
 				return DocumentLocation.Empty;
 			LineSegment line = GetLine (lineNr);
+
 			return new DocumentLocation (lineNr, System.Math.Min (line.Length, offset - line.Offset));
+
+		}
+
+		
+		public string GetLineIndent (int lineNumber)
+		{
+			return GetLineIndent (GetLine (lineNumber));
+		}
+		
+		public string GetLineIndent (LineSegment segment)
+		{
+			if (segment == null)
+				return "";
+			return segment.GetIndentation (this);
 		}
 		
 		public LineSegment GetLine (int lineNumber)
@@ -717,7 +764,7 @@ namespace Mono.TextEditor
 		#endregion
 		
 		#region Folding
-		class FoldSegmentTreeNode : IComparable<FoldSegmentTreeNode>
+		internal class FoldSegmentTreeNode : IComparable<FoldSegmentTreeNode>
 		{
 			public FoldSegment FoldSegment {
 				get;
@@ -852,9 +899,7 @@ namespace Mono.TextEditor
 			public int LogicalToVisualLine (Document doc, int logicalLine)
 			{
 				int result = logicalLine;
-				LineSegment line = doc.GetLine (result);
-				if (line == null)
-					return result;
+				LineSegment line = doc.GetLine (result) ?? doc.GetLine (doc.LineCount - 1);
 				foreach (FoldSegment segment in Traverse (x => !(x.IsFolded && x.StartLine.Offset < line.Offset))) {
 					if (segment.IsFolded && segment.StartLine.Offset < line.Offset) {
 						result -= doc.GetLineCount (segment);
@@ -890,6 +935,10 @@ namespace Mono.TextEditor
 		}
 		
 		FoldSegmentTreeNode foldSegmentTree = new FoldSegmentTreeNode ();
+		
+		internal FoldSegmentTreeNode FoldSegmentTree {
+			get { return this.foldSegmentTree; }
+		}
 		
 		public bool HasFoldSegments {
 			get {
@@ -1102,34 +1151,105 @@ namespace Mono.TextEditor
 			}
 		}
 		#endregion
+		List<TextMarker> extendingTextMarkers = new List<TextMarker> ();
+		public IEnumerable<LineSegment> LinesWithExtendingTextMarkers {
+			get {
+				return from marker in extendingTextMarkers where marker.LineSegment != null select marker.LineSegment;
+			}
+		}
 		
 		public void AddMarker (int lineNumber, TextMarker marker)
 		{
 			AddMarker (this.GetLine (lineNumber), marker);
 		}
+		
 		public void AddMarker (LineSegment line, TextMarker marker)
 		{
-			line.AddMarker (marker);
-			this.CommitLineUpdate (line);
+			AddMarker (line, marker, true);
 		}
 		
-		public void RemoveMarker (int lineNumber, TextMarker marker)
+		public void AddMarker (LineSegment line, TextMarker marker, bool commitUpdate)
 		{
-			RemoveMarker (this.GetLine (lineNumber), marker);
+			if (line == null || marker == null)
+				return;
+			if (marker is IExtendingTextMarker) {
+				lock (extendingTextMarkers) {
+					HeightChanged = true;
+					extendingTextMarkers.Add (marker);
+					extendingTextMarkers.Sort (CompareMarkers);
+				}
+			}
+			line.AddMarker (marker);
+			if (commitUpdate)
+				this.CommitLineUpdate (line);
 		}
-		public void RemoveMarker (LineSegment line, TextMarker marker)
+		
+		static int CompareMarkers (TextMarker left, TextMarker right)
 		{
-			line.RemoveMarker (marker);
-			this.CommitLineUpdate (line);
+			if (left.LineSegment == null || right.LineSegment == null)
+				return 0;
+			return left.LineSegment.Offset.CompareTo (right.LineSegment.Offset);
 		}
+		
+		public void RemoveMarker (TextMarker marker)
+		{
+			RemoveMarker (marker, true);
+		}
+		
+		public void RemoveMarker (TextMarker marker, bool updateLine)
+		{
+			if (marker == null || marker.LineSegment == null)
+				return;
+			if (marker is IExtendingTextMarker) {
+				lock (extendingTextMarkers) {
+					HeightChanged = true;
+					extendingTextMarkers.Remove (marker);
+				}
+			}
+			var line = marker.LineSegment;
+			marker.LineSegment.RemoveMarker (marker);
+			if (updateLine)
+				this.CommitLineUpdate (line);
+		}
+		
 		public void RemoveMarker (int lineNumber, Type type)
 		{
 			RemoveMarker (this.GetLine (lineNumber), type);
 		}
+		
 		public void RemoveMarker (LineSegment line, Type type)
 		{
+			RemoveMarker (line, type, true);
+		}
+		
+		public void RemoveMarker (LineSegment line, Type type, bool updateLine)
+		{
+			if (line == null || type == null)
+				return;
+			if (typeof(IExtendingTextMarker).IsAssignableFrom (type)) {
+				lock (extendingTextMarkers) {
+					HeightChanged = true;
+					foreach (TextMarker marker in line.Markers.Where (marker => marker is IExtendingTextMarker)) {
+						extendingTextMarkers.Remove (marker);
+					}
+				}
+			}
 			line.RemoveMarker (type);
-			this.CommitLineUpdate (line);
+			if (updateLine)
+				this.CommitLineUpdate (line);
+		}
+		
+		void HandleSplitterLineSegmentTreeLineRemoved (object sender, LineEventArgs e)
+		{
+			foreach (TextMarker marker in e.Line.Markers) {
+				if (marker is IExtendingTextMarker) {
+					lock (extendingTextMarkers) {
+						HeightChanged = true;
+						extendingTextMarkers.Remove (marker);
+					}
+					UnRegisterVirtualTextMarker ((IExtendingTextMarker)marker);
+				}
+			}
 		}
 		
 		public bool Contains (int offset)
@@ -1246,15 +1366,32 @@ namespace Mono.TextEditor
 		}
 		
 		public static bool IsWordSeparator (char ch)
+
 		{
+
 			return Char.IsWhiteSpace (ch) || (Char.IsPunctuation (ch) && ch != '_');
+
 		}
+
 		
+
 		public bool IsWholeWordAt (int offset, int length)
+
 		{
 			return (offset == 0 || IsWordSeparator (GetCharAt (offset - 1))) &&
 				   (offset + length == Length || IsWordSeparator (GetCharAt (offset + length)));
 		}
+		
+		public bool IsEmptyLine (LineSegment line)
+		{
+			for (int i = 0; i < line.EditableLength; i++) {
+				char ch = GetCharAt (line.Offset + i);
+				if (!Char.IsWhiteSpace (ch)) 
+					return false;
+			}
+			return true;
+		}
+
 		
 		public int GetMatchingBracketOffset (int offset)
 		{
@@ -1304,17 +1441,24 @@ namespace Mono.TextEditor
 	
 		public enum CharacterClass {
 			Unknown,
+
 			Whitespace,
+
 			IdentifierPart
+
 		}
 		
+
 		public static CharacterClass GetCharacterClass (char ch)
+
 		{
 			if (Char.IsWhiteSpace (ch))
 				return CharacterClass.Whitespace;
 			if (Char.IsLetterOrDigit (ch) || ch == '_')
 				return CharacterClass.IdentifierPart;
+
 			return CharacterClass.Unknown;
+
 		}
 		
 		public static void UpdateSegments (IEnumerable<ISegment> segments, ReplaceEventArgs args)
@@ -1356,6 +1500,32 @@ namespace Mono.TextEditor
 			get {
 				return isInUndo;
 			}
+		}
+		
+		Dictionary<int, IExtendingTextMarker> virtualTextMarkers = new Dictionary<int, IExtendingTextMarker> ();
+		public void RegisterVirtualTextMarker (int lineNumber, IExtendingTextMarker marker)
+		{
+			virtualTextMarkers[lineNumber] = marker;
+		}
+		
+		public IExtendingTextMarker GetExtendingTextMarker (int lineNumber)
+		{
+			IExtendingTextMarker result;
+			if (virtualTextMarkers.TryGetValue (lineNumber, out result))
+				return result;
+			return null;
+		}
+		
+		/// <summary>
+		/// un register virtual text marker.
+		/// </summary>
+		/// <param name='marker'>
+		/// marker.
+		/// </param>
+		public void UnRegisterVirtualTextMarker (IExtendingTextMarker marker)
+		{
+			List<int> keys = new List<int> (from pair in virtualTextMarkers where pair.Value == marker select pair.Key);
+			keys.ForEach (key => virtualTextMarkers.Remove (key));
 		}
 	}
 	

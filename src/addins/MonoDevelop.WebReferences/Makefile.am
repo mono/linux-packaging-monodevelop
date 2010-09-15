@@ -3,12 +3,8 @@ ADDIN_BUILD = $(top_builddir)/build/AddIns/MonoDevelop.WebReferences
 ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.WebReferences.dll
 
 DEPS =  \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
@@ -16,6 +12,9 @@ REFS =  \
 	$(MONO_ADDINS_LIBS) \
 	-r:Mono.Posix \
 	-r:System \
+	-r:System.Configuration \
+	-r:System.Core \
+	-r:System.ServiceModel \
 	-r:System.Web \
 	-r:System.Web.Services \
 	-r:System.Xml
@@ -33,20 +32,34 @@ FILES =  \
 	MonoDevelop.WebReferences.NodeBuilders/ProjectNodeBuilder.cs \
 	MonoDevelop.WebReferences.NodeBuilders/WebReferenceFolderNodeBuilder.cs \
 	MonoDevelop.WebReferences.NodeBuilders/WebReferenceNodeBuilder.cs \
-	MonoDevelop.WebReferences/CodeGenerator.cs \
+	MonoDevelop.WebReferences.WCF/ClientOptions.cs \
+	MonoDevelop.WebReferences.WCF/CollectionMapping.cs \
+	MonoDevelop.WebReferences.WCF/ExtensionFile.cs \
+	MonoDevelop.WebReferences.WCF/MetadataFile.cs \
+	MonoDevelop.WebReferences.WCF/MetadataSource.cs \
+	MonoDevelop.WebReferences.WCF/ReferencedAssembly.cs \
+	MonoDevelop.WebReferences.WCF/ReferenceGroup.cs \
+	MonoDevelop.WebReferences.WCF/WCFMetadata.cs \
+	MonoDevelop.WebReferences.WCF/WCFMetadataStorage.cs \
+	MonoDevelop.WebReferences.WCF/WebServiceDiscoveryResultWCF.cs \
+	MonoDevelop.WebReferences.WCF/WebServiceEngineWCF.cs \
+	MonoDevelop.WebReferences.WS/WebReferences.cs \
+	MonoDevelop.WebReferences.WS/WebReferenceUrl.cs \
+	MonoDevelop.WebReferences.WS/WebServiceDiscoveryResultWS.cs \
+	MonoDevelop.WebReferences.WS/WebServiceEngineWS.cs \
 	MonoDevelop.WebReferences/DiscoveryNetworkCredential.cs \
 	MonoDevelop.WebReferences/DiscoveryProtocol.cs \
 	MonoDevelop.WebReferences/Library.cs \
+	MonoDevelop.WebReferences/MoonlightChannelBaseExtension.cs \
 	MonoDevelop.WebReferences/WebReferenceFolder.cs \
 	MonoDevelop.WebReferences/WebReferenceItem.cs \
-	MonoDevelop.WebReferences/WebReferenceItemCollection.cs
+	MonoDevelop.WebReferences/WebReferencesService.cs \
+	MonoDevelop.WebReferences/WebServiceDiscoveryResult.cs \
+	MonoDevelop.WebReferences/WebServiceEngine.cs
 
 RES =  \
 	MonoDevelop.WebReferences.addin.xml \
 	MonoDevelop.WebReferences.Resources/disco.html \
-	MonoDevelop.WebReferences.Resources/WebReference.File.Disco.png \
-	MonoDevelop.WebReferences.Resources/WebReference.File.Wsdl.png \
-	MonoDevelop.WebReferences.Resources/WebReference.Service.png \
 	MonoDevelop.WebReferences.Resources/WebReferenceItem.png \
 	MonoDevelop.WebReferences.Resources/wsdl.html
 

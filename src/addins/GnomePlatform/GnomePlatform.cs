@@ -26,17 +26,15 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-using System;
-using System.IO;
-using System.Collections;
-using System.Diagnostics;
-using System.Text.RegularExpressions;
-using System.Runtime.InteropServices;
-
-using MonoDevelop.Core.Gui;
 using Gnome;
-using Gnome.Vfs;
-
+using MonoDevelop.Ide.Desktop;
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Diagnostics;
+using System.IO;
+using MonoDevelop.Core.Execution;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Platform
 {
@@ -54,6 +52,7 @@ namespace MonoDevelop.Platform
 			} catch (Exception ex) {
 				Console.WriteLine (ex);
 			}
+			//apparently Gnome.Icon needs GnomeVFS initialized even when we're using GIO.
 			Gnome.Vfs.Vfs.Initialize ();
 		}
 
@@ -63,7 +62,7 @@ namespace MonoDevelop.Platform
 			if (useGio)
 				return Gio.GetDefaultForType (mimeType);
 
-			MimeApplication app = Mime.GetDefaultApplication (mimeType);
+			var app = Gnome.Vfs.Mime.GetDefaultApplication (mimeType);
 			if (app != null)
 				return (DesktopApplication) Marshal.PtrToStructure (app.Handle, typeof(DesktopApplication));
 			else
@@ -75,13 +74,13 @@ namespace MonoDevelop.Platform
 			if (useGio)
 				return Gio.GetAllForType (mimeType);
 
-			ArrayList list = new ArrayList ();
-			MimeApplication[] apps = Mime.GetAllApplications (mimeType);
-			foreach (MimeApplication app in apps) {
-				DesktopApplication dap = (DesktopApplication) Marshal.PtrToStructure (app.Handle, typeof(DesktopApplication));
+			var list = new List<DesktopApplication> ();
+			var apps = Gnome.Vfs.Mime.GetAllApplications (mimeType);
+			foreach (var app in apps) {
+				var dap = (DesktopApplication) Marshal.PtrToStructure (app.Handle, typeof(DesktopApplication));
 				list.Add (dap);
 			}
-			return (DesktopApplication[]) list.ToArray (typeof(DesktopApplication));
+			return list.ToArray ();
 		}
 
 		protected override string OnGetMimeTypeDescription (string mt)
@@ -89,17 +88,20 @@ namespace MonoDevelop.Platform
 			if (useGio)
 				return Gio.GetMimeTypeDescription (mt);
 			else
-				return Mime.GetDescription (mt);
+				return Gnome.Vfs.Mime.GetDescription (mt);
 		}
 
 		protected override string OnGetMimeTypeForUri (string uri)
 		{
+			if (uri == null)
+				return null;
+			
 			if (useGio) {
 				string mt = Gio.GetMimeTypeForUri (uri);
 				if (mt != null)
 					return mt;
 			}
-			return uri != null ? Gnome.Vfs.MimeType.GetMimeTypeForUri (ConvertFileNameToVFS (uri)) : null;
+			return Gnome.Vfs.MimeType.GetMimeTypeForUri (ConvertFileNameToVFS (uri));
 		}
 		
 		protected override bool OnGetMimeTypeIsText (string mimeType)
@@ -140,7 +142,8 @@ namespace MonoDevelop.Platform
 				string icon = null;
 				Gnome.IconLookupResultFlags result;
 				try {
-					icon = Gnome.Icon.LookupSync (IconTheme.Default, thumbnailFactory, filename, null, Gnome.IconLookupFlags.None, out result);
+					icon = Gnome.Icon.LookupSync (IconTheme.Default, thumbnailFactory, filename, null, 
+					                              Gnome.IconLookupFlags.None, out result);
 				} catch {}
 				if (icon != null && icon.Length > 0)
 					return icon;
@@ -173,6 +176,161 @@ namespace MonoDevelop.Platform
 			result = result.Replace ("#", "%23");
 			result = result.Replace ("?", "%3F");
 			return result;
-		}		
+		}
+		
+		
+		delegate string TerminalRunnerHandler (string command, string args, string dir, string title, bool pause);
+	
+		string terminal_command;
+		bool terminal_probed;
+		TerminalRunnerHandler runner;
+		
+		public override IProcessAsyncOperation StartConsoleProcess (string command, string arguments, string workingDirectory,
+		                                                            IDictionary<string, string> environmentVariables, 
+		                                                            string title, bool pauseWhenFinished)
+		{
+			ProbeTerminal ();
+			
+			string exec = runner (command, arguments, workingDirectory, title, pauseWhenFinished);
+			var psi = new ProcessStartInfo (terminal_command, exec) {
+				CreateNoWindow = true,
+				UseShellExecute = false,
+			};
+			foreach (var env in environmentVariables)
+				psi.EnvironmentVariables [env.Key] = env.Value;
+			
+			ProcessWrapper proc = new ProcessWrapper ();
+			proc.StartInfo = psi;
+			proc.Start ();
+			return proc;
+		}
+		
+#region Terminal runner implementations
+		
+		private static string GnomeTerminalRunner (string command, string args, string dir, string title, bool pause)
+		{
+			string extra_commands = pause 
+				? BashPause.Replace ("'", "\\\"")
+				: String.Empty;
+			
+			return String.Format (@" --disable-factory --title ""{4}"" -e ""bash -c 'cd {3} ; {0} {1} ; {2}'""",
+				command,
+				EscapeArgs (args),
+				extra_commands,
+				EscapeDir (dir),
+				title);
+		}
+		
+		private static string XtermRunner (string command, string args, string dir, string title, bool pause)
+		{
+			string extra_commands = pause 
+				? BashPause
+				: String.Empty;
+			
+			return String.Format (@" -title ""{4}"" -e bash -c ""cd {3} ; '{0}' {1} ; {2}""",
+				command,
+				EscapeArgs (args),
+				extra_commands,
+				EscapeDir (dir),
+				title);
+		}
+		
+		private static string EscapeArgs (string args)
+		{
+			return args.Replace ("\\", "\\\\").Replace ("\"", "\\\"");
+		}
+		
+		private static string EscapeDir (string dir)
+		{
+			return dir.Replace (" ", "\\ ");
+		}
+		
+		private static string BashPause {
+			get { return @"echo; read -p 'Press any key to continue...' -n1;"; }
+		}
+
+#endregion
+
+#region Probing for preferred terminal
+
+		private void ProbeTerminal ()
+		{
+			if (terminal_probed) {
+				return;
+			}
+			
+			terminal_probed = true;
+			
+			string fallback_terminal = "xterm";
+			string preferred_terminal;
+			TerminalRunnerHandler preferred_runner = null;
+			TerminalRunnerHandler fallback_runner = XtermRunner;
+
+			if (!String.IsNullOrEmpty (Environment.GetEnvironmentVariable ("GNOME_DESKTOP_SESSION_ID"))) {
+				preferred_terminal = "gnome-terminal";
+				preferred_runner = GnomeTerminalRunner;
+			}
+			else {
+				preferred_terminal = fallback_terminal;
+				preferred_runner = fallback_runner;
+			}
+
+			terminal_command = FindExec (preferred_terminal);
+			if (terminal_command != null) {
+				runner = preferred_runner;
+				return;
+			}
+			
+			FindExec (fallback_terminal);
+			runner = fallback_runner;
+		}
+
+		private string FindExec (string command)
+		{
+			foreach (string path in GetExecPaths ()) {
+				string full_path = Path.Combine (path, command);
+				try {
+					FileInfo info = new FileInfo (full_path);
+					// FIXME: System.IO is super lame, should check for 0755
+					if (info.Exists) {
+						return full_path;
+					}
+				} catch {
+				}
+			}
+
+			return null;
+		}
+
+		private string [] GetExecPaths ()
+		{
+			string path = Environment.GetEnvironmentVariable ("PATH");
+			if (String.IsNullOrEmpty (path)) {
+				return new string [] { "/bin", "/usr/bin", "/usr/local/bin" };
+			}
+
+			// this is super lame, should handle quoting/escaping
+			return path.Split (':');
+		}
+
+#endregion
+		
+		//FIXME: probe for terminal
+		static string TerminalCommand {
+			get {
+				return PropertyService.Get ("MonoDevelop.Shell", "gnome-terminal");
+			}
+		}
+		
+		public override bool CanOpenTerminal {
+			get {
+				return true;
+			}
+		}
+		
+		public override void OpenInTerminal (FilePath directory)
+		{
+			Runtime.ProcessService.StartProcess (TerminalCommand, "", directory, null);
+		}
 	}
 }

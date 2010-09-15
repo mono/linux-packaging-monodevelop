@@ -24,12 +24,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Refactoring;
-using MonoDevelop.Core.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.CodeGeneration
 {
@@ -87,7 +86,7 @@ namespace MonoDevelop.CodeGeneration
 		public static CodeGenerationOptions CreateCodeGenerationOptions (Document document)
 		{
 			var options = new CodeGenerationOptions () {
-				Dom = document.Project != null ? ProjectDomService.GetProjectDom (document.Project) : ProjectDom.Empty,
+				Dom = document.Dom,
 				Document = document,
 			};
 			if (document.ParsedDocument != null && document.ParsedDocument.CompilationUnit != null) {

@@ -87,21 +87,24 @@ namespace Mono.Debugging.Evaluation
 			
 			sb.Append ("]");
 			
-			return ObjectValue.CreateObject (this, new ObjectPath (sb.ToString ()), "", "", ObjectValueFlags.ArrayElement|ObjectValueFlags.ReadOnly|ObjectValueFlags.NoRefresh, null);
+			ObjectValue res = ObjectValue.CreateObject (this, new ObjectPath (sb.ToString ()), "", "", ObjectValueFlags.ArrayElement|ObjectValueFlags.ReadOnly|ObjectValueFlags.NoRefresh, null);
+			res.ChildSelector = "";
+			return res;
 		}
 
-		public ObjectValue[] GetChildren ()
+		public ObjectValue[] GetChildren (EvaluationOptions options)
 		{
-			return GetChildren (new ObjectPath ("this"), -1, -1);
+			return GetChildren (new ObjectPath ("this"), -1, -1, options);
 		}
 		
-		public ObjectValue[] GetChildren (ObjectPath path, int firstItemIndex, int count)
+		public ObjectValue[] GetChildren (ObjectPath path, int firstItemIndex, int count, EvaluationOptions options)
 		{
+			EvaluationContext cctx = ctx.WithOptions (options);
 			if (path.Length > 1) {
 				// Looking for children of an array element
 				int[] idx = StringToIndices (path [1]);
 				object obj = array.GetElement (idx);
-				return ctx.Adapter.GetObjectValueChildren (ctx, new ArrayObjectSource (array, path[1]), obj, firstItemIndex, count);
+				return cctx.Adapter.GetObjectValueChildren (cctx, new ArrayObjectSource (array, path[1]), obj, firstItemIndex, count);
 			}
 			
 			int lowerBound;
@@ -162,11 +165,11 @@ namespace Mono.Debugging.Evaluation
 					else {
 						curIndex [curIndex.Length - 1] = index;
 						object elem = array.GetElement (curIndex);
-						val = ctx.Adapter.CreateObjectValue (ctx, this, newPath.Append (sidx), elem, ObjectValueFlags.ArrayElement);
-						if (elem != null && !ctx.Adapter.IsNull (ctx, elem)) {
-							TypeDisplayData tdata = ctx.Adapter.GetTypeDisplayData (ctx, ctx.Adapter.GetValueType (ctx, elem));
+						val = cctx.Adapter.CreateObjectValue (cctx, this, newPath.Append (sidx), elem, ObjectValueFlags.ArrayElement);
+						if (elem != null && !cctx.Adapter.IsNull (cctx, elem)) {
+							TypeDisplayData tdata = cctx.Adapter.GetTypeDisplayData (cctx, cctx.Adapter.GetValueType (cctx, elem));
 							if (!string.IsNullOrEmpty (tdata.NameDisplayString))
-								ename = ctx.Adapter.EvaluateDisplayString (ctx, elem, tdata.NameDisplayString);
+								ename = cctx.Adapter.EvaluateDisplayString (cctx, elem, tdata.NameDisplayString);
 						}
 					}
 					val.Name = ename;
@@ -191,7 +194,7 @@ namespace Mono.Debugging.Evaluation
 					if (index > upperBound)
 						val = ObjectValue.CreateUnknown ("");
 					else {
-						ArrayElementGroup grp = new ArrayElementGroup (ctx, array, curIndex);
+						ArrayElementGroup grp = new ArrayElementGroup (cctx, array, curIndex);
 						val = grp.CreateObjectValue ();
 					}
 					list.Add (val);
@@ -213,7 +216,7 @@ namespace Mono.Debugging.Evaluation
 					int end = i + div - 1;
 					if (end > len)
 						end = len - 1;
-					ArrayElementGroup grp = new ArrayElementGroup (ctx, array, baseIndices, i, end);
+					ArrayElementGroup grp = new ArrayElementGroup (cctx, array, baseIndices, i, end);
 					list.Add (grp.CreateObjectValue ());
 					i += div;
 				}
@@ -221,7 +224,7 @@ namespace Mono.Debugging.Evaluation
 			}
 		}
 		
-		string IndicesToString (int[] indices)
+		internal static string IndicesToString (int[] indices)
 		{
 			StringBuilder sb = new StringBuilder ();
 			for (int n=0; n<indices.Length; n++) {
@@ -256,7 +259,7 @@ namespace Mono.Debugging.Evaluation
 			return sb.ToString ();
 		}
 		
-		public EvaluationResult SetValue (ObjectPath path, string value)
+		public EvaluationResult SetValue (ObjectPath path, string value, EvaluationOptions options)
 		{
 			if (path.Length != 2)
 				throw new NotSupportedException ();
@@ -266,7 +269,7 @@ namespace Mono.Debugging.Evaluation
 			object val;
 			try {
 				EvaluationContext cctx = ctx.Clone ();
-				EvaluationOptions ops = cctx.Options;
+				EvaluationOptions ops = options ?? cctx.Options;
 				ops.AllowMethodEvaluation = true;
 				ops.AllowTargetInvoke = true;
 				cctx.Options = ops;
@@ -292,7 +295,7 @@ namespace Mono.Debugging.Evaluation
 			
 			int[] idx = StringToIndices (path [1]);
 			object elem = array.GetElement (idx);
-			EvaluationContext cctx = ctx.Clone (options);
+			EvaluationContext cctx = ctx.WithOptions (options);
 			ObjectValue val = cctx.Adapter.CreateObjectValue (cctx, this, path, elem, ObjectValueFlags.ArrayElement);
 			if (elem != null && !cctx.Adapter.IsNull (cctx, elem)) {
 				TypeDisplayData tdata = cctx.Adapter.GetTypeDisplayData (cctx, cctx.Adapter.GetValueType (cctx, elem));
@@ -300,6 +303,29 @@ namespace Mono.Debugging.Evaluation
 					val.Name = cctx.Adapter.EvaluateDisplayString (cctx, elem, tdata.NameDisplayString);
 			}
 			return val;
+		}
+		
+		public object GetRawValue (ObjectPath path, EvaluationOptions options)
+		{
+			if (path.Length != 2)
+				throw new NotSupportedException ();
+			
+			int[] idx = StringToIndices (path [1]);
+			object elem = array.GetElement (idx);
+			EvaluationContext cctx = ctx.WithOptions (options);
+			return cctx.Adapter.ToRawValue (cctx, new ArrayObjectSource (array, idx), elem);
+		}
+		
+		public void SetRawValue (ObjectPath path, object value, EvaluationOptions options)
+		{
+			if (path.Length != 2)
+				throw new NotSupportedException ();
+			
+			int[] idx = StringToIndices (path [1]);
+			
+			EvaluationContext cctx = ctx.WithOptions (options);
+			object val = cctx.Adapter.FromRawValue (cctx, value);
+			array.SetElement (idx, val);
 		}
 	}
 	
@@ -312,6 +338,12 @@ namespace Mono.Debugging.Evaluation
 		{
 			this.source = source;
 			this.path = path;
+		}
+		
+		public ArrayObjectSource (ICollectionAdaptor source, int[] index)
+		{
+			this.source = source;
+			this.path = ArrayElementGroup.IndicesToString (index);
 		}
 		
 		public object Value {

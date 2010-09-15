@@ -4,9 +4,7 @@ using System.Collections;
 using System.Collections.Specialized;
 using System.Xml;
 using Gtk;
-using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Deployment.Linux
 {
@@ -228,8 +226,7 @@ namespace MonoDevelop.Deployment.Linux
 		protected virtual void OnButtonAddCategoriesClicked(object sender, System.EventArgs e)
 		{
 			MenuCategorySelectorDialog dlg = new MenuCategorySelectorDialog ();
-			dlg.TransientFor = IdeApp.Workbench.RootWindow;
-			if (dlg.Run () == (int) Gtk.ResponseType.Ok) {
+			if (MessageService.RunCustomDialog (dlg) == (int) Gtk.ResponseType.Ok) {
 				foreach (string s in dlg.Selection)
 					entry.Categories.Add (s);
 				FillCategs ();

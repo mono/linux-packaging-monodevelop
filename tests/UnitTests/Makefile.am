@@ -19,12 +19,8 @@ REFS =  \
 	-r:../../build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll \
 	-r:../../build/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll \
 	-r:../../build/bin/Mono.TextEditor.dll \
-	-r:../../build/bin/MonoDevelop.Components.dll \
 	-r:../../build/bin/MonoDevelop.Core.dll \
-	-r:../../build/bin/MonoDevelop.Core.Gui.dll \
 	-r:../../build/bin/MonoDevelop.Ide.dll \
-	-r:../../build/bin/MonoDevelop.Projects.dll \
-	-r:../../build/bin/MonoDevelop.Projects.Gui.dll \
 	-r:../../build/bin/NRefactory.dll \
 	-r:../../src/addins/NUnit/lib/nunit.core.dll \
 	-r:../../src/addins/NUnit/lib/nunit.core.interfaces.dll \
@@ -48,6 +44,7 @@ FILES =  \
 	Mono.TextEditor.Tests/SelectionTests.cs \
 	Mono.TextEditor.Tests/SyntaxHighlightingTests.cs \
 	Mono.TextEditor.Tests/UndoRedoTests.cs \
+	Mono.TextEditor.Tests/ViTests.cs \
 	MonoDevelop.AspNet/AspNetCompletionTests.cs \
 	MonoDevelop.AspNet/AspNetTesting.cs \
 	MonoDevelop.CSharpBinding/CodeCompletionAccessibleTests.cs \
@@ -59,6 +56,11 @@ FILES =  \
 	MonoDevelop.CSharpBinding/MemberTests.cs \
 	MonoDevelop.CSharpBinding/ParameterCompletionTests.cs \
 	MonoDevelop.CSharpBinding/ProjectDomTests.cs \
+	MonoDevelop.CSharpBinding/TestBraceStlye.cs \
+	MonoDevelop.CSharpBinding/TestFormattingBugs.cs \
+	MonoDevelop.CSharpBinding/TestSpacingVisitor.cs \
+	MonoDevelop.CSharpBinding/TestStatementIndentation.cs \
+	MonoDevelop.CSharpBinding/TestTypeLevelIndentation.cs \
 	MonoDevelop.CSharpBinding/TestViewContent.cs \
 	MonoDevelop.CSharpBinding/TestWorkbenchWindow.cs \
 	MonoDevelop.CSharpBinding/TopLevelTests.cs \
@@ -82,6 +84,7 @@ FILES =  \
 	MonoDevelop.Refactoring/CreateBackingStoreTests.cs \
 	MonoDevelop.Refactoring/DeclareLocalTests.cs \
 	MonoDevelop.Refactoring/ExtractMethodTests.cs \
+	MonoDevelop.Refactoring/GenerateNewMemberTests.cs \
 	MonoDevelop.Refactoring/IntegrateTemporaryVariableTests.cs \
 	MonoDevelop.Refactoring/IntroduceConstantRefactoringTests.cs \
 	MonoDevelop.Refactoring/IntroduceFormatItemRefactoringTests.cs \

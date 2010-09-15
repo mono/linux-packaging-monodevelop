@@ -22,11 +22,10 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-using MonoDevelop.Core;
-using MonoDevelop.Core.Gui.Dialogs;
-
 using System;
 using Gtk;
+using MonoDevelop.Ide.Gui.Dialogs;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.XmlEditor.Gui
 {
@@ -40,15 +39,17 @@ namespace MonoDevelop.XmlEditor.Gui
 		public override Widget CreatePanelWidget ()
 		{
 			widget = new XmlEditorOptionsPanelWidget();
-			widget.AutoCompleteElements = XmlEditorAddInOptions.AutoCompleteElements;
-			widget.ShowSchemaAnnotation = XmlEditorAddInOptions.ShowSchemaAnnotation;
+			widget.AutoCompleteElements = XmlEditorOptions.AutoCompleteElements;
+			widget.AutoInsertFragments = XmlEditorOptions.AutoInsertFragments;
+			widget.ShowSchemaAnnotation = XmlEditorOptions.ShowSchemaAnnotation;
 			return widget;
 		}
 		
 		public override void ApplyChanges ()
 		{
-			XmlEditorAddInOptions.AutoCompleteElements = widget.AutoCompleteElements;
-			XmlEditorAddInOptions.ShowSchemaAnnotation = widget.ShowSchemaAnnotation;
+			XmlEditorOptions.Properties.Set (XmlEditorOptions.AutoCompleteElementsPropertyName, widget.AutoCompleteElements);
+			XmlEditorOptions.Properties.Set (XmlEditorOptions.AutoInsertFragmentsPropertyName, widget.AutoInsertFragments);
+			XmlEditorOptions.Properties.Set (XmlEditorOptions.ShowSchemaAnnotationPropertyName, widget.ShowSchemaAnnotation);
 		}
 	}
 }

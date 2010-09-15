@@ -1,10 +1,7 @@
-using System;
-using System.IO;
-using System.Collections;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core;
 using MonoDevelop.VersionControl.Dialogs;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl
 {
@@ -16,9 +13,8 @@ namespace MonoDevelop.VersionControl
 				return;
 			
 			SelectRepositoryDialog del = new SelectRepositoryDialog (SelectRepositoryMode.Checkout);
-			del.TransientFor = IdeApp.Workbench.RootWindow;
 			try {
-				if (del.Run () == (int) Gtk.ResponseType.Ok && del.Repository != null) {
+				if (MessageService.RunCustomDialog (del) == (int) Gtk.ResponseType.Ok && del.Repository != null) {
 					CheckoutWorker w = new CheckoutWorker (del.Repository, del.TargetPath);
 					w.Start ();
 				}
@@ -46,7 +42,7 @@ namespace MonoDevelop.VersionControl
 		
 		protected override void Run () 
 		{
-			vc.Checkout (path, null, true, GetProgressMonitor ());
+			vc.Checkout (path, null, true, Monitor);
 			string projectFn = null;
 			
 			string[] list = System.IO.Directory.GetFiles(path);
@@ -75,6 +71,8 @@ namespace MonoDevelop.VersionControl
 			
 			if (projectFn != null)
 				IdeApp.Workspace.OpenWorkspaceItem (projectFn);
+			
+			Monitor.ReportSuccess (GettextCatalog.GetString ("Solution checked out"));
 		}
 	}
 }

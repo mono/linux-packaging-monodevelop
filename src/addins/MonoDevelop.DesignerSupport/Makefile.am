@@ -3,12 +3,8 @@ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.DesignerSupport.dll
 
 DEPS =  \
 	$(top_builddir)/build/bin/Mono.Cecil.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
@@ -73,6 +69,7 @@ FILES =  \
 	MonoDevelop.DesignerSupport/PropertyPad.cs \
 	MonoDevelop.DesignerSupport/PropertyPadVisitor.cs \
 	MonoDevelop.DesignerSupport/RemoteDesignerProcess.cs \
+	MonoDevelop.DesignerSupport/SwitchBetweenRelatedFilesCommand.cs \
 	MonoDevelop.DesignerSupport/ToolboxPad.cs \
 	MonoDevelop.DesignerSupport/ToolboxService.cs \
 	MonoDevelop.DesignerSupport/TypeNotFoundException.cs \

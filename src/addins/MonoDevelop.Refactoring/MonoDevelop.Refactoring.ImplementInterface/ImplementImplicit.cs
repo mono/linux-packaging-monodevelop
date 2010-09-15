@@ -24,24 +24,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-
-using ICSharpCode.NRefactory;
-using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory.PrettyPrinter;
-
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Projects.CodeGeneration;
 using MonoDevelop.Projects.Dom;
-using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using Mono.TextEditor;
+using MonoDevelop.Ide;
+using System.Linq;
 
 namespace MonoDevelop.Refactoring.ImplementInterface
 {
@@ -60,6 +48,8 @@ namespace MonoDevelop.Refactoring.ImplementInterface
 			IType type = options.Dom.GetType (options.ResolveResult.ResolvedType);
 			if (type == null || type.ClassType != MonoDevelop.Projects.Dom.ClassType.Interface)
 				return false;
+			if (!CodeGenerator.HasGenerator (options.GetTextEditorData ().Document.MimeType))
+				return false;
 			DocumentLocation location = options.GetTextEditorData ().Caret.Location;
 			IType declaringType = options.Document.CompilationUnit.GetTypeAt (location.Line + 1, location.Column + 1);
 			return declaringType != null && options.ResolveResult.ResolvedExpression.IsInInheritableTypeContext;
@@ -70,15 +60,18 @@ namespace MonoDevelop.Refactoring.ImplementInterface
 			DocumentLocation location = options.GetTextEditorData ().Caret.Location;
 			IType interfaceType = options.Dom.GetType (options.ResolveResult.ResolvedType);
 			IType declaringType = options.Document.CompilationUnit.GetTypeAt (location.Line + 1, location.Column + 1);
-			options.Document.TextEditor.BeginAtomicUndo ();
-			CodeRefactorer refactorer = IdeApp.Workspace.GetCodeRefactorer (IdeApp.ProjectOperations.CurrentSelectedSolution);
-			refactorer.ImplementInterface (options.Document.CompilationUnit,
-			                               declaringType,
-			                               interfaceType, 
-			                               false, 
-			                               interfaceType, 
-			                               options.ResolveResult.ResolvedType);
-			options.Document.TextEditor.EndAtomicUndo ();
+			
+			var editor = options.GetTextEditorData ().Parent;
+			
+			InsertionCursorEditMode mode = new InsertionCursorEditMode (editor, HelperMethods.GetInsertionPoints (editor.Document, declaringType));
+			mode.CurIndex = mode.InsertionPoints.Count - 1;
+			mode.StartMode ();
+			mode.Exited += delegate(object s, InsertionCursorEventArgs args) {
+				if (args.Success) {
+					CodeGenerator generator = CodeGenerator.CreateGenerator (options.GetTextEditorData ().Document.MimeType);
+					args.InsertionPoint.Insert (editor, generator.CreateInterfaceImplementation (declaringType, interfaceType, false));
+				}
+			};
 		}
 	}
 }

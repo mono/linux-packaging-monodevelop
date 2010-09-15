@@ -1,3 +1,58 @@
+2010-05-30  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Gui/FolderNodeBuilderExtension.cs: Use the recyclable text
+	  templating domain. Fixes Bug 584067 - ASP.NET MVC: cannot
+	  add a View, uncaught exception.
+
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Gui/AddViewDialog.cs:
+	* Gui/FolderNodeBuilderExtension.cs: Fix incorrect use of
+	  ShowCustomDialog/RunCustomDialog.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Gui/AddViewDialog.cs: Clean up dialog placement.
+
+2010-05-18  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* Gui/AddViewDialog.cs: Heavy refactoring and tidying of
+	  ASP.NET parser code to support future changes.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.AspNet.Mvc.addin.xml: Bumped MD version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* AspMvcProject.cs:
+	* gtk-gui/gui.stetic:
+	* Gui/AddViewDialog.cs:
+	* MonoDevelop.AspNet.Mvc.csproj:
+	* MonoDevelop.AspNet.Mvc.addin.xml:
+	* Gui/FolderNodeBuilderExtension.cs: Merged MD.Projects into
+	  MD.Core, and MD.Projects.Gui, MD.Core.Gui and MD.Components
+	  into MD.Ide.
+
+2010-03-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet.Mvc.csproj: Added makefile to project.
+
+2010-03-01  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Gui/FolderNodeBuilderExtension.cs: Fix "Bug 584067 - ASP.NET
+	  MVC: cannot add a View, uncaught exception" by marshalling
+	  assembly resolves from the templating AppDomain to the MD
+	  AppDomain.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.AspNet.Mvc.Gui.AddViewDialog.cs: Flush.
+
 2009-12-01  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* AspMvcProject.cs: Introduced the ConfigurationSelector class

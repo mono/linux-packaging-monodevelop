@@ -32,6 +32,7 @@ using System.Reflection;
 namespace MonoDevelop.CSharp.Formatting
 {
 	public enum BraceStyle {
+		DoNotChange,
 		EndOfLine,
 		EndOfLineWithoutSpace,
 		NextLine,
@@ -42,8 +43,7 @@ namespace MonoDevelop.CSharp.Formatting
 	public enum BraceForcement {
 		DoNotChange,
 		RemoveBraces,
-		AddBraces,
-		RemoveBracesForSingleLine
+		AddBraces
 	}
 	
 	public enum ArrayInitializerPlacement {
@@ -60,73 +60,73 @@ namespace MonoDevelop.CSharp.Formatting
 		
 		#region Indentation
 		[ItemProperty]
-		public bool IndentNamespaceBody {
+		public bool IndentNamespaceBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentClassBody {
+		public bool IndentClassBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentInterfaceBody {
+		public bool IndentInterfaceBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentStructBody {
+		public bool IndentStructBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentEnumBody {
+		public bool IndentEnumBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentMethodBody {
+		public bool IndentMethodBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentPropertyBody {
+		public bool IndentPropertyBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentEventBody {
+		public bool IndentEventBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentBlocks {
+		public bool IndentBlocks { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentSwitchBody {
+		public bool IndentSwitchBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentCaseBody {
+		public bool IndentCaseBody { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IndentBreakStatements {
+		public bool IndentBreakStatements { // tested
 			get;
 			set;
 		}
@@ -134,37 +134,37 @@ namespace MonoDevelop.CSharp.Formatting
 		
 		#region Braces
 		[ItemProperty]
-		public BraceStyle NamespaceBraceStyle {
+		public BraceStyle NamespaceBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle ClassBraceStyle {
+		public BraceStyle ClassBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle InterfaceBraceStyle {
+		public BraceStyle InterfaceBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle StructBraceStyle {
+		public BraceStyle StructBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle EnumBraceStyle {
+		public BraceStyle EnumBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle MethodBraceStyle {
+		public BraceStyle MethodBraceStyle { // tested
 			get;
 			set;
 		}
@@ -176,117 +176,124 @@ namespace MonoDevelop.CSharp.Formatting
 		}
 		
 		[ItemProperty]
-		public BraceStyle ConstructorBraceStyle {
+		public BraceStyle ConstructorBraceStyle {  // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle DestructorBraceStyle {
+		public BraceStyle DestructorBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle PropertyBraceStyle {
+		public BraceStyle PropertyBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle PropertyGetBraceStyle {
+		public BraceStyle PropertyGetBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle PropertySetBraceStyle {
+		public BraceStyle PropertySetBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AllowPropertyGetBlockInline {
+		public bool AllowPropertyGetBlockInline { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AllowPropertySetBlockInline {
+		public bool AllowPropertySetBlockInline { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle EventBraceStyle {
+		public BraceStyle EventBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle EventAddBraceStyle {
+		public BraceStyle EventAddBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle EventRemoveBraceStyle {
+		public BraceStyle EventRemoveBraceStyle { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AllowEventAddBlockInline {
+		public bool AllowEventAddBlockInline { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AllowEventRemoveBlockInline {
+		public bool AllowEventRemoveBlockInline { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceStyle StatementBraceStyle {
+		public BraceStyle StatementBraceStyle { // tested
 			get;
 			set;
 		}
+		
+		[ItemProperty]
+		public bool AllowIfBlockInline {
+			get;
+			set;
+		}
+		
 		#endregion
 		
 		#region Force Braces
 		[ItemProperty]
-		public BraceForcement IfElseBraceForcement {
+		public BraceForcement IfElseBraceForcement { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceForcement ForBraceForcement {
+		public BraceForcement ForBraceForcement { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceForcement ForEachBraceForcement {
+		public BraceForcement ForEachBraceForcement { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceForcement WhileBraceForcement {
+		public BraceForcement WhileBraceForcement { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceForcement UsingBraceForcement {
+		public BraceForcement UsingBraceForcement { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public BraceForcement FixedBraceForcement {
+		public BraceForcement FixedBraceForcement { // tested
 			get;
 			set;
 		}
@@ -294,31 +301,31 @@ namespace MonoDevelop.CSharp.Formatting
 		
 		#region NewLines
 		[ItemProperty]
-		public bool PlaceElseOnNewLine {
+		public bool PlaceElseOnNewLine { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool PlaceElseIfOnNewLine {
+		public bool PlaceElseIfOnNewLine { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool PlaceCatchOnNewLine {
+		public bool PlaceCatchOnNewLine { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool PlaceFinallyOnNewLine {
+		public bool PlaceFinallyOnNewLine { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool PlaceWhileOnNewLine {
+		public bool PlaceWhileOnNewLine { // tested
 			get;
 			set;
 		}
@@ -332,271 +339,271 @@ namespace MonoDevelop.CSharp.Formatting
 		
 		#region Spaces
 		[ItemProperty]
-		public bool BeforeMethodCallParentheses {
+		public bool BeforeMethodCallParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool BeforeMethodDeclarationParentheses {
+		public bool BeforeMethodDeclarationParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool BeforeConstructorDeclarationParentheses {
+		public bool BeforeConstructorDeclarationParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool BeforeDelegateDeclarationParentheses {
+		public bool BeforeDelegateDeclarationParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool NewParentheses {
+		public bool NewParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool IfParentheses {
+		public bool IfParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WhileParentheses {
+		public bool WhileParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool ForParentheses {
+		public bool ForParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool ForeachParentheses {
+		public bool ForeachParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool CatchParentheses {
+		public bool CatchParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool SwitchParentheses {
+		public bool SwitchParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool LockParentheses {
+		public bool LockParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool UsingParentheses {
+		public bool UsingParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AroundAssignmentParentheses {
+		public bool AroundAssignmentParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AroundLogicalOperatorParentheses {
+		public bool AroundLogicalOperatorParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AroundEqualityOperatorParentheses {
+		public bool AroundEqualityOperatorParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AroundRelationalOperatorParentheses {
+		public bool AroundRelationalOperatorParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AroundBitwiseOperatorParentheses {
+		public bool AroundBitwiseOperatorParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AroundAdditiveOperatorParentheses {
+		public bool AroundAdditiveOperatorParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AroundMultiplicativeOperatorParentheses {
+		public bool AroundMultiplicativeOperatorParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool AroundShiftOperatorParentheses {
+		public bool AroundShiftOperatorParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinParentheses {
+		public bool WithinParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinMethodCallParentheses {
+		public bool WithinMethodCallParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinMethodDeclarationParentheses {
+		public bool WithinMethodDeclarationParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinIfParentheses {
+		public bool WithinIfParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinWhileParentheses {
+		public bool WithinWhileParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinForParentheses {
+		public bool WithinForParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinForEachParentheses {
+		public bool WithinForEachParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinCatchParentheses {
+		public bool WithinCatchParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinSwitchParentheses {
+		public bool WithinSwitchParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinLockParentheses {
+		public bool WithinLockParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinUsingParentheses {
+		public bool WithinUsingParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinCastParentheses {
+		public bool WithinCastParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinSizeOfParentheses {
+		public bool WithinSizeOfParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinTypeOfParentheses {
+		public bool WithinTypeOfParentheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool WithinCheckedExpressionParantheses {
+		public bool WithinCheckedExpressionParantheses { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool ConditionalOperatorBeforeConditionSpace {
+		public bool ConditionalOperatorBeforeConditionSpace { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool ConditionalOperatorAfterConditionSpace {
+		public bool ConditionalOperatorAfterConditionSpace { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool ConditionalOperatorBeforeSeparatorSpace {
+		public bool ConditionalOperatorBeforeSeparatorSpace { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool ConditionalOperatorAfterSeparatorSpace {
+		public bool ConditionalOperatorAfterSeparatorSpace { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool SpacesWithinBrackets {
+		public bool SpacesWithinBrackets { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool SpacesAfterComma {
+		public bool SpacesAfterComma { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool SpacesBeforeComma {
+		public bool SpacesBeforeComma { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool SpacesAfterSemicolon {
+		public bool SpacesAfterSemicolon { // tested
 			get;
 			set;
 		}
 		
 		[ItemProperty]
-		public bool SpacesAfterTypecast {
+		public bool SpacesAfterTypecast { // tested
 			get;
 			set;
 		}
@@ -684,11 +691,11 @@ namespace MonoDevelop.CSharp.Formatting
 				object val      = info.GetValue (this, null);
 				object otherVal = info.GetValue (other, null);
 				if (!val.Equals (otherVal)) {
-					Console.WriteLine ("!equal");
+					//Console.WriteLine ("!equal");
 					return false;
 				}
 			}
-			Console.WriteLine ("== equal");
+			//Console.WriteLine ("== equal");
 			return true;
 		}
 	}

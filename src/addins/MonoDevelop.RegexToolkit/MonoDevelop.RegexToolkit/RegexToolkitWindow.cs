@@ -26,15 +26,16 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+using Gdk;
+using Gtk;
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Xml;
 using MonoDevelop.Core;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
-using Gdk;
-using Gtk;
 
 namespace MonoDevelop.RegexToolkit
 {
@@ -44,13 +45,15 @@ namespace MonoDevelop.RegexToolkit
 		TreeStore resultStore;
 		TreeStore elementsStore;
 		RegexLibraryWindow regexLib;
-		
-		public RegexToolkitWindow() : base (Gtk.WindowType.Toplevel)
+		Thread regexThread;
+			
+			
+		public RegexToolkitWindow () : base(Gtk.WindowType.Toplevel)
 		{
-			this.Build();
-			this.TransientFor = MonoDevelop.Ide.Gui.IdeApp.Workbench.RootWindow;
-			optionsStore = new ListStore (typeof (bool), typeof (string), typeof (Options));
-			resultStore = new Gtk.TreeStore (typeof (string), typeof (string), typeof (int), typeof (int));
+			this.Build ();
+			this.TransientFor = IdeApp.Workbench.RootWindow;
+			optionsStore = new ListStore (typeof(bool), typeof(string), typeof(Options));
+			resultStore = new Gtk.TreeStore (typeof(string), typeof(string), typeof(int), typeof(int));
 			
 			FillOptionsBox ();
 			
@@ -63,14 +66,27 @@ namespace MonoDevelop.RegexToolkit
 			this.inputTextview.Buffer.Changed += UpdateStartButtonSensitivity;
 			
 			this.buttonStart.Clicked += delegate {
-				PerformQuery (inputTextview.Buffer.Text,
-				              this.entryRegEx.Text,
-				              this.entryReplace.Text,
-				              GetOptions ());
+				if (regexThread != null && regexThread.IsAlive) {
+					regexThread.Abort ();
+					regexThread.Join ();
+					SetButtonStart (GettextCatalog.GetString ("_Start Regular Expression"), "gtk-media-play");
+					regexThread = null;
+					return;
+				}
+				
+				regexThread = new Thread (delegate() {
+					PerformQuery (inputTextview.Buffer.Text, this.entryRegEx.Text, this.entryReplace.Text, GetOptions ());
+				});
+				
+				regexThread.IsBackground = true;
+				regexThread.Name = "regex thread";
+				regexThread.Start ();
+				SetButtonStart (GettextCatalog.GetString ("_Stop execution"), "gtk-media-stop");
+				
 				SetFindMode (!checkbuttonReplace.Active);
 			};
 			
-			this.buttonLibrary.Clicked  += delegate {
+			this.buttonLibrary.Clicked += delegate {
 				if (regexLib == null) {
 					regexLib = new RegexLibraryWindow ();
 					regexLib.TransientFor = this;
@@ -105,10 +121,10 @@ namespace MonoDevelop.RegexToolkit
 			col.PackStart (cellRendText, true);
 			col.AddAttribute (cellRendText, "text", 1);
 			
-			this.resultsTreeview.RowActivated += delegate (object sender, RowActivatedArgs e) {
+			this.resultsTreeview.RowActivated += delegate(object sender, RowActivatedArgs e) {
 				Gtk.TreeIter iter;
 				if (resultStore.GetIter (out iter, e.Path)) {
-					int index  = (int)resultStore.GetValue (iter, 2);
+					int index = (int)resultStore.GetValue (iter, 2);
 					int length = (int)resultStore.GetValue (iter, 3);
 					if (index >= 0) {
 						this.inputTextview.Buffer.SelectRange (this.inputTextview.Buffer.GetIterAtOffset (index),
@@ -119,7 +135,7 @@ namespace MonoDevelop.RegexToolkit
 				}
 			};
 			
-			elementsStore = new Gtk.TreeStore (typeof (string), typeof (string), typeof (string), typeof (string));
+			elementsStore = new Gtk.TreeStore (typeof(string), typeof(string), typeof(string), typeof(string));
 			this.elementsTreeview.Model = this.elementsStore;
 			this.elementsTreeview.HeadersVisible = false;
 			this.elementsTreeview.Selection.Mode = SelectionMode.Browse;
@@ -129,10 +145,15 @@ namespace MonoDevelop.RegexToolkit
 			col.PackStart (pix, false);
 			col.AddAttribute (pix, "stock_id", 0);
 			col.PackStart (cellRendText, true);
+			
 			col.AddAttribute (cellRendText, "text", 1);
 			
+			var cellRendText2 = new CellRendererText ();
+			col.PackStart (cellRendText2, false);
+			col.SetCellDataFunc (cellRendText2, ElementDescriptionFunc);
+			
 			this.elementsTreeview.Selection.Changed += delegate {
-				ShowTooltipForSelectedEntry ();			
+				ShowTooltipForSelectedEntry ();
 			};
 			
 			this.LeaveNotifyEvent += delegate {
@@ -156,6 +177,27 @@ namespace MonoDevelop.RegexToolkit
 				this.entryReplace.Sensitive = this.checkbuttonReplace.Active;
 			};
 			FillElementsBox ();
+			this.vbox4.Hide ();
+		}
+
+		void SetButtonStart (string text, string icon)
+		{
+			((Gtk.Label)((Gtk.HBox)((Gtk.Alignment)this.buttonStart.Child).Child).Children[1]).Text = text;
+			((Gtk.Label)((Gtk.HBox)((Gtk.Alignment)this.buttonStart.Child).Child).Children[1]).UseUnderline = true;
+			((Gtk.Image)((Gtk.HBox)((Gtk.Alignment)this.buttonStart.Child).Child).Children[0]).Pixbuf = global::Stetic.IconLoader.LoadIcon (this, icon, global::Gtk.IconSize.Menu);
+		}
+
+		
+		void ElementDescriptionFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
+		{
+			string str = (string)model.GetValue (iter, 2);
+			if (string.IsNullOrEmpty (str)) {
+				cell.Visible = false;
+				return;
+			}
+			CellRendererText txtRenderer = (CellRendererText)cell;
+			txtRenderer.Visible = true;
+			txtRenderer.Text = str;
 		}
 		
 		int ox = -1 , oy = -1;
@@ -189,6 +231,7 @@ namespace MonoDevelop.RegexToolkit
 		void UpdateStartButtonSensitivity (object sender, EventArgs args)
 		{
 			this.buttonStart.Sensitive = this.entryRegEx.Text.Length > 0 && inputTextview.Buffer.CharCount > 0;
+			labelStatus.Text = string.Empty;
 		}
 		
 		void ShowTooltipForSelectedEntry ()
@@ -253,8 +296,11 @@ namespace MonoDevelop.RegexToolkit
 			this.GdkWindow.GetOrigin (out ox, out oy);
 			int w = tooltipWindow.Child.SizeRequest().Width;
 			int h = tooltipWindow.Child.SizeRequest().Height;
-			if (ox + x + w + tooltipXOffset >= this.GdkWindow.Screen.Width ||
-			    oy + y + h >= this.GdkWindow.Screen.Height) {
+			
+			Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtWindow (this.GdkWindow));
+			
+			if (ox + x + w + tooltipXOffset >= geometry.Right ||
+			    oy + y + h >= geometry.Bottom) {
 				tooltipWindow.Move (ox + x - w, oy + altY - h);
 			} else 
 				tooltipWindow.Move (ox + x + tooltipXOffset, oy + y);
@@ -286,30 +332,49 @@ namespace MonoDevelop.RegexToolkit
 		
 		void PerformQuery (string input, string pattern, string replacement, RegexOptions options)
 		{
-			Regex regex = new Regex (pattern, options);
-			this.resultStore.Clear ();
-			
-			foreach (Match match in regex.Matches (input)) {
-				TreeIter iter = this.resultStore.AppendValues (Stock.Find, String.Format (GettextCatalog.GetString("Match '{0}'"), match.Value), match.Index, match.Length);
-				int i = 0;
-				foreach (Group group in match.Groups) {
-					if (i > 0) {
-						TreeIter groupIter;
-						if (group.Success) {
-							groupIter = this.resultStore.AppendValues (iter, Stock.Apply, String.Format (GettextCatalog.GetString("Group '{0}':'{1}'"), regex.GroupNameFromNumber (i), group.Value), group.Index, group.Length);
-							foreach (Capture capture in match.Captures) {
-								this.resultStore.AppendValues (groupIter, null, String.Format (GettextCatalog.GetString("Capture '{0}'"), capture.Value), capture.Index, capture.Length);
+			try {
+				Regex regex = new Regex (pattern, options);
+				Application.Invoke (delegate {
+					this.resultStore.Clear ();
+				});
+				
+				foreach (Match match in regex.Matches (input)) {
+					Application.Invoke (delegate {
+						TreeIter iter = this.resultStore.AppendValues (Stock.Find, String.Format (GettextCatalog.GetString("Match '{0}'"), match.Value), match.Index, match.Length);
+						int i = 0;
+						foreach (Group group in match.Groups) {
+							if (i > 0) {
+								TreeIter groupIter;
+								if (group.Success) {
+									groupIter = this.resultStore.AppendValues (iter, Stock.Apply, String.Format (GettextCatalog.GetString("Group '{0}':'{1}'"), regex.GroupNameFromNumber (i), group.Value), group.Index, group.Length);
+									foreach (Capture capture in match.Captures) {
+										this.resultStore.AppendValues (groupIter, null, String.Format (GettextCatalog.GetString("Capture '{0}'"), capture.Value), capture.Index, capture.Length);
+									}
+								} else {
+									groupIter = this.resultStore.AppendValues (iter, Stock.Cancel, String.Format (GettextCatalog.GetString("Group '{0}' not found"), regex.GroupNameFromNumber (i)), -1, -1);
+								}
+		
 							}
-						} else {
-							groupIter = this.resultStore.AppendValues (iter, Stock.Cancel, String.Format (GettextCatalog.GetString("Group '{0}' not found"), regex.GroupNameFromNumber (i)), -1, -1);
+							i++;
 						}
-
-					}
-					i++;
+					});
 				}
-			}
-			if (!String.IsNullOrEmpty (replacement)) {
-				this.replaceResultTextview.Buffer.Text = regex.Replace (input, replacement);
+				if (!String.IsNullOrEmpty (replacement)) {
+					Application.Invoke (delegate {
+						this.replaceResultTextview.Buffer.Text = regex.Replace (input, replacement);
+					});
+				}
+			} catch (ThreadAbortException) {
+				Thread.ResetAbort ();
+			} catch (ArgumentException) {
+				Application.Invoke (delegate {
+					labelStatus.Text = GettextCatalog.GetString ("Invalid expression");
+				});
+			} finally {
+				regexThread = null;
+				Application.Invoke (delegate {
+					SetButtonStart (GettextCatalog.GetString ("_Start Regular Expression"), "gtk-media-play");
+				});
 			}
 		}
 		
@@ -388,7 +453,7 @@ namespace MonoDevelop.RegexToolkit
 				switch (reader.LocalName) {
 				case "Group":
 					TreeIter groupIter = this.elementsStore.AppendValues (Stock.Info,
-						GettextCatalog.GetString (reader.GetAttribute ("_name")), null, null);
+						GettextCatalog.GetString (reader.GetAttribute ("_name")), "", "");
 					while (reader.Read ()) {
 						if (reader.NodeType == XmlNodeType.EndElement && reader.LocalName == "Group") 
 							break;

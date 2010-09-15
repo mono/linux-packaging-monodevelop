@@ -27,12 +27,10 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Projects;
 using MonoDevelop.Core.Serialization;
 using Mono.Addins;
@@ -66,6 +64,7 @@ namespace MonoDevelop.Ide.Execution
 		public static void GenerateExecutionModeCommands (SolutionEntityItem project, CanExecuteDelegate runCheckDelegate, CommandArrayInfo info)
 		{
 			CommandExecutionContext ctx = new CommandExecutionContext (project, runCheckDelegate);
+			bool supportsParameterization = false;
 			
 			foreach (List<IExecutionMode> modes in GetExecutionModeCommands (ctx, false, true)) {
 				foreach (IExecutionMode mode in modes) {
@@ -76,15 +75,20 @@ namespace MonoDevelop.Ide.Execution
 						// already-translated strings by altering them
 						if (!ci.Text.EndsWith ("...")) 
 							ci.Text += "...";
+						supportsParameterization = true;
 					} else {
 						// The parameters window will be shown if ctrl is pressed
-						ci.Description = ci.Text + " - " + GettextCatalog.GetString ("Hold Control key to display the execution parameters dialog.");
+						ci.Description = GettextCatalog.GetString ("Run With: {0}", ci.Text);
+						if (SupportsParameterization (mode, ctx)) {
+							ci.Description += " - " + GettextCatalog.GetString ("Hold Control key to display the execution parameters dialog.");
+							supportsParameterization = true;
+						}
 					}
 				}
 				if (info.Count > 0)
 					info.AddSeparator ();
 			}
-			if (info.Count > 0) {
+			if (supportsParameterization) {
 				info.AddSeparator ();
 				info.Add (GettextCatalog.GetString ("Edit Custom Modes..."), new CommandItem (ctx, null));
 			}
@@ -94,13 +98,8 @@ namespace MonoDevelop.Ide.Execution
 		{
 			CommandItem item = (CommandItem) data;
 			if (item.Mode == null) {
-				CustomExecutionModeManagerDialog dlg = new CustomExecutionModeManagerDialog (item.Context);
-				dlg.TransientFor = IdeApp.Workbench.RootWindow;
-				try {
-					dlg.Run ();
-				} finally {
-					dlg.Destroy ();
-				}
+				var dlg = new CustomExecutionModeManagerDialog (item.Context);
+				MessageService.ShowCustomDialog (dlg);
 				return null;
 			}
 			
@@ -125,6 +124,13 @@ namespace MonoDevelop.Ide.Execution
 			return item.Mode.ExecutionHandler;
 		}
 		
+		static bool SupportsParameterization (IExecutionMode mode, CommandExecutionContext ctx)
+		{
+			if (ExecutionModeCommandService.GetExecutionCommandCustomizers (ctx).Any ())
+				return true;
+			return mode.ExecutionHandler is ParameterizedExecutionHandler;
+		}
+		
 		internal static List<List<IExecutionMode>> GetExecutionModeCommands (CommandExecutionContext ctx, bool includeDefault, bool includeDefaultCustomizer)
 		{
 			List<List<IExecutionMode>> itemGroups = new List<List<IExecutionMode>> ();
@@ -140,7 +146,7 @@ namespace MonoDevelop.Ide.Execution
 					setModes.Add (mode.Id);
 					if (mode.Id != "Default" || includeDefault)
 						items.Add (mode);
-					if (mode.Id == "Default" && includeDefaultCustomizer) {
+					if (mode.Id == "Default" && includeDefaultCustomizer && SupportsParameterization (mode, ctx)) {
 						CustomExecutionMode cmode = new CustomExecutionMode ();
 						cmode.Mode = mode;
 						cmode.Project = ctx.Project;
@@ -216,8 +222,7 @@ namespace MonoDevelop.Ide.Execution
 				CustomExecutionModeDialog dlg = new CustomExecutionModeDialog ();
 				try {
 					dlg.Initialize (ctx, mode, currentMode);
-					dlg.TransientFor = IdeApp.Workbench.RootWindow;
-					if (dlg.Run () == (int) Gtk.ResponseType.Ok) {
+					if (MessageService.RunCustomDialog (dlg) == (int) Gtk.ResponseType.Ok) {
 						cmode = dlg.GetConfigurationData ();
 						cmode.Project = ctx.Project;
 						if (dlg.Save)
@@ -244,7 +249,11 @@ namespace MonoDevelop.Ide.Execution
 			public override bool Equals (object obj)
 			{
 				CommandItem other = obj as CommandItem;
-				return other != null && other.Mode.Id == Mode.Id;
+				if (other == null)
+					return false;
+				if (Mode == null || other.Mode == null)
+					return Mode == other.Mode;
+				return other.Mode.Id == Mode.Id;
 			}
 			
 			public override int GetHashCode ()
@@ -274,7 +283,7 @@ namespace MonoDevelop.Ide.Execution
 			if (cmode.Scope == CustomModeScope.Global)
 				SaveGlobalCustomExecutionModes ();
 			else
-				Ide.Gui.IdeApp.Workspace.SavePreferences ();
+				IdeApp.Workspace.SavePreferences ();
 		}
 		
 		static CustomExecutionModes GetCustomExecutionModeList (SolutionEntityItem project, CustomModeScope scope)
@@ -307,7 +316,7 @@ namespace MonoDevelop.Ide.Execution
 			if (cmode.Scope == CustomModeScope.Global)
 				SaveGlobalCustomExecutionModes ();
 			else
-				Ide.Gui.IdeApp.Workspace.SavePreferences ();
+				IdeApp.Workspace.SavePreferences ();
 		}
 		
 		static CustomExecutionModes GetGlobalCustomExecutionModes ()

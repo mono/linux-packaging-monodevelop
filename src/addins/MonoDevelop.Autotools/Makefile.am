@@ -5,12 +5,8 @@ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.Autotools.dll
 DEPS =  \
 	$(top_builddir)/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
@@ -47,7 +43,6 @@ FILES =  \
 	MakefileOptionPanelWidget.cs \
 	MakefileProject.cs \
 	MakefileProjectServiceExtension.cs \
-	MakefileReaderExtension.cs \
 	MakefileSwitchEditor.cs \
 	MakefileSwitchEditorWidget.cs \
 	MakefileVar.cs \

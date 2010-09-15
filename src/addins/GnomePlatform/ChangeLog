@@ -1,3 +1,52 @@
+2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* GnomePlatform.cs: Implemented
+	  CanOpenTerminal/OpenInTerminal.
+
+2010-04-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* GnomePlatform.cs: Track StartConsoleProcess API.
+
+2010-04-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* GnomePlatform.cs: External console processes are now wrapped
+	  by a IProcessAsyncOperation interface, instead of a Process
+	  instance. In this way it is possible to create external
+	  consoles which are not directly bound to a process.
+
+2010-03-29  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* GnomePlatform.cs: Moved external console creation to the
+	  platform service.
+
+2010-03-23  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* GnomePlatform.cs: If getting the mime type using gio fails
+	  for some reason, fallback to vfs.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* GnomePlatform.addin.xml: Bumped MD version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Gio.cs:
+	* Makefile.am:
+	* GnomePlatform.cs:
+	* GnomePlatform.csproj:
+	* GnomePlatform.addin.xml: Merged MD.Projects into MD.Core,
+	  and MD.Projects.Gui, MD.Core.Gui and MD.Components into
+	  MD.Ide.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* GnomePlatform.csproj: Add missing reference.
+
+2010-02-10  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* GnomePlatform.cs: Tidy up GIO vs. GnomeVFS a bit.
+
 2009-10-30  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* AssemblyInfo.cs:

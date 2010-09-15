@@ -28,19 +28,19 @@
 
 using System;
 using MonoDevelop.Projects;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Commands;
 using MonoDevelop.Core;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Ide.Gui.Content
 {
-	public class TextEditorExtension : ITextEditorExtension, ICommandRouter, IDisposable
+	public class TextEditorExtension : ITextEditorExtension, ICommandRouter
 	{
-		internal ITextEditorExtension Next;
 		internal Document document;
 		
 		internal protected void Initialize (Document document)
@@ -49,12 +49,21 @@ namespace MonoDevelop.Ide.Gui.Content
 			Initialize ();
 		}
 		
+		public ITextEditorExtension Next {
+			get;
+			set;
+		}
+		
 		protected Document Document {
 			get { return document; }
 		}
 		
 		protected TextEditor Editor {
 			get { return document.TextEditor; }
+		}
+		
+		protected TextEditorData TextEditorData {
+			get { return document.TextEditorData; }
 		}
 		
 		protected FilePath FileName {
@@ -135,7 +144,10 @@ namespace MonoDevelop.Ide.Gui.Content
 		
 		public virtual void Dispose ()
 		{
-			document = null;
+			if (Next != null) {
+				Next.Dispose ();
+				Next = null;
+			}
 		}
 		
 		void CheckInitialized ()
@@ -158,8 +170,12 @@ namespace MonoDevelop.Ide.Gui.Content
 		}
 	}
 	
-	public interface ITextEditorExtension
+	public interface ITextEditorExtension : IDisposable
 	{
+		ITextEditorExtension Next {
+			get;
+		}
+		
 		bool KeyPress (Gdk.Key key, char keyChar, Gdk.ModifierType modifier);
 		void CursorPositionChanged ();
 		void TextChanged (int startIndex, int endIndex);

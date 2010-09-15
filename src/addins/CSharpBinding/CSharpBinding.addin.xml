@@ -6,16 +6,13 @@
        url         = "http://www.monodevelop.com/"
        description = "CSharp Language Binding"
 	   category    = "Language bindings"
-       version     = "2.2">
+       version     = "2.4">
 	
 	<Dependencies>
-		<Addin id="Core" version="2.2"/>
-		<Addin id="Core.Gui" version="2.2"/>
-		<Addin id="Projects" version="2.2"/>
-		<Addin id="Projects.Gui" version="2.2"/>
-		<Addin id="Ide" version="2.2"/>
-		<Addin id="SourceEditor2" version="2.2"/>
-		<Addin id="Refactoring" version="2.2"/>
+		<Addin id="Core" version="2.4"/>
+		<Addin id="Ide" version="2.4"/>
+		<Addin id="SourceEditor2" version="2.4"/>
+		<Addin id="Refactoring" version="2.4"/>
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/MSBuildItemTypes">
@@ -36,9 +33,12 @@
 	<Extension path = "/MonoDevelop/Ide/ProjectTemplates">
 		<ProjectTemplate id = "CSharpConsoleProject" resource = "ConsoleProject.xpt.xml"/>
 		<ProjectTemplate id = "CSharpEmptyProject" resource = "EmptyProject.xpt.xml"/>
-		<ProjectTemplate id = "CSharpGladeSharp2Project" resource = "GladeSharp2Project.xpt.xml"/>
-		<ProjectTemplate id = "CSharpGnomeSharp2Project" resource = "GnomeSharp2Project.xpt.xml"/>
-		<ProjectTemplate id = "CSharpGtkSharp2Project" resource = "GtkSharp2Project.xpt.xml"/>
+		<Condition id="Platform" value="!mac">
+			<ProjectTemplate id = "CSharpGtkSharp2Project" resource = "GtkSharp2Project.xpt.xml"/>
+		</Condition>
+		<Condition id="Platform" value="mac">
+			<ProjectTemplate id = "CSharpGtkSharp2ProjectMac" resource = "GtkSharp2ProjectMac.xpt.xml"/>
+		</Condition>
 		<ProjectTemplate id = "CSharpLibrary" resource = "Library.xpt.xml"/>
 	</Extension>
 	
@@ -82,10 +82,6 @@
 			             class = "MonoDevelop.CSharp.Project.CodeGenerationPanel"/>
 		</Condition>
 	</Extension>
-
-	<Extension path = "/MonoDevelop/Ide/GlobalOptionsDialog/TextEditor/Formatting">
-		<Section _label = "C#" class = "MonoDevelop.CSharp.Formatting.FormattingPanel"/>
-	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/LanguageBindings">
 		<LanguageBinding id    = "CSharp"
@@ -99,8 +95,9 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
-		<Class class = "MonoDevelop.CSharp.Completion.CSharpTextEditorCompletion" />
-		<Class class = "MonoDevelop.CSharp.Formatting.CSharpTextEditorIndentation" />
+		<Class fileExtensions = ".cs" class = "MonoDevelop.CSharp.Completion.CSharpTextEditorCompletion" />
+		<Class fileExtensions = ".cs" class = "MonoDevelop.CSharp.Formatting.CSharpTextEditorIndentation" />
+		<Class fileExtensions = ".cs" class = "MonoDevelop.CSharp.Highlighting.HighlightUsagesExtension" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/MD1SerializationMaps">
@@ -127,10 +124,6 @@
 		</MimeType>
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/ProjectModel/TextFormatDefinition">
-		<Definition resource="CSharpFormattingStyleDefinition.xml"/>
-	</Extension>
-	
 	<Extension path = "/MonoDevelop/ProjectModel/TextPrettyPrinters">
 		<Class class="MonoDevelop.CSharp.Formatting.CSharpFormatter" />
 	</Extension>
@@ -155,15 +148,48 @@
 		<Class class = "MonoDevelop.CSharp.Refactoring.CSharpNRefactoryASTProvider" />
 	</Extension>
 	
+	<Extension path = "/MonoDevelop/Ide/TextEditorResolver">
+		<Resolver class = "MonoDevelop.CSharp.Resolver.TextEditorResolverProvider" mimeType="text/x-csharp" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/Ide/Commands/TextEditor">
+		<Command id = "MonoDevelop.CSharp.Highlighting.MoveToUsagesCommand.PrevUsage"
+		         defaultHandler = "MonoDevelop.CSharp.Highlighting.MoveToPrevUsageHandler"
+		         shortcut = "Ctrl|Shift|Up"
+		         macShortcut = "Meta|Shift|Up"
+		         _label = "_Move to prev usage"/>
+		<Command id = "MonoDevelop.CSharp.Highlighting.MoveToUsagesCommand.NextUsage"
+		         defaultHandler = "MonoDevelop.CSharp.Highlighting.MoveToNextUsageHandler"
+		         shortcut = "Ctrl|Shift|Down"
+		         macShortcut = "Meta|Shift|Down"
+		         _label = "_Move to next usage"/>
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/ProjectModel/CodeGenerators">
+		<Generator class="MonoDevelop.CSharp.Refactoring.CSharpCodeGenerator" mimeType = "text/x-csharp" />
+	</Extension>
+	
 	<Module>
 	    <Runtime>
 	        <Import assembly="MonoDevelop.CSharpBinding.Autotools.dll"/>
 	    </Runtime>
 		<Dependencies>
-			<Addin id="Autotools" version="2.2"/>
+			<Addin id="Autotools" version="2.4"/>
 		</Dependencies>
 		<Extension path = "/MonoDevelop/Autotools/SimpleSetups">
 			<Class class="CSharpBinding.Autotools.CSharpAutotoolsSetup" />
+		</Extension>
+	</Module>
+	
+	<Module>
+		<Runtime>
+			<Import assembly="MonoDevelop.CSharpBinding.AspNet.dll"/>
+		</Runtime>
+		<Dependencies>
+			<Addin id="AspNet" version="2.4"/>
+		</Dependencies>
+		<Extension path = "/MonoDevelop/Asp/CompletionBuilders">
+			<Class class = "MonoDevelop.CSharp.Completion.AspLanguageBuilder" />
 		</Extension>
 	</Module>
 </Addin>

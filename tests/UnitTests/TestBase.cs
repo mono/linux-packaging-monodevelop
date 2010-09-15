@@ -30,7 +30,8 @@ using System.IO;
 using NUnit.Framework;
 using MonoDevelop.Core;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Core.Gui;
+using MonoDevelop.Ide;
+using MonoDevelop.Core.Assemblies;
 
 namespace UnitTests
 {
@@ -77,6 +78,21 @@ namespace UnitTests
 		public virtual void TearDown ()
 		{
 			//Util.ClearTmpDir ();
+		}
+		
+		static int pcount = 0;
+		
+		public static string GetTempFile (string extension)
+		{
+			return Path.Combine (Path.GetTempPath (), "test-file-" + (pcount++) + extension);
+		}
+		
+		public static string GetMdb (string file)
+		{
+			if (Runtime.SystemAssemblyService.DefaultRuntime is MonoTargetRuntime)
+				return file + ".mdb";
+			else
+				return Path.ChangeExtension (file, ".pdb");
 		}
 	}
 }

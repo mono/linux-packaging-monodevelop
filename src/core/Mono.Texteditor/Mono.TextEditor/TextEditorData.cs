@@ -27,6 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Gtk;
+using System.IO;
 
 namespace Mono.TextEditor
 {
@@ -41,7 +42,8 @@ namespace Mono.TextEditor
 		Document   document; 
 		Caret      caret;
 		
-		Adjustment hadjustment = new Adjustment (0, 0, 0, 0, 0, 0); 
+		static Adjustment emptyAdjustment = new Adjustment (0, 0, 0, 0, 0, 0);
+		Adjustment hadjustment = emptyAdjustment; 
 		public Adjustment HAdjustment {
 			get {
 				return hadjustment;
@@ -51,7 +53,7 @@ namespace Mono.TextEditor
 			}
 		}
 		
-		Adjustment vadjustment = new Adjustment (0, 0, 0, 0, 0, 0);
+		Adjustment vadjustment = emptyAdjustment;
 		public Adjustment VAdjustment {
 			get {
 				return vadjustment;
@@ -68,9 +70,15 @@ namespace Mono.TextEditor
 			set {
 				EditMode oldMode = this.currentMode;
 				this.currentMode = value;
+				this.currentMode.AddedToEditor (this);
 				if (oldMode != null)
-					oldMode.RemovedFromTextEditor ();
+					oldMode.RemovedFromEditor (this);
 			}
+		}
+		
+		public TextEditor Parent {
+			get;
+			set;
 		}
 		
 		public TextEditorData () : this (new Document ())
@@ -84,17 +92,13 @@ namespace Mono.TextEditor
 			Document = doc;
 			this.SearchEngine = new BasicSearchEngine ();
 			SelectionChanging += HandleSelectionChanging;
-			Caret.PositionChanged += delegate(object sender, DocumentLocationEventArgs e) {
-				if (Options.RemoveTrailingWhitespaces && e.Location.Line != Caret.Line) {
-					LineSegment line = Document.GetLine (e.Location.Line);
-					if (line != null && line.WasChanged)
-						Document.RemoveTrailingWhitespaces (this, line);
-				}
-			};
-			doc.LineChanged += delegate(object sender, LineEventArgs e) {
-				e.Line.WasChanged = true;
-			};
 		}
+
+		void HandleDocLineChanged (object sender, LineEventArgs e)
+		{
+			e.Line.WasChanged = true;
+		}
+
 		
 		public Document Document {
 			get {
@@ -109,6 +113,7 @@ namespace Mono.TextEditor
 				
 				this.document.Undone += DocumentHandleUndone;
 				this.document.Redone += DocumentHandleRedone;
+				this.document.LineChanged += HandleDocLineChanged;
 			}
 		}
 
@@ -176,6 +181,9 @@ namespace Mono.TextEditor
 				for (int i = 0; i < value.Length; i++) {
 					char ch = value[i];
 					switch (ch) {
+					case '\u00A0': // convert non breaking spaces to standard spaces.
+						sb.Append (' ');
+						break;
 					case '\t':
 						if (convertTabs) {
 							int tabWidth = TextViewMargin.GetNextTabstop (this, loc.Column) - loc.Column;
@@ -221,8 +229,12 @@ namespace Mono.TextEditor
 			options = options.Kill ();
 			
 			if (document != null) {
+				document.LineChanged -= HandleDocLineChanged;
 				document.BeginUndo -= OnBeginUndo;
 				document.EndUndo   -= OnEndUndo;
+				document.Undone -= DocumentHandleUndone;
+				document.Redone -= DocumentHandleRedone;
+				
 				// DOCUMENT MUST NOT BE DISPOSED !!! (Split View shares document)
 				document = null;
 			}
@@ -230,10 +242,16 @@ namespace Mono.TextEditor
 			SelectionChanging -= HandleSelectionChanging;
 		}
 		
-		void CaretPositionChanged (object sender, EventArgs args)
+		void CaretPositionChanged (object sender, DocumentLocationEventArgs args)
 		{
 			if (!caret.PreserveSelection)
 				this.ClearSelection ();
+			
+			if (Options.RemoveTrailingWhitespaces && args.Location.Line != Caret.Line) {
+				LineSegment line = Document.GetLine (args.Location.Line);
+				if (line != null && line.WasChanged)
+					Document.RemoveTrailingWhitespaces (this, line);
+			}
 		}
 		
 		public bool CanEdit (int line)
@@ -262,7 +280,16 @@ namespace Mono.TextEditor
 		{
 			return this.options.WordFindStrategy.FindPrevSubwordOffset (this.Document, offset);
 		}
-
+		
+		public int FindCurrentWordEnd (int offset)
+		{
+			return this.Options.WordFindStrategy.FindCurrentWordEnd (this.Document, offset);
+		}
+		
+		public int FindCurrentWordStart (int offset)
+		{
+			return this.Options.WordFindStrategy.FindCurrentWordStart (this.Document, offset);
+		}
 		
 		public delegate void PasteCallback (int insertionOffset, string text);
 		
@@ -408,15 +435,19 @@ namespace Mono.TextEditor
 				if (mainSelection == null && value == null)
 					return;
 				if (mainSelection == null && value != null || mainSelection != null && value == null || !mainSelection.Equals (value)) {
+					if (mainSelection != null)
+						mainSelection.Changed -= HandleMainSelectionChanged;
 					mainSelection = value;
-					if (mainSelection != null) {
-						mainSelection.Changed += delegate {
-							OnSelectionChanged (EventArgs.Empty);
-						};
-					}
+					if (mainSelection != null) 
+						mainSelection.Changed += HandleMainSelectionChanged;
 					OnSelectionChanged (EventArgs.Empty);
 				}
 			}
+		}
+
+		void HandleMainSelectionChanged (object sender, EventArgs e)
+		{
+			OnSelectionChanged (EventArgs.Empty);
 		}
 		
 		public IEnumerable<Selection> Selections {
@@ -588,6 +619,8 @@ namespace Mono.TextEditor
 				DocumentLocation visEnd = LogicalToVisualLocation (selection.Lead);
 				int startCol = System.Math.Min (visStart.Column, visEnd.Column);
 				int endCol = System.Math.Max (visStart.Column, visEnd.Column);
+				bool preserve = Caret.PreserveSelection;
+				Caret.PreserveSelection = true;
 				for (int lineNr = selection.MinLine; lineNr <= selection.MaxLine; lineNr++) {
 					LineSegment curLine = Document.GetLine (lineNr);
 					int col1 = curLine.GetLogicalColumn (this, startCol);
@@ -599,12 +632,21 @@ namespace Mono.TextEditor
 					if (Caret.Line == lineNr && Caret.Column >= col1)
 						Caret.Column -= col2 - col1;
 				}
+				int column = System.Math.Min (selection.Anchor.Column, selection.Lead.Column);
+				selection.Anchor = new DocumentLocation (selection.Anchor.Line, column);
+				selection.Lead = new DocumentLocation (selection.Lead.Line, column);
+				Caret.Column = column;
+				Caret.PreserveSelection = preserve;
 				break;
 			}
-			
+		
 		}
 		
 		public void DeleteSelectedText ()
+		{
+			DeleteSelectedText (true);
+		}
+		public void DeleteSelectedText (bool clearSelection)
 		{
 			if (!IsSomethingSelected)
 				return;
@@ -615,7 +657,8 @@ namespace Mono.TextEditor
 				needUpdate |= Document.OffsetToLineNumber (segment.Offset) != Document.OffsetToLineNumber (segment.EndOffset);
 				DeleteSelection (selection);
 			}
-			ClearSelection ();
+			if (clearSelection)
+				ClearSelection ();
 			document.EndAtomicUndo ();
 			if (needUpdate)
 				Document.CommitDocumentUpdate ();
@@ -638,10 +681,12 @@ namespace Mono.TextEditor
 				return searchEngine;
 			}
 			set {
-				value.TextEditorData = this;
-				value.SearchRequest = SearchRequest;
-				searchEngine = value;
-				OnSearchChanged (EventArgs.Empty);
+				if (searchEngine != value) {
+					value.TextEditorData = this;
+					value.SearchRequest = SearchRequest;
+					searchEngine = value;
+					OnSearchChanged (EventArgs.Empty);
+				}
 			}
 		}
 		
@@ -687,7 +732,7 @@ namespace Mono.TextEditor
 			return searchEngine.SearchBackward (fromOffset);
 		}
 		
-		public SearchResult FindNext ()
+		public SearchResult FindNext (bool setSelection)
 		{
 			int startOffset = Caret.Offset;
 			if (IsSomethingSelected && IsMatchAt (startOffset)) {
@@ -697,27 +742,35 @@ namespace Mono.TextEditor
 			SearchResult result = SearchForward (startOffset);
 			if (result != null) {
 				Caret.Offset = result.Offset + result.Length;
-				MainSelection = new Selection (Document.OffsetToLocation (result.Offset), Caret.Location);
+				if (setSelection)
+					MainSelection = new Selection (Document.OffsetToLocation (result.Offset), Caret.Location);
 			}
 			return result;
 		}
 		
-		public SearchResult FindPrevious ()
+		public SearchResult FindPrevious (bool setSelection)
 		{
-			int startOffset = Caret.Offset;
+			int startOffset = Caret.Offset - SearchEngine.SearchRequest.SearchPattern.Length;
 			if (IsSomethingSelected && IsMatchAt (MainSelection.GetAnchorOffset (this))) 
 				startOffset = MainSelection.GetAnchorOffset (this);
 			
-			SearchResult result = SearchBackward ((startOffset + Document.Length - 1) % Document.Length);
+			int searchOffset;
+			if (startOffset < 0) {
+				searchOffset = Document.Length - 1;
+			} else {
+				searchOffset = (startOffset + Document.Length - 1) % Document.Length;
+			}
+			SearchResult result = SearchBackward (searchOffset);
 			if (result != null) {
-				result.SearchWrapped = result.Offset > startOffset;
+				result.SearchWrapped = result.EndOffset > startOffset;
 				Caret.Offset  = result.Offset + result.Length;
-				MainSelection = new Selection (Document.OffsetToLocation (result.Offset), Caret.Location);
+				if (setSelection)
+					MainSelection = new Selection (Document.OffsetToLocation (result.Offset), Caret.Location);
 			}
 			return result;
 		}
 		
-		public bool SearchReplace (string withPattern)
+		public bool SearchReplace (string withPattern, bool setSelection)
 		{
 			bool result = false;
 			if (this.IsSomethingSelected) {
@@ -730,7 +783,7 @@ namespace Mono.TextEditor
 					result = true;
 				}
 			}
-			return FindNext () != null || result;
+			return FindNext (setSelection) != null || result;
 		}
 		
 		public int SearchReplaceAll (string withPattern)
@@ -808,9 +861,13 @@ namespace Mono.TextEditor
 		public int EnsureCaretIsNotVirtual ()
 		{
 			LineSegment line = Document.GetLine (Caret.Line);
+			if (line == null)
+				return 0;
+			
 			if (Caret.Column > line.EditableLength) {
 				string virtualSpace = GetVirtualSpaces (Caret.Line, Caret.Column);
-				Insert (Caret.Offset, virtualSpace);
+				if (!string.IsNullOrEmpty (virtualSpace))
+					Insert (Caret.Offset, virtualSpace);
 				// No need to reposition the caret, because it's already at the correct position
 				// The only difference is that the position is not virtual anymore.
 				return virtualSpace.Length;
@@ -818,6 +875,11 @@ namespace Mono.TextEditor
 			return 0;
 		}
 		#endregion
+		
+		public Stream OpenStream ()
+		{
+			return new MemoryStream (System.Text.Encoding.UTF8.GetBytes (Document.Text), false);
+		}
 		
 		public void RaiseUpdateAdjustmentsRequested ()
 		{
@@ -832,5 +894,13 @@ namespace Mono.TextEditor
 		}
 		
 		public event EventHandler UpdateAdjustmentsRequested;
+
+		public void RequestRecenter ()
+		{
+			EventHandler handler = RecenterEditor;
+			if (handler != null)
+				handler (this, EventArgs.Empty);
+		}
+		public event EventHandler RecenterEditor;
 	}
 }

@@ -7,19 +7,15 @@
 	url = "http://www.monodevelop.com"
 	description = "Provides support for adding and maintianing Web References for CSharp and VB projects."
 	category = "Web Development"
-	version = "2.2" >
+	version = "2.4" >
     
     <Runtime>
     	<Import assembly = "MonoDevelop.WebReferences.dll"/>
     </Runtime>
     
 	<Dependencies>
-		<Addin id="Core" version="2.2"/>
-		<Addin id="Core.Gui" version="2.2"/>
-		<Addin id="Ide" version="2.2"/>
-		<Addin id="Projects" version="2.2"/>
-		<Addin id="Projects.Gui" version="2.2"/>
-		<Addin id="Components" version="2.2"/>
+		<Addin id="Core" version="2.4"/>
+		<Addin id="Ide" version="2.4"/>
 	</Dependencies>
 	
 	<ExtensionPoint path = "/MonoDevelop/WebReferences/ContextMenu/ProjectPad/WebReferenceFolder">
@@ -76,5 +72,12 @@
 	
 	<Extension path = "/MonoDevelop/Core/StockIcons">
 		<StockIcon stockid = "md-webreference-item" resource = "WebReferenceItem.png" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/ProjectModel/SerializableClasses">
+		<DataType class = "MonoDevelop.WebReferences.WCF.WCFMetadata" />
+		<DataType class = "MonoDevelop.WebReferences.WCF.WCFMetadataStorage" />
+		<DataType class = "MonoDevelop.WebReferences.WS.WebReferences" />
+		<DataType class = "MonoDevelop.WebReferences.WS.WebReferenceUrl" />
 	</Extension>
 </Addin>

@@ -27,6 +27,8 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+//#define TREE_VERIFY_INTEGRITY
+
 using System;
 using System.IO;
 using System.ComponentModel;
@@ -43,14 +45,13 @@ using Mono.Addins;
 using MonoDevelop.Core;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Commands;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Projects.Extensions;
 
 namespace MonoDevelop.Ide.Gui.Components
 {
-	public partial class ExtensibleTreeView : Gtk.ScrolledWindow
+	public partial class ExtensibleTreeView : CompactScrolledWindow
 	{
 		internal const int TextColumn         = 0;
 		internal const int OpenIconColumn     = 1;
@@ -66,11 +67,12 @@ namespace MonoDevelop.Ide.Gui.Components
 		Gtk.TreeView tree = new Gtk.TreeView ();
 		Gtk.TreeStore store;
 		internal Gtk.TreeViewColumn complete_column;
-		internal Gtk.CellRendererPixbuf pix_render;
+		internal ZoomableCellRendererPixbuf pix_render;
 		internal Gtk.CellRendererText text_render;
 		TreeBuilderContext builderContext;
 		Hashtable callbacks = new Hashtable ();
 		bool editingText = false;
+		int customFontSize = -1;
 		
 		TreePadOption[] options;
 		TreeOptions globalOptions;
@@ -113,6 +115,8 @@ namespace MonoDevelop.Ide.Gui.Components
 			}
 		}
 		
+		public string Id { get; set; }
+		
 		public ExtensibleTreeView ()
 		{
 		}
@@ -122,29 +126,29 @@ namespace MonoDevelop.Ide.Gui.Components
 			Initialize (builders, options);
 		}
 		
-		void PropertyChanged (object sender, MonoDevelop.Core.PropertyChangedEventArgs prop)
+		void CustomFontPropertyChanged (object sender, MonoDevelop.Core.PropertyChangedEventArgs prop)
 		{
-			string name;
-			
-			switch (prop.Key) {
-			case "MonoDevelop.Core.Gui.Pads.UseCustomFont":
-				name = tree.Style.FontDescription.ToString ();
-				
-				if ((bool) prop.NewValue)
-					name = PropertyService.Get ("MonoDevelop.Core.Gui.Pads.CustomFont", name);
-				
-				text_render.FontDesc = Pango.FontDescription.FromString (name);
-				tree.ColumnsAutosize ();
-				break;
-			case "MonoDevelop.Core.Gui.Pads.CustomFont":
-				if (!(PropertyService.Get<bool> ("MonoDevelop.Core.Gui.Pads.UseCustomFont")))
-					break;
-				
-				name = (string) prop.NewValue;
-				text_render.FontDesc = Pango.FontDescription.FromString (name);
-				tree.ColumnsAutosize ();
-				break;
-			}
+			string val = (string)prop.NewValue;
+			string name = !string.IsNullOrEmpty (val) ? val : tree.Style.FontDescription.ToString ();
+			UpdateCustomFont (name);
+		}
+		
+		void UpdateCustomFont (string name)
+		{
+			Pango.FontDescription customFont = Pango.FontDescription.FromString (name);
+			customFontSize = customFont.Size;
+			if (Zoom != 1)
+				customFont.Size = (int) (((double) customFont.Size) * Zoom);
+			text_render.Family = customFont.Family;
+			text_render.Size = customFont.Size;
+			customFont.Dispose ();
+			tree.ColumnsAutosize ();
+		}
+		
+		protected override void OnStyleSet (Gtk.Style previous_style)
+		{
+			base.OnStyleSet (previous_style);
+			UpdateCustomFont (IdeApp.Preferences.CustomPadFont ?? tree.Style.FontDescription.ToString ());
 		}
 		
 		public void Initialize (NodeBuilder[] builders, TreePadOption[] options)
@@ -183,20 +187,23 @@ namespace MonoDevelop.Ide.Gui.Components
 			complete_column = new Gtk.TreeViewColumn ();
 			complete_column.Title = "column";
 
-			pix_render = new Gtk.CellRendererPixbuf ();
+			pix_render = new ZoomableCellRendererPixbuf ();
 			complete_column.PackStart (pix_render, false);
-			complete_column.AddAttribute (pix_render, "pixbuf", OpenIconColumn);
-			complete_column.AddAttribute (pix_render, "pixbuf-expander-open", OpenIconColumn);
-			complete_column.AddAttribute (pix_render, "pixbuf-expander-closed", ClosedIconColumn);
+			complete_column.AddAttribute (pix_render, "image", OpenIconColumn);
+			complete_column.AddAttribute (pix_render, "image-expander-open", OpenIconColumn);
+			complete_column.AddAttribute (pix_render, "image-expander-closed", ClosedIconColumn);
 			
 			text_render = new Gtk.CellRendererText ();
-			if (PropertyService.Get ("MonoDevelop.Core.Gui.Pads.UseCustomFont", false)) {
-				string name = tree.Style.FontDescription.ToString ();
-				name = PropertyService.Get ("MonoDevelop.Core.Gui.Pads.CustomFont", name);
-				text_render.FontDesc = Pango.FontDescription.FromString (name);
+			var customFontName = IdeApp.Preferences.CustomPadFont;
+			if (customFontName != null) {
+				Pango.FontDescription customFont = Pango.FontDescription.FromString (customFontName);
+				text_render.Family = customFont.Family;
+				text_render.Size = customFont.Size;
+				customFontSize = customFont.Size;
+				customFont.Dispose ();
 			}
-			text_render.Ypad = 1;
-			PropertyService.PropertyChanged += PropertyChanged;
+			text_render.Ypad = 0;
+			IdeApp.Preferences.CustomPadFontChanged += CustomFontPropertyChanged;;
 			text_render.Edited += HandleOnEdit;
 			text_render.EditingCanceled += HandleOnEditCancelled;
 			
@@ -224,10 +231,51 @@ namespace MonoDevelop.Ide.Gui.Components
 			
 			tree.CursorChanged += OnSelectionChanged;
 			tree.KeyPressEvent += OnKeyPress;
-				
+
+			for (int n=3; n<16; n++) {
+				Gtk.Rc.ParseString ("style \"MonoDevelop.ExtensibleTreeView_" + n + "\" {\n GtkTreeView::expander-size = " + n + "\n }\n");
+				Gtk.Rc.ParseString ("widget \"*.MonoDevelop.ExtensibleTreeView_" + n + "\" style  \"MonoDevelop.ExtensibleTreeView_" + n + "\"\n");
+			}
+			
+			if (!string.IsNullOrEmpty (Id))
+				Zoom = PropertyService.Get<double> ("MonoDevelop.Ide.ExtensibleTreeView.Zoom." + Id, 1d);
+			
 			this.Add (tree);
 			this.ShowAll ();
+
+#if TREE_VERIFY_INTEGRITY
+			GLib.Timeout.Add (3000, Checker);
+#endif
 		}
+	
+#if TREE_VERIFY_INTEGRITY
+		// Verifies the consistency of the tree view. Disabled by default
+		HashSet<object> ochecked = new HashSet<object> ();
+		bool Checker ()
+		{
+			int nodes = 0;
+			foreach (DictionaryEntry e in nodeHash) {
+				if (e.Value is Gtk.TreeIter) {
+					nodes++;
+					if (!store.IterIsValid ((Gtk.TreeIter)e.Value) && ochecked.Add (e.Key)) {
+						Console.WriteLine ("Found invalid iter in tree pad - Object: " + e.Key);
+						MessageService.ShowError ("Found invalid iter in tree pad", "Object: " + e.Key);
+					}
+				} else {
+					Gtk.TreeIter[] iters = (Gtk.TreeIter[]) e.Value;
+					for (int n=0; n<iters.Length; n++) {
+						Gtk.TreeIter it = iters [n];
+						if (!store.IterIsValid (it) && ochecked.Add (e.Key)) {
+							Console.WriteLine ("Found invalid iter in tree pad - Object: " + e.Key + ", index:" + n);
+							MessageService.ShowError ("Found invalid iter in tree pad", "Object: " + e.Key + ", index:" + n);
+						}
+						nodes++;
+					}
+				}
+			}
+			return true;
+		}
+#endif
 		
 		public void UpdateBuilders (NodeBuilder[] builders, TreePadOption[] options)
 		{
@@ -353,6 +401,14 @@ namespace MonoDevelop.Ide.Gui.Components
 			bool foundHandler = false;
 			
 			DragOperation oper = ctx.Action == Gdk.DragAction.Copy ? DragOperation.Copy : DragOperation.Move;
+			DropPosition dropPos;
+			if (pos == Gtk.TreeViewDropPosition.After)
+				dropPos = DropPosition.After;
+			else if (pos == Gtk.TreeViewDropPosition.Before)
+				dropPos = DropPosition.Before;
+			else
+				dropPos = DropPosition.Into;
+			
 			bool updatesLocked = false;
 
 			try {
@@ -360,14 +416,14 @@ namespace MonoDevelop.Ide.Gui.Components
 					try {
 						NodeCommandHandler handler = nb.CommandHandler;
 						handler.SetCurrentNode (nav);
-						if (handler.CanDropMultipleNodes (obj, oper)) {
+						if (handler.CanDropMultipleNodes (obj, oper, dropPos)) {
 							foundHandler = true;
 							if (drop) {
 								if (!updatesLocked) {
 									LockUpdates ();
 									updatesLocked = true;
 								}
-								handler.OnMultipleNodeDrop (obj, oper);
+								handler.OnMultipleNodeDrop (obj, oper, dropPos);
 							}
 						}
 					} catch (Exception ex) {
@@ -625,7 +681,7 @@ namespace MonoDevelop.Ide.Gui.Components
 					if (tnb == null) return null;
 					
 					object parent = tnb.GetParentObject (dataObject);
-					if (parent == null) return null;
+					if (parent == null || parent == dataObject || dataObject.Equals (parent)) return null;
 					
 					ITreeNavigator pnav = GetNodeAtObject (parent, true);
 					if (pnav == null) return null;
@@ -698,7 +754,7 @@ namespace MonoDevelop.Ide.Gui.Components
 			// will be handled by the node Entry.
 			if (editingText)
 				return null;
-
+			
 			ArrayList targets = new ArrayList ();
 			
 			foreach (SelectionGroup grp in GetSelectedNodesGrouped ()) {
@@ -716,17 +772,47 @@ namespace MonoDevelop.Ide.Gui.Components
 							lastNode = newNode;
 						}
 					}
-
+					
 					if (targetChain != null)
 						targets.Add (targetChain);
 				}
 			}
 			if (targets.Count == 1)
-				return targets [0];
+				return targets[0];
 			else if (targets.Count > 1)
 				return new MulticastNodeRouter (targets);
 			else
 				return null;
+		}
+		
+		void ExpandCurrentItem ()
+		{
+			try {
+				LockUpdates ();
+				foreach (SelectionGroup grp in GetSelectedNodesGrouped ()) {
+					grp.SavePositions ();
+					foreach (var node in grp.Nodes) {
+						node.Expanded = true;
+					}
+				}
+			} finally {
+				UnlockUpdates ();
+			}
+		}
+
+		void CollapseCurrentItem ()
+		{
+			try {
+				LockUpdates ();
+				foreach (SelectionGroup grp in GetSelectedNodesGrouped ()) {
+					grp.SavePositions ();
+					foreach (var node in grp.Nodes) {
+						node.Expanded = false;
+					}
+				}
+			} finally {
+				UnlockUpdates ();
+			}
 		}
 
 		[CommandHandler (ViewCommands.Open)]
@@ -801,6 +887,73 @@ namespace MonoDevelop.Ide.Gui.Components
 		}
 		
 		public event EventHandler CurrentItemActivated;
+		
+		public double Zoom {
+			get {
+				return pix_render.Zoom;
+			}
+			set {
+				if (pix_render.Zoom != value) {
+					pix_render.Zoom = value;
+					if (customFontSize != -1) {
+						int newSize = customFontSize;
+						if (value != 1)
+							newSize = (int) (((double) customFontSize) * value);
+						text_render.Size = newSize;
+					}
+					int expanderSize = (int) (12 * Zoom);
+					if (expanderSize < 3) expanderSize = 3;
+					if (expanderSize > 15) expanderSize = 15;
+					if (expanderSize != 12)
+						tree.Name = "MonoDevelop.ExtensibleTreeView_" + expanderSize;
+					else
+						tree.Name = "";
+					tree.ColumnsAutosize ();
+					if (!string.IsNullOrEmpty (Id)) {
+						PropertyService.Set ("MonoDevelop.Ide.ExtensibleTreeView.Zoom." + Id, Zoom);
+						PropertyService.SaveProperties ();
+					}
+				}
+			}
+		}
+		
+		[CommandHandler (ViewCommands.ZoomIn)]
+		public void ZoomIn ()
+		{
+			double newZoom = Zoom * 1.1;
+			Zoom = System.Math.Min (8.0, System.Math.Max (0.3, newZoom));
+		}
+
+		[CommandHandler (ViewCommands.ZoomOut)]
+		public void ZoomOut ()
+		{
+			double newZoom = Zoom * 0.9;
+			Zoom = System.Math.Min (8.0, System.Math.Max (0.3, newZoom));
+		}
+		
+		[CommandHandler (ViewCommands.ZoomReset)]
+		public void ZoomReset ()
+		{
+			Zoom = 1;
+		}
+
+		[CommandUpdateHandler (ViewCommands.ZoomIn)]
+		protected void UpdateZoomIn (CommandInfo cinfo)
+		{
+			cinfo.Enabled = Zoom != 8.0;
+		}
+
+		[CommandUpdateHandler (ViewCommands.ZoomOut)]
+		protected void UpdateZoomOut (CommandInfo cinfo)
+		{
+			cinfo.Enabled = Zoom != 0.3;
+		}
+		
+		[CommandUpdateHandler (ViewCommands.ZoomReset)]
+		protected void UpdateZoomReset (CommandInfo cinfo)
+		{
+			cinfo.Enabled = Zoom != 1;
+		}
 
 		[CommandHandler (EditCommands.Copy)]
 		public void CopyCurrentItem ()
@@ -902,9 +1055,9 @@ namespace MonoDevelop.Ide.Gui.Components
 					foreach (NodeBuilder b in chain) {
 						NodeCommandHandler handler = b.CommandHandler;
 						handler.SetCurrentNode (node);
-						if (handler.CanDropMultipleNodes (copyObjects, currentTransferOperation)) {
+						if (handler.CanDropMultipleNodes (copyObjects, currentTransferOperation, DropPosition.Into)) {
 							node.MoveToPosition (pos);
-							handler.OnMultipleNodeDrop (copyObjects, currentTransferOperation);
+							handler.OnMultipleNodeDrop (copyObjects, currentTransferOperation, DropPosition.Into);
 						}
 						node.MoveToPosition (pos);
 					}
@@ -931,7 +1084,7 @@ namespace MonoDevelop.Ide.Gui.Components
 					foreach (NodeBuilder b in chain) {
 						NodeCommandHandler handler = b.CommandHandler;
 						handler.SetCurrentNode (node);
-						if (handler.CanDropMultipleNodes (copyObjects, currentTransferOperation)) {
+						if (handler.CanDropMultipleNodes (copyObjects, currentTransferOperation, DropPosition.Into)) {
 							info.Enabled = true;
 							return;
 						}
@@ -1200,17 +1353,19 @@ namespace MonoDevelop.Ide.Gui.Components
 			}
 		}
 		
-		internal void RegisterNode (Gtk.TreeIter it, object dataObject, NodeBuilder[] chain)
+		internal void RegisterNode (Gtk.TreeIter it, object dataObject, NodeBuilder[] chain, bool fireAddedEvent)
 		{
 			object currentIt = nodeHash [dataObject];
 			if (currentIt == null) {
 				nodeHash [dataObject] = it;
 				if (chain == null) chain = GetBuilderChain (dataObject.GetType());
-				foreach (NodeBuilder nb in chain) {
-					try {
-						nb.OnNodeAdded (dataObject);
-					} catch (Exception ex) {
-						LoggingService.LogError (ex.ToString ());
+				if (fireAddedEvent) {
+					foreach (NodeBuilder nb in chain) {
+						try {
+							nb.OnNodeAdded (dataObject);
+						} catch (Exception ex) {
+							LoggingService.LogError (ex.ToString ());
+						}
 					}
 				}
 			} else {
@@ -1226,10 +1381,10 @@ namespace MonoDevelop.Ide.Gui.Components
 			}
 		}
 		
-		internal void UnregisterNode (object dataObject, Gtk.TreeIter iter, NodeBuilder[] chain)
+		internal void UnregisterNode (object dataObject, Gtk.TreeIter iter, NodeBuilder[] chain, bool fireRemovedEvent)
 		{
 			// Remove object from copy list
-
+			
 			if (copyObjects != null) {
 				int i = Array.IndexOf (copyObjects, dataObject);
 				if (i != -1) {
@@ -1280,7 +1435,8 @@ namespace MonoDevelop.Ide.Gui.Components
 					nodeHash.Remove (dataObject);
 			} else {
 				nodeHash.Remove (dataObject);
-				NotifyNodeRemoved (dataObject, chain);
+				if (fireRemovedEvent)
+					NotifyNodeRemoved (dataObject, chain);
 			}
 		}
 		
@@ -1291,7 +1447,7 @@ namespace MonoDevelop.Ide.Gui.Components
 				RemoveChildren (child);
 				object childData = store.GetValue (child, ExtensibleTreeView.DataItemColumn);
 				if (childData != null)
-					UnregisterNode (childData, child, null);
+					UnregisterNode (childData, child, null, true);
 				store.Remove (ref child);
 			}
 		}
@@ -1646,6 +1802,12 @@ namespace MonoDevelop.Ide.Gui.Components
 				}
 				args.RetVal = true;
 			}
+			if (args.Event.Key == Gdk.Key.Right || args.Event.Key == Gdk.Key.KP_Right) {
+				ExpandCurrentItem ();
+			}
+			if (args.Event.Key == Gdk.Key.Left || args.Event.Key == Gdk.Key.KP_Left) {
+				CollapseCurrentItem ();
+			}
 
 			if (args.Event.Key == Gdk.Key.Return || args.Event.Key == Gdk.Key.KP_Enter) {
 				ActivateCurrentItem ();
@@ -1695,6 +1857,25 @@ namespace MonoDevelop.Ide.Gui.Components
 					tree.Selection.SelectPath (path);
 			}
 		}
+		
+		protected override bool OnScrollEvent (Gdk.EventScroll evnt)
+		{
+			var modifier = !PropertyService.IsMac? Gdk.ModifierType.ControlMask
+				//Mac window manager already uses control-scroll, so use command
+				//Command might be either meta or mod1, depending on GTK version
+				: (Gdk.ModifierType.MetaMask | Gdk.ModifierType.Mod1Mask);
+			
+			if ((evnt.State & modifier) !=0) {
+				if (evnt.Direction == Gdk.ScrollDirection.Up)
+					ZoomIn ();
+				else if (evnt.Direction == Gdk.ScrollDirection.Down)
+					ZoomOut ();
+				
+				return true;
+			}
+			return base.OnScrollEvent (evnt);
+		}
+
 
 		bool IsClickedNodeSelected (int x, int y)
 		{
@@ -1731,7 +1912,7 @@ namespace MonoDevelop.Ide.Gui.Components
 		
 		protected override void OnDestroyed ()
 		{
-			PropertyService.PropertyChanged -= PropertyChanged;
+			IdeApp.Preferences.CustomPadFontChanged -= CustomFontPropertyChanged;;
 			if (pix_render != null) {
 				pix_render.Destroy ();
 				pix_render = null;
@@ -1813,7 +1994,7 @@ namespace MonoDevelop.Ide.Gui.Components
 			{
 				Gdk.Pixbuf icon = icons [id] as Gdk.Pixbuf;
 				if (icon == null) {
-					icon = pad.tree.RenderIcon (id, Gtk.IconSize.Menu, "");
+					icon = ImageService.GetPixbuf (id, Gtk.IconSize.Menu);
 					icons [id] = icon;
 				}
 				return icon;
@@ -1902,6 +2083,78 @@ namespace MonoDevelop.Ide.Gui.Components
 				return 0;
 			else
 				return p.ToString ().GetHashCode ();
+		}
+	}
+	
+	class ZoomableCellRendererPixbuf: Gtk.CellRendererPixbuf
+	{
+		Gdk.Pixbuf image;
+		Gdk.Pixbuf imageOpen;
+		Gdk.Pixbuf imageClosed;
+		double zoom = 1f;
+		
+		Dictionary<Gdk.Pixbuf,Gdk.Pixbuf> resizedCache = new Dictionary<Gdk.Pixbuf, Gdk.Pixbuf> ();
+		
+		public double Zoom {
+			get { return zoom; }
+			set {
+				if (zoom != value) {
+					zoom = value;
+					resizedCache.Clear ();
+					Notify ("image");
+				}
+			}
+		}
+		
+		[GLib.Property ("image")]
+		public Gdk.Pixbuf Image {
+			get {
+				return image;
+			}
+			set {
+				image = value;
+				Pixbuf = GetResized (image);
+			}
+		}
+		
+		[GLib.Property ("image-expander-open")]
+		public Gdk.Pixbuf ImageExpanderOpen {
+			get {
+				return imageOpen;
+			}
+			set {
+				imageOpen = value;
+				PixbufExpanderOpen = GetResized (imageOpen);
+			}
+		}
+		
+		[GLib.Property ("image-expander-closed")]
+		public Gdk.Pixbuf ImageExpanderClosed {
+			get {
+				return imageClosed;
+			}
+			set {
+				imageClosed = value;
+				PixbufExpanderClosed = GetResized (imageClosed);
+			}
+		}
+		
+		Gdk.Pixbuf GetResized (Gdk.Pixbuf value)
+		{
+			if (zoom == 1)
+				return value;
+			
+			Gdk.Pixbuf resized;
+			if (resizedCache.TryGetValue (value, out resized))
+				return resized;
+			
+			int w = (int) (zoom * (double) value.Width);
+			int h = (int) (zoom * (double) value.Height);
+			if (w == 0) w = 1;
+			if (h == 0) h = 1;
+			resized = value.ScaleSimple (w, h, Gdk.InterpType.Hyper);
+			resizedCache [value] = resized;
+			return resized;
 		}
 	}
 }

@@ -1,3 +1,187 @@
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.XmlEditor/XmlEditorService.cs: Clean up dialog
+	  placement.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.XmlEditor.Gui/BaseXmlEditorExtension.cs: Fix
+	  failing test by making sure that OnParsedDocumentUpdated is
+	  called when the file is first loaded, and moving all the new
+	  parsed document logic handling there.
+
+2010-05-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Xml.Formatting/XmlFormattingPolicyPanelWidget.cs:
+	  Fix translation error.
+
+2010-05-11  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.XmlEditor/XmlTextEditorExtension.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlTagCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/IXmlCompletionProvider.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlSchemaCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/EmptyXmlCompletionProvider.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlCompletionDataCollection.cs:
+	* MonoDevelop.XmlEditor.Completion/InferredXmlCompletionProvider.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlMultipleClosingTagCompletionData.cs:
+	  Track API changes.
+
+2010-05-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.Xml.Formatting/MonoXmlPolicy.xml: Added
+	  attribute to explicitly allow differential serialization for
+	  a policy (which is disabled by default).
+
+2010-04-30  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.XmlEditor.Gui/XmlEditorOptionsPanel.cs:
+	* MonoDevelop.XmlEditor.Gui/XmlEditorOptionsPanelWidget.cs:
+	* gtk-gui/MonoDevelop.XmlEditor.Gui.XmlEditorOptionsPanelWidget.cs:
+	  Added GUI for the 'auto insert punctuation' option.
+
+	* Makefile.am:
+	* MonoDevelop.XmlEditor.csproj:
+	* MonoDevelop.XmlEditor/XmlEditorOptions.cs:
+	* MonoDevelop.XmlEditor/XmlEditorAddInOptions.cs: Renamed
+	  file.
+
+	* MonoDevelop.Xml.Formatting/XmlFormatterWriter.cs: Spelling.
+
+	* MonoDevelop.XmlEditor.addin.xml: Move panel from Style
+	  section to Behavior.
+
+2010-04-30  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.XmlEditor.Gui/BaseXmlEditorExtension.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlCompletionData.cs: Add
+	  settings to stop inserting snippets like ="" and />.
+
+	* MonoDevelop.XmlEditor/XmlSchemaManager.cs:
+	* MonoDevelop.XmlEditor/XmlFileExtensions.cs:
+	* MonoDevelop.XmlEditor.Gui/XmlSchemasPanel.cs:
+	* MonoDevelop.XmlEditor/XmlEditorAddInOptions.cs:
+	* MonoDevelop.XmlEditor/XmlTextEditorExtension.cs:
+	* MonoDevelop.XmlEditor.Gui/XmlEditorOptionsPanel.cs:
+	  Reorganized the XML editor settings.
+
+2010-04-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.XmlEditor.Completion/XmlCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlTagCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlMultipleClosingTagCompletionData.cs:
+	  Track API changes.
+
+2010-04-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.XmlEditor.Gui/BaseXmlEditorExtension.cs: Free up
+	  wasted space between scrollbars and treeview contents.
+
+2010-04-13  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.XmlEditor/XmlFormatter.cs:
+	* MonoDevelop.Xml.Formatting/XmlFormatter.cs:
+	* MonoDevelop.XmlEditor.Gui/BaseXmlEditorExtension.cs: Track
+	  API changes.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.XmlEditor.addin.xml: Bumped MD version.
+
+2010-03-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.XmlEditor.csproj:
+	* MonoDevelop.XmlEditor.addin.xml:
+	* MonoDevelop.XmlEditor/XmlEditorService.cs:
+	* MonoDevelop.Xml.Formatting/XmlFormatter.cs:
+	* MonoDevelop.Xml.Formatting/MonoXmlPolicy.xml:
+	* MonoDevelop.Xml.Formatting/XmlFormatterWriter.cs:
+	* MonoDevelop.Xml.Formatting/XmlFormattingPolicy.cs:
+	* MonoDevelop.Xml.Formatting/XmlFormattingPolicyPanel.cs:
+	* MonoDevelop.Xml.Formatting/XmlFormattingPolicyPanelWidget.cs:
+	* gtk-gui/MonoDevelop.Xml.Formatting.XmlFormattingPolicyPanelWidget.cs:
+	  New xml formatting policy.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.XmlEditor.csproj:
+	* MonoDevelop.XmlEditor.addin.xml:
+	* MonoDevelop.XmlEditor/Commands.cs:
+	* MonoDevelop.XmlEditor/XmlFormatter.cs:
+	* MonoDevelop.XmlEditor/XmlEditorView.cs:
+	* MonoDevelop.XmlEditor/XmlEditorService.cs:
+	* MonoDevelop.Xml.Formatting/XmlFormatter.cs:
+	* MonoDevelop.XmlEditor.Gui/XmlSchemasPanel.cs:
+	* MonoDevelop.XmlEditor/XmlEditorCommandBase.cs:
+	* MonoDevelop.XmlEditor/XmlEditorViewContent.cs:
+	* MonoDevelop.XmlEditor/OpenStylesheetCommand.cs:
+	* MonoDevelop.XmlEditor/XmlTextEditorExtension.cs:
+	* MonoDevelop.XmlEditor.XPath/XPathQueryWidget.cs:
+	* MonoDevelop.XmlEditor/XmlCompletionListWindow.cs:
+	* MonoDevelop.XmlEditor.Gui/XmlSchemasPanelWidget.cs:
+	* MonoDevelop.XmlEditor.Gui/XmlEditorOptionsPanel.cs:
+	* MonoDevelop.XmlEditor.Gui/BaseXmlEditorExtension.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlTagCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/IXmlCompletionProvider.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlSchemaCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/EmptyXmlCompletionProvider.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlCompletionDataCollection.cs:
+	* MonoDevelop.XmlEditor.Completion/InferredXmlCompletionProvider.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlSchemaCompletionDataCollection.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlMultipleClosingTagCompletionData.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-05  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.XmlEditor.csproj: Don't local-copy project refs,
+	  as it duplicates assemblies and breaks running on .NET.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.XmlEditor.Completion/XmlCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlTagCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlMultipleClosingTagCompletionData.cs:
+	  Track api changes.
+
+2010-02-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.XmlEditor/XmlTextEditorExtension.cs:
+	* MonoDevelop.XmlEditor.Gui/BaseXmlEditorExtension.cs: File
+	  extensions are now declared in the node metadata.
+
+2010-02-04  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.XmlEditor.csproj: Add missing indirect
+	  reference.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.XmlEditor.Gui.XmlSchemasPanelWidget.cs:
+	* gtk-gui/MonoDevelop.XmlEditor.Gui.XmlEditorOptionsPanelWidget.cs:
+	  Flush.
+
+2010-01-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.XmlEditor.Completion/XmlCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlTagCompletionData.cs:
+	* MonoDevelop.XmlEditor.Completion/XmlMultipleClosingTagCompletionData.cs:
+	  Track API changes.
+
+2010-01-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.XmlEditor/XmlFormatter.cs: Track api changes.
+
 2009-10-30  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* AssemblyInfo.cs:

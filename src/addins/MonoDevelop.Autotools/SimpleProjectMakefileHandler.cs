@@ -156,7 +156,7 @@ namespace MonoDevelop.Autotools
 				string pfpath = null;
 				foreach (ProjectFile projectFile in project.Files) 
 				{
-					pfpath = FileService.NormalizeRelativePath (projectFile.RelativePath);
+					pfpath = FileService.NormalizeRelativePath (projectFile.FilePath.ToRelative (project.BaseDirectory));
 					switch ( projectFile.BuildAction )
 					{
 						case BuildAction.Compile:
@@ -358,7 +358,7 @@ namespace MonoDevelop.Autotools
 
 
 				foreach (string ef in extraFiles)
-					extras.AppendFormat ("\\\n\t{0} ", MakefileData.ToMakefilePath (ef));
+					extras.AppendFormat ("\\\n\t{0} ", ef);
 
 				Dictionary<string, DeployFileData> commonDeployVars = new Dictionary<string, DeployFileData> (allDeployVars);
 				foreach (ConfigSection configSection in configSections) {

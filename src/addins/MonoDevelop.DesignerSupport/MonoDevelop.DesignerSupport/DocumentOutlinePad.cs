@@ -29,6 +29,7 @@
 using System;
 
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.DesignerSupport
 {
@@ -114,6 +115,7 @@ namespace MonoDevelop.DesignerSupport
 		
 		void ReleaseDoc ()
 		{
+			RemoveBoxChild ();
 			if (currentOutlineDoc != null)
 				currentOutlineDoc.ReleaseOutlineWidget ();
 			currentOutlineDoc = null;
@@ -129,12 +131,17 @@ namespace MonoDevelop.DesignerSupport
 		
 		void SetWidget (Gtk.Widget widget)
 		{
-			Gtk.Widget c = box.Child;
-			if (c != null)
-				box.Remove (c);
+			RemoveBoxChild ();
 			box.Add (widget);
 			widget.Show ();
 			box.Show ();
+		}
+		
+		void RemoveBoxChild ()
+		{
+			Gtk.Widget curChild = box.Child;
+			if (curChild != null)
+				box.Remove (curChild);
 		}
 		
 		private class WrappedCentreLabel : Gtk.Widget

@@ -29,40 +29,33 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components;
 using Mono.Debugging.Client;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
+using MonoDevelop.Components.Docking;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Debugger
 {
 	public class ImmediatePad: IPadContent
 	{
 		ConsoleView view;
-		Gtk.HBox box;
 		
-		public ImmediatePad ()
+		public void Initialize (IPadWindow container)
 		{
-			box = new Gtk.HBox ();
-			
 			view = new ConsoleView ();
 			view.ConsoleInput += OnViewConsoleInput;
 			Pango.FontDescription font = Pango.FontDescription.FromString (DesktopService.DefaultMonospaceFont);
 			font.Size = (font.Size * 8) / 10;
 			view.SetFont (font);
 			view.ShadowType = Gtk.ShadowType.None;
-			box.PackStart (view, true, true, 0);
+			view.ShowAll ();
 			
-			Gtk.Toolbar toolbar = new Gtk.Toolbar ();
-			toolbar.Orientation = Gtk.Orientation.Vertical;
-			toolbar.IconSize = Gtk.IconSize.Menu;
-			toolbar.ToolbarStyle = Gtk.ToolbarStyle.Icons;
-			Gtk.ToolButton buttonClear = new Gtk.ToolButton ("gtk-clear");
+			DockItemToolbar toolbar = container.GetToolbar (Gtk.PositionType.Right);
+			DockToolButton buttonClear = new DockToolButton ("gtk-clear");
 			buttonClear.Clicked += ButtonClearClicked;
 			buttonClear.TooltipText = GettextCatalog.GetString ("Clear");
-			toolbar.Insert (buttonClear, -1);
-			box.PackStart (toolbar, false, false, 0);
-			
-			box.ShowAll ();
+			toolbar.Add (buttonClear);
+			toolbar.ShowAll ();
 		}
-
+		
 		void ButtonClearClicked (object sender, EventArgs e)
 		{
 			view.Clear ();
@@ -79,6 +72,14 @@ namespace MonoDevelop.Debugger
 				ops.AllowMethodEvaluation = true;
 				ops.AllowTargetInvoke = true;
 				ops.EvaluationTimeout = 20000;
+				var ff = DebuggingService.CurrentFrame;
+				string tt = e.Text;
+				ValidationResult vres = ff.ValidateExpression (tt, ops);
+				if (!vres) {
+					view.WriteOutput (vres.Message);
+					view.Prompt (true);
+					return;
+				}
 				ObjectValue val = DebuggingService.CurrentFrame.GetExpressionValue (e.Text, ops);
 				if (val.IsEvaluating) {
 					WaitForCompleted (val);
@@ -93,7 +94,9 @@ namespace MonoDevelop.Debugger
 		{
 			string result = val.Value;
 			if (string.IsNullOrEmpty (result)) {
-				if (val.IsError || val.IsUnknown)
+				if (val.IsNotSupported)
+					result = GettextCatalog.GetString ("Expression not supported.");
+				else if (val.IsError || val.IsUnknown)
 					result = GettextCatalog.GetString ("Evaluation failed.");
 				else
 					result = string.Empty;
@@ -126,17 +129,13 @@ namespace MonoDevelop.Debugger
 			});
 		}
 
-		public void Initialize (IPadWindow container)
-		{
-		}
-		
 		public void RedrawContent ()
 		{
 		}
 		
 		public Gtk.Widget Control {
 			get {
-				return box;
+				return view;
 			}
 		}
 		

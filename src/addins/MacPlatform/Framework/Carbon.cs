@@ -27,6 +27,8 @@
 
 using System;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace OSXIntegration.Framework
 {
@@ -35,7 +37,7 @@ namespace OSXIntegration.Framework
 	
 	internal static class Carbon
 	{
-		const string CarbonLib = "/System/Library/Frameworks/Carbon.framework/Versions/Current/Carbon";
+		public const string CarbonLib = "/System/Library/Frameworks/Carbon.framework/Versions/Current/Carbon";
 		
 		[DllImport (CarbonLib)]
 		public static extern IntPtr GetApplicationEventTarget ();
@@ -151,55 +153,6 @@ namespace OSXIntegration.Framework
 		
 		#endregion
 		
-		#region AEList manipulation
-		
-		[DllImport (CarbonLib)]
-		static extern int AECountItems (ref AEDesc descList, out int count); //return an OSErr
-		
-		public static int AECountItems (ref AEDesc descList)
-		{
-			int count;
-			CheckReturn (AECountItems (ref descList, out count));
-			return count;
-		}
-		
-		[DllImport (CarbonLib)]
-		static extern AEDescStatus AEGetNthPtr (ref AEDesc descList, int index, CarbonEventParameterType desiredType, uint keyword,
-		                                        out CarbonEventParameterType actualType, IntPtr buffer, int bufferSize, out int actualSize);
-		
-		[DllImport (CarbonLib)]
-		static extern AEDescStatus AEGetNthPtr (ref AEDesc descList, int index, CarbonEventParameterType desiredType, uint keyword,
-		                                        uint zero, IntPtr buffer, int bufferSize, int zero2);
-		
-		public static T AEGetNthPtr<T> (ref AEDesc descList, int index, CarbonEventParameterType desiredType) where T : struct
-		{
-			int len = Marshal.SizeOf (typeof (T));
-			IntPtr bufferPtr = Marshal.AllocHGlobal (len);
-			CheckReturn ((int)AEGetNthPtr (ref descList, index, desiredType, 0, 0, bufferPtr, len, 0));
-			T val = (T)Marshal.PtrToStructure (bufferPtr, typeof (T));
-			Marshal.FreeHGlobal (bufferPtr);
-			return val;
-		}
-		
-		[DllImport (CarbonLib)]
-		static extern AEDescStatus AEGetNthPtr (ref AEDesc descList, int index, CarbonEventParameterType desiredType, uint keyword,
-		                                        uint zero, out IntPtr outPtr, int bufferSize, int zero2);
-		
-		public static IntPtr AEGetNthPtr (ref AEDesc descList, int index, CarbonEventParameterType desiredType)
-		{
-			IntPtr ret;
-			CheckReturn ((int)AEGetNthPtr (ref descList, index, desiredType, 0, 0, out ret, 4, 0));
-			return ret;
-		}
-		
-		[DllImport (CarbonLib)]
-		public static extern int AEDisposeDesc (ref AEDesc desc);
-		
-		[DllImport (CarbonLib)]
-		public static extern AEDescStatus AESizeOfNthItem  (ref AEDesc descList, int index, ref CarbonEventParameterType type, out int size);
-		
-		#endregion
-		
 		[DllImport (CarbonLib)]
 		static extern int FSRefMakePath (ref FSRef fsRef, IntPtr buffer, uint bufferSize);
 		
@@ -232,17 +185,24 @@ namespace OSXIntegration.Framework
 		
 		public static void CheckReturn (int osErr)
 		{
-			if (osErr != 0)
-				throw new SystemException ("Unexpected OS error code " + osErr + "");
+			if (osErr != 0) {
+				string s = GetMacOSStatusCommentString (osErr);
+				throw new SystemException ("Unexpected OS error code " + osErr + ": " + s);
+			}
 		}
+		
+		[DllImport (CarbonLib)]
+		static extern string GetMacOSStatusCommentString (int osErr);
 		
 		#endregion
 		
 		#region Char code conversion
 		
-		internal static int ConvertCharCode (string code)
+		internal static int ConvertCharCode (string fourcc)
 		{
-			return (code[3]) | (code[2] << 8) | (code[1] << 16) | (code[0] << 24);
+			Debug.Assert (fourcc != null);
+			Debug.Assert (fourcc.Length == 4);
+			return (fourcc[3]) | (fourcc[2] << 8) | (fourcc[1] << 16) | (fourcc[0] << 24);
 		}
 		
 		internal static string UnConvertCharCode (int i)
@@ -258,32 +218,6 @@ namespace OSXIntegration.Framework
 		#endregion
 		
 		#region Navigation services
-		
-		[DllImport (CarbonLib)]
-		static extern NavStatus NavGetDefaultDialogCreationOptions (out NavDialogCreationOptions options);
-		
-		public static NavDialogCreationOptions NavGetDefaultDialogCreationOptions ()
-		{
-			NavDialogCreationOptions options;
-			CheckReturn ((int)NavGetDefaultDialogCreationOptions (out options));
-			return options;
-		}
-		
-		[DllImport (CarbonLib)]
-		static extern NavStatus NavCreateChooseFileDialog (ref NavDialogCreationOptions options, IntPtr inTypeList, 
-		                                                   NavEventUPP inEventProc, NavPreviewUPP inPreviewProc, 
-		                                                   NavObjectFilterUPP inFilterProc, ref IntPtr inClientData, out IntPtr navDialogRef);
-		//intTypeList is a NavTypeListHandle, which apparently is a pointer to  NavTypeListPtr, which is a pointer to a NavTypeList
-
-		
-		[DllImport (CarbonLib)]
-		static extern NavStatus NavDialogRun (IntPtr navDialogRef);
-		
-		[DllImport (CarbonLib)]
-		static extern NavStatus NavDialogGetReply (IntPtr navDialogRef, out NavReplyRecord outReply );
-		
-		[DllImport (CarbonLib)]
-		static extern void NavDialogDispose (IntPtr navDialogRef);
 		
 		[DllImport (CarbonLib)]
 		static extern NavStatus NavDialogSetFilterTypeIdentifiers (IntPtr getFileDialogRef, IntPtr typeIdentifiersCFArray);
@@ -338,17 +272,40 @@ namespace OSXIntegration.Framework
 		}
 		
 		#endregion
-	}
-	
-	struct NavEventUPP { IntPtr ptr; }
-	struct NavObjectFilterUPP { IntPtr ptr; }
-	struct NavPreviewUPP { IntPtr ptr; }
-	
-	[StructLayout(LayoutKind.Sequential, Pack = 2)]
-	struct AEDesc
-	{
-		uint descriptorType;
-		IntPtr dataHandle;
+		
+		public static Dictionary<string,int> GetFileListFromEventRef (IntPtr eventRef)
+		{
+			AEDesc list = GetEventParameter<AEDesc> (eventRef, CarbonEventParameterName.DirectObject, CarbonEventParameterType.AEList);
+			try {
+				int line = 0;
+				try {
+					SelectionRange range = GetEventParameter<SelectionRange> (eventRef, CarbonEventParameterName.AEPosition, CarbonEventParameterType.Char);
+					line = range.lineNum+1;
+				} catch {
+				}
+				
+				var arr = AppleEvent.GetListFromAEDesc<string,FSRef> (ref list, (ref FSRef t) => FSRefToPath (ref t),
+				                                                      (OSType)(int)CarbonEventParameterType.FSRef);
+				var files = new Dictionary<string,int> ();
+				foreach (var s in arr) {
+					if (!string.IsNullOrEmpty (s))
+						files[s] = line;
+				}
+				return files;
+			} finally {
+				CheckReturn ((int)AppleEvent.AEDisposeDesc (ref list));
+			}
+		}
+		
+		public static IList<string> GetUrlListFromEventRef (IntPtr eventRef)
+		{
+			AEDesc list = GetEventParameter<AEDesc> (eventRef, CarbonEventParameterName.DirectObject, CarbonEventParameterType.AEList);
+			try {
+				return AppleEvent.GetUtf8StringListFromAEDesc (ref list, true);
+			} finally {
+				Carbon.CheckReturn ((int)AppleEvent.AEDisposeDesc (ref list));
+			}
+		}
 	}
 	
 	[StructLayout(LayoutKind.Sequential, Pack = 2, Size = 80)]
@@ -358,15 +315,28 @@ namespace OSXIntegration.Framework
 		private byte hidden;
 	}
 	
+	[StructLayout(LayoutKind.Sequential)]
+	struct SelectionRange
+	{
+		public short unused1; // 0 (not used)
+		public short lineNum; // line to select (<0 to specify range)
+		public int startRange; // start of selection range (if line < 0)
+		public int endRange; // end of selection range (if line < 0)
+		public int unused2; // 0 (not used)
+		public int theDate; // modification date/time
+	}
+	
 	internal enum CarbonEventHandlerStatus //this is an OSStatus
 	{
 		Handled = 0,
 		NotHandled = -9874,
+		UserCancelled = -128,
 	}
 	
 	internal enum CarbonEventParameterName : uint
 	{
 		DirectObject = 757935405, // '----'
+		AEPosition = 1802530675, // 'kpos'
 	}
 	
 	internal enum CarbonEventParameterType : uint
@@ -402,6 +372,7 @@ namespace OSXIntegration.Framework
 		Accessibility = 1633903461, // 'acce'
 		HIObject = 1751740258, // 'hiob'
 		AppleEvent = 1634039412, // 'aevt'
+		Internet = 1196773964, // 'GURL'
 	}
 	
 	public enum CarbonCommandID : uint
@@ -561,17 +532,6 @@ namespace OSXIntegration.Framework
 		EventHotKeyInvalidErr = -9879,
 	}
 	
-	enum AEDescStatus
-	{
-		Ok = 0,
-		MemoryFull = -108,
-		CoercionFail = -1700,
-		DescRecordNotFound = -1701,
-		WrongDataType = -1703,
-		NotAEDesc = -1704,
-		ReplyNotArrived = -1718,
-	}
-	
 	[StructLayout(LayoutKind.Explicit)]
 	struct CarbonHICommand //technically HICommandExtended, but they're compatible
 	{
@@ -640,254 +600,7 @@ namespace OSXIntegration.Framework
 		FromControl = 1 << 1,
 		FromWindow  = 1 << 2,
 	}
-	
-	//[StructLayout(LayoutKind.Sequential, Pack = 2, Size = 66)]
-	struct NavDialogCreationOptions
-	{
-		ushort version;
-		NavDialogOptionFlags optionFlags;
-		Point location;
-		IntPtr clientName; //CFStringRef
-		IntPtr windowTitle; //CFStringRef
-		IntPtr actionButtonLabel; // CFStringRef
-		IntPtr cancelButtonLabel; // CFStringRef
-		IntPtr saveFileName; // CFStringRef
-		IntPtr message; // CFStringRef
-		uint preferenceKey;
-		IntPtr popupExtension; //CFArrayRef
-		WindowModality modality;
-		IntPtr parentWindow; //WindowRef
-		char reserved; //char[16]
-		
-		public NavDialogOptionFlags OptionFlags {
-			get { return optionFlags; }
-			set { optionFlags = value; }
-		}
-		
-		public Point Location {
-			get { return location; }
-			set { location = value; }
-		}
-		
-		public IntPtr ClientName {
-			get { return clientName; }
-			set { clientName = value; }
-		}
-		
-		public IntPtr WindowTitle {
-			get { return windowTitle; }
-			set { windowTitle = value; }
-		}
-		
-		public IntPtr ActionButtonLabel {
-			get { return actionButtonLabel; }
-			set { actionButtonLabel = value; }
-		}
-		
-		public IntPtr CancelButtonLabel {
-			get { return cancelButtonLabel; }
-			set { cancelButtonLabel = value; }
-		}
-		
-		public IntPtr SaveFileName {
-			get { return saveFileName; }
-			set { saveFileName = value; }
-		}
-		
-		public IntPtr Message {
-			get { return message; }
-			set { message = value; }
-		}
-		
-		public uint PreferenceKey {
-			get { return preferenceKey; }
-			set { preferenceKey = value; }
-		}
-		
-		public WindowModality Modality {
-			get { return modality; }
-			set { modality = value; }
-		}
-		
-		public IntPtr ParentWindow {
-			get { return parentWindow; }
-			set { parentWindow = value; }
-		}
-	}
-	
-	[Flags]
-	enum NavDialogOptionFlags : uint
-	{
-		Default = DontAddTranslateItems & AllowStationery & AllowPreviews & AllowMultipleFiles,
-		NoTypePopup = 1,
-		DontAutoTranslate = 1 << 1,
-		DontAddTranslateItems = 1 << 2,
-		AllFilesInPopup = 1 << 4,
-		AllowStationery = 1 << 5,
-		AllowPreviews = 1 << 6,
-		AllowMultipleFiles = 1 << 7,
-		AllowInvisibleFiles = 1 << 8,
-		DontResolveAliases = 1 << 9,
- 		SelectDefaultLocation = 1 << 10,
-		SelectAllReadableItem = 1 << 11,
-		SupportPackages = 1 << 12,
-		AllowOpenPackages = 1 << 13,
-		DontAddRecents = 1 << 14,
-		DontUseCustomFrame = 1 << 15,
-		DontConfirmReplacement = 1 << 16,
-		PreserveSaveFileExtension = 1 << 17
-	}
-	
-	[StructLayout(LayoutKind.Sequential, Pack = 2)]
-	struct Point
-	{
-		short v;
-		short h;
-		
-		public Point (short v, short h)
-		{
-			this.v = v;
-			this.h = h;
-		}
-		
-		public short V { get { return v; } }
-		public short H { get { return h; } }
-	}
-	
-	[StructLayout(LayoutKind.Sequential, Pack = 2)]
-	struct Rect
-	{
-		short top;
-		short left;
-		short bottom;
-		short right;
-		
-		public short Top { get { return top; } }
-		public short Left { get { return left; } }
-		public short Bottom { get { return bottom; } }
-		public short Right { get { return right; } }
-	}
-	
-	enum WindowModality : uint
-	{
-		None = 0,
-		SystemModal = 1,
-		AppModal = 2,
-		WindowModal = 3,
-	}
-	
-	enum WindowPositionMethod : uint
-	{
-		CenterOnMainScreen = 1,
-		CenterOnParentWindow = 2,
-		CenterOnParentWindowScreen = 3,
-		CascadeOnMainScreen = 4,
-		CascadeOnParentWindow = 5,
-		CascadeOnParentWindowScreen = 6,
-		CascadeStartAtParentWindowScreen = 10,
-		AlertPositionOnMainScreen = 7,
-		AlertPositionOnParentWindow = 8,
-		AlertPositionOnParentWindowScreen = 9,
-	}
-	
-	enum NavStatus : int
-	{
-		Ok = 0,
-		WrongDialogStateErr = -5694,
-		WrongDialogClassErr = -5695,
-		InvalidSystemConfigErr = -5696,
-		CustomControlMessageFailedErr = -5697,
-		InvalidCustomControlMessageErr = -5698,
-		MissingKindStringErr = -5699,
-	}
-	
-	enum NavEventCallbackMessage : int
-	{
-		Event = 0,
-		Customize = 1,
-		Start = 2,
-		Terminate = 3,
-		AdjustRect = 4,
-		NewLocation = 5,
-		ShowDesktop = 6,
-		SelectEntry = 7,
-		PopupMenuSelect = 8,
-		Accept = 9,
-		Cancel = 10,
-		AdjustPreview = 11,
-		UserAction = 12,
-		OpenSelection = -2147483648, // unchecked 0x80000000
-	}
-	
-	[StructLayout(LayoutKind.Sequential, Pack = 2, Size=254)]
-	struct NavCBRec
-	{
-		ushort version;
-		IntPtr context; // NavDialogRef
-		IntPtr window; // WindowRef
-		Rect customRect;
-		Rect previewRect;
-		NavEventData eventData;
-		NavUserAction userAction;
-		char reserved; //[218];
-	}
-	
-	[StructLayout(LayoutKind.Sequential, Pack = 2)]
-	struct NavEventData
-	{
-		IntPtr eventDataParms; // NavEventDataInfo union, usually a pointer to either a EventRecord or an AEDescList
-		short itemHit;
-	}
-	
-	enum NavUserAction : uint
-	{
-		None = 0,
-		Cancel = 1,
-		Open = 2,
-		SaveAs = 3,
-		Choose = 4,
-		NewFolder = 5,
-		SaveChanges = 6,
-		DontSaveChanges = 7,
-		DiscardChanges = 8,
-		ReviewDocuments = 9,
-		DiscardDocuments = 10
-	}
-	
-	enum NavFilterModes : short
-	{
-		BrowserList = 0,
-		Favorites = 1,
-		Recents = 2,
-		ShortCutVolumes = 3,
-		LocationPopup = 4
-	}
-	
-	[StructLayout(LayoutKind.Sequential, Pack = 2, Size=255)]
-	struct NavReplyRecord
-	{
-		ushort version;
-		[MarshalAs(UnmanagedType.U1)]
-		bool validRecord;
-		[MarshalAs(UnmanagedType.U1)]
-		bool replacing;
-		[MarshalAs(UnmanagedType.U1)]
-		bool isStationery;
-		[MarshalAs(UnmanagedType.U1)]
-		bool translationNeeded;
-		AEDesc selection; //actually an AEDescList
-		short keyScript;
-		//fileTranslation is a FileTranslationSpecArrayHandle, which apparently is a pointer to a FileTranslationSpecArrayPtr,
-		//which is a pointer to a FileTranslationSpec
-		IntPtr fileTranslation;
-		uint reserved1;
-		IntPtr saveFileName; //CFStringRef
-		[MarshalAs(UnmanagedType.U1)]
-		bool saveFileExtensionHidden;
-		byte reserved2;
-		char reserved; //size [225];
-	}
-	
+
 	[StructLayout(LayoutKind.Sequential, Pack = 2)]
 	struct FileTranslationSpec
 	{
@@ -906,5 +619,38 @@ namespace OSXIntegration.Framework
 		uint catInfoType; // OSType
 		uint catInfoCreator; // OSType
 		*/
+	}
+	
+	struct OSType {
+		int value;
+		
+		public int Value {
+			get { return Value; }
+		}
+		
+		public OSType (int value)
+		{
+			this.value = value;
+		}
+		
+		public OSType (string fourcc)
+		{
+			value = Carbon.ConvertCharCode (fourcc);
+		}
+		
+		public static explicit operator OSType (string fourcc)
+		{
+			return new OSType (fourcc); 
+		}
+		
+		public static implicit operator int (OSType o)
+		{
+			return o.value;
+		}
+		
+		public static implicit operator OSType (int i)
+		{
+			return new OSType (i);
+		}
 	}
 }

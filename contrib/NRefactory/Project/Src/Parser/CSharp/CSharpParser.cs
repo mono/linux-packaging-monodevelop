@@ -465,6 +465,8 @@ namespace ICSharpCode.NRefactory.Parser.CSharp
 			Token pt = la;
 			bool result = IsTypeNameOrKWForTypeCast (ref pt) && IsIdentifierToken (pt);
 			if (Peek (1).kind == Tokens.Question) {
+				if (Peek (2).kind == Tokens.OpenSquareBracket) // array case: T?[,]
+					return true;
 				result &= Peek (2).kind == Tokens.Identifier;
 				result &= Peek (3).kind == Tokens.Semicolon || Peek (3).kind == Tokens.Comma || Peek (3).kind == Tokens.Assign;
 			}
@@ -621,6 +623,8 @@ namespace ICSharpCode.NRefactory.Parser.CSharp
 		internal static string GetReflectionNameForOperator(OverloadableOperatorType op)
 		{
 			switch (op) {
+				case OverloadableOperatorType.None:
+					return "op_unknown";
 				case OverloadableOperatorType.Add:
 					return "op_Addition";
 				case OverloadableOperatorType.BitNot:
@@ -679,7 +683,7 @@ namespace ICSharpCode.NRefactory.Parser.CSharp
 				case OverloadableOperatorType.UnaryPlus:
 					return "op_UnaryPlus";
 				default:
-					throw new NotSupportedException();
+					throw new NotSupportedException("opeartor type:" + op);
 			}
 		}
 	}

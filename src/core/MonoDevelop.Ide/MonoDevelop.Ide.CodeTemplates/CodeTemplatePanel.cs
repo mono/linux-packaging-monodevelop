@@ -29,8 +29,7 @@ using System.Collections.Generic;
 using Gtk;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
+using MonoDevelop.Ide.Gui.Dialogs;
 
 namespace MonoDevelop.Ide.CodeTemplates
 {
@@ -126,10 +125,8 @@ namespace MonoDevelop.Ide.CodeTemplates
 			if (template != null) {
 				templatesToSave.Add (template);
 				var editDialog = new EditTemplateDialog (template, false);
-				editDialog.TransientFor = this.Toplevel as Gtk.Window;
-				if (ResponseType.Ok == (ResponseType)editDialog.Run ())
+				if (MessageService.ShowCustomDialog (editDialog, this.Toplevel as Gtk.Window) == (int)ResponseType.Ok)
 					templatesToSave.Add (template);
-				editDialog.Destroy ();
 			}
 		}
 		
@@ -143,17 +140,13 @@ namespace MonoDevelop.Ide.CodeTemplates
 
 		void ButtonAddClicked (object sender, EventArgs e)
 		{
-			CodeTemplate newTemplate = new CodeTemplate ();
-			EditTemplateDialog editDialog = new EditTemplateDialog (newTemplate, true);
-			
-			editDialog.Parent = parent;
-			editDialog.TransientFor = this.Toplevel as Gtk.Window;
-			if (ResponseType.Ok == (ResponseType)editDialog.Run ()) {
+			var newTemplate = new CodeTemplate ();
+			var editDialog = new EditTemplateDialog (newTemplate, true);
+			if (MessageService.ShowCustomDialog (editDialog, this.Toplevel as Gtk.Window) == (int)ResponseType.Ok) {
 				InsertTemplate (newTemplate);
 				templates.Add (newTemplate);
 				templatesToSave.Add (newTemplate);
 			}
-			editDialog.Destroy ();
 		}
 		
 		public void Store ()
@@ -168,7 +161,7 @@ namespace MonoDevelop.Ide.CodeTemplates
 			CodeTemplate template = (CodeTemplate)templateStore.GetValue (iter, 0);
 			
 			if (template == null) {
-				pixbufCellRenderer.Pixbuf = ImageService.GetPixbuf (treeviewCodeTemplates.GetRowExpanded (templateStore.GetPath (iter)) ? MonoDevelop.Core.Gui.Stock.OpenFolder : MonoDevelop.Core.Gui.Stock.ClosedFolder, IconSize.Menu);
+				pixbufCellRenderer.Pixbuf = ImageService.GetPixbuf (treeviewCodeTemplates.GetRowExpanded (templateStore.GetPath (iter)) ? MonoDevelop.Ide.Gui.Stock.OpenFolder : MonoDevelop.Ide.Gui.Stock.ClosedFolder, IconSize.Menu);
 			} else {
 				pixbufCellRenderer.Pixbuf = ImageService.GetPixbuf ("md-template", IconSize.Menu);
 			}

@@ -63,9 +63,8 @@ namespace MonoDevelop.Refactoring.ConvertPropery
 			base.Run (options);
 			
 			TextEditorData data = options.GetTextEditorData ();
-				
-			Mono.TextEditor.TextEditor editor = MonoDevelop.Refactoring.Rename.RenameRefactoring.GetEditor (options.Document.ActiveView.Control);
-				
+			Mono.TextEditor.TextEditor editor = data.Parent;
+			
 			List<TextLink> links = new List<TextLink> ();
 			TextLink link = new TextLink ("name");
 			int referenceCount = 1;
@@ -106,7 +105,8 @@ namespace MonoDevelop.Refactoring.ConvertPropery
 			backingStoreName = GetBackingStoreName (property);
 			
 			FieldDeclaration backingStore = new FieldDeclaration (null);
-			backingStore.TypeReference = property.ReturnType.ConvertToTypeReference ();
+			
+			backingStore.TypeReference = options.Document.CompilationUnit.ShortenTypeName (property.ReturnType, property.Location).ConvertToTypeReference ();
 			backingStore.Fields.Add (new VariableDeclaration (backingStoreName));
 			DocumentLocation location = property.Location.ToDocumentLocation (data.Document);
 			location.Column = 0;

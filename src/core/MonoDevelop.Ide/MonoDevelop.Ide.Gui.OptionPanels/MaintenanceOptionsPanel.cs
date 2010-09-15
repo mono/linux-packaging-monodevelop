@@ -25,8 +25,7 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
+using MonoDevelop.Ide.Gui.Dialogs;
 using Gtk;
 
 namespace MonoDevelop.Ide.Gui.OptionPanels
@@ -54,12 +53,15 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 		{
 			this.Build ();
 			checkInstr.Active = IdeApp.Preferences.EnableInstrumentation;
+			checkAutoTest.Active = IdeApp.Preferences.EnableAutomatedTesting;
 		}
 		
 		public void ApplyChanges ()
 		{
 			if (IdeApp.Preferences.EnableInstrumentation != checkInstr.Active)
 				IdeApp.Preferences.EnableInstrumentation = checkInstr.Active;
+			if (IdeApp.Preferences.EnableAutomatedTesting != checkAutoTest.Active)
+				IdeApp.Preferences.EnableAutomatedTesting = checkAutoTest.Active;
 		}
 	}
 }

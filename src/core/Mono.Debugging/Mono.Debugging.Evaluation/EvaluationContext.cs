@@ -73,16 +73,20 @@ namespace Mono.Debugging.Evaluation
 			return clone;
 		}
 
-		public EvaluationContext Clone (EvaluationOptions withOptions)
+		public EvaluationContext WithOptions (EvaluationOptions options)
 		{
-			EvaluationContext clone = Clone ();
-			clone.options = withOptions;
-			return clone;
+			if (options == null || this.options == options)
+				return this;
+			else {
+				EvaluationContext clone = Clone ();
+				clone.options = options;
+				return clone;
+			}
 		}
 
 		public virtual void CopyFrom (EvaluationContext ctx)
 		{
-			options = ctx.options;
+			options = ctx.options.Clone ();
 			Evaluator = ctx.Evaluator;
 			Adapter = ctx.Adapter;
 		}
@@ -107,21 +111,31 @@ namespace Mono.Debugging.Evaluation
 			Connect ();
 		}
 		
-		public ObjectValue[] GetChildren (ObjectPath path, int index, int count)
+		public ObjectValue[] GetChildren (ObjectPath path, int index, int count, EvaluationOptions options)
 		{
 			throw new System.NotImplementedException();
 		}
 		
-		public EvaluationResult SetValue (ObjectPath path, string value)
+		public EvaluationResult SetValue (ObjectPath path, string value, EvaluationOptions options)
 		{
 			throw new System.NotImplementedException();
 		}
 		
 		public ObjectValue GetValue (ObjectPath path, EvaluationOptions options)
 		{
-			EvaluationContext c = ctx.Clone (options);
+			EvaluationContext c = ctx.WithOptions (options);
 			ObjectValue[] vals = c.Adapter.GetExpressionValuesAsync (c, new string[] { path.LastName });
 			return vals[0];
+		}
+		
+		public object GetRawValue (ObjectPath path, EvaluationOptions options)
+		{
+			throw new System.NotImplementedException ();
+		}
+		
+		public void SetRawValue (ObjectPath path, object value, EvaluationOptions options)
+		{
+			throw new System.NotImplementedException ();
 		}
 	}
 }

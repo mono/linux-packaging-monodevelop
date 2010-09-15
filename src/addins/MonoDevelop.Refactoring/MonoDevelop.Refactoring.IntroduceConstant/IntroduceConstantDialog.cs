@@ -30,7 +30,7 @@ using MonoDevelop.Projects.CodeGeneration;
 using MonoDevelop.Projects.Dom;
 using System.Collections.Generic;
 using MonoDevelop.Core;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Refactoring.IntroduceConstant
 {
@@ -54,7 +54,6 @@ namespace MonoDevelop.Refactoring.IntroduceConstant
 			ValidateName ();
 			
 			buttonOk.Clicked += OnOKClicked;
-			buttonCancel.Clicked += OnCancelClicked;
 			buttonPreview.Clicked += OnPreviewClicked;
 			
 			ListStore modifiers = new ListStore (typeof (string));
@@ -74,19 +73,14 @@ namespace MonoDevelop.Refactoring.IntroduceConstant
 				return true;
 			ValidationResult result = nameValidator.ValidateName (new DomField (), entry.Text);
 			if (!result.IsValid) {
-				imageWarning.IconName = Stock.DialogError;
+				imageWarning.IconName = Gtk.Stock.DialogError;
 			} else if (result.HasWarning) {
-				imageWarning.IconName = Stock.DialogWarning;
+				imageWarning.IconName = Gtk.Stock.DialogWarning;
 			} else {
-				imageWarning.IconName = Stock.Apply;
+				imageWarning.IconName = Gtk.Stock.Apply;
 			}
 			labelWarning.Text = result.Message;
 			return result.IsValid;
-		}
-		
-		void OnCancelClicked (object sender, EventArgs e)
-		{
-			this.Destroy ();
 		}
 		
 		void SetProperties ()
@@ -125,8 +119,8 @@ namespace MonoDevelop.Refactoring.IntroduceConstant
 			SetProperties ();
 			List<Change> changes = refactoring.PerformChanges (options, parameters);
 			((Widget)this).Destroy ();
-			RefactoringPreviewDialog refactoringPreviewDialog = new RefactoringPreviewDialog (options.Dom, changes);
-			refactoringPreviewDialog.Show ();
+			
+			MessageService.ShowCustomDialog (new RefactoringPreviewDialog (options.Dom, changes));
 		}
 		
 	}

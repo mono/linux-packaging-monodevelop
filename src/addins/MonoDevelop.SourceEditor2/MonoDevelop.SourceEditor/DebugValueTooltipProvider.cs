@@ -33,7 +33,7 @@ using Mono.Debugging.Client;
 using TextEditor = Mono.TextEditor.TextEditor;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Debugger;
 
 namespace MonoDevelop.SourceEditor
@@ -52,7 +52,7 @@ namespace MonoDevelop.SourceEditor
 
 		#region ITooltipProvider implementation 
 		
-		public object GetItem (Mono.TextEditor.TextEditor editor, int offset)
+		public TooltipItem GetItem (Mono.TextEditor.TextEditor editor, int offset)
 		{
 			if (offset >= editor.Document.Length)
 				return null;
@@ -66,13 +66,29 @@ namespace MonoDevelop.SourceEditor
 			
 			ExtensibleTextEditor ed = (ExtensibleTextEditor) editor;
 			
-			string expression;
-			if (ed.IsSomethingSelected && offset >= ed.SelectionRange.Offset && offset <= ed.SelectionRange.EndOffset)
+			string expression = null;
+			int startOffset = 0, length = 0;
+			if (ed.IsSomethingSelected && offset >= ed.SelectionRange.Offset && offset <= ed.SelectionRange.EndOffset) {
 				expression = ed.SelectedText;
-			else
-				expression = ed.GetExpression (offset);
+				startOffset = ed.SelectionRange.Offset;
+				length = ed.SelectionRange.Length;
+			} else {
+				ResolveResult res = ed.GetLanguageItem (offset);
+/*				if (res is MemberResolveResult) {
+					MemberResolveResult mr = (MemberResolveResult) res;
+					if (mr.ResolvedMember == null && mr.ResolvedType != null)
+						expression = mr.ResolvedType.FullName;
+				}
+				if (expression == null)*/
+				if (res != null && res.ResolvedExpression != null) {
+					expression = res.ResolvedExpression.Expression;
+					startOffset = editor.Document.LocationToOffset (res.ResolvedExpression.Region.Start.Line - 1, res.ResolvedExpression.Region.Start.Column - 1);
+					int endOffset = editor.Document.LocationToOffset (res.ResolvedExpression.Region.End.Line - 1, res.ResolvedExpression.Region.End.Column - 1);
+					length = endOffset - startOffset;
+				}
+			}
 			
-			if (expression.Length == 0)
+			if (string.IsNullOrEmpty (expression))
 				return null;
 			
 			ObjectValue val;
@@ -82,8 +98,7 @@ namespace MonoDevelop.SourceEditor
 			}
 			if (val == null || val.IsUnknown || val.IsNotSupported)
 				return null;
-			else
-				return val;
+			return new TooltipItem (val, startOffset, length);
 		}
 		
 		/*string GetExpressionBeforeOffset (TextEditor editor, int offset)
@@ -105,9 +120,9 @@ namespace MonoDevelop.SourceEditor
 			return char.IsLetterOrDigit (c) || c == '_';
 		}
 			
-		public Gtk.Window CreateTooltipWindow (Mono.TextEditor.TextEditor editor, Gdk.ModifierType modifierState, object item)
+		public Gtk.Window CreateTooltipWindow (Mono.TextEditor.TextEditor editor, int offset, Gdk.ModifierType modifierState, TooltipItem item)
 		{
-			return new DebugValueWindow (editor, DebuggingService.CurrentFrame, (ObjectValue) item);
+			return new DebugValueWindow (editor, offset, DebuggingService.CurrentFrame, (ObjectValue) item.Item, null);
 		}
 		
 		public void GetRequiredPosition (Mono.TextEditor.TextEditor editor, Gtk.Window tipWindow, out int requiredWidth, out double xalign)

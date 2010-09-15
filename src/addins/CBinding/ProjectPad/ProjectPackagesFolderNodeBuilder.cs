@@ -30,17 +30,11 @@
 //
 
 using System;
-using System.Collections;
-
-using Mono.Addins;
 
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Projects;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Ide.Gui.Pads;
-using MonoDevelop.Ide.Gui.Pads.ProjectPad;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Ide;
 
 namespace CBinding.ProjectPad
 {	
@@ -136,9 +130,7 @@ namespace CBinding.ProjectPad
 			CProject project = (CProject)CurrentNode.GetParentDataItem (
 			    typeof(CProject), false);
 			
-			EditPackagesDialog dialog = new EditPackagesDialog (project);
-			dialog.TransientFor = IdeApp.Workbench.RootWindow;
-			dialog.Run ();			
+			MessageService.ShowCustomDialog (new EditPackagesDialog (project));
 			
 			IdeApp.ProjectOperations.Save (project);
 			CurrentNode.Expanded = true;

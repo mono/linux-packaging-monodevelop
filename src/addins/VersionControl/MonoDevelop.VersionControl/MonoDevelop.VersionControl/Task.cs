@@ -1,11 +1,9 @@
 using System;
-using System.Collections;
 using System.Threading;
-
 using Gtk;
 
 using MonoDevelop.Core;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl
 {
@@ -28,12 +26,11 @@ namespace MonoDevelop.VersionControl
 		protected Task() {
 			threadnotify = new ThreadNotify(new ReadyEvent(Wakeup));
 			
-			tracker = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor("Version Control", null, true, true);
+			tracker = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor ("Version Control", "md-version-control", false, true);
 		}
 		
-		protected IProgressMonitor GetProgressMonitor ()
-		{
-			return tracker;
+		protected IProgressMonitor Monitor {
+			get { return tracker; }
 		}
 		
 		public void Start() {
@@ -47,11 +44,12 @@ namespace MonoDevelop.VersionControl
 		void BackgroundWorker() {
 			try {
 				Run();
-				tracker.ReportSuccess(GettextCatalog.GetString ("Done."));
 			} catch (DllNotFoundException e) {
 				tracker.ReportError("The operation could not be completed because a shared library is missing: " + e.Message, null);
 			} catch (Exception e) {
-				tracker.ReportError(e.Message, null);
+				string msg = GettextCatalog.GetString ("Version control operation failed: ");
+				msg += e.Message;
+				tracker.ReportError (msg, null);
 				Console.Error.WriteLine(e);
 			} finally {			
 				threadnotify.WakeupMain();

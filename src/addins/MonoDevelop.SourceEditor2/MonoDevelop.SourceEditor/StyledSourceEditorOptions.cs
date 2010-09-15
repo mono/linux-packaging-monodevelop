@@ -29,6 +29,7 @@ using System.Collections.Generic;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.Policies;
 using MonoDevelop.Ide.Gui.Content;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.SourceEditor
 {
@@ -56,7 +57,7 @@ namespace MonoDevelop.SourceEditor
 
 			if (string.IsNullOrEmpty (mimeType))
 				mimeType = "text/plain";
-			this.mimeTypes = MonoDevelop.Core.Gui.DesktopService.GetMimeTypeInheritanceChain (mimeType);
+			this.mimeTypes = DesktopService.GetMimeTypeInheritanceChain (mimeType);
 
 			if (styleParent != null)
 				policyContainer = styleParent.Policies;
@@ -156,9 +157,9 @@ namespace MonoDevelop.SourceEditor
 
 		public event EventHandler Changed {
 			add {
-				changed += value;
-				if (changed != null)
+				if (changed == null)
 					DefaultSourceEditorOptions.Instance.Changed += HandleDefaultsChanged;
+				changed += value;
 			}
 			remove {
 				changed -= value;
@@ -334,6 +335,7 @@ namespace MonoDevelop.SourceEditor
 
 		public void Dispose ()
 		{
+			mimeTypes = null;
 			if (policyContainer != null)
 				policyContainer.PolicyChanged -= HandlePolicyChanged;
 			if (changed != null) {

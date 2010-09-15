@@ -1,3 +1,232 @@
+2010-05-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/DebuggerSession.cs: Dispose
+	  asynchronously.
+
+2010-05-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/BaseBacktrace.cs:
+	* Mono.Debugging.Evaluation/ExceptionInfoSource.cs: Fix crash
+	  when getting locals which include the last thrown exception.
+
+2010-05-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* Mono.Debugging.csproj:
+	* Mono.Debugging.Client/StackFrame.cs:
+	* Mono.Debugging.Backend/IBacktrace.cs:
+	* Mono.Debugging.Client/ExceptionInfo.cs:
+	* Mono.Debugging.Evaluation/BaseBacktrace.cs:
+	* Mono.Debugging.Evaluation/ExceptionInfoSource.cs: Introduced
+	  ExceptionInfo, which provides information about a caught
+	  exception, including description and stack traces.
+
+	* Mono.Debugging.Client/RawValue.cs:
+	* Mono.Debugging.Evaluation/RemoteRawValue.cs:
+	* Mono.Debugging.Backend/IObjectValueSource.cs: Added
+	  evaluation options to raw value methods.
+
+	* Mono.Debugging.Client/ObjectValue.cs: Connect children
+	  directly added to the object value. Propagate eval options
+	  to raw value objects.
+
+2010-05-11  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/AsyncOperationManager.cs: Fixed
+	  deadlock while shuting down.
+
+2010-05-07  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/StackFrame.cs: Added HasDebugInfo
+	  argument. When set to true, the stack frame won't try to get
+	  any information from the underlaying frame.
+
+2010-05-07  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/NRefactoryEvaluator.cs: Fix
+	  support for variable definition. Implement support for
+	  pre/post increment/decrement.
+
+2010-05-07  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.csproj:
+	* Mono.Debugging.Client/StackFrame.cs:
+	* Mono.Debugging.Client/ObjectValue.cs:
+	* Mono.Debugging.Client/DebuggerSession.cs:
+	* Mono.Debugging.Evaluation/RawViewSource.cs:
+	* Mono.Debugging.Evaluation/ValueReference.cs:
+	* Mono.Debugging.Backend/IObjectValueSource.cs:
+	* Mono.Debugging.Evaluation/EvaluationContext.cs:
+	* Mono.Debugging.Evaluation/ArrayElementGroup.cs:
+	* Mono.Debugging.Evaluation/TypeValueReference.cs:
+	* Mono.Debugging.Evaluation/NullValueReference.cs:
+	* Mono.Debugging.Evaluation/BaseTypeViewSource.cs:
+	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs:
+	* Mono.Debugging.Evaluation/ExpressionEvaluator.cs:
+	* Mono.Debugging.Evaluation/NRefactoryEvaluator.cs:
+	* Mono.Debugging.Evaluation/LiteralValueReference.cs:
+	* Mono.Debugging.Evaluation/FilteredMembersSource.cs:
+	* Mono.Debugging.Evaluation/NamespaceValueReference.cs: Added
+	  an EvaluationOptions argument to all methods in
+	  IObjectValueSource. With this change options are not cached
+	  anymore in ValueReference objects. This fixes bug #602894
+	  and allows MD to change the evaluation options in the middle
+	  of a debugging session.
+
+2010-05-06  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/BaseBacktrace.cs: Use async
+	  evaluation when getting the This and Execption values.
+
+2010-04-23  Carlo Kok  <ck@remobjects.com>
+
+	* Mono.Debugging.Client/DebuggerSession.cs:
+	* Mono.Debugging.Client/IExpressionEvaluator.cs:
+	* Mono.Debugging.Evaluation/ExpressionEvaluator.cs:
+	* Mono.Debugging.Evaluation/NRefactoryEvaluator.cs:
+	  Allow for custom expression evaluators.
+	
+	
+2010-04-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* Mono.Debugging.csproj:
+	* Mono.Debugging.Client/RawValue.cs:
+	* Mono.Debugging.Client/ObjectValue.cs:
+	* Mono.Debugging.Evaluation/RawViewSource.cs:
+	* Mono.Debugging.Evaluation/ValueReference.cs:
+	* Mono.Debugging.Evaluation/RemoteRawValue.cs:
+	* Mono.Debugging.Backend/IObjectValueSource.cs:
+	* Mono.Debugging.Evaluation/EvaluationContext.cs:
+	* Mono.Debugging.Evaluation/ArrayElementGroup.cs:
+	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs:
+	* Mono.Debugging.Evaluation/BaseTypeViewSource.cs:
+	* Mono.Debugging.Evaluation/FilteredMembersSource.cs: Add
+	  support for getting raw values of members and variables.
+
+2010-04-13  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs: Fix bug
+	  #595270 - Flags enums in debugger show the zero value.
+
+2010-03-23  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/ObjectValue.cs:
+	* Mono.Debugging.Evaluation/ArrayElementGroup.cs: Child
+	  selector fixes. Fixes bug #588307 - Cannot pin an element of
+	  multidimensional array.
+
+2010-03-15  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/AsyncOperationManager.cs: Use
+	  corrent constant for infinite waits.
+
+2010-03-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/TypeValueReference.cs: Fixed type
+	  name formatting issue.
+
+	* Mono.Debugging.Evaluation/NRefactoryEvaluator.cs: Fixed
+	  parsing of generic type names.
+
+2010-03-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/TypeValueReference.cs: Set the
+	  correct type name for the type reference.
+
+	* Mono.Debugging.Evaluation/NRefactoryEvaluator.cs: Added hack
+	  which allows parsing single generic type names (that is,
+	  when the expression is a type name).
+
+2010-03-02  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs: Add a
+	  better default implementation for ForceLoadType.
+
+2010-03-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/DebuggerSession.cs: Fix null ref.
+
+	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs: Type data
+	  should not be static.
+
+	* Mono.Debugging.Evaluation/NRefactoryResolverVisitor.cs:
+	  Improved resolution of generic types.
+
+2010-03-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs:
+	* Mono.Debugging.Evaluation/NRefactoryEvaluator.cs: Add
+	  support for indexer with more than one parameter.
+
+2010-02-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/EvaluationOptions.cs: Added clone
+	  method.
+
+	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs: Fix crash
+	  when parsing enums.
+
+	* Mono.Debugging.Evaluation/RawViewSource.cs:
+	* Mono.Debugging.Evaluation/BaseTypeViewSource.cs:
+	* Mono.Debugging.Evaluation/FilteredMembersSource.cs: Reset
+	  the child selector for values which are only visual group of
+	  members.
+
+2010-02-24  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/StackFrame.cs: Add null check.
+
+2010-02-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/StackFrame.cs:
+	* Mono.Debugging.Backend/IBacktrace.cs:
+	* Mono.Debugging.Client/TargetEventArgs.cs:
+	* Mono.Debugging.Evaluation/BaseBacktrace.cs:
+	* Mono.Debugging.Client/EvaluationOptions.cs:
+	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs:
+	* Mono.Debugging.Evaluation/NRefactoryEvaluator.cs: Added
+	  method for getting the current exception when a catchpoint
+	  is hit or an exception unhandled.
+
+2010-02-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/StackFrame.cs: Fix win32 build.
+
+2010-02-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/StackFrame.cs:
+	* Mono.Debugging.Client/ObjectValue.cs:
+	* Mono.Debugging.Backend/IBacktrace.cs:
+	* Mono.Debugging.Client/DebuggerSession.cs:
+	* Mono.Debugging.Evaluation/BaseBacktrace.cs:
+	* Mono.Debugging.Evaluation/RawViewSource.cs:
+	* Mono.Debugging.Client/EvaluationOptions.cs:
+	* Mono.Debugging.Evaluation/ValueReference.cs:
+	* Mono.Debugging.Backend/IObjectValueSource.cs:
+	* Mono.Debugging.Evaluation/EvaluationContext.cs:
+	* Mono.Debugging.Evaluation/ArrayElementGroup.cs:
+	* Mono.Debugging.Evaluation/BaseTypeViewSource.cs:
+	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs:
+	* Mono.Debugging.Evaluation/ExpressionEvaluator.cs:
+	* Mono.Debugging.Evaluation/NRefactoryEvaluator.cs:
+	* Mono.Debugging.Evaluation/FilteredMembersSource.cs: Add
+	  support for evaluating expressions. Allow specifying
+	  evaluation options when setting a value. Added option for
+	  displaying integers using hex format. Added wait handle for
+	  waiting for async evaluation completion on ObjectValue.
+
+2010-02-04  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Mono.Debugging.Client/DebuggerSession.cs: Added delegate
+	  which is called when a tracepoint is hit.
+
+	* Mono.Debugging.Client/ObjectValue.cs: New ChildSelector
+	  property.
+
+	* Mono.Debugging.Evaluation/NRefactoryResolverVisitor.cs: Fix
+	  nullref.
+
 2010-02-03  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* Mono.Debugging.Client/DebuggerSession.cs:
@@ -38,6 +267,12 @@
 
 	* Mono.Debugging.Evaluation/ObjectValueAdaptor.cs: Generate
 	  NotSupported values when getting such exception.
+
+2010-01-20  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* mono.debugging.snk:
+	* Mono.Debugging.csproj: Sign and fix deps.
 
 2010-01-20  Lluis Sanchez Gual  <lluis@novell.com>
 

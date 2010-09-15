@@ -31,10 +31,12 @@ using System.ComponentModel;
 using System.Drawing.Design;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.DesignerSupport.Toolbox;
 using MonoDevelop.Core.Serialization;
 using MonoDevelop.Core.Assemblies;
+using MonoDevelop.Ide;
+using MonoDevelop.AspNet.Parser;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.AspNet
 {
@@ -89,50 +91,65 @@ namespace MonoDevelop.AspNet
 		
 		void RegisterReference (MonoDevelop.Projects.Project project)
 		{
-			MonoDevelop.Projects.DotNetProject dnp = (MonoDevelop.Projects.DotNetProject) project;
-			MonoDevelop.Projects.ProjectReference pr = base.Type.GetProjectReference ();
+			var dnp = (MonoDevelop.Projects.DotNetProject) project;
+			var pr = base.Type.GetProjectReference ();
 			
 			//add the reference if it doesn't match an existing one
 			bool match = false;
-			foreach (MonoDevelop.Projects.ProjectReference p in dnp.References)
+			foreach (var p in dnp.References)
 				if (p.Equals (pr))
 					match = true;
 			if (!match)
 				dnp.References.Add (pr);
 		}
-
-		public string GetTextForFile (string path, MonoDevelop.Projects.Project project)
+		
+		public void InsertAtCaret (MonoDevelop.Ide.Gui.Document document)
+		{
+			var tag = GetTextWithDirective (document, true);
+			document.TextEditor.InsertText (document.TextEditor.CursorPosition, tag);
+		}
+		
+		string GetTextWithDirective (MonoDevelop.Ide.Gui.Document document, bool insertDirective)
 		{
 			string tag = Text;
 			
-			if  (!tag.Contains ("{0}"))
+			if (!tag.Contains ("{0}"))
 				return tag;
 			
 			if (base.Type.AssemblyName.StartsWith ("System.Web.UI.WebControls"))
 				return string.Format (tag, "asp");
 			
 			//register the assembly and look up the class
-			RegisterReference (project);
+			//FIXME: only do this on the insert, not the preview - or remove it afterwards
+			RegisterReference (document.Project);
 			
-			MonoDevelop.Projects.Dom.Parser.ProjectDom database =
-				MonoDevelop.Projects.Dom.Parser.ProjectDomService.GetProjectDom (project);
+			var database = MonoDevelop.Projects.Dom.Parser.ProjectDomService.GetProjectDom (document.Project);
 			
-			MonoDevelop.Projects.Dom.IType cls = database.GetType (Type.TypeName);
+			var cls = database.GetType (Type.TypeName);
 			if (cls == null)
 				return tag;
 			
-			//look up the control prefix
-			string mime = DesktopService.GetMimeTypeForUri (path);
-			MonoDevelop.AspNet.Parser.AspNetParsedDocument cu = 
-				MonoDevelop.Projects.Dom.Parser.ProjectDomService.Parse (project, path, mime)
-					as MonoDevelop.AspNet.Parser.AspNetParsedDocument;
+			var doc = document.ParsedDocument as MonoDevelop.AspNet.Parser.AspNetParsedDocument;
+			if (doc == null)
+				return tag;
 			
-			System.Reflection.AssemblyName assemName = SystemAssemblyService.ParseAssemblyName (Type.AssemblyName);
+			var assemName = SystemAssemblyService.ParseAssemblyName (Type.AssemblyName);
 			
-			string prefix = cu.Document.ReferenceManager.AddAssemblyReferenceToDocument (cls, assemName.Name);
+			var refMan = new DocumentReferenceManager ((AspNetAppProject)document.Project) {
+				Doc = doc,
+			};
 			
-			if (prefix != null)
-				return string.Format (tag, prefix);
+			RegisterDirective directive;
+			string prefix = refMan.GetTagPrefixWithNewDirective (cls, assemName.Name, null, out directive);
+			
+			if (prefix == null)
+				return tag;
+			
+			tag = string.Format (tag, prefix);
+			
+			if (directive != null && insertDirective)
+				refMan.AddRegisterDirective (directive, document.TextEditor, true);
+			
 			return tag;
 		}
 		
@@ -141,40 +158,50 @@ namespace MonoDevelop.AspNet
 			get { return aspNetDomain; }
 		}
 		
-		public bool IsCompatibleWith (string fileName, MonoDevelop.Projects.Project project)
+		public bool IsCompatibleWith (MonoDevelop.Ide.Gui.Document document)
 		{
-			ClrVersion clrVersion = ClrVersion.Net_2_0;
-			MonoDevelop.Projects.DotNetProject dnp = project as MonoDevelop.Projects.DotNetProject;
-			if (dnp != null && dnp.TargetFramework.ClrVersion != ClrVersion.Default)
-				clrVersion = dnp.TargetFramework.ClrVersion;
-			
-			bool allow = false;
-			foreach (ToolboxItemFilterAttribute tbfa in ItemFilters) {
-				if (tbfa.FilterString == "ClrVersion.Net_1_1") {
-					if (tbfa.FilterType == ToolboxItemFilterType.Require) {
-						if (clrVersion == ClrVersion.Net_1_1 || clrVersion == ClrVersion.Net_2_0)
-							allow = true;
-					} else if (tbfa.FilterType == ToolboxItemFilterType.Prevent) {
-						if (clrVersion == ClrVersion.Net_1_1)
-							return false;
-					}
-				} else if (tbfa.FilterString == "ClrVersion.Net_2_0") {
-					if (tbfa.FilterType == ToolboxItemFilterType.Require) {
-						if (clrVersion == ClrVersion.Net_2_0)
-							allow = true;
-					} else if (tbfa.FilterType == ToolboxItemFilterType.Prevent) {
-						if (clrVersion == ClrVersion.Net_2_0)
-							return false;
-					}
-				}
+			switch (AspNetAppProject.DetermineWebSubtype (document.FileName)) {
+			case WebSubtype.WebForm:
+			case WebSubtype.MasterPage:
+			case WebSubtype.WebControl:
+				break;
+			default:
+				return false;
 			}
-			if (!allow)
-				return false;
 			
-			if (fileName.EndsWith (".aspx") || fileName.EndsWith (".ascx") || fileName.EndsWith (".master"))
-				return true;
-			else
-				return false;
+			var clrVersion = ClrVersion.Net_2_0;
+			var aspProj = document.Project as AspNetAppProject;
+			if (aspProj != null && aspProj.TargetFramework.ClrVersion != ClrVersion.Default)
+				clrVersion = aspProj.TargetFramework.ClrVersion;
+			
+			foreach (var tbfa in ItemFilters) {
+				ClrVersion filterVersion;
+				switch (tbfa.FilterString) {
+				case "ClrVersion.Net_1_1":
+					filterVersion = ClrVersion.Net_1_1;
+					break;
+				case "ClrVersion.Net_2_0":
+					filterVersion = ClrVersion.Net_2_0;
+					break;
+				case "ClrVersion.Net_4_0":
+					filterVersion = ClrVersion.Net_4_0;
+					break;
+				default:
+					continue;
+				}
+				
+				if (tbfa.FilterType == ToolboxItemFilterType.Require && filterVersion != clrVersion)
+					return false;
+				
+				if (tbfa.FilterType == ToolboxItemFilterType.Prevent && filterVersion == clrVersion)
+					return false;
+			}
+			return true;
+		}
+		
+		public string GetDragPreview (MonoDevelop.Ide.Gui.Document document)
+		{
+			return GetTextWithDirective (document, false);
 		}
 	}
 }

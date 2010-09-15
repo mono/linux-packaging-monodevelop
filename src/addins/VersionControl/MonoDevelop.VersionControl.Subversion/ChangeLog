@@ -1,7 +1,89 @@
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Subversion.Gui/UserPasswordDialog.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/SslServerTrustDialog.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/ClientCertificateDialog.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/ClientCertificatePasswordDialog.cs:
+	  Fix incorrect use of ShowCustomDialog/RunCustomDialog.
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.VersionControl.Subversion.Gui/UserPasswordDialog.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/SslServerTrustDialog.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/ClientCertificateDialog.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/ClientCertificatePasswordDialog.cs:
+	  More dialog placing.
+
+2010-05-10  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Subversion/SvnClient.cs:
+	* MonoDevelop.VersionControl.Subversion/LibSvnClient.cs: Get
+	  the description of errors reported using an error code.
+	  Fixes bug #602762 - No details supplied when svn connection
+	  fails.
+
+2010-05-03  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Subversion/SvnClient.cs:
+	* MonoDevelop.VersionControl.Subversion/SubversionRepository.cs:
+	* MonoDevelop.VersionControl.Subversion/SubversionVersionControl.cs:
+	  Split List method into List and ListUrl.
+
+2010-03-23  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Subversion/SvnClient.cs: Add
+	  description for BlameRevision.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.VersionControl.Subversion.addin.xml: Bumped MD
+	  version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.VersionControl.Subversion.csproj:
+	* MonoDevelop.VersionControl.Subversion.addin.xml:
+	* MonoDevelop.VersionControl.Subversion/SubversionRepository.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/UserPasswordDialog.cs:
+	* MonoDevelop.VersionControl.Subversion/SubversionNodeExtension.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/SslServerTrustDialog.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/ClientCertificateDialog.cs:
+	* MonoDevelop.VersionControl.Subversion.Gui/ClientCertificatePasswordDialog.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-02-24  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.VersionControl.Subversion/SubversionRepository.cs:
+	  Fix build.
+
+2010-02-23  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.VersionControl.Subversion.csproj: Moved diff
+	  widget and algorithm to MonoDevelop.Components.
+
+2010-02-04  Levi Bard  <taktaktaktaktaktaktaktaktaktak@gmail.com>
+
+	* MonoDevelop.VersionControl.Subversion/SubversionRepository.cs:
+	  Add support for revision-range-based recursive diffing.
+
 2010-02-04  Levi Bard  <taktaktaktaktaktaktaktaktaktak@gmail.com>
 
 	* MonoDevelop.VersionControl.Subversion/SvnClient.cs: Prevent
 	  occasional NRE.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.VersionControl.Subversion.Gui.UserPasswordDialog.cs:
+	* gtk-gui/MonoDevelop.VersionControl.Subversion.Gui.SslServerTrustDialog.cs:
+	* gtk-gui/MonoDevelop.VersionControl.Subversion.Gui.ClientCertificateDialog.cs:
+	* gtk-gui/MonoDevelop.VersionControl.Subversion.Gui.ClientCertificatePasswordDialog.cs:
+	  Flush.
 
 2009-11-12  Lluis Sanchez Gual  <lluis@novell.com>
 

@@ -33,11 +33,24 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class IndexerDeclaration : PropertyDeclaration
 	{
-		public IEnumerable<ArgumentDeclaration> Arguments { 
+		public IEnumerable<ParameterDeclarationExpression> Arguments { 
 			get {
-				return base.GetChildrenByRole (Roles.Argument).Cast <ArgumentDeclaration>();
+				return base.GetChildrenByRole (Roles.Argument).Cast <ParameterDeclarationExpression>();
 			}
 		}
+		
+		public CSharpTokenNode LBracket {
+			get {
+				return (CSharpTokenNode)GetChildByRole (Roles.LBracket);
+			}
+		}
+		
+		public CSharpTokenNode RBracket {
+			get {
+				return (CSharpTokenNode)GetChildByRole (Roles.RBracket);
+			}
+		}
+		
 		
 		public override S AcceptVisitor<T, S> (ICSharpDomVisitor<T, S> visitor, T data)
 		{

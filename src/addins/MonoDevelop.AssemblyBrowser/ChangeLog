@@ -1,3 +1,186 @@
+2010-04-13  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.AssemblyBrowser/DisplayBinding.cs: Fix bug #Bug
+	  593622 - assembly browser conflix with wine.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.AssemblyBrowser.addin.xml: Bumped MD version.
+
+2010-03-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.AssemblyBrowser.addin.xml: Remove unrequired
+	  assembly import.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.AssemblyBrowser.csproj:
+	* MonoDevelop.AssemblyBrowser/DisplayBinding.cs:
+	* MonoDevelop.AssemblyBrowser/NamespaceBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/ErrorNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/DomTypeNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/DomEventNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/ResourceNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/DomFieldNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/AssemblyBrowserView.cs:
+	* MonoDevelop.AssemblyBrowser/AssemblyNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/ReferenceNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/DomMethodNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/AssemblyBrowserWidget.cs:
+	* MonoDevelop.AssemblyBrowser/DomPropertyNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/DomReturnTypeNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/BaseTypeFolderNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/ResourceFolderNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/ReferenceFolderNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/ModuleReferenceNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/ModuleDefinitionNodeBuilder.cs:
+	* gtk-gui/MonoDevelop.AssemblyBrowser.AssemblyBrowserWidget.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-03-05  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AssemblyBrowser.csproj: Don't local-copy project
+	  refs, as it duplicates assemblies and breaks running on
+	  .NET.
+
+2010-03-01  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AssemblyBrowser/DomMethodNodeBuilder.cs: Nicer
+	  error message and kill console spew.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AssemblyBrowser/DomTypeNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/DomPropertyNodeBuilder.cs: Fixed
+	  'Bug 583515 - No code completion for set-only properties'.
+
+2010-03-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AssemblyBrowser/DomTypeNodeBuilder.cs: Delegates
+	  are now formatted like c# in c# mode.
+
+2010-02-25  Mike Krüger  <mkrueger@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.AssemblyBrowser/DocumentationPanel.cs:
+	* MonoDevelop.AssemblyBrowser/AssemblyBrowserWidget.cs:
+	* gtk-gui/MonoDevelop.AssemblyBrowser.AssemblyBrowserWidget.cs:
+	  Fixed 'Bug 583017 - Wrong font in the Assembly Browser.' /
+	  applied patch from Alexander Cherniuk <ts33kr@gmail.com>
+
+
+2010-01-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AssemblyBrowser.addin.xml:
+	* MonoDevelop.AssemblyBrowser/AssemblyBrowserView.cs: Added
+	  FindDerivedClasses command.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.AssemblyBrowser.AssemblyBrowserWidget.cs:
+	  Flush.
+
+2010-01-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AssemblyBrowser.addin.xml:
+	* MonoDevelop.AssemblyBrowser/DisplayBinding.cs: Track
+	  DisplayBinding API.
+
+2010-01-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.AssemblyBrowser.csproj: Fix project reference.
+
+2010-01-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AssemblyBrowser/DomMethodNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/ColoredCSharpFormatter.cs: fixed
+	  'Bug 571177 - Assembly browser text widget issues'.
+
+2010-01-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AssemblyBrowser/DomTypeNodeBuilder.cs: fixed
+	  'Bug 571178 - Assembly browser should show protected
+	  members'.
+
+2010-01-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.AssemblyBrowser.csproj:
+	* MonoDevelop.AssemblyBrowser.addin.xml: Fix the Cecil
+	  decompiler in the build. Make building MD with Makefiles
+	  work again, and puts the decompiler properly in its own dll
+	  instead of merging it into a franken-Cecil.
+
+2010-01-15  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.AssemblyBrowser.csproj:
+	* MonoDevelop.AssemblyBrowser/Decompiler.cs:
+	* MonoDevelop.AssemblyBrowser/DomMethodNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/ColoredCSharpFormatter.cs: Now
+	  using the cecil decompiler.
+
+2010-01-14  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.AssemblyBrowser/DomReturnTypeNodeBuilder.cs:
+	  Implemented go to base type.
+
+2010-01-05  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.AssemblyBrowser/AssemblyBrowserWidget.cs:
+	* gtk-gui/MonoDevelop.AssemblyBrowser.AssemblyBrowserWidget.cs:
+	  Reduce spacing and tweak borders.
+
+2009-12-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* gtk-gui/generated.cs:
+	* MonoDevelop.AssemblyBrowser/AssemblyBrowserWidget.cs:
+	* gtk-gui/MonoDevelop.AssemblyBrowser.AssemblyBrowserWidget.cs:
+	  Remove the cancel-search button, because it duplicates the
+	  function clear-textbox button.
+
+2009-12-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* gtk-gui/objects.xml:
+	* MonoDevelop.AssemblyBrowser.csproj:
+	* MonoDevelop.AssemblyBrowser/SearchEntry.cs:
+	* MonoDevelop.AssemblyBrowser/HoverImageButton.cs:
+	* gtk-gui/MonoDevelop.AssemblyBrowser.AssemblyBrowserWidget.cs:
+	  Moved the SearchEntry to MonoDevelop.Components.
+
+2009-12-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* gtk-gui/gui.stetic:
+	* gtk-gui/objects.xml:
+	* gtk-gui/MonoDevelop.AssemblyBrowser.AssemblyBrowserWidget.cs:
+	  Fix layout of the navigation bar.
+
+2009-12-04  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* gtk-gui/objects.xml:
+	* gtk-gui/generated.cs:
+	* MonoDevelop.AssemblyBrowser.csproj:
+	* MonoDevelop.AssemblyBrowser/SearchEntry.cs:
+	* MonoDevelop.AssemblyBrowser/NamespaceBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/HoverImageButton.cs:
+	* MonoDevelop.AssemblyBrowser/DomTypeNodeBuilder.cs:
+	* MonoDevelop.AssemblyBrowser/DocumentationPanel.cs:
+	* MonoDevelop.AssemblyBrowser/AssemblyBrowserWidget.cs:
+	* gtk-gui/MonoDevelop.AssemblyBrowser.AssemblyBrowserWidget.cs:
+	  Overworked the assembly browser GUI.
+
 2009-11-12  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.AssemblyBrowser/Decompiler.cs: Fixed 'Bug 554836

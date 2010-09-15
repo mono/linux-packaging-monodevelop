@@ -47,15 +47,68 @@ namespace Mono.TextEditor
 			}
 		}
 		
+		bool isInCodeFocusMode;
+		public bool IsInCodeFocusMode {
+			get { 
+				return isInCodeFocusMode; 
+			}
+			set {
+				isInCodeFocusMode = value; 
+				if (!isInCodeFocusMode) {
+					RemoveBackgroundRenderer ();
+				} else {
+					foldings = null;
+					HandleEditorCaretPositionChanged (null, null);
+				}
+			}
+		}
+		
 		public FoldMarkerMargin (TextEditor editor)
 		{
 			this.editor = editor;
-			layout = new Pango.Layout (editor.PangoContext);
+			layout = PangoUtil.CreateLayout (editor);
 			delayTimer = new Timer (150);
 			delayTimer.AutoReset = false;
 			delayTimer.Elapsed += DelayTimerElapsed;
+			editor.Caret.PositionChanged += HandleEditorCaretPositionChanged;
 		}
 
+		void HandleEditorCaretPositionChanged (object sender, DocumentLocationEventArgs e)
+		{
+			if (!IsInCodeFocusMode) 
+				return;
+			LineSegment lineSegment = editor.Document.GetLine (editor.Caret.Line);
+			if (lineSegment == null) {
+				RemoveBackgroundRenderer ();
+				return;
+			}
+			
+			IEnumerable<FoldSegment> newFoldings = editor.Document.GetFoldingContaining (lineSegment);
+			if (newFoldings == null) {
+				RemoveBackgroundRenderer ();
+				return;
+			}
+			
+			bool areEqual = foldings != null;
+			
+			if (areEqual && foldings.Count () != newFoldings.Count ())
+				areEqual = false;
+			if (areEqual) {
+				List<FoldSegment> list1 = new List<FoldSegment> (foldings);
+				List<FoldSegment> list2 = new List<FoldSegment> (newFoldings);
+				for (int i = 0; i < list1.Count; i++) {
+					if (list1[i] != list2[i]) {
+						areEqual = false;
+						break;
+					}
+				}
+			}
+			
+			if (!areEqual) {
+				foldings = newFoldings;
+				DelayTimerElapsed (this, null);
+			}
+		}
 		
 		internal protected override void MousePressed (MarginMouseEventArgs args)
 		{
@@ -68,7 +121,7 @@ namespace Mono.TextEditor
 			}
 			editor.SetAdjustments ();
 			editor.Caret.MoveCaretBeforeFoldings ();
-			editor.Repaint ();
+			editor.QueueDraw ();
 		}
 		
 		internal protected override void MouseHover (MarginMouseEventArgs args)
@@ -110,14 +163,14 @@ namespace Mono.TextEditor
 		void DelayTimerElapsed (object sender, ElapsedEventArgs e)
 		{
 			editor.TextViewMargin.BackgroundRenderer = new FoldingScreenbackgroundRenderer (editor, foldings);
-			editor.Repaint ();
+			editor.QueueDraw ();
 		}
 		
 		void RemoveBackgroundRenderer ()
 		{
 			if (editor.TextViewMargin.BackgroundRenderer != null) {
 				editor.TextViewMargin.BackgroundRenderer = null;
-				editor.Repaint ();
+				editor.QueueDraw ();
 			}
 		}
 		
@@ -165,15 +218,14 @@ namespace Mono.TextEditor
 			lineStateDirtyGC = new Gdk.GC (editor.GdkWindow);
 			lineStateDirtyGC.RgbFgColor = new Gdk.Color (255, 238, 98);
 
-			
-			
+			marginWidth = editor.LineHeight;
+			/*
 			layout.FontDescription = editor.Options.Font;
 			layout.SetText ("!");
 			int tmp;
 			layout.GetPixelSize (out tmp, out this.marginWidth);
 			marginWidth *= 8;
-			marginWidth /= 10;
-			marginWidth--; // was dashed line.
+			marginWidth /= 10;*/
 		}
 		
 		Gdk.GC foldBgGC, foldLineGC, foldLineHighlightedGC, foldLineHighlightedGCBg, foldToggleMarkerGC;
@@ -231,12 +283,12 @@ namespace Mono.TextEditor
 		List<FoldSegment> containingFoldings = new List<FoldSegment> ();
 		List<FoldSegment> endFoldings        = new List<FoldSegment> ();
 		
-		internal protected override void Draw (Gdk.Drawable win, Gdk.Rectangle area, int line, int x, int y)
+		internal protected override void Draw (Gdk.Drawable win, Gdk.Rectangle area, int line, int x, int y, int lineHeight)
 		{
 			foldSegmentSize = Width * 4 / 6;
 			foldSegmentSize -= (foldSegmentSize) % 2;
 			
-			Gdk.Rectangle drawArea = new Gdk.Rectangle (x, y, Width, editor.LineHeight);
+			Gdk.Rectangle drawArea = new Gdk.Rectangle (x, y, Width, lineHeight);
 			Document.LineState state = editor.Document.GetLineState (line);
 			
 			bool isFoldStart = false;
@@ -280,15 +332,16 @@ namespace Mono.TextEditor
 				}
 			}
 			
+			win.DrawRectangle (bgGC, true, drawArea);
 			if (state == Document.LineState.Changed) {
-				win.DrawRectangle (lineStateChangedGC, true, x , y, 4, editor.LineHeight);
-				win.DrawRectangle (bgGC, true, x + 3 , y, Width  - 3, editor.LineHeight);
+				win.DrawRectangle (lineStateChangedGC, true, x + 1, y, Width / 3, lineHeight);
+		//		win.DrawRectangle (bgGC, true, x + 3 , y, Width  - 3, lineHeight);
 			} else if (state == Document.LineState.Dirty) {
-				win.DrawRectangle (lineStateDirtyGC, true, x , y, 4, editor.LineHeight);
-				win.DrawRectangle (bgGC, true, x + 3 , y, Width - 3, editor.LineHeight);
-			} else {
+				win.DrawRectangle (lineStateDirtyGC, true, x + 1, y, Width / 3, lineHeight);
+		//		win.DrawRectangle (bgGC, true, x + 3 , y, Width - 3, lineHeight);
+			}/* else {
 				win.DrawRectangle (bgGC, true, drawArea);
-			}
+			}*/
 			
 			if (line < editor.Document.LineCount) {
 			
@@ -312,13 +365,13 @@ namespace Mono.TextEditor
 					}
 					DrawFoldSegment (win, x, y, isVisible, isStartSelected);
 					if (isContaining || isFoldEndFromUpperFold) 
-						win.DrawLine (isContainingSelected ? foldLineHighlightedGC : foldLineGC, xPos, drawArea.Top, xPos, foldSegmentYPos - 1);
+						win.DrawLine (isContainingSelected ? foldLineHighlightedGC : foldLineGC, xPos, drawArea.Top, xPos, foldSegmentYPos - 2);
 					if (isContaining || moreLinedOpenFold) 
-						win.DrawLine (isEndSelected || (isStartSelected && isVisible) || isContainingSelected ? foldLineHighlightedGC : foldLineGC, xPos, foldSegmentYPos + foldSegmentSize + 1, xPos, drawArea.Bottom);
+						win.DrawLine (isEndSelected || (isStartSelected && isVisible) || isContainingSelected ? foldLineHighlightedGC : foldLineGC, xPos, foldSegmentYPos + foldSegmentSize + 2, xPos, drawArea.Bottom);
 				} else {
 					if (isFoldEnd) {
 						int yMid = drawArea.Top + drawArea.Height / 2;
-						win.DrawLine (isEndSelected ? foldLineHighlightedGC : foldLineGC, xPos, yMid, xPos + foldSegmentSize / 2, yMid);
+						win.DrawLine (isEndSelected ? foldLineHighlightedGC : foldLineGC, xPos, yMid, x + Width - 2, yMid);
 						win.DrawLine (isContainingSelected || isEndSelected ? foldLineHighlightedGC : foldLineGC, xPos, drawArea.Top, xPos, yMid);
 						if (isContaining) 
 							win.DrawLine (isContainingSelected ? foldLineHighlightedGC : foldLineGC, xPos, yMid + 1, xPos, drawArea.Bottom);

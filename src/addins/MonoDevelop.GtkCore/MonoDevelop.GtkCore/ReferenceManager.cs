@@ -29,8 +29,8 @@ using System.Collections.Generic;
 
 using MonoDevelop.Core;
 using MonoDevelop.Core.Assemblies;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.GtkCore {
 
@@ -153,7 +153,11 @@ namespace MonoDevelop.GtkCore {
 				string version = sr.Substring (sr.IndexOf (",") + 1).Trim ();
 				if (version != assm_version) {
 					project.References.Remove (r);
-					project.References.Add (new ProjectReference (ReferenceType.Gac, name + ", " + assm_version));
+					if (name == "gnome-sharp" && assm_version == "Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f") {
+						project.References.Add (new ProjectReference (ReferenceType.Gac, name + ", Version=2.24.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"));
+					} else {
+						project.References.Add (new ProjectReference (ReferenceType.Gac, name + ", " + assm_version));
+					}
 					changed = true;
 				}
 			}
@@ -186,7 +190,7 @@ namespace MonoDevelop.GtkCore {
 		static bool updating;
 		static string[] gnome_assemblies = new string [] { 
 			"art-sharp", "atk-sharp", "gconf-sharp", "gdk-sharp", 
-			"glade-sharp","glib-sharp","gnome-sharp",
+			"glade-sharp","glib-sharp", "gnome-sharp",
 			"gnome-vfs-sharp", "gtk-dotnet", "gtkhtml-sharp", 
 			"gtk-sharp", "pango-sharp", "rsvg-sharp"
 		};
@@ -215,7 +219,7 @@ namespace MonoDevelop.GtkCore {
 
 			DotNetProject dnp = args.Project as DotNetProject;
 
-			if (MonoDevelop.Core.Gui.MessageService.Confirm (GettextCatalog.GetString ("The Gtk# User Interface designer will be disabled by removing the gtk-sharp reference."), new MonoDevelop.Core.Gui.AlertButton (GettextCatalog.GetString ("Disable Designer"))))
+			if (MessageService.Confirm (GettextCatalog.GetString ("The Gtk# User Interface designer will be disabled by removing the gtk-sharp reference."), new AlertButton (GettextCatalog.GetString ("Disable Designer"))))
 				GtkDesignInfo.DisableProject (dnp);
 			else
 				dnp.References.Add (new ProjectReference (ReferenceType.Gac, args.ProjectReference.StoredReference));

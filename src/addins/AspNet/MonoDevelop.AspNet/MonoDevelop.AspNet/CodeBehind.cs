@@ -30,6 +30,7 @@
 //
 
 using System;
+using System.Linq;
 using System.IO;
 using System.Collections;
 using System.Collections.Generic;
@@ -41,6 +42,7 @@ using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.DesignerSupport;
 
 using MonoDevelop.AspNet.Parser;
+using System.CodeDom;
 
 namespace MonoDevelop.AspNet
 {
@@ -56,85 +58,91 @@ namespace MonoDevelop.AspNet
 			return proj.GetCodebehindTypeName (file.Name);
 		}
 		
-		public static System.CodeDom.CodeCompileUnit GenerateCodeBehind (
-			AspNetAppProject aspProject, AspNetParsedDocument parsedDocument, List<CodeBehindWarning> errors)
+		static void AddFail (List<CodeBehindWarning> errors, AspNetParsedDocument document, Error err)
 		{
-			string className = parsedDocument.PageInfo.InheritedClass;
+			errors.Add (new CodeBehindWarning (GettextCatalog.GetString (
+					"Parser failed with error {0}. CodeBehind members for this file will not be added.", err.Message),
+					document.FileName, err.Region.Start.Line, err.Region.Start.Column));
+		}
+		
+		public static System.CodeDom.CodeCompileUnit GenerateCodeBehind (AspNetAppProject project,
+		                                                                 string filename,
+		                                                                 AspNetParsedDocument document, 
+		                                                                 List<CodeBehindWarning> errors)
+		{
+			string className = document.Info.InheritedClass;
 			
-			//initialising this list may generate more errors so we do it here
-			MemberListVisitor memberList = null;
-			if (!string.IsNullOrEmpty (className))
-				memberList = parsedDocument.Document.MemberList;
-			
-			//log errors
-			if (parsedDocument.Document.ParseErrors.Count > 0) {
-				foreach (Exception e in parsedDocument.Document.ParseErrors) {
-					CodeBehindWarning cbw;
-					ErrorInFileException eife = e as ErrorInFileException;
-					if (eife != null)
-						cbw = new CodeBehindWarning (eife);
-					else
-						cbw = new CodeBehindWarning (
-						    GettextCatalog.GetString ("Parser failed with error {0}. CodeBehind members for this file will not be added.", e.ToString ()),
-						    parsedDocument.FileName);
-					errors.Add (cbw);
-				}
+			if (document.HasErrors) {
+				AddFail (errors, document, document.Errors.Where (x => x.ErrorType == ErrorType.Error).First ());
+				return null;
 			}
 			
 			if (string.IsNullOrEmpty (className))
 				return null;
 			
+			var refman = new DocumentReferenceManager (project) { Doc = document };
+			var memberList = new MemberListVisitor (document, refman);
+			document.RootNode.AcceptVisit (memberList);
+			
+			var err = memberList.Errors.Where (x => x.ErrorType == ErrorType.Error).FirstOrDefault ();
+			if (err != null) {
+				AddFail (errors, document, err);
+				return null;
+			}
+			
 			//initialise the generated type
-			System.CodeDom.CodeCompileUnit ccu = new System.CodeDom.CodeCompileUnit ();
-			System.CodeDom.CodeNamespace namespac = new System.CodeDom.CodeNamespace ();
+			var ccu = new CodeCompileUnit ();
+			var namespac = new CodeNamespace ();
 			ccu.Namespaces.Add (namespac); 
-			System.CodeDom.CodeTypeDeclaration typeDecl = new System.CodeDom.CodeTypeDeclaration ();
-			typeDecl.IsClass = true;
-			typeDecl.IsPartial = true;
+			var typeDecl = new System.CodeDom.CodeTypeDeclaration () {
+				IsClass = true,
+				IsPartial = true,
+			};
 			namespac.Types.Add (typeDecl);
 			
 			//name the class and namespace
 			int namespaceSplit = className.LastIndexOf ('.');
 			string namespaceName = null;
 			if (namespaceSplit > -1) {
-				namespac.Name = aspProject.StripImplicitNamespace (className.Substring (0, namespaceSplit));
+				namespac.Name = project.StripImplicitNamespace (className.Substring (0, namespaceSplit));
 				typeDecl.Name = className.Substring (namespaceSplit + 1);
 			} else {
 				typeDecl.Name = className;
 			}
 			
 			string masterTypeName = null;
-			if (!String.IsNullOrEmpty (parsedDocument.PageInfo.MasterPageTypeName)) {
-				masterTypeName = parsedDocument.PageInfo.MasterPageTypeName;
-			} else if (!String.IsNullOrEmpty (parsedDocument.PageInfo.MasterPageTypeVPath)) {
+			if (!String.IsNullOrEmpty (document.Info.MasterPageTypeName)) {
+				masterTypeName = document.Info.MasterPageTypeName;
+			} else if (!String.IsNullOrEmpty (document.Info.MasterPageTypeVPath)) {
 				try {
-					ProjectFile resolvedMaster = aspProject.ResolveVirtualPath (parsedDocument.PageInfo.MasterPageTypeVPath, parsedDocument.FileName);
+					ProjectFile resolvedMaster = project.ResolveVirtualPath (document.Info.MasterPageTypeVPath, document.FileName);
 					AspNetParsedDocument masterParsedDocument = null;
 					if (resolvedMaster != null)
-						masterParsedDocument = ProjectDomService.Parse (aspProject, resolvedMaster.FilePath, null)	as AspNetParsedDocument;
-					if (masterParsedDocument != null && !String.IsNullOrEmpty (masterParsedDocument.PageInfo.InheritedClass)) {
-						masterTypeName = masterParsedDocument.PageInfo.InheritedClass;
+						masterParsedDocument = ProjectDomService.Parse (project, resolvedMaster.FilePath, null)	as AspNetParsedDocument;
+					if (masterParsedDocument != null && !String.IsNullOrEmpty (masterParsedDocument.Info.InheritedClass)) {
+						masterTypeName = masterParsedDocument.Info.InheritedClass;
 					} else {
 						errors.Add (new CodeBehindWarning (String.Format ("Could not find type for master '{0}'",
-						                                                  parsedDocument.PageInfo.MasterPageTypeVPath),
-						                                   parsedDocument.FileName));
+						                                                  document.Info.MasterPageTypeVPath),
+						                                   document.FileName));
 					}
 				} catch (Exception ex) {
 					errors.Add (new CodeBehindWarning (String.Format ("Could not find type for master '{0}'",
-					                                                  parsedDocument.PageInfo.MasterPageTypeVPath),
-					                                   parsedDocument.FileName));
+					                                                  document.Info.MasterPageTypeVPath),
+					                                   document.FileName));
 					LoggingService.LogWarning ("Error resolving master page type", ex);
 				}
 			}
 			
 			if (masterTypeName != null) {
-				System.CodeDom.CodeMemberProperty masterProp = new System.CodeDom.CodeMemberProperty ();
-				masterProp.Name = "Master";
-				masterProp.Type = new System.CodeDom.CodeTypeReference (masterTypeName);
-				masterProp.HasGet = true;
-				masterProp.HasSet = false;
-				masterProp.Attributes = System.CodeDom.MemberAttributes.Public | System.CodeDom.MemberAttributes.New 
-					| System.CodeDom.MemberAttributes.Final;
+				var masterProp = new CodeMemberProperty () {
+					Name = "Master",
+					Type = new CodeTypeReference (masterTypeName),
+					HasGet = true,
+					HasSet = false,
+					Attributes = System.CodeDom.MemberAttributes.Public | System.CodeDom.MemberAttributes.New 
+						| System.CodeDom.MemberAttributes.Final,
+				};
 				masterProp.GetStatements.Add (new System.CodeDom.CodeMethodReturnStatement (
 						new System.CodeDom.CodeCastExpression (masterTypeName, 
 							new System.CodeDom.CodePropertyReferenceExpression (
@@ -142,11 +150,49 @@ namespace MonoDevelop.AspNet
 				typeDecl.Members.Add (masterProp);
 			}
 			
-			//add fields for each control in the page
-			foreach (System.CodeDom.CodeMemberField member in memberList.Members.Values)
-				typeDecl.Members.Add (member);
+			//shortcut building the existing members type map
+			if (memberList.Members.Count == 0)
+				return ccu;
 			
+			var dom = refman.TypeCtx.ProjectDom;
+			var cls = dom.GetType (className);
+			var members = GetDesignerMembers (memberList.Members.Values, cls, filename, dom, dom);
+			
+			//add fields for each control in the page
+			
+			foreach (var member in members) {
+				var type = new CodeTypeReference (member.Type.FullName);
+				typeDecl.Members.Add (new CodeMemberField (type, member.Name) { Attributes = MemberAttributes.Family });
+			}
 			return ccu;
+		}
+		
+		/// <summary>Filters out members whose names conflict with existing accessible members</summary>
+		/// <param name="members">Full list of CodeBehind members</param>
+		/// <param name="cls">The class to which these members' partial class will be added.</param>
+		/// <param name="designerFile">Members in this file will be ignored.</param>
+		/// <param name="resolveDom">The ProjectDom to use for resolving base types.</param>
+		/// <param name="internalDom">The ProjectDom to use for checking whether members are accessible as internal.</param>
+		/// <returns>The filtered list of non-conflicting members.</returns>
+		// TODO: check compatibilty with existing members
+		public static IEnumerable<CodeBehindMember> GetDesignerMembers (
+			IEnumerable<CodeBehindMember> members, IType cls, string designerFile, ProjectDom resolveDom,
+			ProjectDom internalDom)
+		{
+			var existingMembers = new HashSet<string> ();
+			while (cls != null) {
+				foreach (var member in cls.Members) {
+					if (member.IsPrivate || (member.IsInternal && member.DeclaringType.SourceProjectDom != internalDom))
+					    continue;
+					if (member.DeclaringType.CompilationUnit.FileName == designerFile)
+						continue;
+					existingMembers.Add (member.Name);
+				}
+				if (cls.BaseType == null)
+					break;
+				cls = resolveDom.GetType (cls.BaseType);
+			}
+			return members.Where (m => !existingMembers.Contains (m.Name));
 		}
 	}
 }

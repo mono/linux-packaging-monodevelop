@@ -56,11 +56,15 @@ namespace MonoDevelop.AspNet
 			ProjectFile masterPage = null;
 			string masterContent = "";
 			
-			using (var dialog = new MonoDevelop.Projects.Gui.Dialogs.ProjectFileSelectorDialog (aspProj, null, "*.master")) {
+			var dialog = new MonoDevelop.Ide.Projects.ProjectFileSelectorDialog (aspProj, null, "*.master");
+			try {
 				dialog.Title = GettextCatalog.GetString ("Select a Master Page...");
-				int response = MonoDevelop.Core.Gui.MessageService.ShowCustomDialog (dialog);
+				int response =  MonoDevelop.Ide.MessageService.RunCustomDialog (dialog);
 				if (response == (int)Gtk.ResponseType.Ok)
 					masterPage = dialog.SelectedFile;
+			}
+			finally {
+				dialog.Destroy ();
 			}
 			if (masterPage == null)
 				return;
@@ -74,7 +78,7 @@ namespace MonoDevelop.AspNet
 					return;
 				
 				ContentPlaceHolderVisitor visitor = new ContentPlaceHolderVisitor ();
-				pd.Document.RootNode.AcceptVisit (visitor);
+				pd.RootNode.AcceptVisit (visitor);
 				
 				System.Text.StringBuilder sb = new System.Text.StringBuilder ();
 				foreach (string id in visitor.PlaceHolders) {

@@ -29,7 +29,6 @@ using System.Linq;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components;
-using MonoDevelop.Core.Gui;
 using Gtk;
 using System.Collections.Generic;
 using MonoDevelop.Ide.Gui.Content;
@@ -62,7 +61,7 @@ namespace MonoDevelop.Ide.FindInFiles
 			this.showReplace = showReplace;
 			this.Build ();
 			this.Title = showReplace ? GettextCatalog.GetString ("Replace in Files") : GettextCatalog.GetString ("Find in Files");
-
+			this.TransientFor = IdeApp.Workbench.RootWindow;
 			if (!showReplace) {
 				buttonReplace.Destroy ();
 			}
@@ -102,11 +101,11 @@ namespace MonoDevelop.Ide.FindInFiles
 				childCombo.TopAttach = 3;
 				childCombo.BottomAttach = 4;
 
-				childCombo = (Gtk.Table.TableChild)this.tableFindAndReplace[this.comboboxentryFileMask];
+				childCombo = (Gtk.Table.TableChild)this.tableFindAndReplace[this.searchentry1];
 				childCombo.TopAttach = 3;
 				childCombo.BottomAttach = 4;
 
-				ShowAll ();
+				Child.ShowAll ();
 			}
 
 			comboboxentryFind.Entry.Activated += delegate { buttonSearch.Click (); };
@@ -151,6 +150,25 @@ namespace MonoDevelop.Ide.FindInFiles
 			
 			Hidden += delegate { Destroy (); };
 			UpdateStopButton ();
+			this.searchentry1.Ready = true;
+			this.searchentry1.Visible = true;
+			this.searchentry1.IsCheckMenu = true;
+			
+			Properties properties = (Properties)PropertyService.Get ("MonoDevelop.FindReplaceDialogs.SearchOptions", new Properties ());
+			
+			CheckMenuItem checkMenuItem = this.searchentry1.AddFilterOption (0, GettextCatalog.GetString ("Include binary files"));
+			checkMenuItem.DrawAsRadio = false;
+			checkMenuItem.Active = properties.Get ("IncludeBinaryFiles", false);
+			checkMenuItem.Toggled += delegate {
+				properties.Set ("IncludeBinaryFiles", checkMenuItem.Active);
+			};
+			
+			CheckMenuItem checkMenuItem1 = this.searchentry1.AddFilterOption (1, GettextCatalog.GetString ("Include hidden files and directories"));
+			checkMenuItem1.DrawAsRadio = false;
+			checkMenuItem1.Active = properties.Get ("IncludeHiddenFiles", false);
+			checkMenuItem1.Toggled += delegate {
+				properties.Set ("IncludeHiddenFiles", checkMenuItem1.Active);
+			};
 		}
 
 		public override void Destroy ()
@@ -194,7 +212,7 @@ namespace MonoDevelop.Ide.FindInFiles
 				childCombo.TopAttach = tableFindAndReplace.NRows - 3;
 				childCombo.BottomAttach = tableFindAndReplace.NRows - 2;
 
-				childCombo = (Gtk.Table.TableChild)this.tableFindAndReplace[this.comboboxentryFileMask];
+				childCombo = (Gtk.Table.TableChild)this.tableFindAndReplace[this.searchentry1];
 				childCombo.TopAttach = tableFindAndReplace.NRows - 3;
 				childCombo.BottomAttach = tableFindAndReplace.NRows - 2;
 			}
@@ -259,7 +277,7 @@ namespace MonoDevelop.Ide.FindInFiles
 				childCombo.TopAttach = tableFindAndReplace.NRows - 1;
 				childCombo.BottomAttach = tableFindAndReplace.NRows;
 
-				childCombo = (Gtk.Table.TableChild)this.tableFindAndReplace[this.comboboxentryFileMask];
+				childCombo = (Gtk.Table.TableChild)this.tableFindAndReplace[this.searchentry1];
 				childCombo.TopAttach = tableFindAndReplace.NRows - 1;
 				childCombo.BottomAttach = tableFindAndReplace.NRows;
 			}
@@ -282,19 +300,18 @@ namespace MonoDevelop.Ide.FindInFiles
 
 		void ButtonBrowsePathsClicked (object sender, EventArgs e)
 		{
-			FolderDialog folderDialog = new FolderDialog (GettextCatalog.GetString ("Select directory"));
-			try {
-				string defaultFolder = this.comboboxentryPath.Entry.Text;
-				if (string.IsNullOrEmpty (defaultFolder))
-					defaultFolder = IdeApp.ProjectOperations.ProjectsDefaultPath;
-				if (!string.IsNullOrEmpty (defaultFolder))
-					folderDialog.SetFilename (defaultFolder);
-				folderDialog.TransientFor = IdeApp.Workbench.RootWindow;
-				if (folderDialog.Run () == (int)Gtk.ResponseType.Ok)
-					this.comboboxentryPath.Entry.Text = folderDialog.Filename;
-			} finally {
-				folderDialog.Destroy ();
-			}
+			var dlg = new SelectFolderDialog (GettextCatalog.GetString ("Select directory")) {
+				TransientFor = this,
+			};
+			
+			string defaultFolder = this.comboboxentryPath.Entry.Text;
+			if (string.IsNullOrEmpty (defaultFolder))
+				defaultFolder = IdeApp.ProjectOperations.ProjectsDefaultPath;
+			if (!string.IsNullOrEmpty (defaultFolder))
+				dlg.CurrentFolder = defaultFolder;
+			
+			if (dlg.Run ())
+				this.comboboxentryPath.Entry.Text = dlg.SelectedFile;
 		}
 
 		void CheckbuttonRecursivelyDestroyed (object sender, EventArgs e)
@@ -311,15 +328,16 @@ namespace MonoDevelop.Ide.FindInFiles
 
 			//checkbuttonRecursively.Active    = properties.Get ("SearchPathRecursively", true);
 			//		checkbuttonFileMask.Active       = properties.Get ("UseFileMask", false);
-			checkbuttonCaseSensitive.Active = properties.Get ("CaseSensitive", true);
+			checkbuttonCaseSensitive.Active = properties.Get ("CaseSensitive", false);
 			checkbuttonWholeWordsOnly.Active = properties.Get ("WholeWordsOnly", false);
 			checkbuttonRegexSearch.Active = properties.Get ("RegexSearch", false);
 
 			LoadHistory ("MonoDevelop.FindReplaceDialogs.FindHistory", comboboxentryFind);
 			if (showReplace)
 				LoadHistory ("MonoDevelop.FindReplaceDialogs.ReplaceHistory", comboboxentryReplace);
+			searchentry1.Query = properties.Get ("MonoDevelop.FindReplaceDialogs.FileMask", "");
 //			LoadHistory ("MonoDevelop.FindReplaceDialogs.PathHistory", comboboxentryPath);
-			LoadHistory ("MonoDevelop.FindReplaceDialogs.FileMaskHistory", comboboxentryFileMask);
+//			LoadHistory ("MonoDevelop.FindReplaceDialogs.FileMaskHistory", comboboxentryFileMask);
 		}
 
 		static void LoadHistory (string propertyName, ComboBoxEntry entry)
@@ -357,8 +375,9 @@ namespace MonoDevelop.Ide.FindInFiles
 			StoreHistory ("MonoDevelop.FindReplaceDialogs.FindHistory", comboboxentryFind);
 			if (showReplace)
 				StoreHistory ("MonoDevelop.FindReplaceDialogs.ReplaceHistory", comboboxentryReplace);
+			properties.Set ("MonoDevelop.FindReplaceDialogs.FileMask", searchentry1.Query);
 //			StoreHistory ("MonoDevelop.FindReplaceDialogs.PathHistory", comboboxentryPath);
-			StoreHistory ("MonoDevelop.FindReplaceDialogs.FileMaskHistory", comboboxentryFileMask);
+			//StoreHistory ("MonoDevelop.FindReplaceDialogs.FileMaskHistory", comboboxentryFileMask);
 		}
 
 		static void StoreHistory (string propertyName, Gtk.ComboBoxEntry comboBox)
@@ -396,25 +415,31 @@ namespace MonoDevelop.Ide.FindInFiles
 		
 		public static void ShowFind ()
 		{
-			if (!IsCurrentDialogClosed)
-				return;
+			if (!IsCurrentDialogClosed) {
+				currentFindDialog.Destroy ();
+			}
 			currentFindDialog = new FindInFilesDialog (false);
+			MessageService.PlaceDialog (currentFindDialog, null);
 			currentFindDialog.Show ();
 		}
 		
 		public static void ShowReplace ()
 		{
-			if (!IsCurrentDialogClosed)
-				return;
+			if (!IsCurrentDialogClosed) {
+				currentFindDialog.Destroy ();
+			}
 			currentFindDialog = new FindInFilesDialog (true);
+			MessageService.PlaceDialog (currentFindDialog, null);
 			currentFindDialog.Show ();
 		}
 		
 		public static void FindInPath (string path)
 		{
-			if (!IsCurrentDialogClosed)
-				return;
+			if (!IsCurrentDialogClosed) {
+				currentFindDialog.Destroy ();
+			}
 			currentFindDialog = new FindInFilesDialog (false, path);
+			MessageService.PlaceDialog (currentFindDialog, null);
 			currentFindDialog.Show ();
 		}
 				
@@ -426,16 +451,39 @@ namespace MonoDevelop.Ide.FindInFiles
 			case ScopeSelection:
 				return new SelectionScope ();
 			case ScopeWholeSolution:
+				if (IdeApp.ProjectOperations.CurrentSelectedSolution == null) {
+					MessageService.ShowError (GettextCatalog.GetString ("Currently there is no open solution."));
+					return null;
+				}
 				return new WholeSolutionScope ();
 			case ScopeCurrentProject:
 				MonoDevelop.Projects.Project currentSelectedProject = IdeApp.ProjectOperations.CurrentSelectedProject;
-				if (currentSelectedProject != null)
+				if (currentSelectedProject != null) {
 					return new WholeProjectScope (currentSelectedProject);
-				return new WholeSolutionScope ();
+				} else {
+					if (IdeApp.ProjectOperations.CurrentSelectedSolution != null) {
+						AlertButton alertButton = MessageService.AskQuestion (GettextCatalog.GetString ("Currently there is no project selected. Search in the solution instead ?"), AlertButton.Yes, AlertButton.No);
+						if (alertButton == AlertButton.Yes)
+							return new WholeSolutionScope ();
+					} else {
+						MessageService.ShowError (GettextCatalog.GetString ("Currently there is no open solution."));
+					}
+				}
+				return null;
 			case ScopeAllOpenFiles:
 				return new AllOpenFilesScope ();
-			case ScopeDirectories:
-				return new DirectoryScope (comboboxentryPath.Entry.Text, checkbuttonRecursively.Active);
+			case ScopeDirectories: 
+				if (!System.IO.Directory.Exists (comboboxentryPath.Entry.Text)) {
+					MessageService.ShowError (string.Format (GettextCatalog.GetString ("Directory not found: {0}"), comboboxentryPath.Entry.Text));
+					return null;
+				}
+				DirectoryScope directoryScope = new DirectoryScope (comboboxentryPath.Entry.Text, checkbuttonRecursively.Active);
+				
+				Properties properties = (Properties)PropertyService.Get ("MonoDevelop.FindReplaceDialogs.SearchOptions", new Properties ());
+				directoryScope.IncludeBinaryFiles = properties.Get ("IncludeBinaryFiles", false);
+				directoryScope.IncludeHiddenFiles = properties.Get ("IncludeHiddenFiles", false);
+				
+				return directoryScope;
 			}
 			throw new ApplicationException ("Unknown scope:" + comboboxScope.Active);
 		}
@@ -443,7 +491,7 @@ namespace MonoDevelop.Ide.FindInFiles
 		FilterOptions GetFilterOptions ()
 		{
 			FilterOptions result = new FilterOptions ();
-			result.FileMask = !string.IsNullOrEmpty (comboboxentryFileMask.Entry.Text) ? comboboxentryFileMask.Entry.Text : "*";
+			result.FileMask = !string.IsNullOrEmpty (searchentry1.Query) ? searchentry1.Query : "*";
 			result.CaseSensitive = checkbuttonCaseSensitive.Active;
 			result.RegexSearch = checkbuttonRegexSearch.Active;
 			result.WholeWordsOnly = checkbuttonWholeWordsOnly.Active;
@@ -451,8 +499,6 @@ namespace MonoDevelop.Ide.FindInFiles
 		}
 
 		static FindReplace find;
-		bool isCanceled = false;
-
 		void HandleReplaceClicked (object sender, EventArgs e)
 		{
 			SearchReplace (comboboxentryReplace.Entry.Text);
@@ -485,15 +531,23 @@ namespace MonoDevelop.Ide.FindInFiles
 			if (find != null && find.IsRunning) {
 				if (!MessageService.Confirm (GettextCatalog.GetString ("There is a search already in progress. Do you want to stop it?"), AlertButton.Stop))
 					return;
-				CancelSearch ();
+				lock (searchesInProgress) {
+					foreach (IProgressMonitor mon in searchesInProgress)
+						mon.AsyncOperation.Cancel ();
+					searchesInProgress.Clear ();
+				}
 			}
+			
+			Scope scope = GetScope ();
+			if (scope == null)
+				return;
+			
 			ISearchProgressMonitor searchMonitor = IdeApp.Workbench.ProgressMonitors.GetSearchProgressMonitor (true);
-			searchMonitor.CancelRequested += (MonitorHandler)DispatchService.GuiDispatch (new MonitorHandler (OnCancelRequested));
 			lock (searchesInProgress)
 				searchesInProgress.Add (searchMonitor);
 			UpdateStopButton ();
 			find = new FindReplace ();
-			Scope scope = GetScope ();
+			
 			string pattern = comboboxentryFind.Entry.Text;
 			FilterOptions options = GetFilterOptions ();
 			searchMonitor.ReportStatus (scope.GetDescription (options, pattern, null));
@@ -508,54 +562,52 @@ namespace MonoDevelop.Ide.FindInFiles
 				return;
 			}
 
-		//	DispatchService.BackgroundDispatch (delegate {
+			DispatchService.BackgroundDispatch (delegate {
 				DateTime timer = DateTime.Now;
 				string errorMessage = null;
-				IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (GettextCatalog.GetString ("Searching..."), MonoDevelop.Core.Gui.Stock.FindInFiles, false);
 				
 				try {
-					foreach (SearchResult result in find.FindAll (scope, monitor, pattern, replacePattern, options)) {
+					List<SearchResult> results = new List<SearchResult> ();
+					foreach (SearchResult result in find.FindAll (scope, searchMonitor, pattern, replacePattern, options)) {
 						if (searchMonitor.IsCancelRequested)
 							return;
-						searchMonitor.ReportResult (result);
+						results.Add (result);
+						if (results.Count > 10) {
+							Application.Invoke (delegate {
+								results.ForEach (r => searchMonitor.ReportResult (r));
+								results.Clear ();
+							});
+						}
 					}
+					Application.Invoke (delegate {
+						results.ForEach (r => searchMonitor.ReportResult (r));
+						results.Clear ();
+					});
 				} catch (Exception ex) {
 					errorMessage = ex.Message;
 					LoggingService.LogError ("Error while search", ex);
-				} finally {
-					monitor.Dispose ();
 				}
 				
 				string message;
 				if (errorMessage != null) {
 					message = GettextCatalog.GetString ("The search could not be finished: {0}", errorMessage);
-				} else if (isCanceled) {
+					searchMonitor.ReportError (message, null);
+				} else if (searchMonitor.IsCancelRequested) {
 					message = GettextCatalog.GetString ("Search cancelled.");
+					searchMonitor.ReportWarning (message);
 				} else {
 					string matches = string.Format (GettextCatalog.GetPluralString ("{0} match found", "{0} matches found", find.FoundMatchesCount), find.FoundMatchesCount);
 					string files = string.Format (GettextCatalog.GetPluralString ("in {0} file.", "in {0} files.", find.SearchedFilesCount), find.SearchedFilesCount);
 					message = GettextCatalog.GetString ("Search completed.") + Environment.NewLine + matches + " " + files;
+					searchMonitor.ReportSuccess (message);
 				}
 				searchMonitor.ReportStatus (message);
-				searchMonitor.Log.WriteLine (message);
 				searchMonitor.Log.WriteLine (GettextCatalog.GetString ("Search time: {0} seconds."), (DateTime.Now - timer).TotalSeconds);
 				searchMonitor.Dispose ();
 				lock (searchesInProgress)
 					searchesInProgress.Remove (searchMonitor);
 				UpdateStopButton ();
-	//		});
-		}
-
-		void OnCancelRequested (IProgressMonitor monitor)
-		{
-			CancelSearch ();
-		}
-
-		public void CancelSearch ()
-		{
-			isCanceled = true;
-			if (find != null)
-				find.IsCanceled = true;
+			});
 		}
 	}
 }

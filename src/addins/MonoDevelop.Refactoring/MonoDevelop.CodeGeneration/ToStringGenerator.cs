@@ -27,7 +27,6 @@
 using System;
 using MonoDevelop.Components;
 using Gtk;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects.Dom;
 using System.Collections.Generic;
@@ -94,7 +93,7 @@ namespace MonoDevelop.CodeGeneration
 				}
 			}
 			
-			protected override IEnumerable<ICSharpCode.NRefactory.Ast.INode> GenerateCode (List<IBaseMember> includedMembers)
+			protected override IEnumerable<string> GenerateCode (INRefactoryASTProvider astProvider, string indent, List<IBaseMember> includedMembers)
 			{
 				StringBuilder format = new StringBuilder ();
 				format.Append ("[");
@@ -125,7 +124,7 @@ namespace MonoDevelop.CodeGeneration
 				}
 
 				methodDeclaration.Body.AddChild (new ReturnStatement (new InvocationExpression (formatReference, arguments)));
-				yield return methodDeclaration;
+				yield return astProvider.OutputNode (this.Options.Dom, methodDeclaration, indent);
 			}
 		}
 	}

@@ -439,6 +439,7 @@ namespace MonoDevelop.Core
 		}
 	}
 
+	[Serializable]
 	public struct FilePath: IComparable<FilePath>, IComparable, IEquatable<FilePath>
 	{
 		string fileName;
@@ -465,7 +466,22 @@ namespace MonoDevelop.Core
 
 		public FilePath FullPath {
 			get {
-				return new FilePath (Path.GetFullPath (fileName));
+				return new FilePath (!string.IsNullOrEmpty (fileName) ? Path.GetFullPath (fileName) : "");
+			}
+		}
+		
+		/// <summary>
+		/// Returns a path in standard form, which can be used to be compared
+		/// for equality with other canonical paths. It is similar to FullPath,
+		/// but unlike FullPath, the directory "/a/b" is considered equal to "/a/b/"
+		/// </summary>
+		public FilePath CanonicalPath {
+			get {
+				string fp = Path.GetFullPath (fileName);
+				if (fp.Length > 0 && fp[fp.Length - 1] == Path.DirectorySeparatorChar)
+					return fp.TrimEnd (Path.DirectorySeparatorChar);
+				else
+					return fp;
 			}
 		}
 
@@ -616,6 +632,14 @@ namespace MonoDevelop.Core
 			string[] array = new string[paths.Length];
 			for (int n = 0; n < paths.Length; n++)
 				array[n] = paths[n].ToString ();
+			return array;
+		}
+		
+		public static FilePath[] ToFilePathArray (this string[] paths)
+		{
+			var array = new FilePath[paths.Length];
+			for (int n = 0; n < paths.Length; n++)
+				array[n] = paths[n];
 			return array;
 		}
 	}

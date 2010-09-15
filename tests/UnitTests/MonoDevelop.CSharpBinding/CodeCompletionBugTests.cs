@@ -31,7 +31,7 @@ using NUnit.Framework;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
-using MonoDevelop.Projects.Gui.Completion;
+using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.CSharp.Parser;
@@ -72,9 +72,9 @@ namespace MonoDevelop.CSharpBinding.Tests
 			TestWorkbenchWindow tww = new TestWorkbenchWindow ();
 			TestViewContent sev = new TestViewContent ();
 			DotNetProject project = new DotNetAssemblyProject ("C#");
-			project.FileName = "/tmp/a" + pcount + ".csproj";
+			project.FileName = GetTempFile (".csproj");
 			
-			string file = "/tmp/test-file-" + (pcount++) + ".cs";
+			string file = GetTempFile (".cs");
 			project.AddFile (file);
 			
 			ProjectDomService.Load (project);
@@ -1666,7 +1666,7 @@ public abstract class GenericBase<T> : NonGenericBase where T : GenericBase<T>
 }
 ");
 			Assert.IsNotNull (provider, "provider not found.");
-			Assert.IsNotNull (provider.Find ("Instance"), "class 'Inner' not found.");
+			Assert.IsNotNull (provider.Find ("Instance"), "property 'Instance' not found.");
 			Assert.IsNull (provider.Find ("this"), "'this' found, but shouldn't.");
 		}
 		
@@ -1966,20 +1966,17 @@ delegate T MyFunc<S, T> (S t);
 
 class TestClass
 {
-    public string Value
-    {
-        get;
-        set;
-    }
+	public string Value {
+		get;
+		set;
+	}
 	
-    public static object GetProperty<TType> (MyFunc<TType, object> expression)
+	public static object GetProperty<TType> (MyFunc<TType, object> expression)
 	{
 		return null;
-    }
-    private static object ValueProperty = TestClass.GetProperty<TestClass> ($x => x.$);
-
+	}
+	private static object ValueProperty = TestClass.GetProperty<TestClass> ($x => x.$);
 }
-
 ");
 			Assert.IsNotNull (provider, "provider not found.");
 			Assert.IsNotNull (provider.Find ("Value"), "property 'Value' not found.");
@@ -2143,5 +2140,447 @@ class MainClass
 			Assert.IsNotNull (provider.Find ("BB"), "property 'BB' not found.");
 		}
 		
+		
+		/// <summary>
+		/// Bug 561964 - Wrong type in tooltip when there are two properties with the same name
+		/// </summary>
+		[Test()]
+		public void TestBug561964 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+interface A1 {
+	int A { get; }
+}
+interface A2 {
+	int B { get; }
+}
+
+interface IFoo {
+	A1 Bar { get; }
+}
+
+class Foo : IFoo
+{
+	A1 IFoo.Bar { get { return null; } }
+	public A2 Bar { get { return null; } }
+
+	public static int Main (string[] args)
+	{
+		$new Foo().Bar.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("B"), "property 'B' not found.");
+		}
+		
+		
+		/// <summary>
+		/// Bug 568204 - Inconsistency in resolution
+		/// </summary>
+		[Test()]
+		public void TestBug568204 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+public class Style 
+{
+	public static Style TestMe ()
+	{
+		return new Style ();
+	}
+	
+	public void Print ()
+	{
+		System.Console.WriteLine (""Hello World!"");
+	}
+}
+
+public class Foo
+{
+	public Style Style { get; set;} 
+	
+	public void Bar ()
+	{
+		$Style.TestMe ().$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Print"), "method 'Print' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 577225 - Inconsistent autocomplete on returned value of generic method.
+		/// </summary>
+		[Test()]
+		public void TestBug577225 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+using Foo;
+	
+namespace Foo 
+{
+	public class FooBar
+	{
+		public void Bar ()
+		{
+		}
+	}
+}
+
+namespace Other 
+{
+	public class MainClass
+	{
+		public static T Test<T> ()
+		{
+			return default (T);
+		}
+			
+		public static void Main (string[] args)
+		{
+			$Test<FooBar> ().$
+		}
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Bar"), "method 'Bar' not found.");
+		}
+		
+		
+		
+		/// <summary>
+		/// Bug 582017 - C# Generic Type Constraints
+		/// </summary>
+		[Test()]
+		public void TestBug582017 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+class Bar
+{
+	public void MyMethod ()
+	{
+	}
+}
+
+class Foo
+{
+	public static void Test<T> (T theObject) where T : Bar
+	{
+		$theObject.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("MyMethod"), "method 'MyMethod' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 586304 - Intellisense does not show several linq extenion methods when using nested generic type
+		/// </summary>
+		[Test()]
+		public void TestBug586304 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+using System;
+using System.Collections.Generic;
+
+public static class ExtMethods
+{
+	public static bool IsEmpty<T> (this IEnumerable<T> v)
+	{
+		return !v.Any ();
+	}
+}
+
+public class Lazy<T> {}
+
+public class IntelliSenseProblems
+{
+    public IEnumerable<Lazy<T>> GetLazies<T>()
+    {
+        return Enumerable.Empty<Lazy<T>>();
+    }
+}
+
+public class Test
+{ 
+   void test ()
+   {
+		var values = new IntelliSenseProblems ();
+		$var x = values.GetLazies<string> ().$
+   }
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("IsEmpty"), "method 'IsEmpty' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 586304 - Intellisense does not show several linq extenion methods when using nested generic type
+		/// </summary>
+		[Test()]
+		public void TestBug586304B ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+public delegate S Func<T, S> (T t);
+
+public class Lazy<T> {
+	public virtual bool IsLazy ()
+	{
+		return true;
+	}
+}
+
+static class ExtMethods
+{
+	public static T Where<T>(this Lazy<T> t, Func<T, bool> pred)
+	{
+		return default (T);
+	}
+}
+
+class MyClass
+{
+	public void Test()
+	{
+		Lazy<Lazy<MyClass>> c; 
+		$c.Where (x => x.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("Test"), "method 'Test' found, but shouldn't.");
+			Assert.IsNotNull (provider.Find ("IsLazy"), "method 'IsLazy' not found.");
+		}
+		
+		
+		/// <summary>
+		/// Bug 587543 - Intellisense ignores interface constraints
+		/// </summary>
+		[Test()]
+		public void TestBug587543 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+interface ITest
+{
+	void Foo ();
+}
+
+class C
+{
+	void Test<T> (T t) where T : ITest
+	{
+		$t.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Foo"), "method 'Foo' not found.");
+		}
+
+		
+		/// <summary>
+		/// Bug 587549 - Intellisense does not work with override constraints
+		/// </summary>
+		[Test()]
+		public void TestBug587549 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+public interface ITest
+{
+	void Bar();
+}
+
+public class BaseClass
+{
+	public void Foo ()
+	{}
+}
+
+public abstract class Printer
+{
+	public abstract void Print<T, U> (object x) where T : BaseClass, U where U : ITest;
+}
+
+public class PrinterImpl : Printer
+{
+	public override void Print<A, B> (object x)
+	{
+		A a;
+		$a.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Foo"), "method 'Foo' not found.");
+			Assert.IsNotNull (provider.Find ("Bar"), "method 'Bar' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 588223 - Intellisense does not recognize nested generics correctly.
+		/// </summary>
+		[Test()]
+		public void TestBug588223 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+class Lazy<T> { public void Foo () {} }
+class Lazy<T, S> { public void Bar () {} }
+
+class Test
+{
+	public object Get ()
+	{
+		return null;
+	}
+	
+	public Lazy<T> Get<T> ()
+	{
+		return null;
+	}
+
+	public Lazy<T, TMetaDataView> Get<T, TMetaDataView> ()
+	{
+		return null;
+	}
+	
+	public Test ()
+	{
+		Test t = new Test ();
+		var bug = t.Get<string, string> ();
+		$bug.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Bar"), "method 'Bar' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 592120 - Type resolver bug with this.Property[]
+		/// </summary>
+		[Test()]
+		public void TestBug592120 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+
+interface IBar
+{
+	void Test ();
+}
+
+class Foo
+{
+	public IBar[] X { get; set; }
+
+	public void Bar ()
+	{
+		var y = this.X;
+		$y.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("Test"), "method 'Test' found, but shouldn't.");
+		}
+		
+		
+		/// <summary>
+		/// Bug 576354 - Type inference failure
+		/// </summary>
+		[Test()]
+		public void TestBug576354 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+delegate T Func<S, T> (S s);
+
+class Foo
+{
+	string str;
+	
+	public Foo (string str)
+	{
+		this.str = str;
+	}
+	
+	public void Bar () 
+	{
+		System.Console.WriteLine (str);
+	}
+}
+
+class Test
+{
+	static T Test<T> (Func<string, T> myFunc)
+	{
+		return myFunc (""Hello World"");
+	}
+	
+	public static void Main (string[] args)
+	{
+		var result = Test (str => new Foo (str));
+		$result.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Bar"), "method 'Bar' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 534680 - LINQ keywords missing from Intellisense
+		/// </summary>
+		[Test()]
+		public void TestBug534680 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+class Foo
+{
+	public static void Main (string[] args)
+	{
+		$from str in args $
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("select"), "keyword 'select' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 610006 - Intellisense gives members of return type of functions even when that function isn't invoked
+		/// </summary>
+		[Test()]
+		public void TestBug610006 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+class MainClass
+{
+	public MainClass FooBar ()
+	{
+	}
+	
+	public void Test ()
+	{
+		$FooBar.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("FooBar"), "method 'FooBar' found, but shouldn't.");
+		}
 	}
 }

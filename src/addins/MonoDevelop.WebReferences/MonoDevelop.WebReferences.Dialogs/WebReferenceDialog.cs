@@ -1,22 +1,17 @@
 using System;
-using System.Collections;
+using System.Linq;
 using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Text;
-using System.Runtime.Remoting.Messaging;
 using System.Threading;
-using System.Web.Services.Description;
-using System.Web.Services.Discovery;
-using System.Xml;
-using System.Xml.Xsl;
-using System.Xml.XPath;
-using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.WebBrowser;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.WebReferences;
 using Gtk;
+
+using MonoDevelop.Core;
+using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide.WebBrowser;
+using MonoDevelop.WebReferences;
+using MonoDevelop.Ide;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.WebReferences.Dialogs
 {
@@ -29,6 +24,7 @@ namespace MonoDevelop.WebReferences.Dialogs
 		#endregion
 		
 		Label docLabel;
+		DotNetProject project;
 		
 		#region Properties
 		/// <summary>Gets or Sets whether the current location of the browser is a valid web service or not.</summary>
@@ -115,9 +111,8 @@ namespace MonoDevelop.WebReferences.Dialogs
 			get { return this.tbxNamespace.Text; }
 		}
 		
-		/// <summary>Gets the selected service discovery client protocol.</summary>
-		/// <value>A DiscoveryClientProtocol containing the web reference information.</value>
-		public DiscoveryClientProtocol SelectedService
+		/// <summary>Gets the selected service discovery result.</summary>
+		public WebServiceDiscoveryResult SelectedService
 		{
 			get { return selectedService; }
 		}
@@ -142,17 +137,18 @@ namespace MonoDevelop.WebReferences.Dialogs
 		private string homeUrl = "http://www.w3schools.com/WebServices/TempConvert.asmx";
 		private string serviceUrl = "";
 		private string namespacePrefix = "";
-		private DiscoveryClientProtocol selectedService;
+		private WebServiceDiscoveryResult selectedService;
 		private string basePath = "";
 //		protected Gtk.Alignment frmBrowserAlign;
 		#endregion
 		
 		/// <summary>Initializes a new instance of the AddWebReferenceDialog widget.</summary>
-		public WebReferenceDialog(string basePath)
+		public WebReferenceDialog (DotNetProject project)
 		{
 			Build();
-			this.basePath = basePath;
+			this.basePath = Library.GetWebReferencePath (project);
 			this.IsWebService = false;
+			this.project = project;
 			
 			// Add the mozilla control to the frame
 			if (WebBrowserService.CanGetWebBrowser) {
@@ -321,78 +317,97 @@ namespace MonoDevelop.WebReferences.Dialogs
 				serviceUrl = url; 
 			}
 			
+			WebServiceEngine serviceEngine;
+			if (comboModel.Active == 0)
+				serviceEngine = WebReferencesService.WcfEngine;
+			else
+				serviceEngine = WebReferencesService.WsEngine;
+			
+			WebServiceDiscoveryResult service = null;
+			
 			// Checks the availablity of any services
-			DiscoveryClientProtocol protocol = new DiscoveryClientProtocol ();
-			AskCredentials creds = new AskCredentials ();
-			protocol.Credentials = creds;
-			bool unauthorized;
 			
-			do {
-				unauthorized = false;
-				creds.Reset ();
-				
-				try
-				{
-					protocol.DiscoverAny (url);
-				}
-				catch (WebException wex) {
-					HttpWebResponse wr = wex.Response as HttpWebResponse;
-					if (!creds.Canceled && wr != null && wr.StatusCode == HttpStatusCode.Unauthorized) {
-						unauthorized = true;
-						continue;
-					}
-					protocol = null;
-					serviceUrl = null;
-				}
-				catch (Exception ex) {
-					protocol = null;
-					serviceUrl = null;
-				}
-			} while (unauthorized);
-			
-			if (protocol != null)
-				creds.Store ();
+			try {
+				service = serviceEngine.Discover (url);
+			} catch (Exception ex) {
+				serviceUrl = null;
+				this.IsWebService = false;
+				this.selectedService = null;
+				LoggingService.LogError ("Error while discovering web services", ex);
+				ShowError (ex.Message);
+				return;
+			}
 			
 			Application.Invoke (delegate {
-				UpdateService (protocol, url);
+				UpdateService (service, url);
 			});
 		}
 		
-		void UpdateService (DiscoveryClientProtocol protocol, string url)
+		void ShowError (string error)
+		{
+			Application.Invoke (delegate {
+				if (docLabel != null) {
+					docLabel.Text = error;
+					docLabel.LineWrapMode = Pango.WrapMode.Word;
+					docLabel.Wrap = true;
+				}
+			});
+		}
+		
+		void UpdateService (WebServiceDiscoveryResult service, string url)
 		{
 			StringBuilder text = new StringBuilder ();
 			
-			if (protocol == null) {
+			if (service == null) {
 				this.IsWebService = false;
 				this.selectedService = null;
 			}
 			else {
 				// Set the Default Namespace and Reference
 				this.tbxNamespace.Text = this.DefaultNamespace;
-				this.tbxReferenceName.Text = this.DefaultReferenceName;
+				
+				string name = this.DefaultReferenceName;
+				
+				var items = WebReferencesService.GetWebReferenceItems (project);
+				if (items.Any (it => it.Name == name)) {
+					int num = 2;
+					while (items.Any (it => it.Name == name + "_" + num))
+						num++;
+					name = name + "_" + num;
+				}
+				this.tbxReferenceName.Text = name;
+				
 				this.IsWebService = true;
-				this.selectedService = protocol;
+				this.selectedService = service;
 				
 				if (docLabel != null) {
-					foreach (object dd in protocol.Documents.Values) {
-						if (dd is ServiceDescription) {
-							Library.GenerateWsdlXml (text, protocol);
-							break;
-						}
-						else if (dd is DiscoveryDocument) {
-							Library.GenerateDiscoXml(text, (DiscoveryDocument)dd);
-							break;
-						}
-					}
+					docLabel.Wrap = false;
+					text.Append (service.GetDescriptionMarkup ());
 				}
 			}
 			if (docLabel != null) {
+				docLabel.Wrap = false;
 				if (text.Length >= 0)
 					docLabel.Markup = text.ToString ();
 				else
 					docLabel.Markup = GettextCatalog.GetString ("Web service not found.");
 			}
 			return;
+		}
+		
+		protected virtual void OnBtnOKClicked (object sender, System.EventArgs e)
+		{
+			if (WebReferencesService.GetWebReferenceItems (project).Any (r => r.Name == this.tbxReferenceName.Text)) {
+				MessageService.ShowError (GettextCatalog.GetString ("Web reference already exists"), GettextCatalog.GetString ("A web service reference with the name '{0}' already exists in the project. Please use a different name.", this.tbxReferenceName.Text));
+				return;
+			}
+			Respond (Gtk.ResponseType.Ok);
+		}
+		
+		protected virtual void OnComboModelChanged (object sender, System.EventArgs e)
+		{
+			serviceUrl = null;
+			ThreadPool.QueueUserWorkItem(new WaitCallback(QueryService), this.tbxReferenceURL.Text);
 		}
 	}
 	
@@ -401,9 +416,6 @@ namespace MonoDevelop.WebReferences.Dialogs
 		static Dictionary<string,NetworkCredential> credentials = new Dictionary<string, NetworkCredential> ();
 		
 		Dictionary<string,NetworkCredential> tempCredentials = new Dictionary<string, NetworkCredential> ();
-		
-		string user;
-		string password;
 		
 		public bool Canceled;
 		
@@ -430,7 +442,7 @@ namespace MonoDevelop.WebReferences.Dialogs
 				dlg.Password = nc.Password;
 			}
 			try {
-				if (dlg.Run () == (int) ResponseType.Ok) {
+				if (MessageService.RunCustomDialog (dlg) == (int) ResponseType.Ok) {
 					nc = new NetworkCredential (dlg.User, dlg.Password);
 					tempCredentials [uri.Host + uri.AbsolutePath] = nc;
 					tempCredentials [uri.Host] = nc;

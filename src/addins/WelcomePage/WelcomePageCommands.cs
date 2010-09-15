@@ -23,12 +23,11 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE. 
 */
 
-using System;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Components.Commands;
-
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
+using System.Linq;
 
 namespace MonoDevelop.WelcomePage
 {
@@ -37,35 +36,73 @@ namespace MonoDevelop.WelcomePage
 		ShowWelcomePage
 	}
 	
-	public class ShowWelcomePageOnStartUpHandler : CommandHandler
+	class ShowWelcomePageOnStartUpHandler : CommandHandler
 	{
 		protected override void Run()
 		{
-			if (!PropertyService.Get("WelcomePage.ShowOnStartup", true))
-				return;
+			IdeApp.Workspace.FirstWorkspaceItemOpened += delegate {
+				if (WelcomePageOptions.CloseWhenSolutionOpened) {
+					var doc = ShowWelcomePageHandler.GetWelcomePageDoc ();
+					if (doc != null)
+						doc.Close ();
+				}
+			};
+			IdeApp.Workspace.LastWorkspaceItemClosed += delegate {
+				if (WelcomePageOptions.CloseWhenSolutionOpened && WelcomePageOptions.ShowOnStartup)
+					ShowWelcomePageHandler.Show ();
+			};
 			
-			WelcomePageView wpv = WelcomePageView.GetWelcomePage ();
-			IdeApp.Workbench.OpenDocument (wpv, true);
+			if (WelcomePageOptions.ShowOnStartup)
+				IdeApp.Workbench.OpenDocument (new WelcomePageView (), true);
 		}
 	}
 
-	public class ShowWelcomePageHandler : CommandHandler
+	class ShowWelcomePageHandler : CommandHandler
 	{
+		public static Document GetWelcomePageDoc ()
+		{
+			foreach (var d in IdeApp.Workbench.Documents)
+				if (d.GetContent<WelcomePageView>() != null)
+					return d;
+			return null;
+		}
+		
+		public static void Show ()
+		{
+			var wp = GetWelcomePageDoc ();
+			if (wp != null) {
+				wp.Select();
+			} else {
+				IdeApp.Workbench.OpenDocument (new WelcomePageView (), true);
+			}
+		}
+		
 		protected override void Run()
 		{
-			foreach (Document d in IdeApp.Workbench.Documents) {
-				if (d.GetContent<WelcomePageView>() != null) {
-					d.Select();
-					return;
-				}
-			}
-			WelcomePageView wpv = WelcomePageView.GetWelcomePage ();
-			IdeApp.Workbench.OpenDocument(wpv, true);
+			Show ();
 		}
 		
 		protected override void Update (CommandInfo info)
 		{
 			base.Update (info);
+		}
+	}
+	
+	static class WelcomePageOptions
+	{
+		public static bool ShowOnStartup {
+			get { return PropertyService.Get ("WelcomePage.ShowOnStartup", true); }
+			set { PropertyService.Set ("WelcomePage.ShowOnStartup", value); }
+		}
+		
+		public static bool CloseWhenSolutionOpened {
+			get { return PropertyService.Get ("WelcomePage.CloseWhenSolutionOpened", true); }
+			set { PropertyService.Set ("WelcomePage.CloseWhenSolutionOpened", value); }
+		}
+		
+		public static bool UpdateFromInternet {
+			get { return PropertyService.Get ("WelcomePage.UpdateFromInternet", true); }
+			set { PropertyService.Set ("WelcomePage.UpdateFromInternet", value); }
 		}
 	}
 }

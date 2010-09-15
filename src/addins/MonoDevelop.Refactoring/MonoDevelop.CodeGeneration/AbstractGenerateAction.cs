@@ -32,8 +32,8 @@ using System.Collections.Generic;
 using ICSharpCode.NRefactory.Ast;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Refactoring;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Projects.Dom.Output;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.CodeGeneration
 {
@@ -66,7 +66,7 @@ namespace MonoDevelop.CodeGeneration
 			column.PackStart (toggleRenderer, false);
 			column.AddAttribute (toggleRenderer, "active", 0);
 
-			CellRendererPixbuf pixbufRenderer = new CellRendererPixbuf ();
+			var pixbufRenderer = new CellRendererPixbuf ();
 			column.PackStart (pixbufRenderer, false);
 			column.AddAttribute (pixbufRenderer, "pixbuf", 1);
 
@@ -100,7 +100,7 @@ namespace MonoDevelop.CodeGeneration
 			return GetValidMembers ().Any ();
 		}
 		
-		protected abstract IEnumerable<ICSharpCode.NRefactory.Ast.INode> GenerateCode (List<IBaseMember> includedMembers);
+		protected abstract IEnumerable<string> GenerateCode (INRefactoryASTProvider astProvider, string indent, List<IBaseMember> includedMembers);
 		
 		public void GenerateCode ()
 		{
@@ -119,21 +119,19 @@ namespace MonoDevelop.CodeGeneration
 				return;
 			StringBuilder output = new StringBuilder ();
 			string indent = RefactoringOptions.GetIndent (options.Document, options.EnclosingMember != null ? options.EnclosingMember : options.EnclosingType) + "\t";
-			foreach (ICSharpCode.NRefactory.Ast.INode node in GenerateCode (includedMembers)) {
+			foreach (string nodeText in GenerateCode (astProvider, indent, includedMembers)) {
 				if (output.Length > 0) {
 					output.AppendLine ();
-					if (node is Statement)
-						output.Append (indent);
+					output.AppendLine ();
 				}
-				string nodeText = astProvider.OutputNode (options.Dom, node, indent);
 				output.Append (nodeText);
 			}
-			//Console.WriteLine ("output:" + output.ToString ().Replace ("\t", "->"));
+			
 			if (output.Length > 0) {
-				int column = 1;
-				if (!Char.IsWhiteSpace (output[0]))
-					column = options.Document.TextEditor.CursorColumn;
-				options.Document.TextEditor.InsertText (options.Document.TextEditor.GetPositionFromLineColumn (options.Document.TextEditor.CursorLine, column), output.ToString ());
+				var data = options.Document.TextEditorData;
+				int offset = data.Caret.Offset - indent.Length;
+				data.Replace (offset, indent.Length, output.ToString ());
+				data.Caret.Offset = offset + output.Length;
 			}
 		}
 	}

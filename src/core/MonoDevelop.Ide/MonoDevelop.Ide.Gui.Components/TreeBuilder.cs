@@ -28,7 +28,6 @@
 using System;
 using System.Collections;
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
 
 
 namespace MonoDevelop.Ide.Gui.Components
@@ -116,7 +115,7 @@ namespace MonoDevelop.Ide.Gui.Components
 			{
 				pad.RemoveChildren (currentIter);
 				object data = store.GetValue (currentIter, ExtensibleTreeView.DataItemColumn);
-				pad.UnregisterNode (data, currentIter, null);
+				pad.UnregisterNode (data, currentIter, null, true);
 				Gtk.TreeIter it = currentIter;
 				if (store.Remove (ref it) && !it.Equals (Gtk.TreeIter.Zero))
 					MoveToIter (it);
@@ -190,7 +189,7 @@ namespace MonoDevelop.Ide.Gui.Components
 						it = store.AppendValues ("", null, null, dataObject, chain, false);
 					}
 
-					pad.RegisterNode (it, dataObject, chain);
+					pad.RegisterNode (it, dataObject, chain, true);
 
 					BuildNode (it, chain, ats, dataObject);
 					pad.NotifyInserted (it, dataObject);
@@ -222,7 +221,7 @@ namespace MonoDevelop.Ide.Gui.Components
 				else
 					it = store.AppendValues ("", null, null, dataObject, chain, false);
 				
-				pad.RegisterNode (it, dataObject, chain);
+				pad.RegisterNode (it, dataObject, chain, true);
 				
 				BuildNode (it, chain, ats, dataObject);
 				if (moveToChild)

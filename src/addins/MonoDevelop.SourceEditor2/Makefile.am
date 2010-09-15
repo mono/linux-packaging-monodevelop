@@ -18,7 +18,6 @@ FILES =  \
 	MonoDevelop.SourceEditor.OptionPanels/HighlightingPanel.cs \
 	MonoDevelop.SourceEditor.OptionPanels/MarkerPanel.cs \
 	MonoDevelop.SourceEditor/AutoSave.cs \
-	MonoDevelop.SourceEditor/ClassQuickFinder.cs \
 	MonoDevelop.SourceEditor/CompileErrorTooltipProvider.cs \
 	MonoDevelop.SourceEditor/Counters.cs \
 	MonoDevelop.SourceEditor/DebugValueTooltipProvider.cs \
@@ -35,6 +34,12 @@ FILES =  \
 	MonoDevelop.SourceEditor/LanguageItemTooltipProvider.cs \
 	MonoDevelop.SourceEditor/LanguageItemWindow.cs \
 	MonoDevelop.SourceEditor/MarkerOperationsHandler.cs \
+	MonoDevelop.SourceEditor/MessageBubbleCommands.cs \
+	MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs \
+	MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs \
+	MonoDevelop.SourceEditor/NavigationBar.cs \
+	MonoDevelop.SourceEditor/NavigationBarCommands.cs \
+	MonoDevelop.SourceEditor/PinnedWatchWidget.cs \
 	MonoDevelop.SourceEditor/PrintSettingsWidget.cs \
 	MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs \
 	MonoDevelop.SourceEditor/SourceEditorCommands.cs \
@@ -43,6 +48,7 @@ FILES =  \
 	MonoDevelop.SourceEditor/SourceEditorPrintOperation.cs \
 	MonoDevelop.SourceEditor/SourceEditorView.cs \
 	MonoDevelop.SourceEditor/SourceEditorWidget.cs \
+	MonoDevelop.SourceEditor/StatusBox.cs \
 	MonoDevelop.SourceEditor/StyledSourceEditorOptions.cs \
 	MonoDevelop.SourceEditor/SyntaxModeCodon.cs \
 	MonoDevelop.SourceEditor/SyntaxModeService.cs 
@@ -50,7 +56,9 @@ FILES =  \
 RES =  \
 	gtk-gui/gui.stetic \
 	gtk-gui/objects.xml \
-	MonoDevelop.SourceEditor.addin.xml  
+	MonoDevelop.SourceEditor.addin.xml \
+	MonoDevelop.SourceEditor/searchoptions.png
+
 
 DEPS =  \
 	$(top_builddir)/build/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll \
@@ -58,12 +66,8 @@ DEPS =  \
 	$(top_builddir)/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll \
 	$(top_builddir)/build/bin/Mono.Debugging.dll \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Components.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.Gui.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Projects.Gui.dll \
 	$(top_builddir)/build/bin/NRefactory.dll
 
 REFS =  \

@@ -25,16 +25,14 @@
 // THE SOFTWARE.
 
 using System;
-using System.Linq;
 
 using Gtk;
 
 using MonoDevelop.Core;
 using MonoDevelop.Projects.Dom;
-using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.CodeGeneration;
 using System.Collections.Generic;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Refactoring.Rename
 {
@@ -48,7 +46,9 @@ namespace MonoDevelop.Refactoring.Rename
 		{
 			this.options = options;
 			this.rename = rename;
-
+			if (options.SelectedItem is IMethod && ((IMethod)options.SelectedItem).IsConstructor) {
+				options.SelectedItem = ((IMethod)options.SelectedItem).DeclaringType;
+			}
 			this.Build ();
 
 			if (options.SelectedItem is IType) {
@@ -57,6 +57,10 @@ namespace MonoDevelop.Refactoring.Rename
 					// not supported for inner types
 					this.renameFileFlag.Visible = true;
 					this.renameFileFlag.Active = true;
+					// if more than one type is in the file, only rename the file as defilt if the file name contains the type name
+					// see Bug 603938 - Renaming a Class in a file with multiple classes renames the file
+					if (options.Document.CompilationUnit != null && options.Document.CompilationUnit.Types.Count > 1) 
+						this.renameFileFlag.Active = options.Document.FileName.FileNameWithoutExtension.Contains (type.Name);
 				} else {
 					this.renameFileFlag.Active = false;
 				}
@@ -108,7 +112,6 @@ namespace MonoDevelop.Refactoring.Rename
 			entry.Activated += OnEntryActivated;
 			
 			buttonOk.Clicked += OnOKClicked;
-			buttonCancel.Clicked += OnCancelClicked;
 			buttonPreview.Clicked += OnPreviewClicked;
 			entry.Changed += delegate { buttonPreview.Sensitive = buttonOk.Sensitive = ValidateName (); };
 			ValidateName ();
@@ -121,11 +124,11 @@ namespace MonoDevelop.Refactoring.Rename
 				return true;
 			ValidationResult result = nameValidator.ValidateName (this.options.SelectedItem, entry.Text);
 			if (!result.IsValid) {
-				imageWarning.IconName = Stock.DialogError;
+				imageWarning.IconName = Gtk.Stock.DialogError;
 			} else if (result.HasWarning) {
-				imageWarning.IconName = Stock.DialogWarning;
+				imageWarning.IconName = Gtk.Stock.DialogWarning;
 			} else {
-				imageWarning.IconName = Stock.Apply;
+				imageWarning.IconName = Gtk.Stock.Apply;
 			}
 			labelWarning.Text = result.Message;
 			return result.IsValid;
@@ -141,11 +144,6 @@ namespace MonoDevelop.Refactoring.Rename
 		{
 			if (buttonOk.Sensitive)
 				buttonOk.Click ();
-		}
-
-		void OnCancelClicked (object sender, EventArgs e)
-		{
-			this.Destroy ();
 		}
 		
 		RenameRefactoring.RenameProperties Properties {
@@ -169,8 +167,7 @@ namespace MonoDevelop.Refactoring.Rename
 		{
 			List<Change> changes = rename.PerformChanges (options, Properties);
 			((Widget)this).Destroy ();
-			RefactoringPreviewDialog refactoringPreviewDialog = new RefactoringPreviewDialog (options.Dom, changes);
-			refactoringPreviewDialog.Show ();
+			MessageService.ShowCustomDialog (new RefactoringPreviewDialog (options.Dom, changes));
 		}
 	}
 		

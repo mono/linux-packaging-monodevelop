@@ -42,7 +42,6 @@ using System.CodeDom.Compiler;
 
 using MonoDevelop.Core;
 using Mono.Addins;
-using MonoDevelop.Core.Gui;
 using MonoDevelop.Ide.Codons;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui;
@@ -84,7 +83,7 @@ namespace MonoDevelop.Ide.Templates
 		}
 
 		private string icon;
-		public string Icon
+		public IconId Icon
 		{
 			get { return icon; }
 		}
@@ -199,7 +198,7 @@ namespace MonoDevelop.Ide.Templates
 				throw new InvalidOperationException ("Combine element not found");
 			}
 			else {
-				solutionDescriptor = SolutionDescriptor.CreateSolutionDescriptor (xmlDocument.DocumentElement ["Combine"]);
+				solutionDescriptor = SolutionDescriptor.CreateSolutionDescriptor (addin, xmlDocument.DocumentElement ["Combine"]);
 			}
 
 			if (xmlDocument.DocumentElement ["Actions"] != null) {

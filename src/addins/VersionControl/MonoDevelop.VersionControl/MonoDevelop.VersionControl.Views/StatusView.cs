@@ -1,21 +1,16 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using System.Text;
-using System.Collections.Specialized;
 using Mono.Addins;
 
 using Gtk;
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Ide.Commands;
 using MonoDevelop.Projects;
+using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -91,7 +86,7 @@ namespace MonoDevelop.VersionControl.Views
 			if (item.Repository.IsVersioned (item.Path)) {
 				if (test) return true;
 				StatusView d = new StatusView (item.Path, item.Repository);
-				MonoDevelop.Ide.Gui.IdeApp.Workbench.OpenDocument (d, true);
+				IdeApp.Workbench.OpenDocument (d, true);
 				return true;
 			}
 			return false;
@@ -184,7 +179,7 @@ namespace MonoDevelop.VersionControl.Views
 			
 			CellRendererToggle cellToggle = new CellRendererToggle();
 			cellToggle.Toggled += new ToggledHandler(OnCommitToggledHandler);
-			CellRendererPixbuf crc = new CellRendererPixbuf();
+			var crc = new CellRendererIcon ();
 			crc.StockId = "vc-comment";
 			colCommit = new TreeViewColumn ();
 			colCommit.Spacing = 2;
@@ -197,7 +192,7 @@ namespace MonoDevelop.VersionControl.Views
 			colCommit.AddAttribute (crc, "visible", ColShowComment);
 			
 			CellRendererText crt = new CellRendererText();
-			CellRendererPixbuf crp = new CellRendererPixbuf();
+			var crp = new CellRendererPixbuf ();
 			TreeViewColumn colStatus = new TreeViewColumn ();
 			colStatus.Title = GettextCatalog.GetString ("Status");
 			colStatus.PackStart (crp, false);
@@ -210,7 +205,7 @@ namespace MonoDevelop.VersionControl.Views
 			TreeViewColumn colFile = new TreeViewColumn ();
 			colFile.Title = GettextCatalog.GetString ("File");
 			colFile.Spacing = 2;
-			crp = new CellRendererPixbuf();
+			crp = new CellRendererPixbuf ();
 			diffRenderer = new CellRendererDiff ();
 			colFile.PackStart (crp, false);
 			colFile.PackStart (diffRenderer, true);
@@ -219,7 +214,7 @@ namespace MonoDevelop.VersionControl.Views
 			colFile.SetCellDataFunc (diffRenderer, new TreeCellDataFunc (SetDiffCellData));
 			
 			crt = new CellRendererText();
-			crp = new CellRendererPixbuf();
+			crp = new CellRendererPixbuf ();
 			colRemote = new TreeViewColumn ();
 			colRemote.Title = GettextCatalog.GetString ("Remote Status");
 			colRemote.PackStart (crp, false);
@@ -283,6 +278,10 @@ namespace MonoDevelop.VersionControl.Views
 			filelist.ShowContextMenu += OnPopupMenu;
 			
 			StartUpdate();
+		}
+		
+		public override string StockIconId {
+			get { return "vc-status"; }
 		}
 
 		int CompareNodes (Gtk.TreeModel model, Gtk.TreeIter a, Gtk.TreeIter b)
@@ -360,7 +359,37 @@ namespace MonoDevelop.VersionControl.Views
 			showRemoteStatus.Sensitive = false;
 			buttonCommit.Sensitive = false;
 			
-			new Worker(vc, filepath, remoteStatus, this).Start();
+			ThreadPool.QueueUserWorkItem (delegate {
+				List<VersionInfo> newList = new List<VersionInfo> ();
+				newList.AddRange (vc.GetDirectoryVersionInfo(filepath, remoteStatus, true));
+				DispatchService.GuiDispatch (delegate {
+					if (!disposed)
+						LoadStatus (newList);
+				});
+			});
+		}
+		
+		void LoadStatus (List<VersionInfo> newList)
+		{
+			statuses = newList;
+			
+			// Remove from the changeset files/folders which have been deleted
+			var toRemove = new List<ChangeSetItem> ();
+			foreach (ChangeSetItem item in changeSet.Items) {
+				bool found = false;
+				foreach (VersionInfo vi in statuses) {
+					if (vi.LocalPath == item.LocalPath) {
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+					toRemove.Add (item);
+			}
+			foreach (var item in toRemove) 
+				changeSet.RemoveItem (item);
+			
+			Update();
 		}
 		
 		void UpdateControlStatus ()
@@ -449,7 +478,7 @@ namespace MonoDevelop.VersionControl.Views
 			
 			Gdk.Pixbuf fileIcon;
 			if (n.IsDirectory)
-				fileIcon = ImageService.GetPixbuf (MonoDevelop.Core.Gui.Stock.ClosedFolder, Gtk.IconSize.Menu);
+				fileIcon = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.ClosedFolder, Gtk.IconSize.Menu);
 			else
 				fileIcon = DesktopService.GetPixbufForFile (n.LocalPath, Gtk.IconSize.Menu);
 
@@ -695,30 +724,8 @@ namespace MonoDevelop.VersionControl.Views
 			string id = codon.Id;
 			if (id.StartsWith ("@"))
 				return id.Substring (1);
-
-			Type enumType = null;
-			string typeName = id;
-			
-			int i = id.LastIndexOf (".");
-			if (i != -1)
-				typeName = id.Substring (0,i);
-				
-			enumType = codon.Addin.GetType (typeName);
-				
-			if (enumType == null)
-				enumType = Type.GetType (typeName);
-
-			if (enumType == null)
-				enumType = typeof(Command).Assembly.GetType (typeName);
-
-			if (enumType == null || !enumType.IsEnum)
-				throw new InvalidOperationException ("Could not find an enum type for the command '" + id + "'.");
-				
-			try {
-				return Enum.Parse (enumType, id.Substring (i+1));
-			} catch {
-				throw new InvalidOperationException ("Could not find an enum value for the command '" + id + "'.");
-			}
+			else
+				return id;
 		}
 		
 		void OnExpandAll (object s, EventArgs args)
@@ -1005,37 +1012,6 @@ namespace MonoDevelop.VersionControl.Views
 				rc.InitCell (filelist, false, lines, path);
 			} else {
 				rc.InitCell (filelist, true, lines, path);
-			}
-		}
-		
-		private class Worker : Task {
-			StatusView view;
-			Repository vc;
-			string filepath;
-			bool remoteStatus;
-			List<VersionInfo> newList = new List<VersionInfo> ();
-
-			public Worker(Repository vc, string filepath, bool remoteStatus, StatusView view) {
-				this.vc = vc;
-				this.filepath = filepath;
-				this.view = view;
-				this.remoteStatus = remoteStatus;
-			}
-			
-			protected override string GetDescription() {
-				return string.Format (GettextCatalog.GetString ("Retrieving status for {0}..."), Path.GetFileName (filepath));
-			}
-			
-			protected override void Run() {
-				newList.AddRange (vc.GetDirectoryVersionInfo(filepath, remoteStatus, true));
-			}
-		
-			protected override void Finished()
-			{
-				if (!view.disposed) {
-					view.statuses = newList;
-					view.Update();
-				}
 			}
 		}
 	}

@@ -1,3 +1,99 @@
+2010-06-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AutotoolsContext.cs:
+	* SolutionDeployer.cs:
+	* SolutionMakefileHandler.cs: Don't allow spaces in paths.
+
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Commands.cs: Fix incorrect use of
+	  ShowCustomDialog/RunCustomDialog.
+
+2010-05-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* TarballBuilderEditorWidget.cs: Use ShowCustomDialog (which
+	  destroys the dialog when done) instead of RunCustomDialog
+	  (which doesn't).
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Commands.cs:
+	* TarballBuilderEditorWidget.cs: More dialog placing.
+
+2010-03-24  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* SimpleProjectMakefileHandler.cs: Removed unnecessary
+	  ToMakefilePath call (it is already called when adding paths
+	  to extraFiles).
+
+	* MakefileData.cs: Properly escape spaces.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.Autotools.addin.xml: Bumped MD version.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* Commands.cs:
+	* MakefileData.cs:
+	* gtk-gui/gui.stetic:
+	* MakefileOptionPanel.cs:
+	* ImportMakefileDialog.cs:
+	* GenerateMakefilesDialog.cs:
+	* FileNodeBuilderExtension.cs:
+	* MakefileOptionPanelWidget.cs:
+	* MonoDevelop.Autotools.csproj:
+	* MonoDevelop.Autotools.addin.xml: Merged MD.Projects into
+	  MD.Core, and MD.Projects.Gui, MD.Core.Gui and MD.Components
+	  into MD.Ide.
+
+2010-03-03  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MakefileData.cs:
+	* SimpleProjectMakefileHandler.cs: Track ProjectFile Link API.
+
+2010-03-03  Levi Bard  <levi@unity3d.com>
+
+	* MakefileData.cs:
+	* gtk-gui/gui.stetic:
+	* MakefileOptionPanelWidget.cs:
+	* MakefileProjectServiceExtension.cs:
+	* gtk-gui/MonoDevelop.Autotools.MakefileOptionPanelWidget.cs:
+	  Add option for number of parallel build processes.
+
+2010-02-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MakefileData.cs: Fix assembly resolution issue when loading
+	  a project.
+
+2010-02-16  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* MakefileReaderExtension.cs:
+	* MonoDevelop.Autotools.csproj: Remove usnused extension.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MakefileIntegrationFeature.cs: Track api changes.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.Autotools.MakefileSwitchEditor.cs:
+	* gtk-gui/MonoDevelop.Autotools.GenerateMakefilesDialog.cs:
+	* gtk-gui/MonoDevelop.Autotools.MakefileOptionPanelWidget.cs:
+	* gtk-gui/MonoDevelop.Autotools.TarballBuilderEditorWidget.cs:
+	* gtk-gui/MonoDevelop.Autotools.MakefileSwitchEditorWidget.cs:
+	* gtk-gui/MonoDevelop.Autotools.MakefileIntegrationFeatureWidget.cs:
+	  Flush.
+
+2010-01-19  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* SolutionDeployer.cs: Fix Bug 572048 - Spelling mistake in
+	  Packaging Output.
+
 2009-12-01  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* Handler.cs:

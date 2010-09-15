@@ -27,22 +27,16 @@
 //
 
 using System;
-using System.Collections;
-using System.IO;
 using System.Threading;
 
 using Gtk;
 
 using MonoDevelop.Core;
-using Mono.Addins;
 using Mono.Addins.Setup;
 using Mono.Addins.Gui;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Core.Gui.Dialogs;
-using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core.ProgressMonitoring;
-using MonoDevelop.Core.Gui.ProgressMonitoring;
+using MonoDevelop.Ide.ProgressMonitoring;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -50,7 +44,7 @@ namespace MonoDevelop.Ide.Gui
 	{
 		public static AggregatedProgressMonitor UpdateMonitor;
 		AddinRepositoryEntry[] updates;
-		static MonoDevelopStatusBar.StatusIcon updateIcon;
+		static StatusBarIcon updateIcon;
 		
 		public static void HideAlert ()
 		{

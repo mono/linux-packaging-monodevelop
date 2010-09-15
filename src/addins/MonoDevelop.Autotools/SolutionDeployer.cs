@@ -212,7 +212,7 @@ namespace MonoDevelop.Autotools
 			{
 				monitor.EndTask ();
 			}
-			monitor.ReportSuccess ( GettextCatalog.GetString ( "Solution was succesfully deployed" ) );
+			monitor.ReportSuccess (GettextCatalog.GetString ("Solution was successfully deployed."));
 			return true;
 		}
 
@@ -342,6 +342,7 @@ AM_CONDITIONAL(ENABLE_{3}, test x$enable_{2} = xyes)",
 				if (PlatformID.Unix != Environment.OSVersion.Platform)
 					tmpmf = tmpmf.Replace("\\","/");
 
+				AutotoolsContext.CheckSpaces (tmpmf);
 				configFiles.Append(FileService.NormalizeRelativePath (tmpmf));
 				configFiles.Append("\n");
 			}

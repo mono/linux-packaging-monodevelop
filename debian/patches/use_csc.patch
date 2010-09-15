@@ -1,28 +1,28 @@
-Index: monodevelop-2.2/contrib/Mono.Cecil/Makefile.am
+Index: monodevelop.git/contrib/Mono.Cecil/Makefile.am
 ===================================================================
---- monodevelop-2.2.orig/contrib/Mono.Cecil/Makefile.am	2010-01-07 19:55:31.000000000 +0000
-+++ monodevelop-2.2/contrib/Mono.Cecil/Makefile.am	2010-01-07 19:56:44.000000000 +0000
+--- monodevelop.git.orig/contrib/Mono.Cecil/Makefile.am	2010-06-09 15:22:46.000000000 +0100
++++ monodevelop.git/contrib/Mono.Cecil/Makefile.am	2010-06-09 15:34:08.000000000 +0100
 @@ -1,4 +1,5 @@
  BINDIR=$(top_builddir)/build/bin
 +MCS=@CSC@
  
- all: $(CECIL)
+ all: $(CECIL) $(CECIL_MDB) $(CECIL_DECOMPILER)
  
-@@ -11,7 +12,7 @@
+@@ -12,7 +13,7 @@
  
  $(CECIL): $(CECIL_CSFILES)
  	mkdir -p $(BINDIR)
--	mcs $(CECIL_CSFILES) /debug /target:library /out:$(CECIL)
-+	$(MCS) $(CECIL_CSFILES) /debug /target:library /out:$(CECIL)
+-	mcs $(CECIL_CSFILES) /keyfile:$(CECIL_SNK) /debug /target:library /out:$(CECIL)
++	$(MCS) $(CECIL_CSFILES) /keyfile:$(CECIL_SNK) /debug /target:library /out:$(CECIL)
  
  $(CECIL_DEBUG): $(CECIL)
  
-@@ -24,7 +25,7 @@
+@@ -25,7 +26,7 @@
  
  $(CECIL_MDB): $(CECIL_MDB_CSFILES) $(CECIL)
  	mkdir -p $(BINDIR)
--	mcs $(CECIL_MDB_CSFILES) /debug /target:library /r:$(CECIL) /d:CECIL /out:$(CECIL_MDB)
-+	$(CSC) $(CECIL_MDB_CSFILES) /debug /target:library /r:$(CECIL) /d:CECIL /out:$(CECIL_MDB)
+-	gmcs $(CECIL_MDB_CSFILES) /debug /target:library /keyfile:$(CECIL_SNK) /r:$(CECIL) /d:CECIL /out:$(CECIL_MDB)
++	$(MCS) $(CECIL_MDB_CSFILES) /debug /target:library /keyfile:$(CECIL_SNK) /r:$(CECIL) /d:CECIL /out:$(CECIL_MDB)
  
  $(CECIL_MDB_DEBUG): $(CECIL_MDB)
  

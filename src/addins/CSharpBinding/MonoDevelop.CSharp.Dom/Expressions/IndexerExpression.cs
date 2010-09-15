@@ -33,8 +33,20 @@ namespace MonoDevelop.CSharp.Dom
 {
 	public class IndexerExpression : AbstractCSharpNode
 	{
-		public INode Target {
-			get { return GetChildByRole (Roles.TargetExpression); }
+		public ICSharpNode Target {
+			get { return (ICSharpNode)GetChildByRole (Roles.TargetExpression); }
+		}
+		
+		public CSharpTokenNode LBracket {
+			get {
+				return (CSharpTokenNode)GetChildByRole (Roles.LBracket);
+			}
+		}
+		
+		public CSharpTokenNode RBracket {
+			get {
+				return (CSharpTokenNode)GetChildByRole (Roles.RBracket);
+			}
 		}
 		
 		public IEnumerable<INode> Arguments {

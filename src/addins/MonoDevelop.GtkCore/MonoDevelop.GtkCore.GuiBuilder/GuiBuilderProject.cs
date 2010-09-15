@@ -29,22 +29,16 @@
 using System;
 using System.Xml;
 using System.IO;
-using System.Reflection;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.CodeDom;
 using System.CodeDom.Compiler;
 
 using MonoDevelop.Core;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Projects.CodeGeneration;
-using MonoDevelop.Core.Gui;
-using MonoDevelop.Projects.Text;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.GtkCore.GuiBuilder
 {
@@ -412,17 +406,13 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 		
 		public void ImportGladeFile ()
 		{
-			Gtk.FileChooserDialog dialog =
-				new Gtk.FileChooserDialog ("Open Glade File", null, Gtk.FileChooserAction.Open,
-						       Gtk.Stock.Cancel, Gtk.ResponseType.Cancel,
-						       Gtk.Stock.Open, Gtk.ResponseType.Ok);
-			dialog.TransientFor = MonoDevelop.Ide.Gui.IdeApp.Workbench.RootWindow;
-			int response = dialog.Run ();
-			if (response == (int)Gtk.ResponseType.Ok) {
-				SteticProject.ImportGlade (dialog.Filename);
+			var dlg = new MonoDevelop.Components.SelectFileDialog (GettextCatalog.GetString ("Open Glade File"));
+			dlg.AddFilter (GettextCatalog.GetString ("Glade files"), "*.glade");
+			dlg.AddAllFilesFilter ();
+			if (dlg.Run ()) {
+				SteticProject.ImportGlade (dlg.SelectedFile);
 				Save (true);
 			}
-			dialog.Destroy ();
 		}
 		
 		public GuiBuilderWindow GetWindowForClass (string className)
@@ -511,7 +501,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 						// Return this class only if it is declared outside the gtk-gui
 						// folder. Generated partial classes will be ignored.
 						foreach (IType part in cls.Parts) {
-							if (part.CompilationUnit != null && !part.CompilationUnit.FileName.IsChildPathOf (gui_folder)) {
+							if (part.CompilationUnit != null && !part.CompilationUnit.FileName.IsNullOrEmpty && !part.CompilationUnit.FileName.IsChildPathOf (gui_folder)) {
 								return part;
 							}
 						}

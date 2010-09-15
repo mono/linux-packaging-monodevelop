@@ -1,3 +1,89 @@
+2010-05-25  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* SelectFileDialogHandler.cs: Fix build.
+
+2010-05-25  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AddFileDialogHandler.cs:
+	* SelectFileDialogHandler.cs: Track api changes.
+
+2010-05-17  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* WindowsPlatform.cs: Fixed Bug 606364 - Cannot execute
+	  program in external console.
+
+2010-05-04  Jonathan Pobst  <monkey@jpobst.com>
+
+	* WindowsPlatform.cs: Respect the workingDirectory parameter
+	in StartConsoleProcess.
+
+2010-04-30  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* WindowsPlatform.cs: Fix build.
+
+2010-04-28  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* WindowsPlatform.cs: Track StartConsoleProcess API.
+
+2010-04-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* WindowsPlatform.cs: External console processes are now
+	  wrapped by a IProcessAsyncOperation interface, instead of a
+	  Process instance. In this way it is possible to create
+	  external consoles which are not directly bound to a process.
+
+2010-03-30  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* WindowsPlatform.cs: Quote the command.
+
+2010-03-30  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* WindowsPlatform.cs: Add support for external consoles using
+	  cmd.exe.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* WindowsPlatform.addin.xml: Bumped MD version.
+
+2010-03-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* WindowsPlatform.addin.xml: Remove old add-in.
+
+2010-03-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Win32.cs:
+	* Enums.cs:
+	* structs.cs:
+	* WinFormsRoot.cs:
+	* WindowsPlatform.cs:
+	* OpenFileDialogEx.cs:
+	* OpenFileDialogEx.resx:
+	* WindowsPlatform.csproj:
+	* CustomAddFilesDialog.cs:
+	* AddFileDialogHandler.cs:
+	* WindowsPlatform.addin.xml:
+	* CustomAddFilesDialog.resx:
+	* SelectFileDialogHandler.cs:
+	* OpenFileDialogEx.Designer.cs:
+	* CustomAddFilesDialog.Designer.cs: Initial implementation of
+	  native dialogs for file open operations. Not yet enabled.
+	  Fixed build.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* WindowsPlatform.csproj: Remove import off mono.addins
+	  targets.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Win32.cs:
+	* WindowsPlatform.cs:
+	* WindowsPlatform.csproj:
+	* WindowsPlatform.addin.xml: Merged MD.Projects into MD.Core,
+	  and MD.Projects.Gui, MD.Core.Gui and MD.Components into
+	  MD.Ide.
+
 2009-12-03  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* WindowsPlatform.cs: Don't return an invalid application from

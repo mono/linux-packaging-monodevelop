@@ -24,21 +24,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
-
-using ICSharpCode.NRefactory;
-using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory.PrettyPrinter;
-
-using MonoDevelop.Core;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Projects.Dom;
 using Gtk;
-using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Core.Gui;
 using System.Collections.Generic;
+using ICSharpCode.NRefactory.Ast;
+using MonoDevelop.Core;
+using MonoDevelop.Projects.Dom;
 using MonoDevelop.Refactoring;
-using System.Text;
 
 namespace MonoDevelop.CodeGeneration
 {
@@ -98,7 +89,7 @@ namespace MonoDevelop.CodeGeneration
 				}
 			}
 			
-			protected override IEnumerable<ICSharpCode.NRefactory.Ast.INode> GenerateCode (List<IBaseMember> includedMembers)
+			protected override IEnumerable<string> GenerateCode (INRefactoryASTProvider astProvider, string indent, List<IBaseMember> includedMembers)
 			{
 				// Genereate Equals
 				MethodDeclaration methodDeclaration = new MethodDeclaration ();
@@ -143,7 +134,7 @@ namespace MonoDevelop.CodeGeneration
 				}
 
 				methodDeclaration.Body.AddChild (new ReturnStatement (binOp));
-				yield return methodDeclaration;
+				yield return astProvider.OutputNode (this.Options.Dom, methodDeclaration, indent);
 
 				methodDeclaration = new MethodDeclaration ();
 				methodDeclaration.Name = "GetHashCode";
@@ -157,7 +148,7 @@ namespace MonoDevelop.CodeGeneration
 					Expression right;
 					right = new InvocationExpression (new MemberReferenceExpression (new IdentifierExpression (member.Name), "GetHashCode"));
 
-					IType type = Options.Dom.SearchType (new SearchTypeRequest (Options.Document.ParsedDocument.CompilationUnit, member.ReturnType, Options.EnclosingType));
+					IType type = Options.Dom.SearchType (member, member.ReturnType);
 					if (type != null && type.ClassType != MonoDevelop.Projects.Dom.ClassType.Struct&& type.ClassType != MonoDevelop.Projects.Dom.ClassType.Enum)
 						right = new ParenthesizedExpression (new ConditionalExpression (new BinaryOperatorExpression (new IdentifierExpression (member.Name), BinaryOperatorType.InEquality, new PrimitiveExpression (null)), right, new PrimitiveExpression (0)));
 
@@ -171,7 +162,7 @@ namespace MonoDevelop.CodeGeneration
 				uncheckedBlock.AddChild (new ReturnStatement (binOp));
 
 				methodDeclaration.Body.AddChild (new UncheckedStatement (uncheckedBlock));
-				yield return methodDeclaration;
+				yield return astProvider.OutputNode (this.Options.Dom, methodDeclaration, indent);
 			}
 		}
 	}

@@ -11,6 +11,8 @@ REFS =  \
 	-r:System.Drawing \
 	-r:System.Xml
 
+CONFIG=Mono.TextEditor.dll.config
+
 FILES =  \
 	AssemblyInfo.cs \
 	gtk-gui/generated.cs \
@@ -20,6 +22,7 @@ FILES =  \
 	Mono.TextEditor.Highlighting/ChunkStyle.cs \
 	Mono.TextEditor.Highlighting/DefaultStyle.cs \
 	Mono.TextEditor.Highlighting/IXmlProvider.cs \
+	Mono.TextEditor.Highlighting/JaySyntaxMode.cs \
 	Mono.TextEditor.Highlighting/Keywords.cs \
 	Mono.TextEditor.Highlighting/Marker.cs \
 	Mono.TextEditor.Highlighting/MarkupSyntaxMode.cs \
@@ -37,8 +40,23 @@ FILES =  \
 	Mono.TextEditor.PopupWindow/ListWidget.cs \
 	Mono.TextEditor.PopupWindow/ListWindow.cs \
 	Mono.TextEditor.PopupWindow/TooltipWindow.cs \
+	Mono.TextEditor.Theatrics/Actor.cs \
+	Mono.TextEditor.Theatrics/AnimatedBox.cs \
+	Mono.TextEditor.Theatrics/AnimatedVBox.cs \
+	Mono.TextEditor.Theatrics/AnimatedWidget.cs \
+	Mono.TextEditor.Theatrics/Animation.cs \
+	Mono.TextEditor.Theatrics/BounceFadePopupWindow.cs \
+	Mono.TextEditor.Theatrics/Choreographer.cs \
+	Mono.TextEditor.Theatrics/Pulsator.cs \
+	Mono.TextEditor.Theatrics/SingleActorStage.cs \
+	Mono.TextEditor.Theatrics/SmartScrolledWindow.cs \
+	Mono.TextEditor.Theatrics/Stage.cs \
 	Mono.TextEditor.Vi/ViActionMaps.cs \
 	Mono.TextEditor.Vi/ViActions.cs \
+	Mono.TextEditor.Vi/ViCommandBuilder.cs \
+	Mono.TextEditor.Vi/ViKeyNotation.cs \
+	Mono.TextEditor.Vi/ViMacro.cs \
+	Mono.TextEditor.Vi/ViMark.cs \
 	Mono.TextEditor.Vi/ViMode.cs \
 	Mono.TextEditor.Vi/ViWordFindStrategy.cs \
 	Mono.TextEditor/BookmarkActions.cs \
@@ -47,6 +65,7 @@ FILES =  \
 	Mono.TextEditor/Caret.cs \
 	Mono.TextEditor/CaretMoveActions.cs \
 	Mono.TextEditor/ClipboardActions.cs \
+	Mono.TextEditor/CodeSegmentEditorWindow.cs \
 	Mono.TextEditor/CodeSegmentPreviewWindow.cs \
 	Mono.TextEditor/DashedLineMargin.cs \
 	Mono.TextEditor/DefaultEditActions.cs \
@@ -65,11 +84,12 @@ FILES =  \
 	Mono.TextEditor/GutterMargin.cs \
 	Mono.TextEditor/HelperMethods.cs \
 	Mono.TextEditor/HslColor.cs \
-	Mono.TextEditor/IAnimation.cs \
+	Mono.TextEditor/IAnimationDrawer.cs \
 	Mono.TextEditor/IBackgroundRenderer.cs \
 	Mono.TextEditor/IBracketMatcher.cs \
 	Mono.TextEditor/IBuffer.cs \
 	Mono.TextEditor/IconMargin.cs \
+	Mono.TextEditor/InsertionCursorEditMode.cs \
 	Mono.TextEditor/ISearchEngine.cs \
 	Mono.TextEditor/ISegment.cs \
 	Mono.TextEditor/ITextEditorOptions.cs \
@@ -81,6 +101,9 @@ FILES =  \
 	Mono.TextEditor/LineSplitter.cs \
 	Mono.TextEditor/LinkEventArgs.cs \
 	Mono.TextEditor/Margin.cs \
+	Mono.TextEditor/MarginDrawer.cs \
+	Mono.TextEditor/PangoUtil.cs \
+	Mono.TextEditor/PieceTable.cs \
 	Mono.TextEditor/Platform.cs \
 	Mono.TextEditor/RedBlackTree.cs \
 	Mono.TextEditor/ReplaceEventArgs.cs \
@@ -92,6 +115,8 @@ FILES =  \
 	Mono.TextEditor/SharpDevelopWordFindStrategy.cs \
 	Mono.TextEditor/SimpleEditMode.cs \
 	Mono.TextEditor/TextEditor.cs \
+	Mono.TextEditor/TextEditorAccessibility.cs \
+	Mono.TextEditor/TextEditorContainer.cs \
 	Mono.TextEditor/TextEditorData.cs \
 	Mono.TextEditor/TextEditorOptions.cs \
 	Mono.TextEditor/TextLinkEditMode.cs \
@@ -111,6 +136,7 @@ RES =  \
 	gtk-gui/gui.stetic \
 	Styles/BrownStyle.xml \
 	Styles/C64Style.xml \
+	Styles/IrBlackStyle.xml \
 	Styles/OblivionStyle.xml \
 	Styles/Styles.xsd \
 	Styles/TangoLightStyle.xml \
@@ -127,6 +153,7 @@ RES =  \
 	SyntaxModes/ILSyntaxMode.xml \
 	SyntaxModes/JavascriptSyntaxMode.xml \
 	SyntaxModes/JavaSyntaxMode.xml \
+	SyntaxModes/JaySyntaxMode.xml \
 	SyntaxModes/LuaSyntaxMode.xml \
 	SyntaxModes/MakefileSyntaxMode.xml \
 	SyntaxModes/PythonSyntaxMode.xml \
@@ -135,7 +162,7 @@ RES =  \
 	SyntaxModes/VBNetSyntaxMode.xml \
 	SyntaxModes/XmlSyntaxMode.xml
 
-all: $(ASSEMBLY) $(ASSEMBLY).mdb
+all: $(ASSEMBLY) $(ASSEMBLY).mdb $(ASSEMBLY).config
 
 $(ADDIN_BUILD)/%: $(srcdir)/lib/%
 	mkdir -p $(ADDIN_BUILD)
@@ -143,14 +170,17 @@ $(ADDIN_BUILD)/%: $(srcdir)/lib/%
 
 $(ASSEMBLY): $(build_sources) $(build_resources)
 	mkdir -p $(ADDIN_BUILD)
-	$(CSC) $(CSC_FLAGS) $(REFS) $(build_resources:%=/resource:%) $(build_sources) -out:$@ -target:library
+	$(CSC) $(CSC_FLAGS) -unsafe $(REFS) $(build_resources:%=/resource:%) $(build_sources) -out:$@ -target:library
 
 $(ASSEMBLY).mdb: $(ASSEMBLY)
 
+$(ASSEMBLY).config: $(srcdir)/$(CONFIG)
+	cp "$(srcdir)/$(CONFIG)" $(ASSEMBLY).config
+
 assemblydir = $(MD_ASSEMBLY_DIR)
-assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
+assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb $(ASSEMBLY).config
 
 CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
-EXTRA_DIST = $(FILES) $(RES)
+EXTRA_DIST = $(FILES) $(RES) $(CONFIG)
 
 include $(top_srcdir)/Makefile.include

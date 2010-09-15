@@ -46,6 +46,12 @@ namespace Mono.Debugging.Evaluation
 		
 		public override ValueReference Evaluate (EvaluationContext ctx, string exp, object expectedType)
 		{
+			return Evaluate (ctx, exp, expectedType, false);
+		}
+		
+		ValueReference Evaluate (EvaluationContext ctx, string exp, object expectedType, bool tryTypeOf)
+		{
+			exp = exp.TrimStart ();
 			if (exp.StartsWith ("?"))
 				exp = exp.Substring (1).Trim ();
 			if (exp.StartsWith ("var ")) {
@@ -69,30 +75,173 @@ namespace Mono.Debugging.Evaluation
 				if (exp == null)
 					return null;
 			}
+			
+			exp = ReplaceExceptionTag (exp, ctx.Options.CurrentExceptionTag);
+			
 			StringReader codeStream = new StringReader (exp);
 			IParser parser = ParserFactory.CreateParser (SupportedLanguage.CSharp, codeStream);
 			Expression expObj = parser.ParseExpression ();
 			if (expObj == null)
 				throw new EvaluatorException ("Could not parse expression '{0}'", exp);
-			EvaluatorVisitor ev = new EvaluatorVisitor (ctx, exp, expectedType, userVariables);
-			return (ValueReference) expObj.AcceptVisitor (ev, null);
+			
+			try {
+				EvaluatorVisitor ev = new EvaluatorVisitor (ctx, exp, expectedType, userVariables, tryTypeOf);
+				return (ValueReference) expObj.AcceptVisitor (ev, null);
+			} catch {
+				if (!tryTypeOf && (expObj is BinaryOperatorExpression) && IsTypeName (exp)) {
+					// This is a hack to be able to parse expressions such as "List<string>". The NRefactory parser
+					// can parse a single type name, so a solution is to wrap it around a typeof(). We do it if
+					// the evaluation fails.
+					return Evaluate (ctx, "typeof(" + exp + ")", expectedType, true);
+				} else
+					throw;
+			}
 		}
 		
-		public string Resolve (DebuggerSession session, SourceLocation location, string exp)
+		public override string Resolve (DebuggerSession session, SourceLocation location, string exp)
 		{
+			return Resolve (session, location, exp, false);
+		}
+		
+		string Resolve (DebuggerSession session, SourceLocation location, string exp, bool tryTypeOf)
+		{
+			exp = exp.TrimStart ();
 			if (exp.StartsWith ("?"))
 				return "?" + Resolve (session, location, exp.Substring (1).Trim ());
 			if (exp.StartsWith ("var "))
 				return "var " + Resolve (session, location, exp.Substring (4).Trim (' ','\t'));
 
+			exp = ReplaceExceptionTag (exp, session.Options.EvaluationOptions.CurrentExceptionTag);
+
 			StringReader codeStream = new StringReader (exp);
 			IParser parser = ParserFactory.CreateParser (SupportedLanguage.CSharp, codeStream);
 			Expression expObj = parser.ParseExpression ();
 			if (expObj == null)
-				throw new EvaluatorException ("Could not parse expression '{0}'", exp);
+				return exp;
 			NRefactoryResolverVisitor ev = new NRefactoryResolverVisitor (session, location, exp);
 			expObj.AcceptVisitor (ev, null);
-			return ev.GetResolvedExpression ();
+			string r = ev.GetResolvedExpression ();
+			if (r == exp && !tryTypeOf && (expObj is BinaryOperatorExpression) && IsTypeName (exp)) {
+				// This is a hack to be able to parse expressions such as "List<string>". The NRefactory parser
+				// can parse a single type name, so a solution is to wrap it around a typeof(). We do it if
+				// the evaluation fails.
+				string res = Resolve (session, location, "typeof(" + exp + ")", true);
+				return res.Substring (7, res.Length - 8);
+			}
+			return r;
+		}
+		
+		public override ValidationResult ValidateExpression (EvaluationContext ctx, string exp)
+		{
+			exp = exp.TrimStart ();
+			if (exp.StartsWith ("?"))
+				exp = exp.Substring (1).Trim ();
+			if (exp.StartsWith ("var "))
+				exp = exp.Substring (4).Trim ();
+			
+			exp = ReplaceExceptionTag (exp, ctx.Options.CurrentExceptionTag);
+			
+			// Required as a workaround for a bug in the parser (it won't parse simple expressions like numbers)
+			if (!exp.EndsWith (";"))
+				exp += ";";
+				
+			StringReader codeStream = new StringReader (exp);
+			IParser parser = ParserFactory.CreateParser (SupportedLanguage.CSharp, codeStream);
+			
+			string errorMsg = null;
+			parser.Errors.Error = delegate (int line, int col, string msg) {
+				if (errorMsg == null)
+					errorMsg = msg;
+			};
+			
+			parser.ParseExpression ();
+			
+			if (errorMsg != null)
+				return new ValidationResult (false, errorMsg);
+			else
+				return new ValidationResult (true, null);
+		}
+		
+		string ReplaceExceptionTag (string exp, string tag)
+		{
+			// FIXME: Don't replace inside string literals
+			return exp.Replace (tag, "__EXCEPTION_OBJECT__");
+		}
+		
+		bool IsTypeName (string name)
+		{
+			int pos = 0;
+			bool res = ParseTypeName (name + "$", ref pos);
+			return res && pos >= name.Length;
+		}
+		
+		bool ParseTypeName (string name, ref int pos)
+		{
+			EatSpaces (name, ref pos);
+			if (!ParseName (name, ref pos))
+				return false;
+			EatSpaces (name, ref pos);
+			if (!ParseGenericArgs (name, ref pos))
+				return false;
+			EatSpaces (name, ref pos);
+			if (!ParseIndexer (name, ref pos))
+				return false;
+			EatSpaces (name, ref pos);
+			return true;
+		}
+		
+		void EatSpaces (string name, ref int pos)
+		{
+			while (char.IsWhiteSpace (name[pos]))
+				pos++;
+		}
+		
+		bool ParseName (string name, ref int pos)
+		{
+			if (name[0] == 'g' && pos < name.Length - 8 && name.Substring (pos, 8) == "global::")
+				pos += 8;
+			do {
+				int oldp = pos;
+				while (char.IsLetterOrDigit (name[pos]))
+					pos++;
+				if (oldp == pos)
+					return false;
+				if (name[pos] != '.')
+					return true;
+				pos++;
+			}
+			while (true);
+		}
+		
+		bool ParseGenericArgs (string name, ref int pos)
+		{
+			if (name [pos] != '<')
+				return true;
+			pos++;
+			EatSpaces (name, ref pos);
+			while (true) {
+				if (!ParseTypeName (name, ref pos))
+					return false;
+				EatSpaces (name, ref pos);
+				char c = name [pos++];
+				if (c == '>')
+					return true;
+				else if (c == ',')
+					continue;
+				else
+					return false;
+			}
+		}
+		
+		bool ParseIndexer (string name, ref int pos)
+		{
+			if (name [pos] != '[')
+				return true;
+			do {
+				pos++;
+				EatSpaces (name, ref pos);
+			} while (name [pos] == ',');
+			return name [pos++] == ']';
 		}
 	}
 
@@ -102,15 +251,26 @@ namespace Mono.Debugging.Evaluation
 		EvaluationOptions options;
 		string name;
 		object expectedType;
+		bool tryTypeOf;
 		Dictionary<string,ValueReference> userVariables;
 
-		public EvaluatorVisitor (EvaluationContext ctx, string name, object expectedType, Dictionary<string,ValueReference> userVariables)
+		public EvaluatorVisitor (EvaluationContext ctx, string name, object expectedType, Dictionary<string,ValueReference> userVariables, bool tryTypeOf)
 		{
 			this.ctx = ctx;
 			this.name = name;
 			this.expectedType = expectedType;
 			this.userVariables = userVariables;
 			this.options = ctx.Options;
+			this.tryTypeOf = tryTypeOf;
+		}
+		
+		long GetInteger (object val)
+		{
+			try {
+				return Convert.ToInt64 (val);
+			} catch {
+				throw CreateParseError ("Expected integer value");
+			}
 		}
 		
 		public override object VisitUnaryOperatorExpression (ICSharpCode.NRefactory.Ast.UnaryOperatorExpression unaryOperatorExpression, object data)
@@ -119,25 +279,53 @@ namespace Mono.Debugging.Evaluation
 			object val = vref.ObjectValue;
 			
 			switch (unaryOperatorExpression.Op) {
-				case UnaryOperatorType.BitNot: {
-					long num = Convert.ToInt64 (val);
-					num = ~num;
-					val = Convert.ChangeType (num, val.GetType ());
-					break;
-				}
-				case UnaryOperatorType.Minus: {
-					long num = Convert.ToInt64 (val);
-					num = -num;
-					val = Convert.ChangeType (num, val.GetType ());
-					break;
-				}
-				case UnaryOperatorType.Not:
-					val = !(bool) val;
-					break;
-				case UnaryOperatorType.Plus:
-					break;
-				default:
-					throw CreateNotSupportedError ();
+			case UnaryOperatorType.BitNot: {
+				long num = GetInteger (val);
+				num = ~num;
+				val = Convert.ChangeType (num, val.GetType ());
+				break;
+			}
+			case UnaryOperatorType.Minus: {
+				long num = GetInteger (val);
+				num = -num;
+				val = Convert.ChangeType (num, val.GetType ());
+				break;
+			}
+			case UnaryOperatorType.Not: {
+				if (!(val is bool))
+					throw CreateParseError ("Expected boolean type in Not operator");
+				
+				val = !(bool) val;
+				break;
+			}
+			case UnaryOperatorType.Decrement: {
+				long num = GetInteger (val);
+				val = Convert.ChangeType (num - 1, val.GetType ());
+				vref.Value = ctx.Adapter.CreateValue (ctx, val);
+				break;
+			}
+			case UnaryOperatorType.Increment: {
+				long num = GetInteger (val);
+				val = Convert.ChangeType (num + 1, val.GetType ());
+				vref.Value = ctx.Adapter.CreateValue (ctx, val);
+				break;
+			}
+			case UnaryOperatorType.PostDecrement: {
+				long num = GetInteger (val);
+				object newVal = Convert.ChangeType (num - 1, val.GetType ());
+				vref.Value = ctx.Adapter.CreateValue (ctx, newVal);
+				break;
+			}
+			case UnaryOperatorType.PostIncrement: {
+				long num = GetInteger (val);
+				object newVal = Convert.ChangeType (num + 1, val.GetType ());
+				vref.Value = ctx.Adapter.CreateValue (ctx, newVal);
+				break;
+			}
+			case UnaryOperatorType.Plus:
+				break;
+			default:
+				throw CreateNotSupportedError ();
 			}
 			
 			return LiteralValueReference.CreateObjectLiteral (ctx, name, val);
@@ -145,7 +333,7 @@ namespace Mono.Debugging.Evaluation
 		
 		public override object VisitTypeReference (ICSharpCode.NRefactory.Ast.TypeReference typeReference, object data)
 		{
-			object type = ctx.Adapter.GetType (ctx, typeReference.Type);
+			object type = ToTargetType (typeReference);
 			if (type != null)
 				return new TypeValueReference (ctx, type);
 			else
@@ -176,10 +364,36 @@ namespace Mono.Debugging.Evaluation
 			}			
 			throw CreateNotSupportedError ();
 		}
+		
+		object ToTargetType (TypeReference type)
+		{
+			if (type.IsNull)
+				throw CreateParseError ("Invalid type reference");
+			if (type.GenericTypes.Count == 0)
+				return ctx.Adapter.GetType (ctx, type.Type);
+			else {
+				object[] args = new object [type.GenericTypes.Count];
+				for (int n=0; n<args.Length; n++) {
+					object t = ToTargetType (type.GenericTypes [n]);
+					if (t == null)
+						return null;
+					args [n] = t;
+				}
+				return ctx.Adapter.GetType (ctx, type.Type + "`" + args.Length, args);
+			}
+		}
 
 		public override object VisitTypeOfExpression (ICSharpCode.NRefactory.Ast.TypeOfExpression typeOfExpression, object data)
 		{
-			object type = ctx.Adapter.GetType (ctx, typeOfExpression.TypeReference.Type);
+			if (tryTypeOf) {
+				// The parser is trying to evaluate a type name, but since NRefactory has problems parsing generic types,
+				// it has to do it by wrapping it with a typeof(). In this case, it sets tryTypeOf=true, meaning that
+				// typeof in this case has to be evaluated in a special way: as a type reference.
+				return typeOfExpression.TypeReference.AcceptVisitor (this, data);
+			}
+			object type = ToTargetType (typeOfExpression.TypeReference);
+			if (type == null)
+				throw CreateParseError ("Unknown type: " + typeOfExpression.TypeReference.Type);
 			object ob = ctx.Adapter.CreateTypeObject (ctx, type);
 			if (ob != null)
 				return LiteralValueReference.CreateTargetObjectLiteral (ctx, typeOfExpression.TypeReference.Type, ob);
@@ -291,13 +505,14 @@ namespace Mono.Debugging.Evaluation
 				}
 				return new ArrayValueReference (ctx, val.Value, indexes);
 			}
+
+			object[] args = new object [indexerExpression.Indexes.Count];
+			for (int n=0; n<args.Length; n++)
+				args [n] = ((ValueReference) indexerExpression.Indexes[n].AcceptVisitor (this, data)).Value;
 			
-			if (indexerExpression.Indexes.Count == 1) {
-				ValueReference vi = (ValueReference) indexerExpression.Indexes[0].AcceptVisitor (this, data);
-				vi = ctx.Adapter.GetIndexerReference (ctx, val.Value, vi.Value);
-				if (vi != null)
-					return vi;
-			}
+			ValueReference res = ctx.Adapter.GetIndexerReference (ctx, val.Value, args);
+			if (res != null)
+				return res;
 			
 			throw CreateNotSupportedError ();
 		}
@@ -309,6 +524,11 @@ namespace Mono.Debugging.Evaluation
 		
 		object VisitIdentifier (string name)
 		{
+			// Exception tag
+			
+			if (name == "__EXCEPTION_OBJECT__")
+				return ctx.Adapter.GetCurrentException (ctx);
+			
 			// Look in user defined variables
 			
 			ValueReference userVar;
@@ -372,7 +592,7 @@ namespace Mono.Debugging.Evaluation
 		public override object VisitMemberReferenceExpression (MemberReferenceExpression memberReferenceExpression, object data)
 		{
 			ValueReference vref = (ValueReference) memberReferenceExpression.TargetObject.AcceptVisitor (this, data);
-			ValueReference ch = vref.GetChild (memberReferenceExpression.MemberName);
+			ValueReference ch = vref.GetChild (memberReferenceExpression.MemberName, ctx.Options);
 			if (ch == null)
 				throw CreateParseError ("Unknown member: {0}", memberReferenceExpression.MemberName);
 			return ch;

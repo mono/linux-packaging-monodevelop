@@ -1,3 +1,149 @@
+2010-06-01  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.GtkCore.Dialogs/GtkFeatureWidget.cs: Don't offer
+	  the gtk feature if gtk# is not installed in the active
+	  runtime. Fixes bug #608052 - The New Solution wizard throws
+	  an exception after choosing project features.
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.GtkCore.Dialogs/BindDesignDialog.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderProject.cs:
+	* MonoDevelop.GtkCore.Dialogs/SelectRenamedClassDialog.cs:
+	* MonoDevelop.GtkCore.Dialogs/ConfirmWindowDeleteDialog.cs:
+	  More dialog placing.
+
+2010-05-11  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderService.cs:
+	  Converted some static fields which don't need to be static
+	  into local vars.
+
+2010-05-03  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderService.cs: Track
+	  API.
+
+2010-04-29  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderService.cs: Track
+	  AddFilesToProject API.
+
+2010-04-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.GtkCore.GuiBuilder/CombinedDesignView.cs:
+	  ViewContent widgets are now destroyed by the workspace
+	  window.
+
+
+2010-04-27  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.GtkCore.GuiBuilder/CombinedDesignView.cs: call
+	  destroy on the container vbox during
+
+2010-04-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.GtkCore/ReferenceManager.cs: Found better work
+	  around for the "gnome-sharp" reference issue.
+
+2010-04-26  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.GtkCore/ReferenceManager.cs: Fixed 'Bug 599335 -
+	  Error CS0433: The imported type `Gtk.DeleteEventArgs' is
+	  defined multiple times (CS0433)'.
+
+2010-03-30  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderProject.cs: Added
+	  null check.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.GtkCore.addin.xml: Bumped MD version.
+
+2010-03-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderService.cs: Use the
+	  stock Visual Design layout as layout for stetic.
+
+2010-03-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.GtkCore.GuiBuilder/ToolboxLoader.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderService.cs: Fix
+	  race in SteticApp initialization.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.GtkCore.csproj:
+	* MonoDevelop.GtkCore.addin.xml:
+	* MonoDevelop.GtkCore/GtkDesignInfo.cs:
+	* MonoDevelop.GtkCore/ReferenceManager.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/CodeBinder.cs:
+	* MonoDevelop.GtkCore/ProjectResourceProvider.cs:
+	* MonoDevelop.GtkCore.Dialogs/BindDesignDialog.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderView.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/ToolboxProvider.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderWindow.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderService.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderProject.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/CombinedDesignView.cs:
+	* MonoDevelop.GtkCore/WidgetFileDescriptionTemplate.cs:
+	* MonoDevelop.GtkCore.NodeBuilders/WidgetNodeBuilder.cs:
+	* MonoDevelop.GtkCore.Dialogs/WidgetBuilderOptionPanel.cs:
+	* MonoDevelop.GtkCore.Dialogs/SelectRenamedClassDialog.cs:
+	* MonoDevelop.GtkCore.Dialogs/ConfirmWindowDeleteDialog.cs:
+	* MonoDevelop.GtkCore.NodeBuilders/ActionGroupNodeBuilder.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderDisplayBinding.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/ActionGroupDisplayBinding.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/GtkProjectServiceExtension.cs:
+	* MonoDevelop.GtkCore.NodeBuilders/WindowsFolderNodeBuilder.cs:
+	* MonoDevelop.GtkCore.Dialogs/GtkDesignerOptionsPanelWidget.cs:
+	* MonoDevelop.GtkCore.NodeBuilders/ProjectFolderNodeBuilderExtension.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
+2010-02-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.GtkCore.Dialogs/SelectRenamedClassDialog.cs:
+	  Track api changes.
+
+2010-02-09  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.GtkCore.Dialogs/SelectRenamedClassDialog.cs:
+	  Track API changes for lazy loading images.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.GtkCore.Dialogs/GtkFeatureWidget.cs: Track api
+	  changes.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.GtkCore.Dialogs.GtkDesignerOptionsPanelWidget.cs:
+	  Flush.
+
+2010-01-26  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderDisplayBinding.cs:
+	* MonoDevelop.GtkCore.GuiBuilder/ActionGroupDisplayBinding.cs:
+	  Track DisplayBinding API.
+
+2010-01-18  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.GtkCore.csproj:
+	* MonoDevelop.GtkCore.GuiBuilder/GuiBuilderService.cs: Format
+	  generated files using the MD formatter to ensure that the
+	  generated text is the same for al platforms and
+	  environments.
+
+	* gtk-gui/gui.stetic: Use global:: for type references in
+	  generated code. 
+
 2009-12-17  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* MonoDevelop.GtkCore.GuiBuilder/GtkProjectServiceExtension.cs:

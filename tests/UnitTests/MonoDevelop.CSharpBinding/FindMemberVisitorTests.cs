@@ -54,6 +54,11 @@ namespace MonoDevelop.CSharpBinding.Tests
 		
 		void RunTest (string test)
 		{
+			RunTest (test, null);
+		}
+		
+		void RunTest (string test, LocalVariable localVariable)
+		{
 			StringBuilder     testText           = new StringBuilder ();
 			List<DomLocation> expectedReferences = new List<DomLocation> ();
 			DomLocation memberLocation = DomLocation.Empty;
@@ -95,12 +100,18 @@ namespace MonoDevelop.CSharpBinding.Tests
 			                                                      MonoDevelop.Ide.Gui.TextEditor.GetTextEditor (testViewContent), 
 			                                                      "a.cs");
 			SearchMemberVisitor smv = new SearchMemberVisitor (memberLocation.Line);
-			smv.Visit (parsedDocument.CompilationUnit, null);
-			if (smv.FoundMember == null) {
-				ResolveResult resolveResult = resolver.ResolveIdentifier ("a", memberLocation);
-				if (resolveResult is LocalVariableResolveResult)
-					smv.FoundMember = ((LocalVariableResolveResult)resolveResult).LocalVariable;
+			if (localVariable != null) {
+				((LocalVariable)localVariable).DeclaringMember = parsedDocument.CompilationUnit.GetMemberAt (expectedReferences[0]);
+				smv.FoundMember = localVariable;
+			} else {
+				smv.Visit (parsedDocument.CompilationUnit, null);
+				if (smv.FoundMember == null) {
+					ResolveResult resolveResult = resolver.ResolveIdentifier ("a", memberLocation);
+					if (resolveResult is LocalVariableResolveResult)
+						smv.FoundMember = ((LocalVariableResolveResult)resolveResult).LocalVariable;
+				}
 			}
+			
 			Assert.IsNotNull (smv.FoundMember, "Member to search not found.");
 			if (smv.FoundMember is IType) {
 				smv.FoundMember = dom.GetType (((IType)smv.FoundMember).FullName, 
@@ -183,7 +194,7 @@ namespace MonoDevelop.CSharpBinding.Tests
 			}
 		}
 		
-		class SearchMemberVisitor : AbstractDomVistitor<object, object>
+		class SearchMemberVisitor : AbstractDomVisitor<object, object>
 		{
 			public INode FoundMember {
 				get;
@@ -635,6 +646,112 @@ class TestClass
 	public string $@Value { get; set; }
 	
 	static object ValueProperty = TypeManager.GetProperty<TestClass> (x => x.@Value);
+}
+");
+		}
+		
+		/// <summary>
+		/// Bug 585454 - Lacking one reference to an enum type
+		/// </summary>
+		[Test()]
+		public void TestBug585454 ()
+		{
+			RunTest (
+@"
+internal enum $@EnumTest {
+	Value1,
+	Value2
+}
+class DemoMain
+{
+	@EnumTest innerEnum;
+
+	public DemoMain (@EnumTest theEnum) {
+		innerEnum = theEnum;
+
+		if (innerEnum == @EnumTest.Value1)
+			throw new Exception ();
+	}
+}
+");
+		}
+		
+		/// <summary>
+		/// Bug 587071 - Find references shows a lot of methods with the same name but not from the correct class
+		/// </summary>
+		[Test()]
+		public void TestBug587071 ()
+		{
+			RunTest (
+@"
+
+class Base {
+}
+
+class A : Base 
+{
+	public virtual void $@FooBar () {}
+}
+
+
+class B : Base 
+{
+	public virtual void FooBar () {}
+}
+");
+		}
+
+		/// <summary>
+		/// Bug 587530 – for/foreach rename refactoring ignores the scope
+		/// </summary>
+		[Test()]
+		public void TestBug587530 ()
+		{
+			LocalVariable localVariable = new LocalVariable (null,
+			                                  "t",
+			                                  DomReturnType.Int32,
+			                                  new DomRegion (12, 8, 13, 1));
+			RunTest (
+@"using System;
+
+class C
+{
+	static void Main ()
+	{
+		for (int t = 0; 
+t < 10;
+++t)
+		Console.WriteLine (t);
+
+		for (int $@t = 0; 
+@t < 10;
+++@t)
+			Console.WriteLine (@t);
+	}
+}
+", localVariable);
+		}
+
+		/// <summary>
+		/// Bug 605104 - Highlighter fails to find an instance of my method
+		/// </summary>
+		[Test()]
+		public void TestBug605104 ()
+		{
+			RunTest (
+@"class TestClass
+{
+	bool $@RemoveFromFiltered (
+object item)
+	{
+		return item != null;
+	}
+
+	void RemoveFromFilteredAndGroup (object item)
+	{
+		if (@RemoveFromFiltered (item) && item != null)
+			;
+	}
 }
 ");
 		}

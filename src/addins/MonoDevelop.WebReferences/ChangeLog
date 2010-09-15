@@ -1,3 +1,174 @@
+2010-05-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs: Fix
+	  incorrect use of ShowCustomDialog/RunCustomDialog.
+
+2010-05-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	  Fix build.
+
+2010-05-26  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	  Properly destroy the web reference dialog.
+
+2010-05-22  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs:
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	  More dialog placing.
+
+2010-05-21  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am: Flush.
+
+2010-05-20  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.WS/WebServiceDiscoveryResultWS.cs:
+	* MonoDevelop.WebReferences.WCF/WebServiceDiscoveryResultWCF.cs:
+	  Use correct namespace when updating a web reference. Fixes
+	  bug #605942 - Refreshing .NET 2.0 Web Service causes
+	  additional class nesting.
+
+2010-04-23  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.WCF/WebServiceDiscoveryResultWCF.cs:
+	  Fix build.
+
+2010-04-23  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* MonoDevelop.WebReferences.WS:
+	* MonoDevelop.WebReferences.WCF:
+	* MonoDevelop.WebReferences.csproj:
+	* MonoDevelop.WebReferences.addin.xml:
+	* MonoDevelop.WebReferences.WCF/WCFMetadata.cs:
+	* MonoDevelop.WebReferences/WebReferenceItem.cs:
+	* MonoDevelop.WebReferences/WebServiceEngine.cs:
+	* MonoDevelop.WebReferences.WS/WebReferences.cs:
+	* MonoDevelop.WebReferences.WCF/MetadataFile.cs:
+	* MonoDevelop.WebReferences.WCF/ExtensionFile.cs:
+	* MonoDevelop.WebReferences.WCF/ClientOptions.cs:
+	* MonoDevelop.WebReferences/WebServiceEngineWS.cs:
+	* MonoDevelop.WebReferences.WS/WebReferenceUrl.cs:
+	* MonoDevelop.WebReferences/WebReferenceFolder.cs:
+	* MonoDevelop.WebReferences.WCF/ReferenceGroup.cs:
+	* MonoDevelop.WebReferences.WCF/MetadataSource.cs:
+	* MonoDevelop.WebReferences/WebServiceEngineWCF.cs:
+	* MonoDevelop.WebReferences/WebReferencesService.cs:
+	* MonoDevelop.WebReferences.WCF/CollectionMapping.cs:
+	* MonoDevelop.WebReferences.WS/WebServiceEngineWS.cs:
+	* MonoDevelop.WebReferences.WCF/WCFMetadataStorage.cs:
+	* MonoDevelop.WebReferences.WCF/ReferencedAssembly.cs:
+	* MonoDevelop.WebReferences.WCF/WebServiceEngineWCF.cs:
+	* MonoDevelop.WebReferences/WebServiceDiscoveryResult.cs:
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs:
+	* MonoDevelop.WebReferences/WebReferenceItemCollection.cs:
+	* MonoDevelop.WebReferences.WS/WebServiceDiscoveryResultWS.cs:
+	* MonoDevelop.WebReferences.NodeBuilders/ProjectNodeBuilder.cs:
+	* MonoDevelop.WebReferences.WCF/WebServiceDiscoveryResultWCF.cs:
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	* MonoDevelop.WebReferences.NodeBuilders/WebReferenceFolderNodeBuilder.cs:
+	* MonoDevelop.WebReferences.NodeBuilders/ProjectFolderNodeBuilderExtension.cs:
+	  Improved compatibility. VS can now properly open projects
+	  with web references created with MD, and vice-versa.
+	  Reorganized a bit the code.
+
+2010-04-23  Carlo Kok  <ck@remobjects.com>
+	* Makefile.am:
+	* MonoDevelop.WebReferences.csproj:
+	  Add missing System.Configuration reference.
+	  
+2010-04-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.WebReferences.csproj:
+	* MonoDevelop.WebReferences.Resources/WebReference.png:
+	* MonoDevelop.WebReferences.Resources/WebReferenceItem.VS.png:
+	* MonoDevelop.WebReferences.Resources/WebReference.Service.png:
+	* MonoDevelop.WebReferences.Resources/WebReference.File.Wsdl.png:
+	* MonoDevelop.WebReferences.Resources/WebReference.File.Disco.png:
+	* MonoDevelop.WebReferences.Resources/WebReferenceFolder.Open.png:
+	* gtk-gui/MonoDevelop.WebReferences.Dialogs.WebReferenceDialog.cs:
+	* MonoDevelop.WebReferences.Resources/WebReferenceFolder.Closed.png:
+	  Remove unused icons.
+
+	* MonoDevelop.WebReferences/WebServiceEngineWCF.cs:
+	* MonoDevelop.WebReferences/MoonlightChannelBaseExtension.cs:
+	  Add support for moonlight and monotouch proxies.
+
+2010-04-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.WebReferences.csproj:
+	* MonoDevelop.WebReferences/CodeGenerator.cs:
+	* MonoDevelop.WebReferences/WebServiceEngine.cs:
+	* MonoDevelop.WebReferences/WebReferenceItem.cs:
+	* MonoDevelop.WebReferences/WebServiceEngineWS.cs:
+	* MonoDevelop.WebReferences/WebServiceEngineWCF.cs:
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs:
+	* MonoDevelop.WebReferences/WebReferenceItemCollection.cs:
+	* gtk-gui/MonoDevelop.WebReferences.Dialogs.WebReferenceDialog.cs:
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	* MonoDevelop.WebReferences.NodeBuilders/WebReferenceFolderNodeBuilder.cs:
+	  Add support for WCF references.
+
+2010-04-21  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs: Log
+	  the error.
+
+2010-04-21  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs:
+	  Show an error message if DiscoverAny fails. Fixes bug
+	  #590375 - Add Web Reference dialog silently swallows errors.
+
+2010-04-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences/WebReferenceItem.cs: Fix warning.
+
+	* MonoDevelop.WebReferences/WebReferenceItemCollection.cs:
+	  Simplify.
+
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	  Ask for confirmation before deleting a web reference.
+
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs:
+	  Don't allow duplicate reference names.
+
+	* gtk-gui/MonoDevelop.WebReferences.Dialogs.WebReferenceDialog.cs:
+	  Don't allow duplicate reference names. Fixes bug #582487 -
+	  Web reference cannot be deleted.
+
+2010-03-22  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* AssemblyInfo.cs:
+	* MonoDevelop.WebReferences.addin.xml: Bumped MD version.
+
+2010-03-19  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	  Use the correct reference name for comparing. Fixes bug
+	  #583009 - WebReferenceCommandHandler duplicates references.
+
+2010-03-17  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* Makefile.am:
+	* gtk-gui/gui.stetic:
+	* MonoDevelop.WebReferences.csproj:
+	* MonoDevelop.WebReferences.addin.xml:
+	* MonoDevelop.WebReferences.Dialogs/WebReferenceDialog.cs:
+	* MonoDevelop.WebReferences.Commands/WebReferenceCommandHandler.cs:
+	* MonoDevelop.WebReferences.NodeBuilders/WebReferenceNodeBuilder.cs:
+	* MonoDevelop.WebReferences.NodeBuilders/WebReferenceFolderNodeBuilder.cs:
+	  Merged MD.Projects into MD.Core, and MD.Projects.Gui,
+	  MD.Core.Gui and MD.Components into MD.Ide.
+
 2010-02-16  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* Makefile.am:
@@ -7,6 +178,12 @@
 	* MonoDevelop.WebReferences.Dialogs/UserPasswordDialog.cs:
 	* gtk-gui/MonoDevelop.WebReferences.Dialogs.UserPasswordDialog.cs:
 	  Add support for basic authentication.
+
+2010-01-28  Lluis Sanchez Gual  <lluis@novell.com>
+
+	* gtk-gui/generated.cs:
+	* gtk-gui/MonoDevelop.WebReferences.Dialogs.WebReferenceDialog.cs:
+	  Flush.
 
 2009-12-02  Michael Hutchinson  <mhutchinson@novell.com>
 
