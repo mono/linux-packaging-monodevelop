@@ -1,3 +1,10 @@
+monodevelop (2.4+dfsg-3~bpo50+1) lenny-backports; urgency=low
+
+  * Rebuild for lenny-backports.
+  * Replaced *-cil-dev build-deps with actual library packages.
+
+ -- Mirco Bauer <meebey@debian.org>  Wed, 03 Nov 2010 17:55:52 +0100
+
 monodevelop (2.4+dfsg-3) unstable; urgency=low
 
   * debian/patches/use_keyfile_not_keycontainer.patch:
