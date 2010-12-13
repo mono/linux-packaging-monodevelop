@@ -152,7 +152,6 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 		[AsyncDispatch]
 		public virtual void Dispose()
 		{
-			// Make sure we are done with all pending calls
 			DispatchService.RunPendingEvents ();
 			
 			lock (progressTracker) {

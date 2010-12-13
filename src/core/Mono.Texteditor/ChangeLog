@@ -1,3 +1,235 @@
+2010-07-15  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs: Added null check.
+
+2010-07-12  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs: Fixed 'Bug 621483 - MD
+	  hangs for a few seconds when searching'.
+
+2010-07-12  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/DefaultEditActions.cs: Implemented 'Bug
+	  621461 - shift+tab should outdent a code line without
+	  selecting it' / shift-tab behaves now like in gedit.
+
+2010-07-09  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs: fixed build.
+
+2010-07-09  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs: Added some gdk window checks.
+
+2010-07-09  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/DefaultEditActions.cs: Fixed indent
+	  selection.
+
+2010-07-09  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Highlighting/Rule.cs: Fixed 'Bug 620977 -
+	  Special characters in source code crashes MD'.
+
+2010-07-08  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/DeleteActions.cs: Fixed 'Bug 620854 -
+	  "delete to end of line" messes up edited file'.
+
+2010-07-05  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Theatrics/SmartScrolledWindow.cs: Fixed GTK
+	  critical when closing a text editor.
+
+2010-07-05  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/DefaultEditActions.cs: Fixed single line
+	  indent/outdent (Bug 619798 - Outdent a selected line selects
+	  the next line).
+
+2010-07-02  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Theatrics/SmartScrolledWindow.cs: Fixed text
+	  editor splitting.
+
+2010-07-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/Caret.cs:
+	* Mono.TextEditor/TextEditor.cs: Fixed some issues.
+
+2010-07-01  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextLinkEditMode.cs: Fixed text link
+	  markers.
+
+2010-06-24  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextMarker.cs:
+	* Mono.TextEditor/TextViewMargin.cs: Fixed 'Bug 616949 -
+	  Message bubbles prevents the background color of selected
+	  text to change'.
+
+2010-06-24  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/DefaultEditActions.cs: Fixed 'Bug 616921 -
+	  "Move the line or highlighted selection up" command deletes
+	  selection'.
+
+2010-06-24  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Highlighting/SyntaxModeService.cs: Check if
+	  line is valid.
+
+2010-06-23  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/Document.cs: Fixed 'Bug 616128 - Text editor
+	  hiccoughs every 2 seconds (approx.)'.
+
+2010-06-23  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/Document.cs: Update line after unregistering
+	  text marker.
+
+2010-06-21  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/Document.cs: Fixed 'Bug 615624 - Pressing
+	  DOWN after RETURN moves cursor to beginning of blank lines
+	  instead of to the indent'.
+
+2010-06-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditorData.cs:
+	* Mono.TextEditor/DefaultEditActions.cs: Improved virtual
+	  space return key behavior.
+
+2010-06-18  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViCommandBuilder.cs: Some simple
+	  multiplier support.
+
+2010-06-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/DefaultEditActions.cs: Fixed 'Bug 615191 -
+	  When using multiline selection to indent/outdent, the
+	  indenter selects too much'.
+
+2010-06-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextEditorData.cs:
+	* Mono.TextEditor/ClipboardActions.cs: Fixed 'Bug 615196 -
+	  Pasting a chunk of text into the virtual whitespace fracks
+	  everything up'.
+
+2010-06-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs: Fixed 'Bug 615342 -
+	  Source code highlighting behaves badly on cyrillic text'.
+
+2010-06-17  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* Mono.TextEditor.csproj:
+	* Mono.TextEditor.PopupWindow/ListWindow.cs:
+	* Mono.TextEditor/InsertionCursorEditMode.cs:
+	* Mono.TextEditor.PopupWindow/ModeHelpWindow.cs:
+	* Mono.TextEditor/FoldingScreenbackgroundRenderer.cs: Added
+	  help window for insertion mode.
+
+2010-06-16  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Highlighting/SyntaxMode.cs: Fixed
+	  highlighting bug.
+
+2010-06-16  Mike Krüger  <mkrueger@novell.com>
+
+	* SyntaxModes/JavascriptSyntaxMode.xml: Added mime type for
+	  java script.
+
+2010-06-16  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Highlighting/SyntaxMode.cs: Corrected a
+	  highlighting bug (visible in the CTAGS section in xml
+	  highlighting).
+
+2010-06-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViCommandBuilder.cs: Remove debug code,
+	  tidy.
+
+	* Mono.TextEditor.Vi/ViEditorContext.cs: Basic input
+	  processing.
+
+2010-06-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor/TextEditor.cs: Use mapped modifier values
+	  for the IM commit. Modifiers and keys received by editor
+	  extensions and editor modes are now always post keyboard
+	  mapping.
+
+	* Mono.TextEditor/SimpleEditMode.cs: Moved
+	  modifier-permits-input check here. Much simpler now that
+	  modifiers are consumed.
+
+2010-06-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor/Platform.cs: Track MapRawKeys from Ide -
+	  don't restore consumed modifiers, since that breaks vi
+	  stuff.
+
+2010-06-16  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViCommandBuilder.cs: Work around a gmcs
+	  bug.
+
+2010-06-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViEditorContext.cs:
+	* Mono.TextEditor.Vi/ViCommandBuilder.cs: Merged ViEditor and
+	  ViEditorContext. Added method for building commands.
+
+2010-06-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViCommandBuilder.cs: Fix build, add more
+	  actions.
+
+2010-06-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViKeyNotation.cs: Remove full ctor that
+	  could create invalid keys.
+
+	* Mono.TextEditor.Vi/ViCommandBuilder.cs: Add some more action
+	  maps.
+
+2010-06-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Makefile.am:
+	* Mono.TextEditor.csproj: Added file to project.
+
+2010-06-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViKeyNotation.cs: Implement equality
+	  members on ViKey.
+
+	* Mono.TextEditor.Vi/ViCommandBuilder.cs: Parse motions,
+	  multipliers, registers.
+
+2010-06-15  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* Mono.TextEditor.Vi/ViKeyNotation.cs:
+	* Mono.TextEditor.Vi/ViEditorContext.cs:
+	* Mono.TextEditor.Vi/ViCommandBuilder.cs: New vi command
+	  builder architecture (incomplete)
+
+2010-06-15  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/TextViewMargin.cs: made some functions
+	  public.
+
+2010-06-15  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor/GutterMargin.cs: Fixed a bug where the
+	  gutter margin with isn't calculated correctly.
+
 2010-06-14  Lluis Sanchez Gual  <lluis@novell.com>
 
 	* Mono.TextEditor.Vi/ViKeyNotation.cs: Really fix the windows

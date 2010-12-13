@@ -26,11 +26,15 @@
 //
 
 using System;
+using System.Linq;
 using Mono.Addins;
 using MonoDevelop.Projects.Formats.MSBuild;
+using System.Collections.Generic;
 
 namespace MonoDevelop.Projects.Extensions
 {
+	[ExtensionNodeChild (typeof(DotNetProjectSubtypeNodeImport), "AddImport")]
+	[ExtensionNodeChild (typeof(DotNetProjectSubtypeNodeImport), "RemoveImport")]
 	public class DotNetProjectSubtypeNode: ExtensionNode
 	{
 		[NodeAttribute]
@@ -44,6 +48,12 @@ namespace MonoDevelop.Projects.Extensions
 		
 		[NodeAttribute]
 		string extension;
+
+		[NodeAttribute]
+		string exclude;
+
+		[NodeAttribute]
+		bool useXBuild;
 
 		Type itemType;
 
@@ -68,6 +78,16 @@ namespace MonoDevelop.Projects.Extensions
 			get { 
 				return extension; 
 			}
+		}
+		
+		public string Exclude {
+			get { 
+				return exclude; 
+			}
+		}
+		
+		public bool UseXBuild {
+			get { return useXBuild; }
 		}
 		
 		public bool SupportsType (string guid)
@@ -97,9 +117,43 @@ namespace MonoDevelop.Projects.Extensions
 		public virtual void InitializeHandler (SolutionEntityItem item)
 		{
 			MSBuildProjectHandler h = (MSBuildProjectHandler) ProjectExtensionUtil.GetItemHandler (item);
-			if (!string.IsNullOrEmpty (import))
-				h.TargetImports.AddRange (import.Split (':'));
+			UpdateImports (item, h.TargetImports);
 			h.SubtypeGuids.Add (guid);
 		}
+		
+		public void UpdateImports (SolutionEntityItem item, List<string> imports)
+		{
+			DotNetProject p = (DotNetProject) item;
+			if (!string.IsNullOrEmpty (import))
+				imports.AddRange (import.Split (':'));
+			if (!string.IsNullOrEmpty (exclude))
+				exclude.Split (':').ToList ().ForEach (i => imports.Remove (i));
+			
+			foreach (DotNetProjectSubtypeNodeImport iob in ChildNodes) {
+				if (iob.Language == p.LanguageName) {
+					if (iob.IsAdd)
+						imports.AddRange (iob.Projects.Split (':'));
+					else
+						iob.Projects.Split (':').ToList ().ForEach (i => imports.Remove (i));
+				}
+			}
+		}
+	}
+	
+	class DotNetProjectSubtypeNodeImport: ExtensionNode
+	{
+		protected override void Read (NodeElement elem)
+		{
+			IsAdd = elem.NodeName == "AddImport";
+			base.Read (elem);
+		}
+		
+		[NodeAttribute ("language")]
+		public string Language { get; set; }
+		
+		[NodeAttribute ("projects")]
+		public string Projects { get; set; }
+		
+		public bool IsAdd { get; private set; }
 	}
 }

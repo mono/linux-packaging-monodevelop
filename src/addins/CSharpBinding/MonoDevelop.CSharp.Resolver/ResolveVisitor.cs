@@ -105,15 +105,17 @@ namespace MonoDevelop.CSharp.Resolver
 		{
 			if (identifierExpression.TypeArguments != null && identifierExpression.TypeArguments.Count > 0) {
 				if (resolver.CallingType != null) {
-					IMethod possibleMethod = resolver.CallingType.Methods.Where (m => m.Name == identifierExpression.Identifier && m.TypeParameters.Count == identifierExpression.TypeArguments.Count).FirstOrDefault ();
-					if (possibleMethod != null) {
-						MethodResolveResult methodResolveResult = new MethodResolveResult (possibleMethod);
-						methodResolveResult.CallingType   = resolver.CallingType;
-						methodResolveResult.CallingMember = resolver.CallingMember;
-						
-						identifierExpression.TypeArguments.ForEach (arg => methodResolveResult.AddGenericArgument (resolver.ResolveType (arg.ConvertToReturnType ())));
-						methodResolveResult.ResolveExtensionMethods ();
-						return methodResolveResult;
+					foreach (var type in resolver.Dom.GetInheritanceTree (resolver.CallingType)) {
+						IMethod possibleMethod = type.Methods.Where (m => m.Name == identifierExpression.Identifier && m.TypeParameters.Count == identifierExpression.TypeArguments.Count && m.IsAccessibleFrom (resolver.Dom, resolver.CallingType, resolver.CallingMember, true)).FirstOrDefault ();
+						if (possibleMethod != null) {
+							MethodResolveResult methodResolveResult = new MethodResolveResult (possibleMethod);
+							methodResolveResult.CallingType   = resolver.CallingType;
+							methodResolveResult.CallingMember = resolver.CallingMember;
+							
+							identifierExpression.TypeArguments.ForEach (arg => methodResolveResult.AddGenericArgument (resolver.ResolveType (arg.ConvertToReturnType ())));
+							methodResolveResult.ResolveExtensionMethods ();
+							return methodResolveResult;
+						}
 					}
 				}
 				TypeReference reference = new TypeReference (identifierExpression.Identifier);
@@ -154,8 +156,27 @@ namespace MonoDevelop.CSharp.Resolver
 		{
 			if (collectionInitializerExpression.CreateExpressions.Count == 0)
 				return null;
-			DomReturnType type = (DomReturnType)ResolveType (collectionInitializerExpression.CreateExpressions[0]);
-			type.ArrayDimensions++;
+			DomReturnType type = null;
+			IType typeObject = null;
+			
+			for (int i = 0; i < collectionInitializerExpression.CreateExpressions.Count; i++) {
+				DomReturnType curType = (DomReturnType)ResolveType (collectionInitializerExpression.CreateExpressions[i]);
+				// if we found object or we have only one create expression we can stop
+				if (curType.DecoratedFullName == DomReturnType.Object.DecoratedFullName || collectionInitializerExpression.CreateExpressions.Count == 1) {
+					type = curType;
+					break;
+				}
+				IType curTypeObject = resolver.Dom.GetType (curType);
+				if (curTypeObject == null)
+					continue;
+				if (type == null || resolver.Dom.GetInheritanceTree (typeObject).Any (t => t.DecoratedFullName == curTypeObject.DecoratedFullName)) {
+					type = curType;
+					typeObject = curTypeObject;
+				}
+			}
+			
+			if (type != null)
+				type.ArrayDimensions++;
 			return CreateResult (type);
 		}
 		
@@ -213,7 +234,8 @@ namespace MonoDevelop.CSharp.Resolver
 			
 			if (result.ResolvedType != null && result.ResolvedType.ArrayDimensions > 0) {
 				((DomReturnType)result.ResolvedType).ArrayDimensions--;
-				((DomReturnType)result.ResolvedType).Type = null; // underlying type has >always< changed
+				if (result.ResolvedType.Type is ITypeParameterType)
+					((DomReturnType)result.ResolvedType).Type = null;
 				return CreateResult (result.ResolvedType);
 			}
 			
@@ -769,7 +791,7 @@ namespace MonoDevelop.CSharp.Resolver
 				selectLambdaExpr.ExpressionBody = selectClause.Projection;
 				TypeReference typeRef = new TypeReference ("System.Func");
 				typeRef.GenericTypes.Add (TypeReference.Null);
-				ResolveResult result = resolver.ResolveExpression (selectLambdaExpr, resolver.ResolvePosition);
+				ResolveResult result = resolver.ResolveExpression (selectLambdaExpr, resolver.ResolvePosition, false);
 				
 				typeRef.GenericTypes.Add (result.ResolvedType.ConvertToTypeReference ());
 				

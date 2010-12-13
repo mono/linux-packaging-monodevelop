@@ -96,6 +96,7 @@ namespace Mono.Debugging.Soft
 				RedirectStandardOutput = true,
 				RedirectStandardError = true,
 				UseShellExecute = false,
+				CreateNoWindow = true,
 			};
 			
 			LaunchOptions options = null;
@@ -121,35 +122,46 @@ namespace Mono.Debugging.Soft
 			
 			if (!String.IsNullOrEmpty (dsi.LogMessage))
 				OnDebuggerOutput (false, dsi.LogMessage + "\n");
-
-			OnConnecting (VirtualMachineManager.BeginLaunch (psi, HandleCallbackErrors (delegate (IAsyncResult ar) {
-					HandleConnection (VirtualMachineManager.EndLaunch (ar));
-				}),
-				options
-			));
+			
+			var callback = HandleConnectionCallbackErrors ((IAsyncResult ar) => {
+				HandleConnection (VirtualMachineManager.EndLaunch (ar));
+			});
+			OnConnecting (VirtualMachineManager.BeginLaunch (psi, callback, options));
 		}
 		
-		protected AsyncCallback HandleCallbackErrors (AsyncCallback callback)
+		///<summary>Catches errors in async callbacks and hands off to OnConnectionError</summary>
+		protected AsyncCallback HandleConnectionCallbackErrors (AsyncCallback callback)
 		{
 			return delegate (IAsyncResult ar) {
 				connectionHandle = null;
 				try {
 					callback (ar);
 				} catch (Exception ex) {
-					//only show the exception if we didn't cause it by cancelling & closing the socket
-					if (!(connectionHandle == null && ex is SocketException)) {
-						LoggingService.LogAndShowException ("Unhandled error launching soft debugger", ex);
-					}
-					EndSession ();
+					OnConnectionError (ex);
 				}
 			};
+		}
+		
+		/// <summary>
+		/// Called if an error happens while making the connection. Default terminates the session.
+		/// </summary>
+		protected virtual void OnConnectionError (Exception ex)
+		{
+			//if the exception was caused by cancelling the session
+			if (Exited && ex is SocketException)
+				return;
+			
+			if (!HandleException (ex)) {
+				LoggingService.LogAndShowException ("Unhandled error launching soft debugger", ex);
+				EndSession ();
+			}
 		}
 		
 		/// <summary>
 		/// Subclasses should pass any handles they get from the VirtualMachineManager to this
 		/// so that they will be closed if the connection attempt is aborted before OnConnected is called.
 		/// </summary>
-		protected void OnConnecting (IAsyncResult connectionHandle)
+		public void OnConnecting (IAsyncResult connectionHandle)
 		{
 			if (this.connectionHandle != null)
 				throw new InvalidOperationException ("Already connecting");
@@ -159,7 +171,7 @@ namespace Mono.Debugging.Soft
 		void EndLaunch ()
 		{
 			if (connectionHandle != null) {
-				((Socket)connectionHandle.AsyncState).Close ();
+				VirtualMachineManager.CancelConnection (connectionHandle);
 				connectionHandle = null;
 			}
 		}
@@ -167,8 +179,8 @@ namespace Mono.Debugging.Soft
 		protected virtual void EndSession ()
 		{
 			if (!exited) {
-				EndLaunch ();
 				exited = true;
+				EndLaunch ();
 				OnTargetEvent (new TargetEventArgs (TargetEventType.TargetExited));
 			}
 		}
@@ -294,6 +306,7 @@ namespace Mono.Debugging.Soft
 		{
 			base.Dispose ();
 			if (!exited) {
+				exited = true;
 				EndLaunch ();
 				if (vm != null) {
 					ThreadPool.QueueUserWorkItem (delegate {
@@ -311,7 +324,6 @@ namespace Mono.Debugging.Soft
 						}
 					});
 				}
-				exited = true;
 			}
 			Adaptor.Dispose ();
 		}
@@ -338,6 +350,7 @@ namespace Mono.Debugging.Soft
 
 		protected override void OnExit ()
 		{
+			exited = true;
 			EndLaunch ();
 			if (vm != null)
 				try {
@@ -347,7 +360,6 @@ namespace Mono.Debugging.Soft
 					LoggingService.LogError ("Error closing debugger session", se);
 				}
 			QueueEnsureExited ();
-			exited = true;
 		}
 		
 		void QueueEnsureExited ()
@@ -560,17 +572,21 @@ namespace Mono.Debugging.Soft
 		protected override void OnNextLine ()
 		{
 			ThreadPool.QueueUserWorkItem (delegate {
-				Adaptor.CancelAsyncOperations (); // This call can block, so it has to run in background thread to avoid keeping the main session lock
-				var req = vm.CreateStepRequest (current_thread);
-				req.Depth = StepDepth.Over;
-				req.Size = StepSize.Line;
-				if (assemblyFilters != null && assemblyFilters.Count > 0)
-					req.AssemblyFilter = assemblyFilters;
-				req.Enabled = true;
-				currentStepRequest = req;
-				OnResumed ();
-				vm.Resume ();
-				DequeueEventsForFirstThread ();
+				try {
+					Adaptor.CancelAsyncOperations (); // This call can block, so it has to run in background thread to avoid keeping the main session lock
+					var req = vm.CreateStepRequest (current_thread);
+					req.Depth = StepDepth.Over;
+					req.Size = StepSize.Line;
+					if (assemblyFilters != null && assemblyFilters.Count > 0)
+						req.AssemblyFilter = assemblyFilters;
+					req.Enabled = true;
+					currentStepRequest = req;
+					OnResumed ();
+					vm.Resume ();
+					DequeueEventsForFirstThread ();
+				} catch (Exception ex) {
+					LoggingService.LogError ("Next Line command failed", ex);
+				}
 			});
 		}
 
@@ -694,8 +710,11 @@ namespace Mono.Debugging.Soft
 			}
 			
 			if (e is ExceptionEvent) {
-				etype = TargetEventType.ExceptionThrown;
 				var ev = (ExceptionEvent)e;
+				if (ev.Request == unhandledExceptionRequest)
+					etype = TargetEventType.UnhandledException;
+				else
+					etype = TargetEventType.ExceptionThrown;
 				exception = ev.Exception;
 				if (ev.Request != unhandledExceptionRequest || exception.Type.FullName != "System.Threading.ThreadAbortException")
 					resume = false;

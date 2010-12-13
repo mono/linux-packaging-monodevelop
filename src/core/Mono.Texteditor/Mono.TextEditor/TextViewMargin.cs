@@ -197,6 +197,7 @@ namespace Mono.TextEditor
 			public int LastLine { get; set; }
 			public List<ISegment> OldRegions { get; set; }
 		}
+		
 		public void RefreshSearchMarker ()
 		{
 			if (textEditor.HighlightSearchPattern) {
@@ -219,36 +220,13 @@ namespace Mono.TextEditor
 				searchPatternWorker = new System.ComponentModel.BackgroundWorker ();
 				searchPatternWorker.WorkerSupportsCancellation = true;
 				searchPatternWorker.DoWork += SearchPatternWorkerDoWork;
-				searchPatternWorker.RunWorkerAsync (args );
+				searchPatternWorker.RunWorkerAsync (args);
 			}
 		}
 		
-		void UpdateRegions (List<ISegment> regions, SearchWorkerArguments args)
-		{
-			int oldLineNumber = -1;
-			foreach (ISegment region in regions) {
-				int lineNumber = Document.OffsetToLineNumber (region.Offset);
-				if (oldLineNumber == lineNumber && lineNumber >= args.FirstLine)
-					continue;
-				if (lineNumber > args.LastLine)
-					break;
-				oldLineNumber = lineNumber;
-				RemoveCachedLine (Document.GetLine (lineNumber));
-				textEditor.Document.RequestUpdate (new LineUpdate (lineNumber));
-			}
-			if (oldLineNumber > 0)
-				textEditor.Document.CommitDocumentUpdate ();
-		}
-		
-		void HandleSearchChanged (object sender, EventArgs args)
-		{
-			RefreshSearchMarker ();
-		}
-
 		void SearchPatternWorkerDoWork (object sender, System.ComponentModel.DoWorkEventArgs e)
 		{
 			SearchWorkerArguments args = (SearchWorkerArguments)e.Argument;
-			
 			System.ComponentModel.BackgroundWorker worker = (System.ComponentModel.BackgroundWorker)sender;
 			List<ISegment> newRegions = new List<ISegment> ();
 			int offset = 0;
@@ -284,22 +262,45 @@ namespace Mono.TextEditor
 					}
 				}
 			}
-			
 			Application.Invoke (delegate {
 				this.selectedRegions = newRegions;
 				if (updateLines != null) {
 					foreach (int lineNumber in updateLines) {
-						RemoveCachedLine (Document.GetLine (lineNumber));
+//						RemoveCachedLine (Document.GetLine (lineNumber));
 						textEditor.Document.RequestUpdate (new LineUpdate (lineNumber));
 					}
 					textEditor.Document.CommitDocumentUpdate ();
 				} else {
-					UpdateRegions (args.OldRegions, args);
-					UpdateRegions (newRegions, args);
+					UpdateRegions (args.OldRegions.Concat (newRegions), args);
 				}
 				OnSearchRegionsUpdated (EventArgs.Empty);
 			});
 		}
+		
+		void UpdateRegions (IEnumerable<ISegment> regions, SearchWorkerArguments args)
+		{
+			HashSet<int> updateLines = new HashSet<int> ();
+			
+			foreach (ISegment region in regions) {
+				int lineNumber = Document.OffsetToLineNumber (region.Offset);
+				if (lineNumber > args.LastLine || lineNumber < args.FirstLine)
+					continue;
+				updateLines.Add (lineNumber);
+			}
+			foreach (int lineNumber in updateLines) {
+//				RemoveCachedLine (Document.GetLine (lineNumber));
+				textEditor.Document.RequestUpdate (new LineUpdate (lineNumber));
+			}
+			if (updateLines.Count > 0)
+				textEditor.Document.CommitDocumentUpdate ();
+		}
+		
+		void HandleSearchChanged (object sender, EventArgs args)
+		{
+			RefreshSearchMarker ();
+		}
+
+		
 		
 		protected virtual void OnSearchRegionsUpdated (EventArgs e)
 		{
@@ -839,6 +840,8 @@ namespace Mono.TextEditor
 
 		internal void DisposeLayoutDict ()
 		{
+			if (layoutDict == null)
+				return;
 			foreach (LayoutDescriptor descr in layoutDict.Values) {
 				descr.Dispose ();
 			}
@@ -848,7 +851,8 @@ namespace Mono.TextEditor
 		public void PurgeLayoutCache ()
 		{
 			DisposeLayoutDict ();
-			chunkDict.Clear ();
+			if (chunkDict != null)
+				chunkDict.Clear ();
 		}
 		
 		class ChunkDescriptor : LineDescriptor
@@ -935,7 +939,7 @@ namespace Mono.TextEditor
 			}
 		}
 
-		static uint TranslateToUTF8Index (char[] charArray, uint textIndex, ref uint curIndex, ref uint byteIndex)
+		public static uint TranslateToUTF8Index (char[] charArray, uint textIndex, ref uint curIndex, ref uint byteIndex)
 		{
 			if (textIndex < curIndex) {
 				byteIndex = (uint)Encoding.UTF8.GetByteCount (charArray, 0, (int)textIndex);
@@ -949,7 +953,7 @@ namespace Mono.TextEditor
 			return byteIndex;
 		}
 
-		static int TranslateIndexToUTF8 (string text, int index)
+		public static int TranslateIndexToUTF8 (string text, int index)
 		{
 			byte[] bytes = Encoding.UTF8.GetBytes (text);
 			return Encoding.UTF8.GetString (bytes, 0, index).Length;
@@ -1039,6 +1043,7 @@ namespace Mono.TextEditor
 				char[] lineChars = lineText.ToCharArray ();
 				int startOffset = offset, endOffset = offset + length;
 				uint curIndex = 0, byteIndex = 0;
+				uint curChunkIndex = 0, byteChunkIndex = 0;
 				
 				uint oldEndIndex = 0;
 				for (Chunk chunk = startChunk; chunk != null; chunk = chunk != null ? chunk.Next : null) {
@@ -1078,15 +1083,18 @@ namespace Mono.TextEditor
 								wrapper.SelectionStartIndex = (int)si;
 							wrapper.SelectionEndIndex   = (int)ei;
 						});
+						
+						var translatedStartIndex = TranslateToUTF8Index (lineChars, (uint)startIndex, ref curChunkIndex, ref byteChunkIndex);
+						var translatedEndIndex = TranslateToUTF8Index (lineChars, (uint)endIndex, ref curChunkIndex, ref byteChunkIndex);
 
 						if (chunkStyle.Bold)
-							atts.AddWeightAttribute (Pango.Weight.Bold, startIndex, endIndex);
+							atts.AddWeightAttribute (Pango.Weight.Bold, translatedStartIndex, translatedEndIndex);
 
 						if (chunkStyle.Italic)
-							atts.AddStyleAttribute (Pango.Style.Italic, startIndex, endIndex);
+							atts.AddStyleAttribute (Pango.Style.Italic, translatedStartIndex, translatedEndIndex);
 						
 						if (chunkStyle.Underline)
-							atts.AddUnderlineAttribute (Pango.Underline.Single, startIndex, endIndex);
+							atts.AddUnderlineAttribute (Pango.Underline.Single, translatedStartIndex, translatedEndIndex);
 					}
 				}
 				if (containsPreedit) {
@@ -1174,7 +1182,7 @@ namespace Mono.TextEditor
 			bool drawText = true;
 			foreach (TextMarker marker in line.Markers) {
 				IBackgroundMarker bgMarker = marker as IBackgroundMarker;
-				if (bgMarker == null)
+				if (bgMarker == null || !marker.IsVisible)
 					continue;
 				isSelectionDrawn |= (marker.Flags & TextMarkerFlags.DrawsSelection) == TextMarkerFlags.DrawsSelection;
 				drawText &= bgMarker.DrawBackground (textEditor, win, layout, selectionStart, selectionEnd, offset, offset + length, y, xPos, xPos + width, ref drawBg);
@@ -1309,11 +1317,28 @@ namespace Mono.TextEditor
 		{
 			if (startOffset < endOffset && this.selectedRegions.Count > 0) {
 				ISegment region = new Segment (startOffset, endOffset - startOffset);
-				foreach (ISegment segment in this.selectedRegions) {
+				int min = 0;
+				int max = selectedRegions.Count - 1;
+				do {
+					int mid = (min + max) / 2;
+					ISegment segment = selectedRegions[mid];
 					if (segment.Contains (startOffset) || segment.Contains (endOffset) || region.Contains (segment)) {
-						return segment;
+						if (mid == 0)
+							return segment;
+						ISegment prevSegment = selectedRegions[mid - 1];
+						if (!(prevSegment.Contains (startOffset) || prevSegment.Contains (endOffset) || region.Contains (prevSegment)))
+							return segment;
+						max = mid - 1;
+						continue;
 					}
-				}
+					
+					if (segment.Offset < endOffset) {
+						min = mid + 1;
+					} else {
+						max = mid - 1;
+					}
+					
+				} while (min <= max);
 			}
 			return null;
 		}
@@ -1794,6 +1819,7 @@ namespace Mono.TextEditor
 
 			int startOffset = line.Offset, endOffset = line.Offset + line.EditableLength;
 			uint curIndex = 0, byteIndex = 0;
+			uint curChunkIndex = 0, byteChunkIndex = 0;
 			List<Pango.Attribute> attributes = new List<Pango.Attribute> ();
 			uint oldEndIndex = 0;
 			for (Chunk chunk = startChunk; chunk != null; chunk = chunk != null ? chunk.Next : null) {
@@ -1833,24 +1859,27 @@ namespace Mono.TextEditor
 
 					});
 
+					var translatedStartIndex = TranslateToUTF8Index (lineChars, (uint)startIndex, ref curChunkIndex, ref byteChunkIndex);
+					var translatedEndIndex = TranslateToUTF8Index (lineChars, (uint)endIndex, ref curChunkIndex, ref byteChunkIndex);
+
 					if (chunkStyle.Bold) {
 						Pango.AttrWeight attrWeight = new Pango.AttrWeight (Pango.Weight.Bold);
-						attrWeight.StartIndex = startIndex;
-						attrWeight.EndIndex = endIndex;
+						attrWeight.StartIndex = translatedStartIndex;
+						attrWeight.EndIndex = translatedEndIndex;
 						attributes.Add (attrWeight);
 					}
 
 					if (chunkStyle.Italic) {
 						Pango.AttrStyle attrStyle = new Pango.AttrStyle (Pango.Style.Italic);
-						attrStyle.StartIndex = startIndex;
-						attrStyle.EndIndex = endIndex;
+						attrStyle.StartIndex = translatedStartIndex;
+						attrStyle.EndIndex = translatedEndIndex;
 						attributes.Add (attrStyle);
 					}
 
 					if (chunkStyle.Underline) {
 						Pango.AttrUnderline attrUnderline = new Pango.AttrUnderline (Pango.Underline.Single);
-						attrUnderline.StartIndex = startIndex;
-						attrUnderline.EndIndex = endIndex;
+						attrUnderline.StartIndex = translatedStartIndex;
+						attrUnderline.EndIndex = translatedEndIndex;
 						attributes.Add (attrUnderline);
 					}
 				}

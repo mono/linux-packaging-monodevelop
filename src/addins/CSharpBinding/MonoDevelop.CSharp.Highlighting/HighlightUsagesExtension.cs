@@ -154,6 +154,7 @@ namespace MonoDevelop.CSharp.Highlighting
 		void ShowReferences (List<MonoDevelop.Projects.CodeGeneration.MemberReference> references)
 		{
 			RemoveMarkers (false);
+			HashSet<int> lineNumbers = new HashSet<int> ();
 			if (references != null) {
 				bool alphaBlend = false;
 				foreach (var r in references) {
@@ -164,9 +165,11 @@ namespace MonoDevelop.CSharp.Highlighting
 						textEditorData.Parent.TextViewMargin.AlphaBlendSearchResults = alphaBlend = true;
 					}
 					marker.Usages.Add (new Mono.TextEditor.Segment (offset, r.Name.Length));
+					lineNumbers.Add (r.Line - 1);
 				}
 			}
-			textEditorData.Document.CommitUpdateAll ();
+			foreach (int line in lineNumbers)
+				textEditorData.Document.CommitLineUpdate (line);
 		}
 		
 		List<MonoDevelop.Projects.CodeGeneration.MemberReference> GetReferences (ResolveResult resolveResult)
@@ -264,11 +267,16 @@ namespace MonoDevelop.CSharp.Highlighting
 					} else {
 						int start = startOffset < markerStart ? markerStart : startOffset;
 						int end = endOffset < markerEnd ? endOffset : markerEnd;
-						int x_pos = layout.Layout.IndexToPos (start - startOffset).X;
-			
+						
+						uint curIndex = 0, byteIndex = 0;
+						TextViewMargin.TranslateToUTF8Index (layout.LineChars, (uint)(start - startOffset), ref curIndex, ref byteIndex);
+						
+						int x_pos = layout.Layout.IndexToPos ((int)byteIndex).X;
+						
 						@from = startXPos + (int)(x_pos / Pango.Scale.PangoScale);
-			
-						x_pos = layout.Layout.IndexToPos (end - startOffset).X;
+						
+						TextViewMargin.TranslateToUTF8Index (layout.LineChars, (uint)(end - startOffset), ref curIndex, ref byteIndex);
+						x_pos = layout.Layout.IndexToPos ((int)byteIndex).X;
 			
 						to = startXPos + (int)(x_pos / Pango.Scale.PangoScale);
 					}

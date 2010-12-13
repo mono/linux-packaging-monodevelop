@@ -2582,5 +2582,81 @@ class MainClass
 			Assert.IsNotNull (provider, "provider not found.");
 			Assert.IsNull (provider.Find ("FooBar"), "method 'FooBar' found, but shouldn't.");
 		}
+		
+		
+		/// <summary>
+		/// Bug 614045 - Types hidden by members are not formatted properly by ambience
+		/// </summary>
+		[Test()]
+		public void TestBug614045 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"
+namespace A
+{
+	enum Foo
+	{
+		One,
+		Two,
+		Three
+	}
+}
+
+namespace B
+{
+	using A;
+	
+	public class Baz
+	{
+		public string Foo;
+		
+		void Test (Foo a)
+		{
+			$switch (a) {
+			case $
+		}
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("Foo"), "enum 'Foo' found, but shouldn't.");
+			Assert.IsNotNull (provider.Find ("A.Foo"), "enum 'A.Foo' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 615992 - Intellisense broken when calling generic method.
+		/// </summary>
+		[Test()]
+		public void TestBug615992 ()
+		{
+				CompletionDataList provider = CreateProvider (
+@"public delegate void Act<T> (T t);
+
+public class Foo
+{
+	public void Bar ()
+	{
+	}
+}
+
+class TestBase
+{
+	protected void Method<T> (Act<T> action)
+	{
+	}
+}
+
+class Test : TestBase
+{
+	public Test ()
+	{
+		$Method<Foo> (f => f.$
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Bar"), "method 'Bar' not found.");
+		}
+		
+
 	}
 }
