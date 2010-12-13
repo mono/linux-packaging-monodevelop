@@ -214,7 +214,7 @@ namespace Mono.TextEditor
 				closedLink = null;
 			}
 		}
-		
+		List<TextLinkMarker> textLinkMarkers = new List<TextLinkMarker> ();
 		public void StartMode ()
 		{
 			foreach (TextLink link in links) {
@@ -229,17 +229,19 @@ namespace Mono.TextEditor
 					if (marker == null) {
 						marker = new TextLinkMarker (this);
 						marker.BaseOffset = baseOffset;
-						line.AddMarker (marker);
+						Editor.Document.AddMarker (line, marker);
+						textLinkMarkers.Add (marker);
 					}
 				}
 			}
-			TextLink firstLink = links.First (l => l.IsEditable);
-			if (SelectPrimaryLink)
-				Setlink (firstLink);
+			
 			Editor.Document.TextReplaced += UpdateLinksOnTextReplace;
 			this.Editor.Caret.PositionChanged += HandlePositionChanged;
 			this.UpdateTextLinks ();
 			this.HandlePositionChanged (null, null);
+			TextLink firstLink = links.First (l => l.IsEditable);
+			if (SelectPrimaryLink)
+				Setlink (firstLink);
 			Editor.Document.CommitUpdateAll ();
 			this.undoDepth = Editor.Document.GetCurrentUndoDepth ();
 		}
@@ -260,12 +262,8 @@ namespace Mono.TextEditor
 		{
 			isExited = true;
 			DestroyWindow ();
-			foreach (TextLink link in links) {
-				foreach (ISegment segment in link.Links) {
-					LineSegment line = Editor.Document.GetLineByOffset (baseOffset + segment.Offset);
-					line.RemoveMarker (typeof(TextLinkMarker));
-				}
-			}
+			textLinkMarkers.ForEach (m => Editor.Document.RemoveMarker (m));
+			textLinkMarkers.Clear ();
 			if (SetCaretPosition && resetCaret)
 				Editor.Caret.Offset = endOffset;
 			
@@ -537,6 +535,7 @@ namespace Mono.TextEditor
 		public TextLinkMarker (TextLinkEditMode mode)
 		{
 			this.mode = mode;
+			IsVisible = true;
 		}
 		/*
 		void InternalDrawBackground (TextEditor Editor, Gdk.Drawable win, Pango.Layout layout, bool selected, int startOffset, int endOffset, int y, ref int startXPos, int endXPos, ref bool drawBg)

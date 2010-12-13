@@ -39,14 +39,19 @@ namespace MonoDevelop.Projects
 		public ProjectFileCollection ()
 		{
 		}
-		
+
 		public ProjectFile GetFile (string fileName)
 		{
-			if (fileName == null) return null;
-			fileName = FileService.GetFullPath (fileName);
+			return GetFile ((FilePath)fileName);
+		}
+		
+		private ProjectFile GetFile (FilePath fileName)
+		{
+			if (fileName.IsNull) return null;
+			fileName = fileName.FullPath;
 			
 			foreach (ProjectFile file in this) {
-				if (file.Name == fileName)
+				if (file.FilePath == fileName)
 					return file;
 			}
 			return null;

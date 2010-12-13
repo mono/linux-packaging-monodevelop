@@ -186,6 +186,7 @@ FILES = \
 	AssemblyInfo.cs \
 	Main.cs \
 	MonoDevelop.Projects.Formats.MSBuild/BuildEngine.cs \
+	MonoDevelop.Projects.Formats.MSBuild/ConsoleLogger.cs \
 	MonoDevelop.Projects.Formats.MSBuild/IBuildEngine.cs \
 	MonoDevelop.Projects.Formats.MSBuild/ILogWriter.cs \
 	MonoDevelop.Projects.Formats.MSBuild/IProjectBuilder.cs \
@@ -195,9 +196,9 @@ FILES = \
 
 RES = 
 assemblydir = $(MD_ASSEMBLY_DIR)
-assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
-CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
-EXTRA_DIST = $(FILES) $(RES)
+assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb $(ASSEMBLY).config
+CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb $(ASSEMBLY).config
+EXTRA_DIST = $(FILES) $(RES) app.config
 build_deps = $(addprefix -r:, $(DEPS))
 build_sources = $(addprefix $(srcdir)/, $(FILES)) $(GENERATED_FILES)
 build_resources = $(addprefix $(srcdir)/, $(RES))
@@ -397,6 +398,9 @@ $(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS)
 	$(CSC) $(CSC_FLAGS) -warnaserror -debug -out:$@ -target:winexe $(REFS) $(build_deps) $(build_resources:%=/resource:%) $(build_sources)
 
 $(ASSEMBLY).mdb: $(ASSEMBLY)
+
+$(ASSEMBLY).config: $(srcdir)/app.config
+	cp $< $@
 
 # workaroundfor lack of abs_top_builddir variable in automake < 1.10. Will break if mdtool isn't 
 # launched from top_srcdir (i.e. where this script is located)

@@ -1,7 +1,8 @@
 
 DEPS =  \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.dll
+	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
+	$(top_builddir)/build/bin/MonoDevelop.Projects.Formats.MSBuild.exe
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
@@ -9,9 +10,9 @@ REFS =  \
 	$(MONO_ADDINS_GUI_LIBS) \
 	$(MONO_ADDINS_LIBS) \
 	$(MONO_ADDINS_SETUP_LIBS) \
+	$(MONO_CAIRO_LIBS) \
 	$(MONODOC_LIBS) \
 	-r:ICSharpCode.SharpZipLib \
-	-r:Mono.Cairo \
 	-r:Mono.Posix \
 	-r:System \
 	-r:System.Core \
@@ -20,7 +21,8 @@ REFS =  \
 	-r:System.Runtime.Remoting \
 	-r:System.Web \
 	-r:System.Web.Services \
-	-r:System.Xml
+	-r:System.Xml \
+	-r:System.Xml.Linq
 
 FILES =  \
 	AssemblyInfo.cs \
@@ -94,6 +96,7 @@ FILES =  \
 	gtk-gui/MonoDevelop.Ide.Projects.SelectReferenceDialog.cs \
 	gtk-gui/MonoDevelop.Ide.SelectEncodingsDialog.cs \
 	gtk-gui/MonoDevelop.Ide.StandardHeader.StandardHeaderPolicyPanelWidget.cs \
+	gtk-gui/MonoDevelop.Ide.Updater.UpdateDialog.cs \
 	MonoDevelop.Components.AutoTest/AutoTestClientSession.cs \
 	MonoDevelop.Components.AutoTest/AutoTestService.cs \
 	MonoDevelop.Components.AutoTest/AutoTestSession.cs \
@@ -635,6 +638,11 @@ FILES =  \
 	MonoDevelop.Ide.Templates/SolutionDescriptor.cs \
 	MonoDevelop.Ide.Templates/SolutionItemDescriptor.cs \
 	MonoDevelop.Ide.Templates/TextFileDescriptionTemplate.cs \
+	MonoDevelop.Ide.Updater/UpdateCommands.cs \
+	MonoDevelop.Ide.Updater/UpdateDialog.cs \
+	MonoDevelop.Ide.Updater/UpdateInfoExtensionNode.cs \
+	MonoDevelop.Ide.Updater/UpdateResult.cs \
+	MonoDevelop.Ide.Updater/UpdateService.cs \
 	MonoDevelop.Ide.WebBrowser/IWebBrowser.cs \
 	MonoDevelop.Ide.WebBrowser/IWebBrowserLoader.cs \
 	MonoDevelop.Ide.WebBrowser/LoadingProgressChangedEventArgs.cs \
@@ -660,7 +668,6 @@ FILES =  \
 
 RES =  \
 	gtk-gui/gui.stetic \
-	gtk-gui/objects.xml \
 	icons/AboutImage.png \
 	icons/AboutImageSep.png \
 	icons/add-namespace-16.png \

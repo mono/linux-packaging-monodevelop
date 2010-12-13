@@ -1,7 +1,115 @@
+2010-07-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/ResolveVisitor.cs: Fixed 'Bug
+	  615992 - Intellisense broken when calling generic method.'.
+
+2010-07-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 619799 - Renaming variable also invokes
+	  auto-complete'.
+
+2010-07-01  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 618676 - C# code editor removes "override" word
+	  after choosing one of intellisense variants'.
+
+2010-06-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Submitted patch from Tom Spink <tspink@gmail.com>: Update to
+	  generic code completion
+
+2010-06-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs: fixed
+	  bug in abstract member overriding.
+
+2010-06-24  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/TextEditorResolverProvider.cs:
+	  Added bounds check.
+
+2010-06-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Only update changed lines.
+
+2010-06-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Resolver/TextEditorResolverProvider.cs:
+	  Fixed 'Bug 615988 - Go to declaration not available on
+	  generic methods'.
+
+2010-06-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  Fixed 'Bug 615983 - Refactoring does not include object
+	  initializers'.
+
+2010-06-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	* MonoDevelop.CSharp.Dom/TypeMembers/DestructorDeclaration.cs:
+	  Worked on C# parser.
+
+2010-06-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs: Updated parser to
+	  Marek's new LocationsBag/latest mcs changes.
+
+2010-06-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.xml:
+	  Removed 'DoNotChange' option - will be availble with the
+	  next gen formatter (fixes Bug 615763 - C# code formatting
+	  throws exception when choosing "Do not change" from menu).
+
+2010-06-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Refactoring/FindMemberAstVisitor.cs:
+	  Fixed 'Bug 615702 - In-place variable renaming can't rename
+	  foreach loop variables'.
+
+2010-06-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Parser/CSharpParser.cs:
+	* MonoDevelop.CSharp.Formatting/DomIndentationVisitor.cs:
+	  Worked on new parser/formatter.
+
+2010-06-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	* MonoDevelop.CSharp.Completion/NRefactoryParameterDataProvider.cs:
+	  Fixed 'Bug 615182 - Tooltip sometimes stays up too long'.
+
 2010-06-15  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs:
 	  Remove debug writelines.
+
+2010-06-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Optimized performance.
+
+2010-06-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs:
+	  Respect UTF-8 coordinates in highlight usages extension.
+
+2010-06-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed unit test.
+
+2010-06-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharp.Completion/CSharpTextEditorCompletion.cs:
+	  Fixed 'Bug 614045 - Types hidden by members are not
+	  formatted properly by ambience'.
 
 2010-06-14  Lluis Sanchez Gual  <lluis@novell.com>
 

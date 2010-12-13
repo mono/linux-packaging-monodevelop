@@ -29,6 +29,7 @@
 using System;
 using System.Xml;
 using System.IO;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -523,8 +524,54 @@ namespace MonoDevelop.Projects
 			}
 			return null;
 		}
+
+		protected internal override BuildResult OnRunTarget (IProgressMonitor monitor, string target, ConfigurationSelector configuration)
+		{
+			if (target == ProjectService.BuildTarget)
+				return OnBuild (monitor, configuration);
+			else if (target == ProjectService.CleanTarget) {
+				OnClean (monitor, configuration);
+				return new BuildResult ();
+			}
+			
+			ReadOnlyCollection<SolutionItem> allProjects;
+				
+			try {
+				allProjects = GetAllBuildableEntries (configuration, true, true);
+			} catch (CyclicDependencyException) {
+				monitor.ReportError (GettextCatalog.GetString ("Cyclic dependencies are not supported."), null);
+				return new BuildResult ("", 1, 1);
+			}
+			
+			try {
+				monitor.BeginTask (GettextCatalog.GetString ("Building Solution {0}", Name), allProjects.Count);
+				
+				BuildResult cres = new BuildResult ();
+				cres.BuildCount = 0;
+				HashSet<SolutionItem> failedItems = new HashSet<SolutionItem> ();
+				
+				foreach (SolutionItem item in allProjects) {
+					if (monitor.IsCancelRequested)
+						break;
+
+					if (!item.ContainsReferences (failedItems, configuration)) {
+						BuildResult res = item.RunTarget (monitor, target, configuration);
+						if (res != null) {
+							cres.Append (res);
+							if (res.ErrorCount > 0)
+								failedItems.Add (item);
+						}
+					} else
+						failedItems.Add (item);
+					monitor.Step (1);
+				}
+				return cres;
+			} finally {
+				monitor.EndTask ();
+			}
+		}
 		
-		protected internal override void OnClean (IProgressMonitor monitor, ConfigurationSelector configuration)
+		protected override void OnClean (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			if (ParentSolution == null)
 				return;
@@ -546,7 +593,7 @@ namespace MonoDevelop.Projects
 			}
 		}
 		
-		protected internal override BuildResult OnBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
+		protected override BuildResult OnBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			ReadOnlyCollection<SolutionItem> allProjects;
 				
@@ -558,13 +605,15 @@ namespace MonoDevelop.Projects
 			}
 			
 			try {
-				monitor.BeginTask (GettextCatalog.GetString ("Building Solution {0}", Name), allProjects.Count);
+				List<SolutionItem> toBuild = new List<SolutionItem> (allProjects.Where (p => p.NeedsBuilding (configuration)));
+				
+				monitor.BeginTask (GettextCatalog.GetString ("Building Solution {0}", Name), toBuild.Count);
 				
 				BuildResult cres = new BuildResult ();
 				cres.BuildCount = 0;
 				HashSet<SolutionItem> failedItems = new HashSet<SolutionItem> ();
 				
-				foreach (SolutionItem item in allProjects) {
+				foreach (SolutionItem item in toBuild) {
 					if (monitor.IsCancelRequested)
 						break;
 

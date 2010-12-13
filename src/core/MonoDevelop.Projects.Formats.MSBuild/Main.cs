@@ -82,7 +82,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			Thread t = new Thread (delegate () {
 				while (true) {
 					Thread.Sleep (1000);
-					if (Process.GetProcessById (id) == null) {
+					try {
+						// Throws exception if process is not running
+						Process.GetProcessById (id);
+					}
+					catch {
 						exitEvent.Set ();
 						break;
 					}

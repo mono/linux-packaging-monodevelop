@@ -91,8 +91,13 @@ namespace MonoDevelop.Ide.FindInFiles
 					if (monitor.IsCancelRequested)
 						break;
 					SearchedFilesCount++;
-					if (!string.IsNullOrEmpty (replacePattern))
-						provider.BeginReplace ();
+					try {
+						if (!string.IsNullOrEmpty (replacePattern))
+							provider.BeginReplace ();
+					} catch (System.IO.FileNotFoundException) {
+						MessageService.ShowError (string.Format (GettextCatalog.GetString ("File {0} not found.")), provider.FileName);
+						continue;
+					}
 					foreach (SearchResult result in FindAll (monitor, provider, pattern, replacePattern, filter)) {
 						if (monitor.IsCancelRequested)
 							break;
@@ -120,7 +125,8 @@ namespace MonoDevelop.Ide.FindInFiles
 				TextReader reader = provider.Open ();
 				content = reader.ReadToEnd ();
 				reader.Close ();
-			} catch (Exception) {
+			} catch (Exception e) {
+				LoggingService.LogError ("Error while reading file", e);
 				return new SearchResult[0];
 			}
 			if (filter.RegexSearch)
@@ -250,8 +256,9 @@ namespace MonoDevelop.Ide.FindInFiles
 					}
 					i += next[0];
 				}
-				else
+				else if (j+1 < next.Length && j+i < content.Length && content[j+i] < occ.Length)
 					i += System.Math.Max (next[j + 1], j-occ[(int)content[i + j]]);
+				else i += next[0];
 			}
 		}
 	}

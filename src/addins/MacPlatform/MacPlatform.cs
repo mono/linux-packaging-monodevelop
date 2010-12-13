@@ -112,7 +112,9 @@ namespace MonoDevelop.Platform
 		internal static void OpenUrl (string url)
 		{
 			//WORKAROUND: don't pass URL directly - Mono currently uses 'open -W' which means 'open' hangs until target app exits
-			var psi = new ProcessStartInfo ("open", url) { UseShellExecute = false };
+			var psi = new ProcessStartInfo ("open", string.Format ("\"{0}\"", url.Replace ("\"", "\\\""))) {
+				UseShellExecute = false
+			};
 			Process.Start (psi);
 		}
 
@@ -243,7 +245,11 @@ namespace MonoDevelop.Platform
 				};
 				
 				ApplicationEvents.OpenDocuments += delegate (object sender, ApplicationDocumentEventArgs e) {
-					IdeApp.OpenFiles (e.Documents.Select (doc => new FileOpenInformation (doc.Key, doc.Value, 1, true)));
+					//OpenFiles may pump the mainloop, but can't do that from an AppleEvent, so use a brief timeout
+					GLib.Timeout.Add (10, delegate {
+						IdeApp.OpenFiles (e.Documents.Select (doc => new FileOpenInformation (doc.Key, doc.Value, 1, true)));
+						return false;
+					});
 					e.Handled = true;
 				};
 				
@@ -281,6 +287,24 @@ namespace MonoDevelop.Platform
 activate
 do script with command ""cd {0}""
 end tell", directory.ToString ().Replace ("\"", "\\\"")));
+		}
+		
+		public override string GetUpdaterUrl ()
+		{
+			return "http://go-mono.com/macupdate/update";
+		}
+		
+		public override IEnumerable<string> GetUpdaterEnviromentFlags ()
+		{
+			var sdkDir = "/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs";
+			if (Directory.Exists (sdkDir)) {
+				foreach (var dir in Directory.GetDirectories (sdkDir, "iPhoneSimulator*")) {
+					var name = Path.GetFileNameWithoutExtension (dir);
+					int len = "iPhoneSimulator".Length;
+					if (name != null && name.Length > len) 
+						yield return "iphsdk" + name.Substring (len);
+				}
+			}
 		}
 	}
 }

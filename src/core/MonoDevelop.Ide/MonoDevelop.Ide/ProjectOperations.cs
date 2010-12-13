@@ -1379,11 +1379,13 @@ namespace MonoDevelop.Ide
 			}
 			
 			// If copying a single file, bring any grouped children along
+			ProjectFile sourceParent = null;
 			if (filesToMove.Count == 1 && sourceProject != null) {
 				var pf = filesToMove[0];
 				if (pf != null && pf.HasChildren)
 					foreach (ProjectFile child in pf.DependentChildren)
 						filesToMove.Add (child);
+				sourceParent = pf;
 			}
 			
 			// Ensure that the destination folder is created, even if no files
@@ -1408,16 +1410,26 @@ namespace MonoDevelop.Ide
 					return;
 				}
 			}
-
+			
 			monitor.BeginTask (GettextCatalog.GetString ("Copying files..."), filesToMove.Count);
 			
+			ProjectFile targetParent = null;
 			foreach (ProjectFile file in filesToMove) {
 				bool fileIsLink = file.Project != null && file.IsLink;
 				
 				var sourceFile = fileIsLink
 					? file.Project.BaseDirectory.Combine (file.ProjectVirtualPath)
 					: file.FilePath;
-				var newFile = sourceIsFolder ? targetPath.Combine (sourceFile.ToRelative (sourcePath)) : targetPath;
+				
+				FilePath newFile;
+				if (sourceIsFolder)
+					newFile = targetPath.Combine (sourceFile.ToRelative (sourcePath));
+				else if (sourceFile == sourcePath)
+					newFile = targetPath;
+				else if (sourceFile.ParentDirectory != targetPath.ParentDirectory)
+					newFile = targetPath.ParentDirectory.Combine (sourceFile.ToRelative (sourcePath.ParentDirectory));
+				else
+					newFile = GetTargetCopyName (sourceFile, false);
 				
 				if (!movingFolder && !fileIsLink) {
 					try {
@@ -1452,6 +1464,13 @@ namespace MonoDevelop.Ide
 					} else if (targetProject.Files.GetFile (newFile) == null) {
 						ProjectFile projectFile = (ProjectFile) file.Clone ();
 						projectFile.Name = newFile;
+						if (targetParent == null) {
+							if (file == sourceParent)
+								targetParent = projectFile;
+						} else if (sourceParent != null) {
+							if (projectFile.DependsOn == sourceParent.Name)
+								projectFile.DependsOn = targetParent.Name;
+						}
 						targetProject.Files.Add (projectFile);
 					}
 				}
@@ -1471,6 +1490,49 @@ namespace MonoDevelop.Ide
 			}
 			
 			monitor.EndTask ();
+		}
+		
+		internal static FilePath GetTargetCopyName (FilePath path, bool isFolder)
+		{
+			int n=1;
+			// First of all try to find an existing copy tag
+			string fn = path.FileNameWithoutExtension;
+			for (int i=1; i<100; i++) {
+				string copyTag = GetCopyTag (i); 
+				if (fn.EndsWith (copyTag)) {
+					string newfn = fn.Substring (0, fn.Length - copyTag.Length);
+					if (newfn.Trim ().Length > 0) {
+						n = i + 1;
+						path = path.ParentDirectory.Combine (newfn + path.Extension);
+						break;
+					}
+				}
+			}
+			FilePath basePath = path;
+			while ((!isFolder && File.Exists (path)) || (isFolder && Directory.Exists (path))) {
+				string copyTag = GetCopyTag (n);
+				path = basePath.ParentDirectory.Combine (basePath.FileNameWithoutExtension + copyTag + basePath.Extension);
+				n++;
+			}
+			return path;
+		}
+		
+		static string GetCopyTag (int n)
+		{
+			string sc;
+			switch (n) {
+				case 1: sc = GettextCatalog.GetString ("copy"); break;
+				case 2: sc = GettextCatalog.GetString ("another copy"); break;
+				case 3: sc = GettextCatalog.GetString ("3rd copy"); break;
+				case 4: sc = GettextCatalog.GetString ("4th copy"); break;
+				case 5: sc = GettextCatalog.GetString ("5th copy"); break;
+				case 6: sc = GettextCatalog.GetString ("6th copy"); break;
+				case 7: sc = GettextCatalog.GetString ("7th copy"); break;
+				case 8: sc = GettextCatalog.GetString ("8th copy"); break;
+				case 9: sc = GettextCatalog.GetString ("9th copy"); break;
+				default: sc = GettextCatalog.GetString ("copy {0}"); break;
+			}
+			return " (" + string.Format (sc, n) + ")";
 		}
 		
 		void GetAllFilesRecursive (string path, List<ProjectFile> files)

@@ -260,10 +260,9 @@ namespace MonoDevelop.Ide
 			
 			// load previous combine
 			if ((bool)PropertyService.Get("SharpDevelop.LoadPrevProjectOnStartup", false)) {
-				RecentOpen recentOpen = Workbench.RecentOpen;
-
-				if (recentOpen.RecentProjectsCount > 0) { 
-					IdeApp.Workspace.OpenWorkspaceItem(recentOpen.RecentProjects.First ().ToString()).WaitForCompleted ();
+				var proj = DesktopService.RecentFiles.GetProjects ().FirstOrDefault ();
+				if (proj != null) { 
+					IdeApp.Workspace.OpenWorkspaceItem (proj.FileName).WaitForCompleted ();
 				}
 			}
 			
@@ -302,7 +301,8 @@ namespace MonoDevelop.Ide
 		 	//FIXME: can we handle multiple slns?
 			bool foundSln = false;
 			foreach (var file in files) {
-				if (Services.ProjectService.IsWorkspaceItemFile (file.FileName)) {
+				if (Services.ProjectService.IsWorkspaceItemFile (file.FileName) ||
+				    Services.ProjectService.IsSolutionItemFile (file.FileName)) {
 					if (!foundSln) {
 						try {
 							Workspace.OpenWorkspaceItem (file.FileName);

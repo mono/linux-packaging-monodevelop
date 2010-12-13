@@ -52,8 +52,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		List<string> subtypeGuids = new List<string> ();
 		const string Unspecified = null;
 		RemoteProjectBuilder projectBuilder;
-		TargetFramework lastBuildFx;
+		string lastBuildToolsVersion;
+		string lastBuildRuntime;
 		ITimeTracker timer;
+		bool useXBuild;
+		MSBuildVerbosity verbosity;
 		
 		struct ItemInfo {
 			public MSBuildItem Item;
@@ -100,6 +103,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				this.targetImports.AddRange (import.Split (':'));
 			
 			Runtime.SystemAssemblyService.DefaultRuntimeChanged += OnDefaultRuntimeChanged;
+			
+			//FIXME: Update these when the properties change
+			useXBuild = PropertyService.Get ("MonoDevelop.Ide.BuildWithMSBuild", false);
+			verbosity = PropertyService.Get ("MonoDevelop.Ide.MSBuildVerbosity", MSBuildVerbosity.Normal);
 		}
 		
 		void OnDefaultRuntimeChanged (object o, EventArgs args)
@@ -116,22 +123,23 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		{
 			SolutionEntityItem item = (SolutionEntityItem) Item;
 			TargetRuntime runtime = null;
-			TargetFramework fx;
+			string toolsVersion;
 			if (item is IAssemblyProject) {
 				runtime = ((IAssemblyProject) item).TargetRuntime;
-				fx = ((IAssemblyProject) item).TargetFramework;
+				toolsVersion = this.TargetFormat.ToolsVersion;
 			}
 			else {
 				runtime = Runtime.SystemAssemblyService.CurrentRuntime;
-				fx = Services.ProjectService.DefaultTargetFramework;
+				toolsVersion = MSBuildProjectService.DefaultToolsVersion;
 			}
-			if (projectBuilder == null || lastBuildFx != fx) {
+			if (projectBuilder == null || lastBuildToolsVersion != toolsVersion || lastBuildRuntime != runtime.Id) {
 				if (projectBuilder != null) {
 					projectBuilder.Dispose ();
 					projectBuilder = null;
 				}
-				projectBuilder = MSBuildProjectService.GetProjectBuilder (runtime, fx, item.FileName);
-				lastBuildFx = fx;
+				projectBuilder = MSBuildProjectService.GetProjectBuilder (runtime, toolsVersion, item.FileName);
+				lastBuildToolsVersion = toolsVersion;
+				lastBuildRuntime = runtime.Id;
 			}
 			return projectBuilder;
 		}
@@ -148,7 +156,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		
 		IEnumerable<string> IAssemblyReferenceHandler.GetAssemblyReferences (ConfigurationSelector configuration)
 		{
-			if (PropertyService.Get ("MonoDevelop.Ide.BuildWithMSBuild", false)) {
+			if (useXBuild) {
 				// Get the references list from the msbuild project
 				SolutionEntityItem item = (SolutionEntityItem) Item;
 				RemoteProjectBuilder builder = GetProjectBuilder ();
@@ -169,7 +177,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		
 		public override BuildResult RunTarget (IProgressMonitor monitor, string target, ConfigurationSelector configuration)
 		{
-			if (PropertyService.Get ("MonoDevelop.Ide.BuildWithMSBuild", false)) {
+			if (useXBuild) {
 				SolutionEntityItem item = Item as SolutionEntityItem;
 				if (item != null) {
 					
@@ -177,7 +185,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				
 					LogWriter logWriter = new LogWriter (monitor.Log);
 					RemoteProjectBuilder builder = GetProjectBuilder ();
-					MSBuildResult[] results = builder.RunTarget (target, configObject.Name, configObject.Platform, logWriter);
+					MSBuildResult[] results = builder.RunTarget (target, configObject.Name, configObject.Platform,
+						logWriter, verbosity);
 					System.Runtime.Remoting.RemotingServices.Disconnect (logWriter);
 					
 					BuildResult br = new BuildResult ();
@@ -281,8 +290,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				DotNetProjectSubtypeNode st = MSBuildProjectService.GetDotNetProjectSubtype (typeGuids);
 				if (st != null) {
 					item = st.CreateInstance (language);
-					if (!string.IsNullOrEmpty (st.Import))
-						targetImports.AddRange (st.Import.Split (':'));
+					useXBuild = useXBuild || st.UseXBuild;
+					st.UpdateImports ((SolutionEntityItem)item, targetImports);
 				} else
 					throw new InvalidOperationException ("Unknown solution item type.");
 			}
@@ -814,7 +823,13 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			} else
 				msproject.RemoveProjectExtensions ("MonoDevelop");
 			
-			msproject.Save (eitem.FileName);
+			string txt = msproject.Save ();
+			
+			// Don't save the file to disk if the content did not change
+			if (txt != fileContent) {
+				File.WriteAllText (eitem.FileName, txt);
+				fileContent = txt;
+			}
 		}
 
 		void CollectMergetoprojectProperties (MSBuildPropertyGroup pgroup, List<String> propertyNames, Dictionary<string,string> mergeToProjectProperties)
