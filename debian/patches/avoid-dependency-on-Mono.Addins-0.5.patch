@@ -1,0 +1,48 @@
+From 5a628ccfeed02aaee060ce563ff6bd2d468bfb9e Mon Sep 17 00:00:00 2001
+From: Lluis Sanchez <lluis@novell.com>
+Date: Mon, 13 Dec 2010 16:19:16 +0100
+Subject: [PATCH] Avoid dependency on Mono.Addins 0.5
+
+---
+ .../DotNetProjectSubtypeNode.cs                    |   18 ++++++++++++++----
+ 1 files changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/main/src/core/MonoDevelop.Core/MonoDevelop.Projects.Extensions/DotNetProjectSubtypeNode.cs b/main/src/core/MonoDevelop.Core/MonoDevelop.Projects.Extensions/DotNetProjectSubtypeNode.cs
+index adcd5ce..2ca5640 100644
+--- a/src/core/MonoDevelop.Core/MonoDevelop.Projects.Extensions/DotNetProjectSubtypeNode.cs
++++ b/src/core/MonoDevelop.Core/MonoDevelop.Projects.Extensions/DotNetProjectSubtypeNode.cs
+@@ -142,17 +142,27 @@ namespace MonoDevelop.Projects.Extensions
+ 	
+ 	class DotNetProjectSubtypeNodeImport: ExtensionNode
+ 	{
++		[NodeAttribute ("language")]
++		string language;
++
++		[NodeAttribute ("projects")]
++		string projects;
++
+ 		protected override void Read (NodeElement elem)
+ 		{
+ 			IsAdd = elem.NodeName == "AddImport";
+ 			base.Read (elem);
+ 		}
+ 		
+-		[NodeAttribute ("language")]
+-		public string Language { get; set; }
++		public string Language {
++			get { return language; }
++			set { language = value; }
++		}
+ 		
+-		[NodeAttribute ("projects")]
+-		public string Projects { get; set; }
++		public string Projects {
++			get { return projects; }
++			set { projects = value; }
++		}
+ 		
+ 		public bool IsAdd { get; private set; }
+ 	}
+-- 
+1.7.3.3
+

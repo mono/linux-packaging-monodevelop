@@ -1,4 +1,5 @@
 #stetic_widget_corruption_r144546.patch -p3
+avoid-dependency-on-Mono.Addins-0.5.patch
 use_system_Mono.Debugger.Soft.patch
 #use_keyfile_not_keycontainer.patch
 link_system_nunit.patch
