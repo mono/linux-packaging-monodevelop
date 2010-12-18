@@ -1,3 +1,28 @@
+monodevelop (2.4.1+dfsg-1) experimental; urgency=low
+
+  [ Stefan Ebner ]
+  * [5ea0b80] Pointing to new VCS-* Locations as we are using git
+    instead of svn now
+
+  [ Jo Shields ]
+  * [0991342] Add a gbp.conf since we're building in a separate branch
+    for Debian Experimental
+  * [aa1e75f] Imported Upstream version 2.4.1+dfsg
+  * [3c4f7de] Remove use_keyfile_not_keycontainer patch (fixed upstream)
+  * [ade23c4] Import upstream git commit 5a628ccfeed02aaee060 as a new 
+    patch. This fixes some code introduced in MonoDevelop 2.4.1 which 
+    requires Mono.Addins 0.5 (rather than the 0.4 cited in configure.in). 
+    Thanks to Lluis Sanchez <lluis@novell.com>
+  * [1207056] Inject a snapshot of the Mono Soft Debugger source from
+    2010-10-23 (as found in Mono commitid fbd6abac72ec96f2034d), along
+    with some build system special sauce (as found in Debian MonoDevelop
+    commitid 9915fc77e5385d377241). This is needed because MonoDevelop
+    2.4.1 makes use of methods in Mono.Debugger.Soft which post-date the
+    release of Mono 2.6.7, our Squeeze release version. And upstream's
+    just-bundle-the-DLL-in-the-source route is inappropriate for Debian.
+
+ -- Jo Shields <directhex@apebox.org>  Sat, 18 Dec 2010 12:09:49 +0000
+
 monodevelop (2.4+dfsg-3) unstable; urgency=low
 
   * debian/patches/use_keyfile_not_keycontainer.patch:
