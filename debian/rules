@@ -10,7 +10,6 @@ DEB_SOURCE_NAME = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^
 VERSION = $(shell echo $(DEB_VERSION) | cut -d"-" -f1 | sed 's/+dfsg.*//')
 
 include /usr/share/cli-common/cli.make
-include /usr/share/quilt/quilt.make
 
 override_dh_auto_configure:
 	aclocal -I.
@@ -76,6 +75,6 @@ get-orig-source:
 	rm -r $(DEB_SOURCE_NAME)-$(VERSION)
 
 %:
-	dh --with quilt $@
+	dh $@
 
 .PHONY: get-orig-source

@@ -3,7 +3,7 @@ Section: devel
 Priority: optional
 Maintainer: Debian CLI Applications Team <pkg-cli-apps-team@lists.alioth.debian.org>
 Uploaders: Mirco Bauer <meebey@debian.org>, Jo Shields <directhex@apebox.org>
-Build-Depends: debhelper (>= 7.0.50), quilt (>= 0.46-7~)
+Build-Depends: debhelper (>= 7.0.50)
 Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  mono-devel (>= 2.6.1),
  libmono-dev (>= 2.6.1),
