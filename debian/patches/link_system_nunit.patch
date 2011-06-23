@@ -1,11 +1,8 @@
-Index: monodevelop-2.1.0/src/addins/NUnit/Makefile.am
-Description: Use system nunit libs instead of shipped ones
-Patch created by Mirco Bauer <meebey@meebey.net>
+Index: monodevelop.git/src/addins/NUnit/Makefile.am
 ===================================================================
-diff -urNad monodevelop-2.1.0~/src/addins/NUnit/Makefile.am monodevelop-2.1.0/src/addins/NUnit/Makefile.am
---- monodevelop-2.1.0~/src/addins/NUnit/Makefile.am	2009-09-11 09:35:08.628794292 +0100
-+++ monodevelop-2.1.0/src/addins/NUnit/Makefile.am	2009-09-11 09:37:57.567794632 +0100
-@@ -16,10 +16,7 @@
+--- monodevelop.git.orig/src/addins/NUnit/Makefile.am	2011-06-23 23:07:40.000000000 +0100
++++ monodevelop.git/src/addins/NUnit/Makefile.am	2011-06-23 23:55:54.000000000 +0100
+@@ -13,10 +13,7 @@
  	$(GLIB_SHARP_LIBS) \
  	$(GTK_SHARP_LIBS) \
  	$(MONO_ADDINS_LIBS) \
@@ -17,7 +14,7 @@ diff -urNad monodevelop-2.1.0~/src/addins/NUnit/Makefile.am monodevelop-2.1.0/sr
  	-r:Mono.Cairo \
  	-r:Mono.Posix \
  	-r:System \
-@@ -86,16 +83,7 @@
+@@ -85,16 +82,7 @@
  	templates/NUnitTestClass.xft.xml
  
  
@@ -35,7 +32,7 @@ diff -urNad monodevelop-2.1.0~/src/addins/NUnit/Makefile.am monodevelop-2.1.0/sr
  
  $(ADDIN_BUILD)/%: $(srcdir)/lib/%
  	mkdir -p $(ADDIN_BUILD)
-@@ -108,9 +96,9 @@
+@@ -107,9 +95,9 @@
  $(ASSEMBLY).mdb: $(ASSEMBLY)
  
  assemblydir = $(MD_ADDIN_DIR)/NUnit
@@ -48,9 +45,10 @@ diff -urNad monodevelop-2.1.0~/src/addins/NUnit/Makefile.am monodevelop-2.1.0/sr
 +EXTRA_DIST = $(FILES) $(RES)
  
  include $(top_srcdir)/Makefile.include
-diff -urNad monodevelop-2.1.0~/src/addins/NUnit/MonoDevelopNUnit.addin.xml monodevelop-2.1.0/src/addins/NUnit/MonoDevelopNUnit.addin.xml
---- monodevelop-2.1.0~/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2009-09-11 09:35:08.628794292 +0100
-+++ monodevelop-2.1.0/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2009-09-11 09:38:41.715795575 +0100
+Index: monodevelop.git/src/addins/NUnit/MonoDevelopNUnit.addin.xml
+===================================================================
+--- monodevelop.git.orig/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-06-23 23:13:22.000000000 +0100
++++ monodevelop.git/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-06-24 00:01:29.000000000 +0100
 @@ -10,10 +10,6 @@
  
  	<Runtime>
@@ -62,12 +60,12 @@ diff -urNad monodevelop-2.1.0~/src/addins/NUnit/MonoDevelopNUnit.addin.xml monod
  	</Runtime>
  	
  	<Dependencies>
-@@ -67,16 +63,6 @@
+@@ -63,16 +59,6 @@
  
  	<!-- Extensions -->
  
 -	<Extension path="/MonoDevelop/Core/SupportPackages">
--		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.4">
+-		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.6">
 -			<Package name="nunit" version="2.4" clrVersion="Default">
 -				<Assembly file="nunit.core.dll" />
 -				<Assembly file="nunit.core.interfaces.dll" />
@@ -77,11 +75,12 @@ diff -urNad monodevelop-2.1.0~/src/addins/NUnit/MonoDevelopNUnit.addin.xml monod
 -	</Extension>
 -
  	<Extension path = "/MonoDevelop/Ide/Pads">
- 		<SolutionPad id = "MonoDevelop.NUnit.TestPad" defaultPlacement = "Left" _label = "Unit Tests" icon = "nunit-pad-icon" class = "MonoDevelop.NUnit.TestPad">
+ 		<SolutionPad id = "MonoDevelop.NUnit.TestPad" defaultLayout="*" defaultPlacement = "Left" defaultStatus="AutoHide" _label = "Unit Tests" icon = "nunit-pad-icon" class = "MonoDevelop.NUnit.TestPad">
  			<PadOption id = "ShowTestTime" _label = "Show Test Time" defaultValue = "False" />
-diff -urNad monodevelop-2.1.0~/src/addins/NUnit/NUnitRunner/Makefile.am monodevelop-2.1.0/src/addins/NUnit/NUnitRunner/Makefile.am
---- monodevelop-2.1.0~/src/addins/NUnit/NUnitRunner/Makefile.am	2009-09-11 09:35:08.628794292 +0100
-+++ monodevelop-2.1.0/src/addins/NUnit/NUnitRunner/Makefile.am	2009-09-11 09:39:13.959795707 +0100
+Index: monodevelop.git/src/addins/NUnit/NUnitRunner/Makefile.am
+===================================================================
+--- monodevelop.git.orig/src/addins/NUnit/NUnitRunner/Makefile.am	2011-06-23 23:07:40.000000000 +0100
++++ monodevelop.git/src/addins/NUnit/NUnitRunner/Makefile.am	2011-06-23 23:55:54.000000000 +0100
 @@ -1,9 +1,7 @@
  FILES = NUnitTestRunner.cs
  
