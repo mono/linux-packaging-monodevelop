@@ -30,36 +30,51 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
+
+using MonoMac.AppKit;
+using MonoMac.Foundation;
+
+using MonoDevelop.Core;
+using MonoDevelop.Core.Execution;
+using MonoDevelop.Core.Instrumentation;
 using MonoDevelop.Components.Commands;
+using MonoDevelop.Ide; 
+using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Commands;
 using MonoDevelop.Ide.Desktop;
-using MonoDevelop.Ide.Gui;
-using OSXIntegration.Framework;
-using MonoDevelop.Ide; 
-using System.Linq;
-using MonoDevelop.Core.Execution;
-using MonoDevelop.Platform.Mac;
-using MonoDevelop.Core;
+using MonoDevelop.MacInterop;
 
-namespace MonoDevelop.Platform
+namespace MonoDevelop.Platform.Mac
 {
-	public class MacPlatform : PlatformService
+	class MacPlatform : PlatformService
 	{
+		static TimerCounter timer = InstrumentationService.CreateTimerCounter ("Mac Platform Initialization", "Platform Service");
+		static TimerCounter mimeTimer = InstrumentationService.CreateTimerCounter ("Mac Mime Database", "Platform Service");
+		
 		static bool setupFail, initedApp, initedGlobal;
 		
 		static Dictionary<string, string> mimemap;
 
 		static MacPlatform ()
 		{
+			timer.BeginTiming ();
+			
+			LoadMimeMapAsync ();
+			
+			CheckGtkVersion (2, 17, 9);
+			
 			//make sure the menu app name is correct even when running Mono 2.6 preview, or not running from the .app
 			Carbon.SetProcessName ("MonoDevelop");
 			
-			GlobalSetup ();
-			mimemap = new Dictionary<string, string> ();
-			LoadMimeMap ();
+			timer.Trace ("Initializing NSApplication");
+			MonoMac.AppKit.NSApplication.Init ();
 			
-			CheckGtkVersion (2, 17, 9);
+			timer.Trace ("Installing App Event Handlers");
+			GlobalSetup ();
+			
+			timer.EndTiming ();
 		}
 		
 		//Mac GTK+ is unstable, even between micro releases
@@ -86,21 +101,11 @@ namespace MonoDevelop.Platform
 			}
 		}
 
-		public override DesktopApplication GetDefaultApplication (string mimetype) {
-			return new DesktopApplication ();
-		}
-		
-		public override DesktopApplication [] GetAllApplications (string mimetype) {
-			return new DesktopApplication [0];
-		}
-
 		protected override string OnGetMimeTypeForUri (string uri)
 		{
-			FileInfo file = new FileInfo (uri);
-			
-			if (mimemap.ContainsKey (file.Extension))
-				return mimemap [file.Extension];
-
+			var ext = System.IO.Path.GetExtension (uri);
+			if (mimemap != null && mimemap.ContainsKey (ext))
+				return mimemap [ext];
 			return null;
 		}
 
@@ -111,11 +116,12 @@ namespace MonoDevelop.Platform
 		
 		internal static void OpenUrl (string url)
 		{
-			//WORKAROUND: don't pass URL directly - Mono currently uses 'open -W' which means 'open' hangs until target app exits
-			var psi = new ProcessStartInfo ("open", string.Format ("\"{0}\"", url.Replace ("\"", "\\\""))) {
-				UseShellExecute = false
-			};
-			Process.Start (psi);
+			NSWorkspace.SharedWorkspace.OpenUrl (new NSUrl (url));
+		}
+		
+		public override void OpenFile (string filename)
+		{
+			NSWorkspace.SharedWorkspace.OpenFile (filename);
 		}
 
 		public override string DefaultMonospaceFont {
@@ -126,36 +132,42 @@ namespace MonoDevelop.Platform
 			get { return "OSX"; }
 		}
 		
-		private static void LoadMimeMap ()
+		private static void LoadMimeMapAsync ()
 		{
-			LoggingService.Trace ("Mac Platform Service", "Loading MIME map");
-			
 			// All recent Macs should have this file; if not we'll just die silently
 			if (!File.Exists ("/etc/apache2/mime.types")) {
 				MonoDevelop.Core.LoggingService.LogError ("Apache mime database is missing");
 				return;
 			}
 			
-			try {
-				StreamReader reader = new StreamReader (File.OpenRead ("/etc/apache2/mime.types"));
-				Regex mime = new Regex ("([a-zA-Z]+/[a-zA-z0-9+-_.]+)\t+([a-zA-Z]+)", RegexOptions.Compiled);
-				string line;
-				while ((line = reader.ReadLine ()) != null) {
-					Match m = mime.Match (line);
-					if (m.Success)
-						mimemap ["." + m.Groups [2].Captures [0].Value] = m.Groups [1].Captures [0].Value; 
+			System.Threading.ThreadPool.QueueUserWorkItem (delegate {
+				mimeTimer.BeginTiming ();
+				try {
+					var map = new Dictionary<string, string> ();
+					using (var file = File.OpenRead ("/etc/apache2/mime.types")) {
+						using (var reader = new StreamReader (file)) {
+							var mime = new Regex ("([a-zA-Z]+/[a-zA-z0-9+-_.]+)\t+([a-zA-Z]+)", RegexOptions.Compiled);
+							string line;
+							while ((line = reader.ReadLine ()) != null) {
+								Match m = mime.Match (line);
+								if (m.Success)
+									map ["." + m.Groups [2].Captures [0].Value] = m.Groups [1].Captures [0].Value; 
+							}
+						}
+					}
+					mimemap = map;
+				} catch (Exception ex){
+					MonoDevelop.Core.LoggingService.LogError ("Could not load Apache mime database", ex);
 				}
-			} catch (Exception ex){
-				MonoDevelop.Core.LoggingService.LogError ("Could not load Apache mime database", ex);
-			}
-			
-			LoggingService.Trace ("Mac Platform Service", "Loaded MIME map");
+				mimeTimer.EndTiming ();
+			});
 		}
 		
 		HashSet<object> ignoreCommands = new HashSet<object> () {
 			CommandManager.ToCommandId (HelpCommands.About),
 			CommandManager.ToCommandId (EditCommands.DefaultPolicies),
 			CommandManager.ToCommandId (EditCommands.MonodevelopPreferences),
+			CommandManager.ToCommandId (ToolCommands.AddinManager),
 			CommandManager.ToCommandId (FileCommands.Exit),
 		};
 		
@@ -167,10 +179,10 @@ namespace MonoDevelop.Platform
 			try {
 				InitApp (commandManager);
 				CommandEntrySet ces = commandManager.CreateCommandEntrySet (commandMenuAddinPath);
-				OSXIntegration.OSXMenu.Recreate (commandManager, ces, ignoreCommands);
+				OSXMenu.Recreate (commandManager, ces, ignoreCommands);
 			} catch (Exception ex) {
 				try {
-					OSXIntegration.OSXMenu.Destroy (true);
+					OSXMenu.Destroy (true);
 				} catch {}
 				MonoDevelop.Core.LoggingService.LogError ("Could not install global menu", ex);
 				setupFail = true;
@@ -185,7 +197,7 @@ namespace MonoDevelop.Platform
 			if (initedApp)
 				return;
 			
-			OSXIntegration.OSXMenu.AddCommandIDMappings (new Dictionary<object, CarbonCommandID> ()
+			OSXMenu.AddCommandIDMappings (new Dictionary<object, CarbonCommandID> ()
 			{
 				{ CommandManager.ToCommandId (EditCommands.Copy), CarbonCommandID.Copy },
 				{ CommandManager.ToCommandId (EditCommands.Cut), CarbonCommandID.Cut },
@@ -207,17 +219,19 @@ namespace MonoDevelop.Platform
 			
 			//mac-ify these command names
 			commandManager.GetCommand (EditCommands.MonodevelopPreferences).Text = GettextCatalog.GetString ("Preferences...");
-			commandManager.GetCommand (EditCommands.DefaultPolicies).Text = GettextCatalog.GetString ("Default Policies...");
+			commandManager.GetCommand (EditCommands.DefaultPolicies).Text = GettextCatalog.GetString ("Custom Policies...");
 			commandManager.GetCommand (HelpCommands.About).Text = GettextCatalog.GetString ("About MonoDevelop");
+			commandManager.GetCommand (ToolCommands.AddinManager).Text = GettextCatalog.GetString ("Add-in Manager...");
 			
 			initedApp = true;
-			OSXIntegration.OSXMenu.SetAppQuitCommand (CommandManager.ToCommandId (FileCommands.Exit));
-			OSXIntegration.OSXMenu.AddAppMenuItems (
+			OSXMenu.SetAppQuitCommand (CommandManager.ToCommandId (FileCommands.Exit));
+			OSXMenu.AddAppMenuItems (
 				commandManager,
 			    CommandManager.ToCommandId (HelpCommands.About),
 				CommandManager.ToCommandId (Command.Separator),
+				CommandManager.ToCommandId (EditCommands.MonodevelopPreferences),
 				CommandManager.ToCommandId (EditCommands.DefaultPolicies),
-				CommandManager.ToCommandId (EditCommands.MonodevelopPreferences));
+				CommandManager.ToCommandId (ToolCommands.AddinManager));
 			
 			IdeApp.Workbench.RootWindow.DeleteEvent += HandleDeleteEvent;
 		}
@@ -247,12 +261,21 @@ namespace MonoDevelop.Platform
 				ApplicationEvents.OpenDocuments += delegate (object sender, ApplicationDocumentEventArgs e) {
 					//OpenFiles may pump the mainloop, but can't do that from an AppleEvent, so use a brief timeout
 					GLib.Timeout.Add (10, delegate {
-						IdeApp.OpenFiles (e.Documents.Select (doc => new FileOpenInformation (doc.Key, doc.Value, 1, true)));
+						IdeApp.OpenFiles (e.Documents.Select (doc =>
+							new FileOpenInformation (doc.Key, doc.Value, 1, OpenDocumentOptions.Default)));
 						return false;
 					});
 					e.Handled = true;
 				};
 				
+				//if not running inside an app bundle, assume usual MD build layout and load the app icon
+				FilePath exePath = System.Reflection.Assembly.GetExecutingAssembly ().Location;
+				if (!exePath.ToString ().Contains ("MonoDevelop.app")) {
+					var mdSrcMain = exePath.ParentDirectory.ParentDirectory.ParentDirectory;
+					var icons = mdSrcMain.Combine ("theme-icons", "Mac", "monodevelop.icns");
+					if (File.Exists (icons))
+						NSApplication.SharedApplication.ApplicationIconImage = new NSImage (icons);
+				}
 			} catch (Exception ex) {
 				MonoDevelop.Core.LoggingService.LogError ("Could not install app event handlers", ex);
 				setupFail = true;
@@ -264,6 +287,54 @@ namespace MonoDevelop.Platform
 		{
 			args.RetVal = true;
 			IdeApp.Workbench.RootWindow.Visible = false;
+		}
+		
+		protected override Gdk.Pixbuf OnGetPixbufForFile (string filename, Gtk.IconSize size)
+		{
+			NSImage icon = null;
+			
+			//FIXME: better handling of names of files that haven't been saved yet
+			if (Path.IsPathRooted (filename)) {
+				icon = NSWorkspace.SharedWorkspace.IconForFile (filename);
+			} else {
+				icon = NSWorkspace.SharedWorkspace.IconForFile ("/tmp/" + filename);
+			}
+			
+			if (icon != null) {
+				int w, h;
+				if (!Gtk.Icon.SizeLookup (Gtk.IconSize.Menu, out w, out h))
+					w = h = 22;
+				var rect = new System.Drawing.RectangleF (0, 0, w, h);
+				var rep = icon.BestRepresentation (rect, null, null) as NSBitmapImageRep;
+				if (rep != null) {
+					var tiff = rep.TiffRepresentation;
+					byte[] arr = new byte[tiff.Length];
+					System.Runtime.InteropServices.Marshal.Copy (tiff.Bytes, arr, 0, arr.Length);
+					int pw = rep.PixelsWide, ph = rep.PixelsHigh;
+					var px = new Gdk.Pixbuf (arr, pw, ph);
+					
+					//if one dimension matches, and the other is same or smaller, use as-is
+					if ((pw == w && ph <= h) || (ph == h && pw <= w))
+						return px;
+					
+					//else scale proportionally such that the largest dimension matches the desired size
+					if (pw == ph) {
+						pw = w;
+						ph = h;
+					} else if (pw > ph) {
+						ph = (int) (w * ((float) ph / pw));
+						pw = w;
+					} else {
+						pw = (int) (h * ((float) pw / ph));
+						ph = h;
+					}
+					
+					var scaled = px.ScaleSimple (pw, ph, Gdk.InterpType.Bilinear);
+					px.Dispose ();
+					return scaled;
+				}
+			}
+			return base.OnGetPixbufForFile (filename, size);
 		}
 		
 		public override IProcessAsyncOperation StartConsoleProcess (string command, string arguments, string workingDirectory,
@@ -304,6 +375,54 @@ end tell", directory.ToString ().Replace ("\"", "\\\"")));
 					if (name != null && name.Length > len) 
 						yield return "iphsdk" + name.Substring (len);
 				}
+			}
+		}
+		
+		public override IEnumerable<DesktopApplication> GetApplications (string filename)
+		{
+			//FIXME: we should disambiguate dupliacte apps in different locations and display both
+			//for now, just filter out the duplicates
+			var checkUniqueName = new HashSet<string> ();
+			var checkUniquePath = new HashSet<string> ();
+			
+			//FIXME: bundle path is wrong because of how MD is built into an app
+			//var thisPath = NSBundle.MainBundle.BundleUrl.Path;
+			//checkUniquePath.Add (thisPath);
+			
+			checkUniqueName.Add ("MonoDevelop");
+			
+			string def = CoreFoundation.GetApplicationUrl (filename, CoreFoundation.LSRolesMask.All);
+			
+			var apps = new List<DesktopApplication> ();
+			
+			foreach (var app in CoreFoundation.GetApplicationUrls (filename, CoreFoundation.LSRolesMask.All)) {
+				if (string.IsNullOrEmpty (app) || !checkUniquePath.Add (app))
+					continue;
+				var name = NSFileManager.DefaultManager.DisplayName (app);
+				if (checkUniqueName.Add (name))
+					apps.Add (new MacDesktopApplication (app, name, def != null && def == app));
+			}
+			
+			apps.Sort ((DesktopApplication a, DesktopApplication b) => {
+				int r = a.IsDefault.CompareTo (b.IsDefault);
+				if (r != 0)
+					return -r;
+				return a.DisplayName.CompareTo (b.DisplayName);
+			});
+			
+			return apps;
+		}
+		
+		class MacDesktopApplication : DesktopApplication
+		{
+			public MacDesktopApplication (string app, string name, bool isDefault) : base (app, name, isDefault)
+			{
+			}
+			
+			public override void Launch (params string[] files)
+			{
+				foreach (var file in files)
+					NSWorkspace.SharedWorkspace.OpenFile (file, Id);
 			}
 		}
 	}

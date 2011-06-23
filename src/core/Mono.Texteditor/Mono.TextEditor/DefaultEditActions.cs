@@ -120,9 +120,9 @@ namespace Mono.TextEditor
 			if (data.IsSomethingSelected) 
 				SelectLineBlock (data, endLineNr, startLineNr);
 			
-			if (data.Caret.Column != 0) {
+			if (data.Caret.Column != DocumentLocation.MinColumn) {
 				data.Caret.PreserveSelection = true;
-				data.Caret.Column = System.Math.Max (0, data.Caret.Column - last);
+				data.Caret.Column = System.Math.Max (DocumentLocation.MinColumn, data.Caret.Column - last);
 				data.Caret.PreserveSelection = false;
 			}
 			
@@ -134,11 +134,11 @@ namespace Mono.TextEditor
 		static void SelectLineBlock (TextEditorData data, int endLineNr, int startLineNr)
 		{
 			if (startLineNr == endLineNr) {
-				data.MainSelection = new Selection (startLineNr, 0, startLineNr + 1, 0);
+				data.MainSelection = new Selection (startLineNr, DocumentLocation.MinColumn, startLineNr + 1, DocumentLocation.MinColumn);
 				return;
 			}
 			LineSegment endLine = data.Document.GetLine (endLineNr);
-			data.MainSelection = new Selection (startLineNr, 0, endLineNr, endLine.Length);
+			data.MainSelection = new Selection (startLineNr, DocumentLocation.MinColumn, endLineNr, endLine.Length + 1);
 		}
 		
 		public static void RemoveTab (TextEditorData data)
@@ -179,12 +179,12 @@ namespace Mono.TextEditor
 					end = data.MainSelection.Anchor;
 				}
 				startLineNr = start.Line;
-				endLineNr = end.Column == 0 ? end.Line - 1 : end.Line;
+				endLineNr = end.Column == DocumentLocation.MinColumn ? end.Line - 1 : end.Line;
 			} else {
 				startLineNr = endLineNr = data.Caret.Line;
 			}
 			
-			if (endLineNr < 0)
+			if (endLineNr < DocumentLocation.MinLine)
 				endLineNr = data.Document.LineCount;
 		}
 
@@ -200,7 +200,7 @@ namespace Mono.TextEditor
 			if (data.IsSomethingSelected) 
 				SelectLineBlock (data, endLineNr, startLineNr);
 			
-			if (data.Caret.Column != 0) {
+			if (data.Caret.Column != DocumentLocation.MinColumn) {
 				data.Caret.PreserveSelection = true;
 				data.Caret.Column++;
 				data.Caret.PreserveSelection = false;
@@ -260,7 +260,7 @@ namespace Mono.TextEditor
 			if (!data.CanEditSelection)
 				return;
 			LineSegment line = data.Document.GetLine (data.Caret.Line);
-			data.Caret.Column = line.EditableLength;
+			data.Caret.Column = line.EditableLength + 1;
 			InsertNewLine (data);
 		}
 		
@@ -294,12 +294,26 @@ namespace Mono.TextEditor
 		{
 			if (data.Document.ReadOnly)
 				return;
+			if (CancelPreEditMode (data))
+				return;
 			data.Document.Undo ();
+		}
+		
+		public static bool CancelPreEditMode (TextEditorData data)
+		{
+			var editor = data.Parent;
+			if (editor != null && editor.preeditOffset >= 0) {
+				editor.ResetIMContext ();
+				return true;
+			}
+			return false;
 		}
 		
 		public static void Redo (TextEditorData data)
 		{
 			if (data.Document.ReadOnly)
+				return;
+			if (CancelPreEditMode (data))
 				return;
 			data.Document.Redo ();
 		}
@@ -319,8 +333,8 @@ namespace Mono.TextEditor
 				return;
 			
 			data.Document.BeginAtomicUndo ();
-			Mono.TextEditor.LineSegment startLine = data.Document.GetLine (lineStart);
-			int relCaretOffset = data.Caret.Offset - startLine.Offset;
+			//Mono.TextEditor.LineSegment startLine = data.Document.GetLine (lineStart);
+			//int relCaretOffset = data.Caret.Offset - startLine.Offset;
 			
 			Mono.TextEditor.LineSegment prevLine = data.Document.GetLine (lineStart - 1);
 			string text = data.Document.GetTextAt (prevLine.Offset, prevLine.EditableLength);
@@ -337,7 +351,7 @@ namespace Mono.TextEditor
 				}
 			}
 			
-			data.Caret.Offset = prevLine.Offset + relCaretOffset;
+			data.Caret.Line--;
 			if (setSelection)
 				data.SetSelection (data.Document.GetLine (lineStart - 1).Offset, data.Document.GetLine (lineEnd - 1).Offset + data.Document.GetLine (lineEnd - 1).EditableLength);
 			data.Document.EndAtomicUndo ();
@@ -358,10 +372,12 @@ namespace Mono.TextEditor
 				return;
 			data.Document.BeginAtomicUndo ();
 			
-			Mono.TextEditor.LineSegment startLine = data.Document.GetLine (lineStart);
-			int relCaretOffset = data.Caret.Offset - startLine.Offset;
+			//Mono.TextEditor.LineSegment startLine = data.Document.GetLine (lineStart);
+			//int relCaretOffset = data.Caret.Offset - startLine.Offset;
 			
 			Mono.TextEditor.LineSegment nextLine = data.Document.GetLine (lineEnd + 1);
+			if (nextLine == null)
+				return;
 			string text = data.Document.GetTextAt (nextLine.Offset, nextLine.EditableLength);
 			List<TextMarker> prevLineMarkers = new List<TextMarker> (nextLine.Markers);
 			nextLine.ClearMarker ();
@@ -376,7 +392,7 @@ namespace Mono.TextEditor
 				}
 			}
 			
-			data.Caret.Offset = nextLine.Offset + relCaretOffset;
+			data.Caret.Line++;
 			if (setSelection)
 				data.SetSelection (data.Document.GetLine (lineStart + 1).Offset, data.Document.GetLine (lineEnd + 1).Offset + data.Document.GetLine (lineEnd + 1).EditableLength);
 			data.Document.EndAtomicUndo ();
@@ -417,7 +433,7 @@ namespace Mono.TextEditor
 			}
 			
 			int offset = data.Caret.Offset;
-			if (data.Caret.Column >= line.EditableLength) {
+			if (data.Caret.Column >= line.EditableLength + 1) {
 				offset = line.Offset + line.EditableLength - 1;
 				transposeOffset = offset - 1;
 				// case one char in line:
@@ -436,7 +452,7 @@ namespace Mono.TextEditor
 			ch = data.Document.GetCharAt (offset);
 			data.Replace (offset, 1, data.Document.GetCharAt (transposeOffset).ToString ());
 			data.Replace (transposeOffset, 1, ch.ToString ());
-			if (data.Caret.Column < line.EditableLength)
+			if (data.Caret.Column < line.EditableLength + 1)
 				data.Caret.Offset = offset + 1;
 		}
 		/// <summary>

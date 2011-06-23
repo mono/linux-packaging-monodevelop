@@ -30,6 +30,8 @@ using MonoDevelop.Core;
 using Mono.TextEditor;
 using MonoDevelop.Ide;
 using System.Linq;
+using Mono.TextEditor.PopupWindow;
+using System.Collections.Generic;
 
 namespace MonoDevelop.Refactoring.ImplementInterface
 {
@@ -51,7 +53,7 @@ namespace MonoDevelop.Refactoring.ImplementInterface
 			if (!CodeGenerator.HasGenerator (options.GetTextEditorData ().Document.MimeType))
 				return false;
 			DocumentLocation location = options.GetTextEditorData ().Caret.Location;
-			IType declaringType = options.Document.CompilationUnit.GetTypeAt (location.Line + 1, location.Column + 1);
+			IType declaringType = options.Document.CompilationUnit.GetTypeAt (location.Line, location.Column);
 			return declaringType != null && options.ResolveResult.ResolvedExpression.IsInInheritableTypeContext;
 		}
 		
@@ -59,17 +61,26 @@ namespace MonoDevelop.Refactoring.ImplementInterface
 		{
 			DocumentLocation location = options.GetTextEditorData ().Caret.Location;
 			IType interfaceType = options.Dom.GetType (options.ResolveResult.ResolvedType);
-			IType declaringType = options.Document.CompilationUnit.GetTypeAt (location.Line + 1, location.Column + 1);
+			IType declaringType = options.Document.CompilationUnit.GetTypeAt (location.Line, location.Column);
 			
 			var editor = options.GetTextEditorData ().Parent;
 			
-			InsertionCursorEditMode mode = new InsertionCursorEditMode (editor, HelperMethods.GetInsertionPoints (editor.Document, declaringType));
+			InsertionCursorEditMode mode = new InsertionCursorEditMode (editor, CodeGenerationService.GetInsertionPoints (options.Document, declaringType));
+			ModeHelpWindow helpWindow = new ModeHelpWindow ();
+			helpWindow.TransientFor = IdeApp.Workbench.RootWindow;
+			helpWindow.TitleText = GettextCatalog.GetString ("<b>Implement Interface -- Targeting</b>");
+			helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Key</b>"), GettextCatalog.GetString ("<b>Behavior</b>")));
+			helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Up</b>"), GettextCatalog.GetString ("Move to <b>previous</b> target point.")));
+			helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Down</b>"), GettextCatalog.GetString ("Move to <b>next</b> target point.")));
+			helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Enter</b>"), GettextCatalog.GetString ("<b>Declare interface implementation</b> at target point.")));
+			helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Esc</b>"), GettextCatalog.GetString ("<b>Cancel</b> this refactoring.")));
+			mode.HelpWindow = helpWindow;
 			mode.CurIndex = mode.InsertionPoints.Count - 1;
 			mode.StartMode ();
 			mode.Exited += delegate(object s, InsertionCursorEventArgs args) {
 				if (args.Success) {
-					CodeGenerator generator = CodeGenerator.CreateGenerator (options.GetTextEditorData ().Document.MimeType);
-					args.InsertionPoint.Insert (editor, generator.CreateInterfaceImplementation (declaringType, interfaceType, false));
+					CodeGenerator generator = options.Document.CreateCodeGenerator ();
+					args.InsertionPoint.Insert (options.GetTextEditorData (), generator.CreateInterfaceImplementation (declaringType, interfaceType, false));
 				}
 			};
 		}

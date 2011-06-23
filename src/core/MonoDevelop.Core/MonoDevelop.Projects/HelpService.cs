@@ -55,7 +55,6 @@ namespace MonoDevelop.Projects
 			}
 			ThreadPool.QueueUserWorkItem (delegate {
 				// Load the help tree asynchronously. Reduces startup time.
-				LoggingService.Trace ("Ide.HelpService", "[ASYNC] Initializing Help Service");
 				InitializeHelpTree ();
 			});
 		}
@@ -67,6 +66,9 @@ namespace MonoDevelop.Projects
 			lock (helpTreeLock) {
 				if (helpTreeInitialized)
 					return;
+				
+				Counters.HelpServiceInitialization.BeginTiming ();
+				
 				try {
 					helpTree = RootTree.LoadTree ();
 					
@@ -77,6 +79,10 @@ namespace MonoDevelop.Projects
 					foreach (var node in AddinManager.GetExtensionNodes ("/MonoDevelop/ProjectModel/MonoDocSources"))
 						sources.Add (((MonoDocSourceNode)node).Directory);
 					
+					//remove nonexistent sources
+					foreach (var s in sources.ToList ().Where (d => !Directory.Exists (d)))
+						sources.Remove (s);
+					
 					foreach (var s in sources)
 						helpTree.AddSource (s);
 							
@@ -85,7 +91,7 @@ namespace MonoDevelop.Projects
 						LoggingService.LogError ("Monodoc documentation tree could not be loaded.", ex);
 				} finally {
 					helpTreeInitialized = true;
-					LoggingService.Trace ("Ide.HelpService", "[ASYNC] Initialized Help Service");
+					Counters.HelpServiceInitialization.EndTiming ();
 				}
 			}
 		}

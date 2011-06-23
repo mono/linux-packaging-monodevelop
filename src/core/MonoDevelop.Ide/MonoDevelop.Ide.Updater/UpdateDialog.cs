@@ -31,7 +31,9 @@ using System.Text;
 
 using Gtk;
 using MonoDevelop.Core;
+using MonoDevelop.Core.Setup;
 using MonoDevelop.Ide;
+using MonoDevelop.Ide.ProgressMonitoring;
 
 namespace MonoDevelop.Ide.Updater
 {
@@ -41,11 +43,14 @@ namespace MonoDevelop.Ide.Updater
 		const int PAGE_UPDATES = 1;
 		
 		List<UpdateResult> results = new List<UpdateResult> ();
+		bool installing;
+		Queue<System.Action> installQueue = new Queue<System.Action> ();
 		
 		public UpdateDialog ()
 		{
 			this.Build ();
 			notebook1.ShowTabs = false;
+			notebook1.ShowBorder = false;
 			
 			checkAutomaticallyCheck.Active = UpdateService.CheckAutomatically;
 			checkAutomaticallyCheck.Toggled += delegate {
@@ -121,7 +126,7 @@ namespace MonoDevelop.Ide.Updater
 			
 			foreach (var update in updates) {
 				var updateBox = new VBox () { Spacing = 2 };
-				var labelBox = new HBox ();
+				var labelBox = new HBox () { Spacing = 3 };
 				updateBox.PackStart (labelBox, false, false, 0);
 				
 				string warning = null;
@@ -146,16 +151,19 @@ namespace MonoDevelop.Ide.Updater
 				};
 				labelBox.PackStart (updateExpander, true, true, 0);
 				
+				var commandBox = new Gtk.Alignment (0, 0.5f, 0, 0);
+				labelBox.PackStart (commandBox, false, false, 0);
+				
 				var downloadButton = new Button () {
-					Label = GettextCatalog.GetString ("Download")
+					Label = update.InstallAction == null ? GettextCatalog.GetString ("Download") : GettextCatalog.GetString ("Install")
 				};
 				
 				//NOTE: grab the variable from the loop var so the closure captures it 
-				var url = update.Url;
+				var updateVal = update;
 				downloadButton.Clicked += delegate {
-					DesktopService.ShowUrl (url);
+					Install (commandBox, downloadButton, updateVal);
 				};
-				labelBox.PackStart (downloadButton, false, false, 0);
+				commandBox.Add (downloadButton);
 				
 				var sb = new StringBuilder ();
 				for (int i = 0; i < update.Releases.Count; i++) {
@@ -200,6 +208,60 @@ namespace MonoDevelop.Ide.Updater
 			}
 			
 			notebook1.CurrentPage = PAGE_UPDATES;
+		}
+		
+		void Install (Gtk.Alignment commandBox, Button installButton, Update update)
+		{
+			if (update.InstallAction == null) {
+				DesktopService.ShowUrl (update.Url);
+				return;
+			}
+			
+			installButton.Hide ();
+			
+			if (installing) {
+				Gtk.Label lab = new Gtk.Label (GettextCatalog.GetString ("Waiting"));
+				commandBox.Child.Destroy ();
+				commandBox.Add (lab);
+				lab.Show ();
+				installQueue.Enqueue (delegate {
+					lab.Hide ();
+					RunInstall (commandBox, update);
+				});
+				return;
+			}
+			
+			RunInstall (commandBox, update);
+		}
+		
+		void RunInstall (Gtk.Alignment commandBox, Update update)
+		{
+			installing = true;
+			
+			ProgressBarMonitor monitorBar = new ProgressBarMonitor ();
+			monitorBar.ShowErrorsDialog = true;
+			monitorBar.Show ();
+			commandBox.Child.Destroy ();
+			commandBox.Add (monitorBar);
+			
+			IAsyncOperation oper = update.InstallAction (monitorBar.CreateProgressMonitor ());
+			oper.Completed += delegate {
+				DispatchService.GuiDispatch (delegate {
+					monitorBar.Hide ();
+					Gtk.Label result = new Gtk.Label ();
+					if (oper.Success)
+						result.Text = GettextCatalog.GetString ("Completed");
+					else
+						result.Text = GettextCatalog.GetString ("Failed");
+					commandBox.Child.Destroy ();
+					commandBox.Add (result);
+					result.Show ();
+					installing = false;
+					
+					if (installQueue.Count > 0)
+						installQueue.Dequeue ()();
+				});
+			};
 		}
 	}
 }

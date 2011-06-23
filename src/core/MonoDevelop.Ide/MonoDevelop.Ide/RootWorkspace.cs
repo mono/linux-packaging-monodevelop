@@ -27,6 +27,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -95,8 +96,7 @@ namespace MonoDevelop.Ide
 				}
 			};
 			
-			//FIXME: disabled OnRunProjectChecks timeout because it churns disk, wastes power on laptop. Need better solution.
-			//GLib.Timeout.Add (2000, OnRunProjectChecks);
+			FileService.FileChanged += (EventHandler<FileEventArgs>) DispatchService.GuiDispatch (new EventHandler<FileEventArgs> (CheckWorkspaceItems));;
 		}
 		
 		public WorkspaceItemCollection Items {
@@ -163,7 +163,7 @@ namespace MonoDevelop.Ide
 		public CodeRefactorer GetCodeRefactorer (Solution solution) 
 		{
 			CodeRefactorer refactorer = new CodeRefactorer (solution);
-			refactorer.TextFileProvider = new OpenDocumentFileProvider ();
+			refactorer.TextFileProvider = TextFileProvider.Instance;
 			return refactorer;
 		}
 
@@ -201,21 +201,6 @@ namespace MonoDevelop.Ide
 			get {
 				return BaseDirectory;
 			}
-		}
-		
-		public AuthorInformation GetAuthorInformation  (SolutionItem item)
-		{
-			if (item != null)
-				return GetAuthorInformation (item.ParentSolution);
-			return AuthorInformation.Default;
-		}
-		
-		public AuthorInformation GetAuthorInformation (Solution solution)
-		{
-			if (solution == null)
-				return AuthorInformation.Default;
-			AuthorInformation info = solution.UserProperties.GetValue<AuthorInformation> ("AuthorInfo");
-			return info ?? AuthorInformation.Default;
 		}
 		
 #region Model queries
@@ -345,7 +330,8 @@ namespace MonoDevelop.Ide
 		public void Save (IProgressMonitor monitor)
 		{
 			monitor.BeginTask (GettextCatalog.GetString ("Saving Workspace..."), Items.Count);
-			foreach (WorkspaceItem it in Items) {
+			List<WorkspaceItem> items = new List<WorkspaceItem> (Items);
+			foreach (WorkspaceItem it in items) {
 				it.Save (monitor);
 				monitor.Step (1);
 			}
@@ -355,7 +341,8 @@ namespace MonoDevelop.Ide
 		BuildResult IBuildTarget.RunTarget (IProgressMonitor monitor, string target, ConfigurationSelector configuration)
 		{
 			BuildResult result = null;
-			foreach (WorkspaceItem it in Items) {
+			List<WorkspaceItem> items = new List<WorkspaceItem> (Items);
+			foreach (WorkspaceItem it in items) {
 				BuildResult res = it.RunTarget (monitor, target, configuration);
 				if (res != null) {
 					if (result == null)
@@ -620,83 +607,94 @@ namespace MonoDevelop.Ide
 		
 		void SearchForNewFiles ()
 		{
-			foreach (Project p in GetAllProjects()) {
+			foreach (Project p in GetAllProjects ()) {
 				if (p.NewFileSearch != NewFileSearch.None)
 					SearchNewFiles (p);
 			}
 		}
-
 		
 		void SearchNewFiles (Project project)
 		{
-			List<string> newFiles   = new List<string> ();
+			var newFiles = new List<string> ();
 			string[] collection = Directory.GetFiles (project.BaseDirectory, "*", SearchOption.AllDirectories);
 			
-			HashSet<string> projectFiles = new HashSet<string> ();
-			foreach (string file in project.GetItemFiles (true))
-				projectFiles.Add (file);
+			var projectFileNames = new HashSet<string> ();
+			foreach (var file in project.GetItemFiles (true))
+				projectFileNames.Add (file);
+			
+			//also ignore files that would conflict with links
+			foreach (var f in project.Files)
+				projectFileNames.Add (f.ProjectVirtualPath.ToAbsolute (project.BaseDirectory));
 
 			foreach (string sfile in collection) {
-				if (projectFiles.Contains (Path.GetFullPath (sfile)))
+				if (projectFileNames.Contains (Path.GetFullPath (sfile)))
 					continue;
 				if (IdeApp.Services.ProjectService.IsSolutionItemFile (sfile) || IdeApp.Services.ProjectService.IsWorkspaceItemFile (sfile))
 					continue;
-				string extension = Path.GetExtension(sfile).ToUpper();
-				string file = Path.GetFileName (sfile);
-
-				if (extension != ".SCC" &&  // source safe control files -- Svante Lidmans
-					extension != ".DLL" &&
-					extension != ".PDB" &&
-					extension != ".EXE" &&
-					extension != ".CMBX" &&
-					extension != ".PRJX" &&
-					extension != ".SWP" &&
-					extension != ".MDSX" &&
-					extension != ".MDS" &&
-					extension != ".MDP" && 
-					extension != ".PIDB" &&
-					extension != ".PIDB-JOURNAL" &&
-					!file.EndsWith ("make.sh") &&
-					!file.EndsWith ("~") &&
-					!file.StartsWith (".") &&
-					!(Path.GetDirectoryName(sfile).IndexOf("CVS") != -1) &&
-					!(Path.GetDirectoryName(sfile).IndexOf(".svn") != -1) &&
-					!(Path.GetDirectoryName(sfile).IndexOf(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar) != -1) &&
-					!file.StartsWith ("Makefile") &&
-					!Path.GetDirectoryName(file).EndsWith("ProjectDocumentation")) {
-
-					newFiles.Add(sfile);
-				}
+				if (IgnoreFileInSearch (sfile))
+					continue;
+				newFiles.Add (sfile);
 			}
 			
-			if (newFiles.Count > 0) {
-				if (project.NewFileSearch == NewFileSearch.OnLoadAutoInsert) {
-					foreach (string file in newFiles) {
-						project.AddFile (file);
-					}		
-				} else {
-					DispatchService.GuiDispatch (
-						delegate (object state) {
-							NewFilesMessage message = (NewFilesMessage) state;
-							var includeNewFilesDialog = new IncludeNewFilesDialog (message.Project);
-							includeNewFilesDialog.AddFiles (message.NewFiles);
-							MessageService.ShowCustomDialog (includeNewFilesDialog, IdeApp.Workbench.RootWindow);
-						},
-						new NewFilesMessage (project, newFiles)
-					);
+			if (newFiles.Count == 0)
+				return;
+			
+			if (project.NewFileSearch == NewFileSearch.OnLoadAutoInsert) {
+				foreach (string file in newFiles) {
+					project.AddFile (file);
 				}
+				
+				return;
 			}
+			
+			DispatchService.GuiDispatch (delegate {
+				var dialog = new IncludeNewFilesDialog (
+					GettextCatalog.GetString ("Found new files in {0}", project.Name),
+					project.BaseDirectory
+				);
+				dialog.AddFiles (newFiles);
+				if (MessageService.ShowCustomDialog (dialog) != (int)Gtk.ResponseType.Ok)
+					return;
+				
+				foreach (var file in dialog.IgnoredFiles) {
+					var projectFile = project.AddFile (file, BuildAction.None);
+					if (projectFile != null)
+						projectFile.Visible = false;
+				}
+				foreach (var file in dialog.SelectedFiles) {
+					project.AddFile (file);
+				}
+				IdeApp.ProjectOperations.Save (project);
+			});
 		}
 		
-		private class NewFilesMessage
+		bool IgnoreFileInSearch (string sfile)
 		{
-			public Project Project;
-			public List<string> NewFiles;
-			public NewFilesMessage (Project p, List<string> newFiles)
-			{
-				this.Project = p;
-				this.NewFiles = newFiles;
-			}
+			string extension = Path.GetExtension (sfile).ToUpper();
+			string file = Path.GetFileName (sfile);
+			
+			if (file.StartsWith (".") || file.EndsWith ("~"))
+				return true;
+			
+			string[] ignoredExtensions = new string [] {
+				".SCC", ".DLL", ".PDB", ".MDB", ".EXE", ".SLN", ".CMBX", ".PRJX",
+				".SWP", ".MDSX", ".MDS", ".MDP", ".PIDB", ".PIDB-JOURNAL",
+			};
+			if (ignoredExtensions.Contains (extension))
+				return true;
+			
+			string directory = Path.GetDirectoryName (sfile);
+			if (directory.IndexOf (".svn") != -1 || directory.IndexOf (".git") != -1 || directory.IndexOf ("CVS") != -1)
+				return true;
+			
+			if (directory.IndexOf (Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar) != -1
+				|| directory.IndexOf (Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar) != -1)
+				return true;
+			
+			if (file.EndsWith ("make.sh") || file.StartsWith ("Makefile") || directory.EndsWith ("ProjectDocumentation"))
+				return true;
+			
+			return false;			
 		}
 		
 		void RestoreWorkspacePreferences (WorkspaceItem item)
@@ -783,6 +781,31 @@ namespace MonoDevelop.Ide
 			// Save the file
 			
 			item.SaveUserProperties ();
+		}
+		
+		public FileStatusTracker GetFileStatusTracker ()
+		{
+			FileStatusTracker fs = new FileStatusTracker ();
+			fs.AddFiles (GetKnownFiles ());
+			return fs;
+		}
+		
+		IEnumerable<FilePath> GetKnownFiles ()
+		{
+			foreach (WorkspaceItem item in IdeApp.Workspace.Items) {
+				foreach (FilePath file in item.GetItemFiles (true))
+					yield return file;
+			}
+		}
+		
+		void CheckWorkspaceItems (object sender, FileEventArgs args)
+		{
+			List<FilePath> files = args.Select (e => e.FileName.CanonicalPath).ToList ();
+			foreach (Solution s in GetAllSolutions ().Where (sol => files.Contains (sol.FileName.CanonicalPath)))
+				OnCheckWorkspaceItem (s);
+			
+			foreach (Project p in GetAllProjects ().Where (proj => files.Contains (proj.FileName.CanonicalPath)))
+				OnCheckProject (p);
 		}
 		
 		bool OnRunProjectChecks ()
@@ -1129,7 +1152,7 @@ namespace MonoDevelop.Ide
 			}
 		}
 		
-		void NotifyItemAddedToSolution (object sender, SolutionItemEventArgs args)
+		void NotifyItemAddedToSolution (object sender, SolutionItemChangeEventArgs args)
 		{
 			// Delay the notification of this event to ensure that the new project is properly
 			// registered in the parser database when it is fired
@@ -1140,7 +1163,7 @@ namespace MonoDevelop.Ide
 			});
 		}
 		
-		void NotifyItemRemovedFromSolution (object sender, SolutionItemEventArgs args)
+		void NotifyItemRemovedFromSolution (object sender, SolutionItemChangeEventArgs args)
 		{
 			NotifyItemRemovedFromSolutionRec (sender, args.SolutionItem, args.Solution);
 		}
@@ -1155,7 +1178,7 @@ namespace MonoDevelop.Ide
 					NotifyItemRemovedFromSolutionRec (sender, ce, sol);
 			}
 			if (ItemRemovedFromSolution != null)
-				ItemRemovedFromSolution (sender, new SolutionItemEventArgs (e, sol));
+				ItemRemovedFromSolution (sender, new SolutionItemChangeEventArgs (e, sol, false));
 		}
 		
 		void NotifyDescendantItemAdded (object s, WorkspaceItemEventArgs args)
@@ -1206,55 +1229,176 @@ namespace MonoDevelop.Ide
 
 		void CheckFileRemove(object sender, FileEventArgs e)
 		{
-			foreach (Solution sol in GetAllSolutions ())
-				sol.RootFolder.RemoveFileFromProjects (e.FileName);
+			foreach (Solution sol in GetAllSolutions ()) {
+				foreach (FilePath p in e.Select (fi => fi.FileName))
+					sol.RootFolder.RemoveFileFromProjects (p);
+			}
 		}
 		
-		void CheckFileRename(object sender, FileCopyEventArgs e)
+		void CheckFileRename(object sender, FileCopyEventArgs args)
 		{
-			foreach (Solution sol in GetAllSolutions ())
-				sol.RootFolder.RenameFileInProjects (e.SourceFile, e.TargetFile);
+			foreach (Solution sol in GetAllSolutions ()) {
+				foreach (FileCopyEventInfo e in args)
+					sol.RootFolder.RenameFileInProjects (e.SourceFile, e.TargetFile);
+			}
 		}
 		
 #endregion
 
 #region Event declaration
 		
+		/// <summary>
+		/// Fired when a file is removed from a project.
+		/// </summary>
 		public event ProjectFileEventHandler FileRemovedFromProject;
+		
+		/// <summary>
+		/// Fired when a file is added to a project
+		/// </summary>
 		public event ProjectFileEventHandler FileAddedToProject;
+		
+		/// <summary>
+		/// Fired when a file belonging to a project is modified.
+		/// </summary>
+		/// <remarks>
+		/// If the file belongs to several projects, the event will be fired for each project
+		/// </remarks>
 		public event ProjectFileEventHandler FileChangedInProject;
+		
+		/// <summary>
+		/// Fired when a property of a project file is modified
+		/// </summary>
 		public event ProjectFileEventHandler FilePropertyChangedInProject;
+		
+		/// <summary>
+		/// Fired when a project file is renamed
+		/// </summary>
 		public event ProjectFileRenamedEventHandler FileRenamedInProject;
 		
+		/// <summary>
+		/// Fired when a solution is loaded in the workbench
+		/// </summary>
+		/// <remarks>
+		/// This event is fired recursively for every solution
+		/// opened in the IDE. For example, if the user opens a workspace
+		/// which contains two solutions, this event will be fired once
+		/// for each solution.
+		/// </remarks>
 		public event EventHandler<SolutionEventArgs> SolutionLoaded;
+		
+		/// <summary>
+		/// Fired when a solution loaded in the workbench is unloaded
+		/// </summary>
 		public event EventHandler<SolutionEventArgs> SolutionUnloaded;
+		
+		/// <summary>
+		/// Fired when a workspace item (a solution or workspace) is opened and there
+		/// is no other item already open
+		/// </summary>
 		public event EventHandler<WorkspaceItemEventArgs> FirstWorkspaceItemOpened;
+		
+		/// <summary>
+		/// Fired a workspace item loaded in the IDE is closed and there are no other
+		/// workspace items opened.
+		/// </summary>
 		public event EventHandler LastWorkspaceItemClosed;
+		
+		/// <summary>
+		/// Fired when a workspace item (a solution or workspace) is loaded.
+		/// </summary>
+		/// <remarks>
+		/// This event is fired recursively for every solution and workspace 
+		/// opened in the IDE. For example, if the user opens a workspace
+		/// which contains two solutions, this event will be fired three times: 
+		/// once for the workspace, and once for each solution.
+		/// </remarks>
 		public event EventHandler<WorkspaceItemEventArgs> WorkspaceItemLoaded;
+		
+		/// <summary>
+		/// Fired when a workspace item (a solution or workspace) is unloaded
+		/// </summary>
 		public event EventHandler<WorkspaceItemEventArgs> WorkspaceItemUnloaded;
+		
+		/// <summary>
+		/// Fired a workspace item (a solution or workspace) is opened in the IDE
+		/// </summary>
 		public event EventHandler<WorkspaceItemEventArgs> WorkspaceItemOpened;
+		
+		/// <summary>
+		/// Fired when a workspace item (a solution or workspace) is closed in the IDE
+		/// </summary>
 		public event EventHandler<WorkspaceItemEventArgs> WorkspaceItemClosed;
+		
+		/// <summary>
+		/// Fired when user preferences for the active solution are being stored
+		/// </summary>
+		/// <remarks>
+		/// Add-ins can subscribe to this event to store custom user preferences
+		/// for a solution. Preferences can be stored in the PropertyBag provided
+		/// in the event arguments object.
+		/// </remarks>
 		public event EventHandler<UserPreferencesEventArgs> StoringUserPreferences;
+		
+		/// <summary>
+		/// Fired when user preferences for a solution are being loaded
+		/// </summary>
+		/// <remarks>
+		/// Add-ins can subscribe to this event to load preferences previously
+		/// stored in the StoringUserPreferences event.
+		/// </remarks>
 		public event EventHandler<UserPreferencesEventArgs> LoadingUserPreferences;
+		
+		/// <summary>
+		/// Fired when an item (a project, solution or workspace) is going to be unloaded.
+		/// </summary>
+		/// <remarks>
+		/// This event is fired before unloading the item, and the unload operation can
+		/// be cancelled by setting the Cancel property of the ItemUnloadingEventArgs
+		/// object to True.
+		/// </remarks>
 		public event EventHandler<ItemUnloadingEventArgs> ItemUnloading;
 		
-		public event EventHandler<SolutionEventArgs> CurrentSelectedSolutionChanged;
-		
+		/// <summary>
+		/// Fired when an assembly reference is added to a .NET project
+		/// </summary>
 		public event ProjectReferenceEventHandler ReferenceAddedToProject;
+		
+		/// <summary>
+		/// Fired when an assembly reference is added to a .NET project
+		/// </summary>
 		public event ProjectReferenceEventHandler ReferenceRemovedFromProject;
 		
-		// Fired just before an entry is added to a combine
-		public event SolutionItemEventHandler ItemAddedToSolution;
-		public event SolutionItemEventHandler ItemRemovedFromSolution;
-
+		/// <summary>
+		/// Fired just before a project is added to a solution
+		/// </summary>
+		public event SolutionItemChangeEventHandler ItemAddedToSolution;
+		
+		/// <summary>
+		/// Fired after a project is removed from a solution
+		/// </summary>
+		public event SolutionItemChangeEventHandler ItemRemovedFromSolution;
+		
+		/// <summary>
+		/// Fired when the active solution configuration has changed
+		/// </summary>
 		public event EventHandler ActiveConfigurationChanged;
+		
+		/// <summary>
+		/// Fired when the list of solution configurations has changed
+		/// </summary>
 		public event EventHandler ConfigurationsChanged;
 		
+		/// <summary>
+		/// Fired when the list of available .NET runtimes has changed
+		/// </summary>
 		public event EventHandler RuntimesChanged {
 			add { Runtime.SystemAssemblyService.RuntimesChanged += value; }
 			remove { Runtime.SystemAssemblyService.RuntimesChanged -= value; }
 		}
 		
+		/// <summary>
+		/// Fired when the active .NET runtime has changed
+		/// </summary>
 		public event EventHandler ActiveRuntimeChanged {
 			add { Runtime.SystemAssemblyService.DefaultRuntimeChanged += value; }
 			remove { Runtime.SystemAssemblyService.DefaultRuntimeChanged -= value; }
@@ -1348,6 +1492,65 @@ namespace MonoDevelop.Ide
 		public ItemUnloadingEventArgs (IBuildTarget item)
 		{
 			this.item = item;
+		}
+	}
+	
+	public class FileStatusTracker: IDisposable
+	{
+		class FileData
+		{
+			public FileData (FilePath file, DateTime time)
+			{
+				this.File = file;
+				this.Time = time;
+			}
+			
+			public FilePath File;
+			public DateTime Time;
+		}
+		
+		List<FileData> fileStatus = new List<FileData> ();
+		
+		internal void AddFiles (IEnumerable<FilePath> files)
+		{
+			foreach (var file in files) {
+				try {
+					FileInfo fi = new FileInfo (file);
+					FileData fd = new FileData (file, fi.Exists ? fi.LastWriteTime : DateTime.MinValue);
+					fileStatus.Add (fd);
+				} catch {
+					// Ignore
+				}
+			}
+		}
+		
+		public void NotifyChanges ()
+		{
+			List<FilePath> modified = new List<FilePath> ();
+			foreach (FileData fd in fileStatus) {
+				try {
+					FileInfo fi = new FileInfo (fd.File);
+					if (fi.Exists) {
+						DateTime wt = fi.LastWriteTime;
+						if (wt != fd.Time) {
+							modified.Add (fd.File);
+							fd.Time = wt;
+						}
+					} else if (fd.Time != DateTime.MinValue) {
+						FileService.NotifyFileRemoved (fd.File);
+						fd.Time = DateTime.MinValue;
+					}
+				} catch {
+					// Ignore
+				}
+			}
+			if (modified.Count > 0)
+				FileService.NotifyFilesChanged (modified);
+		}
+		
+		void IDisposable.Dispose ()
+		{
+			NotifyChanges ();
 		}
 	}
 }

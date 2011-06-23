@@ -30,7 +30,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Refactoring;
 using MonoDevelop.CSharpBinding.Tests;
-using MonoDevelop.Refactoring.ExtractMethod;
+using MonoDevelop.CSharp.Refactoring.ExtractMethod;
 using System.Collections.Generic;
 using MonoDevelop.CSharpBinding;
 using System.Text;
@@ -39,6 +39,7 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.CSharp.Resolver;
 using MonoDevelop.CSharp.Parser;
 using Mono.TextEditor;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Refactoring.Tests
 {
@@ -47,7 +48,19 @@ namespace MonoDevelop.Refactoring.Tests
 	{
 		static void TestInsertionPoints (string text)
 		{
-			TextEditorData data = new TextEditorData ();
+			
+			TestWorkbenchWindow tww = new TestWorkbenchWindow ();
+			TestViewContent sev = new TestViewContent ();
+			DotNetProject project = new DotNetAssemblyProject ("C#");
+			project.FileName = GetTempFile (".csproj");
+			
+			string file = GetTempFile (".cs");
+			project.AddFile (file);
+			sev.Project = project;
+			sev.ContentName = file;
+			tww.ViewContent = sev;
+			var doc = new MonoDevelop.Ide.Gui.Document (tww);
+			var data = doc.Editor;
 			List<InsertionPoint> loc = new List<InsertionPoint> ();
 			for (int i = 0; i < text.Length; i++) {
 				char ch = text[i];
@@ -83,8 +96,16 @@ namespace MonoDevelop.Refactoring.Tests
 						insertBefore = NewLineInsertion.Eol;
 						insertAfter = NewLineInsertion.BlankLine;
 						break;
+					case 'T':
+						insertBefore = NewLineInsertion.None;
+						insertAfter = NewLineInsertion.BlankLine;
+						break;
 					case 'v':
 						insertBefore = NewLineInsertion.BlankLine;
+						insertAfter = NewLineInsertion.Eol;
+						break;
+					case 'V':
+						insertBefore = NewLineInsertion.None;
 						insertAfter = NewLineInsertion.Eol;
 						break;
 					default:
@@ -97,12 +118,12 @@ namespace MonoDevelop.Refactoring.Tests
 				}
 			}
 			
-			var parseResult = new NRefactoryParser ().Parse (null, "a.cs", data.Document.Text);
 			
-			var foundPoints = HelperMethods.GetInsertionPoints (data.Document, parseResult.CompilationUnit.Types[0]);
+			doc.ParsedDocument =  new McsParser ().Parse (null, "a.cs", data.Document.Text);
+			
+			var foundPoints = CodeGenerationService.GetInsertionPoints (doc, doc.ParsedDocument.CompilationUnit.Types[0]);
 			Assert.AreEqual (loc.Count, foundPoints.Count, "point count doesn't match");
 			for (int i = 0; i < loc.Count; i++) {
-				Console.WriteLine (loc[i] + "/" + foundPoints[i]);
 				Assert.AreEqual (loc[i].Location, foundPoints[i].Location, "point " + i + " doesn't match");
 				Assert.AreEqual (loc[i].LineAfter, foundPoints[i].LineAfter, "point " + i + " ShouldInsertNewLineAfter doesn't match");
 				Assert.AreEqual (loc[i].LineBefore, foundPoints[i].LineBefore, "point " + i + " ShouldInsertNewLineBefore doesn't match");
@@ -114,7 +135,7 @@ namespace MonoDevelop.Refactoring.Tests
 		{
 			TestInsertionPoints (@"
 class Test {
-	@D
+@D	
 	void TestMe ()
 	{
 	}
@@ -129,7 +150,7 @@ class Test {
 			TestInsertionPoints (@"
 class Test 
 {
-	@D
+@D	
 	void TestMe ()
 	{
 	}
@@ -139,25 +160,21 @@ class Test
 		}
 		
 		
-		[Test()]
 		public void TestBasicInsertionPointWithoutEmpty ()
 		{
 			TestInsertionPoints (@"
 class Test {
-	@Dvoid TestMe ()
+	@Tvoid TestMe ()
 	{
 	}
-@v}
+@V}
 ");
 		}
-
-		
-		
 		
 		[Test()]
 		public void TestBasicInsertionPointOneLineCase ()
 		{
-			TestInsertionPoints (@"class Test {@Svoid TestMe () { }@v}");
+			TestInsertionPoints (@"class Test {@tvoid TestMe () { }@v}");
 		}
 		
 		
@@ -190,21 +207,21 @@ class Test {
 		{
 			TestInsertionPoints (@"
 class Test {
-	@D
+@D	
 	void TestMe ()
 	{
 	}
-	
-	@Dint a;
-	
-	@Dclass Test2 {
+@u	
+	int a;
+@u	
+	class Test2 {
 		void TestMe2 ()
 		{
 	
 		}
 	}
-	
-	@Dpublic delegate void ADelegate ();
+@u	
+	public delegate void ADelegate ();
 	
 @d}
 ");
@@ -215,25 +232,40 @@ class Test {
 		public void TestComplexInsertionPointCase2 ()
 		{
 			TestInsertionPoints (@"class MainClass {
-	@Dstatic void A ()
+@D	static void A ()
 	{
 	}
-	@Sstatic void B ()
+@t	static void B ()
 	{
 	}
-	
-	@Dpublic static void Main (string[] args)
+@u	
+	public static void Main (string[] args)
 	{
 		System.Console.WriteLine ();
 	}
-	@Sint g;
-	@Sint i;
-	
-	@Dint j;
-	@Spublic delegate void Del(int a);
-@v}
+@t	int g;
+@t	int i;
+@u	
+	int j;
+@t	public delegate void Del(int a);
+@s}
 ");
 		}
+		
+		
+		[Test()]
+		public void TestEmptyClassInsertion ()
+		{
+			TestInsertionPoints (@"
+public class EmptyClass
+{@s}");
+			
+			TestInsertionPoints (@"
+public class EmptyClass : Base
+{@s}");
+
+		}
+		
 
 	}
 }

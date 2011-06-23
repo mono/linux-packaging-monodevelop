@@ -10,20 +10,19 @@ namespace MonoDevelop.VersionControl
 		DateTime time;
 		string author;
 		string message;
-		RevisionPath[] changedFiles; // only set by GetHistory; informative, not necessarily a file path
+		string shortMessage;
 		
 		protected Revision (Repository repo)
 		{
 			this.repo = repo;
 		}
 		
-		protected Revision (Repository repo, DateTime time, string author, string message, RevisionPath[] changedFiles)
+		protected Revision (Repository repo, DateTime time, string author, string message)
 		{
 			this.repo = repo;
 			this.time = time;
 			this.author = author;
 			this.message = message;
-			this.changedFiles = changedFiles;
 		}
 		
 		public abstract Revision GetPrevious ();
@@ -38,15 +37,25 @@ namespace MonoDevelop.VersionControl
 			protected set { author = value; }
 		}
 		
+		public string Email { get; set; }
+		
+		public string ShortMessage {
+			get {
+				if (shortMessage != null)
+					return shortMessage;
+				if (Message.Length > 80)
+					return Message.Substring (0, 80);
+				else
+					return Message;
+			}
+			set {
+				shortMessage = value;
+			}
+		}
+		
 		public string Message {
 			get { return message; }
 			protected set { message = value; }
-		}
-		
-		// only set by GetHistory; informative, not necessarily a file path
-		public RevisionPath[] ChangedFiles {
-			get { return changedFiles; }
-			protected set { changedFiles = value; }
 		}
 		
 		public override int GetHashCode() { return ToString().GetHashCode(); }
@@ -54,6 +63,14 @@ namespace MonoDevelop.VersionControl
 		
 		protected Repository Repository {
 			get { return repo; }
+		}
+		
+		public virtual string Name {
+			get { return ToString (); }
+		}
+		
+		public virtual string ShortName {
+			get { return Name; }
 		}
 	}
 	

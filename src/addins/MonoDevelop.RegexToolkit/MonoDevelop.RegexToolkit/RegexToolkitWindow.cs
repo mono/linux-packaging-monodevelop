@@ -61,6 +61,8 @@ namespace MonoDevelop.RegexToolkit
 				this.Destroy ();
 			};
 			
+			var isWindows = System.IO.Path.DirectorySeparatorChar == '\\';
+			this.buttonLibrary.Visible = !isWindows;
 			this.buttonStart.Sensitive = false;
 			this.entryRegEx.Changed += UpdateStartButtonSensitivity;
 			this.inputTextview.Buffer.Changed += UpdateStartButtonSensitivity;
@@ -214,7 +216,7 @@ namespace MonoDevelop.RegexToolkit
 				this.GdkWindow.GetOrigin (out x, out y);
 				x += rect.X;
 				y += rect.Y;
-				if (this.tooltipWindow == null || ox != x || oy != y) {
+				if (this.tooltipWindow == null || ox != x || oy != y) {
 					ShowTooltipForSelectedEntry ();
 					ox = x;
 					oy = y;
@@ -302,7 +304,7 @@ namespace MonoDevelop.RegexToolkit
 			if (ox + x + w + tooltipXOffset >= geometry.Right ||
 			    oy + y + h >= geometry.Bottom) {
 				tooltipWindow.Move (ox + x - w, oy + altY - h);
-			} else 
+			} else 
 				tooltipWindow.Move (ox + x + tooltipXOffset, oy + y);
 			tooltipWindow.ShowAll ();
 		}
@@ -336,34 +338,25 @@ namespace MonoDevelop.RegexToolkit
 				Regex regex = new Regex (pattern, options);
 				Application.Invoke (delegate {
 					this.resultStore.Clear ();
-				});
-				
-				foreach (Match match in regex.Matches (input)) {
-					Application.Invoke (delegate {
+					foreach (Match match in regex.Matches (input)) {
 						TreeIter iter = this.resultStore.AppendValues (Stock.Find, String.Format (GettextCatalog.GetString("Match '{0}'"), match.Value), match.Index, match.Length);
 						int i = 0;
 						foreach (Group group in match.Groups) {
-							if (i > 0) {
-								TreeIter groupIter;
-								if (group.Success) {
-									groupIter = this.resultStore.AppendValues (iter, Stock.Apply, String.Format (GettextCatalog.GetString("Group '{0}':'{1}'"), regex.GroupNameFromNumber (i), group.Value), group.Index, group.Length);
-									foreach (Capture capture in match.Captures) {
-										this.resultStore.AppendValues (groupIter, null, String.Format (GettextCatalog.GetString("Capture '{0}'"), capture.Value), capture.Index, capture.Length);
-									}
-								} else {
-									groupIter = this.resultStore.AppendValues (iter, Stock.Cancel, String.Format (GettextCatalog.GetString("Group '{0}' not found"), regex.GroupNameFromNumber (i)), -1, -1);
+							TreeIter groupIter;
+							if (group.Success) {
+								groupIter = this.resultStore.AppendValues (iter, Stock.Apply, String.Format (GettextCatalog.GetString("Group '{0}':'{1}'"), regex.GroupNameFromNumber (i), group.Value), group.Index, group.Length);
+								foreach (Capture capture in match.Captures) {
+									this.resultStore.AppendValues (groupIter, null, String.Format (GettextCatalog.GetString("Capture '{0}'"), capture.Value), capture.Index, capture.Length);
 								}
-		
+							} else {
+								groupIter = this.resultStore.AppendValues (iter, Stock.Cancel, String.Format (GettextCatalog.GetString("Group '{0}' not found"), regex.GroupNameFromNumber (i)), -1, -1);
 							}
 							i++;
 						}
-					});
-				}
-				if (!String.IsNullOrEmpty (replacement)) {
-					Application.Invoke (delegate {
+					}
+					if (!String.IsNullOrEmpty (replacement))
 						this.replaceResultTextview.Buffer.Text = regex.Replace (input, replacement);
-					});
-				}
+				});
 			} catch (ThreadAbortException) {
 				Thread.ResetAbort ();
 			} catch (ArgumentException) {
@@ -428,7 +421,7 @@ namespace MonoDevelop.RegexToolkit
 		
 		void FillOptionsBox ()
 		{
-			Options[] options = {
+			Options[] options = {
 				new Options (RegexOptions.IgnorePatternWhitespace, GettextCatalog.GetString("Ignore Whitespace")),
 				new Options (RegexOptions.IgnoreCase, GettextCatalog.GetString("Ignore case")),
 				new Options (RegexOptions.Singleline, GettextCatalog.GetString("Single line")),

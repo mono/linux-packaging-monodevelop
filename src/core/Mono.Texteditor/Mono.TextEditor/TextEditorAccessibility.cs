@@ -23,6 +23,9 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+#if ATK
+
 using System;
 using Atk;
 using System.Collections.Generic;
@@ -191,11 +194,11 @@ namespace Mono.TextEditor
 
 		void TextImplementor.GetCharacterExtents (int offset, out int x, out int y, out int width, out int height, CoordType coords)
 		{
-			var point = editor.DocumentToVisualLocation (Document.OffsetToLocation (offset));
-			x = point.X + editor.TextViewMargin.XOffset;
+			var point = editor.LocationToPoint (Document.OffsetToLocation (offset));
+			x = point.X + (int)editor.TextViewMargin.XOffset;
 			y = point.Y;
-			width = editor.TextViewMargin.CharWidth;
-			height = editor.LineHeight;
+			width = (int)editor.TextViewMargin.CharWidth;
+			height = (int)editor.LineHeight;
 			switch (coords) {
 			case Atk.CoordType.Screen:
 				int ox, oy;
@@ -214,14 +217,14 @@ namespace Mono.TextEditor
 			switch (coords) {
 			case Atk.CoordType.Screen:
 				editor.TranslateCoordinates (editor, x, y, out rx, out ry);
-				rx -= editor.TextViewMargin.XOffset;
+				rx -= (int)editor.TextViewMargin.XOffset;
 				break;
 			case Atk.CoordType.Window:
-				rx = x - editor.TextViewMargin.XOffset;
+				rx = x - (int)editor.TextViewMargin.XOffset;
 				ry = y;
 				break;
 			}
-			return Document.LocationToOffset (editor.TextViewMargin.VisualToDocumentLocation (rx, ry));
+			return Document.LocationToOffset (editor.PointToLocation (rx, ry));
 		}
 
 		string TextImplementor.GetSelection (int selection_num, out int start_offset, out int end_offset)
@@ -263,13 +266,13 @@ namespace Mono.TextEditor
 		void TextImplementor.GetRangeExtents (int start_offset, int end_offset, CoordType coord_type, out TextRectangle rect)
 		{
 			Atk.TextRectangle result = new Atk.TextRectangle ();
-			var point1 = editor.DocumentToVisualLocation (Document.OffsetToLocation (start_offset));
-			var point2 = editor.DocumentToVisualLocation (Document.OffsetToLocation (end_offset));
+			var point1 = editor.LocationToPoint (Document.OffsetToLocation (start_offset));
+			var point2 = editor.LocationToPoint (Document.OffsetToLocation (end_offset));
 
 			result.X = System.Math.Min (point2.X, point1.Y);
 			result.Y = System.Math.Min (point2.Y, point1.Y);
 			result.Width = System.Math.Abs (point2.X - point1.X);
-			result.Height = System.Math.Abs (point2.Y - point1.Y) + editor.LineHeight;
+			result.Height = (int)(System.Math.Abs (point2.Y - point1.Y) + editor.LineHeight);
 			rect = result;
 		}
 
@@ -351,24 +354,24 @@ namespace Mono.TextEditor
 			}
 		}
 		#endregion
-		/*
 		internal sealed class Factory : Atk.ObjectFactory
 		{
-			public static void Init ()
+			public static void Init (object editor)
 			{
-				Atk.Global.DefaultRegistry.SetFactoryType ((GLib.GType)typeof(TextEditor), (GLib.GType)typeof(TextEditor));
+				Atk.Global.DefaultRegistry.SetFactoryType ((GLib.GType)editor.GetType (), (GLib.GType)typeof(Factory));
 			}
 
 			protected override Atk.Object OnCreateAccessible (GLib.Object obj)
 			{
-				return new TextEditorAccessible ( (TextEditor) obj);
+				// seems to be never get called ?
+				return new TextEditorAccessible ((TextEditor) obj);
 			}
 
 			protected override GLib.GType OnGetAccessibleType ()
 			{
 				return TextEditorAccessible.GType;
 			}
-		}*/
+		}
 	}
 
 	public class BaseWidgetAccessible : Gtk.Accessible, Atk.ComponentImplementor
@@ -594,5 +597,6 @@ namespace Mono.TextEditor
 		#endregion Atk.Component
 		
 	}
-	
+
 }
+#endif

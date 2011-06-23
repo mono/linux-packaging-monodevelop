@@ -43,6 +43,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		string file;
 		ILogWriter currentLogWriter;
 		MDConsoleLogger consoleLogger;
+		string currentConfiguration, currentPlatform;
 
 		AutoResetEvent wordDoneEvent = new AutoResetEvent (false);
 		ThreadStart workDelegate;
@@ -69,8 +70,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		{
 			RunSTA (delegate
 			{
-				project = new Project (engine);
-				project.Load (file);
+				//just unload the project. it will be reloaded when we next build
+				project = null;
+				var loadedProj = engine.GetLoadedProject (file);
+				if (loadedProj != null)
+					engine.UnloadProject (loadedProj);
 			});
 		}
 		
@@ -87,18 +91,22 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			RunSTA (delegate
 			{
 				try {
-					SetupEngine (configuration, platform);
+					SetupProject (configuration, platform);
 					currentLogWriter = logWriter;
 
 					LocalLogger logger = new LocalLogger (Path.GetDirectoryName (file));
 					engine.RegisterLogger (logger);
 
 					consoleLogger.Verbosity = GetVerbosity (verbosity);
-					project.Build (target);
+					
+					// We are using this BuildProject overload and the BuildSettings.None argument as a workaround to
+					// an xbuild bug which causes references to not be resolved after the project has been built once.
+					engine.BuildProject (project, new string[] { target }, new Hashtable (), BuildSettings.None);
+					
 					result = logger.BuildResult.ToArray ();
-
-				}
-				finally {
+				} catch (InvalidProjectFileException ex) {
+					result = new MSBuildResult[] { new MSBuildResult (false, ex.ProjectFile ?? file, ex.LineNumber, ex.ColumnNumber, ex.ErrorCode, ex.Message) };
+				} finally {
 					currentLogWriter = null;
 				}
 			});
@@ -128,26 +136,36 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 			RunSTA (delegate
 			{
-				SetupEngine (configuration, platform);
-
-				project.Build ("ResolveAssemblyReferences");
+				SetupProject (configuration, platform);
+				
+				// We are using this BuildProject overload and the BuildSettings.None argument as a workaround to
+				// an xbuild bug which causes references to not be resolved after the project has been built once.
+				engine.BuildProject (project, new string[] { "ResolveAssemblyReferences" }, new Hashtable (), BuildSettings.None);
 				BuildItemGroup grp = project.GetEvaluatedItemsByName ("ReferencePath");
 				List<string> refs = new List<string> ();
 				foreach (BuildItem item in grp)
-					refs.Add (item.Include);
+					refs.Add (UnescapeString (item.Include));
 				refsArray = refs.ToArray ();
 			});
 			return refsArray;
 		}
 		
-		void SetupEngine (string configuration, string platform)
+		void SetupProject (string configuration, string platform)
 		{
+			if (project != null && configuration == currentConfiguration && platform == currentPlatform)
+				return;
+			currentConfiguration = configuration;
+			currentPlatform = platform;
+			
 			Environment.CurrentDirectory = Path.GetDirectoryName (file);
 			engine.GlobalProperties.SetProperty ("Configuration", configuration);
 			if (!string.IsNullOrEmpty (platform))
 				engine.GlobalProperties.SetProperty ("Platform", platform);
 			else
 				engine.GlobalProperties.RemoveProperty ("Platform");
+			
+			project = new Project (engine);
+			project.Load (file);
 		}
 		
 		public override object InitializeLifetimeService ()
@@ -195,6 +213,19 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 				workThread = null;
 			}
+		}
+		
+		//from MSBuildProjectService
+		static string UnescapeString (string str)
+		{
+			int i = str.IndexOf ('%');
+			while (i != -1 && i < str.Length - 2) {
+				int c;
+				if (int.TryParse (str.Substring (i+1, 2), System.Globalization.NumberStyles.HexNumber, null, out c))
+					str = str.Substring (0, i) + (char) c + str.Substring (i + 3);
+				i = str.IndexOf ('%', i + 1);
+			}
+			return str;
 		}
 	}
 }

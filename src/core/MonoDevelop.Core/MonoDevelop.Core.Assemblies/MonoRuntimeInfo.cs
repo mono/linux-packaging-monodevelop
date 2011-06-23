@@ -70,7 +70,7 @@ namespace MonoDevelop.Core.Assemblies
 		}
 		
 		public string DisplayName {
-			get { return "Mono " + MonoVersion; }
+			get { return "Mono " + MonoVersion + " (" + prefix + ")"; }
 		}
 		
 		public bool IsValidRuntime {
@@ -184,6 +184,7 @@ namespace MonoDevelop.Core.Assemblies
 			
 			rt.IsRunning = true;
 			rt.initialized = true;
+			rt.isValidRuntime = true;
 			
 			return rt;
 		}

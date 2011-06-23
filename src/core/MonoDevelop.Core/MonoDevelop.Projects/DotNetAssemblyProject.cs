@@ -31,6 +31,7 @@ using MonoDevelop.Core.Assemblies;
 
 namespace MonoDevelop.Projects
 {
+	[ProjectModelDataItem ("DotNetProject")]
 	public class DotNetAssemblyProject: DotNetProject
 	{
 		public DotNetAssemblyProject ()
@@ -50,7 +51,7 @@ namespace MonoDevelop.Projects
 		{
 			// DotNetAssemblyProject can only generate assemblies for the regular framework.
 			// Special frameworks such as Moonlight or MonoTouch must subclass DotNetProject directly.
-			if (!framework.IsCompatibleWithFramework ("1.1"))
+			if (!framework.IsCompatibleWithFramework (TargetFrameworkMoniker.NET_1_1))
 				return false;
 			else
 				return base.SupportsFramework (framework);

@@ -41,6 +41,8 @@ using MonoDevelop.Core.Execution;
 using MonoDevelop.Ide.Execution;
 using CustomCommand = MonoDevelop.Projects.CustomCommand;
 using System.Linq;
+using MonoDevelop.Ide.Projects;
+using MonoDevelop.Projects.Policies;
 
 namespace MonoDevelop.Ide.Commands
 {
@@ -61,6 +63,8 @@ namespace MonoDevelop.Ide.Commands
 		AddNewFiles,
 		AddFiles,
 		NewFolder,
+		AddFilesFromFolder,
+		AddExistingFolder,
 		IncludeToProject,
 		BuildSolution,
 		Build,
@@ -151,13 +155,13 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandInfo info)
 		{
-			info.Enabled = ((IdeApp.Workspace.IsOpen) && (IdeApp.ProjectOperations.CurrentBuildOperation.IsCompleted));
+			info.Enabled = ((IdeApp.ProjectOperations.CurrentSelectedSolution != null) && (IdeApp.ProjectOperations.CurrentBuildOperation.IsCompleted));
 		}
 
 		protected override void Run ()
 		{
 			//Build solution
-			IdeApp.ProjectOperations.Build (IdeApp.Workspace);
+			IdeApp.ProjectOperations.Build (IdeApp.ProjectOperations.CurrentSelectedSolution);
 		}
 	}
 
@@ -169,7 +173,7 @@ namespace MonoDevelop.Ide.Commands
 				IBuildTarget buildTarget = IdeApp.ProjectOperations.CurrentSelectedBuildTarget;
 				info.Enabled = ((buildTarget != null) && (IdeApp.ProjectOperations.CurrentBuildOperation.IsCompleted));
 				if (buildTarget != null) {
-					info.Text = GettextCatalog.GetString ("B_uild {0}", buildTarget.Name);
+					info.Text = GettextCatalog.GetString ("B_uild {0}", buildTarget.Name.Replace ("_","__"));
 					if (buildTarget is SolutionFolder)
 						info.Description = GettextCatalog.GetString ("Build solution {0}", buildTarget.Name);
 					else if (buildTarget is Project)
@@ -181,7 +185,7 @@ namespace MonoDevelop.Ide.Commands
 			else {
 				info.Enabled = ((IdeApp.Workbench.ActiveDocument != null) && (IdeApp.Workbench.ActiveDocument.IsBuildTarget) && (IdeApp.ProjectOperations.CurrentBuildOperation.IsCompleted));
 				if (IdeApp.Workbench.ActiveDocument != null) {
-					info.Text = GettextCatalog.GetString ("B_uild {0}", Path.GetFileName (IdeApp.Workbench.ActiveDocument.Name));
+					info.Text = GettextCatalog.GetString ("B_uild {0}", Path.GetFileName (IdeApp.Workbench.ActiveDocument.Name).Replace ("_","__"));
                     info.Description = GettextCatalog.GetString ("Build {0}", Path.GetFileName (IdeApp.Workbench.ActiveDocument.Name));
 				}
 			}
@@ -203,13 +207,13 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandInfo info)
 		{
-			info.Enabled = ((IdeApp.Workspace.IsOpen) && (IdeApp.ProjectOperations.CurrentBuildOperation.IsCompleted));
+			info.Enabled = ((IdeApp.ProjectOperations.CurrentSelectedSolution != null) && (IdeApp.ProjectOperations.CurrentBuildOperation.IsCompleted));
 		}
 
 		protected override void Run ()
 		{
 			//Build solution
-			IdeApp.ProjectOperations.Rebuild (IdeApp.Workspace);
+			IdeApp.ProjectOperations.Rebuild (IdeApp.ProjectOperations.CurrentSelectedSolution);
 		}
 	}
 
@@ -221,14 +225,14 @@ namespace MonoDevelop.Ide.Commands
 				IBuildTarget buildTarget = IdeApp.ProjectOperations.CurrentSelectedBuildTarget;
 				info.Enabled = ((buildTarget != null) && (IdeApp.ProjectOperations.CurrentBuildOperation.IsCompleted));
 				if (buildTarget != null) {
-					info.Text = GettextCatalog.GetString ("R_ebuild {0}", IdeApp.ProjectOperations.CurrentSelectedBuildTarget.Name);
+					info.Text = GettextCatalog.GetString ("R_ebuild {0}", IdeApp.ProjectOperations.CurrentSelectedBuildTarget.Name.Replace ("_","__"));
 					info.Description = GettextCatalog.GetString ("Rebuild {0}", IdeApp.ProjectOperations.CurrentSelectedBuildTarget.Name);
 				}
 			}
 			else {
 				info.Enabled = ((IdeApp.Workbench.ActiveDocument != null) && (IdeApp.Workbench.ActiveDocument.IsBuildTarget) && (IdeApp.ProjectOperations.CurrentBuildOperation.IsCompleted));
 				if (info.Enabled) {
-					info.Text = GettextCatalog.GetString ("R_ebuild {0}", IdeApp.Workbench.ActiveDocument.FileName);
+					info.Text = GettextCatalog.GetString ("R_ebuild {0}", IdeApp.Workbench.ActiveDocument.FileName.FileName.Replace ("_","__"));
 					info.Description = GettextCatalog.GetString ("Rebuild {0}", IdeApp.Workbench.ActiveDocument.FileName);
 				}
 			}
@@ -261,7 +265,7 @@ namespace MonoDevelop.Ide.Commands
 		public static bool CanRun (IExecutionHandler executionHandler)
 		{
             if (IdeApp.Workspace.IsOpen)
-                return (IdeApp.ProjectOperations.CanExecute (IdeApp.Workspace, executionHandler)) && !(IdeApp.ProjectOperations.CurrentSelectedItem is Workspace);
+                return IdeApp.ProjectOperations.CurrentSelectedSolution != null && IdeApp.ProjectOperations.CanExecute (IdeApp.ProjectOperations.CurrentSelectedSolution, executionHandler);
             else
                 return (IdeApp.Workbench.ActiveDocument != null) && (IdeApp.Workbench.ActiveDocument.CanRun (executionHandler));
 		}
@@ -288,12 +292,13 @@ namespace MonoDevelop.Ide.Commands
             }
             else {
                 if (!IdeApp.Preferences.BuildBeforeExecuting)
-                    IdeApp.ProjectOperations.Execute (IdeApp.Workspace, executionHandler);
+                    IdeApp.ProjectOperations.Execute (IdeApp.ProjectOperations.CurrentSelectedSolution, executionHandler);
                 else {
-                    IAsyncOperation asyncOperation = IdeApp.ProjectOperations.Build (IdeApp.Workspace);
+					Solution sol = IdeApp.ProjectOperations.CurrentSelectedSolution;
+                    IAsyncOperation asyncOperation = IdeApp.ProjectOperations.Build (sol);
                     asyncOperation.Completed += delegate {
                         if ((asyncOperation.Success) || (IdeApp.Preferences.RunWithWarnings && asyncOperation.SuccessWithWarnings))
-                            IdeApp.ProjectOperations.Execute (IdeApp.Workspace, executionHandler);
+                            IdeApp.ProjectOperations.Execute (sol, executionHandler);
                     };
                 }
 
@@ -393,7 +398,7 @@ namespace MonoDevelop.Ide.Commands
 			if (IdeApp.ProjectOperations.CurrentSelectedBuildTarget == null)
 				info.Enabled = false;
 			else {
-				info.Text = GettextCatalog.GetString ("C_lean {0}", IdeApp.ProjectOperations.CurrentSelectedBuildTarget.Name);
+				info.Text = GettextCatalog.GetString ("C_lean {0}", IdeApp.ProjectOperations.CurrentSelectedBuildTarget.Name.Replace ("_","__"));
 				info.Description = GettextCatalog.GetString ("Clean {0}", IdeApp.ProjectOperations.CurrentSelectedBuildTarget.Name);
 			}
 		}
@@ -408,13 +413,12 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandInfo info)
 		{
-			if (!IdeApp.Workspace.IsOpen)
-				info.Enabled = false;
+			info.Enabled = IdeApp.ProjectOperations.CurrentSelectedSolution != null;
 		}
 
 		protected override void Run ()
 		{
-			IdeApp.ProjectOperations.Clean (IdeApp.Workspace);
+			IdeApp.ProjectOperations.Clean (IdeApp.ProjectOperations.CurrentSelectedSolution);
 		}
 	}
 
@@ -526,6 +530,36 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Run (object dataItem)
 		{
 			IdeApp.Workspace.ActiveRuntime = (MonoDevelop.Core.Assemblies.TargetRuntime) dataItem;
+		}
+	}
+	
+	class ApplyPolicyHandler: CommandHandler
+	{
+		protected override void Update (CommandInfo info)
+		{
+			info.Enabled = IdeApp.ProjectOperations.CurrentSelectedSolutionItem != null || IdeApp.ProjectOperations.CurrentSelectedSolution != null;
+		}
+		
+		protected override void Run ()
+		{
+			ApplyPolicyDialog dlg = new ApplyPolicyDialog ((IPolicyProvider)IdeApp.ProjectOperations.CurrentSelectedSolutionItem ?? (IPolicyProvider)IdeApp.ProjectOperations.CurrentSelectedSolution);
+			dlg.Run ();
+			dlg.Destroy ();
+		}
+	}
+	
+	class ExportPolicyHandler: CommandHandler
+	{
+		protected override void Update (CommandInfo info)
+		{
+			info.Enabled = IdeApp.ProjectOperations.CurrentSelectedSolutionItem != null || IdeApp.ProjectOperations.CurrentSelectedSolution != null;
+		}
+		
+		protected override void Run ()
+		{
+			ExportProjectPolicyDialog dlg = new ExportProjectPolicyDialog ((IPolicyProvider)IdeApp.ProjectOperations.CurrentSelectedSolutionItem ?? (IPolicyProvider)IdeApp.ProjectOperations.CurrentSelectedSolution);
+			dlg.Run ();
+			dlg.Destroy ();
 		}
 	}
 }

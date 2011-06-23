@@ -6,16 +6,16 @@
         url         = "http://monodevelop.com"
         description = "Add-in for working with ChangeLog files"
         category    = "Version Control"
-        version     = "2.4">
+        version     = "2.6">
  
         <Runtime>
 		<Import assembly="ChangeLogAddIn.dll" />
 		</Runtime>
 
 	<Dependencies>
-		<Addin id="Core" version="2.4"/>
-		<Addin id="Ide" version="2.4"/>
-		<Addin id="VersionControl" version="2.4"/>
+		<Addin id="Core" version="2.6"/>
+		<Addin id="Ide" version="2.6"/>
+		<Addin id="VersionControl" version="2.6"/>
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/VersionControl/CommitDialogExtensions">
@@ -42,12 +42,12 @@
 		</ComplexCondition>
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/ProjectModel/Gui/DefaultPolicyPanels/VersionControl">
+	<Extension path = "/MonoDevelop/Ide/GlobalOptionsDialog/VersionControl">
 		<Section id = "DefaultChangeLogIntegration" _label = "ChangeLog Integration" fill="true" class="MonoDevelop.ChangeLogAddIn.ProjectOptionPanel" />
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/ProjectModel/PolicyTypes" >
-		<PolicyType id="ChangeLogPolicy" class="MonoDevelop.ChangeLogAddIn.ChangeLogPolicy" />
+	<Extension path = "/MonoDevelop/ProjectModel/Gui/DefaultPolicyPanels/VersionControl">
+		<Section id = "DefaultChangeLogIntegration" _label = "ChangeLog Integration" fill="true" class="MonoDevelop.ChangeLogAddIn.ProjectOptionPanel" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/PolicySets/Mono" >

@@ -85,6 +85,12 @@ namespace MonoDevelop.Gettext
 		public TranslationProject ()
 		{
 			translations = new TranslationCollection (this);
+			
+			//NOTE: we don't really need multiple configurations for this project type, since nothing actually uses them
+			//but it makes the solution configuration mapping look more consistent
+			//Perhaps in future there will be some per-config settings
+			foreach (string config in new [] { "Debug", "Release"})
+				Configurations.Add (new TranslationProjectConfiguration (config));
 		}
 		
 		protected override List<FilePath> OnGetItemFiles (bool includeReferencedFiles)

@@ -7,19 +7,19 @@
         url = "http://www.monodevelop.com/"
         description = "Provides refactoring support to MonoDevelop"
         category = "IDE extensions"
-        version = "2.4">
+        version = "2.6">
 
 	<Runtime>
 		<Import assembly = "MonoDevelop.Refactoring.dll"/>
 	</Runtime>
 
 	<Dependencies>
-		<Addin id="Core" version="2.4"/>
-		<Addin id="Ide" version="2.4"/>
-		<Addin id="DesignerSupport" version="2.4"/>
-		<Addin id="Autotools" version="2.4"/>
-		<Addin id="Deployment" version="2.4"/>
-		<Addin id="SourceEditor2" version="2.4"/>
+		<Addin id="Core" version="2.6"/>
+		<Addin id="Ide" version="2.6"/>
+		<Addin id="DesignerSupport" version="2.6"/>
+		<Addin id="Autotools" version="2.6"/>
+		<Addin id="Deployment" version="2.6"/>
+		<Addin id="SourceEditor2" version="2.6"/>
 	</Dependencies>
 	
 	<!-- Extension Points -->
@@ -39,9 +39,7 @@
 	
 	<Extension path = "/MonoDevelop/Refactoring/Refactorings">
 		<Class id="Rename" class = "MonoDevelop.Refactoring.Rename.RenameRefactoring" />
-		<Class id="ExtractMethod" class = "MonoDevelop.Refactoring.ExtractMethod.ExtractMethodRefactoring" />
 		<Class id="IntegrateTemporaryVariable" class = "MonoDevelop.Refactoring.IntegrateTemporaryVariable.IntegrateTemporaryVariableRefactoring" />
-		<Class id="CreateMethod" class = "MonoDevelop.Refactoring.CreateMethod.CreateMethodCodeGenerator" />
 		<Class id="DeclareLocal" class = "MonoDevelop.Refactoring.DeclareLocal.DeclareLocalCodeGenerator" />
 		<Class id="IntroduceConstant" class = "MonoDevelop.Refactoring.IntroduceConstant.IntroduceConstantRefactoring" />
 		<Class id="CreateClass" class = "MonoDevelop.Refactoring.CreateClass.CreateClassCodeGenerator" />
@@ -87,11 +85,6 @@
 		</Category>
 		
 		<Category _name = "Refactoring" id = "Refactoring">
-		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.Rename"
-					defaultHandler = "MonoDevelop.Refactoring.Rename.RenameHandler"
-					_label = "_Rename..." 
-					shortcut = "F2"
-					macShortcut = "Meta|R"/>
 		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.CurrentRefactoryOperations"
 				defaultHandler = "MonoDevelop.Refactoring.CurrentRefactoryOperationsHandler"
 				type="array"
@@ -120,13 +113,6 @@
 					defaultHandler = "MonoDevelop.Refactoring.RefactorImports.RemoveSortImportsHandler"
 					_label = "R_emove and Sort usings"/>
 		
-		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.ExtractMethod"
-					defaultHandler = "MonoDevelop.Refactoring.ExtractMethod.ExtractMethodHandler"
-					_label = "Extract Method"
-					shortcut = "Control|Alt|M"/>
-		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.CreateMethod"
-					defaultHandler = "MonoDevelop.Refactoring.CreateMethod.CreateMethodHandler"
-					_label = "Create Method"/>
 		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.IntroduceConstant"
 					defaultHandler = "MonoDevelop.Refactoring.CreateMethod.IntroduceConstantHandler"
 					_label = "_Introduce Constant..."/>
@@ -134,7 +120,8 @@
 		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.QuickFix"
 					defaultHandler = "MonoDevelop.Refactoring.QuickFixHandler"
 					_label = "Quick fix..."
-					shortcut = "Alt|Return" />
+					shortcut = "Alt|Return"
+					macShortcut = "Alt|Return" />
 		
 		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.IntegrateTemporaryVariable"
 					defaultHandler = "MonoDevelop.Refactoring.IntegrateTemporaryVariable.IntegrateTemporaryVariableHandler"
@@ -160,6 +147,10 @@
 		<CommandItem id = "MonoDevelop.Refactoring.RefactoryCommands.CurrentRefactoryOperations" insertafter="MonoDevelop.SourceEditor.SourceEditorCommands.MarkerOperations" insertbefore="MonoDevelop.Debugger.DebugCommands.ExpressionEvaluator"/>
 		<CommandItem id = "MonoDevelop.CodeGeneration.CodeGenerationCommands.ShowCodeGenerationWindow"
 		             insertafter="MonoDevelop.Ide.Commands.TextEditorCommands.ShowCodeTemplateWindow" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
+		<Class class = "MonoDevelop.Refactoring.Rename.RenameTextEditorExtension" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/MainMenu/Edit">

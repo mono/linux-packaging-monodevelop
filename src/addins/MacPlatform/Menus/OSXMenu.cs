@@ -30,15 +30,14 @@
 using System;
 using System.Collections.Generic;
 using MonoDevelop.Components.Commands;
-using OSXIntegration.Framework;
+using MonoDevelop.MacInterop;
 using System.Text;
 using MonoDevelop.Ide;
 using MonoDevelop.Platform;
 
-namespace OSXIntegration
+namespace MonoDevelop.Platform.Mac
 {
-	
-	public static class OSXMenu
+	static class OSXMenu
 	{
 		static IntPtr rootMenu;
 		static IntPtr appMenu;
@@ -190,7 +189,6 @@ namespace OSXIntegration
 					}
 					
 					uint macCmdId = GetNewMenuItemId (cmd);
-					bool isArray = acmd.CommandArray;
 					
 					pos = HIToolbox.AppendMenuItem (parentMenu, (cmd.Text ?? "").Replace ("_", ""), 0, macCmdId);
 				} else {
@@ -355,7 +353,6 @@ namespace OSXIntegration
 					
 					ushort glyphCode, charCode, hardwareCode; 
 					MenuAccelModifier mod;
-					bool isVirtual;
 					if (GetAcceleratorKeys (ci.AccelKey, out glyphCode, out charCode, out hardwareCode, out mod)) {
 						data.CommandKeyModifiers = mod;
 						if (glyphCode != 0) {
@@ -477,6 +474,7 @@ namespace OSXIntegration
 		#region Event handlers
 		
 		//updates commands and populates arrays and dynamic menus
+		//NOTE: when Help menu is opened, Mac OS calls this for ALL menus because the Help menu can search menu items
 		static CarbonEventHandlerStatus HandleMenuOpening (IntPtr callRef, IntPtr eventRef, IntPtr user_data)
 		{
 			DestroyOldMenuObjects ();

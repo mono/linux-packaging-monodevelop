@@ -82,7 +82,9 @@
 	
 	<!-- environment -->
 	<Style name="text" color="NormalVim" bgColor="BlackVim"/>
+	<Style name="text.background.readonly" color="BlackVim"/>
 	<Style name="text.selection" color="NormalVim" bgColor="VisualBGVim"/>
+	<Style name="text.selection.inactive" color="aluminium1" bgColor="aluminium4"/>
 	<Style name="text.background.searchresult" color="VisualBGVim"/>
 	<Style name="text.link" color="butter2"/>
 	
@@ -100,7 +102,7 @@
 	<Style name="marker.ruler" color="aluminium5"/>
 	<Style name="marker.whitespace" color="aluminium3"/>
 	<Style name="marker.invalidline" color="orange1"/>
-	<Style name="marker.bracket" color="aluminium4" bgColor="aluminium6"/>
+	<Style name="marker.bracket" color="aluminium4" bgColor="aluminium5"/>
 	
 	<Style name="marker.bookmark.color1" color="aluminium1"/>
 	<Style name="marker.bookmark.color2" color="aluminium4"/>

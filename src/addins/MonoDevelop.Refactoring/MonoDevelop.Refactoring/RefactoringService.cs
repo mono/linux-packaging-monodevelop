@@ -96,21 +96,23 @@ namespace MonoDevelop.Refactoring
 			{
 				this.changes = changes;
 			}
-			public void FileRename (object sender, FileCopyEventArgs args)
+			public void FileRename (object sender, FileCopyEventArgs e)
 			{
-				foreach (Change change in changes) {
-					TextReplaceChange replaceChange = change as TextReplaceChange;
-					if (replaceChange == null)
-						continue;
-					if (args.SourceFile == replaceChange.FileName)
-						replaceChange.FileName = args.TargetFile;
+				foreach (FileCopyEventInfo args in e) {
+					foreach (Change change in changes) {
+						TextReplaceChange replaceChange = change as TextReplaceChange;
+						if (replaceChange == null)
+							continue;
+						if (args.SourceFile == replaceChange.FileName)
+							replaceChange.FileName = args.TargetFile;
+					}
 				}
 			}
 		}
 		
 		public static void AcceptChanges (IProgressMonitor monitor, ProjectDom dom, List<Change> changes)
 		{
-			AcceptChanges (monitor, dom, changes, MonoDevelop.DesignerSupport.OpenDocumentFileProvider.Instance);
+			AcceptChanges (monitor, dom, changes, MonoDevelop.Ide.TextFileProvider.Instance);
 		}
 		
 		public static void AcceptChanges (IProgressMonitor monitor, ProjectDom dom, List<Change> changes, MonoDevelop.Projects.Text.ITextFileProvider fileProvider)
@@ -134,7 +136,7 @@ namespace MonoDevelop.Refactoring
 								change.Offset += replaceChange.InsertedText.Length;
 						} else if (replaceChange.Offset < change.Offset + change.RemovedChars) {
 							change.RemovedChars -= replaceChange.RemovedChars;
-							change.Offset = replaceChange.Offset + replaceChange.InsertedText.Length;
+							change.Offset = replaceChange.Offset + (!string.IsNullOrEmpty (replaceChange.InsertedText) ? replaceChange.InsertedText.Length : 0);
 						}
 					}
 				}

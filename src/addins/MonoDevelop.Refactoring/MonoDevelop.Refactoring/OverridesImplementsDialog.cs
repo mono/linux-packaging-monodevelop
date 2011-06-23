@@ -38,6 +38,7 @@ using Ambience_ = MonoDevelop.Projects.Dom.Output.Ambience;
 using MonoDevelop.Ide;
 using System.Text;
 using Mono.TextEditor;
+using Mono.TextEditor.PopupWindow;
 
 
 namespace MonoDevelop.Refactoring
@@ -48,7 +49,7 @@ namespace MonoDevelop.Refactoring
 		TreeStore store;
 		CodeRefactorer refactorer;
 		Ambience ambience;
-		TextEditor editor;
+		MonoDevelop.Ide.Gui.Document editor;
 		
 		private const int colCheckedIndex = 0;
 		private const int colIconIndex = 1;
@@ -67,7 +68,7 @@ namespace MonoDevelop.Refactoring
 			OutputFlags.IncludeParameterName |
 			OutputFlags.IncludeReturnType;
 
-		public OverridesImplementsDialog (TextEditor editor, IType cls)
+		public OverridesImplementsDialog (MonoDevelop.Ide.Gui.Document editor, IType cls)
 		{
 			this.Build();
 			this.editor = editor;
@@ -240,8 +241,9 @@ namespace MonoDevelop.Refactoring
 		{
 			try {
 				StringBuilder code = new StringBuilder ();
-				CodeGenerator generator = CodeGenerator.CreateGenerator (editor.Document.MimeType);
-				
+				CodeGenerator generator =  CodeGenerator.CreateGenerator (editor.Editor.Document.MimeType, editor.Editor.Options.TabsToSpaces, editor.Editor.Options.TabSize, editor.Editor.EolMarker);
+				IType declaringType = editor.CompilationUnit.GetTypeAt (cls.Location.Line, cls.Location.Column) ?? cls;
+
 				foreach (KeyValuePair<IType, IEnumerable<TreeIter>> kvp in GetAllClasses ()) {
 					if (code.Length > 0) {
 						code.AppendLine ();
@@ -255,7 +257,7 @@ namespace MonoDevelop.Refactoring
 							curImpl.AppendLine ();
 							curImpl.AppendLine ();
 						}
-						curImpl.Append (generator.CreateMemberImplementation (this.cls, pair.Key, pair.Value != null).Code);
+						curImpl.Append (generator.CreateMemberImplementation (declaringType, pair.Key, pair.Value != null).Code);
 					}
 					if (kvp.Key.ClassType == ClassType.Interface) {
 						code.Append (generator.WrapInRegions (kvp.Key.Name + " implementation", curImpl.ToString ()));
@@ -264,12 +266,21 @@ namespace MonoDevelop.Refactoring
 					}
 				}
 				
-				InsertionCursorEditMode mode = new InsertionCursorEditMode (editor, HelperMethods.GetInsertionPoints (editor.Document, this.cls));
+				InsertionCursorEditMode mode = new InsertionCursorEditMode (editor.Editor.Parent, CodeGenerationService.GetInsertionPoints (editor, this.cls));
+				ModeHelpWindow helpWindow = new ModeHelpWindow ();
+				helpWindow.TransientFor = IdeApp.Workbench.RootWindow;
+				helpWindow.TitleText = GettextCatalog.GetString ("<b>Override -- Targeting</b>");
+				helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Key</b>"), GettextCatalog.GetString ("<b>Behavior</b>")));
+				helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Up</b>"), GettextCatalog.GetString ("Move to <b>previous</b> target point.")));
+				helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Down</b>"), GettextCatalog.GetString ("Move to <b>next</b> target point.")));
+				helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Enter</b>"), GettextCatalog.GetString ("<b>Declare overrides</b> at target point.")));
+				helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Esc</b>"), GettextCatalog.GetString ("<b>Cancel</b> this refactoring.")));
+				mode.HelpWindow = helpWindow;
 				mode.CurIndex = mode.InsertionPoints.Count - 1;
 				mode.StartMode ();
 				mode.Exited += delegate(object s, InsertionCursorEventArgs args) {
 					if (args.Success)
-						args.InsertionPoint.Insert (editor, code.ToString ());
+						args.InsertionPoint.Insert (editor.Editor, code.ToString ());
 				};
 				
 			} finally {

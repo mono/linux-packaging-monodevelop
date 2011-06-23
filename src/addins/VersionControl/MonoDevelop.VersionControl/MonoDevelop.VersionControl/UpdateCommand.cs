@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections;
 using System.IO;
 
@@ -16,9 +17,8 @@ namespace MonoDevelop.VersionControl
 	{
 		public static bool Update (VersionControlItemList items, bool test)
 		{
-			foreach (VersionControlItem it in items)
-				if (!it.Repository.CanUpdate (it.Path))
-					return false;
+			if (!items.All (i => i.VersionInfo.CanUpdate))
+				return false;
 			if (test)
 				return true;
 			
@@ -44,8 +44,7 @@ namespace MonoDevelop.VersionControl
 				}
 				Monitor.ReportSuccess (GettextCatalog.GetString ("Update operation completed."));
 				Gtk.Application.Invoke (delegate {
-					foreach (VersionControlItem item in items)
-						VersionControlService.NotifyFileStatusChanged (item.Repository, item.Path, item.IsDirectory);
+					VersionControlService.NotifyFileStatusChanged (items);
 				});
 			}
 		}

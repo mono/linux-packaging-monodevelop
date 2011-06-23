@@ -38,28 +38,33 @@ namespace MonoDevelop.Components.Extensions
 		public Gtk.Window TransientFor { get; set; }
 	}
 	
+	public interface IDialogHandler<T> where T: PlatformDialogData
+	{
+		bool Run (T data);
+	}
+	
 	/// <summary>
 	/// Base class to be used to implement platform-specific dialogs.
 	/// T is the handler type.
 	/// U is the data type where data will be hold.
 	/// </summary>
-	public class PlatformDialog<T,U> where U: PlatformDialogData, new()
+	public abstract class PlatformDialog<T> where T: PlatformDialogData, new()
 	{
-		T handler;
+		IDialogHandler<T> handler;
 		bool gotHandler;
 		
 		/// <summary>
 		/// Dialog data
 		/// </summary>
-		protected U data = new U ();
+		protected T data = new T ();
 		
-		protected T Handler {
+		protected IDialogHandler<T> Handler {
 			get {
 				if (!gotHandler) {
 					gotHandler = true;
 					foreach (object h in AddinManager.GetExtensionObjects ("/MonoDevelop/Components/DialogHandlers", true)) {
-						if (h is T) {
-							handler = (T) h;
+						if (h is IDialogHandler<T>) {
+							handler = (IDialogHandler<T>) h;
 							break;
 						}
 					}
@@ -83,5 +88,18 @@ namespace MonoDevelop.Components.Extensions
 			get { return data.TransientFor; }
 			set { data.TransientFor = value; }
 		}
+		
+		
+		/// <summary>Shows the dialog </summary>
+		/// <returns> True if the user clicked OK or equivalent.</returns>
+		public virtual bool Run ()
+		{
+			if (Handler != null)
+				return Handler.Run (data);
+			else
+				return RunDefault ();
+		}
+		
+		protected abstract bool RunDefault ();
 	}
 }

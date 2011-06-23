@@ -27,6 +27,7 @@ using System;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MonoDevelop.AspNet.Gui
 {
@@ -51,10 +52,11 @@ namespace MonoDevelop.AspNet.Gui
 			if (type == null)
 				return null;
 			var cu =info.ParsedDocument.CompilationUnit;
-			if (type.IsPartial && cu.Types[0].FullName == type.FullName) {
+			var firstType = cu.Types.FirstOrDefault ();
+			if (type.IsPartial && firstType != null && firstType.FullName == type.FullName) {
 				if (constructedType != null)
 					return constructedType;
-				constructedType = CompoundType.Merge (cu.Types[0], type);
+				constructedType = CompoundType.Merge (firstType, type);
 				constructedType = CompoundType.Merge (constructedType, info.CodeBesideClass);
 				constructedType.SourceProjectDom = this;
 				return constructedType;
@@ -86,11 +88,18 @@ namespace MonoDevelop.AspNet.Gui
 			return CheckType (base.GetType (typeName, genericArgumentsCount, deepSearchReferences, caseSensitive));
 		}
 		
-		public override System.Collections.Generic.IEnumerable<IType> GetInheritanceTree (IType type)
+		public override IEnumerable<IType> GetInheritanceTree (IType type)
 		{
-			foreach (IType t in base.GetInheritanceTree (type)) {
+			foreach (IType t in BaseGetInheritanceTree (type)) {
 				yield return CheckType (t);
 			}
+		}
+		
+		//WORKAROUND for gmcs code generation bug - base not properly accessible from generators.
+		//Should be fixed in Mono 2.8 final.
+		IEnumerable<IType> BaseGetInheritanceTree (IType type)
+		{
+			return base.GetInheritanceTree (type);
 		}
 	}
 }

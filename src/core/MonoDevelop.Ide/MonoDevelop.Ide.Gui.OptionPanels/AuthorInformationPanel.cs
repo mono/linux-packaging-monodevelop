@@ -40,19 +40,13 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 		
 		public override Gtk.Widget CreatePanelWidget ()
 		{
-			AuthorInformation info = solution.UserProperties.GetValue<AuthorInformation> ("AuthorInfo");
-			return widget = new AuthorInformationPanelWidget (info);
+			return widget = new AuthorInformationPanelWidget (solution.LocalAuthorInformation);
 		}
 
 		public override void ApplyChanges ()
 		{
-			if (solution != null) {
-				AuthorInformation ainfo = widget.Get ();
-				if (ainfo != null)
-					solution.UserProperties.SetValue<AuthorInformation> ("AuthorInfo", ainfo);
-				else if (solution.UserProperties.HasValue ("AuthorInfo"))
-					solution.UserProperties.RemoveValue ("AuthorInfo");
-			}
+			if (solution != null)
+				solution.LocalAuthorInformation = widget.Get ();
 		}
 
 		public override void Initialize (MonoDevelop.Ide.Gui.Dialogs.OptionsDialog dialog, object dataObject)
@@ -83,7 +77,7 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 		
 		public AuthorInformation Get ()
 		{
-			return checkCustom.Active? new AuthorInformation (nameEntry.Text, emailEntry.Text, copyrightEntry.Text) : null;
+			return checkCustom.Active? new AuthorInformation (nameEntry.Text, emailEntry.Text, copyrightEntry.Text, companyEntry.Text, trademarkEntry.Text) : null;
 		}
 
 		void UseDefaultToggled (object sender, System.EventArgs e)
@@ -94,10 +88,12 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 					nameEntry.Text = info.Name ?? "";
 					emailEntry.Text = info.Email ?? "";
 					copyrightEntry.Text = info.Copyright ?? "";
+					companyEntry.Text = info.Company ?? "";
+					trademarkEntry.Text = info.Trademark ?? "";
 				}
 			} else {
 				infoTable.Sensitive = false;
-				info = new AuthorInformation (nameEntry.Text, emailEntry.Text, copyrightEntry.Text);
+				info = new AuthorInformation (nameEntry.Text, emailEntry.Text, copyrightEntry.Text, companyEntry.Text, trademarkEntry.Text);
 				if (String.IsNullOrEmpty (info.Name) && String.IsNullOrEmpty (info.Email))
 					info = null;
 				nameEntry.Text = AuthorInformation.Default.Name ?? "";

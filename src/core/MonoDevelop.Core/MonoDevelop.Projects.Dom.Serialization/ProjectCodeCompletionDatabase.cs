@@ -27,6 +27,7 @@
 //
 
 using System;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -43,7 +44,6 @@ namespace MonoDevelop.Projects.Dom.Serialization
 	{
 		Project project;
 		bool initialFileCheck;
-		string lastVersion = null;
 		int parseCount;
 		
 		public ProjectCodeCompletionDatabase (Project project, ParserDatabase pdb): base (pdb, true)
@@ -92,33 +92,40 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		
 		void OnFileChanged (object sender, ProjectFileEventArgs args)
 		{
-			FileEntry file = GetFile (args.ProjectFile.Name);
-			if (file != null) {
-				file.ParseErrorRetries = 0;
-				QueueParseJob (file);
+			foreach (ProjectFileEventInfo fargs in args) {
+				FileEntry file = GetFile (fargs.ProjectFile.Name);
+				if (file != null) {
+					file.ParseErrorRetries = 0;
+					QueueParseJob (file);
+				}
 			}
 		}
 		
 		void OnFileAdded (object sender, ProjectFileEventArgs args)
 		{
-			FileEntry file = AddFile (args.ProjectFile.Name);
-			// CheckModifiedFiles won't detect new files, so parsing
-			// must be manyally signaled
-			QueueParseJob (file);
+			foreach (ProjectFileEventInfo fargs in args) {
+				FileEntry file = AddFile (fargs.ProjectFile.Name);
+				// CheckModifiedFiles won't detect new files, so parsing
+				// must be manyally signaled
+				QueueParseJob (file);
+			}
 		}
 
 		void OnFileRemoved (object sender, ProjectFileEventArgs args)
 		{
-			RemoveFile (args.ProjectFile.Name);
+			foreach (ProjectFileEventInfo fargs in args)
+				RemoveFile (fargs.ProjectFile.Name);
 		}
 
 		void OnFileRenamed (object sender, ProjectFileRenamedEventArgs args)
 		{
-			RemoveFile (args.OldName);
-			FileEntry file = AddFile (args.NewName);
-			// CheckModifiedFiles won't detect new files, so parsing
-			// must be manyally signaled
-			QueueParseJob (file);
+			foreach (ProjectFileRenamedEventInfo fargs in args) {
+				RemoveFile (fargs.OldName);
+				FileEntry file = AddFile (fargs.NewName);
+				// CheckModifiedFiles won't detect new files, so parsing
+				// must be manyally signaled
+				QueueParseJob (file);
+			}
 		}
 		
 		void OnProjectModified (object s, SolutionItemModifiedEventArgs args)
@@ -131,27 +138,24 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		public void UpdateFromProject ()
 		{
 			Hashtable fs = new Hashtable ();
-			foreach (ProjectFile file in project.Files)
-			{
-				if (GetFile (file.Name) == null) AddFile (file.Name);
+			foreach (ProjectFile file in project.Files) {
+				if (GetFile (file.Name) == null)
+					AddFile (file.Name);
 				fs [file.Name] = null;
 			}
-			
-			ArrayList keys = new ArrayList ();
-			keys.AddRange (files.Keys);
-			foreach (string file in keys)
-			{
+
+			foreach (string file in files.Keys.ToArray ()) {
 				if (!fs.Contains (file))
 					RemoveFile (file);
 			}
 			
 			fs.Clear ();
 			if (project is DotNetProject) {
-				DotNetProject netProject = (DotNetProject) project;
+				DotNetProject netProject = (DotNetProject)project;
 				foreach (SolutionItem pr in netProject.GetReferencedItems (ConfigurationSelector.Default)) {
 					if (pr is Project) {
 						string refId = "Project:" + ((Project)pr).FileName;
-						fs[refId] = null;
+						fs [refId] = null;
 						if (!HasReference (refId))
 							AddReference (refId);
 					}
@@ -159,17 +163,20 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				
 				// Get the assembly references throught the project, since it may have custom references
 				foreach (string file in netProject.GetReferencedAssemblies (ConfigurationSelector.Default, false)) {
-					string refId = "Assembly:" + netProject.TargetRuntime.Id + ":" + Path.GetFullPath (file);
-					fs[refId] = null;
+					string fileName;
+					if (!Path.IsPathRooted (file)) {
+						fileName = Path.Combine (Path.GetDirectoryName (netProject.FileName), file);
+					} else {
+						fileName = Path.GetFullPath (file);
+					}
+					string refId = "Assembly:" + netProject.TargetRuntime.Id + ":" + fileName;
+					fs [refId] = null;
 					if (!HasReference (refId))
 						AddReference (refId);
 				}
 			}
 			
-			keys.Clear();
-			keys.AddRange (references);
-			foreach (ReferenceEntry re in keys)
-			{
+			foreach (ReferenceEntry re in References) {
 				// Don't delete corlib references. They are implicit to projects, but not to pidbs.
 				if (!fs.Contains (re.Uri) && !IsCorlibReference (re))
 					RemoveReference (re.Uri);
@@ -185,9 +192,6 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			
 			DotNetProject prj = project as DotNetProject;
 			if (prj == null) return false;
-			
-			if (prj.TargetFramework.Id == lastVersion)
-				return false;
 
 			// Look for an existing mscorlib reference
 			string currentRefUri = null;
@@ -237,10 +241,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			if (monitor != null) monitor.BeginTask (string.Format (GettextCatalog.GetString ("Parsing file: {0}"), Path.GetFileName (fileName)), 1);
 			
 			try {
-				ProjectDomService.Parse (this.project,
-				                         fileName,
-				                         null,
-				                         delegate () { return File.ReadAllText (fileName); });
+				ProjectDomService.Parse (project, fileName);
 				// The call to ProjectDomService.Parse will call UpdateFromParseInfo when done
 			} finally {
 				if (monitor != null) monitor.EndTask ();
@@ -249,29 +250,38 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		
 		int totalUnresolvedCount;
 		
-		public TypeUpdateInformation UpdateFromParseInfo (ICompilationUnit parserInfo, string fileName)
+		public TypeUpdateInformation UpdateFromParseInfo (ICompilationUnit parserInfo, string fileName, bool isFromFile)
 		{
 			lock (rwlock) {
 				ICompilationUnit cu = parserInfo;
 	
 				List<IType> resolved;
+				List<IAttribute> resolvedAtts;
 				
-				int unresolvedCount = ResolveTypes (cu, cu.Types, out resolved);
+				int unresolvedCount = ResolveTypes (cu, cu.Types, cu.Attributes, out resolved, out resolvedAtts);
 				totalUnresolvedCount += unresolvedCount;
 				
-				TypeUpdateInformation res = UpdateTypeInformation (resolved, parserInfo.FileName);
+				TypeUpdateInformation res = UpdateTypeInformation (resolved, resolvedAtts, parserInfo.FileName);
 				
-				FileEntry file = files [fileName] as FileEntry;
-				if (file != null) {
+				FileEntry file;
+				if (files.TryGetValue (fileName, out file)) {
 					if (unresolvedCount > 0) {
 						if (file.ParseErrorRetries != 1) {
 							file.ParseErrorRetries = 1;
 							
 							// Enqueue the file for quickly reparse. Types can't be resolved most probably because
 							// the file that implements them is not yet parsed.
-							ProjectDomService.QueueParseJob (SourceProjectDom, 
-							                                 delegate { UpdateFromParseInfo (parserInfo, fileName); },
-							                                 file.FileName);
+							
+							if (isFromFile) {
+								// To reduce memory usage, we don't keep the compilation unit in memory if the
+								// content comes from a saved file. We'll just reparse the file.
+								file.InParseQueue = false;
+								QueueParseJob (file);
+							} else {
+								ProjectDomService.QueueParseJob (SourceProjectDom, 
+								                                 delegate { UpdateFromParseInfo (parserInfo, fileName, false); },
+								                                 file.FileName);
+							}
 						}
 					}
 					else {

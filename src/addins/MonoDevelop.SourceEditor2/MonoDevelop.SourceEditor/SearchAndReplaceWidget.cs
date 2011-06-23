@@ -34,6 +34,8 @@ using Gtk;
 using Mono.TextEditor;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
+using MonoDevelop.Ide.Commands;
+using MonoDevelop.Components.Commands;
 
 namespace MonoDevelop.SourceEditor
 {
@@ -53,7 +55,7 @@ namespace MonoDevelop.SourceEditor
 		bool isReplaceMode = true;
 		Widget [] replaceWidgets;
 		
-		public static bool IsCaseSensitive {
+		public bool IsCaseSensitive {
 			get { return PropertyService.Get ("IsCaseSensitive", true); }
 			set { 
 				if (IsCaseSensitive != value)
@@ -140,8 +142,8 @@ namespace MonoDevelop.SourceEditor
 			FilterHistory (seachHistoryProperty);
 			FilterHistory (replaceHistoryProperty);
 			//HACK: GTK rendering issue on Mac, images don't repaint unless we put them in visible eventboxes
-			if (Platform.IsMac) {
-				foreach (var eb in new [] { eventbox2, eventbox3, eventbox4, eventbox5, eventbox6 }) {
+			if (Platform.IsMac) {
+				foreach (var eb in new [] { eventbox2, eventbox3, eventbox4, eventbox5, eventbox6 }) {
 					eb.VisibleWindow = true;
 					eb.ModifyBg (StateType.Normal, new Gdk.Color (230, 230, 230));
 				}
@@ -168,7 +170,8 @@ namespace MonoDevelop.SourceEditor
 				widget.SetSearchPattern (SearchPattern);
 				string oldPattern = searchPattern;
 				searchPattern = SearchPattern;
-				UpdateSearchEntry ();
+				if (oldPattern != searchPattern)
+					UpdateSearchEntry ();
 				var history = GetHistory (seachHistoryProperty);
 				if (history.Count > 0 && history[0] == oldPattern) {
 					ChangeHistory (seachHistoryProperty, searchPattern);
@@ -345,6 +348,16 @@ namespace MonoDevelop.SourceEditor
 		{
 			GdkWindow.Cursor = arrowCursor;
 			return base.OnEnterNotifyEvent (evnt);
+		}
+		
+		[CommandHandler (EditCommands.SelectAll)]
+		public void SelectAllCommand ()
+		{
+			if (searchEntry.HasFocus) {
+				searchEntry.Entry.SelectRegion (0, searchEntry.Entry.Text.Length);
+			} else if (IsReplaceMode && entryReplace.HasFocus) {
+				entryReplace.SelectRegion (0, entryReplace.Text.Length);
+			}
 		}
 		
 		public void UpdateSearchPattern ()
@@ -541,11 +554,12 @@ But I leave it in in the case I've missed something. Mike
 					widget.TextEditor.ClearSelection ();
 					return;
 				}
+				widget.TextEditor.StopSearchResultAnimation ();
 				widget.TextEditor.Caret.Offset = result.EndOffset;
 				widget.TextEditor.SetSelection (result.Offset, result.EndOffset);
 				widget.TextEditor.CenterToCaret ();
 				widget.TextEditor.AnimateSearchResult (result);
-			} catch (System.Exception) { 
+			} catch (System.Exception) {
 			}
 		}
 		

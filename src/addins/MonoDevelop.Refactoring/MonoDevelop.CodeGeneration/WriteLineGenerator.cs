@@ -34,7 +34,6 @@ using ICSharpCode.NRefactory.Ast;
 using System.Text;
 using MonoDevelop.Core;
 using MonoDevelop.Refactoring;
-using MonoDevelop.Refactoring.ExtractMethod;
 using ICSharpCode.NRefactory.Visitors;
 using ICSharpCode.NRefactory;
 
@@ -80,32 +79,31 @@ namespace MonoDevelop.CodeGeneration
 			
 			protected override IEnumerable<IBaseMember> GetValidMembers ()
 			{
-				if (Options.EnclosingType == null || Options.EnclosingMember == null)
+				if (Options == null || Options.EnclosingType == null || Options.EnclosingMember == null || Options.Document == null)
+					yield break;
+				var editor = Options.Document.Editor;
+				if (editor == null)
+					yield break;
+				INRefactoryASTProvider provider = Options.GetASTProvider ();
+				if (provider == null)
 					yield break;
 				
 				// add local variables
 				LookupTableVisitor visitor = new LookupTableVisitor (ICSharpCode.NRefactory.SupportedLanguage.CSharp);
-				Location location = new Location (Options.Document.TextEditor.CursorColumn, Options.Document.TextEditor.CursorLine);
-				INRefactoryASTProvider provider = Options.GetASTProvider ();
-				var result = provider.ParseFile (Options.Document.TextEditor.Text);
+				Location location = new Location (editor.Caret.Line, editor.Caret.Column);
+				var result = provider.ParseFile (editor.Text);
 				result.AcceptVisitor (visitor, null);
-				foreach (var list in visitor.Variables.Values) {
-					foreach (LocalLookupVariable varDescr in list) {
+				
+				foreach (var pair in visitor.Variables) {
+					foreach (LocalLookupVariable varDescr in pair.Value) {
 						if (varDescr.StartPos <= location && location <= varDescr.EndPos)
 							yield return new LocalVariable (Options.EnclosingMember, varDescr.Name, varDescr.TypeRef.ConvertToReturnType (), DomRegion.Empty);
 					}
 				}
 				
 				// add parameters
-				IMethod method = Options.EnclosingMember as IMethod;
-				if (method != null) {
-					foreach (IParameter param in method.Parameters)
-						yield return param;
-				}
-				
-				IProperty p = Options.EnclosingMember as IProperty;
-				if (p != null) {
-					foreach (IParameter param in p.Parameters)
+				if (Options.EnclosingMember.CanHaveParameters) {
+					foreach (IParameter param in Options.EnclosingMember.Parameters)
 						yield return param;
 				}
 				

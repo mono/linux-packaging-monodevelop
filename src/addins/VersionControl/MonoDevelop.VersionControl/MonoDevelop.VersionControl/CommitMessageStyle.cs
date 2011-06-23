@@ -42,6 +42,8 @@ namespace MonoDevelop.VersionControl
 			LastFilePostfix = ": ";
 			LineAlign = 0;
 			InterMessageLines = 1;
+			IncludeDirectoryPaths = false;
+			Wrap = true;
 		}
 		
 		[ItemProperty]
@@ -65,6 +67,12 @@ namespace MonoDevelop.VersionControl
 		[ItemProperty]
 		public int InterMessageLines { get; set; }
 		
+		[ItemProperty]
+		public bool IncludeDirectoryPaths { get; set; }
+		
+		[ItemProperty]
+		public bool Wrap { get; set; }
+		
 		public void CopyFrom (CommitMessageStyle other)
 		{
 			Indent = other.Indent;
@@ -74,6 +82,8 @@ namespace MonoDevelop.VersionControl
 			LineAlign = other.LineAlign;
 			InterMessageLines = other.InterMessageLines;
 			Header = other.Header;
+			IncludeDirectoryPaths = other.IncludeDirectoryPaths;
+			Wrap = other.Wrap;
 		}
 		
 		public bool Equals (CommitMessageStyle other)
@@ -84,7 +94,9 @@ namespace MonoDevelop.VersionControl
 				LastFilePostfix == other.LastFilePostfix &&
 				LineAlign == other.LineAlign &&
 				InterMessageLines == other.InterMessageLines &&
-				Header == other.Header;
+				Header == other.Header &&
+				IncludeDirectoryPaths == other.IncludeDirectoryPaths &&
+				Wrap == other.Wrap;
 		}
 	}
 }

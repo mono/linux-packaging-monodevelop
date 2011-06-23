@@ -24,13 +24,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using MonoDevelop.Components.Commands;
-using OSXIntegration.Framework;
 using MonoDevelop.Ide;
+using MonoDevelop.Components.Commands;
+using MonoDevelop.MacInterop;
 
 namespace MonoDevelop.Platform.Mac
 {
-	public enum Commands
+	internal enum Commands
 	{
 		MinimizeWindow,
 		HideWindow,

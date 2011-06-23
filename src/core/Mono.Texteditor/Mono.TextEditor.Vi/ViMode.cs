@@ -34,7 +34,70 @@ using System.Linq;
 
 namespace Mono.TextEditor.Vi
 {
-
+	public class NewViEditMode : EditMode
+	{
+		protected ViEditor ViEditor { get ; private set ;}
+		
+		public NewViEditMode ()
+		{
+			ViEditor = new ViEditor (this);
+		}
+		
+		protected override void HandleKeypress (Gdk.Key key, uint unicodeKey, Gdk.ModifierType modifier)
+		{
+			ViEditor.ProcessKey (modifier, key, (char)unicodeKey);
+		}
+		
+		public new TextEditor Editor { get { return base.Editor; } }
+		public new TextEditorData Data { get { return base.Data; } }
+		
+		public override bool WantsToPreemptIM {
+			get {
+				switch (ViEditor.Mode) {
+				case ViEditorMode.Insert:
+				case ViEditorMode.Replace:
+					return false;
+				case ViEditorMode.Normal:
+				case ViEditorMode.Visual:
+				case ViEditorMode.VisualLine:
+				default:
+					return true;
+				}
+			}
+		}
+		
+		protected override void OnAddedToEditor (TextEditorData data)
+		{
+			ViEditor.SetMode (ViEditorMode.Normal);
+			SetCaretMode (CaretMode.Block, data);
+			ViActions.RetreatFromLineEnd (data);
+		}
+		
+		protected override void OnRemovedFromEditor (TextEditorData data)
+		{
+			SetCaretMode (CaretMode.Insert, data);
+		}
+		
+		protected override void CaretPositionChanged ()
+		{
+			ViEditor.OnCaretPositionChanged ();
+		}
+		
+		public void SetCaretMode (CaretMode mode)
+		{
+			SetCaretMode (mode, Data);
+		}
+		
+		static void SetCaretMode (CaretMode mode, TextEditorData data)
+		{
+			if (data.Caret.Mode == mode)
+				return;
+			data.Caret.Mode = mode;
+			data.Document.RequestUpdate (new SinglePositionUpdate (data.Caret.Line, data.Caret.Column));
+			data.Document.CommitDocumentUpdate ();
+		}
+	}
+	
 	public class ViEditMode : EditMode
 	{
 		bool searchBackward;
@@ -45,6 +108,7 @@ namespace Mono.TextEditor.Vi
 		StringBuilder commandBuffer = new StringBuilder ();
 		Dictionary<char,ViMark> marks = new Dictionary<char, ViMark>();
 		Dictionary<char,ViMacro> macros = new Dictionary<char, ViMacro>();
+		char macros_lastplayed = '@'; // start with the illegal macro character
 		string statusText = "";
 		
 		/// <summary>
@@ -77,7 +141,7 @@ namespace Mono.TextEditor.Vi
 					
 				int line;
 				if (int.TryParse (command.Substring (1), out line)) {
-					if (line < 0 || line > Data.Document.LineCount) {
+					if (line < DocumentLocation.MinLine || line > Data.Document.LineCount) {
 						return "Invalid line number.";
 					} else if (line == 0) {
 						RunAction (CaretMoveActions.ToDocumentStart);
@@ -194,12 +258,13 @@ namespace Mono.TextEditor.Vi
 			data.ClearSelection ();
 			
 			//Editor can be null during GUI-less tests
-			if (Editor != null)
-				Editor.HighlightSearchPattern = false;
+			// Commenting this fixes bug: Bug 622618 - Inline search fails in vi mode
+//			if (Editor != null)
+//				Editor.HighlightSearchPattern = false;
 			
 			if (CaretMode.Block != data.Caret.Mode) {
 				data.Caret.Mode = CaretMode.Block;
-				if (data.Caret.Column > 0)
+				if (data.Caret.Column > DocumentLocation.MinColumn)
 					data.Caret.Column--;
 			}
 			ViActions.RetreatFromLineEnd (data);
@@ -354,7 +419,7 @@ namespace Mono.TextEditor.Vi
 						return;
 						
 					case 'x':
-						if (Data.Caret.Column == Data.Document.GetLine (Data.Caret.Line).EditableLength)
+						if (Data.Caret.Column == Data.Document.GetLine (Data.Caret.Line).EditableLength + 1)
 							return;
 						Status = string.Empty;
 						if (!Data.IsSomethingSelected)
@@ -365,7 +430,7 @@ namespace Mono.TextEditor.Vi
 						return;
 						
 					case 'X':
-						if (Data.Caret.Column == 0)
+						if (Data.Caret.Column == DocumentLocation.MinColumn)
 							return;
 						Status = string.Empty;
 						if (!Data.IsSomethingSelected && 0 < Caret.Offset)
@@ -423,21 +488,21 @@ namespace Mono.TextEditor.Vi
 						return;
 						
 					case 'H':
-						Caret.Line = System.Math.Max (0, Editor.VisualToDocumentLocation (0, Editor.LineHeight - 1).Line);
+						Caret.Line = System.Math.Max (DocumentLocation.MinLine, Editor.PointToLocation (0, Editor.LineHeight - 1).Line);
 						return;
 					case 'J':
 						RunAction (ViActions.Join);
 						return;
 					case 'L':
-						int line = Editor.VisualToDocumentLocation (0, Editor.Allocation.Height - Editor.LineHeight * 2 - 2).Line;
-						if (line < 0)
-							line = Document.LineCount - 1;
+						int line = Editor.PointToLocation (0, Editor.Allocation.Height - Editor.LineHeight * 2 - 2).Line;
+						if (line < DocumentLocation.MinLine)
+							line = Document.LineCount;
 						Caret.Line = line;
 						return;
 					case 'M':
-						line = Editor.VisualToDocumentLocation (0, Editor.Allocation.Height/2).Line;
-						if (line < 0)
-							line = Document.LineCount - 1;
+						line = Editor.PointToLocation (0, Editor.Allocation.Height/2).Line;
+						if (line < DocumentLocation.MinLine)
+							line = Document.LineCount;
 						Caret.Line = line;
 						return;
 						
@@ -581,7 +646,6 @@ namespace Mono.TextEditor.Vi
 			case State.Insert:
 			case State.Replace:
 				action = GetInsertAction (key, modifier);
-				
 				
 				if (action != null)
 					RunAction (action);
@@ -766,16 +830,19 @@ namespace Mono.TextEditor.Vi
 			
 			case State.PlayMacro: {
 				char k = (char) unicodeKey;
+				if (k == '@') 
+					k = macros_lastplayed;
 				if (macros.ContainsKey(k)) {
 					Reset ("");
+					macros_lastplayed = k; // FIXME play nice when playing macros from inside macros?
 					ViMacro macroToPlay = macros [k];
 					foreach (ViMacro.KeySet keySet in macroToPlay.KeysPressed) {
-						HandleKeypress(keySet.Key, keySet.UnicodeKey, keySet.Modifiers);
+						HandleKeypress(keySet.Key, keySet.UnicodeKey, keySet.Modifiers); // FIXME stop on errors? essential with multipliers and nowrapscan
 					}
 					/* Once all the keys have been played back, quickly exit. */
 					return;
 				} else {
-					Reset ("Invalid Macro Name");
+					Reset ("Invalid Macro Name '" + k + "'");
 					return;
 				}
 			}
@@ -957,6 +1024,7 @@ namespace Mono.TextEditor.Vi
 		private void PasteAfter (bool linemode)
 		{
 			TextEditorData data = Data;
+			this.Document.BeginAtomicUndo();
 			
 			Gtk.Clipboard.Get (ClipboardActions.CopyOperation.CLIPBOARD_ATOM).RequestText 
 				(delegate (Gtk.Clipboard cb, string contents) {
@@ -994,6 +1062,7 @@ namespace Mono.TextEditor.Vi
 				}
 				Reset (string.Empty);
 			});
+			this.Document.EndAtomicUndo();
 		}
 
 		/// <summary>
@@ -1004,6 +1073,7 @@ namespace Mono.TextEditor.Vi
 		{
 			TextEditorData data = Data;
 			
+			this.Document.BeginAtomicUndo();
 			Gtk.Clipboard.Get (ClipboardActions.CopyOperation.CLIPBOARD_ATOM).RequestText 
 				(delegate (Gtk.Clipboard cb, string contents) {
 				if (contents == null)
@@ -1039,6 +1109,7 @@ namespace Mono.TextEditor.Vi
 				}
 				Reset (string.Empty);
 			});
+			this.Document.EndAtomicUndo();
 		}
 
 		enum State {

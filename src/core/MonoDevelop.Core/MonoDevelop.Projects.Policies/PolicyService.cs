@@ -36,6 +36,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Projects.Extensions;
 using MonoDevelop.Core.Serialization;
 using System.Text;
+using System.Xml;
 
 namespace MonoDevelop.Projects.Policies
 {
@@ -47,9 +48,11 @@ namespace MonoDevelop.Projects.Policies
 		const string SET_EXT_POINT  = "/MonoDevelop/ProjectModel/PolicySets";
 		
 		static List<PolicySet> sets = new List<PolicySet> ();
+		static List<PolicySet> userSets = new List<PolicySet> ();
 		static DataSerializer serializer;
 		static Dictionary<string, Type> policyNames = new Dictionary<string, Type> ();
 		static Dictionary<Type, string> policyTypes = new Dictionary<Type, string> ();
+		static List<string> deletedUserSets = new List<string> ();
 		
 		static PolicySet defaultPolicies;
 		static PolicyBag defaultPolicyBag = new PolicyBag ();
@@ -59,10 +62,7 @@ namespace MonoDevelop.Projects.Policies
 		{
 			AddinManager.AddExtensionNodeHandler (TYPE_EXT_POINT, HandlePolicyTypeUpdated);
 			AddinManager.AddExtensionNodeHandler (SET_EXT_POINT, HandlePolicySetUpdated);
-			MonoDevelop.Core.Runtime.ShuttingDown += delegate {
-				SaveDefaultPolicies ();
-			};
-			LoadDefaultPolicies ();
+			LoadPolicies ();
 			defaultPolicyBag.ReadOnly = true;
 			
 			PolicySet pset = GetPolicySet ("Invariant");
@@ -98,11 +98,7 @@ namespace MonoDevelop.Projects.Policies
 		
 		static void HandlePolicyTypeUpdated (object sender, ExtensionNodeEventArgs args)
 		{
-			Type t = ((DataTypeCodon)args.ExtensionNode).Class;
-			if (t == null) {
-				throw new UserException ("Type '" + ((DataTypeCodon)args.ExtensionNode).TypeName
-				                         + "' not found. It could not be registered as a serializable type.");
-			}
+			Type t = ((TypeExtensionNode)args.ExtensionNode).Type;
 			
 			string name = null;
 			object[] obs = t.GetCustomAttributes (typeof (DataItemAttribute), true);
@@ -131,11 +127,19 @@ namespace MonoDevelop.Projects.Policies
 			}
 		}
 		
+		public static string GetPolicyTypeDescription (Type t)
+		{
+			foreach (TypeExtensionNode<PolicyTypeAttribute> node in AddinManager.GetExtensionNodes (TYPE_EXT_POINT))
+				if (node.Type == t)
+					return node.Data.Description;
+			return t.Name;
+		}
+		
 		static DataSerializer Serializer {
 			get {
 				if (serializer == null) {
 					serializer = new DataSerializer (new DataContext ());
-					serializer.IncludeDefaultValues = true;
+					serializer.SerializationContext.IncludeDefaultValues = true;
 				}
 				return serializer;
 			}
@@ -159,14 +163,22 @@ namespace MonoDevelop.Projects.Policies
 		internal static IEnumerable<ScopedPolicy> DiffDeserializeXml (System.IO.StreamReader reader)
 		{
 			var xr = System.Xml.XmlReader.Create (reader);
+			return DiffDeserializeXml (xr);
+		}
+		
+		internal static IEnumerable<ScopedPolicy> DiffDeserializeXml (System.Xml.XmlReader xr)
+		{
 			XmlConfigurationReader configReader = XmlConfigurationReader.DefaultReader;
-			while (!xr.EOF && xr.MoveToContent () != System.Xml.XmlNodeType.None) {
+			while (!xr.EOF && xr.MoveToContent () == System.Xml.XmlNodeType.Element) {
 				DataNode node = configReader.Read (xr);
 				if (node.Name == "PolicySet" && node is DataItem) {
-					foreach (DataNode child in ((DataItem)node).ItemData)
-						yield return DiffDeserialize (child);
+					foreach (DataNode child in ((DataItem)node).ItemData) {
+						if (child is DataItem)
+							yield return DiffDeserialize ((DataItem)child);
+					}
+					yield break;
 				} else {
-					yield return DiffDeserialize (node);
+					yield return DiffDeserialize ((DataItem)node);
 				}
 			}
 		}
@@ -223,17 +235,15 @@ namespace MonoDevelop.Projects.Policies
 			return node;
 		}
 		
-		internal static ScopedPolicy DiffDeserialize (DataNode data)
+		internal static ScopedPolicy DiffDeserialize (DataItem item)
 		{
-			DataItem item = (DataItem) data;
-			
 			DataValue inheritVal = item.ItemData ["inheritsSet"] as DataValue;
 			if (inheritVal == null || inheritVal.Value == "null")
-				return RawDeserialize (data);
+				return RawDeserialize (item);
 			
-			Type t = GetRegisteredType (data.Name);
+			Type t = GetRegisteredType (item.Name);
 			if (t == null) {
-				UnknownPolicy up = new UnknownPolicy (data);
+				UnknownPolicy up = new UnknownPolicy (item);
 				return new ScopedPolicy (typeof(UnknownPolicy), up, up.Scope);
 			}
 			
@@ -247,7 +257,7 @@ namespace MonoDevelop.Projects.Policies
 			
 			object baseItem = set.Get (t, inheritScope != null ? inheritScope.Value : null);
 			if (baseItem == null) {
-				string msg = "Policy set '" + set.Id + "' does not contain a policy for '" + data.Name + "'";
+				string msg = "Policy set '" + set.Id + "' does not contain a policy for '" + item.Name + "'";
 				if (inheritScope != null)
 					msg += ", scope '" + inheritScope.Value + "'";
 				msg += ". This policy is likely provided by an addin that is not currently installed.";
@@ -256,7 +266,7 @@ namespace MonoDevelop.Projects.Policies
 			
 			DataValue scopeVal = item.ItemData.Extract ("scope") as DataValue;
 			DataNode baseline = RawSerialize (t, baseItem);
-			ScopedPolicy p = RawDeserialize (ApplyOverlay (baseline, data));
+			ScopedPolicy p = RawDeserialize (ApplyOverlay (baseline, item));
 			return new ScopedPolicy (t, p.Policy, scopeVal != null ? scopeVal.Value : null);
 		}
 		
@@ -283,8 +293,6 @@ namespace MonoDevelop.Projects.Policies
 			if (policy != null) {
 				//find the policy with the fewest differences
 				foreach (PolicySet set in sets) {
-					if (set.Id == "Invariant")
-						continue;
 					foreach (ScopedPolicy sp in set.GetScoped (policyType)) {
 						if (!set.SupportsDiffSerialize (sp))
 							continue;
@@ -578,6 +586,15 @@ namespace MonoDevelop.Projects.Policies
 			}
 		}
 		
+		/// <summary>
+		/// Gets a policy set.
+		/// </summary>
+		/// <returns>
+		/// The policy set.
+		/// </returns>
+		/// <param name='name'>
+		/// Name of the policy set
+		/// </param>
 		public static PolicySet GetPolicySet (string name)
 		{
 			foreach (PolicySet s in sets)
@@ -586,11 +603,32 @@ namespace MonoDevelop.Projects.Policies
 			return null;
 		}
 		
+		/// <summary>
+		/// Get all policy sets which define a specific policy
+		/// </summary>
+		/// <returns>
+		/// The policy sets.
+		/// </returns>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for
+		/// </typeparam>
 		public static IEnumerable<PolicySet> GetPolicySets<T> ()
 		{
 			return GetPolicySets<T> (false);
 		}
 		
+		/// <summary>
+		/// Get all policy sets which define a specific policy
+		/// </summary>
+		/// <returns>
+		/// The policy sets.
+		/// </returns>
+		/// <param name='includeHidden'>
+		/// True if hidden (system) policy sets have to be returned, False otherwise.
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for. Only sets containing this policy will be returned
+		/// </typeparam>
 		public static IEnumerable<PolicySet> GetPolicySets<T> (bool includeHidden)
 		{
 			foreach (PolicySet s in sets)
@@ -598,11 +636,38 @@ namespace MonoDevelop.Projects.Policies
 					yield return s;
 		}
 		
+		/// <summary>
+		/// Get all policy sets which define a policy under a specific scope
+		/// </summary>
+		/// <returns>
+		/// The policy sets.
+		/// </returns>
+		/// <param name='scope'>
+		/// Scope under which the policy has to be defined (it can be for example a mime type)
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for. Only sets containing this policy will be returned
+		/// </typeparam>
 		public static IEnumerable<PolicySet> GetPolicySets<T> (string scope)
 		{
 			return GetPolicySets<T> (scope, false);
 		}
 		
+		/// <summary>
+		/// Get all policy sets which define a policy under a specific scope
+		/// </summary>
+		/// <returns>
+		/// The policy sets.
+		/// </returns>
+		/// <param name='scope'>
+		/// Scope under which the policy has to be defined (it can be for example a mime type)
+		/// </param>
+		/// <param name='includeHidden'>
+		/// True if hidden (system) policy sets have to be returned, False otherwise.
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for. Only sets containing this policy will be returned
+		/// </typeparam>
 		public static IEnumerable<PolicySet> GetPolicySets<T> (string scope, bool includeHidden)
 		{
 			foreach (PolicySet s in sets)
@@ -610,11 +675,38 @@ namespace MonoDevelop.Projects.Policies
 					yield return s;
 		}
 		
+		/// <summary>
+		/// Get all policy sets which define a policy under a specific set of scopes
+		/// </summary>
+		/// <returns>
+		/// The policy sets.
+		/// </returns>
+		/// <param name='scopes'>
+		/// Scopes under which the policy has to be defined (it can be for example a hirearchy of mime types)
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for. Only sets containing this policy will be returned
+		/// </typeparam>
 		public static IEnumerable<PolicySet> GetPolicySets<T> (IEnumerable<string> scopes)
 		{
 			return GetPolicySets<T> (scopes, false);
 		}
 		
+		/// <summary>
+		/// Get all policy sets which define a policy under a specific set of scopes
+		/// </summary>
+		/// <returns>
+		/// The policy sets.
+		/// </returns>
+		/// <param name='scopes'>
+		/// Scopes under which the policy has to be defined (it can be for example a hirearchy of mime types)
+		/// </param>
+		/// <param name='includeHidden'>
+		/// True if hidden (system) policy sets have to be returned, False otherwise.
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for. Only sets containing this policy will be returned
+		/// </typeparam>
 		public static IEnumerable<PolicySet> GetPolicySets<T> (IEnumerable<string> scopes, bool includeHidden)
 		{
 			foreach (PolicySet s in sets)
@@ -622,11 +714,46 @@ namespace MonoDevelop.Projects.Policies
 					yield return s;
 		}
 		
+		/// <summary>
+		/// Gets a list of sets which contain a specific policy value
+		/// </summary>
+		/// <returns>
+		/// The matching sets.
+		/// </returns>
+		/// <param name='policy'>
+		/// Policy to be compared
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for. Only sets containing this policy will be returned
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns a list of policy sets which define a policy of type T which is identical
+		/// to the policy provided as argument.
+		/// </remarks>
 		public static IEnumerable<PolicySet> GetMatchingSets<T> (T policy) where T : class, IEquatable<T>, new ()
 		{
 			return GetMatchingSets<T> (policy, false);
 		}
 		
+		/// <summary>
+		/// Gets a list of sets which contain a specific policy value
+		/// </summary>
+		/// <returns>
+		/// The matching sets.
+		/// </returns>
+		/// <param name='policy'>
+		/// Policy to be compared
+		/// </param>
+		/// <param name='includeHidden'>
+		/// True if hidden (system) policy sets have to be returned, False otherwise.
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for. Only sets containing this policy will be returned
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns a list of policy sets which define a policy of type T which is identical
+		/// to the policy provided as argument.
+		/// </remarks>
 		public static IEnumerable<PolicySet> GetMatchingSets<T> (T policy, bool includeHidden) where T : class, IEquatable<T>, new ()
 		{
 			foreach (PolicySet ps in sets) {
@@ -636,14 +763,79 @@ namespace MonoDevelop.Projects.Policies
 			}
 		}
 		
+		/// <summary>
+		/// Gets a policy set which contains a specific policy value
+		/// </summary>
+		/// <returns>
+		/// The matching policy set.
+		/// </returns>
+		/// <param name='policy'>
+		/// Policy to be compared
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for.
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns a policy set which defines a policy of type T which is identical
+		/// to the policy provided as argument. If there are several matching policy sets, it
+		/// returns the first it finds
+		/// </remarks>
 		public static PolicySet GetMatchingSet<T> (T policy) where T : class, IEquatable<T>, new ()
 		{
 			return GetMatchingSet<T> (policy, false);
 		}
 		
+		/// <summary>
+		/// Gets a policy set which contains a specific policy value
+		/// </summary>
+		/// <returns>
+		/// The matching policy set.
+		/// </returns>
+		/// <param name='policy'>
+		/// Policy to be compared
+		/// </param>
+		/// <param name='includeHidden'>
+		/// True if hidden (system) policy sets have to be returned, False otherwise.
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for.
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns a policy set which defines a policy of type T which is identical
+		/// to the policy provided as argument. If there are several matching policy sets, it
+		/// returns the first it finds
+		/// </remarks>
 		public static PolicySet GetMatchingSet<T> (T policy, bool includeHidden) where T : class, IEquatable<T>, new ()
 		{
-			foreach (PolicySet ps in sets) {
+			return GetMatchingSet (policy, sets, includeHidden);
+		}
+		
+		/// <summary>
+		/// Gets a policy set which contains a specific policy value
+		/// </summary>
+		/// <returns>
+		/// The matching policy set.
+		/// </returns>
+		/// <param name='policy'>
+		/// Policy to be compared
+		/// </param>
+		/// <param name='candidateSets'>
+		/// List of policy sets where to look for the specified policy
+		/// </param>
+		/// <param name='includeHidden'>
+		/// True if hidden (system) policy sets have to be returned, False otherwise.
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for.
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns a policy set which defines a policy of type T which is identical
+		/// to the policy provided as argument. If there are several matching policy sets, it
+		/// returns the first it finds
+		/// </remarks>
+		public static PolicySet GetMatchingSet<T> (T policy, IEnumerable<PolicySet> candidateSets, bool includeHidden) where T : class, IEquatable<T>, new ()
+		{
+			foreach (PolicySet ps in candidateSets) {
 				T match = ps.Get<T> ();
 				if (match != null  && (ps.Visible || includeHidden) && match.Equals (policy))
 					return ps;
@@ -651,14 +843,88 @@ namespace MonoDevelop.Projects.Policies
 			return null;
 		}
 		
+		/// <summary>
+		/// Gets a policy sets which contains a specific policy value
+		/// </summary>
+		/// <returns>
+		/// The policy set.
+		/// </returns>
+		/// <param name='policy'>
+		/// Policy to be compared
+		/// </param>
+		/// <param name='scopes'>
+		/// Scopes under which the policy has to be defined (it can be for example a hirearchy of mime types)
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for.
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns a policy set which defines a policy of type T which is identical
+		/// to the policy provided as argument. This policy has to be defined under one of the
+		/// provided scopes. If there are several matching policy sets, it returns the first it finds.
+		/// </remarks>
 		public static PolicySet GetMatchingSet<T> (T policy, IEnumerable<string> scopes) where T : class, IEquatable<T>, new ()
 		{
 			return GetMatchingSet<T> (policy, scopes, false);
 		}
 		
+		/// <summary>
+		/// Gets a policy sets which contains a specific policy value
+		/// </summary>
+		/// <returns>
+		/// The policy set.
+		/// </returns>
+		/// <param name='policy'>
+		/// Policy to be compared
+		/// </param>
+		/// <param name='scopes'>
+		/// Scopes under which the policy has to be defined (it can be for example a hirearchy of mime types)
+		/// </param>
+		/// <param name='includeHidden'>
+		/// True if hidden (system) policy sets have to be returned, False otherwise.
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for.
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns a policy set which defines a policy of type T which is identical
+		/// to the policy provided as argument. This policy has to be defined under one of the
+		/// provided scopes. If there are several matching policy sets, it returns the first it finds.
+		/// </remarks>		
 		public static PolicySet GetMatchingSet<T> (T policy, IEnumerable<string> scopes, bool includeHidden) where T : class, IEquatable<T>, new ()
 		{
-			foreach (PolicySet ps in sets) {
+			return GetMatchingSet (policy, sets, scopes, includeHidden);
+		}
+		
+		/// <summary>
+		/// Gets a policy set which contains a specific policy value
+		/// </summary>
+		/// <returns>
+		/// The policy set.
+		/// </returns>
+		/// <param name='policy'>
+		/// Policy to be compared
+		/// </param>
+		/// <param name='candidateSets'>
+		/// List of policy sets where to look for the specified policy
+		/// </param>
+		/// <param name='scopes'>
+		/// Scopes under which the policy has to be defined (it can be for example a hirearchy of mime types)
+		/// </param>
+		/// <param name='includeHidden'>
+		/// True if hidden (system) policy sets have to be returned, False otherwise.
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to look for.
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns a policy set which defines a policy of type T which is identical
+		/// to the policy provided as argument. This policy has to be defined under one of the
+		/// provided scopes. If there are several matching policy sets, it returns the first it finds.
+		/// </remarks>		
+		public static PolicySet GetMatchingSet<T> (T policy, IEnumerable<PolicySet> candidateSets, IEnumerable<string> scopes, bool includeHidden) where T : class, IEquatable<T>, new ()
+		{
+			foreach (PolicySet ps in candidateSets) {
 				T match = ps.Get<T> (scopes);
 				if (match != null && (ps.Visible || includeHidden) && match.Equals (policy))
 					return ps;
@@ -666,76 +932,306 @@ namespace MonoDevelop.Projects.Policies
 			return null;
 		}
 		
-		static string DefaultPoliciesPath {
+		static FilePath PoliciesFolder {
 			get {
-				return Path.Combine (PropertyService.ConfigPath, "DefaultPolicies.xml");
+				return Path.Combine (PropertyService.Locations.Data, "Policies");
 			}
 		}
 		
+		/// <summary>
+		/// Gets a default policy.
+		/// </summary>
+		/// <returns>
+		/// The default policy.
+		/// </returns>
+		/// <typeparam name='T'>
+		/// Type of the policy to be returned
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns the default value for the specified policy type. It can be a value defined by
+		/// the user using the default policy options panel, or a system default if the user didn't change it.
+		/// </remarks>
 		public static T GetDefaultPolicy<T> () where T : class, IEquatable<T>, new ()
 		{
 			return defaultPolicies.Get<T> () ?? new T ();
 		}
-		
+
+		/// <summary>
+		/// Gets a default policy for a specific scope
+		/// </summary>
+		/// <returns>
+		/// The default policy.
+		/// </returns>
+		/// <param name='scope'>
+		/// Scope under which the policy has to be defined
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to be returned
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns the default value for the specified policy type and scope. It can be a value defined by
+		/// the user using the default policy options panel, or a system default if the user didn't change it.
+		/// </remarks>
 		public static T GetDefaultPolicy<T> (string scope) where T : class, IEquatable<T>, new ()
 		{
 			return defaultPolicies.Get<T> (scope) ?? new T ();
 		}
-		
+
+		/// <summary>
+		/// Gets a default policy for a specific scope
+		/// </summary>
+		/// <returns>
+		/// The default policy, or NULL if the policy is not defined and createDefault is False
+		/// </returns>
+		/// <param name='scope'>
+		/// Scope under which the policy has to be defined
+		/// </param>
+		/// <param name='createDefault'>
+		/// When set to False and there is no default policy defined of this type, the method returns null.
+		/// When set to True, a policy value is always returned (it can be the system default).
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to be returned
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns the default value for the specified policy type and scope.
+		/// </remarks>
 		public static T GetDefaultPolicy<T> (string scope, bool createDefault) where T : class, IEquatable<T>, new ()
 		{
 			return defaultPolicies.Get<T> (scope) ?? (createDefault ? new T () : null);
 		}
 		
+		/// <summary>
+		/// Gets a default policy for a specific set of scopes
+		/// </summary>
+		/// <returns>
+		/// The default policy.
+		/// </returns>
+		/// <param name='scopes'>
+		/// Scopes under which the policy has to be defined (it can be for example a hirearchy of mime types)
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to be returned
+		/// </typeparam>
+		/// <remarks>
+		/// This method returns the default value of a policy type for a set of scopes. The policy is looked up under
+		/// the provided scopes in sequence, and the first value found is the one returned. If no value is found,
+		/// a system default is returned.
+		/// </remarks>
 		public static T GetDefaultPolicy<T> (IEnumerable<string> scopes) where T : class, IEquatable<T>, new ()
 		{
 			return defaultPolicies.Get<T> (scopes) ?? new T ();
 		}
 		
+		/// <summary>
+		/// Sets a default policy value.
+		/// </summary>
+		/// <param name='value'>
+		/// Policy to be set
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to be set
+		/// </typeparam>
 		public static void SetDefaultPolicy<T> (T value) where T : class, IEquatable<T>, new ()
 		{
 			defaultPolicies.Set (value);
 		}
 		
+		/// <summary>
+		/// Gets default user-defined policy set
+		/// </summary>
 		public static PolicySet GetUserDefaultPolicySet ()
 		{
 			return defaultPolicies;
 		}
 		
+		/// <summary>
+		/// Gets the invariant policy set
+		/// </summary>
+		/// <remarks>
+		/// The invariant policy set is a policy set whose values will not change in future MonoDevelop versions.
+		/// </remarks>
 		public static PolicyContainer InvariantPolicies {
 			get { return invariantPolicies; }
 		}
 		
+
+		/// <summary>
+		/// Gets the system default policies
+		/// </summary>
+		/// <value>
+		/// The default policies.
+		/// </value>
+		/// <remarks>
+		/// The returned PolicyContainer can be used to query the system default value of policies
+		/// </remarks>
 		public static PolicyContainer DefaultPolicies {
 			get { return defaultPolicyBag; }
 		}
 		
+		/// <summary>
+		/// Determines whether a policy instance is an undefined policy
+		/// </summary>
+		/// <returns>
+		/// <c>true</c> if the policy is undefined; otherwise, <c>false</c>.
+		/// </returns>
+		/// <param name='policy'>
+		/// Policy to check
+		/// </param>
+		/// <typeparam name='T'>
+		/// Type of the policy to check
+		/// </typeparam>
 		public static bool IsUndefinedPolicy<T> (T policy)
 		{
 			return policy == null;
 		}
 		
+		/// <summary>
+		/// Gets a undefined policy value
+		/// </summary>
+		/// <returns>
+		/// The undefined policy.
+		/// </returns>
+		/// <typeparam name='T'>
+		/// Type of the policy
+		/// </typeparam>
 		public static T GetUndefinedPolicy<T> () where T : class, IEquatable<T>, new ()
 		{
 			return null;
 		}
 		
-		public static void SaveDefaultPolicies ()
+		/// <summary>
+		/// Gets the policy sets defined by the user
+		/// </summary>
+		/// <returns>
+		/// The user policy sets.
+		/// </returns>
+		public static IEnumerable<PolicySet> GetUserPolicySets ()
 		{
-			ParanoidSave (DefaultPoliciesPath, "default policies", delegate (StreamWriter writer) {
-				defaultPolicies.SaveToFile (writer);
-			});
-		}	
+			return userSets;
+		}
 		
-		static void LoadDefaultPolicies ()
+		/// <summary>
+		/// Adds a new user defined policy set
+		/// </summary>
+		/// <param name='pset'>
+		/// The policy set
+		/// </param>
+		public static void AddUserPolicySet (PolicySet pset)
+		{
+			userSets.Add (pset);
+			sets.Add (pset);
+		}
+		
+		/// <summary>
+		/// Removes a user defined policy set
+		/// </summary>
+		/// <param name='pset'>
+		/// The policy set
+		/// </param>
+		public static void RemoveUserPolicySet (PolicySet pset)
+		{
+			if (userSets.Remove (pset)) {
+				deletedUserSets.Add (GetPolicyFile (pset));
+				sets.Remove (pset);
+			}
+			else
+				throw new InvalidOperationException ("The provided property set is not a user defined property set");
+		}
+		
+		/// <summary>
+		/// Get all defined policy sets
+		/// </summary>
+		/// <returns>
+		/// The policy sets.
+		/// </returns>
+		public static IEnumerable<PolicySet> GetPolicySets ()
+		{
+			return sets;
+		}
+		
+		
+		/// <summary>
+		/// Saves the policies.
+		/// </summary>
+		public static void SavePolicies ()
+		{
+			foreach (var file in deletedUserSets) {
+				if (File.Exists (file))
+					File.Delete (file);
+			}
+			deletedUserSets.Clear ();
+			SavePolicy (defaultPolicies);
+			foreach (PolicySet ps in userSets)
+				SavePolicy (ps);
+		}
+		
+		static void SavePolicy (PolicySet set)
+		{
+			string file = GetPolicyFile (set);
+			string friendlyName = string.Format ("policy '{0}'", set.Name);
+			ParanoidSave (file, friendlyName, delegate (StreamWriter writer) {
+				var xws = new XmlWriterSettings () {
+					Indent = true,
+				};
+				using (var xw = XmlTextWriter.Create (writer, xws)) {
+					xw.WriteStartElement ("Policies");
+					set.SaveToXml (xw);
+					xw.WriteEndElement ();
+				}
+			});
+		}
+		
+		static string GetPolicyFile (PolicySet set)
+		{
+			return PoliciesFolder.Combine ((set.Name ?? set.Id) + ".mdpolicy.xml");
+		}
+		
+		static void LoadPolicies ()
 		{
 			if (defaultPolicies != null)
 				defaultPolicies.PolicyChanged -= DefaultPoliciesPolicyChanged;
-			defaultPolicies = new PolicySet (null, null);
-			ParanoidLoad (DefaultPoliciesPath, "default policies", delegate (StreamReader reader) {
-				defaultPolicies.LoadFromFile (reader);
-			});
+			
+			userSets.Clear ();
+			defaultPolicies = null;
+			
+			if (Directory.Exists (PoliciesFolder)) {
+				foreach (var file in Directory.GetFiles (PoliciesFolder, "*.mdpolicy.xml")) {
+					LoadPolicy (file);
+				}
+			}
+			
+			if (defaultPolicies == null) {
+				defaultPolicies = new PolicySet ("Default", "Default");
+			}
 			defaultPolicies.PolicyChanged += DefaultPoliciesPolicyChanged;
+		}
+		
+		static void LoadPolicy (FilePath file)
+		{
+			string friendlyName = string.Format ("policy file '{0}'", file.FileName);
+			ParanoidLoad (file, friendlyName, delegate (StreamReader reader) {
+				var xr = XmlReader.Create (reader);
+				xr.MoveToContent ();
+				if (xr.LocalName == "PolicySet") {
+					defaultPolicies = new PolicySet ("Default", null);
+					defaultPolicies.LoadFromXml (xr);
+				} else if (xr.LocalName == "Policies" && !xr.IsEmptyElement) {
+					xr.ReadStartElement ();
+					xr.MoveToContent ();
+					while (xr.NodeType != XmlNodeType.EndElement) {
+						PolicySet pset = new PolicySet ();
+						pset.LoadFromXml (xr);
+						if (pset.Id == "Default")
+							defaultPolicies = pset;
+						else {
+							userSets.Add (pset);
+							sets.Add (pset);
+						}
+						xr.MoveToContent ();
+					}
+				}
+			});
 		}
 
 		static void DefaultPoliciesPolicyChanged (object sender, PolicyChangedEventArgs e)

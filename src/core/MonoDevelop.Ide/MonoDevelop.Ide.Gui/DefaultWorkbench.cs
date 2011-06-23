@@ -57,7 +57,7 @@ namespace MonoDevelop.Ide.Gui
 		readonly static string toolbarsPath    = "/MonoDevelop/Ide/Toolbar";
 		readonly static string stockLayoutsPath    = "/MonoDevelop/Ide/WorkbenchLayouts";
 		
-		static string configFile = System.IO.Path.Combine (PropertyService.ConfigPath, "EditingLayout2.xml");
+		static string configFile = PropertyService.Locations.Config.Combine ("EditingLayout.xml");
 		const string fullViewModeTag = "[FullViewMode]";
 		const int MAX_LASTACTIVEWINDOWS = 10;
 		
@@ -458,14 +458,15 @@ namespace MonoDevelop.Ide.Gui
 			}
 			DockItem item = GetDockItem (codon);
 			padContentCollection.Remove (codon);
-			PadWindow win = (PadWindow) padWindows [codon];
-			win.NotifyDestroyed ();
+			PadWindow win = (PadWindow) GetPadWindow (codon);
+			if (win != null) {
+				win.NotifyDestroyed ();
+				Counters.PadsLoaded--;
+				padCodons.Remove (win);
+			}
 			if (item != null)
 				dock.RemoveItem (item);
 			padWindows.Remove (codon);
-			padCodons.Remove (win);
-			
-			Counters.PadsLoaded--;
 		}
 		
 		public void BringToFront (PadCodon content)
@@ -518,10 +519,10 @@ namespace MonoDevelop.Ide.Gui
 			}
 		}
 		
-		public Properties GetStoredMemento(IViewContent content)
+		public Properties GetStoredMemento (IViewContent content)
 		{
 			if (content != null && content.ContentName != null) {
-				string directory = System.IO.Path.Combine (PropertyService.ConfigPath, "temp");
+				string directory = PropertyService.Locations.Cache.Combine ("temp");
 				if (!Directory.Exists(directory)) {
 					Directory.CreateDirectory(directory);
 				}
@@ -541,7 +542,9 @@ namespace MonoDevelop.Ide.Gui
 				int x, y, width, height;
 				GetPosition (out x, out y);
 				GetSize (out width, out height);
-				if (GdkWindow.State == 0) {
+				// HACK: always capture bounds on OS X because we don't restore Gdk.WindowState.Maximized due to
+				// the bug mentioned below. So we simular Maximized by capturing the Maximized size.
+				if (GdkWindow.State == 0 || PropertyService.IsMac) {
 					memento.Bounds = new Rectangle (x, y, width, height);
 				} else {
 					memento.Bounds = normalBounds;
@@ -558,7 +561,12 @@ namespace MonoDevelop.Ide.Gui
 					normalBounds = memento.Bounds;
 					Move (normalBounds.X, normalBounds.Y);
 					Resize (normalBounds.Width, normalBounds.Height);
-					if (memento.WindowState == Gdk.WindowState.Maximized) {
+					
+					// HACK: don't restore Gdk.WindowState.Maximized on OS X, because there's a bug in 
+					// GdkWindow.State that means it doesn't reflect the real state, it only reflects values set
+					// internally by GTK e.g. by Maximize calls. Because MD restores state, if it ever becomes 
+					// Maximized it becomes "stuck" and it's difficult for the user to make it "normal".
+					if (memento.WindowState == Gdk.WindowState.Maximized && !PropertyService.IsMac) {
 						Maximize ();
 					} else if (memento.WindowState == Gdk.WindowState.Iconified) {
 						Iconify ();
@@ -571,41 +579,45 @@ namespace MonoDevelop.Ide.Gui
 			}
 		}
 		
-		void CheckRemovedFile(object sender, FileEventArgs e)
+		void CheckRemovedFile(object sender, FileEventArgs args)
 		{
-			if (e.IsDirectory) {
-				IViewContent[] views = new IViewContent [viewContentCollection.Count];
-				viewContentCollection.CopyTo (views, 0);
-				foreach (IViewContent content in views) {
-					if (content.ContentName.StartsWith(e.FileName)) {
-						content.WorkbenchWindow.CloseWindow(true, true, 0);
+			foreach (FileEventInfo e in args) {
+				if (e.IsDirectory) {
+					IViewContent[] views = new IViewContent [viewContentCollection.Count];
+					viewContentCollection.CopyTo (views, 0);
+					foreach (IViewContent content in views) {
+						if (content.ContentName.StartsWith(e.FileName)) {
+							content.WorkbenchWindow.CloseWindow(true, true, 0);
+						}
 					}
-				}
-			} else {
-				foreach (IViewContent content in viewContentCollection) {
-					if (content.ContentName != null &&
-					    content.ContentName == e.FileName) {
-						content.WorkbenchWindow.CloseWindow(true, true, 0);
-						return;
+				} else {
+					foreach (IViewContent content in viewContentCollection) {
+						if (content.ContentName != null &&
+						    content.ContentName == e.FileName) {
+							content.WorkbenchWindow.CloseWindow(true, true, 0);
+							return;
+						}
 					}
 				}
 			}
 		}
 		
-		void CheckRenamedFile(object sender, FileCopyEventArgs e)
+		void CheckRenamedFile(object sender, FileCopyEventArgs args)
 		{
-			if (e.IsDirectory) {
-				foreach (IViewContent content in viewContentCollection) {
-					if (content.ContentName != null && content.ContentName.StartsWith(e.SourceFile)) {
-						content.ContentName = e.TargetFile + content.ContentName.Substring(e.SourceFile.Length);
+			foreach (FileCopyEventInfo e in args) {
+				if (e.IsDirectory) {
+					foreach (IViewContent content in viewContentCollection) {
+						if (content.ContentName != null && ((FilePath)content.ContentName).IsChildPathOf (e.SourceFile)) {
+							content.ContentName = e.TargetFile + content.ContentName.Substring(e.SourceFile.FileName.Length);
+						}
 					}
-				}
-			} else {
-				foreach (IViewContent content in viewContentCollection) {
-					if (content.ContentName != null &&
-					    content.ContentName == e.SourceFile) {
-						content.ContentName = e.TargetFile;
-						return;
+				} else {
+					foreach (IViewContent content in viewContentCollection) {
+						if (content.ContentName != null &&
+						    content.ContentName == e.SourceFile) {
+							content.ContentName = e.TargetFile;
+							return;
+						}
 					}
 				}
 			}
@@ -986,7 +998,7 @@ namespace MonoDevelop.Ide.Gui
 				? KeyBindingManager.SelectionModifierControl
 				: KeyBindingManager.SelectionModifierAlt;
 			
-			if ((evnt.State & winSwitchModifier) != 0) {		
+			if ((evnt.State & winSwitchModifier) != 0 && (evnt.State & (Gdk.ModifierType.ControlMask | Gdk.ModifierType.Mod1Mask)) != (Gdk.ModifierType.ControlMask | Gdk.ModifierType.Mod1Mask)) {
 				switch (evnt.Key) {
 				case Gdk.Key.KP_1:
 				case Gdk.Key.Key_1:

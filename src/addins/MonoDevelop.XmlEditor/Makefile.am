@@ -53,9 +53,11 @@ FILES =  \
 	MonoDevelop.XmlEditor.Completion/ILazilyLoadedProvider.cs \
 	MonoDevelop.XmlEditor.Completion/InferredXmlCompletionProvider.cs \
 	MonoDevelop.XmlEditor.Completion/IXmlCompletionProvider.cs \
+	MonoDevelop.XmlEditor.Completion/LocalOnlyXmlResolver.cs \
 	MonoDevelop.XmlEditor.Completion/XmlCompletionData.cs \
-	MonoDevelop.XmlEditor.Completion/XmlCompletionDataCollection.cs \
+	MonoDevelop.XmlEditor.Completion/XmlCompletionDataList.cs \
 	MonoDevelop.XmlEditor.Completion/XmlMultipleClosingTagCompletionData.cs \
+	MonoDevelop.XmlEditor.Completion/XmlNamespacePrefixMap.cs \
 	MonoDevelop.XmlEditor.Completion/XmlSchemaCompletionData.cs \
 	MonoDevelop.XmlEditor.Completion/XmlSchemaCompletionDataCollection.cs \
 	MonoDevelop.XmlEditor.Completion/XmlTagCompletionData.cs \
@@ -72,13 +74,13 @@ FILES =  \
 	MonoDevelop.XmlEditor/XmlEditorOptions.cs \
 	MonoDevelop.XmlEditor/XmlEditorService.cs \
 	MonoDevelop.XmlEditor/XmlElementPath.cs \
-	MonoDevelop.XmlEditor/XmlFileExtensionNode.cs \
-	MonoDevelop.XmlEditor/XmlFileExtensions.cs \
-	MonoDevelop.XmlEditor/XmlFormatter.cs \
+	MonoDevelop.XmlEditor/XmlFileAssociation.cs \
+	MonoDevelop.XmlEditor/XmlFileAssociationManager.cs \
+	MonoDevelop.XmlEditor/XmlFileAssociationNode.cs \
 	MonoDevelop.XmlEditor/XmlNamespace.cs \
 	MonoDevelop.XmlEditor/XmlParser.cs \
-	MonoDevelop.XmlEditor/XmlSchemaAssociation.cs \
 	MonoDevelop.XmlEditor/XmlSchemaManager.cs \
+	MonoDevelop.XmlEditor/XmlSchemaNode.cs \
 	MonoDevelop.XmlEditor/XmlTextEditorExtension.cs
 
 DATA_FILES =  \
@@ -95,8 +97,7 @@ RES =  \
 	gtk-gui/gui.stetic \
 	gtk-gui/objects.xml \
 	MonoDevelop.Xml.Formatting/MonoXmlPolicy.xml \
-	MonoDevelop.XmlEditor.addin.xml \
-	XmlEditor.glade
+	MonoDevelop.XmlEditor.addin.xml
 
 
 DATA_FILE_BUILD = $(addprefix $(ADDIN_BUILD)/schemas/, $(notdir $(DATA_FILES)))

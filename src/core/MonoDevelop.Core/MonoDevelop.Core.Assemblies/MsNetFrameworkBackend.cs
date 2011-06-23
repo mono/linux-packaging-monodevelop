@@ -33,9 +33,19 @@ namespace MonoDevelop.Core.Assemblies
 {
 	public class MsNetFrameworkBackend: TargetFrameworkBackend<MsNetTargetRuntime>
 	{
+		public override bool IsInstalled {
+			get {
+				//TODO: it should be possible to support any framework by reading the MS framework definition files
+				return base.IsInstalled;
+			}
+		}
+		
 		public override IEnumerable<string> GetFrameworkFolders ()
 		{
-			switch (framework.Id) {
+			if (framework.Id.Identifier != TargetFrameworkMoniker.ID_NET_FRAMEWORK)
+				yield break;
+			
+			switch (framework.Id.Version) {
 			case "1.1":
 			case "2.0":
 			case "4.0":
@@ -43,7 +53,7 @@ namespace MonoDevelop.Core.Assemblies
 				break;
 			case "3.0":
 			case "3.5":
-				RegistryKey fxFolderKey = Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Microsoft\.NETFramework\AssemblyFolders\v" + framework.Id, false);
+				RegistryKey fxFolderKey = Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Microsoft\.NETFramework\AssemblyFolders\v" + framework.Id.Version, false);
 				if (fxFolderKey != null) {
 					string folder = fxFolderKey.GetValue ("All Assemblies In") as string;
 					fxFolderKey.Close ();
@@ -69,28 +79,35 @@ namespace MonoDevelop.Core.Assemblies
 
 			string sdkPath = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.ProgramFiles), "Microsoft SDKs");
 			sdkPath = Path.Combine (sdkPath, "Windows");
-			if (framework.Id == "4.0")
+			if (framework.Id.Version == "4.0")
 				yield return Path.Combine (sdkPath, "v7.0A\\bin\\NETFX 4.0 Tools");
-			else if (framework.Id == "3.5") {
+			else if (framework.Id.Version == "3.5") {
 				yield return Path.Combine (sdkPath, "v7.0A\\bin");
 				yield return targetRuntime.RootDirectory.Combine (GetClrVersion (ClrVersion.Net_2_0));
 			} else
 				yield return Path.Combine (sdkPath, "v6.0A\\bin");
 
-			foreach (string s in base.GetToolsPaths ())
+			foreach (string s in BaseGetToolsPaths ())
 				yield return s;
 			yield return PropertyService.EntryAssemblyPath;
 		}
-		
+
+		//base isn't verifiably accessible from the enumerator so use this private helper
+		IEnumerable<string> BaseGetToolsPaths ()
+		{
+			return base.GetToolsPaths ();
+		}
+
 		string GetFrameworkToolsPath ()
 		{
-			if (framework.Id == "1.1" || framework.Id == "2.0" || framework.Id == "4.0")
+			var version = framework.Id.Version;
+			if (version == "1.1" || version == "2.0" || version == "4.0")
 				return targetRuntime.RootDirectory.Combine (GetClrVersion (framework.ClrVersion));
 
-			if (framework.Id == "3.0")
+			if (version == "3.0")
 				return targetRuntime.RootDirectory.Combine (GetClrVersion (ClrVersion.Net_2_0));
  
-			return targetRuntime.RootDirectory.Combine ("v" + framework.Id);
+			return targetRuntime.RootDirectory.Combine ("v" + version);
 		}
 		
 		internal static string GetClrVersion (ClrVersion v)

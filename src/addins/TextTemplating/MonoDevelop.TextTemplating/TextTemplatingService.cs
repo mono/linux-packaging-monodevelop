@@ -37,10 +37,8 @@ using MonoDevelop.Core;
 
 namespace MonoDevelop.TextTemplating
 {
-	
-	
 	public static class TextTemplatingService
-	{	
+	{
 		public static void ShowTemplateHostErrors (CompilerErrorCollection errors)
 		{
 			if (errors.Count == 0)
@@ -59,11 +57,17 @@ namespace MonoDevelop.TextTemplating
 		public static RecyclableAppDomain.Handle GetTemplatingDomain ()
 		{
 			if (domain == null || domain.Used) {
-				var dir = Path.GetDirectoryName (typeof (TemplatingEngine).Assembly.Location);
 				var info = new AppDomainSetup () {
-					ApplicationBase = dir,
+					ApplicationBase = System.IO.Path.GetDirectoryName (typeof (RecyclableAppDomain).Assembly.Location),
+					DisallowBindingRedirects = false,
+					DisallowCodeDownload = true,
+					ConfigurationFile = AppDomain.CurrentDomain.SetupInformation.ConfigurationFile,
 				};
 				domain = new RecyclableAppDomain ("T4Domain", info);
+				var handle = domain.GetHandle ();
+				handle.AddAssembly (typeof (TemplatingEngine).Assembly);
+				handle.AddAssembly (typeof (TextTemplatingService).Assembly);
+				return handle;
 			}
 			return domain.GetHandle ();
 		}
@@ -72,20 +76,17 @@ namespace MonoDevelop.TextTemplating
 	public class RecyclableAppDomain
 	{
 		const int DOMAIN_TIMEOUT = 2 * 60 * 1000;
-		const int DOMAIN_RECYCLE_AFTER = 10;
+		const int DOMAIN_RECYCLE_AFTER = 25;
 		
 		int handleCount = 0;
 		int uses = 0;
 		AppDomain domain;
+		CrossDomainAssemblyMap assemblyMap = new CrossDomainAssemblyMap ();
 		
 		public RecyclableAppDomain (string name, AppDomainSetup info)
 		{
 			domain = AppDomain.CreateDomain (name, null, info);
-			
-			//FIXME: do we really want to allow resolving arbitrary MD assemblies?
-			// some things do depend on this behaviour, but maybe some kind of explicit registration system 
-			// would be better, so we can prevent accidentally pulling in unwanted assemblies
-			domain.AssemblyResolve += new Mono.TextTemplating.CrossAppDomainAssemblyResolver ().Resolve;
+			domain.AssemblyResolve += new DomainAssemblyLoader (assemblyMap).Resolve;
 		}
 		
 		public bool Used { get; private set; }
@@ -135,6 +136,48 @@ namespace MonoDevelop.TextTemplating
 						parent.Kill ();
 					parent = null;
 				}
+			}
+			
+			public void AddAssembly (System.Reflection.Assembly assembly)
+			{
+				parent.assemblyMap.Add (assembly.FullName, assembly.Location);
+			}
+		}
+		
+		[Serializable]
+		class DomainAssemblyLoader
+		{
+			CrossDomainAssemblyMap map;
+			
+			public DomainAssemblyLoader (CrossDomainAssemblyMap map)
+			{
+				this.map = map;
+			}
+			
+			public System.Reflection.Assembly Resolve (object sender, ResolveEventArgs args)
+			{
+				var assemblyFile = map.ResolveAssembly (args.Name);
+				if (assemblyFile != null)
+					return System.Reflection.Assembly.LoadFrom (assemblyFile);
+				return null;
+			}
+		}
+		
+		class CrossDomainAssemblyMap : MarshalByRefObject
+		{
+			Dictionary<string, string> maps = new Dictionary<string, string> ();
+			
+			public string ResolveAssembly (string name)
+			{
+				string result;
+				if (maps.TryGetValue (name, out result))
+					return result;
+				return null;
+			}
+				
+			public void Add (string name, string location)
+			{
+				maps.Add (name, location);
 			}
 		}
 	}

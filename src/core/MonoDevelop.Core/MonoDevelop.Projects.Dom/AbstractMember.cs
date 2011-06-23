@@ -45,6 +45,16 @@ namespace MonoDevelop.Projects.Dom
 			get;
 		}
 		
+		public virtual ProjectDom SourceProjectDom {
+			get {
+				return DeclaringType.SourceProjectDom;
+			}
+			set {
+				// nothing
+			}
+		}
+		
+		
 		public IType DeclaringType {
 			get {
 				return declaringType;
@@ -143,6 +153,20 @@ namespace MonoDevelop.Projects.Dom
 		public virtual ReadOnlyCollection<IParameter> Parameters {
 			get {
 				throw new InvalidOperationException ();
+			}
+		}
+		
+		public virtual void Add (IParameter parameter)
+		{
+			throw new InvalidOperationException ();
+		}
+		
+		public void Add (IEnumerable<IParameter> parameters)
+		{
+			if (parameters == null)
+				return;
+			foreach (IParameter parameter in parameters) {
+				Add (parameter);
 			}
 		}
 		

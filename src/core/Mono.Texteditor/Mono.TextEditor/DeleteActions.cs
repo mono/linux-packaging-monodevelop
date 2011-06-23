@@ -107,12 +107,13 @@ namespace Mono.TextEditor
 				return;
 			LineSegment line = data.Document.GetLine (data.Caret.Line);
 			data.EnsureCaretIsNotVirtual ();
-			if (data.Caret.Column == line.EditableLength) {
+			int physColumn = data.Caret.Column - 1;
+			if (physColumn == line.EditableLength) {
 				// Nothing after the cursor, delete the end-of-line sequence
-				data.Remove (line.Offset + data.Caret.Column, line.Length - data.Caret.Column);
+				data.Remove (line.Offset + physColumn, line.Length - physColumn);
 			} else {
 				// Delete from cursor position to the end of the line
-				data.Remove (line.Offset + data.Caret.Column, line.EditableLength - data.Caret.Column);
+				data.Remove (line.Offset + physColumn, line.EditableLength - physColumn);
 			}
 			data.Document.CommitLineUpdate (data.Caret.Line);
 		}
@@ -127,30 +128,39 @@ namespace Mono.TextEditor
 			if (!data.CanEditSelection)
 				return;
 			if (data.IsSomethingSelected) {
-				if (!data.MainSelection.IsDirty) {
-					data.DeleteSelectedText (data.MainSelection.SelectionMode != SelectionMode.Block);
-				} else {
+				// case: zero width block selection
+				if (data.MainSelection.SelectionMode == SelectionMode.Block && data.MainSelection.Anchor.Column == data.MainSelection.Lead.Column) {
+					var col = data.MainSelection.Lead.Column;
+					if (col <= DocumentLocation.MinColumn) {
+						data.ClearSelection ();
+						return;
+					}
 					bool preserve = data.Caret.PreserveSelection;
 					data.Caret.PreserveSelection = true;
+					col--;
 					for (int lineNumber = data.MainSelection.MinLine; lineNumber <= data.MainSelection.MaxLine; lineNumber++) {
-						data.Remove (data.Document.GetLine (lineNumber).Offset + data.Caret.Column - 1, 1);
+						data.Remove (data.Document.GetLine (lineNumber).Offset + col - 1, 1);
 					}
 					data.Caret.Column--;
-					data.MainSelection.Lead = new DocumentLocation (data.MainSelection.Lead.Line, data.Caret.Column);
-					data.MainSelection.IsDirty = true;
+					data.MainSelection.Lead = new DocumentLocation (data.MainSelection.Lead.Line, col);
+					data.MainSelection.Anchor = new DocumentLocation (data.MainSelection.Anchor.Line, col);
 					data.Caret.PreserveSelection = preserve;
 					data.Document.CommitMultipleLineUpdate (data.MainSelection.MinLine, data.MainSelection.MaxLine);
+					return;
 				}
+			
+				data.DeleteSelectedText (data.MainSelection.SelectionMode != SelectionMode.Block);
+				
 				return;
 			}
 			if (data.Caret.Offset == 0)
 				return;
 			LineSegment line = data.Document.GetLine (data.Caret.Line);
-			if (data.Caret.Column > line.EditableLength) {
-				data.Caret.Column = line.EditableLength;
+			if (data.Caret.Column > line.EditableLength + 1) {
+				data.Caret.Column = line.EditableLength + 1;
 			} else if (data.Caret.Offset == line.Offset) {
 				LineSegment lineAbove = data.Document.GetLine (data.Caret.Line - 1);
-				data.Caret.Location = new DocumentLocation (data.Caret.Line - 1, lineAbove.EditableLength);
+				data.Caret.Location = new DocumentLocation (data.Caret.Line - 1, lineAbove.EditableLength + 1);
 				data.Remove (lineAbove.EndOffset - lineAbove.DelimiterLength, lineAbove.DelimiterLength);
 			} else {
 				removeCharBeforeCaret (data);
@@ -171,13 +181,32 @@ namespace Mono.TextEditor
 			if (!data.CanEditSelection)
 				return;
 			if (data.IsSomethingSelected) {
-				data.DeleteSelectedText ();
+				// case: zero width block selection
+				if (data.MainSelection.SelectionMode == SelectionMode.Block && data.MainSelection.Anchor.Column == data.MainSelection.Lead.Column) {
+					var col = data.MainSelection.Lead.Column;
+					if (col <= DocumentLocation.MinColumn) {
+						data.ClearSelection ();
+						return;
+					}
+					bool preserve = data.Caret.PreserveSelection;
+					data.Caret.PreserveSelection = true;
+					col--;
+					for (int lineNumber = data.MainSelection.MinLine; lineNumber <= data.MainSelection.MaxLine; lineNumber++) {
+						LineSegment lineSegment = data.Document.GetLine (lineNumber);
+						if (col < lineSegment.EditableLength)
+							data.Remove (lineSegment.Offset + col, 1);
+					}
+					data.Caret.PreserveSelection = preserve;
+					data.Document.CommitMultipleLineUpdate (data.MainSelection.MinLine, data.MainSelection.MaxLine);
+					return;
+				}
+				data.DeleteSelectedText (data.MainSelection.SelectionMode != SelectionMode.Block);
 				return;
 			}
 			if (data.Caret.Offset >= data.Document.Length)
 				return;
 			LineSegment line = data.Document.GetLine (data.Caret.Line);
-			if (data.Caret.Column == line.EditableLength) {
+			if (data.Caret.Column == line.EditableLength + 1) {
 				if (data.Caret.Line < data.Document.LineCount) { 
 					data.Remove (line.EndOffset - line.DelimiterLength, line.DelimiterLength);
 					if (line.EndOffset == data.Document.Length)

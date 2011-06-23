@@ -41,8 +41,11 @@ namespace MonoDevelop.Moonlight
 		
 		protected override void Initialize (TargetRuntime runtime, TargetFramework framework)
 		{
+			if (framework.Id.Identifier != "Silverlight")
+				throw new InvalidOperationException (string.Format ("Cannot handle unknown framework {0}", framework.Id));
+			
 			base.Initialize (runtime, framework);
-			fxVersion = GetFxVersion (framework);
+			fxVersion = framework.Id.Version;
 			
 			foreach (var dir in GetMoonDirectories ()) {
 				var fxdir = dir.Combine (fxVersion);
@@ -52,18 +55,6 @@ namespace MonoDevelop.Moonlight
 						this.location = dir;
 					break;
 				}
-			}
-		}
-		
-		internal static string GetFxVersion (TargetFramework fx)
-		{
-			switch (fx.Id) {
-			case "SL2.0":
-				return "2.0";
-			case "SL3.0":
-				return "3.0";
-			default:
-				throw new InvalidOperationException ("Cannot handle unknown target framework '" + fx.Id +"'");
 			}
 		}
 		
@@ -112,7 +103,7 @@ namespace MonoDevelop.Moonlight
 			string path;
 			if (targetRuntime.EnvironmentVariables.TryGetValue ("MOONLIGHT_SDK_PATH", out path))
 				yield return (FilePath) path;
-			yield return ((FilePath)base.targetRuntime.Prefix).Combine ("lib", "moonlight");
+			yield return ((FilePath)targetRuntime.Prefix).Combine ("lib", "moonlight");
 			var env = System.Environment.GetEnvironmentVariable ("MOONLIGHT_SDK_PATH");
 			if (!string.IsNullOrEmpty (env))
 				yield return (FilePath) env;
@@ -124,10 +115,17 @@ namespace MonoDevelop.Moonlight
 		
 		public override IEnumerable<string> GetToolsPaths ()
 		{
-			foreach (var f in GetFrameworkFolders ())
+			yield return location;
+			yield return location.Combine (fxVersion);
+			foreach (var f in BaseGetToolsPaths ())
 				yield return f;
-			foreach (var f in base.GetToolsPaths ())
-				yield return f;
+		}
+		
+		//WORKAROUND for gmcs code generation bug - base not properly accessible from generators.
+		//Should be fixed in Mono 2.8 final. 
+		IEnumerable<string> BaseGetToolsPaths ()
+		{
+			return base.GetToolsPaths ();
 		}
 		
 		Dictionary<string, string> envVars;

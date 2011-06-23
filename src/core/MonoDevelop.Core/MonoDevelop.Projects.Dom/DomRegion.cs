@@ -33,36 +33,40 @@ namespace MonoDevelop.Projects.Dom
 	[Serializable]
 	public struct DomRegion : IComparable, IComparable<DomRegion>
 	{
-		public readonly static DomRegion Empty = new DomRegion (-1, -1, -1, -1);
+		public readonly static DomRegion Empty = new DomRegion (0, 0, 0, 0);
+		DomLocation start, end;
 		
 		public bool IsEmpty {
 			get {
-				return Start.Line < 0;
+				return Start.Line < 1;
 			}
 		}
 
 		public DomLocation Start {
-			get;
-			set;
+			get { return start; }
+			set { start = value; }
 		}
 
 		public DomLocation End {
-			get;
-			set;
+			get { return end; }
+			set { end = value; }
 		}
 		
-		public DomRegion (int startLine, int endLine) : this (startLine, -1, endLine, -1)
+		public DomRegion (int startLine, int endLine) : this (startLine, 1, endLine, 1)
 		{
 		}
 		
-		public DomRegion (int startLine, int startColumn, int endLine, int endColumn) : this ()
+		// the call to the empty construtor is required for the windows build
+		public DomRegion (int startLine, int startColumn, int endLine, int endColumn) : this()
 		{
-			this.Start = new DomLocation (startLine, startColumn);
-			this.End   = new DomLocation (endLine, endColumn);
+			this.start = new DomLocation (startLine, startColumn);
+			this.end   = new DomLocation (endLine, endColumn);
 		}
 		
-		public DomRegion (DomLocation start, DomLocation end) : this (start.Line, start.Column, end.Line, end.Column)
+		public DomRegion (DomLocation start, DomLocation end) : this()
 		{
+			this.start = start;
+			this.end   = end;
 		}
 		
 		public static DomRegion FromInvariantString (string invariantString)

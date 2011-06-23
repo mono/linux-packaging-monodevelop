@@ -7,6 +7,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using Mono.Addins;
 using MonoDevelop.Ide;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.VersionControl.Dialogs
 {
@@ -48,16 +49,26 @@ namespace MonoDevelop.VersionControl.Dialogs
 			colCommit.Visible = false;
 			
 			object[] exts = AddinManager.GetExtensionObjects ("/MonoDevelop/VersionControl/CommitDialogExtensions", false);
+			bool separatorRequired = false;
+			
 			foreach (object ob in exts) {
 				CommitDialogExtension ext = ob as CommitDialogExtension;
 				if (ext == null) {
 					MessageService.ShowError ("Commit extension type " + ob.GetType() + " must be a subclass of CommitDialogExtension");
 					continue;
 				}
-				vboxExtensions.PackEnd (ext, false, false, 0);
-				ext.Initialize (changeSet);
-				extensions.Add (ext);
-				ext.AllowCommitChanged += HandleAllowCommitChanged;
+				if (ext.Initialize (changeSet)) {
+					if (separatorRequired) {
+						HSeparator sep = new HSeparator ();
+						sep.Show ();
+						vboxExtensions.PackEnd (sep, false, false, 0);
+					}
+					vboxExtensions.PackEnd (ext, false, false, 0);
+					extensions.Add (ext);
+					ext.AllowCommitChanged += HandleAllowCommitChanged;
+					separatorRequired = true;
+				} else
+					ext.Destroy ();
 			}
 			HandleAllowCommitChanged (null, null);
 
@@ -75,7 +86,7 @@ namespace MonoDevelop.VersionControl.Dialogs
 				selected.Add (info.LocalPath);
 			}
 			
-			if (changeSet.GlobalComment.Length == 0) {
+			if (string.IsNullOrEmpty (changeSet.GlobalComment)) {
 				AuthorInformation aInfo;
 				CommitMessageFormat fmt = VersionControlService.GetCommitMessageFormat (changeSet, out aInfo);
 				Message = changeSet.GenerateGlobalComment (fmt, aInfo);
@@ -84,6 +95,12 @@ namespace MonoDevelop.VersionControl.Dialogs
 				Message = changeSet.GlobalComment;
 				
 			textview.Buffer.Changed += OnTextChanged;
+			
+			// Focus the text view and move the insert point to the begining. Makes it easier to insert
+			// a comment header.
+			textview.Buffer.MoveMark (textview.Buffer.InsertMark, textview.Buffer.StartIter);
+			textview.Buffer.MoveMark (textview.Buffer.SelectionBound, textview.Buffer.StartIter);
+			textview.GrabFocus ();
 		}
 
 		void HandleAllowCommitChanged (object sender, EventArgs e)
@@ -96,47 +113,50 @@ namespace MonoDevelop.VersionControl.Dialogs
 		
 		protected override void OnResponse (Gtk.ResponseType type)
 		{
-			if (type == Gtk.ResponseType.Ok) {
-			
-				// Update the change set
-				ArrayList todel = new ArrayList ();
-				foreach (ChangeSetItem it in changeSet.Items) {
-					if (!selected.Contains (it.LocalPath))
-						todel.Add (it.LocalPath);
-				}
-				foreach (string file in todel)
-					changeSet.RemoveFile (file);
-				changeSet.GlobalComment = Message;
-				
-				// Perform the commit
-				
-				int n;
-				for (n=0; n<extensions.Count; n++) {
-					CommitDialogExtension ext = (CommitDialogExtension) extensions [n];
-					bool res;
-					try {
-						res = ext.OnBeginCommit (changeSet);
-					} catch (Exception ex) {
-						MessageService.ShowException (ex);
-						res = false;
-					}
-					
-					if (!res) {
-						// Commit failed. Rollback the previous extensions
-						for (int m=0; m<n; m++) {
-							ext = (CommitDialogExtension) extensions [m];
-							try {
-								ext.OnEndCommit (changeSet, false);
-							} catch {}
-						}
-						return;
-					}
-					Hide ();
-				}
-			} else {
+			if (type != Gtk.ResponseType.Ok) {
 				changeSet.GlobalComment = oldMessage;
 			}
 			base.OnResponse (type);
+		}
+
+		protected void OnButtonCommitClicked (object sender, System.EventArgs e)
+		{
+			// Update the change set
+			ArrayList todel = new ArrayList ();
+			foreach (ChangeSetItem it in changeSet.Items) {
+				if (!selected.Contains (it.LocalPath))
+					todel.Add (it.LocalPath);
+			}
+			foreach (string file in todel)
+				changeSet.RemoveFile (file);
+			changeSet.GlobalComment = Message;
+			
+			// Perform the commit
+			
+			int n;
+			for (n=0; n<extensions.Count; n++) {
+				CommitDialogExtension ext = (CommitDialogExtension) extensions [n];
+				bool res;
+				try {
+					res = ext.OnBeginCommit (changeSet);
+				} catch (Exception ex) {
+					MessageService.ShowException (ex);
+					res = false;
+				}
+				System.Console.WriteLine ("RES: " + res);
+				if (!res) {
+					// Commit failed. Rollback the previous extensions
+					for (int m=0; m<n; m++) {
+						ext = (CommitDialogExtension) extensions [m];
+						try {
+							ext.OnEndCommit (changeSet, false);
+						} catch {}
+					}
+					return;
+				}
+				Hide ();
+			}
+			Respond (Gtk.ResponseType.Ok);
 		}
 		
 		void OnTextChanged (object s, EventArgs args)

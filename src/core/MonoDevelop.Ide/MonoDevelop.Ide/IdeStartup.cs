@@ -41,6 +41,7 @@ using System.Linq;
 using Mono.Unix;
 
 using Mono.Addins;
+using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Ide.Gui;
@@ -99,6 +100,11 @@ namespace MonoDevelop.Ide
 			string socket_filename = null;
 			EndPoint ep = null;
 			
+			DispatchService.Initialize ();
+			
+			// Set a synchronization context for the main gtk thread
+			SynchronizationContext.SetSynchronizationContext (new GtkSynchronizationContext ());
+			
 			AddinManager.AddinLoadError += OnAddinError;
 			
 			var startupInfo = new StartupInfo (remainingArgs);
@@ -126,6 +132,7 @@ namespace MonoDevelop.Ide
 				options.NoLogo = true;
 			
 			IProgressMonitor monitor;
+			
 			if (options.NoLogo) {
 				monitor = new MonoDevelop.Core.ProgressMonitoring.ConsoleProgressMonitor ();
 			} else {
@@ -134,15 +141,13 @@ namespace MonoDevelop.Ide
 			}
 			
 			Counters.Initialization.Trace ("Initializing Runtime");
-			monitor.BeginTask (GettextCatalog.GetString ("Starting MonoDevelop"), 2);
+			monitor.BeginTask (GettextCatalog.GetString ("Starting MonoDevelop"), 3);
 			monitor.Step (1);
 			Runtime.Initialize (true);
 			
 			//make sure that the platform service is initialised so that the Mac platform can subscribe to open-document events
 			Counters.Initialization.Trace ("Initializing Platform Service");
 			DesktopService.Initialize ();
-			monitor.Step (1);
-			monitor.EndTask ();
 			
 			monitor.Step (1);
 
@@ -254,6 +259,9 @@ namespace MonoDevelop.Ide
 			Thread.CurrentThread.Name = "GUI Thread";
 			Counters.Initialization.Trace ("Running IdeApp");
 			Counters.Initialization.EndTiming ();
+				
+			AddinManager.AddExtensionNodeHandler("/MonoDevelop/Ide/InitCompleteHandlers", OnExtensionChanged);
+				
 			IdeApp.Run ();
 			
 			// unloading services
@@ -269,6 +277,20 @@ namespace MonoDevelop.Ide
 		
 		public bool Initialized {
 			get { return initialized; }
+		}
+		
+		static void OnExtensionChanged (object s, ExtensionNodeEventArgs args)
+		{
+			if (args.Change == ExtensionChange.Add) {
+				try {
+					if (typeof(CommandHandler).IsInstanceOfType (args.ExtensionObject))
+						typeof(CommandHandler).GetMethod ("Run", System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance, null, Type.EmptyTypes, null).Invoke (args.ExtensionObject, null);
+					else
+						LoggingService.LogError ("Type " + args.ExtensionObject.GetType () + " must be a subclass of MonoDevelop.Components.Commands.CommandHandler");
+				} catch (Exception ex) {
+					LoggingService.LogError (ex.ToString ());
+				}
+			}
 		}
 		
 		void OnAddinError (object s, AddinErrorEventArgs args)
@@ -320,7 +342,7 @@ namespace MonoDevelop.Ide
 					MonoDevelop.Projects.Services.ProjectService.IsSolutionItemFile (file)) {
 						IdeApp.Workspace.OpenWorkspaceItem (file);
 				} else {
-						IdeApp.Workbench.OpenDocument (file, line, column, true);
+						IdeApp.Workbench.OpenDocument (file, line, column);
 				}
 			} catch {
 			}

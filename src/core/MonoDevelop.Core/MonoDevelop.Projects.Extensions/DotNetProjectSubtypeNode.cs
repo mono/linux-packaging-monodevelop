@@ -38,22 +38,22 @@ namespace MonoDevelop.Projects.Extensions
 	public class DotNetProjectSubtypeNode: ExtensionNode
 	{
 		[NodeAttribute]
-		string guid;
+		string guid = null;
 		
 		[NodeAttribute]
-		string type;
+		string type = null;
 		
 		[NodeAttribute]
-		string import;
+		string import = null;
 		
 		[NodeAttribute]
-		string extension;
+		string extension = null;
 
 		[NodeAttribute]
-		string exclude;
+		string exclude = null;
 
 		[NodeAttribute]
-		bool useXBuild;
+		bool useXBuild = false;
 
 		Type itemType;
 
@@ -119,6 +119,8 @@ namespace MonoDevelop.Projects.Extensions
 			MSBuildProjectHandler h = (MSBuildProjectHandler) ProjectExtensionUtil.GetItemHandler (item);
 			UpdateImports (item, h.TargetImports);
 			h.SubtypeGuids.Add (guid);
+			if (UseXBuild)
+				h.UseXbuild = true;
 		}
 		
 		public void UpdateImports (SolutionEntityItem item, List<string> imports)

@@ -23,7 +23,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-/*
+
 using System;
 using NUnit.Framework;
 using MonoDevelop.Ide.Gui;
@@ -40,9 +40,8 @@ using MonoDevelop.CSharp.Formatting;
 using System.Collections.Generic;
 using MonoDevelop.Refactoring;
 
-namespace MonoDevelop.CSharpBinding
+namespace MonoDevelop.CSharpBinding.FormattingTests
 {
-	
 	[TestFixture()]
 	public class TestFormattingBugs : UnitTests.TestBase
 	{
@@ -72,7 +71,6 @@ Console.WriteLine (""Bad indent"");",
 		/// Bug 415469 - return ternary in a switch is not tabbed properly
 		/// </summary>
 		[Test()]
-		[Ignore("currently failing because of 'string' has the wrong offset - mcs bug")]
 		public void TestBug415469 () 
 		{
 			CSharpFormattingPolicy policy = new CSharpFormattingPolicy ();
@@ -112,15 +110,36 @@ using (IDisposable b = null) {
 }");
 		}
 		
+		/// <summary>
+		/// Bug 655635 - Auto format document doesn't indent comments as well
+		/// </summary>
+		[Test()]
+		public void TestBug655635 ()
+		{
+			CSharpFormattingPolicy policy = new CSharpFormattingPolicy ();
+			
+			TestStatementFormatting (policy,
+@"try {
+ // Comment 1
+	myObject.x = Run ();
+} catch (InvalidOperationException e) {
+	Console.WriteLine (e.Message);
+}", @"try {
+	// Comment 1
+	myObject.x = Run ();
+} catch (InvalidOperationException e) {
+	Console.WriteLine (e.Message);
+}");
+		}
 		
-
+		
 
 		
 		static void TestStatementFormatting (CSharpFormattingPolicy policy, string input, string expectedOutput)
 		{
 			TextEditorData data = new TextEditorData ();
 			data.Document.FileName = "a.cs";
-			data.Document.Text =
+			data.Document.Text = 
 @"class Test
 {
 	MyType TestMethod ()
@@ -128,36 +147,92 @@ using (IDisposable b = null) {
 		" + input + @"
 	}
 }";
-			
-			Console.WriteLine (data.Document.Text);
-			
-			CSharp.Dom.CompilationUnit compilationUnit = new CSharpParser ().Parse (data);
-			DomSpacingVisitor domSpacingVisitor = new DomSpacingVisitor (policy, data);
-			domSpacingVisitor.AutoAcceptChanges = false;
-			compilationUnit.AcceptVisitor (domSpacingVisitor, null);
-			
-			DomIndentationVisitor domIndentationVisitor = new DomIndentationVisitor (policy, data);
-			domIndentationVisitor.AutoAcceptChanges = false;
-			compilationUnit.AcceptVisitor (domIndentationVisitor, null);
+			var compilationUnit = new CSharpParser ().Parse (data);
+			AstFormattingVisitor formattingVistior = new AstFormattingVisitor (policy, data);
+			formattingVistior.AutoAcceptChanges = false;
+			compilationUnit.AcceptVisitor (formattingVistior, null);
 			
 			List<Change> changes = new List<Change> ();
-			changes.AddRange (domSpacingVisitor.Changes);
-			changes.AddRange (domIndentationVisitor.Changes);
+			changes.AddRange (formattingVistior.Changes);
 			RefactoringService.AcceptChanges (null, null, changes);
 			
-			for (int i = 0; i < data.Document.LineCount; i++) {
+			for (int i = 1; i <= data.Document.LineCount; i++) {
 				LineSegment line = data.Document.GetLine (i);
 				if (line.EditableLength < 2)
 					continue;
 				data.Remove (line.Offset, 2);
 			}
-			string text = data.Document.GetTextBetween (data.Document.GetLine (4).Offset,
-			                                            data.Document.GetLine (data.Document.LineCount - 2).Offset).Trim ();
-			Console.WriteLine (text);
+			string text = data.Document.GetTextBetween (data.Document.GetLine (5).Offset, 
+			                                            data.Document.GetLine (data.Document.LineCount - 1).Offset).Trim ();
 			Assert.AreEqual (expectedOutput, text);
 		}
 
+		/// <summary>
+		///  Bug 659675 - on-the-fly code formatting breaks @-prefixed identifiers
+		/// </summary>
+		[Test()]
+		public void TestBug659675 ()
+		{
+			CSharpFormattingPolicy policy = new CSharpFormattingPolicy ();
+			TestStatementFormatting (policy, "@string=@int;", "@string = @int;");
+		}
+		
+		/// <summary>
+		/// Bug 670213 - Document formatter deletes valid text!
+		/// </summary>
+		[Test()]
+		public void TestBug670213 ()
+		{
+			TextEditorData data = new TextEditorData ();
+			data.Document.FileName = "a.cs";
+			data.Document.Text = @"class Test
+{
+	Test MyMethod() // Comment
+	{
+	}
+}";
+			
+			CSharpFormattingPolicy policy = new CSharpFormattingPolicy ();
+			policy.MethodBraceStyle = BraceStyle.EndOfLine;
+			
+			var compilationUnit = new CSharpParser ().Parse (data);
+			compilationUnit.AcceptVisitor (new AstFormattingVisitor (policy, data), null);
+			
+			Assert.AreEqual (@"class Test
+{
+	Test MyMethod () { // Comment
+	}
+}", data.Document.Text);
+		}
+		
+		
+		/// <summary>
+		/// Bug 677261 - Format Document with constructor with over-indented opening curly brace
+		/// </summary>
+		[Test()]
+		public void TestBug677261 ()
+		{
+			TextEditorData data = new TextEditorData ();
+			data.Document.FileName = "a.cs";
+			data.Document.Text = @"class Test
+{
+	Test ()
+	   {
+	}
+}";
+			
+			CSharpFormattingPolicy policy = new CSharpFormattingPolicy ();
+			policy.ConstructorBraceStyle = BraceStyle.EndOfLine;
+			
+			var compilationUnit = new CSharpParser ().Parse (data);
+			compilationUnit.AcceptVisitor (new AstFormattingVisitor (policy, data), null);
+			Assert.AreEqual (@"class Test
+{
+	Test () {
+	}
+}", data.Document.Text);
+		}
 		
 	}
-}*/
+}
 

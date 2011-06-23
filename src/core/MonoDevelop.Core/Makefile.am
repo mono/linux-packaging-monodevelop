@@ -14,6 +14,7 @@ FILES =  \
 	MonoDevelop.Core.AddIns/PackageInstalledCondition.cs \
 	MonoDevelop.Core.AddIns/PlatformCondition.cs \
 	MonoDevelop.Core.AddIns/TargetFrameworkNode.cs \
+	MonoDevelop.Core.AddIns/UserDataMigrationNode.cs \
 	MonoDevelop.Core.Assemblies/AssemblyContext.cs \
 	MonoDevelop.Core.Assemblies/ComposedAssemblyContext.cs \
 	MonoDevelop.Core.Assemblies/CustomRuntimeExecutionModeSet.cs \
@@ -34,6 +35,7 @@ FILES =  \
 	MonoDevelop.Core.Assemblies/SystemPackage.cs \
 	MonoDevelop.Core.Assemblies/TargetFramework.cs \
 	MonoDevelop.Core.Assemblies/TargetFrameworkBackend.cs \
+	MonoDevelop.Core.Assemblies/TargetFrameworkMoniker.cs \
 	MonoDevelop.Core.Assemblies/TargetRuntime.cs \
 	MonoDevelop.Core.Collections/ReadOnlyDictionary.cs \
 	MonoDevelop.Core.Collections/Set.cs \
@@ -63,7 +65,9 @@ FILES =  \
 	MonoDevelop.Core.Execution/MsNetExecutionHandler.cs \
 	MonoDevelop.Core.Execution/NativeExecutionCommand.cs \
 	MonoDevelop.Core.Execution/NativePlatformExecutionHandler.cs \
+	MonoDevelop.Core.Execution/ProcessArgumentBuilder.cs \
 	MonoDevelop.Core.Execution/ProcessExecutionCommand.cs \
+	MonoDevelop.Core.Execution/ProcessExtensions.cs \
 	MonoDevelop.Core.Execution/ProcessHostController.cs \
 	MonoDevelop.Core.Execution/ProcessService.cs \
 	MonoDevelop.Core.Execution/ProcessWrapper.cs \
@@ -89,11 +93,11 @@ FILES =  \
 	MonoDevelop.Core.ProgressMonitoring/AggregatedProgressMonitor.cs \
 	MonoDevelop.Core.ProgressMonitoring/AsyncOperation.cs \
 	MonoDevelop.Core.ProgressMonitoring/ConsoleProgressMonitor.cs \
-	MonoDevelop.Core.ProgressMonitoring/ConsoleProgressStatus.cs \
 	MonoDevelop.Core.ProgressMonitoring/FilteredProgressMonitor.cs \
 	MonoDevelop.Core.ProgressMonitoring/LogTextWriter.cs \
 	MonoDevelop.Core.ProgressMonitoring/NullAsyncOperation.cs \
 	MonoDevelop.Core.ProgressMonitoring/NullProgressMonitor.cs \
+	MonoDevelop.Core.ProgressMonitoring/ProgressStatusMonitor.cs \
 	MonoDevelop.Core.ProgressMonitoring/ProgressTracker.cs \
 	MonoDevelop.Core.ProgressMonitoring/SimpleProgressMonitor.cs \
 	MonoDevelop.Core.ProgressMonitoring/SynchronizedProgressMonitor.cs \
@@ -117,6 +121,7 @@ FILES =  \
 	MonoDevelop.Core.Serialization/GenericCollectionHandler.cs \
 	MonoDevelop.Core.Serialization/ICollectionHandler.cs \
 	MonoDevelop.Core.Serialization/ICustomDataItemHandler.cs \
+	MonoDevelop.Core.Serialization/IDataItemAttribute.cs \
 	MonoDevelop.Core.Serialization/IExtendedDataItem.cs \
 	MonoDevelop.Core.Serialization/ILoadController.cs \
 	MonoDevelop.Core.Serialization/IPropertyFilter.cs \
@@ -129,18 +134,28 @@ FILES =  \
 	MonoDevelop.Core.Serialization/XmlDataSerializer.cs \
 	MonoDevelop.Core.Serialization/XmlElementDataType.cs \
 	MonoDevelop.Core.Serialization/XmlMapAttributeProvider.cs \
+	MonoDevelop.Core.Setup/AddinSetupService.cs \
+	MonoDevelop.Core.Setup/UpdateLevel.cs \
 	MonoDevelop.Core.StringParsing/IStringTagModel.cs \
 	MonoDevelop.Core.StringParsing/IStringTagProvider.cs \
 	MonoDevelop.Core.StringParsing/StringTagDescription.cs \
 	MonoDevelop.Core.StringParsing/StringTagModel.cs \
 	MonoDevelop.Core.StringParsing/StringTagModelDescription.cs \
 	MonoDevelop.Core.StringParsing/StringTagProvider.cs \
+	MonoDevelop.Core.Text/BacktrackingStringMatcher.cs \
+	MonoDevelop.Core.Text/LaneStringMatcher.cs \
+	MonoDevelop.Core.Text/StringMatcher.cs \
+	MonoDevelop.Core/ApplicationService.cs \
 	MonoDevelop.Core/ClrVersion.cs \
 	MonoDevelop.Core/ComponentModelLocalization.cs \
 	MonoDevelop.Core/DefaultAddinLocalizer.cs \
+	MonoDevelop.Core/EventArgsChain.cs \
 	MonoDevelop.Core/FileEventArgs.cs \
+	MonoDevelop.Core/FilePath.cs \
 	MonoDevelop.Core/FileService.cs \
 	MonoDevelop.Core/Gettext.cs \
+	MonoDevelop.Core/IApplication.cs \
+	MonoDevelop.Core/IApplicationInfo.cs \
 	MonoDevelop.Core/IAsyncOperation.cs \
 	MonoDevelop.Core/IconId.cs \
 	MonoDevelop.Core/ICustomXmlSerializer.cs \
@@ -152,6 +167,8 @@ FILES =  \
 	MonoDevelop.Core/PropertyService.cs \
 	MonoDevelop.Core/Runtime.cs \
 	MonoDevelop.Core/StringParserService.cs \
+	MonoDevelop.Core/UserDataLocations.cs \
+	MonoDevelop.Core/UserDataMigrationService.cs \
 	MonoDevelop.Core/UserException.cs \
 	MonoDevelop.Core/XmlReadHelper.cs \
 	MonoDevelop.Projects.CodeGeneration/BaseRefactorer.cs \
@@ -178,6 +195,7 @@ FILES =  \
 	MonoDevelop.Projects.Dom.Parser/AssemblyInformationEventHandler.cs \
 	MonoDevelop.Projects.Dom.Parser/CommentTag.cs \
 	MonoDevelop.Projects.Dom.Parser/CommentTasksChangedEventHandler.cs \
+	MonoDevelop.Projects.Dom.Parser/IDomObjectTable.cs \
 	MonoDevelop.Projects.Dom.Parser/IParser.cs \
 	MonoDevelop.Projects.Dom.Parser/IParserDatabase.cs \
 	MonoDevelop.Projects.Dom.Parser/IResolver.cs \
@@ -186,9 +204,11 @@ FILES =  \
 	MonoDevelop.Projects.Dom.Parser/ProjectDomDecorator.cs \
 	MonoDevelop.Projects.Dom.Parser/ProjectDomEventArgs.cs \
 	MonoDevelop.Projects.Dom.Parser/ProjectDomService.cs \
+	MonoDevelop.Projects.Dom.Parser/ProjectDomStats.cs \
 	MonoDevelop.Projects.Dom.Parser/TypeNameResolver.cs \
 	MonoDevelop.Projects.Dom.Parser/TypeResolverVisitor.cs \
 	MonoDevelop.Projects.Dom.Serialization/AssemblyCodeCompletionDatabase.cs \
+	MonoDevelop.Projects.Dom.Serialization/AttributeEntry.cs \
 	MonoDevelop.Projects.Dom.Serialization/ClassEntry.cs \
 	MonoDevelop.Projects.Dom.Serialization/ClassInformationEventHandler.cs \
 	MonoDevelop.Projects.Dom.Serialization/CodeCompletionDatabase.cs \
@@ -196,10 +216,10 @@ FILES =  \
 	MonoDevelop.Projects.Dom.Serialization/DomPersistence.cs \
 	MonoDevelop.Projects.Dom.Serialization/DomTypeProxy.cs \
 	MonoDevelop.Projects.Dom.Serialization/FileEntry.cs \
-	MonoDevelop.Projects.Dom.Serialization/NamespaceEntry.cs \
 	MonoDevelop.Projects.Dom.Serialization/ParserDatabase.cs \
 	MonoDevelop.Projects.Dom.Serialization/ProjectCodeCompletionDatabase.cs \
 	MonoDevelop.Projects.Dom.Serialization/SimpleCodeCompletionDatabase.cs \
+	MonoDevelop.Projects.Dom.Serialization/StatsVisitor.cs \
 	MonoDevelop.Projects.Dom/AbstractMember.cs \
 	MonoDevelop.Projects.Dom/AbstractTypeParameterMember.cs \
 	MonoDevelop.Projects.Dom/AnonymousType.cs \
@@ -225,6 +245,7 @@ FILES =  \
 	MonoDevelop.Projects.Dom/DomLocation.cs \
 	MonoDevelop.Projects.Dom/DomMemberDecorator.cs \
 	MonoDevelop.Projects.Dom/DomMethod.cs \
+	MonoDevelop.Projects.Dom/DomOutputVisitor.cs \
 	MonoDevelop.Projects.Dom/DomParameter.cs \
 	MonoDevelop.Projects.Dom/DomProperty.cs \
 	MonoDevelop.Projects.Dom/DomRegion.cs \
@@ -282,6 +303,7 @@ FILES =  \
 	MonoDevelop.Projects.Extensions/ItemTypeNode.cs \
 	MonoDevelop.Projects.Extensions/LanguageBindingCodon.cs \
 	MonoDevelop.Projects.Extensions/MonoDocSourceNode.cs \
+	MonoDevelop.Projects.Extensions/ParserNode.cs \
 	MonoDevelop.Projects.Extensions/PolicyNode.cs \
 	MonoDevelop.Projects.Extensions/PolicySetNode.cs \
 	MonoDevelop.Projects.Extensions/ProjectBindingCodon.cs \
@@ -327,18 +349,17 @@ FILES =  \
 	MonoDevelop.Projects.Formats.MSBuild/SlnData.cs \
 	MonoDevelop.Projects.Formats.MSBuild/SlnFileFormat.cs \
 	MonoDevelop.Projects.Policies/DotNetNamingPolicy.cs \
+	MonoDevelop.Projects.Policies/IPolicyProvider.cs \
 	MonoDevelop.Projects.Policies/PolicyBag.cs \
 	MonoDevelop.Projects.Policies/PolicyChangedEventArgs.cs \
 	MonoDevelop.Projects.Policies/PolicyContainer.cs \
 	MonoDevelop.Projects.Policies/PolicyDictionary.cs \
 	MonoDevelop.Projects.Policies/PolicyService.cs \
 	MonoDevelop.Projects.Policies/PolicySet.cs \
+	MonoDevelop.Projects.Policies/PolicyTypeAttribute.cs \
 	MonoDevelop.Projects.Policies/ScopedPolicy.cs \
-	MonoDevelop.Projects.Text/CodeFormatDescription.cs \
-	MonoDevelop.Projects.Text/Formatter.cs \
+	MonoDevelop.Projects.Text/DocGenerator.cs \
 	MonoDevelop.Projects.Text/IEditableTextFile.cs \
-	MonoDevelop.Projects.Text/IFormatter.cs \
-	MonoDevelop.Projects.Text/IPrettyPrinter.cs \
 	MonoDevelop.Projects.Text/ITextFile.cs \
 	MonoDevelop.Projects.Text/ITextFileProvider.cs \
 	MonoDevelop.Projects.Text/TextEncoding.cs \
@@ -347,6 +368,7 @@ FILES =  \
 	MonoDevelop.Projects.Text/TextFileService.cs \
 	MonoDevelop.Projects.Text/TextFormatter.cs \
 	MonoDevelop.Projects.Utility/DiffUtility.cs \
+	MonoDevelop.Projects/AuthorInformation.cs \
 	MonoDevelop.Projects/BuildAction.cs \
 	MonoDevelop.Projects/BuildEventHandler.cs \
 	MonoDevelop.Projects/BuildResult.cs \
@@ -398,6 +420,8 @@ FILES =  \
 	MonoDevelop.Projects/ProjectFileEventArgs.cs \
 	MonoDevelop.Projects/ProjectItem.cs \
 	MonoDevelop.Projects/ProjectItemCollection.cs \
+	MonoDevelop.Projects/ProjectItemEventArgs.cs \
+	MonoDevelop.Projects/ProjectModelDataItemAttribute.cs \
 	MonoDevelop.Projects/ProjectParameters.cs \
 	MonoDevelop.Projects/ProjectPathItemPropertyAttribute.cs \
 	MonoDevelop.Projects/ProjectReference.cs \

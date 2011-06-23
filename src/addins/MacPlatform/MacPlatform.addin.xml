@@ -6,18 +6,19 @@
        url         = "http://monodevelop.com/"
        description = "Mac Platform Support for MonoDevelop"
        category    = "Platform Support"
-       version     = "2.4">
+       flags       = "Hidden"
+       version     = "2.6">
 	
 	<Runtime>
 	</Runtime>
 
 	<Dependencies>
-	    <Addin id="Ide" version="2.4"/>
+	    <Addin id="Ide" version="2.6"/>
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/Core/PlatformService">
 		<Class id      = "PlatformService"
-		       class   = "MonoDevelop.Platform.MacPlatform"/>
+		       class   = "MonoDevelop.Platform.Mac.MacPlatform"/>
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/Commands/Window">
@@ -44,16 +45,17 @@
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/Updater">
-		<UpdateInfo file="../../updateinfo" />
+		<UpdateInfo file="../../../updateinfo" />
 		<UpdateInfo file="/Library/Frameworks/Mono.framework/Versions/Current/updateinfo" />
 		<UpdateInfo file="/Library/Frameworks/Mono.framework/Versions/Current/updateinfo.csdk" />
 	</Extension>
 	
-	<!--
 	<Extension path = "/MonoDevelop/Components/DialogHandlers">
 		<Class class="MonoDevelop.Platform.Mac.MacSelectFileDialogHandler" />
 		<Class class="MonoDevelop.Platform.Mac.MacAddFileDialogHandler" />
 		<Class class="MonoDevelop.Platform.Mac.MacOpenFileDialogHandler" />
+		<!--
+		<Class class="MonoDevelop.Platform.Mac.MacAlertDialogHandler" />
+		-->
 	</Extension>
-	-->
 </Addin>

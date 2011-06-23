@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections;
 using System.IO;
 
@@ -11,6 +12,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Components.Commands;
  
 using MonoDevelop.Components;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl 
 {
@@ -18,9 +20,8 @@ namespace MonoDevelop.VersionControl
 	{
 		public static bool Add (VersionControlItemList items, bool test)
 		{
-			foreach (VersionControlItem it in items)
-				if (!it.Repository.CanAdd (it.Path))
-					return false;
+			if (!items.All (i => i.VersionInfo.CanAdd))
+				return false;
 			if (test)
 				return true;
 			
@@ -28,13 +29,6 @@ namespace MonoDevelop.VersionControl
 			return true;
 		}
 		
-		public static bool CanAdd (Repository vc, string path) {
-			if (vc.CanAdd(path)) 
-				return true;
-			else
-				return false;
-		}
-
 		private class AddWorker : Task {
 			VersionControlItemList items;
 						
@@ -56,8 +50,7 @@ namespace MonoDevelop.VersionControl
 					list[0].Repository.Add (list.Paths, true, monitor);
 				
 				Gtk.Application.Invoke (delegate {
-					foreach (VersionControlItem item in items)
-						VersionControlService.NotifyFileStatusChanged (item.Repository, item.Path, item.IsDirectory);
+					VersionControlService.NotifyFileStatusChanged (items);
 				});
 			}
 		}
@@ -115,23 +108,18 @@ namespace MonoDevelop.VersionControl
 	{
 		public static bool Remove (VersionControlItemList items, bool test)
 		{
-			foreach (VersionControlItem it in items)
-				if (!it.Repository.CanRemove (it.Path))
-					return false;
+			if (!items.All (i => i.VersionInfo.CanRemove))
+				return false;
 			if (test)
 				return true;
 			
-			new RemoveWorker (items).Start();
+			string msg = GettextCatalog.GetString ("Are you sure you want to remove the selected items from the version control system?");
+			string msg2 = GettextCatalog.GetString ("The files will be removed from disk");
+			if (MessageService.Confirm (msg, msg2, AlertButton.Delete))
+				new RemoveWorker (items).Start();
 			return true;
 		}
 		
-		public static bool CanRemove (Repository vc, string path) {
-			if (vc.CanRemove(path)) 
-				return true;
-			else
-				return false;
-		}
-
 		private class RemoveWorker : Task {
 			VersionControlItemList items;
 						
@@ -155,8 +143,7 @@ namespace MonoDevelop.VersionControl
 				}
 				
 				Gtk.Application.Invoke (delegate {
-					foreach (VersionControlItem item in items)
-						VersionControlService.NotifyFileStatusChanged (item.Repository, item.Path, item.IsDirectory);
+					VersionControlService.NotifyFileStatusChanged (items);
 				});
 			}
 		}

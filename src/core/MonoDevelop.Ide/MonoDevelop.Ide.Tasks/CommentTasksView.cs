@@ -138,10 +138,10 @@ namespace MonoDevelop.Ide.Tasks
 				comments.EndTaskUpdates ();
 			}
 
-			comments.TasksAdded += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (GeneratedTaskAdded));
-			comments.TasksRemoved += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (GeneratedTaskRemoved));
+			comments.TasksAdded += DispatchService.GuiDispatch<TaskEventHandler> (GeneratedTaskAdded);
+			comments.TasksRemoved += DispatchService.GuiDispatch<TaskEventHandler> (GeneratedTaskRemoved);
 
-			PropertyService.PropertyChanged += (EventHandler<PropertyChangedEventArgs>) DispatchService.GuiDispatch (new EventHandler<PropertyChangedEventArgs> (OnPropertyUpdated));
+			PropertyService.PropertyChanged += DispatchService.GuiDispatch<EventHandler<PropertyChangedEventArgs>> (OnPropertyUpdated);
 			
 			CreateMenu ();
 			
@@ -254,7 +254,7 @@ namespace MonoDevelop.Ide.Tasks
 							desc = tag.Key + ": " + desc;
 					}
 					
-					Task t = new Task (fileName, desc, tag.Region.Start.Column - 1, tag.Region.Start.Line,
+					Task t = new Task (fileName, desc, tag.Region.Start.Column, tag.Region.Start.Line,
 					                   TaskSeverity.Information, priorities[tag.Key], wob);
 					newTasks.Add (t);
 				}
@@ -475,16 +475,17 @@ namespace MonoDevelop.Ide.Tasks
 		{
 			Task task = SelectedTask;
 			if (task != null && ! String.IsNullOrEmpty (task.FileName)) {
-				Document doc = IdeApp.Workbench.OpenDocument (task.FileName, Math.Max (1, task.Line), Math.Max (1, task.Column), true);
+				Document doc = IdeApp.Workbench.OpenDocument (task.FileName, Math.Max (1, task.Line), Math.Max (1, task.Column));
 				if (doc != null && doc.HasProject && doc.Project is DotNetProject) {
-					string[] commentTags = TextEditor.GetCommentTags (doc.FileName);
+					string[] commentTags = doc.CommentTags;
 					if (commentTags != null && commentTags.Length == 1) {
-						string line = doc.TextEditor.GetLineText (task.Line);
+						string line = doc.Editor.GetLineText (task.Line);
 						int index = line.IndexOf (commentTags[0]);
 						if (index != -1) {
-							doc.TextEditor.JumpTo (task.Line, task.Column);
+							doc.Editor.SetCaretTo (task.Line, task.Column);
 							line = line.Substring (0, index);
-							doc.TextEditor.ReplaceLine (task.Line, line);
+							var ls = doc.Editor.Document.GetLine (task.Line);
+							doc.Editor.Replace (ls.Offset, ls.EditableLength, line);
 							comments.Remove (task);
 						}
 					}

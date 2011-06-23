@@ -88,10 +88,12 @@ namespace Mono.TextEditor
 		
 		public TextEditorData (Document doc)
 		{
+			caret = new Caret (this);
+			caret.PositionChanged += CaretPositionChanged;
+			
 			options = TextEditorOptions.DefaultOptions;
 			Document = doc;
 			this.SearchEngine = new BasicSearchEngine ();
-			SelectionChanging += HandleSelectionChanging;
 		}
 
 		void HandleDocLineChanged (object sender, LineEventArgs e)
@@ -106,8 +108,6 @@ namespace Mono.TextEditor
 			}
 			set {
 				this.document = value;
-				caret = new Caret (this, document);
-				caret.PositionChanged += CaretPositionChanged;
 				this.document.BeginUndo += OnBeginUndo;
 				this.document.EndUndo += OnEndUndo;
 				
@@ -128,7 +128,7 @@ namespace Mono.TextEditor
 				if (Options.OverrideDocumentEolMarker)
 					return Options.DefaultEolMarker;
 				if (eol == null && Document.LineCount > 0) {
-					LineSegment line = Document.GetLine (0);
+					LineSegment line = Document.GetLine (DocumentLocation.MinLine);
 					if (line.DelimiterLength > 0) 
 						eol = Document.GetTextAt (line.EditableLength, line.DelimiterLength);
 				}
@@ -172,45 +172,59 @@ namespace Mono.TextEditor
 			Replace (offset, count, null);
 		}
 		
-		public int Replace (int offset, int count, string value)
+		public void Remove (ISegment removeSegment)
 		{
+			Remove (removeSegment.Offset, removeSegment.Length);
+		}
+		
+		public string FormatString (DocumentLocation loc, string str)
+		{
+			if (string.IsNullOrEmpty (str))
+				return "";
 			StringBuilder sb = new StringBuilder ();
-			if (value != null) {
-				bool convertTabs = Options.TabsToSpaces;
-				DocumentLocation loc = Document.OffsetToLocation (offset);
-				for (int i = 0; i < value.Length; i++) {
-					char ch = value[i];
-					switch (ch) {
-					case '\u00A0': // convert non breaking spaces to standard spaces.
-						sb.Append (' ');
-						break;
-					case '\t':
-						if (convertTabs) {
-							int tabWidth = TextViewMargin.GetNextTabstop (this, loc.Column) - loc.Column;
-							sb.Append (new string (' ', tabWidth));
-							loc.Column += tabWidth;
-						} else 
-							goto default;
-						break;
-					case '\r':
-						if (i + 1 < value.Length && value[i + 1] == '\n')
-							i++;
-						goto case '\n';
-					case '\n':
-						sb.Append (EolMarker);
-						loc.Line++;
-						loc.Column = 0;
-						break;
-					default:
-						sb.Append (ch);
-						loc.Column++;
-						break;
-					}
+			bool convertTabs = Options.TabsToSpaces;
+			for (int i = 0; i < str.Length; i++) {
+				char ch = str[i];
+				switch (ch) {
+				case '\u00A0': // convert non breaking spaces to standard spaces.
+					sb.Append (' ');
+					break;
+				case '\t':
+					if (convertTabs) {
+						int tabWidth = TextViewMargin.GetNextTabstop (this, loc.Column) - loc.Column;
+						sb.Append (new string (' ', tabWidth));
+						loc.Column += tabWidth;
+					} else 
+						goto default;
+					break;
+				case '\r':
+					if (i + 1 < str.Length && str[i + 1] == '\n')
+						i++;
+					goto case '\n';
+				case '\n':
+					sb.Append (EolMarker);
+					loc.Line++;
+					loc.Column = 0;
+					break;
+				default:
+					sb.Append (ch);
+					loc.Column++;
+					break;
 				}
 			}
-			
-			((IBuffer)document).Replace (offset, count, sb.ToString ());
-			return sb.Length;
+			return sb.ToString ();
+		}
+		
+		public string FormatString (int offset, string str)
+		{
+			return FormatString (Document.OffsetToLocation (offset), str);
+		}
+		
+		public int Replace (int offset, int count, string value)
+		{
+			string formattedString = FormatString (offset, value);
+			((IBuffer)document).Replace (offset, count, formattedString);
+			return formattedString.Length;
 		}
 			
 		public void InsertAtCaret (string text)
@@ -239,8 +253,10 @@ namespace Mono.TextEditor
 				// DOCUMENT MUST NOT BE DISPOSED !!! (Split View shares document)
 				document = null;
 			}
-			caret = caret.Kill (x => x.PositionChanged -= CaretPositionChanged);
-			SelectionChanging -= HandleSelectionChanging;
+			if (caret != null) {
+				caret.PositionChanged -= CaretPositionChanged;
+				caret = null;
+			}
 		}
 		
 		void CaretPositionChanged (object sender, DocumentLocationEventArgs args)
@@ -403,18 +419,13 @@ namespace Mono.TextEditor
 			}
 		}
 		
-		void HandleSelectionChanging (object sender, TextEditorDataEventArgs args)
-		{
-			if (args.TextEditorData != this)
-				this.ClearSelection ();
-		}
+		public event EventHandler SelectionChanging;
 		
-		static event EventHandler<TextEditorDataEventArgs> SelectionChanging;
-		
-		static void OnSelectionChanging (TextEditorDataEventArgs args)
+		protected virtual void OnSelectionChanging (EventArgs e)
 		{
-			if (SelectionChanging != null)
-				SelectionChanging (null, args);
+			EventHandler handler = this.SelectionChanging;
+			if (handler != null)
+				handler (this, e);
 		}
 		
 		public SelectionMode SelectionMode {
@@ -436,6 +447,7 @@ namespace Mono.TextEditor
 				if (mainSelection == null && value == null)
 					return;
 				if (mainSelection == null && value != null || mainSelection != null && value == null || !mainSelection.Equals (value)) {
+					OnSelectionChanging (EventArgs.Empty);
 					if (mainSelection != null)
 						mainSelection.Changed -= HandleMainSelectionChanged;
 					mainSelection = value;
@@ -487,11 +499,11 @@ namespace Mono.TextEditor
 		}
 		public ISegment SelectionRange {
 			get {
-				return MainSelection != null ? MainSelection.GetSelectionRange (this) : null;
+				return MainSelection != null ? MainSelection.GetSelectionRange (this) : new Segment (Caret.Offset, 0);
 			}
 			set {
 				if (!Segment.Equals (this.SelectionRange, value)) {
-					OnSelectionChanging (new TextEditorDataEventArgs (this));
+					OnSelectionChanging (EventArgs.Empty);
 					if (value == null || value.Length == 0) {
 						MainSelection = null;
 					} else {
@@ -535,34 +547,18 @@ namespace Mono.TextEditor
 		
 		public IEnumerable<LineSegment> SelectedLines {
 			get {
-				if (!this.IsSomethingSelected) {
-					yield return this.document.GetLine (this.caret.Line);
-				} else {
-					foreach (Selection selection in Selections) {
-						int startLineNr = selection.MinLine;
-						RedBlackTree<LineSegmentTree.TreeNode>.RedBlackTreeIterator iter = this.document.GetLine (startLineNr).Iter;
-						LineSegment endLine = Document.GetLine (selection.MaxLine);
-						bool skipEndLine = selection.Anchor < selection.Lead ? selection.Lead.Column == 0 : selection.Anchor.Column == 0;
-						do {
-							if (iter.Current == endLine && skipEndLine)
-								break;
-							yield return iter.Current;
-							if (iter.Current == endLine)
-								break;
-						} while (iter.MoveNext ());
-					}
-				}
+				if (!IsSomethingSelected) 
+					return document.GetLinesBetween (caret.Line, caret.Line);
+				var selection = MainSelection;
+				int startLineNr = selection.MinLine;
+				int endLineNr = selection.MaxLine;
+						
+				bool skipEndLine = selection.Anchor < selection.Lead ? selection.Lead.Column == DocumentLocation.MinColumn : selection.Anchor.Column == DocumentLocation.MinColumn;
+				if (skipEndLine)
+					endLineNr--;
+				return document.GetLinesBetween (startLineNr, endLineNr);
 			}
 		}
-	/*	
-		public int SelectionAnchor {
-			get {
-				return selectionAnchor;
-			}
-			set {
-				selectionAnchor = value;
-			}
-		}*/
 		
 		public void ClearSelection ()
 		{
@@ -624,14 +620,14 @@ namespace Mono.TextEditor
 				Caret.PreserveSelection = true;
 				for (int lineNr = selection.MinLine; lineNr <= selection.MaxLine; lineNr++) {
 					LineSegment curLine = Document.GetLine (lineNr);
-					int col1 = curLine.GetLogicalColumn (this, startCol);
-					int col2 = System.Math.Min (curLine.GetLogicalColumn (this, endCol), curLine.EditableLength);
+					int col1 = curLine.GetLogicalColumn (this, startCol) - 1;
+					int col2 = System.Math.Min (curLine.GetLogicalColumn (this, endCol) - 1, curLine.EditableLength);
 					if (col1 >= col2)
 						continue;
 					Remove (curLine.Offset + col1, col2 - col1);
 					
 					if (Caret.Line == lineNr && Caret.Column >= col1)
-						Caret.Column -= col2 - col1;
+						Caret.Column = col1 + 1;
 				}
 				int column = System.Math.Min (selection.Anchor.Column, selection.Lead.Column);
 				selection.Anchor = new DocumentLocation (selection.Anchor.Line, column);
@@ -647,6 +643,7 @@ namespace Mono.TextEditor
 		{
 			DeleteSelectedText (true);
 		}
+		
 		public void DeleteSelectedText (bool clearSelection)
 		{
 			if (!IsSomethingSelected)
@@ -839,7 +836,7 @@ namespace Mono.TextEditor
 				LineSegment line = doc.GetLine (lineNumber);
 				if (line == null)
 					return "";
-				int count = column - line.EditableLength;
+				int count = column - 1 - line.EditableLength;
 				return new string (' ', System.Math.Max (0, count));
 			}
 			
@@ -865,7 +862,7 @@ namespace Mono.TextEditor
 			if (line == null)
 				return 0;
 			
-			if (Caret.Column > line.EditableLength) {
+			if (Caret.Column > line.EditableLength + 1) {
 				string virtualSpace = GetVirtualSpaces (Caret.Line, Caret.Column);
 				if (!string.IsNullOrEmpty (virtualSpace))
 					Insert (Caret.Offset, virtualSpace);
@@ -904,5 +901,184 @@ namespace Mono.TextEditor
 				handler (this, EventArgs.Empty);
 		}
 		public event EventHandler RecenterEditor;
+
+		#region Document delegation
+		public int Length {
+			get {
+				return document.Length;
+			}
+		}
+
+		public string Text {
+			get {
+				return document.Text;
+			}
+			set {
+				document.Text = value;
+			}
+		}
+
+		public string GetTextBetween (int startOffset, int endOffset)
+		{
+			return document.GetTextBetween (startOffset, endOffset);
+		}
+		
+		public string GetTextBetween (DocumentLocation start, DocumentLocation end)
+		{
+			return document.GetTextBetween (start, end);
+		}
+		
+		public string GetTextBetween (int startLine, int startColumn, int endLine, int endColumn)
+		{
+			return document.GetTextBetween (startLine, startColumn, endLine, endColumn);
+		}
+
+		public string GetTextAt (int offset, int count)
+		{
+			return document.GetTextAt (offset, count);
+		}
+
+		public string GetTextAt (ISegment segment)
+		{
+			return document.GetTextAt (segment);
+		}
+		
+		public char GetCharAt (int offset)
+		{
+			return document.GetCharAt (offset);
+		}
+		
+		public string GetLineText (int line)
+		{
+			return Document.GetLineText (line);
+		}
+		
+		public string GetLineText (int line, bool includeDelimiter)
+		{
+			return Document.GetLineText (line, includeDelimiter);
+		}
+		
+		public IEnumerable<LineSegment> Lines {
+			get {
+				return Document.Lines;
+			}
+		}
+		
+		public int LineCount {
+			get {
+				return Document.LineCount;
+			}
+		}
+		
+		public int LocationToOffset (int line, int column)
+		{
+			return Document.LocationToOffset (line, column);
+		}
+		
+		public int LocationToOffset (DocumentLocation location)
+		{
+			return Document.LocationToOffset (location);
+		}
+		
+		public DocumentLocation OffsetToLocation (int offset)
+		{
+			return Document.OffsetToLocation (offset);
+		}
+
+		public string GetLineIndent (int lineNumber)
+		{
+			return Document.GetLineIndent (lineNumber);
+		}
+		
+		public string GetLineIndent (LineSegment segment)
+		{
+			return Document.GetLineIndent (segment);
+		}
+		
+		public LineSegment GetLine (int lineNumber)
+		{
+			return Document.GetLine (lineNumber);
+		}
+		
+		public LineSegment GetLineByOffset (int offset)
+		{
+			return Document.GetLineByOffset (offset);
+		}
+		
+		public int OffsetToLineNumber (int offset)
+		{
+			return Document.OffsetToLineNumber (offset);
+		}
+		#endregion
+		
+		#region Parent functions
+		public bool HasFocus {
+			get {
+				return Parent != null ? Parent.HasFocus : false;
+			}
+		}
+		
+		public void ScrollToCaret ()
+		{
+			if (Parent != null)
+				Parent.ScrollToCaret ();
+		}
+		
+		public void ScrollTo (int offset)
+		{
+			if (Parent != null)
+				Parent.ScrollTo (offset);
+		}
+		
+		public void ScrollTo (int line, int column)
+		{
+			if (Parent != null)
+				Parent.ScrollTo (line, column);
+		}
+
+		public void ScrollTo (DocumentLocation loc)
+		{
+			if (Parent != null)
+				Parent.ScrollTo (loc);
+		}
+		
+		public void CenterToCaret ()
+		{
+			if (Parent != null)
+				Parent.CenterToCaret ();
+		}
+		
+		public void CenterTo (DocumentLocation p)
+		{
+			if (Parent != null)
+				Parent.CenterTo (p);
+		}
+		
+		public void CenterTo (int offset)
+		{
+			if (Parent != null)
+				Parent.CenterTo (offset);
+		}
+		
+		public void CenterTo (int line, int column)
+		{
+			if (Parent != null)
+				Parent.CenterTo (line, column);
+		}
+		
+		public void SetCaretTo (int line, int column)
+		{
+			SetCaretTo (line, column, true);
+		}
+
+		public void SetCaretTo (int line, int column, bool highlight)
+		{
+			if (Parent != null) {
+				Parent.SetCaretTo (line, column, highlight);
+			} else {
+				Caret.Location = new DocumentLocation (line, column);
+			}
+		}
+		#endregion
 	}
 }

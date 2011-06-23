@@ -218,6 +218,13 @@ namespace MonoDevelop.Debugger
 
 		protected override void OnDestroyed ()
 		{
+			crtExp.Edited -= OnExpEdited;
+			crtExp.EditingStarted -= OnExpEditing;
+			crtExp.EditingCanceled -= OnEditingCancelled;
+			crtValue.EditingStarted -= OnValueEditing;
+			crtValue.Edited -= OnValueEdited;
+			crtValue.EditingCanceled -= OnEditingCancelled;
+			
 			base.OnDestroyed ();
 			disposed = true;
 		}
@@ -500,9 +507,6 @@ namespace MonoDevelop.Debugger
 			
 			SetValues (parent, it, val.Name, val);
 			RegisterValue (val, it);
-			
-			if (val.HasChildren && !ShowExpanders)
-				ShowExpanders = true;
 		}
 		
 		void RemoveChildren (TreeIter it)
@@ -701,6 +705,8 @@ namespace MonoDevelop.Debugger
 			if (val.HasChildren) {
 				// Add dummy node
 				it = store.AppendValues (it, "", "", "", null, true);
+				if (!ShowExpanders)
+					ShowExpanders = true;
 			}
 		}
 		
@@ -927,9 +933,11 @@ namespace MonoDevelop.Debugger
 				TreeIter it;
 				if (path.Depth > 1 || PinnedWatch == null) {
 					store.GetIter (out it, path);
-					CleanPinIcon ();
-					store.SetValue (it, PinIconCol, "md-pin-up");
-					lastPinIter = it;
+					if (!it.Equals (lastPinIter)) {
+						store.SetValue (it, PinIconCol, "md-pin-up");
+						CleanPinIcon ();
+						lastPinIter = it;
+					}
 				}
 			}
 			return base.OnMotionNotifyEvent (evnt);
@@ -1134,7 +1142,7 @@ namespace MonoDevelop.Debugger
 			return name + exp;
 		}
 
-		void CreatePinnedWatch (TreeIter it)
+		public void CreatePinnedWatch (TreeIter it)
 		{
 			string exp = GetFullExpression (it);
 			
@@ -1158,7 +1166,7 @@ namespace MonoDevelop.Debugger
 				PinStatusChanged (this, EventArgs.Empty);
 		}
 		
-		void RemovePinnedWatch (TreeIter it)
+		public void RemovePinnedWatch (TreeIter it)
 		{
 			DebuggingService.PinnedWatches.Remove (PinnedWatch);
 			if (PinStatusChanged != null)
@@ -1176,6 +1184,12 @@ namespace MonoDevelop.Debugger
 		}
 		
 		#region ICompletionWidget implementation 
+		
+		CodeCompletionContext ICompletionWidget.CurrentCodeCompletionContext {
+			get {
+				return ((ICompletionWidget)this).CreateCodeCompletionContext (editEntry.Position);
+			}
+		}
 		
 		EventHandler completionContextChanged;
 		
@@ -1242,6 +1256,14 @@ namespace MonoDevelop.Debugger
 			editEntry.DeleteText (sp, sp + partial_word.Length);
 			editEntry.InsertText (complete_word, ref sp);
 			editEntry.Position = sp; // sp is incremented by InsertText
+		}
+		
+		void ICompletionWidget.SetCompletionText (CodeCompletionContext ctx, string partial_word, string complete_word, int offset)
+		{
+			int sp = editEntry.Position - partial_word.Length;
+			editEntry.DeleteText (sp, sp + partial_word.Length);
+			editEntry.InsertText (complete_word, ref sp);
+			editEntry.Position = sp + offset; // sp is incremented by InsertText
 		}
 		
 		int ICompletionWidget.TextLength {
@@ -1340,6 +1362,15 @@ namespace MonoDevelop.Debugger
 		}
 		static List<ICompletionKeyHandler> keyHandler = new List<ICompletionKeyHandler> ();
 		public IEnumerable<ICompletionKeyHandler> KeyHandler { get { return keyHandler;} }
+
+		public void OnCompletionListClosed (EventArgs e)
+		{
+			EventHandler handler = this.CompletionListClosed;
+			if (handler != null)
+				handler (this, e);
+		}
+		
+		public event EventHandler CompletionListClosed;
 	}
 	
 	class DebugCompletionData : MonoDevelop.Ide.CodeCompletion.CompletionData

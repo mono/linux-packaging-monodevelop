@@ -61,7 +61,7 @@ namespace MonoDevelop.VersionControl
 		}
 		
 		public static bool CanPublish (Repository vc, string path, bool isDir) {
-			if (!vc.IsVersioned (path) && isDir) 
+			if (!vc.GetVersionInfo (path).IsVersioned && isDir) 
 				return true;
 			return false;
 		}
@@ -94,7 +94,7 @@ namespace MonoDevelop.VersionControl
 			Monitor.ReportSuccess (GettextCatalog.GetString ("Publish operation completed."));
 			
 			Gtk.Application.Invoke (delegate {
-				VersionControlService.NotifyFileStatusChanged (vc, path, true);
+				VersionControlService.NotifyFileStatusChanged (new FileUpdateEventArgs (vc, path, true));
 			});
 		}
 	}

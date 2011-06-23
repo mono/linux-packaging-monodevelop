@@ -38,30 +38,28 @@ using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.CSharp.Formatting;
 using MonoDevelop.CSharp.Parser;
 using System.Text.RegularExpressions;
-using MonoDevelop.CSharp.Dom;
+using MonoDevelop.CSharp.Ast;
 using MonoDevelop.CSharp.Resolver;
+using Mono.TextEditor;
 
 namespace MonoDevelop.CSharp.Completion
 {
 	public class NRefactoryParameterDataProvider : IParameterDataProvider
 	{
-		MonoDevelop.Ide.Gui.TextEditor editor;
 		List<IMethod> methods = new List<IMethod> ();
 		CSharpAmbience ambience = new CSharpAmbience ();
 		
-		//bool staticResolve = false;
+		bool staticResolve = false;
 		
-		public NRefactoryParameterDataProvider (MonoDevelop.Ide.Gui.TextEditor editor, NRefactoryResolver resolver, MethodResolveResult resolveResult)
+		public NRefactoryParameterDataProvider (TextEditorData editor, NRefactoryResolver resolver, MethodResolveResult resolveResult)
 		{
-			this.editor = editor;
-			//this.staticResolve = resolveResult.StaticResolve;
+			this.staticResolve = resolveResult.StaticResolve;
 			bool includeProtected = true;
-			
 			HashSet<string> alreadyAdded = new HashSet<string> ();
 			foreach (IMethod method in resolveResult.Methods) {
 				if (method.IsConstructor)
 					continue;
-				string str = ambience.GetString (method, OutputFlags.IncludeParameters);
+				string str = ambience.GetString (method, OutputFlags.IncludeParameters | OutputFlags.GeneralizeGenerics | OutputFlags.IncludeGenerics);
 				if (alreadyAdded.Contains (str))
 					continue;
 				alreadyAdded.Add (str);
@@ -76,9 +74,8 @@ namespace MonoDevelop.CSharp.Completion
 			return left.Parameters.Count - right.Parameters.Count;
 		}
 		
-		public NRefactoryParameterDataProvider (MonoDevelop.Ide.Gui.TextEditor editor, NRefactoryResolver resolver, ThisResolveResult resolveResult)
+		public NRefactoryParameterDataProvider (TextEditorData editor, NRefactoryResolver resolver, ThisResolveResult resolveResult)
 		{
-			this.editor = editor;
 			HashSet<string> alreadyAdded = new HashSet<string> ();
 			if (resolveResult.CallingType != null) {
 				bool includeProtected = true;
@@ -96,9 +93,8 @@ namespace MonoDevelop.CSharp.Completion
 			}
 		}
 		
-		public NRefactoryParameterDataProvider (MonoDevelop.Ide.Gui.TextEditor editor, NRefactoryResolver resolver, BaseResolveResult resolveResult)
+		public NRefactoryParameterDataProvider (TextEditorData editor, NRefactoryResolver resolver, BaseResolveResult resolveResult)
 		{
-			this.editor = editor;
 			HashSet<string> alreadyAdded = new HashSet<string> ();
 			if (resolveResult.CallingType != null) {
 				IType resolvedType = resolver.Dom.GetType (resolveResult.ResolvedType);
@@ -124,10 +120,8 @@ namespace MonoDevelop.CSharp.Completion
 		}
 
 		// used for constructor completion
-		public NRefactoryParameterDataProvider (MonoDevelop.Ide.Gui.TextEditor editor, NRefactoryResolver resolver, IType type)
+		public NRefactoryParameterDataProvider (TextEditorData editor, NRefactoryResolver resolver, IType type)
 		{
-			this.editor = editor;
-			
 			if (type != null) {
 				if (type.ClassType == ClassType.Delegate) {
 					IMethod invokeMethod = ExtractInvokeMethod (type);
@@ -175,9 +169,8 @@ namespace MonoDevelop.CSharp.Completion
 		}
 		
  		string delegateName = null;
-		public NRefactoryParameterDataProvider (MonoDevelop.Ide.Gui.TextEditor editor, string delegateName, IType type)
+		public NRefactoryParameterDataProvider (TextEditorData editor, string delegateName, IType type)
 		{
-			this.editor = editor;
 			this.delegateName = delegateName;
 			if (type != null) {
 				methods.Add (ExtractInvokeMethod (type));
@@ -186,14 +179,14 @@ namespace MonoDevelop.CSharp.Completion
 		
 		#region IParameterDataProvider implementation
 		
-		public int GetCurrentParameterIndex (CodeCompletionContext ctx)
+		public int GetCurrentParameterIndex (ICompletionWidget widget, CodeCompletionContext ctx)
 		{
-			return GetCurrentParameterIndex (editor, ctx.TriggerOffset, 0);
+			return GetCurrentParameterIndex (widget, ctx.TriggerOffset, 0);
 		}
 		
-		internal static int GetCurrentParameterIndex (MonoDevelop.Ide.Gui.TextEditor editor, int offset, int memberStart)
+		internal static int GetCurrentParameterIndex (ICompletionWidget widget, int offset, int memberStart)
 		{
-			int cursor = editor.CursorPosition;
+			int cursor = widget.CurrentCodeCompletionContext.TriggerOffset;
 			int i = offset;
 			
 			if (i > cursor)
@@ -206,7 +199,7 @@ namespace MonoDevelop.CSharp.Completion
 			int parentheses = 0;
 			int bracket = 0;
 			do {
-				char c = editor.GetCharAt (i - 1);
+				char c = widget.GetChar (i - 1);
 				engine.Push (c);
 				switch (c) {
 				case '{':
@@ -238,10 +231,13 @@ namespace MonoDevelop.CSharp.Completion
 		
 		public string GetMethodMarkup (int overload, string[] parameterMarkup, int currentParameter)
 		{
-			string name = (this.delegateName ?? (methods[overload].IsConstructor ? ambience.GetString (methods[overload].DeclaringType, OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup | OutputFlags.IncludeGenerics) : methods[overload].Name));
+			var flags = OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup | OutputFlags.IncludeGenerics;
+			if (staticResolve)
+				flags |= OutputFlags.StaticUsage;
+			string name = (this.delegateName ?? (methods [overload].IsConstructor ? ambience.GetString (methods [overload].DeclaringType, flags) : methods [overload].Name));
 			StringBuilder parameters = new StringBuilder ();
 			int curLen = 0;
-			string prefix = !methods[overload].IsConstructor ? ambience.GetString (methods[overload].ReturnType, OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup  | OutputFlags.IncludeGenerics) + " " : "";
+			string prefix = !methods [overload].IsConstructor ? ambience.GetString (methods [overload].ReturnType, flags) + " " : "";
 
 			foreach (string parameter in parameterMarkup) {
 				if (parameters.Length > 0)
@@ -259,22 +255,22 @@ namespace MonoDevelop.CSharp.Completion
 				parameters.Append (parameter);
 			}
 			StringBuilder sb = new StringBuilder ();
-			if (methods[overload].WasExtended)
+			if (!staticResolve && methods [overload].WasExtended)
 				sb.Append (GettextCatalog.GetString ("(Extension) "));
 			sb.Append (prefix);
 			sb.Append ("<b>");
-			sb.Append (name);
+			sb.Append (CSharpAmbience.FilterName (name));
 			sb.Append ("</b> (");
 			sb.Append (parameters.ToString ());
 			sb.Append (")");
 
-			if (methods[overload].IsObsolete) {
+			if (methods [overload].IsObsolete) {
 				sb.AppendLine ();
 				sb.Append (GettextCatalog.GetString ("[Obsolete]"));
 			}
-			IParameter curParameter = currentParameter >= 0 && currentParameter < methods[overload].Parameters.Count ? methods[overload].Parameters[currentParameter] : null;
+			IParameter curParameter = currentParameter >= 0 && currentParameter < methods [overload].Parameters.Count ? methods [overload].Parameters [currentParameter] : null;
 
-			string docText = AmbienceService.GetDocumentation (methods[overload]);
+			string docText = AmbienceService.GetDocumentation (methods [overload]);
 
 			if (!string.IsNullOrEmpty (docText)) {
 				string text = docText;
@@ -282,11 +278,11 @@ namespace MonoDevelop.CSharp.Completion
 					Regex paramRegex = new Regex ("(\\<param\\s+name\\s*=\\s*\"" + curParameter.Name + "\"\\s*\\>.*?\\</param\\>)", RegexOptions.Compiled);
 					Match match = paramRegex.Match (docText);
 					if (match.Success) {
-						text = match.Groups[1].Value;
-						text = "<summary>" + AmbienceService.GetDocumentationSummary (methods[overload]) + "</summary>" + text;
+						text = match.Groups [1].Value;
+						text = "<summary>" + AmbienceService.GetDocumentationSummary (methods [overload]) + "</summary>" + text;
 					}
 				} else {
-					text = "<summary>" + AmbienceService.GetDocumentationSummary (methods[overload]) + "</summary>";
+					text = "<summary>" + AmbienceService.GetDocumentationSummary (methods [overload]) + "</summary>";
 				}
 				sb.AppendLine ();
 				sb.Append (AmbienceService.GetDocumentationMarkup (text, new AmbienceService.DocumentationFormatOptions {
@@ -294,6 +290,18 @@ namespace MonoDevelop.CSharp.Completion
 					Ambience = ambience,
 					SmallText = true
 				}));
+			}
+			
+			if (curParameter != null) {
+				var returnType = curParameter.DeclaringMember.SourceProjectDom.GetType (curParameter.ReturnType);
+				if (returnType != null && returnType.ClassType == ClassType.Delegate) {
+					sb.AppendLine ();
+					sb.AppendLine ();
+					sb.Append ("<small>");
+					sb.AppendLine (GettextCatalog.GetString ("Delegate information"));
+					sb.Append (ambience.GetString (returnType, OutputFlags.ReformatDelegates | OutputFlags.IncludeReturnType | OutputFlags.IncludeParameters | OutputFlags.IncludeParameterName));
+					sb.Append ("</small>");
+				}
 			}
 			return sb.ToString ();
 		}

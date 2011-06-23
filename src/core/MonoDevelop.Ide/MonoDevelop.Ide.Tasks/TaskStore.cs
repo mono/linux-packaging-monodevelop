@@ -83,7 +83,7 @@ namespace MonoDevelop.Ide.Tasks
 					return;
 				Task[] ctasks = GetFileTasks (args.TextFile.Name.FullPath);
 				foreach (Task task in ctasks) {
-					if (task.Line - 1 > args.LineNumber || (task.Line - 1 == args.LineNumber && task.Column - 1 >= args.Column)) {
+					if (task.Line > args.LineNumber || (task.Line == args.LineNumber && task.Column >= args.Column)) {
 						if (task.SavedLine == -1)
 							task.SavedLine = task.Line;
 						task.Line += args.LineCount;
@@ -310,29 +310,33 @@ namespace MonoDevelop.Ide.Tasks
 				NotifyTasksRemoved (new Task [] { t });
 		}
 		
-		void ProjectFileRemoved (object sender, ProjectFileEventArgs e)
+		void ProjectFileRemoved (object sender, ProjectFileEventArgs args)
 		{
 			BeginTaskUpdates ();
 			try {
-				foreach (Task curTask in new List<Task> (GetFileTasks (e.ProjectFile.FilePath))) {
-					Remove (curTask);
+				foreach (ProjectFileEventInfo e in args) {
+					foreach (Task curTask in new List<Task> (GetFileTasks (e.ProjectFile.FilePath))) {
+						Remove (curTask);
+					}
 				}
 			} finally {
 				EndTaskUpdates ();
 			}
 		}
 		
-		void ProjectFileRenamed (object sender, ProjectFileRenamedEventArgs e)
+		void ProjectFileRenamed (object sender, ProjectFileRenamedEventArgs args)
 		{
 			BeginTaskUpdates ();
 			try {
-				Task[] ctasks = GetFileTasks (e.OldName);
-				foreach (Task curTask in ctasks)
-					curTask.FileName = e.NewName;
-				taskIndex.Remove (e.OldName);
-				taskIndex [e.NewName] = ctasks;
-				tasksAdded.AddRange (ctasks);
-				tasksRemoved.AddRange (ctasks);
+				foreach (ProjectFileRenamedEventInfo e in args) {
+					Task[] ctasks = GetFileTasks (e.OldName);
+					foreach (Task curTask in ctasks)
+						curTask.FileName = e.NewName;
+					taskIndex.Remove (e.OldName);
+					taskIndex [e.NewName] = ctasks;
+					tasksAdded.AddRange (ctasks);
+					tasksRemoved.AddRange (ctasks);
+				}
 			} finally {
 				EndTaskUpdates ();
 			}
@@ -423,7 +427,7 @@ namespace MonoDevelop.Ide.Tasks
 			}
 		}
 		
-		bool IsProjectTaskFile (Task t)
+		public static bool IsProjectTaskFile (Task t)
 		{
 			if (t.FileName.IsNullOrEmpty)
 				return false;

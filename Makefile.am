@@ -7,24 +7,24 @@ bin_SCRIPTS = monodevelop mdtool
 
 buildinfo = $(top_builddir)/build/bin/buildinfo
 
-all:
+all: vcrevision
 
 vcrevision:
 	@if test -d ../.git; then \
 		version=$$(cd ..; \
 			LANG=C; export LANG; \
-			git describe --dirty --always --abbrev=0; \
+			git describe --dirty --always --abbrev=0 --match nothing; \
 		); \
-		echo "git revision: $$version" > "vcrevision"; \
+		echo "$$version" > "vcrevision"; \
 	else \
 		if test ! -f ./vcrevision; then \
-			echo "git revision: unknown" > "vcrevision"; \
+			echo "unknown" > "vcrevision"; \
 		fi; \
 	fi
 
 $(buildinfo): vcrevision
 	@mkdir -p "$(top_builddir)/build/bin"
-	@cp "$(top_srcdir)/vcrevision" "$@"
+	@echo "Git revision: $$(cat $(top_srcdir)/vcrevision)" > "$@"
 	@echo "Build date: $$(date -u +'%Y-%m-%d %H:%M:%S%z')" >> "$@"
 	@echo "Updated build information"
 	@cat $(buildinfo)
@@ -88,8 +88,8 @@ DOCFILES = \
 
 mpacks: $(PACKAGES)
 	test -z "packages" || mkdir -p packages
-	mono build/bin/mdrun.exe setup p $(PACKAGES:%=%) -d:packages
-	mono build/bin/mdrun.exe setup rb packages
+	$(MDTOOL_RUN) setup p $(PACKAGES:%=%) -d:packages
+	$(MDTOOL_RUN) setup rb packages
 
 apidocs:
 	monodocer $(DOCFILES:%=--assembly:%) -delete --path docs/api

@@ -53,15 +53,14 @@ namespace MonoDevelop.Projects.Dom
 			Namespace = outerType.DecoratedFullName;
 			Location = outerType.Location;
 			DeclaringType = outerType;
-			if (tp.ValueTypeRequired)
-				BaseType = new DomReturnType ("System.ValueType");
 			
 			if (tp.Constraints.Count > 0)
 				ClassType = ClassType.Interface;
 			foreach (IReturnType rt in tp.Constraints) {
 				if (FindCyclicReference (new HashSet<ITypeParameter> () { tp }, outerType, ((DomReturnType)rt).DecoratedFullName))
 					continue;
-				IType bt = dom.SearchType (typeParameterMember, rt);
+				IType bt = dom.SearchType (compilationUnit, outerType, outerType.Location, rt);
+				
 				IReturnType resolvedType = rt;
 				if (bt != null) {
 					resolvedType = new DomReturnType (bt);
@@ -117,27 +116,15 @@ namespace MonoDevelop.Projects.Dom
 			}
 		}
 
-		public bool ConstructorRequired {
-			get {
-				return typeparam.ConstructorRequired;
-			}
-		}
-
-		public bool ClassRequired {
-			get { 
-				return typeparam.ClassRequired; 
-			}
-		}
-
-		public bool ValueTypeRequired {
-			get { 
-				return typeparam.ValueTypeRequired;
-			}
-		}
-
 		public TypeParameterVariance Variance {
 			get {
 				return typeparam.Variance;
+			}
+		}
+		
+		public TypeParameterModifier TypeParameterModifier {
+			get {
+				return typeparam.TypeParameterModifier;
 			}
 		}
 

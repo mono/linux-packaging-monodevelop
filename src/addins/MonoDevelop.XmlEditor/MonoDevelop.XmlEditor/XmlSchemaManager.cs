@@ -67,7 +67,9 @@ namespace MonoDevelop.XmlEditor
 			get {
 				if (builtinSchemas == null) {
 					builtinSchemas  = new XmlSchemaCompletionDataCollection ();
-					LoadSchemas (builtinSchemas, SchemaFolder, true);
+					var nodes = Mono.Addins.AddinManager.GetExtensionNodes ("/MonoDevelop/XmlEditor/XmlSchemas");
+					foreach (XmlSchemaNode node in nodes)
+						LoadSchema (builtinSchemas, node.File, true);
 				}
 				return builtinSchemas;
 			}
@@ -75,23 +77,24 @@ namespace MonoDevelop.XmlEditor
 		
 		public static XmlSchemaCompletionData GetSchemaCompletionData (string fileExtension)
 		{
-			XmlSchemaCompletionData data = null;
-			
-			var association = XmlEditorOptions.GetSchemaAssociation (fileExtension);
-			if (association != null)
-				if (association.NamespaceUri.Length > 0)
-					data = SchemaCompletionDataItems [association.NamespaceUri];
-			
-			return data;
+			var association = XmlFileAssociationManager.GetAssociation (fileExtension);
+			if (association == null || association.NamespaceUri.Length == 0)
+				return null;
+			var u = new Uri (association.NamespaceUri);
+			if (u.IsFile) {
+				return ReadLocalSchema (u);
+			} else {
+				return SchemaCompletionDataItems [association.NamespaceUri];
+			}
 		}
 		
 		/// <summary>
 		/// Gets the namespace prefix that is associated with the
 		/// specified file extension.
 		/// </summary>
-		public static string GetNamespacePrefix(string extension)
+		public static string GetNamespacePrefix (string extension)
 		{
-			var association = XmlEditorOptions.GetSchemaAssociation(extension);
+			var association = XmlFileAssociationManager.GetAssociation (extension);
 			if (association != null) {
 				return association.NamespacePrefix;
 			}
@@ -198,20 +201,22 @@ namespace MonoDevelop.XmlEditor
 			}
 		}
 		
-		/// <summary>
-		/// Gets the folder where the schemas for all users on the
-		/// local machine are stored.
-		/// </summary>
-		static string SchemaFolder {
-			get {
-				string location = Assembly.GetAssembly (typeof(XmlSchemaManager)).Location;
-				return Path.GetFullPath (Path.Combine (Path.GetDirectoryName (location), "schemas"));
+		//FIXME: cache and re-use these instances using a weak reference table
+		static XmlSchemaCompletionData ReadLocalSchema (Uri uri)
+		{
+			try {
+				return new XmlSchemaCompletionData (uri.ToString (), uri.LocalPath);
+			} catch (Exception ex) {
+				LoggingService.LogWarning (
+				    "XmlSchemaManager is unable to read schema '{0}', because of the following error: {1}",
+				    uri, ex.Message);
+				return null;
 			}
 		}
 		
 		// Gets the folder where schemas are stored for an individual user.
 		static string UserSchemaFolder {
-			get { return Path.Combine (PropertyService.ConfigPath, "schemas"); }
+			get { return PropertyService.Locations.Data.Combine ("schemas"); }
 		}
 		
 		// FIXME: Should really pass schema info with the event.

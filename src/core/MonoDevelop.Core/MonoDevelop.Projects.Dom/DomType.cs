@@ -120,7 +120,7 @@ namespace MonoDevelop.Projects.Dom
 			}
 		}
 		
-		public virtual ProjectDom SourceProjectDom {
+		public override ProjectDom SourceProjectDom {
 			get {
 				if (sourceProjectDom == null && DeclaringType != null)
 					return DeclaringType.SourceProjectDom;
@@ -267,7 +267,9 @@ namespace MonoDevelop.Projects.Dom
 		
 		public override string HelpUrl {
 			get {
-				return "T:" + GetNetFullName (this);
+				if (TypeParameters.Count == 0)
+					return "T:" + FullName;
+				return "T:" + FullName + "`" + TypeParameters.Count;
 			}
 		}
 		
@@ -360,7 +362,8 @@ namespace MonoDevelop.Projects.Dom
 		
 		public override string ToString ()
 		{
-			return String.Format ("[DomType: FullName={0}, #TypeArguments={2}, #Members={1}]", this.FullName, this.Members.Count (), TypeParameters.Count);
+			int memberCount = fieldCount + methodCount + constructorCount + indexerCount + propertyCount + eventCount + innerTypeCount;
+			return String.Format ("[DomType: FullName={0}, #TypeArguments={2}, #Members={1}]", this.FullName, memberCount, TypeParameters.Count);
 		}
 		
 		bool IsEqual (ReadOnlyCollection<IParameter> c1, ReadOnlyCollection<IParameter> c2)
@@ -596,24 +599,46 @@ namespace MonoDevelop.Projects.Dom
 		
 		public static IType CreateInstantiatedGenericTypeInternal (IType type, IList<IReturnType> genericArguments)
 		{
+			return CreateInstantiatedGenericTypeInternal (type, genericArguments, null);
+		}
+
+		
+		static void AddInnerTypes (GenericTypeInstanceResolver resolver, string decoratedFullName, IType type, IList<IReturnType> genericArguments)
+		{
+			foreach (var inner in type.InnerTypes) {
+				var constructedReturnType = new DomReturnType (type.Namespace, type.Name, false, genericArguments);
+				constructedReturnType.Parts.Add (new ReturnTypePart (inner.Name));
+				string constructedName = decoratedFullName + "." + inner.DecoratedFullName;
+				resolver.Add (constructedName, constructedReturnType);
+				AddInnerTypes (resolver, constructedName, inner, genericArguments);
+			}
+			
+		}
+
+		static IType CreateInstantiatedGenericTypeInternal (IType type, IList<IReturnType> genericArguments, GenericTypeInstanceResolver parent)
+		{
 			// This method is now internal. The public one has been moved to ProjectDom, which take cares of caching
 			// instantiated generic types.
 			if (type is InstantiatedType)
 				return type;
 			string name = GetInstantiatedTypeName (type.Name, genericArguments);
-			GenericTypeInstanceResolver resolver = new GenericTypeInstanceResolver ();
+			GenericTypeInstanceResolver resolver = new GenericTypeInstanceResolver (type.SourceProjectDom);
+			resolver.Parent = parent;
 			if (genericArguments != null) {
 				int j = genericArguments.Count - 1;
 				IType curType = type;
 				while (curType != null) {
 					string fullTypeName = curType.DecoratedFullName;
 					for (int i = curType.TypeParameters.Count - 1; i >= 0 && j >= 0; i--, j--) {
-						resolver.Add (fullTypeName + "." + curType.TypeParameters[i].Name, genericArguments[j]);
+						resolver.Add (fullTypeName + "." + curType.TypeParameters [i].Name, genericArguments [j]);
 					}
 					curType = curType.DeclaringType;
 				}
 			}
-			InstantiatedType result = (InstantiatedType) type.AcceptVisitor (resolver, type);
+			
+			AddInnerTypes (resolver, type.DecoratedFullName, type, genericArguments);
+			
+			InstantiatedType result = (InstantiatedType)type.AcceptVisitor (resolver, type);
 			if (result.typeParameters != null)
 				result.typeParameters.Clear ();
 			result.Name = name;
@@ -622,23 +647,34 @@ namespace MonoDevelop.Projects.Dom
 			result.GenericParameters = genericArguments;
 			result.UninstantiatedType = type;
 			result.DeclaringType = type.DeclaringType;
-			CreateInstantiatedSubtypes (result, type, genericArguments);
+			
+			CreateInstantiatedSubtypes (result, type, genericArguments, resolver);
+			Dictionary<string, IType> typeTable = new Dictionary<string, IType> ();
+			Stack<IType> typeStack = new Stack<IType> ();
+			typeStack.Push (result);
+			while (typeStack.Count > 0) {
+				IType cur = typeStack.Pop ();
+				foreach (var inner in cur.InnerTypes)
+					typeStack.Push (inner);
+				var returnType = new DomReturnType (cur);
+				typeTable [returnType.ToInvariantString ()] = cur;
+			}
+			result.AcceptVisitor (new SeedVisitor (), typeTable);
 			return result;
 		}
 
-		static void CreateInstantiatedSubtypes (InstantiatedType result, IType curType, IList<IReturnType> genericArguments)
+		static void CreateInstantiatedSubtypes (InstantiatedType result, IType curType, IList<IReturnType> genericArguments, GenericTypeInstanceResolver resolver)
 		{
 			foreach (IType innerType in curType.InnerTypes) {
-
 				List<IReturnType> newArguments = new List<IReturnType> ();
 				List<int> removeInheritedArguments = new List<int> ();
 				for (int i = 0; i < innerType.TypeParameters.Count; i++) {
-					ITypeParameter curParameter = innerType.TypeParameters[i];
+					ITypeParameter curParameter = innerType.TypeParameters [i];
 					bool found = false;
-					for (int j = curType.TypeParameters.Count - 1; j >= 0 ; j--) {
-						if (curType.TypeParameters[j].Name == curParameter.Name) {
+					for (int j = curType.TypeParameters.Count - 1; j >= 0; j--) {
+						if (curType.TypeParameters [j].Name == curParameter.Name) {
 							removeInheritedArguments.Add (newArguments.Count);
-							newArguments.Add (genericArguments[j]);
+							newArguments.Add (genericArguments [j]);
 							found = true;
 							break;
 						}
@@ -647,16 +683,16 @@ namespace MonoDevelop.Projects.Dom
 						newArguments.Add (new DomReturnType (curParameter.Name));
 				}
 
-				InstantiatedType innerInstantiatedType = (InstantiatedType)CreateInstantiatedGenericTypeInternal (innerType, newArguments);
+				InstantiatedType innerInstantiatedType = (InstantiatedType)CreateInstantiatedGenericTypeInternal (innerType, newArguments, resolver);
 				for (int i = 0, j = 0; i < innerInstantiatedType.TypeParameters.Count && j < innerInstantiatedType.TypeParameters.Count; i++,j++) {
-					if (curType.TypeParameters[i].Name == innerInstantiatedType.TypeParameters[j].Name) {
+					if (curType.TypeParameters [i].Name == innerInstantiatedType.TypeParameters [j].Name) {
 						innerInstantiatedType.typeParameters.RemoveAt (j);
 						j--;
 					}
 				}
 
 				result.Add (innerInstantiatedType);
-				CreateInstantiatedSubtypes (innerInstantiatedType, innerType, newArguments);
+				CreateInstantiatedSubtypes (innerInstantiatedType, innerType, newArguments, resolver);
 				foreach (int i in removeInheritedArguments) {
 					if (i >= 0 && i < newArguments.Count)
 						newArguments.RemoveAt (i);
@@ -664,10 +700,76 @@ namespace MonoDevelop.Projects.Dom
 			}
 		}
 		
+		class SeedVisitor : AbstractDomVisitor<Dictionary<string, IType>, object>
+		{
+			public override object Visit (IReturnType returnType, Dictionary<string, IType> data)
+			{
+				IType underlyingType;
+				if (data.TryGetValue (returnType.ToInvariantString (), out underlyingType)) 
+					((DomReturnType)returnType).Type = underlyingType;
+				return base.Visit (returnType, data);
+			}
+			
+			public override object Visit (IType type, Dictionary<string, IType> data)
+			{
+				foreach (IMember member in type.Members)
+					member.AcceptVisitor (this, data);
+				return base.Visit (type, data);
+			}
+			
+			public override object Visit (MonoDevelop.Projects.Dom.IEvent evt, System.Collections.Generic.Dictionary<string, MonoDevelop.Projects.Dom.IType> data)
+			{
+				if (evt.ReturnType != null)
+					evt.ReturnType.AcceptVisitor (this, data);
+				return null;
+			}
+	
+			public override object Visit (MonoDevelop.Projects.Dom.IField field, System.Collections.Generic.Dictionary<string, MonoDevelop.Projects.Dom.IType> data)
+			{
+				if (field.ReturnType != null)
+					field.ReturnType.AcceptVisitor (this, data);
+				return null;
+			}
+	
+			public override object Visit (MonoDevelop.Projects.Dom.IMethod method, System.Collections.Generic.Dictionary<string, MonoDevelop.Projects.Dom.IType> data)
+			{
+				if (method.ReturnType != null)
+					method.ReturnType.AcceptVisitor (this, data);
+				foreach (IParameter param in method.Parameters) {
+					param.AcceptVisitor (this, data);
+				}
+				return null;
+			}
+	
+			public override object Visit (MonoDevelop.Projects.Dom.IParameter parameter, System.Collections.Generic.Dictionary<string, MonoDevelop.Projects.Dom.IType> data)
+			{
+				if (parameter.ReturnType != null)
+					parameter.ReturnType.AcceptVisitor (this, data);
+				return null;
+			}
+	
+			public override object Visit (MonoDevelop.Projects.Dom.IProperty property, System.Collections.Generic.Dictionary<string, MonoDevelop.Projects.Dom.IType> data)
+			{
+				if (property.ReturnType != null)
+					property.ReturnType.AcceptVisitor (this, data);
+				foreach (IParameter param in property.Parameters) {
+					param.AcceptVisitor (this, data);
+				}
+				return null;
+			}
+		}
+		
 		internal class GenericTypeInstanceResolver: CopyDomVisitor<IType>
 		{
+			public GenericTypeInstanceResolver Parent;
 			public Dictionary<string, IReturnType> typeTable = new Dictionary<string,IReturnType> ();
+			ProjectDom dom;
 			
+			public GenericTypeInstanceResolver (ProjectDom dom)
+			{
+				this.dom = dom;
+			}
+
 			public void Add (string name, IReturnType type)
 			{
 				typeTable.Add (name, type);
@@ -682,7 +784,7 @@ namespace MonoDevelop.Projects.Dom
 				return base.Visit (type, data);
 			}
 			
-			IReturnType LookupReturnType (string decoratedName, IReturnType type, IType typeToInstantiate) 
+			IReturnType LookupReturnType (string decoratedName, IReturnType type, IType typeToInstantiate)
 			{
 				IReturnType res;
 				if (typeTable.TryGetValue (decoratedName, out res)) {
@@ -694,12 +796,13 @@ namespace MonoDevelop.Projects.Dom
 					copy.SetDimensions (type.GetDimensions ());
 					return copy;
 				}
-				return null;
+				
+				return Parent != null ? Parent.LookupReturnType (decoratedName, type, typeToInstantiate) : null;
 			}
 			
 			public override INode Visit (IReturnType type, IType typeToInstantiate)
 			{
-				DomReturnType copyFrom = (DomReturnType) type; 
+				DomReturnType copyFrom = (DomReturnType)type; 
 				string decoratedName = copyFrom.DecoratedFullName;
 				IReturnType result = LookupReturnType (decoratedName, type, typeToInstantiate);
 				IType curType = currentType;
@@ -707,7 +810,8 @@ namespace MonoDevelop.Projects.Dom
 					result = LookupReturnType (curType.DecoratedFullName + "." + decoratedName, type, typeToInstantiate);
 					curType = curType.DeclaringType;
 				}
-				return result ?? base.Visit (type, typeToInstantiate);
+				result = result ?? (IReturnType) base.Visit (type, typeToInstantiate);
+				return dom != null ? dom.GetSharedReturnType (result) : result;
 			}
 			
 			protected override DomType CreateInstance (IType type, IType typeToInstantiate)
@@ -814,8 +918,9 @@ namespace MonoDevelop.Projects.Dom
 			if (resolvedType != null) {
 				foreach (IType curType in dom.GetInheritanceTree (resolvedType)) {
 					foreach (IReturnType baseType in curType.BaseTypes) {
-						if (baseType.FullName == "System.Collections.Generic.IEnumerable" && baseType.GenericArguments.Count == 1)
-							return baseType.GenericArguments[0];
+						if (baseType.FullName == "System.Collections.Generic.IEnumerable" && baseType.GenericArguments.Count == 1) {
+							return baseType.GenericArguments [0];
+						}
 					}
 					
 					foreach (IProperty property in curType.Properties) {
@@ -826,7 +931,7 @@ namespace MonoDevelop.Projects.Dom
 			}
 
 			if (returnType.GenericArguments.Count > 0)
-				return returnType.GenericArguments[0];
+				return returnType.GenericArguments [0];
 
 			return null;
 		}

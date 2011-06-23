@@ -1,8 +1,29 @@
+2010-07-12  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Moonlight.addin.xml:
+	* MonoDevelop.Moonlight/MoonlightParser.cs: Track
+	  ProjectDomService/Parser API.
+
+2010-07-11  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Moonlight/MoonlightFrameworkBackend.cs:
+	  Workaround for gmcs bug.
+
 2010-07-11  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.Moonlight/MoonlightBuildExtension.cs: Include
 	  redist assemblies in manifest AssemblyParts. Should fix Bug
 	  600727 - Moonlight: DataGrid missing.
+
+2010-07-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Moonlight/MoonlightFrameworkBackend.cs: reverted
+	  change (the bug is gone).
+
+2010-07-06  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Moonlight/MoonlightFrameworkBackend.cs: added
+	  null check.
 
 2010-06-14  Lluis Sanchez Gual  <lluis@novell.com>
 

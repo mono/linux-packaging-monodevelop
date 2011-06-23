@@ -46,6 +46,8 @@ namespace MonoDevelop.WelcomePage
 		WelcomePageWidget widget;
 		ScrolledWindow scroller;
 		
+		EventHandler newsUpdatedHandler;
+		
 		// netNewsXml is where online the news.xml file can be found
 		static string netNewsXml {
 			get {
@@ -77,7 +79,8 @@ namespace MonoDevelop.WelcomePage
 			
 			recentChangesHandler = DispatchService.GuiDispatch (new EventHandler (RecentChangesHandler));
 			DesktopService.RecentFiles.Changed += recentChangesHandler;
-			NewsUpdated += (EventHandler) DispatchService.GuiDispatch (new EventHandler (HandleNewsUpdate));
+			newsUpdatedHandler = (EventHandler) DispatchService.GuiDispatch (new EventHandler (HandleNewsUpdate));
+			NewsUpdated += newsUpdatedHandler;
 			
 			UpdateNews ();
 			
@@ -94,9 +97,15 @@ namespace MonoDevelop.WelcomePage
 			scroller.Show ();
 		}
 		
+		static string NewsFile {
+			get {
+				return PropertyService.Locations.Cache.Combine ("WelcomePageNews.xml");
+			}
+		}
+		
 		public XmlDocument GetUpdatedXmlDocument ()
 		{
-			string localCachedNewsFile = System.IO.Path.Combine (PropertyService.ConfigPath, "news.xml");
+			string localCachedNewsFile = NewsFile;
 			
 			Stream stream = Assembly.GetExecutingAssembly ().GetManifestResourceStream ("WelcomePageContent.xml");
 			XmlDocument contentDoc = new XmlDocument ();
@@ -128,7 +137,7 @@ namespace MonoDevelop.WelcomePage
 			LoggingService.LogInfo ("Updating Welcome Page from '{0}'.", netNewsXml);
 			
 			HttpWebRequest request = (HttpWebRequest) WebRequest.Create (netNewsXml);
-			string localCachedNewsFile = System.IO.Path.Combine (PropertyService.ConfigPath, "news.xml");
+			string localCachedNewsFile = NewsFile;
 			FileInfo localNewsXml = new FileInfo (localCachedNewsFile);
 			if (localNewsXml.Exists)
 				request.IfModifiedSince = localNewsXml.LastWriteTime;
@@ -139,7 +148,7 @@ namespace MonoDevelop.WelcomePage
 						var response = (HttpWebResponse) request.EndGetResponse (ar);
 						if (response.StatusCode == HttpStatusCode.OK) {
 							using (var fs = File.Create (localCachedNewsFile))
-								CopyStream (response.GetResponseStream (), fs, response.ContentLength);
+								response.GetResponseStream ().CopyTo (fs, 2048);
 						}
 						NewsUpdated (null, EventArgs.Empty);
 					} catch (System.Net.WebException wex) {
@@ -162,19 +171,6 @@ namespace MonoDevelop.WelcomePage
 				LoggingService.LogWarning ("Welcome Page news file could not be downloaded.", ex);
 				lock (updateLock)
 					isUpdating = false;
-			}
-		}
-		
-		static void CopyStream (Stream fr, Stream to, long remaining)
-		{
-			int position = 0;
-			int readBytes = -1;
-			byte[] buffer = new byte[2048];
-			while (readBytes != 0) {							
-				readBytes = fr.Read (buffer, position, (int) (remaining > 2048 ? 2048 : remaining));
-				position += readBytes;
-				remaining -= readBytes;
-				to.Write (buffer, 0, readBytes);
 			}
 		}
 		
@@ -284,6 +280,7 @@ namespace MonoDevelop.WelcomePage
 
 		public override void Dispose ()
 		{
+			NewsUpdated -= newsUpdatedHandler;
 			if (recentChangesHandler != null) {
 				DesktopService.RecentFiles.Changed -= recentChangesHandler;
 				recentChangesHandler = null;

@@ -209,9 +209,13 @@ namespace MonoDevelop.Projects
 		
 		public override void Dispose()
 		{
+			if (items != null) {
+				foreach (SolutionItem e in items)
+					e.Dispose ();
+				items = null;
+			}
+			files = null;
 			base.Dispose ();
-			foreach (SolutionItem e in Items)
-				e.Dispose ();
 		}
 		
 		public SolutionItem ReloadItem (IProgressMonitor monitor, SolutionItem sitem)
@@ -681,7 +685,7 @@ namespace MonoDevelop.Projects
 			}
 		}
 		
-		public void RenameFileInProjects (string sourceFile, string targetFile)
+		public void RenameFileInProjects (FilePath sourceFile, FilePath targetFile)
 		{
 			if (Directory.Exists (targetFile)) {
 				RenameDirectoryInAllProjects (sourceFile, targetFile);
@@ -690,22 +694,24 @@ namespace MonoDevelop.Projects
 			}
 		}
 		
-		void RenameFileInAllProjects (string oldName, string newName)
+		void RenameFileInAllProjects (FilePath oldName, FilePath newName)
 		{
 			foreach (Project projectEntry in GetAllProjects()) {
 				foreach (ProjectFile fInfo in projectEntry.Files) {
-					if (fInfo.Name == oldName)
+					if (fInfo.FilePath == oldName)
 						fInfo.Name = newName;
 				}
 			}
 		}
 
-		void RenameDirectoryInAllProjects (string oldName, string newName)
+		void RenameDirectoryInAllProjects (FilePath oldName, FilePath newName)
 		{
 			foreach (Project projectEntry in GetAllProjects()) {
 				foreach (ProjectFile fInfo in projectEntry.Files) {
-					if (fInfo.Name.StartsWith (oldName))
-						fInfo.Name = newName + fInfo.Name.Substring(oldName.Length);
+					if (fInfo.FilePath == oldName)
+						fInfo.Name = newName;
+					else if (fInfo.FilePath.IsChildPathOf (oldName))
+						fInfo.Name = newName.Combine (fInfo.FilePath.ToRelative (oldName));
 				}
 			}
 		}

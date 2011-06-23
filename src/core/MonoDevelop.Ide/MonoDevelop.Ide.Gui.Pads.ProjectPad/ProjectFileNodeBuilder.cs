@@ -95,7 +95,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		public override object GetParentObject (object dataObject)
 		{
 			ProjectFile file = (ProjectFile) dataObject;
-			FilePath dir = !file.IsLink ? file.FilePath : file.Project.BaseDirectory.Combine (file.ProjectVirtualPath).ParentDirectory;
+			FilePath dir = !file.IsLink ? file.FilePath.ParentDirectory : file.Project.BaseDirectory.Combine (file.ProjectVirtualPath).ParentDirectory;
 			
 			if (!string.IsNullOrEmpty (file.DependsOn)) {
 				ProjectFile groupUnder = file.Project.Files.GetFile (file.FilePath.ParentDirectory.Combine (file.DependsOn));
@@ -223,7 +223,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			
 			string question, secondaryText;
 			
-			secondaryText = GettextCatalog.GetString ("The Delete option permanently removes the file from your hard disk. Click Remove from Project if you only want to remove it from your current solution.");
+			secondaryText = GettextCatalog.GetString ("The Delete option permanently removes the file from your hard disk. " +
+				"Click Remove from Project if you only want to remove it from your current solution.");
 			
 			if (hasChildren) {
 				if (files.Count == 1)
@@ -291,9 +292,28 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		[CommandUpdateHandler (ViewCommands.OpenWithList)]
 		public void OnOpenWithUpdate (CommandArrayInfo info)
 		{
-			ProjectFile finfo = (ProjectFile) CurrentNode.DataItem;
+			var pf = (ProjectFile) CurrentNode.DataItem;
+			PopulateOpenWithViewers (info, pf.Project, pf.FilePath);
+		}
+		
+		internal static void PopulateOpenWithViewers (CommandArrayInfo info, Project project, string filePath)
+		{
+			var viewers = DisplayBindingService.GetFileViewers (filePath, project).ToList ();
+			
+			//show the default viewer first
+			var def = viewers.FirstOrDefault (v => v.CanUseAsDefault) ?? viewers.FirstOrDefault (v => v.IsExternal);
+			if (def != null) {
+				CommandInfo ci = info.Add (def.Title, def);
+				ci.Description = GettextCatalog.GetString ("Open with '{0}'", def.Title);
+				if (viewers.Count > 1)
+					info.AddSeparator ();
+			}
+			
+			//then the builtins, followed by externals
 			FileViewer prev = null; 
-			foreach (FileViewer fv in IdeApp.Workbench.GetFileViewers (finfo.Name)) {
+			foreach (FileViewer fv in viewers) {
+				if (def != null && fv.Equals (def))
+					continue;
 				if (prev != null && fv.IsExternal != prev.IsExternal)
 					info.AddSeparator ();
 				CommandInfo ci = info.Add (fv.Title, fv);

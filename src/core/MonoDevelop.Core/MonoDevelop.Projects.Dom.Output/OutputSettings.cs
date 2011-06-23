@@ -209,6 +209,12 @@ namespace MonoDevelop.Projects.Dom.Output
 			}
 		}
 		
+		public bool GeneralizeGenerics {
+			get {
+				return (OutputFlags & OutputFlags.GeneralizeGenerics) != 0;
+			}
+		}
+		
 		public bool UseNETTypeNames {
 			get {
 				return (OutputFlags & OutputFlags.UseNETTypeNames) != 0;
@@ -218,6 +224,18 @@ namespace MonoDevelop.Projects.Dom.Output
 		public bool ReformatDelegates {
 			get {
 				return (OutputFlags & OutputFlags.ReformatDelegates) != 0;
+			}
+		}
+		
+		public bool StaticUsage {
+			get {
+				return (OutputFlags & OutputFlags.StaticUsage) != 0;
+			}
+		}
+		
+		public bool IncludeConstraints {
+			get {
+				return (OutputFlags & OutputFlags.IncludeConstraints) != 0;
 			}
 		}
 		
