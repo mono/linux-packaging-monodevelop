@@ -31,18 +31,16 @@ using System.Net;
 using System.Text;
 using System.Linq;
 using MonoDevelop.Core;
+using MonoDevelop.Core.Setup;
 using MonoDevelop.Ide;
+using MonoDevelop.Ide.Gui;
+using System.Globalization;
+using Mono.Addins;
+using Mono.Addins.Setup;
+using MonoDevelop.Core.ProgressMonitoring;
 
 namespace MonoDevelop.Ide.Updater
 {
-	enum UpdateLevel
-	{
-		Stable = 0,
-		Beta = 1,
-		Alpha = 2,
-		Test = 3
-	}
-	
 	static class UpdateService
 	{
 		const int formatVersion = 1;
@@ -50,6 +48,7 @@ namespace MonoDevelop.Ide.Updater
 		const string updateLevelKey = "AppUpdate.UpdateLevel";
 		
 		static UpdateInfo[] updateInfos;
+		static List<string> tags = new List<string> ();
 		
 		static UpdateInfo[] LoadUpdateInfos ()
 		{
@@ -77,10 +76,29 @@ namespace MonoDevelop.Ide.Updater
 		static UpdateService ()
 		{
 			updateInfos = LoadUpdateInfos ();
+			AddinManager.AddExtensionNodeHandler ("/MonoDevelop/Ide/UpdateTags", OnTagExtensionChanged);
+		}
+		
+		static void OnTagExtensionChanged (object sender, ExtensionNodeEventArgs args)
+		{
+			if (args.Change == ExtensionChange.Add)
+				tags.Add (args.ExtensionNode.Id);
+			else
+				tags.Remove (args.ExtensionNode.Id);
+		}
+		
+		public static void AddUpdateTag (string tag)
+		{
+			tags.Add (tag);
+		}
+		
+		public static void RemoteUpdateTag (string tag)
+		{
+			tags.Remove (tag);
 		}
 		
 		public static bool CanUpdate {
-			get { return DefaultUpdateInfos.Length > 0; }
+			get { return true; }
 		}
 		
 		public static UpdateInfo[] DefaultUpdateInfos {
@@ -159,9 +177,11 @@ namespace MonoDevelop.Ide.Updater
 		
 		public static void QueryUpdateServer (UpdateInfo[] updateInfos, UpdateLevel level, Action<UpdateResult> callback)
 		{
+			if (!string.IsNullOrEmpty (Environment.GetEnvironmentVariable ("MONODEVELOP_UPDATER_TEST")))
+				level = UpdateLevel.Test;
+			
 			if (updateInfos == null || updateInfos.Length == 0) {
-				string error = GettextCatalog.GetString ("No updatable products detected");
-				callback (new UpdateResult (null, level, error, null));
+				QueryAddinUpdates (level, callback);
 				return;
 			}
 			
@@ -171,9 +191,6 @@ namespace MonoDevelop.Ide.Updater
 			
 			foreach (var info in updateInfos)
 				query.AppendFormat ("&{0}={1}", info.AppId, info.VersionId);
-			
-			if (!string.IsNullOrEmpty (Environment.GetEnvironmentVariable ("MONODEVELOP_UPDATER_TEST")))
-				level = UpdateLevel.Test;
 			
 			if (level != UpdateLevel.Stable) {
 				query.Append ("&level=");
@@ -213,7 +230,7 @@ namespace MonoDevelop.Ide.Updater
 			
 			try {
 				using (var response = (HttpWebResponse) request.EndGetResponse (ar)) {
-					var encoding = Encoding.GetEncoding (response.CharacterSet);
+					var encoding = !string.IsNullOrEmpty (response.CharacterSet) ? Encoding.GetEncoding (response.CharacterSet) : Encoding.UTF8;
 					using (var reader = new StreamReader (response.GetResponseStream(), encoding)) {
 						var doc = System.Xml.Linq.XDocument.Load (reader);
 						updates = (from x in doc.Root.Elements ("Application")
@@ -234,11 +251,202 @@ namespace MonoDevelop.Ide.Updater
 							}).ToList ();
 					}
 				}
+				
+				CheckAddinUpdates (updates, level);
+				
 			} catch (Exception ex) {
+				LoggingService.LogError ("Could not retrieve update information", ex);
 				error = GettextCatalog.GetString ("Error retrieving update information");
 				errorDetail = ex;
 			}
+			
 			callback (new UpdateResult (updates, level, error, errorDetail));
+		}
+		
+		public static void QueryAddinUpdates (UpdateLevel level, Action<UpdateResult> callback)
+		{
+			System.Threading.ThreadPool.QueueUserWorkItem (delegate {
+				List<Update> updates = new List<Update> ();
+				string error = null;
+				Exception errorDetail = null;
+				
+				try {
+					CheckAddinUpdates (updates, level);
+					
+				} catch (Exception ex) {
+					LoggingService.LogError ("Could not retrieve update information", ex);
+					error = GettextCatalog.GetString ("Error retrieving update information");
+					errorDetail = ex;
+				}
+				
+				callback (new UpdateResult (updates, level, error, errorDetail));
+			});
+		}
+		
+		static void CheckAddinUpdates (List<Update> updates, UpdateLevel level)
+		{
+			for (UpdateLevel n=UpdateLevel.Stable; n<=level; n++)
+				Runtime.AddinSetupService.RegisterMainRepository ((UpdateLevel)n, true);
+			
+			AddinUpdateHandler.QueryAddinUpdates ();
+			
+			updates.AddRange (GetAddinUpdates (UpdateLevel.Stable));
+			if (level >= UpdateLevel.Beta)
+				updates.AddRange (GetAddinUpdates (UpdateLevel.Beta));
+			if (level >= UpdateLevel.Alpha)
+				updates.AddRange (GetAddinUpdates (UpdateLevel.Alpha));
+			if (level == UpdateLevel.Test)
+				updates.AddRange (GetAddinUpdates (UpdateLevel.Test));
+		}
+		
+		static IEnumerable<Update> GetAddinUpdates (UpdateLevel level)
+		{
+			List<Update> res = new List<Update> ();
+			string url = Runtime.AddinSetupService.GetMainRepositoryUrl (level);
+			List<AddinRepositoryEntry> list = new List<AddinRepositoryEntry> ();
+			list.AddRange (Runtime.AddinSetupService.Repositories.GetAvailableUpdates (url));
+			FilterOldVersions (list);
+			foreach (var ventry in list) {
+				var entry = ventry;
+				UpdateRank rank = GetUpdateRank (entry.Addin.Properties.GetPropertyValue ("UpdateRank"));
+				if (rank != UpdateRank.Important)
+					continue;
+				string sdate = entry.Addin.Properties.GetPropertyValue ("ReleaseDate");
+				DateTime date;
+				if (!string.IsNullOrEmpty (sdate))
+					date = DateTime.Parse (sdate, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+				else
+					date = DateTime.Now;
+				res.Add (new Update () {
+					Name = entry.Addin.Name,
+					InstallAction = (m) => InstallAddin (m, entry),
+					Version = entry.Addin.Version,
+					Level = level,
+					Date = date,
+					Releases = ParseReleases (entry.Addin.Id, entry).ToList ()
+				});
+			}
+			return res;
+		}
+		
+		static void FilterOldVersions (List<AddinRepositoryEntry> addins)
+		{
+			Dictionary<string,string> versions = new Dictionary<string, string> ();
+			foreach (AddinRepositoryEntry a in addins) {
+				string last;
+				string id, version;
+				Addin.GetIdParts (a.Addin.Id, out id, out version);
+				if (!versions.TryGetValue (id, out last) || Addin.CompareVersions (last, version) > 0)
+					versions [id] = version;
+			}
+			for (int n=0; n<addins.Count; n++) {
+				AddinRepositoryEntry a = addins [n];
+				string id, version;
+				Addin.GetIdParts (a.Addin.Id, out id, out version);
+				if (versions [id] != version)
+					addins.RemoveAt (n--);
+			}
+		}
+		
+		static IEnumerable<Release> ParseReleases (string addinId, AddinRepositoryEntry entry)
+		{
+			// Format of release notes is:
+			// {{version1,date1}} release note text {{version2,date2}} release note text ...
+			// Releases msyu
+			// for example:
+			// {{1.1,2011-01-10}} Release notes for 1.1 {{1.2,2011-03-22}} Release notes for 2.3
+			
+			string releaseNotes = entry.Addin.Properties.GetPropertyValue ("ReleaseNotes");
+			if (releaseNotes.Length == 0) {
+				string file = entry.Addin.Properties.GetPropertyValue ("ReleaseNotesFile");
+				if (file.Length > 0) {
+					IAsyncResult res = entry.BeginDownloadSupportFile (file, null, null);
+					res.AsyncWaitHandle.WaitOne ();
+					try {
+						using (Stream s = entry.EndDownloadSupportFile (res)) {
+							StreamReader sr = new StreamReader (s);
+							releaseNotes = sr.ReadToEnd ();
+						}
+					} catch (Exception ex) {
+						LoggingService.LogError ("Could not download release notes", ex);
+					}
+				}
+			}
+			
+			if (releaseNotes.Length == 0)
+				yield break;
+			
+			var addin = AddinManager.Registry.GetAddin (Addin.GetIdName (addinId));
+			string currentVersion = addin != null ? addin.Version : null;
+			
+			int i = releaseNotes.IndexOf ("{{");
+			while (i != -1) {
+				int j = releaseNotes.IndexOf ("}}", i + 2);
+				if (j == -1)
+					break;
+				string[] h = releaseNotes.Substring (i + 2, j - i - 2).Trim ().Split (',');
+				if (h.Length != 2)
+					break;
+				DateTime date;
+				if (!DateTime.TryParse (h[1].Trim (), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out date))
+					break;
+				int k = releaseNotes.IndexOf ("{{", j + 2);
+				string version = h[0].Trim ();
+				if (currentVersion == null || Addin.CompareVersions (currentVersion, version) > 0) {
+					string txt = k != -1 ? releaseNotes.Substring (j + 2, k - j - 2) : releaseNotes.Substring (j + 2);
+					yield return new Release () {
+						Version = version,
+						Date = date,
+						Notes = txt.Trim (' ','\t','\r','\n')
+					};
+				}
+				i = k;
+			}
+		}
+		
+		static IAsyncOperation InstallAddin (IProgressMonitor monitor, AddinRepositoryEntry addin)
+		{
+			// Add-in engine changes must be done in the gui thread since mono.addins is not thread safe
+			DispatchService.GuiDispatch (delegate {
+				using (monitor) {
+					Runtime.AddinSetupService.Install (new ProgressStatusMonitor (monitor), addin);
+				}
+			});
+			return monitor.AsyncOperation;
+		}
+
+		/// <summary>
+		/// Parses an update rank string
+		/// </summary>
+		/// <returns>
+		/// The update rank
+		/// </returns>
+		/// <param name='updateRankString'>
+		/// Update rank string.
+		/// </param>
+		/// <remarks>
+		/// This method parses an update rank string. If the rank is conditioned to an update tag, it will
+		/// check the presence of the tag
+		/// </remarks>
+		internal static UpdateRank GetUpdateRank (string updateRankString)
+		{
+			string slevel = null;
+			foreach (string cond in updateRankString.Split (new char[] {' '}, StringSplitOptions.RemoveEmptyEntries)) {
+				int i = cond.IndexOf (':');
+				if (i == -1) {
+					slevel = cond;
+					break;
+				}
+				if (tags.Contains (cond.Substring (0, i))) {
+					slevel = cond.Substring (i+1);
+					break;
+				}
+			}
+			UpdateRank level;
+			if (slevel != null && Enum.TryParse<UpdateRank> (slevel, out level))
+				return level;
+			else
+				return UpdateRank.Normal;
 		}
 	}
 }

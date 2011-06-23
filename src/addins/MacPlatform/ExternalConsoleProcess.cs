@@ -25,17 +25,18 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.Core.Execution;
 using System.Diagnostics;
-using OSXIntegration.Framework;
 using System.Text;
-using MonoDevelop.Core;
 using System.Threading;
 using System.Collections.Generic;
 
+using MonoDevelop.Core;
+using MonoDevelop.Core.Execution;
+using MonoDevelop.MacInterop;
+
 namespace MonoDevelop.Platform.Mac
 {
-	public class ExternalConsoleProcess : IProcessAsyncOperation
+	internal class ExternalConsoleProcess : IProcessAsyncOperation
 	{
 /*
 NOTES ON CONTROLLING A TERMINAL WITH APPLESCRIPT	 
@@ -78,16 +79,14 @@ where running an explicit exec causes it to quit after the exec runs, so we can'
 bash pause on exit trick
 */ 
 		string tabId, windowId;
-		bool pauseWhenFinished, cancelled;
+		bool cancelled;
 		
 		public ExternalConsoleProcess (string command, string arguments, string workingDirectory,
 		                               IDictionary<string, string> environmentVariables,
 		                               string title, bool pauseWhenFinished)
 		{
-			this.pauseWhenFinished = pauseWhenFinished;
-			
 			//build the sh command
-			var sb = new StringBuilder ();
+			var sb = new StringBuilder ("clear; ");
 			if (!string.IsNullOrEmpty (workingDirectory))
 				sb.AppendFormat ("cd \"{0}\"; ", Escape (workingDirectory));
 			foreach (string env in environmentVariables.Keys)
@@ -162,6 +161,7 @@ end tell", tabId, windowId);
 		public void Cancel ()
 		{
 			cancelled = true;
+			//FIXME: try to kill the process without closing the window, if pauseWhenFinished is true
 			CloseTerminalWindow ();
 		}
 		
@@ -172,9 +172,9 @@ end tell", tabId, windowId);
 			}
 		}
 		
-		
 		public bool IsCompleted {
 			get {
+				//FIXME: get the status of the process, not the whole script
 				var ret = AppleScript.Run ("tell app \"Terminal\" to get exists of {0} of {1}", tabId, windowId);
 				return ret != "true";
 			}

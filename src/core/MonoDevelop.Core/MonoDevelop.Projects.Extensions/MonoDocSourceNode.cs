@@ -30,14 +30,14 @@ namespace MonoDevelop.Projects.Extensions
 	class MonoDocSourceNode : ExtensionNode
 	{
 		[NodeAttribute (Required=true)]
-		protected string directory;
+		protected string directory = null;
 		
 		[NodeAttribute]
-		protected bool relative;
+		protected bool relative = false;
 		
 		public string Directory {
 			get {
-				if (relative)
+				if (relative || !System.IO.Path.IsPathRooted (directory))
 					return this.Addin.GetFilePath (directory);
 				return directory;
 			}

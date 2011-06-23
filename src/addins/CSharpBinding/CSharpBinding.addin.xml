@@ -5,14 +5,14 @@
        copyright   = "MIT X11"
        url         = "http://www.monodevelop.com/"
        description = "CSharp Language Binding"
-	   category    = "Language bindings"
-       version     = "2.4">
+       category    = "Language bindings"
+       version     = "2.6">
 	
 	<Dependencies>
-		<Addin id="Core" version="2.4"/>
-		<Addin id="Ide" version="2.4"/>
-		<Addin id="SourceEditor2" version="2.4"/>
-		<Addin id="Refactoring" version="2.4"/>
+		<Addin id="Core" version="2.6"/>
+		<Addin id="Ide" version="2.6"/>
+		<Addin id="SourceEditor2" version="2.6"/>
+		<Addin id="Refactoring" version="2.6"/>
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/MSBuildItemTypes">
@@ -84,6 +84,11 @@
 		                 class = "MonoDevelop.CSharp.CSharpLanguageBinding" />
 	</Extension>
 	
+	<Extension path = "/MonoDevelop/Ide/ReferenceFinder">
+		<ReferenceFinder supportedmimetypes = "text/x-csharp"
+		                 class = "MonoDevelop.CSharp.Refactoring.CSharpReferenceFinder" />
+	</Extension>
+	
 	<Extension path = "/MonoDevelop/ProjectModel/SerializableClasses">
 		<DataType class = "MonoDevelop.CSharp.Project.CSharpCompilerParameters" />
 		<DataType class = "MonoDevelop.CSharp.Project.CSharpProjectParameters" />
@@ -100,12 +105,12 @@
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/DomParser">
-<!--	<Class class = "MonoDevelop.CSharp.Parser.DomParser" /> -->
-		<Class class = "MonoDevelop.CSharp.Parser.NRefactoryParser" />
+<!--		<Parser class = "MonoDevelop.CSharp.Parser.NRefactoryParser" fileExtensions=".cs" /> -->
+		<Parser class = "MonoDevelop.CSharp.Parser.McsParser" fileExtensions=".cs" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/Ambiences">
-		<Class id = "C#" class = "MonoDevelop.CSharp.Dom.CSharpAmbience" />
+		<Class id = "C#" class = "MonoDevelop.CSharp.Ast.CSharpAmbience" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Core/StockIcons">
@@ -119,16 +124,12 @@
 		</MimeType>
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/ProjectModel/TextPrettyPrinters">
-		<Class class="MonoDevelop.CSharp.Formatting.CSharpFormatter" />
+	<Extension path = "/MonoDevelop/Ide/CodeFormatters">
+		<Formatter mimeType="text/x-csharp" class="MonoDevelop.CSharp.Formatting.CSharpFormatter" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/SourceEditor2/CustomModes">
 		<SyntaxMode mimeTypes="text/x-csharp" class="MonoDevelop.CSharp.Highlighting.CSharpSyntaxMode"/>
-	</Extension>
-	
-	<Extension path = "/MonoDevelop/ProjectModel/PolicyTypes" >
-		<PolicyType id="DotNetNamingPolicy" class="MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/PolicySets/Mono" >
@@ -164,12 +165,27 @@
 		<Generator class="MonoDevelop.CSharp.Refactoring.CSharpCodeGenerator" mimeType = "text/x-csharp" />
 	</Extension>
 	
+	<Extension path = "/MonoDevelop/Refactoring/Refactorings">
+		<Class id="CreateMethod" class = "MonoDevelop.CSharp.Refactoring.CreateMethod.CreateMethodCodeGenerator" />
+		<Class id="ExtractMethod" class = "MonoDevelop.CSharp.Refactoring.ExtractMethod.ExtractMethodRefactoring" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/Ide/Commands/Refactoring">
+		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.CreateMethod"
+				defaultHandler = "MonoDevelop.CSharp.Refactoring.CreateMethod.CreateMethodHandler"
+				_label = "Create Method"/>
+		<Command id = "MonoDevelop.Refactoring.RefactoryCommands.ExtractMethod"
+					defaultHandler = "MonoDevelop.CSharp.Refactoring.ExtractMethod.ExtractMethodHandler"
+					_label = "Extract Method"
+					shortcut = "Control|Alt|M"/>
+	</Extension>
+
 	<Module>
 	    <Runtime>
 	        <Import assembly="MonoDevelop.CSharpBinding.Autotools.dll"/>
 	    </Runtime>
 		<Dependencies>
-			<Addin id="Autotools" version="2.4"/>
+			<Addin id="Autotools" version="2.6"/>
 		</Dependencies>
 		<Extension path = "/MonoDevelop/Autotools/SimpleSetups">
 			<Class class="CSharpBinding.Autotools.CSharpAutotoolsSetup" />
@@ -181,10 +197,14 @@
 			<Import assembly="MonoDevelop.CSharpBinding.AspNet.dll"/>
 		</Runtime>
 		<Dependencies>
-			<Addin id="AspNet" version="2.4"/>
+			<Addin id="AspNet" version="2.6"/>
 		</Dependencies>
 		<Extension path = "/MonoDevelop/Asp/CompletionBuilders">
 			<Class class = "MonoDevelop.CSharp.Completion.AspLanguageBuilder" />
+		</Extension>
+		<Extension path = "/MonoDevelop/Ide/ReferenceFinder">
+			<ReferenceFinder supportedmimetypes = "application/x-aspx,application/x-ascx,application/x-asax,application/x-ashx,application/x-asmx,application/x-asix"
+			                 class = "MonoDevelop.CSharp.Refactoring.ASPNetReferenceFinder" />
 		</Extension>
 	</Module>
 </Addin>

@@ -56,6 +56,7 @@ namespace MonoDevelop.Core.Assemblies
 		RuntimeAssemblyContext assemblyContext;
 		ComposedAssemblyContext composedAssemblyContext;
 		ITimeTracker timer;
+		SynchronizationContext mainContext;
 		
 		protected bool ShuttingDown { get; private set; }
 		
@@ -73,6 +74,10 @@ namespace MonoDevelop.Core.Assemblies
 		
 		internal void StartInitialization ()
 		{
+			// Store the main sync context, since we'll need later on for subscribing
+			// add-in extension points (Mono.Addins isn't currently thread safe)
+			mainContext = SynchronizationContext.Current;
+			
 			// Initialize the service in a background thread.
 			Thread t = new Thread (new ThreadStart (BackgroundInitialize)) {
 				Name = "Assembly service initialization",
@@ -204,7 +209,7 @@ namespace MonoDevelop.Core.Assemblies
 		public virtual Process ExecuteAssembly (ProcessStartInfo pinfo, TargetFramework fx)
 		{
 			if (fx == null) {
-				string fxId = Runtime.SystemAssemblyService.GetTargetFrameworkForAssembly (this, pinfo.FileName);
+				TargetFrameworkMoniker fxId = Runtime.SystemAssemblyService.GetTargetFrameworkForAssembly (this, pinfo.FileName);
 				fx = Runtime.SystemAssemblyService.GetTargetFramework (fxId);
 				if (!IsInstalled (fx)) {
 					// Look for a compatible framework which is installed
@@ -400,7 +405,9 @@ namespace MonoDevelop.Core.Assemblies
 			timer.Trace ("Registering support packages");
 			
 			// Get assemblies registered using the extension point
-			AddinManager.AddExtensionNodeHandler ("/MonoDevelop/Core/SupportPackages", OnPackagesChanged);
+			mainContext.Send (delegate {
+				AddinManager.AddExtensionNodeHandler ("/MonoDevelop/Core/SupportPackages", OnPackagesChanged);
+			}, null);
 		}
 		
 		void OnPackagesChanged (object s, ExtensionNodeEventArgs args)

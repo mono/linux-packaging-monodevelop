@@ -56,14 +56,9 @@ namespace MonoDevelop.Ide
 				new EventHandler<FileCopyEventArgs> (NotifyFileRenamed));
 		}
 		
-		public static DesktopApplication GetDefaultApplication (string mimetype)
+		public static IEnumerable<DesktopApplication> GetApplications (string filename)
 		{
-			return platformService.GetDefaultApplication (mimetype);
-		}
-		
-		public static DesktopApplication [] GetAllApplications (string mimetype)
-		{
-			return platformService.GetAllApplications (mimetype);
+			return platformService.GetApplications (filename);
 		}
 		
 		public static string DefaultMonospaceFont {
@@ -87,6 +82,16 @@ namespace MonoDevelop.Ide
 		public static void ShowUrl (string url)
 		{
 			platformService.ShowUrl (url);
+		}
+		
+		public static void OpenFile (string filename)
+		{
+			platformService.OpenFile (filename);
+		}
+
+		public static void OpenFolder (FilePath folderPath)
+		{
+			platformService.OpenFolder (folderPath);
 		}
 
 		public static string GetMimeTypeForUri (string uri)
@@ -158,17 +163,21 @@ namespace MonoDevelop.Ide
 			}
 		}
 		
-		static void NotifyFileRemoved (object sender, FileEventArgs e)
+		static void NotifyFileRemoved (object sender, FileEventArgs args)
 		{
-			if (!e.IsDirectory) {
-				platformService.RecentFiles.NotifyFileRemoved (e.FileName);
+			foreach (FileEventInfo e in args) {
+				if (!e.IsDirectory) {
+					platformService.RecentFiles.NotifyFileRemoved (e.FileName);
+				}
 			}
 		}
 		
-		static void NotifyFileRenamed (object sender, FileCopyEventArgs e)
+		static void NotifyFileRenamed (object sender, FileCopyEventArgs args)
 		{
-			if (!e.IsDirectory) {
-				platformService.RecentFiles.NotifyFileRenamed (e.SourceFile, e.TargetFile);
+			foreach (FileCopyEventInfo e in args) {
+				if (!e.IsDirectory) {
+					platformService.RecentFiles.NotifyFileRenamed (e.SourceFile, e.TargetFile);
+				}
 			}
 		}
 		

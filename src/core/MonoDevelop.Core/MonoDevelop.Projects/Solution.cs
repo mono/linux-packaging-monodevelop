@@ -35,10 +35,12 @@ using MonoDevelop.Core.Serialization;
 using MonoDevelop.Core;
 using MonoDevelop.Core.ProgressMonitoring;
 using MonoDevelop.Core.StringParsing;
+using MonoDevelop.Projects.Policies;
 
 namespace MonoDevelop.Projects
 {
-	public class Solution: WorkspaceItem, IConfigurationTarget
+	[ProjectModelDataItem]
+	public class Solution: WorkspaceItem, IConfigurationTarget, IPolicyProvider
 	{
 		internal object MemoryProbe = Counters.SolutionsInMemory.CreateMemoryProbe ();
 		SolutionFolder rootFolder;
@@ -189,6 +191,32 @@ namespace MonoDevelop.Projects
 			}
 			set {
 				multiStartupItems = value;
+			}
+		}
+		
+		/// <summary>
+		/// Gets the author information for this solution. If no specific information is set for this solution, it
+		/// will return the author defined in the global settings.
+		/// </summary>
+		public AuthorInformation AuthorInformation {
+			get {
+				return LocalAuthorInformation ?? AuthorInformation.Default;
+			}
+		}
+
+		/// <summary>
+		/// Gets or sets the author information for this solution. It returns null if no specific information
+		/// has been set for this solution.
+		/// </summary>
+		public AuthorInformation LocalAuthorInformation {
+			get {
+				return UserProperties.GetValue<AuthorInformation> ("AuthorInfo");
+			}
+			set {
+				if (value != null)
+					UserProperties.SetValue<AuthorInformation> ("AuthorInfo", value);
+				else
+					UserProperties.RemoveValue ("AuthorInfo");
 			}
 		}
 
@@ -432,6 +460,12 @@ namespace MonoDevelop.Projects
 			//this is for deserialisation
 			internal set { RootFolder.Policies = value; }
 		}
+		
+		PolicyContainer IPolicyProvider.Policies {
+			get {
+				return Policies;
+			}
+		}
 
 		public string Version {
 			get {
@@ -585,7 +619,7 @@ namespace MonoDevelop.Projects
 		internal protected virtual void OnSolutionItemAdded (SolutionItemChangeEventArgs args)
 		{
 			solutionItems = null;
-			
+
 			SolutionFolder sf = args.SolutionItem as SolutionFolder;
 			if (sf != null) {
 				foreach (SolutionItem eitem in sf.GetAllItems<SolutionItem> ())
@@ -727,7 +761,7 @@ namespace MonoDevelop.Projects
 				ReferenceRemovedFromProject (this, args);
 		}
 		
-		internal protected virtual void OnEntryModified (SolutionItemEventArgs args)
+		internal protected virtual void OnEntryModified (SolutionItemModifiedEventArgs args)
 		{
 			if (EntryModified != null)
 				EntryModified (this, args);
@@ -759,7 +793,7 @@ namespace MonoDevelop.Projects
 		public event ProjectFileRenamedEventHandler FileRenamedInProject;
 		public event ProjectReferenceEventHandler ReferenceAddedToProject;
 		public event ProjectReferenceEventHandler ReferenceRemovedFromProject;
-		public event SolutionItemEventHandler EntryModified;
+		public event SolutionItemModifiedEventHandler EntryModified;
 		public event SolutionItemEventHandler EntrySaved;
 		public event EventHandler<SolutionItemEventArgs> ItemReloadRequired;
 	}

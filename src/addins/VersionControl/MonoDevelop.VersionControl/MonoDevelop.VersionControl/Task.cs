@@ -23,25 +23,28 @@ namespace MonoDevelop.VersionControl
 		{
 		}
 
-		protected Task() {
+		protected Task()
+		{
 			threadnotify = new ThreadNotify(new ReadyEvent(Wakeup));
-			
-			tracker = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor ("Version Control", "md-version-control", false, true);
 		}
 		
 		protected IProgressMonitor Monitor {
 			get { return tracker; }
 		}
 		
-		public void Start() {
-			tracker.BeginTask(GetDescription(), 0);
-			new Thread(new ThreadStart(BackgroundWorker)) {
-				Name = "VCS background tasks",
-				IsBackground = true,
-			}.Start();
+		protected virtual IProgressMonitor CreateProgressMonitor ()
+		{
+			return VersionControlService.GetProgressMonitor (GetDescription ());
 		}
 		
-		void BackgroundWorker() {
+		public void Start() {
+			tracker = CreateProgressMonitor ();
+			tracker.BeginTask(GetDescription(), 1);
+			ThreadPool.QueueUserWorkItem (BackgroundWorker);
+		}
+		
+		void BackgroundWorker (object state)
+		{
 			try {
 				Run();
 			} catch (DllNotFoundException e) {
@@ -49,7 +52,13 @@ namespace MonoDevelop.VersionControl
 			} catch (Exception e) {
 				string msg = GettextCatalog.GetString ("Version control operation failed: ");
 				msg += e.Message;
-				tracker.ReportError (msg, null);
+				if (e.InnerException != null && e.InnerException.Message != e.Message) {
+					msg = msg.Trim ();
+					if (!msg.EndsWith ("."))
+						msg += ".";
+					msg += " " + e.InnerException.Message;
+				}
+				tracker.ReportError (msg, e);
 				Console.Error.WriteLine(e);
 			} finally {			
 				threadnotify.WakeupMain();

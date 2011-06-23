@@ -63,7 +63,8 @@ namespace MonoDevelop.Components.Commands
 		
 		static string ConfigFileName {
 			get {
-				return Path.Combine (PropertyService.ConfigPath, PropertyService.IsMac? configFileNameMac : configFileName);
+				string file = PropertyService.IsMac? "Custom.mac-kb.xml" : "Custom.kb.xml";
+				return PropertyService.Locations.Config.Combine ("KeyBindings", file);
 			}
 		}
 
@@ -181,6 +182,9 @@ namespace MonoDevelop.Components.Commands
 				
 		public static void SaveCurrentBindings ()
 		{
+			string dir = Path.GetDirectoryName (ConfigFileName);
+			if (!Directory.Exists (dir))
+				Directory.CreateDirectory (dir);
 			current.Save (ConfigFileName, "current");
 		}
 	}

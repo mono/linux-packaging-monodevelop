@@ -81,9 +81,41 @@ namespace MonoDevelop.Ide.CodeCompletion
 			DataProvider = this;
 			HideDeclarationView ();
 		}
-		
+
+		bool completionListClosed;
+		void CloseCompletionList ()
+		{
+			if (!completionListClosed) {
+				completionDataList.OnCompletionListClosed (EventArgs.Empty);
+				completionListClosed = true;
+			}
+		}
+
 		protected override void OnDestroyed ()
 		{
+			if (declarationviewwindow != null) {
+				declarationviewwindow.Destroy ();
+				declarationviewwindow = null;
+			}
+			
+			if (mutableList != null) {
+				mutableList.Changing -= OnCompletionDataChanging;
+				mutableList.Changed -= OnCompletionDataChanged;
+				mutableList = null;
+			}
+
+			if (completionDataList != null) {
+				if (completionDataList is IDisposable) 
+					((IDisposable)completionDataList).Dispose ();
+				CloseCompletionList ();
+				completionDataList = null;
+			}
+
+			if (closedDelegate != null) {
+				closedDelegate ();
+				closedDelegate = null;
+			}
+			
 			HideDeclarationView ();
 			
 			if (declarationviewwindow != null) {
@@ -122,7 +154,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 			}
 			
 			if ((ka & KeyActions.Complete) != 0) {
-				bool completed = CompleteWord ();
+				//bool completed =
+				CompleteWord ();
 				//NOTE: this passes the enter keystroke through to the editor if the current item is an exact match
 				//if (!completed) {
 				//	CompletionWindowManager.HideWindow ();
@@ -215,6 +248,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 					ResetSizes ();
 					ShowAll ();
 					UpdateWordSelection ();
+					UpdateDeclarationView ();
 					
 					//if there is only one matching result we take it by default
 					if (completionDataList.AutoCompleteUniqueMatch && IsUniqueMatch && !IsChanging) {
@@ -226,8 +260,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 				initialWordLength = text.Length /*+ completionWidget.SelectedLength*/;
 				PartialWord = text;
+				HideWhenWordDeleted = initialWordLength != 0;
 				UpdateWordSelection ();
-				
+			
 				//if there is only one matching result we take it by default
 				if (completionDataList.AutoCompleteUniqueMatch && IsUniqueMatch && !IsChanging) {
 					CompleteWord ();
@@ -235,6 +270,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 				} else {
 					ResetSizes ();
 					ShowAll ();
+					UpdateDeclarationView ();
 				}
 				return true;
 			}
@@ -265,6 +301,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			//which makes completion triggering noticeably more responsive
 			if (!completionDataList.IsSorted)
 				completionDataList.Sort (new DataItemComparer ());
+			List.FilterWords ();
 			
 			Reposition (true);
 			
@@ -307,7 +344,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			curYPos = Y;
 			Move (X, Y);
 			UpdateDeclarationView ();
-			ParameterInformationWindowManager.UpdateWindow ();
+			ParameterInformationWindowManager.UpdateWindow (CompletionWidget);
 		}
 		
 		//smaller lists get size reallocated after FillList, so we have to reposition them
@@ -323,11 +360,14 @@ namespace MonoDevelop.Ide.CodeCompletion
 		{
 			if (SelectionIndex == -1 || completionDataList == null)
 				return false;
-			CompletionData item = completionDataList[SelectionIndex];
+			CompletionData item = completionDataList [SelectionIndex];
 			if (item == null)
 				return false;
+			// first close the completion list, then insert the text.
+			// this is required because that's the logical event chain, otherwise things could be messed up
+			CloseCompletionList ();
 			item.InsertCompletionText (this);
-			AddWordToHistory (item.CompletionText);
+			AddWordToHistory (PartialWord, item.CompletionText);
 			OnWordCompleted (new CodeCompletionContextEventArgs (CompletionWidget, CodeCompletionContext, item.CompletionText));
 			return true;
 		}
@@ -340,32 +380,6 @@ namespace MonoDevelop.Ide.CodeCompletion
 		}
 		
 		public event EventHandler<CodeCompletionContextEventArgs> WordCompleted;
-		
-		public override void Destroy ()
-		{
-			if (declarationviewwindow != null) {
-				declarationviewwindow.Destroy ();
-				declarationviewwindow = null;
-			}
-			
-			if (mutableList != null) {
-				mutableList.Changing -= OnCompletionDataChanging;
-				mutableList.Changed -= OnCompletionDataChanged;
-				mutableList = null;
-			}
-
-			if (completionDataList != null) {
-				if (completionDataList is IDisposable) 
-					((IDisposable)completionDataList).Dispose ();
-				completionDataList = null;
-			}
-
-			if (closedDelegate != null) {
-				closedDelegate ();
-				closedDelegate = null;
-			}
-			base.Destroy ();
-		}
 		
 		void ListSizeChanged (object obj, SizeAllocatedArgs args)
 		{
@@ -393,7 +407,6 @@ namespace MonoDevelop.Ide.CodeCompletion
 		{
 			if (completionDataList == null || List.Selection >= completionDataList.Count || List.Selection == -1)
 				return;
-			
 			if (List.GdkWindow == null)
 				return;
 			RemoveDeclarationViewTimer ();
@@ -444,6 +457,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 				HideDeclarationView ();
 				return;
 			}
+			
 			if (currentData != null)
 				declarationViewTimer = GLib.Timeout.Add (250, DelayedTooltipShow);
 		}
@@ -633,18 +647,19 @@ namespace MonoDevelop.Ide.CodeCompletion
 		void OnCompletionDataChanged (object s, EventArgs args)
 		{
 			ResetSizes ();
+			HideFooter ();
+			
 			//try to capture full selection state so as not to interrupt user
 			string last = null;
-			if (Visible)
-				last = List.AutoSelect ? CurrentCompletionText : PartialWord;
 
-			HideFooter ();
 			if (Visible) {
+				last = List.AutoSelect ? CurrentCompletionText : PartialWord;
 				//don't reset the user-entered word when refilling the list
 				var tmp = this.List.AutoSelect;
+				// Fill the list before resetting so that we get the correct size
+				FillList ();
 				Reset (false);
 				this.List.AutoSelect = tmp;
-				FillList ();
 				if (last != null )
 					SelectEntry (last);
 			}

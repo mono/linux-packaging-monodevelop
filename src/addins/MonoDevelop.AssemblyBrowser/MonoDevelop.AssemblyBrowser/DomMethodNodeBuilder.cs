@@ -268,7 +268,10 @@ namespace MonoDevelop.AssemblyBrowser
 
 			NetAmbience netAmbience = new NetAmbience ();
 			StringBuilder result = new StringBuilder ();
-			result.Append (netAmbience.GetString (method, DomTypeNodeBuilder.settings));
+			var settings = DomTypeNodeBuilder.settings;
+			settings.OutputFlags |= OutputFlags.IncludeConstraints;
+			result.Append (netAmbience.GetString (method, settings));
+			settings.OutputFlags &= ~OutputFlags.IncludeConstraints;
 			result.AppendLine ();
 			result.AppendLine ();
 			result.Append (Disassemble (method, true));
@@ -280,7 +283,7 @@ namespace MonoDevelop.AssemblyBrowser
 			DomCecilMethod method = navigator.DataItem as DomCecilMethod;
 			StringBuilder result = new StringBuilder ();
 			result.Append ("<big>");
-			result.Append (Ambience.GetString (method, OutputFlags.AssemblyBrowserDescription));
+			result.Append (Ambience.GetString (method, OutputFlags.AssemblyBrowserDescription | OutputFlags.IncludeConstraints));
 			result.Append ("</big>");
 			result.AppendLine ();
 			

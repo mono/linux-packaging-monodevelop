@@ -161,14 +161,25 @@ namespace MonoDevelop.Core.Assemblies
 		public IEnumerable<string> GetAllPkgConfigFiles ()
 		{
 			HashSet<string> packageNames = new HashSet<string> ();
-			foreach (string pcdir in PkgConfigDirs)
-				foreach (string pcfile in Directory.GetFiles (pcdir, "*.pc"))
+			foreach (string pcdir in PkgConfigDirs) {
+				string[] files;
+				try {
+					files = Directory.GetFiles (pcdir, "*.pc");
+				} catch (Exception ex) {
+					LoggingService.LogError (string.Format (
+						"Runtime '{0}' error in pc file scan of directory '{1}'", DisplayName, pcdir), ex);
+					continue;
+				}
+				foreach (string pcfile in files)
 					if (packageNames.Add (Path.GetFileNameWithoutExtension (pcfile)))
 						yield return pcfile;
+			}
 		}
 		
 		protected override void OnInitialize ()
 		{
+			if (!monoRuntimeInfo.IsValidRuntime)
+				return;
 			foreach (string pcfile in GetAllPkgConfigFiles ()) {
 				try {
 					ParsePCFile (pcfile);
@@ -227,7 +238,7 @@ namespace MonoDevelop.Core.Assemblies
 			bool inconsistentFrameworks = false;
 			
 			foreach (PackageAssemblyInfo pi in pinfo.Assemblies) {
-				string targetFramework = Runtime.SystemAssemblyService.GetTargetFrameworkForAssembly (Runtime.SystemAssemblyService.CurrentRuntime, pi.File);
+				TargetFrameworkMoniker targetFramework = Runtime.SystemAssemblyService.GetTargetFrameworkForAssembly (Runtime.SystemAssemblyService.CurrentRuntime, pi.File);
 				if (commonFramework == null) {
 					commonFramework = Runtime.SystemAssemblyService.GetTargetFramework (targetFramework);
 					if (commonFramework == null)
@@ -250,7 +261,7 @@ namespace MonoDevelop.Core.Assemblies
 			if (inconsistentFrameworks)
 				LoggingService.LogError ("Inconsistent target frameworks found in " + pcfile);
 			if (commonFramework != null)
-				pinfo.SetData ("targetFramework", commonFramework.Id);
+				pinfo.SetData ("targetFramework", commonFramework.Id.ToString ());
 			else
 				pinfo.SetData ("targetFramework", "FxUnknown");
 		}

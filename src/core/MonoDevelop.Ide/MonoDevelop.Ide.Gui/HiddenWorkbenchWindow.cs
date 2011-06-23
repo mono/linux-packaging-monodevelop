@@ -25,6 +25,8 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
+using Mono.Addins;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -55,15 +57,17 @@ namespace MonoDevelop.Ide.Gui
 			set {}
 		}
 		
+		public ExtensionContext ExtensionContext {
+			get { return AddinManager.AddinEngine; }
+		}
+		
 		MonoDevelop.Ide.Gui.IViewContent viewContent;
 		public MonoDevelop.Ide.Gui.IViewContent ViewContent {
 			get { return viewContent; }
 			set { viewContent = value; }
 		}
 		
-		public System.Collections.ArrayList SubViewContents {
-			get { return new System.Collections.ArrayList (); }
-		}
+		public IEnumerable<IAttachableViewContent> SubViewContents { get { return new IAttachableViewContent[0]; } }
 		
 		public MonoDevelop.Ide.Gui.IBaseViewContent ActiveViewContent {
 			get { return ViewContent;}
@@ -82,11 +86,21 @@ namespace MonoDevelop.Ide.Gui
 		public void SwitchView (int viewNumber)
 		{
 		}
+		public void SwitchView (MonoDevelop.Ide.Gui.IAttachableViewContent subViewContent)
+		{
+		}
+		
+		public int FindView (Type viewType)
+		{
+			return -1;
+		}
+		
 		public void AttachViewContent (MonoDevelop.Ide.Gui.IAttachableViewContent subViewContent)
 		{
 			
 		}
 		public event EventHandler TitleChanged { add {} remove {} }
+		public event EventHandler DocumentChanged;
 		public event MonoDevelop.Ide.Gui.WorkbenchWindowEventHandler Closing;
 		public event MonoDevelop.Ide.Gui.WorkbenchWindowEventHandler Closed;
 		public event MonoDevelop.Ide.Gui.ActiveViewContentEventHandler ActiveViewContentChanged;

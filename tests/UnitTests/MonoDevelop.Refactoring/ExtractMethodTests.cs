@@ -31,7 +31,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Refactoring;
 using MonoDevelop.CSharpBinding.Tests;
-using MonoDevelop.Refactoring.ExtractMethod;
+using MonoDevelop.CSharp.Refactoring.ExtractMethod;
 using System.Collections.Generic;
 using MonoDevelop.CSharpBinding;
 using System.Text;
@@ -85,8 +85,8 @@ namespace MonoDevelop.Refactoring.Tests
 			ProjectDomService.Load (project);
 			ProjectDom dom = ProjectDomService.GetProjectDom (project);
 			dom.ForceUpdate (true);
-			ProjectDomService.Parse (project, file, null, delegate { return parsedText; });
-			ProjectDomService.Parse (project, file, null, delegate { return parsedText; });
+			ProjectDomService.Parse (project, file, delegate { return parsedText; });
+			ProjectDomService.Parse (project, file, delegate { return parsedText; });
 			
 			sev.Project = project;
 			sev.ContentName = file;
@@ -95,18 +95,19 @@ namespace MonoDevelop.Refactoring.Tests
 			
 			tww.ViewContent = sev;
 			var doc = new MonoDevelop.Ide.Gui.Document (tww);
-			
-			doc.ParsedDocument = new NRefactoryParser ().Parse (null, sev.ContentName, parsedText);
+			doc.Editor.Document.MimeType = "text/x-csharp";
+			doc.Editor.Document.FileName = file;
+			doc.ParsedDocument = new McsParser ().Parse (null, sev.ContentName, parsedText);
 			foreach (var e in doc.ParsedDocument.Errors)
 				Console.WriteLine (e);
 			if (cursorPosition >= 0)
-				doc.TextEditor.CursorPosition = cursorPosition;
+				doc.Editor.Caret.Offset = cursorPosition;
 			if (selectionStart >= 0) 
-				doc.TextEditor.Select (selectionStart, selectionEnd);
+				doc.Editor.SetSelection (selectionStart, selectionEnd);
 			
 			NRefactoryResolver resolver = new NRefactoryResolver (dom, 
 			                                                      doc.ParsedDocument.CompilationUnit, 
-			                                                      MonoDevelop.Ide.Gui.TextEditor.GetTextEditor (sev), 
+			                                                      sev.Data, 
 			                                                      file);
 			
 			ExpressionResult expressionResult;
@@ -114,9 +115,9 @@ namespace MonoDevelop.Refactoring.Tests
 				expressionResult = new ExpressionResult (editorText.Substring (selectionStart, selectionEnd - selectionStart).Trim ());
 				endPos = selectionEnd;
 			} else {
-				expressionResult = new NewCSharpExpressionFinder (dom).FindFullExpression (editorText, cursorPosition + 1);
+				expressionResult = new NewCSharpExpressionFinder (dom).FindFullExpression (doc.Editor, cursorPosition + 1);
 			}
-			ResolveResult resolveResult = endPos >= 0 ? resolver.Resolve (expressionResult, new DomLocation (doc.TextEditor.CursorLine, doc .TextEditor.CursorColumn)) : null;
+			ResolveResult resolveResult = endPos >= 0 ? resolver.Resolve (expressionResult, new DomLocation (doc.Editor.Caret.Line, doc.Editor.Caret.Column)) : null;
 			
 			RefactoringOptions result = new RefactoringOptions {
 				Document = doc,
@@ -152,7 +153,7 @@ namespace MonoDevelop.Refactoring.Tests
 		internal static string GetOutput (RefactoringOptions options, List<Change> changes)
 		{
 			RefactoringService.AcceptChanges (null, options.Dom, changes, new FileProvider (options));
-			return options.Document.TextEditor.Text;
+			return options.Document.Editor.Text;
 		}
 			
 		
@@ -180,7 +181,7 @@ namespace MonoDevelop.Refactoring.Tests
 			ExtractMethodRefactoring.ExtractMethodParameters parameters = refactoring.CreateParameters (options);
 			Assert.IsNotNull (parameters);
 			parameters.Name = "NewMethod";
-			parameters.InsertionPoint = new Mono.TextEditor.InsertionPoint (new DocumentLocation (options.ResolveResult.CallingMember.BodyRegion.End.Line, 0), NewLineInsertion.BlankLine, NewLineInsertion.None);
+			parameters.InsertionPoint = new Mono.TextEditor.InsertionPoint (new DocumentLocation (options.ResolveResult.CallingMember.BodyRegion.End.Line + 1, 1), NewLineInsertion.BlankLine, NewLineInsertion.None);
 			List<Change> changes = refactoring.PerformChanges (options, parameters);
 			string output = GetOutput (options, changes);
 			Assert.IsTrue (CompareSource (output, outputString), "Expected:" + Environment.NewLine + outputString + Environment.NewLine + "was:" + Environment.NewLine + output);
@@ -205,15 +206,13 @@ namespace MonoDevelop.Refactoring.Tests
 	void TestMethod ()
 	{
 		int i = 5;
-		i = NewMethod ();
+		NewMethod (ref i);
 		Console.WriteLine (i);
 	}
 
-	int NewMethod ()
+	void NewMethod (ref int i)
 	{
-		int i;
 		i = member + 1;
-		return i;
 	}
 }
 ");
@@ -265,14 +264,13 @@ namespace MonoDevelop.Refactoring.Tests
 	void TestMethod ()
 	{
 		int i = 5;
-		i = NewMethod (i);
+		NewMethod (ref i);
 		Console.WriteLine (i);
 	}
 
-	static int NewMethod (int i)
+	static void NewMethod (ref int i)
 	{
 		i = i + 1;
-		return i;
 	}
 }
 ");
@@ -318,7 +316,7 @@ namespace MonoDevelop.Refactoring.Tests
 		j = i + j;
 		k = j + member;
 		->
-		Console.WriteLine (k);
+		Console.WriteLine (k + j);
 	}
 }
 ", @"class TestClass
@@ -328,7 +326,7 @@ namespace MonoDevelop.Refactoring.Tests
 	{
 		int i = 5, j = 10, k;
 		NewMethod (i, ref j, out k);
-		Console.WriteLine (k);
+		Console.WriteLine (k + j);
 	}
 	
 	void NewMethod (int i, ref int j, out int k)
@@ -367,6 +365,102 @@ namespace MonoDevelop.Refactoring.Tests
 	{
 		Object obj1 = new Object();
 		obj1.ToString();
+	}
+}
+");
+		}
+		
+		
+		/// <summary>
+		/// Bug 616193 - Extract method passes param with does not exists any more in main method
+		/// </summary>
+		[Test()]
+		public void TestBug616193 ()
+		{
+			TestExtractMethod (@"class TestClass
+{
+	void TestMethod ()
+	{
+		string ret;
+		string x;
+		IEnumerable<string> y;
+		<-string z = ret + y;
+		ret = x + z;->
+	}
+}
+", @"class TestClass
+{
+	void TestMethod ()
+	{
+		string ret;
+		string x;
+		IEnumerable<string> y;
+		NewMethod (out ret, x, y);
+	}
+	
+	static void NewMethod (out string ret, string x, IEnumerable<string> y)
+	{
+		string z = ret + y;
+		ret = x + z;
+	}
+}
+");
+		}
+		
+		/// <summary>
+		/// Bug 616199 - Extract method forgets to return a local var which is used in main method
+		/// </summary>
+		[Test()]
+		public void TestBug616199 ()
+		{
+			TestExtractMethod (@"class TestClass
+{
+	void TestMethod ()
+	{
+		<-string z = ""test"" + ""x"";->
+		string ret = ""test1"" + z;
+	}
+}
+", @"class TestClass
+{
+	void TestMethod ()
+	{
+		string z = NewMethod ();
+		string ret = ""test1"" + z;
+	}
+	
+	static string NewMethod ()
+	{
+		string z = ""test"" + ""x"";
+		return z;
+	}
+}
+");
+		}
+		
+		/// <summary>
+		/// Bug 666271 - "Extract Method" on single line adds two semi-colons in method, none in replaced text
+		/// </summary>
+		[Test()]
+		public void TestBug666271 ()
+		{
+			TestExtractMethod (@"class TestClass
+{
+	void TestMethod ()
+	{
+		<-TestMethod ();->
+	}
+}
+", @"class TestClass
+{
+	void TestMethod ()
+	{
+		NewMethod ();
+	}
+	
+	void NewMethod ()
+	{
+		TestMethod ();
 	}
 }
 ");

@@ -39,6 +39,7 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.StandardHeader;
 using System.Text;
 using MonoDevelop.Ide.Gui.Content;
+using MonoDevelop.Ide.CodeFormatting;
 
 namespace MonoDevelop.Ide.Templates
 {
@@ -243,7 +244,7 @@ namespace MonoDevelop.Ide.Templates
 			string content = CreateContent (project, tags, language);
 			content = StringParserService.Parse (content, tags);
 			string mime = DesktopService.GetMimeTypeForUri (fileName);
-			Formatter formatter = !String.IsNullOrEmpty (mime) ? TextFileService.GetFormatter (mime) : null;
+			CodeFormatter formatter = !string.IsNullOrEmpty (mime) ? CodeFormatterService.GetFormatter (mime) : null;
 			
 			if (formatter != null)
 				content = formatter.FormatText (policyParent != null ? policyParent.Policies : null, content);
@@ -339,6 +340,12 @@ namespace MonoDevelop.Ide.Templates
 			if (project != null) {
 				tags ["ProjectName"] = project.Name;
 				tags ["SafeProjectName"] = CreateIdentifierName (project.Name);
+				var info = project.AuthorInformation ?? AuthorInformation.Default;
+				tags ["AuthorCopyright"] = info.Copyright;
+				tags ["AuthorCompany"] = info.Company;
+				tags ["AuthorTrademark"] = info.Trademark;
+				tags ["AuthorEmail"] = info.Email;
+				tags ["AuthorName"] = info.Name;
 			}
 			if ((language != null) && (language.Length > 0))
 				tags ["Language"] = language;

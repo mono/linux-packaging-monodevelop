@@ -56,7 +56,7 @@ using ICSharpCode.NRefactory.Visitors;
 using ClassType = MonoDevelop.Projects.Dom.ClassType;
 using MonoDevelop.CSharp.Formatting;
 using MonoDevelop.CSharp.Parser;
-using MonoDevelop.CSharp.Dom;
+using MonoDevelop.CSharp.Ast;
 using MonoDevelop.CSharp.Resolver;
 
 namespace MonoDevelop.CSharp.Refactoring
@@ -416,24 +416,29 @@ namespace MonoDevelop.CSharp.Refactoring
 				yield return new KeyValuePair<IMember,IReturnType> (kvp.Key, new DomReturnType (tn));
 			}
 		}*/
+
 		static void SetContext (IEnumerable<MemberReference> references, RefactorerContext ctx)
 		{
 			foreach (MemberReference r in references) {
 				r.SetContext (ctx);
 			}
 		}
+
 		public override IEnumerable<MemberReference> FindClassReferences (RefactorerContext ctx, string fileName, IType cls, bool includeXmlComment)
 		{
-			IEditableTextFile file = ctx.GetFile (fileName);
-			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, cls.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, null, fileName);
+			var editor = ((Mono.TextEditor.ITextEditorDataProvider)ctx.GetFile (fileName)).GetTextEditorData ();
+			var doc = ProjectDomService.GetParsedDocument (ctx.ParserContext, fileName);
+			if (doc == null || doc.CompilationUnit == null)
+				return null;
+			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, doc.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, editor, fileName);
 			
-			FindMemberAstVisitor visitor = new FindMemberAstVisitor (resolver, file, cls);
+			FindMemberAstVisitor visitor = new FindMemberAstVisitor (editor.Document, cls);
 			visitor.IncludeXmlDocumentation = includeXmlComment;
-			visitor.RunVisitor ();
+			visitor.RunVisitor (resolver);
 			SetContext (visitor.FoundReferences, ctx);
 			return visitor.FoundReferences;
 		}
-		
+
 		protected override int GetVariableNamePosition (IEditableTextFile file, LocalVariable var)
 		{
 			int begin = file.GetPositionFromLineColumn (var.Region.Start.Line, var.Region.Start.Column);
@@ -653,43 +658,46 @@ namespace MonoDevelop.CSharp.Refactoring
 			
 			return new DomRegion (lineBegin, colBegin, lineEnd, colEnd);
 		}
-		static NRefactoryParser parser = new NRefactoryParser ();
+		static McsParser parser = new McsParser ();
 		public override IEnumerable<MemberReference> FindMemberReferences (RefactorerContext ctx, string fileName, IType cls, IMember member, bool includeXmlComment)
 		{
-			ParsedDocument parsedDocument = parser.Parse (cls.SourceProjectDom, fileName, ctx.GetFile (fileName).Text);
+			var editor = ((Mono.TextEditor.ITextEditorDataProvider)ctx.GetFile (fileName)).GetTextEditorData ();
 			
-			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, parsedDocument.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, null, fileName);
-			resolver.SetupParsedCompilationUnit (parser.LastUnit);
+			var doc = ProjectDomService.GetParsedDocument (ctx.ParserContext, fileName);
+			if (doc == null || doc.CompilationUnit == null)
+				return null;
+			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, doc.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, editor, fileName);
 			resolver.CallingMember = member;
-			FindMemberAstVisitor visitor = new FindMemberAstVisitor (resolver, ctx.GetFile (fileName), member);
+			FindMemberAstVisitor visitor = new FindMemberAstVisitor (editor.Document, member);
 			visitor.IncludeXmlDocumentation = includeXmlComment;
-			visitor.RunVisitor ();
+			visitor.RunVisitor (resolver);
 			SetContext (visitor.FoundReferences, ctx);
 			return visitor.FoundReferences;
 		}
 
 		public override IEnumerable<MemberReference> FindVariableReferences (RefactorerContext ctx, string fileName, LocalVariable var)
 		{
-			//System.Console.WriteLine("Find variable references !!!");
-//			ParsedDocument parsedDocument = ProjectDomService.ParseFile (fileName);
-			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, var.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, null, fileName);
+			var editor = ((Mono.TextEditor.ITextEditorDataProvider)ctx.GetFile (fileName)).GetTextEditorData ();
+			
+			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, var.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, editor, fileName);
 			resolver.CallingMember = var.DeclaringMember;
 			
-			FindMemberAstVisitor visitor = new FindMemberAstVisitor (resolver, ctx.GetFile (fileName), var);
-			visitor.RunVisitor ();
+			FindMemberAstVisitor visitor = new FindMemberAstVisitor (editor.Document, var);
+			visitor.RunVisitor (resolver);
 			SetContext (visitor.FoundReferences, ctx);
 			return visitor.FoundReferences;
 		}
 		
 		public override IEnumerable<MemberReference> FindParameterReferences (RefactorerContext ctx, string fileName, IParameter param, bool includeXmlComment)
 		{
-			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, param.DeclaringMember.DeclaringType.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, null, fileName);
+			var editor = ((Mono.TextEditor.ITextEditorDataProvider)ctx.GetFile (fileName)).GetTextEditorData ();
+			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, param.DeclaringMember.DeclaringType.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, editor, fileName);
 			
 			resolver.CallingMember = param.DeclaringMember;
 			
-			FindMemberAstVisitor visitor = new FindMemberAstVisitor (resolver, ctx.GetFile (fileName), param);
+			FindMemberAstVisitor visitor = new FindMemberAstVisitor (editor.Document, param);
 			visitor.IncludeXmlDocumentation = includeXmlComment;
-			visitor.RunVisitor ();
+			visitor.RunVisitor (resolver);
 			SetContext (visitor.FoundReferences, ctx);
 			return visitor.FoundReferences;
 		}

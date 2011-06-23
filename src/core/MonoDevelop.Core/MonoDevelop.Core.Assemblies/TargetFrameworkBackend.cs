@@ -45,6 +45,9 @@ namespace MonoDevelop.Core.Assemblies
 		
 		public virtual bool IsInstalled {
 			get {
+				if (framework.Assemblies.Length == 0)
+					return false;
+
 				foreach (string dir in runtime.GetFrameworkFolders (framework)) {
 					if (Directory.Exists (dir)) {
 						string firstAsm = Path.Combine (dir, framework.Assemblies [0].Name) + ".dll";
@@ -105,9 +108,8 @@ namespace MonoDevelop.Core.Assemblies
 			info.IsFrameworkPackage = true;
 			info.IsCorePackage = true;
 			info.IsGacPackage = true;
-			info.Version = framework.Id;
+			info.Version = framework.Id.Version;
 			info.TargetFramework = framework.Id;
-			info.IsBaseCorePackage = framework.Id == framework.BaseCoreFramework;
 			return info;
 		}
 	}

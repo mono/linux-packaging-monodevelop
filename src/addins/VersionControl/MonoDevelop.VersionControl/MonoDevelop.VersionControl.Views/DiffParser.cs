@@ -48,33 +48,7 @@ namespace MonoDevelop.VersionControl.Views
 		// Capture the file's EOL string
 		static Regex eolExpression = new Regex (@"(?<eol>\r\n|\n|\r)", RegexOptions.Compiled);
 		
-		public DiffParser (): base("Diff", "text/x-diff")
-		{
-		}
-		
 		#region AbstractParser overrides
-		
-		public override bool CanParse (string fileName)
-		{
-			if (!string.IsNullOrEmpty (fileName)) {
-				string extension = Path.GetExtension (fileName);
-				return (".diff".Equals (extension, StringComparison.OrdinalIgnoreCase) ||
-				        ".patch".Equals (extension, StringComparison.OrdinalIgnoreCase));
-			}
-			
-			return false;
-		}
-		
-		public override bool CanParseMimeType (string mimeType)
-		{
-			return (!string.IsNullOrEmpty (mimeType) &&
-			        "text/x-diff".Equals (mimeType.Trim (), StringComparison.Ordinal));
-		}
-		
-		public override bool CanParseProjectType (string projectType)
-		{
-			return true;
-		}
 		
 		public override ParsedDocument Parse (ProjectDom dom, string fileName, string content)
 		{
@@ -115,7 +89,7 @@ namespace MonoDevelop.VersionControl.Views
 					cu.Add (currentFile);
 				} else {
 					lineMatch = chunkExpression.Match (line);
-					if (lineMatch != null && lineMatch.Success) {
+					if (lineMatch != null && lineMatch.Success && currentFile != null) {
 						if (currentRegion != null) // Close out previous chunk region
 							currentRegion.BodyRegion = new DomRegion (currentRegion.BodyRegion.Start.Line,
 							                                          currentRegion.BodyRegion.Start.Column,

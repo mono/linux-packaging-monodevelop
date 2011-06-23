@@ -31,7 +31,7 @@ using System.Collections.Generic;
 
 namespace MonoDevelop.Projects.Dom
 {
-	public class TypeParameter: ITypeParameter
+	public class TypeParameter : AbstractNode, ITypeParameter
 	{
 		string name;
 		public string Name {
@@ -40,14 +40,10 @@ namespace MonoDevelop.Projects.Dom
 			}
 		}
 		
-		public bool ConstructorRequired { get; set; }
-		
-		public bool ClassRequired { get; set; }
-		
-		public bool ValueTypeRequired { get; set; }
-
 		public TypeParameterVariance Variance { get; set; }
 
+		public TypeParameterModifier TypeParameterModifier { get; set; }
+		
 		List<IAttribute> attributes = null;
 		static readonly IAttribute[] emptyAttributes = new IAttribute[0];
 		public IEnumerable<IAttribute> Attributes {
@@ -75,7 +71,7 @@ namespace MonoDevelop.Projects.Dom
 		
 		public override string ToString ()
 		{
-			return string.Format("[TypeParameter: Name={0}, ConstructorRequired={1}, ClassRequired={2}, ValueTypeRequired={3}, Attributes={4}, Constraints={5}]", Name, ConstructorRequired, ClassRequired, ValueTypeRequired, Attributes, Constraints);
+			return string.Format ("[TypeParameter: Name={0}, Variance={1}, TypeParameterModifier={2}, Attributes={3}, Constraints={4}]", Name, Variance, TypeParameterModifier, Attributes, Constraints);
 		}
  		
 		public void AddConstraint (IReturnType type)

@@ -30,7 +30,7 @@ using Gtk;
 
 namespace MonoDevelop.Ide.Gui.Dialogs
 {
-	public abstract class OptionsPanel: IOptionsPanel
+	public abstract class OptionsPanel: IOptionsPanel, IDisposable
 	{
 		OptionsDialog dlg;
 		object dataObject;
@@ -61,6 +61,10 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		
 		public object DataObject {
 			get { return dataObject; }
+		}
+		
+		public virtual void Dispose ()
+		{
 		}
 	}
 }

@@ -29,6 +29,7 @@
 
 
 using System;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -56,7 +57,7 @@ namespace MonoDevelop.Projects
 	/// source code files and which can be built to generate an output.
 	/// </remarks>
 	[DataInclude(typeof(ProjectFile))]
-	[DataItem(FallbackType = typeof(UnknownProject))]
+	[ProjectModelDataItem(FallbackType = typeof(UnknownProject))]
 	public abstract class Project : SolutionEntityItem
 	{
 		string[] buildActions;
@@ -135,7 +136,7 @@ namespace MonoDevelop.Projects
 		/// </value>
 		public virtual IconId StockIcon {
 			get { return stockIcon; }
-			set { this.stockIcon = value; }
+			set { this.stockIcon = value; NotifyModified ("StockIcon"); }
 		}
 		IconId stockIcon = "md-project";
 		
@@ -282,9 +283,6 @@ namespace MonoDevelop.Projects
 		public override void Dispose ()
 		{
 			FileService.FileChanged -= OnFileChanged;
-			foreach (ProjectFile file in Files) {
-				file.Dispose ();
-			}
 			base.Dispose ();
 		}
 		
@@ -300,6 +298,11 @@ namespace MonoDevelop.Projects
 		public ProjectFile AddFile (string filename)
 		{
 			return AddFile (filename, null);
+		}
+		
+		public IEnumerable<ProjectFile> AddFiles (IEnumerable<FilePath> files)
+		{
+			return AddFiles (files, null);
 		}
 		
 		/// <summary>
@@ -329,6 +332,21 @@ namespace MonoDevelop.Projects
 			ProjectFile newFileInformation = new ProjectFile (filename, buildAction);
 			Files.Add (newFileInformation);
 			return newFileInformation;
+		}
+		
+		public IEnumerable<ProjectFile> AddFiles (IEnumerable<FilePath> files, string buildAction)
+		{
+			List<ProjectFile> newFiles = new List<ProjectFile> ();
+			foreach (FilePath filename in files) {
+				string ba = buildAction;
+				if (String.IsNullOrEmpty (ba))
+					ba = GetDefaultBuildAction (filename);
+
+				ProjectFile newFileInformation = new ProjectFile (filename, ba);
+				newFiles.Add (newFileInformation);
+			}
+			Files.AddRange (newFiles);
+			return newFiles;
 		}
 		
 		/// <summary>
@@ -447,8 +465,14 @@ namespace MonoDevelop.Projects
 					if (!Directory.Exists (Path.GetDirectoryName (dest)))
 						FileService.CreateDirectory (Path.GetDirectoryName (dest));
 
-					if (File.Exists (src))
+					if (File.Exists (src)) {
 						FileService.CopyFile (src, dest);
+						
+						// Copied files can't be read-only, so they can be removed when rebuilding the project
+						FileAttributes atts = File.GetAttributes (dest);
+						if (atts.HasFlag (FileAttributes.ReadOnly))
+							File.SetAttributes (dest, atts & ~FileAttributes.ReadOnly);
+					}
 					else
 						monitor.ReportError (GettextCatalog.GetString ("Could not find support file '{0}'.", src), null);
 
@@ -508,7 +532,7 @@ namespace MonoDevelop.Projects
 		public FileCopySet GetSupportFileList (ConfigurationSelector configuration)
 		{
 			FileCopySet list = new FileCopySet ();
-			PopulateSupportFileList (list, configuration);
+			Services.ProjectService.GetExtensionChain (this).PopulateSupportFileList (this, list, configuration);
 			return list;
 		}
 
@@ -525,7 +549,7 @@ namespace MonoDevelop.Projects
 		/// Returns a list of all files that are required to use the project output binary, for example: data files with
 		/// the Copy to Output option, debug information files, generated resource files, etc.
 		/// </remarks>
-		protected virtual void PopulateSupportFileList (FileCopySet list, ConfigurationSelector configuration)
+		internal protected virtual void PopulateSupportFileList (FileCopySet list, ConfigurationSelector configuration)
 		{
 			foreach (ProjectFile pf in Files) {
 				if (pf.CopyToOutputDirectory == FileCopyMode.None)
@@ -550,7 +574,7 @@ namespace MonoDevelop.Projects
 		public List<FilePath> GetOutputFiles (ConfigurationSelector configuration)
 		{
 			List<FilePath> list = new List<FilePath> ();
-			PopulateOutputFileList (list, configuration);
+			Services.ProjectService.GetExtensionChain (this).PopulateOutputFileList (this, list, configuration);
 			return list;
 		}
 
@@ -567,7 +591,7 @@ namespace MonoDevelop.Projects
 		/// Returns a list of all files that are required to use the project output binary, for example: data files with
 		/// the Copy to Output option, debug information files, generated resource files, etc.
 		/// </remarks>
-		protected virtual void PopulateOutputFileList (List<FilePath> list, ConfigurationSelector configuration)
+		internal protected virtual void PopulateOutputFileList (List<FilePath> list, ConfigurationSelector configuration)
 		{
 			string file = GetOutputFileName (configuration);
 			if (file != null)
@@ -753,18 +777,19 @@ namespace MonoDevelop.Projects
 
 		internal virtual void OnFileChanged (object source, FileEventArgs e)
 		{
-			ProjectFile file = GetProjectFile (e.FileName);
-			if (file != null) {
-				SetDirty ();
-				try {
-					NotifyFileChangedInProject (file);
-				} catch {
-					// Workaround Mono bug. The watcher seems to
-					// stop watching if an exception is thrown in
-					// the event handler
+			foreach (FileEventInfo fi in e) {
+				ProjectFile file = GetProjectFile (fi.FileName);
+				if (file != null) {
+					SetDirty ();
+					try {
+						NotifyFileChangedInProject (file);
+					} catch {
+						// Workaround Mono bug. The watcher seems to
+						// stop watching if an exception is thrown in
+						// the event handler
+					}
 				}
 			}
-
 		}
 
 		protected internal override List<FilePath> OnGetItemFiles (bool includeReferencedFiles)
@@ -779,18 +804,16 @@ namespace MonoDevelop.Projects
 			return col;
 		}
 
-		protected internal override void OnItemAdded (object obj)
+		protected internal override void OnItemsAdded (IEnumerable<ProjectItem> objs)
 		{
-			base.OnItemAdded (obj);
-			if (obj is ProjectFile)
-				NotifyFileAddedToProject ((ProjectFile)obj);
+			base.OnItemsAdded (objs);
+			NotifyFileAddedToProject (objs.OfType<ProjectFile> ());
 		}
 
-		protected internal override void OnItemRemoved (object obj)
+		protected internal override void OnItemsRemoved (IEnumerable<ProjectItem> objs)
 		{
-			base.OnItemRemoved (obj);
-			if (obj is ProjectFile)
-				NotifyFileRemovedFromProject ((ProjectFile)obj);
+			base.OnItemsRemoved (objs);
+			NotifyFileRemovedFromProject (objs.OfType<ProjectFile> ());
 		}
 
 		internal void NotifyFileChangedInProject (ProjectFile file)
@@ -806,37 +829,50 @@ namespace MonoDevelop.Projects
 
 		List<ProjectFile> unresolvedDeps;
 
-		void NotifyFileRemovedFromProject (ProjectFile file)
+		void NotifyFileRemovedFromProject (IEnumerable<ProjectFile> objs)
 		{
-			file.SetProject (null);
-
-			if (DependencyResolutionEnabled) {
-				if (unresolvedDeps.Contains (file))
-					unresolvedDeps.Remove (file);
-				foreach (ProjectFile f in file.DependentChildren) {
-					f.DependsOnFile = null;
-					if (!string.IsNullOrEmpty (f.DependsOn))
-						unresolvedDeps.Add (f);
+			if (!objs.Any ())
+				return;
+			
+			var args = new ProjectFileEventArgs ();
+			
+			foreach (ProjectFile file in objs) {
+				file.SetProject (null);
+				args.Add (new ProjectFileEventInfo (this, file));
+				if (DependencyResolutionEnabled) {
+					if (unresolvedDeps.Contains (file))
+						unresolvedDeps.Remove (file);
+					foreach (ProjectFile f in file.DependentChildren) {
+						f.DependsOnFile = null;
+						if (!string.IsNullOrEmpty (f.DependsOn))
+							unresolvedDeps.Add (f);
+					}
+					file.DependsOnFile = null;
 				}
-				file.DependsOnFile = null;
+			}
+			SetDirty ();
+			NotifyModified ("Files");
+			OnFileRemovedFromProject (args);
+		}
+
+		void NotifyFileAddedToProject (IEnumerable<ProjectFile> objs)
+		{
+			if (!objs.Any ())
+				return;
+			
+			var args = new ProjectFileEventArgs ();
+			
+			foreach (ProjectFile file in objs) {
+				if (file.Project != null)
+					throw new InvalidOperationException ("ProjectFile already belongs to a project");
+				file.SetProject (this);
+				args.Add (new ProjectFileEventInfo (this, file));
+				ResolveDependencies (file);
 			}
 
 			SetDirty ();
 			NotifyModified ("Files");
-			OnFileRemovedFromProject (new ProjectFileEventArgs (this, file));
-		}
-
-		void NotifyFileAddedToProject (ProjectFile file)
-		{
-			if (file.Project != null)
-				throw new InvalidOperationException ("ProjectFile already belongs to a project");
-			file.SetProject (this);
-
-			ResolveDependencies (file);
-
-			SetDirty ();
-			NotifyModified ("Files");
-			OnFileAddedToProject (new ProjectFileEventArgs (this, file));
+			OnFileAddedToProject (args);
 		}
 
 		internal void ResolveDependencies (ProjectFile file)

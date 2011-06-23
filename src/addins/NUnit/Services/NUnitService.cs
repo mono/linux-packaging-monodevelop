@@ -147,14 +147,32 @@ namespace MonoDevelop.NUnit
 				}
 			}
 			
+			if (!IdeApp.ProjectOperations.ConfirmExecutionOperation ())
+				return NullProcessAsyncOperation.Failure;
+			
 			Pad resultsPad = IdeApp.Workbench.GetPad <TestResultsPad>();
 			if (resultsPad == null) {
 				resultsPad = IdeApp.Workbench.ShowPad (new TestResultsPad (), "MonoDevelop.NUnit.TestResultsPad", GettextCatalog.GetString ("Test results"), "Bottom", "md-solution");
 			}
 			
+			// Make the pad sticky while the tests are runnig, so the results pad is always visible (even if minimized)
+			// That's required since when running in debug mode, the layout is automatically switched to debug.
+			
+			resultsPad.Sticky = true;
 			resultsPad.BringToFront ();
+			
 			TestSession session = new TestSession (test, context, (TestResultsPad) resultsPad.Content);
+			
+			session.Completed += delegate {
+				Gtk.Application.Invoke (delegate {
+					resultsPad.Sticky = false;
+				});
+			};
+			
 			session.Start ();
+			
+			IdeApp.ProjectOperations.CurrentRunOperation = session;
+			
 			return session;
 		}
 		
@@ -322,7 +340,7 @@ namespace MonoDevelop.NUnit
 			UnitTestGroup group = test as UnitTestGroup;
 			if (group == null) 
 				return;
-			foreach (UnitTest t in group.Tests)
+			foreach (UnitTest t in new List<UnitTest> (group.Tests))
 				ResetResult (t);
 		}
 		

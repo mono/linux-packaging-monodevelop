@@ -49,6 +49,7 @@ namespace MonoDevelop.DesignerSupport
 		TreeStore outlineTreeStore;
 		bool refreshingOutline;
 		bool disposed;
+		bool outlineReady;
 
 		public override bool ExtendsEditor (Document doc, IEditableTextBuffer editor)
 		{
@@ -70,6 +71,7 @@ namespace MonoDevelop.DesignerSupport
 			disposed = true;
 			if (Document != null)
 				Document.DocumentParsed -= UpdateDocumentOutline;
+			RemoveRefillOutlineStoreTimeout ();
 			base.Dispose ();
 		}
 
@@ -100,21 +102,11 @@ namespace MonoDevelop.DesignerSupport
 			outlineTreeView.HeadersVisible = false;
 			
 			outlineTreeView.Selection.Changed += delegate {
-				TreeIter iter;
-				if (!outlineTreeView.Selection.GetSelected (out iter))
-					return;
-				object o = outlineTreeStore.GetValue (iter, 0);
-				int line = -1, col = -1;
-				if (o is IType) {
-					line = ((IType)o).BodyRegion.Start.Line;
-					col = ((IType)o).BodyRegion.Start.Column;
-				} else if (o is IMember) {
-					line = ((IMember)o).BodyRegion.Start.Line;
-					col = ((IMember)o).BodyRegion.Start.Column;
-				}
-				if (line > -1) {
-					Editor.JumpTo (line, Math.Max (1, col));
-				}
+				JumpToDeclaration (false);
+			};
+			
+			outlineTreeView.RowActivated += delegate {
+				JumpToDeclaration (true);
 			};
 
 			this.lastCU = Document.ParsedDocument;
@@ -125,6 +117,20 @@ namespace MonoDevelop.DesignerSupport
 			sw.Add (outlineTreeView);
 			sw.ShowAll ();
 			return sw;
+		}
+		
+		void JumpToDeclaration (bool focusEditor)
+		{
+			if (!outlineReady)
+				return;
+			TreeIter iter;
+			if (!outlineTreeView.Selection.GetSelected (out iter))
+				return;
+			object o = outlineTreeStore.GetValue (iter, 0);
+			
+			IdeApp.ProjectOperations.JumpToDeclaration (o as INode);
+			if (focusEditor)
+				IdeApp.Workbench.ActiveDocument.Select ();
 		}
 
 		void OutlineTreeIconFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
@@ -163,19 +169,23 @@ namespace MonoDevelop.DesignerSupport
 			outlineTreeStore = null;
 			outlineTreeView = null;
 		}
-
+		
+		void RemoveRefillOutlineStoreTimeout ()
+		{
+			if (refillOutlineStoreId == 0)
+				return;
+			GLib.Source.Remove (refillOutlineStoreId);
+			refillOutlineStoreId = 0;
+		}
+		
+		uint refillOutlineStoreId;
 		void UpdateDocumentOutline (object sender, EventArgs args)
 		{
-			bool refreshNow = lastCU == null;
 			lastCU = Document.ParsedDocument;
+			//limit update rate to 3s
 			if (!refreshingOutline) {
 				refreshingOutline = true;
-				if (refreshNow) {
-					RefillOutlineStore (); 
-				} else {
-					//limit update rate to 1s
-					GLib.Timeout.Add (1000, new GLib.TimeoutHandler (RefillOutlineStore));
-				}
+				refillOutlineStoreId = GLib.Timeout.Add (3000, new GLib.TimeoutHandler (RefillOutlineStore));
 			}
 		}
 
@@ -184,18 +194,26 @@ namespace MonoDevelop.DesignerSupport
 			DispatchService.AssertGuiThread ();
 			Gdk.Threads.Enter ();
 			refreshingOutline = false;
-			if (outlineTreeStore == null || !outlineTreeView.IsRealized)
+			if (outlineTreeStore == null || !outlineTreeView.IsRealized) {
+				refillOutlineStoreId = 0;
 				return false;
-
+			}
+			
+			outlineReady = false;
 			outlineTreeStore.Clear ();
 			if (lastCU != null) {
 				BuildTreeChildren (outlineTreeStore, TreeIter.Zero, lastCU);
+				TreeIter it;
+				if (outlineTreeStore.GetIterFirst (out it))
+					outlineTreeView.Selection.SelectIter (it);
 				outlineTreeView.ExpandAll ();
 			}
+			outlineReady = true;
 
 			Gdk.Threads.Leave ();
 
 			//stop timeout handler
+			refillOutlineStoreId = 0;
 			return false;
 		}
 
@@ -270,14 +288,21 @@ namespace MonoDevelop.DesignerSupport
 
 		static DomRegion GetRegion (object o)
 		{
-			if (o is IMember)
-				return ((IMember)o).BodyRegion;
+			if (o is IField) {
+				var f = (IField)o;
+				return new DomRegion (f.Location, f.Location);
+			}
+			
+			if (o is IMember) {
+				var m = (IMember)o;
+				return m.BodyRegion.IsEmpty ? new DomRegion (m.Location, m.Location) : m.BodyRegion;
+			}
 			throw new InvalidOperationException (o.GetType ().ToString ());
 		}
 
 		static bool OuterEndsAfterInner (DomRegion outer, DomRegion inner)
 		{
-			return ((outer.End.Line > 0 && outer.End.Line > inner.End.Line) || (outer.End.Line == inner.End.Line && outer.End.Column > inner.End.Column));
+			return ((outer.End.Line > 1 && outer.End.Line > inner.End.Line) || (outer.End.Line == inner.End.Line && outer.End.Column > inner.End.Column));
 		}
 	}
 }

@@ -60,11 +60,13 @@ namespace MonoDevelop.Ide.CustomTools
 					break;
 				}
 			});
-			IdeApp.Workspace.FileChangedInProject += delegate (object sender, ProjectFileEventArgs e) {
-				Update (e.ProjectFile, false);
+			IdeApp.Workspace.FileChangedInProject += delegate (object sender, ProjectFileEventArgs args) {
+				foreach (ProjectFileEventInfo e in args)
+					Update (e.ProjectFile, false);
 			};
-			IdeApp.Workspace.FilePropertyChangedInProject += delegate (object sender, ProjectFileEventArgs e) {
-				Update (e.ProjectFile, false);
+			IdeApp.Workspace.FilePropertyChangedInProject += delegate (object sender, ProjectFileEventArgs args) {
+				foreach (ProjectFileEventInfo e in args)
+					Update (e.ProjectFile, false);
 			};
 			//FIXME: handle the rename
 			//MonoDevelop.Ide.Gui.IdeApp.Workspace.FileRenamedInProject
@@ -109,8 +111,7 @@ namespace MonoDevelop.Ide.CustomTools
 				}
 			}
 			
-			string title = GettextCatalog.GetString ("Custom Tool");
-			var monitor = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor (title, null, false, true);
+			var monitor = IdeApp.Workbench.ProgressMonitors.GetToolOutputProgressMonitor (false);
 			var result = new SingleFileCustomToolResult ();
 			var aggOp = new AggregatedOperationMonitor (monitor);
 			try {
@@ -213,12 +214,14 @@ namespace MonoDevelop.Ide.CustomTools
 			}
 		}
 		
-		public static void HandleRename (ProjectFileRenamedEventArgs args)
+		public static void HandleRename (ProjectFileRenamedEventArgs e)
 		{
-			var file = args.ProjectFile;
-			var tool = GetGenerator (file);
-			if (tool == null)
-				return;
+			foreach (ProjectFileEventInfo args in e) {
+				var file = args.ProjectFile;
+				var tool = GetGenerator (file);
+				if (tool == null)
+					continue;
+			}
 		}
 	}
 }

@@ -37,6 +37,8 @@ using MonoDevelop.Ide.Commands;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui.Components;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
@@ -118,17 +120,22 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			IdeApp.Workbench.OpenDocument (file.Path);
 		}
 		
-		public override void DeleteItem ()
+		public override void DeleteMultipleItems ()
 		{
-			SystemFile file = CurrentNode.DataItem as SystemFile;
-			
-			bool yes = MessageService.Confirm (GettextCatalog.GetString ("Are you sure you want to permanently delete the file {0}?", file.Path), AlertButton.Delete);
-			if (!yes) return;
-
-			try {
-				FileService.DeleteFile (file.Path);
-			} catch {
-				MessageService.ShowError (GettextCatalog.GetString ("The file {0} could not be deleted", file.Path));
+			if (CurrentNodes.Length == 1) {
+				SystemFile file = (SystemFile)CurrentNodes[0].DataItem;
+				if (!MessageService.Confirm (GettextCatalog.GetString ("Are you sure you want to permanently delete the file {0}?", file.Path), AlertButton.Delete))
+					return;
+			} else {
+				if (!MessageService.Confirm (GettextCatalog.GetString ("Are you sure you want to permanently delete all selected files?"), AlertButton.Delete))
+					return;
+			}
+			foreach (SystemFile file in CurrentNodes.Select (n => (SystemFile)n.DataItem)) {
+				try {
+					FileService.DeleteFile (file.Path);
+				} catch {
+					MessageService.ShowError (GettextCatalog.GetString ("The file {0} could not be deleted", file.Path));
+				}
 			}
 		}
 		
@@ -143,25 +150,32 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		{
 			Set<SolutionEntityItem> projects = new Set<SolutionEntityItem> ();
 			Set<Solution> solutions = new Set<Solution> ();
-			foreach (ITreeNavigator node in CurrentNodes) {
-				SystemFile file = (SystemFile) node.DataItem;
-				Project project = node.GetParentDataItem (typeof(Project), true) as Project;
-				if (project != null) {
-					project.AddFile (file.Path);
-					projects.Add (project);
-				}
-				else {
-					SolutionFolder folder = node.GetParentDataItem (typeof(SolutionFolder), true) as SolutionFolder;
-					if (folder != null) {
-						folder.Files.Add (file.Path);
-						solutions.Add (folder.ParentSolution);
+			var nodesByProject = CurrentNodes.GroupBy (n => n.GetParentDataItem (typeof(Project), true) as Project);
+			
+			foreach (var projectGroup in nodesByProject) {
+				Project project = projectGroup.Key;
+				List<FilePath> newFiles = new List<FilePath> ();
+				foreach (ITreeNavigator node in projectGroup) {
+					SystemFile file = (SystemFile) node.DataItem;
+					if (project != null) {
+						newFiles.Add (file.Path);
+						projects.Add (project);
 					}
 					else {
-						Solution sol = node.GetParentDataItem (typeof(Solution), true) as Solution;
-						sol.RootFolder.Files.Add (file.Path);
-						solutions.Add (sol);
+						SolutionFolder folder = node.GetParentDataItem (typeof(SolutionFolder), true) as SolutionFolder;
+						if (folder != null) {
+							folder.Files.Add (file.Path);
+							solutions.Add (folder.ParentSolution);
+						}
+						else {
+							Solution sol = node.GetParentDataItem (typeof(Solution), true) as Solution;
+							sol.RootFolder.Files.Add (file.Path);
+							solutions.Add (sol);
+						}
 					}
 				}
+				if (newFiles.Count > 0)
+					project.AddFiles (newFiles);
 			}
 			IdeApp.ProjectOperations.Save (projects);
 			foreach (Solution sol in solutions)
@@ -191,14 +205,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		[CommandUpdateHandler (ViewCommands.OpenWithList)]
 		public void OnOpenWithUpdate (CommandArrayInfo info)
 		{
-			SystemFile file = CurrentNode.DataItem as SystemFile;
-			FileViewer prev = null; 
-			foreach (FileViewer fv in IdeApp.Workbench.GetFileViewers (file.Path)) {
-				if (prev != null && fv.IsExternal != prev.IsExternal)
-					info.AddSeparator ();
-				info.Add (fv.Title, fv);
-				prev = fv;
-			}
+			ProjectFileNodeCommandHandler.PopulateOpenWithViewers (info, null, ((SystemFile) CurrentNode.DataItem).Path);
 		}
 	}
 }

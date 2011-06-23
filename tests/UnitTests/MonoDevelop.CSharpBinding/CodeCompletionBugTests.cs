@@ -55,15 +55,91 @@ namespace MonoDevelop.CSharpBinding.Tests
 			return CreateProvider (text, true);
 		}
 		
+		class TestCompletionWidget : ICompletionWidget
+		{
+			Mono.TextEditor.TextEditorData data;
+			
+			public TestCompletionWidget (Mono.TextEditor.TextEditorData data)
+			{
+				this.data = data;
+			}
+
+			#region ICompletionWidget implementation
+			public event EventHandler CompletionContextChanged;
+
+			public string GetText (int startOffset, int endOffset)
+			{
+				return data.GetTextBetween (startOffset, endOffset);
+			}
+
+			public char GetChar (int offset)
+			{
+				return data.GetCharAt (offset);
+			}
+
+			public void Replace (int offset, int count, string text)
+			{
+				data.Replace (offset, count, text);
+			}
+
+			public CodeCompletionContext CreateCodeCompletionContext (int triggerOffset)
+			{
+				CodeCompletionContext result = new CodeCompletionContext ();
+				result.TriggerOffset = triggerOffset;
+				var loc = data.OffsetToLocation (triggerOffset);
+				result.TriggerLine = loc.Line;
+				result.TriggerLineOffset = loc.Column - 1;
+				return result;
+			}
+
+			public string GetCompletionText (CodeCompletionContext ctx)
+			{
+				if (ctx == null)
+					return null;
+				int min = Math.Min (ctx.TriggerOffset, data.Caret.Offset);
+				int max = Math.Max (ctx.TriggerOffset, data.Caret.Offset);
+				return data.GetTextBetween (min, max);
+			}
+
+			public void SetCompletionText (CodeCompletionContext ctx, string partial_word, string complete_word)
+			{
+			}
+
+			void ICompletionWidget.SetCompletionText (CodeCompletionContext ctx, string partial_word, string complete_word, int completeWordOffset)
+			{
+			}
+
+			public CodeCompletionContext CurrentCodeCompletionContext {
+				get;
+				set;
+			}
+
+			public int TextLength {
+				get;
+				set;
+			}
+
+			public int SelectedLength {
+				get;
+				set;
+			}
+
+			public Gtk.Style GtkStyle {
+				get;
+				set;
+			}
+			#endregion
+			
+		}
 		static CompletionDataList CreateProvider (string text, bool isCtrlSpace)
 		{
 			string parsedText;
 			string editorText;
 			int cursorPosition = text.IndexOf ('$');
 			int endPos = text.IndexOf ('$', cursorPosition + 1);
-			if (endPos == -1)
+			if (endPos == -1) {
 				parsedText = editorText = text.Substring (0, cursorPosition) + text.Substring (cursorPosition + 1);
-			else {
+			} else {
 				parsedText = text.Substring (0, cursorPosition) + new string (' ', endPos - cursorPosition) + text.Substring (endPos + 1);
 				editorText = text.Substring (0, cursorPosition) + text.Substring (cursorPosition + 1, endPos - cursorPosition - 1) + text.Substring (endPos + 1);
 				cursorPosition = endPos - 1; 
@@ -80,8 +156,8 @@ namespace MonoDevelop.CSharpBinding.Tests
 			ProjectDomService.Load (project);
 			ProjectDom dom = ProjectDomService.GetProjectDom (project);
 			dom.ForceUpdate (true);
-			ProjectDomService.Parse (project, file, null, delegate { return parsedText; });
-			ProjectDomService.Parse (project, file, null, delegate { return parsedText; });
+			ProjectDomService.Parse (project, file, delegate { return parsedText; });
+			ProjectDomService.Parse (project, file, delegate { return parsedText; });
 			
 			sev.Project = project;
 			sev.ContentName = file;
@@ -89,23 +165,23 @@ namespace MonoDevelop.CSharpBinding.Tests
 			sev.CursorPosition = cursorPosition;
 			tww.ViewContent = sev;
 			Document doc = new Document (tww);
-			doc.ParsedDocument = new NRefactoryParser ().Parse (null, sev.ContentName, parsedText);
+			doc.ParsedDocument = new McsParser ().Parse (null, sev.ContentName, parsedText);
 			foreach (var e in doc.ParsedDocument.Errors)
 				Console.WriteLine (e);
 			CSharpTextEditorCompletion textEditorCompletion = new CSharpTextEditorCompletion (doc);
-			
 			int triggerWordLength = 1;
 			CodeCompletionContext ctx = new CodeCompletionContext ();
+			textEditorCompletion.CompletionWidget = new TestCompletionWidget (doc.Editor) {
+				CurrentCodeCompletionContext = ctx
+			};
 			ctx.TriggerOffset = sev.CursorPosition;
 			int line, column;
 			sev.GetLineColumnFromPosition (sev.CursorPosition, out line, out column);
 			ctx.TriggerLine = line;
-			ctx.TriggerLineOffset = column;
-			
+			ctx.TriggerLineOffset = column - 1;
 			if (isCtrlSpace)
 				return textEditorCompletion.CodeCompletionCommand (ctx) as CompletionDataList;
-			else
-				return textEditorCompletion.HandleCodeCompletion (ctx, editorText[cursorPosition - 1] , ref triggerWordLength) as CompletionDataList;
+			return textEditorCompletion.HandleCodeCompletion (ctx, editorText[cursorPosition - 1] , ref triggerWordLength) as CompletionDataList;
 		}
 		
 		public static void CheckObjectMembers (CompletionDataList provider)
@@ -613,7 +689,7 @@ class C {
         }
 }");
 			Assert.IsNotNull (provider, "provider not found.");
-			Assert.AreEqual ("C.D", provider.DefaultCompletionString, "Completion string is incorrect");
+			Assert.AreEqual ("D", provider.DefaultCompletionString, "Completion string is incorrect");
 		}
 		
 		[Test()]
@@ -649,7 +725,6 @@ class Test{
 	}
 }");
 			Assert.IsNotNull (provider, "provider not found.");
-			Assert.AreEqual (1, provider.Count);
 			Assert.IsNotNull (provider.Find ("string"), "type string not found.");
 		}
 
@@ -2521,7 +2596,7 @@ class Foo
 	}
 }
 
-class Test
+class MyTest
 {
 	static T Test<T> (Func<string, T> myFunc)
 	{
@@ -2657,6 +2732,721 @@ class Test : TestBase
 			Assert.IsNotNull (provider.Find ("Bar"), "method 'Bar' not found.");
 		}
 		
+		/// <summary>
+		/// Bug 625064 - Internal classes aren't suggested for completion
+		/// </summary>
+		[Test()]
+		public void TestBug625064 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"class Foo 
+{
+	class Bar { }
+	$List<$
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Bar"), "class 'Bar' not found.");
+		}
+		
+		
+		/// <summary>
+		/// Bug 631875 - No Intellisense for arrays
+		/// </summary>
+		[Test()]
+		public void TestBug631875 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"class C
+{
+	static void Main ()
+	{
+		var objects = new[] { new { X = (object)null }};
+		$objects[0].$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("X"), "property 'X' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 632228 - Wrong var inference
+		/// </summary>
+		[Test()]
+		public void TestBug632228 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"
+class C {
+	public void FooBar () {}
+	public static void Main ()
+	{
+		var thingToTest = new[] { new C (), 22, new object(), string.Empty, null };
+		$thingToTest[0].$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("FooBar"), "method 'FooBar' found, but shouldn't.");
+		}
 
+		/// <summary>
+		/// Bug 632696 - No intellisense for constraints
+		/// </summary>
+		[Test()]
+		public void TestBug632696 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"
+class Program
+{
+	void Foo ()
+	{
+	}
+
+	static void Foo<T> () where T : Program
+	{
+		var s = new[] { default(T) };
+		$s[0].$
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Foo"), "method 'Foo' not found.");
+		}
+		
+		[Test()]
+		public void TestCommentsWithWindowsEol ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider ("class TestClass\r\n{\r\npublic static void Main (string[] args) {\r\n// TestComment\r\n$args.$\r\n}\r\n}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("ToString"), "method 'ToString' not found.");
+		}
+		
+		[Test()]
+		public void TestGhostEntryBug ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"
+using System.IO;
+
+class TestClass
+{
+	public Path Path {
+		get;
+		set;
+	}
+	
+	void Test ()
+	{
+		$$
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("System.IO.Path"), "'System.IO.Path' found but shouldn't.");
+			Assert.IsNotNull (provider.Find ("Path"), "property 'Path' not found.");
+		}
+		
+		
+		/// <summary>
+		/// Bug 648562 – Abstract members are allowed by base call
+		/// </summary>
+		[Test()]
+		public void TestBug648562 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"using System;
+
+abstract class A
+{
+    public abstract void Foo<T> (T type);
+}
+
+class B : A
+{
+    public override void Foo<U> (U type)
+    {
+        $base.$
+    }
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("Foo"), "method 'Foo' found, but shouldn't.");
+		}
+		
+		/// <summary>
+		/// Bug 633767 - Wrong intellisense for simple lambda
+		/// </summary>
+		[Test()]
+		public void TestBug633767 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"using System;
+
+public class E
+{
+	public int Foo { get; set; }
+}
+
+public class C
+{
+	delegate void D<T> (T t);
+	
+	static T M<T> (T t, D<T> a)
+	{
+		return t;
+	}
+
+	static void MethodArg (object o)
+	{
+	}
+
+	public static int Main ()
+	{
+		D<object> action = l => Console.WriteLine (l);
+		var b = M (new E (), action);
+		$b.$
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("Foo"), "property 'Foo' found, but shouldn't.");
+		}
+		
+		/// <summary>
+		/// Bug 616208 - Renaming a struct/class is renaming too much
+		/// </summary>
+		[Test()]
+		public void TestBug616208 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"using System;
+
+namespace System 
+{
+	public class Foo { public int Bar; };
+}
+
+namespace test.Util
+{
+	public class Foo { public string x; }
+}
+
+namespace Test
+{
+	public class A
+	{
+		public Foo X;
+		
+		public A ()
+		{
+			$X.$
+		}
+	}
+}
+
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Bar"), "property 'Bar' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 668135 - Problems with "new" completion
+		/// </summary>
+		[Test()]
+		public void TestBug668135a ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"public class A
+{
+	public A ()
+	{
+		string test;
+		$Console.WriteLine (test = new $
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("string"), "class 'string' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 668453 - var completion infers var type too eagerly
+		/// </summary>
+		[Test()]
+		public void TestBug668453 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"public class Test
+{
+	private void FooBar ()
+	{
+		$var str = new $
+		FooBar ();
+	}
+}
+
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("FooBar"), "method 'FooBar' found.");
+		}
+		
+		/// <summary>
+		/// Bug 669285 - Extension method on T[] shows up on T
+		/// </summary>
+		[Test()]
+		public void TestBug669285 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"static class Ext
+{
+	public static void Foo<T> (this T[] t)
+	{
+	}
+}
+
+public class Test<T>
+{
+	public void Foo ()
+	{
+		T t;
+		$t.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNull (provider.Find ("Foo"), "method 'Foo' found.");
+			provider = CreateCtrlSpaceProvider (
+@"static class Ext
+{
+	public static void Foo<T> (this T[] t)
+	{
+	}
+}
+
+public class Test<T>
+{
+	public void Foo ()
+	{
+		T[] t;
+		$t.$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Foo"), "method 'Foo' not found.");
+		}
+		
+		
+		/// <summary>
+		/// Bug 669818 - Autocomplete missing for new nested class
+		/// </summary>
+		[Test()]
+		public void TestBug669818 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"using System;
+public class Foo
+{
+    public class Bar
+    {
+    }
+	public static void FooBar () {}
+}
+class TestNested
+{
+    public static void Main (string[] args)
+    {
+        $new Foo.$
+    }
+}
+
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Bar"), "class 'Bar' not found.");
+			Assert.IsNull (provider.Find ("FooBar"), "method 'FooBar' found.");
+		}
+		
+		/// <summary>
+		/// Bug 674514 - foreach value should not be in the completion list
+		/// </summary>
+		[Test()]
+		public void TestBug674514 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"using System;
+using System.Linq;
+using System.Collections.Generic;
+
+class Foo
+{
+	public static void Main (string[] args)
+	{
+		$foreach (var arg in $
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("args"), "parameter 'args' not found.");
+			Assert.IsNull (provider.Find ("arg"), "variable 'arg' found.");
+			
+			provider = CreateCtrlSpaceProvider (
+@"using System;
+using System.Linq;
+using System.Collections.Generic;
+
+class Foo
+{
+	public static void Main (string[] args)
+	{
+		$foreach (var arg in args) 
+			Console.WriteLine ($
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("args"), "parameter 'args' not found.");
+			Assert.IsNotNull (provider.Find ("arg"), "variable 'arg' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 675436 - Completion is trying to complete symbol names in declarations
+		/// </summary>
+		[Test()]
+		public void TestBug675436_LocalVar ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"class Test
+{
+    public static void Main (string[] args)
+    {
+        $int test = $
+    }
+}
+");
+			Assert.IsNull (provider.Find ("test"), "name 'test' found.");
+		}
+		
+		/// <summary>
+		/// Bug 675956 - Completion in for loops is broken
+		/// </summary>
+		[Test()]
+		public void TestBug675956 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"class Test
+{
+    public static void Main (string[] args)
+    {
+        $for (int i = 0; $
+    }
+}
+");
+			Assert.IsNotNull (provider.Find ("i"), "variable 'i' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 676311 - auto completion too few proposals in fluent API (Moq)
+		/// </summary>
+		[Test()]
+		public void TestBug676311 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"using System;
+
+namespace Test
+{
+	public interface IFoo<T>
+	{
+		void Foo1 ();
+	}
+
+	public interface IFoo<T, S>
+	{
+		void Foo2 ();
+	}
+	
+	public class Test<T>
+	{
+		public IFoo<T> TestMe (Expression<Action<T>> act)
+		{
+			return null;
+		}
+		
+		public IFoo<T, S> TestMe<S> (Expression<Func<S, T>> func)
+		{
+			return null;
+		}
+		
+		public string TestMethod (string str)
+		{
+			return str;
+		}
+	}
+	
+	class MainClass
+	{
+		public static void Main (string[] args)
+		{
+			var t = new Test<string> ();
+			var s = t.TestMe (x => t.TestMethod (x));
+			$s.$
+		}
+	}
+}");
+			Assert.IsNotNull (provider.Find ("Foo2"), "method 'Foo2' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 676311 - auto completion too few proposals in fluent API (Moq)
+		/// </summary>
+		[Test()]
+		public void TestBug676311_Case2 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"using System;
+using System.Linq.Expressions;
+
+namespace Test
+{
+	public interface IFoo<T>
+	{
+		void Foo1 ();
+	}
+
+	public interface IFoo<T, S>
+	{
+		void Foo2 ();
+	}
+	
+	public class Test<T>
+	{
+		public IFoo<T> TestMe (Expression<Action<T>> act)
+		{
+			return null;
+		}
+		
+		public IFoo<T, S> TestMe<S> (Expression<Func<S, T>> func)
+		{
+			return null;
+		}
+		
+		public void TestMethod (string str)
+		{
+		}
+	}
+	
+	class MainClass
+	{
+		public static void Main (string[] args)
+		{
+			var t = new Test<string> ();
+			var s = t.TestMe (x => t.TestMethod (x));
+			$s.$
+		}
+	}
+}");
+			Assert.IsNotNull (provider.Find ("Foo1"), "method 'Foo2' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 678340 - Cannot infer types from Dictionary<K,V>.Values
+		/// </summary>
+		[Test()]
+		public void TestBug678340 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"using System;
+using System.Collections.Generic;
+
+public class Test
+{
+	public void SomeMethod ()
+	{
+		var foo = new Dictionary<string,Test> ();
+		foreach (var bar in foo.Values) {
+			$bar.$
+		}
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("SomeMethod"), "method 'SomeMethod' not found.");
+	}
+		/// <summary>
+		/// Bug 678340 - Cannot infer types from Dictionary<K,V>.Values
+		/// </summary>
+		[Test()]
+		public void TestBug678340_Case2 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"public class Foo<T>
+{
+	public class TestFoo
+	{
+		T Return ()
+		{
+			
+		}
+	}
+	
+	public TestFoo Bar;
+}
+
+public class Test
+{
+	public void SomeMethod ()
+	{
+		Foo<Test> foo;
+		var f = foo.Bar;
+		$f.Return ().$
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("SomeMethod"), "method 'SomeMethod' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 679792 - MonoDevelop becomes unresponsive and leaks memory
+		/// </summary>
+		[Test()]
+		public void TestBug679792 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"using System.Collections.Generic;
+
+class TestClass
+{
+	public static void Main (string[] args)
+	{
+		Dictionary<string, Dictionary<string, TestClass>> cache;
+		$cache[""Hello""] [""World""] = new $
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("TestClass"), "class 'TestClass' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 679995 - Variable missing from completiom
+		/// </summary>
+		/// 
+		[Test()]
+		public void TestBug679995 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"class TestClass
+{
+	public void Foo ()
+	{
+		using (var testMe = new TestClass ()) {
+			$$
+		}
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("testMe"), "variable 'testMe' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 680264 - Lamba completion inference issues
+		/// </summary>
+		/// 
+		[Test()]
+		public void TestBug680264 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"
+public delegate S Func<T, S> (T t);
+
+public static class Linq
+{
+	public static bool Any<T> (this T[] t, Func<T, bool> func)
+	{
+		return true;
+	}
+}
+
+class TestClass
+{
+	public void Foo ()
+	{
+		TestClass[] test;
+		$test.Any (t => t.$
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Foo"), "method 'Foo' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 683037 - Missing autocompletion when 'using' directive references namespace by relative names
+		/// </summary>
+		/// 
+		[Test()]
+		public void TestBug683037 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"namespace N1.N2
+{
+	public class C1
+	{
+		public void Foo () {
+			System.Console.WriteLine (1);
+		}
+	}
+}
+
+namespace N1
+{
+	using N2;
+
+	public class C2
+	{
+		public static void Main (string[] args)
+		{
+			C1 x = new C1 ();
+
+			$x.$
+		}
+	}
+}
+
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Foo"), "method 'Foo' not found.");
+		}
+		
+		/// <summary>
+		/// Bug 690606 - Incomplete subclasses listing in code completion
+
+
+		/// <summary>
+		/// Bug 690606 - Incomplete subclasses listing in code completion
+		/// </summary>
+		[Test()]
+		public void TestBug690606 ()
+		{
+			CompletionDataList provider = CreateCtrlSpaceProvider (
+@"
+public abstract class Base {}
+public abstract class MyBase<T> : Base {}
+public class A : MyBase<string> {}
+public class B : MyBase<int> {}
+public class C : MyBase<bool> {}
+
+public class Test
+{
+	public static void Main (string[] args)
+	{
+		$Base x = new $
+	}
+}
+
+");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("A"), "class 'A' not found.");
+			Assert.IsNotNull (provider.Find ("B"), "class 'B' not found.");
+			Assert.IsNotNull (provider.Find ("C"), "class 'C' not found.");
+		}
 	}
 }

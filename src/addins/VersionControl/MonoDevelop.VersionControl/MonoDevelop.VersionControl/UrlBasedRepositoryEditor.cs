@@ -1,18 +1,24 @@
 
 using System;
+using MonoDevelop.Ide;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace MonoDevelop.VersionControl
 {
-	public partial class UrlBasedRepositoryEditor : Gtk.Bin
+	public partial class UrlBasedRepositoryEditor : Gtk.Bin, IRepositoryEditor
 	{
 		UrlBasedRepository repo;
 		bool updating;
-		string[] protocols;
+		List<string> protocols = new List<string> ();
+		int altProtocolIndex;
 		
-		public UrlBasedRepositoryEditor (UrlBasedRepository repo, string[] supportedProtocols)
+		public UrlBasedRepositoryEditor (UrlBasedRepository repo)
 		{
 			Build ();
-			protocols = supportedProtocols;
+			protocols = new List<string> (repo.SupportedProtocols);
+			altProtocolIndex = protocols.Count;
+			protocols.AddRange (repo.SupportedNonUrlProtocols);
 				
 			this.repo = repo;
 			foreach (string p in protocols)
@@ -25,16 +31,44 @@ namespace MonoDevelop.VersionControl
 			updating = false;
 		}
 		
+		Gtk.Widget IRepositoryEditor.Widget {
+			get { return this; }
+		}
+		
+		public bool Validate ()
+		{
+			if (!repo.IsUrlValid (repositoryUrlEntry.Text)) {
+				labelError.Show ();
+				return false;
+			} else {
+				return true;
+			}
+		}
+		
 		void Fill ()
 		{
-			if (repo.Name == repositoryServerEntry.Text)
-				repo.Name = repo.Server;
-			repositoryServerEntry.Text = repo.Server;
-			repositoryPortSpin.Value = repo.Port;
-			repositoryPathEntry.Text = repo.Dir;
-			repositoryUserEntry.Text = repo.User;
-			repositoryPassEntry.Text = repo.Pass;
-			comboProtocol.Active = Array.IndexOf (protocols, repo.Method);
+			if (repo.Uri != null) {
+				if (repo.Name == repositoryServerEntry.Text)
+					repo.Name = repo.Uri.Host;
+				repositoryServerEntry.Text = repo.Uri.Host;
+				repositoryPortSpin.Value = repo.Uri.Port;
+				repositoryPathEntry.Text = repo.Uri.PathAndQuery;
+				repositoryUserEntry.Text = repo.Uri.UserInfo;
+				comboProtocol.Active = protocols.IndexOf (repo.Uri.Scheme);
+			} else {
+				// The url may have a scheme, but it may be an incomplete or incorrect url. Do the best to select
+				// the correct value in the protocol combo
+				string prot = repo.SupportedProtocols.FirstOrDefault (p => repo.Url.StartsWith (p + "://"));
+				if (prot != null) {
+					repositoryServerEntry.Text = string.Empty;
+					repositoryPortSpin.Value = 0;
+					repositoryPathEntry.Text = string.Empty;
+					repositoryUserEntry.Text = string.Empty;
+					comboProtocol.Active = protocols.IndexOf (prot);
+				}
+				else
+					comboProtocol.Active = protocols.IndexOf (repo.Protocol);
+			}
 		}
 
 		protected virtual void OnRepositoryUrlEntryChanged(object sender, System.EventArgs e)
@@ -43,6 +77,8 @@ namespace MonoDevelop.VersionControl
 				updating = true;
 				repo.Url = repositoryUrlEntry.Text;
 				Fill ();
+				UpdateControls ();
+				labelError.Hide ();
 				updating = false;
 			}
 		}
@@ -51,66 +87,67 @@ namespace MonoDevelop.VersionControl
 		{
 			updating = true;
 			repositoryUrlEntry.Text = repo.Url;
-			if (repo.Name == repositoryServerEntry.Text)
-				repo.Name = repo.Server;
+			if (repo.Uri != null && repo.Name == repositoryServerEntry.Text)
+				repo.Name = repo.Uri.Host;
 			updating = false;
 		}
 		
 		void UpdateControls ()
 		{
-			switch (Protocol) {
-				case "svn":
-				case "svn+ssh":
-				case "http":
-				case "https":
-					repositoryServerEntry.Sensitive = true;
-					repositoryUserEntry.Sensitive = true;
-					repositoryPassEntry.Sensitive = true;
-					repositoryPortSpin.Sensitive = true;
-					break;
-				case "file":
-					repositoryServerEntry.Sensitive = false;
-					repositoryUserEntry.Sensitive = false;
-					repositoryPassEntry.Sensitive = false;
-					repositoryPortSpin.Sensitive = false;
-					break;
+			if (repo.Uri != null || repo.SupportedProtocols.Any (p => repositoryUrlEntry.Text.StartsWith (p + "://"))) {
+				repositoryPathEntry.Sensitive = true;
+				bool isUrl = Protocol != "file";
+				repositoryServerEntry.Sensitive = isUrl;
+				repositoryUserEntry.Sensitive = isUrl;
+				repositoryPortSpin.Sensitive = isUrl;
+			} else {
+				repositoryPathEntry.Sensitive = false;
+				repositoryServerEntry.Sensitive = false;
+				repositoryUserEntry.Sensitive = false;
+				repositoryPortSpin.Sensitive = false;
 			}
+		}
+		
+		void SetRepoUrl ()
+		{
+			if (!repo.SupportedProtocols.Contains (Protocol)) {
+				repo.Url = string.Empty;
+				return;
+			}
+			UriBuilder ub = new UriBuilder ();
+			ub.Host = repositoryServerEntry.Text;
+			ub.Scheme = Protocol;
+			ub.UserName = repositoryUserEntry.Text;
+			ub.Port = (int)repositoryPortSpin.Value;
+			ub.Path = repositoryPathEntry.Text;
+			repo.Url = ub.ToString ();
 		}
 
 		protected virtual void OnRepositoryServerEntryChanged(object sender, System.EventArgs e)
 		{
 			if (updating) return;
-			if (repo.Name == repo.Server)
-				repo.Name = repositoryServerEntry.Text;
-			repo.Server = repositoryServerEntry.Text;
+			SetRepoUrl ();
 			UpdateUrl ();
 		}
 
 		protected virtual void OnRepositoryPathEntryChanged(object sender, System.EventArgs e)
 		{
 			if (updating) return;
-			repo.Dir = repositoryPathEntry.Text;
+			SetRepoUrl ();
 			UpdateUrl ();
 		}
 
 		protected virtual void OnRepositoryUserEntryChanged(object sender, System.EventArgs e)
 		{
 			if (updating) return;
-			repo.User = repositoryUserEntry.Text;
-			UpdateUrl ();
-		}
-
-		protected virtual void OnRepositoryPassEntryChanged(object sender, System.EventArgs e)
-		{
-			if (updating) return;
-			repo.Pass = repositoryPassEntry.Text;
+			SetRepoUrl ();
 			UpdateUrl ();
 		}
 
 		protected virtual void OnComboProtocolChanged(object sender, System.EventArgs e)
 		{
 			if (updating) return;
-			repo.Method = Protocol;
+			SetRepoUrl ();
 			UpdateUrl ();
 			UpdateControls ();
 		}
@@ -118,13 +155,13 @@ namespace MonoDevelop.VersionControl
 		protected virtual void OnRepositoryPortSpinValueChanged (object sender, System.EventArgs e)
 		{
 			if (updating) return;
-			repo.Port = (int) repositoryPortSpin.Value;
+			SetRepoUrl ();
 			UpdateUrl ();
 		}
 		
 		string Protocol {
 			get {
-				return protocols [comboProtocol.Active];
+				return comboProtocol.Active != -1 ? protocols [comboProtocol.Active] : null;
 			}
 		}
 	}

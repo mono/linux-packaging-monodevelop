@@ -26,6 +26,7 @@
 //
 
 using System;
+using System.Linq;
 using System.Xml;
 using System.IO;
 using System.Collections;
@@ -44,7 +45,7 @@ using MonoDevelop.Core.StringParsing;
 
 namespace MonoDevelop.Projects
 {
-	[DataItem (FallbackType = typeof(UnknownSolutionItem))]
+	[ProjectModelDataItem (FallbackType = typeof(UnknownSolutionItem))]
 	public abstract class SolutionEntityItem : SolutionItem, IConfigurationTarget, IWorkspaceFileObject
 	{
 		internal object MemoryProbe = Counters.ItemsInMemory.CreateMemoryProbe ();
@@ -67,6 +68,8 @@ namespace MonoDevelop.Projects
 		public event ConfigurationEventHandler DefaultConfigurationChanged;
 		public event ConfigurationEventHandler ConfigurationAdded;
 		public event ConfigurationEventHandler ConfigurationRemoved;
+		public event EventHandler<ProjectItemEventArgs> ProjectItemAdded;
+		public event EventHandler<ProjectItemEventArgs> ProjectItemRemoved;
 		
 		public SolutionEntityItem ()
 		{
@@ -81,7 +84,24 @@ namespace MonoDevelop.Projects
 		
 		public override void Dispose ()
 		{
+			if (Disposed)
+				return;
+			
 			Counters.ItemsLoaded--;
+			
+			foreach (var item in items) {
+				IDisposable disp = item as IDisposable;
+				if (disp != null)
+					disp.Dispose ();
+			}
+			
+			// items = null;
+			// thisItemArgs = null;
+			// fileStatusTracker = null;
+			// fileFormat = null;
+			// activeConfiguration = null;
+			// configurations = null;
+			
 			base.Dispose ();
 		}
 
@@ -113,6 +133,7 @@ namespace MonoDevelop.Projects
 			}
 			set {
 				releaseVersion = value;
+				NotifyModified ("Version");
 			}
 		}
 		
@@ -124,6 +145,7 @@ namespace MonoDevelop.Projects
 				syncReleaseVersion = value;
 				if (syncReleaseVersion && ParentSolution != null)
 					Version = ParentSolution.Version;
+				NotifyModified ("SyncVersionWithSolution");
 			}
 		}
 		
@@ -461,12 +483,22 @@ namespace MonoDevelop.Projects
 			return source;
 		}
 		
-		internal protected virtual void OnItemAdded (object obj)
+		internal protected virtual void OnItemsAdded (IEnumerable<ProjectItem> objs)
 		{
+			NotifyModified ("Items");
+			var args = new ProjectItemEventArgs ();
+			args.AddRange (objs.Select (pi => new ProjectItemEventInfo (this, pi)));
+			if (ProjectItemAdded != null)
+				ProjectItemAdded (this, args);
 		}
 		
-		internal protected virtual void OnItemRemoved (object obj)
+		internal protected virtual void OnItemsRemoved (IEnumerable<ProjectItem> objs)
 		{
+			NotifyModified ("Items");
+			var args = new ProjectItemEventArgs ();
+			args.AddRange (objs.Select (pi => new ProjectItemEventInfo (this, pi)));
+			if (ProjectItemRemoved != null)
+				ProjectItemRemoved (this, args);
 		}
 		
 		protected virtual void OnDefaultConfigurationChanged (ConfigurationEventArgs args)

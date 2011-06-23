@@ -7,15 +7,15 @@
        description = "Supporting services and pads for visual design tools."
 	   category    = "MonoDevelop Core"
        flags = "Hidden"
-       version     = "2.4">
+       version     = "2.6">
 	
 	<Runtime>
 		<Import assembly = "MonoDevelop.DesignerSupport.dll"/>
 	</Runtime>
 	
 	<Dependencies>
-		<Addin id="Core" version="2.4"/>
-		<Addin id="Ide" version="2.4"/>
+		<Addin id="Core" version="2.6"/>
+		<Addin id="Ide" version="2.6"/>
 	</Dependencies>
 
 	<!-- Extension points -->
@@ -119,7 +119,7 @@
 		         _label = "Switch between related files "
 		         _description = "Switch between related files, such as CodeBehind, headers, etc."
 		         defaultHandler="MonoDevelop.DesignerSupport.SwitchBetweenRelatedFilesCommand"
-		         shortcut="Control|Alt|Up|"
+		         shortcut="Control|Alt|Up"
 		         macShortcut="Meta|Alt|Up" />
 	</Extension>
 	
@@ -139,5 +139,9 @@
 	
 	<Extension path = "/MonoDevelop/DesignerSupport/ToolboxProviders">
 		<Class class="MonoDevelop.DesignerSupport.Toolbox.CodeTemplateToolboxProvider" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/Core/UserDataMigration">
+		<Migration sourceVersion="2.4" kind="ConfigLocal" sourcePath="Toolbox.xml" />
 	</Extension>
 </Addin>

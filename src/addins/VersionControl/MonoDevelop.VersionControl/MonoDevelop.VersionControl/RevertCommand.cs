@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
@@ -22,12 +23,8 @@ namespace MonoDevelop.VersionControl
 		private static bool RevertInternal (VersionControlItemList items, bool test)
 		{
 			try {
-				if (test) {
-					foreach (VersionControlItem item in items)
-						if (!item.Repository.CanRevert (item.Path))
-							return false;
-					return true;
-				}
+				if (test)
+					return items.All (i => i.VersionInfo.CanRevert);
 
 				if (MessageService.AskQuestion (GettextCatalog.GetString ("Are you sure you want to revert the changes done in the selected files?"), 
 				                                GettextCatalog.GetString ("All changes made to the selected files will be permanently lost."),
@@ -66,14 +63,14 @@ namespace MonoDevelop.VersionControl
 				Gtk.Application.Invoke (delegate {
 					foreach (VersionControlItem item in items) {
 						if (!item.IsDirectory) {
+							FileService.NotifyFileChanged (item.Path);
 							// Reload reverted files
 							Document doc = IdeApp.Workbench.GetDocument (item.Path);
-							if (doc != null)
+							if (doc != null && System.IO.File.Exists (item.Path))
 								doc.Reload ();
-							FileService.NotifyFileChanged (item.Path);
 						}
-						VersionControlService.NotifyFileStatusChanged (item.Repository, item.Path, item.IsDirectory);
 					}
+					VersionControlService.NotifyFileStatusChanged (items);
 				});
 			}
 		}

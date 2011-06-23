@@ -29,15 +29,27 @@ using System;
 
 namespace Mono.TextEditor
 {
-	public class FoldSegment : Segment, System.IComparable
+	public class FoldSegment : TreeSegment, System.IComparable
 	{
-		public bool IsFolded { get; set; }
+		internal bool isFolded;
+		internal bool isAttached;
+		public bool IsFolded {
+			get {
+				return isFolded;
+			}
+			set {
+				isFolded = value;
+				if (isAttached)
+					doc.InformFoldChanged (new FoldSegmentEventArgs (this));
+			}
+		}
+		
 		public string Description { get; set; }
 		
 		public int Column { get; set; }
 		public int EndColumn { get; set; }
 
-		public override int Offset {
+	/*	public override int Offset {
 			get {
 				return StartLine != null ? StartLine.Offset + Column : base.Offset;
 			}
@@ -53,18 +65,37 @@ namespace Mono.TextEditor
 			set {
 				base.Length = value;
 			}
+		}*/
+		
+		public LineSegment StartLine { 
+			get {
+				return doc.GetLineByOffset (Offset);
+			} 
 		}
 		
-		public LineSegment StartLine { get; set; }
-		public LineSegment EndLine { get; set; }
+		public LineSegment EndLine {
+			get {
+				return doc.GetLineByOffset (EndOffset);
+			}
+		}
 		
 		public FoldingType FoldingType { get; set; }
+		Document doc;
 		
-		public FoldSegment (string description, int offset, int length, FoldingType foldingType) : base (offset, length)
+		public FoldSegment (Document doc,string description,int offset,int length,FoldingType foldingType) : base (offset, length)
 		{
-			this.IsFolded    = false;
+			this.doc = doc;
+			this.isFolded = false;
 			this.Description = description;
 			this.FoldingType = foldingType;
+		}
+		
+		public FoldSegment (FoldSegment foldSegment) : base (foldSegment.Offset, foldSegment.Length)
+		{
+			this.doc = foldSegment.doc;
+			this.isFolded = foldSegment.IsFolded;
+			this.Description = foldSegment.Description;
+			this.FoldingType = foldSegment.FoldingType;
 		}
 		
 		public override string ToString()
@@ -78,4 +109,19 @@ namespace Mono.TextEditor
 			return this.Offset != segment.Offset ? this.Offset.CompareTo (segment.Offset) : 0;
 		}
 	}
+	
+	[Serializable]
+	public sealed class FoldSegmentEventArgs : EventArgs
+	{
+		public FoldSegment FoldSegment {
+			get;
+			set;
+		}
+		
+		public FoldSegmentEventArgs (FoldSegment foldSegment)
+		{
+			this.FoldSegment = foldSegment;
+		}
+	}
+	
 }

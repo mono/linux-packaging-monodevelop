@@ -88,7 +88,7 @@ namespace MonoDevelop.Projects.CodeGeneration
 			sw.Close ();
 			
 			
-			ICompilationUnit pi = ProjectDomService.Parse (ctx.ParserContext.Project, file, null).CompilationUnit;
+			ICompilationUnit pi = ProjectDomService.Parse (ctx.ParserContext.Project, file).CompilationUnit;
 			IList<IType> clss = pi.Types;
 			if (clss.Count > 0)
 				return clss [0];
@@ -111,15 +111,13 @@ namespace MonoDevelop.Projects.CodeGeneration
 			IEditableTextFile buffer = ctx.GetFile (cls.CompilationUnit.FileName);
 			
 			int pos = GetNewMemberPosition (buffer, cls, member);
-			string code = GenerateCodeFromMember (member);
+			string code = GenerateCodeFromMember (member).Trim ();
 			
 			int line, col;
 			buffer.GetLineColumnFromPosition (pos, out line, out col);
 			
 			string indent = GetLineIndent (buffer, cls.Location.Line) + "\t";
 			code = Indent (code, indent, false);
-//			code = code.Trim (' ', '\t');
-			code += "\n";
 			buffer.InsertText (pos, code);
 			
 			return FindGeneratedMember (ctx, buffer, cls, member, line);
@@ -170,11 +168,13 @@ namespace MonoDevelop.Projects.CodeGeneration
 			StringBuilder generatedString = new StringBuilder ();
 			bool isFirst = true;
 			foreach (CodeTypeMember member in members) {
+				if (generatedString.Length > 0) {
+					generatedString.AppendLine ();
+				}
 				generatedString.Append (Indent (GenerateCodeFromMember (member), indent, isFirst));
-				generatedString.AppendLine ();
-				generatedString.Append (indent);
 				isFirst = false;
 			}
+			
 			// remove last new line + indent
 			generatedString.Length -= indent.Length + Environment.NewLine.Length;
 			// remove indent from last generated code member
@@ -698,7 +698,7 @@ namespace MonoDevelop.Projects.CodeGeneration
 			file.DeleteText (pos, txt.Length);
 			file.InsertText (pos, newName);
 			
-			ProjectDomService.Parse (ctx.ParserContext.Project, file.Name, null, delegate () { return file.Text; });
+			ProjectDomService.Parse (ctx.ParserContext.Project, file.Name, delegate () { return file.Text; });
 			
 			return true;
 		}
@@ -750,7 +750,7 @@ namespace MonoDevelop.Projects.CodeGeneration
 			file.DeleteText (pos, txt.Length);
 			file.InsertText (pos, newName);
 			
-			ProjectDomService.Parse (ctx.ParserContext.Project, file.Name, null, delegate () { return file.Text; });
+			ProjectDomService.Parse (ctx.ParserContext.Project, file.Name, delegate () { return file.Text; });
 			
 			return true;
 		}
@@ -845,7 +845,7 @@ namespace MonoDevelop.Projects.CodeGeneration
 		{
 			// Don't get the class from the parse results because in that class the types are not resolved.
 			// Get the class from the database instead.
-			ParsedDocument doc = ProjectDomService.Parse (ctx.ParserContext.Project, buffer.Name, null, delegate () { return buffer.Text; });
+			ParsedDocument doc = ProjectDomService.Parse (ctx.ParserContext.Project, buffer.Name, delegate () { return buffer.Text; });
 			IType result = ctx.ParserContext.GetType (cls.FullName, cls.TypeParameters.Count, true, true);
 			if (result is CompoundType) {
 				IType hintType = doc.CompilationUnit.GetType (cls.FullName, cls.TypeParameters.Count);
@@ -979,7 +979,7 @@ namespace MonoDevelop.Projects.CodeGeneration
 		
 		protected int EnsurePositionIsNotInRegionsAndIndented (Project p, IEditableTextFile buffer, string indent, int position)
 		{
-			ParsedDocument doc = ProjectDomService.Parse (p, buffer.Name, null, delegate () { return buffer.Text; });
+			ParsedDocument doc = ProjectDomService.Parse (p, buffer.Name, delegate () { return buffer.Text; });
 			int line, column;
 			buffer.GetLineColumnFromPosition (position, out line, out column);
 			
@@ -1065,7 +1065,7 @@ namespace MonoDevelop.Projects.CodeGeneration
 		protected virtual int GetNewMethodPosition (IEditableTextFile buffer, IType cls)
 		{
 			cls = GetMainPart (cls);
-			if (cls.MethodCount == 0) {
+			if (cls.MethodCount + cls.ConstructorCount == 0) {
 				return GetNewPropertyPosition (buffer, cls);
 				/*int pos = GetNewPropertyPosition (buffer, cls);
 				int line, col;
@@ -1074,10 +1074,10 @@ namespace MonoDevelop.Projects.CodeGeneration
 				pos = GetNextLine (buffer, pos);
 				return EnsurePositionIsNotInRegionsAndIndented (cls.SourceProject as Project, buffer, ind, pos);*/
 			} else {
-				IMethod m = cls.Methods.Last ();
+				var m = cls.Members .Last ();
 				
 				int pos;
-				if (!m.BodyRegion.IsEmpty && m.BodyRegion.End.Line > 0) {
+				if (!m.BodyRegion.IsEmpty && m.BodyRegion.End.Line > 1) {
 					pos = buffer.GetPositionFromLineColumn (m.BodyRegion.End.Line, m.BodyRegion.End.Column);
 					pos = GetNextLine (buffer, pos);
 					pos = SkipBlankLine (buffer, pos);

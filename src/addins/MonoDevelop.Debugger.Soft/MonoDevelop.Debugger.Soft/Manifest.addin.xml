@@ -5,11 +5,11 @@
        description = "Mono Soft Debugger Support"
        copyright   = "MIT X11"
        category = "Debugging"
-       version   = "2.4">
+       version   = "2.6">
 
 	<Dependencies>
-		<Addin id="MonoDevelop.Core" version="2.4"/>
-		<Addin id="MonoDevelop.Debugger" version="2.4"/>
+		<Addin id="MonoDevelop.Core" version="2.6"/>
+		<Addin id="MonoDevelop.Debugger" version="2.6"/>
 	</Dependencies>
 	
 	<Runtime>
@@ -20,15 +20,15 @@
 		<DebuggerEngine
 			id="Mono.Debugger.Soft"
 			name="Mono Soft Debugger"
-			features="Breakpoints, Pause, Stepping, DebugFile, ConditionalBreakpoints, Tracepoints, Catchpoints"
+			features="Breakpoints, Pause, Stepping, DebugFile, ConditionalBreakpoints, Tracepoints, Catchpoints, Disassembly"
 			type="MonoDevelop.Debugger.Soft.SoftDebuggerEngine" />
 	</Extension>
 	
 	<Extension path="/MonoDevelop/Debugging/DebuggerEngines">
 		<DebuggerEngine
-			id="Mono.Debugger.Soft"
+			id="Mono.Debugger.Soft.Custom"
 			name="Custom Command Mono Soft Debugger"
-			features="Breakpoints, Pause, Stepping, DebugFile, ConditionalBreakpoints, Tracepoints, Catchpoints"
+			features="Breakpoints, Pause, Stepping, DebugFile, ConditionalBreakpoints, Tracepoints, Catchpoints, Disassembly"
 			type="MonoDevelop.Debugger.Soft.CustomSoftDebuggerEngine" />
 	</Extension>
 </Addin>

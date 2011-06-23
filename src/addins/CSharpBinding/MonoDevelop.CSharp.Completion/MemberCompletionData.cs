@@ -35,7 +35,7 @@ using MonoDevelop.Projects.Dom.Output;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.CSharp.Dom;
+using MonoDevelop.CSharp.Ast;
 
 namespace MonoDevelop.CSharp.Completion
 {
@@ -125,16 +125,23 @@ namespace MonoDevelop.CSharp.Completion
 			descriptionCreated = true;
 			if (Member is IMethod && ((IMethod)Member).WasExtended)
 				sb.Append (GettextCatalog.GetString ("(Extension) "));
-			sb.Append (ambience.GetString (Member,
-				OutputFlags.ClassBrowserEntries | OutputFlags.IncludeKeywords | OutputFlags.UseFullName | OutputFlags.IncludeParameterName  | OutputFlags.IncludeMarkup
-					| (HideExtensionParameter ? OutputFlags.HideExtensionsParameter : OutputFlags.None)));
+			sb.Append (ambience.GetString (Member, 
+				OutputFlags.ClassBrowserEntries | OutputFlags.IncludeKeywords | OutputFlags.UseFullName | OutputFlags.IncludeParameterName | OutputFlags.IncludeMarkup  | (HideExtensionParameter ? OutputFlags.HideExtensionsParameter : OutputFlags.None)));
 
 			if (Member is IMember) {
-				if ((Member as IMember).IsObsolete) {
+				var m = (IMember)Member;
+				if (m.IsObsolete) {
 					sb.AppendLine ();
 					sb.Append (GettextCatalog.GetString ("[Obsolete]"));
 					DisplayFlags |= DisplayFlags.Obsolete;
 				}
+				var returnType = m.SourceProjectDom.GetType (m.ReturnType);
+				if (returnType != null && returnType.ClassType == ClassType.Delegate) {
+					sb.AppendLine ();
+					sb.AppendLine (GettextCatalog.GetString ("Delegate information"));
+					sb.Append (ambience.GetString (returnType, OutputFlags.ReformatDelegates | OutputFlags.IncludeReturnType | OutputFlags.IncludeParameters | OutputFlags.IncludeParameterName));
+				}
+				
 				string docMarkup = AmbienceService.GetDocumentationMarkup ("<summary>" + AmbienceService.GetDocumentationSummary ((IMember)Member) + "</summary>", new AmbienceService.DocumentationFormatOptions {
 					Ambience = ambience
 				});
@@ -202,15 +209,6 @@ namespace MonoDevelop.CSharp.Completion
 			if (overloads == null)
 				overloads = new Dictionary<string, CompletionData> ();
 			
-			// always set the member with the least type parameters as the main member.
-			if (Member is ITypeParameterMember && overload.Member is ITypeParameterMember) {
-				if (((ITypeParameterMember)Member).TypeParameters.Count > ((ITypeParameterMember)overload.Member).TypeParameters.Count) {
-					INode member = Member;
-					SetMember (overload.Member);
-					overload.Member = member;
-				}
-			}
-			
 			if (overload.Member is IMember && Member is IMember) {
 				// filter virtual & overriden members that came from base classes
 				// note that the overload tree is traversed top down.
@@ -227,8 +225,8 @@ namespace MonoDevelop.CSharp.Completion
 				
 				string MemberId = (overload.Member as IMember).HelpUrl;
 				if (Member is IMethod && overload.Member is IMethod) {
-					string signature1 = ambience.GetString (Member, OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics);
-					string signature2 = ambience.GetString (overload.Member, OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics);
+					string signature1 = ambience.GetString (Member, OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics | OutputFlags.GeneralizeGenerics);
+					string signature2 = ambience.GetString (overload.Member, OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics | OutputFlags.GeneralizeGenerics);
 					if (signature1 == signature2)
 						return;
 				}
@@ -251,6 +249,17 @@ namespace MonoDevelop.CSharp.Completion
 					}*/
 				}
 			}
+			
+			
+			// always set the member with the least type parameters as the main member.
+			if (Member is ITypeParameterMember && overload.Member is ITypeParameterMember) {
+				if (((ITypeParameterMember)Member).TypeParameters.Count > ((ITypeParameterMember)overload.Member).TypeParameters.Count) {
+					INode member = Member;
+					SetMember (overload.Member);
+					overload.Member = member;
+				}
+			}
+			
 		}
 		
 		#endregion

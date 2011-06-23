@@ -75,11 +75,12 @@ namespace MonoDevelop.Debugger
 			if (frame == null)
 				return;
 			
-			FilePath file = frame.SourceLocation.Filename;
+			FilePath file = frame.SourceLocation.FileName;
 			int line = frame.SourceLocation.Line;
 			
 			if (!file.IsNullOrEmpty && System.IO.File.Exists (file) && line != -1) {
-				Document doc = IdeApp.Workbench.OpenDocument (file, line, 1, !disassemblyCurrent, null, false);
+				OpenDocumentOptions ops = !disassemblyCurrent ? OpenDocumentOptions.BringToFront : OpenDocumentOptions.None;
+				Document doc = IdeApp.Workbench.OpenDocument (file, line, 1, ops);
 				if (doc != null)
 					return;
 			}
@@ -113,10 +114,16 @@ namespace MonoDevelop.Debugger
 			if (bt != null) {
 				for (int n=0; n<bt.FrameCount; n++) {
 					StackFrame sf = bt.GetFrame (n);
-					if (!sf.IsExternalCode && !string.IsNullOrEmpty (sf.SourceLocation.Filename) && System.IO.File.Exists (sf.SourceLocation.Filename) && sf.SourceLocation.Line != -1) {
-						if (n != DebuggingService.CurrentFrameIndex)
-							DebuggingService.CurrentFrameIndex = n;
-						break;
+					if (!sf.IsExternalCode && sf.SourceLocation.Line != -1) {
+						bool found = !string.IsNullOrEmpty (sf.SourceLocation.FileName)
+							&& System.IO.File.Exists (sf.SourceLocation.FileName);
+						if (found) {
+							if (n != DebuggingService.CurrentFrameIndex)
+								DebuggingService.CurrentFrameIndex = n;
+							break;
+						} else {
+							LoggingService.LogWarning ("Debugger could not find file '{0}'", sf.SourceLocation.FileName);
+						}
 					}
 				}
 			}

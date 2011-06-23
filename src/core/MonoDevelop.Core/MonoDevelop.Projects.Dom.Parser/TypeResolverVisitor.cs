@@ -33,33 +33,58 @@ namespace MonoDevelop.Projects.Dom.Parser
 {
 	public class TypeResolverVisitor: CopyDomVisitor<IType>
 	{
-		ProjectDom db;
+		readonly ProjectDom db;
 		ICompilationUnit unit;
 		int unresolvedCount;
 		IMethod currentMethod;
+		DomLocation resolvePosition;
 		
 		public void SetCurrentMember (IMember currentMember)
 		{
+			if (currentMember != null)
+				resolvePosition = currentMember.Location;
 			currentMethod = currentMember as IMethod;
 		}
 		
 		public TypeResolverVisitor (ProjectDom db, ICompilationUnit unit)
 		{
+			if (db == null)
+				throw new ArgumentNullException ("db", "Type resolving needs a valid project dom.");
 			this.db = db;
 			this.unit = unit;
 		}
 		
 		public override INode Visit (IType type, IType data)
 		{
+			resolvePosition = type.Location;
 			return base.Visit (type, type);
 		}
 		
 		public override INode Visit (IMethod source, IType data)
 		{
 			currentMethod = source;
+			resolvePosition = source.Location;
 			INode res = base.Visit (source, data);
 			currentMethod = null;
 			return res;
+		}
+		
+		public override INode Visit (IEvent source, IType data)
+		{
+			resolvePosition = source.Location;
+			return base.Visit (source, data);
+		}
+		
+		public override INode Visit (IField field, IType data)
+		{
+			resolvePosition = field.Location;
+			return base.Visit (field, data);
+		}
+		
+		public override INode Visit (IProperty source, IType data)
+		{
+			resolvePosition = source.Location;
+			return base.Visit (source, data);
 		}
 		
 		bool visitAttribute = false;
@@ -103,7 +128,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 					method = currentMethod;
 				int idx = currentMethod.GetTypeParameterIndex (type.Name);
 				if (idx >= 0) {
-					ITypeParameter t = method.TypeParameters[idx];
+					ITypeParameter t = method.TypeParameters [idx];
 					DomReturnType typeParameterReturnType = new DomReturnType (type.FullName);
 					DomType constructedType = new InstantiatedParameterType (db, method, t);
 					
@@ -117,14 +142,17 @@ namespace MonoDevelop.Projects.Dom.Parser
 					typeParameterReturnType.PointerNestingLevel = type.PointerNestingLevel;
 					for (int i = 0; i < type.ArrayDimensions; i++)
 						typeParameterReturnType.SetDimension (i, type.GetDimension (i));
-					return typeParameterReturnType;
+					return db.GetSharedReturnType (typeParameterReturnType);
 				}
 			}
 			
-			IType lookupType = db.SearchType (unit, contextType, null, type);
+			IType lookupType = db.SearchType (unit, contextType, resolvePosition, type);
 			if (visitAttribute && lookupType == null && type.Parts.Count > 0) {
-				type.Parts[type.Parts.Count - 1].Name += "Attribute";
-				lookupType = db.SearchType (unit, contextType, null, type);
+				DomReturnType typeCopy = new DomReturnType (type);
+				typeCopy.Parts [typeCopy.Parts.Count - 1].Name += "Attribute";
+				lookupType = db.SearchType (unit, contextType, resolvePosition, typeCopy);
+				if (lookupType != null) 
+					type = typeCopy;
 			}
 			
 			if (lookupType == null) {
@@ -132,14 +160,19 @@ namespace MonoDevelop.Projects.Dom.Parser
 				return type;
 			}
 			
-			List<IReturnTypePart> parts = new List<IReturnTypePart> (type.Parts.Count);
+			List<ReturnTypePart> parts = new List<ReturnTypePart> (type.Parts.Count);
 			IType curType = lookupType.DeclaringType;
+			int typePart = 0;
 			while (curType != null) {
 				ReturnTypePart newPart = new ReturnTypePart {Name = curType.Name};
 				newPart.IsGenerated = true;
 				for (int n=curType.TypeParameters.Count - 1; n >= 0; n--)
 					newPart.AddTypeParameter (new DomReturnType ("?"));
-				parts.Insert (0, newPart);
+				
+				if (typePart >= type.Parts.Count || (type.Parts [typePart].Name != newPart.Name || type.Parts [typePart].GenericArguments.Count != newPart.GenericArguments.Count)) {
+					parts.Insert (0, newPart);
+					typePart++;
+				}
 				curType = curType.DeclaringType;
 			}
 			
@@ -152,19 +185,19 @@ namespace MonoDevelop.Projects.Dom.Parser
 			}
 			
 			DomReturnType rt = new DomReturnType (lookupType.Namespace, parts);
-			
 			// Make sure the whole type is resolved
-			if (parts.Count > 1 && db.SearchType (unit, contextType, null, rt) == null) {
-				unresolvedCount++;
-				return type;
+			if (parts.Count > 1 && db.SearchType (unit, contextType, resolvePosition, rt) == null) {
+				rt = new DomReturnType (null, parts);
+				if (db.SearchType (unit, contextType, resolvePosition, rt) == null) {
+					unresolvedCount++;
+					return type;
+				}
 			}
-			
 			rt.PointerNestingLevel = type.PointerNestingLevel;
 			rt.IsNullable = type.IsNullable;
 			rt.ArrayDimensions = type.ArrayDimensions;
 			for (int n=0; n<type.ArrayDimensions; n++)
 				rt.SetDimension (n, type.GetDimension (n));
-			
 			return db.GetSharedReturnType (rt);
 		}
 		

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -11,6 +12,7 @@ using MonoDevelop.Components.Commands;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
+using MonoDevelop.Ide.Gui;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -69,6 +71,7 @@ namespace MonoDevelop.VersionControl.Views
 		const int ColRemoteIcon = 11;
 		const int ColStatusColor = 12;
 		const int ColStatusRemoteDiff = 13;
+		const int ColRenderAsText = 14;
 		
 		delegate void DiffDataHandler (DiffData diffdata);
 		
@@ -83,7 +86,7 @@ namespace MonoDevelop.VersionControl.Views
 				return false;
 
 			VersionControlItem item = items [0];
-			if (item.Repository.IsVersioned (item.Path)) {
+			if (item.VersionInfo.IsVersioned) {
 				if (test) return true;
 				StatusView d = new StatusView (item.Path, item.Repository);
 				IdeApp.Workbench.OpenDocument (d, true);
@@ -230,7 +233,7 @@ namespace MonoDevelop.VersionControl.Views
 			
 			colRemote.Visible = false;
 
-			filestore = new TreeStore (typeof (Gdk.Pixbuf), typeof (string), typeof (string[]), typeof (string), typeof(bool), typeof(bool), typeof(string), typeof(bool), typeof (bool), typeof(Gdk.Pixbuf), typeof(bool), typeof (Gdk.Pixbuf), typeof(string), typeof(bool));
+			filestore = new TreeStore (typeof (Gdk.Pixbuf), typeof (string), typeof (string[]), typeof (string), typeof(bool), typeof(bool), typeof(string), typeof(bool), typeof (bool), typeof(Gdk.Pixbuf), typeof(bool), typeof (Gdk.Pixbuf), typeof(string), typeof(bool), typeof(bool));
 			filelist.Model = filestore;
 			filelist.TestExpandRow += new Gtk.TestExpandRowHandler (OnTestExpandRow);
 			
@@ -414,7 +417,7 @@ namespace MonoDevelop.VersionControl.Views
 				colRemote.Visible = remoteStatus;
 				
 				try {
-					if (vc.CanCommit(filepath))
+					if (vc.GetVersionInfo (filepath).CanCommit)
 						buttonCommit.Sensitive = true;
 				} catch (Exception ex) {
 					LoggingService.LogError (ex.ToString ());
@@ -641,9 +644,6 @@ namespace MonoDevelop.VersionControl.Views
 					return;
 			}
 			
-			// Reset the global comment. It may be already set from previous commits.
-			changeSet.GlobalComment = string.Empty;
-			
 			if (!CommitCommand.Commit (vc, changeSet.Clone (), false))
 				return;
 		}
@@ -693,7 +693,7 @@ namespace MonoDevelop.VersionControl.Views
 			VersionControlItemList items = new VersionControlItemList ();
 			foreach (string file in files) {
 				Project prj = IdeApp.Workspace.GetProjectContainingFile (file);
-				items.Add (new VersionControlItem (vc, prj, file, Directory.Exists (file)));
+				items.Add (new VersionControlItem (vc, prj, file, Directory.Exists (file), null));
 			}
 			return items;
 		}
@@ -797,7 +797,7 @@ namespace MonoDevelop.VersionControl.Views
 				int line = -1;
 				if (rows.Length == 1 && rows [0].Depth == 2)
 					line = diffRenderer.GetSelectedLine (rows[0]);
-				IdeApp.Workbench.OpenDocument (files [0], line, 0, true);
+				IdeApp.Workbench.OpenDocument (files [0], line, 0);
 			}
 			else {
 				AlertButton openAll = new AlertButton (GettextCatalog.GetString ("_Open All")); 
@@ -810,12 +810,25 @@ namespace MonoDevelop.VersionControl.Views
 		
 		void OnFileStatusChanged (object s, FileUpdateEventArgs args)
 		{
-			if (!args.FilePath.IsChildPathOf (filepath) && args.FilePath != filepath)
-				return;
-				
-			if (args.IsDirectory) {
+			if (args.Any (f => f.FilePath == filepath || (f.FilePath.IsChildPathOf (filepath) && f.IsDirectory))) {
 				StartUpdate ();
 				return;
+			}
+			foreach (FileUpdateEventInfo f in args) {
+				if (!OnFileStatusChanged (f))
+					break;
+			}
+			UpdateControlStatus ();
+		}
+		
+		bool OnFileStatusChanged (FileUpdateEventInfo args)
+		{
+			if (!args.FilePath.IsChildPathOf (filepath) && args.FilePath != filepath)
+				return true;
+			
+			if (args.IsDirectory) {
+				StartUpdate ();
+				return false;
 			}
 			
 			bool found = false;
@@ -857,7 +870,7 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			catch (Exception ex) {
 				LoggingService.LogError (ex.ToString ());
-				return;
+				return true;
 			}
 			
 			if (found) {
@@ -866,8 +879,7 @@ namespace MonoDevelop.VersionControl.Views
 					changeSet.RemoveFile (args.FilePath);
 					statuses.RemoveAt (oldStatusIndex);
 					filestore.Remove (ref oldStatusIter);
-					UpdateControlStatus ();
-					return;
+					return true;
 				}
 				
 				statuses [oldStatusIndex] = newInfo;
@@ -883,7 +895,7 @@ namespace MonoDevelop.VersionControl.Views
 					AppendFileInfo (newInfo);
 				}
 			}
-			UpdateControlStatus ();
+			return true;
 		}
 		
 		bool FileVisible (VersionInfo vinfo)
@@ -916,8 +928,8 @@ namespace MonoDevelop.VersionControl.Views
 			ddata.diffRunning = true;
 			
 			// Run the diff in a separate thread and update the tree when done
-			Thread t = new Thread (
-				delegate () {
+			ThreadPool.QueueUserWorkItem (
+				delegate {
 					ddata.diffException = null;
 					try {
 						ddata.difs = vc.PathDiff (filepath, null, remote);
@@ -935,9 +947,6 @@ namespace MonoDevelop.VersionControl.Views
 					}
 				}
 			);
-			t.Name = "VCS diff loader";
-			t.IsBackground = true;
-			t.Start ();
 		}
 		
 		void SetFileDiff (TreeIter iter, string file, bool remote)
@@ -952,6 +961,7 @@ namespace MonoDevelop.VersionControl.Views
 			}
 
 			filestore.SetValue (iter, ColPath, new string[] { GettextCatalog.GetString ("Loading data...") });
+			filestore.SetValue (iter, ColRenderAsText, true);
 			
 			if (ddata.diffRunning)
 				return;
@@ -966,11 +976,13 @@ namespace MonoDevelop.VersionControl.Views
 				foreach (DiffInfo di in ddata.difs) {
 					if (di.FileName == file) {
 						filestore.SetValue (iter, ColPath, di.Content.Split ('\n'));
+						filestore.SetValue (iter, ColRenderAsText, false);
 						return;
 					}
 				}
 			}
 			filestore.SetValue (iter, ColPath, new string[] { GettextCatalog.GetString ("No differences found") });
+			filestore.SetValue (iter, ColRenderAsText, true);
 		}
 		
 		void FillDifs (DiffData ddata)
@@ -1008,7 +1020,7 @@ namespace MonoDevelop.VersionControl.Views
 			CellRendererDiff rc = (CellRendererDiff)cell;
 			string[] lines = (string[])filestore.GetValue (iter, ColPath);
 			TreePath path = filestore.GetPath (iter);
-			if (filestore.IterDepth (iter) == 0) {
+			if (filestore.IterDepth (iter) == 0 || (bool)filestore.GetValue (iter, ColRenderAsText)) {
 				rc.InitCell (filelist, false, lines, path);
 			} else {
 				rc.InitCell (filelist, true, lines, path);
@@ -1103,7 +1115,6 @@ namespace MonoDevelop.VersionControl.Views
 			QueueDraw ();
 			return base.OnScrollEvent (evnt);
 		}
-
 
 		public event EventHandler ShowContextMenu;
 		public event EventHandler DiffLineActivated;

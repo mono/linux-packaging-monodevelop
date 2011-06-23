@@ -23,7 +23,6 @@ FILES =  \
 	gtk-gui/generated.cs \
 	gtk-gui/MonoDevelop.CodeGeneration.GenerateCodeWindow.cs \
 	gtk-gui/MonoDevelop.Refactoring.EncapsulateFieldDialog.cs \
-	gtk-gui/MonoDevelop.Refactoring.ExtractMethod.ExtractMethodDialog.cs \
 	gtk-gui/MonoDevelop.Refactoring.IntroduceConstant.IntroduceConstantDialog.cs \
 	gtk-gui/MonoDevelop.Refactoring.OverridesImplementsDialog.cs \
 	gtk-gui/MonoDevelop.Refactoring.RefactoringPreviewDialog.cs \
@@ -47,16 +46,9 @@ FILES =  \
 	MonoDevelop.Refactoring.ConvertPropery/RemoveBackingStore.cs \
 	MonoDevelop.Refactoring.CreateClass/CreateClassCodeGenerator.cs \
 	MonoDevelop.Refactoring.CreateClass/CreateStructCodeGenerator.cs \
-	MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs \
-	MonoDevelop.Refactoring.CreateMethod/CreateMethodHandler.cs \
 	MonoDevelop.Refactoring.DeclareLocal/DeclareLocalCodeGenerator.cs \
 	MonoDevelop.Refactoring.DeclareLocal/DeclareLocalHandler.cs \
 	MonoDevelop.Refactoring.DeclareLocal/GetContainingEmbeddedStatementVisitor.cs \
-	MonoDevelop.Refactoring.ExtractMethod/ExtractMethodAstTransformer.cs \
-	MonoDevelop.Refactoring.ExtractMethod/ExtractMethodDialog.cs \
-	MonoDevelop.Refactoring.ExtractMethod/ExtractMethodHandler.cs \
-	MonoDevelop.Refactoring.ExtractMethod/ExtractMethodRefactoring.cs \
-	MonoDevelop.Refactoring.ExtractMethod/VariableLookupVisitor.cs \
 	MonoDevelop.Refactoring.ImplementInterface/ImplementAbstractMembers.cs \
 	MonoDevelop.Refactoring.ImplementInterface/ImplementExplicit.cs \
 	MonoDevelop.Refactoring.ImplementInterface/ImplementImplicit.cs \
@@ -76,6 +68,7 @@ FILES =  \
 	MonoDevelop.Refactoring.Rename/RenameHandler.cs \
 	MonoDevelop.Refactoring.Rename/RenameItemDialog.cs \
 	MonoDevelop.Refactoring.Rename/RenameRefactoring.cs \
+	MonoDevelop.Refactoring.Rename/RenameTextEditorExtension.cs \
 	MonoDevelop.Refactoring/AbstractRefactoringCommandHandler.cs \
 	MonoDevelop.Refactoring/Change.cs \
 	MonoDevelop.Refactoring/EncapsulateFieldDialog.cs \
@@ -91,7 +84,8 @@ FILES =  \
 	MonoDevelop.Refactoring/RefactoringOptions.cs \
 	MonoDevelop.Refactoring/RefactoringPreviewDialog.cs \
 	MonoDevelop.Refactoring/RefactoringService.cs \
-	MonoDevelop.Refactoring/RefactoryCommands.cs 
+	MonoDevelop.Refactoring/RefactoryCommands.cs \
+	MonoDevelop.Refactoring/ReferencesFinder.cs 
 
 RES =  \
 	gtk-gui/gui.stetic \

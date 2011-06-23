@@ -6,15 +6,16 @@
        url         = "http://www.monodevelop.com"
        description = "C/C++ Language binding"
        category    = "Language bindings"
-       version     = "2.4">
+       version     = "2.6">
 
 	<Dependencies>
-		<Addin id = "Core" version = "2.4"/>
-		<Addin id = "Ide" version = "2.4"/>
-		<Addin id = "Deployment" version = "2.4"/>
-		<Addin id = "Deployment.Linux" version = "2.4"/>
-		<Addin id = "SourceEditor2" version = "2.4" />
-		<Addin id = "DesignerSupport" version = "2.4" />
+		<Addin id = "Core" version = "2.6"/>
+		<Addin id = "Ide" version = "2.6"/>
+		<Addin id = "Deployment" version = "2.6"/>
+		<Addin id = "Deployment.Linux" version = "2.6"/>
+		<Addin id = "SourceEditor2" version = "2.6" />
+		<Addin id = "DesignerSupport" version = "2.6" />
+		<Addin id = "Refactoring" version = "2.6" />
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/Core/StockIcons">
@@ -37,6 +38,16 @@
 			insertbefore = "AllFiles"
 			_label = "C Files"
 			extensions = "*.c,*.h"/>
+		<FileFilter
+			id = "Objective C"
+			insertbefore = "AllFiles"
+			_label = "Objective C Files"
+			extensions = "*.m,*.h"/>
+		<FileFilter
+			id = "Objective C++"
+			insertbefore = "AllFiles"
+			_label = "Objective C++ Files"
+			extensions = "*.mm,*.M,*.h"/>
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/FileTemplates">
@@ -44,6 +55,8 @@
 		<FileTemplate id = "EmptyCHeaderFile" resource = "EmptyCHeaderFile.xft.xml"/>
 		<FileTemplate id = "EmptyCppSourceFile" resource = "EmptyCppSourceFile.xft.xml"/>
 		<FileTemplate id = "EmptyCppHeaderFile" resource = "EmptyCppHeaderFile.xft.xml"/>
+		<FileTemplate id = "EmptyObjCSourceFile" resource = "EmptyObjCSourceFile.xft.xml"/>
+		<FileTemplate id = "EmptyObjCppSourceFile" resource = "EmptyObjCppSourceFile.xft.xml"/>
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/ProjectTemplates">
@@ -58,6 +71,9 @@
 		<ProjectTemplate id = "SharedLibraryCppProject" resource = "SharedLibraryCppProject.xpt.xml"/>
 		<ProjectTemplate id = "StaticLibraryCppProject" resource = "StaticLibraryCppProject.xpt.xml"/>
 		<ProjectTemplate id = "ConsoleCppProject" resource = "ConsoleCppProject.xpt.xml"/>
+		
+		<!-- ObjC -->
+		<ProjectTemplate id = "ConsoleObjCProject" resource = "ConsoleObjCProject.xpt.xml"/>
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Core/MimeTypes">
@@ -77,6 +93,13 @@
 			<File pattern="*.hh" />
 			<File pattern="*.hxx" />
 		</MimeType>
+		<MimeType id="text/x-objcsrc" icon="md-c-file" isText="true">
+			<File pattern="*.m" />
+		</MimeType>
+		<MimeType id="text/x-objc++src" icon="md-cpp-file" isText="true">
+			<File pattern="*.mm" />
+			<File pattern="*.M" />
+		</MimeType>
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/ProjectBindings">
@@ -92,6 +115,14 @@
 			id = "CPP"
 			supportedextensions = ".cpp,.cxx,.cc,.h,.hpp,.hh,.hxx"
 		    class = "CBinding.CppLanguageBinding"/>
+		<LanguageBinding
+			id = "Objective C"
+		    supportedextensions = ".m,.h"
+		    class = "CBinding.ObjCLanguageBinding"/>
+		<LanguageBinding
+			id = "Objective C++"
+			supportedextensions = ".mm,.M"
+		    class = "CBinding.ObjCppLanguageBinding"/>
     </Extension>
     
 	<Extension path = "/MonoDevelop/Ide/GlobalOptionsDialog/Other">
@@ -184,7 +215,7 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
-		<Class mimeTypes="text/x-csrc, text/x-chdr, text/x-c++src, text/x-c++hdr" class = "CBinding.CTextEditorExtension" />
+		<Class fileExtensions=".c,.cpp,.cxx,.cc,.h,.hpp,.hh,.hxx,.m,.mm,.M" class = "CBinding.CTextEditorExtension" />
 	</Extension>
 
 	<Extension path = "/MonoDevelop/ProjectModel/SerializableClasses">
@@ -210,7 +241,7 @@
 	    </Runtime>
 	    
 		<Dependencies>
-			<Addin id = "MonoDevelop.Autotools" version = "2.4"/>
+			<Addin id = "MonoDevelop.Autotools" version = "2.6"/>
 		</Dependencies>
 		
 		<Extension path = "/Autotools/SimpleSetups">
@@ -220,6 +251,13 @@
 -->
 	
 	<Extension path = "/MonoDevelop/ProjectModel/DomParser">
-		<Class class = "CBinding.Parser.CDocumentParser" id = "CDocumentParser" />
+		<Parser class = "CBinding.Parser.CDocumentParser" id = "CDocumentParser"
+			fileExtensions=".c,.cpp,.cxx,.cc,.h,.hpp,.hh,.hxx,.m,.mm,.M" />
+	</Extension>
+	
+	<Extension path="/MonoDevelop/SourceEditor2/ContextMenu/Editor">
+		<Condition id="FileType" fileExtensions=".c,.cpp,.cxx,.cc,.h,.hpp,.hh,.hxx,.m,.mm,.M">
+			<CommandItem id = "MonoDevelop.Refactoring.RefactoryCommands.GotoDeclaration" insertafter="MonoDevelop.SourceEditor.SourceEditorCommands.MarkerOperations" />
+		</Condition>
 	</Extension>
 </Addin>

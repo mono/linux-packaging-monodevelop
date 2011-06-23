@@ -21,6 +21,7 @@ namespace MonoDevelop.VersionControl.Dialogs
 		Gtk.TreeStore store;
 		SelectRepositoryMode mode;
 		ArrayList loadingRepos = new ArrayList ();
+		IRepositoryEditor currentEditor;
 		
 		const int RepositoryCol = 0;
 		const int RepoNameCol = 1;
@@ -111,9 +112,9 @@ namespace MonoDevelop.VersionControl.Dialogs
 
 			VersionControlSystem vcs = (VersionControlSystem) systems [repCombo.Active];
 			repo = vcs.CreateRepositoryInstance ();
-			Gtk.Widget editor = vcs.CreateRepositoryEditor (repo);
-			repoContainer.Add (editor);
-			editor.Show ();
+			currentEditor = vcs.CreateRepositoryEditor (repo);
+			repoContainer.Add (currentEditor.Widget);
+			currentEditor.Widget.Show ();
 			UpdateRepoDescription ();
 		}
 		
@@ -240,13 +241,9 @@ namespace MonoDevelop.VersionControl.Dialogs
 			loadingRepos.Add (FindRootRepo (repoIter));
 			UpdateControls ();
 			
-			Thread t = new Thread (delegate () {
+			ThreadPool.QueueUserWorkItem (delegate {
 				LoadRepoInfo (parent, repoIter, citer);
 			});
-			
-			t.Name = "VCS repository loader";
-			t.IsBackground = true;
-			t.Start ();
 		}
 			
 		Repository FindRootRepo (TreeIter iter)
@@ -324,6 +321,15 @@ namespace MonoDevelop.VersionControl.Dialogs
 		{
 			if (mode == SelectRepositoryMode.Checkout)
 				buttonOk.Sensitive = entryFolder.Text.Length > 0;
+		}
+		
+		protected virtual void OnButtonOkClicked (object sender, System.EventArgs e)
+		{
+			if (notebook.Page == 0 && Repository != null) {
+				if (!currentEditor.Validate ())
+					return;
+			}
+			Respond (ResponseType.Ok);
 		}
 	}
 }

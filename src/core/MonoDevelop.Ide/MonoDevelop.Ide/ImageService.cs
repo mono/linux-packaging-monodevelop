@@ -31,6 +31,8 @@ using Mono.Addins;
 using System.IO;
 using MonoDevelop.Ide.Extensions;
 using MonoDevelop.Core;
+using MonoDevelop.Components;
+using System.Text;
 
 namespace MonoDevelop.Ide
 {
@@ -172,6 +174,34 @@ namespace MonoDevelop.Ide
 				return CreateColorBlock ("#FF0000FF", size);
 			}
 			return null;
+		}
+		
+		static Dictionary<string,ImageLoader> userIcons = new Dictionary<string, ImageLoader> ();
+		
+		public static ImageLoader GetUserIcon (string email, int size)
+		{
+			string key = email + size;
+			ImageLoader img;
+			if (!userIcons.TryGetValue (key, out img)) {
+				var md5 = System.Security.Cryptography.MD5.Create ();
+				byte[] hash = md5.ComputeHash (Encoding.UTF8.GetBytes (email.Trim ().ToLower ()));
+				StringBuilder sb = new StringBuilder ();
+				foreach (byte b in hash)
+					sb.Append (b.ToString ("x2"));
+				string url = "http://www.gravatar.com/avatar/" + sb.ToString () + "?d=mm&s=" + size;
+				userIcons [key] = img = new ImageLoader (url);
+			}
+			return img;
+		}
+		
+		public static void LoadUserIcon (this Gtk.Image image, string email, int size)
+		{
+			image.WidthRequest = size;
+			image.HeightRequest = size;
+			ImageLoader loader = GetUserIcon (email, size);
+			loader.LoadOperation.Completed += delegate {
+				image.Pixbuf = loader.Pixbuf;
+			};
 		}
 		
 		internal static void EnsureStockIconIsLoaded (string stockId, Gtk.IconSize size)
@@ -384,12 +414,9 @@ namespace MonoDevelop.Ide
 						continue;
 					}
 
-					if (icon.Width != px.Width || icon.Height != px.Height) {
-						LoggingService.LogWarning ("Error creating composed icon {0} at size {1}. Icon {2} is {3}x{4}, expected {5}x{6}.", id, sz, ids[n], px.Width, px.Height, icon.Width, icon.Height);
-//						icon = null;
-//						break;
-					}
-					
+					if (icon.Width != px.Width || icon.Height != px.Height) 
+						px = px.ScaleSimple (icon.Width, icon.Height, Gdk.InterpType.Bilinear);
+
 					icon = MergeIcons (icon, px);
 				}
 				if (icon != null)

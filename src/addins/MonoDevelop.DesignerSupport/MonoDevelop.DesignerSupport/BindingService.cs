@@ -151,7 +151,7 @@ namespace MonoDevelop.DesignerSupport
 			IMember existingMember = GetCompatibleMemberInClass (dom, cls, member);
 			
 			if (existingMember == null)
-				return GetCodeGenerator (project).AddMember (specificPartToAffect, member);
+				return CodeGenerationService.AddCodeDomMember (specificPartToAffect, member);
 			
 			if (throwIfExists)
 				throw new MemberExistsException (cls.Name, member, MemberType.Method, existingMember.BodyRegion, cls.CompilationUnit.FileName);
@@ -162,7 +162,7 @@ namespace MonoDevelop.DesignerSupport
 		public static CodeRefactorer GetCodeGenerator (Project project)
 		{			
 			CodeRefactorer cr = new CodeRefactorer (project.ParentSolution);
-			cr.TextFileProvider = OpenDocumentFileProvider.Instance;
+			cr.TextFileProvider = MonoDevelop.Ide.TextFileProvider.Instance;
 			return cr;
 		}
 		
@@ -271,7 +271,7 @@ namespace MonoDevelop.DesignerSupport
 				beginline = mem.BodyRegion.Start.Line;
 			
 			//jump to the member or class
-			IdeApp.Workbench.OpenDocument (specificPartToAffect.CompilationUnit.FileName, beginline, 1, true);
+			IdeApp.Workbench.OpenDocument (specificPartToAffect.CompilationUnit.FileName, beginline, 1);
 		}
 		
 		public static System.CodeDom.CodeTypeMember ReflectionToCodeDomMember (MemberInfo memberInfo)

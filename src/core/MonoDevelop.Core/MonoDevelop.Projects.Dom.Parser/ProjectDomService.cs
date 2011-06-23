@@ -42,6 +42,7 @@ using MonoDevelop.Core.ProgressMonitoring;
 using MonoDevelop.Core.Collections;
 using MonoDevelop.Projects;
 using Mono.Addins;
+using MonoDevelop.Projects.Extensions;
 //using MonoDevelop.Projects.Dom.Database;
 
 namespace MonoDevelop.Projects.Dom.Parser
@@ -76,7 +77,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 		class ParsingJob
 		{
 			public string File;
-			public JobCallback ParseCallback;
+			public Action<string, IProgressMonitor> ParseCallback;
 			public ProjectDom Database;
 		}
 
@@ -87,14 +88,12 @@ namespace MonoDevelop.Projects.Dom.Parser
 		static object parseQueueLock = new object ();
 		static AutoResetEvent parseEvent = new AutoResetEvent (false);
 		
-		static string codeCompletionPath;
-
 		static Dictionary<string,ProjectDom> databases = new Dictionary<string,ProjectDom>();
 		static Dictionary<FilePath,SingleFileCacheEntry> singleDatabases = new Dictionary<FilePath,SingleFileCacheEntry> ();		
 		
 		static ProjectDomService ()
 		{
-			codeCompletionPath = GetDefaultCompletionFileLocation ();
+			CodeCompletionPath = GetDefaultCompletionFileLocation ();
 			// for unit tests it may not have been initialized.
 		}
 
@@ -127,60 +126,40 @@ namespace MonoDevelop.Projects.Dom.Parser
 			}
 		}
 
-		static List<IParser> parsers;
-		static IParser[] cachedParsers = new IParser [0];
-		public static IEnumerable<IParser> Parsers {
+		static List<ParserNode> parsers;
+		static IEnumerable<ParserNode> Parsers {
 			get {
 				if (parsers == null) {
-					LoggingService.Trace ("ProjectDomService", "Initializing");
-					parsers = new List<IParser>();
-					AddinManager.AddExtensionNodeHandler ("/MonoDevelop/ProjectModel/DomParser", delegate(object sender, ExtensionNodeEventArgs args) {
+					Counters.ParserServiceInitialization.BeginTiming ();
+					parsers = new List<ParserNode> ();
+					AddinManager.AddExtensionNodeHandler ("/MonoDevelop/ProjectModel/DomParser", delegate (object sender, ExtensionNodeEventArgs args) {
 						switch (args.Change) {
 						case ExtensionChange.Add:
-							parsers.Add ((IParser) args.ExtensionObject);
+							parsers.Add ((ParserNode) args.ExtensionNode);
 							break;
 						case ExtensionChange.Remove:
-							parsers.Remove ((IParser) args.ExtensionObject);
+							parsers.Remove ((ParserNode) args.ExtensionNode);
 							break;
 						}
-						cachedParsers = parsers.ToArray ();
 					});
-					LoggingService.Trace ("ProjectDomService", "Initialized");
+					Counters.ParserServiceInitialization.EndTiming ();
 				}
-				return cachedParsers;
+				return parsers;
 			}
 		}
 		
-		public static IParser GetParserByMime (string mimeType)
+		public static IParser GetParser (string fileName)
 		{
-			return Parsers.FirstOrDefault (p => p.CanParseMimeType (mimeType));
-		}
-		
-		public static IParser GetParserByFileName (string fileName)
-		{
-			return Parsers.FirstOrDefault (p => p.CanParse (fileName));
-		}
-		
-		public static IParser GetParser (string fileName, string mimeType)
-		{
-			if (mimeType != null) {
-				IParser result = GetParserByMime (mimeType);
-				if (result != null) 
-					return result;
-			}
-			
-			if (!String.IsNullOrEmpty (fileName)) 
-				return GetParserByFileName (fileName);
-				
-			// give up
-			return null;
+			return Parsers.Where (n => n.Supports (fileName)).Select (n => n.Parser)
+				.Where (p => p.CanParse (fileName))
+				.FirstOrDefault ();
 		}
 
 		#endregion
 		
 		public static IExpressionFinder GetExpressionFinder (string fileName)
 		{
-			IParser parser = GetParserByFileName (fileName);
+			IParser parser = GetParser (fileName);
 			if (parser != null)
 				return parser.CreateExpressionFinder (null);
 			return null;
@@ -211,25 +190,19 @@ namespace MonoDevelop.Projects.Dom.Parser
 		}
 
 		internal static string CodeCompletionPath {
-			get { return codeCompletionPath; }
+			get;
+			private set;
 		}
 		
-		static string GetDefaultCompletionFileLocation()
+		static string GetDefaultCompletionFileLocation ()
 		{
-			string path = PropertyService.Get<string> ("MonoDevelop.CodeCompletion.DataDirectory", String.Empty);
-			if (string.IsNullOrEmpty (path)) {
-				path = Path.Combine (PropertyService.ConfigPath, "CodeCompletionData");
-				PropertyService.Set ("MonoDevelop.CodeCompletion.DataDirectory", path);
-				PropertyService.SaveProperties ();
-			}
-			
-			if (!Directory.Exists (path))
-				Directory.CreateDirectory (path);
+			string path = Path.Combine (PropertyService.Locations.Cache, "CodeCompletionData");
+			FileService.EnsureDirectoryExists (path);
 
 			return path;
 		}
 
-		public static ParsedDocument Parse (string fileName, string mimeType, ContentDelegate getContent)
+		public static ParsedDocument Parse (string fileName, Func<string> getContent)
 		{
 			List<Project> projects = new List<Project> ();
 			
@@ -243,36 +216,26 @@ namespace MonoDevelop.Projects.Dom.Parser
 			}
 
 			if (projects.Count > 0)
-				return UpdateFile (projects.ToArray (), fileName, mimeType, getContent);
+				return UpdateFile (projects.ToArray (), fileName, getContent);
 			else
 				return ParseFile (null, fileName, getContent);
 		}
 
 		// Parses a file an updates the parser database
-		public static ParsedDocument Parse (Project project, string fileName, string mimeType)
+		public static ParsedDocument Parse (Project project, string fileName)
 		{
-			return Parse (project, fileName, mimeType, delegate () {
-				if (!System.IO.File.Exists (fileName))
-					return "";
-				try {
-					return System.IO.File.ReadAllText (fileName);
-				} catch (Exception e) {
-					LoggingService.LogError ("Error reading file {0} for ProjectDomService: {1}", fileName, e);
-					return "";
-				}
-			});
+			return Parse (project, fileName, (Func<string>)null);
 		}
 		
-		public static ParsedDocument Parse (Project project, string fileName, string mimeType, string content)
+		public static ParsedDocument Parse (Project project, string fileName, string content)
 		{
-			return Parse (project, fileName, mimeType, delegate () { return content; });
+			return Parse (project, fileName, delegate () { return content; });
 		}
 		
-		
-		public static ParsedDocument Parse (Project project, string fileName, string mimeType, ContentDelegate getContent)
+		public static ParsedDocument Parse (Project project, string fileName, Func<string> getContent)
 		{
 			Project[] projects = project != null ? new Project[] { project } : null;
-			return UpdateFile (projects, fileName, mimeType, getContent);
+			return UpdateFile (projects, fileName, getContent);
 		}
 
 		// Parses a file. It does not update the parser database
@@ -282,7 +245,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 		}
 		
 		// Parses a file. It does not update the parser database
-		public static ParsedDocument ParseFile (ProjectDom dom, string fileName, ContentDelegate getContent)
+		public static ParsedDocument ParseFile (ProjectDom dom, string fileName, Func<string> getContent)
 		{
 			string fileContent = getContent != null ? getContent () : null;
 			return DoParseFile (dom, fileName, fileContent);
@@ -407,6 +370,9 @@ namespace MonoDevelop.Projects.Dom.Parser
 					// in which case those references are not properly registered.
 					foreach (Project project in solution.GetAllProjects ()) {
 						ProjectDom dom = GetProjectDom (project);
+						// referenced by main project - prevents the removal if a project is referenced one time inside the solution
+						// and the project that references it is reloaded.
+						dom.ReferenceCount++; 
 						if (dom != null)
 							dom.UpdateReferences ();
 					}
@@ -430,8 +396,13 @@ namespace MonoDevelop.Projects.Dom.Parser
 			}
 			else if (item is Solution) {
 				Solution solution = (Solution) item;
-				foreach (Project project in solution.GetAllProjects ())
-					Unload (project);
+				foreach (Project project in solution.GetAllProjects ()) {
+					ProjectDom dom = GetProjectDom (project);
+					if (dom != null) {
+						dom.ReferenceCount--;
+						Unload (project);
+					}
+				}
 				solution.SolutionItemAdded -= OnSolutionItemAdded;
 				solution.SolutionItemRemoved -= OnSolutionItemRemoved;
 			}
@@ -471,7 +442,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 				try {
 					ProjectDom db = ParserDatabase.LoadProjectDom (project);
 					RegisterDom (db, uri);
-				
+					
 					if (project is DotNetProject) {
 						((DotNetProject)project).ReferenceAddedToProject += OnProjectReferenceAdded;
 						((DotNetProject)project).ReferenceRemovedFromProject += OnProjectReferenceRemoved;
@@ -487,6 +458,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 			dom.Uri = uri;
 			databases [uri] = dom;
 			dom.UpdateReferences ();
+			OnDomRegistered (new ProjectDomEventArgs (dom));
 		}
 		
 		internal static ProjectDom GetDomForUri (string uri)
@@ -504,13 +476,13 @@ namespace MonoDevelop.Projects.Dom.Parser
 			lock (databases)
 			{
 				ProjectDom db;
+				
 				if (!databases.TryGetValue (uri, out db)) {
 					// Create/load the database
 					
 					TargetRuntime tr = null;
 					TargetFramework fx = null;
 					string file;
-					
 					if (ParseAssemblyUri (uri, out tr, out fx, out file)) {
 						db = ParserDatabase.LoadAssemblyDom (tr, fx, file);
 						RegisterDom (db, uri);
@@ -631,13 +603,13 @@ namespace MonoDevelop.Projects.Dom.Parser
 			Unload (args.Item);
 		}
 		
-		static void OnSolutionItemAdded (object sender, SolutionItemEventArgs args)
+		static void OnSolutionItemAdded (object sender, SolutionItemChangeEventArgs args)
 		{
 			if (args.SolutionItem is Project)
 				Load ((Project) args.SolutionItem);
 		}
 		
-		static void OnSolutionItemRemoved (object sender, SolutionItemEventArgs args)
+		static void OnSolutionItemRemoved (object sender, SolutionItemChangeEventArgs args)
 		{
 			if (args.SolutionItem is Project)
 				Unload ((Project) args.SolutionItem);
@@ -678,7 +650,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 			}
 		}
 		
-		internal static void QueueParseJob (ProjectDom db, JobCallback callback, string file)
+		public static void QueueParseJob (ProjectDom db, Action<string, IProgressMonitor> callback, string file)
 		{
 			ParsingJob job = new ParsingJob ();
 			job.ParseCallback = callback;
@@ -876,21 +848,28 @@ namespace MonoDevelop.Projects.Dom.Parser
 			}
 		}
 
-		static ParsedDocument UpdateFile (Project[] projects, string fileName, string mimeType, ContentDelegate getContent)
+		static ParsedDocument UpdateFile (Project[] projects, string fileName, Func<string> getContent)
 		{
 			try {
-				if (GetParser (fileName, mimeType) == null)
+				if (GetParser (fileName) == null)
 					return null;
 				
 				ParsedDocument parseInformation = null;
 				string fileContent;
 				if (getContent == null) {
-					StreamReader sr = new StreamReader (fileName);
-					fileContent = sr.ReadToEnd ();
-					sr.Close ();
+					if (!System.IO.File.Exists (fileName))
+						fileContent = "";
+					else {
+						try {
+							fileContent = System.IO.File.ReadAllText (fileName);
+						} catch (Exception e) {
+							LoggingService.LogError ("Error reading file {0} for ProjectDomService: {1}", fileName, e);
+							fileContent = "";
+						}
+					}
 				} else
 					fileContent = getContent ();
-
+				
 				// Remove any pending jobs for this file
 				RemoveParseJob (fileName);
 				ProjectDom dom = projects != null && projects.Length > 0 ? GetProjectDom (projects [0]) : null;
@@ -901,6 +880,14 @@ namespace MonoDevelop.Projects.Dom.Parser
 				// information.
 				if (projects != null && projects.Length > 0 && parseInformation.CompilationUnit != null)
 					SetSourceProject (parseInformation.CompilationUnit, dom);
+				
+//				if (parseInformation.Errors.Any ()) {
+//					Console.WriteLine (fileName + "-- Errors:");
+//					foreach (var e in parseInformation.Errors) {
+//						Console.WriteLine (e);
+//					}
+//				}
+				
 				if (parseInformation.CompilationUnit != null &&
 				    (parseInformation.Flags & ParsedDocumentFlags.NonSerializable) == 0) {
 					if (projects != null && projects.Length > 0) {
@@ -913,7 +900,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 									} else {
 										db.UpdateTagComments (fileName, parseInformation.TagComments);
 										db.RemoveTemporaryCompilationUnit (parseInformation.CompilationUnit);
-										TypeUpdateInformation res = db.UpdateFromParseInfo (parseInformation.CompilationUnit);
+										TypeUpdateInformation res = db.UpdateFromParseInfo (parseInformation.CompilationUnit, getContent == null);
 										if (res != null)
 											NotifyTypeUpdate (project, fileName, res);
 										UpdatedCommentTasks (fileName, parseInformation.TagComments, project);
@@ -925,7 +912,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 						}
 					} else {
 						ProjectDom db = GetFileDom (fileName);
-						db.UpdateFromParseInfo (parseInformation.CompilationUnit);
+						db.UpdateFromParseInfo (parseInformation.CompilationUnit, getContent == null);
 					}
 				}
 				
@@ -939,21 +926,21 @@ namespace MonoDevelop.Projects.Dom.Parser
 		static ParsedDocument DoParseFile (ProjectDom dom, string fileName, string fileContent)
 		{
 			using (Counters.FileParse.BeginTiming ()) {
-				IParser parser = GetParserByFileName (fileName);
-				
+				IParser parser = GetParser (fileName);
 				if (parser == null)
 					return null;
-				
-				parser.LexerTags = SpecialCommentTags.GetNames ();
 				
 				ParsedDocument parserOutput = null;
 				
 				if (fileContent == null) {
 					try {
+						if (!File.Exists (fileName))
+							return null;
 						using (StreamReader sr = File.OpenText (fileName)) {
 							fileContent = sr.ReadToEnd();
 						}
-					} catch (Exception) {
+					} catch (Exception e) {
+						LoggingService.LogError ("Got exception while reading file", e);
 						return null;
 					}
 				}
@@ -1036,28 +1023,100 @@ namespace MonoDevelop.Projects.Dom.Parser
 			}
 		}
 		
-		internal static int ResolveTypes (ProjectDom db, ICompilationUnit unit, IList<IType> types, out List<IType> result)
+		internal static int ResolveTypes (ProjectDom db, ICompilationUnit unit, IEnumerable<IType> types, IEnumerable<IAttribute> attributes, out List<IType> result, out List<IAttribute> resultAtrtibutes)
 		{
 			TypeResolverVisitor tr = new TypeResolverVisitor (db, unit);
 			
 			int unresolvedCount = 0;
+			
 			result = new List<IType> ();
 			foreach (IType c in types) {
 				tr.UnresolvedCount = 0;
 				DomType rc = (DomType)c.AcceptVisitor (tr, null);
+				if (rc.CompilationUnit != null)
+					rc.CompilationUnit = new CompilationUnit (rc.CompilationUnit.FileName);
 				rc.Resolved = true;
-				
+				// no need to set the base type here - the completion db handles that
+				// (setting to system.object is wrong for enums & structs - and interfaces may never have a base)
+/*				
 				if (tr.UnresolvedCount == 0 && c.FullName != "System.Object") {
 					// If the class has no base classes, make sure it subclasses System.Object
 					if (rc.BaseType == null)
 						rc.BaseType = new DomReturnType ("System.Object");
-				}
+				}*/
 				
 				result.Add (rc);
 				unresolvedCount += tr.UnresolvedCount;
 			}
 				
+			resultAtrtibutes = new List<IAttribute> ();
+			foreach (IAttribute a in attributes) {
+				tr.UnresolvedCount = 0;
+				DomAttribute ra = (DomAttribute)a.AcceptVisitor (tr, null);
+				resultAtrtibutes.Add (ra);
+				unresolvedCount += tr.UnresolvedCount;
+			}
+			
 			return unresolvedCount;
+		}
+		
+		internal static void DumpSharedReturnTypes ()
+		{
+			StreamWriter w = new StreamWriter ("rt.txt");
+			
+			w.WriteLine ("Summary");
+			w.WriteLine ("-------");
+			w.WriteLine ();
+			
+			ProjectDomStats globalStats = new ProjectDomStats ();
+			int nt = 0;
+			Dictionary<string,int> count = new Dictionary<string, int> ();
+			foreach (ProjectDom p in databases.Values) {
+				w.WriteLine (p.GetSharedReturnTypes ().Count () + " " + p.Uri);
+				ProjectDomStats stats = p.GetStats ();
+				globalStats.Add (stats);
+				stats.Dump (w, "  ");
+				foreach (var tt in p.GetSharedReturnTypes ().Select (tt => tt.ToInvariantString ())) {
+					int c;
+					count.TryGetValue (tt, out c);
+					count [tt] = c + 1;
+					nt++;
+				}
+			}
+			
+			w.WriteLine ();
+			w.WriteLine ("Totals");
+			w.WriteLine ("------");
+			w.WriteLine ();
+			
+			w.WriteLine ("Total databases: " + databases.Count);
+			w.WriteLine ("Total RTs in cache: " + nt);
+			w.WriteLine ("Total RTs in cache shareable: " + count.Count);
+			
+			globalStats.Dump (w, "");
+			
+			w.WriteLine ();
+			w.WriteLine ("Detail");
+			w.WriteLine ("------");
+			w.WriteLine ();
+			
+			foreach (ProjectDom p in databases.Values) {
+				w.WriteLine ("### " + p.Uri);
+				List<string> ts = new List<string> (p.GetSharedReturnTypes ().Select (tt => tt.ToInvariantString ()));
+				ts.Sort ();
+				w.WriteLine ("Total: " + ts.Count);
+				foreach (var tt in ts)
+					w.WriteLine (tt);
+				w.WriteLine ();
+			}
+			
+			w.WriteLine ("@@@ Summary");
+			List<KeyValuePair<string,int>> names = new List<KeyValuePair<string, int>> (count);
+			names.Sort ((a,b) => a.Value != b.Value ? a.Value.CompareTo(b.Value) : a.Key.CompareTo(b.Key));
+			w.WriteLine ("Total: " + names.Count);
+			foreach (var tt in names)
+				w.WriteLine (tt.Value + "\t" + tt.Key);
+			w.Close ();
 		}
 
 		internal static void StartParseOperation ()
@@ -1105,12 +1164,20 @@ namespace MonoDevelop.Projects.Dom.Parser
 				TypesUpdated (null, new TypeUpdateInformationEventArgs (project, info));
 		}
 		
+		static void OnDomRegistered (ProjectDomEventArgs e)
+		{
+			EventHandler<ProjectDomEventArgs> handler = DomRegistered;
+			if (handler != null)
+				handler (null, e);
+		}
+
 		public static event EventHandler<TypeUpdateInformationEventArgs> TypesUpdated;
 		public static event AssemblyInformationEventHandler AssemblyInformationChanged;
 		public static event EventHandler<CommentTasksChangedEventArgs> CommentTasksChanged;
 		public static event EventHandler SpecialCommentTagsChanged;
 		public static event EventHandler ParseOperationStarted;
 		public static event EventHandler ParseOperationFinished;
+		public static event EventHandler<ProjectDomEventArgs> DomRegistered;
 	}
 	
 	class InternalProgressMonitor: NullProgressMonitor
@@ -1125,13 +1192,9 @@ namespace MonoDevelop.Projects.Dom.Parser
 			ProjectDomService.EndParseOperation ();
 		}
 	}
-		
-	public delegate string ContentDelegate ();
-	public delegate void JobCallback (string file, IProgressMonitor monitor);
 	
 	public interface IProgressMonitorFactory
 	{
 		IProgressMonitor CreateProgressMonitor ();
 	}
-	
 }

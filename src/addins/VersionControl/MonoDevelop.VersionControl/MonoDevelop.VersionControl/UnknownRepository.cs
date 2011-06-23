@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using MonoDevelop.Core.Serialization;
 using MonoDevelop.Core;
+using System.Collections.Generic;
 
 namespace MonoDevelop.VersionControl
 {
@@ -17,7 +18,7 @@ namespace MonoDevelop.VersionControl
 			}
 		}
 
-		public override string GetPathToBaseText (FilePath sourcefile)
+		public override string GetBaseText (FilePath sourcefile)
 		{
 			return null;
 		}
@@ -32,14 +33,15 @@ namespace MonoDevelop.VersionControl
 			return null;
 		}
 
-		public override VersionInfo GetVersionInfo (FilePath localPath, bool getRemoteStatus)
+		protected override IEnumerable<VersionInfo> OnGetVersionInfo (IEnumerable<FilePath> paths, bool getRemoteStatus)
 		{
-			return null;
+			foreach (var p in paths)
+				yield return VersionInfo.CreateUnversioned (p, System.IO.Directory.Exists (p));
 		}
 
-		public override VersionInfo[] GetDirectoryVersionInfo (FilePath sourcepath, bool getRemoteStatus, bool recursive)
+		protected override VersionInfo[] OnGetDirectoryVersionInfo (FilePath sourcepath, bool getRemoteStatus, bool recursive)
 		{
-			return null;
+			return new VersionInfo [0];
 		}
 
 
@@ -92,9 +94,14 @@ namespace MonoDevelop.VersionControl
 		{
 		}
 		
-		public override string[] GetAnnotations (MonoDevelop.Core.FilePath repositoryPath)
+		public override Annotation[] GetAnnotations (MonoDevelop.Core.FilePath repositoryPath)
 		{
-			return new string[0];
+			return new Annotation[0];
+		}
+		
+		protected override RevisionPath[] OnGetRevisionChanges (Revision revision)
+		{
+			return new RevisionPath [0];
 		}
 	}
 }

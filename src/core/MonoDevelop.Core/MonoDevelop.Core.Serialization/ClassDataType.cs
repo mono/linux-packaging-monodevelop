@@ -50,7 +50,7 @@ namespace MonoDevelop.Core.Serialization
 		
 		protected override void Initialize ()
 		{
-			DataItemAttribute atd = (DataItemAttribute) Context.AttributeProvider.GetCustomAttribute (ValueType, typeof(DataItemAttribute), false);
+			IDataItemAttribute atd = (IDataItemAttribute) Context.AttributeProvider.GetCustomAttribute (ValueType, typeof(IDataItemAttribute), false);
 			if (atd != null) {
 				if (!string.IsNullOrEmpty (atd.Name)) {
 					Name = atd.Name;
@@ -316,7 +316,7 @@ namespace MonoDevelop.Core.Serialization
 				object val = prop.GetValue (obj);
 				if (val == null)
 					continue;
-				if (!serCtx.Serializer.IncludeDefaultValues && val.Equals (prop.DefaultValue))
+				if (!serCtx.IsDefaultValueSerializationForced (prop) && val.Equals (prop.DefaultValue))
 					continue;
 				
 				DataCollection col = itemCol;

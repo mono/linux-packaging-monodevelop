@@ -74,23 +74,27 @@ namespace Mono.TextEditor
 		static extern int uname (IntPtr buf);
 		
 		//from MonoDevelop.Components.Commands.KeyBindingManager
-		internal static void MapRawKeys (Gdk.EventKey evt, out Gdk.Key key, out Gdk.ModifierType mod)
+		internal static void MapRawKeys (Gdk.EventKey evt, out Gdk.Key key, out Gdk.ModifierType mod, out uint keyval)
 		{
 			mod = evt.State;
 			key = evt.Key;
+			keyval = evt.KeyValue;
 			
-			uint keyval;
 			int effectiveGroup, level;
 			Gdk.ModifierType consumedModifiers;
-			keymap.TranslateKeyboardState (evt.HardwareKeycode, evt.State, evt.Group, out keyval, out effectiveGroup,
+			ModifierType modifier = evt.State;
+			byte grp = evt.Group;
+			// Workaround for bug "Bug 688247 - Ctrl+Alt key not work on windows7 with bootcamp on a Mac Book Pro"
+			// Ctrl+Alt should behave like right alt key - unfortunately TranslateKeyboardState doesn't handle it. 
+			if (IsWindows && (modifier & ~ModifierType.LockMask) == (ModifierType.Mod1Mask | ModifierType.ControlMask)) {
+				modifier = ModifierType.Mod2Mask;
+				grp = 1;
+			}
+			
+			keymap.TranslateKeyboardState (evt.HardwareKeycode, modifier, grp, out keyval, out effectiveGroup,
 			                               out level, out consumedModifiers);
-			
 			key = (Gdk.Key)keyval;
-			mod = evt.State & ~consumedModifiers;
-			
-			//we restore the shift modifier if it was a letter, since those always get displayed uppercase
-			if (char.IsUpper ((char)Gdk.Keyval.ToUnicode (keyval)) && ((consumedModifiers & Gdk.ModifierType.ShiftMask) != 0))
-				mod |= Gdk.ModifierType.ShiftMask;
+			mod = modifier & ~consumedModifiers;
 			
 			if (IsX11) {
 				//this is a workaround for a common X mapping issue
@@ -127,6 +131,10 @@ namespace Mono.TextEditor
 					mod |= Gdk.ModifierType.Mod1Mask;
 					key = GetGroupZeroKey (key, evt);
 				}
+				
+				// Fix for allow ctrl+shift+a/ctrl+shift+e keys on mac (select to line begin/end actions)
+				if ((key == Gdk.Key.A || key == Gdk.Key.E) && (evt.State & (Gdk.ModifierType.ShiftMask | Gdk.ModifierType.ControlMask)) == (Gdk.ModifierType.ShiftMask | Gdk.ModifierType.ControlMask))
+					mod = Gdk.ModifierType.ShiftMask | Gdk.ModifierType.ControlMask;
 			}
 			
 			//fix shift-tab weirdness. There isn't a nice name for untab, so make it shift-tab
@@ -134,6 +142,9 @@ namespace Mono.TextEditor
 				key = Gdk.Key.Tab;
 				mod |= Gdk.ModifierType.ShiftMask;
 			}
+			
+			if ((key == Gdk.Key.space || key == Gdk.Key.parenleft || key == Gdk.Key.parenright) && (mod & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask)
+				mod = ModifierType.None;
 		}
 		
 		static Dictionary<Gdk.Key,Gdk.Key> groupZeroMappings = new Dictionary<Gdk.Key,Gdk.Key> ();

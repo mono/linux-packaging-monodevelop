@@ -5,8 +5,8 @@
 	copyright   = "MIT X11"
 	url         = "http://salmonsalvo.net/"
 	description = "Welcome Page for MonoDevelop"
-	category    = "MonoDevelop Core"	   
-	version     = "2.4">
+	category    = "IDE extensions"	   
+	version     = "2.6">
 	
 	<Runtime>
 		<Import file="md-bg.png"/>		
@@ -14,8 +14,8 @@
 	</Runtime>
 
 	<Dependencies>
-		<Addin id="Core" version="2.4"/>
-		<Addin id="Ide" version="2.4"/>
+		<Addin id="Core" version="2.6"/>
+		<Addin id="Ide" version="2.6"/>
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/Ide/Commands">

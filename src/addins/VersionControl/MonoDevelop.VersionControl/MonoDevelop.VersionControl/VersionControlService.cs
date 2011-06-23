@@ -1,5 +1,6 @@
 
 using System;
+using System.Linq;
 using System.IO;
 using System.Xml;
 using System.Collections;
@@ -14,6 +15,7 @@ using MonoDevelop.Projects.Policies;
 using MonoDevelop.Core.Serialization;
 using Mono.Addins;
 using MonoDevelop.Ide;
+using MonoDevelop.Core.ProgressMonitoring;
 
 namespace MonoDevelop.VersionControl
 {
@@ -89,9 +91,16 @@ namespace MonoDevelop.VersionControl
 			VersionControlSystem vcs = (VersionControlSystem) args.ExtensionObject;
 			if (args.Change == ExtensionChange.Add) {
 				handlers.Add (vcs);
-				// Include the repository type in the serialization context, so repositories
-				// of this type can be deserialized from the configuration file.
-				dataContext.IncludeType (vcs.CreateRepositoryInstance ().GetType ());
+				try {
+					// Include the repository type in the serialization context, so repositories
+					// of this type can be deserialized from the configuration file.
+					Repository r = vcs.CreateRepositoryInstance ();
+					r.AddRef ();
+					dataContext.IncludeType (r.GetType ());
+					r.Unref ();
+				} catch (Exception e) {
+					LoggingService.LogError ("Error while adding version control system.", e);
+				}
 			}
 			else {
 				handlers.Remove (vcs);
@@ -169,14 +178,31 @@ namespace MonoDevelop.VersionControl
 		
 		public static Repository GetRepository (IWorkspaceObject entry)
 		{
-			Repository repo = (Repository) entry.ExtendedProperties [typeof(Repository)];
-			if (repo != null)
-				return repo;
+			InternalRepositoryReference repoRef = (InternalRepositoryReference) entry.ExtendedProperties [typeof(InternalRepositoryReference)];
+			if (repoRef != null)
+				return repoRef.Repo;
 			
-			repo = VersionControlService.GetRepositoryReference (entry.BaseDirectory, entry.Name);
-			entry.ExtendedProperties [typeof(Repository)] = repo;
+			Repository repo = VersionControlService.GetRepositoryReference (entry.BaseDirectory, entry.Name);
+			InternalRepositoryReference rref = null;
+			if (repo != null) {
+				repo.AddRef ();
+				rref = new InternalRepositoryReference (repo);
+			}
+			entry.ExtendedProperties [typeof(InternalRepositoryReference)] = rref;
 			
 			return repo;
+		}
+		
+		static Repository GetRepositoryReference (string path, string id)
+		{
+			foreach (VersionControlSystem vcs in GetVersionControlSystems ()) {
+				Repository repo = vcs.GetRepositoryReference (path, id);
+				if (repo != null) {
+					repo.VersionControlSystem = vcs;
+					return repo;
+				}
+			}
+			return null;
 		}
 		
 		internal static void SetCommitComment (string file, string comment, bool save)
@@ -212,6 +238,13 @@ namespace MonoDevelop.VersionControl
 			}
 		}
 		
+		static string CommitMessagesFile {
+			get {
+				return PropertyService.Locations.Cache.Combine ("version-control-commit-msg");
+				
+			}
+		}
+		
 		static Hashtable GetCommitComments ()
 		{
 			if (comments != null)
@@ -225,7 +258,7 @@ namespace MonoDevelop.VersionControl
 				return null;
 			};
 
-			string file = Path.Combine (PropertyService.ConfigPath, "version-control-commit-msg");
+			string file = CommitMessagesFile;
 			if (File.Exists (file)) {
 				FileStream stream = null;
 				try {
@@ -290,15 +323,14 @@ namespace MonoDevelop.VersionControl
 				
 				FileStream stream = null;
 				try {
-					string file = Path.Combine (PropertyService.ConfigPath, "version-control-commit-msg");
+					FilePath file = CommitMessagesFile;
 					if (comments.Count == 0) {
 						if (File.Exists (file))
 							FileService.DeleteFile (file);
 						return;
 					}
 				
-					if (!Directory.Exists (PropertyService.ConfigPath))
-						Directory.CreateDirectory (PropertyService.ConfigPath);
+					FileService.EnsureDirectoryExists (file.ParentDirectory);
 					stream = new FileStream (file, FileMode.Create, FileAccess.Write);
 					BinaryFormatter formatter = new BinaryFormatter ();
 					formatter.Serialize (stream, comments);
@@ -356,15 +388,22 @@ namespace MonoDevelop.VersionControl
 			return true;
 		}
 
-		public static void NotifyFileStatusChanged (Repository repo, FilePath localPath, bool isDirectory) 
+		public static void NotifyFileStatusChanged (IEnumerable<VersionControlItem> items) 
+		{
+			FileUpdateEventArgs vargs = new FileUpdateEventArgs ();
+			vargs.AddRange (items.Select (i => new FileUpdateEventInfo (i.Repository, i.Path, i.IsDirectory)));
+			NotifyFileStatusChanged (vargs);
+		}
+		
+		public static void NotifyFileStatusChanged (FileUpdateEventArgs args) 
 		{
 			if (!DispatchService.IsGuiThread)
 				Gtk.Application.Invoke (delegate {
-					NotifyFileStatusChanged (repo, localPath, isDirectory);
+					NotifyFileStatusChanged (args);
 				});
 			else {
 				if (FileStatusChanged != null)
-					FileStatusChanged (null, new FileUpdateEventArgs (repo, localPath, isDirectory));
+					FileStatusChanged (null, args);
 			}
 		}
 		
@@ -375,16 +414,31 @@ namespace MonoDevelop.VersionControl
 		//		NotifyFileStatusChanged (repo, args.ProjectFile.FilePath, false);
 		//}
 
-		static void OnFileAdded (object s, ProjectFileEventArgs args)
+		static void OnFileAdded (object s, ProjectFileEventArgs e)
 		{
-			string path = args.ProjectFile.FilePath;
-			Repository repo = GetRepository (args.Project);
-			if (repo != null && repo.CanAdd (path)) {
-				using (IProgressMonitor monitor = GetStatusMonitor ()) {
-					repo.Add (path, false, monitor);
+			FileUpdateEventArgs vargs = new FileUpdateEventArgs ();
+			IProgressMonitor monitor = null;
+			try {
+				foreach (var repoFiles in e.GroupBy (i => i.Project)) {
+					Repository repo = GetRepository (repoFiles.Key);
+					if (repo == null)
+						continue;
+					var versionInfos = repo.GetVersionInfo (repoFiles.Select (f => f.ProjectFile.FilePath));
+					FilePath[] paths = versionInfos.Where (i => i.CanAdd).Select (i => i.LocalPath).ToArray ();
+					if (paths.Length > 0) {
+						if (monitor == null)
+							monitor = GetStatusMonitor ();
+						repo.Add (paths, false, monitor);
+					}
+					vargs.AddRange (repoFiles.Select (i => new FileUpdateEventInfo (repo, i.ProjectFile.FilePath, i.ProjectFile.Subtype == Subtype.Directory)));
 				}
-				NotifyFileStatusChanged (repo, path, args.ProjectFile.Subtype == Subtype.Directory);
 			}
+			finally {
+				if (monitor != null)
+					monitor.Dispose ();
+			}
+			if (vargs.Count > 0)
+				NotifyFileStatusChanged (vargs);
 		}
 		
 /*		static void OnFileRemoved (object s, ProjectFileEventArgs args)
@@ -459,10 +513,14 @@ namespace MonoDevelop.VersionControl
 				return;
 			
 			SolutionItem entry = args.SolutionItem;
-			string path = entry.BaseDirectory;
-			
-			if (!repo.CanAdd (path))
+			Repository currentRepo = GetRepository (entry);
+			if (currentRepo != null && currentRepo.VersionControlSystem != repo.VersionControlSystem) {
+				// If the item is already under version control using a different version control system
+				// don't add it to the parent repo.
 				return;
+			}
+			
+			string path = entry.BaseDirectory;
 			
 			// While we /could/ call repo.Add with `recursive = true', we don't
 			// necessarily want to add files under the project/solution directory
@@ -477,11 +535,23 @@ namespace MonoDevelop.VersionControl
 			using (IProgressMonitor monitor = GetStatusMonitor ()) {
 				string[] paths = (string[]) files.ToArray (typeof (string));
 				
-				for (int i = 0; i < paths.Length; i++)
-					repo.Add (paths[i], false, monitor);
+				foreach (string p in paths) {
+					if (repo.GetVersionInfo (p).CanAdd)
+						repo.Add (p, false, monitor);
+				}
 			}
 			
-			NotifyFileStatusChanged (repo, parent.BaseDirectory, true);
+			NotifyFileStatusChanged (new FileUpdateEventArgs (repo, parent.BaseDirectory, true));
+		}
+		
+		public static IProgressMonitor GetProgressMonitor (string operation)
+		{
+			IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor ("MonoDevelop.VersionControlOutput", "Version Control", "md-version-control", false, true);
+			Pad outPad = IdeApp.Workbench.ProgressMonitors.GetPadForMonitor (monitor);
+			
+			AggregatedProgressMonitor mon = new AggregatedProgressMonitor (monitor);
+			mon.AddSlaveMonitor (IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (operation, "md-version-control", true, true, false, outPad));
+			return mon;
 		}
 		
 		static IProgressMonitor GetStatusMonitor ()
@@ -491,7 +561,7 @@ namespace MonoDevelop.VersionControl
 		
 		static string ConfigFile {
 			get {
-				return Path.Combine (PropertyService.ConfigPath, "VersionControl.config");
+				return PropertyService.Locations.Config.Combine ("VersionControl.config");
 			}
 		}
 		
@@ -540,6 +610,7 @@ namespace MonoDevelop.VersionControl
 			if (configuration != null) {
 				XmlDataSerializer ser = new XmlDataSerializer (dataContext);
 				XmlTextWriter tw = new XmlTextWriter (new StreamWriter (ConfigFile));
+				tw.Formatting = Formatting.Indented;
 				try {
 					ser.Serialize (tw, configuration, typeof (VersionControlConfiguration));
 				} finally {
@@ -551,16 +622,6 @@ namespace MonoDevelop.VersionControl
 		public static void ResetConfiguration ()
 		{
 			configuration = null;
-		}
-		
-		public static Repository GetRepositoryReference (string path, string id)
-		{
-			foreach (VersionControlSystem vcs in GetVersionControlSystems ()) {
-				Repository repo = vcs.GetRepositoryReference (path, id);
-				if (repo != null)
-					return repo;
-			}
-			return null;
 		}
 		
 		public static void StoreRepositoryReference (Repository repo, string path, string id)
@@ -611,6 +672,7 @@ namespace MonoDevelop.VersionControl
 		{
 			CommitMessageFormat format = new CommitMessageFormat ();
 			format.Style = item.Policies.Get<VersionControlPolicy> ().CommitMessageStyle;
+			format.ShowFilesForSingleComment = false;
 			return format;
 		}
 		
@@ -644,10 +706,11 @@ namespace MonoDevelop.VersionControl
 				style = PolicyService.GetDefaultPolicy<CommitMessageStyle> ();
 			}
 			
-			authorInfo = IdeApp.Workspace.GetAuthorInformation (project);
+			authorInfo = project != null ? project.AuthorInformation : AuthorInformation.Default;
 			
 			CommitMessageFormat format = new CommitMessageFormat ();
 			format.Style = style;
+			format.ShowFilesForSingleComment = false;
 			
 			return format;
 		}
@@ -658,5 +721,26 @@ namespace MonoDevelop.VersionControl
 	{
 		public string Comment;
 		public DateTime Date;
+	}
+	
+	class InternalRepositoryReference: IDisposable
+	{
+		Repository repo;
+		
+		public InternalRepositoryReference (Repository repo)
+		{
+			this.repo = repo;
+		}
+
+		public Repository Repo {
+			get {
+				return this.repo;
+			}
+		}
+		
+		public void Dispose ()
+		{
+			repo.Unref ();
+		}
 	}
 }

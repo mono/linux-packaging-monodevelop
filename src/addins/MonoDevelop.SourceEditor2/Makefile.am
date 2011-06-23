@@ -22,9 +22,6 @@ FILES =  \
 	MonoDevelop.SourceEditor/Counters.cs \
 	MonoDevelop.SourceEditor/DebugValueTooltipProvider.cs \
 	MonoDevelop.SourceEditor/DebugValueWindow.cs \
-	MonoDevelop.SourceEditor/DefaultFormatter.cs \
-	MonoDevelop.SourceEditor/DropDownBox.cs \
-	MonoDevelop.SourceEditor/DropDownBoxListWindow.cs \
 	MonoDevelop.SourceEditor/DynamicAbbrevHandler.cs \
 	MonoDevelop.SourceEditor/EditActions.cs \
 	MonoDevelop.SourceEditor/ExtensibleTextEditor.cs \
@@ -34,11 +31,10 @@ FILES =  \
 	MonoDevelop.SourceEditor/LanguageItemTooltipProvider.cs \
 	MonoDevelop.SourceEditor/LanguageItemWindow.cs \
 	MonoDevelop.SourceEditor/MarkerOperationsHandler.cs \
+	MonoDevelop.SourceEditor/MessageBubbleCache.cs \
 	MonoDevelop.SourceEditor/MessageBubbleCommands.cs \
 	MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs \
 	MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs \
-	MonoDevelop.SourceEditor/NavigationBar.cs \
-	MonoDevelop.SourceEditor/NavigationBarCommands.cs \
 	MonoDevelop.SourceEditor/PinnedWatchWidget.cs \
 	MonoDevelop.SourceEditor/PrintSettingsWidget.cs \
 	MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs \
@@ -55,7 +51,6 @@ FILES =  \
 
 RES =  \
 	gtk-gui/gui.stetic \
-	gtk-gui/objects.xml \
 	MonoDevelop.SourceEditor.addin.xml \
 	MonoDevelop.SourceEditor/searchoptions.png
 

@@ -40,6 +40,8 @@ using MonoDevelop.Core.Execution;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Core.Assemblies;
 using TargetRuntime = MonoDevelop.Core.Assemblies.TargetRuntime;
+using System.Xml;
+using System.Globalization;
 
 namespace MonoDevelop.Projects.Dom.Serialization
 {	
@@ -82,7 +84,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			}
 			else
 				isPackageAssembly = false;
-
+			
 			this.baseDir = ProjectDomService.CodeCompletionPath;
 
 			if (isTempDatabase)
@@ -101,7 +103,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			foreach (FileEntry e in oldFiles)
 				RemoveFile (e.FileName);
 			
-			if (files [assemblyFile] == null) {
+			if (!files.ContainsKey (assemblyFile)) {
 				AddFile (assemblyFile);
 				headers ["CheckFile"] = assemblyFile;
 			}
@@ -116,14 +118,72 @@ namespace MonoDevelop.Projects.Dom.Serialization
 						AddReference (uri);
 				}
 				
-				ArrayList keys = new ArrayList ();
-				keys.AddRange (references);
-				foreach (ReferenceEntry re in keys)
+				foreach (ReferenceEntry re in References)
 				{
 					if (!rs.Contains (re.Uri))
 						RemoveReference (re.Uri);
 				}
 			}
+		}
+		
+		/// <summary>
+		/// Searches for xml files. The .xml file extension is treated case insensitive.
+		/// </summary>
+		bool GetXml (string baseName, out FilePath xmlFileName)
+		{
+			string filePattern = Path.GetFileNameWithoutExtension (baseName) + ".*";
+			foreach (string fileName in Directory.EnumerateFileSystemEntries (Path.GetDirectoryName (baseName), filePattern)) {
+				if (fileName.ToLower ().EndsWith (".xml")) {
+					xmlFileName = fileName;
+					return true;
+				}
+			}
+			xmlFileName = "";
+			return false;
+		}
+		
+		Dictionary<string, string> xmlDocumentation = null;
+		public override string GetDocumentation (IMember member)
+		{
+			if (member == null)
+				return null; 
+			
+			if (xmlDocumentation == null) {
+				FilePath xmlFileName;
+				GetXml (assemblyFile, out xmlFileName);
+				var langCode = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
+				
+				var langDirectory = Path.Combine (Path.GetDirectoryName (assemblyFile), langCode);
+				if (Directory.Exists (langDirectory)) {
+					var langXmlFile = Path.Combine (langDirectory, xmlFileName.FileName);
+					FilePath localizedXml;
+					if (GetXml (langXmlFile, out localizedXml))
+						xmlFileName = localizedXml;
+				}
+				
+				if (!xmlFileName.IsNull && File.Exists (xmlFileName)) {
+					xmlDocumentation = new Dictionary<string, string> ();
+					try {
+						using (var reader = new XmlTextReader (xmlFileName)) {
+							while (reader.Read ()) {
+								if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "member") {
+									string memberName = reader.GetAttribute ("name");
+									string innerXml   = reader.ReadInnerXml ();
+									xmlDocumentation[memberName] = innerXml.Trim ();
+								}
+							}
+						}
+					} catch (Exception e) {
+						LoggingService.LogWarning ("Can't load xml documentation: " + e.Message);
+						xmlDocumentation = null;
+					}
+				}
+			}
+			if (xmlDocumentation == null)
+				return null;
+			string documentation;
+			xmlDocumentation.TryGetValue (member.HelpUrl, out documentation);
+			return documentation;
 		}
 		
 		public override void Dispose ()
@@ -238,7 +298,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				} else {
 					DomCecilCompilationUnit ainfo = DomCecilCompilationUnit.Load (fileName, false, true);
 					
-					UpdateTypeInformation (ainfo.Types, fileName);
+					UpdateTypeInformation (ainfo.Types, ainfo.Attributes, fileName);
 					
 					// Reset the error retry count, since the file has been
 					// successfully parsed.
@@ -305,10 +365,9 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		
 		public IEnumerable<string> ReadAssemblyReferences ()
 		{
-			AssemblyDefinition asm = AssemblyFactory.GetAssemblyManifest (assemblyFile);
-		
-			AssemblyNameReferenceCollection names = asm.MainModule.AssemblyReferences;
-			foreach (AssemblyNameReference aname in names) {
+			AssemblyDefinition asm = AssemblyDefinition.ReadAssembly (assemblyFile);
+
+			foreach (AssemblyNameReference aname in asm.MainModule.AssemblyReferences) {
 				string afile = runtime.AssemblyContext.GetAssemblyLocation (aname.FullName, fx);
 				if (afile != null)
 					yield return "Assembly:" + runtime.Id + ":" + Path.GetFullPath (afile);
@@ -318,7 +377,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 	
 	internal class DatabaseGenerator: RemoteProcessObject
 	{
-		public string GenerateDatabase (string runtimeId, string fxId, string baseDir, string assemblyFile)
+		public string GenerateDatabase (string runtimeId, TargetFrameworkMoniker fxId, string baseDir, string assemblyFile)
 		{
 			try {
 				Runtime.Initialize (false);
@@ -329,7 +388,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				TargetFramework fx = Runtime.SystemAssemblyService.GetTargetFramework (fxId);
 
 				// Generate the new db in a temp file. The main process will move the file if required.
-				using (AssemblyCodeCompletionDatabase db = new AssemblyCodeCompletionDatabase (runtime, fx, assemblyFile, pdb, true)) {
+				using (var db = new AssemblyCodeCompletionDatabase (runtime, fx, assemblyFile, pdb, true)) {
 					if (db.LoadError)
 						throw new InvalidOperationException ("Could find assembly: " + assemblyFile);
 					db.ParseInExternalProcess = false;

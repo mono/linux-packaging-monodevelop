@@ -52,7 +52,7 @@ namespace Mono.TextEditor.Highlighting
 			{
 				Tag result = new Tag ();
 				string[] commands = text.Split (' ', '\t');
-				result.Command = commands[0];
+				result.Command = commands[0].ToUpper ();
 				for (int i = 1; i < commands.Length; i++) {
 					string[] argument = commands[i].Split ('=');
 					if (argument.Length == 2)
@@ -115,28 +115,29 @@ namespace Mono.TextEditor.Highlighting
 			ChunkStyle result = new ChunkStyle ();
 			if (style == null)
 				style = new DefaultStyle (null);
-			result.Color = style.Default.Color;
+			result.CairoColor = style.Default.CairoColor;
 			
 			foreach (Tag tag in tagStack) {
 				//System.Console.WriteLine("'" + tag.Command + "'");
-				switch (tag.Command.ToUpper ()) {
+				switch (tag.Command) {
 				case "B":
 					result.ChunkProperties |= ChunkProperties.Bold;
 					break;
 				case "SPAN":
-					if (tag.Arguments.ContainsKey ("style")) {
-						ChunkStyle chunkStyle = style.GetChunkStyle (tag.Arguments["style"]);
+					string val;
+					if (tag.Arguments.TryGetValue ("style", out val)) {
+						ChunkStyle chunkStyle = style.GetChunkStyle (val);
 						if (chunkStyle != null) {
-							result.Color = chunkStyle.Color;
+							result.CairoColor = chunkStyle.CairoColor;
 							result.ChunkProperties |= chunkStyle.ChunkProperties;
 						} else {
-							throw new Exception ("Style " + tag.Arguments["style"] + " not found.");
+							throw new Exception ("Style " + val + " not found.");
 						}
 					}
-					if (tag.Arguments.ContainsKey ("foreground")) 
-						result.Color = style.GetColorFromString (tag.Arguments["foreground"]);
-					if (tag.Arguments.ContainsKey ("background")) 
-						result.BackgroundColor = style.GetColorFromString (tag.Arguments["background"]);
+					if (tag.Arguments.TryGetValue ("foreground", out val))
+						result.CairoColor = style.GetColorFromString (val);
+					if (tag.Arguments.TryGetValue ("background", out val))
+						result.CairoBackgroundColor = style.GetColorFromString (val);
 					break;
 				case "A":
 					result.Link = tag.Arguments["ref"];
@@ -162,13 +163,9 @@ namespace Mono.TextEditor.Highlighting
 			while (curOffset < endOffset) {
 				LineSegment curLine = doc.GetLineByOffset (curOffset);
 				for (Chunk chunk = GetChunks (doc, style, curLine, curOffset, System.Math.Min (endOffset - curOffset, curLine.EndOffset - curOffset)); chunk != null; chunk = chunk.Next) {
-					for (int i = 0; i < chunk.Length; i++) {
-						result.Append (chunk.GetCharAt (doc, chunk.Offset + i));
-					}
+					result.Append (chunk.GetText (doc));
 				}
-				curOffset += curLine.Length;
-				if (curOffset < endOffset)
-					result.AppendLine ();
+				curOffset = curLine.EndOffset;
 			}
 			return result.ToString ();
 		}
@@ -181,7 +178,9 @@ namespace Mono.TextEditor.Highlighting
 			Chunk startChunk = curChunk;
 			Chunk endChunk = curChunk;
 			bool inTag = true, inSpecial = false;
-			int tagBegin = -1, specialBegin = -1;
+			int specialBegin = -1;
+			StringBuilder tagBuilder = new StringBuilder ();
+			StringBuilder specialBuilder = new StringBuilder ();
 			for (int i = offset; i < endOffset; i++) {
 				char ch = doc.GetCharAt (i);
 				switch (ch) {
@@ -192,22 +191,26 @@ namespace Mono.TextEditor.Highlighting
 						endChunk = endChunk.Next = curChunk;
 						curChunk = new TextChunk (new ChunkStyle (), offset);
 					}
-					tagBegin = i;
+					tagBuilder.Length = 0;
+					specialBuilder.Length = 0;
 					inTag = true;
 					break;
 				case '&':
+					curChunk.Length = i - curChunk.Offset;
+					if (curChunk.Length > 0) {
+						curChunk.ChunkStyle = GetChunkStyle (style, tagStack);
+						endChunk = endChunk.Next = curChunk;
+						curChunk = new TextChunk (new ChunkStyle (), offset);
+					}
+					
 					inSpecial = true;
+					specialBuilder.Length = 0;
+					tagBuilder.Length = 0;
 					specialBegin = i;
 					break;
 				case ';':
 					if (inSpecial) {
-						string specialText = doc.GetTextBetween (specialBegin + 1, i);
-						curChunk.Length = specialBegin - curChunk.Offset;
-						if (curChunk.Length > 0) {
-							curChunk.ChunkStyle = GetChunkStyle (style, tagStack);
-							endChunk = endChunk.Next = curChunk;
-							curChunk = new TextChunk (new ChunkStyle (), offset);
-						}
+						string specialText = specialBuilder.ToString ();
 						switch (specialText) {
 						case "lt":
 							endChunk = endChunk.Next = new TextChunk (GetChunkStyle (style, tagStack), specialBegin, "<");
@@ -221,12 +224,15 @@ namespace Mono.TextEditor.Highlighting
 						}
 						curChunk.Offset = i + 1;
 						inSpecial = false;
+						specialBuilder.Length = 0;
+						tagBuilder.Length = 0;
 					}
 					break;
 				case '>':
 					if (!inTag)
 						break;
-					string tagText = doc.GetTextBetween (tagBegin + 1, i);
+					string tagText = tagBuilder.ToString ();
+					tagBuilder.Length = 0;
 					if (tagText.StartsWith ("/")) {
 						if (tagStack.Count > 0)
 							tagStack.Pop ();
@@ -235,6 +241,15 @@ namespace Mono.TextEditor.Highlighting
 					}
 					curChunk.Offset = i + 1;
 					inTag = false;
+					specialBuilder.Length = 0;
+					tagBuilder.Length = 0;
+					break;
+				default:
+					if (inSpecial) {
+						specialBuilder.Append (ch);
+					} else {
+						tagBuilder.Append (ch);
+					}
 					break;
 				}
 			}

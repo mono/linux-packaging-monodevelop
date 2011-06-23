@@ -154,7 +154,7 @@ namespace MonoDevelop.Core.Assemblies
 			}
 		}
 
-		public TargetFramework GetTargetFramework (string id)
+		public TargetFramework GetTargetFramework (TargetFrameworkMoniker id)
 		{
 			foreach (TargetFramework fx in frameworks)
 				if (fx.Id == id)
@@ -202,7 +202,7 @@ namespace MonoDevelop.Core.Assemblies
 		internal static System.Reflection.AssemblyName GetAssemblyNameObj (string file)
 		{
 			try {
-				AssemblyDefinition asm = AssemblyFactory.GetAssemblyManifest (file);
+				AssemblyDefinition asm = AssemblyDefinition.ReadAssembly (file);
 				return new AssemblyName (asm.Name.FullName);
 				
 				// Don't use reflection to get the name since it is a common cause for deadlocks
@@ -217,7 +217,7 @@ namespace MonoDevelop.Core.Assemblies
 				}
 				throw;
 			} catch (BadImageFormatException) {
-				AssemblyDefinition asm = AssemblyFactory.GetAssemblyManifest (file);
+				AssemblyDefinition asm = AssemblyDefinition.ReadAssembly (file);
 				return new AssemblyName (asm.Name.FullName);
 			}
 		}
@@ -259,42 +259,18 @@ namespace MonoDevelop.Core.Assemblies
 			if (fx.RelationsBuilt)
 				return;
 			
-			fx.BaseCoreFramework = fx.Id;
-			fx.ExtendedFrameworks.Add (fx.Id);
-			fx.CompatibleFrameworks.Add (fx.Id);
-			
-			if (!string.IsNullOrEmpty (fx.CompatibleWithFramework)) {
-				TargetFramework compatFx = GetTargetFramework (fx.CompatibleWithFramework);
+			var includesFramework = fx.GetIncludesFramework ();
+			if (includesFramework != null) {
+				fx.IncludedFrameworks.Add (includesFramework);
+				TargetFramework compatFx = GetTargetFramework (includesFramework);
 				BuildFrameworkRelations (compatFx);
-				if (!UseExpandedFrameworksFile) {
-					List<AssemblyInfo> allAsm = new List<AssemblyInfo> (fx.Assemblies);
-					foreach (string extFxId in compatFx.ExtendedFrameworks) {
-						TargetFramework extFx = GetTargetFramework (extFxId);
-						foreach (AssemblyInfo ai in extFx.Assemblies)
-							allAsm.Add (ai.Clone ());
-					}
-					fx.Assemblies = allAsm.ToArray ();
-				}
-				fx.CompatibleFrameworks.AddRange (compatFx.CompatibleFrameworks);
-			}
-			else if (!string.IsNullOrEmpty (fx.ExtendsFramework)) {
-				TargetFramework compatFx = GetTargetFramework (fx.ExtendsFramework);
-				BuildFrameworkRelations (compatFx);
-				fx.CompatibleFrameworks.AddRange (compatFx.CompatibleFrameworks);
-				fx.ExtendedFrameworks.AddRange (compatFx.ExtendedFrameworks);
-				fx.BaseCoreFramework = compatFx.BaseCoreFramework;
-			}
-			
-			// Find subsets of this framework
-			foreach (TargetFramework sfx in frameworks) {
-				if (sfx.SubsetOfFramework == fx.Id)
-					fx.CompatibleFrameworks.Add (sfx.Id);
+				fx.IncludedFrameworks.AddRange (compatFx.IncludedFrameworks);
 			}
 			
 			fx.RelationsBuilt = true;
 		}
 
-		void LoadKnownAssemblyVersions ( )
+		void LoadKnownAssemblyVersions ()
 		{
 			Stream s = AddinManager.CurrentAddin.GetResource ("frameworks.xml");
 			XmlDocument doc = new XmlDocument ();
@@ -334,13 +310,12 @@ namespace MonoDevelop.Core.Assemblies
 			}
 		}
 		
-		public string GetTargetFrameworkForAssembly (TargetRuntime tr, string file)
+		public TargetFrameworkMoniker GetTargetFrameworkForAssembly (TargetRuntime tr, string file)
 		{
 			try {
-				AssemblyDefinition asm = AssemblyFactory.GetAssemblyManifest (file);
-			
-				AssemblyNameReferenceCollection names = asm.MainModule.AssemblyReferences;
-				foreach (AssemblyNameReference aname in names) {
+				AssemblyDefinition asm = AssemblyDefinition.ReadAssembly (file);
+
+				foreach (AssemblyNameReference aname in asm.MainModule.AssemblyReferences) {
 					if (aname.Name == "mscorlib") {
 						foreach (TargetFramework tf in GetTargetFrameworks ()) {
 							if (tf.GetCorlibVersion () == aname.Version.ToString ())
@@ -352,7 +327,7 @@ namespace MonoDevelop.Core.Assemblies
 			} catch {
 				// Ignore
 			}
-			return "FxUnknown";
+			return TargetFrameworkMoniker.UNKNOWN;
 		}
 		
 		void SaveUserAssemblyContext ()

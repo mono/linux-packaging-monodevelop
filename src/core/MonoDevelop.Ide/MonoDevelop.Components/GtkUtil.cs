@@ -43,6 +43,20 @@ namespace MonoDevelop.Components
 			                        (double)color.Blue / ushort.MaxValue);
 		}
 		
+		/// <summary>
+		/// Makes a color lighter or darker
+		/// </summary>
+		/// <param name='lightAmount'>
+		/// Amount of lightness to add. If the value is positive, the color will be lighter,
+		/// if negative it will be darker. Value must be between 0 and 1.
+		/// </param>
+		public static Gdk.Color AddLight (this Gdk.Color color, double lightAmount)
+		{
+			HslColor c = color;
+			c.L += lightAmount;
+			return c;
+		}
+		
 		public static void EnableAutoTooltips (this Gtk.TreeView tree)
 		{
 			TreeViewTooltipsData data = new TreeViewTooltipsData ();
@@ -200,7 +214,6 @@ namespace MonoDevelop.Components
 			}
 
 			col.CellSetCellData (tree.Model, iter, false, false);
-			
 			int x = 0;
 			int th = 0;
 			CellRenderer[] renderers = col.CellRenderers;
@@ -224,9 +237,14 @@ namespace MonoDevelop.Components
 			Gdk.Rectangle rect = Allocation;
 			col.CellSetCellData (tree.Model, iter, false, false);
 			int x = 1;
+			Gdk.Color save = Gdk.Color.Zero;
 			foreach (CellRenderer cr in col.CellRenderers) {
 				if (!cr.Visible)
 					continue;
+				if (cr is CellRendererText) {
+					save = ((CellRendererText)cr).ForegroundGdk;
+					((CellRendererText)cr).ForegroundGdk = Style.Foreground (State);
+				}
 				int sp, wi, he, xo, yo;
 				col.CellGetPosition (cr, out sp, out wi);
 				Gdk.Rectangle colcrect = new Gdk.Rectangle (x, rect.Y, wi, rect.Height - 2);
@@ -236,6 +254,9 @@ namespace MonoDevelop.Components
 				Gdk.Rectangle crect = new Gdk.Rectangle (colcrect.X + leftMargin, colcrect.Y + rightMargin + 1, wi, he);
 				cr.Render (this.GdkWindow, tree, colcrect, crect, rect, CellRendererState.Focused);
 				x += colcrect.Width + col.Spacing + 1;
+				if (cr is CellRendererText) {
+					((CellRendererText)cr).ForegroundGdk = save;
+				}
 			}
 			return true;
 		}
