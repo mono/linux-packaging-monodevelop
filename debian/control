@@ -4,9 +4,8 @@ Priority: optional
 Maintainer: Debian CLI Applications Team <pkg-cli-apps-team@lists.alioth.debian.org>
 Uploaders: Mirco Bauer <meebey@debian.org>, Jo Shields <directhex@apebox.org>
 Build-Depends: debhelper (>= 7.0.50)
-Build-Depends-Indep: cli-common-dev (>= 0.5.7),
+Build-Depends-Indep: cli-common-dev (>= 0.8~),
  mono-devel (>= 2.6.1),
- libmono-dev (>= 2.6.1),
  monodoc-base (>= 1.1.9),
  intltool,
  autoconf,
@@ -19,15 +18,12 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  libgnome2.0-cil-dev,
  libnunit-cil-dev,
  libmono-cecil-cil-dev,
- libmono-addins-cil-dev (>= 0.4),
- libmono-addins-gui-cil-dev (>= 0.4),
+ libmono-addins-cil-dev (>= 0.6),
+ libmono-addins-gui-cil-dev (>= 0.6),
  libmetacity-dev,
  libsvn-dev,
- libmono-debugger-soft0.0-cil (>= 2.6.7),
  libapr1-dev,
  libgtkspell-dev,
- mono-xsp-base,
- mono-xsp2-base,
  desktop-file-utils
 Standards-Version: 3.8.4
 Homepage: http://www.monodevelop.com/
