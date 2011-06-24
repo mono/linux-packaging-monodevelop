@@ -19,10 +19,9 @@ override_dh_auto_configure:
 	  --disable-update-mimedb \
 	  --disable-update-desktopdb \
 	  --disable-monoextensions \
-	  --enable-versioncontrol --enable-subversion \
-	  --enable-aspnet \
+	  --enable-git --enable-subversion \
 	  --enable-gnomeplatform \
-	  --enable-c MCS=/usr/bin/mono-csc CSC=/usr/bin/mono-csc
+	  MCS=/usr/bin/mono-csc CSC=/usr/bin/mono-csc
 
 override_dh_auto_build:
 	XDG_CONFIG_HOME=$(DEBIAN_DIR) dh_auto_build
