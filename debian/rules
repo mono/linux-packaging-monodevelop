@@ -30,7 +30,8 @@ override_dh_clideps:
 	dh_clideps	--exclude-moduleref=/System/Library/Frameworks/Carbon.framework/Versions/Current/Carbon \
 			--exclude-moduleref=/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation \
 			--exclude-moduleref=/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices \
-			--exclude-moduleref=libigemacintegration.dylib
+			--exclude-moduleref=libigemacintegration.dylib \
+			--exclude-moduleref=glibsharpglue-2
 
 override_dh_auto_test:
 	# skip "make test"
