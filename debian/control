@@ -25,7 +25,7 @@ Build-Depends-Indep: cli-common-dev (>= 0.8~),
  libapr1-dev,
  libgtkspell-dev,
  desktop-file-utils
-Standards-Version: 3.8.4
+Standards-Version: 3.9.2
 Homepage: http://www.monodevelop.com/
 Vcs-Git: git://git.debian.org/pkg-cli-apps/packages/monodevelop.git
 Vcs-Browser: http://git.debian.org/?p=pkg-cli-apps/packages/monodevelop.git
