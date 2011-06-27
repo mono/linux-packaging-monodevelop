@@ -5,7 +5,7 @@ Maintainer: Debian CLI Applications Team <pkg-cli-apps-team@lists.alioth.debian.
 Uploaders: Mirco Bauer <meebey@debian.org>, Jo Shields <directhex@apebox.org>
 Build-Depends: debhelper (>= 7.0.50)
 Build-Depends-Indep: cli-common-dev (>= 0.8~),
- mono-devel (>= 2.6.1),
+ mono-devel (>= 2.10),
  monodoc-base (>= 1.1.9),
  intltool,
  autoconf,
