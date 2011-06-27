@@ -1,3 +1,34 @@
+monodevelop (2.5.92+dfsg-1) experimental; urgency=low
+
+  * [d3fe546] Imported Upstream version 2.5.92+dfsg (2.6 Beta 3)
+  * [d499e57] Disable inject_Mono.Debugger.Soft_source.patch, since this 
+    source is now shipped by upstream.
+  * [2098790] Disable avoid-dependency-on-Mono.Addins-0.5.patch, since 
+    we now have Mono.Addins 0.6
+  * [363239b] Refreshed link_system_nunit.patch, which had some aspects 
+    hard-coded
+  * [24aac28] Update use_libsvn1.patch for altered path in source tree
+  * [a18613d] Refresh use_libapr1.patch for new path in source tree
+  * [db6d7d0] Refresh use_csc.patch to specify ToolsVersion 4.0 for 
+    xbuild-built components, especially contrib conponents
+  * [0f7e9bf] Refresh debian/patches/remove_support_for_moonlight
+  * [3bfb6d6] Start using DebSrc 3.0 (quilt) rather than quilt.make separately
+  * [28a6814] Exclude modulerefs for Mac-only libraries
+  * [fdce601] Update build-dependencies
+  * [cf3ce81] Refresh binary dependencies for MonoDevelop package
+  * [445d8a0] Refresh configure flags
+  * [9971926] Exclude more modulerefs, for private libs which aren't going 
+    to be in LD_LIBRARY_PATH
+  * [8264ecb] Patch MonoDevelop to force .NET 4.0 as the default framework 
+    version on new projects. This is recommended for new projects because our 
+    GTK# (plus every other library not bundled inside Mono itself) is built 
+    for .NET 4.0, so users will get nasty errors building their projects 
+    with the 3.5 compiler when consuming 4.0 libraries.
+  * [001f0aa] Bump mono-devel dependency
+  * [e987431] Bump Debian Standards version to 3.9.2 (no changes)
+
+ -- Jo Shields <directhex@apebox.org>  Mon, 27 Jun 2011 17:03:13 +0100
+
 monodevelop (2.4.1+dfsg-1) experimental; urgency=low
 
   [ Stefan Ebner ]
