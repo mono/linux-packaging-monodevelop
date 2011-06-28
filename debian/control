@@ -32,8 +32,7 @@ Vcs-Browser: http://git.debian.org/?p=pkg-cli-apps/packages/monodevelop.git
 
 Package: monodevelop
 Architecture: all
-Suggests: monodevelop-boo,
-          monodevelop-java,
+Suggests: monodevelop-java,
           monodevelop-vala,
           monodevelop-nunit,
           monodevelop-versioncontrol,
