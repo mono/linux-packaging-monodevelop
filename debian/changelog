@@ -1,3 +1,11 @@
+monodevelop (2.5.92+dfsg-2) experimental; urgency=low
+
+  * [69b146e] Don't Suggest monodevelop-boo, since it seems EOL.
+  * [30e59cf] Port NUnit addin to use NUnit 2.5.
+  * [a398070] Include a hard build-dep on NUnit 2.5, since we need it now.
+
+ -- Jo Shields <directhex@apebox.org>  Mon, 04 Jul 2011 17:53:49 +0100
+
 monodevelop (2.5.92+dfsg-1) experimental; urgency=low
 
   * [d3fe546] Imported Upstream version 2.5.92+dfsg (2.6 Beta 3)
