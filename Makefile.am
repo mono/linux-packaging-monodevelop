@@ -105,7 +105,7 @@ MD_LAUNCH=$(MD_LAUNCH_SETUP) exec -a "monodevelop" $(RUNTIME)
 run: runmd
 
 runmd: $(PROGRAM)
-	$(MD_LAUNCH) --debug $(MD_BIN_PATH)/MonoDevelop.exe
+	UBUNTU_MENUPROXY=0 $(MD_LAUNCH) --debug $(MD_BIN_PATH)/MonoDevelop.exe
 
 run-debug: $(PROGRAM)
 	MONODEVELOP_CONSOLE_LOG_LEVEL=All $(MD_LAUNCH) --debug=casts $(MD_BIN_PATH)/MonoDevelop.exe
@@ -164,3 +164,6 @@ distcleancheck_listfiles      = find . -type f -print		# automake-1.9 setting
 distcleancheck_listfiles     += $(filter_stale_buildfiles)	# amend by required filtering
 
 .PHONY: vcrevision
+
+package-monomac:
+	$(MD_LAUNCH_SETUP) mono --debug "build/bin/mdrun.exe" setup pack ../extras/MonoDevelop.MonoMac/build/MonoDevelop.MonoMac.dll

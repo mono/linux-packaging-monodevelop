@@ -997,7 +997,7 @@ apidocs:
 run: runmd
 
 runmd: $(PROGRAM)
-	$(MD_LAUNCH) --debug $(MD_BIN_PATH)/MonoDevelop.exe
+	UBUNTU_MENUPROXY=0 $(MD_LAUNCH) --debug $(MD_BIN_PATH)/MonoDevelop.exe
 
 run-debug: $(PROGRAM)
 	MONODEVELOP_CONSOLE_LOG_LEVEL=All $(MD_LAUNCH) --debug=casts $(MD_BIN_PATH)/MonoDevelop.exe
@@ -1032,6 +1032,9 @@ app-dir: all
 abs_top_builddir ?= $(top_builddir)
 
 .PHONY: vcrevision
+
+package-monomac:
+	$(MD_LAUNCH_SETUP) mono --debug "build/bin/mdrun.exe" setup pack ../extras/MonoDevelop.MonoMac/build/MonoDevelop.MonoMac.dll
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
