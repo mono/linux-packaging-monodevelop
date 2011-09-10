@@ -5,14 +5,15 @@
        description = "Mono Soft Debugger Support"
        copyright   = "MIT X11"
        category = "Debugging"
-       version   = "2.6">
+       version   = "2.6.0">
 
 	<Dependencies>
-		<Addin id="MonoDevelop.Core" version="2.6"/>
-		<Addin id="MonoDevelop.Debugger" version="2.6"/>
+		<Addin id="MonoDevelop.Core" version="2.6.0"/>
+		<Addin id="MonoDevelop.Debugger" version="2.6.0"/>
 	</Dependencies>
 	
 	<Runtime>
+		<Import assembly="Mono.Debugging.Soft.dll" />
 		<Import assembly="Mono.Debugger.Soft.dll" />
 	</Runtime>
 	
