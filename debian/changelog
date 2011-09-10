@@ -1,3 +1,12 @@
+monodevelop (2.6+dfsg-1) experimental; urgency=low
+
+  * [7c7e1e1] Update watch file to point to Xamarin-hosted MonoDevelop.
+  * [c1bd155] Imported Upstream version 2.6+dfsg
+  * [9b44935] Disable Ubuntu Appmenu for monodevelop (thanks bratsche) (LP: #606470)
+  * [21473bc] Refresh system nunit patch.
+
+ -- Jo Shields <directhex@apebox.org>  Sat, 10 Sep 2011 14:24:16 +0100
+
 monodevelop (2.5.92+dfsg-2) experimental; urgency=low
 
   * [69b146e] Don't Suggest monodevelop-boo, since it seems EOL.
