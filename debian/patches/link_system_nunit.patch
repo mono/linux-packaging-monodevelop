@@ -1,7 +1,7 @@
-Index: monodevelop.git/src/addins/NUnit/Makefile.am
+Index: monodevelop/src/addins/NUnit/Makefile.am
 ===================================================================
---- monodevelop.git.orig/src/addins/NUnit/Makefile.am	2011-06-23 23:07:40.000000000 +0100
-+++ monodevelop.git/src/addins/NUnit/Makefile.am	2011-06-23 23:55:54.000000000 +0100
+--- monodevelop.orig/src/addins/NUnit/Makefile.am	2011-06-30 18:13:11.000000000 +0100
++++ monodevelop/src/addins/NUnit/Makefile.am	2011-09-10 14:21:52.570680937 +0100
 @@ -13,10 +13,7 @@
  	$(GLIB_SHARP_LIBS) \
  	$(GTK_SHARP_LIBS) \
@@ -45,10 +45,10 @@ Index: monodevelop.git/src/addins/NUnit/Makefile.am
 +EXTRA_DIST = $(FILES) $(RES)
  
  include $(top_srcdir)/Makefile.include
-Index: monodevelop.git/src/addins/NUnit/MonoDevelopNUnit.addin.xml
+Index: monodevelop/src/addins/NUnit/MonoDevelopNUnit.addin.xml
 ===================================================================
---- monodevelop.git.orig/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-06-23 23:13:22.000000000 +0100
-+++ monodevelop.git/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-06-24 00:01:29.000000000 +0100
+--- monodevelop.orig/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-09-10 14:18:37.310305166 +0100
++++ monodevelop/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-09-10 14:22:56.260803504 +0100
 @@ -10,10 +10,6 @@
  
  	<Runtime>
@@ -65,7 +65,7 @@ Index: monodevelop.git/src/addins/NUnit/MonoDevelopNUnit.addin.xml
  	<!-- Extensions -->
  
 -	<Extension path="/MonoDevelop/Core/SupportPackages">
--		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.6">
+-		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.5.93">
 -			<Package name="nunit" version="2.4" clrVersion="Default">
 -				<Assembly file="nunit.core.dll" />
 -				<Assembly file="nunit.core.interfaces.dll" />
@@ -77,10 +77,10 @@ Index: monodevelop.git/src/addins/NUnit/MonoDevelopNUnit.addin.xml
  	<Extension path = "/MonoDevelop/Ide/Pads">
  		<SolutionPad id = "MonoDevelop.NUnit.TestPad" defaultLayout="*" defaultPlacement = "Left" defaultStatus="AutoHide" _label = "Unit Tests" icon = "nunit-pad-icon" class = "MonoDevelop.NUnit.TestPad">
  			<PadOption id = "ShowTestTime" _label = "Show Test Time" defaultValue = "False" />
-Index: monodevelop.git/src/addins/NUnit/NUnitRunner/Makefile.am
+Index: monodevelop/src/addins/NUnit/NUnitRunner/Makefile.am
 ===================================================================
---- monodevelop.git.orig/src/addins/NUnit/NUnitRunner/Makefile.am	2011-06-23 23:07:40.000000000 +0100
-+++ monodevelop.git/src/addins/NUnit/NUnitRunner/Makefile.am	2011-06-23 23:55:54.000000000 +0100
+--- monodevelop.orig/src/addins/NUnit/NUnitRunner/Makefile.am	2011-06-30 18:13:11.000000000 +0100
++++ monodevelop/src/addins/NUnit/NUnitRunner/Makefile.am	2011-09-10 14:21:52.570680937 +0100
 @@ -1,9 +1,7 @@
  FILES = NUnitTestRunner.cs
  
