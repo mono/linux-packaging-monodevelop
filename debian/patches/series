@@ -16,4 +16,3 @@ use_csc.patch
 #remove_support_for_soft_debugger.patch
 remove_support_for_moonlight.patch
 no_appmenu
-remove-libobjc-dylib-dep.patch
