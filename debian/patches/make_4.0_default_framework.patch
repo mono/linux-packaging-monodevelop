@@ -1,7 +1,7 @@
-Index: monodevelop.git/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs
+Index: monodevelop/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs
 ===================================================================
---- monodevelop.git.orig/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs	2011-06-26 16:43:02.958100798 +0100
-+++ monodevelop.git/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs	2011-06-26 16:43:15.728141574 +0100
+--- monodevelop.orig/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs	2011-11-08 00:33:54.000000000 +0000
++++ monodevelop/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs	2011-11-08 00:43:17.000000000 +0000
 @@ -50,9 +50,9 @@
  		
  		//NOTE: default toolsversion should match the default format.
@@ -15,94 +15,10 @@ Index: monodevelop.git/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MS
  		internal const string DefaultToolsVersion = REFERENCED_MSBUILD_TOOLS;
  		
  		static DataContext dataContext;
-Index: monodevelop.git/src/core/MonoDevelop.Core/MonoDevelop.Projects/ProjectService.cs
+Index: monodevelop/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config
 ===================================================================
---- monodevelop.git.orig/src/core/MonoDevelop.Core/MonoDevelop.Projects/ProjectService.cs	2011-06-26 16:42:39.548030172 +0100
-+++ monodevelop.git/src/core/MonoDevelop.Core/MonoDevelop.Projects/ProjectService.cs	2011-06-26 16:42:51.628065930 +0100
-@@ -61,7 +61,7 @@
- 		TargetFramework defaultTargetFramework;
- 		
- 		string defaultPlatformTarget = "x86";
--		public static readonly TargetFrameworkMoniker DefaultTargetFrameworkId = TargetFrameworkMoniker.NET_3_5;
-+		public static readonly TargetFrameworkMoniker DefaultTargetFrameworkId = TargetFrameworkMoniker.NET_4_0;
- 		
- 		public const string BuildTarget = "Build";
- 		public const string CleanTarget = "Clean";
-@@ -379,7 +379,7 @@
- 					ExcludeEntries (obj, includedChildIds);
- 					if (format != null)
- 						obj.ConvertToFormat (format, true);
--					obj.Save (monitor);
-+					obj.Save (monitor);
- 					List<FilePath> newFiles = obj.GetItemFiles (true);
- 					
- 					foreach (FilePath f in newFiles) {
-@@ -392,12 +392,12 @@
- 						oldFiles.Remove (f);
- 					}
- 	
--					// Remove old files
-+					// Remove old files
- 					foreach (FilePath file in oldFiles) {
- 						if (File.Exists (file)) {
- 							File.Delete (file);
- 						
--							// Exclude empty directories
-+							// Exclude empty directories
- 							FilePath dir = file.ParentDirectory;
- 							if (Directory.GetFiles (dir).Length == 0 && Directory.GetDirectories (dir).Length == 0) {
- 								try {
-@@ -437,17 +437,17 @@
- 						item.ParentFolder.Items.Remove (item);
- 				}
- 			}
--		}
--
-+		}
-+
- 		bool CopyFiles (IProgressMonitor monitor, IWorkspaceFileObject obj, IEnumerable<FilePath> files, FilePath targetBasePath, bool ignoreExternalFiles)
--		{
--			FilePath baseDir = obj.BaseDirectory.FullPath;
-+		{
-+			FilePath baseDir = obj.BaseDirectory.FullPath;
- 			foreach (FilePath file in files) {
- 
- 				if (!File.Exists (file)) {
- 					monitor.ReportWarning (GettextCatalog.GetString ("File '{0}' not found.", file));
- 					continue;
--				}
-+				}
- 				FilePath fname = file.FullPath;
- 				
- 				// Can't export files from outside the root solution directory
-@@ -459,9 +459,9 @@
- 					else
- 						monitor.ReportError ("The project '" + obj.Name + "' is referencing the file '" + Path.GetFileName (file) + "' which is located outside the project directory.", null);
- 					return false;
--				}
--
--				FilePath rpath = fname.ToRelative (baseDir);
-+				}
-+
-+				FilePath rpath = fname.ToRelative (baseDir);
- 				rpath = rpath.ToAbsolute (targetBasePath);
- 				
- 				if (!Directory.Exists (rpath.ParentDirectory))
-@@ -650,8 +650,8 @@
- 		public override void Save (IProgressMonitor monitor, WorkspaceItem entry)
- 		{
- 			entry.OnSave (monitor);
--		}
--
-+		}
-+
- 		public override List<FilePath> GetItemFiles (SolutionEntityItem entry, bool includeReferencedFiles)
- 		{
- 			return entry.OnGetItemFiles (includeReferencedFiles);
-Index: monodevelop.git/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config
-===================================================================
---- monodevelop.git.orig/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config	2011-06-26 16:43:24.508170476 +0100
-+++ monodevelop.git/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config	2011-06-26 16:43:33.558200977 +0100
+--- monodevelop.orig/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config	2011-11-08 00:32:44.000000000 +0000
++++ monodevelop/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config	2011-11-08 00:43:17.000000000 +0000
 @@ -5,11 +5,11 @@
  		<assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
  			<dependentAssembly>
