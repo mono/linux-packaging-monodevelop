@@ -1,3 +1,23 @@
+monodevelop (2.8.2+dfsg-1) experimental; urgency=low
+
+  [ Gleb Golubitsky ]
+  * [0c50f48] Removing dependency to non-present lib libobjc.dylib
+
+  [ Jo Shields ]
+  * [6612c21] Update debian/watch to use bz2, not gz, for upstream tarballs.
+  * [d780bf9] Imported Upstream version 2.8.2+dfsg
+  * [2058cc2] Refresh debian/patches/make_4.0_default_framework.patch.
+  * [b27507a] Refresh debian/patches/link_system_nunit.patch.
+  * [225c2c1] Refreshed 
+              debian/patches/update_templates_for_gtk-sharp_2.12.patch.
+  * [dbbfc74] Refreshed debian/patches/use_csc.patch
+  * [6d74297] Refresh debian/patches/remove_support_for_moonlight.patch.
+  * [dfdeb30] Don't apply debian/patches/remove-libobjc-dylib-dep.patch 
+              after all - use --exclude-moduleref to skip this Mac-only 
+              code.
+
+ -- Jo Shields <directhex@apebox.org>  Tue, 08 Nov 2011 17:47:50 +0000
+
 monodevelop (2.6+dfsg-1) experimental; urgency=low
 
   * [7c7e1e1] Update watch file to point to Xamarin-hosted MonoDevelop.
