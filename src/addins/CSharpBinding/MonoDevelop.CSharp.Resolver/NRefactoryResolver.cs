@@ -45,10 +45,10 @@ using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide.CodeTemplates;
 using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Refactoring;
-using ICSharpCode.NRefactory.Visitors;
-using ICSharpCode.NRefactory.Parser;
-using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory;
+using ICSharpCode.OldNRefactory.Visitors;
+using ICSharpCode.OldNRefactory.Parser;
+using ICSharpCode.OldNRefactory.Ast;
+using ICSharpCode.OldNRefactory;
 using MonoDevelop.CSharp.Parser;
 using MonoDevelop.CSharp.Completion;
 using Mono.TextEditor;
@@ -93,7 +93,7 @@ namespace MonoDevelop.CSharp.Resolver
 				return unit;
 			}
 		}
-
+		
 		public static IType GetTypeAtCursor (IType outerType, string fileName, DomLocation position)
 		{
 			foreach (IType type in outerType.InnerTypes) {
@@ -144,8 +144,8 @@ namespace MonoDevelop.CSharp.Resolver
 			return dom.SearchType (Unit, CallingType, resolvePosition, type);
 		}
 		
-		ICSharpCode.NRefactory.Ast.CompilationUnit memberCompilationUnit;
-		public ICSharpCode.NRefactory.Ast.CompilationUnit MemberCompilationUnit {
+		ICSharpCode.OldNRefactory.Ast.CompilationUnit memberCompilationUnit;
+		public ICSharpCode.OldNRefactory.Ast.CompilationUnit MemberCompilationUnit {
 			get {
 				return this.memberCompilationUnit;
 			}
@@ -189,11 +189,12 @@ namespace MonoDevelop.CSharp.Resolver
 					callingMember = GetMemberAt (callingType, fileName, posAbove);
 				}
 			}
-			if (memberCompilationUnit != null)
+			if (memberCompilationUnit != null) {
 				return;
-			if (callingMember != null && !setupLookupTableVisitor ) {
+			}
+			if (callingMember != null && !setupLookupTableVisitor) {
 				string wrapper = CreateWrapperClassForMember (callingMember, fileName, editor);
-				using (ICSharpCode.NRefactory.IParser parser = ICSharpCode.NRefactory.ParserFactory.CreateParser (lang, new StringReader (wrapper))) {
+				using (ICSharpCode.OldNRefactory.IParser parser = ICSharpCode.OldNRefactory.ParserFactory.CreateParser (lang, new StringReader (wrapper))) {
 					parser.Parse ();
 					memberCompilationUnit = parser.CompilationUnit;
 					lookupTableVisitor.VisitCompilationUnit (parser.CompilationUnit, null);
@@ -208,7 +209,7 @@ namespace MonoDevelop.CSharp.Resolver
 				sb.Append (editor.EolMarker);
 				sb.Append (editor.GetLineText (editor.Caret.Line));
 				sb.Append ("}");
-				using (ICSharpCode.NRefactory.IParser parser = ICSharpCode.NRefactory.ParserFactory.CreateParser (lang, new StringReader (sb.ToString ()))) {
+				using (ICSharpCode.OldNRefactory.IParser parser = ICSharpCode.OldNRefactory.ParserFactory.CreateParser (lang, new StringReader (sb.ToString ()))) {
 					parser.Parse ();
 					lookupTableVisitor.VisitCompilationUnit (parser.CompilationUnit, null);
 					memberCompilationUnit = parser.CompilationUnit;
@@ -220,7 +221,7 @@ namespace MonoDevelop.CSharp.Resolver
 		
 		bool setupLookupTableVisitor = false;
 		int lookupVariableLine = 0;
-		internal void SetupParsedCompilationUnit (ICSharpCode.NRefactory.Ast.CompilationUnit unit)
+		internal void SetupParsedCompilationUnit (ICSharpCode.OldNRefactory.Ast.CompilationUnit unit)
 		{
 			lookupVariableLine = 0; // all compilation unit lines are 1 based
 			memberCompilationUnit = unit;
@@ -266,6 +267,8 @@ namespace MonoDevelop.CSharp.Resolver
 		
 		void AddInnerTypes (ExpressionContext context, CSharpTextEditorCompletion.CompletionDataCollector col)
 		{
+			if (CallingType == null)
+				return;
 			bool includeProtected = DomType.IncludeProtected (dom, CallingType, CallingMember != null ? CallingMember.DeclaringType : CallingType);
 			foreach (IType type in dom.GetInheritanceTree (CallingType)) {
 				foreach (IMember member in type.Members) {
@@ -395,7 +398,7 @@ namespace MonoDevelop.CSharp.Resolver
 			string expr = expressionResult.Expression.Trim ();
 			if (!expr.EndsWith (";"))
 				expr += ";";
-			using (ICSharpCode.NRefactory.IParser parser = ICSharpCode.NRefactory.ParserFactory.CreateParser (this.lang, new StringReader (expr))) {
+			using (ICSharpCode.OldNRefactory.IParser parser = ICSharpCode.OldNRefactory.ParserFactory.CreateParser (this.lang, new StringReader (expr))) {
 				Expression result = parser.ParseExpression();
 				if (result is BinaryOperatorExpression) {
 					TypeReference typeRef = ParseTypeReference (expressionResult);
@@ -412,7 +415,7 @@ namespace MonoDevelop.CSharp.Resolver
 			if (expressionResult == null || String.IsNullOrEmpty (expressionResult.Expression))
 				return null;
 			string expr = expressionResult.Expression.Trim ();
-			using (ICSharpCode.NRefactory.IParser parser = ICSharpCode.NRefactory.ParserFactory.CreateParser (SupportedLanguage.CSharp, new StringReader ("typeof(" + expr + ");"))) {
+			using (ICSharpCode.OldNRefactory.IParser parser = ICSharpCode.OldNRefactory.ParserFactory.CreateParser (SupportedLanguage.CSharp, new StringReader ("typeof(" + expr + ");"))) {
 				TypeOfExpression typeOfExpression = parser.ParseExpression () as TypeOfExpression;
 				if (typeOfExpression != null)
 					return typeOfExpression.TypeReference;
@@ -463,13 +466,17 @@ namespace MonoDevelop.CSharp.Resolver
 			}
 		}
 		
+		public ResolveResult Resolve (string expression, DomLocation resolvePosition)
+		{
+			return Resolve (new ExpressionResult (expression), resolvePosition);
+		}
+
 		public ResolveResult Resolve (ExpressionResult expressionResult, DomLocation resolvePosition)
 		{
 			this.SetupResolver (resolvePosition);
 			ResolveVisitor visitor = new ResolveVisitor (this);
 			ResolveResult result;
-//			System.Console.WriteLine("expressionResult:" + expressionResult);
-
+			
 			if (unit != null && expressionResult.ExpressionContext == ExpressionContext.AttributeArguments) {
 				string attributeName = NewCSharpExpressionFinder.FindAttributeName (editor, unit, unit.FileName);
 				if (attributeName != null) {
@@ -519,10 +526,50 @@ namespace MonoDevelop.CSharp.Resolver
 			return result;
 		}
 		
-		public static IReturnType ConvertTypeReference (TypeReference typeRef)
+		public static DomReturnType ConvertTypeReference (TypeReference typeRef)
 		{
-			return typeRef.ConvertToReturnType ();
+			if (typeRef == null)
+				return null;
+			DomReturnType result;
+			if (typeRef is InnerClassTypeReference) {
+				InnerClassTypeReference innerTypeRef = (InnerClassTypeReference)typeRef;
+				result = ConvertTypeReference (innerTypeRef.BaseType);
+				result.Parts.Add (new ReturnTypePart (typeRef.Type));
+			} else {
+				result = new DomReturnType (typeRef.Type);
+			}
+			foreach (TypeReference genericArgument in typeRef.GenericTypes) {
+				result.AddTypeParameter (ConvertTypeReference (genericArgument));
+			}
+			result.PointerNestingLevel = typeRef.PointerNestingLevel;
+			if (typeRef.IsArrayType) {
+				result.ArrayDimensions = typeRef.RankSpecifier.Length;
+				for (int i = 0; i < typeRef.RankSpecifier.Length; i++) {
+					result.SetDimension (i, typeRef.RankSpecifier[i]);
+				}
+			}
+			return result;
 		}
+		
+		public static TypeReference ConvertToTypeReference (MonoDevelop.Projects.Dom.IReturnType returnType)
+		{
+			List<TypeReference> genericTypes = new List<TypeReference> ();
+			foreach (MonoDevelop.Projects.Dom.IReturnType genericType in returnType.GenericArguments) {
+				genericTypes.Add (ConvertToTypeReference (genericType));
+			}
+			TypeReference result = new TypeReference (returnType.FullName, genericTypes);
+			result.IsKeyword = true;
+			result.PointerNestingLevel = returnType.PointerNestingLevel;
+			if (returnType.ArrayDimensions > 0) {
+				int[] rankSpecfier = new int[returnType.ArrayDimensions];
+				for (int i = 0; i < returnType.ArrayDimensions; i++) {
+					rankSpecfier[i] = returnType.GetDimension (i);
+				}
+				result.RankSpecifier = rankSpecfier;
+			}
+			return result;
+		}
+		
 		
 		public IReturnType ResolveType (IReturnType type)
 		{
@@ -766,18 +813,20 @@ namespace MonoDevelop.CSharp.Resolver
 						
 						QueryExpressionGroupClause grouBy = query.SelectOrGroupClause as QueryExpressionGroupClause;
 						DomLocation old = resolvePosition;
-						try {
-							resolvePosition = new DomLocation (lookupVariableLine + grouBy.Projection.StartLocation.Line, 
-							                                   grouBy.Projection.StartLocation.Column);
-							ResolveResult initializerResolve = visitor.Resolve (grouBy.Projection);
-							ResolveResult groupByResolve = visitor.Resolve (grouBy.GroupBy);
-							DomReturnType resolved = new DomReturnType (dom.GetType ("System.Linq.IGrouping", new IReturnType [] { 
-								DomType.GetComponentType (dom, initializerResolve.ResolvedType), groupByResolve.ResolvedType}));
-							varTypeUnresolved = varType = resolved;
-						} finally {
-							resolvePosition = old;
-						}
 						
+						if (grouBy != null && grouBy.Projection != null) {
+							try {
+								resolvePosition = new DomLocation (lookupVariableLine + grouBy.Projection.StartLocation.Line, 
+								                                   grouBy.Projection.StartLocation.Column);
+								ResolveResult initializerResolve = visitor.Resolve (grouBy.Projection);
+								ResolveResult groupByResolve = visitor.Resolve (grouBy.GroupBy);
+								DomReturnType resolved = new DomReturnType (dom.GetType ("System.Linq.IGrouping", new IReturnType [] { 
+									DomType.GetComponentType (dom, initializerResolve.ResolvedType), groupByResolve.ResolvedType}));
+								varTypeUnresolved = varType = resolved;
+							} finally {
+								resolvePosition = old;
+							}
+						}
 					} else if ((var.TypeRef == null || var.TypeRef.Type == "var" || var.TypeRef.IsNull)) {
 						if (var.ParentLambdaExpression != null) {
 							ResolveResult lambdaResolve = ResolveLambda (visitor, var.ParentLambdaExpression);
@@ -863,18 +912,18 @@ namespace MonoDevelop.CSharp.Resolver
 				foreach (IType type in dom.GetInheritanceTree (callingType)) {
 					members.AddRange (type.SearchMember (identifier, true));
 				}
-				bool includeProtected = true;
+//				bool includeProtected = true;
 				// filter members
-				if (this.CallingMember != null) {
-					for (int i = 0; i < members.Count; i++) {
-						if (this.CallingMember.IsStatic && !members [i].IsStatic || !members [i].IsAccessibleFrom (dom, callingType, this.CallingMember, includeProtected)) {
-							members.RemoveAt (i);
-							i--;
-							continue;
-						}
-					}
-				}
-				
+// be more gentle when resolving non accessible members - see: Bug 693949 - Create method uses the wrong type for param
+//				if (this.CallingMember != null) {
+//					for (int i = 0; i < members.Count; i++) {
+//						if (this.CallingMember.IsStatic && !members [i].IsStatic || !members [i].IsAccessibleFrom (dom, callingType, this.CallingMember, includeProtected)) {
+//							members.RemoveAt (i);
+//							i--;
+//							continue;
+//						}
+//					}
+//				}
 				if (members.Count > 0) {
 					if (members [0] is IMethod) {
 						result = new MethodResolveResult (members);
@@ -962,18 +1011,6 @@ namespace MonoDevelop.CSharp.Resolver
 			return result.ToString ();
 		}
 	}
-	static class HelperMethods
-	{
-		public static void SetText (this CompletionData data, string text)
-		{
-			if (data is CompletionData) {
-				((CompletionData)data).CompletionText = text;
-			} else if (data is MonoDevelop.Ide.CodeCompletion.MemberCompletionData) {
-				((MonoDevelop.Ide.CodeCompletion.MemberCompletionData)data).CompletionText = text;
-			} else {
-				System.Console.WriteLine("Unknown completion data:" + data);
-			}
-		}
-	}
+
 	
 }

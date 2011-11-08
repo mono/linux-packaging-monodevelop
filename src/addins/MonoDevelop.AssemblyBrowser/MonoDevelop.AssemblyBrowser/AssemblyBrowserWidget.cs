@@ -41,6 +41,8 @@ using MonoDevelop.Ide.Commands;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
+using System.Linq;
+using Mono.TextEditor;
 
 namespace MonoDevelop.AssemblyBrowser
 {
@@ -114,7 +116,39 @@ namespace MonoDevelop.AssemblyBrowser
 			
 			PropertyService.PropertyChanged += HandlePropertyChanged;
 			this.inspectEditor.Document.ReadOnly = true;
-			this.inspectEditor.Document.SyntaxMode = new Mono.TextEditor.Highlighting.MarkupSyntaxMode ();
+//			this.inspectEditor.Document.SyntaxMode = new Mono.TextEditor.Highlighting.MarkupSyntaxMode ();
+			this.inspectEditor.TextViewMargin.GetLink = delegate(Mono.TextEditor.MarginMouseEventArgs arg) {
+				var loc = inspectEditor.PointToLocation (arg.X, arg.Y);
+				int offset = inspectEditor.LocationToOffset (loc);
+				var referencedSegment = ReferencedSegments != null ? ReferencedSegments.FirstOrDefault (seg => seg.Contains (offset)) : null;
+				if (referencedSegment == null)
+					return null;
+				if (referencedSegment.Reference is TypeDefinition)
+					return new DomCecilType ((TypeDefinition)referencedSegment.Reference).HelpUrl;
+				
+				if (referencedSegment.Reference is MethodDefinition)
+					return new DomCecilMethod ((MethodDefinition)referencedSegment.Reference).HelpUrl;
+				
+				if (referencedSegment.Reference is PropertyDefinition)
+					return new DomCecilProperty ((PropertyDefinition)referencedSegment.Reference).HelpUrl;
+				
+				if (referencedSegment.Reference is FieldDefinition)
+					return new DomCecilField ((FieldDefinition)referencedSegment.Reference).HelpUrl;
+				
+				if (referencedSegment.Reference is EventDefinition)
+					return new DomCecilEvent ((EventDefinition)referencedSegment.Reference).HelpUrl;
+				
+				if (referencedSegment.Reference is FieldDefinition)
+					return new DomCecilField ((FieldDefinition)referencedSegment.Reference).HelpUrl;
+				
+				if (referencedSegment.Reference is TypeReference) {
+					var returnType = DomCecilMethod.GetReturnType ((TypeReference)referencedSegment.Reference);
+					if (returnType.GenericArguments.Count == 0)
+						return "T:" + returnType.FullName;
+					return "T:" + returnType.FullName + "`" + returnType.GenericArguments.Count;
+				}
+				return referencedSegment.Reference.ToString ();
+			};
 			this.inspectEditor.LinkRequest += InspectEditorhandleLinkRequest;
 			
 //			this.inspectLabel.ModifyBg (Gtk.StateType.Normal, new Gdk.Color (255, 255, 250));
@@ -186,7 +220,7 @@ namespace MonoDevelop.AssemblyBrowser
 				                               typeof (IMember)
 			                                  );
 			CreateColumns ();
-			SetInpectWidget ();
+			SetInspectWidget ();
 //			this.searchEntry.Changed += SearchEntryhandleChanged;
 			this.searchTreeview.RowActivated += SearchTreeviewhandleRowActivated;
 			this.searchentry1.ShowAll ();
@@ -251,7 +285,7 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			this.notebook1.Page = 1;
 			PropertyService.Set ("AssemblyBrowser.InspectLanguage", this.languageCombobox.Active);
-			SetInpectWidget ();
+			SetInspectWidget ();
 			FillInspectLabel ();
 		}
 
@@ -318,32 +352,35 @@ namespace MonoDevelop.AssemblyBrowser
 		
 		ITreeNavigator SearchMember (ITreeNavigator nav, string helpUrl)
 		{
-			do {
-				if (IsMatch (nav, helpUrl))
-					return nav;
-				if (!SkipChildren (nav, helpUrl) && nav.HasChildren ()) {
-					DispatchService.RunPendingEvents ();
-					nav.MoveToFirstChild ();
-					ITreeNavigator result = SearchMember (nav, helpUrl);
-					if (result != null)
-						return result;
-					
-					if (!nav.MoveToParent ())
-						return null;
-					try {
-						if (nav.DataItem is DomCecilType && nav.Options["PublicApiOnly"]) {
-							nav.Options["PublicApiOnly"] = false;
-							nav.MoveToFirstChild ();
-							result = SearchMember (nav, helpUrl);
-							if (result != null)
-								return result;
-							nav.MoveToParent ();
+			try {
+				do {
+					if (IsMatch (nav, helpUrl))
+						return nav;
+					if (!SkipChildren (nav, helpUrl) && nav.HasChildren ()) {
+						DispatchService.RunPendingEvents ();
+						nav.MoveToFirstChild ();
+						ITreeNavigator result = SearchMember (nav, helpUrl);
+						if (result != null)
+							return result;
+						
+						if (!nav.MoveToParent ())
+							return null;
+						try {
+							if (nav.DataItem is DomCecilType && nav.Options["PublicApiOnly"]) {
+								nav.Options["PublicApiOnly"] = false;
+								nav.MoveToFirstChild ();
+								result = SearchMember (nav, helpUrl);
+								if (result != null)
+									return result;
+								nav.MoveToParent ();
+							}
+						} catch (Exception) {
+							return null;
 						}
-					} catch (Exception) {
-						return null;
 					}
-				}
-			} while (nav.MoveNext());
+				} while (nav.MoveNext());
+			} catch (Exception) {
+			}
 			return null;
 		}
 		
@@ -502,9 +539,9 @@ namespace MonoDevelop.AssemblyBrowser
 								DomCecilMethod domMethod = method as DomCecilMethod;
 								if (domMethod == null)
 									continue;
-								if (DomMethodNodeBuilder.Disassemble (domMethod, false).ToUpper ().Contains (pattern)) {
-									members.Add (method);
-								}
+//								if (DomMethodNodeBuilder.Disassemble (rd => rd.DisassembleMethod (domMethod.MethodDefinition)).ToUpper ().Contains (pattern)) {
+//									members.Add (method);
+//								}
 							}
 
 						}
@@ -534,9 +571,9 @@ namespace MonoDevelop.AssemblyBrowser
 								DomCecilMethod domMethod = method as DomCecilMethod;
 								if (domMethod == null)
 									continue;
-								if (DomMethodNodeBuilder.Decompile (domMethod, false).ToUpper ().Contains (pattern)) {
+/*								if (DomMethodNodeBuilder.Decompile (domMethod, false).ToUpper ().Contains (pattern)) {
 									members.Add (method);
-								}
+								}*/
 							}
 						}
 					}
@@ -785,7 +822,7 @@ namespace MonoDevelop.AssemblyBrowser
 			return result.ToString ();
 		}
 		
-		void SetInpectWidget ()
+		void SetInspectWidget ()
 		{
 			if (this.scrolledwindow3.Child != null)
 				this.scrolledwindow3.Remove (this.scrolledwindow3.Child);
@@ -802,6 +839,32 @@ namespace MonoDevelop.AssemblyBrowser
 			this.scrolledwindow3.ShowAll ();
 		}
 		
+		List<ReferenceSegment> ReferencedSegments = new List<ReferenceSegment>();
+		List<UnderlineMarker> underlineMarkers = new List<UnderlineMarker> ();
+		
+		public void ClearReferenceSegment ()
+		{
+			ReferencedSegments = null;
+			underlineMarkers.ForEach (m => inspectEditor.Document.RemoveMarker (m));
+			underlineMarkers.Clear ();
+		}
+		
+		public void SetReferencedSegments (List<ReferenceSegment> refs)
+		{
+			ReferencedSegments = refs;
+			if (ReferencedSegments == null)
+				return;
+			foreach (var seg in refs) {
+				LineSegment line = inspectEditor.GetLineByOffset (seg.Offset);
+				if (line == null)
+					continue;
+				var marker = new UnderlineMarker ("blue", 1 + seg.Offset - line.Offset, 1 + seg.EndOffset - line.Offset);
+				marker.Wave = false;
+				underlineMarkers.Add (marker);
+				inspectEditor.Document.AddMarker (line, marker);
+			}
+		}
+
 		void FillInspectLabel ()
 		{
 			ITreeNavigator nav = TreeView.GetSelectedNode ();
@@ -813,17 +876,26 @@ namespace MonoDevelop.AssemblyBrowser
 				return;
 			}
 			
+			ClearReferenceSegment ();
+			inspectEditor.Document.ClearFoldSegments ();
 			switch (this.languageCombobox.Active) {
 			case 0:
+				inspectEditor.Options.ShowFoldMargin = false;
+				this.inspectEditor.Document.MimeType = "text/x-csharp";
 				this.documentationPanel.Markup = builder.GetDocumentationMarkup (nav);
 				break;
 			case 1:
-				this.inspectEditor.Document.Text = builder.GetDisassembly (nav);
+				inspectEditor.Options.ShowFoldMargin = true;
+				this.inspectEditor.Document.MimeType = "text/x-ilasm";
+				SetReferencedSegments (builder.Disassemble (inspectEditor.GetTextEditorData (), nav));
 				break;
 			case 2:
-				this.inspectEditor.Document.Text = builder.GetDecompiledCode (nav);
+				inspectEditor.Options.ShowFoldMargin = true;
+				this.inspectEditor.Document.MimeType = "text/x-csharp";
+				SetReferencedSegments (builder.Decompile (inspectEditor.GetTextEditorData (),  nav));
 				break;
 			default:
+				inspectEditor.Options.ShowFoldMargin = false;
 				this.inspectEditor.Document.Text = "Invalid combobox value: " + this.languageCombobox.Active;
 				break;
 			}
@@ -838,16 +910,19 @@ namespace MonoDevelop.AssemblyBrowser
 				IMember member = nav.DataItem as IMember;
 				string documentation = GettextCatalog.GetString ("No documentation available.");
 				if (member != null) {
-					XmlNode node = member.GetMonodocDocumentation ();
-					if (node != null) {
-						documentation = TransformDocumentation (node) ?? documentation;
-						/*
-						StringWriter writer = new StringWriter ();
-						XmlTextWriter w = new XmlTextWriter (writer);
-						node.WriteTo (w);
-						System.Console.WriteLine ("---------------------------");
-						System.Console.WriteLine (writer);*/
-						
+					try {
+						XmlNode node = member.GetMonodocDocumentation ();
+						if (node != null) {
+							documentation = TransformDocumentation (node) ?? documentation;
+							/*
+							StringWriter writer = new StringWriter ();
+							XmlTextWriter w = new XmlTextWriter (writer);
+							node.WriteTo (w);
+							System.Console.WriteLine ("---------------------------");
+							System.Console.WriteLine (writer);*/
+							
+						}
+					} catch (Exception) {
 					}
 				}
 				this.documentationLabel.Markup = documentation;
@@ -879,10 +954,12 @@ namespace MonoDevelop.AssemblyBrowser
 			oldSize2 = size;
 			this.hpaned1.Position = Math.Min (350, this.Allocation.Width * 2 / 3);
 		}
-			
+		
 		public void Open (string url)
 		{
 			ITreeNavigator nav = SearchMember (url);
+			if (definitions == null) // we've been disposed
+				return;
 			if (nav == null) {
 				foreach (DomCecilCompilationUnit definition in definitions.ToArray ()) {
 					foreach (AssemblyNameReference assemblyNameReference in definition.AssemblyDefinition.MainModule.AssemblyReferences) {

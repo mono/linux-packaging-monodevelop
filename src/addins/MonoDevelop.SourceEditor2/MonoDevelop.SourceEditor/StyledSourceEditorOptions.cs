@@ -193,7 +193,7 @@ namespace MonoDevelop.SourceEditor
 			set { throw new NotSupportedException (); }
 		}
 
-		public Mono.TextEditor.Highlighting.Style GetColorStyle (Gtk.Style widgetStyle)
+		public Mono.TextEditor.Highlighting.ColorSheme GetColorStyle (Gtk.Style widgetStyle)
 		{
 			return DefaultSourceEditorOptions.Instance.GetColorStyle (widgetStyle);
 		}
@@ -250,6 +250,11 @@ namespace MonoDevelop.SourceEditor
 		
 		public bool EnableAnimations {
 			get { return DefaultSourceEditorOptions.Instance.EnableAnimations; }
+			set { throw new NotSupportedException (); }
+		}
+		
+		public bool UseAntiAliasing {
+			get { return DefaultSourceEditorOptions.Instance.UseAntiAliasing; }
 			set { throw new NotSupportedException (); }
 		}
 

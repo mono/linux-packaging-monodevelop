@@ -88,7 +88,7 @@ namespace CBinding.Parser
 					try {
 						var output = new StringWriter ();
 						Runtime.ProcessService.StartProcess (CTagsManager.CTagsExecutable, "--version", null, output, null, null).WaitForExit ();
-						if (PropertyService.IsMac && !output.ToString ().StartsWith ("Exuberant", StringComparison.Ordinal)) {
+						if (Platform.IsMac && !output.ToString ().StartsWith ("Exuberant", StringComparison.Ordinal)) {
 							System.Console.WriteLine ("Fallback to OSX ctags");
 							ctags = new BsdCTagsManager ();
 						} else {
@@ -194,10 +194,12 @@ namespace CBinding.Parser
 				fullpath = findFileInPath (filename, project.BaseDirectory);
 				if (string.Empty != fullpath) return fullpath;
 
-				// Check project's additional configuration includes
-				foreach (string p in conf.Includes) {
-					fullpath = findFileInPath (filename, p);
-					if (string.Empty != fullpath) return fullpath;
+				if (conf != null) {
+					// Check project's additional configuration includes
+					foreach (string p in conf.Includes) {
+						fullpath = findFileInPath (filename, p);
+						if (string.Empty != fullpath) return fullpath;
+					}
 				}
 			}
 			

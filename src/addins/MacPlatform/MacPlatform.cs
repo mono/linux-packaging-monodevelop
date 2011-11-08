@@ -1,10 +1,11 @@
 //
-// MacPlatform.cs
+// MacPlatformService.cs
 //
 // Author:
 //   Geoff Norton  <gnorton@novell.com>
+//   Michael Hutchinson <m.j.hutchinson@gmail.com>
 //
-// Copyright (C) 2007 Novell, Inc (http://www.novell.com)
+// Copyright (C) 2007-2011 Novell, Inc (http://www.novell.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -27,6 +28,7 @@
 //
 
 using System;
+using System.Drawing;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -46,9 +48,9 @@ using MonoDevelop.Ide.Commands;
 using MonoDevelop.Ide.Desktop;
 using MonoDevelop.MacInterop;
 
-namespace MonoDevelop.Platform.Mac
+namespace MonoDevelop.MacIntegration
 {
-	class MacPlatform : PlatformService
+	class MacPlatformService : PlatformService
 	{
 		static TimerCounter timer = InstrumentationService.CreateTimerCounter ("Mac Platform Initialization", "Platform Service");
 		static TimerCounter mimeTimer = InstrumentationService.CreateTimerCounter ("Mac Mime Database", "Platform Service");
@@ -56,20 +58,25 @@ namespace MonoDevelop.Platform.Mac
 		static bool setupFail, initedApp, initedGlobal;
 		
 		static Dictionary<string, string> mimemap;
+		
+		//this is a BCD value of the form "xxyz", where x = major, y = minor, z = bugfix
+		//eg. 0x1071 = 10.7.1
+		static int systemVersion;
 
-		static MacPlatform ()
+		static MacPlatformService ()
 		{
 			timer.BeginTiming ();
 			
+			systemVersion = Carbon.Gestalt ("sysv");
+			
 			LoadMimeMapAsync ();
 			
-			CheckGtkVersion (2, 17, 9);
+			CheckGtkVersion (2, 24, 0);
 			
 			//make sure the menu app name is correct even when running Mono 2.6 preview, or not running from the .app
-			Carbon.SetProcessName ("MonoDevelop");
+			Carbon.SetProcessName (BrandingService.ApplicationName);
 			
-			timer.Trace ("Initializing NSApplication");
-			MonoMac.AppKit.NSApplication.Init ();
+			MonoDevelop.MacInterop.Cocoa.InitMonoMac ();
 			
 			timer.Trace ("Installing App Event Handlers");
 			GlobalSetup ();
@@ -77,7 +84,7 @@ namespace MonoDevelop.Platform.Mac
 			timer.EndTiming ();
 		}
 		
-		//Mac GTK+ is unstable, even between micro releases
+		//Mac GTK+ behaviour isn't completely stable even between micro releases
 		static void CheckGtkVersion (uint major, uint minor, uint micro)
 		{
 			string url = "http://www.go-mono.com/mono-downloads/download.html";
@@ -179,10 +186,10 @@ namespace MonoDevelop.Platform.Mac
 			try {
 				InitApp (commandManager);
 				CommandEntrySet ces = commandManager.CreateCommandEntrySet (commandMenuAddinPath);
-				OSXMenu.Recreate (commandManager, ces, ignoreCommands);
+				MacMainMenu.Recreate (commandManager, ces, ignoreCommands);
 			} catch (Exception ex) {
 				try {
-					OSXMenu.Destroy (true);
+					MacMainMenu.Destroy (true);
 				} catch {}
 				MonoDevelop.Core.LoggingService.LogError ("Could not install global menu", ex);
 				setupFail = true;
@@ -197,7 +204,7 @@ namespace MonoDevelop.Platform.Mac
 			if (initedApp)
 				return;
 			
-			OSXMenu.AddCommandIDMappings (new Dictionary<object, CarbonCommandID> ()
+			MacMainMenu.AddCommandIDMappings (new Dictionary<object, CarbonCommandID> ()
 			{
 				{ CommandManager.ToCommandId (EditCommands.Copy), CarbonCommandID.Copy },
 				{ CommandManager.ToCommandId (EditCommands.Cut), CarbonCommandID.Cut },
@@ -220,14 +227,15 @@ namespace MonoDevelop.Platform.Mac
 			//mac-ify these command names
 			commandManager.GetCommand (EditCommands.MonodevelopPreferences).Text = GettextCatalog.GetString ("Preferences...");
 			commandManager.GetCommand (EditCommands.DefaultPolicies).Text = GettextCatalog.GetString ("Custom Policies...");
-			commandManager.GetCommand (HelpCommands.About).Text = GettextCatalog.GetString ("About MonoDevelop");
+			commandManager.GetCommand (HelpCommands.About).Text = string.Format (GettextCatalog.GetString ("About {0}"), BrandingService.ApplicationName);
 			commandManager.GetCommand (ToolCommands.AddinManager).Text = GettextCatalog.GetString ("Add-in Manager...");
 			
 			initedApp = true;
-			OSXMenu.SetAppQuitCommand (CommandManager.ToCommandId (FileCommands.Exit));
-			OSXMenu.AddAppMenuItems (
+			MacMainMenu.SetAppQuitCommand (CommandManager.ToCommandId (FileCommands.Exit));
+			MacMainMenu.AddAppMenuItems (
 				commandManager,
 			    CommandManager.ToCommandId (HelpCommands.About),
+				CommandManager.ToCommandId (MonoDevelop.Ide.Updater.UpdateCommands.CheckForUpdates),
 				CommandManager.ToCommandId (Command.Separator),
 				CommandManager.ToCommandId (EditCommands.MonodevelopPreferences),
 				CommandManager.ToCommandId (EditCommands.DefaultPolicies),
@@ -245,6 +253,17 @@ namespace MonoDevelop.Platform.Mac
 			//FIXME: should we remove these when finalizing?
 			try {
 				ApplicationEvents.Quit += delegate (object sender, ApplicationQuitEventArgs e) {
+					//FIXME: can we avoid replying to the message until the app quits?
+					//There's NSTerminateLate but I'm not sure how to access it from carbon, maybe
+					//we need to swizzle methods into the app's NSApplicationDelegate.
+					//Also, it stops the main CFRunLoop, hopefully GTK dialogs use a child runloop.
+					//For now, just bounce.
+					var topDialog = MessageService.GetDefaultModalParent () as Gtk.Dialog;
+					if (topDialog != null && topDialog.Modal) {
+						NSApplication.SharedApplication.RequestUserAttention (
+							NSRequestUserAttentionType.CriticalRequest);
+					}
+					//FIXME: delay this until all existing modal dialogs were closed
 					if (!IdeApp.Exit ())
 						e.UserCancelled = true;
 					e.Handled = true;
@@ -253,7 +272,14 @@ namespace MonoDevelop.Platform.Mac
 				ApplicationEvents.Reopen += delegate (object sender, ApplicationEventArgs e) {
 					if (IdeApp.Workbench != null && IdeApp.Workbench.RootWindow != null) {
 						IdeApp.Workbench.RootWindow.Deiconify ();
-						IdeApp.Workbench.RootWindow.Visible = true;
+
+						// This is a workaround to a GTK+ bug. The HasTopLevelFocus flag is not properly
+						// set when the main window is restored. The workaround is to hide and re-show it.
+						// Since this happens before the next mainloop cycle, the window isn't actually affected.
+						IdeApp.Workbench.RootWindow.Hide ();
+						IdeApp.Workbench.RootWindow.Show ();
+
+						IdeApp.Workbench.RootWindow.Present ();
 						e.Handled = true;
 					}
 				};
@@ -286,62 +312,86 @@ namespace MonoDevelop.Platform.Mac
 		static void HandleDeleteEvent (object o, Gtk.DeleteEventArgs args)
 		{
 			args.RetVal = true;
-			IdeApp.Workbench.RootWindow.Visible = false;
+			IdeApp.Workbench.RootWindow.Hide ();
 		}
 		
 		protected override Gdk.Pixbuf OnGetPixbufForFile (string filename, Gtk.IconSize size)
 		{
+			//this only works on MacOS 10.6.0 and greater
+			if (systemVersion < 0x1060)
+				return base.OnGetPixbufForFile (filename, size);
+			
 			NSImage icon = null;
 			
-			//FIXME: better handling of names of files that haven't been saved yet
-			if (Path.IsPathRooted (filename)) {
+			if (Path.IsPathRooted (filename) && File.Exists (filename)) {
 				icon = NSWorkspace.SharedWorkspace.IconForFile (filename);
 			} else {
-				icon = NSWorkspace.SharedWorkspace.IconForFile ("/tmp/" + filename);
+				string extension = Path.GetExtension (filename);
+				if (!string.IsNullOrEmpty (extension))
+					icon = NSWorkspace.SharedWorkspace.IconForFileType (extension);
 			}
 			
-			if (icon != null) {
-				int w, h;
-				if (!Gtk.Icon.SizeLookup (Gtk.IconSize.Menu, out w, out h))
-					w = h = 22;
-				var rect = new System.Drawing.RectangleF (0, 0, w, h);
-				var rep = icon.BestRepresentation (rect, null, null) as NSBitmapImageRep;
-				if (rep != null) {
-					var tiff = rep.TiffRepresentation;
-					byte[] arr = new byte[tiff.Length];
-					System.Runtime.InteropServices.Marshal.Copy (tiff.Bytes, arr, 0, arr.Length);
-					int pw = rep.PixelsWide, ph = rep.PixelsHigh;
-					var px = new Gdk.Pixbuf (arr, pw, ph);
-					
-					//if one dimension matches, and the other is same or smaller, use as-is
-					if ((pw == w && ph <= h) || (ph == h && pw <= w))
-						return px;
-					
-					//else scale proportionally such that the largest dimension matches the desired size
-					if (pw == ph) {
-						pw = w;
-						ph = h;
-					} else if (pw > ph) {
-						ph = (int) (w * ((float) ph / pw));
-						pw = w;
-					} else {
-						pw = (int) (h * ((float) pw / ph));
-						ph = h;
-					}
-					
-					var scaled = px.ScaleSimple (pw, ph, Gdk.InterpType.Bilinear);
-					px.Dispose ();
-					return scaled;
-				}
+			if (icon == null) {
+				return base.OnGetPixbufForFile (filename, size);
 			}
-			return base.OnGetPixbufForFile (filename, size);
+			
+			int w, h;
+			if (!Gtk.Icon.SizeLookup (Gtk.IconSize.Menu, out w, out h)) {
+				w = h = 22;
+			}
+			var rect = new System.Drawing.RectangleF (0, 0, w, h);
+			
+			var arep = icon.BestRepresentation (rect, null, null);
+			if (arep == null) {
+				return base.OnGetPixbufForFile (filename, size);
+			}
+			
+			var rep = arep as NSBitmapImageRep;
+			if (rep == null) {
+				using (var cgi = arep.AsCGImage (rect, null, null))
+					rep = new NSBitmapImageRep (cgi);
+				arep.Dispose ();
+			}
+			
+			try {
+				byte[] arr;
+				using (var tiff = rep.TiffRepresentation) {
+					arr = new byte[tiff.Length];
+					System.Runtime.InteropServices.Marshal.Copy (tiff.Bytes, arr, 0, arr.Length);
+				}
+				int pw = rep.PixelsWide, ph = rep.PixelsHigh;
+				var px = new Gdk.Pixbuf (arr, pw, ph);
+				
+				//if one dimension matches, and the other is same or smaller, use as-is
+				if ((pw == w && ph <= h) || (ph == h && pw <= w))
+					return px;
+				
+				//else scale proportionally such that the largest dimension matches the desired size
+				if (pw == ph) {
+					pw = w;
+					ph = h;
+				} else if (pw > ph) {
+					ph = (int) (w * ((float) ph / pw));
+					pw = w;
+				} else {
+					pw = (int) (h * ((float) pw / ph));
+					ph = h;
+				}
+				
+				var scaled = px.ScaleSimple (pw, ph, Gdk.InterpType.Bilinear);
+				px.Dispose ();
+				return scaled;
+			} finally {
+				if (rep != null)
+					rep.Dispose ();
+			}
 		}
 		
 		public override IProcessAsyncOperation StartConsoleProcess (string command, string arguments, string workingDirectory,
 		                                                            IDictionary<string, string> environmentVariables,
 		                                                            string title, bool pauseWhenFinished)
 		{
-			return new ExternalConsoleProcess (command, arguments, workingDirectory, environmentVariables,
+			return new MacExternalConsoleProcess (command, arguments, workingDirectory, environmentVariables,
 			                                   title, pauseWhenFinished);
 		}
 		
@@ -358,24 +408,6 @@ namespace MonoDevelop.Platform.Mac
 activate
 do script with command ""cd {0}""
 end tell", directory.ToString ().Replace ("\"", "\\\"")));
-		}
-		
-		public override string GetUpdaterUrl ()
-		{
-			return "http://go-mono.com/macupdate/update";
-		}
-		
-		public override IEnumerable<string> GetUpdaterEnviromentFlags ()
-		{
-			var sdkDir = "/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs";
-			if (Directory.Exists (sdkDir)) {
-				foreach (var dir in Directory.GetDirectories (sdkDir, "iPhoneSimulator*")) {
-					var name = Path.GetFileNameWithoutExtension (dir);
-					int len = "iPhoneSimulator".Length;
-					if (name != null && name.Length > len) 
-						yield return "iphsdk" + name.Substring (len);
-				}
-			}
 		}
 		
 		public override IEnumerable<DesktopApplication> GetApplications (string filename)
@@ -424,6 +456,52 @@ end tell", directory.ToString ().Replace ("\"", "\\\"")));
 				foreach (var file in files)
 					NSWorkspace.SharedWorkspace.OpenFile (file, Id);
 			}
+		}
+		
+		public override Gdk.Rectangle GetUsableMonitorGeometry (Gdk.Screen screen, int monitor_id)
+		{
+			Gdk.Rectangle geometry = screen.GetMonitorGeometry (0);
+			NSScreen monitor = NSScreen.Screens[monitor_id];
+			RectangleF visible = monitor.VisibleFrame;
+			RectangleF frame = monitor.Frame;
+			
+			// Note: Frame and VisibleFrame rectangles are relative to monitor 0, but we need absolute
+			// coordinates.
+			visible.X += geometry.X;
+			visible.Y += geometry.Y;
+			frame.X += geometry.X;
+			frame.Y += geometry.Y;
+			
+			// VisibleFrame.Y is the height of the Dock if it is at the bottom of the screen, so in order
+			// to get the menu height, we just figure out the difference between the visibleFrame height
+			// and the actual frame height, then subtract the Dock height.
+			//
+			// We need to swap the Y offset with the menu height because our callers expect the Y offset
+			// to be from the top of the screen, not from the bottom of the screen.
+			float x, y, width, height;
+			
+			if (visible.Height <= frame.Height) {
+				float dockHeight = visible.Y;
+				float menubarHeight = (frame.Height - visible.Height) - dockHeight;
+				
+				height = frame.Height - menubarHeight - dockHeight;
+				y = menubarHeight;
+			} else {
+				height = frame.Height;
+				y = frame.Y;
+			}
+			
+			// Takes care of the possibility of the Dock being positioned on the left or right edge of the screen.
+			width = Math.Min (visible.Width, frame.Width);
+			x = Math.Max (visible.X, frame.X);
+			
+			return new Gdk.Rectangle ((int) x, (int) y, (int) width, (int) height);
+		}
+		
+		public override void GrabDesktopFocus (Gtk.Window window)
+		{
+			window.Present ();
+			NSApplication.SharedApplication.ActivateIgnoringOtherApps (true);
 		}
 	}
 }

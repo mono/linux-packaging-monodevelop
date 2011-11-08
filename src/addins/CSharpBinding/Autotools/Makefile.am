@@ -10,9 +10,7 @@ DEPS =  \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
-REFS =  \
-	-r:../../../../build/bin/NRefactory.dll \
-	-r:System
+REFS = -r:System
 
 FILES = CSharpAutotoolsSetup.cs
 

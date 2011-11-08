@@ -247,7 +247,7 @@ namespace MonoDevelop.Core.Execution
 			return null;
 		}
 		
-		public ExecutionCommand CreateCommand (string file)
+		public ProcessExecutionCommand CreateCommand (string file)
 		{
 			string f = file.ToLower ();
 			if (f.EndsWith (".exe") || f.EndsWith (".dll"))
@@ -418,7 +418,7 @@ namespace MonoDevelop.Core.Execution
 				if (exited != null)
 					exited (op, null);
 				
-				if (!PropertyService.IsWindows && Mono.Unix.Native.Syscall.WIFSIGNALED (operation.ExitCode))
+				if (!Platform.IsWindows && Mono.Unix.Native.Syscall.WIFSIGNALED (operation.ExitCode))
 					console.Log.WriteLine (GettextCatalog.GetString ("The application was terminated by a signal: {0}"), Mono.Unix.Native.Syscall.WTERMSIG (operation.ExitCode));
 				else if (operation.ExitCode != 0)
 					console.Log.WriteLine (GettextCatalog.GetString ("The application exited with code: {0}"), operation.ExitCode);

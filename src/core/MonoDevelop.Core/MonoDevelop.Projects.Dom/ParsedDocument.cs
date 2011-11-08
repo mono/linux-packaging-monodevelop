@@ -27,6 +27,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 
 namespace MonoDevelop.Projects.Dom
 {
@@ -123,7 +124,42 @@ namespace MonoDevelop.Projects.Dom
 			}
 		}
 		
+		public object LanguageAST {
+			get;
+			set;
+		}
+		
+		Dictionary<System.Type, object> tags = new Dictionary<System.Type, object> ();
+
+		public bool TryGetTag<T> (out T tag)
+		{
+			object o;
+			if (tags.TryGetValue (typeof(T), out o)) {
+				tag = (T)o;
+				return true;
+			}
+			tag = default (T);
+			return false;
+		}
+		
+		public void SetTag<T> (T tag)
+		{
+			tags [typeof(T)] = tag;;
+		}
+		
 		public ICompilationUnit CompilationUnit { get; set; }
+
+		public FoldingRegion GetUserRegion (int line, int column)
+		{
+			// search all regions -> then search the last containing region since regions can be nested
+			// this algorithm doesn't require the folding regions to be sorted.
+			FoldingRegion result = null;
+			foreach (var region in UserRegions.Where (r => r.Region.Contains (line, column))) {
+				if (result == null || region.Region.Start > result.Region.Start)
+					result = region;
+			}
+			return result;
+		}
 		
 		public virtual IEnumerable<FoldingRegion> GenerateFolds ()
 		{

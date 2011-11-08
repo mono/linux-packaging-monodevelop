@@ -38,10 +38,10 @@ using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Text;
 using MonoDevelop.Projects.CodeGeneration;
 
-using ICSharpCode.NRefactory;
-using ICSharpCode.NRefactory.Parser;
-using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory.Visitors;
+using ICSharpCode.OldNRefactory;
+using ICSharpCode.OldNRefactory.Parser;
+using ICSharpCode.OldNRefactory.Ast;
+using ICSharpCode.OldNRefactory.Visitors;
 using MonoDevelop.Ide.FindInFiles;
 using MonoDevelop.CSharp.Resolver;
 using MonoDevelop.Core;
@@ -78,7 +78,6 @@ namespace MonoDevelop.CSharp.Refactoring
 		{
 			fileName = document.FileName;
 			this.text = document;
-			this.resolver = resolver;
 			if (searchedMember != null)
 				Init (searchedMember);
 		}
@@ -183,7 +182,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			return text.SearchForward (SearchedMemberName, 0).Any ();
 		}
 		
-		List<ICSharpCode.NRefactory.IParser> parsers = new List<ICSharpCode.NRefactory.IParser> ();
+		List<ICSharpCode.OldNRefactory.IParser> parsers = new List<ICSharpCode.OldNRefactory.IParser> ();
 		
 		public void ClearParsers ()
 		{
@@ -196,7 +195,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			string parseText = text.Text;
 			ClearParsers ();
 			
-			var parser = ICSharpCode.NRefactory.ParserFactory.CreateParser (ICSharpCode.NRefactory.SupportedLanguage.CSharp, new StringReader (parseText));
+			var parser = ICSharpCode.OldNRefactory.ParserFactory.CreateParser (ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, new StringReader (parseText));
 			parser.Lexer.EvaluateConditionalCompilation = true;
 //			Console.WriteLine ("parse :" + text.FileName);
 			parser.Parse ();
@@ -208,7 +207,7 @@ namespace MonoDevelop.CSharp.Refactoring
 				parser.Lexer.ConditionalCompilationSymbols.Clear ();
 				foreach (string define in usedIdentifiers[i])
 					parser.Lexer.ConditionalCompilationSymbols.Add (define, true);
-				parser = ICSharpCode.NRefactory.ParserFactory.CreateParser (ICSharpCode.NRefactory.SupportedLanguage.CSharp, new StringReader (parseText));
+				parser = ICSharpCode.OldNRefactory.ParserFactory.CreateParser (ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, new StringReader (parseText));
 				parser.Parse ();
 				this.parsers.Add (parser);
 			}
@@ -229,14 +228,14 @@ namespace MonoDevelop.CSharp.Refactoring
 				var searchedMember = searchedMembers.First ().Item1;
 				if (searchedMember is IParameter) {
 					IParameter parameter = (IParameter)searchedMember;
-					var docComments = from ICSharpCode.NRefactory.Comment cmt in 
+					var docComments = from ICSharpCode.OldNRefactory.Comment cmt in 
 						(from ISpecial s in parser.Lexer.SpecialTracker.CurrentSpecials 
-						where s is ICSharpCode.NRefactory.Comment && s.StartPosition.Line <= parameter.DeclaringMember.Location.Line
+						where s is ICSharpCode.OldNRefactory.Comment && s.StartPosition.Line <= parameter.DeclaringMember.Location.Line
 						select s) 
 						select cmt;
 					
-					ICSharpCode.NRefactory.Comment lastComment = null;
-					foreach (ICSharpCode.NRefactory.Comment curComment in docComments.Reverse ()) {
+					ICSharpCode.OldNRefactory.Comment lastComment = null;
+					foreach (ICSharpCode.OldNRefactory.Comment curComment in docComments.Reverse ()) {
 						if (lastComment != null && Math.Abs (lastComment.StartPosition.Line - curComment.StartPosition.Line) > 1)
 							break;
 						// Concat doesn't work on MatchCollections
@@ -250,15 +249,15 @@ namespace MonoDevelop.CSharp.Refactoring
 					}
 				} else if (searchedMember is IMember) {
 					IMember member = (IMember)searchedMember;
-					var docComments = from ICSharpCode.NRefactory.Comment cmt in 
+					var docComments = from ICSharpCode.OldNRefactory.Comment cmt in 
 						(from ISpecial s in parser.Lexer.SpecialTracker.CurrentSpecials 
-						where s is ICSharpCode.NRefactory.Comment
+						where s is ICSharpCode.OldNRefactory.Comment
 						select s) 
 						select cmt;
 					
 					string fullName = member.FullName;
 					
-					foreach (ICSharpCode.NRefactory.Comment curComment in docComments) {
+					foreach (ICSharpCode.OldNRefactory.Comment curComment in docComments) {
 						// Concat doesn't work on MatchCollections
 						foreach (var matchCol in new [] { seeRegex.Matches (curComment.CommentText), seeAlsoRegRegex.Matches (curComment.CommentText) }) {
 							foreach (Match match in matchCol) {
@@ -272,7 +271,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			}
 		}
 
-		public void RunVisitor (ICSharpCode.NRefactory.Ast.CompilationUnit compilationUnit)
+		public void RunVisitor (ICSharpCode.OldNRefactory.Ast.CompilationUnit compilationUnit)
 		{
 			if (searchedMembers.Count == 0)
 				return;
@@ -290,7 +289,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			VisitCompilationUnit (compilationUnit, null);
 		}
 		
-		class ExpressionVisitor : ICSharpCode.NRefactory.Visitors.AbstractAstVisitor
+		class ExpressionVisitor : ICSharpCode.OldNRefactory.Visitors.AbstractAstVisitor
 		{
 			HashSet<string> identifiers = new HashSet<string> ();
 
@@ -299,8 +298,8 @@ namespace MonoDevelop.CSharp.Refactoring
 					return identifiers;
 				}
 			}
-
-			public override object VisitIdentifierExpression (ICSharpCode.NRefactory.Ast.IdentifierExpression identifierExpression, object data)
+			
+			public override object VisitIdentifierExpression(ICSharpCode.OldNRefactory.Ast.IdentifierExpression identifierExpression, object data)
 			{
 				identifiers.Add (identifierExpression.Identifier);
 				return null;
@@ -322,8 +321,8 @@ namespace MonoDevelop.CSharp.Refactoring
 			}
 			return result;
 		}
-
-		static List<HashSet<string>> GetUsedDefineCombinations (ICSharpCode.NRefactory.IParser parser)
+		
+		static List<HashSet<string>> GetUsedDefineCombinations (ICSharpCode.OldNRefactory.IParser parser)
 		{
 			List<HashSet<string >> result = new List<HashSet<string>> ();
 			foreach (ISpecial special in parser.Lexer.SpecialTracker.CurrentSpecials) {
@@ -333,10 +332,10 @@ namespace MonoDevelop.CSharp.Refactoring
 				
 				ExpressionVisitor visitor = new ExpressionVisitor ();
 				directive.Expression.AcceptVisitor (visitor, null);
-				ICSharpCode.NRefactory.Parser.CSharp.ConditionalCompilation cond = new ICSharpCode.NRefactory.Parser.CSharp.ConditionalCompilation ();
+				ICSharpCode.OldNRefactory.Parser.CSharp.ConditionalCompilation cond = new ICSharpCode.OldNRefactory.Parser.CSharp.ConditionalCompilation ();
 				bool nothingDefined = cond.Evaluate (directive.Expression);
 				foreach (var combination in GetAllCombinations (visitor.Identifiers)) {
-					cond = new ICSharpCode.NRefactory.Parser.CSharp.ConditionalCompilation ();
+					cond = new ICSharpCode.OldNRefactory.Parser.CSharp.ConditionalCompilation ();
 					HashSet<string > defines = new HashSet<string> ();
 					foreach (string usedIdentifier in combination) {
 						cond.Define (usedIdentifier);
@@ -409,7 +408,7 @@ namespace MonoDevelop.CSharp.Refactoring
 				foundReferences.Add (mref);
 		}
 
-		bool IsSearchedNode (ICSharpCode.NRefactory.Ast.INode node)
+		bool IsSearchedNode (ICSharpCode.OldNRefactory.Ast.INode node)
 		{
 			if (node == null || node.StartLocation.IsEmpty)
 				return false;
@@ -476,7 +475,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			return false;
 		}
 
-		void CheckNode (ICSharpCode.NRefactory.Ast.INode node)
+		void CheckNode (ICSharpCode.OldNRefactory.Ast.INode node)
 		{
 			if (IsSearchedNode (node)) {
 				int line, column;
@@ -564,7 +563,7 @@ namespace MonoDevelop.CSharp.Refactoring
 				var searchedMember = tuple.Item1;
 				if (searchedMember is LocalVariable) {
 					LocalVariable searchedVariable = (LocalVariable)searchedMember;
-					ICSharpCode.NRefactory.Ast.INode parent = localVariableDeclaration.Parent;
+					ICSharpCode.OldNRefactory.Ast.INode parent = localVariableDeclaration.Parent;
 					while (parent != null && !(parent is MemberNode) && !(parent is ParametrizedNode)) {
 						parent = parent.Parent;
 					}
@@ -628,7 +627,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			return new DomLocation (loc.Line, loc.Column);
 		}
 
-		public override object VisitObjectCreateExpression (ICSharpCode.NRefactory.Ast.ObjectCreateExpression objectCreateExpression, object data)
+		public override object VisitObjectCreateExpression (ICSharpCode.OldNRefactory.Ast.ObjectCreateExpression objectCreateExpression, object data)
 		{
 			foreach (var tuple in searchedMembers) {
 				var searchedMember = tuple.Item1;
@@ -864,14 +863,12 @@ namespace MonoDevelop.CSharp.Refactoring
 		}
 
 		Stack<string> namespaceStack = new Stack<string> ();
-
-		public override object VisitNamespaceDeclaration (ICSharpCode.NRefactory.Ast.NamespaceDeclaration namespaceDeclaration, object data)
+		public override object VisitNamespaceDeclaration (ICSharpCode.OldNRefactory.Ast.NamespaceDeclaration namespaceDeclaration, object data)
 		{
 			namespaceStack.Push (namespaceDeclaration.Name);
 			object result = base.VisitNamespaceDeclaration (namespaceDeclaration, data);
 			namespaceStack.Pop ();
 			return result;
 		}
-		
 	}
 }

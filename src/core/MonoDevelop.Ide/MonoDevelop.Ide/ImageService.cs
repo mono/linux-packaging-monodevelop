@@ -45,6 +45,8 @@ namespace MonoDevelop.Ide
 		static Dictionary<Gdk.Pixbuf, string> namedIcons = new Dictionary<Gdk.Pixbuf, string> ();
 		static Dictionary<string, List<StockIconCodon>> iconStock = new Dictionary<string, List<StockIconCodon>> ();
 		
+		static Gtk.Requisition[] iconSizes = new Gtk.Requisition[7];
+		
 		static ImageService ()
 		{
 			iconFactory.AddDefault ();
@@ -56,19 +58,23 @@ namespace MonoDevelop.Ide
 				StockIconCodon iconCodon = (StockIconCodon)args.ExtensionNode;
 				switch (args.Change) {
 				case ExtensionChange.Add:
-					if (iconCodon.File != null) {
-						LoadStockIcon (iconCodon);
-						break;
-					}
 					if (!iconStock.ContainsKey (iconCodon.StockId))
 						iconStock[iconCodon.StockId] = new List<StockIconCodon> ();
 					iconStock[iconCodon.StockId].Add (iconCodon);
 					break;
 				}
 			});
+			
+			for (int i = 0; i < iconSizes.Length; i++) {
+				int w, h;
+				if (!Gtk.Icon.SizeLookup ((Gtk.IconSize)i, out w, out h))
+					w = h = -1;
+				iconSizes[i].Width = w;
+				iconSizes[i].Height = h;
+			}
 		}
 		
-		static void LoadStockIcon (StockIconCodon iconCodon)
+		static void LoadStockIcon (StockIconCodon iconCodon, bool forceWildcard)
 		{
 			try {
 				Gdk.Pixbuf pixbuf = null;
@@ -93,8 +99,10 @@ namespace MonoDevelop.Ide
 				} else if (!string.IsNullOrEmpty (iconCodon.IconId)) {
 					pixbuf = GetPixbuf (InternalGetStockId (iconCodon.Addin, iconCodon.IconId, iconCodon.IconSize), iconCodon.IconSize);
 				}
-				if (pixbuf != null)
-					AddToIconFactory (iconCodon.StockId, pixbuf, iconCodon.IconSize);
+				if (pixbuf != null) {
+					Gtk.IconSize size = forceWildcard? Gtk.IconSize.Invalid : iconCodon.IconSize;
+					AddToIconFactory (iconCodon.StockId, pixbuf, size);
+				}
 			} catch (Exception ex) {
 				LoggingService.LogError (string.Format ("Error loading icon '{0}'", iconCodon.StockId), ex);
 			}
@@ -211,7 +219,30 @@ namespace MonoDevelop.Ide
 
 			List<StockIconCodon> stockIcon;
 			if (iconStock.TryGetValue (stockId, out stockIcon)) {
-				stockIcon.ForEach (i => LoadStockIcon (i));
+				//determine whether there's a wildcarded image
+				bool hasWildcard = false;
+				foreach (var i in stockIcon) {
+					if (i.IconSize == Gtk.IconSize.Invalid)
+						hasWildcard = true;
+				}
+				//load all the images
+				foreach (var i in stockIcon) {
+					LoadStockIcon (i, false);
+				}
+				//if there's no wildcard, find the "biggest" version and make it a wildcard
+				if (!hasWildcard) {
+					int biggest = 0, biggestSize = iconSizes[(int)stockIcon[0].IconSize].Width;
+					for (int i = 1; i < stockIcon.Count; i++) {
+						int w = iconSizes[(int)stockIcon[i].IconSize].Width;
+						if (w > biggestSize) {
+							biggest = i;
+							biggestSize = w;
+						}
+					}
+					//	LoggingService.LogWarning ("Stock icon '{0}' registered without wildcarded version.", stockId);
+					LoadStockIcon (stockIcon[biggest], true);
+					
+				}
 				iconStock.Remove (stockId);
 			}
 		}
@@ -314,6 +345,8 @@ namespace MonoDevelop.Ide
 			return InternalGetStockIdFromResource (addin, id);
 		}
 		 */
+		
+		[Obsolete ("Easy to misuse and leak memory. Register icon properly, or use pixbuf directly.")]
 		public static string GetStockId (Gdk.Pixbuf pixbuf, Gtk.IconSize size)
 		{
 			string id;

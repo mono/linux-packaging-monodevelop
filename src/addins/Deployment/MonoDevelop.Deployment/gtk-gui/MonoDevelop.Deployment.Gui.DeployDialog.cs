@@ -57,7 +57,7 @@ namespace MonoDevelop.Deployment.Gui
 		private global::Gtk.Button buttonCancel;
 		private global::Gtk.Button buttonBack;
 		private global::Gtk.Button buttonNext;
-
+		
 		protected virtual void Build ()
 		{
 			global::Stetic.Gui.Initialize (this);

@@ -35,11 +35,12 @@ using MonoDevelop.Ide;
 using MonoDevelop.Components;
 using System.ComponentModel;
 using MonoDevelop.Core;
+using MonoDevelop.Ide.Gui;
 
 namespace MonoDevelop.VersionControl.Views
 {
 	[ToolboxItem (true)]
-	class ComparisonWidget : EditorCompareWidgetBase
+	public class ComparisonWidget : EditorCompareWidgetBase
 	{
 		internal DropDownBox originalComboBox, diffComboBox;
 		
@@ -72,11 +73,12 @@ namespace MonoDevelop.VersionControl.Views
 		
 		protected override void CreateComponents ()
 		{
-			this.editors = new [] { new TextEditor (), new TextEditor ()};
-			DiffEditor.Document.ReadOnly = true;
-			if (viewOnly) {
-				OriginalEditor.Document.ReadOnly = true;
-			} else {
+			this.editors = new [] {
+				new TextEditor (new Mono.TextEditor.Document (), new CommonTextEditorOptions ()),
+				new TextEditor (new Mono.TextEditor.Document (), new CommonTextEditorOptions ()),
+			};
+
+			if (!viewOnly) {
 				originalComboBox = new DropDownBox ();
 				originalComboBox.WindowRequestFunc = CreateComboBoxSelector;
 				originalComboBox.Text = "Local";
@@ -213,14 +215,14 @@ namespace MonoDevelop.VersionControl.Views
 			{
 			}
 	
-			public string GetText (int n)
+			public string GetMarkup (int n)
 			{
 				if (n == 0)
 					return "Local";
 				if (n == 1)
 					return "Base";
 				Revision rev = widget.info.History[n - 2];
-				return rev.ToString () + "\t" + rev.Time.ToString () + "\t" + rev.Author;
+				return GLib.Markup.EscapeText (rev.ToString () + "\t" + rev.Time.ToString () + "\t" + rev.Author);
 			}
 
 			public Pixbuf GetIcon (int n)

@@ -61,7 +61,7 @@ namespace MonoDevelop.Projects
 		TargetFramework defaultTargetFramework;
 		
 		string defaultPlatformTarget = "x86";
-		public static readonly TargetFrameworkMoniker DefaultTargetFrameworkId = TargetFrameworkMoniker.NET_3_5;
+		static readonly TargetFrameworkMoniker DefaultTargetFrameworkId = TargetFrameworkMoniker.NET_4_0;
 		
 		public const string BuildTarget = "Build";
 		public const string CleanTarget = "Clean";
@@ -575,7 +575,7 @@ namespace MonoDevelop.Projects
 		{
 			FileFormatNode node = (FileFormatNode) args.ExtensionNode;
 			if (args.Change == ExtensionChange.Add)
-				formatManager.RegisterFileFormat ((IFileFormat) args.ExtensionObject, node.Id, node.Name);
+				formatManager.RegisterFileFormat ((IFileFormat) args.ExtensionObject, node.Id, node.Name, node.CanDefault);
 			else
 				formatManager.UnregisterFileFormat ((IFileFormat) args.ExtensionObject);
 		}
@@ -621,7 +621,7 @@ namespace MonoDevelop.Projects
 		
 		string GetTargetFile (string file)
 		{
-			if (!PropertyService.IsWindows) {
+			if (!Platform.IsWindows) {
 				try {
 					UnixSymbolicLinkInfo fi = new UnixSymbolicLinkInfo (file);
 					if (fi.IsSymbolicLink)

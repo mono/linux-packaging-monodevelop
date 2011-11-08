@@ -91,7 +91,7 @@ namespace MonoDevelop.Ide.FindInFiles
 						yield break;
 					SearchedFilesCount++;
 					try {
-						if (!string.IsNullOrEmpty (replacePattern))
+						if (replacePattern != null)
 							provider.BeginReplace ();
 					} catch (System.IO.FileNotFoundException) {
 						MessageService.ShowError (string.Format (GettextCatalog.GetString ("File {0} not found.")), provider.FileName);
@@ -103,7 +103,7 @@ namespace MonoDevelop.Ide.FindInFiles
 						FoundMatchesCount++;
 						yield return result;
 					}
-					if (!string.IsNullOrEmpty (replacePattern))
+					if (replacePattern != null)
 						provider.EndReplace ();
 					if (SearchedFilesCount % step == 0)
 						monitor.Step (1); 
@@ -120,11 +120,9 @@ namespace MonoDevelop.Ide.FindInFiles
 				return Enumerable.Empty<SearchResult> ();
 			string content;
 			try {
-				TextReader reader = provider.Open ();
-				if (reader == null)
+				content = provider.ReadString ();
+				if (content == null)
 					return Enumerable.Empty<SearchResult> ();
-				content = reader.ReadToEnd ();
-				reader.Close ();
 			} catch (Exception e) {
 				LoggingService.LogError ("Error while reading file", e);
 				return Enumerable.Empty<SearchResult> ();
@@ -158,8 +156,7 @@ namespace MonoDevelop.Ide.FindInFiles
 						continue;
 					matches.Add(match);
 				}
-				if (!string.IsNullOrEmpty (replacePattern))
-					provider.BeginReplace ();
+				provider.BeginReplace ();
 				int delta = 0;
 				for (int i = 0; !monitor.IsCancelRequested && i < matches.Count; i++) {
 					Match match = matches[i];
@@ -170,8 +167,7 @@ namespace MonoDevelop.Ide.FindInFiles
 						delta += replacement.Length - match.Length;
 					}
 				}
-				if (!string.IsNullOrEmpty (replacePattern))
-					provider.EndReplace ();
+				provider.EndReplace ();
 			}
 			return results;
 		}

@@ -57,6 +57,12 @@ namespace Mono.TextEditor
 			set { cairoBackgroundColor = value; backColorIsZero = false; }
 		}
 		
+		public bool GotBackgroundColorAssigned {
+			get {
+				return !backColorIsZero;
+			}
+		}
+		
 		public Gdk.Color BackgroundColor {
 			get {
 				return (HslColor)CairoBackgroundColor;
@@ -155,7 +161,7 @@ namespace Mono.TextEditor
 			this.CairoColor           = color;
 			this.ChunkProperties = chunkProperties;
 		}
-		
+
 		public override string ToString ()
 		{
 			return string.Format ("[ChunkStyle: Color={0}, BackgroundColor={1}, TransparentBackround={2}, ChunkProperties={3}, Link={4}]", CairoColor, CairoBackgroundColor, TransparentBackround, ChunkProperties, Link);

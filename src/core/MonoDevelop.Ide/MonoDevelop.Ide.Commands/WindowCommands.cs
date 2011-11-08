@@ -106,12 +106,12 @@ namespace MonoDevelop.Ide.Commands
 				commandInfo.Description = GettextCatalog.GetString ("Activate window '{0}'", commandInfo.Text);
 				if (document.Window.ShowNotification) {
 					commandInfo.UseMarkup = true;
-					document.Window.Title = "<span foreground=" + '"' + "blue" + '"' + ">" + commandInfo.Text + "</span>";
+					commandInfo.Text = "<span foreground=" + '"' + "blue" + '"' + ">" + commandInfo.Text + "</span>";
 				}
 
 				//Add AccelKey
 				if (i < 10) {
-					commandInfo.AccelKey = ((PropertyService.IsMac) ? "Meta" : "Alt") + "|" + ((i + 1) % 10).ToString ();
+					commandInfo.AccelKey = ((Platform.IsMac) ? "Meta" : "Alt") + "|" + ((i + 1) % 10).ToString ();
 				}
 
 
@@ -230,8 +230,7 @@ namespace MonoDevelop.Ide.Commands
 			var toplevel = Window.ListToplevels ().FirstOrDefault (w => w.HasToplevelFocus)
 				?? IdeApp.Workbench.RootWindow;
 			var sw = new DocumentSwitcher (toplevel, next);
-			sw.ShowAll ();
-			sw.GrabFocus ();
+			sw.Present ();
 		}
 		
 		protected override void Update (CommandInfo info)

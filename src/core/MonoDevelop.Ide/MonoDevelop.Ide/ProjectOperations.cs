@@ -226,7 +226,37 @@ namespace MonoDevelop.Ide
 				return false ;
 			return member.DeclaringType.CompilationUnit != null;
 		}
-
+		
+		public void JumpToDeclaration (MonoDevelop.Projects.Dom.INode visitable, bool askIfMultipleLocations)
+		{
+			if (askIfMultipleLocations) {
+				var type = visitable as IType;
+				if (type != null && type.HasParts) {
+					using (var monitor = IdeApp.Workbench.ProgressMonitors.GetSearchProgressMonitor (true, true)) {
+						foreach (IType part in DomType.GetSortedParts (type))
+							monitor.ReportResult (GetJumpTypePartSearchResult (part));
+					}
+					return;
+				}
+			}
+			
+			JumpToDeclaration (visitable);
+		}
+		
+		static MonoDevelop.Ide.FindInFiles.SearchResult GetJumpTypePartSearchResult (IType part)
+		{
+			var provider = new MonoDevelop.Ide.FindInFiles.FileProvider (part.CompilationUnit.FileName);
+			var doc = new Mono.TextEditor.Document ();
+			doc.Text = provider.ReadString ();
+			int position = doc.LocationToOffset (part.Location.Line, part.Location.Column);
+			while (position + part.Name.Length < doc.Length) {
+				if (doc.GetTextAt (position, part.Name.Length) == part.Name)
+					break;
+				position++;
+			}
+			return new MonoDevelop.Ide.FindInFiles.SearchResult (provider, position, part.Name.Length);
+		}
+		
 		public void JumpToDeclaration (MonoDevelop.Projects.Dom.INode visitable)
 		{
 			if (visitable is LocalVariable) {
@@ -647,7 +677,7 @@ namespace MonoDevelop.Ide
 		
 		public WorkspaceItem AddWorkspaceItem (Workspace parentWorkspace, string itemFileName)
 		{
-			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetLoadProgressMonitor (true)) {
+			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetProjectLoadProgressMonitor (true)) {
 				WorkspaceItem it = Services.ProjectService.ReadWorkspaceItem (monitor, itemFileName);
 				if (it != null) {
 					parentWorkspace.Items.Add (it);
@@ -700,7 +730,7 @@ namespace MonoDevelop.Ide
 				AddingEntryToCombine (this, args);
 			if (args.Cancel)
 				return null;
-			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetLoadProgressMonitor (true)) {
+			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetProjectLoadProgressMonitor (true)) {
 				return folder.AddItem (monitor, args.FileName, true);
 			}
 		}
@@ -747,27 +777,6 @@ namespace MonoDevelop.Ide
 					return false;
 			} finally {
 				selDialog.Hide ();
-			}
-		}
-		
-		public bool SelectProjectReferences (ProjectReferenceCollection references, AssemblyContext ctx, TargetFramework targetVersion)
-		{
-			try {
-				if (selDialog == null)
-					selDialog = new SelectReferenceDialog ();
-				
-				selDialog.SetReferenceCollection (references, ctx, targetVersion);
-
-				if (MessageService.RunCustomDialog (selDialog) == (int)Gtk.ResponseType.Ok) {
-					references.Clear ();
-					references.AddRange (selDialog.ReferenceInformations);
-					return true;
-				}
-				else
-					return false;
-			} finally {
-				if (selDialog != null)
-					selDialog.Hide ();
 			}
 		}
 		
@@ -883,14 +892,21 @@ namespace MonoDevelop.Ide
 		{
 			if (currentRunOperation != null && !currentRunOperation.IsCompleted) return currentRunOperation;
 
-			IProgressMonitor monitor = new MessageDialogProgressMonitor ();
+			NullProgressMonitor monitor = new NullProgressMonitor ();
 
 			DispatchService.ThreadDispatch (delegate {
 				ExecuteSolutionItemAsync (monitor, entry, context);
 			});
 			currentRunOperation = monitor.AsyncOperation;
 			currentRunOperationOwner = entry;
-			currentRunOperation.Completed += delegate { currentRunOperationOwner = null; };
+			currentRunOperation.Completed += delegate {
+			 	DispatchService.GuiDispatch (() => {
+					var error = monitor.Errors.FirstOrDefault ();
+					if (error != null)
+						IdeApp.Workbench.StatusBar.ShowError (error.Message);
+					currentRunOperationOwner = null;
+				});
+			};
 			return currentRunOperation;
 		}
 		
@@ -906,9 +922,72 @@ namespace MonoDevelop.Ide
 			}
 		}
 		
-		public void Clean (IBuildTarget entry)
+		public IAsyncOperation Clean (IBuildTarget entry)
 		{
-			entry.RunTarget (new NullProgressMonitor (), ProjectService.CleanTarget, IdeApp.Workspace.ActiveConfiguration);
+			if (currentBuildOperation != null && !currentBuildOperation.IsCompleted) return currentBuildOperation;
+			
+			ITimeTracker tt = Counters.BuildItemTimer.BeginTiming ("Cleaning " + entry.Name);
+			try {
+				IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetCleanProgressMonitor ();
+				
+				tt.Trace ("Start clean event");
+				TaskService.Errors.ClearByOwner (this);
+				OnStartClean (monitor);
+				
+				DispatchService.ThreadDispatch (delegate {
+					CleanAsync (entry, monitor, tt);
+				}, null);
+				
+				currentBuildOperation = monitor.AsyncOperation;
+				currentBuildOperationOwner = entry;
+				currentBuildOperation.Completed += delegate {
+					currentBuildOperationOwner = null;
+				};
+			}
+			catch {
+				tt.End ();
+				throw;
+			}
+			
+			return currentBuildOperation;
+		}
+		
+		void CleanAsync (IBuildTarget entry, IProgressMonitor monitor, ITimeTracker tt)
+		{
+			try {
+				tt.Trace ("Cleaning item");
+				SolutionItem it = entry as SolutionItem;
+				if (it != null) {
+					it.Clean (monitor, IdeApp.Workspace.ActiveConfiguration);
+				}
+				else {
+					entry.RunTarget (monitor, ProjectService.CleanTarget, IdeApp.Workspace.ActiveConfiguration);
+				}
+			} catch (Exception ex) {
+				monitor.ReportError (GettextCatalog.GetString ("Clean failed."), ex);
+			} finally {
+				tt.Trace ("Done cleaning");
+			}
+			DispatchService.GuiDispatch (
+				delegate {
+					CleanDone (monitor, entry, tt);
+			});
+		}
+		
+		void CleanDone (IProgressMonitor monitor, IBuildTarget entry, ITimeTracker tt)
+		{
+			tt.Trace ("Begin reporting clean result");
+			try {
+				monitor.Log.WriteLine ();
+				monitor.Log.WriteLine (GettextCatalog.GetString ("---------------------- Done ----------------------"));
+				tt.Trace ("Reporting result");			
+				monitor.ReportSuccess (GettextCatalog.GetString ("Clean successful."));
+				tt.Trace ("End clean event");
+				OnEndClean (monitor);
+			} finally {
+				monitor.Dispose ();
+				tt.End ();
+			}
 		}
 		
 		public IAsyncOperation BuildFile (string file)
@@ -982,9 +1061,18 @@ namespace MonoDevelop.Ide
 		public IAsyncOperation Rebuild (IBuildTarget entry)
 		{
 			if (currentBuildOperation != null && !currentBuildOperation.IsCompleted) return currentBuildOperation;
+			
+			var asyncOperation = new AsyncOperation ();
+			IAsyncOperation cleanOperation = Clean (entry);
 
-			Clean (entry);
-			return Build (entry);
+			asyncOperation.TrackOperation (cleanOperation, false);
+			
+			cleanOperation.Completed += (aop) => {
+				if (aop.Success)
+					asyncOperation.TrackOperation (Build (entry), true);
+			};
+			
+			return asyncOperation;
 		}
 //		bool errorPadInitialized = false;
 		public IAsyncOperation Build (IBuildTarget entry)
@@ -1607,12 +1695,14 @@ namespace MonoDevelop.Ide
 				monitor.Step (1);
 			}
 			
+			var pfolder = sourcePath.ParentDirectory;
+			
 			// If this was the last item in the folder, make sure we keep
 			// a reference to the folder, so it is not deleted from the tree.
-			if (removeFromSource && sourceProject != null) {
-				var folder = sourcePath.ParentDirectory;
-				if (!sourceProject.Files.GetFilesInVirtualPath (folder).Any ()) {
-					var folderFile = new ProjectFile (sourceProject.BaseDirectory.Combine (folder));
+			if (removeFromSource && sourceProject != null && pfolder.CanonicalPath != sourceProject.BaseDirectory.CanonicalPath && pfolder.IsChildPathOf (sourceProject.BaseDirectory)) {
+				pfolder = pfolder.ToRelative (sourceProject.BaseDirectory);
+				if (!sourceProject.Files.GetFilesInVirtualPath (pfolder).Any ()) {
+					var folderFile = new ProjectFile (sourceProject.BaseDirectory.Combine (pfolder));
 					folderFile.Subtype = Subtype.Directory;
 					sourceProject.Files.Add (folderFile);
 				}
@@ -1701,6 +1791,20 @@ namespace MonoDevelop.Ide
 				EndBuild (this, new BuildEventArgs (monitor, success));
 			}
 		}
+		
+		void OnStartClean (IProgressMonitor monitor)
+		{
+			if (StartClean != null) {
+				StartClean (this, new CleanEventArgs (monitor));
+			}
+		}
+		
+		void OnEndClean (IProgressMonitor monitor)
+		{
+			if (EndClean != null) {
+				EndClean (this, new CleanEventArgs (monitor));
+			}
+		}
 
 		void IdeAppWorkspaceItemUnloading (object sender, ItemUnloadingEventArgs args)
 		{
@@ -1747,6 +1851,8 @@ namespace MonoDevelop.Ide
 		public event BuildEventHandler StartBuild;
 		public event BuildEventHandler EndBuild;
 		public event EventHandler BeforeStartProject;
+		public event CleanEventHandler StartClean;
+		public event CleanEventHandler EndClean;
 		
 		public event EventHandler<SolutionEventArgs> CurrentSelectedSolutionChanged;
 		public event ProjectEventHandler CurrentProjectChanged;

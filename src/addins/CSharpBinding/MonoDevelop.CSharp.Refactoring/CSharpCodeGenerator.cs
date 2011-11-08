@@ -24,7 +24,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 using System;
-using MonoDevelop.CSharp.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Projects.Dom.Output;
 using MonoDevelop.Projects.Dom;
 using System.Text;
@@ -40,9 +40,9 @@ namespace MonoDevelop.CSharp.Refactoring
 		static CSharpAmbience ambience = new CSharpAmbience ();
 		
 		OutputVisitor visitor;
-		CSharpFormattingPolicy policy;
+		MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy policy;
 		
-		public CSharpFormattingPolicy Policy {
+		public MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy Policy {
 			get {
 				return this.policy;
 			}
@@ -325,7 +325,7 @@ namespace MonoDevelop.CSharp.Refactoring
 					}
 				}
 				
-				if (options.ImplementingType.ClassType == ClassType.Interface) {
+				if (options.ImplementingType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface) {
 					result.Append (";");
 				} else {
 					generator.AppendBraceStart (result, generator.policy.MethodBraceStyle);
@@ -362,7 +362,7 @@ namespace MonoDevelop.CSharp.Refactoring
 						generator.AppendLine (result);
 					} else if (IsMonoTouchModelMember (method)) {
 						AppendMonoTouchTodo (result, out bodyStartOffset, out bodyEndOffset);
-					} else if (method.IsAbstract || !(method.IsVirtual || method.IsOverride) || method.DeclaringType.ClassType == ClassType.Interface) {
+					} else if (method.IsAbstract || !(method.IsVirtual || method.IsOverride) || method.DeclaringType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface) {
 						AppendNotImplementedException (result, options, out bodyStartOffset, out bodyEndOffset);
 					} else {
 						generator.AppendIndent (result);
@@ -416,7 +416,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			static string GetModifiers (IType implementingType, IMember member)
 			{
 				StringBuilder result = new StringBuilder ();
-				if (member.IsPublic || (member.DeclaringType != null && member.DeclaringType.ClassType == ClassType.Interface)) {
+				if (member.IsPublic || (member.DeclaringType != null && member.DeclaringType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface)) {
 					result.Append ("public ");
 				} else if (member.IsProtectedAndInternal) {
 					result.Append ("protected internal ");
@@ -437,16 +437,16 @@ namespace MonoDevelop.CSharp.Refactoring
 			void AppendModifiers (StringBuilder result, CSharpCodeGenerator.CodeGenerationOptions options, IMember member)
 			{
 				generator.AppendIndent (result);
-				if (options.ExplicitDeclaration || options.ImplementingType.ClassType == ClassType.Interface)
+				if (options.ExplicitDeclaration || options.ImplementingType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface)
 					return;
 				result.Append (GetModifiers (options.ImplementingType, member));
 				
 				bool isFromInterface = false;
-				if (member.DeclaringType != null && member.DeclaringType.ClassType == ClassType.Interface) {
+				if (member.DeclaringType != null && member.DeclaringType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface) {
 					isFromInterface = true;
 					if (options.ImplementingType != null) {
 						foreach (IType type in options.ImplementingType.SourceProjectDom.GetInheritanceTree (options.ImplementingType)) {
-							if (type.ClassType == ClassType.Interface)
+							if (type.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface)
 								continue;
 							if (type.SearchMember (member.Name, true).Any (m => m.Name == member.Name && member.MemberType == m.MemberType && DomMethod.ParameterListEquals (member.Parameters, m.Parameters))) {
 								isFromInterface = false;
@@ -455,8 +455,8 @@ namespace MonoDevelop.CSharp.Refactoring
 						}
 					}
 				}
-				if (!isFromInterface && ((member.Modifiers & Modifiers.Virtual) == Modifiers.Virtual || 
-					(member.Modifiers & Modifiers.Abstract) == Modifiers.Abstract))
+				if (!isFromInterface && ((member.Modifiers & MonoDevelop.Projects.Dom.Modifiers.Virtual) == MonoDevelop.Projects.Dom.Modifiers.Virtual || 
+					(member.Modifiers & MonoDevelop.Projects.Dom.Modifiers.Abstract) == MonoDevelop.Projects.Dom.Modifiers.Abstract))
 					result.Append ("override ");
 			}
 			
@@ -483,13 +483,13 @@ namespace MonoDevelop.CSharp.Refactoring
 					int bodyStartOffset, bodyEndOffset;
 					generator.AppendIndent (result);
 					result.Append ("get");
-					if (options.ImplementingType.ClassType == ClassType.Interface) {
+					if (options.ImplementingType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface) {
 						result.AppendLine (";");
 					} else {
 						generator.AppendBraceStart (result, generator.policy.PropertyGetBraceStyle);
 						if (IsMonoTouchModelMember (property)) {
 							AppendMonoTouchTodo (result, out bodyStartOffset, out bodyEndOffset);
-						} else if (property.IsAbstract || property.DeclaringType.ClassType == ClassType.Interface) {
+						} else if (property.IsAbstract || property.DeclaringType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface) {
 							AppendNotImplementedException (result, options, out bodyStartOffset, out bodyEndOffset);
 						} else {
 							generator.AppendIndent (result);
@@ -510,13 +510,13 @@ namespace MonoDevelop.CSharp.Refactoring
 					int bodyStartOffset, bodyEndOffset;
 					generator.AppendIndent (result);
 					result.Append ("set");
-					if (options.ImplementingType.ClassType == ClassType.Interface) {
+					if (options.ImplementingType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface) {
 						result.AppendLine (";");
 					} else {
 						generator.AppendBraceStart (result, generator.policy.PropertyGetBraceStyle);
 						if (IsMonoTouchModelMember (property)) {
 							AppendMonoTouchTodo (result, out bodyStartOffset, out bodyEndOffset);
-						} else if (property.IsAbstract || property.DeclaringType.ClassType == ClassType.Interface) {
+						} else if (property.IsAbstract || property.DeclaringType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface) {
 							AppendNotImplementedException (result, options, out bodyStartOffset, out bodyEndOffset);
 						} else {
 							generator.AppendIndent (result);
@@ -543,14 +543,14 @@ namespace MonoDevelop.CSharp.Refactoring
 				return member.DeclaringType.Attributes.Any (attr => attr.AttributeType != null && attr.AttributeType.FullName == "MonoTouch.Foundation.ModelAttribute");
 			}
 		}
-
-		public override string CreateFieldEncapsulation (IType implementingType, IField field, string propertyName, Modifiers modifiers, bool readOnly)
+		
+		public override string CreateFieldEncapsulation (IType implementingType, IField field, string propertyName, MonoDevelop.Projects.Dom.Modifiers modifiers, bool readOnly)
 		{
 			SetIndentTo (implementingType);
 			StringBuilder result = new StringBuilder ();
 			AppendIndent (result);
 			
-			if (modifiers != Modifiers.None) {
+			if (modifiers != MonoDevelop.Projects.Dom.Modifiers.None) {
 				result.Append (ambience.GetString (modifiers));
 				result.Append (" ");
 			}

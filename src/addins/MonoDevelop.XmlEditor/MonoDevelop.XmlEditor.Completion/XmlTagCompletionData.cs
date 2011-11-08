@@ -66,17 +66,17 @@ namespace MonoDevelop.XmlEditor.Completion
 			get { return element; }
 		}
 		
-		public override void InsertCompletionText (CompletionListWindow window)
+		public override void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
 		{
 			IEditableTextBuffer buf = window.CompletionWidget as IEditableTextBuffer;
 			if (buf != null) {
-				buf.BeginAtomicUndo ();
-				buf.InsertText (buf.CursorPosition, element);
-				
-				// Move caret into the middle of the tags
-				buf.CursorPosition = window.CodeCompletionContext.TriggerOffset + cursorOffset;
-				buf.Select (buf.CursorPosition, buf.CursorPosition);
-				buf.EndAtomicUndo ();
+				using (var undo = buf.OpenUndoGroup ()) {
+					buf.InsertText (buf.CursorPosition, element);
+					
+					// Move caret into the middle of the tags
+					buf.CursorPosition = window.CodeCompletionContext.TriggerOffset + cursorOffset;
+					buf.Select (buf.CursorPosition, buf.CursorPosition);
+				}
 			}
 		}
 	}

@@ -35,7 +35,7 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Projects.Dom.Parser;
 using System.Collections.Generic;
-using MonoDevelop.CSharp.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Projects.CodeGeneration;
 using Mono.TextEditor;
 using MonoDevelop.CSharp.Refactoring;
@@ -65,11 +65,11 @@ namespace MonoDevelop.CSharp.Completion
 			this.CompletionText = member.Name;
 		}
 		
-		public override void InsertCompletionText (CompletionListWindow window)
+		public override void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
 		{
 			CodeGenerator generator = CodeGenerator.CreateGenerator (editor.Document.MimeType, editor.Options.TabsToSpaces, editor.Options.TabSize, editor.EolMarker);
 			bool isExplicit = false;
-			if (member.DeclaringType.ClassType == ClassType.Interface) {
+			if (member.DeclaringType.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface) {
 				foreach (var m in type.Members) {
 					if (m.Name == member.Name && m.ReturnType.ToInvariantString () != member.ReturnType.ToInvariantString ()) {
 						isExplicit = true;

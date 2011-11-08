@@ -117,7 +117,6 @@ namespace MonoDevelop.CSharp.Resolver
 				}
 				if (identifer.Length > 0) {
 					expressionResult.Expression = identifer.ToString ();
-					Console.WriteLine (expressionResult.Expression);
 					resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, int.MaxValue));
 					if (resolveResult != null) {
 						resolveResult = new MemberResolveResult (dom.GetType (resolveResult.ResolvedType));
@@ -140,7 +139,7 @@ namespace MonoDevelop.CSharp.Resolver
 			}
 			
 			// identifier may not be valid at that point, try to resolve it at line end (ex. foreach loop variable)
-			if (resolveResult != null && string.IsNullOrEmpty (resolveResult.ResolvedType.FullName))
+			if (resolveResult != null &&  (resolveResult.ResolvedType == null || string.IsNullOrEmpty (resolveResult.ResolvedType.FullName)))
 				resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, int.MaxValue));
 		
 			// Search for possible generic parameters.
@@ -197,7 +196,7 @@ namespace MonoDevelop.CSharp.Resolver
 		{
 			string fileName = data.Document.FileName;
 			MonoDevelop.Ide.Gui.Document doc = IdeApp.Workbench.ActiveDocument;
-			if (doc == null)
+			if (doc == null || doc.Editor == null)
 				return null;
 			
 			IParser parser = ProjectDomService.GetParser (fileName);

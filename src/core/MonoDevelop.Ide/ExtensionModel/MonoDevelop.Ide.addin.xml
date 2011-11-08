@@ -7,15 +7,15 @@
        description = "The MonoDevelop IDE application."
        category    = "MonoDevelop Core"
        isroot      = "true"
-       version     = "2.6.0"
-       compatVersion = "2.6.0">
+       version     = "2.8.2"
+       compatVersion = "2.7">
 	
 	<Runtime>
 		<Import assembly="MonoDevelop.Ide.dll"/>
 	</Runtime>
 	
 	<Dependencies>
-		<Addin id="Core" version="2.6.0"/>
+		<Addin id="Core" version="2.8.2"/>
 	</Dependencies>
 
 	<!-- Extension ponts -->
@@ -137,11 +137,6 @@
 		<ExtensionNode name="Font" type="MonoDevelop.Ide.Fonts.FontDescriptionCodon"/>
 	</ExtensionPoint>
 	
-	<ExtensionPoint path = "/MonoDevelop/Ide/Updater" name = "Updater information">
-		<Description>Path of an updateinfo file.</Description>
-		<ExtensionNode name="UpdateInfo" type="MonoDevelop.Ide.Updater.UpdateInfoExtensionNode"/>
-	</ExtensionPoint>
-	
 	<ExtensionPoint path = "/MonoDevelop/Ide/CodeFormatters" name = "Code formatters">
 		<ExtensionNode name="Formatter" type="MonoDevelop.Ide.CodeFormatting.CodeFormatterExtensionNode" />
 	</ExtensionPoint>
@@ -151,12 +146,15 @@
 		<ExtensionNode name="ReferenceFinder" type="MonoDevelop.Ide.FindInFiles.ReferenceFinderCodon"/>
 	</ExtensionPoint>
 	
-	<ExtensionPoint path = "/MonoDevelop/Ide/UpdateTags" name = "Update tags">
-		<Description>Update tags for the Updater service</Description>
-		<ExtensionNode name="Tag" type="Mono.Addins.ExtensionNode"/>
+	<ExtensionPoint path = "/MonoDevelop/Ide/Updater/UpdateHandlers" name = "Update handlers">
+		<ExtensionNode name="Type" />
 	</ExtensionPoint>
-
-		<!-- Extensions -->
+	
+	<ExtensionPoint path = "/MonoDevelop/Ide/AboutInformation" name = "Adddional about information">
+		<ExtensionNode name = "Class" objectType = "MonoDevelop.Ide.Gui.Dialogs.IAboutInformation" />
+	</ExtensionPoint>
+	
+	<!-- Extensions -->
 	
 	<Extension path = "/MonoDevelop/Core/Applications">
 		<Application id = "gsetup"
@@ -170,9 +168,9 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/StartupHandlers">
-		<Class class = "MonoDevelop.Ide.Gui.AddinUpdateHandler"/>
+		<Class class = "MonoDevelop.Ide.Updater.UpdateCheckHandler"/>
 		<Class class = "MonoDevelop.Ide.Gui.Dialogs.TipOfTheDayStartup"/>
-		<Class class = "MonoDevelop.Ide.Updater.CheckForUpdatesOnStartUpHandler" />
+		<Class class = "MonoDevelop.Ide.WelcomePage.WelcomePageStartUp"/>
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/KeyBindingSchemes">
@@ -181,14 +179,6 @@
 		<Scheme id="MD1" _name = "MonoDevelop 1.0" resource="KeyBindingSchemeMonoDevelop1.xml"/>
 		<Scheme id="MD2" _name = "MonoDevelop 2.0" resource="KeyBindingSchemeMonoDevelop2.xml"/>
 	</Extension>
-	
-
-	
-	<!--<Extension path = "/MonoDevelop/Ide/FileFilters">
-		<FileFilter id = "AllFiles"
-		            _label = "All Files"
-		            extensions = "*.*"/>
-	</Extension>-->
 	
 	<Extension path = "/MonoDevelop/Ide/TaskList/View">
 		<TaskListView _label = "Comments" class = "MonoDevelop.Ide.Tasks.CommentTasksView" />
@@ -202,16 +192,31 @@
 		<Layout id="Solution" _name="Solution" />
 	</Extension>
 	
+	<Extension path = "/MonoDevelop/Ide/FileFilters">
+		<FileFilter id = "Assemblies"
+		            _label = "Assemblies"
+		            extensions = "*.exe,*.dll"/>
+		<FileFilter id = "Xml"
+		            _label = "XML Files"
+		            extensions = "*.xml"/>
+		<FileFilter id = "Resources"
+		            _label = ".NET Resource Files"
+		            extensions = "*.resources,*.resx"/>
+	</Extension>
+	
 	<Extension path = "/MonoDevelop/Ide/ProjectFileFilters">
+		<FileFilter id = "SlnCombine"
+		            _label = "Solution Files"
+		            extensions = "*.sln"/>
+		<FileFilter id = "MSBuildProject"
+		            _label = "Project Files"
+		            extensions = "*.*proj"/>
 		<FileFilter id = "Combine"
-		            _label = "MonoDevelop Solution Files"
+		            _label = "MD 1.0 Solution Files"
 		            extensions = "*.mds"/>
 		<FileFilter id = "Project"
-		            _label = "MonoDevelop Project Files"
+		            _label = "MD 1.0 Project Files"
 		            extensions = "*.mdp"/>
-		<!--<FileFilter id = "AllFiles"
-		            _label = "All Files"
-		            extensions = "*.*"/>-->
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
@@ -242,11 +247,22 @@
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Core/UserDataMigration">
-		<Migration sourceVersion="2.4" kind="Data" sourcePath="KeyBindings.xml" targetPath="KeyBindings/Custom.kb.xml" />
-		<Migration sourceVersion="2.4" kind="Data" sourcePath="KeyBindingsMac.xml" targetPath="KeyBindings/Custom.kb-mac.xml" />
-		<Migration sourceVersion="2.4" kind="Data" isDirectory="true" sourcePath="templates/code" targetPath="Snippets" />
-		<Migration sourceVersion="2.4" kind="Config" sourcePath="custom-command-modes.xml" />
-		<Migration sourceVersion="2.4" kind="Config" sourcePath="MonoDevelop-tools.xml" />
-		<Migration sourceVersion="2.4" kind="Config" sourcePath="EditingLayout2.xml" targetPath="EditingLayout.xml"/>
+		<!-- 2.4 -->
+		<Migration sourceVersion="2.4" kind="UserData" path="KeyBindings.xml" targetPath="KeyBindings/Custom.kb.xml" />
+		<Migration sourceVersion="2.4" kind="UserData" path="KeyBindingsMac.xml" targetPath="KeyBindings/Custom.kb-mac.xml" />
+		<Migration sourceVersion="2.4" kind="UserData" path="templates/code" targetPath="Snippets" isDirectory="true" />
+		<Migration sourceVersion="2.4" kind="Config" path="custom-command-modes.xml" />
+		<Migration sourceVersion="2.4" kind="Config" path="MonoDevelop-tools.xml" />
+		<Migration sourceVersion="2.4" kind="Config" path="EditingLayout2.xml" targetPath="EditingLayout.xml"/>
+		<!-- 2.6 and 2.7 incorrectly stored KeyBindings in Config despite migrating 2.4 ones to UserData -->
+		<Migration sourceVersion="2.6-2.7" kind="Config" targetKind="UserData" path="KeyBindings" isDirectory="true" />
+		<!-- 2.6+ -->
+		<Migration sourceVersion="2.8+" kind="UserData" path="KeyBindings" isDirectory="true" />
+		<Migration sourceVersion="2.6+" kind="UserData" path="Snippets" isDirectory="true" />
+		<Migration sourceVersion="2.6+" kind="Config" path="custom-command-modes.xml" />
+		<Migration sourceVersion="2.6+" kind="Config" path="MonoDevelop-tools.xml" />
+		<Migration sourceVersion="2.6+" kind="Config" path="EditingLayout.xml" />
+		<Migration sourceVersion="2.6+" kind="LocalConfig" path="RecentlyUsed.xml" />
+		<Migration sourceVersion="2.6+" kind="LocalConfig" path="Feedback.xml" />
 	</Extension>
 </Addin>

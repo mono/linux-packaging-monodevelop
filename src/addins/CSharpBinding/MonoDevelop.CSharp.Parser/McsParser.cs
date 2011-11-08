@@ -25,19 +25,17 @@
 // THE SOFTWARE.
 
 using System;
-using System.Linq;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.IO;
-using Mono.CSharp;
 using System.Text;
-using Mono.TextEditor;
-using MonoDevelop.CSharp.Ast;
-using MonoDevelop.Projects.Dom;
-using MonoDevelop.Projects.Dom.Parser;
+using Mono.CSharp;
+using MonoDevelop.CSharp.Project;
 using MonoDevelop.CSharp.Resolver;
 using MonoDevelop.Projects;
-using MonoDevelop.CSharp.Project;
-using System.CodeDom;
+using MonoDevelop.Projects.Dom;
+using MonoDevelop.Projects.Dom.Parser;
+using System.Linq;
 
 namespace MonoDevelop.CSharp.Parser
 {
@@ -47,11 +45,11 @@ namespace MonoDevelop.CSharp.Parser
 		{
 			return new NewCSharpExpressionFinder (dom);
 		}
-
+		
 		public override IResolver CreateResolver (ProjectDom dom, object editor, string fileName)
 		{
 			MonoDevelop.Ide.Gui.Document doc = (MonoDevelop.Ide.Gui.Document)editor;
-			return new NRefactoryResolver (dom, doc.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, doc.Editor, fileName);
+			return new NRefactoryResolver (dom, doc.CompilationUnit, ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, doc.Editor, fileName);
 		}
 		
 		public class ErrorReportPrinter : ReportPrinter
@@ -85,20 +83,20 @@ namespace MonoDevelop.CSharp.Parser
 				if (string.IsNullOrEmpty (content))
 					return null;
 				var tagComments = ProjectDomService.SpecialCommentTags.GetNames ();
-				List<string> compilerArguments = new List<string> ();
+				List<string > compilerArguments = new List<string> ();
 				if (dom != null && dom.Project != null && MonoDevelop.Ide.IdeApp.Workspace != null) {
 					DotNetProjectConfiguration configuration = dom.Project.GetConfiguration (MonoDevelop.Ide.IdeApp.Workspace.ActiveConfiguration) as DotNetProjectConfiguration;
 					CSharpCompilerParameters par = configuration != null ? configuration.CompilationParameters as CSharpCompilerParameters : null;
 					if (par != null) {
 						if (!string.IsNullOrEmpty (par.DefineSymbols)) {
-							compilerArguments.Add ("-define:" + string.Join (";", par.DefineSymbols.Split (';', ',', ' ', '\t')));
+							compilerArguments.Add ("-define:" + string.Join (";", par.DefineSymbols.Split (';', ',', ' ', '\t').Where (s => !string.IsNullOrWhiteSpace (s))));
 						}
 						if (par.UnsafeCode)
 							compilerArguments.Add ("-unsafe");
 						if (par.TreatWarningsAsErrors)
 							compilerArguments.Add ("-warnaserror");
 						if (!string.IsNullOrEmpty (par.NoWarnings))
-							compilerArguments.Add ("-nowarn:"+ string.Join (",", par.NoWarnings.Split (';', ',', ' ', '\t')));
+							compilerArguments.Add ("-nowarn:" + string.Join (",", par.NoWarnings.Split (';', ',', ' ', '\t')));
 						compilerArguments.Add ("-warn:" + par.WarningLevel);
 						compilerArguments.Add ("-langversion:" + GetLangString (par.LangVersion));
 						if (par.GenerateOverflowChecks)
@@ -106,18 +104,17 @@ namespace MonoDevelop.CSharp.Parser
 					}
 				}
 				
-				var unit =  new MonoDevelop.Projects.Dom.CompilationUnit (fileName);
+				var unit = new MonoDevelop.Projects.Dom.CompilationUnit (fileName);
 				var result = new ParsedDocument (fileName);
 				result.CompilationUnit = unit;
 				
 				CompilerCompilationUnit top;
 				ErrorReportPrinter errorReportPrinter = new ErrorReportPrinter ();
-				using (var stream = new MemoryStream (Encoding.Default.GetBytes (content))) {
+				using (var stream = new MemoryStream (Encoding.UTF8.GetBytes (content))) {
 					top = CompilerCallableEntryPoint.ParseFile (compilerArguments.ToArray (), stream, fileName, errorReportPrinter);
 				}
 				if (top == null)
 					return null;
-				
 				foreach (var special in top.SpecialsBag.Specials) {
 					var comment = special as SpecialsBag.Comment;
 					if (comment != null) {
@@ -126,22 +123,19 @@ namespace MonoDevelop.CSharp.Parser
 						VisitPreprocessorDirective (result, special as SpecialsBag.PreProcessorDirective);
 					}
 				}
-				
 				// convert DOM
 				var conversionVisitor = new ConversionVisitor (top.LocationsBag);
-				conversionVisitor.Dom = dom;
-				conversionVisitor.ParsedDocument = result;
-				conversionVisitor.Unit = unit;
-				top.UsingsBag.Global.Accept (conversionVisitor);
-				top.ModuleCompiled.Accept (conversionVisitor);
-				/*
 				try {
-					unit.Tag = CSharpParser.Parse (top);
+					conversionVisitor.Dom = dom;
+					conversionVisitor.ParsedDocument = result;
+					conversionVisitor.Unit = unit;
+					top.UsingsBag.Global.Accept (conversionVisitor);
+					top.ModuleCompiled.Accept (conversionVisitor);
 				} catch (Exception ex) {
 					System.Console.WriteLine (ex);
-				}*/
-				
-				// parser errors
+				}
+				result.LanguageAST = new ICSharpCode.NRefactory.CSharp.CSharpParser().Parse (top, 0);
+				// parser errorse
 				errorReportPrinter.Errors.ForEach (e => conversionVisitor.ParsedDocument.Add (e));
 				return result;
 			}
@@ -205,7 +199,7 @@ namespace MonoDevelop.CSharp.Parser
 			conditionalRegions.Pop ();
 		}
 
-		static ICSharpCode.NRefactory.PrettyPrinter.CSharpOutputVisitor visitor = new ICSharpCode.NRefactory.PrettyPrinter.CSharpOutputVisitor ();
+		static ICSharpCode.OldNRefactory.PrettyPrinter.CSharpOutputVisitor visitor = new ICSharpCode.OldNRefactory.PrettyPrinter.CSharpOutputVisitor ();
 
 		void VisitPreprocessorDirective (ParsedDocument result, SpecialsBag.PreProcessorDirective directive)
 		{
@@ -468,7 +462,6 @@ namespace MonoDevelop.CSharp.Parser
 					return "";
 				
 				return name.Left != null ? ConvertToString (name.Left)  + "." + name.Name : name.Name;
-				
 			}
 			
 			public override void Visit (ModuleContainer mc)
@@ -546,8 +539,8 @@ namespace MonoDevelop.CSharp.Parser
 				newType.ClassType = classType;
 				var location = LocationsBag.GetMemberLocation (c);
 				
-				if (location != null && location.Count > 2) {
-					var region = ConvertRegion (c.MemberName.Location, location[2]);
+				if (location != null && location.Count > 1) {
+					var region = ConvertRegion (c.MemberName.Location, location[location.Count - 1]);
 					region.Start = new DomLocation (region.Start.Line, region.Start.Column + c.MemberName.Name.Length);
 					newType.BodyRegion =  region;
 				} else {
@@ -693,50 +686,58 @@ namespace MonoDevelop.CSharp.Parser
 				
 				if (optAttributes == null || optAttributes.Attrs == null)
 					return atts;
-				
 				ResolveContext ctx = new ResolveContext (mc);
+				foreach (var section in optAttributes.Sections) {
 				
-				foreach (var attr in optAttributes.Attrs) {
-					DomAttribute domAttribute = new DomAttribute ();
-					domAttribute.Name = ConvertQuoted (attr.Name);
-					domAttribute.Region = ConvertRegion (attr.Location, attr.Location);
-					domAttribute.AttributeType = ConvertReturnType (attr.TypeNameExpression);
-					if (attr.PosArguments != null) {
-						for (int i = 0; i < attr.PosArguments.Count; i++) {
-							CodeExpression domExp;
-							var exp = attr.PosArguments [i].Expr;
-							if (exp is TypeOf) {
-								TypeOf tof = (TypeOf)exp;
-								IReturnType rt = ConvertReturnType (tof.TypeExpression);
-								domExp = new CodeTypeOfExpression (rt.FullName);
-							} else {
-								try {
-									domExp = ResolveMemberAccessExpression (exp);
-									// may be literal
-									if (domExp == null) {
+					foreach (var attr in section) {
+						DomAttribute domAttribute = new DomAttribute ();
+						domAttribute.Name = ConvertQuoted (attr.Name);
+						domAttribute.Region = ConvertRegion (attr.Location, attr.Location);
+						domAttribute.AttributeType = ConvertReturnType (attr.TypeNameExpression);
+						if (attr.PosArguments != null) {
+							for (int i = 0; i < attr.PosArguments.Count; i++) {
+								CodeExpression domExp;
+								var exp = attr.PosArguments [i].Expr;
+								
+								if (exp is TypeOf) {
+									TypeOf tof = (TypeOf)exp;
+									IReturnType rt = ConvertReturnType (tof.TypeExpression);
+									domExp = new CodeTypeOfExpression (rt.FullName);
+								} else if (exp is Binary) {
+									// Currently unsupported in the old dom (will be in the new dom)
+									continue;
+								} else if (exp is Constant) {
+									try {
 										var res = exp.Resolve (ctx);
 										var val = res as Constant;
 										if (val == null)
 											continue;
 										domExp = new CodePrimitiveExpression (val.GetValue ());
+									} catch {
+										continue;
 									}
-								} catch {
-									continue;
+								} else {
+									try {
+										domExp = ResolveMemberAccessExpression (exp);
+									} catch {
+										continue;
+									}
 								}
+								if (domExp != null)
+									domAttribute.AddPositionalArgument (domExp);
 							}
-							domAttribute.AddPositionalArgument (domExp);
 						}
-					}
-					if (attr.NamedArguments != null) {
-						for (int i = 0; i < attr.NamedArguments.Count; i++) {
-							var val = attr.NamedArguments [i].Expr as Constant;
-							if (val == null)
-								continue;
-							domAttribute.AddNamedArgument (((NamedArgument)attr.NamedArguments [i]).Name, new CodePrimitiveExpression (val.GetValue ()));
+						if (attr.NamedArguments != null) {
+							for (int i = 0; i < attr.NamedArguments.Count; i++) {
+								var val = attr.NamedArguments [i].Expr as Constant;
+								if (val == null)
+									continue;
+								domAttribute.AddNamedArgument (((NamedArgument)attr.NamedArguments [i]).Name, new CodePrimitiveExpression (val.GetValue ()));
+							}
 						}
+						
+						atts.Add (domAttribute);
 					}
-					
-					atts.Add (domAttribute);
 				}
 				return atts;
 			}
@@ -917,7 +918,7 @@ namespace MonoDevelop.CSharp.Parser
 				evt.ReturnType = ConvertReturnType (e.TypeName);
 				var location = LocationsBag.GetMemberLocation (e);
 				if (location != null)
-					evt.BodyRegion = ConvertRegion (location[1], location[2]);
+					evt.BodyRegion = ConvertRegion (location[1], location[location.Count - 1]);
 				
 				AddAttributes (evt, e.OptAttributes, e);
 				AddExplicitInterfaces (evt, e);
@@ -936,7 +937,7 @@ namespace MonoDevelop.CSharp.Parser
 				
 				var location = LocationsBag.GetMemberLocation (p);
 				if (location != null && location.Count >= 1) {
-					var endLoc = location.Count == 1 ? location[0] : location[1];
+					var endLoc = location.Count == 1 ? location[0] : location[location.Count - 1];
 					property.BodyRegion = ConvertRegion (location[0], endLoc);
 				} else {
 					property.BodyRegion = DomRegion.Empty;
@@ -1012,7 +1013,7 @@ namespace MonoDevelop.CSharp.Parser
 				indexer.GetterModifier = indexer.SetterModifier = ConvertModifiers (i.ModFlags);
 				var location = LocationsBag.GetMemberLocation (i);
 				if (location != null && location.Count >= 1) {
-					var endLoc = location.Count == 1 ? location[0] : location[1];
+					var endLoc = location.Count == 1 ? location[0] : location[location.Count - 1];
 					indexer.BodyRegion = ConvertRegion (location[0], endLoc);
 				} else {
 					indexer.BodyRegion = DomRegion.Empty;

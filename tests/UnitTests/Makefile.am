@@ -21,10 +21,11 @@ REFS =  \
 	-r:../../build/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll \
 	-r:../../build/AddIns/VersionControl/MonoDevelop.VersionControl.dll \
 	-r:../../build/AddIns/VersionControl/MonoDevelop.VersionControl.Git.dll \
+	-r:../../build/bin/ICSharpCode.NRefactory.dll \
 	-r:../../build/bin/Mono.TextEditor.dll \
 	-r:../../build/bin/MonoDevelop.Core.dll \
 	-r:../../build/bin/MonoDevelop.Ide.dll \
-	-r:../../build/bin/NRefactory.dll \
+	-r:../../build/bin/OldNRefactory.dll \
 	-r:../../contrib/bin/NGit.dll \
 	-r:../../contrib/bin/Sharpen.dll \
 	-r:../../src/addins/NUnit/lib/nunit.core.dll \
@@ -47,6 +48,7 @@ FILES =  \
 	Mono.TextEditor.Tests/DocumentTests.cs \
 	Mono.TextEditor.Tests/EditActionsTest.cs \
 	Mono.TextEditor.Tests/FoldingTests.cs \
+	Mono.TextEditor.Tests/HeightTreeTests.cs \
 	Mono.TextEditor.Tests/InsertionModeTests.cs \
 	Mono.TextEditor.Tests/LineSplitterTests.cs \
 	Mono.TextEditor.Tests/RedBlackTreeTests.cs \
@@ -69,12 +71,6 @@ FILES =  \
 	MonoDevelop.CSharpBinding/MemberTests.cs \
 	MonoDevelop.CSharpBinding/ParameterCompletionTests.cs \
 	MonoDevelop.CSharpBinding/ProjectDomTests.cs \
-	MonoDevelop.CSharpBinding/TestBlankLineFormatting.cs \
-	MonoDevelop.CSharpBinding/TestBraceStlye.cs \
-	MonoDevelop.CSharpBinding/TestFormattingBugs.cs \
-	MonoDevelop.CSharpBinding/TestSpacingVisitor.cs \
-	MonoDevelop.CSharpBinding/TestStatementIndentation.cs \
-	MonoDevelop.CSharpBinding/TestTypeLevelIndentation.cs \
 	MonoDevelop.CSharpBinding/TestViewContent.cs \
 	MonoDevelop.CSharpBinding/TestWorkbenchWindow.cs \
 	MonoDevelop.CSharpBinding/TopLevelTests.cs \

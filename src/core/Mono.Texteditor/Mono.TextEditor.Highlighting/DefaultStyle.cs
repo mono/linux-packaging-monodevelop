@@ -29,7 +29,7 @@ using Gtk;
 
 namespace Mono.TextEditor.Highlighting
 {
-	public class DefaultStyle : Style
+	public class DefaultStyle : ColorSheme
 	{
 		ChunkStyle defaultStyle;
 		public override ChunkStyle Default {
@@ -37,13 +37,7 @@ namespace Mono.TextEditor.Highlighting
 				return defaultStyle;
 			}
 		}
-		
-		public override ChunkStyle Caret {
-			get {
-				return Default;
-			}
-		}
-		
+				
 		ChunkStyle lineNumberStyle;
 		public override ChunkStyle LineNumber {
 			get {

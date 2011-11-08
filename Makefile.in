@@ -36,6 +36,7 @@ POST_UNINSTALL = :
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/mdtool.in \
 	$(srcdir)/monodevelop-core-addins.pc.in \
+	$(srcdir)/monodevelop-core-mac-addins.pc.in \
 	$(srcdir)/monodevelop.in $(srcdir)/monodevelop.pc.in \
 	$(srcdir)/monodevelop.spec.in $(top_srcdir)/Makefile.include \
 	$(top_srcdir)/configure AUTHORS COPYING ChangeLog NEWS \
@@ -49,7 +50,8 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES = monodevelop mdtool monodevelop.pc \
-	monodevelop-core-addins.pc monodevelop.spec
+	monodevelop-core-addins.pc monodevelop-core-mac-addins.pc \
+	monodevelop.spec
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -303,7 +305,7 @@ DOCFILES = \
 	build/bin/MonoDevelop.Projects.Gui.dll
 
 #	cd docs/apiguide && mdassembler --out monodevelop-api-guide --xhtml toc.xhtml && mv monodevelop-api-guide.zip ../web/sources
-MD_LAUNCH = $(MD_LAUNCH_SETUP) exec -a "monodevelop" $(RUNTIME)
+MD_LAUNCH = $(MD_LAUNCH_SETUP) UBUNTU_MENUPROXY=0 exec -a "monodevelop" $(RUNTIME)
 #mkdir -p $(MAC_APP_DIR)/Contents/{MacOS,Resources}
 #mkdir -p $(MAC_APP_LIB_DIR)
 #cp -a build/AddIns $(MAC_APP_LIB_DIR)
@@ -390,6 +392,8 @@ mdtool: $(top_builddir)/config.status $(srcdir)/mdtool.in
 monodevelop.pc: $(top_builddir)/config.status $(srcdir)/monodevelop.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 monodevelop-core-addins.pc: $(top_builddir)/config.status $(srcdir)/monodevelop-core-addins.pc.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+monodevelop-core-mac-addins.pc: $(top_builddir)/config.status $(srcdir)/monodevelop-core-mac-addins.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 monodevelop.spec: $(top_builddir)/config.status $(srcdir)/monodevelop.spec.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
@@ -997,7 +1001,7 @@ apidocs:
 run: runmd
 
 runmd: $(PROGRAM)
-	UBUNTU_MENUPROXY=0 $(MD_LAUNCH) --debug $(MD_BIN_PATH)/MonoDevelop.exe
+	$(MD_LAUNCH) --debug $(MD_BIN_PATH)/MonoDevelop.exe
 
 run-debug: $(PROGRAM)
 	MONODEVELOP_CONSOLE_LOG_LEVEL=All $(MD_LAUNCH) --debug=casts $(MD_BIN_PATH)/MonoDevelop.exe
@@ -1034,7 +1038,7 @@ abs_top_builddir ?= $(top_builddir)
 .PHONY: vcrevision
 
 package-monomac:
-	$(MD_LAUNCH_SETUP) mono --debug "build/bin/mdrun.exe" setup pack ../extras/MonoDevelop.MonoMac/build/MonoDevelop.MonoMac.dll
+	$(MD_LAUNCH_SETUP) mono --debug "build/bin/mdtool.exe" setup pack ../extras/MonoDevelop.MonoMac/build/MonoDevelop.MonoMac.dll
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

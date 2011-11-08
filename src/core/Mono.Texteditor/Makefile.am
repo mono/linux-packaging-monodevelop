@@ -21,6 +21,7 @@ FILES =  \
 	Mono.TextEditor.Highlighting/Chunk.cs \
 	Mono.TextEditor.Highlighting/ChunkStyle.cs \
 	Mono.TextEditor.Highlighting/CloneableStack.cs \
+	Mono.TextEditor.Highlighting/ColorSheme.cs \
 	Mono.TextEditor.Highlighting/DefaultStyle.cs \
 	Mono.TextEditor.Highlighting/HighlightingPartitioner.cs \
 	Mono.TextEditor.Highlighting/IXmlProvider.cs \
@@ -33,7 +34,6 @@ FILES =  \
 	Mono.TextEditor.Highlighting/Rule.cs \
 	Mono.TextEditor.Highlighting/SemanticRule.cs \
 	Mono.TextEditor.Highlighting/Span.cs \
-	Mono.TextEditor.Highlighting/Style.cs \
 	Mono.TextEditor.Highlighting/SyntaxMode.cs \
 	Mono.TextEditor.Highlighting/SyntaxModeService.cs \
 	Mono.TextEditor.Highlighting/XmlReadHelper.cs \
@@ -69,6 +69,7 @@ FILES =  \
 	Mono.TextEditor.Vi/ViMode.cs \
 	Mono.TextEditor.Vi/ViWordFindStrategy.cs \
 	Mono.TextEditor/AbstractPartitioner.cs \
+	Mono.TextEditor/Annotatable.cs \
 	Mono.TextEditor/BookmarkActions.cs \
 	Mono.TextEditor/BookmarkMarker.cs \
 	Mono.TextEditor/BufferedTextReader.cs \
@@ -91,7 +92,9 @@ FILES =  \
 	Mono.TextEditor/FoldMarkerMargin.cs \
 	Mono.TextEditor/FoldSegment.cs \
 	Mono.TextEditor/GapBuffer.cs \
+	Mono.TextEditor/GtkWorkarounds.cs \
 	Mono.TextEditor/GutterMargin.cs \
+	Mono.TextEditor/HeightTree.cs \
 	Mono.TextEditor/HelperMethods.cs \
 	Mono.TextEditor/HslColor.cs \
 	Mono.TextEditor/IAnimationDrawer.cs \
@@ -150,6 +153,8 @@ RES =  \
 	gtk-gui/gui.stetic \
 	Styles/BrownStyle.xml \
 	Styles/C64Style.xml \
+	Styles/DefaultStyle.xml \
+	Styles/GeditStyle.xml \
 	Styles/IrBlackStyle.xml \
 	Styles/OblivionStyle.xml \
 	Styles/Styles.xsd \
@@ -158,6 +163,7 @@ RES =  \
 	SyntaxModes/ActionScriptSyntaxMode.xml \
 	SyntaxModes/AspNetSyntaxMode.xml \
 	SyntaxModes/BooSyntaxMode.xml \
+	SyntaxModes/CGSyntaxMode.xml \
 	SyntaxModes/ChangeLogSyntaxMode.xml \
 	SyntaxModes/CPPSyntaxMode.xml \
 	SyntaxModes/CSharpSyntaxMode.xml \
@@ -168,10 +174,13 @@ RES =  \
 	SyntaxModes/JavascriptSyntaxMode.xml \
 	SyntaxModes/JavaSyntaxMode.xml \
 	SyntaxModes/JaySyntaxMode.xml \
+	SyntaxModes/JsonSyntaxMode.xml \
 	SyntaxModes/LuaSyntaxMode.xml \
 	SyntaxModes/MakefileSyntaxMode.xml \
 	SyntaxModes/PythonSyntaxMode.xml \
 	SyntaxModes/RubySyntaxMode.xml \
+	SyntaxModes/ShellScriptSyntaxMode.xml \
+	SyntaxModes/StringsSyntaxMode.xml \
 	SyntaxModes/ValaSyntaxMode.xml \
 	SyntaxModes/VBNetSyntaxMode.xml \
 	SyntaxModes/XmlSyntaxMode.xml

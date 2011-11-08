@@ -3,4 +3,8 @@
     <itemgroups />
     <signals />
   </object>
+  <object type="MonoDevelop.CSharp.Inspection.NamingConventionPanelWidget" palette-category="General" allow-children="false" base-type="Gtk.Bin">
+    <itemgroups />
+    <signals />
+  </object>
 </objects>

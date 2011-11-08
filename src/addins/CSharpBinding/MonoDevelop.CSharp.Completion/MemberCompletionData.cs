@@ -26,6 +26,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Xml;
 using MonoDevelop.Ide.CodeCompletion;
@@ -35,12 +36,14 @@ using MonoDevelop.Projects.Dom.Output;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.CSharp.Ast;
+using ICSharpCode.NRefactory.CSharp;
+using Mono.TextEditor;
 
 namespace MonoDevelop.CSharp.Completion
 {
 	public class MemberCompletionData : MonoDevelop.Ide.CodeCompletion.MemberCompletionData
 	{
+		CSharpTextEditorCompletion editorCompletion;
 		OutputFlags flags;
 		bool hideExtensionParameter = true;
 		static CSharpAmbience ambience = new CSharpAmbience ();
@@ -50,6 +53,18 @@ namespace MonoDevelop.CSharp.Completion
 		string displayText;
 		
 		Dictionary<string, CompletionData> overloads;
+		
+		Mono.TextEditor.TextEditorData Editor {
+			get {
+				return editorCompletion.textEditorData;
+			}
+		}
+		
+		MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy Policy {
+			get {
+				return editorCompletion.policy;
+			}
+		}
 		
 		public override string Description {
 			get {
@@ -93,14 +108,147 @@ namespace MonoDevelop.CSharp.Completion
 			}
 		}
 		
-		public MemberCompletionData (INode member, OutputFlags flags) 
+		public bool IsDelegateExpected { get; set; }
+		
+		public MemberCompletionData (CSharpTextEditorCompletion  editorCompletion, INode member, OutputFlags flags)
 		{
+			this.editorCompletion = editorCompletion;
 			this.flags = flags;
 			SetMember (member);
 			DisplayFlags = DisplayFlags.DescriptionHasMarkup;
 			IMember m = Member as IMember;
 			if (m != null && m.IsObsolete)
 				DisplayFlags |= DisplayFlags.Obsolete;
+		}
+		
+		public bool SearchBracket (int start, out int pos)
+		{
+			pos = -1;
+			
+			for (int i = start; i < Editor.Length; i++) {
+				char ch = Editor.GetCharAt (i);
+				if (ch == '(') {
+					pos = i + 1;
+					return true;
+				}
+				if (!char.IsWhiteSpace (ch))
+					return false;
+			}
+			return false;
+		}
+		
+		static bool HasNonMethodMembersWithSameName (MonoDevelop.Projects.Dom.IMember member)
+		{
+			var type = member.DeclaringType;
+			foreach (var t in type.SourceProjectDom.GetInheritanceTree (type)) {
+				if (t.SearchMember (member.Name, true).Any (m => m.MemberType != MonoDevelop.Projects.Dom.MemberType.Method)) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		bool HasAnyOverloadWithParameters (IMethod method)
+		{
+			var type = method.DeclaringType;
+			List<IType > accessibleExtTypes = DomType.GetAccessibleExtensionTypes (editorCompletion.Dom, editorCompletion.GetDocument ().CompilationUnit);
+			
+			foreach (var t in type.SourceProjectDom.GetInheritanceTree (type)) {
+				if (t.Methods.Concat (t.GetExtensionMethods (accessibleExtTypes, method.Name)).Any (m => m.Parameters.Count > 0))
+					return true;
+			}
+			return false;
+		}
+		
+		public override void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
+		{
+			string text = CompletionText;
+			string partialWord = GetCurrentWord (window);
+			int skipChars = 0;
+			bool runParameterCompletionCommand = false;
+			
+			if (keyChar == '(' && !IsDelegateExpected && Member is IMethod  && !HasNonMethodMembersWithSameName ((IMember)Member)) {
+				int pos;
+				if (SearchBracket (window.CodeCompletionContext.TriggerOffset + partialWord.Length, out pos)) {
+					window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, partialWord, text);
+					ka |= KeyActions.Ignore;
+					int bracketOffset = pos + text.Length - partialWord.Length;
+					
+					// correct white space before method call.
+					char charBeforeBracket = bracketOffset > 1 ? Editor.GetCharAt (bracketOffset - 2) : '\0';
+					if (Policy.BeforeMethodCallParentheses) {
+						if (charBeforeBracket != ' ') {
+							Editor.Insert (bracketOffset - 1, " ");
+							bracketOffset++;
+						}
+					} else { 
+						if (char.IsWhiteSpace (charBeforeBracket)) {
+							while (bracketOffset > 1 && char.IsWhiteSpace (Editor.GetCharAt (bracketOffset - 2))) {
+								Editor.Remove (bracketOffset - 1, 1);
+								bracketOffset--;
+							}
+						}
+					}
+					
+					Editor.Caret.Offset = bracketOffset;
+					return;
+				}
+				
+				IMethod method = (IMethod)Member;
+				var line = Editor.GetLine (Editor.Caret.Line);
+				string textToEnd = Editor.GetTextBetween (window.CodeCompletionContext.TriggerOffset + partialWord.Length, line.Offset + line.EditableLength);
+				if (Policy.BeforeMethodCallParentheses)
+					text += " ";
+				int exprStart = window.CodeCompletionContext.TriggerOffset;
+				while (exprStart > line.Offset) {
+					char ch = Editor.GetCharAt (exprStart);
+					if (ch != '.' && ch != '_' && /*ch != '<' && ch != '>' && */!char.IsLetterOrDigit (ch))
+						break;
+					exprStart--;
+				}
+				string textBefore = Editor.GetTextBetween (line.Offset, exprStart);
+				
+				bool insertSemicolon = false;
+				if (string.IsNullOrEmpty ((textBefore + textToEnd).Trim ()))
+					insertSemicolon = true;
+				
+				if (HasAnyOverloadWithParameters (method)) {
+					if (insertSemicolon) {
+						text += "(|);";
+						skipChars = 2;
+					} else {
+						text += "(|)";
+						skipChars = 1;
+					}
+					runParameterCompletionCommand = true;
+				} else {
+					if (insertSemicolon) {
+						text += "();|";
+					} else {
+						text += "()|";
+					}
+				}
+				if (keyChar == '(') {
+					var skipChar = Editor.SkipChars.LastOrDefault ();
+					if (skipChar != null && skipChar.Offset == (window.CodeCompletionContext.TriggerOffset + partialWord.Length) && skipChar.Char == ')')
+						Editor.Remove (skipChar.Offset, 1);
+				}
+				
+				ka |= KeyActions.Ignore;
+			}
+			
+			if (text == partialWord) 
+				return;
+
+			window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, partialWord, text);
+			int offset = Editor.Caret.Offset;
+			for (int i = 0; i < skipChars; i++) {
+				Editor.SetSkipChar (offset, Editor.GetCharAt (offset));
+				offset++;
+			}
+			
+			if (runParameterCompletionCommand)
+				editorCompletion.RunParameterCompletionCommand ();
 		}
 		
 		void SetMember (INode member)
@@ -135,8 +283,8 @@ namespace MonoDevelop.CSharp.Completion
 					sb.Append (GettextCatalog.GetString ("[Obsolete]"));
 					DisplayFlags |= DisplayFlags.Obsolete;
 				}
-				var returnType = m.SourceProjectDom.GetType (m.ReturnType);
-				if (returnType != null && returnType.ClassType == ClassType.Delegate) {
+				var returnType = m.SourceProjectDom != null ? m.SourceProjectDom.GetType (m.ReturnType) : null;
+				if (returnType != null && returnType.ClassType == MonoDevelop.Projects.Dom.ClassType.Delegate) {
 					sb.AppendLine ();
 					sb.AppendLine (GettextCatalog.GetString ("Delegate information"));
 					sb.Append (ambience.GetString (returnType, OutputFlags.ReformatDelegates | OutputFlags.IncludeReturnType | OutputFlags.IncludeParameters | OutputFlags.IncludeParameterName));

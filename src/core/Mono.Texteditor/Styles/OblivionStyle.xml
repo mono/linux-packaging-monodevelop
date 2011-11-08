@@ -64,8 +64,6 @@
 	<Style name="text.background.searchresult-main" color="#008080"/>
 	<Style name="text.link" color="butter2"/>
 	
-	<Style name="caret" color="aluminium2" bgColor="aluminium6"/>
-	
 	<Style name="marker.line" color="aluminium7"/>
 	<Style name="marker.line.changed" color="chameleon2"/>
 	<Style name="marker.line.dirty" color="butter2"/>
@@ -98,35 +96,8 @@
 	
 
 	<Style name="bubble">
-		<Style name="warning.light.color1" color="#444400"/>
-		<Style name="warning.light.color2" color="#333300"/>
-		<Style name="warning.dark.color1" color="#333300"/>
-		<Style name="warning.dark.color2" color="#222200"/>
-		<Style name="warning.line.top" color="#222200"/>
-		<Style name="warning.line.bottom" color="#222200"/>
-		<Style name="warning.text" color="aluminium3"/>
-		
-		<Style name="inactive.warning.light.color1" color="#44442E"/>
-		<Style name="inactive.warning.light.color2" color="#33332E"/>
-		<Style name="inactive.warning.dark.color1" color="#33332E"/>
-		<Style name="inactive.warning.dark.color2" color="#22222E"/>
-		<Style name="inactive.warning.line.top" color="#22222E"/>
-		<Style name="inactive.warning.line.bottom" color="#22222E"/>
-		
-		<Style name="error.light.color1" color="#440000"/>
-		<Style name="error.light.color2" color="#330000"/>
-		<Style name="error.dark.color1" color="#330000"/>
-		<Style name="error.dark.color2" color="#220000"/>
-		<Style name="error.line.top" color="#220000"/>
-		<Style name="error.line.bottom" color="#220000"/>
-		<Style name="error.text" color="aluminium3"/>
-		
-		<Style name="inactive.error.light.color1" color="#442222"/>
-		<Style name="inactive.error.light.color2" color="#332222"/>
-		<Style name="inactive.error.dark.color1" color="#332222"/>
-		<Style name="inactive.error.dark.color2" color="#222222"/>
-		<Style name="inactive.error.line.top" color="#222222"/>
-		<Style name="inactive.error.line.bottom" color="#222222"/>
+		<Style name="warning" color="aluminium3" bgColor="#444400"/>
+		<Style name="error" color="aluminium3" bgColor="#440000"/>
 	</Style>
 	
 	
@@ -166,7 +137,6 @@
 	<Style name="comment.keyword" color="aluminium4" weight="bold" />
 	<Style name="comment.tag" color="aluminium4"/>
 	
-	<Style name="text.literal" color="butter2"/>
 	<Style name="text.punctuation" color="butter2"/>
 	<Style name="text.preprocessor" color="skyblue1" weight="italic"/>
 	<Style name="text.preprocessor.keyword" color="skyblue1" weight="bold"/>
@@ -201,5 +171,6 @@
 	<Style name="keyword.misc" color="white" weight="bold"/>
 	
 	<Style name="keyword.semantic.type" color="chameleon1"/>
+	<Style name="keyword.semantic.field" color="aluminium2" weight="Italic"/>
 	
 </EditorStyle>

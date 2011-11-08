@@ -39,7 +39,7 @@ using System.Text;
 using Mono.TextEditor.PopupWindow;
 using MonoDevelop.Refactoring;
 using MonoDevelop.CSharp.Parser;
-using MonoDevelop.CSharp.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Projects.Text;
 using MonoDevelop.Projects.Dom.Output;
 using MonoDevelop.CSharp.Resolver;
@@ -161,7 +161,7 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 				set;
 			}
 			
-			public Modifiers Modifiers {
+			public MonoDevelop.Projects.Dom.Modifiers Modifiers {
 				get;
 				set;
 			}
@@ -276,7 +276,6 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 			param.StartOffset = startOffset;
 			param.EndOffset = endOffset;
 			param.Nodes = new List<AstNode> (unit.GetNodesBetween (startLocation.Line, startLocation.Column, endLocation.Line, endLocation.Column));
-			
 			string text = options.Document.Editor.GetTextBetween (startLocation, endLocation);
 			
 			param.Text = RemoveIndent (text, GetIndent (data.GetTextBetween (data.GetLine (startLocation.Line).Offset, data.GetLine (endLocation.Line).EndOffset))).TrimEnd ('\n', '\r');
@@ -321,7 +320,7 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 				if (startOffset < bodyStartOffset || bodyEndOffset < endOffset)
 					return false;
 				text = data.Document.GetTextBetween (bodyStartOffset, startOffset) + data.Document.GetTextBetween (endOffset, bodyEndOffset);
-				//				ICSharpCode.NRefactory.Ast.INode parsedNode = provider.ParseText (text);
+				//				ICSharpCode.OldNRefactory.Ast.INode parsedNode = provider.ParseText (text);
 				//				visitor = new VariableLookupVisitor (resolver, param.Location);
 				//				visitor.CutRegion = new DomRegion (data.MainSelection.MinLine, data.MainSelection.MaxLine);
 				//				visitor.MemberLocation = new Location (param.DeclaringMember.Location.Column, param.DeclaringMember.Location.Line);
@@ -423,7 +422,7 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 			result.ReturnType = param.ExpressionType ?? DomReturnType.Void;
 			result.Modifiers = param.Modifiers;
 			if (!param.ReferencesMember)
-				result.Modifiers |= Modifiers.Static;
+				result.Modifiers |= MonoDevelop.Projects.Dom.Modifiers.Static;
 			
 			if (param.Parameters == null)
 				return result;

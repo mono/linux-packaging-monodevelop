@@ -15,7 +15,7 @@ namespace MonoDevelop.Debugger
 		private global::MonoDevelop.Debugger.ObjectValueTreeView valueView;
 		private global::Gtk.Label page1;
 		private global::Gtk.Button buttonOk;
-
+		
 		protected virtual void Build ()
 		{
 			global::Stetic.Gui.Initialize (this);

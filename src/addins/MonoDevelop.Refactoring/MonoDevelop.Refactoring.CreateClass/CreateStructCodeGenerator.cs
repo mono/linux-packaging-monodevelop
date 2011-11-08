@@ -41,9 +41,9 @@ namespace MonoDevelop.Refactoring.CreateClass
 			return GettextCatalog.GetString ("C_reate Struct");
 		}
 		
-		protected override ICSharpCode.NRefactory.Ast.ClassType GetNewTypeType ()
+		protected override ICSharpCode.NRefactory.CSharp.ClassType GetNewTypeType ()
 		{
-			return ICSharpCode.NRefactory.Ast.ClassType.Struct;
+			return ICSharpCode.NRefactory.CSharp.ClassType.Struct;
 		}
 	}
 }

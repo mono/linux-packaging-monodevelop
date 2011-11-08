@@ -39,12 +39,23 @@ namespace MonoDevelop.Ide
 	{
 		static bool sending;
 		static object sendingLock = new object ();
+		static FeedbackDialog currentFeedbackDialog;
 		
-		public static void ShowFeedbackWidnow ()
+		public static bool IsFeedbackWindowVisible {
+			get { return currentFeedbackDialog != null && currentFeedbackDialog.Visible; }
+		}
+		
+		public static void ShowFeedbackWindow ()
 		{
-			var p = FeedbackPositionGetter ();
-			FeedbackDialog d = new FeedbackDialog (p.X, p.Y);
-			d.Show ();
+			if (currentFeedbackDialog == null) {
+				var p = FeedbackPositionGetter ();
+				currentFeedbackDialog = new FeedbackDialog (p.X, p.Y);
+				currentFeedbackDialog.Show ();
+				currentFeedbackDialog.Destroyed += delegate {
+					currentFeedbackDialog = null;
+				};
+			} else
+				currentFeedbackDialog.Show ();
 		}
 		
 		internal static Func<Gdk.Point> FeedbackPositionGetter { get; set; }
@@ -58,7 +69,7 @@ namespace MonoDevelop.Ide
 		}
 		
 		static FilePath FeedbackFile {
-			get { return PropertyService.Locations.Data.Combine ("Feedback.xml"); }
+			get { return UserProfile.Current.LocalConfigDir.Combine ("Feedback.xml"); }
 		}
 		
 		public static void SendFeedback (string email, string body)
@@ -81,8 +92,9 @@ namespace MonoDevelop.Ide
 				header += "Runtime: Microsoft .NET v" + Environment.Version + "\n";
 			}
 			
-			string os = PropertyService.IsMac ? "Mac OSX" : (PropertyService.IsWindows ? "Windows" : "Linux");
+			string os = Platform.IsMac ? "Mac OSX" : (Platform.IsWindows ? "Windows" : "Linux");
 			header += "Operating System: " + os + " (" + Environment.OSVersion + ")\n";
+			header += "Distributor: " + PropertyService.Get <string> ("MonoDevelop.Distributor", "Xamarin") + "\n";
 			
 			body = header + "\n" + body;
 			

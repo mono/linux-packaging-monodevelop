@@ -51,7 +51,7 @@ using MonoDevelop.Projects.Dom.Parser;
 namespace MonoDevelop.AspNet
 {
 	[DataInclude (typeof(AspNetAppProjectConfiguration))]
-	public class AspNetAppProject : DotNetProject
+	public class AspNetAppProject : DotNetAssemblyProject
 	{
 		[ItemProperty("XspParameters", IsExternal=true)]
 		protected XspParameters xspParameters = new XspParameters ();
@@ -126,12 +126,6 @@ namespace MonoDevelop.AspNet
 					registrationCache = new RegistrationCache (this);
 				return registrationCache;
 			}
-		}
-		
-		public override bool SupportsFramework (TargetFramework framework)
-		{
-			//only support 1.1, 2.0, 3.5, 4.0 etc, not monotouch, moonlight and so on
-			return framework.Id.Identifier == TargetFrameworkMoniker.ID_NET_FRAMEWORK && base.SupportsFramework (framework);
 		}
 		
 		#endregion
@@ -346,7 +340,7 @@ namespace MonoDevelop.AspNet
 			var dllName = parsed.Name + ".dll";
 			
 			foreach (var reference in References) {
-				if (reference.ReferenceType == ReferenceType.Gac || reference.ReferenceType == ReferenceType.Assembly) {
+				if (reference.ReferenceType == ReferenceType.Package || reference.ReferenceType == ReferenceType.Assembly) {
 					foreach (string refPath in reference.GetReferencedFileNames (null))
 						if (Path.GetFileName (refPath) == dllName)
 							return ProjectDomService.GetAssemblyDom (TargetRuntime, refPath);

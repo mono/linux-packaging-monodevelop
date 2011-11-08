@@ -20,7 +20,7 @@ namespace MonoDevelop.Ide.Projects
 		private global::Gtk.Label labelPolicies;
 		private global::Gtk.Button buttonCancel;
 		private global::Gtk.Button buttonOk;
-
+		
 		protected virtual void Build ()
 		{
 			global::Stetic.Gui.Initialize (this);
@@ -192,7 +192,7 @@ namespace MonoDevelop.Ide.Projects
 			}
 			this.DefaultWidth = 528;
 			this.DefaultHeight = 254;
-			this.Show ();
+			this.Hide ();
 			this.radioCustom.Toggled += new global::System.EventHandler (this.OnRadioCustomToggled);
 			this.buttonOk.Clicked += new global::System.EventHandler (this.OnButtonOkClicked);
 		}

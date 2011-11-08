@@ -53,6 +53,12 @@ namespace Mono.TextEditor
 			private set;
 		}
 		
+		public bool IsEmptyText {
+			get {
+				return string.IsNullOrEmpty ((layout.Text ?? "").Trim ());
+			}
+		}
+		
 		public CodeSegmentPreviewWindow (TextEditor editor, bool hideCodeSegmentPreviewInformString, ISegment segment) : this(editor, hideCodeSegmentPreviewInformString, segment, DefaultPreviewWindowWidth, DefaultPreviewWindowHeight)
 		{
 		}
@@ -102,7 +108,7 @@ namespace Mono.TextEditor
 				w = System.Math.Max (w, w2);
 				h += h2;
 			}
-			Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtWindow (editor.GdkWindow));
+			Gdk.Rectangle geometry = Screen.GetUsableMonitorGeometry (Screen.GetMonitorAtWindow (editor.GdkWindow));
 			this.SetSizeRequest (System.Math.Max (1, System.Math.Min (w + 3, geometry.Width * 2 / 5)), 
 			                     System.Math.Max (1, System.Math.Min (h + 3, geometry.Height * 2 / 5)));
 		}

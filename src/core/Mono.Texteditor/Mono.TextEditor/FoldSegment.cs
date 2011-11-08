@@ -38,11 +38,15 @@ namespace Mono.TextEditor
 				return isFolded;
 			}
 			set {
-				isFolded = value;
-				if (isAttached)
-					doc.InformFoldChanged (new FoldSegmentEventArgs (this));
+				if (isFolded != value) {
+					isFolded = value;
+					if (isAttached)
+						doc.InformFoldChanged (new FoldSegmentEventArgs (this));
+				}
 			}
 		}
+		
+		public HeightTree.FoldMarker Marker { get; set;}
 		
 		public string Description { get; set; }
 		

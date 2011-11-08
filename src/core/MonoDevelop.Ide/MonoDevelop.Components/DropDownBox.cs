@@ -28,6 +28,8 @@ using System;
 using System.ComponentModel;
 using Gtk;
 
+using MonoDevelop.Ide;
+
 namespace MonoDevelop.Components
 {
 	[Category ("Widgets")]
@@ -44,7 +46,7 @@ namespace MonoDevelop.Components
 				return layout.Text;
 			}
 			set {
-				layout.SetText (value);
+				layout.SetMarkup (value);
 //				QueueResize ();
 			}
 		}
@@ -107,7 +109,7 @@ namespace MonoDevelop.Components
 			window.WidthRequest = Allocation.Width;
 			int width, height;
 			window.GetSizeRequest (out width, out height);
-			Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtPoint (dx, dy));
+			Gdk.Rectangle geometry = DesktopService.GetUsableMonitorGeometry (Screen, Screen.GetMonitorAtPoint (dx, dy));
 			
 			if (dy + height > geometry.Bottom)
 				dy = oy + this.Allocation.Y - height;
@@ -134,7 +136,7 @@ namespace MonoDevelop.Components
 		
 		public void SetItem (int i)
 		{
-			SetItem (DataProvider.GetText (i), DataProvider.GetIcon (i), DataProvider.GetTag (i));
+			SetItem (DataProvider.GetMarkup (i), DataProvider.GetIcon (i), DataProvider.GetTag (i));
 		}
 		
 		protected override void OnDestroyed ()

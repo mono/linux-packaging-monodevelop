@@ -39,7 +39,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		ClassEntry entry;
 		bool isLoaded = false;
 		IType wrappedType = null;
-		IType WrappedType {
+		public IType WrappedType {
 			get {
 				if (!isLoaded) {
 					isLoaded = true;
@@ -172,7 +172,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		
 		public override IEnumerable<IProperty> Properties {
 			get {
-				if (HasContent (ContentFlags.HasProperties))
+				if (HasContent (ContentFlags.HasProperties) || HasContent (ContentFlags.HasIndexers))
 					return WrappedType.Properties;
 				return new IProperty [0];
 			}

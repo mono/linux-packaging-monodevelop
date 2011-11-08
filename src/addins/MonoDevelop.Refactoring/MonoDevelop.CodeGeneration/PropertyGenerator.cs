@@ -26,10 +26,7 @@
 
 using System;
 
-using ICSharpCode.NRefactory;
-using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory.PrettyPrinter;
-
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects.Dom;

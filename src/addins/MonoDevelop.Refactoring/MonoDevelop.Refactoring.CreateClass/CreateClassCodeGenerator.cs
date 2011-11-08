@@ -29,9 +29,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-using ICSharpCode.NRefactory;
-using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory.PrettyPrinter;
+using ICSharpCode.NRefactory.CSharp;
 
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
@@ -136,15 +134,16 @@ namespace MonoDevelop.Refactoring.CreateClass
 			INRefactoryASTProvider provider = options.GetASTProvider ();
 			if (resolver == null || provider == null)
 				return result;
+			
+			var newType = new TypeDeclaration ();
+			newType.Name = provider.OutputNode (options.Dom, createExpression.Type);
+			newType.ClassType = GetNewTypeType ();
 
-			TypeDeclaration newType = new TypeDeclaration (ICSharpCode.NRefactory.Ast.Modifiers.None, null);
-			newType.Name = createExpression.CreateType.Type;
-			newType.Type = GetNewTypeType ();
-
-			ConstructorDeclaration constructor = new ConstructorDeclaration (newType.Name, ICSharpCode.NRefactory.Ast.Modifiers.Public, null, null);
+			var constructor = new ConstructorDeclaration ();
+			constructor.Modifiers = ICSharpCode.NRefactory.CSharp.Modifiers.Public;
 			constructor.Body = new BlockStatement ();
 			int i = 0;
-			foreach (Expression expression in createExpression.Parameters) {
+			foreach (var expression in createExpression.Arguments) {
 				i++;
 				string output = provider.OutputNode (options.Dom, expression);
 				string parameterName;
@@ -155,19 +154,18 @@ namespace MonoDevelop.Refactoring.CreateClass
 				}
 
 				ResolveResult resolveResult2 = resolver.Resolve (new ExpressionResult (output), options.ResolveResult.ResolvedExpression.Region.Start);
-				TypeReference typeReference = new TypeReference (resolveResult2.ResolvedType.ToInvariantString ());
-				typeReference.IsKeyword = true;
-				ParameterDeclarationExpression pde = new ParameterDeclarationExpression (typeReference, parameterName);
+				var typeReference = new SimpleType (resolveResult2.ResolvedType.ToInvariantString ());
+				var pde = new ParameterDeclaration (typeReference, parameterName);
 				constructor.Parameters.Add (pde);
 			}
-			ICSharpCode.NRefactory.Ast.INode node = newType;
+			AstNode node = newType;
 			IType curType = options.Document.CompilationUnit.GetTypeAt (options.Document.Editor.Caret.Line, options.Document.Editor.Caret.Column);
 			if (curType != null && !string.IsNullOrEmpty (curType.Namespace)) {
-				NamespaceDeclaration namespaceDeclaration = new NamespaceDeclaration (curType.Namespace);
-				namespaceDeclaration.Children.Add (newType);
+				var namespaceDeclaration = new NamespaceDeclaration (curType.Namespace);
+				namespaceDeclaration.Members.Add (newType);
 				node = namespaceDeclaration;
 			}
-			newType.Children.Add (constructor);
+			newType.Members.Add (constructor);
 			string fileName = GetName (Path.Combine (Path.GetDirectoryName (options.Document.FileName), newType.Name + Path.GetExtension (options.Document.FileName)));
 			string header = options.Dom.Project is DotNetProject ? StandardHeaderService.GetHeader (options.Dom.Project, fileName, true) + Environment.NewLine : "";
 			CreateFileChange createFile = new CreateFileChange (fileName, header + provider.OutputNode (options.Dom, node));
@@ -176,9 +174,9 @@ namespace MonoDevelop.Refactoring.CreateClass
 			return result;
 		}
 
-		protected virtual ICSharpCode.NRefactory.Ast.ClassType GetNewTypeType ()
+		protected virtual ICSharpCode.NRefactory.CSharp.ClassType GetNewTypeType ()
 		{
-			return ICSharpCode.NRefactory.Ast.ClassType.Class;
+			return ICSharpCode.NRefactory.CSharp.ClassType.Class;
 		}
 
 	}

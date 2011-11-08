@@ -9,7 +9,11 @@ using System.Linq;
 
 namespace MonoDevelop.VersionControl.Views
 {
-	public class LogView : BaseView, IAttachableViewContent 
+	public interface ILogView : IAttachableViewContent
+	{
+	}
+	
+	public class LogView : BaseView, ILogView 
 	{
 		string filepath;
 		LogWidget widget;
@@ -21,19 +25,6 @@ namespace MonoDevelop.VersionControl.Views
 		public LogWidget LogWidget {
 			get {
 				return this.widget;
-			}
-		}
-		
-		public static void Show (VersionControlItemList items, Revision since)
-		{
-			foreach (VersionControlItem item in items) {
-				if (!item.IsDirectory) {
-					var document = IdeApp.Workbench.OpenDocument (item.Path, OpenDocumentOptions.Default | OpenDocumentOptions.OnlyInternalViewer);
-					DiffView.AttachViewContents (document, item);
-					document.Window.SwitchView (document.Window.FindView (typeof(LogView)));
-				} else if (item.VersionInfo.CanLog) {
-					new Worker (item.Repository, item.Path, item.IsDirectory, since).Start ();
-				}
 			}
 		}
 		

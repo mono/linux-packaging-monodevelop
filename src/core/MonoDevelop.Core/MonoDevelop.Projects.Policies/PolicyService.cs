@@ -56,7 +56,7 @@ namespace MonoDevelop.Projects.Policies
 		
 		static PolicySet defaultPolicies;
 		static PolicyBag defaultPolicyBag = new PolicyBag ();
-		static PolicyBag invariantPolicies = new PolicyBag ();
+		static InvariantPolicyBag invariantPolicies = new InvariantPolicyBag ();
 		
 		static PolicyService ()
 		{
@@ -934,7 +934,7 @@ namespace MonoDevelop.Projects.Policies
 		
 		static FilePath PoliciesFolder {
 			get {
-				return Path.Combine (PropertyService.Locations.Data, "Policies");
+				return UserProfile.Current.UserDataRoot.Combine ("Policies");
 			}
 		}
 		
@@ -1353,6 +1353,31 @@ namespace MonoDevelop.Projects.Policies
 		
 		public string Scope {
 			get { return scope; }
+		}
+	}
+	
+	class InvariantPolicyBag: PolicyContainer
+	{
+		public override bool IsRoot {
+			get {
+				return true;
+			}
+		}
+		
+		public override PolicyContainer ParentPolicies {
+			get {
+				return null;
+			}
+		}
+		
+		protected override T GetDefaultPolicy<T> ()
+		{
+			return new T ();
+		}
+		
+		protected override T GetDefaultPolicy<T> (IEnumerable<string> scopes)
+		{
+			return new T ();
 		}
 	}
 }

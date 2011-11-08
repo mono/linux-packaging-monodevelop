@@ -32,14 +32,28 @@ using MonoDevelop.Core;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.CodeGeneration;
+using MonoDevelop.Projects.Dom;
+using System.Linq;
+using MonoDevelop.AnalysisCore;
+using MonoDevelop.Inspection;
 
 namespace MonoDevelop.Refactoring
 {
+	using MonoDevelop.ContextAction;
+
 	public static class RefactoringService
 	{
 		static List<RefactoringOperation> refactorings = new List<RefactoringOperation>();
 		static List<INRefactoryASTProvider> astProviders = new List<INRefactoryASTProvider>();
 		static List<ICodeGenerator> codeGenerators = new List<ICodeGenerator>();
+		static List<ContextActionAddinNode> contextActions = new List<ContextActionAddinNode> ();
+		static List<InspectorAddinNode> inspectors = new List<InspectorAddinNode> ();
+		
+		public static IEnumerable<ContextActionAddinNode> ContextAddinNodes {
+			get {
+				return contextActions;
+			}
+		} 
 		
 		static RefactoringService ()
 		{
@@ -75,6 +89,29 @@ namespace MonoDevelop.Refactoring
 					break;
 				}
 			});
+			
+//			AddinManager.AddExtensionNodeHandler ("/MonoDevelop/Refactoring/ContextActions", delegate(object sender, ExtensionNodeEventArgs args) {
+//				switch (args.Change) {
+//				case ExtensionChange.Add:
+//					contextActions.Add ((ContextActionAddinNode)args.ExtensionNode);
+//					break;
+//				case ExtensionChange.Remove:
+//					contextActions.Remove ((ContextActionAddinNode)args.ExtensionNode);
+//					break;
+//				}
+//			});
+//			
+			AddinManager.AddExtensionNodeHandler ("/MonoDevelop/Refactoring/Inspectors", delegate(object sender, ExtensionNodeEventArgs args) {
+				switch (args.Change) {
+				case ExtensionChange.Add:
+					inspectors.Add ((InspectorAddinNode)args.ExtensionNode);
+					break;
+				case ExtensionChange.Remove:
+					inspectors.Remove ((InspectorAddinNode)args.ExtensionNode);
+					break;
+				}
+			});
+			
 		}
 		
 		public static IEnumerable<RefactoringOperation> Refactorings {
@@ -100,7 +137,7 @@ namespace MonoDevelop.Refactoring
 			{
 				foreach (FileCopyEventInfo args in e) {
 					foreach (Change change in changes) {
-						TextReplaceChange replaceChange = change as TextReplaceChange;
+						var replaceChange = change as TextReplaceChange;
 						if (replaceChange == null)
 							continue;
 						if (args.SourceFile == replaceChange.FileName)
@@ -117,16 +154,16 @@ namespace MonoDevelop.Refactoring
 		
 		public static void AcceptChanges (IProgressMonitor monitor, ProjectDom dom, List<Change> changes, MonoDevelop.Projects.Text.ITextFileProvider fileProvider)
 		{
-			RefactorerContext rctx = new RefactorerContext (dom, fileProvider, null);
-			RenameHandler handler = new RenameHandler (changes);
+			var rctx = new RefactorerContext (dom, fileProvider, null);
+			var handler = new RenameHandler (changes);
 			FileService.FileRenamed += handler.FileRename;
 			for (int i = 0; i < changes.Count; i++) {
 				changes[i].PerformChange (monitor, rctx);
-				TextReplaceChange replaceChange = changes[i] as TextReplaceChange;
+				var replaceChange = changes[i] as TextReplaceChange;
 				if (replaceChange == null)
 					continue;
 				for (int j = i + 1; j < changes.Count; j++) {
-					TextReplaceChange change = changes[j] as TextReplaceChange;
+					var change = changes[j] as TextReplaceChange;
 					if (change == null)
 						continue;
 					if (replaceChange.Offset >= 0 && change.Offset >= 0 && replaceChange.FileName == change.FileName) {
@@ -135,7 +172,7 @@ namespace MonoDevelop.Refactoring
 							if (!string.IsNullOrEmpty (replaceChange.InsertedText))
 								change.Offset += replaceChange.InsertedText.Length;
 						} else if (replaceChange.Offset < change.Offset + change.RemovedChars) {
-							change.RemovedChars -= replaceChange.RemovedChars;
+							change.RemovedChars = Math.Max (0, change.RemovedChars - replaceChange.RemovedChars);
 							change.Offset = replaceChange.Offset + (!string.IsNullOrEmpty (replaceChange.InsertedText) ? replaceChange.InsertedText.Length : 0);
 						}
 					}
@@ -154,5 +191,36 @@ namespace MonoDevelop.Refactoring
 			}
 			return null;
 		}
+		
+		public static IEnumerable<InspectorAddinNode> GetInspectors (string mimeTye)
+		{
+			return inspectors.Where (i => i.MimeType == mimeTye);
+		}
+		
+		public static void QueueQuickFixAnalysis (MonoDevelop.Ide.Gui.Document doc, DomLocation loc, Action<List<ContextAction>> callback)
+		{
+			System.Threading.ThreadPool.QueueUserWorkItem (delegate {
+				try {
+					string disabledNodes = PropertyService.Get ("ContextActions." + doc.Editor.Document.MimeType, "") ?? "";
+					
+					var availableFixes = new List<ContextAction> (contextActions.Where (fix => disabledNodes.IndexOf (fix.Type.FullName) < 0 && fix.Action.IsValid (doc, loc)).Select (fix => fix.Action));
+					var ext = doc.GetContent<MonoDevelop.AnalysisCore.Gui.ResultsEditorExtension> ();
+					if (ext != null) {
+						foreach (var result in ext.GetResultsAtOffset (doc.Editor.LocationToOffset (loc.Line, loc.Column))) {
+							var fresult = result as FixableResult;
+							if (fresult == null)
+								continue;
+							foreach (var action in FixOperationsHandler.GetActions (doc, fresult)) {
+								availableFixes.Add (new AnalysisContextAction (result, action));
+							}
+						}
+					}
+					
+					callback (availableFixes);
+				} catch (Exception ex) {
+					LoggingService.LogError ("Error in analysis service", ex);
+				}
+			});
+		}	
 	}
 }

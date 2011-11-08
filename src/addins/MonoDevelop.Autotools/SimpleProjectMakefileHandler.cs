@@ -146,8 +146,8 @@ namespace MonoDevelop.Autotools
 					string resgen = "resgen";
 					if (System.Environment.Version.Major >= 2) {
 						switch (dotnetProject.TargetFramework.ClrVersion) {
-							case ClrVersion.Net_2_0: resgen = "resgen2"; break;
 							case ClrVersion.Net_1_1: resgen = "resgen1"; break;
+							default: resgen = "resgen2"; break;
 						}
 					}
 					templateEngine.Variables ["RESGEN"] = resgen;
@@ -497,7 +497,7 @@ endif", s.SwitchName.Replace ('-', '_').ToUpperInvariant (), s.Define));
 			// grab pkg-config references
 			foreach (ProjectReference reference in project.References) 
 			{
-				if (reference.ReferenceType == ReferenceType.Gac) 
+				if (reference.ReferenceType == ReferenceType.Package) 
 				{
 					// Get pkg-config keys
 					SystemPackage pkg = reference.Package;
