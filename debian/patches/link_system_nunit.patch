@@ -1,7 +1,7 @@
 Index: monodevelop/src/addins/NUnit/Makefile.am
 ===================================================================
---- monodevelop.orig/src/addins/NUnit/Makefile.am	2011-06-30 18:13:11.000000000 +0100
-+++ monodevelop/src/addins/NUnit/Makefile.am	2011-09-10 14:21:52.570680937 +0100
+--- monodevelop.orig/src/addins/NUnit/Makefile.am	2011-11-08 00:30:37.000000000 +0000
++++ monodevelop/src/addins/NUnit/Makefile.am	2011-11-08 00:48:51.000000000 +0000
 @@ -13,10 +13,7 @@
  	$(GLIB_SHARP_LIBS) \
  	$(GTK_SHARP_LIBS) \
@@ -47,8 +47,8 @@ Index: monodevelop/src/addins/NUnit/Makefile.am
  include $(top_srcdir)/Makefile.include
 Index: monodevelop/src/addins/NUnit/MonoDevelopNUnit.addin.xml
 ===================================================================
---- monodevelop.orig/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-09-10 14:18:37.310305166 +0100
-+++ monodevelop/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-09-10 14:22:56.260803504 +0100
+--- monodevelop.orig/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-11-08 00:33:54.000000000 +0000
++++ monodevelop/src/addins/NUnit/MonoDevelopNUnit.addin.xml	2011-11-08 00:50:12.000000000 +0000
 @@ -10,10 +10,6 @@
  
  	<Runtime>
@@ -65,7 +65,7 @@ Index: monodevelop/src/addins/NUnit/MonoDevelopNUnit.addin.xml
  	<!-- Extensions -->
  
 -	<Extension path="/MonoDevelop/Core/SupportPackages">
--		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.5.93">
+-		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.7">
 -			<Package name="nunit" version="2.4" clrVersion="Default">
 -				<Assembly file="nunit.core.dll" />
 -				<Assembly file="nunit.core.interfaces.dll" />
@@ -79,8 +79,8 @@ Index: monodevelop/src/addins/NUnit/MonoDevelopNUnit.addin.xml
  			<PadOption id = "ShowTestTime" _label = "Show Test Time" defaultValue = "False" />
 Index: monodevelop/src/addins/NUnit/NUnitRunner/Makefile.am
 ===================================================================
---- monodevelop.orig/src/addins/NUnit/NUnitRunner/Makefile.am	2011-06-30 18:13:11.000000000 +0100
-+++ monodevelop/src/addins/NUnit/NUnitRunner/Makefile.am	2011-09-10 14:21:52.570680937 +0100
+--- monodevelop.orig/src/addins/NUnit/NUnitRunner/Makefile.am	2011-11-08 00:30:37.000000000 +0000
++++ monodevelop/src/addins/NUnit/NUnitRunner/Makefile.am	2011-11-08 00:48:51.000000000 +0000
 @@ -1,9 +1,7 @@
  FILES = NUnitTestRunner.cs
  
