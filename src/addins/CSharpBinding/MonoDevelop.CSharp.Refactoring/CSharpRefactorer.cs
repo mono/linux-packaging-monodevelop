@@ -48,16 +48,17 @@ using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Text;
 using MonoDevelop.Projects.CodeGeneration;
 
-using ICSharpCode.NRefactory;
-using ICSharpCode.NRefactory.Parser;
-using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory.Visitors;
+using ICSharpCode.OldNRefactory;
+using ICSharpCode.OldNRefactory.Parser;
+using ICSharpCode.OldNRefactory.Ast;
+using ICSharpCode.OldNRefactory.Visitors;
 
 using ClassType = MonoDevelop.Projects.Dom.ClassType;
 using MonoDevelop.CSharp.Formatting;
 using MonoDevelop.CSharp.Parser;
-using MonoDevelop.CSharp.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.CSharp.Resolver;
+using Mono.TextEditor;
 
 namespace MonoDevelop.CSharp.Refactoring
 {
@@ -74,8 +75,8 @@ namespace MonoDevelop.CSharp.Refactoring
 			if (string.IsNullOrEmpty (name))
 				return ValidationResult.CreateError (GettextCatalog.GetString ("Name must not be empty."));
 			
-			int token = ICSharpCode.NRefactory.Parser.CSharp.Keywords.GetToken (name);
-			if (token >= ICSharpCode.NRefactory.Parser.CSharp.Tokens.Abstract)
+			int token = ICSharpCode.OldNRefactory.Parser.CSharp.Keywords.GetToken (name);
+			if (token >= ICSharpCode.OldNRefactory.Parser.CSharp.Tokens.Abstract)
 				return ValidationResult.CreateError (GettextCatalog.GetString ("Name can't be a keyword."));
 			
 			char startChar = name[0];
@@ -200,42 +201,40 @@ namespace MonoDevelop.CSharp.Refactoring
 		
 		public override DomLocation CompleteStatement (RefactorerContext ctx, string fileName, DomLocation caretLocation)
 		{
-			IEditableTextFile file = ctx.GetFile (fileName);
-			int pos = file.GetPositionFromLineColumn (caretLocation.Line + 1, 1);
+			var provider = ctx.GetFile (fileName) as ITextEditorDataProvider;
+			if (provider == null)
+				return caretLocation;
+			var file = provider.GetTextEditorData ();
 			
-			StringBuilder line = new StringBuilder ();
-			int lineNr = caretLocation.Line + 1, column = 1, maxColumn = 1, lastPos = pos;
+			var line = file.GetLine (caretLocation.Line);
+			var maxColumn = line.EditableLength;
+			var lastPos = line.Offset + line.EditableLength;
 			
-			while (lineNr == caretLocation.Line + 1) {
-				maxColumn = column;
-				lastPos = pos;
-				line.Append (file.GetCharAt (pos));
-				pos++;
-				file.GetLineColumnFromPosition (pos, out lineNr, out column);
-			}
-			string trimmedline = line.ToString ().Trim ();
-			string indent      = line.ToString ().Substring (0, line.Length - line.ToString ().TrimStart (' ', '\t').Length);
+			string trimmedline = file.GetLineText (caretLocation.Line, false).Trim ();
+			string indent      = file.GetLineIndent (line);
+			
 			if (trimmedline.EndsWith (";") || trimmedline.EndsWith ("{"))
 				return caretLocation;
+			
 			if (trimmedline.StartsWith ("if") || 
 			    trimmedline.StartsWith ("while") ||
 			    trimmedline.StartsWith ("switch") ||
 			    trimmedline.StartsWith ("for") ||
 			    trimmedline.StartsWith ("foreach")) {
 				if (!trimmedline.EndsWith (")")) {
-					file.InsertText (lastPos, " () {" + Environment.NewLine + indent + TextEditorProperties.IndentString + Environment.NewLine + indent + "}");
+					file.Insert (lastPos, " () {" + file.EolMarker + indent + TextEditorProperties.IndentString + file.EolMarker + indent + "}");
 					caretLocation.Column = maxColumn + 1;
 				} else {
-					file.InsertText (lastPos, " {" + Environment.NewLine + indent + TextEditorProperties.IndentString + Environment.NewLine + indent + "}");
-					caretLocation.Column = indent.Length + 1;
+					file.Insert (lastPos, " {" + file.EolMarker + indent + TextEditorProperties.IndentString + file.EolMarker + indent + "}");
+					caretLocation.Column = maxColumn + 1;
 					caretLocation.Line++;
 				}
 			} else if (trimmedline.StartsWith ("do")) {
-				file.InsertText (lastPos, " {" + Environment.NewLine + indent + TextEditorProperties.IndentString + Environment.NewLine + indent + "} while ();");
+				file.Insert (lastPos, " {" + file.EolMarker + indent + TextEditorProperties.IndentString + file.EolMarker + indent + "} while ();");
 				caretLocation.Column = indent.Length + 1;
 				caretLocation.Line++;
 			} else {
-				file.InsertText (lastPos, ";" + Environment.NewLine + indent);
+				file.Insert (lastPos, ";" + file.EolMarker + indent);
 				caretLocation.Column = indent.Length;
 				caretLocation.Line++;
 			}
@@ -265,16 +264,18 @@ namespace MonoDevelop.CSharp.Refactoring
 			text.Append ("using ");
 			text.Append (nsName);
 			text.Append (";");
-			if (pos == 0)
-				text.AppendLine ();
 			if (file is Mono.TextEditor.ITextEditorDataProvider) {
 				Mono.TextEditor.TextEditorData data = ((Mono.TextEditor.ITextEditorDataProvider)file).GetTextEditorData ();
+				if (pos == 0)
+					text.Append (data.EolMarker);
 				int caretOffset = data.Caret.Offset;
 				int insertedChars = data.Insert (pos, text.ToString ());
 				if (pos < caretOffset) {
 					data.Caret.Offset = caretOffset + insertedChars;
 				}
 			} else {
+				if (pos == 0)
+					text.AppendLine ();
 				file.InsertText (pos, text.ToString ());
 			}
 		}
@@ -338,16 +339,18 @@ namespace MonoDevelop.CSharp.Refactoring
 			text.Append ("using ");
 			text.Append (nsName);
 			text.Append (";");
-			if (pos == 0)
-				text.AppendLine ();
 			if (file is Mono.TextEditor.ITextEditorDataProvider) {
 				Mono.TextEditor.TextEditorData data = ((Mono.TextEditor.ITextEditorDataProvider)file).GetTextEditorData ();
+				if (pos == 0)
+					text.Append (data.EolMarker);
 				int caretOffset = data.Caret.Offset;
 				int insertedChars = data.Insert (pos, text.ToString ());
 				if (pos < caretOffset) {
 					data.Caret.Offset = caretOffset + insertedChars;
 				}
 			} else {
+				if (pos == 0)
+					text.AppendLine ();
 				file.InsertText (pos, text.ToString ());
 			} 
 		}
@@ -430,7 +433,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			var doc = ProjectDomService.GetParsedDocument (ctx.ParserContext, fileName);
 			if (doc == null || doc.CompilationUnit == null)
 				return null;
-			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, doc.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, editor, fileName);
+			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, doc.CompilationUnit, ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, editor, fileName);
 			
 			FindMemberAstVisitor visitor = new FindMemberAstVisitor (editor.Document, cls);
 			visitor.IncludeXmlDocumentation = includeXmlComment;
@@ -666,7 +669,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			var doc = ProjectDomService.GetParsedDocument (ctx.ParserContext, fileName);
 			if (doc == null || doc.CompilationUnit == null)
 				return null;
-			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, doc.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, editor, fileName);
+			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, doc.CompilationUnit, ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, editor, fileName);
 			resolver.CallingMember = member;
 			FindMemberAstVisitor visitor = new FindMemberAstVisitor (editor.Document, member);
 			visitor.IncludeXmlDocumentation = includeXmlComment;
@@ -679,7 +682,7 @@ namespace MonoDevelop.CSharp.Refactoring
 		{
 			var editor = ((Mono.TextEditor.ITextEditorDataProvider)ctx.GetFile (fileName)).GetTextEditorData ();
 			
-			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, var.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, editor, fileName);
+			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, var.CompilationUnit, ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, editor, fileName);
 			resolver.CallingMember = var.DeclaringMember;
 			
 			FindMemberAstVisitor visitor = new FindMemberAstVisitor (editor.Document, var);
@@ -691,7 +694,7 @@ namespace MonoDevelop.CSharp.Refactoring
 		public override IEnumerable<MemberReference> FindParameterReferences (RefactorerContext ctx, string fileName, IParameter param, bool includeXmlComment)
 		{
 			var editor = ((Mono.TextEditor.ITextEditorDataProvider)ctx.GetFile (fileName)).GetTextEditorData ();
-			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, param.DeclaringMember.DeclaringType.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, editor, fileName);
+			NRefactoryResolver resolver = new NRefactoryResolver (ctx.ParserContext, param.DeclaringMember.DeclaringType.CompilationUnit, ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, editor, fileName);
 			
 			resolver.CallingMember = param.DeclaringMember;
 			

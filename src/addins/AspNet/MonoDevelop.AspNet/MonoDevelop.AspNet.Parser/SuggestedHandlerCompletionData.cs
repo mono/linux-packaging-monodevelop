@@ -73,15 +73,15 @@ namespace MonoDevelop.AspNet.Parser
 			}
 		}
 		
-		public override void InsertCompletionText (CompletionListWindow window)
+		public override void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
 		{
 			//insert the method name
 			MonoDevelop.Ide.Gui.Content.IEditableTextBuffer buf = window.CompletionWidget as MonoDevelop.Ide.Gui.Content.IEditableTextBuffer;
 			if (buf != null) {
-				buf.BeginAtomicUndo ();
-				buf.DeleteText (window.CodeCompletionContext.TriggerOffset, buf.CursorPosition - window.CodeCompletionContext.TriggerOffset);
-				buf.InsertText (buf.CursorPosition, methodInfo.Name);
-				buf.EndAtomicUndo ();
+				using (var undo = buf.OpenUndoGroup ()) {
+					buf.DeleteText (window.CodeCompletionContext.TriggerOffset, buf.CursorPosition - window.CodeCompletionContext.TriggerOffset);
+					buf.InsertText (buf.CursorPosition, methodInfo.Name);
+				}
 			}
 			
 			//generate the codebehind method

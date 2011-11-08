@@ -137,7 +137,6 @@ namespace MonoDevelop.Projects.CodeGeneration
 			} while (t != null);
 			DomLocation lastLoc = DomLocation.Empty;
 			foreach (IUsing us in declaringType.CompilationUnit.Usings.Where (u => u.IsFromNamespace && u.ValidRegion.Contains (declaringType.Location))) {
-				Console.WriteLine (us);
 				if (lastLoc == us.Region.Start)
 					continue;
 				lastLoc = us.Region.Start;
@@ -152,7 +151,7 @@ namespace MonoDevelop.Projects.CodeGeneration
 				IndentLevel = CalculateBodyIndentLevel (implementingType);
 		}
 		
-		public string CreateInterfaceImplementation (IType implementingType, IType interfaceType, bool explicitly)
+		public string CreateInterfaceImplementation (IType implementingType, IType interfaceType, bool explicitly, bool wrapRegions = true)
 		{
 			SetIndentTo (implementingType);
 			StringBuilder result = new StringBuilder ();
@@ -165,9 +164,28 @@ namespace MonoDevelop.Projects.CodeGeneration
 					AppendLine (result);
 				}
 				string implementation = InternalCreateInterfaceImplementation (implementingType, baseInterface, explicitly, implementedMembers);
-				result.Append (WrapInRegions (baseInterface.Name + " implementation", implementation));
+				if (string.IsNullOrWhiteSpace (implementation))
+					continue;
+				if (wrapRegions) {
+					result.Append (WrapInRegions (baseInterface.Name + " implementation", implementation));
+				} else {
+					result.Append (implementation);
+				}
 			}
 			return result.ToString ();
+		}
+
+		static bool CompareParameters (System.Collections.ObjectModel.ReadOnlyCollection<MonoDevelop.Projects.Dom.IParameter> parameters1, System.Collections.ObjectModel.ReadOnlyCollection<MonoDevelop.Projects.Dom.IParameter> parameters2)
+		{
+			if (parameters1.Count != parameters2.Count)
+				return false;
+			for (int i = 0; i < parameters1.Count; i++) {
+				var p1 = parameters1 [i];
+				var p2 = parameters2 [i];
+				if (p1.ReturnType.ToInvariantString () != p2.ReturnType.ToInvariantString ())
+					return false;
+			}
+			return true;
 		}
 		
 		protected string InternalCreateInterfaceImplementation (IType implementingType, IType interfaceType, bool explicitly, List<IMember> implementedMembers)
@@ -201,7 +219,7 @@ namespace MonoDevelop.Projects.CodeGeneration
 					if (t.ClassType == ClassType.Interface)
 						continue;
 					foreach (IMethod cmet in t.Methods) {
-						if (cmet.Name == method.Name && Equals (cmet.Parameters, method.Parameters)) {
+						if (cmet.Name == method.Name && CompareParameters (cmet.Parameters, method.Parameters)) {
 							if (!needsExplicitly && !cmet.ReturnType.Equals (method.ReturnType))
 								needsExplicitly = true;
 							else
@@ -245,20 +263,11 @@ namespace MonoDevelop.Projects.CodeGeneration
 				bool isExplicit = pair.Value;
 				foreach (IMember member in implementedMembers.Where (m => m.Name == pair.Key.Name && m.MemberType == pair.Key.MemberType)) {
 					if (member.MemberType == MemberType.Method) {
-						isExplicit = member.ReturnType.ToInvariantString () != pair.Key.ReturnType.ToInvariantString ();
-						if (member.Parameters.Count == pair.Key.Parameters.Count && pair.Key.Parameters.Count > 0) {
-							for (int i = 0; i < member.Parameters.Count; i++) {
-								if (member.Parameters [i].ReturnType.ToInvariantString () != pair.Key.Parameters [i].ReturnType.ToInvariantString ()) {
-									isExplicit = true;
-									break;
-								}
-							}
-						}
+						isExplicit = member.ReturnType.ToInvariantString () != pair.Key.ReturnType.ToInvariantString () && CompareParameters (member.Parameters, pair.Key.Parameters);
 					} else {
 						isExplicit = true;
 					}
 				}
-				
 				result.Append (CreateMemberImplementation (implementingType, pair.Key, isExplicit).Code);
 				implementedMembers.Add (pair.Key);
 			}

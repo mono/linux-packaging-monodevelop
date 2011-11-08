@@ -193,7 +193,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-ASSEMBLY = $(top_builddir)/build/bin/NRefactory.dll
+ASSEMBLY = $(top_builddir)/build/bin/OldNRefactory.dll
 REFS = \
 	-r:System \
 	-r:System.Drawing \

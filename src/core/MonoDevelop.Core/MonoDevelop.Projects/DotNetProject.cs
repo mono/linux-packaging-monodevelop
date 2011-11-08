@@ -126,9 +126,8 @@ namespace MonoDevelop.Projects
 				Configurations.Add (configDebug);
 
 				DotNetProjectConfiguration configRelease = CreateConfiguration ("Release" + platformSuffix) as DotNetProjectConfiguration;
-				if (projectOptions != null)
-					projectOptions.SetAttribute ("DefineDebug", "False");
 				configRelease.CompilationParameters = languageBinding.CreateCompilationParameters (projectOptions);
+				configRelease.CompilationParameters.RemoveDefineSymbol ("DEBUG");
 				configRelease.DebugMode = false;
 				configRelease.ExternalConsole = externalConsole;
 				configRelease.PauseConsoleOutput = externalConsole;
@@ -136,7 +135,7 @@ namespace MonoDevelop.Projects
 			}
 
 			if ((projectOptions != null) && (projectOptions.Attributes["TargetFrameworkVersion"] != null))
-				targetFrameworkId = TargetFrameworkMoniker.Parse (projectOptions.Attributes["TargetFrameworkVersion"].Value);
+				newProjectTargetFrameworkId = TargetFrameworkMoniker.Parse (projectOptions.Attributes["TargetFrameworkVersion"].Value);
 
 			string binPath;
 			if (projectCreateInfo != null) {
@@ -275,25 +274,30 @@ namespace MonoDevelop.Projects
 				return resourceHandler;
 			}
 		}
-
-		TargetFrameworkMoniker targetFrameworkId;
+		
+		//only used for initializing new projects
+		TargetFrameworkMoniker newProjectTargetFrameworkId;
+		
 		TargetFramework targetFramework;
 
 		public TargetFramework TargetFramework {
 			get {
-				SetDefaultFramework ();
+				if (targetFramework == null) {
+					var id = newProjectTargetFrameworkId ?? GetDefaultTargetFrameworkId ();
+					targetFramework = Runtime.SystemAssemblyService.GetTargetFramework (id);
+				}
 				return targetFramework;
 			}
 			set {
-				bool replacingValue = targetFramework != null;
-				TargetFramework validValue = GetValidFrameworkVersion (value);
-				if (targetFramework == null && validValue == null)
-					targetFramework = Services.ProjectService.DefaultTargetFramework;
-				if (targetFramework == validValue || validValue == null)
+				if (!SupportsFramework (value))
+					throw new ArgumentException ("Project does not support framework '" + value.Id.ToString () +"'");
+				if (value == null)
+					value = Runtime.SystemAssemblyService.GetTargetFramework (GetDefaultTargetFrameworkForFormat (FileFormat));
+				if (targetFramework != null && value.Id == targetFramework.Id)
 					return;
-				targetFramework = validValue;
-				targetFrameworkId = validValue.Id;
-				if (replacingValue)
+				bool updateReferences = targetFramework != null;
+				targetFramework = value;
+				if (updateReferences)
 					UpdateSystemReferences ();
 				NotifyModified ("TargetFramework");
 			}
@@ -303,11 +307,35 @@ namespace MonoDevelop.Projects
 			get { return Runtime.SystemAssemblyService.DefaultRuntime; }
 		}
 		
+		/// <summary>
+		/// Gets the target framework for new projects
+		/// </summary>
+		/// <returns>
+		/// The default target framework identifier.
+		/// </returns>
 		public virtual TargetFrameworkMoniker GetDefaultTargetFrameworkId ()
 		{
-			return ProjectService.DefaultTargetFrameworkId;
+			return Services.ProjectService.DefaultTargetFramework.Id;
 		}
-
+		
+		/// <summary>
+		/// Returns the default framework for a given format
+		/// </summary>
+		/// <returns>
+		/// The default target framework for the format.
+		/// </returns>
+		/// <param name='format'>
+		/// A format
+		/// </param>
+		/// <remarks>
+		/// This method is used to determine what's the correct target framework for a project
+		/// deserialized using a specific format.
+		/// </remarks>
+		public virtual TargetFrameworkMoniker GetDefaultTargetFrameworkForFormat (FileFormat format)
+		{
+			return GetDefaultTargetFrameworkId ();
+		}
+		
 		public IAssemblyContext AssemblyContext {
 			get {
 				if (composedAssemblyContext == null) {
@@ -328,16 +356,6 @@ namespace MonoDevelop.Projects
 			}
 		}
 
-		void SetDefaultFramework ()
-		{
-			if (targetFramework == null) {
-				if (targetFrameworkId != null)
-					targetFramework = Runtime.SystemAssemblyService.GetTargetFramework (targetFrameworkId);
-				if (targetFramework == null)
-					TargetFramework = Services.ProjectService.DefaultTargetFramework;
-			}
-		}
-
 		public virtual bool SupportsFramework (TargetFramework framework)
 		{
 			if (LanguageBinding == null)
@@ -350,34 +368,6 @@ namespace MonoDevelop.Projects
 				}
 			}
 			return false;
-		}
-
-		//if possible, find a ClrVersion that the language binding can handle
-		TargetFramework GetValidFrameworkVersion (TargetFramework suggestion)
-		{
-			if (suggestion == null) {
-				if (LanguageBinding == null)
-					return null;
-				else
-					suggestion = Services.ProjectService.DefaultTargetFramework;
-			}
-
-			if (SupportsFramework (suggestion))
-				return suggestion;
-
-			TargetFramework oneSupported = null;
-			foreach (TargetFramework f in Runtime.SystemAssemblyService.GetTargetFrameworks ()) {
-				if (SupportsFramework (f)) {
-					if (TargetRuntime.IsInstalled (f))
-						return f;
-					else if (oneSupported == null)
-						oneSupported = f;
-				}
-			}
-			if (oneSupported != null)
-				return oneSupported;
-
-			return null;
 		}
 
 		[ItemProperty(DefaultValue = true)]
@@ -463,16 +453,6 @@ namespace MonoDevelop.Projects
 			}
 		}
 		
-		internal protected override BuildResult OnRunTarget (IProgressMonitor monitor, string target, ConfigurationSelector configuration)
-		{
-			if (!TargetRuntime.IsInstalled (TargetFramework)) {
-				BuildResult res = new BuildResult ();
-				res.AddError (GettextCatalog.GetString ("Framework '{0}' not installed.", TargetFramework.Name));
-				return res;
-			}
-			return base.OnRunTarget (monitor, target, configuration);
-		}
-		
 		internal protected override void PopulateOutputFileList (List<FilePath> list, ConfigurationSelector configuration)
 		{
 			base.PopulateOutputFileList (list, configuration);
@@ -519,7 +499,7 @@ namespace MonoDevelop.Projects
 
 		void PopulateSupportFileListInternal (FileCopySet list, ConfigurationSelector configuration)
 		{
-			if (supportReferDistance < 2)
+			if (supportReferDistance <= 2)
 				base.PopulateSupportFileList (list, configuration);
 
 			//rename the app.config file
@@ -534,10 +514,10 @@ namespace MonoDevelop.Projects
 			
 			//collect all the "local copy" references and their attendant files
 			foreach (ProjectReference projectReference in References) {
-				if (!projectReference.LocalCopy || ParentSolution == null)
+				if (!projectReference.LocalCopy || !projectReference.CanSetLocalCopy)
 					continue;
 
-				if (projectReference.ReferenceType == ReferenceType.Project) {
+				if (ParentSolution != null && projectReference.ReferenceType == ReferenceType.Project) {
 					DotNetProject p = ParentSolution.FindProjectByName (projectReference.Reference) as DotNetProject;
 
 					if (p == null) {
@@ -749,7 +729,8 @@ namespace MonoDevelop.Projects
 		{
 			// Make sure the fx version is sorted out before saving
 			// to avoid changes in project references while saving 
-			SetDefaultFramework ();
+			if (targetFramework == null)
+				targetFramework = Runtime.SystemAssemblyService.GetTargetFramework (GetDefaultTargetFrameworkForFormat (FileFormat));
 			base.OnSave (monitor);
 		}
 
@@ -839,7 +820,7 @@ namespace MonoDevelop.Projects
 			DotNetExecutionCommand cmd = new DotNetExecutionCommand (configuration.CompiledOutputName);
 			cmd.Arguments = configuration.CommandLineParameters;
 			cmd.WorkingDirectory = Path.GetDirectoryName (configuration.CompiledOutputName);
-			cmd.EnvironmentVariables = new Dictionary<string, string> (configuration.EnvironmentVariables);
+			cmd.EnvironmentVariables = configuration.GetParsedEnvironmentVariables ();
 			cmd.TargetRuntime = TargetRuntime;
 			cmd.UserAssemblyPaths = GetUserAssemblyPaths (configSel);
 			return cmd;
@@ -962,27 +943,17 @@ namespace MonoDevelop.Projects
 		// Make sure that the project references are valid for the target clr version.
 		void UpdateSystemReferences ()
 		{
-			ArrayList toDelete = new ArrayList ();
-			ArrayList toAdd = new ArrayList ();
-
 			foreach (ProjectReference pref in References) {
-				if (pref.ReferenceType == ReferenceType.Gac) {
+				if (pref.ReferenceType == ReferenceType.Package) {
 					string newRef = AssemblyContext.GetAssemblyNameForVersion (pref.Reference, pref.Package != null ? pref.Package.Name : null, this.TargetFramework);
 					if (newRef == null) {
 						pref.ResetReference ();
 					} else if (newRef != pref.Reference) {
-						toDelete.Add (pref);
-						toAdd.Add (new ProjectReference (ReferenceType.Gac, newRef));
+						pref.Reference = newRef;
 					} else if (!pref.IsValid) {
 						pref.ResetReference ();
 					}
 				}
-			}
-			foreach (ProjectReference pref in toDelete) {
-				References.Remove (pref);
-			}
-			foreach (ProjectReference pref in toAdd) {
-				References.Add (pref);
 			}
 		}
 

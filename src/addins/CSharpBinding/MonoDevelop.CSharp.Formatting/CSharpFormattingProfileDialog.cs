@@ -30,6 +30,7 @@ using MonoDevelop.Ide;
 using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
+using ICSharpCode.NRefactory.CSharp;
 namespace MonoDevelop.CSharp.Formatting
 {
 	public partial class CSharpFormattingProfileDialog : Gtk.Dialog
@@ -435,7 +436,7 @@ namespace TestSpace {
 			CellRendererToggle cellRendererToggle = new CellRendererToggle ();
 			cellRendererToggle.Ypad = 1;
 			cellRendererToggle.Activatable = !profile.IsBuiltIn;
-			cellRendererToggle.Toggled += new CellRendererToggledHandler (this, indentOptions).Toggled;
+			cellRendererToggle.Toggled += new CellRendererToggledHandler (this, treeviewIndentOptions, indentOptions).Toggled;
 			column.PackStart (cellRendererToggle, false);
 			column.SetAttributes (cellRendererToggle, "visible", toggleVisibleColumn);
 			column.SetCellDataFunc (cellRendererToggle, ToggleDataFunc);
@@ -500,7 +501,7 @@ namespace TestSpace {
 			cellRendererToggle = new CellRendererToggle ();
 			cellRendererToggle.Activatable = !profile.IsBuiltIn;
 			cellRendererToggle.Ypad = 1;
-			cellRendererToggle.Toggled += new CellRendererToggledHandler (this, bacePositionOptions).Toggled;
+			cellRendererToggle.Toggled += new CellRendererToggledHandler (this, treeviewBracePositions, bacePositionOptions).Toggled;
 			column.PackStart (cellRendererToggle, false);
 			column.SetAttributes (cellRendererToggle, "visible", toggleVisibleColumn);
 			column.SetCellDataFunc (cellRendererToggle, ToggleDataFunc);
@@ -606,7 +607,7 @@ namespace TestSpace {
 			cellRendererToggle = new CellRendererToggle ();
 			cellRendererToggle.Activatable = !profile.IsBuiltIn;
 			cellRendererToggle.Ypad = 1;
-			cellRendererToggle.Toggled += new CellRendererToggledHandler (this, newLineOptions).Toggled;
+			cellRendererToggle.Toggled += new CellRendererToggledHandler (this, treeviewNewLines, newLineOptions).Toggled;
 			column.PackStart (cellRendererToggle, false);
 			column.SetAttributes (cellRendererToggle, "visible", toggleVisibleColumn);
 			column.SetCellDataFunc (cellRendererToggle, ToggleDataFunc);
@@ -658,7 +659,7 @@ namespace TestSpace {
 			cellRendererToggle = new CellRendererToggle ();
 			cellRendererToggle.Activatable = !profile.IsBuiltIn;
 			cellRendererToggle.Ypad = 1;
-			cellRendererToggle.Toggled += new CellRendererToggledHandler (this, whiteSpaceOptions).Toggled;
+			cellRendererToggle.Toggled += new CellRendererToggledHandler (this, treeviewInsertWhiteSpaceCategory, whiteSpaceOptions).Toggled;
 			column.PackStart (cellRendererToggle, false);
 			column.SetAttributes (cellRendererToggle, "visible", toggleVisibleColumn);
 			column.SetCellDataFunc (cellRendererToggle, ToggleDataFunc);
@@ -1032,10 +1033,14 @@ delegate void BarFoo ();
 		
 		void UpdateExample (string example)
 		{
-			var formatter = MonoDevelop.Ide.CodeFormatting.CodeFormatterService.GetFormatter (CSharpFormatter.MimeType);
-			var policyParent = new MonoDevelop.Projects.Policies.PolicyBag (null);
-			policyParent.Set<CSharpFormattingPolicy> (profile, CSharpFormatter.MimeType);
-			texteditor.Document.Text = formatter.FormatText (policyParent, Environment.NewLine != "\n" ? example.Replace ("\n", Environment.NewLine) : example);
+			var formatter = new CSharpFormatter ();
+			string text;
+			if (!string.IsNullOrEmpty (example)) {
+				text = Environment.NewLine != "\n" ? example.Replace ("\n", Environment.NewLine) : example;
+			} else {
+				text = "";
+			}
+			texteditor.Document.Text = formatter.FormatText (profile, null, CSharpFormatter.MimeType, text, 0, text.Length);
 		}
 		
 		static PropertyInfo GetProperty (TreeModel model, TreeIter iter)
@@ -1089,11 +1094,13 @@ delegate void BarFoo ();
 		{
 			CSharpFormattingProfileDialog dialog;
 			Gtk.TreeStore model;
+			Gtk.TreeView treeView;
 			
-			public CellRendererToggledHandler (CSharpFormattingProfileDialog dialog, Gtk.TreeStore model)
+			public CellRendererToggledHandler (CSharpFormattingProfileDialog dialog, Gtk.TreeView treeView, Gtk.TreeStore model)
 			{
 				this.dialog = dialog;
 				this.model = model;
+				this.treeView = treeView;
 			}
 			
 			public void Toggled (object o, ToggledArgs args)
@@ -1106,6 +1113,9 @@ delegate void BarFoo ();
 					bool value = (bool)info.GetValue (dialog.profile, null);
 					info.SetValue (dialog.profile, !value, null);
 					dialog.UpdateExample (model, iter);
+					// When toggeling with the keyboard the tree view doesn't update automatically
+					// see 'Bug 188 - Pressing space to select does not update checkbox'
+					treeView.QueueDraw ();
 				}
 			}
 		}
@@ -1130,7 +1140,7 @@ delegate void BarFoo ();
 						return;
 					var value = ConvertProperty (info.PropertyType, args.NewText);
 					info.SetValue (dialog.profile, value, null);
-					dialog.UpdateExample (dialog.texteditor.Document.Text);
+					dialog.UpdateExample (model, iter);
 				}
 			}
 		}

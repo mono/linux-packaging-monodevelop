@@ -38,6 +38,7 @@ namespace MonoDevelop.Projects.Dom
 	public class DomCecilType : MonoDevelop.Projects.Dom.DomType
 	{
 		TypeDefinition typeDefinition;
+		internal bool LoadMonotouchDocumentation { get; private set; }
 		
 		static ClassType GetClassType (TypeDefinition typeDefinition)
 		{
@@ -94,16 +95,17 @@ namespace MonoDevelop.Projects.Dom
 			this.Namespace = typeReference.Namespace;
 		}
 		
-		public DomCecilType (TypeDefinition typeDefinition, bool loadInternal)
+		public DomCecilType (TypeDefinition typeDefinition, bool loadInternal, bool loadMonotouchDocumentation = true)
 		{
+			this.LoadMonotouchDocumentation = loadMonotouchDocumentation;
 			this.typeDefinition = typeDefinition;
-			this.loadInternal   = loadInternal;
-			this.classType      = GetClassType (typeDefinition);
+			this.loadInternal = loadInternal;
+			this.classType = GetClassType (typeDefinition);
 			
-			this.Name           = DomCecilType.RemoveGenericParamSuffix (typeDefinition.Name);
-			this.Namespace      = typeDefinition.Namespace;
+			this.Name = DomCecilType.RemoveGenericParamSuffix (typeDefinition.Name);
+			this.Namespace = typeDefinition.Namespace;
 			
-			this.Modifiers      = GetModifiers (typeDefinition.Attributes);
+			this.Modifiers = GetModifiers (typeDefinition.Attributes);
 			
 			if (typeDefinition.BaseType != null)
 				this.baseType = DomCecilMethod.GetReturnType (typeDefinition.BaseType);
@@ -122,10 +124,46 @@ namespace MonoDevelop.Projects.Dom
 				}
 				AddTypeParameter (tp);
 			}
+			AddDocumentation (this);
 		}
-		
+
 		bool loadInternal;
 		bool isInitialized = false;
+
+		bool AddDocumentation (IMember member)
+		{
+			if (!LoadMonotouchDocumentation)
+				return false;
+			try {
+				var node = member.GetMonodocDocumentation ();
+				if (node == null)
+					return true;
+				string innerXml = (node.InnerXml ?? "").Trim ();
+				var sb = new StringBuilder ();
+				bool wasWhiteSpace = false;
+				for (int i = 0; i < innerXml.Length; i++) {
+					char ch = innerXml [i];
+					switch (ch) {
+					case '\n':
+					case '\r':
+						break;
+					default:
+						bool isWhiteSpace = Char.IsWhiteSpace (ch);
+						if (isWhiteSpace && wasWhiteSpace)
+							continue;
+						wasWhiteSpace = isWhiteSpace;
+						sb.Append (ch);
+						break;
+					}
+				}
+				member.Documentation = sb.ToString ();
+				return true;
+			} catch (Exception) {
+				LoadMonotouchDocumentation = false;
+				return false;
+			}
+		}
+		
 		void CheckInitialization ()
 		{
 			if (isInitialized)
@@ -135,15 +173,19 @@ namespace MonoDevelop.Projects.Dom
 			foreach (FieldDefinition fieldDefinition in typeDefinition.Fields) {
 				if (!loadInternal && DomCecilCompilationUnit.IsInternal (DomCecilType.GetModifiers (fieldDefinition)))
 					continue;
-				base.Add (new DomCecilField (fieldDefinition));
+				var field = new DomCecilField (fieldDefinition);
+				base.Add (field);
+				AddDocumentation (field);
 			}
 			foreach (MethodDefinition methodDefinition in typeDefinition.Methods.Where (m => !m.IsConstructor)) {
 				if (!loadInternal && DomCecilCompilationUnit.IsInternal (DomCecilType.GetModifiers (methodDefinition)))
 					continue;
-				base.Add (new DomCecilMethod (methodDefinition));
+				var method = new DomCecilMethod (methodDefinition);
+				base.Add (method);
+				AddDocumentation (method);
 			}
 			
-			bool internalOnly    = true;
+			bool internalOnly = true;
 			bool hasConstructors = false;
 			foreach (MethodDefinition methodDefinition in typeDefinition.Methods.Where (m => m.IsConstructor)) {
 				hasConstructors = true;

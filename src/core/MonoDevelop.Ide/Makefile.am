@@ -41,6 +41,7 @@ FILES =  \
 	gtk-gui/MonoDevelop.Ide.FindInFiles.SearchResultWidget.cs \
 	gtk-gui/MonoDevelop.Ide.Fonts.FontChooserPanelWidget.cs \
 	gtk-gui/MonoDevelop.Ide.Gui.Components.ExecutionModeComboBox.cs \
+	gtk-gui/MonoDevelop.Ide.Gui.Components.PriorityList.cs \
 	gtk-gui/MonoDevelop.Ide.Gui.Components.ProjectSelectorWidget.cs \
 	gtk-gui/MonoDevelop.Ide.Gui.Components.StringTagSelectorButton.cs \
 	gtk-gui/MonoDevelop.Ide.Gui.Dialogs.AddinLoadErrorDialog.cs \
@@ -103,7 +104,6 @@ FILES =  \
 	gtk-gui/MonoDevelop.Ide.Projects.SelectReferenceDialog.cs \
 	gtk-gui/MonoDevelop.Ide.SelectEncodingsDialog.cs \
 	gtk-gui/MonoDevelop.Ide.StandardHeader.StandardHeaderPolicyPanelWidget.cs \
-	gtk-gui/MonoDevelop.Ide.Updater.UpdateDialog.cs \
 	MonoDevelop.Components.AutoTest/AutoTestClientSession.cs \
 	MonoDevelop.Components.AutoTest/AutoTestService.cs \
 	MonoDevelop.Components.AutoTest/AutoTestSession.cs \
@@ -214,6 +214,7 @@ FILES =  \
 	MonoDevelop.Components.PropertyGrid.Editors/EnumerationEditorCell.cs \
 	MonoDevelop.Components.PropertyGrid.Editors/EventEditor.cs \
 	MonoDevelop.Components.PropertyGrid.Editors/ExpandableObjectEditor.cs \
+	MonoDevelop.Components.PropertyGrid.Editors/FilePathEditor.cs \
 	MonoDevelop.Components.PropertyGrid.Editors/FlagsEditorCell.cs \
 	MonoDevelop.Components.PropertyGrid.Editors/FlagsSelectorDialog.cs \
 	MonoDevelop.Components.PropertyGrid.Editors/FloatRange.cs \
@@ -245,6 +246,7 @@ FILES =  \
 	MonoDevelop.Components/DropDownBox.cs \
 	MonoDevelop.Components/DropDownBoxListWindow.cs \
 	MonoDevelop.Components/FileEntry.cs \
+	MonoDevelop.Components/FileFilterSet.cs \
 	MonoDevelop.Components/FileSelector.cs \
 	MonoDevelop.Components/FixedWidthWrapLabel.cs \
 	MonoDevelop.Components/FolderDialog.cs \
@@ -399,7 +401,6 @@ FILES =  \
 	MonoDevelop.Ide.Gui.Components/EnvVarList.cs \
 	MonoDevelop.Ide.Gui.Components/ExecutionModeComboBox.cs \
 	MonoDevelop.Ide.Gui.Components/ExtensibleTreeView.cs \
-	MonoDevelop.Ide.Gui.Components/FileBrowser.cs \
 	MonoDevelop.Ide.Gui.Components/ITreeBuilder.cs \
 	MonoDevelop.Ide.Gui.Components/ITreeBuilderContext.cs \
 	MonoDevelop.Ide.Gui.Components/ITreeNavigator.cs \
@@ -411,6 +412,7 @@ FILES =  \
 	MonoDevelop.Ide.Gui.Components/NodeCommandHandler.cs \
 	MonoDevelop.Ide.Gui.Components/NodeState.cs \
 	MonoDevelop.Ide.Gui.Components/PadTreeView.cs \
+	MonoDevelop.Ide.Gui.Components/PriorityList.cs \
 	MonoDevelop.Ide.Gui.Components/ProjectFileEntry.cs \
 	MonoDevelop.Ide.Gui.Components/ProjectSelectorWidget.cs \
 	MonoDevelop.Ide.Gui.Components/StringTagSelectorButton.cs \
@@ -485,6 +487,7 @@ FILES =  \
 	MonoDevelop.Ide.Gui.OptionPanels/LoadSavePanel.cs \
 	MonoDevelop.Ide.Gui.OptionPanels/MaintenanceOptionsPanel.cs \
 	MonoDevelop.Ide.Gui.OptionPanels/MonoRuntimePanel.cs \
+	MonoDevelop.Ide.Gui.OptionPanels/SdkLocationPanel.cs \
 	MonoDevelop.Ide.Gui.OptionPanels/TasksOptionsPanel.cs \
 	MonoDevelop.Ide.Gui.OptionPanels/TextStylePolicyPanel.cs \
 	MonoDevelop.Ide.Gui.Pads.ClassPad/ClassBrowserPad.cs \
@@ -524,7 +527,6 @@ FILES =  \
 	MonoDevelop.Ide.Gui.Pads/ErrorListPad.cs \
 	MonoDevelop.Ide.Gui.Pads/FileList.cs \
 	MonoDevelop.Ide.Gui.Pads/FileListItem.cs \
-	MonoDevelop.Ide.Gui.Pads/FileScout.cs \
 	MonoDevelop.Ide.Gui.Pads/InternalLogPad.cs \
 	MonoDevelop.Ide.Gui.Pads/MonodocTreePad.cs \
 	MonoDevelop.Ide.Gui.Pads/SolutionPad.cs \
@@ -534,9 +536,9 @@ FILES =  \
 	MonoDevelop.Ide.Gui/AbstractBaseViewContent.cs \
 	MonoDevelop.Ide.Gui/AbstractPadContent.cs \
 	MonoDevelop.Ide.Gui/AbstractViewContent.cs \
-	MonoDevelop.Ide.Gui/AddinUpdateHandler.cs \
 	MonoDevelop.Ide.Gui/AsyncDispatchAttribute.cs \
 	MonoDevelop.Ide.Gui/BackgroundProgressMonitor.cs \
+	MonoDevelop.Ide.Gui/CommonTextEditorOptions.cs \
 	MonoDevelop.Ide.Gui/ConfigurationComboBox.cs \
 	MonoDevelop.Ide.Gui/DefaultWorkbench.cs \
 	MonoDevelop.Ide.Gui/DisplayBindingService.cs \
@@ -565,6 +567,7 @@ FILES =  \
 	MonoDevelop.Ide.Gui/Pad.cs \
 	MonoDevelop.Ide.Gui/PadFontChanger.cs \
 	MonoDevelop.Ide.Gui/ProgressMonitors.cs \
+	MonoDevelop.Ide.Gui/ProjectLoadProgressMonitor.cs \
 	MonoDevelop.Ide.Gui/SdiWorkspaceWindow.cs \
 	MonoDevelop.Ide.Gui/StartupInfo.cs \
 	MonoDevelop.Ide.Gui/StatusProgressMonitor.cs \
@@ -624,7 +627,6 @@ FILES =  \
 	MonoDevelop.Ide.Projects/ExportProjectDialog.cs \
 	MonoDevelop.Ide.Projects/ExportProjectPolicyDialog.cs \
 	MonoDevelop.Ide.Projects/FeatureSelectorDialog.cs \
-	MonoDevelop.Ide.Projects/GacReferencePanel.cs \
 	MonoDevelop.Ide.Projects/ImportProjectPolicyDialog.cs \
 	MonoDevelop.Ide.Projects/IncludeNewFilesDialog.cs \
 	MonoDevelop.Ide.Projects/NewConfigurationDialog.cs \
@@ -632,6 +634,7 @@ FILES =  \
 	MonoDevelop.Ide.Projects/NewPolicySetDialog.cs \
 	MonoDevelop.Ide.Projects/NewProjectDialog.cs \
 	MonoDevelop.Ide.Projects/NewProjectOptionsWidget.cs \
+	MonoDevelop.Ide.Projects/PackageReferencePanel.cs \
 	MonoDevelop.Ide.Projects/ProjectFileSelectorDialog.cs \
 	MonoDevelop.Ide.Projects/ProjectOptionsDialog.cs \
 	MonoDevelop.Ide.Projects/ProjectReferencePanel.cs \
@@ -668,13 +671,10 @@ FILES =  \
 	MonoDevelop.Ide.Templates/SolutionDescriptor.cs \
 	MonoDevelop.Ide.Templates/SolutionItemDescriptor.cs \
 	MonoDevelop.Ide.Templates/TextFileDescriptionTemplate.cs \
-	MonoDevelop.Ide.Updater/UpdateCommands.cs \
-	MonoDevelop.Ide.Updater/UpdateDialog.cs \
-	MonoDevelop.Ide.Updater/UpdateInfoExtensionNode.cs \
-	MonoDevelop.Ide.Updater/UpdateRank.cs \
-	MonoDevelop.Ide.Updater/UpdateResult.cs \
+	MonoDevelop.Ide.Updater/AddinsUpdateHandler.cs \
+	MonoDevelop.Ide.Updater/IUpdateHandler.cs \
+	MonoDevelop.Ide.Updater/UpdateCheckHandler.cs \
 	MonoDevelop.Ide.Updater/UpdateService.cs \
-	MonoDevelop.Ide.Updater/UpdateTagExtensionNode.cs \
 	MonoDevelop.Ide.WebBrowser/IWebBrowser.cs \
 	MonoDevelop.Ide.WebBrowser/IWebBrowserLoader.cs \
 	MonoDevelop.Ide.WebBrowser/LoadingProgressChangedEventArgs.cs \
@@ -682,6 +682,16 @@ FILES =  \
 	MonoDevelop.Ide.WebBrowser/LocationChangingEventArgs.cs \
 	MonoDevelop.Ide.WebBrowser/StatusMessageChangedEventArgs.cs \
 	MonoDevelop.Ide.WebBrowser/TitleChangedEventArgs.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageBranding.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageCommands.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageLinkButton.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageLinksList.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageNewsFeed.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageOptionPanel.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageOptions.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageRecentProjectsList.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageView.cs \
+	MonoDevelop.Ide.WelcomePage/WelcomePageWidget.cs \
 	MonoDevelop.Ide/AddEntryEventHandler.cs \
 	MonoDevelop.Ide/CodeGenerationService.cs \
 	MonoDevelop.Ide/DesktopService.cs \
@@ -701,6 +711,12 @@ FILES =  \
 	MonoDevelop.Ide/WebBrowserService.cs
 
 RES =  \
+	branding/AboutImage.png \
+	branding/AboutImageSep.png \
+	branding/SplashScreen.png \
+	branding/WelcomePage_Logo.png \
+	branding/WelcomePage_TopBorderRepeat.png \
+	branding/WelcomePageContent.xml \
 	ExtensionModel/Commands.addin.xml \
 	ExtensionModel/DefaultPolicyPanels.addin.xml \
 	ExtensionModel/GlobalOptionsDialog.addin.xml \
@@ -714,8 +730,6 @@ RES =  \
 	ExtensionModel/StockIcons.addin.xml \
 	ExtensionModel/Templates.addin.xml \
 	gtk-gui/gui.stetic \
-	icons/AboutImage.png \
-	icons/AboutImageSep.png \
 	icons/add-namespace-16.png \
 	icons/assembly-project-16.png \
 	icons/author-information-16.png \
@@ -834,6 +848,7 @@ RES =  \
 	icons/navigate-previous-24.png \
 	icons/package-x-generic.png \
 	icons/package-x-generic_22.png \
+	icons/package-x-generic_32.png \
 	icons/pad-task-list-16.png \
 	icons/pad-task-list-24.png \
 	icons/parsing.png \
@@ -853,6 +868,7 @@ RES =  \
 	icons/project-reference-package-16.png \
 	icons/project-reference-project-16.png \
 	icons/remove-namespace-16.png \
+	icons/software-update-available.png \
 	icons/solution-16.png \
 	icons/solution-32.png \
 	icons/solution-folder-closed-16.png \
@@ -860,7 +876,6 @@ RES =  \
 	icons/solution-folder-open-16.png \
 	icons/solution-new-16.png \
 	icons/sort-namespace-16.png \
-	icons/SplashScreen.png \
 	icons/static-16.png \
 	icons/syntax-highlighting-16.png \
 	icons/syntax-highlighting-24.png \
@@ -873,6 +888,7 @@ RES =  \
 	icons/text-editor-22.png \
 	icons/text-editor-behavior-16.png \
 	icons/text-editor-behavior-24.png \
+	icons/text-quickfix-16.png \
 	icons/tools-external-tools-16.png \
 	icons/tools-external-tools-24.png \
 	icons/uncomment.png \

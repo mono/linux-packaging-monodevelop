@@ -4,15 +4,17 @@ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.Refactoring.dll
 
 DEPS =  \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
+	$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor2.dll \
+	$(top_builddir)/build/bin/ICSharpCode.NRefactory.dll \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/NRefactory.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
 	$(GTK_SHARP_LIBS) \
 	$(MONO_ADDINS_LIBS) \
+	-r:Mono.Cairo \
 	-r:Mono.Posix \
 	-r:System \
 	-r:System.Core \
@@ -22,11 +24,31 @@ FILES =  \
 	AssemblyInfo.cs \
 	gtk-gui/generated.cs \
 	gtk-gui/MonoDevelop.CodeGeneration.GenerateCodeWindow.cs \
+	gtk-gui/MonoDevelop.ContextAction.ContextActionPanelWidget.cs \
+	gtk-gui/MonoDevelop.Inspection.InspectionPanelWidget.cs \
 	gtk-gui/MonoDevelop.Refactoring.EncapsulateFieldDialog.cs \
 	gtk-gui/MonoDevelop.Refactoring.IntroduceConstant.IntroduceConstantDialog.cs \
 	gtk-gui/MonoDevelop.Refactoring.OverridesImplementsDialog.cs \
 	gtk-gui/MonoDevelop.Refactoring.RefactoringPreviewDialog.cs \
 	gtk-gui/MonoDevelop.Refactoring.Rename.RenameItemDialog.cs \
+	MonoDevelop.AnalysisCore/AnalysisCommands.cs \
+	MonoDevelop.AnalysisCore/AnalysisExtensions.cs \
+	MonoDevelop.AnalysisCore/AnalysisOptions.cs \
+	MonoDevelop.AnalysisCore/AnalysisService.cs \
+	MonoDevelop.AnalysisCore/Extensions/AnalysisRuleAddinNode.cs \
+	MonoDevelop.AnalysisCore/Extensions/AnalysisTypeExtensionNode.cs \
+	MonoDevelop.AnalysisCore/Extensions/FixHandlerExtensionNode.cs \
+	MonoDevelop.AnalysisCore/FixableResult.cs \
+	MonoDevelop.AnalysisCore/Fixes/GenericFix.cs \
+	MonoDevelop.AnalysisCore/Fixes/RenameMemberFix.cs \
+	MonoDevelop.AnalysisCore/Gui/AnalysisOptionsPanel.cs \
+	MonoDevelop.AnalysisCore/Gui/ResultMarker.cs \
+	MonoDevelop.AnalysisCore/Gui/ResultsEditorExtension.cs \
+	MonoDevelop.AnalysisCore/Gui/ResultTooltipProvider.cs \
+	MonoDevelop.AnalysisCore/Result.cs \
+	MonoDevelop.AnalysisCore/Rules/Adaptors.cs \
+	MonoDevelop.AnalysisCore/RuleTree.cs \
+	MonoDevelop.AnalysisCore/RuleTreeType.cs \
 	MonoDevelop.CodeGeneration/AbstractGenerateAction.cs \
 	MonoDevelop.CodeGeneration/CodeGenerationCommands.cs \
 	MonoDevelop.CodeGeneration/CodeGenerationOptions.cs \
@@ -41,14 +63,16 @@ FILES =  \
 	MonoDevelop.CodeGeneration/ReadonlyPropertyGenerator.cs \
 	MonoDevelop.CodeGeneration/ToStringGenerator.cs \
 	MonoDevelop.CodeGeneration/WriteLineGenerator.cs \
-	MonoDevelop.Refactoring.ConvertPropery/CreateBackingStore.cs \
-	MonoDevelop.Refactoring.ConvertPropery/PropertyVisitor.cs \
-	MonoDevelop.Refactoring.ConvertPropery/RemoveBackingStore.cs \
+	MonoDevelop.ContextAction/AnalysisContextAction.cs \
+	MonoDevelop.ContextAction/ContextAction.cs \
+	MonoDevelop.ContextAction/ContextActionAddinNode.cs \
+	MonoDevelop.ContextAction/ContextActionEditorExtension.cs \
+	MonoDevelop.ContextAction/ContextActionPanelWidget.cs \
+	MonoDevelop.ContextAction/ContextActionWidget.cs \
+	MonoDevelop.Inspection/InspectionPanelWidget.cs \
+	MonoDevelop.Inspection/InspectorAddinNode.cs \
 	MonoDevelop.Refactoring.CreateClass/CreateClassCodeGenerator.cs \
 	MonoDevelop.Refactoring.CreateClass/CreateStructCodeGenerator.cs \
-	MonoDevelop.Refactoring.DeclareLocal/DeclareLocalCodeGenerator.cs \
-	MonoDevelop.Refactoring.DeclareLocal/DeclareLocalHandler.cs \
-	MonoDevelop.Refactoring.DeclareLocal/GetContainingEmbeddedStatementVisitor.cs \
 	MonoDevelop.Refactoring.ImplementInterface/ImplementAbstractMembers.cs \
 	MonoDevelop.Refactoring.ImplementInterface/ImplementExplicit.cs \
 	MonoDevelop.Refactoring.ImplementInterface/ImplementImplicit.cs \
@@ -57,10 +81,6 @@ FILES =  \
 	MonoDevelop.Refactoring.IntroduceConstant/IntroduceConstantDialog.cs \
 	MonoDevelop.Refactoring.IntroduceConstant/IntroduceConstantHandler.cs \
 	MonoDevelop.Refactoring.IntroduceConstant/IntroduceConstantRefactoring.cs \
-	MonoDevelop.Refactoring.IntroduceFormatItem/IntroduceFormatItemRefactoring.cs \
-	MonoDevelop.Refactoring.MoveTypeToFile/MoveTypeToFileRefactoring.cs \
-	MonoDevelop.Refactoring.MoveTypeToFile/TypeFilterTransformer.cs \
-	MonoDevelop.Refactoring.MoveTypeToFile/TypeSearchVisitor.cs \
 	MonoDevelop.Refactoring.RefactorImports/FindTypeReferencesVisitor.cs \
 	MonoDevelop.Refactoring.RefactorImports/RefactorImportsHandler.cs \
 	MonoDevelop.Refactoring.RefactorImports/RemoveUnusedImportsRefactoring.cs \

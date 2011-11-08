@@ -206,12 +206,6 @@ CECIL_MDB_DEBUG = $(BINDIR)/$(CECIL_MDB_DLL).mdb
 CECIL_MDB_DIR = $(srcdir)/Mono.Cecil.Mdb
 CECIL_MDB_CSFILES = $(addprefix $(CECIL_MDB_DIR)/, $(shell sed -f $(srcdir)/stripnewline.sed  $(CECIL_MDB_DIR)/Mono.Cecil.Mdb.dll.sources))
 CECIL_MDB_DIST = $(CECIL_MDB_CSFILES) $(CECIL_SNK)
-CECIL_DECOMPILER_DLL = Cecil.Decompiler.dll
-CECIL_DECOMPILER = $(BINDIR)/$(CECIL_DECOMPILER_DLL)
-CECIL_DECOMPILER_DEBUG = $(BINDIR)/$(CECIL_DECOMPILER_DLL).mdb
-CECIL_DECOMPILER_DIR = $(srcdir)/Cecil.Decompiler
-CECIL_DECOMPILER_CSFILES = $(CECIL_DECOMPILER_DIR)/*/*.cs
-CECIL_DECOMPILER_DIST = $(CECIL_DECOMPILER_CSFILES)
 SVN_SERVER = svn+ssh://$(USER)@mono-cvs.ximian.com
 SVN_R_REVISION = $(addprefix -r, $(SVN_REVISION))
 assemblydir = $(MD_ASSEMBLY_DIR)
@@ -426,7 +420,7 @@ uninstall-am: uninstall-assemblyDATA
 	pdf-am ps ps-am uninstall uninstall-am uninstall-assemblyDATA
 
 
-all: $(CECIL) $(CECIL_MDB) $(CECIL_DECOMPILER)
+all: $(CECIL) $(CECIL_MDB)
 
 $(CECIL): $(CECIL_CSFILES)
 	mkdir -p $(BINDIR)
@@ -439,10 +433,6 @@ $(CECIL_MDB): $(CECIL_MDB_CSFILES) $(CECIL)
 	gmcs $(CECIL_MDB_CSFILES) /debug /target:library /keyfile:$(CECIL_SNK) /r:$(CECIL) /d:CECIL /d:NET_3_5 /out:$(CECIL_MDB)
 
 $(CECIL_MDB_DEBUG): $(CECIL_MDB)
-
-$(CECIL_DECOMPILER): $(CECIL_DECOMPILER_CSFILES) $(CECIL)
-	mkdir -p $(BINDIR)
-	gmcs /debug /target:library /r:$(CECIL) /r:System /r:System.Core /r:System.Xml /out:$(CECIL_DECOMPILER) $(CECIL_DECOMPILER_CSFILES)
 
 update-source-Mono.Cecil:
 	svn rm Mono.Cecil && \

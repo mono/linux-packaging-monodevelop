@@ -29,6 +29,8 @@
 using System;
 using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Ide.Gui.Components;
+using Mono.TextEditor;
+using System.Collections.Generic;
 
 namespace MonoDevelop.AssemblyBrowser
 {
@@ -36,7 +38,7 @@ namespace MonoDevelop.AssemblyBrowser
 	{
 		string GetDocumentationMarkup (ITreeNavigator navigator);
 		string GetDescription (ITreeNavigator navigator);
-		string GetDisassembly (ITreeNavigator navigator);
-		string GetDecompiledCode (ITreeNavigator navigator);
+		List<ReferenceSegment> Disassemble (TextEditorData data, ITreeNavigator navigator);
+		List<ReferenceSegment> Decompile (TextEditorData data, ITreeNavigator navigator);
 	}
 }

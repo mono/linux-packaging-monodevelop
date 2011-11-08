@@ -33,12 +33,14 @@ using System.Xml;
 using MonoDevelop.Projects.Dom;
 using Mono.Cecil;
 using MonoDevelop.Core;
+using MonoDevelop.Core.Assemblies;
 
 namespace MonoDevelop.Projects.Dom
 {
 	
 	public class DomCecilCompilationUnit : CompilationUnit
 	{
+		bool loadMonotouchDocumentation = true;
 		AssemblyDefinition assemblyDefinition;
 		public AssemblyDefinition AssemblyDefinition {
 			get {
@@ -89,6 +91,16 @@ namespace MonoDevelop.Projects.Dom
 				Add (new DomCecilAttribute (attr));
 			}
 		}
+
+		public static AssemblyDefinition ReadAssembly (string fileName, bool useCustomResolver = true)
+		{
+			ReaderParameters parameters = new ReaderParameters ();
+			if (useCustomResolver)
+				parameters.AssemblyResolver = new SimpleAssemblyResolver (Path.GetDirectoryName (fileName));
+			using (var stream = new MemoryStream (File.ReadAllBytes (fileName))) {
+				return AssemblyDefinition.ReadAssembly (stream, parameters);
+			}
+		}
 		
 /*		public static DomCecilCompilationUnit Load (string fileName)
 		{
@@ -100,20 +112,87 @@ namespace MonoDevelop.Projects.Dom
 		}
 		public static DomCecilCompilationUnit Load (string fileName, bool keepDefinitions, bool loadInternals)
 		{
-			return Load (fileName, true, true, false);
+			return
+		Load (fileName, true, true, false);
+
 		}
 		*/
 		
-		public static DomCecilCompilationUnit Load (string fileName, bool loadInternals, bool instantiateTypeParameter)
+		public static DomCecilCompilationUnit Load (string fileName, bool loadInternals, bool instantiateTypeParameter, bool customResolver = true)
 		{
 			if (String.IsNullOrEmpty (fileName))
 				return null;
-			//FIXME: should pass a custom resolver to the AssemblyDefinition so that it resolves from the correct GAC
-			using (var stream = new MemoryStream (File.ReadAllBytes (fileName))) {
-				DomCecilCompilationUnit result = new DomCecilCompilationUnit (AssemblyDefinition.ReadAssembly (stream), loadInternals, instantiateTypeParameter);
-				result.fileName = fileName;
+			DomCecilCompilationUnit result = new DomCecilCompilationUnit (ReadAssembly (fileName, customResolver), loadInternals, instantiateTypeParameter);
+			result.fileName = fileName;
+			return result;
+		}
+		
+		class SimpleAssemblyResolver : IAssemblyResolver
+		{
+			string lookupPath;
+			Dictionary<string, AssemblyDefinition> cache = new Dictionary<string, AssemblyDefinition> ();
+			
+			public SimpleAssemblyResolver (string lookupPath)
+			{
+				this.lookupPath = lookupPath;
+			}
+
+			public AssemblyDefinition InternalResolve (string fullName)
+			{
+				AssemblyDefinition result;
+				if (cache.TryGetValue (fullName, out result))
+					return result;
+				
+				var name = AssemblyNameReference.Parse (fullName);
+				// need to handle different file extension casings. Some dlls from windows tend to end with .Dll or .DLL rather than '.dll'
+				foreach (string file in Directory.GetFiles (lookupPath, name.Name + ".*")) {
+					string ext = Path.GetExtension (file);
+					if (string.IsNullOrEmpty (ext))
+						continue;
+					ext = ext.ToUpper ();
+					if (ext == ".DLL" || ext == ".EXE") {
+						result = ReadAssembly (file);
+						break;
+					}
+				}
+				
+				if (result == null) {
+					var framework = Services.ProjectService.DefaultTargetFramework;
+					var assemblyName = Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblyFullName (fullName, framework);
+					if (assemblyName == null)
+						return null;
+					var location = Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblyLocation (assemblyName, framework);
+					
+					if (!string.IsNullOrEmpty (location) && File.Exists (location)) {
+						result = ReadAssembly (location);
+					}
+				}
+				if (result != null)
+					cache [fullName] = result;
 				return result;
 			}
+
+			#region IAssemblyResolver implementation
+			public AssemblyDefinition Resolve (AssemblyNameReference name)
+			{
+				return InternalResolve (name.FullName) ?? GlobalAssemblyResolver.Instance.Resolve (name);
+			}
+
+			public AssemblyDefinition Resolve (AssemblyNameReference name, ReaderParameters parameters)
+			{
+				return InternalResolve (name.FullName) ?? GlobalAssemblyResolver.Instance.Resolve (name, parameters);
+			}
+
+			public AssemblyDefinition Resolve (string fullName)
+			{
+				return InternalResolve (fullName) ?? GlobalAssemblyResolver.Instance.Resolve (fullName);
+			}
+
+			public AssemblyDefinition Resolve (string fullName, ReaderParameters parameters)
+			{
+				return InternalResolve (fullName) ?? GlobalAssemblyResolver.Instance.Resolve (fullName, parameters);
+			}
+			#endregion
 		}
 		
 		public static bool IsInternal (MonoDevelop.Projects.Dom.Modifiers mods)
@@ -132,11 +211,12 @@ namespace MonoDevelop.Projects.Dom
 					continue;
 //				if (type.Name == "SimplePropertyDescriptor")
 //					System.Console.WriteLine(type.Attributes + "/" + DomCecilType.GetModifiers (type.Attributes) + "/" + IsInternal (DomCecilType.GetModifiers (type.Attributes)));
-				DomCecilType loadType = new DomCecilType (type, loadInternal);
+				DomCecilType loadType = new DomCecilType (type, loadInternal, loadMonotouchDocumentation);
 				if (instantiateTypeParameter) {
 					resolver.Visit (loadType, null);
 					resolver.ClearTypes ();
 				}
+				loadMonotouchDocumentation &= loadType.LoadMonotouchDocumentation;
 				Add (loadType);
 				module.Types.Add (loadType);
 			}

@@ -232,44 +232,73 @@ namespace MonoDevelop.Ide.Gui
 		public void OnUppercaseSelection ()
 		{
 			IEditableTextBuffer buffer = GetContent <IEditableTextBuffer> ();
-			if (buffer != null)
-			{
-				if (buffer.SelectedText == String.Empty)
-				{
-					int pos = buffer.CursorPosition;
-					string ch = buffer.GetText (pos, pos + 1);
-					buffer.DeleteText (pos, 1);
-					buffer.InsertText (pos, ch.ToUpper ());
+			if (buffer == null)
+				return;
+			
+			string selectedText = buffer.SelectedText;
+			if (string.IsNullOrEmpty (selectedText)) {
+				int pos = buffer.CursorPosition;
+				string ch = buffer.GetText (pos, pos + 1);
+				string upper = ch.ToUpper ();
+				if (upper == ch) {
 					buffer.CursorPosition = pos + 1;
-				} else
-				{
-					string newText = buffer.SelectedText.ToUpper ();
-					int startPos = buffer.SelectionStartPosition;
-					buffer.DeleteText (startPos, buffer.SelectedText.Length);
+					return;
+				}
+				using (var undo = buffer.OpenUndoGroup ()) {
+					buffer.DeleteText (pos, 1);
+					buffer.InsertText (pos, upper);
+					buffer.CursorPosition = pos + 1;
+				}
+			} else {
+				string newText = selectedText.ToUpper ();
+				if (newText == selectedText)
+					return;
+				int startPos = buffer.SelectionStartPosition;
+				using (var undo = buffer.OpenUndoGroup ()) {
+					buffer.DeleteText (startPos, selectedText.Length);
 					buffer.InsertText (startPos, newText);
+					buffer.Select (startPos, startPos + newText.Length);
 				}
 			}
+		}
+		
+		[CommandUpdateHandler (EditCommands.UppercaseSelection)]
+		protected void OnUppercaseSelection (CommandInfo info)
+		{
+			IEditableTextBuffer buffer = GetContent <IEditableTextBuffer> ();
+			info.Enabled = buffer != null && buffer.CursorPosition < buffer.Length;
 		}
 		
 		[CommandHandler (EditCommands.LowercaseSelection)]
 		public void OnLowercaseSelection ()
 		{
 			IEditableTextBuffer buffer = GetContent <IEditableTextBuffer> ();
-			if (buffer != null)
-			{
-				if (buffer.SelectedText == String.Empty)
-				{
-					int pos = buffer.CursorPosition;
-					string ch = buffer.GetText (pos, pos + 1);
-					buffer.DeleteText (pos, 1);
-					buffer.InsertText (pos, ch.ToLower ());
+			if (buffer == null)
+				return;
+			
+			string selectedText = buffer.SelectedText;
+			if (string.IsNullOrEmpty (selectedText)) {
+				int pos = buffer.CursorPosition;
+				string ch = buffer.GetText (pos, pos + 1);
+				string lower = ch.ToLower ();
+				if (lower == ch) {
 					buffer.CursorPosition = pos + 1;
-				} else
-				{
-					string newText = buffer.SelectedText.ToLower ();
-					int startPos = buffer.SelectionStartPosition;
-					buffer.DeleteText (startPos, buffer.SelectedText.Length);
+					return;
+				};
+				using (var undo = buffer.OpenUndoGroup ()) {
+					buffer.DeleteText (pos, 1);
+					buffer.InsertText (pos, lower);
+					buffer.CursorPosition = pos + 1;
+				}
+			} else {
+				string newText = selectedText.ToLower ();
+				if (newText == selectedText)
+					return;
+				int startPos = buffer.SelectionStartPosition;
+				using (var undo = buffer.OpenUndoGroup ()) {
+					buffer.DeleteText (startPos, selectedText.Length);
 					buffer.InsertText (startPos, newText);
+					buffer.Select (startPos, startPos + newText.Length);
 				}
 			}
 		}
@@ -277,7 +306,8 @@ namespace MonoDevelop.Ide.Gui
 		[CommandUpdateHandler (EditCommands.LowercaseSelection)]
 		protected void OnLowercaseSelection (CommandInfo info)
 		{
-			info.Enabled = GetContent <IEditableTextBuffer> () != null;
+			IEditableTextBuffer buffer = GetContent <IEditableTextBuffer> ();
+			info.Enabled = buffer != null && buffer.CursorPosition < buffer.Length;
 		}
 		
 
@@ -441,14 +471,13 @@ namespace MonoDevelop.Ide.Gui
 				}
 				--pos;
 			}
-			
-			data.Document.BeginAtomicUndo ();
-			foreach (var info in removeList) {
-				((Mono.TextEditor.IBuffer)data.Document).Remove (info.Position, info.Length);
-				data.Document.CommitLineUpdate (data.Document.OffsetToLineNumber (info.Position));
+			using (var undo = data.OpenUndoGroup ()) {
+				foreach (var info in removeList) {
+					((Mono.TextEditor.IBuffer)data.Document).Remove (info.Position, info.Length);
+					data.Document.CommitLineUpdate (data.Document.OffsetToLineNumber (info.Position));
+				}
+				data.Caret.Offset = Math.Min (data.Caret.Offset, data.Document.Length - 1);
 			}
-			data.Caret.Offset = Math.Min (data.Caret.Offset, data.Document.Length - 1);
-			data.Document.EndAtomicUndo ();
 		}
 		
 		[CommandUpdateHandler (EditCommands.RemoveTrailingWhiteSpaces)]

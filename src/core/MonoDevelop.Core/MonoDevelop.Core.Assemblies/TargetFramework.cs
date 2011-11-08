@@ -55,9 +55,8 @@ namespace MonoDevelop.Core.Assemblies
 
 		internal bool RelationsBuilt;
 		
-		internal static int FrameworkCount;
-		internal int Index;
 		string corlibVersion;
+		TargetFrameworkToolsVersion toolsVersion;
 
 		public static TargetFramework Default {
 			get { return Runtime.SystemAssemblyService.GetTargetFramework (TargetFrameworkMoniker.Default); }
@@ -65,12 +64,10 @@ namespace MonoDevelop.Core.Assemblies
 
 		internal TargetFramework ()
 		{
-			Index = FrameworkCount++;
 		}
 
 		internal TargetFramework (TargetFrameworkMoniker id)
 		{
-			Index = FrameworkCount++;
 			this.id = id;
 			this.name = id.Profile == null
 				? string.Format ("{0} {1}", id.Identifier, id.Version)
@@ -85,6 +82,11 @@ namespace MonoDevelop.Core.Assemblies
 		
 		public string Name {
 			get {
+				if (string.IsNullOrEmpty (name)) {
+					return string.IsNullOrEmpty (id.Profile)
+						? string.Format ("{0} {1}", id.Identifier, id.Version)
+						: string.Format ("{0} {1} ({2})", id.Identifier, id.Version, id.Profile);
+				}
 				return name;
 			}
 		}
@@ -97,10 +99,47 @@ namespace MonoDevelop.Core.Assemblies
 		
 		public ClrVersion ClrVersion {
 			get {
+				// Always return a concrete ClrVersion, nothing that uses this can deal with ClrVersion.Default
+				// If the framework didn't specify one, assume the same default as the ToolsVersion.
+				if (clrVersion == ClrVersion.Default) {
+					return ClrVersion.Net_4_0;
+				}
 				return clrVersion;
 			}
 		}
-
+		
+		//FIXME: this isn't really valid/useful. anything using MSBuild custom frameworks should use 4.0 tools
+		internal TargetFrameworkToolsVersion GetToolsVersion ()
+		{
+			if (toolsVersion != TargetFrameworkToolsVersion.Unspecified)
+				return toolsVersion;
+			
+			if (Id.Identifier == TargetFrameworkMoniker.ID_NET_FRAMEWORK) {
+				switch (id.Version) {
+				case "4.0":
+					return TargetFrameworkToolsVersion.V4_0;
+				case "3.5":
+					return TargetFrameworkToolsVersion.V3_5;
+				case "3.0":
+				case "2.0":
+					return TargetFrameworkToolsVersion.V2_0;
+				case "1.1":
+					return TargetFrameworkToolsVersion.V1_1;
+				}
+			}
+			
+			switch (clrVersion) {
+			case MonoDevelop.Core.ClrVersion.Net_1_1:
+				return TargetFrameworkToolsVersion.V1_1;
+			case MonoDevelop.Core.ClrVersion.Net_2_0:
+				return TargetFrameworkToolsVersion.V2_0;
+			case MonoDevelop.Core.ClrVersion.Net_4_0:
+				return TargetFrameworkToolsVersion.V4_0;
+			}
+			
+			return TargetFrameworkToolsVersion.V4_0;
+		}
+		
 		public bool IsCompatibleWithFramework (TargetFrameworkMoniker fxId)
 		{
 			return fxId.Identifier == this.id.Identifier
@@ -174,6 +213,113 @@ namespace MonoDevelop.Core.Assemblies
 			return string.Format ("[TargetFramework: Hidden={0}, Name={1}, Id={2}, ClrVersion={3}]",
 				Hidden, Name, Id, ClrVersion);
 		}
+		
+		public static TargetFramework FromFrameworkDirectory (TargetFrameworkMoniker moniker, FilePath dir)
+		{
+			var fxList = dir.Combine ("RedistList", "FrameworkList.xml");
+			if (!System.IO.File.Exists (fxList))
+				return null;
+			
+			var fx = new TargetFramework (moniker);
+			
+			using (var reader = System.Xml.XmlReader.Create (fxList)) {
+				if (!reader.ReadToDescendant ("FileList"))
+					throw new Exception ("Missing FileList element");
+				
+				//not sure what this is for
+				//if (reader.MoveToAttribute ("Redist") && reader.ReadAttributeValue ())
+				//	redist = reader.ReadContentAsString ();
+				
+				if (reader.MoveToAttribute ("Name") && reader.ReadAttributeValue ())
+					fx.name = reader.ReadContentAsString ();
+				
+				if (reader.MoveToAttribute ("RuntimeVersion") && reader.ReadAttributeValue ()) {
+					string runtimeVersion = reader.ReadContentAsString ();
+					switch (runtimeVersion) {
+					case "2.0":
+						fx.clrVersion = ClrVersion.Net_2_0;
+						break;
+					case "4.0":
+						fx.clrVersion = ClrVersion.Net_4_0;
+						break;
+					default:
+						throw new Exception ("Unknown RuntimeVersion '" + runtimeVersion + "'");
+					}
+				}
+				
+				if (reader.MoveToAttribute ("ToolsVersion") && reader.ReadAttributeValue ()) {
+					string runtimeVersion = reader.ReadContentAsString ();
+					switch (runtimeVersion) {
+					case "2.0":
+						fx.toolsVersion = TargetFrameworkToolsVersion.V2_0;
+						break;
+					case "3.5":
+						fx.toolsVersion = TargetFrameworkToolsVersion.V3_5;
+						break;
+					case "4.0":
+						fx.toolsVersion = TargetFrameworkToolsVersion.V4_0;
+						break;
+					default:
+						throw new Exception ("Unknown ToolsVersion '" + runtimeVersion + "'");
+					}
+				}
+				
+				if (reader.MoveToAttribute ("IncludeFramework") && reader.ReadAttributeValue ()) {
+					string include = reader.ReadContentAsString ();
+					if (!string.IsNullOrEmpty (include)) {
+						fx.IncludedFrameworks.Add (new TargetFrameworkMoniker (fx.Id.Identifier, include));
+					}
+				}
+				
+				//this is a Mono-specific extension
+				if (reader.MoveToAttribute ("TargetFrameworkDirectory") && reader.ReadAttributeValue ()) {
+					string targetDir = reader.ReadContentAsString ();
+					if (!string.IsNullOrEmpty (targetDir)) {
+						targetDir = targetDir.Replace ('\\', System.IO.Path.DirectorySeparatorChar);
+						dir = fxList.ParentDirectory.Combine (targetDir).FullPath;
+					}
+				}
+				
+				var assemblies = new List<AssemblyInfo> ();
+				if (reader.ReadToFollowing ("File")) {
+					do {
+						var ainfo = new AssemblyInfo ();
+						assemblies.Add (ainfo);
+						if (reader.MoveToAttribute ("AssemblyName") && reader.ReadAttributeValue ())
+							ainfo.Name = reader.ReadContentAsString ();
+						if (string.IsNullOrEmpty (ainfo.Name))
+							throw new Exception ("Missing AssemblyName attribute");
+						if (reader.MoveToAttribute ("Version") && reader.ReadAttributeValue ())
+							ainfo.Version = reader.ReadContentAsString ();
+						if (reader.MoveToAttribute ("PublicKeyToken") && reader.ReadAttributeValue ())
+							ainfo.PublicKeyToken = reader.ReadContentAsString ();
+						if (reader.MoveToAttribute ("Culture") && reader.ReadAttributeValue ())
+							ainfo.Culture = reader.ReadContentAsString ();
+						if (reader.MoveToAttribute ("ProcessorArchitecture") && reader.ReadAttributeValue ())
+							ainfo.ProcessorArchitecture = (ProcessorArchitecture)
+								Enum.Parse (typeof (ProcessorArchitecture), reader.ReadContentAsString (), true);
+						if (reader.MoveToAttribute ("InGac") && reader.ReadAttributeValue ())
+							ainfo.InGac = reader.ReadContentAsBoolean ();
+					} while (reader.ReadToFollowing ("File"));
+				} else {
+					var files = System.IO.Directory.GetFiles (dir, "*.dll");
+					foreach (var f in files) {
+						try {
+							var an = SystemAssemblyService.GetAssemblyNameObj (dir.Combine (f));
+							var ainfo = new AssemblyInfo ();
+							ainfo.Update (an);
+							assemblies.Add (ainfo);
+						} catch (Exception ex) {
+							LoggingService.LogError ("Error reading name for assembly '{0}' in framework '{1}':\n{2}",
+								f, fx.Id, ex.ToString ());
+						}
+					}
+				}
+				fx.Assemblies = assemblies.ToArray ();
+			}
+			
+			return fx;
+		}
 	}
 	
 	class AssemblyInfo
@@ -189,6 +335,15 @@ namespace MonoDevelop.Core.Assemblies
 		
 		[ItemProperty ("package")]
 		public string Package = null;
+		
+		[ItemProperty ("culture")]
+		public string Culture = null;
+		
+		[ItemProperty ("processorArchitecture")]
+		public ProcessorArchitecture ProcessorArchitecture = ProcessorArchitecture.MSIL;
+		
+		[ItemProperty ("inGac")]
+		public bool InGac = false;
 		
 		public AssemblyInfo ()
 		{
@@ -210,6 +365,8 @@ namespace MonoDevelop.Core.Assemblies
 		{
 			Name = aname.Name;
 			Version = aname.Version.ToString ();
+			ProcessorArchitecture = aname.ProcessorArchitecture;
+			Culture = aname.CultureInfo.Name;
 			string fn = aname.ToString ();
 			string key = "publickeytoken=";
 			int i = fn.ToLower().IndexOf (key) + key.Length;
@@ -222,5 +379,14 @@ namespace MonoDevelop.Core.Assemblies
 		{
 			return (AssemblyInfo) MemberwiseClone ();
 		}
+	}
+	
+	public enum TargetFrameworkToolsVersion
+	{
+		Unspecified,
+		V1_1, //not a real MSBuild ToolsVersion, but MD internal build supports it
+		V2_0,
+		V3_5,
+		V4_0,
 	}
 }

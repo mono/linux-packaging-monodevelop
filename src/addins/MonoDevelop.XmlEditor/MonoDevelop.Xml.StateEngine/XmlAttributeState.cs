@@ -47,6 +47,15 @@ namespace MonoDevelop.Xml.StateEngine
 		const int GETTINGEQ = 1;
 		const int GETTINGVAL = 2;
 		
+		public bool AllowOpeningTagCharInsideAttributeValue {
+			get {
+				return SingleQuotedAttributeValueState.AllowOpeningTagCharInside;
+			}
+			set {
+				SingleQuotedAttributeValueState.AllowOpeningTagCharInside = DoubleQuotedAttributeValueState.AllowOpeningTagCharInside = value;
+			}
+		}
+		
 		public XmlAttributeState () : this (
 			new XmlNameState (),
 			new XmlDoubleQuotedAttributeValueState (),
@@ -142,8 +151,7 @@ namespace MonoDevelop.Xml.StateEngine
 				}
 			}
 			
-			if (Char.IsLetterOrDigit (c) || char.IsPunctuation (c) || char.IsWhiteSpace (c)) {
-				string err;
+			if (char.IsLetterOrDigit (c) || char.IsPunctuation (c) || char.IsWhiteSpace (c)) {
 				if (context.StateTag == GETTINGEQ)
 					context.LogError ("Expecting = in attribute, got " + c + ".");
 				else if (context.StateTag == GETTINGVAL)

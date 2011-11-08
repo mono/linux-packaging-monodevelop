@@ -125,10 +125,10 @@ namespace MonoDevelop.Ide.CodeCompletion
 			base.OnDestroyed ();
 		}
 
-		public void PostProcessKeyEvent (KeyActions ka)
+		public void PostProcessKeyEvent (KeyActions ka, Gdk.Key key, char keyChar, Gdk.ModifierType modifier)
 		{
 			if ((ka & KeyActions.Complete) != 0) 
-				CompleteWord ();
+				CompleteWord (ref ka, key, keyChar, modifier);
 		}
 		
 		public void ToggleCategoryMode ()
@@ -155,7 +155,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			
 			if ((ka & KeyActions.Complete) != 0) {
 				//bool completed =
-				CompleteWord ();
+				CompleteWord (ref ka, key, keyChar, modifier);
 				//NOTE: this passes the enter keystroke through to the editor if the current item is an exact match
 				//if (!completed) {
 				//	CompletionWindowManager.HideWindow ();
@@ -326,14 +326,19 @@ namespace MonoDevelop.Ide.CodeCompletion
 			if (!force && previousHeight != h && previousWidth != w)
 				return;
 			
-			Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtPoint (X, Y));
+			// Note: we add back the TextOffset here in case X and X+TextOffset are on different monitors.
+			Gdk.Rectangle geometry = DesktopService.GetUsableMonitorGeometry (Screen, Screen.GetMonitorAtPoint (X + TextOffset, Y));
 			
 			previousHeight = h;
 			previousWidth = w;
+			
 			if (X + w > geometry.Right)
 				X = geometry.Right - w;
-
+			else if (X < geometry.Left)
+				X = geometry.Left;
+			
 			if (Y + h > geometry.Bottom || yPosition == WindowPositonY.Top) {
+				// Put the completion-list window *above* the cursor
 				Y = Y - CodeCompletionContext.TriggerTextHeight - h;
 				yPosition = WindowPositonY.Top;
 			} else {
@@ -355,8 +360,13 @@ namespace MonoDevelop.Ide.CodeCompletion
 			Reposition (true);
 		}
 		
-		
 		public bool CompleteWord ()
+		{
+			KeyActions ka = KeyActions.None;
+			return CompleteWord (ref ka, (Gdk.Key)0, '\0', Gdk.ModifierType.None);
+		}
+		
+		public bool CompleteWord (ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
 		{
 			if (SelectionIndex == -1 || completionDataList == null)
 				return false;
@@ -366,7 +376,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			// first close the completion list, then insert the text.
 			// this is required because that's the logical event chain, otherwise things could be messed up
 			CloseCompletionList ();
-			item.InsertCompletionText (this);
+			item.InsertCompletionText (this, ref ka, closeChar, keyChar, modifier);
 			AddWordToHistory (PartialWord, item.CompletionText);
 			OnWordCompleted (new CodeCompletionContextEventArgs (CompletionWidget, CodeCompletionContext, item.CompletionText));
 			return true;
@@ -546,7 +556,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 				declarationViewHidden = false;
 			}
 			
-			Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtWindow (GdkWindow));
+			Gdk.Rectangle geometry = DesktopService.GetUsableMonitorGeometry (Screen, Screen.GetMonitorAtWindow (GdkWindow));
 		
 			Requisition req = declarationviewwindow.SizeRequest ();
 			int dvwWidth = req.Width;

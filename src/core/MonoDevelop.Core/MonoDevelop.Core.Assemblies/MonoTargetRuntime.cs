@@ -104,6 +104,21 @@ namespace MonoDevelop.Core.Assemblies
 					return base.DisplayName;
 			}
 		}
+		
+		public override IEnumerable<FilePath> GetReferenceFrameworkDirectories ()
+		{
+			//duplicate xbuild's framework folders path logic
+			//see xbuild man page
+			string env;
+			if (environmentVariables.TryGetValue ("XBUILD_FRAMEWORK_FOLDERS_PATH", out env) && !string.IsNullOrEmpty (env)) {
+				foreach (var dir in env.Split (new char[] { Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries))
+					yield return (FilePath) dir;
+			}
+			if (Platform.IsMac)
+				yield return "/Library/Frameworks/Mono.framework/External/xbuild-frameworks";
+			//can't return $(TargetFrameworkRoot) MSBuild var, since that's per-project
+			yield return Path.Combine (monoDir, "xbuild-frameworks");
+		}
 
 		public bool UserDefined { get; internal set; }
 		
@@ -140,6 +155,8 @@ namespace MonoDevelop.Core.Assemblies
 			
 			string gacs;
 			if (environmentVariables.TryGetValue ("MONO_GAC_PREFIX", out gacs)) {
+				if (string.IsNullOrEmpty (gacs))
+					yield break;
 				foreach (string path in gacs.Split (new char[] { Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries))
 					yield return path;
 			}
@@ -240,12 +257,12 @@ namespace MonoDevelop.Core.Assemblies
 			foreach (PackageAssemblyInfo pi in pinfo.Assemblies) {
 				TargetFrameworkMoniker targetFramework = Runtime.SystemAssemblyService.GetTargetFrameworkForAssembly (Runtime.SystemAssemblyService.CurrentRuntime, pi.File);
 				if (commonFramework == null) {
-					commonFramework = Runtime.SystemAssemblyService.GetTargetFramework (targetFramework);
+					commonFramework = Runtime.SystemAssemblyService.GetCoreFramework (targetFramework);
 					if (commonFramework == null)
 						inconsistentFrameworks = true;
 				}
 				else if (targetFramework != null) {
-					TargetFramework newfx = Runtime.SystemAssemblyService.GetTargetFramework (targetFramework);
+					TargetFramework newfx = Runtime.SystemAssemblyService.GetCoreFramework (targetFramework);
 					if (newfx == null)
 						inconsistentFrameworks = true;
 					else {

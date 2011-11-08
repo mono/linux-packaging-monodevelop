@@ -60,13 +60,14 @@ namespace Mono.TextEditor
 		bool OverrideDocumentEolMarker { get; set; }
 		bool EnableSyntaxHighlighting { get; set; }
 		bool EnableAnimations { get; }
+		bool UseAntiAliasing { get; set; }
 		string FontName { get;  set; }
 		Pango.FontDescription Font { get;  }
 		
 		string ColorScheme { get; set;  }
 		string DefaultEolMarker { get; set; }
 		
-		Style GetColorStyle (Gtk.Style widgetStyle);
+		ColorSheme GetColorStyle (Gtk.Style widgetStyle);
 		
 		event EventHandler Changed;
 	}

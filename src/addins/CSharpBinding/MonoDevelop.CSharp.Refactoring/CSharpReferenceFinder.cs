@@ -57,7 +57,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			var doc = ProjectDomService.ParseFile (dom, fileName, () => editor.Text);
 			if (doc == null || doc.CompilationUnit == null)
 				yield break;
-			var resolver = new NRefactoryResolver (dom, doc.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, editor, fileName);
+			var resolver = new NRefactoryResolver (dom, doc.CompilationUnit, ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, editor, fileName);
 
 			visitor.ParseFile (resolver);
 			visitor.RunVisitor (resolver);

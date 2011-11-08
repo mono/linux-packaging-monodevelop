@@ -102,7 +102,7 @@ namespace Mono.TextEditor
 		Email
 	}
 	
-	public class UrlMarker : TextMarker
+	public class UrlMarker : TextMarker, IDisposable
 	{
 		string url;
 		string style;
@@ -110,6 +110,7 @@ namespace Mono.TextEditor
 		int endColumn;
 		LineSegment line;
 		UrlType urlType;
+		Document doc;
 		
 		public string Url {
 			get {
@@ -135,14 +136,27 @@ namespace Mono.TextEditor
 			}
 		}
 		
-		public UrlMarker (LineSegment line, string url, UrlType urlType, string style, int startColumn, int endColumn)
+		public UrlMarker (Document doc, LineSegment line, string url, UrlType urlType, string style, int startColumn, int endColumn)
 		{
-			this.line        = line;
-			this.url         = url;
-			this.urlType     = urlType;
-			this.style       = style;
+			this.doc = doc;
+			this.line = line;
+			this.url = url;
+			this.urlType = urlType;
+			this.style = style;
 			this.startColumn = startColumn;
-			this.endColumn   = endColumn;
+			this.endColumn = endColumn;
+			doc.LineChanged += HandleDocLineChanged;
+		}
+		
+		void HandleDocLineChanged (object sender, LineEventArgs e)
+		{
+			if (line == e.Line)
+				doc.RemoveMarker (this);
+		}
+		
+		public void Dispose ()
+		{
+			doc.LineChanged -= HandleDocLineChanged;
 		}
 		
 		public override void Draw (TextEditor editor, Cairo.Context cr, Pango.Layout layout, bool selected, int startOffset, int endOffset, double y, double startXPos, double endXPos)
@@ -283,7 +297,13 @@ namespace Mono.TextEditor
 			}
 			double height = editor.LineHeight / 5;
 			cr.Color = ColorName == null ? Color : editor.ColorStyle.GetColorFromDefinition (ColorName);
-			Pango.CairoHelper.ShowErrorUnderline (cr, @from, y + editor.LineHeight - height, to - @from, height);
+			if (Wave) {	
+				Pango.CairoHelper.ShowErrorUnderline (cr, @from, y + editor.LineHeight - height, to - @from, height);
+			} else {
+				cr.MoveTo (@from, y + editor.LineHeight - 1);
+				cr.LineTo (to, y + editor.LineHeight - 1);
+				cr.Stroke ();
+			}
 		}
 	}
 
@@ -298,7 +318,6 @@ namespace Mono.TextEditor
 			Italic = 8
 		}
 		
-		StyleFlag includedStyles;
 		Cairo.Color color;
 		Cairo.Color backColor;
 		bool bold;
@@ -310,17 +329,13 @@ namespace Mono.TextEditor
 			}
 			set {
 				italic = value;
-				includedStyles |= StyleFlag.Italic;
+				IncludedStyles |= StyleFlag.Italic;
 			}
 		}
 		
-		public StyleFlag IncludedStyles {
-			get {
-				return includedStyles;
-			}
-			set {
-				includedStyles = value;
-			}
+		public virtual StyleFlag IncludedStyles {
+			get;
+			set;
 		}
 		
 		public virtual Cairo.Color Color {
@@ -329,7 +344,7 @@ namespace Mono.TextEditor
 			}
 			set {
 				color = value;
-				includedStyles |= StyleFlag.Color;
+				IncludedStyles |= StyleFlag.Color;
 			}
 		}
 		
@@ -339,7 +354,7 @@ namespace Mono.TextEditor
 			}
 			set {
 				bold = value;
-				includedStyles |= StyleFlag.Bold;
+				IncludedStyles |= StyleFlag.Bold;
 			}
 		}
 		
@@ -349,30 +364,35 @@ namespace Mono.TextEditor
 			}
 			set {
 				backColor = value;
-				includedStyles |= StyleFlag.BackgroundColor;
+				IncludedStyles |= StyleFlag.BackgroundColor;
 			}
+		}
+		
+		protected virtual ChunkStyle CreateStyle (ChunkStyle baseStyle, Cairo.Color color, Cairo.Color bgColor)
+		{
+			ChunkStyle style = new ChunkStyle (baseStyle);
+			if ((IncludedStyles & StyleFlag.Color) != 0)
+				style.CairoColor = color;
+			
+			if ((IncludedStyles & StyleFlag.BackgroundColor) != 0) {
+				style.ChunkProperties &= ~ChunkProperties.TransparentBackground;
+				style.CairoBackgroundColor = bgColor;
+			}
+			
+			if ((IncludedStyles & StyleFlag.Bold) != 0)
+				style.ChunkProperties |= ChunkProperties.Bold;
+			
+			if ((IncludedStyles & StyleFlag.Italic) != 0)
+				style.ChunkProperties |= ChunkProperties.Italic;
+			return style;
 		}
 		
 		public override ChunkStyle GetStyle (ChunkStyle baseStyle)
 		{
-			if (includedStyles == StyleFlag.None)
+			if (baseStyle == null || IncludedStyles == StyleFlag.None)
 				return baseStyle;
 			
-			ChunkStyle style = new ChunkStyle (baseStyle);
-			if ((includedStyles & StyleFlag.Color) != 0)
-				style.CairoColor = Color;
-		
-			if ((includedStyles & StyleFlag.BackgroundColor) != 0) {
-				style.ChunkProperties &= ~ChunkProperties.TransparentBackground;
-				style.CairoBackgroundColor = BackgroundColor;
-			}
-			
-			if ((includedStyles & StyleFlag.Bold) != 0)
-				style.ChunkProperties |= ChunkProperties.Bold;
-			
-			if ((includedStyles & StyleFlag.Italic) != 0)
-				style.ChunkProperties |= ChunkProperties.Italic;
-			return style;
+			return CreateStyle (baseStyle, Color, BackgroundColor);
 		}
 	}
 }

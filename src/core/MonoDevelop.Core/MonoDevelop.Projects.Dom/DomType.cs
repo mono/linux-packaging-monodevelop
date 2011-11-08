@@ -325,17 +325,23 @@ namespace MonoDevelop.Projects.Dom
 			this.Location    = location;
 		}
 		
-		System.Xml.XmlDocument helpXml;
+		static Dictionary<string, System.Xml.XmlDocument> helpTreeCache = new Dictionary<string, System.Xml.XmlDocument> ();
 		public System.Xml.XmlDocument HelpXml {
 			get {
-				if (helpXml == null && ProjectDomService.HelpTree != null) {
+				System.Xml.XmlDocument result;
+				var url = HelpUrl;
+				if (!helpTreeCache.TryGetValue (url, out result)) {
+					if (ProjectDomService.HelpTree == null)
+						return null;
 					try {
-						helpXml = ProjectDomService.HelpTree.GetHelpXml (this.HelpUrl);
-					} catch {
-						// Ignore
+						result = ProjectDomService.HelpTree.GetHelpXml (url);
+					} catch (Exception e) {
+						LoggingService.LogError ("Error while reading monodoc file.", e);
+						throw e;
 					}
+					helpTreeCache.Add (url, result);
 				}
-				return helpXml;
+				return result;
 			}
 		}
 		
@@ -764,6 +770,7 @@ namespace MonoDevelop.Projects.Dom
 			public GenericTypeInstanceResolver Parent;
 			public Dictionary<string, IReturnType> typeTable = new Dictionary<string,IReturnType> ();
 			ProjectDom dom;
+			CopyDomVisitor<object> copyVisitor = new CopyDomVisitor<object> ();
 			
 			public GenericTypeInstanceResolver (ProjectDom dom)
 			{
@@ -791,7 +798,7 @@ namespace MonoDevelop.Projects.Dom
 					if (type.ArrayDimensions == 0 && type.PointerNestingLevel == 0) {
 						return res;
 					}
-					DomReturnType copy = (DomReturnType)base.Visit (res, typeToInstantiate);
+					DomReturnType copy = (DomReturnType)copyVisitor.Visit (res, null);
 					copy.PointerNestingLevel = type.PointerNestingLevel;
 					copy.SetDimensions (type.GetDimensions ());
 					return copy;
@@ -864,19 +871,26 @@ namespace MonoDevelop.Projects.Dom
 			}
 			return result;
 		}
-
-		public List<IMethod> GetExtensionMethods (List<IType> accessibleExtensionTypes)
+		
+		public IEnumerable<IMethod> GetAllExtensionMethods (List<IType> accessibleExtensionTypes)
 		{
-			List<IMethod> result = new List<IMethod> ();
 			foreach (IType staticType in accessibleExtensionTypes) {
 				foreach (IMethod method in staticType.Methods) {
 					IMethod extMethod = method.Extends (this.SourceProjectDom, this);
-					if (extMethod != null) {
-						result.Add (extMethod);
-					}
-				}
+					if (extMethod != null)
+						yield return extMethod;
+				} 
 			}
-			return result;
+		}
+		public IEnumerable<IMethod> GetExtensionMethods (List<IType> accessibleExtensionTypes, string methodName)
+		{
+			foreach (IType staticType in accessibleExtensionTypes) {
+				foreach (IMethod method in staticType.Methods.Where (m => m.Name == methodName)) {
+					IMethod extMethod = method.Extends (this.SourceProjectDom, this);
+					if (extMethod != null)
+						yield return extMethod;
+				} 
+			}
 		}
 
 		public static bool IncludeProtected (ProjectDom dom, IType type, IType callingType)
@@ -957,6 +971,46 @@ namespace MonoDevelop.Projects.Dom
 			IType         b = other is InstantiatedType ? ((InstantiatedType)other).UninstantiatedType : other;
 			int typeParamsB = other is InstantiatedType ? ((InstantiatedType)other).UninstantiatedType.TypeParameters.Count : other.TypeParameters.Count;
 			return typeParamsA == typeParamsB && a.FullName == b.FullName;
+		}
+		
+		static readonly string designerFileNameExt = ".designer.";
+		static readonly string designerFileNameGtkGui = System.IO.Path.DirectorySeparatorChar + "gtk-gui"
+				+ System.IO.Path.DirectorySeparatorChar;
+			
+		public static bool IsDesignerType (IType type)
+		{
+			return IsDesignerFile (type.CompilationUnit.FileName.ToString ());
+		}
+		
+		static bool IsDesignerFile (string filename)
+		{
+			//designer files
+			int designerIdx = filename.LastIndexOf (designerFileNameExt, StringComparison.OrdinalIgnoreCase);
+			if (designerIdx > -1 && filename.IndexOf ('.', designerIdx) < 0)
+				return true;
+			
+			//stetic files
+			if (filename.Contains (designerFileNameGtkGui))
+				return true;
+			
+			return false;
+		}
+		
+		public static IEnumerable<IType> GetSortedParts (IType type)
+		{
+			var list = type.Parts.ToList ();
+			list.Sort ((x,y) => x.CompilationUnit.FileName.CompareTo (y.CompilationUnit.FileName));
+			//don't need to do IsDesignerPart in the comparer, just do a two-pass return
+			for (int i = 0; i < list.Count; i++) {
+				if (!IsDesignerType (list[i])) {
+					yield return list[i];
+					list[i] = null;
+				}
+			}
+			foreach (var part in list) {
+				if (part != null)
+					yield return part;
+			}
 		}
 	}
 	

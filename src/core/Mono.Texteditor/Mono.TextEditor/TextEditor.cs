@@ -68,8 +68,7 @@ namespace Mono.TextEditor
 		Gdk.Key lastIMEventMappedKey;
 		uint lastIMEventMappedChar;
 		Gdk.ModifierType lastIMEventMappedModifier;
-		bool imContextActive;
-		
+		bool imContextNeedsReset;
 		string currentStyleName;
 		
 		double mx, my;
@@ -96,6 +95,7 @@ namespace Mono.TextEditor
 				textEditorData.Document.MarkerRemoved += HandleTextEditorDataDocumentMarkerChange;
 			}
 		}
+
 		
 		public Mono.TextEditor.Caret Caret {
 			get {
@@ -109,11 +109,36 @@ namespace Mono.TextEditor
 		
 		public MenuItem CreateInputMethodMenuItem (string label)
 		{
+			if (GtkWorkarounds.GtkMinorVersion >= 16) {
+				bool showMenu = (bool) GtkWorkarounds.GetProperty (Settings, "gtk-show-input-method-menu").Val;
+				if (!showMenu)
+					return null;
+			}
 			MenuItem imContextMenuItem = new MenuItem (label);
 			Menu imContextMenu = new Menu ();
 			imContextMenuItem.Submenu = imContextMenu;
 			IMContext.AppendMenuitems (imContextMenu);
 			return imContextMenuItem;
+		}
+		
+		[DllImport (PangoUtil.LIBGTK)]
+		static extern void gtk_im_multicontext_set_context_id (IntPtr context, string context_id);
+		
+		[DllImport (PangoUtil.LIBGTK)]
+		static extern string gtk_im_multicontext_get_context_id (IntPtr context);
+		
+		[GLib.Property ("im-module")]
+		public string IMModule {
+			get {
+				if (GtkWorkarounds.GtkMinorVersion < 16 || imContext == null)
+					return null;
+				return gtk_im_multicontext_get_context_id (imContext.Handle);
+			}
+			set {
+				if (GtkWorkarounds.GtkMinorVersion < 16 || imContext == null)
+					return;
+				gtk_im_multicontext_set_context_id (imContext.Handle, value);
+			}
 		}
 		
 		public ITextEditorOptions Options {
@@ -137,6 +162,11 @@ namespace Mono.TextEditor
 
 		void HandleTextEditorDataDocumentMarkerChange (object sender, TextMarkerEvent e)
 		{
+			if (e.TextMarker is IExtendingTextMarker) {
+				int lineNumber = OffsetToLineNumber (e.Line.Offset);
+				textEditorData.heightTree.SetLineHeight (lineNumber, GetLineHeight (e.Line));
+			}
+			
 			TextViewMargin.RemoveCachedLine (e.Line);
 			Document.CommitLineUpdate (e.Line);
 		}
@@ -251,11 +281,7 @@ namespace Mono.TextEditor
 				CenterToCaret ();
 				StartCaretPulseAnimation ();
 			};
-			doc.TextReplaced += OnDocumentStateChanged;
-			doc.TextSet += OnTextSet;
-			doc.LineChanged += UpdateLinesOnTextMarkerHeightChange; 
-			doc.MarkerAdded += HandleTextEditorDataDocumentMarkerChange;
-			doc.MarkerRemoved += HandleTextEditorDataDocumentMarkerChange;
+			this.Document = doc;
 
 			textEditorData.CurrentMode = initialMode;
 			
@@ -292,24 +318,7 @@ namespace Mono.TextEditor
 			imContext.Commit += IMCommit;
 			
 			imContext.UsePreedit = true;
-			imContext.PreeditStart += delegate {
-				preeditOffset = Caret.Offset;
-				this.textViewMargin.ForceInvalidateLine (Caret.Line);
-				this.textEditorData.Document.CommitLineUpdate (Caret.Line);
-			};
-			imContext.PreeditEnd += delegate {
-				preeditOffset = -1;
-				this.textViewMargin.ForceInvalidateLine (Caret.Line);
-				this.textEditorData.Document.CommitLineUpdate (Caret.Line);
-			};
-			
-			imContext.PreeditChanged += delegate(object sender, EventArgs e) {
-				if (preeditOffset >= 0) {
-					imContext.GetPreeditString (out preeditString, out preeditAttrs, out preeditCursorPos);
-					this.textViewMargin.ForceInvalidateLine (Caret.Line);
-					this.textEditorData.Document.CommitLineUpdate (Caret.Line);
-				}
-			};
+			imContext.PreeditChanged += PreeditStringChanged;
 			
 			imContext.RetrieveSurrounding += delegate (object o, RetrieveSurroundingArgs args) {
 				//use a single line of context, whole document would be very expensive
@@ -360,20 +369,43 @@ namespace Mono.TextEditor
 			window.ShowAll ();
 		}
 		
-		internal int preeditCursorPos = -1, preeditOffset = -1;
+		internal int preeditOffset, preeditLine, preeditCursorCharIndex;
 		internal string preeditString;
 		internal Pango.AttrList preeditAttrs;
-		
-		public int PreeditOffset {
-			get {
-				return this.preeditOffset;
-			}
-		}
 
-		public string PreeditString {
-			get {
-				return this.preeditString;
+		internal bool ContainsPreedit (int line, int length)
+		{
+			if (string.IsNullOrEmpty (preeditString))
+				return false;
+			
+			return line <= preeditOffset && preeditOffset <= line + length;
+		}
+		
+		void PreeditStringChanged (object sender, EventArgs e)
+		{
+			imContext.GetPreeditString (out preeditString, out preeditAttrs, out preeditCursorCharIndex);
+			if (!string.IsNullOrEmpty (preeditString)) {
+				if (preeditOffset < 0) {
+					preeditOffset = Caret.Offset;
+					preeditLine = Caret.Line;
+				}
+				using (var preeditLayout = PangoUtil.CreateLayout (this)) {
+					preeditLayout.SetText (preeditString);
+					preeditLayout.Attributes = preeditAttrs;
+					int w, h;
+					preeditLayout.GetSize (out w, out h);
+					if (LineHeight != System.Math.Ceiling (h / Pango.Scale.PangoScale))
+						OptionsChanged (this, EventArgs.Empty);
+				}
+				
+			} else {
+				preeditOffset = -1;
+				preeditString = null;
+				preeditAttrs = null;
+				preeditCursorCharIndex = 0;
 			}
+			this.textViewMargin.ForceInvalidateLine (preeditLine);
+			this.textEditorData.Document.CommitLineUpdate (preeditLine);
 		}
 
 		void CaretPositionChanged (object sender, DocumentLocationEventArgs args) 
@@ -469,42 +501,46 @@ namespace Mono.TextEditor
 		
 		internal void ResetIMContext ()
 		{
-			if (imContextActive) {
+			if (imContextNeedsReset) {
 				imContext.Reset ();
-				imContextActive = false;
+				imContextNeedsReset = false;
 			}
 		}
 		
 		void IMCommit (object sender, Gtk.CommitArgs ca)
 		{
-			try {
-				if (IsRealized && IsFocus) {
-					//this, if anywhere, is where we should handle UCS4 conversions
-					for (int i = 0; i < ca.Str.Length; i++) {
-						int utf32Char;
-						if (char.IsHighSurrogate (ca.Str, i)) {
-							utf32Char = char.ConvertToUtf32 (ca.Str, i);
-							i++;
-						} else {
-							utf32Char = (int)ca.Str [i];
-						}
-						
-						//include the other pre-IM state *if* the post-IM char matches the pre-IM (key-mapped) one
-						 if (lastIMEventMappedChar == utf32Char && lastIMEventMappedChar == (uint)lastIMEventMappedKey) {
-							OnIMProcessedKeyPressEvent (lastIMEventMappedKey, lastIMEventMappedChar, lastIMEventMappedModifier);
-						} else {
-							OnIMProcessedKeyPressEvent ((Gdk.Key)0, (uint)utf32Char, Gdk.ModifierType.None);
-						}
-					}
+			if (!IsRealized || !IsFocus)
+				return;
+			
+			//this, if anywhere, is where we should handle UCS4 conversions
+			for (int i = 0; i < ca.Str.Length; i++) {
+				int utf32Char;
+				if (char.IsHighSurrogate (ca.Str, i)) {
+					utf32Char = char.ConvertToUtf32 (ca.Str, i);
+					i++;
+				} else {
+					utf32Char = (int)ca.Str [i];
 				}
-			} finally {
-				ResetIMContext ();
+				
+				//include the other pre-IM state *if* the post-IM char matches the pre-IM (key-mapped) one
+				 if (lastIMEventMappedChar == utf32Char && lastIMEventMappedChar == (uint)lastIMEventMappedKey) {
+					OnIMProcessedKeyPressEvent (lastIMEventMappedKey, lastIMEventMappedChar, lastIMEventMappedModifier);
+				} else {
+					OnIMProcessedKeyPressEvent ((Gdk.Key)0, (uint)utf32Char, Gdk.ModifierType.None);
+				}
+			}
+			
+			//the IME can commit while there's still a pre-edit string
+			//since we cached the pre-edit offset when it started, need to update it
+			if (preeditOffset > -1) {
+				preeditOffset = Caret.Offset;
 			}
 		}
 		
 		protected override bool OnFocusInEvent (EventFocus evnt)
 		{
 			var result = base.OnFocusInEvent (evnt);
+			imContextNeedsReset = true;
 			IMContext.FocusIn ();
 			RequestResetCaretBlink ();
 			Document.CommitLineUpdate (Caret.Line);
@@ -514,6 +550,7 @@ namespace Mono.TextEditor
 		protected override bool OnFocusOutEvent (EventFocus evnt)
 		{
 			var result = base.OnFocusOutEvent (evnt);
+			imContextNeedsReset = true;
 			imContext.FocusOut ();
 			GLib.Timeout.Add (10, delegate {
 				// Don't immediately hide the tooltip. Wait a bit and check if the tooltip has the focus.
@@ -600,6 +637,7 @@ namespace Mono.TextEditor
 				margin.OptionsChanged ();
 			}
 			SetAdjustments (Allocation);
+			textEditorData.heightTree.Rebuild ();
 			this.QueueResize ();
 		}
 		
@@ -651,8 +689,11 @@ namespace Mono.TextEditor
 			Document.DocumentUpdated -= DocumentUpdatedHandler;
 			if (textEditorData.Options != null)
 				textEditorData.Options.Changed -= OptionsChanged;
-
-			imContext = imContext.Kill (x => x.Commit -= IMCommit);
+			
+			if (imContext != null){
+				ResetIMContext ();
+				imContext = imContext.Kill (x => x.Commit -= IMCommit);
+			}
 
 			if (this.textEditorData.HAdjustment != null)
 				this.textEditorData.HAdjustment.ValueChanged -= HAdjustmentValueChanged;
@@ -807,7 +848,7 @@ namespace Mono.TextEditor
 			}
 			
 			if (imContext.FilterKeypress (evt)) {
-				imContextActive = true;
+				imContextNeedsReset = true;
 				return true;
 			} else {
 				return false;
@@ -864,8 +905,9 @@ namespace Mono.TextEditor
 		
 		protected override bool OnKeyReleaseEvent (EventKey evnt)
 		{
-			if (IMFilterKeyPress (evnt, 0, 0, ModifierType.None))
-				imContextActive = true;
+			if (IMFilterKeyPress (evnt, 0, 0, ModifierType.None)) {
+				imContextNeedsReset = true;
+			}
 			return true;
 		}
 		
@@ -981,39 +1023,39 @@ namespace Mono.TextEditor
 				
 		protected override void OnDragDataReceived (DragContext context, int x, int y, SelectionData selection_data, uint info, uint time_)
 		{
-			textEditorData.Document.BeginAtomicUndo ();
-			int dragOffset = Document.LocationToOffset (dragCaretPos);
-			if (context.Action == DragAction.Move) {
-				if (CanEdit (Caret.Line) && selection != null) {
-					ISegment selectionRange = selection.GetSelectionRange (textEditorData);
-					if (selectionRange.Offset < dragOffset)
-						dragOffset -= selectionRange.Length;
-					Caret.PreserveSelection = true;
-					textEditorData.DeleteSelection (selection);
-					Caret.PreserveSelection = false;
-
-					selection = null;
-				}
-			}
-			if (selection_data.Length > 0 && selection_data.Format == 8) {
-				Caret.Offset = dragOffset;
-				if (CanEdit (dragCaretPos.Line)) {
-					int offset = Caret.Offset;
-					if (selection != null && selection.GetSelectionRange (textEditorData).Offset >= offset) {
-						var start = Document.OffsetToLocation (selection.GetSelectionRange (textEditorData).Offset + selection_data.Text.Length);
-						var end = Document.OffsetToLocation (selection.GetSelectionRange (textEditorData).Offset + selection_data.Text.Length + selection.GetSelectionRange (textEditorData).Length);
-						selection = new Selection (start, end);
+			using (var undo = OpenUndoGroup ()) {
+				int dragOffset = Document.LocationToOffset (dragCaretPos);
+				if (context.Action == DragAction.Move) {
+					if (CanEdit (Caret.Line) && selection != null) {
+						ISegment selectionRange = selection.GetSelectionRange (textEditorData);
+						if (selectionRange.Offset < dragOffset)
+							dragOffset -= selectionRange.Length;
+						Caret.PreserveSelection = true;
+						textEditorData.DeleteSelection (selection);
+						Caret.PreserveSelection = false;
+	
+						selection = null;
 					}
-					textEditorData.Insert (offset, selection_data.Text);
-					Caret.Offset = offset + selection_data.Text.Length;
-					MainSelection = new Selection (Document.OffsetToLocation (offset), Document.OffsetToLocation (offset + selection_data.Text.Length));
-					textEditorData.PasteText (offset, selection_data.Text);
 				}
-				dragOver = false;
-				context = null;
+				if (selection_data.Length > 0 && selection_data.Format == 8) {
+					Caret.Offset = dragOffset;
+					if (CanEdit (dragCaretPos.Line)) {
+						int offset = Caret.Offset;
+						if (selection != null && selection.GetSelectionRange (textEditorData).Offset >= offset) {
+							var start = Document.OffsetToLocation (selection.GetSelectionRange (textEditorData).Offset + selection_data.Text.Length);
+							var end = Document.OffsetToLocation (selection.GetSelectionRange (textEditorData).Offset + selection_data.Text.Length + selection.GetSelectionRange (textEditorData).Length);
+							selection = new Selection (start, end);
+						}
+						textEditorData.Insert (offset, selection_data.Text);
+						Caret.Offset = offset + selection_data.Text.Length;
+						MainSelection = new Selection (Document.OffsetToLocation (offset), Document.OffsetToLocation (offset + selection_data.Text.Length));
+						textEditorData.PasteText (offset, selection_data.Text);
+					}
+					dragOver = false;
+					context = null;
+				}
+				mouseButtonPressed = 0;
 			}
-			mouseButtonPressed = 0;
-			textEditorData.Document.EndAtomicUndo ();
 			base.OnDragDataReceived (context, x, y, selection_data, info, time_);
 		}
 		
@@ -1178,9 +1220,10 @@ namespace Mono.TextEditor
 
 		public double LineHeight {
 			get {
-				if (this.textViewMargin == null)
-					return 16;
-				return this.textViewMargin.LineHeight;
+				return this.textEditorData.LineHeight;
+			}
+			internal set {
+				this.textEditorData.LineHeight = value;
 			}
 		}
 		
@@ -1196,7 +1239,7 @@ namespace Mono.TextEditor
 		
 		public DocumentLocation LogicalToVisualLocation (DocumentLocation location)
 		{
-			return Document.LogicalToVisualLocation (this.textEditorData, location);
+			return textEditorData.LogicalToVisualLocation (location);
 		}
 		
 		public void CenterToCaret ()
@@ -1341,6 +1384,8 @@ namespace Mono.TextEditor
 		
 		void SetHAdjustment ()
 		{
+			textEditorData.heightTree.Rebuild ();
+			
 			if (textEditorData.HAdjustment == null)
 				return;
 			textEditorData.HAdjustment.ValueChanged -= HAdjustmentValueChanged;
@@ -1361,15 +1406,16 @@ namespace Mono.TextEditor
 			SetAdjustments (Allocation);
 		}
 		
+		public const int EditorLineThreshold = 5;
+
 		internal void SetAdjustments (Gdk.Rectangle allocation)
 		{
+			SetHAdjustment ();
+			
 			if (this.textEditorData.VAdjustment != null) {
-				double maxY = Document.LineCount > 1 ? LineToY (Document.LineCount) : 0;
-				
-				maxY += LineHeight;
-				
+				double maxY = textEditorData.heightTree.TotalHeight;
 				if (maxY > allocation.Height)
-					maxY += 5 * this.LineHeight;
+					maxY += EditorLineThreshold * this.LineHeight;
 				
 				this.textEditorData.VAdjustment.SetBounds (0, 
 				                                           maxY, 
@@ -1379,7 +1425,6 @@ namespace Mono.TextEditor
 				if (maxY < allocation.Height)
 					this.textEditorData.VAdjustment.Value = 0;
 			}
-			SetHAdjustment ();
 		}
 		
 		public int GetWidth (string text)
@@ -1459,7 +1504,7 @@ namespace Mono.TextEditor
 		
 		void UpdateAdjustments ()
 		{
-			int lastVisibleLine = Document.LogicalToVisualLine (Document.LineCount);
+			int lastVisibleLine = textEditorData.LogicalToVisualLine (Document.LineCount);
 			if (oldRequest != lastVisibleLine) {
 				SetAdjustments (this.Allocation);
 				oldRequest = lastVisibleLine;
@@ -1479,6 +1524,11 @@ namespace Mono.TextEditor
 			var cairoArea = new Cairo.Rectangle (area.X, area.Y, area.Width, area.Height);
 			using (Cairo.Context cr = Gdk.CairoHelper.Create (e.Window))
 			using (Cairo.Context textViewCr = Gdk.CairoHelper.Create (e.Window)) {
+				if (!Options.UseAntiAliasing) {
+					textViewCr.Antialias = Cairo.Antialias.None;
+					cr.Antialias = Cairo.Antialias.None;
+				}
+				
 				UpdateMarginXOffsets ();
 				
 				cr.LineWidth = Options.Zoom;
@@ -1526,7 +1576,7 @@ namespace Mono.TextEditor
 			}
 		}
 		
-		public Mono.TextEditor.Highlighting.Style ColorStyle {
+		public Mono.TextEditor.Highlighting.ColorSheme ColorStyle {
 			get {
 				return this.textEditorData.ColorStyle;
 			}
@@ -1658,6 +1708,11 @@ namespace Mono.TextEditor
 		public void SetSelection (DocumentLocation anchor, DocumentLocation lead)
 		{
 			this.textEditorData.SetSelection (anchor, lead);
+		}
+			
+		public void SetSelection (int anchorLine, int anchorColumn, int leadLine, int leadColumn)
+		{
+			this.textEditorData.SetSelection (anchorLine, anchorColumn, leadLine, leadColumn);
 		}
 		
 		public void ExtendSelectionTo (DocumentLocation location)
@@ -1810,6 +1865,11 @@ namespace Mono.TextEditor
 		{
 			return Document.OffsetToLineNumber (offset);
 		}
+		
+		public IDisposable OpenUndoGroup()
+		{
+			return Document.OpenUndoGroup ();
+		}
 		#endregion
 		
 		#region Search & Replace
@@ -1923,7 +1983,7 @@ namespace Mono.TextEditor
 				                                                    System.Math.Min (editor.TextViewMargin.charWidth / 2, width), 
 				                                                    width,
 				                                                    editor.LineHeight + 2 * extend * editor.Options.Zoom);
-				Cairo.Color color = Mono.TextEditor.Highlighting.Style.ToCairoColor (editor.ColorStyle.Caret.Color);
+				Cairo.Color color = editor.ColorStyle.Default.CairoColor;
 				color.A = 0.8;
 				cr.LineWidth = editor.Options.Zoom;
 				cr.Color = color;
@@ -1987,7 +2047,7 @@ namespace Mono.TextEditor
 				                                                    System.Math.Min (editor.TextViewMargin.charWidth / 2, width), 
 				                                                    width,
 				                                                    (int)(region.Height + 2 * animationPosition * editor.Options.Zoom));
-				Cairo.Color color = Mono.TextEditor.Highlighting.Style.ToCairoColor (editor.ColorStyle.Caret.Color);
+				Cairo.Color color = editor.ColorStyle.Default.CairoColor;
 				color.A = 0.8;
 				cr.LineWidth = editor.Options.Zoom;
 				cr.Color = color;
@@ -2008,7 +2068,7 @@ namespace Mono.TextEditor
 			if (startPt.Y != endPt.Y || startPt.X < 0 || startPt.Y < 0 || width < 0)
 				return Gdk.Rectangle.Zero;
 			
-			return new Gdk.Rectangle (startPt.X, startPt.Y, width, (int)this.textViewMargin.LineHeight);
+			return new Gdk.Rectangle (startPt.X, startPt.Y, width, (int)this.LineHeight);
 		}
 		
 		/// <summary>
@@ -2266,7 +2326,7 @@ namespace Mono.TextEditor
 		
 		void ShowTooltip (Gdk.ModifierType modifierState, int offset, int xloc, int yloc)
 		{
-			CancelSheduledShow ();
+			CancelScheduledShow ();
 			
 			if (tipWindow != null && currentTooltipProvider.IsInteractive (this, tipWindow)) {
 				int wx, ww, wh;
@@ -2340,7 +2400,7 @@ namespace Mono.TextEditor
 				if (tw == null)
 					return false;
 				
-				CancelSheduledShow ();
+				CancelScheduledShow ();
 				DoShowTooltip (provider, tw, tipX, tipY);
 				tipShowTimeoutId = 0;
 			} else
@@ -2350,7 +2410,7 @@ namespace Mono.TextEditor
 		
 		void DoShowTooltip (ITooltipProvider provider, Gtk.Window liw, int xloc, int yloc)
 		{
-			CancelSheduledShow ();
+			CancelScheduledShow ();
 			
 			tipWindow = liw;
 			currentTooltipProvider = provider;
@@ -2368,8 +2428,10 @@ namespace Mono.TextEditor
 			provider.GetRequiredPosition (this, liw, out w, out xalign);
 			w += 10;
 			
-			int x = xloc + ox + (int)textViewMargin.XOffset - (int) ((double)w * xalign);
-			Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtPoint (ox + xloc, oy + yloc));
+			int x = xloc + ox + (int) textViewMargin.XOffset;
+			Gdk.Rectangle geometry = Screen.GetUsableMonitorGeometry (Screen.GetMonitorAtPoint (x, oy + yloc));
+			
+			x -= (int) ((double) w * xalign);
 			
 			if (x + w >= geometry.Right)
 				x = geometry.Right - w;
@@ -2384,7 +2446,7 @@ namespace Mono.TextEditor
 		public void HideTooltip ()
 		{
 			CancelScheduledHide ();
-			CancelSheduledShow ();
+			CancelScheduledShow ();
 			
 			if (tipWindow != null) {
 				tipWindow.Destroy ();
@@ -2403,14 +2465,14 @@ namespace Mono.TextEditor
 		
 		void CancelScheduledHide ()
 		{
-			CancelSheduledShow ();
+			CancelScheduledShow ();
 			if (tipHideTimeoutId != 0) {
 				GLib.Source.Remove (tipHideTimeoutId);
 				tipHideTimeoutId = 0;
 			}
 		}
 		
-		void CancelSheduledShow ()
+		void CancelScheduledShow ()
 		{
 			// Don't remove the timeout handler since it may be reused
 			nextTipOffset = -1;
@@ -2636,15 +2698,18 @@ namespace Mono.TextEditor
 
 		void UpdateLinesOnTextMarkerHeightChange (object sender, LineEventArgs e)
 		{
+			// TODO: Optimize
+			textEditorData.heightTree.Rebuild ();
+			
 			if (!e.Line.Markers.Any (m => m is IExtendingTextMarker))
 				return;
 			double currentHeight = GetLineHeight (e.Line);
 			double h;
 			if (!lineHeights.TryGetValue (e.Line.Offset, out h))
-				h = TextViewMargin.LineHeight;
+				h = LineHeight;
 			if (h != currentHeight)
 				textEditorData.Document.CommitLineToEndUpdate (textEditorData.Document.OffsetToLineNumber (e.Line.Offset));
-			lineHeights[e.Line.Offset] = currentHeight;
+			lineHeights [e.Line.Offset] = currentHeight;
 		}
 
 		class SetCaret 

@@ -33,9 +33,12 @@ using MonoDevelop.Refactoring;
 using System;
 using System.Collections.Generic;
 using MonoDevelop.Projects.Policies;
-using MonoDevelop.CSharp.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using System.Text;
 using System.Linq;
+using ICSharpCode.NRefactory;
+using ICSharpCode.NRefactory.CSharp.Refactoring;
+using MonoDevelop.CSharp.ContextAction;
 
 namespace MonoDevelop.CSharp.Formatting
 {
@@ -71,12 +74,11 @@ namespace MonoDevelop.CSharp.Formatting
 			DomRegion validRegion = DomRegion.Empty;
 			foreach (var u in data.ParsedDocument.CompilationUnit.Usings.Where (us => us.IsFromNamespace)) {
 				// the dom parser breaks A.B.C into 3 namespaces with the same region, this is filtered here
-				if (u.ValidRegion == validRegion)
+				if (u.ValidRegion == validRegion || !u.ValidRegion.Contains (location))
 					continue;
 				// indicates a parser error on namespace level.
 				if (u.Namespaces.FirstOrDefault () == "<invalid>")
 					continue;
-				
 				validRegion = u.ValidRegion;
 				sb.Append ("namespace Stub {");
 				closingBrackets++;
@@ -89,7 +91,6 @@ namespace MonoDevelop.CSharp.Formatting
 				parent = parent.DeclaringType;
 			}
 			sb.AppendLine ();
-			
 			int startOffset = sb.Length;
 			int memberStart = data.Editor.LocationToOffset (member.Location.Line, 1);
 			int memberEnd = data.Editor.LocationToOffset (member.BodyRegion.End.Line + (runAferCR ? 1 : 0), member.BodyRegion.End.Column);
@@ -101,34 +102,38 @@ namespace MonoDevelop.CSharp.Formatting
 			sb.Append (new string ('}', closingBrackets));
 			TextEditorData stubData = new TextEditorData () { Text = sb.ToString () };
 			stubData.Document.FileName = data.FileName;
-			var parser = new MonoDevelop.CSharp.Parser.CSharpParser ();
+			var parser = new ICSharpCode.NRefactory.CSharp.CSharpParser ();
 			var compilationUnit = parser.Parse (stubData);
 			bool hadErrors = parser.HasErrors;
 			var policy = policyParent.Get<CSharpFormattingPolicy> (mimeTypeChain);
-			var domSpacingVisitor = new AstFormattingVisitor (policy, stubData) {
-				AutoAcceptChanges = false,
+			var adapter = new TextEditorDataAdapter (stubData);
+			
+			var domSpacingVisitor = new AstFormattingVisitor (policy.CreateOptions (), adapter, new FormattingActionFactory (data.Editor)) {
 				HadErrors = hadErrors
 			};
 			compilationUnit.AcceptVisitor (domSpacingVisitor, null);
-
-			var changes = new List<Change> ();
-			changes.AddRange (domSpacingVisitor.Changes.Cast<TextReplaceChange> ().Where (c => startOffset < c.Offset && c.Offset < endOffset));
+			
+			var changes = new List<ICSharpCode.NRefactory.CSharp.Refactoring.Action> ();
+			changes.AddRange (domSpacingVisitor.Changes.Cast<TextReplaceAction> ().Where (c => startOffset < c.Offset && c.Offset < endOffset));
+			
 			int delta = data.Editor.LocationToOffset (member.Location.Line, 1) - startOffset;
 			HashSet<int > lines = new HashSet<int> ();
-			foreach (TextReplaceChange change in changes) {
-				if (change is AstFormattingVisitor.MyTextReplaceChange) 
-					((AstFormattingVisitor.MyTextReplaceChange)change).SetTextEditorData (data.Editor);
+			foreach (TextReplaceAction change in changes) {
 				change.Offset += delta;
 				lines.Add (data.Editor.OffsetToLineNumber (change.Offset));
 			}
 			// be sensible in documents with parser errors - only correct up to the caret position.
 			if (hadErrors || data.ParsedDocument.Errors.Any (e => e.ErrorType == ErrorType.Error)) {
 				var lastOffset = data.Editor.Caret.Offset;
-				changes.RemoveAll (c => ((TextReplaceChange)c).Offset > lastOffset);
+				changes.RemoveAll (c => ((TextReplaceAction)c).Offset > lastOffset);
 			}
-			RefactoringService.AcceptChanges (null, null, changes);
-			foreach (int line in lines)
-				data.Editor.Document.CommitLineUpdate (line);
+			
+			using (var undo = data.Editor.OpenUndoGroup ()) {
+				MDRefactoringContext.MdScript.RunActions (changes, null);
+				
+				foreach (int line in lines)
+					data.Editor.Document.CommitLineUpdate (line);
+			}
 			stubData.Dispose ();
 		}
 	}

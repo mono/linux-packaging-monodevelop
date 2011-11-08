@@ -65,14 +65,11 @@ namespace Mono.TextEditor
 			return new Selection (selection.Anchor, selection.Lead, selection.SelectionMode);
 		}
 		
-		public Selection (int anchorLine, int anchorColumn, int leadLine, int leadColumn) : this(new DocumentLocation (anchorLine, anchorColumn), new DocumentLocation (leadLine, leadColumn), SelectionMode.Normal)
-		{
-		}
-		public Selection (DocumentLocation anchor, DocumentLocation lead) : this (anchor, lead, SelectionMode.Normal)
+		public Selection (int anchorLine, int anchorColumn, int leadLine, int leadColumn, SelectionMode mode = SelectionMode.Normal) : this(new DocumentLocation (anchorLine, anchorColumn), new DocumentLocation (leadLine, leadColumn), mode)
 		{
 		}
 		
-		public Selection (DocumentLocation anchor, DocumentLocation lead, SelectionMode selectionMode)
+		public Selection (DocumentLocation anchor, DocumentLocation lead, SelectionMode selectionMode = SelectionMode.Normal)
 		{
 			if (anchor.Line < DocumentLocation.MinLine || anchor.Column < DocumentLocation.MinColumn)
 				throw new ArgumentException ("anchor");
@@ -132,7 +129,27 @@ namespace Mono.TextEditor
 			Mono.TextEditor.Selection other = (Mono.TextEditor.Selection)obj;
 			return Anchor == other.Anchor && Lead == other.Lead;
 		}
-
+		
+		public bool IsSelected (DocumentLocation loc)
+		{
+			return anchor <= loc && loc <= lead || lead <= loc && loc <= anchor;
+		}
+		
+		public bool IsSelected (int line, int column)
+		{
+			return IsSelected (new DocumentLocation (line, column));
+		}
+		
+		public bool IsSelected (DocumentLocation start, DocumentLocation end)
+		{
+			return IsSelected (start) && IsSelected (end);
+		}
+		
+		public bool IsSelected (int startLine, int startColumn, int endLine, int endColumn)
+		{
+			return IsSelected (new DocumentLocation (startLine, startColumn), new DocumentLocation (endLine, endColumn));
+		}
+		
 		public override int GetHashCode ()
 		{
 			unchecked {

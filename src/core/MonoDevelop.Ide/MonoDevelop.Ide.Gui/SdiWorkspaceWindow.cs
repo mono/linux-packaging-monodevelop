@@ -179,8 +179,8 @@ namespace MonoDevelop.Ide.Gui
 			get {
 				if (activeView != null)
 					return activeView;
-				if (subViewNotebook != null && subViewNotebook.CurrentPage > 0) {
-					return (IBaseViewContent)subViewContents[subViewNotebook.CurrentPage - 1];
+				if (subViewToolbar != null && subViewToolbar.ActiveTab - 1 >= 0) {
+					return (IBaseViewContent)subViewContents[subViewToolbar.ActiveTab - 1];
 				}
 				return content;
 			}
@@ -204,14 +204,14 @@ namespace MonoDevelop.Ide.Gui
 				ShowPage (subViewContents.IndexOf (view) + 1);
 		}
 		
-		public int FindView (Type viewType)
+		public int FindView<T> ()
 		{
-			if (viewType.Equals (ViewContent.GetType ()))
+			if (ViewContent is T)
 				return 0;
 				
 			int i = 1;
 			foreach (IAttachableViewContent item in SubViewContents) {
-				if (viewType.Equals (item.GetType ()))
+				if (item is T)
 					return i;
 				i++;
 			}
@@ -241,8 +241,9 @@ namespace MonoDevelop.Ide.Gui
 				if (first == null)
 					first = f;
 			}
-			if (first != null)
+			if (first != null) {
 				first.GrabFocus ();
+			}
 		}
 		
 		static IEnumerable<Gtk.Widget> GetFocussableWidgets (Gtk.Widget widget)

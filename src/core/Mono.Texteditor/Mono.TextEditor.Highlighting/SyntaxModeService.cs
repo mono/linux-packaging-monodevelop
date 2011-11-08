@@ -39,9 +39,10 @@ namespace Mono.TextEditor.Highlighting
 	public static class SyntaxModeService
 	{
 		static Dictionary<string, SyntaxMode> syntaxModes = new Dictionary<string, SyntaxMode> ();
-		static Dictionary<string, Style>      styles      = new Dictionary<string, Style> ();
+		static Dictionary<string, ColorSheme>      styles      = new Dictionary<string, ColorSheme> ();
 		static Dictionary<string, IXmlProvider> syntaxModeLookup = new Dictionary<string, IXmlProvider> ();
 		static Dictionary<string, IXmlProvider> styleLookup      = new Dictionary<string, IXmlProvider> ();
+		static Dictionary<string, string> isLoadedFromFile = new Dictionary<string, string> ();
 		
 		public static string[] Styles {
 			get {
@@ -58,6 +59,14 @@ namespace Mono.TextEditor.Highlighting
 			}
 		}
 		
+		public static string GetFileNameForStyle (ColorSheme style)
+		{
+			string result;
+			if (!isLoadedFromFile.TryGetValue (style.Name, out result))
+				return null;
+			return result;
+		}
+		
 		public static void InstallSyntaxMode (string mimeType, SyntaxMode mode)
 		{
 			if (syntaxModeLookup.ContainsKey (mimeType))
@@ -65,7 +74,7 @@ namespace Mono.TextEditor.Highlighting
 			syntaxModes[mimeType] = mode;
 		}
 		
-		public static Style GetColorStyle (Gtk.Style widgetStyle, string name) 
+		public static ColorSheme GetColorStyle (Gtk.Style widgetStyle, string name)
 		{
 			if (styles.ContainsKey (name))
 				return styles [name];
@@ -73,7 +82,7 @@ namespace Mono.TextEditor.Highlighting
 				LoadStyle (name);
 				return GetColorStyle (widgetStyle, name);
 			}
-			return new DefaultStyle (widgetStyle);
+			return GetColorStyle (widgetStyle, "Default");
 		}
 		
 		public static IXmlProvider GetProvider (SyntaxMode mode)
@@ -85,7 +94,7 @@ namespace Mono.TextEditor.Highlighting
 			return null;
 		}
 		
-		public static IXmlProvider GetProvider (Style style)
+		public static IXmlProvider GetProvider (ColorSheme style)
 		{
 			if (styleLookup.ContainsKey (style.Name)) 
 				return styleLookup[style.Name];
@@ -98,7 +107,7 @@ namespace Mono.TextEditor.Highlighting
 				throw new System.ArgumentException ("Style " + name + " not found", "name");
 			XmlReader reader = styleLookup [name].Open ();
 			try {
-				styles [name] = Style.LoadFrom (reader);
+				styles [name] = ColorSheme.LoadFrom (reader);
 			} catch (Exception e) {
 				throw new IOException ("Error while loading style :" + name, e);
 			} finally {
@@ -146,7 +155,7 @@ namespace Mono.TextEditor.Highlighting
 			}
 			styleLookup.Clear ();
 			bool result = true;
-			foreach (KeyValuePair<string, Style> style in styles) {
+			foreach (KeyValuePair<string, ColorSheme> style in styles) {
 				HashSet<SyntaxMode> checkedModes = new HashSet<SyntaxMode> ();
 				foreach (KeyValuePair<string, SyntaxMode> mode in syntaxModes) {
 					if (checkedModes.Contains (mode.Value))
@@ -161,7 +170,7 @@ namespace Mono.TextEditor.Highlighting
 			return result;
 		}
 		
-		public static void Remove (Style style)
+		public static void Remove (ColorSheme style)
 		{
 			if (styles.ContainsKey (style.Name))
 				styles.Remove (style.Name);
@@ -390,8 +399,9 @@ namespace Mono.TextEditor.Highlighting
 					}
 				} else if (file.EndsWith ("Style.xml")) {
 					using (XmlTextReader reader =  new XmlTextReader (file)) {
-						string styleName = Scan (reader, Style.NameAttribute);
+						string styleName = Scan (reader, ColorSheme.NameAttribute);
 						styleLookup [styleName] = new UrlXmlProvider (file);
+						isLoadedFromFile [styleName] = file;
 					}
 				}
 			}
@@ -413,7 +423,7 @@ namespace Mono.TextEditor.Highlighting
 				} else if (resource.EndsWith ("Style.xml")) {
 					using (Stream stream = assembly.GetManifestResourceStream (resource)) 
 					using (XmlTextReader reader = new XmlTextReader (stream)) {
-						string styleName = Scan (reader, Style.NameAttribute);
+						string styleName = Scan (reader, ColorSheme.NameAttribute);
 						styleLookup [styleName] = new ResourceXmlProvider (assembly, resource);
 					}
 				}
@@ -440,17 +450,22 @@ namespace Mono.TextEditor.Highlighting
 			}
 		}
 		
+		public static void AddStyle (string fileName, ColorSheme style)
+		{
+			isLoadedFromFile [style.Name] = fileName;
+			styles [style.Name] = style;
+		}
 		public static void AddStyle (IXmlProvider provider)
 		{
 			using (XmlReader reader = provider.Open ()) {
-				string styleName = Scan (reader, Style.NameAttribute);
+				string styleName = Scan (reader, ColorSheme.NameAttribute);
 				styleLookup [styleName] = provider;
 			}
 		}
 		public static void RemoveStyle (IXmlProvider provider)
 		{
 			using (XmlReader reader = provider.Open ()) {
-				string styleName = Scan (reader, Style.NameAttribute);
+				string styleName = Scan (reader, ColorSheme.NameAttribute);
 				styleLookup.Remove (styleName);
 			}
 		}

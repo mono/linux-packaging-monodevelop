@@ -30,7 +30,7 @@ using System.Collections.Generic;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Parser;
 using Mono.TextEditor;
-using MonoDevelop.CSharp.Ast;
+using ICSharpCode.NRefactory.CSharp;
 
 namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 {
@@ -137,7 +137,7 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 		
 		public override object VisitVariableDeclarationStatement (VariableDeclarationStatement variableDeclarationStatement, object data)
 		{
-			bool isDefinedInsideCutRegion = CutRegion.Contains (variableDeclarationStatement.StartLocation);
+			bool isDefinedInsideCutRegion = CutRegion.Contains (variableDeclarationStatement.StartLocation.Line, variableDeclarationStatement.StartLocation.Column);
 			foreach (var varDecl in variableDeclarationStatement.Variables) {
 				var descr = new VariableDescriptor (varDecl.Name) {
 					IsDefinedInsideCutRegion = isDefinedInsideCutRegion,
@@ -146,7 +146,7 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 				if (varDecl.Initializer != null) {
 					if (isDefinedInsideCutRegion) {
 						descr.UsedInCutRegion = true;
-					} else if (variableDeclarationStatement.StartLocation < CutRegion.Start) {
+					} else if (variableDeclarationStatement.StartLocation < new AstLocation (CutRegion.Start.Line, CutRegion.Start.Column)) {
 						descr.UsedBeforeCutRegion = !varDecl.Initializer.IsNull; 
 					} else {
 						descr.UsedAfterCutRegion = true;
@@ -157,7 +157,7 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 			return base.VisitVariableDeclarationStatement (variableDeclarationStatement, data);
 		}
 		
-		public override object VisitIdentifierExpression (MonoDevelop.CSharp.Ast.IdentifierExpression identifierExpression, object data)
+		public override object VisitIdentifierExpression (ICSharpCode.NRefactory.CSharp.IdentifierExpression identifierExpression, object data)
 		{
 			ExpressionResult expressionResult = new ExpressionResult (identifierExpression.Identifier);
 			ResolveResult result = resolver.Resolve (expressionResult, position);
@@ -170,10 +170,10 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 				return null;
 			var v = variables[identifierExpression.Identifier];
 			v.ReturnType = result.ResolvedType;
-			if (CutRegion.Contains (identifierExpression.StartLocation)) {
+			if (CutRegion.Contains (identifierExpression.StartLocation.Line, identifierExpression.StartLocation.Column)) {
 				if (!v.IsChangedInsideCutRegion)
 					v.UsedInCutRegion = true;
-			} else if (identifierExpression.StartLocation < CutRegion.Start) {
+			} else if (identifierExpression.StartLocation < new AstLocation (CutRegion.Start.Line, CutRegion.Start.Column)) {
 				v.UsedBeforeCutRegion = true;
 			} else {
 				v.UsedAfterCutRegion = true;
@@ -181,18 +181,18 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 			return null;
 		}
 		
-		public override object VisitAssignmentExpression (MonoDevelop.CSharp.Ast.AssignmentExpression assignmentExpression, object data)
+		public override object VisitAssignmentExpression (ICSharpCode.NRefactory.CSharp.AssignmentExpression assignmentExpression, object data)
 		{
 			assignmentExpression.Right.AcceptVisitor(this, data);
 //			valueGetsChanged = true;
 
-			var left = assignmentExpression.Left as MonoDevelop.CSharp.Ast.IdentifierExpression;
+			var left = assignmentExpression.Left as ICSharpCode.NRefactory.CSharp.IdentifierExpression;
 			
 			if (left != null && variables.ContainsKey (left.Identifier)) {
 				var v = variables[left.Identifier];
-				v.IsChangedInsideCutRegion = CutRegion.Contains (assignmentExpression.StartLocation);
+				v.IsChangedInsideCutRegion = CutRegion.Contains (assignmentExpression.StartLocation.Line, assignmentExpression.StartLocation.Column);
 				if (!v.IsChangedInsideCutRegion) {
-					if (assignmentExpression.StartLocation < CutRegion.Start) {
+					if (assignmentExpression.StartLocation < new AstLocation (CutRegion.Start.Line, CutRegion.Start.Column)) {
 						v.UsedBeforeCutRegion = true;
 					} else {
 						v.UsedAfterCutRegion = true;
@@ -202,32 +202,32 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 			return null;
 		}
 		
-		public override object VisitUnaryOperatorExpression (MonoDevelop.CSharp.Ast.UnaryOperatorExpression unaryOperatorExpression, object data)
+		public override object VisitUnaryOperatorExpression (ICSharpCode.NRefactory.CSharp.UnaryOperatorExpression unaryOperatorExpression, object data)
 		{
 			base.VisitUnaryOperatorExpression (unaryOperatorExpression, data);
-			if (CutRegion.Contains (unaryOperatorExpression.StartLocation)) {
-				var left = unaryOperatorExpression.Expression as MonoDevelop.CSharp.Ast.IdentifierExpression;
+			if (CutRegion.Contains (unaryOperatorExpression.StartLocation.Line, unaryOperatorExpression.StartLocation.Column)) {
+				var left = unaryOperatorExpression.Expression as ICSharpCode.NRefactory.CSharp.IdentifierExpression;
 				if (left != null && variables.ContainsKey (left.Identifier)) {
 					variables[left.Identifier].IsChangedInsideCutRegion = true;
 				}
 			}
 			/*
 			switch (unaryOperatorExpression.UnaryOperatorType) {
-			case MonoDevelop.CSharp.Ast.UnaryOperatorType.Increment:
-			case MonoDevelop.CSharp.Ast.UnaryOperatorType.Decrement:
-			case MonoDevelop.CSharp.Ast.UnaryOperatorType.PostIncrement:
-			case MonoDevelop.CSharp.Ast.UnaryOperatorType.PostDecrement:
+			case ICSharpCode.NRefactory.CSharp.UnaryOperatorType.Increment:
+			case ICSharpCode.NRefactory.CSharp.UnaryOperatorType.Decrement:
+			case ICSharpCode.NRefactory.CSharp.UnaryOperatorType.PostIncrement:
+			case ICSharpCode.NRefactory.CSharp.UnaryOperatorType.PostDecrement:
 				valueGetsChanged = true;
 				break;
 			}
 			object result = base.VisitUnaryOperatorExpression (unaryOperatorExpression, data);
 			valueGetsChanged = false;
 			switch (unaryOperatorExpression.UnaryOperatorType) {
-			case MonoDevelop.CSharp.Ast.UnaryOperatorType.Increment:
-			case MonoDevelop.CSharp.Ast.UnaryOperatorType.Decrement:
-			case MonoDevelop.CSharp.Ast.UnaryOperatorType.PostIncrement:
-			case MonoDevelop.CSharp.Ast.UnaryOperatorType.PostDecrement:
-				var left = unaryOperatorExpression.Expression as MonoDevelop.CSharp.Ast.IdentifierExpression;
+			case ICSharpCode.NRefactory.CSharp.UnaryOperatorType.Increment:
+			case ICSharpCode.NRefactory.CSharp.UnaryOperatorType.Decrement:
+			case ICSharpCode.NRefactory.CSharp.UnaryOperatorType.PostIncrement:
+			case ICSharpCode.NRefactory.CSharp.UnaryOperatorType.PostDecrement:
+				var left = unaryOperatorExpression.Expression as ICSharpCode.NRefactory.CSharp.IdentifierExpression;
 				if (left != null && variables.ContainsKey (left.Identifier.Name))
 					variables[left.Identifier.Name].GetsChanged = true;
 				break;
@@ -267,7 +267,7 @@ namespace MonoDevelop.CSharp.Refactoring.ExtractMethod
 		}
 		
 		/*
-		public override object VisitDirectionExpression (ICSharpCode.NRefactory.Ast.DirectionExpression directionExpression, object data)
+		public override object VisitDirectionExpression (ICSharpCode.OldNRefactory.Ast.DirectionExpression directionExpression, object data)
 		{
 			valueGetsChanged = true;
 			IdentifierExpression left = directionExpression.Expression as IdentifierExpression;

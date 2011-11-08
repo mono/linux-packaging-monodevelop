@@ -29,12 +29,19 @@ using MonoDevelop.Ide.CodeFormatting;
 using MonoDevelop.Projects.Text;
 using System.Xml;
 using MonoDevelop.Ide.Gui.Dialogs;
+using System;
 
 namespace MonoDevelop.CSharp.Formatting
 {
 	class CSharpFormattingPolicyPanel : MimeTypePolicyOptionsPanel<CSharpFormattingPolicy>
 	{
 		CSharpFormattingPolicyPanelWidget panel;
+		
+		static CSharpFormattingPolicyPanel ()
+		{
+			// ensure that custom text editor shemes are loaded.
+			MonoDevelop.SourceEditor.SourceEditorDisplayBinding.InitSourceEditor ();
+		}
 		
 		public override Widget CreatePanelWidget ()
 		{
@@ -45,7 +52,6 @@ namespace MonoDevelop.CSharp.Formatting
 		{
 			panel.Policy = policy.Clone ();
 		}
-		
 		
 		protected override CSharpFormattingPolicy GetPolicy ()
 		{

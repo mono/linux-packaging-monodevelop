@@ -46,8 +46,6 @@ using System.Text;
 
 namespace MonoDevelop.XmlEditor.Gui
 {
-	
-	
 	public abstract class BaseXmlEditorExtension : CompletionTextEditorExtension, IPathedDocument, IOutlinedDocument
 	{
 		DocumentStateTracker<Parser> tracker;
@@ -188,10 +186,10 @@ namespace MonoDevelop.XmlEditor.Gui
 						if (newCaretOffset > seg.Offset) {
 							newCaretOffset += (indent.Length - oldIndent.Length);
 						}
-						Editor.Document.BeginAtomicUndo ();
-						Editor.Replace (seg.Offset, oldIndent.Length, indent);
-						Editor.Caret.Offset = newCaretOffset;
-						Editor.Document.EndAtomicUndo ();
+						using (var undo = Editor.OpenUndoGroup ()) {
+							Editor.Replace (seg.Offset, oldIndent.Length, indent);
+							Editor.Caret.Offset = newCaretOffset;
+						}
 					}
 				}
 				return ret;
@@ -247,19 +245,19 @@ namespace MonoDevelop.XmlEditor.Gui
 					string tag = String.Concat ("</", el.Name.FullName, ">");
 					if (XmlEditorOptions.AutoCompleteElements) {
 						
-						//make sure we have a clean atomic undo so the user can undo the tag insertion
-						//independently of the >
-						bool wasInAtomicUndo = this.Editor.Document.IsInAtomicUndo;
-						if (wasInAtomicUndo)
-							this.Editor.Document.EndAtomicUndo ();
+//						//make sure we have a clean atomic undo so the user can undo the tag insertion
+//						//independently of the >
+//						bool wasInAtomicUndo = this.Editor.Document.IsInAtomicUndo;
+//						if (wasInAtomicUndo)
+//							this.Editor.Document.EndAtomicUndo ();
 						
-						buf.BeginAtomicUndo ();
-						buf.InsertText (buf.CursorPosition, tag);
-						buf.CursorPosition -= tag.Length;
-						buf.EndAtomicUndo ();
+						using (var undo = buf.OpenUndoGroup ()) {
+							buf.InsertText (buf.CursorPosition, tag);
+							buf.CursorPosition -= tag.Length;
+						}
 						
-						if (wasInAtomicUndo)
-							this.Editor.Document.BeginAtomicUndo ();
+//						if (wasInAtomicUndo)
+//							this.Editor.Document.BeginAtomicUndo ();
 						
 						return null;
 					} else {
@@ -274,9 +272,7 @@ namespace MonoDevelop.XmlEditor.Gui
 			// Auto insert '>' when '/' is typed inside tag state (for quick tag closing)
 			//FIXME: avoid doing this when the next non-whitespace char is ">" or ignore the next ">" typed
 			if (XmlEditorOptions.AutoInsertFragments && tracker.Engine.CurrentState is XmlTagState && currentChar == '/') {
-				buf.BeginAtomicUndo ();
 				buf.InsertText (buf.CursorPosition, ">");
-				buf.EndAtomicUndo ();
 				return null;
 			}
 			
@@ -739,7 +735,7 @@ namespace MonoDevelop.XmlEditor.Gui
 			PathEntry[] path = new PathEntry[l.Count];
 			for (int i = 0; i < l.Count; i++) {
 				if (l[i].FriendlyPathRepresentation == null) System.Console.WriteLine(l[i].GetType ());
-				path[i] = new PathEntry (l[i].FriendlyPathRepresentation ?? "<>");
+				path[i] = new PathEntry (GLib.Markup.EscapeText (l[i].FriendlyPathRepresentation ?? "<>"));
 			}
 			
 			PathEntry[] oldPath = currentPath;
@@ -788,6 +784,11 @@ namespace MonoDevelop.XmlEditor.Gui
 			sw.Add (outlineTreeView);
 			sw.ShowAll ();
 			return sw;
+		}
+		
+		IEnumerable<Gtk.Widget> IOutlinedDocument.GetToolbarWidgets ()
+		{
+			return null;
 		}
 		
 		protected virtual void InitializeOutlineColumns (MonoDevelop.Ide.Gui.Components.PadTreeView outlineTree)

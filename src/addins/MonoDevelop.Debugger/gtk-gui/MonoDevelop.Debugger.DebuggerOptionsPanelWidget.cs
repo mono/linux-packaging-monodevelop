@@ -18,14 +18,9 @@ namespace MonoDevelop.Debugger
 		private global::Gtk.Label label4;
 		private global::Gtk.VBox vbox2;
 		private global::Gtk.Label label2;
-		private global::Gtk.HBox hbox1;
-		private global::Gtk.ScrolledWindow GtkScrolledWindow;
-		private global::Gtk.TreeView engineList;
-		private global::Gtk.VBox vbox4;
-		private global::Gtk.Button buttonUp;
-		private global::Gtk.Button buttonDown;
+		private global::MonoDevelop.Ide.Gui.Components.PriorityList prioritylist;
 		private global::Gtk.Label label1;
-
+		
 		protected virtual void Build ()
 		{
 			global::Stetic.Gui.Initialize (this);
@@ -36,7 +31,7 @@ namespace MonoDevelop.Debugger
 			this.notebook1 = new global::Gtk.Notebook ();
 			this.notebook1.CanFocus = true;
 			this.notebook1.Name = "notebook1";
-			this.notebook1.CurrentPage = 0;
+			this.notebook1.CurrentPage = 1;
 			// Container child notebook1.Gtk.Notebook+NotebookChild
 			this.vbox3 = new global::Gtk.VBox ();
 			this.vbox3.Name = "vbox3";
@@ -173,61 +168,14 @@ namespace MonoDevelop.Debugger
 			w11.Expand = false;
 			w11.Fill = false;
 			// Container child vbox2.Gtk.Box+BoxChild
-			this.hbox1 = new global::Gtk.HBox ();
-			this.hbox1.Name = "hbox1";
-			this.hbox1.Spacing = 6;
-			// Container child hbox1.Gtk.Box+BoxChild
-			this.GtkScrolledWindow = new global::Gtk.ScrolledWindow ();
-			this.GtkScrolledWindow.Name = "GtkScrolledWindow";
-			this.GtkScrolledWindow.ShadowType = ((global::Gtk.ShadowType)(1));
-			// Container child GtkScrolledWindow.Gtk.Container+ContainerChild
-			this.engineList = new global::Gtk.TreeView ();
-			this.engineList.CanFocus = true;
-			this.engineList.Name = "engineList";
-			this.engineList.HeadersVisible = false;
-			this.GtkScrolledWindow.Add (this.engineList);
-			this.hbox1.Add (this.GtkScrolledWindow);
-			global::Gtk.Box.BoxChild w13 = ((global::Gtk.Box.BoxChild)(this.hbox1 [this.GtkScrolledWindow]));
-			w13.Position = 0;
-			// Container child hbox1.Gtk.Box+BoxChild
-			this.vbox4 = new global::Gtk.VBox ();
-			this.vbox4.Name = "vbox4";
-			this.vbox4.Spacing = 6;
-			// Container child vbox4.Gtk.Box+BoxChild
-			this.buttonUp = new global::Gtk.Button ();
-			this.buttonUp.CanFocus = true;
-			this.buttonUp.Name = "buttonUp";
-			this.buttonUp.UseStock = true;
-			this.buttonUp.UseUnderline = true;
-			this.buttonUp.Label = "gtk-go-up";
-			this.vbox4.Add (this.buttonUp);
-			global::Gtk.Box.BoxChild w14 = ((global::Gtk.Box.BoxChild)(this.vbox4 [this.buttonUp]));
-			w14.Position = 0;
-			w14.Expand = false;
-			w14.Fill = false;
-			// Container child vbox4.Gtk.Box+BoxChild
-			this.buttonDown = new global::Gtk.Button ();
-			this.buttonDown.CanFocus = true;
-			this.buttonDown.Name = "buttonDown";
-			this.buttonDown.UseStock = true;
-			this.buttonDown.UseUnderline = true;
-			this.buttonDown.Label = "gtk-go-down";
-			this.vbox4.Add (this.buttonDown);
-			global::Gtk.Box.BoxChild w15 = ((global::Gtk.Box.BoxChild)(this.vbox4 [this.buttonDown]));
-			w15.Position = 1;
-			w15.Expand = false;
-			w15.Fill = false;
-			this.hbox1.Add (this.vbox4);
-			global::Gtk.Box.BoxChild w16 = ((global::Gtk.Box.BoxChild)(this.hbox1 [this.vbox4]));
-			w16.Position = 1;
-			w16.Expand = false;
-			w16.Fill = false;
-			this.vbox2.Add (this.hbox1);
-			global::Gtk.Box.BoxChild w17 = ((global::Gtk.Box.BoxChild)(this.vbox2 [this.hbox1]));
-			w17.Position = 1;
+			this.prioritylist = new global::MonoDevelop.Ide.Gui.Components.PriorityList ();
+			this.prioritylist.Name = "prioritylist";
+			this.vbox2.Add (this.prioritylist);
+			global::Gtk.Box.BoxChild w12 = ((global::Gtk.Box.BoxChild)(this.vbox2 [this.prioritylist]));
+			w12.Position = 1;
 			this.notebook1.Add (this.vbox2);
-			global::Gtk.Notebook.NotebookChild w18 = ((global::Gtk.Notebook.NotebookChild)(this.notebook1 [this.vbox2]));
-			w18.Position = 1;
+			global::Gtk.Notebook.NotebookChild w13 = ((global::Gtk.Notebook.NotebookChild)(this.notebook1 [this.vbox2]));
+			w13.Position = 1;
 			// Notebook tab
 			this.label1 = new global::Gtk.Label ();
 			this.label1.Name = "label1";
@@ -240,8 +188,6 @@ namespace MonoDevelop.Debugger
 			}
 			this.Hide ();
 			this.checkAllowEval.Toggled += new global::System.EventHandler (this.OnCheckAllowEvalToggled);
-			this.buttonUp.Clicked += new global::System.EventHandler (this.OnButtonUpClicked);
-			this.buttonDown.Clicked += new global::System.EventHandler (this.OnButtonDownClicked);
 		}
 	}
 }

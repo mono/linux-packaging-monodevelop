@@ -39,7 +39,7 @@ using System.Text;
 using Mono.TextEditor.PopupWindow;
 using MonoDevelop.Refactoring;
 using MonoDevelop.CSharp.Parser;
-using MonoDevelop.CSharp.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.CSharp.Formatting;
 
 namespace MonoDevelop.CSharp.Refactoring.CreateMethod
@@ -60,8 +60,8 @@ namespace MonoDevelop.CSharp.Refactoring.CreateMethod
 				return false;
 			}
 		}
-
-		InvocationExpression GetInvocation (MonoDevelop.CSharp.Ast.CompilationUnit unit, TextEditorData data)
+		
+		InvocationExpression GetInvocation (ICSharpCode.NRefactory.CSharp.CompilationUnit unit, TextEditorData data)
 		{
 			var containingNode = unit.GetNodeAt (data.Caret.Line, data.Caret.Column);
 			var curNode = containingNode;
@@ -71,7 +71,7 @@ namespace MonoDevelop.CSharp.Refactoring.CreateMethod
 			return curNode as InvocationExpression;
 		}
 		
-		bool AnalyzeTargetExpression (RefactoringOptions options, MonoDevelop.CSharp.Ast.CompilationUnit unit)
+		bool AnalyzeTargetExpression (RefactoringOptions options, ICSharpCode.NRefactory.CSharp.CompilationUnit unit)
 		{
 			var data = options.GetTextEditorData ();
 			var target = unit.GetNodeAt (data.Caret.Line, data.Caret.Column);
@@ -86,13 +86,18 @@ namespace MonoDevelop.CSharp.Refactoring.CreateMethod
 				declaringType = options.Dom.GetType (targetResult.ResolvedType);
 				methodName = memberReference.MemberName;
 			} else if (target is Identifier) {
-				declaringType = options.ResolveResult.CallingType;
+				if (options.ResolveResult != null) {
+					declaringType = options.ResolveResult.CallingType;
+				} else {
+					declaringType = options.Document.CompilationUnit.GetTypeAt (options.Document.Editor.Caret.Line, options.Document.Editor.Caret.Column);
+				}
 				methodName = data.GetTextBetween (target.StartLocation.Line, target.StartLocation.Column, target.EndLocation.Line, target.EndLocation.Column);
 			}
-			
 			if (declaringType != null && !HasCompatibleMethod (declaringType, methodName, invocation)) {
 				if (declaringType.HasParts)
 					declaringType = declaringType.Parts.FirstOrDefault (t => t.CompilationUnit.FileName == options.Document.FileName) ?? declaringType;
+				if (declaringType == null || declaringType.CompilationUnit == null)
+					return false;
 				var doc = ProjectDomService.GetParsedDocument (declaringType.SourceProjectDom, declaringType.CompilationUnit.FileName);
 				declaringType = doc.CompilationUnit.GetTypeAt (declaringType.Location) ?? declaringType;
 				return true;
@@ -100,7 +105,7 @@ namespace MonoDevelop.CSharp.Refactoring.CreateMethod
 			return false;
 		}
 		
-		IType GetDelegateType (RefactoringOptions options, MonoDevelop.CSharp.Ast.CompilationUnit unit)
+		IType GetDelegateType (RefactoringOptions options, ICSharpCode.NRefactory.CSharp.CompilationUnit unit)
 		{
 			var data = options.GetTextEditorData ();
 			var containingNode = unit.GetNodeAt (data.Caret.Line, data.Caret.Column);
@@ -116,7 +121,7 @@ namespace MonoDevelop.CSharp.Refactoring.CreateMethod
 					if (resolveResult == null)
 						return null;
 					IType type = options.Dom.GetType (resolveResult.ResolvedType);
-					if (type == null || type.ClassType != ClassType.Delegate)
+					if (type == null || type.ClassType != MonoDevelop.Projects.Dom.ClassType.Delegate)
 						return null;
 					return type;
 				}
@@ -175,9 +180,13 @@ namespace MonoDevelop.CSharp.Refactoring.CreateMethod
 					var resolveResult = resolver.Resolve (new ExpressionResult (data.GetTextBetween (parentInvocation.StartLocation.Line, parentInvocation.StartLocation.Column, parentInvocation.EndLocation.Line, parentInvocation.EndLocation.Column)), resolvePosition) as MethodResolveResult;
 					if (resolveResult != null) {
 						if (idx < resolveResult.MostLikelyMethod.Parameters.Count)
-							return resolveResult.MostLikelyMethod.Parameters[idx].ReturnType;
+							return resolveResult.MostLikelyMethod.Parameters [idx].ReturnType;
 					}
 					return DomReturnType.Object;
+				}
+				
+				if (node.Parent is ReturnStatement && options.ResolveResult != null && options.ResolveResult.CallingMember != null) {
+					return options.ResolveResult.CallingMember.ReturnType;
 				}
 				
 				node = node.Parent;
@@ -198,7 +207,6 @@ namespace MonoDevelop.CSharp.Refactoring.CreateMethod
 			
 			if (!AnalyzeTargetExpression (options, unit))
 				return false;
-			
 			invocation = GetInvocation (unit, data);
 			if (invocation != null) 
 				return AnalyzeInvocation (options);
@@ -213,11 +221,17 @@ namespace MonoDevelop.CSharp.Refactoring.CreateMethod
 				modifiers = MonoDevelop.Projects.Dom.Modifiers.None;
 			} else {
 				bool isStatic = (modifiers & MonoDevelop.Projects.Dom.Modifiers.Static) != 0;
-				modifiers = options.ResolveResult.CallingMember.Modifiers;
-				if (declaringType.DecoratedFullName != options.ResolveResult.CallingType.DecoratedFullName) {
-					modifiers = MonoDevelop.Projects.Dom.Modifiers.Public;
-	//				if (options.ResolveResult.CallingMember.IsStatic)
-	//					isStatic = true;
+				if (options.ResolveResult != null) {
+					modifiers = options.ResolveResult.CallingMember.Modifiers & (MonoDevelop.Projects.Dom.Modifiers.Public | MonoDevelop.Projects.Dom.Modifiers.Protected | MonoDevelop.Projects.Dom.Modifiers.Private | MonoDevelop.Projects.Dom.Modifiers.Static);
+					if (declaringType.DecoratedFullName != options.ResolveResult.CallingType.DecoratedFullName) {
+						modifiers = MonoDevelop.Projects.Dom.Modifiers.Public;
+						//				if (options.ResolveResult.CallingMember.IsStatic)
+						//					isStatic = true;
+					}
+				} else {
+					var member = options.Document.CompilationUnit.GetMemberAt (options.Document.Editor.Caret.Line, options.Document.Editor.Caret.Column);
+					if (member != null)
+						modifiers = member.Modifiers;
 				}
 				if (isStatic)
 					modifiers |= MonoDevelop.Projects.Dom.Modifiers.Static;
@@ -369,7 +383,7 @@ namespace MonoDevelop.CSharp.Refactoring.CreateMethod
 				}
 				
 				string argExpression = options.GetTextEditorData ().GetTextBetween (argument.StartLocation.Line, argument.StartLocation.Column, argument.EndLocation.Line, argument.EndLocation.Column);
-				var resolveResult = resolver.Resolve (new ExpressionResult (argExpression), resolvePosition);
+				var resolveResult = resolver.Resolve (new ExpressionResult (argExpression), new DomLocation (argument.StartLocation.Line, argument.StartLocation.Column));
 				
 				if (argument is MemberReferenceExpression) {
 					arg.Name = ((MemberReferenceExpression)argument).MemberName;

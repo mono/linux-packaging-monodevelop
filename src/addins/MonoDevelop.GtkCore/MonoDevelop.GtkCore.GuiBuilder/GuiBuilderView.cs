@@ -28,6 +28,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 
 using MonoDevelop.Core;
@@ -506,7 +507,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 				if (asm == null)
 					return;
 				if (gproject.Project.AssemblyContext.GetPackagesFromFullName (asm).Length > 0) {
-					pref = new ProjectReference (ReferenceType.Gac, asm);
+					pref = new ProjectReference (ReferenceType.Package, asm);
 				} else {
 					asm = gproject.Project.AssemblyContext.GetAssemblyLocation (asm, gproject.Project.TargetFramework);
 					pref = new ProjectReference (ReferenceType.Assembly, asm);
@@ -601,6 +602,11 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 		Widget MonoDevelop.DesignerSupport.IOutlinedDocument.GetOutlineWidget ()
 		{
 			return GuiBuilderDocumentOutline.Instance;
+		}
+		
+		IEnumerable<Gtk.Widget> MonoDevelop.DesignerSupport.IOutlinedDocument.GetToolbarWidgets ()
+		{
+			return null;
 		}
 
 		void MonoDevelop.DesignerSupport.IOutlinedDocument.ReleaseOutlineWidget ()

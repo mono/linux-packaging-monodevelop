@@ -63,14 +63,12 @@ namespace MonoDevelop.Refactoring.Tests
 			var refactoring = new CreateMethodCodeGenerator ();
 			RefactoringOptions options = ExtractMethodTests.CreateRefactoringOptions (input);
 			Assert.IsTrue (refactoring.IsValid (options));
-			
 			if (returnWholeFile) {
 				refactoring.SetInsertionPoint (CodeGenerationService.GetInsertionPoints (options.Document, refactoring.DeclaringType).First ());
 			} else {
 				DocumentLocation loc = new DocumentLocation (1, 1);
 				refactoring.SetInsertionPoint (new InsertionPoint (loc, NewLineInsertion.Eol, NewLineInsertion.Eol));
 			}
-			
 			List<Change> changes = refactoring.PerformChanges (options, null);
 //			changes.ForEach (c => Console.WriteLine (c));
 			// get just the generated method.
@@ -80,7 +78,6 @@ namespace MonoDevelop.Refactoring.Tests
 				return;
 			}
 			output = output.Substring (0, output.IndexOf ('}') + 1).Trim ();
-			
 			// crop 1 level of indent
 			Document doc = new Document (output);
 			foreach (LineSegment line in doc.Lines) {
@@ -191,7 +188,7 @@ namespace MonoDevelop.Refactoring.Tests
 	throw new System.NotImplementedException ();
 }");
 		}
-		
+
 		[Test()]
 		public void TestCreateDelegateDeclaration ()
 		{
@@ -394,7 +391,108 @@ namespace Test {
 }
 ", true);
 		}
+		
+		
+		/// <summary>
+		/// Bug 693949 - Create method uses the wrong type for param
+		/// </summary>
+		[Test()]
+		public void TestBug693949 ()
+		{
+			// the c# code isn't 100% correct since test isn't accessible in Main (can't call non static method from static member)
+			TestCreateMethod (
+@"using System.Text;
+
+namespace Test {
+	class TestClass
+	{
+		string test(string a)
+		{
+		}
+	
+		public static void Main(string[] args)
+		{
+			Type a = $M(test(""a""));
+		}
+	}
+}
+", @"using System.Text;
+
+namespace Test {
+	class TestClass
+	{
+		public static Type M (string par1)
+		{
+			throw new System.NotImplementedException ();
+		}
+
+		string test(string a)
+		{
+		}
+	
+		public static void Main(string[] args)
+		{
+			Type a = M(test(""a""));
+		}
+	}
+}
+", true);
+		}
+		
+		/// <summary>
+		/// Bug 469 - CreateMethod created a method incorrectly
+		/// </summary>
+		[Test()]
+		public void TestBug469 ()
+		{
+			TestCreateMethod (
+@"class Test
+{
+	public override string ToString ()
+	{
+		$BeginDownloadingImage (this);
+	}
+}
+", @"class Test
+{
+	public void BeginDownloadingImage (Test par1)
+	{
+		throw new System.NotImplementedException ();
 	}
 	
+	public override string ToString ()
+	{
+		BeginDownloadingImage (this);
+	}
+}
+", true);
+		}
+		
+		[Test()]
+		public void TestTestGuessReturnReturnType ()
+		{
+			TestCreateMethod (
+@"class Test
+{
+	public override string ToString ()
+	{
+		return $BeginDownloadingImage (this);
+	}
+}
+", @"class Test
+{
+	public string BeginDownloadingImage (Test par1)
+	{
+		throw new System.NotImplementedException ();
+	}
+	
+	public override string ToString ()
+	{
+		return BeginDownloadingImage (this);
+	}
+}
+", true);
+		}
+	}
 }
 

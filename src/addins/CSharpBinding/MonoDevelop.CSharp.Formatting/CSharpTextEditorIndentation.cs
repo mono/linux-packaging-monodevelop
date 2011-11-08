@@ -211,12 +211,12 @@ namespace MonoDevelop.CSharp.Formatting
 
 				int guessedOffset = GuessSemicolonInsertionOffset (textEditorData, curLine);
 				if (guessedOffset != textEditorData.Caret.Offset) {
-					textEditorData.Document.EndAtomicUndo ();
-					textEditorData.Document.BeginAtomicUndo ();
-					textEditorData.Remove (textEditorData.Caret.Offset - 1, 1);
-					textEditorData.Caret.Offset = guessedOffset;
-					lastInsertedSemicolon = textEditorData.Caret.Offset + 1;
-					retval = base.KeyPress (key, keyChar, modifier);
+					using (var undo = textEditorData.OpenUndoGroup ()) {
+						textEditorData.Remove (textEditorData.Caret.Offset - 1, 1);
+						textEditorData.Caret.Offset = guessedOffset;
+						lastInsertedSemicolon = textEditorData.Caret.Offset + 1;
+						retval = base.KeyPress (key, keyChar, modifier);
+					}
 				}
 				return retval;
 			}

@@ -51,7 +51,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 	{
 		static protected readonly int MAX_ACTIVE_COUNT = 100;
 		static protected readonly int MIN_ACTIVE_COUNT = 10;
-		static protected readonly int FORMAT_VERSION   = 84;
+		static protected readonly int FORMAT_VERSION   = 85;
 		
 		Dictionary<string, ClassEntry> typeEntries = new Dictionary<string, ClassEntry> ();
 		Dictionary<string, ClassEntry> typeEntriesIgnoreCase = new Dictionary<string, ClassEntry> (StringComparer.InvariantCultureIgnoreCase);
@@ -973,7 +973,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			}
 		}
 		
-		protected void AddReference (string uri)
+		internal void AddReference (string uri)
 		{
 			lock (rwlock)
 			{
@@ -985,7 +985,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			}
 		}
 		
-		protected void RemoveReference (string uri)
+		internal void RemoveReference (string uri)
 		{
 			lock (rwlock)
 			{
@@ -1002,7 +1002,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			}
 		}
 		
-		protected bool HasReference (string uri)
+		internal bool HasReference (string uri)
 		{
 			return references.Any (r => r.Uri == uri);
 		}

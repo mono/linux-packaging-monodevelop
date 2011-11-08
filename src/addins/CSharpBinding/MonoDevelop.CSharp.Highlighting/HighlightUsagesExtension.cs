@@ -136,7 +136,7 @@ namespace MonoDevelop.CSharp.Highlighting
 					return false;
 				
 				string expression = textEditorData.Document.GetTextBetween (start, end);
-				ResolveResult resolveResult = textEditorResolver.GetLanguageItem (caretOffset, expression);
+				var resolveResult = textEditorResolver.GetLanguageItem (caretOffset, expression);
 				if (resolveResult == null)
 					return false;
 				if (resolveResult is AggregatedResolveResult) {
@@ -197,12 +197,12 @@ namespace MonoDevelop.CSharp.Highlighting
 					ICompilationUnit compUnit = Document.CompilationUnit;
 					if (compUnit == null)
 						return null;
-					NRefactoryResolver resolver = new NRefactoryResolver (dom, compUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, Document.Editor, Document.FileName);
+					NRefactoryResolver resolver = new NRefactoryResolver (dom, compUnit, ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, Document.Editor, Document.FileName);
 					if (member is LocalVariable)
 						resolver.CallingMember = ((LocalVariable)member).DeclaringMember;
 					FindMemberAstVisitor visitor = new FindMemberAstVisitor (textEditorData.Document, member);
 					visitor.IncludeXmlDocumentation = true;
-/*					ICSharpCode.NRefactory.Ast.CompilationUnit unit = compUnit.Tag as ICSharpCode.NRefactory.Ast.CompilationUnit;
+/*					ICSharpCode.OldNRefactory.Ast.CompilationUnit unit = compUnit.Tag as ICSharpCode.OldNRefactory.Ast.CompilationUnit;
 					if (unit == null)
 						return null;*/
 					visitor.RunVisitor (resolver);

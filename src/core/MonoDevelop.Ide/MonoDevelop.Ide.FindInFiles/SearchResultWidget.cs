@@ -58,7 +58,7 @@ namespace MonoDevelop.Ide.FindInFiles
 		const int SearchResultColumn = 0;
 		const int DidReadColumn      = 1;
 		
-		Mono.TextEditor.Highlighting.Style highlightStyle;
+		Mono.TextEditor.Highlighting.ColorSheme highlightStyle;
 		
 		public string BasePath {
 			get;
@@ -457,7 +457,7 @@ namespace MonoDevelop.Ide.FindInFiles
 				int pos2 = FindPosition (markup, col + searchResult.Length, out tag);
 				if (pos1 >= 0 && pos2 >= 0) {
 					markup = tag.StartsWith ("span") ? markup.Insert (pos2, "</span></span><" + tag + ">") : markup.Insert (pos2, "</span>");
-					Color searchColor = Mono.TextEditor.Highlighting.Style.ToGdkColor (highlightStyle.SearchTextBg);
+					Color searchColor = Mono.TextEditor.Highlighting.ColorSheme.ToGdkColor (highlightStyle.SearchTextBg);
 					double b1 = HslColor.Brightness (searchColor);
 					double b2 = HslColor.Brightness (AdjustColor (Style.Base (StateType.Normal), highlightStyle.Default.Color));
 					double delta = Math.Abs (b1 - b2);
@@ -531,14 +531,13 @@ namespace MonoDevelop.Ide.FindInFiles
 		{
 			Document doc;
 			if (!documents.TryGetValue (result.FileName, out doc)) {
-				TextReader reader = result.FileProvider.Open ();
-				if (reader == null)
+				var content = result.FileProvider.ReadString ();
+				if (content == null)
 					return null;
-					doc = Document.CreateImmutableDocument (reader.ReadToEnd ());
+				doc = Document.CreateImmutableDocument (content);
 				doc.MimeType = DesktopService.GetMimeTypeForUri (result.FileName);
 				
-				reader.Close ();
-				documents [result.FileName] = doc;
+				documents [result.FileName] = doc;	
 			}
 			return doc;
 		}

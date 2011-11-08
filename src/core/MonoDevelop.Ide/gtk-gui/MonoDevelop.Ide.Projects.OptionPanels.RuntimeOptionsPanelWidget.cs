@@ -8,7 +8,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 		private global::Gtk.HBox hbox68;
 		private global::Gtk.Label label114;
 		private global::Gtk.ComboBox runtimeVersionCombo;
-
+		
 		protected virtual void Build ()
 		{
 			global::Stetic.Gui.Initialize (this);
@@ -27,7 +27,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 			this.label114 = new global::Gtk.Label ();
 			this.label114.Name = "label114";
 			this.label114.Xalign = 0F;
-			this.label114.LabelProp = global::MonoDevelop.Core.GettextCatalog.GetString ("Runtime _version:");
+			this.label114.LabelProp = global::MonoDevelop.Core.GettextCatalog.GetString ("Target _framework:");
 			this.label114.UseUnderline = true;
 			this.hbox68.Add (this.label114);
 			global::Gtk.Box.BoxChild w1 = ((global::Gtk.Box.BoxChild)(this.hbox68 [this.label114]));

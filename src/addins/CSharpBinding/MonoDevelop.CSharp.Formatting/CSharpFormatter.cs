@@ -29,9 +29,9 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 
-using ICSharpCode.NRefactory;
-using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory.PrettyPrinter;
+using ICSharpCode.OldNRefactory;
+using ICSharpCode.OldNRefactory.Ast;
+using ICSharpCode.OldNRefactory.PrettyPrinter;
 
 using Mono.TextEditor;
 using MonoDevelop.CSharp.Formatting;
@@ -45,9 +45,46 @@ using MonoDevelop.Ide;
 using MonoDevelop.Refactoring;
 using System.Linq;
 using MonoDevelop.Ide.CodeFormatting;
+using ICSharpCode.NRefactory;
+using ICSharpCode.NRefactory.CSharp;
+using ICSharpCode.NRefactory.CSharp.Refactoring;
+using MonoDevelop.CSharp.ContextAction;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.CSharp.Formatting
 {
+	class FormattingActionFactory : AbstractActionFactory
+	{
+		Mono.TextEditor.TextEditorData data;
+		
+		class ConcreteTextReplaceAction : TextReplaceAction
+		{
+			Mono.TextEditor.TextEditorData data;
+			
+			public ConcreteTextReplaceAction (Mono.TextEditor.TextEditorData data, int offset, int removedChars, string insertedText) : base (offset, removedChars, insertedText)
+			{
+				this.data = data;
+			}
+			
+			public override void Perform (Script script)
+			{
+				data.Replace (Offset, RemovedChars, InsertedText);
+			}
+		}
+		
+		public FormattingActionFactory (Mono.TextEditor.TextEditorData data)
+		{
+			if (data == null)
+				throw new ArgumentNullException ("data");
+			this.data = data;
+		}
+		
+		public override TextReplaceAction CreateTextReplaceAction (int offset, int removedChars, string insertedText)
+		{
+			return new ConcreteTextReplaceAction (data, offset, removedChars, insertedText);
+		}
+	}
+	
 	public class CSharpFormatter : AbstractAdvancedFormatter
 	{
 		static internal readonly string MimeType = "text/x-csharp";
@@ -91,76 +128,104 @@ namespace MonoDevelop.CSharp.Formatting
 		public override void OnTheFlyFormat (PolicyContainer policyParent, IEnumerable<string> mimeTypeChain, 
 			TextEditorData data, int startOffset, int endOffset)
 		{
-			var parser = new MonoDevelop.CSharp.Parser.CSharpParser ();
-			var compilationUnit = parser.Parse (data);
-			bool hadErrors = parser.HasErrors;
+			var parser = new CSharpParser ();
+			var compilationUnit = parser.ParseSnippet (data);
+			if (compilationUnit == null) {
+				Console.WriteLine ("couldn't parse : " + data.Text);
+				return;
+			}
+			
+			if (parser.HasErrors)
+				return;
+			
 			var policy = policyParent.Get<CSharpFormattingPolicy> (mimeTypeChain);
-			var formattingVisitor = new AstFormattingVisitor (policy, data) {
-				AutoAcceptChanges = false,
-				HadErrors = hadErrors
+			var adapter = new TextEditorDataAdapter (data);
+			
+			var formattingVisitor = new ICSharpCode.NRefactory.CSharp.AstFormattingVisitor (policy.CreateOptions (), adapter, new FormattingActionFactory (data)) {
+				HadErrors =  parser.HasErrors
 			};
-			compilationUnit.AcceptVisitor (formattingVisitor, null);
 			
-			
-			var changes = new List<Change> ();
-
+			var changes = new List<ICSharpCode.NRefactory.CSharp.Refactoring.Action> ();
 			changes.AddRange (formattingVisitor.Changes.
-				Where (c => c is TextReplaceChange && (startOffset <= ((TextReplaceChange)c).Offset && ((TextReplaceChange)c).Offset < endOffset)));
-
-			RefactoringService.AcceptChanges (null, null, changes);
+				Where (c => (startOffset <= c.Offset && c.Offset < endOffset)));
+			using (var undo = data.OpenUndoGroup ()) {
+				MDRefactoringContext.MdScript.RunActions (changes, null);
+			}
 		}
 
-		public override string FormatText (PolicyContainer policyParent, IEnumerable<string> mimeTypeChain, string input, int startOffset, int endOffset)
+		public string FormatText (CSharpFormattingPolicy policy, TextStylePolicy textPolicy, string mimeType, string input, int startOffset, int endOffset)
 		{
 			var data = new TextEditorData ();
 			data.Document.SuppressHighlightUpdate = true;
-			data.Document.MimeType = mimeTypeChain.First ();
+			data.Document.MimeType = mimeType;
 			data.Document.FileName = "toformat.cs";
-			var textPolicy = policyParent.Get<TextStylePolicy> (mimeTypeChain);
-			data.Options.TabsToSpaces = textPolicy.TabsToSpaces;
-			data.Options.TabSize = textPolicy.TabWidth;
+			if (textPolicy != null) {
+				data.Options.TabsToSpaces = textPolicy.TabsToSpaces;
+				data.Options.TabSize = textPolicy.TabWidth;
+				data.Options.DefaultEolMarker = textPolicy.GetEolMarker ();
+			}
 			data.Options.OverrideDocumentEolMarker = true;
-			data.Options.DefaultEolMarker = textPolicy.GetEolMarker ();
 			data.Text = input;
 
 //			System.Console.WriteLine ("-----");
 //			System.Console.WriteLine (data.Text.Replace (" ", ".").Replace ("\t", "->"));
 //			System.Console.WriteLine ("-----");
 
-			MonoDevelop.CSharp.Parser.CSharpParser parser = new MonoDevelop.CSharp.Parser.CSharpParser ();
+			var parser = new CSharpParser ();
 			var compilationUnit = parser.Parse (data);
 			bool hadErrors = parser.HasErrors;
+			
 			if (hadErrors) {
 //				foreach (var e in parser.ErrorReportPrinter.Errors)
 //					Console.WriteLine (e.Message);
 				return input.Substring (startOffset, Math.Max (0, Math.Min (endOffset, input.Length) - startOffset));
 			}
-			var policy = policyParent.Get<CSharpFormattingPolicy> (mimeTypeChain);
-
-			var formattingVisitor = new AstFormattingVisitor (policy, data) {
-				AutoAcceptChanges = false,
+			var adapter = new TextEditorDataAdapter (data);
+			var formattingVisitor = new ICSharpCode.NRefactory.CSharp.AstFormattingVisitor (policy.CreateOptions (), adapter, new FormattingActionFactory (data)) {
 				HadErrors = hadErrors
 			};
+			
 			compilationUnit.AcceptVisitor (formattingVisitor, null);
-
-			var changes = new List<Change> ();
+			
+			
+			var changes = new List<ICSharpCode.NRefactory.CSharp.Refactoring.Action> ();
 
 			changes.AddRange (formattingVisitor.Changes.
-				Where (c => c is TextReplaceChange && (startOffset <= ((TextReplaceChange)c).Offset && ((TextReplaceChange)c).Offset < endOffset)));
-
-			RefactoringService.AcceptChanges (null, null, changes);
+				Where (c => (startOffset <= c.Offset && c.Offset < endOffset)));
+			
+			MDRefactoringContext.MdScript.RunActions (changes, null);
+			
+			// check if the formatter has produced errors
+			parser = new CSharpParser ();
+			parser.Parse (data);
+			if (parser.HasErrors) {
+				LoggingService.LogError ("C# formatter produced source code errors. See console for output.");
+				Console.WriteLine (data.Text);
+				return input.Substring (startOffset, Math.Max (0, Math.Min (endOffset, input.Length) - startOffset));
+			}
+				
 			int end = endOffset;
-			foreach (TextReplaceChange c in changes) {
+			foreach (TextReplaceAction c in changes) {
 				end -= c.RemovedChars;
 				if (c.InsertedText != null)
 					end += c.InsertedText.Length;
 			}
-			/*			System.Console.WriteLine ("-----");
+			
+		/*			System.Console.WriteLine ("-----");
 			System.Console.WriteLine (data.Text.Replace (" ", "^").Replace ("\t", "->"));
 			System.Console.WriteLine ("-----");*/
 			string result = data.GetTextBetween (startOffset, Math.Min (data.Length, end));
 			data.Dispose ();
 			return result;
+		}
+
+		public override string FormatText (PolicyContainer policyParent, IEnumerable<string> mimeTypeChain, string input, int startOffset, int endOffset)
+		{
+			var policy = policyParent.Get<CSharpFormattingPolicy> (mimeTypeChain);
+			var textPolicy = policyParent.Get<TextStylePolicy> (mimeTypeChain);
+
+			return FormatText (policy, textPolicy, mimeTypeChain.First (), input, startOffset, endOffset);
+
 		}
 	}
 }

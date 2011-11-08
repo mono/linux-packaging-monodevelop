@@ -16,7 +16,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		private global::Gtk.HButtonBox hbuttonbox1;
 		private global::Gtk.Button nextButton;
 		private global::Gtk.Button closeButton;
-
+		
 		protected virtual void Build ()
 		{
 			global::Stetic.Gui.Initialize (this);
@@ -100,7 +100,6 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			w7.Fill = false;
 			// Container child hbox5.Gtk.Box+BoxChild
 			this.hbuttonbox1 = new global::Gtk.HButtonBox ();
-			this.hbuttonbox1.Name = "hbuttonbox1";
 			this.hbuttonbox1.Spacing = 10;
 			this.hbuttonbox1.LayoutStyle = ((global::Gtk.ButtonBoxStyle)(4));
 			// Container child hbuttonbox1.Gtk.ButtonBox+ButtonBoxChild

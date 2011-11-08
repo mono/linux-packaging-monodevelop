@@ -6,10 +6,10 @@
 </ExtensionPoint>
 
 <Extension path = "/MonoDevelop/Core/MimeTypes">
-	<MimeType id="text/x-resource" _description=".NET resource" icon="md-resource-file-icon" isText="true">
+	<MimeType id="application/x-resource" _description=".NET binary resource" icon="md-resource-file-icon">
 		<File pattern="*.resources" />
 	</MimeType>
-	<MimeType id="application/x-resource" _description=".NET resource" icon="md-resource-file-icon" isText="true">
+	<MimeType id="text/microsoft-resx" _description=".NET XML resource" icon="md-resource-file-icon" baseType="application/xml">
 		<File pattern="*.resx" />
 	</MimeType>
 	<MimeType id="application/x-addin+xml" _description="Add-in manifest" icon="md-addin-file">
@@ -59,7 +59,21 @@
 	<MimeType id="text/x-jay" _description="jay files" isText="true">
 		<File pattern="*.jay" />
 	</MimeType>
-</Extension>	
+		
+	<MimeType id="text/x-cgsrc" _description="Cg Shader files" isText="true">
+		<File pattern="*.cg" />
+	</MimeType>
+	
+	<MimeType id="text/x-apple-strings" _description="Apple Strings" isText="true">
+		<File pattern="*.strings" />
+	</MimeType>
+	<MimeType id="application/json" _description="JSON files" isText="true">
+		<File pattern="*.json" />
+	</MimeType>
+	<MimeType id="application/x-sh" _description="Shell script" isText="true">
+		<File pattern="*.sh" />
+	</MimeType>
+</Extension>
 
 </ExtensionModel>
 

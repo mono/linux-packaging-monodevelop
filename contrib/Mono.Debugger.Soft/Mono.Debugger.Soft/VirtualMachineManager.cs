@@ -51,7 +51,7 @@ namespace Mono.Debugger.Soft
 				throw;
 			}
 
-			Connection conn = new Connection (accepted);
+			Connection conn = new TcpConnection (accepted);
 
 			VirtualMachine vm = new VirtualMachine (p, conn);
 
@@ -117,8 +117,8 @@ namespace Mono.Debugger.Soft
 			if (!asyncResult.IsCompleted)
 				asyncResult.AsyncWaitHandle.WaitOne ();
 
-			AsyncResult async = (AsyncResult) asyncResult;
-			LaunchCallback cb = (LaunchCallback) async.AsyncDelegate;
+			AsyncResult result = (AsyncResult) asyncResult;
+			LaunchCallback cb = (LaunchCallback) result.AsyncDelegate;
 			return cb.EndInvoke (asyncResult);
 		}
 
@@ -182,20 +182,10 @@ namespace Mono.Debugger.Soft
 				dbg_sock.Disconnect (false);
 			dbg_sock.Close ();
 
-			Connection conn = new Connection (dbg_acc);
-
-			VirtualMachine vm = new VirtualMachine (null, conn);
-
-			if (con_acc != null) {
-				vm.StandardOutput = new StreamReader (new NetworkStream (con_acc));
-				vm.StandardError = null;
-			}
-
-			conn.EventHandler = new EventHandler (vm);
-
-			vm.connect ();
-
-			return vm;
+			Connection transport = new TcpConnection (dbg_acc);
+			StreamReader console = con_acc != null? new StreamReader (new NetworkStream (con_acc)) : null;
+			
+			return Connect (transport, console, null);
 		}
 
 		public static IAsyncResult BeginListen (IPEndPoint dbg_ep, AsyncCallback callback) {
@@ -239,8 +229,8 @@ namespace Mono.Debugger.Soft
 			if (!asyncResult.IsCompleted)
 				asyncResult.AsyncWaitHandle.WaitOne ();
 
-			AsyncResult async = (AsyncResult) asyncResult;
-			ListenCallback cb = (ListenCallback) async.AsyncDelegate;
+			AsyncResult result = (AsyncResult) asyncResult;
+			ListenCallback cb = (ListenCallback) result.AsyncDelegate;
 			return cb.EndInvoke (asyncResult);
 		}
 
@@ -290,21 +280,11 @@ namespace Mono.Debugger.Soft
 				}
 				throw;
 			}
-
-			Connection conn = new Connection (dbg_sock);
-
-			VirtualMachine vm = new VirtualMachine (null, conn);
-
-			if (con_sock != null) {
-				vm.StandardOutput = new StreamReader (new NetworkStream (con_sock));
-				vm.StandardError = null;
-			}
-
-			conn.EventHandler = new EventHandler (vm);
-
-			vm.connect ();
-
-			return vm;
+			
+			Connection transport = new TcpConnection (dbg_sock);
+			StreamReader console = con_sock != null? new StreamReader (new NetworkStream (con_sock)) : null;
+			
+			return Connect (transport, console, null);
 		}
 
 		public static IAsyncResult BeginConnect (IPEndPoint dbg_ep, AsyncCallback callback) {
@@ -332,14 +312,28 @@ namespace Mono.Debugger.Soft
 			if (!asyncResult.IsCompleted)
 				asyncResult.AsyncWaitHandle.WaitOne ();
 
-			AsyncResult async = (AsyncResult) asyncResult;
-			ConnectCallback cb = (ConnectCallback) async.AsyncDelegate;
+			AsyncResult result = (AsyncResult) asyncResult;
+			ConnectCallback cb = (ConnectCallback) result.AsyncDelegate;
 			return cb.EndInvoke (asyncResult);
 		}
 
 		public static void CancelConnection (IAsyncResult asyncResult)
 		{
 			((Socket)asyncResult.AsyncState).Close ();
+		}
+		
+		public static VirtualMachine Connect (Connection transport, StreamReader standardOutput, StreamReader standardError)
+		{
+			VirtualMachine vm = new VirtualMachine (null, transport);
+			
+			vm.StandardOutput = standardOutput;
+			vm.StandardError = standardError;
+			
+			transport.EventHandler = new EventHandler (vm);
+
+			vm.connect ();
+
+			return vm;
 		}
 	}
 }
