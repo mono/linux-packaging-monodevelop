@@ -1,3 +1,10 @@
+monodevelop (2.8.5+dfsg-1) experimental; urgency=low
+
+  * [5cc97fa] Imported Upstream version 2.8.5+dfsg
+  * [97a3587] Refresh debian/patches/use_libsvn1.patch
+
+ -- Jo Shields <directhex@apebox.org>  Mon, 19 Dec 2011 11:19:21 +0000
+
 monodevelop (2.8.2+dfsg-1) experimental; urgency=low
 
   [ Gleb Golubitsky ]
