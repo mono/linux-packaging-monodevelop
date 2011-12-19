@@ -1,7 +1,7 @@
-Index: monodevelop.git/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs
+Index: monodevelop/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs
 ===================================================================
---- monodevelop.git.orig/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs	2011-06-24 00:05:54.000000000 +0100
-+++ monodevelop.git/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs	2011-06-24 00:06:29.000000000 +0100
+--- monodevelop.orig/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs	2011-12-19 11:11:30.000000000 +0000
++++ monodevelop/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs	2011-12-19 11:16:14.000000000 +0000
 @@ -22,10 +22,6 @@
  		public static LibSvnClient GetLib ()
  		{
@@ -13,12 +13,19 @@ Index: monodevelop.git/src/addins/VersionControl/MonoDevelop.VersionControl.Subv
  				return new LibSvnClient1 ();
  			} catch {}
  			
-@@ -582,381 +578,6 @@
+@@ -584,388 +580,6 @@
  		public delegate IntPtr svn_client_blame_receiver_t (IntPtr baton, long line_no, int revision, string author, string date, string line, IntPtr pool);
  	}
  	
 -	public class LibSvnClient0 : LibSvnClient {
 -		private const string svnclientlib = "libsvn_client-1.so.0";
+-		
+-		[DllImport(svnclientlib)] static extern IntPtr svn_client_root_url_from_path (ref IntPtr url, string path_or_url, IntPtr ctx, IntPtr pool);
+-		
+-		public override IntPtr client_root_url_from_path (ref IntPtr url, string path_or_url, IntPtr ctx, IntPtr pool)
+-		{
+-			return svn_client_root_url_from_path (ref url, path_or_url, ctx, pool);
+-		}
 -		
 -		public override void config_ensure (string config_dir, IntPtr pool)
 -		{
