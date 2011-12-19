@@ -10,6 +10,7 @@ DEPS = ../../build/bin/Mono.Cecil.dll
 SIGNING_KEY=$(srcdir)/mono.snk
 
 FILES =  \
+	Locale.cs \
 	Mono.Debugger.Soft/AbsentInformationException.cs \
 	Mono.Debugger.Soft/AppDomainCreateEvent.cs \
 	Mono.Debugger.Soft/AppDomainMirror.cs \
@@ -38,6 +39,7 @@ FILES =  \
 	Mono.Debugger.Soft/IInvokeAsyncResult.cs \
 	Mono.Debugger.Soft/ILInstruction.cs \
 	Mono.Debugger.Soft/IMirror.cs \
+	Mono.Debugger.Soft/InterfaceMappingMirror.cs \
 	Mono.Debugger.Soft/InvalidStackFrameException.cs \
 	Mono.Debugger.Soft/InvocationException.cs \
 	Mono.Debugger.Soft/InvokeOptions.cs \

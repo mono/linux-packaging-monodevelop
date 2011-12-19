@@ -646,8 +646,12 @@ namespace Mono.Debugging.Soft
 		
 		public override object GetValueType (EvaluationContext ctx, object val)
 		{
+			if (val is ArrayMirror)
+				return ((ArrayMirror)val).Type;
 			if (val is ObjectMirror)
 				return ((ObjectMirror)val).Type;
+			if (val is EnumMirror)
+				return ((EnumMirror)val).Type;
 			if (val is StructMirror)
 				return ((StructMirror)val).Type;
 			if (val is PrimitiveValue) {
@@ -655,12 +659,9 @@ namespace Mono.Debugging.Soft
 				if (pv.Value == null)
 					return typeof(Object);
 				else
-					return ((PrimitiveValue)val).Value.GetType ();
+					return pv.Value.GetType ();
 			}
-			if (val is ArrayMirror)
-				return ((ArrayMirror)val).Type;
-			if (val is EnumMirror)
-				return ((EnumMirror)val).Type;
+			
 			throw new NotSupportedException ();
 		}
 		
@@ -1032,9 +1033,29 @@ namespace Mono.Debugging.Soft
 
 		public override object TargetObjectToObject (EvaluationContext gctx, object obj)
 		{
-			if (obj is StringMirror)
-				return ((StringMirror)obj).Value;
-			else if (obj is PrimitiveValue)
+			if (obj is StringMirror) {
+				StringMirror mirror = (StringMirror) obj;
+				string str;
+				
+				if (gctx.Options.EllipsizeStrings) {
+					if (mirror.VirtualMachine.Version.AtLeast (2, 10)) {
+						int length = mirror.Length;
+						
+						if (length > gctx.Options.EllipsizedLength)
+							str = new string (mirror.GetChars (0, gctx.Options.EllipsizedLength)) + EvaluationOptions.Ellipsis;
+						else
+							str = mirror.Value;
+					} else {
+						str = mirror.Value;
+						if (str.Length > gctx.Options.EllipsizedLength)
+							str = str.Substring (0, gctx.Options.EllipsizedLength) + EvaluationOptions.Ellipsis;
+					}
+				} else {
+					str = mirror.Value;
+				}
+				
+				return str;
+			} else if (obj is PrimitiveValue)
 				return ((PrimitiveValue)obj).Value;
 			else if ((obj is StructMirror) && ((StructMirror)obj).Type.IsPrimitive) {
 				// Boxed primitive

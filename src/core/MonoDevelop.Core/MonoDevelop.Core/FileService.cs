@@ -48,7 +48,7 @@ namespace MonoDevelop.Core
 		static FileServiceErrorHandler errorHandler;
 		
 		static FileSystemExtension fileSystemChain;
-		static FileSystemExtension defaultExtension = new DefaultFileSystemExtension ();
+		static FileSystemExtension defaultExtension = Platform.IsWindows ? new DefaultFileSystemExtension () : new UnixFileSystemExtension () ;
 		
 		static EventQueue eventQueue = new EventQueue ();
 		
@@ -87,6 +87,17 @@ namespace MonoDevelop.Core
 			}
 		}
 		
+		public static FilePath ResolveFullPath (FilePath path)
+		{
+			try {
+				return GetFileSystemForPath (path, false).ResolveFullPath (path);
+			} catch (Exception e) {
+				if (!HandleError (GettextCatalog.GetString ("Can't resolve full path {0}", path), e))
+					throw;
+				return FilePath.Empty;
+			}
+		}
+		
 		public static void DeleteFile (string fileName)
 		{
 			Debug.Assert (!String.IsNullOrEmpty (fileName));
@@ -118,8 +129,8 @@ namespace MonoDevelop.Core
 			Debug.Assert (!String.IsNullOrEmpty (oldName));
 			Debug.Assert (!String.IsNullOrEmpty (newName));
 			if (Path.GetFileName (oldName) != newName) {
-				string newPath = Path.Combine (Path.GetDirectoryName (oldName), newName);
-				InternalMoveFile (oldName, newPath);
+				var newPath = ((FilePath)oldName).ParentDirectory.Combine (newName);
+				InternalRenameFile (oldName, newName);
 				OnFileRenamed (new FileCopyEventArgs (oldName, newPath, false));
 				OnFileCreated (new FileEventArgs (newPath, false));
 				OnFileRemoved (new FileEventArgs (oldName, false));
@@ -173,6 +184,15 @@ namespace MonoDevelop.Core
 				dstExt.CopyFile (srcFile, dstFile, true);
 				srcExt.DeleteFile (srcFile);
 			}
+		}
+		
+		static void InternalRenameFile (string srcFile, string newName)
+		{
+			Debug.Assert (!string.IsNullOrEmpty (srcFile));
+			Debug.Assert (!string.IsNullOrEmpty (newName));
+			FileSystemExtension srcExt = GetFileSystemForPath (srcFile, false);
+			
+			srcExt.RenameFile (srcFile, newName);
 		}
 		
 		public static void CreateDirectory (string path)

@@ -119,7 +119,7 @@ namespace MonoDevelop.CSharp.Completion
 		
 		public override bool ExtendsEditor (MonoDevelop.Ide.Gui.Document doc, IEditableTextBuffer editor)
 		{
-			return System.IO.Path.GetExtension (doc.Name) == ".cs";
+			return StringComparer.OrdinalIgnoreCase.Equals (System.IO.Path.GetExtension (doc.Name), ".cs");
 		}
 		
 		#region Sharing the tracker
@@ -244,8 +244,7 @@ namespace MonoDevelop.CSharp.Completion
 						ICSharpCode.OldNRefactory.Ast.PrimitiveExpression pex = (ICSharpCode.OldNRefactory.Ast.PrimitiveExpression)resolver.ResolvedExpression;
 						if (!tryToForceCompletion && !(pex.Value is string || pex.Value is char || pex.Value is bool))
 							return null;
-					}
-					
+					} 
 					return CreateCompletionData (location, resolveResult, result, resolver);
 				case '#':
 					if (stateTracker.Engine.IsInsidePreprocessorDirective) 
@@ -1686,7 +1685,7 @@ namespace MonoDevelop.CSharp.Completion
 						continue;
 					if (expressionResult.ExpressionContext == ExpressionContext.NamespaceNameExcepted && !(obj is Namespace))
 						continue;
-					if (showOnlyTypes && !(obj is IType))
+					if (showOnlyTypes && !(obj is IType) && !(obj is Namespace))
 						continue;
 					CompletionData data = col.Add (obj);
 					if (data != null && expressionResult.ExpressionContext == ExpressionContext.Attribute && data.CompletionText != null && data.CompletionText.EndsWith ("Attribute")) {

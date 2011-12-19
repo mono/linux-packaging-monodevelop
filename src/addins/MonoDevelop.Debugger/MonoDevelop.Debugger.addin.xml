@@ -6,11 +6,11 @@
        description = "Support for Debugging projects"
        copyright = "MIT X11"
        flags = "Hidden"
-       version = "2.8.2">
+       version = "2.8.5">
 
 	<Dependencies>
-		<Addin id="Core" version="2.8.2"/>
-		<Addin id="Ide" version="2.8.2"/>
+		<Addin id="Core" version="2.8.5"/>
+		<Addin id="Ide" version="2.8.5"/>
 	</Dependencies>
 	
 	<ExtensionPoint path="/MonoDevelop/Debugging/DebuggerEngines">
@@ -229,6 +229,7 @@
 	
 	<Extension path = "/MonoDevelop/Ide/Toolbar">
 		<ItemSet id = "Debugger" _label = "Debugger">
+			<CommandItem id = "MonoDevelop.Debugger.DebugCommands.Debug" />
 			<CommandItem id = "MonoDevelop.Debugger.DebugCommands.StepOver" />
 			<CommandItem id = "MonoDevelop.Debugger.DebugCommands.StepInto" />
 			<CommandItem id = "MonoDevelop.Debugger.DebugCommands.StepOut" />	

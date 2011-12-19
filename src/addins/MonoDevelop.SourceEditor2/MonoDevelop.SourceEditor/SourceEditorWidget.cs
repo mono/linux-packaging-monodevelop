@@ -68,7 +68,7 @@ namespace MonoDevelop.SourceEditor
 		
 		ParsedDocument parsedDocument;
 		
-		MonoDevelop.SourceEditor.ExtensibleTextEditor textEditor;
+		readonly MonoDevelop.SourceEditor.ExtensibleTextEditor textEditor;
 		MonoDevelop.SourceEditor.ExtensibleTextEditor splittedTextEditor;
 		MonoDevelop.SourceEditor.ExtensibleTextEditor lastActiveEditor;
 		
@@ -129,6 +129,10 @@ namespace MonoDevelop.SourceEditor
 			return false;
 		}
 		#endregion
+		
+		public bool HasMessageBar {
+			get { return messageBar != null; }
+		}
 		
 		Gtk.VBox vbox = new Gtk.VBox ();
 		public Gtk.VBox Vbox {
@@ -307,7 +311,6 @@ namespace MonoDevelop.SourceEditor
 				StopParseInfoThread ();
 				KillWidgets ();
 				
-				this.textEditor = null;
 				this.lastActiveEditor = null;
 				this.splittedTextEditor = null;
 				view = null;
@@ -456,6 +459,8 @@ namespace MonoDevelop.SourceEditor
 				if (reloadSettings) {
 					reloadSettings = false;
 					Application.Invoke (delegate {
+						if (isDisposed)
+							return;
 						view.LoadSettings ();
 						mainsw.QueueDraw ();
 					});
@@ -620,22 +625,10 @@ namespace MonoDevelop.SourceEditor
 			double hadjustment = mainsw.Hadjustment.Value;
 			
 			splitContainer.Remove (mainsw);
-			if (this.textEditor == lastActiveEditor) {
-				secondsw.Destroy ();
-				secondsw = null;
-				splittedTextEditor = null;
-			} else {
-				this.mainsw.Destroy ();
-				this.mainsw = secondsw;
-				
-				vadjustment = secondsw.Vadjustment.Value;
-				hadjustment = secondsw.Hadjustment.Value;
-				splitContainer.Remove (secondsw);
-				
-				lastActiveEditor = this.textEditor = splittedTextEditor;
-				
-				splittedTextEditor = null;
-			}
+			secondsw.Destroy ();
+			secondsw = null;
+			splittedTextEditor = null;
+			
 			vbox.Remove (splitContainer);
 			splitContainer.Destroy ();
 			splitContainer = null;
@@ -761,6 +754,7 @@ namespace MonoDevelop.SourceEditor
 				messageBar.ActionArea.Add (b2);
 			}
 			
+			view.IsDirty = true;
 			view.WarnOverwrite = true;
 			vbox.PackStart (messageBar, false, false, CHILD_PADDING);
 			vbox.ReorderChild (messageBar, 0);
@@ -824,16 +818,14 @@ namespace MonoDevelop.SourceEditor
 				};
 				messageBar.ActionArea.Add (b1);
 				
-				Button b2 = new Button (GettextCatalog.GetString("_Keep changes"));
+				Button b2 = new Button (GettextCatalog.GetString("_Keep line endings"));
 				b2.Image = ImageService.GetImage (Gtk.Stock.Cancel, IconSize.Button);
 				b2.Clicked += delegate(object sender, EventArgs e) {
-					try {
-						useIncorrectMarkers = true;
-						view.Save (fileName, encoding);
-					} finally {
-						RemoveMessageBar ();
-						view.WorkbenchWindow.ShowNotification = false;
-					}
+					useIncorrectMarkers = true;
+					RemoveMessageBar ();
+					view.WorkbenchWindow.ShowNotification = false;
+					
+					view.Save (fileName, encoding);
 				};
 				messageBar.ActionArea.Add (b2);
 			}
@@ -894,6 +886,7 @@ namespace MonoDevelop.SourceEditor
 				messageBar.ActionArea.Add (b2);
 			}
 			
+			view.IsDirty = true;
 			view.WarnOverwrite = true;
 			vbox.PackStart (messageBar, false, false, CHILD_PADDING);
 			vbox.ReorderChild (messageBar, 0);

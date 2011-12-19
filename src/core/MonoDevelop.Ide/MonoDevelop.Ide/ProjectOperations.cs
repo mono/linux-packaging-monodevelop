@@ -1098,8 +1098,6 @@ namespace MonoDevelop.Ide
 			
 			ITimeTracker tt = Counters.BuildItemTimer.BeginTiming ("Building " + entry.Name);
 			try {
-				tt.Trace ("Pre-build operations");
-				DoBeforeCompileAction ();
 				IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetBuildProgressMonitor ();
 			
 				tt.Trace ("Start build event");
@@ -1122,12 +1120,17 @@ namespace MonoDevelop.Ide
 		{
 			BuildResult result = null;
 			try {
-				tt.Trace ("Building item");
-				SolutionItem it = entry as SolutionItem;
-				if (it != null)
-					result = it.Build (monitor, IdeApp.Workspace.ActiveConfiguration, true);
-				else
-					result = entry.RunTarget (monitor, ProjectService.BuildTarget, IdeApp.Workspace.ActiveConfiguration);
+				tt.Trace ("Pre-build operations");
+				result = DoBeforeCompileAction ();
+
+				if (result.ErrorCount == 0) {
+					tt.Trace ("Building item");
+					SolutionItem it = entry as SolutionItem;
+					if (it != null)
+						result = it.Build (monitor, IdeApp.Workspace.ActiveConfiguration, true);
+					else
+						result = entry.RunTarget (monitor, ProjectService.BuildTarget, IdeApp.Workspace.ActiveConfiguration);
+				}
 			} catch (Exception ex) {
 				monitor.ReportError (GettextCatalog.GetString ("Build failed."), ex);
 			} finally {
@@ -1139,8 +1142,10 @@ namespace MonoDevelop.Ide
 			});
 		}
 
-		void DoBeforeCompileAction ()
+		BuildResult DoBeforeCompileAction ()
 		{
+			var result = new BuildResult ();
+			var couldNotSaveError = "The build has been aborted as the file '{0}' could not be saved";
 			BeforeCompileAction action = IdeApp.Preferences.BeforeBuildSaveAction;
 			
 			switch (action) {
@@ -1155,6 +1160,8 @@ namespace MonoDevelop.Ide
 							                                AlertButton.BuildWithoutSave, AlertButton.Save) == AlertButton.Save) {
 								MarkFileDirty (doc.FileName);
 								doc.Save ();
+								if (doc.IsDirty)
+									result.AddError (string.Format (couldNotSaveError, Path.GetFileName (doc.FileName)), doc.FileName);
 							}
 							else
 								break;
@@ -1163,13 +1170,18 @@ namespace MonoDevelop.Ide
 					break;
 				case BeforeCompileAction.SaveAllFiles:
 					foreach (var doc in new List<MonoDevelop.Ide.Gui.Document> (IdeApp.Workbench.Documents))
-						if (doc.IsDirty && doc.Project != null)
+						if (doc.IsDirty && doc.Project != null) {
 							doc.Save ();
+							if (doc.IsDirty)
+								result.AddError (string.Format (couldNotSaveError, Path.GetFileName (doc.FileName)), doc.FileName);
+						}
 					break;
 				default:
 					System.Diagnostics.Debug.Assert(false);
 					break;
 			}
+			
+			return result;
 		}
 
 		void BeginBuild (IProgressMonitor monitor)
@@ -1304,10 +1316,14 @@ namespace MonoDevelop.Ide
 				
 				if (folder.IsRoot) {
 					// Don't allow adding files to the root folder. VS doesn't allow it
-					SolutionFolder newFolder = new SolutionFolder ();
-					newFolder.Name = "Solution Items";
-					folder.AddItem (newFolder);
-					folder = newFolder;
+					// If there is no existing folder, create one
+					var itemsFolder = (SolutionFolder) folder.Items.Where (item => item.Name == "Solution Items").FirstOrDefault ();
+					if (itemsFolder == null) {
+						itemsFolder = new SolutionFolder ();
+						itemsFolder.Name = "Solution Items";
+						folder.AddItem (itemsFolder);
+					}
+					folder = itemsFolder;
 				}
 				
 				if (!fp.IsChildPathOf (folder.BaseDirectory)) {
@@ -1561,20 +1577,26 @@ namespace MonoDevelop.Ide
 					!copyOnlyProjectFiles ||
 					IsDirectoryHierarchyEmpty (sourcePath)));
 
-			// Get the list of files to copy
-
+			// We need to remove all files + directories from the source project
+			// but when dealing with the VCS addins we need to process only the
+			// files so we do not create a 'file' in the VCS which corresponds
+			// to a directory in the project and blow things up.
+			List<ProjectFile> filesToRemove = null;
 			List<ProjectFile> filesToMove = null;
 			try {
 				//get the real ProjectFiles
 				if (sourceProject != null) {
 					if (sourceIsFolder) {
 						var virtualPath = sourcePath.ToRelative (sourceProject.BaseDirectory);
-						filesToMove = sourceProject.Files.GetFilesInVirtualPath (virtualPath).ToList ();
+						// Grab all the child nodes of the folder we just dragged/dropped
+						filesToRemove = sourceProject.Files.GetFilesInVirtualPath (virtualPath).ToList ();
+						// Add the folder itself so we can remove it from the soruce project if its a Move operation
+						filesToRemove.Add (sourceProject.Files.Where (f => f.ProjectVirtualPath == virtualPath).FirstOrDefault ());
 					} else {
-						filesToMove = new List<ProjectFile> ();
+						filesToRemove = new List<ProjectFile> ();
 						var pf = sourceProject.GetProjectFile (sourcePath);
 						if (pf != null)
-							filesToMove.Add (pf);
+							filesToRemove.Add (pf);
 					}
 				}
 				//get all the non-project files and create fake ProjectFiles
@@ -1582,18 +1604,21 @@ namespace MonoDevelop.Ide
 					var col = new List<ProjectFile> ();
 					GetAllFilesRecursive (sourcePath, col);
 					if (sourceProject != null) {
-						var names = new HashSet<string> (filesToMove.Select (f => sourceProject.BaseDirectory.Combine (f.ProjectVirtualPath).ToString ()));
+						var names = new HashSet<string> (filesToRemove.Select (f => sourceProject.BaseDirectory.Combine (f.ProjectVirtualPath).ToString ()));
 						foreach (var f in col)
 							if (names.Add (f.Name))
-							    filesToMove.Add (f);
+							    filesToRemove.Add (f);
 					} else {
-						filesToMove = col;
+						filesToRemove = col;
 					}
 				}
 			} catch (Exception ex) {
 				monitor.ReportError (GettextCatalog.GetString ("Could not get any file from '{0}'.", sourcePath), ex);
 				return;
 			}
+			
+			// Strip out all the directories to leave us with just the files.
+			filesToMove = filesToRemove.Where (f => f.Subtype != Subtype.Directory).ToList ();
 			
 			// If copying a single file, bring any grouped children along
 			ProjectFile sourceParent = null;
@@ -1665,8 +1690,6 @@ namespace MonoDevelop.Ide
 				}
 				
 				if (sourceProject != null) {
-					if (removeFromSource && sourceProject.Files.Contains (file))
-						sourceProject.Files.Remove (file);
 					if (fileIsLink) {
 						var linkFile = (sourceProject == targetProject)? file : (ProjectFile) file.Clone ();
 						if (movingFolder) {
@@ -1693,6 +1716,12 @@ namespace MonoDevelop.Ide
 				}
 				
 				monitor.Step (1);
+			}
+			
+			if (removeFromSource) {
+				// Remove all files and directories under 'sourcePath'
+				foreach (var v in filesToRemove)
+					sourceProject.Files.Remove (v);
 			}
 			
 			var pfolder = sourcePath.ParentDirectory;

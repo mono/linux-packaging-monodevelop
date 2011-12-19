@@ -129,22 +129,35 @@ namespace MonoDevelop.Core
 		}
 		
 		[MethodImpl (MethodImplOptions.NoInlining)]
-		public static Stream GetStream (string name)
+		public static FilePath GetFile (string name)
 		{
-			//read branding directory, then calling assembly's resources
 			if (localizedBrandingDir != null) {
 				var file = localizedBrandingDir.Combine (name);
 				if (File.Exists (file))
-					return File.OpenRead (file);
+					return file;
 			}
 			
 			if (brandingDir != null) {
 				var file = brandingDir.Combine (name);
 				if (File.Exists (file))
-					return File.OpenRead (file);
+					return file;
 			}
 			
-			return Assembly.GetCallingAssembly ().GetManifestResourceStream (name);
+			return null;
+		}
+		
+		[MethodImpl (MethodImplOptions.NoInlining)]
+		public static Stream GetStream (string name, bool lookInCallingAssembly=false)
+		{
+			//read branding directory, then calling assembly's resources
+			var file = GetFile (name);
+			if (file != null)
+				return File.OpenRead (file);
+			
+			if (lookInCallingAssembly)
+				return Assembly.GetCallingAssembly ().GetManifestResourceStream (name);
+			
+			return null;
 		}
 	}
 }

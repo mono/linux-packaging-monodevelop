@@ -633,7 +633,10 @@ namespace Mono.TextEditor
 			
 			textEditor.ResetIMContext ();
 			
-			textEditor.IMContext.CursorLocation = new Rectangle ((int)caretX, (int)caretY, 0, (int)(LineHeight - 1));
+			GtkWorkarounds.SetImCursorLocation (
+				textEditor.IMContext,
+				textEditor.GdkWindow,
+				new Rectangle ((int)caretX, (int)caretY, 0, (int)(LineHeight - 1)));
 		}
 
 		public static Gdk.Rectangle EmptyRectangle = new Gdk.Rectangle (0, 0, 0, 0);
@@ -1334,7 +1337,7 @@ namespace Mono.TextEditor
 				if (textEditor.MainSelection.SelectionMode == SelectionMode.Block && startX == endX) {
 					endX = startX + 2;
 				}
-				DrawRectangleWithRuler (cr, xPos + textEditor.HAdjustment.Value - TextStartPosition, new Cairo.Rectangle (xPos + startX, y, endX - startX + 0.5, LineHeight), this.SelectionColor.CairoBackgroundColor, true);
+				DrawRectangleWithRuler (cr, xPos + textEditor.HAdjustment.Value - TextStartPosition, new Cairo.Rectangle (xPos + startX, y, endX - startX, LineHeight), this.SelectionColor.CairoBackgroundColor, true);
 			}
 
 			// highlight search results
@@ -1528,6 +1531,10 @@ namespace Mono.TextEditor
 		protected internal override void MousePressed (MarginMouseEventArgs args)
 		{
 			base.MousePressed (args);
+			
+			if (args.TriggersContextMenu ())
+				return;
+			
 			inSelectionDrag = false;
 			inDrag = false;
 			Selection selection = textEditor.MainSelection;
@@ -1654,7 +1661,6 @@ namespace Mono.TextEditor
 		}
 
 		CodeSegmentPreviewWindow previewWindow = null;
-		ISegment previewSegment = null;
 		public bool IsCodeSegmentPreviewWindowShown {
 			get {
 				return previewWindow != null;
@@ -1673,6 +1679,7 @@ namespace Mono.TextEditor
 		{
 			if (!IsCodeSegmentPreviewWindowShown)
 				throw new InvalidOperationException ("CodeSegment preview window isn't shown.");
+			var previewSegment = previewWindow.Segment;
 
 			int x = 0, y = 0;
 			this.previewWindow.GdkWindow.GetOrigin (out x, out y);
@@ -1684,7 +1691,6 @@ namespace Mono.TextEditor
 			codeSegmentEditorWindow.Move (x, y);
 			codeSegmentEditorWindow.Resize (w, h);
 			codeSegmentEditorWindow.SyntaxMode = Document.SyntaxMode;
-
 			int indentLength = SyntaxMode.GetIndentLength (Document, previewSegment.Offset, previewSegment.Length, false);
 
 			StringBuilder textBuilder = new StringBuilder ();
@@ -1709,11 +1715,10 @@ namespace Mono.TextEditor
 		uint codeSegmentTooltipTimeoutId = 0;
 		void ShowTooltip (ISegment segment, Rectangle hintRectangle)
 		{
-			if (previewSegment == segment)
+			if (previewWindow != null && previewWindow.Segment == segment)
 				return;
 			CancelCodeSegmentTooltip ();
 			HideCodeSegmentPreviewWindow ();
-			previewSegment = segment;
 			if (segment == null || segment.Length == 0)
 				return;
 			codeSegmentTooltipTimeoutId = GLib.Timeout.Add (650, delegate {
@@ -1803,21 +1808,21 @@ namespace Mono.TextEditor
 				Caret.AllowCaretBehindLineEnd = true;
 			}
 
-			DocumentLocation loc = PointToLocation (args.X, args.Y);
-			if (loc.IsEmpty)
+			var loc = PointToLocation (args.X, args.Y);
+			if (loc.Line < DocumentLocation.MinLine || loc.Column < DocumentLocation.MinColumn)
 				return;
-			LineSegment line = Document.GetLine (loc.Line);
-			LineSegment oldHoveredLine = HoveredLine;
+			var line = Document.GetLine (loc.Line);
+			var oldHoveredLine = HoveredLine;
 			HoveredLine = line;
 			OnHoveredLineChanged (new LineEventArgs (oldHoveredLine));
 
-			TextMarkerHoverResult hoverResult = new TextMarkerHoverResult ();
+			var hoverResult = new TextMarkerHoverResult ();
 			oldMarkers.ForEach (m => m.MouseHover (this.textEditor, args, hoverResult));
 
 			if (line != null) {
 				newMarkers.Clear ();
 				newMarkers.AddRange (line.Markers.Where (m => m is IActionTextMarker).Cast <IActionTextMarker> ());
-				IActionTextMarker extraMarker = Document.GetExtendingTextMarker (loc.Line) as IActionTextMarker;
+				var extraMarker = Document.GetExtendingTextMarker (loc.Line) as IActionTextMarker;
 				if (extraMarker != null && !oldMarkers.Contains (extraMarker))
 					newMarkers.Add (extraMarker);
 				foreach (var marker in newMarkers.Where (m => !oldMarkers.Contains (m))) {
@@ -1857,7 +1862,6 @@ namespace Mono.TextEditor
 				}
 				return;
 			}
-
 
 			if (inDrag)
 				return;
@@ -1965,21 +1969,22 @@ namespace Mono.TextEditor
 			if (isDefaultColor && !drawDefaultBackground)
 				return;
 			cr.Color = color;
-			double xp = System.Math.Floor (area.X);
+			double xp = /*System.Math.Floor*/ (area.X);
 			
 			if (textEditor.Options.ShowRuler) {
-				double divider = System.Math.Max (xp, System.Math.Min (x + TextStartPosition + rulerX + 0.5, xp + area.Width));
+				double divider = System.Math.Max (area.X, System.Math.Min (x + TextStartPosition + rulerX, area.X + area.Width));
 				if (divider < area.X + area.Width) {
-					cr.Rectangle (xp, area.Y, divider - xp, area.Height);
+					cr.Rectangle (xp, area.Y, divider - area.X, area.Height);
 					cr.Fill ();
-					cr.Rectangle (divider, area.Y, xp + area.Width - divider + 1, area.Height);
+					
+					cr.Rectangle (divider, area.Y, area.X + area.Width - divider, area.Height);
 					cr.Color = DimColor (color);
 					cr.Fill ();
 					cr.DrawLine (ColorStyle.Ruler, divider, area.Y, divider, area.Y + area.Height);
 					return;
 				}
 			}
-			cr.Rectangle (xp, area.Y, System.Math.Ceiling (area.Width), area.Height);
+			cr.Rectangle (xp, area.Y, area.Width, area.Height);
 			cr.Fill ();
 		}
 
@@ -2073,7 +2078,7 @@ namespace Mono.TextEditor
 		{
 //			double xStart = System.Math.Max (area.X, XOffset);
 //			xStart = System.Math.Max (0, xStart);
-			var lineArea = new Cairo.Rectangle (XOffset - 1, y, textEditor.Allocation.Width - XOffset + 1, LineHeight);
+			var lineArea = new Cairo.Rectangle (XOffset - 1, y, textEditor.Allocation.Width - XOffset + 1, _lineHeight);
 			int width, height;
 			double pangoPosition = (x - textEditor.HAdjustment.Value + TextStartPosition) * Pango.Scale.PangoScale;
 
@@ -2547,7 +2552,7 @@ namespace Mono.TextEditor
 		
 		public double GetLineHeight (LineSegment line)
 		{
-			if (line == null || line.MarkerCount == 0)
+			if (line == null)
 				return LineHeight;
 			foreach (var marker in line.Markers) {
 				IExtendingTextMarker extendingTextMarker = marker as IExtendingTextMarker;
@@ -2555,7 +2560,9 @@ namespace Mono.TextEditor
 					continue;
 				return extendingTextMarker.GetLineHeight (textEditor);
 			}
-			return LineHeight;
+			int lineNumber = textEditor.OffsetToLineNumber (line.Offset); 
+			var node = textEditor.GetTextEditorData ().heightTree.GetNodeByLine (lineNumber);
+			return node.height / node.count;
 		}
 		
 		public double GetLineHeight (int logicalLineNumber)

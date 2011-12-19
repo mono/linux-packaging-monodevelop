@@ -7,16 +7,16 @@
        description = "Provides a text editor for the MonoDevelop based on Mono.TextEditor"
        category    = "MonoDevelop Core"
        flags       = "Hidden"
-       version     = "2.8.2">
+       version     = "2.8.5">
 	
 	<Runtime>
 		<Import assembly="MonoDevelop.SourceEditor2.dll"/>
 	</Runtime>
 	
 	<Dependencies>
-	    <Addin id="Core" version="2.8.2"/>
-		<Addin id="Ide" version="2.8.2"/>
-		<Addin id="Debugger" version="2.8.2"/>
+	    <Addin id="Core" version="2.8.5"/>
+		<Addin id="Ide" version="2.8.5"/>
+		<Addin id="Debugger" version="2.8.5"/>
 	</Dependencies>
 
 	<!-- Extension points -->
@@ -110,12 +110,7 @@
 				_description = "Activates code focus on caret move"
 				shortcut = "Ctrl|Shift|k"
 				macShortcut = "Meta|Shift|k" />
-				
-		<Command id = "MonoDevelop.SourceEditor.NavigationBarCommands.ToggleNavPanelViews"
-				defaultHandler = "MonoDevelop.SourceEditor.ToggleNavPanelViewsHandler"
-				_label = ""
-				type="array"/>
-				
+		
 		<Command id = "MonoDevelop.SourceEditor.MessageBubbleCommands.HideIssues"
 				defaultHandler = "MonoDevelop.SourceEditor.HideIssuesHandler"
 				_label = "_Hide Issues"/>
@@ -149,11 +144,6 @@
 		<CommandItem id = "MonoDevelop.SourceEditor.SourceEditorCommands.ToggleCodeFocus" />
 		<CommandItem id = "MonoDevelop.Ide.Commands.TextEditorCommands.ShowCodeTemplateWindow" />
 	</Extension>
-	
-	<Extension path = "/MonoDevelop/SourceEditor2/ContextMenu/NavigationBar">
-		<CommandItem id = "MonoDevelop.SourceEditor.NavigationBarCommands.ToggleNavPanelViews" />
-	</Extension>
-	
 	
 	<Extension path = "/MonoDevelop/SourceEditor2/IconContextMenu/Editor">
 		<CommandItem id = "MonoDevelop.Ide.Commands.SearchCommands.ToggleBookmark" />

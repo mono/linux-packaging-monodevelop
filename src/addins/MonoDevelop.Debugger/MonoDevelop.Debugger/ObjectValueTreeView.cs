@@ -37,6 +37,7 @@ using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Commands;
+using Mono.TextEditor;
 
 
 namespace MonoDevelop.Debugger
@@ -47,7 +48,7 @@ namespace MonoDevelop.Debugger
 		List<string> valueNames = new List<string> ();
 		Dictionary<string,string> oldValues = new Dictionary<string,string> ();
 		List<ObjectValue> values = new List<ObjectValue> ();
-		Dictionary<ObjectValue,TreeIter> nodes = new Dictionary<ObjectValue, TreeIter> (); 
+		Dictionary<ObjectValue,TreeRowReference> nodes = new Dictionary<ObjectValue, TreeRowReference> ();
 		Dictionary<string,ObjectValue> cachedValues = new Dictionary<string,ObjectValue> ();
 		TreeStore store;
 		TreeViewState state;
@@ -129,7 +130,7 @@ namespace MonoDevelop.Debugger
 			store = new TreeStore (typeof(string), typeof(string), typeof(string), typeof(ObjectValue), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string), typeof(string), typeof(bool), typeof(string), typeof(Gdk.Pixbuf), typeof(bool));
 			Model = store;
 			RulesHint = true;
-			Selection.Mode = SelectionMode.Multiple;
+			Selection.Mode = Gtk.SelectionMode.Multiple;
 			ResetColumnSizes ();
 			
 			Pango.FontDescription newFont = this.Style.FontDescription.Copy ();
@@ -496,9 +497,10 @@ namespace MonoDevelop.Debugger
 			if (!store.IterParent (out parent, it))
 				parent = TreeIter.Zero;
 			
-			EvaluationOptions ops = frame.DebuggerSession.Options.EvaluationOptions;
+			EvaluationOptions ops = frame.DebuggerSession.Options.EvaluationOptions.Clone ();
 			ops.AllowMethodEvaluation = true;
 			ops.AllowTargetInvoke = true;
+			ops.EllipsizeStrings = false;
 			
 			string oldName = val.Name;
 			val.Refresh (ops);
@@ -526,7 +528,7 @@ namespace MonoDevelop.Debugger
 		void RegisterValue (ObjectValue val, TreeIter it)
 		{
 			if (val.IsEvaluating) {
-				nodes [val] = it;
+				nodes [val] = new TreeRowReference (store, store.GetPath (it));
 				val.ValueChanged += OnValueUpdated;
 			}
 		}
@@ -577,7 +579,14 @@ namespace MonoDevelop.Debugger
 
 		bool FindValue (ObjectValue val, out TreeIter it)
 		{
-			return nodes.TryGetValue (val, out it);
+			TreeRowReference row;
+			
+			if (!nodes.TryGetValue (val, out row)) {
+				it = TreeIter.Zero;
+				return false;
+			}
+			
+			return store.GetIter (out it, row.Path);
 		}
 		
 		public void ResetChangeTracking ()
@@ -746,23 +755,22 @@ namespace MonoDevelop.Debugger
 		{
 			if (!allowExpanding)
 				return true;
-			bool expanded = (bool) store.GetValue (iter, ExpandedCol);
-			if (!expanded) {
-				store.SetValue (iter, ExpandedCol, true);
-				TreeIter it;
-				store.IterChildren (out it, iter);
-				store.Remove (ref it);
-				ObjectValue val = (ObjectValue) store.GetValue (iter, ObjectCol);
-				foreach (ObjectValue cval in val.GetAllChildren ())
-					AppendValue (iter, null, cval);
-				return base.OnTestExpandRow (iter, path);
+			
+			if (GetRowExpanded (path))
+				return true;
+			
+			TreeIter parent;
+			if (store.IterParent (out parent, iter)) {
+				if (!GetRowExpanded (store.GetPath (parent)))
+					return true;
 			}
-			else
-				return false;
+			
+			return base.OnTestExpandRow (iter, path);
 		}
 		
 		protected override void OnRowCollapsed (TreeIter iter, TreePath path)
 		{
+			store.SetValue (iter, ExpandedCol, false);
 			base.OnRowCollapsed (iter, path);
 			if (compact)
 				ColumnsAutosize ();
@@ -770,7 +778,27 @@ namespace MonoDevelop.Debugger
 		
 		protected override void OnRowExpanded (TreeIter iter, TreePath path)
 		{
+			store.SetValue (iter, ExpandedCol, true);
+			TreeIter it;
+			
+			if (store.IterChildren (out it, iter)) {
+				ObjectValue val = (ObjectValue) store.GetValue (it, ObjectCol);
+				if (val == null) {
+					val = (ObjectValue) store.GetValue (iter, ObjectCol);
+					bool first = true;
+					
+					foreach (ObjectValue cval in val.GetAllChildren ()) {
+						SetValues (iter, it, null, cval);
+						RegisterValue (cval, it);
+						it = store.InsertNodeAfter (it);
+					}
+					
+					store.Remove (ref it);
+				}
+			}
+			
 			base.OnRowExpanded (iter, path);
+			
 			if (compact)
 				ColumnsAutosize ();
 		}
@@ -972,6 +1000,12 @@ namespace MonoDevelop.Debugger
 			TreeViewColumn col;
 			CellRenderer cr;
 			
+			//HACK: show context menu in release event instead of show event to work around gtk bug
+			if (evnt.TriggersContextMenu ()) {
+			//	ShowPopup (evnt);
+				return true;
+			}
+			
 			if (evnt.Button == 1 && GetCellAtPos ((int)evnt.X, (int)evnt.Y, out path, out col, out cr)) {
 				TreeIter it;
 				store.GetIter (out it, path);
@@ -1001,28 +1035,31 @@ namespace MonoDevelop.Debugger
 				}
 			}
 			
-			if (evnt.Button == 3)
-				ShowPopup ();
-			
 			return res;
 		}
 		
 		protected override bool OnButtonReleaseEvent (Gdk.EventButton evnt)
 		{
 			allowStoreColumnSizes = false;
-			return base.OnButtonReleaseEvent (evnt);
+			var res = base.OnButtonReleaseEvent (evnt);
+			
+			//HACK: show context menu in release event instead of show event to work around gtk bug
+			if (evnt.IsContextMenuButton ()) {
+				ShowPopup (evnt);
+				return true;
+			}
+			return res;
 		}
-		
 		
 		protected override bool OnPopupMenu ()
 		{
-			ShowPopup ();
+			ShowPopup (null);
 			return true;
 		}
 		
-		void ShowPopup ()
+		void ShowPopup (Gdk.EventButton evt)
 		{
-			IdeApp.CommandService.ShowContextMenu (menuSet, this);
+			IdeApp.CommandService.ShowContextMenu (this, evt, menuSet, this);
 		}
 		
 		[CommandHandler (EditCommands.Delete)]
@@ -1111,7 +1148,7 @@ namespace MonoDevelop.Debugger
 			TreePath[] sel = Selection.GetSelectedRows ();
 			if (store.GetIter (out it, sel[0])) {
 				ObjectValue val = (ObjectValue) store.GetValue (it, ObjectCol);
-				if (val.Name == DebuggingService.DebuggerSession.EvaluationOptions.CurrentExceptionTag)
+				if (val != null && val.Name == DebuggingService.DebuggerSession.EvaluationOptions.CurrentExceptionTag)
 					DebuggingService.ShowExceptionCaughtDialog ();
 			}
 		}

@@ -31,6 +31,7 @@
 using System;
 using Gtk;
 using Gdk;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Components.Docking
 {
@@ -53,11 +54,13 @@ namespace MonoDevelop.Components.Docking
 		Gtk.PositionType position;
 		bool disposed;
 		bool insideGrip;
+		DockItem item;
 		
 		const int gripSize = 8;
 		
 		public AutoHideBox (DockFrame frame, DockItem item, Gtk.PositionType pos, int size)
 		{
+			this.item = item;
 			this.position = pos;
 			this.frame = frame;
 			this.targetSize = size;
@@ -259,7 +262,7 @@ namespace MonoDevelop.Components.Docking
 		
 		void OnSizeButtonPress (object ob, Gtk.ButtonPressEventArgs args)
 		{
-			if (args.Event.Button == 1 && !animating) {
+			if (!animating && args.Event.Button == 1 && !args.Event.TriggersContextMenu ()) {
 				int n;
 				if (horiz) {
 					Toplevel.GetPointer (out resizePos, out n);
