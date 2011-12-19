@@ -39,6 +39,9 @@ namespace MonoDevelop.Core
 	[Serializable]
 	public struct FilePath: IComparable<FilePath>, IComparable, IEquatable<FilePath>
 	{
+		static readonly StringComparer PathComparer = (Platform.IsWindows || Platform.IsMac) ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+		static readonly StringComparison PathComparison = (Platform.IsWindows || Platform.IsMac) ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
 		string fileName;
 
 		public static readonly FilePath Null = new FilePath (null);
@@ -123,11 +126,10 @@ namespace MonoDevelop.Core
 
 		public bool IsChildPathOf (FilePath basePath)
 		{
-			StringComparison sc = Platform.IsWindows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 			if (basePath.fileName [basePath.fileName.Length - 1] != Path.DirectorySeparatorChar)
-				return fileName.StartsWith (basePath.fileName + Path.DirectorySeparatorChar, sc);
+				return fileName.StartsWith (basePath.fileName + Path.DirectorySeparatorChar, PathComparison);
 			else
-				return fileName.StartsWith (basePath.fileName, sc);
+				return fileName.StartsWith (basePath.fileName, PathComparison);
 		}
 
 		public FilePath ChangeExtension (string ext)
@@ -149,6 +151,41 @@ namespace MonoDevelop.Core
 			foreach (string p in paths)
 				path = Path.Combine (path, p);
 			return new FilePath (path);
+		}
+		
+		public void Delete ()
+		{
+			MakeWritable ();
+			if (Directory.Exists (this))
+				Directory.Delete (this, true);
+			else if (File.Exists (this))
+				File.Delete (this);
+		}
+		
+		public void MakeWritable ()
+		{
+			if (Directory.Exists (this)) {
+				try {
+					var info = new DirectoryInfo (this);
+					info.Attributes &= ~FileAttributes.ReadOnly;
+				} catch {
+					
+				}
+
+				foreach (var sub in Directory.GetFileSystemEntries (this)) {
+					((FilePath) sub).MakeWritable ();
+				}
+			} else if (File.Exists (this)) {
+				try {
+					// Try/catch is to work around a mono bug where dangling symlinks
+					// blow up when you call SetFileAttributes. Just ignore this case
+					// until mono 2.10.7/8 is released which fixes it.
+					var info = new FileInfo (this);
+					info.Attributes &= ~FileAttributes.ReadOnly;
+				} catch {
+				
+				}
+			}
 		}
 		
 		/// <summary>
@@ -202,10 +239,7 @@ namespace MonoDevelop.Core
 
 		public static bool operator == (FilePath name1, FilePath name2)
 		{
-			if (Platform.IsWindows)
-				return string.Equals (name1.fileName, name2.fileName, StringComparison.OrdinalIgnoreCase);
-			else
-				return string.Equals (name1.fileName, name2.fileName, StringComparison.Ordinal);
+			return PathComparer.Equals (name1.fileName, name2.fileName);
 		}
 
 		public static bool operator != (FilePath name1, FilePath name2)
@@ -226,10 +260,7 @@ namespace MonoDevelop.Core
 		{
 			if (fileName == null)
 				return 0;
-			if (Platform.IsWindows)
-				return fileName.ToLower ().GetHashCode ();
-			else
-				return fileName.GetHashCode ();
+			return PathComparer.GetHashCode (fileName);
 		}
 
 		public override string ToString ( )
@@ -239,7 +270,7 @@ namespace MonoDevelop.Core
 
 		public int CompareTo (FilePath filePath)
 		{
-			return string.Compare (fileName, filePath.fileName, Platform.IsWindows);
+			return PathComparer.Compare (fileName, filePath.fileName);
 		}
 
 		int IComparable.CompareTo (object obj)

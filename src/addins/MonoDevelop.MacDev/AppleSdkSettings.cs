@@ -107,6 +107,7 @@ namespace MonoDevelop.MacDev
 						DTXcode = ((NSString) value).ToString ();
 				}
 				IsXcode4 = !string.IsNullOrEmpty (DTXcode) && int.Parse (DTXcode) >= 0400;
+				IsXcode42 = !string.IsNullOrEmpty (DTXcode) && int.Parse (DTXcode) >= 0420;
 				IsValid = true;
 			} catch (Exception ex) {
 				LoggingService.LogError ("Error loading Xcode information for prefix '" + DeveloperRoot + "'", ex);
@@ -137,11 +138,12 @@ namespace MonoDevelop.MacDev
 		public static bool IsValid { get; private set; }
 		public static string DTXcode { get; private set; }
 		public static bool IsXcode4 { get; private set; }
+		public static bool IsXcode42 { get; private set; }
 		
 		public static event Action Changed;
 	}
 	
-	class AppleSdkAboutInformation : MonoDevelop.Ide.Gui.Dialogs.IAboutInformation
+	class AppleSdkAboutInformation : ISystemInformationProvider
 	{
 		public string Description {
 			get {

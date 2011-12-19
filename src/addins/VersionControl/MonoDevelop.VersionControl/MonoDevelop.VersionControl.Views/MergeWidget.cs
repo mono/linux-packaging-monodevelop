@@ -35,6 +35,7 @@ using MonoDevelop.Ide;
 using MonoDevelop.Components;
 using System.ComponentModel;
 using MonoDevelop.Core;
+using MonoDevelop.Ide.Gui;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -43,7 +44,7 @@ namespace MonoDevelop.VersionControl.Views
 	{
 		protected override TextEditor MainEditor {
 			get {
-				return editors[1];
+				return editors != null && editors.Length >= 2 ? editors[1] : null;
 			}
 		}
 
@@ -95,7 +96,8 @@ namespace MonoDevelop.VersionControl.Views
 		protected override void OnDestroyed ()
 		{
 			base.OnDestroyed ();
-			MainEditor.Document.TextReplaced -= UpdateConflictsOnTextReplace;
+			if (MainEditor != null && MainEditor.Document != null)
+				MainEditor.Document.TextReplaced -= UpdateConflictsOnTextReplace;
 		}
 		
 		public string GetResultText ()
@@ -105,7 +107,12 @@ namespace MonoDevelop.VersionControl.Views
 
 		protected override void CreateComponents ()
 		{
-			this.editors = new [] { new TextEditor (), new TextEditor (), new TextEditor () };
+			this.editors = new [] {
+				new TextEditor (new Mono.TextEditor.Document (), new CommonTextEditorOptions ()),
+				new TextEditor (new Mono.TextEditor.Document (), new CommonTextEditorOptions ()),
+				new TextEditor (new Mono.TextEditor.Document (), new CommonTextEditorOptions ()),
+			};
+			
 			this.editors[0].Document.ReadOnly = true;
 			this.editors[2].Document.ReadOnly = true;
 			
@@ -242,7 +249,7 @@ namespace MonoDevelop.VersionControl.Views
 		void UpdateConflictsOnTextReplace (object sender, ReplaceEventArgs e)
 		{
 			this.UpdateDiff ();
-			Document.UpdateSegments (GetAllConflictingSegments (), e);
+			Mono.TextEditor.Document.UpdateSegments (GetAllConflictingSegments (), e);
 		}
 	}
 }

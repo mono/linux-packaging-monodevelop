@@ -310,14 +310,20 @@ namespace Mono.TextEditor
 		{
 			if (document == null) 
 				return;
-			document.LineChanged -= HandleDocLineChanged;
+			
 			document.BeginUndo -= OnBeginUndo;
 			document.EndUndo -= OnEndUndo;
+			
 			document.Undone -= DocumentHandleUndone;
 			document.Redone -= DocumentHandleRedone;
+			document.LineChanged -= HandleDocLineChanged;
+			
 			document.TextSet -= HandleDocTextSet;
 			document.Folded -= HandleTextEditorDataDocumentFolded;
 			document.FoldTreeUpdated -= HandleTextEditorDataDocumentFoldTreeUpdated;
+			
+			document.splitter.LineInserted -= HandleDocumentsplitterhandleLineInserted;
+			document.splitter.LineRemoved -= HandleDocumentsplitterhandleLineRemoved;
 			
 			document = null;
 		}
@@ -382,14 +388,14 @@ namespace Mono.TextEditor
 			return this.Options.WordFindStrategy.FindCurrentWordStart (this.Document, offset);
 		}
 		
-		public delegate void PasteCallback (int insertionOffset, string text);
+		public delegate void PasteCallback (int insertionOffset, string text, int insertedChars);
 		
 		public event PasteCallback Paste;
 		
-		public void PasteText (int insertionOffset, string text)
+		public void PasteText (int insertionOffset, string text, int insertedChars)
 		{
 			if (Paste != null)
-				Paste (insertionOffset, text);
+				Paste (insertionOffset, text, insertedChars);
 		}
 		
 		#region undo/redo handling
@@ -1154,11 +1160,16 @@ namespace Mono.TextEditor
 		{
 			SetCaretTo (line, column, true);
 		}
-
+		
 		public void SetCaretTo (int line, int column, bool highlight)
 		{
+			SetCaretTo (line, column, highlight, true);
+		}
+		
+		public void SetCaretTo (int line, int column, bool highlight, bool centerCaret)
+		{
 			if (Parent != null) {
-				Parent.SetCaretTo (line, column, highlight);
+				Parent.SetCaretTo (line, column, highlight, centerCaret);
 			} else {
 				Caret.Location = new DocumentLocation (line, column);
 			}

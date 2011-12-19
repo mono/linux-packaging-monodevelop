@@ -363,6 +363,9 @@ namespace MonoDevelop.SourceEditor
 		{
 			if (!widget.EnsureCorrectEolMarker (fileName, encoding))
 				return;
+			if (widget.HasMessageBar)
+				return;
+			
 			if (!string.IsNullOrEmpty (ContentName))
 				AutoSave.RemoveAutoSaveFile (ContentName);
 
@@ -515,7 +518,7 @@ namespace MonoDevelop.SourceEditor
 			UpdateExecutionLocation ();
 			UpdateBreakpoints ();
 			UpdatePinnedWatches ();
-			this.IsDirty = false;
+			this.IsDirty = !didLoadCleanly;
 			UpdateTasks (null, null);
 			widget.TextEditor.VAdjustment.Changed += HandleTextEditorVAdjustmentChanged;
 			if (didLoadCleanly)
@@ -547,7 +550,7 @@ namespace MonoDevelop.SourceEditor
 		internal void LoadSettings ()
 		{
 			Settings settings;
-			if (string.IsNullOrEmpty (ContentName) || !settingStore.TryGetValue (ContentName, out settings))
+			if (widget == null || string.IsNullOrEmpty (ContentName) || !settingStore.TryGetValue (ContentName, out settings))
 				return;
 			
 			widget.TextEditor.Caret.Offset = settings.CaretOffset;
@@ -1044,7 +1047,7 @@ namespace MonoDevelop.SourceEditor
 		
 		void OnIconButtonPress (object s, MarginMouseEventArgs args)
 		{
-			if (args.Button == 3) {
+			if (args.TriggersContextMenu ()) {
 				TextEditor.Caret.Line = args.LineNumber;
 				TextEditor.Caret.Column = 1;
 				IdeApp.CommandService.ShowContextMenu (WorkbenchWindow.ExtensionContext, "/MonoDevelop/SourceEditor2/IconContextMenu/Editor");
@@ -1116,12 +1119,17 @@ namespace MonoDevelop.SourceEditor
 
 		public void SetCaretTo (int line, int column)
 		{
-			widget.TextEditor.SetCaretTo (line, column, true);
+			this.Document.RunWhenLoaded (() => widget.TextEditor.SetCaretTo (line, column, true));
 		}
 
 		public void SetCaretTo (int line, int column, bool highlight)
 		{
-			widget.TextEditor.SetCaretTo (line, column, highlight);
+			this.Document.RunWhenLoaded (() => widget.TextEditor.SetCaretTo (line, column, highlight));
+		}
+		
+		public void SetCaretTo (int line, int column, bool highlight, bool centerCaret)
+		{
+			this.Document.RunWhenLoaded (() => widget.TextEditor.SetCaretTo (line, column, highlight, centerCaret));
 		}
 
 		public void Redo()
@@ -1663,7 +1671,7 @@ namespace MonoDevelop.SourceEditor
 		
 		static SourceEditorView ()
 		{
-			CodeSegmentPreviewWindow.CodeSegmentPreviewInformString = GettextCatalog.GetString ("Press 'shift+space' for focus");
+			CodeSegmentPreviewWindow.CodeSegmentPreviewInformString = GettextCatalog.GetString ("Press 'F2' for focus");
 			ClipboardActions.CopyOperation.Copy += delegate (string text) {
 				if (String.IsNullOrEmpty (text))
 					return;
@@ -1920,15 +1928,19 @@ namespace MonoDevelop.SourceEditor
 		[CommandHandler (TextEditorCommands.MoveBlockUp)]
 		protected void OnMoveBlockUp ()
 		{
-			TextEditor.RunAction (MiscActions.MoveBlockUp);
-			CorrectIndenting ();
+			using (var undo = TextEditor.OpenUndoGroup ()) {
+				TextEditor.RunAction (MiscActions.MoveBlockUp);
+				CorrectIndenting ();
+			}
 		}
 		
 		[CommandHandler (TextEditorCommands.MoveBlockDown)]
 		protected void OnMoveBlockDown ()
 		{
-			TextEditor.RunAction (MiscActions.MoveBlockDown);
-			CorrectIndenting ();
+			using (var undo = TextEditor.OpenUndoGroup ()) {
+				TextEditor.RunAction (MiscActions.MoveBlockDown);
+				CorrectIndenting ();
+			}
 		}
 		
 		[CommandUpdateHandler (TextEditorCommands.ToggleBlockSelectionMode)]
@@ -2071,6 +2083,11 @@ namespace MonoDevelop.SourceEditor
 			Mono.TextEditor.MiscActions.RemoveIndentSelection (widget.TextEditor.GetTextEditorData ());
 		}
 		
+		[CommandHandler (EditCommands.InsertGuid)]
+		public void InsertGuid ()
+		{
+			TextEditor.InsertAtCaret (Guid.NewGuid ().ToString ());
+		}
 		#endregion
 	}
 } 
