@@ -56,13 +56,10 @@ namespace MonoDevelop.Refactoring
 				IType type = unresolvedMemberResolveResult.TargetResolveResult != null ? options.Dom.GetType (unresolvedMemberResolveResult.TargetResolveResult.ResolvedType) : null;
 				if (type != null) {
 					List<IType> allExtTypes = DomType.GetAccessibleExtensionTypes (options.Dom, null);
-					List<IMethod> extensionMethods = type.GetExtensionMethods (allExtTypes);
-					foreach (ExtensionMethod method in extensionMethods) {
-						if (method.Name == unresolvedMemberResolveResult.MemberName) {
-							string ns = method.OriginalMethod.DeclaringType.Namespace;
-							if (!namespaces.Contains (ns) && !options.Document.CompilationUnit.Usings.Any (u => u.Namespaces.Contains (ns)))
-								namespaces.Add (ns);
-						}
+					foreach (ExtensionMethod method in type.GetExtensionMethods (allExtTypes, unresolvedMemberResolveResult.MemberName)) {
+						string ns = method.OriginalMethod.DeclaringType.Namespace;
+						if (!namespaces.Contains (ns) && !options.Document.CompilationUnit.Usings.Any (u => u.Namespaces.Contains (ns)))
+							namespaces.Add (ns);
 					}
 				}
 				resolveDirect = false;
@@ -70,7 +67,14 @@ namespace MonoDevelop.Refactoring
 				namespaces = new List<string> (options.Dom.ResolvePossibleNamespaces (returnType));
 				resolveDirect = true;
 			}
-			
+			for (int i = 0; i < namespaces.Count; i++) {
+				for (int j = i + 1; j < namespaces.Count; j++) {
+					if (namespaces[j] == namespaces[i]) {
+						namespaces.RemoveAt (j);
+						j--;
+					}
+				}
+			}
 			return namespaces;
 		}
 		

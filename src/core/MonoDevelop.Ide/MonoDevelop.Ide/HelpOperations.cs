@@ -52,13 +52,13 @@ namespace MonoDevelop.Ide
 			if (topic == null || topic.Trim ().Length == 0)
 				return;
 			
-			if (PropertyService.IsMac) {
+			if (Platform.IsMac) {
 				var url = "monodoc://" + System.Web.HttpUtility.UrlEncode (topic);
 				string mdapp = new FilePath (typeof (HelpOperations).Assembly.Location)
 					.ParentDirectory
 					.Combine ("..", "..", "..", "MonoDoc.app").FullPath;
 				if (Directory.Exists (mdapp))
-					System.Diagnostics.Process.Start ("open", "-a \"" + mdapp + "\" " + url + " --args " + RootDirArg);
+					System.Diagnostics.Process.Start ("open", "-a \"" + mdapp + "\" " + url + " --args " + DirArgs);
 				else
 					System.Diagnostics.Process.Start ("open", url);
 				return;
@@ -73,7 +73,7 @@ namespace MonoDevelop.Ide
 		
 		public bool CanShowHelp (string topic)
 		{
-			return topic != null && !PropertyService.IsWindows;
+			return topic != null && !Platform.IsWindows;
 		}
 		
 		void CheckExternalMonodoc ()
@@ -107,13 +107,12 @@ namespace MonoDevelop.Ide
 					GettextCatalog.GetString ("You need a newer monodoc to use it externally from monodevelop. Using the integrated help viewer now."));
 		}
 		
-		string RootDirArg {
+		string DirArgs {
 			get {
-				//docrootdir only works on Mono 2.6, but 2.4 should just ignore it
-				string mdocroot = HelpService.GetMonoDocCacheRoot ();
-				if (mdocroot != null)
-					return " --docrootdir=\"" + mdocroot + "\" ";
-				return "";
+				var sb = new System.Text.StringBuilder ();
+				foreach (var dir in HelpService.Sources)
+					sb.AppendFormat (" --docdir=\"{0}\"", dir);
+				return sb.ToString ();
 			}
 		}
 
@@ -125,7 +124,7 @@ namespace MonoDevelop.Ide
 					errWriter = new StringWriter ();
 					
 					pw = Runtime.ProcessService.StartProcess (
-						"monodoc", "--remote-mode" + RootDirArg, "", outWriter, errWriter, 
+						"monodoc", "--remote-mode" + DirArgs, "", outWriter, errWriter, 
 						delegate { 
 							if (pw.ExitCode == 0)
 								return;

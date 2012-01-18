@@ -52,8 +52,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		List<string> subtypeGuids = new List<string> ();
 		const string Unspecified = null;
 		RemoteProjectBuilder projectBuilder;
-		TargetFramework lastBuildFx;
+		string lastBuildToolsVersion;
+		string lastBuildRuntime;
 		ITimeTracker timer;
+		bool useXBuild;
+		MSBuildVerbosity verbosity;
 		
 		struct ItemInfo {
 			public MSBuildItem Item;
@@ -100,6 +103,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				this.targetImports.AddRange (import.Split (':'));
 			
 			Runtime.SystemAssemblyService.DefaultRuntimeChanged += OnDefaultRuntimeChanged;
+			
+			//FIXME: Update these when the properties change
+			useXBuild = PropertyService.Get ("MonoDevelop.Ide.BuildWithMSBuild", false);
+			verbosity = PropertyService.Get ("MonoDevelop.Ide.MSBuildVerbosity", MSBuildVerbosity.Normal);
 		}
 		
 		void OnDefaultRuntimeChanged (object o, EventArgs args)
@@ -116,22 +123,23 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		{
 			SolutionEntityItem item = (SolutionEntityItem) Item;
 			TargetRuntime runtime = null;
-			TargetFramework fx;
+			string toolsVersion;
 			if (item is IAssemblyProject) {
 				runtime = ((IAssemblyProject) item).TargetRuntime;
-				fx = ((IAssemblyProject) item).TargetFramework;
+				toolsVersion = this.TargetFormat.ToolsVersion;
 			}
 			else {
 				runtime = Runtime.SystemAssemblyService.CurrentRuntime;
-				fx = Services.ProjectService.DefaultTargetFramework;
+				toolsVersion = MSBuildProjectService.DefaultToolsVersion;
 			}
-			if (projectBuilder == null || lastBuildFx != fx) {
+			if (projectBuilder == null || lastBuildToolsVersion != toolsVersion || lastBuildRuntime != runtime.Id) {
 				if (projectBuilder != null) {
 					projectBuilder.Dispose ();
 					projectBuilder = null;
 				}
-				projectBuilder = MSBuildProjectService.GetProjectBuilder (runtime, fx, item.FileName);
-				lastBuildFx = fx;
+				projectBuilder = MSBuildProjectService.GetProjectBuilder (runtime, toolsVersion, item.FileName);
+				lastBuildToolsVersion = toolsVersion;
+				lastBuildRuntime = runtime.Id;
 			}
 			return projectBuilder;
 		}
@@ -148,7 +156,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		
 		IEnumerable<string> IAssemblyReferenceHandler.GetAssemblyReferences (ConfigurationSelector configuration)
 		{
-			if (PropertyService.Get ("MonoDevelop.Ide.BuildWithMSBuild", false)) {
+			if (useXBuild) {
 				// Get the references list from the msbuild project
 				SolutionEntityItem item = (SolutionEntityItem) Item;
 				RemoteProjectBuilder builder = GetProjectBuilder ();
@@ -169,7 +177,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		
 		public override BuildResult RunTarget (IProgressMonitor monitor, string target, ConfigurationSelector configuration)
 		{
-			if (PropertyService.Get ("MonoDevelop.Ide.BuildWithMSBuild", false)) {
+			if (useXBuild) {
 				SolutionEntityItem item = Item as SolutionEntityItem;
 				if (item != null) {
 					
@@ -177,7 +185,15 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				
 					LogWriter logWriter = new LogWriter (monitor.Log);
 					RemoteProjectBuilder builder = GetProjectBuilder ();
-					MSBuildResult[] results = builder.RunTarget (target, configObject.Name, configObject.Platform, logWriter);
+					
+					//for some reason, MD internally handles "AnyCPU" as "", but we need to be explicit when
+					//passing it to the build engine
+					var platform = configObject.Platform;
+					if (platform.Length == 0)
+						platform = "AnyCPU";
+					
+					MSBuildResult[] results = builder.RunTarget (target, configObject.Name, configObject.Platform,
+						logWriter, verbosity);
 					System.Runtime.Remoting.RemotingServices.Disconnect (logWriter);
 					
 					BuildResult br = new BuildResult ();
@@ -219,7 +235,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			return FileService.AbsoluteToRelativePath (basePath, path);
 		}
 
-		public SolutionEntityItem Load (IProgressMonitor monitor, string fileName, string language, Type itemClass)
+		public SolutionEntityItem Load (IProgressMonitor monitor, string fileName, MSBuildFileFormat expectedFormat, string language, Type itemClass)
 		{
 			timer = Counters.ReadMSBuildProject.BeginTiming ();
 			
@@ -228,9 +244,26 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			fileContent = File.ReadAllText (fileName);
 			p.LoadXml (fileContent);
 			
+			//determine the file format
+			MSBuildFileFormat format = null;
+			if (expectedFormat != null) {
+				if (p.ToolsVersion != expectedFormat.ToolsVersion) {
+					monitor.ReportWarning (GettextCatalog.GetString ("Project '{0}' has different ToolsVersion than the containing solution.", Path.GetFileNameWithoutExtension (fileName)));
+				} else {
+					format = expectedFormat;
+				}
+			}
+			if (format == null) {
+				string toolsVersion = p.ToolsVersion;
+				if (string.IsNullOrEmpty (toolsVersion))
+					toolsVersion = "2.0";
+				format = MSBuildFileFormat.GetFormatForToolsVersion (toolsVersion);
+			}
+			this.SetTargetFormat (format);
+			
 			timer.Trace ("Read project guids");
 			
-			MSBuildPropertyGroup globalGroup = p.GetGlobalPropertyGroup ();
+			MSBuildPropertySet globalGroup = p.GetGlobalPropertyGroup ();
 			
 			// Avoid crash if there is not global group
 			if (globalGroup == null)
@@ -252,7 +285,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			try {
 				timer.Trace ("Create item instance");
 				ProjectExtensionUtil.BeginLoadOperation ();
-				Item = CreateSolutionItem (language, projectTypeGuids, itemType, itemClass);
+				Item = CreateSolutionItem (monitor, p, fileName, language, projectTypeGuids, itemType, itemClass);
 	
 				Item.SetItemHandler (this);
 				MSBuildProjectService.SetId (Item, itemGuid);
@@ -261,7 +294,9 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				
 				it.FileName = fileName;
 				it.Name = System.IO.Path.GetFileNameWithoutExtension (fileName);
-			
+				
+				RemoveDuplicateItems (p, fileName);
+				
 				Load (monitor, p);
 				return it;
 				
@@ -271,20 +306,45 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 		}
 		
-		SolutionItem CreateSolutionItem (string language, string typeGuids, string itemType, Type itemClass)
+		internal bool UseXbuild {
+			get { return useXBuild; }
+			set { useXBuild = value; }
+		}
+		
+		// All of the last 4 parameters are optional, but at least one must be provided.
+		SolutionItem CreateSolutionItem (IProgressMonitor monitor, MSBuildProject p, string fileName, string language, string typeGuids,
+			string itemType, Type itemClass)
 		{
-			// All the parameters are optional, but at least one must be provided.
-			
 			SolutionItem item = null;
 			
 			if (!string.IsNullOrEmpty (typeGuids)) {
 				DotNetProjectSubtypeNode st = MSBuildProjectService.GetDotNetProjectSubtype (typeGuids);
 				if (st != null) {
 					item = st.CreateInstance (language);
-					if (!string.IsNullOrEmpty (st.Import))
-						targetImports.AddRange (st.Import.Split (':'));
+					useXBuild = useXBuild || st.UseXBuild;
+					if (st.IsMigration) {
+						MigrateProject (monitor, st, p, fileName, language);
+						
+						var oldSt = st;
+						st = MSBuildProjectService.GetItemSubtypeNodes ()
+							.Where (t => t.CanHandleItem ((SolutionEntityItem)item)).Last ();
+						for (int i = 0; i < subtypeGuids.Count; i++) {
+							if (string.Equals (subtypeGuids[i], oldSt.Guid, StringComparison.OrdinalIgnoreCase)) {
+								subtypeGuids[i] = st.Guid;
+								oldSt = null;
+								break;
+							}
+						}
+						if (oldSt != null)
+							throw new Exception ("Unable to correct flavor GUID");
+						var gg = string.Join (";", subtypeGuids) + ";" + TypeGuid;
+						p.GetGlobalPropertyGroup ().SetPropertyValue ("ProjectTypeGuids", gg.ToUpper ());
+						fileContent = p.Save ();
+						MonoDevelop.Projects.Text.TextFile.WriteFile (fileName, fileContent, "UTF-8");
+					}
+					st.UpdateImports ((SolutionEntityItem)item, targetImports);
 				} else
-					throw new InvalidOperationException ("Unknown solution item type.");
+					throw new UnknownSolutionItemTypeException (typeGuids);
 			}
 			if (item == null && itemClass != null)
 				item = (SolutionItem) Activator.CreateInstance (itemClass);
@@ -294,22 +354,103 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			
 			if (item == null) {
 				if (string.IsNullOrEmpty (itemType))
-					throw new InvalidOperationException ("Unknown solution item type.");
+					throw new UnknownSolutionItemTypeException ();
 					
 				DataType dt = MSBuildProjectService.DataContext.GetConfigurationDataType (itemType);
 				if (dt == null)
-					throw new InvalidOperationException ("Unknown solution item type: " + itemType);
+					throw new UnknownSolutionItemTypeException (itemType);
 					
 				item = (SolutionItem) Activator.CreateInstance (dt.ValueType);
 			}
-			
-			// Basic initialization
-			
-			if (item is DotNetProject) {
-				DotNetProject p = (DotNetProject) item;
-				p.TargetFramework = Services.ProjectService.DefaultTargetFramework;
-			}
 			return item;
+		}
+
+		void MigrateProject (IProgressMonitor monitor, DotNetProjectSubtypeNode st, MSBuildProject p, string fileName, string language)
+		{
+			var projectLoadMonitor = monitor as IProjectLoadProgressMonitor;
+			if (projectLoadMonitor == null) {
+				LoggingService.LogError (Environment.StackTrace);
+				monitor.ReportError ("Could not open unmigrated project and no migrator was supplied", null);
+				throw new Exception ("Could not open unmigrated project and no migrator was supplied");
+			}
+			
+			var migrationType = projectLoadMonitor.ShouldMigrateProject ();
+			if (migrationType == MigrationType.Ignore) {
+				monitor.ReportError (string.Format ("MonoDevelop cannot open the project '{0}' unless it is migrated.", Path.GetFileName (fileName)), null);
+				throw new Exception ("The user choose not to migrate the project");
+			}
+			
+			var baseDir = (FilePath) Path.GetDirectoryName (fileName);
+			if (migrationType == MigrationType.BackupAndMigrate) {
+				var backupDirFirst = baseDir.Combine ("backup");
+				string backupDir = backupDirFirst;
+				int i = 0;
+				while (Directory.Exists (backupDir)) {
+					backupDir = backupDirFirst + "-" + i.ToString ();
+					if (i++ > 20) {
+						throw new Exception ("Too many backup directories");
+					}
+				}
+				Directory.CreateDirectory (backupDir);
+				foreach (var file in st.MigrationHandler.FilesToBackup (fileName))
+					File.Copy (file, Path.Combine (backupDir, Path.GetFileName (file)));
+			}
+			
+			if (!st.MigrationHandler.Migrate (projectLoadMonitor, p, fileName, language))
+				throw new Exception ("Could not migrate the project");
+		}
+		
+		FileFormat GetFileFormat ()
+		{
+			return new FileFormat (TargetFormat, TargetFormat.Id, TargetFormat.Name);
+		}
+		
+		void RemoveDuplicateItems (MSBuildProject msproject, string fileName)
+		{
+			timer.Trace ("Checking for duplicate items");
+			
+			var uniqueIncludes = new Dictionary<string,object> ();
+			var toRemove = new List<MSBuildItem> ();
+			foreach (MSBuildItem bi in msproject.GetAllItems ()) {
+				object existing;
+				string key = bi.Name + "<" + bi.Include;
+				if (!uniqueIncludes.TryGetValue (key, out existing)) {
+					uniqueIncludes[key] = bi;
+					continue;
+				}
+				var exBi = existing as MSBuildItem;
+				if (exBi != null) {
+					if (exBi.Condition != bi.Condition || exBi.Element.InnerXml != bi.Element.InnerXml) {
+						uniqueIncludes[key] = new List<MSBuildItem> { exBi, bi };
+					} else {
+						toRemove.Add (bi);
+					}
+					continue;
+				}
+				
+				var exList = (List<MSBuildItem>)existing;
+				bool found = false;
+				foreach (var m in (exList)) {
+					if (m.Condition == bi.Condition && m.Element.InnerXml == bi.Element.InnerXml) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					exList.Add (bi);
+				} else {
+					toRemove.Add (bi);
+				}
+			}
+			if (toRemove.Count == 0)
+				return;
+			
+			timer.Trace ("Removing duplicate items");
+			
+			foreach (var t in toRemove)
+				msproject.RemoveItem (t);
+			fileContent = msproject.Save ();
+			MonoDevelop.Projects.Text.TextFile.WriteFile (fileName, fileContent, "UTF-8");
 		}
 		
 		void Load (IProgressMonitor monitor, MSBuildProject msproject)
@@ -320,13 +461,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			ser.SerializationContext.BaseFile = EntityItem.FileName;
 			ser.SerializationContext.ProgressMonitor = monitor;
 			
-			MSBuildPropertyGroup globalGroup = msproject.GetGlobalPropertyGroup ();
+			MSBuildPropertySet globalGroup = msproject.GetGlobalPropertyGroup ();
 			
 			Item.SetItemHandler (this);
 			
 			DotNetProject dotNetProject = Item as DotNetProject;
-			
-			string frameworkVersion = null;
 			
 			// Read all items
 			
@@ -336,20 +475,25 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				ProjectItem it = ReadItem (ser, buildItem);
 				if (it != null) {
 					EntityItem.Items.Add (it);
-					int i = EntityItem.Items.IndexOf (it);
-					if (i != -1 && EntityItem.Items [i] != it && EntityItem.Items [i].Condition == it.Condition)
-						EntityItem.Items.RemoveAt (i); // Remove duplicates
 				}
 			}
 			
 			timer.Trace ("Read configurations");
 			
+			TargetFrameworkMoniker targetFx = null;
+			
 			if (dotNetProject != null) {
-				frameworkVersion = globalGroup.GetPropertyValue ("TargetFrameworkVersion");
-				if (frameworkVersion != null && frameworkVersion.StartsWith ("v"))
-					frameworkVersion = frameworkVersion.Substring (1);
-				if (!string.IsNullOrEmpty (frameworkVersion))
-					dotNetProject.TargetFramework = Runtime.SystemAssemblyService.GetTargetFramework (frameworkVersion);
+				string frameworkIdentifier = globalGroup.GetPropertyValue ("TargetFrameworkIdentifier");
+				string frameworkVersion = globalGroup.GetPropertyValue ("TargetFrameworkVersion");
+				string frameworkProfile = globalGroup.GetPropertyValue ("TargetFrameworkProfile");
+				
+				//determine the default target framework from the project type's default
+				//overridden by the components in the project
+				var def = dotNetProject.GetDefaultTargetFrameworkForFormat (GetFileFormat ());
+				targetFx = new TargetFrameworkMoniker (
+					string.IsNullOrEmpty (frameworkIdentifier)? def.Identifier : frameworkIdentifier,
+					string.IsNullOrEmpty (frameworkVersion)? def.Version : frameworkVersion,
+					string.IsNullOrEmpty (frameworkProfile)? def.Profile : frameworkProfile);
 				
 				if (dotNetProject.LanguageParameters != null) {
 					DataItem data = ReadPropertyGroupMetadata (ser, globalGroup, dotNetProject.LanguageParameters);
@@ -359,38 +503,42 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			
 			// Read configurations
 			
-			List<ConfigData> configData = GetConfigData (msproject);
-			List<ConfigData> readConfigData = new List<ConfigData> ();
+			List<ConfigData> configData = GetConfigData (msproject, false);
 			
 			MSBuildPropertyGroup mergedToProjectProperties = ExtractMergedtoprojectProperties (ser, globalGroup, EntityItem.CreateConfiguration ("Dummy"));
 			configData.Insert (0, new ConfigData (Unspecified, Unspecified, mergedToProjectProperties));
-			
+
+			// Create a project configuration for each configuration/platform combination
+
+			var platforms = new HashSet<string> ();
+			var configurations = new HashSet<string> ();
 			foreach (ConfigData cgrp in configData) {
-				readConfigData.Add (cgrp);
+				if (cgrp.Platform != Unspecified)
+					platforms.Add (cgrp.Platform);
+				if (cgrp.Config != Unspecified)
+					configurations.Add (cgrp.Config);
+			}
+			
+			if (platforms.Count == 0)
+				platforms.Add (string.Empty); // AnyCpu
 
-				string conf = cgrp.Config;
-				string platform = cgrp.Platform;
-
-				if (platform == Unspecified && conf != Unspecified && !ContainsSpecificPlatformConfiguration (configData, conf))
-					platform = string.Empty;
-
-				// It may be a partial configuration
-				if (conf == Unspecified || platform == Unspecified)
-					continue;
-				
-				MSBuildPropertyGroup grp = CreateMergedConfiguration (readConfigData, conf, platform);
-				SolutionItemConfiguration config = EntityItem.CreateConfiguration (conf);
-				
-				config.Platform = platform;
-				DataItem data = ReadPropertyGroupMetadata (ser, grp, config);
-				ser.Deserialize (config, data);
-				EntityItem.Configurations.Add (config);
-				
-				if (config is DotNetProjectConfiguration) {
-					DotNetProjectConfiguration dpc = (DotNetProjectConfiguration) config;
-					if (dpc.CompilationParameters != null) {
-						data = ReadPropertyGroupMetadata (ser, grp, dpc.CompilationParameters);
-						ser.Deserialize (dpc.CompilationParameters, data);
+			foreach (string platform in platforms) {
+				foreach (string conf in configurations) {
+					
+					MSBuildPropertySet grp = GetMergedConfiguration (configData, conf, platform, null);
+					SolutionItemConfiguration config = EntityItem.CreateConfiguration (conf);
+					
+					config.Platform = platform;
+					DataItem data = ReadPropertyGroupMetadata (ser, grp, config);
+					ser.Deserialize (config, data);
+					EntityItem.Configurations.Add (config);
+					
+					if (config is DotNetProjectConfiguration) {
+						DotNetProjectConfiguration dpc = (DotNetProjectConfiguration) config;
+						if (dpc.CompilationParameters != null) {
+							data = ReadPropertyGroupMetadata (ser, grp, dpc.CompilationParameters);
+							ser.Deserialize (dpc.CompilationParameters, data);
+						}
 					}
 				}
 			}
@@ -413,29 +561,42 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			
 			timer.Trace ("Final initializations");
 			
-			if (dotNetProject != null && string.IsNullOrEmpty (frameworkVersion)) {
+			//clean up the "InternalTargetFrameworkVersion" hack from MD 2.2, 2.4
+			if (dotNetProject != null) {
 				string fx = Item.ExtendedProperties ["InternalTargetFrameworkVersion"] as string;
-				if (fx != null) {
-					dotNetProject.TargetFramework = Runtime.SystemAssemblyService.GetTargetFramework (fx);
+				if (!string.IsNullOrEmpty (fx)) {
+					targetFx = TargetFrameworkMoniker.Parse (fx);
 					Item.ExtendedProperties.Remove ("InternalTargetFrameworkVersion");
-				} else {
-					// If no framework is specified, it means the format is VS2005, so the default framework is 2.0.
-					dotNetProject.TargetFramework = Runtime.SystemAssemblyService.GetTargetFramework ("2.0");
 				}
+				
+				dotNetProject.TargetFramework = Runtime.SystemAssemblyService.GetTargetFramework (targetFx);
 			}
 			
 			Item.NeedsReload = false;
 		}
 
-		MSBuildPropertyGroup ExtractMergedtoprojectProperties (MSBuildSerializer ser, MSBuildPropertyGroup pgroup, object ob)
+		MSBuildPropertyGroup ExtractMergedtoprojectProperties (MSBuildSerializer ser, MSBuildPropertySet pgroup, SolutionItemConfiguration ob)
 		{
 			XmlDocument doc = new XmlDocument ();
-			MSBuildPropertyGroup res = new MSBuildPropertyGroup (doc.CreateElement ("PropGroup"));
+			MSBuildPropertyGroup res = new MSBuildPropertyGroup (null, doc.CreateElement ("PropGroup"));
+
+			// When reading a project, all configuration properties specified in the global property group have to
+			// be merged with all project configurations, no matter if they have the MergeToProject attribute or not
 			
-			foreach (string propName in GetMergeToProjectProperties (ser, ob)) {
-				MSBuildProperty bp = pgroup.GetProperty (propName);
+			ClassDataType dt = (ClassDataType) ser.DataContext.GetConfigurationDataType (ob.GetType ());
+			foreach (ItemProperty prop in dt.GetProperties (ser.SerializationContext, ob)) {
+				MSBuildProperty bp = pgroup.GetProperty (prop.Name);
 				if (bp != null)
 					res.SetPropertyValue (bp.Name, bp.Value);
+			}
+			if (ob is DotNetProjectConfiguration) {
+				object cparams = ((DotNetProjectConfiguration)ob).CompilationParameters;
+				dt = (ClassDataType) ser.DataContext.GetConfigurationDataType (cparams.GetType ());
+				foreach (ItemProperty prop in dt.GetProperties (ser.SerializationContext, cparams)) {
+					MSBuildProperty bp = pgroup.GetProperty (prop.Name);
+					if (bp != null)
+						res.SetPropertyValue (bp.Name, bp.Value);
+				}
 			}
 			return res;
 		}
@@ -477,7 +638,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 							if (MSBuildProjectService.IsAbsoluteMSBuildPath (hintPath))
 								pref.ExtendedProperties ["_OriginalMSBuildReferenceIsAbsolute"] = true;
 						} else {
-							pref = new ProjectReference (ReferenceType.Gac, buildItem.Include);
+							pref = new ProjectReference (ReferenceType.Package, buildItem.Include);
 							pref.ExtendedProperties ["_OriginalMSBuildReferenceHintPath"] = hintPath;
 						}
 						pref.LocalCopy = !buildItem.GetMetadataIsFalse ("Private");
@@ -490,10 +651,20 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 							asm = "System.Xml";
 						else if (asm == "system")
 							asm = "System";
-						pref = new ProjectReference (ReferenceType.Gac, asm);
+						pref = new ProjectReference (ReferenceType.Package, asm);
+						pref.LocalCopy = !buildItem.GetMetadataIsFalse ("Private");
 					}
 					pref.Condition = buildItem.Condition;
-					pref.SpecificVersion = !buildItem.GetMetadataIsFalse ("SpecificVersion");
+					string specificVersion = buildItem.GetMetadata ("SpecificVersion");
+					if (string.IsNullOrWhiteSpace (specificVersion)) {
+						// If the SpecificVersion element isn't present, check if the Assembly Reference specifies a Version
+						pref.SpecificVersion = ReferenceStringHasVersion (buildItem.Include);
+					}
+					else {
+						bool value;
+						// if we can't parse the value, default to false which is more permissive
+						pref.SpecificVersion = bool.TryParse (specificVersion, out value) && value;
+					}
 					ReadBuildItemMetadata (ser, buildItem, pref, typeof(ProjectReference));
 					return pref;
 				}
@@ -524,6 +695,12 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			
 			return uitem;
 		}
+		
+		bool ReferenceStringHasVersion (string asmName)
+		{
+			int commaPos = asmName.IndexOf (',');
+			return commaPos >= 0 && asmName.IndexOf ("Version", commaPos) >= 0;
+		}
 
 		bool IsValidFile (string path)
 		{
@@ -546,21 +723,35 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				Group = grp;
 			}
 			
+			public bool FullySpecified {
+				get { return Config != Unspecified && Platform != Unspecified; }
+			}
+			
 			public string Config;
 			public string Platform;
 			public MSBuildPropertyGroup Group;
+			public bool Exists;
+			public bool IsNew; // The group did not exist in the original file
 		}
 
-		MSBuildPropertyGroup CreateMergedConfiguration (List<ConfigData> configData, string conf, string platform)
+		MSBuildPropertySet GetMergedConfiguration (List<ConfigData> configData, string conf, string platform, MSBuildPropertyGroup propGroupLimit)
 		{
-			MSBuildPropertyGroup merged = null;
+			MSBuildPropertySet merged = null;
 			
 			foreach (ConfigData grp in configData) {
-				if ((grp.Config == conf || grp.Config == Unspecified) && (grp.Platform == platform || grp.Platform == Unspecified)) {
+				if (grp.Group == propGroupLimit)
+					break;
+				if ((grp.Config == conf || grp.Config == Unspecified || conf == Unspecified) && (grp.Platform == platform || grp.Platform == Unspecified || platform == Unspecified)) {
 					if (merged == null)
 						merged = grp.Group;
-					else
-						merged = MSBuildPropertyGroup.Merge (merged, grp.Group);
+					else if (merged is MSBuildPropertyGroupMerged)
+						((MSBuildPropertyGroupMerged)merged).Add (grp.Group);
+					else {
+						MSBuildPropertyGroupMerged m = new MSBuildPropertyGroupMerged ();
+						m.Add ((MSBuildPropertyGroup)merged);
+						m.Add (grp.Group);
+						merged = m;
+					}
 				}
 			}
 			return merged;
@@ -599,7 +790,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 			// Global properties
 			
-			MSBuildPropertyGroup globalGroup = msproject.GetGlobalPropertyGroup ();
+			MSBuildPropertySet globalGroup = msproject.GetGlobalPropertyGroup ();
 			if (globalGroup == null) {
 				globalGroup = msproject.AddNewPropertyGroup (false);
 			}
@@ -647,23 +838,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			else
 				msproject.ToolsVersion = string.Empty;
 
-			
-			string targetFramework = null;
-			IList supportedFrameworks = TargetFormat.FrameworkVersions;
-			
-			if (dotNetProject != null) {
-
-				targetFramework = dotNetProject.TargetFramework.Id;
-
-				// If the file format does not support this framework version, store the highest version
-				// supported in the TargetFrameworkVersion property and the real one in the extended properties
-				if (!supportedFrameworks.Contains (targetFramework)) {
-					dotNetProject.ExtendedProperties ["InternalTargetFrameworkVersion"] = targetFramework;
-					targetFramework = FindClosestSupportedVersion (targetFramework);
-				} else
-					dotNetProject.ExtendedProperties.Remove ("InternalTargetFrameworkVersion");
-			}
-
 			// This serialize call will write data to ser.InternalItemProperties and ser.ExternalItemProperties
 			ser.Serialize (Item, Item.GetType ());
 			
@@ -708,25 +882,37 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			// Configurations
 
 			if (eitem.Configurations.Count > 0) {
-				List<ConfigData> configData = GetConfigData (msproject);
+				List<ConfigData> configData = GetConfigData (msproject, true);
+				
 				Dictionary<string,string> mergeToProjectProperties = new Dictionary<string,string> ();
-				List<string> mergeToProjectPropertyNames = new List<string> (GetMergeToProjectProperties (ser, eitem.Configurations [0]));
-				List<string> mergeToProjectPropertyNamesCopy = new List<string> (mergeToProjectPropertyNames);
+				HashSet<string> mergeToProjectPropertyNames = new HashSet<string> (GetMergeToProjectProperties ( ser, eitem.Configurations [0]));
+				HashSet<string> mergeToProjectPropertyNamesCopy = new HashSet<string> (mergeToProjectPropertyNames);
 				
 				foreach (SolutionItemConfiguration conf in eitem.Configurations) {
 					bool newConf = false;
-					MSBuildPropertyGroup propGroup = FindPropertyGroup (configData, conf);
-					if (propGroup == null) {
-						propGroup = msproject.AddNewPropertyGroup (false);
-						propGroup.Condition = BuildConfigCondition (conf.Name, conf.Platform);
-						ConfigData cd = new ConfigData (conf.Name, conf.Platform, propGroup);
-						configData.Add (cd);
+					ConfigData cdata = FindPropertyGroup (configData, conf);
+					if (cdata == null) {
+						MSBuildPropertyGroup pg = msproject.AddNewPropertyGroup (true);
+						pg.Condition = BuildConfigCondition (conf.Name, conf.Platform);
+						cdata = new ConfigData (conf.Name, conf.Platform, pg);
+						cdata.IsNew = true;
+						configData.Add (cdata);
 						newConf = true;
 					}
 					
-					DotNetProjectConfiguration netConfig = conf as DotNetProjectConfiguration;
+					MSBuildPropertyGroup propGroup = cdata.Group;
+					cdata.Exists = true;
 					
+					MSBuildPropertySet baseGroup = GetMergedConfiguration (configData, conf.Name, conf.Platform, propGroup);
+
+					// Force the serialization of properties defined in
+					// the base group, so that they can be later unmerged
+					if (baseGroup != null)
+						ForceDefaultValueSerialization (ser, baseGroup, conf);
 					DataItem ditem = (DataItem) ser.Serialize (conf);
+					ser.SerializationContext.ResetDefaultValueSerialization ();
+					
+					DotNetProjectConfiguration netConfig = conf as DotNetProjectConfiguration;
 					
 					if (netConfig != null && netConfig.CompilationParameters != null) {
 						// Remove all compilation parameters properties from the data item, since we are going to write them again.
@@ -736,7 +922,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 							if (n != null)
 								ditem.ItemData.Remove (n);
 						}
+						if (baseGroup != null)
+							ForceDefaultValueSerialization (ser, baseGroup, netConfig.CompilationParameters);
 						DataItem ditemComp = (DataItem) ser.Serialize (netConfig.CompilationParameters);
+						ser.SerializationContext.ResetDefaultValueSerialization ();
 						ditem.ItemData.AddRange (ditemComp.ItemData);
 					}
 	
@@ -745,9 +934,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					
 					WritePropertyGroupMetadata (propGroup, ditem.ItemData, ser, conf, netConfig != null ? netConfig.CompilationParameters : null);
 					
-					UnmergeBaseConfiguration (configData, propGroup, conf.Name, conf.Platform);
-					
 					CollectMergetoprojectProperties (propGroup, mergeToProjectPropertyNames, mergeToProjectProperties);
+					
+					if (baseGroup != null)
+						propGroup.UnMerge (baseGroup, mergeToProjectPropertyNamesCopy);
 				}
 				
 				// Move properties with common values from configurations to the main
@@ -759,9 +949,16 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						globalGroup.RemoveProperty (prop);
 				}
 				foreach (SolutionItemConfiguration conf in eitem.Configurations) {
-					MSBuildPropertyGroup propGroup = FindPropertyGroup (configData, conf);
+					MSBuildPropertyGroup propGroup = FindPropertyGroup (configData, conf).Group;
 					foreach (string mp in mergeToProjectProperties.Keys)
 						propGroup.RemoveProperty (mp);
+				}
+				
+				// Remove groups corresponding to configurations that have been removed
+				// or groups which don't have any property and did not already exist
+				foreach (ConfigData cd in configData) {
+					if ((!cd.Exists && cd.FullySpecified) || (cd.IsNew && !cd.Group.Properties.Any ()))
+						msproject.RemoveGroup (cd.Group);
 				}
 			}
 			
@@ -780,20 +977,40 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 		
 			if (dotNetProject != null) {
+				var moniker = dotNetProject.TargetFramework.Id;
+				bool supportsMultipleFrameworks = TargetFormat.FrameworkVersions.Length > 0;
+				var def = dotNetProject.GetDefaultTargetFrameworkForFormat (GetFileFormat ());
+				bool isDefaultIdentifier = def.Identifier == moniker.Identifier;
+				bool isDefaultVersion = isDefaultIdentifier && def.Version == moniker.Version;
+				bool isDefaultProfile = isDefaultVersion && def.Profile == moniker.Profile;
 
-				// If the format only supports one fx version, there is no need to store it
-				if (supportedFrameworks.Count > 1)
-					SetGroupProperty (globalGroup, "TargetFrameworkVersion", "v" + targetFramework, false);
+				// If the format only supports one fx version, or the version is the default, there is no need to store it
+				if (!isDefaultVersion && supportsMultipleFrameworks)
+					SetGroupProperty (globalGroup, "TargetFrameworkVersion", "v" + moniker.Version, false);
 				else
 					globalGroup.RemoveProperty ("TargetFrameworkVersion");
 				
+				if (TargetFormat.SupportsMonikers) {
+					if (!isDefaultIdentifier && def.Identifier != moniker.Identifier)
+						SetGroupProperty (globalGroup, "TargetFrameworkIdentifier", moniker.Identifier, false);
+					else
+						globalGroup.RemoveProperty ("TargetFrameworkIdentifier");
+					
+					if (!isDefaultProfile && def.Profile != moniker.Profile)
+						SetGroupProperty (globalGroup, "TargetFrameworkProfile", moniker.Profile, false);
+					else
+						globalGroup.RemoveProperty ("TargetFrameworkProfile");
+				}
 			}
 
 			// Impdate the imports section
 			
 			List<string> currentImports = msproject.Imports;
 			List<string> imports = new List<string> (currentImports);
-			UpdateImports (imports);
+			
+			// If the project is not new, don't add the default project imports,
+			// just assume that the current imports are correct
+			UpdateImports (imports, newProject);
 			foreach (string imp in imports) {
 				if (!currentImports.Contains (imp)) {
 					msproject.AddNewImport (imp, null);
@@ -814,10 +1031,28 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			} else
 				msproject.RemoveProjectExtensions ("MonoDevelop");
 			
-			msproject.Save (eitem.FileName);
+			string txt = msproject.Save ();
+			
+			// Don't save the file to disk if the content did not change
+			if (txt != fileContent) {
+				MonoDevelop.Projects.Text.TextFile.WriteFile (eitem.FileName, txt, "UTF-8");
+				fileContent = txt;
+				
+				if (projectBuilder != null)
+					projectBuilder.Refresh ();
+			}
+		}
+		
+		void ForceDefaultValueSerialization (MSBuildSerializer ser, MSBuildPropertySet baseGroup, object ob)
+		{
+			ClassDataType dt = (ClassDataType) ser.DataContext.GetConfigurationDataType (ob.GetType());
+			foreach (ItemProperty prop in dt.GetProperties (ser.SerializationContext, ob)) {
+				if (baseGroup.GetProperty (prop.Name) != null)
+					ser.SerializationContext.ForceDefaultValueSerialization (prop);
+			}
 		}
 
-		void CollectMergetoprojectProperties (MSBuildPropertyGroup pgroup, List<String> propertyNames, Dictionary<string,string> mergeToProjectProperties)
+		void CollectMergetoprojectProperties (MSBuildPropertyGroup pgroup, HashSet<string> propertyNames, Dictionary<string,string> mergeToProjectProperties)
 		{
 			// This method checks every property in pgroup which has the MergeToProject flag.
 			// If the value of this property is the same as the one stored in mergeToProjectProperties
@@ -835,7 +1070,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					}
 					// If there is no value, it can't be merged
 				}
-				else if (prop != null && prop.Value == mvalue)
+				else if (prop != null && prop.Value.Equals (mvalue, StringComparison.CurrentCultureIgnoreCase))
 					// Same value. It can be merged.
 					continue;
 
@@ -942,7 +1177,12 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				else {
 					if (File.Exists (pref.Reference)) {
 						try {
-							asm = AssemblyName.GetAssemblyName (pref.Reference).FullName;
+							var aname = AssemblyName.GetAssemblyName (pref.Reference);
+							if (pref.SpecificVersion) {
+								asm = aname.FullName;
+							} else {
+								asm = aname.Name;
+							}
 						} catch (Exception ex) {
 							string msg = string.Format ("Could not get full name for assembly '{0}'.", pref.Reference);
 							monitor.ReportWarning (msg);
@@ -958,17 +1198,21 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					asm = Path.GetFileNameWithoutExtension (pref.Reference);
 				
 				buildItem = AddOrGetBuildItem (msproject, oldItems, "Reference", asm);
-				if (!pref.SpecificVersion)
+				
+				if (!pref.SpecificVersion && ReferenceStringHasVersion (asm)) {
 					buildItem.SetMetadata ("SpecificVersion", "False");
-				else
+				} else {
 					buildItem.UnsetMetadata ("SpecificVersion");
+				}
+				
 				buildItem.SetMetadata ("HintPath", hintPath);
-				if (!pref.LocalCopy)
+				
+				if (!pref.LocalCopy && pref.CanSetLocalCopy)
 					buildItem.SetMetadata ("Private", "False");
 				else
 					buildItem.UnsetMetadata ("Private");
 			}
-			else if (pref.ReferenceType == ReferenceType.Gac) {
+			else if (pref.ReferenceType == ReferenceType.Package) {
 				string include = pref.StoredReference;
 				SystemPackage pkg = pref.Package;
 				if (pkg != null && pkg.IsFrameworkPackage) {
@@ -977,21 +1221,35 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						include = include.Substring (0, i).Trim ();
 				}
 				buildItem = AddOrGetBuildItem (msproject, oldItems, "Reference", include);
-				if (!pref.SpecificVersion)
+				if (!pref.SpecificVersion && ReferenceStringHasVersion (include))
 					buildItem.SetMetadata ("SpecificVersion", "False");
 				else
 					buildItem.UnsetMetadata ("SpecificVersion");
+				
+				//RequiredTargetFramework is undocumented, maybe only a hint for VS. Only seems to be used for .NETFramework
+				var dnp = pref.OwnerProject as DotNetProject;
 				IList supportedFrameworks = TargetFormat.FrameworkVersions;
-				if (pkg != null && pkg.IsFrameworkPackage && supportedFrameworks.Contains (pkg.TargetFramework) && pkg.TargetFramework != "2.0" && supportedFrameworks.Count > 1) {
+				if (dnp != null && pkg != null
+					&& dnp.TargetFramework.Id.Identifier == TargetFrameworkMoniker.ID_NET_FRAMEWORK
+					&& pkg.IsFrameworkPackage && supportedFrameworks.Contains (pkg.TargetFramework)
+					&& pkg.TargetFramework.Version != "2.0" && supportedFrameworks.Count > 1)
+				{
 					TargetFramework fx = Runtime.SystemAssemblyService.GetTargetFramework (pkg.TargetFramework);
-					buildItem.SetMetadata ("RequiredTargetFramework", fx.Id);
-				} else
+					buildItem.SetMetadata ("RequiredTargetFramework", fx.Id.Version);
+				} else {
 					buildItem.UnsetMetadata ("RequiredTargetFramework");
+				}
+				
 				string hintPath = (string) pref.ExtendedProperties ["_OriginalMSBuildReferenceHintPath"];
 				if (hintPath != null)
 					buildItem.SetMetadata ("HintPath", hintPath);
 				else
 					buildItem.UnsetMetadata ("HintPath");
+				
+				if (!pref.LocalCopy && pref.CanSetLocalCopy)
+					buildItem.SetMetadata ("Private", "False");
+				else
+					buildItem.UnsetMetadata ("Private");
 			}
 			else if (pref.ReferenceType == ReferenceType.Project) {
 				Project refProj = Item.ParentSolution.FindProjectByName (pref.Reference);
@@ -1021,9 +1279,9 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			buildItem.Condition = pref.Condition;
 		}
 		
-		void UpdateImports (List<string> imports)
+		void UpdateImports (List<string> imports, bool addItemTypeImports)
 		{
-			if (targetImports != null) {
+			if (targetImports != null && addItemTypeImports) {
 				foreach (string imp in targetImports)
 					if (!imports.Contains (imp))
 						imports.Add (imp);
@@ -1033,24 +1291,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 		}
 
-		void UnmergeBaseConfiguration (List<ConfigData> configData, MSBuildPropertyGroup propGroup, string conf, string platform)
-		{
-			MSBuildPropertyGroup baseGroup = null;
-			
-			foreach (ConfigData data in configData) {
-				if (data.Group == propGroup)
-					break;
-				if ((data.Config == conf || data.Config == Unspecified) && (data.Platform == platform || data.Platform == Unspecified)) {
-					if (baseGroup == null)
-						baseGroup = data.Group;
-					else
-						baseGroup = MSBuildPropertyGroup.Merge (baseGroup, data.Group);
-				}
-			}
-			if (baseGroup != null)
-				propGroup.UnMerge (baseGroup);
-		}
-		
 		void ReadBuildItemMetadata (DataSerializer ser, MSBuildItem buildItem, object dataItem, Type extendedType)
 		{
 			DataItem ditem = new DataItem ();
@@ -1099,11 +1339,12 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					oldItems [key] = itemInfo;
 				}
 				return itemInfo.Item;
-			} else
+			} else {
 				return msproject.AddNewItem (name, include);
+			}
 		}
 		
-		DataItem ReadPropertyGroupMetadata (DataSerializer ser, MSBuildPropertyGroup propGroup, object dataItem)
+		DataItem ReadPropertyGroupMetadata (DataSerializer ser, MSBuildPropertySet propGroup, object dataItem)
 		{
 			DataItem ditem = new DataItem ();
 
@@ -1116,7 +1357,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					}
 				}
 				if (node == null)
-					node = new DataValue (bprop.Name, bprop.Value);
+					node = new DataValue (bprop.Name, Projects.Dom.Output.AmbienceService.UnescapeText (bprop.Value));
 				
 				ConvertFromMsbuildFormat (node);
 				ditem.ItemData.Add (node);
@@ -1125,7 +1366,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			return ditem;
 		}
 		
-		void WritePropertyGroupMetadata (MSBuildPropertyGroup propGroup, DataCollection itemData, MSBuildSerializer ser, params object[] itemsToReplace)
+		void WritePropertyGroupMetadata (MSBuildPropertySet propGroup, DataCollection itemData, MSBuildSerializer ser, params object[] itemsToReplace)
 		{
 			var notWrittenProps = new HashSet<string> ();
 			
@@ -1172,28 +1413,28 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 		}
 
-		List<ConfigData> GetConfigData (MSBuildProject msproject)
+		List<ConfigData> GetConfigData (MSBuildProject msproject, bool includeGlobalGroups)
 		{
 			List<ConfigData> configData = new List<ConfigData> ();
 			foreach (MSBuildPropertyGroup cgrp in msproject.PropertyGroups) {
 				string conf, platform;
-				if (ParseConfigCondition (cgrp.Condition, out conf, out platform))
+				if (ParseConfigCondition (cgrp.Condition, out conf, out platform) || includeGlobalGroups)
 					configData.Add (new ConfigData (conf, platform, cgrp));
 			}
 			return configData;
 		}
 		
-		MSBuildProperty SetGroupProperty (MSBuildPropertyGroup propGroup, string name, string value, bool isLiteral)
+		MSBuildProperty SetGroupProperty (MSBuildPropertySet propGroup, string name, string value, bool isLiteral)
 		{
 			propGroup.SetPropertyValue (name, value);
 			return propGroup.GetProperty (name);
 		}
 		
-		MSBuildPropertyGroup FindPropertyGroup (List<ConfigData> configData, SolutionItemConfiguration config)
+		ConfigData FindPropertyGroup (List<ConfigData> configData, SolutionItemConfiguration config)
 		{
 			foreach (ConfigData data in configData) {
 				if (data.Config == config.Name && data.Platform == config.Platform)
-					return data.Group;
+					return data;
 			}
 			return null;
 		}
@@ -1261,7 +1502,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 		bool ParseConfigCondition (string cond, out string config, out string platform)
 		{
-			config = platform = null;
+			config = platform = Unspecified;
 			int i = cond.IndexOf ("==");
 			if (i == -1)
 				return false;
@@ -1309,25 +1550,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 			return false;
 		}
-
-		string FindClosestSupportedVersion (string version)
-		{
-			TargetFramework sfx = Runtime.SystemAssemblyService.GetTargetFramework (version);
-			if (!string.IsNullOrEmpty (sfx.SubsetOfFramework) && ((IList)TargetFormat.FrameworkVersions).Contains (sfx.SubsetOfFramework))
-				return sfx.SubsetOfFramework;
-			
-			foreach (string supv in TargetFormat.FrameworkVersions) {
-				TargetFramework fx = Runtime.SystemAssemblyService.GetTargetFramework (supv);
-				if (fx.IsCompatibleWithFramework (version))
-					return fx.Id;
-			}
-			return TargetFormat.FrameworkVersions [TargetFormat.FrameworkVersions.Length - 1];
-		}
 		
 		string GetXmlString (DataNode node)
 		{
 			if (node is DataValue)
-				return ((DataValue)node).Value;
+				return Projects.Dom.Output.AmbienceService.EscapeText (((DataValue)node).Value);
 			else {
 				StringWriter sw = new StringWriter ();
 				XmlTextWriter xw = new XmlTextWriter (sw);
@@ -1369,7 +1596,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			new ItemMember (typeof(SolutionEntityItem), "ProjectTypeGuids"),
 			new ItemMember (typeof(DotNetProjectConfiguration), "DebugType"),
 			new ItemMember (typeof(DotNetProjectConfiguration), "ErrorReport"),
-			new ItemMember (typeof(DotNetProjectConfiguration), "TargetFrameworkVersion"),
+			new ItemMember (typeof(DotNetProjectConfiguration), "TargetFrameworkVersion", new object[] { new MergeToProjectAttribute () }),
 			new ItemMember (typeof(ProjectReference), "RequiredTargetFramework"),
 			new ItemMember (typeof(Project), "InternalTargetFrameworkVersion", true),
 		};
@@ -1436,6 +1663,22 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 			return data;
 		}
+	}
+	
+	class UnknownSolutionItemTypeException : InvalidOperationException
+	{
+		public UnknownSolutionItemTypeException ()
+			: base ("Unknown solution item type")
+		{
+		}
+		
+		public UnknownSolutionItemTypeException (string name)
+			: base ("Unknown solution item type: " + name)
+		{
+			this.TypeName = name;
+		}
+		
+		public string TypeName { get; private set; }
 	}
 	
 	class MSBuildElementOrder: Dictionary<string, int>

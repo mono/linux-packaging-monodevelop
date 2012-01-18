@@ -38,6 +38,7 @@ using MonoDevelop.Ide.Commands;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui.Components;
+using System.Linq;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
@@ -105,12 +106,16 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		
 		void OnFolderRemoved (object sender, FileEventArgs e)
 		{
-			ITreeBuilder tb = Context.GetTreeBuilder (sender);
-			if (tb != null) {
-				if (!tb.HasChildren())
-					tb.Remove ();
-				else
-					tb.UpdateAll ();
+			var tb = Context.GetTreeBuilder (sender);
+			if (tb == null)
+				return;
+			if (!tb.HasChildren ()) {
+				tb.Remove ();
+			} else {
+				//this may have been removed but HasChildren could still be false, not sure why
+				//but fully updating the parent's children works
+				tb.MoveToParent ();
+				tb.UpdateChildren ();
 			}
 		}
 	
@@ -121,12 +126,6 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			ProjectFolder folder = (ProjectFolder) dataObject;
 
 			label = folder.Name;
-			
-			//show directory in red if doesn't exist and doesn't have virtual linked children
-			if (!Directory.Exists (folder.Path) && !treeBuilder.HasChildren ()) {
-				label = "<span foreground='red'>" + label + "</span>";
-			}
-
 			icon = folderOpenIcon;
 			closedIcon = folderClosedIcon;
 		}
@@ -172,64 +171,83 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		
 		public override void DeleteMultipleItems ()
 		{
-			Set<SolutionEntityItem> projects = new Set<SolutionEntityItem> ();
+			var projects = new Set<SolutionEntityItem> ();
+			var folders = new List<ProjectFolder> ();
+			foreach (ITreeNavigator node in CurrentNodes)
+				folders.Add ((ProjectFolder) node.DataItem);
 			
-			ConfirmationMessage confirmMsg = new ConfirmationMessage ();
-			confirmMsg.ConfirmButton = AlertButton.Delete;
-			confirmMsg.AllowApplyToAll = CurrentNodes.Length > 1;
+			var removeButton = new AlertButton (GettextCatalog.GetString ("_Remove from Project"), Gtk.Stock.Remove);
+			var question = new QuestionMessage () {
+				AllowApplyToAll = folders.Count > 1,
+				SecondaryText = GettextCatalog.GetString (
+				"The Delete option permanently removes the directory and any files it contains from your hard disk. " +
+				"Click Remove from Project if you only want to remove it from your current solution.")
+			};
+			question.Buttons.Add (AlertButton.Cancel);
+			question.Buttons.Add (AlertButton.Delete);
+			question.Buttons.Add (removeButton);
 			
-			foreach (ITreeNavigator node in CurrentNodes) {
-				ProjectFolder folder = (ProjectFolder) node.DataItem as ProjectFolder;
-				Project project = folder.Project;
-				ProjectFile[] files = project != null ? project.Files.GetFilesInPath (folder.Path) : null;
+			foreach (var folder in folders) {
+				var project = folder.Project;
 				
-				if (files != null && files.Length == 0) {
-					confirmMsg.Text = GettextCatalog.GetString ("Are you sure you want to permanently delete the folder {0}?", folder.Path);
-					bool yes = MessageService.Confirm (confirmMsg);
-					if (!yes) 
-						return;
-	
-					bool removeFiles = false;
+				var folderRelativePath = folder.Path.ToRelative (project.BaseDirectory);
+				var files = project.Files.GetFilesInVirtualPath (folderRelativePath).ToList ();
+				var folderPf = project.Files.GetFileWithVirtualPath (folderRelativePath);
+				
+				//if the parent directory has already been removed, there may be nothing to do
+				if (files.Count == 0 && folderPf == null)
+					continue;
+				
+				question.Text = GettextCatalog.GetString ("Are you sure you want to remove directory {0} from project {1}?",
+					folder.Name, project.Name);
+				var result = MessageService.AskQuestion (question);
+				if (result != removeButton && result != AlertButton.Delete) 
+					break;
+				
+				projects.Add (project);
+				
+				//remove the files and link files in the directory
+				foreach (var f in files)
+					project.Files.Remove (f);
+				
+				// also remove the folder's own ProjectFile, if it exists 
+				// FIXME: it probably was already in the files list
+				if (folderPf != null)
+					project.Files.Remove (folderPf);
+				
+				if (result == AlertButton.Delete) {
 					try {
 						if (Directory.Exists (folder.Path))
-							// Indirect events will remove the files from the project
+							// FileService events should remove remaining files from the project
 							FileService.DeleteDirectory (folder.Path);
-						else
-							removeFiles = true;
 					} catch (Exception ex) {
-						MessageService.ShowError (GettextCatalog.GetString ("The folder {0} could not be deleted from disk: {1}", folder.Path, ex.Message));
-						removeFiles = true;
+						MessageService.ShowError (GettextCatalog.GetString (
+							"The folder {0} could not be deleted from disk: {1}", folder.Path, ex.Message));
 					}
-					if (removeFiles && project != null) {
-						List<ProjectFile> list = new List<ProjectFile>();
-						list.AddRange (project.Files.GetFilesInVirtualPath (folder.Path.ToRelative (project.BaseDirectory)));
-						ProjectFile pf = project.Files.GetFileWithVirtualPath (folder.Path.ToRelative (project.BaseDirectory));
-						if (pf != null) list.Add (pf);
-						foreach (var f in list)
-							project.Files.Remove (f);
-					}
+				} else {
+					//explictly remove the node from the tree, since it currently only tracks real folder deletions
+					folder.Remove ();
 				}
-				else {
-					bool yes = MessageService.Confirm (GettextCatalog.GetString ("Do you really want to remove folder {0}?", folder.Name), AlertButton.Remove);
-					if (!yes) return;
-					
-					ProjectFile[] inParentFolder = project.Files.GetFilesInPath (Path.GetDirectoryName (folder.Path));
-					
-					if (inParentFolder.Length == files.Length) {
-						// This is the last folder in the parent folder. Make sure we keep
-						// a reference to the folder, so it is not deleted from the tree.
-						ProjectFile folderFile = new ProjectFile (Path.GetDirectoryName (folder.Path));
-						folderFile.Subtype = Subtype.Directory;
-						project.Files.Add (folderFile);
+				
+				if (folder.Path.ParentDirectory != project.BaseDirectory) {
+					// If it's the last item in the parent folder, make sure we keep a reference to the parent 
+					// folder, so it is not deleted from the tree.
+					var inParentFolder = project.Files.GetFilesInVirtualPath (folderRelativePath.ParentDirectory);
+					if (!inParentFolder.Skip (1).Any ()) {
+						project.Files.Add (new ProjectFile (folder.Path.ParentDirectory) {
+							Subtype = Subtype.Directory,
+						});
 					}
-					
-					foreach (ProjectFile file in files)
-						project.Files.Remove (file);
-					
-					projects.Add (project);
 				}
 			}
 			IdeApp.ProjectOperations.Save (projects);
+		}
+		
+		[CommandUpdateHandler (EditCommands.Delete)]
+		public void UpdateRemoveItem (CommandInfo info)
+		{
+			info.Enabled = CanDeleteMultipleItems ();
+			info.Text = GettextCatalog.GetString ("Remove");
 		}
 
 		[CommandHandler (ProjectCommands.IncludeToProject)]

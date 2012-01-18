@@ -42,9 +42,17 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		{
 			AddFile (file);
 			this.file = file;
-			
-			string requiredRefUri = "Assembly:" + Runtime.SystemAssemblyService.DefaultRuntime.Id + ":";
-			requiredRefUri += Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblyForVersion (typeof(object).Assembly.FullName, null, Services.ProjectService.DefaultTargetFramework).Location;
+			string mscorLibFullName = Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblyFullName ("mscorlib", Services.ProjectService.DefaultTargetFramework);
+			if (mscorLibFullName == null) {
+				LoggingService.LogError ("Can't find mscorlib for runtime:" + Services.ProjectService.DefaultTargetFramework);
+				return;
+			}
+			var assembly = Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblyForVersion (mscorLibFullName, null, Services.ProjectService.DefaultTargetFramework);
+			if (assembly == null) {
+				LoggingService.LogError ("Can't find runtime directory for :" + Services.ProjectService.DefaultTargetFramework);
+				return;
+			}
+			string requiredRefUri = "Assembly:" + Runtime.SystemAssemblyService.DefaultRuntime.Id + ":" + assembly.Location;
 			AddReference (requiredRefUri);
 		}
 		
@@ -54,11 +62,14 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				return new TypeUpdateInformation ();
 			// TODO dom Get tag comments
 //			UpdateTagComments (cu.TagComments, file);
-			List<IType> resolved;
-			ProjectDomService.ResolveTypes (SourceProjectDom, cu, cu.Types, out resolved);
-			TypeUpdateInformation res = UpdateTypeInformation (resolved, file);
-			Flush ();
-			return res;
+			lock (rwlock) {
+				List<IType> resolved;
+				List<IAttribute> resolvedAtts;
+				ProjectDomService.ResolveTypes (SourceProjectDom, cu, cu.Types, cu.Attributes, out resolved, out resolvedAtts);
+				TypeUpdateInformation res = UpdateTypeInformation (resolved, resolvedAtts, file);
+				Flush ();
+				return res;
+			}
 		}
 		
 		public override void Read () {}

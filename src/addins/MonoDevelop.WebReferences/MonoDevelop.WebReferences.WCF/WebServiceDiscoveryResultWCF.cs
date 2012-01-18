@@ -129,7 +129,7 @@ namespace MonoDevelop.WebReferences.WCF
 			
 			metadata = wref.metadata;
 			protocol = wref.protocol;
-			GenerateFiles (Item.Project, Item.MapFile.Project.Name, Item.Name);
+			GenerateFiles (Item.Project, Item.Project.DefaultNamespace, Item.Name);
 		}
 		
 		public override System.Collections.Generic.IEnumerable<string> GetAssemblyReferences ()
@@ -145,12 +145,13 @@ namespace MonoDevelop.WebReferences.WCF
 			CodeNamespace cns = new CodeNamespace (proxyNamespace);
 			ccu.Namespaces.Add (cns);
 			
-			bool targetMoonlight = dotNetProject.TargetFramework.Id.StartsWith ("SL");
-			bool targetMonoTouch = dotNetProject.TargetFramework.Id.StartsWith ("IPhone");
+			bool targetMoonlight = dotNetProject.TargetFramework.Id.Identifier == ("Silverlight");
+			bool targetMonoTouch = dotNetProject.TargetFramework.Id.Identifier == ("MonoTouch");
+			bool targetMonoDroid = dotNetProject.TargetFramework.Id.Identifier == ("MonoDroid");
 			
 			ServiceContractGenerator generator = new ServiceContractGenerator (ccu);
 			generator.Options = ServiceContractGenerationOptions.ChannelInterface | ServiceContractGenerationOptions.ClientClass;
-			if (refGroup.ClientOptions.GenerateAsynchronousMethods)
+			if (refGroup.ClientOptions.GenerateAsynchronousMethods || targetMoonlight || targetMonoTouch)
 				generator.Options |= ServiceContractGenerationOptions.AsynchronousMethods;
 			if (refGroup.ClientOptions.GenerateInternalTypes)
 				generator.Options |= ServiceContractGenerationOptions.InternalTypes;

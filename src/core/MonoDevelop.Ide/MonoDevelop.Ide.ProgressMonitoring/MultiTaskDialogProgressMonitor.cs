@@ -67,9 +67,14 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 		public MultiTaskDialogProgressMonitor (bool showProgress, bool allowCancel, bool showDetails, IDictionary<string, string> taskLabelAliases)
 		{
 			if (showProgress) {
-				dialog = new MultiTaskProgressDialog (allowCancel, showDetails, taskLabelAliases);
-				MessageService.PlaceDialog (dialog, MessageService.RootWindow);
-				dialog.Show ();
+				var parent = MessageService.GetDefaultModalParent ();
+				dialog = new MultiTaskProgressDialog (allowCancel, showDetails, taskLabelAliases) {
+					DestroyWithParent = true,
+					Modal = true,
+					TransientFor = parent,
+				};
+				MessageService.PlaceDialog (dialog, parent);
+				Mono.TextEditor.GtkWorkarounds.PresentWindowWithNotification (dialog);
 				dialog.AsyncOperation = AsyncOperation;
 				DispatchService.RunPendingEvents ();
 				this.showDetails = showDetails;

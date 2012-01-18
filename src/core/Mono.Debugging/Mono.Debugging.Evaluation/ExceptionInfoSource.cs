@@ -60,15 +60,19 @@ namespace Mono.Debugging.Evaluation
 			if (withTimeout) {
 				messageValue = ctx.Adapter.CreateObjectValueAsync ("Message", ObjectValueFlags.None, delegate {
 					ValueReference mref = exception.GetChild ("Message", options);
-					if (mref != null)
-						return mref.CreateObjectValue (false, options);
+					if (mref != null) {
+						string val = (string) mref.ObjectValue;
+						return ObjectValue.CreatePrimitive (null, new ObjectPath ("Message"), "System.String", new EvaluationResult (val), ObjectValueFlags.Literal);
+					}
 					else
 						return ObjectValue.CreateUnknown ("Message");
 				});
 			} else {
 				ValueReference mref = exception.GetChild ("Message", options);
-				if (mref != null)
-					messageValue = mref.CreateObjectValue (false, options);
+				if (mref != null) {
+					string val = (string) mref.ObjectValue;
+					messageValue = ObjectValue.CreatePrimitive (null, new ObjectPath ("Message"), "System.String", new EvaluationResult (val), ObjectValueFlags.Literal);
+				}
 			}
 			if (messageValue == null)
 				messageValue = ObjectValue.CreateUnknown ("Message");
@@ -83,7 +87,7 @@ namespace Mono.Debugging.Evaluation
 				childExceptionValue = ctx.Adapter.CreateObjectValueAsync ("InnerException", ObjectValueFlags.None, delegate {
 					ValueReference inner = exception.GetChild ("InnerException", options);
 					if (inner != null && !ctx.Adapter.IsNull (ctx, inner.Value)) {
-						Console.WriteLine ("pp got child:" + type);
+						//Console.WriteLine ("pp got child:" + type);
 						ExceptionInfoSource innerSource = new ExceptionInfoSource (ctx, inner);
 						ObjectValue res = innerSource.CreateObjectValue (false, options);
 						return res;
@@ -94,7 +98,7 @@ namespace Mono.Debugging.Evaluation
 			} else {
 				ValueReference inner = exception.GetChild ("InnerException", options);
 				if (inner != null && !ctx.Adapter.IsNull (ctx, inner.Value)) {
-					Console.WriteLine ("pp got child:" + type);
+					//Console.WriteLine ("pp got child:" + type);
 					ExceptionInfoSource innerSource = new ExceptionInfoSource (ctx, inner);
 					childExceptionValue = innerSource.CreateObjectValue (false, options);
 					childExceptionValue.Name = "InnerException";

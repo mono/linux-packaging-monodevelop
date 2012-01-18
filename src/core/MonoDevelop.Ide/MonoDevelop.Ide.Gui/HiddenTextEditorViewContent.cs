@@ -47,7 +47,7 @@ namespace MonoDevelop.Ide.Gui
 			Name = "";
 		}
 		
-		public override void Load(string fileName)
+		public override void Load (string fileName)
 		{
 		}
 		
@@ -104,14 +104,14 @@ namespace MonoDevelop.Ide.Gui
 		
 		public int GetPositionFromLineColumn (int line, int column)
 		{
-			return document.LocationToOffset (line - 1, column - 1);
+			return document.LocationToOffset (line, column);
 		}
 		
 		public void GetLineColumnFromPosition (int position, out int line, out int column)
 		{
 			Mono.TextEditor.DocumentLocation loc = document.OffsetToLocation (position);
-			line = loc.Line + 1;
-			column = loc.Column + 1;
+			line = loc.Line;
+			column = loc.Column;
 		}
 		
 		public string SelectedText { get { return ""; } set { } }
@@ -167,6 +167,9 @@ namespace MonoDevelop.Ide.Gui
 		public void SetCaretTo (int line, int column, bool highlightCaretLine)
 		{
 		}
+		public void SetCaretTo (int line, int column, bool highlightCaretLine, bool centerCaretLine)
+		{
+		}
 		
 		public void Undo()
 		{
@@ -175,11 +178,16 @@ namespace MonoDevelop.Ide.Gui
 		{
 		}
 		
-		public void BeginAtomicUndo ()
+		class DisposeStub : IDisposable
 		{
+			public void Dispose ()
+			{
+			}
 		}
-		public void EndAtomicUndo ()
+		
+		public IDisposable OpenUndoGroup ()
 		{
+			return new DisposeStub ();
 		}
 		
 		public Mono.TextEditor.TextEditorData GetTextEditorData ()

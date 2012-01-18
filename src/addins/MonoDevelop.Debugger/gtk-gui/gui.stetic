@@ -11,6 +11,7 @@
   </import>
   <widget class="Gtk.Dialog" id="MonoDevelop.Debugger.AttachToProcessDialog" design-size="656 413">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Title" translatable="yes">Attach to Process</property>
     <property name="WindowPosition">CenterOnParent</property>
     <property name="BorderWidth">3</property>
@@ -169,6 +170,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Debugger.ExceptionsDialog" design-size="910 451">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Title" translatable="yes">Exceptions</property>
     <property name="WindowPosition">CenterOnParent</property>
     <property name="BorderWidth">3</property>
@@ -423,6 +425,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Debugger.ExpressionEvaluatorDialog" design-size="716 410">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Title" translatable="yes">Expression Evaluator</property>
     <property name="WindowPosition">CenterOnParent</property>
     <property name="Modal">True</property>
@@ -539,6 +542,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Debugger.BreakpointPropertiesDialog" design-size="512 438">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Title" translatable="yes">Breakpoint Properties</property>
     <property name="WindowPosition">CenterOnParent</property>
     <property name="Modal">True</property>
@@ -1226,7 +1230,7 @@
       </widget>
     </child>
   </widget>
-  <widget class="Gtk.Bin" id="MonoDevelop.Debugger.DebuggerOptionsPanelWidget" design-size="523 242">
+  <widget class="Gtk.Bin" id="MonoDevelop.Debugger.DebuggerOptionsPanelWidget" design-size="523 250">
     <property name="MemberName" />
     <property name="Visible">False</property>
     <child>
@@ -1345,7 +1349,23 @@
                 <property name="RowSpacing">6</property>
                 <property name="ColumnSpacing">6</property>
                 <child>
-                  <placeholder />
+                  <widget class="Gtk.Label" id="label3">
+                    <property name="MemberName" />
+                    <property name="LabelProp" translatable="yes">ms</property>
+                  </widget>
+                  <packing>
+                    <property name="LeftAttach">2</property>
+                    <property name="RightAttach">3</property>
+                    <property name="AutoSize">True</property>
+                    <property name="XOptions">Fill</property>
+                    <property name="YOptions">Fill</property>
+                    <property name="XExpand">False</property>
+                    <property name="XFill">True</property>
+                    <property name="XShrink">False</property>
+                    <property name="YExpand">False</property>
+                    <property name="YFill">True</property>
+                    <property name="YShrink">False</property>
+                  </packing>
                 </child>
                 <child>
                   <widget class="Gtk.Label" id="label60">
@@ -1429,73 +1449,8 @@
               </packing>
             </child>
             <child>
-              <widget class="Gtk.HBox" id="hbox1">
+              <widget class="MonoDevelop.Ide.Gui.Components.PriorityList" id="prioritylist">
                 <property name="MemberName" />
-                <property name="Spacing">6</property>
-                <child>
-                  <widget class="Gtk.ScrolledWindow" id="GtkScrolledWindow">
-                    <property name="MemberName" />
-                    <property name="ShadowType">In</property>
-                    <child>
-                      <widget class="Gtk.TreeView" id="engineList">
-                        <property name="MemberName" />
-                        <property name="CanFocus">True</property>
-                        <property name="ShowScrollbars">True</property>
-                        <property name="HeadersVisible">False</property>
-                      </widget>
-                    </child>
-                  </widget>
-                  <packing>
-                    <property name="Position">0</property>
-                    <property name="AutoSize">False</property>
-                  </packing>
-                </child>
-                <child>
-                  <widget class="Gtk.VBox" id="vbox4">
-                    <property name="MemberName" />
-                    <property name="Spacing">6</property>
-                    <child>
-                      <widget class="Gtk.Button" id="buttonUp">
-                        <property name="MemberName" />
-                        <property name="CanFocus">True</property>
-                        <property name="UseStock">True</property>
-                        <property name="Type">StockItem</property>
-                        <property name="StockId">gtk-go-up</property>
-                        <signal name="Clicked" handler="OnButtonUpClicked" />
-                        <property name="label">gtk-go-up</property>
-                      </widget>
-                      <packing>
-                        <property name="Position">0</property>
-                        <property name="AutoSize">True</property>
-                        <property name="Expand">False</property>
-                        <property name="Fill">False</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <widget class="Gtk.Button" id="buttonDown">
-                        <property name="MemberName" />
-                        <property name="CanFocus">True</property>
-                        <property name="UseStock">True</property>
-                        <property name="Type">StockItem</property>
-                        <property name="StockId">gtk-go-down</property>
-                        <signal name="Clicked" handler="OnButtonDownClicked" />
-                        <property name="label">gtk-go-down</property>
-                      </widget>
-                      <packing>
-                        <property name="Position">1</property>
-                        <property name="AutoSize">True</property>
-                        <property name="Expand">False</property>
-                        <property name="Fill">False</property>
-                      </packing>
-                    </child>
-                  </widget>
-                  <packing>
-                    <property name="Position">1</property>
-                    <property name="AutoSize">True</property>
-                    <property name="Expand">False</property>
-                    <property name="Fill">False</property>
-                  </packing>
-                </child>
               </widget>
               <packing>
                 <property name="Position">1</property>
@@ -1521,6 +1476,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Debugger.AddTracePointDialog" design-size="540 208">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Title" translatable="yes">Add Tracepoint</property>
     <property name="WindowPosition">CenterOnParent</property>
     <property name="Buttons">2</property>
@@ -1744,6 +1700,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Debugger.ExceptionCaughtDialog" design-size="541 358">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Title" translatable="yes">Exception Caught</property>
     <property name="WindowPosition">CenterOnParent</property>
     <property name="Buttons">1</property>
@@ -1890,6 +1847,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Debugger.Viewers.ValueVisualizerDialog" design-size="628 433">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Title" translatable="yes">Value Visualizer</property>
     <property name="WindowPosition">CenterOnParent</property>
     <property name="Buttons">2</property>

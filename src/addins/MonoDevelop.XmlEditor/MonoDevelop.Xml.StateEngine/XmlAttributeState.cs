@@ -29,6 +29,7 @@
 using System;
 using System.Text;
 using System.Diagnostics;
+using MonoDevelop.Projects.Dom;
 
 namespace MonoDevelop.Xml.StateEngine
 {
@@ -45,6 +46,15 @@ namespace MonoDevelop.Xml.StateEngine
 		const int NAMING = 0;
 		const int GETTINGEQ = 1;
 		const int GETTINGVAL = 2;
+		
+		public bool AllowOpeningTagCharInsideAttributeValue {
+			get {
+				return SingleQuotedAttributeValueState.AllowOpeningTagCharInside;
+			}
+			set {
+				SingleQuotedAttributeValueState.AllowOpeningTagCharInside = DoubleQuotedAttributeValueState.AllowOpeningTagCharInside = value;
+			}
+		}
 		
 		public XmlAttributeState () : this (
 			new XmlNameState (),
@@ -141,8 +151,14 @@ namespace MonoDevelop.Xml.StateEngine
 				}
 			}
 			
-			if (Char.IsLetterOrDigit (c) || char.IsPunctuation (c) || char.IsWhiteSpace (c)) {
-				context.LogError ("Unexpected character '" + c + "' in attribute.");
+			if (char.IsLetterOrDigit (c) || char.IsPunctuation (c) || char.IsWhiteSpace (c)) {
+				if (context.StateTag == GETTINGEQ)
+					context.LogError ("Expecting = in attribute, got " + c + ".");
+				else if (context.StateTag == GETTINGVAL)
+					context.LogError ("Expecting attribute value, got " + c + ".");
+				else
+					context.LogError ("Unexpected character '" + c + "' in attribute.");
+				
 				if (att != null)
 					context.Nodes.Pop ();
 				rollback = string.Empty;

@@ -28,22 +28,77 @@
 
 using System;
 using System.Xml;
+using MonoDevelop.Core;
+using System.IO;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.Ide.Templates
 {
 	public class TextFileDescriptionTemplate: SingleFileDescriptionTemplate
 	{
 		string content;
+		FilePath contentSrcFile;
 		
-		public override void Load (XmlElement filenode)
+		public override void Load (XmlElement filenode, FilePath baseDirectory)
 		{
-			base.Load (filenode);
-			content = filenode.InnerText;
+			base.Load (filenode, baseDirectory);
+			var srcAtt = filenode.Attributes["src"];
+			if (srcAtt != null) {
+				contentSrcFile = FileService.MakePathSeparatorsNative (srcAtt.Value);
+				if (contentSrcFile.IsNullOrEmpty)
+					throw new InvalidOperationException ("Template's Src attribute is empty");
+				contentSrcFile = contentSrcFile.ToAbsolute (baseDirectory);
+			} else {
+				// Taking InnerText doesn't work, because there because there can be child 
+				// AssemblyReference nodes, and we don't want their values too. To fix this, look 
+				// for a single child CData node (which is the common pattern) and use only that.
+				var node = GetSingleCDataChild (filenode) ?? filenode;
+				content = node.InnerText;
+			}
+		}
+		
+		static XmlNode GetSingleCDataChild (XmlElement el)
+		{
+			var child = el.FirstChild;
+			XmlNode singleCData = null;
+			while (child != null) {
+				if (child.NodeType == XmlNodeType.CDATA) {
+					if (singleCData != null)
+						return null;
+					singleCData = child;
+				}
+				child = child.NextSibling;
+			}
+			return singleCData;
 		}
 		
 		public override string CreateContent (string language)
 		{
-			return content.Replace ("\t", MonoDevelop.Ide.Gui.Content.TextEditorProperties.IndentString);
+			return contentSrcFile.IsNullOrEmpty? content : File.ReadAllText (contentSrcFile);
+		}
+	}
+	
+	public class RawFileDescriptionTemplate : SingleFileDescriptionTemplate
+	{
+		FilePath contentSrcFile;
+		
+		public override void Load (XmlElement filenode, FilePath baseDirectory)
+		{
+			base.Load (filenode, baseDirectory);
+			var srcAtt = filenode.Attributes["src"];
+			if (srcAtt == null)
+				throw new InvalidOperationException ("Template is missing Src attribute");
+			
+			contentSrcFile = FileService.MakePathSeparatorsNative (srcAtt.Value);
+			if (contentSrcFile.IsNullOrEmpty)
+				throw new InvalidOperationException ("Template's Src attribute is empty");
+			contentSrcFile = contentSrcFile.ToAbsolute (baseDirectory);
+		}
+		
+		public override Stream CreateFileContent (SolutionItem policyParent, Project project, string language,
+			string fileName, string identifier)
+		{
+			return File.OpenRead (contentSrcFile);
 		}
 	}
 }

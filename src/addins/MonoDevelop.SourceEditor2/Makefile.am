@@ -6,25 +6,26 @@ FILES =  \
 	gtk-gui/generated.cs \
 	gtk-gui/MonoDevelop.SourceEditor.GotoLineNumberWidget.cs \
 	gtk-gui/MonoDevelop.SourceEditor.OptionPanels.BehaviorPanel.cs \
+	gtk-gui/MonoDevelop.SourceEditor.OptionPanels.ColorShemeEditor.cs \
 	gtk-gui/MonoDevelop.SourceEditor.OptionPanels.GeneralOptionsPanel.cs \
 	gtk-gui/MonoDevelop.SourceEditor.OptionPanels.HighlightingPanel.cs \
 	gtk-gui/MonoDevelop.SourceEditor.OptionPanels.MarkerPanel.cs \
+	gtk-gui/MonoDevelop.SourceEditor.OptionPanels.NewColorShemeDialog.cs \
 	gtk-gui/MonoDevelop.SourceEditor.PrintSettingsWidget.cs \
 	gtk-gui/MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs \
 	MonoDevelop.SourceEditor.Extension/TemplateCodon.cs \
 	MonoDevelop.SourceEditor.Extension/TemplateExtensionNodeLoader.cs \
 	MonoDevelop.SourceEditor.OptionPanels/BehaviorPanel.cs \
+	MonoDevelop.SourceEditor.OptionPanels/ColorShemeEditor.cs \
 	MonoDevelop.SourceEditor.OptionPanels/GeneralOptionsPanel.cs \
 	MonoDevelop.SourceEditor.OptionPanels/HighlightingPanel.cs \
 	MonoDevelop.SourceEditor.OptionPanels/MarkerPanel.cs \
+	MonoDevelop.SourceEditor.OptionPanels/NewColorShemeDialog.cs \
 	MonoDevelop.SourceEditor/AutoSave.cs \
 	MonoDevelop.SourceEditor/CompileErrorTooltipProvider.cs \
 	MonoDevelop.SourceEditor/Counters.cs \
 	MonoDevelop.SourceEditor/DebugValueTooltipProvider.cs \
 	MonoDevelop.SourceEditor/DebugValueWindow.cs \
-	MonoDevelop.SourceEditor/DefaultFormatter.cs \
-	MonoDevelop.SourceEditor/DropDownBox.cs \
-	MonoDevelop.SourceEditor/DropDownBoxListWindow.cs \
 	MonoDevelop.SourceEditor/DynamicAbbrevHandler.cs \
 	MonoDevelop.SourceEditor/EditActions.cs \
 	MonoDevelop.SourceEditor/ExtensibleTextEditor.cs \
@@ -34,13 +35,13 @@ FILES =  \
 	MonoDevelop.SourceEditor/LanguageItemTooltipProvider.cs \
 	MonoDevelop.SourceEditor/LanguageItemWindow.cs \
 	MonoDevelop.SourceEditor/MarkerOperationsHandler.cs \
+	MonoDevelop.SourceEditor/MessageBubbleCache.cs \
 	MonoDevelop.SourceEditor/MessageBubbleCommands.cs \
 	MonoDevelop.SourceEditor/MessageBubbleHighlightPopupWindow.cs \
 	MonoDevelop.SourceEditor/MessageBubbleTextMarker.cs \
-	MonoDevelop.SourceEditor/NavigationBar.cs \
-	MonoDevelop.SourceEditor/NavigationBarCommands.cs \
 	MonoDevelop.SourceEditor/PinnedWatchWidget.cs \
 	MonoDevelop.SourceEditor/PrintSettingsWidget.cs \
+	MonoDevelop.SourceEditor/QuickTaskStrip.cs \
 	MonoDevelop.SourceEditor/SearchAndReplaceWidget.cs \
 	MonoDevelop.SourceEditor/SourceEditorCommands.cs \
 	MonoDevelop.SourceEditor/SourceEditorDisplayBinding.cs \
@@ -48,14 +49,12 @@ FILES =  \
 	MonoDevelop.SourceEditor/SourceEditorPrintOperation.cs \
 	MonoDevelop.SourceEditor/SourceEditorView.cs \
 	MonoDevelop.SourceEditor/SourceEditorWidget.cs \
-	MonoDevelop.SourceEditor/StatusBox.cs \
 	MonoDevelop.SourceEditor/StyledSourceEditorOptions.cs \
 	MonoDevelop.SourceEditor/SyntaxModeCodon.cs \
 	MonoDevelop.SourceEditor/SyntaxModeService.cs 
 
 RES =  \
 	gtk-gui/gui.stetic \
-	gtk-gui/objects.xml \
 	MonoDevelop.SourceEditor.addin.xml \
 	MonoDevelop.SourceEditor/searchoptions.png
 
@@ -63,12 +62,10 @@ RES =  \
 DEPS =  \
 	$(top_builddir)/build/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
-	$(top_builddir)/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll \
 	$(top_builddir)/build/bin/Mono.Debugging.dll \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/NRefactory.dll
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
 REFS =  \
 	$(GLIB_SHARP_LIBS) \

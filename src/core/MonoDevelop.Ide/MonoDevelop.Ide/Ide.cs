@@ -204,6 +204,7 @@ namespace MonoDevelop.Ide
 			// Startup commands
 			Counters.Initialization.Trace ("Running Startup Commands");
 			AddinManager.AddExtensionNodeHandler ("/MonoDevelop/Ide/StartupHandlers", OnExtensionChanged);
+			monitor.Step (1);
 			monitor.EndTask ();
 
 			// Set initial run flags
@@ -260,10 +261,9 @@ namespace MonoDevelop.Ide
 			
 			// load previous combine
 			if ((bool)PropertyService.Get("SharpDevelop.LoadPrevProjectOnStartup", false)) {
-				RecentOpen recentOpen = Workbench.RecentOpen;
-
-				if (recentOpen.RecentProjectsCount > 0) { 
-					IdeApp.Workspace.OpenWorkspaceItem(recentOpen.RecentProjects.First ().ToString()).WaitForCompleted ();
+				var proj = DesktopService.RecentFiles.GetProjects ().FirstOrDefault ();
+				if (proj != null) { 
+					IdeApp.Workspace.OpenWorkspaceItem (proj.FileName).WaitForCompleted ();
 				}
 			}
 			
@@ -302,7 +302,8 @@ namespace MonoDevelop.Ide
 		 	//FIXME: can we handle multiple slns?
 			bool foundSln = false;
 			foreach (var file in files) {
-				if (Services.ProjectService.IsWorkspaceItemFile (file.FileName)) {
+				if (Services.ProjectService.IsWorkspaceItemFile (file.FileName) ||
+				    Services.ProjectService.IsSolutionItemFile (file.FileName)) {
 					if (!foundSln) {
 						try {
 							Workspace.OpenWorkspaceItem (file.FileName);
@@ -319,7 +320,7 @@ namespace MonoDevelop.Ide
 			
 			foreach (var file in filteredFiles) {
 				try {
-					Workbench.OpenDocument (file.FileName, file.Line, file.Column, file.BringToFront);
+					Workbench.OpenDocument (file.FileName, file.Line, file.Column, file.Options);
 				} catch (Exception ex) {
 					LoggingService.LogError ("Unhandled error opening file \"" + file.FileName + "\"", ex);
 					MessageService.ShowException (ex, "Could not open file: " + file.FileName);
@@ -443,7 +444,6 @@ namespace MonoDevelop.Ide
 				IdeApp.Workbench.CurrentLayout = "Solution";
 				IdeApp.Workbench.CurrentLayout = "Default";
 				IdeApp.Workbench.GetPad<MonoDevelop.Ide.Gui.Pads.ProjectPad.ProjectSolutionPad> ().Visible = false;
-				IdeApp.Workbench.GetPad<FileScout> ().Visible = false;
 				IdeApp.Workbench.GetPad<MonoDevelop.Ide.Gui.Pads.ClassBrowser.ClassBrowserPad> ().Visible = false;
 				foreach (Pad p in IdeApp.Workbench.Pads) {
 					if (p.Visible)

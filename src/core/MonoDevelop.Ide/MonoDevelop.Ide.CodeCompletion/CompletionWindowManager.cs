@@ -105,7 +105,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 					return false;
 				}
 			} finally {
-				ParameterInformationWindowManager.UpdateWindow ();
+				ParameterInformationWindowManager.UpdateWindow (completionWidget);
 			}
 		}
 
@@ -123,9 +123,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 		{
 			if (wnd != null) {
 				wnd.Destroy ();
+				ParameterInformationWindowManager.UpdateWindow (wnd.CompletionWidget);
 				wnd = null;
 			}
-			ParameterInformationWindowManager.UpdateWindow ();
 			OnWindowClosed (EventArgs.Empty);
 		}
 		
@@ -138,11 +138,11 @@ namespace MonoDevelop.Ide.CodeCompletion
 			return wnd.PreProcessKeyEvent (key, keyChar, modifier, out ka);
 		}
 		
-		public static void PostProcessKeyEvent (KeyActions ka)
+		public static void PostProcessKeyEvent (KeyActions ka, Gdk.Key key, char keyChar, Gdk.ModifierType modifier)
 		{
 			if (wnd == null)
 				return;
-			wnd.PostProcessKeyEvent (ka);
+			wnd.PostProcessKeyEvent (ka, key, keyChar, modifier);
 		}
 		
 		public static void HideWindow ()

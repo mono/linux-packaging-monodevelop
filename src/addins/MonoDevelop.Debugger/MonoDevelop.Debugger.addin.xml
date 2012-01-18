@@ -6,11 +6,11 @@
        description = "Support for Debugging projects"
        copyright = "MIT X11"
        flags = "Hidden"
-       version = "2.4">
+       version = "2.8.5">
 
 	<Dependencies>
-		<Addin id="Core" version="2.4"/>
-		<Addin id="Ide" version="2.4"/>
+		<Addin id="Core" version="2.8.5"/>
+		<Addin id="Ide" version="2.8.5"/>
 	</Dependencies>
 	
 	<ExtensionPoint path="/MonoDevelop/Debugging/DebuggerEngines">
@@ -158,6 +158,10 @@
 		<Command id = "MonoDevelop.Debugger.DebugCommands.AddWatch"
 				_description = "Add expression to watch pad"
 				_label = "Add watch" />
+		<Command id = "MonoDevelop.Debugger.DebugCommands.StopEvaluation"
+				_description = "Stops the execution of the expression being evaluated by the debugger"
+				defaultHandler = "MonoDevelop.Debugger.StopEvaluationHandler"
+				_label = "Stop Evaluation" />
 		</Category>
 	</Extension>
 	
@@ -168,6 +172,7 @@
 	<Extension path = "/MonoDevelop/Ide/MainMenu/Run">
 		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.Debug" insertafter="MonoDevelop.Ide.Commands.ProjectCommands.Run"/>
 		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.Pause" insertafter="MonoDevelop.Ide.Commands.ProjectCommands.Stop"/>
+		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.StopEvaluation" />
 		<SeparatorItem id = "MonoDevelop.Debugger.ExternalDebuggingSection" />
 		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.DebugApplication" />
 		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.AttachToProcess" />
@@ -224,6 +229,7 @@
 	
 	<Extension path = "/MonoDevelop/Ide/Toolbar">
 		<ItemSet id = "Debugger" _label = "Debugger">
+			<CommandItem id = "MonoDevelop.Debugger.DebugCommands.Debug" />
 			<CommandItem id = "MonoDevelop.Debugger.DebugCommands.StepOver" />
 			<CommandItem id = "MonoDevelop.Debugger.DebugCommands.StepInto" />
 			<CommandItem id = "MonoDevelop.Debugger.DebugCommands.StepOut" />	

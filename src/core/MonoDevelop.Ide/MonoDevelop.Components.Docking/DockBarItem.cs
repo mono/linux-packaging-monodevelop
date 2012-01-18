@@ -31,6 +31,7 @@
 
 using System;
 using Gtk;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Components.Docking
 {
@@ -59,7 +60,7 @@ namespace MonoDevelop.Components.Docking
 			lastFrameSize = bar.Frame.Allocation.Size;
 			bar.Frame.SizeAllocated += HandleBarFrameSizeAllocated;
 		}
-
+		
 		void HandleBarFrameSizeAllocated (object o, SizeAllocatedArgs args)
 		{
 			if (!lastFrameSize.Equals (args.Allocation.Size)) {
@@ -286,7 +287,12 @@ namespace MonoDevelop.Components.Docking
 			if (autoHideTimeout == uint.MaxValue) {
 				autoHideTimeout = GLib.Timeout.Add (force ? 0 : bar.Frame.AutoHideDelay, delegate {
 					// Don't hide the item if it has the focus. Try again later.
-					if (it.Widget.FocusChild != null)
+					if (it.Widget.FocusChild != null && !force)
+						return true;
+					// Don't hide the item if the mouse pointer is still inside the window. Try again later.
+					int px, py;
+					it.Widget.GetPointer (out px, out py);
+					if (it.Widget.Visible && it.Widget.IsRealized && it.Widget.Allocation.Contains (px, py) && !force)
 						return true;
 					autoHideTimeout = uint.MaxValue;
 					AutoHide (true);
@@ -378,14 +384,14 @@ namespace MonoDevelop.Components.Docking
 		
 		protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
 		{
-			if (evnt.Button == 1) {
+			if (evnt.TriggersContextMenu ()) {
+				it.ShowDockPopupMenu (evnt.Time);
+			} else if (evnt.Button == 1) {
 				if (evnt.Type == Gdk.EventType.TwoButtonPress)
 					it.Status = DockItemStatus.Dockable;
 				else
 					AutoShow ();
 			}
-			else if (evnt.Button == 3)
-				it.ShowDockPopupMenu (evnt.Time);
 			return base.OnButtonPressEvent (evnt);
 		}
 	}

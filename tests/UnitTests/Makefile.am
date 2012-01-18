@@ -11,6 +11,7 @@ FIXTURE = /fixture=$(fixture)
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
 	$(GTK_SHARP_LIBS) \
+	$(MONO_ADDINS_LIBS) \
 	-r:../../build/AddIns/BackendBindings/MonoDevelop.CSharpBinding.dll \
 	-r:../../build/AddIns/MonoDevelop.AspNet/MonoDevelop.AspNet.dll \
 	-r:../../build/AddIns/MonoDevelop.Autotools/MonoDevelop.Autotools.dll \
@@ -18,14 +19,20 @@ REFS =  \
 	-r:../../build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
 	-r:../../build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll \
 	-r:../../build/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll \
+	-r:../../build/AddIns/VersionControl/MonoDevelop.VersionControl.dll \
+	-r:../../build/AddIns/VersionControl/MonoDevelop.VersionControl.Git.dll \
+	-r:../../build/bin/ICSharpCode.NRefactory.dll \
 	-r:../../build/bin/Mono.TextEditor.dll \
 	-r:../../build/bin/MonoDevelop.Core.dll \
 	-r:../../build/bin/MonoDevelop.Ide.dll \
-	-r:../../build/bin/NRefactory.dll \
+	-r:../../build/bin/OldNRefactory.dll \
+	-r:../../contrib/bin/NGit.dll \
+	-r:../../contrib/bin/Sharpen.dll \
 	-r:../../src/addins/NUnit/lib/nunit.core.dll \
 	-r:../../src/addins/NUnit/lib/nunit.core.interfaces.dll \
 	-r:../../src/addins/NUnit/lib/nunit.framework.dll \
 	-r:../../src/addins/NUnit/lib/nunit.util.dll \
+	-r:Mono.Cairo \
 	-r:System \
 	-r:System.Core \
 	-r:System.Xml
@@ -37,13 +44,21 @@ FILES =  \
 	Mono.TextEditor.Tests.DefaultEditActions/InsertTabTests.cs \
 	Mono.TextEditor.Tests.DefaultEditActions/RemoveTabTests.cs \
 	Mono.TextEditor.Tests.DefaultEditActions/SelectionActionTests.cs \
+	Mono.TextEditor.Tests/BufferTests.cs \
 	Mono.TextEditor.Tests/DocumentTests.cs \
+	Mono.TextEditor.Tests/EditActionsTest.cs \
 	Mono.TextEditor.Tests/FoldingTests.cs \
+	Mono.TextEditor.Tests/HeightTreeTests.cs \
+	Mono.TextEditor.Tests/InsertionModeTests.cs \
 	Mono.TextEditor.Tests/LineSplitterTests.cs \
+	Mono.TextEditor.Tests/RedBlackTreeTests.cs \
 	Mono.TextEditor.Tests/SearchTests.cs \
+	Mono.TextEditor.Tests/SegmentTreeTests.cs \
 	Mono.TextEditor.Tests/SelectionTests.cs \
 	Mono.TextEditor.Tests/SyntaxHighlightingTests.cs \
+	Mono.TextEditor.Tests/TextBreakerTests.cs \
 	Mono.TextEditor.Tests/UndoRedoTests.cs \
+	Mono.TextEditor.Tests/VirtualSpacesTests.cs \
 	Mono.TextEditor.Tests/ViTests.cs \
 	MonoDevelop.AspNet/AspNetCompletionTests.cs \
 	MonoDevelop.AspNet/AspNetTesting.cs \
@@ -56,11 +71,6 @@ FILES =  \
 	MonoDevelop.CSharpBinding/MemberTests.cs \
 	MonoDevelop.CSharpBinding/ParameterCompletionTests.cs \
 	MonoDevelop.CSharpBinding/ProjectDomTests.cs \
-	MonoDevelop.CSharpBinding/TestBraceStlye.cs \
-	MonoDevelop.CSharpBinding/TestFormattingBugs.cs \
-	MonoDevelop.CSharpBinding/TestSpacingVisitor.cs \
-	MonoDevelop.CSharpBinding/TestStatementIndentation.cs \
-	MonoDevelop.CSharpBinding/TestTypeLevelIndentation.cs \
 	MonoDevelop.CSharpBinding/TestViewContent.cs \
 	MonoDevelop.CSharpBinding/TestWorkbenchWindow.cs \
 	MonoDevelop.CSharpBinding/TopLevelTests.cs \
@@ -82,13 +92,17 @@ FILES =  \
 	MonoDevelop.Projects/WorkspaceTests.cs \
 	MonoDevelop.Refactoring/BaseRefactorerTests.cs \
 	MonoDevelop.Refactoring/CreateBackingStoreTests.cs \
+	MonoDevelop.Refactoring/CreateMethodTests.cs \
 	MonoDevelop.Refactoring/DeclareLocalTests.cs \
 	MonoDevelop.Refactoring/ExtractMethodTests.cs \
 	MonoDevelop.Refactoring/GenerateNewMemberTests.cs \
+	MonoDevelop.Refactoring/ImplementInterfaceTests.cs \
 	MonoDevelop.Refactoring/IntegrateTemporaryVariableTests.cs \
 	MonoDevelop.Refactoring/IntroduceConstantRefactoringTests.cs \
 	MonoDevelop.Refactoring/IntroduceFormatItemRefactoringTests.cs \
 	MonoDevelop.Refactoring/RemoveBackingStoreTests.cs \
+	MonoDevelop.VersionControl.Git/GitUtilsTests.cs \
+	MonoDevelop.VersionControl.Views/EditorCompareWidgetBaseTest.cs \
 	MonoDevelop.Xml.StateEngine/AspNetParsingTests.cs \
 	MonoDevelop.Xml.StateEngine/HtmlParsingTests.cs \
 	MonoDevelop.Xml.StateEngine/ParsingTests.cs \

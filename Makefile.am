@@ -7,31 +7,24 @@ bin_SCRIPTS = monodevelop mdtool
 
 buildinfo = $(top_builddir)/build/bin/buildinfo
 
-all:
+all: vcrevision
 
 vcrevision:
-	@if test -d ./.svn; then \
-		version=$$( \
+	@if test -d ../.git; then \
+		version=$$(cd ..; \
 			LANG=C; export LANG; \
-			svn info | sed -n -e '/Last Changed Rev/ s/.*: //p'; \
+			git describe --dirty --always --abbrev=0 --match nothing; \
 		); \
-		modified=$$( \
-			LANG=C; export LANG; \
-			svn st | grep -v ^\? | wc -l; \
-		); \
-		if test $$modified != 0; then \
-			version="$$version (modified)"; \
-		fi; \
-		echo "SVN revision: $$version" > "vcrevision"; \
+		echo "$$version" > "vcrevision"; \
 	else \
 		if test ! -f ./vcrevision; then \
-			echo "SVN revision: unknown" > "vcrevision"; \
+			echo "unknown" > "vcrevision"; \
 		fi; \
 	fi
 
 $(buildinfo): vcrevision
 	@mkdir -p "$(top_builddir)/build/bin"
-	@cp "$(top_srcdir)/vcrevision" "$@"
+	@echo "Git revision: $$(cat $(top_srcdir)/vcrevision)" > "$@"
 	@echo "Build date: $$(date -u +'%Y-%m-%d %H:%M:%S%z')" >> "$@"
 	@echo "Updated build information"
 	@cat $(buildinfo)
@@ -95,8 +88,8 @@ DOCFILES = \
 
 mpacks: $(PACKAGES)
 	test -z "packages" || mkdir -p packages
-	mono build/bin/mdrun.exe setup p $(PACKAGES:%=%) -d:packages
-	mono build/bin/mdrun.exe setup rb packages
+	$(MDTOOL_RUN) setup p $(PACKAGES:%=%) -d:packages
+	$(MDTOOL_RUN) setup rb packages
 
 apidocs:
 	monodocer $(DOCFILES:%=--assembly:%) -delete --path docs/api
@@ -107,7 +100,7 @@ apidocs:
 	mdassembler --out docs/sources/monodevelop-extension-guide --addins docs/extension-model.xml
 #	cd docs/apiguide && mdassembler --out monodevelop-api-guide --xhtml toc.xhtml && mv monodevelop-api-guide.zip ../web/sources
 
-MD_LAUNCH=$(MD_LAUNCH_SETUP) exec -a "monodevelop" $(RUNTIME)
+MD_LAUNCH=$(MD_LAUNCH_SETUP) UBUNTU_MENUPROXY=0 exec -a "monodevelop" $(RUNTIME)
 
 run: runmd
 
@@ -171,3 +164,6 @@ distcleancheck_listfiles      = find . -type f -print		# automake-1.9 setting
 distcleancheck_listfiles     += $(filter_stale_buildfiles)	# amend by required filtering
 
 .PHONY: vcrevision
+
+package-monomac:
+	$(MD_LAUNCH_SETUP) mono --debug "build/bin/mdtool.exe" setup pack ../extras/MonoDevelop.MonoMac/build/MonoDevelop.MonoMac.dll

@@ -8,20 +8,20 @@ namespace Stetic.Wrapper {
 		{
 			if (Wrapped == null)
 				return;
-			((GLib.Object)Wrapped).RemoveNotification (NotifyHandler);
+			NotifyWorkaround.RemoveNotification (( GLib.Object)Wrapped, NotifyHandler);
 			base.Dispose ();
 		}
 
 		internal protected override void OnDesignerAttach (IDesignArea designer)
 		{
 			base.OnDesignerAttach (designer);
-			((GLib.Object)Wrapped).AddNotification (NotifyHandler);
+			NotifyWorkaround.AddNotification ((GLib.Object)Wrapped, NotifyHandler);
 		}
 		
 		internal protected override void OnDesignerDetach (IDesignArea designer)
 		{
 			base.OnDesignerDetach (designer);
-			((GLib.Object)Wrapped).RemoveNotification (NotifyHandler);
+			NotifyWorkaround.RemoveNotification ((GLib.Object)Wrapped, NotifyHandler);
 		}
 		
 		public static Object Lookup (GLib.Object obj)

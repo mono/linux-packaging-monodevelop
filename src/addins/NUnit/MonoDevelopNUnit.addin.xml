@@ -5,8 +5,8 @@
        copyright = "MIT X11"
        url       = "http://monodevelop.com"
        description = "Integrates NUnit into the MonoDevelop IDE."
-	   category    = "IDE extensions"
-       version   = "2.4">
+	   category    = "Testing"
+       version   = "2.8.5">
 
 	<Runtime>
 		<Import assembly="MonoDevelop.NUnit.dll" />
@@ -17,8 +17,8 @@
 	</Runtime>
 	
 	<Dependencies>
-		<Addin id="Core" version="2.4"/>
-		<Addin id="Ide" version="2.4"/>
+		<Addin id="Core" version="2.8.5"/>
+		<Addin id="Ide" version="2.8.5"/>
 	</Dependencies>
 	
 	<!-- Extension Points -->
@@ -64,7 +64,7 @@
 	<!-- Extensions -->
 
 	<Extension path="/MonoDevelop/Core/SupportPackages">
-		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.4">
+		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.7">
 			<Package name="nunit" version="2.4" clrVersion="Default">
 				<Assembly file="nunit.core.dll" />
 				<Assembly file="nunit.core.interfaces.dll" />
@@ -199,7 +199,7 @@
 	</Extension>
   
 	<Extension path = "/MonoDevelop/Core/StockIcons">
-		<StockIcon stockid = "nunit-pad-icon" resource = "unit-test-16.png" />
+		<StockIcon stockid = "nunit-pad-icon" resource = "unit-test-16.png" size="Menu" />
 	</Extension>
 
 	<Extension path = "/MonoDevelop/ProjectModel/ProjectServiceExtensions">

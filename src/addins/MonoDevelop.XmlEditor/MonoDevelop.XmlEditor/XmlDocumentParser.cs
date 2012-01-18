@@ -38,15 +38,8 @@ using MonoDevelop.Projects.Dom.Parser;
 
 namespace MonoDevelop.XmlEditor
 {
-	
-	
 	public class XmlDocumentParser : AbstractParser
 	{
-		
-		public XmlDocumentParser () : base (null, "application/xml")
-		{
-		}
-		
 		public override bool CanParse (string fileName)
 		{
 			return XmlTextEditorExtension.IsFileNameHandled (fileName);

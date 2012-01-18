@@ -27,7 +27,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ICSharpCode.NRefactory.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Dom;
 
@@ -48,7 +48,7 @@ namespace MonoDevelop.Refactoring.RefactorImports
 		public override List<Change> PerformChanges (RefactoringOptions options, object properties)
 		{
 			List<Change> result = new List<Change> ();
-			ICSharpCode.NRefactory.Ast.CompilationUnit unit = options.GetASTProvider ().ParseFile (options.Document.TextEditor.Text);
+			ICSharpCode.NRefactory.CSharp.CompilationUnit unit = options.GetASTProvider ().ParseFile (options.Document.Editor.Text);
 			FindTypeReferencesVisitor visitor = new FindTypeReferencesVisitor (options.GetTextEditorData (), options.GetResolver ());
 			visitor.VisitCompilationUnit (unit, null);
 
@@ -56,10 +56,10 @@ namespace MonoDevelop.Refactoring.RefactorImports
 			
 			ICompilationUnit compilationUnit = options.ParseDocument ().CompilationUnit;
 			HashSet<string> usedUsings = new HashSet<string> ();
-			foreach (TypeReference r in visitor.PossibleTypeReferences) {
-				if (r.IsKeyword)
+			foreach (var r in visitor.PossibleTypeReferences) {
+				if (r is PrimitiveType)
 					continue;
-				IType type = dom.SearchType (compilationUnit, r.ConvertToReturnType ());
+				IType type = dom.SearchType (compilationUnit, options.ResolveResult != null ? options.ResolveResult.CallingType : null, new DomLocation (options.Document.Editor.Caret.Line, options.Document.Editor.Caret.Column), r.ConvertToReturnType ());
 				if (type != null) {
 					usedUsings.Add (type.Namespace);
 				}
@@ -73,8 +73,8 @@ namespace MonoDevelop.Refactoring.RefactorImports
 				if (!u.Aliases.Any () && u.Namespaces.All (name => currentUsings.Contains (name) || !usedUsings.Contains (name)) ) {
 					TextReplaceChange change = new TextReplaceChange ();
 					change.FileName = options.Document.FileName;
-					change.Offset = textEditorData.Document.LocationToOffset (u.Region.Start.Line - 1, u.Region.Start.Column - 1);
-					change.RemovedChars = textEditorData.Document.LocationToOffset (u.Region.End.Line - 1, u.Region.End.Column - 1) - change.Offset;
+					change.Offset = textEditorData.Document.LocationToOffset (u.Region.Start.Line, u.Region.Start.Column);
+					change.RemovedChars = textEditorData.Document.LocationToOffset (u.Region.End.Line, u.Region.End.Column) - change.Offset;
 					Mono.TextEditor.LineSegment line = textEditorData.Document.GetLineByOffset (change.Offset);
 					if (line != null && line.EditableLength == change.RemovedChars)
 						change.RemovedChars += line.DelimiterLength;

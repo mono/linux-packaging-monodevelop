@@ -71,14 +71,15 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Run ()
 		{
-			CommonAboutDialog dlg = new CommonAboutDialog ();
-			dlg.TransientFor = IdeApp.Workbench.RootWindow;
-			try {
-				dlg.Run ();
-			}
-			finally {
-				dlg.Destroy ();
-			}
+			CommonAboutDialog.ShowAboutDialog ();
+		}
+	}
+	
+	class SendFeedbackHandler : CommandHandler
+	{
+		protected override void Run ()
+		{
+			FeedbackService.ShowFeedbackWindow ();
 		}
 	}
 }

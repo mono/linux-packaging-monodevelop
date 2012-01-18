@@ -50,7 +50,7 @@ namespace Mono.TextEditor.Highlighting
 			}
 		}
 		
-		public virtual bool GetIsValid (Style style)
+		public virtual bool GetIsValid (ColorSheme style)
 		{
 			foreach (Keywords keyword in keywords) {
 				if (!keyword.GetIsValid (style)) {
@@ -149,13 +149,17 @@ namespace Mono.TextEditor.Highlighting
 			return String.Format ("[Rule: Name={0}, #Keywords={1}]", Name, keywords.Count);
 		}
 		
+		public Dictionary<string, Keywords> keywordTable = null;
+		public Dictionary<string, Keywords> keywordTableIgnoreCase = null;
+		
+		/*
 		public class KeyTable 
 		{
 			public Keywords   keywords = null;
-			public KeyTable[] table    = new KeyTable[255];
+			public KeyTable[] table    = new KeyTable[tableLength];
 		}
-		
-		protected KeyTable[] table = new KeyTable[255];
+		const int tableLength = 255;
+		protected KeyTable[] table = new KeyTable[tableLength];
 		public KeyTable[] Table {
 			get {
 				return table;
@@ -166,7 +170,7 @@ namespace Mono.TextEditor.Highlighting
 			KeyTable[] curTable = table;
 			for (int i = 0; i < word.Length; i++) {
 				uint idx = (uint)word[i];
-				if (idx > 255)
+				if (idx >= tableLength)
 					throw new ArgumentOutOfRangeException (word + " contains invalid chars.");
 				if (curTable[idx] == null)
 					curTable[idx] = new KeyTable ();
@@ -185,16 +189,26 @@ namespace Mono.TextEditor.Highlighting
 			uint idx;
 			for (int i = offset; i < max; i++) {
 				idx = (uint)(IgnoreCase ? Char.ToUpper (doc.GetCharAt (i)) : doc.GetCharAt (i));
-				if (idx >= curTable.Length || curTable[idx] == null)
+				if (idx >= tableLength || curTable[idx] == null)
 					return null;
 				curTable = curTable[idx].table;
 			}
 			idx = (uint)(IgnoreCase ? Char.ToUpper (doc.GetCharAt (max)) : doc.GetCharAt (max));
-			if (idx > 255 || curTable[idx] == null)
+			if (idx >= tableLength || curTable[idx] == null)
 				return null;
 			return curTable[idx].keywords;
-		}
+		}*/
 		
+		public Keywords GetKeyword (string word)
+		{
+			Keywords result = null;
+			if (keywordTable != null && keywordTable.TryGetValue (word, out result))
+				return result;
+			
+			if (keywordTableIgnoreCase != null && keywordTableIgnoreCase.TryGetValue (word, out result))
+				return result;
+			return null;
+		}
 		
 		protected bool ReadNode (XmlReader reader, List<Match> matchList, List<Span> spanList, List<Marker> prevMarkerList)
 		{
@@ -203,12 +217,12 @@ namespace Mono.TextEditor.Highlighting
 				this.Delimiter = reader.ReadElementString ();
 				return true;
 			case "Property":
-				string name  = reader.GetAttribute ("name");
+				string name = reader.GetAttribute ("name");
 				string value = reader.ReadElementString ();
 				
 				if (!properties.ContainsKey (name))
-					properties[name] = new List<string> ();
-				properties[name].Add (value);
+					properties [name] = new List<string> ();
+				properties [name].Add (value);
 				return true;
 			case Match.Node:
 				matchList.Add (Match.Read (reader));
@@ -221,7 +235,23 @@ namespace Mono.TextEditor.Highlighting
 				Keywords keywords = Mono.TextEditor.Highlighting.Keywords.Read (reader, IgnoreCase);
 				this.keywords.Add (keywords);
 				foreach (string word in keywords.Words) {
-					AddToTable (keywords, (keywords.IgnoreCase ? word.ToUpper () :  word).ToCharArray ());
+					if (keywords.IgnoreCase) {
+						if (keywordTableIgnoreCase == null)
+							keywordTableIgnoreCase = new Dictionary<string, Keywords> (StringComparer.InvariantCultureIgnoreCase);
+						if (keywordTableIgnoreCase.ContainsKey (word)) {
+							Console.WriteLine ("Error: duplicate keyword " + word);
+							continue;
+						}
+						keywordTableIgnoreCase.Add (word, keywords);
+					} else {
+						if (keywordTable == null)
+							keywordTable = new Dictionary<string, Keywords> ();
+						if (keywordTable.ContainsKey (word)) {
+							Console.WriteLine ("Error: duplicate keyword " + word);
+							continue;
+						}
+						keywordTable.Add (word, keywords);
+					}
 				}
 				return true;
 			case Marker.PrevMarker:

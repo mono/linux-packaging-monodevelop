@@ -26,13 +26,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MonoDevelop.Projects.Policies
 {
 	/// <summary>
 	/// A set of policies. Policies are identified by type.
 	/// </summary>
-	public abstract class PolicyContainer
+	public abstract class PolicyContainer: IPolicyProvider
 	{
 		internal PolicyDictionary policies;
 		
@@ -57,16 +58,11 @@ namespace MonoDevelop.Projects.Policies
 				if (policies.TryGetValue (typeof(T), null, out policy)) {
 					if (!PolicyService.IsUndefinedPolicy (policy))
 						return (T)policy;
-					else if (InheritDefaultPolicies)
-						return PolicyService.GetDefaultPolicy<T> ();
-					else
-						return null;
+					return GetDefaultPolicy<T> ();
 				}
 			}
-			if (!InheritDefaultPolicies)
-				return null;
-			else if (IsRoot)
-				return PolicyService.GetDefaultPolicy<T> ();
+			if (IsRoot)
+				return GetDefaultPolicy<T> ();
 			else
 				return ParentPolicies.Get<T> ();
 		}
@@ -94,10 +90,7 @@ namespace MonoDevelop.Projects.Policies
 						currentBag = currentBag.ParentPolicies;
 				}
 			}
-			if (InheritDefaultPolicies)
-				return PolicyService.GetDefaultPolicy<T>(scopes);
-			else
-				return null;
+			return GetDefaultPolicy<T>(scopes);
 		}
 		
 		public void Set<T> (T value) where T : class, IEquatable<T>, new ()
@@ -133,6 +126,17 @@ namespace MonoDevelop.Projects.Policies
 			OnPolicyChanged (key.PolicyType, key.Scope);
 		}
 		
+		/// <summary>
+		/// Removes all policies defined in this container
+		/// </summary>
+		public void Clear ()
+		{
+			PolicyDictionary oldPolicies = policies;
+			policies = null;
+			foreach (PolicyKey pk in oldPolicies.Keys)
+				OnPolicyChanged (pk.PolicyType, pk.Scope);
+		}
+		
 		public bool Remove<T> () where T : class, IEquatable<T>, new ()
 		{
 			CheckReadOnly ();
@@ -156,6 +160,85 @@ namespace MonoDevelop.Projects.Policies
 				}
 			}
 			return false;
+		}
+		
+		/// <summary>
+		/// Copies the policies defined in another container
+		/// </summary>
+		/// <param name='other'>
+		/// A policy container from which to copy the policies
+		/// </param>
+		/// <remarks>
+		/// Policies of this container are removed or replaced by policies defined in the
+		/// provided container.
+		/// </remarks>
+		public void CopyFrom (PolicyContainer other)
+		{
+			if (other.policies == null && policies == null)
+				return;
+
+			// Add and update policies
+			
+			if (other.policies != null) {
+				foreach (KeyValuePair<PolicyKey, object> p in other.policies) {
+					object oldVal;
+					if (policies == null || !policies.TryGetValue (p.Key, out oldVal) || oldVal == null || !oldVal.Equals (p.Value)) {
+						if (policies == null)
+							policies = new PolicyDictionary ();
+						policies [p.Key] = p.Value;
+						OnPolicyChanged (p.Key.PolicyType, p.Key.Scope);
+					}
+				}
+			}
+			
+			// Remove policies
+			
+			if (policies != null) {
+				foreach (PolicyKey k in policies.Keys.ToArray ()) {
+					if (other.policies == null || !other.policies.ContainsKey (k)) {
+						policies.Remove (k);
+						OnPolicyChanged (k.PolicyType, k.Scope);
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Import the policies defined by another policy container
+		/// </summary>
+		/// <param name='source'>
+		/// The policy container to be imported
+		/// </param>
+		/// <param name='includeParentPolicies'>
+		/// If <c>true</c>, policies defined by all ancestors of polContainer will also
+		/// be imported
+		/// </param>
+		/// <remarks>
+		/// This method adds or replaces policies defined in the source container into
+		/// this container. Policies in this container which are not defined in the source container
+		/// are not modified or removed.
+		/// </remarks>
+		public void Import (PolicyContainer source, bool includeParentPolicies)
+		{
+			if (includeParentPolicies && source.ParentPolicies != null)
+				Import (source.ParentPolicies, true);
+			
+			if (source.policies == null && policies == null)
+				return;
+
+			// Add and update policies
+			
+			if (source.policies != null) {
+				foreach (KeyValuePair<PolicyKey, object> p in source.policies) {
+					object oldVal;
+					if (policies == null || !policies.TryGetValue (p.Key, out oldVal) || oldVal == null || !oldVal.Equals (p.Value)) {
+						if (policies == null)
+							policies = new PolicyDictionary ();
+						policies [p.Key] = p.Value;
+						OnPolicyChanged (p.Key.PolicyType, p.Key.Scope);
+					}
+				}
+			}
 		}
 		
 		public IEnumerable<string> GetScopes<T> ()
@@ -182,9 +265,11 @@ namespace MonoDevelop.Projects.Policies
 		
 		internal IEnumerable<ScopedPolicy> GetScoped (Type t)
 		{
-			foreach (KeyValuePair<PolicyKey,object> pinfo in policies) {
-				if (pinfo.Key.PolicyType == t)
-					yield return new ScopedPolicy (t, pinfo.Value, pinfo.Key.Scope);
+			if (policies != null) {
+				foreach (KeyValuePair<PolicyKey,object> pinfo in policies) {
+					if (pinfo.Key.PolicyType == t)
+						yield return new ScopedPolicy (t, pinfo.Value, pinfo.Key.Scope);
+				}
 			}
 			object pol = Get (t);
 			if (pol != null)
@@ -206,6 +291,16 @@ namespace MonoDevelop.Projects.Policies
 					return null;
 			}
 			return o;
+		}
+		
+		/// <summary>
+		/// Gets a list of all policies defined in this container (not inherited)
+		/// </summary>
+		public IEnumerable<ScopedPolicy> DirectGetAll ()
+		{
+			if (policies == null)
+				return new ScopedPolicy [0];
+			return policies.Select (pk => new ScopedPolicy (pk.Key.PolicyType, pk.Value, pk.Key.Scope));
 		}
 		
 		public abstract bool IsRoot { get; }
@@ -261,16 +356,20 @@ namespace MonoDevelop.Projects.Policies
 		
 		#endregion
 		
-		/// <summary>
-		/// When set to true, the container will return a default policy when requesting a
-		/// policy object that is not defined in the container.
-		/// </summary>
-		protected abstract bool InheritDefaultPolicies { get; }
-		
 		protected virtual void OnPolicyChanged (Type policyType, string scope)
 		{
 			if (PolicyChanged != null)
 				PolicyChanged (this, new PolicyChangedEventArgs (policyType, scope));
+		}
+		
+		protected virtual T GetDefaultPolicy<T> () where T : class, IEquatable<T>, new ()
+		{
+			return PolicyService.GetDefaultPolicy<T> ();
+		}
+		
+		protected virtual T GetDefaultPolicy<T> (IEnumerable<string> scopes) where T : class, IEquatable<T>, new ()
+		{
+			return PolicyService.GetDefaultPolicy<T> (scopes);
 		}
 		
 		public virtual bool ReadOnly {
@@ -282,6 +381,12 @@ namespace MonoDevelop.Projects.Policies
 		{
 			if (ReadOnly)
 				throw new InvalidOperationException ("This PolicyContainer can't be modified");
+		}
+		
+		PolicyContainer IPolicyProvider.Policies {
+			get {
+				return this;
+			}
 		}
 	}
 }

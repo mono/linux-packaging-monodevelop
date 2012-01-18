@@ -39,7 +39,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		ClassEntry entry;
 		bool isLoaded = false;
 		IType wrappedType = null;
-		IType WrappedType {
+		public IType WrappedType {
 			get {
 				if (!isLoaded) {
 					isLoaded = true;
@@ -70,7 +70,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			
 			Debug.Assert (entry != null);
 			base.Name      = entry.Name;
-			base.Namespace = entry.NamespaceRef.FullName;
+			base.Namespace = entry.Namespace;
 		}
 		
 		public override string ToString ()
@@ -86,7 +86,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		
 		public override string Namespace {
 			get {
-				return entry.NamespaceRef.FullName;
+				return entry.Namespace;
 			}
 		}
 		public override TypeModifier TypeModifier {
@@ -172,7 +172,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		
 		public override IEnumerable<IProperty> Properties {
 			get {
-				if (HasContent (ContentFlags.HasProperties))
+				if (HasContent (ContentFlags.HasProperties) || HasContent (ContentFlags.HasIndexers))
 					return WrappedType.Properties;
 				return new IProperty [0];
 			}

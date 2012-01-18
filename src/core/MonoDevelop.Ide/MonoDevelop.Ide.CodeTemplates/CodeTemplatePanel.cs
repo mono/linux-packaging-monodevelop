@@ -36,7 +36,6 @@ namespace MonoDevelop.Ide.CodeTemplates
 	[System.ComponentModel.ToolboxItem(true)]
 	internal partial class CodeTemplatePanelWidget : Gtk.Bin
 	{
-		OptionsDialog parent;
 		List<CodeTemplate> templates;
 		Gtk.TreeStore templateStore;
 		CellRendererText   templateCellRenderer;
@@ -46,7 +45,6 @@ namespace MonoDevelop.Ide.CodeTemplates
 		
 		public CodeTemplatePanelWidget (OptionsDialog parent)
 		{
-			this.parent = parent;
 			this.Build();
 			scrolledwindow1.Child = textEditor;
 			textEditor.ShowAll ();
@@ -75,13 +73,12 @@ namespace MonoDevelop.Ide.CodeTemplates
 			treeviewCodeTemplates.ExpandAll ();
 			treeviewCodeTemplates.Selection.Changed += HandleChanged;
 			
-			options = new Mono.TextEditor.TextEditorOptions ();
+			options = new MonoDevelop.Ide.Gui.CommonTextEditorOptions ();
 			options.ShowLineNumberMargin = false;
 			options.ShowFoldMargin = false;
 			options.ShowIconMargin = false;
 			options.ShowInvalidLines = false;
 			options.ShowSpaces = options.ShowTabs = options.ShowEolMarkers = false;
-			options.ColorScheme = PropertyService.Get ("ColorScheme", "Default");
 			textEditor.Options = options;
 			textEditor.Document.ReadOnly = true;
 			this.buttonAdd.Clicked += ButtonAddClicked;
@@ -127,6 +124,7 @@ namespace MonoDevelop.Ide.CodeTemplates
 				var editDialog = new EditTemplateDialog (template, false);
 				if (MessageService.ShowCustomDialog (editDialog, this.Toplevel as Gtk.Window) == (int)ResponseType.Ok)
 					templatesToSave.Add (template);
+				HandleChanged (this, EventArgs.Empty);
 			}
 		}
 		

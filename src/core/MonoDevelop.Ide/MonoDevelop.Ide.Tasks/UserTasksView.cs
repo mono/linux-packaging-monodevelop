@@ -84,9 +84,7 @@ namespace MonoDevelop.Ide.Tasks
 			view.RulesHint = true;
 			view.SearchColumn = (int)Columns.Description;
 			view.Selection.Changed += new EventHandler (SelectionChanged);
-			view.PopupMenu += new PopupMenuHandler (OnUserPopupMenu);
-			view.ButtonPressEvent += new ButtonPressEventHandler (OnUserButtonPressed);
-			
+			view.DoPopupMenu = ShowUserPopup;
 			TreeViewColumn col;
 			
 			CellRendererComboBox cellRendPriority = new CellRendererComboBox ();
@@ -126,14 +124,18 @@ namespace MonoDevelop.Ide.Tasks
 			delButton.Clicked += new EventHandler (DeleteUserTaskClicked); 
 			delButton.TooltipText = GettextCatalog.GetString ("Delete Task");
 
-			TaskService.UserTasks.TasksChanged += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (UserTasksChanged));
-			TaskService.UserTasks.TasksAdded += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (UserTasksChanged));
-			TaskService.UserTasks.TasksRemoved += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (UserTasksChanged));
+			TaskService.UserTasks.TasksChanged += DispatchService.GuiDispatch<TaskEventHandler> (UserTasksChanged);
+			TaskService.UserTasks.TasksAdded += DispatchService.GuiDispatch<TaskEventHandler> (UserTasksChanged);
+			TaskService.UserTasks.TasksRemoved += DispatchService.GuiDispatch<TaskEventHandler> (UserTasksChanged);
+			
+			if (IdeApp.Workspace.IsOpen)
+				solutionLoaded = true;
 			
 			IdeApp.Workspace.FirstWorkspaceItemOpened += CombineOpened;
 			IdeApp.Workspace.LastWorkspaceItemClosed += CombineClosed;
-			PropertyService.PropertyChanged += (EventHandler<PropertyChangedEventArgs>) DispatchService.GuiDispatch (new EventHandler<PropertyChangedEventArgs> (OnPropertyUpdated));	
+			PropertyService.PropertyChanged += DispatchService.GuiDispatch<EventHandler<PropertyChangedEventArgs>> (OnPropertyUpdated);
 			ValidateButtons ();
+			
 			// Initialize with existing tags.
 			UserTasksChanged (this, null);
 		}
@@ -340,28 +342,16 @@ namespace MonoDevelop.Ide.Tasks
 					return lowPrioColor;
 			}
 		}
-		
-		[GLib.ConnectBefore]
-		void OnUserButtonPressed (object o, ButtonPressEventArgs args)
-		{
-			if (args.Event.Button == 3)
-				ShowUserPopup ();
-		}
-		
-		void OnUserPopupMenu (object o, PopupMenuArgs args)
-		{
-			ShowUserPopup ();
-		}
 
-		void ShowUserPopup ()
+		void ShowUserPopup (Gdk.EventButton evt)
 		{
-			Menu menu = new Menu ();
-			menu.AccelGroup = new AccelGroup ();
-			ImageMenuItem copy = new ImageMenuItem (Gtk.Stock.Copy, menu.AccelGroup);
-			copy.Activated += new EventHandler (OnUserTaskCopied);
+			var menu = new Menu () {
+				AccelGroup = new AccelGroup (),
+			};
+			var copy = new ImageMenuItem (Gtk.Stock.Copy, menu.AccelGroup);
+			copy.Activated += OnUserTaskCopied;
 			menu.Append (copy);
-			menu.Popup (null, null, null, 3, Gtk.Global.CurrentEventTime);
-			menu.ShowAll ();
+			IdeApp.CommandService.ShowContextMenu (view, evt, menu);
 		}
 
 		void OnUserTaskCopied (object o, EventArgs args)

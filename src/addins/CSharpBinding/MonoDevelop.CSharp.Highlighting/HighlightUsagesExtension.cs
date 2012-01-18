@@ -52,10 +52,15 @@ namespace MonoDevelop.CSharp.Highlighting
 			dom = Document.Dom;
 			
 			textEditorResolver = base.Document.GetContent<ITextEditorResolver> ();
-			textEditorData = base.Document.TextEditorData;
+			textEditorData = base.Document.Editor;
 			textEditorData.Caret.PositionChanged += HandleTextEditorDataCaretPositionChanged;
 			textEditorData.Document.TextReplaced += HandleTextEditorDataDocumentTextReplaced;
-			
+			textEditorData.SelectionChanged += HandleTextEditorDataSelectionChanged;
+		}
+
+		void HandleTextEditorDataSelectionChanged (object sender, EventArgs e)
+		{
+			RemoveMarkers (false);
 		}
 
 		void HandleTextEditorDataDocumentTextReplaced (object sender, ReplaceEventArgs e)
@@ -65,6 +70,7 @@ namespace MonoDevelop.CSharp.Highlighting
 		
 		public override void Dispose ()
 		{
+			textEditorData.SelectionChanged -= HandleTextEditorDataSelectionChanged;
 			textEditorData.Caret.PositionChanged -= HandleTextEditorDataCaretPositionChanged;
 			textEditorData.Document.TextReplaced -= HandleTextEditorDataDocumentTextReplaced;
 			base.Dispose ();
@@ -95,6 +101,8 @@ namespace MonoDevelop.CSharp.Highlighting
 
 		void HandleTextEditorDataCaretPositionChanged (object sender, DocumentLocationEventArgs e)
 		{
+			if (!SourceEditor.DefaultSourceEditorOptions.Instance.EnableHighlightUsages)
+				return;
 			if (!textEditorData.IsSomethingSelected && markers.Values.Any (m => m.Contains (textEditorData.Caret.Offset)))
 				return;
 			RemoveMarkers (textEditorData.IsSomethingSelected);
@@ -129,7 +137,7 @@ namespace MonoDevelop.CSharp.Highlighting
 					return false;
 				
 				string expression = textEditorData.Document.GetTextBetween (start, end);
-				ResolveResult resolveResult = textEditorResolver.GetLanguageItem (caretOffset, expression);
+				var resolveResult = textEditorResolver.GetLanguageItem (caretOffset, expression);
 				if (resolveResult == null)
 					return false;
 				if (resolveResult is AggregatedResolveResult) {
@@ -154,19 +162,22 @@ namespace MonoDevelop.CSharp.Highlighting
 		void ShowReferences (List<MonoDevelop.Projects.CodeGeneration.MemberReference> references)
 		{
 			RemoveMarkers (false);
+			HashSet<int> lineNumbers = new HashSet<int> ();
 			if (references != null) {
 				bool alphaBlend = false;
 				foreach (var r in references) {
-					UsageMarker marker = GetMarker (r.Line - 1);
-					int offset = textEditorData.Document.LocationToOffset (r.Line - 1, r.Column - 1);
+					UsageMarker marker = GetMarker (r.Line);
+					int offset = textEditorData.Document.LocationToOffset (r.Line, r.Column);
 					if (!alphaBlend && textEditorData.Parent.TextViewMargin.SearchResults.Any (sr => sr.Contains (offset) || sr.Contains (offset + r.Name.Length) ||
 					                                                        offset < sr.Offset && sr.EndOffset < offset + r.Name.Length)) {
 						textEditorData.Parent.TextViewMargin.AlphaBlendSearchResults = alphaBlend = true;
 					}
 					marker.Usages.Add (new Mono.TextEditor.Segment (offset, r.Name.Length));
+					lineNumbers.Add (r.Line);
 				}
 			}
-			textEditorData.Document.CommitUpdateAll ();
+			foreach (int line in lineNumbers)
+				textEditorData.Document.CommitLineUpdate (line);
 		}
 		
 		List<MonoDevelop.Projects.CodeGeneration.MemberReference> GetReferences (ResolveResult resolveResult)
@@ -182,16 +193,20 @@ namespace MonoDevelop.CSharp.Highlighting
 				member = ((ParameterResolveResult)resolveResult).Parameter;
 			if (resolveResult is LocalVariableResolveResult)
 				member = ((LocalVariableResolveResult)resolveResult).LocalVariable;
-			
 			if (member != null) {
 				try {
-					NRefactoryResolver resolver = new NRefactoryResolver (dom, Document.CompilationUnit, ICSharpCode.NRefactory.SupportedLanguage.CSharp, Document.TextEditor, Document.FileName);
-					FindMemberAstVisitor visitor = new FindMemberAstVisitor (textEditorData.Document, resolver, member);
-					visitor.IncludeXmlDocumentation = true;
-					ICSharpCode.NRefactory.Ast.CompilationUnit unit = Document.CompilationUnit.Tag as ICSharpCode.NRefactory.Ast.CompilationUnit;
-					if (unit == null)
+					ICompilationUnit compUnit = Document.CompilationUnit;
+					if (compUnit == null)
 						return null;
-					visitor.RunVisitor (unit);
+					NRefactoryResolver resolver = new NRefactoryResolver (dom, compUnit, ICSharpCode.OldNRefactory.SupportedLanguage.CSharp, Document.Editor, Document.FileName);
+					if (member is LocalVariable)
+						resolver.CallingMember = ((LocalVariable)member).DeclaringMember;
+					FindMemberAstVisitor visitor = new FindMemberAstVisitor (textEditorData.Document, member);
+					visitor.IncludeXmlDocumentation = true;
+/*					ICSharpCode.OldNRefactory.Ast.CompilationUnit unit = compUnit.Tag as ICSharpCode.OldNRefactory.Ast.CompilationUnit;
+					if (unit == null)
+						return null;*/
+					visitor.RunVisitor (resolver);
 					return visitor.FoundReferences;
 				} catch (Exception e) {
 					LoggingService.LogError ("Error in highlight usages extension.", e);
@@ -208,10 +223,9 @@ namespace MonoDevelop.CSharp.Highlighting
 		
 		void RemoveMarkers (bool updateLine)
 		{
-			textEditorData.Parent.TextViewMargin.AlphaBlendSearchResults = false;
 			if (markers.Count == 0)
 				return;
-			
+			textEditorData.Parent.TextViewMargin.AlphaBlendSearchResults = false;
 			foreach (var pair in markers) {
 				textEditorData.Document.RemoveMarker (pair.Value, true);
 			}
@@ -243,7 +257,7 @@ namespace MonoDevelop.CSharp.Highlighting
 				return usages.Any (u => u.Offset <= offset && offset <= u.EndOffset);
 			}
 			
-			public bool DrawBackground (TextEditor editor, Gdk.Drawable win, TextViewMargin.LayoutWrapper layout, int selectionStart, int selectionEnd, int startOffset, int endOffset, int y, int startXPos, int endXPos, ref bool drawBg)
+			public bool DrawBackground (TextEditor editor, Cairo.Context cr, TextViewMargin.LayoutWrapper layout, int selectionStart, int selectionEnd, int startOffset, int endOffset, double y, double startXPos, double endXPos, ref bool drawBg)
 			{
 				drawBg = false;
 				if (selectionStart >= 0 || editor.CurrentMode is TextLinkEditMode)
@@ -255,8 +269,8 @@ namespace MonoDevelop.CSharp.Highlighting
 					if (markerEnd < startOffset || markerStart > endOffset) 
 						return true; 
 					
-					int @from;
-					int to;
+					double @from;
+					double to;
 					
 					if (markerStart < startOffset && endOffset < markerEnd) {
 						@from = startXPos;
@@ -264,11 +278,16 @@ namespace MonoDevelop.CSharp.Highlighting
 					} else {
 						int start = startOffset < markerStart ? markerStart : startOffset;
 						int end = endOffset < markerEnd ? endOffset : markerEnd;
-						int x_pos = layout.Layout.IndexToPos (start - startOffset).X;
-			
+						
+						uint curIndex = 0, byteIndex = 0;
+						TextViewMargin.TranslateToUTF8Index (layout.LineChars, (uint)(start - startOffset), ref curIndex, ref byteIndex);
+						
+						int x_pos = layout.Layout.IndexToPos ((int)byteIndex).X;
+						
 						@from = startXPos + (int)(x_pos / Pango.Scale.PangoScale);
-			
-						x_pos = layout.Layout.IndexToPos (end - startOffset).X;
+						
+						TextViewMargin.TranslateToUTF8Index (layout.LineChars, (uint)(end - startOffset), ref curIndex, ref byteIndex);
+						x_pos = layout.Layout.IndexToPos ((int)byteIndex).X;
 			
 						to = startXPos + (int)(x_pos / Pango.Scale.PangoScale);
 					}
@@ -276,12 +295,13 @@ namespace MonoDevelop.CSharp.Highlighting
 					@from = System.Math.Max (@from, editor.TextViewMargin.XOffset);
 					to = System.Math.Max (to, editor.TextViewMargin.XOffset);
 					if (@from < to) {
-						using (Gdk.GC gc = new Gdk.GC(win)) {
-							gc.RgbFgColor = editor.ColorStyle.BracketHighlightRectangle.BackgroundColor;
-							win.DrawRectangle (gc, true, @from + 1, y + 1, to - @from - 1, editor.LineHeight - 2);
-							gc.RgbFgColor = editor.ColorStyle.BracketHighlightRectangle.Color;
-							win.DrawRectangle (gc, false, @from, y, to - @from, editor.LineHeight - 1);
-						}
+						cr.Color = (HslColor)editor.ColorStyle.BracketHighlightRectangle.BackgroundColor;
+						cr.Rectangle (@from + 1, y + 1, to - @from - 1, editor.LineHeight - 2);
+						cr.Fill ();
+						
+						cr.Color = (HslColor)editor.ColorStyle.BracketHighlightRectangle.Color;
+						cr.Rectangle (@from, y, to - @from, editor.LineHeight - 1);
+						cr.Fill ();
 					}
 				}
 				return true;

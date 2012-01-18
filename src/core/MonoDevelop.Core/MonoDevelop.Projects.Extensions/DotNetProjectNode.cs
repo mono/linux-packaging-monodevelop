@@ -36,10 +36,10 @@ namespace MonoDevelop.Projects.Extensions
 	public class DotNetProjectNode: ItemTypeNode
 	{
 		[NodeAttribute (Required=true)]
-		string language;
+		string language = null;
 		
 		[NodeAttribute]
-		string resourceHandler;
+		string resourceHandler = null;
 		
 		public override bool CanHandleItem (SolutionEntityItem item)
 		{
@@ -59,11 +59,11 @@ namespace MonoDevelop.Projects.Extensions
 			return false;
 		}
 		
-		public override SolutionEntityItem LoadSolutionItem (IProgressMonitor monitor, string fileName, string itemGuid)
+		public override SolutionEntityItem LoadSolutionItem (IProgressMonitor monitor, string fileName, MSBuildFileFormat expectedFormat, string itemGuid)
 		{
 			MSBuildProjectHandler handler = CreateHandler<MSBuildProjectHandler> (fileName, itemGuid);
 			handler.SetCustomResourceHandler (GetResourceHandler ());
-			return handler.Load (monitor, fileName, language, null);
+			return handler.Load (monitor, fileName, expectedFormat, language, null);
 		}
 		
 		public IResourceHandler GetResourceHandler ()

@@ -101,8 +101,7 @@ namespace MonoDevelop.Ide.Tasks
 			view = new MonoDevelop.Ide.Gui.Components.PadTreeView (store);
 			view.RulesHint = true;
 			view.SearchColumn = (int)Columns.Description;
-			view.PopupMenu += new PopupMenuHandler (OnPopupMenu);
-			view.ButtonPressEvent += new ButtonPressEventHandler (OnButtonPressed);
+			view.DoPopupMenu = (evt) => IdeApp.CommandService.ShowContextMenu (view, evt, menu);
 			view.RowActivated += new RowActivatedHandler (OnRowActivated);
 
 			TreeViewColumn col;
@@ -113,19 +112,19 @@ namespace MonoDevelop.Ide.Tasks
 			col.Clickable = true;
 			col.SortColumnId = (int)Columns.Description;
 			col.Resizable = true;
-			col.Clicked += new EventHandler (Resort);
+			col.Clicked += Resort;
 
 			col = view.AppendColumn (GettextCatalog.GetString ("File"), view.TextRenderer, "text", Columns.File, "foreground-gdk", Columns.Foreground, "weight", Columns.Bold);
 			col.Clickable = true;
 			col.SortColumnId = (int)Columns.File;
 			col.Resizable = true;
-			col.Clicked += new EventHandler (Resort);
+			col.Clicked += Resort;
 
 			col = view.AppendColumn (GettextCatalog.GetString ("Path"), view.TextRenderer, "text", Columns.Path, "foreground-gdk", Columns.Foreground, "weight", Columns.Bold);
 			col.Clickable = true;
 			col.SortColumnId = (int)Columns.Path;
 			col.Resizable = true;
-			col.Clicked += new EventHandler (Resort);
+			col.Clicked += Resort;
 
 			LoadColumnsVisibility ();
 			
@@ -138,12 +137,10 @@ namespace MonoDevelop.Ide.Tasks
 				comments.EndTaskUpdates ();
 			}
 
-			comments.TasksAdded += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (GeneratedTaskAdded));
-			comments.TasksRemoved += (TaskEventHandler) DispatchService.GuiDispatch (new TaskEventHandler (GeneratedTaskRemoved));
+			comments.TasksAdded += DispatchService.GuiDispatch<TaskEventHandler> (GeneratedTaskAdded);
+			comments.TasksRemoved += DispatchService.GuiDispatch<TaskEventHandler> (GeneratedTaskRemoved);
 
-			PropertyService.PropertyChanged += (EventHandler<PropertyChangedEventArgs>) DispatchService.GuiDispatch (new EventHandler<PropertyChangedEventArgs> (OnPropertyUpdated));
-			
-			CreateMenu ();
+			PropertyService.PropertyChanged += DispatchService.GuiDispatch<EventHandler<PropertyChangedEventArgs>> (OnPropertyUpdated);
 			
 			// Initialize with existing tags.
 			foreach (Task t in comments)
@@ -254,7 +251,7 @@ namespace MonoDevelop.Ide.Tasks
 							desc = tag.Key + ": " + desc;
 					}
 					
-					Task t = new Task (fileName, desc, tag.Region.Start.Column - 1, tag.Region.Start.Line,
+					Task t = new Task (fileName, desc, tag.Region.Start.Column, tag.Region.Start.Line,
 					                   TaskSeverity.Information, priorities[tag.Key], wob);
 					newTasks.Add (t);
 				}
@@ -338,101 +335,90 @@ namespace MonoDevelop.Ide.Tasks
 			return TreeIter.Zero;
 		}
 
-		void CreateMenu ()
+		Menu CreateMenu ()
 		{
-			if (menu == null)
+			if (menu != null)
+				return menu;
+			
+			var group = new ActionGroup ("Popup");
+			
+			var copy = new Gtk.Action ("copy", GettextCatalog.GetString ("_Copy"),
+				GettextCatalog.GetString ("Copy comment task"), Gtk.Stock.Copy);
+			copy.Activated += OnGenTaskCopied;
+			group.Add (copy, "<Control><Mod2>c");
+
+			var jump = new Gtk.Action ("jump", GettextCatalog.GetString ("_Go to"),
+				GettextCatalog.GetString ("Go to comment task"), Gtk.Stock.JumpTo);
+			jump.Activated += OnGenTaskJumpto;
+			group.Add (jump);
+
+			var delete = new Gtk.Action ("delete", GettextCatalog.GetString ("_Delete"),
+				GettextCatalog.GetString ("Delete comment task"), Gtk.Stock.Delete);
+			delete.Activated += OnGenTaskDelete;
+			group.Add (delete);
+
+			var columns = new Gtk.Action ("columns", GettextCatalog.GetString ("Columns"));
+			group.Add (columns, null);
+
+			var columnLine = new ToggleAction ("columnLine", GettextCatalog.GetString ("Line"),
+				GettextCatalog.GetString ("Toggle visibility of Line column"), null);
+			columnLine.Toggled += OnColumnVisibilityChanged;
+			columnsActions[columnLine] = (int)Columns.Line;
+			group.Add (columnLine);
+
+			var columnDescription = new ToggleAction ("columnDescription", GettextCatalog.GetString ("Description"),
+				GettextCatalog.GetString ("Toggle visibility of Description column"), null);
+			columnDescription.Toggled += OnColumnVisibilityChanged;
+			columnsActions[columnDescription] = (int)Columns.Description;
+			group.Add (columnDescription);
+
+			var columnFile = new ToggleAction ("columnFile", GettextCatalog.GetString ("File"),
+				GettextCatalog.GetString ("Toggle visibility of File column"), null);
+			columnFile.Toggled += OnColumnVisibilityChanged;
+			columnsActions[columnFile] = (int)Columns.File;
+			group.Add (columnFile);
+
+			var columnPath = new ToggleAction ("columnPath", GettextCatalog.GetString ("Path"),
+				GettextCatalog.GetString ("Toggle visibility of Path column"), null);
+			columnPath.Toggled += OnColumnVisibilityChanged;
+			columnsActions[columnPath] = (int)Columns.Path;
+			group.Add (columnPath);
+
+			UIManager uiManager = new UIManager ();
+			uiManager.InsertActionGroup (group, 0);
+			
+			string uiStr = "<ui><popup name='popup'>"
+				+ "<menuitem action='copy'/>"
+				+ "<menuitem action='jump'/>"
+				+ "<menuitem action='delete'/>"
+				+ "<separator/>"
+				+ "<menu action='columns'>"
+				+ "<menuitem action='columnLine' />"
+				+ "<menuitem action='columnDescription' />"
+				+ "<menuitem action='columnFile' />"
+				+ "<menuitem action='columnPath' />"
+				+ "</menu>"
+				+ "</popup></ui>";
+
+			uiManager.AddUiFromString (uiStr);
+			menu = (Menu)uiManager.GetWidget ("/popup");
+			menu.ShowAll ();
+
+			menu.Shown += delegate (object o, EventArgs args)
 			{
-				ActionGroup group = new ActionGroup ("Popup");
-
-				Gtk.Action copy = new Gtk.Action ("copy", GettextCatalog.GetString ("_Copy"),
-				                          GettextCatalog.GetString ("Copy comment task"), Gtk.Stock.Copy);
-				copy.Activated += new EventHandler (OnGenTaskCopied);
-				group.Add (copy, "<Control><Mod2>c");
-
-				Gtk.Action jump = new Gtk.Action ("jump", GettextCatalog.GetString ("_Go to"),
-				                          GettextCatalog.GetString ("Go to comment task"), Gtk.Stock.JumpTo);
-				jump.Activated += new EventHandler (OnGenTaskJumpto);
-				group.Add (jump);
-
-				Gtk.Action delete = new Gtk.Action ("delete", GettextCatalog.GetString ("_Delete"),
-				                          GettextCatalog.GetString ("Delete comment task"), Gtk.Stock.Delete);
-				delete.Activated += new EventHandler (OnGenTaskDelete);
-				group.Add (delete);
-
-				Gtk.Action columns = new Gtk.Action ("columns", GettextCatalog.GetString ("Columns"));
-				group.Add (columns, null);
-
-				ToggleAction columnLine = new ToggleAction ("columnLine", GettextCatalog.GetString ("Line"),
-				                                            GettextCatalog.GetString ("Toggle visibility of Line column"), null);
-				columnLine.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnLine] = (int)Columns.Line;
-				group.Add (columnLine);
-
-				ToggleAction columnDescription = new ToggleAction ("columnDescription", GettextCatalog.GetString ("Description"),
-				                                            GettextCatalog.GetString ("Toggle visibility of Description column"), null);
-				columnDescription.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnDescription] = (int)Columns.Description;
-				group.Add (columnDescription);
-
-				ToggleAction columnFile = new ToggleAction ("columnFile", GettextCatalog.GetString ("File"),
-				                                            GettextCatalog.GetString ("Toggle visibility of File column"), null);
-				columnFile.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnFile] = (int)Columns.File;
-				group.Add (columnFile);
-
-				ToggleAction columnPath = new ToggleAction ("columnPath", GettextCatalog.GetString ("Path"),
-				                                            GettextCatalog.GetString ("Toggle visibility of Path column"), null);
-				columnPath.Toggled += new EventHandler (OnColumnVisibilityChanged);
-				columnsActions[columnPath] = (int)Columns.Path;
-				group.Add (columnPath);
-
-				UIManager uiManager = new UIManager ();
-				uiManager.InsertActionGroup (group, 0);
-				
-				string uiStr = "<ui><popup name='popup'>"
-					+ "<menuitem action='copy'/>"
-					+ "<menuitem action='jump'/>"
-					+ "<menuitem action='delete'/>"
-					+ "<separator/>"
-					+ "<menu action='columns'>"
-					+ "<menuitem action='columnLine' />"
-					+ "<menuitem action='columnDescription' />"
-					+ "<menuitem action='columnFile' />"
-					+ "<menuitem action='columnPath' />"
-					+ "</menu>"
-					+ "</popup></ui>";
-
-				uiManager.AddUiFromString (uiStr);
-				menu = (Menu)uiManager.GetWidget ("/popup");
-				menu.ShowAll ();
-
-				menu.Shown += delegate (object o, EventArgs args)
-				{
-					columnLine.Active = view.Columns[(int)Columns.Line].Visible;
-					columnDescription.Active = view.Columns[(int)Columns.Description].Visible;
-					columnFile.Active = view.Columns[(int)Columns.File].Visible;
-					columnPath.Active = view.Columns[(int)Columns.Path].Visible;
-					copy.Sensitive = jump.Sensitive = delete.Sensitive =
-						view.Selection != null &&
-						view.Selection.CountSelectedRows () > 0 &&
-						(columnLine.Active ||
-						columnDescription.Active ||
-						columnFile.Active ||
-						columnPath.Active);
-				};
-			}
-		}
-
-		[GLib.ConnectBefore]
-		void OnButtonPressed (object o, ButtonPressEventArgs args)
-		{
-			if (args.Event.Button == 3)
-				menu.Popup ();
-		}
-
-		void OnPopupMenu (object o, PopupMenuArgs args)
-		{
-			menu.Popup ();
+				columnLine.Active = view.Columns[(int)Columns.Line].Visible;
+				columnDescription.Active = view.Columns[(int)Columns.Description].Visible;
+				columnFile.Active = view.Columns[(int)Columns.File].Visible;
+				columnPath.Active = view.Columns[(int)Columns.Path].Visible;
+				copy.Sensitive = jump.Sensitive = delete.Sensitive =
+					view.Selection != null &&
+					view.Selection.CountSelectedRows () > 0 &&
+					(columnLine.Active ||
+					columnDescription.Active ||
+					columnFile.Active ||
+					columnPath.Active);
+			};
+			return menu;
 		}
 
 		void OnGenTaskCopied (object o, EventArgs args)
@@ -475,16 +461,17 @@ namespace MonoDevelop.Ide.Tasks
 		{
 			Task task = SelectedTask;
 			if (task != null && ! String.IsNullOrEmpty (task.FileName)) {
-				Document doc = IdeApp.Workbench.OpenDocument (task.FileName, Math.Max (1, task.Line), Math.Max (1, task.Column), true);
+				Document doc = IdeApp.Workbench.OpenDocument (task.FileName, Math.Max (1, task.Line), Math.Max (1, task.Column));
 				if (doc != null && doc.HasProject && doc.Project is DotNetProject) {
-					string[] commentTags = TextEditor.GetCommentTags (doc.FileName);
+					string[] commentTags = doc.CommentTags;
 					if (commentTags != null && commentTags.Length == 1) {
-						string line = doc.TextEditor.GetLineText (task.Line);
+						string line = doc.Editor.GetLineText (task.Line);
 						int index = line.IndexOf (commentTags[0]);
 						if (index != -1) {
-							doc.TextEditor.JumpTo (task.Line, task.Column);
+							doc.Editor.SetCaretTo (task.Line, task.Column);
 							line = line.Substring (0, index);
-							doc.TextEditor.ReplaceLine (task.Line, line);
+							var ls = doc.Editor.Document.GetLine (task.Line);
+							doc.Editor.Replace (ls.Offset, ls.EditableLength, line);
 							comments.Remove (task);
 						}
 					}

@@ -37,6 +37,7 @@ using MonoDevelop.Core.Serialization;
 using MonoDevelop.Projects;
 using MonoDevelop.AspNet.Gui;
 using MonoDevelop.Core.Execution;
+using MonoDevelop.Core.Assemblies;
 
 namespace MonoDevelop.Moonlight
 {
@@ -48,20 +49,16 @@ namespace MonoDevelop.Moonlight
 		public MoonlightProject ()
 			: base ()
 		{
-			Init ();
 		}
 		
 		public MoonlightProject (string languageName)
 			: base (languageName)
 		{
-			Init ();
 		}
 		
 		public MoonlightProject (string languageName, ProjectCreateInformation info, XmlElement projectOptions)
 			: base (languageName, info, projectOptions)
 		{
-			Init ();
-			
 			XmlNode silverAppNode = projectOptions.SelectSingleNode ("SilverlightApplication");
 			if (silverAppNode == null || !Boolean.TryParse (silverAppNode.InnerText, out silverlightApplication))
 				throw new Exception ("Moonlight template is missing SilverlightApplication node");
@@ -99,15 +96,19 @@ namespace MonoDevelop.Moonlight
 			generateSilverlightManifest = true;
 		}
 		
-		void Init ()
+		public override TargetFrameworkMoniker GetDefaultTargetFrameworkForFormat (FileFormat format)
 		{
-			//set the framework to an available SL version
-			//FIXME: we need to base these on the MSBuild targets, so that changes are persisted
-			var fx = Runtime.SystemAssemblyService.GetTargetFramework ("SL3.0");
-			if (TargetRuntime.IsInstalled (fx))
-				TargetFramework = fx;
-			else
-				TargetFramework = Runtime.SystemAssemblyService.GetTargetFramework ("SL2.0");
+			switch (format.Id) {
+			case "MSBuild08":
+				return new TargetFrameworkMoniker ("Silverlight", "3.0");
+			default:
+				return new TargetFrameworkMoniker ("Silverlight", "4.0");
+			}
+		}
+		
+		public override TargetFrameworkMoniker GetDefaultTargetFrameworkId ()
+		{
+			return new TargetFrameworkMoniker ("Silverlight", "4.0");
 		}
 		
 		public override SolutionItemConfiguration CreateConfiguration (string name)
@@ -119,8 +120,12 @@ namespace MonoDevelop.Moonlight
 		
 		public override bool SupportsFramework (MonoDevelop.Core.Assemblies.TargetFramework framework)
 		{
-			//framework.ClrVersion == ClrVersion.Clr_2_1;
-			return framework.Id == "SL2.0" || framework.Id == "SL3.0";
+			return framework.Id.Identifier == "Silverlight";
+		}
+		
+		public override bool SupportsFormat (FileFormat format)
+		{
+			return format.Id == "MSBuild08" || format.Id == "MSBuild10";
 		}
 		
 		public override string ProjectType {
@@ -238,6 +243,11 @@ namespace MonoDevelop.Moonlight
 		
 		[ItemProperty("ThrowErrorsInValidation")]
 		bool throwErrorsInValidation = false;
+		
+		//FIXME: how can we ensure this goes after the TargetFrameworkVersion element?
+		//why do we even need to deserialize it?
+		[ItemProperty("SilverlightVersion")]
+		string silverlightVersion = "$(TargetFrameworkVersion)";
 		
 		//whether it's an application or a classlib
 		public bool SilverlightApplication {
@@ -360,41 +370,44 @@ namespace MonoDevelop.Moonlight
 		
 		static string[] groupedExtensions = { ".xaml" };
 		
-		protected override void OnFileAddedToProject (ProjectFileEventArgs e)
+		protected override void OnFileAddedToProject (ProjectFileEventArgs args)
 		{
 			//short-circuit if the project is being deserialised
 			if (Loading) {
-				base.OnFileAddedToProject (e);
+				base.OnFileAddedToProject (args);
 				return;
 			}
 			
-			//set some properties automatically
-			if (Path.GetExtension (e.ProjectFile.FilePath) == ".xaml") {
-				e.ProjectFile.Generator = "MSBuild:MarkupCompilePass1";
-				e.ProjectFile.ContentType = "Designer";
+			List<string> filesToAdd = new List<string> ();
+			foreach (ProjectFileEventInfo e in args) {
+				//set some properties automatically
+				if (Path.GetExtension (e.ProjectFile.FilePath) == ".xaml") {
+					e.ProjectFile.Generator = "MSBuild:MarkupCompilePass1";
+					e.ProjectFile.ContentType = "Designer";
+					
+					//fixme: detect Application xaml?
+					//if (e.ProjectFile.BuildAction == BuildAction.Page
+					//    && Path.GetFileName (e.ProjectFile.Name).Contains ("Application"))
+					//{
+					//	e.ProjectFile.BuildAction = BuildAction.ApplicationDefinition;
+					//}
+				}
 				
-				//fixme: detect Application xaml?
-				//if (e.ProjectFile.BuildAction == BuildAction.Page
-				//    && Path.GetFileName (e.ProjectFile.Name).Contains ("Application"))
-				//{
-				//	e.ProjectFile.BuildAction = BuildAction.ApplicationDefinition;
-				//}
+				//find any related files, e.g codebehind
+				IEnumerable<string> files = MonoDevelop.DesignerSupport.CodeBehind.GuessDependencies
+					(this, e.ProjectFile, groupedExtensions);
+				if (files != null)
+					filesToAdd.AddRange (files);
 			}
-			
-			//find any related files, e.g codebehind
-			IEnumerable<string> filesToAdd = MonoDevelop.DesignerSupport.CodeBehind.GuessDependencies
-				(this, e.ProjectFile, groupedExtensions);
 			
 			//let the base fire the event before we add files
 			//don't want to fire events out of order of files being added
-			base.OnFileAddedToProject (e);
+			base.OnFileAddedToProject (args);
 			
 			//make sure that the parent and child files are in the project
-			if (filesToAdd != null) {
-				foreach (string file in filesToAdd) {
-					//NOTE: this only adds files if they are not already in the project
-					AddFile (file);
-				}
+			foreach (string file in filesToAdd) {
+				//NOTE: this only adds files if they are not already in the project
+				AddFile (file);
 			}
 		}
 		

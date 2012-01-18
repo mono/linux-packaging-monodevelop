@@ -1,0 +1,165 @@
+Index: monodevelop/src/addins/NUnit/NUnitRunner/NUnitTestRunner.cs
+===================================================================
+--- monodevelop.orig/src/addins/NUnit/NUnitRunner/NUnitTestRunner.cs	2011-07-03 16:33:08.000000000 +0100
++++ monodevelop/src/addins/NUnit/NUnitRunner/NUnitTestRunner.cs	2011-07-03 16:33:37.000000000 +0100
+@@ -43,25 +43,25 @@
+ 	public class NUnitTestRunner: MarshalByRefObject
+ 	{
+ 		public void Initialize (string nunitPath, string nunitCorePath)
+-		{
+-			// In some cases MS.NET can't properly resolve assemblies even if they
+-			// are already loaded. For example, when deserializing objects from remoting.
+-			AppDomain.CurrentDomain.AssemblyResolve += delegate (object s, ResolveEventArgs args) {
+-				foreach (Assembly am in AppDomain.CurrentDomain.GetAssemblies ()) {
+-					if (am.GetName ().FullName == args.Name)
+-						return am;
+-				}
+-				return null;
+-			};
+-
++		{
++			// In some cases MS.NET can't properly resolve assemblies even if they
++			// are already loaded. For example, when deserializing objects from remoting.
++			AppDomain.CurrentDomain.AssemblyResolve += delegate (object s, ResolveEventArgs args) {
++				foreach (Assembly am in AppDomain.CurrentDomain.GetAssemblies ()) {
++					if (am.GetName ().FullName == args.Name)
++						return am;
++				}
++				return null;
++			};
++
+ 			// Force the loading of the NUnit.Framework assembly.
+ 			// It's needed since that dll is not located in the test dll directory.
+ 			Assembly.LoadFrom (nunitCorePath);
+ 			Assembly.LoadFrom (nunitPath);
+-
+-			// Initialize ExtensionHost if not already done
+-			if ( !CoreExtensions.Host.Initialized )
+-				CoreExtensions.Host.InitializeService();
++
++			// Initialize ExtensionHost if not already done
++			if ( !CoreExtensions.Host.Initialized )
++				CoreExtensions.Host.InitializeService();
+ 		}
+ 		
+ 		public TestResult Run (EventListener listener, ITestFilter filter, string path, string suiteName, List<string> supportAssemblies)
+@@ -153,7 +153,7 @@
+ 		
+ 		public bool Pass (ITest test)
+ 		{
+-			if ((test is global::NUnit.Core.TestCase) && test.TestName.FullName == name)
++			if ((test is global::NUnit.Core.Test) && test.TestName.FullName == name)
+ 				return true;
+ 			if (test.Tests != null) {
+ 				foreach (ITest ct in test.Tests) {
+Index: monodevelop/src/addins/NUnit/Services/ExternalTestRunner.cs
+===================================================================
+--- monodevelop.orig/src/addins/NUnit/Services/ExternalTestRunner.cs	2011-07-03 16:33:52.000000000 +0100
++++ monodevelop/src/addins/NUnit/Services/ExternalTestRunner.cs	2011-07-03 16:34:34.000000000 +0100
+@@ -46,27 +46,27 @@
+ {
+ 	class ExternalTestRunner: RemoteProcessObject
+ 	{
+-		NUnitTestRunner runner;
+-
+-		public ExternalTestRunner ( )
+-		{
+-			// In some cases MS.NET can't properly resolve assemblies even if they
+-			// are already loaded. For example, when deserializing objects from remoting.
+-			AppDomain.CurrentDomain.AssemblyResolve += delegate (object s, ResolveEventArgs args) {
+-				foreach (Assembly am in AppDomain.CurrentDomain.GetAssemblies ()) {
+-					if (am.GetName ().FullName == args.Name)
+-						return am;
+-				}
+-				return null;
++		NUnitTestRunner runner;
++
++		public ExternalTestRunner ( )
++		{
++			// In some cases MS.NET can't properly resolve assemblies even if they
++			// are already loaded. For example, when deserializing objects from remoting.
++			AppDomain.CurrentDomain.AssemblyResolve += delegate (object s, ResolveEventArgs args) {
++				foreach (Assembly am in AppDomain.CurrentDomain.GetAssemblies ()) {
++					if (am.GetName ().FullName == args.Name)
++						return am;
++				}
++				return null;
+ 			};
+ 			
+-			// Preload the runner assembly. Required because TestNameFilter is implemented there
++			// Preload the runner assembly. Required because TestNameFilter is implemented there
+ 			string asm = Path.Combine (Path.GetDirectoryName (GetType ().Assembly.Location), "NUnitRunner.dll");
+ 			Assembly.LoadFrom (asm);
+ 		}
+ 		
+ 		public UnitTestResult Run (IRemoteEventListener listener, ITestFilter filter, string path, string suiteName, List<string> supportAssemblies)
+-		{
++		{
+ 			NUnitTestRunner runner = GetRunner (path);
+ 			EventListenerWrapper listenerWrapper = listener != null ? new EventListenerWrapper (listener) : null;
+ 			
+@@ -81,7 +81,7 @@
+ 		}
+ 		
+ 		NUnitTestRunner GetRunner (string assemblyPath)
+-		{
++		{
+ 			TestPackage package = new TestPackage (assemblyPath);
+ 			package.Settings ["ShadowCopyFiles"] = false;
+ 			DomainManager dm = new DomainManager ();
+@@ -116,7 +116,7 @@
+ 		{
+ 		}
+ 		
+-		public void SuiteFinished (TestSuiteResult result)
++		public void SuiteFinished (TestResult result)
+ 		{
+ 			testSuites.Pop ();
+ 			wrapped.SuiteFinished (GetTestName (result.Test), GetLocalTestResult (result));
+@@ -128,7 +128,7 @@
+ 			wrapped.SuiteStarted (GetTestName (suite));
+ 		}
+ 		
+-		public void TestFinished (TestCaseResult result)
++		public void TestFinished (TestResult result)
+ 		{
+ 			wrapped.TestFinished (GetTestName (result.Test), GetLocalTestResult (result));
+ 		}
+@@ -182,9 +182,9 @@
+ 			UnitTestResult res = new UnitTestResult ();
+ 			res.Message = t.Message;
+ 			
+-			if (t is TestSuiteResult) {
++			if (t is TestResult) {
+ 				int s=0, f=0, i=0;
+-				CountResults ((TestSuiteResult)t, ref s, ref f, ref i);
++				CountResults ((TestResult)t, ref s, ref f, ref i);
+ 				res.TotalFailures = f;
+ 				res.TotalSuccess = s;
+ 				res.TotalIgnored = i;
+@@ -232,21 +232,21 @@
+ 			return res;
+ 		}		
+ 		
+-		void CountResults (TestSuiteResult ts, ref int s, ref int f, ref int i)
++		void CountResults (TestResult ts, ref int s, ref int f, ref int i)
+ 		{
+ 			if (ts.Results == null)
+ 				return;
+ 
+ 			foreach (TestResult t in ts.Results) {
+-				if (t is TestCaseResult) {
++				if (t is TestResult) {
+ 					if (t.IsFailure)
+ 						f++;
+ 					else if (!t.Executed)
+ 						i++;
+ 					else
+ 						s++;
+-				} else if (t is TestSuiteResult) {
+-					CountResults ((TestSuiteResult) t, ref s, ref f, ref i);
++				} else if (t is TestResult) {
++					CountResults ((TestResult) t, ref s, ref f, ref i);
+ 				}
+ 			}
+ 		}

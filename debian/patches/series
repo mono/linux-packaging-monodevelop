@@ -1,6 +1,10 @@
 #stetic_widget_corruption_r144546.patch -p3
-use_system_Mono.Debugger.Soft.patch
-use_keyfile_not_keycontainer.patch
+#inject_Mono.Debugger.Soft_source.patch
+#avoid-dependency-on-Mono.Addins-0.5.patch
+#use_system_Mono.Debugger.Soft.patch
+#use_keyfile_not_keycontainer.patch
+port_to_nunit_2.5.patch
+make_4.0_default_framework.patch
 link_system_nunit.patch
 use_libsvn1.patch
 use_libapr1.patch
@@ -11,3 +15,4 @@ use_csc.patch
 #monodevelop_fix_addin_highlights_r130904.patch
 #remove_support_for_soft_debugger.patch
 remove_support_for_moonlight.patch
+no_appmenu

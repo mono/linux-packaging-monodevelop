@@ -44,10 +44,17 @@ namespace MonoDevelop.Ide.Gui
         bool IsFile { get; }
         bool IsDirty { get; set; }
         bool IsReadOnly { get; }
-
+		
         void Load (string fileName);
+		void LoadNew (System.IO.Stream content, string mimeType);
         void Save (string fileName);
         void Save ();
+		
+		/// <summary>
+		/// Discards all changes. This method is called before a dirty file is closed. It tells the view 
+		/// content to remove all autosave data of the file.
+		/// </summary>
+		void DiscardChanges ();
 
         event EventHandler ContentNameChanged;
         event EventHandler ContentChanged;

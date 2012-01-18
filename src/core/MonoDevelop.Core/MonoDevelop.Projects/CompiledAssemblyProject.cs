@@ -80,15 +80,15 @@ namespace MonoDevelop.Projects
 		{
 			FileName = assemblyPath;
 			
-			string tid = Runtime.SystemAssemblyService.GetTargetFrameworkForAssembly (Runtime.SystemAssemblyService.DefaultRuntime, assemblyPath);
+			var tid = Runtime.SystemAssemblyService.GetTargetFrameworkForAssembly (Runtime.SystemAssemblyService.DefaultRuntime, assemblyPath);
 			if (tid != null)
 				targetFramework = Runtime.SystemAssemblyService.GetTargetFramework (tid);
 			
-			AssemblyDefinition adef = AssemblyFactory.GetAssembly (assemblyPath);
-			MdbFactory mdbFactory = new MdbFactory ();
+			AssemblyDefinition adef = AssemblyDefinition.ReadAssembly (assemblyPath);
+			MdbReaderProvider mdbProvider = new MdbReaderProvider ();
 			try {
-				ISymbolReader reader = mdbFactory.CreateReader (adef.MainModule, assemblyPath);
-				adef.MainModule.LoadSymbols (reader);
+				ISymbolReader reader = mdbProvider.GetSymbolReader (adef.MainModule, assemblyPath);
+				adef.MainModule.ReadSymbols (reader);
 			} catch {
 				// Ignore
 			}
@@ -125,7 +125,7 @@ namespace MonoDevelop.Projects
 				else if (File.Exists (asm + ".exe"))
 					References.Add (new ProjectReference (ReferenceType.Assembly, asm + ".exe"));
 				else
-					References.Add (new ProjectReference (ReferenceType.Gac, aref.FullName));
+					References.Add (new ProjectReference (ReferenceType.Package, aref.FullName));
 			}*/
 		}
 		
@@ -139,7 +139,7 @@ namespace MonoDevelop.Projects
 			return string.Join (Path.DirectorySeparatorChar.ToString (), s1, 0, n);
 		}
 		
-		internal protected override BuildResult OnBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
+		protected override BuildResult OnBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			return new BuildResult ();
 		}

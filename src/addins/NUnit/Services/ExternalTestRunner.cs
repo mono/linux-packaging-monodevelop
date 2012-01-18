@@ -118,17 +118,20 @@ namespace MonoDevelop.NUnit.External
 		
 		public void SuiteFinished (TestSuiteResult result)
 		{
-			wrapped.SuiteFinished (GetTestName (result.Test.TestName), GetLocalTestResult (result));
+			testSuites.Pop ();
+			wrapped.SuiteFinished (GetTestName (result.Test), GetLocalTestResult (result));
 		}
-		
+		Stack<string> testSuites = new Stack<string>();
 		public void SuiteStarted (TestName suite)
 		{
+			Console.WriteLine ("start:"+suite.Name +"/"+suite.GetType ());
+			testSuites.Push (suite.FullName);
 			wrapped.SuiteStarted (GetTestName (suite));
 		}
 		
 		public void TestFinished (TestCaseResult result)
 		{
-			wrapped.TestFinished (GetTestName (result.Test.TestName), GetLocalTestResult (result));
+			wrapped.TestFinished (GetTestName (result.Test), GetLocalTestResult (result));
 		}
 		
 		public void TestOutput (TestOutput testOutput)
@@ -153,6 +156,24 @@ namespace MonoDevelop.NUnit.External
 		public override object InitializeLifetimeService ()
 		{
 			return null;
+		}
+		
+		string GetTestName (ITest t)
+		{
+			if (t == null)
+				return null;
+			if (t.TestType != "Test Case" || testSuites.Count == 0)
+				return t.TestName.FullName;
+			
+			// This is a work around for a nunit bug. 
+			// see Bug 1026 - Test hierarchies are not colored correctly during testing (using Generics) for details
+			// Either t.TestName.FullName is wrong or t.TestName.Name (but not both at the same time) depending on
+			// the base class is generic or not.
+			string name = t.TestName.Name;
+			int idx = name.LastIndexOf ('.');
+			if (idx >= 0)
+				name = name.Substring (idx + 1);
+			return testSuites.Peek () + "." + name;
 		}
 		
 		public string GetTestName (TestName t)
@@ -344,13 +365,16 @@ namespace MonoDevelop.NUnit.External
 		
 		UnitTest GetLocalTest (string sname)
 		{
-			if (sname == null) return null;
-			if (sname == "<root>") return rootTest;
+			if (sname == null)
+				return null;
+			if (sname == "<root>")
+				return rootTest;
 			
 			if (sname.StartsWith (rootFullName)) {
 				sname = sname.Substring (rootFullName.Length);
 			}
-			if (sname.StartsWith (".")) sname = sname.Substring (1);
+			if (sname.StartsWith ("."))
+				sname = sname.Substring (1);
 			UnitTest tt = FindTest (rootTest, sname);
 			return tt;
 		}

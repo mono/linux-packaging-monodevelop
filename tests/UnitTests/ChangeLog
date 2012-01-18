@@ -1,3 +1,149 @@
+2010-07-28  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  unit test for 'Bug 625064 - Internal classes aren't
+	  suggested for completion'.
+
+2010-07-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs: Track API
+	  changes.
+
+2010-07-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestViewContent.cs:
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: Track
+	  API changes.
+
+2010-07-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs: Track API
+	  changes.
+
+2010-07-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestViewContent.cs:
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs:
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: Track
+	  API changes.
+
+2010-07-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Projects.Gui/CompletionListWindowTests.cs: Track
+	  API changes.
+
+2010-07-12  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.AspNet/AspNetTesting.cs:
+	* MonoDevelop.Refactoring/ExtractMethodTests.cs:
+	* MonoDevelop.Projects/CompletionDatabaseTests.cs:
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs:
+	* MonoDevelop.CSharpBinding/ParameterCompletionTests.cs: Track
+	  ProjectDomService/Parser API.
+
+2010-07-12  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Xml.StateEngine/ParsingTests.cs: Track changes
+	  in warnings emitted by XML parser.
+
+2010-07-12  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Tests/FoldingTests.cs: track API changes.
+
+2010-07-05  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  unit test for 'Bug 615992 - Intellisense broken when calling
+	  generic method.'.
+
+2010-06-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestWorkbenchWindow.cs: Added
+	  missing using.
+
+2010-06-30  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestWorkbenchWindow.cs: Track API
+	  changes.
+
+2010-06-29  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestSpacingVisitor.cs: Added tests
+	  for fixed fields/constants.
+
+2010-06-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestSpacingVisitor.cs: Activated
+	  unit test.
+
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: Added
+	  unit test for 'Bug 615983 - Refactoring does not include
+	  object initializers'.
+
+2010-06-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/TestFormattingBugs.cs: Moved test
+	  suite to different namespace.
+
+2010-06-21  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Tests/VirtualSpacesTests.cs: Added test for
+	  'Bug 615624 - Pressing DOWN after RETURN moves cursor to
+	  beginning of blank lines instead of to the indent'.
+
+2010-06-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/FindMemberVisitorTests.cs: Added
+	  test for 'Bug 615702 - In-place variable renaming can't
+	  rename foreach loop variables'.
+
+2010-06-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Tests/ViTests.cs: Set flag required for one
+	  vi test.
+
+	* Mono.TextEditor.Tests/VirtualSpacesTests.cs: Added test for
+	  virtual space return key behavior.
+
+2010-06-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* UnitTests.csproj:
+	* Mono.TextEditor.Tests/EditActionsTest.cs:
+	* Mono.TextEditor.Tests/VirtualSpacesTests.cs: Added unit
+	  tests for 'Bug 615191 - When using multiline selection to
+	  indent/outdent, the indenter selects too much'.
+
+2010-06-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Tests/VirtualSpacesTests.cs: Added test for
+	  'Bug 613770 - Backspace inconsistently deletes entire lines
+	  when using "virtual spaces"'.
+
+2010-06-18  Mike Krüger  <mkrueger@novell.com>
+
+	* Makefile.am:
+	* UnitTests.csproj:
+	* Mono.TextEditor.Tests/VirtualSpacesTests.cs: Added unit test
+	  for 'Bug 615196 - Pasting a chunk of text into the virtual
+	  whitespace fracks everything up'.
+
+2010-06-16  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Tests/SyntaxHighlightingTests.cs: Try to fix
+	  unit test for the build bot.
+
+2010-06-16  Mike Krüger  <mkrueger@novell.com>
+
+	* Mono.TextEditor.Tests/SyntaxHighlightingTests.cs: Added unit
+	  test for CDATA highlighting.
+
+2010-06-15  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CSharpBinding/CodeCompletionBugTests.cs: Added
+	  unit test for 'Bug 614045 - Types hidden by members are not
+	  formatted properly by ambience'.
+
 2010-06-14  Mike Krüger  <mkrueger@novell.com>
 
 	* MonoDevelop.Projects.Gui/CompletionListWindowTests.cs: Added

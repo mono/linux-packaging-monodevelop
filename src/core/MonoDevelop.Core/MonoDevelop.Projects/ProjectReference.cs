@@ -43,8 +43,10 @@ namespace MonoDevelop.Projects
 	public enum ReferenceType {
 		Assembly,
 		Project,
-		Gac,
-		Custom
+		Package,
+		Custom,
+		[Obsolete]
+		Gac = Package
 	}
 	
 	/// <summary>
@@ -95,31 +97,35 @@ namespace MonoDevelop.Projects
 		internal void SetOwnerProject (DotNetProject project)
 		{
 			ownerProject = project;
-			UpdateGacReference ();
+			UpdatePackageReference ();
 		}
 		
-		public ProjectReference(ReferenceType referenceType, string reference)
+		public ProjectReference (ReferenceType referenceType, string reference)
 		{
 			if (referenceType == ReferenceType.Assembly)
 				specificVersion = false;
 			this.referenceType = referenceType;
 			this.reference     = reference;
-			UpdateGacReference ();
+			UpdatePackageReference ();
 		}
 		
 		public ProjectReference (Project referencedProject)
 		{
 			referenceType = ReferenceType.Project;
 			reference = referencedProject.Name;
+			specificVersion = localCopy = true;
 		}
 		
 		public ProjectReference (SystemAssembly asm)
 		{
-			referenceType = ReferenceType.Gac;
+			referenceType = ReferenceType.Package;
 			reference = asm.FullName;
+			localCopy = false;
+			if (asm.Package.IsFrameworkPackage)
+				specificVersion = false;
 			if (!asm.Package.IsGacPackage)
 				package = asm.Package.Name;
-			UpdateGacReference ();
+			UpdatePackageReference ();
 		}
 		
 		protected void InitCustomReference (string reference)
@@ -151,7 +157,7 @@ namespace MonoDevelop.Projects
 			}
 			internal set {
 				reference = value;
-				UpdateGacReference ();
+				UpdatePackageReference ();
 			}
 		}
 		
@@ -172,6 +178,12 @@ namespace MonoDevelop.Projects
 				localCopy = value;
 			}
 		}
+		
+		public bool CanSetLocalCopy {
+			get {
+				return cachedPackage == null || !cachedPackage.IsFrameworkPackage;
+			}
+		}
 
 		internal string LoadedReference {
 			get {
@@ -190,6 +202,16 @@ namespace MonoDevelop.Projects
 				}
 			}
 		}
+		
+		public bool CanSetSpecificVersion {
+			get {
+				if (ReferenceType == ReferenceType.Project || ReferenceType == ReferenceType.Custom)
+					return false;
+				if (ReferenceType == ReferenceType.Package && Package != null && Package.IsFrameworkPackage)
+					return false;
+				return true;
+			}
+		}
 
 		public bool IsValid {
 			get { return string.IsNullOrEmpty (ValidationErrorMessage); }
@@ -200,7 +222,7 @@ namespace MonoDevelop.Projects
 			get {
 				if (customError != null)
 					return customError;
-				if (ReferenceType == ReferenceType.Gac) {
+				if (ReferenceType == ReferenceType.Package) {
 					if (!IsExactVersion && SpecificVersion)
 						return GettextCatalog.GetString ("Specified version not found: expected {0}, found {1}", GetVersionNum (StoredReference), GetVersionNum (Reference));
 					if (notFound) {
@@ -233,7 +255,7 @@ namespace MonoDevelop.Projects
 		
 		public bool IsExactVersion {
 			get {
-				if (ReferenceType == ReferenceType.Gac) {
+				if (ReferenceType == ReferenceType.Package) {
 					string r1 = MonoDevelop.Core.Assemblies.AssemblyContext.NormalizeAsmName (StoredReference);
 					string r2 = MonoDevelop.Core.Assemblies.AssemblyContext.NormalizeAsmName (Reference);
 					return r1 == r2;
@@ -267,7 +289,7 @@ namespace MonoDevelop.Projects
 				case ReferenceType.Assembly:
 					return reference;
 				
-				case ReferenceType.Gac:
+				case ReferenceType.Package:
 					string file = AssemblyContext.GetAssemblyLocation (Reference, package, ownerProject != null? ownerProject.TargetFramework : null);
 					return file == null ? reference : file;
 				case ReferenceType.Project:
@@ -280,15 +302,14 @@ namespace MonoDevelop.Projects
 					return null;
 				
 				default:
-					Console.WriteLine ("pp: " + Reference + " " + OwnerProject.FileName);
-					throw new NotImplementedException("unknown reference type : " + ReferenceType);
+					return null;
 			}
 		}
 		
 		public virtual string[] GetReferencedFileNames (ConfigurationSelector configuration)
 		{
 			string s = GetReferencedFileName (configuration);
-	/*		if (referenceType == ReferenceType.Gac) {
+	/*		if (referenceType == ReferenceType.Package) {
 				List<string> result = new List<string> ();
 				result.Add (s);
 				AddRequiredPackages (result, Package);
@@ -318,9 +339,9 @@ namespace MonoDevelop.Projects
 			}
 		}*/
 		
-		void UpdateGacReference ()
+		void UpdatePackageReference ()
 		{
-			if (referenceType == ReferenceType.Gac && ownerProject != null) {
+			if (referenceType == ReferenceType.Package && ownerProject != null) {
 				notFound = false;
 				string cref = AssemblyContext.FindInstalledAssembly (reference, package, ownerProject.TargetFramework);
 				if (cref == null)
@@ -369,7 +390,7 @@ namespace MonoDevelop.Projects
 		
 		public SystemPackage Package {
 			get {
-				if (referenceType == ReferenceType.Gac) {
+				if (referenceType == ReferenceType.Package) {
 					if (cachedPackage != null)
 						return cachedPackage;
 					
@@ -381,8 +402,11 @@ namespace MonoDevelop.Projects
 					SystemAssembly best = null;
 					foreach (SystemAssembly asm in AssemblyContext.GetAssembliesFromFullName (reference)) {
 						//highest priority to framework packages
-						if (ownerProject != null && asm.Package.IsFrameworkPackage && asm.Package.TargetFramework == ownerProject.TargetFramework.Id) {
-							return cachedPackage = asm.Package;
+						if (ownerProject != null && asm.Package.IsFrameworkPackage) {
+							var targetFx = ownerProject.TargetFramework;
+							var packageFxId = asm.Package.TargetFramework;
+							if (targetFx.IncludesFramework (packageFxId))
+								return cachedPackage = asm.Package;
 						}
 						if (asm.Package.IsGacPackage)
 							best = asm;
@@ -402,9 +426,9 @@ namespace MonoDevelop.Projects
 			if (loadedReference != null) {
 				reference = loadedReference;
 				loadedReference = null;
-				UpdateGacReference ();
+				UpdatePackageReference ();
 			} else
-				UpdateGacReference ();
+				UpdatePackageReference ();
 		}
 		
 		public object Clone()
@@ -412,17 +436,27 @@ namespace MonoDevelop.Projects
 			return MemberwiseClone();
 		}
 		
-		public override bool Equals (object other)
+		public override bool Equals (object obj)
 		{
-			ProjectReference oref = other as ProjectReference;
-			if (oref == null) return false;
-			
-			return StoredReference == oref.StoredReference && referenceType == oref.referenceType && package == oref.package;
+			return Equals (obj as ProjectReference);
+		}
+		
+		public bool Equals (ProjectReference other)
+		{
+			return other != null
+				&& StoredReference == other.StoredReference
+				&& referenceType == other.referenceType
+				&& package == other.package;
 		}
 		
 		public override int GetHashCode ()
 		{
-			return StoredReference.GetHashCode ();
+			int result = 0;
+			if (StoredReference != null)
+				result ^= StoredReference.GetHashCode ();
+			if (package != null)
+				result ^= package.GetHashCode ();
+			return result;
 		}
 		
 		internal void NotifyStatusChanged ()

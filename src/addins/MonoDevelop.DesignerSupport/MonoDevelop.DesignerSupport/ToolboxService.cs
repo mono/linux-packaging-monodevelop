@@ -75,7 +75,7 @@ namespace MonoDevelop.DesignerSupport
 		}
 		
 		static string ToolboxConfigFile {
-			get { return System.IO.Path.Combine (PropertyService.ConfigPath, "Toolbox.xml"); }
+			get { return UserProfile.Current.LocalConfigDir.Combine ("Toolbox.xml"); }
 		}
 		
 		#region Extension loading
@@ -417,9 +417,9 @@ namespace MonoDevelop.DesignerSupport
 			}
 			
 			//only treat active ViewContent as a Toolbox consumer if it implements IToolboxConsumer
-			if (IdeApp.Workbench.ActiveDocument != null) {
-				CurrentConsumer = IdeApp.Workbench.ActiveDocument.ActiveView as IToolboxConsumer;
-				viewProvider    = IdeApp.Workbench.ActiveDocument.ActiveView as IToolboxDynamicProvider;
+			if (IdeApp.Workbench.ActiveDocument != null && IdeApp.Workbench.ActiveDocument.ActiveView != null) {
+				CurrentConsumer = IdeApp.Workbench.ActiveDocument.ActiveView.GetContent<IToolboxConsumer> ();
+				viewProvider    = IdeApp.Workbench.ActiveDocument.ActiveView.GetContent<IToolboxDynamicProvider> ();
 				if (viewProvider != null)  {
 					this.dynamicProviders.Add (viewProvider);
 					viewProvider.ItemsChanged += OnProviderItemsChanged;
@@ -606,7 +606,7 @@ namespace MonoDevelop.DesignerSupport
 		List<ComponentIndexFile> files = new List<ComponentIndexFile> ();
 		
 		static string ToolboxIndexFile {
-			get { return Path.Combine (PropertyService.ConfigPath, "ToolboxIndex.xml"); }
+			get { return UserProfile.Current.CacheDir.Combine ("ToolboxIndex.xml"); }
 		}
 		
 		internal static ComponentIndex Load ()

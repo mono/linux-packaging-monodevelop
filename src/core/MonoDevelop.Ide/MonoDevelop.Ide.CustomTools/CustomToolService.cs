@@ -60,11 +60,13 @@ namespace MonoDevelop.Ide.CustomTools
 					break;
 				}
 			});
-			IdeApp.Workspace.FileChangedInProject += delegate (object sender, ProjectFileEventArgs e) {
-				Update (e.ProjectFile, false);
+			IdeApp.Workspace.FileChangedInProject += delegate (object sender, ProjectFileEventArgs args) {
+				foreach (ProjectFileEventInfo e in args)
+					Update (e.ProjectFile, false);
 			};
-			IdeApp.Workspace.FilePropertyChangedInProject += delegate (object sender, ProjectFileEventArgs e) {
-				Update (e.ProjectFile, false);
+			IdeApp.Workspace.FilePropertyChangedInProject += delegate (object sender, ProjectFileEventArgs args) {
+				foreach (ProjectFileEventInfo e in args)
+					Update (e.ProjectFile, false);
 			};
 			//FIXME: handle the rename
 			//MonoDevelop.Ide.Gui.IdeApp.Workspace.FileRenamedInProject
@@ -109,8 +111,7 @@ namespace MonoDevelop.Ide.CustomTools
 				}
 			}
 			
-			string title = GettextCatalog.GetString ("Custom Tool");
-			var monitor = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor (title, null, false, true);
+			var monitor = IdeApp.Workbench.ProgressMonitors.GetToolOutputProgressMonitor (false);
 			var result = new SingleFileCustomToolResult ();
 			var aggOp = new AggregatedOperationMonitor (monitor);
 			try {
@@ -161,6 +162,7 @@ namespace MonoDevelop.Ide.CustomTools
 					string msg = GettextCatalog.GetString ("The '{0}' code generator crashed", file.Generator);
 					result.Errors.Add (new CompilerError (file.Name, 0, 0, "", msg + ": " + result.UnhandledException.Message));
 					monitor.ReportError (msg, result.UnhandledException);
+					LoggingService.LogError (msg, result.UnhandledException);
 				}
 				
 				genFileName = result.GeneratedFilePath.IsNullOrEmpty?
@@ -170,7 +172,7 @@ namespace MonoDevelop.Ide.CustomTools
 					&& genFileName.IndexOfAny (new char[] { '/', '\\' }) < 0
 					&& FileService.IsValidFileName (genFileName);
 				
-				if (!validName) {
+				if (!broken && !validName) {
 					broken = true;
 					string msg = GettextCatalog.GetString ("The '{0}' code generator output invalid filename '{1}'",
 					                                       file.Generator, result.GeneratedFilePath);
@@ -198,22 +200,28 @@ namespace MonoDevelop.Ide.CustomTools
 			}
 			
 			if (!result.GeneratedFilePath.IsNullOrEmpty && File.Exists (result.GeneratedFilePath)) {
-				if (genFile == null) {
-					genFile = file.Project.AddFile (result.GeneratedFilePath);
-				} else if (result.GeneratedFilePath != genFile.FilePath) {
-					genFile.Name = result.GeneratedFilePath;
-				}
-				file.LastGenOutput = genFileName;
-				genFile.DependsOn = file.FilePath.FileName; 
+				Gtk.Application.Invoke (delegate {
+					if (genFile == null) {
+						genFile = file.Project.AddFile (result.GeneratedFilePath);
+					} else if (result.GeneratedFilePath != genFile.FilePath) {
+						genFile.Name = result.GeneratedFilePath;
+					}
+					file.LastGenOutput = genFileName;
+					genFile.DependsOn = file.FilePath.FileName;
+					
+					IdeApp.ProjectOperations.Save (file.Project);
+				});
 			}
 		}
 		
-		public static void HandleRename (ProjectFileRenamedEventArgs args)
+		public static void HandleRename (ProjectFileRenamedEventArgs e)
 		{
-			var file = args.ProjectFile;
-			var tool = GetGenerator (file);
-			if (tool == null)
-				return;
+			foreach (ProjectFileEventInfo args in e) {
+				var file = args.ProjectFile;
+				var tool = GetGenerator (file);
+				if (tool == null)
+					continue;
+			}
 		}
 	}
 }

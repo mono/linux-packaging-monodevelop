@@ -40,7 +40,7 @@ namespace MonoDevelop.Core.Assemblies
 		
 		protected override void Initialize ()
 		{
-			runtime.Initialize ();
+			runtime.EnsureInitialized ();
 		}
 		
 		public override bool AssemblyIsInGac (string aname)
@@ -110,6 +110,9 @@ namespace MonoDevelop.Core.Assemblies
 					if (Directory.Exists (asmDir)) {
 						foreach (string dir in Directory.GetDirectories (asmDir, pattern)) {
 							string file = Path.Combine (dir, name + ".dll");
+							if (File.Exists (file))
+								return file;
+							file = Path.Combine (dir, name + ".exe");
 							if (File.Exists (file))
 								return file;
 						}

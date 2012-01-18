@@ -1,3 +1,103 @@
+monodevelop (2.8.5+dfsg-1) experimental; urgency=low
+
+  * [5cc97fa] Imported Upstream version 2.8.5+dfsg
+  * [97a3587] Refresh debian/patches/use_libsvn1.patch
+
+ -- Jo Shields <directhex@apebox.org>  Mon, 19 Dec 2011 11:19:21 +0000
+
+monodevelop (2.8.2+dfsg-1) experimental; urgency=low
+
+  [ Gleb Golubitsky ]
+  * [0c50f48] Removing dependency to non-present lib libobjc.dylib
+
+  [ Jo Shields ]
+  * [6612c21] Update debian/watch to use bz2, not gz, for upstream tarballs.
+  * [d780bf9] Imported Upstream version 2.8.2+dfsg
+  * [2058cc2] Refresh debian/patches/make_4.0_default_framework.patch.
+  * [b27507a] Refresh debian/patches/link_system_nunit.patch.
+  * [225c2c1] Refreshed 
+              debian/patches/update_templates_for_gtk-sharp_2.12.patch.
+  * [dbbfc74] Refreshed debian/patches/use_csc.patch
+  * [6d74297] Refresh debian/patches/remove_support_for_moonlight.patch.
+  * [dfdeb30] Don't apply debian/patches/remove-libobjc-dylib-dep.patch 
+              after all - use --exclude-moduleref to skip this Mac-only 
+              code.
+
+ -- Jo Shields <directhex@apebox.org>  Tue, 08 Nov 2011 17:47:50 +0000
+
+monodevelop (2.6+dfsg-1) experimental; urgency=low
+
+  * [7c7e1e1] Update watch file to point to Xamarin-hosted MonoDevelop.
+  * [c1bd155] Imported Upstream version 2.6+dfsg
+  * [9b44935] Disable Ubuntu Appmenu for monodevelop (thanks bratsche) (LP: #606470)
+  * [21473bc] Refresh system nunit patch.
+
+ -- Jo Shields <directhex@apebox.org>  Sat, 10 Sep 2011 14:24:16 +0100
+
+monodevelop (2.5.92+dfsg-2) experimental; urgency=low
+
+  * [69b146e] Don't Suggest monodevelop-boo, since it seems EOL.
+  * [30e59cf] Port NUnit addin to use NUnit 2.5.
+  * [a398070] Include a hard build-dep on NUnit 2.5, since we need it now.
+
+ -- Jo Shields <directhex@apebox.org>  Mon, 04 Jul 2011 17:53:49 +0100
+
+monodevelop (2.5.92+dfsg-1) experimental; urgency=low
+
+  * [d3fe546] Imported Upstream version 2.5.92+dfsg (2.6 Beta 3)
+  * [d499e57] Disable inject_Mono.Debugger.Soft_source.patch, since this 
+    source is now shipped by upstream.
+  * [2098790] Disable avoid-dependency-on-Mono.Addins-0.5.patch, since 
+    we now have Mono.Addins 0.6
+  * [363239b] Refreshed link_system_nunit.patch, which had some aspects 
+    hard-coded
+  * [24aac28] Update use_libsvn1.patch for altered path in source tree
+  * [a18613d] Refresh use_libapr1.patch for new path in source tree
+  * [db6d7d0] Refresh use_csc.patch to specify ToolsVersion 4.0 for 
+    xbuild-built components, especially contrib conponents
+  * [0f7e9bf] Refresh debian/patches/remove_support_for_moonlight
+  * [3bfb6d6] Start using DebSrc 3.0 (quilt) rather than quilt.make separately
+  * [28a6814] Exclude modulerefs for Mac-only libraries
+  * [fdce601] Update build-dependencies
+  * [cf3ce81] Refresh binary dependencies for MonoDevelop package
+  * [445d8a0] Refresh configure flags
+  * [9971926] Exclude more modulerefs, for private libs which aren't going 
+    to be in LD_LIBRARY_PATH
+  * [8264ecb] Patch MonoDevelop to force .NET 4.0 as the default framework 
+    version on new projects. This is recommended for new projects because our 
+    GTK# (plus every other library not bundled inside Mono itself) is built 
+    for .NET 4.0, so users will get nasty errors building their projects 
+    with the 3.5 compiler when consuming 4.0 libraries.
+  * [001f0aa] Bump mono-devel dependency
+  * [e987431] Bump Debian Standards version to 3.9.2 (no changes)
+
+ -- Jo Shields <directhex@apebox.org>  Mon, 27 Jun 2011 17:03:13 +0100
+
+monodevelop (2.4.1+dfsg-1) experimental; urgency=low
+
+  [ Stefan Ebner ]
+  * [5ea0b80] Pointing to new VCS-* Locations as we are using git
+    instead of svn now
+
+  [ Jo Shields ]
+  * [0991342] Add a gbp.conf since we're building in a separate branch
+    for Debian Experimental
+  * [aa1e75f] Imported Upstream version 2.4.1+dfsg
+  * [3c4f7de] Remove use_keyfile_not_keycontainer patch (fixed upstream)
+  * [ade23c4] Import upstream git commit 5a628ccfeed02aaee060 as a new 
+    patch. This fixes some code introduced in MonoDevelop 2.4.1 which 
+    requires Mono.Addins 0.5 (rather than the 0.4 cited in configure.in). 
+    Thanks to Lluis Sanchez <lluis@novell.com>
+  * [1207056] Inject a snapshot of the Mono Soft Debugger source from
+    2010-10-23 (as found in Mono commitid fbd6abac72ec96f2034d), along
+    with some build system special sauce (as found in Debian MonoDevelop
+    commitid 9915fc77e5385d377241). This is needed because MonoDevelop
+    2.4.1 makes use of methods in Mono.Debugger.Soft which post-date the
+    release of Mono 2.6.7, our Squeeze release version. And upstream's
+    just-bundle-the-DLL-in-the-source route is inappropriate for Debian.
+
+ -- Jo Shields <directhex@apebox.org>  Sat, 18 Dec 2010 12:09:49 +0000
+
 monodevelop (2.4+dfsg-4) unstable; urgency=low
 
   * No-change upload to catch new Metacity package name.

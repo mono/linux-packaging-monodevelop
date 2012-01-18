@@ -54,7 +54,8 @@ namespace MonoDevelop.Ide.Commands
 		ZoomIn,
 		ZoomOut,
 		ZoomReset,
-		FocusCurrentDocument
+		FocusCurrentDocument,
+		ShowWelcomePage
 	}
 
 	// MonoDevelop.Ide.Commands.ViewCommands.ViewList
@@ -170,6 +171,12 @@ namespace MonoDevelop.Ide.Commands
 	// MonoDevelop.Ide.Commands.ViewCommands.FullScreen
 	public class FullScreenHandler : CommandHandler
 	{
+		protected override void Update (CommandInfo info)
+		{
+			base.Update (info);
+			info.Checked = IdeApp.Workbench.FullScreen;
+		}
+		
 		protected override void Run ()
 		{
 			IdeApp.Workbench.FullScreen = !IdeApp.Workbench.FullScreen;
@@ -274,12 +281,13 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandInfo info)
 		{
-			info.Enabled = IdeApp.Workbench.ActiveDocument != null && IdeApp.Workbench.ActiveDocument.TextEditor != null;
+			info.Enabled = IdeApp.Workbench.ActiveDocument != null && IdeApp.Workbench.ActiveDocument.Editor != null;
 		}
 
 		protected override void Run ()
 		{
-			IdeApp.Workbench.ActiveDocument.TextEditor.JumpTo (IdeApp.Workbench.ActiveDocument.TextEditor.CursorLine, IdeApp.Workbench.ActiveDocument.TextEditor.CursorColumn);
+			IdeApp.Workbench.ActiveDocument.Editor.SetCaretTo (IdeApp.Workbench.ActiveDocument.Editor.Caret.Line, IdeApp.Workbench.ActiveDocument.Editor.Caret.Column);
 		}
+
 	}
 }

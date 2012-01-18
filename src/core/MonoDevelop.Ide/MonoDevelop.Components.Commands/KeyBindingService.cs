@@ -63,7 +63,8 @@ namespace MonoDevelop.Components.Commands
 		
 		static string ConfigFileName {
 			get {
-				return Path.Combine (PropertyService.ConfigPath, PropertyService.IsMac? configFileNameMac : configFileName);
+				string file = Platform.IsMac? "Custom.mac-kb.xml" : "Custom.kb.xml";
+				return UserProfile.Current.UserDataRoot.Combine ("KeyBindings", file);
 			}
 		}
 
@@ -108,12 +109,12 @@ namespace MonoDevelop.Components.Commands
 		{
 			if (args.Change == ExtensionChange.Add) {
 				SchemeExtensionNode node = (SchemeExtensionNode) args.ExtensionNode;
-				if (node.IsForMac == PropertyService.IsMac)
+				if (node.IsForMac == Platform.IsMac)
 					schemes.Add (node.Id, node);
 			}
 			else {
 				SchemeExtensionNode node = (SchemeExtensionNode) args.ExtensionNode;
-				if (node.IsForMac == PropertyService.IsMac)
+				if (node.IsForMac == Platform.IsMac)
 					schemes.Remove (node.Name);
 			}
 		}
@@ -181,6 +182,9 @@ namespace MonoDevelop.Components.Commands
 				
 		public static void SaveCurrentBindings ()
 		{
+			string dir = Path.GetDirectoryName (ConfigFileName);
+			if (!Directory.Exists (dir))
+				Directory.CreateDirectory (dir);
 			current.Save (ConfigFileName, "current");
 		}
 	}

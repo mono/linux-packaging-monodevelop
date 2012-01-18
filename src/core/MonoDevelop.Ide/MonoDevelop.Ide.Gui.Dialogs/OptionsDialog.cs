@@ -47,6 +47,10 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		HashSet<object> modifiedObjects = new HashSet<object> ();
 		bool removeEmptySections;
 		
+		const string emptyCategoryIcon = "md-empty-category";
+		const Gtk.IconSize treeIconSize = IconSize.Menu;
+		const Gtk.IconSize headerIconSize = IconSize.Button;
+		
 		public object DataObject {
 			get {
 				return mainDataObject;
@@ -82,30 +86,80 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			if (parentWindow != null)
 				TransientFor = parentWindow;
 			
-			store = new TreeStore (typeof(OptionsDialogSection), typeof(string), typeof(string), typeof(bool), typeof(string));
+			ImageService.EnsureStockIconIsLoaded (emptyCategoryIcon, treeIconSize);
+			ImageService.EnsureStockIconIsLoaded (emptyCategoryIcon, headerIconSize);
+			
+			store = new TreeStore (typeof(OptionsDialogSection));
 			tree.Model = store;
 			tree.HeadersVisible = false;
 			
 			TreeViewColumn col = new TreeViewColumn ();
-			CellRendererIcon crp = new CellRendererIcon ();
-			crp.StockSize = (uint) IconSize.Menu;
+			var crp = new CellRendererPixbuf ();
 			col.PackStart (crp, false);
-			col.AddAttribute (crp, "stock-id", 1);
-			col.AddAttribute (crp, "visible", 3);
-			col.AddAttribute (crp, "cell-background", 4);
-			CellRendererText crt = new CellRendererText ();
+			col.SetCellDataFunc (crp, PixbufCellDataFunc);
+			var crt = new CellRendererText ();
 			col.PackStart (crt, true);
-			col.AddAttribute (crt, "markup", 2);
-			col.AddAttribute (crt, "cell-background", 4);
+			col.SetCellDataFunc (crt, TextCellDataFunc);
 			tree.AppendColumn (col);
 			
 			tree.Selection.Changed += OnSelectionChanged;
+			
+			Child.ShowAll ();
 			
 			InitializeContext (extensionContext);
 			
 			FillTree ();
 			ExpandCategories ();
 			this.DefaultResponse = Gtk.ResponseType.Ok;
+		}
+		
+		void PixbufCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
+		{
+			TreeIter parent;
+			bool toplevel = !model.IterParent (out parent, iter);
+			
+			var crp = (CellRendererPixbuf) cell;
+			crp.Visible = !toplevel;
+			
+			if (toplevel) {
+				return;
+			}
+			
+			var section = (OptionsDialogSection) model.GetValue (iter, 0);
+			
+			//HACK: The mimetype panels can't register a single fake stock ID for all the possible image size.
+			// Instead, give this some awareness of the mime system.
+			var mimeSection = section as MonoDevelop.Ide.Projects.OptionPanels.MimetypeOptionsDialogSection;
+			if (mimeSection != null && !string.IsNullOrEmpty (mimeSection.MimeType)) {
+				var pix = DesktopService.GetPixbufForType (mimeSection.MimeType, treeIconSize);
+				if (pix != null) {
+					crp.Pixbuf = pix;
+				} else {
+					crp.Pixbuf = ImageService.GetPixbuf (emptyCategoryIcon, treeIconSize);
+				}
+			} else {
+				string icon = section.Icon.IsNull? emptyCategoryIcon : section.Icon.ToString ();
+				crp.Pixbuf = ImageService.GetPixbuf (icon, treeIconSize);
+			}
+		}
+		
+		void TextCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
+		{
+			TreeIter parent;
+			bool toplevel = !model.IterParent (out parent, iter);
+			
+			var crt = (CellRendererText) cell;
+			var section = (OptionsDialogSection) model.GetValue (iter, 0);
+			
+			if (toplevel) {
+				crt.Markup = "<b>" + GLib.Markup.EscapeText (section.Label) + "</b>";
+			} else {
+				crt.Text = section.Label;
+			}
+		}
+		
+		protected Alignment MainBox {
+			get { return alignment; }
 		}
 		
 		protected void ExpandCategories ()
@@ -135,9 +189,13 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 
 		protected override void OnDestroyed()
 		{
-			foreach (PanelInstance pi in panels.Values)
+			foreach (PanelInstance pi in panels.Values) {
 				if (pi.Widget != null)
 					pi.Widget.Destroy ();
+				IDisposable disp = pi.Panel as IDisposable;
+				if (disp != null)
+					disp.Dispose ();
+			}
 			base.OnDestroyed ();
 		}
 		
@@ -193,8 +251,12 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			if (section != null) {
 				SectionPage page;
 				if (pages.TryGetValue (section, out page)) {
-					foreach (PanelInstance pi in page.Panels)
+					foreach (PanelInstance pi in page.Panels) {
 						panels.Remove (pi.Node);
+						IDisposable d = pi.Panel as IDisposable;
+						if (d != null)
+							d.Dispose ();
+					}
 					pages.Remove (section);
 					if (page.Widget != null)
 						page.Widget.Destroy ();
@@ -212,12 +274,9 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		{
 			TreeIter it;
 			if (parentIter.Equals (TreeIter.Zero)) {
-				string sectionLabel = "<b>" + GLib.Markup.EscapeText (section.Label) + "</b>";
-				it = store.AppendValues (section, null, sectionLabel, false, null);
-			}
-			else {
-				string icon = section.Icon.IsNull ? "md-empty-category" : section.Icon.ToString ();
-				it = store.AppendValues (parentIter, section, icon, section.Label, true, null);
+				it = store.AppendValues (section);
+			} else {
+				it = store.AppendValues (parentIter,section);
 			}
 			
 			if (!section.CustomNode)
@@ -226,8 +285,10 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			// Remove the section if it doesn't have children nor panels
 			SectionPage page = CreatePage (it, section, dataObject);
 			TreeIter cit;
-			if (removeEmptySections && page.Panels.Count == 0 && !store.IterChildren (out cit, it))
+			if (removeEmptySections && page.Panels.Count == 0 && !store.IterChildren (out cit, it)) {
 				store.Remove (ref it);
+				return TreeIter.Zero;
+			}
 			return it;
 		}
 		
@@ -295,6 +356,22 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			}
 		}
 		
+		bool HasVisiblePanel (OptionsDialogSection section)
+		{
+			SectionPage page;
+			if (!pages.TryGetValue (section, out page))
+				return false;
+			if (page.Panels.Count > 0)
+				return true;
+			foreach (ExtensionNode node in section.ChildNodes) {
+				if (node is OptionsDialogSection) {
+					if (HasVisiblePanel ((OptionsDialogSection) node))
+						return true;
+				}
+			}
+			return false;
+		}
+		
 		public void ShowPage (OptionsDialogSection section)
 		{
 			SectionPage page;
@@ -304,8 +381,10 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			if (page.Panels.Count == 0) {
 				foreach (ExtensionNode node in section.ChildNodes) {
 					if (node is OptionsDialogSection) {
-						ShowPage ((OptionsDialogSection) node);
-						return;
+						if (HasVisiblePanel ((OptionsDialogSection) node)) {
+							ShowPage ((OptionsDialogSection) node);
+							return;
+						}
 					}
 				}
 			}
@@ -323,10 +402,21 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 				CreatePageWidget (page);
 			
 			labelTitle.Markup = "<span weight=\"bold\" size=\"x-large\">" + GLib.Markup.EscapeText (section.Label) + "</span>";
-			if (!string.IsNullOrEmpty (section.Icon))
-				image.Stock = section.Icon;
-			else
-				image.Stock = "md-empty-category";
+			
+			//HACK: mimetype panels can't provide stock ID for mimetype images. Give this some awareness of mimetypes.
+			var mimeSection = section as MonoDevelop.Ide.Projects.OptionPanels.MimetypeOptionsDialogSection;
+			if (mimeSection != null && !string.IsNullOrEmpty (mimeSection.MimeType)) {
+				var pix = DesktopService.GetPixbufForType (mimeSection.MimeType, headerIconSize);
+				if (pix != null) {
+					image.Pixbuf = pix;
+				} else {
+					image.Pixbuf = ImageService.GetPixbuf (emptyCategoryIcon, headerIconSize);
+				}
+			} else {
+				string icon = section.Icon.IsNull? emptyCategoryIcon : section.Icon.ToString ();
+				image.Pixbuf = ImageService.GetPixbuf (icon, headerIconSize);
+			}
+			
 			pageFrame.PackStart (page.Widget, true, true, 0);
 			
 			// Ensures that the Shown event is fired for each panel
@@ -334,6 +424,9 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			if (c != null) {
 				foreach (Gtk.Widget cw in c)
 					cw.Show ();
+				//HACK: weird bug - switching page away and back selects last tab. should preserve the selection.
+				if (c is Notebook)
+					((Notebook)c).Page = 0;
 			}
 			
 			tree.ExpandToPath (store.GetPath (page.Iter));
@@ -377,6 +470,9 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 						panels.Remove (node);
 						if (pi.Widget != null)
 							pi.Widget.Destroy ();
+						IDisposable d = pi.Panel as IDisposable;
+						if (d != null)
+							d.Dispose ();
 						pi = null;
 					}
 				}

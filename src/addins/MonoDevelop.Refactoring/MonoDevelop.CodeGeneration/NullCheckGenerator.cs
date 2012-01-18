@@ -28,7 +28,7 @@
 using System.Collections.Generic;
 
 using Gtk;
-using ICSharpCode.NRefactory.Ast;
+using ICSharpCode.NRefactory.CSharp;
 
 using MonoDevelop;
 using MonoDevelop.CodeGeneration;
@@ -84,7 +84,7 @@ namespace MonoDevelop.CodeGeneration
 				foreach (var parameter in Options.EnclosingMember.Parameters) {
 					if (parameter == null || parameter.ReturnType == null)
 						continue;
-					IType type = Options.Dom.SearchType (Options.EnclosingMember, parameter.ReturnType);
+					IType type = Options.Dom.SearchType (Options.Document.ParsedDocument.CompilationUnit, Options.EnclosingType, new DomLocation (Options.Document.Editor.Caret.Line, Options.Document.Editor.Caret.Column), parameter.ReturnType);
 					if (type != null && (type.ClassType == MonoDevelop.Projects.Dom.ClassType.Interface || type.ClassType == MonoDevelop.Projects.Dom.ClassType.Class))
 						yield return parameter;
 				}
@@ -100,7 +100,7 @@ namespace MonoDevelop.CodeGeneration
 					        new PrimitiveExpression (null)
 					    ), new ThrowStatement (
 					    	new ObjectCreateExpression (
-					        	Options.ShortenTypeName (new TypeReference ("System.ArgumentNullException")),
+					        	Options.ShortenTypeName (new SimpleType ("System.ArgumentNullException")),
 					            new List<Expression> { new PrimitiveExpression (member.Name) }
 							)
 					    )

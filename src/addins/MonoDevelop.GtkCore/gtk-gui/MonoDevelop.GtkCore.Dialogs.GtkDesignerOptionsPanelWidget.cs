@@ -5,9 +5,8 @@ namespace MonoDevelop.GtkCore.Dialogs
 	public partial class GtkDesignerOptionsPanelWidget
 	{
 		private global::Gtk.VBox vbox2;
-
 		private global::Gtk.CheckButton checkSwitchLayout;
-
+		
 		protected virtual void Build ()
 		{
 			global::Stetic.Gui.Initialize (this);
@@ -26,7 +25,7 @@ namespace MonoDevelop.GtkCore.Dialogs
 			this.checkSwitchLayout.DrawIndicator = true;
 			this.checkSwitchLayout.UseUnderline = true;
 			this.vbox2.Add (this.checkSwitchLayout);
-			global::Gtk.Box.BoxChild w1 = ((global::Gtk.Box.BoxChild)(this.vbox2[this.checkSwitchLayout]));
+			global::Gtk.Box.BoxChild w1 = ((global::Gtk.Box.BoxChild)(this.vbox2 [this.checkSwitchLayout]));
 			w1.Position = 0;
 			w1.Expand = false;
 			w1.Fill = false;

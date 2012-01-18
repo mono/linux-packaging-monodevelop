@@ -30,6 +30,7 @@ using Gdk;
 using Pango;
 using System;
 using System.Text;
+using Mono.TextEditor;
 
 namespace Mono.TextEditor.PopupWindow
 {
@@ -52,7 +53,7 @@ namespace Mono.TextEditor.PopupWindow
 		StringBuilder word;
 		int curPos;
 		
-		public ListWindow (): base (Gtk.WindowType.Popup)
+		public ListWindow () : base (Gtk.WindowType.Popup)
 		{
 			vbox = new VBox ();
 			
@@ -339,10 +340,29 @@ namespace Mono.TextEditor.PopupWindow
 
 		void OnScrolled (object o, ScrollEventArgs args)
 		{
-			if (args.Event.Direction == Gdk.ScrollDirection.Up)
-				scrollbar.Value --;
-			else if (args.Event.Direction == Gdk.ScrollDirection.Down)
-				scrollbar.Value ++;
+			if (!scrollbar.Visible)
+				return;
+			
+			var adj = scrollbar.Adjustment;
+			var alloc = Allocation;
+			
+			//This widget is a special case because it's always aligned to items as it scrolls.
+			//Although this means we can't use the pixel deltas for true smooth scrolling, we 
+			//can still make use of the effective scrolling velocity by basing the calculation 
+			//on pixels and rounding to the nearest item.
+			
+			double dx, dy;
+			args.Event.GetPageScrollPixelDeltas (0, alloc.Height, out dx, out dy);
+			if (dy == 0)
+				return;
+			
+			var itemDelta = dy / (alloc.Height / adj.PageSize);
+			double discreteItemDelta = System.Math.Round (itemDelta);
+			if (discreteItemDelta == 0.0 && dy != 0.0)
+				discreteItemDelta = dy > 0? 1.0 : -1.0;
+			
+			adj.AddValueClamped (discreteItemDelta);
+			args.RetVal = true;
 		}
 		
 		void OnSelectionChanged (object o, EventArgs args)
@@ -363,7 +383,7 @@ namespace Mono.TextEditor.PopupWindow
 			this.GetSize (out winWidth, out winHeight);
 			this.GdkWindow.DrawRectangle (this.Style.ForegroundGC (StateType.Insensitive), false, 0, 0, winWidth-1, winHeight-1);
 			return false;
-		}		
+		}
 		
 		public int TextOffset {
 			get { return list.TextOffset + (int) this.BorderWidth; }

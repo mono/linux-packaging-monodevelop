@@ -34,6 +34,9 @@ using Mono.TextEditor;
 using System.Text;
 using MonoDevelop.Ide;
 using System.Linq;
+using Mono.TextEditor.PopupWindow;
+using MonoDevelop.Ide.FindInFiles;
+using MonoDevelop.Ide.ProgressMonitoring;
 
 namespace MonoDevelop.Refactoring.Rename
 {
@@ -41,7 +44,7 @@ namespace MonoDevelop.Refactoring.Rename
 	{
 		public override string AccelKey {
 			get {
-				var key = IdeApp.CommandService.GetCommandInfo (RefactoryCommands.Rename).AccelKey;
+				var key = IdeApp.CommandService.GetCommandInfo (MonoDevelop.Ide.Commands.EditCommands.Rename).AccelKey;
 				return key == null ? null : key.Replace ("dead_circumflex", "^");
 			}
 		}
@@ -68,13 +71,13 @@ namespace MonoDevelop.Refactoring.Rename
 		
 		public override string GetMenuDescription (RefactoringOptions options)
 		{
-			return IdeApp.CommandService.GetCommandInfo (RefactoryCommands.Rename).Text;
+			return IdeApp.CommandService.GetCommandInfo (MonoDevelop.Ide.Commands.EditCommands.Rename).Text;
 		}
 		
 		public override void Run (RefactoringOptions options)
 		{
 			if (options.SelectedItem is LocalVariable || options.SelectedItem is IParameter) {
-				MemberReferenceCollection col = GetReferences (options);
+				var col = ReferenceFinder.FindReferences (options.SelectedItem);
 				if (col == null)
 					return;
 				TextEditorData data = options.GetTextEditorData ();
@@ -83,16 +86,15 @@ namespace MonoDevelop.Refactoring.Rename
 					MessageService.ShowCustomDialog (new RenameItemDialog (options, this));
 					return;
 				}
-
 				
 				List<TextLink> links = new List<TextLink> ();
 				TextLink link = new TextLink ("name");
 				int baseOffset = Int32.MaxValue;
 				foreach (MemberReference r in col) {
-					baseOffset = Math.Min (baseOffset, data.Document.LocationToOffset (r.Line - 1, r.Column - 1));
+					baseOffset = Math.Min (baseOffset, data.Document.LocationToOffset (r.Line, r.Column));
 				}
 				foreach (MemberReference r in col) {
-					Segment segment = new Segment (data.Document.LocationToOffset (r.Line - 1, r.Column - 1) - baseOffset, r.Name.Length);
+					Segment segment = new Segment (data.Document.LocationToOffset (r.Line, r.Column) - baseOffset, r.Name.Length);
 					if (segment.Offset <= data.Caret.Offset - baseOffset && data.Caret.Offset - baseOffset <= segment.EndOffset) {
 						link.Links.Insert (0, segment); 
 					} else {
@@ -101,10 +103,23 @@ namespace MonoDevelop.Refactoring.Rename
 				}
 				
 				links.Add (link);
+				if (editor.CurrentMode is TextLinkEditMode)
+					((TextLinkEditMode)editor.CurrentMode).ExitTextLinkMode ();
 				TextLinkEditMode tle = new TextLinkEditMode (editor, baseOffset, links);
 				tle.SetCaretPosition = false;
 				tle.SelectPrimaryLink = true;
 				if (tle.ShouldStartTextLinkMode) {
+					ModeHelpWindow helpWindow = new ModeHelpWindow ();
+					helpWindow.TransientFor = IdeApp.Workbench.RootWindow;
+					helpWindow.TitleText = options.SelectedItem is LocalVariable ? GettextCatalog.GetString ("<b>Local Variable -- Renaming</b>") : GettextCatalog.GetString ("<b>Parameter -- Renaming</b>");
+					helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Key</b>"), GettextCatalog.GetString ("<b>Behavior</b>")));
+					helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Return</b>"), GettextCatalog.GetString ("<b>Accept</b> this refactoring.")));
+					helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Esc</b>"), GettextCatalog.GetString ("<b>Cancel</b> this refactoring.")));
+					tle.HelpWindow = helpWindow;
+					tle.Cancel += delegate {
+						if (tle.HasChangedText)
+							editor.Document.Undo ();
+					};
 					tle.OldMode = data.CurrentMode;
 					tle.StartMode ();
 					data.CurrentMode = tle;
@@ -131,49 +146,52 @@ namespace MonoDevelop.Refactoring.Rename
 		{
 			RenameProperties properties = (RenameProperties)prop;
 			List<Change> result = new List<Change> ();
-
-			MemberReferenceCollection col = GetReferences (options);
-			if (col == null)
-				return result;
-			
-			if (properties.RenameFile && options.SelectedItem is IType) {
-				IType cls = (IType)options.SelectedItem;
-				int currentPart = 1;
-				HashSet<string> alreadyRenamed = new HashSet<string> ();
-				foreach (IType part in cls.Parts) {
-					if (part.CompilationUnit.FileName != options.Document.FileName && System.IO.Path.GetFileNameWithoutExtension (part.CompilationUnit.FileName) != System.IO.Path.GetFileNameWithoutExtension (options.Document.FileName))
-						continue;
-					if (alreadyRenamed.Contains (part.CompilationUnit.FileName))
-						continue;
-					alreadyRenamed.Add (part.CompilationUnit.FileName);
+			IEnumerable<MemberReference> col = null;
+			using (var monitor = new MessageDialogProgressMonitor (true, false, false, true)) {
+				col = ReferenceFinder.FindReferences (options.SelectedItem, monitor);
+				if (col == null)
+					return result;
 					
-					string oldFileName = System.IO.Path.GetFileNameWithoutExtension (part.CompilationUnit.FileName);
-					string newFileName;
-					
-					int idx = oldFileName.IndexOf (cls.Name);
-					if (idx >= 0) {
-						newFileName = oldFileName.Substring (0, idx) + properties.NewName + oldFileName.Substring (idx + cls.Name.Length);
-					} else {
-						newFileName = currentPart != 1 ? properties.NewName + currentPart : properties.NewName;
-						currentPart++;
+				if (properties.RenameFile && options.SelectedItem is IType) {
+					IType cls = (IType)options.SelectedItem;
+					int currentPart = 1;
+					HashSet<string> alreadyRenamed = new HashSet<string> ();
+					foreach (IType part in cls.Parts) {
+						if (part.CompilationUnit.FileName != options.Document.FileName && System.IO.Path.GetFileNameWithoutExtension (part.CompilationUnit.FileName) != System.IO.Path.GetFileNameWithoutExtension (options.Document.FileName))
+							continue;
+						if (alreadyRenamed.Contains (part.CompilationUnit.FileName))
+							continue;
+						alreadyRenamed.Add (part.CompilationUnit.FileName);
+							
+						string oldFileName = System.IO.Path.GetFileNameWithoutExtension (part.CompilationUnit.FileName);
+						string newFileName;
+						if (oldFileName.ToUpper () == properties.NewName.ToUpper () || oldFileName.ToUpper ().EndsWith ("." + properties.NewName.ToUpper ()))
+							continue;
+						int idx = oldFileName.IndexOf (cls.Name);
+						if (idx >= 0) {
+							newFileName = oldFileName.Substring (0, idx) + properties.NewName + oldFileName.Substring (idx + cls.Name.Length);
+						} else {
+							newFileName = currentPart != 1 ? properties.NewName + currentPart : properties.NewName;
+							currentPart++;
+						}
+							
+						int t = 0;
+						while (System.IO.File.Exists (GetFullFileName (newFileName, part.CompilationUnit.FileName, t))) {
+							t++;
+						}
+						result.Add (new RenameFileChange (part.CompilationUnit.FileName, GetFullFileName (newFileName, part.CompilationUnit.FileName, t)));
 					}
-					
-					int t = 0;
-					while (System.IO.File.Exists (GetFullFileName (newFileName, part.CompilationUnit.FileName, t))) {
-						t++;
-					}
-					result.Add (new RenameFileChange (part.CompilationUnit.FileName, GetFullFileName (newFileName, part.CompilationUnit.FileName, t)));
 				}
-			}
-			
-			foreach (MemberReference memberRef in col) {
-				TextReplaceChange change = new TextReplaceChange ();
-				change.FileName = memberRef.FileName;
-				change.Offset = memberRef.Position;
-				change.RemovedChars = memberRef.Name.Length;
-				change.InsertedText = properties.NewName;
-				change.Description = string.Format (GettextCatalog.GetString ("Replace '{0}' with '{1}'"), memberRef.Name, properties.NewName);
-				result.Add (change);
+				
+				foreach (MemberReference memberRef in col) {
+					TextReplaceChange change = new TextReplaceChange ();
+					change.FileName = memberRef.FileName;
+					change.Offset = memberRef.Position;
+					change.RemovedChars = memberRef.Name.Length;
+					change.InsertedText = properties.NewName;
+					change.Description = string.Format (GettextCatalog.GetString ("Replace '{0}' with '{1}'"), memberRef.Name, properties.NewName);
+					result.Add (change);
+				}
 			}
 			return result;
 		}
@@ -189,77 +207,6 @@ namespace MonoDevelop.Refactoring.Rename
 				name.Append (System.IO.Path.GetExtension (oldFullFileName));
 			
 			return System.IO.Path.Combine (System.IO.Path.GetDirectoryName (oldFullFileName), name.ToString ());
-		}
-		
-		MemberReferenceCollection GetReferences (RefactoringOptions options)
-		{
-			CodeRefactorer refactorer = IdeApp.Workspace.GetCodeRefactorer (IdeApp.ProjectOperations.CurrentSelectedSolution);
-			IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetBackgroundProgressMonitor (this.Name, null);
-			if (options.SelectedItem is IType) {
-				IType cls = (IType)options.SelectedItem;
-				return refactorer.FindClassReferences (monitor, cls, RefactoryScope.Solution, true);
-			} else if (options.SelectedItem is LocalVariable) {
-				return refactorer.FindVariableReferences (monitor, (LocalVariable)options.SelectedItem);
-			} else if (options.SelectedItem is IParameter) {
-				return refactorer.FindParameterReferences (monitor, (IParameter)options.SelectedItem, true);
-			} else if (options.SelectedItem is IMember) {
-				IMember member = (IMember)options.SelectedItem;
-				Dictionary<string, HashSet<DomLocation>> foundLocations = new Dictionary <string, HashSet<DomLocation>> ();
-				MemberReferenceCollection result = new MemberReferenceCollection ();
-				foreach (IMember m in CollectMembers (member.DeclaringType.SourceProjectDom, member)) {
-					foreach (MemberReference r in refactorer.FindMemberReferences (monitor, m.DeclaringType, m, true)) {
-						DomLocation location = new DomLocation (r.Line, r.Column);
-						if (!foundLocations.ContainsKey (r.FileName))
-							foundLocations[r.FileName] = new HashSet<DomLocation> ();
-						if (foundLocations[r.FileName].Contains (location))
-							continue;
-						foundLocations[r.FileName].Add (location);
-						result.Add (r);
-					}
-				}
-				return result;
-			}
-			return null;
-		}
-		
-		internal static IEnumerable<IMember> CollectMembers (ProjectDom dom, IMember member)
-		{
-			if (member is IMethod && ((IMethod)member).IsConstructor) {
-				yield return member;
-			} else {
-				bool isOverrideable = member.DeclaringType.ClassType == ClassType.Interface || member.IsOverride || member.IsVirtual || member.IsAbstract;
-				bool isLastMember = false;
-				// for members we need to collect the whole 'class' of members (overloads & implementing types)
-				HashSet<string> alreadyVisitedTypes = new HashSet<string> ();
-				foreach (IType type in dom.GetInheritanceTree (member.DeclaringType)) {
-					if (type.ClassType == ClassType.Interface || isOverrideable || type.DecoratedFullName == member.DeclaringType.DecoratedFullName) {
-						// search in the class for the member
-						foreach (IMember interfaceMember in type.SearchMember (member.Name, true)) {
-							if (interfaceMember.MemberType == member.MemberType)
-								yield return interfaceMember;
-						}
-						
-						// now search in all subclasses of this class for the member
-						isLastMember = !member.IsOverride;
-						foreach (IType implementingType in dom.GetSubclasses (type)) {
-							string name = implementingType.DecoratedFullName;
-							if (alreadyVisitedTypes.Contains (name))
-								continue;
-							alreadyVisitedTypes.Add (name);
-							foreach (IMember typeMember in implementingType.SearchMember (member.Name, true)) {
-								if (typeMember.MemberType == member.MemberType) {
-									isLastMember = type.ClassType != ClassType.Interface && (typeMember.IsVirtual || typeMember.IsAbstract || !typeMember.IsOverride);
-									yield return typeMember;
-								}
-							}
-							if (!isOverrideable)
-								break;
-						}
-						if (isLastMember)
-							break;
-					}
-				}
-			}
 		}
 	}
 }

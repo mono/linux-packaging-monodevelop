@@ -31,16 +31,19 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Xml;
 
 namespace MonoDevelop.Core
 {
 	public static class PropertyService
 	{
+		//force the static class to intialize
+		internal static void Initialize ()
+		{
+		}
 		readonly static string FileName = "MonoDevelopProperties.xml";
 		static Properties properties;
-
-		public readonly static bool IsWindows;
-		public readonly static bool IsMac;
 
 		public static Properties GlobalInstance {
 			get { return properties; }
@@ -54,13 +57,9 @@ namespace MonoDevelop.Core
 			}
 		}
 		
-		public static FilePath ConfigPath {
-			get {
-				string configPath = Environment.GetFolderPath (Environment.SpecialFolder.ApplicationData);
-				return Path.Combine (configPath, "MonoDevelop");
-			}
-		}
-		
+		/// <summary>
+		/// Location of data files that are bundled with MonoDevelop itself.
+		/// </summary>
 		public static FilePath DataPath {
 			get {
 				string result = System.Configuration.ConfigurationManager.AppSettings ["DataDirectory"];
@@ -70,49 +69,79 @@ namespace MonoDevelop.Core
 			}
 		}
 		
-		//From Managed.Windows.Forms/XplatUI
-		static bool IsRunningOnMac ()
-		{
-			IntPtr buf = IntPtr.Zero;
-			try {
-				buf = System.Runtime.InteropServices.Marshal.AllocHGlobal (8192);
-				// This is a hacktastic way of getting sysname from uname ()
-				if (uname (buf) == 0) {
-					string os = System.Runtime.InteropServices.Marshal.PtrToStringAnsi (buf);
-					if (os == "Darwin")
-						return true;
-				}
-			} catch {
-			} finally {
-				if (buf != IntPtr.Zero)
-					System.Runtime.InteropServices.Marshal.FreeHGlobal (buf);
-			}
-			return false;
-		}
-		
-		[System.Runtime.InteropServices.DllImport ("libc")]
-		static extern int uname (IntPtr buf);
-		
 		static PropertyService ()
 		{
-			IsWindows = Path.DirectorySeparatorChar == '\\';
-
-			if (!LoadProperties (Path.Combine (ConfigPath, FileName))) {
-				if (!LoadProperties (Path.Combine (DataPath, FileName))) {
-					properties = new Properties ();
-					properties.Set ("MonoDevelop.Core.FirstRun", true);
+			Counters.PropertyServiceInitialization.BeginTiming ();
+			
+			string migrateVersion = null;
+			UserProfile migratableProfile = null;
+			
+			var prefsPath = UserProfile.Current.ConfigDir.Combine (FileName);
+			if (!File.Exists (prefsPath)) {
+				if (GetMigratableProfile (out migratableProfile, out migrateVersion)) {
+					FilePath migratePrefsPath = migratableProfile.ConfigDir.Combine (FileName);
+					try {
+						var parentDir = prefsPath.ParentDirectory;
+						//can't use file service until property service is initialized
+						if (!Directory.Exists (parentDir))
+							Directory.CreateDirectory (parentDir);
+						File.Copy (migratePrefsPath, prefsPath);
+						LoggingService.LogInfo ("Migrated core properties from {0}", migratePrefsPath);
+					} catch (IOException ex) {
+						string message = string.Format ("Failed to migrate core properties from {0}", migratePrefsPath);
+						LoggingService.LogError (message, ex);
+					}
+				} else {
+					LoggingService.LogInfo ("Did not find previous version from which to migrate data");	
 				}
 			}
+			
+			if (!LoadProperties (prefsPath)) {
+				properties = new Properties ();
+				properties.Set ("MonoDevelop.Core.FirstRun", true);
+			}
+			
+			if (migratableProfile != null)
+				UserDataMigrationService.SetMigrationSource (migratableProfile, migrateVersion);
+			
 			properties.PropertyChanged += delegate(object sender, PropertyChangedEventArgs args) {
 				if (PropertyChanged != null)
 					PropertyChanged (sender, args);
 			};
-			IsMac = !IsWindows && IsRunningOnMac();
+			
+			Counters.PropertyServiceInitialization.EndTiming ();
+		}
+		
+		internal static bool GetMigratableProfile (out UserProfile profile, out string version)
+		{
+			profile = null;
+			version = null;
+			
+			//try versioned profiles from most recent to oldest
+			//skip the last in the array, it's the current profile
+			int userProfileMostRecent = UserProfile.ProfileVersions.Length - 2;
+			for (int i = userProfileMostRecent; i >= 0; i--) {
+				string v = UserProfile.ProfileVersions[i];
+				var p = UserProfile.GetProfile (v);
+				if (File.Exists (p.ConfigDir.Combine (FileName))) {
+					profile = p;
+					version = v;
+					return true;
+				}
+			}
+			
+			//try the old unversioned MD <= 2.4 profile
+			var md24 = UserProfile.ForMD24 ();
+			if (File.Exists (md24.ConfigDir.Combine (FileName))) {
+				profile = md24;
+				version = "2.4";
+				return true;
+			}
+			return false;
 		}
 		
 		static bool LoadProperties (string fileName)
 		{
-			LoggingService.Trace ("CorePropertyService", "Loading");
 			properties = null;
 			if (File.Exists (fileName)) {
 				try {
@@ -131,16 +160,20 @@ namespace MonoDevelop.Core
 					LoggingService.LogError ("Error loading properties from backup file '{0}':\n{1}", backupFile, ex);
 				}
 			}
-			LoggingService.Trace ("CorePropertyService", "Loaded");
 			return properties != null;
 		}
 		
-		public static void SaveProperties()
+		public static void SaveProperties ()
 		{
 			Debug.Assert (properties != null);
-			if (!Directory.Exists (ConfigPath))
-				Directory.CreateDirectory (ConfigPath);
-			properties.Save (Path.Combine (ConfigPath, FileName));
+			var prefsPath = UserProfile.Current.ConfigDir.Combine (FileName);
+			FileService.EnsureDirectoryExists (prefsPath.ParentDirectory);
+			properties.Save (prefsPath);
+		}
+		
+		public static bool HasValue (string property)
+		{
+			return properties.HasValue (property);
 		}
 		
 		public static T Get<T> (string property, T defaultValue)

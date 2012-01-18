@@ -29,6 +29,7 @@ FILES =  \
 	editor/FlagsSelectorDialog.cs \
 	editor/FloatRange.cs \
 	editor/GroupPicker.cs \
+	editor/GtkWorkarounds.cs \
 	editor/IconList.cs \
 	editor/IconSelectorItem.cs \
 	editor/IconSelectorMenu.cs \
@@ -135,6 +136,7 @@ FILES =  \
 	wrapper/MessageDialog.cs \
 	wrapper/Misc.cs \
 	wrapper/Notebook.cs \
+	wrapper/NotifyWorkaround.cs \
 	wrapper/Object.cs \
 	wrapper/OptionMenu.cs \
 	wrapper/Paned.cs \

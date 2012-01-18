@@ -26,21 +26,13 @@
 
 using System;
 using System.Text;
-using System.Collections;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Threading;
 using Gdk;
 using Gtk;
+using MonoDevelop.Core;
+using MonoDevelop.Core.Text;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.Dom;
-using MonoDevelop.Projects.Dom.Parser;
-using MonoDevelop.Components;
-using MonoDevelop.Core;
-using MonoDevelop.Core.Instrumentation;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects.Dom.Output;
-using MonoDevelop.Ide.CodeCompletion;
 
 namespace MonoDevelop.Ide.NavigateToDialog
 {
@@ -48,10 +40,9 @@ namespace MonoDevelop.Ide.NavigateToDialog
 	{
 		protected string match;
 		
-		public virtual string MarkupText {
-			get {
-				return HighlightMatch (PlainText, match);
-			}
+		public virtual string GetMarkupText (Widget widget)
+		{
+			return HighlightMatch (widget, PlainText, match);
 		}
 		
 		public abstract string PlainText  { get; }
@@ -74,21 +65,24 @@ namespace MonoDevelop.Ide.NavigateToDialog
 			Rank = rank;
 		}
 		
-		protected static string HighlightMatch (string text, string toMatch)
+		protected static string HighlightMatch (Widget widget, string text, string toMatch)
 		{
-			var lane = !string.IsNullOrEmpty (toMatch) ? NavigateToDialog.MatchString (text, toMatch) : null;
+			var lane = StringMatcher.GetMatcher (toMatch, false).GetMatch (text);
 			if (lane != null) {
 				StringBuilder result = new StringBuilder ();
 				int lastPos = 0;
-				for (int n=0; n <= lane.Index; n++) {
-					int pos = lane.Positions [n];
-					int len = lane.Lengths [n];
+				for (int n=0; n < lane.Length; n++) {
+					int pos = lane[n];
 					if (pos - lastPos > 0)
 						result.Append (GLib.Markup.EscapeText (text.Substring (lastPos, pos - lastPos)));
-					result.Append ("<span foreground=\"blue\">");
-					result.Append (GLib.Markup.EscapeText (text.Substring (pos, len)));
+					result.Append ("<span foreground=\"");
+					var color = Mono.TextEditor.HslColor.GenerateHighlightColors (widget.Style.Base (StateType.Normal), 
+						widget.Style.Text (StateType.Normal), 3)[2];
+					result.Append (color.ToPangoString ());
+					result.Append ("\">");
+					result.Append (GLib.Markup.EscapeText (text[pos].ToString ()));
 					result.Append ("</span>");
-					lastPos = pos + len;
+					lastPos = pos + 1;
 				}
 				if (lastPos < text.Length)
 					result.Append (GLib.Markup.EscapeText (text.Substring (lastPos, text.Length - lastPos)));
@@ -102,22 +96,28 @@ namespace MonoDevelop.Ide.NavigateToDialog
 	class TypeSearchResult : MemberSearchResult
 	{
 		public override string File {
-			get { return ((IType)member).CompilationUnit.FileName; }
+			get {
+				var cu = ((IType)member).CompilationUnit;
+				return cu != null ? cu.FileName : null;
+			}
 		}
 		
 		public override string Description {
 			get {
 				IType type = (IType)member;
 				if (useFullName) 
-					return type.SourceProject != null ? String.Format (GettextCatalog.GetString ("from Project \"{0}\""), type.SourceProject.Name) : String.Format (GettextCatalog.GetString ("from \"{0}\""), type.CompilationUnit.FileName);
+					return type.SourceProject != null
+						? GettextCatalog.GetString ("from Project \"{0}\"", type.SourceProject.Name ?? "")
+						: GettextCatalog.GetString ("from \"{0}\"", (string)type.CompilationUnit.FileName ?? "");
 				if (type.SourceProject != null)
-					return String.Format (GettextCatalog.GetString ("from Project \"{0} in {1}\""), type.SourceProject.Name, type.Namespace);
-				return String.Format (GettextCatalog.GetString ("from \"{0} in {1}\""), type.CompilationUnit.FileName, type.Namespace);
+					return GettextCatalog.GetString ("from Project \"{0} in {1}\"", type.SourceProject.Name ?? "", type.Namespace ?? "");
+				return GettextCatalog.GetString ("from \"{0} in {1}\"", (string)type.CompilationUnit.FileName ?? "", type.Namespace ?? "");
 			}
 		}
 		
 		
-		public TypeSearchResult (string match, string matchedString, int rank, IType type, bool useFullName) : base (match, matchedString, rank, type, useFullName)
+		public TypeSearchResult (string match, string matchedString, int rank, IType type, bool useFullName)
+			: base (match, matchedString, rank, type, useFullName)
 		{
 		}
 	}
@@ -150,12 +150,15 @@ namespace MonoDevelop.Ide.NavigateToDialog
 		public override string Description {
 			get {
 				if (useFileName)
-					return file.Project != null ? String.Format (GettextCatalog.GetString ("from \"{0}\" in Project \"{1}\""), GetRelProjectPath (file), file.Project.Name) : String.Format (GettextCatalog.GetString ("from \"{0}\""), GetRelProjectPath (file));
-				return file.Project != null ? String.Format (GettextCatalog.GetString ("from Project \"{0}\""), file.Project.Name) : "";
+					return file.Project != null
+						? GettextCatalog.GetString ("from \"{0}\" in Project \"{1}\"", GetRelProjectPath (file), file.Project.Name)
+						: GettextCatalog.GetString ("from \"{0}\"", GetRelProjectPath (file));
+				return file.Project != null ? GettextCatalog.GetString ("from Project \"{0}\"", file.Project.Name) : "";
 			}
 		}
 		
-		public FileSearchResult (string match, string matchedString, int rank, ProjectFile file, bool useFileName) : base (match, matchedString, rank)
+		public FileSearchResult (string match, string matchedString, int rank, ProjectFile file, bool useFileName)
+							: base (match, matchedString, rank)
 		{
 			this.file = file;
 			this.useFileName = useFileName;
@@ -176,21 +179,21 @@ namespace MonoDevelop.Ide.NavigateToDialog
 		
 		protected virtual OutputFlags Flags {
 			get {
-				return OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics | (useFullName  ? OutputFlags.UseFullName : OutputFlags.None);
+				return OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics
+					| (useFullName  ? OutputFlags.UseFullName : OutputFlags.None);
 			}
 		}
 		
-		public override string MarkupText {
-			get {
-				if (useFullName)
-					return HighlightMatch (Ambience.GetString (member, Flags), match);
-				OutputSettings settings = new OutputSettings (Flags | OutputFlags.IncludeMarkup);
-				settings.EmitNameCallback = delegate (INode domVisitable, ref string outString) {
-					if (domVisitable == member)
-						outString = HighlightMatch (outString, match);
-				};
-				return Ambience.GetString (member, settings);
-			}
+		public override string GetMarkupText (Widget widget)
+		{
+			if (useFullName)
+				return HighlightMatch (widget, Ambience.GetString (member, Flags), match);
+			OutputSettings settings = new OutputSettings (Flags | OutputFlags.IncludeMarkup);
+			settings.EmitNameCallback = delegate (INode domVisitable, ref string outString) {
+				if (domVisitable == member)
+					outString = HighlightMatch (widget, outString, match);
+			};
+			return Ambience.GetString (member, settings);
 		}
 		
 			/*	
@@ -227,11 +230,12 @@ namespace MonoDevelop.Ide.NavigateToDialog
 		
 		public override string Description {
 			get {
-				return String.Format (GettextCatalog.GetString ("from Type \"{0}\""), member.DeclaringType.Name);
+				return GettextCatalog.GetString ("from Type \"{0}\"", member.DeclaringType.Name);
 			}
 		}
 		
-		public MemberSearchResult (string match, string matchedString, int rank, IMember member, bool useFullName) : base (match, matchedString, rank)
+		public MemberSearchResult (string match, string matchedString, int rank, IMember member, bool useFullName)
+								: base (match, matchedString, rank)
 		{
 			this.member = member;
 			this.useFullName = useFullName;

@@ -41,10 +41,11 @@ using MonoDevelop.Core.Serialization;
 using MonoDevelop.Projects.Extensions;
 using MonoDevelop.Core;
 using MonoDevelop.Core.ProgressMonitoring;
+using System.Reflection;
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
-	internal class SlnFileFormat
+	public class SlnFileFormat
 	{
 		public string GetValidFormatName (object obj, string fileName, MSBuildFileFormat format)
 		{
@@ -302,6 +303,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 				foreach (SolutionConfigurationEntry cce in cc.Configurations) {
 					SolutionEntityItem p = cce.Item;
+					
+					// Ignore unknown projects. We deal with them below
+					if (p is UnknownSolutionItem)
+						continue;
+					
 					list.Add (String.Format (
 						"\t\t{0}.{1}.ActiveCfg = {2}", p.ItemId, ToSlnConfigurationId (cc), ToSlnConfigurationId (cce.ItemConfiguration)));
 
@@ -309,6 +315,12 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						list.Add (String.Format (
 							"\t\t{0}.{1}.Build.0 = {2}", p.ItemId, ToSlnConfigurationId (cc), ToSlnConfigurationId (cce.ItemConfiguration)));
 				}
+			}
+			
+			// Dump config lines for unknown projects
+			foreach (UnknownSolutionItem item in sol.GetAllSolutionItems<UnknownSolutionItem> ()) {
+				ItemSlnData data = ItemSlnData.ForItem (item);
+				list.AddRange (data.ConfigLines);
 			}
 		}
 
@@ -730,7 +742,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				
 				try {
 					item = ProjectExtensionUtil.LoadSolutionItem (monitor, projectPath, delegate {
-						return MSBuildProjectService.LoadItem (monitor, projectPath, projTypeGuid, projectGuid);
+						return MSBuildProjectService.LoadItem (monitor, projectPath, format, projTypeGuid, projectGuid);
 					});
 					
 					if (item == null) {
@@ -751,15 +763,37 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					handler.ReadSlnData (it);
 					
 				} catch (Exception e) {
-					LoggingService.LogError (GettextCatalog.GetString (
-								"Error while trying to load the project {0}. Exception : {1}",
-								projectPath, e.ToString ()));
-					monitor.ReportWarning (GettextCatalog.GetString (
-						"Error while trying to load the project '{0}': {1}", projectPath, e.Message));
+					// If we get a TargetInvocationException from using Activator.CreateInstance we
+					// need to unwrap the real exception
+					while (e is TargetInvocationException)
+						e = ((TargetInvocationException) e).InnerException;
+					
+					if (e is UnknownSolutionItemTypeException) {
+						var name = ((UnknownSolutionItemTypeException)e).TypeName;
+						LoggingService.LogWarning (!string.IsNullOrEmpty (name)?
+							  string.Format ("Could not load project '{0}' with unknown item type '{1}'", projectPath, name)
+							: string.Format ("Could not load project '{0}' with unknown item type", projectPath));
+						monitor.ReportWarning (!string.IsNullOrEmpty (name)?
+							  GettextCatalog.GetString ("Could not load project '{0}' with unknown item type '{1}'", projectPath, name)
+							: GettextCatalog.GetString ("Could not load project '{0}' with unknown item type", projectPath));
+					} else if (e is UserException) {
+						var ex = (UserException) e;
+						LoggingService.LogError ("{0}: {1}", ex.Message, ex.Details);
+						monitor.ReportError (string.Format ("{0}{1}{1}{2}", ex.Message, Environment.NewLine, ex.Details), null);
+					} else {
+						LoggingService.LogError (string.Format ("Error while trying to load the project {0}", projectPath), e);
+						monitor.ReportWarning (GettextCatalog.GetString (
+							"Error while trying to load the project '{0}': {1}", projectPath, e.Message));
+					}
 
-					UnknownSolutionItem uitem = new UnknownSolutionItem ();
-					uitem.FileName = projectPath;
-					uitem.LoadError = e.Message;
+					var uitem = new UnknownSolutionItem () {
+						FileName = projectPath,
+						LoadError = e.Message,
+					};
+					var h = new MSBuildHandler (projTypeGuid, projectGuid) {
+						Item = uitem,
+					};
+					uitem.SetItemHandler (h);
 					item = uitem;
 				}
 				
@@ -856,7 +890,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			if (sec == null || String.Compare (sec.Val, "postSolution", true) != 0)
 				return;
 
-			List<SolutionConfigurationEntry> noBuildList = new List<SolutionConfigurationEntry> ();
 			Dictionary<string, SolutionConfigurationEntry> cache = new Dictionary<string, SolutionConfigurationEntry> ();
 			Dictionary<string, string> ignoredProjects = new Dictionary<string, string> ();
 			SlnData slnData = GetSlnData (sln.RootFolder);
@@ -917,12 +950,19 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 				SolutionEntityItem item;
 				if (slnData.ItemsByGuid.TryGetValue (projGuid, out item)) {
+					if (item is UnknownSolutionItem) {
+						ItemSlnData data = ItemSlnData.ForItem (item);
+						data.ConfigLines.Add (lines [lineNum]);
+						extras.RemoveAt (extras.Count - 1);
+						continue;
+					}
 					string key = projGuid + "." + slnConfig;
 					SolutionConfigurationEntry combineConfigEntry = null;
 					if (cache.ContainsKey (key)) {
 						combineConfigEntry = cache [key];
 					} else {
 						combineConfigEntry = GetConfigEntry (sln, item, slnConfig);
+						combineConfigEntry.Build = false; // Not buildable by default. Build will be enabled if a Build.0 entry is found
 						cache [key] = combineConfigEntry;
 					}
 	
@@ -937,21 +977,14 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					 */
 					if (action == "ActiveCfg") {
 						combineConfigEntry.ItemConfiguration = FromSlnConfigurationId (projConfig);
-						noBuildList.Add (combineConfigEntry);
 					} else if (action == "Build.0") {
-						noBuildList.Remove (combineConfigEntry);
+						combineConfigEntry.Build = true;
 					}
 				}
 				extras.RemoveAt (extras.Count - 1);
 			}
 
 			slnData.SectionExtras ["ProjectConfigurationPlatforms"] = extras;
-
-			foreach (SolutionConfigurationEntry e in noBuildList) {
-				//Mark (build=false) of all projects for which 
-				//ActiveCfg was found but no Build.0
-				e.Build = false;
-			}
 		}
 
 		/* Gets the CombineConfigurationEntry corresponding to the @entry in its parentCombine's 

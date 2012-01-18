@@ -27,6 +27,7 @@
 //
 
 using System;
+using System.Linq;
 using System.IO;
 using System.Collections.Generic;
 using Mono.Addins;
@@ -55,9 +56,9 @@ namespace MonoDevelop.VersionControl
 		/// </returns>
 		public static bool CreatePatch (VersionControlItemList items, bool test)
 		{
-			if (items.Count < 1)
-				return false;
-				
+			bool can = CanCreatePatch (items);
+			if (test || !can){ return can; }
+			
 			FilePath basePath = FindMostSpecificParent (items, FilePath.Null);
 			if (FilePath.Empty == basePath)
 				return false;
@@ -80,15 +81,19 @@ namespace MonoDevelop.VersionControl
 			List<DiffInfo> diffs = new List<DiffInfo> ();
 			
 			object[] exts = AddinManager.GetExtensionObjects ("/MonoDevelop/VersionControl/CommitDialogExtensions", typeof(CommitDialogExtension), false);
-			
+			List<CommitDialogExtension> activeExtensions = new List<CommitDialogExtension> ();
 			try {
 				foreach (CommitDialogExtension ext in exts) {
-					ext.Initialize (items);
-					ext.OnBeginCommit (items);
+					if (ext.Initialize (items)) {
+						activeExtensions.Add (ext);
+						if (!ext.OnBeginCommit (items))
+							break;
+					} else
+						ext.Destroy ();
 				}
 				diffs.AddRange (repo.PathDiff (items, false));
 			} finally {
-				foreach (CommitDialogExtension ext in exts) {
+				foreach (CommitDialogExtension ext in activeExtensions) {
 					ext.OnEndCommit (items, false);
 					ext.Destroy ();
 				}
@@ -102,19 +107,24 @@ namespace MonoDevelop.VersionControl
 		
 		/// <summary>
 		/// Determines whether a patch can be created 
-		/// from a VersionControlItemList.
+		/// from a ChangeSet.
 		/// </summary>
 		public static bool CanCreatePatch (ChangeSet items) 
 		{
 			if (null == items || 0 == items.Count){ return false; }
 			
-			foreach (ChangeSetItem item in items.Items) {
-				if (!items.Repository.CanRevert (item.LocalPath)) {
-					return false;
-				}
-			}
-			
-			return true;
+			var vinfos = items.Repository.GetVersionInfo (items.Items.Select (i => i.LocalPath));
+			return vinfos.All (i => i.CanRevert);
+		}
+		
+		/// <summary>
+		/// Determines whether a patch can be created 
+		/// from a VersionControlItemList.
+		/// </summary>
+		public static bool CanCreatePatch (VersionControlItemList items) 
+		{
+			if (null == items || 0 == items.Count){ return false; }
+			return items.All (i => i.VersionInfo.CanRevert);
 		}
 		
 		// Finds the most specific ancestor path of a set of version control items.

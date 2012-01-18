@@ -5,17 +5,17 @@
        copyright   = ""
        url         = ""
        description = "Provides a hex editor for MonoDevelop"
-       category    = "MonoDevelop Core"
-       version     = "2.4">
+       category    = "IDE extensions"
+       version     = "2.8.5">
 	
 	<Runtime>
 		<Import assembly="MonoDevelop.HexEditor.dll"/>
 	</Runtime>
 	
 	<Dependencies>
-		<Addin id="Core" version="2.4"/>
-		<Addin id="Ide" version="2.4"/>
-		<Addin id="AssemblyBrowser" version="2.4"/>
+		<Addin id="Core" version="2.8.5"/>
+		<Addin id="Ide" version="2.8.5"/>
+		<Addin id="AssemblyBrowser" version="2.8.5"/>
 	</Dependencies>
 	<!--
 	<Extension path = "/MonoDevelop/Ide/Commands">

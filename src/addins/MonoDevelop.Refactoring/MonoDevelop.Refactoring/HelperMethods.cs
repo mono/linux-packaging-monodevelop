@@ -26,7 +26,7 @@
 
 using System;
 using System.Collections.Generic;
-using ICSharpCode.NRefactory.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Projects.Dom;
 using Mono.TextEditor;
 using System.Linq;
@@ -35,6 +35,27 @@ namespace MonoDevelop.Refactoring
 {
 	public static class HelperMethods
 	{
+		static Dictionary<string, string> TypeTable = new Dictionary<string, string> ();
+		static HelperMethods ()
+		{
+			TypeTable[DomReturnType.Void.FullName] = "void";
+			TypeTable[DomReturnType.String.FullName] = "string";
+			TypeTable[DomReturnType.Int32.FullName] = "int";
+			TypeTable[DomReturnType.UInt32.FullName] = "uint";
+			TypeTable[DomReturnType.Int64.FullName] = "long";
+			TypeTable[DomReturnType.UInt64.FullName] = "ulong";
+			TypeTable[DomReturnType.Object.FullName] = "object";
+			TypeTable[DomReturnType.Float.FullName] = "float";
+			TypeTable[DomReturnType.Double.FullName] = "double";
+			TypeTable[DomReturnType.Byte.FullName] = "byte";
+			TypeTable[DomReturnType.SByte.FullName] = "sbyte";
+			TypeTable[DomReturnType.Int16.FullName] = "short";
+			TypeTable[DomReturnType.UInt16.FullName] = "ushort";
+			TypeTable[DomReturnType.Decimal.FullName] = "decimal";
+			TypeTable[DomReturnType.Char.FullName] = "char";
+			TypeTable[DomReturnType.Bool.FullName] = "bool";
+		}
+		
 		public static bool IsIdentifierPart (this char ch)
 		{
 			return Char.IsLetterOrDigit (ch) || ch == '_';
@@ -42,16 +63,41 @@ namespace MonoDevelop.Refactoring
 		
 		public static DocumentLocation ToDocumentLocation (this DomLocation location, Document document)
 		{
-			return new DocumentLocation (location.Line - 1, location.Column - 1);
+			return new DocumentLocation (location.Line, location.Column);
 		}
 		
-		public static TypeReference ConvertToTypeReference (this MonoDevelop.Projects.Dom.IReturnType returnType)
+		public static AstType ConvertToTypeReference (this MonoDevelop.Projects.Dom.IReturnType returnType)
 		{
+			string primitiveType;
+			if (TypeTable.TryGetValue (returnType.DecoratedFullName, out primitiveType))
+				return new PrimitiveType (primitiveType);
+			
+			AstType result = null;
+			if (!string.IsNullOrEmpty (returnType.Namespace))
+				result = new SimpleType (returnType.Namespace);
+			foreach (var part in returnType.Parts) {
+				if (result == null) {
+					var st = new SimpleType (part.Name);
+					foreach (var type in part.GenericArguments.Select (ga => ConvertToTypeReference (ga)))
+						st.AddChild (type, SimpleType.Roles.TypeArgument);
+					result = st;
+				} else {
+					var mt = new ICSharpCode.NRefactory.CSharp.MemberType () {
+						Target = result,
+						MemberName = part.Name
+					};
+					foreach (var type in part.GenericArguments.Select (ga => ConvertToTypeReference (ga)))
+						mt.AddChild (type, SimpleType.Roles.TypeArgument);
+					result = mt;
+				}
+			}
+			
+			/*
 			List<TypeReference> genericTypes = new List<TypeReference> ();
 			foreach (MonoDevelop.Projects.Dom.IReturnType genericType in returnType.GenericArguments) {
 				genericTypes.Add (ConvertToTypeReference (genericType));
 			}
-			TypeReference result = new TypeReference (returnType.FullName, genericTypes);
+			TypeReference result = new AstType (returnType.FullName, genericTypes);
 			result.IsKeyword = true;
 			result.PointerNestingLevel = returnType.PointerNestingLevel;
 			if (returnType.ArrayDimensions > 0) {
@@ -60,143 +106,55 @@ namespace MonoDevelop.Refactoring
 					rankSpecfier[i] = returnType.GetDimension (i);
 				}
 				result.RankSpecifier = rankSpecfier;
-			}
+			}*/
 			return result;
 		}
 		
-		public static DomReturnType ConvertToReturnType (this TypeReference typeRef)
+		public static DomReturnType ConvertToReturnType (this AstType typeRef)
 		{
 			if (typeRef == null)
 				return null;
 			DomReturnType result;
-			if (typeRef is InnerClassTypeReference) {
-				InnerClassTypeReference innerTypeRef = (InnerClassTypeReference)typeRef;
-				result = innerTypeRef.BaseType.ConvertToReturnType ();
-				result.Parts.Add (new ReturnTypePart (typeRef.Type));
-			} else {
-				result = new DomReturnType (typeRef.Type);
-			}
-			foreach (TypeReference genericArgument in typeRef.GenericTypes) {
-				result.AddTypeParameter (ConvertToReturnType (genericArgument));
-			}
-			result.PointerNestingLevel = typeRef.PointerNestingLevel;
-			if (typeRef.IsArrayType) {
-				result.ArrayDimensions = typeRef.RankSpecifier.Length;
-				for (int i = 0; i < typeRef.RankSpecifier.Length; i++) {
-					result.SetDimension (i, typeRef.RankSpecifier[i]);
+			if (typeRef is SimpleType) {
+				var st = (SimpleType)typeRef;
+				result = new DomReturnType (st.Identifier);
+				foreach (var arg in st.TypeArguments){
+					result.AddTypeParameter (ConvertToReturnType (arg));
 				}
-			}
-			return result;
-		}
-		
-		public static List<InsertionPoint> GetInsertionPoints (Document doc, IType type)
-		{
-			if (doc == null)
-				throw new ArgumentNullException ("doc");
-			if (type == null)
-				throw new ArgumentNullException ("type");
-			List<InsertionPoint> result = new List<InsertionPoint> ();
-			
-			int offset = doc.LocationToOffset (type.BodyRegion.Start.Line - 1, type.BodyRegion.Start.Column);
-			if (offset < 0)
-				return result;
-			while (offset < doc.Length && doc.GetCharAt (offset) != '{' && char.IsWhiteSpace (doc.GetCharAt (offset)))
-				offset++;
-			var realStartLocation = doc.OffsetToLocation (offset);
-			result.Add (GetInsertionPosition (doc, realStartLocation.Line, realStartLocation.Column));
-			result[0].LineBefore = NewLineInsertion.None;
-			foreach (IMember member in type.Members) {
-				DomLocation domLocation = member.BodyRegion.End;
-				if (domLocation.Line <= 0) {
-					LineSegment lineSegment = doc.GetLine (member.Location.Line - 1);
-					if (lineSegment == null)
-						continue;
-					domLocation = new DomLocation (member.Location.Line, lineSegment.EditableLength + 1);
+			} else if (typeRef is ICSharpCode.NRefactory.CSharp.MemberType) {
+				var mt = (ICSharpCode.NRefactory.CSharp.MemberType)typeRef;
+				result = ConvertToReturnType (mt.Target);
+				result.Parts.Add (new ReturnTypePart (mt.MemberName));
+				
+				foreach (var arg in mt.TypeArguments){
+					result.AddTypeParameter (ConvertToReturnType (arg));
 				}
-				result.Add (GetInsertionPosition (doc, domLocation.Line - 1, domLocation.Column - 1));
-			}
-			result[result.Count - 1].LineAfter = NewLineInsertion.None;
-			CheckStartPoint (doc, result[0], result.Count == 1);
-			if (result.Count > 1)
-				CheckEndPoint (doc, result[result.Count - 1], result.Count == 1);
-			return result;
-		}
+			} else if (typeRef is ComposedType) {
+				var ct = (ComposedType)typeRef;
+				result = ConvertToReturnType (ct.BaseType);
+				result.PointerNestingLevel = ct.PointerRank;
+				result.IsNullable = ct.HasNullableSpecifier;
+				
+				int arraySpecifiers = ct.ArraySpecifiers.Count;
+				if (arraySpecifiers> 0) {
+					result.ArrayDimensions = arraySpecifiers;
+					int i = 0;
+					foreach (var spec in ct.ArraySpecifiers) {
+						result.SetDimension (i, spec.Dimensions);
+						i++;
+					}
+				}
+			} else if (typeRef is PrimitiveType) {
+				var pt = (PrimitiveType)typeRef;
+				result = new DomReturnType (pt.Keyword);
+			} else if (typeRef.IsNull) {
+				return null;
 
-		static void CheckEndPoint (Document doc, InsertionPoint point, bool isStartPoint)
-		{
-			LineSegment line = doc.GetLine (point.Location.Line);
-			if (line == null)
-				return;
-			
-			if (doc.GetLineIndent (line).Length < point.Location.Column)
-				point.LineBefore = NewLineInsertion.BlankLine;
-			if (point.Location.Column < line.EditableLength)
-				point.LineAfter = NewLineInsertion.Eol;
-		}
-		
-		static void CheckStartPoint (Document doc, InsertionPoint point, bool isEndPoint)
-		{
-			LineSegment line = doc.GetLine (point.Location.Line);
-			if (line == null)
-				return;
-			if (doc.GetLineIndent (line).Length == point.Location.Column) {
-				int lineNr = point.Location.Line;
-				while (lineNr > 0 && doc.GetLineIndent (lineNr - 1).Length == doc.GetLine (lineNr - 1).EditableLength) {
-					lineNr--;
-				}
-				line = doc.GetLine (lineNr);
-				point.Location = new DocumentLocation (lineNr, doc.GetLineIndent (line).Length);
+			} else { 
+				throw new InvalidOperationException ("unknown AstType:" + typeRef);
 			}
 			
-			if (doc.GetLineIndent (line).Length < point.Location.Column)
-				point.LineBefore = isEndPoint ? NewLineInsertion.Eol : NewLineInsertion.BlankLine;
-			if (point.Location.Column < line.EditableLength)
-				point.LineAfter = isEndPoint ? NewLineInsertion.Eol : NewLineInsertion.BlankLine;
-		}
-		
-		static InsertionPoint GetInsertionPosition (Document doc, int line, int column)
-		{
-			int bodyEndOffset = doc.LocationToOffset (line, column) + 1;
-			
-			LineSegment curLine = doc.GetLine (line);
-			if (curLine != null) {
-				if (bodyEndOffset < curLine.Offset + curLine.EditableLength)
-					return new InsertionPoint (new DocumentLocation (line, column + 1), NewLineInsertion.BlankLine, NewLineInsertion.BlankLine);
-			}
-			
-			LineSegment nextLine = doc.GetLine (line + 1);
-			
-			int endOffset = nextLine != null ? nextLine.Offset : doc.Length;
-			for (int i = bodyEndOffset; i < endOffset; i++) {
-				char ch = doc.GetCharAt (i);
-				if (!char.IsWhiteSpace (ch))
-					return new InsertionPoint (doc.OffsetToLocation (i), NewLineInsertion.BlankLine, NewLineInsertion.BlankLine);
-			}
-			
-			if (nextLine == null)
-				return new InsertionPoint (doc.OffsetToLocation (bodyEndOffset - 1), NewLineInsertion.BlankLine, NewLineInsertion.BlankLine);
-			int oldLine = line;
-			while (line + 1 < doc.LineCount && doc.GetLineIndent (line + 1).Length == doc.GetLine (line + 1).EditableLength)
-				line++;
-			NewLineInsertion insertBefore = NewLineInsertion.None;
-			NewLineInsertion insertAfter = NewLineInsertion.None;
-			int delta = line - oldLine;
-			int lineNumber = line + 1;
-			
-			if (delta == 0) {
-				insertBefore = NewLineInsertion.BlankLine;
-				insertAfter = NewLineInsertion.BlankLine;
-			} else if (delta == 1) {
-				insertAfter = NewLineInsertion.BlankLine;
-			} else if (delta == 2) {
-				lineNumber--;
-				insertAfter = NewLineInsertion.BlankLine;
-			} else if (delta >= 3) {
-				lineNumber -= 2;
-				insertAfter = NewLineInsertion.None;
-			}
-			
-			return new InsertionPoint (new DocumentLocation (lineNumber, doc.GetLineIndent (lineNumber).Length), insertBefore, insertAfter);
+			return result;
 		}
 	}
 }

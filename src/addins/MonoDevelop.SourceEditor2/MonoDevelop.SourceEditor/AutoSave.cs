@@ -1,21 +1,21 @@
-// 
+//
 // AutoSave.cs
-//  
+//
 // Author:
 //       Mike Krüger <mkrueger@novell.com>
-// 
+//
 // Copyright (c) 2009 Novell, Inc (http://www.novell.com)
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -25,22 +25,33 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using MonoDevelop.Core;
 
 namespace MonoDevelop.SourceEditor
 {
-	public class AutoSave : IDisposable
+	static class AutoSave
 	{
-		static string autoSavePath = Path.Combine (PropertyService.Get<string> ("MonoDevelop.CodeCompletion.DataDirectory", String.Empty), "AutoSave");
+		//FIXME: is this path a good one? wouldn't it be better to put autosaves beside the files anyway?
+		static string autoSavePath = UserProfile.Current.CacheDir.Combine ("AutoSave");
+		static bool autoSaveEnabled;
 		
 		static AutoSave ()
 		{
-			if (!Directory.Exists (autoSavePath))
-				Directory.CreateDirectory (autoSavePath);
+			try {
+				if (!Directory.Exists (autoSavePath))
+					Directory.CreateDirectory (autoSavePath);
+			} catch (Exception e) {
+				LoggingService.LogError ("Can't create auto save path:" + autoSavePath +". Auto save is disabled.", e);
+				autoSaveEnabled = false;
+				return;
+			}
+			autoSaveEnabled = true;
+			StartAutoSaveThread ();
 		}
-		
+
 		static string GetAutoSaveFileName (string fileName)
 		{
 			if (fileName == null)
@@ -49,24 +60,36 @@ namespace MonoDevelop.SourceEditor
 			newFileName = Path.Combine (autoSavePath, newFileName.Replace(',','_').Replace(" ","").Replace (":","").Replace (Path.DirectorySeparatorChar, '_').Replace (Path.AltDirectorySeparatorChar, '_'));
 			return newFileName;
 		}
-		
+
 		public static bool AutoSaveExists (string fileName)
 		{
-			return File.Exists (GetAutoSaveFileName (fileName));
+			if (!autoSaveEnabled)
+				return false;
+			try {
+				return File.Exists (GetAutoSaveFileName (fileName));
+			} catch (Exception e) {
+				LoggingService.LogError ("Error in auto save - disableing.", e);
+				DisableAutoSave ();
+				return false;
+			}
 		}
-		
+
 		static void CreateAutoSave (string fileName, string content)
 		{
+			if (!autoSaveEnabled)
+				return;
 			try {
 				// Directory may have removed/unmounted. Therefore this operation is not guaranteed to work.
 				File.WriteAllText (GetAutoSaveFileName (fileName), content);
 				Counters.AutoSavedFiles++;
-			} catch (Exception) {
+			} catch (Exception e) {
+				LoggingService.LogError ("Error in auto save while creating: " + fileName +". Disableing auto save.", e);
+				DisableAutoSave ();
 			}
 		}
-		
-#region AutoSave 
-		class FileContent 
+
+#region AutoSave
+		class FileContent
 		{
 			public string FileName;
 			public Mono.TextEditor.Document Content;
@@ -77,35 +100,20 @@ namespace MonoDevelop.SourceEditor
 				this.Content = content;
 			}
 		}
-		
-		public bool Running {
+
+		public static bool Running {
 			get {
 				return autoSaveThreadRunning;
 			}
 		}
-		
-		public bool IsDirty {
-			get;
-			set;
-		}
-		
-		public string FileName {
-			get;
-			set;
-		}
-		
-		public AutoSave ()
-		{
-			IsDirty = false;
-		}
-		AutoResetEvent resetEvent = new AutoResetEvent (false);
-		bool autoSaveThreadRunning = false;
-		Thread autoSaveThread;
-		bool fileChanged   = false;
-		FileContent content = null;
-		object contentLock = new object ();
-		
-		public void StartAutoSaveThread ()
+
+		static AutoResetEvent resetEvent = new AutoResetEvent (false);
+		static bool autoSaveThreadRunning = false;
+		static Thread autoSaveThread;
+		static Queue<FileContent> queue = new Queue<FileContent> ();
+		static object contentLock = new object ();
+
+		static void StartAutoSaveThread ()
 		{
 			autoSaveThreadRunning = true;
 			if (autoSaveThread == null) {
@@ -115,58 +123,63 @@ namespace MonoDevelop.SourceEditor
 				autoSaveThread.Start ();
 			}
 		}
-		
-		void AutoSaveThread ()
+
+		static void AutoSaveThread ()
 		{
 			while (autoSaveThreadRunning) {
 				resetEvent.WaitOne ();
-				lock (contentLock) {
-					if (fileChanged) {
-						CreateAutoSave (content.FileName, content.Content.Text);
-						fileChanged = false;
+				while (queue.Count > 0) {
+					var content = queue.Dequeue ();
+					lock (contentLock) {
+						string text;
+						try {
+							text = content.Content.Text;
+						} catch (Exception e) {
+							LoggingService.LogError ("Exception in auto save thread.", e);
+							continue;
+						}
+						CreateAutoSave (content.FileName, text);
 					}
 				}
 			}
 		}
-		
-		public string LoadAutoSave ()
+
+		public static string LoadAutoSave (string fileName)
 		{
-			string autoSaveFileName = GetAutoSaveFileName (FileName);
+			string autoSaveFileName = GetAutoSaveFileName (fileName);
 			return File.ReadAllText (autoSaveFileName);
 		}
-		
-		public void RemoveAutoSaveFile ()
+
+		public static void RemoveAutoSaveFile (string fileName)
 		{
-			IsDirty = false;
-			if (AutoSaveExists (FileName)) {
-				string autoSaveFileName = GetAutoSaveFileName (FileName);
+			if (!autoSaveEnabled)
+				return;
+			if (AutoSaveExists (fileName)) {
+				string autoSaveFileName = GetAutoSaveFileName (fileName);
 				try {
 					lock (contentLock) {
 						File.Delete (autoSaveFileName);
 					}
 				} catch (Exception e) {
-					LoggingService.LogError ("Can't delete auto save file: " + autoSaveFileName, e);
+					LoggingService.LogError ("Can't delete auto save file: " + autoSaveFileName +". Disableing auto save.", e);
+					DisableAutoSave ();
 				}
 			}
 		}
-		
-		public void InformAutoSaveThread (Mono.TextEditor.Document content)
+
+		public static void InformAutoSaveThread (Mono.TextEditor.Document content)
 		{
-			if (FileName == null || content == null)
+			if (content == null || !autoSaveEnabled)
 				return;
-			if (!autoSaveThreadRunning)
-				StartAutoSaveThread ();
-			
-			IsDirty = true;
-			lock (contentLock) {
-				fileChanged = true;
-				this.content = new FileContent (FileName, content);
-				
+			if (content.IsDirty) {
+				queue.Enqueue (new FileContent (content.FileName, content));
 				resetEvent.Set ();
+			} else {
+				RemoveAutoSaveFile (content.FileName);
 			}
 		}
-		
-		public void Dispose ()
+
+		public static void DisableAutoSave ()
 		{
 			autoSaveThreadRunning = false;
 			if (autoSaveThread != null) {
@@ -174,8 +187,8 @@ namespace MonoDevelop.SourceEditor
 				autoSaveThread.Join ();
 				autoSaveThread = null;
 			}
+			autoSaveEnabled = false;
 		}
 #endregion
-	
 	}
 }

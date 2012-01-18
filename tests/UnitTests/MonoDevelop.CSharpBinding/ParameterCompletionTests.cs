@@ -68,8 +68,8 @@ namespace MonoDevelop.CSharpBinding.Tests
 			
 			ProjectDomService.Load (project);
 //			ProjectDom dom = ProjectDomService.GetProjectDom (project);
-			ProjectDomService.Parse (project, file, null, delegate { return parsedText; });
-			ProjectDomService.Parse (project, file, null, delegate { return parsedText; });
+			ProjectDomService.Parse (project, file, delegate { return parsedText; });
+			ProjectDomService.Parse (project, file, delegate { return parsedText; });
 			
 			sev.Project = project;
 			sev.ContentName = file;
@@ -77,7 +77,7 @@ namespace MonoDevelop.CSharpBinding.Tests
 			sev.CursorPosition = cursorPosition;
 			tww.ViewContent = sev;
 			Document doc = new Document (tww);
-			doc.ParsedDocument = new NRefactoryParser ().Parse (null, sev.ContentName, parsedText);
+			doc.ParsedDocument = new McsParser ().Parse (null, sev.ContentName, parsedText);
 			CSharpTextEditorCompletion textEditorCompletion = new CSharpTextEditorCompletion (doc);
 			
 			CodeCompletionContext ctx = new CodeCompletionContext ();
@@ -85,7 +85,7 @@ namespace MonoDevelop.CSharpBinding.Tests
 			int line, column;
 			sev.GetLineColumnFromPosition (sev.CursorPosition, out line, out column);
 			ctx.TriggerLine = line;
-			ctx.TriggerLineOffset = column;
+			ctx.TriggerLineOffset = column - 1;
 			
 			IParameterDataProvider result = textEditorCompletion.HandleParameterCompletion (ctx, editorText[cursorPosition - 1]);
 			ProjectDomService.Unload (project);

@@ -37,7 +37,7 @@ namespace MonoDevelop.AspNet
 {
 	public class AspNetSyntaxMode : Mono.TextEditor.Highlighting.SyntaxMode
 	{
-		SyntaxMode charpMode;
+	//	SyntaxMode charpMode;
 		
 		public AspNetSyntaxMode ()
 		{
@@ -50,18 +50,19 @@ namespace MonoDevelop.AspNet
 				this.matches = baseMode.Matches;
 				this.prevMarker = baseMode.PrevMarker;
 				this.SemanticRules = new List<SemanticRule> (baseMode.SemanticRules);
-				this.table = baseMode.Table;
+				this.keywordTable = baseMode.keywordTable;
+				this.keywordTableIgnoreCase = baseMode.keywordTableIgnoreCase;
 			}
 		}
 		
-		public override SpanParser CreateSpanParser (Mono.TextEditor.Document doc, SyntaxMode mode, LineSegment line, Stack<Span> spanStack)
+		public override SpanParser CreateSpanParser (Mono.TextEditor.Document doc, SyntaxMode mode, LineSegment line, CloneableStack<Span> spanStack)
 		{
-			return new ASPNetSpanParser (doc, mode, line, spanStack);
+			return new ASPNetSpanParser (doc, mode, spanStack ?? line.StartSpan.Clone ());
 		}
 
 		protected class ASPNetSpanParser : SpanParser
 		{
-			public ASPNetSpanParser (Mono.TextEditor.Document doc, SyntaxMode mode, LineSegment line, Stack<Span> spanStack) : base (doc, mode, line, spanStack)
+			public ASPNetSpanParser (Mono.TextEditor.Document doc, SyntaxMode mode, CloneableStack<Span> spanStack) : base (doc, mode, spanStack)
 			{}
 			
 			class CodeExpressionSpan : Span
@@ -71,7 +72,8 @@ namespace MonoDevelop.AspNet
 					Rule = "mode:" + language;
 					Begin = new Regex ("<%");
 					End = new Regex ("<%");
-					Color = "";
+					Color = "template";
+					TagColor = "template.tag";
 				}
 			}
 			
@@ -94,6 +96,7 @@ namespace MonoDevelop.AspNet
 					return "text/x-csharp";
 				case "VB":
 					return "text/x-vb";
+				case "javascript":
 				case "JScript.NET":
 					return "application/javascript";
 				}
@@ -112,50 +115,69 @@ namespace MonoDevelop.AspNet
 			}
 			
 			
+			public string GetAttributeValue (ref int j)
+			{
+				bool inString = false;
+				StringBuilder langBuilder = new StringBuilder ();
+				while (j < doc.Length) {
+					char ch = doc.GetCharAt (j);
+					if (ch == '"' || ch == '\'') {
+						if (inString)
+							break;
+						inString = true;
+						j++;
+						continue;
+					}
+					if (inString)
+						langBuilder.Append (ch);
+					j++;
+				}
+				return langBuilder.ToString ();
+			}
+
+			
 			protected override void ScanSpan (ref int i)
 			{
-				if (i + 3 < doc.Length && doc.GetTextAt (i, 2) == "<%" && doc.GetCharAt (i + 2) != '@') {
+				if (!spanStack.Any (s => s is CodeDeclarationSpan || s is CodeExpressionSpan) &&  i + 3 < doc.Length && doc.GetTextAt (i, 2) == "<%" && doc.GetCharAt (i + 2) != '@') {
 					var span = new CodeExpressionSpan (GetDefaultMime ());
-					spanStack.Push (span);
-					ruleStack.Push (GetRule (span));
-					OnFoundSpanBegin (span, i, 0);
+					FoundSpanBegin (span, i, "#$=:".IndexOf (doc.GetCharAt (i + 2)) >= 0? 3 : 2);
 					return;
 				}
 				
-				if (i + 7 < doc.Length && doc.GetTextAt (i, 7) == "<script") {
-					StringBuilder langBuilder = new StringBuilder ();
-					int j = i + 7;
-					while (j < doc.Length && doc.GetCharAt (j) != '>') {
-						if (j + 8 < doc.Length && doc.GetTextAt (j, 8) == "language") {
-							j += 8;
-							bool inString = false;
-							while (j < doc.Length) {
-								char ch = doc.GetCharAt (j);
-								if (ch == '"' || ch == '\'') {
-									if (inString)
-										break;
-									inString = true;
-									j++;
-									continue;
-								}
-								if (inString)
-									langBuilder.Append (ch);
-								j++;
-							}
-							break;
-						}
-						j++;
+				if (i > 0 && doc.GetCharAt (i - 1) == '>') {
+					int k = i - 1;
+					while (k > 0 && doc.GetCharAt (k) != '<') {
+						k--;
 					}
-					
-					string mime = langBuilder.Length != 0 ? GetMimeForLanguage (langBuilder.ToString ()) : GetDefaultMime ();
-					
-					if (mime != null) {
-						CodeDeclarationSpan span = new CodeDeclarationSpan (mime);
-						spanStack.Push (span);
-						ruleStack.Push (GetRule (span));
-						OnFoundSpanBegin (span, i,  j - i + 1);
-						i = j + 1;
-						return;
+					if (k + 7 < doc.Length && doc.GetTextAt (k, 7) == "<script") {
+						int j = k + 7;
+						string mime = "application/javascript";
+						while (j < doc.Length && doc.GetCharAt (j) != '>') {
+							if (j + 8 < doc.Length && doc.GetTextAt (j, 8) == "language") {
+								j += 8;
+								mime = GetMimeForLanguage (GetAttributeValue (ref j));
+								break;
+							}
+							if (j + 5 < doc.Length && doc.GetTextAt (j, 5) == "runat") {
+								j += 5;
+								GetAttributeValue (ref j);
+								mime = GetDefaultMime ();
+								break;
+							}
+							if (j + 4 < doc.Length && doc.GetTextAt (j, 4) == "type") {
+								j += 4;
+								mime = GetAttributeValue (ref j);
+								break;
+							}
+							
+							j++;
+						}
+						
+						if (mime != null) {
+							CodeDeclarationSpan span = new CodeDeclarationSpan (mime);
+							FoundSpanBegin (span, i, 0);
+							return;
+						}
 					}
 				}
 				
@@ -166,32 +188,20 @@ namespace MonoDevelop.AspNet
 			{
 				if (spanStack.Any (s => s is CodeDeclarationSpan) && i + 9 <= doc.Length && doc.GetTextAt (i, 9) == "</script>") {
 					while (!(spanStack.Peek () is CodeDeclarationSpan)) {
-						OnFoundSpanEnd (spanStack.Peek (), i, 0);
-						spanStack.Pop ();
-						if (ruleStack.Count > 1)
-							ruleStack.Pop ();
+						FoundSpanEnd (spanStack.Peek (), i, 0);
 					}
 					cur = spanStack.Peek ();
-					OnFoundSpanEnd (cur, i, "</script>".Length);
 					i += "</script>".Length;
-					spanStack.Pop ();
-					if (ruleStack.Count > 1)
-						ruleStack.Pop ();
+					FoundSpanEnd (cur, i, "</script>".Length);
 					return true;
 				}
 				
 				if (spanStack.Any (s => s is CodeExpressionSpan) && i + 2 < doc.Length && doc.GetTextAt (i, 2) == "%>") {
 					while (!(spanStack.Peek () is CodeExpressionSpan)) {
-						OnFoundSpanEnd (spanStack.Peek (), i, 0);
-						spanStack.Pop ();
-						if (ruleStack.Count > 1)
-							ruleStack.Pop ();
+						FoundSpanEnd (spanStack.Peek (), i, 0);
 					}
 					cur = spanStack.Peek ();
-					OnFoundSpanEnd (cur, i, 0);
-					spanStack.Pop ();
-					if (ruleStack.Count > 1)
-						ruleStack.Pop ();
+					FoundSpanEnd (cur, i, 2);
 					return true;
 				}
 				return base.ScanSpanEnd (cur, ref i);

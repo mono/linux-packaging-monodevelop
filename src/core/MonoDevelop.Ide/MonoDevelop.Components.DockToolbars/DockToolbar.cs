@@ -30,6 +30,7 @@ using System;
 using System.Collections.Generic;
 using Gtk;
 using Gdk;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Components.DockToolbars
 {
@@ -244,7 +245,7 @@ namespace MonoDevelop.Components.DockToolbars
 		
 		protected override bool OnButtonPressEvent (EventButton e)
 		{
-			if (parentFrame != null && e.Button == 1) {
+			if (parentFrame != null && e.Button == 1 && !e.TriggersContextMenu ()) {
 				if (Orientation == Orientation.Horizontal && e.X <= 10) {
 					dragging = true;
 					parentFrame.StartDragBar (this, (int)e.X, (int)e.Y, e.Time);
@@ -268,28 +269,23 @@ namespace MonoDevelop.Components.DockToolbars
 			return base.OnButtonReleaseEvent (e);
 		}
 		
-/*		protected override bool OnExposeEvent (EventExpose evnt)
+		protected override bool OnExposeEvent (EventExpose evnt)
 		{
-			//use the base class to paint the background like a toolbar, which may be a gradient
-			// but only if horizontal, else the gradient usually looks really ugly
-			if (this.Orientation == Orientation.Horizontal){
-				//the WIMP theme engine's rendering is a bit off, need to force it to render wider
-				int widen = MonoDevelop.Core.PropertyService.IsWindows? 1 : 0;
-				
+			//HACK: the WIMP theme engine's rendering is a bit off, need to force it to render wider
+			if (MonoDevelop.Core.Platform.IsWindows && Orientation == Orientation.Horizontal) {
+				int widen = 1;
 				var shadowType = (ShadowType)StyleGetProperty ("shadow-type");
-				Style.PaintBox (Style, evnt.Window, State, shadowType, evnt.Area, this, "toolbar", 
-				                Allocation.X - widen, Allocation.Y, Allocation.Width + widen + widen, Allocation.Height);
-			} else {
-				//else we paint a plain flat background to make everything even - see DockToolbarPanel.OnExposeEvent
-				GdkWindow.DrawRectangle (Style.BackgroundGC (State), true, Allocation);
+				Style.PaintBox (Style, evnt.Window, State, shadowType, evnt.Area, this, "toolbar",
+					Allocation.X - widen, Allocation.Y, Allocation.Width + widen + widen, Allocation.Height);
+				
+				foreach (Widget child in Children) {
+					PropagateExpose (child, evnt);
+				}
+				return true;
 			}
-            
-            foreach (Widget child in Children) {
-                PropagateExpose (child, evnt);
-            }
-		
-		    return true;
-		}*/
+			
+			return base.OnExposeEvent (evnt);
+		}
 		
 		bool firstRealized;
 		protected override void OnRealized ()

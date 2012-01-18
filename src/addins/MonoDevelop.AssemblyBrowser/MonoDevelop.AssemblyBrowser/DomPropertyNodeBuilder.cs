@@ -33,6 +33,12 @@ using MonoDevelop.Projects.Dom;
 using MonoDevelop.Projects.Dom.Output;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
+using MonoDevelop.Projects.Text;
+using ICSharpCode.Decompiler.Ast;
+using ICSharpCode.Decompiler;
+using System.Threading;
+using Mono.TextEditor;
+using System.Collections.Generic;
 
 namespace MonoDevelop.AssemblyBrowser
 {
@@ -56,7 +62,7 @@ namespace MonoDevelop.AssemblyBrowser
 		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
 		{
 			IProperty property = (IProperty)dataObject;
-			label = Ambience.GetString (property, OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup);
+			label = Ambience.GetString (property, OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup | OutputFlags.ReturnTypesLast);
 			if (property.IsPrivate || property.IsInternal)
 				label = DomMethodNodeBuilder.FormatPrivate (label);
 			icon = ImageService.GetPixbuf (property.StockIcon, Gtk.IconSize.Menu);
@@ -102,60 +108,29 @@ namespace MonoDevelop.AssemblyBrowser
 			return result.ToString ();
 		}
 		
-		string IAssemblyBrowserNodeBuilder.GetDisassembly (ITreeNavigator navigator)
+		List<ReferenceSegment> IAssemblyBrowserNodeBuilder.Disassemble (TextEditorData data, ITreeNavigator navigator)
 		{
-			NetAmbience netAmbience = new NetAmbience ();
-			IProperty property = (IProperty)navigator.DataItem;
-			StringBuilder result = new StringBuilder ();
-			result.Append (netAmbience.GetString (property, DomTypeNodeBuilder.settings));
-			result.AppendLine ();
-			result.AppendLine ();
-			DomCecilProperty cecilProperty = property as DomCecilProperty;
-			if (property.HasGet) {
-				result.Append ("Getter:");result.AppendLine ();
-				result.Append (DomMethodNodeBuilder.Disassemble (cecilProperty.GetMethod as DomCecilMethod, true).Replace ("\t", "\t\t"));
-			}
-			if (property.HasSet) {
-				result.Append ("Setter:");result.AppendLine ();
-				result.Append (DomMethodNodeBuilder.Disassemble (cecilProperty.SetMethod as DomCecilMethod, true).Replace ("\t", "\t\t"));
-			}
-			
-			return result.ToString ();
+			var property = (DomCecilProperty)navigator.DataItem;
+			return DomMethodNodeBuilder.Disassemble (data, rd => rd.DisassembleProperty (property.PropertyDefinition));
 		}
 		
-		string IAssemblyBrowserNodeBuilder.GetDecompiledCode (ITreeNavigator navigator)
+		static string GetBody (string text)
 		{
-			IProperty property = (IProperty)navigator.DataItem;
-			StringBuilder result = new StringBuilder ();
-			result.Append (DomMethodNodeBuilder.GetAttributes (Ambience, property.Attributes));
-			result.Append (Ambience.GetString (property, DomTypeNodeBuilder.settings));
-			result.Append ("{");result.AppendLine ();
-			DomCecilProperty cecilProperty = property as DomCecilProperty;
-			if (property.HasGet) {
-				result.Append ("\t");
-				if (property.GetterModifier != property.Modifiers) {
-					result.Append ("<span style=\"keyword.modifier\">");
-					result.Append (Ambience.GetString (property.GetterModifier));
-					result.Append ("</span> ");
-				}
-				result.Append ("<b>get</b> {");result.AppendLine ();
-				result.Append (DomMethodNodeBuilder.Decompile (cecilProperty.GetMethod as DomCecilMethod, true).Replace ("\t", "\t\t"));
-				result.Append ("\t}");result.AppendLine ();
-			}
-			if (property.HasSet) {
-				result.Append ("\t");
-				if (property.SetterModifier != property.Modifiers) {
-					result.Append ("<span style=\"keyword.modifier\">");
-					result.Append (Ambience.GetString (property.SetterModifier));
-					result.Append ("</span> ");
-				}
-				result.Append ("<b>set</b> {");result.AppendLine ();
-				
-				result.Append (DomMethodNodeBuilder.Decompile (cecilProperty.SetMethod as DomCecilMethod, true).Replace ("\t", "\t\t"));
-				result.Append ("\t}");result.AppendLine ();
-			}
-			result.Append ("}");
-			return result.ToString ();
+			
+			int idx = text.IndexOf ('{') + 1;
+			int idx2 = text.LastIndexOf ('}');
+			if (idx2 - idx <= 0)
+				return text;
+			string result = text.Substring (idx, idx2 - idx);
+			if (result.StartsWith ("\n"))
+				result = result.Substring (1);
+			return result;
+		}
+
+		List<ReferenceSegment> IAssemblyBrowserNodeBuilder.Decompile (TextEditorData data, ITreeNavigator navigator)
+		{
+			var property = (DomCecilProperty)navigator.DataItem;
+			return DomMethodNodeBuilder.Decompile (data, DomMethodNodeBuilder.GetModule (navigator), ((DomCecilType)property.DeclaringType).TypeDefinition, b => b.AddProperty (property.PropertyDefinition));
 		}
 		
 		string IAssemblyBrowserNodeBuilder.GetDocumentationMarkup (ITreeNavigator navigator)

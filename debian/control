@@ -3,10 +3,9 @@ Section: devel
 Priority: optional
 Maintainer: Debian CLI Applications Team <pkg-cli-apps-team@lists.alioth.debian.org>
 Uploaders: Mirco Bauer <meebey@debian.org>, Jo Shields <directhex@apebox.org>
-Build-Depends: debhelper (>= 7.0.50), quilt (>= 0.46-7~)
-Build-Depends-Indep: cli-common-dev (>= 0.5.7),
- mono-devel (>= 2.6.1),
- libmono-dev (>= 2.6.1),
+Build-Depends: debhelper (>= 7.0.50)
+Build-Depends-Indep: cli-common-dev (>= 0.8~),
+ mono-devel (>= 2.10),
  monodoc-base (>= 1.1.9),
  intltool,
  autoconf,
@@ -17,36 +16,29 @@ Build-Depends-Indep: cli-common-dev (>= 0.5.7),
  libglade2.0-cil-dev,
  libgconf2.0-cil-dev,
  libgnome2.0-cil-dev,
- libnunit-cil-dev,
+ libnunit-cil-dev (>= 2.5),
  libmono-cecil-cil-dev,
- libmono-addins-cil-dev (>= 0.4),
- libmono-addins-gui-cil-dev (>= 0.4),
+ libmono-addins-cil-dev (>= 0.6),
+ libmono-addins-gui-cil-dev (>= 0.6),
  libmetacity-dev,
  libsvn-dev,
- libmono-debugger-soft0.0-cil (>= 2.6.7),
  libapr1-dev,
  libgtkspell-dev,
- mono-xsp-base,
- mono-xsp2-base,
  desktop-file-utils
-Standards-Version: 3.8.4
+Standards-Version: 3.9.2
 Homepage: http://www.monodevelop.com/
 Vcs-Git: git://git.debian.org/pkg-cli-apps/packages/monodevelop.git
 Vcs-Browser: http://git.debian.org/?p=pkg-cli-apps/packages/monodevelop.git
 
 Package: monodevelop
 Architecture: all
-Suggests: monodevelop-boo,
-          monodevelop-java,
+Suggests: monodevelop-java,
           monodevelop-vala,
           monodevelop-nunit,
           monodevelop-versioncontrol,
           monodevelop-database,
-          monodevelop-debugger-mdb,
           monodevelop-debugger-gdb,
-          mono-xsp | mono-xsp2,
-          mono-1.0-devel,
-          nemerle,
+          mono-xsp | mono-xsp4,
           mono-vbnc,
           monodoc-browser,
           exuberant-ctags,

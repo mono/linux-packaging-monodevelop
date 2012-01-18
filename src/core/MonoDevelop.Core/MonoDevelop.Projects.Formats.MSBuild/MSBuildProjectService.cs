@@ -38,6 +38,7 @@ using MonoDevelop.Projects.Extensions;
 using MonoDevelop.Core.Serialization;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Assemblies;
+using Cecil = Mono.Cecil;
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
@@ -46,12 +47,17 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		const string ItemTypesExtensionPath = "/MonoDevelop/ProjectModel/MSBuildItemTypes";
 		public const string GenericItemGuid = "{9344bdbb-3e7f-41fc-a0dd-8665d75ee146}";
 		public const string FolderTypeGuid = "{2150E333-8FDC-42A3-9474-1A3956D46DE8}";
-
+		
+		//NOTE: default toolsversion should match the default format.
+		// remember to update the builder process' app.config too
 		public const string DefaultFormat = "MSBuild08";
+		const string REFERENCED_MSBUILD_TOOLS = "3.5";
+		const string REFERENCED_MSBUILD_UTILS = "Microsoft.Build.Utilities.v3.5";
+		internal const string DefaultToolsVersion = REFERENCED_MSBUILD_TOOLS;
 		
 		static DataContext dataContext;
 		
-		static Dictionary<TargetRuntime,RemoteBuildEngine> builders = new Dictionary<TargetRuntime, RemoteBuildEngine> ();
+		static Dictionary<string,RemoteBuildEngine> builders = new Dictionary<string, RemoteBuildEngine> ();
 		static GenericItemTypeNode genericItemTypeNode = new GenericItemTypeNode ();
 		
 		public static DataContext DataContext {
@@ -62,6 +68,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					foreach (ItemMember prop in MSBuildProjectHandler.ExtendedMSBuildProperties) {
 						ItemProperty iprop = new ItemProperty (prop.Name, prop.Type);
 						iprop.IsExternal = prop.IsExternal;
+						if (prop.CustomAttributes != null)
+							iprop.CustomAttributes = prop.CustomAttributes;
 						dataContext.RegisterProperty (prop.DeclaringType, iprop);
 					}
 				}
@@ -76,18 +84,18 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			};
 		}
 		
-		public static SolutionEntityItem LoadItem (IProgressMonitor monitor, string fileName, string typeGuid, string itemGuid)
+		public static SolutionEntityItem LoadItem (IProgressMonitor monitor, string fileName, MSBuildFileFormat expectedFormat, string typeGuid, string itemGuid)
 		{
 			foreach (ItemTypeNode node in GetItemTypeNodes ()) {
 				if (node.CanHandleFile (fileName, typeGuid))
-					return node.LoadSolutionItem (monitor, fileName, itemGuid);
+					return node.LoadSolutionItem (monitor, fileName, expectedFormat, itemGuid);
 			}
 			
 			if (string.IsNullOrEmpty (typeGuid) && IsProjectSubtypeFile (fileName)) {
 				typeGuid = LoadProjectTypeGuids (fileName);
 				foreach (ItemTypeNode node in GetItemTypeNodes ()) {
 					if (node.CanHandleFile (fileName, typeGuid))
-						return node.LoadSolutionItem (monitor, fileName, itemGuid);
+						return node.LoadSolutionItem (monitor, fileName, expectedFormat, itemGuid);
 				}
 			}
 
@@ -174,7 +182,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			yield return genericItemTypeNode;
 		}
 		
-		static IEnumerable<DotNetProjectSubtypeNode> GetItemSubtypeNodes ()
+		internal static IEnumerable<DotNetProjectSubtypeNode> GetItemSubtypeNodes ()
 		{
 			foreach (ExtensionNode node in AddinManager.GetExtensionNodes (ItemTypesExtensionPath)) {
 				if (node is DotNetProjectSubtypeNode)
@@ -224,7 +232,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			return false;
 		}
 		
-		static char[] specialCharacters = new char [] {'%', '$', '@', '(', ')', '\'', ';', '?', '*' };
+		static char[] specialCharacters = new char [] {'%', '$', '@', '(', ')', '\'', ';', '?' };
 		
 		public static string EscapeString (string str)
 		{
@@ -271,7 +279,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			return file.ToRelative (basePath);
 		}
 
-		internal static string FromMSBuildPath (string basePath, string relPath)
+		public static string FromMSBuildPath (string basePath, string relPath)
 		{
 			string res;
 			FromMSBuildPath (basePath, relPath, out res);
@@ -295,69 +303,82 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				return false;
 			
 			string path = relPath;
-			if (!PropertyService.IsWindows)
+			if (!Platform.IsWindows)
 				path = path.Replace ("\\", "/");
 			
 			path = UnscapeString (path);
 
 			if (char.IsLetter (path [0]) && path.Length > 1 && path[1] == ':') {
-				if (PropertyService.IsWindows) {
+				if (Platform.IsWindows) {
 					resultPath = path; // Return the escaped value
 					return true;
 				} else
 					return false;
 			}
 			
-			if (basePath != null)
-				path = Path.Combine (basePath, path);
+			bool isRooted = Path.IsPathRooted (path);
 			
+			if (!isRooted && basePath != null) {
+				path = Path.Combine (basePath, path);
+				isRooted = Path.IsPathRooted (path);
+			}
+			
+			// Return relative paths as-is, we can't do anything else with them
+			if (!isRooted) {
+				resultPath = FileService.NormalizeRelativePath (path);
+				return true;
+			}
+			
+			// If we're on Windows, don't need to fix file casing.
+			if (Platform.IsWindows) {
+				resultPath = Path.GetFullPath (path);
+				return true;
+			}
+			
+			// If the path exists with the exact casing specified, then we're done
 			if (System.IO.File.Exists (path) || System.IO.Directory.Exists (path)){
 				resultPath = Path.GetFullPath (path);
 				return true;
 			}
-				
-			if (Path.IsPathRooted (path) && !PropertyService.IsWindows) {
-					
-				// Windows paths are case-insensitive. When mapping an absolute path
-				// we can try to find the correct case for the path.
-				
-				string[] names = path.Substring (1).Split ('/');
-				string part = "/";
-				
-				for (int n=0; n<names.Length; n++) {
-					string[] entries;
+			
+			// Not on Windows, file doesn't exist. That could mean the project was brought from Windows
+			// and the filename case in the project doesn't match the file on disk, because Windows is
+			// case-insensitive. Since we have an absolute path, search the directory for the file with
+			// the correct case.
+			string[] names = path.Substring (1).Split ('/');
+			string part = "/";
+			
+			for (int n=0; n<names.Length; n++) {
+				string[] entries;
 
-					if (names [n] == ".."){
-						if (part == "/")
-							return false; // Can go further back. It's not an existing file
-						part = Path.GetFullPath (part + "/..");
-						continue;
-					}
-					
-					entries = Directory.GetFileSystemEntries (part);
-					
-					string fpath = null;
-					foreach (string e in entries) {
-						if (string.Compare (Path.GetFileName (e), names[n], true) == 0) {
-							fpath = e;
-							break;
-						}
-					}
-					if (fpath == null) {
-						// Part of the path does not exist. Can't do any more checking.
-						part = Path.GetFullPath (part);
-						for (; n < names.Length; n++)
-							part += "/" + names[n];
-						resultPath = part;
-						return true;
-					}
-
-					part = fpath;
+				if (names [n] == ".."){
+					if (part == "/")
+						return false; // Can go further back. It's not an existing file
+					part = Path.GetFullPath (part + "/..");
+					continue;
 				}
-				resultPath = Path.GetFullPath (part);
-			} else {
-				resultPath = Path.GetFullPath (path);
+				
+				entries = Directory.GetFileSystemEntries (part);
+				
+				string fpath = null;
+				foreach (string e in entries) {
+					if (string.Compare (Path.GetFileName (e), names[n], true) == 0) {
+						fpath = e;
+						break;
+					}
+				}
+				if (fpath == null) {
+					// Part of the path does not exist. Can't do any more checking.
+					part = Path.GetFullPath (part);
+					for (; n < names.Length; n++)
+						part += "/" + names[n];
+					resultPath = part;
+					return true;
+				}
+
+				part = fpath;
 			}
+			resultPath = Path.GetFullPath (part);
 			return true;
 		}
 
@@ -401,55 +422,130 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			return true;
 		}
 		
-		static RemoteBuildEngine currentBuildEngine;
-		
-		public static RemoteProjectBuilder GetProjectBuilder (TargetRuntime runtime, TargetFramework fx, string file)
+		public static RemoteProjectBuilder GetProjectBuilder (TargetRuntime runtime, string toolsVersion, string file)
 		{
 			lock (builders) {
-				string binDir = runtime.GetMSBuildBinPath (fx);
+				var toolsFx = Runtime.SystemAssemblyService.GetTargetFramework (new TargetFrameworkMoniker (toolsVersion));
+				string binDir = runtime.GetMSBuildBinPath (toolsFx);
 				
+				if (!runtime.IsInstalled (toolsFx))
+					throw new InvalidOperationException (string.Format (
+						"Runtime '{0}' does not have the MSBuild '{1}' framework installed",
+						runtime.Id, toolsVersion));
+				
+				string builderKey = runtime.Id + " " + toolsVersion;
 				RemoteBuildEngine builder;
-				if (builders.TryGetValue (runtime, out builder)) {
+				if (builders.TryGetValue (builderKey, out builder)) {
 					builder.ReferenceCount++;
 					return new RemoteProjectBuilder (file, binDir, builder);
 				}
 				
-				if (runtime.IsRunning) {
-					if (currentBuildEngine == null)
-						currentBuildEngine = new RemoteBuildEngine (null, new BuildEngine ());
-					return new RemoteProjectBuilder (file, binDir, currentBuildEngine);
-				}
-				else {
-					MonoDevelop.Core.Execution.RemotingService.RegisterRemotingChannel ();
-					string exe = typeof(ProjectBuilder).Assembly.Location;
-					ProcessStartInfo pinfo = new ProcessStartInfo (exe);
-					runtime.GetToolsExecutionEnvironment (fx).MergeTo (pinfo);
-					pinfo.UseShellExecute = false;
-					pinfo.RedirectStandardError = true;
-					pinfo.RedirectStandardInput = true;
-					
-					Process p = null;
-					try {
-						p = runtime.ExecuteAssembly (pinfo, fx);
-						p.StandardInput.WriteLine (Process.GetCurrentProcess ().Id.ToString ());
-						string sref = p.StandardError.ReadLine ();
-						byte[] data = Convert.FromBase64String (sref);
-						MemoryStream ms = new MemoryStream (data);
-						BinaryFormatter bf = new BinaryFormatter ();
-						builder = new RemoteBuildEngine (p, (IBuildEngine) bf.Deserialize (ms));
-					} catch {
-						if (p != null) {
-							try {
-								p.Kill ();
-							} catch { }
-						}
-						throw;
+
+				//always start the remote process explicitly, even if it's using the current runtime and fx
+				//else it won't pick up the assembly redirects from the builder exe
+				var exe = GetExeLocation (toolsVersion);
+				MonoDevelop.Core.Execution.RemotingService.RegisterRemotingChannel ();
+				var pinfo = new ProcessStartInfo (exe) {
+					UseShellExecute = false,
+					CreateNoWindow = true,
+					RedirectStandardError = true,
+					RedirectStandardInput = true,
+				};
+				runtime.GetToolsExecutionEnvironment (toolsFx).MergeTo (pinfo);
+				
+				Process p = null;
+				try {
+					p = runtime.ExecuteAssembly (pinfo);
+					p.StandardInput.WriteLine (Process.GetCurrentProcess ().Id.ToString ());
+					string sref = p.StandardError.ReadLine ();
+					byte[] data = Convert.FromBase64String (sref);
+					MemoryStream ms = new MemoryStream (data);
+					BinaryFormatter bf = new BinaryFormatter ();
+					builder = new RemoteBuildEngine (p, (IBuildEngine) bf.Deserialize (ms));
+				} catch {
+					if (p != null) {
+						try {
+							p.Kill ();
+						} catch { }
 					}
+					throw;
 				}
-				builders [runtime] = builder;
+				
+				builders [builderKey] = builder;
 				builder.ReferenceCount = 1;
 				return new RemoteProjectBuilder (file, binDir, builder);
 			}
+		}
+		
+		static string GetExeLocation (string toolsVersion)
+		{
+			FilePath sourceExe = typeof(ProjectBuilder).Assembly.Location;
+			if (toolsVersion == REFERENCED_MSBUILD_TOOLS)
+				return sourceExe;
+			
+			var newVersions = new Dictionary<string, string[]> ();
+			string version;
+			Mono.Cecil.TargetRuntime runtime;
+			
+			switch (toolsVersion) {
+			case "2.0":
+				version = "2.0.0.0";
+				newVersions.Add ("Microsoft.Build.Engine", new string[] {"Microsoft.Build.Engine", version});
+				newVersions.Add ("Microsoft.Build.Framework", new string[] {"Microsoft.Build.Framework", version});
+				newVersions.Add (REFERENCED_MSBUILD_UTILS, new string[] {"Microsoft.Build.Utilities", version});
+				runtime = Mono.Cecil.TargetRuntime.Net_2_0;
+				break;
+			case "3.5":
+				version = "3.5.0.0";
+				newVersions.Add ("Microsoft.Build.Engine", new string[] {"Microsoft.Build.Engine", version});
+				newVersions.Add ("Microsoft.Build.Framework", new string[] {"Microsoft.Build.Framework", version});
+				newVersions.Add (REFERENCED_MSBUILD_UTILS, new string[] {"Microsoft.Build.Utilities.v3.5", version});
+				runtime = Mono.Cecil.TargetRuntime.Net_2_0;
+				break;
+			case "4.0":
+				version = "4.0.0.0";
+				newVersions.Add ("Microsoft.Build.Engine", new string[] {"Microsoft.Build.Engine", version});
+				newVersions.Add ("Microsoft.Build.Framework", new string[] {"Microsoft.Build.Framework", version});
+				newVersions.Add (REFERENCED_MSBUILD_UTILS, new string[] {"Microsoft.Build.Utilities.v4.0", version});
+				runtime = Mono.Cecil.TargetRuntime.Net_4_0;
+				break;
+			default:
+				throw new InvalidOperationException ("Unknown MSBuild ToolsVersion '" + toolsVersion + "'");
+			}
+			
+			FilePath p = UserProfile.Current.CacheDir.Combine ("xbuild", toolsVersion, "MonoDevelop.Projects.Formats.MSBuild.exe");
+			if (!File.Exists (p) || File.GetLastWriteTime (p) < File.GetLastWriteTime (sourceExe)) {
+				if (!Directory.Exists (p.ParentDirectory))
+					Directory.CreateDirectory (p.ParentDirectory);
+				
+				// Update the references to msbuild
+				Cecil.AssemblyDefinition asm = Cecil.AssemblyDefinition.ReadAssembly (sourceExe);
+				foreach (Cecil.AssemblyNameReference ar in asm.MainModule.AssemblyReferences) {
+					string[] replacement;
+					if (newVersions.TryGetValue (ar.Name, out replacement)) {
+						ar.Name = replacement[0];
+						ar.Version = new Version (replacement[1]);
+					}
+				}
+				asm.MainModule.Runtime = runtime;
+				
+				//run in 32-bit mode because usually msbuild targets are installed for 32-bit only
+				asm.MainModule.Attributes |= Mono.Cecil.ModuleAttributes.Required32Bit;
+				
+				// Workaround to a bug in mcs. The ILOnly flag is not emitted when using /platform:x86
+				asm.MainModule.Attributes |= Mono.Cecil.ModuleAttributes.ILOnly;
+				
+				asm.Write (p);
+			}
+			
+			FilePath configFile = p + ".config";
+			FilePath configSrc = typeof(ProjectBuilder).Assembly.Location + ".config";
+			if (!File.Exists (configFile) || File.GetLastWriteTime (configFile) < File.GetLastWriteTime (configSrc)) {
+				var config = File.ReadAllText (configSrc);
+				config = config.Replace (REFERENCED_MSBUILD_TOOLS + ".0.0", version);
+				File.WriteAllText (p + ".config", config);
+			}
+			return p;
 		}
 
 		internal static void ReleaseProjectBuilder (RemoteBuildEngine engine)
@@ -487,7 +583,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		{
 			lock (builders) {
 				DateTime tnow = DateTime.Now;
-				foreach (var val in new Dictionary<TargetRuntime,RemoteBuildEngine> (builders)) {
+				foreach (var val in new Dictionary<string,RemoteBuildEngine> (builders)) {
 					if (val.Value.ReferenceCount == 0 && val.Value.ReleaseTime <= tnow) {
 						builders.Remove (val.Key);
 						val.Value.Dispose ();
@@ -514,7 +610,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			MSBuildProject project = new MSBuildProject ();
 			project.LoadXml (File.ReadAllText (fileName));
 			
-			MSBuildPropertyGroup globalGroup = project.GetGlobalPropertyGroup ();
+			MSBuildPropertySet globalGroup = project.GetGlobalPropertyGroup ();
 			if (globalGroup == null)
 				return null;
 
@@ -593,10 +689,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			return true;
 		}
 		
-		public override SolutionEntityItem LoadSolutionItem (IProgressMonitor monitor, string fileName, string itemGuid)
+		public override SolutionEntityItem LoadSolutionItem (IProgressMonitor monitor, string fileName, MSBuildFileFormat expectedFormat, string itemGuid)
 		{
 			MSBuildProjectHandler handler = new MSBuildProjectHandler (Guid, Import, itemGuid);
-			return handler.Load (monitor, fileName, null, null);
+			return handler.Load (monitor, fileName, expectedFormat, null, null);
 		}
 	}
 }

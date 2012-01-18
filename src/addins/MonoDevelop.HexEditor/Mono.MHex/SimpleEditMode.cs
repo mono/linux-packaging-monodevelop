@@ -203,9 +203,11 @@ namespace Mono.MHex
 					CaretMoveActions.Right (HexEditorData);
 				}
 			} else {
-				string hex = "01234567890ABCDEF";
+				string hex = "0123456789ABCDEF";
 				int idx = hex.IndexOf (char.ToUpper (ch));
 				if (idx >= 0) {
+					if (HexEditorData.Caret.Offset >= HexEditorData.Length)
+						HexEditorData.Insert (HexEditorData.Length, 0);
 					if (HexEditorData.Caret.IsInsertMode && HexEditorData.Caret.SubPosition == 0) {
 						HexEditorData.Insert (HexEditorData.Caret.Offset, (byte)(idx * 0x10));
 					} else {

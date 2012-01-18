@@ -33,6 +33,8 @@ using System.Xml;
 using System.Linq;
 using System.Text;
 using System.Collections.Generic;
+using MonoDevelop.Core.Text;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Ide.CodeCompletion
 {
@@ -130,12 +132,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 		{
 			list.CompletionString = PartialWord;
 			
-			if (list.filteredItems.Count == 0 && !list.PreviewCompletionString) {
-				Hide ();
-			} else {
-				if (IsRealized && !Visible)
-					Show ();
-			}
+			if (IsRealized && !Visible)
+				Show ();
 			
 			int width = list.WidthRequest;
 			int height = list.HeightRequest + (footer != null ? footer.Allocation.Height : 0);
@@ -240,20 +238,35 @@ namespace MonoDevelop.Ide.CodeCompletion
 			get;
 			set;
 		}
+		
+		/// <summary>
+		/// Gets or sets a value indicating that shift was pressed during enter.
+		/// </summary>
+		/// <value>
+		/// <c>true</c> if was shift pressed; otherwise, <c>false</c>.
+		/// </value>
+		public bool WasShiftPressed {
+			get;
+			private set;
+		}
 
 		public KeyActions ProcessKey (Gdk.Key key, char keyChar, Gdk.ModifierType modifier)
 		{
 			switch (key) {
 			case Gdk.Key.Home:
+				if ((modifier & ModifierType.ShiftMask) == ModifierType.ShiftMask)
+					return KeyActions.Process;
 				List.Selection = 0;
 				return KeyActions.Ignore;
 			case Gdk.Key.End:
+				if ((modifier & ModifierType.ShiftMask) == ModifierType.ShiftMask)
+					return KeyActions.Process;
 				List.Selection = List.filteredItems.Count - 1;
 				return KeyActions.Ignore;
 				
 			case Gdk.Key.Up:
 				if ((modifier & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask) {
-					if (!SelectionEnabled && !CompletionWindowManager.ForceSuggestionMode)
+					if (!SelectionEnabled /*&& !CompletionWindowManager.ForceSuggestionMode*/)
 						AutoCompleteEmptyMatch = AutoSelect = true;
 					if (!List.InCategoryMode) {
 						List.InCategoryMode = true;
@@ -264,7 +277,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 				}
 				if (SelectionEnabled && list.filteredItems.Count < 2)
 					return KeyActions.CloseWindow | KeyActions.Process;
-				if (!SelectionEnabled && !CompletionWindowManager.ForceSuggestionMode) {
+				if (!SelectionEnabled /*&& !CompletionWindowManager.ForceSuggestionMode*/) {
 					AutoCompleteEmptyMatch = AutoSelect = true;
 				} else {
 					list.MoveCursor (-1);
@@ -273,7 +286,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 			case Gdk.Key.Down:
 				if ((modifier & Gdk.ModifierType.ShiftMask) == Gdk.ModifierType.ShiftMask) {
-					if (!SelectionEnabled && !CompletionWindowManager.ForceSuggestionMode)
+					if (!SelectionEnabled /*&& !CompletionWindowManager.ForceSuggestionMode*/)
 						AutoCompleteEmptyMatch = AutoSelect = true;
 					if (!List.InCategoryMode) {
 						List.InCategoryMode = true;
@@ -285,7 +298,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 				if (SelectionEnabled && list.filteredItems.Count < 2)
 					return KeyActions.CloseWindow | KeyActions.Process;
 				
-				if (!SelectionEnabled && !CompletionWindowManager.ForceSuggestionMode) {
+				if (!SelectionEnabled /*&& !CompletionWindowManager.ForceSuggestionMode*/) {
 					AutoCompleteEmptyMatch = AutoSelect = true;
 				} else {
 					list.MoveCursor (1);
@@ -293,12 +306,16 @@ namespace MonoDevelop.Ide.CodeCompletion
 				return KeyActions.Ignore;
 
 			case Gdk.Key.Page_Up:
+				if ((modifier & ModifierType.ShiftMask) == ModifierType.ShiftMask)
+					return KeyActions.Process;
 				if (list.filteredItems.Count < 2)
 					return KeyActions.CloseWindow | KeyActions.Process;
 				list.MoveCursor (-(list.VisibleRows - 1));
 				return KeyActions.Ignore;
 
 			case Gdk.Key.Page_Down:
+				if ((modifier & ModifierType.ShiftMask) == ModifierType.ShiftMask)
+					return KeyActions.Process;
 				if (list.filteredItems.Count < 2)
 					return KeyActions.CloseWindow | KeyActions.Process;
 				list.MoveCursor (list.VisibleRows - 1);
@@ -316,6 +333,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 				word.Remove (curPos, 1);
 				ResetSizes ();
 				UpdateWordSelection ();
+				if (HideWhenWordDeleted && word.Length == 0)
+					return KeyActions.CloseWindow | KeyActions.Process;
 				return KeyActions.Process;
 
 			case Gdk.Key.Right:
@@ -338,6 +357,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			case Gdk.Key.ISO_Enter:
 			case Gdk.Key.Key_3270_Enter:
 			case Gdk.Key.KP_Enter:
+				WasShiftPressed = (modifier & ModifierType.ShiftMask) == ModifierType.ShiftMask;
 				return (!list.AutoSelect ? KeyActions.Process : (KeyActions.Complete | KeyActions.Ignore)) | KeyActions.CloseWindow;
 
 			case Gdk.Key.Escape:
@@ -363,9 +383,12 @@ namespace MonoDevelop.Ide.CodeCompletion
 			bool nonShiftModifierActive = ((Gdk.ModifierType.ControlMask | Gdk.ModifierType.MetaMask
 				| Gdk.ModifierType.Mod1Mask | Gdk.ModifierType.SuperMask)
 				& modifier) != 0;
-			if (nonShiftModifierActive)
+			if (nonShiftModifierActive) {
+				if (modifier.HasFlag (Gdk.ModifierType.ControlMask) && char.IsLetterOrDigit ((char)key))
+					return KeyActions.Process | KeyActions.CloseWindow;
 				return KeyActions.Ignore;
-			const string commitChars = " <>()[]{}=";
+			}
+			const string commitChars = " <>()[]{}=+-*/%~&|!";
 			if (System.Char.IsLetterOrDigit (keyChar) || keyChar == '_') {
 				word.Insert (curPos, keyChar);
 				ResetSizes ();
@@ -378,7 +401,11 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 				bool hasMismatches;
 				int match = FindMatchedEntry (CurrentPartialWord, out hasMismatches);
-				
+				if (match >= 0 && System.Char.IsPunctuation (keyChar)) {
+					string text = DataProvider.GetCompletionText (FilteredItems [match]);
+					if (!text.ToUpper ().StartsWith (word.ToString ().ToUpper ()))
+						match =-1;	 
+				}
 				if (match >= 0 && !hasMismatches && keyChar != '<') {
 					ResetSizes ();
 					UpdateWordSelection ();
@@ -395,6 +422,10 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 			return KeyActions.CloseWindow | KeyActions.Process;
 		}
+		
+		protected bool HideWhenWordDeleted {
+			get; set;
+		}
 
 		public void UpdateWordSelection ()
 		{
@@ -407,18 +438,20 @@ namespace MonoDevelop.Ide.CodeCompletion
 		class WordComparer : IComparer <KeyValuePair<int, string>>
 		{
 			string filterWord;
+			StringMatcher matcher;
 
 			public WordComparer (string filterWord)
 			{
 				this.filterWord = filterWord ?? "";
+				matcher = CompletionMatcher.CreateCompletionMatcher (filterWord);
 			}
 			
 			public int Compare (KeyValuePair<int, string> xpair, KeyValuePair<int, string> ypair)
 			{
 				string x = xpair.Value;
 				string y = ypair.Value;
-				int[] xMatches = ListWidget.Match (filterWord, x) ?? new int[0];
-				int[] yMatches = ListWidget.Match (filterWord, y) ?? new int[0];
+				int[] xMatches = matcher.GetMatch (x) ?? new int[0];
+				int[] yMatches = matcher.GetMatch (y) ?? new int[0];
 				if (xMatches.Length < yMatches.Length) 
 					return 1;
 				if (xMatches.Length > yMatches.Length) 
@@ -456,40 +489,48 @@ namespace MonoDevelop.Ide.CodeCompletion
 		{
 			// default - word with highest match rating in the list.
 			hasMismatches = true;
-			int idx = -1;
+			if (partialWord == null)
+				return -1;
 			
-			List<KeyValuePair<int, string>> words = new List<KeyValuePair<int, string>> ();
+			int idx = -1;
+			var matcher = CompletionMatcher.CreateCompletionMatcher (partialWord);
+			
+			string bestWord = null;
+			int bestRank = int.MinValue;
+			int bestIndex = 0;
+			
 			if (!string.IsNullOrEmpty (partialWord)) {
 				for (int i = 0; i < list.filteredItems.Count; i++) {
 					int index = list.filteredItems[i];
 					string text = DataProvider.GetCompletionText (index);
-					if (!ListWidget.Matches (partialWord, text))
+					int rank;
+					if (!matcher.CalcMatchRank (text, out rank))
 						continue;
-					words.Add (new KeyValuePair <int,string> (i, text));
+					if (rank > bestRank) {
+						bestWord = text;
+						bestRank = rank;
+						bestIndex = i;
+					}
 				}
 			}
 			
-			ListWindow.WordComparer comparer = new WordComparer (partialWord);
-			if (words.Count > 0) {
-				words.Sort (comparer);
-				idx = words[0].Key;
+			if (bestWord != null) {
+				idx = bestIndex;
 				hasMismatches = false;
 				// exact match found.
-				if (words[0].Value.ToUpper () == (partialWord ?? "").ToUpper ()) 
+				if (string.Compare (bestWord, partialWord ?? "", true) == 0) 
 					return idx;
 			}
 			
 			if (string.IsNullOrEmpty (partialWord) || partialWord.Length <= 2) {
 				// Search for history matches.
-				for (int i = 0; i < wordHistory.Count; i++) {
-					string historyWord = wordHistory[i];
-					if (ListWidget.Matches (partialWord, historyWord)) {
-						for (int xIndex = 0; xIndex < list.filteredItems.Count; xIndex++) {
-							string currentWord = DataProvider.GetCompletionText (list.filteredItems[xIndex]);
-							if (currentWord == historyWord) {
-								idx = xIndex;
-								break;
-							}
+				string historyWord;
+				if (wordHistory.TryGetValue (partialWord, out historyWord)) {
+					for (int xIndex = 0; xIndex < list.filteredItems.Count; xIndex++) {
+						string currentWord = DataProvider.GetCompletionText (list.filteredItems[xIndex]);
+						if (currentWord == historyWord) {
+							idx = xIndex;
+							break;
 						}
 					}
 				}
@@ -497,22 +538,29 @@ namespace MonoDevelop.Ide.CodeCompletion
 			return idx;
 		}
 
-		static List<string> wordHistory = new List<string> ();
+		static Dictionary<string,string> wordHistory = new Dictionary<string,string> ();
+		static List<string> partalWordHistory = new List<string> ();
 		const int maxHistoryLength = 500;
-		protected void AddWordToHistory (string word)
+		protected void AddWordToHistory (string partialWord, string word)
 		{
-			if (!wordHistory.Contains (word)) {
-				wordHistory.Add (word);
-				while (wordHistory.Count > maxHistoryLength)
-					wordHistory.RemoveAt (0);
+			if (!wordHistory.ContainsKey (partialWord)) {
+				wordHistory.Add (partialWord, word);
+				partalWordHistory.Add (partialWord);
+				while (partalWordHistory.Count > maxHistoryLength) {
+					string first = partalWordHistory [0];
+					partalWordHistory.RemoveAt (0);
+					wordHistory.Remove (first);
+				}
 			} else {
-				wordHistory.Remove (word);
-				wordHistory.Add (word);
+				partalWordHistory.Remove (partialWord);
+				partalWordHistory.Add (partialWord);
+				wordHistory [partialWord] = word;
 			}
 		}
 		public static void ClearHistory ()
 		{
 			wordHistory.Clear ();
+			partalWordHistory.Clear ();
 		}
 
 		void SelectEntry (int n)
@@ -546,14 +594,29 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 		void OnScrolled (object o, ScrollEventArgs args)
 		{
-			switch (args.Event.Direction) {
-			case ScrollDirection.Up:
-				scrollbar.Value--; 
-				break;
-			case ScrollDirection.Down:
-				scrollbar.Value++; 
-				break;
-			}
+			if (!scrollbar.Visible)
+				return;
+			
+			var adj = scrollbar.Adjustment;
+			var alloc = Allocation;
+			
+			//This widget is a special case because it's always aligned to items as it scrolls.
+			//Although this means we can't use the pixel deltas for true smooth scrolling, we 
+			//can still make use of the effective scrolling velocity by basing the calculation 
+			//on pixels and rounding to the nearest item.
+			
+			double dx, dy;
+			args.Event.GetPageScrollPixelDeltas (0, alloc.Height, out dx, out dy);
+			if (dy == 0)
+				return;
+			
+			var itemDelta = dy / (alloc.Height / adj.PageSize);
+			double discreteItemDelta = System.Math.Round (itemDelta);
+			if (discreteItemDelta == 0.0 && dy != 0.0)
+				discreteItemDelta = dy > 0? 1.0 : -1.0;
+			
+			adj.AddValueClamped (discreteItemDelta);
+			args.RetVal = true;
 		}
 
 		void OnSelectionChanged (object o, EventArgs args)

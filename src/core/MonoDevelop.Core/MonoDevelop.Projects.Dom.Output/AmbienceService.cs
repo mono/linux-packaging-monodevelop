@@ -151,47 +151,28 @@ namespace MonoDevelop.Projects.Dom.Output
 		
 		public static string GetDocumentationSummary (IMember member)
 		{
-			if (member == null)
+			if (member == null || member.SourceProjectDom == null)
 				return null;
-			if (!string.IsNullOrEmpty (member.Documentation)) {
-				int idx1 = member.Documentation.IndexOf ("<summary>");
-				int idx2 = member.Documentation.IndexOf ("</summary>");
+			string documentation = member.SourceProjectDom.GetDocumentation (member);
+			
+			if (!string.IsNullOrEmpty (documentation)) {
+				int idx1 = documentation.IndexOf ("<summary>");
+				int idx2 = documentation.IndexOf ("</summary>");
 				string result;
 				if (idx2 >= 0 && idx1 >= 0) {
-					result = member.Documentation.Substring (idx1 + "<summary>".Length, idx2 - idx1 - "<summary>".Length);
+					result = documentation.Substring (idx1 + "<summary>".Length, idx2 - idx1 - "<summary>".Length);
 				} else if (idx1 >= 0) {
-					result = member.Documentation.Substring (idx1 + "<summary>".Length);
+					result = documentation.Substring (idx1 + "<summary>".Length);
 				} else if (idx2 >= 0) {
-					result = member.Documentation.Substring (0, idx2 - 1);
+					result = documentation.Substring (0, idx2 - 1);
 				} else {
-					result = member.Documentation;
+					result = documentation;
 				}
+				
 				return CleanEmpty (result);
 			}
-			XmlElement node = (XmlElement)member.GetMonodocDocumentation ();
-			if (node != null) {
-				string innerXml = (node["summary"].InnerXml ?? "").Trim ();
-				StringBuilder sb = new StringBuilder ();
-				bool wasWhiteSpace = false;
-				for (int i = 0; i < innerXml.Length; i++) {
-					char ch = innerXml[i];
-					switch (ch) {
-					case '\n':
-					case '\r':
-						break;
-					default:
-						bool isWhiteSpace = Char.IsWhiteSpace (ch);
-						if (isWhiteSpace && wasWhiteSpace)
-							continue;
-						wasWhiteSpace = isWhiteSpace;
-						sb.Append (ch);
-						break;
-					}
-				}
-				return CleanEmpty (sb.ToString ());
-			}
 			
-			return CleanEmpty (member.Documentation);
+			return CleanEmpty (documentation);
 		}
 		
 		static string CleanEmpty (string doc)
@@ -210,11 +191,6 @@ namespace MonoDevelop.Projects.Dom.Output
 				return null;
 			if (!string.IsNullOrEmpty (member.Documentation))
 				return CleanEmpty (member.Documentation);
-			XmlElement node = (XmlElement)member.GetMonodocDocumentation ();
-			if (node != null) {
-				string result = (node.InnerXml ?? "").Trim ();
-				return CleanEmpty (result);
-			}
 			return null;
 		}
 		
@@ -316,6 +292,42 @@ namespace MonoDevelop.Projects.Dom.Output
 			return result.ToString ();
 		}
 		
+		public static string UnescapeText (string text)
+		{
+			var sb = new StringBuilder ();
+			for (int i = 0; i < text.Length; i++) {
+				char ch = text[i];
+				if (ch == '&') {
+					int end = text.IndexOf (';', i);
+					if (end == -1)
+						break;
+					string entity = text.Substring (i + 1, end - i - 1);
+					switch (entity) {
+					case "lt":
+						sb.Append ('<');
+						break;
+					case "gt":
+						sb.Append ('>');
+						break;
+					case "amp":
+						sb.Append ('&');
+						break;
+					case "apos":
+						sb.Append ('\'');
+						break;
+					case "quot":
+						sb.Append ('"');
+						break;
+					}
+					i = end;
+				} else {
+					sb.Append (ch);
+				}
+			}
+			return sb.ToString ();	
+		}
+		
+		
 		public static string GetDocumentationMarkup (string doc)
 		{
 			return GetDocumentationMarkup (doc, DocumentationFormatOptions.Empty);
@@ -382,7 +394,6 @@ namespace MonoDevelop.Projects.Dom.Output
 		{
 			if (string.IsNullOrEmpty (doc))
 				return null;
-			
 			System.IO.StringReader reader = new System.IO.StringReader ("<docroot>" + doc + "</docroot>");
 			XmlTextReader xml = new XmlTextReader (reader);
 			StringBuilder ret = new StringBuilder (70);
@@ -477,7 +488,7 @@ namespace MonoDevelop.Projects.Dom.Output
 			
 			} catch (Exception ex) {
 				MonoDevelop.Core.LoggingService.LogError (ex.ToString ());
-				return doc;
+				return EscapeText (doc);
 			}
 			if (IsEmptyDocumentation (ret.ToString ()))
 				return null;

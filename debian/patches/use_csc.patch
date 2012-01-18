@@ -1,19 +1,19 @@
-Index: monodevelop.git/contrib/Mono.Cecil/Makefile.am
+Index: monodevelop/contrib/Mono.Cecil/Makefile.am
 ===================================================================
---- monodevelop.git.orig/contrib/Mono.Cecil/Makefile.am	2010-06-09 15:22:46.000000000 +0100
-+++ monodevelop.git/contrib/Mono.Cecil/Makefile.am	2010-06-09 15:34:08.000000000 +0100
+--- monodevelop.orig/contrib/Mono.Cecil/Makefile.am	2011-11-08 00:57:55.000000000 +0000
++++ monodevelop/contrib/Mono.Cecil/Makefile.am	2011-11-08 00:58:07.000000000 +0000
 @@ -1,4 +1,5 @@
  BINDIR=$(top_builddir)/build/bin
 +MCS=@CSC@
  
- all: $(CECIL) $(CECIL_MDB) $(CECIL_DECOMPILER)
+ all: $(CECIL) $(CECIL_MDB)
  
 @@ -12,7 +13,7 @@
  
  $(CECIL): $(CECIL_CSFILES)
  	mkdir -p $(BINDIR)
--	mcs $(CECIL_CSFILES) /keyfile:$(CECIL_SNK) /debug /target:library /out:$(CECIL)
-+	$(MCS) $(CECIL_CSFILES) /keyfile:$(CECIL_SNK) /debug /target:library /out:$(CECIL)
+-	gmcs $(CECIL_CSFILES) /keyfile:$(CECIL_SNK) /debug /target:library /d:NET_3_5 /out:$(CECIL)
++	mono-csc $(CECIL_CSFILES) /keyfile:$(CECIL_SNK) /debug /target:library /d:NET_3_5 /out:$(CECIL)
  
  $(CECIL_DEBUG): $(CECIL)
  
@@ -21,8 +21,76 @@ Index: monodevelop.git/contrib/Mono.Cecil/Makefile.am
  
  $(CECIL_MDB): $(CECIL_MDB_CSFILES) $(CECIL)
  	mkdir -p $(BINDIR)
--	gmcs $(CECIL_MDB_CSFILES) /debug /target:library /keyfile:$(CECIL_SNK) /r:$(CECIL) /d:CECIL /out:$(CECIL_MDB)
-+	$(MCS) $(CECIL_MDB_CSFILES) /debug /target:library /keyfile:$(CECIL_SNK) /r:$(CECIL) /d:CECIL /out:$(CECIL_MDB)
+-	gmcs $(CECIL_MDB_CSFILES) /debug /target:library /keyfile:$(CECIL_SNK) /r:$(CECIL) /d:CECIL /d:NET_3_5 /out:$(CECIL_MDB)
++	mono-csc $(CECIL_MDB_CSFILES) /debug /target:library /keyfile:$(CECIL_SNK) /r:$(CECIL) /d:CECIL /d:NET_3_5 /out:$(CECIL_MDB)
  
  $(CECIL_MDB_DEBUG): $(CECIL_MDB)
  
+Index: monodevelop/contrib/NGit/NGit.csproj
+===================================================================
+--- monodevelop.orig/contrib/NGit/NGit.csproj	2011-11-08 00:57:55.000000000 +0000
++++ monodevelop/contrib/NGit/NGit.csproj	2011-11-08 00:58:07.000000000 +0000
+@@ -9,7 +9,7 @@
+     <OutputType>Library</OutputType>
+     <RootNamespace>NGit</RootNamespace>
+     <AssemblyName>NGit</AssemblyName>
+-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
++    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+   </PropertyGroup>
+   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+     <DebugSymbols>true</DebugSymbols>
+Index: monodevelop/contrib/NSch/NSch.csproj
+===================================================================
+--- monodevelop.orig/contrib/NSch/NSch.csproj	2011-11-08 00:57:55.000000000 +0000
++++ monodevelop/contrib/NSch/NSch.csproj	2011-11-08 00:58:07.000000000 +0000
+@@ -9,7 +9,7 @@
+     <OutputType>Library</OutputType>
+     <RootNamespace>NSch</RootNamespace>
+     <AssemblyName>NSch</AssemblyName>
+-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
++    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+   </PropertyGroup>
+   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+     <DebugSymbols>true</DebugSymbols>
+Index: monodevelop/contrib/Sharpen/Sharpen.csproj
+===================================================================
+--- monodevelop.orig/contrib/Sharpen/Sharpen.csproj	2011-11-08 00:57:55.000000000 +0000
++++ monodevelop/contrib/Sharpen/Sharpen.csproj	2011-11-08 00:58:07.000000000 +0000
+@@ -9,7 +9,7 @@
+     <OutputType>Library</OutputType>
+     <RootNamespace>Sharpen</RootNamespace>
+     <AssemblyName>Sharpen</AssemblyName>
+-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
++    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+   </PropertyGroup>
+   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+     <DebugSymbols>true</DebugSymbols>
+@@ -157,4 +157,4 @@
+   <ItemGroup>
+     <Folder Include="Sharpen\" />
+   </ItemGroup>
+-</Project>
+\ No newline at end of file
++</Project>
+Index: monodevelop/src/core/MonoDevelop.Projects.Formats.MSBuild/Makefile.am
+===================================================================
+--- monodevelop.orig/src/core/MonoDevelop.Projects.Formats.MSBuild/Makefile.am	2011-11-08 00:57:55.000000000 +0000
++++ monodevelop/src/core/MonoDevelop.Projects.Formats.MSBuild/Makefile.am	2011-11-08 00:58:07.000000000 +0000
+@@ -4,7 +4,7 @@
+ REFS =  \
+ 	-r:Microsoft.Build.Engine \
+ 	-r:Microsoft.Build.Framework \
+-	-r:Microsoft.Build.Utilities.v3.5 \
++	-r:Microsoft.Build.Utilities.v4.0 \
+ 	-r:System \
+ 	-r:System.Runtime.Remoting
+ 
+@@ -24,7 +24,7 @@
+ 
+ # Mono's 2.0/3.5 compiler doesn't recognize 3.5 variants of the MSBuild assemblies
+ # so patch up the references
+-MSB_REF_PREFIX:=$(shell pkg-config --variable prefix mono)/lib/mono/3.5/
++MSB_REF_PREFIX:=$(shell pkg-config --variable prefix mono)/lib/mono/4.0/
+ FIXED_REFS:=$(shell echo '$(REFS)' | sed -e 's@Microsoft.Build[^ ]*@$(MSB_REF_PREFIX)&.dll@g')
+ 
+ all: $(ASSEMBLY) $(ASSEMBLY).mdb

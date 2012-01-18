@@ -34,6 +34,9 @@ using System.Text;
 
 using Mono.Addins;
 using MonoDevelop.Core.FileSystem;
+using System.Collections.Generic;
+using System.Threading;
+using System.Linq;
 
 namespace MonoDevelop.Core
 {
@@ -45,7 +48,9 @@ namespace MonoDevelop.Core
 		static FileServiceErrorHandler errorHandler;
 		
 		static FileSystemExtension fileSystemChain;
-		static FileSystemExtension defaultExtension = new DefaultFileSystemExtension ();
+		static FileSystemExtension defaultExtension = Platform.IsWindows ? new DefaultFileSystemExtension () : new UnixFileSystemExtension () ;
+		
+		static EventQueue eventQueue = new EventQueue ();
 		
 		static string applicationRootPath = Path.Combine (PropertyService.EntryAssemblyPath, "..");
 		public static string ApplicationRootPath {
@@ -82,6 +87,17 @@ namespace MonoDevelop.Core
 			}
 		}
 		
+		public static FilePath ResolveFullPath (FilePath path)
+		{
+			try {
+				return GetFileSystemForPath (path, false).ResolveFullPath (path);
+			} catch (Exception e) {
+				if (!HandleError (GettextCatalog.GetString ("Can't resolve full path {0}", path), e))
+					throw;
+				return FilePath.Empty;
+			}
+		}
+		
 		public static void DeleteFile (string fileName)
 		{
 			Debug.Assert (!String.IsNullOrEmpty (fileName));
@@ -113,8 +129,8 @@ namespace MonoDevelop.Core
 			Debug.Assert (!String.IsNullOrEmpty (oldName));
 			Debug.Assert (!String.IsNullOrEmpty (newName));
 			if (Path.GetFileName (oldName) != newName) {
-				string newPath = Path.Combine (Path.GetDirectoryName (oldName), newName);
-				InternalMoveFile (oldName, newPath);
+				var newPath = ((FilePath)oldName).ParentDirectory.Combine (newName);
+				InternalRenameFile (oldName, newName);
 				OnFileRenamed (new FileCopyEventArgs (oldName, newPath, false));
 				OnFileCreated (new FileEventArgs (newPath, false));
 				OnFileRemoved (new FileEventArgs (oldName, false));
@@ -170,6 +186,15 @@ namespace MonoDevelop.Core
 			}
 		}
 		
+		static void InternalRenameFile (string srcFile, string newName)
+		{
+			Debug.Assert (!string.IsNullOrEmpty (srcFile));
+			Debug.Assert (!string.IsNullOrEmpty (newName));
+			FileSystemExtension srcExt = GetFileSystemForPath (srcFile, false);
+			
+			srcExt.RenameFile (srcFile, newName);
+		}
+		
 		public static void CreateDirectory (string path)
 		{
 			Debug.Assert (!String.IsNullOrEmpty (path));
@@ -218,12 +243,17 @@ namespace MonoDevelop.Core
 			return GetFileSystemForPath (fileName, false).RequestFileEdit (fileName);
 		}
 		
-		public static void NotifyFileChanged (string fileName)
+		public static void NotifyFileChanged (FilePath fileName)
 		{
-			Debug.Assert (!String.IsNullOrEmpty (fileName));
+			NotifyFilesChanged (new FilePath[] { fileName });
+		}
+		
+		public static void NotifyFilesChanged (IEnumerable<FilePath> files)
+		{
 			try {
-				GetFileSystemForPath (fileName, false).NotifyFileChanged (fileName);
-				OnFileChanged (new FileEventArgs (fileName, false));
+				foreach (var fsFiles in files.GroupBy (f => GetFileSystemForPath (f, false)))
+					fsFiles.Key.NotifyFilesChanged (fsFiles);
+				OnFileChanged (new FileEventArgs (files, false));
 			} catch (Exception ex) {
 				LoggingService.LogError ("File change notification failed", ex);
 			}
@@ -231,9 +261,13 @@ namespace MonoDevelop.Core
 		
 		public static void NotifyFileRemoved (string fileName)
 		{
-			Debug.Assert (!String.IsNullOrEmpty (fileName));
+			NotifyFilesRemoved (new FilePath[] { fileName });
+		}
+		
+		public static void NotifyFilesRemoved (IEnumerable<FilePath> files)
+		{
 			try {
-				OnFileRemoved (new FileEventArgs (fileName, false));
+				OnFileRemoved (new FileEventArgs (files, false));
 			} catch (Exception ex) {
 				LoggingService.LogError ("File remove notification failed", ex);
 			}
@@ -347,7 +381,8 @@ namespace MonoDevelop.Core
 		// Atomic rename of a file. It does not fire events.
 		public static void SystemRename (string sourceFile, string destFile)
 		{
-			if (PropertyService.IsWindows) {
+			//FIXME: use the atomic System.IO.File.Replace on NTFS
+			if (Platform.IsWindows) {
 				string wtmp = null;
 				if (File.Exists (destFile)) {
 					do {
@@ -382,6 +417,35 @@ namespace MonoDevelop.Core
 				Mono.Unix.Native.Syscall.rename (sourceFile, destFile);
 			}
 		}
+		
+		/// <summary>
+		/// Removes the directory if it's empty.
+		/// </summary>
+		public static void RemoveDirectoryIfEmpty (string directory)
+		{
+			if (Directory.Exists (directory) && !Directory.EnumerateFiles (directory).Any ())
+				Directory.Delete (directory);
+		}
+		
+		/// <summary>
+		/// Creates a directory if it does not already exist.
+		/// </summary>
+		public static void EnsureDirectoryExists (string directory)
+		{
+			if (!Directory.Exists (directory))
+				Directory.CreateDirectory (directory);
+		}
+		
+		/// <summary>
+		/// Makes the path separators native.
+		/// </summary>
+		public static string MakePathSeparatorsNative (string path)
+		{
+			if (path == null || path.Length == 0)
+				return path;
+			char c = Path.DirectorySeparatorChar == '\\'? '/' : '\\'; 
+			return path.Replace (c, Path.DirectorySeparatorChar);
+		}
 
 		static bool HandleError (string message, Exception ex)
 		{
@@ -392,255 +456,140 @@ namespace MonoDevelop.Core
 			get { return errorHandler; }
 			set { errorHandler = value; }
 		}
+		
+		public static void FreezeEvents ()
+		{
+			eventQueue.Freeze ();
+		}
+		
+		public static void ThawEvents ()
+		{
+			eventQueue.Thaw ();
+		}
 
 		public static event EventHandler<FileEventArgs> FileCreated;
 		static void OnFileCreated (FileEventArgs args)
 		{
-			if (args.IsDirectory)
-				Counters.DirectoriesCreated++;
-			else
-				Counters.FilesCreated++;
-			
-			if (FileCreated != null) 
-				FileCreated (null, args);
+			foreach (FileEventInfo fi in args) {
+				if (fi.IsDirectory)
+					Counters.DirectoriesCreated++;
+				else
+					Counters.FilesCreated++;
+			}
+
+			eventQueue.RaiseEvent (() => FileCreated, args);
 		}
 		
 		public static event EventHandler<FileCopyEventArgs> FileRenamed;
 		static void OnFileRenamed (FileCopyEventArgs args)
 		{
-			if (args.IsDirectory)
-				Counters.DirectoriesRenamed++;
-			else
-				Counters.FilesRenamed++;
+			foreach (FileCopyEventInfo fi in args) {
+				if (fi.IsDirectory)
+					Counters.DirectoriesRenamed++;
+				else
+					Counters.FilesRenamed++;
+			}
 			
-			if (FileRenamed != null) 
-				FileRenamed (null, args);
+			eventQueue.RaiseEvent (() => FileRenamed, args);
 		}
 		
 		public static event EventHandler<FileEventArgs> FileRemoved;
 		static void OnFileRemoved (FileEventArgs args)
 		{
-			if (args.IsDirectory)
-				Counters.DirectoriesRemoved++;
-			else
-				Counters.FilesRemoved++;
+			foreach (FileEventInfo fi in args) {
+				if (fi.IsDirectory)
+					Counters.DirectoriesRemoved++;
+				else
+					Counters.FilesRemoved++;
+			}
 			
-			if (FileRemoved != null) 
-				FileRemoved (null, args);
+			eventQueue.RaiseEvent (() => FileRemoved, args);
 		}
 		
 		public static event EventHandler<FileEventArgs> FileChanged;
 		static void OnFileChanged (FileEventArgs args)
 		{
 			Counters.FileChangeNotifications++;
-			
-			if (FileChanged != null) 
-				FileChanged (null, args);
+			eventQueue.RaiseEvent (() => FileChanged, null, args);
 		}
 	}
-
-	[Serializable]
-	public struct FilePath: IComparable<FilePath>, IComparable, IEquatable<FilePath>
+	
+	class EventQueue
 	{
-		string fileName;
-
-		public static readonly FilePath Null = new FilePath (null);
-		public static readonly FilePath Empty = new FilePath (string.Empty);
-
-		public FilePath (string name)
+		class EventData
 		{
-			fileName = name;
+			public Func<Delegate> Delegate;
+			public object ThisObject;
+			public EventArgs Args;
 		}
-
-		public bool IsNull {
-			get { return fileName == null; }
+		
+		List<EventData> events = new List<EventData> ();
+		
+		int frozen;
+		object defaultSourceObject;
+		
+		public EventQueue ()
+		{
 		}
-
-		public bool IsNullOrEmpty {
-			get { return string.IsNullOrEmpty (fileName); }
+		
+		public EventQueue (object defaultSourceObject)
+		{
+			this.defaultSourceObject = defaultSourceObject;
 		}
-
-		public bool IsEmpty {
-			get { return fileName != null && fileName.Length == 0; }
-		}
-
-		public FilePath FullPath {
-			get {
-				return new FilePath (!string.IsNullOrEmpty (fileName) ? Path.GetFullPath (fileName) : "");
+		
+		public void Freeze ()
+		{
+			lock (events) {
+				frozen++;
 			}
 		}
 		
-		/// <summary>
-		/// Returns a path in standard form, which can be used to be compared
-		/// for equality with other canonical paths. It is similar to FullPath,
-		/// but unlike FullPath, the directory "/a/b" is considered equal to "/a/b/"
-		/// </summary>
-		public FilePath CanonicalPath {
-			get {
-				string fp = Path.GetFullPath (fileName);
-				if (fp.Length > 0 && fp[fp.Length - 1] == Path.DirectorySeparatorChar)
-					return fp.TrimEnd (Path.DirectorySeparatorChar);
-				else
-					return fp;
+		public void Thaw ()
+		{
+			List<EventData> pendingEvents = null;
+			lock (events) {
+				if (--frozen == 0) {
+					pendingEvents = events;
+					events = new List<EventData> ();
+				}
 			}
-		}
-
-		public string FileName {
-			get {
-				return Path.GetFileName (fileName);
+			if (pendingEvents != null) {
+				for (int n=0; n<pendingEvents.Count; n++) {
+					EventData ev = pendingEvents [n];
+					Delegate del = ev.Delegate ();
+					if (ev.Args is IEventArgsChain) {
+						EventData next = n < pendingEvents.Count - 1 ? pendingEvents [n + 1] : null;
+						if (next != null && (next.Args.GetType() == ev.Args.GetType ()) && next.Delegate() == del && next.ThisObject == ev.ThisObject) {
+							((IEventArgsChain)next.Args).MergeWith ((IEventArgsChain)ev.Args);
+							continue;
+						}
+					}
+					if (del != null)
+						del.DynamicInvoke (ev.ThisObject, ev.Args);
+				}
 			}
-		}
-
-		public string Extension {
-			get {
-				return Path.GetExtension (fileName);
-			}
-		}
-
-		public string FileNameWithoutExtension {
-			get {
-				return Path.GetFileNameWithoutExtension (fileName);
-			}
-		}
-
-		public FilePath ParentDirectory {
-			get {
-				return new FilePath (Path.GetDirectoryName (fileName));
-			}
-		}
-
-		public bool IsAbsolute {
-			get { return Path.IsPathRooted (fileName); }
-		}
-
-		public bool IsChildPathOf (FilePath basePath)
-		{
-			StringComparison sc = PropertyService.IsWindows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-			if (basePath.fileName [basePath.fileName.Length - 1] != Path.DirectorySeparatorChar)
-				return fileName.StartsWith (basePath.fileName + Path.DirectorySeparatorChar, sc);
-			else
-				return fileName.StartsWith (basePath.fileName, sc);
-		}
-
-		public FilePath ChangeExtension (string ext)
-		{
-			return Path.ChangeExtension (fileName, ext);
-		}
-
-		public FilePath Combine (params FilePath[] paths)
-		{
-			string path = fileName;
-			foreach (FilePath p in paths)
-				path = Path.Combine (path, p.fileName);
-			return new FilePath (path);
-		}
-
-		public FilePath Combine (params string[] paths)
-		{
-			string path = fileName;
-			foreach (string p in paths)
-				path = Path.Combine (path, p);
-			return new FilePath (path);
-		}
-
-		public FilePath ToAbsolute (FilePath basePath)
-		{
-			if (IsAbsolute)
-				return FullPath;
-			else
-				return Combine (basePath, this).FullPath;
-		}
-
-		public FilePath ToRelative (FilePath basePath)
-		{
-			return FileService.AbsoluteToRelativePath (basePath, fileName);
-		}
-
-		public static implicit operator FilePath (string name)
-		{
-			return new FilePath (name);
-		}
-
-		public static implicit operator string (FilePath filePath)
-		{
-			return filePath.fileName;
-		}
-
-		public static bool operator == (FilePath name1, FilePath name2)
-		{
-			if (PropertyService.IsWindows)
-				return string.Equals (name1.fileName, name2.fileName, StringComparison.OrdinalIgnoreCase);
-			else
-				return string.Equals (name1.fileName, name2.fileName, StringComparison.Ordinal);
-		}
-
-		public static bool operator != (FilePath name1, FilePath name2)
-		{
-			return !(name1 == name2);
-		}
-
-		public override bool Equals (object obj)
-		{
-			if (obj == null && !(obj is FilePath))
-				return false;
-
-			FilePath fn = (FilePath) obj;
-			return this == fn;
-		}
-
-		public override int GetHashCode ( )
-		{
-			if (fileName == null)
-				return 0;
-			if (PropertyService.IsWindows)
-				return fileName.ToLower ().GetHashCode ();
-			else
-				return fileName.GetHashCode ();
-		}
-
-		public override string ToString ( )
-		{
-			return fileName;
-		}
-
-		public int CompareTo (FilePath filePath)
-		{
-			return string.Compare (fileName, filePath.fileName, PropertyService.IsWindows);
-		}
-
-		int IComparable.CompareTo (object obj)
-		{
-			if (!(obj is FilePath))
-				return -1;
-			return CompareTo ((FilePath) obj);
-		}
-
-		#region IEquatable<FilePath> Members
-
-		bool IEquatable<FilePath>.Equals (FilePath other)
-		{
-			return this == other;
-		}
-
-		#endregion
-	}
-
-	public static class FilePathUtil
-	{
-		public static string[] ToStringArray (this FilePath[] paths)
-		{
-			string[] array = new string[paths.Length];
-			for (int n = 0; n < paths.Length; n++)
-				array[n] = paths[n].ToString ();
-			return array;
 		}
 		
-		public static FilePath[] ToFilePathArray (this string[] paths)
+		public void RaiseEvent (Func<Delegate> d, EventArgs args)
 		{
-			var array = new FilePath[paths.Length];
-			for (int n = 0; n < paths.Length; n++)
-				array[n] = paths[n];
-			return array;
+			RaiseEvent (d, defaultSourceObject, args);
+		}
+		
+		public void RaiseEvent (Func<Delegate> d, object thisObj, EventArgs args)
+		{
+			Delegate del = d ();
+			lock (events) {
+				if (frozen > 0) {
+					EventData ed = new EventData ();
+					ed.Delegate = d;
+					ed.ThisObject = thisObj;
+					ed.Args = args;
+					events.Add (ed);
+					return;
+				}
+			}
+			if (del != null)
+				del.DynamicInvoke (thisObj, args);
 		}
 	}
 	

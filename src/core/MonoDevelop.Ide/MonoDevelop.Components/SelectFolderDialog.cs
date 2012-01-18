@@ -35,10 +35,11 @@ namespace MonoDevelop.Components
 	/// <summary>
 	/// Dialog which can be used to select a folder
 	/// </summary>
-	public class SelectFolderDialog: SelectFileDialog<ISelectFileDialogHandler,SelectFileDialogData>
+	public class SelectFolderDialog: SelectFileDialog<SelectFileDialogData>
 	{
 		public SelectFolderDialog ()
 		{
+			Action = Gtk.FileChooserAction.SelectFolder;
 		}
 		
 		public SelectFolderDialog (string title): this (title, Gtk.FileChooserAction.SelectFolder)
@@ -49,14 +50,6 @@ namespace MonoDevelop.Components
 		{
 			Title = title;
 			Action = action;
-		}
-		
-		public bool Run ()
-		{
-			if (Handler != null)
-				return Handler.Run (data);
-			else
-				return RunDefault ();
 		}
 	}
 }

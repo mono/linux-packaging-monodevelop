@@ -51,6 +51,9 @@ namespace MonoDevelop.Ide.Commands
 			yield return new StringTagDescription ("CurText", "Selected Editor Text", false);
 			yield return new StringTagDescription ("EditorText", "Editor Text", false);
 			yield return new StringTagDescription ("StartupPath", "MonoDevelop Startup Directory", false);
+			yield return new StringTagDescription ("ConfigDir", "MonoDevelop Configuration Directory", false);
+			yield return new StringTagDescription ("DataDir", "MonoDevelop User Data Directory", false);
+			yield return new StringTagDescription ("LogDir", "MonoDevelop Log Directory", false);
 		}
 		
 		public override object GetTagValue (Workbench wb, string tag)
@@ -77,32 +80,41 @@ namespace MonoDevelop.Ide.Commands
 					return null;
 					
 				case "CURLINE":
-					if (wb.ActiveDocument != null && wb.ActiveDocument.TextEditor != null)
-						return wb.ActiveDocument.TextEditor.CursorLine;
+					if (wb.ActiveDocument != null && wb.ActiveDocument.Editor != null)
+						return wb.ActiveDocument.Editor.Caret.Line;
 					return null;
 					
 				case "CURCOLUMN":
-					if (wb.ActiveDocument != null && wb.ActiveDocument.TextEditor != null)
-						return wb.ActiveDocument.TextEditor.CursorColumn;
+					if (wb.ActiveDocument != null && wb.ActiveDocument.Editor != null)
+						return wb.ActiveDocument.Editor.Caret.Column;
 					return null;
 					
 				case "CUROFFSET":
-					if (wb.ActiveDocument != null && wb.ActiveDocument.TextEditor != null)
-						return wb.ActiveDocument.TextEditor.CursorPosition;
+					if (wb.ActiveDocument != null && wb.ActiveDocument.Editor != null)
+						return wb.ActiveDocument.Editor.Caret.Offset;
 					return null;
 					
 				case "CURTEXT":
-					if (wb.ActiveDocument != null && wb.ActiveDocument.TextEditor != null)
-						return wb.ActiveDocument.TextEditor.SelectedText;
+					if (wb.ActiveDocument != null && wb.ActiveDocument.Editor != null)
+						return wb.ActiveDocument.Editor.SelectedText;
 					return null;
 					
 				case "EDITORTEXT":
-					if (wb.ActiveDocument != null && wb.ActiveDocument.TextEditor != null)
-						return wb.ActiveDocument.TextEditor.Text;
+					if (wb.ActiveDocument != null && wb.ActiveDocument.Editor != null)
+						return wb.ActiveDocument.Editor.Text;
 					return null;
 					
 				case "STARTUPPATH":
 					return AppDomain.CurrentDomain.BaseDirectory;
+					
+				case "CONFIGDIR":
+					return UserProfile.Current.ConfigDir;
+				
+				case "DATADIR":
+					return UserProfile.Current.UserDataRoot;
+				
+				case "LOGDIR":
+					return UserProfile.Current.LogDir;
 			}
 			throw new NotSupportedException ();
         }

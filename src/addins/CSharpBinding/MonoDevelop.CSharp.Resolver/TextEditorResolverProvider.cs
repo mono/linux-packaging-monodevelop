@@ -42,9 +42,10 @@ namespace MonoDevelop.CSharp.Resolver
 		
 		public MonoDevelop.Projects.Dom.ResolveResult GetLanguageItem (ProjectDom dom, Mono.TextEditor.TextEditorData data, int offset)
 		{
+			if (offset < 0)
+				return null;
 			string fileName = data.Document.FileName;
-			
-			IParser parser = ProjectDomService.GetParser (fileName, data.Document.MimeType);
+			IParser parser = ProjectDomService.GetParser (fileName);
 			if (parser == null)
 				return null;
 			
@@ -52,34 +53,62 @@ namespace MonoDevelop.CSharp.Resolver
 			if (doc == null)
 				return null;
 			
-			IResolver         resolver = parser.CreateResolver (dom, doc, fileName);
-			IExpressionFinder expressionFinder = parser.CreateExpressionFinder (dom);
-			if (resolver == null || expressionFinder == null) 
+			IResolver resolver = parser.CreateResolver (dom, doc, fileName);
+			if (resolver == null) 
 				return null;
+			var expressionFinder = new NewCSharpExpressionFinder (dom);
 			
-			string txt = data.Document.Text;
-			int wordEnd = offset;
-			while (wordEnd < txt.Length && (Char.IsLetterOrDigit (txt[wordEnd]) || txt[wordEnd] == '_'))
+			int wordEnd = Math.Min (offset, data.Length - 1);
+			if (wordEnd < 0)
+				return null;
+			if (data.GetCharAt (wordEnd) == '@')
+				wordEnd++;
+			while (wordEnd < data.Length && (Char.IsLetterOrDigit (data.GetCharAt (wordEnd)) || data.GetCharAt (wordEnd) == '_'))
 				wordEnd++;
 			
-			ExpressionResult expressionResult = expressionFinder.FindExpression (txt, wordEnd);
+			while (wordEnd < data.Length - 1 && Char.IsWhiteSpace (data.GetCharAt (wordEnd)))
+				wordEnd++;
+			/* is checked at the end.
+			int saveEnd = wordEnd;
+			if (wordEnd < data.Length && data.GetCharAt (wordEnd) == '<') {
+				int matchingBracket = data.Document.GetMatchingBracketOffset (wordEnd);
+				if (matchingBracket > 0)
+					wordEnd = matchingBracket;
+				while (wordEnd < data.Length - 1 && Char.IsWhiteSpace (data.GetCharAt (wordEnd)))
+					wordEnd++;
+			}
+			
+			bool wasMethodCall = false;
+			if (data.GetCharAt (wordEnd) == '(') {
+				int matchingBracket = data.Document.GetMatchingBracketOffset (wordEnd);
+				if (matchingBracket > 0) {
+					wordEnd = matchingBracket;
+					wasMethodCall = true;
+				}
+			}
+			if (!wasMethodCall)
+				wordEnd = saveEnd;*/
+
+			ExpressionResult expressionResult = expressionFinder.FindExpression (data, wordEnd);
 			if (expressionResult == null)
 				return null;
 			ResolveResult resolveResult;
 			DocumentLocation loc = data.Document.OffsetToLocation (offset);
 			string savedExpression = null;
-			
 			// special handling for 'var' "keyword"
 			if (expressionResult.ExpressionContext == ExpressionContext.IdentifierExpected && expressionResult.Expression != null && expressionResult.Expression.Trim () == "var") {
-				int endOffset = data.Document.LocationToOffset (expressionResult.Region.End.Line - 1, expressionResult.Region.End.Column - 1);
+				int endOffset = data.Document.LocationToOffset (expressionResult.Region.End.Line, expressionResult.Region.End.Column);
 				StringBuilder identifer = new StringBuilder ();
 				for (int i = endOffset; i >= 0 && i < data.Document.Length; i++) {
 					char ch = data.Document.GetCharAt (i);
-					if (Char.IsWhiteSpace (ch))
+					if (Char.IsWhiteSpace (ch)) {
+						if (identifer.Length > 0)
+							break;
 						continue;
-					if (ch == '=')
+					}
+					if (ch == '=' || ch == ';')
 						break;
-					if (Char.IsLetterOrDigit (ch) || ch =='_') {
+					if (Char.IsLetterOrDigit (ch) || ch == '_') {
 						identifer.Append (ch);
 						continue;
 					}
@@ -88,29 +117,35 @@ namespace MonoDevelop.CSharp.Resolver
 				}
 				if (identifer.Length > 0) {
 					expressionResult.Expression = identifer.ToString ();
-					resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
+					resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, int.MaxValue));
 					if (resolveResult != null) {
 						resolveResult = new MemberResolveResult (dom.GetType (resolveResult.ResolvedType));
+						resolveResult.ResolvedExpression = expressionResult;
 						return resolveResult;
 					}
 				}
 			}
 			
-			if (expressionResult.ExpressionContext == ExpressionContext.Attribute) {
+			if (expressionResult.ExpressionContext == ExpressionContext.Attribute && !string.IsNullOrEmpty (expressionResult.Expression)) {
 				savedExpression = expressionResult.Expression;
-				expressionResult.Expression += "Attribute";
+				expressionResult.Expression = expressionResult.Expression.Trim () + "Attribute";
 				expressionResult.ExpressionContext = ExpressionContext.ObjectCreation;
-			} 
-			resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
+			}
 			
+			resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, loc.Column));
 			if (savedExpression != null && resolveResult == null) {
 				expressionResult.Expression = savedExpression;
-				resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
+				resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, loc.Column));
 			}
+			
+			// identifier may not be valid at that point, try to resolve it at line end (ex. foreach loop variable)
+			if (resolveResult != null &&  (resolveResult.ResolvedType == null || string.IsNullOrEmpty (resolveResult.ResolvedType.FullName)))
+				resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, int.MaxValue));
+		
 			// Search for possible generic parameters.
 //			if (this.resolveResult == null || this.resolveResult.ResolvedType == null || String.IsNullOrEmpty (this.resolveResult.ResolvedType.Name)) {
 			if (!expressionResult.Region.IsEmpty) {
-				int j = data.Document.LocationToOffset (expressionResult.Region.End.Line - 1, expressionResult.Region.End.Column - 1);
+				int j = data.Document.LocationToOffset (expressionResult.Region.End.Line, expressionResult.Region.End.Column);
 				int bracket = 0;
 				for (int i = j; i >= 0 && i < data.Document.Length; i++) {
 					char ch = data.Document.GetCharAt (i);
@@ -123,7 +158,7 @@ namespace MonoDevelop.CSharp.Resolver
 						if (bracket == 0) {
 							expressionResult.Expression += data.Document.GetTextBetween (j, i + 1);
 							expressionResult.ExpressionContext = ExpressionContext.ObjectCreation;
-							resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
+							resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, loc.Column));
 							break;
 						}
 					} else {
@@ -141,16 +176,16 @@ namespace MonoDevelop.CSharp.Resolver
 			    resolveResult is MethodResolveResult && ((MethodResolveResult)resolveResult).Methods.Count > 1) {
 				// put the search offset at the end of the invocation to be able to find the full expression
 				// the resolver finds it itself if spaces are between the method name and the argument opening parentheses.
-				while (wordEnd < txt.Length - 1 && Char.IsWhiteSpace (txt[wordEnd]))
+				while (wordEnd < data.Length - 1 && Char.IsWhiteSpace (data.GetCharAt (wordEnd)))
 					wordEnd++;
-				if (txt[wordEnd] == '(') {
+				if (data.GetCharAt (wordEnd) == '(') {
 					int matchingBracket = data.Document.GetMatchingBracketOffset (wordEnd);
 					if (matchingBracket > 0)
 						wordEnd = matchingBracket;
 				}
 				//Console.WriteLine (expressionFinder.FindFullExpression (txt, wordEnd));
-				ResolveResult possibleResult = resolver.Resolve (expressionFinder.FindFullExpression (txt, wordEnd), new DomLocation (loc.Line + 1, loc.Column + 1)) ?? resolveResult;
-				//Console.WriteLine ("possi:" + resolver.Resolve (expressionFinder.FindFullExpression (txt, wordEnd), new DomLocation (loc.Line + 1, loc.Column + 1)));
+				ResolveResult possibleResult = resolver.Resolve (expressionFinder.FindFullExpression (data, wordEnd), new DomLocation (loc.Line, loc.Column)) ?? resolveResult;
+				//Console.WriteLine ("possi:" + resolver.Resolve (expressionFinder.FindFullExpression (txt, wordEnd), new DomLocation (loc.Line, loc.Column)));
 				if (possibleResult is MethodResolveResult)
 					resolveResult = possibleResult;
 			}
@@ -161,10 +196,10 @@ namespace MonoDevelop.CSharp.Resolver
 		{
 			string fileName = data.Document.FileName;
 			MonoDevelop.Ide.Gui.Document doc = IdeApp.Workbench.ActiveDocument;
-			if (doc == null)
+			if (doc == null || doc.Editor == null)
 				return null;
 			
-			IParser parser = ProjectDomService.GetParser (fileName, data.Document.MimeType);
+			IParser parser = ProjectDomService.GetParser (fileName);
 			if (parser == null)
 				return null;
 			
@@ -172,9 +207,8 @@ namespace MonoDevelop.CSharp.Resolver
 			IExpressionFinder expressionFinder = parser.CreateExpressionFinder (dom);
 			if (resolver == null || expressionFinder == null) 
 				return null;
-			string txt = data.Document.Text;
 			int wordEnd = offset;
-			while (wordEnd < txt.Length && (Char.IsLetterOrDigit (txt[wordEnd]) || txt[wordEnd] == '_'))
+			while (wordEnd < data.Length && (Char.IsLetterOrDigit (data.GetCharAt (wordEnd)) || data.GetCharAt (wordEnd) == '_'))
 				wordEnd++;
 			ExpressionResult expressionResult = new ExpressionResult (expression);
 			expressionResult.ExpressionContext = ExpressionContext.MethodBody;
@@ -188,14 +222,16 @@ namespace MonoDevelop.CSharp.Resolver
 				expressionResult.Expression += "Attribute";
 				expressionResult.ExpressionContext = ExpressionContext.ObjectCreation;
 			} 
-			resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
+			resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, loc.Column));
 			if (savedExpression != null && resolveResult == null) {
 				expressionResult.Expression = savedExpression;
-				resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
+				resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, loc.Column));
 			}
+			if (expressionResult.Region.End.IsEmpty)
+				return resolveResult;
 			// Search for possible generic parameters.
 //			if (this.resolveResult == null || this.resolveResult.ResolvedType == null || String.IsNullOrEmpty (this.resolveResult.ResolvedType.Name)) {
-				int j = data.Document.LocationToOffset (expressionResult.Region.End.Line - 1, expressionResult.Region.End.Column - 1);
+				int j = data.Document.LocationToOffset (expressionResult.Region.End.Line, expressionResult.Region.End.Column);
 				int bracket = 0;
 				for (int i = j; i >= 0 && i < data.Document.Length; i++) {
 					char ch = data.Document.GetCharAt (i);
@@ -208,7 +244,7 @@ namespace MonoDevelop.CSharp.Resolver
 						if (bracket == 0) {
 							expressionResult.Expression += data.Document.GetTextBetween (j, i + 1);
 							expressionResult.ExpressionContext = ExpressionContext.ObjectCreation;
-							resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line + 1, loc.Column + 1));
+							resolveResult = resolver.Resolve (expressionResult, new DomLocation (loc.Line, loc.Column)) ?? resolveResult;
 							break;
 						}
 					} else {
@@ -221,7 +257,7 @@ namespace MonoDevelop.CSharp.Resolver
 			// To resolve method overloads the full expression must be parsed.
 			// ex.: Overload (1)/ Overload("one") - parsing "Overload" gives just a MethodResolveResult
 			if (resolveResult is MethodResolveResult) 
-				resolveResult = resolver.Resolve (expressionFinder.FindFullExpression (txt, wordEnd), new DomLocation (loc.Line + 1, loc.Column + 1)) ?? resolveResult;
+				resolveResult = resolver.Resolve (expressionFinder.FindFullExpression (data, wordEnd), new DomLocation (loc.Line, loc.Column)) ?? resolveResult;
 			return resolveResult;
 		}
 		

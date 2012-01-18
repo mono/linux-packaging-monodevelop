@@ -4,13 +4,13 @@ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.VBNetBinding.dll
 
 DEPS =  \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll 
+	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
+	$(top_builddir)/build/bin/OldNRefactory.dll 
 	
 REFS =  \
 	$(GLIB_SHARP_LIBS) \
 	$(GTK_SHARP_LIBS) \
 	$(MONO_ADDINS_LIBS) \
-	-r:../../../build/bin/NRefactory.dll \
 	-r:Mono.Posix \
 	-r:System \
 	-r:System.Core \
@@ -40,7 +40,6 @@ FILES =  \
 
 RES =  \
 	gtk-gui/gui.stetic \
-	gtk-gui/objects.xml \
 	icons/VB.FileIcon \
 	icons/vb-icon-32.png \
 	md1format.xml \

@@ -31,6 +31,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Linq;
 
 namespace MonoDevelop.Projects.Dom
 {
@@ -50,7 +51,14 @@ namespace MonoDevelop.Projects.Dom
 				return genericArguments.AsReadOnly ();
 			}
 		}
-		
+		public virtual string HelpUrl {
+			get {
+				if (GenericArguments.Count == 0)
+					return Name;
+				return Name + "`" + GenericArguments.Count;
+			}
+		}
+
 		public bool IsGenerated {
 			get;
 			set;
@@ -63,6 +71,15 @@ namespace MonoDevelop.Projects.Dom
 		
 		public ReturnTypePart ()
 		{
+		}
+		
+		public ReturnTypePart (IReturnTypePart part)
+		{
+			Name = part.Name;
+			IsGenerated = part.IsGenerated;
+			Tag = part.Tag;
+			foreach (var a in part.GenericArguments)
+				AddTypeParameter (a);
 		}
 		
 		public ReturnTypePart (string name)
@@ -80,13 +97,13 @@ namespace MonoDevelop.Projects.Dom
 				}
 			}
 			this.Name = name;
-			if (typeParameters != null) 
+			if (typeParameters != null && typeParameters.Any ())
 				this.genericArguments = new List<IReturnType> (typeParameters);
 		}
 		public ReturnTypePart (string baseName, string name, IEnumerable<ITypeParameter> typeParameters)
 		{
 			this.Name = name;
-			if (typeParameters != null) {
+			if (typeParameters != null && typeParameters.Any ()) {
 				this.genericArguments = new List<IReturnType> ();
 				foreach (ITypeParameter para in typeParameters) {
 					this.genericArguments.Add (new DomReturnType (baseName + "." + para.Name));
@@ -129,7 +146,7 @@ namespace MonoDevelop.Projects.Dom
 		static readonly int[] zeroDimensions = new int[0];
 		static readonly int[] oneDimensions = new int[] { 0 };
 		
-		List<IReturnTypePart> parts = new List<IReturnTypePart> ();
+		List<ReturnTypePart> parts = new List<ReturnTypePart> ();
 		
 		public static readonly IReturnType Void;
 		public static readonly IReturnType Object;
@@ -160,10 +177,29 @@ namespace MonoDevelop.Projects.Dom
 		public static readonly IReturnType EventArgs;
 		public static readonly IReturnType StringBuilder;
 		public static readonly IReturnType TypeReturnType;
+		
+		public static readonly IReturnType Enum;
+		public static readonly IReturnType ValueType;
 	
 		public bool IsGenerated {
 			get;
 			set;
+		}
+		
+		public string HelpUrl {
+			get {
+				
+				StringBuilder result = new StringBuilder ();
+				result.Append ("T:");
+				if (!string.IsNullOrEmpty (Namespace))
+					result.Append (Namespace);
+				for (int i = 0; i < parts.Count; i++) {
+					if (result.Length > "T:".Length)
+						result.Append (".");
+					result.Append (parts[i].HelpUrl);
+				}
+				return result.ToString ();
+			}
 		}
 		
 		public object Tag {
@@ -234,11 +270,19 @@ namespace MonoDevelop.Projects.Dom
 			CreateTableEntry ("Gtk.Label");
 			
 			Delegate = CreateTableEntry ("System.Delegate");
+			Enum = CreateTableEntry ("System.Enum");
+			ValueType = CreateTableEntry ("System.ValueType");
 		}
 
-		public List<IReturnTypePart> Parts {
+		public List<ReturnTypePart> Parts {
 			get {
 				return parts;
+			}
+		}
+		
+		ReadOnlyCollection<IReturnTypePart> IReturnType.Parts {
+			get {
+				return new ReadOnlyCollection<IReturnTypePart> (parts.ToArray ());
 			}
 		}
 		
@@ -403,10 +447,27 @@ namespace MonoDevelop.Projects.Dom
 			this.parts.Add (new ReturnTypePart ());
 		}
 		
-		internal DomReturnType (string ns, List<IReturnTypePart> parts)
+		internal DomReturnType (string ns, List<ReturnTypePart> parts)
 		{
 			this.nspace = ns;
 			this.parts = parts;
+		}
+		
+		public DomReturnType (IReturnType type)
+		{
+			DomReturnType rt = (DomReturnType) type;
+			if (rt.dimensions != null) {
+				dimensions = new int [rt.dimensions.Length];
+				rt.dimensions.CopyTo (dimensions, 0);
+			}
+			IsGenerated = rt.IsGenerated;
+			nspace = rt.nspace;
+			pointerNestingLevel = rt.pointerNestingLevel;
+			arrayPointerNestingLevel = rt.arrayPointerNestingLevel;
+			modifiers = rt.modifiers;
+			
+			foreach (var p in rt.Parts)
+				parts.Add (new ReturnTypePart (p));
 		}
 		
 		public DomReturnType (IType type)
@@ -502,12 +563,27 @@ namespace MonoDevelop.Projects.Dom
 		{
 		}
 		
+		public DomReturnType (string nameSpace, string name) : this (nameSpace, name, false, new List<IReturnType> ())
+		{
+		}
+		
 		public DomReturnType (string name, bool isNullable, IEnumerable<IReturnType> typeParameters)
 		{
 			KeyValuePair<string, string> splitted = SplitFullName (name);
 			this.nspace = splitted.Key;
 			this.parts.Add (new ReturnTypePart (splitted.Value, typeParameters));
 			this.IsNullable     = isNullable;
+		}
+		
+		public DomReturnType (string nameSpace, string name, bool isNullable, IEnumerable<IReturnType> typeParameters)
+		{
+			this.nspace = nameSpace;
+			var parts = name.Split ('.');
+			for (int i = 0; i < parts.Length; i++) {
+				string part = parts[i];
+				this.parts.Add (i + 1 < parts.Length ? new ReturnTypePart (part) : new ReturnTypePart (part, typeParameters));
+			}
+			this.IsNullable = isNullable;
 		}
 		
 		public static int num = 0;
@@ -522,7 +598,7 @@ namespace MonoDevelop.Projects.Dom
 				if (result.Length > 0)
 					result.Append ('.');
 				result.Append (part.ToInvariantString ());
-							}
+			}
 			if (this.IsNullable)
 				result.Append ('?');
 
@@ -531,7 +607,8 @@ namespace MonoDevelop.Projects.Dom
 			for (int i = 0; i < ArrayDimensions; i++) {
 				result.Append ('[');
 				int dimension = this.GetDimension (i);
-				if (dimension > 0)
+				 // setting upper limit to prevent out of memory exceptions on false data.
+				if (dimension > 0 && dimension < 4096)
 					result.Append (',', dimension);
 				result.Append (']');
 			}
@@ -551,25 +628,13 @@ namespace MonoDevelop.Projects.Dom
 		
 		public override string ToString ()
 		{
-			StringBuilder genArgs = new StringBuilder ();
-			if (GenericArguments == null) {
-				genArgs.Append ("<null>");
-			} else {
-				genArgs.Append ("{");
-				foreach (object o in GenericArguments) {
-					if (genArgs.Length > 1)
-						genArgs.Append (", ");
-					genArgs.Append (o != null ? o.ToString () : "null");
-				} 
-				genArgs.Append ("}");
-			}
-			
-			return string.Format ("[DomReturnType:FullName={0}, PointerNestingLevel={1}, ArrayDimensions={2}, GenericArguments={3}, UnderlyingType={4}]",
-			                      FullName,
-			                      PointerNestingLevel,
-			                      ArrayDimensions,
-			                      genArgs.ToString (),
+			string result = string.Format ("[DomReturnType:FullName={0}, PointerNestingLevel={1}, ArrayDimensions={2}, #GenericArguments={3}, UnderlyingType={4}]", 
+			                      FullName, 
+			                      PointerNestingLevel, 
+			                      ArrayDimensions, 
+			                      GenericArguments.Count, 
 			                      Type == null ? "null" : Type.ToString ());
+			return result;
 		}
 		
 		public static string ConvertToString (IReturnType type)
@@ -645,12 +710,12 @@ namespace MonoDevelop.Projects.Dom
 			}
 		}*/
 		
-		public static IReturnType GetSharedReturnType (IReturnType returnType)
+		public static IReturnType GetSharedReturnType (IReturnType returnType, bool nullIfNotShared = false)
 		{
 			if (returnType == null)
 				return null;
 			if (returnType.PointerNestingLevel != 0 || returnType.ArrayDimensions != 0 || returnType.GenericArguments.Count != 0)
-				return returnType;
+				return nullIfNotShared ? null : returnType;
 			
 			string invariantString = returnType.ToInvariantString ();
 			int index;
@@ -661,7 +726,7 @@ namespace MonoDevelop.Projects.Dom
 				table[invariantString] = 0;
 			table[invariantString]++;*/
 			
-			return returnType;
+			return nullIfNotShared ? null : returnType;
 		}
 		
 #endregion

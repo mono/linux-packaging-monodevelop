@@ -6,16 +6,17 @@
        url         = ""
        description = "Provides a text editor for the MonoDevelop based on Mono.TextEditor"
        category    = "MonoDevelop Core"
-       version     = "2.4">
+       flags       = "Hidden"
+       version     = "2.8.5">
 	
 	<Runtime>
 		<Import assembly="MonoDevelop.SourceEditor2.dll"/>
 	</Runtime>
 	
 	<Dependencies>
-	    <Addin id="Core" version="2.4"/>
-		<Addin id="Ide" version="2.4"/>
-		<Addin id="Debugger" version="2.4"/>
+	    <Addin id="Core" version="2.8.5"/>
+		<Addin id="Ide" version="2.8.5"/>
+		<Addin id="Debugger" version="2.8.5"/>
 	</Dependencies>
 
 	<!-- Extension points -->
@@ -23,6 +24,9 @@
 	<ExtensionPoint path = "/MonoDevelop/SourceEditor2/ContextMenu/Editor" name = "Editor context menu">
 		<Description>Context menu for the editor.</Description>
 		<ExtensionNodeSet id="MonoDevelop.Components.Commands.ItemSet" />
+		<ConditionType id="FileType" type="MonoDevelop.Ide.Extensions.FileTypeCondition">
+			<Description>Type of the file being edited.</Description>
+		</ConditionType>
 	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/SourceEditor2/ContextMenu/NavigationBar" name = "Navigation bar context menu">
@@ -33,6 +37,9 @@
 	<ExtensionPoint path = "/MonoDevelop/SourceEditor2/IconContextMenu/Editor" name = "Editor context menu">
 		<Description>Context menu for the editor's icon margin.</Description>
 		<ExtensionNodeSet id="MonoDevelop.Components.Commands.ItemSet" />
+		<ConditionType id="FileType" type="MonoDevelop.Ide.Extensions.FileTypeCondition">
+			<Description>Type of the file being edited.</Description>
+		</ConditionType>
 	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/SourceEditor2/EditActions" name = "Custom edit actions">
@@ -48,6 +55,9 @@
 	<ExtensionPoint path = "/MonoDevelop/SourceEditor2/TooltipProviders" name = "Tooltip providers">
 		<Description>Tooltip providers. Classes must implement ITooltipProvider.</Description>
 		<ExtensionNode name="Class" />
+		<ConditionType id="FileType" type="MonoDevelop.Ide.Extensions.FileTypeCondition">
+			<Description>Type of the file being edited.</Description>
+		</ConditionType>
 	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/SourceEditor2/SyntaxModes" name = "Text editor syntax modes">
@@ -70,10 +80,6 @@
 		<Class id="Debug" class="MonoDevelop.SourceEditor.DebugValueTooltipProvider" />
 		<Class id="LanguageItem" class="MonoDevelop.SourceEditor.LanguageItemTooltipProvider" />
 		<Class id="CompileError" class="MonoDevelop.SourceEditor.CompileErrorTooltipProvider" />
-	</Extension>
-	
-	<Extension path = "/MonoDevelop/ProjectModel/TextFormatters">
-		<Class id="default" class="MonoDevelop.SourceEditor.DefaultFormatter" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/Commands">
@@ -104,12 +110,7 @@
 				_description = "Activates code focus on caret move"
 				shortcut = "Ctrl|Shift|k"
 				macShortcut = "Meta|Shift|k" />
-				
-		<Command id = "MonoDevelop.SourceEditor.NavigationBarCommands.ToggleNavPanelViews"
-				defaultHandler = "MonoDevelop.SourceEditor.ToggleNavPanelViewsHandler"
-				_label = ""
-				type="array"/>
-				
+		
 		<Command id = "MonoDevelop.SourceEditor.MessageBubbleCommands.HideIssues"
 				defaultHandler = "MonoDevelop.SourceEditor.HideIssuesHandler"
 				_label = "_Hide Issues"/>
@@ -144,11 +145,6 @@
 		<CommandItem id = "MonoDevelop.Ide.Commands.TextEditorCommands.ShowCodeTemplateWindow" />
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/SourceEditor2/ContextMenu/NavigationBar">
-		<CommandItem id = "MonoDevelop.SourceEditor.NavigationBarCommands.ToggleNavPanelViews" />
-	</Extension>
-	
-	
 	<Extension path = "/MonoDevelop/SourceEditor2/IconContextMenu/Editor">
 		<CommandItem id = "MonoDevelop.Ide.Commands.SearchCommands.ToggleBookmark" />
 		<CommandItem id = "MonoDevelop.Ide.Commands.SearchCommands.ClearBookmarks" />
@@ -178,7 +174,17 @@
 			<SeparatorItem id = "Separator1" />
 			<CommandItem id = "MonoDevelop.SourceEditor.MessageBubbleCommands.ToggleIssues" />
 		</ItemSet>
-
 	</Extension>
 	
+	<Extension path = "/MonoDevelop/Ide/Fonts">
+		<Font name ="MessageBubbles" _displayName="Message bubbles" default ="_DEFAULT_SANS"/>
+		<Font name ="LanguageTooltips" _displayName="Editor tooltips" default ="_DEFAULT_SANS"/>
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/Core/UserDataMigration">
+		<!-- 2.4 -->
+		<Migration sourceVersion="2.4" kind="UserData" path="syntaxmodes" targetPath="HighlightingSchemes" isDirectory="true" />
+		<!-- 2.6+ -->
+		<Migration sourceVersion="2.6+" kind="UserData" path="HighlightingSchemes" isDirectory="true" />
+	</Extension>
 </Addin>

@@ -32,6 +32,7 @@ using System.Collections;
 using System.Reflection;
 using Gtk;
 using Gdk;
+using Stetic.Editor;
 
 namespace Stetic
 {
@@ -677,7 +678,7 @@ namespace Stetic
 				IObjectSelection sel = GetSelection ();
 				if (sel != null && sel.DataObject != null) {
 					Wrapper.Widget wrapper = Wrapper.Widget.Lookup (sel.DataObject) as Wrapper.Widget;
-					if (wrapper != null)
+					if (wrapper != null && !wrapper.IsTopLevel)
 						wrapper.Delete ();
 				}
 				return true;
@@ -884,7 +885,7 @@ namespace Stetic
 		
 		protected override bool OnButtonPressEvent (Gdk.EventButton evb)
 		{
-			if (evb.Type == Gdk.EventType.ButtonPress && evb.Button == 1) {
+			if (evb.Type == Gdk.EventType.ButtonPress && evb.Button == 1 && !GtkWorkarounds.TriggersContextMenu (evb)) {
 				clickX = (int)evb.XRoot;
 				clickY = (int)evb.YRoot;
 				localClickX = (int) evb.X;

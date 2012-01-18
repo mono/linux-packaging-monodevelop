@@ -48,6 +48,8 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Projects;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Core.Instrumentation;
+using Mono.TextEditor;
+using System.Diagnostics;
 
 namespace MonoDevelop.Ide
 {
@@ -154,7 +156,7 @@ namespace MonoDevelop.Ide
 		
 		public IAsyncOperation CurrentRunOperation {
 			get { return currentRunOperation; }
-			set { currentRunOperation = value; }
+			set { currentRunOperation = value ?? NullAsyncOperation.Success; }
 		}
 		
 		public bool IsBuilding (IBuildTarget target)
@@ -224,15 +226,44 @@ namespace MonoDevelop.Ide
 				return false ;
 			return member.DeclaringType.CompilationUnit != null;
 		}
-
+		
+		public void JumpToDeclaration (MonoDevelop.Projects.Dom.INode visitable, bool askIfMultipleLocations)
+		{
+			if (askIfMultipleLocations) {
+				var type = visitable as IType;
+				if (type != null && type.HasParts) {
+					using (var monitor = IdeApp.Workbench.ProgressMonitors.GetSearchProgressMonitor (true, true)) {
+						foreach (IType part in DomType.GetSortedParts (type))
+							monitor.ReportResult (GetJumpTypePartSearchResult (part));
+					}
+					return;
+				}
+			}
+			
+			JumpToDeclaration (visitable);
+		}
+		
+		static MonoDevelop.Ide.FindInFiles.SearchResult GetJumpTypePartSearchResult (IType part)
+		{
+			var provider = new MonoDevelop.Ide.FindInFiles.FileProvider (part.CompilationUnit.FileName);
+			var doc = new Mono.TextEditor.Document ();
+			doc.Text = provider.ReadString ();
+			int position = doc.LocationToOffset (part.Location.Line, part.Location.Column);
+			while (position + part.Name.Length < doc.Length) {
+				if (doc.GetTextAt (position, part.Name.Length) == part.Name)
+					break;
+				position++;
+			}
+			return new MonoDevelop.Ide.FindInFiles.SearchResult (provider, position, part.Name.Length);
+		}
+		
 		public void JumpToDeclaration (MonoDevelop.Projects.Dom.INode visitable)
 		{
 			if (visitable is LocalVariable) {
 				LocalVariable localVar = (LocalVariable)visitable;
 				IdeApp.Workbench.OpenDocument (localVar.FileName,
 				                               localVar.Region.Start.Line,
-				                               localVar.Region.Start.Column,
-				                               true);
+				                               localVar.Region.Start.Column);
 				return;
 			}
 			
@@ -240,8 +271,7 @@ namespace MonoDevelop.Ide
 				IParameter para = (IParameter)visitable;
 				IdeApp.Workbench.OpenDocument (para.DeclaringMember.DeclaringType.CompilationUnit.FileName,
 				                               para.Location.Line,
-				                               para.Location.Column,
-				                               true);
+				                               para.Location.Column);
 				return;
 			}
 			
@@ -262,11 +292,13 @@ namespace MonoDevelop.Ide
 				IType declaringType = SearchContainingPart (member);
 				fileName = declaringType.CompilationUnit.FileName;
 			}
-			Document doc = IdeApp.Workbench.OpenDocument (fileName, member.Location.Line, member.Location.Column, true);
+			var doc = IdeApp.Workbench.OpenDocument (fileName, member.Location.Line, member.Location.Column);
 			if (doc != null) {
-				MonoDevelop.Ide.Gui.Content.IUrlHandler handler = doc.ActiveView as MonoDevelop.Ide.Gui.Content.IUrlHandler;
-				if (handler != null)
-					handler.Open (member.HelpUrl);
+				doc.RunWhenLoaded (delegate {
+					MonoDevelop.Ide.Gui.Content.IUrlHandler handler = doc.ActiveView as MonoDevelop.Ide.Gui.Content.IUrlHandler;
+					if (handler != null)
+						handler.Open (member.HelpUrl);
+				});
 			}
 		}
 
@@ -312,7 +344,7 @@ namespace MonoDevelop.Ide
 			try {
 				if (MessageService.RunCustomDialog (dlg) == (int) Gtk.ResponseType.Ok) {
 					
-					using (IProgressMonitor mon = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor (GettextCatalog.GetString ("Export Project"), null, true, true)) {
+					using (IProgressMonitor mon = IdeApp.Workbench.ProgressMonitors.GetToolOutputProgressMonitor (true)) {
 						string folder = dlg.TargetFolder;
 						
 						string file = entry is WorkspaceItem ? ((WorkspaceItem)entry).FileName : ((SolutionEntityItem)entry).FileName;
@@ -526,6 +558,7 @@ namespace MonoDevelop.Ide
 				var optionsDialog = new ProjectOptionsDialog (IdeApp.Workbench.RootWindow, selectedProject);
 				var conf = selectedProject.GetConfiguration (IdeApp.Workspace.ActiveConfiguration);
 				optionsDialog.CurrentConfig = conf != null ? conf.Name : null;
+				optionsDialog.CurrentPlatform = conf != null ? conf.Platform : null;
 				try {
 					if (panelId != null)
 						optionsDialog.SelectPanel (panelId);
@@ -540,6 +573,7 @@ namespace MonoDevelop.Ide
 						}
 						Save (selectedProject);
 						IdeApp.Workspace.SavePreferences ();
+						IdeApp.Workbench.ReparseOpenDocuments ();
 					}
 				} finally {
 					optionsDialog.Destroy ();
@@ -621,28 +655,29 @@ namespace MonoDevelop.Ide
 		{
 			WorkspaceItem res = null;
 			
-			FileSelector fdiag = new FileSelector (GettextCatalog.GetString ("Add to Workspace"));
-			try {
-				fdiag.SetCurrentFolder (parentWorkspace.BaseDirectory);
-				fdiag.SelectMultiple = false;
-				if (MessageService.RunCustomDialog (fdiag) == (int) Gtk.ResponseType.Ok) {
-					try {
-						res = AddWorkspaceItem (parentWorkspace, fdiag.Filename);
-					}
-					catch (Exception ex) {
-						MessageService.ShowException (ex, GettextCatalog.GetString ("The file '{0}' could not be loaded.", fdiag.Filename));
-					}
-				}
-			} finally {
-				fdiag.Destroy ();
-			}
+			var dlg = new SelectFileDialog () {
+				Action = Gtk.FileChooserAction.Open,
+				CurrentFolder = parentWorkspace.BaseDirectory,
+				SelectMultiple = false,
+			};
+		
+			dlg.AddAllFilesFilter ();
+			dlg.DefaultFilter = dlg.AddFilter (GettextCatalog.GetString ("Solution Files"), "*.mds", "*.sln");
 			
+			if (dlg.Run ()) {
+				try {
+					res = AddWorkspaceItem (parentWorkspace, dlg.SelectedFile);
+				} catch (Exception ex) {
+					MessageService.ShowException (ex, GettextCatalog.GetString ("The file '{0}' could not be loaded.", dlg.SelectedFile));
+				}
+			}
+
 			return res;
 		}
 		
 		public WorkspaceItem AddWorkspaceItem (Workspace parentWorkspace, string itemFileName)
 		{
-			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetLoadProgressMonitor (true)) {
+			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetProjectLoadProgressMonitor (true)) {
 				WorkspaceItem it = Services.ProjectService.ReadWorkspaceItem (monitor, itemFileName);
 				if (it != null) {
 					parentWorkspace.Items.Add (it);
@@ -654,31 +689,32 @@ namespace MonoDevelop.Ide
 		
 		public SolutionItem CreateProject (SolutionFolder parentFolder)
 		{
-			SolutionItem res = null;
 			string basePath = parentFolder != null ? parentFolder.BaseDirectory : null;
 			NewProjectDialog npdlg = new NewProjectDialog (parentFolder, false, basePath);
-			MessageService.ShowCustomDialog (npdlg);
-			return res;
+			if (MessageService.ShowCustomDialog (npdlg) == (int)Gtk.ResponseType.Ok)
+				return npdlg.NewItem as SolutionItem;
+			return null;
 		}
 
 		public SolutionItem AddSolutionItem (SolutionFolder parentFolder)
 		{
 			SolutionItem res = null;
 			
-			FileSelector fdiag = new FileSelector (GettextCatalog.GetString ("Add to Solution"));
-			try {
-				fdiag.SetCurrentFolder (parentFolder.BaseDirectory);
-				fdiag.SelectMultiple = false;
-				if (MessageService.RunCustomDialog (fdiag) == (int) Gtk.ResponseType.Ok) {
-					try {
-						res = AddSolutionItem (parentFolder, fdiag.Filename);
-					}
-					catch (Exception ex) {
-						MessageService.ShowException (ex, GettextCatalog.GetString ("The file '{0}' could not be loaded.", fdiag.Filename));
-					}
+			var dlg = new SelectFileDialog () {
+				Action = Gtk.FileChooserAction.Open,
+				CurrentFolder = parentFolder.BaseDirectory,
+				SelectMultiple = false,
+			};
+		
+			dlg.AddAllFilesFilter ();
+			dlg.DefaultFilter = dlg.AddFilter (GettextCatalog.GetString ("Project Files"), "*.*proj", "*.mdp");
+			
+			if (dlg.Run ()) {
+				try {
+					res = AddSolutionItem (parentFolder, dlg.SelectedFile);
+				} catch (Exception ex) {
+					MessageService.ShowException (ex, GettextCatalog.GetString ("The file '{0}' could not be loaded.", dlg.SelectedFile));
 				}
-			} finally {
-				fdiag.Destroy ();
 			}
 			
 			if (res != null)
@@ -694,7 +730,7 @@ namespace MonoDevelop.Ide
 				AddingEntryToCombine (this, args);
 			if (args.Cancel)
 				return null;
-			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetLoadProgressMonitor (true)) {
+			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetProjectLoadProgressMonitor (true)) {
 				return folder.AddItem (monitor, args.FileName, true);
 			}
 		}
@@ -744,31 +780,10 @@ namespace MonoDevelop.Ide
 			}
 		}
 		
-		public bool SelectProjectReferences (ProjectReferenceCollection references, AssemblyContext ctx, TargetFramework targetVersion)
-		{
-			try {
-				if (selDialog == null)
-					selDialog = new SelectReferenceDialog ();
-				
-				selDialog.SetReferenceCollection (references, ctx, targetVersion);
-
-				if (MessageService.RunCustomDialog (selDialog) == (int)Gtk.ResponseType.Ok) {
-					references.Clear ();
-					references.AddRange (selDialog.ReferenceInformations);
-					return true;
-				}
-				else
-					return false;
-			} finally {
-				if (selDialog != null)
-					selDialog.Hide ();
-			}
-		}
-		
 		public void RemoveSolutionItem (SolutionItem item)
 		{
 			string question = GettextCatalog.GetString ("Do you really want to remove project '{0}' from '{1}'?", item.Name, item.ParentFolder.Name);
-			string secondaryText = GettextCatalog.GetString ("The Delete option physically removes the project files from disc.");
+			string secondaryText = GettextCatalog.GetString ("The Remove option remove the project from the solution, but it will not physically delete any file from disk.");
 			
 			SolutionEntityItem prj = item as SolutionEntityItem;
 			if (prj == null) {
@@ -777,9 +792,10 @@ namespace MonoDevelop.Ide
 				return;
 			}
 			
+			AlertButton delete = new AlertButton (GettextCatalog.GetString ("Delete from Disk"));
 			AlertButton result = MessageService.AskQuestion (question, secondaryText,
-			                                                 AlertButton.Delete, AlertButton.Cancel, AlertButton.Remove);
-			if (result == AlertButton.Delete) {
+			                                                 delete, AlertButton.Cancel, AlertButton.Remove);
+			if (result == delete) {
 				if (!IdeApp.Workspace.RequestItemUnload (prj))
 					return;
 				ConfirmProjectDeleteDialog dlg = new ConfirmProjectDeleteDialog (prj);
@@ -820,6 +836,29 @@ namespace MonoDevelop.Ide
 			prj.Dispose ();
 			IdeApp.ProjectOperations.Save (sol);
 		}
+		
+		/// <summary>
+		/// Checks if an execution operation can start (asking the user if necessary)
+		/// </summary>
+		/// <returns>
+		/// True if execution can continue, false otherwise
+		/// </returns>
+		/// <remarks>
+		/// This method must be called before starting an execution operation. If there is already an execution in
+		/// progress, MonoDevelop will ask confirmation for stopping the current operation.
+		/// </remarks>
+		public bool ConfirmExecutionOperation ()
+		{
+			if (!currentRunOperation.IsCompleted) {
+				if (MessageService.Confirm (GettextCatalog.GetString ("An application is already running and will have to be stopped. Do you want to continue?"), AlertButton.Yes)) {
+					if (currentRunOperation != null && !currentRunOperation.IsCompleted)
+						currentRunOperation.Cancel ();
+					return true;
+				} else
+					return false;
+			} else
+				return true;
+		}
 
 		public bool CanExecute (IBuildTarget entry)
 		{
@@ -853,14 +892,21 @@ namespace MonoDevelop.Ide
 		{
 			if (currentRunOperation != null && !currentRunOperation.IsCompleted) return currentRunOperation;
 
-			IProgressMonitor monitor = new MessageDialogProgressMonitor ();
+			NullProgressMonitor monitor = new NullProgressMonitor ();
 
 			DispatchService.ThreadDispatch (delegate {
 				ExecuteSolutionItemAsync (monitor, entry, context);
 			});
 			currentRunOperation = monitor.AsyncOperation;
 			currentRunOperationOwner = entry;
-			currentRunOperation.Completed += delegate { currentRunOperationOwner = null; };
+			currentRunOperation.Completed += delegate {
+			 	DispatchService.GuiDispatch (() => {
+					var error = monitor.Errors.FirstOrDefault ();
+					if (error != null)
+						IdeApp.Workbench.StatusBar.ShowError (error.Message);
+					currentRunOperationOwner = null;
+				});
+			};
 			return currentRunOperation;
 		}
 		
@@ -876,9 +922,72 @@ namespace MonoDevelop.Ide
 			}
 		}
 		
-		public void Clean (IBuildTarget entry)
+		public IAsyncOperation Clean (IBuildTarget entry)
 		{
-			entry.RunTarget (new NullProgressMonitor (), ProjectService.CleanTarget, IdeApp.Workspace.ActiveConfiguration);
+			if (currentBuildOperation != null && !currentBuildOperation.IsCompleted) return currentBuildOperation;
+			
+			ITimeTracker tt = Counters.BuildItemTimer.BeginTiming ("Cleaning " + entry.Name);
+			try {
+				IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetCleanProgressMonitor ();
+				
+				tt.Trace ("Start clean event");
+				TaskService.Errors.ClearByOwner (this);
+				OnStartClean (monitor);
+				
+				DispatchService.ThreadDispatch (delegate {
+					CleanAsync (entry, monitor, tt);
+				}, null);
+				
+				currentBuildOperation = monitor.AsyncOperation;
+				currentBuildOperationOwner = entry;
+				currentBuildOperation.Completed += delegate {
+					currentBuildOperationOwner = null;
+				};
+			}
+			catch {
+				tt.End ();
+				throw;
+			}
+			
+			return currentBuildOperation;
+		}
+		
+		void CleanAsync (IBuildTarget entry, IProgressMonitor monitor, ITimeTracker tt)
+		{
+			try {
+				tt.Trace ("Cleaning item");
+				SolutionItem it = entry as SolutionItem;
+				if (it != null) {
+					it.Clean (monitor, IdeApp.Workspace.ActiveConfiguration);
+				}
+				else {
+					entry.RunTarget (monitor, ProjectService.CleanTarget, IdeApp.Workspace.ActiveConfiguration);
+				}
+			} catch (Exception ex) {
+				monitor.ReportError (GettextCatalog.GetString ("Clean failed."), ex);
+			} finally {
+				tt.Trace ("Done cleaning");
+			}
+			DispatchService.GuiDispatch (
+				delegate {
+					CleanDone (monitor, entry, tt);
+			});
+		}
+		
+		void CleanDone (IProgressMonitor monitor, IBuildTarget entry, ITimeTracker tt)
+		{
+			tt.Trace ("Begin reporting clean result");
+			try {
+				monitor.Log.WriteLine ();
+				monitor.Log.WriteLine (GettextCatalog.GetString ("---------------------- Done ----------------------"));
+				tt.Trace ("Reporting result");			
+				monitor.ReportSuccess (GettextCatalog.GetString ("Clean successful."));
+				tt.Trace ("End clean event");
+				OnEndClean (monitor);
+			} finally {
+				monitor.Dispose ();
+				tt.End ();
+			}
 		}
 		
 		public IAsyncOperation BuildFile (string file)
@@ -952,9 +1061,18 @@ namespace MonoDevelop.Ide
 		public IAsyncOperation Rebuild (IBuildTarget entry)
 		{
 			if (currentBuildOperation != null && !currentBuildOperation.IsCompleted) return currentBuildOperation;
+			
+			var asyncOperation = new AsyncOperation ();
+			IAsyncOperation cleanOperation = Clean (entry);
 
-			Clean (entry);
-			return Build (entry);
+			asyncOperation.TrackOperation (cleanOperation, false);
+			
+			cleanOperation.Completed += (aop) => {
+				if (aop.Success)
+					asyncOperation.TrackOperation (Build (entry), true);
+			};
+			
+			return asyncOperation;
 		}
 //		bool errorPadInitialized = false;
 		public IAsyncOperation Build (IBuildTarget entry)
@@ -980,8 +1098,6 @@ namespace MonoDevelop.Ide
 			
 			ITimeTracker tt = Counters.BuildItemTimer.BeginTiming ("Building " + entry.Name);
 			try {
-				tt.Trace ("Pre-build operations");
-				DoBeforeCompileAction ();
 				IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetBuildProgressMonitor ();
 			
 				tt.Trace ("Start build event");
@@ -1004,12 +1120,17 @@ namespace MonoDevelop.Ide
 		{
 			BuildResult result = null;
 			try {
-				tt.Trace ("Building item");
-				SolutionItem it = entry as SolutionItem;
-				if (it != null)
-					result = it.Build (monitor, IdeApp.Workspace.ActiveConfiguration, true);
-				else
-					result = entry.RunTarget (monitor, ProjectService.BuildTarget, IdeApp.Workspace.ActiveConfiguration);
+				tt.Trace ("Pre-build operations");
+				result = DoBeforeCompileAction ();
+
+				if (result.ErrorCount == 0) {
+					tt.Trace ("Building item");
+					SolutionItem it = entry as SolutionItem;
+					if (it != null)
+						result = it.Build (monitor, IdeApp.Workspace.ActiveConfiguration, true);
+					else
+						result = entry.RunTarget (monitor, ProjectService.BuildTarget, IdeApp.Workspace.ActiveConfiguration);
+				}
 			} catch (Exception ex) {
 				monitor.ReportError (GettextCatalog.GetString ("Build failed."), ex);
 			} finally {
@@ -1021,15 +1142,17 @@ namespace MonoDevelop.Ide
 			});
 		}
 
-		void DoBeforeCompileAction ()
+		BuildResult DoBeforeCompileAction ()
 		{
+			var result = new BuildResult ();
+			var couldNotSaveError = "The build has been aborted as the file '{0}' could not be saved";
 			BeforeCompileAction action = IdeApp.Preferences.BeforeBuildSaveAction;
 			
 			switch (action) {
 				case BeforeCompileAction.Nothing:
 					break;
 				case BeforeCompileAction.PromptForSave:
-					foreach (Document doc in IdeApp.Workbench.Documents) {
+					foreach (var doc in IdeApp.Workbench.Documents) {
 						if (doc.IsDirty && doc.Project != null) {
 							if (MessageService.AskQuestion (
 						            GettextCatalog.GetString ("Save changed documents before building?"),
@@ -1037,6 +1160,8 @@ namespace MonoDevelop.Ide
 							                                AlertButton.BuildWithoutSave, AlertButton.Save) == AlertButton.Save) {
 								MarkFileDirty (doc.FileName);
 								doc.Save ();
+								if (doc.IsDirty)
+									result.AddError (string.Format (couldNotSaveError, Path.GetFileName (doc.FileName)), doc.FileName);
 							}
 							else
 								break;
@@ -1044,14 +1169,19 @@ namespace MonoDevelop.Ide
 					}
 					break;
 				case BeforeCompileAction.SaveAllFiles:
-					foreach (Document doc in new List<Document> (IdeApp.Workbench.Documents))
-						if (doc.IsDirty && doc.Project != null)
+					foreach (var doc in new List<MonoDevelop.Ide.Gui.Document> (IdeApp.Workbench.Documents))
+						if (doc.IsDirty && doc.Project != null) {
 							doc.Save ();
+							if (doc.IsDirty)
+								result.AddError (string.Format (couldNotSaveError, Path.GetFileName (doc.FileName)), doc.FileName);
+						}
 					break;
 				default:
 					System.Diagnostics.Debug.Assert(false);
 					break;
 			}
+			
+			return result;
 		}
 
 		void BeginBuild (IProgressMonitor monitor)
@@ -1127,18 +1257,20 @@ namespace MonoDevelop.Ide
 					}
 				} catch {}
 				
-				Task jumpTask = null;
-				switch (IdeApp.Preferences.JumpToFirstErrorOrWarning) {
-				case JumpToFirst.Error:
-					jumpTask = tasks.FirstOrDefault (t => t.Severity == TaskSeverity.Error);
-					break;
-				case JumpToFirst.ErrorOrWarning:
-					jumpTask = tasks.FirstOrDefault (t => t.Severity == TaskSeverity.Error || t.Severity == TaskSeverity.Warning);
-					break;
-				}
-				if (jumpTask != null) {
-					tt.Trace ("Jumping to first result position");
-					jumpTask.JumpToPosition ();
+				if (tasks != null) {
+					Task jumpTask = null;
+					switch (IdeApp.Preferences.JumpToFirstErrorOrWarning) {
+					case JumpToFirst.Error:
+						jumpTask = tasks.FirstOrDefault (t => t.Severity == TaskSeverity.Error && TaskStore.IsProjectTaskFile (t));
+						break;
+					case JumpToFirst.ErrorOrWarning:
+						jumpTask = tasks.FirstOrDefault (t => (t.Severity == TaskSeverity.Error || t.Severity == TaskSeverity.Warning) && TaskStore.IsProjectTaskFile (t));
+						break;
+					}
+					if (jumpTask != null) {
+						tt.Trace ("Jumping to first result position");
+						jumpTask.JumpToPosition ();
+					}
 				}
 				
 			} finally {
@@ -1184,10 +1316,14 @@ namespace MonoDevelop.Ide
 				
 				if (folder.IsRoot) {
 					// Don't allow adding files to the root folder. VS doesn't allow it
-					SolutionFolder newFolder = new SolutionFolder ();
-					newFolder.Name = "Solution Items";
-					folder.AddItem (newFolder);
-					folder = newFolder;
+					// If there is no existing folder, create one
+					var itemsFolder = (SolutionFolder) folder.Items.Where (item => item.Name == "Solution Items").FirstOrDefault ();
+					if (itemsFolder == null) {
+						itemsFolder = new SolutionFolder ();
+						itemsFolder.Name = "Solution Items";
+						folder.AddItem (itemsFolder);
+					}
+					folder = itemsFolder;
 				}
 				
 				if (!fp.IsChildPathOf (folder.BaseDirectory)) {
@@ -1214,12 +1350,39 @@ namespace MonoDevelop.Ide
 			return AddFilesToProject (project, files.ToFilePathArray (), targetDirectory);
 		}
 		
+		public IList<ProjectFile> AddFilesToProject (Project project, FilePath[] files, FilePath targetDirectory)
+		{
+			return AddFilesToProject (project, files, targetDirectory, null);
+		}
+		
+		public IList<ProjectFile> AddFilesToProject (Project project, FilePath[] files, FilePath targetDirectory,
+			string buildAction)
+		{
+			Debug.Assert (targetDirectory.CanonicalPath == project.BaseDirectory.CanonicalPath
+				|| targetDirectory.IsChildPathOf (project.BaseDirectory));
+			
+			var targetPaths = new FilePath[files.Length];
+			for (int i = 0; i < files.Length; i++)
+				targetPaths[i] = targetDirectory.Combine (files[i].FileName);
+			
+			return AddFilesToProject (project, files, targetPaths, buildAction);
+		}
+
 		/// <summary>
 		/// Adds files to a project, potentially asking the user whether to move, copy or link the files.
 		/// </summary>
-		public IList<ProjectFile> AddFilesToProject (Project project, FilePath[] files, FilePath targetDirectory)
+		public IList<ProjectFile> AddFilesToProject (Project project, FilePath[] files, FilePath[] targetPaths,
+			string buildAction)
 		{
-			int action = -1;
+			Debug.Assert (project != null);
+			Debug.Assert (files != null);
+			Debug.Assert (targetPaths != null);
+			Debug.Assert (files.Length == targetPaths.Length);
+			
+			AddAction action = AddAction.Copy;
+			bool applyToAll = true;
+			bool dialogShown = false;
+			
 			IProgressMonitor monitor = null;
 			
 			if (files.Length > 10) {
@@ -1229,8 +1392,20 @@ namespace MonoDevelop.Ide
 			
 			var newFileList = new List<ProjectFile> ();
 			
-			using (monitor) {
-				foreach (FilePath file in files) {
+			//project.AddFile (string) does linear search for duplicate file, so instead we use this HashSet and 
+			//and add the ProjectFiles directly. With large project and many files, this should really help perf.
+			//Also, this is a better check because we handle vpaths and links.
+			//FIXME: it would be really nice if project.Files maintained these hashmaps
+			var vpathsInProject = new HashSet<FilePath> (project.Files.Select (pf => pf.ProjectVirtualPath));
+			var filesInProject = new Dictionary<FilePath,ProjectFile> ();
+			foreach (var pf in project.Files)
+				filesInProject [pf.FilePath] = pf;
+			
+			using (monitor)
+			{
+				for (int i = 0; i < files.Length; i++) {
+					FilePath file = files[i];
+					
 					if (monitor != null) {
 						monitor.Log.WriteLine (file);
 						monitor.Step (1);
@@ -1242,60 +1417,93 @@ namespace MonoDevelop.Ide
 						continue;
 					}
 					
-					//files in the project directory get added directly in their current location without moving/copying
-					if (file.IsChildPathOf (project.BaseDirectory)) {
-						newFileList.Add (project.AddFile (file));
+					FilePath targetPath = targetPaths[i].CanonicalPath;
+					Debug.Assert (targetPath.IsChildPathOf (project.BaseDirectory));
+					
+					var vpath = targetPath.ToRelative (project.BaseDirectory);
+					if (vpathsInProject.Contains (vpath)) {
+						MessageService.ShowWarning (GettextCatalog.GetString (
+							"There is a already a file or link in the project with the name '{0}'", vpath));
+						continue;
+					}
+					
+					string fileBuildAction = buildAction;
+					if (string.IsNullOrEmpty (buildAction))
+						fileBuildAction = project.GetDefaultBuildAction (file);
+					
+					//files in the target directory get added directly in their current location without moving/copying
+					if (file.CanonicalPath == targetPath) {
+						AddFileToFolder (newFileList, vpathsInProject, filesInProject, file, fileBuildAction);
 						continue;
 					}
 					
 					//for files outside the project directory, we ask the user whether to move, copy or link
-					var md = new Gtk.MessageDialog (
-						 IdeApp.Workbench.RootWindow,
-						 Gtk.DialogFlags.Modal | Gtk.DialogFlags.DestroyWithParent,
-						 Gtk.MessageType.Question, Gtk.ButtonsType.None,
-						 GettextCatalog.GetString ("The file {0} is outside the project directory. What would you like to do?", file));
-
-					try {
-						Gtk.CheckButton remember = null;
+					
+					AddExternalFileDialog addExternalDialog = null;
+					
+					if (!dialogShown || !applyToAll) {
+						addExternalDialog = new AddExternalFileDialog (file);
 						if (files.Length > 1) {
-							remember = new Gtk.CheckButton (GettextCatalog.GetString ("Use the same action for all selected files."));
-							md.VBox.PackStart (remember, false, false, 0);
+							addExternalDialog.ApplyToAll = applyToAll;
+							addExternalDialog.ShowApplyAll = true;
 						}
-						
-						const int ACTION_LINK = 3;
-						const int ACTION_COPY = 1;
-						const int ACTION_MOVE = 2;
-						
-						md.AddButton (GettextCatalog.GetString ("_Link"), ACTION_LINK);
-						md.AddButton (Gtk.Stock.Copy, ACTION_COPY);
-						md.AddButton (GettextCatalog.GetString ("_Move"), ACTION_MOVE);
-						md.AddButton (Gtk.Stock.Cancel, Gtk.ResponseType.Cancel);
-						md.VBox.ShowAll ();
-						
-						int ret = -1;
-						if (action < 0) {
-							ret = MessageService.RunCustomDialog (md);
-							if (ret < 0)
+						if (file.IsChildPathOf (targetPath.ParentDirectory))
+							addExternalDialog.ShowKeepOption (file.ParentDirectory.ToRelative (targetPath.ParentDirectory));
+						else {
+							if (action == AddAction.Keep)
+								action = AddAction.Copy;
+							addExternalDialog.SelectedAction = action;
+						}
+					}
+					
+					try {
+						if (!dialogShown || !applyToAll) {
+							if (MessageService.RunCustomDialog (addExternalDialog) == (int) Gtk.ResponseType.Cancel) {
+								project.Files.AddRange (newFileList.Where (f => f != null));
 								return newFileList;
-							if (remember != null && remember.Active) action = ret;
-						} else {
-							ret = action;
+							}
+							action = addExternalDialog.SelectedAction;
+							applyToAll = addExternalDialog.ApplyToAll;
+							dialogShown = true;
 						}
 						
-						var targetName = targetDirectory.Combine (file.FileName);
+						if (action == AddAction.Keep) {
+							AddFileToFolder (newFileList, vpathsInProject, filesInProject, file, fileBuildAction);
+							continue;
+						}
 						
-						if (ret == ACTION_LINK) {
-							var pf = project.AddFile (file);
-							pf.Link = project.GetRelativeChildPath (targetName);
+						if (action == AddAction.Link) {
+							//FIXME: MD project system doesn't cope with duplicate includes - project save/load will remove the file
+							ProjectFile pf;
+							if (filesInProject.TryGetValue (file, out pf)) {
+								var link = pf.Link;
+								MessageService.ShowWarning (GettextCatalog.GetString (
+									"The link '{0}' in the project already includes the file '{1}'", link, file));
+								continue;
+							}
+							
+							pf = new ProjectFile (file, fileBuildAction) {
+								Link = vpath
+							};
+							vpathsInProject.Add (pf.ProjectVirtualPath);
+							filesInProject [pf.FilePath] = pf;
 							newFileList.Add (pf);
 							continue;
 						}
 						
 						try {
-							if (MoveCopyFile (file, targetName, ret == ACTION_MOVE))
-								newFileList.Add (project.AddFile (targetName));
-							else
+							if (!Directory.Exists (targetPath.ParentDirectory))
+								FileService.CreateDirectory (targetPath.ParentDirectory);
+							
+							if (MoveCopyFile (file, targetPath, action == AddAction.Move)) {
+								var pf = new ProjectFile (targetPath, fileBuildAction);
+								vpathsInProject.Add (pf.ProjectVirtualPath);
+								filesInProject [pf.FilePath] = pf;
+								newFileList.Add (pf);
+							}
+							else {
 								newFileList.Add (null);
+							}
 						}
 						catch (Exception ex) {
 							MessageService.ShowException (ex, GettextCatalog.GetString (
@@ -1303,11 +1511,29 @@ namespace MonoDevelop.Ide
 							newFileList.Add (null);
 						}
 					} finally {
-						md.Destroy ();
+						if (addExternalDialog != null)
+							addExternalDialog.Destroy ();
 					}
 				}
 			}
+			project.Files.AddRange (newFileList.Where (f => f != null));
 			return newFileList;
+		}
+		
+		void AddFileToFolder (List<ProjectFile> newFileList, HashSet<FilePath> vpathsInProject, Dictionary<FilePath, ProjectFile> filesInProject, FilePath file, string fileBuildAction)
+		{
+			//FIXME: MD project system doesn't cope with duplicate includes - project save/load will remove the file
+			ProjectFile pf;
+			if (filesInProject.TryGetValue (file, out pf)) {
+				var link = pf.Link;
+				MessageService.ShowWarning (GettextCatalog.GetString (
+					"The link '{0}' in the project already includes the file '{1}'", link, file));
+				return;
+			}
+			pf = new ProjectFile (file, fileBuildAction);
+			vpathsInProject.Add (pf.ProjectVirtualPath);
+			filesInProject [pf.FilePath] = pf;
+			newFileList.Add (pf);
 		}
 		
 		bool MoveCopyFile (string filename, string targetFilename, bool move)
@@ -1351,26 +1577,39 @@ namespace MonoDevelop.Ide
 					!copyOnlyProjectFiles ||
 					IsDirectoryHierarchyEmpty (sourcePath)));
 
-			// Get the list of files to copy
-
+			// We need to remove all files + directories from the source project
+			// but when dealing with the VCS addins we need to process only the
+			// files so we do not create a 'file' in the VCS which corresponds
+			// to a directory in the project and blow things up.
+			List<ProjectFile> filesToRemove = null;
 			List<ProjectFile> filesToMove = null;
 			try {
 				//get the real ProjectFiles
 				if (sourceProject != null) {
-					var virtualPath = sourcePath.ToRelative (sourceProject.BaseDirectory);
-					filesToMove = sourceProject.Files.GetFilesInVirtualPath (virtualPath).ToList ();
+					if (sourceIsFolder) {
+						var virtualPath = sourcePath.ToRelative (sourceProject.BaseDirectory);
+						// Grab all the child nodes of the folder we just dragged/dropped
+						filesToRemove = sourceProject.Files.GetFilesInVirtualPath (virtualPath).ToList ();
+						// Add the folder itself so we can remove it from the soruce project if its a Move operation
+						filesToRemove.Add (sourceProject.Files.Where (f => f.ProjectVirtualPath == virtualPath).FirstOrDefault ());
+					} else {
+						filesToRemove = new List<ProjectFile> ();
+						var pf = sourceProject.GetProjectFile (sourcePath);
+						if (pf != null)
+							filesToRemove.Add (pf);
+					}
 				}
 				//get all the non-project files and create fake ProjectFiles
 				if (!copyOnlyProjectFiles || sourceProject == null) {
 					var col = new List<ProjectFile> ();
 					GetAllFilesRecursive (sourcePath, col);
 					if (sourceProject != null) {
-						var names = new HashSet<string> (filesToMove.Select (f => sourceProject.BaseDirectory.Combine (f.ProjectVirtualPath).ToString ()));
+						var names = new HashSet<string> (filesToRemove.Select (f => sourceProject.BaseDirectory.Combine (f.ProjectVirtualPath).ToString ()));
 						foreach (var f in col)
 							if (names.Add (f.Name))
-							    filesToMove.Add (f);
+							    filesToRemove.Add (f);
 					} else {
-						filesToMove = col;
+						filesToRemove = col;
 					}
 				}
 			} catch (Exception ex) {
@@ -1378,12 +1617,17 @@ namespace MonoDevelop.Ide
 				return;
 			}
 			
+			// Strip out all the directories to leave us with just the files.
+			filesToMove = filesToRemove.Where (f => f.Subtype != Subtype.Directory).ToList ();
+			
 			// If copying a single file, bring any grouped children along
+			ProjectFile sourceParent = null;
 			if (filesToMove.Count == 1 && sourceProject != null) {
 				var pf = filesToMove[0];
 				if (pf != null && pf.HasChildren)
 					foreach (ProjectFile child in pf.DependentChildren)
 						filesToMove.Add (child);
+				sourceParent = pf;
 			}
 			
 			// Ensure that the destination folder is created, even if no files
@@ -1408,16 +1652,26 @@ namespace MonoDevelop.Ide
 					return;
 				}
 			}
-
+			
 			monitor.BeginTask (GettextCatalog.GetString ("Copying files..."), filesToMove.Count);
 			
+			ProjectFile targetParent = null;
 			foreach (ProjectFile file in filesToMove) {
 				bool fileIsLink = file.Project != null && file.IsLink;
 				
 				var sourceFile = fileIsLink
 					? file.Project.BaseDirectory.Combine (file.ProjectVirtualPath)
 					: file.FilePath;
-				var newFile = sourceIsFolder ? targetPath.Combine (sourceFile.ToRelative (sourcePath)) : targetPath;
+				
+				FilePath newFile;
+				if (sourceIsFolder)
+					newFile = targetPath.Combine (sourceFile.ToRelative (sourcePath));
+				else if (sourceFile == sourcePath)
+					newFile = targetPath;
+				else if (sourceFile.ParentDirectory != targetPath.ParentDirectory)
+					newFile = targetPath.ParentDirectory.Combine (sourceFile.ToRelative (sourcePath.ParentDirectory));
+				else
+					newFile = GetTargetCopyName (sourceFile, false);
 				
 				if (!movingFolder && !fileIsLink) {
 					try {
@@ -1436,8 +1690,6 @@ namespace MonoDevelop.Ide
 				}
 				
 				if (sourceProject != null) {
-					if (removeFromSource && sourceProject.Files.Contains (file))
-						sourceProject.Files.Remove (file);
 					if (fileIsLink) {
 						var linkFile = (sourceProject == targetProject)? file : (ProjectFile) file.Clone ();
 						if (movingFolder) {
@@ -1452,6 +1704,13 @@ namespace MonoDevelop.Ide
 					} else if (targetProject.Files.GetFile (newFile) == null) {
 						ProjectFile projectFile = (ProjectFile) file.Clone ();
 						projectFile.Name = newFile;
+						if (targetParent == null) {
+							if (file == sourceParent)
+								targetParent = projectFile;
+						} else if (sourceParent != null) {
+							if (projectFile.DependsOn == sourceParent.Name)
+								projectFile.DependsOn = targetParent.Name;
+						}
 						targetProject.Files.Add (projectFile);
 					}
 				}
@@ -1459,18 +1718,69 @@ namespace MonoDevelop.Ide
 				monitor.Step (1);
 			}
 			
+			if (removeFromSource) {
+				// Remove all files and directories under 'sourcePath'
+				foreach (var v in filesToRemove)
+					sourceProject.Files.Remove (v);
+			}
+			
+			var pfolder = sourcePath.ParentDirectory;
+			
 			// If this was the last item in the folder, make sure we keep
 			// a reference to the folder, so it is not deleted from the tree.
-			if (removeFromSource && sourceProject != null) {
-				var folder = sourcePath.ParentDirectory;
-				if (!sourceProject.Files.GetFilesInVirtualPath (folder).Any ()) {
-					var folderFile = new ProjectFile (sourceProject.BaseDirectory.Combine (folder));
+			if (removeFromSource && sourceProject != null && pfolder.CanonicalPath != sourceProject.BaseDirectory.CanonicalPath && pfolder.IsChildPathOf (sourceProject.BaseDirectory)) {
+				pfolder = pfolder.ToRelative (sourceProject.BaseDirectory);
+				if (!sourceProject.Files.GetFilesInVirtualPath (pfolder).Any ()) {
+					var folderFile = new ProjectFile (sourceProject.BaseDirectory.Combine (pfolder));
 					folderFile.Subtype = Subtype.Directory;
 					sourceProject.Files.Add (folderFile);
 				}
 			}
 			
 			monitor.EndTask ();
+		}
+		
+		internal static FilePath GetTargetCopyName (FilePath path, bool isFolder)
+		{
+			int n=1;
+			// First of all try to find an existing copy tag
+			string fn = path.FileNameWithoutExtension;
+			for (int i=1; i<100; i++) {
+				string copyTag = GetCopyTag (i); 
+				if (fn.EndsWith (copyTag)) {
+					string newfn = fn.Substring (0, fn.Length - copyTag.Length);
+					if (newfn.Trim ().Length > 0) {
+						n = i + 1;
+						path = path.ParentDirectory.Combine (newfn + path.Extension);
+						break;
+					}
+				}
+			}
+			FilePath basePath = path;
+			while ((!isFolder && File.Exists (path)) || (isFolder && Directory.Exists (path))) {
+				string copyTag = GetCopyTag (n);
+				path = basePath.ParentDirectory.Combine (basePath.FileNameWithoutExtension + copyTag + basePath.Extension);
+				n++;
+			}
+			return path;
+		}
+		
+		static string GetCopyTag (int n)
+		{
+			string sc;
+			switch (n) {
+				case 1: sc = GettextCatalog.GetString ("copy"); break;
+				case 2: sc = GettextCatalog.GetString ("another copy"); break;
+				case 3: sc = GettextCatalog.GetString ("3rd copy"); break;
+				case 4: sc = GettextCatalog.GetString ("4th copy"); break;
+				case 5: sc = GettextCatalog.GetString ("5th copy"); break;
+				case 6: sc = GettextCatalog.GetString ("6th copy"); break;
+				case 7: sc = GettextCatalog.GetString ("7th copy"); break;
+				case 8: sc = GettextCatalog.GetString ("8th copy"); break;
+				case 9: sc = GettextCatalog.GetString ("9th copy"); break;
+				default: sc = GettextCatalog.GetString ("copy {0}"); break;
+			}
+			return " (" + string.Format (sc, n) + ")";
 		}
 		
 		void GetAllFilesRecursive (string path, List<ProjectFile> files)
@@ -1508,6 +1818,20 @@ namespace MonoDevelop.Ide
 		{
 			if (EndBuild != null) {
 				EndBuild (this, new BuildEventArgs (monitor, success));
+			}
+		}
+		
+		void OnStartClean (IProgressMonitor monitor)
+		{
+			if (StartClean != null) {
+				StartClean (this, new CleanEventArgs (monitor));
+			}
+		}
+		
+		void OnEndClean (IProgressMonitor monitor)
+		{
+			if (EndClean != null) {
+				EndClean (this, new CleanEventArgs (monitor));
 			}
 		}
 
@@ -1556,6 +1880,8 @@ namespace MonoDevelop.Ide
 		public event BuildEventHandler StartBuild;
 		public event BuildEventHandler EndBuild;
 		public event EventHandler BeforeStartProject;
+		public event CleanEventHandler StartClean;
+		public event CleanEventHandler EndClean;
 		
 		public event EventHandler<SolutionEventArgs> CurrentSelectedSolutionChanged;
 		public event ProjectEventHandler CurrentProjectChanged;
@@ -1572,17 +1898,119 @@ namespace MonoDevelop.Ide
 		}
 	}
 	
-	class OpenDocumentFileProvider: ITextFileProvider
+	public class TextFileProvider : ITextFileProvider
 	{
+		static TextFileProvider instance = new TextFileProvider ();
+		public static TextFileProvider Instance {
+			get {
+				return instance;
+			}
+		}
+		
+		TextFileProvider ()
+		{
+		}
+		
+		class ProviderProxy : ITextEditorDataProvider, IEditableTextFile
+		{
+			TextEditorData data;
+			public ProviderProxy (TextEditorData data)
+			{
+				this.data = data;
+			}
+
+			public TextEditorData GetTextEditorData ()
+			{
+				return data;
+			}
+			
+			#region IEditableTextFile implementation
+			public FilePath Name { get { return data.Document.FileName; } }
+
+			public int Length { get { return data.Length; } }
+		
+			public string GetText (int startPosition, int endPosition)
+			{
+				return data.GetTextBetween (startPosition, endPosition);
+			}
+			public char GetCharAt (int position)
+			{
+				return data.GetCharAt (position);
+			}
+			
+			public int GetPositionFromLineColumn (int line, int column)
+			{
+				return data.Document.LocationToOffset (line, column);
+			}
+			
+			public void GetLineColumnFromPosition (int position, out int line, out int column)
+			{
+				var loc = data.Document.OffsetToLocation (position);
+				line = loc.Line;
+				column = loc.Column;
+			}
+			
+			public int InsertText (int position, string text)
+			{
+				int result = data.Insert (position, text);
+				File.WriteAllText (Name, Text);
+				return result;
+			}
+			
+			
+			public void DeleteText (int position, int length)
+			{
+				data.Remove (position, length);
+				File.WriteAllText (Name, Text);
+			}
+			
+			public string Text {
+				get {
+					return data.Text;
+				}
+				set {
+					data.Text = value;
+				}
+			}
+			
+			#endregion
+		}
+		
 		public IEditableTextFile GetEditableTextFile (FilePath filePath)
 		{
-			foreach (Document doc in IdeApp.Workbench.Documents) {
+			foreach (var doc in IdeApp.Workbench.Documents) {
 				if (doc.FileName == filePath) {
 					IEditableTextFile ef = doc.GetContent<IEditableTextFile> ();
 					if (ef != null) return ef;
 				}
 			}
-			return null;
+			
+			TextEditorData data = new TextEditorData ();
+			data.Document.FileName = filePath;
+			data.Text = File.ReadAllText (filePath);
+			return new ProviderProxy (data);
+		}
+		
+		public TextEditorData GetTextEditorData (FilePath filePath)
+		{
+			bool isOpen;
+			return GetTextEditorData (filePath, out isOpen);
+		}
+
+		public TextEditorData GetTextEditorData (FilePath filePath, out bool isOpen)
+		{
+			foreach (var doc in IdeApp.Workbench.Documents) {
+				if (doc.FileName == filePath) {
+					isOpen = true;
+					return doc.Editor;
+				}
+			}
+			
+			TextEditorData data = new TextEditorData ();
+			data.Document.FileName = filePath;
+			data.Text = File.ReadAllText (filePath);
+			isOpen = false;
+			return data;
 		}
 	}
 }

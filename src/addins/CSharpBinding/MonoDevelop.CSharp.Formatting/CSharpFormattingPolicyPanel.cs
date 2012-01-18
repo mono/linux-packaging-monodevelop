@@ -29,39 +29,34 @@ using MonoDevelop.Ide.CodeFormatting;
 using MonoDevelop.Projects.Text;
 using System.Xml;
 using MonoDevelop.Ide.Gui.Dialogs;
+using System;
 
 namespace MonoDevelop.CSharp.Formatting
 {
 	class CSharpFormattingPolicyPanel : MimeTypePolicyOptionsPanel<CSharpFormattingPolicy>
 	{
-		TypedCodeFormattingPolicyPanelWidget<CSharpFormattingPolicy> panel;
+		CSharpFormattingPolicyPanelWidget panel;
 		
-		public static CodeFormatDescription CodeFormatDescription {
-			get {
-				XmlReaderSettings settings = new XmlReaderSettings ();
-				settings.CloseInput = true;
-				using (XmlReader reader = XmlTextReader.Create (typeof (CSharpFormattingPolicy).Assembly.GetManifestResourceStream ("CSharpFormattingPolicy.xml"), settings)) {
-					return CodeFormatDescription.Read (reader);
-				}
-			}
+		static CSharpFormattingPolicyPanel ()
+		{
+			// ensure that custom text editor shemes are loaded.
+			MonoDevelop.SourceEditor.SourceEditorDisplayBinding.InitSourceEditor ();
 		}
 		
 		public override Widget CreatePanelWidget ()
 		{
-			panel = new TypedCodeFormattingPolicyPanelWidget<CSharpFormattingPolicy> ();
-			return panel;
+			return panel = new CSharpFormattingPolicyPanelWidget ();
 		}
 		
-		CSharpFormattingPolicy policy;
 		protected override void LoadFrom (CSharpFormattingPolicy policy)
 		{
-			this.policy = policy.Clone ();
-			panel.SetFormat (CodeFormatDescription, this.policy);
+			panel.Policy = policy.Clone ();
 		}
 		
 		protected override CSharpFormattingPolicy GetPolicy ()
 		{
-			return policy;
+			// return cloned policy
+			return panel.Policy;
 		}
 	}
 }

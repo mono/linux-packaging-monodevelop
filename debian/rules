@@ -10,7 +10,6 @@ DEB_SOURCE_NAME = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^
 VERSION = $(shell echo $(DEB_VERSION) | cut -d"-" -f1 | sed 's/+dfsg.*//')
 
 include /usr/share/cli-common/cli.make
-include /usr/share/quilt/quilt.make
 
 override_dh_auto_configure:
 	aclocal -I.
@@ -20,13 +19,20 @@ override_dh_auto_configure:
 	  --disable-update-mimedb \
 	  --disable-update-desktopdb \
 	  --disable-monoextensions \
-	  --enable-versioncontrol --enable-subversion \
-	  --enable-aspnet \
+	  --enable-git --enable-subversion \
 	  --enable-gnomeplatform \
-	  --enable-c MCS=/usr/bin/mono-csc CSC=/usr/bin/mono-csc
+	  MCS=/usr/bin/mono-csc CSC=/usr/bin/mono-csc
 
 override_dh_auto_build:
 	XDG_CONFIG_HOME=$(DEBIAN_DIR) dh_auto_build
+
+override_dh_clideps:
+	dh_clideps	--exclude-moduleref=/System/Library/Frameworks/Carbon.framework/Versions/Current/Carbon \
+			--exclude-moduleref=/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation \
+			--exclude-moduleref=/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices \
+			--exclude-moduleref=libigemacintegration.dylib \
+			--exclude-moduleref=/usr/lib/libobjc.dylib \
+			--exclude-moduleref=glibsharpglue-2
 
 override_dh_auto_test:
 	# skip "make test"
@@ -76,6 +82,6 @@ get-orig-source:
 	rm -r $(DEB_SOURCE_NAME)-$(VERSION)
 
 %:
-	dh --with quilt $@
+	dh $@
 
 .PHONY: get-orig-source

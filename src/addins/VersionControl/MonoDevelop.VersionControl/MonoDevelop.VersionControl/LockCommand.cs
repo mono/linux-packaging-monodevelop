@@ -26,6 +26,7 @@
 //
 
 using System;
+using System.Linq;
 using MonoDevelop.Core;
 using System.IO;
 
@@ -35,9 +36,8 @@ namespace MonoDevelop.VersionControl
 	{
 		public static bool Lock (VersionControlItemList items, bool test)
 		{
-			foreach (VersionControlItem it in items)
-				if (!it.Repository.CanLock (it.Path))
-					return false;
+			if (!items.All (i => i.VersionInfo.CanLock))
+				return false;
 			if (test)
 				return true;
 			
@@ -65,8 +65,7 @@ namespace MonoDevelop.VersionControl
 				Monitor.ReportSuccess (GettextCatalog.GetString ("Lock operation completed."));
 				
 				Gtk.Application.Invoke (delegate {
-					foreach (VersionControlItem item in items)
-						VersionControlService.NotifyFileStatusChanged (item.Repository, item.Path, item.IsDirectory);
+					VersionControlService.NotifyFileStatusChanged (items);
 				});
 			}
 		}

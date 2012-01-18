@@ -34,6 +34,8 @@ using System.Linq;
 using System.IO;
 using MonoDevelop.Core.Serialization;
 using System.Reflection;
+using MonoDevelop.Projects.Dom.Parser;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Projects.Dom.Serialization
 {
@@ -88,11 +90,11 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			writer.Write (region.End.Column);
 		}
 		
-		public static DomField ReadField (BinaryReader reader, INameDecoder nameTable)
+		public static DomField ReadField (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			DomField result = new DomField ();
-			ReadMemberInformation (reader, nameTable, result);
-			result.ReturnType = ReadReturnType (reader, nameTable);
+			ReadMemberInformation (reader, nameTable, objectTable, result);
+			result.ReturnType = ReadReturnType (reader, nameTable, objectTable);
 			return result;
 		}
 		
@@ -103,7 +105,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			Write (writer, nameTable, field.ReturnType);
 		}
 		
-		public static IReturnType ReadReturnType (BinaryReader reader, INameDecoder nameTable)
+		public static IReturnType ReadReturnType (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			if (ReadNull (reader))
 				return null;
@@ -112,7 +114,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				return DomReturnType.GetSharedReturnType (index);
 			
 			string ns = ReadString (reader, nameTable);
-			List<IReturnTypePart> parts = new List<IReturnTypePart> ();
+			List<ReturnTypePart> parts = new List<ReturnTypePart> ();
 			
 			uint partCount = ReadUInt (reader, 500);
 			while (partCount-- > 0) {
@@ -122,7 +124,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				part.IsGenerated = reader.ReadBoolean ();
 				uint arguments  = ReadUInt (reader, 1000);
 				while (arguments-- > 0)
-					part.AddTypeParameter (ReadReturnType (reader, nameTable));
+					part.AddTypeParameter (ReadReturnType (reader, nameTable, objectTable));
 			}
 			
 			DomReturnType result = new DomReturnType (ns, parts);
@@ -136,7 +138,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				dims [n] = reader.ReadInt32 ();
 			
 			result.SetDimensions (dims);
-			return result;
+			return objectTable != null ? (IReturnType) objectTable.GetSharedObject (result) : result;
 		}
 		
 		public static void Write (BinaryWriter writer, INameEncoder nameTable, IReturnType returnType)
@@ -167,26 +169,26 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				writer.Write (returnType.GetDimension (n));
 		}
 		
-		public static DomMethod ReadMethod (BinaryReader reader, INameDecoder nameTable)
+		public static DomMethod ReadMethod (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			DomMethod result = new DomMethod ();
-			ReadMemberInformation (reader, nameTable, result);
+			ReadMemberInformation (reader, nameTable, objectTable, result);
 			uint explicitInterfaces = ReadUInt (reader, 500);
 			while (explicitInterfaces-- > 0) {
-				result.AddExplicitInterface (ReadReturnType (reader, nameTable));
+				result.AddExplicitInterface (ReadReturnType (reader, nameTable, objectTable));
 			}
 			
 			result.BodyRegion = ReadRegion (reader, nameTable);
-			result.ReturnType = ReadReturnType (reader, nameTable);
+			result.ReturnType = ReadReturnType (reader, nameTable, objectTable);
 			result.MethodModifier = (MethodModifier)reader.ReadInt32 ();
 			
 			uint arguments = ReadUInt (reader, 5000);
 			while (arguments-- > 0) {
-				result.Add (ReadParameter (reader, nameTable));
+				result.Add (ReadParameter (reader, nameTable, objectTable));
 			}
 			arguments = ReadUInt (reader, 500);
 			while (arguments-- > 0) {
-				result.AddTypeParameter (ReadTypeParameter (reader, nameTable));
+				result.AddTypeParameter (ReadTypeParameter (reader, nameTable, objectTable));
 			}
 			return result;
 		}
@@ -217,13 +219,13 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			}
 		}
 
-		public static DomParameter ReadParameter (BinaryReader reader, INameDecoder nameTable)
+		public static DomParameter ReadParameter (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			DomParameter result = new DomParameter ();
 
 			result.Name = ReadString (reader, nameTable);
 			result.ParameterModifiers = (ParameterModifiers)reader.ReadUInt32 ();
-			result.ReturnType = ReadReturnType (reader, nameTable);
+			result.ReturnType = ReadReturnType (reader, nameTable, objectTable);
 			result.Location = ReadLocation (reader, nameTable);
 			if(reader.ReadBoolean())
 				result.DefaultValue = ReadExpression (reader, nameTable);
@@ -245,7 +247,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				writer.Write (false); 
 		}
 		
-		public static DomProperty ReadProperty (BinaryReader reader, INameDecoder nameTable)
+		public static DomProperty ReadProperty (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			DomProperty result = new DomProperty ();
 			// ReadMemeberInformation (changed for storing getter & setter modifiers)
@@ -257,21 +259,21 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			
 			uint count = ReadUInt (reader, 1000);
 			while (count-- > 0)
-				result.Add (ReadAttribute (reader, nameTable));
+				result.Add (ReadAttribute (reader, nameTable, objectTable));
 			// End
 			
 			
 			uint explicitInterfaces = ReadUInt (reader, 500);
 			while (explicitInterfaces-- > 0) {
-				result.AddExplicitInterface (ReadReturnType (reader, nameTable));
+				result.AddExplicitInterface (ReadReturnType (reader, nameTable, objectTable));
 			}
 			uint arguments = ReadUInt (reader, 5000);
 			while (arguments-- > 0) {
-				result.Add (ReadParameter (reader, nameTable));
+				result.Add (ReadParameter (reader, nameTable, objectTable));
 			}
 			
  			result.BodyRegion = ReadRegion (reader, nameTable);
-			result.ReturnType = ReadReturnType (reader, nameTable);
+			result.ReturnType = ReadReturnType (reader, nameTable, objectTable);
 			result.PropertyModifier = (PropertyModifier)reader.ReadInt32 ();
 			result.GetRegion = ReadRegion (reader, nameTable);
 			result.SetRegion = ReadRegion (reader, nameTable);
@@ -311,17 +313,17 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			Write (writer, nameTable, property.SetRegion);
 		}
 		
-		public static DomEvent ReadEvent (BinaryReader reader, INameDecoder nameTable)
+		public static DomEvent ReadEvent (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			DomEvent result = new DomEvent ();
-			ReadMemberInformation (reader, nameTable, result);
-			result.ReturnType = ReadReturnType (reader, nameTable);
+			ReadMemberInformation (reader, nameTable, objectTable, result);
+			result.ReturnType = ReadReturnType (reader, nameTable, objectTable);
 			if (!ReadNull (reader))
-				result.AddMethod = ReadMethod (reader, nameTable);
+				result.AddMethod = ReadMethod (reader, nameTable, objectTable);
 			if (!ReadNull (reader))
-				result.RemoveMethod = ReadMethod (reader, nameTable);
+				result.RemoveMethod = ReadMethod (reader, nameTable, objectTable);
 			if (!ReadNull (reader))
-				result.RaiseMethod = ReadMethod (reader, nameTable);
+				result.RaiseMethod = ReadMethod (reader, nameTable, objectTable);
 			return result;
 		}
 		
@@ -339,90 +341,90 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		}
 		
 		
-		public static DomType ReadType (BinaryReader reader, INameDecoder nameTable)
+		public static DomType ReadType (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			nameTable.Reset ();
-			return ReadTypeInternal (reader, nameTable);
+			return ReadTypeInternal (reader, nameTable, objectTable);
 		}
 		
-		static DomType ReadTypeInternal (BinaryReader reader, INameDecoder nameTable)
+		static DomType ReadTypeInternal (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			uint typeCount = ReadUInt (reader, 1000);
 			if (typeCount > 1) {
 				CompoundType compoundResult = new CompoundType ();
 				while (typeCount-- > 0) {
-					compoundResult.AddPart (ReadTypeInternal (reader, nameTable));
+					compoundResult.AddPart (ReadTypeInternal (reader, nameTable, objectTable));
 				}
 				
 				return compoundResult;
 			}
 			
 			DomType result = new DomType ();
-			ReadMemberInformation (reader, nameTable, result);
-//			bool verbose = result.Name == "CopyDelegate";
-//			if (verbose) System.Console.WriteLine("read type:" + result.Name);
-			result.TypeModifier = (TypeModifier)reader.ReadUInt32();
+			ReadMemberInformation (reader, nameTable, objectTable, result);
+			//			bool verbose = result.Name == "CopyDelegate";
+			//			if (verbose) System.Console.WriteLine("read type:" + result.Name);
+			result.TypeModifier = (TypeModifier)reader.ReadUInt32 ();
 			result.BodyRegion = ReadRegion (reader, nameTable);
 			string compilationUnitFileName = ReadString (reader, nameTable);
 			result.CompilationUnit = new CompilationUnit (compilationUnitFileName);
 			
 			result.Namespace = ReadString (reader, nameTable);
-			result.ClassType = (ClassType)reader.ReadUInt32();
-			result.BaseType  = ReadReturnType (reader, nameTable);
+			result.ClassType = (ClassType)reader.ReadUInt32 ();
+			result.BaseType = ReadReturnType (reader, nameTable, objectTable);
 			
 			// implemented interfaces
 			long count = ReadUInt (reader, 5000);
-//			if (verbose) System.Console.WriteLine("impl. interfaces:" + count);
+			//			if (verbose) System.Console.WriteLine("impl. interfaces:" + count);
 			while (count-- > 0) {
-				result.AddInterfaceImplementation (ReadReturnType (reader, nameTable));
+				result.AddInterfaceImplementation (ReadReturnType (reader, nameTable, objectTable));
 			}
 			
 			// innerTypes
-//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
+			//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
 			count = ReadUInt (reader, 10000);
-//			if (verbose) System.Console.WriteLine("inner types:" + count);
+			//			if (verbose) System.Console.WriteLine("inner types:" + count);
 			while (count-- > 0) {
-				DomType innerType = ReadTypeInternal (reader, nameTable);
+				DomType innerType = ReadTypeInternal (reader, nameTable, objectTable);
 				innerType.DeclaringType = result;
 				result.Add (innerType);
 			}
 			
 			// fields
-//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
+			//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
 			count = ReadUInt (reader, 10000);
-//			if (verbose) System.Console.WriteLine("fields:" + count);
+			//			if (verbose) System.Console.WriteLine("fields:" + count);
 			while (count-- > 0) {
-				DomField field = ReadField (reader, nameTable);
+				DomField field = ReadField (reader, nameTable, objectTable);
 				field.DeclaringType = result;
 				result.Add (field);
 			}
 			
 			// methods
-//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
+			//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
 			count = ReadUInt (reader, 10000);
-//			if (verbose) System.Console.WriteLine("methods:" + count);
+			//			if (verbose) System.Console.WriteLine("methods:" + count);
 			while (count-- > 0) {
-				DomMethod method = ReadMethod (reader, nameTable);
+				DomMethod method = ReadMethod (reader, nameTable, objectTable);
 				method.DeclaringType = result;
 				result.Add (method);
 			}
 			
 			// properties
-//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
+			//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
 			count = ReadUInt (reader, 10000);
-//			if (verbose) System.Console.WriteLine("properties:" + count);
+			//			if (verbose) System.Console.WriteLine("properties:" + count);
 			while (count-- > 0) {
-				DomProperty property = ReadProperty (reader, nameTable);
+				DomProperty property = ReadProperty (reader, nameTable, objectTable);
 				property.DeclaringType = result;
 				result.Add (property);
 			}
 			
 			// events
-//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
+			//			if (verbose) System.Console.WriteLine("pos:" + reader.BaseStream.Position);
 			count = ReadUInt (reader, 10000);
-//			if (verbose) System.Console.WriteLine("events:" + count);
+			//			if (verbose) System.Console.WriteLine("events:" + count);
 			while (count-- > 0) {
-				DomEvent evt = ReadEvent (reader, nameTable);
+				DomEvent evt = ReadEvent (reader, nameTable, objectTable);
 				evt.DeclaringType = result;
 				result.Add (evt);
 			}
@@ -430,7 +432,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			// type parameters
 			count = ReadUInt (reader, 500);
 			while (count-- > 0) {
-				TypeParameter tp = ReadTypeParameter (reader, nameTable);
+				TypeParameter tp = ReadTypeParameter (reader, nameTable, objectTable);
 				result.AddTypeParameter (tp);
 			}
 			return result;
@@ -445,6 +447,8 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		static void WriteInternal (BinaryWriter writer, INameEncoder nameTable, IType type)
 		{
 			Debug.Assert (type != null);
+			if (type is DomTypeProxy)
+				type = ((DomTypeProxy)type).WrappedType;
 			if (type is CompoundType && ((CompoundType)type).PartsCount > 1) {
 				CompoundType compoundType = type as CompoundType;
 				writer.Write ((uint)compoundType.PartsCount);
@@ -459,6 +463,10 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			Write (writer, nameTable, type.BodyRegion);
 			
 			if (type.CompilationUnit != null) {
+				if (string.IsNullOrEmpty (type.CompilationUnit.FileName)) {
+					LoggingService.LogError ("compilation unit file name == null. Can't write invalid data for:" + type.Name);
+					throw new InvalidDataException ("compilation unit file name == null. Can't write invalid data for:" + type.Name);
+				}
 				WriteString (type.CompilationUnit.FileName, writer, nameTable);
 			} else {
 				WriteString (null, writer, nameTable);
@@ -504,36 +512,29 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				Write (writer, nameTable, tp);
 		}
 
-		public static TypeParameter ReadTypeParameter (BinaryReader reader, INameDecoder nameTable)
+		public static TypeParameter ReadTypeParameter (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			string name = ReadString (reader, nameTable);
 			TypeParameter tp = new TypeParameter (name);
 			
 			// Flags
+			tp.TypeParameterModifier = (TypeParameterModifier)reader.ReadByte ();
 			
-			byte f = reader.ReadByte ();
-			if ((f & 1) != 0)
-				tp.ClassRequired = true;
-			if ((f & 2) != 0)
-				tp.ValueTypeRequired = true;
-			if ((f & 4) != 0)
-				tp.ConstructorRequired = true;
-
 			// Variance 
 
 			tp.Variance = (TypeParameterVariance)reader.ReadByte ();
-
+			
 			// Constraints
 			
 			uint count = ReadUInt (reader, 1000);
 			while (count-- > 0)
-				tp.AddConstraint (ReadReturnType (reader, nameTable));
+				tp.AddConstraint (ReadReturnType (reader, nameTable, objectTable));
 
 			// Attributes
 			
 			count = ReadUInt (reader, 1000);
 			while (count-- > 0)
-				tp.AddAttribute (ReadAttribute (reader, nameTable));
+				tp.AddAttribute (ReadAttribute (reader, nameTable, objectTable));
 
 			return tp;
 		}
@@ -543,20 +544,12 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			WriteString (typeParameter.Name, writer, nameTable);
 
 			// Flags
+			writer.Write ((byte)typeParameter.TypeParameterModifier);
 			
-			byte f = 0;
-			if (typeParameter.ClassRequired)
-				f |= 1;
-			if (typeParameter.ValueTypeRequired)
-				f |= 2;
-			if (typeParameter.ConstructorRequired)
-				f |= 4;
-			writer.Write (f);
-
 			// Variance 
 
 			writer.Write ((byte)typeParameter.Variance);
-
+			
 			// Constraints
 			
 			writer.Write (typeParameter.Constraints.Count ());
@@ -570,13 +563,13 @@ namespace MonoDevelop.Projects.Dom.Serialization
 				Write (writer, nameTable, attr);
 		}
 
-		public static DomAttribute ReadAttribute (BinaryReader reader, INameDecoder nameTable)
+		public static DomAttribute ReadAttribute (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
 		{
 			DomAttribute attr = new DomAttribute ();
 			attr.Name = ReadString (reader, nameTable);
 			attr.Region = ReadRegion (reader, nameTable);
-			attr.AttributeTarget = (AttributeTarget) reader.ReadInt32 ();
-			attr.AttributeType = ReadReturnType (reader, nameTable);
+			attr.AttributeTarget = (AttributeTarget)reader.ReadInt32 ();
+			attr.AttributeType = ReadReturnType (reader, nameTable, objectTable);
 			
 			// Named argument count
 			uint num = ReadUInt (reader, 500);
@@ -588,9 +581,9 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			
 			int i;
 			for (i=0; i<num; i++)
-				attr.AddNamedArgument (names[i], exps [i]);
+				attr.AddNamedArgument (names [i], exps [i]);
 			
-			for (;i<exps.Length; i++)
+			for (; i<exps.Length; i++)
 				attr.AddPositionalArgument (exps [i]);
 
 			return attr;
@@ -604,15 +597,13 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			Write (writer, nameTable, attr.AttributeType);
 			
 			CodeExpression[] exps = new CodeExpression [attr.PositionalArguments.Count + attr.NamedArguments.Count];
-			
 			// Save the named argument count. The remaining expressions will be considered positionl arguments.
 			writer.Write ((uint)attr.NamedArguments.Count);
-			int n=0;
+			int n = 0;
 			foreach (KeyValuePair<string, CodeExpression> na in attr.NamedArguments) {
 				WriteString (na.Key, writer, nameTable);
 				exps [n++] = na.Value;
 			}
-			
 			attr.PositionalArguments.CopyTo (exps, n);
 			Write (writer, nameTable, exps);
 		}
@@ -628,44 +619,67 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		public static void Write (BinaryWriter writer, INameEncoder nameTable, CodeExpression cexp)
 		{
 			if (cexp is CodePrimitiveExpression) {
-				CodePrimitiveExpression exp = (CodePrimitiveExpression) cexp;
-				if(exp.Value == null) {
+				CodePrimitiveExpression exp = (CodePrimitiveExpression)cexp;
+				if (exp.Value == null) {
 					writer.Write ((int)TypeCode.DBNull);
+					return;
 				}
-				else {
+				if (!(exp.Value is Array)) {
 					writer.Write ((int)Type.GetTypeCode (exp.Value.GetType ()));
 					WriteString (Convert.ToString (exp.Value, CultureInfo.InvariantCulture), writer, nameTable);
+					return;
 				}
 			}
-			else {
-				writer.Write ((int)TypeCode.Object);
-				serializer.Serialize (writer, cexp, typeof(CodeExpression));
-			}
+			writer.Write ((int)TypeCode.Object);
+			serializer.Serialize (writer, cexp, typeof(CodeExpression));
 		}
 
 		public static CodeExpression ReadExpression (BinaryReader reader, INameDecoder nameTable)
 		{
 			TypeCode code = (TypeCode)reader.ReadInt32 ();
-			if (code == TypeCode.DBNull)
+			switch (code) {
+			case TypeCode.DBNull:
 				return new CodePrimitiveExpression (null);
-			else if (code == TypeCode.Object)
-				return (CodeExpression) serializer.Deserialize (reader, typeof(CodeExpression));
-			else
+			case TypeCode.Object:
+				return (CodeExpression)serializer.Deserialize (reader, typeof(CodeExpression));
+			default:
 				return new CodePrimitiveExpression (Convert.ChangeType (ReadString (reader, nameTable), code, CultureInfo.InvariantCulture));
+			}
 		}
 		
 		public static CodeExpression[] ReadExpressionArray (BinaryReader reader, INameDecoder nameTable)
 		{
 			int count = reader.ReadInt32 ();
-			if (count == 0) {
+			if (count == 0) 
 				return new CodeExpression[0];
-			} else {
-				CodeExpression[] exps = new CodeExpression[count];
-				for (int n=0; n<count; n++) {
-					exps [n] = ReadExpression (reader, nameTable);
-				}
-				return exps;
+			CodeExpression[] exps = new CodeExpression[count];
+			for (int n = 0; n < count; n++) {
+				exps [n] = ReadExpression (reader, nameTable);
 			}
+			return exps;
+		}
+		
+		internal static void WriteAttributeEntryList (BinaryWriter writer, INameEncoder nameTable, List<AttributeEntry> list)
+		{
+			writer.Write (list.Count);
+			foreach (AttributeEntry e in list) {
+				WriteString (e.File, writer, nameTable);
+				Write (writer, nameTable, e.Attribute);
+			}
+		}
+		
+		internal static List<AttributeEntry> ReadAttributeEntryList (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable)
+		{
+			List<AttributeEntry> list = new List<AttributeEntry> ();
+			// Number of attributes
+			int num = reader.ReadInt32 ();
+			while (num-- > 0) {
+				AttributeEntry e = new AttributeEntry ();
+				e.File = ReadString (reader, nameTable);
+				e.Attribute = ReadAttribute (reader, nameTable, objectTable);
+				list.Add (e);
+			}
+			return list;
 		}
 		
 #region Helper methods
@@ -680,7 +694,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			foreach (IAttribute attr in member.Attributes)
 				Write (writer, nameTable, attr);
 		}
-		static void ReadMemberInformation (BinaryReader reader, INameDecoder nameTable, AbstractMember member)
+		static void ReadMemberInformation (BinaryReader reader, INameDecoder nameTable, IDomObjectTable objectTable, AbstractMember member)
 		{
 			member.Name          = ReadString (reader, nameTable);
 			member.Documentation = ReadString (reader, nameTable);
@@ -689,7 +703,7 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			
 			uint count = ReadUInt (reader, 1000);
 			while (count-- > 0)
-				member.Add (ReadAttribute (reader, nameTable));
+				member.Add (ReadAttribute (reader, nameTable, objectTable));
 		}
 		
 		static void WriteString (string s, BinaryWriter writer, INameEncoder nameTable)
@@ -763,13 +777,13 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			public object[] GetCustomAttributes (object ob, Type type, bool inherit)
 			{
 				List<object> atts = new List<object> (2);
-				if (type.IsAssignableFrom (typeof(ItemPropertyAttribute))) {
+				if (typeof(ItemPropertyAttribute).IsAssignableFrom (type)) {
 					PropertyInfo prop = ob as PropertyInfo;
 					if (prop != null && prop.CanRead && prop.CanWrite && prop.GetGetMethod ().IsPublic && prop.GetSetMethod ().IsPublic) {
 						atts.Add (new ItemPropertyAttribute ());
 					}
 				}
-				if (type.IsAssignableFrom (typeof(DataItemAttribute)) && (ob is Type)) {
+				if (typeof(IDataItemAttribute).IsAssignableFrom (type) && (ob is Type)) {
 					Type t = (Type) ob;
 					if (t.Name.StartsWith ("Code"))
 						atts.Add (new DataItemAttribute (t.Name.Substring (4)));

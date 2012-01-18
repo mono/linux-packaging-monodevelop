@@ -31,6 +31,7 @@ using System.Xml;
 
 namespace MonoDevelop.Projects
 {
+	[ProjectModelDataItem]
 	public class GenericProject: Project
 	{
 		public GenericProject ()
@@ -53,6 +54,7 @@ namespace MonoDevelop.Projects
 		}
 	}
 	
+	[ProjectModelDataItem]
 	public class GenericProjectConfiguration: ProjectConfiguration
 	{
 		public GenericProjectConfiguration ()

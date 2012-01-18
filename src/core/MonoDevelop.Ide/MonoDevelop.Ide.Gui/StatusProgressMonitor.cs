@@ -50,7 +50,8 @@ namespace MonoDevelop.Ide.Gui
 			this.showTaskTitles = showTaskTitles;
 			this.title = title;
 			this.statusSourcePad = statusSourcePad;
-			icon = ImageService.GetImage (iconName, Gtk.IconSize.Menu);
+			if (!string.IsNullOrEmpty (iconName))
+				icon = ImageService.GetImage (iconName, Gtk.IconSize.Menu);
 			statusBar = IdeApp.Workbench.StatusBar.CreateContext ();
 			statusBar.StatusSourcePad = statusSourcePad;
 			statusBar.BeginProgress (icon, title);
@@ -64,7 +65,7 @@ namespace MonoDevelop.Ide.Gui
 				statusBar.ShowMessage (icon, CurrentTask);
 			if (!UnknownWork)
 				statusBar.SetProgressFraction (GlobalWork);
-			DispatchService.RunPendingEvents ();
+			RunPendingEvents ();
 		}
 		
 		public void UpdateStatusBar ()
@@ -97,16 +98,9 @@ namespace MonoDevelop.Ide.Gui
 				
 				base.OnCompleted ();
 				
-				if (showErrorDialogs) {
-					MultiMessageDialog resultDialog = new MultiMessageDialog ();
-					foreach (string m in Errors)
-						resultDialog.AddError (m);
-					foreach (string m in Warnings)
-						resultDialog.AddWarning (m);
-					resultDialog.TransientFor = IdeApp.Workbench.RootWindow;
-					resultDialog.Run ();
-					resultDialog.Destroy ();
-				}
+				if (showErrorDialogs)
+					ShowResultDialog ();
+				
 				IdeApp.Workbench.StatusBar.SetMessageSourcePad (statusSourcePad);
 				return;
 			}

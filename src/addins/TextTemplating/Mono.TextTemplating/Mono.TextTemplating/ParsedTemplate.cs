@@ -37,6 +37,7 @@ namespace Mono.TextTemplating
 	public class ParsedTemplate
 	{
 		List<ISegment> segments = new List<ISegment> ();
+		List<ISegment> importedHelperSegments = new List<ISegment> ();
 		CompilerErrorCollection errors = new CompilerErrorCollection ();
 		string rootFileName;
 		
@@ -96,7 +97,13 @@ namespace Mono.TextTemplating
 		
 		void Parse (ITextTemplatingEngineHost host, Tokeniser tokeniser, bool parseIncludes)
 		{
+			Parse (host, tokeniser, parseIncludes, false);
+		}
+		
+		void Parse (ITextTemplatingEngineHost host, Tokeniser tokeniser, bool parseIncludes, bool isImport)
+		{
 			bool skip = false;
+			bool addToImportedHelpers = false;
 			while ((skip || tokeniser.Advance ()) && tokeniser.State != State.EOF) {
 				skip = false;
 				ISegment seg = null;	
@@ -114,6 +121,7 @@ namespace Mono.TextTemplating
 						seg = new TemplateSegment (SegmentType.Expression, tokeniser.Value, tokeniser.Location);
 					break;
 				case State.Helper:
+					addToImportedHelpers = isImport;
 					if (!String.IsNullOrEmpty (tokeniser.Value))
 						seg = new TemplateSegment (SegmentType.Helper, tokeniser.Value, tokeniser.Location);
 					break;
@@ -148,7 +156,7 @@ namespace Mono.TextTemplating
 						}
 					}
 					if (parseIncludes && directive.Name == "include")
-						Import (host, directive);
+						Import (host, directive, Path.GetDirectoryName (tokeniser.Location.FileName));
 					break;
 				default:
 					throw new InvalidOperationException ();
@@ -156,23 +164,42 @@ namespace Mono.TextTemplating
 				if (seg != null) {
 					seg.TagStartLocation = tokeniser.TagStartLocation;
 					seg.EndLocation = tokeniser.TagEndLocation;
-					segments.Add (seg);
+					if (addToImportedHelpers)
+						importedHelperSegments.Add (seg);
+					else
+						segments.Add (seg);
 				}
 			}
+			if (!isImport)
+				AppendAnyImportedHelperSegments ();
 		}
 		
-		void Import (ITextTemplatingEngineHost host, Directive includeDirective)
+		void Import (ITextTemplatingEngineHost host, Directive includeDirective, string relativeToDirectory)
 		{
 			string fileName;
 			if (includeDirective.Attributes.Count > 1 || !includeDirective.Attributes.TryGetValue ("file", out fileName)) {
 				LogError ("Unexpected attributes in include directive", includeDirective.StartLocation);
 				return;
 			}
+			
+			//try to resolve path relative to the file that included it
+			if (!Path.IsPathRooted (fileName)) {
+				string possible = Path.Combine (relativeToDirectory, fileName);
+				if (File.Exists (possible))
+					fileName = possible;
+			}
+			
 			string content, resolvedName;
 			if (host.LoadIncludeText (fileName, out content, out resolvedName))
-				Parse (host, new Tokeniser (resolvedName, content), true);
+				Parse (host, new Tokeniser (resolvedName, content), true, true);
 			else
 				LogError ("Could not resolve include file '" + fileName + "'.", includeDirective.StartLocation);
+		}
+		
+		void AppendAnyImportedHelperSegments ()
+		{
+			segments.AddRange (importedHelperSegments);
+			importedHelperSegments.Clear ();
 		}
 		
 		void LogError (string message, Location location, bool isWarning)

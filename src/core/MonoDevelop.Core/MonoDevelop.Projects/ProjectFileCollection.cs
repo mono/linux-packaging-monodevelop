@@ -40,13 +40,13 @@ namespace MonoDevelop.Projects
 		{
 		}
 		
-		public ProjectFile GetFile (string fileName)
+		public ProjectFile GetFile (FilePath fileName)
 		{
-			if (fileName == null) return null;
-			fileName = FileService.GetFullPath (fileName);
+			if (fileName.IsNull) return null;
+			fileName = fileName.FullPath;
 			
 			foreach (ProjectFile file in this) {
-				if (file.Name == fileName)
+				if (file.FilePath == fileName)
 					return file;
 			}
 			return null;
@@ -66,18 +66,17 @@ namespace MonoDevelop.Projects
 		
 		public IEnumerable<ProjectFile> GetFilesInVirtualPath (string virtualPath)
 		{
-			if (String.IsNullOrEmpty (virtualPath))
+			if (string.IsNullOrEmpty (virtualPath))
 				yield break;
 			
-			if (virtualPath[virtualPath.Length -1] != Path.DirectorySeparatorChar)
+			//saves a ton of string allocations in IsChildPathOf
+			if (virtualPath[virtualPath.Length-1] != Path.DirectorySeparatorChar)
 				virtualPath = virtualPath + Path.DirectorySeparatorChar;
 			
-			foreach (ProjectFile file in this) {
-				if ((file.ProjectVirtualPath.ToString () + Path.DirectorySeparatorChar).StartsWith (virtualPath))
+			foreach (ProjectFile file in this)
+				if (file.ProjectVirtualPath.IsChildPathOf (virtualPath))
 					yield return file;
-			}
 		}
-		
 		
 		public ProjectFile[] GetFilesInPath (FilePath path)
 		{

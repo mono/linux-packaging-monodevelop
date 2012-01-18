@@ -29,6 +29,7 @@ using System;
 using System.IO;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Serialization;
+using MonoDevelop.Core.Assemblies;
 
 namespace MonoDevelop.Projects.Formats.MD1
 {
@@ -72,7 +73,7 @@ namespace MonoDevelop.Projects.Formats.MD1
 				}
 				if (project != null) {
 					data.Extract ("targetFramework");
-					data.Add (new DataValue ("targetFramework", project.TargetFramework.Id));
+					data.Add (new DataValue ("targetFramework", project.TargetFramework.Id.ToLegacyIdString ()));
 				}
 				WriteItems (handler, (SolutionEntityItem) obj, data);
 				return data;
@@ -84,7 +85,7 @@ namespace MonoDevelop.Projects.Formats.MD1
 				if (pref.ReferenceType == ReferenceType.Assembly) {
 					string basePath = Path.GetDirectoryName (handler.SerializationContext.BaseFile);
 					refto = FileService.AbsoluteToRelativePath (basePath, refto);
-				} else if (pref.ReferenceType == ReferenceType.Gac && pref.LoadedReference != null)
+				} else if (pref.ReferenceType == ReferenceType.Package && pref.LoadedReference != null)
 					refto = pref.LoadedReference;
 	
 				data.Add (new DataValue ("refto", refto));
@@ -144,18 +145,18 @@ namespace MonoDevelop.Projects.Formats.MD1
 				DotNetProject np = obj as DotNetProject;
 				if (np != null) {
 					// Import the framework version
-					string fx = null;
+					TargetFrameworkMoniker fx = null;
 					DataValue vfx = data["targetFramework"] as DataValue;
 					if (vfx != null)
-						fx = vfx.Value;
+						fx = TargetFrameworkMoniker.Parse (vfx.Value);
 					else {
 						vfx = data ["clr-version"] as DataValue;
 						if (vfx != null && vfx.Value == "Net_2_0")
-							fx = "2.0";
+							fx = TargetFrameworkMoniker.NET_2_0;
 						else if (vfx != null && vfx.Value == "Net_1_1")
-							fx = "1.1";
+							fx = TargetFrameworkMoniker.NET_1_1;
 					}
-					if (!string.IsNullOrEmpty (fx))
+					if (fx != null)
 						np.TargetFramework = Runtime.SystemAssemblyService.GetTargetFramework (fx);
 
 					// Get the compile target from one of the configurations

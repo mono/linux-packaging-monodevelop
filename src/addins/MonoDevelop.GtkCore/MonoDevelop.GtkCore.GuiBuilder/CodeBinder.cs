@@ -89,7 +89,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			if (targetObject == null)
 				return;
 			
-			ParsedDocument doc = ProjectDomService.Parse (project, fileName, null);
+			ParsedDocument doc = ProjectDomService.Parse (project, fileName);
 			classFile = fileName;
 			
 			if (doc != null && doc.CompilationUnit != null) {
@@ -175,15 +175,15 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			if (FindSignalHandler (cls, signal) != null)
 				return;
 
-			CodeMemberMethod met = new CodeMemberMethod ();
-			met.Name = signal.Handler;
-			met.Attributes = MemberAttributes.Family;
-			met.ReturnType = new CodeTypeReference (signal.SignalDescriptor.HandlerReturnTypeName);
-			
+			var met = new DomMethod () {
+				Name = signal.Handler,
+				Modifiers = Modifiers.Protected,
+				ReturnType = new DomReturnType (signal.SignalDescriptor.HandlerReturnTypeName)
+			};
 			foreach (Stetic.ParameterDescriptor pinfo in signal.SignalDescriptor.HandlerParameters)
-				met.Parameters.Add (new CodeParameterDeclarationExpression (pinfo.TypeName, pinfo.Name));
-			CodeRefactorer gen = GetCodeGenerator ();
-			gen.AddMember (cls, met);
+				met.Add (new DomParameter () { Name = pinfo.Name, ReturnType = new DomReturnType (pinfo.TypeName) });
+			
+			CodeGenerationService.AddNewMember (cls, met);
 		}
 		
 		public void UpdateSignal (Stetic.Signal oldSignal, Stetic.Signal newSignal)
@@ -219,17 +219,17 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			
 			IEditableTextFile editor = doc.GetContent<IEditableTextFile> ();
 			if (editor != null) {
-				CodeRefactorer gen = GetCodeGenerator ();
-				gen.AddMember (cls, GetFieldCode (obj, name));
+				CodeGenerationService.AddNewMember (cls, GetFieldCode (obj, name));
 			}
 		}
 		
-		CodeMemberField GetFieldCode (Stetic.Component obj, string name)
+		IField GetFieldCode (Stetic.Component obj, string name)
 		{
-			string type = obj.Type.ClassName;
-			CodeMemberField field = new CodeMemberField (type, name);
-			field.Attributes = MemberAttributes.Family;
-			return field;
+			return new DomField () {
+				Name = name,
+				ReturnType = new DomReturnType (obj.Type.ClassName),
+				Modifiers = Modifiers.Protected
+			};
 		}
 		
 		IField FindField (IType cls, string name)
@@ -266,7 +266,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			ArrayList matches = new ArrayList ();
 			ICompilationUnit unit = null;
 			ProjectDom ctx = gproject.GetParserContext ();
-			ParsedDocument doc = ProjectDomService.Parse (project, classFile, null);
+			ParsedDocument doc = ProjectDomService.Parse (project, classFile);
 			if (doc != null && doc.CompilationUnit != null) {
 				unit = doc.CompilationUnit;
 				foreach (IType fcls in unit.Types) {

@@ -2,8 +2,10 @@
 //
 // Author:
 //   Viktoria Dudka (viktoriad@remobjects.com)
+//   Mike Krüger <mkrueger@xamarin.com>
 //
 // Copyright (c) 2009 RemObjects Software
+// Copyright (c) 2011 Xamarin Inc. (http://xamarin.com)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,67 +31,90 @@ using System;
 using Gtk;
 using MonoDevelop.Core;
 using System.Reflection;
+using System.Text;
+using System.IO;
+using MonoDevelop.Ide.Fonts;
+using Mono.Addins;
+
 
 namespace MonoDevelop.Ide.Gui.Dialogs
 {
+	[ObsoleteAttribute ("Use ISystemInformationProvider")]
+	public interface IAboutInformation
+	{
+		string Description {
+			get;
+		}
+	}
+	
 	internal class VersionInformationTabPage: VBox
 	{
-        private ListStore data = null;
-        private CellRenderer cellRenderer = new CellRendererText ();
-
-        public VersionInformationTabPage ()
-        {
-            TreeView treeView = new TreeView ();
-
-            TreeViewColumn treeViewColumnTitle = new TreeViewColumn (GettextCatalog.GetString ("Title"), cellRenderer, "text", 0);
-            treeViewColumnTitle.FixedWidth = 200;
-            treeViewColumnTitle.Sizing = TreeViewColumnSizing.Fixed;
-            treeViewColumnTitle.Resizable = true;
-            treeView.AppendColumn (treeViewColumnTitle);
-
-            TreeViewColumn treeViewColumnVersion = new TreeViewColumn (GettextCatalog.GetString ("Version"), cellRenderer, "text", 1);
-            treeView.AppendColumn (treeViewColumnVersion);
-
-            TreeViewColumn treeViewColumnPath = new TreeViewColumn (GettextCatalog.GetString ("Path"), cellRenderer, "text", 2);
-            treeView.AppendColumn (treeViewColumnPath);
-
-            treeView.RulesHint = true;
-
-            data = new ListStore (typeof (string), typeof (string), typeof (string));
-            treeView.Model = data;
-
-            ScrolledWindow scrolledWindow = new ScrolledWindow ();
-            scrolledWindow.Add (treeView);
-            scrolledWindow.ShadowType = ShadowType.In;
-
-            BorderWidth = 6;
-
-            PackStart (scrolledWindow, true, true, 0);
-
-            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies ()) {
-                try {
-                    AssemblyName assemblyName = assembly.GetName ();
-                    data.AppendValues (assemblyName.Name, assemblyName.Version.ToString (), System.IO.Path.GetFullPath (assembly.Location));
-                }
-                catch { }
-            }
-
-            data.SetSortColumnId (0, SortType.Ascending);
-        }
-
-        protected override void OnDestroyed ()
-        {
-            if (cellRenderer != null) {
-                cellRenderer.Destroy ();
-                cellRenderer = null;
-            }
-
-            if (data != null) {
-                data.Dispose ();
-                data = null;
-            }
-
-            base.OnDestroyed ();
-        }
+		bool destroyed;
+		
+		public VersionInformationTabPage ()
+		{
+			SetLabel (GettextCatalog.GetString ("Loading..."));
+			
+			new System.Threading.Thread (() => {
+				try {
+					var text = SystemInformation.ToText ();
+					Gtk.Application.Invoke (delegate {
+						if (destroyed)
+							return;
+						SetText (text);
+					});
+				} catch (Exception ex) {
+					Gtk.Application.Invoke (delegate {
+						if (destroyed)
+							return;
+						SetLabel (GettextCatalog.GetString ("Failed to load version information."));
+					});
+				}
+			}).Start ();
+		}
+		
+		void Clear ()
+		{
+			foreach (var c in this.Children) {
+				this.Remove (c);
+			}
+		}
+		
+		void SetLabel (string text)
+		{
+			Clear ();
+			var label = new Gtk.Label (text);
+			PackStart (label, true, true, 0);
+			ShowAll ();
+		}
+		
+		void SetText (string text)
+		{
+			Clear ();
+			var buf = new TextBuffer (null);
+			buf.Text = text;
+			
+			var sw = new ScrolledWindow () {
+				BorderWidth = 6,
+				ShadowType = ShadowType.EtchedIn,
+				Child = new TextView (buf) {
+					Editable = false,
+					LeftMargin = 4,
+					RightMargin = 4,
+					PixelsAboveLines = 4,
+					PixelsBelowLines = 4
+				}
+			};
+			
+			sw.Child.ModifyFont (Pango.FontDescription.FromString (DesktopService.DefaultMonospaceFont));
+			PackStart (sw, true, true, 0);
+			ShowAll ();
+		}
+		
+		public override void Destroy ()
+		{
+			base.Destroy ();
+			destroyed = true;
+		}
 	}
 }

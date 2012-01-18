@@ -117,7 +117,7 @@ namespace MonoDevelop.AspNet
 				}
 				
 				//parse the ASP.NET file
-				var parsedDocument = ProjectDomService.Parse (aspProject, file.FilePath, null) as AspNetParsedDocument;
+				var parsedDocument = ProjectDomService.Parse (aspProject, file.FilePath) as AspNetParsedDocument;
 				if (parsedDocument == null)
 					continue;
 				
@@ -125,7 +125,7 @@ namespace MonoDevelop.AspNet
 				if (ccu == null)
 					continue;
 				
-				writer.Write (ccu, designerFile.FilePath);
+				writer.WriteFile (designerFile.FilePath, ccu);
 			}
 			
 			writer.WriteOpenFiles ();

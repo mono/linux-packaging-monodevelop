@@ -39,9 +39,6 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 	
 	public class MessageDialogProgressMonitor: BaseProgressMonitor
 	{
-		StringCollection errorsMessages = new StringCollection ();
-		StringCollection warningMessages = new StringCollection ();
-		Exception errorException;
 		ProgressDialog dialog;
 		bool hideWhenDone;
 		bool showDetails;
@@ -66,12 +63,12 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 		public MessageDialogProgressMonitor (bool showProgress, bool allowCancel, bool showDetails, bool hideWhenDone)
 		{
 			if (showProgress) {
-				dialog = new ProgressDialog (allowCancel, showDetails);
+				dialog = new ProgressDialog (MessageService.RootWindow, allowCancel, showDetails);
 				dialog.Message = "";
 				MessageService.PlaceDialog (dialog, MessageService.RootWindow);
 				dialog.Show ();
 				dialog.AsyncOperation = AsyncOperation;
-				DispatchService.RunPendingEvents ();
+				RunPendingEvents ();
 				this.hideWhenDone = hideWhenDone;
 				this.showDetails = showDetails;
 			}
@@ -81,7 +78,7 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 		{
 			if (dialog != null) {
 				dialog.WriteText (text);
-				DispatchService.RunPendingEvents ();
+				RunPendingEvents ();
 			}
 		}
 		
@@ -90,7 +87,7 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 			if (dialog != null) {
 				dialog.Message = CurrentTask;
 				dialog.Progress = GlobalWork;
-				DispatchService.RunPendingEvents ();
+				RunPendingEvents ();
 			}
 		}
 		
@@ -116,36 +113,25 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 				dialog.EndTask ();
 			}
 			base.EndTask ();
-			DispatchService.RunPendingEvents ();
+			RunPendingEvents ();
 		}
 						
 		public override void ReportWarning (string message)
 		{
+			base.ReportWarning (message);
 			if (dialog != null) {
 				dialog.WriteText (GettextCatalog.GetString ("WARNING: ") + message + "\n");
-				DispatchService.RunPendingEvents ();
+				RunPendingEvents ();
 			}
-			warningMessages.Add (message);
 		}
 		
 		public override void ReportError (string message, Exception ex)
 		{
-			if (message == null && ex != null)
-				message = ex.Message;
-			else if (message != null && ex != null) {
-				if (!message.EndsWith (".")) message += ".";
-				message += " " + ex.Message;
-			}
-			
-			errorsMessages.Add (message);
-			if (ex != null) {
-				LoggingService.LogError (ex.ToString ());
-				errorException = ex;
-			}
+			base.ReportError (message, ex);
 			
 			if (dialog != null) {
-				dialog.WriteText (GettextCatalog.GetString ("ERROR: ") + message + "\n");
-				DispatchService.RunPendingEvents ();
+				dialog.WriteText (GettextCatalog.GetString ("ERROR: ") + Errors [Errors.Count - 1] + "\n");
+				RunPendingEvents ();
 			}
 		}
 		
@@ -158,7 +144,7 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 		void ShowDialogs ()
 		{
 			if (dialog != null) {
-				dialog.ShowDone (warningMessages.Count > 0, errorsMessages.Count > 0);
+				dialog.ShowDone (Warnings.Count > 0, Errors.Count > 0);
 				if (hideWhenDone)
 					dialog.Destroy ();
 			}
@@ -166,22 +152,7 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 			if (showDetails)
 				return;
 			
-			if (errorsMessages.Count > 0) {
-				string s = "";
-				foreach (string m in errorsMessages)
-					s += m + "\n";
-				if (errorException != null)
-					MessageService.ShowException (errorException, s);
-				else
-					MessageService.ShowError (s);
-			}
-			
-			if (warningMessages.Count > 0) {
-				string s = "";
-				foreach (string m in warningMessages)
-					s += m + "\n";
-				MessageService.ShowError (s);
-			}
+			ShowResultDialog ();
 		}
 	}
 }

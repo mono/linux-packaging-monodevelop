@@ -51,7 +51,7 @@ using MonoDevelop.Projects.Dom.Parser;
 namespace MonoDevelop.AspNet
 {
 	[DataInclude (typeof(AspNetAppProjectConfiguration))]
-	public class AspNetAppProject : DotNetProject
+	public class AspNetAppProject : DotNetAssemblyProject
 	{
 		[ItemProperty("XspParameters", IsExternal=true)]
 		protected XspParameters xspParameters = new XspParameters ();
@@ -126,12 +126,6 @@ namespace MonoDevelop.AspNet
 					registrationCache = new RegistrationCache (this);
 				return registrationCache;
 			}
-		}
-		
-		public override bool SupportsFramework (TargetFramework framework)
-		{
-			//only support 1.1, 2.0, 3.5, 4.0 etc, not monotouch, moonlight and so on
-			return framework.IsCompatibleWithFramework ("1.1") && base.SupportsFramework (framework);
 		}
 		
 		#endregion
@@ -346,7 +340,7 @@ namespace MonoDevelop.AspNet
 			var dllName = parsed.Name + ".dll";
 			
 			foreach (var reference in References) {
-				if (reference.ReferenceType == ReferenceType.Gac || reference.ReferenceType == ReferenceType.Assembly) {
+				if (reference.ReferenceType == ReferenceType.Package || reference.ReferenceType == ReferenceType.Assembly) {
 					foreach (string refPath in reference.GetReferencedFileNames (null))
 						if (Path.GetFileName (refPath) == dllName)
 							return ProjectDomService.GetAssemblyDom (TargetRuntime, refPath);
@@ -478,7 +472,7 @@ namespace MonoDevelop.AspNet
 			if (webConfig == null || !File.Exists (webConfig.FilePath))
 				return;
 			
-			var textFile = DesignerSupport.OpenDocumentFileProvider.Instance.GetEditableTextFile (webConfig.FilePath);
+			var textFile = MonoDevelop.Ide.TextFileProvider.Instance.GetEditableTextFile (webConfig.FilePath);
 			//use textfile API because it's write safe (writes out to another file then moves)
 			if (textFile == null)
 				textFile = MonoDevelop.Projects.Text.TextFile.ReadFile (webConfig.FilePath);
@@ -624,11 +618,20 @@ namespace MonoDevelop.AspNet
 				base.OnFileAddedToProject (e);
 				return;
 			}
+
+			bool webConfigChange = false;
+			List<string> filesToAdd = new List<string> ();
 			
-			IEnumerable<string> filesToAdd = MonoDevelop.DesignerSupport.CodeBehind.GuessDependencies
-				(this, e.ProjectFile, groupedExtensions);
+			foreach (ProjectFileEventInfo fargs in e) {
+				IEnumerable<string> files = MonoDevelop.DesignerSupport.CodeBehind.GuessDependencies
+					(this, fargs.ProjectFile, groupedExtensions);
+				if (files != null)
+					filesToAdd.AddRange (files);
+				if (IsWebConfig (fargs.ProjectFile.FilePath))
+					webConfigChange = true;
+			}
 			
-			if (IsWebConfig (e.ProjectFile.FilePath))
+			if (webConfigChange)
 				UpdateWebConfigRefs ();
 			
 			//let the base fire the event before we add files
@@ -636,11 +639,9 @@ namespace MonoDevelop.AspNet
 			base.OnFileAddedToProject (e);
 			
 			//make sure that the parent and child files are in the project
-			if (filesToAdd != null) {
-				foreach (string file in filesToAdd) {
-					//NOTE: this only adds files if they are not already in the project
-					AddFile (file);
-				}
+			foreach (string file in filesToAdd) {
+				//NOTE: this only adds files if they are not already in the project
+				AddFile (file);
 			}
 		}
 		
@@ -710,7 +711,7 @@ namespace MonoDevelop.AspNet
 			protected override string GenerateInfo (string filename)
 			{
 				try {
-					var doc = ProjectDomService.Parse (Project, filename, null) as AspNetParsedDocument;
+					var doc = ProjectDomService.Parse (Project, filename) as AspNetParsedDocument;
 					if (doc != null && !string.IsNullOrEmpty (doc.Info.InheritedClass))
 						return doc.Info.InheritedClass;
 				} catch (Exception ex) {

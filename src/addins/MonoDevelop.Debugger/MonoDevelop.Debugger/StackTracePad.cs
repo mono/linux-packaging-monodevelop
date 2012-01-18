@@ -41,8 +41,7 @@ namespace MonoDevelop.Debugger
 			tree.RulesHint = true;
 			tree.HeadersVisible = true;
 			tree.Selection.Mode = SelectionMode.Multiple;
-			tree.ButtonPressEvent += HandleTreeButtonPressEvent;;
-			tree.PopupMenu += HandleTreePopupMenu;
+			tree.DoPopupMenu = ShowPopup;
 
 			TreeViewColumn col = new TreeViewColumn ();
 			CellRenderer crp = new CellRendererIcon ();
@@ -126,9 +125,9 @@ namespace MonoDevelop.Debugger
 				
 				StackFrame fr = current_backtrace.GetFrame (i);
 				
-				StringBuilder met = new StringBuilder (fr.SourceLocation.Method);
+				StringBuilder met = new StringBuilder (fr.SourceLocation.MethodName);
 				ObjectValue[] args = fr.GetParameters ();
-				if (args.Length != 0 || !fr.SourceLocation.Method.StartsWith ("[")) {
+				if (args.Length != 0 || !fr.SourceLocation.MethodName.StartsWith ("[")) {
 					met.Append (" (");
 					for (int n=0; n<args.Length; n++) {
 						if (n > 0)
@@ -139,8 +138,8 @@ namespace MonoDevelop.Debugger
 				}
 				
 				string file;
-				if (!string.IsNullOrEmpty (fr.SourceLocation.Filename)) {
-					file = fr.SourceLocation.Filename;
+				if (!string.IsNullOrEmpty (fr.SourceLocation.FileName)) {
+					file = fr.SourceLocation.FileName;
 					if (fr.SourceLocation.Line != -1)
 						file += ":" + fr.SourceLocation.Line;
 				} else
@@ -201,22 +200,9 @@ namespace MonoDevelop.Debugger
 			UpdateDisplay ();
 		}
 
-		[GLib.ConnectBefore]
-		void HandleTreeButtonPressEvent (object o, ButtonPressEventArgs args)
+		void ShowPopup (Gdk.EventButton evt)
 		{
-			if (args.Event.Button == 3)
-				ShowPopup ();
-		}
-
-		[GLib.ConnectBefore]
-		void HandleTreePopupMenu (object o, PopupMenuArgs args)
-		{
-			ShowPopup ();
-		}
-
-		internal void ShowPopup ()
-		{
-			IdeApp.CommandService.ShowContextMenu (menuSet, tree);
+			IdeApp.CommandService.ShowContextMenu (tree, evt, menuSet, tree);
 		}
 		
 		[CommandHandler ("StackTracePad.ActivateFrame")]

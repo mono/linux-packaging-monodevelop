@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace ICSharpCode.NRefactory.Parser
+namespace ICSharpCode.OldNRefactory.Parser
 {
 	/// <summary>
 	/// This is the base class for the C# and VB.NET lexer
@@ -84,14 +84,19 @@ namespace ICSharpCode.NRefactory.Parser
 			if (recordRead)
 				recordedText.Append ((char)val);
 			if (val == '\r') {
-				if (reader.Peek() == '\n')
+				if (reader.Peek() == '\n') {
+					lineBreakPosition = new Location (col + 2, line);
 					reader.Read ();
+				} else {
+					lineBreakPosition = new Location (col + 1, line);
+				}
 				++line;
 				col = 1;
 				LineBreak ();
 				return '\n';
 			}
 			if (val == '\n') {
+				lineBreakPosition = new Location (col + 1, line);
 				++line;
 				col = 1;
 				LineBreak ();
@@ -144,7 +149,7 @@ namespace ICSharpCode.NRefactory.Parser
 		}
 		
 		/// <summary>
-		/// The current Token. <seealso cref="ICSharpCode.NRefactory.Parser.Token"/>
+		/// The current Token. <seealso cref="ICSharpCode.OldNRefactory.Parser.Token"/>
 		/// </summary>
 		public Token Token {
 			get {
@@ -154,7 +159,7 @@ namespace ICSharpCode.NRefactory.Parser
 		}
 		
 		/// <summary>
-		/// The next Token (The <see cref="Token"/> after <see cref="NextToken"/> call) . <seealso cref="ICSharpCode.NRefactory.Parser.Token"/>
+		/// The next Token (The <see cref="Token"/> after <see cref="NextToken"/> call) . <seealso cref="ICSharpCode.OldNRefactory.Parser.Token"/>
 		/// </summary>
 		public Token LookAhead {
 			get {
@@ -216,7 +221,7 @@ namespace ICSharpCode.NRefactory.Parser
 			if (curToken == null) {
 				curToken = Next();
 				specialTracker.InformToken(curToken.kind);
-				//Console.WriteLine(ICSharpCode.NRefactory.Parser.CSharp.Tokens.GetTokenString(curToken.kind) + " -- " + curToken.val + "(" + curToken.kind + ")");
+				//Console.WriteLine(ICSharpCode.OldNRefactory.Parser.CSharp.Tokens.GetTokenString(curToken.kind) + " -- " + curToken.val + "(" + curToken.kind + ")");
 				return curToken;
 			}
 			
@@ -230,7 +235,7 @@ namespace ICSharpCode.NRefactory.Parser
 			}
 			
 			curToken  = curToken.next;
-			//Console.WriteLine(ICSharpCode.NRefactory.Parser.CSharp.Tokens.GetTokenString(curToken.kind) + " -- " + curToken.val + "(" + curToken.kind + ")");
+			//Console.WriteLine(ICSharpCode.OldNRefactory.Parser.CSharp.Tokens.GetTokenString(curToken.kind) + " -- " + curToken.val + "(" + curToken.kind + ")");
 			return curToken;
 		}
 		
@@ -262,6 +267,7 @@ namespace ICSharpCode.NRefactory.Parser
 			errors.Error(line, col, String.Format("Invalid hex number '" + digit + "'"));
 			return 0;
 		}
+		protected Location lineBreakPosition = new Location (1, 1);
 		protected Location lastLineEnd = new Location (1, 1);
 		protected Location curLineEnd = new Location (1, 1);
 		protected void LineBreak ()
@@ -290,21 +296,28 @@ namespace ICSharpCode.NRefactory.Parser
 		
 		protected void SkipToEndOfLine()
 		{
-			while (true) {
-				int nextChar = reader.Read ();
-				if (nextChar == -1)
+			int nextChar;
+			while ((nextChar = reader.Read()) != -1) {
+				char ch = (char)nextChar;
+				
+				if (ch == '\r') {
+					if (reader.Peek() == '\n') {
+						lineBreakPosition = new Location (col + 2, line);
+						reader.Read();
+					} else {
+						lineBreakPosition = new Location (col + 1, line);
+					}
+					++line;
+					col = 1;
 					return;
-				switch (nextChar) {
-					case '\r':
-						if (reader.Peek() == '\n') {
-							reader.Read();
-							goto case '\n';
-						}
-						break;
-					case '\n':
-						++line;
-						col = 1;
-						return;
+				}
+				
+				// Return read string, if EOL is reached
+				if (ch == '\n') {
+					lineBreakPosition = new Location (col + 1, line);
+					++line;
+					col = 1;
+					return;
 				}
 			}
 		}
@@ -322,12 +335,20 @@ namespace ICSharpCode.NRefactory.Parser
 				char ch = (char)nextChar;
 				
 				if (nextChar == '\r') {
-					if (reader.Peek() == '\n')
+					if (reader.Peek() == '\n') {
+						lineBreakPosition = new Location (col + 2, line);
 						reader.Read();
-					nextChar = '\n';
+					} else {
+						lineBreakPosition = new Location (col + 1, line);
+					}
+					++line;
+					col = 1;
+					return sb.ToString();
 				}
+				
 				// Return read string, if EOL is reached
 				if (nextChar == '\n') {
+					lineBreakPosition = new Location (col + 1, line);
 					++line;
 					col = 1;
 					return sb.ToString();

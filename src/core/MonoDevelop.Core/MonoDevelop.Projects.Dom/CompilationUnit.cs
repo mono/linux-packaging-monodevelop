@@ -71,12 +71,6 @@ namespace MonoDevelop.Projects.Dom
 			}
 		}
 		
-		
-		public object Tag {
-			get;
-			set;
-		}
-		
 		S INode.AcceptVisitor<T, S> (IDomVisitor<T, S> visitor, T data)
 		{
 			return visitor.Visit (this, data);
@@ -210,10 +204,11 @@ namespace MonoDevelop.Projects.Dom
 			
 			public override INode Visit (IReturnType type, object data)
 			{
-				IReturnType returnType = (IReturnType)base.Visit (type, data);
-				if (BuiltInTypes.Contains (returnType.FullName))
-					return returnType;
+				IReturnType rt = (IReturnType)base.Visit (type, data);
+				if (BuiltInTypes.Contains (rt.FullName))
+					return rt;
 				
+				DomReturnType returnType = new DomReturnType (rt);
 				string longest = "";
 				string lastAlias = null;
 				if (callingType != null && returnType.DecoratedFullName.StartsWith (callingType.FullName)) {
@@ -224,7 +219,7 @@ namespace MonoDevelop.Projects.Dom
 				}
 					
 				foreach (IUsing u in unit.Usings.Where (u => u.ValidRegion.Contains (location))) {
-					foreach (string ns in u.Namespaces.Where (ns => returnType.Namespace == ns || returnType.Namespace.StartsWith (ns + "."))) {
+					foreach (string ns in u.Namespaces.Where (ns => returnType.Namespace == ns || returnType.Namespace != null && returnType.Namespace.StartsWith (ns + "."))) {
 						if (longest.Length < ns.Length)
 							longest = ns;
 					}
@@ -236,8 +231,8 @@ namespace MonoDevelop.Projects.Dom
 				}
 				if (lastAlias != null)
 					return new DomReturnType (lastAlias);
-				if (longest.Length > 0) 
-					returnType.Namespace = returnType.Namespace == longest ? "" : returnType.Namespace.Substring (longest.Length + 1);
+				if (longest.Length > 0 && returnType.Namespace == longest) 
+					returnType.Namespace = "";
 				return returnType;
 			}
 		}

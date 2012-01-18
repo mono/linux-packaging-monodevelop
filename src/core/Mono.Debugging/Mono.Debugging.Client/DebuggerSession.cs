@@ -42,6 +42,7 @@ namespace Mono.Debugging.Client
 	public delegate string TypeResolverHandler (string identifier, SourceLocation location);
 	public delegate void BreakpointTraceHandler (BreakEvent be, string trace);
 	public delegate IExpressionEvaluator GetExpressionEvaluatorHandler (string extension);
+	public delegate IConnectionDialog ConnectionDialogCreator ();
 	
 	public abstract class DebuggerSession: IDisposable
 	{
@@ -54,6 +55,7 @@ namespace Mono.Debugging.Client
 		OutputWriterDelegate logWriter;
 		bool disposed;
 		bool attached;
+		bool ownedBreakpointStore;
 		object slock = new object ();
 		object olock = new object ();
 		ThreadInfo activeThread;
@@ -61,32 +63,75 @@ namespace Mono.Debugging.Client
 		ExceptionHandler exceptionHandler;
 		DebuggerSessionOptions options;
 		Dictionary<string,string> resolvedExpressionCache = new Dictionary<string, string> ();
-		
-		struct BreakEventInfo {
-			// Handle is the native debugger breakpoint handle
-			public object Handle;
-			// IsValid is always true unless the subclass explicitly sets it to false using SetBreakEventStatus.
-			public bool IsValid;
-			
-			public BreakEventInfo (object handle) {
-				Handle = handle;
-				IsValid = true;
-			}
-		}
+		bool adjustingBreakpoints;
 		
 		ProcessInfo[] currentProcesses;
-		
+
+		/// <summary>
+		/// Reports a debugger event
+		/// </summary>
 		public event EventHandler<TargetEventArgs> TargetEvent;
 		
+		/// <summary>
+		/// Raised when the debugger resumes execution after being stopped
+		/// </summary>
 		public event EventHandler TargetStarted;
+		
+		/// <summary>
+		/// Raised when the underlying debugging engine has been initialized and it is ready to start execution.
+		/// </summary>
+		public event EventHandler<TargetEventArgs> TargetReady;
+		
+		/// <summary>
+		/// Raised when the debugging session is paused
+		/// </summary>
 		public event EventHandler<TargetEventArgs> TargetStopped;
+		
+		/// <summary>
+		/// Raised when the execution is interrupted by an external event
+		/// </summary>
 		public event EventHandler<TargetEventArgs> TargetInterrupted;
+		
+		/// <summary>
+		/// Raised when a breakpoint is hit
+		/// </summary>
 		public event EventHandler<TargetEventArgs> TargetHitBreakpoint;
+		
+		/// <summary>
+		/// Raised when the execution is interrupted due to receiving a signal
+		/// </summary>
 		public event EventHandler<TargetEventArgs> TargetSignaled;
+		
+		/// <summary>
+		/// Raised when the debugged process exits
+		/// </summary>
 		public event EventHandler TargetExited;
+		
+		/// <summary>
+		/// Raised when an exception for which there is a catchpoint is thrown
+		/// </summary>
 		public event EventHandler<TargetEventArgs> TargetExceptionThrown;
+		
+		/// <summary>
+		/// Raised when an exception is unhandled
+		/// </summary>
 		public event EventHandler<TargetEventArgs> TargetUnhandledException;
 		
+		/// <summary>
+		/// Raised when a thread is started in the debugged process
+		/// </summary>
+		public event EventHandler<TargetEventArgs> TargetThreadStarted;
+		
+		/// <summary>
+		/// Raised when a thread is stopped in the debugged process
+		/// </summary>
+		public event EventHandler<TargetEventArgs> TargetThreadStopped;
+		
+		/// <summary>
+		/// Raised when the 'busy state' of the debugger changes.
+		/// The debugger may switch to busy state if it is in the middle
+		/// of an expression evaluation which can't be aborted.
+		/// </summary>
 		public event EventHandler<BusyStateEventArgs> BusyStateChanged;
 		
 		public DebuggerSession ()
@@ -95,56 +140,114 @@ namespace Mono.Debugging.Client
 			frontend = new InternalDebuggerSession (this);
 		}
 		
-		public void Initialize ()
-		{
-		}
-		
+		/// <summary>
+		/// Releases all resource used by the <see cref="Mono.Debugging.Client.DebuggerSession"/> object.
+		/// </summary>
+		/// <remarks>
+		/// Call <see cref="Dispose"/> when you are finished using the <see cref="Mono.Debugging.Client.DebuggerSession"/>.
+		/// The <see cref="Dispose"/> method leaves the <see cref="Mono.Debugging.Client.DebuggerSession"/> in an unusable
+		/// state. After calling <see cref="Dispose"/>, you must release all references to the
+		/// <see cref="Mono.Debugging.Client.DebuggerSession"/> so the garbage collector can reclaim the memory that the
+		/// <see cref="Mono.Debugging.Client.DebuggerSession"/> was occupying.
+		/// </remarks>
 		public virtual void Dispose ()
 		{
 			Dispatch (delegate {
 				if (!disposed) {
 					disposed = true;
-					Breakpoints = null;
+					if (!ownedBreakpointStore)
+						Breakpoints = null;
 				}
 			});
 		}
 		
+		/// <summary>
+		/// Gets or sets an exception handler to be invoked when an exception is raised by the debugger engine.
+		/// </summary>
+		/// <remarks>
+		/// Notice that this handler will be used to report exceptions in the debugger, not exceptions raised
+		/// in the debugged process.
+		/// </remarks>
 		public ExceptionHandler ExceptionHandler {
 			get { return exceptionHandler; }
 			set { exceptionHandler = value; }
 		}
 		
+		/// <summary>
+		/// Gets or sets the connection dialog creator callback.
+		/// </summary>
+		public ConnectionDialogCreator ConnectionDialogCreator { get; set; }
+
+		/// <summary>
+		/// Gets or sets the breakpoint trace handler.
+		/// </summary>
+		/// <remarks>
+		/// This handler is invoked when the value of a tracepoint has to be printed
+		/// </remarks>
 		public BreakpointTraceHandler BreakpointTraceHandler { get; set; }
 		
+		/// <summary>
+		/// Gets or sets the type resolver handler.
+		/// </summary>
+		/// <remarks>
+		/// This handler is invoked when the expression evaluator needs to resolve a type name.
+		/// </remarks>
 		public TypeResolverHandler TypeResolverHandler { get; set; }
-
-		public GetExpressionEvaluatorHandler GetExpressionEvaluator { get; set; }		
 		
+		/// <summary>
+		/// Gets or sets the an expression evaluator provider
+		/// </summary>
+		/// <remarks>
+		/// This handler is invoked when the debugger needs to get an evaluator for a specific type of file
+		/// </remarks>
+		public GetExpressionEvaluatorHandler GetExpressionEvaluator { get; set; }		
+
+		/// <summary>
+		/// Gets or sets the custom break event hit handler.
+		/// </summary>
+		/// <remarks>
+		/// This handler is invoked when a custom breakpoint is hit to determine if the debug session should
+		/// continue or stop.
+		/// </remarks>
+		public BreakEventHitHandler CustomBreakEventHitHandler {
+			get {
+				return customBreakpointHitHandler;
+			}
+			set {
+				customBreakpointHitHandler = value;
+			}
+		}
+		
+		/// <summary>
+		/// Gets or sets the breakpoint store for the debugger session.
+		/// </summary>
 		public BreakpointStore Breakpoints {
 			get {
 				lock (slock) {
-					if (breakpointStore == null)
+					if (breakpointStore == null) {
 						Breakpoints = new BreakpointStore ();
+						ownedBreakpointStore = true;
+					}
 					return breakpointStore;
 				}
 			}
 			set {
 				lock (slock) {
 					if (breakpointStore != null) {
-						if (started) {
-							foreach (BreakEvent bp in breakpointStore) {
-								RemoveBreakEvent (bp);
-								Breakpoints.NotifyStatusChanged (bp);
-							}
+						foreach (BreakEvent bp in breakpointStore) {
+							RemoveBreakEvent (bp);
+							NotifyBreakEventStatusChanged (bp);
 						}
 						breakpointStore.BreakEventAdded -= OnBreakpointAdded;
 						breakpointStore.BreakEventRemoved -= OnBreakpointRemoved;
 						breakpointStore.BreakEventModified -= OnBreakpointModified;
 						breakpointStore.BreakEventEnableStatusChanged -= OnBreakpointStatusChanged;
 						breakpointStore.CheckingReadOnly -= BreakpointStoreCheckingReadOnly;
+						Breakpoints.ResetAdjustedBreakpoints ();
 					}
 					
 					breakpointStore = value;
+					ownedBreakpointStore = false;
 					
 					if (breakpointStore != null) {
 						if (started) {
@@ -158,15 +261,6 @@ namespace Mono.Debugging.Client
 						breakpointStore.CheckingReadOnly += BreakpointStoreCheckingReadOnly;
 					}
 				}
-			}
-		}
-
-		public BreakEventHitHandler CustomBreakEventHitHandler {
-			get {
-				return customBreakpointHitHandler;
-			}
-			set {
-				customBreakpointHitHandler = value;
 			}
 		}
 		
@@ -185,6 +279,18 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		/// <summary>
+		/// Starts a debugging session
+		/// </summary>
+		/// <param name='startInfo'>
+		/// Startup information
+		/// </param>
+		/// <param name='options'>
+		/// Session options
+		/// </param>
+		/// <exception cref='ArgumentNullException'>
+		/// Is thrown when an argument passed to a method is invalid because it is <see langword="null" /> .
+		/// </exception>
 		public void Run (DebuggerStartInfo startInfo, DebuggerSessionOptions options)
 		{
 			if (startInfo == null)
@@ -207,6 +313,18 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		/// <summary>
+		/// Starts a debugging session by attaching the debugger to a running process
+		/// </summary>
+		/// <param name='proc'>
+		/// Process information
+		/// </param>
+		/// <param name='options'>
+		/// Debugging options
+		/// </param>
+		/// <exception cref='ArgumentNullException'>
+		/// Is thrown when an argument passed to a method is invalid because it is <see langword="null" /> .
+		/// </exception>
 		public void AttachToProcess (ProcessInfo proc, DebuggerSessionOptions options)
 		{
 			if (proc == null)
@@ -230,6 +348,9 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		/// <summary>
+		/// Detaches this debugging session from the debugged process
+		/// </summary>
 		public void Detach ()
 		{
 			lock (slock) {
@@ -242,6 +363,12 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		/// <summary>
+		/// Gets a value indicating whether this <see cref="Mono.Debugging.Client.DebuggerSession"/> has been attached to a process using the Attach method.
+		/// </summary>
+		/// <value>
+		/// <c>true</c> if attached to process; otherwise, <c>false</c>.
+		/// </value>
 		public bool AttachedToProcess {
 			get {
 				lock (slock) {
@@ -250,6 +377,12 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		/// <summary>
+		/// Gets or sets the active thread.
+		/// </summary>
+		/// <remarks>
+		/// This property can only be used when the debugger is paused
+		/// </remarks>
 		public ThreadInfo ActiveThread {
 			get {
 				lock (slock) {
@@ -269,6 +402,10 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		
+		/// <summary>
+		/// Executes one line of code
+		/// </summary>
 		public void NextLine ()
 		{
 			lock (slock) {
@@ -284,7 +421,10 @@ namespace Mono.Debugging.Client
 				});
 			}
 		}
-
+		
+		/// <summary>
+		/// Executes one line of code, stepping into method invocations
+		/// </summary>
 		public void StepLine ()
 		{
 			lock (slock) {
@@ -301,6 +441,9 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		/// <summary>
+		/// Executes one low level instruction
+		/// </summary>
 		public void NextInstruction ()
 		{
 			lock (slock) {
@@ -317,6 +460,9 @@ namespace Mono.Debugging.Client
 			}
 		}
 
+		/// <summary>
+		/// Executes one low level instruction, stepping into method invocations
+		/// </summary>
 		public void StepInstruction ()
 		{
 			lock (slock) {
@@ -332,7 +478,10 @@ namespace Mono.Debugging.Client
 				});
 			}
 		}
-
+		
+		/// <summary>
+		/// Resumes the execution of the debugger and stops when the current method is exited
+		/// </summary>
 		public void Finish ()
 		{
 			lock (slock) {
@@ -350,88 +499,86 @@ namespace Mono.Debugging.Client
 		}
 		
 		/// <summary>
-		/// Returns true if the breakpoint is valid for this debugger session.
-		/// It may be invalid, for example, if the breakpoint was placed in a line
-		/// that has no code.
+		/// Returns the status of a breakpoint for this debugger session.
 		/// </summary>
-		public bool IsBreakEventValid (BreakEvent be)
+		public BreakEventStatus GetBreakEventStatus (BreakEvent be)
 		{
-			if (!started)
-				return true;
-			
-			BreakEventInfo binfo;
-			lock (breakpoints) {
-				return (breakpoints.TryGetValue (be, out binfo) && binfo.IsValid && binfo.Handle != null);
+			if (started) {
+				BreakEventInfo binfo;
+				lock (breakpoints) {
+					if (breakpoints.TryGetValue (be, out binfo))
+						return binfo.Status;
+				}
 			}
+			return BreakEventStatus.NotBound;
 		}
 		
 		/// <summary>
-		/// This method can be used by subclasses to set the validity of a breakpoint.
+		/// Returns a status message of a breakpoint for this debugger session.
 		/// </summary>
-		protected void SetBreakEventStatus (BreakEvent be, bool isValid)
+		public string GetBreakEventStatusMessage (BreakEvent be)
 		{
-			lock (breakpoints) {
-				BreakEventInfo bi;
-				if (!breakpoints.TryGetValue (be, out bi))
-					bi = new BreakEventInfo (null);
-				if (bi.IsValid != isValid) {
-					bi.IsValid = isValid;
-					breakpoints [be] = bi;
-					Breakpoints.NotifyStatusChanged (be);
+			if (started) {
+				BreakEventInfo binfo;
+				lock (breakpoints) {
+					if (breakpoints.TryGetValue (be, out binfo)) {
+						if (binfo.StatusMessage != null)
+							return binfo.StatusMessage;
+						switch (binfo.Status) {
+						case BreakEventStatus.BindError: return "The breakpoint could not be bound";
+						case BreakEventStatus.Bound: return "";
+						case BreakEventStatus.Disconnected: return "";
+						case BreakEventStatus.Invalid: return "The breakpoint location is invalid. Perhaps the source line does " +
+							"not contain any statements, or the source does not correspond to the current binary";
+						case BreakEventStatus.NotBound: return "The breakpoint could not yet be bound to a valid location";
+						}
+					}
 				}
 			}
+			return "The breakpoint will not currently be hit";
 		}
-
-		void SetBreakEventHandle (BreakEvent be, object handle)
-		{
-			lock (breakpoints) {
-				BreakEventInfo bi;
-				if (!breakpoints.TryGetValue (be, out bi))
-					bi = new BreakEventInfo (handle);
-				else
-					bi.Handle = handle;
-				breakpoints [be] = bi;
-			}
-		}
-
+		
 		void AddBreakEvent (BreakEvent be)
 		{
-			object handle = null;
-			
 			try {
-				handle = OnInsertBreakEvent (be, be.Enabled);
+				var eventInfo = OnInsertBreakEvent (be);
+				if (eventInfo == null)
+					throw new InvalidOperationException ("OnInsertBreakEvent can't return a null value. If the breakpoint can't be bound or is invalid, a BreakEventInfo with the corresponding status must be returned");
+				lock (breakpoints) {
+					breakpoints [be] = eventInfo;
+				}
+				eventInfo.AttachSession (this, be);
+				
 			} catch (Exception ex) {
 				Breakpoint bp = be as Breakpoint;
+				string msg;
 				if (bp != null)
-					OnDebuggerOutput (false, "Could not set breakpoint at location '" + bp.FileName + ":" + bp.Line + "' (" + ex.Message + ")\n");
+					msg = "Could not set breakpoint at location '" + bp.FileName + ":" + bp.Line + "'";
 				else
-					OnDebuggerOutput (false, "Could not set catchpoint for exception '" + ((Catchpoint)be).ExceptionName + "' (" + ex.Message + ")\n");
+					msg = "Could not set catchpoint for exception '" + ((Catchpoint)be).ExceptionName + "'";
+				
+				msg += " (" + ex.Message + ")";
+				OnDebuggerOutput (false, msg + "\n");
 				HandleException (ex);
 				return;
-			}
-
-			lock (breakpoints) {
-				SetBreakEventHandle (be, handle);
-				Breakpoints.NotifyStatusChanged (be);
 			}
 		}
 
 		bool RemoveBreakEvent (BreakEvent be)
 		{
 			lock (breakpoints) {
-				object handle;
-				if (GetBreakpointHandle (be, out handle)) {
+				BreakEventInfo binfo;
+				if (breakpoints.TryGetValue (be, out binfo)) {
 					try {
-						if (handle != null)
-							OnRemoveBreakEvent (handle);
+						OnRemoveBreakEvent (binfo);
 					} catch (Exception ex) {
 						if (started)
 							OnDebuggerOutput (false, ex.Message);
 						HandleException (ex);
 						return false;
 					}
+					breakpoints.Remove (be);
 				}
-				breakpoints.Remove (be);
 				return true;
 			}
 		}
@@ -439,10 +586,10 @@ namespace Mono.Debugging.Client
 		void UpdateBreakEventStatus (BreakEvent be)
 		{
 			lock (breakpoints) {
-				object handle;
-				if (GetBreakpointHandle (be, out handle) && handle != null) {
+				BreakEventInfo binfo;
+				if (breakpoints.TryGetValue (be, out binfo)) {
 					try {
-						OnEnableBreakEvent (handle, be.Enabled);
+						OnEnableBreakEvent (binfo, be.Enabled);
 					} catch (Exception ex) {
 						if (started)
 							OnDebuggerOutput (false, ex.Message);
@@ -455,39 +602,18 @@ namespace Mono.Debugging.Client
 		void UpdateBreakEvent (BreakEvent be)
 		{
 			lock (breakpoints) {
-				object handle;
-				if (GetBreakpointHandle (be, out handle)) {
-					if (handle != null) {
-						object newHandle = OnUpdateBreakEvent (handle, be);
-						if (newHandle != handle && (newHandle == null || !newHandle.Equals (handle))) {
-							// Update the handle if it has changed, and notify the status change
-							SetBreakEventHandle (be, newHandle);
-						}
-						Breakpoints.NotifyStatusChanged (be);
-					} else {
-						// Try inserting the breakpoint again
-						try {
-							handle = OnInsertBreakEvent (be, be.Enabled);
-							if (handle != null) {
-								// This time worked
-								SetBreakEventHandle (be, handle);
-								Breakpoints.NotifyStatusChanged (be);
-							}
-						} catch (Exception ex) {
-							Breakpoint bp = be as Breakpoint;
-							if (bp != null)
-								OnDebuggerOutput (false, "Could not set breakpoint at location '" + bp.FileName + ":" + bp.Line + " (" + ex.Message + ")\n");
-							else
-								OnDebuggerOutput (false, "Could not set catchpoint for exception '" + ((Catchpoint)be).ExceptionName + "' (" + ex.Message + ")\n");
-							HandleException (ex);
-						}
-					}
-				}
+				BreakEventInfo binfo;
+				if (breakpoints.TryGetValue (be, out binfo))
+					OnUpdateBreakEvent (binfo);
 			}
 		}
 		
 		void OnBreakpointAdded (object s, BreakEventArgs args)
 		{
+			lock (breakpoints) {
+				if (adjustingBreakpoints)
+					return;
+			}
 			lock (slock) {
 				if (started)
 					AddBreakEvent (args.BreakEvent);
@@ -496,6 +622,10 @@ namespace Mono.Debugging.Client
 		
 		void OnBreakpointRemoved (object s, BreakEventArgs args)
 		{
+			lock (breakpoints) {
+				if (adjustingBreakpoints)
+					return;
+			}
 			lock (slock) {
 				if (started)
 					RemoveBreakEvent (args.BreakEvent);
@@ -534,26 +664,24 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
-		protected bool GetBreakpointHandle (BreakEvent be, out object handle)
-		{
-			BreakEventInfo binfo;
-			if (!breakpoints.TryGetValue (be, out binfo)) {
-				handle = null;
-				return false;
-			}
-			handle = binfo.Handle;
-			return true;
-		}
-		
+		/// <summary>
+		/// Gets the debugger options object
+		/// </summary>
 		public DebuggerSessionOptions Options {
 			get { return options; }
 		}
-
+		
+		/// <summary>
+		/// Gets or sets the evaluation options.
+		/// </summary>
 		public EvaluationOptions EvaluationOptions {
 			get { return options.EvaluationOptions; }
 			set { options.EvaluationOptions = value; }
 		}
-
+		
+		/// <summary>
+		/// Resumes the execution of the debugger
+		/// </summary>
 		public void Continue ()
 		{
 			lock (slock) {
@@ -569,7 +697,10 @@ namespace Mono.Debugging.Client
 				});
 			}
 		}
-
+		
+		/// <summary>
+		/// Pauses the execution of the debugger
+		/// </summary>
 		public void Stop ()
 		{
 			Dispatch (delegate {
@@ -581,7 +712,10 @@ namespace Mono.Debugging.Client
 				}
 			});
 		}
-
+		
+		/// <summary>
+		/// Stops the execution of the debugger by killing the debugged process
+		/// </summary>
 		public void Exit ()
 		{
 			Dispatch (delegate {
@@ -593,13 +727,22 @@ namespace Mono.Debugging.Client
 				}
 			});
 		}
-
+		
+		/// <summary>
+		/// Gets a value indicating whether the debuggee is currently running (not paused by the debugger)
+		/// </summary>
 		public bool IsRunning {
 			get {
 				return isRunning;
 			}
 		}
 		
+		/// <summary>
+		/// Gets a list of all processes
+		/// </summary>
+		/// <remarks>
+		/// This method can only be used when the debuggee is stopped by the debugger
+		/// </remarks>
 		public ProcessInfo[] GetProcesses ()
 		{
 			lock (slock) {
@@ -612,6 +755,12 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		/// <summary>
+		/// Gets or sets the output writer callback.
+		/// </summary>
+		/// <remarks>
+		/// This callback is invoked to print debuggee output
+		/// </remarks>
 		public OutputWriterDelegate OutputWriter {
 			get { return outputWriter; }
 			set {
@@ -621,6 +770,12 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		/// <summary>
+		/// Gets or sets the log writer.
+		/// </summary>
+		/// <remarks>
+		/// This callback is invoked to print debugger log messages
+		/// </remarks>
 		public OutputWriterDelegate LogWriter {
 			get { return logWriter; }
 			set {
@@ -629,7 +784,19 @@ namespace Mono.Debugging.Client
 				}
 			}
 		}
-
+		
+		/// <summary>
+		/// Gets the disassembly of a source code file
+		/// </summary>
+		/// <returns>
+		/// An array of AssemblyLine, with one element for each source code line that could be disassembled
+		/// </returns>
+		/// <param name='file'>
+		/// The file.
+		/// </param>
+		/// <remarks>
+		/// This method can only be used when the debuggee is stopped by the debugger
+		/// </remarks>
 		public AssemblyLine[] DisassembleFile (string file)
 		{
 			lock (slock) {
@@ -661,15 +828,49 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
+		/// <summary>
+		/// Stops the execution of background evaluations being done by the debugger
+		/// </summary>
+		/// <remarks>
+		/// This method can only be used when the debuggee is stopped by the debugger
+		/// </remarks>
+		public void CancelAsyncEvaluations ()
+		{
+			if (UseOperationThread) {
+				ThreadPool.QueueUserWorkItem (delegate {
+					OnCancelAsyncEvaluations ();
+				});
+			} else
+				OnCancelAsyncEvaluations ();
+		}
+
+		/// <summary>
+		/// Gets a value indicating whether there are background evaluations being done by the debugger
+		/// which can be cancelled.
+		/// </summary>
+		/// <remarks>
+		/// This method can only be used when the debuggee is stopped by the debugger
+		/// </remarks>
+		public virtual bool CanCancelAsyncEvaluations {
+			get { return false; }
+		}
+		
+		/// <summary>
+		/// Override to stop the execution of background evaluations being done by the debugger
+		/// </summary>
+		protected virtual void OnCancelAsyncEvaluations ()
+		{
+		}
+		
 		Mono.Debugging.Evaluation.ExpressionEvaluator defaultResolver = new Mono.Debugging.Evaluation.NRefactoryEvaluator ();
 		Dictionary <string, IExpressionEvaluator> evaluators = new Dictionary <string, IExpressionEvaluator> ();
 
-		public IExpressionEvaluator FindExpressionEvaluator (StackFrame frame)
+		internal IExpressionEvaluator FindExpressionEvaluator (StackFrame frame)
 		{
 			if (GetExpressionEvaluator == null)
 				return null;
 
-			string fn = frame.SourceLocation == null ? null : frame.SourceLocation.Filename;
+			string fn = frame.SourceLocation == null ? null : frame.SourceLocation.FileName;
 			if (String.IsNullOrEmpty (fn))
 				return null;
 
@@ -685,7 +886,7 @@ namespace Mono.Debugging.Client
 			return result;
 		}
 
-		public Mono.Debugging.Evaluation.ExpressionEvaluator GetResolver (StackFrame frame)
+		public Mono.Debugging.Evaluation.ExpressionEvaluator GetEvaluator (StackFrame frame)
 		{
 			IExpressionEvaluator result = FindExpressionEvaluator (frame);
 			if (result == null)
@@ -694,6 +895,18 @@ namespace Mono.Debugging.Client
 		}
 		
 		
+		/// <summary>
+		/// Called when an expression needs to be resolved
+		/// </summary>
+		/// <param name='expression'>
+		/// The expression
+		/// </param>
+		/// <param name='location'>
+		/// The source code location
+		/// </param>
+		/// <returns>
+		/// The resolved expression
+		/// </returns>
 		protected virtual string OnResolveExpression (string expression, SourceLocation location)
 		{
 			return defaultResolver.Resolve (this, location, expression);
@@ -751,63 +964,77 @@ namespace Mono.Debugging.Client
 			}
 			if (args.Backtrace != null)
 				args.Backtrace.Attach (this);
-			
+
+			EventHandler<TargetEventArgs> evnt = null;
 			switch (args.Type) {
 				case TargetEventType.ExceptionThrown:
 					lock (slock) {
 						isRunning = false;
+						args.IsStopEvent = true;
 					}
-					if (TargetExceptionThrown != null)
-						TargetExceptionThrown (this, args);
+					evnt = TargetExceptionThrown;
 					break;
 				case TargetEventType.TargetExited:
 					lock (slock) {
 						isRunning = false;
 						started = false;
-						foreach (BreakEvent bp in Breakpoints)
-							Breakpoints.NotifyStatusChanged (bp);
 					}
-					if (TargetExited != null)
-						TargetExited (this, args);
+					EventHandler exited = TargetExited;
+					if (exited != null)
+						exited (this, args);
 					break;
 				case TargetEventType.TargetHitBreakpoint:
 					lock (slock) {
 						isRunning = false;
+						args.IsStopEvent = true;
 					}
-					if (TargetHitBreakpoint != null)
-						TargetHitBreakpoint (this, args);
+					evnt = TargetHitBreakpoint;
 					break;
 				case TargetEventType.TargetInterrupted:
 					lock (slock) {
 						isRunning = false;
+						args.IsStopEvent = true;
 					}
-					if (TargetInterrupted != null)
-						TargetInterrupted (this, args);
+					evnt = TargetInterrupted;
 					break;
 				case TargetEventType.TargetSignaled:
 					lock (slock) {
 						isRunning = false;
+						args.IsStopEvent = true;
 					}
-					if (TargetSignaled != null)
-						TargetSignaled (this, args);
+					evnt = TargetSignaled;
 					break;
 				case TargetEventType.TargetStopped:
 					lock (slock) {
 						isRunning = false;
+						args.IsStopEvent = true;
 					}
-					if (TargetStopped != null)
-						TargetStopped (this, args);
+					evnt = TargetStopped;
 					break;
 				case TargetEventType.UnhandledException:
 					lock (slock) {
 						isRunning = false;
+						args.IsStopEvent = true;
 					}
-					if (TargetUnhandledException != null)
-						TargetUnhandledException (this, args);
+					evnt = TargetUnhandledException;
+					break;
+				case TargetEventType.TargetReady:
+					evnt = TargetReady;
+					break;
+				case TargetEventType.ThreadStarted:
+					evnt = TargetThreadStarted;
+					break;
+				case TargetEventType.ThreadStopped:
+					evnt = TargetThreadStopped;
 					break;
 			}
-			if (TargetEvent != null)
-				TargetEvent (this, args);
+			
+			if (evnt != null)
+				evnt (this, args);
+
+			EventHandler<TargetEventArgs> targetEvent = TargetEvent;
+			if (targetEvent != null)
+				targetEvent (this, args);
 		}
 		
 		internal void OnRunning ()
@@ -819,6 +1046,12 @@ namespace Mono.Debugging.Client
 		
 		internal protected void OnStarted ()
 		{
+			OnStarted (null);
+		}
+		
+		internal protected virtual void OnStarted (ThreadInfo t)
+		{
+			OnTargetEvent (new TargetEventArgs (TargetEventType.TargetReady) { Thread = t });
 			lock (slock) {
 				started = true;
 				foreach (BreakEvent bp in breakpointStore)
@@ -848,50 +1081,119 @@ namespace Mono.Debugging.Client
 				BusyStateChanged (this, args);
 		}
 		
-		internal protected void NotifySourceFileLoaded (string fullFilePath)
+		/// <summary>
+		/// Tries to bind all unbound breakpoints of a source file
+		/// </summary>
+		/// <param name='fullFilePath'>
+		/// Source file path
+		/// </param>
+		/// <remarks>
+		/// This method can be called by a subclass to ask the debugger session to attempt
+		/// to bind all unbound breakpoints defined on the given file. This method could
+		/// be called, for example, when a new assembly that contains this file is loaded
+		/// into memory. It is not necessary to use this method if the subclass keeps
+		/// track of unbound breakpoints by itself.
+		/// </remarks>
+		internal protected void BindSourceFileBreakpoints (string fullFilePath)
 		{
 			lock (breakpoints) {
 				// Make a copy of the breakpoints table since it can be modified while iterating
 				Dictionary<BreakEvent, BreakEventInfo> breakpointsCopy = new Dictionary<BreakEvent, BreakEventInfo> (breakpoints);
 				foreach (KeyValuePair<BreakEvent, BreakEventInfo> bps in breakpointsCopy) {
 					Breakpoint bp = bps.Key as Breakpoint;
-					if (bp != null && bps.Value.Handle == null) {
+					if (bp != null && bps.Value.Status == BreakEventStatus.NotBound) {
 						if (string.Compare (System.IO.Path.GetFullPath (bp.FileName), fullFilePath, System.IO.Path.DirectorySeparatorChar == '\\') == 0)
-							UpdateBreakEvent (bp);
+							RetryEventBind (bps.Value);
 					}
 				}
 			}
 		}
-
-		internal protected void NotifySourceFileUnloaded (string fullFilePath)
+		
+		void RetryEventBind (BreakEventInfo binfo)
 		{
-			List<BreakEvent> toUpdate = new List<BreakEvent> ();
+			// Try inserting the breakpoint again
+			BreakEvent be = binfo.BreakEvent;
+			try {
+				binfo = OnInsertBreakEvent (be);
+				if (binfo == null)
+					throw new InvalidOperationException ("OnInsertBreakEvent can't return a null value. If the breakpoint can't be bound or is invalid, a BreakEventInfo with the corresponding status must be returned");
+				lock (breakpoints) {
+					breakpoints [be] = binfo;
+				}
+				binfo.AttachSession (this, be);
+			} catch (Exception ex) {
+				Breakpoint bp = be as Breakpoint;
+				if (bp != null)
+					OnDebuggerOutput (false, "Could not set breakpoint at location '" + bp.FileName + ":" + bp.Line + " (" + ex.Message + ")\n");
+				else
+					OnDebuggerOutput (false, "Could not set catchpoint for exception '" + ((Catchpoint)be).ExceptionName + "' (" + ex.Message + ")\n");
+				HandleException (ex);
+			}
+		}
+		
+		/// <summary>
+		/// Unbinds all bound breakpoints of a source file
+		/// </summary>
+		/// <param name='fullFilePath'>
+		/// The source file path
+		/// </param>
+		/// <remarks>
+		/// This method can be called by a subclass to ask the debugger session to
+		/// unbind all bound breakpoints defined on the given file. This method could
+		/// be called, for example, when an assembly that contains this file is unloaded
+		/// from memory. It is not necessary to use this method if the subclass keeps
+		/// track of unbound breakpoints by itself.
+		/// </remarks>
+		internal protected void UnbindSourceFileBreakpoints (string fullFilePath)
+		{
+			List<BreakEventInfo> toUpdate = new List<BreakEventInfo> ();
 			lock (breakpoints) {
 				// Make a copy of the breakpoints table since it can be modified while iterating
 				Dictionary<BreakEvent, BreakEventInfo> breakpointsCopy = new Dictionary<BreakEvent, BreakEventInfo> (breakpoints);
 				foreach (KeyValuePair<BreakEvent, BreakEventInfo> bps in breakpointsCopy) {
 					Breakpoint bp = bps.Key as Breakpoint;
-					if (bp != null && bps.Value.Handle != null) {
+					if (bp != null && bps.Value.Status == BreakEventStatus.Bound) {
 						if (System.IO.Path.GetFullPath (bp.FileName) == fullFilePath)
-							toUpdate.Add (bp);
+							toUpdate.Add (bps.Value);
 					}
 				}
-				foreach (BreakEvent be in toUpdate) {
-					SetBreakEventHandle (be, null);
-					Breakpoints.NotifyStatusChanged (be);
+				foreach (BreakEventInfo be in toUpdate) {
+					breakpoints.Remove (be.BreakEvent);
+					NotifyBreakEventStatusChanged (be.BreakEvent);
 				}
 			}
 		}
 		
-		BreakEvent GetBreakEvent (object handle)
+		internal void NotifyBreakEventStatusChanged (BreakEvent be)
 		{
-			foreach (KeyValuePair<BreakEvent,BreakEventInfo> e in breakpoints) {
-				if (handle == e.Value.Handle || handle.Equals (e.Value.Handle))
-					return e.Key;
-			}
-			return null;
+			var s = GetBreakEventStatus (be);
+			if (s == BreakEventStatus.BindError || s == BreakEventStatus.Invalid)
+				OnDebuggerOutput (true, GetBreakEventErrorMessage (be) + ": " + GetBreakEventStatusMessage (be) + "\n");
+			Breakpoints.NotifyStatusChanged (be);
 		}
 		
+		string GetBreakEventErrorMessage (BreakEvent be)
+		{
+			Breakpoint bp = be as Breakpoint;
+			if (bp != null)
+				return string.Format ("Could not insert breakpoint at '{0}:{1}'", bp.FileName, bp.Line);
+			Catchpoint cp = (Catchpoint) be;
+			return string.Format ("Could not enable catchpoint for exception '{0}'", cp.ExceptionName);
+		}
+		
+		/// <summary>
+		/// Reports an unhandled exception in the debugger
+		/// </summary>
+		/// <returns>
+		/// True if the debugger engine handles the exception. False otherwise.
+		/// </returns>
+		/// <param name='ex'>
+		/// The exception
+		/// </param>
+		/// <remarks>
+		/// This method can be used by subclasses to report errors in the debugger that must be reported
+		/// to the user.
+		/// </remarks>
 		protected virtual bool HandleException (Exception ex)
 		{
 			if (exceptionHandler != null)
@@ -900,90 +1202,231 @@ namespace Mono.Debugging.Client
 				return false;
 		}
 		
-		internal protected bool OnCustomBreakpointAction (string actionId, object handle)
+		internal void AdjustBreakpointLocation (Breakpoint b, int newLine)
 		{
-			BreakEvent ev = GetBreakEvent (handle);
-			return ev != null && customBreakpointHitHandler (actionId, ev);
-		}
-		
-		protected void UpdateHitCount (object breakEventHandle, int count)
-		{
-			BreakEvent ev = GetBreakEvent (breakEventHandle);
-			if (ev != null) {
-				ev.HitCount = count;
-				ev.NotifyUpdate ();
-			}
-		}
-		
-		protected void UpdateLastTraceValue (object breakEventHandle, string value)
-		{
-			BreakEvent ev = GetBreakEvent (breakEventHandle);
-			if (ev != null) {
-				ev.LastTraceValue = value;
-				ev.NotifyUpdate ();
-				if (value != null) {
-					if (BreakpointTraceHandler != null)
-						BreakpointTraceHandler (ev, value);
-					else
-						OnDebuggerOutput (false, value + "\n");
+			lock (breakpoints) {
+				try {
+					adjustingBreakpoints = true;
+					Breakpoints.AdjustBreakpointLine (b, newLine);
+				} finally {
+					adjustingBreakpoints = false;
 				}
 			}
 		}
-		
+
 		/// <summary>
 		/// When set, operations such as OnRun, OnAttachToProcess, OnStepLine, etc, are run in
 		/// a background thread, so it will not block the caller of the corresponding public methods.
 		/// </summary>
 		protected bool UseOperationThread { get; set; }
 		
+		/// <summary>
+		/// Called to start the execution of the debugger
+		/// </summary>
+		/// <param name='startInfo'>
+		/// Startup information
+		/// </param>
 		protected abstract void OnRun (DebuggerStartInfo startInfo);
-
-		protected abstract void OnAttachToProcess (long processId);
 		
+		/// <summary>
+		/// Called to attach the debugger to a running process
+		/// </summary>
+		/// <param name='processId'>
+		/// Process identifier.
+		/// </param>
+		protected abstract void OnAttachToProcess (long processId);
+
+		/// <summary>
+		/// Called to detach the debugging session from the running process
+		/// </summary>
 		protected abstract void OnDetach ();
 		
+		/// <summary>
+		/// Called when the active thread has to be changed
+		/// </summary>
+		/// <param name='processId'>
+		/// Process identifier.
+		/// </param>
+		/// <param name='threadId'>
+		/// Thread identifier.
+		/// </param>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract void OnSetActiveThread (long processId, long threadId);
-
+		
+		/// <summary>
+		/// Called when the debug session has to be paused
+		/// </summary>
 		protected abstract void OnStop ();
 		
+		/// <summary>
+		/// Called when the target process has to be exited
+		/// </summary>
 		protected abstract void OnExit ();
-
-		// Step one source line
+		
+		
+		/// <summary>
+		/// Called to step one source code line
+		/// </summary>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract void OnStepLine ();
 
-		// Step one source line, but step over method calls
+		/// <summary>
+		/// Called to step one source line, but step over method calls
+		/// </summary>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract void OnNextLine ();
 
-		// Step one instruction
+		/// <summary>
+		/// Called to step one instruction
+		/// </summary>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract void OnStepInstruction ();
 
-		// Step one instruction, but step over method calls
+		/// <summary>
+		// Called to step one instruction, but step over method calls
+		/// </summary>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract void OnNextInstruction ();
 
-		// Continue until leaving the current method
+		/// <summary>
+		/// Called to continue execution until leaving the current method
+		/// </summary>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract void OnFinish ();
 
-		//breakpoints etc
-
-		// returns a handle
-		protected abstract object OnInsertBreakEvent (BreakEvent be, bool activate);
-
-		protected abstract void OnRemoveBreakEvent (object handle);
-		
-		protected abstract object OnUpdateBreakEvent (object handle, BreakEvent be);
-		
-		protected abstract void OnEnableBreakEvent (object handle, bool enable);
-		
-		protected virtual bool AllowBreakEventChanges { get { return true; } }
-
+		/// <summary>
+		/// Called to resume execution
+		/// </summary>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract void OnContinue ();
 		
+		//breakpoints etc
+
+		/// <summary>
+		/// Called to insert a new breakpoint or catchpoint
+		/// </summary>
+		/// <param name='breakEvent'>
+		/// The break event.
+		/// </param>
+		/// <remarks>
+		/// Implementations of this method must: (1) create (and return) an instance of BreakEventInfo
+		/// (or a subclass of it). (2) Attempt to activate a breakpoint at the location
+		/// specified in breakEvent. If the breakpoint cannot be activated at the time this
+		/// method is called, it is the responsibility of the DebuggerSession subclass
+		/// to attempt it later on.
+		/// The BreakEventInfo object can be used to change the status of the breakpoint,
+		/// update the hit point, etc.
+		/// </remarks>
+		protected abstract BreakEventInfo OnInsertBreakEvent (BreakEvent breakEvent);
+		
+		/// <summary>
+		/// Called when a breakpoint has been removed.
+		/// </summary>
+		/// <param name='eventInfo'>
+		/// The breakpoint
+		/// </param>
+		/// <remarks>
+		/// Implementations of this method should remove or disable the breakpoint
+		/// in the debugging engine.
+		/// </remarks>
+		protected abstract void OnRemoveBreakEvent (BreakEventInfo eventInfo);
+
+		/// <summary>
+		/// Called when information about a breakpoint has changed
+		/// </summary>
+		/// <param name='eventInfo'>
+		/// The break event
+		/// </param>
+		/// <remarks>
+		/// This method is called when some information about the breakpoint changes.
+		/// Notice that the file and line of a breakpoint or the exception name of
+		/// a catchpoint can't be modified. Changes of the Enabled property are
+		/// notified by calling OnEnableBreakEvent. 
+		/// </remarks>
+		protected abstract void OnUpdateBreakEvent (BreakEventInfo eventInfo);
+		
+		/// <summary>
+		/// Called when a break event is enabled or disabled
+		/// </summary>
+		/// <param name='eventInfo'>
+		/// The break event
+		/// </param>
+		/// <param name='enable'>
+		/// The new status
+		/// </param>
+		protected abstract void OnEnableBreakEvent (BreakEventInfo eventInfo, bool enable);
+		
+		/// <summary>
+		/// Queried when the debugger session has to check if changes in breakpoints are allowed or not
+		/// </summary>
+		/// <value>
+		/// <c>true</c> if break event changes are allowed; otherwise, <c>false</c>.
+		/// </value>
+		/// <remarks>
+		/// This property should return false if at the time it is invoked the debugger engine doesn't support
+		/// adding, removing or doing changes in breakpoints.
+		/// </remarks>
+		protected virtual bool AllowBreakEventChanges { get { return true; } }
+		
+		/// <summary>
+		/// Called to get a list of the threads of a process
+		/// </summary>
+		/// <param name='processId'>
+		/// Process identifier.
+		/// </param>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract ThreadInfo[] OnGetThreads (long processId);
 		
+		/// <summary>
+		/// Called to get a list of all debugee processes
+		/// </summary>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract ProcessInfo[] OnGetProcesses ();
 		
+		/// <summary>
+		/// Called to get the backtrace of a thread
+		/// </summary>
+		/// <param name='processId'>
+		/// Process identifier.
+		/// </param>
+		/// <param name='threadId'>
+		/// Thread identifier.
+		/// </param>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected abstract Backtrace OnGetThreadBacktrace (long processId, long threadId);
-
+		
+		/// <summary>
+		/// Called to gets the disassembly of a source code file
+		/// </summary>
+		/// <returns>
+		/// An array of AssemblyLine, with one element for each source code line that could be disassembled
+		/// </returns>
+		/// <param name='file'>
+		/// The file.
+		/// </param>
+		/// <remarks>
+		/// This method can only be used when the debuggee is stopped by the debugger
+		/// </remarks>
 		protected virtual AssemblyLine[] OnDisassembleFile (string file)
 		{
 			return null;
@@ -1020,24 +1463,24 @@ namespace Mono.Debugging.Client
 			session.OnDebuggerOutput (isStderr, text);
 		}
 		
+		public void NotifyStarted (ThreadInfo t)
+		{
+			session.OnStarted (t);
+		}
+		
 		public void NotifyStarted ()
 		{
 			session.OnStarted ();
 		}
 		
-		public bool NotifyCustomBreakpointAction (string actionId, object handle)
+		public void BindSourceFileBreakpoints (string fullFilePath)
 		{
-			return session.OnCustomBreakpointAction (actionId, handle);
-		}
-		
-		public void NotifySourceFileLoaded (string fullFilePath)
-		{
-			session.NotifySourceFileLoaded (fullFilePath);
+			session.BindSourceFileBreakpoints (fullFilePath);
 		}
 
-		public void NotifySourceFileUnloaded (string fullFilePath)
+		public void UnbindSourceFileBreakpoints (string fullFilePath)
 		{
-			session.NotifySourceFileUnloaded (fullFilePath);
+			session.UnbindSourceFileBreakpoints (fullFilePath);
 		}
 	}
 
@@ -1049,4 +1492,13 @@ namespace Mono.Debugging.Client
 		
 		public string Description { get; internal set; }
 	}
+	
+	public interface IConnectionDialog : IDisposable
+	{
+		event EventHandler UserCancelled;
+		
+		//message may be null in which case the dialog should construct a default
+		void SetMessage (DebuggerStartInfo dsi, string message, bool listening, int attemptNumber);
+	}
 }
+

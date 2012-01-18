@@ -1,0 +1,35 @@
+Index: monodevelop/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs
+===================================================================
+--- monodevelop.orig/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs	2011-11-08 00:33:54.000000000 +0000
++++ monodevelop/src/core/MonoDevelop.Core/MonoDevelop.Projects.Formats.MSBuild/MSBuildProjectService.cs	2011-11-08 00:43:17.000000000 +0000
+@@ -50,9 +50,9 @@
+ 		
+ 		//NOTE: default toolsversion should match the default format.
+ 		// remember to update the builder process' app.config too
+-		public const string DefaultFormat = "MSBuild08";
+-		const string REFERENCED_MSBUILD_TOOLS = "3.5";
+-		const string REFERENCED_MSBUILD_UTILS = "Microsoft.Build.Utilities.v3.5";
++		public const string DefaultFormat = "MSBuild10";
++		const string REFERENCED_MSBUILD_TOOLS = "4.0";
++		const string REFERENCED_MSBUILD_UTILS = "Microsoft.Build.Utilities.v4.0";
+ 		internal const string DefaultToolsVersion = REFERENCED_MSBUILD_TOOLS;
+ 		
+ 		static DataContext dataContext;
+Index: monodevelop/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config
+===================================================================
+--- monodevelop.orig/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config	2011-11-08 00:32:44.000000000 +0000
++++ monodevelop/src/core/MonoDevelop.Projects.Formats.MSBuild/app.config	2011-11-08 00:43:17.000000000 +0000
+@@ -5,11 +5,11 @@
+ 		<assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
+ 			<dependentAssembly>
+ 				<assemblyIdentity name="Microsoft.Build.Framework" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
+-				<bindingRedirect oldVersion="0.0.0.0-100.0.0.0" newVersion="3.5.0.0" />
++				<bindingRedirect oldVersion="0.0.0.0-100.0.0.0" newVersion="4.0.0.0" />
+ 			</dependentAssembly>
+ 			<dependentAssembly>
+ 				<assemblyIdentity name="Microsoft.Build.Engine" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
+-				<bindingRedirect oldVersion="0.0.0.0-100.0.0.0" newVersion="3.5.0.0" />
++				<bindingRedirect oldVersion="0.0.0.0-100.0.0.0" newVersion="4.0.0.0" />
+ 			</dependentAssembly>
+ 		</assemblyBinding>
+ 	</runtime>

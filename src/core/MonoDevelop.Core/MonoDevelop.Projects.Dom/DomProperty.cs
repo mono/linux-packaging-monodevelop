@@ -124,7 +124,8 @@ namespace MonoDevelop.Projects.Dom
 				StringBuilder result = new StringBuilder ();
 				result.Append ("P:");
 				if (this.IsIndexer) {
-					result.Append (DeclaringType.FullName);
+					if (DeclaringType != null)
+						result.Append (DeclaringType.FullName);
 					result.Append (".Item");
 					DomMethod.AppendHelpParameterList (result, this.Parameters);
 				} else {
@@ -224,21 +225,12 @@ namespace MonoDevelop.Projects.Dom
 			base.ReturnType = returnType;
 		}
 		
-		public void Add (IParameter parameter)
+		public override void Add (IParameter parameter)
 		{
 			if (parameters == null) 
 				parameters = new List<IParameter> ();
 			parameter.DeclaringMember = this;
 			parameters.Add (parameter);
-		}
-		
-		public void Add (IEnumerable<IParameter> parameters)
-		{
-			if (parameters == null)
-				return;
-			foreach (IParameter parameter in parameters) {
-				Add (parameter);
-			}
 		}
 		
 		public override string ToString ()

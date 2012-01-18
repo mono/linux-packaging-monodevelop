@@ -177,9 +177,10 @@ namespace Mono.Debugging.Evaluation
 			if (Adaptor.IsEvaluating) {
 				List<ObjectValue> vals = new List<ObjectValue> ();
 				foreach (string exp in expressions) {
-					ObjectValue val = Adaptor.CreateObjectValueAsync (exp, ObjectValueFlags.Field, delegate {
+					string tmpExp = exp;
+					ObjectValue val = Adaptor.CreateObjectValueAsync (tmpExp, ObjectValueFlags.Field, delegate {
 						EvaluationContext cctx = GetEvaluationContext (frameIndex, options);
-						return Adaptor.GetExpressionValue (cctx, exp);
+						return Adaptor.GetExpressionValue (cctx, tmpExp);
 					});
 					vals.Add (val);
 				}
@@ -216,6 +217,9 @@ namespace Mono.Debugging.Evaluation
 				return null;
 			
 			EvaluationContext ctx = GetEvaluationContext (frameIndex, options);
+			if (ctx == null)
+				return null;
+			
 			finfo = new FrameInfo ();
 			finfo.Context = ctx;
 			finfo.LocalVariables.AddRange (ctx.Adapter.GetLocalVariables (ctx));

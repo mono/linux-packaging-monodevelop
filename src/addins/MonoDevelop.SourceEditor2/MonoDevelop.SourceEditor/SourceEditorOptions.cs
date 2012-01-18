@@ -29,21 +29,10 @@ using Mono.TextEditor;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide;
+using MonoDevelop.Ide.Fonts;
 
 namespace MonoDevelop.SourceEditor
 {
-	public enum EditorFontType {
-		/// <summary>
-		/// Default Monospace font as set in the user's GNOME font properties
-		/// </summary>
-		DefaultMonospace,
-		
-		/// <summary>
-		/// Custom font, will need to get the FontName property for more specifics
-		/// </summary>
-		UserSpecified
-	}
-
 	public enum ControlLeftRightMode {
 		MonoDevelop,
 		Emacs,
@@ -88,11 +77,22 @@ namespace MonoDevelop.SourceEditor
 			LoadAllPrefs ();
 			UpdateStylePolicy (currentPolicy);
 			PropertyService.PropertyChanged += UpdatePreferences;
+			FontService.RegisterFontChangedCallback ("Editor", UpdateFont);
+			FontService.RegisterFontChangedCallback ("MessageBubbles", UpdateFont);
+			
 		}
 		
 		public override void Dispose()
 		{
 			PropertyService.PropertyChanged -= UpdatePreferences;
+			FontService.RemoveCallback (UpdateFont);
+		}
+		
+		void UpdateFont ()
+		{
+			base.FontName = FontName;
+			this.OnChanged (EventArgs.Empty);
+		
 		}
 		
 		void UpdateStylePolicy (MonoDevelop.Ide.Gui.Content.TextStylePolicy currentPolicy)
@@ -128,9 +128,6 @@ namespace MonoDevelop.SourceEditor
 			case "EnableParameterInsight":
 				this.EnableParameterInsight = (bool) args.NewValue;
 				break;
-			case "EnableQuickFinder":
-				this.EnableQuickFinder = (bool) args.NewValue;
-				break;
 			case "UnderlineErrors":
 				this.UnderlineErrors = (bool) args.NewValue;
 				break;
@@ -142,9 +139,6 @@ namespace MonoDevelop.SourceEditor
 					this.IndentStyle = (MonoDevelop.Ide.Gui.Content.IndentStyle)Enum.Parse (typeof (MonoDevelop.Ide.Gui.Content.IndentStyle), args.NewValue.ToString ());
 				} else 
 					this.IndentStyle = (MonoDevelop.Ide.Gui.Content.IndentStyle) args.NewValue;
-				break;
-			case "EditorFontType":
-				this.EditorFontType = (MonoDevelop.SourceEditor.EditorFontType) args.NewValue;
 				break;
 			case "ShowLineNumberMargin":
 				base.ShowLineNumberMargin = (bool) args.NewValue;
@@ -206,6 +200,9 @@ namespace MonoDevelop.SourceEditor
 			case "EnableAnimations":
 				base.EnableAnimations =  (bool) args.NewValue;
 				break;
+			case "UseAntiAliasing":
+				base.UseAntiAliasing =  (bool) args.NewValue;
+				break;
 			}
 			} catch (Exception ex) {
 				LoggingService.LogError ("SourceEditorOptions error with property value for '" + (args.Key ?? "") + "'", ex);
@@ -221,13 +218,11 @@ namespace MonoDevelop.SourceEditor
 			this.smartSemicolonPlacement = PropertyService.Get ("SmartSemicolonPlacement", false);
 			this.enableCodeCompletion = PropertyService.Get ("EnableCodeCompletion", true);
 			this.enableParameterInsight = PropertyService.Get ("EnableParameterInsight", true);
-			this.enableQuickFinder = PropertyService.Get ("EnableQuickFinder", true);
 			this.underlineErrors = PropertyService.Get ("UnderlineErrors", true);
 			this.indentStyle = PropertyService.Get ("IndentStyle", MonoDevelop.Ide.Gui.Content.IndentStyle.Smart);
-			this.editorFontType = PropertyService.Get ("EditorFontType", MonoDevelop.SourceEditor.EditorFontType.DefaultMonospace);
 			base.ShowLineNumberMargin = PropertyService.Get ("ShowLineNumberMargin", true);
 			base.ShowFoldMargin = PropertyService.Get ("ShowFoldMargin", true);
-			base.ShowInvalidLines = PropertyService.Get ("ShowInvalidLines", true);
+			base.ShowInvalidLines = PropertyService.Get ("ShowInvalidLines", false);
 			base.ShowTabs = PropertyService.Get ("ShowTabs", false);
 			base.ShowEolMarkers = PropertyService.Get ("ShowEolMarkers", false);
 			base.HighlightCaretLine = PropertyService.Get ("HighlightCaretLine", false);
@@ -246,7 +241,8 @@ namespace MonoDevelop.SourceEditor
 			var defaultControlMode = (ControlLeftRightMode)Enum.Parse (typeof(ControlLeftRightMode), DesktopService.DefaultControlLeftRightBehavior);
 			this.ControlLeftRightMode = PropertyService.Get ("ControlLeftRightMode", defaultControlMode);
 			base.EnableAnimations = PropertyService.Get ("EnableAnimations", true);
-			
+			base.UseAntiAliasing = PropertyService.Get ("UseAntiAliasing", true);
+			this.EnableHighlightUsages = PropertyService.Get ("EnableHighlightUsages", false);
 		}
 		
 		#region new options
@@ -400,20 +396,6 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		
-		bool enableQuickFinder;
-		public bool EnableQuickFinder {
-			get {
-				return enableQuickFinder;
-			}
-			set {
-				if (value != this.enableQuickFinder) {
-					this.enableQuickFinder = value;
-					PropertyService.Set ("EnableQuickFinder", value);
-					OnChanged (EventArgs.Empty);
-				}
-			}
-		}
-		
 		bool underlineErrors;
 		public bool UnderlineErrors {
 			get {
@@ -456,6 +438,19 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		
+		bool enableHighlightUsages;
+		public bool EnableHighlightUsages {
+			get {
+				return enableHighlightUsages;
+			}
+			set {
+				if (value != this.enableHighlightUsages) {
+					this.enableHighlightUsages = value;
+					PropertyService.Set ("EnableHighlightUsages", value);
+					OnChanged (EventArgs.Empty);
+				}
+			}
+		}
 		#endregion
 		
 		bool useViModes = false;
@@ -492,7 +487,10 @@ namespace MonoDevelop.SourceEditor
 			get { return defaultEolMarker; }
 		}
 
-		ControlLeftRightMode controlLeftRightMode = ControlLeftRightMode.MonoDevelop;
+		ControlLeftRightMode controlLeftRightMode = Platform.IsWindows
+			? ControlLeftRightMode.SharpDevelop
+			: ControlLeftRightMode.MonoDevelop;
+		
 		public ControlLeftRightMode ControlLeftRightMode {
 			get {
 				return controlLeftRightMode;
@@ -662,6 +660,13 @@ namespace MonoDevelop.SourceEditor
 				base.EnableAnimations = value;
 			}
 		}
+		
+		public override bool UseAntiAliasing {
+			set {
+				PropertyService.Set ("UseAntiAliasing", value);
+				base.UseAntiAliasing = value;
+			}
+		}
 
 		public override bool AutoIndent {
 			get {
@@ -674,19 +679,10 @@ namespace MonoDevelop.SourceEditor
 		
 		public override string FontName {
 			get {
-				if (EditorFontType == EditorFontType.DefaultMonospace) {
-					string font = DesktopService.DefaultMonospaceFont;
-					if (String.IsNullOrEmpty (font))
-						return DEFAULT_FONT;
-					else
-						return font;
-				}
-				return base.FontName;
+				return FontService.FilterFontName (FontService.GetUnderlyingFontName ("Editor"));
 			}
 			set {
-				string newName = !String.IsNullOrEmpty (value) ? value : DEFAULT_FONT;
-				PropertyService.Set ("FontName", newName);
-				base.FontName = newName;
+				throw new InvalidOperationException ("Set font through font service");
 			}
 		}
 		

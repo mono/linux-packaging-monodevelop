@@ -6,7 +6,9 @@ DEPS =  \
 	$(top_builddir)/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
+	$(top_builddir)/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.SourceEditor2.dll \
+	$(top_builddir)/build/bin/Mono.TextEditor.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
@@ -16,6 +18,7 @@ REFS =  \
 	$(MONO_ADDINS_LIBS) \
 	-r:Mono.Posix \
 	-r:System \
+	-r:System.Core \
 	-r:System.Xml
 	
 
@@ -60,10 +63,17 @@ FILES =  \
 	Navigation/TypedefNodeBuilder.cs \
 	Navigation/UnionNodeBuilder.cs \
 	Navigation/VariableNodeBuilder.cs \
+	ObjCLanguageBinding.cs \
+	ObjCppLanguageBinding.cs \
+	Parser/BsdCTagsManager.cs \
 	Parser/CDocumentParser.cs \
 	Parser/Class.cs \
+	Parser/CompilationUnitDataProvider.cs \
+	Parser/CTagsManager.cs \
+	Parser/DataProvider.cs \
 	Parser/Enumeration.cs \
 	Parser/Enumerator.cs \
+	Parser/ExuberantCTagsManager.cs \
 	Parser/Function.cs \
 	Parser/LanguageItem.cs \
 	Parser/Local.cs \
@@ -93,7 +103,6 @@ FILES =  \
 RES =  \
 	CBinding.addin.xml \
 	gtk-gui/gui.stetic \
-	gtk-gui/objects.xml \
 	icons/c-icon-32.png \
 	icons/cpp-icon-32.png \
 	icons/Icons.16x16.PrivateUnion \
@@ -120,12 +129,15 @@ RES =  \
 	md1format.xml \
 	templates/ConsoleCppProject.xpt.xml \
 	templates/ConsoleCProject.xpt.xml \
+	templates/ConsoleObjCProject.xpt.xml \
 	templates/EmptyCHeaderFile.xft.xml \
 	templates/EmptyCppHeaderFile.xft.xml \
 	templates/EmptyCppProject.xpt.xml \
 	templates/EmptyCppSourceFile.xft.xml \
 	templates/EmptyCProject.xpt.xml \
 	templates/EmptyCSourceFile.xft.xml \
+	templates/EmptyObjCppSourceFile.xft.xml \
+	templates/EmptyObjCSourceFile.xft.xml \
 	templates/SharedLibraryCppProject.xpt.xml \
 	templates/SharedLibraryCProject.xpt.xml \
 	templates/StaticLibraryCppProject.xpt.xml \

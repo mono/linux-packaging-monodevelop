@@ -55,6 +55,12 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			}
 		}
 
+		public override IEnumerable<IAttribute> Attributes {
+			get {
+				return database.GetGlobalAttributes ();
+			}
+		}
+
 		public override IEnumerable<IType> GetTypes (FilePath fileName)
 		{
 			return database.GetFileContents (fileName);
@@ -116,19 +122,50 @@ namespace MonoDevelop.Projects.Dom.Serialization
 			if (!database.Disposed)
 				database.Dispose ();
 			base.Unload ();
+			// database = null;
 		}
 
 		internal override void OnProjectReferenceAdded (ProjectReference pref)
 		{
-			ProjectCodeCompletionDatabase db = (ProjectCodeCompletionDatabase) database;
-			db.UpdateFromProject ();
+			var netProject = Project as DotNetProject;
+			if (netProject == null)
+				return;
+			
+			var db = (ProjectCodeCompletionDatabase) database;
+			if (pref.ReferenceType != ReferenceType.Project) {
+				foreach (var fileName in pref.GetReferencedFileNames (ConfigurationSelector.Default)){
+					var uri = ProjectCodeCompletionDatabase.GetReferenceUri (netProject, fileName);
+					if (!db.HasReference (uri))
+						db.AddReference (uri);
+				}
+			} else {
+				var uri = "Project:"+ pref.Reference;
+				if (!db.HasReference (uri))
+					db.AddReference (uri);
+			}
+			
 			this.UpdateReferences ();
 		}
 
 		internal override void OnProjectReferenceRemoved (ProjectReference pref)
 		{
-			ProjectCodeCompletionDatabase db = (ProjectCodeCompletionDatabase) database;
-			db.UpdateFromProject ();
+			var netProject = Project as DotNetProject;
+			if (netProject == null)
+				return;
+			
+			var db = (ProjectCodeCompletionDatabase) database;
+			if (pref.ReferenceType != ReferenceType.Project) {
+				foreach (var fileName in pref.GetReferencedFileNames (ConfigurationSelector.Default)){
+					var uri = ProjectCodeCompletionDatabase.GetReferenceUri (netProject, fileName);
+					if (db.HasReference (uri))
+						db.RemoveReference (uri);
+				}
+			} else {
+				var uri = "Project:"+ pref.Reference;
+				if (db.HasReference (uri))
+					db.RemoveReference (uri);
+			}
+			
 			this.UpdateReferences ();
 		}
 
@@ -139,14 +176,24 @@ namespace MonoDevelop.Projects.Dom.Serialization
 
 		internal override void Flush ()
 		{
-			database.Flush ();
+			if (database != null)
+				database.Flush ();
 		}
 		
-		public override TypeUpdateInformation UpdateFromParseInfo (ICompilationUnit unit)
+		public override string GetDocumentation (IMember member)
 		{
+			if (database == null)
+				return "";
+			return database.GetDocumentation (member);
+		}
+		
+		public override TypeUpdateInformation UpdateFromParseInfo (ICompilationUnit unit, bool isFromFile)
+		{
+			if (string.IsNullOrEmpty (unit.FileName))
+				throw new ArgumentException ("Compilation unit has no file name set.", "unit");
 			ProjectCodeCompletionDatabase db = database as ProjectCodeCompletionDatabase;
 			if (db != null)
-				return db.UpdateFromParseInfo (unit, unit.FileName);
+				return db.UpdateFromParseInfo (unit, unit.FileName, isFromFile);
 			
 			SimpleCodeCompletionDatabase sdb = database as SimpleCodeCompletionDatabase;
 			if (sdb != null)
@@ -157,14 +204,20 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		
 		public override IType GetType (string typeName, IList<IReturnType> genericArguments, bool deepSearchReferences, bool caseSensitive)
 		{
-			return dbProvider.GetClass (database, typeName, genericArguments, deepSearchReferences, caseSensitive);
+			var result = dbProvider.GetClass (database, typeName, genericArguments, deepSearchReferences, caseSensitive);
+			if (result == null)
+				result = GetTemporaryType (typeName, genericArguments, deepSearchReferences, caseSensitive);
+			return result;
 		}
 
 		public override IType GetType (string typeName, int genericArgumentsCount, bool deepSearchReferences, bool caseSensitive)
 		{
 			if (genericArgumentsCount > 0)
 				typeName += "`" + genericArgumentsCount;
-			return dbProvider.GetClass (database, typeName, null, deepSearchReferences, caseSensitive);
+			var result = dbProvider.GetClass (database, typeName, null, deepSearchReferences, caseSensitive);
+			if (result == null)
+				result = GetTemporaryType (typeName, genericArgumentsCount, deepSearchReferences, caseSensitive);
+			return result;
 		}
 
 		public override string ToString ()
@@ -175,6 +228,13 @@ namespace MonoDevelop.Projects.Dom.Serialization
 		protected override void ForceUpdateBROKEN ()
 		{
 			database.ForceUpdateBROKEN ();
+		}
+		
+		internal override ProjectDomStats GetStats ()
+		{
+			ProjectDomStats s = database.GetStats ();
+			s.Add (base.GetStats ());
+			return s;
 		}
 	}
 }

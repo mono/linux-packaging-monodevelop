@@ -8,32 +8,48 @@ namespace Mono.Debugging.Client
 	public class StackFrame
 	{
 		long address;
+		string addressSpace;
 		SourceLocation location;
 		IBacktrace sourceBacktrace;
 		string language;
 		int index;
 		bool isExternalCode;
 		bool hasDebugInfo;
+		string fullModuleName;
+		string fullTypeName;
 		
 		[NonSerialized]
 		DebuggerSession session;
 
-		public StackFrame (long address, SourceLocation location, string language, bool isExternalCode, bool hasDebugInfo)
+		public StackFrame (long address, string addressSpace, SourceLocation location, string language, bool isExternalCode, bool hasDebugInfo, string fullModuleName, string fullTypeName)
 		{
 			this.address = address;
+			this.addressSpace = addressSpace;
 			this.location = location;
 			this.language = language;
 			this.isExternalCode = isExternalCode;
 			this.hasDebugInfo = hasDebugInfo;
+			this.fullModuleName = fullModuleName;
+			this.fullTypeName = fullTypeName;
 		}
 		
-		public StackFrame (long address, SourceLocation location, string language)
-			: this (address, location, language, string.IsNullOrEmpty (location.Filename), true)
+		public StackFrame (long address, string addressSpace, SourceLocation location, string language)
+			: this (address, addressSpace, location, language, string.IsNullOrEmpty (location.FileName), true, "", "")
 		{
 		}
 
-		public StackFrame (long address, string module, string method, string filename, int line, string language)
-			: this (address, new SourceLocation (method, filename, line), language)
+		public StackFrame (long address, string addressSpace, string module, string method, string filename, int line, string language)
+			: this (address, addressSpace, new SourceLocation (method, filename, line), language)
+		{
+		}
+
+		public StackFrame (long address, SourceLocation location, string language, bool isExternalCode, bool hasDebugInfo)
+			: this (address, "", location, language, string.IsNullOrEmpty (location.FileName), true, "", "")
+		{
+		}
+		
+		public StackFrame (long address, SourceLocation location, string language)
+			: this (address, "", location, language, string.IsNullOrEmpty (location.FileName), true, "", "")
 		{
 		}
 
@@ -54,6 +70,10 @@ namespace Mono.Debugging.Client
 		public long Address
 		{
 			get { return address; }
+		}
+		
+		public string AddressSpace {
+			get { return addressSpace; }
 		}
 
 		internal IBacktrace SourceBacktrace {
@@ -78,6 +98,14 @@ namespace Mono.Debugging.Client
 		
 		public bool HasDebugInfo {
 			get { return this.hasDebugInfo; }
+		}
+		
+		public string FullModuleName {
+			get { return this.fullModuleName; }
+		}
+		
+		public string FullTypeName {
+			get { return this.fullTypeName; }
 		}
 		
 		public ObjectValue[] GetLocalVariables ()
@@ -137,7 +165,8 @@ namespace Mono.Debugging.Client
 			if (!hasDebugInfo)
 				return null;
 			ObjectValue value = sourceBacktrace.GetThisReference (index, options);
-			ObjectValue.ConnectCallbacks (this, value);
+			if (value != null)
+				ObjectValue.ConnectCallbacks (this, value);
 			return value;
 		}
 		
@@ -163,7 +192,7 @@ namespace Mono.Debugging.Client
 		
 		public ObjectValue[] GetExpressionValues (string[] expressions, bool evaluateMethods)
 		{
-			EvaluationOptions options = session.EvaluationOptions;
+			EvaluationOptions options = session.EvaluationOptions.Clone ();
 			options.AllowMethodEvaluation = evaluateMethods;
 			return GetExpressionValues (expressions, options);
 		}
@@ -189,7 +218,7 @@ namespace Mono.Debugging.Client
 		
 		public ObjectValue GetExpressionValue (string expression, bool evaluateMethods)
 		{
-			EvaluationOptions options = session.EvaluationOptions;
+			EvaluationOptions options = session.EvaluationOptions.Clone ();
 			options.AllowMethodEvaluation = evaluateMethods;
 			return GetExpressionValue (expression, options);
 		}
@@ -240,13 +269,13 @@ namespace Mono.Debugging.Client
 		public override string ToString()
 		{
 			string loc;
-			if (location.Line != -1 && !string.IsNullOrEmpty (location.Filename))
-				loc = " at " + location.Filename + ":" + location.Line;
-			else if (!string.IsNullOrEmpty (location.Filename))
-				loc = " at " + location.Filename;
+			if (location.Line != -1 && !string.IsNullOrEmpty (location.FileName))
+				loc = " at " + location.FileName + ":" + location.Line;
+			else if (!string.IsNullOrEmpty (location.FileName))
+				loc = " at " + location.FileName;
 			else
 				loc = "";
-			return String.Format("0x{0:X} in {1}{2}", address, location.Method, loc);
+			return String.Format("0x{0:X} in {1}{2}", address, location.MethodName, loc);
 		}
 	}
 	

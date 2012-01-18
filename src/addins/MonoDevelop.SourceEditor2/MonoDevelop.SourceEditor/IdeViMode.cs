@@ -34,9 +34,23 @@ using MonoDevelop.Ide;
 
 namespace MonoDevelop.SourceEditor
 {
+	public class NewIdeViMode : Mono.TextEditor.Vi.NewViEditMode
+	{
+		public NewIdeViMode (ExtensibleTextEditor editor)
+		{
+			this.editor = editor;
+		}
+		
+		protected override void HandleKeypress (Gdk.Key key, uint unicodeKey, Gdk.ModifierType modifier)
+		{
+			base.HandleKeypress (key, unicodeKey, modifier);
+			IdeApp.Workbench.StatusBar.ShowMessage (ViEditor.Message);
+		}
+	}
+	
 	public class IdeViMode : Mono.TextEditor.Vi.ViEditMode
 	{
-		ExtensibleTextEditor editor;
+		new ExtensibleTextEditor editor;
 		TabAction tabAction;
 		
 		public IdeViMode (ExtensibleTextEditor editor)
@@ -149,7 +163,8 @@ namespace MonoDevelop.SourceEditor
 				switch (key) {
 				case Gdk.Key.bracketright:
 					// ctrl-] => Go to declaration	
-					IdeApp.CommandService.DispatchCommand (MonoDevelop.Refactoring.RefactoryCommands.GotoDeclaration);
+					// HACK: since the SourceEditor can't link the Refactoring addin the command is provided as string.
+					IdeApp.CommandService.DispatchCommand ("MonoDevelop.Refactoring.RefactoryCommands.GotoDeclaration");
 					return;
 				}
 			}// ctrl+key		

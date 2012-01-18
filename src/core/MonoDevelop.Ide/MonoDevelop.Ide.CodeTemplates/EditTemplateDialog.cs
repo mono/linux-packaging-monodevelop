@@ -138,7 +138,7 @@ namespace MonoDevelop.Ide.CodeTemplates
 
 		void ButtonOkClicked (object sender, EventArgs e)
 		{
-			template.Shortcut = this.entryShortcut1.Text;
+			template.Shortcut = this.entryShortcut1.Text.Trim ();
 			template.Group = this.comboboxentryGroups.Entry.Text;
 			template.MimeType = this.comboboxentryMime.Entry.Text;
 			template.Description = this.entryDescription.Text;
@@ -156,7 +156,9 @@ namespace MonoDevelop.Ide.CodeTemplates
 			List<string> vars = template.ParseVariables (textEditor.Document.Text);
 			foreach (string var in vars) {
 				if (!variables.Any (v => v.Name == var) && !template.Variables.Any (v => v.Name == var)) {
-					variables.Add (new CodeTemplateVariable (var));
+					variables.Add (new CodeTemplateVariable (var) {
+						Default = GettextCatalog.GetString ("notset")
+					});
 				}
 			}
 			for (int i = 0; i < variables.Count; i++) {

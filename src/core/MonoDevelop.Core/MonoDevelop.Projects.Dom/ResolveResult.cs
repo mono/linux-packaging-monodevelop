@@ -33,6 +33,7 @@ using System.Collections.Generic;
 using MonoDevelop.Projects.Dom.Parser;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 
 namespace MonoDevelop.Projects.Dom
 {
@@ -260,6 +261,11 @@ namespace MonoDevelop.Projects.Dom
 		
 		internal static void AddType (ProjectDom dom, List<object> result, IType type, IMember callingMember, bool showStatic)
 		{
+			AddType (dom, result, type, callingMember, showStatic, null);
+		}
+		
+		internal static void AddType (ProjectDom dom, List<object> result, IType type, IMember callingMember, bool showStatic, Func<IMember, bool> filter)
+		{
 //			System.Console.WriteLine("Add Type:" + type);
 			if (type == null)
 				return;
@@ -280,7 +286,7 @@ namespace MonoDevelop.Projects.Dom
 
 			bool includeProtected = callingMember != null ? DomType.IncludeProtected (dom, type, callingMember.DeclaringType) : false;
 			if (accessibleStaticTypes != null) {
-				foreach (IMethod extensionMethod in type.GetExtensionMethods (accessibleStaticTypes))
+				foreach (IMethod extensionMethod in type.GetAllExtensionMethods (accessibleStaticTypes))
 					result.Add (extensionMethod);
 			}
 			foreach (IType curType in dom.GetInheritanceTree (type)) {
@@ -295,6 +301,8 @@ namespace MonoDevelop.Projects.Dom
 					if (member is IMethod && (((IMethod)member).IsConstructor || ((IMethod)member).IsFinalizer))
 						continue;
 					if (!showStatic && member is IType)
+						continue;
+					if (filter != null && filter (member))
 						continue;
 					if (member is IType || !(showStatic ^ (member.IsStatic || member.IsConst))) {
 						result.Add (member);
@@ -328,7 +336,11 @@ namespace MonoDevelop.Projects.Dom
 		public override IEnumerable<object> CreateResolveResult (ProjectDom dom, IMember callingMember)
 		{
 			List<object> result = new List<object> ();
-			AddType (dom, result, ResolvedType, callingMember, StaticResolve);
+			if (ResolvedExpression != null && ResolvedExpression.ExpressionContext != null && ResolvedExpression.ExpressionContext.IsObjectCreation) {
+				AddType (dom, result, dom.GetType (ResolvedType), callingMember, true);
+			} else {
+				AddType (dom, result, ResolvedType, callingMember, StaticResolve);
+			}
 			return result;
 		}
 		
@@ -413,19 +425,21 @@ namespace MonoDevelop.Projects.Dom
 				return false;
 			}
 		}
+		
 		public IMethod MostLikelyMethod {
 			get {
 				if (methods.Count == 0)
 					return null;
-				IMethod result = methods [0];
+				IMethod result = methods[0];
 				foreach (IMethod method in methods) {
 					if (method.Parameters.Any (p => p.IsParams)) {
-						if (method.TypeParameters.Count != genericArguments.Count || method.Parameters.Count - 1 > arguments.Count)
+						if (method.Parameters.Count - 1 > arguments.Count)
 							continue;
 					} else {
-						if (method.TypeParameters.Count != genericArguments.Count || method.Parameters.Count != arguments.Count)
+						if (method.Parameters.Count != arguments.Count)
 							continue;
 					}
+					
 					bool match = true;
 					for (int i = 0; i < arguments.Count; i++) {
 						if (method.Parameters.Count == 0) { // should never happen
@@ -434,17 +448,55 @@ namespace MonoDevelop.Projects.Dom
 						}
 						
 						IParameter parameter = method.Parameters[System.Math.Min (i, method.Parameters.Count - 1)];
-						if (IsCompatible (parameter.ReturnType, arguments[i]))
+						if (!IsCompatible (parameter.ReturnType, arguments[i])) {
 							match = false;
+							break;
+						}
 					}
 					if (match)
 						return method;
-					result = method;
+					if (MayBeBetter (result, method))
+						result = method;
 				}
 				return result;
 			}
 		}
 		
+		string CreateGenericIdString (IReturnType type)
+		{
+			StringBuilder result = new StringBuilder ();
+			result.Append (type.GenericArguments.Count);
+			result.Append ("<");
+			foreach (var generic in type.GenericArguments)
+				result.Append (CreateGenericIdString (generic));
+			result.Append (">");
+			return result.ToString ();
+		}
+		
+		bool MayBeBetter (IMethod current, IMethod possibleBetterMethod)
+		{
+			if (current == null)
+				return true;
+			if (possibleBetterMethod == null)
+				return false;
+			
+			int better = 0;
+			for (int i = 0; i < arguments.Count; i++) {
+				if (i >= current.Parameters.Count || i >= possibleBetterMethod.Parameters.Count)
+					return false;
+				IParameter curParameter = current.Parameters[System.Math.Min (i, current.Parameters.Count - 1)];
+				IParameter newParameter = possibleBetterMethod.Parameters[System.Math.Min (i, possibleBetterMethod.Parameters.Count - 1)];
+				string s1 = CreateGenericIdString (curParameter.ReturnType);
+				string s2 = CreateGenericIdString (newParameter.ReturnType);
+				string arg = CreateGenericIdString (arguments[i]);
+				if (arg.Contains (s1) || s1.Contains (arg))
+					better--;
+				if (arg.Contains (s2) || s2.Contains (arg))
+					better++;
+			}
+			return better >= 0;
+		}
+			
 		public bool IsCompatible (IReturnType baseType, IReturnType type)
 		{
 			if (baseType.ToInvariantString () == type.ToInvariantString ())
@@ -453,8 +505,8 @@ namespace MonoDevelop.Projects.Dom
 			if (CallingType == null) 
 				return false;
 			dom = CallingType.SourceProjectDom;
-			IType b = dom.SearchType (CallingType, baseType);
-			IType t = dom.SearchType (CallingType, type);
+			IType b = dom.SearchType (CallingType.CompilationUnit, CallingType, CallingType.Location, baseType);
+			IType t = dom.SearchType (CallingType.CompilationUnit, CallingType, CallingType.Location, type);
 			if (b == null || t == null)
 				return false;
 			return dom.GetInheritanceTree (t).Any (tBase => tBase.DecoratedFullName == b.DecoratedFullName);
@@ -490,6 +542,7 @@ namespace MonoDevelop.Projects.Dom
 				return genericArguments.AsReadOnly ();
 			}
 		}
+		
 		public void AddGenericArgument (IReturnType arg)
 		{
 			genericArguments.Add (arg);
@@ -500,6 +553,7 @@ namespace MonoDevelop.Projects.Dom
 				return arguments.AsReadOnly ();
 			}
 		}
+		
 		public void AddArgument (IReturnType arg)
 		{
 			arguments.Add (arg);
@@ -528,6 +582,11 @@ namespace MonoDevelop.Projects.Dom
 			}
 		}
 		
+		public bool StaticUsage {
+			get;
+			set;
+		}
+		
 		public void ResolveExtensionMethods ()
 		{
 //			Console.WriteLine (" --- Resolve extension");
@@ -541,12 +600,11 @@ namespace MonoDevelop.Projects.Dom
 //			} else {
 //				Console.WriteLine ("<null>");
 //			}
-			
 			Debug.Assert (originalMethods.Count == methods.Count);
 			for (int i = 0; i < originalMethods.Count; i++) {
 				if (originalMethods[i] is ExtensionMethod) { // Extension methods are already resolved & instantiated.
 					methods[i] = originalMethods[i];
-				} else if (originalMethods[i].IsExtension && Type != null) {
+				} else if (!StaticUsage && originalMethods[i].IsExtension && Type != null) {
 					methods[i] = new ExtensionMethod (Type, originalMethods[i], genericArguments, arguments);
 				} else {
 					methods[i] = DomMethod.CreateInstantiatedGenericMethod (originalMethods[i], genericArguments, arguments);
@@ -644,8 +702,8 @@ namespace MonoDevelop.Projects.Dom
 		{
 			List<object> result = new List<object> ();
 			if (CallingMember != null && !CallingMember.IsStatic) {
-				IType baseType = dom.SearchType (CallingMember ?? CallingType, CallingType.BaseType ?? DomReturnType.Object);
-				MemberResolveResult.AddType (dom, result, baseType, new BaseMemberDecorator (CallingMember, baseType), StaticResolve);
+				IType baseType = dom.SearchType (CallingType != null ? CallingType.CompilationUnit : null, CallingType, CallingMember.Location ,CallingType.BaseType ?? DomReturnType.Object);
+				MemberResolveResult.AddType (dom, result, baseType, new BaseMemberDecorator (CallingMember, baseType), StaticResolve, m => m.IsAbstract);
 			}
 			return result;
 		}

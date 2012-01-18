@@ -63,6 +63,8 @@ namespace MonoDevelop.Debugger
 		static IConsole console;
 		static DebugExecutionHandlerFactory executionHandlerFactory;
 		
+		static string oldLayout;
+		
 		static DebuggerEngine currentEngine;
 		static DebuggerSession session;
 		static Backtrace currentBacktrace;
@@ -192,13 +194,9 @@ namespace MonoDevelop.Debugger
 		
 		public static void ShowValueVisualizer (ObjectValue val)
 		{
-			ValueVisualizerDialog dlg = new ValueVisualizerDialog ();
-			try {
-				dlg.Show (val);
-				dlg.Run ();
-			} finally {
-				dlg.Destroy ();
-			}
+			var dlg = new ValueVisualizerDialog ();
+			dlg.Show (val);
+			MessageService.ShowCustomDialog (dlg);
 		}
 		
 		public static bool ShowBreakpointProperties (Breakpoint bp, bool editNew)
@@ -284,6 +282,8 @@ namespace MonoDevelop.Debugger
 			ExceptionInfo val = CurrentFrame.GetException ();
 			if (val != null) {
 				ExceptionCaughtDialog dlg = new ExceptionCaughtDialog (val);
+				dlg.TransientFor = IdeApp.Workbench.RootWindow;
+				MessageService.PlaceDialog (dlg, IdeApp.Workbench.RootWindow);
 				dlg.Show ();
 			}
 		}
@@ -301,22 +301,36 @@ namespace MonoDevelop.Debugger
 			session.TargetStarted += OnStarted;
 			session.OutputWriter = OutputWriter;
 			session.LogWriter = LogWriter;
-			session.ExceptionHandler = ExceptionHandler;
 			session.BusyStateChanged += OnBusyStateChanged;
 			session.TypeResolverHandler = ResolveType;
 			session.BreakpointTraceHandler = BreakpointTraceHandler;
 			session.GetExpressionEvaluator = OnGetExpressionEvaluator;
+			session.ConnectionDialogCreator = delegate {
+				return new GtkConnectionDialog ();
+			};
 
 			console.CancelRequested += OnCancelRequested;
 			
-			if (DebugSessionStarted != null)
-				DebugSessionStarted (null, EventArgs.Empty);
+			DispatchService.GuiDispatch (delegate {
+				if (DebugSessionStarted != null)
+					DebugSessionStarted (null, EventArgs.Empty);
+				NotifyLocationChanged ();
+			});
 
-			NotifyLocationChanged ();
 		}
 		
 		static void Cleanup ()
 		{
+			if (oldLayout != null) {
+				string layout = oldLayout;
+				oldLayout = null;
+				// Dispatch asynchronously to avoid start/stop races
+				DispatchService.GuiSyncDispatch (delegate {
+					if (IdeApp.Workbench.CurrentLayout == "Debug")
+						IdeApp.Workbench.CurrentLayout = layout;
+				});
+			}
+			
 			currentBacktrace = null;
 			
 			if (!IsDebugging)
@@ -331,7 +345,6 @@ namespace MonoDevelop.Debugger
 			session.TargetStarted -= OnStarted;
 			session.OutputWriter = null;
 			session.LogWriter = null;
-			session.ExceptionHandler = null;
 			session.BusyStateChanged -= OnBusyStateChanged;
 			session.TypeResolverHandler = null;
 			session.BreakpointTraceHandler = null;
@@ -341,9 +354,11 @@ namespace MonoDevelop.Debugger
 			// Dispose the session at the end, since it may take a while.
 			DebuggerSession oldSession = session;
 			session = null;
-
-			if (StoppedEvent != null)
-				StoppedEvent (null, new EventArgs ());
+			
+			DispatchService.GuiDispatch (delegate {
+				if (StoppedEvent != null)
+					StoppedEvent (null, new EventArgs ());
+			});
 			
 			if (console != null) {
 				console.Dispose ();
@@ -374,6 +389,12 @@ namespace MonoDevelop.Debugger
 			}
 		}
 
+		public static bool IsPaused {
+			get {
+				return IsDebugging && !IsRunning && currentBacktrace != null;
+			}
+		}
+
 		public static void Pause ()
 		{
 			session.Stop ();
@@ -398,6 +419,7 @@ namespace MonoDevelop.Debugger
 		{
 			currentEngine = debugger;
 			session = debugger.CreateSession ();
+			session.ExceptionHandler = ExceptionHandler;
 			IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetRunProgressMonitor ();
 			console = monitor as IConsole;
 			SetupSession ();
@@ -455,16 +477,31 @@ namespace MonoDevelop.Debugger
 					throw new InvalidOperationException ("Unsupported command: " + cmd);
 			}
 			
+			if (session != null)
+				throw new InvalidOperationException ("A debugger session is already started");
+
 			DebuggerStartInfo startInfo = factory.CreateDebuggerStartInfo (cmd);
 			startInfo.UseExternalConsole = c is ExternalConsole;
 			startInfo.CloseExternalConsoleOnExit = c.CloseOnDispose;
 			currentEngine = factory;
 			session = factory.CreateSession ();
-			session.Initialize ();
-			console = c;
+			session.ExceptionHandler = ExceptionHandler;
+			
+			// When using an external console, create a new internal console which will be used
+			// to show the debugger log
+			if (startInfo.UseExternalConsole)
+				console = (IConsole) IdeApp.Workbench.ProgressMonitors.GetRunProgressMonitor ();
+			else
+				console = c;
 			
 			SetupSession ();
-
+			
+			// Dispatch synchronously to avoid start/stop races
+			DispatchService.GuiSyncDispatch (delegate {
+				oldLayout = IdeApp.Workbench.CurrentLayout;
+				IdeApp.Workbench.CurrentLayout = "Debug";
+			});
+			
 			try {
 				session.Run (startInfo, GetUserOptions ());
 			} catch {
@@ -475,6 +512,7 @@ namespace MonoDevelop.Debugger
 		
 		static bool ExceptionHandler (Exception ex)
 		{
+			LoggingService.LogError ("Error in debugger", ex);
 			Gtk.Application.Invoke (delegate {
 				if (ex is DebuggerException)
 					MessageService.ShowError (ex.Message);
@@ -545,30 +583,25 @@ namespace MonoDevelop.Debugger
 		static void OnTargetEvent (object sender, TargetEventArgs args)
 		{
 			try {
-				Console.WriteLine ("OnTargetEvent, type - {0}", args.Type);
-				if (args.Type != TargetEventType.TargetExited) {
-					SetCurrentBacktrace (args.Backtrace);
-				}
-
 				switch (args.Type) {
 					case TargetEventType.TargetExited:
 						Cleanup ();
 						break;
 					case TargetEventType.TargetSignaled:
 					case TargetEventType.TargetStopped:
-					case TargetEventType.TargetRunning:
 					case TargetEventType.TargetHitBreakpoint:
 					case TargetEventType.TargetInterrupted:
 					case TargetEventType.UnhandledException:
 					case TargetEventType.ExceptionThrown:
+						SetCurrentBacktrace (args.Backtrace);
 						NotifyPaused ();
 						NotifyException (args);
 						break;
 					default:
 						break;
 				}
-			} catch (Exception e) {
-				Console.WriteLine ("OnTargetEvent, {0}", e.ToString ());
+			} catch (Exception ex) {
+				LoggingService.LogError ("Error handling debugger target event", ex);
 			}
 		}
 		
@@ -585,7 +618,7 @@ namespace MonoDevelop.Debugger
 				if (PausedEvent != null)
 					PausedEvent (null, EventArgs.Empty);
 				NotifyLocationChanged ();
-				IdeApp.Workbench.Present ();
+				IdeApp.Workbench.GrabDesktopFocus ();
 			});
 		}
 		
@@ -733,8 +766,8 @@ namespace MonoDevelop.Debugger
 		{
 			if (currentBacktrace != null) {
 				var sf = GetCurrentVisibleFrame ();
-				if (!string.IsNullOrEmpty (sf.SourceLocation.Filename) && System.IO.File.Exists (sf.SourceLocation.Filename) && sf.SourceLocation.Line != -1) {
-					Document document = IdeApp.Workbench.OpenDocument (sf.SourceLocation.Filename, sf.SourceLocation.Line, 1, true, false);
+				if (!string.IsNullOrEmpty (sf.SourceLocation.FileName) && System.IO.File.Exists (sf.SourceLocation.FileName) && sf.SourceLocation.Line != -1) {
+					Document document = IdeApp.Workbench.OpenDocument (sf.SourceLocation.FileName, sf.SourceLocation.Line, 1, OpenDocumentOptions.BringToFront);
 					OnDisableConditionalCompilation (new DocumentEventArgs (document));
 				}
 			}
@@ -837,11 +870,11 @@ namespace MonoDevelop.Debugger
 		
 		static string ResolveType (string identifier, SourceLocation location)
 		{
-			Document doc = IdeApp.Workbench.GetDocument (location.Filename);
+			Document doc = IdeApp.Workbench.GetDocument (location.FileName);
 			if (doc != null) {
 				ITextEditorResolver textEditorResolver = doc.GetContent <ITextEditorResolver> ();
 				if (textEditorResolver != null) {
-					ResolveResult rr = textEditorResolver.GetLanguageItem (doc.TextEditor.GetPositionFromLineColumn (location.Line, 1), identifier);
+					ResolveResult rr = textEditorResolver.GetLanguageItem (doc.Editor.Document.LocationToOffset (location.Line, 1), identifier);
 					NamespaceResolveResult ns = rr as NamespaceResolveResult;
 					if (ns != null)
 						return ns.Namespace;
@@ -905,6 +938,84 @@ namespace MonoDevelop.Debugger
 		{
 			DebugExecutionHandler h = new DebugExecutionHandler (engine);
 			return h.Execute (command, console);
+		}
+	}
+	
+	internal class GtkConnectionDialog : IConnectionDialog
+	{
+		bool disposed;
+		Gtk.Dialog dialog;
+		Gtk.Label label;
+		
+		public event EventHandler UserCancelled;
+		
+		string DefaultListenMessage {
+			get { return GettextCatalog.GetString ("Waiting for debugger to connect..."); }
+		}
+
+		public void SetMessage (DebuggerStartInfo dsi, string message, bool listening, int attemptNumber)
+		{
+			if (disposed)
+				return;
+			
+			if (string.IsNullOrEmpty (message))
+				message = DefaultListenMessage;
+			
+			if (dialog == null) {
+				Gtk.Application.Invoke (delegate {
+					if (disposed)
+						return;
+					RunDialog (message);
+				});
+			} else {
+				Gtk.Application.Invoke (delegate {
+					if (disposed)
+						return;
+					if (label != null)
+						label.Text = message;
+				});
+			}
+		}
+		
+		void RunDialog (string message)
+		{
+			if (disposed)
+				return;
+			
+			dialog = new Gtk.Dialog () {
+				Title = "Waiting for debugger"
+			};
+			
+			var label = new Gtk.Alignment (0.5f, 0.5f, 1f, 1f) {
+				Child = new Gtk.Label (message),
+				BorderWidth = 12
+			};
+			dialog.VBox.PackStart (label);
+			label.ShowAll ();
+			
+			dialog.AddButton ("Cancel", Gtk.ResponseType.Cancel);
+			
+			int response = MonoDevelop.Ide.MessageService.ShowCustomDialog (dialog);
+			dialog.Destroy ();
+			dialog = null;
+			
+			if (!disposed && response != (int) Gtk.ResponseType.Ok && UserCancelled != null) {
+				UserCancelled (null, null);
+			}
+		}
+
+		public void Dispose ()
+		{
+			if (disposed)
+				return;
+			disposed = true;
+			
+			if (dialog != null) {
+				Gtk.Application.Invoke (delegate {
+					if (dialog != null)
+						dialog.Respond (Gtk.ResponseType.Ok);
+				});
+			}
 		}
 	}
 }

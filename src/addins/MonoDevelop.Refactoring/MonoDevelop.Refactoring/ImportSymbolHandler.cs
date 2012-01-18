@@ -81,7 +81,7 @@ namespace MonoDevelop.Refactoring
 			
 			foreach (IUsing u in unit.Usings.Where (u => u.ValidRegion.Contains (location))) {
 				foreach (string ns in u.Namespaces) {
-					if (dom.SearchType (unit, unit.GetTypeAt (location), unit.GetMemberAt (location), ns + "." + name) != null) {
+					if (dom.SearchType (unit, unit.GetTypeAt (location), location, ns + "." + name) != null) {
 						result.GenerateUsing = false;
 						result.InsertNamespace = true;
 						return result;
@@ -111,7 +111,7 @@ namespace MonoDevelop.Refactoring
 			this.doc = doc;
 			this.cache = cache;
 			this.dom = dom;
-			this.data = doc.TextEditorData;
+			this.data = doc.Editor;
 			this.ambience = doc.Project != null ? doc.Project.Ambience : AmbienceService.GetAmbienceForFile (doc.FileName);
 			this.type = type;
 			this.unit = doc.CompilationUnit;
@@ -133,13 +133,17 @@ namespace MonoDevelop.Refactoring
 		}
 		
 		#region IActionCompletionData implementation
-		public override void InsertCompletionText (CompletionListWindow window)
+		public override void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
 		{
 			Initialize ();
 			string text = insertNamespace ? type.Namespace + "." + type.Name : type.Name;
-			data.Replace (window.CodeCompletionContext.TriggerOffset, data.Caret.Offset - window.CodeCompletionContext.TriggerOffset, text);
-			data.Caret.Offset = window.CodeCompletionContext.TriggerOffset + text.Length;
-			if (generateUsing) {
+			if (text != GetCurrentWord (window)) {
+				if (window.WasShiftPressed && generateUsing) 
+					text = type.Namespace + "." + text;
+				window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, GetCurrentWord (window), text);
+			}
+			
+			if (!window.WasShiftPressed && generateUsing) {
 				CodeRefactorer refactorer = IdeApp.Workspace.GetCodeRefactorer (IdeApp.ProjectOperations.CurrentSelectedSolution);
 				refactorer.AddGlobalNamespaceImport (dom, data.Document.FileName, type.Namespace);
 				// add using to compilation unit (this way the using is valid before the parser thread updates)

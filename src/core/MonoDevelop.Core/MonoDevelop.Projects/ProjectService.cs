@@ -61,7 +61,7 @@ namespace MonoDevelop.Projects
 		TargetFramework defaultTargetFramework;
 		
 		string defaultPlatformTarget = "x86";
-		public const string DefaultTargetFrameworkId = "3.5";
+		static readonly TargetFrameworkMoniker DefaultTargetFrameworkId = TargetFrameworkMoniker.NET_4_0;
 		
 		public const string BuildTarget = "Build";
 		public const string CleanTarget = "Clean";
@@ -190,7 +190,7 @@ namespace MonoDevelop.Projects
 
 		internal FileFormat GetDefaultFormat (object ob)
 		{
-			if (defaultFormat.Format.CanWriteFile (ob))
+			if (defaultFormat.CanWrite (ob))
 				return defaultFormat;
 			FileFormat[] formats = FileFormats.GetFileFormatsForObject (ob);
 			if (formats.Length == 0)
@@ -317,7 +317,7 @@ namespace MonoDevelop.Projects
 		string WriteFile (IProgressMonitor monitor, string file, object item, FileFormat format)
 		{
 			if (format == null) {
-				if (defaultFormat.Format.CanWriteFile (item))
+				if (defaultFormat.CanWrite (item))
 					format = defaultFormat;
 				else {
 					FileFormat[] formats = formatManager.GetFileFormatsForObject (item);
@@ -365,7 +365,7 @@ namespace MonoDevelop.Projects
 			targetPath = Path.GetFullPath (targetPath);
 			
 			if (sourcePath != targetPath) {
-				if (!CopyFiles (monitor, obj, obj.GetItemFiles (true), targetPath))
+				if (!CopyFiles (monitor, obj, obj.GetItemFiles (true), targetPath, true))
 					return null;
 				
 				string newFile = Path.Combine (targetPath, Path.GetFileName (rootSourceFile));
@@ -381,12 +381,19 @@ namespace MonoDevelop.Projects
 						obj.ConvertToFormat (format, true);
 					obj.Save (monitor);
 					List<FilePath> newFiles = obj.GetItemFiles (true);
+					
+					foreach (FilePath f in newFiles) {
+						if (!f.IsChildPathOf (targetPath)) {
+							if (obj is Solution)
+								monitor.ReportError ("The solution '" + obj.Name + "' is referencing the file '" + f.FileName + "' which is located outside the root solution directory.", null);
+							else
+								monitor.ReportError ("The project '" + obj.Name + "' is referencing the file '" + f.FileName + "' which is located outside the project directory.", null);
+						}
+						oldFiles.Remove (f);
+					}
 	
 					// Remove old files
 					foreach (FilePath file in oldFiles) {
-						if (newFiles.Contains (file))
-							continue;
-						
 						if (File.Exists (file)) {
 							File.Delete (file);
 						
@@ -432,7 +439,7 @@ namespace MonoDevelop.Projects
 			}
 		}
 
-		bool CopyFiles (IProgressMonitor monitor, IWorkspaceFileObject obj, List<FilePath> files, FilePath targetBasePath)
+		bool CopyFiles (IProgressMonitor monitor, IWorkspaceFileObject obj, IEnumerable<FilePath> files, FilePath targetBasePath, bool ignoreExternalFiles)
 		{
 			FilePath baseDir = obj.BaseDirectory.FullPath;
 			foreach (FilePath file in files) {
@@ -445,6 +452,8 @@ namespace MonoDevelop.Projects
 				
 				// Can't export files from outside the root solution directory
 				if (!fname.IsChildPathOf (baseDir)) {
+					if (ignoreExternalFiles)
+						continue;
 					if (obj is Solution)
 						monitor.ReportError ("The solution '" + obj.Name + "' is referencing the file '" + Path.GetFileName (file) + "' which is located outside the root solution directory.", null);
 					else
@@ -504,7 +513,7 @@ namespace MonoDevelop.Projects
 			Solution tempSolution = new Solution ();
 			
 			FileFormat solutionFileFormat;
-			if (formats [0].Format.CanWriteFile (tempSolution))
+			if (formats [0].CanWrite (tempSolution))
 				solutionFileFormat = formats [0];
 			else
 				solutionFileFormat = MonoDevelop.Projects.Formats.MD1.MD1ProjectService.FileFormat;
@@ -566,7 +575,7 @@ namespace MonoDevelop.Projects
 		{
 			FileFormatNode node = (FileFormatNode) args.ExtensionNode;
 			if (args.Change == ExtensionChange.Add)
-				formatManager.RegisterFileFormat ((IFileFormat) args.ExtensionObject, node.Id, node.Name);
+				formatManager.RegisterFileFormat ((IFileFormat) args.ExtensionObject, node.Id, node.Name, node.CanDefault);
 			else
 				formatManager.UnregisterFileFormat ((IFileFormat) args.ExtensionObject);
 		}
@@ -612,7 +621,7 @@ namespace MonoDevelop.Projects
 		
 		string GetTargetFile (string file)
 		{
-			if (!PropertyService.IsWindows) {
+			if (!Platform.IsWindows) {
 				try {
 					UnixSymbolicLinkInfo fi = new UnixSymbolicLinkInfo (file);
 					if (fi.IsSymbolicLink)
@@ -668,44 +677,14 @@ namespace MonoDevelop.Projects
 			return Services.ProjectService.InternalReadWorkspaceItem (fileName, monitor);
 		}
 		
-		protected override void Clean (IProgressMonitor monitor, IBuildTarget item, ConfigurationSelector configuration)
-		{
-			if (item is SolutionEntityItem) {
-				SolutionEntityItem entry = (SolutionEntityItem) item;
-				SolutionItemConfiguration config = entry.GetConfiguration (configuration) as SolutionItemConfiguration;
-				if (config != null && config.CustomCommands.HasCommands (CustomCommandType.Clean)) {
-					config.CustomCommands.ExecuteCommand (monitor, entry, CustomCommandType.Clean, configuration);
-					return;
-				}
-				entry.OnClean (monitor, configuration);
-			}
-			else if (item is WorkspaceItem) {
-				((WorkspaceItem)item).OnRunTarget (monitor, ProjectService.CleanTarget, configuration);
-			}
-			else if (item is SolutionItem)
-				((SolutionItem)item).OnClean (monitor, configuration);
-			else
-				throw new InvalidOperationException ("Unknown item type: " + item);
-		}
-
-		protected override BuildResult Build (IProgressMonitor monitor, IBuildTarget item, ConfigurationSelector configuration)
+		public override BuildResult RunTarget (IProgressMonitor monitor, IBuildTarget item, string target, ConfigurationSelector configuration)
 		{
 			BuildResult res;
-			if (item is SolutionEntityItem) {
-				SolutionEntityItem entry = (SolutionEntityItem) item;
-				SolutionItemConfiguration conf = entry.GetConfiguration (configuration) as SolutionItemConfiguration;
-				if (conf != null && conf.CustomCommands.HasCommands (CustomCommandType.Build)) {
-					conf.CustomCommands.ExecuteCommand (monitor, entry, CustomCommandType.Build, configuration);
-					res = new BuildResult ();
-				}
-				else
-					res = entry.OnBuild (monitor, configuration);
-			}
-			else if (item is WorkspaceItem) {
-				res = ((WorkspaceItem)item).OnRunTarget (monitor, ProjectService.BuildTarget, configuration);
+			if (item is WorkspaceItem) {
+				res = ((WorkspaceItem)item).OnRunTarget (monitor, target, configuration);
 			}
 			else if (item is SolutionItem)
-				res = ((SolutionItem)item).OnBuild (monitor, configuration);
+				res = ((SolutionItem)item).OnRunTarget (monitor, target, configuration);
 			else
 				throw new InvalidOperationException ("Unknown item type: " + item);
 			
@@ -713,7 +692,7 @@ namespace MonoDevelop.Projects
 				res.SourceTarget = item;
 			return res;
 		}
-		
+
 		public override void Execute (IProgressMonitor monitor, IBuildTarget item, ExecutionContext context, ConfigurationSelector configuration)
 		{
 			if (item is SolutionEntityItem) {
@@ -740,7 +719,7 @@ namespace MonoDevelop.Projects
 				SolutionEntityItem entry = (SolutionEntityItem) item;
 				SolutionItemConfiguration conf = entry.GetConfiguration (configuration) as SolutionItemConfiguration;
 				if (conf != null && conf.CustomCommands.HasCommands (CustomCommandType.Execute))
-					return conf.CustomCommands.CanExecute (CustomCommandType.Execute, context, configuration);
+					return conf.CustomCommands.CanExecute (entry, CustomCommandType.Execute, context, configuration);
 				return entry.OnGetCanExecute (context, configuration);
 			}
 			else if (item is WorkspaceItem) {
@@ -798,6 +777,16 @@ namespace MonoDevelop.Projects
 		{
 			return callback (monitor, item, buildData);
 		}
+		
+		public override void PopulateSupportFileList (Project project, FileCopySet list, ConfigurationSelector configuration)
+		{
+			project.PopulateSupportFileList (list, configuration);
+		}
+		
+		public override void PopulateOutputFileList (Project project, List<FilePath> list, ConfigurationSelector configuration)
+		{
+			project.PopulateOutputFileList (list, configuration);
+		}
 	}	
 	
 	internal static class Counters
@@ -824,5 +813,8 @@ namespace MonoDevelop.Projects
 		public static TimerCounter DatabasesWritten = InstrumentationService.CreateTimerCounter ("Parser database written", "Parser Service");
 		public static TimerCounter FileParse = InstrumentationService.CreateTimerCounter ("File parsed", "Parser Service");
 		public static TimerCounter AssemblyParseTime = InstrumentationService.CreateTimerCounter ("Assembly parsed", "Parser Service");
+		
+		public static TimerCounter HelpServiceInitialization = InstrumentationService.CreateTimerCounter ("Help Service initialization", "IDE");
+		public static TimerCounter ParserServiceInitialization = InstrumentationService.CreateTimerCounter ("Parser Service initialization", "IDE");
 	}
 }

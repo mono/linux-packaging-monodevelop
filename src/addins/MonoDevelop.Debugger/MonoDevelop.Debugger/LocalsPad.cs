@@ -25,12 +25,18 @@
 //
 //
 
+using System;
+using System.Linq;
 using Mono.Debugging.Client;
+using System.Collections.Generic;
 
 namespace MonoDevelop.Debugger
 {
 	public class LocalsPad: ObjectValuePad
 	{
+		StackFrame lastFrame;
+		HashSet<string> lastExpressions = new HashSet<string> ();
+		
 		public LocalsPad()
 		{
 			tree.AllowEditing = true;
@@ -41,10 +47,39 @@ namespace MonoDevelop.Debugger
 		{
 			base.OnUpdateList ();
 			StackFrame frame = DebuggingService.CurrentFrame;
-			if (frame != null) {
-				tree.ClearValues ();
-				tree.AddValues (frame.GetAllLocals ());
+			
+			if (frame == null || !FrameEquals (frame, lastFrame)) {
+				tree.ClearExpressions ();
+				lastExpressions = null;
 			}
+			lastFrame = frame;
+			
+			if (frame == null)
+				return;
+			
+			//FIXME: tree should use the local refs rather than expressions. ATM we exclude items without names
+			var expr = new HashSet<string> (frame.GetAllLocals ().Select (i => i.Name)
+				.Where (n => !string.IsNullOrEmpty (n) && n != "?"));
+			
+			//add expressions not in tree already, remove expressions that are longer valid
+			if (lastExpressions != null) {
+				foreach (string rem in lastExpressions.Except (expr))
+					tree.RemoveExpression (rem);
+				foreach (string rem in expr.Except (lastExpressions))
+					tree.AddExpression (rem);
+			} else {
+				tree.AddExpressions (expr);
+			}
+			
+			lastExpressions = expr;
+		}
+		
+		static bool FrameEquals (StackFrame a, StackFrame z)
+		{
+			if (null == a || null == z)
+				return a == z;
+			return a.SourceLocation.FileName.Equals (z.SourceLocation.FileName, StringComparison.Ordinal) &&
+			       a.SourceLocation.MethodName.Equals (z.SourceLocation.MethodName, StringComparison.Ordinal);
 		}
 	}
 }

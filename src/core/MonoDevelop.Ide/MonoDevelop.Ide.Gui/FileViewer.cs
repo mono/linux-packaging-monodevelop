@@ -34,7 +34,7 @@ namespace MonoDevelop.Ide.Gui
 {
 	public class FileViewer
 	{
-		IDisplayBinding binding;
+		IViewDisplayBinding binding;
 		DesktopApplication app;
 		
 		internal FileViewer (DesktopApplication app)
@@ -42,7 +42,7 @@ namespace MonoDevelop.Ide.Gui
 			this.app = app;
 		}
 		
-		internal FileViewer (IDisplayBinding binding)
+		internal FileViewer (IViewDisplayBinding binding)
 		{
 			this.binding = binding;
 		}
@@ -55,11 +55,24 @@ namespace MonoDevelop.Ide.Gui
 			get { return binding == null; }
 		}
 		
+		public bool CanUseAsDefault {
+			get {
+				if (binding != null)
+					return binding.CanUseAsDefault;
+				else
+					return app.IsDefault;
+			}
+		}
+		
 		public override bool Equals (object ob)
 		{
 			FileViewer fv = ob as FileViewer;
-			if (fv == null) return false;
-			return binding == fv.binding || app.Command == fv.app.Command;
+			if (fv == null)
+				return false;
+			if (binding != null)
+				return binding == fv.binding;
+			else
+				return app.Equals (fv.app);
 		}
 		
 		public override int GetHashCode ()
@@ -67,7 +80,7 @@ namespace MonoDevelop.Ide.Gui
 			if (binding != null)
 				return binding.GetHashCode ();
 			else
-				return app.Command.GetHashCode ();
+				return app.GetHashCode ();
 		}
 		
 		public Document OpenFile (string filePath)
@@ -78,7 +91,7 @@ namespace MonoDevelop.Ide.Gui
 		public Document OpenFile (string filePath, string encoding)
 		{
 			if (binding != null)
-				return IdeApp.Workbench.OpenDocument (filePath, -1, -1, true, encoding, binding);
+				return IdeApp.Workbench.OpenDocument (filePath, -1, -1, OpenDocumentOptions.Default, encoding, binding);
 			else {
 				app.Launch (filePath);
 				return null;

@@ -38,9 +38,9 @@ namespace MonoDevelop.Projects
 	{
 		List<FileFormat> fileFormats = new List<FileFormat> ();
 		
-		public void RegisterFileFormat (IFileFormat format, string id, string name)
+		public void RegisterFileFormat (IFileFormat format, string id, string name, bool canDefault)
 		{
-			FileFormat f = new FileFormat (format, id, name);
+			FileFormat f = new FileFormat (format, id, name, canDefault);
 			fileFormats.Add (f);
 		}
 		
@@ -75,7 +75,7 @@ namespace MonoDevelop.Projects
 		{
 			List<FileFormat> list = new List<FileFormat> ();
 			foreach (FileFormat f in fileFormats)
-				if (f.Format.CanWriteFile (obj))
+				if (f.CanWrite(obj))
 					list.Add (f);
 			return list.ToArray ();
 		}

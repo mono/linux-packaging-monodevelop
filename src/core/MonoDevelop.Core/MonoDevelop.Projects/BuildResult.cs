@@ -89,6 +89,11 @@ namespace MonoDevelop.Projects
 			Append (new BuildError (null, 0, 0, null, text));
 		}
 		
+		public void AddError (string text, string file)
+		{
+			Append (new BuildError (file, 0, 0, null, text));
+		}
+		
 		public void AddWarning (string file, int line, int col, string errorNum, string text)
 		{
 			BuildError ce = new BuildError (file, line, col, errorNum, text);
@@ -98,9 +103,12 @@ namespace MonoDevelop.Projects
 		
 		public void AddWarning (string text)
 		{
-			BuildError ce = new BuildError (null, 0, 0, null, text);
-			ce.IsWarning = true;
-			Append (ce);
+			AddWarning (text, null);
+		}
+		
+		public void AddWarning (string text, string file)
+		{
+			AddWarning (file, 0, 0, null, text);
 		}
 		
 		public BuildResult Append (BuildResult res)
@@ -222,9 +230,9 @@ namespace MonoDevelop.Projects
 			System.Text.StringBuilder sb = new System.Text.StringBuilder ();
 			if (!string.IsNullOrEmpty (fileName)) {
 				sb.Append (fileName);
-				if (line > 0) {
+				if (line > 1) {
 					sb.Append ('(').Append (line);
-					if (column > 0)
+					if (column > 1)
 						sb.Append (',').Append (column);
 					sb.Append (')');
 				}

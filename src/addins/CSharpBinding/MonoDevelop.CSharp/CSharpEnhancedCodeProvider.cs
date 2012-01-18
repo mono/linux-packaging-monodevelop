@@ -34,12 +34,13 @@ using System.IO;
 using System.CodeDom;
 using System.CodeDom.Compiler;
 using Microsoft.CSharp;
-using ICSharpCode.NRefactory;
-using ICSharpCode.NRefactory.Parser;
-using ICSharpCode.NRefactory.Visitors;
+using ICSharpCode.OldNRefactory;
+using ICSharpCode.OldNRefactory.Parser;
+using ICSharpCode.OldNRefactory.Visitors;
 
 namespace MonoDevelop.CSharp
 {
+	[System.ComponentModel.DesignerCategory ("Code")]
 	public class CSharpEnhancedCodeProvider : CSharpCodeProvider
 	{
 		private ICodeParser codeParser;
@@ -68,7 +69,7 @@ namespace MonoDevelop.CSharp
 			if (parser.Errors.Count > 0)
 				throw new ArgumentException (parser.Errors.ErrorOutput);
 			
-			CodeDomVisitor cdv = new CodeDomVisitor (); // new CodeDomVisitor (parser.Lexer.SpecialTracker.CurrentSpecials);
+			var cdv = new CodeDomVisitor (); // new CodeDomVisitor (parser.Lexer.SpecialTracker.CurrentSpecials);
 			parser.CompilationUnit.AcceptVisitor (cdv, null);
 			
 			parser.Dispose ();

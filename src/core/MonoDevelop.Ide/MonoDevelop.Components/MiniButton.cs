@@ -26,6 +26,7 @@
 
 using System;
 using Gtk;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Components
 {
@@ -35,6 +36,7 @@ namespace MonoDevelop.Components
 		Gdk.Color normalColor;
 		bool pressed;
 		bool highligted;
+		bool backgroundColorSet;
 		
 		public MiniButton ()
 		{
@@ -71,6 +73,17 @@ namespace MonoDevelop.Components
 		
 		public bool ToggleMode { get; set; }
 		
+		public bool ClickOnRelease { get; set; }
+		
+		public Gdk.Color BackroundColor {
+			get { return normalColor; }
+			set {
+				normalColor = value;
+				ModifyBg (StateType.Normal, normalColor);
+				backgroundColorSet = true;
+			}
+		}
+		
 		public bool Pressed {
 			get {
 				return pressed;
@@ -93,15 +106,27 @@ namespace MonoDevelop.Components
 		
 		protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
 		{
-			if (evnt.Button == 1 && Clickable)
+			if (!ClickOnRelease && Clickable && evnt.Button == 1 && !evnt.TriggersContextMenu ()) {
 				OnClicked ();
+				return true;
+			}
 			return base.OnButtonPressEvent (evnt);
+		}
+		
+		protected override bool OnButtonReleaseEvent (Gdk.EventButton evnt)
+		{
+			if (ClickOnRelease && evnt.Button == 1 && !evnt.TriggersContextMenu ()) {
+				OnClicked ();
+				return true;
+			}
+			return base.OnButtonReleaseEvent (evnt);
 		}
 		
 		protected override void OnRealized ()
 		{
 			base.OnRealized ();
-			normalColor = Parent.Style.Background (Gtk.StateType.Normal);
+			if (!backgroundColorSet)
+				normalColor = Parent.Style.Background (Gtk.StateType.Normal);
 		}
 		
 		protected override bool OnEnterNotifyEvent (Gdk.EventCrossing evnt)

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 
 using MonoDevelop.Core;
@@ -15,7 +16,14 @@ namespace MonoDevelop.VersionControl
 {
 	class VersionControlNodeExtension : NodeBuilderExtension
 	{
-		Dictionary<string,object> filePaths = new Dictionary<string, object> ();
+		Dictionary<FilePath,DirData> filePaths = new Dictionary<FilePath, DirData> ();
+		
+		class DirData
+		{
+			public object Object;
+			public Dictionary<FilePath,VersionInfo> FileData;
+			public DateTime Timestamp;
+		}
 	
 		public override bool CanBuildNode (Type dataType)
 		{
@@ -40,6 +48,7 @@ namespace MonoDevelop.VersionControl
 			
 			if (dataObject is IWorkspaceObject) {
 				IWorkspaceObject ce = (IWorkspaceObject) dataObject;
+				ClearDirCache (ce.BaseDirectory);
 				Repository rep = VersionControlService.GetRepository (ce);
 				if (rep != null)
 					AddFolderOverlay (rep, ce.BaseDirectory, ref icon, ref closedIcon);
@@ -47,6 +56,7 @@ namespace MonoDevelop.VersionControl
 			} else if (dataObject is ProjectFolder) {
 				ProjectFolder ce = (ProjectFolder) dataObject;
 				if (ce.ParentWorkspaceObject != null) {
+					ClearDirCache (ce.Path);
 					Repository rep = VersionControlService.GetRepository (ce.ParentWorkspaceObject);
 					if (rep != null)
 						AddFolderOverlay (rep, ce.Path, ref icon, ref closedIcon);
@@ -55,7 +65,7 @@ namespace MonoDevelop.VersionControl
 			}
 			
 			IWorkspaceObject prj;
-			string file;
+			FilePath file;
 			
 			if (dataObject is ProjectFile) {
 				ProjectFile pfile = (ProjectFile) dataObject;
@@ -74,8 +84,11 @@ namespace MonoDevelop.VersionControl
 			if (repo == null)
 				return;
 			
-			VersionStatus status = GetVersionInfo (repo, file);
-			Gdk.Pixbuf overlay = VersionControlService.LoadOverlayIconForStatus (status);
+			VersionInfo vi = GetVersionInfo (repo, file);
+			if (dataObject is ProjectFile)
+				((ProjectFile)dataObject).ExtendedProperties [typeof(VersionInfo)] = vi;
+			
+			Gdk.Pixbuf overlay = VersionControlService.LoadOverlayIconForStatus (vi.Status);
 			if (overlay != null)
 				AddOverlay (ref icon, overlay);
 		}
@@ -123,36 +136,93 @@ namespace MonoDevelop.VersionControl
 			icon = res;
 		}
 		
-		VersionStatus GetVersionInfo (Repository vc, string filepath)
+		void ClearDirCache (FilePath path)
 		{
+			path = path.CanonicalPath;
+			DirData data;
+			if (filePaths.TryGetValue (path, out data))
+				data.FileData = null;
+		}
+		
+		VersionInfo GetVersionInfo (Repository vc, FilePath filepath)
+		{
+			FilePath dir = filepath;
+			dir = dir.ParentDirectory.CanonicalPath;
+
+			DirData data;
+			if (filePaths.TryGetValue (dir, out data)) {
+				if (data.FileData == null) {
+					data.FileData = new Dictionary<FilePath, VersionInfo> ();
+					foreach (VersionInfo vin in vc.GetDirectoryVersionInfo (dir, false, false))
+						data.FileData [vin.LocalPath.CanonicalPath] = vin;
+					data.Timestamp = DateTime.Now;
+				}
+				VersionInfo vi;
+				if (data.FileData.TryGetValue (filepath.CanonicalPath, out vi))
+					return vi;
+			}
+			
 			VersionInfo node = vc.GetVersionInfo (filepath, false);
-			if (node != null)
-				return node.Status;
-			return VersionStatus.Unversioned;
+			if (node != null) {
+				if (data != null)
+					data.FileData [filepath] = node;
+				return node;
+			}
+			return VersionInfo.CreateUnversioned (filepath, false);
 		}
 		
 		void Monitor (object sender, FileUpdateEventArgs args)
 		{
-			object obj;
-			if (filePaths.TryGetValue (args.FilePath, out obj)) {
-				ITreeBuilder builder = Context.GetTreeBuilder (obj);
-				if (builder != null)
-					builder.UpdateAll();
+			foreach (var dir in args.GroupByDirectory ()) {
+				if (dir.Count () > 3 || dir.Any (f => f.IsDirectory)) {
+					FilePath path = dir.Key.CanonicalPath;
+					DirData dd;
+					if (filePaths.TryGetValue (path, out dd)) {
+						dd.FileData = null; // Clear the status cache
+						ITreeBuilder builder = Context.GetTreeBuilder (dd.Object);
+						if (builder != null)
+							builder.UpdateAll();
+					}
+					continue;
+				}
+				else {
+					// All files, clear the cached version info for each file, if exists
+					foreach (FileUpdateEventInfo uinfo in dir) {
+						FilePath path = uinfo.FilePath.ParentDirectory;
+						DirData dd;
+						if (filePaths.TryGetValue (path.CanonicalPath, out dd) && dd.FileData != null) {
+							dd.FileData.Remove (uinfo.FilePath.CanonicalPath);
+						}
+						if (filePaths.TryGetValue (uinfo.FilePath.CanonicalPath, out dd)) {
+							ITreeBuilder builder = Context.GetTreeBuilder (dd.Object);
+							if (builder != null)
+								builder.UpdateAll();
+						}
+					}
+				}
 			}
 		}
 		
 		public override void OnNodeAdded (object dataObject)
 		{
 			FilePath path = GetPath (dataObject);
-			if (path != FilePath.Null)
-				filePaths [path] = dataObject;
+			if (path != FilePath.Null) {
+				DirData dd = new DirData ();
+				dd.Object = dataObject;
+				filePaths [path.CanonicalPath] = dd;
+			}
 		}
 		
 		public override void OnNodeRemoved (object dataObject)
 		{
 			FilePath path = GetPath (dataObject);
-			if (path != FilePath.Null)
-				filePaths.Remove (path);
+			if (path != FilePath.Null) {
+				path = path.CanonicalPath;
+				DirData data;
+				if (filePaths.TryGetValue (path, out data) && data.Object == dataObject) {
+					filePaths.Remove (path);
+				}
+			}
 		}
 		
 		internal static string GetPath (object dataObject)
@@ -339,7 +409,7 @@ namespace MonoDevelop.VersionControl
 				if (it.Repository == null) {
 					if (cmd != Commands.Publish)
 						return TestResult.NoVersionControl;
-				} else if (!it.Repository.VersionControlSystem.IsInstalled) {
+				} else if (it.Repository.VersionControlSystem != null && !it.Repository.VersionControlSystem.IsInstalled) {
 					return TestResult.Disable;
 				}
 			}
@@ -348,47 +418,47 @@ namespace MonoDevelop.VersionControl
 			
 			try {
 				switch (cmd) {
-					case Commands.Update:
-						res = UpdateCommand.Update (items, test);
-						break;
-					case Commands.Diff:
-						res = DiffView.Show (items, test);
-						break;
-					case Commands.Log:
-						res = MonoDevelop.VersionControl.Views.LogView.Show (items, null, test);
-						break;
-					case Commands.Status:
-						res = StatusView.Show (items, test);
-						break;
-					case Commands.Commit:
-						res = CommitCommand.Commit (items, test);
-						break;
-					case Commands.Add:
-						res = AddCommand.Add (items, test);
-						break;
-					case Commands.Remove:
-						res = RemoveCommand.Remove (items, test);
-						break;
-					case Commands.Revert:
-						res = RevertCommand.Revert (items, test);
-						break;
-					case Commands.Lock:
-						res = LockCommand.Lock (items, test);
-						break;
-					case Commands.Unlock:
-						res = UnlockCommand.Unlock (items, test);
-						break;
-					case Commands.Publish:
-						VersionControlItem it = items [0];
-						if (items.Count == 1 && it.IsDirectory && it.WorkspaceObject != null)
-							res = PublishCommand.Publish (it.WorkspaceObject, it.Path, test);
-						break;
-					case Commands.Annotate:
-						res = AnnotateView.Show (items[0].Repository, items[0].Path, test);
-						break;
-					case Commands.CreatePatch:
-						res = CreatePatchCommand.CreatePatch (items, test);
-						break;
+				case Commands.Update:
+					res = UpdateCommand.Update (items, test);
+					break;
+				case Commands.Diff:
+					res = DiffCommand.Show (items, test);
+					break;
+				case Commands.Log:
+					res = LogCommand.Show (items, test);
+					break;
+				case Commands.Status:
+					res = StatusView.Show (items, test);
+					break;
+				case Commands.Commit:
+					res = CommitCommand.Commit (items, test);
+					break;
+				case Commands.Add:
+					res = AddCommand.Add (items, test);
+					break;
+				case Commands.Remove:
+					res = RemoveCommand.Remove (items, test);
+					break;
+				case Commands.Revert:
+					res = RevertCommand.Revert (items, test);
+					break;
+				case Commands.Lock:
+					res = LockCommand.Lock (items, test);
+					break;
+				case Commands.Unlock:
+					res = UnlockCommand.Unlock (items, test);
+					break;
+				case Commands.Publish:
+					VersionControlItem it = items [0];
+					if (items.Count == 1 && it.IsDirectory && it.WorkspaceObject != null)
+						res = PublishCommand.Publish (it.WorkspaceObject, it.Path, test);
+					break;
+				case Commands.Annotate:
+					res = BlameCommand.Show (items, test);
+					break;
+				case Commands.CreatePatch:
+					res = CreatePatchCommand.CreatePatch (items, test);
+					break;
 				}
 			}
 			catch (Exception ex) {

@@ -36,10 +36,11 @@ using MonoDevelop.Core;
 
 namespace MonoDevelop.Projects.Dom.Parser
 {
-	public abstract class ProjectDom
+	public abstract class ProjectDom: IDomObjectTable
 	{	
 		protected List<ProjectDom> references; 
 		Dictionary<string, IType> instantiatedTypeCache = new Dictionary<string, IType> ();
+		Dictionary<string, IReturnType> returnTypeCache = new Dictionary<string, IReturnType> ();
 		
 		public Project Project;
 		internal int ReferenceCount;
@@ -57,6 +58,11 @@ namespace MonoDevelop.Projects.Dom.Parser
 		
 		public abstract IEnumerable<IType> Types { get; }
 
+		public virtual IEnumerable<IAttribute> Attributes {
+			get {
+				yield break;
+			}
+		}
 
 		protected virtual IEnumerable<string> InternalResolvePossibleNamespaces (IReturnType returnType)
 		{
@@ -140,7 +146,12 @@ namespace MonoDevelop.Projects.Dom.Parser
 			foreach (ProjectDom dom in References)
 				dom.ForceUpdateRec (visited);
 		}
-
+		
+		public virtual string GetDocumentation (IMember member)
+		{
+			return member != null ? member.Documentation : null;
+		}
+		
 		public virtual IEnumerable<IType> GetTypes (FilePath fileName)
 		 {
 			foreach (IType type in Types) {
@@ -175,14 +186,19 @@ namespace MonoDevelop.Projects.Dom.Parser
 					// There is no need to resolve baseType here, since 'cur' is an already resolved
 					// type, so all types it references are already resolved too
 					IType resolvedType = GetType (baseType);
-					
 					if (resolvedType != null) {
 						types.Push (resolvedType);
 					}
 				}
-
-				if (cur.BaseType == null && cur.FullName != "System.Object") 
-					types.Push (this.GetType (DomReturnType.Object));
+				if (cur.BaseType == null && cur.FullName != "System.Object") {
+					if (cur.ClassType == ClassType.Enum) {
+						types.Push (this.GetType (DomReturnType.Enum));
+					} else if (cur.ClassType == ClassType.Struct) {
+						types.Push (this.GetType (DomReturnType.ValueType));
+					} else {
+						types.Push (this.GetType (DomReturnType.Object));
+					}
+				}
 			}
 		}
 
@@ -211,44 +227,18 @@ namespace MonoDevelop.Projects.Dom.Parser
 			return type;
 		}
 		
-		public virtual IType SearchType (ICompilationUnit unit, IType callingClass, IMember callingMember, string decoratedFullName)
+		public virtual IType SearchType (ICompilationUnit unit, IType callingClass, DomLocation lookupLocation, string decoratedFullName)
 		{
 			if (string.IsNullOrEmpty (decoratedFullName))
 				return null;
-			return SearchType (decoratedFullName, callingClass, callingMember, unit, null);
+			return SearchType (unit, callingClass, lookupLocation, decoratedFullName, null);
 		}
 		
-		public virtual IType SearchType (INode searchIn, string decoratedFullName)
-		{
-			if (string.IsNullOrEmpty (decoratedFullName))
-				return null;
-			INode cu = searchIn;
-			while (cu != null && !(cu is ICompilationUnit)) {
-				cu = cu.Parent;
-			}
-			IMember callingMember = searchIn as IMember;
-			IType callingClass = callingMember != null ? callingMember as IType ?? callingMember.DeclaringType : null;
-			return SearchType (decoratedFullName, callingClass, callingMember, cu as CompilationUnit, null);
-		}
-		
-		public virtual IType SearchType (ICompilationUnit unit, IType callingClass, IMember callingMember, IReturnType returnType)
+		public virtual IType SearchType (ICompilationUnit unit, IType callingClass, DomLocation lookupLocation, IReturnType returnType)
 		{
 			if (returnType == null)
 				return null;
-			return SearchType (returnType.DecoratedFullName, callingClass, callingMember, unit, returnType.GenericArguments);
-		}
-		
-		public virtual IType SearchType (INode searchIn, IReturnType returnType)
-		{
-			if (returnType == null)
-				return null;
-			INode cu = searchIn;
-			while (cu != null && !(cu is ICompilationUnit)) {
-				cu = cu.Parent;
-			}
-			IMember callingMember = searchIn as IMember;
-			IType callingClass = callingMember != null ? callingMember as IType ?? callingMember.DeclaringType : null;
-			return SearchType (returnType.DecoratedFullName, callingClass, callingMember, cu as CompilationUnit, returnType.GenericArguments);
+			return SearchType (unit, callingClass, lookupLocation, returnType.DecoratedFullName,returnType.GenericArguments);
 		}
 		
 /*		public virtual IType SearchType (SearchTypeRequest request)
@@ -256,10 +246,10 @@ namespace MonoDevelop.Projects.Dom.Parser
 			return SearchType (request.Name, request.CallingType, request.CurrentCompilationUnit, request.GenericParameters);
 		}*/
 		
-		internal IType SearchType (string name, IType callingClass, IMember callingMember, ICompilationUnit unit, IList<IReturnType> genericParameters)
+		internal IType SearchType (ICompilationUnit unit, IType callingClass, DomLocation lookupLocation, string name, IList<IReturnType> genericParameters)
 		{
 			// TODO dom check generic parameter count
-			if (name == null || name == String.Empty)
+			if (string.IsNullOrEmpty (name))
 				return null;
 			
 			IType result = null;
@@ -270,24 +260,19 @@ namespace MonoDevelop.Projects.Dom.Parser
 					if (result != null)
 						return result;
 				}
-				
-			/*	if (callingMember is IMethod) {
-					result = FindGenericParameter (unit, (IMethod)callingMember, name);
-					if (result != null)
-						return result;
-				}*/
 			}
 			
 			// A known type?
 			result = GetType (name, genericParameters, false, true);
 			if (result != null)
 				return result;
-			// Maybe an inner type?
+
+			// Maybe an inner type that isn't fully qualified?
 			if (callingClass != null) {
 				IType t = ResolveType (callingClass);
 				result = SearchInnerType (t, name.Split ('.'), 0, genericParameters != null ? genericParameters.Count : 0, true);
 				if (result != null) {
-					if (genericParameters != null && genericParameters.Count > 0)
+					if (genericParameters != null && genericParameters.Count > 0) 
 						return CreateInstantiatedGenericType (result, genericParameters);
 					return result;
 				}
@@ -306,12 +291,18 @@ namespace MonoDevelop.Projects.Dom.Parser
 			
 			// The enclosing namespace has preference over the using directives.
 			// Check it now.
-
 			if (callingClass != null) {
-				string[] namespaces = callingClass.FullName.Split ('.');
-				for (int n = namespaces.Length - 1; n >= 0; n--) {
-					string curnamespace = string.Join (".", namespaces, 0, n);
-					result = GetType (curnamespace + "." + name, genericParameters, false, true);
+				List<int> indices = new List<int> ();
+				string str = callingClass.FullName;
+				for (int i = 0; i < str.Length; i++) {
+					if (str[i] == '.')
+						indices.Add (i);
+				}
+				for (int n = indices.Count - 1; n >= 0; n--) {
+					if (n < 1)
+						continue;
+					string curnamespace = str.Substring (0, indices[n] + 1);
+					result = GetType (curnamespace + name, genericParameters, false, true);
 					if (result != null)
 						return result;
 				}
@@ -325,6 +316,8 @@ namespace MonoDevelop.Projects.Dom.Parser
 				foreach (IUsing u in unit.Usings.Reverse ()) {
 					if (u.Namespaces.Contains (name)) 
 						return null;
+					if (callingClass != null && !u.ValidRegion.Contains (lookupLocation))
+						continue;
 					if (u != null) {
 						result = SearchType (u, name, genericParameters, true);
 						if (result != null)
@@ -444,8 +437,9 @@ namespace MonoDevelop.Projects.Dom.Parser
 			HashSet<string> uniqueNamespaces = new HashSet<string> (subNamespaces);
 			GetNamespaceContentsInternal (result, uniqueNamespaces, caseSensitive);
 			if (includeReferences) {
-				foreach (ProjectDom reference in References)
+				foreach (ProjectDom reference in References) {
 					reference.GetNamespaceContentsInternal (result, uniqueNamespaces, caseSensitive);
+				}
 			}
 			return result;
 		}
@@ -490,9 +484,40 @@ namespace MonoDevelop.Projects.Dom.Parser
 		
 		protected abstract IEnumerable<IType> InternalGetSubclasses (IType type, bool searchDeep, IList<string> namespaces);
 		
+		IEnumerable<IType> InternalGetSubclassesSafe (IType btype, bool includeReferences, IList<string> namespaces)
+		{
+			string decoratedName = btype.DecoratedFullName;
+			string genericName = decoratedName;
+			if (btype is InstantiatedType)
+				genericName = ((InstantiatedType)btype).UninstantiatedType.DecoratedFullName;
+			
+			
+			Stack<IType > types = new Stack <IType> (Types);
+			while (types.Count > 0) {
+				IType t = types.Pop ();
+				string typeDecoratedFullName = t.DecoratedFullName;
+				foreach (var inner in t.InnerTypes)
+					types.Push (inner);
+				foreach (var v in t.SourceProjectDom.GetInheritanceTree (t)) {
+					string curDecoratedFullName = v.DecoratedFullName;
+					if (curDecoratedFullName == typeDecoratedFullName)
+						continue;
+					if (curDecoratedFullName == (v is InstantiatedType ? decoratedName : genericName))
+						yield return t;
+				}
+			}
+			
+			if (includeReferences) {
+				foreach (var refDom in References) {
+					foreach (var t in refDom.InternalGetSubclassesSafe (btype, false, namespaces))
+						yield return t;
+				}
+			}
+		}
+		
 		public virtual IEnumerable<IType> GetSubclasses (IType type, bool searchDeep, IList<string> namespaces)
 		{
-			foreach (IType subType in InternalGetSubclasses (type, searchDeep, null)) {
+			foreach (IType subType in InternalGetSubclassesSafe (type, searchDeep, null)) {
 				yield return subType;
 			}
 			if (type is InstantiatedType) {
@@ -507,7 +532,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 				}
 			}
 			if (type.FullName == "System.Collections.IEnumerable" || type.FullName == "System.Collections.ICollection" || type.FullName == "System.Collections.IList") {
-				foreach (IType t in GetSubclasses (GetType(DomReturnType.Object), true, namespaces)) {
+				foreach (IType t in InternalGetSubclassesSafe (GetType(DomReturnType.Object), true, namespaces)) {
 					yield return GetArrayType (new DomReturnType (t));
 				}
 			}
@@ -554,10 +579,8 @@ namespace MonoDevelop.Projects.Dom.Parser
 			
 			if (returnType.ArrayDimensions > 0) {
 				DomReturnType newType = new DomReturnType (returnType.FullName);
+				// dimensions are correctly updated when cropped
 				newType.ArrayDimensions = returnType.ArrayDimensions - 1;
-				for (int i = 0; i < newType.ArrayDimensions; i++) {
-					newType.SetDimension (i, returnType.ArrayDimensions - 1);
-				}
 				newType.PointerNestingLevel = returnType.PointerNestingLevel;
 				return GetArrayType (newType);
 			}
@@ -732,7 +755,7 @@ namespace MonoDevelop.Projects.Dom.Parser
 			return null;
 		}
 		
-		public virtual TypeUpdateInformation UpdateFromParseInfo (ICompilationUnit unit)
+		public virtual TypeUpdateInformation UpdateFromParseInfo (ICompilationUnit unit, bool isFromFile)
 		{
 			return null;
 		}
@@ -749,9 +772,46 @@ namespace MonoDevelop.Projects.Dom.Parser
 			temporaryCompilationUnits[unit.FileName] = unit;
 		}
 		
+		protected IType GetTemporaryType (string typeName, IList<IReturnType> genericArguments, bool deepSearchReferences, bool caseSensitive)
+		{
+			foreach (var unit in temporaryCompilationUnits.Values) {
+				var result = unit.GetType (typeName, genericArguments != null ? genericArguments.Count : 0);
+				if (result == null)
+					continue;
+				return genericArguments == null || genericArguments.Count == 0 ? result : CreateInstantiatedGenericType (result, genericArguments);
+			}
+			if (deepSearchReferences) {
+				foreach (var r in References) {
+					var result = r.GetTemporaryType (typeName, genericArguments, false, caseSensitive);
+					if (result != null)
+						return result;
+				}
+			}
+			return null;
+		}
+		
+		protected IType GetTemporaryType (string typeName, int genericArgumentsCount, bool deepSearchReferences, bool caseSensitive)
+		{
+			foreach (var unit in temporaryCompilationUnits.Values) {
+				var result = unit.GetType (typeName, genericArgumentsCount);
+				if (result == null)
+					continue;
+				return result;
+			}
+			
+			if (deepSearchReferences) {
+				foreach (var r in References) {
+					var result = r.GetTemporaryType (typeName, genericArgumentsCount, false, caseSensitive);
+					if (result != null)
+						return result;
+				}
+			}
+			return null;
+		}
+		
 		public IType MergeTypeWithTemporary (IType type)
 		{
-			if (type == null || type.CompilationUnit == null)
+			if (type == null || type.CompilationUnit == null || string.IsNullOrEmpty (type.CompilationUnit.FileName))
 				return type;
 			
 			if (temporaryCompilationUnits.ContainsKey (type.CompilationUnit.FileName)) {
@@ -774,13 +834,11 @@ namespace MonoDevelop.Projects.Dom.Parser
 				foreach (ProjectDom dom in references)
 					ProjectDomService.UnrefDom (dom.Uri);
 			}
-		}
-		
-		internal void FireLoaded ()
-		{
-			if (Loaded != null) {
-				Loaded (this, EventArgs.Empty);
-			}
+			OnUnloaded ();
+			references.Clear ();
+			instantiatedTypeCache.Clear ();
+			returnTypeCache.Clear ();
+			Project = null;
 		}
 
 		internal void UpdateReferences ()
@@ -802,13 +860,54 @@ namespace MonoDevelop.Projects.Dom.Parser
 			references = refs;
 			foreach (ProjectDom dom in oldRefs)
 				ProjectDomService.UnrefDom (dom.Uri); 
+			OnReferencesUpdated ();
 		}
-
-		internal IReturnType GetSharedReturnType (DomReturnType rt)
+		
+		object IDomObjectTable.GetSharedObject (object ob)
 		{
-			return DomReturnType.GetSharedReturnType (rt);
+			if (ob is IReturnType)
+				return GetSharedReturnType ((IReturnType)ob);
+			else
+				return ob;
 		}
-
+		
+		internal IEnumerable<IReturnType> GetSharedReturnTypes ()
+		{
+			return returnTypeCache.Values;
+		}
+		
+		internal IReturnType GetSharedReturnType (IReturnType rt)
+		{
+			string id = rt.ToInvariantString ();
+			IReturnType s;
+			if (!returnTypeCache.TryGetValue (id, out s)) {
+				s = DomReturnType.GetSharedReturnType (rt, true);
+				if (s == null) {
+					s = rt;
+					returnTypeCache [id] = rt;
+				}
+			}
+			return s;
+		}
+		
+		internal virtual ProjectDomStats GetStats ()
+		{
+			ProjectDomStats stats = new ProjectDomStats ();
+			
+			StatsVisitor v = new StatsVisitor (stats);
+			v.SharedTypes = GetSharedReturnTypes ().ToArray ();
+			foreach (IType t in instantiatedTypeCache.Values) {
+				stats.InstantiatedTypes++;
+				v.Reset ();
+				v.Visit (t, "Instantiated/");
+				if (v.Failures.Count > 0) {
+					stats.UnsharedReturnTypes += v.Failures.Count;
+					stats.ClassesWithUnsharedReturnTypes++;
+				}
+			}
+			return stats;
+		}
+		
 		internal abstract IEnumerable<string> OnGetReferences ();
 
 		internal virtual void OnProjectReferenceAdded (ProjectReference pref)
@@ -874,7 +973,27 @@ namespace MonoDevelop.Projects.Dom.Parser
 		{
 		}
 		
-		public event EventHandler Loaded;
+		void OnUnloaded ()
+		{
+			var evt = Unloaded;
+			if (evt != null)
+				evt (this, EventArgs.Empty);
+		}
+		
+		void OnReferencesUpdated ()
+		{
+			var evt = ReferencesUpdated;
+			if (evt != null)
+				evt (this, EventArgs.Empty);
+		}
+		
+		public override string ToString ()
+		{
+			return string.Format ("[ProjectDom: Uri={0}]", Uri);
+		}
+		
+		public event EventHandler Unloaded;
+		public event EventHandler ReferencesUpdated;
 	}
 
 	public class SimpleProjectDom : ProjectDom
@@ -926,6 +1045,16 @@ namespace MonoDevelop.Projects.Dom.Parser
 			}
 		}
 
+		public override IEnumerable<IAttribute> Attributes {
+			get {
+				foreach (ICompilationUnit unit in units) {
+					foreach (var att in unit.Attributes) {
+						yield return att;
+					}
+				}
+			}
+		}
+		
 		protected override IEnumerable<IType> InternalGetSubclasses (IType type, bool searchDeep, IList<string> namespaces)
 		{
 			if (namespaces == null || namespaces.Contains (type.Namespace))

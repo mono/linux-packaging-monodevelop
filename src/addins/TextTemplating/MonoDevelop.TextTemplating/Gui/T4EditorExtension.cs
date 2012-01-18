@@ -25,6 +25,7 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Ide.Gui.Content;
@@ -34,8 +35,6 @@ using MonoDevelop.Ide;
 
 namespace MonoDevelop.TextTemplating.Gui
 {
-	
-	
 	public class T4EditorExtension : CompletionTextEditorExtension, IOutlinedDocument
 	{
 		bool disposed;
@@ -113,12 +112,10 @@ namespace MonoDevelop.TextTemplating.Gui
 		public override ICompletionDataList CodeCompletionCommand (CodeCompletionContext completionContext)
 		{
 			int pos = completionContext.TriggerOffset;
-			string txt = Editor.GetText (pos - 1, pos);
+			if (pos <= 0)
+				return null;
 			int triggerWordLength = 0;
-			if (txt.Length > 0) {
-				return HandleCodeCompletion ((CodeCompletionContext) completionContext, true, ref triggerWordLength);
-			}
-			return null;
+			return HandleCodeCompletion ((CodeCompletionContext) completionContext, true, ref triggerWordLength);
 		}
 
 		public override ICompletionDataList HandleCodeCompletion (
@@ -174,6 +171,11 @@ namespace MonoDevelop.TextTemplating.Gui
 			sw.Add (outlineTreeView);
 			sw.ShowAll ();
 			return sw;
+		}
+		
+		IEnumerable<Gtk.Widget> IOutlinedDocument.GetToolbarWidgets ()
+		{
+			return null;
 		}
 		
 		void RefreshOutline ()
@@ -276,10 +278,10 @@ namespace MonoDevelop.TextTemplating.Gui
 		
 		void SelectSegment (Mono.TextTemplating.ISegment seg)
 		{
-			int s = Editor.GetPositionFromLineColumn (seg.TagStartLocation.Line, seg.TagStartLocation.Column);
+			int s = Editor.Document.LocationToOffset (seg.TagStartLocation.Line, seg.TagStartLocation.Column);
 			if (s > -1) {
-				Editor.CursorPosition = s;
-				Editor.ShowPosition (s);
+				Editor.Caret.Offset = s;
+				Editor.CenterTo (s);
 			}
 		}
 		

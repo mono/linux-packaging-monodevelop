@@ -72,6 +72,7 @@ namespace MonoDevelop.Projects.Text
 			tf.Read (fileName, encoding);
 			return tf;
 		}
+		
 		class BOM 
 		{
 			public string Enc {
@@ -127,12 +128,13 @@ namespace MonoDevelop.Projects.Text
 			
 			if (encoding != null) {
 				string s = ConvertFromEncoding (content, encoding);
-				if (s == null)
-					throw new Exception ("Invalid text file format");
+				if (s == null) {
+					Read (fileName, null);
+					return;
+				}	
 				text = new StringBuilder (s);
 				sourceEncoding = encoding;
-			}
-			else {
+			} else {
 				string enc = (from bom in bomTable where content.StartsWith (bom.Bytes) select bom.Enc).FirstOrDefault ();
 				if (!string.IsNullOrEmpty (enc)) {
 					// remove the BOM (see bug Bug 538827 – Pango crash when opening a specific file)
@@ -191,24 +193,52 @@ namespace MonoDevelop.Projects.Text
 
 		static string ConvertFromEncoding (byte[] content, string fromEncoding)
 		{
-			if (content.LongLength > int.MaxValue)
-				throw new Exception ("Cannot handle long arrays");
-
-			byte[] utfBytes = ConvertToBytes (content, "UTF-8", fromEncoding);
-			if (utfBytes != null)
-				return Encoding.UTF8.GetString (utfBytes);
-			else
+			try {
+				return Encoding.UTF8.GetString (ConvertToBytes (content, "UTF-8", fromEncoding));
+			} catch (Exception e) {
+				LoggingService.LogWarning ("Fail to use encoding " + fromEncoding, e);
 				return null;
+			}
+		}
+
+		struct GError {
+			public int Domain;
+			public int Code;
+			public IntPtr Msg;
+		}
+
+		static unsafe int strlen (IntPtr str)
+		{
+			byte *s = (byte *) str;
+			int n = 0;
+			
+			while (*s != 0) {
+				s++; n++;
+			}
+			
+			return n;
+		}
+
+		public static string Utf8PtrToString (IntPtr ptr)
+		{
+			if (ptr == IntPtr.Zero)
+				return null;
+
+			int len = strlen (ptr);
+			byte[] bytes = new byte [len];
+			Marshal.Copy (ptr, bytes, 0, len);
+			return System.Text.Encoding.UTF8.GetString (bytes);
 		}
 		
 		static byte[] ConvertToBytes (byte[] content, string toEncoding, string fromEncoding)
 		{
 			if (content.LongLength > int.MaxValue)
-				throw new Exception ("Cannot handle long arrays");
-			
+				throw new Exception ("Content too large.");
 			IntPtr nr = IntPtr.Zero, nw = IntPtr.Zero;
 			IntPtr clPtr = new IntPtr (content.Length);
-			IntPtr cc = g_convert (content, clPtr, toEncoding, fromEncoding, ref nr, ref nw, IntPtr.Zero);
+			IntPtr errptr = IntPtr.Zero;
+			
+			IntPtr cc = g_convert (content, clPtr, toEncoding, fromEncoding, ref nr, ref nw, ref errptr);
 			if (cc != IntPtr.Zero) {
 				//FIXME: check for out-of-range conversions on uints
 				int len = (int)(uint)nw.ToInt64 ();
@@ -216,17 +246,26 @@ namespace MonoDevelop.Projects.Text
 				System.Runtime.InteropServices.Marshal.Copy (cc, buf, 0, buf.Length);
 				g_free (cc);
 				return buf;
-			} else
-				return null;
+			} else {
+				GError err = (GError) Marshal.PtrToStructure (errptr, typeof (GError));
+				string reason = Utf8PtrToString (err.Msg);
+				string message = string.Format ("Failed to convert content from {0} to {1}: {2}.", fromEncoding, toEncoding, reason);
+				InvalidEncodingException ex = new InvalidEncodingException (message);
+				g_error_free (errptr);
+				throw ex;
+			}
 		}
 		
-		[DllImport("libglib-2.0-0.dll")]
+		[DllImport("libglib-2.0-0.dll", CallingConvention = CallingConvention.Cdecl)]
 		//note: textLength is signed, read/written are not
 		static extern IntPtr g_convert(byte[] text, IntPtr textLength, string toCodeset, string fromCodeset, 
-		                               ref IntPtr read, ref IntPtr written, IntPtr err);
+		                               ref IntPtr read, ref IntPtr written, ref IntPtr err);
 		
-		[DllImport("libglib-2.0-0.dll")]
+		[DllImport("libglib-2.0-0.dll", CallingConvention = CallingConvention.Cdecl)]
 		static extern void g_free (IntPtr ptr);
+		
+		[DllImport("libglib-2.0-0.dll", CallingConvention = CallingConvention.Cdecl)]
+		static extern void g_error_free (IntPtr err);
 		
 		#endregion
 		
@@ -347,11 +386,8 @@ namespace MonoDevelop.Projects.Text
 		{
 			byte[] buf = Encoding.UTF8.GetBytes (content);
 			
-			if (encoding != null) {
+			if (encoding != null)
 				buf = ConvertToBytes (buf, encoding, "UTF-8");
-				if (buf == null)
-					throw new Exception ("Invalid encoding: " + encoding);
-			}
 			
 			string tempName = Path.GetDirectoryName (fileName) + 
 				Path.DirectorySeparatorChar + ".#" + Path.GetFileName (fileName);
@@ -368,6 +404,35 @@ namespace MonoDevelop.Projects.Text
 			fs.Close ();
 
 			FileService.SystemRename (tempName, fileName);
+		}
+	}
+	
+	
+	[Serializable]
+	public class InvalidEncodingException : Exception
+	{
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:InvalidEncodingException"/> class
+		/// </summary>
+		public InvalidEncodingException ()
+		{
+		}
+		
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:InvalidEncodingException"/> class
+		/// </summary>
+		/// <param name="message">A <see cref="T:System.String"/> that describes the exception. </param>
+		public InvalidEncodingException (string message) : base (message)
+		{
+		}
+		
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:InvalidEncodingException"/> class
+		/// </summary>
+		/// <param name="message">A <see cref="T:System.String"/> that describes the exception. </param>
+		/// <param name="inner">The exception that is the cause of the current exception. </param>
+		public InvalidEncodingException (string message, Exception inner) : base (message, inner)
+		{
 		}
 	}
 	

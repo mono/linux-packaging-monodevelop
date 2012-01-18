@@ -33,14 +33,15 @@ using System.Xml;
 using MonoDevelop.Projects.Dom;
 using Mono.Cecil;
 using MonoDevelop.Core;
+using MonoDevelop.Core.Assemblies;
 
 namespace MonoDevelop.Projects.Dom
 {
 	
 	public class DomCecilCompilationUnit : CompilationUnit
 	{
+		bool loadMonotouchDocumentation = true;
 		AssemblyDefinition assemblyDefinition;
-		Dictionary<string, string> xmlDocumentation = null;
 		public AssemblyDefinition AssemblyDefinition {
 			get {
 				return assemblyDefinition;
@@ -79,31 +80,25 @@ namespace MonoDevelop.Projects.Dom
 //		{
 //		}
 		
-		public DomCecilCompilationUnit (AssemblyDefinition assemblyDefinition, string xmlFileName, bool loadInternals, bool instantiateTypeParameter) : base (assemblyDefinition.Name.FullName)
+		public DomCecilCompilationUnit (AssemblyDefinition assemblyDefinition, bool loadInternals, bool instantiateTypeParameter) : base (assemblyDefinition.Name.FullName)
 		{
 			this.assemblyDefinition = assemblyDefinition;
-			if (xmlFileName != null && File.Exists (xmlFileName)) {
-				xmlDocumentation = new Dictionary<string, string> ();
-				try {
-					using (XmlReader reader = new XmlTextReader (xmlFileName)) {
-						while (reader.Read ()) {
-							if (reader.NodeType == XmlNodeType.Element && reader.LocalName == "member") {
-								string memberName = reader.GetAttribute ("name");
-								string innerXml   = reader.ReadInnerXml ();
-								xmlDocumentation[memberName] = innerXml.Trim ();
-							}
-						}
-					}
-				} catch (Exception e) {
-					LoggingService.LogWarning ("Can't load xml documentation: " + e.Message);
-					xmlDocumentation = null;
-				}
-			}
+		
 			foreach (ModuleDefinition moduleDefinition in assemblyDefinition.Modules) {
 				AddModuleDefinition (moduleDefinition, loadInternals, instantiateTypeParameter);
 			}
 			foreach (CustomAttribute attr in assemblyDefinition.CustomAttributes) {
 				Add (new DomCecilAttribute (attr));
+			}
+		}
+
+		public static AssemblyDefinition ReadAssembly (string fileName, bool useCustomResolver = true)
+		{
+			ReaderParameters parameters = new ReaderParameters ();
+			if (useCustomResolver)
+				parameters.AssemblyResolver = new SimpleAssemblyResolver (Path.GetDirectoryName (fileName));
+			using (var stream = new MemoryStream (File.ReadAllBytes (fileName))) {
+				return AssemblyDefinition.ReadAssembly (stream, parameters);
 			}
 		}
 		
@@ -117,19 +112,87 @@ namespace MonoDevelop.Projects.Dom
 		}
 		public static DomCecilCompilationUnit Load (string fileName, bool keepDefinitions, bool loadInternals)
 		{
-			return Load (fileName, true, true, false);
+			return
+		Load (fileName, true, true, false);
+
 		}
 		*/
 		
-		public static DomCecilCompilationUnit Load (string fileName, bool loadInternals, bool instantiateTypeParameter)
+		public static DomCecilCompilationUnit Load (string fileName, bool loadInternals, bool instantiateTypeParameter, bool customResolver = true)
 		{
 			if (String.IsNullOrEmpty (fileName))
 				return null;
-			string xmlFileName = System.IO.Path.ChangeExtension (fileName, ".xml");
-			//FIXME: should assign a custom resolver to the AssemblyDefinition so that it resolves from the correct GAC
-			DomCecilCompilationUnit result = new DomCecilCompilationUnit (AssemblyFactory.GetAssembly (fileName), xmlFileName, loadInternals, instantiateTypeParameter);
+			DomCecilCompilationUnit result = new DomCecilCompilationUnit (ReadAssembly (fileName, customResolver), loadInternals, instantiateTypeParameter);
 			result.fileName = fileName;
 			return result;
+		}
+		
+		class SimpleAssemblyResolver : IAssemblyResolver
+		{
+			string lookupPath;
+			Dictionary<string, AssemblyDefinition> cache = new Dictionary<string, AssemblyDefinition> ();
+			
+			public SimpleAssemblyResolver (string lookupPath)
+			{
+				this.lookupPath = lookupPath;
+			}
+
+			public AssemblyDefinition InternalResolve (string fullName)
+			{
+				AssemblyDefinition result;
+				if (cache.TryGetValue (fullName, out result))
+					return result;
+				
+				var name = AssemblyNameReference.Parse (fullName);
+				// need to handle different file extension casings. Some dlls from windows tend to end with .Dll or .DLL rather than '.dll'
+				foreach (string file in Directory.GetFiles (lookupPath, name.Name + ".*")) {
+					string ext = Path.GetExtension (file);
+					if (string.IsNullOrEmpty (ext))
+						continue;
+					ext = ext.ToUpper ();
+					if (ext == ".DLL" || ext == ".EXE") {
+						result = ReadAssembly (file);
+						break;
+					}
+				}
+				
+				if (result == null) {
+					var framework = Services.ProjectService.DefaultTargetFramework;
+					var assemblyName = Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblyFullName (fullName, framework);
+					if (assemblyName == null)
+						return null;
+					var location = Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblyLocation (assemblyName, framework);
+					
+					if (!string.IsNullOrEmpty (location) && File.Exists (location)) {
+						result = ReadAssembly (location);
+					}
+				}
+				if (result != null)
+					cache [fullName] = result;
+				return result;
+			}
+
+			#region IAssemblyResolver implementation
+			public AssemblyDefinition Resolve (AssemblyNameReference name)
+			{
+				return InternalResolve (name.FullName) ?? GlobalAssemblyResolver.Instance.Resolve (name);
+			}
+
+			public AssemblyDefinition Resolve (AssemblyNameReference name, ReaderParameters parameters)
+			{
+				return InternalResolve (name.FullName) ?? GlobalAssemblyResolver.Instance.Resolve (name, parameters);
+			}
+
+			public AssemblyDefinition Resolve (string fullName)
+			{
+				return InternalResolve (fullName) ?? GlobalAssemblyResolver.Instance.Resolve (fullName);
+			}
+
+			public AssemblyDefinition Resolve (string fullName, ReaderParameters parameters)
+			{
+				return InternalResolve (fullName) ?? GlobalAssemblyResolver.Instance.Resolve (fullName, parameters);
+			}
+			#endregion
 		}
 		
 		public static bool IsInternal (MonoDevelop.Projects.Dom.Modifiers mods)
@@ -141,25 +204,19 @@ namespace MonoDevelop.Projects.Dom
 		
 		void AddModuleDefinition (ModuleDefinition moduleDefinition, bool loadInternal, bool instantiateTypeParameter)
 		{
-			InstantiatedParamResolver resolver = new InstantiatedParamResolver (xmlDocumentation);
+			InstantiatedParamResolver resolver = new InstantiatedParamResolver ();
 			Module module = new Module (moduleDefinition);
 			foreach (TypeDefinition type in moduleDefinition.Types) {
-				// filter nested types, they're handled in DomCecilType.
-				if ((type.Attributes & TypeAttributes.NestedPublic) == TypeAttributes.NestedPublic ||
-				    (type.Attributes & TypeAttributes.NestedFamily) == TypeAttributes.NestedFamily || 
-				    (type.Attributes & TypeAttributes.NestedAssembly) == TypeAttributes.NestedAssembly ||
-				    (type.Attributes & TypeAttributes.NestedPrivate) == TypeAttributes.NestedPrivate || 
-				    (type.Attributes & TypeAttributes.NestedFamANDAssem) == TypeAttributes.NestedFamANDAssem)
-					continue;
 				if (!loadInternal && IsInternal (DomCecilType.GetModifiers (type.Attributes)))
 					continue;
 //				if (type.Name == "SimplePropertyDescriptor")
 //					System.Console.WriteLine(type.Attributes + "/" + DomCecilType.GetModifiers (type.Attributes) + "/" + IsInternal (DomCecilType.GetModifiers (type.Attributes)));
-				DomCecilType loadType = new DomCecilType (type, loadInternal);
+				DomCecilType loadType = new DomCecilType (type, loadInternal, loadMonotouchDocumentation);
 				if (instantiateTypeParameter) {
 					resolver.Visit (loadType, null);
 					resolver.ClearTypes ();
 				}
+				loadMonotouchDocumentation &= loadType.LoadMonotouchDocumentation;
 				Add (loadType);
 				module.Types.Add (loadType);
 			}
@@ -168,12 +225,10 @@ namespace MonoDevelop.Projects.Dom
 		
 		class InstantiatedParamResolver : AbstractDomVisitor<object, object>
 		{
-			Dictionary<string, string> xmlDocumentation;
 			Dictionary<string, IType> argTypes = new Dictionary<string, IType> ();
 			
-			public InstantiatedParamResolver (Dictionary<string, string> xmlDocumentation)
+			public InstantiatedParamResolver ()
 			{
-				this.xmlDocumentation = xmlDocumentation;
 			}
 			
 			public void ClearTypes ()
@@ -181,22 +236,11 @@ namespace MonoDevelop.Projects.Dom
 				this.argTypes.Clear ();
 			}
 			
-			void AddDocumentation (IMember member)
-			{
-				if (xmlDocumentation == null || member == null)
-					return;
-				string doc;
-				if (xmlDocumentation.TryGetValue (member.HelpUrl, out doc))
-					member.Documentation = doc;
-			}
-				
 			public override object Visit (IType type, object data)
 			{
 				foreach (TypeParameter p in type.TypeParameters)
 					argTypes[p.Name] = type;
-				AddDocumentation (type);
 				foreach (IMember member in type.Members) {
-					AddDocumentation (member);
 					CheckReturnType (member.ReturnType);
 					member.AcceptVisitor (this, data);
 				}

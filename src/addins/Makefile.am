@@ -1,12 +1,13 @@
 
+
 SUBDIRS = \
 	MacPlatform \
 	GnomePlatform \
 	MonoDevelop.DesignerSupport \
 	MonoDevelop.Debugger \
 	Deployment \
-	MonoDevelop.Refactoring \
 	MonoDevelop.SourceEditor2 \
+	MonoDevelop.Refactoring \
 	VersionControl \
 	MonoDevelop.Autotools \
 	MonoDevelop.Gettext \
@@ -19,7 +20,6 @@ SUBDIRS = \
 	MonoDeveloperExtensions \
 	VBNetBinding \
 	prj2make-sharp-lib \
-	WelcomePage \
 	MonoDevelop.GtkCore \
 	ChangeLogAddIn \
 	MonoDevelop.WebReferences \
@@ -30,4 +30,6 @@ SUBDIRS = \
 	MonoDevelop.CodeMetrics \
 	MonoDevelop.Debugger.Soft \
 	WindowsPlatform \
-	MonoDevelop.HexEditor
+	MonoDevelop.HexEditor \
+	MonoDevelop.DocFood \
+	MonoDevelop.MacDev

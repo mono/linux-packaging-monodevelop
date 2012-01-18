@@ -51,13 +51,16 @@ namespace CBinding
 {
 	public enum Language {
 		C,
-		CPP
+		CPP,
+		OBJC,
+		OBJCPP
 	}
 	
 	public enum CProjectCommands {
 		AddPackage,
 		UpdateClassPad,
-		ShowPackageDetails
+		ShowPackageDetails,
+		GotoDeclaration,
 	}
 	
 	[DataInclude(typeof(CProjectConfiguration))]
@@ -80,7 +83,7 @@ namespace CBinding
 		/// <summary>
 		/// Extensions for C/C++ source files
 		/// </summary>
-		public static string[] SourceExtensions = { ".C", ".CC", ".CPP", ".CXX" };
+		public static string[] SourceExtensions = { ".C", ".CC", ".CPP", ".CXX", ".M", ".MM" };
 		
 		/// <summary>
 		/// Extensions for C/C++ header files
@@ -117,6 +120,12 @@ namespace CBinding
 				break;
 			case "CPP":
 				this.language = Language.CPP;
+				break;
+			case "Objective C":
+				this.language = Language.OBJC;
+				break;
+			case "Objective C++":
+				this.language = Language.OBJCPP;
 				break;
 			}
 			
@@ -172,7 +181,7 @@ namespace CBinding
 		}
 		
 		public override string[] SupportedLanguages {
-			get { return new string[] { "C", "CPP" }; }
+			get { return new string[] { "C", "CPP", "Objective C", "Objective C++" }; }
 		}
 		
 		public CompileTarget CompileTarget {
@@ -238,11 +247,11 @@ namespace CBinding
 				writer.WriteLine ("Name: {0}", Name);
 				writer.WriteLine ("Description: {0}", Description);
 				writer.WriteLine ("Version: {0}", Version);
-				writer.WriteLine ("Libs: -L{0} -l{1}", config.OutputDirectory, config.Output.StartsWith ("lib", StringComparison.OrdinalIgnoreCase)?
+				writer.WriteLine ("Libs: -L\"{0}\" -l{1}", config.OutputDirectory, config.Output.StartsWith ("lib", StringComparison.OrdinalIgnoreCase)?
 				                                                                                                config.Output.Substring (3):
 				                                                                                                config.Output);
 //				writer.WriteLine ("Cflags: -I{0}", BaseDirectory);
-				writer.WriteLine ("Cflags: -I{0}", string.Join (" -I", headerDirectories.ToArray ()));
+				writer.WriteLine ("Cflags: -I\"{0}\"", string.Join ("\" -I\"", headerDirectories.ToArray ()));
 			}
 			
 			// If this project compiles into a shared object we need to
@@ -414,31 +423,35 @@ namespace CBinding
 			}
 		}
 		
-		protected override void OnFileAddedToProject (ProjectFileEventArgs e)
+		protected override void OnFileAddedToProject (ProjectFileEventArgs args)
 		{
-			base.OnFileAddedToProject (e);
+			base.OnFileAddedToProject (args);
 			
-			if (!Loading && !IsCompileable (e.ProjectFile.Name) &&
-			    e.ProjectFile.BuildAction == BuildAction.Compile) {
-				e.ProjectFile.BuildAction = BuildAction.None;
+			foreach (ProjectFileEventInfo e in args) {
+				if (!Loading && !IsCompileable (e.ProjectFile.Name) &&
+				    e.ProjectFile.BuildAction == BuildAction.Compile) {
+					e.ProjectFile.BuildAction = BuildAction.None;
+				}
+				
+				if (e.ProjectFile.BuildAction == BuildAction.Compile)
+					TagDatabaseManager.Instance.UpdateFileTags (this, e.ProjectFile.Name);
 			}
-			
-			if (e.ProjectFile.BuildAction == BuildAction.Compile)
-				TagDatabaseManager.Instance.UpdateFileTags (this, e.ProjectFile.Name);
 		}
 		
 		protected override void OnFileChangedInProject (ProjectFileEventArgs e)
 		{
 			base.OnFileChangedInProject (e);
 			
-			TagDatabaseManager.Instance.UpdateFileTags (this, e.ProjectFile.Name);
+			foreach (ProjectFileEventInfo fe in e)
+				TagDatabaseManager.Instance.UpdateFileTags (this, fe.ProjectFile.Name);
 		}
 		
 		protected override void OnFileRemovedFromProject (ProjectFileEventArgs e)
 		{
 			base.OnFileRemovedFromProject (e);
 			
-			TagDatabaseManager.Instance.RemoveFileInfo (this, e.ProjectFile.Name);
+			foreach (ProjectFileEventInfo fe in e)
+				TagDatabaseManager.Instance.RemoveFileInfo (this, fe.ProjectFile.Name);
 		}
 
 		

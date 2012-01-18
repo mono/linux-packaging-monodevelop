@@ -35,36 +35,20 @@ using MonoDevelop.Core.Serialization;
 
 namespace MonoDevelop.AspNet.Mvc
 {
-	
-	
 	public class AspMvcProject : AspNetAppProject
 	{
-		static void Check24 ()
-		{
-			Type mr = Type.GetType ("Mono.Runtime");
-			if (mr != null) {
-				string version = (string) mr.GetMethod ("GetDisplayName", BindingFlags.NonPublic|BindingFlags.Static).Invoke (null, null);
-				//MD only builds on 2.0 or later
-				if (version.StartsWith ("Mono 2.0") || version.StartsWith ("Mono 2.2"))
-					MonoDevelop.Ide.MessageService.ShowWarning ("ASP.NET MVC projects only build and run on Mono 2.4 or later");
-			}
-		}
-		
 		public AspMvcProject ()
 		{
-			Check24 ();
 		}
 		
 		public AspMvcProject (string languageName)
 			: base (languageName)
 		{
-			Check24 ();
 		}
 		
 		public AspMvcProject (string languageName, ProjectCreateInformation info, XmlElement projectOptions)
 			: base (languageName, info, projectOptions)
 		{
-			Check24 ();
 		}	
 		
 		public override SolutionItemConfiguration CreateConfiguration (string name)
@@ -80,16 +64,22 @@ namespace MonoDevelop.AspNet.Mvc
 		
 		public override bool SupportsFramework (MonoDevelop.Core.Assemblies.TargetFramework framework)
 		{
-			return framework.IsCompatibleWithFramework ("3.5");
+			return framework.IsCompatibleWithFramework (MonoDevelop.Core.Assemblies.TargetFrameworkMoniker.NET_3_5);
 		}
 		
 		public override IEnumerable<string> GetSpecialDirectories ()
 		{
-			foreach (string s in base.GetSpecialDirectories ())
+			foreach (string s in BaseGetSpecialDirectories ())
 				yield return s;
 			yield return "Views";
 			yield return "Models";
 			yield return "Controllers";
+		}
+		
+		//so iterator can access base.GetSpecialDirectories () verifiably
+		IEnumerable<string> BaseGetSpecialDirectories ()
+		{
+			return base.GetSpecialDirectories ();
 		}
 		
 		public IList<string> GetCodeTemplates (string type)
@@ -120,7 +110,7 @@ namespace MonoDevelop.AspNet.Mvc
 			//HACK: workaround for MD not local-copying package references
 			foreach (ProjectReference projectReference in References) {
 				if (projectReference.Package != null && projectReference.Package.Name == "system.web.mvc") {
-					if (projectReference.LocalCopy && projectReference.ReferenceType == ReferenceType.Gac)
+					if (projectReference.ReferenceType == ReferenceType.Package)
 						foreach (MonoDevelop.Core.Assemblies.SystemAssembly assem in projectReference.Package.Assemblies)
 							list.Add (assem.Location);
 					break;

@@ -5,14 +5,21 @@ DEPS =  \
 	$(top_builddir)/build/AddIns/MonoDevelop.AspNet/MonoDevelop.AspNet.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
 	$(top_builddir)/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll \
+	$(top_builddir)/build/bin/ICSharpCode.NRefactory.dll \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/NRefactory.dll
+	$(top_builddir)/build/bin/OldNRefactory.dll
 
-REFS = -r:System
+REFS =  \
+	$(GLIB_SHARP_LIBS) \
+	$(GTK_SHARP_LIBS) \
+	-r:System \
+	-r:System.Core
 
-FILES = AspLanguageBuilder.cs
+FILES =  \
+	AspLanguageBuilder.cs \
+	ASPNetReferenceFinder.cs
 
 ADDIN_BUILD = $(top_builddir)/build/AddIns/BackendBindings
 ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.CSharpBinding.AspNet.dll

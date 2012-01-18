@@ -4,7 +4,7 @@ ASSEMBLY = $(ASSEMBLY_BUILD_DIR)/Mono.Debugging.dll
 
 SIGNING_KEY=$(srcdir)/mono.debugging.snk
 
-DEPS = $(top_builddir)/build/bin/NRefactory.dll
+DEPS = $(top_builddir)/build/bin/OldNRefactory.dll
 
 REFS =  \
 	-r:System \
@@ -23,6 +23,8 @@ FILES =  \
 	Mono.Debugging.Client/Backtrace.cs \
 	Mono.Debugging.Client/BreakEvent.cs \
 	Mono.Debugging.Client/BreakEventArgs.cs \
+	Mono.Debugging.Client/BreakEventInfo.cs \
+	Mono.Debugging.Client/BreakEventStatus.cs \
 	Mono.Debugging.Client/Breakpoint.cs \
 	Mono.Debugging.Client/BreakpointEventArgs.cs \
 	Mono.Debugging.Client/BreakpointStore.cs \
@@ -82,7 +84,7 @@ all: $(ASSEMBLY) $(ASSEMBLY).mdb
 
 $(ASSEMBLY): $(build_sources) $(build_resources) $(SIGNING_KEY) $(DEPS)
 	mkdir -p $(ASSEMBLY_BUILD_DIR)
-	$(CSC) $(CSC_FLAGS) -debug -out:$@ /keycontainer:$(SIGNING_KEY) -target:library $(REFS) $(build_deps) $(build_resources:%=/resource:%) $(build_sources)
+	$(CSC) $(CSC_FLAGS) -debug -out:$@ /keyfile:$(SIGNING_KEY) -target:library $(REFS) $(build_deps) $(build_resources:%=/resource:%) $(build_sources)
 
 $(ASSEMBLY).mdb: $(ASSEMBLY)
 

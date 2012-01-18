@@ -71,6 +71,9 @@ namespace Mono.Debugging.Evaluation
 			object res = ctx.Adapter.TargetObjectToObject (ctx, obj);
 			if (res == null)
 				return null;
+			
+			if (res is EvaluationResult)
+				return ((EvaluationResult) res).DisplayValue;
 			else
 				return res.ToString ();
 		}
@@ -157,6 +160,10 @@ namespace Mono.Debugging.Evaluation
 				sb.Append (txt);
 			}
 			return sb.ToString ();
+		}
+		
+		public virtual bool CaseSensitive {
+			get { return true; }
 		}
 
 		public abstract string Resolve (DebuggerSession session, SourceLocation location, string exp);

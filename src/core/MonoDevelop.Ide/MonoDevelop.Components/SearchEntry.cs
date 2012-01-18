@@ -294,6 +294,15 @@ namespace MonoDevelop.Components
 			active_filter_id = 0;
 			entry.Text = String.Empty;
 		}
+		
+		protected override void OnDestroyed ()
+		{
+			if (menu != null) {
+				menu.Destroy ();
+				menu = null;
+			}
+			base.OnDestroyed ();
+		}
 
 		protected override bool OnKeyPressEvent (Gdk.EventKey evnt)
 		{
@@ -505,7 +514,6 @@ namespace MonoDevelop.Components
 
 		private class FramelessEntry : Entry
 		{
-			private Gdk.Window text_window;
 			private SearchEntry parent;
 			private Pango.Layout layout;
 			private Gdk.GC text_gc;
@@ -527,17 +535,15 @@ namespace MonoDevelop.Components
 
 			private void RefreshGC ()
 			{
-				if (text_window == null) {
-					return;
-				}
-				
-				text_gc = new Gdk.GC (text_window);
-				text_gc.Copy (Style.TextGC (StateType.Normal));
-				Gdk.Color color_a = parent.Style.Base (StateType.Normal);
-				Gdk.Color color_b = parent.Style.Text (StateType.Normal);
-				text_gc.RgbFgColor = ColorBlend (color_a, color_b);
+				text_gc = null;
 			}
-
+			
+			protected override void OnDestroyed ()
+			{
+				parent.StyleSet -= OnParentStyleSet;
+				base.OnDestroyed ();
+			}
+			
 			public static Gdk.Color ColorBlend (Gdk.Color a, Gdk.Color b)
 			{
 				// at some point, might be nice to allow any blend?
@@ -583,9 +589,12 @@ namespace MonoDevelop.Components
 				
 				bool ret = base.OnExposeEvent (evnt);
 				
-				if (text_gc == null || evnt.Window != text_window) {
-					text_window = evnt.Window;
-					RefreshGC ();
+				if (text_gc == null) {
+					text_gc = new Gdk.GC (evnt.Window);
+					text_gc.Copy (Style.TextGC (StateType.Normal));
+					Gdk.Color color_a = parent.Style.Base (StateType.Normal);
+					Gdk.Color color_b = parent.Style.Text (StateType.Normal);
+					text_gc.RgbFgColor = ColorBlend (color_a, color_b);
 				}
 				
 				if (Text.Length > 0 || HasFocus || parent.EmptyMessage == null) {

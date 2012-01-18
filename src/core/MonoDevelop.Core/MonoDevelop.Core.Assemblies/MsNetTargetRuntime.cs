@@ -36,17 +36,20 @@ namespace MonoDevelop.Core.Assemblies
 	{
 		FilePath rootDir;
 		FilePath newFxDir;
-		FilePath gacDir;
 		bool running;
 		MsNetExecutionHandler execHandler;
+		string winDir;
 		
 		public MsNetTargetRuntime (bool running)
 		{
-			string winDir = Path.GetFullPath (Environment.SystemDirectory + "\\..");
+			winDir = Path.GetFullPath (Environment.SystemDirectory + "\\..");
 			rootDir = winDir + "\\Microsoft.NET\\Framework";
-			newFxDir = Environment.GetFolderPath (Environment.SpecialFolder.ProgramFiles);
-			newFxDir = newFxDir + "\\Reference Assemblies\\Microsoft\\Framework";
-			gacDir = winDir + "\\assembly\\GAC";
+			
+			// ProgramFilesX86 is broken on 32-bit WinXP
+			string programFilesX86 = Environment.GetFolderPath (
+				IntPtr.Size == 8? Environment.SpecialFolder.ProgramFilesX86 : Environment.SpecialFolder.ProgramFiles);
+			
+			newFxDir = programFilesX86 + "\\Reference Assemblies\\Microsoft\\Framework";
 			this.running = running;
 			execHandler = new MsNetExecutionHandler ();
 		}
@@ -73,11 +76,15 @@ namespace MonoDevelop.Core.Assemblies
 			get { return rootDir; }
 		}
 		
+		public override IEnumerable<FilePath> GetReferenceFrameworkDirectories ()
+		{
+			yield return newFxDir;
+		}
+		
 		public override string GetAssemblyDebugInfoFile (string assemblyPath)
 		{
 			return Path.ChangeExtension (assemblyPath, ".pdb");
 		}
-
 		
 		protected override void OnInitialize ()
 		{
@@ -98,17 +105,19 @@ namespace MonoDevelop.Core.Assemblies
 
 			// Extended assembly folders
 
-			foreach (TargetFramework fx in Runtime.SystemAssemblyService.GetTargetFrameworks ()) {
+			foreach (TargetFramework fx in Runtime.SystemAssemblyService.GetCoreFrameworks ()) {
+				if (fx.Id.Identifier != ".NETFramework")
+					continue;
 				if (ShuttingDown)
 					return;
-				RegistryKey fxKey = Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Microsoft\.NETFramework\v" + fx.Id + @"\AssemblyFoldersEx", false);
+				RegistryKey fxKey = Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Microsoft\.NETFramework\v" + fx.Id.Version + @"\AssemblyFoldersEx", false);
 				if (fxKey != null) {
 					AddPackages (fx, fxKey);
 					fxKey.Close ();
 				}
 
 				string clrVer = MsNetFrameworkBackend.GetClrVersion (fx.ClrVersion);
-				if (clrVer.StartsWith ("v" + fx.Id)) {
+				if (clrVer.StartsWith ("v" + fx.Id.Version)) {
 					// Several frameworks can share the same clr version. Make sure only one registers the assemblies.
 					fxKey = Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Microsoft\.NETFramework\" + clrVer + @"\AssemblyFoldersEx", false);
 					if (fxKey != null) {
@@ -168,7 +177,25 @@ namespace MonoDevelop.Core.Assemblies
 
 		internal protected override IEnumerable<string> GetGacDirectories ()
 		{
-			yield return gacDir;
+			FilePath gacDir = winDir + "\\assembly\\GAC";
+			if (Directory.Exists (gacDir))
+				yield return gacDir;
+			if (Directory.Exists (gacDir + "_32"))
+				yield return gacDir + "_32";
+			if (Directory.Exists (gacDir + "_64"))
+				yield return gacDir + "_64";
+			if (Directory.Exists (gacDir + "_MSIL"))
+				yield return gacDir + "_MSIL";
+			
+			gacDir = winDir + "\\Microsoft.NET\\assembly\\GAC";
+			if (Directory.Exists (gacDir))
+				yield return gacDir;
+			if (Directory.Exists (gacDir + "_32"))
+				yield return gacDir + "_32";
+			if (Directory.Exists (gacDir + "_64"))
+				yield return gacDir + "_64";
+			if (Directory.Exists (gacDir + "_MSIL"))
+				yield return gacDir + "_MSIL";
 		}
 
 		public override IExecutionHandler GetExecutionHandler ()

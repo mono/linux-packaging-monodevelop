@@ -6,7 +6,8 @@ using System.Diagnostics;
 namespace MonoDevelop.Core.Execution
 {
 	public delegate void ProcessEventHandler(object sender, string message);
-	
+
+	[System.ComponentModel.DesignerCategory ("Code")]
 	public class ProcessWrapper : Process, IProcessAsyncOperation
 	{
 		private Thread captureOutputThread;
@@ -44,7 +45,7 @@ namespace MonoDevelop.Core.Execution
 		{
 			CheckDisposed ();
 			WaitForExit (milliseconds);
-			WaitHandle.WaitAll (new WaitHandle[] {endEventOut});
+			endEventOut.WaitOne ();
 		}
 		
 		public void WaitForOutput ()
@@ -70,13 +71,15 @@ namespace MonoDevelop.Core.Execution
 				// WORKAROUND for "Bug 410743 - wapi leak in System.Diagnostic.Process"
 				// Process leaks when an exit event is registered
 				if (endEventErr != null)
-					WaitHandle.WaitAll (new WaitHandle[] {endEventErr} );
+					endEventErr.WaitOne ();
 
 				OnExited (this, EventArgs.Empty);
 
-				//call this AFTER the exit event, or the ProcessWrapper may get disposed and abort this thread
-				if (endEventOut != null)
-					endEventOut.Set ();
+				lock (lockObj) {
+					//call this AFTER the exit event, or the ProcessWrapper may get disposed and abort this thread
+					if (endEventOut != null)
+						endEventOut.Set ();
+				}
 			}
 		}
 		
@@ -90,8 +93,10 @@ namespace MonoDevelop.Core.Execution
 						ErrorStreamChanged (this, new string (buffer, 0, nr));
 				}					
 			} finally {
-				if (endEventErr != null)
-					endEventErr.Set ();
+				lock (lockObj) {
+					if (endEventErr != null)
+						endEventErr.Set ();
+				}
 			}
 		}
 		
@@ -100,15 +105,15 @@ namespace MonoDevelop.Core.Execution
 			lock (lockObj) {
 				if (endEventOut == null)
 					return;
+				
+				if (!done)
+					((IAsyncOperation)this).Cancel ();
+				
+				captureOutputThread = captureErrorThread = null;
+				endEventOut.Close ();
+				endEventErr.Close ();
+				endEventOut = endEventErr = null;
 			}
-			
-			if (!done)
-				((IAsyncOperation)this).Cancel ();
-			
-			captureOutputThread = captureErrorThread = null;
-			endEventOut.Close ();
-			endEventErr.Close ();
-			endEventOut = endEventErr = null;
 			
 			base.Dispose (disposing);
 		}
@@ -132,7 +137,7 @@ namespace MonoDevelop.Core.Execution
 			try {
 				if (!done) {
 					try {
-						Kill ();
+						this.KillProcessTree ();
 					} catch {
 						// Ignore
 					}

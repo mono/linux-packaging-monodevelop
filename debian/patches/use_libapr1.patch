@@ -1,10 +1,7 @@
-Index: monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
-Description: Only make use of libapr1, so removing libapr code
-Patch created by Mirco Bauer <meebey@debian.org>
+Index: monodevelop.git/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibApr.cs
 ===================================================================
-diff -urNad monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs
---- monodevelop-0.18.1+dfsg~/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-12-20 20:04:42.000000000 +0100
-+++ monodevelop-0.18.1+dfsg/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/MonoDevelop.VersionControl.Subversion/LibApr.cs	2007-12-25 18:56:29.000000000 +0100
+--- monodevelop.git.orig/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibApr.cs	2011-06-24 00:10:16.000000000 +0100
++++ monodevelop.git/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibApr.cs	2011-06-24 00:10:56.000000000 +0100
 @@ -14,15 +14,6 @@
  		public static LibApr GetLib (int ver)
  		{

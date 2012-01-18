@@ -34,6 +34,7 @@ using System.IO;
 using MonoDevelop.Core;
 using MonoDevelop.Core.ProgressMonitoring;
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide.Gui.Dialogs;
 
 namespace MonoDevelop.Ide.ProgressMonitoring
 {
@@ -56,6 +57,7 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 		ProgressTracker progressTracker;
 		LogTextWriter logger;
 		bool canceled;
+		bool runningPendingEvents;
 		
 		event OperationHandler completedEvent;
 		
@@ -152,7 +154,6 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 		[AsyncDispatch]
 		public virtual void Dispose()
 		{
-			// Make sure we are done with all pending calls
 			DispatchService.RunPendingEvents ();
 			
 			lock (progressTracker) {
@@ -313,5 +314,41 @@ namespace MonoDevelop.Ide.ProgressMonitoring
 		protected virtual void OnProgressChanged ()
 		{
 		}
+		
+		protected void RunPendingEvents ()
+		{
+			if (!runningPendingEvents) {
+				try {
+					runningPendingEvents = true;
+					DispatchService.RunPendingEvents ();
+				} finally {
+					runningPendingEvents = false;
+				}
+			}
+		}
+		
+		protected void ShowResultDialog ()
+		{
+			if (Errors.Count == 1 && Warnings.Count == 0) {
+				if (ErrorException != null)
+					MessageService.ShowException (ErrorException, Errors[0]);
+				else
+					MessageService.ShowError (Errors[0]);
+			}
+			else if (Errors.Count == 0 && Warnings.Count == 1) {
+				MessageService.ShowWarning (Warnings[0]);
+			}
+			else if (Errors.Count > 0 || Warnings.Count > 0) {
+				var resultDialog = new MultiMessageDialog () {
+					Modal = true,
+				};
+				foreach (string m in Errors)
+					resultDialog.AddError (m);
+				foreach (string m in Warnings)
+					resultDialog.AddWarning (m);
+				MessageService.ShowCustomDialog (resultDialog);
+			}
+		}
+		
 	}
 }

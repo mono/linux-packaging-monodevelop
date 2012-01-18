@@ -3,6 +3,7 @@ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.DesignerSupport.dll
 
 DEPS =  \
 	$(top_builddir)/build/bin/Mono.Cecil.dll \
+	$(top_builddir)/build/bin/Mono.TextEditor.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
 
@@ -23,6 +24,7 @@ REFS =  \
 FILES =  \
 	AssemblyInfo.cs \
 	gtk-gui/generated.cs \
+	gtk-gui/MonoDevelop.DesignerSupport.ClassOutlineSortingPreferencesDialog.cs \
 	gtk-gui/MonoDevelop.DesignerSupport.Toolbox.ComponentSelectorDialog.cs \
 	MonoDevelop.DesignerSupport.Projects/ComponentNodeBuilder.cs \
 	MonoDevelop.DesignerSupport.Projects/ProjectFileDescriptor.cs \
@@ -53,6 +55,9 @@ FILES =  \
 	MonoDevelop.DesignerSupport.Toolbox/TypeToolboxNode.cs \
 	MonoDevelop.DesignerSupport.Toolbox/UnknownToolboxNode.cs \
 	MonoDevelop.DesignerSupport/BindingService.cs \
+	MonoDevelop.DesignerSupport/ClassOutlineNodeComparer.cs \
+	MonoDevelop.DesignerSupport/ClassOutlineSettings.cs \
+	MonoDevelop.DesignerSupport/ClassOutlineSortingPreferencesDialog.cs \
 	MonoDevelop.DesignerSupport/ClassOutlineTextEditorExtension.cs \
 	MonoDevelop.DesignerSupport/CodeBehind.cs \
 	MonoDevelop.DesignerSupport/CodeBehindWriter.cs \
@@ -65,7 +70,6 @@ FILES =  \
 	MonoDevelop.DesignerSupport/IPropertyPadProvider.cs \
 	MonoDevelop.DesignerSupport/IPropertyProvider.cs \
 	MonoDevelop.DesignerSupport/MemberExistsException.cs \
-	MonoDevelop.DesignerSupport/OpenDocumentFileProvider.cs \
 	MonoDevelop.DesignerSupport/PropertyPad.cs \
 	MonoDevelop.DesignerSupport/PropertyPadVisitor.cs \
 	MonoDevelop.DesignerSupport/RemoteDesignerProcess.cs \

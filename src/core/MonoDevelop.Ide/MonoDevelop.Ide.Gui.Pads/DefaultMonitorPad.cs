@@ -114,6 +114,10 @@ namespace MonoDevelop.Ide.Gui.Pads
 			set { this.statusSourcePad = value; }
 		}
 		
+		internal IProgressMonitor CurrentMonitor {
+			get { return monitor; }
+		}
+		
 		void OnButtonClearClick (object sender, EventArgs e)
 		{
 			logView.Clear ();
@@ -154,7 +158,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			monitor = logView.GetProgressMonitor ();
 			asyncOperation = monitor.AsyncOperation;
 			
-			Gtk.Application.Invoke (delegate {
+			DispatchService.GuiDispatch (delegate {
 				window.HasNewData = false;
 				window.HasErrors = false;
 				window.IsWorking = true;

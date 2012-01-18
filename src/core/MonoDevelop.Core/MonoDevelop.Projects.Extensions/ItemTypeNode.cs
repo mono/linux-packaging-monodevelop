@@ -37,16 +37,16 @@ namespace MonoDevelop.Projects.Extensions
 	public abstract class ItemTypeNode: ExtensionNode
 	{
 		[NodeAttribute (Required=true)]
-		string guid;
+		string guid = null;
 		
 		[NodeAttribute]
-		string extension;
+		string extension = null;
 		
 		[NodeAttribute]
-		string import;
+		string import = null;
 		
 		[NodeAttribute]
-		string handlerType;
+		string handlerType = null;
 		
 		public ItemTypeNode ()
 		{
@@ -118,6 +118,6 @@ namespace MonoDevelop.Projects.Extensions
 			return h;
 		}
 		
-		public abstract SolutionEntityItem LoadSolutionItem (IProgressMonitor monitor, string fileName, string itemGuid);
+		public abstract SolutionEntityItem LoadSolutionItem (IProgressMonitor monitor, string fileName, MSBuildFileFormat expectedFormat, string itemGuid);
 	}
 }

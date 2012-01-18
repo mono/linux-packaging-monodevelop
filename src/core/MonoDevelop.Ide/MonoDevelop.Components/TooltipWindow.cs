@@ -28,6 +28,7 @@
 
 using System;
 
+using MonoDevelop.Ide;
 using Gtk;
 using Gdk;
 
@@ -38,6 +39,13 @@ namespace MonoDevelop.Components
 		bool nudgeVertical = false;
 		bool nudgeHorizontal = false;
 		WindowTransparencyDecorator decorator;
+		
+		public string LinkColor {
+			get {
+				var color = Mono.TextEditor.HslColor.GenerateHighlightColors (Style.Background (State), Style.Text (State), 3)[2];
+				return color.ToPangoString ();
+			}
+		}
 		
 		public TooltipWindow () : base(Gtk.WindowType.Popup)
 		{
@@ -113,19 +121,19 @@ namespace MonoDevelop.Components
 //					LimitWidth (fittedWidth);
 //				}
 				
-				Gdk.Rectangle geometry = Screen.GetMonitorGeometry (Screen.GetMonitorAtPoint (x, y));
+				Gdk.Rectangle geometry = DesktopService.GetUsableMonitorGeometry (Screen, Screen.GetMonitorAtPoint (x, y));
 				if (nudgeHorizontal) {
 					if (allocation.Width <= geometry.Width && x + allocation.Width >= geometry.Width - edgeGap)
 						x = geometry.Left + (geometry.Width - allocation.Height - edgeGap);
-					if (x <= geometry.Left)
-						x = geometry.Left;
+					if (x <= geometry.Left + edgeGap)
+						x = geometry.Left + edgeGap;
 				}
 				
 				if (nudgeVertical) {
 					if (allocation.Height <= geometry.Height && y + allocation.Height >= geometry.Height - edgeGap)
 						y = geometry.Top + (geometry.Height - allocation.Height - edgeGap);
-					if (y <= geometry.Top)
-						y = geometry.Top;
+					if (y <= geometry.Top + edgeGap)
+						y = geometry.Top + edgeGap;
 				}
 				
 				if (y != oldY || x != oldX)

@@ -35,15 +35,24 @@ namespace MonoDevelop.Core.ProgressMonitoring
 	{
 		int columns = 80;
 		bool indent = true;
-		bool wrap = true;
+		bool wrap = false;
 		int ilevel = 0;
 		int isize = 3;
 		int col = -1;
 		LogTextWriter logger;
 		bool ignoreLogMessages;
+		TextWriter writer;
 		
-		public ConsoleProgressMonitor ()
+		public ConsoleProgressMonitor () : this (Console.Out)
 		{
+			//FIXME: can we efficiently update Console.WindowWidth when it changes?
+			columns = Console.WindowWidth;
+			this.wrap = columns > 0;
+		}
+		
+		public ConsoleProgressMonitor (TextWriter writer)
+		{
+			this.writer = writer;
 			logger = new LogTextWriter ();
 			logger.TextWritten += new LogTextEventHandler (WriteLog);
 		}
@@ -99,7 +108,7 @@ namespace MonoDevelop.Core.ProgressMonitoring
 		
 		public override void ReportSuccess (string message)
 		{
-			WriteText (message);
+			WriteText (message + "\n");
 		}
 		
 		public override void ReportWarning (string message)
@@ -138,7 +147,7 @@ namespace MonoDevelop.Core.ProgressMonitoring
 			while (n < text.Length)
 			{
 				if (col == -1) {
-					Console.Write (new String (' ', leftMargin));
+					writer.Write (new String (' ', leftMargin));
 					col = leftMargin;
 				}
 				
@@ -167,11 +176,11 @@ namespace MonoDevelop.Core.ProgressMonitoring
 				else if (col >= maxCols)
 					n = lastWhite + 1;
 				
-				Console.Write (text.Substring (sn, lastWhite - sn));
+				writer.Write (text.Substring (sn, lastWhite - sn));
 				
 				if (eol || col >= maxCols) {
 					col = -1;
-					Console.WriteLine ();
+					writer.WriteLine ();
 					if (eol) n++;
 				}
 			}
@@ -181,7 +190,7 @@ namespace MonoDevelop.Core.ProgressMonitoring
 		{
 			ilevel += isize;
 			if (col != -1) {
-				Console.WriteLine ();
+				writer.WriteLine ();
 				col = -1;
 			}
 		}
@@ -191,7 +200,7 @@ namespace MonoDevelop.Core.ProgressMonitoring
 			ilevel -= isize;
 			if (ilevel < 0) ilevel = 0;
 			if (col != -1) {
-				Console.WriteLine ();
+				writer.WriteLine ();
 				col = -1;
 			}
 		}

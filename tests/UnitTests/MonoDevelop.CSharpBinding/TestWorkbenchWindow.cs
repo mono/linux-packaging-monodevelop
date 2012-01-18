@@ -30,6 +30,8 @@ using System;
 using System.Collections;
 
 using MonoDevelop.Ide.Gui;
+using System.Collections.Generic;
+using Mono.Addins;
 
 namespace MonoDevelop.CSharpBinding.Tests
 {
@@ -65,11 +67,13 @@ namespace MonoDevelop.CSharpBinding.Tests
 			get { return viewContent; }
 			set { viewContent = value; }
 		}
-		
-		public ArrayList SubViewContents {
-			get { return new ArrayList (); }
+
+		public ExtensionContext ExtensionContext {
+			get { return AddinManager.AddinEngine; }
 		}
 		
+		public IEnumerable<IAttachableViewContent> SubViewContents { get { return new IAttachableViewContent[0]; } }
+
 		public IBaseViewContent ActiveViewContent {
 			get { return ViewContent;}
 			set {}
@@ -87,10 +91,21 @@ namespace MonoDevelop.CSharpBinding.Tests
 		public void SwitchView (int viewNumber)
 		{
 		}
+		public void SwitchView (IAttachableViewContent view)
+		{
+		}
+		
+		public int FindView<T> ()
+		{
+			return -1;
+		}
+		
 		public void AttachViewContent (IAttachableViewContent subViewContent)
 		{
 			
 		}
+		
+		public event EventHandler DocumentChanged;
 		public event EventHandler TitleChanged;
 		public event WorkbenchWindowEventHandler Closing;
 		public event WorkbenchWindowEventHandler Closed;

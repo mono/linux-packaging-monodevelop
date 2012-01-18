@@ -61,7 +61,7 @@ namespace Mono.Debugging.Soft
 		public override DC.StackFrame[] GetStackFrames (int firstIndex, int lastIndex)
 		{
 			ValidateStack ();
-			if (lastIndex == -1)
+			if (lastIndex < 0)
 				lastIndex = frames.Length - 1;
 			List<DC.StackFrame> list = new List<DC.StackFrame> ();
 			for (int n = firstIndex; n <= lastIndex && n < frames.Length; n++)
@@ -78,19 +78,29 @@ namespace Mono.Debugging.Soft
 		
 		DC.StackFrame CreateStackFrame (MDB.StackFrame frame)
 		{
-			string method = frame.Method.Name;
-			if (frame.Method.DeclaringType != null)
-				method = frame.Method.DeclaringType.FullName + "." + method;
-			var location = new DC.SourceLocation (method, frame.FileName, frame.LineNumber);
-			var lang = frame.Method != null? "Managed" : "Native";
-			return new DC.StackFrame (frame.ILOffset, location, lang, session.IsExternalCode (frame), true);
+			MDB.MethodMirror method = frame.Method;
+			MDB.TypeMirror type = method.DeclaringType;
+			string methodName = method.Name;
+			if (type != null)
+				methodName = type.FullName + "." + methodName;
+			var location = new DC.SourceLocation (methodName, SoftDebuggerSession.NormalizePath (frame.FileName), frame.LineNumber);
+			var lang = frame.Method != null ? "Managed" : "Native";
+			return new DC.StackFrame (frame.ILOffset, method.FullName, location, lang, session.IsExternalCode (frame), true, type.Module.FullyQualifiedName, type.FullName);
 		}
 		
 		protected override EvaluationContext GetEvaluationContext (int frameIndex, EvaluationOptions options)
 		{
 			ValidateStack ();
+			if (frameIndex >= frames.Length)
+				return null;
+			
 			MDB.StackFrame frame = frames [frameIndex];
 			return new SoftEvaluationContext (session, frame, options);
+		}
+		
+		public override AssemblyLine[] Disassemble (int frameIndex, int firstLine, int count)
+		{
+			return session.Disassemble (frames [frameIndex], firstLine, count);
 		}
 	}
 }

@@ -29,7 +29,7 @@ using System.Linq;
 using System.Text;
 using Gtk;
 using System.Collections.Generic;
-using ICSharpCode.NRefactory.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Projects.Dom;
 using MonoDevelop.Refactoring;
 using MonoDevelop.Projects.Dom.Output;
@@ -78,7 +78,7 @@ namespace MonoDevelop.CodeGeneration
 			treeView.AppendColumn (column);
 			Ambience ambience = AmbienceService.GetAmbienceForFile (options.Document.FileName);
 			foreach (IBaseMember member in GetValidMembers ()) {
-				Store.AppendValues (false, ImageService.GetPixbuf (member.StockIcon, IconSize.Menu), ambience.GetString (member, member.MemberType == MemberType.Parameter ? OutputFlags.IncludeParameterName : OutputFlags.ClassBrowserEntries), member);
+				Store.AppendValues (false, ImageService.GetPixbuf (member.StockIcon, IconSize.Menu), ambience.GetString (member, member.MemberType == MonoDevelop.Projects.Dom.MemberType.Parameter ? OutputFlags.IncludeParameterName : OutputFlags.ClassBrowserEntries), member);
 			}
 			
 			treeView.Model = store;
@@ -128,7 +128,7 @@ namespace MonoDevelop.CodeGeneration
 			}
 			
 			if (output.Length > 0) {
-				var data = options.Document.TextEditorData;
+				var data = options.Document.Editor;
 				int offset = data.Caret.Offset - indent.Length;
 				data.Replace (offset, indent.Length, output.ToString ());
 				data.Caret.Offset = offset + output.Length;

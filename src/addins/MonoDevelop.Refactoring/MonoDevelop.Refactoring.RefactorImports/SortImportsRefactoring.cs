@@ -27,7 +27,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ICSharpCode.NRefactory.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Projects.Dom.Parser;
 using MonoDevelop.Projects.Dom;
 using System.Text;
@@ -73,11 +73,11 @@ namespace MonoDevelop.Refactoring.RefactorImports
 			foreach (IUsing u in compilationUnit.Usings) {
 				if (u.IsFromNamespace)
 					continue;
-				int offset = textEditorData.Document.LocationToOffset (u.Region.Start.Line - 1, u.Region.Start.Column - 1);
+				int offset = textEditorData.Document.LocationToOffset (u.Region.Start.Line, u.Region.Start.Column);
 				TextReplaceChange change = new TextReplaceChange () {
 					FileName = options.Document.FileName,
 					Offset = offset,
-					RemovedChars = textEditorData.Document.LocationToOffset (u.Region.End.Line - 1, u.Region.End.Column - 1) - offset
+					RemovedChars = textEditorData.Document.LocationToOffset (u.Region.End.Line, u.Region.End.Column) - offset
 				};
 				Mono.TextEditor.LineSegment line = textEditorData.Document.GetLineByOffset (change.Offset);
 				if (line != null && line.EditableLength == change.RemovedChars)
@@ -90,12 +90,12 @@ namespace MonoDevelop.Refactoring.RefactorImports
 			usings.Sort (UsingComparer);
 			INRefactoryASTProvider astProvider = options.GetASTProvider ();
 			foreach (IUsing u in usings) {
-				UsingDeclaration declaration;
+				AstNode declaration;
 				if (u.IsFromNamespace)
 					continue;
 				if (u.Aliases.Any ()) {
 					KeyValuePair<string, IReturnType> alias = u.Aliases.First ();
-					declaration = new UsingDeclaration (alias.Key, alias.Value.ConvertToTypeReference ());
+					declaration = new UsingAliasDeclaration (alias.Key, alias.Value.ConvertToTypeReference ());
 				} else {
 					declaration = new UsingDeclaration (u.Namespaces.First ());
 				}

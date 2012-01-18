@@ -821,6 +821,189 @@ namespace X
 			Assert.IsNotNull (provider.Find ("MyMethod"), "method 'MyMethod' not found");			
 		}
 
+		[Test()]
+		public void TestEnumInnerClass ()
+		{
+			CompletionDataList provider = CodeCompletionBugTests.CreateProvider (
+@"
+using System;
+namespace CaptainHook.Mail
+{
+	public class TestClass
+	{
+		enum ParsingState
+		{
+			Any,
+			Start,
+			InMacro,
+			InMacroArgumentList,
+			InQuotedMacroArgument,
+			PlainText
+		}
+
+		ParsingState state;
+
+		public TestClass ()
+		{
+			$state = $
+		}
+	}
+}");
+			Assert.IsNotNull (provider, "provider == null");
+			Assert.IsNull (provider.Find ("CaptainHook.Mail.TestClass.ParsingState"), "class 'CaptainHook.Mail.TestClass.ParsingState' found!");
+			Assert.IsNull (provider.Find ("TestClass.ParsingState"), "class 'TestClass.ParsingState' found!");
+			Assert.IsNotNull (provider.Find ("ParsingState"), "class 'ParsingState' not found");
+		}
 		
+		[Test()]
+		public void TestInheritableTypeContext ()
+		{
+			CompletionDataList provider = CodeCompletionBugTests.CreateProvider (
+@"
+class Test
+{
+	public class Inner {}
+	public static void Foo () {}
+}
+
+$class Test2 : Test.$
+");
+			Assert.IsNotNull (provider, "provider == null");
+			Assert.IsNotNull (provider.Find ("Inner"), "class 'Inner' not found.");
+			Assert.IsNull (provider.Find ("Foo"), "method 'Foo' found.");
+		}
+		
+		[Test()]
+		public void TestInheritableTypeWhereContext ()
+		{
+			CompletionDataList provider = CodeCompletionBugTests.CreateProvider (
+@"
+class Test
+{
+	public class Inner {}
+	public static void Foo () {}
+}
+
+$class Test2<T> where T : Test.$
+");
+			Assert.IsNotNull (provider, "provider == null");
+			Assert.IsNotNull (provider.Find ("Inner"), "class 'Inner' not found.");
+			Assert.IsNull (provider.Find ("Foo"), "method 'Foo' found.");
+		}
+		
+		[Test()]
+		public void TestEnumAssignment ()
+		{
+			CompletionDataList provider = CodeCompletionBugTests.CreateCtrlSpaceProvider (
+@"
+public enum TestEnum { A, B, C}
+
+class TestClass
+{
+	public void Foo ()
+	{
+		$TestEnum test = $
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum"), "enum 'TestEnum' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.A"), "enum 'TestEnum.A' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.B"), "enum 'TestEnum.B' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.C"), "enum 'TestEnum.C' not found.");
+		}
+		
+		[Test()]
+		public void TestEnumAssignmentCase2 ()
+		{
+			CompletionDataList provider = CodeCompletionBugTests.CreateCtrlSpaceProvider (
+@"
+public enum TestEnum { A, B, C}
+
+class TestClass
+{
+	public void Foo ()
+	{
+		TestEnum test;
+		$test = $
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum"), "enum 'TestEnum' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.A"), "enum 'TestEnum.A' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.B"), "enum 'TestEnum.B' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.C"), "enum 'TestEnum.C' not found.");
+		}
+		
+		[Test()]
+		public void TestEnumAsParameter ()
+		{
+			CompletionDataList provider = CodeCompletionBugTests.CreateCtrlSpaceProvider (
+@"
+public enum TestEnum { A, B, C}
+
+class TestClass
+{
+	void Bar (TestEnum test) {}
+	public void Foo ()
+	{
+		$Bar ($
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum"), "enum 'TestEnum' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.A"), "enum 'TestEnum.A' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.B"), "enum 'TestEnum.B' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.C"), "enum 'TestEnum.C' not found.");
+		}
+	
+		[Test()]
+		public void TestEnumAsParameterCase2 ()
+		{
+			CompletionDataList provider = CodeCompletionBugTests.CreateCtrlSpaceProvider (
+@"
+public enum TestEnum { A, B, C}
+
+class TestClass
+{
+	void Bar (int a, TestEnum test) {}
+	public void Foo ()
+	{
+		$Bar (5, $
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum"), "enum 'TestEnum' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.A"), "enum 'TestEnum.A' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.B"), "enum 'TestEnum.B' not found.");
+			Assert.IsNotNull (provider.Find ("TestEnum.C"), "enum 'TestEnum.C' not found.");
+		}
+		
+		[Test()]
+		public void TestInnerEnums ()
+		{
+			CompletionDataList provider = CodeCompletionBugTests.CreateCtrlSpaceProvider (
+@"
+public class InnerEnumTest
+{
+	public enum TestEnum { A, B, C}
+	void Bar (TestEnum test) {}
+}
+
+class TestClass
+{
+	public void Foo ()
+	{
+		InnerEnumTest test;
+		$test.Bar ($
+	}
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("InnerEnumTest.TestEnum"), "enum 'InnerEnumTest.TestEnum' not found.");
+			Assert.IsNotNull (provider.Find ("InnerEnumTest.TestEnum.A"), "enum 'InnerEnumTest.TestEnum.A' not found.");
+			Assert.IsNotNull (provider.Find ("InnerEnumTest.TestEnum.B"), "enum 'InnerEnumTest.TestEnum.B' not found.");
+			Assert.IsNotNull (provider.Find ("InnerEnumTest.TestEnum.C"), "enum 'InnerEnumTest.TestEnum.C' not found.");
+		}
+		
+
 	}
 }

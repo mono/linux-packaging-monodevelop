@@ -1,0 +1,14 @@
+Index: monodevelop-2.4+dfsg/monodevelop.in
+===================================================================
+--- monodevelop-2.4+dfsg.orig/monodevelop.in   2010-09-30 17:35:57.824000003 +0200
++++ monodevelop-2.4+dfsg/monodevelop.in        2010-09-30 17:36:37.764000005 +0200
+@@ -13,6 +13,9 @@
+ 	_MONO_OPTIONS=$MONO_OPTIONS
+ fi
+ 
++# Monodevelop menus don't work with Ubuntu appmenu
++export UBUNTU_MENUPROXY=0
++
+ if [ -n "$_MD_REDIRECT_LOG" ]; then
+ 	mkdir -p `dirname "$_MD_REDIRECT_LOG"`
+ 	$MONO_EXEC $_MONO_OPTIONS "$EXE_PATH" $* 2>&1 | tee "$_MD_REDIRECT_LOG"

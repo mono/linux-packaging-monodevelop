@@ -60,7 +60,7 @@ namespace MonoDevelop.Projects.Dom
 			get;
 		}
 		
-		ProjectDom SourceProjectDom {
+		new ProjectDom SourceProjectDom {
 			get;
 			set;
 		}
@@ -165,7 +165,9 @@ namespace MonoDevelop.Projects.Dom
 			get;
 		}
 		
-		List<IMethod> GetExtensionMethods (List<IType> accessibleExtensionTypes);
+		IEnumerable<IMethod> GetAllExtensionMethods (List<IType> accessibleExtensionTypes);
+		
+		IEnumerable<IMethod> GetExtensionMethods (List<IType> accessibleExtensionTypes, string methodName);
 	
 		TypeKind Kind {
 			get;

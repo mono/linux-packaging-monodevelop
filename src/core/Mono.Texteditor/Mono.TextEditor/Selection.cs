@@ -1,4 +1,5 @@
 using System;
+using Mono.TextEditor.Highlighting;
 
 namespace Mono.TextEditor
 {
@@ -13,7 +14,6 @@ namespace Mono.TextEditor
 				if (anchor != value) {
 					anchor = value;
 					OnChanged ();
-					IsDirty = false;
 				}
 			}
 		}
@@ -27,7 +27,6 @@ namespace Mono.TextEditor
 				if (lead != value) {
 					lead = value;
 					OnChanged ();
-					IsDirty = false;
 				}
 			}
 		}
@@ -49,11 +48,6 @@ namespace Mono.TextEditor
 			set;
 		}
 		
-		public bool IsDirty {
-			get;
-			set;
-		}
-		
 		public bool Contains (DocumentLocation loc)
 		{
 			return anchor <= loc && loc <= lead || lead <= loc && loc <= anchor;
@@ -71,15 +65,16 @@ namespace Mono.TextEditor
 			return new Selection (selection.Anchor, selection.Lead, selection.SelectionMode);
 		}
 		
-		public Selection (int anchorLine, int anchorColumn, int leadLine, int leadColumn) : this(new DocumentLocation (anchorLine, anchorColumn), new DocumentLocation (leadLine, leadColumn), SelectionMode.Normal)
-		{
-		}
-		public Selection (DocumentLocation anchor, DocumentLocation lead) : this (anchor, lead, SelectionMode.Normal)
+		public Selection (int anchorLine, int anchorColumn, int leadLine, int leadColumn, SelectionMode mode = SelectionMode.Normal) : this(new DocumentLocation (anchorLine, anchorColumn), new DocumentLocation (leadLine, leadColumn), mode)
 		{
 		}
 		
-		public Selection (DocumentLocation anchor, DocumentLocation lead, SelectionMode selectionMode)
+		public Selection (DocumentLocation anchor, DocumentLocation lead, SelectionMode selectionMode = SelectionMode.Normal)
 		{
+			if (anchor.Line < DocumentLocation.MinLine || anchor.Column < DocumentLocation.MinColumn)
+				throw new ArgumentOutOfRangeException ("anchor", anchor + " is out of range.");
+			if (lead.Line < DocumentLocation.MinLine || lead.Column < DocumentLocation.MinColumn)
+				throw new ArgumentOutOfRangeException ("lead", lead + " is out of range.");
 			this.Anchor        = anchor;
 			this.Lead          = lead;
 			this.SelectionMode = selectionMode;
@@ -92,13 +87,34 @@ namespace Mono.TextEditor
 			return new Segment (System.Math.Min (anchorOffset, leadOffset), System.Math.Abs (anchorOffset - leadOffset));
 		}
 		
+		// for markup syntax mode the syntax highlighting information need to be taken into account
+		// when calculating the selection offsets.
+		int PosToOffset (TextEditorData data, DocumentLocation loc) 
+		{
+			LineSegment line = data.GetLine (loc.Line);
+			if (line == null)
+				return 0;
+			Chunk startChunk = data.Document.SyntaxMode.GetChunks (data.Document, data.Parent.ColorStyle, line, line.Offset, line.Length);
+			int col = 1;
+			for (Chunk chunk = startChunk; chunk != null; chunk = chunk != null ? chunk.Next : null) {
+				if (col <= loc.Column && loc.Column < col + chunk.Length)
+					return chunk.Offset - col + loc.Column;
+				col += chunk.Length;
+			}
+			return line.Offset + line.EditableLength;
+		}
+		
 		public int GetAnchorOffset (TextEditorData data)
 		{
+			if (data.Document.SyntaxMode is MarkupSyntaxMode)
+				return PosToOffset (data, Anchor);
 			return data.Document.LocationToOffset (Anchor);
 		}
 		
 		public int GetLeadOffset (TextEditorData data)
 		{
+			if (data.Document.SyntaxMode is MarkupSyntaxMode)
+				return PosToOffset (data, Lead);
 			return data.Document.LocationToOffset (Lead);
 		}
 		
@@ -113,7 +129,27 @@ namespace Mono.TextEditor
 			Mono.TextEditor.Selection other = (Mono.TextEditor.Selection)obj;
 			return Anchor == other.Anchor && Lead == other.Lead;
 		}
-
+		
+		public bool IsSelected (DocumentLocation loc)
+		{
+			return anchor <= loc && loc <= lead || lead <= loc && loc <= anchor;
+		}
+		
+		public bool IsSelected (int line, int column)
+		{
+			return IsSelected (new DocumentLocation (line, column));
+		}
+		
+		public bool IsSelected (DocumentLocation start, DocumentLocation end)
+		{
+			return IsSelected (start) && IsSelected (end);
+		}
+		
+		public bool IsSelected (int startLine, int startColumn, int endLine, int endColumn)
+		{
+			return IsSelected (new DocumentLocation (startLine, startColumn), new DocumentLocation (endLine, endColumn));
+		}
+		
 		public override int GetHashCode ()
 		{
 			unchecked {

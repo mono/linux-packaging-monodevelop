@@ -1,87 +1,30 @@
-Index: monodevelop.git/monodevelop-core-addins.pc.in
+Index: monodevelop/monodevelop-core-addins.pc.in
 ===================================================================
---- monodevelop.git.orig/monodevelop-core-addins.pc.in	2010-06-11 13:52:00.848569868 +0100
-+++ monodevelop.git/monodevelop-core-addins.pc.in	2010-06-16 12:36:47.158579102 +0100
+--- monodevelop.orig/monodevelop-core-addins.pc.in	2011-11-08 00:30:37.000000000 +0000
++++ monodevelop/monodevelop-core-addins.pc.in	2011-11-08 00:59:11.000000000 +0000
 @@ -6,4 +6,4 @@
  Name: MonoDevelop Core Add-ins
  Description: MonoDevelop Core Add-ins
  Version: @VERSION@
 -Libs: -r:${libdir}/AddIns/VersionControl/MonoDevelop.VersionControl.dll -r:${libdir}/AddIns/NUnit/MonoDevelop.NUnit.dll -r:${libdir}/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll -r:${libdir}/AddIns/MonoDevelop.AspNet/MonoDevelop.AspNet.dll -r:${libdir}/AddIns/MonoDevelop.Gettext/MonoDevelop.Gettext.dll -r:${libdir}/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll -r:${libdir}/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll -r:${libdir}/AddIns/MonoDevelop.GtkCore/MonoDevelop.GtkCore.dll -r:${libdir}/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.VBNetBinding.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.CBinding.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.CSharpBinding.dll -r:${libdir}/AddIns/MonoDevelop.Autotools/MonoDevelop.Autotools.dll -r:${libdir}/AddIns/MonoDevelop.SourceEditor2.dll -r:${libdir}/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll -r:${libdir}/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll -r:${libdir}/AddIns/MonoDevelop.Moonlight/MonoDevelop.Moonlight.dll  -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft.dll -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugger.Soft.dll
 +Libs: -r:${libdir}/AddIns/VersionControl/MonoDevelop.VersionControl.dll -r:${libdir}/AddIns/NUnit/MonoDevelop.NUnit.dll -r:${libdir}/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll -r:${libdir}/AddIns/MonoDevelop.AspNet/MonoDevelop.AspNet.dll -r:${libdir}/AddIns/MonoDevelop.Gettext/MonoDevelop.Gettext.dll -r:${libdir}/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll -r:${libdir}/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll -r:${libdir}/AddIns/MonoDevelop.GtkCore/MonoDevelop.GtkCore.dll -r:${libdir}/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.VBNetBinding.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.CBinding.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.CSharpBinding.dll -r:${libdir}/AddIns/MonoDevelop.Autotools/MonoDevelop.Autotools.dll -r:${libdir}/AddIns/MonoDevelop.SourceEditor2.dll -r:${libdir}/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll -r:${libdir}/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft.dll -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugger.Soft.dll
-Index: monodevelop.git/src/addins/Makefile.am
+Index: monodevelop/src/addins/Makefile.am
 ===================================================================
---- monodevelop.git.orig/src/addins/Makefile.am	2010-06-11 13:52:01.068569754 +0100
-+++ monodevelop.git/src/addins/Makefile.am	2010-06-16 12:36:47.168582259 +0100
-@@ -1,33 +1,32 @@
- 
--SUBDIRS = \
--	MacPlatform \
--	GnomePlatform \
--	MonoDevelop.DesignerSupport \
--	MonoDevelop.Debugger \
--	Deployment \
--	MonoDevelop.Refactoring \
--	MonoDevelop.SourceEditor2 \
--	VersionControl \
--	MonoDevelop.Autotools \
--	MonoDevelop.Gettext \
--	MonoDevelop.XmlEditor \
--	TextTemplating \
--	AspNet \
--	CSharpBinding \
--	ILAsmBinding \
--	NUnit \
--	MonoDeveloperExtensions \
--	VBNetBinding \
--	prj2make-sharp-lib \
--	WelcomePage \
--	MonoDevelop.GtkCore \
--	ChangeLogAddIn \
--	MonoDevelop.WebReferences \
--	MonoDevelop.RegexToolkit \
--	CBinding \
--	MonoDevelop.AssemblyBrowser \
+--- monodevelop.orig/src/addins/Makefile.am	2011-11-08 00:33:54.000000000 +0000
++++ monodevelop/src/addins/Makefile.am	2011-11-08 00:59:50.000000000 +0000
+@@ -26,7 +26,6 @@
+ 	MonoDevelop.RegexToolkit \
+ 	CBinding \
+ 	MonoDevelop.AssemblyBrowser \
 -	MonoDevelop.Moonlight \
--	MonoDevelop.CodeMetrics \
--	MonoDevelop.Debugger.Soft \
--	WindowsPlatform \
--	MonoDevelop.HexEditor
-+SUBDIRS = \
-+	MacPlatform \
-+	GnomePlatform \
-+	MonoDevelop.DesignerSupport \
-+	MonoDevelop.Debugger \
-+	Deployment \
-+	MonoDevelop.Refactoring \
-+	MonoDevelop.SourceEditor2 \
-+	VersionControl \
-+	MonoDevelop.Autotools \
-+	MonoDevelop.Gettext \
-+	MonoDevelop.XmlEditor \
-+	TextTemplating \
-+	AspNet \
-+	CSharpBinding \
-+	ILAsmBinding \
-+	NUnit \
-+	MonoDeveloperExtensions \
-+	VBNetBinding \
-+	prj2make-sharp-lib \
-+	WelcomePage \
-+	MonoDevelop.GtkCore \
-+	ChangeLogAddIn \
-+	MonoDevelop.WebReferences \
-+	MonoDevelop.RegexToolkit \
-+	CBinding \
-+	MonoDevelop.AssemblyBrowser \
-+	MonoDevelop.CodeMetrics \
-+	MonoDevelop.Debugger.Soft \
-+	WindowsPlatform \
-+	MonoDevelop.HexEditor
-Index: monodevelop.git/configure.in
+ 	MonoDevelop.CodeMetrics \
+ 	MonoDevelop.Debugger.Soft \
+ 	WindowsPlatform \
+Index: monodevelop/configure.in
 ===================================================================
---- monodevelop.git.orig/configure.in	2010-06-16 12:37:35.958569809 +0100
-+++ monodevelop.git/configure.in	2010-06-16 12:37:49.308571279 +0100
-@@ -366,7 +366,6 @@
+--- monodevelop.orig/configure.in	2011-11-08 00:33:54.000000000 +0000
++++ monodevelop/configure.in	2011-11-08 00:59:11.000000000 +0000
+@@ -331,7 +331,6 @@
  src/addins/WindowsPlatform/Makefile
  src/addins/MonoDevelop.AssemblyBrowser/Makefile
  src/addins/MonoDevelop.SourceEditor2/Makefile
@@ -89,20 +32,20 @@ Index: monodevelop.git/configure.in
  src/addins/MonoDevelop.XmlEditor/Makefile
  src/addins/MonoDevelop.CodeMetrics/Makefile
  src/addins/MonoDevelop.Refactoring/Makefile
-@@ -376,7 +375,6 @@
+@@ -340,7 +339,6 @@
  src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/Makefile
  src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/Makefile
  src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet/Makefile
 -src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.Moonlight/Makefile
  src/addins/MonoDevelop.HexEditor/Makefile
- tests/Makefile
- tests/UnitTests/Makefile
-Index: monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/Makefile.am
+ src/addins/MonoDevelop.DocFood/Makefile
+ src/addins/MonoDevelop.MacDev/Makefile
+Index: monodevelop/src/addins/MonoDevelop.Debugger.Soft/Makefile.am
 ===================================================================
---- monodevelop.git.orig/src/addins/MonoDevelop.Debugger.Soft/Makefile.am	2010-06-16 12:37:20.778579690 +0100
-+++ monodevelop.git/src/addins/MonoDevelop.Debugger.Soft/Makefile.am	2010-06-16 12:37:28.488580745 +0100
-@@ -2,5 +2,4 @@
- 	Mono.Debugger.Soft \
+--- monodevelop.orig/src/addins/MonoDevelop.Debugger.Soft/Makefile.am	2011-11-08 00:30:37.000000000 +0000
++++ monodevelop/src/addins/MonoDevelop.Debugger.Soft/Makefile.am	2011-11-08 00:59:11.000000000 +0000
+@@ -1,5 +1,4 @@
+ SUBDIRS = \
  	Mono.Debugging.Soft \
  	MonoDevelop.Debugger.Soft \
 -	MonoDevelop.Debugger.Soft.AspNet \

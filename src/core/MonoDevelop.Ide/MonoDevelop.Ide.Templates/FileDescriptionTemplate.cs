@@ -48,7 +48,7 @@ namespace MonoDevelop.Ide.Templates
 	{
 		static List<FileTemplateTypeCodon> templates;
 		
-		public static FileDescriptionTemplate CreateTemplate (XmlElement element)
+		public static FileDescriptionTemplate CreateTemplate (XmlElement element, FilePath baseDirectory)
 		{
 			if (templates == null) {
 				templates = new List<FileTemplateTypeCodon> ();
@@ -58,7 +58,7 @@ namespace MonoDevelop.Ide.Templates
 			foreach (FileTemplateTypeCodon template in templates) {
 				if (template.ElementName == element.Name) {
 					FileDescriptionTemplate t = (FileDescriptionTemplate) template.CreateInstance (typeof(FileDescriptionTemplate));
-					t.Load (element);
+					t.Load (element, baseDirectory);
 					return t;
 				}
 			}
@@ -75,13 +75,13 @@ namespace MonoDevelop.Ide.Templates
 		
 		public abstract string Name { get; }
 		
-		public abstract void Load (XmlElement filenode);
+		public abstract void Load (XmlElement filenode, FilePath baseDirectory);
 		public abstract bool AddToProject (SolutionItem policyParent, Project project, string language, string directory, string name);
 		public abstract void Show ();
 		
 		public virtual bool IsValidName (string name, string language)
 		{
-			return name.IndexOfAny (Path.GetInvalidFileNameChars ()) == -1;
+			return name.Length > 0 && name.IndexOfAny (Path.GetInvalidFileNameChars ()) == -1;
 /*			if (name.Length > 0) {
 				if (language != null && language.Length > 0) {
 					IDotNetLanguageBinding binding = LanguageBindingService.GetBindingPerLanguageName (language) as IDotNetLanguageBinding;

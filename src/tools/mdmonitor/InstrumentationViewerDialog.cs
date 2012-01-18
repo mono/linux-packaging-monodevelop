@@ -83,9 +83,9 @@ namespace Mono.Instrumentation.Monitor
 		{
 			try {
 				XmlDataSerializer ser = new XmlDataSerializer (new DataContext ());
-				FilePath file = PropertyService.ConfigPath.Combine ("monitor-views.xml");
+				FilePath file = ConfigFile;
 				if (System.IO.File.Exists (file)) {
-					views = (List<ChartView>) ser.Deserialize (PropertyService.ConfigPath.Combine ("monitor-views.xml"), typeof (List<ChartView>));
+					views = (List<ChartView>) ser.Deserialize (file, typeof (List<ChartView>));
 					UpdateViews ();
 					return;
 				}
@@ -98,12 +98,16 @@ namespace Mono.Instrumentation.Monitor
 			views.Add (v);
 			UpdateViews ();
 		}
+
+		static string ConfigFile {
+			get { return UserProfile.Current.ConfigDir.Combine ("monitor-views.xml"); }
+		}
 		
 		public void SaveViews ()
 		{
 			try {
 				XmlDataSerializer ser = new XmlDataSerializer (new DataContext ());
-				ser.Serialize (PropertyService.ConfigPath.Combine ("monitor-views.xml"), views);
+				ser.Serialize (ConfigFile, views);
 			} catch (Exception ex) {
 				LoggingService.LogError ("Error while saving monitor-views.xml", ex);
 			}
@@ -148,14 +152,13 @@ namespace Mono.Instrumentation.Monitor
 		internal void DeleteView (ChartView view)
 		{
 			string msg = string.Format ("Are you sure you want to delete the profile '{0}'?", view.Name);
-			MessageDialog dlg = new MessageDialog (this, DialogFlags.Modal, MessageType.Question, ButtonsType.Ok | ButtonsType.Cancel, msg);
-			if (dlg.Run () == (int) ResponseType.Cancel)
-			
-				return;
-
-			views.Remove (view);
-			SaveViews ();
-			UpdateViews ();
+			MessageDialog dlg = new MessageDialog (this, DialogFlags.Modal, MessageType.Question, ButtonsType.OkCancel, msg);
+			if (dlg.Run () == (int) ResponseType.Ok) {
+				views.Remove (view);
+				SaveViews ();
+				UpdateViews ();
+			}
+			dlg.Destroy ();
 		}
 
 		protected virtual void OnButtonOkClicked (object sender, System.EventArgs e)
@@ -298,6 +301,15 @@ namespace Mono.Instrumentation.Monitor
 			} finally {
 				fdiag.Destroy ();
 			}
+		}
+		
+		public void InstallMacGlobalMenu ()
+		{
+			MacIntegration.IgeMacMenu.GlobalKeyHandlerEnabled = true;
+			MacIntegration.IgeMacMenu.MenuBar = menubar1;
+			var quitItem = (MenuItem) UIManager.GetWidget ("/menubar1/FileAction/ExitAction");
+			MacIntegration.IgeMacMenu.QuitMenuItem = quitItem;
+			menubar1.Hide ();
 		}
 	}		
 	

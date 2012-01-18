@@ -26,24 +26,38 @@
 //
 
 using System;
+using System.Linq;
 using Mono.Addins;
 using MonoDevelop.Projects.Formats.MSBuild;
+using System.Collections.Generic;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Projects.Extensions
 {
+	[ExtensionNodeChild (typeof(DotNetProjectSubtypeNodeImport), "AddImport")]
+	[ExtensionNodeChild (typeof(DotNetProjectSubtypeNodeImport), "RemoveImport")]
 	public class DotNetProjectSubtypeNode: ExtensionNode
 	{
 		[NodeAttribute]
-		string guid;
+		string guid = null;
 		
 		[NodeAttribute]
-		string type;
+		string type = null;
 		
 		[NodeAttribute]
-		string import;
+		string import = null;
 		
 		[NodeAttribute]
-		string extension;
+		string extension = null;
+
+		[NodeAttribute]
+		string exclude = null;
+
+		[NodeAttribute]
+		bool useXBuild = false;
+		
+		[NodeAttribute]
+		string migrationHandler;
 
 		Type itemType;
 
@@ -70,6 +84,28 @@ namespace MonoDevelop.Projects.Extensions
 			}
 		}
 		
+		public string Exclude {
+			get { 
+				return exclude; 
+			}
+		}
+		
+		public string Guid {
+			get { return guid; }
+		}
+		
+		public bool UseXBuild {
+			get { return useXBuild; }
+		}
+		
+		public bool IsMigration {
+			get { return migrationHandler != null; }
+		}
+		
+		public IDotNetSubtypeMigrationHandler MigrationHandler {
+			get { return (IDotNetSubtypeMigrationHandler) Addin.CreateInstance (migrationHandler); }
+		}
+		
 		public bool SupportsType (string guid)
 		{
 			return string.Compare (this.guid, guid, true) == 0;
@@ -82,7 +118,7 @@ namespace MonoDevelop.Projects.Extensions
 		
 		public virtual bool CanHandleItem (SolutionEntityItem item)
 		{
-			return Type.IsAssignableFrom (item.GetType ());
+			return !IsMigration && Type.IsAssignableFrom (item.GetType ());
 		}
 		
 		public virtual bool CanHandleFile (string fileName, string typeGuid)
@@ -97,9 +133,57 @@ namespace MonoDevelop.Projects.Extensions
 		public virtual void InitializeHandler (SolutionEntityItem item)
 		{
 			MSBuildProjectHandler h = (MSBuildProjectHandler) ProjectExtensionUtil.GetItemHandler (item);
-			if (!string.IsNullOrEmpty (import))
-				h.TargetImports.AddRange (import.Split (':'));
+			UpdateImports (item, h.TargetImports);
 			h.SubtypeGuids.Add (guid);
+			if (UseXBuild)
+				h.UseXbuild = true;
 		}
+		
+		public void UpdateImports (SolutionEntityItem item, List<string> imports)
+		{
+			DotNetProject p = (DotNetProject) item;
+			if (!string.IsNullOrEmpty (import))
+				imports.AddRange (import.Split (':'));
+			if (!string.IsNullOrEmpty (exclude))
+				exclude.Split (':').ToList ().ForEach (i => imports.Remove (i));
+			
+			foreach (DotNetProjectSubtypeNodeImport iob in ChildNodes) {
+				if (iob.Language == p.LanguageName) {
+					if (iob.IsAdd)
+						imports.AddRange (iob.Projects.Split (':'));
+					else
+						iob.Projects.Split (':').ToList ().ForEach (i => imports.Remove (i));
+				}
+			}
+		}
+	}
+	
+	class DotNetProjectSubtypeNodeImport: ExtensionNode
+	{
+		protected override void Read (NodeElement elem)
+		{
+			IsAdd = elem.NodeName == "AddImport";
+			base.Read (elem);
+		}
+		
+		[NodeAttribute ("language")]
+		public string Language { get; set; }
+		
+		[NodeAttribute ("projects")]
+		public string Projects { get; set; }
+		
+		public bool IsAdd { get; private set; }
+	}
+	
+	public interface IDotNetSubtypeMigrationHandler
+	{
+		IEnumerable<string> FilesToBackup (string filename);
+		bool Migrate (IProjectLoadProgressMonitor monitor, MSBuildProject project, string fileName, string language);
+	}
+	
+	public enum MigrationType {
+		Ignore,
+		Migrate,
+		BackupAndMigrate,
 	}
 }

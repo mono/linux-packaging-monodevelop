@@ -95,10 +95,10 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		public override object GetParentObject (object dataObject)
 		{
 			ProjectFile file = (ProjectFile) dataObject;
-			string dir = Path.GetDirectoryName (file.FilePath);
+			FilePath dir = !file.IsLink ? file.FilePath.ParentDirectory : file.Project.BaseDirectory.Combine (file.ProjectVirtualPath).ParentDirectory;
 			
 			if (!string.IsNullOrEmpty (file.DependsOn)) {
-				ProjectFile groupUnder = file.Project.Files.GetFile (Path.Combine (dir, file.DependsOn));
+				ProjectFile groupUnder = file.Project.Files.GetFile (file.FilePath.ParentDirectory.Combine (file.DependsOn));
 				if (groupUnder != null)
 					return groupUnder;
 			}
@@ -137,8 +137,16 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 	
 	public class ProjectFileNodeCommandHandler: NodeCommandHandler
 	{
+		public override void OnRenameStarting (ref int selectionStart, ref int selectionLength)
+		{
+			string name = CurrentNode.NodeName;
+			selectionStart = 0;
+			selectionLength = Path.GetFileNameWithoutExtension(name).Length;
+		}
+
 		public override void RenameItem (string newName)
 		{
+			ProjectFile newProjectFile = null;
 			ProjectFile file = (ProjectFile) CurrentNode.DataItem;
 			
 			FilePath oldPath, newPath, newLink = FilePath.Null, oldLink = FilePath.Null;
@@ -152,27 +160,29 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				newPath = oldPath.ParentDirectory.Combine (newName);	
 			}
 			
-			if (oldPath != newPath) {
-				try {
-					if (!FileService.IsValidPath (newPath)) {
-						MessageService.ShowWarning (GettextCatalog.GetString ("The name you have chosen contains illegal characters. Please choose a different name."));
-					} else if (File.Exists (newPath) || Directory.Exists (newPath) ||
-					           (file.Project != null && file.Project.Files.GetFileWithVirtualPath (newPath.ToRelative (file.Project.BaseDirectory)) != null)) {
-						MessageService.ShowWarning (GettextCatalog.GetString ("File or directory name is already in use. Please choose a different one."));
-					} else {
-						if (file.IsLink) {
-							file.Link = newLink;
-						} else {
-							FileService.RenameFile (oldPath, newName);
-						}
-						if (file.Project != null)
-							IdeApp.ProjectOperations.Save (file.Project);
-					}
-				} catch (System.ArgumentException) { // new file name with wildcard (*, ?) characters in it
+			try {
+				if (file.Project != null)
+					newProjectFile = file.Project.Files.GetFileWithVirtualPath (newPath.ToRelative (file.Project.BaseDirectory));
+				
+				if (!FileService.IsValidPath (newPath)) {
 					MessageService.ShowWarning (GettextCatalog.GetString ("The name you have chosen contains illegal characters. Please choose a different name."));
-				} catch (System.IO.IOException ex) {
-					MessageService.ShowException (ex, GettextCatalog.GetString ("There was an error renaming the file."));
+				} else if (newProjectFile != null && newProjectFile != file) {
+					// If there is already a file under the newPath which is *different*, then throw an exception
+					MessageService.ShowWarning (GettextCatalog.GetString ("File or directory name is already in use. Please choose a different one."));
+				} else {
+					if (file.IsLink) {
+						file.Link = newLink;
+					} else {
+						// This could throw an exception if we try to replace another file during the rename.
+						FileService.RenameFile (oldPath, newName);
+					}
+					if (file.Project != null)
+						IdeApp.ProjectOperations.Save (file.Project);
 				}
+			} catch (System.ArgumentException) { // new file name with wildcard (*, ?) characters in it
+				MessageService.ShowWarning (GettextCatalog.GetString ("The name you have chosen contains illegal characters. Please choose a different name."));
+			} catch (System.IO.IOException ex) {
+				MessageService.ShowException (ex, GettextCatalog.GetString ("There was an error renaming the file."));
 			}
 		}
 		
@@ -223,7 +233,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			
 			string question, secondaryText;
 			
-			secondaryText = GettextCatalog.GetString ("The Delete option permanently removes the file from your hard disk. Click Remove from Project if you only want to remove it from your current solution.");
+			secondaryText = GettextCatalog.GetString ("The Delete option permanently removes the file from your hard disk. " +
+				"Click Remove from Project if you only want to remove it from your current solution.");
 			
 			if (hasChildren) {
 				if (files.Count == 1)
@@ -291,9 +302,28 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		[CommandUpdateHandler (ViewCommands.OpenWithList)]
 		public void OnOpenWithUpdate (CommandArrayInfo info)
 		{
-			ProjectFile finfo = (ProjectFile) CurrentNode.DataItem;
+			var pf = (ProjectFile) CurrentNode.DataItem;
+			PopulateOpenWithViewers (info, pf.Project, pf.FilePath);
+		}
+		
+		internal static void PopulateOpenWithViewers (CommandArrayInfo info, Project project, string filePath)
+		{
+			var viewers = DisplayBindingService.GetFileViewers (filePath, project).ToList ();
+			
+			//show the default viewer first
+			var def = viewers.FirstOrDefault (v => v.CanUseAsDefault) ?? viewers.FirstOrDefault (v => v.IsExternal);
+			if (def != null) {
+				CommandInfo ci = info.Add (def.Title, def);
+				ci.Description = GettextCatalog.GetString ("Open with '{0}'", def.Title);
+				if (viewers.Count > 1)
+					info.AddSeparator ();
+			}
+			
+			//then the builtins, followed by externals
 			FileViewer prev = null; 
-			foreach (FileViewer fv in IdeApp.Workbench.GetFileViewers (finfo.Name)) {
+			foreach (FileViewer fv in viewers) {
+				if (def != null && fv.Equals (def))
+					continue;
 				if (prev != null && fv.IsExternal != prev.IsExternal)
 					info.AddSeparator ();
 				CommandInfo ci = info.Add (fv.Title, fv);

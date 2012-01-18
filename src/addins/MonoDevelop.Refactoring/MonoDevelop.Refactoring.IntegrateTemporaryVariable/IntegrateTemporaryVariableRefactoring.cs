@@ -27,7 +27,7 @@
 using System;
 using MonoDevelop.Projects.Dom;
 using System.Collections.Generic;
-using ICSharpCode.NRefactory.Ast;
+using ICSharpCode.NRefactory.CSharp;
  
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
@@ -55,20 +55,20 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 			return GettextCatalog.GetString ("_Integrate Temporary Variable");
 		}
 		
-		ICSharpCode.NRefactory.Ast.INode GetMemberBodyNode (MonoDevelop.Refactoring.RefactoringOptions options)
+		AstNode GetMemberBodyNode (MonoDevelop.Refactoring.RefactoringOptions options)
 		{
 			IMember member = ((LocalVariable) options.SelectedItem).DeclaringMember;
 			if (member == null)
 				return null;
-			int start = options.Document.TextEditor.GetPositionFromLineColumn (member.BodyRegion.Start.Line, member.BodyRegion.Start.Column);
-			int end = options.Document.TextEditor.GetPositionFromLineColumn (member.BodyRegion.End.Line, member.BodyRegion.End.Column);
-			string memberBody = options.Document.TextEditor.GetText (start, end);
+			int start = options.Document.Editor.Document.LocationToOffset (member.BodyRegion.Start.Line, member.BodyRegion.Start.Column);
+			int end = options.Document.Editor.Document.LocationToOffset (member.BodyRegion.End.Line, member.BodyRegion.End.Column);
+			string memberBody = options.Document.Editor.GetTextBetween (start, end);
 			INRefactoryASTProvider provider = options.GetASTProvider ();
 			if (provider == null) {
 //				Console.WriteLine("!!!Provider not found!");
 				return null;
 			}
-			return provider.ParseText (memberBody);
+			return provider.ParseText (memberBody.Trim ());
 		}
 
 		public override bool IsValid (RefactoringOptions options)
@@ -77,7 +77,7 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 				//				Console.WriteLine ("!!! Item is not LocalVariable");
 				return false;
 			}
-			ICSharpCode.NRefactory.Ast.INode result = GetMemberBodyNode (options);
+			var result = GetMemberBodyNode (options);
 			if (result == null)
 				return false;
 			return true;
@@ -85,7 +85,7 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 		
 		public override List<Change> PerformChanges (RefactoringOptions options, object properties)
 		{
-			ICSharpCode.NRefactory.Ast.INode memberNode = GetMemberBodyNode (options);
+			var memberNode = GetMemberBodyNode (options);
 			List<Change> changes = new List<Change> ();
 			if (memberNode == null)
 				return null;
@@ -111,7 +111,7 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 //			Console.WriteLine ("Changes accepted");
 		}
 		
-		class IntegrateTemporaryVariableVisitor : ICSharpCode.NRefactory.Visitors.AbstractAstVisitor
+		class IntegrateTemporaryVariableVisitor : DepthFirstAstVisitor<object, object>
 		{
 			bool IsPrimary (Expression e)
 			{
@@ -147,7 +147,7 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 				change.Description = string.Format (GettextCatalog.GetString ("Substitute variable {0} with the Initializeexpression"), options.GetName ());
 				change.FileName = options.Options.Document.FileName;
 
-				change.Offset = options.Options.Document.TextEditor.GetPositionFromLineColumn (toReplace.StartLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line, toReplace.StartLocation.Column);
+				change.Offset = options.Options.Document.Editor.Document.LocationToOffset (toReplace.StartLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line, toReplace.StartLocation.Column);
 				change.RemovedChars = options.GetName ().Length;
 
 				INRefactoryASTProvider provider = options.Options.GetASTProvider ();
@@ -157,23 +157,40 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 				return change;
 			}
 			
-			public override object VisitLocalVariableDeclaration (LocalVariableDeclaration localVariableDeclaration, object data)
+			public override object VisitVariableDeclarationStatement (VariableDeclarationStatement localVariableDeclaration, object data)
 			{
 				//				Console.WriteLine ("LocalVariableDeclaration: " + localVariableDeclaration.StartLocation.ToString () + " - " + localVariableDeclaration.EndLocation.ToString ());
-				localVariableDeclaration.TypeReference.AcceptVisitor (this, data);
-				foreach (VariableDeclaration o in localVariableDeclaration.Variables) {
+				localVariableDeclaration.Type.AcceptVisitor (this, data);
+				foreach (var o in localVariableDeclaration.Variables) {
 					if (o.Name == ((IntegrateTemporaryVariableVisitorOptions)data).GetName ()) {
 						IntegrateTemporaryVariableVisitorOptions options = (IntegrateTemporaryVariableVisitorOptions)data;
-						options.Initializer = localVariableDeclaration.GetVariableDeclaration(((LocalVariable)options.Options.SelectedItem).Name).Initializer;
+						options.Initializer = localVariableDeclaration.GetVariable (((LocalVariable)options.Options.SelectedItem).Name).Initializer.Clone ();
 						if (localVariableDeclaration.Variables.Count == 1) {
 							TextReplaceChange change = new TextReplaceChange ();
 							change.Description = string.Format (GettextCatalog.GetString ("Deleting local variable declaration {0}"), options.GetName ());
 							change.FileName = options.Options.Document.FileName;
-
-							change.Offset = options.Options.Document.TextEditor.GetPositionFromLineColumn (localVariableDeclaration.StartLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line, localVariableDeclaration.StartLocation.Column);
-							int end = options.Options.Document.TextEditor.GetPositionFromLineColumn (localVariableDeclaration.EndLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line, localVariableDeclaration.EndLocation.Column);
-
+							int lineNumber = localVariableDeclaration.StartLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line;
+							Console.WriteLine (localVariableDeclaration.StartLocation  + "/" + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start);
+							change.Offset = options.Options.Document.Editor.Document.LocationToOffset (lineNumber, localVariableDeclaration.StartLocation.Column);
+							int end = options.Options.Document.Editor.Document.LocationToOffset (localVariableDeclaration.EndLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line, localVariableDeclaration.EndLocation.Column);
 							change.RemovedChars = end - change.Offset;
+							// check if whole line can be removed.
+							var line = options.Options.Document.Editor.GetLine (lineNumber);
+							Console.WriteLine (line.GetIndentation (options.Options.Document.Editor.Document).Length  + "/" + localVariableDeclaration.StartLocation.Column);
+							Console.WriteLine (options.Options.Document.Editor.GetTextAt (line));
+							if (line.GetIndentation (options.Options.Document.Editor.Document).Length == localVariableDeclaration.StartLocation.Column - 1) {
+								bool isEmpty = true;
+								for (int i = end; i < line.EndOffset; i++) {
+									if (!char.IsWhiteSpace (options.Options.Document.Editor.GetCharAt (i))) {
+										isEmpty = false;
+										break;
+									}
+								}
+								if (isEmpty) {
+									change.Offset = line.Offset;
+									change.RemovedChars = line.Length;
+								}
+							}
 							change.InsertedText = "";
 							((IntegrateTemporaryVariableVisitorOptions)data).Changes.Add (change);
 						} else {
@@ -181,11 +198,11 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 							change.Description = string.Format (GettextCatalog.GetString ("Deleting local variable declaration {0}"), options.GetName ());
 							change.FileName = options.Options.Document.FileName;
 
-							change.Offset = options.Options.Document.TextEditor.GetPositionFromLineColumn (localVariableDeclaration.StartLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line, localVariableDeclaration.StartLocation.Column);
-							int end = options.Options.Document.TextEditor.GetPositionFromLineColumn (localVariableDeclaration.EndLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line, localVariableDeclaration.EndLocation.Column);
+							change.Offset = options.Options.Document.Editor.Document.LocationToOffset (localVariableDeclaration.StartLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line, localVariableDeclaration.StartLocation.Column);
+							int end = options.Options.Document.Editor.Document.LocationToOffset (localVariableDeclaration.EndLocation.Line + ((LocalVariable)options.Options.SelectedItem).DeclaringMember.BodyRegion.Start.Line, localVariableDeclaration.EndLocation.Column);
 
 							change.RemovedChars = end - change.Offset;
-							localVariableDeclaration.Variables.Remove (localVariableDeclaration.GetVariableDeclaration (options.GetName ()));
+							localVariableDeclaration.Variables.Remove (localVariableDeclaration.GetVariable (options.GetName ()));
 							INRefactoryASTProvider provider = options.Options.GetASTProvider ();
 							change.InsertedText = options.Options.GetWhitespaces (change.Offset) + provider.OutputNode (options.Options.Dom, localVariableDeclaration);
 							((IntegrateTemporaryVariableVisitorOptions)data).Changes.Add (change);
@@ -215,19 +232,7 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 					return assignmentExpression.Right.AcceptVisitor (this, data);
 			}
 			
-			// ExpressionStatement, LockStatement can not be the parent of an IdentifierExpression
 			
-			public override object VisitAddressOfExpression (AddressOfExpression expression, object data)
-			{
-//				Console.WriteLine ("AddressOfExpression");
-				IntegrateTemporaryVariableVisitorOptions options = (IntegrateTemporaryVariableVisitorOptions)data;
-				if (IsExpressionToReplace (expression.Expression, options)) {
-					// in this Case the integration is not valid
-					throw new IntegrateTemporaryVariableAddressOfException ();
-				} else {
-					return base.VisitAddressOfExpression (expression, data);
-				}
-			}
 			public override object VisitCastExpression (CastExpression expression, object data)
 			{
 				//				Console.WriteLine ("CastExpression");
@@ -254,19 +259,7 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 			{
 				return IsAdditivOrHigher(t) || t == BinaryOperatorType.ShiftLeft || t == BinaryOperatorType.ShiftRight;
 			}
-			public override object VisitTypeOfIsExpression (TypeOfIsExpression stmt, object data)
-			{
-				Console.WriteLine ("TypeOfIsExpression");
-				IntegrateTemporaryVariableVisitorOptions options = (IntegrateTemporaryVariableVisitorOptions)data;
-				if (IsExpressionToReplace (stmt.Expression, options)) {
-					if (IsUnary (options.Initializer) || (options.Initializer is BinaryOperatorExpression && IsShiftOrHigher (((BinaryOperatorExpression)options.Initializer).Op)))
-						options.Changes.Add (ReplaceExpression (stmt.Expression, options.Initializer, options)); else
-						options.Changes.Add (ReplaceExpression (stmt.Expression, new ParenthesizedExpression (options.Initializer), options));
-					return null;
-				} else {
-					return base.VisitTypeOfIsExpression (stmt, data);
-				}
-			}
+			
 			public override object VisitUnaryOperatorExpression (UnaryOperatorExpression expression, object data)
 			{
 				Console.WriteLine ("UnaryOperatorExpression");
@@ -282,7 +275,6 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 			}
 			public override object VisitBinaryOperatorExpression (BinaryOperatorExpression expression, object data) // there are too much Parenthisiz
 			{
-				Console.WriteLine ("BinaryOperatorExpression");
 				IntegrateTemporaryVariableVisitorOptions options = (IntegrateTemporaryVariableVisitorOptions)data;
 				if (IsExpressionToReplace (expression.Left, (IntegrateTemporaryVariableVisitorOptions)data))
 					if (IsUnary (options.Initializer))
@@ -301,7 +293,6 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 			}
 			public override object VisitConditionalExpression (ConditionalExpression expression, object data)
 			{
-				Console.WriteLine ("ConditionalExpression");
 				IntegrateTemporaryVariableVisitorOptions options = (IntegrateTemporaryVariableVisitorOptions)data;
 				if (IsExpressionToReplace (expression.Condition, (IntegrateTemporaryVariableVisitorOptions)data))
 					if (IsUnary (options.Initializer))
@@ -325,14 +316,14 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 			public override object VisitIndexerExpression (IndexerExpression e, object data)
 			{
 				IntegrateTemporaryVariableVisitorOptions options = (IntegrateTemporaryVariableVisitorOptions)data;
-				if (IsExpressionToReplace (e.TargetObject, options)) {
+				if (IsExpressionToReplace (e.Target, options)) {
 					if (IsUnary (options.Initializer))
-						options.Changes.Add (ReplaceExpression (e.TargetObject, options.Initializer, options)); else
-						options.Changes.Add (ReplaceExpression (e.TargetObject, new ParenthesizedExpression (options.Initializer), options));
+						options.Changes.Add (ReplaceExpression (e.Target, options.Initializer, options)); else
+						options.Changes.Add (ReplaceExpression (e.Target, new ParenthesizedExpression (options.Initializer), options));
 				} else
-					e.TargetObject.AcceptVisitor (this, data);
+					e.Target.AcceptVisitor (this, data);
 				
-				foreach (Expression o in e.Indexes) {
+				foreach (Expression o in e.Arguments) {
 					o.AcceptVisitor(this, data);
 				}
 				return null;
@@ -341,12 +332,12 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 			public override object VisitInvocationExpression (InvocationExpression e, object data)
 			{
 				IntegrateTemporaryVariableVisitorOptions options = (IntegrateTemporaryVariableVisitorOptions)data;
-				if (IsExpressionToReplace (e.TargetObject, options)) {
+				if (IsExpressionToReplace (e.Target, options)) {
 					if (IsUnary (options.Initializer))
-						options.Changes.Add (ReplaceExpression (e.TargetObject, options.Initializer, options)); else
-						options.Changes.Add (ReplaceExpression (e.TargetObject, new ParenthesizedExpression (options.Initializer), options));
+						options.Changes.Add (ReplaceExpression (e.Target, options.Initializer, options)); else
+						options.Changes.Add (ReplaceExpression (e.Target, new ParenthesizedExpression (options.Initializer), options));
 				} else
-					e.TargetObject.AcceptVisitor (this, data);
+					e.Target.AcceptVisitor (this, data);
 
 				foreach (Expression o in e.Arguments) {
 					o.AcceptVisitor (this, data);
@@ -356,18 +347,17 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 			public override object VisitMemberReferenceExpression (MemberReferenceExpression e, object data)
 			{
 				IntegrateTemporaryVariableVisitorOptions options = (IntegrateTemporaryVariableVisitorOptions)data;
-				if (IsExpressionToReplace (e.TargetObject, options)) {
+				if (IsExpressionToReplace (e.Target, options)) {
 					if (IsUnary (options.Initializer))
-						options.Changes.Add (ReplaceExpression (e.TargetObject, options.Initializer, options)); else
-						options.Changes.Add (ReplaceExpression (e.TargetObject, new ParenthesizedExpression (options.Initializer), options));
+						options.Changes.Add (ReplaceExpression (e.Target, options.Initializer, options)); else
+						options.Changes.Add (ReplaceExpression (e.Target, new ParenthesizedExpression (options.Initializer), options));
 					return null;
 				} else
-					return e.TargetObject.AcceptVisitor (this, data);
+					return e.Target.AcceptVisitor (this, data);
 			}
 			
 			public override object VisitIdentifierExpression (IdentifierExpression e, object data)
 			{
-				Console.WriteLine ("IdentifierExpression");
 				IntegrateTemporaryVariableVisitorOptions options = (IntegrateTemporaryVariableVisitorOptions)data;
 				if (!(e.Identifier == options.GetName ())) {
 					return data;
@@ -377,58 +367,35 @@ namespace MonoDevelop.Refactoring.IntegrateTemporaryVariable
 				// somtimes because the Syntax ist not clear (add them if you know the Syntax)
 				// or because no Paranthesis are needet (because different Chars are used to separate the expression)
 				// or because the integration is not valid in this case
-				if (e.Parent is CaseLabel) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is AddHandlerStatement) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is RemoveHandlerStatement) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is CatchClause) {
+				if (e.Parent is CatchClause) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
 				} else if (e.Parent is DirectionExpression) {
 					if (((DirectionExpression)e.Parent).FieldDirection == FieldDirection.Out || ((DirectionExpression)e.Parent).FieldDirection == FieldDirection.Ref)
 						throw new IntegrateTemporaryVariableDirectionException ();
-				} else if (e.Parent is DoLoopStatement) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is EraseStatement) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is ErrorStatement) {
-					// VB
-					throw new IntegrateTemporaryVariableNotImplementedException ();
 				} else if (e.Parent is EventDeclaration) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is ExpressionRangeVariable) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is ForNextStatement) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
 				} else if (e.Parent is LambdaExpression) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
 				} else if (e.Parent is PointerReferenceExpression) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is QueryExpressionFromOrJoinClause) {
+				} else if (e.Parent is QueryFromClause) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is QueryExpressionGroupClause) {
+				} else if (e.Parent is QueryGroupClause) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is QueryExpressionJoinClause) {
+				} else if (e.Parent is QueryJoinClause) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is QueryExpressionJoinConditionVB) {
+				} else if (e.Parent is QueryLetClause) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is QueryExpressionLetClause) {
+				} else if (e.Parent is QueryOrderClause) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is QueryExpressionOrdering) {
+				} else if (e.Parent is QuerySelectClause) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is QueryExpressionPartitionVBClause) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is QueryExpressionSelectClause) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is QueryExpressionWhereClause) {
-					throw new IntegrateTemporaryVariableNotImplementedException ();
-				} else if (e.Parent is RaiseEventStatement) {
+				} else if (e.Parent is QueryWhereClause) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
 				} else if (e.Parent is StackAllocExpression) {
 					throw new IntegrateTemporaryVariableNotImplementedException ();
 				}
-				// ConstructorInitializer, WithStatement, ParameterDeclarationExpression, CollectionInitializerExpression, ParenthesizedExpression, 
+				// ConstructorInitializer, WithStatement, ParameterDeclaration, CollectionInitializerExpression, ParenthesizedExpression, 
 				// ElseIfSection, IfElseStatement, ForeachStatement, ForStatement, Indexes of the IndexerExpression, Arguments of the InvocationExpression,
 				// NamedArgumentExpression, ObjectCreateExpression, VariableDeclaration (if the Initializer is the IdentifierExpression, this is handled here)
 				// ThrowStatement, SwitchStatement, ReturnStatement, GotoCaseStatement, CheckedExpression, UncheckedExpression

@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace ICSharpCode.NRefactory.Ast {
+namespace ICSharpCode.OldNRefactory.Ast {
 	using System;
 	using System.Collections.Generic;
 	
@@ -355,7 +355,7 @@ namespace ICSharpCode.NRefactory.Ast {
 		
 		string attributeTarget;
 		
-		List<ICSharpCode.NRefactory.Ast.Attribute> attributes;
+		List<ICSharpCode.OldNRefactory.Ast.Attribute> attributes;
 		
 		public string AttributeTarget {
 			get {
@@ -366,7 +366,7 @@ namespace ICSharpCode.NRefactory.Ast {
 			}
 		}
 		
-		public List<ICSharpCode.NRefactory.Ast.Attribute> Attributes {
+		public List<ICSharpCode.OldNRefactory.Ast.Attribute> Attributes {
 			get {
 				return attributes;
 			}
@@ -2713,7 +2713,7 @@ namespace ICSharpCode.NRefactory.Ast {
 			expressionBody = Expression.Null;
 		}
 		
-public Location ExtendedEndLocation { get; set; }
+		public Location ExtendedEndLocation { get; set; }
 		
 		public override object AcceptVisitor(IAstVisitor visitor, object data) {
 			return visitor.VisitLambdaExpression(this, data);

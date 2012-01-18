@@ -37,6 +37,7 @@ using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Commands;
+using Mono.TextEditor;
 
 
 namespace MonoDevelop.Debugger
@@ -47,7 +48,7 @@ namespace MonoDevelop.Debugger
 		List<string> valueNames = new List<string> ();
 		Dictionary<string,string> oldValues = new Dictionary<string,string> ();
 		List<ObjectValue> values = new List<ObjectValue> ();
-		Dictionary<ObjectValue,TreeIter> nodes = new Dictionary<ObjectValue, TreeIter> (); 
+		Dictionary<ObjectValue,TreeRowReference> nodes = new Dictionary<ObjectValue, TreeRowReference> ();
 		Dictionary<string,ObjectValue> cachedValues = new Dictionary<string,ObjectValue> ();
 		TreeStore store;
 		TreeViewState state;
@@ -121,7 +122,7 @@ namespace MonoDevelop.Debugger
 			menuSet.AddItem (DebugCommands.AddWatch);
 			menuSet.AddSeparator ();
 			menuSet.AddItem (EditCommands.Rename);
-			menuSet.AddItem (EditCommands.Delete);
+			menuSet.AddItem (EditCommands.DeleteKey);
 		}
 		
 		public ObjectValueTreeView ()
@@ -129,7 +130,7 @@ namespace MonoDevelop.Debugger
 			store = new TreeStore (typeof(string), typeof(string), typeof(string), typeof(ObjectValue), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string), typeof(string), typeof(bool), typeof(string), typeof(Gdk.Pixbuf), typeof(bool));
 			Model = store;
 			RulesHint = true;
-			Selection.Mode = SelectionMode.Multiple;
+			Selection.Mode = Gtk.SelectionMode.Multiple;
 			ResetColumnSizes ();
 			
 			Pango.FontDescription newFont = this.Style.FontDescription.Copy ();
@@ -218,6 +219,13 @@ namespace MonoDevelop.Debugger
 
 		protected override void OnDestroyed ()
 		{
+			crtExp.Edited -= OnExpEdited;
+			crtExp.EditingStarted -= OnExpEditing;
+			crtExp.EditingCanceled -= OnEditingCancelled;
+			crtValue.EditingStarted -= OnValueEditing;
+			crtValue.Edited -= OnValueEdited;
+			crtValue.EditingCanceled -= OnEditingCancelled;
+			
 			base.OnDestroyed ();
 			disposed = true;
 		}
@@ -339,6 +347,8 @@ namespace MonoDevelop.Debugger
 			get { return pinCol.Visible; }
 			set { pinCol.Visible = value; }
 		}
+		
+		public bool RootPinAlwaysVisible { get; set; }
 		
 		public bool AllowExpanding {
 			get { return this.allowExpanding; }
@@ -487,9 +497,10 @@ namespace MonoDevelop.Debugger
 			if (!store.IterParent (out parent, it))
 				parent = TreeIter.Zero;
 			
-			EvaluationOptions ops = frame.DebuggerSession.Options.EvaluationOptions;
+			EvaluationOptions ops = frame.DebuggerSession.Options.EvaluationOptions.Clone ();
 			ops.AllowMethodEvaluation = true;
 			ops.AllowTargetInvoke = true;
+			ops.EllipsizeStrings = false;
 			
 			string oldName = val.Name;
 			val.Refresh (ops);
@@ -500,9 +511,6 @@ namespace MonoDevelop.Debugger
 			
 			SetValues (parent, it, val.Name, val);
 			RegisterValue (val, it);
-			
-			if (val.HasChildren && !ShowExpanders)
-				ShowExpanders = true;
 		}
 		
 		void RemoveChildren (TreeIter it)
@@ -520,7 +528,7 @@ namespace MonoDevelop.Debugger
 		void RegisterValue (ObjectValue val, TreeIter it)
 		{
 			if (val.IsEvaluating) {
-				nodes [val] = it;
+				nodes [val] = new TreeRowReference (store, store.GetPath (it));
 				val.ValueChanged += OnValueUpdated;
 			}
 		}
@@ -571,7 +579,14 @@ namespace MonoDevelop.Debugger
 
 		bool FindValue (ObjectValue val, out TreeIter it)
 		{
-			return nodes.TryGetValue (val, out it);
+			TreeRowReference row;
+			
+			if (!nodes.TryGetValue (val, out row)) {
+				it = TreeIter.Zero;
+				return false;
+			}
+			
+			return store.GetIter (out it, row.Path);
 		}
 		
 		public void ResetChangeTracking ()
@@ -697,10 +712,14 @@ namespace MonoDevelop.Debugger
 				else
 					store.SetValue (it, LiveUpdateIconCol, noLiveIcon);
 			}
+			if (RootPinAlwaysVisible && (!hasParent && PinnedWatch ==null && AllowPinning))
+				store.SetValue (it, PinIconCol, "md-pin-up");
 			
 			if (val.HasChildren) {
 				// Add dummy node
 				it = store.AppendValues (it, "", "", "", null, true);
+				if (!ShowExpanders)
+					ShowExpanders = true;
 			}
 		}
 		
@@ -736,23 +755,22 @@ namespace MonoDevelop.Debugger
 		{
 			if (!allowExpanding)
 				return true;
-			bool expanded = (bool) store.GetValue (iter, ExpandedCol);
-			if (!expanded) {
-				store.SetValue (iter, ExpandedCol, true);
-				TreeIter it;
-				store.IterChildren (out it, iter);
-				store.Remove (ref it);
-				ObjectValue val = (ObjectValue) store.GetValue (iter, ObjectCol);
-				foreach (ObjectValue cval in val.GetAllChildren ())
-					AppendValue (iter, null, cval);
-				return base.OnTestExpandRow (iter, path);
+			
+			if (GetRowExpanded (path))
+				return true;
+			
+			TreeIter parent;
+			if (store.IterParent (out parent, iter)) {
+				if (!GetRowExpanded (store.GetPath (parent)))
+					return true;
 			}
-			else
-				return false;
+			
+			return base.OnTestExpandRow (iter, path);
 		}
 		
 		protected override void OnRowCollapsed (TreeIter iter, TreePath path)
 		{
+			store.SetValue (iter, ExpandedCol, false);
 			base.OnRowCollapsed (iter, path);
 			if (compact)
 				ColumnsAutosize ();
@@ -760,7 +778,27 @@ namespace MonoDevelop.Debugger
 		
 		protected override void OnRowExpanded (TreeIter iter, TreePath path)
 		{
+			store.SetValue (iter, ExpandedCol, true);
+			TreeIter it;
+			
+			if (store.IterChildren (out it, iter)) {
+				ObjectValue val = (ObjectValue) store.GetValue (it, ObjectCol);
+				if (val == null) {
+					val = (ObjectValue) store.GetValue (iter, ObjectCol);
+					bool first = true;
+					
+					foreach (ObjectValue cval in val.GetAllChildren ()) {
+						SetValues (iter, it, null, cval);
+						RegisterValue (cval, it);
+						it = store.InsertNodeAfter (it);
+					}
+					
+					store.Remove (ref it);
+				}
+			}
+			
 			base.OnRowExpanded (iter, path);
+			
 			if (compact)
 				ColumnsAutosize ();
 		}
@@ -894,12 +932,12 @@ namespace MonoDevelop.Debugger
 		[GLib.ConnectBeforeAttribute]
 		void OnEditKeyPress (object s, Gtk.KeyPressEventArgs args)
 		{
-			Gtk.Entry entry = (Gtk.Entry) s;
+			Gtk.Entry entry = (Gtk.Entry)s;
 			
 			if (currentCompletionData != null) {
 				KeyActions ka;
 				bool ret = CompletionWindowManager.PreProcessKeyEvent (args.Event.Key, (char)args.Event.Key, args.Event.State, out ka);
-				CompletionWindowManager.PostProcessKeyEvent (ka);
+				CompletionWindowManager.PostProcessKeyEvent (ka, args.Event.Key, (char)args.Event.Key, args.Event.State);
 				args.RetVal = ret;
 			}
 			
@@ -927,9 +965,12 @@ namespace MonoDevelop.Debugger
 				TreeIter it;
 				if (path.Depth > 1 || PinnedWatch == null) {
 					store.GetIter (out it, path);
-					CleanPinIcon ();
-					store.SetValue (it, PinIconCol, "md-pin-up");
-					lastPinIter = it;
+					if (!it.Equals (lastPinIter)) {
+						store.SetValue (it, PinIconCol, "md-pin-up");
+						CleanPinIcon ();
+						if (path.Depth > 1 || !RootPinAlwaysVisible)
+							lastPinIter = it;
+					}
 				}
 			}
 			return base.OnMotionNotifyEvent (evnt);
@@ -958,6 +999,12 @@ namespace MonoDevelop.Debugger
 			TreePath path;
 			TreeViewColumn col;
 			CellRenderer cr;
+			
+			//HACK: show context menu in release event instead of show event to work around gtk bug
+			if (evnt.TriggersContextMenu ()) {
+			//	ShowPopup (evnt);
+				return true;
+			}
 			
 			if (evnt.Button == 1 && GetCellAtPos ((int)evnt.X, (int)evnt.Y, out path, out col, out cr)) {
 				TreeIter it;
@@ -988,28 +1035,31 @@ namespace MonoDevelop.Debugger
 				}
 			}
 			
-			if (evnt.Button == 3)
-				ShowPopup ();
-			
 			return res;
 		}
 		
 		protected override bool OnButtonReleaseEvent (Gdk.EventButton evnt)
 		{
 			allowStoreColumnSizes = false;
-			return base.OnButtonReleaseEvent (evnt);
+			var res = base.OnButtonReleaseEvent (evnt);
+			
+			//HACK: show context menu in release event instead of show event to work around gtk bug
+			if (evnt.IsContextMenuButton ()) {
+				ShowPopup (evnt);
+				return true;
+			}
+			return res;
 		}
-		
 		
 		protected override bool OnPopupMenu ()
 		{
-			ShowPopup ();
+			ShowPopup (null);
 			return true;
 		}
 		
-		void ShowPopup ()
+		void ShowPopup (Gdk.EventButton evt)
 		{
-			IdeApp.CommandService.ShowContextMenu (menuSet, this);
+			IdeApp.CommandService.ShowContextMenu (this, evt, menuSet, this);
 		}
 		
 		[CommandHandler (EditCommands.Delete)]
@@ -1098,7 +1148,7 @@ namespace MonoDevelop.Debugger
 			TreePath[] sel = Selection.GetSelectedRows ();
 			if (store.GetIter (out it, sel[0])) {
 				ObjectValue val = (ObjectValue) store.GetValue (it, ObjectCol);
-				if (val.Name == DebuggingService.DebuggerSession.EvaluationOptions.CurrentExceptionTag)
+				if (val != null && val.Name == DebuggingService.DebuggerSession.EvaluationOptions.CurrentExceptionTag)
 					DebuggingService.ShowExceptionCaughtDialog ();
 			}
 		}
@@ -1134,7 +1184,7 @@ namespace MonoDevelop.Debugger
 			return name + exp;
 		}
 
-		void CreatePinnedWatch (TreeIter it)
+		public void CreatePinnedWatch (TreeIter it)
 		{
 			string exp = GetFullExpression (it);
 			
@@ -1158,7 +1208,7 @@ namespace MonoDevelop.Debugger
 				PinStatusChanged (this, EventArgs.Empty);
 		}
 		
-		void RemovePinnedWatch (TreeIter it)
+		public void RemovePinnedWatch (TreeIter it)
 		{
 			DebuggingService.PinnedWatches.Remove (PinnedWatch);
 			if (PinStatusChanged != null)
@@ -1176,6 +1226,12 @@ namespace MonoDevelop.Debugger
 		}
 		
 		#region ICompletionWidget implementation 
+		
+		CodeCompletionContext ICompletionWidget.CurrentCodeCompletionContext {
+			get {
+				return ((ICompletionWidget)this).CreateCodeCompletionContext (editEntry.Position);
+			}
+		}
 		
 		EventHandler completionContextChanged;
 		
@@ -1242,6 +1298,14 @@ namespace MonoDevelop.Debugger
 			editEntry.DeleteText (sp, sp + partial_word.Length);
 			editEntry.InsertText (complete_word, ref sp);
 			editEntry.Position = sp; // sp is incremented by InsertText
+		}
+		
+		void ICompletionWidget.SetCompletionText (CodeCompletionContext ctx, string partial_word, string complete_word, int offset)
+		{
+			int sp = editEntry.Position - partial_word.Length;
+			editEntry.DeleteText (sp, sp + partial_word.Length);
+			editEntry.InsertText (complete_word, ref sp);
+			editEntry.Position = sp + offset; // sp is incremented by InsertText
 		}
 		
 		int ICompletionWidget.TextLength {
@@ -1340,6 +1404,15 @@ namespace MonoDevelop.Debugger
 		}
 		static List<ICompletionKeyHandler> keyHandler = new List<ICompletionKeyHandler> ();
 		public IEnumerable<ICompletionKeyHandler> KeyHandler { get { return keyHandler;} }
+
+		public void OnCompletionListClosed (EventArgs e)
+		{
+			EventHandler handler = this.CompletionListClosed;
+			if (handler != null)
+				handler (this, e);
+		}
+		
+		public event EventHandler CompletionListClosed;
 	}
 	
 	class DebugCompletionData : MonoDevelop.Ide.CodeCompletion.CompletionData

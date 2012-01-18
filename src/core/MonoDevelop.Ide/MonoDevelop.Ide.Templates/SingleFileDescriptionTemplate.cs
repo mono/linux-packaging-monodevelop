@@ -39,6 +39,7 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.StandardHeader;
 using System.Text;
 using MonoDevelop.Ide.Gui.Content;
+using MonoDevelop.Ide.CodeFormatting;
 
 namespace MonoDevelop.Ide.Templates
 {
@@ -55,7 +56,7 @@ namespace MonoDevelop.Ide.Templates
 		string customTool;
 		List<string> references = new List<string> ();
 		
-		public override void Load (XmlElement filenode)
+		public override void Load (XmlElement filenode, FilePath baseDirectory)
 		{
 			name = filenode.GetAttribute ("name");
 			defaultName = filenode.GetAttribute ("DefaultName");
@@ -132,7 +133,7 @@ namespace MonoDevelop.Ide.Templates
 						string res = netProject.AssemblyContext.GetAssemblyFullName (aref, netProject.TargetFramework);
 						res = netProject.AssemblyContext.GetAssemblyNameForVersion (res, netProject.TargetFramework);
 						if (!ContainsReference (netProject, res))
-							netProject.References.Add (new ProjectReference (ReferenceType.Gac, aref));
+							netProject.References.Add (new ProjectReference (ReferenceType.Package, aref));
 					}
 				}
 				
@@ -141,8 +142,28 @@ namespace MonoDevelop.Ide.Templates
 				return null;
 		}
 		
+		public override bool SupportsProject (Project project, string projectPath)
+		{
+			DotNetProject netProject = project as DotNetProject;
+			if (netProject != null) {
+				// Ensure that the references are valid inside the project's target framework.
+				foreach (string aref in references) {
+					string res = netProject.AssemblyContext.GetAssemblyFullName (aref, netProject.TargetFramework);
+					if (string.IsNullOrEmpty (res))
+						return false;
+					res = netProject.AssemblyContext.GetAssemblyNameForVersion (res, netProject.TargetFramework);
+					if (string.IsNullOrEmpty (res))
+						return false;
+				}
+			}
+			
+			return true;
+		}
+		
 		bool ContainsReference (DotNetProject project, string aref)
 		{
+			if (string.IsNullOrEmpty (aref))
+				return false;
 			string aname;
 			int i = aref.IndexOf (',');
 			if (i == -1)
@@ -150,8 +171,8 @@ namespace MonoDevelop.Ide.Templates
 			else
 				aname = aref.Substring (0, i);
 			foreach (ProjectReference pr in project.References) {
-				if (pr.ReferenceType == ReferenceType.Gac && (pr.Reference == aname || pr.Reference.StartsWith (aname + ",")) || 
-					pr.ReferenceType != ReferenceType.Gac && pr.Reference.Contains (aname))
+				if (pr.ReferenceType == ReferenceType.Package && (pr.Reference == aname || pr.Reference.StartsWith (aname + ",")) || 
+					pr.ReferenceType != ReferenceType.Package && pr.Reference.Contains (aname))
 					return true;
 			}
 			return false;
@@ -243,7 +264,7 @@ namespace MonoDevelop.Ide.Templates
 			string content = CreateContent (project, tags, language);
 			content = StringParserService.Parse (content, tags);
 			string mime = DesktopService.GetMimeTypeForUri (fileName);
-			Formatter formatter = !String.IsNullOrEmpty (mime) ? TextFileService.GetFormatter (mime) : null;
+			CodeFormatter formatter = !string.IsNullOrEmpty (mime) ? CodeFormatterService.GetFormatter (mime) : null;
 			
 			if (formatter != null)
 				content = formatter.FormatText (policyParent != null ? policyParent.Policies : null, content);
@@ -259,11 +280,18 @@ namespace MonoDevelop.Ide.Templates
 			Mono.TextEditor.Document doc = new Mono.TextEditor.Document ();
 			doc.Text = content;
 			
-			TextStylePolicy textPolicy = policyParent != null ? policyParent.Policies.Get<TextStylePolicy> ("text/plain") : MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<TextStylePolicy> ("text/plain");
+			TextStylePolicy textPolicy = policyParent != null ? policyParent.Policies.Get<TextStylePolicy> ("text/plain")
+				: MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<TextStylePolicy> ("text/plain");
 			string eolMarker = TextStylePolicy.GetEolMarker (textPolicy.EolMarker);
 			byte[] eolMarkerBytes = System.Text.Encoding.UTF8.GetBytes (eolMarker);
+			
+			var tabToSpaces = textPolicy.TabsToSpaces? new string (' ', textPolicy.TabWidth) : null;
+			
 			foreach (Mono.TextEditor.LineSegment line in doc.Lines) {
-				data = System.Text.Encoding.UTF8.GetBytes (doc.GetTextAt (line.Offset, line.EditableLength));
+				var lineText = doc.GetTextAt (line.Offset, line.EditableLength);
+				if (tabToSpaces != null)
+					lineText = lineText.Replace ("\t", tabToSpaces);
+				data = System.Text.Encoding.UTF8.GetBytes (lineText);
 				ms.Write (data, 0, data.Length);
 				ms.Write (eolMarkerBytes, 0, eolMarkerBytes.Length);
 			}
@@ -290,7 +318,8 @@ namespace MonoDevelop.Ide.Templates
 		// We supply defaults whenever it is possible, to avoid having unsubstituted tags. However,
 		// do not substitute blanks when a sensible default cannot be guessed, because they result
 		//in less obvious errors.
-		public virtual void ModifyTags (SolutionItem policyParent, Project project, string language, string identifier, string fileName, ref Dictionary<string,string> tags)
+		public virtual void ModifyTags (SolutionItem policyParent, Project project, string language,
+			string identifier, string fileName, ref Dictionary<string,string> tags)
 		{
 			DotNetProject netProject = project as DotNetProject;
 			string languageExtension = "";
@@ -318,7 +347,6 @@ namespace MonoDevelop.Ide.Templates
 				tags ["FullName"] = ns.Length > 0 ? ns + "." + identifier : identifier;
 				
 				//some .NET languages may be able to use keywords as identifiers if they're escaped
-				//for simplicity, we escape the identifier in "Name" and provide "UnescapedName"
 				IDotNetLanguageBinding dnb = binding as IDotNetLanguageBinding;
 				if (dnb != null) {
 					System.CodeDom.Compiler.CodeDomProvider provider = dnb.GetCodeDomProvider ();
@@ -329,8 +357,16 @@ namespace MonoDevelop.Ide.Templates
 			}
 			
 			tags ["Namespace"] = ns;
-			if (project != null)
+			if (project != null) {
 				tags ["ProjectName"] = project.Name;
+				tags ["SafeProjectName"] = CreateIdentifierName (project.Name);
+				var info = project.AuthorInformation ?? AuthorInformation.Default;
+				tags ["AuthorCopyright"] = info.Copyright;
+				tags ["AuthorCompany"] = info.Company;
+				tags ["AuthorTrademark"] = info.Trademark;
+				tags ["AuthorEmail"] = info.Email;
+				tags ["AuthorName"] = info.Name;
+			}
 			if ((language != null) && (language.Length > 0))
 				tags ["Language"] = language;
 			if (languageExtension.Length > 0)

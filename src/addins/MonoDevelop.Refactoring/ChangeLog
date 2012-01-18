@@ -1,3 +1,104 @@
+2010-07-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.CodeGeneration/CodeGenerationCommands.cs: Use
+	  delegation methods.
+
+2010-07-22  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.IntroduceFormatItem/IntroduceFormatItemRefactoring.cs:
+	  Track API changes.
+
+2010-07-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/RefactoringService.cs: Track API
+	  changes.
+
+	* MonoDevelop.Refactoring.ConvertPropery/RemoveBackingStore.cs:
+	  Remove empty line of the backing store.
+
+2010-07-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/Change.cs:
+	* MonoDevelop.Refactoring/RefactoryCommands.cs:
+	* MonoDevelop.Refactoring/RefactoringOptions.cs:
+	* MonoDevelop.Refactoring/ImportSymbolHandler.cs:
+	* MonoDevelop.CodeGeneration/PropertyGenerator.cs:
+	* MonoDevelop.CodeGeneration/WriteLineGenerator.cs:
+	* MonoDevelop.CodeGeneration/CodeGenerationOptions.cs:
+	* MonoDevelop.CodeGeneration/AbstractGenerateAction.cs:
+	* MonoDevelop.CodeGeneration/CodeGenerationCommands.cs:
+	* MonoDevelop.CodeGeneration/OverrideMembersGenerator.cs:
+	* MonoDevelop.Refactoring.ConvertPropery/RemoveBackingStore.cs:
+	* MonoDevelop.Refactoring.CreateClass/CreateClassCodeGenerator.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodRefactoring.cs:
+	* MonoDevelop.Refactoring.DeclareLocal/DeclareLocalCodeGenerator.cs:
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	* MonoDevelop.Refactoring.MoveTypeToFile/MoveTypeToFileRefactoring.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementAbstractMembers.cs:
+	* MonoDevelop.Refactoring.RefactorImports/RemoveUnusedImportsRefactoring.cs:
+	* MonoDevelop.Refactoring.IntroduceFormatItem/IntroduceFormatItemRefactoring.cs:
+	* MonoDevelop.Refactoring.IntegrateTemporaryVariable/IntegrateTemporaryVariableRefactoring.cs:
+	  Track API changes.
+
+2010-07-18  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/RefactoryCommands.cs:
+	* MonoDevelop.Refactoring/RefactoringOptions.cs:
+	* MonoDevelop.CodeGeneration/WriteLineGenerator.cs:
+	* MonoDevelop.CodeGeneration/CodeGenerationOptions.cs:
+	* MonoDevelop.CodeGeneration/CodeGenerationCommands.cs:
+	* MonoDevelop.Refactoring.ConvertPropery/RemoveBackingStore.cs:
+	* MonoDevelop.Refactoring.CreateClass/CreateClassCodeGenerator.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodRefactoring.cs:
+	* MonoDevelop.Refactoring.DeclareLocal/DeclareLocalCodeGenerator.cs:
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	* MonoDevelop.Refactoring.MoveTypeToFile/MoveTypeToFileRefactoring.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementAbstractMembers.cs:
+	* MonoDevelop.Refactoring.RefactorImports/RemoveUnusedImportsRefactoring.cs:
+	* MonoDevelop.Refactoring.IntroduceFormatItem/IntroduceFormatItemRefactoring.cs:
+	* MonoDevelop.Refactoring.IntegrateTemporaryVariable/IntegrateTemporaryVariableRefactoring.cs:
+	  Use texteditordata infrastructure.
+
+2010-07-16  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.IntroduceConstant/IntroduceConstantRefactoring.cs:
+	* MonoDevelop.Refactoring.IntroduceFormatItem/IntroduceFormatItemRefactoring.cs:
+	  Track API changes.
+
+2010-07-12  Michael Hutchinson  <mhutchinson@novell.com>
+
+	* MonoDevelop.Refactoring/RefactoringOptions.cs:
+	* MonoDevelop.CodeGeneration/CodeGenerationOptions.cs: Track
+	  ProjectDomService/Parser API.
+
+2010-06-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/ImportSymbolHandler.cs: fixed
+	  cut&paste error.
+
+2010-06-23  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/ImportSymbolHandler.cs: Fixed 'Bug
+	  616653 - "import symbol" does not resolve full typenames'.
+
+2010-06-21  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring.Rename/RenameRefactoring.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodDialog.cs:
+	  Implemented 'Bug 615701 - Escape should cancel renaming
+	  refactor action, not accept it'.
+
+2010-06-17  Mike Krüger  <mkrueger@novell.com>
+
+	* MonoDevelop.Refactoring/EncapsulateFieldDialog.cs:
+	* MonoDevelop.Refactoring/OverridesImplementsDialog.cs:
+	* MonoDevelop.Refactoring.ExtractMethod/ExtractMethodDialog.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementImplicit.cs:
+	* MonoDevelop.Refactoring.ImplementInterface/ImplementExplicit.cs:
+	* MonoDevelop.Refactoring.CreateMethod/CreateMethodCodeGenerator.cs:
+	  Added help windows for refactorings that use the insertion
+	  point mode.
+
 2010-06-09  Michael Hutchinson  <mhutchinson@novell.com>
 
 	* MonoDevelop.Refactoring/OverridesImplementsDialog.cs:

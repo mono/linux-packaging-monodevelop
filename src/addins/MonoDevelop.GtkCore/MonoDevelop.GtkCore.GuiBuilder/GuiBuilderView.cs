@@ -28,6 +28,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 
 using MonoDevelop.Core;
@@ -46,7 +47,7 @@ using MonoDevelop.Ide;
 
 namespace MonoDevelop.GtkCore.GuiBuilder
 {
-	public class GuiBuilderView : CombinedDesignView, IToolboxConsumer, MonoDevelop.DesignerSupport.IOutlinedDocument, ISupportsProjectReload
+	public class GuiBuilderView : CombinedDesignView, ISupportsProjectReload
 	{
 		Stetic.WidgetDesigner designer;
 		Stetic.ActionGroupDesigner actionsBox;
@@ -65,7 +66,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 		{
 			rootName = window.Name;
 			
-			designerPage = new DesignerPage ();
+			designerPage = new DesignerPage (window.Project);
 			designerPage.Show ();
 			AddButton (GettextCatalog.GetString ("Designer"), designerPage);
 			
@@ -239,7 +240,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			return label;
 		}
 		
-		public override void ShowPage (int npage)
+		protected override void OnPageShown (int npage)
 		{
 			if (npage == 0 && designer != null && window != null && !ErrorMode) {
 				// At every page switch update the generated code, to make sure code completion works
@@ -249,7 +250,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 				if (gproject.Project.UsePartialTypes)
 					GuiBuilderService.GenerateSteticCodeStructure ((DotNetProject)gproject.Project, designer.RootComponent, null, false, false);
 			}
-			base.ShowPage (npage);
+			base.OnPageShown (npage);
 		}
 		
 		string ImportFile (string file)
@@ -396,13 +397,51 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 		bool ErrorMode {
 			get { return designer.RootComponent == null; }
 		}
+	}
+	
+	class DesignerPage: Gtk.EventBox, ICustomPropertyPadProvider, IToolboxConsumer, MonoDevelop.DesignerSupport.IOutlinedDocument
+	{
+		GuiBuilderProject gproject;
+		
+		public DesignerPage (GuiBuilderProject gproject)
+		{
+			this.gproject = gproject;
+		}
 		
 		public Stetic.ComponentType[] GetComponentTypes ()
 		{
-			if (designer != null)
-				return designer.GetComponentTypes ();
+			if (Designer != null)
+				return Designer.GetComponentTypes ();
 			else
 				return null;
+		}
+		
+		public DotNetProject Project {
+			get { return gproject.Project; }
+		}
+		
+		Gtk.Widget ICustomPropertyPadProvider.GetCustomPropertyWidget ()
+		{
+			return PropertiesWidget.Instance;
+		}
+		
+		void ICustomPropertyPadProvider.DisposeCustomPropertyWidget ()
+		{
+		}
+		
+		Stetic.WidgetDesigner Designer {
+			get {
+				return Child as Stetic.WidgetDesigner;
+			}
+		}
+		
+		public void ClearChild ()
+		{
+			if (Child != null) {
+				Gtk.Widget w = Child;
+				Remove (w);
+				w.Destroy ();
+			}
 		}
 		
 		void IToolboxConsumer.ConsumeItem (ItemToolboxNode item)
@@ -436,17 +475,17 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			
 		void IToolboxConsumer.DragItem (ItemToolboxNode item, Gtk.Widget source, Gdk.DragContext ctx)
 		{
-			if (designer != null) {
+			if (Designer != null) {
 				ComponentToolboxNode node = item as ComponentToolboxNode;
 				if (node != null) {
 					if (node.Reference == null)
-						designer.BeginComponentDrag (node.ComponentType, source, ctx);
+						Designer.BeginComponentDrag (node.ComponentType, source, ctx);
 					else
-						designer.BeginComponentDrag (node.Name, node.ClassName, source, ctx, delegate { CheckReference (node); });
+						Designer.BeginComponentDrag (node.Name, node.ClassName, source, ctx, delegate { CheckReference (node); });
 				}
 			}
 		}
-			
+		
 		void CheckReference (ComponentToolboxNode node)
 		{
 			if (node.Reference == null)
@@ -468,7 +507,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 				if (asm == null)
 					return;
 				if (gproject.Project.AssemblyContext.GetPackagesFromFullName (asm).Length > 0) {
-					pref = new ProjectReference (ReferenceType.Gac, asm);
+					pref = new ProjectReference (ReferenceType.Package, asm);
 				} else {
 					asm = gproject.Project.AssemblyContext.GetAssemblyLocation (asm, gproject.Project.TargetFramework);
 					pref = new ProjectReference (ReferenceType.Assembly, asm);
@@ -483,52 +522,11 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			}
 			gproject.Project.References.Add (pref);
 		}
-		
-		Widget MonoDevelop.DesignerSupport.IOutlinedDocument.GetOutlineWidget ()
-		{
-			return GuiBuilderDocumentOutline.Instance;
-		}
-
-		void MonoDevelop.DesignerSupport.IOutlinedDocument.ReleaseOutlineWidget ()
-		{
-			//Do nothing. We keep the instance to avoid creation cost when switching documents.
-		}
 
 		TargetEntry[] IToolboxConsumer.DragTargets {
 			get { return Stetic.DND.Targets; }
 		}
-	}
-	
-	class DesignerPage: Gtk.EventBox, ICustomPropertyPadProvider
-	{
-		public DesignerPage ()
-		{
-		}
-		
-		Gtk.Widget ICustomPropertyPadProvider.GetCustomPropertyWidget ()
-		{
-			return PropertiesWidget.Instance;
-		}
-		
-		void ICustomPropertyPadProvider.DisposeCustomPropertyWidget ()
-		{
-		}
-		
-		Stetic.WidgetDesigner Designer {
-			get {
-				return Child as Stetic.WidgetDesigner;
-			}
-		}
-		
-		public void ClearChild ()
-		{
-			if (Child != null) {
-				Gtk.Widget w = Child;
-				Remove (w);
-				w.Destroy ();
-			}
-		}
-		
+			
 		[CommandHandler (EditCommands.Delete)]
 		protected void OnDelete ()
 		{
@@ -599,6 +597,21 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 		protected void OnUpdateRedo (CommandInfo cinfo)
 		{
 			cinfo.Enabled = Designer != null && Designer.UndoQueue.CanRedo;
+		}
+		
+		Widget MonoDevelop.DesignerSupport.IOutlinedDocument.GetOutlineWidget ()
+		{
+			return GuiBuilderDocumentOutline.Instance;
+		}
+		
+		IEnumerable<Gtk.Widget> MonoDevelop.DesignerSupport.IOutlinedDocument.GetToolbarWidgets ()
+		{
+			return null;
+		}
+
+		void MonoDevelop.DesignerSupport.IOutlinedDocument.ReleaseOutlineWidget ()
+		{
+			//Do nothing. We keep the instance to avoid creation cost when switching documents.
 		}
 	}
 }

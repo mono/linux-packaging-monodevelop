@@ -44,7 +44,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Core.Instrumentation;
 
 using MonoDevelop.CSharp.Parser;
-using MonoDevelop.CSharp.Dom;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.CSharp.Formatting;
 using MonoDevelop.CSharp.Refactoring;
 using MonoDevelop.CSharp.Project;
@@ -72,7 +72,7 @@ namespace MonoDevelop.CSharp
 		
 		public bool IsSourceCodeFile (string fileName)
 		{
-			return string.Compare (Path.GetExtension (fileName), ".cs", true) == 0;
+			return StringComparer.OrdinalIgnoreCase.Equals (Path.GetExtension (fileName), ".cs");
 		}
 		
 		public BuildResult Compile (ProjectItemCollection projectItems, DotNetProjectConfiguration configuration, ConfigurationSelector configSelector, IProgressMonitor monitor)
@@ -89,7 +89,7 @@ namespace MonoDevelop.CSharp
 					pars.PlatformTarget = platform;
 				string debugAtt = projectOptions.GetAttribute ("DefineDebug");
 				if (string.Compare ("True", debugAtt, true) == 0)
-					pars.DefineSymbols = "DEBUG";
+					pars.AddDefineSymbol ("DEBUG");
 			}
 			return pars;
 		}

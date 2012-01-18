@@ -6,8 +6,8 @@
        description = "Provides the core services of the MonoDevelop platform"
        category    = "MonoDevelop Core"
        isroot      = "true"
-       version     = "2.4"
-       compatVersion = "2.4">
+       version     = "2.8.5"
+       compatVersion = "2.7">
        
 	<ConditionType id="PackageInstalled" type="MonoDevelop.Core.AddIns.PackageInstalledCondition" />
 	<ConditionType id="PackageNotInstalled" type="MonoDevelop.Core.AddIns.PackageNotInstalledCondition" />
@@ -36,7 +36,7 @@
 
 	<ExtensionPoint path = "/MonoDevelop/Core/Applications" name = "Applications">
 		<Description>MonoDevelop tools.</Description>
-		<ExtensionNode name="Application" type="MonoDevelop.Core.AddIns.ApplicationExtensionNode"/>
+		<ExtensionNode name="Application" type="MonoDevelop.Core.AddIns.ApplicationExtensionNode" customAttributeType="MonoDevelop.Core.ApplicationExtensionAttribute"/>
 	</ExtensionPoint>
 
 	<ExtensionPoint path = "/MonoDevelop/Core/SupportPackages">
@@ -48,6 +48,10 @@
 		<ExtensionNode name="Class" objectType="MonoDevelop.Core.AddIns.ITargetRuntimeFactory"/>
 	</ExtensionPoint>
 	
+	<ExtensionPoint path = "/MonoDevelop/Core/SystemInformation" name = "Adddional system information">
+		<ExtensionNode name = "Class" objectType = "MonoDevelop.Core.ISystemInformationProvider" />
+	</ExtensionPoint>
+	
 	<ExtensionPoint path = "/MonoDevelop/Core/Frameworks">
 		<Description>Target frameworks.</Description>
 		<ExtensionNode name="Framework" type="MonoDevelop.Core.AddIns.TargetFrameworkNode" objectType="MonoDevelop.Core.Assemblies.TargetFramework">
@@ -56,6 +60,11 @@
 				<Description>A framework backend. Provides support for a framework for a runtime.</Description>
 			</ExtensionNode>
 		</ExtensionNode>
+	</ExtensionPoint>
+	
+	<ExtensionPoint path = "/MonoDevelop/Core/UserDataMigration">
+		<Description>Defines data to be migrated from the previous version of MonoDevelop.</Description>
+		<ExtensionNode name="Migration" type="MonoDevelop.Core.AddIns.UserDataMigrationNode" />
 	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/ProjectModel/Ambiences" name = "Language ambiences">
@@ -79,7 +88,7 @@
 
 	<ExtensionPoint path = "/MonoDevelop/ProjectModel/SerializableClasses" name = "Serializable classes">
 		<Description>Classes to be registered for serialization.</Description>
-		<ExtensionNode name="DataType" type="MonoDevelop.Projects.Extensions.DataTypeCodon">
+		<ExtensionNode name="DataType" type="MonoDevelop.Projects.Extensions.DataTypeCodon" customAttributeType="MonoDevelop.Projects.ProjectModelDataItemAttribute">
 			<Description>A type name.</Description>
 		</ExtensionNode>
 	</ExtensionPoint>
@@ -122,24 +131,12 @@
 	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/ProjectModel/DomParser" name = "Parsers">
-		<ExtensionNode name="Class"/>
-	</ExtensionPoint>
-	
-	<ExtensionPoint path = "/MonoDevelop/ProjectModel/TextFormatters" name = "Formatters">
-		<ExtensionNode name="Class"/>
-	</ExtensionPoint>
-	
-	<ExtensionPoint path = "/MonoDevelop/ProjectModel/TextFormatters" name = "Formatters">
-		<ExtensionNode name="Class"/>
-	</ExtensionPoint>
-	
-	<ExtensionPoint path = "/MonoDevelop/ProjectModel/TextPrettyPrinters" name = "Pretty Printers">
-		<ExtensionNode name="Class"/>
+		<ExtensionNode name="Parser" type="MonoDevelop.Projects.Extensions.ParserNode"/>
 	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/ProjectModel/PolicyTypes" name = "Policy types">
 		<Description>Types for per-project policies language binding. These types must be serializable.</Description>
-		<ExtensionNode name="PolicyType" type="MonoDevelop.Projects.Extensions.DataTypeCodon" />
+		<ExtensionNode name="PolicyType" customAttributeType="MonoDevelop.Projects.Policies.PolicyTypeAttribute" objectType="System.Object"/>
 	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/ProjectModel/PolicySets" name = "Named policy sets">
@@ -158,7 +155,11 @@
 	
 	<ExtensionPoint path = "/MonoDevelop/ProjectModel/CodeGenerators">
 		<ExtensionNode name="Generator" type="MonoDevelop.Projects.CodeGeneration.MimeTypeExtensionNode"/>
-	</ExtensionPoint>	
+	</ExtensionPoint>
+
+	<ExtensionPoint path = "/MonoDevelop/ProjectModel/DocumentationGenerator">
+		<ExtensionNode name="Class"/>
+	</ExtensionPoint>
 	<!-- Extensions -->
 	
 	
@@ -186,6 +187,18 @@
 		<ExecutionHandler id="Native"
 		                  class = "MonoDevelop.Core.Execution.NativePlatformExecutionHandler"/>
 	</Extension>
+	
+	<Extension path = "/MonoDevelop/Core/UserDataMigration">
+		<!-- 2.4 -->
+		<Migration sourceVersion="2.4" kind="Config" path="mono-runtimes.xml" />
+		<Migration sourceVersion="2.4" kind="UserData" path="DefaultPolicies.xml" targetPath="Policies/Default.mdpolicy.xml" />
+		<!-- the following file belongs to the instrumentation viewer but it's not an addin so can't register for migrations -->
+		<Migration sourceVersion="2.4" kind="Config" path="monitor-views.xml" />
+		<!-- 2.6 -->
+		<Migration sourceVersion="2.6+" kind="Config" targetKind="LocalConfig" path="mono-runtimes.xml" />
+		<Migration sourceVersion="2.6+" kind="UserData" path="Policies" isDirectory="true" />
+		<Migration sourceVersion="2.6+" kind="Config" path="monitor-views.xml" />
+	</Extension>
 
 	<Extension path = "/MonoDevelop/Core/Applications">
 		<Application id = "build" class = "MonoDevelop.Projects.BuildTool" description = "Project build tool"/>
@@ -201,27 +214,19 @@
 	<Extension path = "/MonoDevelop/ProjectModel/FileFormats">
 		<FileFormat id = "MSBuild08" 
 			class = "MonoDevelop.Projects.Formats.MSBuild.MSBuildFileFormatVS08"
-			name = "MSBuild (Visual Studio 2008)" />
+			name = "MSBuild (Visual Studio 2008)"
+			canDefault = "true" />
 		<FileFormat id = "MSBuild05" 
 			class = "MonoDevelop.Projects.Formats.MSBuild.MSBuildFileFormatVS05"
-			name = "MSBuild (Visual Studio 2005)" />
+			name = "MSBuild (Visual Studio 2005)"
+			canDefault = "true" />
 		<FileFormat id = "MSBuild10" 
 			class = "MonoDevelop.Projects.Formats.MSBuild.MSBuildFileFormatVS10"
-			name = "MSBuild (Visual Studio 2010)" />
+			name = "MSBuild (Visual Studio 2010)"
+			canDefault = "true" />
 		<FileFormat id = "MD1" 
 			class = "MonoDevelop.Projects.Formats.MD1.MD1FileFormat"
-			name = "MonoDevelop 1.0"/>
-	</Extension>
-	  
-	<Extension path = "/MonoDevelop/ProjectModel/SerializableClasses">
-		<DataType class = "MonoDevelop.Projects.Solution" />
-		<DataType class = "MonoDevelop.Projects.SolutionEntityItem" />
-		<DataType class = "MonoDevelop.Projects.Project" />
-		<DataType class = "MonoDevelop.Projects.Workspace" />
-		<DataType class = "MonoDevelop.Projects.DotNetProject" name = "AbstractDotNetProject"/>
-		<DataType class = "MonoDevelop.Projects.DotNetAssemblyProject" name = "DotNetProject"/>
-		<DataType class = "MonoDevelop.Projects.GenericProject" />
-		<DataType class = "MonoDevelop.Projects.GenericProjectConfiguration" />
+			name = "MonoDevelop 1.0" />
 	</Extension>
 
 	<Extension path = "/MonoDevelop/ProjectModel/ExtendedProperties">
@@ -238,18 +243,14 @@
 		<SerializationMap resource="md1format.xml" />
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/ProjectModel/PolicyTypes" >
-		<PolicyType id="DotNetNamingPolicy" class="MonoDevelop.Projects.Policies.DotNetNamingPolicy" />
-	</Extension>
-	
 	<Extension path = "/MonoDevelop/ProjectModel/PolicySets" >
-		<PolicySet id="Mono" _name="Mono">
+		<PolicySet id="Mono" _name="Mono" allowDiffSerialize="true">
 		<!--	<Policies resource="" /> -->
 		</PolicySet>
-		<PolicySet id="VisualStudio" _name="Microsoft Visual Studio">
+		<PolicySet id="VisualStudio" _name="Microsoft Visual Studio" allowDiffSerialize="true">
 		<!--	<Policies resource="" /> -->
 		</PolicySet>
-		<PolicySet id="Invariant" _name="Invariant" visible="false" />
+		<PolicySet id="Invariant" _name="Invariant" visible="false"/>
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/MSBuildItemTypes">

@@ -14,6 +14,7 @@ namespace MonoDevelop.VersionControl
 		List<ChangeSetItem> items = new List<ChangeSetItem> ();
 		Repository repo;
 		FilePath basePath;
+		Hashtable extendedProperties;
 
 		internal protected ChangeSet (Repository repo, FilePath basePath)
 		{
@@ -26,6 +27,19 @@ namespace MonoDevelop.VersionControl
 				basePath = bp + System.IO.Path.DirectorySeparatorChar;
 			
 			this.basePath = basePath;
+		}
+		
+		public IDictionary ExtendedProperties {
+			get {
+				if (extendedProperties == null)
+					extendedProperties = new Hashtable ();
+				return extendedProperties;
+			}
+		}
+		
+		public string GlobalComment {
+			get { return globalComment; }
+			set { globalComment = value; }
 		}
 		
 		public bool IsEmpty {
@@ -41,13 +55,13 @@ namespace MonoDevelop.VersionControl
 			get { return items.Count (item => !string.IsNullOrEmpty (item.Comment)); }
 		}
 		
-		public string GenerateGlobalComment (CommitMessageFormat format, MonoDevelop.Ide.Gui.AuthorInformation userInfo)
+		public string GenerateGlobalComment (CommitMessageFormat format, MonoDevelop.Projects.AuthorInformation userInfo)
 		{
 			return GeneratePathComment (basePath, items, format, userInfo);
 		}
 		
 		public string GeneratePathComment (string path, IEnumerable<ChangeSetItem> items, 
-			CommitMessageFormat messageFormat, MonoDevelop.Ide.Gui.AuthorInformation userInfo)
+			CommitMessageFormat messageFormat, MonoDevelop.Projects.AuthorInformation userInfo)
 		{
 			ChangeLogWriter writer = new ChangeLogWriter (path, userInfo);
 			writer.MessageFormat = messageFormat;
@@ -57,11 +71,6 @@ namespace MonoDevelop.VersionControl
 			}
 			
 			return writer.ToString ();
-		}
-		
-		public string GlobalComment {
-			get { return globalComment; }
-			set { globalComment = value; }
 		}
 		
 		public FilePath BaseLocalPath {
@@ -134,7 +143,6 @@ namespace MonoDevelop.VersionControl
 		
 		public virtual void CopyFrom (ChangeSet other)
 		{
-			globalComment = other.globalComment;
 			repo = other.repo;
 			basePath = other.basePath;
 			items = new List<ChangeSetItem> ();
@@ -166,6 +174,10 @@ namespace MonoDevelop.VersionControl
 		
 		public VersionStatus Status {
 			get { return versionInfo.Status; }
+		}
+		
+		public bool HasLocalChanges {
+			get { return versionInfo.HasLocalChanges; }
 		}
 		
 		public bool IsDirectory {

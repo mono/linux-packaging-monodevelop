@@ -29,6 +29,7 @@
 
 
 using System;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -47,9 +48,16 @@ namespace MonoDevelop.Projects
 		OnLoad,
 		OnLoadAutoInsert
 	}
-
+	
+	/// <summary>
+	/// A project
+	/// </summary>
+	/// <remarks>
+	/// This is the base class for MonoDevelop projects. A project is a solution item which has a list of
+	/// source code files and which can be built to generate an output.
+	/// </remarks>
 	[DataInclude(typeof(ProjectFile))]
-	[DataItem(FallbackType = typeof(UnknownProject))]
+	[ProjectModelDataItem(FallbackType = typeof(UnknownProject))]
 	public abstract class Project : SolutionEntityItem
 	{
 		string[] buildActions;
@@ -62,7 +70,10 @@ namespace MonoDevelop.Projects
 			Items.Bind (files);
 			DependencyResolutionEnabled = true;
 		}
-
+		
+		/// <summary>
+		/// Description of the project.
+		/// </summary>
 		[ItemProperty("Description", DefaultValue = "")]
 		private string description = "";
 		public string Description {
@@ -72,17 +83,30 @@ namespace MonoDevelop.Projects
 				NotifyModified ("Description");
 			}
 		}
-
+		
+		/// <summary>
+		/// Determines whether the provided file can be as part of this project
+		/// </summary>
+		/// <returns>
+		/// <c>true</c> if the file can be compiled; otherwise, <c>false</c>.
+		/// </returns>
+		/// <param name='fileName'>
+		/// File name
+		/// </param>
 		public virtual bool IsCompileable (string fileName)
 		{
 			return false;
 		}
 
-		private ProjectFileCollection files;
+		/// <summary>
+		/// Files of the project
+		/// </summary>
 		public ProjectFileCollection Files {
 			get { return files; }
 		}
-
+		private ProjectFileCollection files;
+		
+		
 		[ItemProperty("newfilesearch", DefaultValue = NewFileSearch.None)]
 		protected NewFileSearch newFileSearch = NewFileSearch.None;
 		public NewFileSearch NewFileSearch {
@@ -94,41 +118,91 @@ namespace MonoDevelop.Projects
 			}
 		}
 
+		/// <summary>
+		/// Gets the type of the project.
+		/// </summary>
+		/// <value>
+		/// The type of the project.
+		/// </value>
 		public abstract string ProjectType {
 			get;
 		}
 
-		IconId stockIcon = "md-project";
+		/// <summary>
+		/// Gets or sets the icon of the project.
+		/// </summary>
+		/// <value>
+		/// The stock icon.
+		/// </value>
 		public virtual IconId StockIcon {
 			get { return stockIcon; }
-			set { this.stockIcon = value; }
+			set { this.stockIcon = value; NotifyModified ("StockIcon"); }
 		}
-
+		IconId stockIcon = "md-project";
+		
+		/// <summary>
+		/// Ambience to use to show information about the project
+		/// </summary>
 		public virtual Ambience Ambience {
 			get { return new NetAmbience (); }
 		}
 
+		/// <summary>
+		/// List of languages that this project supports
+		/// </summary>
+		/// <value>
+		/// The identifiers of the supported languages.
+		/// </value>
 		public virtual string[] SupportedLanguages {
 			get { return new String[] { "" }; }
 		}
 
+		/// <summary>
+		/// Gets the default build action for a file
+		/// </summary>
+		/// <returns>
+		/// The default build action.
+		/// </returns>
+		/// <param name='fileName'>
+		/// File name.
+		/// </param>
 		public virtual string GetDefaultBuildAction (string fileName)
 		{
 			return IsCompileable (fileName) ? BuildAction.Compile : BuildAction.None;
 		}
-
+		
+		/// <summary>
+		/// Gets a project file.
+		/// </summary>
+		/// <returns>
+		/// The project file.
+		/// </returns>
+		/// <param name='fileName'>
+		/// File name.
+		/// </param>
 		public ProjectFile GetProjectFile (string fileName)
 		{
 			return files.GetFile (fileName);
 		}
-
+		
+		/// <summary>
+		/// Determines whether a file belongs to this project
+		/// </summary>
+		/// <param name='fileName'>
+		/// File name
+		/// </param>
 		public bool IsFileInProject (string fileName)
 		{
 			return files.GetFile (fileName) != null;
 		}
 
-		//NOTE: groups the common actions at the top, separated by a "--" entry *IF* there are 
-		// more "uncommon" actions than "common" actions
+		/// <summary>
+		/// Gets a list of build actions supported by this project
+		/// </summary>
+		/// <remarks>
+		/// Common actions are grouped at the top, separated by a "--" entry *IF* there are 
+		/// more "uncommon" actions than "common" actions
+		/// </remarks>
 		public string[] GetBuildActions ()
 		{
 			if (buildActions != null)
@@ -179,12 +253,18 @@ namespace MonoDevelop.Projects
 			}
 			return buildActions;
 		}
-
+		
+		/// <summary>
+		/// Gets a list of standard build actions.
+		/// </summary>
 		protected virtual IEnumerable<string> GetStandardBuildActions ()
 		{
 			return BuildAction.StandardActions;
 		}
 
+		/// <summary>
+		/// Gets a list of common build actions (common actions are shown first in the project build action list)
+		/// </summary>
 		protected virtual IList<string> GetCommonBuildActions ()
 		{
 			return BuildAction.StandardActions;
@@ -203,17 +283,40 @@ namespace MonoDevelop.Projects
 		public override void Dispose ()
 		{
 			FileService.FileChanged -= OnFileChanged;
-			foreach (ProjectFile file in Files) {
-				file.Dispose ();
-			}
 			base.Dispose ();
 		}
-
+		
+		/// <summary>
+		/// Adds a file to the project
+		/// </summary>
+		/// <returns>
+		/// The file instance.
+		/// </returns>
+		/// <param name='filename'>
+		/// Absolute path to the file.
+		/// </param>
 		public ProjectFile AddFile (string filename)
 		{
 			return AddFile (filename, null);
 		}
-
+		
+		public IEnumerable<ProjectFile> AddFiles (IEnumerable<FilePath> files)
+		{
+			return AddFiles (files, null);
+		}
+		
+		/// <summary>
+		/// Adds a file to the project
+		/// </summary>
+		/// <returns>
+		/// The file instance.
+		/// </returns>
+		/// <param name='filename'>
+		/// Absolute path to the file.
+		/// </param>
+		/// <param name='buildAction'>
+		/// Build action to assign to the file.
+		/// </param>
 		public ProjectFile AddFile (string filename, string buildAction)
 		{
 			foreach (ProjectFile fInfo in Files) {
@@ -230,12 +333,45 @@ namespace MonoDevelop.Projects
 			Files.Add (newFileInformation);
 			return newFileInformation;
 		}
+		
+		public IEnumerable<ProjectFile> AddFiles (IEnumerable<FilePath> files, string buildAction)
+		{
+			List<ProjectFile> newFiles = new List<ProjectFile> ();
+			foreach (FilePath filename in files) {
+				string ba = buildAction;
+				if (String.IsNullOrEmpty (ba))
+					ba = GetDefaultBuildAction (filename);
 
+				ProjectFile newFileInformation = new ProjectFile (filename, ba);
+				newFiles.Add (newFileInformation);
+			}
+			Files.AddRange (newFiles);
+			return newFiles;
+		}
+		
+		/// <summary>
+		/// Adds a file to the project
+		/// </summary>
+		/// <param name='projectFile'>
+		/// The file.
+		/// </param>
 		public void AddFile (ProjectFile projectFile)
 		{
 			Files.Add (projectFile);
 		}
-
+		
+		/// <summary>
+		/// Adds a directory to the project.
+		/// </summary>
+		/// <returns>
+		/// The directory instance.
+		/// </returns>
+		/// <param name='relativePath'>
+		/// Relative path of the directory.
+		/// </param>
+		/// <remarks>
+		/// The directory is created if it doesn't exist
+		/// </remarks>
 		public ProjectFile AddDirectory (string relativePath)
 		{
 			string newPath = Path.Combine (BaseDirectory, relativePath);
@@ -258,7 +394,7 @@ namespace MonoDevelop.Projects
 			return newDir;
 		}
 
-		protected internal override BuildResult OnBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
+		protected override BuildResult OnBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			// create output directory, if not exists
 			ProjectConfiguration conf = GetConfiguration (configuration) as ProjectConfiguration;
@@ -297,14 +433,27 @@ namespace MonoDevelop.Projects
 
 			return res;
 		}
-
+		
+		/// <summary>
+		/// Copies the support files to the output directory
+		/// </summary>
+		/// <param name='monitor'>
+		/// Progress monitor.
+		/// </param>
+		/// <param name='configuration'>
+		/// Configuration for which to copy the files.
+		/// </param>
+		/// <remarks>
+		/// Copies all support files to the output directory of the given configuration. Support files
+		/// include: assembly references with the Local Copy flag, data files with the Copy to Output option, etc.
+		/// </remarks>
 		public void CopySupportFiles (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			ProjectConfiguration config = (ProjectConfiguration) GetConfiguration (configuration);
 
 			foreach (FileCopySet.Item item in GetSupportFileList (configuration)) {
-				string dest = Path.GetFullPath (Path.Combine (config.OutputDirectory, item.Target));
-				string src = Path.GetFullPath (item.Src);
+				FilePath dest = Path.GetFullPath (Path.Combine (config.OutputDirectory, item.Target));
+				FilePath src = Path.GetFullPath (item.Src);
 
 				try {
 					if (dest == src)
@@ -316,8 +465,15 @@ namespace MonoDevelop.Projects
 					if (!Directory.Exists (Path.GetDirectoryName (dest)))
 						FileService.CreateDirectory (Path.GetDirectoryName (dest));
 
-					if (File.Exists (src))
+					if (File.Exists (src)) {
+						dest.Delete ();
 						FileService.CopyFile (src, dest);
+						
+						// Copied files can't be read-only, so they can be removed when rebuilding the project
+						FileAttributes atts = File.GetAttributes (dest);
+						if (atts.HasFlag (FileAttributes.ReadOnly))
+							File.SetAttributes (dest, atts & ~FileAttributes.ReadOnly);
+					}
 					else
 						monitor.ReportError (GettextCatalog.GetString ("Could not find support file '{0}'.", src), null);
 
@@ -327,6 +483,19 @@ namespace MonoDevelop.Projects
 			}
 		}
 
+		/// <summary>
+		/// Removes all support files from the output directory
+		/// </summary>
+		/// <param name='monitor'>
+		/// Progress monitor.
+		/// </param>
+		/// <param name='configuration'>
+		/// Configuration for which to delete the files.
+		/// </param>
+		/// <remarks>
+		/// Deletes all support files from the output directory of the given configuration. Support files
+		/// include: assembly references with the Local Copy flag, data files with the Copy to Output option, etc.
+		/// </remarks>
 		public void DeleteSupportFiles (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			ProjectConfiguration config = (ProjectConfiguration) GetConfiguration (configuration);
@@ -347,15 +516,41 @@ namespace MonoDevelop.Projects
 				}
 			}
 		}
-
+		
+		/// <summary>
+		/// Gets a list of files required to use the project output
+		/// </summary>
+		/// <returns>
+		/// A list of files.
+		/// </returns>
+		/// <param name='configuration'>
+		/// Build configuration for which get the list
+		/// </param>
+		/// <remarks>
+		/// Returns a list of all files that are required to use the project output binary, for example: data files with
+		/// the Copy to Output option, debug information files, generated resource files, etc.
+		/// </remarks>
 		public FileCopySet GetSupportFileList (ConfigurationSelector configuration)
 		{
 			FileCopySet list = new FileCopySet ();
-			PopulateSupportFileList (list, configuration);
+			Services.ProjectService.GetExtensionChain (this).PopulateSupportFileList (this, list, configuration);
 			return list;
 		}
 
-		protected virtual void PopulateSupportFileList (FileCopySet list, ConfigurationSelector configuration)
+		/// <summary>
+		/// Gets a list of files required to use the project output
+		/// </summary>
+		/// <param name='list'>
+		/// List where to add the support files.
+		/// </param>
+		/// <param name='configuration'>
+		/// Build configuration for which get the list
+		/// </param>
+		/// <remarks>
+		/// Returns a list of all files that are required to use the project output binary, for example: data files with
+		/// the Copy to Output option, debug information files, generated resource files, etc.
+		/// </remarks>
+		internal protected virtual void PopulateSupportFileList (FileCopySet list, ConfigurationSelector configuration)
 		{
 			foreach (ProjectFile pf in Files) {
 				if (pf.CopyToOutputDirectory == FileCopyMode.None)
@@ -363,14 +558,70 @@ namespace MonoDevelop.Projects
 				list.Add (pf.FilePath, pf.CopyToOutputDirectory == FileCopyMode.PreserveNewest, pf.ProjectVirtualPath);
 			}
 		}
+		
+		/// <summary>
+		/// Gets a list of files generated when building this project
+		/// </summary>
+		/// <returns>
+		/// A list of files.
+		/// </returns>
+		/// <param name='configuration'>
+		/// Build configuration for which get the list
+		/// </param>
+		/// <remarks>
+		/// Returns a list of all files that are generated when this project is built, including: the generated binary,
+		/// debug information files, satellite assemblies.
+		/// </remarks>
+		public List<FilePath> GetOutputFiles (ConfigurationSelector configuration)
+		{
+			List<FilePath> list = new List<FilePath> ();
+			Services.ProjectService.GetExtensionChain (this).PopulateOutputFileList (this, list, configuration);
+			return list;
+		}
 
+		/// <summary>
+		/// Gets a list of files retuired to use the project output
+		/// </summary>
+		/// <param name='list'>
+		/// List where to add the support files.
+		/// </param>
+		/// <param name='configuration'>
+		/// Build configuration for which get the list
+		/// </param>
+		/// <remarks>
+		/// Returns a list of all files that are required to use the project output binary, for example: data files with
+		/// the Copy to Output option, debug information files, generated resource files, etc.
+		/// </remarks>
+		internal protected virtual void PopulateOutputFileList (List<FilePath> list, ConfigurationSelector configuration)
+		{
+			string file = GetOutputFileName (configuration);
+			if (file != null)
+				list.Add (file);
+		}		
+
+		/// <summary>
+		/// Builds the project.
+		/// </summary>
+		/// <returns>
+		/// The build result.
+		/// </returns>
+		/// <param name='monitor'>
+		/// Progress monitor.
+		/// </param>
+		/// <param name='configuration'>
+		/// Configuration to build.
+		/// </param>
+		/// <remarks>
+		/// This method is invoked to build the project. Support files such as files with the Copy to Output flag will
+		/// be copied before calling this method.
+		/// </remarks>
 		protected virtual BuildResult DoBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			BuildResult res = ItemHandler.RunTarget (monitor, "Build", configuration);
 			return res ?? new BuildResult ();
 		}
 
-		protected internal override void OnClean (IProgressMonitor monitor, ConfigurationSelector configuration)
+		protected override void OnClean (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			SetDirty ();
 			ProjectConfiguration config = GetConfiguration (configuration) as ProjectConfiguration;
@@ -378,17 +629,23 @@ namespace MonoDevelop.Projects
 				monitor.ReportError (GettextCatalog.GetString ("Configuration '{0}' not found in project '{1}'", config.Id, Name), null);
 				return;
 			}
-
-			// Delete the generated assembly
-			string file = GetOutputFileName (configuration);
-			if (file != null) {
-				if (File.Exists (file))
+			
+			monitor.BeginTask (GettextCatalog.GetString ("Performing clean..."), 0);
+			// Delete generated files
+			
+			foreach (FilePath file in GetOutputFiles (configuration)) {
+				if (File.Exists (file)) {
 					FileService.DeleteFile (file);
+					if (file.ParentDirectory.CanonicalPath != config.OutputDirectory.CanonicalPath && Directory.GetFiles (file.ParentDirectory).Length == 0)
+						FileService.DeleteDirectory (file.ParentDirectory);
+				}
 			}
 
 			DeleteSupportFiles (monitor, configuration);
-
 			DoClean (monitor, config.Selector);
+			monitor.Log.WriteLine ();
+			monitor.Log.WriteLine (GettextCatalog.GetString ("Clean complete"));
+			monitor.EndTask ();
 		}
 
 		protected virtual void DoClean (IProgressMonitor monitor, ConfigurationSelector configuration)
@@ -417,11 +674,32 @@ namespace MonoDevelop.Projects
 			}
 			DoExecute (monitor, context, configuration);
 		}
-
+		
+		/// <summary>
+		/// Executes the project
+		/// </summary>
+		/// <param name='monitor'>
+		/// Progress monitor.
+		/// </param>
+		/// <param name='context'>
+		/// Execution context.
+		/// </param>
+		/// <param name='configuration'>
+		/// Configuration to execute.
+		/// </param>
 		protected virtual void DoExecute (IProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
 		{
 		}
 
+		/// <summary>
+		/// Gets the absolute path to the output file generated by this project.
+		/// </summary>
+		/// <returns>
+		/// Absolute path the the output file.
+		/// </returns>
+		/// <param name='configuration'>
+		/// Build configuration.
+		/// </param>
 		public virtual FilePath GetOutputFileName (ConfigurationSelector configuration)
 		{
 			return FilePath.Null;
@@ -447,6 +725,15 @@ namespace MonoDevelop.Projects
 				isDirty = true;
 		}
 
+		/// <summary>
+		/// Checks if the project needs to be built
+		/// </summary>
+		/// <returns>
+		/// <c>True</c> if the project needs to be built (it has changes)
+		/// </returns>
+		/// <param name='configuration'>
+		/// Build configuration.
+		/// </param>
 		protected virtual bool CheckNeedsBuild (ConfigurationSelector configuration)
 		{
 			DateTime tim = GetLastBuildTime (configuration);
@@ -494,18 +781,19 @@ namespace MonoDevelop.Projects
 
 		internal virtual void OnFileChanged (object source, FileEventArgs e)
 		{
-			ProjectFile file = GetProjectFile (e.FileName);
-			if (file != null) {
-				SetDirty ();
-				try {
-					NotifyFileChangedInProject (file);
-				} catch {
-					// Workaround Mono bug. The watcher seems to
-					// stop watching if an exception is thrown in
-					// the event handler
+			foreach (FileEventInfo fi in e) {
+				ProjectFile file = GetProjectFile (fi.FileName);
+				if (file != null) {
+					SetDirty ();
+					try {
+						NotifyFileChangedInProject (file);
+					} catch {
+						// Workaround Mono bug. The watcher seems to
+						// stop watching if an exception is thrown in
+						// the event handler
+					}
 				}
 			}
-
 		}
 
 		protected internal override List<FilePath> OnGetItemFiles (bool includeReferencedFiles)
@@ -520,18 +808,16 @@ namespace MonoDevelop.Projects
 			return col;
 		}
 
-		protected internal override void OnItemAdded (object obj)
+		protected internal override void OnItemsAdded (IEnumerable<ProjectItem> objs)
 		{
-			base.OnItemAdded (obj);
-			if (obj is ProjectFile)
-				NotifyFileAddedToProject ((ProjectFile)obj);
+			base.OnItemsAdded (objs);
+			NotifyFileAddedToProject (objs.OfType<ProjectFile> ());
 		}
 
-		protected internal override void OnItemRemoved (object obj)
+		protected internal override void OnItemsRemoved (IEnumerable<ProjectItem> objs)
 		{
-			base.OnItemRemoved (obj);
-			if (obj is ProjectFile)
-				NotifyFileRemovedFromProject ((ProjectFile)obj);
+			base.OnItemsRemoved (objs);
+			NotifyFileRemovedFromProject (objs.OfType<ProjectFile> ());
 		}
 
 		internal void NotifyFileChangedInProject (ProjectFile file)
@@ -547,37 +833,50 @@ namespace MonoDevelop.Projects
 
 		List<ProjectFile> unresolvedDeps;
 
-		void NotifyFileRemovedFromProject (ProjectFile file)
+		void NotifyFileRemovedFromProject (IEnumerable<ProjectFile> objs)
 		{
-			file.SetProject (null);
-
-			if (DependencyResolutionEnabled) {
-				if (unresolvedDeps.Contains (file))
-					unresolvedDeps.Remove (file);
-				foreach (ProjectFile f in file.DependentChildren) {
-					f.DependsOnFile = null;
-					if (!string.IsNullOrEmpty (f.DependsOn))
-						unresolvedDeps.Add (f);
+			if (!objs.Any ())
+				return;
+			
+			var args = new ProjectFileEventArgs ();
+			
+			foreach (ProjectFile file in objs) {
+				file.SetProject (null);
+				args.Add (new ProjectFileEventInfo (this, file));
+				if (DependencyResolutionEnabled) {
+					if (unresolvedDeps.Contains (file))
+						unresolvedDeps.Remove (file);
+					foreach (ProjectFile f in file.DependentChildren) {
+						f.DependsOnFile = null;
+						if (!string.IsNullOrEmpty (f.DependsOn))
+							unresolvedDeps.Add (f);
+					}
+					file.DependsOnFile = null;
 				}
-				file.DependsOnFile = null;
+			}
+			SetDirty ();
+			NotifyModified ("Files");
+			OnFileRemovedFromProject (args);
+		}
+
+		void NotifyFileAddedToProject (IEnumerable<ProjectFile> objs)
+		{
+			if (!objs.Any ())
+				return;
+			
+			var args = new ProjectFileEventArgs ();
+			
+			foreach (ProjectFile file in objs) {
+				if (file.Project != null)
+					throw new InvalidOperationException ("ProjectFile already belongs to a project");
+				file.SetProject (this);
+				args.Add (new ProjectFileEventInfo (this, file));
+				ResolveDependencies (file);
 			}
 
 			SetDirty ();
 			NotifyModified ("Files");
-			OnFileRemovedFromProject (new ProjectFileEventArgs (this, file));
-		}
-
-		void NotifyFileAddedToProject (ProjectFile file)
-		{
-			if (file.Project != null)
-				throw new InvalidOperationException ("ProjectFile already belongs to a project");
-			file.SetProject (this);
-
-			ResolveDependencies (file);
-
-			SetDirty ();
-			NotifyModified ("Files");
-			OnFileAddedToProject (new ProjectFileEventArgs (this, file));
+			OnFileAddedToProject (args);
 		}
 
 		internal void ResolveDependencies (ProjectFile file)
@@ -626,7 +925,10 @@ namespace MonoDevelop.Projects
 			NotifyModified ("Files");
 			OnFileRenamedInProject (args);
 		}
-
+		
+		/// <summary>
+		/// Raises the FileRemovedFromProject event.
+		/// </summary>
 		protected virtual void OnFileRemovedFromProject (ProjectFileEventArgs e)
 		{
 			buildActions = null;
@@ -635,6 +937,9 @@ namespace MonoDevelop.Projects
 			}
 		}
 
+		/// <summary>
+		/// Raises the FileAddedToProject event.
+		/// </summary>
 		protected virtual void OnFileAddedToProject (ProjectFileEventArgs e)
 		{
 			buildActions = null;
@@ -642,14 +947,20 @@ namespace MonoDevelop.Projects
 				FileAddedToProject (this, e);
 			}
 		}
-
+		
+		/// <summary>
+		/// Raises the FileChangedInProject event.
+		/// </summary>
 		protected virtual void OnFileChangedInProject (ProjectFileEventArgs e)
 		{
 			if (FileChangedInProject != null) {
 				FileChangedInProject (this, e);
 			}
 		}
-
+		
+		/// <summary>
+		/// Raises the FilePropertyChangedInProject event.
+		/// </summary>
 		protected virtual void OnFilePropertyChangedInProject (ProjectFileEventArgs e)
 		{
 			buildActions = null;
@@ -657,7 +968,10 @@ namespace MonoDevelop.Projects
 				FilePropertyChangedInProject (this, e);
 			}
 		}
-
+		
+		/// <summary>
+		/// Raises the FileRenamedInProject event.
+		/// </summary>
 		protected virtual void OnFileRenamedInProject (ProjectFileRenamedEventArgs e)
 		{
 			if (FileRenamedInProject != null) {
@@ -665,13 +979,30 @@ namespace MonoDevelop.Projects
 			}
 		}
 
+		/// <summary>
+		/// Occurs when a file is removed from this project.
+		/// </summary>
 		public event ProjectFileEventHandler FileRemovedFromProject;
+		
+		/// <summary>
+		/// Occurs when a file is added to this project.
+		/// </summary>
 		public event ProjectFileEventHandler FileAddedToProject;
+
+		/// <summary>
+		/// Occurs when a file of this project has been modified
+		/// </summary>
 		public event ProjectFileEventHandler FileChangedInProject;
+		
+		/// <summary>
+		/// Occurs when a property of a file of this project has changed
+		/// </summary>
 		public event ProjectFileEventHandler FilePropertyChangedInProject;
+		
+		/// <summary>
+		/// Occurs when a file of this project has been renamed
+		/// </summary>
 		public event ProjectFileRenamedEventHandler FileRenamedInProject;
-
-
 	}
 
 	public class UnknownProject : Project
@@ -690,7 +1021,7 @@ namespace MonoDevelop.Projects
 			return false;
 		}
 		
-		internal protected override BuildResult OnBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
+		protected override BuildResult OnBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			BuildResult res = new BuildResult ();
 			res.AddError ("Unknown project type");

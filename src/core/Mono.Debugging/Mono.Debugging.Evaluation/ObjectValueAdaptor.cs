@@ -15,7 +15,7 @@ namespace Mono.Debugging.Evaluation
 		Dictionary<string, TypeDisplayData> typeDisplayData = new Dictionary<string, TypeDisplayData> ();
 
 		// Time to wait while evaluating before switching to async mode
-		public int DefaultEvaluationWaitTime = 100;
+		public int DefaultEvaluationWaitTime { get; set; }
 		
 		public event EventHandler<BusyStateEventArgs> BusyStateChanged;
 		
@@ -46,6 +46,8 @@ namespace Mono.Debugging.Evaluation
 		
 		public ObjectValueAdaptor ()
 		{
+			DefaultEvaluationWaitTime = 100;
+			
 			asyncOperationManager.BusyStateChanged += delegate(object sender, BusyStateEventArgs e) {
 				OnBusyStateChanged (e);
 			};
@@ -184,8 +186,9 @@ namespace Mono.Debugging.Evaluation
 		
 		public virtual void OnBusyStateChanged (BusyStateEventArgs e)
 		{
-			if (BusyStateChanged != null)
-				BusyStateChanged (this, e);
+			EventHandler<BusyStateEventArgs> evnt = BusyStateChanged;
+			if (evnt != null)
+				evnt (this, e);
 		}
 
 		public abstract ICollectionAdaptor CreateArrayAdaptor (EvaluationContext ctx, object arr);
@@ -289,7 +292,7 @@ namespace Mono.Debugging.Evaluation
 			string typeName = obj != null ? GetValueTypeName (ctx, obj) : "";
 			
 			if (obj == null || IsNull (ctx, obj)) {
-				return ObjectValue.CreateObject (source, path, GetDisplayTypeName (typeName), "(null)", flags, null);
+				return ObjectValue.CreateNullObject (source, path, GetDisplayTypeName (typeName), flags);
 			}
 			else if (IsPrimitive (ctx, obj) || IsEnum (ctx,obj)) {
 				return ObjectValue.CreatePrimitive (source, path, GetDisplayTypeName (typeName), ctx.Evaluator.TargetObjectToExpression (ctx, obj), flags);
@@ -334,21 +337,24 @@ namespace Mono.Debugging.Evaluation
 			if (IsPrimitive (ctx, obj))
 				return new ObjectValue[0];
 
+			bool showRawView = false;
+			
 			// If there is a proxy, it has to show the members of the proxy
 			object proxy = obj;
 			if (dereferenceProxy) {
 				proxy = GetProxyObject (ctx, obj);
-				if (proxy != obj)
+				if (proxy != obj) {
 					type = GetValueType (ctx, proxy);
+					showRawView = true;
+				}
 			}
 
 			TypeDisplayData tdata = GetTypeDisplayData (ctx, type);
-			bool showRawView = tdata.IsProxyType && dereferenceProxy && ctx.Options.AllowDebuggerProxy;
 			bool groupPrivateMembers = ctx.Options.GroupPrivateMembers && (ctx.Options.GroupUserPrivateMembers || IsExternalType (ctx, type));
 
 			List<ObjectValue> values = new List<ObjectValue> ();
 			BindingFlags flattenFlag = ctx.Options.FlattenHierarchy ? (BindingFlags)0 : BindingFlags.DeclaredOnly;
-			BindingFlags nonNonPublicFlag = groupPrivateMembers ? (BindingFlags)0 : BindingFlags.NonPublic;
+			BindingFlags nonNonPublicFlag = groupPrivateMembers || showRawView ? (BindingFlags)0 : BindingFlags.NonPublic;
 			BindingFlags staticFlag = ctx.Options.GroupStaticMembers ? (BindingFlags)0 : BindingFlags.Static;
 			BindingFlags access = BindingFlags.Public | BindingFlags.Instance | flattenFlag | nonNonPublicFlag | staticFlag;
 			
@@ -356,8 +362,7 @@ namespace Mono.Debugging.Evaluation
 			// to avoid problems with objects being invalidated due to evaluations in the target,
 			List<ValueReference> list = new List<ValueReference> ();
 			list.AddRange (GetMembersSorted (ctx, objectSource, type, proxy, access));
-
-			var names = new ObjectValueNameTracker (ctx);
+			
 			object tdataType = type;
 			
 			foreach (ValueReference val in list) {
@@ -382,7 +387,6 @@ namespace Mono.Debugging.Evaluation
 					}
 					else {
 						ObjectValue oval = val.CreateObjectValue (true);
-						names.FixName (val, oval);
 						values.Add (oval);
 					}
 
@@ -460,35 +464,66 @@ namespace Mono.Debugging.Evaluation
 			return null;
 		}
 
-		public virtual ValueReference GetLocalVariable (EvaluationContext ctx, string name)
+		public ValueReference GetLocalVariable (EvaluationContext ctx, string name)
 		{
+			return OnGetLocalVariable (ctx, name);
+		}
+
+		protected virtual ValueReference OnGetLocalVariable (EvaluationContext ctx, string name)
+		{
+			ValueReference best = null;
 			foreach (ValueReference var in GetLocalVariables (ctx)) {
 				if (var.Name == name)
 					return var;
+				if (!ctx.Evaluator.CaseSensitive && var.Name.Equals (name, StringComparison.CurrentCultureIgnoreCase))
+					best = var;
 			}
-			return null;
+			return best;
 		}
 
 		public virtual ValueReference GetParameter (EvaluationContext ctx, string name)
 		{
+			return OnGetParameter (ctx, name);
+		}
+
+		protected virtual ValueReference OnGetParameter (EvaluationContext ctx, string name)
+		{
+			ValueReference best = null;
 			foreach (ValueReference var in GetParameters (ctx)) {
 				if (var.Name == name)
 					return var;
+				if (!ctx.Evaluator.CaseSensitive && var.Name.Equals (name, StringComparison.CurrentCultureIgnoreCase))
+					best = var;
 			}
-			return null;
+			return best;
 		}
 
-		public virtual IEnumerable<ValueReference> GetLocalVariables (EvaluationContext ctx)
+		public IEnumerable<ValueReference> GetLocalVariables (EvaluationContext ctx)
+		{
+			return OnGetLocalVariables (ctx);
+		}
+
+		public ValueReference GetThisReference (EvaluationContext ctx)
+		{
+			return OnGetThisReference (ctx);
+		}
+
+		public IEnumerable<ValueReference> GetParameters (EvaluationContext ctx)
+		{
+			return OnGetParameters (ctx);
+		}
+
+		protected virtual IEnumerable<ValueReference> OnGetLocalVariables (EvaluationContext ctx)
 		{
 			yield break;
 		}
 
-		public virtual IEnumerable<ValueReference> GetParameters (EvaluationContext ctx)
+		protected virtual IEnumerable<ValueReference> OnGetParameters (EvaluationContext ctx)
 		{
 			yield break;
 		}
 
-		public virtual ValueReference GetThisReference (EvaluationContext ctx)
+		protected virtual ValueReference OnGetThisReference (EvaluationContext ctx)
 		{
 			return null;
 		}
@@ -547,26 +582,26 @@ namespace Mono.Debugging.Evaluation
 				
 				// Local variables
 				
-				foreach (ValueReference vc in ctx.Adapter.GetLocalVariables (ctx))
+				foreach (ValueReference vc in GetLocalVariables (ctx))
 					if (vc.Name.StartsWith (partialWord))
 						data.Items.Add (new CompletionItem (vc.Name, vc.Flags));
 				
 				// Parameters
 				
-				foreach (ValueReference vc in ctx.Adapter.GetParameters (ctx))
+				foreach (ValueReference vc in GetParameters (ctx))
 					if (vc.Name.StartsWith (partialWord))
 						data.Items.Add (new CompletionItem (vc.Name, vc.Flags));
 				
 				// Members
 				
-				ValueReference thisobj = ctx.Adapter.GetThisReference (ctx);
+				ValueReference thisobj = GetThisReference (ctx);
 				
 				if (thisobj != null)
 					data.Items.Add (new CompletionItem ("this", ObjectValueFlags.Field | ObjectValueFlags.ReadOnly));
 
-				object type = ctx.Adapter.GetEnclosingType (ctx);
+				object type = GetEnclosingType (ctx);
 				
-				foreach (ValueReference vc in ctx.Adapter.GetMembers (ctx, null, type, thisobj != null ? thisobj.Value : null))
+				foreach (ValueReference vc in GetMembers (ctx, null, type, thisobj != null ? thisobj.Value : null))
 					if (vc.Name.StartsWith (partialWord))
 						data.Items.Add (new CompletionItem (vc.Name, vc.Flags));
 				
@@ -599,10 +634,14 @@ namespace Mono.Debugging.Evaluation
 		
 		protected virtual ValueReference GetMember (EvaluationContext ctx, object t, object co, string name)
 		{
-			foreach (ValueReference var in GetMembers (ctx, t, co, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static))
+			ValueReference best = null;
+			foreach (ValueReference var in GetMembers (ctx, t, co, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)) {
 				if (var.Name == name)
 					return var;
-			return null;
+				if (!ctx.Evaluator.CaseSensitive && var.Name.Equals (name, StringComparison.CurrentCultureIgnoreCase))
+					best = var;
+			}
+			return best;
 		}
 
 		internal IEnumerable<ValueReference> GetMembersSorted (EvaluationContext ctx, IObjectSource objectSource, object t, object co)
@@ -887,10 +926,20 @@ namespace Mono.Debugging.Evaluation
 				string mem = exp.Substring (i, j - i).Trim ();
 				if (mem.Length == 0)
 					return exp;
-
-				ValueReference member = GetMember (ctx, null, GetValueType (ctx, obj), obj, mem);
+				
+				string[] props = mem.Split (new char[] { '.' });
+				ValueReference member = null;
+				object val = obj;
+				
+				for (int k = 0; k < props.Length; k++) {
+					member = GetMember (ctx, null, GetValueType (ctx, val), val, props[k]);
+					if (member == null)
+						break;
+					
+					val = member.Value;
+				}
+				
 				if (member != null) {
-					object val = member.Value;
 					sb.Append (ctx.Evaluator.TargetObjectToString (ctx, val));
 				} else {
 					sb.Append ("{Unknown member '" + mem + "'}");
@@ -950,7 +999,10 @@ namespace Mono.Debugging.Evaluation
 
 		public bool HasMethod (EvaluationContext ctx, object targetType, string methodName)
 		{
-			return HasMethod (ctx, targetType, methodName, null, BindingFlags.Instance | BindingFlags.Static);
+			BindingFlags flags = BindingFlags.Instance | BindingFlags.Static;
+			if (!ctx.Evaluator.CaseSensitive)
+				flags |= BindingFlags.IgnoreCase;
+			return HasMethod (ctx, targetType, methodName, null, flags);
 		}
 		
 		public bool HasMethod (EvaluationContext ctx, object targetType, string methodName, BindingFlags flags)
@@ -978,18 +1030,30 @@ namespace Mono.Debugging.Evaluation
 
 	public class TypeDisplayData
 	{
-		public string ProxyType;
-		public string ValueDisplayString;
-		public string TypeDisplayString;
-		public string NameDisplayString;
+		public string ProxyType { get; internal set; }
+		public string ValueDisplayString { get; internal set; }
+		public string TypeDisplayString { get; internal set; }
+		public string NameDisplayString { get; internal set; }
+		public bool IsCompilerGenerated { get; internal set; }
 		
 		public bool IsProxyType {
 			get { return ProxyType != null; }
 		}
 
-		public static readonly TypeDisplayData Default = new TypeDisplayData ();
+		public static readonly TypeDisplayData Default = new TypeDisplayData (null, null, null, null, false, null);
 
-		public Dictionary<string, DebuggerBrowsableState> MemberData;
+		public Dictionary<string, DebuggerBrowsableState> MemberData { get; internal set; }
+		
+		public TypeDisplayData (string proxyType, string valueDisplayString, string typeDisplayString,
+			string nameDisplayString, bool isCompilerGenerated, Dictionary<string, DebuggerBrowsableState> memberData)
+		{
+			ProxyType = proxyType;
+			ValueDisplayString = valueDisplayString;
+			TypeDisplayString = typeDisplayString;
+			NameDisplayString = nameDisplayString;
+			IsCompilerGenerated = isCompilerGenerated;
+			MemberData = memberData;
+		}
 
 		public DebuggerBrowsableState GetMemberBrowsableState (string name)
 		{
@@ -1001,33 +1065,6 @@ namespace Mono.Debugging.Evaluation
 				return state;
 			else
 				return DebuggerBrowsableState.Collapsed;
-		}
-	}
-	
-	class ObjectValueNameTracker
-	{
-		Dictionary<string,KeyValuePair<ObjectValue, ValueReference>> names = new Dictionary<string,KeyValuePair<ObjectValue, ValueReference>> ();
-		EvaluationContext ctx;
-		
-		public ObjectValueNameTracker (EvaluationContext ctx)
-		{
-			this.ctx = ctx;
-		}
-		
-		public void FixName (ValueReference val, ObjectValue oval)
-		{
-			KeyValuePair<ObjectValue, ValueReference> other;
-			if (names.TryGetValue (oval.Name, out other)) {
-				object tn = val.DeclaringType;
-				if (tn != null)
-					oval.Name += " (" + ctx.Adapter.GetDisplayTypeName (ctx, tn) + ")";
-				if (!other.Key.Name.EndsWith (")")) {
-					tn = other.Value.DeclaringType;
-					if (tn != null)
-						other.Key.Name += " (" + ctx.Adapter.GetDisplayTypeName (ctx, tn) + ")";
-				}
-			} else
-				names [oval.Name] = new KeyValuePair<ObjectValue, ValueReference> (oval, val);
 		}
 	}
 	

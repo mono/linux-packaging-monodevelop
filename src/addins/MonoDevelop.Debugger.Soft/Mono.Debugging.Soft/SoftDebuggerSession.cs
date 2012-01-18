@@ -38,6 +38,7 @@ using System.Net.Sockets;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Net;
 
 namespace Mono.Debugging.Soft
 {
@@ -45,10 +46,12 @@ namespace Mono.Debugging.Soft
 	{
 		VirtualMachine vm;
 		Thread eventHandler;
-		Dictionary<string, List<TypeMirror>> source_to_type = new Dictionary<string, List<TypeMirror>> ();
+		Dictionary<string, List<TypeMirror>> source_to_type = new Dictionary<string, List<TypeMirror>> (PathComparer);
+		Dictionary<TypeMirror, string[]> type_to_source = new Dictionary<TypeMirror, string[]> ();
+		bool useFullPaths = true;
 		Dictionary<string,TypeMirror> types = new Dictionary<string, TypeMirror> ();
 		Dictionary<EventRequest,BreakInfo> breakpoints = new Dictionary<EventRequest,BreakInfo> ();
-		List<BreakEvent> pending_bes = new List<BreakEvent> ();
+		List<BreakInfo> pending_bes = new List<BreakInfo> ();
 		ThreadMirror current_thread, recent_thread;
 		ProcessInfo[] procs;
 		ThreadInfo[] current_threads;
@@ -57,6 +60,10 @@ namespace Mono.Debugging.Soft
 		internal int StackVersion;
 		StepEventRequest currentStepRequest;
 		ExceptionEventRequest unhandledExceptionRequest;
+		string remoteProcessName;
+		Dictionary<long,long> localThreadIds = new Dictionary<long, long> ();
+		IConnectionDialog connectionDialog;
+		TypeLoadEventRequest typeLoadReq, typeLoadTypeNameReq;
 		
 		Dictionary<long,ObjectMirror> activeExceptionsByThread = new Dictionary<long, ObjectMirror> ();
 		
@@ -64,21 +71,29 @@ namespace Mono.Debugging.Soft
 		Thread errorReader;
 		
 		IAsyncResult connectionHandle;
+		SoftDebuggerStartArgs startArgs;
 		
-		LinkedList<Event> queuedEvents = new LinkedList<Event> ();
+		LinkedList<List<Event>> queuedEventSets = new LinkedList<List<Event>> ();
 		
 		List<string> userAssemblyNames;
 		List<AssemblyMirror> assemblyFilters;
 		
 		bool loggedSymlinkedRuntimesBug = false;
+
+		Dictionary<Tuple<TypeMirror,string>, MethodMirror[]> overloadResolveCache;
 		
-		public readonly SoftDebuggerAdaptor Adaptor = new SoftDebuggerAdaptor ();
+		public SoftDebuggerAdaptor Adaptor {
+			get { return adaptor; }
+		}
+		
+		readonly SoftDebuggerAdaptor adaptor = new SoftDebuggerAdaptor ();
 		
 		public SoftDebuggerSession ()
 		{
 			Adaptor.BusyStateChanged += delegate(object sender, BusyStateEventArgs e) {
 				SetBusyState (e);
 			};
+			overloadResolveCache = new Dictionary<Tuple<TypeMirror,string>, MethodMirror[]> ();
 		}
 		
 		protected override void OnRun (DebuggerStartInfo startInfo)
@@ -87,7 +102,68 @@ namespace Mono.Debugging.Soft
 				throw new InvalidOperationException ("Already exited");
 			
 			var dsi = (SoftDebuggerStartInfo) startInfo;
-			var runtime = Path.Combine (Path.Combine (dsi.MonoRuntimePrefix, "bin"), "mono");
+			if (dsi.StartArgs is SoftDebuggerLaunchArgs) {
+				StartLaunching (dsi);
+			} else if (dsi.StartArgs is SoftDebuggerConnectArgs) {
+				StartConnecting (dsi);
+			} else if (dsi.StartArgs is SoftDebuggerListenArgs) {
+				StartListening (dsi);
+			} else if (dsi.StartArgs.ConnectionProvider != null) {
+				StartConnection (dsi);
+			} else {
+				throw new ArgumentException ("StartArgs has no ConnectionProvider");
+			}
+		}
+		
+		void StartConnection (SoftDebuggerStartInfo dsi)
+		{
+			this.startArgs = dsi.StartArgs;
+			
+			RegisterUserAssemblies (dsi.UserAssemblyNames);
+			
+			if (!String.IsNullOrEmpty (dsi.LogMessage))
+				LogWriter (false, dsi.LogMessage + "\n");
+			
+			
+			AsyncCallback callback = null;
+			int attemptNumber = 0;
+			int maxAttempts = startArgs.MaxConnectionAttempts;
+			int timeBetweenAttempts = startArgs.TimeBetweenConnectionAttempts;
+			callback = delegate (IAsyncResult ar) {
+				try {
+					string appName;
+					VirtualMachine vm;
+					startArgs.ConnectionProvider.EndConnect (ar, out vm, out appName);
+					this.remoteProcessName = appName;
+					ConnectionStarted (vm);
+					return;
+				} catch (Exception ex) {
+					attemptNumber++;
+					if (!ShouldRetryConnection (ex, attemptNumber)
+						|| !startArgs.ConnectionProvider.ShouldRetryConnection (ex)
+						|| attemptNumber == maxAttempts
+						|| Exited)
+					{
+						OnConnectionError (ex);
+						return;
+					}
+				}
+				try {
+					if (timeBetweenAttempts > 0)
+						System.Threading.Thread.Sleep (timeBetweenAttempts);
+					ConnectionStarting (startArgs.ConnectionProvider.BeginConnect (dsi, callback), dsi, false, 0);
+				} catch (Exception ex2) {
+					OnConnectionError (ex2);
+				}
+			};
+			//the "listening" value is never used, pass a dummy value
+			ConnectionStarting (startArgs.ConnectionProvider.BeginConnect (dsi, callback), dsi, false, 0);
+		}
+		
+		void StartLaunching (SoftDebuggerStartInfo dsi)
+		{
+			var args = (SoftDebuggerLaunchArgs) dsi.StartArgs;
+			var runtime = Path.Combine (Path.Combine (args.MonoRuntimePrefix, "bin"), "mono");
 			RegisterUserAssemblies (dsi.UserAssemblyNames);
 			
 			var psi = new System.Diagnostics.ProcessStartInfo (runtime) {
@@ -96,13 +172,14 @@ namespace Mono.Debugging.Soft
 				RedirectStandardOutput = true,
 				RedirectStandardError = true,
 				UseShellExecute = false,
+				CreateNoWindow = true,
 			};
 			
 			LaunchOptions options = null;
 			
-			if (dsi.UseExternalConsole && dsi.ExternalConsoleLauncher != null) {
+			if (dsi.UseExternalConsole && args.ExternalConsoleLauncher != null) {
 				options = new LaunchOptions ();
-				options.CustomTargetProcessLauncher = dsi.ExternalConsoleLauncher;
+				options.CustomTargetProcessLauncher = args.ExternalConsoleLauncher;
 				psi.RedirectStandardOutput = false;
 				psi.RedirectStandardError = false;
 			}
@@ -113,53 +190,179 @@ namespace Mono.Debugging.Soft
 				options.AgentArgs = string.Format ("loglevel=1,logfile='{0}'", sdbLog);
 			}
 			
-			foreach (var env in dsi.MonoRuntimeEnvironmentVariables)
+			foreach (var env in args.MonoRuntimeEnvironmentVariables)
 				psi.EnvironmentVariables[env.Key] = env.Value;
 			
-			foreach (var env in startInfo.EnvironmentVariables)
+			foreach (var env in dsi.EnvironmentVariables)
 				psi.EnvironmentVariables[env.Key] = env.Value;
 			
 			if (!String.IsNullOrEmpty (dsi.LogMessage))
 				OnDebuggerOutput (false, dsi.LogMessage + "\n");
-
-			OnConnecting (VirtualMachineManager.BeginLaunch (psi, HandleCallbackErrors (delegate (IAsyncResult ar) {
-					HandleConnection (VirtualMachineManager.EndLaunch (ar));
-				}),
-				options
-			));
+			
+			var callback = HandleConnectionCallbackErrors ((IAsyncResult ar) => {
+				ConnectionStarted (VirtualMachineManager.EndLaunch (ar));
+			});
+			ConnectionStarting (VirtualMachineManager.BeginLaunch (psi, callback, options), dsi, true, 0);
 		}
 		
-		protected AsyncCallback HandleCallbackErrors (AsyncCallback callback)
+		/// <summary>Starts the debugger listening for a connection over TCP/IP</summary>
+		protected void StartListening (SoftDebuggerStartInfo dsi)
+		{
+			int dp, cp;
+			StartListening (dsi, out dp, out cp);
+		}
+		
+		/// <summary>Starts the debugger listening for a connection over TCP/IP</summary>
+		protected void StartListening (SoftDebuggerStartInfo dsi, out int assignedDebugPort)
+		{
+			int cp;
+			StartListening (dsi, out assignedDebugPort, out cp);
+		}
+		
+		/// <summary>Starts the debugger listening for a connection over TCP/IP</summary>
+		protected void StartListening (SoftDebuggerStartInfo dsi,
+			out int assignedDebugPort, out int assignedConsolePort)
+		{
+		
+			IPEndPoint dbgEP, conEP;
+			InitForRemoteSession (dsi, out dbgEP, out conEP);
+			
+			var callback = HandleConnectionCallbackErrors (delegate (IAsyncResult ar) {
+				ConnectionStarted (VirtualMachineManager.EndListen (ar));
+			});
+			var a = VirtualMachineManager.BeginListen (dbgEP, conEP, callback, out assignedDebugPort, out assignedConsolePort);
+			ConnectionStarting (a, dsi, true, 0);
+		}
+
+		protected virtual bool ShouldRetryConnection (Exception ex, int attemptNumber)
+		{
+			var sx = ex as SocketException;
+			if (sx != null) {
+				if (sx.ErrorCode == 10061) //connection refused
+					return true;
+			}
+			return false;
+		}
+		
+		protected void StartConnecting (SoftDebuggerStartInfo dsi)
+		{
+			StartConnecting (dsi, dsi.StartArgs.MaxConnectionAttempts, dsi.StartArgs.TimeBetweenConnectionAttempts);
+		}
+		
+		/// <summary>Starts the debugger connecting to a remote IP</summary>
+		protected void StartConnecting (SoftDebuggerStartInfo dsi, int maxAttempts, int timeBetweenAttempts)
+		{	
+			if (timeBetweenAttempts < 0 || timeBetweenAttempts > 10000)
+				throw new ArgumentException ("timeBetweenAttempts");
+			
+			IPEndPoint dbgEP, conEP;
+			InitForRemoteSession (dsi, out dbgEP, out conEP);
+			
+			AsyncCallback callback = null;
+			int attemptNumber = 0;
+			callback = delegate (IAsyncResult ar) {
+				try {
+					ConnectionStarted (VirtualMachineManager.EndConnect (ar));
+					return;
+				} catch (Exception ex) {
+					attemptNumber++;
+					if (!ShouldRetryConnection (ex, attemptNumber) || attemptNumber == maxAttempts || Exited) {
+						OnConnectionError (ex);
+						return;
+					}
+				}
+				try {
+					if (timeBetweenAttempts > 0)
+						System.Threading.Thread.Sleep (timeBetweenAttempts);
+					
+					ConnectionStarting (VirtualMachineManager.BeginConnect (dbgEP, conEP, callback), dsi, false, attemptNumber);
+					
+				} catch (Exception ex2) {
+					OnConnectionError (ex2);
+				}
+			};
+			
+			ConnectionStarting (VirtualMachineManager.BeginConnect (dbgEP, conEP, callback), dsi, false, 0);
+		}
+		
+		void InitForRemoteSession (SoftDebuggerStartInfo dsi, out IPEndPoint dbgEP, out IPEndPoint conEP)
+		{
+			if (remoteProcessName != null)
+				throw new InvalidOperationException ("Cannot initialize connection more than once");
+			
+			var args = (SoftDebuggerRemoteArgs) dsi.StartArgs;
+			
+			remoteProcessName = args.AppName;
+			
+			RegisterUserAssemblies (dsi.UserAssemblyNames);
+			
+			dbgEP = new IPEndPoint (args.Address, args.DebugPort);
+			conEP = args.RedirectOutput? new IPEndPoint (args.Address, args.OutputPort) : null;
+			
+			if (!String.IsNullOrEmpty (dsi.LogMessage))
+				LogWriter (false, dsi.LogMessage + "\n");
+		}
+		
+		///<summary>Catches errors in async callbacks and hands off to OnConnectionError</summary>
+		AsyncCallback HandleConnectionCallbackErrors (AsyncCallback callback)
 		{
 			return delegate (IAsyncResult ar) {
 				connectionHandle = null;
 				try {
 					callback (ar);
 				} catch (Exception ex) {
-					//only show the exception if we didn't cause it by cancelling & closing the socket
-					if (!(connectionHandle == null && ex is SocketException)) {
-						LoggingService.LogAndShowException ("Unhandled error launching soft debugger", ex);
-					}
-					EndSession ();
+					OnConnectionError (ex);
 				}
 			};
 		}
 		
 		/// <summary>
-		/// Subclasses should pass any handles they get from the VirtualMachineManager to this
-		/// so that they will be closed if the connection attempt is aborted before OnConnected is called.
+		/// Called if an error happens while making the connection. Default terminates the session.
 		/// </summary>
-		protected void OnConnecting (IAsyncResult connectionHandle)
+		protected virtual void OnConnectionError (Exception ex)
 		{
-			if (this.connectionHandle != null)
+			//if the exception was caused by cancelling the session
+			if (Exited)
+				return;
+			
+			if (!HandleException (ex)) {
+				LoggingService.LogAndShowException ("Unhandled error launching soft debugger", ex);
+				EndSession ();
+			}
+		}
+		
+		void ConnectionStarting (IAsyncResult connectionHandle, DebuggerStartInfo dsi, bool listening, int attemptNumber) 
+		{
+			if (this.connectionHandle != null && (attemptNumber == 0 || !this.connectionHandle.IsCompleted))
 				throw new InvalidOperationException ("Already connecting");
+			
 			this.connectionHandle = connectionHandle;
+			
+			if (ConnectionDialogCreator != null && attemptNumber == 0) {
+				connectionDialog = ConnectionDialogCreator ();
+				connectionDialog.UserCancelled += delegate {
+					EndSession ();
+				};
+			}
+			if (connectionDialog != null)
+				connectionDialog.SetMessage (dsi, GetConnectingMessage (dsi), listening, attemptNumber);
+		}
+		
+		protected virtual string GetConnectingMessage (DebuggerStartInfo dsi)
+		{
+			return null;
 		}
 		
 		void EndLaunch ()
 		{
+			HideConnectionDialog ();
 			if (connectionHandle != null) {
-				((Socket)connectionHandle.AsyncState).Close ();
+				if (startArgs != null && startArgs.ConnectionProvider != null) {
+					startArgs.ConnectionProvider.CancelConnect (connectionHandle);
+					startArgs = null;
+				} else {
+					VirtualMachineManager.CancelConnection (connectionHandle);
+				}
 				connectionHandle = null;
 			}
 		}
@@ -167,8 +370,8 @@ namespace Mono.Debugging.Soft
 		protected virtual void EndSession ()
 		{
 			if (!exited) {
-				EndLaunch ();
 				exited = true;
+				EndLaunch ();
 				OnTargetEvent (new TargetEventArgs (TargetEventType.TargetExited));
 			}
 		}
@@ -176,12 +379,26 @@ namespace Mono.Debugging.Soft
 		protected bool Exited {
 			get { return exited; }
 		}
+
+		public Dictionary<Tuple<TypeMirror, string>, MethodMirror[]> OverloadResolveCache {
+			get {
+				return overloadResolveCache;
+			}
+		}
+		
+		void HideConnectionDialog ()
+		{
+			if (connectionDialog != null) {
+				connectionDialog.Dispose ();
+				connectionDialog = null;
+			}
+		}
 		
 		/// <summary>
 		/// If subclasses do an async connect in OnRun, they should pass the resulting VM to this method.
 		/// If the vm is null, the session will be closed.
 		/// </summary>
-		protected void HandleConnection (VirtualMachine vm)
+		void ConnectionStarted (VirtualMachine vm)
 		{
 			if (this.vm != null)
 				throw new InvalidOperationException ("The VM has already connected");
@@ -195,32 +412,37 @@ namespace Mono.Debugging.Soft
 			
 			this.vm = vm;
 			
+			//full paths, from GetSourceFiles (true), are only supported by sdb protocol 2.2 and later
+			useFullPaths = vm.Version.AtLeast (2, 2);
+			
 			ConnectOutput (vm.StandardOutput, false);
 			ConnectOutput (vm.StandardError, true);
 			
-			OnConnected ();
+			HideConnectionDialog ();
 			
-			vm.EnableEvents (EventType.AssemblyLoad, EventType.TypeLoad, EventType.ThreadStart, EventType.ThreadDeath, EventType.AssemblyUnload);
+			vm.EnableEvents (EventType.AssemblyLoad, EventType.ThreadStart, EventType.ThreadDeath,
+				EventType.AssemblyUnload, EventType.UserBreak, EventType.UserLog);
 			try {
 				unhandledExceptionRequest = vm.CreateExceptionRequest (null, false, true);
 				unhandledExceptionRequest.Enable ();
 			} catch (NotSupportedException) {
 				//Mono < 2.6.3 doesn't support catching unhandled exceptions
 			}
+
+			if (vm.Version.AtLeast (2, 9)) {
+				/* Created later */
+			} else {
+				vm.EnableEvents (EventType.TypeLoad);
+			}
 			
-			OnStarted ();
 			started = true;
 			
 			/* Wait for the VMStart event */
-			HandleEvent (vm.GetNextEvent ());
+			HandleEventSet (vm.GetNextEventSet ());
 			
 			eventHandler = new Thread (EventHandler);
 			eventHandler.Name = "SDB event handler";
 			eventHandler.Start ();
-		}
-		
-		protected virtual void OnConnected ()
-		{
 		}
 		
 		protected void RegisterUserAssemblies (List<AssemblyName> userAssemblyNames)
@@ -231,6 +453,21 @@ namespace Mono.Debugging.Soft
 			}
 		}
 		
+		protected bool SetSocketTimeouts (int send_timeout, int receive_timeout, int keepalive_interval)
+		{
+			try {
+				if (vm.Version.AtLeast (2, 4)) {
+					vm.EnableEvents (EventType.KeepAlive);
+					vm.SetSocketTimeouts (send_timeout, receive_timeout, keepalive_interval);
+					return true;
+				} else {
+					return false;
+				}
+			} catch {
+				return false;
+			}
+		}
+
 		protected void ConnectOutput (System.IO.StreamReader reader, bool error)
 		{
 			Thread t = (error ? errorReader : outputReader);
@@ -252,10 +489,15 @@ namespace Mono.Debugging.Soft
 		void ReadOutput (System.IO.StreamReader reader, bool isError)
 		{
 			try {
-				char[] buffer = new char [256];
+				var buffer = new char [1024];
 				while (!exited) {
 					int c = reader.Read (buffer, 0, buffer.Length);
-					OnTargetOutput (isError, new string (buffer, 0, c));
+					if (c > 0) {
+						OnTargetOutput (isError, new string (buffer, 0, c));
+					} else {
+						//FIXME: workaround for buggy console stream that never blocks
+						Thread.Sleep (250);
+					}
 				}
 			} catch {
 				// Ignore
@@ -294,6 +536,7 @@ namespace Mono.Debugging.Soft
 		{
 			base.Dispose ();
 			if (!exited) {
+				exited = true;
 				EndLaunch ();
 				if (vm != null) {
 					ThreadPool.QueueUserWorkItem (delegate {
@@ -311,33 +554,38 @@ namespace Mono.Debugging.Soft
 						}
 					});
 				}
-				exited = true;
 			}
 			Adaptor.Dispose ();
 		}
 
 		protected override void OnAttachToProcess (long processId)
 		{
-			throw new System.NotImplementedException ();
+			throw new System.NotSupportedException ();
 		}
 
 		protected override void OnContinue ()
 		{
 			ThreadPool.QueueUserWorkItem (delegate {
-				Adaptor.CancelAsyncOperations (); // This call can block, so it has to run in background thread to avoid keeping the main session lock
-				OnResumed ();
-				vm.Resume ();
-				DequeueEventsForFirstThread ();
+				try {
+					Adaptor.CancelAsyncOperations (); // This call can block, so it has to run in background thread to avoid keeping the main session lock
+					OnResumed ();
+					vm.Resume ();
+					DequeueEventsForFirstThread ();
+				} catch (Exception ex) {
+					if (!HandleException (ex))
+						OnDebuggerOutput (true, ex.ToString ());
+				}
 			});
 		}
 
 		protected override void OnDetach ()
 		{
-			throw new System.NotImplementedException ();
+			throw new System.NotSupportedException ();
 		}
 
 		protected override void OnExit ()
 		{
+			exited = true;
 			EndLaunch ();
 			if (vm != null)
 				try {
@@ -347,19 +595,33 @@ namespace Mono.Debugging.Soft
 					LoggingService.LogError ("Error closing debugger session", se);
 				}
 			QueueEnsureExited ();
-			exited = true;
 		}
 		
 		void QueueEnsureExited ()
 		{
 			if (vm != null) {
 				//FIXME: this might never get reached if the IDE is exited first
+				try {
+					if (vm.Process != null) {
+						ThreadPool.QueueUserWorkItem (delegate {
+							// This is a workaround for a mono bug
+							// Without this call, the process may become zombie in mono < 2.10.2
+							vm.Process.WaitForExit ();
+						});
+					}
+				} catch {
+					// Ignore
+				}
 				var t = new System.Timers.Timer ();
-				t.Interval = 10000;
+				t.Interval = 1000;
 				t.Elapsed += delegate {
-					EnsureExited ();
-					t.Enabled = false;
-					t.Dispose ();
+					try {
+						t.Enabled = false;
+						t.Dispose ();
+						EnsureExited ();
+					} catch (Exception ex) {
+						LoggingService.LogError ("Failed to force-terminate process", ex);
+					}
 				};
 				t.Enabled = true;
 			}	
@@ -378,32 +640,24 @@ namespace Mono.Debugging.Soft
 
 		protected override void OnFinish ()
 		{
-			ThreadPool.QueueUserWorkItem (delegate {
-				Adaptor.CancelAsyncOperations (); // This call can block, so it has to run in background thread to avoid keeping the main session lock
-				var req = vm.CreateStepRequest (current_thread);
-				req.Depth = StepDepth.Out;
-				req.Size = StepSize.Line;
-				if (assemblyFilters != null && assemblyFilters.Count > 0)
-					req.AssemblyFilter = assemblyFilters;
-				req.Enabled = true;
-				currentStepRequest = req;
-				OnResumed ();
-				vm.Resume ();
-				DequeueEventsForFirstThread ();
-			});
+			Step (StepDepth.Out, StepSize.Line);
 		}
 
 		protected override ProcessInfo[] OnGetProcesses ()
 		{
 			if (procs == null) {
-				try {
-					procs = new ProcessInfo[] { new ProcessInfo (vm.TargetProcess.Id, vm.TargetProcess.ProcessName) };
-				} catch (Exception ex) {
-					if (!loggedSymlinkedRuntimesBug) {
-						loggedSymlinkedRuntimesBug = true;
-						LoggingService.LogError ("Error getting debugger process info. Known Mono bug with symlinked runtimes.", ex);
+				if (remoteProcessName != null || vm.TargetProcess == null) {
+					procs = new ProcessInfo[] { new ProcessInfo (0, remoteProcessName ?? "mono") };
+				} else {
+					try {
+						procs = new ProcessInfo[] { new ProcessInfo (vm.TargetProcess.Id, vm.TargetProcess.ProcessName) };
+					} catch (Exception ex) {
+						if (!loggedSymlinkedRuntimesBug) {
+							loggedSymlinkedRuntimesBug = true;
+							LoggingService.LogError ("Error getting debugger process info. Known Mono bug with symlinked runtimes.", ex);
+						}
+						procs = new ProcessInfo[] { new ProcessInfo (0, "mono") };
 					}
-					procs = new ProcessInfo[] { new ProcessInfo (0, "mono") };
 				}
 			}
 			return new ProcessInfo[] { new ProcessInfo (procs[0].Id, procs[0].Name) };
@@ -422,10 +676,16 @@ namespace Mono.Debugging.Soft
 		protected override ThreadInfo[] OnGetThreads (long processId)
 		{
 			if (current_threads == null) {
-				List<ThreadInfo> threads = new List<ThreadInfo> ();
-				foreach (ThreadMirror t in vm.GetThreads ())
-					threads.Add (new ThreadInfo (processId, t.Id, t.Name, null));
-				current_threads = threads.ToArray ();
+				IList<ThreadMirror> mirrors = vm.GetThreads ();
+				var threads = new ThreadInfo[mirrors.Count];
+				for (int i = 0; i < mirrors.Count; i++) {
+					ThreadMirror t = mirrors [i];
+					string name = t.Name;
+					if (string.IsNullOrEmpty (name) && t.IsThreadPoolThread)
+						name = "<Thread Pool>";
+					threads[i] = new ThreadInfo (processId, GetId (t), name, null);
+				}
+				current_threads = threads;
 			}
 			return current_threads;
 		}
@@ -433,117 +693,171 @@ namespace Mono.Debugging.Soft
 		ThreadMirror GetThread (long processId, long threadId)
 		{
 			foreach (ThreadMirror t in vm.GetThreads ())
-				if (t.Id == threadId)
+				if (GetId (t) == threadId)
 					return t;
 			return null;
 		}
 		
 		ThreadInfo GetThread (ProcessInfo process, ThreadMirror thread)
 		{
+			long tid = GetId (thread);
 			foreach (var t in OnGetThreads (process.Id))
-				if (t.Id == thread.Id)
+				if (t.Id == tid)
 					return t;
 			return null;
 		}
-
-		protected override object OnInsertBreakEvent (BreakEvent be, bool activate)
+		
+		protected override BreakEventInfo OnInsertBreakEvent (BreakEvent ev)
 		{
 			if (exited)
 				return null;
-			BreakInfo bi = new BreakInfo ();
-			bi.Enabled = activate;
-			bi.BreakEvent = be;
+
+			var bi = new BreakInfo ();
 			
-			if (be is Breakpoint) {
-				Breakpoint bp = (Breakpoint) be;
-				bi.Location = FindLocation (bp.FileName, bp.Line);
-				if (bi.Location != null)
+			if (ev is Breakpoint) {
+				var bp = (Breakpoint) ev;
+				bool inisideLoadedRange;
+				bi.FileName = bp.FileName;
+				bi.Location = FindLocation (bp.FileName, bp.Line, out inisideLoadedRange);
+				if (bi.Location != null) {
 					InsertBreakpoint (bp, bi);
-				else {
-					pending_bes.Add (bp);
-					SetBreakEventStatus (be, false);
+					bi.SetStatus (BreakEventStatus.Bound, null);
 				}
-			} else if (be is Catchpoint) {
-				var cp = (Catchpoint) be;
+				else {
+					pending_bes.Add (bi);
+					if (inisideLoadedRange)
+						bi.SetStatus (BreakEventStatus.Invalid, null);
+					else
+						bi.SetStatus (BreakEventStatus.NotBound, null);
+				}
+			} else if (ev is Catchpoint) {
+				var cp = (Catchpoint) ev;
 				TypeMirror type;
+
+				if (!types.TryGetValue (cp.ExceptionName, out type)) {
+					//
+					// Same as in FindLocation (), fetch types matching the type name
+					if (vm.Version.AtLeast (2, 9)) {
+						foreach (TypeMirror t in vm.GetTypes (cp.ExceptionName, false))
+							ProcessType (t);
+					}
+				}
 				if (types.TryGetValue (cp.ExceptionName, out type)) {
 					InsertCatchpoint (cp, bi, type);
+					bi.SetStatus (BreakEventStatus.Bound, null);
 				} else {
-					pending_bes.Add (be);
-					SetBreakEventStatus (be, false);
+					bi.ExceptionName = cp.ExceptionName;
+					pending_bes.Add (bi);
+					bi.SetStatus (BreakEventStatus.NotBound, null);
 				}
 			}
+
+			/*
+			 * TypeLoad events lead to too much wire traffic + suspend/resume work, so
+			 * filter them using the file names used by pending breakpoints.
+			 */
+			if (vm.Version.AtLeast (2, 9)) {
+				var sourceFileList = pending_bes.Where (b => b.FileName != null).Select (b => b.FileName).ToArray ();
+				if (sourceFileList.Length > 0) {
+					if (typeLoadReq == null) {
+						typeLoadReq = vm.CreateTypeLoadRequest ();
+					}
+					typeLoadReq.Enabled = false;
+					typeLoadReq.SourceFileFilter = sourceFileList;
+					typeLoadReq.Enabled = true;
+				}
+				var typeNameList = pending_bes.Where (b => b.ExceptionName != null).Select (b => b.ExceptionName).ToArray ();
+				if (typeNameList.Length > 0) {
+					// Use a separate request since the filters are ANDed together
+					if (typeLoadTypeNameReq == null) {
+						typeLoadTypeNameReq = vm.CreateTypeLoadRequest ();
+					}
+					typeLoadTypeNameReq.Enabled = false;
+					typeLoadTypeNameReq.TypeNameFilter = typeNameList;
+					typeLoadTypeNameReq.Enabled = true;
+				}
+			}
+
 			return bi;
 		}
 
-		protected override void OnRemoveBreakEvent (object handle)
+		protected override void OnRemoveBreakEvent (BreakEventInfo binfo)
 		{
 			if (exited)
 				return;
-			BreakInfo bi = (BreakInfo) handle;
+			var bi = (BreakInfo) binfo;
 			if (bi.Req != null) {
 				bi.Req.Enabled = false;
-				RemoveQueuedEvents (bi.Req);
+				RemoveQueuedBreakEvents (bi.Req);
 			}
-			pending_bes.Remove (bi.BreakEvent);
+			pending_bes.Remove (bi);
 		}
 
-		protected override void OnEnableBreakEvent (object handle, bool enable)
+		protected override void OnEnableBreakEvent (BreakEventInfo binfo, bool enable)
 		{
 			if (exited)
 				return;
-			BreakInfo bi = (BreakInfo) handle;
-			bi.Enabled = enable;
+			var bi = (BreakInfo) binfo;
 			if (bi.Req != null) {
 				bi.Req.Enabled = enable;
 				if (!enable)
-					RemoveQueuedEvents (bi.Req);
+					RemoveQueuedBreakEvents (bi.Req);
 			}
 		}
 
-		protected override object OnUpdateBreakEvent (object handle, BreakEvent be)
+		protected override void OnUpdateBreakEvent (BreakEventInfo binfo)
 		{
-			return handle;
 		}
 
 		void InsertBreakpoint (Breakpoint bp, BreakInfo bi)
 		{
 			bi.Req = vm.SetBreakpoint (bi.Location.Method, bi.Location.ILOffset);
-			bi.Req.Enabled = bi.Enabled;
+			bi.Req.Enabled = bp.Enabled;
 			breakpoints [bi.Req] = bi;
-			OnBreakpointBound (bp, (BreakpointEventRequest) bi.Req);
+			
+			if (bi.Location.LineNumber != bp.Line)
+				bi.AdjustBreakpointLocation (bi.Location.LineNumber);
 		}
 		
 		void InsertCatchpoint (Catchpoint cp, BreakInfo bi, TypeMirror excType)
 		{
 			var request = bi.Req = vm.CreateExceptionRequest (excType, true, true);
 			request.Count = cp.HitCount;
-			bi.Req.Enabled = bi.Enabled;
-		}
-
-		protected virtual void OnBreakpointBound (Breakpoint bp, BreakpointEventRequest request)
-		{
+			bi.Req.Enabled = cp.Enabled;
 		}
 		
-		Location FindLocation (string file, int line)
+		Location FindLocation (string file, int line, out bool inisideLoadedRange)
 		{
+			inisideLoadedRange = false;
 			if (!started)
 				return null;
-			string filename = System.IO.Path.GetFileName (file);
+
+			string filename = PathToFileName (file);
+
+			//
+			// Fetch types matching the source file from the debuggee, and add them
+			// to the source file->type mapping tables.
+			// This is needed because we don't receive type load events for all types,
+			// just the ones which match a source file with an existing breakpoint.
+			//
+			if (vm.Version.AtLeast (2, 9)) {
+				foreach (TypeMirror t in vm.GetTypesForSourceFile (filename, false))
+					ProcessType (t);
+			}
 	
-			// Try the current class first
-			Location target_loc = null;// = GetLocFromType (current_thread.GetFrames()[0].Method.DeclaringType, filename, line);
+			Location target_loc = null;
 	
 			// Try already loaded types in the current source file
-			if (target_loc == null) {
-				List<TypeMirror> types;
-	
-				if (source_to_type.TryGetValue (filename, out types)) {
-					foreach (TypeMirror t in types) {
-						target_loc = GetLocFromType (t, filename, line);
-						if (target_loc != null)
-							break;
-					}
+			List<TypeMirror> types;
+
+			if (source_to_type.TryGetValue (filename, out types)) {
+				foreach (TypeMirror t in types) {
+					bool insideRange;
+					target_loc = GetLocFromType (t, filename, line, out insideRange);
+					if (insideRange)
+						inisideLoadedRange = true;
+					if (target_loc != null)
+						break;
 				}
 			}
 	
@@ -552,25 +866,45 @@ namespace Mono.Debugging.Soft
 			return target_loc;
 		}
 		
+		public override bool CanCancelAsyncEvaluations {
+			get {
+				return Adaptor.IsEvaluating;
+			}
+		}
+		
+		protected override void OnCancelAsyncEvaluations ()
+		{
+			Adaptor.CancelAsyncOperations ();
+		}
+		
 		protected override void OnNextInstruction ()
 		{
-			throw new System.NotImplementedException ();
+			Step (StepDepth.Over, StepSize.Min);
 		}
 
 		protected override void OnNextLine ()
 		{
+			Step (StepDepth.Over, StepSize.Line);
+		}
+		
+		void Step (StepDepth depth, StepSize size)
+		{
 			ThreadPool.QueueUserWorkItem (delegate {
-				Adaptor.CancelAsyncOperations (); // This call can block, so it has to run in background thread to avoid keeping the main session lock
-				var req = vm.CreateStepRequest (current_thread);
-				req.Depth = StepDepth.Over;
-				req.Size = StepSize.Line;
-				if (assemblyFilters != null && assemblyFilters.Count > 0)
-					req.AssemblyFilter = assemblyFilters;
-				req.Enabled = true;
-				currentStepRequest = req;
-				OnResumed ();
-				vm.Resume ();
-				DequeueEventsForFirstThread ();
+				try {
+					Adaptor.CancelAsyncOperations (); // This call can block, so it has to run in background thread to avoid keeping the main session lock
+					var req = vm.CreateStepRequest (current_thread);
+					req.Depth = depth;
+					req.Size = size;
+					if (assemblyFilters != null && assemblyFilters.Count > 0)
+						req.AssemblyFilter = assemblyFilters;
+					req.Enabled = true;
+					currentStepRequest = req;
+					OnResumed ();
+					vm.Resume ();
+					DequeueEventsForFirstThread ();
+				} catch (Exception ex) {
+					LoggingService.LogError ("Next Line command failed", ex);
+				}
 			});
 		}
 
@@ -578,76 +912,181 @@ namespace Mono.Debugging.Soft
 		{
 			while (true) {
 				try {
-					Event e = vm.GetNextEvent ();
-					if (e is VMDeathEvent || e is VMDisconnectEvent) {
-						OnVMDeathEvent ();
+					EventSet e = vm.GetNextEventSet ();
+					var type = e[0].EventType;
+					if (type == EventType.VMDeath || type == EventType.VMDisconnect) {
 						break;
 					}
-					HandleEvent (e);
+					HandleEventSet (e);
 				} catch (VMDisconnectedException ex) {
-					OnVMDeathEvent ();
-					OnDebuggerOutput (true, ex.ToString ());
+					if (!HandleException (ex))
+						OnDebuggerOutput (true, ex.ToString ());
 					break;
 				} catch (Exception ex) {
-					OnDebuggerOutput (true, ex.ToString ());
+					if (!HandleException (ex))
+						OnDebuggerOutput (true, ex.ToString ());
 				}
+			}
+			
+			try {
+				// This is a workaround for a mono bug
+				// Without this call, the process may become zombie in mono < 2.10.2
+				if (vm.Process != null)
+					vm.Process.WaitForExit (1);
+			} catch {
+				// Ignore
 			}
 			
 			exited = true;
 			OnTargetEvent (new TargetEventArgs (TargetEventType.TargetExited));
 		}
-
-		void HandleEvent (Event e)
+		
+		protected override bool HandleException (Exception ex)
 		{
-			bool isBreakEvent = e is BreakpointEvent || e is ExceptionEvent || e is StepEvent;
-			if (isBreakEvent && current_thread != null && e.Thread.Id != current_thread.Id) {
-				QueueEvent (e);
+			HideConnectionDialog ();
+			
+			if (ex is VMDisconnectedException)
+				ex = new DisconnectedException ();
+			else if (ex is SocketException)
+				ex = new DebugSocketException (ex);
+			
+			return base.HandleException (ex);
+		}
+		
+		// This method dispatches an event set.
+		//
+		// Based on the subset of events for which we register, and the contract for EventSet contents (equivalent to 
+		// Java - http://download.oracle.com/javase/1.5.0/docs/guide/jpda/jdi/com/sun/jdi/event/EventSet.html)
+		// we know that event sets we receive are either:
+		// 1) Set of step and break events for a location in a single thread.
+		// 2) Set of catchpoints for a single exception.
+		// 3) A single event of any other kind.
+		// We verify these assumptions where possible, because things will break in horrible ways if they are wrong.
+		//
+		// If we are currently stopped on a thread, and the break events are on a different thread, we must queue
+		// that event set and dequeue it next time we resume. This eliminates race conditions when multiple threads
+		// hit breakpoints or catchpoints simultaneously.
+		//
+		void HandleEventSet (EventSet es)
+		{
+#if DEBUG_EVENT_QUEUEING
+			if (!(es[0] is TypeLoadEvent))
+				Console.WriteLine ("pp eventset({0}): {1}", es.Events.Length, es[0]);
+#endif
+			var type = es[0].EventType;
+			bool isBreakEvent = type == EventType.Step || type == EventType.Breakpoint || type == EventType.Exception || type == EventType.UserBreak;
+			
+			if (isBreakEvent) {
+				if (current_thread != null && es[0].Thread.Id != current_thread.Id) {
+					QueueBreakEventSet (es.Events);
+				} else {
+					HandleBreakEventSet (es.Events, false);
+				}
 			} else {
-				HandleEvent (e, false);
+				if (es.Events.Length != 1)
+					throw new InvalidOperationException ("EventSet has unexpected combination of events");
+				HandleEvent (es[0]);
+				vm.Resume ();
 			}
 		}
 		
-		void HandleEvent (Event e, bool dequeuing)
+		void HandleBreakEventSet (Event[] es, bool dequeuing)
 		{
 			if (dequeuing && exited)
 				return;
-
+			
 			bool resume = true;
 			ObjectMirror exception = null;
-			
 			TargetEventType etype = TargetEventType.TargetStopped;
-
-#if DEBUG_EVENT_QUEUEING
-			if (!(e is TypeLoadEvent))
-				Console.WriteLine ("pp event: " + e);
-#endif
-
-			OnHandleEvent (e);
+			BreakEvent breakEvent = null;
 			
-			if (e is AssemblyLoadEvent) {
-				AssemblyLoadEvent ae = (AssemblyLoadEvent)e;
+			if (es[0] is ExceptionEvent) {
+				var bad = es.FirstOrDefault (ee => ee.EventType != EventType.Exception);
+				if (bad != null)
+					throw new Exception ("Catchpoint eventset had unexpected event type " + bad.GetType ());
+				var ev = (ExceptionEvent)es[0];
+				if (ev.Request == unhandledExceptionRequest)
+					etype = TargetEventType.UnhandledException;
+				else
+					etype = TargetEventType.ExceptionThrown;
+				exception = ev.Exception;
+				if (ev.Request != unhandledExceptionRequest || exception.Type.FullName != "System.Threading.ThreadAbortException")
+					resume = false;
+			}
+			else {
+				//always need to evaluate all breakpoints, some might be tracepoints or conditional bps with counters
+				foreach (Event e in es) {
+					var be = e as BreakpointEvent;
+					if (be != null) {
+						if (!HandleBreakpoint (e.Thread, be.Request)) {
+							etype = TargetEventType.TargetHitBreakpoint;
+							BreakInfo binfo;
+							if (breakpoints.TryGetValue (be.Request, out binfo))
+								breakEvent = binfo.BreakEvent;
+							resume = false;
+						}
+					} else if (e.EventType == EventType.Step) {
+						etype = TargetEventType.TargetStopped;
+						resume = false;
+					} else if (e.EventType == EventType.UserBreak) {
+						etype = TargetEventType.TargetStopped;
+						resume = false;
+					} else {
+						throw new Exception ("Break eventset had unexpected event type " + e.GetType ());
+					}
+				}
+			}
+			
+			if (resume) {
+				//all breakpoints were conditional and evaluated as false
+				vm.Resume ();
+				DequeueEventsForFirstThread ();
+			} else {
+				if (currentStepRequest != null) {
+					currentStepRequest.Enabled = false;
+					currentStepRequest = null;
+				}
+				current_thread = recent_thread = es[0].Thread;
+				var args = new TargetEventArgs (etype);
+				args.Process = OnGetProcesses () [0];
+				args.Thread = GetThread (args.Process, current_thread);
+				args.Backtrace = GetThreadBacktrace (current_thread);
+				args.BreakEvent = breakEvent;
+				
+				if (exception != null)
+					activeExceptionsByThread [current_thread.ThreadId] = exception;
+				
+				OnTargetEvent (args);
+			}
+		}
+		
+		void HandleEvent (Event e)
+		{
+			switch (e.EventType) {
+			case EventType.AssemblyLoad: {
+				var ae = (AssemblyLoadEvent) e;
 				bool isExternal = !UpdateAssemblyFilters (ae.Assembly) && userAssemblyNames != null;
 				string flagExt = isExternal? " [External]" : "";
 				OnDebuggerOutput (false, string.Format ("Loaded assembly: {0}{1}\n", ae.Assembly.Location, flagExt));
+				break;
 			}
-			
-			if (e is AssemblyUnloadEvent) {
-				AssemblyUnloadEvent aue = (AssemblyUnloadEvent)e;
+			case EventType.AssemblyUnload: {
+				var aue = (AssemblyUnloadEvent) e;
 				
 				// Mark affected breakpoints as pending again
-				List<KeyValuePair<EventRequest,BreakInfo>> affectedBreakpoints = new List<KeyValuePair<EventRequest, BreakInfo>> (
+				var affectedBreakpoints = new List<KeyValuePair<EventRequest, BreakInfo>> (
 					breakpoints.Where (x=> (x.Value.Location.Method.DeclaringType.Assembly.Location.Equals (aue.Assembly.Location, StringComparison.OrdinalIgnoreCase)))
 				);
 				foreach (KeyValuePair<EventRequest,BreakInfo> breakpoint in affectedBreakpoints) {
-					OnDebuggerOutput (false, string.Format ("Re-pending breakpoint at {0}:{1}\n",
-					                                        Path.GetFileName (breakpoint.Value.Location.SourceFile),
-					                                        breakpoint.Value.Location.LineNumber));
+					string file = PathToFileName (breakpoint.Value.Location.SourceFile);
+					int line = breakpoint.Value.Location.LineNumber;
+					OnDebuggerOutput (false, string.Format ("Re-pending breakpoint at {0}:{1}\n", file, line));
 					breakpoints.Remove (breakpoint.Key);
-					pending_bes.Add (breakpoint.Value.BreakEvent);
+					pending_bes.Add (breakpoint.Value);
 				}
 				
 				// Remove affected types from the loaded types list
-				List<string> affectedTypes = new List<string> (
+				var affectedTypes = new List<string> (
 					from pair in types
 					where pair.Value.Assembly.Location.Equals (aue.Assembly.Location, StringComparison.OrdinalIgnoreCase)
 					select pair.Key
@@ -662,116 +1101,90 @@ namespace Mono.Debugging.Soft
 					});
 				}
 				OnDebuggerOutput (false, string.Format ("Unloaded assembly: {0}\n", aue.Assembly.Location));
+				break;
 			}
-			
-			if (e is VMStartEvent) {
+			case EventType.VMStart: {
+				OnStarted (new ThreadInfo (0, GetId (e.Thread), e.Thread.Name, null));
 				//HACK: 2.6.1 VM doesn't emit type load event, so work around it
 				var t = vm.RootDomain.Corlib.GetType ("System.Exception", false, false);
 				if (t != null)
 					ResolveBreakpoints (t);
-				OnVMStartEvent ((VMStartEvent) e);
+				break;
 			}
-			
-			if (e is TypeLoadEvent) {
+			case EventType.TypeLoad: {
 				var t = ((TypeLoadEvent)e).Type;
 				
 				string typeName = t.FullName;
-				
+
 				if (types.ContainsKey (typeName)) {
-					if (typeName != "System.Exception")
+					if (typeName != "System.Exception" && typeName != "<Module>")
 						LoggingService.LogError ("Type '" + typeName + "' loaded more than once", null);
 				} else {
 					ResolveBreakpoints (t);
 				}
+				break;
 			}
-			
-			if (e is BreakpointEvent) {
-				BreakpointEvent be = (BreakpointEvent)e;
-				if (!HandleBreakpoint (e.Thread, be.Request)) {
-					etype = TargetEventType.TargetHitBreakpoint;
-					resume = false;
-				}
-			}
-			
-			if (e is ExceptionEvent) {
-				etype = TargetEventType.ExceptionThrown;
-				var ev = (ExceptionEvent)e;
-				exception = ev.Exception;
-				if (ev.Request != unhandledExceptionRequest || exception.Type.FullName != "System.Threading.ThreadAbortException")
-					resume = false;
-			}
-			
-			if (e is StepEvent) {
-				etype = TargetEventType.TargetStopped;
-				resume = false;
-			}
-			
-			if (e is ThreadStartEvent) {
-				ThreadStartEvent ts = (ThreadStartEvent)e;
+			case EventType.ThreadStart: {
+				var ts = (ThreadStartEvent) e;
 				OnDebuggerOutput (false, string.Format ("Thread started: {0}\n", ts.Thread.Name));
+				OnTargetEvent (new TargetEventArgs (TargetEventType.ThreadStarted) {
+					Thread = new ThreadInfo (0, GetId (ts.Thread), ts.Thread.Name, null),
+				});
+				break;
 			}
-			
-			if (resume)
-				vm.Resume ();
-			else {
-				if (currentStepRequest != null) {
-					currentStepRequest.Enabled = false;
-					currentStepRequest = null;
-				}
-				current_thread = recent_thread = e.Thread;
-				TargetEventArgs args = new TargetEventArgs (etype);
-				args.Process = OnGetProcesses () [0];
-				args.Thread = GetThread (args.Process, current_thread);
-				args.Backtrace = GetThreadBacktrace (current_thread);
-				
-				if (exception != null)
-					activeExceptionsByThread [current_thread.Id] = exception;
-				
-				OnTargetEvent (args);
+			case EventType.ThreadDeath: {
+				var ts = (ThreadDeathEvent) e;
+				OnDebuggerOutput (false, string.Format ("Thread finished: {0}\n", ts.Thread.Name));
+				OnTargetEvent (new TargetEventArgs (TargetEventType.ThreadStopped) {
+					Thread = new ThreadInfo (0, GetId (ts.Thread), ts.Thread.Name, null),
+				});
+				break;
 			}
-		}
-
-		protected virtual void OnHandleEvent (Event e)
-		{
-		}
-
-		protected virtual void OnVMStartEvent (VMStartEvent e)
-		{
-		}
-
-		protected virtual void OnVMDeathEvent ()
-		{
+			case EventType.UserLog: {
+				var ul = (UserLogEvent) e;
+				OnDebuggerOutput (false, string.Format ("[{0}:{1}] {2}\n", ul.Level, ul.Category, ul.Message));
+				break;
+			}
+			default:
+				Console.WriteLine ("Unknown debugger event type {0}", e.GetType ());
+				break;
+			}
 		}
 
 		public ObjectMirror GetExceptionObject (ThreadMirror thread)
 		{
 			ObjectMirror obj;
-			if (activeExceptionsByThread.TryGetValue (thread.Id, out obj))
+			if (activeExceptionsByThread.TryGetValue (thread.ThreadId, out obj))
 				return obj;
 			else
 				return null;
 		}
 		
-		void QueueEvent (Event ev)
+		void QueueBreakEventSet (Event[] eventSet)
 		{
 #if DEBUG_EVENT_QUEUEING
-			Console.WriteLine ("qq event: " + ev);
+			Console.WriteLine ("qq eventset({0}): {1}", eventSet.Length, eventSet[0]);
 #endif
-			lock (queuedEvents) {
-				queuedEvents.AddLast (ev);
+			var events = new List<Event> (eventSet);
+			lock (queuedEventSets) {
+				queuedEventSets.AddLast (events);
 			}
 		}
 		
-		void RemoveQueuedEvents (EventRequest request)
+		void RemoveQueuedBreakEvents (EventRequest request)
 		{
 			int resume = 0;
-			lock (queuedEvents) {
-				var node = queuedEvents.First;
+			lock (queuedEventSets) {
+				var node = queuedEventSets.First;
 				while (node != null) {
-					if (node.Value.Request == request) {
+					List<Event> q = node.Value;
+					for (int i = 0; i < q.Count; i++)
+						if (q[i].Request == request)
+							q.RemoveAt (i--);
+					if (q.Count == 0) {
 						var d = node;
 						node = node.Next;
-						queuedEvents.Remove (d);
+						queuedEventSets.Remove (d);
 						resume++;
 					} else {
 						node = node.Next;
@@ -784,22 +1197,22 @@ namespace Mono.Debugging.Soft
 		
 		void DequeueEventsForFirstThread ()
 		{
-			List<Event> dequeuing;
-			lock (queuedEvents) {
-				if (queuedEvents.Count < 1)
+			List<List<Event>> dequeuing;
+			lock (queuedEventSets) {
+				if (queuedEventSets.Count < 1)
 					return;
 				
-				dequeuing = new List<Event> ();
-				var node = queuedEvents.First;
+				dequeuing = new List<List<Event>> ();
+				var node = queuedEventSets.First;
 				
 				//making this the current thread means that all events from other threads will get queued
-				current_thread = node.Value.Thread;
+				current_thread = node.Value[0].Thread;
 				while (node != null) {
-					if (node.Value.Thread.Id == current_thread.Id) {
+					if (node.Value[0].Thread.Id == current_thread.Id) {
 						var d = node;
 						node = node.Next;
 						dequeuing.Add (d.Value);
-						queuedEvents.Remove (d);
+						queuedEventSets.Remove (d);
 					} else {
 						node = node.Next;
 					}
@@ -808,20 +1221,22 @@ namespace Mono.Debugging.Soft
 
 #if DEBUG_EVENT_QUEUEING
 			foreach (var e in dequeuing)
-				Console.WriteLine ("dq event: " + e);
+				Console.WriteLine ("dq eventset({0}): {1}", e.Count, e[0]);
 #endif
 
 			//firing this off in a thread prevents possible infinite recursion
 			ThreadPool.QueueUserWorkItem (delegate {
 				if (!exited) {
-					foreach (var ev in dequeuing) {
+					foreach (var es in dequeuing) {
 						try {
-							 HandleEvent (ev, true);
+							 HandleBreakEventSet (es.ToArray (), true);
 						} catch (VMDisconnectedException ex) {
-							OnDebuggerOutput (true, ex.ToString ());
+							if (!HandleException (ex))
+								OnDebuggerOutput (true, ex.ToString ());
 							break;
 						} catch (Exception ex) {
-							OnDebuggerOutput (true, ex.ToString ());
+							if (!HandleException (ex))
+								OnDebuggerOutput (true, ex.ToString ());
 						}
 					}
 				}
@@ -834,13 +1249,13 @@ namespace Mono.Debugging.Soft
 			if (!breakpoints.TryGetValue (er, out binfo))
 				return false;
 			
-			Breakpoint bp = binfo.BreakEvent as Breakpoint;
+			var bp = binfo.BreakEvent as Breakpoint;
 			if (bp == null)
 				return false;
 			
-			if (bp.HitCount > 1) {
+			if (bp.HitCount > 0) {
 				// Just update the count and continue
-				UpdateHitCount (binfo, bp.HitCount - 1);
+				binfo.UpdateHitCount (bp.HitCount - 1);
 				return true;
 			}
 			
@@ -858,10 +1273,10 @@ namespace Mono.Debugging.Soft
 			switch (bp.HitAction) {
 				case HitAction.CustomAction:
 					// If custom action returns true, execution must continue
-					return OnCustomBreakpointAction (bp.CustomActionId, binfo);
+					return binfo.RunCustomBreakpointAction (bp.CustomActionId);
 				case HitAction.PrintExpression: {
 					string exp = EvaluateTrace (thread, bp.TraceExpression);
-					UpdateLastTraceValue (binfo, exp);
+					binfo.UpdateLastTraceValue (exp);
 					return true;
 				}
 				case HitAction.Break:
@@ -872,7 +1287,7 @@ namespace Mono.Debugging.Soft
 		
 		string EvaluateTrace (ThreadMirror thread, string exp)
 		{
-			StringBuilder sb = new StringBuilder ();
+			var sb = new StringBuilder ();
 			int last = 0;
 			int i = exp.IndexOf ('{');
 			while (i != -1) {
@@ -902,9 +1317,9 @@ namespace Mono.Debugging.Soft
 				MDB.StackFrame[] frames = thread.GetFrames ();
 				if (frames.Length == 0)
 					return string.Empty;
-				EvaluationOptions ops = Options.EvaluationOptions;
+				EvaluationOptions ops = Options.EvaluationOptions.Clone ();
 				ops.AllowTargetInvoke = true;
-				SoftEvaluationContext ctx = new SoftEvaluationContext (this, frames[0], ops);
+				var ctx = new SoftEvaluationContext (this, frames[0], ops);
 				ValueReference val = ctx.Evaluator.Evaluate (ctx, exp);
 				return val.CreateObjectValue (false).Value;
 			} catch (Exception ex) {
@@ -913,16 +1328,35 @@ namespace Mono.Debugging.Soft
 			}
 		}
 		
-		void ResolveBreakpoints (TypeMirror t)
-		{
+		void ProcessType (TypeMirror t) {
 			string typeName = t.FullName;
+
+			if (types.ContainsKey (typeName))
+				return;
 			types [typeName] = t;
+
+			//get the source file paths
+			//full paths, from GetSourceFiles (true), are only supported by sdb protocol 2.2 and later
+			string[] sourceFiles;
+			if (useFullPaths) {
+				sourceFiles = t.GetSourceFiles (true);
+			} else {
+				sourceFiles = t.GetSourceFiles ();
+				
+				//HACK: if mdb paths are windows paths but the sdb agent is on unix, it won't map paths to filenames correctly
+				if (IsWindows) {
+					for (int i = 0; i < sourceFiles.Length; i++) {
+						string s = sourceFiles[i];
+						if (s != null && !s.StartsWith ("/"))
+							sourceFiles[i] = System.IO.Path.GetFileName (s);
+					}
+				}
+			}
 			
-			/* Handle pending breakpoints */
-			
-			var resolved = new List<BreakEvent> ();
-			
-			foreach (string s in t.GetSourceFiles ()) {
+			for (int n=0; n<sourceFiles.Length; n++)
+				sourceFiles[n] = NormalizePath (sourceFiles[n]);
+
+			foreach (string s in sourceFiles) {
 				List<TypeMirror> typesList;
 				
 				if (source_to_type.TryGetValue (s, out typesList)) {
@@ -932,20 +1366,36 @@ namespace Mono.Debugging.Soft
 					typesList.Add (t);
 					source_to_type[s] = typesList;
 				}
-				
-				
-				foreach (var bp in pending_bes.OfType<Breakpoint> ()) {
-					if (System.IO.Path.GetFileName (bp.FileName) == s) {
-						Location l = GetLocFromType (t, s, bp.Line);
+			}
+
+			type_to_source [t] = sourceFiles;
+		}
+
+		void ResolveBreakpoints (TypeMirror t)
+		{
+			ProcessType (t);
+
+			string typeName = t.FullName;
+
+			/* Handle pending breakpoints */
+			
+			var resolved = new List<BreakInfo> ();
+			
+			foreach (string s in type_to_source [t]) {
+				foreach (var bi in pending_bes.Where (b => b.BreakEvent is Breakpoint)) {
+					var bp = (Breakpoint) bi.BreakEvent;
+					if (PathComparer.Compare (PathToFileName (bp.FileName), s) == 0) {
+						bool inisideLoadedRange;
+						Location l = GetLocFromType (t, s, bp.Line, out inisideLoadedRange);
 						if (l != null) {
-							OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint at '{0}:{1}' to {2}:{3}.\n",
-							                                        s, bp.Line, l.Method.FullName, l.ILOffset));
-							ResolvePendingBreakpoint (bp, l);
-							resolved.Add (bp);
+							OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint at '{0}:{1}' to {2} [0x{3:x5}].\n",
+							                                        s, l.LineNumber, l.Method.FullName, l.ILOffset));
+							ResolvePendingBreakpoint (bi, l);
+							resolved.Add (bi);
 						} else {
-							OnDebuggerOutput (true, string.Format ("Could not insert pending breakpoint at '{0}:{1}'. " +
-								"Perhaps the source line does not contain any statements, or the source does not correspond " +
-								"to the current binary.\n", s, bp.Line));
+							if (inisideLoadedRange) {
+								bi.SetStatus (BreakEventStatus.Invalid, null);
+							}
 						}
 					}
 				}
@@ -957,48 +1407,90 @@ namespace Mono.Debugging.Soft
 			
 			//handle pending catchpoints
 			
-			foreach (var cp in pending_bes.OfType<Catchpoint> ()) {
+			foreach (var bi in pending_bes.Where (b => b.BreakEvent is Catchpoint)) {
+				var cp = (Catchpoint) bi.BreakEvent;
 				if (cp.ExceptionName == typeName) {
-					ResolvePendingCatchpoint (cp, t);
-					resolved.Add (cp);
+					ResolvePendingCatchpoint (bi, t);
+					resolved.Add (bi);
 				}
 			}
 			foreach (var be in resolved)
 				pending_bes.Remove (be);
 		}
 		
-		Location GetLocFromType (TypeMirror type, string file, int line)
+		internal static string NormalizePath (string path)
+		{
+			if (!IsWindows && path.StartsWith ("\\"))
+				return path.Replace ('\\','/');
+			else
+				return path;
+		}
+		
+		string PathToFileName (string path)
+		{
+			if (useFullPaths)
+				return path;
+			return System.IO.Path.GetFileName (path);
+		}
+		
+		bool PathsAreEqual (string p1, string p2)
+		{
+			return PathComparer.Compare (p1, p2) == 0;
+		}
+		
+		Location GetLocFromType (TypeMirror type, string file, int line, out bool insideTypeRange)
 		{
 			Location target_loc = null;
-			foreach (MethodMirror m in type.GetMethods ()) {
+			insideTypeRange = false;
+			
+			foreach (MethodMirror m in type.GetMethods ())
+			{
+				int rangeFirstLine = -1;
+				int rangeLastLine = -1;
+				
 				foreach (Location l in m.Locations) {
-					if (System.IO.Path.GetFileName (l.SourceFile) == file && l.LineNumber == line) {
-						target_loc = l;
-						break;
+					if (PathComparer.Compare (PathToFileName (NormalizePath (l.SourceFile)), file) == 0) {
+						// If we are inserting a breakpoint in line L, but L+1 has the same IL offset as L,
+						// pick the L+1 location, since that's where the debugger is going to stop.
+						if (l.LineNumber == line) {
+							if (target_loc == null)
+								target_loc = l;
 						}
+						else if (target_loc != null) {
+							if (target_loc.ILOffset == l.ILOffset)
+								target_loc = l;
+							else
+								break;
+						}
+						rangeLastLine = l.LineNumber;
+						if (rangeFirstLine == -1)
+							rangeFirstLine = l.LineNumber;
+					} else {
+						if (rangeFirstLine != -1 && line >= rangeFirstLine && line <= rangeLastLine)
+							insideTypeRange = true;
+						rangeFirstLine = -1;
+					}
 				}
 				if (target_loc != null)
 					break;
+				if (rangeFirstLine != -1 && line >= rangeFirstLine && line <= rangeLastLine)
+					insideTypeRange = true;
 			}
 	
 			return target_loc;
 		}
 
-		void ResolvePendingBreakpoint (Breakpoint bp, Location l)
+		void ResolvePendingBreakpoint (BreakInfo bi, Location l)
 		{
-			BreakInfo bi = GetBreakInfo (bp);
-			if (bi != null) {
-				bi.Location = l;
-				InsertBreakpoint (bp, bi);
-				SetBreakEventStatus (bp, true);
-			}
+			bi.Location = l;
+			InsertBreakpoint ((Breakpoint) bi.BreakEvent, bi);
+			bi.SetStatus (BreakEventStatus.Bound, null);
 		}
 				
-		void ResolvePendingCatchpoint (Catchpoint cp, TypeMirror type)
+		void ResolvePendingCatchpoint (BreakInfo bi, TypeMirror type)
 		{
-			BreakInfo bi = GetBreakInfo (cp);
-			InsertCatchpoint (cp, bi, type);
-			SetBreakEventStatus (cp, true);
+			InsertCatchpoint ((Catchpoint) bi.BreakEvent, bi, type);
+			bi.SetStatus (BreakEventStatus.Bound, null);
 		}
 		
 		bool UpdateAssemblyFilters (AssemblyMirror asm)
@@ -1032,24 +1524,12 @@ namespace Mono.Debugging.Soft
 
 		protected override void OnStepInstruction ()
 		{
-			throw new System.NotImplementedException ();
+			Step (StepDepth.Into, StepSize.Min);
 		}
 
 		protected override void OnStepLine ()
 		{
-			ThreadPool.QueueUserWorkItem (delegate {
-				Adaptor.CancelAsyncOperations (); // This call can block, so it has to run in background thread to avoid keeping the main session lock
-				var req = vm.CreateStepRequest (current_thread);
-				req.Depth = StepDepth.Into;
-				req.Size = StepSize.Line;
-				if (assemblyFilters != null && assemblyFilters.Count > 0)
-					req.AssemblyFilter = assemblyFilters;
-				req.Enabled = true;
-				currentStepRequest = req;
-				OnResumed ();
-				vm.Resume ();
-				DequeueEventsForFirstThread ();
-			});
+			Step (StepDepth.Into, StepSize.Line);
 		}
 
 		protected override void OnStop ()
@@ -1071,17 +1551,27 @@ namespace Mono.Debugging.Soft
 		{
 			var infos = process.GetThreads ();
 			
-			if (ThreadIsAlive (recent_thread) && HasUserFrame (recent_thread.Id, infos))
+			if (ThreadIsAlive (recent_thread) && HasUserFrame (GetId (recent_thread), infos))
 				return;
 
 			var threads = vm.GetThreads ();
 			foreach (var thread in threads) {
-				if (ThreadIsAlive (thread) && HasUserFrame (thread.Id, infos)) {
+				if (ThreadIsAlive (thread) && HasUserFrame (GetId (thread), infos)) {
 					recent_thread = thread;
 					return;
 				}
 			}
 			recent_thread = threads[0];	
+		}
+		
+		long GetId (ThreadMirror thread)
+		{
+			long id;
+			if (!localThreadIds.TryGetValue (thread.ThreadId, out id)) {
+				id = localThreadIds.Count + 1;
+				localThreadIds [thread.ThreadId] = id;
+			}
+			return id;
 		}
 		
 		static bool ThreadIsAlive (ThreadMirror thread)
@@ -1109,15 +1599,6 @@ namespace Mono.Debugging.Soft
 			return false;
 		}
 		
-		BreakInfo GetBreakInfo (BreakEvent be)
-		{
-			object bi;
-			if (GetBreakpointHandle (be, out bi))
-				return (BreakInfo) bi;
-			else
-				return null;
-		}
-		
 		public bool IsExternalCode (Mono.Debugger.Soft.StackFrame frame)
 		{
 			return frame.Method == null || string.IsNullOrEmpty (frame.FileName)
@@ -1128,14 +1609,168 @@ namespace Mono.Debugging.Soft
 		{
 			return assemblyFilters != null && !assemblyFilters.Contains (type.Assembly);
 		}
+		
+		protected override AssemblyLine[] OnDisassembleFile (string file)
+		{
+			List<TypeMirror> types;
+			if (!source_to_type.TryGetValue (file, out types))
+				return new AssemblyLine [0];
+			
+			var lines = new List<AssemblyLine> ();
+			foreach (TypeMirror type in types) {
+				foreach (MethodMirror met in type.GetMethods ()) {
+					if (!PathsAreEqual (NormalizePath (met.SourceFile), file))
+						continue;
+					var body = met.GetMethodBody ();
+					int lastLine = -1;
+					int firstPos = lines.Count;
+					string addrSpace = met.FullName;
+					foreach (var ins in body.Instructions) {
+						Location loc = met.LocationAtILOffset (ins.Offset);
+						if (loc != null && lastLine == -1) {
+							lastLine = loc.LineNumber;
+							for (int n=firstPos; n<lines.Count; n++) {
+								AssemblyLine old = lines [n];
+								lines [n] = new AssemblyLine (old.Address, old.AddressSpace, old.Code, loc.LineNumber);
+							}
+						}
+						lines.Add (new AssemblyLine (ins.Offset, addrSpace, Disassemble (ins), loc != null ? loc.LineNumber : lastLine));
+					}
+				}
+			}
+			lines.Sort (delegate (AssemblyLine a1, AssemblyLine a2) {
+				int res = a1.SourceLine.CompareTo (a2.SourceLine);
+				if (res != 0)
+					return res;
+				else
+					return a1.Address.CompareTo (a2.Address);
+			});
+			return lines.ToArray ();
+		}
+		
+		public AssemblyLine[] Disassemble (Mono.Debugger.Soft.StackFrame frame, int firstLine, int count)
+		{
+			MethodBodyMirror body = frame.Method.GetMethodBody ();
+			var instructions = body.Instructions;
+			ILInstruction current = null;
+			foreach (var ins in instructions) {
+				if (ins.Offset >= frame.ILOffset) {
+					current = ins;
+					break;
+				}
+			}
+			if (current == null)
+				return new AssemblyLine [0];
+			
+			var result = new List<AssemblyLine> ();
+			
+			int pos = firstLine;
+			
+			while (firstLine < 0 && count > 0) {
+				if (current.Previous == null) {
+//					result.Add (new AssemblyLine (99999, "<" + (pos++) + ">"));
+					result.Add (AssemblyLine.OutOfRange);
+					count--;
+					firstLine++;
+				} else {
+					current = current.Previous;
+					firstLine++;
+				}
+			}
+			
+			while (current != null && firstLine > 0) {
+				current = current.Next;
+				firstLine--;
+			}
+			
+			while (count > 0) {
+				if (current != null) {
+					Location loc = frame.Method.LocationAtILOffset (current.Offset);
+					result.Add (new AssemblyLine (current.Offset, frame.Method.FullName, Disassemble (current), loc != null ? loc.LineNumber : -1));
+					current = current.Next;
+					pos++;
+				} else
+					result.Add (AssemblyLine.OutOfRange);
+//					result.Add (new AssemblyLine (99999, "<" + (pos++) + ">"));
+				count--;
+			}
+			return result.ToArray ();
+		}
+		
+		string Disassemble (ILInstruction ins)
+		{
+			string oper;
+			if (ins.Operand is MethodMirror)
+				oper = ((MethodMirror)ins.Operand).FullName;
+			else if (ins.Operand is TypeMirror)
+				oper = ((TypeMirror)ins.Operand).FullName;
+			else if (ins.Operand is ILInstruction)
+				oper = ((ILInstruction)ins.Operand).Offset.ToString ("x8");
+			else if (ins.Operand == null)
+				oper = string.Empty;
+			else
+				oper = ins.Operand.ToString ();
+			
+			return ins.OpCode + " " + oper;
+		}
+		
+		readonly static bool IsWindows;
+		readonly static bool IsMac;
+		readonly static StringComparer PathComparer;
+		
+		static SoftDebuggerSession ()
+		{
+			IsWindows = Path.DirectorySeparatorChar == '\\';
+			IsMac = !IsWindows && IsRunningOnMac();
+			PathComparer = (IsWindows || IsMac)? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+		}
+		
+		//From Managed.Windows.Forms/XplatUI
+		static bool IsRunningOnMac ()
+		{
+			IntPtr buf = IntPtr.Zero;
+			try {
+				buf = System.Runtime.InteropServices.Marshal.AllocHGlobal (8192);
+				// This is a hacktastic way of getting sysname from uname ()
+				if (uname (buf) == 0) {
+					string os = System.Runtime.InteropServices.Marshal.PtrToStringAnsi (buf);
+					if (os == "Darwin")
+						return true;
+				}
+			} catch {
+			} finally {
+				if (buf != IntPtr.Zero)
+					System.Runtime.InteropServices.Marshal.FreeHGlobal (buf);
+			}
+			return false;
+		}
+		
+		[System.Runtime.InteropServices.DllImport ("libc")]
+		static extern int uname (IntPtr buf);
 	}
 	
-	class BreakInfo
+	class BreakInfo: BreakEventInfo
 	{
-		public bool Enabled;
 		public Location Location;
 		public EventRequest Req;
-		public BreakEvent BreakEvent;
 		public string LastConditionValue;
+		public string FileName;
+		public string ExceptionName;
+	}
+	
+	class DisconnectedException: DebuggerException
+	{
+		public DisconnectedException ():
+			base ("The connection with the debugger has been lost. The target application may have exited.")
+		{
+		}
+	}
+	
+	class DebugSocketException: DebuggerException
+	{
+		public DebugSocketException (Exception ex):
+			base ("Could not open port for debugger. Another process may be using the port.", ex)
+		{
+		}
 	}
 }

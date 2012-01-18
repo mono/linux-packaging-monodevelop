@@ -59,13 +59,14 @@ namespace MonoDevelop.NUnit
 		Label resultLabel = new Label ();
 		
 		ProgressBar progressBar = new ProgressBar ();
-		TreeView failuresTreeView;
+		MonoDevelop.Ide.Gui.Components.PadTreeView failuresTreeView;
 		TreeStore failuresStore;
 		TextView outputView;
 		TextTag bold;
 		Dictionary<UnitTest,int> outIters = new Dictionary<UnitTest,int> ();
 		Widget outputViewScrolled;
 		VSeparator infoSep;
+		Gtk.TreeIter startMessageIter;
 		
 		Button buttonStop;
 		Button buttonRun;
@@ -108,7 +109,7 @@ namespace MonoDevelop.NUnit
 			panel.FocusChain = new Gtk.Widget [] { book };
 			
 			// Failures tree
-			failuresTreeView = new TreeView ();
+			failuresTreeView = new MonoDevelop.Ide.Gui.Components.PadTreeView ();
 			failuresTreeView.HeadersVisible = false;
 			failuresStore = new TreeStore (typeof(Pixbuf), typeof (string), typeof(object), typeof(string));
 			var pr = new CellRendererPixbuf ();
@@ -137,9 +138,12 @@ namespace MonoDevelop.NUnit
 			book.Pack2 (sw, true, true);
 			outputViewScrolled = sw;
 			
-			failuresTreeView.ButtonReleaseEvent += new Gtk.ButtonReleaseEventHandler (OnPopupMenu);
 			failuresTreeView.RowActivated += OnRowActivated;
 			failuresTreeView.Selection.Changed += OnRowSelected;
+			failuresTreeView.DoPopupMenu = delegate (EventButton evt) {
+				IdeApp.CommandService.ShowContextMenu (failuresTreeView, evt,
+					"/MonoDevelop/NUnit/ContextMenu/TestResultsPad");
+			};
 			
 			Control.ShowAll ();
 			
@@ -240,6 +244,10 @@ namespace MonoDevelop.NUnit
 		public void OnTestSuiteChanged (object sender, EventArgs e)
 		{
 			results.Clear ();
+			
+			error = null;
+			errorMessage = null;
+			
 			failuresStore.Clear ();
 			outputView.Buffer.Clear ();
 			outIters.Clear ();
@@ -285,6 +293,10 @@ namespace MonoDevelop.NUnit
 			rootTest = test;
 			results.Clear ();
 			testsToRun = test.CountTestCases ();
+			
+			error = null;
+			errorMessage = null;
+			
 			progressBar.Fraction = 0;
 			progressBar.Text = "";
 			progressBar.Text = "0 / " + testsToRun;
@@ -313,12 +325,14 @@ namespace MonoDevelop.NUnit
 			AddStartMessage ();
 		}
 		
-		public void AddStartMessage ()
+		public void AddStartMessage (bool isRunning = true)
 		{
 			if (rootTest != null) {
 				Gdk.Pixbuf infoIcon = failuresTreeView.RenderIcon (Gtk.Stock.DialogInfo, Gtk.IconSize.Menu, "");
-				string msg = string.Format (GettextCatalog.GetString ("Running tests for <b>{0}</b> configuration <b>{1}</b>"), rootTest.Name, configuration);
-				failuresStore.AppendValues (infoIcon, msg, rootTest);
+				string msg = string.Format (isRunning ? GettextCatalog.GetString ("Running tests for <b>{0}</b> configuration <b>{1}</b>") : GettextCatalog.GetString ("Test results for <b>{0}</b> configuration <b>{1}</b>"), rootTest.Name, configuration);
+				startMessageIter = failuresStore.AppendValues (infoIcon, msg, rootTest);
+			} else {
+				startMessageIter = Gtk.TreeIter.Zero;
 			}
 		}
 
@@ -359,6 +373,11 @@ namespace MonoDevelop.NUnit
 		
 		public void FinishTestRun ()
 		{
+			if (!Gtk.TreeIter.Zero.Equals (startMessageIter)) {
+				string msg = string.Format (GettextCatalog.GetString ("Test results for <b>{0}</b> configuration <b>{1}</b>"), rootTest.Name, configuration);
+				failuresStore.SetValue (startMessageIter, 1, msg);
+				startMessageIter = Gtk.TreeIter.Zero;
+			}
 			infoCurrent.Text = "";
 			progressBar.Fraction = 1;
 			progressBar.Text = "";
@@ -392,13 +411,6 @@ namespace MonoDevelop.NUnit
 				return;
 			NUnitService.Instance.RunTest (rootTest, null);
 		}
-		
-		void OnPopupMenu (object o, Gtk.ButtonReleaseEventArgs args)
-		{
-			if (args.Event.Button == 3) {
-				IdeApp.CommandService.ShowContextMenu ("/MonoDevelop/NUnit/ContextMenu/TestResultsPad");
-			}
-		}
 
 		void OnRowActivated (object s, EventArgs a)
 		{
@@ -410,7 +422,7 @@ namespace MonoDevelop.NUnit
 					if (i != -1) {
 						int line;
 						if (int.TryParse (file.Substring (i+1), out line)) {
-							IdeApp.Workbench.OpenDocument (file.Substring (0, i), line, -1, true);
+							IdeApp.Workbench.OpenDocument (file.Substring (0, i), line, -1);
 							return;
 						}
 					}
@@ -462,7 +474,7 @@ namespace MonoDevelop.NUnit
 			if (loc == null)
 				loc = test.SourceCodeLocation;
 			if (loc != null)
-				IdeApp.Workbench.OpenDocument (loc.FileName, loc.Line, loc.Column, true);
+				IdeApp.Workbench.OpenDocument (loc.FileName, loc.Line, loc.Column);
 		}
 		
 		[CommandHandler (TestCommands.ShowTestCode)]
@@ -473,7 +485,7 @@ namespace MonoDevelop.NUnit
 				return;
 			SourceCodeLocation loc = test.SourceCodeLocation;
 			if (loc != null)
-				IdeApp.Workbench.OpenDocument (loc.FileName, loc.Line, loc.Column, true);
+				IdeApp.Workbench.OpenDocument (loc.FileName, loc.Line, loc.Column);
 		}
 		
 		[CommandUpdateHandler (TestCommands.ShowTestCode)]
@@ -520,7 +532,7 @@ namespace MonoDevelop.NUnit
 			failuresStore.Clear ();
 			outputView.Buffer.Clear ();
 			outIters.Clear ();
-			AddStartMessage ();
+			AddStartMessage (running);
 				
 			foreach (ResultRecord res in results) {
 				ShowTestResult (res.Test, res.Result);
@@ -541,7 +553,8 @@ namespace MonoDevelop.NUnit
 			if (result.IsFailure) {
 				if (!buttonFailures.Active)
 					return;
-				TreeIter testRow = failuresStore.AppendValues (CircleImage.Failure, Escape (test.FullName), test);
+				string file = test.SourceCodeLocation != null ? test.SourceCodeLocation.FileName + ":" + test.SourceCodeLocation.Line : null;
+				TreeIter testRow = failuresStore.AppendValues (CircleImage.Failure, Escape (test.FullName), test, file);
 				bool hasMessage = result.Message != null && result.Message.Length > 0;
 				if (hasMessage)
 					failuresStore.AppendValues (testRow, null, Escape (result.Message), test);

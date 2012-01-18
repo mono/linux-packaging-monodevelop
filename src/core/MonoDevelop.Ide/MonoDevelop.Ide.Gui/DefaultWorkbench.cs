@@ -44,6 +44,7 @@ using MonoDevelop.Components.DockToolbars;
 using Gtk;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Extensions;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -57,7 +58,7 @@ namespace MonoDevelop.Ide.Gui
 		readonly static string toolbarsPath    = "/MonoDevelop/Ide/Toolbar";
 		readonly static string stockLayoutsPath    = "/MonoDevelop/Ide/WorkbenchLayouts";
 		
-		static string configFile = System.IO.Path.Combine (PropertyService.ConfigPath, "EditingLayout2.xml");
+		static string configFile = UserProfile.Current.ConfigDir.Combine ("EditingLayout.xml");
 		const string fullViewModeTag = "[FullViewMode]";
 		const int MAX_LASTACTIVEWINDOWS = 10;
 		
@@ -77,8 +78,6 @@ namespace MonoDevelop.Ide.Gui
 
 		bool fullscreen;
 		Rectangle normalBounds = new Rectangle(0, 0, 640, 480);
-		
-		internal static GType gtype;
 		
 		Gtk.Container rootWidget;
 		DockToolbarFrame toolbarFrame;
@@ -203,7 +202,7 @@ namespace MonoDevelop.Ide.Gui
 		
 		public DefaultWorkbench()
 		{
-			Title = "MonoDevelop";
+			Title = BrandingService.ApplicationName;
 			LoggingService.LogInfo ("Creating DefaultWorkbench");
 			
 			WidthRequest = normalBounds.Width;
@@ -211,15 +210,7 @@ namespace MonoDevelop.Ide.Gui
 
 			DeleteEvent += new Gtk.DeleteEventHandler (OnClosing);
 			
-			if (Gtk.IconTheme.Default.HasIcon ("monodevelop")) 
-				Gtk.Window.DefaultIconName = "monodevelop";
-			else
-				this.IconList = new Gdk.Pixbuf[] {
-					ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.MonoDevelop, Gtk.IconSize.Menu),
-					ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.MonoDevelop, Gtk.IconSize.Button),
-					ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.MonoDevelop, Gtk.IconSize.Dnd),
-					ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.MonoDevelop, Gtk.IconSize.Dialog)
-				};
+			SetAppIcons ();
 
 			//this.WindowPosition = Gtk.WindowPosition.None;
 
@@ -227,6 +218,37 @@ namespace MonoDevelop.Ide.Gui
 			DragDataReceived += new Gtk.DragDataReceivedHandler (onDragDataRec);
 			
 			IdeApp.CommandService.SetRootWindow (this);
+		}
+		
+		void SetAppIcons ()
+		{
+			//first try to get the icon from the GTK icon theme
+			var appIconName = BrandingService.GetString ("ApplicationIconId")
+				?? BrandingService.ApplicationName.ToLower ();
+			if (Gtk.IconTheme.Default.HasIcon (appIconName)) {
+				Gtk.Window.DefaultIconName = appIconName;
+				return;
+			}
+			
+			//branded icons
+			var iconsEl = BrandingService.GetElement ("ApplicationIcons");
+			if (iconsEl != null) {
+				try {
+					this.IconList = iconsEl.Elements ("Icon")
+						.Select (el => new Gdk.Pixbuf (BrandingService.GetFile ((string)el))).ToArray ();
+					return;
+				} catch (Exception ex) {
+					LoggingService.LogError ("Could not load app icons", ex);
+				}
+			}
+			
+			//built-ins
+			this.IconList = new Gdk.Pixbuf[] {
+				ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.MonoDevelop, Gtk.IconSize.Menu),
+				ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.MonoDevelop, Gtk.IconSize.Button),
+				ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.MonoDevelop, Gtk.IconSize.Dnd),
+				ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.MonoDevelop, Gtk.IconSize.Dialog)
+			};
 		}
 
 		void onDragDataRec (object o, Gtk.DragDataReceivedArgs args)
@@ -458,14 +480,15 @@ namespace MonoDevelop.Ide.Gui
 			}
 			DockItem item = GetDockItem (codon);
 			padContentCollection.Remove (codon);
-			PadWindow win = (PadWindow) padWindows [codon];
-			win.NotifyDestroyed ();
+			PadWindow win = (PadWindow) GetPadWindow (codon);
+			if (win != null) {
+				win.NotifyDestroyed ();
+				Counters.PadsLoaded--;
+				padCodons.Remove (win);
+			}
 			if (item != null)
 				dock.RemoveItem (item);
 			padWindows.Remove (codon);
-			padCodons.Remove (win);
-			
-			Counters.PadsLoaded--;
 		}
 		
 		public void BringToFront (PadCodon content)
@@ -494,9 +517,9 @@ namespace MonoDevelop.Ide.Gui
 							post = "*";
 						}
 						if (window.ViewContent.Project != null) {
-							Title = window.ViewContent.Project.Name + " - " + window.ViewContent.PathRelativeToProject + post + " - MonoDevelop";
+							Title = window.ViewContent.Project.Name + " - " + window.ViewContent.PathRelativeToProject + post + " - " + BrandingService.ApplicationName;
 						} else {
-							Title = window.ViewContent.ContentName + post + " - MonoDevelop";
+							Title = window.ViewContent.ContentName + post + " - " + BrandingService.ApplicationName;
 						}
 					}
 				} else {
@@ -512,16 +535,16 @@ namespace MonoDevelop.Ide.Gui
 		void SetDefaultTitle ()
 		{
 			if (IdeApp.ProjectOperations.CurrentSelectedProject != null) {
-				Title = IdeApp.ProjectOperations.CurrentSelectedProject.Name + " - MonoDevelop";
+				Title = IdeApp.ProjectOperations.CurrentSelectedProject.Name + " - " + BrandingService.ApplicationName;
 			} else {
-				Title = "MonoDevelop";
+				Title = BrandingService.ApplicationName;
 			}
 		}
 		
-		public Properties GetStoredMemento(IViewContent content)
+		public Properties GetStoredMemento (IViewContent content)
 		{
 			if (content != null && content.ContentName != null) {
-				string directory = System.IO.Path.Combine (PropertyService.ConfigPath, "temp");
+				string directory = UserProfile.Current.CacheDir.Combine ("temp");
 				if (!Directory.Exists(directory)) {
 					Directory.CreateDirectory(directory);
 				}
@@ -541,7 +564,9 @@ namespace MonoDevelop.Ide.Gui
 				int x, y, width, height;
 				GetPosition (out x, out y);
 				GetSize (out width, out height);
-				if (GdkWindow.State == 0) {
+				// HACK: always capture bounds on OS X because we don't restore Gdk.WindowState.Maximized due to
+				// the bug mentioned below. So we simular Maximized by capturing the Maximized size.
+				if (GdkWindow.State == 0 || Platform.IsMac) {
 					memento.Bounds = new Rectangle (x, y, width, height);
 				} else {
 					memento.Bounds = normalBounds;
@@ -558,7 +583,12 @@ namespace MonoDevelop.Ide.Gui
 					normalBounds = memento.Bounds;
 					Move (normalBounds.X, normalBounds.Y);
 					Resize (normalBounds.Width, normalBounds.Height);
-					if (memento.WindowState == Gdk.WindowState.Maximized) {
+					
+					// HACK: don't restore Gdk.WindowState.Maximized on OS X, because there's a bug in 
+					// GdkWindow.State that means it doesn't reflect the real state, it only reflects values set
+					// internally by GTK e.g. by Maximize calls. Because MD restores state, if it ever becomes 
+					// Maximized it becomes "stuck" and it's difficult for the user to make it "normal".
+					if (memento.WindowState == Gdk.WindowState.Maximized && !Platform.IsMac) {
 						Maximize ();
 					} else if (memento.WindowState == Gdk.WindowState.Iconified) {
 						Iconify ();
@@ -571,41 +601,45 @@ namespace MonoDevelop.Ide.Gui
 			}
 		}
 		
-		void CheckRemovedFile(object sender, FileEventArgs e)
+		void CheckRemovedFile(object sender, FileEventArgs args)
 		{
-			if (e.IsDirectory) {
-				IViewContent[] views = new IViewContent [viewContentCollection.Count];
-				viewContentCollection.CopyTo (views, 0);
-				foreach (IViewContent content in views) {
-					if (content.ContentName.StartsWith(e.FileName)) {
-						content.WorkbenchWindow.CloseWindow(true, true, 0);
+			foreach (FileEventInfo e in args) {
+				if (e.IsDirectory) {
+					IViewContent[] views = new IViewContent [viewContentCollection.Count];
+					viewContentCollection.CopyTo (views, 0);
+					foreach (IViewContent content in views) {
+						if (content.ContentName.StartsWith(e.FileName)) {
+							content.WorkbenchWindow.CloseWindow(true, true, 0);
+						}
 					}
-				}
-			} else {
-				foreach (IViewContent content in viewContentCollection) {
-					if (content.ContentName != null &&
-					    content.ContentName == e.FileName) {
-						content.WorkbenchWindow.CloseWindow(true, true, 0);
-						return;
+				} else {
+					foreach (IViewContent content in viewContentCollection) {
+						if (content.ContentName != null &&
+						    content.ContentName == e.FileName) {
+							content.WorkbenchWindow.CloseWindow(true, true, 0);
+							return;
+						}
 					}
 				}
 			}
 		}
 		
-		void CheckRenamedFile(object sender, FileCopyEventArgs e)
+		void CheckRenamedFile(object sender, FileCopyEventArgs args)
 		{
-			if (e.IsDirectory) {
-				foreach (IViewContent content in viewContentCollection) {
-					if (content.ContentName != null && content.ContentName.StartsWith(e.SourceFile)) {
-						content.ContentName = e.TargetFile + content.ContentName.Substring(e.SourceFile.Length);
+			foreach (FileCopyEventInfo e in args) {
+				if (e.IsDirectory) {
+					foreach (IViewContent content in viewContentCollection) {
+						if (content.ContentName != null && ((FilePath)content.ContentName).IsChildPathOf (e.SourceFile)) {
+							content.ContentName = e.TargetFile + content.ContentName.Substring(e.SourceFile.FileName.Length);
+						}
 					}
-				}
-			} else {
-				foreach (IViewContent content in viewContentCollection) {
-					if (content.ContentName != null &&
-					    content.ContentName == e.SourceFile) {
-						content.ContentName = e.TargetFile;
-						return;
+				} else {
+					foreach (IViewContent content in viewContentCollection) {
+						if (content.ContentName != null &&
+						    content.ContentName == e.SourceFile) {
+							content.ContentName = e.TargetFile;
+							return;
+						}
 					}
 				}
 			}
@@ -626,8 +660,11 @@ namespace MonoDevelop.Ide.Gui
 			foreach (var fv in dock.Layouts)
 				if (fv.EndsWith (fullViewModeTag))
 					dock.DeleteLayout (fv);
-			
-			dock.SaveLayouts (configFile);
+			try {
+				dock.SaveLayouts (configFile);
+			} catch (Exception ex) {
+				LoggingService.LogError ("Error while saving layout.", ex);
+			}
 			UninstallMenuBar ();
 			Remove (rootWidget);
 			
@@ -792,16 +829,7 @@ namespace MonoDevelop.Ide.Gui
 					ToggleFullViewMode ();
 			};
 			
-			this.tabControl.PopupMenu += delegate {
-				ShowPopup ();
-			};
-			this.tabControl.ButtonReleaseEvent += delegate (object sender, Gtk.ButtonReleaseEventArgs e) {
-				int tab = tabControl.FindTabAtPosition (e.Event.XRoot, e.Event.YRoot);
-				if (tab < 0)
-					return;
-				if (e.Event.Button == 3)
-					ShowPopup ();
-			};
+			this.tabControl.DoPopupMenu = ShowPopup;
 			
 			tabControl.TabsReordered += new TabsReorderedHandler (OnTabsReordered);
 
@@ -839,7 +867,7 @@ namespace MonoDevelop.Ide.Gui
 			
 			fullViewVBox.PackEnd (this.StatusBar, false, true, 0);
 			
-			if (MonoDevelop.Core.PropertyService.IsMac)
+			if (MonoDevelop.Core.Platform.IsMac)
 				this.StatusBar.HasResizeGrip = true;
 			else {
 				if (GdkWindow != null && GdkWindow.State == Gdk.WindowState.Maximized)
@@ -924,11 +952,10 @@ namespace MonoDevelop.Ide.Gui
 			}
 		}
 		
-		void ShowPopup ()
+		void ShowPopup (int tabIndex, Gdk.EventButton evt)
 		{
-			Gtk.Menu contextMenu = IdeApp.CommandService.CreateMenu ("/MonoDevelop/Ide/ContextMenu/DocumentTab");
-			if (contextMenu != null)
-				contextMenu.Popup ();
+			this.tabControl.Page = tabIndex;
+			IdeApp.CommandService.ShowContextMenu (this.tabControl, evt, "/MonoDevelop/Ide/ContextMenu/DocumentTab");
 		}
 		
 		void OnTabsReordered (Widget widget, int oldPlacement, int newPlacement)
@@ -982,11 +1009,11 @@ namespace MonoDevelop.Ide.Gui
 		protected override bool OnKeyPressEvent (Gdk.EventKey evnt)
 		{
 			// Handle Alt+1-0 keys
-			Gdk.ModifierType winSwitchModifier = PropertyService.IsMac
+			Gdk.ModifierType winSwitchModifier = Platform.IsMac
 				? KeyBindingManager.SelectionModifierControl
 				: KeyBindingManager.SelectionModifierAlt;
 			
-			if ((evnt.State & winSwitchModifier) != 0) {		
+			if ((evnt.State & winSwitchModifier) != 0 && (evnt.State & (Gdk.ModifierType.ControlMask | Gdk.ModifierType.Mod1Mask)) != (Gdk.ModifierType.ControlMask | Gdk.ModifierType.Mod1Mask)) {
 				switch (evnt.Key) {
 				case Gdk.Key.KP_1:
 				case Gdk.Key.Key_1:
@@ -1369,6 +1396,28 @@ namespace MonoDevelop.Ide.Gui
 				rect.Height -= CurrentPageWidget.Allocation.Height;
 			yield return rect;
 		}
+		
+		public Action<int,Gdk.EventButton> DoPopupMenu { get; set; }
+		
+		protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
+		{
+			if (DoPopupMenu != null && evnt.TriggersContextMenu ()) {
+				int tab = FindTabAtPosition (evnt.XRoot, evnt.YRoot);
+				if (tab >= 0) {
+					DoPopupMenu (tab, evnt);
+					return true;
+				}
+			}
+			return base.OnButtonPressEvent (evnt);
+		}
+		
+		protected override bool OnPopupMenu ()
+		{
+			if (DoPopupMenu != null) {
+				DoPopupMenu (this.Page, null);
+				return true;
+			}
+			return base.OnPopupMenu ();
+		}
 	}
 }
-

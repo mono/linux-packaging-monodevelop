@@ -26,6 +26,7 @@
 //
 
 using System;
+using System.Linq;
 using System.IO;
 using System.Collections.Generic;
 using System.Xml;
@@ -33,7 +34,7 @@ using System.Text;
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
-	class MSBuildProject
+	public class MSBuildProject
 	{
 		public XmlDocument doc;
 		Dictionary<XmlElement,MSBuildObject> elemCache = new Dictionary<XmlElement,MSBuildObject> ();
@@ -43,7 +44,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		static XmlNamespaceManager manager;
 		
 		bool endsWithEmptyLine;
-		string newLine = "\r";
+		string newLine = Environment.NewLine;
 		
 		internal static XmlNamespaceManager XmlNamespaceManager {
 			get {
@@ -85,7 +86,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 		}
 		
-		public void Save (string file)
+		public string Save ()
 		{
 			// StringWriter.Encoding always returns UTF16. We need it to return UTF8, so the
 			// XmlDocument will write the UTF8 header.
@@ -95,7 +96,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			string txt = sw.ToString ();
 			if (endsWithEmptyLine && !txt.EndsWith (newLine))
 				txt += newLine;
-			File.WriteAllText (file, txt);
+			return txt;
 		}
 		
 		int CountNewLines (string nl, string text)
@@ -157,24 +158,37 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 		}
 		
-		public MSBuildPropertyGroup GetGlobalPropertyGroup ()
+		public MSBuildPropertySet GetGlobalPropertyGroup ()
 		{
+			MSBuildPropertyGroupMerged res = new MSBuildPropertyGroupMerged ();
 			foreach (MSBuildPropertyGroup grp in PropertyGroups) {
 				if (grp.Condition.Length == 0)
-					return grp;
+					res.Add (grp);
 			}
-			return null;
+			return res.GroupCount > 0 ? res : null;
 		}
 		
 		public MSBuildPropertyGroup AddNewPropertyGroup (bool insertAtEnd)
 		{
 			XmlElement elem = doc.CreateElement (null, "PropertyGroup", MSBuildProject.Schema);
 			
-			XmlElement last = doc.DocumentElement.SelectSingleNode ("tns:PropertyGroup[last()]", XmlNamespaceManager) as XmlElement;
-			if (last != null)
-				doc.DocumentElement.InsertAfter (elem, last);
-			else
-				doc.DocumentElement.AppendChild (elem);
+			if (insertAtEnd) {
+				XmlElement last = doc.DocumentElement.SelectSingleNode ("tns:PropertyGroup[last()]", XmlNamespaceManager) as XmlElement;
+				if (last != null)
+					doc.DocumentElement.InsertAfter (elem, last);
+			} else {
+				XmlElement first = doc.DocumentElement.SelectSingleNode ("tns:PropertyGroup", XmlNamespaceManager) as XmlElement;
+				if (first != null)
+					doc.DocumentElement.InsertBefore (elem, first);
+			}
+			
+			if (elem.ParentNode == null) {
+				XmlElement first = doc.DocumentElement.SelectSingleNode ("tns:ItemGroup", XmlNamespaceManager) as XmlElement;
+				if (first != null)
+					doc.DocumentElement.InsertBefore (elem, first);
+				else
+					doc.DocumentElement.AppendChild (elem);
+			}
 			
 			return GetGroup (elem);
 		}
@@ -307,7 +321,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			MSBuildObject ob;
 			if (elemCache.TryGetValue (elem, out ob))
 				return (MSBuildPropertyGroup) ob;
-			MSBuildPropertyGroup it = new MSBuildPropertyGroup (elem);
+			MSBuildPropertyGroup it = new MSBuildPropertyGroup (this, elem);
 			elemCache [elem] = it;
 			return it;
 		}
@@ -320,6 +334,12 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			MSBuildItemGroup it = new MSBuildItemGroup (this, elem);
 			elemCache [elem] = it;
 			return it;
+		}
+		
+		public void RemoveGroup (MSBuildPropertyGroup grp)
+		{
+			elemCache.Remove (grp.Element);
+			grp.Element.ParentNode.RemoveChild (grp.Element);
 		}
 	}
 	
@@ -356,7 +376,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		}
 	}
 	
-	class MSBuildProperty: MSBuildObject
+	public class MSBuildProperty: MSBuildObject
 	{
 		public MSBuildProperty (XmlElement elem): base (elem)
 		{
@@ -376,12 +396,117 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		}
 	}
 	
-	class MSBuildPropertyGroup: MSBuildObject
+	public interface MSBuildPropertySet
+	{
+		MSBuildProperty GetProperty (string name);
+		IEnumerable<MSBuildProperty> Properties { get; }
+		void SetPropertyValue (string name, string value);
+		string GetPropertyValue (string name);
+		bool RemoveProperty (string name);
+		void RemoveAllProperties ();
+		void UnMerge (MSBuildPropertySet baseGrp, ISet<string> propertiesToExclude);
+	}
+	
+	class MSBuildPropertyGroupMerged: MSBuildPropertySet
+	{
+		List<MSBuildPropertyGroup> groups = new List<MSBuildPropertyGroup> ();
+		
+		public void Add (MSBuildPropertyGroup g)
+		{
+			groups.Add (g);
+		}
+		
+		public int GroupCount {
+			get { return groups.Count; }
+		}
+		
+		public MSBuildProperty GetProperty (string name)
+		{
+			// Find property in reverse order, since the last set
+			// value is the good one
+			for (int n=groups.Count - 1; n >= 0; n--) {
+				var g = groups [n];
+				MSBuildProperty p = g.GetProperty (name);
+				if (p != null)
+					return p;
+			}
+			return null;
+		}
+
+		public void SetPropertyValue (string name, string value)
+		{
+			MSBuildProperty p = GetProperty (name);
+			if (p != null)
+				p.Value = value;
+			else
+				groups [0].SetPropertyValue (name, value);
+		}
+
+		public string GetPropertyValue (string name)
+		{
+			MSBuildProperty prop = GetProperty (name);
+			return prop != null ? prop.Value : null;
+		}
+
+		public bool RemoveProperty (string name)
+		{
+			bool found = false;
+			foreach (var g in groups) {
+				if (g.RemoveProperty (name)) {
+					Prune (g);
+					found = true;
+				}
+			}
+			return found;
+		}
+
+		public void RemoveAllProperties ()
+		{
+			foreach (var g in groups) {
+				g.RemoveAllProperties ();
+				Prune (g);
+			}
+		}
+
+		public void UnMerge (MSBuildPropertySet baseGrp, ISet<string> propertiesToExclude)
+		{
+			foreach (var g in groups) {
+				g.UnMerge (baseGrp, propertiesToExclude);
+			}
+		}
+
+		public IEnumerable<MSBuildProperty> Properties {
+			get {
+				foreach (var g in groups) {
+					foreach (var p in g.Properties)
+						yield return p;
+				}
+			}
+		}
+		
+		void Prune (MSBuildPropertyGroup g)
+		{
+			if (g != groups [0] && !g.Properties.Any()) {
+				// Remove this group since it's now empty
+				g.Parent.RemoveGroup (g);
+			}
+		}
+	}
+	
+	public class MSBuildPropertyGroup: MSBuildObject, MSBuildPropertySet
 	{
 		Dictionary<string,MSBuildProperty> properties = new Dictionary<string,MSBuildProperty> ();
+		MSBuildProject parent;
 		
-		public MSBuildPropertyGroup (XmlElement elem): base (elem)
+		public MSBuildPropertyGroup (MSBuildProject parent, XmlElement elem): base (elem)
 		{
+			this.parent = parent;
+		}
+		
+		public MSBuildProject Parent {
+			get {
+				return this.parent;
+			}
 		}
 		
 		public MSBuildProperty GetProperty (string name)
@@ -437,13 +562,15 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				return prop.Value;
 		}
 		
-		public void RemoveProperty (string name)
+		public bool RemoveProperty (string name)
 		{
 			MSBuildProperty prop = GetProperty (name);
 			if (prop != null) {
 				properties.Remove (name);
 				Element.RemoveChild (prop.Element);
+				return true;
 			}
+			return false;
 		}
 
 		public void RemoveAllProperties ()
@@ -458,22 +585,13 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			properties.Clear ();
 		}
 
-		public static MSBuildPropertyGroup Merge (MSBuildPropertyGroup g1, MSBuildPropertyGroup g2)
-		{
-			XmlElement elem = g1.Element.OwnerDocument.CreateElement (null, "PropertyGroup", MSBuildProject.Schema);
-			MSBuildPropertyGroup grp = new MSBuildPropertyGroup (elem);
-			foreach (MSBuildProperty prop in g1.Properties)
-				grp.SetPropertyValue (prop.Name, prop.Value);
-			foreach (MSBuildProperty prop in g2.Properties)
-				grp.SetPropertyValue (prop.Name, prop.Value);
-			return grp;
-		}
-
-		public void UnMerge (MSBuildPropertyGroup baseGrp)
+		public void UnMerge (MSBuildPropertySet baseGrp, ISet<string> propsToExclude)
 		{
 			foreach (MSBuildProperty prop in baseGrp.Properties) {
+				if (propsToExclude != null && propsToExclude.Contains (prop.Name))
+					continue;
 				MSBuildProperty thisProp = GetProperty (prop.Name);
-				if (thisProp != null && prop.Value == thisProp.Value)
+				if (thisProp != null && prop.Value.Equals (thisProp.Value, StringComparison.CurrentCultureIgnoreCase))
 					RemoveProperty (prop.Name);
 			}
 		}
@@ -488,7 +606,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 	}
 	
-	class MSBuildItem: MSBuildObject
+	public class MSBuildItem: MSBuildObject
 	{
 		public MSBuildItem (XmlElement elem): base (elem)
 		{
@@ -526,8 +644,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		public void UnsetMetadata (string name)
 		{
 			XmlElement elem = Element [name, MSBuildProject.Schema];
-			if (elem != null)
+			if (elem != null) {
 				Element.RemoveChild (elem);
+				if (!Element.HasChildNodes)
+					Element.IsEmpty = true;
+			}
 		}
 		
 		public string GetMetadata (string name)
@@ -553,7 +674,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		}
 	}
 	
-	class MSBuildItemGroup: MSBuildObject
+	public class MSBuildItemGroup: MSBuildObject
 	{
 		MSBuildProject parent;
 		

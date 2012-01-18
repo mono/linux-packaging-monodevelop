@@ -69,7 +69,8 @@ namespace MonoDevelop.Ide.Commands
 		/// convenient to fire the Delete command when pressing Delete (for example, while editing the name of
 		/// a file in the solution pad.
 		/// </summary>
-		DeleteKey
+		DeleteKey,
+		InsertGuid
 	}
 	
 	internal class MonodevelopPreferencesHandler: CommandHandler
@@ -141,9 +142,11 @@ namespace MonoDevelop.Ide.Commands
 			if (focus is Gtk.Editable)
 				info.Enabled = ((Gtk.Editable)focus).IsEditable;
 			else if (focus is Gtk.TextView)
-				info.Enabled =  ((Gtk.TextView)focus).Editable;
+				info.Enabled = ((Gtk.TextView)focus).Editable;
 			else
-				info.Bypass = true;
+				info.Enabled = false;
+				
+			info.Bypass = !info.Enabled;
 		}
 	}
 	
@@ -169,7 +172,8 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Update (CommandInfo info)
 		{
 			object focus = IdeApp.Workbench.RootWindow.HasToplevelFocus ? IdeApp.Workbench.RootWindow.Focus : null;
-			info.Bypass = !(focus is Gtk.Editable || focus is Gtk.TextView); 
+			info.Enabled = (focus is Gtk.Editable || focus is Gtk.TextView);
+			info.Bypass = !info.Enabled;
 		}
 	}	
 	
@@ -198,9 +202,11 @@ namespace MonoDevelop.Ide.Commands
 			if (focus is Gtk.Editable)
 				info.Enabled = ((Gtk.Editable)focus).IsEditable;
 			else if (focus is Gtk.TextView)
-				info.Enabled =  ((Gtk.TextView)focus).Editable;
+				info.Enabled = ((Gtk.TextView)focus).Editable;
 			else
-				info.Bypass = true;
+				info.Enabled = false;
+			
+			info.Bypass = !info.Enabled;
 		}
 	}
 	
@@ -231,7 +237,9 @@ namespace MonoDevelop.Ide.Commands
 			else if (focus is Gtk.TextView)
 				info.Enabled = ((Gtk.TextView)focus).Editable;
 			else
-				info.Bypass = true;
+				info.Enabled = false;
+			
+			info.Bypass = !info.Enabled;
 		}
 	}
 	
@@ -241,14 +249,14 @@ namespace MonoDevelop.Ide.Commands
 		{
 			Document doc = IdeApp.Workbench.ActiveDocument;
 			string header = MonoDevelop.Ide.StandardHeader.StandardHeaderService.GetHeader (doc.Project, doc.Name, false);
-			doc.TextEditor.InsertText (0, header + "\n");
+			doc.Editor.Insert (0, header + "\n");
 		}
 		
 		protected override void Update (CommandInfo info)
 		{
 			Document doc = IdeApp.Workbench.ActiveDocument;
-			if (doc != null && doc.Name != null && doc.TextEditor != null && doc.TextEditor.HasInputFocus) {
-				info.Enabled = TextEditor.GetCommentTags (doc.Name) != null;
+			if (doc != null && doc.Editor != null && doc.Editor.HasFocus) {
+				info.Enabled = doc.CommentTags != null;
 			} else
 				info.Enabled = false;
 		}

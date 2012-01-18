@@ -32,14 +32,14 @@ namespace Mono.TextEditor
 {
 	public abstract class Margin : IDisposable
 	{
-		public abstract int Width {
+		public abstract double Width {
 			get;
 		}
 		
 		public bool IsVisible { get; set; }
 		
 		// set by the text editor
-		public virtual int XOffset {
+		public virtual double XOffset {
 			get;
 			internal set;
 		}
@@ -73,16 +73,8 @@ namespace Mono.TextEditor
 		{
 			marginDrawer.Remove (drawer);
 		}
-
-		internal protected virtual void BeginRender (Gdk.Drawable drawable, Gdk.Rectangle area, int x)
-		{
-		}
-
-		internal protected virtual void EndRender (Gdk.Drawable drawable, Gdk.Rectangle area, int x)
-		{
-		}
 		
-		internal protected abstract void Draw (Gdk.Drawable drawable, Gdk.Rectangle area, int line, int x, int y, int lineHeight);
+		internal protected abstract void Draw (Cairo.Context cr, Cairo.Rectangle area, LineSegment line, int lineNumber, double x, double y, double lineHeight);
 		
 		internal protected virtual void OptionsChanged ()
 		{
@@ -125,15 +117,20 @@ namespace Mono.TextEditor
 	
 	public class MarginMouseEventArgs : EventArgs
 	{
-		public int X {
+		public double X {
 			get;
 			private set;
 		}
 		
-		public int Y {
+		public double Y {
 			get;
 			private set;
 		}
+		
+		/// <summary>
+		/// The raw GDK event. May be null if the event was synthesized.
+		/// </summary>
+		public Gdk.Event RawEvent { get; private set; }
 		
 		public Gdk.EventType Type {
 			get;
@@ -145,18 +142,24 @@ namespace Mono.TextEditor
 			private set;
 		}
 		
-		public int Button {
+		public uint Button {
 			get;
 			private set;
+		}
+		
+		public bool TriggersContextMenu ()
+		{
+			var evt = RawEvent as Gdk.EventButton;
+			return evt != null && evt.TriggersContextMenu ();
 		}
 		
 		int lineNumber = -2; // -2 means that line number has not yet been calculated
 		public int LineNumber {
 			get {
 				if (lineNumber == -2) {
-					lineNumber = Editor.CalculateLineNumber ((int)(Editor.VAdjustment.Value + Y));
-					if (lineNumber >= Editor.Document.LineCount)
-						lineNumber = -1;
+					lineNumber = Editor.YToLine (Editor.VAdjustment.Value + Y);
+					if (lineNumber > Editor.Document.LineCount)
+						lineNumber = 0;
 				}
 				return lineNumber;
 			}
@@ -166,7 +169,7 @@ namespace Mono.TextEditor
 		public LineSegment LineSegment {
 			get {
 				if (line == null) {
-					if (LineNumber == -1)
+					if (LineNumber < DocumentLocation.MinLine)
 						return null;
 					line = Editor.Document.GetLine (lineNumber);
 				}
@@ -179,16 +182,21 @@ namespace Mono.TextEditor
 			private set;
 		}
 		
-		public MarginMouseEventArgs (TextEditor editor, int button, int x, int y, Gdk.EventType type, Gdk.ModifierType modifierState)
+		public MarginMouseEventArgs (TextEditor editor, Gdk.Event raw, uint button, double x, double y, Gdk.ModifierType modifierState)
+			: this (editor, raw.Type, button, x, y, modifierState)
+		{
+			this.RawEvent = raw;
+		}
+		
+		public MarginMouseEventArgs (TextEditor editor, Gdk.EventType type, uint button, double x, double y, Gdk.ModifierType modifierState)
 		{
 			this.Editor = editor;
+			this.Type = type;
+			
 			this.Button = button;
 			this.X = x;
 			this.Y = y;
-			this.Type = type;
 			this.ModifierState = modifierState;
 		}
-		
-		
 	}
 }

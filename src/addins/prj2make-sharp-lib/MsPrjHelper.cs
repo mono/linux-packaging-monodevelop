@@ -30,7 +30,7 @@ namespace MonoDevelop.Prj2Make
 		private bool m_bIsMcs;
 		private bool m_bIsUsingLib;
 		
-		TargetFramework fx = Runtime.SystemAssemblyService.GetTargetFramework ("1.1");
+		TargetFramework fx = Runtime.SystemAssemblyService.GetTargetFramework (TargetFrameworkMoniker.NET_1_1);
  
 		// Flag use to determine if the LIB variable will be used in
 		// the Makefile that prj2make generates
@@ -356,7 +356,7 @@ namespace MonoDevelop.Prj2Make
 							monitor.ReportWarning (GettextCatalog.GetString ("Assembly reference could not be imported: ") + rf.AssemblyName);
 							continue;
 						}
-						rfOut = new ProjectReference (MonoDevelop.Projects.ReferenceType.Gac, oref);
+						rfOut = new ProjectReference (MonoDevelop.Projects.ReferenceType.Package, oref);
 						rfOut.LocalCopy = true;
 						references.Add (rfOut);
 					}
@@ -382,7 +382,7 @@ namespace MonoDevelop.Prj2Make
 							}
 							
 							if (rfOut == null) {
-								rfOut = new ProjectReference (MonoDevelop.Projects.ReferenceType.Gac, Path.GetFileName (rf.HintPath));
+								rfOut = new ProjectReference (MonoDevelop.Projects.ReferenceType.Package, Path.GetFileName (rf.HintPath));
 								rfOut.LocalCopy = true;
 							}
 							references.Add (rfOut);
@@ -409,7 +409,7 @@ namespace MonoDevelop.Prj2Make
 
 			// Test to see if file exist in GAC location
 			if (System.IO.File.Exists (strRefFileName)) {
-				ProjectReference rfOut = new ProjectReference (MonoDevelop.Projects.ReferenceType.Gac, Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblyFullName (strRefFileName, fx));
+				ProjectReference rfOut = new ProjectReference (MonoDevelop.Projects.ReferenceType.Package, Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblyFullName (strRefFileName, fx));
 				rfOut.LocalCopy = true;
 				return rfOut;
 			}

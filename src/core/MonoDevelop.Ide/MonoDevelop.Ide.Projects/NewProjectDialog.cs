@@ -45,6 +45,7 @@ using IconView = MonoDevelop.Components.IconView;
 using Gtk;
 using System.Collections.Generic;
 using MonoDevelop.Ide.Gui.Components;
+using System.Reflection;
 
 namespace MonoDevelop.Ide.Projects {
 	/// <summary>
@@ -386,16 +387,17 @@ namespace MonoDevelop.Ide.Projects {
 			
 			string solution = txt_subdirectory.Text;
 			string name     = txt_name.Text;
-			string location = entry_location.Path;
+			string location = ProjectLocation;
 
 			if(solution.Equals("")) solution = name; //This was empty when adding after first combine
 			
 			if (
 				!FileService.IsValidPath (solution) || 
 			    !FileService.IsValidFileName(name) ||
+				name.IndexOf (' ') >= 0 ||
 				!FileService.IsValidPath(location))
 			{
-				MessageService.ShowError (GettextCatalog.GetString ("Illegal project name.\nOnly use letters, digits, space, '.' or '_'."));
+				MessageService.ShowError (GettextCatalog.GetString ("Illegal project name.\nOnly use letters, digits, '.' or '_'."));
 				return false;
 			}
 
@@ -414,12 +416,12 @@ namespace MonoDevelop.Ide.Projects {
 			ProjectTemplate item = (ProjectTemplate) templateView.CurrentlySelected;
 			
 			try {
-				System.IO.Directory.CreateDirectory (ProjectLocation);
+				System.IO.Directory.CreateDirectory (location);
 			} catch (IOException) {
-				MessageService.ShowError (GettextCatalog.GetString ("Could not create directory {0}. File already exists.", ProjectLocation));
+				MessageService.ShowError (GettextCatalog.GetString ("Could not create directory {0}. File already exists.", location));
 				return false;
 			} catch (UnauthorizedAccessException) {
-				MessageService.ShowError (GettextCatalog.GetString ("You do not have permission to create to {0}", ProjectLocation));
+				MessageService.ShowError (GettextCatalog.GetString ("You do not have permission to create to {0}", location));
 				return false;
 			}
 			
@@ -441,8 +443,8 @@ namespace MonoDevelop.Ide.Projects {
 		ProjectCreateInformation CreateProjectCreateInformation ()
 		{
 			ProjectCreateInformation cinfo = new ProjectCreateInformation ();
-			cinfo.SolutionPath = SolutionLocation;
-			cinfo.ProjectBasePath = ProjectLocation;
+			cinfo.SolutionPath = FileService.ResolveFullPath (SolutionLocation);
+			cinfo.ProjectBasePath = FileService.ResolveFullPath (ProjectLocation);
 			cinfo.ProjectName = txt_name.Text;
 			cinfo.SolutionName = CreateSolutionDirectory ? txt_subdirectory.Text : txt_name.Text;
 			cinfo.ParentFolder = parentFolder;
@@ -453,35 +455,57 @@ namespace MonoDevelop.Ide.Projects {
 		// icon view event handlers
 		void SelectedIndexChange(object sender, EventArgs e)
 		{
-			if (templateView.CurrentlySelected != null) {
-				ProjectTemplate ptemplate = (ProjectTemplate) templateView.CurrentlySelected;
-				lbl_template_descr.Text = StringParserService.Parse (ptemplate.Description);
-				labelTemplateTitle.Markup = "<b>" + GLib.Markup.EscapeText (ptemplate.Name) + "</b>";
+			try {
+				btn_new.Sensitive = true;
+				txt_name.Sensitive = true;
+				txt_subdirectory.Sensitive = true;
+				chk_combine_directory.Sensitive = true;
+				entry_location.Sensitive = true;
 				
-				if (ptemplate.SolutionDescriptor.EntryDescriptors.Length == 0) {
-					txt_subdirectory.Sensitive = false;
-					chk_combine_directory.Sensitive = false;
-					lbl_subdirectory.Sensitive = false;
-					btn_new.Label = Gtk.Stock.Ok;
-				} else {
-					txt_subdirectory.Sensitive = true;
-					chk_combine_directory.Sensitive = true;
-					lbl_subdirectory.Sensitive = true;
-					txt_subdirectory.Text = txt_name.Text;
+				if (templateView.CurrentlySelected != null) {
+					ProjectTemplate ptemplate = (ProjectTemplate) templateView.CurrentlySelected;
+					lbl_template_descr.Text = StringParserService.Parse (ptemplate.Description);
+					labelTemplateTitle.Markup = "<b>" + GLib.Markup.EscapeText (ptemplate.Name) + "</b>";
 					
-					ProjectCreateInformation cinfo = CreateProjectCreateInformation ();
-					if (ptemplate.HasItemFeatures (parentFolder, cinfo))
-						btn_new.Label = Gtk.Stock.GoForward;
-					else
+					if (ptemplate.SolutionDescriptor.EntryDescriptors.Length == 0) {
+						txt_subdirectory.Sensitive = false;
+						chk_combine_directory.Sensitive = false;
+						lbl_subdirectory.Sensitive = false;
 						btn_new.Label = Gtk.Stock.Ok;
+					} else {
+						lbl_subdirectory.Sensitive = true;
+						txt_subdirectory.Text = txt_name.Text;
+						
+						ProjectCreateInformation cinfo = CreateProjectCreateInformation ();
+						if (ptemplate.HasItemFeatures (parentFolder, cinfo))
+							btn_new.Label = Gtk.Stock.GoForward;
+						else
+							btn_new.Label = Gtk.Stock.Ok;
+					}
 				}
+				else {
+					lbl_template_descr.Text = String.Empty;
+					labelTemplateTitle.Text = "";
+				}
+				
+				PathChanged (null, null);
+			} catch (Exception ex) {
+				txt_name.Sensitive = false;
+				btn_new.Sensitive = false;
+				txt_subdirectory.Sensitive = false;
+				chk_combine_directory.Sensitive = false;
+				entry_location.Sensitive = false;
+				
+				while (ex is TargetInvocationException)
+						ex = ((TargetInvocationException) ex).InnerException;
+				
+				if (ex is UserException) {
+					var user = (UserException) ex;
+					MessageService.ShowError (user.Message, user.Details);
+				} else {
+					MessageService.ShowException (ex);
+				};
 			}
-			else {
-				lbl_template_descr.Text = String.Empty;
-				labelTemplateTitle.Text = "";
-			}
-			
-			PathChanged (null, null);
 		}
 		
 		protected void cancelClicked (object o, EventArgs e)
@@ -491,7 +515,7 @@ namespace MonoDevelop.Ide.Projects {
 		
 		void ActivateIfReady ()
 		{
-			if (templateView.CurrentlySelected == null || txt_name.Text.Trim () == "" || (txt_subdirectory.Sensitive && chk_combine_directory.Active && txt_subdirectory.Text.Trim ().Length == 0))
+			if (templateView.CurrentlySelected == null || !txt_name.Sensitive || txt_name.Text.Trim () == "" || (txt_subdirectory.Sensitive && chk_combine_directory.Active && txt_subdirectory.Text.Trim ().Length == 0))
 				btn_new.Sensitive = false;
 			else
 				btn_new.Sensitive = true;
@@ -524,7 +548,7 @@ namespace MonoDevelop.Ide.Projects {
 			if (basePath == null)
 				basePath = IdeApp.ProjectOperations.ProjectsDefaultPath;
 				
-			entry_location.Path = basePath;
+			entry_location.Path = FileService.ResolveFullPath (basePath);
 			
 			PathChanged (null, null);
 			
@@ -558,6 +582,10 @@ namespace MonoDevelop.Ide.Projects {
 					return template;
 				}
 			}
+			
+			public bool DisplayCategory {
+				get; set;
+			}
 		}
 
 		private void InitializeTemplates ()
@@ -581,7 +609,7 @@ namespace MonoDevelop.Ide.Projects {
 			foreach (string id in recentIds) {
 				ProjectTemplate pt = GetTemplate (id);
 				if (pt != null)
-					recentCategory.Templates.Add (new TemplateItem (pt));
+					recentCategory.Templates.Add (new TemplateItem (pt) { DisplayCategory = true });
 			}
 			
 			InitializeComponents ();
@@ -751,8 +779,14 @@ namespace MonoDevelop.Ide.Projects {
 			public void Add (TemplateItem templateItem)
 			{
 				string name = GLib.Markup.EscapeText (templateItem.Name);
-				if (!string.IsNullOrEmpty (templateItem.Template.LanguageName))
-					name += "\n<span foreground='darkgrey'><small>" + templateItem.Template.LanguageName + "</small></span>";
+				string desc = null;
+				if (templateItem.DisplayCategory)
+					desc = templateItem.Template.Category;
+				else if (!string.IsNullOrEmpty (templateItem.Template.LanguageName))
+					desc = templateItem.Template.LanguageName;
+				
+				if (desc != null)
+					name += "\n<span foreground='darkgrey'><small>" + desc + "</small></span>";
 				templateStore.AppendValues (templateItem.Template.Icon.IsNull ? "md-project" : templateItem.Template.Icon.ToString (), name, templateItem.Template);
 			}
 			

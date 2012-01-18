@@ -26,7 +26,7 @@
 
 using System;
 using System.Collections.Generic;
-using ICSharpCode.NRefactory.Ast;
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Core;
 using Mono.TextEditor;
 using Mono.TextEditor.Highlighting;
@@ -45,7 +45,7 @@ namespace MonoDevelop.Refactoring.IntroduceConstant
 				set;
 			}
 			
-			public ICSharpCode.NRefactory.Ast.Modifiers Modifiers {
+			public ICSharpCode.NRefactory.CSharp.Modifiers Modifiers {
 				get;
 				set;
 			}
@@ -56,7 +56,7 @@ namespace MonoDevelop.Refactoring.IntroduceConstant
 			TextEditorData data = options.GetTextEditorData ();
 			LineSegment line = data.Document.GetLine (data.Caret.Line);
 			if (!data.IsSomethingSelected && line != null) {
-				Stack<Span> stack = line.StartSpan != null ? new Stack<Span> (line.StartSpan) : new Stack<Span> ();
+				var stack = line.StartSpan.Clone ();
 				Mono.TextEditor.Highlighting.SyntaxModeService.ScanSpans (data.Document, data.Document.SyntaxMode, data.Document.SyntaxMode, stack, line.Offset, data.Caret.Offset);
 				foreach (Span span in stack) {
 					if (span.Color == "string.single" || span.Color == "string.double")
@@ -147,7 +147,7 @@ namespace MonoDevelop.Refactoring.IntroduceConstant
 			if (resolveResult == null) {
 				LineSegment line = data.Document.GetLine (data.Caret.Line);
 				if (line != null) {
-					Stack<Span> stack = line.StartSpan != null ? new Stack<Span> (line.StartSpan) : new Stack<Span> ();
+					var stack = line.StartSpan.Clone ();
 					Mono.TextEditor.Highlighting.SyntaxModeService.ScanSpans (data.Document, data.Document.SyntaxMode, data.Document.SyntaxMode, stack, line.Offset, data.Caret.Offset);
 					foreach (Span span in stack) {
 						if (span.Color == "string.single" || span.Color == "string.double") {
@@ -160,26 +160,24 @@ namespace MonoDevelop.Refactoring.IntroduceConstant
 					resolveResult = resolver.Resolve (new ExpressionResult (SearchNumber (data, out start, out end)), DomLocation.Empty);
 				}
 			} else {
-				start = data.Document.LocationToOffset (resolveResult.ResolvedExpression.Region.Start.Line - 1, resolveResult.ResolvedExpression.Region.Start.Column - 1);
-				end = data.Document.LocationToOffset (resolveResult.ResolvedExpression.Region.End.Line - 1, resolveResult.ResolvedExpression.Region.End.Column - 1);
+				start = data.Document.LocationToOffset (resolveResult.ResolvedExpression.Region.Start.Line, resolveResult.ResolvedExpression.Region.Start.Column);
+				end = data.Document.LocationToOffset (resolveResult.ResolvedExpression.Region.End.Line, resolveResult.ResolvedExpression.Region.End.Column);
 			}
 			if (start == 0 && end == 0)
 				return result;
 			INRefactoryASTProvider provider = options.GetASTProvider ();
 
-			FieldDeclaration fieldDeclaration = new FieldDeclaration (null);
-			VariableDeclaration varDecl = new VariableDeclaration (param.Name);
-			varDecl.Initializer = provider.ParseExpression (resolveResult.ResolvedExpression.Expression);
-			fieldDeclaration.Fields.Add (varDecl);
-			fieldDeclaration.Modifier = param.Modifiers;
-			fieldDeclaration.Modifier |= ICSharpCode.NRefactory.Ast.Modifiers.Const;
-			fieldDeclaration.TypeReference = resolveResult.ResolvedType.ConvertToTypeReference ();
-			fieldDeclaration.TypeReference.IsKeyword = true;
+			var fieldDeclaration = new FieldDeclaration ();
+			var varDecl = new VariableInitializer (param.Name, provider.ParseExpression (resolveResult.ResolvedExpression.Expression));
+			fieldDeclaration.AddChild (varDecl, FieldDeclaration.Roles.Variable);
+			fieldDeclaration.Modifiers = param.Modifiers;
+			fieldDeclaration.Modifiers |= ICSharpCode.NRefactory.CSharp.Modifiers.Const;
+			fieldDeclaration.ReturnType = resolveResult.ResolvedType.ConvertToTypeReference ();
 
 			TextReplaceChange insertConstant = new TextReplaceChange ();
 			insertConstant.FileName = options.Document.FileName;
 			insertConstant.Description = string.Format (GettextCatalog.GetString ("Generate constant '{0}'"), param.Name);
-			insertConstant.Offset = data.Document.LocationToOffset (curMember.Location.Line - 1, 0);
+			insertConstant.Offset = data.Document.LocationToOffset (curMember.Location.Line, 1);
 			insertConstant.InsertedText = provider.OutputNode (options.Dom, fieldDeclaration, options.GetIndent (curMember)) + Environment.NewLine;
 			result.Add (insertConstant);
 

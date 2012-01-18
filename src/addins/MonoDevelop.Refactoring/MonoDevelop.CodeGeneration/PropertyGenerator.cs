@@ -26,10 +26,7 @@
 
 using System;
 
-using ICSharpCode.NRefactory;
-using ICSharpCode.NRefactory.Ast;
-using ICSharpCode.NRefactory.PrettyPrinter;
-
+using ICSharpCode.NRefactory.CSharp;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects.Dom;
@@ -106,7 +103,8 @@ namespace MonoDevelop.CodeGeneration
 			
 			protected override IEnumerable<string> GenerateCode (INRefactoryASTProvider astProvider, string indent, List<IBaseMember> includedMembers)
 			{
-				CodeGenerator generator = CodeGenerator.CreateGenerator (Options.Document.TextEditorData.Document.MimeType);
+				
+				CodeGenerator generator = Options.Document.CreateCodeGenerator ();
 				foreach (IField field in includedMembers)
 					yield return generator.CreateFieldEncapsulation (Options.EnclosingType, field, CreatePropertyName (field), MonoDevelop.Projects.Dom.Modifiers.Public, ReadOnly);
 			}

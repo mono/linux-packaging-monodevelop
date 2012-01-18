@@ -76,8 +76,10 @@ namespace MonoDevelop.Ide.CodeCompletion
 			return window.CompletionWidget.GetText (window.CodeCompletionContext.TriggerOffset, window.CodeCompletionContext.TriggerOffset + replaceLength);
 		}
 
-		public virtual void InsertCompletionText (CompletionListWindow window)
+		public virtual void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
 		{
+			if (CompletionText == GetCurrentWord (window)) 
+				return;
 			window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, GetCurrentWord (window), CompletionText);
 		}
 		

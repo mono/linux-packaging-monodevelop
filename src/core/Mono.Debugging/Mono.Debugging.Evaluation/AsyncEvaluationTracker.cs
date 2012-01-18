@@ -33,7 +33,14 @@ using Mono.Debugging.Backend;
 namespace Mono.Debugging.Evaluation
 {
 	public delegate ObjectValue ObjectEvaluatorDelegate ();
-
+	
+	/// <summary>
+	/// This class can be used to generate an ObjectValue using a provided evaluation delegate.
+	/// The value is initialy evaluated synchronously (blocking the caller). If no result
+	/// is obtained after a short period (provided in the WaitTime property), evaluation
+	/// will then be made asynchronous and the Run method will immediately return an ObjectValue
+	/// with the Evaluating state.
+	/// </summary>
 	public class AsyncEvaluationTracker: RemoteFrameObject, IObjectValueUpdater, IDisposable
 	{
 		Dictionary<string, UpdateCallback> asyncCallbacks = new Dictionary<string, UpdateCallback> ();
@@ -71,7 +78,8 @@ namespace Mono.Debugging.Evaluation
 			});
 			
 			if (done)
-				return val;
+				return val ?? ObjectValue.CreateUnknown (name);
+			    // 'val' may be null if the timed evaluator is disposed while evaluating
 			else
 				return ObjectValue.CreateEvaluating (this, new ObjectPath (id, name), flags);
 		}
@@ -87,6 +95,12 @@ namespace Mono.Debugging.Evaluation
 			lock (asyncCallbacks) {
 				cancelTimestamp = asyncCounter;
 				runner.CancelAll ();
+				foreach (var cb in asyncCallbacks.Values) {
+					try {
+						cb.UpdateValue (ObjectValue.CreateFatalError ("", "Canceled", ObjectValueFlags.None));
+					} catch {
+					}
+				}
 				asyncCallbacks.Clear ();
 				asyncResults.Clear ();
 			}
@@ -104,7 +118,9 @@ namespace Mono.Debugging.Evaluation
 			UpdateCallback cb = null;
 			lock (asyncCallbacks) {
 				if (asyncCallbacks.TryGetValue (id, out cb)) {
-					cb.UpdateValue (val);
+					try {
+						cb.UpdateValue (val);
+					} catch {}
 					asyncCallbacks.Remove (id);
 				}
 				else

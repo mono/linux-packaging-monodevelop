@@ -31,6 +31,7 @@
 using System;
 using Gtk;
 using Mono.Unix;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Components.Docking
 {
@@ -79,6 +80,7 @@ namespace MonoDevelop.Components.Docking
 			title.Xalign = 0;
 			title.Xpad = 3;
 			title.UseMarkup = true;
+			title.Ellipsize = Pango.EllipsizeMode.End;
 			
 			btnDock = new Button (new Gtk.Image (pixAutoHide));
 			btnDock.Relief = ReliefStyle.None;
@@ -197,21 +199,20 @@ namespace MonoDevelop.Components.Docking
 		
 		void HeaderButtonPress (object ob, Gtk.ButtonPressEventArgs args)
 		{
-			if (args.Event.Button == 1) {
+			if (args.Event.TriggersContextMenu ()) {
+				item.ShowDockPopupMenu (args.Event.Time);
+			} else if (args.Event.Button == 1) {
 				frame.ShowPlaceholder ();
 				header.GdkWindow.Cursor = fleurCursor;
 				frame.Toplevel.KeyPressEvent += HeaderKeyPress;
 				frame.Toplevel.KeyReleaseEvent += HeaderKeyRelease;
 				allowPlaceholderDocking = true;
 			}
-			else if (args.Event.Button == 3) {
-				item.ShowDockPopupMenu (args.Event.Time);
-			}
 		}
 		
 		void HeaderButtonRelease (object ob, Gtk.ButtonReleaseEventArgs args)
 		{
-			if (args.Event.Button == 1) {
+			if (!args.Event.TriggersContextMenu () && args.Event.Button == 1) {
 				frame.DockInPlaceholder (item);
 				frame.HidePlaceholder ();
 				if (header.GdkWindow != null)
@@ -348,9 +349,14 @@ namespace MonoDevelop.Components.Docking
 
 		protected override void OnSizeRequested (ref Requisition requisition)
 		{
-			requisition = child.SizeRequest ();
-			requisition.Width += leftMargin + rightMargin + leftPadding + rightPadding;
-			requisition.Height += topMargin + bottomMargin + topPadding + bottomPadding;
+			if (child != null) {
+				requisition = child.SizeRequest ();
+				requisition.Width += leftMargin + rightMargin + leftPadding + rightPadding;
+				requisition.Height += topMargin + bottomMargin + topPadding + bottomPadding;
+			} else {
+				requisition.Width = 0;
+				requisition.Height = 0;
+			}
 		}
 
 		protected override void OnSizeAllocated (Gdk.Rectangle allocation)
@@ -364,7 +370,8 @@ namespace MonoDevelop.Components.Docking
 				allocation.Y += topMargin + topPadding;
 				allocation.Height -= topMargin + bottomMargin + topPadding + bottomPadding;
 			}
-			child.SizeAllocate (allocation);
+			if (child != null)
+				child.SizeAllocate (allocation);
 		}
 
 		protected override bool OnExposeEvent (Gdk.EventExpose evnt)

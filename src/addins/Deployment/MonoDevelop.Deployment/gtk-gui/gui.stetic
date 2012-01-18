@@ -216,6 +216,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Deployment.Gui.DeployDialog" design-size="573 433">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Events">ButtonPressMask</property>
     <property name="GeneratePublic">False</property>
     <property name="Title" translatable="yes">Create Package</property>
@@ -922,6 +923,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Deployment.Gui.InstallDialog" design-size="453 193">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Events">ButtonPressMask</property>
     <property name="GeneratePublic">False</property>
     <property name="Title" translatable="yes">Install Project</property>
@@ -1261,6 +1263,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Deployment.Gui.EditPackageDialog" design-size="599 450">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="GeneratePublic">False</property>
     <property name="WindowPosition">CenterOnParent</property>
     <property name="Buttons">2</property>
@@ -1817,6 +1820,7 @@
   </widget>
   <widget class="Gtk.Dialog" id="MonoDevelop.Deployment.FileReplaceDialog" design-size="425 420">
     <property name="MemberName" />
+    <property name="Visible">False</property>
     <property name="Title" translatable="yes">Replace existing file?</property>
     <property name="WindowPosition">CenterOnParent</property>
     <property name="Modal">True</property>

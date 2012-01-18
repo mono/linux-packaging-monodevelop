@@ -46,8 +46,6 @@ namespace MonoDevelop.Ide.Desktop
 	{
 		Hashtable iconHash = new Hashtable ();
 		
-		public abstract DesktopApplication GetDefaultApplication (string mimetype);
-		public abstract DesktopApplication [] GetAllApplications (string mimetype);
 		public abstract string DefaultMonospaceFont { get; }
 		public abstract string Name { get; }
 
@@ -59,6 +57,16 @@ namespace MonoDevelop.Ide.Desktop
 			get {
 				return "MonoDevelop";
 			}
+		}
+		
+		public virtual void OpenFile (string filename)
+		{
+			Process.Start ("file://" + filename);
+		}
+		
+		public virtual void OpenFolder (FilePath folderPath)
+		{
+			Process.Start ("file://" + folderPath);
 		}
 		
 		public virtual void ShowUrl (string url)
@@ -314,6 +322,62 @@ namespace MonoDevelop.Ide.Desktop
 		public virtual void OpenInTerminal (FilePath directory)
 		{
 			throw new InvalidOperationException ();
+		}
+		
+		protected virtual RecentFiles CreateRecentFilesProvider ()
+		{
+			return new FdoRecentFiles ();
+		}
+		
+		RecentFiles recentFiles;
+		public RecentFiles RecentFiles {
+			get {
+				return recentFiles ?? (recentFiles = CreateRecentFilesProvider ());
+			}
+		}
+		
+		public virtual string GetUpdaterUrl ()
+		{
+			return null;
+		}
+		
+		public virtual IEnumerable<string> GetUpdaterEnviromentFlags ()
+		{
+			return new string[0];
+		}
+		
+		/// <summary>
+		/// Starts the installer.
+		/// </summary>
+		/// <param name='installerDataFile'>
+		/// File containing the list of updates to install
+		/// </param>
+		/// <param name='updatedInstallerPath'>
+		/// Optional path to an updated installer executable
+		/// </param>
+		/// <remarks>
+		/// This method should start the installer in an independent process.
+		/// </remarks>
+		public virtual void StartUpdatesInstaller (FilePath installerDataFile, FilePath updatedInstallerPath)
+		{
+		}
+		
+		public virtual IEnumerable<DesktopApplication> GetApplications (string filename)
+		{
+			return new DesktopApplication[0];
+		}
+		
+		public virtual Gdk.Rectangle GetUsableMonitorGeometry (Gdk.Screen screen, int monitor)
+		{
+			return screen.GetMonitorGeometry (monitor);
+		}
+		
+		/// <summary>
+		/// Grab the desktop focus for the window.
+		/// </summary>
+		public virtual void GrabDesktopFocus (Gtk.Window window)
+		{
+			window.Present ();
 		}
 	}
 }

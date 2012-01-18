@@ -27,17 +27,18 @@
 //
 
 using System;
-using System.Collections;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-
-using MonoDevelop.Core;
-using MonoDevelop.Core.Assemblies;
-using MonoDevelop.Core.AddIns;
-using MonoDevelop.Core.Execution;
+using System.Threading;
 using Mono.Addins;
 using Mono.Addins.Setup;
+using MonoDevelop.Core;
+using MonoDevelop.Core.Assemblies;
+using MonoDevelop.Core.Execution;
 using MonoDevelop.Core.Instrumentation;
+using MonoDevelop.Core.Setup;
+
 
 namespace MonoDevelop.Core
 {
@@ -45,7 +46,7 @@ namespace MonoDevelop.Core
 	{
 		static ProcessService processService;
 		static SystemAssemblyService systemAssemblyService;
-		static SetupService setupService;
+		static AddinSetupService setupService;
 		static ApplicationService applicationService;
 		static bool initialized;
 		
@@ -56,33 +57,45 @@ namespace MonoDevelop.Core
 			Counters.RuntimeInitialization.BeginTiming ();
 			SetupInstrumentation ();
 			
+			if (Platform.IsMac)
+				InitMacFoundation ();
+			
+			// Set a default sync context
+			if (SynchronizationContext.Current == null)
+				SynchronizationContext.SetSynchronizationContext (new SynchronizationContext ());
+			
 			AddinManager.AddinLoadError += OnLoadError;
 			AddinManager.AddinLoaded += OnLoad;
 			AddinManager.AddinUnloaded += OnUnload;
 			
+			//provides a development-time way to load addins that are being developed in a asperate solution
+			var devAddinDir = Environment.GetEnvironmentVariable ("MONODEVELOP_DEV_ADDINS");
+			if (devAddinDir != null && devAddinDir.Length == 0)
+				devAddinDir = null;
+			
 			try {
 				Counters.RuntimeInitialization.Trace ("Initializing Addin Manager");
-				AddinManager.Initialize (MonoDevelop.Core.PropertyService.ConfigPath);
+				AddinManager.Initialize (
+					UserProfile.Current.ConfigDir,
+					devAddinDir ?? UserProfile.Current.LocalInstallDir.Combine ("Addins"),
+					devAddinDir ?? UserProfile.Current.CacheDir);
 				AddinManager.InitializeDefaultLocalizer (new DefaultAddinLocalizer ());
 				
 				if (updateAddinRegistry)
 					AddinManager.Registry.Update (null);
-				setupService = new SetupService (AddinManager.Registry);
+				setupService = new AddinSetupService (AddinManager.Registry);
 				Counters.RuntimeInitialization.Trace ("Initialized Addin Manager");
 				
-				string prefix = string.Empty;
-				if (PropertyService.IsWindows)
-					prefix = "win-";
-	
-				string mainRep = "http://monodevelop.com/files/addins/" + prefix + AddinManager.CurrentAddin.Version + "/main.mrep";
+				PropertyService.Initialize ();
 				
-				AddinRepository[] repos = setupService.Repositories.GetRepositories ();
-				foreach (AddinRepository rep in repos) {
-					if (rep.Url.StartsWith ("http://go-mono.com/md/") || (rep.Url.StartsWith ("http://monodevelop.com/files/addins/") && rep.Url != mainRep))
-						setupService.Repositories.RemoveRepository (rep.Url);
+				//have to do this after the addin service and property service have initialized
+				if (UserDataMigrationService.HasSource) {
+					Counters.RuntimeInitialization.Trace ("Migrating User Data from MD " + UserDataMigrationService.SourceVersion);
+					UserDataMigrationService.StartMigration ();
 				}
-				setupService.Repositories.RegisterRepository (null, mainRep, false);
-	
+				
+				RegisterAddinRepositories ();
+				
 				Counters.RuntimeInitialization.Trace ("Initializing Assembly Service");
 				systemAssemblyService = new SystemAssemblyService ();
 				systemAssemblyService.Initialize ();
@@ -99,13 +112,52 @@ namespace MonoDevelop.Core
 			}
 		}
 		
+		static void RegisterAddinRepositories ()
+		{
+			var validUrls = Enum.GetValues (typeof(UpdateLevel)).Cast<UpdateLevel> ().Select (v => setupService.GetMainRepositoryUrl (v)).ToList ();
+			
+			// Remove old repositories
+			
+			var reps = setupService.Repositories;
+			
+			foreach (AddinRepository rep in reps.GetRepositories ()) {
+				if (rep.Url.StartsWith ("http://go-mono.com/md/") || 
+					(rep.Url.StartsWith ("http://monodevelop.com/files/addins/")) ||
+					(rep.Url.StartsWith ("http://addins.monodevelop.com/") && !validUrls.Contains (rep.Url)))
+					reps.RemoveRepository (rep.Url);
+			}
+			
+			if (!setupService.IsMainRepositoryRegistered (UpdateLevel.Stable)) {
+				setupService.RegisterMainRepository (UpdateLevel.Stable, true);
+				setupService.RegisterMainRepository (UpdateLevel.Beta, true);
+			}
+			if (!setupService.IsMainRepositoryRegistered (UpdateLevel.Beta))
+				setupService.RegisterMainRepository (UpdateLevel.Beta, false);
+
+			if (!setupService.IsMainRepositoryRegistered (UpdateLevel.Alpha))
+				setupService.RegisterMainRepository (UpdateLevel.Alpha, false);
+		}
+		
+		internal static string GetRepoUrl (string quality)
+		{
+			string platform;
+			if (Platform.IsWindows)
+				platform = "Win32";
+			else if (Platform.IsMac)
+				platform = "Mac";
+			else
+				platform = "Linux";
+			
+			return "http://addins.monodevelop.com/" + quality + "/" + platform + "/" + AddinManager.CurrentAddin.Version + "/main.mrep";
+		}
+		
 		static void SetupInstrumentation ()
 		{
 			InstrumentationService.Enabled = PropertyService.Get ("MonoDevelop.EnableInstrumentation", false);
 			if (InstrumentationService.Enabled) {
 				LoggingService.LogInfo ("Instrumentation Service started");
 				try {
-					int port = InstrumentationService.PublishService (0);
+					int port = InstrumentationService.PublishService ();
 					LoggingService.LogInfo ("Instrumentation available at port " + port);
 				} catch (Exception ex) {
 					LoggingService.LogError ("Instrumentation service could not be published", ex);
@@ -167,7 +219,7 @@ namespace MonoDevelop.Core
 			}
 		}
 	
-		public static SetupService AddinSetupService {
+		public static AddinSetupService AddinSetupService {
 			get {
 				return setupService;
 			}
@@ -213,56 +265,21 @@ namespace MonoDevelop.Core
 			}
 		}
 		
-		public static event EventHandler ShuttingDown;
-	}
-	
-	public class ApplicationService
-	{
-		public int StartApplication (string appId, string[] parameters)
+		[DllImport ("libc")]
+		extern static IntPtr dlopen (string name, int mode);
+		
+		static void InitMacFoundation ()
 		{
-			ExtensionNode node = AddinManager.GetExtensionNode ("/MonoDevelop/Core/Applications/" + appId);
-			if (node == null)
-				throw new InstallException ("Application not found: " + appId);
-			
-			ApplicationExtensionNode apnode = node as ApplicationExtensionNode;
-			if (apnode == null)
-				throw new Exception ("Invalid node type");
-			
-			IApplication app = (IApplication) apnode.CreateInstance ();
-
-			try {
-				return app.Run (parameters);
-			} catch (Exception ex) {
-				Console.WriteLine (ex.Message);
-				LoggingService.LogFatalError (ex.ToString ());
-				return -1;
-			}
+			dlopen ("/System/Library/Frameworks/Foundation.framework/Foundation", 0x1);
 		}
 		
-		public IApplicationInfo[] GetApplications ()
-		{
-			ExtensionNodeList nodes = AddinManager.GetExtensionNodes ("/MonoDevelop/Core/Applications");
-			IApplicationInfo[] apps = new IApplicationInfo [nodes.Count];
-			for (int n=0; n<nodes.Count; n++)
-				apps [n] = (ApplicationExtensionNode) nodes [n];
-			return apps;
-		}
-	}
-	
-	public interface IApplicationInfo
-	{
-		string Id { get; }
-		string Description { get; }
-	}
-	
-	public interface IApplication
-	{
-		int Run (string[] arguments);
+		public static event EventHandler ShuttingDown;
 	}
 	
 	internal static class Counters
 	{
 		public static TimerCounter RuntimeInitialization = InstrumentationService.CreateTimerCounter ("Runtime initialization", "Runtime");
+		public static TimerCounter PropertyServiceInitialization = InstrumentationService.CreateTimerCounter ("Property Service initialization", "Runtime");
 		
 		public static Counter AddinsLoaded = InstrumentationService.CreateCounter ("Add-ins loaded", "Add-in Engine", true);
 		

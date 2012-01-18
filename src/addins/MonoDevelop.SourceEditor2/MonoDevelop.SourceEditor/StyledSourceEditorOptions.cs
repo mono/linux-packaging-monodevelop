@@ -80,9 +80,9 @@ namespace MonoDevelop.SourceEditor
 				throw new NotSupportedException ();
 			}
 		}
-
+		
 		public string DefaultEolMarker {
-			get { return DefaultSourceEditorOptions.Instance.DefaultEolMarker; }
+			get { return TextStylePolicy.GetEolMarker (CurrentPolicy.EolMarker); }
 			set {
 				throw new NotSupportedException ();
 			}
@@ -193,7 +193,7 @@ namespace MonoDevelop.SourceEditor
 			set { throw new NotSupportedException (); }
 		}
 
-		public Mono.TextEditor.Highlighting.Style GetColorStyle (Gtk.Style widgetStyle)
+		public Mono.TextEditor.Highlighting.ColorSheme GetColorStyle (Gtk.Style widgetStyle)
 		{
 			return DefaultSourceEditorOptions.Instance.GetColorStyle (widgetStyle);
 		}
@@ -252,6 +252,11 @@ namespace MonoDevelop.SourceEditor
 			get { return DefaultSourceEditorOptions.Instance.EnableAnimations; }
 			set { throw new NotSupportedException (); }
 		}
+		
+		public bool UseAntiAliasing {
+			get { return DefaultSourceEditorOptions.Instance.UseAntiAliasing; }
+			set { throw new NotSupportedException (); }
+		}
 
 		public Mono.TextEditor.IWordFindStrategy WordFindStrategy {
 			get { return DefaultSourceEditorOptions.Instance.WordFindStrategy; }
@@ -305,10 +310,6 @@ namespace MonoDevelop.SourceEditor
 
 		public bool EnableCodeCompletion {
 			get { return DefaultSourceEditorOptions.Instance.EnableCodeCompletion; }
-		}
-
-		public bool EnableQuickFinder {
-			get { return DefaultSourceEditorOptions.Instance.EnableQuickFinder; }
 		}
 
 		public bool EnableSemanticHighlighting {
