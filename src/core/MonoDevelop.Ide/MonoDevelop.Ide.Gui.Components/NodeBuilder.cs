@@ -27,6 +27,7 @@
 //
 
 using System;
+
 using MonoDevelop.Core;
 
 namespace MonoDevelop.Ide.Gui.Components

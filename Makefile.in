@@ -1006,6 +1006,11 @@ runmd: $(PROGRAM)
 run-debug: $(PROGRAM)
 	MONODEVELOP_CONSOLE_LOG_LEVEL=All $(MD_LAUNCH) --debug=casts $(MD_BIN_PATH)/MonoDevelop.exe
 
+run-gdb: $(PROGRAM)
+	echo "run --debug $(MD_BIN_PATH)/MonoDevelop.exe" > gdb.commands
+	$(MD_LAUNCH_SETUP) gdb $(RUNTIME) -x gdb.commands
+	rm -f gdb.commands
+
 run-profile: $(PROGRAM)
 	$(MD_LAUNCH) -O=inline --profile $(MD_BIN_PATH)/MonoDevelop.exe
 

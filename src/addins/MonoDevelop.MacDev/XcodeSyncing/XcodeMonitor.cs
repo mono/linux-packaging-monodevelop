@@ -356,14 +356,19 @@ namespace MonoDevelop.MacDev.XcodeSyncing
 		
 				const string XCODE_OPEN_PROJECT =
 @"tell application ""{0}""
-	activate
+	if it is not running then
+		launch
+		activate
+	end if
 	open ""{1}""
 end tell";
 
 		const string XCODE_OPEN_PROJECT_FILE =
 @"tell application ""{0}""
 	activate
+	activate
 	open ""{1}""
+	activate
 	open ""{2}""
 end tell";
 

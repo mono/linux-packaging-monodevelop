@@ -138,24 +138,45 @@ namespace MonoDevelop.Ide
 		}
 		
 		#region ShowException
-		public static void ShowException (Exception e, string primaryText)
-		{
-			ShowException (RootWindow, e, primaryText);
-		}
 		
 		public static void ShowException (Exception e)
 		{
 			ShowException (RootWindow, e);
 		}
 		
+		public static void ShowException (Exception e, string message)
+		{
+			ShowException (RootWindow, e, message);
+		}
+		
+		public static void ShowException (Exception e, string message, string title)
+		{
+			ShowException (RootWindow, e, message, title);
+		}
+		
+		public static AlertButton ShowException (Exception e, string message, string title, params AlertButton[] buttons)
+		{
+			return ShowException (RootWindow, e, message, title, buttons);
+		}
+
 		public static void ShowException (Gtk.Window parent, Exception e)
 		{
 			ShowException (RootWindow, e, e.Message);
 		}
 		
-		public static void ShowException (Gtk.Window parent, Exception e, string primaryText)
+		public static void ShowException (Gtk.Window parent, Exception e, string message)
 		{
-			messageService.ShowException (parent, e, primaryText);
+			ShowException (parent, e, message, null);
+		}
+		
+		public static void ShowException (Gtk.Window parent, Exception e, string message, string title)
+		{
+			ShowException (parent, e, message, title, null);
+		}
+
+		public static AlertButton ShowException (Gtk.Window parent, Exception e, string message, string title, params AlertButton[] buttons)
+		{
+			return messageService.ShowException (parent, title, message, e, buttons);
 		}
 		#endregion
 		
@@ -410,14 +431,17 @@ namespace MonoDevelop.Ide
 		//The real GTK# code is wrapped in a GuiSyncObject to make calls synchronous on the GUI thread
 		private class InternalMessageService : GuiSyncObject
 		{
-			public void ShowException (Gtk.Window parent, Exception e, string primaryText)
+			public AlertButton ShowException (Gtk.Window parent, string title, string message, Exception e, params AlertButton[] buttons)
 			{
 				var exceptionDialog = new ExceptionDialog () {
-					Message = primaryText,
+					Buttons = buttons ?? new AlertButton[] { AlertButton.Ok },
+					Title = title ?? GettextCatalog.GetString ("An error has occurred"),
+					Message = message,
 					Exception = e,
 					TransientFor = parent,
 				};
 				exceptionDialog.Run ();
+				return exceptionDialog.ResultButton;
 			}
 			
 			public AlertButton GenericAlert (MessageDescription message)
