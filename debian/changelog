@@ -1,3 +1,10 @@
+monodevelop (2.8.5+dfsg-3) unstable; urgency=low
+
+  * [980e6b4] Update Autotools exporter template not to try and use 
+    pkglib_SCRIPTS for assemblies, as Automake 1.11.2 does not permit this.
+
+ -- Jo Shields <directhex@apebox.org>  Fri, 20 Jan 2012 17:28:33 +0000
+
 monodevelop (2.8.5+dfsg-2) unstable; urgency=low
 
   * Upload to Unstable for Mono 2.10 transition.
