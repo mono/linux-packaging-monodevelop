@@ -139,6 +139,9 @@ namespace MonoDevelop.Components.Docking
 			if (layout == null)
 				return;
 			
+			if (this.GdkWindow != null)
+				this.GdkWindow.MoveResize (rect);
+			
 			// This container has its own window, so allocation of children
 			// is relative to 0,0
 			rect.X = rect.Y = 0;
@@ -170,6 +173,29 @@ namespace MonoDevelop.Components.Docking
 			return res;
 		}
 
+		protected override void OnAdded (Widget widget)
+		{
+			System.Diagnostics.Debug.Assert (
+				widget.Parent == null,
+				"Widget is already parented on another widget");
+			System.Diagnostics.Debug.Assert (
+				System.Linq.Enumerable.Any (items, item => item.Widget == widget),
+				"Can only add widgets to the container that are in the parent DockFrame's DockItem collection");
+
+			widget.Parent = this;
+		}
+
+		protected override void OnRemoved (Widget widget)
+		{
+			System.Diagnostics.Debug.Assert (
+				widget.Parent != this,
+				"Widget is not parented on this widget");
+			System.Diagnostics.Debug.Assert (
+				System.Linq.Enumerable.Any (items, item => item.Widget == widget),
+				"Can only remove widgets from the container that are in the parent DockFrame's DockItem collection");
+
+			widget.Unparent ();
+		}
 
 		public void RelayoutWidgets ()
 		{
@@ -357,8 +383,19 @@ namespace MonoDevelop.Components.Docking
 
 			Style = Style.Attach (GdkWindow);
 			Style.SetBackground (GdkWindow, State);
+			this.WidgetFlags &= ~WidgetFlags.NoWindow;
 			
 			//GdkWindow.SetBackPixmap (null, true);
+		}
+		
+		protected override void OnUnrealized ()
+		{
+			if (this.GdkWindow != null) {
+				this.GdkWindow.UserData = IntPtr.Zero;
+				this.GdkWindow.Destroy ();
+				this.WidgetFlags |= WidgetFlags.NoWindow;
+			}
+			base.OnUnrealized ();
 		}
 		
 		internal void ShowPlaceholder ()

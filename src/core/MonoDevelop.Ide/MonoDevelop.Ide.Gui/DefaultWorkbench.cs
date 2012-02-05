@@ -349,6 +349,8 @@ namespace MonoDevelop.Ide.Gui
 		public void CloseContent (IViewContent content)
 		{
 			if (viewContentCollection.Contains(content)) {
+				if (content.Project != null)
+					content.Project.NameChanged -= HandleProjectNameChanged;
 				viewContentCollection.Remove(content);
 			}
 		}
@@ -398,14 +400,26 @@ namespace MonoDevelop.Ide.Gui
 			TabLabel tabLabel = new TabLabel (new Label (), mimeimage != null ? mimeimage : new Gtk.Image (""));
 			tabLabel.CloseClicked += new EventHandler (closeClicked);			
 			tabLabel.ClearFlag (WidgetFlags.CanFocus);
+			tabLabel.Show ();
+			
 			SdiWorkspaceWindow sdiWorkspaceWindow = new SdiWorkspaceWindow (this, content, tabControl, tabLabel);
 			sdiWorkspaceWindow.TitleChanged += delegate { SetWorkbenchTitle (); };
 			sdiWorkspaceWindow.Closed += CloseWindowEvent;
+			sdiWorkspaceWindow.Show ();
+			
 			tabControl.InsertPage (sdiWorkspaceWindow, tabLabel, -1);
-			tabLabel.Show ();
+			
+			
+			if (content.Project != null)
+				content.Project.NameChanged += HandleProjectNameChanged;
 			
 			if (bringToFront)
 				content.WorkbenchWindow.SelectWindow();
+		}
+
+		void HandleProjectNameChanged (object sender, SolutionItemRenamedEventArgs e)
+		{
+			SetWorkbenchTitle ();
 		}
 		
 		void ShowPadNode (ExtensionNode node)

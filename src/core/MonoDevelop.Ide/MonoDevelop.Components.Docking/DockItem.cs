@@ -365,8 +365,9 @@ namespace MonoDevelop.Components.Docking
 		{
 			ResetBarUndockMode ();
 			if (floatingWindow == null) {
-				if (Widget.Parent != null)
-					Widget.Unparent ();
+				if (Widget.Parent != null) {
+					((Gtk.Container) Widget.Parent).Remove (Widget);
+				}
 				floatingWindow = new Window (GetWindowTitle ());
 				floatingWindow.TransientFor = frame.Toplevel as Gtk.Window;
 				floatingWindow.TypeHint = Gdk.WindowTypeHint.Utility;
@@ -420,7 +421,9 @@ namespace MonoDevelop.Components.Docking
 			ResetMode ();
 			if (widget != null) {
 				widget.Hide (); // Avoids size allocation warning
-				widget.Unparent ();
+				if (widget.Parent != null) {
+					((Gtk.Container)widget.Parent).Remove (widget);
+				}
 			}
 			dockBarItem = frame.BarDock (pos, this, size);
 			if (widget != null)

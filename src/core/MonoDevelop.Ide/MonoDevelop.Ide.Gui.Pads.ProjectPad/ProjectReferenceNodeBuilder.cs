@@ -77,6 +77,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 					icon = Context.GetIcon (Stock.Reference);
 					break;
 			}
+			
+			label = GLib.Markup.EscapeText (label);
 
 			if (!pref.IsValid) {
 				label = "<span color='red'>" + label + "</span>";

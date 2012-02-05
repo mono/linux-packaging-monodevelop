@@ -95,7 +95,7 @@ namespace MonoDevelop.SourceEditor
 			tree.RootPinAlwaysVisible = true;
 			tree.PinnedWatch = watch;
 			DocumentLocation location = editor.Document.OffsetToLocation (offset);
-			tree.PinnedWatchLine = location.Line + 1;
+			tree.PinnedWatchLine = location.Line;
 			tree.PinnedWatchFile = ((ExtensibleTextEditor)editor).View.ContentName;
 			
 			tree.AddValue (value);
@@ -203,6 +203,26 @@ namespace MonoDevelop.SourceEditor
 				sw.HscrollbarPolicy = PolicyType.Never;
 				sw.WidthRequest = -1;
 			}
+		}
+		
+		protected override void OnSizeAllocated (Gdk.Rectangle allocation)
+		{
+			const int edgeGap = 2;
+			int oldY, x, y;
+			
+			this.GetPosition (out x, out y);
+			oldY = y;
+			
+			Gdk.Rectangle geometry = DesktopService.GetUsableMonitorGeometry (Screen, Screen.GetMonitorAtPoint (x, y));
+			if (allocation.Height <= geometry.Height && y + allocation.Height >= geometry.Height - edgeGap)
+				y = geometry.Top + (geometry.Height - allocation.Height - edgeGap);
+			if (y < geometry.Top + edgeGap)
+				y = geometry.Top + edgeGap;
+			
+			if (y != oldY)
+				Move (x, y);
+			
+			base.OnSizeAllocated (allocation);
 		}
 	}
 	

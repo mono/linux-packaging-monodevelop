@@ -917,6 +917,7 @@ namespace MonoDevelop.Ide
 				entry.Execute (monitor, context, IdeApp.Workspace.ActiveConfiguration);
 			} catch (Exception ex) {
 				monitor.ReportError (GettextCatalog.GetString ("Execution failed."), ex);
+				LoggingService.LogError ("Execution failed", ex);
 			} finally {
 				monitor.Dispose ();
 			}
@@ -1141,44 +1142,51 @@ namespace MonoDevelop.Ide
 					BuildDone (monitor, result, entry, tt);	// BuildDone disposes the monitor
 			});
 		}
+		
+		// Note: This must run in the main thread
+		void PromptForSave (BuildResult result)
+		{
+			var couldNotSaveError = "The build has been aborted as the file '{0}' could not be saved";
+			
+			foreach (var doc in IdeApp.Workbench.Documents) {
+				if (doc.IsDirty && doc.Project != null) {
+					if (MessageService.AskQuestion (GettextCatalog.GetString ("Save changed documents before building?"),
+					                                GettextCatalog.GetString ("Some of the open documents have unsaved changes."),
+					                                AlertButton.BuildWithoutSave, AlertButton.Save) == AlertButton.Save) {
+						MarkFileDirty (doc.FileName);
+						doc.Save ();
+						if (doc.IsDirty)
+							result.AddError (string.Format (couldNotSaveError, Path.GetFileName (doc.FileName)), doc.FileName);
+					} else
+						break;
+				}
+			}
+		}
+		
+		// Note: This must run in the main thread
+		void SaveAllFiles (BuildResult result)
+		{
+			var couldNotSaveError = "The build has been aborted as the file '{0}' could not be saved";
+			
+			foreach (var doc in new List<MonoDevelop.Ide.Gui.Document> (IdeApp.Workbench.Documents)) {
+				if (doc.IsDirty && doc.Project != null) {
+					doc.Save ();
+					if (doc.IsDirty)
+						result.AddError (string.Format (couldNotSaveError, Path.GetFileName (doc.FileName)), doc.FileName);
+				}
+			}
+		}
 
 		BuildResult DoBeforeCompileAction ()
 		{
-			var result = new BuildResult ();
-			var couldNotSaveError = "The build has been aborted as the file '{0}' could not be saved";
 			BeforeCompileAction action = IdeApp.Preferences.BeforeBuildSaveAction;
+			var result = new BuildResult ();
 			
 			switch (action) {
-				case BeforeCompileAction.Nothing:
-					break;
-				case BeforeCompileAction.PromptForSave:
-					foreach (var doc in IdeApp.Workbench.Documents) {
-						if (doc.IsDirty && doc.Project != null) {
-							if (MessageService.AskQuestion (
-						            GettextCatalog.GetString ("Save changed documents before building?"),
-							        GettextCatalog.GetString ("Some of the open documents have unsaved changes."),
-							                                AlertButton.BuildWithoutSave, AlertButton.Save) == AlertButton.Save) {
-								MarkFileDirty (doc.FileName);
-								doc.Save ();
-								if (doc.IsDirty)
-									result.AddError (string.Format (couldNotSaveError, Path.GetFileName (doc.FileName)), doc.FileName);
-							}
-							else
-								break;
-						}
-					}
-					break;
-				case BeforeCompileAction.SaveAllFiles:
-					foreach (var doc in new List<MonoDevelop.Ide.Gui.Document> (IdeApp.Workbench.Documents))
-						if (doc.IsDirty && doc.Project != null) {
-							doc.Save ();
-							if (doc.IsDirty)
-								result.AddError (string.Format (couldNotSaveError, Path.GetFileName (doc.FileName)), doc.FileName);
-						}
-					break;
-				default:
-					System.Diagnostics.Debug.Assert(false);
-					break;
+			case BeforeCompileAction.Nothing: break;
+			case BeforeCompileAction.PromptForSave: DispatchService.GuiDispatch (delegate { PromptForSave (result); }); break;
+			case BeforeCompileAction.SaveAllFiles: DispatchService.GuiDispatch (delegate { SaveAllFiles (result); }); break;
+			default: System.Diagnostics.Debug.Assert (false); break;
 			}
 			
 			return result;
@@ -1429,7 +1437,7 @@ namespace MonoDevelop.Ide
 					
 					string fileBuildAction = buildAction;
 					if (string.IsNullOrEmpty (buildAction))
-						fileBuildAction = project.GetDefaultBuildAction (file);
+						fileBuildAction = project.GetDefaultBuildAction (targetPath);
 					
 					//files in the target directory get added directly in their current location without moving/copying
 					if (file.CanonicalPath == targetPath) {
@@ -1473,16 +1481,7 @@ namespace MonoDevelop.Ide
 						}
 						
 						if (action == AddAction.Link) {
-							//FIXME: MD project system doesn't cope with duplicate includes - project save/load will remove the file
-							ProjectFile pf;
-							if (filesInProject.TryGetValue (file, out pf)) {
-								var link = pf.Link;
-								MessageService.ShowWarning (GettextCatalog.GetString (
-									"The link '{0}' in the project already includes the file '{1}'", link, file));
-								continue;
-							}
-							
-							pf = new ProjectFile (file, fileBuildAction) {
+							ProjectFile pf = new ProjectFile (file, fileBuildAction) {
 								Link = vpath
 							};
 							vpathsInProject.Add (pf.ProjectVirtualPath);
@@ -1914,14 +1913,24 @@ namespace MonoDevelop.Ide
 		class ProviderProxy : ITextEditorDataProvider, IEditableTextFile
 		{
 			TextEditorData data;
-			public ProviderProxy (TextEditorData data)
+			string encoding;
+			bool bom;
+			
+			public ProviderProxy (TextEditorData data, string encoding, bool bom)
 			{
 				this.data = data;
+				this.encoding = encoding;
+				this.bom = bom;
 			}
 
 			public TextEditorData GetTextEditorData ()
 			{
 				return data;
+			}
+			
+			void Save ()
+			{
+				TextFile.WriteFile (Name, Text, encoding, bom);
 			}
 			
 			#region IEditableTextFile implementation
@@ -1933,6 +1942,7 @@ namespace MonoDevelop.Ide
 			{
 				return data.GetTextBetween (startPosition, endPosition);
 			}
+			
 			public char GetCharAt (int position)
 			{
 				return data.GetCharAt (position);
@@ -1953,15 +1963,15 @@ namespace MonoDevelop.Ide
 			public int InsertText (int position, string text)
 			{
 				int result = data.Insert (position, text);
-				File.WriteAllText (Name, Text);
+				Save ();
+				
 				return result;
 			}
-			
 			
 			public void DeleteText (int position, int length)
 			{
 				data.Remove (position, length);
-				File.WriteAllText (Name, Text);
+				Save ();
 			}
 			
 			public string Text {
@@ -1970,6 +1980,7 @@ namespace MonoDevelop.Ide
 				}
 				set {
 					data.Text = value;
+					Save ();
 				}
 			}
 			
@@ -1985,10 +1996,12 @@ namespace MonoDevelop.Ide
 				}
 			}
 			
+			TextFile file = TextFile.ReadFile (filePath);
 			TextEditorData data = new TextEditorData ();
 			data.Document.FileName = filePath;
-			data.Text = File.ReadAllText (filePath);
-			return new ProviderProxy (data);
+			data.Text = file.Text;
+			
+			return new ProviderProxy (data, file.SourceEncoding, file.HadBOM);
 		}
 		
 		public TextEditorData GetTextEditorData (FilePath filePath)
@@ -2006,9 +2019,10 @@ namespace MonoDevelop.Ide
 				}
 			}
 			
+			TextFile file = TextFile.ReadFile (filePath);
 			TextEditorData data = new TextEditorData ();
 			data.Document.FileName = filePath;
-			data.Text = File.ReadAllText (filePath);
+			data.Text = file.Text;
 			isOpen = false;
 			return data;
 		}

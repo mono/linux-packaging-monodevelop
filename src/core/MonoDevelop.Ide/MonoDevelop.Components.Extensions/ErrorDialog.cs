@@ -25,6 +25,7 @@
 // THE SOFTWARE.
 
 using System;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Components.Extensions
 {
@@ -34,12 +35,19 @@ namespace MonoDevelop.Components.Extensions
 	
 	public class ExceptionDialogData : PlatformDialogData
 	{
+		public AlertButton[] Buttons { get; set; }
 		public string Message { get; set; }
 		public Exception Exception { get; set; }
+		public AlertButton ResultButton {  get; set; }
 	}
 	
 	public class ExceptionDialog : PlatformDialog<ExceptionDialogData>
 	{
+		public AlertButton[] Buttons {
+			get { return data.Buttons; }
+			set { data.Buttons = value; }
+		}
+
 		public string Message {
 			get { return data.Message; }
 			set { data.Message = value; }
@@ -50,14 +58,18 @@ namespace MonoDevelop.Components.Extensions
 			set { data.Exception = value; }
 		}
 		
+		public AlertButton ResultButton {
+			get { return data.ResultButton; }
+			private set { data.ResultButton = value; }
+		}
+
 		protected override bool RunDefault ()
 		{
-			var errorDialog = new MonoDevelop.Ide.Gui.Dialogs.GtkErrorDialog (TransientFor);
-			errorDialog.Message = Message;
+			var errorDialog = new MonoDevelop.Ide.Gui.Dialogs.GtkErrorDialog (TransientFor, Title, Message, Buttons);
 			errorDialog.AddDetails (Exception.ToString (), false);
-			MonoDevelop.Ide.MessageService.ShowCustomDialog (errorDialog, TransientFor);
+			int result = MonoDevelop.Ide.MessageService.ShowCustomDialog (errorDialog);
+			ResultButton = result >= 0 ? Buttons [result] : null;
 			return true;
 		}
 	}
 }
-
