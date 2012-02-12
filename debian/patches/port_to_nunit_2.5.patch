@@ -1,48 +1,5 @@
-Index: monodevelop/src/addins/NUnit/NUnitRunner/NUnitTestRunner.cs
-===================================================================
---- monodevelop.orig/src/addins/NUnit/NUnitRunner/NUnitTestRunner.cs	2011-07-03 16:33:08.000000000 +0100
-+++ monodevelop/src/addins/NUnit/NUnitRunner/NUnitTestRunner.cs	2011-07-03 16:33:37.000000000 +0100
-@@ -43,25 +43,25 @@
- 	public class NUnitTestRunner: MarshalByRefObject
- 	{
- 		public void Initialize (string nunitPath, string nunitCorePath)
--		{
--			// In some cases MS.NET can't properly resolve assemblies even if they
--			// are already loaded. For example, when deserializing objects from remoting.
--			AppDomain.CurrentDomain.AssemblyResolve += delegate (object s, ResolveEventArgs args) {
--				foreach (Assembly am in AppDomain.CurrentDomain.GetAssemblies ()) {
--					if (am.GetName ().FullName == args.Name)
--						return am;
--				}
--				return null;
--			};
--
-+		{
-+			// In some cases MS.NET can't properly resolve assemblies even if they
-+			// are already loaded. For example, when deserializing objects from remoting.
-+			AppDomain.CurrentDomain.AssemblyResolve += delegate (object s, ResolveEventArgs args) {
-+				foreach (Assembly am in AppDomain.CurrentDomain.GetAssemblies ()) {
-+					if (am.GetName ().FullName == args.Name)
-+						return am;
-+				}
-+				return null;
-+			};
-+
- 			// Force the loading of the NUnit.Framework assembly.
- 			// It's needed since that dll is not located in the test dll directory.
- 			Assembly.LoadFrom (nunitCorePath);
- 			Assembly.LoadFrom (nunitPath);
--
--			// Initialize ExtensionHost if not already done
--			if ( !CoreExtensions.Host.Initialized )
--				CoreExtensions.Host.InitializeService();
-+
-+			// Initialize ExtensionHost if not already done
-+			if ( !CoreExtensions.Host.Initialized )
-+				CoreExtensions.Host.InitializeService();
- 		}
- 		
- 		public TestResult Run (EventListener listener, ITestFilter filter, string path, string suiteName, List<string> supportAssemblies)
+--- a/src/addins/NUnit/NUnitRunner/NUnitTestRunner.cs
++++ b/src/addins/NUnit/NUnitRunner/NUnitTestRunner.cs
 @@ -153,7 +153,7 @@
  		
  		public bool Pass (ITest test)
@@ -52,11 +9,9 @@ Index: monodevelop/src/addins/NUnit/NUnitRunner/NUnitTestRunner.cs
  				return true;
  			if (test.Tests != null) {
  				foreach (ITest ct in test.Tests) {
-Index: monodevelop/src/addins/NUnit/Services/ExternalTestRunner.cs
-===================================================================
---- monodevelop.orig/src/addins/NUnit/Services/ExternalTestRunner.cs	2011-07-03 16:33:52.000000000 +0100
-+++ monodevelop/src/addins/NUnit/Services/ExternalTestRunner.cs	2011-07-03 16:34:34.000000000 +0100
-@@ -46,27 +46,27 @@
+--- a/src/addins/NUnit/Services/ExternalTestRunner.cs
++++ b/src/addins/NUnit/Services/ExternalTestRunner.cs
+@@ -46,27 +46,28 @@
  {
  	class ExternalTestRunner: RemoteProcessObject
  	{
@@ -90,6 +45,7 @@ Index: monodevelop/src/addins/NUnit/Services/ExternalTestRunner.cs
 +			// Preload the runner assembly. Required because TestNameFilter is implemented there
  			string asm = Path.Combine (Path.GetDirectoryName (GetType ().Assembly.Location), "NUnitRunner.dll");
  			Assembly.LoadFrom (asm);
++                        ServiceManager.Services.AddService( new ProjectService() );
  		}
  		
  		public UnitTestResult Run (IRemoteEventListener listener, ITestFilter filter, string path, string suiteName, List<string> supportAssemblies)
@@ -98,7 +54,7 @@ Index: monodevelop/src/addins/NUnit/Services/ExternalTestRunner.cs
  			NUnitTestRunner runner = GetRunner (path);
  			EventListenerWrapper listenerWrapper = listener != null ? new EventListenerWrapper (listener) : null;
  			
-@@ -81,7 +81,7 @@
+@@ -81,7 +82,7 @@
  		}
  		
  		NUnitTestRunner GetRunner (string assemblyPath)
@@ -107,7 +63,7 @@ Index: monodevelop/src/addins/NUnit/Services/ExternalTestRunner.cs
  			TestPackage package = new TestPackage (assemblyPath);
  			package.Settings ["ShadowCopyFiles"] = false;
  			DomainManager dm = new DomainManager ();
-@@ -116,7 +116,7 @@
+@@ -116,7 +117,7 @@
  		{
  		}
  		
@@ -116,7 +72,7 @@ Index: monodevelop/src/addins/NUnit/Services/ExternalTestRunner.cs
  		{
  			testSuites.Pop ();
  			wrapped.SuiteFinished (GetTestName (result.Test), GetLocalTestResult (result));
-@@ -128,7 +128,7 @@
+@@ -129,7 +130,7 @@
  			wrapped.SuiteStarted (GetTestName (suite));
  		}
  		
@@ -125,19 +81,78 @@ Index: monodevelop/src/addins/NUnit/Services/ExternalTestRunner.cs
  		{
  			wrapped.TestFinished (GetTestName (result.Test), GetLocalTestResult (result));
  		}
-@@ -182,9 +182,9 @@
+@@ -187,42 +188,42 @@
+ 		{
  			UnitTestResult res = new UnitTestResult ();
  			res.Message = t.Message;
- 			
+-			
 -			if (t is TestSuiteResult) {
-+			if (t is TestResult) {
++
++			if (t.IsFailure) {
++				res.Status = ResultStatus.Failure;
++				res.TotalFailures = 1;
++			}
++			else if (!t.Executed) {
++				res.Status = ResultStatus.Ignored;
++				res.TotalIgnored = 1;
++			}
++			else {
++				res.Status = ResultStatus.Success;
++				res.TotalSuccess = 1;
++			}
++
++			if (t.Results != null) {
  				int s=0, f=0, i=0;
 -				CountResults ((TestSuiteResult)t, ref s, ref f, ref i);
+-				res.TotalFailures = f;
+-				res.TotalSuccess = s;
+-				res.TotalIgnored = i;
 +				CountResults ((TestResult)t, ref s, ref f, ref i);
- 				res.TotalFailures = f;
- 				res.TotalSuccess = s;
- 				res.TotalIgnored = i;
-@@ -232,21 +232,21 @@
++				res.TotalFailures += f;
++				res.TotalSuccess += s;
++				res.TotalIgnored += i;
+ 				if (f > 0)
+ 					res.Status |= ResultStatus.Failure;
+ 				if (s > 0)
+ 					res.Status |= ResultStatus.Success;
+ 				if (i > 0)
+ 					res.Status |= ResultStatus.Ignored;
+-			} else {
+-				if (t.IsFailure) {
+-					res.Status = ResultStatus.Failure;
+-					res.TotalFailures = 1;
+-				}
+-				else if (!t.Executed) {
+-					res.Status = ResultStatus.Ignored;
+-					res.TotalIgnored = 1;
+-				}
+-				else {
+-					res.Status = ResultStatus.Success;
+-					res.TotalSuccess = 1;
+-				}
++                        }
+ 			
+-				if (string.IsNullOrEmpty (res.Message)) {
+-					if (t.IsFailure)
+-						res.Message = GettextCatalog.GetString ("Test failed");
+-					else if (!t.Executed)
+-						res.Message = GettextCatalog.GetString ("Test ignored");
+-					else {
+-						res.Message = GettextCatalog.GetString ("Test successful") + "\n\n";
+-						res.Message += GettextCatalog.GetString ("Execution time: {0:0.00}ms", t.Time);
+-					}
++			if (string.IsNullOrEmpty (res.Message)) {
++				if (t.IsFailure)
++					res.Message = GettextCatalog.GetString ("Test failed");
++				else if (!t.Executed)
++					res.Message = GettextCatalog.GetString ("Test ignored");
++				else {
++					res.Message = GettextCatalog.GetString ("Test successful") + "\n\n";
++					res.Message += GettextCatalog.GetString ("Execution time: {0:0.00}ms", t.Time);
+ 				}
+ 			}
+ 			res.StackTrace = t.StackTrace;
+@@ -238,21 +239,21 @@
  			return res;
  		}		
  		
