@@ -1,7 +1,5 @@
-Index: monodevelop/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs
-===================================================================
---- monodevelop.orig/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs	2011-12-19 11:11:30.000000000 +0000
-+++ monodevelop/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs	2011-12-19 11:16:14.000000000 +0000
+--- a/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs
++++ b/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/MonoDevelop.VersionControl.Subversion.Unix/LibSvnClient.cs
 @@ -22,10 +22,6 @@
  		public static LibSvnClient GetLib ()
  		{

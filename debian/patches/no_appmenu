@@ -1,8 +1,6 @@
-Index: monodevelop-2.4+dfsg/monodevelop.in
-===================================================================
---- monodevelop-2.4+dfsg.orig/monodevelop.in   2010-09-30 17:35:57.824000003 +0200
-+++ monodevelop-2.4+dfsg/monodevelop.in        2010-09-30 17:36:37.764000005 +0200
-@@ -13,6 +13,9 @@
+--- a/monodevelop.in
++++ b/monodevelop.in
+@@ -16,6 +16,9 @@
  	_MONO_OPTIONS=$MONO_OPTIONS
  fi
  

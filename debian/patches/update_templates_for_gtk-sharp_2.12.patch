@@ -1,7 +1,5 @@
-Index: monodevelop/src/addins/CSharpBinding/templates/GtkSharp2Project.xpt.xml
-===================================================================
---- monodevelop.orig/src/addins/CSharpBinding/templates/GtkSharp2Project.xpt.xml	2011-11-08 00:33:54.000000000 +0000
-+++ monodevelop/src/addins/CSharpBinding/templates/GtkSharp2Project.xpt.xml	2011-11-08 00:53:24.000000000 +0000
+--- a/src/addins/CSharpBinding/templates/GtkSharp2Project.xpt.xml
++++ b/src/addins/CSharpBinding/templates/GtkSharp2Project.xpt.xml
 @@ -28,12 +28,12 @@
  			
  			<References>
@@ -21,10 +19,8 @@ Index: monodevelop/src/addins/CSharpBinding/templates/GtkSharp2Project.xpt.xml
  			</References>
  		
  			<Files>
-Index: monodevelop/src/addins/VBNetBinding/templates/VBGtkSharp2Project.xpt.xml
-===================================================================
---- monodevelop.orig/src/addins/VBNetBinding/templates/VBGtkSharp2Project.xpt.xml	2011-11-08 00:33:54.000000000 +0000
-+++ monodevelop/src/addins/VBNetBinding/templates/VBGtkSharp2Project.xpt.xml	2011-11-08 00:53:53.000000000 +0000
+--- a/src/addins/VBNetBinding/templates/VBGtkSharp2Project.xpt.xml
++++ b/src/addins/VBNetBinding/templates/VBGtkSharp2Project.xpt.xml
 @@ -28,12 +28,12 @@
  			
  			<References>

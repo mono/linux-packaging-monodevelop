@@ -1,8 +1,5 @@
-Index: monodevelop-0.10/monodevelop.xml
-Description: Add boo mimetype
-===================================================================
---- monodevelop-0.10/monodevelop.xml.old	2006-04-13 12:12:05.676000000 +0200
-+++ monodevelop-0.10/monodevelop.xml	2006-04-13 12:12:54.376000000 +0200
+--- a/monodevelop.xml
++++ b/monodevelop.xml
 @@ -12,6 +12,10 @@
      <comment xml:lang="en">Nemerle source</comment>
      <glob pattern="*.n"/>

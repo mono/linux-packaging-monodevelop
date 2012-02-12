@@ -1,7 +1,5 @@
-Index: monodevelop/src/addins/MonoDevelop.Autotools/templates/Makefile.include
-===================================================================
---- monodevelop.orig/src/addins/MonoDevelop.Autotools/templates/Makefile.include	2012-01-20 17:26:47.000000000 +0000
-+++ monodevelop/src/addins/MonoDevelop.Autotools/templates/Makefile.include	2012-01-20 17:27:20.000000000 +0000
+--- a/src/addins/MonoDevelop.Autotools/templates/Makefile.include
++++ b/src/addins/MonoDevelop.Autotools/templates/Makefile.include
 @@ -62,7 +62,8 @@
  CLEANFILES += $(ASSEMBLY) $(ASSEMBLY).mdb $(BINARIES) $(build_resx_resources) $(build_satellite_assembly_list)
  DISTCLEANFILES = $(GENERATED_FILES) $(pc_files) $(BUILD_DIR)/*
