@@ -10,9 +10,6 @@ DEB_SOURCE_NAME = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^
 VERSION = $(shell echo $(DEB_VERSION) | cut -d"-" -f1 | sed 's/+dfsg.*//')
 
 override_dh_auto_configure:
-	aclocal -I.
-	autoconf
-	automake --add-missing --copy
 	dh_auto_configure -- \
 	  --disable-update-mimedb \
 	  --disable-update-desktopdb \
@@ -34,11 +31,6 @@ override_dh_clideps:
 
 override_dh_auto_test:
 	# skip "make test"
-
-override_dh_clean:
-	dh_clean
-	rm -rf configure config.sub config.guess ltmain.sh aclocal.m4 autom4te.cache/
-	find . -name "Makefile.in" -delete
 
 override_dh_auto_install:
 	dh_auto_install
@@ -80,6 +72,6 @@ get-orig-source:
 	rm -r $(DEB_SOURCE_NAME)-$(VERSION)
 
 %:
-	dh $@ --with cli
+	dh $@ --with cli,autoreconf
 
 .PHONY: get-orig-source
