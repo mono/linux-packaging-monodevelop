@@ -9,8 +9,6 @@ DEB_VERSION = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^Vers
 DEB_SOURCE_NAME = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^Source | cut -d" " -f2)
 VERSION = $(shell echo $(DEB_VERSION) | cut -d"-" -f1 | sed 's/+dfsg.*//')
 
-include /usr/share/cli-common/cli.make
-
 override_dh_auto_configure:
 	aclocal -I.
 	autoconf
@@ -82,6 +80,6 @@ get-orig-source:
 	rm -r $(DEB_SOURCE_NAME)-$(VERSION)
 
 %:
-	dh $@
+	dh $@ --with cli
 
 .PHONY: get-orig-source
