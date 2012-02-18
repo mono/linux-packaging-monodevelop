@@ -4,27 +4,27 @@ Priority: optional
 Maintainer: Debian CLI Applications Team <pkg-cli-apps-team@lists.alioth.debian.org>
 Uploaders: Mirco Bauer <meebey@debian.org>, Jo Shields <directhex@apebox.org>
 Build-Depends: debhelper (>= 7.0.50)
-Build-Depends-Indep: cli-common-dev (>= 0.8~),
- mono-devel (>= 2.10),
- monodoc-base (>= 1.1.9),
- intltool,
- autoconf,
- automake,
- autotools-dev,
- gtk-sharp2-gapi (>= 2.12.8),
- libgtk2.0-cil-dev,
- libglade2.0-cil-dev,
- libgconf2.0-cil-dev,
- libgnome2.0-cil-dev,
- libnunit-cil-dev (>= 2.5),
- libmono-cecil-cil-dev,
- libmono-addins-cil-dev (>= 0.6),
- libmono-addins-gui-cil-dev (>= 0.6),
- libmetacity-dev,
- libsvn-dev,
- libapr1-dev,
- libgtkspell-dev,
- desktop-file-utils
+Build-Depends-Indep: autoconf,
+                     automake,
+                     autotools-dev,
+                     cli-common-dev (>= 0.8~),
+                     desktop-file-utils,
+                     gtk-sharp2-gapi (>= 2.12.8),
+                     intltool,
+                     libapr1-dev,
+                     libgconf2.0-cil-dev,
+                     libglade2.0-cil-dev,
+                     libgnome2.0-cil-dev,
+                     libgtk2.0-cil-dev,
+                     libgtkspell-dev,
+                     libmetacity-dev,
+                     libmono-addins-cil-dev (>= 0.6),
+                     libmono-addins-gui-cil-dev (>= 0.6),
+                     libmono-cecil-cil-dev,
+                     libnunit-cil-dev (>= 2.5),
+                     libsvn-dev,
+                     mono-devel (>= 2.10),
+                     monodoc-base (>= 1.1.9)
 Standards-Version: 3.9.2
 Homepage: http://www.monodevelop.com/
 Vcs-Git: git://git.debian.org/pkg-cli-apps/packages/monodevelop.git
@@ -32,30 +32,28 @@ Vcs-Browser: http://git.debian.org/?p=pkg-cli-apps/packages/monodevelop.git
 
 Package: monodevelop
 Architecture: all
-Suggests: monodevelop-java,
-          monodevelop-vala,
-          monodevelop-nunit,
-          monodevelop-versioncontrol,
+Suggests: exuberant-ctags,
+          gcc,
+          gettext,
+          make,
+          mono-vbnc,
+          mono-xsp | mono-xsp4,
           monodevelop-database,
           monodevelop-debugger-gdb,
-          mono-xsp | mono-xsp4,
-          mono-vbnc,
+          monodevelop-java,
+          monodevelop-nunit,
+          monodevelop-vala,
+          monodevelop-versioncontrol,
           monodoc-browser,
-          exuberant-ctags,
-          gcc,
-          make,
-          zip,
-          gettext
-Recommends: mono-devel,
-            libgtk2.0-cil-dev,
-            libglade2.0-cil-dev
-Depends: ${shlibs:Depends},
-         ${misc:Depends},
-         ${cli:Depends},
+          zip
+Recommends: libglade2.0-cil-dev, libgtk2.0-cil-dev, mono-devel
+Depends: gnome-icon-theme (>= 1.1.3),
          monodoc-manual (>= 1.1.9),
          pkg-config,
-         gnome-icon-theme (>= 1.1.3),
-         xterm | x-terminal-emulator
+         xterm | x-terminal-emulator,
+         ${cli:Depends},
+         ${misc:Depends},
+         ${shlibs:Depends}
 Provides: monodoc-viewer
 Description: Development Environment for GNOME
  MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
@@ -73,10 +71,10 @@ Description: Development Environment for GNOME
 
 Package: monodevelop-nunit
 Architecture: all
-Depends: ${shlibs:Depends},
-         ${misc:Depends},
+Depends: monodevelop (= ${source:Version}),
          ${cli:Depends},
-         monodevelop (= ${source:Version})
+         ${misc:Depends},
+         ${shlibs:Depends}
 Description: NUnit plugin for MonoDevelop
  MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
  languages.
@@ -86,10 +84,10 @@ Description: NUnit plugin for MonoDevelop
 Package: monodevelop-versioncontrol
 Architecture: all
 Replaces: monodevelop (<< 0.13.1)
-Depends: ${shlibs:Depends},
-         ${misc:Depends},
+Depends: monodevelop (= ${source:Version}),
          ${cli:Depends},
-         monodevelop (= ${source:Version})
+         ${misc:Depends},
+         ${shlibs:Depends}
 Description: VersionControl plugin for MonoDevelop
  MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
  languages.
