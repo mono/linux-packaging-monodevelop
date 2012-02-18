@@ -1,3 +1,19 @@
+monodevelop (2.8.6.3+dfsg-2) unstable; urgency=low
+
+  * Team upload.
+  * [3b97509] fix nunit port patch.
+    Needed a small logic change for the TestSuiteResult -> TestResult merge
+    in 2.5
+    Added a ProjectService needed by nunit's DomainManager service
+    Removed some line ending fuzz
+  * [ad86e5e] refresh all patches
+  * [226a326] treat new Error TestResult as a failure to get it displayed
+  * [be03336] use dh $@ --with cli instead of cli.make
+  * [f475710] wrap-and-sort debian/
+  * [2635858] use dh-autoreconf
+
+ -- Julian Taylor <jtaylor.debian@googlemail.com>  Sat, 18 Feb 2012 22:59:35 +0800
+
 monodevelop (2.8.6.3+dfsg-1) unstable; urgency=low
 
   * [1840cc1] Imported Upstream version 2.8.6.3+dfsg
