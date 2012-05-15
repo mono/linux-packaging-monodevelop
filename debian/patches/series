@@ -14,6 +14,6 @@ boo_mimetype.patch
 #use_csc.patch
 #monodevelop_fix_addin_highlights_r130904.patch
 #remove_support_for_soft_debugger.patch
-remove_support_for_moonlight.patch
+#remove_support_for_moonlight.patch
 no_appmenu
 generate_automake_1.11.2_compatible_makefiles.patch
