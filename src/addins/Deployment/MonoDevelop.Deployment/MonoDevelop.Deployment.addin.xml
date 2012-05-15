@@ -6,14 +6,14 @@
        url         = "http://www.monodevelop.com"
        description = "Provides basic deployment services"
 	   category    = "Deployment"
-       version     = "2.8.6.3"
+       version     = "3.0.1"
        flags       = "Hidden"
-       compatVersion = "2.7">
+       compatVersion = "2.9.0">
 
 	<Dependencies>
-		<Addin id="Core" version="2.8.6.3"/>
-		<Addin id="Ide" version="2.8.6.3"/>
-		<Addin id="DesignerSupport" version="2.8.6.3"/>
+		<Addin id="Core" version="3.0.1"/>
+		<Addin id="Ide" version="3.0.1"/>
+		<Addin id="DesignerSupport" version="3.0.1"/>
 	</Dependencies>
 
 	<Extension path = "/MonoDevelop/Ide/Commands">
@@ -82,14 +82,14 @@
 
 	<Extension path = "/MonoDevelop/Ide/ContextMenu/ProjectPad/Tools">
 		<Condition id="ItemType" value="Solution|Project">
-			<CommandItem id = "MonoDevelop.Deployment.Commands.CreatePackage" insertafter="MonoDevelop.Ide.Commands.ProjectCommands.ExportProject"/>
+			<CommandItem id = "MonoDevelop.Deployment.Commands.CreatePackage" insertafter="MonoDevelop.Ide.Commands.ProjectCommands.ExportSolution"/>
 			<CommandItem id = "MonoDevelop.Deployment.Commands.Install" insertafter="ExportSeparator"/>
 		</Condition>
 	</Extension>	
 
 	<Extension path = "/MonoDevelop/Ide/MainMenu/Project">
-		<CommandItem id = "MonoDevelop.Deployment.Commands.CreatePackage" insertafter="MonoDevelop.Ide.Commands.ProjectCommands.ExportProject"/>
-	</Extension>	
+		<CommandItem id = "MonoDevelop.Deployment.Commands.CreatePackage" insertafter="MonoDevelop.Ide.Commands.ProjectCommands.ExportSolution"/>
+	</Extension>
 
 	<Extension path = "/MonoDevelop/ProjectModel/SerializableClasses">
 		<DataType class = "MonoDevelop.Deployment.Targets.LocalFileCopyConfiguration" />

@@ -65,12 +65,16 @@ namespace Mono.Debugging.Soft
 			get {
 				SoftEvaluationContext ctx = (SoftEvaluationContext) Context;
 				try {
-					return ctx.Frame.GetValue (variable);
+					var value = ctx.Frame.GetValue (variable);
+
+					if (variable.Type.IsPointer) {
+						long addr = (long) ((PrimitiveValue) value).Value;
+						value = new PointerValue (value.VirtualMachine, variable.Type, addr);
+					}
+
+					return value;
 				} catch (AbsentInformationException) {
-					if (((SoftDebuggerSession) ctx.Session).IsExternalCode (ctx.Frame))
-						throw new EvaluatorException ("Value not available");
-					
-					throw;
+					throw new EvaluatorException ("Value not available");
 				}
 			}
 			set {

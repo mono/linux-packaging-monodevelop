@@ -1,4 +1,4 @@
-	
+
 ASSEMBLY_BUILD_DIR = $(top_builddir)/build/bin
 ASSEMBLY = $(ASSEMBLY_BUILD_DIR)/Mono.Debugging.dll
 
@@ -38,6 +38,7 @@ FILES =  \
 	Mono.Debugging.Client/DebuggerStartInfo.cs \
 	Mono.Debugging.Client/EvaluationOptions.cs \
 	Mono.Debugging.Client/ExceptionInfo.cs \
+	Mono.Debugging.Client/FunctionBreakpoint.cs \
 	Mono.Debugging.Client/IExpressionEvaluator.cs \
 	Mono.Debugging.Client/ObjectPath.cs \
 	Mono.Debugging.Client/ObjectValue.cs \
@@ -63,6 +64,7 @@ FILES =  \
 	Mono.Debugging.Evaluation/FilteredMembersSource.cs \
 	Mono.Debugging.Evaluation/ICollectionAdaptor.cs \
 	Mono.Debugging.Evaluation/IObjectSource.cs \
+	Mono.Debugging.Evaluation/IStringAdaptor.cs \
 	Mono.Debugging.Evaluation/LiteralValueReference.cs \
 	Mono.Debugging.Evaluation/NamespaceValueReference.cs \
 	Mono.Debugging.Evaluation/NRefactoryEvaluator.cs \

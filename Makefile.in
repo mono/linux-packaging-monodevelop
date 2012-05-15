@@ -256,7 +256,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = contrib src po man theme-icons build tests
+SUBDIRS = ../external contrib src po man theme-icons build tests
 
 #capture aclocal flags for autoreconf
 ACLOCAL_AMFLAGS = $(ACLOCAL_FLAGS)
@@ -979,6 +979,8 @@ $(buildinfo): vcrevision
 	@echo "Updated build information"
 	@cat $(buildinfo)
 
+buildinfo: $(buildinfo)
+
 @ENABLE_UPDATE_MIMEDB_TRUE@install-data-hook:
 @ENABLE_UPDATE_MIMEDB_TRUE@	$(UPDATE_MIME_DB) $(DESTDIR)$(datadir)/mime
 
@@ -1012,10 +1014,10 @@ run-gdb: $(PROGRAM)
 	rm -f gdb.commands
 
 run-profile: $(PROGRAM)
-	$(MD_LAUNCH) -O=inline --profile $(MD_BIN_PATH)/MonoDevelop.exe
+	$(MD_LAUNCH) --profile=log:calls $(MD_BIN_PATH)/MonoDevelop.exe
 
 run-profile-stat: $(PROGRAM)
-	$(MD_LAUNCH) --profile=logging:stat $(MD_BIN_PATH)/MonoDevelop.exe
+	$(MD_LAUNCH) --profile=log:sample $(MD_BIN_PATH)/MonoDevelop.exe
 
 run-trace: $(PROGRAM)
 	$(MD_LAUNCH_SETUP) MONODEVELOP_TRACE=1 exec strace -ttt -f -o md.strace mono $(MD_BIN_PATH)/MonoDevelop.exe
@@ -1040,10 +1042,7 @@ app-dir: all
 # launched from top_srcdir (i.e. where this script is located)
 abs_top_builddir ?= $(top_builddir)
 
-.PHONY: vcrevision
-
-package-monomac:
-	$(MD_LAUNCH_SETUP) mono --debug "build/bin/mdtool.exe" setup pack ../extras/MonoDevelop.MonoMac/build/MonoDevelop.MonoMac.dll
+.PHONY: vcrevision buildinfo
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -25,6 +25,7 @@
 // THE SOFTWARE.
 
 using System;
+using System.Text;
 using System.Collections.Generic;
 using Mono.Debugging.Client;
 using Mono.Debugging.Backend;
@@ -34,6 +35,18 @@ using Mono.Debugging.Evaluation;
 
 namespace Mono.Debugging.Soft
 {
+	internal class SoftDebuggerStackFrame : Mono.Debugging.Client.StackFrame {
+		public Mono.Debugger.Soft.StackFrame StackFrame {
+			get; private set;
+		}
+		
+		public SoftDebuggerStackFrame (Mono.Debugger.Soft.StackFrame frame, string addressSpace, SourceLocation location, string language, bool isExternalCode, bool hasDebugInfo, string fullModuleName, string fullTypeName)
+			: base (frame.ILOffset, addressSpace, location, language, isExternalCode, hasDebugInfo, fullModuleName, fullTypeName)
+		{
+			StackFrame = frame;
+		}
+	}
+	
 	public class SoftDebuggerBacktrace: BaseBacktrace
 	{
 		MDB.StackFrame[] frames;
@@ -80,12 +93,80 @@ namespace Mono.Debugging.Soft
 		{
 			MDB.MethodMirror method = frame.Method;
 			MDB.TypeMirror type = method.DeclaringType;
-			string methodName = method.Name;
-			if (type != null)
-				methodName = type.FullName + "." + methodName;
-			var location = new DC.SourceLocation (methodName, SoftDebuggerSession.NormalizePath (frame.FileName), frame.LineNumber);
-			var lang = frame.Method != null ? "Managed" : "Native";
-			return new DC.StackFrame (frame.ILOffset, method.FullName, location, lang, session.IsExternalCode (frame), true, type.Module.FullyQualifiedName, type.FullName);
+			string fileName = frame.FileName;
+			string typeFullName = null;
+			string typeFQN = null;
+			string methodName;
+			
+			if (fileName != null)
+				fileName = SoftDebuggerSession.NormalizePath (fileName);
+			
+			if (method.VirtualMachine.Version.AtLeast (2, 12) && method.IsGenericMethod) {
+				StringBuilder name = new StringBuilder (method.Name);
+				
+				name.Append ('<');
+				
+				if (method.VirtualMachine.Version.AtLeast (2, 15)) {
+					bool first = true;
+					
+					foreach (var argumentType in method.GetGenericArguments ()) {
+						if (!first)
+							name.Append (", ");
+						
+						name.Append (session.Adaptor.GetDisplayTypeName (argumentType.FullName));
+						first = false;
+					}
+				}
+				
+				name.Append ('>');
+				
+				methodName = name.ToString ();
+			} else {
+				methodName = method.Name;
+			}
+			
+			// Compiler generated anonymous/lambda methods
+			bool special_method = false;
+			if (methodName [0] == '<' && methodName.Contains (">m__")) {
+				int nidx = methodName.IndexOf (">m__") + 2;
+				methodName = "AnonymousMethod" + methodName.Substring (nidx, method.Name.Length - nidx);
+				special_method = true;
+			}
+			
+			if (type != null) {
+				string typeDisplayName = session.Adaptor.GetDisplayTypeName (type.FullName);
+				
+				if (SoftDebuggerAdaptor.IsGeneratedType (type)) {
+					// The user-friendly method name is embedded in the generated type name
+					var mn = SoftDebuggerAdaptor.GetNameFromGeneratedType (type);
+					
+					// Strip off the generated type name
+					int dot = typeDisplayName.LastIndexOf ('.');
+					var tname = typeDisplayName.Substring (0, dot);
+
+					// Keep any type arguments
+					int targs = typeDisplayName.LastIndexOf ('<');
+					if (targs > dot + 1)
+						mn += typeDisplayName.Substring (targs, typeDisplayName.Length - targs);
+					
+					typeDisplayName = tname;
+					
+					if (special_method)
+						typeDisplayName += "." + mn;
+					else
+						methodName = mn;
+				}
+				
+				methodName = typeDisplayName + "." + methodName;
+				
+				typeFQN = type.Module.FullyQualifiedName;
+				typeFullName = type.FullName;
+			}
+			
+			var location = new DC.SourceLocation (methodName, fileName, frame.LineNumber);
+			var external = session.IsExternalCode (frame);
+			
+			return new SoftDebuggerStackFrame (frame, method.FullName, location, "Managed", external, true, typeFQN, typeFullName);
 		}
 		
 		protected override EvaluationContext GetEvaluationContext (int frameIndex, EvaluationOptions options)

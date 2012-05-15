@@ -37,6 +37,7 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.DesignerSupport;
 using pg = MonoDevelop.Components.PropertyGrid;
 using MonoDevelop.Components.Docking;
+using System.Collections.Generic;
 
 namespace MonoDevelop.DesignerSupport
 {
@@ -46,6 +47,8 @@ namespace MonoDevelop.DesignerSupport
 		pg.PropertyGrid grid;
 		MonoDevelop.Components.InvisibleFrame frame;
 		bool customWidget;
+		IPadWindow container;
+		DockToolbarProvider toolbarProvider = new DockToolbarProvider ();
 		
 		public PropertyPad ()
 		{
@@ -54,15 +57,20 @@ namespace MonoDevelop.DesignerSupport
 			frame.Add (grid);
 			
 			frame.ShowAll ();
-			DesignerSupport.Service.SetPad (this);
 		}
 		
 		public override void Initialize (IPadWindow container)
 		{
 			base.Initialize (container);
-			grid.SetToolbarProvider (new DockToolbarProvider (container.GetToolbar (Gtk.PositionType.Top)));
+			toolbarProvider.Attach (container.GetToolbar (Gtk.PositionType.Top));
+			grid.SetToolbarProvider (toolbarProvider);
+			this.container = container;
+			DesignerSupport.Service.SetPad (this);
 		}
-
+		
+		internal IPadWindow PadWindow {
+			get { return container; }
+		}
 		
 		#region AbstractPadContent implementations
 		
@@ -89,6 +97,7 @@ namespace MonoDevelop.DesignerSupport
 					customWidget = false;
 					frame.Remove (frame.Child);
 					frame.Add (grid);
+					toolbarProvider.Attach (container.GetToolbar (Gtk.PositionType.Top));
 				}
 				
 				return grid;
@@ -97,48 +106,87 @@ namespace MonoDevelop.DesignerSupport
 		
 		internal void UseCustomWidget (Gtk.Widget widget)
 		{
+			toolbarProvider.Attach (null);
+			ClearToolbar ();
 			customWidget = true;
 			frame.Remove (frame.Child);
 			frame.Add (widget);
 			widget.Show ();			
+		}
+		
+		void ClearToolbar ()
+		{
+			if (container != null) {
+				var toolbar = container.GetToolbar (Gtk.PositionType.Top);
+				foreach (var w in toolbar.Children)
+					toolbar.Remove (w);
+			}
 		}
 	}
 	
 	class DockToolbarProvider: pg.PropertyGrid.IToolbarProvider
 	{
 		DockItemToolbar tb;
+		List<Gtk.Widget> buttons = new List<Gtk.Widget> ();
+		bool visible = true;
 		
-		public DockToolbarProvider (DockItemToolbar tb)
+		public DockToolbarProvider ()
 		{
+		}
+		
+		public void Attach (DockItemToolbar tb)
+		{
+			if (this.tb == tb)
+				return;
 			this.tb = tb;
+			if (tb != null) {
+				tb.Visible = visible;
+				foreach (var c in tb.Children)
+					tb.Remove (c);
+				foreach (var b in buttons)
+					tb.Add (b);
+			}
 		}
 		
 		#region IToolbarProvider implementation
 		public void Insert (Gtk.Widget w, int pos)
 		{
-			tb.Insert (w, pos);
+			if (tb != null)
+				tb.Insert (w, pos);
+			
+			if (pos == -1)
+				buttons.Add (w);
+			else
+				buttons.Insert (pos, w);
 		}
 		
 		
 		public void ShowAll ()
 		{
-			tb.ShowAll ();
+			if (tb != null)
+				tb.ShowAll ();
+			else {
+				foreach (var b in buttons)
+					b.Show ();
+			}
 		}
 		
 		
 		public Gtk.Widget[] Children {
 			get {
-				return tb.Children;
+				return buttons.ToArray ();
 			}
 		}
 		
 		
 		public bool Visible {
 			get {
-				return tb.Visible;
+				return visible;
 			}
 			set {
-				tb.Visible = value;
+				visible = value;
+				if (tb != null)
+					tb.Visible = value;
 			}
 		}
 		

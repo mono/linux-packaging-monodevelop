@@ -36,6 +36,7 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Core.ProgressMonitoring;
 using MonoDevelop.Ide.FindInFiles;
+using MonoDevelop.Components.Docking;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -58,6 +59,11 @@ namespace MonoDevelop.Ide.Gui
 		public IProgressMonitor GetCleanProgressMonitor ()
 		{
 			return GetBuildProgressMonitor (GettextCatalog.GetString ("Cleaning..."));
+		}
+		
+		public IProgressMonitor GetRebuildProgressMonitor ()
+		{
+			return GetBuildProgressMonitor (GettextCatalog.GetString ("Rebuilding..."));
 		}
 		
 		private IProgressMonitor GetBuildProgressMonitor (string statusText)
@@ -199,9 +205,9 @@ namespace MonoDevelop.Ide.Gui
 			}
 
 			if (show)
-				pad = IdeApp.Workbench.ShowPad (monitorPad, newPadId, title, basePadId + "/Center Bottom", icon);
+				pad = IdeApp.Workbench.ShowPad (monitorPad, newPadId, title, basePadId + "/Center Bottom", DockItemStatus.AutoHide, icon);
 			else
-				pad = IdeApp.Workbench.AddPad (monitorPad, newPadId, title, basePadId + "/Center Bottom", icon);
+				pad = IdeApp.Workbench.AddPad (monitorPad, newPadId, title, basePadId + "/Center Bottom", DockItemStatus.AutoHide, icon);
 			
 			monitorPad.StatusSourcePad = pad;
 			pad.Sticky = true;
@@ -214,8 +220,6 @@ namespace MonoDevelop.Ide.Gui
 					pad.Destroy ();
 				};
 			}
-			
-			pad.AutoHide = true;
 			
 			if (bringToFront) {
 				pad.Visible = true;

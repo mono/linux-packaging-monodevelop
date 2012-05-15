@@ -50,16 +50,18 @@ namespace MonoDevelop.Components
 		
 		protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
 		{
+			if (!evnt.TriggersContextMenu ()) {
+				return base.OnButtonPressEvent (evnt);
+			}
+
+			//pass click to base it it can update the selection
+			//unless the node is already selected, in which case we don't want to change the selection
 			bool res = false;
-			bool withModifier = (evnt.State & selectionModifiers) != 0;
-			if (IsClickedNodeSelected ((int)evnt.X, (int)evnt.Y) && MultipleNodesSelected () && !withModifier) {
-				res = true;
+			if (!IsClickedNodeSelected ((int)evnt.X, (int)evnt.Y)) {
+				res = base.OnButtonPressEvent (evnt);
 			}
 			
-			if (!res)
-				res = base.OnButtonPressEvent (evnt);
-			
-			if (DoPopupMenu != null && evnt.TriggersContextMenu ()) {
+			if (DoPopupMenu != null) {
 				if (!workaroundBug2157)
 					DoPopupMenu (evnt);
 				return true;
@@ -103,5 +105,23 @@ namespace MonoDevelop.Components
 		{
 			return this.Selection.GetSelectedRows ().Length > 1;
 		}
+		
+		protected override bool OnDragMotion (Gdk.DragContext context, int x, int y, uint time)
+		{
+			bool canDrop = CheckCanDrop != null && CheckCanDrop (context, x, y, time);
+			
+			//let default handler handle hover-to-expand, autoscrolling, etc
+			base.OnDragMotion (context, x, y, time);
+			
+			//if we can't handle it, flag as not droppable and remove the drop marker
+			if (!canDrop) {
+				Gdk.Drag.Status (context, (Gdk.DragAction)0, time);
+				SetDragDestRow (null, 0);
+			}
+			
+			return true;
+		}
+		
+		internal Func<Gdk.DragContext, int, int, uint, bool> CheckCanDrop { get; set; }
 	}
 }

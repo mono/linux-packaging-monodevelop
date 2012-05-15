@@ -134,10 +134,15 @@ namespace Mono.Debugger.Soft
 			conn.VM_Exit (exitCode);
 		}
 
-		public void Dispose () {
+		public void Detach () {
 			conn.VM_Dispose ();
 			conn.Close ();
 			notify_vm_event (EventType.VMDisconnect, SuspendPolicy.None, 0, 0, null);
+		}
+
+		public void ForceDisconnect ()
+		{
+			conn.ForceDisconnect ();
 		}
 
 		public IList<ThreadMirror> GetThreads () {
@@ -581,6 +586,11 @@ namespace Mono.Debugger.Soft
 			for (int i = 0; i < values.Count; ++i)
 				res [i] = EncodeValue (values [i]);
 			return res;
+		}
+
+		internal void CheckProtocolVersion (int major, int minor) {
+			if (!conn.Version.AtLeast (major, minor))
+				throw new NotSupportedException ("This request is not supported by the protocol version implemented by the debuggee.");
 		}
     }
 

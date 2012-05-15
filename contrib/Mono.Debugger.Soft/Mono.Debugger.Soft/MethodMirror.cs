@@ -19,6 +19,8 @@ namespace Mono.Debugger.Soft
 		LocalVariable[] locals;
 		IList<Location> locations;
 		MethodBodyMirror body;
+		MethodMirror gmd;
+		TypeMirror[] type_args;
 
 		internal MethodMirror (VirtualMachine vm, long id) : base (vm, id) {
 		}
@@ -29,7 +31,7 @@ namespace Mono.Debugger.Soft
 					name = vm.conn.Method_GetName (id);
 				return name;
 			}
-	    }
+		}
 
 		public TypeMirror DeclaringType {
 			get {
@@ -37,7 +39,7 @@ namespace Mono.Debugger.Soft
 					declaring_type = vm.GetType (vm.conn.Method_GetDeclaringType (id));
 				return declaring_type;
 			}
-	    }
+		}
 
 		public TypeMirror ReturnType {
 			get {
@@ -68,24 +70,24 @@ namespace Mono.Debugger.Soft
 				sb.Append(")");
 				return sb.ToString ();
 			}
-	    }
+		}
 
-		void GetInfo () {
+		MethodInfo GetInfo () {
 			if (info == null)
 				info = vm.conn.Method_GetInfo (id);
+			
+			return info;
 		}
 
 		public int MetadataToken {
 			get {
-				GetInfo ();
-				return info.token;
+				return GetInfo ().token;
 			}
 		}
 
 		public MethodAttributes Attributes {
 			get {
-				GetInfo ();
-				return (MethodAttributes)info.attributes;
+				return (MethodAttributes) GetInfo ().attributes;
 			}
 		}
 
@@ -158,7 +160,27 @@ namespace Mono.Debugger.Soft
 			}
 		}
 
-	    public ParameterInfoMirror[] GetParameters () {
+		// Since protocol version 2.12
+		public bool IsGenericMethodDefinition {
+			get {
+				vm.CheckProtocolVersion (2, 12);
+				return GetInfo ().is_gmd;
+			}
+		}
+
+		// Since protocol version 2.12
+		public bool IsGenericMethod {
+			get {
+				vm.CheckProtocolVersion (2, 12);
+				return GetInfo ().is_generic_method;
+			}
+		}
+
+		public MethodImplAttributes GetMethodImplementationFlags() {
+			return (MethodImplAttributes)GetInfo ().iattributes;
+		}
+
+		public ParameterInfoMirror[] GetParameters () {
 			if (param_info == null) {
 				var pi = vm.conn.Method_GetParamInfo (id);
 				param_info = new ParameterInfoMirror [pi.param_count];
@@ -174,7 +196,7 @@ namespace Mono.Debugger.Soft
 			return param_info;
 		}
 
-	    public ParameterInfoMirror ReturnParameter {
+		public ParameterInfoMirror ReturnParameter {
 			get {
 				if (ret_param == null)
 					GetParameters ();
@@ -184,7 +206,13 @@ namespace Mono.Debugger.Soft
 
 		public LocalVariable[] GetLocals () {
 			if (locals == null) {
-				var li = vm.conn.Method_GetLocalsInfo (id);
+
+				LocalsInfo li = new LocalsInfo ();
+				try {
+					li = vm.conn.Method_GetLocalsInfo (id);
+				} catch (CommandException) {
+					throw new ArgumentException ("Method doesn't have a body.");
+				}
 				// Add the arguments as well
 				var pi = vm.conn.Method_GetParamInfo (id);
 
@@ -226,13 +254,31 @@ namespace Mono.Debugger.Soft
 			return body;
 		}
 
+		public MethodMirror GetGenericMethodDefinition () {
+			vm.CheckProtocolVersion (2, 12);
+			if (gmd == null) {
+				if (info.gmd == 0)
+					throw new InvalidOperationException ();
+				gmd = vm.GetMethod (info.gmd);
+			}
+			return gmd;
+		}
+
+		// Since protocol version 2.15
+		public TypeMirror[] GetGenericArguments () {
+			vm.CheckProtocolVersion (2, 15);
+			if (type_args == null)
+				type_args = vm.GetTypes (GetInfo ().type_args);
+			return type_args;
+		}
+
 		public IList<int> ILOffsets {
 			get {
 				if (debug_info == null)
 					debug_info = vm.conn.Method_GetDebugInfo (id);
 				return Array.AsReadOnly (debug_info.il_offsets);
 			}
-	    }
+		}
 
 		public IList<int> LineNumbers {
 			get {
@@ -240,15 +286,15 @@ namespace Mono.Debugger.Soft
 					debug_info = vm.conn.Method_GetDebugInfo (id);
 				return Array.AsReadOnly (debug_info.line_numbers);
 			}
-	    }
+		}
 
 		public string SourceFile {
 			get {
 				if (debug_info == null)
 					debug_info = vm.conn.Method_GetDebugInfo (id);
-				return debug_info.filename;
+				return debug_info.source_files.Length > 0 ? debug_info.source_files [0].source_file : null;
 			}
-	    }
+		}
 
 		public IList<Location> Locations {
 			get {
@@ -257,24 +303,29 @@ namespace Mono.Debugger.Soft
 					var line_numbers = LineNumbers;
 					IList<Location> res = new Location [ILOffsets.Count];
 					for (int i = 0; i < il_offsets.Count; ++i)
-						res [i] = new Location (vm, this, -1, il_offsets [i], SourceFile, line_numbers [i], 0);
+						res [i] = new Location (vm, this, -1, il_offsets [i], debug_info.source_files [i].source_file, line_numbers [i], 0, debug_info.source_files [i].hash);
 					locations = res;
 				}
 				return locations;
 			}
 		}				
 
-		internal int il_offset_to_line_number (int il_offset) {
+		internal int il_offset_to_line_number (int il_offset, out string src_file, out byte[] src_hash) {
 			if (debug_info == null)
 				debug_info = vm.conn.Method_GetDebugInfo (id);
 
 			// FIXME: Optimize this
+			src_file = null;
+			src_hash = null;
 			for (int i = debug_info.il_offsets.Length - 1; i >= 0; --i) {
-				if (debug_info.il_offsets [i] <= il_offset)
+				if (debug_info.il_offsets [i] <= il_offset) {
+					src_file = debug_info.source_files [i].source_file;
+					src_hash = debug_info.source_files [i].hash;
 					return debug_info.line_numbers [i];
+				}
 			}
 			return -1;
-	    }
+		}
 
 		public Location LocationAtILOffset (int il_offset) {
 			IList<Location> locs = Locations;
@@ -295,5 +346,5 @@ namespace Mono.Debugger.Soft
 				return meta;
 			}
 		}
-    }
+	}
 }

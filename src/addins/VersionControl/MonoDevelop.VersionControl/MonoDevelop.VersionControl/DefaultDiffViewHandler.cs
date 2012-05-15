@@ -28,20 +28,21 @@ using System;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.VersionControl.Views;
+using MonoDevelop.Projects.Text;
 
 namespace MonoDevelop.VersionControl
 {
 	public class DefaultDiffViewHandler : IDiffViewHandler
 	{
-		
-		public bool CanHandle (VersionControlItem item)
+		public bool CanHandle (VersionControlItem item, IViewContent primaryView)
 		{
-			return DesktopService.GetMimeTypeIsText (DesktopService.GetMimeTypeForUri (item.Path));
+			return (primaryView == null || primaryView.GetContent <ITextFile> () != null)
+				&& DesktopService.GetMimeTypeIsText (DesktopService.GetMimeTypeForUri (item.Path));
 		}
-		
-		public IDiffView CreateView (VersionControlItem item, IViewContent primaryView)
+
+		public IDiffView CreateView (VersionControlDocumentInfo info)
 		{
-			return new DiffView (new VersionControlDocumentInfo (primaryView, item, item.Repository));
+			return new DiffView (info);
 		}
 	}
 }

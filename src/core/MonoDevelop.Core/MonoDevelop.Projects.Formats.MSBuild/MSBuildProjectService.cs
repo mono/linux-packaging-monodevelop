@@ -33,6 +33,7 @@ using System.Xml;
 using System.Globalization;
 using System.Runtime.Serialization.Formatters.Binary;
 using Mono.Addins;
+using MonoDevelop.Core.AddIns;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.Extensions;
 using MonoDevelop.Core.Serialization;
@@ -50,9 +51,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		
 		//NOTE: default toolsversion should match the default format.
 		// remember to update the builder process' app.config too
-		public const string DefaultFormat = "MSBuild08";
-		const string REFERENCED_MSBUILD_TOOLS = "3.5";
-		const string REFERENCED_MSBUILD_UTILS = "Microsoft.Build.Utilities.v3.5";
+		public const string DefaultFormat = "MSBuild10";
+		const string REFERENCED_MSBUILD_TOOLS = "4.0";
 		internal const string DefaultToolsVersion = REFERENCED_MSBUILD_TOOLS;
 		
 		static DataContext dataContext;
@@ -446,7 +446,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					builder.ReferenceCount++;
 					return new RemoteProjectBuilder (file, binDir, builder);
 				}
-				
 
 				//always start the remote process explicitly, even if it's using the current runtime and fx
 				//else it won't pick up the assembly redirects from the builder exe
@@ -490,69 +489,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			if (toolsVersion == REFERENCED_MSBUILD_TOOLS)
 				return sourceExe;
 			
-			var newVersions = new Dictionary<string, string[]> ();
-			string version;
-			Mono.Cecil.TargetRuntime runtime;
+			var exe = sourceExe.ParentDirectory.Combine ("MSBuild", toolsVersion, sourceExe.FileName);
+			if (File.Exists (exe))
+				return exe;
 			
-			switch (toolsVersion) {
-			case "2.0":
-				version = "2.0.0.0";
-				newVersions.Add ("Microsoft.Build.Engine", new string[] {"Microsoft.Build.Engine", version});
-				newVersions.Add ("Microsoft.Build.Framework", new string[] {"Microsoft.Build.Framework", version});
-				newVersions.Add (REFERENCED_MSBUILD_UTILS, new string[] {"Microsoft.Build.Utilities", version});
-				runtime = Mono.Cecil.TargetRuntime.Net_2_0;
-				break;
-			case "3.5":
-				version = "3.5.0.0";
-				newVersions.Add ("Microsoft.Build.Engine", new string[] {"Microsoft.Build.Engine", version});
-				newVersions.Add ("Microsoft.Build.Framework", new string[] {"Microsoft.Build.Framework", version});
-				newVersions.Add (REFERENCED_MSBUILD_UTILS, new string[] {"Microsoft.Build.Utilities.v3.5", version});
-				runtime = Mono.Cecil.TargetRuntime.Net_2_0;
-				break;
-			case "4.0":
-				version = "4.0.0.0";
-				newVersions.Add ("Microsoft.Build.Engine", new string[] {"Microsoft.Build.Engine", version});
-				newVersions.Add ("Microsoft.Build.Framework", new string[] {"Microsoft.Build.Framework", version});
-				newVersions.Add (REFERENCED_MSBUILD_UTILS, new string[] {"Microsoft.Build.Utilities.v4.0", version});
-				runtime = Mono.Cecil.TargetRuntime.Net_4_0;
-				break;
-			default:
-				throw new InvalidOperationException ("Unknown MSBuild ToolsVersion '" + toolsVersion + "'");
-			}
-			
-			FilePath p = UserProfile.Current.CacheDir.Combine ("xbuild", toolsVersion, "MonoDevelop.Projects.Formats.MSBuild.exe");
-			if (!File.Exists (p) || File.GetLastWriteTime (p) < File.GetLastWriteTime (sourceExe)) {
-				if (!Directory.Exists (p.ParentDirectory))
-					Directory.CreateDirectory (p.ParentDirectory);
-				
-				// Update the references to msbuild
-				Cecil.AssemblyDefinition asm = Cecil.AssemblyDefinition.ReadAssembly (sourceExe);
-				foreach (Cecil.AssemblyNameReference ar in asm.MainModule.AssemblyReferences) {
-					string[] replacement;
-					if (newVersions.TryGetValue (ar.Name, out replacement)) {
-						ar.Name = replacement[0];
-						ar.Version = new Version (replacement[1]);
-					}
-				}
-				asm.MainModule.Runtime = runtime;
-				
-				//run in 32-bit mode because usually msbuild targets are installed for 32-bit only
-				asm.MainModule.Attributes |= Mono.Cecil.ModuleAttributes.Required32Bit;
-				
-				// Workaround to a bug in mcs. The ILOnly flag is not emitted when using /platform:x86
-				asm.MainModule.Attributes |= Mono.Cecil.ModuleAttributes.ILOnly;
-				
-				asm.Write (p);
-			}
-			
-			FilePath configFile = p + ".config";
-			FilePath configSrc = typeof(ProjectBuilder).Assembly.Location + ".config";
-			if (!File.Exists (configFile) || File.GetLastWriteTime (configFile) < File.GetLastWriteTime (configSrc)) {
-				var config = File.ReadAllText (configSrc);
-				config = config.Replace (REFERENCED_MSBUILD_TOOLS + ".0.0", version);
-				File.WriteAllText (p + ".config", config);
-			}
-			return p;
+			throw new InvalidOperationException ("Unsupported MSBuild ToolsVersion '" + toolsVersion + "'");
 		}
 
 		internal static void ReleaseProjectBuilder (RemoteBuildEngine engine)
@@ -615,7 +556,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		static string LoadProjectTypeGuids (string fileName)
 		{
 			MSBuildProject project = new MSBuildProject ();
-			project.LoadXml (File.ReadAllText (fileName));
+			project.Load (fileName);
 			
 			MSBuildPropertySet globalGroup = project.GetGlobalPropertyGroup ();
 			if (globalGroup == null)

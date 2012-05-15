@@ -42,13 +42,15 @@ namespace Mono.Debugger.Soft
 			get {
 				if (location == null) {
 					int line_number;
+					string src_file = null;
+					byte[] hash = null;
 
 					if (il_offset == -1)
 						line_number = -1;
 					else
-						line_number = method.il_offset_to_line_number (il_offset);
+						line_number = method.il_offset_to_line_number (il_offset, out src_file, out hash);
 
-					location = new Location (vm, Method, 0, il_offset, method.SourceFile, line_number, 0);
+					location = new Location (vm, Method, 0, il_offset, src_file != null ? src_file : method.SourceFile, line_number, 0, hash);
 				}
 				return location;
 			}
@@ -75,6 +77,16 @@ namespace Mono.Debugger.Soft
 		public bool IsDebuggerInvoke {
 			get {
 				return (flags & StackFrameFlags.DEBUGGER_INVOKE) != 0;
+			}
+		}
+
+		/*
+		 * Whenever this frame transitions to native code. The method associated
+		 * with the frame is either an InternalCall or a pinvoke method.
+		 */
+		public bool IsNativeTransition {
+			get {
+				return (flags & StackFrameFlags.NATIVE_TRANSITION) != 0;
 			}
 		}
 

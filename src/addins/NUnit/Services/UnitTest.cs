@@ -49,6 +49,16 @@ namespace MonoDevelop.NUnit
 		SolutionEntityItem ownerSolutionEntityItem;
 		UnitTestResultsStore results;
 		
+		public string FixtureTypeNamespace {
+			get;
+			set;
+		}
+		
+		public string FixtureTypeName {
+			get;
+			set;
+		}
+
 		protected UnitTest (string name)
 		{
 			this.name = name;
@@ -286,7 +296,15 @@ namespace MonoDevelop.NUnit
 		
 		public TestStatus Status {
 			get { return status; }
-			set { status = value; OnTestStatusChanged (); }
+			set {
+				status = value;
+				OnTestStatusChanged ();
+			}
+		}
+
+		public string TestId {
+			get;
+			protected set;
 		}
 		
 		public string FullName {
@@ -373,8 +391,8 @@ namespace MonoDevelop.NUnit
 				return;
 
 			result.TestDate = context.TestDate;
-			if ((int)result.Status == 0)
-				result.Status = ResultStatus.Ignored;
+//			if ((int)result.Status == 0)
+//				result.Status = ResultStatus.Ignored;
 			lastResult = result;
 			IResultsStore store = GetResultsStore ();
 			if (store != null)

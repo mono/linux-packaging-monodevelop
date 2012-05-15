@@ -30,16 +30,12 @@ using MonoDevelop.AspNet.Gui;
 using MonoDevelop.AspNet.Parser;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
-using MonoDevelop.Projects.Dom;
-using MonoDevelop.Projects.Dom.Parser;
+using MonoDevelop.Ide.TypeSystem;
 
 namespace MonoDevelop.AspNet
 {
-	
-	
 	public class MasterContentFileDescriptionTemplate : AspNetFileDescriptionTemplate
 	{
-		
 		public override void ModifyTags (MonoDevelop.Projects.SolutionItem policyParent, MonoDevelop.Projects.Project project, string language, string identifier, string fileName, ref Dictionary<string,string> tags)
 		{
 			base.ModifyTags (policyParent, project, language, identifier, fileName, ref tags);
@@ -54,7 +50,6 @@ namespace MonoDevelop.AspNet
 				throw new InvalidOperationException ("MasterContentFileDescriptionTemplate is only valid for ASP.NET projects");
 			
 			ProjectFile masterPage = null;
-			string masterContent = "";
 			
 			var dialog = new MonoDevelop.Ide.Projects.ProjectFileSelectorDialog (aspProj, null, "*.master");
 			try {
@@ -72,15 +67,15 @@ namespace MonoDevelop.AspNet
 			tags["AspNetMaster"] = aspProj.LocalToVirtualPath (masterPage);
 			
 			try {
-				AspNetParsedDocument pd	= ProjectDomService.GetParsedDocument (ProjectDomService.GetProjectDom (project), masterPage.FilePath)
+				var pd = TypeSystemService.ParseFile (project, masterPage.FilePath)
 						as AspNetParsedDocument;
 				if (pd == null)
 					return;
 				
-				ContentPlaceHolderVisitor visitor = new ContentPlaceHolderVisitor ();
+				var visitor = new ContentPlaceHolderVisitor ();
 				pd.RootNode.AcceptVisit (visitor);
 				
-				System.Text.StringBuilder sb = new System.Text.StringBuilder ();
+				var sb = new System.Text.StringBuilder ();
 				foreach (string id in visitor.PlaceHolders) {
 					sb.Append ("<asp:Content ContentPlaceHolderID=\"");
 					sb.Append (id);
@@ -94,6 +89,7 @@ namespace MonoDevelop.AspNet
 			catch (Exception ex) {
 				//no big loss if we just insert blank space
 				//it's just a template for the user to start editing
+				LoggingService.LogWarning ("Error generating AspNetMasterContent for template", ex);
 			}
 		}
 	}

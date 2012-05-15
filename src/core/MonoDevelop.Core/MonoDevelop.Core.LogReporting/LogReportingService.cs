@@ -61,9 +61,14 @@ namespace MonoDevelop.Core.LogReporting
 		
 		public static void ReportUnhandledException (Exception ex, bool willShutDown)
 		{
+			ReportUnhandledException (ex, willShutDown, false);
+		}
+		
+		public static void ReportUnhandledException (Exception ex, bool willShutDown, bool silently)
+		{
 			var oldReportCrashes = ReportCrashes;
 			
-			if (UnhandledErrorOccured != null)
+			if (UnhandledErrorOccured != null && !silently)
 				ReportCrashes = UnhandledErrorOccured (ReportCrashes, ex, willShutDown);
 			
 			// If crash reporting has been explicitly disabled, disregard this crash
@@ -85,7 +90,7 @@ namespace MonoDevelop.Core.LogReporting
 			}
 			
 			// Log to disk only if uploading fails.
-			var filename = string.Format ("{0}.{1}.crashlog", SystemInformation.SessionUuid, Interlocked.Increment (ref CrashId));
+			var filename = string.Format ("{0}.{1}.{2}.crashlog", DateTime.UtcNow.ToString ("yyyy-MM-dd__HH-mm-ss"), SystemInformation.SessionUuid, Interlocked.Increment (ref CrashId));
 			ThreadPool.QueueUserWorkItem (delegate {
 				if (!TryUploadReport (filename, data)) {
 					if (!Directory.Exists (CrashLogDirectory))
@@ -133,6 +138,11 @@ namespace MonoDevelop.Core.LogReporting
 		static bool TryUploadReport (string filename, byte[] data)
 		{
 			try {
+				// Empty files won't be accepted by the server as it thinks 'ContentLength' has not been set as it's
+				// zero. We don't need empty files anyway.
+				if (data.Length == 0)
+					return true;
+				
 				var server = Environment.GetEnvironmentVariable ("MONODEVELOP_CRASHREPORT_SERVER");
 				if (string.IsNullOrEmpty (server))
 					server = "monodevlog.xamarin.com:35162";

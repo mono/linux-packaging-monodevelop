@@ -33,14 +33,14 @@ namespace MonoDevelop.VersionControl
 {
 	public class DefaultLogViewHandler : ILogViewHandler
 	{
-		public bool CanHandle (VersionControlItem item)
+		public bool CanHandle (VersionControlItem item, IViewContent primaryView)
 		{
 			return true;
 		}
-		
-		public ILogView CreateView (VersionControlItem item, IViewContent primaryView)
+
+		public ILogView CreateView (VersionControlDocumentInfo info)
 		{
-			return new LogView (new VersionControlDocumentInfo (primaryView, item, item.Repository));
+			return new LogView (info);
 		}
 	}
 }

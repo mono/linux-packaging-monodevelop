@@ -43,7 +43,8 @@ namespace MonoDevelop.MacDev
 		
 		public override bool ValidateSdkLocation (FilePath location)
 		{
-			return AppleSdkSettings.ValidateSdkLocation (location);
+			FilePath xcode, vplist, devroot;
+			return AppleSdkSettings.ValidateSdkLocation (location, out xcode, out vplist, out devroot);
 		}
 		
 		public override FilePath LoadSdkLocationSetting ()

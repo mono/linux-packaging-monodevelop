@@ -41,12 +41,12 @@ using MonoDevelop.Core.Execution;
 using Mono.Addins;
 using System.Linq;
 using MonoDevelop.Core.Instrumentation;
+using System.Text;
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
 	public class MSBuildProjectHandler: MSBuildHandler, IResourceHandler, IPathHandler, IAssemblyReferenceHandler
 	{
-		string fileContent;
 		List<string> targetImports = new List<string> ();
 		IResourceHandler customResourceHandler;
 		List<string> subtypeGuids = new List<string> ();
@@ -54,10 +54,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		RemoteProjectBuilder projectBuilder;
 		string lastBuildToolsVersion;
 		string lastBuildRuntime;
+		string lastFileName;
 		ITimeTracker timer;
 		bool useXBuild;
 		MSBuildVerbosity verbosity;
-		
+
 		struct ItemInfo {
 			public MSBuildItem Item;
 			public bool Added;
@@ -132,7 +133,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				runtime = Runtime.SystemAssemblyService.CurrentRuntime;
 				toolsVersion = MSBuildProjectService.DefaultToolsVersion;
 			}
-			if (projectBuilder == null || lastBuildToolsVersion != toolsVersion || lastBuildRuntime != runtime.Id) {
+			if (projectBuilder == null || lastBuildToolsVersion != toolsVersion || lastBuildRuntime != runtime.Id || lastFileName != item.FileName) {
 				if (projectBuilder != null) {
 					projectBuilder.Dispose ();
 					projectBuilder = null;
@@ -140,6 +141,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				projectBuilder = MSBuildProjectService.GetProjectBuilder (runtime, toolsVersion, item.FileName);
 				lastBuildToolsVersion = toolsVersion;
 				lastBuildRuntime = runtime.Id;
+				lastFileName = item.FileName;
 			}
 			return projectBuilder;
 		}
@@ -154,6 +156,16 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			Runtime.SystemAssemblyService.DefaultRuntimeChanged -= OnDefaultRuntimeChanged;
 		}
 		
+		//for some reason, MD internally handles "AnyCPU" as "", but we need to be explicit when
+		//passing it to the build engine
+		static string GetExplicitPlatform (SolutionItemConfiguration configObject)
+		{
+			if (string.IsNullOrEmpty (configObject.Platform)) {
+				return "AnyCPU";
+			}
+			return configObject.Platform;
+		}
+		
 		IEnumerable<string> IAssemblyReferenceHandler.GetAssemblyReferences (ConfigurationSelector configuration)
 		{
 			if (useXBuild) {
@@ -161,7 +173,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				SolutionEntityItem item = (SolutionEntityItem) Item;
 				RemoteProjectBuilder builder = GetProjectBuilder ();
 				SolutionItemConfiguration configObject = item.GetConfiguration (configuration);
-				foreach (string s in builder.GetAssemblyReferences (configObject.Name, configObject.Platform))
+				foreach (string s in builder.GetAssemblyReferences (configObject.Name, GetExplicitPlatform (configObject)))
 					yield return s;
 			}
 			else {
@@ -185,14 +197,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				
 					LogWriter logWriter = new LogWriter (monitor.Log);
 					RemoteProjectBuilder builder = GetProjectBuilder ();
-					
-					//for some reason, MD internally handles "AnyCPU" as "", but we need to be explicit when
-					//passing it to the build engine
-					var platform = configObject.Platform;
-					if (platform.Length == 0)
-						platform = "AnyCPU";
-					
-					MSBuildResult[] results = builder.RunTarget (target, configObject.Name, configObject.Platform,
+					MSBuildResult[] results = builder.RunTarget (target, configObject.Name, GetExplicitPlatform (configObject),
 						logWriter, verbosity);
 					System.Runtime.Remoting.RemotingServices.Disconnect (logWriter);
 					
@@ -241,8 +246,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			
 			timer.Trace ("Reading project file");
 			MSBuildProject p = new MSBuildProject ();
-			fileContent = File.ReadAllText (fileName);
-			p.LoadXml (fileContent);
+			p.Load (fileName);
 			
 			//determine the file format
 			MSBuildFileFormat format = null;
@@ -339,8 +343,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 							throw new Exception ("Unable to correct flavor GUID");
 						var gg = string.Join (";", subtypeGuids) + ";" + TypeGuid;
 						p.GetGlobalPropertyGroup ().SetPropertyValue ("ProjectTypeGuids", gg.ToUpper ());
-						fileContent = p.Save ();
-						MonoDevelop.Projects.Text.TextFile.WriteFile (fileName, fileContent, "UTF-8");
+						p.Save (fileName);
 					}
 					st.UpdateImports ((SolutionEntityItem)item, targetImports);
 				} else
@@ -449,8 +452,27 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			
 			foreach (var t in toRemove)
 				msproject.RemoveItem (t);
-			fileContent = msproject.Save ();
-			MonoDevelop.Projects.Text.TextFile.WriteFile (fileName, fileContent, "UTF-8");
+			
+			msproject.Save (fileName);
+		}
+		
+		void LoadConfiguration (MSBuildSerializer serializer, List<ConfigData> configData, string conf, string platform)
+		{
+			MSBuildPropertySet grp = GetMergedConfiguration (configData, conf, platform, null);
+			SolutionItemConfiguration config = EntityItem.CreateConfiguration (conf);
+			
+			config.Platform = platform;
+			DataItem data = ReadPropertyGroupMetadata (serializer, grp, config);
+			serializer.Deserialize (config, data);
+			EntityItem.Configurations.Add (config);
+			
+			if (config is DotNetProjectConfiguration) {
+				DotNetProjectConfiguration dpc = (DotNetProjectConfiguration) config;
+				if (dpc.CompilationParameters != null) {
+					data = ReadPropertyGroupMetadata (serializer, grp, dpc.CompilationParameters);
+					serializer.Deserialize (dpc.CompilationParameters, data);
+				}
+			}
 		}
 		
 		void Load (IProgressMonitor monitor, MSBuildProject msproject)
@@ -504,40 +526,72 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			// Read configurations
 			
 			List<ConfigData> configData = GetConfigData (msproject, false);
+			List<ConfigData> partialConfigurations = new List<ConfigData> ();
+			HashSet<string> handledConfigurations = new HashSet<string> ();
+			var configurations = new HashSet<string> ();
+			var platforms = new HashSet<string> ();
 			
 			MSBuildPropertyGroup mergedToProjectProperties = ExtractMergedtoprojectProperties (ser, globalGroup, EntityItem.CreateConfiguration ("Dummy"));
 			configData.Insert (0, new ConfigData (Unspecified, Unspecified, mergedToProjectProperties));
-
-			// Create a project configuration for each configuration/platform combination
-
-			var platforms = new HashSet<string> ();
-			var configurations = new HashSet<string> ();
-			foreach (ConfigData cgrp in configData) {
-				if (cgrp.Platform != Unspecified)
-					platforms.Add (cgrp.Platform);
-				if (cgrp.Config != Unspecified)
-					configurations.Add (cgrp.Config);
+			
+			// Load configurations, skipping the dummy config at index 0.
+			for (int i = 1; i < configData.Count; i++) {
+				ConfigData cgrp = configData[i];
+				string platform = cgrp.Platform;
+				string conf = cgrp.Config;
+				
+				if (platform != Unspecified)
+					platforms.Add (platform);
+				
+				if (conf != Unspecified)
+					configurations.Add (conf);
+				
+				if (conf == Unspecified || platform == Unspecified) {
+					// skip partial configurations for now...
+					partialConfigurations.Add (cgrp);
+					continue;
+				}
+				
+				string key = conf + "|" + platform;
+				if (handledConfigurations.Contains (key))
+					continue;
+				
+				LoadConfiguration (ser, configData, conf, platform);
+				
+				handledConfigurations.Add (key);
 			}
 			
-			if (platforms.Count == 0)
-				platforms.Add (string.Empty); // AnyCpu
-
-			foreach (string platform in platforms) {
-				foreach (string conf in configurations) {
-					
-					MSBuildPropertySet grp = GetMergedConfiguration (configData, conf, platform, null);
-					SolutionItemConfiguration config = EntityItem.CreateConfiguration (conf);
-					
-					config.Platform = platform;
-					DataItem data = ReadPropertyGroupMetadata (ser, grp, config);
-					ser.Deserialize (config, data);
-					EntityItem.Configurations.Add (config);
-					
-					if (config is DotNetProjectConfiguration) {
-						DotNetProjectConfiguration dpc = (DotNetProjectConfiguration) config;
-						if (dpc.CompilationParameters != null) {
-							data = ReadPropertyGroupMetadata (ser, grp, dpc.CompilationParameters);
-							ser.Deserialize (dpc.CompilationParameters, data);
+			// Now we can load any partial configurations by combining them with known configs or platforms.
+			if (partialConfigurations.Count > 0) {
+				if (platforms.Count == 0)
+					platforms.Add (string.Empty); // AnyCpu
+				
+				foreach (ConfigData cgrp in partialConfigurations) {
+					if (cgrp.Config != Unspecified && cgrp.Platform == Unspecified) {
+						string conf = cgrp.Config;
+						
+						foreach (var platform in platforms) {
+							string key = conf + "|" + platform;
+							
+							if (handledConfigurations.Contains (key))
+								continue;
+							
+							LoadConfiguration (ser, configData, conf, platform);
+							
+							handledConfigurations.Add (key);
+						}
+					} else if (cgrp.Config == Unspecified && cgrp.Platform != Unspecified) {
+						string platform = cgrp.Platform;
+						
+						foreach (var conf in configurations) {
+							string key = conf + "|" + platform;
+							
+							if (handledConfigurations.Contains (key))
+								continue;
+							
+							LoadConfiguration (ser, configData, conf, platform);
+							
+							handledConfigurations.Add (key);
 						}
 					}
 				}
@@ -771,7 +825,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			if (Item is UnknownProject || Item is UnknownSolutionItem)
 				return;
 			
-			bool newProject = false;
+			bool newProject;
 			SolutionEntityItem eitem = EntityItem;
 			
 			MSBuildSerializer ser = CreateSerializer ();
@@ -781,11 +835,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			DotNetProject dotNetProject = Item as DotNetProject;
 			
 			MSBuildProject msproject = new MSBuildProject ();
-			if (fileContent != null) {
-				msproject.LoadXml (fileContent);
-			} else {
+			newProject = EntityItem.FileName == null || !File.Exists (EntityItem.FileName);
+			if (newProject) {
 				msproject.DefaultTargets = "Build";
-				newProject = true;
+			} else {
+				msproject.Load (EntityItem.FileName);
 			}
 
 			// Global properties
@@ -856,7 +910,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				langParams = dotNetProject.LanguageParameters;
 			}
 			
-			if (fileContent == null)
+			if (newProject)
 				ser.InternalItemProperties.ItemData.Sort (globalConfigOrder);
 
 			WritePropertyGroupMetadata (globalGroup, ser.InternalItemProperties.ItemData, ser, Item, langParams);
@@ -975,7 +1029,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				if (!itemInfo.Added)
 					msproject.RemoveItem (itemInfo.Item);
 			}
-		
+			
 			if (dotNetProject != null) {
 				var moniker = dotNetProject.TargetFramework.Id;
 				bool supportsMultipleFrameworks = TargetFormat.FrameworkVersions.Length > 0;
@@ -1031,16 +1085,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			} else
 				msproject.RemoveProjectExtensions ("MonoDevelop");
 			
-			string txt = msproject.Save ();
-			
 			// Don't save the file to disk if the content did not change
-			if (txt != fileContent) {
-				MonoDevelop.Projects.Text.TextFile.WriteFile (eitem.FileName, txt, "UTF-8");
-				fileContent = txt;
-				
-				if (projectBuilder != null)
-					projectBuilder.Refresh ();
-			}
+			msproject.Save (eitem.FileName);
+			
+			if (projectBuilder != null)
+				projectBuilder.Refresh ();
 		}
 		
 		void ForceDefaultValueSerialization (MSBuildSerializer ser, MSBuildPropertySet baseGroup, object ob)
@@ -1357,7 +1406,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					}
 				}
 				if (node == null)
-					node = new DataValue (bprop.Name, Projects.Dom.Output.AmbienceService.UnescapeText (bprop.Value));
+					node = new DataValue (bprop.Name, UnescapeText (bprop.Value));
 				
 				ConvertFromMsbuildFormat (node);
 				ditem.ItemData.Add (node);
@@ -1557,7 +1606,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		string GetXmlString (DataNode node)
 		{
 			if (node is DataValue)
-				return Projects.Dom.Output.AmbienceService.EscapeText (((DataValue)node).Value);
+				return EscapeText (((DataValue)node).Value);
 			else {
 				StringWriter sw = new StringWriter ();
 				XmlTextWriter xw = new XmlTextWriter (sw);
@@ -1609,6 +1658,84 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		internal static readonly IList<string> UnsupportedItems = new string[] {
 			"BootstrapperFile", "AppDesigner", "WebReferences", "WebReferenceUrl", "Service"
 		};
+		
+		public static string EscapeText (string text)
+		{
+			var result = new StringBuilder ();
+			foreach (char ch in text) {
+				switch (ch) {
+				case '<':
+					result.Append ("&lt;");
+					break;
+				case '>':
+					result.Append ("&gt;");
+					break;
+				case '&':
+					result.Append ("&amp;");
+					break;
+				case '\'':
+					result.Append ("&apos;");
+					break;
+				case '"':
+					result.Append ("&quot;");
+					break;
+				default:
+					int charValue = (int)ch;
+					if (IsSpecialChar (charValue)) {
+						result.AppendFormat ("&#x{0:X};", charValue);
+					} else {
+						result.Append (ch);
+					}
+					break;
+				}
+			}
+			return result.ToString ();
+		}
+		
+		static bool IsSpecialChar (int charValue)
+		{
+			return 
+				0x01 <= charValue && charValue <= 0x08 ||
+				0x0B <= charValue && charValue <= 0x0C ||
+				0x0E <= charValue && charValue <= 0x1F ||
+				0x7F <= charValue && charValue <= 0x84 ||
+				0x86 <= charValue && charValue <= 0x9F;
+		}
+		
+		public static string UnescapeText (string text)
+		{
+			var sb = new StringBuilder ();
+			for (int i = 0; i < text.Length; i++) {
+				char ch = text [i];
+				if (ch == '&') {
+					int end = text.IndexOf (';', i);
+					if (end == -1)
+						break;
+					string entity = text.Substring (i + 1, end - i - 1);
+					switch (entity) {
+					case "lt":
+						sb.Append ('<');
+						break;
+					case "gt":
+						sb.Append ('>');
+						break;
+					case "amp":
+						sb.Append ('&');
+						break;
+					case "apos":
+						sb.Append ('\'');
+						break;
+					case "quot":
+						sb.Append ('"');
+						break;
+					}
+					i = end;
+				} else {
+					sb.Append (ch);
+				}
+			}
+			return sb.ToString ();	
+		}
 	}
 	
 	class MSBuildSerializer: DataSerializer

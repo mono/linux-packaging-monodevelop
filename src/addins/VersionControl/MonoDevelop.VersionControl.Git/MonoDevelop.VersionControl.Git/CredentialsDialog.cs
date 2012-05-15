@@ -88,6 +88,9 @@ namespace MonoDevelop.VersionControl.Git
 						else
 							((CredentialItem.CharArrayType)cred).SetValue (e.Text.ToCharArray ());
 					};
+					
+					if (c is CredentialItem.Username)
+						e.Text = uri.GetUser () ?? "";
 				}
 				if (editor != null) {
 					table.Attach (editor, 1, 2, r, r + 1);

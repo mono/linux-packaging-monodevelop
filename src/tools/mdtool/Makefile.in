@@ -198,7 +198,8 @@ FILES = src/AssemblyInfo.cs \
 src/mdtool.cs
 
 REFS = $(MONO_ADDINS_LIBS) \
-	$(MONO_ADDINS_SETUP_LIBS)
+	$(MONO_ADDINS_SETUP_LIBS) \
+	$(GTK_SHARP_LIBS)
 
 DEPS = $(top_builddir)/build/bin/MonoDevelop.Core.dll
 assemblydir = $(MD_ASSEMBLY_DIR)

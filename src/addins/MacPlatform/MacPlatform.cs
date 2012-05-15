@@ -50,14 +50,14 @@ using MonoDevelop.MacInterop;
 
 namespace MonoDevelop.MacIntegration
 {
-	class MacPlatformService : PlatformService
+	public class MacPlatformService : PlatformService
 	{
 		static TimerCounter timer = InstrumentationService.CreateTimerCounter ("Mac Platform Initialization", "Platform Service");
 		static TimerCounter mimeTimer = InstrumentationService.CreateTimerCounter ("Mac Mime Database", "Platform Service");
 		
 		static bool setupFail, initedApp, initedGlobal;
 		
-		static Dictionary<string, string> mimemap;
+		static Lazy<Dictionary<string, string>> mimemap;
 		
 		//this is a BCD value of the form "xxyz", where x = major, y = minor, z = bugfix
 		//eg. 0x1071 = 10.7.1
@@ -69,7 +69,7 @@ namespace MonoDevelop.MacIntegration
 			
 			systemVersion = Carbon.Gestalt ("sysv");
 			
-			LoadMimeMapAsync ();
+			mimemap = new Lazy<Dictionary<string, string>> (LoadMimeMapAsync);
 			
 			CheckGtkVersion (2, 24, 0);
 			
@@ -111,8 +111,9 @@ namespace MonoDevelop.MacIntegration
 		protected override string OnGetMimeTypeForUri (string uri)
 		{
 			var ext = System.IO.Path.GetExtension (uri);
-			if (mimemap != null && mimemap.ContainsKey (ext))
-				return mimemap [ext];
+			string mime = null;
+			if (ext != null && mimemap.Value.TryGetValue (ext, out mime))
+				return mime;
 			return null;
 		}
 
@@ -139,35 +140,33 @@ namespace MonoDevelop.MacIntegration
 			get { return "OSX"; }
 		}
 		
-		private static void LoadMimeMapAsync ()
+		private static Dictionary<string, string> LoadMimeMapAsync ()
 		{
+			var map = new Dictionary<string, string> ();
 			// All recent Macs should have this file; if not we'll just die silently
 			if (!File.Exists ("/etc/apache2/mime.types")) {
 				MonoDevelop.Core.LoggingService.LogError ("Apache mime database is missing");
-				return;
+				return map;
 			}
 			
-			System.Threading.ThreadPool.QueueUserWorkItem (delegate {
-				mimeTimer.BeginTiming ();
-				try {
-					var map = new Dictionary<string, string> ();
-					using (var file = File.OpenRead ("/etc/apache2/mime.types")) {
-						using (var reader = new StreamReader (file)) {
-							var mime = new Regex ("([a-zA-Z]+/[a-zA-z0-9+-_.]+)\t+([a-zA-Z]+)", RegexOptions.Compiled);
-							string line;
-							while ((line = reader.ReadLine ()) != null) {
-								Match m = mime.Match (line);
-								if (m.Success)
-									map ["." + m.Groups [2].Captures [0].Value] = m.Groups [1].Captures [0].Value; 
-							}
+			mimeTimer.BeginTiming ();
+			try {
+				using (var file = File.OpenRead ("/etc/apache2/mime.types")) {
+					using (var reader = new StreamReader (file)) {
+						var mime = new Regex ("([a-zA-Z]+/[a-zA-z0-9+-_.]+)\t+([a-zA-Z]+)", RegexOptions.Compiled);
+						string line;
+						while ((line = reader.ReadLine ()) != null) {
+							Match m = mime.Match (line);
+							if (m.Success)
+								map ["." + m.Groups [2].Captures [0].Value] = m.Groups [1].Captures [0].Value; 
 						}
 					}
-					mimemap = map;
-				} catch (Exception ex){
-					MonoDevelop.Core.LoggingService.LogError ("Could not load Apache mime database", ex);
 				}
-				mimeTimer.EndTiming ();
-			});
+			} catch (Exception ex){
+				MonoDevelop.Core.LoggingService.LogError ("Could not load Apache mime database", ex);
+			}
+			mimeTimer.EndTiming ();
+			return map;
 		}
 		
 		HashSet<object> ignoreCommands = new HashSet<object> () {
@@ -296,11 +295,20 @@ namespace MonoDevelop.MacIntegration
 				
 				//if not running inside an app bundle, assume usual MD build layout and load the app icon
 				FilePath exePath = System.Reflection.Assembly.GetExecutingAssembly ().Location;
+				string iconFile = null;
 				if (!exePath.ToString ().Contains ("MonoDevelop.app")) {
 					var mdSrcMain = exePath.ParentDirectory.ParentDirectory.ParentDirectory;
-					var icons = mdSrcMain.Combine ("theme-icons", "Mac", "monodevelop.icns");
-					if (File.Exists (icons))
-						NSApplication.SharedApplication.ApplicationIconImage = new NSImage (icons);
+					iconFile = mdSrcMain.Combine ("theme-icons", "Mac", "monodevelop.icns");
+				} else {
+					//HACK: override the app image
+					//NSApplication doesn't seem to pick up the image correctly, probably due to the
+					//getting confused about the bundle root because of the launch script
+					var bundleContents = exePath.ParentDirectory.ParentDirectory.ParentDirectory
+						.ParentDirectory.ParentDirectory;
+					iconFile = bundleContents.Combine ("Resources", "monodevelop.icns");
+				}
+				if (File.Exists (iconFile)) {
+					NSApplication.SharedApplication.ApplicationIconImage = new NSImage (iconFile);
 				}
 			} catch (Exception ex) {
 				MonoDevelop.Core.LoggingService.LogError ("Could not install app event handlers", ex);
@@ -313,6 +321,52 @@ namespace MonoDevelop.MacIntegration
 		{
 			args.RetVal = true;
 			IdeApp.Workbench.RootWindow.Hide ();
+		}
+
+		public static Gdk.Pixbuf GetPixbufFromNSImageRep (NSImageRep rep, int width, int height)
+		{
+			var rect = new System.Drawing.RectangleF (0, 0, width, height);
+			var bitmap = rep as NSBitmapImageRep;
+			
+			if (bitmap == null) {
+				using (var cgi = rep.AsCGImage (rect, null, null))
+					bitmap = new NSBitmapImageRep (cgi);
+			}
+			
+			try {
+				byte[] data;
+				using (var tiff = bitmap.TiffRepresentation) {
+					data = new byte[tiff.Length];
+					System.Runtime.InteropServices.Marshal.Copy (tiff.Bytes, data, 0, data.Length);
+				}
+				
+				int pw = bitmap.PixelsWide, ph = bitmap.PixelsHigh;
+				var pixbuf = new Gdk.Pixbuf (data, pw, ph);
+				
+				// if one dimension matches, and the other is same or smaller, use as-is
+				if ((pw == width && ph <= height) || (ph == height && pw <= width))
+					return pixbuf;
+				
+				// otherwise scale proportionally such that the largest dimension matches the desired size
+				if (pw == ph) {
+					pw = width;
+					ph = height;
+				} else if (pw > ph) {
+					ph = (int) (width * ((float) ph / pw));
+					pw = width;
+				} else {
+					pw = (int) (height * ((float) pw / ph));
+					ph = height;
+				}
+				
+				var scaled = pixbuf.ScaleSimple (pw, ph, Gdk.InterpType.Bilinear);
+				pixbuf.Dispose ();
+				
+				return scaled;
+			} finally {
+				if (bitmap != rep)
+					bitmap.Dispose ();
+			}
 		}
 		
 		protected override Gdk.Pixbuf OnGetPixbufForFile (string filename, Gtk.IconSize size)
@@ -339,51 +393,14 @@ namespace MonoDevelop.MacIntegration
 			if (!Gtk.Icon.SizeLookup (Gtk.IconSize.Menu, out w, out h)) {
 				w = h = 22;
 			}
+			
 			var rect = new System.Drawing.RectangleF (0, 0, w, h);
 			
-			var arep = icon.BestRepresentation (rect, null, null);
-			if (arep == null) {
-				return base.OnGetPixbufForFile (filename, size);
-			}
-			
-			var rep = arep as NSBitmapImageRep;
-			if (rep == null) {
-				using (var cgi = arep.AsCGImage (rect, null, null))
-					rep = new NSBitmapImageRep (cgi);
-				arep.Dispose ();
-			}
-			
-			try {
-				byte[] arr;
-				using (var tiff = rep.TiffRepresentation) {
-					arr = new byte[tiff.Length];
-					System.Runtime.InteropServices.Marshal.Copy (tiff.Bytes, arr, 0, arr.Length);
-				}
-				int pw = rep.PixelsWide, ph = rep.PixelsHigh;
-				var px = new Gdk.Pixbuf (arr, pw, ph);
+			using (var rep = icon.BestRepresentation (rect, null, null)) {
+				if (rep == null)
+					return base.OnGetPixbufForFile (filename, size);
 				
-				//if one dimension matches, and the other is same or smaller, use as-is
-				if ((pw == w && ph <= h) || (ph == h && pw <= w))
-					return px;
-				
-				//else scale proportionally such that the largest dimension matches the desired size
-				if (pw == ph) {
-					pw = w;
-					ph = h;
-				} else if (pw > ph) {
-					ph = (int) (w * ((float) ph / pw));
-					pw = w;
-				} else {
-					pw = (int) (h * ((float) pw / ph));
-					ph = h;
-				}
-				
-				var scaled = px.ScaleSimple (pw, ph, Gdk.InterpType.Bilinear);
-				px.Dispose ();
-				return scaled;
-			} finally {
-				if (rep != null)
-					rep.Dispose ();
+				return GetPixbufFromNSImageRep (rep, w, h);
 			}
 		}
 		

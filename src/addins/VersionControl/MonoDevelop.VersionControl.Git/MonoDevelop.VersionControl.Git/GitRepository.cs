@@ -163,7 +163,7 @@ namespace MonoDevelop.VersionControl.Git
 			RevWalk walk = new RevWalk (repo);
 			string path = ToGitPath (localFile);
 			if (path != ".")
-				walk.SetTreeFilter (AndTreeFilter.Create (TreeFilter.ANY_DIFF, PathFilter.Create (path)));
+				walk.SetTreeFilter (FollowFilter.Create (path));
 			walk.MarkStart (hc);
 			
 			foreach (RevCommit commit in walk) {
@@ -183,27 +183,15 @@ namespace MonoDevelop.VersionControl.Git
 			GitRevision rev = (GitRevision) revision;
 			if (rev.Commit == null)
 				return new RevisionPath [0];
-			
+
 			List<RevisionPath> paths = new List<RevisionPath> ();
-			
-			foreach (Change change in GitUtil.GetCommitChanges (repo, rev.Commit)) {
-				FilePath cpath = FromGitPath (change.Path);
-				if (!rev.FileForChanges.IsNull && cpath != rev.FileForChanges && !cpath.IsChildPathOf (rev.FileForChanges))
-					continue;
-				RevisionAction ra;
-				switch (change.ChangeType) {
-				case ChangeType.Added:
-					ra = RevisionAction.Add;
-					break;
-				case ChangeType.Deleted:
-					ra = RevisionAction.Delete;
-					break;
-				default:
-					ra = RevisionAction.Modify;
-					break;
-				}
-				RevisionPath p = new RevisionPath (cpath, ra, null);
-				paths.Add (p);
+			foreach (var entry in GitUtil.GetCommitChanges (repo, rev.Commit)) {
+				if (entry.GetChangeType () == DiffEntry.ChangeType.ADD)
+					paths.Add (new RevisionPath (FromGitPath (entry.GetNewPath ()), RevisionAction.Add, null));
+				if (entry.GetChangeType () == DiffEntry.ChangeType.DELETE)
+					paths.Add (new RevisionPath (FromGitPath (entry.GetOldPath ()), RevisionAction.Delete, null));
+				if (entry.GetChangeType () == DiffEntry.ChangeType.MODIFY)
+					paths.Add (new RevisionPath (FromGitPath (entry.GetNewPath ()), RevisionAction.Modify, null));
 			}
 			return paths.ToArray ();
 		}
@@ -266,12 +254,18 @@ namespace MonoDevelop.VersionControl.Git
 			else
 				rev = null;
 			
-			RepositoryStatus status;
-			if (localFileNames != null)
-				status = GitUtil.GetFileStatus (repo, localFileNames);
-			else
-				status = GitUtil.GetDirectoryStatus (repo, localDirectory, recursive);
-			
+			IEnumerable<string> paths;
+			if (localFileNames == null) {
+				if (recursive)
+					paths = new [] { (string) localDirectory };
+				else
+					paths = Directory.GetFiles (localDirectory);
+			} else {
+				paths = localFileNames.Select (f => (string)f);
+			}
+			paths = paths.Select (f => ToGitPath (f));
+
+			var status = new FilteredStatus (repo, paths).Call (); 
 			HashSet<string> added = new HashSet<string> ();
 			Action<IEnumerable<string>, VersionStatus> AddFiles = delegate(IEnumerable<string> files, VersionStatus fstatus) {
 				foreach (string file in files) {
@@ -284,13 +278,14 @@ namespace MonoDevelop.VersionControl.Git
 				}
 			};
 			
-			AddFiles (status.Added, VersionStatus.Versioned | VersionStatus.ScheduledAdd);
-			AddFiles (status.Modified, VersionStatus.Versioned | VersionStatus.Modified);
-			AddFiles (status.Removed, VersionStatus.Versioned | VersionStatus.ScheduledDelete);
-			AddFiles (status.Missing, VersionStatus.Versioned | VersionStatus.ScheduledDelete);
-			AddFiles (status.MergeConflict, VersionStatus.Versioned | VersionStatus.Conflicted);
-			AddFiles (status.Untracked, VersionStatus.Unversioned);
-			
+			AddFiles (status.GetAdded (), VersionStatus.Versioned | VersionStatus.ScheduledAdd);
+			AddFiles (status.GetChanged (), VersionStatus.Versioned | VersionStatus.Modified);
+			AddFiles (status.GetModified (), VersionStatus.Versioned | VersionStatus.Modified);
+			AddFiles (status.GetRemoved (), VersionStatus.Versioned | VersionStatus.ScheduledDelete);
+			AddFiles (status.GetMissing (), VersionStatus.Versioned | VersionStatus.ScheduledDelete);
+			AddFiles (status.GetConflicting (), VersionStatus.Versioned | VersionStatus.Conflicted);
+			AddFiles (status.GetUntracked (), VersionStatus.Unversioned);
+
 			// Existing files for which git did not report an status are supposed to be tracked
 			foreach (FilePath file in existingFiles) {
 				VersionInfo vi = new VersionInfo (file, "", false, VersionStatus.Versioned, rev, VersionStatus.Versioned, null);
@@ -352,7 +347,7 @@ namespace MonoDevelop.VersionControl.Git
 		
 		public override void Update (FilePath[] localPaths, bool recurse, IProgressMonitor monitor)
 		{
-			IEnumerable<Change> statusList = null;
+			IEnumerable<DiffEntry> statusList = null;
 			
 			monitor.BeginTask (GettextCatalog.GetString ("Updating"), 5);
 			
@@ -468,7 +463,7 @@ namespace MonoDevelop.VersionControl.Git
 		
 		public void Merge (string branch, bool saveLocalChanges, IProgressMonitor monitor)
 		{
-			IEnumerable<Change> statusList = null;
+			IEnumerable<DiffEntry> statusList = null;
 			Stash stash = null;
 			StashCollection stashes = new StashCollection (repo);
 			monitor.BeginTask (null, 4);
@@ -644,8 +639,8 @@ namespace MonoDevelop.VersionControl.Git
 			List<FilePath> changedFiles = new List<FilePath> ();
 			List<FilePath> removedFiles = new List<FilePath> ();
 			
-			monitor.BeginTask (GettextCatalog.GetString ("Revering files"), 3);
-			monitor.BeginStepTask (GettextCatalog.GetString ("Revering files"), localPaths.Length, 2);
+			monitor.BeginTask (GettextCatalog.GetString ("Reverting files"), 3);
+			monitor.BeginStepTask (GettextCatalog.GetString ("Reverting files"), localPaths.Length, 2);
 			
 			DirCache dc = repo.LockDirCache ();
 			DirCacheBuilder builder = dc.Builder ();
@@ -802,26 +797,34 @@ namespace MonoDevelop.VersionControl.Git
 				return GetCommitTextContent (c, repositoryPath);
 		}
 
+		public override DiffInfo GenerateDiff (FilePath baseLocalPath, VersionInfo vi)
+		{
+			try {
+				if ((vi.Status & VersionStatus.ScheduledAdd) != 0) {
+					var ctxt = GetFileContent (vi.LocalPath);
+					return new DiffInfo (baseLocalPath, vi.LocalPath, GenerateDiff (EmptyContent, ctxt));
+				} else if ((vi.Status & VersionStatus.ScheduledDelete) != 0) {
+					var ctxt = GetCommitContent (GetHeadCommit (), vi.LocalPath);
+					return new DiffInfo (baseLocalPath, vi.LocalPath, GenerateDiff (ctxt, EmptyContent));
+				} else if ((vi.Status & VersionStatus.Modified) != 0 || (vi.Status & VersionStatus.Conflicted) != 0) {
+					var ctxt1 = GetCommitContent (GetHeadCommit (), vi.LocalPath);
+					var ctxt2 = GetFileContent (vi.LocalPath);
+					return new DiffInfo (baseLocalPath, vi.LocalPath, GenerateDiff (ctxt1, ctxt2));
+				}
+			} catch (Exception ex) {
+				LoggingService.LogError ("Could not get diff for file '" + vi.LocalPath + "'", ex);
+			}
+			return null;	
+		}
+		
 		public override DiffInfo[] PathDiff (FilePath baseLocalPath, FilePath[] localPaths, bool remoteDiff)
 		{
 			List<DiffInfo> diffs = new List<DiffInfo> ();
 			VersionInfo[] vinfos = GetDirectoryVersionInfo (baseLocalPath, localPaths, false, true);
 			foreach (VersionInfo vi in vinfos) {
-				try {
-					if ((vi.Status & VersionStatus.ScheduledAdd) != 0) {
-						var ctxt = GetFileContent (vi.LocalPath);
-						diffs.Add (new DiffInfo (baseLocalPath, vi.LocalPath, GenerateDiff (EmptyContent, ctxt)));
-					} else if ((vi.Status & VersionStatus.ScheduledDelete) != 0) {
-						var ctxt = GetCommitContent (GetHeadCommit (), vi.LocalPath);
-						diffs.Add (new DiffInfo (baseLocalPath, vi.LocalPath, GenerateDiff (ctxt, EmptyContent)));
-					} else if ((vi.Status & VersionStatus.Modified) != 0 || (vi.Status & VersionStatus.Conflicted) != 0) {
-						var ctxt1 = GetCommitContent (GetHeadCommit (), vi.LocalPath);
-						var ctxt2 = GetFileContent (vi.LocalPath);
-						diffs.Add (new DiffInfo (baseLocalPath, vi.LocalPath, GenerateDiff (ctxt1, ctxt2)));
-					}
-				} catch (Exception ex) {
-					LoggingService.LogError ("Could not get diff for file '" + vi.LocalPath + "'", ex);
-				}
+				var diff = GenerateDiff (baseLocalPath, vi);
+				if (diff != null)
+					diffs.Add (diff);
 			}
 			return diffs.ToArray ();
 		}
@@ -842,7 +845,7 @@ namespace MonoDevelop.VersionControl.Git
 
 		string GetCommitTextContent (RevCommit c, FilePath file)
 		{
-			return NGit.Util.RawParseUtils.Decode (GetCommitContent (c, file));
+			return Mono.TextEditor.Utils.TextFileUtility.GetText (GetCommitContent (c, file));
 		}
 		
 		string GenerateDiff (byte[] data1, byte[] data2)
@@ -941,8 +944,14 @@ namespace MonoDevelop.VersionControl.Git
 
 		public void CreateBranch (string name, string trackSource)
 		{
-			ObjectId headId = repo.Resolve (Constants.HEAD);
-			RefUpdate updateRef = repo.UpdateRef ("refs/heads/" + name);
+			// If the user did not specify a branch to base the new local
+			// branch off, assume they want to create the new branch based
+			// on the current HEAD.
+			if (string.IsNullOrEmpty (trackSource))
+				trackSource = Constants.HEAD;
+
+			ObjectId headId = repo.Resolve (trackSource);
+			RefUpdate updateRef = repo.UpdateRef (Constants.R_HEADS + name);
 			updateRef.SetNewObjectId(headId);
 			updateRef.Update();
 			GitUtil.SetUpstreamSource (repo, name, trackSource);
@@ -1066,7 +1075,7 @@ namespace MonoDevelop.VersionControl.Git
 			monitor.BeginTask (GettextCatalog.GetString ("Switching to branch {0}", branch), GitService.StashUnstashWhenSwitchingBranches ? 4 : 2);
 			
 			// Get a list of files that are different in the target branch
-			IEnumerable<Change> statusList = GitUtil.GetChangedFiles (repo, branch);
+			IEnumerable<DiffEntry> statusList = GitUtil.GetChangedFiles (repo, branch);
 			
 			StashCollection stashes = null;
 			Stash stash = null;
@@ -1136,13 +1145,13 @@ namespace MonoDevelop.VersionControl.Git
 			monitor.EndTask ();
 		}
 
-		void NotifyFileChanges (IProgressMonitor monitor, IEnumerable<Change> statusList)
+		void NotifyFileChanges (IProgressMonitor monitor, IEnumerable<DiffEntry> statusList)
 		{
-			List<Change> changes = new List<Change> (statusList);
+			List<DiffEntry> changes = new List<DiffEntry> (statusList);
 			
 			// Files added to source branch not present to target branch.
-			var removed = changes.Where (c => c.ChangeType == ChangeType.Added).Select (c => FromGitPath (c.Path)).ToList ();
-			var modified = changes.Where (c => c.ChangeType != ChangeType.Added).Select (c => FromGitPath (c.Path)).ToList ();
+			var removed = changes.Where (c => c.GetChangeType () == DiffEntry.ChangeType.ADD).Select (c => FromGitPath (c.GetNewPath ())).ToList ();
+			var modified = changes.Where (c => c.GetChangeType () != DiffEntry.ChangeType.ADD).Select (c => FromGitPath (c.GetNewPath ())).ToList ();
 			
 			monitor.BeginTask (GettextCatalog.GetString ("Updating solution"), removed.Count + modified.Count);
 			
@@ -1187,20 +1196,20 @@ namespace MonoDevelop.VersionControl.Git
 			RevCommit c1 = rw.ParseCommit (cid1);
 			RevCommit c2 = rw.ParseCommit (cid2);
 			
-			foreach (Change change in GitUtil.CompareCommits (repo, c2, c1)) {
+			foreach (var change in GitUtil.CompareCommits (repo, c2, c1)) {
 				VersionStatus status;
-				switch (change.ChangeType) {
-				case ChangeType.Added:
+				switch (change.GetChangeType ()) {
+				case DiffEntry.ChangeType.ADD:
 					status = VersionStatus.ScheduledAdd;
 					break;
-				case ChangeType.Deleted:
+				case DiffEntry.ChangeType.DELETE:
 					status = VersionStatus.ScheduledDelete;
 					break;
 				default:
 					status = VersionStatus.Modified;
 					break;
 				}
-				VersionInfo vi = new VersionInfo (FromGitPath (change.Path), "", false, status | VersionStatus.Versioned, null, VersionStatus.Versioned, null);
+				VersionInfo vi = new VersionInfo (FromGitPath (change.GetNewPath ()), "", false, status | VersionStatus.Versioned, null, VersionStatus.Versioned, null);
 				cset.AddFile (vi);
 			}
 			return cset;
@@ -1221,20 +1230,20 @@ namespace MonoDevelop.VersionControl.Git
 			RevCommit c2 = rw.ParseCommit (cid2);
 			
 			List<DiffInfo> diffs = new List<DiffInfo> ();
-			foreach (Change change in GitUtil.CompareCommits (repo, c1, c2)) {
+			foreach (var change in GitUtil.CompareCommits (repo, c1, c2)) {
 				string diff;
-				switch (change.ChangeType) {
-				case ChangeType.Deleted:
-					diff = GenerateDiff (EmptyContent, GetCommitContent (c2, change.Path));
+				switch (change.GetChangeType ()) {
+				case DiffEntry.ChangeType.DELETE:
+					diff = GenerateDiff (EmptyContent, GetCommitContent (c2, change.GetOldPath ()));
 					break;
-				case ChangeType.Added:
-					diff = GenerateDiff (GetCommitContent (c1, change.Path), EmptyContent);
+				case DiffEntry.ChangeType.ADD:
+					diff = GenerateDiff (GetCommitContent (c1, change.GetNewPath ()), EmptyContent);
 					break;
 				default:
-					diff = GenerateDiff (GetCommitContent (c1, change.Path), GetCommitContent (c2, change.Path));
+					diff = GenerateDiff (GetCommitContent (c1, change.GetNewPath ()), GetCommitContent (c2, change.GetNewPath ()));
 					break;
 				}
-				DiffInfo di = new DiffInfo (path, FromGitPath (change.Path), diff);
+				DiffInfo di = new DiffInfo (path, FromGitPath (change.GetNewPath ()), diff);
 				diffs.Add (di);
 			}
 			return diffs.ToArray ();
@@ -1274,35 +1283,24 @@ namespace MonoDevelop.VersionControl.Git
 			RevCommit hc = GetHeadCommit ();
 			if (hc == null)
 				return new Annotation [0];
-			RevCommit[] lineCommits = GitUtil.Blame (repo, hc, repositoryPath);
-			int lineCount = lineCommits.Length;
-			List<Annotation> annotations = new List<Annotation>(lineCount);
-			for (int n = 0; n < lineCount; n++) {
-				RevCommit c = lineCommits[n];
-				Annotation annotation = new Annotation (c.Name, c.GetAuthorIdent ().GetName () + "<" + c.GetAuthorIdent ().GetEmailAddress () + ">", c.GetCommitterIdent ().GetWhen ());
-				annotations.Add(annotation);
-			}
 			
-			Document baseDocument = new Document (GetCommitTextContent (hc, repositoryPath));
-			Document workingDocument = new Document (File.ReadAllText (repositoryPath));
-			Annotation uncommittedRev = new Annotation("0000000000000000000000000000000000000000", "", new DateTime());
-			
-			// Based on Subversion code until we support blame on things other than commits
-			foreach (var hunk in baseDocument.Diff (workingDocument)) {
-				annotations.RemoveRange (hunk.RemoveStart, hunk.Removed);
-				int start = hunk.InsertStart - 1; //Line number - 1 = index
-				bool insert = (start < annotations.Count);
-					
-				for (int i = 0; i < hunk.Inserted; ++i) {
-					if (insert) {
-						annotations.Insert (start, uncommittedRev);
-					} else {
-						annotations.Add (uncommittedRev);
-					}
+			var git = new NGit.Api.Git (repo);
+			var result = git.Blame ().SetFilePath (ToGitPath (repositoryPath)).Call ();
+			result.ComputeAll ();
+
+			List<Annotation> list = new List<Annotation> ();
+			for (int i = 0; i < result.GetResultContents ().Size (); i++) {
+				var commit = result.GetSourceCommit (i);
+				var author = result.GetSourceCommitter (i);
+				if (commit != null && author != null) {
+					string name = string.Format ("{0} <{1}>", author.GetName (), author.GetEmailAddress ());
+					var commitTime = new DateTime (1970, 1, 1).AddSeconds (commit.CommitTime);
+					list.Add (new Annotation (commit.Name, name, commitTime));
+				} else {
+					list.Add (new Annotation (new string ('0', 20), "<uncommitted>", DateTime.Now));
 				}
 			}
-			
-			return annotations.ToArray();
+			return list.ToArray ();
 		}
 		
 		internal GitRevision GetPreviousRevisionFor (GitRevision revision)

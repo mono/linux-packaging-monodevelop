@@ -1,5 +1,7 @@
 
 DEPS =  \
+	$(top_builddir)/build/bin/ICSharpCode.NRefactory.CSharp.dll \
+	$(top_builddir)/build/bin/ICSharpCode.NRefactory.dll \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Projects.Formats.MSBuild.exe
@@ -11,6 +13,7 @@ REFS =  \
 	$(MONO_ADDINS_LIBS) \
 	$(MONO_ADDINS_SETUP_LIBS) \
 	$(MONODOC_LIBS) \
+	-r:../../../build/bin/Mono.Cecil.dll \
 	-r:ICSharpCode.SharpZipLib \
 	-r:Mono.Cairo \
 	-r:Mono.Posix \
@@ -72,8 +75,8 @@ FILES =  \
 	gtk-gui/MonoDevelop.Ide.Projects.CombineEntryFeatureSelector.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.ConfirmProjectDeleteDialog.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.DeleteConfigDialog.cs \
-	gtk-gui/MonoDevelop.Ide.Projects.ExportProjectDialog.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.ExportProjectPolicyDialog.cs \
+	gtk-gui/MonoDevelop.Ide.Projects.ExportSolutionDialog.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.FeatureSelectorDialog.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.ImportProjectPolicyDialog.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.IncludeNewFilesDialog.cs \
@@ -93,6 +96,7 @@ FILES =  \
 	gtk-gui/MonoDevelop.Ide.Projects.OptionPanels.GeneralProjectOptionsWidget.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.OptionPanels.NamespaceSynchronisationPanelWidget.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.OptionPanels.OutputOptionsPanelWidget.cs \
+	gtk-gui/MonoDevelop.Ide.Projects.OptionPanels.PortableRuntimeOptionsPanelWidget.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.OptionPanels.RunOptionsPanelWidget.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.OptionPanels.RuntimeOptionsPanelWidget.cs \
 	gtk-gui/MonoDevelop.Ide.Projects.OptionPanels.StartupOptionsPanelWidget.cs \
@@ -146,6 +150,7 @@ FILES =  \
 	MonoDevelop.Components.Commands/CommandToolbar.cs \
 	MonoDevelop.Components.Commands/CommandToolButton.cs \
 	MonoDevelop.Components.Commands/CustomCommand.cs \
+	MonoDevelop.Components.Commands/CustomCommandTargetAttribute.cs \
 	MonoDevelop.Components.Commands/CustomCommandUpdaterAttribute.cs \
 	MonoDevelop.Components.Commands/CustomItem.cs \
 	MonoDevelop.Components.Commands/CustomMenuItem.cs \
@@ -280,16 +285,13 @@ FILES =  \
 	MonoDevelop.Components/WindowTransparencyDecorator.cs \
 	MonoDevelop.Ide.CodeCompletion/CodeCompletionContext.cs \
 	MonoDevelop.Ide.CodeCompletion/CodeCompletionContextEventArgs.cs \
-	MonoDevelop.Ide.CodeCompletion/CompletionCategory.cs \
 	MonoDevelop.Ide.CodeCompletion/CompletionData.cs \
 	MonoDevelop.Ide.CodeCompletion/CompletionDataList.cs \
 	MonoDevelop.Ide.CodeCompletion/CompletionListWindow.cs \
 	MonoDevelop.Ide.CodeCompletion/CompletionMatcher.cs \
 	MonoDevelop.Ide.CodeCompletion/CompletionWindowManager.cs \
 	MonoDevelop.Ide.CodeCompletion/DeclarationViewWindow.cs \
-	MonoDevelop.Ide.CodeCompletion/DisplayFlags.cs \
 	MonoDevelop.Ide.CodeCompletion/ICompletionWidget.cs \
-	MonoDevelop.Ide.CodeCompletion/IParameterDataProvider.cs \
 	MonoDevelop.Ide.CodeCompletion/ListWidget.cs \
 	MonoDevelop.Ide.CodeCompletion/ListWindow.cs \
 	MonoDevelop.Ide.CodeCompletion/MemberCompletionData.cs \
@@ -372,6 +374,7 @@ FILES =  \
 	MonoDevelop.Ide.Extensions/MimeTypeOptionsPanelNode.cs \
 	MonoDevelop.Ide.Extensions/OptionsDialogSection.cs \
 	MonoDevelop.Ide.Extensions/OptionsPanelNode.cs \
+	MonoDevelop.Ide.Extensions/ServiceUrlExtensionNode.cs \
 	MonoDevelop.Ide.Extensions/StartupHandlerExtensionAttribute.cs \
 	MonoDevelop.Ide.Extensions/StockIconCodon.cs \
 	MonoDevelop.Ide.Extensions/TextEditorExtensionNode.cs \
@@ -384,8 +387,11 @@ FILES =  \
 	MonoDevelop.Ide.FindInFiles/FindInFilesDialog.cs \
 	MonoDevelop.Ide.FindInFiles/FindReplace.cs \
 	MonoDevelop.Ide.FindInFiles/ISearchProgressMonitor.cs \
+	MonoDevelop.Ide.FindInFiles/MemberCollector.cs \
+	MonoDevelop.Ide.FindInFiles/MemberReference.cs \
 	MonoDevelop.Ide.FindInFiles/ReferencesFinder.cs \
 	MonoDevelop.Ide.FindInFiles/Scope.cs \
+	MonoDevelop.Ide.FindInFiles/SearchCollector.cs \
 	MonoDevelop.Ide.FindInFiles/SearchProgressMonitor.cs \
 	MonoDevelop.Ide.FindInFiles/SearchResult.cs \
 	MonoDevelop.Ide.FindInFiles/SearchResultPad.cs \
@@ -395,7 +401,6 @@ FILES =  \
 	MonoDevelop.Ide.Fonts/FontDescriptionCodon.cs \
 	MonoDevelop.Ide.Fonts/FontService.cs \
 	MonoDevelop.Ide.Gui.Components/CellRendererPixbuf.cs \
-	MonoDevelop.Ide.Gui.Components/CustomCommandTargetAttribute.cs \
 	MonoDevelop.Ide.Gui.Components/DragOperation.cs \
 	MonoDevelop.Ide.Gui.Components/EnvVarList.cs \
 	MonoDevelop.Ide.Gui.Components/ExecutionModeComboBox.cs \
@@ -432,7 +437,6 @@ FILES =  \
 	MonoDevelop.Ide.Gui.Content/IFoldable.cs \
 	MonoDevelop.Ide.Gui.Content/ILocationList.cs \
 	MonoDevelop.Ide.Gui.Content/INavigable.cs \
-	MonoDevelop.Ide.Gui.Content/IndentStyle.cs \
 	MonoDevelop.Ide.Gui.Content/IPathedDocument.cs \
 	MonoDevelop.Ide.Gui.Content/IPrintable.cs \
 	MonoDevelop.Ide.Gui.Content/ISmartIndenter.cs \
@@ -444,7 +448,6 @@ FILES =  \
 	MonoDevelop.Ide.Gui.Content/IUrlHandler.cs \
 	MonoDevelop.Ide.Gui.Content/IZoomable.cs \
 	MonoDevelop.Ide.Gui.Content/TextEditorExtension.cs \
-	MonoDevelop.Ide.Gui.Content/TextEditorProperties.cs \
 	MonoDevelop.Ide.Gui.Content/TextStylePolicy.cs \
 	MonoDevelop.Ide.Gui.Dialogs/AboutMonoDevelopTabPage.cs \
 	MonoDevelop.Ide.Gui.Dialogs/AddinLoadErrorDialog.cs \
@@ -608,6 +611,7 @@ FILES =  \
 	MonoDevelop.Ide.Projects.OptionPanels/GeneralProjectOptions.cs \
 	MonoDevelop.Ide.Projects.OptionPanels/NamespaceSynchronisationPanel.cs \
 	MonoDevelop.Ide.Projects.OptionPanels/OutputOptionsPanel.cs \
+	MonoDevelop.Ide.Projects.OptionPanels/PortableRuntimeOptionsPanel.cs \
 	MonoDevelop.Ide.Projects.OptionPanels/RunOptionsPanel.cs \
 	MonoDevelop.Ide.Projects.OptionPanels/RuntimeOptionsPanel.cs \
 	MonoDevelop.Ide.Projects.OptionPanels/SolutionItemConfigurationsPanel.cs \
@@ -622,8 +626,8 @@ FILES =  \
 	MonoDevelop.Ide.Projects/ConfirmProjectDeleteDialog.cs \
 	MonoDevelop.Ide.Projects/DefaultPolicyOptionsDialog.cs \
 	MonoDevelop.Ide.Projects/DeleteConfigDialog.cs \
-	MonoDevelop.Ide.Projects/ExportProjectDialog.cs \
 	MonoDevelop.Ide.Projects/ExportProjectPolicyDialog.cs \
+	MonoDevelop.Ide.Projects/ExportSolutionDialog.cs \
 	MonoDevelop.Ide.Projects/FeatureSelectorDialog.cs \
 	MonoDevelop.Ide.Projects/ImportProjectPolicyDialog.cs \
 	MonoDevelop.Ide.Projects/IncludeNewFilesDialog.cs \
@@ -642,6 +646,8 @@ FILES =  \
 	MonoDevelop.Ide.Projects/TemplatePickerWidget.cs \
 	MonoDevelop.Ide.StandardHeader/StandardHeaderPolicyPanel.cs \
 	MonoDevelop.Ide.StandardHeader/StandardHeaderService.cs \
+	MonoDevelop.Ide.Tasks/CommentTag.cs \
+	MonoDevelop.Ide.Tasks/CommentTasksChangedEventHandler.cs \
 	MonoDevelop.Ide.Tasks/CommentTasksView.cs \
 	MonoDevelop.Ide.Tasks/ITaskListView.cs \
 	MonoDevelop.Ide.Tasks/Task.cs \
@@ -669,6 +675,27 @@ FILES =  \
 	MonoDevelop.Ide.Templates/SolutionDescriptor.cs \
 	MonoDevelop.Ide.Templates/SolutionItemDescriptor.cs \
 	MonoDevelop.Ide.Templates/TextFileDescriptionTemplate.cs \
+	MonoDevelop.Ide.Templates/XmlCodeDomReader.cs \
+	MonoDevelop.Ide.TypeSystem/Ambience.cs \
+	MonoDevelop.Ide.TypeSystem/AmbienceService.cs \
+	MonoDevelop.Ide.TypeSystem/CodeGenerationService.cs \
+	MonoDevelop.Ide.TypeSystem/CodeGenerator.cs \
+	MonoDevelop.Ide.TypeSystem/Comment.cs \
+	MonoDevelop.Ide.TypeSystem/ConditionalRegion.cs \
+	MonoDevelop.Ide.TypeSystem/FoldingRegion.cs \
+	MonoDevelop.Ide.TypeSystem/ITypeSystemParser.cs \
+	MonoDevelop.Ide.TypeSystem/MarkupUtilities.cs \
+	MonoDevelop.Ide.TypeSystem/MonoDocDocumentationProvider.cs \
+	MonoDevelop.Ide.TypeSystem/NetAmbience.cs \
+	MonoDevelop.Ide.TypeSystem/OutputFlags.cs \
+	MonoDevelop.Ide.TypeSystem/OutputSettings.cs \
+	MonoDevelop.Ide.TypeSystem/ParsedDocument.cs \
+	MonoDevelop.Ide.TypeSystem/PreProcessorDefine.cs \
+	MonoDevelop.Ide.TypeSystem/ProjectContentEventArgs.cs \
+	MonoDevelop.Ide.TypeSystem/StockIcons.cs \
+	MonoDevelop.Ide.TypeSystem/Tag.cs \
+	MonoDevelop.Ide.TypeSystem/TypeSystemParserNode.cs \
+	MonoDevelop.Ide.TypeSystem/TypeSystemService.cs \
 	MonoDevelop.Ide.Updater/AddinsUpdateHandler.cs \
 	MonoDevelop.Ide.Updater/IUpdateHandler.cs \
 	MonoDevelop.Ide.Updater/UpdateCheckHandler.cs \
@@ -691,7 +718,6 @@ FILES =  \
 	MonoDevelop.Ide.WelcomePage/WelcomePageView.cs \
 	MonoDevelop.Ide.WelcomePage/WelcomePageWidget.cs \
 	MonoDevelop.Ide/AddEntryEventHandler.cs \
-	MonoDevelop.Ide/CodeGenerationService.cs \
 	MonoDevelop.Ide/DesktopService.cs \
 	MonoDevelop.Ide/DispatchService.cs \
 	MonoDevelop.Ide/ExitEventHandler.cs \
@@ -705,6 +731,7 @@ FILES =  \
 	MonoDevelop.Ide/ImageService.cs \
 	MonoDevelop.Ide/LogReportingStartup.cs \
 	MonoDevelop.Ide/MessageService.cs \
+	MonoDevelop.Ide/ProjectCreatedEventArgs.cs \
 	MonoDevelop.Ide/ProjectOperations.cs \
 	MonoDevelop.Ide/RootWorkspace.cs \
 	MonoDevelop.Ide/Services.cs \

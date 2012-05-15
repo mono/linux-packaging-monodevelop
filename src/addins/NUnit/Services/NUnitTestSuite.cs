@@ -47,6 +47,7 @@ namespace MonoDevelop.NUnit
 			fullName = !string.IsNullOrEmpty (tinfo.PathName) ? tinfo.PathName + "." + tinfo.Name : tinfo.Name;
 			this.testInfo = tinfo;
 			this.rootSuite = rootSuite;
+			this.TestId = tinfo.TestId;
 		}
 		
 		public override bool HasTests {
@@ -76,10 +77,14 @@ namespace MonoDevelop.NUnit
 				return;
 			
 			foreach (NunitTestInfo test in testInfo.Tests) {
+				UnitTest newTest;
 				if (test.Tests != null)
-					Tests.Add (new NUnitTestSuite (rootSuite, test));
+					newTest = new NUnitTestSuite (rootSuite, test);
 				else
-					Tests.Add (new NUnitTestCase (rootSuite, test, ClassName));
+					newTest = new NUnitTestCase (rootSuite, test, ClassName);
+				newTest.FixtureTypeName = test.FixtureTypeName;
+				newTest.FixtureTypeNamespace = test.FixtureTypeNamespace;
+				Tests.Add (newTest);
 			}
 		}
 		

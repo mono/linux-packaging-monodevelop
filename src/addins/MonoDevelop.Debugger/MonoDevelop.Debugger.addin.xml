@@ -6,11 +6,11 @@
        description = "Support for Debugging projects"
        copyright = "MIT X11"
        flags = "Hidden"
-       version = "2.8.6.3">
+       version = "3.0.1">
 
 	<Dependencies>
-		<Addin id="Core" version="2.8.6.3"/>
-		<Addin id="Ide" version="2.8.6.3"/>
+		<Addin id="Core" version="3.0.1"/>
+		<Addin id="Ide" version="3.0.1"/>
 	</Dependencies>
 	
 	<ExtensionPoint path="/MonoDevelop/Debugging/DebuggerEngines">
@@ -58,13 +58,13 @@
 				icon = "md-execute-debug"
 				shortcut = "F5"
 				macShortcut = "Meta|Return"
-				_description = "Debug"
-				_label = "_Debug" />
+				_description = "Start debugging"
+				_label = "Start _Debugging" />
 		<Command id = "MonoDevelop.Debugger.DebugCommands.DebugEntry"
 				defaultHandler = "MonoDevelop.Debugger.DebugEntryHandler"
 				icon = "md-execute-debug"
 				_description = "Debug current project"
-				_label = "D_ebug Item" />
+				_label = "Start D_ebugging Item" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/Commands">
@@ -105,11 +105,15 @@
 				_label = "Step Out"
 				_description = "Step Out"
 				shortcut = "Shift|F11" 
-				macShortcut = "Shift|Meta|T"
+				macShortcut = "Shift|Meta|U"
 				icon="md-step-out-debug"/>
 		<Command id = "MonoDevelop.Debugger.DebugCommands.NewBreakpoint"
 				defaultHandler = "MonoDevelop.Debugger.NewBreakpointHandler"
 				_label = "New Breakpoint..."
+				icon = "md-breakpoint-new" />
+		<Command id = "MonoDevelop.Debugger.DebugCommands.NewFunctionBreakpoint"
+				defaultHandler = "MonoDevelop.Debugger.NewFunctionBreakpointHandler"
+				_label = "New Function Breakpoint..."
 				icon = "md-breakpoint-new" />
 		<Command id = "MonoDevelop.Debugger.DebugCommands.RemoveBreakpoint"
 				defaultHandler = "MonoDevelop.Debugger.RemoveBreakpointHandler"
@@ -183,6 +187,8 @@
 		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.StepOut" />
 		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.ShowCurrentExecutionLine" />
 		<SeparatorItem id = "MonoDevelop.Debugger.BreakpointsSection" />
+		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.NewFunctionBreakpoint" />
+		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.NewBreakpoint" />
 		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.ToggleBreakpoint" />
 		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.AddTracepoint" />
 		<CommandItem id = "MonoDevelop.Debugger.DebugCommands.EnableDisableBreakpoint" />

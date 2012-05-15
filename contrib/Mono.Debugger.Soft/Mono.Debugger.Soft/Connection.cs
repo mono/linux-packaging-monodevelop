@@ -34,11 +34,16 @@ namespace Mono.Debugger.Soft
 		}
 	}
 
+	struct SourceInfo {
+		public string source_file;
+		public byte[] guid, hash;
+	}
+
 	class DebugInfo {
 		public int max_il_offset;
-		public string filename;
 		public int[] il_offsets;
 		public int[] line_numbers;
+		public SourceInfo[] source_files;
 	}
 
 	struct FrameInfo {
@@ -53,7 +58,10 @@ namespace Mono.Debugger.Soft
 		public long assembly, module, base_type, element_type;
 		public int token, rank, attributes;
 		public bool is_byref, is_pointer, is_primitive, is_valuetype, is_enum;
+		public bool is_gtd, is_generic_type;
 		public long[] nested;
+		public long gtd;
+		public long[] type_args;
 	}
 
 	struct IfaceMapInfo {
@@ -64,6 +72,9 @@ namespace Mono.Debugger.Soft
 
 	class MethodInfo {
 		public int attributes, iattributes, token;
+		public bool is_gmd, is_generic_method;
+		public long gmd;
+		public long[] type_args;
 	}
 
 	class MethodBodyInfo {
@@ -191,7 +202,9 @@ namespace Mono.Debugger.Soft
 	}
 
 	enum StackFrameFlags {
-		DEBUGGER_INVOKE = 1
+		NONE = 0,
+		DEBUGGER_INVOKE = 1,
+		NATIVE_TRANSITION = 2
 	}
 
 	class ResolvedToken {
@@ -229,6 +242,10 @@ namespace Mono.Debugger.Soft
 		}
 
 		public int Size {
+			get; set;
+		}
+
+		public int Filter {
 			get; set;
 		}
 	}
@@ -359,7 +376,7 @@ namespace Mono.Debugger.Soft
 		 * with newer runtimes, and vice versa.
 		 */
 		internal const int MAJOR_VERSION = 2;
-		internal const int MINOR_VERSION = 11;
+		internal const int MINOR_VERSION = 17;
 
 		enum WPSuspendPolicy {
 			NONE = 0,
@@ -875,8 +892,9 @@ namespace Mono.Debugger.Soft
 				if (s == null)
 					return WriteInt (-1);
 
-				encode_int (data, s.Length, ref offset);
 				byte[] b = Encoding.UTF8.GetBytes (s);
+				MakeRoom (4);
+				encode_int (data, b.Length, ref offset);
 				MakeRoom (b.Length);
 				Buffer.BlockCopy (b, 0, data, offset, b.Length);
 				offset += b.Length;
@@ -1114,7 +1132,9 @@ namespace Mono.Debugger.Soft
 					if (!res)
 						break;
 				} catch (Exception ex) {
-					Console.WriteLine (ex);
+					if (!closed) {
+						Console.WriteLine (ex);
+					}
 					break;
 				}
 			}
@@ -1630,14 +1650,37 @@ namespace Mono.Debugger.Soft
 
 			DebugInfo info = new DebugInfo ();
 			info.max_il_offset = res.ReadInt ();
-			info.filename = res.ReadString ();
+
+			SourceInfo[] sources = null;
+			if (Version.AtLeast (2, 13)) {
+				int n = res.ReadInt ();
+				sources = new SourceInfo [n];
+				for (int i = 0; i < n; ++i) {
+					sources [i].source_file = res.ReadString ();
+					if (Version.AtLeast (2, 14)) {
+						sources [i].hash = new byte [16];
+						for (int j = 0; j < 16; ++j)
+							sources [i].hash [j] = (byte)res.ReadByte ();
+					}
+				}
+			} else {
+				sources = new SourceInfo [1];
+				sources [0].source_file = res.ReadString ();
+			}
 
 			int n_il_offsets = res.ReadInt ();
 			info.il_offsets = new int [n_il_offsets];
 			info.line_numbers = new int [n_il_offsets];
+			info.source_files = new SourceInfo [n_il_offsets];
 			for (int i = 0; i < n_il_offsets; ++i) {
 				info.il_offsets [i] = res.ReadInt ();
 				info.line_numbers [i] = res.ReadInt ();
+				if (Version.AtLeast (2, 12)) {
+					int idx = res.ReadInt ();
+					info.source_files [i] = idx >= 0 ? sources [idx] : default (SourceInfo);
+				} else {
+					info.source_files [i] = sources [0];
+				}
 			}
 
 			return info;
@@ -1689,7 +1732,20 @@ namespace Mono.Debugger.Soft
 			info.attributes = res.ReadInt ();
 			info.iattributes = res.ReadInt ();
 			info.token = res.ReadInt ();
-
+			if (Version.AtLeast (2, 12)) {
+				int attrs = res.ReadByte ();
+				if ((attrs & (1 << 0)) != 0)
+					info.is_gmd = true;
+				if ((attrs & (1 << 1)) != 0)
+					info.is_generic_method = true;
+				info.gmd = res.ReadId ();
+				if (Version.AtLeast (2, 15)) {
+					if (info.is_generic_method) {
+						int n = res.ReadInt ();
+						info.type_args = res.ReadIds (n);
+					}
+				}
+			}
 			return info;
 		}
 
@@ -1736,11 +1792,14 @@ namespace Mono.Debugger.Soft
 
 			var frames = new FrameInfo [count];
 			for (int i = 0; i < count; ++i) {
-				frames [i].id = res.ReadInt ();
-				frames [i].method = res.ReadId ();
-				frames [i].il_offset = res.ReadInt ();
-				frames [i].flags = (StackFrameFlags)res.ReadByte ();
+				var f = new FrameInfo ();
+				f.id = res.ReadInt ();
+				f.method = res.ReadId ();
+				f.il_offset = res.ReadInt ();
+				f.flags = (StackFrameFlags)res.ReadByte ();
+				frames [i] = f;
 			}
+
 			return frames;
 		}
 
@@ -1826,11 +1885,20 @@ namespace Mono.Debugger.Soft
 			res.is_primitive = (b & 4) != 0;
 			res.is_valuetype = (b & 8) != 0;
 			res.is_enum = (b & 16) != 0;
+			res.is_gtd = (b & 32) != 0;
+			res.is_generic_type = (b & 64) != 0;
 
 			int nested_len = r.ReadInt ();
 			res.nested = new long [nested_len];
 			for (int i = 0; i < nested_len; ++i)
 				res.nested [i] = r.ReadId ();
+
+			if (Version.AtLeast (2, 12))
+				res.gtd = r.ReadId ();
+			if (Version.AtLeast (2, 15) && res.is_generic_type) {
+				int n = r.ReadInt ();
+				res.type_args = r.ReadIds (n);
+			}
 
 			return res;
 		}
@@ -1982,6 +2050,8 @@ namespace Mono.Debugger.Soft
 						w.WriteId ((mod as StepModifier).Thread);
 						w.WriteInt ((mod as StepModifier).Size);
 						w.WriteInt ((mod as StepModifier).Depth);
+						if (Version.AtLeast (2, 16))
+							w.WriteInt ((mod as StepModifier).Filter);
 					} else if (mod is ThreadModifier) {
 						w.WriteByte ((byte)ModifierKind.THREAD_ONLY);
 						w.WriteId ((mod as ThreadModifier).Thread);
@@ -2147,6 +2217,10 @@ namespace Mono.Debugger.Soft
 			return res;
 		}
 
+		public void ForceDisconnect ()
+		{
+			TransportClose ();
+		}
 	}
 	
 	class TcpConnection : Connection
