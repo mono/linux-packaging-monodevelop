@@ -40,6 +40,12 @@ namespace MonoDevelop.SourceEditor
 		
 	}
 	
+	public enum LineEndingConversion {
+		Ask,
+		LeaveAsIs,
+		ConvertAlways
+	}
+	
 	public class DefaultSourceEditorOptions : TextEditorOptions, ISourceEditorOptions
 	{
 		static DefaultSourceEditorOptions instance;
@@ -112,98 +118,86 @@ namespace MonoDevelop.SourceEditor
 		void UpdatePreferences (object sender, PropertyChangedEventArgs args)
 		{
 			try {
-			switch (args.Key) {
-			case "TabIsReindent": 
-				this.TabIsReindent = (bool) args.NewValue;
-				break;
-			case "EnableSemanticHighlighting":
-				this.EnableSemanticHighlighting = (bool) args.NewValue;
-				break;
-			case "AutoInsertMatchingBracket":
-				this.AutoInsertMatchingBracket = (bool) args.NewValue;
-				break;
-			case "EnableCodeCompletion":
-				this.EnableCodeCompletion = (bool) args.NewValue;
-				break;
-			case "EnableParameterInsight":
-				this.EnableParameterInsight = (bool) args.NewValue;
-				break;
-			case "UnderlineErrors":
-				this.UnderlineErrors = (bool) args.NewValue;
-				break;
-			case "IndentStyle":
-				if (args.NewValue == null) {
-					LoggingService.LogWarning ("tried to set indent style == null");
-				} else if (!(args.NewValue is MonoDevelop.Ide.Gui.Content.IndentStyle)) {
-					LoggingService.LogWarning ("tried to set indent style to " + args.NewValue + " which isn't from type IndentStyle instead it is from:" +  args.NewValue.GetType ());
-					this.IndentStyle = (MonoDevelop.Ide.Gui.Content.IndentStyle)Enum.Parse (typeof (MonoDevelop.Ide.Gui.Content.IndentStyle), args.NewValue.ToString ());
-				} else 
-					this.IndentStyle = (MonoDevelop.Ide.Gui.Content.IndentStyle) args.NewValue;
-				break;
-			case "ShowLineNumberMargin":
-				base.ShowLineNumberMargin = (bool) args.NewValue;
-				break;
-			case "ShowFoldMargin":
-				base.ShowFoldMargin = (bool) args.NewValue;
-				break;
-			case "ShowInvalidLines":
-				base.ShowInvalidLines = (bool) args.NewValue;
-				break;
-			case "ShowTabs":
-				base.ShowTabs = (bool) args.NewValue;
-				break;
-			case "ShowEolMarkers":
-				base.ShowEolMarkers = (bool) args.NewValue;
-				break;
-			case "HighlightCaretLine":
-				base.HighlightCaretLine = (bool) args.NewValue;
-				break;
-			case "ShowSpaces":
-				base.ShowSpaces = (bool) args.NewValue;
-				break;
-			case "EnableSyntaxHighlighting":
-				base.EnableSyntaxHighlighting = (bool) args.NewValue;
-				break;
-			case "HighlightMatchingBracket":
-				base.HighlightMatchingBracket = (bool) args.NewValue;
-				break;
-			case "ShowRuler":
-				base.ShowRuler = (bool) args.NewValue;
-				break;
-			case "FontName":
-				base.FontName = (string) args.NewValue;
-				break;
-			case "ColorScheme":
-				base.ColorScheme = (string) args.NewValue;
-				break;
-			case "DefaultRegionsFolding":
-				this.DefaultRegionsFolding = (bool) args.NewValue;
-				break;
-			case "DefaultCommentFolding":
-				this.DefaultCommentFolding = (bool) args.NewValue;
-				break;
-			case "UseViModes":
-				this.UseViModes = (bool) args.NewValue;
-				break;
-			case "OnTheFlyFormatting":
-				this.OnTheFlyFormatting = (bool) args.NewValue;
-				break;
-			case "EnableAutoCodeCompletion":
-				this.EnableAutoCodeCompletion = (bool) args.NewValue;
-				break;
-			case "CompleteWithSpaceOrPunctuation":
-				this.CompleteWithSpaceOrPunctuation = (bool) args.NewValue;
-				break;
-			case "ControlLeftRightMode":
-				this.ControlLeftRightMode = (ControlLeftRightMode) args.NewValue;
-				break;
-			case "EnableAnimations":
-				base.EnableAnimations =  (bool) args.NewValue;
-				break;
-			case "UseAntiAliasing":
-				base.UseAntiAliasing =  (bool) args.NewValue;
-				break;
-			}
+				switch (args.Key) {
+				case "TabIsReindent": 
+					this.TabIsReindent = (bool)args.NewValue;
+					break;
+				case "EnableSemanticHighlighting":
+					this.EnableSemanticHighlighting = (bool)args.NewValue;
+					break;
+				case "AutoInsertMatchingBracket":
+					this.AutoInsertMatchingBracket = (bool)args.NewValue;
+					break;
+				case "UnderlineErrors":
+					this.UnderlineErrors = (bool)args.NewValue;
+					break;
+				case "IndentStyle":
+					if (args.NewValue == null) {
+						LoggingService.LogWarning ("tried to set indent style == null");
+					} else if (!(args.NewValue is IndentStyle)) {
+						LoggingService.LogWarning ("tried to set indent style to " + args.NewValue + " which isn't from type IndentStyle instead it is from:" + args.NewValue.GetType ());
+						this.IndentStyle = (IndentStyle)Enum.Parse (typeof(IndentStyle), args.NewValue.ToString ());
+					} else 
+						this.IndentStyle = (IndentStyle)args.NewValue;
+					break;
+				case "ShowLineNumberMargin":
+					base.ShowLineNumberMargin = (bool)args.NewValue;
+					break;
+				case "ShowFoldMargin":
+					base.ShowFoldMargin = (bool)args.NewValue;
+					break;
+				case "ShowInvalidLines":
+					base.ShowInvalidLines = (bool)args.NewValue;
+					break;
+				case "ShowTabs":
+					base.ShowTabs = (bool)args.NewValue;
+					break;
+				case "ShowEolMarkers":
+					base.ShowEolMarkers = (bool)args.NewValue;
+					break;
+				case "HighlightCaretLine":
+					base.HighlightCaretLine = (bool)args.NewValue;
+					break;
+				case "ShowSpaces":
+					base.ShowSpaces = (bool)args.NewValue;
+					break;
+				case "EnableSyntaxHighlighting":
+					base.EnableSyntaxHighlighting = (bool)args.NewValue;
+					break;
+				case "HighlightMatchingBracket":
+					base.HighlightMatchingBracket = (bool)args.NewValue;
+					break;
+				case "ShowRuler":
+					base.ShowRuler = (bool)args.NewValue;
+					break;
+				case "FontName":
+					base.FontName = (string)args.NewValue;
+					break;
+				case "ColorScheme":
+					base.ColorScheme = (string)args.NewValue;
+					break;
+				case "DefaultRegionsFolding":
+					this.DefaultRegionsFolding = (bool)args.NewValue;
+					break;
+				case "DefaultCommentFolding":
+					this.DefaultCommentFolding = (bool)args.NewValue;
+					break;
+				case "UseViModes":
+					this.UseViModes = (bool)args.NewValue;
+					break;
+				case "OnTheFlyFormatting":
+					this.OnTheFlyFormatting = (bool)args.NewValue;
+					break;
+				case "ControlLeftRightMode":
+					this.ControlLeftRightMode = (ControlLeftRightMode)args.NewValue;
+					break;
+				case "EnableAnimations":
+					base.EnableAnimations = (bool)args.NewValue;
+					break;
+				case "UseAntiAliasing":
+					base.UseAntiAliasing = (bool)args.NewValue;
+					break;
+				}
 			} catch (Exception ex) {
 				LoggingService.LogError ("SourceEditorOptions error with property value for '" + (args.Key ?? "") + "'", ex);
 			}
@@ -212,14 +206,12 @@ namespace MonoDevelop.SourceEditor
 		void LoadAllPrefs ()
 		{
 			this.tabIsReindent = PropertyService.Get ("TabIsReindent", false);
-			this.enableSemanticHighlighting = PropertyService.Get ("EnableSemanticHighlighting", false);
+			this.enableSemanticHighlighting = PropertyService.Get ("EnableSemanticHighlighting", true);
 			//			this.autoInsertTemplates        = PropertyService.Get ("AutoInsertTemplates", false);
 			this.autoInsertMatchingBracket = PropertyService.Get ("AutoInsertMatchingBracket", false);
 			this.smartSemicolonPlacement = PropertyService.Get ("SmartSemicolonPlacement", false);
-			this.enableCodeCompletion = PropertyService.Get ("EnableCodeCompletion", true);
-			this.enableParameterInsight = PropertyService.Get ("EnableParameterInsight", true);
 			this.underlineErrors = PropertyService.Get ("UnderlineErrors", true);
-			this.indentStyle = PropertyService.Get ("IndentStyle", MonoDevelop.Ide.Gui.Content.IndentStyle.Smart);
+			this.indentStyle = PropertyService.Get ("IndentStyle", IndentStyle.Smart);
 			base.ShowLineNumberMargin = PropertyService.Get ("ShowLineNumberMargin", true);
 			base.ShowFoldMargin = PropertyService.Get ("ShowFoldMargin", true);
 			base.ShowInvalidLines = PropertyService.Get ("ShowInvalidLines", false);
@@ -235,43 +227,25 @@ namespace MonoDevelop.SourceEditor
 			this.defaultRegionsFolding = PropertyService.Get ("DefaultRegionsFolding", false);
 			this.defaultCommentFolding = PropertyService.Get ("DefaultCommentFolding", true);
 			this.useViModes = PropertyService.Get ("UseViModes", false);
-			this.onTheFlyFormatting = PropertyService.Get ("OnTheFlyFormatting", false);
-			this.enableAutoCodeCompletion = PropertyService.Get ("EnableAutoCodeCompletion", true);
-			this.completeWithSpaceOrPunctuation = PropertyService.Get ("CompleteWithSpaceOrPunctuation", true);
+			this.onTheFlyFormatting = PropertyService.Get ("OnTheFlyFormatting", true);
 			var defaultControlMode = (ControlLeftRightMode)Enum.Parse (typeof(ControlLeftRightMode), DesktopService.DefaultControlLeftRightBehavior);
 			this.ControlLeftRightMode = PropertyService.Get ("ControlLeftRightMode", defaultControlMode);
 			base.EnableAnimations = PropertyService.Get ("EnableAnimations", true);
 			base.UseAntiAliasing = PropertyService.Get ("UseAntiAliasing", true);
 			this.EnableHighlightUsages = PropertyService.Get ("EnableHighlightUsages", false);
+			this.lineEndingConversion = PropertyService.Get ("LineEndingConversion", LineEndingConversion.Ask);
 		}
 		
 		#region new options
 		
-		
-		bool enableAutoCodeCompletion;
 		public bool EnableAutoCodeCompletion {
-			get {
-				return enableAutoCodeCompletion;
-			}
-			set {
-				if (value != enableAutoCodeCompletion) {
-					enableAutoCodeCompletion = value;
-					PropertyService.Set ("EnableAutoCodeCompletion", value);
-				}
-			}
+			get { return CompletionTextEditorExtension.EnableAutoCodeCompletion; }
+			set { CompletionTextEditorExtension.EnableAutoCodeCompletion.Set (value); }
 		}
 		
-		bool completeWithSpaceOrPunctuation;
 		public bool CompleteWithSpaceOrPunctuation {
-			get {
-				return completeWithSpaceOrPunctuation;
-			}
-			set {
-				if (value != completeWithSpaceOrPunctuation) {
-					completeWithSpaceOrPunctuation = value;
-					PropertyService.Set ("CompleteWithSpaceOrPunctuation", value);
-				}
-			}
+			get { return CompletionTextEditorExtension.CompleteWithSpaceOrPunctuation; }
+			set { CompletionTextEditorExtension.CompleteWithSpaceOrPunctuation.Set (value); }
 		}
 		
 		bool defaultRegionsFolding;
@@ -372,28 +346,14 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		
-		bool enableCodeCompletion;
 		public bool EnableCodeCompletion {
-			get { return enableCodeCompletion; }
-			set {
-				if (value != this.enableCodeCompletion) {
-					this.enableCodeCompletion = value;
-					PropertyService.Set ("EnableCodeCompletion", value);
-					OnChanged (EventArgs.Empty);
-				}
-			}
+			get { return CompletionTextEditorExtension.EnableCodeCompletion; }
+			set { CompletionTextEditorExtension.EnableCodeCompletion.Value = value; }
 		}
 		
-		bool enableParameterInsight;
 		public bool EnableParameterInsight {
-			get { return enableParameterInsight; }
-			set {
-				if (value != this.enableParameterInsight) {
-					this.enableParameterInsight = value;
-					PropertyService.Set ("EnableParameterInsight", value);
-					OnChanged (EventArgs.Empty);
-				}
-			}
+			get { return CompletionTextEditorExtension.EnableParameterInsight; }
+			set { CompletionTextEditorExtension.EnableParameterInsight.Value = value; }
 		}
 		
 		bool underlineErrors;
@@ -411,7 +371,7 @@ namespace MonoDevelop.SourceEditor
 		}
 		
 		IndentStyle indentStyle;
-		public IndentStyle IndentStyle {
+		public override IndentStyle IndentStyle {
 			get {
 				return indentStyle;
 			}
@@ -451,6 +411,21 @@ namespace MonoDevelop.SourceEditor
 				}
 			}
 		}
+		
+		LineEndingConversion lineEndingConversion;
+		public LineEndingConversion LineEndingConversion {
+			get {
+				return lineEndingConversion;
+			}
+			set {
+				if (value != this.lineEndingConversion) {
+					this.lineEndingConversion = value;
+					PropertyService.Set ("LineEndingConversion", value);
+					OnChanged (EventArgs.Empty);
+				}
+			}
+		}
+		
 		#endregion
 		
 		bool useViModes = false;
@@ -668,15 +643,6 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 
-		public override bool AutoIndent {
-			get {
-				return IndentStyle != MonoDevelop.Ide.Gui.Content.IndentStyle.None;
-			}
-			set {
-				throw new NotSupportedException ("Use property 'IndentStyle' instead.");
-			}
-		}
-		
 		public override string FontName {
 			get {
 				return FontService.FilterFontName (FontService.GetUnderlyingFontName ("Editor"));

@@ -5,6 +5,7 @@ ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.NUnit.dll
 
 DEPS =  \
 	$(top_builddir)/build/AddIns/NUnit/NUnitRunner.dll \
+	$(top_builddir)/build/bin/ICSharpCode.NRefactory.dll \
 	$(top_builddir)/build/bin/Mono.TextEditor.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
 	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
@@ -69,6 +70,7 @@ FILES =  \
 RES =  \
 	gtk-gui/gui.stetic \
 	Gui/NUnit.Failed.png \
+	Gui/NUnit.Inconclusive.png \
 	Gui/NUnit.Loading.png \
 	Gui/NUnit.None.png \
 	Gui/NUnit.NotRun.png \

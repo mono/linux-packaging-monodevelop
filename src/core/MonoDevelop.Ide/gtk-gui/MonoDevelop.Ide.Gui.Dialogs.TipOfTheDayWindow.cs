@@ -52,7 +52,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			this.categoryLabel = new global::Gtk.Label ();
 			this.categoryLabel.Name = "categoryLabel";
 			this.categoryLabel.Xalign = 0F;
-			this.categoryLabel.LabelProp = global::MonoDevelop.Core.GettextCatalog.GetString ("Did you know...?");
+			this.categoryLabel.LabelProp = global::Mono.Unix.Catalog.GetString ("Did you know...?");
 			this.categoryLabel.UseMarkup = true;
 			this.categoryLabel.Wrap = true;
 			this.hbox7.Add (this.categoryLabel);
@@ -90,7 +90,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			// Container child hbox5.Gtk.Box+BoxChild
 			this.noshowCheckbutton = new global::Gtk.CheckButton ();
 			this.noshowCheckbutton.Name = "noshowCheckbutton";
-			this.noshowCheckbutton.Label = global::MonoDevelop.Core.GettextCatalog.GetString ("_Show at startup");
+			this.noshowCheckbutton.Label = global::Mono.Unix.Catalog.GetString ("_Show at startup");
 			this.noshowCheckbutton.DrawIndicator = true;
 			this.noshowCheckbutton.UseUnderline = true;
 			this.hbox5.Add (this.noshowCheckbutton);
@@ -100,7 +100,6 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			w7.Fill = false;
 			// Container child hbox5.Gtk.Box+BoxChild
 			this.hbuttonbox1 = new global::Gtk.HButtonBox ();
-			this.hbuttonbox1.Name = "hbuttonbox1";
 			this.hbuttonbox1.Spacing = 10;
 			this.hbuttonbox1.LayoutStyle = ((global::Gtk.ButtonBoxStyle)(4));
 			// Container child hbuttonbox1.Gtk.ButtonBox+ButtonBoxChild
@@ -118,7 +117,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			w9.Add (w10);
 			// Container child GtkHBox.Gtk.Container+ContainerChild
 			global::Gtk.Label w12 = new global::Gtk.Label ();
-			w12.LabelProp = global::MonoDevelop.Core.GettextCatalog.GetString ("_Next Tip");
+			w12.LabelProp = global::Mono.Unix.Catalog.GetString ("_Next Tip");
 			w12.UseUnderline = true;
 			w9.Add (w12);
 			w8.Add (w9);

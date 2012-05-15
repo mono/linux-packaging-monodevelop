@@ -59,9 +59,9 @@ namespace Mono.TextEditor
 	
 	public class TextMarker
 	{
-		LineSegment lineSegment;
+		DocumentLine lineSegment;
 		
-		public LineSegment LineSegment {
+		public DocumentLine LineSegment {
 			get {
 				return lineSegment;
 			}
@@ -108,9 +108,9 @@ namespace Mono.TextEditor
 		string style;
 		int startColumn;
 		int endColumn;
-		LineSegment line;
+		DocumentLine line;
 		UrlType urlType;
-		Document doc;
+		TextDocument doc;
 		
 		public string Url {
 			get {
@@ -136,7 +136,7 @@ namespace Mono.TextEditor
 			}
 		}
 		
-		public UrlMarker (Document doc, LineSegment line, string url, UrlType urlType, string style, int startColumn, int endColumn)
+		public UrlMarker (TextDocument doc, DocumentLine line, string url, UrlType urlType, string style, int startColumn, int endColumn)
 		{
 			this.doc = doc;
 			this.line = line;
@@ -198,7 +198,7 @@ namespace Mono.TextEditor
 	/// </summary>
 	public interface IIconBarMarker
 	{
-		void DrawIcon (TextEditor editor, Cairo.Context cr, LineSegment line, int lineNumber, double xPos, double yPos, double width, double height);
+		void DrawIcon (TextEditor editor, Cairo.Context cr, DocumentLine line, int lineNumber, double xPos, double yPos, double width, double height);
 		void MousePress (MarginMouseEventArgs args);
 		void MouseRelease (MarginMouseEventArgs args);
 		void MouseHover (MarginMouseEventArgs args);
@@ -268,13 +268,42 @@ namespace Mono.TextEditor
 		public override void Draw (TextEditor editor, Cairo.Context cr, Pango.Layout layout, bool selected, int startOffset, int endOffset, double y, double startXPos, double endXPos)
 		{
 			int markerStart = LineSegment.Offset + System.Math.Max (StartCol - 1, 0);
-			int markerEnd = LineSegment.Offset + (EndCol < 1 ? LineSegment.EditableLength : EndCol - 1);
+			int markerEnd = LineSegment.Offset + (EndCol < 1 ? LineSegment.Length : EndCol - 1);
 			if (markerEnd < startOffset || markerStart > endOffset) 
 				return; 
 	
+			
+			if (editor.IsSomethingSelected) {
+				var range = editor.SelectionRange;
+				if (range.Contains (markerStart)) {
+					int end = System.Math.Min (markerEnd, range.EndOffset);
+					InternalDraw (markerStart, end, editor, cr, layout, true, startOffset, endOffset, y, startXPos, endXPos);
+					InternalDraw (range.EndOffset, markerEnd, editor, cr, layout, false, startOffset, endOffset, y, startXPos, endXPos);
+					return;
+				}
+				if (range.Contains (markerEnd)) {
+					InternalDraw (markerStart, range.Offset, editor, cr, layout, false, startOffset, endOffset, y, startXPos, endXPos);
+					InternalDraw (range.Offset, markerEnd, editor, cr, layout, true, startOffset, endOffset, y, startXPos, endXPos);
+					return;
+				}
+				if (markerStart <= range.Offset && range.EndOffset <= markerEnd) {
+					InternalDraw (markerStart, range.Offset, editor, cr, layout, false, startOffset, endOffset, y, startXPos, endXPos);
+					InternalDraw (range.Offset, range.EndOffset, editor, cr, layout, true, startOffset, endOffset, y, startXPos, endXPos);
+					InternalDraw (range.EndOffset, markerEnd, editor, cr, layout, false, startOffset, endOffset, y, startXPos, endXPos);
+					return;
+				}
+				
+			}
+			
+			InternalDraw (markerStart, markerEnd, editor, cr, layout, false, startOffset, endOffset, y, startXPos, endXPos);
+		}
+		
+		void InternalDraw (int markerStart, int markerEnd, TextEditor editor, Cairo.Context cr, Pango.Layout layout, bool selected, int startOffset, int endOffset, double y, double startXPos, double endXPos)
+		{
+			if (markerStart >= markerEnd)
+				return;
 			double @from;
 			double to;
-				
 			if (markerStart < startOffset && endOffset < markerEnd) {
 				@from = startXPos;
 				to = endXPos;
@@ -296,12 +325,17 @@ namespace Mono.TextEditor
 				return;
 			}
 			double height = editor.LineHeight / 5;
-			cr.Color = ColorName == null ? Color : editor.ColorStyle.GetColorFromDefinition (ColorName);
+			if (selected) {
+				cr.Color = editor.ColorStyle.Selection.CairoColor;
+			} else {
+				cr.Color = ColorName == null ? Color : editor.ColorStyle.GetColorFromDefinition (ColorName);
+			}
 			if (Wave) {	
 				Pango.CairoHelper.ShowErrorUnderline (cr, @from, y + editor.LineHeight - height, to - @from, height);
 			} else {
-				cr.MoveTo (@from, y + editor.LineHeight - 1);
-				cr.LineTo (to, y + editor.LineHeight - 1);
+				cr.LineWidth = 1;
+				cr.MoveTo (@from, y + editor.LineHeight - 1.5);
+				cr.LineTo (to, y + editor.LineHeight - 1.5);
 				cr.Stroke ();
 			}
 		}

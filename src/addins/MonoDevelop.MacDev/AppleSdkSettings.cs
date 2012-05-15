@@ -25,7 +25,9 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using MonoDevelop.Core;
+using System.Linq;
 using MonoMac.Foundation;
 using System.IO;
 
@@ -34,7 +36,24 @@ namespace MonoDevelop.MacDev
 	public static class AppleSdkSettings
 	{
 		const string SDK_KEY = "MonoDevelop.MacDev.AppleSdkRoot";
-		internal const string DefaultRoot = "/Developer";
+		
+		internal static string DefaultRoot {
+			get {
+				// If the current developer root corresponds to a default SDK location for
+				// any of the supported configurations, return that as the default root. If
+				// they have configured an SDK in a non-default location, fall back to using
+				// the default location for the latest SDK.
+				if (DefaultRoots.Contains (DeveloperRoot))
+					return DeveloperRoot;
+				return DefaultRoots [0];
+			}
+		}
+		
+		// Put newer SDKs at the top as we scan from 0 -> List.Count
+		static readonly IList<string> DefaultRoots = new List<string> {
+			"/Applications/Xcode.app",
+			"/Developer"
+		};
 		static DateTime lastWritten;
 		
 		static string GetEnvLocation ()
@@ -42,14 +61,44 @@ namespace MonoDevelop.MacDev
 			return Environment.GetEnvironmentVariable ("MD_APPLE_SDK_ROOT");
 		}
 		
-		internal static bool ValidateSdkLocation (FilePath location)
+		static void GetNewPaths (FilePath root, out FilePath xcode, out FilePath vplist, out FilePath devroot)
 		{
-			return System.IO.File.Exists (location.Combine ("Library", "version.plist"));
+			xcode = root;
+			vplist = root.Combine ("Contents", "version.plist");
+			devroot = root.Combine ("Contents", "Developer");
 		}
-
+		
+		static void GetOldPaths (FilePath root, out FilePath xcode, out FilePath vplist, out FilePath devroot)
+		{
+			xcode = root.Combine ("Applications", "Xcode.app");
+			vplist = root.Combine ("Library", "version.plist");
+			devroot = root;
+		}
+		
+		static bool ValidatePaths (FilePath xcode, FilePath vplist, FilePath devroot)
+		{
+			return Directory.Exists (xcode)
+				&& Directory.Exists (devroot)
+				&& File.Exists (vplist)
+				&& File.Exists (xcode.Combine ("Contents", "Info.plist"));
+		}
+		
+		internal static bool ValidateSdkLocation (FilePath location, out FilePath xcode, out FilePath vplist, out FilePath devroot)
+		{
+			GetNewPaths (location, out xcode, out vplist, out devroot);
+			if (ValidatePaths (xcode, vplist, devroot))
+				return true;
+			
+			GetOldPaths (location, out xcode, out vplist, out devroot);
+			if (ValidatePaths (xcode, vplist, devroot))
+				return true;
+			
+			return false;
+		}
+		
 		internal static void SetConfiguredSdkLocation (FilePath location)
 		{
-			if (location.IsNullOrEmpty || location == DefaultRoot)
+			if (location.IsNullOrEmpty || location == DefaultRoots.First ())
 				location = null;
 			if (location == PropertyService.Get<string> (SDK_KEY))
 				return;
@@ -67,6 +116,9 @@ namespace MonoDevelop.MacDev
 		
 		static void SetInvalid ()
 		{
+			XcodePath = FilePath.Empty;
+			DeveloperRoot = FilePath.Empty;
+			DeveloperRootVersionPlist = FilePath.Empty;
 			IsValid = false;
 			DTXcode = null;
 			IsXcode4 = false;
@@ -86,13 +138,33 @@ namespace MonoDevelop.MacDev
 			DeveloperRoot = Environment.GetEnvironmentVariable ("MD_APPLE_SDK_ROOT");
 			if (DeveloperRoot.IsNullOrEmpty) {
 				DeveloperRoot = GetConfiguredSdkLocation ();
-				if (DeveloperRoot.IsNullOrEmpty)
-					DeveloperRoot = "/Developer";
 			}
 			
-			if (!ValidateSdkLocation (DeveloperRoot))
-				return;
+			bool foundSdk = false;
+			FilePath xcode, vplist, devroot;
 			
+			if (DeveloperRoot.IsNullOrEmpty) {
+				foreach (var v in DefaultRoots)  {
+					if (ValidateSdkLocation (v, out xcode, out vplist, out devroot)) {
+						foundSdk = true;
+						break;
+					} else {
+						LoggingService.LogDebug ("Apple iOS SDK not found at '{0}'", v);
+					}
+				}
+			} else {
+				foundSdk = ValidateSdkLocation (DeveloperRoot, out xcode, out vplist, out devroot);
+			}
+			
+			if (foundSdk) {
+				XcodePath = xcode;
+				DeveloperRoot = devroot;
+				DeveloperRootVersionPlist = vplist;
+			} else {
+				SetInvalid ();
+				return;
+			}
+
 			try {
 				var plist = XcodePath.Combine ("Contents", "Info.plist");
 				if (!File.Exists (plist))
@@ -116,13 +188,15 @@ namespace MonoDevelop.MacDev
 		}
 		
 		public static FilePath DeveloperRoot { get; private set; }
-		
-		public static FilePath XcodePath {
-			get {
-				return DeveloperRoot.Combine ("Applications", "Xcode.app");
-			}
+
+		public static FilePath DeveloperRootVersionPlist {
+			get; private set;
 		}
-		
+
+		public static FilePath XcodePath {
+			get; private set;
+		}
+
 		public static void CheckChanged ()
 		{
 			var plist = XcodePath.Combine ("Contents", "Info.plist");
@@ -161,7 +235,7 @@ namespace MonoDevelop.MacDev
 						dict[(NSString)"CFBundleVersion"]);
 					sb.AppendLine ();
 					
-					dict = NSDictionary.FromFile (AppleSdkSettings.DeveloperRoot.Combine ("Library", "version.plist"));
+					dict = NSDictionary.FromFile (AppleSdkSettings.DeveloperRootVersionPlist);
 					sb.AppendFormat ("\t Build {0}",
 						dict[(NSString)"ProductBuildVersion"]);
 				}

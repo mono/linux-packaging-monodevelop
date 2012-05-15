@@ -65,8 +65,9 @@ am__nobase_list = $(am__nobase_strip_setup); \
 am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
-am__installdirs = "$(DESTDIR)$(assemblydir)"
-DATA = $(assembly_DATA)
+am__installdirs = "$(DESTDIR)$(assemblydir)" \
+	"$(DESTDIR)$(assembly20dir)" "$(DESTDIR)$(assembly35dir)"
+DATA = $(assembly_DATA) $(assembly20_DATA) $(assembly35_DATA)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 ACLOCAL_FLAGS = @ACLOCAL_FLAGS@
@@ -193,16 +194,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-ASSEMBLY = $(top_builddir)/build/bin/MonoDevelop.Projects.Formats.MSBuild.exe
-REFS = \
-	-r:Microsoft.Build.Engine \
-	-r:Microsoft.Build.Framework \
-	-r:Microsoft.Build.Utilities.v3.5 \
-	-r:System \
-	-r:System.Runtime.Remoting
-
 FILES = \
 	AssemblyInfo.cs \
+	AssemblyInfo.v2.0.cs \
+	AssemblyInfo.v3.5.cs \
+	AssemblyInfo.v4.0.cs \
 	Main.cs \
 	MonoDevelop.Projects.Formats.MSBuild/BuildEngine.cs \
 	MonoDevelop.Projects.Formats.MSBuild/ConsoleLogger.cs \
@@ -213,16 +209,28 @@ FILES = \
 	MonoDevelop.Projects.Formats.MSBuild/MSBuildResult.cs \
 	MonoDevelop.Projects.Formats.MSBuild/ProjectBuilder.cs
 
-RES = 
+PROJECTS = \
+	MonoDevelop.Projects.Formats.MSBuild.csproj \
+	MonoDevelop.Projects.Formats.MSBuild.v2.0.csproj \
+	MonoDevelop.Projects.Formats.MSBuild.v3.5.csproj
 
-# Mono's 2.0/3.5 compiler doesn't recognize 3.5 variants of the MSBuild assemblies
-# so patch up the references
-MSB_REF_PREFIX := $(shell pkg-config --variable prefix mono)/lib/mono/3.5/
-FIXED_REFS := $(shell echo '$(REFS)' | sed -e 's@Microsoft.Build[^ ]*@$(MSB_REF_PREFIX)&.dll@g')
+REFS = 
+RES = 
+ASSEMBLY = $(top_builddir)/build/bin/MonoDevelop.Projects.Formats.MSBuild.exe
 assemblydir = $(MD_ASSEMBLY_DIR)
 assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb $(ASSEMBLY).config
-CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb $(ASSEMBLY).config
-EXTRA_DIST = $(FILES) $(RES) app.config
+ASSEMBLY20 = $(top_builddir)/build/bin/MSBuild/2.0/MonoDevelop.Projects.Formats.MSBuild.exe
+assembly20dir = $(MD_ASSEMBLY_DIR)/MSBuild/2.0
+assembly20_DATA = $(ASSEMBLY20) $(ASSEMBLY20).mdb $(ASSEMBLY20).config
+ASSEMBLY35 = $(top_builddir)/build/bin/MSBuild/3.5/MonoDevelop.Projects.Formats.MSBuild.exe
+assembly35dir = $(MD_ASSEMBLY_DIR)/MSBuild/3.5
+assembly35_DATA = $(ASSEMBLY35) $(ASSEMBLY35).mdb $(ASSEMBLY35).config
+EXTRA_DIST = $(FILES) \
+	$(PROJECTS) \
+	app.config \
+	MonoDevelop.Projects.Formats.MSBuild.v2.0.exe.config \
+	MonoDevelop.Projects.Formats.MSBuild.v3.5.exe.config
+
 build_deps = $(addprefix -r:, $(DEPS))
 build_sources = $(addprefix $(srcdir)/, $(FILES)) $(GENERATED_FILES)
 build_resources = $(addprefix $(srcdir)/, $(RES))
@@ -291,6 +299,46 @@ uninstall-assemblyDATA:
 	test -n "$$files" || exit 0; \
 	echo " ( cd '$(DESTDIR)$(assemblydir)' && rm -f" $$files ")"; \
 	cd "$(DESTDIR)$(assemblydir)" && rm -f $$files
+install-assembly20DATA: $(assembly20_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(assembly20dir)" || $(MKDIR_P) "$(DESTDIR)$(assembly20dir)"
+	@list='$(assembly20_DATA)'; test -n "$(assembly20dir)" || list=; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(assembly20dir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(assembly20dir)" || exit $$?; \
+	done
+
+uninstall-assembly20DATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(assembly20_DATA)'; test -n "$(assembly20dir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	test -n "$$files" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(assembly20dir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(assembly20dir)" && rm -f $$files
+install-assembly35DATA: $(assembly35_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(assembly35dir)" || $(MKDIR_P) "$(DESTDIR)$(assembly35dir)"
+	@list='$(assembly35_DATA)'; test -n "$(assembly35dir)" || list=; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(assembly35dir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(assembly35dir)" || exit $$?; \
+	done
+
+uninstall-assembly35DATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(assembly35_DATA)'; test -n "$(assembly35dir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	test -n "$$files" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(assembly35dir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(assembly35dir)" && rm -f $$files
 tags: TAGS
 TAGS:
 
@@ -332,7 +380,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(assemblydir)"; do \
+	for dir in "$(DESTDIR)$(assemblydir)" "$(DESTDIR)$(assembly20dir)" "$(DESTDIR)$(assembly35dir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -352,7 +400,6 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
-	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -363,7 +410,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic mostlyclean-am
+clean-am: clean-generic clean-local mostlyclean-am
 
 distclean: distclean-am
 	-rm -f Makefile
@@ -381,7 +428,8 @@ info: info-am
 
 info-am:
 
-install-data-am: install-assemblyDATA
+install-data-am: install-assembly20DATA install-assembly35DATA \
+	install-assemblyDATA
 
 install-dvi: install-dvi-am
 
@@ -425,31 +473,33 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-assemblyDATA
+uninstall-am: uninstall-assembly20DATA uninstall-assembly35DATA \
+	uninstall-assemblyDATA
 
 .MAKE: install-am install-strip
 
-.PHONY: all all-am check check-am clean clean-generic distclean \
-	distclean-generic distdir dvi dvi-am html html-am info info-am \
-	install install-am install-assemblyDATA install-data \
+.PHONY: all all-am check check-am clean clean-generic clean-local \
+	distclean distclean-generic distdir dvi dvi-am html html-am \
+	info info-am install install-am install-assembly20DATA \
+	install-assembly35DATA install-assemblyDATA install-data \
 	install-data-am install-dvi install-dvi-am install-exec \
 	install-exec-am install-html install-html-am install-info \
 	install-info-am install-man install-pdf install-pdf-am \
 	install-ps install-ps-am install-strip installcheck \
 	installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
-	pdf-am ps ps-am uninstall uninstall-am uninstall-assemblyDATA
+	pdf-am ps ps-am uninstall uninstall-am \
+	uninstall-assembly20DATA uninstall-assembly35DATA \
+	uninstall-assemblyDATA
 
 
-all: $(ASSEMBLY) $(ASSEMBLY).mdb
+all:
+	for p in $(PROJECTS); do xbuild $$p; done
 
-$(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS)
-	$(CSC) $(CSC_FLAGS) -warnaserror -debug -out:$@ -target:winexe $(FIXED_REFS) $(build_deps) $(build_resources:%=/resource:%) $(build_sources)
+clean-local:
+	for p in $(PROJECTS); do xbuild /t:Clean $$p; done
 
-$(ASSEMBLY).mdb: $(ASSEMBLY)
-
-$(ASSEMBLY).config: $(srcdir)/app.config
-	cp $< $@
+.PHONY: $(ASSEMBLY) $(ASSEMBLY).mdb $(ASSEMBLY).config $(ASSEMBLY20) $(ASSEMBLY20).mdb $(ASSEMBLY20).config $(ASSEMBLY35) $(ASSEMBLY35).mdb $(ASSEMBLY35).config
 
 # workaroundfor lack of abs_top_builddir variable in automake < 1.10. Will break if mdtool isn't 
 # launched from top_srcdir (i.e. where this script is located)

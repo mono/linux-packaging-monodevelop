@@ -48,8 +48,8 @@ namespace MonoDevelop.Components.Docking
 		
 		int handleSize = IsWindows ? 4 : 6;
 		int handlePadding = 0;
-		int defaultItemWidth = 130;
-		int defaultItemHeight = 130;
+		int defaultItemWidth = 300;
+		int defaultItemHeight = 250;
 		uint autoShowDelay = 400;
 		uint autoHideDelay = 500;
 		
@@ -64,6 +64,8 @@ namespace MonoDevelop.Components.Docking
 		
 		public DockFrame ()
 		{
+			Mono.TextEditor.GtkWorkarounds.FixContainerLeak (this);
+			
 			shadedContainer = new ShadedContainer ();
 			
 			dockBarTop = new DockBar (this, Gtk.PositionType.Top);
@@ -649,8 +651,14 @@ namespace MonoDevelop.Components.Docking
 				// The widget may already be removed from the parent
 				// so 'parent' can be null
 				Gtk.Container parent = (Gtk.Container) item.Widget.Parent;
-				if (parent != null)
+				if (parent != null) {
+					//removing the widget from its parent causes it to unrealize without unmapping
+					//so make sure it's unmapped
+					if (item.Widget.IsMapped) {
+						item.Widget.Unmap ();
+					}
 					parent.Remove (item.Widget);
+				}
 				RemoveTopLevel (widget);
 				widget.Disposed = true;
 				widget.Destroy ();

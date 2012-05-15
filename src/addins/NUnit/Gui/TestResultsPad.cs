@@ -27,6 +27,7 @@
 //
 
 using System;
+using System.IO;
 using System.Text;
 using System.Collections;
 using System.Collections.Generic;
@@ -51,8 +52,7 @@ namespace MonoDevelop.NUnit
 		VBox panel;
 		HPaned book;
 		
-		Label infoFailed = new Label (GettextCatalog.GetString ("<b>Failed</b>: {0}", 0));
-		Label infoIgnored = new Label (GettextCatalog.GetString ("<b>Ignored</b>: {0}", 0));
+		Label infoLabel = new Label ();
 		Label infoCurrent = new Label ();
 		HBox labels;
 		
@@ -79,9 +79,9 @@ namespace MonoDevelop.NUnit
 		bool running;
 		int testsToRun;
 		int testsRun;
-		int testsFailed;
-		int testsIgnored;
-		
+
+		UnitTestResult resultSummary;
+
 		UnitTest rootTest;
 		string configuration;
 		ArrayList results = new ArrayList ();
@@ -111,7 +111,7 @@ namespace MonoDevelop.NUnit
 			// Failures tree
 			failuresTreeView = new MonoDevelop.Ide.Gui.Components.PadTreeView ();
 			failuresTreeView.HeadersVisible = false;
-			failuresStore = new TreeStore (typeof(Pixbuf), typeof (string), typeof(object), typeof(string));
+			failuresStore = new TreeStore (typeof(Pixbuf), typeof(string), typeof(object), typeof(string), typeof(int));
 			var pr = new CellRendererPixbuf ();
 			CellRendererText tr = new CellRendererText ();
 			TreeViewColumn col = new TreeViewColumn ();
@@ -180,7 +180,7 @@ namespace MonoDevelop.NUnit
 			buttonIgnored.Image = new Gtk.Image (CircleImage.NotRun);
 			buttonIgnored.Image.Show ();
 			buttonIgnored.Toggled += new EventHandler (OnShowIgnoredToggled);
-			buttonIgnored.TooltipText = GettextCatalog.GetString( "Show Ignored Tests");
+			buttonIgnored.TooltipText = GettextCatalog.GetString ("Show Ignored Tests");
 			toolbar.Add (buttonIgnored);
 			
 			buttonOutput = new ToggleButton ();
@@ -223,18 +223,18 @@ namespace MonoDevelop.NUnit
 			
 			labels = new HBox (false, 10);
 			
-			infoFailed.UseMarkup = true;
-			infoIgnored.UseMarkup = true;
-			
-			labels.PackStart (infoFailed, true, false, 0);
-			labels.PackStart (infoIgnored, true, false, 0);
-			
+			infoLabel.UseMarkup = true;
+
+			labels.PackStart (infoLabel, true, false, 0);
+
 			runPanel.Add (new Gtk.Label (), true);
 			runPanel.Add (labels);
 			runPanel.Add (infoSep, false, 10);
 			
-			progressBar.HeightRequest = infoFailed.SizeRequest().Height;
+			progressBar.HeightRequest = infoLabel.SizeRequest ().Height;
 			runPanel.ShowAll ();
+			resultSummary = new UnitTestResult ();
+			UpdateCounters ();
 		}
 		
 		public void Dispose ()
@@ -254,8 +254,7 @@ namespace MonoDevelop.NUnit
 			progressBar.Fraction = 0;
 			progressBar.Text = "";
 			testsRun = 0;
-			testsFailed = 0;
-			testsIgnored = 0;
+			resultSummary = new UnitTestResult ();
 			UpdateCounters ();
 			if (rootTest != null) {
 				rootTest = testService.SearchTest (rootTest.FullName);
@@ -282,28 +281,30 @@ namespace MonoDevelop.NUnit
 		{
 		}
 		
+		string GetResultsMarkup ()
+		{
+			return string.Format (GettextCatalog.GetString ("<b>Passed</b>: {0}   <b>Failed</b>: {1}   <b>Errors</b>: {2}   <b>Inconclusive</b>: {3}   <b>Invalid</b>: {4}   <b>Ignored</b>: {5}   <b>Skipped</b>: {6}   <b>Time</b>: {7}"), 
+					                        resultSummary.Passed, resultSummary.Failures, resultSummary.Errors, resultSummary.Inconclusive, resultSummary.NotRunnable, resultSummary.Ignored, resultSummary.Skipped, resultSummary.Time);
+		}
 		void UpdateCounters ()
 		{
-			infoFailed.Markup = GettextCatalog.GetString ("<b>Failed</b>: {0}", testsFailed);
-			infoIgnored.Markup = GettextCatalog.GetString ("<b>Ignored</b>: {0}", testsIgnored);
+			infoLabel.Markup = GetResultsMarkup ();
 		}
 		
 		public void InitializeTestRun (UnitTest test)
 		{
 			rootTest = test;
 			results.Clear ();
+
 			testsToRun = test.CountTestCases ();
-			
 			error = null;
 			errorMessage = null;
 			
 			progressBar.Fraction = 0;
 			progressBar.Text = "";
 			progressBar.Text = "0 / " + testsToRun;
-
 			testsRun = 0;
-			testsFailed = 0;
-			testsIgnored = 0;
+			resultSummary = new UnitTestResult ();
 			UpdateCounters ();
 			
 			infoSep.Show ();
@@ -330,7 +331,7 @@ namespace MonoDevelop.NUnit
 			if (rootTest != null) {
 				Gdk.Pixbuf infoIcon = failuresTreeView.RenderIcon (Gtk.Stock.DialogInfo, Gtk.IconSize.Menu, "");
 				string msg = string.Format (isRunning ? GettextCatalog.GetString ("Running tests for <b>{0}</b> configuration <b>{1}</b>") : GettextCatalog.GetString ("Test results for <b>{0}</b> configuration <b>{1}</b>"), rootTest.Name, configuration);
-				startMessageIter = failuresStore.AppendValues (infoIcon, msg, rootTest);
+				startMessageIter = failuresStore.AppendValues (infoIcon, msg, rootTest, null, 0);
 			} else {
 				startMessageIter = Gtk.TreeIter.Zero;
 			}
@@ -350,31 +351,49 @@ namespace MonoDevelop.NUnit
 				msg += ": " + errorMessage;
 
 			Gdk.Pixbuf stock = failuresTreeView.RenderIcon (Gtk.Stock.DialogError, Gtk.IconSize.Menu, "");
-			TreeIter testRow = failuresStore.AppendValues (stock, msg, null);
-			failuresStore.AppendValues (testRow, null, Escape (error.GetType().Name + ": " + error.Message), null);
-			TreeIter row = failuresStore.AppendValues (testRow, null, GettextCatalog.GetString ("Stack Trace"), null);
+			TreeIter testRow = failuresStore.AppendValues (stock, msg, null, null, 0);
+			failuresStore.AppendValues (testRow, null, Escape (error.GetType ().Name + ": " + error.Message), null);
+			TreeIter row = failuresStore.AppendValues (testRow, null, GettextCatalog.GetString ("Stack Trace"), null, null, 0);
 			AddStackTrace (row, error.StackTrace, null);
 		}
 		
+		readonly static Regex stackTraceLineRegex = new Regex (@".*\s(?<file>.*)\:\D*\s?(?<line>\d+)", RegexOptions.Compiled);
+		
+		public static bool TryParseLocationFromStackTrace (string stackTraceLine, out string fileName, out int lineNumber)
+		{
+			var match = stackTraceLineRegex.Match (stackTraceLine);
+
+			if (!match.Success) {
+				fileName = null;
+				lineNumber = -1;
+				return false;
+			}
+			try {
+				fileName = match.Groups ["file"].Value;
+				lineNumber = int.Parse (match.Groups ["line"].Value);
+			} catch (Exception) {
+				fileName = null;
+				lineNumber = -1;
+				return false;
+			}
+			return true;
+		}
+
 		void AddStackTrace (TreeIter row, string stackTrace, UnitTest test)
 		{
-			string[] stackLines = stackTrace.Replace ("\r","").Split ('\n');
+			string[] stackLines = stackTrace.Replace ("\r", "").Split ('\n');
 			foreach (string line in stackLines) {
-				Regex r = new Regex (@".*?\(.*?\)\s\[.*?\]\s.*?\s(?<file>.*)\:(?<line>\d*)");
-				Match m = r.Match (line);
-				string file;
-				if (m.Groups["file"] != null && m.Groups["line"] != null)
-					file = m.Groups["file"].Value + ":" + m.Groups["line"].Value;
-				else
-					file = null;
-				failuresStore.AppendValues (row, null, Escape (line), test, file);
+				string fileName;
+				int lineNumber;
+				TryParseLocationFromStackTrace (line, out fileName, out lineNumber);
+				failuresStore.AppendValues (row, null, Escape (line), test, fileName, lineNumber);
 			}
 		}
 		
 		public void FinishTestRun ()
 		{
 			if (!Gtk.TreeIter.Zero.Equals (startMessageIter)) {
-				string msg = string.Format (GettextCatalog.GetString ("Test results for <b>{0}</b> configuration <b>{1}</b>"), rootTest.Name, configuration);
+				string msg = string.Format (GettextCatalog.GetString ("Test results for <b>{0}</b> configuration <b>{1}</b>"), rootTest != null ? rootTest.Name : "null", configuration);
 				failuresStore.SetValue (startMessageIter, 1, msg);
 				startMessageIter = Gtk.TreeIter.Zero;
 			}
@@ -390,12 +409,8 @@ namespace MonoDevelop.NUnit
 			buttonStop.Sensitive = false;
 			buttonRun.Sensitive = true;
 			
-			StringBuilder sb = new StringBuilder ();
-			sb.Append (GettextCatalog.GetString ("<b>Tests</b>: {0}", testsRun)).Append ("  ");
-			sb.Append (GettextCatalog.GetString ("<b>Failed</b>: {0}", testsFailed)).Append ("  ");
-			sb.Append (GettextCatalog.GetString ("<b>Ignored</b>: {0}", testsIgnored));
-			resultLabel.Markup = sb.ToString ();
-			
+			resultLabel.Markup = GetResultsMarkup ();
+
 			Running = false;
 		}
 		
@@ -416,16 +431,14 @@ namespace MonoDevelop.NUnit
 		{
 			Gtk.TreeIter iter;
 			if (failuresTreeView.Selection.GetSelected (out iter)) {
-				string file = (string) failuresStore.GetValue (iter, 3);
-				if (file != null) {
-					int i = file.LastIndexOf (':');
-					if (i != -1) {
-						int line;
-						if (int.TryParse (file.Substring (i+1), out line)) {
-							IdeApp.Workbench.OpenDocument (file.Substring (0, i), line, -1);
-							return;
-						}
+				string file = (string)failuresStore.GetValue (iter, 3);
+				int line = (int)failuresStore.GetValue (iter, 4);
+				try {
+					if (file != null && File.Exists (file)) {
+						IdeApp.Workbench.OpenDocument (file, line, -1);
+						return;
 					}
+				} catch (Exception) {
 				}
 			}
 			OnShowTest ();
@@ -566,7 +579,7 @@ namespace MonoDevelop.NUnit
 				}
 				failuresTreeView.ScrollToCell (failuresStore.GetPath (testRow), null, false, 0, 0);
 			}
-			if (result.IsIgnored) {
+			if (result.IsNotRun) {
 				if (!buttonIgnored.Active)
 					return;
 				TreeIter testRow = failuresStore.AppendValues (CircleImage.NotRun, Escape (test.FullName), test);
@@ -602,12 +615,7 @@ namespace MonoDevelop.NUnit
 			rec.Test = test;
 			rec.Result = result;
 			
-			if (result.IsFailure) {
-				testsFailed++;
-			}
-			if (result.IsIgnored) {
-				testsIgnored++;
-			}
+			resultSummary.Add (result);
 			results.Add (rec);
 			
 			ShowTestResult (test, result);

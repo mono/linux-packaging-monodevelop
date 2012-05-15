@@ -1,4 +1,4 @@
-SUBDIRS = contrib src po man theme-icons build tests
+SUBDIRS = ../external contrib src po man theme-icons build tests
 
 #capture aclocal flags for autoreconf
 ACLOCAL_AMFLAGS=$(ACLOCAL_FLAGS)
@@ -28,6 +28,8 @@ $(buildinfo): vcrevision
 	@echo "Build date: $$(date -u +'%Y-%m-%d %H:%M:%S%z')" >> "$@"
 	@echo "Updated build information"
 	@cat $(buildinfo)
+
+buildinfo: $(buildinfo)
 
 buildinfodir = $(MD_ASSEMBLY_DIR)
 buildinfo_DATA = $(buildinfo)
@@ -116,10 +118,10 @@ run-gdb: $(PROGRAM)
 	rm -f gdb.commands
 
 run-profile: $(PROGRAM)
-	$(MD_LAUNCH) -O=inline --profile $(MD_BIN_PATH)/MonoDevelop.exe
+	$(MD_LAUNCH) --profile=log:calls $(MD_BIN_PATH)/MonoDevelop.exe
 
 run-profile-stat: $(PROGRAM)
-	$(MD_LAUNCH) --profile=logging:stat $(MD_BIN_PATH)/MonoDevelop.exe
+	$(MD_LAUNCH) --profile=log:sample $(MD_BIN_PATH)/MonoDevelop.exe
 
 run-trace: $(PROGRAM)
 	$(MD_LAUNCH_SETUP) MONODEVELOP_TRACE=1 exec strace -ttt -f -o md.strace mono $(MD_BIN_PATH)/MonoDevelop.exe
@@ -168,7 +170,4 @@ distuninstallcheck_listfiles += $(filter_stale_uninstalled)	# amend by required 
 distcleancheck_listfiles      = find . -type f -print		# automake-1.9 setting
 distcleancheck_listfiles     += $(filter_stale_buildfiles)	# amend by required filtering
 
-.PHONY: vcrevision
-
-package-monomac:
-	$(MD_LAUNCH_SETUP) mono --debug "build/bin/mdtool.exe" setup pack ../extras/MonoDevelop.MonoMac/build/MonoDevelop.MonoMac.dll
+.PHONY: vcrevision buildinfo

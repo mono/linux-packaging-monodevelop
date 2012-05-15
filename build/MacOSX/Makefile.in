@@ -175,9 +175,9 @@ MAC_APP_LIB_DIR = $(MACOS)/lib/monodevelop
 ADDINS = $(MACOS)/lib/monodevelop/AddIns
 EXTRAS = $(top_srcdir)/../extras
 ARTIFACTS = $(top_srcdir)/../../artifacts
-CLEANFILES = MonoDevelop.dmg MonoDevelop.app
+CLEANFILES = render.exe
 #DISTCLEANFILES = 
-EXTRA_DIST = dmg-bg.png DS_Store Info.plist.in make-dmg-bundle.sh mdtool monodevelop 
+EXTRA_DIST = dmg-bg.png DS_Store Info.plist.in make-dmg-bundle.sh mdtool monodevelop render.exe
 all: all-am
 
 .SUFFIXES:
@@ -358,17 +358,19 @@ uninstall-am:
 	uninstall-am
 
 
-all: MonoDevelop.app
+all: app
 
-MonoDevelop.dmg: MonoDevelop.app
+render.exe: render.cs
+	gmcs -r:System.Drawing render.cs
+
+dmg: render.exe app
 	./make-dmg-bundle.sh
 
 clean-local:
 	rm -rf MonoDevelop.app
-	rm -f MonoDevelop.dmg
-	rm -f MonoDevelop.app.zip
+	rm -f MonoDevelop*.dmg
 
-MonoDevelop.app:
+app:
 	@echo ""
 	@echo "Creating directories in app bundle"
 	@echo ""
@@ -449,7 +451,7 @@ MonoDevelop.app:
 	@echo "Copying supported extras into app bundle"
 	@echo ""
 
-	@for ADDIN in MonoDevelop.Database MonoDevelop.MonoMac; do \
+	@for ADDIN in MonoDevelop.Database; do \
 		(ls $(EXTRAS)/$${ADDIN}/build/* > /dev/null 2>&1 && \
 			echo "Copying $${ADDIN}" && \
 			mkdir -p $(MAC_APP_LIB_DIR)/AddIns/$${ADDIN} && \
@@ -462,9 +464,8 @@ MonoDevelop.app:
 	@echo "Copying binary artifacts into app bundle"
 	@echo ""
 
-	mkdir -p $(MACOS)/lib/{moonlight,pkgconfig}
+	mkdir -p $(MACOS)/lib/{pkgconfig}
 	mkdir -p $(MACOS)/MonoDoc.app/
-	test ! -d $(ARTIFACTS)/MoonSDK ||  cp -pR $(ARTIFACTS)/MoonSDK/* $(MACOS)/lib/moonlight/
 	test ! -d $(ARTIFACTS)/MonoDoc.app ||  cp -pR $(ARTIFACTS)/MonoDoc.app/* $(MACOS)/MonoDoc.app/
 
 	cp -r MDMonitor.app $(MACOS)
@@ -473,6 +474,8 @@ MonoDevelop.app:
 	@echo ""
 	@echo "Updating build information"
 	@echo ""
+
+	pushd ../..; make buildinfo; popd
 
 	echo "a3140c14-ef90-4019-ae6c-9d93804d6611 $$(cat release-info)" > "$(MACOS)/updateinfo"
 
@@ -489,13 +492,7 @@ MonoDevelop.app:
 	@echo ""
 	@rm -f missing-stuff
 
-MonoDevelop.app.zip: MonoDevelop.app
-	zip -r9uyq MonoDevelop.app.zip MonoDevelop.app
-
-update-png:
-	/Applications/Inkscape.app/Contents/Resources/script --without-gui --export-png=`pwd`/dmg-bg.png `pwd`/dmg-bg.svg
-
-.PHONY: MonoDevelop.app
+.PHONY: app dmg
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

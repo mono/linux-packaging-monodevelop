@@ -160,7 +160,7 @@
 	</ItemSet>
 
 	<ItemSet id = "Project" _label = "_Project">
-		<CommandItem id = "MonoDevelop.Ide.Commands.ProjectCommands.ExportProject" />
+		<CommandItem id = "MonoDevelop.Ide.Commands.ProjectCommands.ExportSolution" />
 		<CommandItem id = "MonoDevelop.Ide.Commands.ProjectCommands.AddReference" />
 		<SeparatorItem id = "ExportSeparator" />
 		<CommandItem id = "MonoDevelop.Ide.Commands.ProjectCommands.CustomCommandList" />
@@ -204,12 +204,12 @@
 		<SeparatorItem id ="AddinManagerSeparator" /> 
 		<CommandItem id = "MonoDevelop.Ide.Commands.ToolCommands.ToolList" />
 		<CommandItem id = "MonoDevelop.Ide.Commands.ToolCommands.InstrumentationViewer" />
+		<CommandItem id = "MonoDevelop.Ide.Commands.EditCommands.InsertGuid" />
 		<SeparatorItem id = "OptionsSection" />
 		<Condition id="Platform" value="windows">
 			<CommandItem id = "MonoDevelop.Ide.Commands.EditCommands.MonodevelopPreferences" />
 			<CommandItem id = "MonoDevelop.Ide.Commands.EditCommands.DefaultPolicies" />
 		</Condition>
-		<CommandItem id = "MonoDevelop.Ide.Commands.EditCommands.InsertGuid" />
 	</ItemSet>
 
 	<ItemSet id = "Window" _label = "_Window">
@@ -251,4 +251,3 @@
 </Extension>
 
 </ExtensionModel>
-	

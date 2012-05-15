@@ -151,7 +151,13 @@ namespace MonoDevelop.VersionControl
 		// Returns the versioning status of a file or directory
 		public VersionInfo GetVersionInfo (FilePath localPath, bool getRemoteStatus)
 		{
-			VersionInfo vi = OnGetVersionInfo (new FilePath[] { localPath }, getRemoteStatus).Single ();
+			VersionInfo[] infos = OnGetVersionInfo (new FilePath[] { localPath }, getRemoteStatus).ToArray ();
+			if (infos.Length != 1) {
+				var names = infos;
+				LoggingService.LogError ("VersionControl returned {0} items for {1}", infos.Length, localPath);
+				LoggingService.LogError ("The infos were: {0}", string.Join (" ::: ", infos.Select (i => i.LocalPath)));
+			}
+			VersionInfo vi = infos.Single ();
 			vi.Init (this);
 			return vi;
 		}
@@ -375,6 +381,11 @@ namespace MonoDevelop.VersionControl
 		public virtual void Unlock (IProgressMonitor monitor, params FilePath[] localPaths)
 		{
 			throw new System.NotSupportedException ();
+		}
+		
+		public virtual DiffInfo GenerateDiff (FilePath baseLocalPath, VersionInfo versionInfo)
+		{
+			return null;
 		}
 		
 		// Returns a dif description between local files and the remote files.

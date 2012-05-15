@@ -130,80 +130,6 @@ namespace MonoDevelop.VersionControl.Views
 			base.Dispose ();
 		}
 
-		
-/*		internal class DiffWorker : Task {
-			Repository vc;
-			string name;
-			Revision revision;
-			string text1, text2;
-			string revPath;
-						
-			public DiffWorker (string name, Repository vc, string revPath, Revision revision) {
-				this.name = name;
-				this.vc = vc;
-				this.revPath = revPath;
-				this.revision = revision;
-			}
-			
-			protected override string GetDescription () {
-				return GettextCatalog.GetString ("Retrieving changes in {0} at revision {1}...", name, revision);
-			}
-			
-			protected override void Run () {
-				Log (GettextCatalog.GetString ("Getting text of {0} at revision {1}...", revPath, revision.GetPrevious ()));
-				try {
-					text1 = vc.GetTextAtRevision (revPath, revision.GetPrevious ());
-				} catch {
-					// If the file was added in this revision, no previous
-					// text exists.
-					text1 = String.Empty;
-				}
-				Log (GettextCatalog.GetString ("Getting text of {0} at revision {1}...", revPath, revision));
-				text2 = vc.GetTextAtRevision (revPath, revision);
-			}
-		
-			protected override void Finished () {
-				if (text1 == null || text2 == null) return;
-				DiffView.Show (name + " (revision " + revision.ToString () + ")", DesktopService.GetMimeTypeForUri (revPath), text1, text2);
-			}
-		}*/
-		
-		/// Background worker to create a revision-specific diff for a directory
-		internal class DirectoryDiffWorker: Task
-		{
-			FilePath path;
-			Repository repo;
-			Revision revision;
-			string name;
-			string patch;
-			
-			public DirectoryDiffWorker (FilePath path, Repository repo, Revision revision)
-			{
-				this.path = path;
-				name = string.Format ("{0} (revision {1})", path.FileName, revision);
-				this.repo = repo;
-				this.revision = revision;
-			}
-			
-			protected override string GetDescription ()
-			{
-				return GettextCatalog.GetString ("Retrieving changes in {0} ...", name, revision);
-			}
-			
-			
-			protected override void Run ()
-			{
-				DiffInfo[] diffs = repo.PathDiff (path, revision.GetPrevious (), revision);
-				patch = repo.CreatePatch (diffs);
-			}
-			
-			protected override void Finished ()
-			{
-				if (patch != null)
-					IdeApp.Workbench.NewDocument (name, "text/x-diff", patch);
-			}
-		}
-		
 		#region IAttachableViewContent implementation
 		public void Selected ()
 		{
@@ -225,53 +151,6 @@ namespace MonoDevelop.VersionControl.Views
 		{
 		}
 		#endregion
-	}
-
-	internal class HistoricalFileView
-	{
-		public static void Show (string name, string file, string text) {
-			string mimeType = DesktopService.GetMimeTypeForUri (file);
-			if (mimeType == null || mimeType.Length == 0)
-				mimeType = "text/plain";
-			Document doc = IdeApp.Workbench.NewDocument (name, mimeType, text);
-			doc.IsDirty = false;
-		}
-			
-		public static void Show (string file, Repository vc, string revPath, Revision revision) {
-			new Worker (Path.GetFileName (file) + " (revision " + revision.ToString () + ")",
-				file, vc, revPath, revision).Start ();
-		}
-		
-			
-		internal class Worker : Task {
-			Repository vc;
-			string name, file;
-			string revPath;
-			Revision revision;
-			string text;
-						
-			public Worker (string name, string file, Repository vc, string revPath, Revision revision) {
-				this.name = name;
-				this.file = file;
-				this.vc = vc;
-				this.revPath = revPath;
-				this.revision = revision;
-			}
-			
-			protected override string GetDescription () {
-				return GettextCatalog.GetString ("Retrieving content of {0} at revision {1}...", name, revision);
-			}
-			
-			protected override void Run () {
-				text = vc.GetTextAtRevision (revPath, revision);
-			}
-		
-			protected override void Finished () {
-				if (text == null)
-					return;
-				HistoricalFileView.Show (name, file, text);
-			}
-		}
 	}
 
 }

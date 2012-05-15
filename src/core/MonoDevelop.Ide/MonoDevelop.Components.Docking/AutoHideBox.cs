@@ -28,6 +28,8 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+//#define ANIMATE_DOCKING
+
 using System;
 using Gtk;
 using Gdk;
@@ -37,6 +39,8 @@ namespace MonoDevelop.Components.Docking
 {
 	class AutoHideBox: DockFrameTopLevel
 	{
+		const bool ANIMATE = false;
+		
 		static Gdk.Cursor resizeCursorW = new Gdk.Cursor (Gdk.CursorType.SbHDoubleArrow);
 		static Gdk.Cursor resizeCursorH = new Gdk.Cursor (Gdk.CursorType.SbVDoubleArrow);
 		
@@ -54,13 +58,11 @@ namespace MonoDevelop.Components.Docking
 		Gtk.PositionType position;
 		bool disposed;
 		bool insideGrip;
-		DockItem item;
 		
 		const int gripSize = 8;
 		
 		public AutoHideBox (DockFrame frame, DockItem item, Gtk.PositionType pos, int size)
 		{
-			this.item = item;
 			this.position = pos;
 			this.frame = frame;
 			this.targetSize = size;
@@ -100,17 +102,23 @@ namespace MonoDevelop.Components.Docking
 			ShowAll ();
 			Hide ();
 			
+#if ANIMATE_DOCKING
 			scrollable = new ScrollableContainer ();
 			scrollable.ScrollMode = false;
 			scrollable.Show ();
+#endif
 
 			if (item.Widget.Parent != null) {
 				((Gtk.Container)item.Widget.Parent).Remove (item.Widget);
 			}
 
 			item.Widget.Show ();
+#if ANIMATE_DOCKING
 			scrollable.Add (item.Widget);
 			fr.PackStart (scrollable, true, true, 0);
+#else
+			fr.PackStart (item.Widget, true, true, 0);
+#endif
 			
 			sepBox.ButtonPressEvent += OnSizeButtonPress;
 			sepBox.ButtonReleaseEvent += OnSizeButtonRelease;
@@ -127,6 +135,7 @@ namespace MonoDevelop.Components.Docking
 		
 		public void AnimateShow ()
 		{
+#if ANIMATE_DOCKING
 			animating = true;
 			scrollable.ScrollMode = true;
 			scrollable.SetSize (position, targetSize);
@@ -149,20 +158,21 @@ namespace MonoDevelop.Components.Docking
 			}
 			Show ();
 			GLib.Timeout.Add (10, RunAnimateShow);
+#else
+			Show ();
+#endif
 		}
-		
-		protected override void OnShown ()
-		{
-			base.OnShown ();
-		}
-
 		
 		public void AnimateHide ()
 		{
+#if ANIMATE_DOCKING
 			animating = true;
 			scrollable.ScrollMode = true;
 			scrollable.SetSize (position, targetSize);
 			GLib.Timeout.Add (10, RunAnimateHide);
+#else
+			Hide ();
+#endif
 		}
 		
 		bool RunAnimateShow ()
@@ -319,35 +329,15 @@ namespace MonoDevelop.Components.Docking
 			}
 		}
 		
-		void OnGripExpose (object ob, Gtk.ExposeEventArgs args)
+		void OnGripExpose (object sender, Gtk.ExposeEventArgs args)
 		{
-			EventBox w = (EventBox) ob;
-			Gdk.Rectangle handleRect = w.Allocation;
-//			w.GdkWindow.DrawRectangle (w.Style.DarkGC (StateType.Normal), true, handleRect);
-			handleRect.X = handleRect.Y = 0;
-			
-/*			switch (position) {
-			case PositionType.Top:
-				handleRect.Height -= 4; handleRect.Y += 1;
-				Gtk.Style.PaintHline (w.Style, w.GdkWindow, StateType.Normal, args.Event.Area, w, "", 0, w.Allocation.Width, gripSize - 2);
-				break;
-			case PositionType.Bottom:
-				handleRect.Height -= 4; handleRect.Y += 3;
-				Gtk.Style.PaintHline (w.Style, w.GdkWindow, StateType.Normal, args.Event.Area, w, "", 0, w.Allocation.Width, 0);
-				break;
-			case PositionType.Left:
-				handleRect.Width -= 4; handleRect.X += 1;
-				Gtk.Style.PaintVline (w.Style, w.GdkWindow, StateType.Normal, args.Event.Area, w, "", 0, w.Allocation.Height, gripSize - 2);
-				break;
-			case PositionType.Right:
-				handleRect.Width -= 4; handleRect.X += 3;
-				Gtk.Style.PaintVline (w.Style, w.GdkWindow, StateType.Normal, args.Event.Area, w, "", 0, w.Allocation.Height, 0);
-				break;
-			}*/
-			
-			Orientation or = horiz ? Orientation.Vertical : Orientation.Horizontal;
+			var w = (EventBox) sender;
 			StateType s = insideGrip ? StateType.Prelight : StateType.Normal;
-			Gtk.Style.PaintHandle (w.Style, w.GdkWindow, s, ShadowType.None, args.Event.Area, w, "paned", handleRect.Left, handleRect.Top, handleRect.Width, handleRect.Height, or);
+			
+			using (var ctx = CairoHelper.Create (args.Event.Window)) {
+				ctx.Color = (HslColor) (w.Style.Background (s));
+				ctx.Paint ();
+			}
 		}
 	}
 	

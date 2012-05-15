@@ -36,7 +36,6 @@ using MonoDevelop.Projects;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Core.Serialization;
-using MonoDevelop.Projects.CodeGeneration;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Ide.Gui.Content;
 using System.Runtime.CompilerServices;
@@ -83,7 +82,6 @@ namespace MonoDevelop.Ide
 			descendantItemRemovedHandler = (EventHandler<WorkspaceItemChangeEventArgs>) DispatchService.GuiDispatch (new EventHandler<WorkspaceItemChangeEventArgs> (NotifyDescendantItemRemoved));
 			configurationsChanged = (EventHandler) DispatchService.GuiDispatch (new EventHandler (NotifyConfigurationsChanged));
 			
-			FileService.FileRemoved += (EventHandler<FileEventArgs>) DispatchService.GuiDispatch (new EventHandler<FileEventArgs> (CheckFileRemove));
 			FileService.FileRenamed += (EventHandler<FileCopyEventArgs>) DispatchService.GuiDispatch (new EventHandler<FileCopyEventArgs> (CheckFileRename));
 			
 			// Set the initial active runtime
@@ -160,13 +158,6 @@ namespace MonoDevelop.Ide
 			get { return Items.Count > 0; }
 		}
 		
-		public CodeRefactorer GetCodeRefactorer (Solution solution) 
-		{
-			CodeRefactorer refactorer = new CodeRefactorer (solution);
-			refactorer.TextFileProvider = TextFileProvider.Instance;
-			return refactorer;
-		}
-
 		IDictionary IExtendedDataItem.ExtendedProperties {
 			get {
 				throw new NotSupportedException ("Root namespace can't have extended properties.");
@@ -450,10 +441,8 @@ namespace MonoDevelop.Ide
 					Document[] docs = new Document[IdeApp.Workbench.Documents.Count];
 					IdeApp.Workbench.Documents.CopyTo (docs, 0);
 					foreach (Document doc in docs) {
-						if (doc.HasProject) {
-							if (!doc.Close ())
-								return false;
-						}
+						if (!doc.Close ())
+							return false;
 					}
 				}
 				
@@ -1009,7 +998,7 @@ namespace MonoDevelop.Ide
 		{
 			try {
 //				Mono.Profiler.RuntimeControls.EnableProfiler ();
-				MonoDevelop.Projects.Dom.Parser.ProjectDomService.Load (item);
+				MonoDevelop.Ide.TypeSystem.TypeSystemService.Load (item);
 //				Mono.Profiler.RuntimeControls.DisableProfiler ();
 //				Console.WriteLine ("PARSE LOAD: " + (DateTime.Now - t).TotalMilliseconds);
 			} catch (Exception ex) {
@@ -1067,7 +1056,7 @@ namespace MonoDevelop.Ide
 			if (WorkspaceItemClosed != null)
 				WorkspaceItemClosed (this, args);
 			
-			MonoDevelop.Projects.Dom.Parser.ProjectDomService.Unload (item);
+			MonoDevelop.Ide.TypeSystem.TypeSystemService.Unload (item);
 //			ParserDatabase.Unload (item);
 			
 			NotifyDescendantItemRemoved (this, args);
@@ -1226,14 +1215,6 @@ namespace MonoDevelop.Ide
 					SolutionUnloaded (this, new SolutionEventArgs ((Solution)item));
 			} catch (Exception ex) {
 				LoggingService.LogError ("Error in SolutionClosed event.", ex);
-			}
-		}
-
-		void CheckFileRemove(object sender, FileEventArgs e)
-		{
-			foreach (Solution sol in GetAllSolutions ()) {
-				foreach (FilePath p in e.Select (fi => fi.FileName))
-					sol.RootFolder.RemoveFileFromProjects (p);
 			}
 		}
 		

@@ -195,7 +195,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ADDIN_BUILD = $(top_builddir)/build/AddIns
 ASSEMBLY = $(ADDIN_BUILD)/MacPlatform.dll
-MONOMAC_SRC = $(top_srcdir)/../extras/MonoDevelop.MonoMac/MonoDevelop.MonoMac/MonoMac.dll
+MONOMAC_SRC = $(top_srcdir)/../external/monomac/src/MonoMac.dll
 MONOMAC = $(ADDIN_BUILD)/MonoMac.dll
 DEPS = \
 	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
@@ -204,7 +204,7 @@ DEPS = \
 REFS = \
 	$(GLIB_SHARP_LIBS) \
 	$(GTK_SHARP_LIBS) \
-	-r:../../../../extras/MonoDevelop.MonoMac/MonoDevelop.MonoMac/MonoMac.dll \
+	-r:../../../../external/monomac/src/MonoMac.dll \
 	-r:Mono.Posix \
 	-r:System \
 	-r:System.Core \
@@ -468,11 +468,14 @@ uninstall-am: uninstall-assemblyDATA
 @ENABLE_MACPLATFORM_TRUE@all: $(MONOMAC) $(MONOMAC).mdb $(ASSEMBLY) $(ASSEMBLY).mdb
 @ENABLE_MACPLATFORM_FALSE@all:
 
-$(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS)
+$(MONOMAC_SRC):
+	make -C $(top_srcdir)/../external/monomac/src
+
+$(ASSEMBLY): $(MONOMAC_SRC) $(build_sources) $(build_resources) $(DEPS)
 	mkdir -p $(ADDIN_BUILD)
 	$(CSC) $(CSC_FLAGS) -unsafe $(REFS) $(build_deps) $(build_resources:%=/resource:%) $(build_sources) -out:$@ -target:library
 
-$(ASSEMBLY).mdb: $(ASSEMBLY)
+$(ASSEMBLY).mdb: $(ASSEMBLY) $(MONOMAC).mdb
 
 $(MONOMAC).mdb: $(MONOMAC_SRC).mdb
 	mkdir -p $(ADDIN_BUILD)
@@ -481,6 +484,8 @@ $(MONOMAC).mdb: $(MONOMAC_SRC).mdb
 $(MONOMAC): $(MONOMAC_SRC)
 	mkdir -p $(ADDIN_BUILD)
 	cp $< $@
+
+.PHONY: $(MONOMAC_SRC)
 
 # workaroundfor lack of abs_top_builddir variable in automake < 1.10. Will break if mdtool isn't 
 # launched from top_srcdir (i.e. where this script is located)

@@ -41,6 +41,7 @@ using NGit.Storage.File;
 using NGit.Transport;
 using NGit.Diff;
 using Mono.TextEditor.Utils;
+using NGit.Internal;
 
 namespace MonoDevelop.VersionControl.Git
 {
@@ -83,98 +84,43 @@ namespace MonoDevelop.VersionControl.Git
 		/// <summary>
 		/// Compares two commits and returns a list of files that have changed
 		/// </summary>
-		public static IEnumerable<Change> CompareCommits (NGit.Repository repo, RevCommit reference, RevCommit compared)
+		public static IEnumerable<DiffEntry> CompareCommits (NGit.Repository repo, RevCommit reference, RevCommit compared)
 		{
-			var changes = new List<Change>();
+			var changes = new List<DiffEntry>();
 			if (reference == null && compared == null)
 				return changes;
 			ObjectId refTree = (reference != null ? reference.Tree.Id : ObjectId.ZeroId);
 			ObjectId comparedTree = (compared != null ? compared.Tree.Id : ObjectId.ZeroId);
-			var walk = new TreeWalk (repo);
-			if (reference == null || compared == null)
-				walk.Reset ((reference ?? compared).Tree.Id);
-			else
-				walk.Reset (new AnyObjectId[] {refTree, comparedTree});
-			walk.Recursive = true;
-			walk.Filter = AndTreeFilter.Create(TreeFilter.ANY_DIFF, TreeFilter.ALL);
-
-			return CalculateCommitDiff (repo, walk, new[] { reference, compared });
+			return CompareCommits (repo, refTree, comparedTree);
 		}
 		
 		/// <summary>
 		/// Returns a list of files that have changed in a commit
 		/// </summary>
-		public static IEnumerable<Change> GetCommitChanges (NGit.Repository repo, RevCommit commit)
+		public static IEnumerable<DiffEntry> GetCommitChanges (NGit.Repository repo, RevCommit commit)
 		{
-			var treeIds = new[] { commit.Tree.Id }.Concat (commit.Parents.Select (c => c.Tree.Id)).ToArray ();
-			var walk = new TreeWalk (repo);
-			walk.Reset (treeIds);
-			walk.Recursive = true;
-			walk.Filter = AndTreeFilter.Create (AndTreeFilter.ANY_DIFF, AndTreeFilter.ALL);
-			
-			return CalculateCommitDiff (repo, walk, new[] { commit }.Concat (commit.Parents).ToArray ());
+			var rev = commit.ToObjectId ();
+			var prev = repo.Resolve (commit.Name + "^") ?? ObjectId.ZeroId;
+			return CompareCommits (repo, rev, prev);
+		}
+		
+		public static IEnumerable<DiffEntry> CompareCommits (NGit.Repository repo, AnyObjectId reference, ObjectId compared)
+		{
+			var diff = new NGit.Api.Git (repo).Diff ();
+
+			var firstTree = new CanonicalTreeParser ();
+			firstTree.Reset (repo.NewObjectReader (), new RevWalk (repo).ParseTree (reference));
+
+			var secondTree = new CanonicalTreeParser ();
+			secondTree.Reset (repo.NewObjectReader (), new RevWalk (repo).ParseTree (compared));
+
+			diff.SetNewTree (firstTree);
+			if (compared != ObjectId.ZeroId)
+				diff.SetOldTree (secondTree);
+
+			return diff.Call ();
 		}
 
-		static IEnumerable<Change> CalculateCommitDiff (NGit.Repository repo, TreeWalk walk, RevCommit[] commits)
-		{
-			while (walk.Next ()) {
-				int m0 = walk.GetRawMode (0);
-				if (walk.TreeCount == 2) {
-					int m1 = walk.GetRawMode (1);
-					var change = new Change { ReferenceCommit = commits[0], ComparedCommit = commits[1], ReferencePermissions = walk.GetFileMode (0).GetBits (), ComparedPermissions = walk.GetFileMode (1).GetBits (), Name = walk.NameString, Path = walk.PathString };
-					if (m0 != 0 && m1 == 0) {
-						change.ChangeType = ChangeType.Added;
-						change.ComparedObject = walk.GetObjectId (0);
-					} else if (m0 == 0 && m1 != 0) {
-						change.ChangeType = ChangeType.Deleted;
-						change.ReferenceObject = walk.GetObjectId (0);
-					} else if (m0 != m1 && walk.IdEqual (0, 1)) {
-						change.ChangeType = ChangeType.TypeChanged;
-						change.ReferenceObject = walk.GetObjectId (0);
-						change.ComparedObject = walk.GetObjectId (1);
-					} else {
-						change.ChangeType = ChangeType.Modified;
-						change.ReferenceObject = walk.GetObjectId (0);
-						change.ComparedObject = walk.GetObjectId (1);
-					}
-					yield return change;
-				} else {
-					var raw_modes = new int[walk.TreeCount - 1];
-					for (int i = 0; i < walk.TreeCount - 1; i++)
-						raw_modes[i] = walk.GetRawMode (i + 1);
-					//ComparedCommit = compared,
-					var change = new Change { ReferenceCommit = commits[0], Name = walk.NameString, Path = walk.PathString };
-					if (m0 != 0 && raw_modes.All (m1 => m1 == 0)) {
-						change.ChangeType = ChangeType.Added;
-						change.ComparedObject = walk.GetObjectId (0);
-						yield return change;
-					} else if (m0 == 0 && raw_modes.Any (m1 => m1 != 0)) {
-						change.ChangeType = ChangeType.Deleted;
-						yield return change;
-					// TODO: not sure if this condition suffices in some special cases.
-					} else if (raw_modes.Select ((m1, i) => new { Mode = m1, Index = i + 1 }).All (x => !walk.IdEqual (0, x.Index))) {
-						change.ChangeType = ChangeType.Modified;
-						change.ReferenceObject = walk.GetObjectId (0);
-						yield return change;
-					} else if (raw_modes.Select ((m1, i) => new { Mode = m1, Index = i + 1 }).Any (x => m0 != x.Mode && walk.IdEqual (0, x.Index))) {
-						change.ChangeType = ChangeType.TypeChanged;
-						change.ReferenceObject = walk.GetObjectId (0);
-						yield return change;
-					}
-				}
-			}
-		}
-		
-		public static RepositoryStatus GetDirectoryStatus (NGit.Repository repo, string dir, bool recursive)
-		{
-			return new RepositoryStatus (repo, null, repo.ToGitPath (dir), recursive);
-		}
-		
-		public static RepositoryStatus GetFileStatus (NGit.Repository repo, IEnumerable<FilePath> fileNames)
-		{
-			return new RepositoryStatus (repo, repo.ToGitPath (fileNames), null, false);
-		}
-		
 		public static ObjectId CreateCommit (NGit.Repository rep, string message, IList<ObjectId> parents, ObjectId indexTreeId, PersonIdent author, PersonIdent committer)
 		{
 			try {
@@ -258,7 +204,7 @@ namespace MonoDevelop.VersionControl.Git
 			return new StashCollection (repo);
 		}
 		
-		public static IEnumerable<Change> GetChangedFiles (NGit.Repository repo, string refRev)
+		public static IEnumerable<DiffEntry> GetChangedFiles (NGit.Repository repo, string refRev)
 		{
 			// Get a list of files that are different in the target branch
 			RevWalk rw = new RevWalk (repo);
@@ -350,155 +296,7 @@ namespace MonoDevelop.VersionControl.Git
 			repo.GetConfig().Save();
 			return repo;
 		}
-		
-		public static RevCommit[] Blame (NGit.Repository repo, RevCommit commit, string file)
-		{
-			string localFile = ToGitPath (repo, file);
-			TreeWalk tw = TreeWalk.ForPath (repo, localFile, commit.Tree);
-			if (tw == null)
-				return new RevCommit [0];
-			int totalLines = GetFileLineCount (repo, tw);
-			int lineCount = totalLines;			
-			RevCommit[] lines = new RevCommit [lineCount];
-			RevWalk revWalker = new RevWalk (repo);
-			revWalker.MarkStart (commit);
-			List<RevCommit> commitHistory = new List<RevCommit>();
-			FilePath localCpath = FromGitPath (repo, localFile);
-			
-			foreach (RevCommit ancestorCommit in revWalker) {
-				foreach (Change change in GetCommitChanges (repo, ancestorCommit)) {
-					FilePath cpath = FromGitPath (repo, change.Path);
-					if (change.ChangeType != ChangeType.Deleted && (localCpath == cpath || cpath.IsChildPathOf (localCpath)))
-					{
-						commitHistory.Add(ancestorCommit);
-						break;
-					}
-				}
-			}
-			
-			int historySize = commitHistory.Count;
-			
-			if (historySize > 1) {
-				RevCommit recentCommit = commitHistory[0];
-				RawText latestRawText = GetRawText (repo, localFile, recentCommit);
-				
-				for (int i = 1; i < historySize; i++) {
-					RevCommit ancestorCommit = commitHistory[i];
-					RawText ancestorRawText = GetRawText (repo, localFile, ancestorCommit);
-					lineCount -= SetBlameLines(repo, lines, recentCommit, latestRawText, ancestorRawText);
-					recentCommit = ancestorCommit;
-					
-					if (lineCount <= 0)
-					{
-						break;
-					}
-				}
-				
-				if (lineCount > 0) {
-					RevCommit firstCommit = commitHistory[historySize - 1];
-					
-					for (int i = 0; i < totalLines; i++) {
-						if (lines[i] == null) {
-							lines[i] = firstCommit;
-						}
-					}
-				}
-			} else if (historySize == 1) {
-				RevCommit firstCommit = commitHistory[0];
-					
-				for (int i = 0; i < totalLines; i++) {
-					lines[i] = firstCommit;
-				}
-			}
-			
-			return lines;
-		}
-		
-		static int GetFileLineCount (NGit.Repository repo, TreeWalk tw) {
-			ObjectId id = tw.GetObjectId (0);
-			byte[] data = repo.ObjectDatabase.Open (id).GetBytes ();			
-			return new RawText (data).Size();
-		}
-		
-		static RawText GetRawText(NGit.Repository repo, string file, RevCommit commit) {
-			TreeWalk tw = TreeWalk.ForPath (repo, file, commit.Tree);
-			if (tw == null)
-				return new RawText (new byte[0]);
-			ObjectId objectID = tw.GetObjectId(0);
-			byte[] data = repo.ObjectDatabase.Open (objectID).GetBytes ();
-			return new RawText (data);
-		}
 
-		static int SetBlameLines (NGit.Repository repo, RevCommit[] lines, RevCommit commit, RawText curText, RawText ancestorText)
-		{
-			int lineCount = 0;
-			IEnumerable<Hunk> diffHunks = GetDiffHunks (curText, ancestorText);
-
-			foreach (Hunk e in diffHunks) {
-				int basePosition = e.InsertStart - 1;
-				for (int i = 0; i < e.Inserted; i++) {
-					int lineNum = basePosition + i;
-					if (lines [lineNum] == null) {
-						lines [lineNum] = commit;
-						lineCount++;
-					}
-				}
-			}
-			
-			return lineCount;
-		}
-		
-		static IEnumerable<Hunk> GetDiffHunks (RawText curText, RawText ancestorText)
-		{
-			Dictionary<string, int> codeDictionary = new Dictionary<string, int> ();
-			int codeCounter = 0;
-			int[] ancestorDiffCodes = GetDiffCodes (ref codeCounter, codeDictionary, ancestorText);
-			int[] currentDiffCodes = GetDiffCodes (ref codeCounter, codeDictionary, curText);
-			return Diff.GetDiff<int> (ancestorDiffCodes, currentDiffCodes);
-		}
-
-		static int[] GetDiffCodes (ref int codeCounter, Dictionary<string, int> codeDictionary, RawText text)
-		{
-			int lineCount = text.Size ();
-			int[] result = new int[lineCount];
-			string[] lines = GetLineStrings (text);
-			for (int i = 0; i < lineCount; i++) {
-				string lineText = lines [i];
-				int curCode;
-				if (!codeDictionary.TryGetValue (lineText, out curCode)) {
-					codeDictionary [lineText] = curCode = ++codeCounter;
-				}
-				result [i] = curCode;
-			}
-			return result;
-		}
-
-		static string[] GetLineStrings (RawText text)
-		{
-			int lineCount = text.Size ();
-			string[] lines = new string[lineCount];
-
-			for (int i = 0; i < lineCount; i++) {
-				lines [i] = text.GetString (i);
-			}
-
-			return lines;
-		}
-
-		static int FillRemainingBlame (RevCommit[] lines, RevCommit commit)
-		{
-			int lineCount = 0;
-			
-			for (int n=0; n<lines.Length; n++) {
-				if (lines [n] == null) {
-					lines [n] = commit;
-					lineCount++;
-				}
-			}
-			
-			return lineCount;
-		}
-		
 		public static MergeCommandResult MergeTrees (NGit.ProgressMonitor monitor, NGit.Repository repo, RevCommit srcBase, RevCommit srcCommit, string sourceDisplayName, bool commitResult)
 		{
 			RevCommit newHead = null;
@@ -577,18 +375,6 @@ namespace MonoDevelop.VersionControl.Git
 				revWalk.Release();
 			}
 		}
-	}
-	
-	class RevisionObjectIdPair
-	{
-		public RevisionObjectIdPair(RevCommit revision, ObjectId objectId)
-		{
-			this.Commit = revision;
-			this.ObjectId = objectId;
-		}
-		
-		public RevCommit Commit { get; private set; }
-		public ObjectId ObjectId { get; private set; }
 	}
 }
 

@@ -35,19 +35,19 @@ using System.Collections.Generic;
 
 using MonoDevelop.Core;
 using MonoDevelop.AspNet.Parser.Dom;
-using MonoDevelop.Projects.Dom;
+using ICSharpCode.NRefactory.TypeSystem;
+using ICSharpCode.NRefactory.CSharp;
+using ICSharpCode.NRefactory;
 
 namespace MonoDevelop.AspNet.Parser
 {
 	//purpose is to find all named tags for code completion and compilation of base class
 	public class MemberListVisitor : Visitor
 	{
-		AspNetParsedDocument doc;
 		DocumentReferenceManager refMan;
 		
-		public MemberListVisitor (AspNetParsedDocument doc, DocumentReferenceManager refMan)
+		public MemberListVisitor (DocumentReferenceManager refMan)
 		{
-			this.doc = doc;
 			this.refMan = refMan;
 			this.Errors = new List<Error> ();
 			this.Members = new Dictionary<string,CodeBehindMember> ();
@@ -89,12 +89,12 @@ namespace MonoDevelop.AspNet.Parser
 				return;
 			}
 			
-			Members [id] = new CodeBehindMember (id, type, new DomLocation (node.Location.BeginLine, node.Location.BeginColumn));
+			Members [id] = new CodeBehindMember (id, type, new TextLocation (node.Location.BeginLine, node.Location.BeginColumn));
 		}
 		
 		internal void AddError (ErrorType type, ILocation location, string message)
 		{
-			Errors.Add (new Error (type, location.BeginLine, location.BeginColumn, message));
+			Errors.Add (new Error (type, message, location.BeginLine, location.BeginColumn));
 		}
 		
 		public IDictionary<string,CodeBehindMember> Members { get; private set; }
@@ -103,7 +103,7 @@ namespace MonoDevelop.AspNet.Parser
 	
 	public class CodeBehindMember
 	{
-		public CodeBehindMember (string name, IType type, DomLocation location)
+		public CodeBehindMember (string name, IType type, TextLocation location)
 		{
 			this.Name = name;
 			this.Type = type;
@@ -112,6 +112,6 @@ namespace MonoDevelop.AspNet.Parser
 		
 		public string Name { get; private set; }
 		public IType Type { get; private set; }
-		public DomLocation Location { get; private set; }
+		public TextLocation Location { get; private set; }
 	}
 }

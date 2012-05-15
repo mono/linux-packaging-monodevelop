@@ -90,7 +90,7 @@ namespace MonoDevelop.Ide.Gui
 			content.DirtyChanged       += new EventHandler(SetTitleEvent);
 			content.BeforeSave         += new EventHandler(BeforeSave);
 			content.ContentChanged     += new EventHandler (OnContentChanged);
-			
+			IdeApp.Workbench.ActiveDocumentChanged += ActiveDocumentChanged;
 			box.Show ();
 			Add (box);
 			
@@ -219,7 +219,7 @@ namespace MonoDevelop.Ide.Gui
 			return -1;
 		}
 		
-		public void SelectWindow()	
+		public void SelectWindow()
 		{
 			if (this.Parent == null)
 				return;
@@ -369,6 +369,7 @@ namespace MonoDevelop.Ide.Gui
 			content.BeforeSave         -= new EventHandler(BeforeSave);
 			content.ContentChanged     -= new EventHandler (OnContentChanged);
 			content.WorkbenchWindow     = null;
+			IdeApp.Workbench.ActiveDocumentChanged -= ActiveDocumentChanged;
 			content.Dispose ();
 			
 			DetachFromPathedDocument ();
@@ -439,8 +440,9 @@ namespace MonoDevelop.Ide.Gui
 			AddButton (this.ViewContent.TabPageLabel, this.ViewContent);
 			
 			//pack them in a box
+			subViewNotebook.Show ();
 			box.PackStart (subViewNotebook, true, true, 1);
-			box.ShowAll ();
+			box.Show ();
 		}
 		#endregion
 		
@@ -462,23 +464,41 @@ namespace MonoDevelop.Ide.Gui
 		{
 			CheckCreateSubViewToolbar ();
 			updating = true;
-			
-			Tab tab = new Tab (subViewToolbar, label);
-			tab.Tag = subViewToolbar.TabCount;
-			tab.Activated += (sender, e) => { SetCurrentView ((int)((Tab)sender).Tag); QueueDraw (); };
-			subViewToolbar.AddTab (tab);
-			
-			Gtk.VBox widgetBox = new Gtk.VBox ();
-			widgetBox.Realized += delegate {
-				widgetBox.Add (viewContent.Control);
+
+			var addedContent = subViewToolbar.TabCount == 0 && IdeApp.Workbench.ActiveDocument == Document;
+			var widgetBox = new Gtk.VBox ();
+			var tab = new Tab (subViewToolbar, label) {
+				Tag = subViewToolbar.TabCount
 			};
 			
-			subViewNotebook.AppendPage (widgetBox, new Gtk.Label ());
-			widgetBox.ShowAll ();
+			// If this is the current displayed document we need to add the control immediately as the tab is already active.
+			if (addedContent) {
+				widgetBox.Add (viewContent.Control);
+				widgetBox.Show ();
+			}
 			
+			subViewToolbar.AddTab (tab);
+			subViewNotebook.AppendPage (widgetBox, new Gtk.Label ());
+			tab.Activated += (sender, e) => {
+				if (!addedContent) {
+					widgetBox.Add (viewContent.Control);
+					widgetBox.Show ();
+				}
+				addedContent = true;
+				SetCurrentView ((int)((Tab)sender).Tag);
+				QueueDraw ();
+			};
+
 			EnsureToolbarBoxSeparator ();
 			updating = false;
 			return tab;
+		}
+		
+		
+		void ActiveDocumentChanged (object sender, EventArgs e)
+		{
+			if (subViewToolbar != null)
+				subViewToolbar.Tabs [subViewToolbar.ActiveTab].Activate ();
 		}
 		
 		#region Track and display document's "path"

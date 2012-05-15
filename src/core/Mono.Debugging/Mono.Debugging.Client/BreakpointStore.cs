@@ -172,27 +172,39 @@ namespace Mono.Debugging.Client
 		
 		public ReadOnlyCollection<Breakpoint> GetBreakpointsAtFile (string filename)
 		{
-			filename = System.IO.Path.GetFullPath (filename);
-			
 			List<Breakpoint> list = new List<Breakpoint> ();
+			
+			try {
+				filename = System.IO.Path.GetFullPath (filename);
+			} catch {
+				return list.AsReadOnly ();
+			}
+			
 			foreach (BreakEvent be in breakpoints) {
 				Breakpoint bp = be as Breakpoint;
 				if (bp != null && FileNameEquals (bp.FileName, filename))
 					list.Add (bp);
 			}
+			
 			return list.AsReadOnly ();
 		}
 		
 		public ReadOnlyCollection<Breakpoint> GetBreakpointsAtFileLine (string filename, int line)
 		{
-			filename = System.IO.Path.GetFullPath (filename);
-			
 			List<Breakpoint> list = new List<Breakpoint> ();
+			
+			try {
+				filename = System.IO.Path.GetFullPath (filename);
+			} catch {
+				return list.AsReadOnly ();
+			}
+			
 			foreach (BreakEvent be in breakpoints) {
 				Breakpoint bp = be as Breakpoint;
-				if (bp != null && FileNameEquals (bp.FileName, filename) && bp.Line == line)
+				if (bp != null && FileNameEquals (bp.FileName, filename) && (bp.OriginalLine == line || bp.Line == line))
 					list.Add (bp);
 			}
+			
 			return list.AsReadOnly ();
 		}
 
@@ -237,25 +249,31 @@ namespace Mono.Debugging.Client
 		
 		public void UpdateBreakpointLine (Breakpoint bp, int newLine)
 		{
-			Remove (bp);
+			if (IsReadOnly)
+				return;
+			
 			bp.SetLine (newLine);
-			Add (bp);
+			NotifyBreakEventChanged (bp);
 		}
 		
 		internal void AdjustBreakpointLine (Breakpoint bp, int newLine)
 		{
-			Remove (bp);
+			if (IsReadOnly)
+				return;
+			
 			bp.SetAdjustedLine (newLine);
-			Add (bp);
+			NotifyBreakEventChanged (bp);
 		}
 		
 		internal void ResetAdjustedBreakpoints ()
 		{
+			if (IsReadOnly)
+				return;
+			
 			foreach (Breakpoint bp in breakpoints.Where (b => b is Breakpoint).ToArray ()) {
 				if (bp.HasAdjustedLine) {
-					Remove (bp);
 					bp.ResetAdjustedLine ();
-					Add (bp);
+					NotifyBreakEventChanged (bp);
 				}
 			}
 		}
@@ -368,7 +386,7 @@ namespace Mono.Debugging.Client
 		internal void NotifyBreakEventChanged (BreakEvent be)
 		{
 			try {
-				EventHandler<BreakEventArgs > breakEventModified = BreakEventModified;
+				EventHandler<BreakEventArgs> breakEventModified = BreakEventModified;
 				if (breakEventModified != null)
 					breakEventModified (this, new BreakEventArgs ((BreakEvent)be));
 				if (be is Breakpoint) {

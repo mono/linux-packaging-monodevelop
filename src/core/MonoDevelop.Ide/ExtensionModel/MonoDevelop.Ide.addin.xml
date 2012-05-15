@@ -7,15 +7,15 @@
        description = "The MonoDevelop IDE application."
        category    = "MonoDevelop Core"
        isroot      = "true"
-       version     = "2.8.6.3"
-       compatVersion = "2.7">
+       version     = "3.0.1"
+       compatVersion = "2.9.0">
 	
 	<Runtime>
 		<Import assembly="MonoDevelop.Ide.dll"/>
 	</Runtime>
 	
 	<Dependencies>
-		<Addin id="Core" version="2.8.6.3"/>
+		<Addin id="Core" version="3.0.1"/>
 	</Dependencies>
 
 	<!-- Extension ponts -->
@@ -136,6 +136,11 @@
 		<Description>Addins can register own fonts to be configured.</Description>
 		<ExtensionNode name="Font" type="MonoDevelop.Ide.Fonts.FontDescriptionCodon"/>
 	</ExtensionPoint>
+		
+	<ExtensionPoint path = "/MonoDevelop/Ide/FeedbackService" name = "Feedback reporting service">
+		<Description>Provides the webservice url to which MonoDevelop will send user feedback.</Description>
+		<ExtensionNode name="Service" type="MonoDevelop.Ide.Extensions.ServiceUrlExtensionNode" />
+	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/Ide/CodeFormatters" name = "Code formatters">
 		<ExtensionNode name="Formatter" type="MonoDevelop.Ide.CodeFormatting.CodeFormatterExtensionNode" />
@@ -150,6 +155,23 @@
 		<ExtensionNode name="Type" />
 	</ExtensionPoint>
 	
+	<ExtensionPoint path = "/MonoDevelop/TypeSystem/Parser" name = "TypeSystemParser">
+		<ExtensionNode name="Parser" type="MonoDevelop.Ide.TypeSystem.TypeSystemParserNode"/>
+	</ExtensionPoint>
+	
+	<ExtensionPoint path = "/MonoDevelop/TypeSystem/FoldingParser">
+		<ExtensionNode name="Parser" type="MonoDevelop.Core.AddIns.MimeTypeExtensionNode"/>
+	</ExtensionPoint
+		>	
+	<ExtensionPoint path = "/MonoDevelop/TypeSystem/Ambiences" name = "Language ambiences">
+		<Description>Language ambiences. Specified classes must implement IAmbience.</Description>
+		<ExtensionNode name="Ambience" type="MonoDevelop.Core.AddIns.MimeTypeExtensionNode" />
+	</ExtensionPoint>
+	
+	<ExtensionPoint path = "/MonoDevelop/TypeSystem/CodeGenerators">
+		<ExtensionNode name="Generator" type="MonoDevelop.Core.AddIns.MimeTypeExtensionNode"/>
+	</ExtensionPoint>
+
 	<!-- Extensions -->
 	
 	<Extension path = "/MonoDevelop/Core/Applications">

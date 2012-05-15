@@ -29,19 +29,22 @@ using MonoDevelop.Ide;
 using MonoDevelop.VersionControl;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.VersionControl.Views;
+using MonoDevelop.Projects.Text;
 
 namespace MonoDevelop.MacDev.PlistEditor
 {	
 	public class PlistDiffViewHandler : IDiffViewHandler
 	{
-		public bool CanHandle (VersionControlItem item)
+		public bool CanHandle (VersionControlItem item, IViewContent primaryView)
 		{
-			return !item.IsDirectory && item.Path.HasExtension (".plist");
+			return (primaryView == null || primaryView.GetContent<ITextFile> () != null)
+				&& !item.IsDirectory
+				&& item.Path.HasExtension (".plist");
 		}
-		
-		public IDiffView CreateView (VersionControlItem item, IViewContent primaryView)
+
+		public IDiffView CreateView (VersionControlDocumentInfo info)
 		{
-			return new DiffView (new VersionControlDocumentInfo (primaryView, item, item.Repository));
+			return new DiffView (info);
 		}
 	}
 }
