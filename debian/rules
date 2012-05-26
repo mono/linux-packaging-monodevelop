@@ -67,6 +67,10 @@ get-orig-source:
 	rm $(DEB_SOURCE_NAME)_$(VERSION).orig.tar.gz
 	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.dll"
 	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.dll" -delete
+	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.exe"
+	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.exe" -delete
+	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.mdb"
+	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.mdb" -delete
 	tar --mtime=@1252623600 -cf ./$(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar $(DEB_SOURCE_NAME)-$(VERSION)
 	gzip -9fn ./$(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar
 	rm -r $(DEB_SOURCE_NAME)-$(VERSION)
