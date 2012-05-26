@@ -5,7 +5,6 @@
 #use_keyfile_not_keycontainer.patch
 #port_to_nunit_2.5.patch
 #make_4.0_default_framework.patch
-dont_build_codemetrics.patch
 link_system_nunit.patch
 use_libsvn1.patch
 use_libapr1.patch
