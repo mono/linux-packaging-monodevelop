@@ -1,5 +1,5 @@
 #!/usr/bin/make -f
-export DH_VERBOSE=1
+#export DH_VERBOSE=1
 
 MAKEFILE = $(firstword $(MAKEFILE_LIST))
 DEBIAN_DIR = $(dir $(MAKEFILE))
@@ -27,7 +27,8 @@ override_dh_clideps:
 			--exclude-moduleref=/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices \
 			--exclude-moduleref=libigemacintegration.dylib \
 			--exclude-moduleref=/usr/lib/libobjc.dylib \
-			--exclude-moduleref=glibsharpglue-2
+			--exclude-moduleref=glibsharpglue-2 \
+			--exclude-moduleref=gtksharpglue-2
 
 override_dh_auto_test:
 	# skip "make test"

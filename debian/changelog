@@ -1,3 +1,16 @@
+monodevelop (3.0.2+dfsg-1) UNRELEASED; urgency=low
+
+  * [d9ae4b4] Imported Upstream version 3.0.1+dfsg
+  * [a5fbc35] Remove obsolete downstream port to NUnit 2.5, upstream now requires 2.6.
+  * [9be4510] Remove patch to make 4.0 profile the default - it is now the default upstream.
+  * [c0e5c81] Remove obsolete patch to use our downstream mono-csc compiler command for contrib libs.
+  * [d225eb7] Moonlight is dead, so remove our patch to disable support.
+  * [9597e12] Remove patch to generate Automake 1.11.2-compatible makefiles, this has been accepted upstream.
+  * [4850e5b] Delete more things in get-orig-source, since upstream has accidentally left more things in the source.
+  * [17080f3] Imported Upstream version 3.0.2+dfsg
+
+ -- Jo Shields <directhex@apebox.org>  Sat, 26 May 2012 01:21:04 +0100
+
 monodevelop (2.8.6.3+dfsg-2) unstable; urgency=low
 
   * Team upload.
