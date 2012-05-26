@@ -1,4 +1,4 @@
-AC_INIT([monodevelop], 3.0.1, [monodevelop-list@lists.ximian.com])
+AC_INIT([monodevelop], 3.0.2, [monodevelop-list@lists.ximian.com])
 AC_PREREQ(2.53)
 AM_INIT_AUTOMAKE([1.9 tar-ustar])
 AM_MAINTAINER_MODE
@@ -12,7 +12,7 @@ ASSEMBLY_VERSION=3.0.0.0
 # the C# side of things. It should be one of the following two formats:
 # 1) "VERSION_NUMBER"					"2.0"
 # 2) "VERSION_NUMBER BUILD_TYPE BUILD_NUMBER"		"2.0 Alpha 1"
-PACKAGE_VERSION_LABEL="3.0"
+PACKAGE_VERSION_LABEL="3.0.2"
 
 AC_PATH_PROG(MONO, mono)
 AC_PATH_PROG(MCS, gmcs)
@@ -262,6 +262,8 @@ if test -z "$platform_bindings"; then
 	AC_MSG_ERROR([You must enable one of the platform bindings])
 fi
 
+echo PACKAGE_VERSION=$PACKAGE_VERSION > monodevelop_version
+
 AC_OUTPUT([
 build/Makefile
 build/MacOSX/Makefile
@@ -271,6 +273,7 @@ contrib/NRefactory/Makefile
 contrib/ICSharpCode.NRefactory/Makefile
 contrib/ICSharpCode.NRefactory.CSharp/Makefile
 contrib/ICSharpCode.Decompiler/Makefile
+external/Makefile
 src/Makefile
 src/core/Makefile
 src/core/Mono.Texteditor/Makefile
@@ -328,7 +331,6 @@ src/addins/WindowsPlatform/Makefile
 src/addins/MonoDevelop.AssemblyBrowser/Makefile
 src/addins/MonoDevelop.SourceEditor2/Makefile
 src/addins/MonoDevelop.XmlEditor/Makefile
-src/addins/MonoDevelop.CodeMetrics/Makefile
 src/addins/MonoDevelop.Refactoring/Makefile
 src/addins/MonoDevelop.Debugger/Makefile
 src/addins/MonoDevelop.Debugger.Soft/Makefile

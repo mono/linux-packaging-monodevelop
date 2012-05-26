@@ -256,7 +256,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = ../external contrib src po man theme-icons build tests
+SUBDIRS = external contrib src po man theme-icons build tests
 
 #capture aclocal flags for autoreconf
 ACLOCAL_AMFLAGS = $(ACLOCAL_FLAGS)
@@ -314,7 +314,7 @@ MD_LAUNCH = $(MD_LAUNCH_SETUP) UBUNTU_MENUPROXY=0 exec -a "monodevelop" $(RUNTIM
 
 # we can't use the variables that are conditionally defined
 EXTRA_DIST = $(bin_SCRIPTS) $(desktop_DATA) $(pixmap_DATA) \
-	monodevelop.xml $(pkgconfig_in_files) vcrevision
+	monodevelop.xml $(pkgconfig_in_files) vcrevision external/Makefile.in
 
 DISTCLEANFILES = monodevelop intltool-extract intltool-merge intltool-update \
 	$(pkgconfig_DATA) 
