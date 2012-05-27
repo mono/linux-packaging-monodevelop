@@ -5,7 +5,7 @@
 #use_keyfile_not_keycontainer.patch
 #port_to_nunit_2.5.patch
 #make_4.0_default_framework.patch
-correct_paths_in_monodevelop-core-addins.pc.patch -p2
+correct_paths_in_monodevelop-core-addins.pc.patch
 link_system_nunit.patch
 use_libsvn1.patch
 use_libapr1.patch

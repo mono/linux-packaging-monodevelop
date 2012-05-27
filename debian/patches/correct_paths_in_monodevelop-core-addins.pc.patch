@@ -13,8 +13,8 @@ Date:   Sun May 27 17:51:47 2012 +0100
 
 diff --git a/main/monodevelop-core-addins.pc.in b/main/monodevelop-core-addins.pc.in
 index 5f83aac..19cf971 100644
---- a/main/monodevelop-core-addins.pc.in
-+++ b/main/monodevelop-core-addins.pc.in
+--- a/monodevelop-core-addins.pc.in
++++ b/monodevelop-core-addins.pc.in
 @@ -6,4 +6,4 @@ GacPackage=false
  Name: MonoDevelop Core Add-ins
  Description: MonoDevelop Core Add-ins
