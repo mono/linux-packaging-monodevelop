@@ -1,3 +1,18 @@
+monodevelop (3.0.2+dfsg-3) unstable; urgency=low
+
+  * [fcecfe7] Fix monodevelop-core-addins.pc.in to point to actual 
+    installed location of assemblies.
+  * [26e1a07] DebSrc 3.0 does not support Quilt's -p parameter, so 
+    manually adjust the path in the patch file.
+
+ -- Jo Shields <directhex@apebox.org>  Sun, 27 May 2012 18:08:20 +0100
+
+monodevelop (3.0.2+dfsg-2) unstable; urgency=low
+
+  * Upload to unstable.
+
+ -- Jo Shields <directhex@apebox.org>  Sun, 27 May 2012 17:02:55 +0100
+
 monodevelop (3.0.2+dfsg-1) experimental; urgency=low
 
   * [d9ae4b4] Imported Upstream version 3.0.1+dfsg

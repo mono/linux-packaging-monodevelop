@@ -1,0 +1,23 @@
+commit 999cb5ba4b7159f665202d8e1f225d4419c81d7d
+Author: Jo Shields <directhex@apebox.org>
+Date:   Sun May 27 17:51:47 2012 +0100
+
+    Fix monodevelop-core-addins.pc.in to point to actual installed location of assemblies.
+    
+    Without this fix, the following behaviour is observed when trying to build MD addins:
+    
+    directhex@dream:/tmp$ PKG_CONFIG_PATH=moomin/lib/pkgconfig/ dmcs -pkg:monodevelop -pkg:monodevelop-core-addins hello.cs
+    error CS0006: Metadata file `moomin/lib/pkgconfig/../../lib/monodevelop/AddIns/DisplayBindings/Gettext/MonoDevelop.Gettext.dll' could not be found
+    error CS0006: Metadata file `moomin/lib/pkgconfig/../../lib/monodevelop/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll' could not be found
+    Compilation failed: 2 error(s), 0 warnings
+
+diff --git a/main/monodevelop-core-addins.pc.in b/main/monodevelop-core-addins.pc.in
+index 5f83aac..19cf971 100644
+--- a/monodevelop-core-addins.pc.in
++++ b/monodevelop-core-addins.pc.in
+@@ -6,4 +6,4 @@ GacPackage=false
+ Name: MonoDevelop Core Add-ins
+ Description: MonoDevelop Core Add-ins
+ Version: @VERSION@
+-Libs: -r:${libdir}/AddIns/VersionControl/MonoDevelop.VersionControl.dll -r:${libdir}/AddIns/NUnit/MonoDevelop.NUnit.dll -r:${libdir}/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll -r:${libdir}/AddIns/MonoDevelop.AspNet/MonoDevelop.AspNet.dll -r:${libdir}/AddIns/DisplayBindings/Gettext/MonoDevelop.Gettext.dll -r:${libdir}/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll -r:${libdir}/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll -r:${libdir}/AddIns/MonoDevelop.GtkCore/MonoDevelop.GtkCore.dll -r:${libdir}/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.VBNetBinding.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.CBinding.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.CSharpBinding.dll -r:${libdir}/AddIns/MonoDevelop.Autotools/MonoDevelop.Autotools.dll -r:${libdir}/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll -r:${libdir}/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll -r:${libdir}/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll  -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft.dll -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugger.Soft.dll
++Libs: -r:${libdir}/AddIns/VersionControl/MonoDevelop.VersionControl.dll -r:${libdir}/AddIns/NUnit/MonoDevelop.NUnit.dll -r:${libdir}/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll -r:${libdir}/AddIns/MonoDevelop.AspNet/MonoDevelop.AspNet.dll -r:${libdir}/AddIns/MonoDevelop.Gettext/MonoDevelop.Gettext.dll -r:${libdir}/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll -r:${libdir}/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll -r:${libdir}/AddIns/MonoDevelop.GtkCore/MonoDevelop.GtkCore.dll -r:${libdir}/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.VBNetBinding.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.CBinding.dll -r:${libdir}/AddIns/BackendBindings/MonoDevelop.CSharpBinding.dll -r:${libdir}/AddIns/MonoDevelop.Autotools/MonoDevelop.Autotools.dll -r:${libdir}/AddIns/MonoDevelop.SourceEditor2.dll -r:${libdir}/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll -r:${libdir}/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll  -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft.dll -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll -r:${libdir}/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugger.Soft.dll
