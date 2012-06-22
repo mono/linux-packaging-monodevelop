@@ -28,7 +28,6 @@ using System;
 using System.Linq;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using MonoDevelop.Projects;
 
 using ICSharpCode.NRefactory.TypeSystem;
@@ -77,11 +76,13 @@ namespace MonoDevelop.MacDev.ObjCIntegration
 		{
 			if (!needsUpdating)
 				return;
+
 			foreach (DotNetProject r in dom.ReferencedProjects) {
 				var info = infoService.GetProjectInfo (r);
 				if (info != null)
 					info.Update ();
 			}
+
 			TypeSystemService.ForceUpdate (dom);
 			objcTypes.Clear ();
 			cliTypes.Clear ();
@@ -91,6 +92,9 @@ namespace MonoDevelop.MacDev.ObjCIntegration
 			foreach (var type in infoService.GetRegisteredObjects (dom, dom.Compilation.MainAssembly)) {
 				if (objcTypes.ContainsKey (type.ObjCName)) {
 					var other = objcTypes[type.ObjCName];
+					if (other.CliName == type.CliName)
+						continue;
+
 					throw new ArgumentException (string.Format ("Multiple types ({0} and {1}) registered with the same Objective-C name: {2}", type.CliName, other.CliName, type.ObjCName));
 				}
 				
@@ -102,6 +106,9 @@ namespace MonoDevelop.MacDev.ObjCIntegration
 				foreach (var type in infoService.GetRegisteredObjects (dom, refAssembly)) {
 					if (refObjcTypes.ContainsKey (type.ObjCName)) {
 						var other = refObjcTypes[type.ObjCName];
+						if (other.CliName == type.CliName)
+							continue;
+
 						throw new ArgumentException (string.Format ("Multiple types ({0} and {1}) registered with the same Objective-C name: {2}", type.CliName, other.CliName, type.ObjCName));
 					}
 					
@@ -178,15 +185,19 @@ namespace MonoDevelop.MacDev.ObjCIntegration
 		static IEnumerable<ITypeDefinition> GetAllBaseClassDefinitions (IType type)
 		{
 			while (type != null) {
+				IType baseType = null;
+
 				foreach (var t in type.DirectBaseTypes) {
 					if (t.Kind != TypeKind.Class)
 						continue;
 					var def = t.GetDefinition ();
 					if (def != null)
 						yield return def;
-					type = t;
+					baseType = t;
 					break;
 				}
+
+				type = baseType;
 			}
 		}
 		

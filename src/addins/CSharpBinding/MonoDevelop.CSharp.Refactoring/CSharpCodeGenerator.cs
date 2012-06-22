@@ -111,14 +111,23 @@ namespace MonoDevelop.CSharp.Refactoring
 				ImplementingType = implementingType,
 				Part = part
 			};
-			if (member is IMethod)
-				return GenerateCode ((IMethod)member, options);
-			if (member is IProperty)
-				return GenerateCode ((IProperty)member, options);
-			if (member is IField)
-				return GenerateCode ((IField)member, options);
-			if (member is IEvent)
-				return GenerateCode ((IEvent)member, options);
+			ITypeResolveContext ctx;
+
+			var doc = IdeApp.Workbench.GetDocument (implementingType.Region.FileName);
+			if (doc != null) {
+				ctx = doc.ParsedDocument.GetTypeResolveContext (doc.Compilation, implementingType.Region.Begin);
+			} else {
+				ctx = new CSharpTypeResolveContext (implementingType.Compilation.MainAssembly, null, implementingType, null);
+			}
+
+			if (member is IUnresolvedMethod)
+				return GenerateCode ((IMethod) ((IUnresolvedMethod)member).CreateResolved (ctx), options);
+			if (member is IUnresolvedProperty)
+				return GenerateCode ((IProperty) ((IUnresolvedProperty)member).CreateResolved (ctx), options);
+			if (member is IUnresolvedField)
+				return GenerateCode ((IField) ((IUnresolvedField)member).CreateResolved (ctx), options);
+			if (member is IUnresolvedEvent)
+				return GenerateCode ((IEvent) ((IUnresolvedEvent)member).CreateResolved (ctx), options);
 			throw new NotSupportedException ("member " +  member + " is not supported.");
 		}
 		
@@ -224,7 +233,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			var file = pf as CSharpParsedFile;
 			var resolved = type;
 			if (resolved.Kind == TypeKind.Unknown) {
-				result.Append (type.ToString ());
+				result.Append (type.FullName);
 				return;
 			}
 			var def = type.GetDefinition ();
@@ -560,15 +569,24 @@ namespace MonoDevelop.CSharp.Refactoring
 			}
 		}
 		
-		static string GetModifiers (IUnresolvedTypeDefinition implementingType, IMember member)
+		static string GetModifiers (ITypeDefinition implementingType, IUnresolvedTypeDefinition implementingPart, IMember member)
 		{
 			StringBuilder result = new StringBuilder ();
+
 			if (member.IsPublic || (member.DeclaringType != null && member.DeclaringTypeDefinition.Kind == TypeKind.Interface)) {
 				result.Append ("public ");
-			} else if (member.IsProtectedAndInternal) {
-				result.Append ("protected internal ");
 			} else if (member.IsProtectedOrInternal) {
-				result.Append ("internal protected ");
+				if (IdeApp.Workbench.ActiveDocument != null && member.DeclaringTypeDefinition.ParentAssembly != implementingType.ParentAssembly) {
+					result.Append ("protected ");
+				} else {
+					result.Append ("internal protected ");
+				}
+			} else if (member.IsProtectedAndInternal) {
+				if (IdeApp.Workbench.ActiveDocument != null && member.DeclaringTypeDefinition.ParentAssembly != implementingType.ParentAssembly) {
+					result.Append ("protected ");
+				} else {
+					result.Append ("protected internal ");
+				}
 			} else if (member.IsProtected) {
 				result.Append ("protected ");
 			} else if (member.IsInternal) {
@@ -586,7 +604,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			AppendIndent (result);
 			if (options.ExplicitDeclaration || options.ImplementingType.Kind == TypeKind.Interface)
 				return;
-			result.Append (GetModifiers (options.Part, member));
+			result.Append (GetModifiers (options.ImplementingType, options.Part, member));
 			
 			bool isFromInterface = false;
 			if (member.DeclaringType != null && member.DeclaringTypeDefinition.Kind == TypeKind.Interface) {

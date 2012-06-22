@@ -370,7 +370,7 @@ namespace MonoDevelop.Ide.Gui
 							vcFound = doc.Window.ViewContent;
 						
 						//old method as fallback
-						if ((vcFound == null) && (doc.FileName == uniqueName))
+						if ((vcFound == null) && (doc.FileName == uniqueName || doc.FileName == fileName))
 							vcFound = doc.Window.ViewContent;
 						//if found, select window and jump to line
 						if (vcFound != null) {
@@ -490,7 +490,9 @@ namespace MonoDevelop.Ide.Gui
 			workbench.ShowView (newContent, true);
 			DisplayBindingService.AttachSubWindows (newContent.WorkbenchWindow);
 			
-			return WrapDocument (newContent.WorkbenchWindow);
+			var document = WrapDocument (newContent.WorkbenchWindow);
+			document.StartReparseThread ();
+			return document;
 		}
 		
 		public void ShowGlobalPreferencesDialog (Gtk.Window parentWindow)
@@ -694,6 +696,8 @@ namespace MonoDevelop.Ide.Gui
 			Project project = null;
 			if (IdeApp.ProjectOperations.CurrentSelectedProject != null) {
 				if (IdeApp.ProjectOperations.CurrentSelectedProject.Files.GetFile (fileName) != null)
+					project = IdeApp.ProjectOperations.CurrentSelectedProject;
+				else if (IdeApp.ProjectOperations.CurrentSelectedProject.FileName == fileName)
 					project = IdeApp.ProjectOperations.CurrentSelectedProject;
 			}
 			if (project == null && IdeApp.ProjectOperations.CurrentSelectedWorkspaceItem != null) {

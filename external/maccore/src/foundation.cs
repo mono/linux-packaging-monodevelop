@@ -2621,10 +2621,10 @@ namespace MonoMac.Foundation
 		void Cancel ();
 	
 		[Export ("scheduleInRunLoop:forMode:")]
-		void Schedule (NSRunLoop aRunLoop, string forMode);
+		void Schedule (NSRunLoop aRunLoop, NSString forMode);
 	
 		[Export ("unscheduleFromRunLoop:forMode:")]
-		void Unschedule (NSRunLoop aRunLoop, string forMode);
+		void Unschedule (NSRunLoop aRunLoop, NSString forMode);
 
 		/* Adopted by the NSUrlAuthenticationChallengeSender protocol */
 		[Export ("useCredential:forAuthenticationChallenge:")]
@@ -3353,12 +3353,6 @@ namespace MonoMac.Foundation
 	
 	[BaseType (typeof (NSStream))]
 	public interface NSInputStream {
-		//[Export ("read:maxLength:")]
-		//int Read (byte [] buffer, uint len);
-		
-		//[Export ("getBuffer:length:")]
-		//bool GetBuffer (ref byte buffer, ref uint len);
-	
 		[Export ("hasBytesAvailable")]
 		bool HasBytesAvailable ();
 	
@@ -3372,6 +3366,12 @@ namespace MonoMac.Foundation
 		[Static]
 		[Export ("inputStreamWithFileAtPath:")]
 		NSInputStream FromFile (string  path);
+		
+		[Export ("_scheduleInCFRunLoop:forMode:")]
+		void ScheduleInCFRunLoop (IntPtr runloop, string mode);
+
+		[Export ("_unscheduleFromCFRunLoop:forMode:")]
+		void UnscheduleInCFRunLoop (IntPtr runloop, string mode);
 	}
 
 	//
@@ -3843,19 +3843,22 @@ namespace MonoMac.Foundation
 		NSDictionary InfoDictionary{ get; }
 
 		// Additions from AppKit
+#if MONOMAC
+		// https://developer.apple.com/library/mac/#documentation/Cocoa/Reference/ApplicationKit/Classes/NSBundle_AppKitAdditions/Reference/Reference.html
 		[Static]
 		[Export ("loadNibNamed:owner:")]
 		bool LoadNib (string nibName, NSObject owner);
-		
-		[Export ("loadNibNamed:owner:options:")]
-		NSArray LoadNib (string nibName, NSObject owner, [NullAllowed] NSDictionary options);
 
 		[Export ("pathForImageResource:")]
 		string PathForImageResource (string resource);
 
 		[Export ("pathForSoundResource:")]
 		string PathForSoundResource (string resource);
-
+#else
+		// http://developer.apple.com/library/ios/#documentation/uikit/reference/NSBundle_UIKitAdditions/Introduction/Introduction.html
+		[Export ("loadNibNamed:owner:options:")]
+		NSArray LoadNib (string nibName, NSObject owner, [NullAllowed] NSDictionary options);
+#endif
 		[Export ("bundleURL")]
 		[Since (4,0)]
 		NSUrl BundleUrl { get; }
@@ -4219,7 +4222,8 @@ namespace MonoMac.Foundation
 		NSNotificationCenter DefaultCenter { get; }
 	
 		[Export ("addObserver:selector:name:object:")]
-		void AddObserver ([RetainList (true, "ObserverList")] NSObject observer, Selector aSelector, [NullAllowed] NSString aName, [NullAllowed] NSObject anObject);
+		[PostSnippet ("AddObserverToList (observer, aName, anObject);")]
+		void AddObserver (NSObject observer, Selector aSelector, [NullAllowed] NSString aName, [NullAllowed] NSObject anObject);
 	
 		[Export ("postNotification:")]
 		void PostNotification (NSNotification notification);
@@ -4231,10 +4235,12 @@ namespace MonoMac.Foundation
 		void PostNotificationName (string aName, [NullAllowed] NSObject anObject, [NullAllowed] NSDictionary aUserInfo);
 	
 		[Export ("removeObserver:")]
-		void RemoveObserver ([RetainList (false, "ObserverList")] NSObject observer);
+		[PostSnippet ("RemoveObserversFromList (observer, null, null);")]
+		void RemoveObserver (NSObject observer);
 	
 		[Export ("removeObserver:name:object:")]
-		void RemoveObserver ([RetainList (false, "ObserverList")] NSObject observer, [NullAllowed] string aName, [NullAllowed] NSObject anObject);
+		[PostSnippet ("RemoveObserversFromList (observer, aName, anObject);")]
+		void RemoveObserver (NSObject observer, [NullAllowed] string aName, [NullAllowed] NSObject anObject);
 
 		[Since (4,0)]
 		[Export ("addObserverForName:object:queue:usingBlock:")]

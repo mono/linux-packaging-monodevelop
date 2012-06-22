@@ -28,6 +28,14 @@ SHARED_SOURCE = \
 	./AddressBook/ABPerson.cs			\
 	./AddressBook/ABRecord.cs			\
 	./AddressBook/ABSource.cs			\
+	./AVFoundation/Events.cs			\
+	./AVFoundation/AVAudioPlayer.cs			\
+	./AVFoundation/AVAudioRecorder.cs		\
+	./AVFoundation/AVAudioSession.cs		\
+	./AVFoundation/AVCaptureConnection.cs		\
+	./AVFoundation/AVCaptureDeviceInput.cs		\
+	./AVFoundation/AVCaptureVideoDataOutput.cs	\
+	./AVFoundation/AVAssetReaderVideoCompositionOutput.cs	\
 	./CoreAnimation/CADefs.cs			\
 	./CoreAnimation/CALayer.cs			\
 	./CoreAnimation/CATextLayer.cs			\
@@ -35,6 +43,7 @@ SHARED_SOURCE = \
 	./CoreFoundation/CFBoolean.cs                   \
 	./CoreFoundation/CFDictionary.cs                \
 	./CoreFoundation/CFException.cs                 \
+	./CoreFoundation/CFStream.cs					\
 	./CoreFoundation/CFType.cs			\
 	./CoreGraphics/CGContextPDF.cs			\
 	./CoreGraphics/CGDataProvider-2.cs		\
@@ -117,6 +126,7 @@ SHARED_SOURCE = \
 	./Security/Trust.cs
 
 SHARED_CORE_SOURCE = \
+	./AVFoundation/Enums.cs				\
 	./CoreAnimation/CATransform3D.cs		\
 	./CoreAnimation/CAEnums.cs			\
 	./CoreData/Enums.cs				\
@@ -174,5 +184,6 @@ SHARED_CORE_SOURCE = \
 	./ObjCRuntime/LionAttribute.cs			\
         ./ObjCRuntime/SinceAttribute.cs                 \
         ./ObjCRuntime/TypeConverter.cs                  \
+	./MonoNativeFunctionWrapperAttribute.cs			\
 	./MonoPInvokeCallbackAttribute.cs
 

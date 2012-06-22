@@ -28,12 +28,14 @@
 
 using System;
 using System.Runtime.InteropServices;
+using MonoMac.Foundation;
 using MonoMac.ObjCRuntime;
 
 namespace MonoMac.AudioToolbox
 {
 	[StructLayout(LayoutKind.Sequential)]
 	public class AudioBufferList {
+		[Preserve (Conditional=true)]
 		internal int bufferCount;
 		// mBuffers array size is variable. But here we uses fixed size of 2, because iPhone phone terminal two (L/R) channels.        
 		[MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
@@ -55,9 +57,9 @@ namespace MonoMac.AudioToolbox
 		public override string ToString ()
 		{
 			if (buffers != null && buffers.Length > 0)
-				return string.Format ("[buffers={0},bufferSize={1}]", buffers [0].DataByteSize);
-			else
-				return string.Format ("[empty]");
+				return string.Format ("[buffers={0},bufferSize={1}]", buffers [0], buffers [0].DataByteSize);
+			
+			return "[empty]";
 		}
 	}
 

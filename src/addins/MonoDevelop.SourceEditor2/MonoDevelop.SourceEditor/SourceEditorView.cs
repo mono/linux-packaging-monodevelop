@@ -481,9 +481,14 @@ namespace MonoDevelop.SourceEditor
 		public override void LoadNew (Stream content, string mimeType)
 		{
 			Document.MimeType = mimeType;
+			string text = null;
 			if (content != null) {
-				Document.Text = Mono.TextEditor.Utils.TextFileUtility.GetText (content, out hadBom, out encoding);
+				text = Mono.TextEditor.Utils.TextFileUtility.GetText (content, out hadBom, out encoding);
+				Document.Text = text;
 			}
+			this.CreateDocumentParsedHandler ();
+			RunFirstTimeFoldUpdate (text);
+			Document.InformLoadComplete ();
 		}
 		
 		public override void Load (string fileName)
@@ -510,7 +515,27 @@ namespace MonoDevelop.SourceEditor
 			if (parsedDocument != null) 
 				widget.UpdateParsedDocument (parsedDocument);
 		}
-		
+
+		void CreateDocumentParsedHandler ()
+		{
+			this.WorkbenchWindowChanged += delegate {
+				if (WorkbenchWindow == null)
+					return;
+				WorkbenchWindow.DocumentChanged += delegate {
+					if (WorkbenchWindow.Document == null)
+						return;
+					foreach (var provider in WorkbenchWindow.Document.GetContents<IQuickTaskProvider> ()) {
+						widget.AddQuickTaskProvider (provider);
+					}
+					foreach (var provider in WorkbenchWindow.Document.GetContents<IUsageProvider> ()) {
+						widget.AddUsageTaskProvider (provider);
+					}
+					WorkbenchWindow.Document.DocumentParsed += delegate (object sender, EventArgs e) {
+						widget.UpdateParsedDocument (WorkbenchWindow.Document.ParsedDocument);
+					};
+				};
+			};
+		}		
 		public void Load (string fileName, Encoding loadEncoding)
 		{
 			// Handle the "reload" case.
@@ -545,30 +570,12 @@ namespace MonoDevelop.SourceEditor
 			}
 			
 			// TODO: Would be much easier if the view would be created after the containers.
-			this.WorkbenchWindowChanged += delegate {
-				if (WorkbenchWindow == null)
-					return;
-				WorkbenchWindow.DocumentChanged += delegate {
-					if (WorkbenchWindow.Document == null)
-						return;
-					foreach (var provider in WorkbenchWindow.Document.GetContents<IQuickTaskProvider> ()) {
-						widget.AddQuickTaskProvider (provider);
-					}
+			CreateDocumentParsedHandler ();
 
-					foreach (var provider in WorkbenchWindow.Document.GetContents<IUsageProvider> ()) {
-						widget.AddUsageTaskProvider (provider);
-					}
-					
-					WorkbenchWindow.Document.DocumentParsed += delegate(object sender, EventArgs e) {
-						widget.UpdateParsedDocument (WorkbenchWindow.Document.ParsedDocument);
-					};
-				};
-			};
-			
 			ContentName = fileName;
 			lastSaveTimeUtc = File.GetLastWriteTimeUtc (ContentName);			
 			RunFirstTimeFoldUpdate (text);
-			
+
 			widget.TextEditor.Caret.Offset = 0;
 			UpdateExecutionLocation ();
 			UpdateBreakpoints ();
@@ -658,6 +665,7 @@ namespace MonoDevelop.SourceEditor
 			this.encoding = encoding;
 			ContentName = fileName;
 			RunFirstTimeFoldUpdate (content);
+			CreateDocumentParsedHandler ();
 			UpdateExecutionLocation ();
 			UpdateBreakpoints ();
 			UpdatePinnedWatches ();
@@ -1489,10 +1497,9 @@ namespace MonoDevelop.SourceEditor
 		{
 			SetCompletionText (ctx, partial_word, complete_word, complete_word.Length);
 		}
-		
-		public void SetCompletionText (CodeCompletionContext ctx, string partial_word, string complete_word, int wordOffset)
+
+		public static void SetCompletionText (TextEditorData data, CodeCompletionContext ctx, string partial_word, string complete_word, int wordOffset)
 		{
-			TextEditorData data = this.GetTextEditorData ();
 			if (data == null || data.Document == null)
 				return;
 			int triggerOffset = ctx.TriggerOffset;
@@ -1533,7 +1540,7 @@ namespace MonoDevelop.SourceEditor
 					}
 					int minColumn = System.Math.Min (data.MainSelection.Anchor.Column, data.MainSelection.Lead.Column);
 					data.MainSelection.Anchor = new DocumentLocation (data.Caret.Line == minLine ? maxLine : minLine, minColumn);
-					data.MainSelection.Lead = new DocumentLocation (data.Caret.Line, TextEditor.Caret.Column);
+					data.MainSelection.Lead = data.Caret.Location;
 					
 					data.Document.CommitMultipleLineUpdate (data.MainSelection.MinLine, data.MainSelection.MaxLine);
 					data.Caret.PreserveSelection = false;
@@ -1543,6 +1550,21 @@ namespace MonoDevelop.SourceEditor
 			}
 			
 			data.Document.CommitLineUpdate (data.Caret.Line);
+			if (idx >= 0)
+				data.Caret.Offset = triggerOffset + idx;
+
+		}
+
+		public void SetCompletionText (CodeCompletionContext ctx, string partial_word, string complete_word, int wordOffset)
+		{
+			var data = GetTextEditorData ();
+			using (var undo = data.OpenUndoGroup ()) {
+				SetCompletionText (data, ctx, partial_word, complete_word, wordOffset);
+				var formatter = CodeFormatterService.GetFormatter (data.MimeType);
+				if (formatter.SupportsOnTheFlyFormatting) {
+					formatter.OnTheFlyFormat (WorkbenchWindow.Document, ctx.TriggerOffset, ctx.TriggerOffset + complete_word.Length);
+				}
+			}
 		}
 		
 		internal void FireCompletionContextChanged ()
@@ -1636,7 +1658,7 @@ namespace MonoDevelop.SourceEditor
 			foreach (FoldSegment segment in Document.FoldSegments) {
 				if (segment.FoldingType == FoldingType.TypeDefinition)
 					segment.IsFolded = false;
-				if (segment.FoldingType == FoldingType.TypeMember)
+				if (segment.FoldingType == FoldingType.TypeMember || segment.FoldingType == FoldingType.Comment)
 					segment.IsFolded = true;
 			}
 			widget.TextEditor.Caret.MoveCaretBeforeFoldings ();

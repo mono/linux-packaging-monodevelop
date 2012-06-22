@@ -354,18 +354,27 @@ namespace MonoDevelop.Core
 					a++;
 					b++;
 					if (b >= bEnd) {
-						indx++;
-						lastStartA = a + 1;
-						lastStartB = b;
+						if (a >= aEnd || IsSeparator (*a)) {
+							indx++;
+							lastStartA = a + 1;
+							lastStartB = b;
+						}
 						break;
 					}
 				}
-				
 				if (indx == 0) 
 					return absPath;
 				
 				if (lastStartA >= aEnd)
 					return ".";
+
+				// handle case a: some/path b: some/path/deeper...
+				if (a >= aEnd) {
+					if (IsSeparator (*b)) {
+						lastStartA = a + 1;
+						lastStartB = b;
+					}
+				}
 				
 				// look how many levels to go up into the base path
 				int goUpCount = 0;
@@ -374,7 +383,6 @@ namespace MonoDevelop.Core
 						goUpCount++;
 					lastStartB++;
 				}
-				
 				var size = goUpCount * 2 + goUpCount + aEnd - lastStartA;
 				var result = new char [size];
 				fixed (char* rPtr = result) {

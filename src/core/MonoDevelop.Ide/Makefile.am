@@ -528,7 +528,6 @@ FILES =  \
 	MonoDevelop.Ide.Gui.Pads.ProjectPad/WorkspaceNodeBuilder.cs \
 	MonoDevelop.Ide.Gui.Pads/DefaultMonitorPad.cs \
 	MonoDevelop.Ide.Gui.Pads/ErrorListPad.cs \
-	MonoDevelop.Ide.Gui.Pads/InternalLogPad.cs \
 	MonoDevelop.Ide.Gui.Pads/MonodocTreePad.cs \
 	MonoDevelop.Ide.Gui.Pads/SolutionPad.cs \
 	MonoDevelop.Ide.Gui.Pads/TaskListPad.cs \
@@ -691,6 +690,7 @@ FILES =  \
 	MonoDevelop.Ide.TypeSystem/OutputSettings.cs \
 	MonoDevelop.Ide.TypeSystem/ParsedDocument.cs \
 	MonoDevelop.Ide.TypeSystem/PreProcessorDefine.cs \
+	MonoDevelop.Ide.TypeSystem/ProjectCommentTags.cs \
 	MonoDevelop.Ide.TypeSystem/ProjectContentEventArgs.cs \
 	MonoDevelop.Ide.TypeSystem/StockIcons.cs \
 	MonoDevelop.Ide.TypeSystem/Tag.cs \

@@ -291,6 +291,10 @@ public class PlainStringAttribute : Attribute {
 	public PlainStringAttribute () {}
 }
 
+public class AutoreleaseAttribute : Attribute {
+	public AutoreleaseAttribute () {}
+}
+
 // When applied, the generator generates a check for the Handle being valid on the main object, to
 // ensure that the user did not Dispose() the object.
 //
@@ -386,6 +390,26 @@ public class SealedAttribute : Attribute {
 // Flags the object as being thread safe
 public class ThreadSafeAttribute : Attribute {
 	public ThreadSafeAttribute () {}
+}
+
+// Marks a struct parameter/return value as requiring a certain alignment.
+public class AlignAttribute : Attribute {
+	public int Align { get; set; }
+	public AlignAttribute (int align)
+	{
+		Align = align;
+	}
+	public int Bits {
+		get {
+			int bits = 0;
+			int tmp = Align;
+			while (tmp > 1) {
+				bits++;
+				tmp /= 2;
+			}
+			return bits;
+		}
+	}
 }
 
 //
@@ -575,12 +599,17 @@ public class MarshalInfo {
  	// Copy.   This means that we can do fast string passing.
 	public bool ZeroCopyStringMarshal;
 
+	public bool IsAligned;
+
 	// Used for parameters
 	public MarshalInfo (MethodInfo mi, ParameterInfo pi)
 	{
 		PlainString = pi.GetCustomAttributes (typeof (PlainStringAttribute), true).Length > 0;
 		Type = pi.ParameterType;
 		ZeroCopyStringMarshal = (Type == typeof (string)) && PlainString == false && !Generator.HasAttribute (pi, (typeof (DisableZeroCopyAttribute))) && Generator.SharedGenerator.type_wants_zero_copy;
+		IsAligned = Generator.HasAttribute (pi, typeof (AlignAttribute));
+		if (IsAligned)
+			Type = typeof (IntPtr);
 		if (ZeroCopyStringMarshal && Generator.HasAttribute (mi, typeof (DisableZeroCopyAttribute)))
 			ZeroCopyStringMarshal = false;
 	}
@@ -590,6 +619,9 @@ public class MarshalInfo {
 	{
 		PlainString = mi.ReturnTypeCustomAttributes.GetCustomAttributes (typeof (PlainStringAttribute), true).Length > 0;
 		Type = mi.ReturnType;
+		IsAligned = Generator.HasAttribute (mi, typeof (AlignAttribute));
+		if (IsAligned)
+			Type = typeof (IntPtr);
 	}
 
 	public static bool UseString (MethodInfo mi, ParameterInfo pi)
@@ -826,7 +858,7 @@ public class Generator {
 		return (pt == typeof (int) || pt == typeof (long) || pt == typeof (byte) || pt == typeof (short));
 	}
 
-	public string PrimitiveType (Type t)
+	public string PrimitiveType (Type t, bool formatted = false)
 	{
 		if (t == typeof (void))
 			return "void";
@@ -845,7 +877,7 @@ public class Generator {
 		if (t == typeof (bool))
 			return "bool";
 
-		return t.Name;
+		return formatted ? FormatType (null, t) : t.Name;
 	}
 
 	// Is this a wrapped type of NSObject from the MonoTouch/MonoMac binding world?
@@ -864,13 +896,13 @@ public class Generator {
 	string ParameterGetMarshalType (MarshalInfo mai, bool formatted = false)
 	{
 		if (mai.Type.IsEnum)
-			return PrimitiveType (mai.Type);
+			return PrimitiveType (mai.Type, formatted);
 
 		if (IsWrappedType (mai.Type))
 			return "IntPtr";
 
 		if (IsNativeType (mai.Type))
-			return PrimitiveType (mai.Type);
+			return PrimitiveType (mai.Type, formatted);
 
 		if (mai.Type == typeof (string)){
 			if (mai.PlainString)
@@ -885,7 +917,7 @@ public class Generator {
 			return mt.Encoding;
 		
 		if (mai.Type.IsValueType)
-			return PrimitiveType (mai.Type);
+			return PrimitiveType (mai.Type, formatted);
 
 		// Arrays are returned as NSArrays
 		if (mai.Type.IsArray)
@@ -928,12 +960,14 @@ public class Generator {
 		var mi = t.GetMethod ("Invoke");
 		var pars = new StringBuilder ();
 		var invoke = new StringBuilder ();
-		var returntype = mi.ReturnType.ToString ();
+		string returntype;
 		var returnformat = "return {0};";
 		
 		if (IsWrappedType (mi.ReturnType)) {
 			returntype = "IntPtr";
 			returnformat = "return {0} != null ? {0}.Handle : IntPtr.Zero;";
+		} else {
+			returntype = FormatType (mi.DeclaringType, mi.ReturnType);
 		}
 		
 		pars.Append ("IntPtr block");
@@ -1230,8 +1264,8 @@ public class Generator {
 
 		print (m, "\t\t[DllImport (LIBOBJC_DYLIB, EntryPoint=\"{0}\")]", entry_point);
 		print (m, "\t\tpublic extern static {0} {1} ({3}IntPtr receiver, IntPtr selector{2});",
-		       need_stret ? "void" : ParameterGetMarshalType (mi), method_name, b.ToString (),
-		       need_stret ? "out " + FormatType (MessagingType, mi.ReturnType) + " retval, " : "");
+		       need_stret ? "void" : ParameterGetMarshalType (mi, true), method_name, b.ToString (),
+		       need_stret ? (HasAttribute (mi, typeof (AlignAttribute)) ? "IntPtr" : "out " + FormatType (MessagingType, mi.ReturnType)) + " retval, " : "");
 		       
 	}
 
@@ -1456,7 +1490,7 @@ public class Generator {
 						if (mi.DeclaringType == t)
 							need_abstract [t] = true;
 						continue;
-					} else if (attr is SealedAttribute || attr is EventArgsAttribute || attr is DelegateNameAttribute || attr is EventNameAttribute || attr is DefaultValueAttribute || attr is ObsoleteAttribute || attr is AlphaAttribute || attr is DefaultValueFromArgumentAttribute || attr is NewAttribute || attr is SinceAttribute || attr is PostGetAttribute || attr is NullAllowedAttribute || attr is CheckDisposedAttribute || attr is SnippetAttribute || attr is LionAttribute || attr is AppearanceAttribute || attr is ThreadSafeAttribute)
+					} else if (attr is SealedAttribute || attr is EventArgsAttribute || attr is DelegateNameAttribute || attr is EventNameAttribute || attr is DefaultValueAttribute || attr is ObsoleteAttribute || attr is AlphaAttribute || attr is DefaultValueFromArgumentAttribute || attr is NewAttribute || attr is SinceAttribute || attr is PostGetAttribute || attr is NullAllowedAttribute || attr is CheckDisposedAttribute || attr is SnippetAttribute || attr is LionAttribute || attr is AppearanceAttribute || attr is ThreadSafeAttribute || attr is AutoreleaseAttribute)
 						continue;
 					else 
 						Console.WriteLine ("Error: Unknown attribute {0} on {1}", attr.GetType (), t);
@@ -1857,10 +1891,11 @@ public class Generator {
 			sig = MessagingNS + ".Messaging." + sig;
 		
 		if (stret){
+			string ret_val = HasAttribute (mi, typeof (AlignAttribute)) ? "ret" : "out ret";
 			if (is_static)
-				print ("{0} (out ret, class_ptr, {3}{4});", sig, "/*unusued*/", "/*unusued*/", selector, args);
+				print ("{0} ({5}, class_ptr, {3}{4});", sig, "/*unusued*/", "/*unusued*/", selector, args, ret_val);
 			else
-				print ("{0} (out ret, {1}{2}, {3}{4});", sig, target_name, handle, selector, args);
+				print ("{0} ({5}, {1}{2}, {3}{4});", sig, target_name, handle, selector, args, ret_val);
 		} else {
 			bool returns = mi.ReturnType != typeof (void) && mi.Name != "Constructor";
 
@@ -2018,7 +2053,7 @@ public class Generator {
 			else
 				return "ns{0}.Dispose ();\n";
 #else
-			return "NSString.ReleaseNative (ns{0});";
+			return "NSString.ReleaseNative (ns{0});\n";
 #endif
 		} else 
 			return "if (_s{0}.Flags != 0x010007d1) throw new Exception (\"String was retained, not copied\");";
@@ -2185,6 +2220,7 @@ public class Generator {
 			print (sw, convs.ToString ());
 
 		Inject (mi, typeof (PreSnippetAttribute));
+		AlignAttribute align = GetAttribute (mi, typeof (AlignAttribute)) as AlignAttribute;
 		bool has_postget = HasAttribute (mi, typeof (PostGetAttribute));
 		bool use_temp_return  =
 			(mi.Name != "Constructor" && (NeedStret (mi) || disposes.Length > 0 || has_postget) && mi.ReturnType != typeof (void)) ||
@@ -2197,7 +2233,11 @@ public class Generator {
 		if (use_temp_return) {
 			if (mi.ReturnType.IsSubclassOf (typeof (Delegate)))
 				print ("BlockLiteral *ret;");
-			else
+			else if (align != null) {
+				print ("{0} ret_real;", FormatType (mi.DeclaringType, mi.ReturnType));
+				print ("IntPtr ret_alloced = Marshal.AllocHGlobal (sizeof ({0}) + {1});", FormatType (mi.DeclaringType, mi.ReturnType), align.Align);
+				print ("IntPtr ret = new IntPtr (((ret_alloced.ToInt32 () + {0}) >> {1}) << {1});", align.Align - 1, align.Bits);
+			} else
 				print ("{0} ret;", FormatType (mi.DeclaringType, mi.ReturnType)); //  = new {0} ();"
 		}
 		
@@ -2267,6 +2307,10 @@ public class Generator {
 				print ("return null;");
 				indent--;
 				print ("return ({0}) (ret->global_handle != IntPtr.Zero ? GCHandle.FromIntPtr (ret->global_handle).Target : GCHandle.FromIntPtr (ret->local_handle).Target);", FormatType (mi.DeclaringType, mi.ReturnType));
+			} else if (align != null) {
+				print ("unsafe {{ ret_real = *({0} *) ret; }}", FormatType (mi.DeclaringType, mi.ReturnType));
+				print ("Marshal.FreeHGlobal (ret_alloced);");
+				print ("return ret_real;");
 			} else {
 				print ("return ret;");
 			}
@@ -2518,6 +2562,7 @@ public class Generator {
 		bool is_new = HasAttribute (mi, typeof (NewAttribute));
 		bool is_sealed = HasAttribute (mi, typeof (SealedAttribute));
 		bool is_unsafe = false;
+		bool is_autorelease = HasAttribute (mi, typeof (AutoreleaseAttribute));
 
 		foreach (ParameterInfo pi in mi.GetParameters ())
 			if (pi.ParameterType.IsSubclassOf (typeof (Delegate)))
@@ -2539,8 +2584,17 @@ public class Generator {
 					
 			if (is_model)
 				print ("\tthrow new You_Should_Not_Call_base_In_This_Method ();");
-			else
+			else {
+				if (is_autorelease) {
+					indent++;
+					print ("using (var autorelease_pool = new NSAutoreleasePool ()) {");
+				}
 				GenerateMethodBody (type, mi, virtual_method, is_static, selector, false, null, BodyOption.None, threadCheck);
+				if (is_autorelease) {
+					print ("}");
+					indent--;
+				}
+			}
 			print ("}\n");
 		}
 	}
@@ -2906,7 +2960,7 @@ public class Generator {
 
 							var def = GetDefaultValue (mi);
 							if ((def is string) && ((def as string) == "null") && mi.ReturnType.IsValueType)
-								print ("throw new Exception ();");
+								print ("throw new Exception (\"No event handler has been added to the {0} event.\");", mi.Name);
 							else {
 								foreach (var j in pars){
 									if (j.ParameterType.IsByRef && j.IsOut){
@@ -2968,7 +3022,7 @@ public class Generator {
 				indent++;
 				print ("var descriptor = (BlockLiteral *) block;");
 				print ("var del = ({0}) (descriptor->global_handle != IntPtr.Zero ? GCHandle.FromIntPtr (descriptor->global_handle).Target : GCHandle.FromIntPtr (descriptor->local_handle).Target);", ti.UserDelegate);
-				bool is_void = ti.ReturnType == "System.Void";
+				bool is_void = ti.ReturnType == "void";
 				// FIXME: right now we only support 'null' when the delegate does not return a value
 				// otherwise we will need to know the default value to be returned (likely uncommon)
 				if (is_void) {
@@ -3315,7 +3369,7 @@ public class Generator {
 		if (def == null)
 			return "null";
 
-		if (def.GetType ().FullName == "System.Drawing.RectangleF")
+		if (def == typeof (System.Drawing.RectangleF))
 			return "System.Drawing.RectangleF.Empty";
 		
 		if (def is bool)
@@ -3357,6 +3411,10 @@ public class Generator {
 				return "bool";
 			}
 		}
+		
+		if (t == typeof (void))
+			return "void";
+
 		string ns = t.Namespace;
 		if (implicit_ns.Contains (ns))
 			return t.Name;

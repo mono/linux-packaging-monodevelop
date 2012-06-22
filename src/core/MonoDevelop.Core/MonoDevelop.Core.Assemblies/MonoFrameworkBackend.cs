@@ -32,8 +32,12 @@ namespace MonoDevelop.Core.Assemblies
 {
 	public class MonoFrameworkBackend: TargetFrameworkBackend<MonoTargetRuntime>
 	{
+		string ref_assemblies_folder;
+
 		string GetReferenceAssembliesFolder ()
 		{
+			if (ref_assemblies_folder != null)
+				return ref_assemblies_folder;
 			var fxDir = framework.Id.GetAssemblyDirectoryName ();
 			foreach (var rootDir in runtime.GetReferenceFrameworkDirectories ()) {
 				var dir = rootDir.Combine (fxDir);
@@ -50,6 +54,7 @@ namespace MonoDevelop.Core.Assemblies
 						}
 					}
 				}
+				ref_assemblies_folder = dir;
 				return dir;
 			}
 			return null;
@@ -104,17 +109,41 @@ namespace MonoDevelop.Core.Assemblies
 			}
 		}
 		
+		
+		string GetOldMcsName (TargetFrameworkMoniker fx)
+		{
+			//old compilers for specific frameworks
+			switch (fx.Identifier) {
+			case TargetFrameworkMoniker.ID_NET_FRAMEWORK: {
+					switch (fx.Version) {
+					case "1.1":
+						return "mcs";
+					case "2.0":
+					case "3.0":
+					case "3.5":
+						return "gmcs";
+					case "4.0":
+						return "dmcs";
+					}
+				}
+				break;
+			case TargetFrameworkMoniker.ID_MONODROID:
+			case TargetFrameworkMoniker.ID_MONOTOUCH:
+			case TargetFrameworkMoniker.ID_SILVERLIGHT:
+				return "smcs";
+			}
+
+			return "mcs";
+		}
+		
 		public override string GetToolPath (string toolName)
 		{
 			if (toolName == "csc" || toolName == "mcs") {
-				if (framework.ClrVersion == ClrVersion.Net_1_1)
+				if (((MonoTargetRuntime)runtime).HasMultitargetingMcs) {
 					toolName = "mcs";
-				else if (framework.ClrVersion == ClrVersion.Net_2_0)
-					toolName = "gmcs";
-				else if (framework.ClrVersion == ClrVersion.Clr_2_1)
-					toolName = "smcs";
-				else if (framework.ClrVersion == ClrVersion.Net_4_0)
-					toolName = "dmcs";
+				} else {
+					toolName = GetOldMcsName (framework.Id);
+				}
 			}
 			else if (toolName == "vbc")
 				toolName = "vbnc";

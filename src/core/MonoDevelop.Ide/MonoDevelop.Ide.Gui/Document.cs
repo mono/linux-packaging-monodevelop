@@ -123,7 +123,19 @@ namespace MonoDevelop.Ide.Gui
 				nextExtension = nextExtension.Next as TextEditorExtension;
 			}
 		}
-		
+		static Document ()
+		{
+			if (IdeApp.Workbench != null) {
+				IdeApp.Workbench.ActiveDocumentChanged += delegate {
+					// reparse on document switch to update the current file with changes done in other files.
+					var doc = IdeApp.Workbench.ActiveDocument;
+					if (doc == null || doc.Editor == null)
+						return;
+					doc.StartReparseThread ();
+				};
+			}
+		}
+
 		public Document (IWorkbenchWindow window)
 		{
 			Counters.OpenDocuments++;
@@ -178,7 +190,17 @@ namespace MonoDevelop.Ide.Gui
 				StartReparseThread ();
 			}*/
 		}
-		
+
+		public bool IsCompileableInProject {
+			get {
+				var project = Project;
+				if (project == null)
+					return false;
+				var pf = project.GetProjectFile (FileName);
+				return pf != null && pf.BuildAction == BuildAction.Compile;
+			}
+		}
+
 		IProjectContent singleFileContext;
 		public  virtual IProjectContent ProjectContent {
 			get {
@@ -312,7 +334,8 @@ namespace MonoDevelop.Ide.Gui
 		{
 			if (Window.ViewContent.IsViewOnly || !Window.ViewContent.IsFile)
 				return;
-			
+
+
 			Encoding encoding = null;
 			
 			IEncodedTextContent tbuffer = GetContent <IEncodedTextContent> ();
@@ -360,7 +383,9 @@ namespace MonoDevelop.Ide.Gui
 				else
 					Window.ViewContent.Save (filename + "~");
 			}
-			
+			lock (TypeSystemService.FilesSkippedInParseThread) {
+				TypeSystemService.FilesSkippedInParseThread.Remove (FileName);
+			}
 			// do actual save
 			if (tbuffer != null && encoding != null)
 				tbuffer.Save (filename, encoding);
@@ -447,10 +472,10 @@ namespace MonoDevelop.Ide.Gui
 //			TypeSystemService.DomRegistered -= UpdateRegisteredDom;
 			CancelParseTimeout ();
 			ClearTasks ();
-			
-			string currentParseFile = FileName;
-			Project curentParseProject = Project;
-			
+
+			lock (TypeSystemService.FilesSkippedInParseThread) {
+				TypeSystemService.FilesSkippedInParseThread.Remove (FileName);
+			}
 			if (window is SdiWorkspaceWindow)
 				((SdiWorkspaceWindow)window).DetachFromPathedDocument ();
 			window.Closed -= OnClosed;
@@ -585,7 +610,6 @@ namespace MonoDevelop.Ide.Gui
 			
 			if (editorExtension != null)
 				last.Next = editor.AttachExtension (editorExtension);
-			
 		}
 		
 		internal void OnDocumentAttached ()
@@ -664,6 +688,9 @@ namespace MonoDevelop.Ide.Gui
 				var editor = Editor;
 				if (editor == null)
 					return null;
+				lock (TypeSystemService.FilesSkippedInParseThread) {
+					TypeSystemService.FilesSkippedInParseThread.Add (currentParseFile);
+				}
 				string currentParseText = editor.Text;
 				this.parsedDocument = TypeSystemService.ParseFile (Project, currentParseFile, editor.Document.MimeType, currentParseText);
 				if (Project == null && this.parsedDocument != null) {
@@ -699,7 +726,7 @@ namespace MonoDevelop.Ide.Gui
 		}
 		
 		uint parseTimeout = 0;
-		void StartReparseThread ()
+		internal void StartReparseThread ()
 		{
 			// Don't directly parse the document because doing it at every key press is
 			// very inefficient. Do it after a small delay instead, so several changes can
@@ -714,15 +741,15 @@ namespace MonoDevelop.Ide.Gui
 				string currentParseText = editor.Text;
 				string mimeType = editor.Document.MimeType;
 				ThreadPool.QueueUserWorkItem (delegate {
+					lock (TypeSystemService.FilesSkippedInParseThread) {
+						TypeSystemService.FilesSkippedInParseThread.Add (currentParseFile);
+					}
 					var currentParsedDocument = TypeSystemService.ParseFile (Project, currentParseFile, mimeType, currentParseText);
 					Application.Invoke (delegate {
 						// this may be called after the document has closed, in that case the OnDocumentParsed event shouldn't be invoked.
 						if (isClosed)
 							return;
 						this.parsedDocument = currentParsedDocument;
-//						this.parsedDocument = currentParsedDocument;
-//						if (this.parsedDocument != null && !this.parsedDocument.HasErrors)
-//							this.lastErrorFreeParsedDocument = parsedDocument;
 						OnDocumentParsed (EventArgs.Empty);
 					});
 				});
