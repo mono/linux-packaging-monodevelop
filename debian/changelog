@@ -1,3 +1,17 @@
+monodevelop (3.0.3.2+dfsg-1) unstable; urgency=low
+
+  * [3fd89ae] Imported Upstream version 3.0.3.2+dfsg
+  * [379a680] Remove old patches we haven't used for ages from git.
+  * [d71161d] Remove correct_paths_in_monodevelop-core-addins.pc.patch.
+    Upstream claim to have fixed this by moving assembly install locations.
+  * [15dbfb9] Fix install location for MonoDevelop.Gettext.dll.config.
+  * [26eb434] Fix install location for MonoDevelop.SourceEditor2.dll.config.
+  * [4169974] Upstream commit 53282c9 which finally reconciles the 
+    MonoDevelop.Gettext.dll install location with the 
+    monodevelop-core-addins.pc location.
+
+ -- Jo Shields <directhex@apebox.org>  Fri, 22 Jun 2012 20:35:35 +0100
+
 monodevelop (3.0.2+dfsg-3) unstable; urgency=low
 
   * [fcecfe7] Fix monodevelop-core-addins.pc.in to point to actual 
