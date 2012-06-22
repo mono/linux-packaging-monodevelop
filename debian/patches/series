@@ -1,4 +1,3 @@
-correct_paths_in_monodevelop-core-addins.pc.patch
 link_system_nunit.patch
 use_libsvn1.patch
 use_libapr1.patch
