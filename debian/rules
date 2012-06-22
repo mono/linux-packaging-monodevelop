@@ -37,7 +37,7 @@ override_dh_auto_install:
 	dh_auto_install
 	# install missing DLL maps
 	cp debian/MonoDevelop.SourceEditor.dll.config debian/tmp/usr/lib/monodevelop/AddIns/
-	cp debian/MonoDevelop.Gettext.dll.config debian/tmp/usr/lib/monodevelop/AddIns/MonoDevelop.Gettext/
+	cp debian/MonoDevelop.Gettext.dll.config debian/tmp/usr/lib/monodevelop/AddIns/DisplayBindings/MonoDevelop.Gettext/
 	# fix permissions of .mo files
 	cd $(CURDIR)/debian/tmp/usr/share/locale && find -name "*.mo" -exec chmod -x {} \;
 
