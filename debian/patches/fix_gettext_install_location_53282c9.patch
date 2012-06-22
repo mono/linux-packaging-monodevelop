@@ -1,0 +1,19 @@
+commit 1805a34b6212748ce2ddf075cc54cf67853282c9
+Author: Michael Hutchinson <m.j.hutchinson@gmail.com>
+Date:   Fri Jun 22 14:35:35 2012 -0400
+
+    [Gettext] Fix install location for real
+
+Index: monodevelop/src/addins/MonoDevelop.Gettext/Makefile.am
+===================================================================
+--- monodevelop.orig/src/addins/MonoDevelop.Gettext/Makefile.am	2012-06-22 20:16:04.113176007 +0100
++++ monodevelop/src/addins/MonoDevelop.Gettext/Makefile.am	2012-06-22 20:16:11.597175941 +0100
+@@ -93,7 +93,7 @@
+ 
+ $(ASSEMBLY).mdb: $(ASSEMBLY)
+ 
+-assemblydir = $(MD_ADDIN_DIR)/DisplayBindings/MonoDevelop.Gettext
++assemblydir = $(MD_ADDIN_DIR)/DisplayBindings/Gettext
+ assembly_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
+ 
+ CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
