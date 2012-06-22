@@ -6814,7 +6814,7 @@ namespace MonoMac.AppKit {
 		[Export ("constraintWithItem:attribute:relatedBy:toItem:attribute:multiplier:constant:")]
 		NSLayoutConstraint Create (NSObject view1, NSLayoutAttribute attribute1, NSLayoutRelation relation, NSObject view2, NSLayoutAttribute attribute2, float multiplier, float constant);
 		
-		[Export ("NSLayoutPriority")]
+		[Export ("priority")]
 		NSLayoutPriority Priority { get; set;  }
 
 		[Export ("shouldBeArchived")]
@@ -6838,7 +6838,7 @@ namespace MonoMac.AppKit {
 		[Export ("multiplier")]
 		float Multiplier { get;  }
 
-		[Export ("CGFloat")]
+		[Export ("constant")]
 		float Constant { get; set;  }
 	}
 	
@@ -13327,7 +13327,7 @@ namespace MonoMac.AppKit {
 		void Update ();
 	
 		[Export ("makeFirstResponder:")]
-		bool MakeFirstResponder (NSResponder  aResponder);
+		bool MakeFirstResponder ([NullAllowed] NSResponder  aResponder);
 	
 		[Export ("firstResponder")]
 		NSResponder FirstResponder { get; }
@@ -13341,10 +13341,9 @@ namespace MonoMac.AppKit {
 		/* NSWindow.Close by default calls [window release]
 		 * This will cause a double free in our code since we're not aware of this
 		 * and we end up GCing the proxy eventually and sending our own release
-		 * Removing this method for now
-		[Export ("close")]
-		void Close ();
 		 */
+		[Internal, Export ("close")]
+		void _Close ();
 	
 		[Export ("releasedWhenClosed")]
 		bool ReleasedWhenClosed  { [Bind ("isReleasedWhenClosed")] get; set; }

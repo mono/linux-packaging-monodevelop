@@ -247,7 +247,9 @@ namespace MonoDevelop.Ide.TypeSystem
 				int col = type.BodyRegion.EndColumn - 1;
 				var line = data.GetLine (type.BodyRegion.EndLine);
 				if (line != null) {
-					while (col > 1 && char.IsWhiteSpace (data.GetCharAt (line.Offset + col - 2)))
+					var lineOffset = line.Offset;
+					col = Math.Min (line.Length, col);
+					while (lineOffset + col - 2 >= 0 && char.IsWhiteSpace (data.GetCharAt (lineOffset + col - 2)))
 						col--;
 				}
 				result.Add (new InsertionPoint (new DocumentLocation (type.BodyRegion.EndLine, col), insertLine, NewLineInsertion.Eol));
@@ -357,38 +359,34 @@ namespace MonoDevelop.Ide.TypeSystem
 		
 		static InsertionPoint GetNewFieldPosition (IEnumerable<InsertionPoint> points, IUnresolvedTypeDefinition cls)
 		{
-			throw new NotImplementedException ();
-//			if (cls.GetDefinition ().Fields.Count  == 0) 
-//				return points.FirstOrDefault ();
-//			var lastField = cls.Fields.Last ();
-//			return points.FirstOrDefault (p => p.Location.Convert () > lastField.Location);
+			if (!cls.Fields.Any ()) 
+				return points.FirstOrDefault ();
+			var lastField = cls.Fields.Last ();
+			return points.FirstOrDefault (p => p.Location.Convert () > lastField.Region.Begin);
 		}
 		
 		static InsertionPoint GetNewMethodPosition (IEnumerable<InsertionPoint> points, IUnresolvedTypeDefinition cls)
 		{
-			throw new NotImplementedException ();
-//			if (cls.MethodCount + cls.ConstructorCount == 0) 
-//				return GetNewPropertyPosition (points, cls);
-//			var lastMember = cls.Members.Last ();
-//			return points.FirstOrDefault (p => p.Location.Convert () > lastMember.Location);
+			if (!cls.Methods.Any ()) 
+				return GetNewPropertyPosition (points, cls);
+			var lastMember = cls.Members.Last ();
+			return points.FirstOrDefault (p => p.Location.Convert () > lastMember.Region.Begin);
 		}
 		
 		static InsertionPoint GetNewPropertyPosition (IEnumerable<InsertionPoint> points, IUnresolvedTypeDefinition cls)
 		{
-			throw new NotImplementedException ();
-//			if (cls.PropertyCount == 0)
-//			IProperty lastProperty = cls.Properties.Last ();
-//				return GetNewFieldPosition (points, cls);
-//			return points.FirstOrDefault (p => p.Location.Convert () > lastProperty.Location);
+			if (!cls.Properties.Any ())
+				return GetNewFieldPosition (points, cls);
+			var lastProperty = cls.Properties.Last ();
+			return points.FirstOrDefault (p => p.Location.Convert () > lastProperty.Region.Begin);
 		}
 		
 		static InsertionPoint GetNewEventPosition (IEnumerable<InsertionPoint> points, IUnresolvedTypeDefinition cls)
 		{
-			throw new NotImplementedException ();
-//			if (cls.EventCount == 0)
-//				return GetNewMethodPosition (points, cls);
-//			IEvent lastEvent = cls.Events.Last ();
-//			return points.FirstOrDefault (p => p.Location.Convert () > lastEvent.Location);
+			if (!cls.Events.Any ())
+				return GetNewMethodPosition (points, cls);
+			var lastEvent = cls.Events.Last ();
+			return points.FirstOrDefault (p => p.Location.Convert () > lastEvent.Region.Begin);
 		}
 		#endregion
 		

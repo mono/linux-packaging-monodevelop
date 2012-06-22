@@ -13,6 +13,7 @@ REFS =  \
 	$(GTK_SHARP_LIBS) \
 	$(MONO_ADDINS_LIBS) \
 	-r:../../build/AddIns/BackendBindings/MonoDevelop.CSharpBinding.dll \
+	-r:../../build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll \
 	-r:../../build/AddIns/MonoDevelop.AspNet/MonoDevelop.AspNet.dll \
 	-r:../../build/AddIns/MonoDevelop.Autotools/MonoDevelop.Autotools.dll \
 	-r:../../build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.dll \
@@ -84,6 +85,7 @@ FILES =  \
 	MonoDevelop.Ide.FindInFiles/MemberCollectorTests.cs \
 	MonoDevelop.Ide.FindInFiles/SearchCollectorTests.cs \
 	MonoDevelop.Ide.Gui/CompletionListWindowTests.cs \
+	MonoDevelop.Projects/FileServiceTests.cs \
 	MonoDevelop.Projects/LocalCopyTests.cs \
 	MonoDevelop.Projects/MakefileTests.cs \
 	MonoDevelop.Projects/MdsTests.cs \
@@ -91,10 +93,12 @@ FILES =  \
 	MonoDevelop.Projects/MSBuildTests.cs \
 	MonoDevelop.Projects/PackagingTests.cs \
 	MonoDevelop.Projects/ProjectTests.cs \
+	MonoDevelop.Projects/SolutionFolderTests.cs \
 	MonoDevelop.Projects/SolutionTests.cs \
 	MonoDevelop.Projects/TestProjectsChecks.cs \
 	MonoDevelop.Projects/TextFormatterTests.cs \
 	MonoDevelop.Projects/WorkspaceTests.cs \
+	MonoDevelop.SourceEditor/SourceEditorTests.cs \
 	MonoDevelop.VersionControl.Git/GitUtilsTests.cs \
 	MonoDevelop.VersionControl.Views/EditorCompareWidgetBaseTest.cs \
 	TestBase.cs \

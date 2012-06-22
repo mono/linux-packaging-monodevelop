@@ -97,6 +97,11 @@ namespace ICSharpCode.NRefactory.CSharp
 			get;
 			set;
 		}
+
+		public DomRegion FormattingRegion {
+			get;
+			set;
+		}
 		
 		public AstFormattingVisitor(CSharpFormattingOptions policy, IDocument document, TextEditorOptions options = null)
 		{
@@ -110,6 +115,22 @@ namespace ICSharpCode.NRefactory.CSharp
 			this.document = document;
 			this.options = options ?? TextEditorOptions.Default;
 			curIndent = new Indent(this.options);
+		}
+
+		protected virtual void VisitChildren (AstNode node)
+		{
+			if (!FormattingRegion.IsEmpty) {
+				if (node.EndLocation < FormattingRegion.Begin || node.StartLocation > FormattingRegion.End)
+					return;
+			}
+
+			AstNode next;
+			for (var child = node.FirstChild; child != null; child = next) {
+				// Store next to allow the loop to continue
+				// if the visitor removes/replaces child.
+				next = child.NextSibling;
+				child.AcceptVisitor (this);
+			}
 		}
 		
 		/// <summary>
@@ -228,14 +249,17 @@ namespace ICSharpCode.NRefactory.CSharp
 			for (int i = 0; i < blankLines; i++) {
 				sb.Append(this.options.EolMarker);
 			}
+			if (end - start == 0 && sb.Length == 0)
+				return;
 			AddChange(start, end - start, sb.ToString());
 		}
 
 		public override void VisitUsingDeclaration(UsingDeclaration usingDeclaration)
 		{
-			if (!(usingDeclaration.PrevSibling is UsingDeclaration || usingDeclaration.PrevSibling  is UsingAliasDeclaration)) {
+			if (usingDeclaration.PrevSibling != null && !(usingDeclaration.PrevSibling is UsingDeclaration || usingDeclaration.PrevSibling is UsingAliasDeclaration)) {
 				EnsureBlankLinesBefore(usingDeclaration, policy.BlankLinesBeforeUsings);
 			} else if (!(usingDeclaration.NextSibling is UsingDeclaration || usingDeclaration.NextSibling  is UsingAliasDeclaration)) {
+				FixIndentationForceNewLine(usingDeclaration.StartLocation);
 				EnsureBlankLinesAfter(usingDeclaration, policy.BlankLinesAfterUsings);
 			} else {
 				FixIndentationForceNewLine(usingDeclaration.StartLocation);
@@ -244,9 +268,10 @@ namespace ICSharpCode.NRefactory.CSharp
 
 		public override void VisitUsingAliasDeclaration(UsingAliasDeclaration usingDeclaration)
 		{
-			if (!(usingDeclaration.PrevSibling is UsingDeclaration || usingDeclaration.PrevSibling  is UsingAliasDeclaration)) {
+			if (usingDeclaration.PrevSibling != null && !(usingDeclaration.PrevSibling is UsingDeclaration || usingDeclaration.PrevSibling  is UsingAliasDeclaration)) {
 				EnsureBlankLinesBefore(usingDeclaration, policy.BlankLinesBeforeUsings);
 			} else if (!(usingDeclaration.NextSibling is UsingDeclaration || usingDeclaration.NextSibling  is UsingAliasDeclaration)) {
+				FixIndentationForceNewLine(usingDeclaration.StartLocation);
 				EnsureBlankLinesAfter(usingDeclaration, policy.BlankLinesAfterUsings);
 			} else {
 				FixIndentationForceNewLine(usingDeclaration.StartLocation);
@@ -852,7 +877,8 @@ namespace ICSharpCode.NRefactory.CSharp
 				rParToken = methodDeclaration.RParToken;
 				parameters = methodDeclaration.Parameters;
 			}
-			
+			if (FormattingMode == ICSharpCode.NRefactory.CSharp.FormattingMode.OnTheFly)
+				methodCallArgumentWrapping = Wrapping.DoNotChange;
 
 			bool wrapMethodCall = DoWrap(methodCallArgumentWrapping, rParToken, parameters.Count);
 			if (wrapMethodCall && parameters.Any()) {
@@ -1776,6 +1802,9 @@ namespace ICSharpCode.NRefactory.CSharp
 				arguments = invocationExpression.Arguments;
 			}
 
+			if (FormattingMode == ICSharpCode.NRefactory.CSharp.FormattingMode.OnTheFly)
+				methodCallArgumentWrapping = Wrapping.DoNotChange;
+
 			bool wrapMethodCall = DoWrap(methodCallArgumentWrapping, rParToken, arguments.Count);
 			if (wrapMethodCall && arguments.Any()) {
 				if (newLineAferMethodCallOpenParentheses) {
@@ -2058,6 +2087,10 @@ namespace ICSharpCode.NRefactory.CSharp
 			if (keywordNode == null || newLine == NewLinePlacement.DoNotCare) {
 				return;
 			}
+
+			var prev = keywordNode.GetPrevNode ();
+			if (prev is Comment || prev is PreProcessorDirective)
+				return;
 
 			int offset = document.GetOffset(keywordNode.StartLocation);
 			

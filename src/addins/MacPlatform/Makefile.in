@@ -387,7 +387,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic mostlyclean-am
+clean-am: clean-generic clean-local mostlyclean-am
 
 distclean: distclean-am
 	-rm -f Makefile
@@ -453,29 +453,36 @@ uninstall-am: uninstall-assemblyDATA
 
 .MAKE: install-am install-strip
 
-.PHONY: all all-am check check-am clean clean-generic distclean \
-	distclean-generic distdir dvi dvi-am html html-am info info-am \
-	install install-am install-assemblyDATA install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
+.PHONY: all all-am check check-am clean clean-generic clean-local \
+	distclean distclean-generic distdir dvi dvi-am html html-am \
+	info info-am install install-am install-assemblyDATA \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
 	pdf-am ps ps-am uninstall uninstall-am uninstall-assemblyDATA
 
 
-@ENABLE_MACPLATFORM_TRUE@all: $(MONOMAC) $(MONOMAC).mdb $(ASSEMBLY) $(ASSEMBLY).mdb
+@ENABLE_MACPLATFORM_TRUE@all: $(ASSEMBLY) $(ASSEMBLY).mdb
 @ENABLE_MACPLATFORM_FALSE@all:
 
-$(MONOMAC_SRC):
-	make -C $(top_srcdir)/external/monomac/src
-
-$(ASSEMBLY): $(MONOMAC_SRC) $(build_sources) $(build_resources) $(DEPS)
+$(ASSEMBLY): $(MONOMAC) $(build_sources) $(build_resources) $(DEPS)
 	mkdir -p $(ADDIN_BUILD)
 	$(CSC) $(CSC_FLAGS) -unsafe $(REFS) $(build_deps) $(build_resources:%=/resource:%) $(build_sources) -out:$@ -target:library
 
 $(ASSEMBLY).mdb: $(ASSEMBLY) $(MONOMAC).mdb
+
+monomac-build:
+	make -C $(top_srcdir)/external/monomac/src
+
+monomac-clean:
+	make -C $(top_srcdir)/external/monomac/src clean
+
+$(MONOMAC_SRC): monomac-build
+
+$(MONOMAC_SRC).mdb: monomac-build
 
 $(MONOMAC).mdb: $(MONOMAC_SRC).mdb
 	mkdir -p $(ADDIN_BUILD)
@@ -485,7 +492,9 @@ $(MONOMAC): $(MONOMAC_SRC)
 	mkdir -p $(ADDIN_BUILD)
 	cp $< $@
 
-.PHONY: $(MONOMAC_SRC)
+clean-local: monomac-clean
+
+.PHONY: monomac-build monomac-clean
 
 # workaroundfor lack of abs_top_builddir variable in automake < 1.10. Will break if mdtool isn't 
 # launched from top_srcdir (i.e. where this script is located)

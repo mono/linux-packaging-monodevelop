@@ -6,7 +6,7 @@
        url         = "http://monodevelop.com/"
        description = "Support for ASP.NET MVC projects."
        category    = "Web Development"
-       version     = "3.0.2">
+       version     = "3.0.3">
 	
 	<Runtime>
 		<Import file = "Templates/Controller.xft.xml"/>
@@ -20,15 +20,20 @@
 		<Import file = "Templates/WebConfigApp.xft.xml"/>
 		<Import file = "Templates/WebConfigViews.xft.xml"/>
 		<Import file = "CodeTemplates/AddView/Empty.tt" />
+		<Import file = "Templates/ProjectMvc3.xpt.xml" />
+		<Import file = "Templates/EmptyProjectMvc3.xpt.xml" />
+		<Import file = "Templates/GlobalAsaxMvc3.xft.xml" />
+		<Import file = "Templates/WebConfigAppMvc3.xft.xml" />
+		<Import file = "Templates/WebConfigViewsMvc3.xft.xml" />
 	</Runtime>
 	
 	<Dependencies>
-		<Addin id="Core" version="3.0.2"/>
-		<Addin id="Ide" version="3.0.2"/>
-		<Addin id="XmlEditor" version="3.0.2" />
-		<Addin id="AspNet" version="3.0.2" />
-		<Addin id="SourceEditor2" version="3.0.2" />
-		<Addin id="TextTemplating" version="3.0.2" />
+		<Addin id="Core" version="3.0.3"/>
+		<Addin id="Ide" version="3.0.3"/>
+		<Addin id="XmlEditor" version="3.0.3" />
+		<Addin id="AspNet" version="3.0.3" />
+		<Addin id="SourceEditor2" version="3.0.3" />
+		<Addin id="TextTemplating" version="3.0.3" />
 	</Dependencies>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/MSBuildItemTypes">
@@ -55,11 +60,21 @@
 		              file     = "Templates/WebConfigApp.xft.xml" />
 		<FileTemplate id       = "AspMvcWebConfigViews"
 		              file     = "Templates/WebConfigViews.xft.xml" />
+		<FileTemplate id       = "AspMvc3GlobalAsax"
+		              file     = "Templates/GlobalAsaxMvc3.xft.xml" />
+		<FileTemplate id       = "AspMvc3WebConfigApp"
+		              file     = "Templates/WebConfigAppMvc3.xft.xml" />
+		<FileTemplate id       = "AspMvc3WebConfigViews"
+		              file     = "Templates/WebConfigViewsMvc3.xft.xml" />
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/ProjectTemplates">
 		<ProjectTemplate id = "AspMvcProject" file = "Templates/Project.xpt.xml" />
 		<ProjectTemplate id = "AspMvcProject-Empty" file = "Templates/EmptyProject.xpt.xml"/>
+	<Condition id="AssemblyInstalled" name="System.Web.Mvc" minVersion="3.0.0.0">
+		<ProjectTemplate id = "AspMvc3Project" file = "Templates/ProjectMvc3.xpt.xml" />
+		<ProjectTemplate id = "AspMvc3Project-Empty" file = "Templates/EmptyProjectMvc3.xpt.xml" />
+	</Condition>
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/ProjectModel/ProjectBindings">

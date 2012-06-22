@@ -21,6 +21,8 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
+
+using System;
 using System.Runtime.InteropServices;
 using MonoMac.ObjCRuntime;
 
@@ -55,6 +57,17 @@ namespace MonoMac.Foundation {
 		GCHandle gch;
 		NSAction action;
 
+		// This ctor is so that the runtime can create a new instance of this class
+		// if ObjC wants to call release on an instance we've already called Dispose on.
+		// Since we detach the handle from the managed instance when Dispose is called,
+		// there is no way we can get the existing managed instance (which has possibly 
+		// been freed anyway) when ObjC calls release (which ends up in NSObject.NativeRelease).
+		[Obsolete ("Do not use")]
+		public NSAsyncActionDispatcher (IntPtr handle)
+			: base (handle)
+		{
+		}
+
 		public NSAsyncActionDispatcher (NSAction action)
 		{
 			this.action = action;
@@ -68,7 +81,9 @@ namespace MonoMac.Foundation {
 			try {
 				action ();
 			} finally {
+				action = null; // this is a one-shot dispatcher
 				gch.Free ();
+				Dispose ();
 			}
 		}
 	}

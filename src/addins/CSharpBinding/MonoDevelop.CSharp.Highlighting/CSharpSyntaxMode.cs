@@ -137,11 +137,12 @@ namespace MonoDevelop.CSharp.Highlighting
 				if (parsedDocument != null) {
 					unit = parsedDocument.GetAst<CompilationUnit> ();
 					parsedFile = parsedDocument.ParsedFile as CSharpParsedFile;
-					compilation = guiDocument.Compilation;
-					if (guiDocument.Project != null) {
+					if (guiDocument.Project != null && guiDocument.IsCompileableInProject) {
 						src = new CancellationTokenSource ();
 						var cancellationToken = src.Token;
 						System.Threading.Tasks.Task.Factory.StartNew (delegate {
+							Thread.Sleep (100);
+							compilation = guiDocument.Compilation;
 							var newResolver = new CSharpAstResolver (compilation, unit, parsedFile);
 							var visitor = new QuickTaskVisitor (newResolver, cancellationToken);
 							unit.AcceptVisitor (visitor);
@@ -158,10 +159,11 @@ namespace MonoDevelop.CSharp.Highlighting
 									var textEditor = editorData.Parent;
 									if (textEditor != null) {
 										var margin = textEditor.TextViewMargin;
-										if (!parsedDocument.HasErrors)
+										if (!parsedDocument.HasErrors) {
 											highlightedSegmentCache.Clear ();
-										margin.PurgeLayoutCache ();
-										textEditor.QueueDraw ();
+											margin.PurgeLayoutCache ();
+											textEditor.QueueDraw ();
+										}
 									}
 								});
 							}
@@ -290,6 +292,7 @@ namespace MonoDevelop.CSharp.Highlighting
 				guiDocument = null;
 			}
 			if (guiDocument != null) {
+
 				guiDocument.Closed += delegate {
 					if (src != null)
 						src.Cancel ();
@@ -452,6 +455,7 @@ namespace MonoDevelop.CSharp.Highlighting
 				foreach (var tag in CommentTag.SpecialCommentTags) {
 					tags.Add (tag.Tag);
 				}
+
 			}
 
 			#region IResolveVisitorNavigator implementation
@@ -500,7 +504,6 @@ namespace MonoDevelop.CSharp.Highlighting
 				var node = unit.GetNodeAt (loc, n => n is Identifier || n is AstType || n is CSharpTokenNode);
 				var word = wordbuilder.ToString ();
 				string color;
-
 				while (node != null && !(node is Statement || node is EntityDeclaration)) {
 					if (node is CSharpTokenNode || node is ICSharpCode.NRefactory.CSharp.Comment || node is PreProcessorDirective)
 						break;
@@ -797,9 +800,8 @@ namespace MonoDevelop.CSharp.Highlighting
 
 				public override object VisitBinaryOperatorExpression (BinaryOperatorExpression binaryOperatorExpression, object data)
 				{
-					bool left  = (bool)(binaryOperatorExpression.Left.AcceptVisitor (this, data) ?? (object)false);
+					bool left = (bool)(binaryOperatorExpression.Left.AcceptVisitor (this, data) ?? (object)false);
 					bool right = (bool)(binaryOperatorExpression.Right.AcceptVisitor (this, data) ?? (object)false);
-					
 					switch (binaryOperatorExpression.Operator) {
 					case BinaryOperatorType.InEquality:
 						return left != right;
@@ -813,6 +815,11 @@ namespace MonoDevelop.CSharp.Highlighting
 					
 					Console.WriteLine ("Unknown operator:" + binaryOperatorExpression.Operator);
 					return left;
+				}
+
+				public override object VisitParenthesizedExpression (ParenthesizedExpression parenthesizedExpression, object data)
+				{
+					return parenthesizedExpression.Expression.AcceptVisitor (this, data);
 				}
 			}
 			
@@ -853,9 +860,14 @@ namespace MonoDevelop.CSharp.Highlighting
 			}
 			IEnumerable<string> Defines {
 				get {
+					if (SpanStack == null)
+						yield break;
 					foreach (var span in SpanStack) {
-						if (span is DefineSpan)
-							yield return ((DefineSpan)span).Define;
+						if (span is DefineSpan) {
+							var define = ((DefineSpan)span).Define;
+							if (define != null)
+								yield return define;
+						}
 					}
 				}
 			}
@@ -902,13 +914,17 @@ namespace MonoDevelop.CSharp.Highlighting
 				DocumentLine line = doc.GetLineByOffset (i);
 				int length = line.Offset + line.Length - i;
 				string parameter = doc.GetTextAt (i + 5, length - 5);
-					
 				AstNode expr;
 				using (var reader = new StringReader (parameter)) {
 					expr = new CSharpParser ().ParseExpression (reader);
 				}
-				
-				bool result = expr != null && !expr.IsNull ? (bool)expr.AcceptVisitor (new ConditinalExpressionEvaluator (doc, Defines), null) : false;
+				bool result;
+				if (expr != null && !expr.IsNull) {
+					var visitResult = expr.AcceptVisitor (new ConditinalExpressionEvaluator (doc, Defines), null);
+					result = visitResult != null ? (bool)visitResult : false;
+				} else {
+					result = false;
+				}
 					
 				IfBlockSpan containingIf = null;
 				if (result) {
@@ -992,9 +1008,7 @@ namespace MonoDevelop.CSharp.Highlighting
 			void PopCurrentIfBlock ()
 			{
 				while (spanStack.Count > 0 && (spanStack.Peek () is IfBlockSpan || spanStack.Peek () is ElseIfBlockSpan || spanStack.Peek () is ElseBlockSpan)) {
-					var poppedSpan = spanStack.Pop ();
-					if (ruleStack.Count > 1) // rulStack[1] is always syntax mode
-						ruleStack.Pop ();
+					var poppedSpan = PopSpan ();
 					if (poppedSpan is IfBlockSpan)
 						break;
 				}

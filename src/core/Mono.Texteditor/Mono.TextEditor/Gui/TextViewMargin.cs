@@ -184,7 +184,7 @@ namespace Mono.TextEditor
 			int startLine = (int)(textEditor.GetTextEditorData ().VAdjustment.Value / LineHeight);
 			int endLine = (int)(startLine + textEditor.GetTextEditorData ().VAdjustment.PageSize / LineHeight) + 1;
 			foreach (DocumentLine line in layoutDict.Keys) {
-				int curLine = Document.OffsetToLineNumber (line.Offset);
+				int curLine = line.LineNumber;
 				if (startLine - 5 >= curLine || endLine + 5 <= curLine) {
 					linesToRemove.Add (line);
 				}
@@ -730,7 +730,7 @@ namespace Mono.TextEditor
 					DocumentLocation visStart = textEditor.LogicalToVisualLocation (start);
 					DocumentLocation visEnd = textEditor.LogicalToVisualLocation (end);
 					int lineOffset = line.Offset;
-					int lineNumber = Document.OffsetToLineNumber (lineOffset);
+					int lineNumber = line.LineNumber;
 					if (textEditor.MainSelection.MinLine <= lineNumber && lineNumber <= textEditor.MainSelection.MaxLine) {
 						selectionStart = lineOffset + line.GetLogicalColumn (this.textEditor.GetTextEditorData (), System.Math.Min (visStart.Column, visEnd.Column)) - 1;
 						selectionEnd = lineOffset + line.GetLogicalColumn (this.textEditor.GetTextEditorData (), System.Math.Max (visStart.Column, visEnd.Column)) - 1;
@@ -1671,6 +1671,10 @@ namespace Mono.TextEditor
 					int lineNr = Document.OffsetToLineNumber (offset);
 					textEditor.SetSelectLines (lineNr, lineNr);
 
+					var range = textEditor.SelectionRange;
+					mouseWordStart = range.Offset;
+					mouseWordEnd = range.EndOffset;
+
 					inSelectionDrag = true;
 					mouseSelectionMode = MouseSelectionMode.WholeLine;
 					return;
@@ -1713,16 +1717,18 @@ namespace Mono.TextEditor
 
 				bool autoScroll = textEditor.Caret.AutoScrollToCaret;
 				textEditor.Caret.AutoScrollToCaret = false;
+				if (selection != null && selectionRange.Contains (offset)) {
+					textEditor.ClearSelection ();
+					textEditor.Caret.Offset = selectionRange.EndOffset;
+					return;
+				}
+
 				int length = ClipboardActions.PasteFromPrimary (textEditor.GetTextEditorData (), offset);
 				textEditor.Caret.Offset = oldOffset;
 				if (selection != null) {
 					if (offset < selectionRange.EndOffset) {
-						oldOffset += length;
-						anchor += length;
-						selection = new Selection (Document.OffsetToLocation (selectionRange.Offset + length),
-						                           Document.OffsetToLocation (selectionRange.Offset + length + selectionRange.Length));
+						textEditor.SelectionRange = new TextSegment (selectionRange.Offset + length, selectionRange.Length);
 					}
-					textEditor.MainSelection = selection;
 				}
 
 				if (autoScroll)
@@ -1980,9 +1986,18 @@ namespace Mono.TextEditor
 				//textEditor.SetSelectLines (loc.Line, textEditor.MainSelection.Anchor.Line);
 				DocumentLine line1 = textEditor.Document.GetLine (loc.Line);
 				DocumentLine line2 = textEditor.Document.GetLineByOffset (textEditor.SelectionAnchor);
-				Caret.Offset = line1.Offset < line2.Offset ? line1.Offset : line1.EndOffsetIncludingDelimiter;
-				if (textEditor.MainSelection != null)
+				var o2 = line1.Offset < line2.Offset ? line1.Offset : line1.EndOffsetIncludingDelimiter;
+				Caret.Offset = o2;
+				if (textEditor.MainSelection != null) {
 					textEditor.MainSelection.Lead = Caret.Location;
+					if (mouseWordStart < o2) {
+						textEditor.MainSelection.Anchor = textEditor.OffsetToLocation (mouseWordStart);
+					} else {
+						textEditor.MainSelection.Anchor = textEditor.OffsetToLocation (mouseWordEnd);
+
+					}
+				}
+
 				break;
 			}
 			Caret.PreserveSelection = false;
@@ -2228,7 +2243,7 @@ namespace Mono.TextEditor
 
 					if (folding.EndLine != line) {
 						line = folding.EndLine;
-						lineNr = Document.OffsetToLineNumber (line.Offset);
+						lineNr = line.LineNumber;
 						foldings = Document.GetStartFoldings (line);
 						isEolFolded = line.Length <= folding.EndColumn;
 						goto restart;
@@ -2284,7 +2299,7 @@ namespace Mono.TextEditor
 						lineArea.Height);
 					} else {
 						// prevent "gaps" in the selection drawing ('fuzzy' lines problem)
-						lineArea = new Cairo.Rectangle (pangoPosition / Pango.Scale.PangoScale - 1,
+						lineArea = new Cairo.Rectangle (System.Math.Max (pangoPosition / Pango.Scale.PangoScale - 1, XOffset + TextStartPosition),
 						lineArea.Y,
 						textEditor.Allocation.Width - pangoPosition / Pango.Scale.PangoScale + 1,
 						lineArea.Height);
@@ -2645,7 +2660,7 @@ namespace Mono.TextEditor
 					continue;
 				return extendingTextMarker.GetLineHeight (textEditor);
 			}
-			int lineNumber = textEditor.OffsetToLineNumber (line.Offset); 
+			int lineNumber = line.LineNumber; 
 			var node = textEditor.GetTextEditorData ().HeightTree.GetNodeByLine (lineNumber);
 			if (node == null)
 				return LineHeight;

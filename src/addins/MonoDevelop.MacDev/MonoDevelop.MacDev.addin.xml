@@ -7,7 +7,7 @@
        description = "Mac Development Support for MonoDevelop"
        category    = "Mac Development"
        flags       = "Hidden"
-       version     = "3.0.2">
+       version     = "3.0.3">
 	
 	<Runtime>
 		<Import file = "icons/application-x-mono-develop-xib-16.png"/>
@@ -22,11 +22,11 @@
 	</Runtime>
 
 	<Dependencies>
-	    <Addin id="Ide" version="3.0.2"/>
-	    <Addin id="Core" version="3.0.2"/>
-	    <Addin id="MacPlatform" version="3.0.2"/>
-	    <Addin id="DesignerSupport" version="3.0.2"/>
-	    <Addin id="VersionControl" version="3.0.2" />
+	    <Addin id="Ide" version="3.0.3"/>
+	    <Addin id="Core" version="3.0.3"/>
+	    <Addin id="MacPlatform" version="3.0.3"/>
+	    <Addin id="DesignerSupport" version="3.0.3"/>
+	    <Addin id="VersionControl" version="3.0.3" />
 	</Dependencies>
 	
 	<ExtensionPoint path = "/MonoDevelop/MacDev/ContextMenu/ProjectPad/NativeReferenceFolder">
@@ -105,7 +105,7 @@
 	<Extension path = "/MonoDevelop/Ide/ContextMenu/ProjectPad/Add">
 		<Condition id="ItemType" value="DotNetProject">
 			<SeparatorItem insertafter = "MonoDevelop.Ide.Commands.ProjectCommands.AddFiles" />
-			<CommandItem id = "MonoDevelop.MacDev.NativeReferences.NativeReferenceCommands.Add"/>
+			<CommandItem id = "MonoDevelop.MacDev.NativeReferences.NativeReferenceCommands.Add" disabledVisible="false"/>
 		</Condition>
 	</Extension>
 	

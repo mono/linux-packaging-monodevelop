@@ -44,7 +44,13 @@ namespace MonoDevelop.CSharp.Parser
 			var parser = new ICSharpCode.NRefactory.CSharp.CSharpParser (GetCompilerArguments (project));
 			parser.GenerateTypeSystemMode = !storeAst;
 			var result = new ParsedDocumentDecorator ();
-			
+
+			if (project != null) {
+				var projectFile = project.Files.GetFile (fileName);
+				if (projectFile != null && projectFile.BuildAction != BuildAction.Compile)
+					result.Flags |= ParsedDocumentFlags.NonSerializable;
+			}
+
 			var tagComments = CommentTag.SpecialCommentTags.Select (t => t.Tag).ToArray ();
 			
 			parser.CompilationUnitCallback = delegate (CompilerCompilationUnit top) {
@@ -94,9 +100,32 @@ namespace MonoDevelop.CSharp.Parser
 		class FoldingVisitor : DepthFirstAstVisitor<object, object>
 		{
 			public readonly List<FoldingRegion> Foldings = new List<FoldingRegion> ();
-			
+
+			void AddUsings (AstNode parent)
+			{
+				var firstChild = parent.Children.FirstOrDefault (child => child is UsingDeclaration || child is UsingAliasDeclaration);
+				var node = firstChild;
+				while (node != null) {
+					var next = node.GetNextNode ();
+					if (next is UsingDeclaration || next is UsingAliasDeclaration) {
+						node = next;
+					} else {
+						break;
+					}
+				}
+				if (firstChild != node) {
+					Foldings.Add (new FoldingRegion (new DomRegion (firstChild.StartLocation, node.EndLocation), FoldType.Undefined));
+				}
+			}
+			public override object VisitCompilationUnit (CompilationUnit unit, object data)
+			{
+				AddUsings (unit);
+				return base.VisitCompilationUnit (unit, data);
+			}
+
 			public override object VisitNamespaceDeclaration (NamespaceDeclaration namespaceDeclaration, object data)
 			{
+				AddUsings (namespaceDeclaration);
 				if (!namespaceDeclaration.RBraceToken.IsNull)
 					Foldings.Add (new FoldingRegion (new DomRegion (namespaceDeclaration.LBraceToken.GetPrevNode ().EndLocation, namespaceDeclaration.RBraceToken.EndLocation), FoldType.Undefined));
 				return base.VisitNamespaceDeclaration (namespaceDeclaration, data);
@@ -201,9 +230,9 @@ namespace MonoDevelop.CSharp.Parser
 			}
 			cmt.Region = new DomRegion (comment.Line, comment.Col, comment.EndLine, comment.EndCol);
 			result.Comments.Add (cmt);
+			var trimmedContent = comment.Content.TrimStart ();
 			foreach (string tag in tagComments) {
-				int idx = comment.Content.IndexOf (tag);
-				if (idx < 0)
+				if (!trimmedContent.StartsWith (tag))
 					continue;
 				result.Add (new MonoDevelop.Ide.TypeSystem.Tag (tag, comment.Content, cmt.Region));
 			}
@@ -296,8 +325,12 @@ namespace MonoDevelop.CSharp.Parser
 		public static CompilerSettings GetCompilerArguments (MonoDevelop.Projects.Project project)
 		{
 			var compilerArguments = new CompilerSettings ();
-			if (project == null || MonoDevelop.Ide.IdeApp.Workspace == null)
+			compilerArguments.TabSize = 1;
+
+			if (project == null || MonoDevelop.Ide.IdeApp.Workspace == null) {
+				compilerArguments.Unsafe = true;
 				return compilerArguments;
+			}
 
 			var configuration = project.GetConfiguration (MonoDevelop.Ide.IdeApp.Workspace.ActiveConfiguration) as DotNetProjectConfiguration;
 			var par = configuration != null ? configuration.CompilationParameters as CSharpCompilerParameters : null;
@@ -313,16 +346,19 @@ namespace MonoDevelop.CSharp.Parser
 			compilerArguments.Unsafe = par.UnsafeCode;
 			compilerArguments.Version = ConvertLanguageVersion (par.LangVersion);
 			compilerArguments.Checked = par.GenerateOverflowChecks;
-			compilerArguments.TabSize = 1;
-			
-			// TODO: Warning options need to be set in the report object.
-			
-/*			compilerArguments.EnhancedWarnings = par.TreatWarningsAsErrors;
-			if (!string.IsNullOrEmpty (par.NoWarnings))
-				compilerArguments.Add ("-nowarn:" + string.Join (",", par.NoWarnings.Split (';', ',', ' ', '\t')));
-			
-			compilerArguments.Add ("-warn:" + par.WarningLevel);
-*/
+			compilerArguments.WarningLevel = par.WarningLevel;
+			compilerArguments.EnhancedWarnings = par.TreatWarningsAsErrors;
+			if (!string.IsNullOrEmpty (par.NoWarnings)) {
+				foreach (var warning in par.NoWarnings.Split (';', ',', ' ', '\t')) {
+					int w;
+					try {
+						w = int.Parse (warning);
+					} catch (Exception) {
+						continue;
+					}
+					compilerArguments.SetIgnoreWarning (w);
+				}
+			}
 			
 			return compilerArguments;
 		}

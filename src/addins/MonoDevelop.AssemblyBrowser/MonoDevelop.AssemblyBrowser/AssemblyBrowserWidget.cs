@@ -88,8 +88,9 @@ namespace MonoDevelop.AssemblyBrowser
 					if (publicApiOnly == value)
 						return;
 					publicApiOnly = value;
-					GetRootNode ().Options ["PublicApiOnly"] = publicApiOnly;
-					RefreshTree ();
+					var root = GetRootNode ();
+					if (root != null)
+						RefreshNode (root);
 				}
 			}
 
@@ -120,19 +121,20 @@ namespace MonoDevelop.AssemblyBrowser
 				new DomPropertyNodeBuilder (this),
 				new BaseTypeFolderNodeBuilder (this),
 				new BaseTypeNodeBuilder (this)
-				}, new TreePadOption [] {
-				new TreePadOption ("PublicApiOnly", GettextCatalog.GetString ("Show public members only"), true)
-			});
+				}, new TreePadOption [0]);
 			TreeView.Tree.Selection.Mode = Gtk.SelectionMode.Single;
 			TreeView.Tree.CursorChanged += HandleCursorChanged;
-			TreeView.ShadowType = ShadowType.In;
+			TreeView.ShadowType = ShadowType.None;
+			TreeView.BorderWidth = 1;
+			TreeView.ShowBorderLine = true;
+			TreeView.Zoom = 1.0;
 			treeViewPlaceholder.Add (TreeView);
 			treeViewPlaceholder.ShowAll ();
 			
 //			this.descriptionLabel.ModifyFont (Pango.FontDescription.FromString ("Sans 9"));
-			this.documentationLabel.ModifyFont (Pango.FontDescription.FromString ("Sans 12"));
-			this.documentationLabel.ModifyBg (Gtk.StateType.Normal, new Gdk.Color (255, 255, 225));
-			this.documentationLabel.Wrap = true;
+//			this.documentationLabel.ModifyFont (Pango.FontDescription.FromString ("Sans 12"));
+//			this.documentationLabel.ModifyBg (Gtk.StateType.Normal, new Gdk.Color (255, 255, 225));
+//			this.documentationLabel.Wrap = true;
 			
 			var options = new MonoDevelop.Ide.Gui.CommonTextEditorOptions () {
 				ShowFoldMargin = false,
@@ -373,6 +375,8 @@ namespace MonoDevelop.AssemblyBrowser
 		
 		static void AppendHelpParameterList (StringBuilder result, IList<IUnresolvedParameter> parameters)
 		{
+			if (parameters == null || parameters.Count == 0)
+				return;
 			result.Append ('(');
 			if (parameters != null) {
 				for (int i = 0; i < parameters.Count; i++) {
@@ -522,8 +526,7 @@ namespace MonoDevelop.AssemblyBrowser
 						return null;
 					}
 					try {
-						if (nav.DataItem is TypeDefinition && nav.Options ["PublicApiOnly"]) {
-							nav.Options ["PublicApiOnly"] = PublicApiOnly;
+						if (nav.DataItem is TypeDefinition && PublicApiOnly) {
 							nav.MoveToFirstChild ();
 							result = SearchMember (nav, helpUrl);
 							if (result != null)
@@ -1084,7 +1087,7 @@ namespace MonoDevelop.AssemblyBrowser
 					} catch (Exception) {
 					}
 				}
-				this.documentationLabel.Markup = documentation;
+//				this.documentationLabel.Markup = documentation;
 /*				IAssemblyBrowserNodeBuilder builder = nav.TypeNodeBuilder as IAssemblyBrowserNodeBuilder;
 				if (builder != null) {
 					this.descriptionLabel.Markup  = builder.GetDescription (nav);
