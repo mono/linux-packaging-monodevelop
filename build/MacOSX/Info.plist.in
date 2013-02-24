@@ -12,7 +12,7 @@
 				<string>sln</string>
 			</array>
 			<key>CFBundleTypeName</key>
-			<string>MonoDevelop Solution</string>
+			<string>@APP_NAME@ Solution</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSIsAppleDefaultForType</key>
@@ -26,7 +26,7 @@
 				<string>mdw</string>
 			</array>
 			<key>CFBundleTypeName</key>
-			<string>MonoDevelop Workspace</string>
+			<string>@APP_NAME@ Workspace</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSIsAppleDefaultForType</key>
@@ -48,7 +48,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string>monodevelop</string>
+	<string>MonoDevelop</string>
 	<key>CFBundleIconFile</key>
 	<string>monodevelop.icns</string>
 	<key>LSApplicationCategoryType</key>
@@ -60,7 +60,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>MonoDevelop</string>
+	<string>@APP_NAME@</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -73,5 +73,9 @@
 	<string>NO</string>
 	<key>QuartzGLEnable</key>
 	<false/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>ReleaseId</key>
+	<string>@RELEASE_ID@</string>
 </dict>
 </plist>

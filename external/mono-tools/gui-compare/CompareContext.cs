@@ -327,10 +327,15 @@ namespace GuiCompare {
 			while (m < reference_attrs.Count || a < target_attrs.Count) {
 				if (m == reference_attrs.Count) {
 					
-					if (target_attrs[a].Name == "System.Diagnostics.DebuggerDisplayAttribute") {
-						// Ignore additional debugging attributes in Mono source code
-					} else {
+					switch (target_attrs[a].Name) {
+						case "System.Diagnostics.DebuggerDisplayAttribute":
+						case "System.Runtime.CompilerServices.AsyncStateMachineAttribute":
+						case "System.Runtime.CompilerServices.IteratorStateMachineAttribute":
+							// Ignore extra attributes in Mono source code
+						break;
+					default:
 						AddExtra (parent, target_attrs[a]);
+						break;
 					}
 					
 					a++;
@@ -476,6 +481,16 @@ namespace GuiCompare {
 									comparison.Status = ComparisonStatus.Error;
 									break;
 								}
+							}
+							
+							if (m1[0].Name[0] == m2[0].Name[0]) {
+								CompareAttributes (comparison, (ICompAttributeContainer)m1[0], (ICompAttributeContainer)m2[0]);
+								if (m1.Count > 1)
+									CompareAttributes (comparison, (ICompAttributeContainer)m1[1], (ICompAttributeContainer)m2[1]);
+							} else {
+								CompareAttributes (comparison, (ICompAttributeContainer)m1[0], (ICompAttributeContainer)m2[1]);
+								if (m1.Count > 1)
+									CompareAttributes (comparison, (ICompAttributeContainer)m1[1], (ICompAttributeContainer)m2[0]);
 							}
 						}
 

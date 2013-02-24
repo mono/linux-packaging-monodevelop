@@ -1,0 +1,7 @@
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.gtk-gui.objects.xml
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.MonoDevelop.VersionControl.Subversion.addin.xml
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.gtk-gui.gui.stetic
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.dll.mdb
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.dll.mdb

@@ -18,14 +18,17 @@ namespace macdoc
 		}
 		
 		readonly string[] searchPaths = new[] {
+			"/Applications/Xcode.app/Contents/Developer/Documentation/DocSets/",
 			"/Library/Developer/Shared/Documentation/DocSets/",
 			"/Developer/Platforms/iPhoneOS.platform/Developer/Documentation/DocSets/"
 		};
 		const string MonodocLibPath = "/Library/Frameworks/Mono.framework/External/monodoc/";
 		const string MonoTouchLibPath = "/Developer/MonoTouch/usr/lib/mono/2.1/monotouch.dll";
 
-		public const string IosAtomFeed = "https://developer.apple.com/rss/com.apple.adc.documentation.AppleiPhone5_0.atom";
+		public const string Ios5AtomFeed = "https://developer.apple.com/rss/com.apple.adc.documentation.AppleiPhone5_0.atom";
+		public const string Ios6AtomFeed = "https://developer.apple.com/rss/com.apple.adc.documentation.AppleiPhone6.0.atom";
 		public const string MacLionAtomFeed = "http://developer.apple.com/rss/com.apple.adc.documentation.AppleLion.atom";
+		public const string MacMountainLionFeed = "https://developer.apple.com/rss/com.apple.adc.documentation.AppleOSX10_8.atom";
 
 		readonly XNamespace docsetNamespace = "http://developer.apple.com/rss/docset_extensions";
 		readonly XNamespace atomNamespace = "http://www.w3.org/2005/Atom";
@@ -110,7 +113,7 @@ namespace macdoc
 			return needRefresh;
 		}
 		
-		public bool CheckMergedDocumentationFreshness (AppleDocInformation infos)
+		public bool CheckMergedDocumentationFreshness (AppleDocInformation infos, Product product)
 		{
 			var statusFile = Path.Combine (baseApplicationPath, "macdoc");
 			if (!Directory.Exists (statusFile)) {
@@ -119,14 +122,13 @@ namespace macdoc
 				} catch {}
 				return true;
 			}
-			statusFile = Path.Combine (statusFile, "merge.status");
+			statusFile = Path.Combine (statusFile, product == Product.MonoMac ? "merge.mac.status" : "merge.status");
 			if (!File.Exists (statusFile))
 				return true;
 			if (!string.IsNullOrEmpty (Environment.GetEnvironmentVariable ("APPLEDOCWIZARD_FORCE_MERGE")))
 				return true;
 			
 			var mergedVersion = CloneFillWithZeros (new Version (File.ReadAllText (statusFile)));
-			
 			return mergedVersion != infos.Version;
 		}
 		

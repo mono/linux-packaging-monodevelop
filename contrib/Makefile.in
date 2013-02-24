@@ -134,12 +134,6 @@ MKDIR_P = @MKDIR_P@
 MONO = @MONO@
 MONODOC_CFLAGS = @MONODOC_CFLAGS@
 MONODOC_LIBS = @MONODOC_LIBS@
-MONO_ADDINS_CFLAGS = @MONO_ADDINS_CFLAGS@
-MONO_ADDINS_GUI_CFLAGS = @MONO_ADDINS_GUI_CFLAGS@
-MONO_ADDINS_GUI_LIBS = @MONO_ADDINS_GUI_LIBS@
-MONO_ADDINS_LIBS = @MONO_ADDINS_LIBS@
-MONO_ADDINS_SETUP_CFLAGS = @MONO_ADDINS_SETUP_CFLAGS@
-MONO_ADDINS_SETUP_LIBS = @MONO_ADDINS_SETUP_LIBS@
 MONO_GAC_PREFIX = @MONO_GAC_PREFIX@
 MONO_NUNIT_CFLAGS = @MONO_NUNIT_CFLAGS@
 MONO_NUNIT_LIBS = @MONO_NUNIT_LIBS@
@@ -208,7 +202,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = Mono.Debugger.Soft NRefactory ICSharpCode.NRefactory ICSharpCode.NRefactory.CSharp ICSharpCode.Decompiler 
+SUBDIRS = Mono.Debugger.Soft NRefactory ICSharpCode.Decompiler 
 EXTRA_DIST = $(srcdir)/extract_makefile_variable.sh
 all: all-recursive
 
@@ -549,35 +543,6 @@ uninstall-am:
 	mostlyclean mostlyclean-generic pdf pdf-am ps ps-am tags \
 	tags-recursive uninstall uninstall-am
 
-
-update-ngit:
-	rm -rf ngit-source
-	git clone --depth=1 git://github.com/mono/ngit.git ngit-source
-	cp NGit/Makefile Makefile.tmp
-	cp NGit/Makefile.in Makefile.tmp.in
-	cp NGit/Makefile.am Makefile.tmp.am
-	rm -rf NGit
-	cp -r ngit-source/NGit .
-	cp Makefile.tmp NGit/Makefile
-	cp Makefile.tmp.in NGit/Makefile.in
-	cp Makefile.tmp.am NGit/Makefile.am
-	cp NSch/Makefile Makefile.tmp
-	cp NSch/Makefile.in Makefile.tmp.in
-	cp NSch/Makefile.am Makefile.tmp.am
-	rm -rf NSch
-	cp -r ngit-source/NSch .
-	cp Makefile.tmp NSch/Makefile
-	cp Makefile.tmp.in NSch/Makefile.in
-	cp Makefile.tmp.am NSch/Makefile.am
-	cp Sharpen/Makefile Makefile.tmp
-	cp Sharpen/Makefile.in Makefile.tmp.in
-	cp Sharpen/Makefile.am Makefile.tmp.am
-	rm -rf Sharpen
-	cp -r ngit-source/Sharpen .
-	cp Makefile.tmp Sharpen/Makefile
-	cp Makefile.tmp.in Sharpen/Makefile.in
-	cp Makefile.tmp.am Sharpen/Makefile.am
-	rm -rf ngit-source
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

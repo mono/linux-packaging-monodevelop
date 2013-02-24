@@ -1,0 +1,8 @@
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.gtk-gui.gui.stetic
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.MonoDevelop.Deployment.Linux.DesktopInfo.xml
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.MonoDevelop.Deployment.Linux.addin.xml
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.app.desktop.xft.xml
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll.mdb
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.dll.mdb

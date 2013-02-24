@@ -42,9 +42,9 @@ namespace MonoDevelop.CSharp.Refactoring.CodeActions
 {
 	public class MoveTypeToFile : MonoDevelop.CodeActions.CodeActionProvider
 	{
-		public override IEnumerable<MonoDevelop.CodeActions.CodeAction> GetActions (MonoDevelop.Ide.Gui.Document document, TextLocation loc, CancellationToken cancellationToken)
+		public override IEnumerable<MonoDevelop.CodeActions.CodeAction> GetActions (MonoDevelop.Ide.Gui.Document document, object refactoringContext, TextLocation loc, CancellationToken cancellationToken)
 		{
-			var context = new MDRefactoringContext (document, loc);
+			var context = (MDRefactoringContext)refactoringContext;
 			return GetActions (context);
 		}
 		protected IEnumerable<MonoDevelop.CodeActions.CodeAction> GetActions (MDRefactoringContext context)
@@ -83,7 +83,7 @@ namespace MonoDevelop.CSharp.Refactoring.CodeActions
 		{
 			var content = context.Document.Editor.Text;
 			
-			var types = new List<TypeDeclaration> (context.Unit.GetTypes ().Where (t => t.StartLocation != type.StartLocation));
+			var types = new List<EntityDeclaration> (context.Unit.GetTypes ().Where (t => t.StartLocation != type.StartLocation));
 			types.Sort ((x, y) => y.StartLocation.CompareTo (x.StartLocation));
 
 			foreach (var removeType in types) {

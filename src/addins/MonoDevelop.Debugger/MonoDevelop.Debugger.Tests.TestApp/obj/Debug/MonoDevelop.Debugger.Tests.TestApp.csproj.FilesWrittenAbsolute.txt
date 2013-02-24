@@ -1,0 +1,4 @@
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/tests/MonoDevelop.Debugger.Tests.TestApp.exe.mdb
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/tests/MonoDevelop.Debugger.Tests.TestApp.exe
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests.TestApp/obj/Debug/MonoDevelop.Debugger.Tests.TestApp.exe
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests.TestApp/obj/Debug/MonoDevelop.Debugger.Tests.TestApp.exe.mdb

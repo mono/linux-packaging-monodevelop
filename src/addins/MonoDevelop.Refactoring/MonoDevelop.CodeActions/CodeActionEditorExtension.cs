@@ -33,6 +33,7 @@ using MonoDevelop.SourceEditor.QuickTasks;
 using System.Linq;
 using MonoDevelop.Refactoring;
 using ICSharpCode.NRefactory;
+using System.Threading;
 
 namespace MonoDevelop.CodeActions
 {
@@ -48,9 +49,14 @@ namespace MonoDevelop.CodeActions
 		
 		void RemoveWidget ()
 		{
+			/*
 			if (widget == null)
 				return;
-			widget.Hide ();
+			widget.Hide ();*/
+			if (widget != null) {
+				widget.Destroy ();
+				widget = null;
+			}
 		}
 		
 		public override void Dispose ()
@@ -81,21 +87,8 @@ namespace MonoDevelop.CodeActions
 				RemoveWidget ();
 				return;
 			}
-			if (!fixes.Any ()) {
-				ICSharpCode.NRefactory.Semantics.ResolveResult resolveResult;
-				ICSharpCode.NRefactory.CSharp.AstNode node;
-				if (ResolveCommandHandler.ResolveAt (document, out resolveResult, out node)) {
-					var possibleNamespaces = ResolveCommandHandler.GetPossibleNamespaces (document, node, resolveResult);
-					if (!possibleNamespaces.Any ()) {
-						RemoveWidget ();
-						return;
-					}
-				} else {
-					RemoveWidget ();
-					return;
-				}
-			}
-			var container = editor.Parent.Parent as TextEditorContainer;
+
+			var container = editor.Parent;
 			if (container == null) {
 				RemoveWidget ();
 				return;
@@ -105,6 +98,7 @@ namespace MonoDevelop.CodeActions
 				container.AddTopLevelWidget (widget,
 					2 + (int)editor.Parent.TextViewMargin.XOffset,
 					-2 + (int)editor.Parent.LineToY (document.Editor.Caret.Line));
+				widget.Show ();
 			} else {
 				if (!widget.Visible)
 					widget.Show ();
@@ -117,21 +111,44 @@ namespace MonoDevelop.CodeActions
 
 		public void CancelQuickFixTimer ()
 		{
+			if (quickFixCancellationTokenSource != null)
+				quickFixCancellationTokenSource.Cancel ();
 			if (quickFixTimeout != 0) {
 				GLib.Source.Remove (quickFixTimeout);
 				quickFixTimeout = 0;
 			}
 		}
 
+		CancellationTokenSource quickFixCancellationTokenSource;
+
 		public override void CursorPositionChanged ()
 		{
 			CancelQuickFixTimer ();
-
-			if (QuickTaskStrip.EnableFancyFeatures &&  Document.ParsedDocument != null) {
+			if (QuickTaskStrip.EnableFancyFeatures &&  Document.ParsedDocument != null && !Debugger.DebuggingService.IsDebugging) {
+				quickFixCancellationTokenSource = new CancellationTokenSource ();
+				var token = quickFixCancellationTokenSource.Token;
 				quickFixTimeout = GLib.Timeout.Add (100, delegate {
 					var loc = Document.Editor.Caret.Location;
-					RefactoringService.QueueQuickFixAnalysis (Document, loc, delegate(List<CodeAction> fixes) {
+					RefactoringService.QueueQuickFixAnalysis (Document, loc, token, delegate(List<CodeAction> fixes) {
+						if (!fixes.Any ()) {
+							ICSharpCode.NRefactory.Semantics.ResolveResult resolveResult;
+							ICSharpCode.NRefactory.CSharp.AstNode node;
+							if (ResolveCommandHandler.ResolveAt (document, out resolveResult, out node, token)) {
+								var possibleNamespaces = ResolveCommandHandler.GetPossibleNamespaces (document, node, ref resolveResult);
+								if (!possibleNamespaces.Any ()) {
+									if (widget != null)
+										Application.Invoke (delegate { RemoveWidget (); });
+									return;
+								}
+							} else {
+								if (widget != null)
+									Application.Invoke (delegate { RemoveWidget (); });
+								return;
+							}
+						}
 						Application.Invoke (delegate {
+							if (token.IsCancellationRequested)
+								return;
 							CreateWidget (fixes, loc);
 							quickFixTimeout = 0;
 						});
@@ -164,12 +181,24 @@ namespace MonoDevelop.CodeActions
 		[CommandUpdateHandler(RefactoryCommands.QuickFix)]
 		public void UpdateQuickFixCommand (CommandInfo ci)
 		{
-			ci.Enabled = widget != null && widget.Visible;
+			if (QuickTaskStrip.EnableFancyFeatures) {
+				ci.Enabled = widget != null && widget.Visible;
+			} else {
+				ci.Enabled = true;
+			}
 		}
 		
 		[CommandHandler(RefactoryCommands.QuickFix)]
 		void OnQuickFixCommand ()
 		{
+
+			if (!QuickTaskStrip.EnableFancyFeatures) {
+				var w = new CodeActionWidget (this, Document);
+				w.SetFixes (RefactoringService.GetValidActions (Document, Document.Editor.Caret.Location).Result, Document.Editor.Caret.Location);
+				w.PopupQuickFixMenu ();
+				w.Destroy ();
+				return;
+			}
 			if (widget == null || !widget.Visible)
 				return;
 			widget.PopupQuickFixMenu ();

@@ -195,13 +195,16 @@ namespace MonoDevelop.Refactoring
 				var result = new List<MonoDevelop.CodeActions.CodeAction> ();
 				try {
 					var editor = doc.Editor;
-					if (editor != null) {
-						string disabledNodes = PropertyService.Get ("ContextActions." + editor.Document.MimeType, "") ?? "";
-						foreach (var provider in contextActions.Where (fix => disabledNodes.IndexOf (fix.IdString) < 0)) {
-							try {
-								result.AddRange (provider.GetActions (doc, loc, cancellationToken));
-							} catch (Exception ex) {
-								LoggingService.LogError ("Error in context action provider " + provider.Title, ex);
+					if (editor != null && doc.ParsedDocument != null) {
+						var ctx = doc.ParsedDocument.CreateRefactoringContext (doc, cancellationToken);
+						if (ctx != null) {
+							string disabledNodes = PropertyService.Get ("ContextActions." + editor.Document.MimeType, "") ?? "";
+							foreach (var provider in contextActions.Where (fix => disabledNodes.IndexOf (fix.IdString) < 0)) {
+								try {
+									result.AddRange (provider.GetActions (doc, ctx, loc, cancellationToken));
+								} catch (Exception ex) {
+									LoggingService.LogError ("Error in context action provider " + provider.Title, ex);
+								}
 							}
 						}
 					}
@@ -212,7 +215,7 @@ namespace MonoDevelop.Refactoring
 			}, cancellationToken);
 		}
 
-		public static void QueueQuickFixAnalysis (MonoDevelop.Ide.Gui.Document doc, TextLocation loc, Action<List<MonoDevelop.CodeActions.CodeAction>> callback)
+		public static void QueueQuickFixAnalysis (MonoDevelop.Ide.Gui.Document doc, TextLocation loc, CancellationToken token, Action<List<MonoDevelop.CodeActions.CodeAction>> callback)
 		{
 			System.Threading.ThreadPool.QueueUserWorkItem (delegate {
 				try {
@@ -220,7 +223,9 @@ namespace MonoDevelop.Refactoring
 
 					var ext = doc.GetContent<MonoDevelop.AnalysisCore.Gui.ResultsEditorExtension> ();
 					if (ext != null) {
-						foreach (var r in ext.GetResultsAtOffset (doc.Editor.LocationToOffset (loc)).OrderBy (r => r.Level)) {
+						foreach (var r in ext.GetResultsAtOffset (doc.Editor.LocationToOffset (loc), token).OrderBy (r => r.Level)) {
+							if (token.IsCancellationRequested)
+								return;
 							var fresult = r as FixableResult;
 							if (fresult == null)
 								continue;
@@ -249,9 +254,8 @@ namespace MonoDevelop.Refactoring
 				return editor.MainSelection.Start;
 
 			var line = editor.GetLine (location.Line);
-			if (line == null || location.Column >= line.Length)
+			if (line == null || location.Column > line.LengthIncludingDelimiter)
 				return location;
-
 			int offset = editor.LocationToOffset (location);
 			if (offset > 0 && !char.IsLetterOrDigit (doc.Editor.GetCharAt (offset)) && char.IsLetterOrDigit (doc.Editor.GetCharAt (offset - 1)))
 				return new DocumentLocation (location.Line, location.Column - 1);

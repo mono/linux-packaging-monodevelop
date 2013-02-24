@@ -1,0 +1,6 @@
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.AssemblyBrowser/obj/Debug/MonoDevelop.AssemblyBrowser.gtk-gui.gui.stetic
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.AssemblyBrowser/obj/Debug/MonoDevelop.AssemblyBrowser.MonoDevelop.AssemblyBrowser.addin.xml
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/DisplayBindings/AssemblyBrowser/MonoDevelop.AssemblyBrowser.dll.mdb
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/DisplayBindings/AssemblyBrowser/MonoDevelop.AssemblyBrowser.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.AssemblyBrowser/obj/Debug/MonoDevelop.AssemblyBrowser.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.AssemblyBrowser/obj/Debug/MonoDevelop.AssemblyBrowser.dll.mdb

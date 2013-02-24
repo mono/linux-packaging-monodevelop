@@ -41,9 +41,9 @@ namespace Mono.TextEditor
 	
 	public class TextEditorData : IDisposable
 	{
-		ITextEditorOptions options;
+		ITextEditorOptions    options;
 		readonly TextDocument document; 
-		Caret      caret;
+		readonly Caret        caret;
 		
 		static Adjustment emptyAdjustment = new Adjustment (0, 0, 0, 0, 0, 0);
 		
@@ -103,6 +103,27 @@ namespace Mono.TextEditor
 			protected set;
 		}
 
+		ISelectionSurroundingProvider selectionSurroundingProvider = new DefaultSelectionSurroundingProvider ();
+		public ISelectionSurroundingProvider SelectionSurroundingProvider {
+			get {
+				return selectionSurroundingProvider;
+			}
+			set {
+				if (value == null)
+					throw new ArgumentNullException ("surrounding provider needs to be != null");
+				selectionSurroundingProvider = value;
+			}
+		}
+
+		bool? customTabsToSpaces;
+		public bool TabsToSpaces {
+			get {
+				return customTabsToSpaces.HasValue ? customTabsToSpaces.Value : options.TabsToSpaces;
+			}
+			set {
+				customTabsToSpaces = value;
+			}
+		}
 		
 		public TextEditorData () : this (new TextDocument ())
 		{
@@ -142,9 +163,13 @@ namespace Mono.TextEditor
 
 		void HandleDocTextSet (object sender, EventArgs e)
 		{
-			caret.SetDocument (document);
+			if (vadjustment != null)
+				vadjustment.Value = vadjustment.Lower;
+			if (hadjustment != null)
+				hadjustment.Value = hadjustment.Lower;
 			HeightTree.Rebuild ();
 			ClearSelection ();
+			caret.SetDocument (document);
 		}
 
 		public double GetLineHeight (DocumentLine line)
@@ -175,7 +200,7 @@ namespace Mono.TextEditor
 
 		void HandleTextReplaced (object sender, DocumentChangeEventArgs e)
 		{
-			caret.UpdateCaretPosition ();
+			caret.UpdateCaretPosition (e);
 		}
 
 
@@ -216,7 +241,7 @@ namespace Mono.TextEditor
 		ColorScheme colorStyle;
 		public ColorScheme ColorStyle {
 			get {
-				return colorStyle ?? ColorScheme.Empty;
+				return colorStyle ?? Mono.TextEditor.Highlighting.SyntaxModeService.DefaultColorStyle;
 			}
 			set {
 				colorStyle = value;
@@ -335,7 +360,7 @@ namespace Mono.TextEditor
 			if (string.IsNullOrEmpty (str))
 				return "";
 			StringBuilder sb = new StringBuilder ();
-			bool convertTabs = Options.TabsToSpaces;
+			bool convertTabs = TabsToSpaces;
 			
 			for (int i = 0; i < str.Length; i++) {
 				char ch = str [i];
@@ -425,7 +450,8 @@ namespace Mono.TextEditor
 			document.Undone -= DocumentHandleUndone;
 			document.Redone -= DocumentHandleRedone;
 			document.LineChanged -= HandleDocLineChanged;
-			
+			document.TextReplaced -= HandleTextReplaced;
+
 			document.TextSet -= HandleDocTextSet;
 			document.Folded -= HandleTextEditorDataDocumentFolded;
 			document.FoldTreeUpdated -= HandleFoldTreeUpdated;
@@ -862,6 +888,8 @@ namespace Mono.TextEditor
 			using (var undo = OpenUndoGroup ()) {
 				EnsureCaretIsNotVirtual ();
 				foreach (Selection selection in Selections) {
+					EnsureIsNotVirtual (selection.Anchor);
+					EnsureIsNotVirtual (selection.Lead);
 					var segment = selection.GetSelectionRange (this);
 					needUpdate |= Document.OffsetToLineNumber (segment.Offset) != Document.OffsetToLineNumber (segment.EndOffset);
 					DeleteSelection (selection);
@@ -1075,22 +1103,32 @@ namespace Mono.TextEditor
 		/// </summary>
 		public int EnsureCaretIsNotVirtual ()
 		{
+			return EnsureIsNotVirtual (Caret.Location);
+		}
+
+		int EnsureIsNotVirtual (DocumentLocation loc)
+		{
+			return EnsureIsNotVirtual (loc.Line, loc.Column);
+		}
+
+		int EnsureIsNotVirtual (int line, int column)
+		{
 			Debug.Assert (document.IsInAtomicUndo);
-			DocumentLine line = Document.GetLine (Caret.Line);
-			if (line == null)
+			DocumentLine documentLine = Document.GetLine (line);
+			if (documentLine == null)
 				return 0;
-			if (Caret.Column > line.Length + 1) {
+			if (column > documentLine.Length + 1) {
 				string virtualSpace;
-				if (HasIndentationTracker && line.Length == 0) {
-					virtualSpace = GetIndentationString (Caret.Location);
+				if (HasIndentationTracker && documentLine.Length == 0) {
+					virtualSpace = GetIndentationString (line, column);
 				} else {
-					virtualSpace = new string (' ', Caret.Column - 1 - line.Length);
+					virtualSpace = new string (' ', column - 1 - documentLine.Length);
 				}
 				var oldPreserve = Caret.PreserveSelection;
 				Caret.PreserveSelection = true;
-				Insert (Caret.Offset, virtualSpace);
+				Insert (documentLine.Offset, virtualSpace);
 				Caret.PreserveSelection = oldPreserve;
-			
+				
 				// No need to reposition the caret, because it's already at the correct position
 				// The only difference is that the position is not virtual anymore.
 				return virtualSpace.Length;
@@ -1263,12 +1301,7 @@ namespace Mono.TextEditor
 		#endregion
 		
 		#region Parent functions
-		public bool HasFocus {
-			get {
-				return Parent != null ? Parent.HasFocus : false;
-			}
-		}
-		
+
 		public void ScrollToCaret ()
 		{
 			if (Parent != null)

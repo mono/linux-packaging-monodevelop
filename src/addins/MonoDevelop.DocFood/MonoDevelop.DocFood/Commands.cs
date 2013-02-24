@@ -90,7 +90,7 @@ namespace MonoDevelop.DocFood
 					if (!NeedsDocumentation (data, member))
 						continue;
 					int offset;
-					var ctx = (unit.ParsedFile as CSharpParsedFile).GetTypeResolveContext (document.Compilation, member.Region.Begin);
+					var ctx = (unit.ParsedFile as CSharpUnresolvedFile).GetTypeResolveContext (document.Compilation, member.Region.Begin);
 					var resolvedMember = member.CreateResolved (ctx);
 					string indent = GetIndent (data, resolvedMember, out offset);
 					string documentation = GenerateDocumentation (data, resolvedMember, indent);
@@ -107,15 +107,12 @@ namespace MonoDevelop.DocFood
 		
 		static bool NeedsDocumentation (TextEditorData data, IUnresolvedEntity member)
 		{
-			int lineNr = member.Region.BeginLine;
+			int lineNr = member.Region.BeginLine - 1;
 			DocumentLine line;
 			do {
 				line = data.Document.GetLine (lineNr--);
 			} while (lineNr > 0 && data.Document.GetLineIndent (line).Length == line.Length);
-			int start = data.Document.GetLineIndent (line).Length;
-			if (start + 3 < line.Length && data.Document.GetTextAt (start, 3) == "///")
-				return false;
-			return true;
+			return !data.Document.GetTextAt (line).TrimStart ().StartsWith ("///", StringComparison.Ordinal);
 		}
 		
 		static string GetIndent (TextEditorData data, IEntity member, out int offset)
@@ -154,14 +151,20 @@ namespace MonoDevelop.DocFood
 				foreach (var attr in section.Attributes) {
 					result.Append (" ");
 					result.Append (attr.Key);
-					result.Append ("='");
+					result.Append ("=\"");
 					result.Append (attr.Value);
-					result.Append ("'");
+					result.Append ("\"");
 				}
-				result.AppendLine (">");
-				
-				result.Append (indent);
-				result.Append (prefix);
+				if (section.Name == "summary")
+				{
+					result.AppendLine (">");
+					result.Append (indent);
+					result.Append (prefix);
+				}
+				else
+				{
+					result.Append (">");
+				}
 				bool inTag = false;
 				int column = indent.Length + prefix.Length;
 				StringBuilder curWord = new StringBuilder ();
@@ -170,7 +173,16 @@ namespace MonoDevelop.DocFood
 						inTag = true;
 					if (ch == '>')
 						inTag = false;
-					if (!inTag && char.IsWhiteSpace (ch)) {
+
+					if (ch =='\n') {
+						result.Append (curWord.ToString ());
+						curWord.Length = 0;
+
+						result.AppendLine ();
+						result.Append (indent);
+						result.Append (prefix);
+						column = indent.Length + prefix .Length;
+					} else if (!inTag && char.IsWhiteSpace (ch)) {
 						if (column + curWord.Length > 120) {
 							result.Length--; // trunk last char white space.
 							result.AppendLine ();
@@ -186,10 +198,17 @@ namespace MonoDevelop.DocFood
 						curWord.Append (ch);
 					}
 				}
-				result.AppendLine (curWord.ToString ());
-				
-				result.Append (indent);
-				result.Append (prefix);
+				if (section.Name == "summary")
+				{
+					result.AppendLine(curWord.ToString ());
+					result.Append(indent);
+					result.Append(prefix);
+				}
+				else
+				{
+					result.Append(curWord.ToString ());
+				}
+
 				result.Append ("</");
 				result.Append (section.Name);
 				result.Append (">");
@@ -220,20 +239,28 @@ namespace MonoDevelop.DocFood
 				foreach (var attr in section.Attributes) {
 					result.Append (" ");
 					result.Append (attr.Key);
-					result.Append ("='");
+					result.Append ("=\"");
 					result.Append (attr.Value);
-					result.Append ("'");
+					result.Append ("\"");
 				}
-				result.AppendLine (">");
-				
-				result.Append (indent);
-				result.Append ("/// ");
+				if (section.Name == "summary")
+				{
+					result.AppendLine (">");
+					result.Append (indent);
+					result.Append ("/// ");
+					result.AppendLine ();
+					result.Append (indent);
+					result.Append ("/// ");
+				}
+				else
+				{
+					result.Append (">");
+				}
+
 //				bool inTag = false;
 //				int column = indent.Length + "/// ".Length;
-				
-				result.AppendLine ();
-				result.Append (indent);
-				result.Append ("/// </");
+
+				result.Append ("</");
 				result.Append (section.Name);
 				result.Append (">");
 			}

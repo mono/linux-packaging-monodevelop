@@ -24,34 +24,28 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-
 using System;
 using System.Collections.Generic;
 
 namespace MonoDevelop.Core.Text
 {
-	class BacktrackingStringMatcher: StringMatcher
+	class BacktrackingStringMatcher : StringMatcher
 	{
 		readonly string filterTextUpperCase;
-
-		readonly bool[] filterTextLowerCaseTable;
-		readonly bool[] filterIsNonLetter;
-		readonly bool[] filterIsDigit;
+		readonly ulong filterTextLowerCaseTable;
+		readonly ulong filterIsNonLetter;
+		readonly ulong filterIsDigit;
 		readonly string filterText;
-
 		int[] cachedResult;
 
 		public BacktrackingStringMatcher (string filterText)
 		{
 			this.filterText = filterText ?? "";
 			if (filterText != null) {
-				filterTextLowerCaseTable = new bool[filterText.Length];
-				filterIsNonLetter = new bool[filterText.Length];
-				filterIsDigit = new bool[filterText.Length];
-				for (int i = 0; i < filterText.Length; i++) {
-					filterTextLowerCaseTable [i] = char.IsLower (filterText [i]);
-					filterIsNonLetter [i] = !char.IsLetterOrDigit (filterText [i]);
-					filterIsDigit [i] = char.IsDigit (filterText [i]);
+				for (int i = 0; i < filterText.Length && i < 64; i++) {
+					filterTextLowerCaseTable |= char.IsLower (filterText [i]) ? 1ul << i : 0;
+					filterIsNonLetter |= !char.IsLetterOrDigit (filterText [i]) ? 1ul << i : 0;
+					filterIsDigit |= char.IsDigit (filterText [i]) ? 1ul << i : 0;
 				}
 				
 				filterTextUpperCase = filterText.ToUpper ();
@@ -68,6 +62,23 @@ namespace MonoDevelop.Core.Text
 			}
 			var lane = GetMatch (name);
 			if (lane != null) {
+				if (name.Length == filterText.Length) {
+					matchRank = int.MaxValue;
+					for (int n = 0; n < name.Length; n++) {
+						if (filterText[n] != name[n])
+							matchRank--;
+					}
+					return true;
+				}
+				// exact named parameter case see discussion in bug #9114
+				if (name.Length - 1  == filterText.Length && name[name.Length - 1] == ':') {
+					matchRank = int.MaxValue - 1;
+					for (int n = 0; n < name.Length - 1; n++) {
+						if (filterText[n] != name[n])
+							matchRank--;
+					}
+					return true;
+				}
 				int capitalMatches = 0;
 				int nonCapitalMatches = 0;
 				int matching = 0;
@@ -89,11 +100,14 @@ namespace MonoDevelop.Core.Text
 						if (char.IsUpper (ch))
 							capitalMatches += Math.Max (1, 1000 - 100 * fragments);
 					} else {
-						var x = 100 * (i + 1) / (1 + fragments);
+						var x = 600  / (1 + fragments);
 						nonCapitalMatches += x;
 					}
 				}
-				matchRank = capitalMatches + matching - fragments + nonCapitalMatches;
+				matchRank = capitalMatches + matching - fragments + nonCapitalMatches + filterText.Length - name.Length;
+				// devalue named parameters.
+				if (name[name.Length - 1] == ':')
+					matchRank /= 2;
 				return true;
 			}
 			matchRank = int.MinValue;
@@ -111,47 +125,63 @@ namespace MonoDevelop.Core.Text
 		int GetMatchChar (string text, int i, int j, bool onlyWordStart)
 		{
 			char filterChar = filterTextUpperCase [i];
+			char ch;
 			// filter char is no letter -> next char should match it - see Bug 674512 - Space doesn't commit generics
-			if (filterIsNonLetter [i]) {
-				if (filterChar == text [j])
-					return j;
+			var flag = 1ul << i;
+			if ((filterIsNonLetter & flag) != 0) {
+				for (; j < text.Length; j++) {
+					if (filterChar == text [j])
+						return j;
+				}
 				return -1;
 			}
 			// letter case
-			bool textCharIsUpper = char.IsUpper (text [j]);
-			if (!onlyWordStart && filterChar == (textCharIsUpper ? text [j] : char.ToUpper (text [j]))) {
+			ch = text [j];
+			bool textCharIsUpper = char.IsUpper (ch);
+			if (!onlyWordStart && filterChar == (textCharIsUpper ? ch : char.ToUpper (ch))) {
 				// cases don't match. Filter is upper char & letter is low, now prefer the match that does the word skip.
-				if (!(textCharIsUpper || filterTextLowerCaseTable [i]) && j + 1 < text.Length) {
+				if (!(textCharIsUpper || (filterTextLowerCaseTable & flag) != 0) && j + 1 < text.Length) {
 					int possibleBetterResult = GetMatchChar (text, i, j + 1, onlyWordStart);
 					if (possibleBetterResult >= 0)
 						return possibleBetterResult;
 				}
 				return j;
 			}
-			bool filterCharIsDigit = filterIsDigit [i];
 			// no match, try to continue match at the next word start
-			j++;
+			
+			bool lastWasLower = false;
+			bool lastWasUpper = false;
+			int wordStart = j + 1;
 			for (; j < text.Length; j++) {
 				// word start is either a upper case letter (FooBar) or a char that follows a non letter
 				// like foo:bar 
-				if ((char.IsUpper (text [j]) || filterCharIsDigit) && filterChar == text [j] || 
-					(filterChar == char.ToUpper (text [j]) && j > 0 && !char.IsLetterOrDigit (text [j - 1]))) {
-					if (HasLetter (text, j))
+				ch = text [j];
+				var category = char.GetUnicodeCategory (ch);
+				if (category == System.Globalization.UnicodeCategory.LowercaseLetter) {
+					if (lastWasUpper && (j - wordStart) > 0) {
+						if (filterChar == char.ToUpper (text [j - 1]))
+							return j - 1;
+					}
+					lastWasLower = true;
+					lastWasUpper = false;
+				} else if (category == System.Globalization.UnicodeCategory.UppercaseLetter) {
+					if (lastWasLower) {
+						if (filterChar == char.ToUpper (ch))
+							return j;
+					}
+					lastWasLower = false;
+					lastWasUpper = true;
+				} else {
+					if (filterChar == ch)
 						return j;
-				}
+					if (j + 1 < text.Length && filterChar == char.ToUpper (text [j + 1]))
+						return j + 1;
+					lastWasLower = lastWasUpper = false;
+				} 
 			}
 			return -1;
 		}
 
-		static bool HasLetter (string text, int i)
-		{
-			for (int j = 0; j < i; j++) {
-				var ch = text [j];
-				if (ch == '_' || char.IsLetterOrDigit (ch)) 
-					return true;
-			}
-			return false;
-		}		
 		/// <summary>
 		/// Gets the match indices.
 		/// </summary>
@@ -165,7 +195,7 @@ namespace MonoDevelop.Core.Text
 		{
 			if (string.IsNullOrEmpty (filterTextUpperCase))
 				return new int[0];
-			if (string.IsNullOrEmpty (text))
+			if (string.IsNullOrEmpty (text) || filterText.Length  > text.Length)
 				return null;
 			int[] result;
 			if (cachedResult != null) {
@@ -176,10 +206,10 @@ namespace MonoDevelop.Core.Text
 			int j = 0;
 			int i = 0;
 			bool onlyWordStart = false;
-			while (i < filterTextUpperCase.Length) {
+			while (i < filterText.Length) {
 				if (j >= text.Length) {
 					if (i > 0) {
-						j = result[--i] + 1;
+						j = result [--i] + 1;
 						onlyWordStart = true;
 						continue;
 					}
@@ -189,13 +219,13 @@ namespace MonoDevelop.Core.Text
 				onlyWordStart = false;
 				if (j == -1) {
 					if (i > 0) {
-						j = result[--i] + 1;
+						j = result [--i] + 1;
 						onlyWordStart = true;
 						continue;
 					}
 					return null;
 				} else {
-					result[i] = j++;
+					result [i] = j++;
 				}
 				i++;
 			}

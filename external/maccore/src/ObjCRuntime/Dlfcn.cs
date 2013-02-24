@@ -6,6 +6,7 @@
 //   Miguel de Icaza.
 //
 // Copyright 2009-2010, Novell, Inc.
+// Copyright 2011, 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -30,6 +31,7 @@
 using System;
 using System.Runtime.InteropServices;
 using MonoMac.Foundation;
+using System.Drawing;
 
 namespace MonoMac.ObjCRuntime {
 	
@@ -44,8 +46,14 @@ namespace MonoMac.ObjCRuntime {
 		[DllImport (Constants.SystemLibrary)]
 		public static extern IntPtr dlsym (IntPtr handle, string symbol);
 
-		[DllImport (Constants.SystemLibrary)]
-		public static extern string dlerror ();
+		[DllImport (Constants.SystemLibrary, EntryPoint="dlerror")]
+		internal static extern IntPtr dlerror_ ();
+
+		public static string dlerror ()
+		{
+			// we can't free the string returned from dlerror
+			return Marshal.PtrToStringAnsi (dlerror_ ());
+		}
 
 		public static NSString GetStringConstant (IntPtr handle, string symbol)
 		{
@@ -84,12 +92,67 @@ namespace MonoMac.ObjCRuntime {
 			return Marshal.ReadInt32 (indirect);
 		}
 
+		public static void SetInt32 (IntPtr handle, string symbol, int value)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return;
+			Marshal.WriteInt32 (indirect, value);
+		}
+		
+		public static long GetInt64 (IntPtr handle, string symbol)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return 0;
+			return Marshal.ReadInt64 (indirect);
+		}
+		
+		public static void SetInt64 (IntPtr handle, string symbol, long value)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return;
+			Marshal.WriteInt64 (indirect, value);
+		}
+
 		public static IntPtr GetIntPtr (IntPtr handle, string symbol)
 		{
 			var indirect = dlsym (handle, symbol);
 			if (indirect == IntPtr.Zero)
 				return IntPtr.Zero;
 			return Marshal.ReadIntPtr (indirect);
+		}
+
+		public static void SetIntPtr (IntPtr handle, string symbol, IntPtr value)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return;
+			Marshal.WriteIntPtr (indirect, value);
+		}
+
+		public static SizeF GetSizeF (IntPtr handle, string symbol)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return SizeF.Empty;
+			unsafe {
+				float *ptr = (float *) indirect;
+				return new SizeF (ptr [0], ptr [1]);
+			}
+		}
+
+		public static void SetSizeF (IntPtr handle, string symbol, SizeF value)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return;
+			unsafe {
+				float *ptr = (float *) indirect;
+				ptr [0] = value.Width;
+				ptr [1] = value.Height;
+			}
 		}
 
 		public static double GetDouble (IntPtr handle, string symbol)
@@ -104,6 +167,16 @@ namespace MonoMac.ObjCRuntime {
 			}
 		}
 
+		public static void SetDouble (IntPtr handle, string symbol, double value)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return;
+			unsafe {
+				*(double *) indirect = value;
+			}
+		}
+
 		public static float GetFloat (IntPtr handle, string symbol)
 		{
 			var indirect = dlsym (handle, symbol);
@@ -115,6 +188,16 @@ namespace MonoMac.ObjCRuntime {
 				return *d;
 			}
 		}
+
+		public static void SetFloat (IntPtr handle, string symbol, float value)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return;
+			unsafe {
+				*(float *) indirect = value;
+			}
+		}
 		
 		internal static int SlowGetInt32 (string lib, string symbol)
 		{
@@ -123,6 +206,18 @@ namespace MonoMac.ObjCRuntime {
 				return 0;
 			try {
 				return GetInt32 (handle, symbol);
+			} finally {
+				dlclose (handle);
+			}
+		}
+
+		internal static long SlowGetInt64 (string lib, string symbol)
+		{
+			var handle = dlopen (lib, 0);
+			if (handle == IntPtr.Zero)
+				return 0;
+			try {
+				return GetInt64 (handle, symbol);
 			} finally {
 				dlclose (handle);
 			}

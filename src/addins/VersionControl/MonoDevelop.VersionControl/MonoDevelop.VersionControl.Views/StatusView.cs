@@ -14,6 +14,7 @@ using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
 using Mono.TextEditor;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -24,12 +25,11 @@ namespace MonoDevelop.VersionControl.Views
 		bool disposed;
 		
 		Widget widget;
-		Toolbar commandbar;
 		VBox main;
 		Label status;
-		Gtk.ToolButton showRemoteStatus;
-		Gtk.ToolButton buttonCommit;
-		Gtk.ToolButton buttonRevert;
+		Gtk.Button showRemoteStatus;
+		Gtk.Button buttonCommit;
+		Gtk.Button buttonRevert;
 		
 		FileTreeView filelist;
 		TreeViewColumn colCommit, colRemote;
@@ -99,11 +99,6 @@ namespace MonoDevelop.VersionControl.Views
 		
 		delegate void DiffDataHandler (List<DiffData> diffdata);
 		
-		/// <summary>
-		/// Fired when content difference data is loaded
-		/// </summary>
-		event DiffDataHandler DiffDataLoaded;
-		
 		public static bool Show (VersionControlItemList items, bool test)
 		{
 			if (items.Count != 1)
@@ -129,72 +124,27 @@ namespace MonoDevelop.VersionControl.Views
 			main = new VBox(false, 6);
 			widget = main;
 			
-			commandbar = new Toolbar ();
-			commandbar.ToolbarStyle = Gtk.ToolbarStyle.BothHoriz;
-			commandbar.IconSize = Gtk.IconSize.Menu;
-			main.PackStart (commandbar, false, false, 0);
-			
-			buttonCommit = new Gtk.ToolButton (new Gtk.Image ("vc-commit", Gtk.IconSize.Menu), GettextCatalog.GetString ("Commit..."));
-			buttonCommit.IsImportant = true;
-			buttonCommit.Clicked += new EventHandler (OnCommitClicked);
-			commandbar.Insert (buttonCommit, -1);
-			
-			Gtk.ToolButton btnRefresh = new Gtk.ToolButton (new Gtk.Image (Gtk.Stock.Refresh, IconSize.Menu), GettextCatalog.GetString ("Refresh"));
-			btnRefresh.IsImportant = true;
-			btnRefresh.Clicked += new EventHandler (OnRefresh);
-			commandbar.Insert (btnRefresh, -1);
-			
-			buttonRevert = new Gtk.ToolButton (new Gtk.Image ("vc-revert-command", Gtk.IconSize.Menu), GettextCatalog.GetString ("Revert"));
-			buttonRevert.IsImportant = true;
-			buttonRevert.Clicked += new EventHandler (OnRevert);
-			commandbar.Insert (buttonRevert, -1);
-			
-			showRemoteStatus = new Gtk.ToolButton (new Gtk.Image ("vc-remote-status", Gtk.IconSize.Menu), GettextCatalog.GetString ("Show Remote Status"));
-			showRemoteStatus.IsImportant = true;
-			showRemoteStatus.Clicked += new EventHandler(OnShowRemoteStatusClicked);
-			commandbar.Insert (showRemoteStatus, -1);
-			
-			Gtk.ToolButton btnCreatePatch = new Gtk.ToolButton (new Gtk.Image ("vc-diff", Gtk.IconSize.Menu), GettextCatalog.GetString ("Create Patch"));
-			btnCreatePatch.IsImportant = true;
-			btnCreatePatch.Clicked += new EventHandler (OnCreatePatch);
-			commandbar.Insert (btnCreatePatch, -1);
-			
-			commandbar.Insert (new Gtk.SeparatorToolItem (), -1);
-			
-			Gtk.ToolButton btnOpen = new Gtk.ToolButton (new Gtk.Image (Gtk.Stock.Open, IconSize.Menu), GettextCatalog.GetString ("Open"));
-			btnOpen.IsImportant = true;
-			btnOpen.Clicked += new EventHandler (OnOpen);
-			commandbar.Insert (btnOpen, -1);
-			
-			commandbar.Insert (new Gtk.SeparatorToolItem (), -1);
-			
-			Gtk.ToolButton btnExpand = new Gtk.ToolButton (null, GettextCatalog.GetString ("Expand All"));
-			btnExpand.IsImportant = true;
-			btnExpand.Clicked += new EventHandler (OnExpandAll);
-			commandbar.Insert (btnExpand, -1);
-			
-			Gtk.ToolButton btnCollapse = new Gtk.ToolButton (null, GettextCatalog.GetString ("Collapse All"));
-			btnCollapse.IsImportant = true;
-			btnCollapse.Clicked += new EventHandler (OnCollapseAll);
-			commandbar.Insert (btnCollapse, -1);
-			
-			commandbar.Insert (new Gtk.SeparatorToolItem (), -1);
-			
-			Gtk.ToolButton btnSelectAll = new Gtk.ToolButton (null, GettextCatalog.GetString ("Select All"));
-			btnSelectAll.IsImportant = true;
-			btnSelectAll.Clicked += new EventHandler (OnSelectAll);
-			commandbar.Insert (btnSelectAll, -1);
-			
-			Gtk.ToolButton btnSelectNone = new Gtk.ToolButton (null, GettextCatalog.GetString ("Select None"));
-			btnSelectNone.IsImportant = true;
-			btnSelectNone.Clicked += new EventHandler (OnSelectNone);
-			commandbar.Insert (btnSelectNone, -1);
-			
+			buttonCommit = new Gtk.Button () {
+				Image = new Gtk.Image ("vc-commit", Gtk.IconSize.Menu),
+				Label = GettextCatalog.GetString ("Commit...")
+			};
+			buttonCommit.Image.Show ();
+			buttonRevert = new Gtk.Button () {
+				Image = new Gtk.Image ("vc-revert-command", Gtk.IconSize.Menu),
+				Label = GettextCatalog.GetString ("Revert")
+			};
+			buttonRevert.Image.Show ();
+			showRemoteStatus = new Gtk.Button () {
+				Image = new Gtk.Image ("vc-remote-status", Gtk.IconSize.Menu),
+				Label = GettextCatalog.GetString ("Show Remote Status")
+			};
+			showRemoteStatus.Image.Show ();
+
 			status = new Label("");
 			main.PackStart(status, false, false, 0);
 			
 			scroller = new ScrolledWindow();
-			scroller.ShadowType = Gtk.ShadowType.In;
+			scroller.ShadowType = Gtk.ShadowType.None;
 			filelist = new FileTreeView();
 			filelist.Selection.Mode = Gtk.SelectionMode.Multiple;
 			
@@ -262,24 +212,32 @@ namespace MonoDevelop.VersionControl.Views
 			filelist.TestExpandRow += new Gtk.TestExpandRowHandler (OnTestExpandRow);
 			
 			commitBox = new VBox ();
-			
+
+			HeaderBox commitMessageLabelBox = new HeaderBox ();
+			commitMessageLabelBox.SetPadding (6, 6, 6, 6);
+			commitMessageLabelBox.SetMargins (1, 1, 0, 0);
+
 			HBox labBox = new HBox ();
 			labelCommit = new Gtk.Label (GettextCatalog.GetString ("Commit message:"));
 			labelCommit.Xalign = 0;
 			labBox.PackStart (new Gtk.Image ("vc-comment", Gtk.IconSize.Menu), false, false, 0);
 			labBox.PackStart (labelCommit, true, true, 3);
-			
-			commitBox.PackStart (labBox, false, false, 0);
+
+			commitMessageLabelBox.Add (labBox);
+			commitMessageLabelBox.ShowAll ();
+			//commitBox.PackStart (commitMessageLabelBox, false, false, 0);
 			
 			Gtk.ScrolledWindow frame = new Gtk.ScrolledWindow ();
-			frame.ShadowType = ShadowType.In;
+			frame.HeightRequest = 75;
+			frame.ShadowType = ShadowType.None;
 			commitText = new TextView ();
 			commitText.WrapMode = WrapMode.WordChar;
 			commitText.Buffer.Changed += OnCommitTextChanged;
 			frame.Add (commitText);
-			commitBox.PackStart (frame, true, true, 6);
+			commitBox.PackStart (frame, true, true, 0);
 			
-			VPaned paned = new VPaned ();
+			var paned = new VPanedThin ();
+			paned.HandleWidget = commitMessageLabelBox;
 			paned.Pack1 (scroller, true, true);
 			paned.Pack2 (commitBox, false, false);
 			main.PackStart (paned, true, true, 0);
@@ -305,6 +263,72 @@ namespace MonoDevelop.VersionControl.Views
 			filelist.DoPopupMenu = DoPopupMenu;
 			
 			StartUpdate();
+		}
+
+		protected override void OnWorkbenchWindowChanged (EventArgs e)
+		{
+			base.OnWorkbenchWindowChanged (e);
+			if (WorkbenchWindow == null)
+				return;
+
+			var toolbar = WorkbenchWindow.GetToolbar (this);
+
+			buttonCommit.Clicked += new EventHandler (OnCommitClicked);
+			toolbar.Add (buttonCommit);
+
+			var btnRefresh = new Gtk.Button () {
+				Label = GettextCatalog.GetString ("Refresh"),
+				Image = new Gtk.Image (Gtk.Stock.Refresh, IconSize.Menu)
+			};
+			btnRefresh.Image.Show ();
+
+			btnRefresh.Clicked += new EventHandler (OnRefresh);
+			toolbar.Add (btnRefresh);
+
+			buttonRevert.Clicked += new EventHandler (OnRevert);
+			toolbar.Add (buttonRevert);
+			
+			showRemoteStatus.Clicked += new EventHandler(OnShowRemoteStatusClicked);
+			toolbar.Add (showRemoteStatus);
+			
+			var btnCreatePatch = new Gtk.Button () {
+				Image = new Gtk.Image ("vc-diff", Gtk.IconSize.Menu), 
+				Label = GettextCatalog.GetString ("Create Patch")
+			};
+			btnCreatePatch.Image.Show ();
+			btnCreatePatch.Clicked += new EventHandler (OnCreatePatch);
+			toolbar.Add (btnCreatePatch);
+			
+			toolbar.Add (new Gtk.SeparatorToolItem ());
+			
+			var btnOpen = new Gtk.Button () {
+				Image = new Gtk.Image (Gtk.Stock.Open, IconSize.Menu), 
+				Label = GettextCatalog.GetString ("Open")
+			};
+			btnOpen.Image.Show ();
+			btnOpen.Clicked += new EventHandler (OnOpen);
+			toolbar.Add (btnOpen);
+			
+			toolbar.Add (new Gtk.SeparatorToolItem ());
+			
+			var btnExpand = new Gtk.Button (GettextCatalog.GetString ("Expand All"));
+			btnExpand.Clicked += new EventHandler (OnExpandAll);
+			toolbar.Add (btnExpand);
+			
+			var btnCollapse = new Gtk.Button (GettextCatalog.GetString ("Collapse All"));
+			btnCollapse.Clicked += new EventHandler (OnCollapseAll);
+			toolbar.Add (btnCollapse);
+			
+			toolbar.Add (new Gtk.SeparatorToolItem ());
+			
+			var btnSelectAll = new Gtk.Button (GettextCatalog.GetString ("Select All"));
+			btnSelectAll.Clicked += new EventHandler (OnSelectAll);
+			toolbar.Add (btnSelectAll);
+			
+			var btnSelectNone = new Gtk.Button (GettextCatalog.GetString ("Select None"));
+			btnSelectNone.Clicked += new EventHandler (OnSelectNone);
+			toolbar.Add (btnSelectNone);
+			toolbar.ShowAll ();
 		}
 		
 		public override string StockIconId {
@@ -894,7 +918,7 @@ namespace MonoDevelop.VersionControl.Views
 			VersionInfo newInfo;
 			try {
 				// Reuse remote status from old version info
-				newInfo = vc.GetVersionInfo (args.FilePath, false);
+				newInfo = vc.GetVersionInfo (args.FilePath);
 				if (found && newInfo != null) {
 					VersionInfo oldInfo = statuses [oldStatusIndex];
 					if (oldInfo != null) {

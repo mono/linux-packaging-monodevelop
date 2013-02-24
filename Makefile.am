@@ -1,4 +1,6 @@
-SUBDIRS = external contrib src po man theme-icons build tests
+include $(top_srcdir)/xbuild.include
+
+SUBDIRS = external . contrib src po man theme-icons build tests
 
 #capture aclocal flags for autoreconf
 ACLOCAL_AMFLAGS=$(ACLOCAL_FLAGS)
@@ -9,11 +11,17 @@ buildinfo = $(top_builddir)/build/bin/buildinfo
 
 all: vcrevision
 
+all-local: sln_build
+
+clean: clean-local
+
+clean-local: sln_clean
+
 vcrevision:
 	@if test -d ../.git; then \
 		version=$$(cd ..; \
 			LANG=C; export LANG; \
-			git describe --dirty --always --abbrev=0 --match nothing; \
+			git rev-parse HEAD; \
 		); \
 		echo "$$version" > "vcrevision"; \
 	else \
@@ -24,7 +32,7 @@ vcrevision:
 
 $(buildinfo): vcrevision
 	@mkdir -p "$(top_builddir)/build/bin"
-	@echo "Git revision: $$(cat $(top_srcdir)/vcrevision)" > "$@"
+	@echo "$$(cat $(top_srcdir)/vcrevision)" > "$@"
 	@echo "Build date: $$(date -u +'%Y-%m-%d %H:%M:%S%z')" >> "$@"
 	@echo "Updated build information"
 	@cat $(buildinfo)
@@ -104,10 +112,15 @@ apidocs:
 
 MD_LAUNCH=$(MD_LAUNCH_SETUP) UBUNTU_MENUPROXY=0 exec -a "monodevelop" $(RUNTIME)
 
-run: runmd
+run: runmd-sgen
+
+run-sgen: runmd-sgen
 
 runmd: $(PROGRAM)
 	$(MD_LAUNCH) --debug $(MD_BIN_PATH)/MonoDevelop.exe --no-redirect
+
+runmd-sgen: $(PROGRAM)
+	$(MD_LAUNCH)-sgen --debug $(MD_BIN_PATH)/MonoDevelop.exe --no-redirect
 
 run-debug: $(PROGRAM)
 	MONODEVELOP_CONSOLE_LOG_LEVEL=All $(MD_LAUNCH) --debug=casts $(MD_BIN_PATH)/MonoDevelop.exe --no-redirect
@@ -115,6 +128,11 @@ run-debug: $(PROGRAM)
 run-gdb: $(PROGRAM)
 	echo "run --debug $(MD_BIN_PATH)/MonoDevelop.exe" > gdb.commands
 	$(MD_LAUNCH_SETUP) gdb $(RUNTIME) -x gdb.commands
+	rm -f gdb.commands
+
+run-gdb-sgen: $(PROGRAM)
+	echo "run --debug $(MD_BIN_PATH)/MonoDevelop.exe" > gdb.commands
+	$(MD_LAUNCH_SETUP) gdb $(RUNTIME)-sgen -x gdb.commands
 	rm -f gdb.commands
 
 run-profile: $(PROGRAM)
@@ -137,7 +155,7 @@ check-addins:
 	$(MDTOOL_RUN) setup reg-build -v
 
 test:
-	cd tests/UnitTests && make test fixture=$(fixture)
+	cd tests && $(MAKE) test assembly=$(assembly)
 
 app-dir: all
 	cd build && make app-dir
@@ -149,7 +167,9 @@ app-dir: all
 
 # we can't use the variables that are conditionally defined
 EXTRA_DIST = $(bin_SCRIPTS) $(desktop_DATA) $(pixmap_DATA) \
-	monodevelop.xml $(pkgconfig_in_files) vcrevision external/Makefile.in
+	monodevelop.xml $(pkgconfig_in_files) vcrevision external/Makefile.in \
+	Main.sln \
+	md.targets
 
 DISTCLEANFILES = monodevelop intltool-extract intltool-merge intltool-update \
 	$(pkgconfig_DATA) 

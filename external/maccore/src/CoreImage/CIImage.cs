@@ -28,6 +28,8 @@ using MonoMac.CoreFoundation;
 #if !MONOMAC
 using MonoTouch.UIKit;
 using MonoTouch.CoreGraphics;
+#else
+using MonoMac.CoreGraphics;
 #endif
 
 namespace MonoMac.CoreImage {
@@ -99,6 +101,20 @@ namespace MonoMac.CoreImage {
 			}
 			return ret;
 		}
+
+		public static CIImage FromCGImage (CGImage image, CGColorSpace colorSpace)
+		{
+			if (colorSpace == null)
+				throw new ArgumentNullException ("colorSpace");
+			
+			using (var arr = NSArray.FromIntPtrs (new IntPtr [] { colorSpace.Handle })){
+				using (var keys = NSArray.FromIntPtrs (new IntPtr [] { CIImageColorSpaceKey.Handle } )){
+					using (var dict = NSDictionary.FromObjectsAndKeysInternal (arr, keys)){
+						return FromCGImage (image, dict);
+					}
+				}
+			}
+		}
 		
 		public CIFilter [] GetAutoAdjustmentFilters ()
 		{
@@ -114,5 +130,44 @@ namespace MonoMac.CoreImage {
 				return GetAutoAdjustmentFilters ();
 			return WrapFilters (_GetAutoAdjustmentFilters (dict));
 		}
+
+		public static implicit operator CIImage (CGImage image)
+		{
+			return FromCGImage (image);
+		}
+		
+		internal static int CIFormatToInt (CIFormat format)
+		{
+			switch (format) {
+#if MONOMAC
+			case CIFormat.ARGB8: return FormatARGB8;			
+			case CIFormat.RGBAh: return FormatRGBAh;
+			case CIFormat.RGBA16: return FormatRGBA16;
+			case CIFormat.RGBAf: return FormatRGBAf;
+#else
+			case CIFormat.ARGB8: return FormatARGB8;
+			case CIFormat.RGBAh: return FormatRGBAh;
+			case CIFormat.BGRA8: return FormatBGRA8;
+			case CIFormat.RGBA8: return FormatRGBA8;
+#endif
+			default:
+				throw new ArgumentOutOfRangeException ("format");
+			}
+		}
 	}
+#if MONOMAC
+    public enum CIFormat {
+		ARGB8,
+		RGBAh,
+		RGBA16,
+		RGBAf
+	}
+#else
+	public enum CIFormat {
+		ARGB8,
+		RGBAh,
+		BGRA8,
+		RGBA8,
+	}
+#endif
 }

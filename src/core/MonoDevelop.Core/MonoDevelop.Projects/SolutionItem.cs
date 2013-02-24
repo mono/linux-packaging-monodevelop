@@ -38,6 +38,7 @@ using MonoDevelop.Core.Collections;
 using MonoDevelop.Core.StringParsing;
 using MonoDevelop.Core.Instrumentation;
 using MonoDevelop.Projects.Policies;
+using MonoDevelop.Core.Execution;
 
 namespace MonoDevelop.Projects
 {
@@ -178,6 +179,7 @@ namespace MonoDevelop.Projects
 			}
 			internal set {
 				parentSolution = value;
+				NotifyBoundToSolution (true);
 			}
 		}
 
@@ -364,10 +366,35 @@ namespace MonoDevelop.Projects
 			}
 			internal set {
 				parentFolder = value;
-				if (internalChildren != null)
+				if (internalChildren != null) {
 					internalChildren.ParentFolder = value;
+				}
+				if (value != null && value.ParentSolution != null) {
+					NotifyBoundToSolution (false);
+				}
 			}
 		}
+
+		// Normally, the ParentFolder setter fires OnBoundToSolution. However, when deserializing, child
+		// ParentFolder hierarchies can become connected before the ParentSolution becomes set. This method
+		// enables us to recursively fire the OnBoundToSolution call in those cases.
+		void NotifyBoundToSolution (bool includeInternalChildren)
+		{
+			var folder = this as SolutionFolder;
+			if (folder != null) {
+				var items = folder.GetItemsWithoutCreating ();
+				if (items != null) {
+					foreach (var item in items) {
+						item.NotifyBoundToSolution (includeInternalChildren);
+					}
+				}
+			}
+			if (includeInternalChildren && internalChildren != null) {
+				internalChildren.NotifyBoundToSolution (includeInternalChildren);
+			}
+			OnBoundToSolution ();
+		}
+
 
 		/// <summary>
 		/// Gets a value indicating whether this <see cref="MonoDevelop.Projects.SolutionItem"/> has been disposed.
@@ -634,6 +661,11 @@ namespace MonoDevelop.Projects
 		public bool CanExecute (ExecutionContext context, ConfigurationSelector configuration)
 		{
 			return Services.ProjectService.GetExtensionChain (this).CanExecute (this, context, configuration);
+		}
+
+		public IEnumerable<ExecutionTarget> GetExecutionTargets (ConfigurationSelector configuration)
+		{
+			return Services.ProjectService.GetExtensionChain (this).GetExecutionTargets (this, configuration);
 		}
 		
 		/// <summary>
@@ -1012,6 +1044,15 @@ namespace MonoDevelop.Projects
 		internal protected virtual bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration)
 		{
 			return false;
+		}
+
+		internal protected virtual IEnumerable<ExecutionTarget> OnGetExecutionTargets (ConfigurationSelector configuration)
+		{
+			yield break;
+		}
+
+		protected virtual void OnBoundToSolution ()
+		{
 		}
 		
 		/// <summary>

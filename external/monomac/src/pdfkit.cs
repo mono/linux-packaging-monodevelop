@@ -239,10 +239,10 @@ namespace MonoMac.PdfKit {
 		[Export ("paths")]
 		NSBezierPath [] Paths { get; }
 
-		[Export ("addBezierPath:path")]
+		[Export ("addBezierPath:")]
 		void AddBezierPathpath (NSBezierPath path);
 
-		[Export ("removeBezierPath:path")]
+		[Export ("removeBezierPath:")]
 		void RemoveBezierPathpath (NSBezierPath path);
 	}
 
@@ -358,7 +358,7 @@ namespace MonoMac.PdfKit {
 		NSArray DashPattern { get; set; }
 		//float [] DashPattern { get; set; }
 
-		[Export ("drawInRect:rect")]
+		[Export ("drawInRect:")]
 		void Draw (RectangleF rect);
 	}
 
@@ -607,7 +607,7 @@ namespace MonoMac.PdfKit {
 		[Export ("removeAnnotation:")]
 		void RemoveAnnotation (PdfAnnotation annotation);
 
-		[Export ("annotationAtPoint:point")]
+		[Export ("annotationAtPoint:")]
 		PdfAnnotation GetAnnotation (PointF point);
 
 		[Export ("drawWithBox:")]
@@ -651,6 +651,7 @@ namespace MonoMac.PdfKit {
 	}
 
 	[BaseType (typeof (NSObject), Name="PDFSelection")]
+	[DisableDefaultCtor] // An uncaught exception was raised: init: not a valid initializer for PDFSelection
 	public interface PdfSelection {
 		[Export ("initWithDocument:")]
 		IntPtr Constructor (PdfDocument document);
@@ -668,7 +669,7 @@ namespace MonoMac.PdfKit {
 		[Export ("attributedString")]
 		NSAttributedString AttributedString { get; }
 
-		[Export ("boundsForPage:page")]
+		[Export ("boundsForPage:")]
 		RectangleF GetBoundsForPage (PdfPage page);
 	
 		//verify NSArray
@@ -870,7 +871,7 @@ namespace MonoMac.PdfKit {
 		[Export ("copy:")]
 		void Copy (NSObject sender);
 
-		[Export ("printWithInfo:autoRotate:doRotate")]
+		[Export ("printWithInfo:autoRotate:")]
 		void Print (NSPrintInfo printInfo, bool doRotate);
 
 		[Export ("printWithInfo:autoRotate:pageScaling:")]
@@ -912,8 +913,53 @@ namespace MonoMac.PdfKit {
 
 		[Export ("enableDataDetectors")]
 		bool EnableDataDetectors { get; set; }
-	}
 
+		[Field("PDFViewChangedHistoryNotification")]
+		[Notification]
+		NSString ChangedHistoryNotification { get; }
+
+		[Field("PDFViewDocumentChangedNotification")]
+		[Notification]
+		NSString DocumentChangedNotification { get; }
+
+		[Field ("PDFViewPageChangedNotification")]
+		[Notification]
+		NSString PageChangedNotification { get; }
+
+		[Field ("PDFViewScaleChangedNotification")]
+		[Notification]
+		NSString ScaleChangedNotification { get; }
+
+		[Field ("PDFViewAnnotationHitNotification")]
+		[Notification (typeof (PdfViewAnnotationHitEventArgs))]
+		NSString AnnotationHitNotification { get; }
+
+		[Field ("PDFViewCopyPermissionNotification")]
+		[Notification]
+		NSString CopyPermissionNotification { get; }
+
+		[Field ("PDFViewAnnotationWillHitNotification")]
+		[Notification]
+		NSString AnnotationWillHitNotification { get; }
+
+		[Field ("PDFViewSelectionChangedNotification")]
+		[Notification]
+		NSString SelectionChangedNotification { get; }
+
+		[Field ("PDFViewDisplayModeChangedNotification")]
+		[Notification]
+		NSString DisplayModeChangedNotification { get; }
+
+		[Field ("PDFViewDisplayBoxChangedNotification")]
+		[Notification]
+		NSString DisplayBoxChangedNotification { get; }
+	}
+	
+	public interface PdfViewAnnotationHitEventArgs {
+		[Export ("PDFAnnotationHit")]
+		PdfAnnotation AnnotationHit { get; }
+	}
+	
 	//Verify delegate methods.  There are default actions (not just return null ) that should occur
 	//if the delegate does not implement the method.
 	[BaseType (typeof (NSObject))]

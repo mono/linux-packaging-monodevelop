@@ -29,6 +29,7 @@ using System;
 using System.ComponentModel;
 using System.Collections.Generic;
 using Mono.Addins;
+using MonoDevelop.Components.Docking;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -50,13 +51,19 @@ namespace MonoDevelop.Ide.Gui
 		void SwitchView (IAttachableViewContent subViewContent);
 		int FindView <T>();
 		
-		bool CloseWindow (bool force, bool fromMenu, int pageNum);
+		bool CloseWindow (bool force);
 		void SelectWindow ();
-		
+
+		/// <summary>
+		/// Returns a toolbar for the pad.
+		/// </summary>
+		DocumentToolbar GetToolbar (IBaseViewContent targetView);
+
 		event EventHandler DocumentChanged;
 		event WorkbenchWindowEventHandler Closed;
 		event WorkbenchWindowEventHandler Closing;
 		event ActiveViewContentEventHandler ActiveViewContentChanged;
+		event EventHandler ViewsChanged;
 	}
 
 	public delegate void WorkbenchWindowEventHandler (object o, WorkbenchWindowEventArgs e);

@@ -41,7 +41,7 @@ namespace MonoDevelop.VersionControl.Views
 	{
 		bool alreadyStarted = false;
 		
-		public IViewContent Document {
+		public DocumentView Document {
 			get;
 			set;
 		}
@@ -70,7 +70,7 @@ namespace MonoDevelop.VersionControl.Views
 			get { return alreadyStarted; }
 		}
 
-		public VersionControlDocumentInfo (IViewContent document, VersionControlItem item, Repository repository)
+		public VersionControlDocumentInfo (DocumentView document, VersionControlItem item, Repository repository)
 		{
 			this.Document = document;
 			this.Item = item;
@@ -86,7 +86,7 @@ namespace MonoDevelop.VersionControl.Views
 				lock (updateLock) {
 					try {
 						History      = Item.Repository.GetHistory (Item.Path, null);
-						VersionInfo  = Item.Repository.GetVersionInfo (Item.Path, false);
+						VersionInfo  = Item.Repository.GetVersionInfo (Item.Path);
 					} catch (Exception ex) {
 						LoggingService.LogError ("Error retrieving history", ex);
 					}

@@ -7,6 +7,7 @@
 //
 // Copyright 2009, Novell, Inc.
 // Copyright 2010, Novell, Inc.
+// Copyright 2011, 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -480,7 +481,7 @@ namespace MonoMac.CoreAnimation {
 		[Export ("autoresizingMask")]
 		CAAutoresizingMask AutoresizinMask { get; set; }
 
-		[Export ("resizeSublayersWithOldSize")]
+		[Export ("resizeSublayersWithOldSize:")]
 		void ResizeSublayers (SizeF oldSize);
 
 		[Export ("resizeWithOldSuperlayerSize:")]
@@ -506,6 +507,10 @@ namespace MonoMac.CoreAnimation {
 		[Since (3,2)]
 		[Export ("rasterizationScale")]
 		float RasterizationScale { get; set; }
+
+		[Since (6,0)]
+		[Export ("drawsAsynchronously")]
+		bool DrawsAsynchronously { get; set; }
 #endif
 	}
 
@@ -750,6 +755,8 @@ namespace MonoMac.CoreAnimation {
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	// protocol
+	[DisableDefaultCtor]
 	public interface CAAction {
 		[Export ("runActionForKey:object:arguments:")]
 		void RunAction (string eventKey, NSObject obj, NSDictionary arguments);
@@ -853,6 +860,12 @@ namespace MonoMac.CoreAnimation {
 
 		[Field ("kCAAnimationRotateAutoReverse")]
 		NSString RotateModeAutoReverse { get; }
+
+#if MONOMAC
+		[MountainLion]
+		[Export ("usesSceneTimeBase")]
+		bool UsesSceneTimeBase { get; set; }
+#endif
 	}
 	
 	[BaseType (typeof (NSObject))]
@@ -1048,10 +1061,11 @@ namespace MonoMac.CoreAnimation {
 	}
 
 	[BaseType (typeof (NSObject))]
+	[DisableDefaultCtor]
 	public interface CAMediaTimingFunction {
 		[Export ("functionWithName:")][Static]
-		CAMediaTimingFunction FromName (string  name);
-	
+		CAMediaTimingFunction FromName (NSString  name);
+
 		[Static]
 		[Export ("functionWithControlPoints::::")]
 		CAMediaTimingFunction FromControlPoints (float c1x, float c1y, float c2x, float c2y);
@@ -1059,8 +1073,8 @@ namespace MonoMac.CoreAnimation {
 		[Export ("initWithControlPoints::::")]
 		IntPtr Constructor (float c1x, float c1y, float c2x, float c2y);
 	
-		//[Export ("getControlPointAtIndex:values:")]
-		//void getControlPointAtIndex:values: (size_t idx, float[2] ptr);
+		[Export ("getControlPointAtIndex:values:"), Internal]
+		void GetControlPointAtIndex (int idx, IntPtr point);
 	
 		[Field("kCAMediaTimingFunctionLinear")]
 		NSString Linear { get; }
@@ -1073,6 +1087,9 @@ namespace MonoMac.CoreAnimation {
 		
 		[Field("kCAMediaTimingFunctionEaseInEaseOut")]
 		NSString EaseInEaseOut { get; }
+
+		[Field("kCAMediaTimingFunctionDefault")]
+		NSString Default { get; }
 	}
 
 	[BaseType (typeof (NSObject))]
@@ -1213,10 +1230,10 @@ namespace MonoMac.CoreAnimation {
 		[Export ("greenSpeed")]
 		float GreenSpeed { get; set;  }
 
-		[Export ("BlueSpeed")]
+		[Export ("blueSpeed")]
 		float BlueSpeed { get; set;  }
 
-		[Export ("AlphaSpeed")]
+		[Export ("alphaSpeed")]
 		float AlphaSpeed { get; set;  }
 
 		[Export ("contents")]
@@ -1357,7 +1374,7 @@ namespace MonoMac.CoreAnimation {
 		[Field ("kCAEmitterLayerOldestFirst")]
 		NSString RenderOldestFirst { get; }			
 
-		[Field ("kCAEmitterLayerOldestLastt")]
+		[Field ("kCAEmitterLayerOldestLast")]
 		NSString RenderOldestLast { get; }			
 
 		[Field ("kCAEmitterLayerBackToFront")]

@@ -69,12 +69,8 @@ namespace NGit.Api
 		private DirCacheEntry prestage;
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		public virtual void SetupRepository()
 		{
 			// create initial commit
@@ -116,11 +112,7 @@ namespace NGit.Api
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
 		/// <exception cref="NGit.Errors.AmbiguousObjectException"></exception>
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestHardReset()
 		{
@@ -130,7 +122,7 @@ namespace NGit.Api
 				Call();
 			// check if HEAD points to initial commit now
 			ObjectId head = db.Resolve(Constants.HEAD);
-			NUnit.Framework.Assert.IsTrue(head.Equals(initialCommit));
+			NUnit.Framework.Assert.AreEqual(initialCommit, head);
 			// check if files were removed
 			NUnit.Framework.Assert.IsFalse(indexFile.Exists());
 			NUnit.Framework.Assert.IsTrue(untrackedFile.Exists());
@@ -139,11 +131,13 @@ namespace NGit.Api
 			NUnit.Framework.Assert.IsFalse(InHead(fileInIndexPath));
 			NUnit.Framework.Assert.IsFalse(InIndex(indexFile.GetName()));
 			AssertReflog(prevHead, head);
+			NUnit.Framework.Assert.AreEqual(prevHead, db.ReadOrigHead());
 		}
 
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
 		/// <exception cref="NGit.Errors.AmbiguousObjectException"></exception>
 		/// <exception cref="System.IO.IOException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestResetToNonexistingHEAD()
 		{
@@ -164,11 +158,7 @@ namespace NGit.Api
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
 		/// <exception cref="NGit.Errors.AmbiguousObjectException"></exception>
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestSoftReset()
 		{
@@ -178,7 +168,7 @@ namespace NGit.Api
 				Call();
 			// check if HEAD points to initial commit now
 			ObjectId head = db.Resolve(Constants.HEAD);
-			NUnit.Framework.Assert.IsTrue(head.Equals(initialCommit));
+			NUnit.Framework.Assert.AreEqual(initialCommit, head);
 			// check if files still exist
 			NUnit.Framework.Assert.IsTrue(untrackedFile.Exists());
 			NUnit.Framework.Assert.IsTrue(indexFile.Exists());
@@ -187,16 +177,13 @@ namespace NGit.Api
 			NUnit.Framework.Assert.IsFalse(InHead(fileInIndexPath));
 			NUnit.Framework.Assert.IsTrue(InIndex(indexFile.GetName()));
 			AssertReflog(prevHead, head);
+			NUnit.Framework.Assert.AreEqual(prevHead, db.ReadOrigHead());
 		}
 
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
 		/// <exception cref="NGit.Errors.AmbiguousObjectException"></exception>
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestMixedReset()
 		{
@@ -206,7 +193,7 @@ namespace NGit.Api
 				.Call();
 			// check if HEAD points to initial commit now
 			ObjectId head = db.Resolve(Constants.HEAD);
-			NUnit.Framework.Assert.IsTrue(head.Equals(initialCommit));
+			NUnit.Framework.Assert.AreEqual(initialCommit, head);
 			// check if files still exist
 			NUnit.Framework.Assert.IsTrue(untrackedFile.Exists());
 			NUnit.Framework.Assert.IsTrue(indexFile.Exists());
@@ -215,6 +202,67 @@ namespace NGit.Api
 			NUnit.Framework.Assert.IsFalse(InHead(fileInIndexPath));
 			NUnit.Framework.Assert.IsFalse(InIndex(indexFile.GetName()));
 			AssertReflog(prevHead, head);
+			NUnit.Framework.Assert.AreEqual(prevHead, db.ReadOrigHead());
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
+		public virtual void TestMixedResetRetainsSizeAndModifiedTime()
+		{
+			git = new Git(db);
+			WriteTrashFile("a.txt", "a").SetLastModified(Runtime.CurrentTimeMillis() - 60 * 1000
+				);
+			NUnit.Framework.Assert.IsNotNull(git.Add().AddFilepattern("a.txt").Call());
+			NUnit.Framework.Assert.IsNotNull(git.Commit().SetMessage("a commit").Call());
+			WriteTrashFile("b.txt", "b").SetLastModified(Runtime.CurrentTimeMillis() - 60 * 1000
+				);
+			NUnit.Framework.Assert.IsNotNull(git.Add().AddFilepattern("b.txt").Call());
+			RevCommit commit2 = git.Commit().SetMessage("b commit").Call();
+			NUnit.Framework.Assert.IsNotNull(commit2);
+			DirCache cache = db.ReadDirCache();
+			DirCacheEntry aEntry = cache.GetEntry("a.txt");
+			NUnit.Framework.Assert.IsNotNull(aEntry);
+			NUnit.Framework.Assert.IsTrue(aEntry.Length > 0);
+			NUnit.Framework.Assert.IsTrue(aEntry.LastModified > 0);
+			DirCacheEntry bEntry = cache.GetEntry("b.txt");
+			NUnit.Framework.Assert.IsNotNull(bEntry);
+			NUnit.Framework.Assert.IsTrue(bEntry.Length > 0);
+			NUnit.Framework.Assert.IsTrue(bEntry.LastModified > 0);
+			git.Reset().SetMode(ResetCommand.ResetType.MIXED).SetRef(commit2.GetName()).Call(
+				);
+			cache = db.ReadDirCache();
+			DirCacheEntry mixedAEntry = cache.GetEntry("a.txt");
+			NUnit.Framework.Assert.IsNotNull(mixedAEntry);
+			NUnit.Framework.Assert.AreEqual(aEntry.LastModified, mixedAEntry.LastModified);
+			NUnit.Framework.Assert.AreEqual(aEntry.LastModified, mixedAEntry.LastModified);
+			DirCacheEntry mixedBEntry = cache.GetEntry("b.txt");
+			NUnit.Framework.Assert.IsNotNull(mixedBEntry);
+			NUnit.Framework.Assert.AreEqual(bEntry.LastModified, mixedBEntry.LastModified);
+			NUnit.Framework.Assert.AreEqual(bEntry.LastModified, mixedBEntry.LastModified);
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
+		public virtual void TestMixedResetWithUnmerged()
+		{
+			git = new Git(db);
+			string file = "a.txt";
+			WriteTrashFile(file, "data");
+			string file2 = "b.txt";
+			WriteTrashFile(file2, "data");
+			git.Add().AddFilepattern(file).AddFilepattern(file2).Call();
+			git.Commit().SetMessage("commit").Call();
+			DirCache index = db.LockDirCache();
+			DirCacheBuilder builder = index.Builder();
+			builder.Add(CreateEntry(file, FileMode.REGULAR_FILE, 1, string.Empty));
+			builder.Add(CreateEntry(file, FileMode.REGULAR_FILE, 2, string.Empty));
+			builder.Add(CreateEntry(file, FileMode.REGULAR_FILE, 3, string.Empty));
+			NUnit.Framework.Assert.IsTrue(builder.Commit());
+			NUnit.Framework.Assert.AreEqual("[a.txt, mode:100644, stage:1]" + "[a.txt, mode:100644, stage:2]"
+				 + "[a.txt, mode:100644, stage:3]", IndexState(0));
+			git.Reset().SetMode(ResetCommand.ResetType.MIXED).Call();
+			NUnit.Framework.Assert.AreEqual("[a.txt, mode:100644]" + "[b.txt, mode:100644]", 
+				IndexState(0));
 		}
 
 		/// <exception cref="System.Exception"></exception>
@@ -237,7 +285,7 @@ namespace NGit.Api
 			NUnit.Framework.Assert.AreEqual(prestage.GetObjectId(), postReset.GetObjectId());
 			// check that HEAD hasn't moved
 			ObjectId head = db.Resolve(Constants.HEAD);
-			NUnit.Framework.Assert.IsTrue(head.Equals(secondCommit));
+			NUnit.Framework.Assert.AreEqual(secondCommit, head);
 			// check if files still exist
 			NUnit.Framework.Assert.IsTrue(untrackedFile.Exists());
 			NUnit.Framework.Assert.IsTrue(indexFile.Exists());
@@ -264,7 +312,7 @@ namespace NGit.Api
 				);
 			// check that HEAD hasn't moved
 			ObjectId head = db.Resolve(Constants.HEAD);
-			NUnit.Framework.Assert.IsTrue(head.Equals(secondCommit));
+			NUnit.Framework.Assert.AreEqual(secondCommit, head);
 			// check if files still exist
 			NUnit.Framework.Assert.IsTrue(untrackedFile.Exists());
 			NUnit.Framework.Assert.IsTrue(InHead("dir/b.txt"));
@@ -287,13 +335,77 @@ namespace NGit.Api
 				untrackedFile.GetName()).Call();
 			// check that HEAD hasn't moved
 			ObjectId head = db.Resolve(Constants.HEAD);
-			NUnit.Framework.Assert.IsTrue(head.Equals(secondCommit));
+			NUnit.Framework.Assert.AreEqual(secondCommit, head);
 			// check if files still exist
 			NUnit.Framework.Assert.IsTrue(untrackedFile.Exists());
 			NUnit.Framework.Assert.IsTrue(indexFile.Exists());
 			NUnit.Framework.Assert.IsTrue(InHead(indexFile.GetName()));
 			NUnit.Framework.Assert.IsFalse(InIndex(indexFile.GetName()));
 			NUnit.Framework.Assert.IsFalse(InIndex(untrackedFile.GetName()));
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
+		public virtual void TestPathsResetWithUnmerged()
+		{
+			SetupRepository();
+			string file = "a.txt";
+			WriteTrashFile(file, "data");
+			git.Add().AddFilepattern(file).Call();
+			git.Commit().SetMessage("commit").Call();
+			DirCache index = db.LockDirCache();
+			DirCacheBuilder builder = index.Builder();
+			builder.Add(CreateEntry(file, FileMode.REGULAR_FILE, 1, string.Empty));
+			builder.Add(CreateEntry(file, FileMode.REGULAR_FILE, 2, string.Empty));
+			builder.Add(CreateEntry(file, FileMode.REGULAR_FILE, 3, string.Empty));
+			builder.Add(CreateEntry("b.txt", FileMode.REGULAR_FILE));
+			NUnit.Framework.Assert.IsTrue(builder.Commit());
+			NUnit.Framework.Assert.AreEqual("[a.txt, mode:100644, stage:1]" + "[a.txt, mode:100644, stage:2]"
+				 + "[a.txt, mode:100644, stage:3]" + "[b.txt, mode:100644]", IndexState(0));
+			git.Reset().AddPath(file).Call();
+			NUnit.Framework.Assert.AreEqual("[a.txt, mode:100644]" + "[b.txt, mode:100644]", 
+				IndexState(0));
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
+		public virtual void TestHardResetOnTag()
+		{
+			SetupRepository();
+			string tagName = "initialtag";
+			git.Tag().SetName(tagName).SetObjectId(secondCommit).SetMessage("message").Call();
+			DirCacheEntry preReset = DirCache.Read(db.GetIndexFile(), db.FileSystem).GetEntry
+				(indexFile.GetName());
+			NUnit.Framework.Assert.IsNotNull(preReset);
+			git.Add().AddFilepattern(untrackedFile.GetName()).Call();
+			git.Reset().SetRef(tagName).SetMode(ResetCommand.ResetType.HARD).Call();
+			ObjectId head = db.Resolve(Constants.HEAD);
+			NUnit.Framework.Assert.AreEqual(secondCommit, head);
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
+		public virtual void TestHardResetAfterSquashMerge()
+		{
+			Git g = new Git(db);
+			WriteTrashFile("file1", "file1");
+			g.Add().AddFilepattern("file1").Call();
+			RevCommit first = g.Commit().SetMessage("initial commit").Call();
+			NUnit.Framework.Assert.IsTrue(new FilePath(db.WorkTree, "file1").Exists());
+			CreateBranch(first, "refs/heads/branch1");
+			CheckoutBranch("refs/heads/branch1");
+			WriteTrashFile("file2", "file2");
+			g.Add().AddFilepattern("file2").Call();
+			g.Commit().SetMessage("second commit").Call();
+			NUnit.Framework.Assert.IsTrue(new FilePath(db.WorkTree, "file2").Exists());
+			CheckoutBranch("refs/heads/master");
+			MergeCommandResult result = g.Merge().Include(db.GetRef("branch1")).SetSquash(true
+				).Call();
+			NUnit.Framework.Assert.AreEqual(MergeStatus.FAST_FORWARD_SQUASHED, result.GetMergeStatus
+				());
+			NUnit.Framework.Assert.IsNotNull(db.ReadSquashCommitMsg());
+			g.Reset().SetMode(ResetCommand.ResetType.HARD).SetRef(first.GetName()).Call();
+			NUnit.Framework.Assert.IsNull(db.ReadSquashCommitMsg());
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>

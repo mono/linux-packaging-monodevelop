@@ -38,61 +38,56 @@ namespace MonoDevelop.CSharp.Refactoring.CodeIssues
 {
 	class NRefactoryIssueProvider : CodeIssueProvider
 	{
-		readonly List<List<string>> actionIdList = new List<List<string>> ();
 		ICSharpCode.NRefactory.CSharp.Refactoring.ICodeIssueProvider issueProvider;
+		readonly string providerIdString;
 
 		public override string IdString {
 			get {
-				return "refactoring.inspectors." + MimeType + "." + issueProvider.GetType ().FullName;
+				return "refactoring.codeissues." + MimeType + "." + issueProvider.GetType ().FullName;
 			}
 		}
 
 		public NRefactoryIssueProvider (ICSharpCode.NRefactory.CSharp.Refactoring.ICodeIssueProvider issue, IssueDescriptionAttribute attr)
 		{
 			issueProvider = issue;
-			MimeType = "text/x-csharp";
+			providerIdString = issueProvider.GetType ().FullName;
 			Category = GettextCatalog.GetString (attr.Category ?? "");
 			Title = GettextCatalog.GetString (attr.Title ?? "");
 			Description = GettextCatalog.GetString (attr.Description ?? "");
 			DefaultSeverity = attr.Severity;
 			IssueMarker = attr.IssueMarker;
+			MimeType = "text/x-csharp";
 		}
 
-		public override IEnumerable<CodeIssue> GetIssues (Document document, CancellationToken cancellationToken)
+		public override IEnumerable<CodeIssue> GetIssues (Document document, object ctx, CancellationToken cancellationToken)
 		{
-			var context = new MDRefactoringContext (document, document.Editor.Caret.Location);
-			if (context.IsInvalid || context.RootNode == null)
+			var context = ctx as MDRefactoringContext;
+			if (context == null || context.IsInvalid || context.RootNode == null)
 				yield break;
-			int issueNum = 0;
 			foreach (var action in issueProvider.GetIssues (context)) {
+				if (cancellationToken.IsCancellationRequested)
+					yield break;
 				if (action.Actions == null) {
 					LoggingService.LogError ("NRefactory actions == null in :" + Title);
 					continue;
 				}
-				if (actionIdList.Count <= issueNum)
-					actionIdList.Add (new List<string> ());
-				var actionId = actionIdList [issueNum];
-				int actionNum = 0;
-				
 				var actions = new List<MonoDevelop.CodeActions.CodeAction> ();
 				foreach (var act in action.Actions) {
+					if (cancellationToken.IsCancellationRequested)
+						yield break;
 					if (act == null) {
 						LoggingService.LogError ("NRefactory issue action was null in :" + Title);
 						continue;
 					}
-					if (actionId.Count <= actionNum)
-						actionId.Add (issueProvider.GetType ().FullName + "'" + issueNum + "'" + actionNum);
-					actions.Add (new NRefactoryCodeAction (actionId[actionNum], act.Description, act));
-					actionNum++;
+					actions.Add (new NRefactoryCodeAction (providerIdString, act.Description, act));
 				}
 				var issue = new CodeIssue (
-					GettextCatalog.GetString (action.Desription ?? ""),
+					GettextCatalog.GetString (action.Description ?? ""),
 					action.Start,
 					action.End,
 					actions
 				);
 				yield return issue;
-				issueNum ++;
 			}
 		}
 	}

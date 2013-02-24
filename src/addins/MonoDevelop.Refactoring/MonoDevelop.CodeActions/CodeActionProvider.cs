@@ -27,6 +27,7 @@ using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory;
 using System.Threading;
 using System.Collections.Generic;
+using System;
 
 namespace MonoDevelop.CodeActions
 {
@@ -57,6 +58,12 @@ namespace MonoDevelop.CodeActions
 		public string Description { get; set; }
 
 		/// <summary>
+		/// Gets or sets the code issue all actions are bound to. 
+		/// This allows to split the action and the issue provider.
+		/// </summary>
+		public Type BoundToIssue { get; set; }
+
+		/// <summary>
 		/// Gets the identifier string used as property ID tag.
 		/// </summary>
 		public virtual string IdString {
@@ -68,6 +75,6 @@ namespace MonoDevelop.CodeActions
 		/// <summary>
 		/// Gets all the code actions in document at given location.
 		/// </summary>
-		public abstract IEnumerable<CodeAction> GetActions (MonoDevelop.Ide.Gui.Document document, TextLocation loc, CancellationToken cancellationToken);
+		public abstract IEnumerable<CodeAction> GetActions (MonoDevelop.Ide.Gui.Document document, object refactoringContext, TextLocation loc, CancellationToken cancellationToken);
 	}
 }

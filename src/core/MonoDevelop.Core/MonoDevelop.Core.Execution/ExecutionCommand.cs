@@ -28,8 +28,23 @@ using System;
 
 namespace MonoDevelop.Core.Execution
 {
+	/// <summary>
+	/// Set of parameters to be used to execute a file or project
+	/// </summary>
+	/// <remarks>
+	/// This is the base class for types of commands that can be used
+	/// to run a project or file. This class only contains the data
+	/// required to run the project, but not the actual execution logic.
+	/// The execution logic is provided by classes that implement
+	/// IExecutionHandler. A project generates an ExecutionCommand
+	/// instance, and a user can select a IExecutionHandler to
+	/// run it.
+	/// </remarks>
 	public abstract class ExecutionCommand
 	{
-		public abstract string CommandString { get; }
+		/// <summary>
+		/// Execution target. For example, a specific device.
+		/// </summary>
+		public ExecutionTarget Target { get; set; }
 	}
 }

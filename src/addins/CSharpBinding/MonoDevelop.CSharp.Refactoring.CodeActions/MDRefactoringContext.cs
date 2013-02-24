@@ -57,14 +57,14 @@ namespace MonoDevelop.CSharp.Refactoring.CodeActions
 
 		public bool IsInvalid {
 			get {
-				return Resolver == null;
+				return Resolver == null || Document == null || Document.ParsedDocument.HasErrors;
 			}
 		}
 
-		public CompilationUnit Unit {
+		public SyntaxTree Unit {
 			get {
 				Debug.Assert (!IsInvalid);
-				return Document.ParsedDocument.GetAst<CompilationUnit> ();
+				return Document.ParsedDocument.GetAst<SyntaxTree> ();
 			}
 		}
 
@@ -159,8 +159,8 @@ namespace MonoDevelop.CSharp.Refactoring.CodeActions
 			if (parsedDocument == null)
 				return null;
 
-			var unit       = parsedDocument.GetAst<CompilationUnit> ();
-			var parsedFile = parsedDocument.ParsedFile as CSharpParsedFile;
+			var unit       = parsedDocument.GetAst<SyntaxTree> ();
+			var parsedFile = parsedDocument.ParsedFile as CSharpUnresolvedFile;
 			
 			if (unit == null || parsedFile == null)
 				return null;

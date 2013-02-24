@@ -38,7 +38,7 @@ using MonoDevelop.Ide.Gui.Components;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
-	public class ProjectReferenceFolderNodeBuilder: TypeNodeBuilder
+	class ProjectReferenceFolderNodeBuilder: TypeNodeBuilder
 	{
 		ProjectReferenceEventHandler addedHandler;
 		ProjectReferenceEventHandler removedHandler;
@@ -97,9 +97,10 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 
 		void OnRemoveReference (object sender, ProjectReferenceEventArgs e)
 		{
-			ITreeBuilder tb = Context.GetTreeBuilder (e.Project);
-			if (tb != null) {
-				if (tb.FindChild (e.ProjectReference, true))
+			var p = e.Project as DotNetProject;
+			if (p != null) {
+				ITreeBuilder tb = Context.GetTreeBuilder (p.References);
+				if (tb != null && tb.FindChild (e.ProjectReference, true))
 					tb.Remove ();
 			}
 		}
@@ -109,12 +110,13 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			DotNetProject p = e.Project as DotNetProject;
 			if (p != null) {
 				ITreeBuilder tb = Context.GetTreeBuilder (p.References);
-				if (tb != null) tb.AddChild (e.ProjectReference);
+				if (tb != null)
+					tb.AddChild (e.ProjectReference);
 			}
 		}
 	}
 	
-	public class ProjectReferenceFolderNodeCommandHandler: NodeCommandHandler
+	class ProjectReferenceFolderNodeCommandHandler: NodeCommandHandler
 	{
 		public override bool CanDropNode (object dataObject, DragOperation operation)
 		{
@@ -130,7 +132,12 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			if (project != null) {
 				ProjectReference pr = new ProjectReference (project);
 				DotNetProject p = CurrentNode.GetParentDataItem (typeof(DotNetProject), false) as DotNetProject;
-				if (ProjectReferencesProject (project, p.Name))
+				// Circular dependencies are not allowed.
+				if (HasCircularReference (project, p.Name))
+					return;
+
+				// If the reference already exists, bail out
+				if (ProjectReferencesProject (p, project.Name))
 					return;
 				p.References.Add (pr);
 				IdeApp.ProjectOperations.Save (p);
@@ -171,7 +178,13 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				// Check for cyclic referencies
 				if (pref.ReferenceType == ReferenceType.Project) {
 					DotNetProject pdest = p.ParentSolution.FindProjectByName (pref.Reference) as DotNetProject;
-					if (pdest == null || ProjectReferencesProject (pdest, p.Name))
+					if (pdest == null)
+						return;
+					if (HasCircularReference (pdest, p.Name))
+						return;
+
+					// The reference is already there
+					if (ProjectReferencesProject (p, pdest.Name))
 						return;
 				}
 				p.References.Add ((ProjectReference) pref.Clone ());
@@ -193,13 +206,19 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				CurrentNode.Expanded = true;
 			}
 		}
-		
+
+		bool HasCircularReference (DotNetProject project, string targetProject)
+		{
+			bool result = ProjectReferencesProject (project, targetProject);
+			if (result)
+				MessageService.ShowError (GettextCatalog.GetString ("Cyclic project references are not allowed."));
+			return result;
+		}
+
 		bool ProjectReferencesProject (DotNetProject project, string targetProject)
 		{
-			if (project.Name == targetProject) {
-				MessageService.ShowError (GettextCatalog.GetString ("Cyclic project references are not allowed."));
+			if (project.Name == targetProject)
 				return true;
-			}
 			
 			foreach (ProjectReference pr in project.References) {
 				DotNetProject pref = project.ParentSolution.FindProjectByName (pr.Reference) as DotNetProject;

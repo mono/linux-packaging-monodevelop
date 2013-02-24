@@ -61,9 +61,12 @@ namespace Mono.TextEditor
 		[DllImport (LIBOBJC, EntryPoint = "objc_msgSend_stret")]
 		static extern void objc_msgSend_RectangleF (out RectangleF rect, IntPtr klass, IntPtr selector);
 		
+		[DllImport ("libgtk-quartz-2.0.dylib")]
+		static extern IntPtr gdk_quartz_window_get_nswindow (IntPtr window);
+
 		static IntPtr cls_NSScreen;
 		static IntPtr sel_screens, sel_objectEnumerator, sel_nextObject, sel_frame, sel_visibleFrame,
-			sel_requestUserAttention;
+			sel_requestUserAttention, sel_setHasShadow, sel_invalidateShadow;
 		static IntPtr sharedApp;
 		static IntPtr cls_NSEvent;
 		static IntPtr sel_modifierFlags;
@@ -126,6 +129,8 @@ namespace Mono.TextEditor
 			sel_frame = sel_registerName ("frame");
 			sel_requestUserAttention = sel_registerName ("requestUserAttention:");
 			sel_modifierFlags = sel_registerName ("modifierFlags");
+			sel_setHasShadow = sel_registerName ("setHasShadow:");
+			sel_invalidateShadow = sel_registerName ("invalidateShadow");
 			sharedApp = objc_msgSend_IntPtr (objc_getClass ("NSApplication"), sel_registerName ("sharedApplication"));
 		}
 		
@@ -184,9 +189,83 @@ namespace Mono.TextEditor
 			int kind = critical?  NSCriticalRequest : NSInformationalRequest;
 			objc_msgSend_int_int (sharedApp, sel_requestUserAttention, kind);
 		}
+
+		// Note: we can't reuse RectangleF because the layout is different...
+		[StructLayout (LayoutKind.Sequential)]
+		struct Rect {
+			public int Left;
+			public int Top;
+			public int Right;
+			public int Bottom;
+
+			public int X { get { return Left; } }
+			public int Y { get { return Top; } }
+			public int Width { get { return Right - Left; } }
+			public int Height { get { return Bottom - Top; } }
+		}
+
+		const int MonitorInfoFlagsPrimary = 0x01;
+
+		[StructLayout (LayoutKind.Sequential)]
+		unsafe struct MonitorInfo {
+			public int Size;
+			public Rect Frame;         // Monitor
+			public Rect VisibleFrame;  // Work
+			public int Flags;
+			public fixed byte Device[32];
+		}
+
+		[UnmanagedFunctionPointer (CallingConvention.Winapi)]
+		delegate int EnumMonitorsCallback (IntPtr hmonitor, IntPtr hdc, IntPtr prect, IntPtr user_data);
+
+		[DllImport ("User32.dll")]
+		extern static int EnumDisplayMonitors (IntPtr hdc, IntPtr clip, EnumMonitorsCallback callback, IntPtr user_data);
+
+		[DllImport ("User32.dll")]
+		extern static int GetMonitorInfoA (IntPtr hmonitor, ref MonitorInfo info);
+
+		static Gdk.Rectangle WindowsGetUsableMonitorGeometry (Gdk.Screen screen, int monitor_id)
+		{
+			Gdk.Rectangle geometry = screen.GetMonitorGeometry (monitor_id);
+			List<MonitorInfo> screens = new List<MonitorInfo> ();
+
+			EnumDisplayMonitors (IntPtr.Zero, IntPtr.Zero, delegate (IntPtr hmonitor, IntPtr hdc, IntPtr prect, IntPtr user_data) {
+				var info = new MonitorInfo ();
+
+				unsafe {
+					info.Size = sizeof (MonitorInfo);
+				}
+
+				GetMonitorInfoA (hmonitor, ref info);
+
+				// In order to keep the order the same as Gtk, we need to put the primary monitor at the beginning.
+				if ((info.Flags & MonitorInfoFlagsPrimary) != 0)
+					screens.Insert (0, info);
+				else
+					screens.Add (info);
+
+				return 1;
+			}, IntPtr.Zero);
+
+			MonitorInfo monitor = screens[monitor_id];
+			Rect visible = monitor.VisibleFrame;
+			Rect frame = monitor.Frame;
+
+			// Rebase the VisibleFrame off of Gtk's idea of this monitor's geometry (since they use different coordinate systems)
+			int x = geometry.X + (visible.Left - frame.Left);
+			int width = visible.Width;
+
+			int y = geometry.Y + (visible.Top - frame.Top);
+			int height = visible.Height;
+
+			return new Gdk.Rectangle (x, y, width, height);
+		}
 		
 		public static Gdk.Rectangle GetUsableMonitorGeometry (this Gdk.Screen screen, int monitor)
 		{
+			if (Platform.IsWindows)
+				return WindowsGetUsableMonitorGeometry (screen, monitor);
+
 			if (Platform.IsMac)
 				return MacGetUsableMonitorGeometry (screen, monitor);
 			
@@ -292,7 +371,7 @@ namespace Mono.TextEditor
 			adj.Value = System.Math.Max (adj.Lower, System.Math.Min (adj.Value + value, adj.Upper - adj.PageSize));
 		}
 		
-		[DllImport (PangoUtil.LIBGTK)]
+		[DllImport (PangoUtil.LIBGTK, CallingConvention = CallingConvention.Cdecl)]
 		extern static bool gdk_event_get_scroll_deltas (IntPtr eventScroll, out double deltaX, out double deltaY);
 		static bool scrollDeltasNotSupported;
 		
@@ -317,14 +396,12 @@ namespace Mono.TextEditor
 		public static void ShowContextMenu (Gtk.Menu menu, Gtk.Widget parent, Gdk.EventButton evt, Gdk.Rectangle caret)
 		{
 			Gtk.MenuPositionFunc posFunc = null;
-			
-			// NOTE: we don't gtk_menu_attach_to_widget to the parent because it seems to cause issues.
-			// The expanders in other treeviews in MD stop working when we detach it, and detaching is necessary
-			// to prevent memory leaks.
-			// Attaching means menu moves when parent is moved and is destroyed when parent is destroyed. Neither is
-			// particularly important for us.
-			// See https://bugzilla.xamarin.com/show_bug.cgi?id=4388
+
 			if (parent != null) {
+				menu.AttachToWidget (parent, null);
+				menu.Hidden += (sender, e) => {
+					menu.Detach ();
+				};
 				posFunc = delegate (Gtk.Menu m, out int x, out int y, out bool pushIn) {
 					Gdk.Window window = evt != null? evt.Window : parent.GdkWindow;
 					window.GetOrigin (out x, out y);
@@ -412,11 +489,11 @@ namespace Mono.TextEditor
 		}
 		
 		//introduced in GTK 2.20
-		[DllImport (PangoUtil.LIBGDK)]
+		[DllImport (PangoUtil.LIBGDK, CallingConvention = CallingConvention.Cdecl)]
 		extern static bool gdk_keymap_add_virtual_modifiers (IntPtr keymap, ref Gdk.ModifierType state);
 		
 		//Custom patch in Mono Mac w/GTK+ 2.24.8+
-		[DllImport (PangoUtil.LIBGDK)]
+		[DllImport (PangoUtil.LIBGDK, CallingConvention = CallingConvention.Cdecl)]
 		extern static bool gdk_quartz_set_fix_modifiers (bool fix);
 		
 		static Gdk.Keymap keymap = Gdk.Keymap.Default;
@@ -528,6 +605,11 @@ namespace Mono.TextEditor
 				if ((state & ctrlAlt) == ctrlAlt) {
 					state = (state & ~ctrlAlt) | Gdk.ModifierType.Mod2Mask;
 					group = 1;
+				}
+				// Case: Caps lock on + shift + key 
+				// See: Bug 8069 - [UI Refresh] If caps lock is on, holding the shift key prevents typed characters from appearing
+				if (state.HasFlag (Gdk.ModifierType.ShiftMask)) {
+					state &= ~Gdk.ModifierType.ShiftMask;
 				}
 			}
 			
@@ -668,9 +750,33 @@ namespace Mono.TextEditor
 		{
 			return rect.Y + rect.Height - 1;
 		}
-		
-		static HashSet<Type> fixedContainerTypes = new HashSet<Type>();
-		static ForallDelegate forallCallback;
+
+		/// <summary>
+		/// Shows or hides the shadow of the window rendered by the native toolkit
+		/// </summary>
+		public static void ShowNativeShadow (Gtk.Window window, bool show)
+		{
+			if (Platform.IsMac) {
+				var ptr = gdk_quartz_window_get_nswindow (window.GdkWindow.Handle);
+				objc_msgSend_void_bool (ptr, sel_setHasShadow, show);
+			}
+		}
+
+		public static void UpdateNativeShadow (Gtk.Window window)
+		{
+			if (!Platform.IsMac)
+				return;
+
+			var ptr = gdk_quartz_window_get_nswindow (window.GdkWindow.Handle);
+			objc_msgSend_IntPtr (ptr, sel_invalidateShadow);
+		}
+
+		[DllImport ("gtksharpglue-2", CallingConvention = CallingConvention.Cdecl)]
+		static extern void gtksharp_container_leak_fixed_marker ();
+
+		static HashSet<Type> fixedContainerTypes;
+		static Dictionary<IntPtr,ForallDelegate> forallCallbacks;
+		static bool containerLeakFixed;
 		
 		// Works around BXC #3801 - Managed Container subclasses are incorrectly resurrected, then leak.
 		// It does this by registering an alternative callback for gtksharp_container_override_forall, which
@@ -678,41 +784,80 @@ namespace Mono.TextEditor
 		// finalized->release->dispose->re-wrap resurrection cycle.
 		// We use a dynamic method to access internal/private GTK# API in a performant way without having to track
 		// per-instance delegates.
-		public static void FixContainerLeak<T> (T c)
+		public static void FixContainerLeak (Gtk.Container c)
 		{
-			var t = typeof (T);
-			if (fixedContainerTypes.Add (t)) {
-				if (forallCallback == null) {
-					forallCallback = CreateForallCallback ();
-				}
-				var gt = (GLib.GType) t.GetMethod ("LookupGType", BindingFlags.Instance | BindingFlags.NonPublic).Invoke (c, null);
-				gtksharp_container_override_forall (gt.Val, forallCallback);
+			if (containerLeakFixed) {
+				return;
 			}
+
+			FixContainerLeak (c.GetType ());
 		}
-		
-		static ForallDelegate CreateForallCallback ()
+
+		static void FixContainerLeak (Type t)
+		{
+			if (containerLeakFixed) {
+				return;
+			}
+
+			if (fixedContainerTypes == null) {
+				try {
+					gtksharp_container_leak_fixed_marker ();
+					containerLeakFixed = true;
+					return;
+				} catch (EntryPointNotFoundException) {
+				}
+				fixedContainerTypes = new HashSet<Type>();
+				forallCallbacks = new Dictionary<IntPtr, ForallDelegate> ();
+			}
+
+			if (!fixedContainerTypes.Add (t)) {
+				return;
+			}
+
+			//need to fix the callback for the type and all the managed supertypes
+			var lookupGType = typeof (GLib.Object).GetMethod ("LookupGType", BindingFlags.Static | BindingFlags.NonPublic);
+			do {
+				var gt = (GLib.GType) lookupGType.Invoke (null, new[] { t });
+				var cb = CreateForallCallback (gt.Val);
+				forallCallbacks[gt.Val] = cb;
+				gtksharp_container_override_forall (gt.Val, cb);
+				t = t.BaseType;
+			} while (fixedContainerTypes.Add (t) && t.Assembly != typeof (Gtk.Container).Assembly);
+		}
+
+		static ForallDelegate CreateForallCallback (IntPtr gtype)
 		{
 			var dm = new DynamicMethod (
 				"ContainerForallCallback",
-				typeof (void),
-				new Type[] { typeof (IntPtr), typeof (bool), typeof (IntPtr), typeof (IntPtr) },
-				typeof (GtkWorkarounds).Module,
+				typeof(void),
+				new Type[] { typeof(IntPtr), typeof(bool), typeof(IntPtr), typeof(IntPtr) },
+				typeof(GtkWorkarounds).Module,
 				true);
 			
-			var invokerType = typeof (Gtk.Container.CallbackInvoker);
+			var invokerType = typeof(Gtk.Container.CallbackInvoker);
 			
 			//this was based on compiling a similar method and disassembling it
 			ILGenerator il = dm.GetILGenerator ();
 			var IL_002b = il.DefineLabel ();
 			var IL_003f = il.DefineLabel ();
 			var IL_0060 = il.DefineLabel ();
-			var IL_0072 = il.DefineLabel ();
-			
-			var loc_container  = il.DeclareLocal (typeof (Gtk.Container));
-			var loc_obj = il.DeclareLocal (typeof (object));
+			var label_return = il.DefineLabel ();
+
+			var loc_container = il.DeclareLocal (typeof(Gtk.Container));
+			var loc_obj = il.DeclareLocal (typeof(object));
 			var loc_invoker = il.DeclareLocal (invokerType);
-			var loc_ex = il.DeclareLocal (typeof (Exception));
-			
+			var loc_ex = il.DeclareLocal (typeof(Exception));
+
+			//check that the type is an exact match
+			// prevent stack overflow, because the callback on a more derived type will handle everything
+			il.Emit (OpCodes.Ldarg_0);
+			il.Emit (OpCodes.Call, typeof(GLib.ObjectManager).GetMethod ("gtksharp_get_type_id", BindingFlags.Static | BindingFlags.NonPublic));
+
+			il.Emit (OpCodes.Ldc_I8, gtype.ToInt64 ());
+			il.Emit (OpCodes.Newobj, typeof (IntPtr).GetConstructor (new Type[] { typeof (Int64) }));
+			il.Emit (OpCodes.Call, typeof (IntPtr).GetMethod ("op_Equality", BindingFlags.Static | BindingFlags.Public));
+			il.Emit (OpCodes.Brfalse, label_return);
+
 			il.BeginExceptionBlock ();
 			il.Emit (OpCodes.Ldnull);
 			il.Emit (OpCodes.Stloc, loc_container);
@@ -723,7 +868,7 @@ namespace Mono.TextEditor
 			il.Emit (OpCodes.Stloc, loc_obj);
 			il.Emit (OpCodes.Ldloc, loc_obj);
 			il.Emit (OpCodes.Brfalse, IL_002b);
-			
+
 			var tref = typeof (GLib.Object).Assembly.GetType ("GLib.ToggleRef");
 			il.Emit (OpCodes.Ldloc, loc_obj);
 			il.Emit (OpCodes.Castclass, tref);
@@ -766,24 +911,24 @@ namespace Mono.TextEditor
 			il.Emit (OpCodes.Ldloc, loc_ex);
 			il.Emit (OpCodes.Ldc_I4_0);
 			il.Emit (OpCodes.Call, typeof (GLib.ExceptionManager).GetMethod ("RaiseUnhandledException"));
-			il.Emit (OpCodes.Leave, IL_0072);
+			il.Emit (OpCodes.Leave, label_return);
 			il.EndExceptionBlock ();
 			
-			il.MarkLabel (IL_0072);
+			il.MarkLabel (label_return);
 			il.Emit (OpCodes.Ret);
 			
 			return (ForallDelegate) dm.CreateDelegate (typeof (ForallDelegate));
 		}
 		
-		[GLib.CDeclCallback]
+		[UnmanagedFunctionPointer (CallingConvention.Cdecl)]
 		delegate void ForallDelegate (IntPtr container, bool include_internals, IntPtr cb, IntPtr data);
 		
-		[DllImport("gtksharpglue-2", CallingConvention=CallingConvention.Cdecl)]
+		[DllImport("gtksharpglue-2", CallingConvention = CallingConvention.Cdecl)]
 		static extern void gtksharp_container_override_forall (IntPtr gtype, ForallDelegate cb);
 
 		public static string MarkupLinks (string text)
 		{
-			if (Mono.TextEditor.GtkWorkarounds.GtkMinorVersion < 18)
+			if (GtkMinorVersion < 18)
 				return text;
 			return HighlightUrlSemanticRule.UrlRegex.Replace (text, MatchToUrl);
 		}
@@ -796,7 +941,7 @@ namespace Mono.TextEditor
 
 		public static void SetLinkHandler (this Gtk.Label label, Action<string> urlHandler)
 		{
-			if (Mono.TextEditor.GtkWorkarounds.GtkMinorVersion >= 18)
+			if (GtkMinorVersion >= 18)
 				new UrlHandlerClosure (urlHandler).ConnectTo (label);
 		}
 

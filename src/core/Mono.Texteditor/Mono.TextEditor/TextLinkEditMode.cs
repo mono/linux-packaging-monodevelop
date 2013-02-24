@@ -134,6 +134,11 @@ namespace Mono.TextEditor
 		#endregion
 	}
 
+	public enum TextLinkMode {
+		EditIdentifier,
+		General
+	}
+
 	public class TextLinkEditMode : HelpWindowEditMode
 	{
 		List<TextLink> links;
@@ -176,6 +181,11 @@ namespace Mono.TextEditor
 			set;
 		}
 
+		public TextLinkMode TextLinkMode {
+			get;
+			set;
+		}
+
 		TextLinkTooltipProvider tooltipProvider;
 
 		public TextLinkEditMode (TextEditor editor,int baseOffset,List<TextLink> links)
@@ -193,6 +203,15 @@ namespace Mono.TextEditor
 		void HandleEditorDocumentBeginUndo (object sender, EventArgs e)
 		{
 			ExitTextLinkMode ();
+		}
+
+		public event EventHandler Exited;
+
+		protected virtual void OnExited (EventArgs e)
+		{
+			EventHandler handler = this.Exited;
+			if (handler != null)
+				handler (this, e);
 		}
 
 		public event EventHandler Cancel;
@@ -219,6 +238,9 @@ namespace Mono.TextEditor
 				closedLink = null;
 				if (window == null) {
 					window = new ListWindow<string> ();
+					window.DoubleClicked += delegate {
+						CompleteWindow ();
+					};
 					window.DataProvider = link;
 					
 					DocumentLocation loc = Editor.Document.OffsetToLocation (BaseOffset + link.PrimaryLink.Offset);
@@ -303,6 +325,7 @@ namespace Mono.TextEditor
 				Editor.Document.StackUndoToDepth (undoDepth);
 			Editor.CurrentMode = OldMode;
 			Editor.Document.CommitUpdateAll ();
+			OnExited (EventArgs.Empty);
 		}
 
 		public bool IsInUpdate {
@@ -516,7 +539,7 @@ namespace Mono.TextEditor
 		}
 	}
 
-	public class TextLinkTooltipProvider : ITooltipProvider
+	public class TextLinkTooltipProvider : TooltipProvider
 	{
 		TextLinkEditMode mode;
 
@@ -526,7 +549,7 @@ namespace Mono.TextEditor
 		}
 
 		#region ITooltipProvider implementation 
-		public TooltipItem GetItem (TextEditor Editor, int offset)
+		public override TooltipItem GetItem (TextEditor Editor, int offset)
 		{
 			int o = offset - mode.BaseOffset;
 			for (int i = 0; i < mode.Links.Count; i++) {
@@ -538,7 +561,7 @@ namespace Mono.TextEditor
 			//return mode.Links.First (l => l.PrimaryLink != null && l.PrimaryLink.Offset <= o && o <= l.PrimaryLink.EndOffset);
 		}
 
-		public Gtk.Window CreateTooltipWindow (TextEditor Editor, int offset, Gdk.ModifierType modifierState, TooltipItem item)
+		protected override Gtk.Window CreateTooltipWindow (TextEditor Editor, int offset, Gdk.ModifierType modifierState, TooltipItem item)
 		{
 			TextLink link = item.Item as TextLink;
 			if (link == null || string.IsNullOrEmpty (link.Tooltip))
@@ -549,21 +572,16 @@ namespace Mono.TextEditor
 			return window;
 		}
 
-		public void GetRequiredPosition (TextEditor Editor, Gtk.Window tipWindow, out int requiredWidth, out double xalign)
+		protected override void GetRequiredPosition (TextEditor Editor, Gtk.Window tipWindow, out int requiredWidth, out double xalign)
 		{
 			TooltipWindow win = (TooltipWindow)tipWindow;
 			requiredWidth = win.SetMaxWidth (win.Screen.Width);
 			xalign = 0.5;
 		}
-
-		public bool IsInteractive (TextEditor Editor, Gtk.Window tipWindow)
-		{
-			return false;
-		}
 		#endregion 
 	}
 
-	public class TextLinkMarker : TextMarker, IBackgroundMarker
+	public class TextLinkMarker : TextLineMarker, IBackgroundMarker, IGutterMarker
 	{
 		TextLinkEditMode mode;
 
@@ -699,5 +717,33 @@ namespace Mono.TextEditor
 			}
 			return true;
 		}
+
+		#region IGutterMarker implementation
+		public void DrawLineNumber (TextEditor editor, double width, Cairo.Context cr, Cairo.Rectangle area, DocumentLine lineSegment, int line, double x, double y, double lineHeight)
+		{
+			var lineNumberBgGC = editor.ColorStyle.LineNumber.CairoBackgroundColor;
+			var lineNumberGC = editor.ColorStyle.LineNumber.CairoColor;
+
+			cr.Rectangle (x, y, width, lineHeight);
+			cr.Color = editor.Caret.Line == line ? editor.ColorStyle.LineMarker : lineNumberGC;
+			cr.Fill ();
+			
+			if (line <= editor.Document.LineCount) {
+				// Due to a mac? gtk bug I need to re-create the layout here
+				// otherwise I get pango exceptions.
+				using (var layout = PangoUtil.CreateLayout (editor)) {
+					layout.FontDescription = editor.Options.Font;
+					layout.Width = (int)width;
+					layout.Alignment = Pango.Alignment.Right;
+					layout.SetText (line.ToString ());
+					cr.Save ();
+					cr.Translate (x + (int)width + (editor.Options.ShowFoldMargin ? 0 : -2), y);
+					cr.Color = lineNumberBgGC;
+					cr.ShowLayout (layout);
+					cr.Restore ();
+				}
+			}
+		}
+		#endregion
 	}
 }

@@ -4,6 +4,7 @@
 // Authors: Mono Team
 //     
 // Copyright 2009 Novell, Inc
+// Copyright 2011, 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -43,6 +44,15 @@ namespace MonoMac.CoreGraphics {
 	public partial class CGPDFPage {
 		CGPDFDocument doc;
 
+		public CGPDFPage (IntPtr handle)
+		{
+			if (handle == IntPtr.Zero)
+				throw new Exception ("Invalid parameters to CGPDFPage creation");
+
+			CGPDFPageRetain (handle);
+			this.handle = handle;
+		}
+		
 		internal CGPDFPage (CGPDFDocument doc, IntPtr handle)
 		{
 			this.doc = doc;
@@ -61,7 +71,7 @@ namespace MonoMac.CoreGraphics {
 		public int PageNumber {
 			get {
 				return CGPDFPageGetPageNumber (handle);
-			}
+ 			}
 		}
 		
 		[DllImport (Constants.CoreGraphicsLibrary)]

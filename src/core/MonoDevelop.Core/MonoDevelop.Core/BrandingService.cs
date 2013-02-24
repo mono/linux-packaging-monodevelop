@@ -43,6 +43,8 @@ namespace MonoDevelop.Core
 		static XDocument localizedBrandingDocument;
 		
 		public static readonly string ApplicationName;
+		public static readonly string SuiteName;
+		public static readonly string ProfileDirectoryName;
 		
 		static BrandingService ()
 		{
@@ -73,12 +75,20 @@ namespace MonoDevelop.Core
 					}
 				}
 				ApplicationName = GetString ("ApplicationName");
+				SuiteName = GetString ("SuiteName");
+				ProfileDirectoryName = GetString ("ProfileDirectoryName");
 			} catch (Exception ex) {
 				LoggingService.LogError ("Could not read branding document", ex);
 			}
 			
 			if (string.IsNullOrEmpty (ApplicationName))
 				ApplicationName = "MonoDevelop";
+
+			if (string.IsNullOrEmpty (SuiteName))
+				SuiteName = ApplicationName;
+
+			if (string.IsNullOrEmpty (ProfileDirectoryName))
+				ProfileDirectoryName = ApplicationName;
 		}
 		
 		public static string GetString (params string[] keyPath)
@@ -158,6 +168,11 @@ namespace MonoDevelop.Core
 				return Assembly.GetCallingAssembly ().GetManifestResourceStream (name);
 			
 			return null;
+		}
+
+		public static string BrandApplicationName (string s)
+		{
+			return s.Replace ("MonoDevelop", ApplicationName);
 		}
 	}
 }

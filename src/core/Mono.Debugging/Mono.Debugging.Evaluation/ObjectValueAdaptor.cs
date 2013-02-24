@@ -1,12 +1,39 @@
+// 
+// ObjectValueAdaptor.cs
+//  
+// Authors: Lluis Sanchez Gual <lluis@novell.com>
+//          Jeffrey Stedfast <jeff@xamarin.com>
+// 
+// Copyright (c) 2008 Novell, Inc (http://www.novell.com)
+// Copyright (c) 2012 Xamarin Inc. (http://www.xamarin.com)
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Reflection;
+using System.Diagnostics;
+using System.Collections.Generic;
+
 using Mono.Debugging.Client;
 using Mono.Debugging.Backend;
-using System.Diagnostics;
-using System.Collections;
 
 namespace Mono.Debugging.Evaluation
 {
@@ -64,6 +91,10 @@ namespace Mono.Debugging.Evaluation
 		{
 			try {
 				return CreateObjectValueImpl (ctx, source, path, obj, flags);
+			} catch (EvaluatorAbortedException ex) {
+				return ObjectValue.CreateFatalError (path.LastName, ex.Message, flags);
+			} catch (EvaluatorException ex) {
+				return ObjectValue.CreateFatalError (path.LastName, ex.Message, flags);
 			} catch (Exception ex) {
 				ctx.WriteDebuggerError (ex);
 				return ObjectValue.CreateFatalError (path.LastName, ex.Message, flags);
@@ -245,6 +276,7 @@ namespace Mono.Debugging.Evaluation
 		public abstract bool IsString (EvaluationContext ctx, object val);
 		public abstract bool IsArray (EvaluationContext ctx, object val);
 		public abstract bool IsEnum (EvaluationContext ctx, object val);
+		public abstract bool IsValueType (object type);
 		public abstract bool IsClass (object type);
 		public abstract object TryCast (EvaluationContext ctx, object val, object type);
 
@@ -275,7 +307,7 @@ namespace Mono.Debugging.Evaluation
 		public object GetBaseType (EvaluationContext ctx, object type, bool includeObjectClass)
 		{
 			object bt = GetBaseType (ctx, type);
-			string tn = GetTypeName (ctx, bt);
+			string tn = bt != null ? GetTypeName (ctx, bt) : null;
 			if (!includeObjectClass && bt != null && (tn == "System.Object" || tn == "System.ValueType"))
 				return null;
 			else
@@ -308,10 +340,41 @@ namespace Mono.Debugging.Evaluation
 		{
 			return default (object);
 		}
+
+		public virtual bool IsTypeLoaded (EvaluationContext ctx, string typeName)
+		{
+			object t = GetType (ctx, typeName);
+
+			if (t == null)
+				return false;
+
+			return IsTypeLoaded (ctx, t);
+		}
+
+		public virtual bool IsTypeLoaded (EvaluationContext ctx, object type)
+		{
+			return true;
+		}
 		
 		public virtual object ForceLoadType (EvaluationContext ctx, string typeName)
 		{
-			return GetType (ctx, typeName);
+			object t = GetType (ctx, typeName);
+
+			if (t == null || IsTypeLoaded (ctx, t))
+				return t;
+
+			if (!ctx.Options.AllowTargetInvoke)
+				return null;
+
+			if (ForceLoadType (ctx, t))
+				return t;
+
+			return null;
+		}
+
+		public virtual bool ForceLoadType (EvaluationContext ctx, object type)
+		{
+			return true;
 		}
 
 		public abstract object CreateValue (EvaluationContext ctx, object value);
@@ -349,27 +412,47 @@ namespace Mono.Debugging.Evaluation
 				return ObjectValue.CreateObject (source, path, GetDisplayTypeName (typeName), ctx.Evaluator.TargetObjectToExpression (ctx, obj), flags, null);
 			}
 			else {
-				TypeDisplayData tdata = GetTypeDisplayData (ctx, GetValueType (ctx, obj));
-				
-				EvaluationResult tvalue;
-				if (!string.IsNullOrEmpty (tdata.ValueDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
-					tvalue = new EvaluationResult (EvaluateDisplayString (ctx, obj, tdata.ValueDisplayString));
-				else
-					tvalue = ctx.Evaluator.TargetObjectToExpression (ctx, obj);
-				
+				object type = GetValueType (ctx, obj);
+				EvaluationResult tvalue = null;
+				TypeDisplayData tdata = null;
 				string tname;
-				if (!string.IsNullOrEmpty (tdata.TypeDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
-					tname = EvaluateDisplayString (ctx, obj, tdata.TypeDisplayString);
-				else
+
+				if (typeName.StartsWith ("System.Nullable`1")) {
+					ValueReference hasValue = GetMember (ctx, type, obj, "HasValue");
+					if ((bool) hasValue.ObjectValue) {
+						ValueReference value = GetMember (ctx, type, obj, "Value");
+
+						tdata = GetTypeDisplayData (ctx, value.Type);
+						obj = value.Value;
+					} else {
+						tdata = GetTypeDisplayData (ctx, type);
+						tvalue = new EvaluationResult ("null");
+					}
+
 					tname = GetDisplayTypeName (typeName);
-				
+				} else {
+					tdata = GetTypeDisplayData (ctx, type);
+
+					if (!string.IsNullOrEmpty (tdata.TypeDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
+						tname = EvaluateDisplayString (ctx, obj, tdata.TypeDisplayString);
+					else
+						tname = GetDisplayTypeName (typeName);
+				}
+
+				if (tvalue == null) {
+					if (!string.IsNullOrEmpty (tdata.ValueDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
+						tvalue = new EvaluationResult (EvaluateDisplayString (ctx, obj, tdata.ValueDisplayString));
+					else
+						tvalue = ctx.Evaluator.TargetObjectToExpression (ctx, obj);
+				}
+
 				ObjectValue oval = ObjectValue.CreateObject (source, path, tname, tvalue, flags, null);
 				if (!string.IsNullOrEmpty (tdata.NameDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
 					oval.Name = EvaluateDisplayString (ctx, obj, tdata.NameDisplayString);
 				return oval;
 			}
 		}
-
+		
 		public ObjectValue[] GetObjectValueChildren (EvaluationContext ctx, IObjectSource objectSource, object obj, int firstItemIndex, int count)
 		{
 			return GetObjectValueChildren (ctx, objectSource, GetValueType (ctx, obj), obj, firstItemIndex, count, true);
@@ -607,7 +690,7 @@ namespace Mono.Debugging.Evaluation
 							CompletionData data = new CompletionData ();
 							foreach (ValueReference cv in vr.GetChildReferences (ctx.Options))
 								data.Items.Add (new CompletionItem (cv.Name, cv.Flags));
-							data.ExpressionLenght = 0;
+							data.ExpressionLength = 0;
 							return data;
 						}
 					} catch (Exception ex) {
@@ -630,7 +713,7 @@ namespace Mono.Debugging.Evaluation
 				string partialWord = exp.Substring (i+1);
 				
 				CompletionData data = new CompletionData ();
-				data.ExpressionLenght = partialWord.Length;
+				data.ExpressionLength = partialWord.Length;
 				
 				// Local variables
 				
@@ -991,14 +1074,17 @@ namespace Mono.Debugging.Evaluation
 		public string EvaluateDisplayString (EvaluationContext ctx, object obj, string exp)
 		{
 			StringBuilder sb = new StringBuilder ();
-			int last = 0;
 			int i = exp.IndexOf ("{");
+			int last = 0;
+
 			while (i != -1 && i < exp.Length) {
 				sb.Append (exp.Substring (last, i - last));
 				i++;
+
 				int j = exp.IndexOf ("}", i);
 				if (j == -1)
 					return exp;
+
 				string mem = exp.Substring (i, j - i).Trim ();
 				if (mem.Length == 0)
 					return exp;
@@ -1016,14 +1102,21 @@ namespace Mono.Debugging.Evaluation
 				}
 				
 				if (member != null) {
-					sb.Append (ctx.Evaluator.TargetObjectToString (ctx, val));
+					var str = ctx.Evaluator.TargetObjectToString (ctx, val);
+					if (str == null)
+						sb.Append ("null");
+					else
+						sb.Append (str);
 				} else {
 					sb.Append ("{Unknown member '" + mem + "'}");
 				}
+
 				last = j + 1;
 				i = exp.IndexOf ("{", last);
 			}
+
 			sb.Append (exp.Substring (last));
+
 			return sb.ToString ();
 		}
 

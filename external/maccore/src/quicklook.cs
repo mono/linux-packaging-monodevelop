@@ -104,11 +104,11 @@ namespace MonoMac.QuickLook {
 		
 		[Since (4,2)]
 		[Export ("previewController:frameForPreviewItem:inSourceView:"), DelegateName ("QLFrame"), DefaultValue (typeof (System.Drawing.RectangleF))]
-		RectangleF FrameForPreviewItem (QLPreviewItem item, [NullAllowed] UIView view);
+		RectangleF FrameForPreviewItem (QLPreviewController controller, QLPreviewItem item, ref UIView view);
 		
 		[Since (4,2)]
 		[Export ("previewController:transitionImageForPreviewItem:contentRect:"), DelegateName ("QLTransition"), DefaultValue (null)]
-		UIImage TransitionImageForPreviewItem (QLPreviewItem item, RectangleF contentRect);
+		UIImage TransitionImageForPreviewItem (QLPreviewController controller, QLPreviewItem item, RectangleF contentRect);
 #endif
 	}
 	
@@ -124,8 +124,7 @@ namespace MonoMac.QuickLook {
 		[Export ("previewItemTitle")]
 		string ItemTitle { get; }
 	}
-#endif
-
+#else
 	[Static]
 	interface QLThumbnailImage {
 		[Internal, Field ("kQLThumbnailOptionScaleFactorKey")]
@@ -134,4 +133,5 @@ namespace MonoMac.QuickLook {
 		[Internal, Field ("kQLThumbnailOptionIconModeKey")]
 		NSString OptionIconModeKey { get; }
 	}
+#endif
 }

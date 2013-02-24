@@ -46,18 +46,25 @@ namespace macdoc
 				return "Mono Documentation Browser";
 			}
 		}
+
+		public void LoadWithSearch (string searchTerm)
+		{
+			if (!string.IsNullOrEmpty (searchTerm)) {
+				toolbarSearchEntry.StringValue = searchTerm;
+				tabSelector.SelectAt (2);
+				Search (searchTerm);
+				Logger.Log ("Searched: '{0}'", searchTerm);
+			}
+		}
 		
 		public override bool ReadFromUrl (NSUrl url, string typeName, out NSError outError)
 		{
-			Console.WriteLine ("ReadFromUrl : {0}", url.ToString ());
+			Logger.Log ("ReadFromUrl: {0}", url.ToString ());
 			outError = null;
-			const int NSServiceMiscellaneousError = 66800;
-			if (url.Scheme != "monodoc" && url.Scheme != "mdoc") {
-				outError = new NSError (NSError.CocoaErrorDomain,
-				                       	NSServiceMiscellaneousError,
-				                      	NSDictionary.FromObjectAndKey (NSError.LocalizedFailureReasonErrorKey, new NSString (string.Format ("Scheme {0} isn't supported", url.Scheme))));
-				return false;
-			}
+
+			// if scheme is not right, we ignore the url
+			if (url.Scheme != "monodoc" && url.Scheme != "mdoc")
+				return true;
 			
 			// ResourceSpecifier is e.g. "//T:System.String"
 			initialLoadFromUrl = Uri.UnescapeDataString (url.ResourceSpecifier.Substring (2));
@@ -116,7 +123,8 @@ namespace macdoc
 		{
 			outlineView.DataSource = new DocTreeDataSource (this);
 			outlineView.Delegate = new OutlineDelegate (this);
-			outlineView.EnclosingScrollView.HorizontalScrollElasticity = outlineView.EnclosingScrollView.VerticalScrollElasticity = NSScrollElasticity.None;
+			if (AppDelegate.IsOnLionOrBetter)
+				outlineView.EnclosingScrollView.HorizontalScrollElasticity = outlineView.EnclosingScrollView.VerticalScrollElasticity = NSScrollElasticity.None;
 		}
 		
 		void SetupSearch ()
@@ -147,7 +155,7 @@ namespace macdoc
 		
 		void SetupBookmarks ()
 		{
-			if (!AppDelegate.IsOnLion){
+			if (!AppDelegate.IsOnLionOrBetter){
 				addBookmarkBtn.Hidden = true;
 				
 				viewBookmarksBtn.Hidden = true;
@@ -196,14 +204,30 @@ namespace macdoc
 
 			if (!manager.IsCreatingSearchIndex) {
 				InvokeOnMainThread (delegate {
+					var indexSpinnerHeight = indexSpinnerView.Frame.Height * 3 /4;
+					var searchSpinnerHeight = spinnerView.Frame.Height * 3 / 4;
+					
 					spinnerWidget.StopAnimation (this);
 					spinnerView.Hidden = true;
 					indexSpinnerWidget.StopAnimation (this);
 					indexSpinnerView.Hidden = true;
+
 					searchIndex = AppDelegate.Root.GetSearchIndex ();
 					indexSearchEntry.Enabled = true;
 					mdocSearch.Index = AppDelegate.Root.GetIndex ();
 					indexResults.ReloadData ();
+					
+					var splitViewFrame = splitView.Frame;
+					splitView.Frame = new RectangleF (splitViewFrame.X,
+					                                  splitViewFrame.Y - indexSpinnerHeight,
+					                                  splitViewFrame.Width,
+					                                  splitViewFrame.Height + indexSpinnerHeight);
+					
+					var searchScrollViewFrame = searchScrollView.Frame;
+					searchScrollView.Frame = new RectangleF (searchScrollViewFrame.X,
+					                                         searchScrollViewFrame.Y - searchSpinnerHeight,
+					                                         searchScrollViewFrame.Width,
+					                                         searchScrollViewFrame.Height + searchSpinnerHeight);
 				});
 			} else {
 				InvokeOnMainThread (delegate {
@@ -218,16 +242,14 @@ namespace macdoc
 		
 		internal void LoadUrl (string url, bool syncTreeView = false, HelpSource source = null, bool addToHistory = true)
 		{
-			if (url.StartsWith ("#")) {
-				Console.WriteLine ("FIXME: Anchor jump");
+			if (url.StartsWith ("#"))
 				return;
-			}
 			// In case user click on an external link e.g. [Android documentation] link at bottom of MonoDroid docs
 			if (url.StartsWith ("http://")) {
 				UrlLauncher.Launch (url);
 				return;
 			}
-			Console.WriteLine ("Loading {0}", url);
+			Logger.Log ("Loading {0}", url);
 			var ts = Interlocked.Increment (ref loadUrlTimestamp);
 			Task.Factory.StartNew (() => {
 				Node node;
@@ -241,7 +263,8 @@ namespace macdoc
 						if (ts < loadUrlTimestamp)
 							return;
 						currentUrl = node == null ? url : node.PublicUrl;
-						InvalidateRestorableState ();
+						if (AppDelegate.IsOnLionOrBetter)
+							InvalidateRestorableState ();
 						if (addToHistory)
 							history.AppendHistory (new LinkPageVisit (this, currentUrl));
 						LoadHtml (res);
@@ -362,10 +385,12 @@ namespace macdoc
 		partial void StartSearch (NSSearchField sender)
 		{
 			var contents = sender.StringValue;
-			if (contents == null || contents == "")
+			if (string.IsNullOrEmpty (contents))
 				return;
 			tabSelector.SelectAt (2);
 			Search (contents);
+			// Unselect the search term in case user is typing slowly
+			sender.CurrentEditor.SelectedRange = new NSRange (contents.Length, 0);
 		}
 		
 		// Typing in the index panel
@@ -393,7 +418,7 @@ namespace macdoc
 			}
 		}
 
-		void HandleWebViewDecidePolicyForNavigation (object sender, WebNavigatioPolicyEventArgs e)
+		void HandleWebViewDecidePolicyForNavigation (object sender, WebNavigationPolicyEventArgs e)
 		{
 			if (LoadingFromString){
 				WebView.DecideUse (e.DecisionToken);
@@ -482,7 +507,8 @@ namespace macdoc
 				ScrollToVisible ((Node) n.Nodes [n.Nodes.Count-1]);
 			var row = ScrollToVisible (n);
 			ignoreSelect = true;
-			outlineView.SelectRows (new NSIndexSet (row), false);
+			if (row > 0)
+				outlineView.SelectRows (new NSIndexSet (row), false);
 			ignoreSelect = false;
 		}
 		

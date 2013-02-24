@@ -42,6 +42,7 @@ using System.Runtime.CompilerServices;
 using MonoDevelop.Core.Instrumentation;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Projects;
+using MonoDevelop.Core.Execution;
 
 namespace MonoDevelop.Ide
 {
@@ -51,7 +52,8 @@ namespace MonoDevelop.Ide
 //		IParserDatabase parserDatabase;
 		string activeConfiguration;
 		bool useDefaultRuntime;
-		
+		string preferredActiveExecutionTarget;
+
 		ProjectFileEventHandler fileAddedToProjectHandler;
 		ProjectFileEventHandler fileRemovedFromProjectHandler;
 		ProjectFileRenamedEventHandler fileRenamedInProjectHandler;
@@ -123,12 +125,24 @@ namespace MonoDevelop.Ide
 			set {
 				if (activeConfiguration != value) {
 					activeConfiguration = value;
-					if (ActiveConfigurationChanged != null)
-						ActiveConfigurationChanged (this, EventArgs.Empty);
+					OnActiveConfigurationChanged ();
 				}
 			}
 		}
-		
+
+		void OnActiveConfigurationChanged ()
+		{
+			if (ActiveConfigurationChanged != null)
+				ActiveConfigurationChanged (this, EventArgs.Empty);
+		}
+
+		public ExecutionTarget ActiveExecutionTarget { get; set; }
+
+		internal string PreferredActiveExecutionTarget {
+			get { return ActiveExecutionTarget != null ? ActiveExecutionTarget.Id : preferredActiveExecutionTarget; }
+			set { preferredActiveExecutionTarget = value; }
+		}
+
 		public ConfigurationSelector ActiveConfiguration {
 			get { return new SolutionConfigurationSelector (activeConfiguration); }
 		}
@@ -438,9 +452,7 @@ namespace MonoDevelop.Ide
 					SavePreferences ();
 
 				if (closeProjectFiles) {
-					Document[] docs = new Document[IdeApp.Workbench.Documents.Count];
-					IdeApp.Workbench.Documents.CopyTo (docs, 0);
-					foreach (Document doc in docs) {
+					foreach (Document doc in IdeApp.Workbench.Documents.ToArray ()) {
 						if (!doc.Close ())
 							return false;
 					}
@@ -458,13 +470,27 @@ namespace MonoDevelop.Ide
 			return true;
 		}
 		
-		public void CloseWorkspaceItem (WorkspaceItem item)
+		public void CloseWorkspaceItem (WorkspaceItem item, bool closeItemFiles = true)
 		{
 			if (!Items.Contains (item))
 				throw new InvalidOperationException ("Only top level items can be closed.");
-			
-			if (RequestItemUnload (item))
+
+			if (Items.Count == 1 && closeItemFiles) {
+				// There is only one item, close the whole workspace
+				Close (true, closeItemFiles);
+				return;
+			}
+
+			if (RequestItemUnload (item)) {
+				if (closeItemFiles) {
+					var projects = item.GetAllProjects ();
+					foreach (Document doc in IdeApp.Workbench.Documents.Where (d => d.Project != null && projects.Contains (d.Project)).ToArray ()) {
+						if (!doc.Close ())
+							return;
+					}
+				}
 				Items.Remove (item);
+			}
 		}
 		
 		public bool RequestItemUnload (IBuildTarget item)
@@ -502,9 +528,10 @@ namespace MonoDevelop.Ide
 				filename = new Uri(filename).LocalPath;
 
 			var monitor = IdeApp.Workbench.ProgressMonitors.GetProjectLoadProgressMonitor (true);
-			
+			bool reloading = IsReloading;
+
 			DispatchService.BackgroundDispatch (delegate {
-				BackgroundLoadWorkspace (monitor, filename, loadPreferences);
+				BackgroundLoadWorkspace (monitor, filename, loadPreferences, reloading);
 			});
 			return monitor.AsyncOperation;
 		}
@@ -525,16 +552,27 @@ namespace MonoDevelop.Ide
 			}
 		}
 		
-		void BackgroundLoadWorkspace (IProgressMonitor monitor, string filename, bool loadPreferences)
+		void BackgroundLoadWorkspace (IProgressMonitor monitor, string filename, bool loadPreferences, bool reloading)
 		{
 			WorkspaceItem item = null;
 			ITimeTracker timer = Counters.OpenWorkspaceItemTimer.BeginTiming ();
 			
 			try {
+				if (reloading)
+					SetReloading (true);
+
 				if (!File.Exists (filename)) {
 					monitor.ReportError (GettextCatalog.GetString ("File not found: {0}", filename), null);
 					monitor.Dispose ();
 					return;
+				}
+
+				for (int i = 0; i < Items.Count; i++) {
+					if (Items[i].FileName == filename) {
+						IdeApp.ProjectOperations.CurrentSelectedWorkspaceItem = Items[i];
+						monitor.Dispose ();
+						return;
+					}
 				}
 				
 				if (!Services.ProjectService.IsWorkspaceItemFile (filename)) {
@@ -575,6 +613,9 @@ namespace MonoDevelop.Ide
 				monitor.Dispose ();
 				timer.End ();
 				return;
+			} finally {
+				if (reloading)
+					SetReloading (false);
 			}
 			
 			Gtk.Application.Invoke (delegate {
@@ -695,7 +736,14 @@ namespace MonoDevelop.Ide
 			try {
 				WorkspaceUserData data = item.UserProperties.GetValue<WorkspaceUserData> ("MonoDevelop.Ide.Workspace");
 				if (data != null) {
-					ActiveConfigurationId = data.ActiveConfiguration;
+					PreferredActiveExecutionTarget = data.PreferredExecutionTarget;
+					ActiveExecutionTarget = null;
+
+					if (GetConfigurations ().Contains (data.ActiveConfiguration))
+						activeConfiguration = data.ActiveConfiguration;
+					else
+						activeConfiguration = GetBestDefaultConfiguration ();
+
 					if (string.IsNullOrEmpty (data.ActiveRuntime))
 						UseDefaultRuntime = true;
 					else {
@@ -705,6 +753,7 @@ namespace MonoDevelop.Ide
 						else
 							UseDefaultRuntime = true;
 					}
+					OnActiveConfigurationChanged ();
 				}
 				else {
 					ActiveConfigurationId = GetBestDefaultConfiguration ();
@@ -756,6 +805,8 @@ namespace MonoDevelop.Ide
 			WorkspaceUserData data = new WorkspaceUserData ();
 			data.ActiveConfiguration = ActiveConfigurationId;
 			data.ActiveRuntime = UseDefaultRuntime ? null : ActiveRuntime.Id;
+			if (ActiveExecutionTarget != null)
+				data.PreferredExecutionTarget = ActiveExecutionTarget.Id;
 			item.UserProperties.SetValue ("MonoDevelop.Ide.Workspace", data);
 			
 			// Allow add-ins to fill-up data
@@ -788,7 +839,21 @@ namespace MonoDevelop.Ide
 					yield return file;
 			}
 		}
-		
+
+		int reloadingCount;
+
+		internal bool IsReloading {
+			get { return reloadingCount > 0; }
+		}
+
+		void SetReloading (bool doingIt)
+		{
+			if (doingIt)
+				reloadingCount++;
+			else
+				reloadingCount--;
+		}
+
 		void CheckWorkspaceItems (object sender, FileEventArgs args)
 		{
 			List<FilePath> files = args.Select (e => e.FileName.CanonicalPath).ToList ();
@@ -806,7 +871,7 @@ namespace MonoDevelop.Ide
 				OnCheckWorkspaceItem (it);
 			return true;
 		}
-		
+
 		void OnCheckWorkspaceItem (WorkspaceItem item)
 		{
 			if (item.NeedsReload) {
@@ -814,9 +879,14 @@ namespace MonoDevelop.Ide
 				if (AllowReload (item.GetAllProjects (), out closedDocs)) {
 					if (item.ParentWorkspace == null) {
 						string file = item.FileName;
-						SavePreferences ();
-						CloseWorkspaceItem (item);
-						OpenWorkspaceItem (file, false);
+						try {
+							SetReloading (true);
+							SavePreferences ();
+							CloseWorkspaceItem (item, false);
+							OpenWorkspaceItem (file, false, false);
+						} finally {
+							SetReloading (false);
+						}
 					}
 					else {
 						using (IProgressMonitor m = IdeApp.Workbench.ProgressMonitors.GetSaveProgressMonitor (true)) {
@@ -987,14 +1057,16 @@ namespace MonoDevelop.Ide
 		internal void NotifyItemAdded (WorkspaceItem item)
 		{
 			if (DispatchService.IsGuiThread)
-				NotifyItemAddedGui (item);
-			else
+				NotifyItemAddedGui (item, IsReloading);
+			else {
+				bool reloading = IsReloading;
 				Gtk.Application.Invoke (delegate {
-					NotifyItemAddedGui (item);
+					NotifyItemAddedGui (item, reloading);
 				});
+			}
 		}
 		
-		void NotifyItemAddedGui (WorkspaceItem item)
+		void NotifyItemAddedGui (WorkspaceItem item, bool reloading)
 		{
 			try {
 //				Mono.Profiler.RuntimeControls.EnableProfiler ();
@@ -1018,7 +1090,7 @@ namespace MonoDevelop.Ide
 			
 			if (WorkspaceItemOpened != null)
 				WorkspaceItemOpened (this, args);
-			if (Items.Count == 1) {
+			if (Items.Count == 1 && !reloading) {
 				IdeApp.Workbench.CurrentLayout = "Solution";
 				if (FirstWorkspaceItemOpened != null)
 					FirstWorkspaceItemOpened (this, args);
@@ -1028,14 +1100,16 @@ namespace MonoDevelop.Ide
 		internal void NotifyItemRemoved (WorkspaceItem item)
 		{
 			if (DispatchService.IsGuiThread)
-				NotifyItemRemovedGui (item);
-			else
+				NotifyItemRemovedGui (item, IsReloading);
+			else {
+				bool reloading = IsReloading;
 				Gtk.Application.Invoke (delegate {
-					NotifyItemRemovedGui (item);
+					NotifyItemRemovedGui (item, reloading);
 				});
+			}
 		}
 		
-		internal void NotifyItemRemovedGui (WorkspaceItem item)
+		internal void NotifyItemRemovedGui (WorkspaceItem item, bool reloading)
 		{
 			Workspace ws = item as Workspace;
 			if (ws != null) {
@@ -1044,8 +1118,7 @@ namespace MonoDevelop.Ide
 			}
 			item.ConfigurationsChanged -= configurationsChanged;
 			
-			if (Items.Count == 0) {
-				IdeApp.Workbench.CurrentLayout = "Default";
+			if (Items.Count == 0 && !reloading) {
 				if (LastWorkspaceItemClosed != null)
 					LastWorkspaceItemClosed (this, EventArgs.Empty);
 			}
@@ -1458,6 +1531,8 @@ namespace MonoDevelop.Ide
 		public string ActiveConfiguration;
 		[ItemProperty]
 		public string ActiveRuntime;
+		[ItemProperty]
+		public string PreferredExecutionTarget;
 	}
 	
 	public class ItemUnloadingEventArgs: EventArgs

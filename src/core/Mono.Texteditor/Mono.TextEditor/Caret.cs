@@ -351,8 +351,12 @@ namespace Mono.TextEditor
 			offsetVersion = doc.Version;
 		}
 
-		internal void UpdateCaretPosition ()
+		internal void UpdateCaretPosition (DocumentChangeEventArgs e)
 		{
+			if (e.AnchorMovementType == AnchorMovementType.BeforeInsertion && caretOffset == e.Offset) {
+				offsetVersion = TextEditorData.Version;
+				return;
+			}
 			var curVersion = TextEditorData.Version;
 			if (offsetVersion == null) {
 				offsetVersion = curVersion;
@@ -377,7 +381,6 @@ namespace Mono.TextEditor
 				if (curLine != null && column > curLine.Length)
 					newColumn = column;
 			}
-
 			line = newLocation.Line;
 			column = newColumn;
 

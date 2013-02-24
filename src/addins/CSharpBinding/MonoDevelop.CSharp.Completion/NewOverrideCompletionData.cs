@@ -47,7 +47,12 @@ namespace MonoDevelop.CSharp.Completion
 		IUnresolvedTypeDefinition  type;
 		
 		public bool GenerateBody { get; set; }
-		
+
+		public override TooltipInformation CreateTooltipInformation (bool smartWrap)
+		{
+			return MemberCompletionData.CreateTooltipInformation (ext, null, member, smartWrap);
+		}
+
 		public NewOverrideCompletionData (CSharpCompletionTextEditorExtension ext, int declarationBegin, IUnresolvedTypeDefinition type, IMember member) : base (null)
 		{
 			this.ext = ext;
@@ -63,7 +68,7 @@ namespace MonoDevelop.CSharp.Completion
 		
 		public override void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
 		{
-			var editor = ext.textEditorData;
+			var editor = ext.TextEditorData;
 			var generator = CodeGenerator.CreateGenerator (ext.Document);
 			bool isExplicit = false;
 			if (member.DeclaringTypeDefinition.Kind == TypeKind.Interface) {

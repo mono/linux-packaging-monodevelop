@@ -1,0 +1,4 @@
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.CSharpBinding.AspNet.dll.mdb
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.CSharpBinding.AspNet.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/CSharpBinding/AspNet/obj/Debug/MonoDevelop.CSharpBinding.AspNet.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/CSharpBinding/AspNet/obj/Debug/MonoDevelop.CSharpBinding.AspNet.dll.mdb

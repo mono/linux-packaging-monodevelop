@@ -28,6 +28,17 @@ using System;
 
 namespace Sharpen
 {
+	public class VirtualMachineError : Error
+	{
+	}
+
+	public class StackOverflowError : VirtualMachineError
+	{
+		public StackOverflowError ()
+		{
+		}
+	}
+
 	public class BrokenBarrierException : Exception
 	{
 	}
@@ -110,6 +121,17 @@ namespace Sharpen
 
 	internal class OverlappingFileLockException : Exception
 	{
+	}
+
+	public class ParseException : Exception
+	{
+		public ParseException ()
+		{
+		}
+
+		public ParseException (string msg, int errorOffset) : base(string.Format ("Msg: msg. Error Offset: {1}", msg, errorOffset))
+		{ 
+		}
 	}
 
 	public class RuntimeException : Exception

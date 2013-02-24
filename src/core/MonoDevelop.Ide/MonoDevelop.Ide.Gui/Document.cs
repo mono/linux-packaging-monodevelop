@@ -50,6 +50,7 @@ using MonoDevelop.Ide.TypeSystem;
 using ICSharpCode.NRefactory.TypeSystem;
 using ICSharpCode.NRefactory.TypeSystem.Implementation;
 using System.Text;
+using System.Collections.ObjectModel;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -78,14 +79,14 @@ namespace MonoDevelop.Ide.Gui
 		public T GetContent<T> () where T : class
 		{
 			//check whether the ViewContent can return the type directly
-			T ret = Window.ActiveViewContent.GetContent<T> ();
+			T ret = Window.ActiveViewContent.GetContent (typeof(T)) as T;
 			if (ret != null)
 				return ret;
 			
 			//check the primary viewcontent
 			//not sure if this is the right thing to do, but things depend on this behaviour
 			if (Window.ViewContent != Window.ActiveViewContent) {
-				ret = Window.ViewContent.GetContent<T> ();
+				ret = Window.ViewContent.GetContent (typeof(T)) as T;
 				if (ret != null)
 					return ret;
 			}
@@ -103,14 +104,14 @@ namespace MonoDevelop.Ide.Gui
 		public IEnumerable<T> GetContents<T> () where T : class
 		{
 			//check whether the ViewContent can return the type directly
-			T ret = Window.ActiveViewContent.GetContent<T> ();
+			T ret = (T) Window.ActiveViewContent.GetContent (typeof(T));
 			if (ret != null)
 				yield return ret;
 			
 			//check the primary viewcontent
 			//not sure if this is the right thing to do, but things depend on this behaviour
 			if (Window.ViewContent != Window.ActiveViewContent) {
-				ret = Window.ViewContent.GetContent<T> ();
+				ret = (T) Window.ViewContent.GetContent (typeof(T));
 				if (ret != null)
 					yield return ret;
 			}
@@ -147,6 +148,7 @@ namespace MonoDevelop.Ide.Gui
 				IdeApp.Workspace.ItemRemovedFromSolution += OnEntryRemoved;
 			if (window.ViewContent.Project != null)
 				window.ViewContent.Project.Modified += HandleProjectModified;
+			window.ViewsChanged += HandleViewsChanged;
 		}
 
 /*		void UpdateRegisteredDom (object sender, ProjectDomEventArgs e)
@@ -202,13 +204,13 @@ namespace MonoDevelop.Ide.Gui
 		}
 
 		IProjectContent singleFileContext;
-		public  virtual IProjectContent ProjectContent {
+		public  IProjectContent ProjectContent {
 			get {
 				return Project != null ? TypeSystemService.GetProjectContext (Project) : GetProjectContext ();
 			}
 		}
 		
-		public  virtual ICompilation Compilation {
+		public virtual ICompilation Compilation {
 			get {
 				return Project != null ? TypeSystemService.GetCompilation (Project) : GetProjectContext ().CreateCompilation ();
 			}
@@ -230,14 +232,59 @@ namespace MonoDevelop.Ide.Gui
 			window.SelectWindow ();
 		}
 		
-		public IBaseViewContent ActiveView {
-			get { return window.ActiveViewContent; }
+		public DocumentView ActiveView {
+			get {
+				LoadViews (true);
+				return WrapView (window.ActiveViewContent);
+			}
 		}
 		
-		public IViewContent PrimaryView {
-			get { return window.ViewContent; }
+		public DocumentView PrimaryView {
+			get {
+				LoadViews (true);
+				return WrapView (window.ViewContent);
+			}
 		}
-		
+
+		public ReadOnlyCollection<DocumentView> Views {
+			get {
+				LoadViews (true);
+				if (viewsRO == null)
+					viewsRO = new ReadOnlyCollection<DocumentView> (views);
+				return viewsRO;
+			}
+		}
+
+		ReadOnlyCollection<DocumentView> viewsRO;
+		List<DocumentView> views = new List<DocumentView> ();
+
+		void HandleViewsChanged (object sender, EventArgs e)
+		{
+			LoadViews (false);
+		}
+
+		void LoadViews (bool force)
+		{
+			if (!force && views == null)
+				return;
+			var newList = new List<DocumentView> ();
+			newList.Add (WrapView (window.ViewContent));
+			foreach (var v in window.SubViewContents)
+				newList.Add (WrapView (v));
+			views = newList;
+			viewsRO = null;
+		}
+
+		DocumentView WrapView (IBaseViewContent content)
+		{
+			if (content == null)
+				return null;
+			if (views != null)
+				return views.FirstOrDefault (v => v.BaseContent == content) ?? new DocumentView (this, content);
+			else
+				return new DocumentView (this, content);
+		}
+
 		public string Name {
 			get {
 				IViewContent view = Window.ViewContent;
@@ -245,19 +292,15 @@ namespace MonoDevelop.Ide.Gui
 			}
 		}
 
-		Mono.TextEditor.TextEditorData data = null;
+		Mono.TextEditor.ITextEditorDataProvider provider = null;
 		public Mono.TextEditor.TextEditorData Editor {
 			get {
-				if (data == null) {
-					Mono.TextEditor.ITextEditorDataProvider view = GetContent <Mono.TextEditor.ITextEditorDataProvider> ();
-					if (view != null) {
-						data = view.GetTextEditorData ();
-						if (data.IsDisposed)
-							return null;
-						data.Document.Tag = this;
-					}
+				if (provider == null) {
+					provider = GetContent <Mono.TextEditor.ITextEditorDataProvider> ();
+					if (provider == null)
+						return null;
 				}
-				return data;
+				return provider.GetTextEditorData ();
 			}
 		}
 
@@ -278,7 +321,7 @@ namespace MonoDevelop.Ide.Gui
 			}
 		}
 		
-		public virtual void Save ()
+		public void Save ()
 		{
 			// suspend type service "check all file loop" since we have already a parsed document.
 			// Or at least one that updates "soon".
@@ -383,9 +426,7 @@ namespace MonoDevelop.Ide.Gui
 				else
 					Window.ViewContent.Save (filename + "~");
 			}
-			lock (TypeSystemService.FilesSkippedInParseThread) {
-				TypeSystemService.FilesSkippedInParseThread.Remove (FileName);
-			}
+			TypeSystemService.RemoveSkippedfile (FileName);
 			// do actual save
 			if (tbuffer != null && encoding != null)
 				tbuffer.Save (filename, encoding);
@@ -399,7 +440,7 @@ namespace MonoDevelop.Ide.Gui
 			UpdateParseDocument ();
 		}
 		
-		public virtual bool IsBuildTarget
+		public bool IsBuildTarget
 		{
 			get
 			{
@@ -412,17 +453,17 @@ namespace MonoDevelop.Ide.Gui
 			}
 		}
 		
-		public virtual IAsyncOperation Build ()
+		public IAsyncOperation Build ()
 		{
 			return IdeApp.ProjectOperations.BuildFile (Window.ViewContent.ContentName);
 		}
 		
-		public virtual IAsyncOperation Rebuild ()
+		public IAsyncOperation Rebuild ()
 		{
 			return Build ();
 		}
 		
-		public virtual void Clean ()
+		public void Clean ()
 		{
 		}
 		
@@ -431,27 +472,27 @@ namespace MonoDevelop.Ide.Gui
 			return Run (Runtime.ProcessService.DefaultExecutionHandler);
 		}
 
-		public virtual IAsyncOperation Run (IExecutionHandler handler)
+		public IAsyncOperation Run (IExecutionHandler handler)
 		{
 			return IdeApp.ProjectOperations.ExecuteFile (Window.ViewContent.ContentName, handler);
 		}
 
-		public virtual bool CanRun ()
+		public bool CanRun ()
 		{
 			return CanRun (Runtime.ProcessService.DefaultExecutionHandler);
 		}
 		
-		public virtual bool CanRun (IExecutionHandler handler)
+		public bool CanRun (IExecutionHandler handler)
 		{
 			return IsBuildTarget && Window.ViewContent.ContentName != null && IdeApp.ProjectOperations.CanExecuteFile (Window.ViewContent.ContentName, handler);
 		}
 		
 		public bool Close ()
 		{
-			return Window.CloseWindow (false, true, 0);
+			return ((SdiWorkspaceWindow)Window).CloseWindow (false, true);
 		}
 		
-		protected virtual void OnSaved (EventArgs args)
+		void OnSaved (EventArgs args)
 		{
 			if (Saved != null)
 				Saved (this, args);
@@ -472,17 +513,18 @@ namespace MonoDevelop.Ide.Gui
 //			TypeSystemService.DomRegistered -= UpdateRegisteredDom;
 			CancelParseTimeout ();
 			ClearTasks ();
-
-			lock (TypeSystemService.FilesSkippedInParseThread) {
-				TypeSystemService.FilesSkippedInParseThread.Remove (FileName);
-			}
+			TypeSystemService.RemoveSkippedfile (FileName);
 			if (window is SdiWorkspaceWindow)
 				((SdiWorkspaceWindow)window).DetachFromPathedDocument ();
 			window.Closed -= OnClosed;
 			window.ActiveViewContentChanged -= OnActiveViewContentChanged;
 			if (IdeApp.Workspace != null)
 				IdeApp.Workspace.ItemRemovedFromSolution -= OnEntryRemoved;
-			
+
+			// Unsubscribe project events
+			if (window.ViewContent.Project != null)
+				window.ViewContent.Project.Modified -= HandleProjectModified;
+
 			try {
 				OnClosed (a);
 			} catch (Exception ex) {
@@ -513,7 +555,7 @@ namespace MonoDevelop.Ide.Gui
 			}*/
 			
 			parsedDocument = null;
-			data = null;
+			provider = null;
 			Counters.OpenDocuments--;
 		}
 #region document tasks
@@ -548,13 +590,13 @@ namespace MonoDevelop.Ide.Gui
 			OnViewChanged (args);
 		}
 		
-		protected virtual void OnClosed (EventArgs args)
+		void OnClosed (EventArgs args)
 		{
 			if (Closed != null)
 				Closed (this, args);
 		}
 		
-		protected virtual void OnViewChanged (EventArgs args)
+		void OnViewChanged (EventArgs args)
 		{
 			if (ViewChanged != null)
 				ViewChanged (this, args);
@@ -657,6 +699,9 @@ namespace MonoDevelop.Ide.Gui
 			editorExtension = null;
 			ISupportsProjectReload pr = GetContent<ISupportsProjectReload> ();
 			if (pr != null) {
+				// Unsubscribe project events
+				if (Window.ViewContent.Project != null)
+					Window.ViewContent.Project.Modified -= HandleProjectModified;
 				Window.ViewContent.Project = project;
 				pr.Update (project);
 			}
@@ -688,13 +733,11 @@ namespace MonoDevelop.Ide.Gui
 				var editor = Editor;
 				if (editor == null)
 					return null;
-				lock (TypeSystemService.FilesSkippedInParseThread) {
-					TypeSystemService.FilesSkippedInParseThread.Add (currentParseFile);
-				}
+				TypeSystemService.AddSkippedFile (currentParseFile);
 				string currentParseText = editor.Text;
 				this.parsedDocument = TypeSystemService.ParseFile (Project, currentParseFile, editor.Document.MimeType, currentParseText);
 				if (Project == null && this.parsedDocument != null) {
-					singleFileContext = GetProjectContext ().UpdateProjectContent (singleFileContext.GetFile (currentParseFile), parsedDocument.ParsedFile);
+					singleFileContext = GetProjectContext ().AddOrUpdateFiles (parsedDocument.ParsedFile);
 				}
 			} finally {
 				OnDocumentParsed (EventArgs.Empty);
@@ -718,7 +761,7 @@ namespace MonoDevelop.Ide.Gui
 					singleFileContext = singleFileContext.AddAssemblyReferences (new [] { Mscorlib, System, SystemCore });
 				}
 				if (parsedDocument != null)
-					return singleFileContext.UpdateProjectContent (null, parsedDocument.ParsedFile);
+					return singleFileContext.AddOrUpdateFiles (parsedDocument.ParsedFile);
 				return singleFileContext;
 			}
 			
@@ -741,9 +784,7 @@ namespace MonoDevelop.Ide.Gui
 				string currentParseText = editor.Text;
 				string mimeType = editor.Document.MimeType;
 				ThreadPool.QueueUserWorkItem (delegate {
-					lock (TypeSystemService.FilesSkippedInParseThread) {
-						TypeSystemService.FilesSkippedInParseThread.Add (currentParseFile);
-					}
+					TypeSystemService.AddSkippedFile (currentParseFile);
 					var currentParsedDocument = TypeSystemService.ParseFile (Project, currentParseFile, mimeType, currentParseText);
 					Application.Invoke (delegate {
 						// this may be called after the document has closed, in that case the OnDocumentParsed event shouldn't be invoked.
@@ -782,7 +823,7 @@ namespace MonoDevelop.Ide.Gui
 				window.ViewContent.Project = null;
 		}
 		
-		protected virtual void OnDocumentParsed (EventArgs e)
+		void OnDocumentParsed (EventArgs e)
 		{
 			EventHandler handler = this.DocumentParsed;
 			if (handler != null)
@@ -797,7 +838,10 @@ namespace MonoDevelop.Ide.Gui
 		
 		public string[] CommentTags {
 			get {
-				return GetCommentTags (FileName);
+				if (IsFile)
+					return GetCommentTags (FileName);
+				else
+					return null;
 			}
 		}
 		

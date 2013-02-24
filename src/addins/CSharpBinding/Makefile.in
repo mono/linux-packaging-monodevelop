@@ -14,7 +14,6 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
-
 VPATH = @srcdir@
 pkgdatadir = $(datadir)/@PACKAGE@
 pkgincludedir = $(includedir)/@PACKAGE@
@@ -33,7 +32,7 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	$(top_srcdir)/Makefile.include ChangeLog
+	$(top_srcdir)/xbuild.include ChangeLog
 subdir = src/addins/CSharpBinding
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
@@ -51,29 +50,6 @@ RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	install-pdf-recursive install-ps-recursive install-recursive \
 	installcheck-recursive installdirs-recursive pdf-recursive \
 	ps-recursive uninstall-recursive
-am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
-am__vpath_adj = case $$p in \
-    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
-    *) f=$$p;; \
-  esac;
-am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
-am__install_max = 40
-am__nobase_strip_setup = \
-  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
-am__nobase_strip = \
-  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
-am__nobase_list = $(am__nobase_strip_setup); \
-  for p in $$list; do echo "$$p $$p"; done | \
-  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
-  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
-    if (++n[$$2] == $(am__install_max)) \
-      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
-    END { for (dir in files) print dir, files[dir] }'
-am__base_list = \
-  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
-  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
-am__installdirs = "$(DESTDIR)$(csharpbindinglibdir)"
-DATA = $(csharpbindinglib_DATA)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -159,12 +135,6 @@ MKDIR_P = @MKDIR_P@
 MONO = @MONO@
 MONODOC_CFLAGS = @MONODOC_CFLAGS@
 MONODOC_LIBS = @MONODOC_LIBS@
-MONO_ADDINS_CFLAGS = @MONO_ADDINS_CFLAGS@
-MONO_ADDINS_GUI_CFLAGS = @MONO_ADDINS_GUI_CFLAGS@
-MONO_ADDINS_GUI_LIBS = @MONO_ADDINS_GUI_LIBS@
-MONO_ADDINS_LIBS = @MONO_ADDINS_LIBS@
-MONO_ADDINS_SETUP_CFLAGS = @MONO_ADDINS_SETUP_CFLAGS@
-MONO_ADDINS_SETUP_LIBS = @MONO_ADDINS_SETUP_LIBS@
 MONO_GAC_PREFIX = @MONO_GAC_PREFIX@
 MONO_NUNIT_CFLAGS = @MONO_NUNIT_CFLAGS@
 MONO_NUNIT_LIBS = @MONO_NUNIT_LIBS@
@@ -234,148 +204,33 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = . Autotools AspNet
-ADDIN_BUILD = $(top_builddir)/build/AddIns/BackendBindings
-ASSEMBLY = $(ADDIN_BUILD)/MonoDevelop.CSharpBinding.dll
+ALL_CSPROJ = $(wildcard *.csproj)
+MAIN_SLN = $(top_builddir)/Main.sln
+@ENABLE_GNOMEPLATFORM_TRUE@PROFILE_NAME = Debug
+@ENABLE_MACPLATFORM_TRUE@PROFILE_NAME = DebugMac
+@ENABLE_WINDOWSPLATFORM_TRUE@PROFILE_NAME = DebugWin32
+XBUILD = xbuild
+XBUILD_VERBOSITY = quiet
+XBUILD_ARGS = /verbosity:$(XBUILD_VERBOSITY) /nologo /property:CodePage=65001
+XBUILD_PROFILE = /property:Configuration=$(PROFILE_NAME)
+
+# Figure out how far we are from top_builddir
+DEPTH = $(shell echo "$(top_builddir)" | tr '/' '\n' | grep -c '..')
+EXTS := *.bmp *.cs *.csproj *.html *.png *.snk *.config *.stetic *.glade *.xml *.xsd *.exe.addins *.template *.tt *.txt
+ALL_FILES := $(EXTS) \
+		$(addprefix */,$(EXTS))		\
+		$(addprefix */*/,$(EXTS))	\
+		$(addprefix */*/*/,$(EXTS))	\
+		$(addprefix */*/*/*/,$(EXTS))	\
+		$(addprefix */*/*/*/*/,$(EXTS))	\
+		$(wildcard icons/*)		\
+		$(wildcard templates/*)
+
+WILDCARDED_FILES := $(wildcard $(ALL_FILES))
+EXTRA_DIST = \
+	$(wildcard $(ALL_FILES))
+
 PARSE = parse.exe
-DEPS = \
-	$(top_builddir)/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll \
-	$(top_builddir)/build/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll \
-	$(top_builddir)/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll \
-	$(top_builddir)/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll \
-	$(top_builddir)/build/bin/ICSharpCode.Decompiler.dll \
-	$(top_builddir)/build/bin/ICSharpCode.NRefactory.CSharp.dll \
-	$(top_builddir)/build/bin/ICSharpCode.NRefactory.dll \
-	$(top_builddir)/build/bin/Mono.Debugging.dll \
-	$(top_builddir)/build/bin/Mono.TextEditor.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll \
-	$(top_builddir)/build/bin/OldNRefactory.dll \
-	$(top_builddir)/external/cecil/bin/net_4_0_Debug/Mono.Cecil.dll
-
-REFS = \
-	$(GLIB_SHARP_LIBS) \
-	$(GTK_SHARP_LIBS) \
-	$(MONO_ADDINS_LIBS) \
-	-r:Mono.Cairo \
-	-r:Mono.Posix \
-	-r:System \
-	-r:System.Core \
-	-r:System.Drawing \
-	-r:System.Xml
-
-FILES = \
-	AssemblyInfo.cs \
-	gtk-gui/generated.cs \
-	gtk-gui/MonoDevelop.CodeGeneration.GenerateCodeWindow.cs \
-	gtk-gui/MonoDevelop.CSharp.Formatting.CSharpFormattingPolicyPanelWidget.cs \
-	gtk-gui/MonoDevelop.CSharp.Formatting.CSharpFormattingProfileDialog.cs \
-	gtk-gui/MonoDevelop.CSharp.Formatting.NewFormattingProfileDialog.cs \
-	gtk-gui/MonoDevelop.CSharp.Project.CodeGenerationPanelWidget.cs \
-	gtk-gui/MonoDevelop.CSharp.Project.CompilerOptionsPanelWidget.cs \
-	gtk-gui/MonoDevelop.CSharp.Refactoring.CodeIssues.NameConventionEditRuleDialog.cs \
-	gtk-gui/MonoDevelop.CSharp.Refactoring.CodeIssues.NameConventionPanelWidget.cs \
-	MonoDevelop.CSharp.CodeGeneration/AbstractGenerateAction.cs \
-	MonoDevelop.CSharp.CodeGeneration/CodeGenerationCommands.cs \
-	MonoDevelop.CSharp.CodeGeneration/CodeGenerationOptions.cs \
-	MonoDevelop.CSharp.CodeGeneration/CreateConstructorGenerator.cs \
-	MonoDevelop.CSharp.CodeGeneration/EqualityMembersGenerator.cs \
-	MonoDevelop.CSharp.CodeGeneration/GenerateCodeWindow.cs \
-	MonoDevelop.CSharp.CodeGeneration/ICodeGenerator.cs \
-	MonoDevelop.CSharp.CodeGeneration/OverrideMembersGenerator.cs \
-	MonoDevelop.CSharp.CodeGeneration/PropertyGenerator.cs \
-	MonoDevelop.CSharp.CodeGeneration/RaiseEventMethodGenerator.cs \
-	MonoDevelop.CSharp.CodeGeneration/ReadonlyPropertyGenerator.cs \
-	MonoDevelop.CSharp.CodeGeneration/ToStringGenerator.cs \
-	MonoDevelop.CSharp.CodeGeneration/WriteLineGenerator.cs \
-	MonoDevelop.CSharp.Completion/CompletionTextLinkMode.cs \
-	MonoDevelop.CSharp.Completion/ConstructorParameterDataProvider.cs \
-	MonoDevelop.CSharp.Completion/CSharpCompletionTextEditorExtension.cs \
-	MonoDevelop.CSharp.Completion/DelegateDataProvider.cs \
-	MonoDevelop.CSharp.Completion/EventCreationCompletionData.cs \
-	MonoDevelop.CSharp.Completion/IndexerParameterDataProvider.cs \
-	MonoDevelop.CSharp.Completion/MemberCompletionData.cs \
-	MonoDevelop.CSharp.Completion/MethodParameterDataProvider.cs \
-	MonoDevelop.CSharp.Completion/NewOverrideCompletionData.cs \
-	MonoDevelop.CSharp.Completion/TemplateParameterDataProvider.cs \
-	MonoDevelop.CSharp.Completion/VariableCompletionData.cs \
-	MonoDevelop.CSharp.Formatting/CSharpFormatter.cs \
-	MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.cs \
-	MonoDevelop.CSharp.Formatting/CSharpFormattingPolicyPanel.cs \
-	MonoDevelop.CSharp.Formatting/CSharpFormattingPolicyPanelWidget.cs \
-	MonoDevelop.CSharp.Formatting/CSharpFormattingProfileDialog.cs \
-	MonoDevelop.CSharp.Formatting/CSharpFormattingProperties.cs \
-	MonoDevelop.CSharp.Formatting/CSharpIndentEngine.cs \
-	MonoDevelop.CSharp.Formatting/CSharpIndentEngineStack.cs \
-	MonoDevelop.CSharp.Formatting/CSharpIndentVirtualSpaceManager.cs \
-	MonoDevelop.CSharp.Formatting/CSharpTextEditorIndentation.cs \
-	MonoDevelop.CSharp.Formatting/Indent.cs \
-	MonoDevelop.CSharp.Formatting/NewFormattingProfileDialog.cs \
-	MonoDevelop.CSharp.Formatting/OnTheFlyFormatter.cs \
-	MonoDevelop.CSharp.Highlighting/CSharpSyntaxMode.cs \
-	MonoDevelop.CSharp.Highlighting/HighlightUsagesExtension.cs \
-	MonoDevelop.CSharp.Highlighting/MoveToUsagesHandler.cs \
-	MonoDevelop.CSharp.Parser/CSharpFoldingParser.cs \
-	MonoDevelop.CSharp.Parser/TypeSystemProvider.cs \
-	MonoDevelop.CSharp.Project/CodeGenerationPanel.cs \
-	MonoDevelop.CSharp.Project/CompilerOptionsPanelWidget.cs \
-	MonoDevelop.CSharp.Project/CSharpCompilerParameters.cs \
-	MonoDevelop.CSharp.Project/CSharpProjectParameters.cs \
-	MonoDevelop.CSharp.Project/CSharpResourceIdBuilder.cs \
-	MonoDevelop.CSharp.Refactoring.CodeActions/Actions/MoveTypeToFile.cs \
-	MonoDevelop.CSharp.Refactoring.CodeActions/ContextActionExtensions.cs \
-	MonoDevelop.CSharp.Refactoring.CodeActions/MDRefactoringContext.cs \
-	MonoDevelop.CSharp.Refactoring.CodeActions/MDRefactoringScript.cs \
-	MonoDevelop.CSharp.Refactoring.CodeActions/NRefactoryCodeAction.cs \
-	MonoDevelop.CSharp.Refactoring.CodeActions/NRefactoryCodeActionProvider.cs \
-	MonoDevelop.CSharp.Refactoring.CodeActions/NRefactoryCodeActionSource.cs \
-	MonoDevelop.CSharp.Refactoring.CodeIssues/NamingInspection/NameConventionEditRuleDialog.cs \
-	MonoDevelop.CSharp.Refactoring.CodeIssues/NamingInspection/NameConventionPanel.cs \
-	MonoDevelop.CSharp.Refactoring.CodeIssues/NamingInspection/NameConventionPanelWidget.cs \
-	MonoDevelop.CSharp.Refactoring.CodeIssues/NamingInspection/NameConventionPolicy.cs \
-	MonoDevelop.CSharp.Refactoring.CodeIssues/NamingInspection/NameConventionRule.cs \
-	MonoDevelop.CSharp.Refactoring.CodeIssues/NRefactoryCodeIssueSource.cs \
-	MonoDevelop.CSharp.Refactoring.CodeIssues/NRefactoryIssueProvider.cs \
-	MonoDevelop.CSharp.Refactoring/CSharpCodeGenerator.cs \
-	MonoDevelop.CSharp.Refactoring/CSharpReferenceFinder.cs \
-	MonoDevelop.CSharp.Refactoring/HelperMethods.cs \
-	MonoDevelop.CSharp.Resolver/HelperMethods.cs \
-	MonoDevelop.CSharp.Resolver/TextEditorResolverProvider.cs \
-	MonoDevelop.CSharp.Tooltips/LanguageItemTooltipProvider.cs \
-	MonoDevelop.CSharp/AstAmbience.cs \
-	MonoDevelop.CSharp/AstStockIcons.cs \
-	MonoDevelop.CSharp/CSharpAmbience.cs \
-	MonoDevelop.CSharp/CSharpBindingCompilerManager.cs \
-	MonoDevelop.CSharp/CSharpEnhancedCodeProvider.cs \
-	MonoDevelop.CSharp/CSharpLanguageBinding.cs \
-	MonoDevelop.CSharp/ExpandSelectionHandler.cs \
-	MonoDevelop.CSharp/PathedDocumentTextEditorExtension.cs
-
-RES = \
-	CSharpBinding.addin.xml \
-	gtk-gui/gui.stetic \
-	gtk-gui/objects.xml \
-	icons/C\#.FileIcon \
-	icons/csharp-icon-32.png \
-	icons/csharp-project-16.png \
-	md1format.xml \
-	MonoDevelop.CSharp.Formatting/CSharpFormattingPolicy.xml \
-	MonoDevelop.CSharp.Formatting/policies/AllmanCSharpPolicy.xml \
-	MonoDevelop.CSharp.Formatting/policies/GNUCSharpPolicy.xml \
-	MonoDevelop.CSharp.Formatting/policies/GNUTextStylePolicy.xml \
-	MonoDevelop.CSharp.Formatting/policies/InvariantTextStylePolicy.xml \
-	MonoDevelop.CSharp.Formatting/policies/KRCSharpPolicy.xml \
-	MonoDevelop.CSharp.Formatting/policies/MonoCSharpPolicy.xml \
-	MonoDevelop.CSharp.Formatting/policies/SharpDevelopCSharpPolicy.xml \
-	MonoDevelop.CSharp.Formatting/policies/WhitesmithsCSharpPolicy.xml \
-	MonoDevelop.CSharp.Refactoring.CodeIssues/NamingInspection/MonoNameConventionPolicy.xml \
-	templates/AssemblyInfo.xft.xml \
-	templates/ConsoleProject.xpt.xml \
-	templates/EmptyCSharpFile.xft.xml \
-	templates/EmptyProject.xpt.xml \
-	templates/GtkSharp2Project.xpt.xml \
-	templates/Library.xpt.xml \
-	templates/PortableLibrary.xpt.xml
-
 TESTFILES = \
 	CSharpAmbience.cs \
 	CSharpBindingCompilerManager.cs \
@@ -415,29 +270,11 @@ TESTDLLS = \
 	$(NUNIT_LIBS)
 
 TESTASSEMBLY = $(top_builddir)/build/bin/CSharpBinding.Test.dll
-csharpbindinglibdir = $(MD_ADDIN_DIR)/BackendBindings
-csharpbindinglib_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
-CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb $(PARSE) $(PARSE).mdb
-EXTRA_DIST = $(FILES) $(RES)
-build_deps = $(addprefix -r:, $(DEPS))
-build_sources = $(addprefix $(srcdir)/, $(FILES)) $(GENERATED_FILES)
-build_resources = $(addprefix $(srcdir)/, $(RES))
-build_test_sources = $(addprefix $(srcdir)/, $(TESTFILES)) $(GENERATED_FILES)
-MD_BIN_PATH = $(abs_top_builddir)/build/bin
-MD_LAUNCH_SETUP = \
-	PATH="$(PATH)" \
-	PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
-	LD_LIBRARY_PATH="$(LD_LIBRARY_PATH)" \
-	DYLD_FALLBACK_LIBRARY_PATH="$(DYLD_FALLBACK_LIBRARY_PATH)" \
-	MONO_GAC_PREFIX="$(MONO_GAC_PREFIX)" \
-	MONODEVELOP_LOCALE_PATH="$(abs_top_builddir)/build/locale" \
-	MONO_ADDINS_REGISTRY="$(MD_BIN_PATH)"
-
-MDTOOL_RUN = $(MD_LAUNCH_SETUP) exec -a "mdtool" $(RUNTIME) --debug "$(MD_BIN_PATH)/mdtool.exe"
+CLEANFILES = $(PARSE) $(PARSE).mdb
 all: all-recursive
 
 .SUFFIXES:
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/Makefile.include $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/xbuild.include $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -467,26 +304,6 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-install-csharpbindinglibDATA: $(csharpbindinglib_DATA)
-	@$(NORMAL_INSTALL)
-	test -z "$(csharpbindinglibdir)" || $(MKDIR_P) "$(DESTDIR)$(csharpbindinglibdir)"
-	@list='$(csharpbindinglib_DATA)'; test -n "$(csharpbindinglibdir)" || list=; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(csharpbindinglibdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(csharpbindinglibdir)" || exit $$?; \
-	done
-
-uninstall-csharpbindinglibDATA:
-	@$(NORMAL_UNINSTALL)
-	@list='$(csharpbindinglib_DATA)'; test -n "$(csharpbindinglibdir)" || list=; \
-	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	test -n "$$files" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(csharpbindinglibdir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(csharpbindinglibdir)" && rm -f $$files
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run `make' without going through this Makefile.
@@ -683,12 +500,9 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-recursive
-all-am: Makefile $(DATA)
+all-am: Makefile
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(csharpbindinglibdir)"; do \
-	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
-	done
 install: install-recursive
 install-exec: install-exec-recursive
 install-data: install-data-recursive
@@ -715,8 +529,6 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-clean: clean-recursive
-
 clean-am: clean-generic mostlyclean-am
 
 distclean: distclean-recursive
@@ -735,7 +547,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-csharpbindinglibDATA
+install-data-am:
 
 install-dvi: install-dvi-recursive
 
@@ -779,7 +591,7 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-csharpbindinglibDATA
+uninstall-am:
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) ctags-recursive \
 	install-am install-strip tags-recursive
@@ -788,28 +600,44 @@ uninstall-am: uninstall-csharpbindinglibDATA
 	all all-am check check-am clean clean-generic ctags \
 	ctags-recursive distclean distclean-generic distclean-tags \
 	distdir dvi dvi-am html html-am info info-am install \
-	install-am install-csharpbindinglibDATA install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
-	pdf-am ps ps-am tags tags-recursive uninstall uninstall-am \
-	uninstall-csharpbindinglibDATA
+	install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	installdirs-am maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-generic pdf pdf-am ps ps-am tags \
+	tags-recursive uninstall uninstall-am
 
 
-all: $(ASSEMBLY) $(ASSEMBLY).mdb
+all: csproj_build
 
-$(ASSEMBLY): $(build_sources) $(build_resources) $(DEPS)
-	mkdir -p $(ADDIN_BUILD)
-	$(CSC) $(CSC_FLAGS) "-define:GMCS_SOURCE;NET_2_0;MS_COMPATIBLE;FULL_AST;BOOTSTRAP_BASIC" -unsafe  -debug -out:$@ -target:library $(REFS) $(build_deps) \
-		$(build_resources:%=/resource:%) $(build_sources)
+clean: csproj_clean
 
-$(ASSEMBLY).mdb: $(ASSEMBLY)
+csproj_build:
+	@if test x$(SKIP) != xy -a $(DEPTH) -gt $(MAKELEVEL); then \
+	echo Building $(ALL_CSPROJ); \
+	for p in $(ALL_CSPROJ); do $(XBUILD) $(XBUILD_ARGS) $$p; done \
+	fi
 
-#check: all $(TESTASSEMBLY)
-#	MONO_PATH=$(top_builddir)/build/AddIns nunit-console $(TESTASSEMBLY)
+csproj_clean:
+	@if test x$(SKIP) != xy -a $(DEPTH) -gt $(MAKELEVEL); then \
+	echo Cleaning $(ALL_CSPROJ); \
+	for p in $(ALL_CSPROJ); do $(XBUILD) $(XBUILD_ARGS) $$p /t:Clean; done \
+	fi
+
+sln_build:
+	@echo Building $(MAIN_SLN)
+	$(XBUILD) $(XBUILD_ARGS) $(MAIN_SLN) $(XBUILD_PROFILE)
+
+sln_clean:
+	@echo Cleaning $(MAIN_SLN)
+	$(XBUILD) $(XBUILD_ARGS) $(MAIN_SLN) $(XBUILD_PROFILE) /t:Clean
+
+print_extradist:
+	@echo $(WILDCARDED_FILES)
+
+.PHONY: all clean csproj_build csproj_clean sln_build sln_clean
 
 $(TESTASSEMBLY) : $(build_test_sources) $(build_resources)
 	$(CSC) $(CSC_FLAGS) -debug "-define:GMCS_SOURCE;NET_2_0;MS_COMPATIBLE;FULL_AST;BOOTSTRAP_BASIC" -unsafe  -codepage:utf8 -out:$@ -target:library $(DLLS) $(TESTDLLS) $(REFS) /r:$(ASSEMBLY) \
@@ -817,15 +645,11 @@ $(TESTASSEMBLY) : $(build_test_sources) $(build_resources)
 
 parse: $(PARSE)
 
-$(PARSE): parse.cs $(ASSEMBLY)
+$(PARSE): parse.cs all
 	$(CSC) -out:$@ parse.cs $(REFS) -r:$(ASSEMBLY)
 
 run-parse-test: $(PARSE)
 	MONO_PATH=$(top_builddir)/build/AddIns/BackendBindings/:$(top_builddir)/build/bin/ mono $(PARSE) .
-
-# workaroundfor lack of abs_top_builddir variable in automake < 1.10. Will break if mdtool isn't 
-# launched from top_srcdir (i.e. where this script is located)
-abs_top_builddir ?= $(top_builddir)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

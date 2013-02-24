@@ -66,7 +66,10 @@ namespace MonoDevelop.CSharp.Refactoring
 			var firstMember = searchedMembers.FirstOrDefault ();
 			if (firstMember is INamedElement) {
 				var namedElement = (INamedElement)firstMember;
-				memberName = namedElement.Name;
+				var name = namedElement.Name;
+				if (namedElement is IMethod && (((IMethod)namedElement).IsConstructor | ((IMethod)namedElement).IsDestructor))
+					name = ((IMethod)namedElement).DeclaringType.Name;
+				memberName = name;
 
 				keywordName = CSharpAmbience.NetToCSharpTypeName (namedElement.FullName);
 				if (keywordName == namedElement.FullName)
@@ -134,7 +137,9 @@ namespace MonoDevelop.CSharp.Refactoring
 			
 			if (node is TypeDeclaration && (searchedMembers.First () is IType)) 
 				node = ((TypeDeclaration)node).NameToken;
-			
+			if (node is DelegateDeclaration) 
+				node = ((DelegateDeclaration)node).NameToken;
+
 			if (node is EntityDeclaration && (searchedMembers.First () is IMember)) 
 				node = ((EntityDeclaration)node).NameToken;
 			
@@ -176,13 +181,20 @@ namespace MonoDevelop.CSharp.Refactoring
 			var parsedDocument = doc.ParsedDocument;
 			if (parsedDocument == null)
 				return Enumerable.Empty<MemberReference> ();
-			var unit = parsedDocument.GetAst<CompilationUnit> ();
-			var file = parsedDocument.ParsedFile as CSharpParsedFile;
+			var unit = parsedDocument.GetAst<SyntaxTree> ();
+			var file = parsedDocument.ParsedFile as CSharpUnresolvedFile;
 			var result = new List<MemberReference> ();
 			
 			foreach (var obj in searchedMembers) {
 				if (obj is IEntity) {
-					refFinder.FindReferencesInFile (refFinder.GetSearchScopes ((IEntity)obj), file, unit, doc.Compilation, (astNode, r) => {
+					var entity = (IEntity)obj;
+
+					// May happen for anonymous types since empty constructors are always generated.
+					// But there is no declaring type definition for them - we filter out this case.
+					if (entity.EntityType == EntityType.Constructor && entity.DeclaringTypeDefinition == null)
+						continue;
+
+					refFinder.FindReferencesInFile (refFinder.GetSearchScopes (entity), file, unit, doc.Compilation, (astNode, r) => {
 						if (IsNodeValid (obj, astNode))
 							result.Add (GetReference (r, astNode, editor.FileName, editor)); 
 					}, CancellationToken.None);
@@ -203,15 +215,13 @@ namespace MonoDevelop.CSharp.Refactoring
 		
 		public override IEnumerable<MemberReference> FindReferences (Project project, IProjectContent content, IEnumerable<FilePath> possibleFiles, IEnumerable<object> members)
 		{
-			if (project == null)
-				throw new ArgumentNullException ("project", "Project not set.");
 			if (content == null)
 				throw new ArgumentNullException ("content", "Project content not set.");
 			SetPossibleFiles (possibleFiles);
 			SetSearchedMembers (members);
-			
+
 			var scopes = searchedMembers.Select (e => refFinder.GetSearchScopes (e as IEntity));
-			var compilation = TypeSystemService.GetCompilation (project);
+			var compilation = project != null ? TypeSystemService.GetCompilation (project) : content.CreateCompilation ();
 			List<MemberReference> refs = new List<MemberReference> ();
 			foreach (var opendoc in openDocuments) {
 				foreach (var newRef in FindInDocument (opendoc.Item2)) {
@@ -233,16 +243,16 @@ namespace MonoDevelop.CSharp.Refactoring
 						continue;
 					
 					var storedFile = content.GetFile (file);
-					var parsedFile = storedFile as CSharpParsedFile;
+					var parsedFile = storedFile as CSharpUnresolvedFile;
 					
 					if (parsedFile == null && storedFile is ParsedDocumentDecorator) {
-						parsedFile = ((ParsedDocumentDecorator)storedFile).ParsedFile as CSharpParsedFile;
+						parsedFile = ((ParsedDocumentDecorator)storedFile).ParsedFile as CSharpUnresolvedFile;
 					}
 					
 					if (parsedFile == null) {
 						// for fallback purposes - should never happen.
 						parsedFile = unit.ToTypeSystem ();
-						content = content.UpdateProjectContent (content.GetFile (file), parsedFile);
+						content = content.AddOrUpdateFiles (parsedFile);
 						compilation = content.CreateCompilation ();
 					}
 					foreach (var scope in scopes) {

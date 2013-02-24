@@ -239,8 +239,8 @@ namespace Sharpen
 
 		public static InputStream GetResourceAsStream (this Type type, string name)
 		{
-			string str2 = type.Assembly.GetName ().Name;
-			string[] textArray1 = new string[] { str2, ".resources.", type.Namespace, ".", name };
+			string str2 = type.Assembly.GetName ().Name + ".resources";
+			string[] textArray1 = new string[] { str2, ".", type.Namespace, ".", name };
 			string str = string.Concat (textArray1);
 			Stream manifestResourceStream = type.Assembly.GetManifestResourceStream (str);
 			if (manifestResourceStream == null) {
@@ -261,6 +261,24 @@ namespace Sharpen
 				return tz;
 			} catch {
 				// Not found
+			}
+
+            // Mono and Java allow you to specify timezones by short id (i.e. EST instead of Eastern Standard Time).
+            // Mono on Windows and the microsoft framewokr on windows do not allow this. This hack is to compensate
+            // for that and allow you to match 'EST' to 'Eastern Standard Time' by matching the first letter of each
+            // word to the corresponding character in the short string. Bleh.
+			if (tzone.Length <= 4) {
+				foreach (var timezone in TimeZoneInfo.GetSystemTimeZones ()) {
+					var parts = timezone.Id.Split (new [] {' '}, StringSplitOptions.RemoveEmptyEntries);
+					if (parts.Length == tzone.Length) {
+						bool found = true;
+						for (int i = 0; i <parts.Length; i++)
+							found &= parts[i][0] == tzone[i];
+
+						if (found)
+							return timezone;
+					}
+				}
 			}
 			char[] separator = new char[] { ':' };
 			string[] strArray = tzone.Substring (4).Split (separator);
@@ -608,7 +626,7 @@ namespace Sharpen
 		public static int GetTotalInFixed (this Inflater inf)
 		{
 			if (inf.TotalIn > 0)
-				return inf.TotalIn + 4;
+				return Convert.ToInt32( inf.TotalIn ) + 4;
 			else
 				return 0;
 		}

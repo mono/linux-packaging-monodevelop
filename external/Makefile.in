@@ -94,12 +94,6 @@ MKDIR_P = @MKDIR_P@
 MONO = @MONO@
 MONODOC_CFLAGS = @MONODOC_CFLAGS@
 MONODOC_LIBS = @MONODOC_LIBS@
-MONO_ADDINS_CFLAGS = @MONO_ADDINS_CFLAGS@
-MONO_ADDINS_GUI_CFLAGS = @MONO_ADDINS_GUI_CFLAGS@
-MONO_ADDINS_GUI_LIBS = @MONO_ADDINS_GUI_LIBS@
-MONO_ADDINS_LIBS = @MONO_ADDINS_LIBS@
-MONO_ADDINS_SETUP_CFLAGS = @MONO_ADDINS_SETUP_CFLAGS@
-MONO_ADDINS_SETUP_LIBS = @MONO_ADDINS_SETUP_LIBS@
 MONO_GAC_PREFIX = @MONO_GAC_PREFIX@
 MONO_NUNIT_CFLAGS = @MONO_NUNIT_CFLAGS@
 MONO_NUNIT_LIBS = @MONO_NUNIT_LIBS@
@@ -169,12 +163,6 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 TARBALL_PATH = ../../tarballs/external
-NGIT_SLN = ngit/ngit.sln
-NGIT = $(NGIT_SLN) /t:NGit
-CECIL_SLN = cecil/Mono.Cecil.sln
-CECIL = /property:Configuration=net_4_0_Debug $(CECIL_SLN)
-CECIL_OUTPUT = cecil/bin/net_4_0_Debug
-OUTPUT = ../build/bin
 all: all-am
 
 .SUFFIXES:
@@ -319,18 +307,14 @@ uninstall-am:
 
 
 all:
-	mkdir -p $(OUTPUT)
-	xbuild $(NGIT)
-	cp ngit/bin/* $(OUTPUT)
-	xbuild $(CECIL)
-	cp $(CECIL_OUTPUT)/Mono.Cecil.dll $(OUTPUT)
-	cp $(CECIL_OUTPUT)/Mono.Cecil.dll.mdb $(OUTPUT)
-	cp $(CECIL_OUTPUT)/Mono.Cecil.Mdb.dll $(OUTPUT)
-	cp $(CECIL_OUTPUT)/Mono.Cecil.Mdb.dll.mdb $(OUTPUT)
 
 clean:
-	@if test -f $(NGIT_SLN); then xbuild $(NGIT) /t:Clean; fi
-	@if test -f $(CECIL_SLN); then xbuild $(CECIL) /t:Clean; fi
+
+@ENABLE_MACPLATFORM_TRUE@all:
+@ENABLE_MACPLATFORM_TRUE@	$(MAKE) -C monomac/src
+
+@ENABLE_MACPLATFORM_TRUE@clean:
+@ENABLE_MACPLATFORM_TRUE@	$(MAKE) -C monomac/src clean
 
 install:
 

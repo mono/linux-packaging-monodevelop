@@ -781,6 +781,7 @@ namespace NGit.Treewalk
 		/// start of name component part within
 		/// <see cref="GetEntryPathBuffer()">GetEntryPathBuffer()</see>
 		/// </returns>
+		/// <since>2.0</since>
 		public virtual int GetNameOffset()
 		{
 			return pathOffset;
@@ -803,6 +804,11 @@ namespace NGit.Treewalk
 		public virtual void GetName(byte[] buffer, int offset)
 		{
 			System.Array.Copy(path, pathOffset, buffer, offset, pathLen - pathOffset);
+		}
+
+		public override string ToString()
+		{
+			return GetType().Name + "[" + EntryPathString + "]";
 		}
 	}
 }

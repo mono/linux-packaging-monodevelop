@@ -45,6 +45,7 @@ using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Ide.TypeSystem;
 using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory;
+using ICSharpCode.NRefactory.CSharp.Resolver;
 
 namespace MonoDevelop.Refactoring
 {
@@ -58,7 +59,7 @@ namespace MonoDevelop.Refactoring
 	{
 		Dictionary<string, GenerateNamespaceImport> cache = new Dictionary<string, GenerateNamespaceImport> ();
 		
-		public GenerateNamespaceImport GetResult (IParsedFile unit, IType type, MonoDevelop.Ide.Gui.Document doc)
+		public GenerateNamespaceImport GetResult (IUnresolvedFile unit, IType type, MonoDevelop.Ide.Gui.Document doc)
 		{
 			GenerateNamespaceImport result;
 			if (cache.TryGetValue (type.Namespace, out result))
@@ -211,9 +212,12 @@ namespace MonoDevelop.Refactoring
 		
 			var dom = doc.Compilation;
 			ImportSymbolCache cache = new ImportSymbolCache ();
-			
+			var lookup = new MemberLookup (null, doc.Compilation.MainAssembly);
+
 			List<ImportSymbolCompletionData> typeList = new List<ImportSymbolCompletionData> ();
 			foreach (var type in dom.GetAllTypeDefinitions ()) {
+				if (!lookup.IsAccessible (type, false))
+					continue;
 				typeList.Add (new ImportSymbolCompletionData (doc, cache, type));
 			}
 			

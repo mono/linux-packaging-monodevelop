@@ -46,6 +46,7 @@ using System.Collections.Generic;
 using NGit;
 using NGit.Junit;
 using NGit.Util;
+using NUnit.Framework;
 using Sharpen;
 
 namespace NGit
@@ -59,7 +60,7 @@ namespace NGit
 		public virtual void Test001_ReadBareKey()
 		{
 			Config c = Parse("[foo]\nbar\n");
-			NUnit.Framework.Assert.AreEqual(true, c.GetBoolean("foo", null, "bar", false));
+			NUnit.Framework.Assert.IsTrue(c.GetBoolean("foo", null, "bar", false));
 			NUnit.Framework.Assert.AreEqual(string.Empty, c.GetString("foo", null, "bar"));
 		}
 
@@ -68,9 +69,9 @@ namespace NGit
 		public virtual void Test002_ReadWithSubsection()
 		{
 			Config c = Parse("[foo \"zip\"]\nbar\n[foo \"zap\"]\nbar=false\nn=3\n");
-			NUnit.Framework.Assert.AreEqual(true, c.GetBoolean("foo", "zip", "bar", false));
+			NUnit.Framework.Assert.IsTrue(c.GetBoolean("foo", "zip", "bar", false));
 			NUnit.Framework.Assert.AreEqual(string.Empty, c.GetString("foo", "zip", "bar"));
-			NUnit.Framework.Assert.AreEqual(false, c.GetBoolean("foo", "zap", "bar", true));
+			NUnit.Framework.Assert.IsFalse(c.GetBoolean("foo", "zap", "bar", true));
 			NUnit.Framework.Assert.AreEqual("false", c.GetString("foo", "zap", "bar"));
 			NUnit.Framework.Assert.AreEqual(3, c.GetInt("foo", "zap", "n", 4));
 			NUnit.Framework.Assert.AreEqual(4, c.GetInt("foo", "zap", "m", 4));
@@ -105,7 +106,7 @@ namespace NGit
 			c.SetStringList("my", null, "somename", values);
 			object[] expArr = Sharpen.Collections.ToArray(values);
 			string[] actArr = c.GetStringList("my", null, "somename");
-			NUnit.Framework.Assert.IsTrue(Arrays.Equals(expArr, actArr));
+			CollectionAssert.AreEquivalent(expArr, actArr);
 			string expText = "[my]\n\tsomename = value1\n\tsomename = value2\n";
 			NUnit.Framework.Assert.AreEqual(expText, c.ToText());
 		}
@@ -115,7 +116,7 @@ namespace NGit
 		public virtual void Test006_readCaseInsensitive()
 		{
 			Config c = Parse("[Foo]\nBar\n");
-			NUnit.Framework.Assert.AreEqual(true, c.GetBoolean("foo", null, "bar", false));
+			NUnit.Framework.Assert.IsTrue(c.GetBoolean("foo", null, "bar", false));
 			NUnit.Framework.Assert.AreEqual(string.Empty, c.GetString("foo", null, "bar"));
 		}
 

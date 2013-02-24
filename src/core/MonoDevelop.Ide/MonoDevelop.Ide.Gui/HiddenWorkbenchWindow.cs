@@ -74,7 +74,7 @@ namespace MonoDevelop.Ide.Gui
 			set {}
 		}
 		
-		public bool CloseWindow (bool force, bool fromMenu, int pageNum)
+		public bool CloseWindow (bool force)
 		{
 			return true;
 		}
@@ -99,10 +99,17 @@ namespace MonoDevelop.Ide.Gui
 		{
 			
 		}
+
+		public DocumentToolbar GetToolbar (IBaseViewContent targetView)
+		{
+			return null;
+		}
+
 		public event EventHandler TitleChanged { add {} remove {} }
 		public event EventHandler DocumentChanged;
 		public event MonoDevelop.Ide.Gui.WorkbenchWindowEventHandler Closing;
 		public event MonoDevelop.Ide.Gui.WorkbenchWindowEventHandler Closed;
 		public event MonoDevelop.Ide.Gui.ActiveViewContentEventHandler ActiveViewContentChanged;
+		public event EventHandler ViewsChanged;
 	}
 }

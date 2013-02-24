@@ -51,25 +51,6 @@ namespace NGit.Util
 {
 	internal class FS_Win32 : FS
 	{
-		internal static bool IsWin32()
-		{
-			string osDotName = AccessController.DoPrivileged(new _PrivilegedAction_58());
-			return osDotName != null && StringUtils.ToLowerCase(osDotName).IndexOf("windows")
-				 != -1;
-		}
-
-		private sealed class _PrivilegedAction_58 : PrivilegedAction<string>
-		{
-			public _PrivilegedAction_58()
-			{
-			}
-
-			public string Run()
-			{
-				return Runtime.GetProperty("os.name");
-			}
-		}
-
 		public FS_Win32() : base()
 		{
 		}
@@ -94,6 +75,11 @@ namespace NGit.Util
 		}
 
 		public override bool SetExecute(FilePath f, bool canExec)
+		{
+			return false;
+		}
+
+		public override bool IsCaseSensitive()
 		{
 			return false;
 		}

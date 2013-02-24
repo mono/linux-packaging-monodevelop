@@ -1,9 +1,12 @@
 // 
 // CFUrl.cs: Implements the managed CFUrl
 //
-// Authors: Miguel de Icaza
+// Authors:
+//     Miguel de Icaza
+//     Rolf Bjarne Kvinge <rolf@xamarin.com>
 //     
 // Copyright 2009 Novell, Inc
+// Copyright 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -37,7 +40,7 @@ namespace MonoMac.CoreFoundation {
 		Windows = 2
 	};
 	
-	public class CFUrl : IDisposable {
+	public class CFUrl : INativeObject, IDisposable {
 		internal IntPtr handle;
 
 		~CFUrl ()
@@ -87,11 +90,16 @@ namespace MonoMac.CoreFoundation {
 		static public CFUrl FromUrlString (string url, CFUrl baseurl)
 		{
 			using (var str = new CFString (url)){
-				IntPtr handle = CFURLCreateWithString (IntPtr.Zero, str.Handle, baseurl != null ? baseurl.Handle : IntPtr.Zero);
-				if (handle == IntPtr.Zero)
-					return null;
-				return new CFUrl (handle);
+				return FromStringHandle (str.Handle, baseurl);
 			}
+		}
+
+		internal static CFUrl FromStringHandle (IntPtr cfstringHandle, CFUrl baseurl)
+		{
+			IntPtr handle = CFURLCreateWithString (IntPtr.Zero, cfstringHandle, baseurl != null ? baseurl.Handle : IntPtr.Zero);
+			if (handle == IntPtr.Zero)
+				return null;
+			return new CFUrl (handle);
 		}
 
 		[DllImport (Constants.CoreFoundationLibrary)]
@@ -103,6 +111,24 @@ namespace MonoMac.CoreFoundation {
 				return str.ToString ();
 			}
 		}
+		
+		[DllImport (Constants.CoreFoundationLibrary)]
+		extern static IntPtr CFURLCopyFileSystemPath (IntPtr cfUrl, int style);
+		
+		public string FileSystemPath {
+			get {
+				return GetFileSystemPath (handle);
+			}
+		}
+
+		static internal string GetFileSystemPath (IntPtr hcfurl)
+		{
+			using (var str = new CFString (CFURLCopyFileSystemPath (hcfurl, 0), true))
+				return str.ToString ();
+		}
+
+		[DllImport (Constants.CoreFoundationLibrary, EntryPoint="CFURLGetTypeID")]
+		public extern static int GetTypeID ();
 	}
 	
 }

@@ -423,7 +423,7 @@ namespace MonoDevelop.VersionControl
 					Repository repo = GetRepository (repoFiles.Key);
 					if (repo == null)
 						continue;
-					var versionInfos = repo.GetVersionInfo (repoFiles.Select (f => f.ProjectFile.FilePath));
+					var versionInfos = repo.GetVersionInfo (repoFiles.Select (f => f.ProjectFile.FilePath), VersionInfoQueryFlags.IgnoreCache);
 					FilePath[] paths = versionInfos.Where (i => i.CanAdd).Select (i => i.LocalPath).ToArray ();
 					if (paths.Length > 0) {
 						if (monitor == null)
@@ -463,7 +463,7 @@ namespace MonoDevelop.VersionControl
 			}
 		}
 */
-		static void SolutionItemAddFiles (string rootPath, SolutionItem entry, ArrayList files)
+		static void SolutionItemAddFiles (string rootPath, SolutionItem entry, HashSet<string> files)
 		{
 			if (entry is SolutionEntityItem) {
 				string file = ((SolutionEntityItem)entry).FileName;
@@ -481,26 +481,24 @@ namespace MonoDevelop.VersionControl
 			}
 		}
 		
-		static void SolutionItemAddFile (string rootPath, ArrayList files, string file)
+		static void SolutionItemAddFile (string rootPath, HashSet<string> files, string file)
 		{
 			if (!file.StartsWith (rootPath + Path.DirectorySeparatorChar))
 			    return;
 			if (!File.Exists (file))
 				return;
-			if (files.Contains (file))
-				return;
-			string dir = Path.GetDirectoryName (file);
-			while (dir != rootPath) {
-				if (files.Contains (dir))
-					break;
-				files.Add (dir);
-				dir = Path.GetDirectoryName (dir);
+			if (files.Add (file)) {
+				string dir = Path.GetDirectoryName (file);
+				while (dir != rootPath && files.Add (dir))
+					dir = Path.GetDirectoryName (dir);
 			}
-			files.Add (file);
 		}
 		
 		static void OnEntryAdded (object o, SolutionItemEventArgs args)
 		{
+			if (args is SolutionItemChangeEventArgs && ((SolutionItemChangeEventArgs) args).Reloading)
+				return;
+
 			// handles addition of solutions and projects
 			SolutionItem parent = (SolutionItem) args.SolutionItem.ParentFolder;
 			
@@ -525,19 +523,15 @@ namespace MonoDevelop.VersionControl
 			// While we /could/ call repo.Add with `recursive = true', we don't
 			// necessarily want to add files under the project/solution directory
 			// that may not be a part of this project/solution.
-			
-			ArrayList files = new ArrayList ();
-			
-			files.Add (path);
+
+			var files = new HashSet<string> { path };
 			SolutionItemAddFiles (path, entry, files);
-			files.Sort ();
 			
 			using (IProgressMonitor monitor = GetStatusMonitor ()) {
-				string[] paths = (string[]) files.ToArray (typeof (string));
-				
-				foreach (string p in paths) {
-					if (repo.GetVersionInfo (p).CanAdd)
-						repo.Add (p, false, monitor);
+				var status = repo.GetDirectoryVersionInfo (path, false, true);
+				foreach (var v in status) {
+					if (!v.IsVersioned && files.Contains (v.LocalPath))
+						repo.Add (v.LocalPath, false, monitor);
 				}
 			}
 			
@@ -546,11 +540,23 @@ namespace MonoDevelop.VersionControl
 		
 		public static IProgressMonitor GetProgressMonitor (string operation)
 		{
+			return GetProgressMonitor (operation, VersionControlOperationType.Other);
+		}
+		
+		public static IProgressMonitor GetProgressMonitor (string operation, VersionControlOperationType op)
+		{
+			IconId icon;
+			switch (op) {
+			case VersionControlOperationType.Pull: icon = Stock.StatusDownload; break;
+			case VersionControlOperationType.Push: icon = Stock.StatusUpload; break;
+			default: icon = "md-version-control"; break;
+			}
+
 			IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor ("MonoDevelop.VersionControlOutput", "Version Control", "md-version-control", false, true);
 			Pad outPad = IdeApp.Workbench.ProgressMonitors.GetPadForMonitor (monitor);
 			
 			AggregatedProgressMonitor mon = new AggregatedProgressMonitor (monitor);
-			mon.AddSlaveMonitor (IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (operation, "md-version-control", true, true, false, outPad));
+			mon.AddSlaveMonitor (IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (operation, icon, true, true, false, outPad));
 			return mon;
 		}
 		
@@ -591,12 +597,12 @@ namespace MonoDevelop.VersionControl
 		{
 			if (configuration == null) {
 				if (File.Exists (ConfigFile)) {
-					XmlDataSerializer ser = new XmlDataSerializer (dataContext);
-					XmlTextReader reader = new XmlTextReader (new StreamReader (ConfigFile));
 					try {
-						configuration = (VersionControlConfiguration) ser.Deserialize (reader, typeof (VersionControlConfiguration));
-					} finally {
-						reader.Close ();
+						XmlDataSerializer ser = new XmlDataSerializer (dataContext);
+						using (var reader = File.OpenText (ConfigFile))
+							configuration = (VersionControlConfiguration) ser.Deserialize (reader, typeof (VersionControlConfiguration));
+					} catch {
+						((FilePath) ConfigFile).Delete ();
 					}
 				}
 				if (configuration == null)
@@ -609,12 +615,9 @@ namespace MonoDevelop.VersionControl
 		{
 			if (configuration != null) {
 				XmlDataSerializer ser = new XmlDataSerializer (dataContext);
-				XmlTextWriter tw = new XmlTextWriter (new StreamWriter (ConfigFile));
-				tw.Formatting = Formatting.Indented;
-				try {
+				using (var tw = new XmlTextWriter (File.CreateText (ConfigFile))) {
+					tw.Formatting = Formatting.Indented;
 					ser.Serialize (tw, configuration, typeof (VersionControlConfiguration));
-				} finally {
-					tw.Close ();
 				}
 			}
 		}
@@ -741,5 +744,12 @@ namespace MonoDevelop.VersionControl
 		{
 			repo.Unref ();
 		}
+	}
+
+	public enum VersionControlOperationType
+	{
+		Pull,
+		Push,
+		Other
 	}
 }

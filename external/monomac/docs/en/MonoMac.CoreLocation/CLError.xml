@@ -13,6 +13,76 @@
     <remarks />
   </Docs>
   <Members>
+    <Member MemberName="DeferredAccuracyTooLow">
+      <MemberSignature Language="C#" Value="DeferredAccuracyTooLow" />
+      <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError DeferredAccuracyTooLow = int32(13)" />
+      <MemberType>Field</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
+      <ReturnValue>
+        <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
+      </Docs>
+    </Member>
+    <Member MemberName="DeferredCanceled">
+      <MemberSignature Language="C#" Value="DeferredCanceled" />
+      <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError DeferredCanceled = int32(15)" />
+      <MemberType>Field</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
+      <ReturnValue>
+        <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
+      </Docs>
+    </Member>
+    <Member MemberName="DeferredDistanceFiltered">
+      <MemberSignature Language="C#" Value="DeferredDistanceFiltered" />
+      <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError DeferredDistanceFiltered = int32(14)" />
+      <MemberType>Field</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
+      <ReturnValue>
+        <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
+      </Docs>
+    </Member>
+    <Member MemberName="DeferredFailed">
+      <MemberSignature Language="C#" Value="DeferredFailed" />
+      <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError DeferredFailed = int32(11)" />
+      <MemberType>Field</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
+      <ReturnValue>
+        <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
+      </Docs>
+    </Member>
+    <Member MemberName="DeferredNotUpdatingLocation">
+      <MemberSignature Language="C#" Value="DeferredNotUpdatingLocation" />
+      <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError DeferredNotUpdatingLocation = int32(12)" />
+      <MemberType>Field</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
+      <ReturnValue>
+        <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
+      </Docs>
+    </Member>
     <Member MemberName="Denied">
       <MemberSignature Language="C#" Value="Denied" />
       <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError Denied = int32(1)" />
@@ -25,6 +95,48 @@
       </ReturnValue>
       <Docs>
         <summary>Access to the location service was denied by the user.</summary>
+      </Docs>
+    </Member>
+    <Member MemberName="GeocodeCanceled">
+      <MemberSignature Language="C#" Value="GeocodeCanceled" />
+      <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError GeocodeCanceled = int32(10)" />
+      <MemberType>Field</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
+      <ReturnValue>
+        <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
+      </Docs>
+    </Member>
+    <Member MemberName="GeocodeFoundNoResult">
+      <MemberSignature Language="C#" Value="GeocodeFoundNoResult" />
+      <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError GeocodeFoundNoResult = int32(8)" />
+      <MemberType>Field</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
+      <ReturnValue>
+        <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
+      </Docs>
+    </Member>
+    <Member MemberName="GeocodeFoundPartialResult">
+      <MemberSignature Language="C#" Value="GeocodeFoundPartialResult" />
+      <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError GeocodeFoundPartialResult = int32(9)" />
+      <MemberType>Field</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
+      <ReturnValue>
+        <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
       </Docs>
     </Member>
     <Member MemberName="HeadingFailure">
@@ -100,6 +212,20 @@
           <AttributeName>MonoMac.ObjCRuntime.Since(4, 0)</AttributeName>
         </Attribute>
       </Attributes>
+      <ReturnValue>
+        <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
+      </Docs>
+    </Member>
+    <Member MemberName="RegionMonitoringResponseDelayed">
+      <MemberSignature Language="C#" Value="RegionMonitoringResponseDelayed" />
+      <MemberSignature Language="ILAsm" Value=".field public static literal valuetype MonoMac.CoreLocation.CLError RegionMonitoringResponseDelayed = int32(7)" />
+      <MemberType>Field</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
       <ReturnValue>
         <ReturnType>MonoMac.CoreLocation.CLError</ReturnType>
       </ReturnValue>

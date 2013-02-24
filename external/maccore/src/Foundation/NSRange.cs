@@ -1,5 +1,6 @@
 //
 // Copyright 2010, Novell, Inc.
+// Copyright 2011, 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -33,6 +34,11 @@ namespace MonoMac.Foundation {
 		{
 			Location = start;
 			Length = len;
+		}
+
+		public override string ToString ()
+		{
+			return String.Format ("[Location={0},Length={1}]", Location, Length);
 		}
 	}
 }

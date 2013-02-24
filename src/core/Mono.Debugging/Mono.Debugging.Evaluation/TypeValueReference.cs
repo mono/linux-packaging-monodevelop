@@ -26,10 +26,12 @@
 //
 
 using System;
+using System.Linq;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Reflection;
+
 using Mono.Debugging.Client;
-using System.Diagnostics;
 
 namespace Mono.Debugging.Evaluation
 {
@@ -170,8 +172,7 @@ namespace Mono.Debugging.Evaluation
 				}
 				
 				return list.ToArray ();
-			}
-			catch (Exception ex) {
+			} catch (Exception ex) {
 				Console.WriteLine (ex);
 				ctx.WriteDebuggerOutput (ex.Message);
 				return new ObjectValue [0];

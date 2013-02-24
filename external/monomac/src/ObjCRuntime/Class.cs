@@ -49,7 +49,7 @@ namespace MonoMac.ObjCRuntime {
 			this.handle = objc_getClass (name);
 
 			if (this.handle == IntPtr.Zero)
-				throw new ArgumentException ("name is an unknown class", name);
+				throw new ArgumentException (String.Format ("name {0} is an unknown class", name), "name");
 		}
 
 		public Class (Type type) {
@@ -105,6 +105,13 @@ namespace MonoMac.ObjCRuntime {
 				if (type_map.TryGetValue (kls, out type)) {
 					type_map [orig_klass] = type;
 					return type;
+				}
+
+				if ( kls == IntPtr.Zero ) {
+					var message = "Could not find a valid superclass for type " + new Class(orig_klass).Name 
+					+  ". Did you forget to register the bindings at " + typeof(Class).FullName
+					+  ".Register() or call NSApplication.Init()?";
+					throw new ArgumentException(message);
 				}
 
 				klass = kls;
@@ -214,6 +221,23 @@ namespace MonoMac.ObjCRuntime {
 			m = prop.GetSetMethod (true);
 			if (m != null)
 				RegisterMethod (m, ea.ToSetter (prop), type, handle);
+				
+			// http://developer.apple.com/library/mac/#documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtPropertyIntrospection.html
+			int count = 0;
+			var props = new objc_attribute_prop [3];
+			props [count++] = new objc_attribute_prop { name = "T", value = TypeConverter.ToNative (prop.PropertyType) };
+			switch (ea.ArgumentSemantic) {
+			case ArgumentSemantic.Copy:
+				props [count++] = new objc_attribute_prop { name = "C", value = "" };
+				break;
+			case ArgumentSemantic.Retain:
+				props [count++] = new objc_attribute_prop { name = "&", value = "" };
+				break;
+			}
+			props [count++] = new objc_attribute_prop { name = "V", value = ea.Selector };
+			
+			class_addProperty (handle, ea.Selector, props, count);
+			
 		}
 
 		private unsafe static void RegisterMethod (MethodInfo minfo, Type type, IntPtr handle) {
@@ -271,13 +295,16 @@ namespace MonoMac.ObjCRuntime {
 			foreach (var field in t.GetFields (BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)) {
 				if (field.FieldType == typeof (double) || field.FieldType == typeof (float))
 					return true;
+				if (field.FieldType == t)
+					continue;
 				if (TypeContainsFloatingPoint (field.FieldType))
 					return true;
 			}
 
 			return false;
 		}
-		
+
+		[MonoNativeFunctionWrapper]
 		delegate int getFrameLengthDelegate (IntPtr @this, IntPtr sel);
 		static getFrameLengthDelegate getFrameLength = Selector.GetFrameLength;
 		static IntPtr getFrameLengthPtr = Marshal.GetFunctionPointerForDelegate (getFrameLength);
@@ -418,6 +445,35 @@ retl    $0x4                   */  0xc2, 0x04, 0x00,                            
 		[DllImport ("/usr/lib/libobjc.dylib")]
 		extern static IntPtr class_getSuperclass (IntPtr cls);
 
+		[MonoNativeFunctionWrapper]
+		delegate IntPtr addPropertyDelegate (IntPtr cls, string name, objc_attribute_prop [] attributes, int count);
+		static addPropertyDelegate addProperty;
+		static bool addPropertyInitialized;
+
+		static IntPtr class_addProperty (IntPtr cls, string name, objc_attribute_prop [] attributes, int count)
+		{
+			if (!addPropertyInitialized) {
+				var handle = Dlfcn.dlopen (Constants.ObjectiveCLibrary, 0);
+				try {
+					var fptr = Dlfcn.dlsym (handle, "class_addProperty");
+					if (fptr != IntPtr.Zero)
+						addProperty = (addPropertyDelegate) Marshal.GetDelegateForFunctionPointer (fptr, typeof (addPropertyDelegate));
+				} finally {
+					Dlfcn.dlclose (handle);
+				}
+				addPropertyInitialized = true;
+			}
+			if (addProperty == null)
+				return IntPtr.Zero;
+			return addProperty (cls, name, attributes, count);
+		}
+
+		[StructLayout (LayoutKind.Sequential, CharSet=CharSet.Ansi)]
+		private struct objc_attribute_prop {
+			[MarshalAs (UnmanagedType.LPStr)] internal string name;
+			[MarshalAs (UnmanagedType.LPStr)] internal string value;
+		}
+		
 		internal struct objc_class {
 			internal IntPtr isa;
 		}

@@ -14,7 +14,6 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
-
 VPATH = @srcdir@
 pkgdatadir = $(datadir)/@PACKAGE@
 pkgincludedir = $(includedir)/@PACKAGE@
@@ -33,7 +32,7 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	$(top_srcdir)/Makefile.include ChangeLog
+	$(top_srcdir)/xbuild.include ChangeLog
 subdir = src/addins/MonoDeveloperExtensions
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
@@ -51,29 +50,6 @@ RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	install-pdf-recursive install-ps-recursive install-recursive \
 	installcheck-recursive installdirs-recursive pdf-recursive \
 	ps-recursive uninstall-recursive
-am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
-am__vpath_adj = case $$p in \
-    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
-    *) f=$$p;; \
-  esac;
-am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
-am__install_max = 40
-am__nobase_strip_setup = \
-  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
-am__nobase_strip = \
-  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
-am__nobase_list = $(am__nobase_strip_setup); \
-  for p in $$list; do echo "$$p $$p"; done | \
-  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
-  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
-    if (++n[$$2] == $(am__install_max)) \
-      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
-    END { for (dir in files) print dir, files[dir] }'
-am__base_list = \
-  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
-  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
-am__installdirs = "$(DESTDIR)$(MonoDeveloperExtensionsdir)"
-DATA = $(MonoDeveloperExtensions_DATA)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -159,12 +135,6 @@ MKDIR_P = @MKDIR_P@
 MONO = @MONO@
 MONODOC_CFLAGS = @MONODOC_CFLAGS@
 MONODOC_LIBS = @MONODOC_LIBS@
-MONO_ADDINS_CFLAGS = @MONO_ADDINS_CFLAGS@
-MONO_ADDINS_GUI_CFLAGS = @MONO_ADDINS_GUI_CFLAGS@
-MONO_ADDINS_GUI_LIBS = @MONO_ADDINS_GUI_LIBS@
-MONO_ADDINS_LIBS = @MONO_ADDINS_LIBS@
-MONO_ADDINS_SETUP_CFLAGS = @MONO_ADDINS_SETUP_CFLAGS@
-MONO_ADDINS_SETUP_LIBS = @MONO_ADDINS_SETUP_LIBS@
 MONO_GAC_PREFIX = @MONO_GAC_PREFIX@
 MONO_NUNIT_CFLAGS = @MONO_NUNIT_CFLAGS@
 MONO_NUNIT_LIBS = @MONO_NUNIT_LIBS@
@@ -234,50 +204,37 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = . NUnit
-FILES = \
-	AssemblyInfo.cs \
-	Commands.cs \
-	MonoMakefile.cs \
-	MonoMakefileFormat.cs \
-	MonoSolutionItemHandler.cs
+ALL_CSPROJ = $(wildcard *.csproj)
+MAIN_SLN = $(top_builddir)/Main.sln
+@ENABLE_GNOMEPLATFORM_TRUE@PROFILE_NAME = Debug
+@ENABLE_MACPLATFORM_TRUE@PROFILE_NAME = DebugMac
+@ENABLE_WINDOWSPLATFORM_TRUE@PROFILE_NAME = DebugWin32
+XBUILD = xbuild
+XBUILD_VERBOSITY = quiet
+XBUILD_ARGS = /verbosity:$(XBUILD_VERBOSITY) /nologo /property:CodePage=65001
+XBUILD_PROFILE = /property:Configuration=$(PROFILE_NAME)
 
-DEPS = \
-	$(top_builddir)/build/bin/MonoDevelop.Core.dll \
-	$(top_builddir)/build/bin/MonoDevelop.Ide.dll
+# Figure out how far we are from top_builddir
+DEPTH = $(shell echo "$(top_builddir)" | tr '/' '\n' | grep -c '..')
+EXTS := *.bmp *.cs *.csproj *.html *.png *.snk *.config *.stetic *.glade *.xml *.xsd *.exe.addins *.template *.tt *.txt
+ALL_FILES := $(EXTS) \
+		$(addprefix */,$(EXTS))		\
+		$(addprefix */*/,$(EXTS))	\
+		$(addprefix */*/*/,$(EXTS))	\
+		$(addprefix */*/*/*/,$(EXTS))	\
+		$(addprefix */*/*/*/*/,$(EXTS))	\
+		$(wildcard icons/*)		\
+		$(wildcard templates/*)
 
-REFS = \
-	$(GTK_SHARP_LIBS) \
-	$(MONO_ADDINS_LIBS) \
-	-r:System \
-	-r:System.Data \
-	-r:System.Xml
+WILDCARDED_FILES := $(wildcard $(ALL_FILES))
+EXTRA_DIST = \
+	$(wildcard $(ALL_FILES))
 
-RES = MonoDeveloperExtensions.addin.xml
-ADDIN_BUILD = $(top_builddir)/build/AddIns/MonoDeveloperExtensions
-ASSEMBLY = $(ADDIN_BUILD)/MonoDeveloperExtensions.dll
-CLEANFILES = $(ASSEMBLY) $(ASSEMBLY).mdb
-EXTRA_DIST = $(FILES) $(RES)
-build_deps = $(addprefix -r:, $(DEPS))
-build_sources = $(addprefix $(srcdir)/, $(FILES)) $(GENERATED_FILES)
-build_resources = $(addprefix $(srcdir)/, $(RES))
-build_test_sources = $(addprefix $(srcdir)/, $(TESTFILES)) $(GENERATED_FILES)
-MD_BIN_PATH = $(abs_top_builddir)/build/bin
-MD_LAUNCH_SETUP = \
-	PATH="$(PATH)" \
-	PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
-	LD_LIBRARY_PATH="$(LD_LIBRARY_PATH)" \
-	DYLD_FALLBACK_LIBRARY_PATH="$(DYLD_FALLBACK_LIBRARY_PATH)" \
-	MONO_GAC_PREFIX="$(MONO_GAC_PREFIX)" \
-	MONODEVELOP_LOCALE_PATH="$(abs_top_builddir)/build/locale" \
-	MONO_ADDINS_REGISTRY="$(MD_BIN_PATH)"
-
-MDTOOL_RUN = $(MD_LAUNCH_SETUP) exec -a "mdtool" $(RUNTIME) --debug "$(MD_BIN_PATH)/mdtool.exe"
-@ENABLE_MONOEXTENSIONS_TRUE@MonoDeveloperExtensionsdir = $(MD_ADDIN_DIR)/MonoDeveloperExtensions
-@ENABLE_MONOEXTENSIONS_TRUE@MonoDeveloperExtensions_DATA = $(ASSEMBLY) $(ASSEMBLY).mdb
+@ENABLE_MONOEXTENSIONS_FALSE@SKIP = y
 all: all-recursive
 
 .SUFFIXES:
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/Makefile.include $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/xbuild.include $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -307,26 +264,6 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-install-MonoDeveloperExtensionsDATA: $(MonoDeveloperExtensions_DATA)
-	@$(NORMAL_INSTALL)
-	test -z "$(MonoDeveloperExtensionsdir)" || $(MKDIR_P) "$(DESTDIR)$(MonoDeveloperExtensionsdir)"
-	@list='$(MonoDeveloperExtensions_DATA)'; test -n "$(MonoDeveloperExtensionsdir)" || list=; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(MonoDeveloperExtensionsdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(MonoDeveloperExtensionsdir)" || exit $$?; \
-	done
-
-uninstall-MonoDeveloperExtensionsDATA:
-	@$(NORMAL_UNINSTALL)
-	@list='$(MonoDeveloperExtensions_DATA)'; test -n "$(MonoDeveloperExtensionsdir)" || list=; \
-	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	test -n "$$files" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(MonoDeveloperExtensionsdir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(MonoDeveloperExtensionsdir)" && rm -f $$files
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run `make' without going through this Makefile.
@@ -523,12 +460,9 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-recursive
-all-am: Makefile $(DATA)
+all-am: Makefile
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(MonoDeveloperExtensionsdir)"; do \
-	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
-	done
 install: install-recursive
 install-exec: install-exec-recursive
 install-data: install-data-recursive
@@ -546,7 +480,6 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
-	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -555,8 +488,6 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-clean: clean-recursive
-
 clean-am: clean-generic mostlyclean-am
 
 distclean: distclean-recursive
@@ -575,7 +506,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-MonoDeveloperExtensionsDATA
+install-data-am:
 
 install-dvi: install-dvi-recursive
 
@@ -619,7 +550,7 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-MonoDeveloperExtensionsDATA
+uninstall-am:
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) ctags-recursive \
 	install-am install-strip tags-recursive
@@ -628,29 +559,44 @@ uninstall-am: uninstall-MonoDeveloperExtensionsDATA
 	all all-am check check-am clean clean-generic ctags \
 	ctags-recursive distclean distclean-generic distclean-tags \
 	distdir dvi dvi-am html html-am info info-am install \
-	install-MonoDeveloperExtensionsDATA install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
-	pdf-am ps ps-am tags tags-recursive uninstall \
-	uninstall-MonoDeveloperExtensionsDATA uninstall-am
+	install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	installdirs-am maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-generic pdf pdf-am ps ps-am tags \
+	tags-recursive uninstall uninstall-am
 
 
-@ENABLE_MONOEXTENSIONS_TRUE@all: $(ASSEMBLY) $(ASSEMBLY).mdb
-@ENABLE_MONOEXTENSIONS_FALSE@all:
+all: csproj_build
 
-$(ASSEMBLY): $(build_sources) $(srcdir)/$(GLADEFILE) $(build_resources) $(DEPS)
-	mkdir -p $(ADDIN_BUILD)
-	$(CSC) $(CSC_FLAGS) -target:library -out:$@ $(build_resources:%=/resource:%) $(build_sources) $(REFS) $(build_deps)
+clean: csproj_clean
 
-$(ASSEMBLY).mdb: $(ASSEMBLY)
+csproj_build:
+	@if test x$(SKIP) != xy -a $(DEPTH) -gt $(MAKELEVEL); then \
+	echo Building $(ALL_CSPROJ); \
+	for p in $(ALL_CSPROJ); do $(XBUILD) $(XBUILD_ARGS) $$p; done \
+	fi
 
-# workaroundfor lack of abs_top_builddir variable in automake < 1.10. Will break if mdtool isn't 
-# launched from top_srcdir (i.e. where this script is located)
-abs_top_builddir ?= $(top_builddir)
+csproj_clean:
+	@if test x$(SKIP) != xy -a $(DEPTH) -gt $(MAKELEVEL); then \
+	echo Cleaning $(ALL_CSPROJ); \
+	for p in $(ALL_CSPROJ); do $(XBUILD) $(XBUILD_ARGS) $$p /t:Clean; done \
+	fi
+
+sln_build:
+	@echo Building $(MAIN_SLN)
+	$(XBUILD) $(XBUILD_ARGS) $(MAIN_SLN) $(XBUILD_PROFILE)
+
+sln_clean:
+	@echo Cleaning $(MAIN_SLN)
+	$(XBUILD) $(XBUILD_ARGS) $(MAIN_SLN) $(XBUILD_PROFILE) /t:Clean
+
+print_extradist:
+	@echo $(WILDCARDED_FILES)
+
+.PHONY: all clean csproj_build csproj_clean sln_build sln_clean
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

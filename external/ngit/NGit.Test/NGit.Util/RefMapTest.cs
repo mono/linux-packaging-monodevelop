@@ -439,6 +439,7 @@ namespace NGit.Util
 		}
 
 		[NUnit.Framework.Test]
+		[NUnit.Framework.Ignore ("This test compares ToString and GetHashCode between .NETs KeyValuePair and Java's equivalent. They're semantically different")]
 		public virtual void TestEntryType()
 		{
 			Ref a = NewRef("refs/heads/A", ID_ONE);
@@ -448,10 +449,10 @@ namespace NGit.Util
 			Iterator<KeyValuePair<string, Ref>> itr = map.EntrySet().Iterator();
 			KeyValuePair<string, Ref> ent_a = itr.Next();
 			KeyValuePair<string, Ref> ent_b = itr.Next();
-//			NUnit.Framework.Assert.AreEqual(ent_a.GetHashCode(), "A".GetHashCode());
-			NUnit.Framework.Assert.IsTrue(ent_a.Equals(ent_a));
+			NUnit.Framework.Assert.AreEqual(ent_a.GetHashCode(), "A".GetHashCode());
+			NUnit.Framework.Assert.AreEqual(ent_a, ent_a);
 			NUnit.Framework.Assert.IsFalse(ent_a.Equals(ent_b));
-			NUnit.Framework.Assert.AreEqual(a.ToString(), ent_a.Value.ToString());
+			NUnit.Framework.Assert.AreEqual(a.ToString(), ent_a.ToString());
 		}
 
 		[NUnit.Framework.Test]

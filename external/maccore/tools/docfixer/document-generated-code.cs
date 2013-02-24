@@ -8,7 +8,8 @@
 // erased in the compilation process (like the link between events
 // and their ObjC delegate classes).
 //
-
+// Copyright 2012 Xamarin Inc
+//
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -53,6 +54,13 @@ class DocumentGeneratedCode {
 	{
 		var ns = t.Namespace;
 		var typeName = t.FullName.Substring (ns.Length+1);
+		if (ns == "MonoTouch.Foundation"){
+			if (typeName == "NSString2")
+				typeName = "NSString";
+			if (typeName == "NSObject2")
+				typeName = "NSObject";
+		}
+		
 		return String.Format ("{0}/{1}/{2}{3}.xml", assembly_dir, ns, typeName, notification ? "+Notifications" : "");
 	}
 	
@@ -87,12 +95,14 @@ class DocumentGeneratedCode {
 		var xmlSettings = new XmlWriterSettings (){
 			Indent = true,
 			Encoding = new UTF8Encoding (false),
-			OmitXmlDeclaration = true
+			OmitXmlDeclaration = true,
+			NewLineChars = Environment.NewLine
 		};
 		using (var output = File.CreateText (xmldocpath)){
-			var xmlw = XmlWriter.Create (output, xmlSettings);
-			xmldoc.Save (xmlw);
-			output.WriteLine ();
+			using (var xmlw = XmlWriter.Create (output, xmlSettings)){
+				xmldoc.Save (xmlw);
+				output.WriteLine ();
+			}
 		}
 	}
 	
@@ -106,32 +116,48 @@ class DocumentGeneratedCode {
 		}
 	}
 
+	static XElement GetXmlNodeForMemberName (Type t, XDocument xdoc, string name)
+	{
+		var field = xdoc.XPathSelectElement ("Type/Members/Member[@MemberName='" + name + "']");
+		if (field == null){
+			if (!warnings_up_to_date.ContainsKey (t)){
+				Console.WriteLine ("Warning: {0} document is not up-to-date with the latest assembly (could not find Field <Member MemberName='{1}')", t, name);
+				warnings_up_to_date [t] = true;
+			}
+		}
+		return field;
+	}
+
+	static XElement GetXmlNodeFromExport (Type t, XDocument xdoc, string selector)
+	{
+		return (from m in xdoc.XPathSelectElements ("Type/Members/Member")
+			let a = m.XPathSelectElement ("Attributes/Attribute/AttributeName")
+			where a != null && a.Value.IndexOf ("MonoTouch.Foundation.Export(\"" + selector + "\"") != -1
+			select m).FirstOrDefault ();
+	}
+
 	//
 	// Handles fields, but perhaps this is better done in DocFixer to pull the definitions
 	// from the docs?
 	//
-	public static void ProcessField (Type t, XDocument xdoc, PropertyInfo pi)
+	public static void ProcessField (Type t, XDocument xdoc, PropertyInfo pi, bool isNotification)
 	{
 		var fieldAttr = pi.GetCustomAttributes (typeof (FieldAttribute), true);
 		if (fieldAttr.Length == 0)
 			return;
 		
 		var export = ((FieldAttribute) fieldAttr [0]).SymbolName;
-		
-		var field = xdoc.XPathSelectElement ("Type/Members/Member[@MemberName='" + pi.Name + "']");
-		if (field == null){
-			if (!warnings_up_to_date.ContainsKey (t)){
-				Console.WriteLine ("Warning: {0} document is not up-to-date with the latest assembly (could not find Field <Member MemberName='{1}')", t, pi.Name);
-				warnings_up_to_date [t] = true;
-			}
+
+		var field = GetXmlNodeForMemberName (t, xdoc, pi.Name);
+		if (field == null)
 			return;
-		}
+		
 		var returnType = field.XPathSelectElement ("ReturnValue/ReturnType");
 		var summary = field.XPathSelectElement ("Docs/summary");
 		var remarks = field.XPathSelectElement ("Docs/remarks");
 		var example = field.XPathSelectElement ("Docs/remarks/example");
-		if (mergeAppledocs){
-			if (returnType.Value == "MonoMac.Foundation.NSString" && export.EndsWith ("Notification")){
+		if (isNotification || (returnType.Value.EndsWith (".Foundation.NSString") && export.EndsWith ("Notification"))){
+			if (mergeAppledocs){
 				var mdoc = docGenerator.GetAppleMemberDocs (ToCecilType (t), export);
 				if (mdoc == null){
 					Console.WriteLine ("Failed to load docs for {0} - {1}", t.Name, export);
@@ -144,17 +170,30 @@ class DocumentGeneratedCode {
 				// Make this pretty, the first paragraph we turn into the summary,
 				// the rest we put in the remarks section
 				//
-				summary.Value = "";
+				summary.RemoveAll ();
 				summary.Add (section);
 
 				var skipOne = summary.Nodes ().Skip (2).ToArray ();
-				remarks.Value = "";
+				remarks.RemoveAll ();
 				remarks.Add (skipOne);
 				foreach (var n in skipOne)
 					n.Remove ();
 				if (example != null)
 					remarks.Add (example);
 			}
+		} else {
+			var value = field.XPathSelectElement ("Docs/value");
+			if (value != null && value.Value == "To be added.")
+				value.RemoveAll ();
+
+			//var since = pi.GetCustomAttributes (typeof (SinceAttribute), true);
+			//if (since.Length != 0 && pi.PropertyType.IsClass) {
+				// TODO: Could format the since value into the text
+			//	value.Value = "Value will be null when the constant is not available";
+			//}
+
+			summary.RemoveAll ();
+			summary.Value = "Represents the value associated with the constant " + export;
 		}
 	}
 
@@ -198,10 +237,9 @@ class DocumentGeneratedCode {
 			}
 		}
 
-		if (remarks.Value == "To be added.")
-			remarks.Value = "";
-		
-		remarks.AddFirst (XElement.Parse (String.Format ("<para id='tool-remark'>If you want to subscribe to this notification, you can use the convenience <see cref='T:{0}+Notifications'/>.<see cref='M:{0}+Notifications.Observe{1}'/> method which offers strongly typed access to the parameters of the notification.</para>", t.Name, mname)));
+		remarks.RemoveAll ();
+		remarks.Add (XElement.Parse ("<para id='tool-remark'>This constant can be used with the <see cref=\"T:MonoTouch.Foundation.NSNotificationCenter\"/> to register a listener for this notification.   This is an NSString instead of a string, because these values can be used as tokens in some native libraries instead of being used purely for their actual string content.    The 'notification' parameter to the callback contains extra information that is specific to the notification type.</para>"));
+		remarks.Add (XElement.Parse (String.Format ("<para id='tool-remark'>If you want to subscribe to this notification, you can use the convenience <see cref='T:{0}+Notifications'/>.<see cref='M:{0}+Notifications.Observe{1}'/> method which offers strongly typed access to the parameters of the notification.</para>", t.Name, mname)));
 		remarks.Add (XElement.Parse ("<para>The following example shows how to use the strongly typed Notifications class, to take the guesswork out of the available properties in the notification:</para>"));
 		remarks.Add (XElement.Parse (String.Format ("<example><code lang=\"c#\">\n" +
 							    "//\n// Lambda style\n//\n\n// listening\n" +
@@ -215,6 +253,16 @@ class DocumentGeneratedCode {
 							    "    notification = {0}.Notifications.Observe{1} (Callback);\n}}\n\n" +
 							    "void Teardown ()\n{{\n" +
 							    "    notification.Dispose ();\n}}</code></example>", t.Name, mname, body)));
+		remarks.Add (XElement.Parse ("<para>The following example shows how to use the notification with the DefaultCenter API:</para>"));
+		remarks.Add (XElement.Parse (String.Format ("<example><code lang=\"c#\">\n" +
+						      "// Lambda style\n" +
+						      "NSNotificationCenter.DefaultCenter.AddObserver (\n        {0}.{1}, (notification) => {{Console.WriteLine (\"Received the notification {0}\", notification); }}\n\n\n" +
+						      "// Method style\n" +
+						      "void Callback (NSNotification notification)\n{{\n" +
+						      "    Console.WriteLine (\"Received a notification {0}\", notification);\n}}\n\n" +
+						      "void Setup ()\n{{\n" +
+						      "    NSNotificationCenter.DefaultCenter.AddObserver ({0}.{1}, Callback);\n}}\n</code></example>", t.Name, name)));
+		
 
 		// Keep track of the uses, so we can list all of the observers.
 		if (notification_event_args != null){
@@ -241,8 +289,9 @@ class DocumentGeneratedCode {
 		var class_summary = class_doc.XPathSelectElement ("Type/Docs/summary");
 		var class_remarks = class_doc.XPathSelectElement ("Type/Docs/remarks");
 
-		class_summary.Value = "Notification posted by the <see cref =\"T:" + t.FullName + "\"/> class.";
-		class_remarks.Value = "";
+		class_summary.RemoveAll ();
+		class_summary.Add (XElement.Parse ("<para>Notification posted by the <see cref =\"T:" + t.FullName + "\"/> class.</para>"));
+		class_remarks.RemoveAll ();
 		class_remarks.Add (XElement.Parse ("<para>This is a static class which contains various helper methods that allow developers to observe events posted " +
 						   "in the iOS notification hub (<see cref=\"T:MonoTouch.Foundation.NSNotificationCenter\"/>).</para>"));
 		class_remarks.Add (XElement.Parse ("<para>The methods defined in this class post events invoke the provided method or lambda with a " +
@@ -269,8 +318,9 @@ class DocumentGeneratedCode {
 				Console.WriteLine ("Looking for {0}, and this is the class\n{1}", notification.Item1, class_doc);
 			handler.Value = "Method to invoke when the notification is posted.";
 			summary.Value = "Registers a method to be notified when the " + notification.Item2 + " notification is posted.";
-			returns.Value = "The returned NSObject represents the registered notification.   Either call Dispose on the object to stop receiving notifications, or pass it to <see cref=\"M:MonoTouch.Foundation.NSNotification.RemoveObserver\"/>";
-			remarks.Value = "";
+			returns.RemoveAll ();
+			returns.Add (XElement.Parse ("<para>The returned NSObject represents the registered notification.   Either call Dispose on the object to stop receiving notifications, or pass it to <see cref=\"M:MonoTouch.Foundation.NSNotification.RemoveObserver\"/></para>"));
+			remarks.RemoveAll ();
 			remarks.Add (XElement.Parse ("<para>The following example shows how you can use this method in your code</para>"));
 
 			remarks.Add (XElement.Parse (String.Format ("<example><code lang=\"c#\">\n" +
@@ -316,31 +366,161 @@ class DocumentGeneratedCode {
 			}
 		}
 	}
+
+	//
+	// This prepares a node that contains text, like this:
+	// <foo>To be added.</foo>
+	//
+	// to wrap the text in a para.
+	// <foo><para>To be added.</para></foo>
+	//
+	static void PrepareNakedNode (XElement element, bool addStub = true)
+	{
+		if (element.HasElements)
+			return;
+		var val = element.Value;
+		if (addStub && val == "To be added.")
+			val = "(More documentation for this node is coming)";
+		
+		element.Value = "";
+		element.Add (XElement.Parse ("<para>" + val + "</para>"));
+	}
+	
+	
+	public static void AnnotateNullAllowedPropertyValue (Type t, XDocument xdoc, PropertyInfo pi)
+	{
+		var field = GetXmlNodeForMemberName (t, xdoc, pi.Name);
+		if (field == null)
+			return;
+		var value = field.XPathSelectElement ("Docs/value");
+		var toolgen_null_annotations = value.XPathSelectElement ("para[@tool='nullallowed']");
+		if (toolgen_null_annotations == null)
+			PrepareNakedNode (value);
+		else
+			toolgen_null_annotations.Remove ();
+
+		value.Add (XElement.Parse ("<para tool='nullallowed'>This value can be <see langword=\"null\"/>.</para>"));
+	}
 	
 	public static void ProcessNSO (Type t, BaseTypeAttribute bta)
 	{
 		var xmldoc = GetDoc (t);
-		if (xmldoc == null)
+		if (xmldoc == null){
+			Console.WriteLine ("Can not find docs for {0}", t);
 			return;
-		
+		}
+
 		foreach (var pi in t.GatherProperties ()){
 			object [] attrs;
 			var kbd = false;
+			if (pi.GetCustomAttributes (typeof (InternalAttribute), true).Length > 0)
+				continue;
+			
 			if (pi.GetCustomAttributes (typeof (FieldAttribute), true).Length > 0){
-				ProcessField (t, xmldoc, pi);
+				bool is_notification = pi.GetCustomAttributes (typeof (NotificationAttribute), true).Length != 0;
+				ProcessField (t, xmldoc, pi, is_notification);
 
-				if ((attrs = pi.GetCustomAttributes (typeof (NotificationAttribute), true)).Length > 0)
+				if (is_notification)
 					ProcessNotification (t, xmldoc, pi);
 				continue;
 			}
-			
-		}
+			if (pi.GetCustomAttributes (typeof (NullAllowedAttribute), true).Length > 0){
+				AnnotateNullAllowedPropertyValue (t, xmldoc, pi);
 
+				//
+				// Propagate the [NullAllowed] from the WeakXXX to XXX
+				//
+				if (pi.Name.StartsWith ("Weak")){
+					var npi = t.GetProperty (pi.Name.Substring (4));
+
+					// Validate that the other property is actually a wrapper around this one.
+					if (npi != null && npi.GetCustomAttributes (typeof (WrapAttribute), true).Length > 0){
+						if (npi != null)
+							AnnotateNullAllowedPropertyValue (t, xmldoc, npi);
+					} else
+						Console.WriteLine ("Did not find matching {0}", pi.Name);
+					
+				}
+			}
+			if (pi.GetCustomAttributes (typeof (ThreadSafeAttribute), true).Length > 0){
+				var field = GetXmlNodeForMemberName (t, xmldoc, pi.Name);
+				if (field == null)
+					return;
+				var remarks = field.XPathSelectElement ("Docs/remarks");
+				if (remarks != null)
+					AddThreadRemark (remarks, "This");
+			}
+		}
+		foreach (var mi in t.GatherMethods ()){
+			//
+			// Since it is a pain to go from a MethodInfo into an ECMA XML signature name
+			// we will lookup the method by the [Export] attribute
+			//
+
+			if (mi.GetCustomAttributes (typeof (InternalAttribute), true).Length > 0)
+				continue;
+			
+			var attrs = mi.GetCustomAttributes (typeof (ExportAttribute), true);
+			if (attrs.Length == 0)
+				continue;
+			var ea = attrs [0] as ExportAttribute;
+			var node = GetXmlNodeFromExport (t, xmldoc, ea.Selector);
+			if (node == null){
+				Console.WriteLine ("Did not find the selector {0} on type {1}", ea.Selector, t);
+				continue;
+			}
+			
+			if (mi.GetCustomAttributes (typeof (ThreadSafeAttribute), true).Length > 0){
+				var remarks = node.XPathSelectElement ("Docs/remarks");
+				AddThreadRemark (remarks, "This");
+			}
+			foreach (var parameter in mi.GetParameters ()){
+				if (parameter.GetCustomAttributes (typeof (NullAllowedAttribute), true).Length > 0){
+					var par = node.XPathSelectElement ("Docs/param[@name='" + parameter.Name + "']");
+					if (par == null){
+						Console.WriteLine ("Did not find parameter {0} in {1}.{2}\n{3}", parameter.Name, t, mi, node);
+						continue;
+					}
+					var toolgen_null_annotations = par.XPathSelectElement ("para[@tool='nullallowed']");
+					if (toolgen_null_annotations == null)
+						PrepareNakedNode (par, addStub: false);
+					else
+						toolgen_null_annotations.Remove ();
+					par.Add (XElement.Parse ("<para tool='nullallowed'>This parameter can be <see langword=\"null\"/>.</para>"));
+				}
+			}
+		}
+		
 		if (bta != null && bta.Events != null){
 			PopulateEvents (xmldoc, bta, t);
 		}
 	}
-			
+
+	static void AddThreadRemark (XElement node, string msg)
+	{
+		var threadNode =  node.XPathSelectElement ("para[@tool='threads']");
+		if (threadNode == null)
+			PrepareNakedNode (node);
+		else
+			threadNode.Remove ();
+		node.Add (XElement.Parse ("<para tool='threads'>" + msg + " can be used from a background thread.</para>"));
+	}
+	
+	public static void AnnotateThreadSafeType (Type t)
+	{
+		var xmldoc = GetDoc (t);
+		if (xmldoc == null){
+			Console.WriteLine ("Can not find docs for {0}", t);
+			return;
+		}
+		var typeRemarks = xmldoc.XPathSelectElement ("Type/Docs/remarks");
+		AddThreadRemark (typeRemarks, "The members of this class");
+
+		var memberRemarks = xmldoc.XPathSelectElements ("Type/Members/Member/Docs/remarks");
+		foreach (var mr in memberRemarks)
+			AddThreadRemark (mr, "This");
+	}
+	
 	public static int Main (string [] args)
 	{
 		string dir = null;
@@ -381,17 +561,22 @@ class DocumentGeneratedCode {
 		assembly_dir = Path.Combine (dir, "en");
 		assembly = Assembly.LoadFrom (lib);
 
-		docGenerator = new AppleDocMerger (new AppleDocMerger.Options {
-			DocBase = Path.Combine (docBase, "Contents/Resources/Documents/documentation"),
-			DebugDocs = debugDoc,
-			MonodocArchive = new MDocDirectoryArchive (assembly_dir),
-			Assembly = Mono.Cecil.AssemblyDefinition.ReadAssembly (lib),
-			BaseAssemblyNamespace = ns,
-			ImportSamples = false
-		});
+		if (mergeAppledocs){
+			docGenerator = new AppleDocMerger (new AppleDocMerger.Options {
+				DocBase = Path.Combine (docBase, "Contents/Resources/Documents/documentation"),
+				DebugDocs = debugDoc,
+				MonodocArchive = new MDocDirectoryArchive (assembly_dir),
+					Assembly = Mono.Cecil.AssemblyDefinition.ReadAssembly (lib),
+					BaseAssemblyNamespace = ns,
+					ImportSamples = false
+					});
+		}
 
 		foreach (Type t in assembly.GetTypes ()){
-			if (debugDoc){
+			if (t.GetCustomAttributes (typeof (ThreadSafeAttribute), true).Length > 0)
+				AnnotateThreadSafeType (t);
+			
+			if (debugDoc && mergeAppledocs){
 				string str = docGenerator.GetAppleDocFor (ToCecilType (t));
 				if (str == null){
 					Console.WriteLine ("Could not find docs for {0}", t);
@@ -399,7 +584,7 @@ class DocumentGeneratedCode {
 				
 				continue;
 			}
-			
+
 			if (debug != null && t.FullName != debug)
 				continue;
 

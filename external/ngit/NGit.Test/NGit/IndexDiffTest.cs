@@ -111,7 +111,7 @@ namespace NGit
 			NUnit.Framework.Assert.AreEqual(0, diff.GetChanged().Count);
 			NUnit.Framework.Assert.AreEqual(0, diff.GetModified().Count);
 			NUnit.Framework.Assert.AreEqual(0, diff.GetRemoved().Count);
-			NUnit.Framework.Assert.AreEqual(Collections<string>.EMPTY_SET, diff.GetUntrackedFolders()
+			NUnit.Framework.CollectionAssert.AreEquivalent(Collections<string>.EMPTY_SET, diff.GetUntrackedFolders()
 				);
 		}
 
@@ -146,7 +146,7 @@ namespace NGit
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestModified()
 		{
@@ -292,7 +292,7 @@ namespace NGit
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestUnchangedSimple()
 		{
@@ -337,7 +337,7 @@ namespace NGit
 		/// used by Git.
 		/// </remarks>
 		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException">NGit.Api.Errors.NoFilepatternException
+		/// <exception cref="NGit.Api.Errors.GitAPIException">NGit.Api.Errors.GitAPIException
 		/// 	</exception>
 		[NUnit.Framework.Test]
 		public virtual void TestUnchangedComplex()
@@ -447,7 +447,7 @@ namespace NGit
 			git.Commit().SetMessage("initial").Call();
 			diff = new IndexDiff(db, Constants.HEAD, new FileTreeIterator(db));
 			diff.Diff();
-			NUnit.Framework.Assert.AreEqual(new HashSet<string>(Arrays.AsList("target")), diff
+			NUnit.Framework.CollectionAssert.AreEquivalent(new HashSet<string>(Arrays.AsList("target")), diff
 				.GetUntrackedFolders());
 			WriteTrashFile("src/tst/A.java", string.Empty);
 			WriteTrashFile("src/tst/B.java", string.Empty);
@@ -460,7 +460,7 @@ namespace NGit
 			WriteTrashFile("src/org/C.java", string.Empty);
 			diff = new IndexDiff(db, Constants.HEAD, new FileTreeIterator(db));
 			diff.Diff();
-			NUnit.Framework.Assert.AreEqual(new HashSet<string>(Arrays.AsList("src/org", "src/tst"
+			NUnit.Framework.CollectionAssert.AreEquivalent(new HashSet<string>(Arrays.AsList("src/org", "src/tst"
 				, "target")), diff.GetUntrackedFolders());
 		}
 

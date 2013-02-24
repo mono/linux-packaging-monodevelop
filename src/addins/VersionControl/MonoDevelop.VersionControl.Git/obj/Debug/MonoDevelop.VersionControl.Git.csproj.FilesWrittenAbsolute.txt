@@ -1,0 +1,9 @@
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.MonoDevelop.VersionControl.Git.addin.xml
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.gtk-gui.gui.stetic
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.icons.arrow_branch.png
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.icons.server.png
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.icons.tag_blue.png
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Git.dll.mdb
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Git.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.dll.mdb

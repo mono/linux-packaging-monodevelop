@@ -39,8 +39,8 @@ DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/monodevelop-core-mac-addins.pc.in \
 	$(srcdir)/monodevelop.in $(srcdir)/monodevelop.pc.in \
 	$(srcdir)/monodevelop.spec.in $(top_srcdir)/Makefile.include \
-	$(top_srcdir)/configure AUTHORS COPYING ChangeLog NEWS \
-	install-sh missing
+	$(top_srcdir)/configure $(top_srcdir)/xbuild.include AUTHORS \
+	COPYING ChangeLog NEWS install-sh missing
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
@@ -182,12 +182,6 @@ MKDIR_P = @MKDIR_P@
 MONO = @MONO@
 MONODOC_CFLAGS = @MONODOC_CFLAGS@
 MONODOC_LIBS = @MONODOC_LIBS@
-MONO_ADDINS_CFLAGS = @MONO_ADDINS_CFLAGS@
-MONO_ADDINS_GUI_CFLAGS = @MONO_ADDINS_GUI_CFLAGS@
-MONO_ADDINS_GUI_LIBS = @MONO_ADDINS_GUI_LIBS@
-MONO_ADDINS_LIBS = @MONO_ADDINS_LIBS@
-MONO_ADDINS_SETUP_CFLAGS = @MONO_ADDINS_SETUP_CFLAGS@
-MONO_ADDINS_SETUP_LIBS = @MONO_ADDINS_SETUP_LIBS@
 MONO_GAC_PREFIX = @MONO_GAC_PREFIX@
 MONO_NUNIT_CFLAGS = @MONO_NUNIT_CFLAGS@
 MONO_NUNIT_LIBS = @MONO_NUNIT_LIBS@
@@ -256,7 +250,42 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = external contrib src po man theme-icons build tests
+ALL_CSPROJ = $(wildcard *.csproj)
+MAIN_SLN = $(top_builddir)/Main.sln
+@ENABLE_GNOMEPLATFORM_TRUE@PROFILE_NAME = Debug
+@ENABLE_MACPLATFORM_TRUE@PROFILE_NAME = DebugMac
+@ENABLE_WINDOWSPLATFORM_TRUE@PROFILE_NAME = DebugWin32
+XBUILD = xbuild
+XBUILD_VERBOSITY = quiet
+XBUILD_ARGS = /verbosity:$(XBUILD_VERBOSITY) /nologo /property:CodePage=65001
+XBUILD_PROFILE = /property:Configuration=$(PROFILE_NAME)
+
+# Figure out how far we are from top_builddir
+DEPTH = $(shell echo "$(top_builddir)" | tr '/' '\n' | grep -c '..')
+EXTS := *.bmp *.cs *.csproj *.html *.png *.snk *.config *.stetic *.glade *.xml *.xsd *.exe.addins *.template *.tt *.txt
+ALL_FILES := $(EXTS) \
+		$(addprefix */,$(EXTS))		\
+		$(addprefix */*/,$(EXTS))	\
+		$(addprefix */*/*/,$(EXTS))	\
+		$(addprefix */*/*/*/,$(EXTS))	\
+		$(addprefix */*/*/*/*/,$(EXTS))	\
+		$(wildcard icons/*)		\
+		$(wildcard templates/*)
+
+WILDCARDED_FILES := $(wildcard $(ALL_FILES))
+#mkdir -p $(MAC_APP_DIR)/Contents/{MacOS,Resources}
+#mkdir -p $(MAC_APP_LIB_DIR)
+#cp -a build/AddIns $(MAC_APP_LIB_DIR)
+#cp -a build/data $(MAC_APP_LIB_DIR)
+#cp -a build/bin $(MAC_APP_LIB_DIR)
+
+# we can't use the variables that are conditionally defined
+EXTRA_DIST = $(bin_SCRIPTS) $(desktop_DATA) $(pixmap_DATA) \
+	monodevelop.xml $(pkgconfig_in_files) vcrevision external/Makefile.in \
+	Main.sln \
+	md.targets
+
+SUBDIRS = external . contrib src po man theme-icons build tests
 
 #capture aclocal flags for autoreconf
 ACLOCAL_AMFLAGS = $(ACLOCAL_FLAGS)
@@ -306,16 +335,6 @@ DOCFILES = \
 
 #	cd docs/apiguide && mdassembler --out monodevelop-api-guide --xhtml toc.xhtml && mv monodevelop-api-guide.zip ../web/sources
 MD_LAUNCH = $(MD_LAUNCH_SETUP) UBUNTU_MENUPROXY=0 exec -a "monodevelop" $(RUNTIME)
-#mkdir -p $(MAC_APP_DIR)/Contents/{MacOS,Resources}
-#mkdir -p $(MAC_APP_LIB_DIR)
-#cp -a build/AddIns $(MAC_APP_LIB_DIR)
-#cp -a build/data $(MAC_APP_LIB_DIR)
-#cp -a build/bin $(MAC_APP_LIB_DIR)
-
-# we can't use the variables that are conditionally defined
-EXTRA_DIST = $(bin_SCRIPTS) $(desktop_DATA) $(pixmap_DATA) \
-	monodevelop.xml $(pkgconfig_in_files) vcrevision external/Makefile.in
-
 DISTCLEANFILES = monodevelop intltool-extract intltool-merge intltool-update \
 	$(pkgconfig_DATA) 
 
@@ -353,7 +372,7 @@ all: all-recursive
 .SUFFIXES:
 am--refresh:
 	@:
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/Makefile.include $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/xbuild.include $(top_srcdir)/Makefile.include $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -824,7 +843,7 @@ distcleancheck: distclean
 	       exit 1; } >&2
 check-am: all-am
 check: check-recursive
-all-am: Makefile $(SCRIPTS) $(DATA)
+all-am: Makefile $(SCRIPTS) $(DATA) all-local
 installdirs: installdirs-recursive
 installdirs-am:
 	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(buildinfodir)" "$(DESTDIR)$(desktopdir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(xdgmimedir)"; do \
@@ -858,9 +877,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 @ENABLE_UPDATE_MIMEDB_FALSE@install-data-hook:
 @ENABLE_UPDATE_MIMEDB_FALSE@uninstall-hook:
-clean: clean-recursive
-
-clean-am: clean-generic mostlyclean-am
+clean-am: clean-generic clean-local mostlyclean-am
 
 distclean: distclean-recursive
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
@@ -937,12 +954,12 @@ uninstall-am: uninstall-binSCRIPTS uninstall-buildinfoDATA \
 	uninstall-am
 
 .PHONY: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) CTAGS GTAGS \
-	all all-am am--refresh check check-am clean clean-generic \
-	ctags ctags-recursive dist dist-all dist-bzip2 dist-gzip \
-	dist-lzma dist-shar dist-tarZ dist-xz dist-zip distcheck \
-	distclean distclean-generic distclean-tags distcleancheck \
-	distdir distuninstallcheck dvi dvi-am html html-am info \
-	info-am install install-am install-binSCRIPTS \
+	all all-am all-local am--refresh check check-am clean \
+	clean-generic clean-local ctags ctags-recursive dist dist-all \
+	dist-bzip2 dist-gzip dist-lzma dist-shar dist-tarZ dist-xz \
+	dist-zip distcheck distclean distclean-generic distclean-tags \
+	distcleancheck distdir distuninstallcheck dvi dvi-am html \
+	html-am info info-am install install-am install-binSCRIPTS \
 	install-buildinfoDATA install-data install-data-am \
 	install-data-hook install-desktopDATA install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
@@ -957,13 +974,48 @@ uninstall-am: uninstall-binSCRIPTS uninstall-buildinfoDATA \
 	uninstall-xdgmimeDATA
 
 
+all: csproj_build
+
+clean: csproj_clean
+
+csproj_build:
+	@if test x$(SKIP) != xy -a $(DEPTH) -gt $(MAKELEVEL); then \
+	echo Building $(ALL_CSPROJ); \
+	for p in $(ALL_CSPROJ); do $(XBUILD) $(XBUILD_ARGS) $$p; done \
+	fi
+
+csproj_clean:
+	@if test x$(SKIP) != xy -a $(DEPTH) -gt $(MAKELEVEL); then \
+	echo Cleaning $(ALL_CSPROJ); \
+	for p in $(ALL_CSPROJ); do $(XBUILD) $(XBUILD_ARGS) $$p /t:Clean; done \
+	fi
+
+sln_build:
+	@echo Building $(MAIN_SLN)
+	$(XBUILD) $(XBUILD_ARGS) $(MAIN_SLN) $(XBUILD_PROFILE)
+
+sln_clean:
+	@echo Cleaning $(MAIN_SLN)
+	$(XBUILD) $(XBUILD_ARGS) $(MAIN_SLN) $(XBUILD_PROFILE) /t:Clean
+
+print_extradist:
+	@echo $(WILDCARDED_FILES)
+
+.PHONY: all clean csproj_build csproj_clean sln_build sln_clean
+
 all: vcrevision
+
+all-local: sln_build
+
+clean: clean-local
+
+clean-local: sln_clean
 
 vcrevision:
 	@if test -d ../.git; then \
 		version=$$(cd ..; \
 			LANG=C; export LANG; \
-			git describe --dirty --always --abbrev=0 --match nothing; \
+			git rev-parse HEAD; \
 		); \
 		echo "$$version" > "vcrevision"; \
 	else \
@@ -974,7 +1026,7 @@ vcrevision:
 
 $(buildinfo): vcrevision
 	@mkdir -p "$(top_builddir)/build/bin"
-	@echo "Git revision: $$(cat $(top_srcdir)/vcrevision)" > "$@"
+	@echo "$$(cat $(top_srcdir)/vcrevision)" > "$@"
 	@echo "Build date: $$(date -u +'%Y-%m-%d %H:%M:%S%z')" >> "$@"
 	@echo "Updated build information"
 	@cat $(buildinfo)
@@ -1000,10 +1052,15 @@ apidocs:
 	mautil -reg build/bin -p build/bin info --all --xml > docs/extension-model.xml
 	mdassembler --out docs/sources/monodevelop-extension-guide --addins docs/extension-model.xml
 
-run: runmd
+run: runmd-sgen
+
+run-sgen: runmd-sgen
 
 runmd: $(PROGRAM)
 	$(MD_LAUNCH) --debug $(MD_BIN_PATH)/MonoDevelop.exe --no-redirect
+
+runmd-sgen: $(PROGRAM)
+	$(MD_LAUNCH)-sgen --debug $(MD_BIN_PATH)/MonoDevelop.exe --no-redirect
 
 run-debug: $(PROGRAM)
 	MONODEVELOP_CONSOLE_LOG_LEVEL=All $(MD_LAUNCH) --debug=casts $(MD_BIN_PATH)/MonoDevelop.exe --no-redirect
@@ -1011,6 +1068,11 @@ run-debug: $(PROGRAM)
 run-gdb: $(PROGRAM)
 	echo "run --debug $(MD_BIN_PATH)/MonoDevelop.exe" > gdb.commands
 	$(MD_LAUNCH_SETUP) gdb $(RUNTIME) -x gdb.commands
+	rm -f gdb.commands
+
+run-gdb-sgen: $(PROGRAM)
+	echo "run --debug $(MD_BIN_PATH)/MonoDevelop.exe" > gdb.commands
+	$(MD_LAUNCH_SETUP) gdb $(RUNTIME)-sgen -x gdb.commands
 	rm -f gdb.commands
 
 run-profile: $(PROGRAM)
@@ -1033,7 +1095,7 @@ check-addins:
 	$(MDTOOL_RUN) setup reg-build -v
 
 test:
-	cd tests/UnitTests && make test fixture=$(fixture)
+	cd tests && $(MAKE) test assembly=$(assembly)
 
 app-dir: all
 	cd build && make app-dir

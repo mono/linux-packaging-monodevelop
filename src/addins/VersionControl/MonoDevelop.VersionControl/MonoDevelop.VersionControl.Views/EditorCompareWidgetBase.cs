@@ -108,6 +108,7 @@ namespace MonoDevelop.VersionControl.Views
 
 		protected EditorCompareWidgetBase (bool viewOnly)
 		{
+			GtkWorkarounds.FixContainerLeak (this);
 			this.viewOnly = viewOnly;
 		}
 
@@ -155,12 +156,12 @@ namespace MonoDevelop.VersionControl.Views
 
 			if (editors.Length == 2) {
 				editors[0].Painted +=  delegate (object sender, PaintEventArgs args) {
-					var myEditor = (TextEditor)sender;
+					var myEditor = (TextArea)sender;
 					PaintEditorOverlay (myEditor, args, LeftDiff, true);
 				};
 
 				editors[1].Painted +=  delegate (object sender, PaintEventArgs args) {
-					var myEditor = (TextEditor)sender;
+					var myEditor = (TextArea)sender;
 					PaintEditorOverlay (myEditor, args, LeftDiff, false);
 				};
 
@@ -168,16 +169,16 @@ namespace MonoDevelop.VersionControl.Views
 				Add (rightDiffScrollBar);
 			} else {
 				editors[0].Painted +=  delegate (object sender, PaintEventArgs args) {
-					var myEditor = (TextEditor)sender;
+					var myEditor = (TextArea)sender;
 					PaintEditorOverlay (myEditor, args, LeftDiff, true);
 				};
 				editors[1].Painted +=  delegate (object sender, PaintEventArgs args) {
-					var myEditor = (TextEditor)sender;
+					var myEditor = (TextArea)sender;
 					PaintEditorOverlay (myEditor, args, LeftDiff, false);
 					PaintEditorOverlay (myEditor, args, RightDiff, false);
 				};
 				editors[2].Painted +=  delegate (object sender, PaintEventArgs args) {
-					var myEditor = (TextEditor)sender;
+					var myEditor = (TextArea)sender;
 					PaintEditorOverlay (myEditor, args, RightDiff, true);
 				};
 				rightDiffScrollBar = new DiffScrollbar (this, editors[2], false, false);
@@ -250,22 +251,26 @@ namespace MonoDevelop.VersionControl.Views
 
 				editor.Options.ShowFoldMargin = false;
 				editor.Options.ShowIconMargin = false;
+				editor.Options.DrawIndentationMarkers = PropertyService.Get ("DrawIndentationMarkers", false);
 			}
 		}
 		
 		protected abstract void CreateComponents ();
 		
-		public static Cairo.Rectangle GetDiffRectangle (TextEditor editor, int startOffset, int endOffset)
+		public static ICollection<Cairo.Rectangle> GetDiffRectangles (TextEditor editor, int startOffset, int endOffset)
 		{
-			var point = editor.LocationToPoint (editor.Document.OffsetToLocation (startOffset), true);
-			Cairo.Point point2;
-			var line = editor.GetLineByOffset (startOffset);
-			if (line.Offset + line.Length < endOffset) {
-				point2 = new Cairo.Point ((int)(point.X + editor.TextViewMargin.CharWidth * (endOffset - startOffset)), point.Y);
-			} else {
-				point2 = editor.LocationToPoint (editor.Document.OffsetToLocation (endOffset), true);
+			ICollection<Cairo.Rectangle> rectangles = new List<Cairo.Rectangle> ();
+			var startLine = editor.GetLineByOffset (startOffset);
+			var endLine = editor.GetLineByOffset (endOffset);
+			int lineCount = endLine.LineNumber - startLine.LineNumber;
+			var line = startLine;
+			for (int i = 0; i <= lineCount; i++) {
+				Cairo.Point point = editor.LocationToPoint (editor.Document.OffsetToLocation (Math.Max (startOffset, line.Offset)), true);
+				Cairo.Point point2 = editor.LocationToPoint (editor.Document.OffsetToLocation (Math.Min (line.EndOffset, endOffset)), true);
+				rectangles.Add (new Cairo.Rectangle (point.X - editor.TextViewMargin.XOffset, point.Y, point2.X - point.X, editor.LineHeight));
+				line = line.NextLine;
 			}
-			return new Cairo.Rectangle (point.X - editor.TextViewMargin.XOffset, point.Y, point2.X - point.X, editor.LineHeight);
+			return rectangles;
 		}
 		
 		Dictionary<List<Mono.TextEditor.Utils.Hunk>, Dictionary<Hunk, Tuple<List<Cairo.Rectangle>, List<Cairo.Rectangle>>>> diffCache = new Dictionary<List<Mono.TextEditor.Utils.Hunk>, Dictionary<Hunk, Tuple<List<Cairo.Rectangle>, List<Cairo.Rectangle>>>> ();
@@ -292,14 +297,14 @@ namespace MonoDevelop.VersionControl.Views
 					var word = words[start + i - 1];
 					if (endOffset != word.Offset) {
 						if (startOffset >= 0)
-							result.Add (GetDiffRectangle (editor, startOffset, endOffset));
+							result.AddRange (GetDiffRectangles (editor, startOffset, endOffset));
 						startOffset = word.Offset;
 					}
 					endOffset = word.EndOffset;
 				}
 			}
 			if (startOffset >= 0)
-				result.Add (GetDiffRectangle (editor, startOffset, endOffset));
+				result.AddRange (GetDiffRectangles (editor, startOffset, endOffset));
 			return result;
 		}
 		
@@ -386,14 +391,14 @@ namespace MonoDevelop.VersionControl.Views
 
 		static void UpdateCaretPosition (Caret caret)
 		{
-			int offset = caret.Offset;
-			if (offset < 0 || offset > caret.TextEditorData.Document.TextLength)
-				return;
-			DocumentLocation location = caret.TextEditorData.LogicalToVisualLocation (caret.Location);
-			IdeApp.Workbench.StatusBar.ShowCaretState (caret.Line,
-			                                           location.Column,
-			                                           caret.TextEditorData.IsSomethingSelected ? caret.TextEditorData.SelectionRange.Length : 0,
-			                                           caret.IsInInsertMode);
+//			int offset = caret.Offset;
+//			if (offset < 0 || offset > caret.TextEditorData.Document.TextLength)
+//				return;
+//			DocumentLocation location = caret.TextEditorData.LogicalToVisualLocation (caret.Location);
+//			IdeApp.Workbench.StatusBar.ShowCaretState (caret.Line,
+//			                                           location.Column,
+//			                                           caret.TextEditorData.IsSomethingSelected ? caret.TextEditorData.SelectionRange.Length : 0,
+//			                                           caret.IsInInsertMode);
 		}
 
 		#region Container implementation
@@ -535,7 +540,7 @@ namespace MonoDevelop.VersionControl.Views
 			return result;
 		}
 		
-		void PaintEditorOverlay (TextEditor editor, PaintEventArgs args, List<Mono.TextEditor.Utils.Hunk> diff, bool paintRemoveSide)
+		void PaintEditorOverlay (TextArea editor, PaintEventArgs args, List<Mono.TextEditor.Utils.Hunk> diff, bool paintRemoveSide)
 		{
 			if (diff == null)
 				return;
@@ -580,7 +585,7 @@ namespace MonoDevelop.VersionControl.Views
 		{
 			foreach (var data in localUpdate.ToArray ()) {
 				data.Document.TextReplaced -= HandleDataDocumentTextReplaced;
-				data.Replace (e.Offset, e.RemovalLength, e.InsertedText);
+				data.Replace (e.Offset, e.RemovalLength, e.InsertedText.Text);
 				data.Document.TextReplaced += HandleDataDocumentTextReplaced;
 				data.Document.CommitUpdateAll ();
 			}
@@ -618,7 +623,7 @@ namespace MonoDevelop.VersionControl.Views
 			localUpdate.Remove (data);
 			var editor = info.Document.GetContent<IEditableTextFile> ();
 			editor.DeleteText (e.Offset, e.RemovalLength);
-			editor.InsertText (e.Offset, e.InsertedText);
+			editor.InsertText (e.Offset, e.InsertedText.Text);
 			localUpdate.Add (data);
 			UpdateDiff ();
 		}
@@ -634,17 +639,25 @@ namespace MonoDevelop.VersionControl.Views
 			using (var undo = toEditor.OpenUndoGroup ()) {
 				var start = toEditor.Document.GetLine (hunk.InsertStart);
 				int toOffset = start != null ? start.Offset : toEditor.Document.TextLength;
+
+				int replaceLength = 0;
 				if (start != null && hunk.Inserted > 0) {
 					int line = Math.Min (hunk.InsertStart + hunk.Inserted - 1, toEditor.Document.LineCount);
 					var end = toEditor.Document.GetLine (line);
-					toEditor.Remove (start.Offset, end.EndOffsetIncludingDelimiter - start.Offset);
+					replaceLength = end.EndOffsetIncludingDelimiter - start.Offset;
 				}
 	
 				if (hunk.Removed > 0) {
 					start = fromEditor.Document.GetLine (Math.Min (hunk.RemoveStart, fromEditor.Document.LineCount));
 					int line = Math.Min (hunk.RemoveStart + hunk.Removed - 1, fromEditor.Document.LineCount);
 					var end = fromEditor.Document.GetLine (line);
-					toEditor.Insert (toOffset, start.Offset == end.EndOffsetIncludingDelimiter ? toEditor.EolMarker : fromEditor.Document.GetTextBetween (start.Offset, end.EndOffsetIncludingDelimiter));
+					toEditor.Replace (
+						toOffset,
+						replaceLength,
+						fromEditor.Document.GetTextBetween (start.Offset, end.EndOffsetIncludingDelimiter)
+					);
+				} else if (replaceLength > 0) {
+					toEditor.Remove (toOffset, replaceLength);
 				}
 			}
 		}
@@ -918,6 +931,7 @@ namespace MonoDevelop.VersionControl.Views
 			EditorCompareWidgetBase widget;
 			bool useLeftDiff;
 			bool paintInsert;
+			Adjustment vAdjustment;
 			
 			public DiffScrollbar (EditorCompareWidgetBase widget, TextEditor editor, bool useLeftDiff, bool paintInsert)
 			{
@@ -925,14 +939,27 @@ namespace MonoDevelop.VersionControl.Views
 				this.useLeftDiff = useLeftDiff;
 				this.paintInsert = paintInsert;
 				this.widget = widget;
-				widget.vAdjustment.ValueChanged += delegate {
-					QueueDraw ();
-				};
+				vAdjustment = widget.vAdjustment;
+				vAdjustment.ValueChanged += HandleValueChanged;
 				WidthRequest = 50;
 
 				Events |= EventMask.ButtonPressMask | EventMask.ButtonReleaseMask | EventMask.ButtonMotionMask;
 
 				Show ();
+			}
+
+			protected override void OnDestroyed ()
+			{
+				base.OnDestroyed ();
+				if (vAdjustment != null) {
+					vAdjustment.ValueChanged -= HandleValueChanged;
+					vAdjustment = null;
+				}
+			}
+
+			void HandleValueChanged (object sender, EventArgs e)
+			{
+				QueueDraw ();
 			}
 
 			public void MouseMove (double y)

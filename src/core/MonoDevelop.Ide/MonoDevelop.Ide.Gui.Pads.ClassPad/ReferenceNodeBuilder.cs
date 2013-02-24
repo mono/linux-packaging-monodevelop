@@ -33,7 +33,6 @@ using System.IO;
 using MonoDevelop.Projects;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Components;
-using ICSharpCode.NRefactory.TypeSystem;
 
 namespace MonoDevelop.Ide.Gui.Pads.ClassPad
 {
@@ -111,8 +110,9 @@ namespace MonoDevelop.Ide.Gui.Pads.ClassPad
 		
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
 		{
-			ProjectReference pref = (ProjectReference)dataObject;
-			return pref.ReferenceType != ReferenceType.Project;
+			return false;
+			//ProjectReference pref = (ProjectReference)dataObject;
+			//return pref.ReferenceType != ReferenceType.Project;
 		}
 	}
 	

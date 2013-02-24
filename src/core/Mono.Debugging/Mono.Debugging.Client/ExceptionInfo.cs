@@ -26,6 +26,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Mono.Debugging.Client
 {
@@ -33,7 +34,8 @@ namespace Mono.Debugging.Client
 	public class ExceptionInfo
 	{
 		ObjectValue exception;
-		
+		ObjectValue messageObject;
+
 		[NonSerialized]
 		ExceptionStackFrame[] frames;
 		
@@ -59,14 +61,30 @@ namespace Mono.Debugging.Client
 				exception.ValueChanged += HandleExceptionValueChanged;
 		}
 
+		void LoadMessage ()
+		{
+			if (messageObject == null) {
+				messageObject = exception.GetChild ("Message");
+				if (messageObject != null && messageObject.IsEvaluating)
+					messageObject.ValueChanged += HandleMessageValueChanged;
+			}
+		}
+
+		void HandleMessageValueChanged (object sender, EventArgs e)
+		{
+			frames = null;
+			NotifyChanged ();
+		}
+
 		void HandleExceptionValueChanged (object sender, EventArgs e)
 		{
 			frames = null;
 			if (exception.IsEvaluatingGroup)
 				exception = exception.GetArrayItem (0);
+			LoadMessage ();
 			NotifyChanged ();
 		}
-		
+
 		void NotifyChanged ()
 		{
 			EventHandler evnt = Changed;
@@ -80,8 +98,10 @@ namespace Mono.Debugging.Client
 
 		public string Message {
 			get {
-				ObjectValue val = exception.GetChild ("Message");
-				return val != null ? val.Value : null;
+				LoadMessage ();
+				if (messageObject != null && messageObject.IsEvaluating)
+					return "Loading...";
+				return messageObject != null ? messageObject.Value : null;
 			}
 		}
 
@@ -93,6 +113,16 @@ namespace Mono.Debugging.Client
 		
 		public bool IsEvaluating {
 			get { return exception.IsEvaluating || exception.IsEvaluatingGroup; }
+		}
+
+		public bool StackIsEvaluating {
+			get {
+				ObjectValue stackTrace = exception.GetChild ("StackTrace");
+				if (stackTrace != null)
+					return stackTrace.IsEvaluating;
+				else
+					return false;
+			}
 		}
 
 		public ExceptionStackFrame[] StackTrace {
@@ -141,6 +171,32 @@ namespace Mono.Debugging.Client
 		internal void ConnectCallback (StackFrame parentFrame)
 		{
 			ObjectValue.ConnectCallbacks (parentFrame, exception);
+		}
+
+		public override string ToString ()
+		{
+			StringBuilder sb = new StringBuilder ();
+			var chain = new List<ExceptionInfo> ();
+			ExceptionInfo e = this;
+			while (e != null) {
+				chain.Insert (0, e);
+				if (sb.Length > 0)
+					sb.Append (" ---> ");
+				sb.Append (e.Type).Append (": ").Append (e.Message);
+				e = e.InnerException;
+			}
+			sb.AppendLine ();
+			foreach (var ex in chain) {
+				if (ex != chain[0])
+					sb.AppendLine ("  --- End of inner exception stack trace ---");
+				foreach (var f in ex.StackTrace) {
+					sb.Append ("  at ").Append (f.DisplayText);
+					if (!string.IsNullOrEmpty (f.File))
+						sb.Append (" in ").Append (f.File).Append (":").Append (f.Line);
+					sb.AppendLine ();
+				}
+			}
+			return sb.ToString ();
 		}
 	}
 	

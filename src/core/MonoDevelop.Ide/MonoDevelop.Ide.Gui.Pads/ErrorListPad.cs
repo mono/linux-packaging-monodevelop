@@ -46,6 +46,8 @@ using Gtk;
 using System.Text;
 using MonoDevelop.Components.Docking;
 using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Components.Commands;
+using MonoDevelop.Ide.Commands;
 
 namespace MonoDevelop.Ide.Gui.Pads
 {
@@ -111,14 +113,13 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 		void IPadContent.Initialize (IPadWindow window)
 		{
-			window.Title = GettextCatalog.GetString ("Error List");
-			window.Icon = MonoDevelop.Ide.Gui.Stock.Error;
-			
+			window.Title = GettextCatalog.GetString ("Errors");
+
 			DockItemToolbar toolbar = window.GetToolbar (PositionType.Top);
 			
 			errorBtn = new ToggleButton ();
 			errorBtn.Active = (bool)PropertyService.Get (showErrorsPropertyName, true);
-			errorBtn.Image = new Gtk.Image (Gtk.Stock.DialogError, Gtk.IconSize.Menu);
+			errorBtn.Image = new Gtk.Image (Stock.Error, Gtk.IconSize.Menu);
 			errorBtn.Image.Show ();
 			errorBtn.Toggled += new EventHandler (FilterChanged);
 			errorBtn.TooltipText = GettextCatalog.GetString ("Show Errors");
@@ -127,7 +128,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			
 			warnBtn = new ToggleButton ();
 			warnBtn.Active = (bool)PropertyService.Get (showWarningsPropertyName, true);
-			warnBtn.Image = new Gtk.Image (Gtk.Stock.DialogWarning, Gtk.IconSize.Menu);
+			warnBtn.Image = new Gtk.Image (Stock.Warning, Gtk.IconSize.Menu);
 			warnBtn.Image.Show ();
 			warnBtn.Toggled += new EventHandler (FilterChanged);
 			warnBtn.TooltipText = GettextCatalog.GetString ("Show Warnings");
@@ -195,8 +196,8 @@ namespace MonoDevelop.Ide.Gui.Pads
 			
 			view.RowActivated += new RowActivatedHandler (OnRowActivated);
 			
-			iconWarning = sw.RenderIcon (Gtk.Stock.DialogWarning, Gtk.IconSize.Menu, "");
-			iconError = sw.RenderIcon (Gtk.Stock.DialogError, Gtk.IconSize.Menu, "");
+			iconWarning = sw.RenderIcon (Stock.Warning, Gtk.IconSize.Menu, "");
+			iconError = sw.RenderIcon (Stock.Error, Gtk.IconSize.Menu, "");
 			iconInfo = sw.RenderIcon (Gtk.Stock.DialogInfo, Gtk.IconSize.Menu, "");
 			
 			control.Add1 (sw);
@@ -424,6 +425,12 @@ namespace MonoDevelop.Ide.Gui.Pads
 					return model.GetValue (iter, DataColumns.Task) as Task;
 				return null; // no one selected
 			}
+		}
+
+		[CommandHandler (EditCommands.Copy)]
+		protected void OnCopy ()
+		{
+			OnTaskCopied (null, null);
 		}
 
 		void OnTaskCopied (object o, EventArgs args)

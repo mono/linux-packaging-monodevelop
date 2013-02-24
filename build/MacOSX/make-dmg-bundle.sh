@@ -4,10 +4,15 @@
  	
 pushd $(dirname $0) &>/dev/null
 
-DMG_APP=MonoDevelop.app
+DMG_APP=$1
+RENDER_OP=$2
+
+if [ -z "$DMG_APP" ]; then
+	DMG_APP=MonoDevelop.app
+fi
 
 if test ! -e "$DMG_APP" ; then
-	echo "Missing MonoDevelop.app"
+	echo "Missing $DMG_APP"
 	exit 1
 fi
 
@@ -49,11 +54,18 @@ ln -s /Applications Applications
 popd &>/dev/null
 
 mkdir -p "$MOUNT_POINT/.background"
-DYLD_FALLBACK_LIBRARY_PATH="/Library/Frameworks/Mono.framework/Versions/Current/lib:/lib:/usr/lib" mono render.exe "$NAME $VERSION"
-mv dmg-bg-with-version.png "$MOUNT_POINT/.background/dmg-bg.png"
+if [ "$RENDER_OP" == "norender" ]; then
+	cp dmg-bg.png "$MOUNT_POINT/.background/dmg-bg.png"
+else
+	DYLD_FALLBACK_LIBRARY_PATH="/Library/Frameworks/Mono.framework/Versions/Current/lib:/lib:/usr/lib" mono render.exe "$NAME $VERSION"
+	mv dmg-bg-with-version.png "$MOUNT_POINT/.background/dmg-bg.png"
+fi
+
 cp DS_Store "$MOUNT_POINT/.DS_Store"
-cp VolumeIcon.icns "$MOUNT_POINT/.VolumeIcon.icns"
-SetFile -c icnC "$MOUNT_POINT/.VolumeIcon.icns"
+if [ -e VolumeIcon.icns ] ; then
+	cp VolumeIcon.icns "$MOUNT_POINT/.VolumeIcon.icns"
+	SetFile -c icnC "$MOUNT_POINT/.VolumeIcon.icns"
+fi
 SetFile -a C "$MOUNT_POINT"
 
 echo "Detaching from disk image..."

@@ -118,11 +118,22 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 				cr.Color = color;
 				cr.Fill ();*/
 			}
-		
+
+
+			protected override void MouseMove (double y)
+			{
+				if (button != 1)
+					return;
+				var ph = (int)(lineHeight * (TextEditor.GetTextEditorData ().VisibleLineCount));
+				double position = vadjustment.Upper * (Math.Min (GetBufferYOffset () + y, ph) / (double)ph) - vadjustment.PageSize / 2;
+				position = Math.Max (vadjustment.Lower, Math.Min (position, vadjustment.Upper - vadjustment.PageSize));
+				vadjustment.Value = position;
+			}
+
 			protected override void OnSizeRequested (ref Requisition requisition)
 			{
 				base.OnSizeRequested (ref requisition);
-				requisition.Width = 164;
+				requisition.Width = 150;
 			}
 			
 			void DestroyBgBuffer ()
@@ -179,7 +190,7 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 			{
 				DestroyBgBuffer ();
 				curWidth = Allocation.Width;
-				curHeight = Math.Max (Allocation.Height, (int)(lineHeight * TextEditor.GetTextEditorData ().VisibleLineCount));
+				curHeight = Math.Max (Allocation.Height, (int)(lineHeight * (TextEditor.GetTextEditorData ().VisibleLineCount)));
 				if (GdkWindow == null || curWidth < 1 || curHeight < 1)
 					return;
 				backgroundPixbuf = new Pixmap (GdkWindow, curWidth, curHeight);
@@ -275,7 +286,15 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 					return true;
 				}
 			}
-			
+
+			int GetBufferYOffset ()
+			{
+				int h = backgroundPixbuf.ClipRegion.Clipbox.Height - Allocation.Height;
+				if (h < 0)
+					return 0;
+				return Math.Max (0, (int)(h * (vadjustment.Value) / (vadjustment.Upper - vadjustment.Lower - vadjustment.PageSize)));
+			}
+
 			protected override bool OnExposeEvent (Gdk.EventExpose e)
 			{
 				if (TextEditor == null)
@@ -283,24 +302,23 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 				using (Cairo.Context cr = Gdk.CairoHelper.Create (e.Window)) {
 					cr.LineWidth = 1;
 					if (backgroundPixbuf != null) {
-						int h = backgroundPixbuf.ClipRegion.Clipbox.Height - Allocation.Height;
-						int y = (int)(h * vadjustment.Value / (vadjustment.Upper - vadjustment.Lower));
-						e.Window.DrawDrawable (Style.BlackGC, backgroundPixbuf, 0, y, 0, 0, Allocation.Width, Allocation.Height);
+						e.Window.DrawDrawable (Style.BlackGC, backgroundPixbuf, 0, GetBufferYOffset (), 0, 0, Allocation.Width, Allocation.Height);
 					} else {
 						cr.Rectangle (0, 0, Allocation.Width, Allocation.Height);
 						if (TextEditor.ColorStyle != null)
 							cr.Color = TextEditor.ColorStyle.Default.CairoBackgroundColor;
 						cr.Fill ();
 					}
-					
+					/*
 					cr.Color = (HslColor)Style.Dark (State);
-					cr.MoveTo (0.5, 0.5);
+					cr.MoveTo (-0.5, 0.5);
 					cr.LineTo (Allocation.Width, 0.5);
-					cr.Stroke ();
+					cr.MoveTo (-0.5, Allocation.Height - 0.5);
+					cr.LineTo (Allocation.Width, Allocation.Height - 0.5);
+					cr.Stroke ();*/
 
 					if (backgroundPixbuf != null) {
-						int h = backgroundPixbuf.ClipRegion.Clipbox.Height - Allocation.Height;
-						int y = (int)(h * vadjustment.Value / (vadjustment.Upper - vadjustment.Lower));
+						int y = GetBufferYOffset ();
 
 						int startLine = TextEditor.YToLine (vadjustment.Value);
 						double dy = TextEditor.LogicalToVisualLocation (startLine, 1).Line * lineHeight;

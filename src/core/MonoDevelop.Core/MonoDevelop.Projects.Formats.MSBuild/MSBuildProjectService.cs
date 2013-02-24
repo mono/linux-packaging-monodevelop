@@ -29,11 +29,10 @@ using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.IO;
-using System.Xml;
 using System.Globalization;
 using System.Runtime.Serialization.Formatters.Binary;
 using Mono.Addins;
-using MonoDevelop.Core.AddIns;
+using MonoDevelop.Core.ProgressMonitoring;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.Extensions;
 using MonoDevelop.Core.Serialization;
@@ -152,6 +151,22 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 		}
 		
+		public static bool SupportsProjectType (string projectFile)
+		{
+			if (!string.IsNullOrWhiteSpace (projectFile)) {
+				// If we have a project file, try to load it.
+				try {
+					using (var monitor = new ConsoleProgressMonitor ()) {
+						return MSBuildProjectService.LoadItem (monitor, projectFile, null, null, null) != null;
+					}
+				} catch {
+					return false;
+				}
+			}
+
+			return false;
+		}
+
 		internal static DotNetProjectSubtypeNode GetDotNetProjectSubtype (string typeGuids)
 		{
 			if (!string.IsNullOrEmpty (typeGuids)) {
@@ -449,7 +464,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 				//always start the remote process explicitly, even if it's using the current runtime and fx
 				//else it won't pick up the assembly redirects from the builder exe
-				var exe = GetExeLocation (toolsVersion);
+				var exe = GetExeLocation (runtime, toolsVersion);
 				MonoDevelop.Core.Execution.RemotingService.RegisterRemotingChannel ();
 				var pinfo = new ProcessStartInfo (exe) {
 					UseShellExecute = false,
@@ -483,9 +498,13 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 		}
 		
-		static string GetExeLocation (string toolsVersion)
+		static string GetExeLocation (TargetRuntime runtime, string toolsVersion)
 		{
 			FilePath sourceExe = typeof(ProjectBuilder).Assembly.Location;
+
+			if ((runtime is MsNetTargetRuntime) && int.Parse (toolsVersion.Split ('.')[0]) >= 4)
+				toolsVersion = "dotnet." + toolsVersion;
+
 			if (toolsVersion == REFERENCED_MSBUILD_TOOLS)
 				return sourceExe;
 			
@@ -585,7 +604,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		
 		internal protected override DataNode OnSerialize (SerializationContext serCtx, object mapData, object value)
 		{
-			return new DataValue (Name, (bool)value ? "true" : "false");
+			return new DataValue (Name, (bool)value ? "True" : "False");
 		}
 		
 		internal protected override object OnDeserialize (SerializationContext serCtx, object mapData, DataNode data)

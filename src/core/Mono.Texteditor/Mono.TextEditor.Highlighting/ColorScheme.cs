@@ -35,8 +35,6 @@ namespace Mono.TextEditor.Highlighting
 {
 	public class ColorScheme
 	{
-		public static ColorScheme Empty = new ColorScheme ();
-		
 		Dictionary<string, ChunkStyle> styleLookupTable = new Dictionary<string, ChunkStyle> (); 
 		Dictionary<string, string> customPalette = new Dictionary<string, string> (); 
 		
@@ -60,17 +58,17 @@ namespace Mono.TextEditor.Highlighting
 			}
 		}
 
+		public const string TooltipString = "tooltip";
+		public virtual ChunkStyle Tooltip {
+			get {
+				return GetChunkStyle (TooltipString);
+			}
+		}
+
 		public const string LineNumberString = "linenumber";
 		public virtual ChunkStyle LineNumber {
 			get {
 				return GetChunkStyle (LineNumberString);
-			}
-		}
-
-		public const string LineNumberFgHighlightedString = "linenumber.highlight";
-		public virtual Cairo.Color LineNumberFgHighlighted {
-			get {
-				return GetColorFromDefinition (LineNumberFgHighlightedString);
 			}
 		}
 
@@ -95,13 +93,13 @@ namespace Mono.TextEditor.Highlighting
 			}
 		}
 
-		public const string FoldLineHighlightedString = "fold.highlight";
-		public virtual Cairo.Color FoldLineHighlighted {
+		public const string FoldMarginString = "fold.margin";
+		public virtual ChunkStyle FoldMargin {
 			get {
-				return GetColorFromDefinition (FoldLineHighlightedString);
+				return GetChunkStyle (FoldMarginString);
 			}
 		}
-		
+
 		public const string LineChangedBgString = "marker.line.changed";
 		public virtual Cairo.Color LineChangedBg {
 			get {
@@ -144,34 +142,6 @@ namespace Mono.TextEditor.Highlighting
 			}
 		}
 
-		public const string WhitespaceMarkerString = "marker.whitespace";
-		public virtual Cairo.Color WhitespaceMarker {
-			get {
-				return GetColorFromDefinition (WhitespaceMarkerString);
-			}
-		}
-		
-		public const string EolWhitespaceMarkerString = "marker.whitespace.eol";
-		public virtual Cairo.Color EolWhitespaceMarker {
-			get {
-				return GetColorFromDefinition (EolWhitespaceMarkerString);
-			}
-		}
-
-		public const string InvalidLineMarkerString = "marker.invalidline";
-		public virtual Cairo.Color InvalidLineMarker {
-			get {
-				return GetColorFromDefinition (InvalidLineMarkerString);
-			}
-		}
-		
-		public const string FoldToggleMarkerString = "fold.togglemarker";
-		public virtual Cairo.Color FoldToggleMarker {
-			get {
-				return GetColorFromDefinition (FoldToggleMarkerString);
-			}
-		}
-		
 		public const string BracketHighlightRectangleString = "marker.bracket";
 
 		public virtual ChunkStyle BracketHighlightRectangle {
@@ -435,148 +405,6 @@ namespace Mono.TextEditor.Highlighting
 		
 		protected ColorScheme ()
 		{
-			SetStyle (DefaultString, 0, 0, 0, 255, 255, 255);
-			SetStyle (ReadOnlyTextBgString, 0xFA, 0xFA, 0xF8);
-			
-			GetChunkStyle (DefaultString).ChunkProperties |= ChunkProperties.TransparentBackground;
-
-			SetStyle (LineNumberString, 172, 168, 153, 255, 255, 255);
-			SetStyle (LineNumberFgHighlightedString, 122, 118, 103);
-			
-			SetStyle (IconBarBgString, 255, 255, 255);
-			SetStyle (IconBarSeperatorString, 172, 168, 153);
-			
-			SetStyle (FoldLineString, LineNumberString);
-			SetStyle (FoldLineHighlightedString, IconBarSeperatorString);
-			SetStyle (FoldToggleMarkerString, DefaultString);
-			
-			SetStyle (LineDirtyBgString, 255, 238, 98);
-			SetStyle (LineChangedBgString, 108, 226, 108);
-			
-			SetStyle (SelectionString, 255, 255, 255, 96, 87, 210);
-			SetStyle (InactiveSelectionString, 255, 255, 255, 196, 196, 196);
-			
-			SetStyle (LineMarkerString, 200, 255, 255);
-			SetStyle (RulerString, 187, 187, 187);
-			SetStyle (WhitespaceMarkerString, RulerString);
-			
-			SetStyle (InvalidLineMarkerString, 210, 0, 0);
-			
-			SetStyle (BreakpointString, 255, 255, 255, 125, 0, 0);
-			
-			SetStyle (BreakpointMarkerColor1String, 255, 255, 255);
-			SetStyle (BreakpointMarkerColor2String, 125, 0, 0);
-
-			SetStyle (DisabledBreakpointBgString, 237, 220, 220);
-			
-			SetStyle (CurrentDebugLineString, 0, 0, 0, 255, 255, 0);
-			SetStyle (CurrentDebugLineMarkerColor1String, 255, 255, 0);
-			SetStyle (CurrentDebugLineMarkerColor2String, 255, 255, 204);
-			SetStyle (CurrentDebugLineMarkerBorderString, 102, 102, 0);
-			
-			SetStyle (DebugStackLineString, 0, 0, 0, 128, 255, 128);
-			SetStyle (DebugStackLineMarkerColor1String, 128, 255, 128);
-			SetStyle (DebugStackLineMarkerColor2String, 204, 255, 204);
-			SetStyle (DebugStackLineMarkerBorderString, 51, 102, 51); 
-			
-			SetStyle (InvalidBreakpointBgString, 237, 220, 220);
-			SetStyle (InvalidBreakpointMarkerColor1String, 237, 220, 220);
-			SetStyle (InvalidBreakpointMarkerBorderString, 125, 0, 0);
-			SetStyle (SearchTextBgString, 255, 226, 185);
-			SetStyle (SearchTextMainBgString, 243, 221, 72);
-			
-			SetStyle (BracketHighlightRectangleString, 0xd3, 0xd7, 0xcf, 0xee, 0xee, 0xec);
-			SetStyle (UsagesHighlightRectangleString, 0xd3, 0xd7, 0xcf, 0xee, 0xee, 0xec);
-			
-			SetStyle (BookmarkColor1String, 255, 255, 255);
-			SetStyle (BookmarkColor2String, 105, 156, 235);
-			
-			SetStyle (ErrorUnderlineString, 255, 0, 0);
-			SetStyle (WarningUnderlineString, 255, 165, 0);
-			SetStyle (SuggestionUnderlineString, 143, 198, 143);
-			SetStyle (HintUnderlineString, 143, 143, 198);
-			
-			SetStyle ("diff.line-added", 0, 0x8B, 0x8B, ChunkProperties.None);
-			SetStyle ("diff.line-removed", 0x6A, 0x5A, 0xCD, ChunkProperties.None);
-			SetStyle ("diff.line-changed", "text.preprocessor");
-			SetStyle ("diff.header", 0, 128, 0, BOLD);
-			SetStyle ("diff.header-seperator", 0, 0, 255);
-			SetStyle ("diff.header-oldfile", "diff.header");
-			SetStyle ("diff.header-newfile", "diff.header");
-			SetStyle ("diff.location", "keyword.misc");
-			
-			SetStyle (PrimaryTemplateColorString, 0xB4, 0xE4, 0xB4, 0xB4, 0xE4, 0xB4);
-			SetStyle (PrimaryTemplateHighlightedColorString, 0, 0, 0, 0xB4, 0xE4, 0xB4);
-			 
-			SetStyle (SecondaryTemplateColorString, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
-			SetStyle (SecondaryTemplateHighlightedColorString, 0x7F, 0x7F, 0x7F, 0xFF, 0xFF, 0xFF);
-			
-			
-			SetStyleFromWeb ("bubble.warning", "black", "#f4eeda");
-			SetStyle ("bubble.warning.text", 0, 0, 0);
-			SetStyleFromWeb ("bubble.error", "black", "#f5eae7");
-			SetStyle ("bubble.error.text", 0, 0, 0);
-			
-			//regions in ASP.NET, T4, etc.
-			SetStyle ("template", "text");
-			SetStyle ("template.tag", "constant.language");
-			SetStyle ("template.directive", "constant.language");
-			
-		}
-		
-		protected void PopulateDefaults ()
-		{
-			SetStyle ("text",                      0,    0,    0);
-			SetStyle ("text.punctuation",          0,    0,    0);
-			SetStyle ("text.link",                 0,    0,  255);
-			SetStyle ("text.preprocessor",         0,  128,    0);
-			SetStyle ("text.preprocessor.keyword", 0,  128,    0, BOLD);
-			SetStyle ("text.markup",               0, 0x8A, 0x8C);
-			SetStyle ("text.markup.tag",        0x6A, 0x5A, 0xCD);
-			
-			SetStyle ("comment",              0,   0, 255);
-			SetStyle ("comment.line",         0,   0, 255);
-			SetStyle ("comment.block",        0,   0, 255);
-			SetStyle ("comment.doc",          0,   0, 255);
-			SetStyle ("comment.tag",        128, 128, 128, ITALIC);
-			SetStyle ("comment.tag.line",   128, 128, 128, ITALIC);
-			SetStyle ("comment.tag.block" , 128, 128, 128, ITALIC);
-			SetStyle ("comment.tag.doc",    128, 128, 128, ITALIC);
-			SetStyle ("comment.keyword",      0,   0, 255, ITALIC);
-			SetStyle ("comment.keyword.todo", 0,   0, 255, BOLD);
-			
-			SetStyle ("constant",               255,   0, 255);
-			SetStyle ("constant.digit",         255,   0, 255);
-			SetStyle ("constant.language",      165,  42,  42, BOLD);
-			SetStyle ("constant.language.void", 165,  42,  42, BOLD);
-			
-			SetStyle ("string",        255, 0, 255);
-			SetStyle ("string.single", 255, 0, 255);
-			SetStyle ("string.double", 255, 0, 255);
-			SetStyle ("string.other",  255, 0, 255);
-			
-			SetStyle ("keyword.semantic.type", 0, 0x8A , 0x8C);
-			
-			SetStyle ("keyword", 0, 0, 0, BOLD);
-			SetStyle ("keyword.access",      165,  42,  42, BOLD);
-			SetStyle ("keyword.operator",    165,  42,  42, BOLD);
-			SetStyle ("keyword.operator.declaration", 165,  42,  42, BOLD);
-			SetStyle ("keyword.selection",   165,  42,  42, BOLD);
-			SetStyle ("keyword.iteration",   165,  42,  42, BOLD);
-			SetStyle ("keyword.jump",        165,  42,  42, BOLD);
-			SetStyle ("keyword.context",     165,  42,  42, BOLD);
-			SetStyle ("keyword.exceptions",  165,  42,  42, BOLD);
-			SetStyle ("keyword.modifier",    165,  42,  42, BOLD);
-			SetStyle ("keyword.type",         46, 139,  87, BOLD);
-			SetStyle ("keyword.namespace",   165,  42,  42, BOLD);
-			SetStyle ("keyword.property",    165,  42,  42, BOLD);
-			SetStyle ("keyword.declaration", 165,  42,  42, BOLD);
-			SetStyle ("keyword.parameter",   165,  42,  42, BOLD);
-			SetStyle ("keyword.misc",        165,  42,  42, BOLD);
-			
-			SetStyle ("template.directive", 0x6A, 0x5A, 0xCD, 0xF0, 0xF0, 0xD0);
-			SetStyle ("template.tag",       0x6A, 0x5A, 0xCD, 0xF0, 0xF0, 0xD0);
-			SetStyle ("template",           0x00, 0x00, 0x00, 0xF0, 0xF0, 0xD0);
 		}
 		
 		const ChunkProperties BOLD   = ChunkProperties.Bold;
@@ -652,6 +480,14 @@ namespace Mono.TextEditor.Highlighting
 		{
 			if (name == null)
 				return GetDefaultChunkStyle ();
+			var style = InternalGetChunkStyle (name);
+			if (style == null)
+				style =SyntaxModeService.DefaultColorStyle.InternalGetChunkStyle (name);
+			return style ?? GetDefaultChunkStyle ();
+		}
+
+		internal ChunkStyle InternalGetChunkStyle (string name)
+		{
 			ChunkStyle style;
 			if (styleLookupTable.TryGetValue (name, out style))
 				return style;
@@ -662,14 +498,14 @@ namespace Mono.TextEditor.Highlighting
 				fallbackName = fallbackName.Substring (0, dotIndex);
 				if (styleLookupTable.TryGetValue (fallbackName, out style)) {
 					styleLookupTable[name] = style;
-				//	Console.WriteLine ("Chunk style {0} fell back to {1}", name, fallbackName);
+					//	Console.WriteLine ("Chunk style {0} fell back to {1}", name, fallbackName);
 					return style;
 				}
 				dotIndex = fallbackName.LastIndexOf ('.');
 			}
-			
-		//	Console.WriteLine ("Chunk style {0} fell back to default", name);
-			return GetDefaultChunkStyle ();
+
+			//	Console.WriteLine ("Chunk style {0} fell back to default", name);
+			return null;
 		}
 		
 		public void SetChunkStyle (string name, string weight, string foreColor, string backColor)
@@ -685,7 +521,20 @@ namespace Mono.TextEditor.Highlighting
 				if (weight.ToUpper ().IndexOf ("UNDERLINE") >= 0)
 					properties |= ChunkProperties.Underline;
 			}
-			SetStyle (name, !string.IsNullOrEmpty (backColor) ? new ChunkStyle (color, bgColor, properties) : new ChunkStyle (color, properties));
+			ChunkStyle chunkStyle;
+			if (string.IsNullOrEmpty (backColor)) {
+				chunkStyle = new ChunkStyle (color, properties);
+			} else if (string.IsNullOrEmpty (foreColor)) {
+				chunkStyle = new ChunkStyle () {
+					ChunkProperties =properties,
+					CairoBackgroundColor = bgColor
+				};
+			} else {
+				chunkStyle = new ChunkStyle (color, bgColor, properties);
+			}
+
+
+			SetStyle (name, chunkStyle);
 		}
 		
 		public void SetChunkStyle (string name, ChunkStyle style)
@@ -707,6 +556,14 @@ namespace Mono.TextEditor.Highlighting
 			if (styleLookupTable.TryGetValue (colorString, out style))
 				return style.CairoColor;
 			if (colorString.Length > 0 && colorString[0] == '#') {
+				if (colorString.Length == 4) {
+					// #RGB -> #RRGGBB
+					colorString = string.Format ("#{0}{0}{1}{1}{2}{2}", colorString[1], colorString[2], colorString[3]);
+				}
+				if (colorString.Length == 5) {
+					// #RAGB -> #AARRGGBB
+					colorString = string.Format ("#{0}{0}{1}{1}{2}{2}{3}{3}", colorString[1], colorString[2], colorString[3], colorString[4]);
+				}
 				if (colorString.Length == 9) {
 					// #AARRGGBB
 					return new Cairo.Color ( GetNumber (colorString, 3) / 255.0, GetNumber (colorString, 5) / 255.0, GetNumber (colorString, 7) / 255.0, GetNumber (colorString, 1) / 255.0);
@@ -716,10 +573,11 @@ namespace Mono.TextEditor.Highlighting
 					return new Cairo.Color ( GetNumber (colorString, 1) / 255.0, GetNumber (colorString, 3) / 255.0, GetNumber (colorString, 5) / 255.0);
 				}
 				throw new ArgumentException ("colorString", "colorString must either be #RRGGBB (length 7) or #AARRGGBB (length 9) your string " + colorString + " is invalid because it has a length of " + colorString.Length);
-			} 
-			var color = new Gdk.Color ();
-			if (Gdk.Color.Parse (colorString, ref color))
-				return (Cairo.Color)((HslColor)color);
+			}
+
+			var color = System.Drawing.ColorTranslator.FromHtml (colorString);
+			if (!color.IsEmpty)
+				return new Cairo.Color (color.R / 255.0, color.G / 255.0, color.B / 255.0);
 			throw new Exception ("Failed to parse color or find named color '" + colorString + "'");
 		}
 		
@@ -737,9 +595,10 @@ namespace Mono.TextEditor.Highlighting
 			} else {
 				fullName = curName + "." + name;
 			}
-			if (!String.IsNullOrEmpty (color)) {
+			if (!string.IsNullOrEmpty (color) || !string.IsNullOrEmpty (bgColor)) {
 				result.SetChunkStyle (fullName, weight, color, bgColor);
 			}
+			
 			XmlReadHelper.ReadList (reader, "Style", delegate () {
 				switch (reader.LocalName) {
 				case "Style":

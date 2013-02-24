@@ -327,10 +327,17 @@ namespace MonoDevelop.Core.Assemblies
 
 				foreach (AssemblyNameReference aname in asm.MainModule.AssemblyReferences) {
 					if (aname.Name == "mscorlib") {
+						TargetFramework compatibleFramework = null;
+						// If there are several frameworks that can run the file, pick one that is installed
 						foreach (TargetFramework tf in GetCoreFrameworks ()) {
-							if (tf.GetCorlibVersion () == aname.Version.ToString ())
-								return tf.Id;
+							if (tf.GetCorlibVersion () == aname.Version.ToString ()) {
+								compatibleFramework = tf;
+								if (tr.IsInstalled (tf))
+									return tf.Id;
+							}
 						}
+						if (compatibleFramework != null)
+							return compatibleFramework.Id;
 						break;
 					}
 				}
@@ -353,5 +360,85 @@ namespace MonoDevelop.Core.Assemblies
 			if (dirs != null)
 				userAssemblyContext.Directories = dirs;
 		}
+
+		/// <summary>
+		/// Simply get all assembly reference names from an assembly given it's file name.
+		/// </summary>
+		public static IEnumerable<string> GetAssemblyReferences (string fileName)
+		{
+			using (var universe = new IKVM.Reflection.Universe ()) {
+				IKVM.Reflection.Assembly assembly;
+				try {
+					assembly = universe.LoadFile (fileName);
+				} catch {
+					yield break;
+				}
+				foreach (var r in assembly.GetReferencedAssemblies ()) {
+					yield return r.Name;
+				}
+			}
+
+			/* CECIL version:
+
+			Mono.Cecil.AssemblyDefinition adef;
+			try {
+				adef = Mono.Cecil.AssemblyDefinition.ReadAssembly (fileName);
+			} catch {
+				yield break;
+			}
+			foreach (Mono.Cecil.AssemblyNameReference aref in adef.MainModule.AssemblyReferences) {
+				yield return aref.Name;
+			}*/
+		}
+
+		public class ManifestResource
+		{
+			public string Name {
+				get; private set;
+			}
+
+			Func<Stream> streamCallback;
+			public Stream Open ()
+			{
+				return streamCallback ();
+			}
+
+			public ManifestResource (string name, Func<Stream> streamCallback)
+			{
+				this.streamCallback = streamCallback;
+				Name = name;
+			}
+		}
+
+		/// <summary>
+		/// Simply get all assembly manifest resources from an assembly given it's file name.
+		/// </summary>
+		public static IEnumerable<ManifestResource> GetAssemblyManifestResources (string fileName)
+		{
+			using (var universe = new IKVM.Reflection.Universe ()) {
+				IKVM.Reflection.Assembly assembly;
+				try {
+					assembly = universe.LoadFile (fileName);
+				} catch {
+					yield break;
+				}
+				foreach (var _r in assembly.GetManifestResourceNames ()) {
+					var r = _r;
+					yield return new ManifestResource (r, () => assembly.GetManifestResourceStream (r));
+				}
+			}
+
+			/* CECIL version:
+
+		Mono.Cecil.AssemblyDefinition a = Mono.Cecil.AssemblyDefinition.ReadAssembly (asmInBundle);
+			foreach (Mono.Cecil.ModuleDefinition m in a.Modules) {
+				for (int i = 0; i < m.Resources.Count; i++) {
+					var er = m.Resources[i] as Mono.Cecil.EmbeddedResource;
+					
+					yield return new ManifestResource (er.Name, () => er.GetResourceStream ().ReadToEnd ());
+				}
+			}*/
+		}
+
 	}
 }

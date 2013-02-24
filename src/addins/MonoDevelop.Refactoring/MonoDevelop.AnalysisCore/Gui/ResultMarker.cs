@@ -31,14 +31,11 @@ using ICSharpCode.NRefactory.CSharp;
 
 namespace MonoDevelop.AnalysisCore.Gui
 {
-	class ResultMarker : UnderlineMarker
+	class ResultMarker : UnderlineTextSegmentMarker
 	{
 		Result result;
 		
-		public ResultMarker (Result result) : base (
-				GetColor (result),
-				IsOneLine (result)? (result.Region.BeginColumn) : 0,
-				IsOneLine (result)? (result.Region.EndColumn) : 0)
+		public ResultMarker (Result result, TextSegment segment) : base (GetColor (result), segment)
 		{
 			this.result = result;
 		}
@@ -76,8 +73,10 @@ namespace MonoDevelop.AnalysisCore.Gui
 		
 		public override void Draw (TextEditor editor, Cairo.Context cr, Pango.Layout layout, bool selected, int startOffset, int endOffset, double y, double startXPos, double endXPos)
 		{
-			int markerStart = LineSegment.Offset + System.Math.Max (StartCol - 1, 0);
-			int markerEnd = LineSegment.Offset + (EndCol < 1 ? LineSegment.Length : EndCol - 1);
+			if (Debugger.DebuggingService.IsDebugging)
+				return;
+			int markerStart = Segment.Offset;
+			int markerEnd = Segment.EndOffset;
 			if (markerEnd < startOffset || markerStart > endOffset) 
 				return;
 			
@@ -134,5 +133,34 @@ namespace MonoDevelop.AnalysisCore.Gui
 				cr.Stroke ();
 			}
 		}
+	}
+
+	class GrayOutMarker : ResultMarker, IChunkMarker
+	{
+		public GrayOutMarker (Result result, TextSegment segment) : base (result, segment)
+		{
+		}
+
+		public override void Draw (TextEditor editor, Cairo.Context cr, Pango.Layout layout, bool selected, int startOffset, int endOffset, double y, double startXPos, double endXPos)
+		{
+		}
+
+		#region IChunkMarker implementation
+		void IChunkMarker.ChangeForeColor (TextEditor editor, Chunk chunk, ref Gdk.Color color)
+		{
+			if (Debugger.DebuggingService.IsDebugging)
+				return;
+			int markerStart = Segment.Offset;
+			int markerEnd = Segment.EndOffset;
+			if (!(markerStart <= chunk.Offset && chunk.Offset < markerEnd)) 
+				return;
+
+			var bgc = editor.ColorStyle.Default.BackgroundColor;
+			double alpha = 0.6;
+			color.Red = (ushort)(color.Red * alpha + bgc.Red * (1.0 - alpha));
+			color.Green = (ushort)(color.Green * alpha + bgc.Green * (1.0 - alpha));
+			color.Blue = (ushort)(color.Blue * alpha + bgc.Blue * (1.0 - alpha));
+		}
+		#endregion
 	}
 }

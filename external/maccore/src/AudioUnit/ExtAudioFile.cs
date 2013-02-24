@@ -1,10 +1,12 @@
 ﻿//
 // ExtAudioFile.cs: ExtAudioFile wrapper class
 //
-// Author:
+// Authors:
 //   AKIHIRO Uehara (u-akihiro@reinforce-lab.com)
+//   Marek Safar (marek.safar@gmail.com)
 //
 // Copyright 2010 Reinforce Lab.
+// Copyright 2012 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -31,28 +33,80 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Runtime.InteropServices;
-
+using MonoMac.CoreFoundation;
 using MonoMac.AudioToolbox;
 
 namespace MonoMac.AudioUnit
 {
+    public enum ExtAudioFileError
+    {
+        OK = 0,
+        CodecUnavailableInputConsumed    = -66559,
+        CodecUnavailableInputNotConsumed = -66560,
+        InvalidProperty          = -66561,
+        InvalidPropertySize      = -66562,
+        NonPCMClientFormat       = -66563,
+        InvalidChannelMap        = -66564,
+        InvalidOperationOrder    = -66565,
+        InvalidDataFormat        = -66566,
+        MaxPacketSizeUnknown     = -66567,
+        InvalidSeek              = -66568,
+        AsyncWriteTooLarge       = -66569,
+        AsyncWriteBufferOverflow = -66570,
+
+        // Shared error codes
+        NotOpenError                  = -38,
+        EndOfFileError                = -39,
+        PositionError                 = -40,
+        FileNotFoundError             = -43
+    }
+
     public class ExtAudioFile : IDisposable
     {
-        #region Variables
-        const int kAudioUnitSampleFractionBits = 24;
-        readonly IntPtr _extAudioFile;
-        #endregion
+        IntPtr _extAudioFile;
 
-        #region Property        
-        public long FileLengthFrames
-        {
+        public uint? ClientMaxPacketSize {
             get {
-                long length = 0;
-                uint size   = (uint)Marshal.SizeOf(typeof(long));
+                uint size = sizeof (uint);
+                uint value;
+                if (ExtAudioFileGetProperty (_extAudioFile, PropertyIDType.ClientMaxPacketSize, ref size, out value) != ExtAudioFileError.OK)
+                    return null;
+
+                return value;
+            }
+        }
+
+        public uint? FileMaxPacketSize {
+            get {
+                uint size = sizeof (uint);
+                uint value;
+
+                if (ExtAudioFileGetProperty (_extAudioFile, PropertyIDType.FileMaxPacketSize, ref size, out value) != ExtAudioFileError.OK)
+                    return null;
+
+                return value;
+            }
+        }
+
+
+        public IntPtr? AudioFile {
+            get {
+                uint size = (uint) Marshal.SizeOf (typeof (IntPtr));
+                IntPtr value;
+                if (ExtAudioFileGetProperty (_extAudioFile, PropertyIDType.AudioFile, ref size, out value) != ExtAudioFileError.OK)
+                    return null;
+
+                return value;
+            }
+        }
+
+
+        public long FileLengthFrames {
+            get {
+                long length;
+                uint size  =  sizeof (long);
                 
-                int err = ExtAudioFileGetProperty(_extAudioFile,
-                    ExtAudioFilePropertyIDType.kExtAudioFileProperty_FileLengthFrames,
-                    ref size, ref length);
+                var err = ExtAudioFileGetProperty(_extAudioFile, PropertyIDType.FileLengthFrames, ref size, out length);
                 if (err != 0)
                 {
                     throw new InvalidOperationException(String.Format("Error code:{0}", err));
@@ -68,9 +122,7 @@ namespace MonoMac.AudioUnit
             {
                 AudioStreamBasicDescription dc = new AudioStreamBasicDescription();
                 uint size = (uint)Marshal.SizeOf(typeof(AudioStreamBasicDescription));
-                int err = ExtAudioFileGetProperty(_extAudioFile,
-                    ExtAudioFilePropertyIDType.kExtAudioFileProperty_FileDataFormat,
-                    ref size, ref dc);
+                int err = ExtAudioFileGetProperty(_extAudioFile, PropertyIDType.FileDataFormat, ref size, ref dc);
                 if (err != 0)
                 {
                     throw new InvalidOperationException(String.Format("Error code:{0}", err));
@@ -84,8 +136,7 @@ namespace MonoMac.AudioUnit
         {
             set
             {                
-                int err = ExtAudioFileSetProperty(_extAudioFile,
-                    ExtAudioFilePropertyIDType.kExtAudioFileProperty_ClientDataFormat,
+                int err = ExtAudioFileSetProperty(_extAudioFile, PropertyIDType.ClientDataFormat,
                     (uint)Marshal.SizeOf(value), ref value);
                 if (err != 0)
                 {
@@ -93,23 +144,24 @@ namespace MonoMac.AudioUnit
                 }
             }
         }           
-        #endregion
 
-        #region Constructor
         private ExtAudioFile(IntPtr ptr)
         {
             _extAudioFile = ptr;
         }
-        #endregion
 
-        #region Private methods
-        #endregion
+        ~ExtAudioFile ()
+        {
+            Dispose (false);
+        }
 
-        #region Public methods        
-        public static ExtAudioFile OpenUrl(MonoMac.CoreFoundation.CFUrl url)
-        { 
-            int err;
-            IntPtr ptr = new IntPtr();
+        public static ExtAudioFile OpenUrl (CFUrl url)
+        {
+            if (url == null)
+                throw new ArgumentNullException ("url");
+
+            ExtAudioFileError err;
+            IntPtr ptr;
             unsafe {                
                 err = ExtAudioFileOpenUrl(url.Handle, (IntPtr)(&ptr));
             }            
@@ -124,12 +176,16 @@ namespace MonoMac.AudioUnit
             
             return new ExtAudioFile(ptr);
         }
-        public static ExtAudioFile CreateWithUrl(MonoMac.CoreFoundation.CFUrl url,
+
+        public static ExtAudioFile CreateWithUrl (CFUrl url,
             AudioFileType fileType, 
             AudioStreamBasicDescription inStreamDesc, 
             //AudioChannelLayout channelLayout, 
             AudioFileFlags flag)
         {             
+            if (url == null)
+                throw new ArgumentNullException ("url");
+
             int err;
             IntPtr ptr = new IntPtr();
             unsafe {                
@@ -147,6 +203,24 @@ namespace MonoMac.AudioUnit
             
             return new ExtAudioFile(ptr);         
         }
+
+        public static ExtAudioFileError WrapAudioFileID (IntPtr audioFileID, bool forWriting, out ExtAudioFile outAudioFile)
+        {
+            IntPtr ptr;
+            ExtAudioFileError res;
+            unsafe {                
+                res = ExtAudioFileWrapAudioFileID (audioFileID, forWriting, (IntPtr)(&ptr));
+            }            
+
+            if (res != ExtAudioFileError.OK) {
+                outAudioFile = null;
+                return res;
+            }
+
+            outAudioFile = new ExtAudioFile (ptr);
+            return res;
+        }
+
         public void Seek(long frameOffset)
         {
             int err = ExtAudioFileSeek(_extAudioFile, frameOffset);
@@ -167,8 +241,13 @@ namespace MonoMac.AudioUnit
             
             return frame;
         }
+
+        [Obsolete ("Use overload with AudioBuffers")]
         public int Read(int numberFrames, AudioBufferList data)
-        {            
+        {
+            if (data == null)
+                throw new ArgumentNullException ("data");
+
             int err = ExtAudioFileRead(_extAudioFile, ref numberFrames, data);
             if (err != 0)
             {
@@ -177,31 +256,79 @@ namespace MonoMac.AudioUnit
 
             return numberFrames;
         }
+
+        public uint Read (uint numberFrames, AudioBuffers audioBufferList, out ExtAudioFileError status)
+        {
+            if (audioBufferList == null)
+                throw new ArgumentNullException ("audioBufferList");
+
+            status = ExtAudioFileRead (_extAudioFile, ref numberFrames, (IntPtr) audioBufferList);
+            return numberFrames;
+        }
+
+        [Obsolete ("Use overload with AudioBuffers")]
         public void WriteAsync(int numberFrames, AudioBufferList data)
         {
             int err = ExtAudioFileWriteAsync(_extAudioFile, numberFrames, data);
-            if (err != 0)
-                throw new ArgumentException(String.Format("Error code:{0}", err));            
-        }         
-        #endregion
-
-        #region IDisposable メンバ
-        public void Dispose()
-        {
-            ExtAudioFileDispose(_extAudioFile);            
+            
+            if (err != 0) {
+                throw new ArgumentException(String.Format("Error code:{0}", err));
+            }        
         }
-        #endregion
 
+        public ExtAudioFileError WriteAsync (uint numberFrames, AudioBuffers audioBufferList)
+        {
+            if (audioBufferList == null)
+                throw new ArgumentNullException ("audioBufferList");
+
+            return ExtAudioFileWriteAsync (_extAudioFile, numberFrames, (IntPtr) audioBufferList);
+        }
+
+        public ExtAudioFileError Write (uint numberFrames, AudioBuffers audioBufferList)
+        {
+            if (audioBufferList == null)
+                throw new ArgumentNullException ("audioBufferList");
+
+            return ExtAudioFileWrite (_extAudioFile, numberFrames, (IntPtr) audioBufferList);
+        }
+
+        public void Dispose ()
+        {
+            Dispose (true);
+            GC.SuppressFinalize (this);
+        }
+
+        protected virtual void Dispose (bool disposing)
+        {
+            if (_extAudioFile != IntPtr.Zero){
+                ExtAudioFileDispose (_extAudioFile);
+                _extAudioFile = IntPtr.Zero;
+            }
+        }
 
         #region Interop
         [DllImport(MonoMac.Constants.AudioToolboxLibrary, EntryPoint = "ExtAudioFileOpenURL")]
-        static extern int ExtAudioFileOpenUrl(IntPtr inUrl, IntPtr outExtAudioFile); // caution
+        static extern ExtAudioFileError ExtAudioFileOpenUrl(IntPtr inUrl, IntPtr outExtAudioFile); // caution
 
+        [DllImport (MonoMac.Constants.AudioToolboxLibrary)]
+        static extern ExtAudioFileError ExtAudioFileWrapAudioFileID (IntPtr inFileID, bool inForWriting, IntPtr outExtAudioFile);    
+
+        [Obsolete]
         [DllImport(MonoMac.Constants.AudioToolboxLibrary, EntryPoint = "ExtAudioFileRead")]
         static extern int ExtAudioFileRead(IntPtr  inExtAudioFile, ref int ioNumberFrames, AudioBufferList ioData);
 
+        [DllImport(MonoMac.Constants.AudioToolboxLibrary)]
+        static extern ExtAudioFileError ExtAudioFileRead (IntPtr inExtAudioFile, ref uint ioNumberFrames, IntPtr ioData);
+
+        [DllImport(MonoMac.Constants.AudioToolboxLibrary)]
+        static extern ExtAudioFileError ExtAudioFileWrite (IntPtr inExtAudioFile, uint inNumberFrames, IntPtr ioData);                 
+
+        [Obsolete]
         [DllImport(MonoMac.Constants.AudioToolboxLibrary, EntryPoint = "ExtAudioFileWriteAsync")]
         static extern int ExtAudioFileWriteAsync(IntPtr inExtAudioFile, int inNumberFrames, AudioBufferList ioData);
+
+        [DllImport(MonoMac.Constants.AudioToolboxLibrary)]
+        static extern ExtAudioFileError ExtAudioFileWriteAsync(IntPtr inExtAudioFile, uint inNumberFrames, IntPtr ioData);
 
         [DllImport(MonoMac.Constants.AudioToolboxLibrary, EntryPoint = "ExtAudioFileDispose")]
         static extern int ExtAudioFileDispose(IntPtr inExtAudioFile);
@@ -223,53 +350,54 @@ namespace MonoMac.AudioUnit
         [DllImport(MonoMac.Constants.AudioToolboxLibrary, EntryPoint = "ExtAudioFileGetProperty")]
         static extern int ExtAudioFileGetProperty(
             IntPtr inExtAudioFile, 
-            ExtAudioFilePropertyIDType inPropertyID,
+            PropertyIDType inPropertyID,
             ref uint ioPropertyDataSize,
             IntPtr outPropertyData);
         
         [DllImport(MonoMac.Constants.AudioToolboxLibrary, EntryPoint = "ExtAudioFileGetProperty")]
         static extern int ExtAudioFileGetProperty(
             IntPtr inExtAudioFile,
-            ExtAudioFilePropertyIDType inPropertyID,
+            PropertyIDType inPropertyID,
             ref uint ioPropertyDataSize,
             ref AudioStreamBasicDescription outPropertyData);
         
+        [DllImport(MonoMac.Constants.AudioToolboxLibrary)]
+        static extern ExtAudioFileError ExtAudioFileGetProperty (IntPtr inExtAudioFile, PropertyIDType inPropertyID, ref uint ioPropertyDataSize, out IntPtr outPropertyData);
 
-        [DllImport(MonoMac.Constants.AudioToolboxLibrary, EntryPoint = "ExtAudioFileGetProperty")]
-        static extern int ExtAudioFileGetProperty(
-            IntPtr inExtAudioFile,
-            ExtAudioFilePropertyIDType inPropertyID,
-            ref uint ioPropertyDataSize,
-            ref long outPropertyData);
+        [DllImport(MonoMac.Constants.AudioToolboxLibrary)]
+        static extern ExtAudioFileError ExtAudioFileGetProperty (IntPtr inExtAudioFile, PropertyIDType inPropertyID, ref uint ioPropertyDataSize, out long outPropertyData);
+
+        [DllImport(MonoMac.Constants.AudioToolboxLibrary)]
+        static extern ExtAudioFileError ExtAudioFileGetProperty (IntPtr inExtAudioFile, PropertyIDType inPropertyID, ref uint ioPropertyDataSize, out uint outPropertyData);
 
         [DllImport(MonoMac.Constants.AudioToolboxLibrary, EntryPoint = "ExtAudioFileSetProperty")]
         static extern int ExtAudioFileSetProperty(
             IntPtr inExtAudioFile,
-            ExtAudioFilePropertyIDType inPropertyID,
+            PropertyIDType inPropertyID,
             uint ioPropertyDataSize,
             IntPtr outPropertyData);
 
         [DllImport(MonoMac.Constants.AudioToolboxLibrary, EntryPoint = "ExtAudioFileSetProperty")]
         static extern int ExtAudioFileSetProperty(
             IntPtr inExtAudioFile,
-            ExtAudioFilePropertyIDType inPropertyID,
+            PropertyIDType inPropertyID,
             uint ioPropertyDataSize,
             ref AudioStreamBasicDescription outPropertyData);
         
-        enum ExtAudioFilePropertyIDType {                 
-	        kExtAudioFileProperty_FileDataFormat		= 0x66666d74, //'ffmt',   // AudioStreamBasicDescription
+        enum PropertyIDType {                 
+	        FileDataFormat		   = 0x66666d74,       // 'ffmt'
 	        //kExtAudioFileProperty_FileChannelLayout		= 'fclo',   // AudioChannelLayout
 
-            kExtAudioFileProperty_ClientDataFormat = 0x63666d74, //'cfmt',   // AudioStreamBasicDescription
+            ClientDataFormat = 0x63666d74, //'cfmt',   // AudioStreamBasicDescription
 	        //kExtAudioFileProperty_ClientChannelLayout	= 'cclo',   // AudioChannelLayout
-	        //kExtAudioFileProperty_CodecManufacturer		= 'cman',	// UInt32
+	        CodecManufacturer	 	= 0x636d616e,      // 'cman'
 	
 	        // read-only:
 	        //kExtAudioFileProperty_AudioConverter		= 'acnv',	// AudioConverterRef
-	        //kExtAudioFileProperty_AudioFile				= 'afil',	// AudioFileID
-	        //kExtAudioFileProperty_FileMaxPacketSize		= 'fmps',	// UInt32
-	        //kExtAudioFileProperty_ClientMaxPacketSize	= 'cmps',	// UInt32
-	        kExtAudioFileProperty_FileLengthFrames		= 0x2366726d,//'#frm',	// SInt64
+	        AudioFile				= 0x6166696c,      // 'afil'
+	        FileMaxPacketSize		= 0x666d7073,      // 'fmps'
+	        ClientMaxPacketSize    	= 0x636d7073,      // 'cmps'
+	        FileLengthFrames		= 0x2366726d,      // '#frm'
 	
 	        // writable:
 	        //kExtAudioFileProperty_ConverterConfig		= 'accf',   // CFPropertyListRef

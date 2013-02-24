@@ -103,7 +103,9 @@ namespace NGit.Api
 		/// twice on an instance.
 		/// </summary>
 		/// <returns>the Ref after reset</returns>
-		/// <exception cref="System.IO.IOException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException">NGit.Api.Errors.GitAPIException
+		/// 	</exception>
+		/// <exception cref="NGit.Api.Errors.CheckoutConflictException"></exception>
 		public override Ref Call()
 		{
 			CheckCallable();
@@ -120,7 +122,7 @@ namespace NGit.Api
 				ObjectId commitId;
 				try
 				{
-					commitId = repo.Resolve(@ref);
+					commitId = repo.Resolve(@ref + "^{commit}");
 					if (commitId == null)
 					{
 						// @TODO throw an InvalidRefNameException. We can't do that
@@ -166,6 +168,11 @@ namespace NGit.Api
 					throw new JGitInternalException(MessageFormat.Format(JGitText.Get().cannotLock, ru
 						.GetName()));
 				}
+				ObjectId origHead = ru.GetOldObjectId();
+				if (origHead != null)
+				{
+					repo.WriteOrigHead(origHead);
+				}
 				switch (mode)
 				{
 					case ResetCommand.ResetType.HARD:
@@ -205,6 +212,13 @@ namespace NGit.Api
 						if (cherryPicking)
 						{
 							ResetCherryPick();
+						}
+						else
+						{
+							if (repo.ReadSquashCommitMsg() != null)
+							{
+								repo.WriteSquashCommitMsg(null);
+							}
 						}
 					}
 				}
@@ -256,39 +270,29 @@ namespace NGit.Api
 		private void ResetIndexForPaths(RevCommit commit)
 		{
 			DirCache dc = null;
-			DirCacheEditor edit;
 			try
 			{
 				dc = repo.LockDirCache();
-				edit = dc.Editor();
+				DirCacheBuilder builder = dc.Builder();
 				TreeWalk tw = new TreeWalk(repo);
-				tw.AddTree(new DirCacheIterator(dc));
+				tw.AddTree(new DirCacheBuildIterator(builder));
 				tw.AddTree(commit.Tree);
 				tw.Filter = PathFilterGroup.CreateFromStrings(filepaths);
 				tw.Recursive = true;
 				while (tw.Next())
 				{
-					string path = tw.PathString;
-					// DirCacheIterator dci = tw.getTree(0, DirCacheIterator.class);
 					CanonicalTreeParser tree = tw.GetTree<CanonicalTreeParser>(1);
-					if (tree == null)
-					{
-						// file is not in the commit, remove from index
-						edit.Add(new DirCacheEditor.DeletePath(path));
-					}
-					else
+					// only keep file in index if it's in the commit
+					if (tree != null)
 					{
 						// revert index to commit
-						// it seams that there is concurrent access to tree
-						// variable, therefore we need to keep references to
-						// entryFileMode and entryObjectId in local
-						// variables
-						FileMode entryFileMode = tree.EntryFileMode;
-						ObjectId entryObjectId = tree.EntryObjectId;
-						edit.Add(new _PathEdit_294(entryFileMode, entryObjectId, path));
+						DirCacheEntry entry = new DirCacheEntry(tw.RawPath);
+						entry.FileMode = tree.EntryFileMode;
+						entry.SetObjectId(tree.EntryObjectId);
+						builder.Add(entry);
 					}
 				}
-				edit.Commit();
+				builder.Commit();
 			}
 			catch (IOException e)
 			{
@@ -303,73 +307,71 @@ namespace NGit.Api
 			}
 		}
 
-		private sealed class _PathEdit_294 : DirCacheEditor.PathEdit
-		{
-			public _PathEdit_294(FileMode entryFileMode, ObjectId entryObjectId, string baseArg1
-				) : base(baseArg1)
-			{
-				this.entryFileMode = entryFileMode;
-				this.entryObjectId = entryObjectId;
-			}
-
-			public override void Apply(DirCacheEntry ent)
-			{
-				ent.FileMode = entryFileMode;
-				ent.SetObjectId(entryObjectId);
-				ent.LastModified = 0;
-			}
-
-			private readonly FileMode entryFileMode;
-
-			private readonly ObjectId entryObjectId;
-		}
-
 		/// <exception cref="System.IO.IOException"></exception>
 		private void ResetIndex(RevCommit commit)
 		{
-			DirCache dc = null;
+			DirCache dc = repo.LockDirCache();
+			TreeWalk walk = null;
 			try
 			{
-				dc = repo.LockDirCache();
-				dc.Clear();
-				DirCacheBuilder dcb = dc.Builder();
-				dcb.AddTree(new byte[0], 0, repo.NewObjectReader(), commit.Tree);
-				dcb.Commit();
-			}
-			catch (IOException e)
-			{
-				throw;
+				DirCacheBuilder builder = dc.Builder();
+				walk = new TreeWalk(repo);
+				walk.AddTree(commit.Tree);
+				walk.AddTree(new DirCacheIterator(dc));
+				walk.Recursive = true;
+				while (walk.Next())
+				{
+					AbstractTreeIterator cIter = walk.GetTree<AbstractTreeIterator>(0);
+					if (cIter == null)
+					{
+						// Not in commit, don't add to new index
+						continue;
+					}
+					DirCacheEntry entry = new DirCacheEntry(walk.RawPath);
+					entry.FileMode = cIter.EntryFileMode;
+					entry.SetObjectIdFromRaw(cIter.IdBuffer, cIter.IdOffset);
+					DirCacheIterator dcIter = walk.GetTree<DirCacheIterator>(1);
+					if (dcIter != null && dcIter.IdEqual(cIter))
+					{
+						DirCacheEntry indexEntry = dcIter.GetDirCacheEntry();
+						entry.LastModified = indexEntry.LastModified;
+						entry.SetLength(indexEntry.Length);
+					}
+					builder.Add(entry);
+				}
+				builder.Commit();
 			}
 			finally
 			{
-				if (dc != null)
+				dc.Unlock();
+				if (walk != null)
 				{
-					dc.Unlock();
+					walk.Release();
 				}
 			}
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		private void CheckoutIndex(RevCommit commit)
 		{
-			DirCache dc = null;
+			DirCache dc = repo.LockDirCache();
 			try
 			{
-				dc = repo.LockDirCache();
 				DirCacheCheckout checkout = new DirCacheCheckout(repo, dc, commit.Tree);
 				checkout.SetFailOnConflict(false);
-				checkout.Checkout();
-			}
-			catch (IOException e)
-			{
-				throw;
+				try
+				{
+					checkout.Checkout();
+				}
+				catch (NGit.Errors.CheckoutConflictException cce)
+				{
+					throw new NGit.Api.Errors.CheckoutConflictException(checkout.GetConflicts(), cce);
+				}
 			}
 			finally
 			{
-				if (dc != null)
-				{
-					dc.Unlock();
-				}
+				dc.Unlock();
 			}
 		}
 

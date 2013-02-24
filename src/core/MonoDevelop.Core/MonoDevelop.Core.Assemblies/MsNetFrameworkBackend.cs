@@ -57,8 +57,12 @@ namespace MonoDevelop.Core.Assemblies
 			switch (framework.Id.Version) {
 			case "1.1":
 			case "2.0":
-			case "4.0":
 				yield return targetRuntime.RootDirectory.Combine (GetClrVersion (framework.ClrVersion));
+				break;
+			case "4.0":
+				var fx40dir = targetRuntime.RootDirectory.Combine (GetClrVersion (framework.ClrVersion));
+				yield return fx40dir;
+				yield return fx40dir.Combine ("WPF");
 				break;
 			case "3.0":
 			case "3.5":
@@ -142,6 +146,7 @@ namespace MonoDevelop.Core.Assemblies
 			switch (v) {
 				case ClrVersion.Net_1_1: return "v1.1.4322";
 				case ClrVersion.Net_2_0: return "v2.0.50727";
+				case ClrVersion.Net_4_5: // The 4_5 binaries have the same version as the NET_4_0 binaries
 				case ClrVersion.Net_4_0: return "v4.0.30319";
 			}
 			return null;

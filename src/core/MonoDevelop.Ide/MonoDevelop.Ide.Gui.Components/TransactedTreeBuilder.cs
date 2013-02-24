@@ -413,7 +413,7 @@ namespace MonoDevelop.Ide.Gui.Components
 				if (!citPath.Up ())
 					return false;
 
-				if (citPath == pitPath)
+				if (citPath.Equals (pitPath))
 					return true;
 
 				return recursive && pitPath.IsAncestor (citPath);
@@ -498,6 +498,14 @@ namespace MonoDevelop.Ide.Gui.Components
 			{
 				node.Filled = true;
 				NodePosition pos = CurrentPosition;
+				foreach (NodeBuilder builder in node.BuilderChain) {
+					try {
+						builder.PrepareChildNodes (node.DataItem);
+					} catch (Exception ex) {
+						LoggingService.LogError (ex.ToString ());
+					}
+					MoveToPosition (pos);
+				}
 				foreach (NodeBuilder builder in node.BuilderChain) {
 					try {
 						builder.BuildChildNodes (this, node.DataItem);

@@ -80,6 +80,7 @@ namespace NGit.Api
 		/// if rename is tried without specifying the old name and HEAD
 		/// is detached
 		/// </exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		public override Ref Call()
 		{
 			CheckCallable();
@@ -94,7 +95,7 @@ namespace NGit.Api
 				string fullNewName;
 				if (repo.GetRef(newName) != null)
 				{
-					throw new RefAlreadyExistsException(MessageFormat.Format(JGitText.Get().refAlreadyExists
+					throw new RefAlreadyExistsException(MessageFormat.Format(JGitText.Get().refAlreadyExists1
 						, newName));
 				}
 				if (oldName != null)

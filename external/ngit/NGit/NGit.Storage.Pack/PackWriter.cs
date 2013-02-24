@@ -108,8 +108,8 @@ namespace NGit.Storage.Pack
 	{
 		private const int PACK_VERSION_GENERATED = 2;
 
-		private static readonly IDictionary<WeakReference<NGit.Storage.Pack.PackWriter>, 
-			bool> instances = new ConcurrentHashMap<WeakReference<NGit.Storage.Pack.PackWriter
+		private static readonly IDictionary<JavaWeakReference<NGit.Storage.Pack.PackWriter
+			>, bool> instances = new ConcurrentHashMap<JavaWeakReference<NGit.Storage.Pack.PackWriter
 			>, bool>();
 
 		private sealed class _Iterable_150 : Iterable<NGit.Storage.Pack.PackWriter>
@@ -130,7 +130,7 @@ namespace NGit.Storage.Pack
 					this.it = NGit.Storage.Pack.PackWriter.instances.Keys.Iterator();
 				}
 
-				private readonly Iterator<WeakReference<NGit.Storage.Pack.PackWriter>> it;
+				private readonly Iterator<JavaWeakReference<NGit.Storage.Pack.PackWriter>> it;
 
 				private NGit.Storage.Pack.PackWriter next;
 
@@ -142,7 +142,7 @@ namespace NGit.Storage.Pack
 					}
 					while (this.it.HasNext())
 					{
-						WeakReference<NGit.Storage.Pack.PackWriter> @ref = this.it.Next();
+						JavaWeakReference<NGit.Storage.Pack.PackWriter> @ref = this.it.Next();
 						this.next = @ref.Get();
 						if (this.next != null)
 						{
@@ -212,7 +212,7 @@ namespace NGit.Storage.Pack
 
 		private readonly PackWriter.MutableState state;
 
-		private readonly WeakReference<NGit.Storage.Pack.PackWriter> selfRef;
+		private readonly JavaWeakReference<NGit.Storage.Pack.PackWriter> selfRef;
 
 		private PackWriter.Statistics.ObjectType typeStats;
 
@@ -338,7 +338,7 @@ namespace NGit.Storage.Pack
 			// be paranoid by default
 			stats = new PackWriter.Statistics();
 			state = new PackWriter.MutableState(this);
-			selfRef = new WeakReference<NGit.Storage.Pack.PackWriter>(this);
+			selfRef = new JavaWeakReference<NGit.Storage.Pack.PackWriter>(this);
 			instances.Put(selfRef, true);
 		}
 
@@ -1969,7 +1969,7 @@ namespace NGit.Storage.Pack
 					for (int i = 0; i < cmit.ParentCount; i++)
 					{
 						RevCommit p = cmit.GetParent(i);
-						if (!p.Has(added) && !p.Has(RevFlag.UNINTERESTING))
+						if (!p.Has(added) && !p.Has(RevFlag.UNINTERESTING) && !Exclude(p))
 						{
 							p.Add(added);
 							AddObject(p, 0);
@@ -2246,6 +2246,7 @@ namespace NGit.Storage.Pack
 					otp.ClearReuseAsIs();
 				}
 			}
+			otp.SetDeltaAttempted(next.WasDeltaAttempted());
 			otp.Select(next);
 		}
 
@@ -2609,8 +2610,9 @@ namespace NGit.Storage.Pack
 			/// <returns>formatted message string for display to clients.</returns>
 			public virtual string GetMessage()
 			{
-				return MessageFormat.Format(JGitText.Get().packWriterStatistics, totalObjects, totalDeltas
-					, reusedObjects, reusedDeltas);
+				return MessageFormat.Format(JGitText.Get().packWriterStatistics, Sharpen.Extensions.ValueOf
+					(totalObjects), Sharpen.Extensions.ValueOf(totalDeltas), Sharpen.Extensions.ValueOf
+					(reusedObjects), Sharpen.Extensions.ValueOf(reusedDeltas));
 			}
 
 			public Statistics()

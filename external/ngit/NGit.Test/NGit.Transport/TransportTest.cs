@@ -210,7 +210,20 @@ namespace NGit.Transport
 			NUnit.Framework.Assert.AreEqual("refs/remotes/test/a", tru.GetLocalName());
 			NUnit.Framework.Assert.AreEqual("refs/heads/a", tru.GetRemoteName());
 			NUnit.Framework.Assert.AreEqual(db.Resolve("refs/heads/a"), tru.GetNewObjectId());
-			NUnit.Framework.Assert.IsNull(tru.GetOldObjectId());
+			NUnit.Framework.Assert.AreEqual(ObjectId.ZeroId, tru.GetOldObjectId());
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
+		public virtual void TestLocalTransportWithRelativePath()
+		{
+			FileRepository other = CreateWorkRepository();
+			string otherDir = other.WorkTree.GetName();
+			RemoteConfig config = new RemoteConfig(((FileBasedConfig)db.GetConfig()), "other"
+				);
+			config.AddURI(new URIish("../" + otherDir));
+			// Should not throw NoRemoteRepositoryException
+			transport = NGit.Transport.Transport.Open(db, config);
 		}
 
 		[NUnit.Framework.Test]

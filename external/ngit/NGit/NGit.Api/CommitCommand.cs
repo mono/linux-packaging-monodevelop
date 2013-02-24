@@ -119,24 +119,15 @@ namespace NGit.Api
 		/// 	</exception>
 		/// <exception cref="NGit.Api.Errors.NoMessageException">when called without specifying a commit message
 		/// 	</exception>
-		/// <exception cref="NGit.Errors.UnmergedPathException">when the current index contained unmerged paths (conflicts)
+		/// <exception cref="NGit.Api.Errors.UnmergedPathsException">when the current index contained unmerged paths (conflicts)
 		/// 	</exception>
+		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException">
+		/// when HEAD or branch ref is updated concurrently by someone
+		/// else
+		/// </exception>
 		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException">when repository is not in the right state for committing
 		/// 	</exception>
-		/// <exception cref="NGit.Api.Errors.JGitInternalException">
-		/// a low-level exception of JGit has occurred. The original
-		/// exception can be retrieved by calling
-		/// <see cref="System.Exception.InnerException()">System.Exception.InnerException()</see>
-		/// . Expect only
-		/// <code>IOException's</code>
-		/// to be wrapped. Subclasses of
-		/// <see cref="System.IO.IOException">System.IO.IOException</see>
-		/// (e.g.
-		/// <see cref="NGit.Errors.UnmergedPathException">NGit.Errors.UnmergedPathException</see>
-		/// ) are
-		/// typically not wrapped here but thrown as original exception
-		/// </exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		public override RevCommit Call()
 		{
 			CheckCallable();
@@ -170,6 +161,11 @@ namespace NGit.Api
 				}
 				// determine the current HEAD and the commit it is referring to
 				ObjectId headId = repo.Resolve(Constants.HEAD + "^{commit}");
+				if (headId == null && amend)
+				{
+					throw new WrongRepositoryStateException(JGitText.Get().commitAmendOnInitialNotPossible
+						);
+				}
 				if (headId != null)
 				{
 					if (amend)
@@ -179,6 +175,10 @@ namespace NGit.Api
 						for (int i = 0; i < p.Length; i++)
 						{
 							parents.Add(0, p[i].Id);
+						}
+						if (author == null)
+						{
+							author = previousCommit.GetAuthorIdent();
 						}
 					}
 					else
@@ -294,10 +294,7 @@ namespace NGit.Api
 			}
 			catch (UnmergedPathException e)
 			{
-				// since UnmergedPathException is a subclass of IOException
-				// which should not be wrapped by a JGitInternalException we
-				// have to catch and re-throw it here
-				throw;
+				throw new UnmergedPathsException(e);
 			}
 			catch (IOException e)
 			{
@@ -407,7 +404,7 @@ namespace NGit.Api
 							}
 						}
 						// update index
-						dcEditor.Add(new _PathEdit_373(dcEntry, path));
+						dcEditor.Add(new _PathEdit_375(dcEntry, path));
 						// add to temporary in-core index
 						dcBuilder.Add(dcEntry);
 						if (emptyCommit && (hTree == null || !hTree.IdEqual(fTree) || hTree.EntryRawMode 
@@ -467,9 +464,9 @@ namespace NGit.Api
 			return inCoreIndex;
 		}
 
-		private sealed class _PathEdit_373 : DirCacheEditor.PathEdit
+		private sealed class _PathEdit_375 : DirCacheEditor.PathEdit
 		{
-			public _PathEdit_373(DirCacheEntry dcEntry, string baseArg1) : base(baseArg1)
+			public _PathEdit_375(DirCacheEntry dcEntry, string baseArg1) : base(baseArg1)
 			{
 				this.dcEntry = dcEntry;
 			}
@@ -534,7 +531,7 @@ namespace NGit.Api
 			{
 				committer = new PersonIdent(repo);
 			}
-			if (author == null)
+			if (author == null && !amend)
 			{
 				author = committer;
 			}
@@ -563,9 +560,28 @@ namespace NGit.Api
 					}
 				}
 			}
+			else
+			{
+				if (state == RepositoryState.SAFE && message == null)
+				{
+					try
+					{
+						message = repo.ReadSquashCommitMsg();
+						if (message != null)
+						{
+							repo.WriteSquashCommitMsg(null);
+						}
+					}
+					catch (IOException e)
+					{
+						throw new JGitInternalException(MessageFormat.Format(JGitText.Get().exceptionOccurredDuringReadingOfGIT_DIR
+							, Constants.MERGE_MSG, e), e);
+					}
+				}
+			}
 			if (message == null)
 			{
-				// as long as we don't suppport -C option we have to have
+				// as long as we don't support -C option we have to have
 				// an explicit message
 				throw new NoMessageException(JGitText.Get().commitMessageNotSpecified);
 			}
@@ -620,10 +636,8 @@ namespace NGit.Api
 		/// Sets the committer for this
 		/// <code>commit</code>
 		/// . If no committer is explicitly
-		/// specified because this method is never called or called with
-		/// <code>null</code>
-		/// value then the committer will be deduced from config info in repository,
-		/// with current time.
+		/// specified because this method is never called then the committer will be
+		/// deduced from config info in repository, with current time.
 		/// </summary>
 		/// <param name="name">
 		/// the name of the committer used for the
@@ -665,7 +679,8 @@ namespace NGit.Api
 		/// . If no author is explicitly
 		/// specified because this method is never called or called with
 		/// <code>null</code>
-		/// value then the author will be set to the committer.
+		/// value then the author will be set to the committer or to the original
+		/// author when amending.
 		/// </summary>
 		/// <param name="author">
 		/// the author used for the
@@ -686,9 +701,8 @@ namespace NGit.Api
 		/// Sets the author for this
 		/// <code>commit</code>
 		/// . If no author is explicitly
-		/// specified because this method is never called or called with
-		/// <code>null</code>
-		/// value then the author will be set to the committer.
+		/// specified because this method is never called then the author will be set
+		/// to the committer or to the original author when amending.
 		/// </summary>
 		/// <param name="name">
 		/// the name of the author used for the

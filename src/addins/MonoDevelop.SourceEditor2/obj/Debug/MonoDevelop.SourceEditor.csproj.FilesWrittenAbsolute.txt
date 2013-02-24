@@ -1,0 +1,7 @@
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.gtk-gui.gui.stetic
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.MonoDevelop.SourceEditor.addin.xml
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.MonoDevelop.SourceEditor.searchoptions.png
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll.mdb
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor2.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor2.dll.mdb

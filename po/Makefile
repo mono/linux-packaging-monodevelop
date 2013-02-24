@@ -44,19 +44,19 @@ CONFIG_CLEAN_VPATH_FILES =
 SOURCES =
 DIST_SOURCES =
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main/missing --run aclocal-1.11
+ACLOCAL = ${SHELL} /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/missing --run aclocal-1.11
 ACLOCAL_FLAGS = 
-ALL_LINGUAS = cs da de es fr ja pt_BR tr pl it zh_TW zh_CN ru sl ca gl pt sv nl id hu
-AMTAR = ${SHELL} /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main/missing --run tar
-ASSEMBLY_VERSION = 3.0.0.0
-AUTOCONF = ${SHELL} /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main/missing --run autoconf
-AUTOHEADER = ${SHELL} /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main/missing --run autoheader
-AUTOMAKE = ${SHELL} /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main/missing --run automake-1.11
+ALL_LINGUAS = cs da de es fr ja pt_BR tr pl it zh_TW zh_CN ru sl ca gl pt sv nl id hu nb
+AMTAR = ${SHELL} /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/missing --run tar
+ASSEMBLY_VERSION = 4.0.0.0
+AUTOCONF = ${SHELL} /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/missing --run autoconf
+AUTOHEADER = ${SHELL} /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/missing --run autoheader
+AUTOMAKE = ${SHELL} /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/missing --run automake-1.11
 AWK = gawk
 CSC = /usr/bin/dmcs
 CSC_FLAGS = -debug -codepage:utf8
 CYGPATH_W = echo
-DEFS = -DPACKAGE_NAME=\"monodevelop\" -DPACKAGE_TARNAME=\"monodevelop\" -DPACKAGE_VERSION=\"3.0.3.2\" -DPACKAGE_STRING=\"monodevelop\ 3.0.3.2\" -DPACKAGE_BUGREPORT=\"monodevelop-list@lists.ximian.com\" -DPACKAGE_URL=\"\" -DPACKAGE=\"monodevelop\" -DVERSION=\"3.0.3.2\" -DGETTEXT_PACKAGE=\"monodevelop\"
+DEFS = -DPACKAGE_NAME=\"monodevelop\" -DPACKAGE_TARNAME=\"monodevelop\" -DPACKAGE_VERSION=\"4.0\" -DPACKAGE_STRING=\"monodevelop\ 4.0\" -DPACKAGE_BUGREPORT=\"monodevelop-list@lists.ximian.com\" -DPACKAGE_URL=\"\" -DPACKAGE=\"monodevelop\" -DVERSION=\"4.0\" -DGETTEXT_PACKAGE=\"monodevelop\"
 DYLD_FALLBACK_LIBRARY_PATH = 
 ECHO_C = 
 ECHO_N = -n
@@ -79,14 +79,14 @@ INSTALL_DATA = ${INSTALL} -m 644
 INSTALL_PROGRAM = ${INSTALL}
 INSTALL_SCRIPT = ${INSTALL}
 INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
-LD_LIBRARY_PATH = /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/install/lib
+LD_LIBRARY_PATH = /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/install/lib
 LIBOBJS = 
 LIBS = 
 LIB_PREFIX = .so
 LIB_SUFFIX = 
 LTLIBOBJS = 
 MAINT = 
-MAKEINFO = ${SHELL} /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main/missing --run makeinfo
+MAKEINFO = ${SHELL} /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/missing --run makeinfo
 MCS = /usr/bin/gmcs
 MD_ADDIN_DIR = $(prefix)/lib/monodevelop/AddIns
 MD_ASSEMBLY_DIR = $(prefix)/lib/monodevelop/bin
@@ -95,30 +95,24 @@ MKDIR_P = /bin/mkdir -p
 MONO = /usr/bin/mono
 MONODOC_CFLAGS =  
 MONODOC_LIBS = /r:/usr/lib/mono/monodoc/monodoc.dll  
-MONO_ADDINS_CFLAGS =  
-MONO_ADDINS_GUI_CFLAGS =  
-MONO_ADDINS_GUI_LIBS = -r:/usr/share/pkgconfig/../../lib/mono/mono-addins/Mono.Addins.Gui.dll -r:/usr/share/pkgconfig/../../lib/mono/mono-addins/Mono.Addins.dll  
-MONO_ADDINS_LIBS = -r:/usr/share/pkgconfig/../../lib/mono/mono-addins/Mono.Addins.dll  
-MONO_ADDINS_SETUP_CFLAGS =  
-MONO_ADDINS_SETUP_LIBS = -r:/usr/share/pkgconfig/../../lib/mono/mono-addins/Mono.Addins.Setup.dll -r:/usr/share/pkgconfig/../../lib/mono/mono-addins/Mono.Addins.dll  
 MONO_GAC_PREFIX = /usr/local:
-MONO_NUNIT_CFLAGS = 
-MONO_NUNIT_LIBS = 
+MONO_NUNIT_CFLAGS =  
+MONO_NUNIT_LIBS = -r:/usr/lib/pkgconfig/../../lib/mono/2.0/nunit.core.dll -r:/usr/lib/pkgconfig/../../lib/mono/2.0/nunit.core.interfaces.dll -r:/usr/lib/pkgconfig/../../lib/mono/2.0/nunit.core.extensions.dll -r:/usr/lib/pkgconfig/../../lib/mono/2.0/nunit.framework.dll -r:/usr/lib/pkgconfig/../../lib/mono/2.0/nunit.framework.extensions.dll -r:/usr/lib/pkgconfig/../../lib/mono/2.0/nunit.mocks.dll -r:/usr/lib/pkgconfig/../../lib/mono/2.0/nunit.util.dll -r:/usr/lib/pkgconfig/../../lib/mono/2.0/nunit-console-runner.dll  
 MSGFMT = /usr/bin/msgfmt
 MSGMERGE = /usr/bin/msgmerge
 PACKAGE = monodevelop
 PACKAGE_BUGREPORT = monodevelop-list@lists.ximian.com
 PACKAGE_NAME = monodevelop
-PACKAGE_STRING = monodevelop 3.0.3.2
+PACKAGE_STRING = monodevelop 4.0
 PACKAGE_TARNAME = monodevelop
 PACKAGE_URL = 
-PACKAGE_VERSION = 3.0.3.2
-PACKAGE_VERSION_LABEL = 3.0.3.2
-PATH = /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/install/bin:/usr/bin:/bin
+PACKAGE_VERSION = 4.0
+PACKAGE_VERSION_LABEL = 4.0
+PATH = /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/install/bin:/usr/bin:/bin
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
-PKG_CONFIG_PATH = /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/local-config:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:/home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/install/lib/pkgconfig
+PKG_CONFIG_PATH = /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/local-config:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/install/lib/pkgconfig
 RUNTIME = /usr/bin/mono
 SET_MAKE = 
 SHELL = /bin/sh
@@ -128,11 +122,11 @@ UNMANAGED_DEPENDENCIES_MONO_CFLAGS =
 UNMANAGED_DEPENDENCIES_MONO_LIBS =  
 UPDATE_DESKTOP_DB = 
 UPDATE_MIME_DB = /usr/bin/update-mime-database
-VERSION = 3.0.3.2
-abs_builddir = /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main/po
-abs_srcdir = /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main/po
-abs_top_builddir = /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main
-abs_top_srcdir = /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main
+VERSION = 4.0
+abs_builddir = /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/po
+abs_srcdir = /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/po
+abs_top_builddir = /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main
+abs_top_srcdir = /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main
 am__leading_dot = .
 am__tar = tar --format=ustar -chf - "$$tardir"
 am__untar = tar -xf -
@@ -149,7 +143,7 @@ host_alias =
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/builder/data/lanes/monodevelop-linux-3.0.3.2/7bf6ac0c/source/monodevelop/main/install-sh
+install_sh = ${SHELL} /home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -378,7 +372,7 @@ update-po:
 	$(MDTOOL_RUN) gettext-update -f:$(top_srcdir)/Main.sln
 
 $(GMO_FILES): $(LC_BUILD)/%/LC_MESSAGES/$(PACKAGE).mo: %.po
-	$(mkdir_p) $(dir $@)
+	$(MKDIR_P) $(dir $@)
 	msgfmt '$<' -o '$@'
 
 statistics:
@@ -388,7 +382,7 @@ statistics:
 	done
 
 $(MO_FILES): $(INSTALL_DIR)/%/LC_MESSAGES/$(PACKAGE).mo : $(LC_BUILD)/%/LC_MESSAGES/$(PACKAGE).mo
-	$(mkdir_p) $(dir $@)
+	$(MKDIR_P) $(dir $@)
 	$(install_sh) '$<' '$@'
 
 install-data-local: $(MO_FILES)

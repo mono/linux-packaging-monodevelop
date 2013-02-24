@@ -39,7 +39,7 @@ namespace MonoDevelop.Ide.Gui
 {
 	public static class DisplayBindingService
 	{
-		static IEnumerable<T> GetBindings<T> ()
+		public static IEnumerable<T> GetBindings<T> ()
 		{
 			return AddinManager.GetExtensionObjects ("/MonoDevelop/Ide/DisplayBindings")
 				.OfType<T> ();
@@ -67,7 +67,7 @@ namespace MonoDevelop.Ide.Gui
 			return GetDisplayBindings (filePath, mimeType, ownerProject).FirstOrDefault (d => d.CanUseAsDefault);
 		}
 		
-		public static void AttachSubWindows (IWorkbenchWindow workbenchWindow)
+		internal static void AttachSubWindows (IWorkbenchWindow workbenchWindow)
 		{
 			foreach (var b in GetBindings<IAttachableDisplayBinding> ()) {
 				if (b.CanAttachTo (workbenchWindow.ViewContent)) 

@@ -1,5 +1,6 @@
 //
 // Copyright 2009-2010, Novell, Inc.
+// Copyright 2011, 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -28,7 +29,7 @@ using System.Runtime.InteropServices;
 using MonoMac.ObjCRuntime;
 
 namespace MonoMac.Foundation {
-	[Register ("NSAutoreleasePool")]
+	[Register ("NSAutoreleasePool", true)]
 	public class NSAutoreleasePool : NSObject, IDisposable {
 		static IntPtr class_ptr = Class.GetHandle ("NSAutoreleasePool");
 
