@@ -1,4 +1,3 @@
-link_system_nunit.patch
 use_libsvn1.patch
 use_libapr1.patch
 update_templates_for_gtk-sharp_2.12.patch
