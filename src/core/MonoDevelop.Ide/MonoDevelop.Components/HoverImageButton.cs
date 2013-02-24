@@ -28,6 +28,7 @@
 
 using System;
 using Gtk;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Components
 {
@@ -54,18 +55,21 @@ namespace MonoDevelop.Components
 
         public HoverImageButton()
         {
+			Gtk.Alignment al = new Alignment (0.5f, 0.5f, 0f, 0f);
+			al.Show ();
             CanFocus = true;
-
+			VisibleWindow = false;
             image = new Image();
             image.Show();
-            Add(image);
+			al.Add (image);
+            Add(al);
         }
 
         public HoverImageButton(IconSize size, string icon_name) : this(size, new string [] { icon_name })
         {
         }
 
-        public HoverImageButton(IconSize size, string [] icon_names) : this()
+        public HoverImageButton(IconSize size, params string [] icon_names) : this()
         {
             this.icon_size = size;
             this.icon_names = icon_names;
@@ -102,7 +106,8 @@ namespace MonoDevelop.Components
 
         protected override bool OnLeaveNotifyEvent(Gdk.EventCrossing evnt)
         {
-            is_hovering = false;
+			image.GdkWindow.Cursor = null;
+			is_hovering = false;
             UpdateImage();
             return base.OnLeaveNotifyEvent(evnt);
         }
@@ -151,8 +156,6 @@ namespace MonoDevelop.Components
         {
             base.OnExposeEvent(evnt);
 
-            PropagateExpose(Child, evnt);
-
             if(HasFocus && draw_focus) {
                 Style.PaintFocus(Style, GdkWindow, StateType.Normal, evnt.Area, this, "button",
                     0, 0, Allocation.Width, Allocation.Height);
@@ -171,7 +174,6 @@ namespace MonoDevelop.Components
         {
             int width, height;
             Icon.SizeLookup(icon_size, out width, out height);
-            IconTheme theme = IconTheme.GetForScreen(Screen);
 
             if(normal_pixbuf != null) {
                 normal_pixbuf.Dispose();
@@ -185,9 +187,8 @@ namespace MonoDevelop.Components
 
             for(int i = 0; i < icon_names.Length; i++) {
                 try {
-                    normal_pixbuf = RenderIcon(icon_names[i], icon_size, null)
-                        ?? theme.LoadIcon(icon_names[i], width, 0);
-                    active_pixbuf = ColorShiftPixbuf(normal_pixbuf, 30);
+					normal_pixbuf = ImageService.GetPixbuf (icon_names[i], icon_size);
+					active_pixbuf = ColorShiftPixbuf(normal_pixbuf, 30);
                     break;
                 } catch {
                 }
@@ -223,9 +224,9 @@ namespace MonoDevelop.Components
                 byte *dest_pixels = dest_pixels_orig + i * dest.Rowstride;
 
                 for(int j = 0; j < src.Width; j++) {
-                    *(dest_pixels++) = PixelClamp(*(src_pixels++) + shift);
-                    *(dest_pixels++) = PixelClamp(*(src_pixels++) + shift);
-                    *(dest_pixels++) = PixelClamp(*(src_pixels++) + shift);
+                    *(dest_pixels++) = PixelClamp(*(src_pixels++) - shift);
+                    *(dest_pixels++) = PixelClamp(*(src_pixels++) - shift);
+                    *(dest_pixels++) = PixelClamp(*(src_pixels++) - shift);
 
                     if(src.HasAlpha) {
                         *(dest_pixels++) = *(src_pixels++);

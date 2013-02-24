@@ -30,6 +30,8 @@ using NUnit.Framework;
 using MonoDevelop.Projects;
 using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Ide.TypeSystem;
+using ICSharpCode.NRefactory.CSharp;
+using ICSharpCode.NRefactory.CSharp.TypeSystem;
 
 namespace MonoDevelop.Ide.FindInFiles
 {
@@ -38,10 +40,10 @@ namespace MonoDevelop.Ide.FindInFiles
 	{
 		IAssembly GenerateAssembly(Project project, string code)
 		{
-			TypeSystemService.LoadProject (project);
+			var wrapper = TypeSystemService.LoadProject (project);
+			project.Files.Add (new ProjectFile ("test.cs", BuildAction.Compile));
 			TypeSystemService.ParseFile (project, "test.cs", "text/x-csharp", code);
-			var compilation = TypeSystemService.GetCompilation (project);
-			return compilation.MainAssembly;
+			return wrapper.Compilation.MainAssembly;
 		}
 
 		List<IMember> CollectMembers (string code, string typeName, Predicate<IUnresolvedMember> filter1, Predicate<IMember> filter2,
@@ -216,7 +218,7 @@ class C : IA
 		}
 		
 		[Test ()]
-		public void TestMultiInterfacesImpl ()
+		public void TestMultiInterfacesImpl1 ()
 		{
 			var code = @"
 interface IA
@@ -248,13 +250,67 @@ class C : IB
 			expected1.Add (GetMemberFilter ("IA", memberName));
 			expected1.Add (GetMemberFilter ("IB", memberName));
 			TestCollectMembers (code, "A", memberName, expected1);
-			
+		}
+
+		[Test ()]
+		public void TestMultiInterfacesImpl2 ()
+		{
+			var code = @"
+interface IA
+{
+	void Method();
+}
+interface IB
+{
+	void Method();
+}
+class A : IA, IB
+{
+	public void Method() { }
+}
+class B : IA
+{
+	public void Method() { }
+}
+class C : IB
+{
+	public void Method() { }
+}";
+			string memberName = "Method";
+
 			var expected2 = new List<Predicate<IMember>>();
 			expected2.Add (GetMemberFilter ("A", memberName));
 			expected2.Add (GetMemberFilter ("B", memberName));
 			expected2.Add (GetMemberFilter ("IA", memberName));
 			TestCollectMembers (code, "B", memberName, expected2);
 			TestCollectMembers (code, "IA", memberName, expected2);
+		}
+
+		[Test ()]
+		public void TestMultiInterfacesImpl3 ()
+		{
+			var code = @"
+interface IA
+{
+	void Method();
+}
+interface IB
+{
+	void Method();
+}
+class A : IA, IB
+{
+	public void Method() { }
+}
+class B : IA
+{
+	public void Method() { }
+}
+class C : IB
+{
+	public void Method() { }
+}";
+			string memberName = "Method";
 			
 			var expected3 = new List<Predicate<IMember>>();
 			expected3.Add (GetMemberFilter ("A", memberName));
@@ -484,8 +540,8 @@ class B : A
 			var code = @"
 class A
 {
-	public A() { }
-	public A(int i) { }
+public A() { }
+public A(int i) { }
 }";
 			var emptyParam = new string [] { };
 			var intParam = new [] { "Int32" };
@@ -494,14 +550,30 @@ class A
 				m => m.EntityType == EntityType.Constructor && MatchParameters(m, emptyParam),
 				m => m.EntityType == EntityType.Constructor && MatchParameters(m, intParam)
 			};
-
+			
 			foreach (var filter in filters) {
 				var result1 = CollectMembers (code, "A", m => true, filter, true, false);
 				VerifyResult (result1, filters);
 			}
-
+			
 			var result2 = CollectMembers (code, "A", m => true, filters [0], false, true);
 			VerifyResult (result2, new [] { filters [0] });
+		}
+
+
+		[Test ()]
+		public void TestStaticConstructor ()
+		{
+			var code = @"
+class A
+{
+public A() { }
+static A() { }
+}";
+			var emptyParam = new string [] { };
+			Predicate<IMember> filter = m => m.EntityType == EntityType.Constructor && MatchParameters(m, emptyParam);
+			var result1 = CollectMembers (code, "A", m => true, filter, true, false);
+			Assert.AreEqual (2, result1.Count);
 		}
 
 	}

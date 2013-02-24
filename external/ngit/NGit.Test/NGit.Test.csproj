@@ -11,31 +11,29 @@
     <AssemblyName>NGit.Test</AssemblyName>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
+    <DebugSymbols>True</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
+    <Optimize>False</Optimize>
     <OutputPath>..\bin</OutputPath>
     <DefineConstants>DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <ConsolePause>false</ConsolePause>
+    <ConsolePause>False</ConsolePause>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>none</DebugType>
-    <Optimize>false</Optimize>
+    <Optimize>False</Optimize>
     <OutputPath>..\bin</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <ConsolePause>false</ConsolePause>
+    <ConsolePause>False</ConsolePause>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="ICSharpCode.SharpZipLib" />
     <Reference Include="System.Core" />
-    <Reference Include="nunit.framework, Version=2.4.8.0, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77">
-      <Private>False</Private>
+    <Reference Include="nunit.framework, Version=2.6.0.12051, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77">
       <SpecificVersion>False</SpecificVersion>
-      <Package>mono-nunit</Package>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -264,6 +262,21 @@
     <Compile Include="NGit.Transport\SpiTransport.cs" />
     <Compile Include="NGit.Api\HugeFileTest.cs" />
     <Compile Include="NGit.Util\ReadLinesTest.cs" />
+    <Compile Include="NGit\IndexModificationTimesTest.cs" />
+    <Compile Include="NGit\SquashCommitMsgTest.cs" />
+    <Compile Include="NGit.Api\ApplyCommandTest.cs" />
+    <Compile Include="NGit.Api\RenameBranchCommandTest.cs" />
+    <Compile Include="NGit.Api\StashApplyCommandTest.cs" />
+    <Compile Include="NGit.Api\StashCreateCommandTest.cs" />
+    <Compile Include="NGit.Api\StashDropCommandTest.cs" />
+    <Compile Include="NGit.Merge\ResolveMergerTest.cs" />
+    <Compile Include="NGit.Merge\SquashMessageFormatterTest.cs" />
+    <Compile Include="NGit.Revwalk\RevCommitListTest.cs" />
+    <Compile Include="NGit.Transport\OpenSshConfigTest.cs" />
+    <Compile Include="NGit.Transport\PackParserTest.cs" />
+    <Compile Include="NGit.Transport\ReceivePackAdvertiseRefsHookTest.cs" />
+    <Compile Include="NGit.Util\GitDateFormatterTest.cs" />
+    <Compile Include="NGit.Storage.File\GCTest.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
@@ -277,8 +290,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="resources\NGit.Diff\.gitattributes" />
-    <None Include="resources\NGit.Patch\.gitattributes" />
     <None Include="resources\global\dircache.testRemovedSubtree">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -428,5 +439,16 @@
     <EmbeddedResource Include="resources\NonTranslatedBundle.properties">
       <LogicalName>NGit.Nls.NonTranslatedBundle.properties</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="resources\NGit.Diff\A1_PostImage" />
+    <EmbeddedResource Include="resources\NGit.Diff\A1.patch" />
+    <EmbeddedResource Include="resources\NGit.Diff\A2_PostImage" />
+    <EmbeddedResource Include="resources\NGit.Diff\A2.patch" />
+    <EmbeddedResource Include="resources\NGit.Diff\D_PreImage" />
+    <EmbeddedResource Include="resources\NGit.Diff\D.patch" />
+    <EmbeddedResource Include="resources\NGit.Diff\F1_PreImage" />
+    <EmbeddedResource Include="resources\NGit.Diff\F1.patch" />
+    <EmbeddedResource Include="resources\NGit.Diff\F2_PreImage" />
+    <EmbeddedResource Include="resources\NGit.Diff\F2.patch" />
+    <EmbeddedResource Include="resources\NGit.Diff\A1_sub.patch" />
   </ItemGroup>
 </Project>

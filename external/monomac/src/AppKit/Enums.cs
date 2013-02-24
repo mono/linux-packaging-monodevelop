@@ -1407,9 +1407,17 @@ namespace MonoMac.AppKit {
 		RemotePixelBuffer  =  91,
 		AllowOfflineRenderers = 96,
 		AcceleratedCompute =  97,
+
+		// Specify the profile
+	        OpenGLProfile = 99,
 		VirtualScreenCount = 128,
 	}
-    
+
+	public enum NSOpenGLProfile {
+		VersionLegacy   = 0x1000, // Legacy
+		Version3_2Core  = 0x3200  // 3.2 or better
+	}
+	
 	public enum NSAlertButtonReturn {
 		First = 1000,
 		Second = 1001,
@@ -1469,9 +1477,9 @@ namespace MonoMac.AppKit {
 	}
 
 	public static class NSFileTypeForHFSTypeCode {
-		public static string ComputerIcon = "root";
-		public static string DesktopIcon = "desk";
-		public static string FinderIcon = "FNDR";
+		public static readonly string ComputerIcon = "root";
+		public static readonly string DesktopIcon = "desk";
+		public static readonly string FinderIcon = "FNDR";
 	}
 	
 	// These constants specify the possible states of a drawer.
@@ -1592,6 +1600,8 @@ namespace MonoMac.AppKit {
 	}
 
 	public enum NSLayoutFormatOptions {
+		None = 0,
+
 		AlignAllLeft = (1 << NSLayoutAttribute.Left),
 		AlignAllRight = (1 << NSLayoutAttribute.Right),
 		AlignAllTop = (1 << NSLayoutAttribute.Top),
@@ -1680,4 +1690,60 @@ namespace MonoMac.AppKit {
 		ShowReplaceInterface = 12,
 		HideReplaceInterface = 13
 	}
-} 
+
+	[Flags]
+	public enum NSFontPanelMode {
+		FaceMask = 1 << 0,
+		SizeMask = 1 << 1,
+		CollectionMask = 1 << 2,
+		UnderlineEffectMask = 1<<8,
+		StrikethroughEffectMask = 1<<9,
+		TextColorEffectMask = 1<< 10,
+		DocumentColorEffectMask = 1<<11,
+		ShadowEffectMask = 1<<12,
+		AllEffectsMask = 0XFFF00,
+		StandardMask = 0xFFFF,
+		AllModesMask = unchecked( (int)0xFFFFFFFF )
+	}
+
+	[Flags]
+	public enum NSFontCollectionVisibility {
+		Process = 1 << 0,
+		User = 1 << 1,
+		Computer = 1 << 2,
+	}
+
+	public enum NSSharingContentScope {
+		Item,
+		Partial,
+		Full
+	}
+
+	public enum NSSharingServiceName {
+		PostOnFacebook,
+		PostOnTwitter,
+		PostOnSinaWeibo,
+		ComposeEmail,
+		ComposeMessage,
+		SendViaAirDrop,
+		AddToSafariReadingList,
+		AddToIPhoto,
+		AddToAperture,
+		UseAsTwitterProfileImage,
+		UseAsDesktopPicture,
+		PostImageOnFlickr,
+		PostVideoOnVimeo,
+		PostVideoOnYouku,
+		PostVideoOnTudou
+	}
+
+	[Flags]
+	public enum NSTypesetterControlCharacterAction {
+		ZeroAdvancement = 1 << 0,
+		Whitespace = 1 << 1,
+		HorizontalTab = 1 << 2,
+		LineBreak = 1 << 3,
+		ParagraphBreak = 1 << 4,
+		ContainerBreak = 1 << 5,
+	}
+}

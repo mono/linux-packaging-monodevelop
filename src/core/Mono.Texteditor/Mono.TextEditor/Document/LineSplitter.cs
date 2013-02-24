@@ -29,6 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Mono.TextEditor.Utils;
+using System.Diagnostics;
 
 namespace Mono.TextEditor
 {
@@ -95,7 +96,7 @@ namespace Mono.TextEditor
 			if (args.RemovalLength > 0)
 				TextRemove (args.Offset, args.RemovalLength);
 			if (args.InsertionLength > 0)
-				TextInsert (args.Offset, args.InsertedText);
+				TextInsert (args.Offset, args.InsertedText.Text);
 		}
 
 		public void TextRemove (int offset, int length)

@@ -75,7 +75,7 @@ namespace MonoDevelop.VersionControl
 		bool IViewContent.IsFile {
 			get { return false; }
 		}
-		
+
 		string IViewContent.PathRelativeToProject {
 			get { return ""; }
 		}

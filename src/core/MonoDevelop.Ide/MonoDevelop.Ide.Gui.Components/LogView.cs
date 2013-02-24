@@ -33,6 +33,9 @@ using MonoDevelop.Core;
 using MonoDevelop.Core.ProgressMonitoring;
 using MonoDevelop.Core.Execution;
 using System.IO;
+using System.Text.RegularExpressions;
+using MonoDevelop.Ide.Fonts;
+using MonoDevelop.Components.Commands;
 
 namespace MonoDevelop.Ide.Gui.Components
 {
@@ -41,8 +44,7 @@ namespace MonoDevelop.Ide.Gui.Components
 		Gtk.TextBuffer buffer;
 		Gtk.TextView textEditorControl;
 		TextMark endMark;
-		FontDescription customFont;
-		
+
 		TextTag tag;
 		TextTag bold;
 		TextTag errorTag;
@@ -58,10 +60,66 @@ namespace MonoDevelop.Ide.Gui.Components
 		
 		const int MAX_BUFFER_LENGTH = 4000 * 1024; 
 
+		/// <summary>
+		/// The log text view allows the user to jump to the source of an error/warning
+		/// by double clicking on the line in the text view.
+		/// </summary>
+		class LogTextView : TextView
+		{
+			public LogTextView (Gtk.TextBuffer buf) : base (buf)
+			{
+			}
+
+			static Regex lineRegex = new Regex ("\\b.*\\s(?<file>[/\\\\].*):(line\\s)?(?<line>\\d+)\\s*$", RegexOptions.Compiled);
+			protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
+			{
+				if (evnt.Type == Gdk.EventType.TwoButtonPress) {
+					var cursorPos = base.Buffer.GetIterAtOffset (this.Buffer.CursorPosition);
+
+					TextIter iterStart;
+					TextIter iterEnd;
+					string lineText;
+					try {
+						iterStart = Buffer.GetIterAtLine (cursorPos.Line);
+						iterEnd = Buffer.GetIterAtOffset (iterStart.Offset + iterStart.CharsInLine);
+
+						lineText = Buffer.GetText (iterStart, iterEnd, true);
+					} catch (Exception e) {
+						LoggingService.LogError ("Error in getting text of the current line.", e);
+						return base.OnButtonPressEvent (evnt);
+					}
+
+					var match = lineRegex.Match (lineText);
+					if (match.Success) {
+						string file = match.Groups["file"].Value;
+						string line = match.Groups["line"].Value;
+						if (!string.IsNullOrEmpty (file) && !string.IsNullOrEmpty (line)) {
+							bool fileExists;
+							try {
+								fileExists = File.Exists (file);
+							} catch {
+								fileExists = false;
+							}
+							if (fileExists) {
+								int lineNumber;
+								try {
+									lineNumber = int.Parse (line);
+								} catch (Exception) {
+									lineNumber = 1;
+								}
+								IdeApp.Workbench.OpenDocument (file, lineNumber, 1);
+							}
+						}
+					}
+				}
+				return base.OnButtonPressEvent (evnt);
+			}
+		}
+
 		public LogView ()
 		{
 			buffer = new Gtk.TextBuffer (new Gtk.TextTagTable ());
-			textEditorControl = new Gtk.TextView (buffer);
+			textEditorControl = new LogTextView (buffer);
 			textEditorControl.Editable = false;
 			
 			ShadowType = ShadowType.None;
@@ -87,10 +145,25 @@ namespace MonoDevelop.Ide.Gui.Components
 			
 			endMark = buffer.CreateMark ("end-mark", buffer.EndIter, false);
 
-			UpdateCustomFont (IdeApp.Preferences.CustomOutputPadFont);
+			UpdateCustomFont ();
 			IdeApp.Preferences.CustomOutputPadFontChanged += HandleCustomFontChanged;
 			
 			outputDispatcher = new GLib.TimeoutHandler (outputDispatchHandler);
+		}
+
+		[CommandHandler (Ide.Commands.EditCommands.Copy)]
+		void CopyText ()
+		{
+			TextIter start;
+			TextIter end;
+			if (buffer.HasSelection && buffer.GetSelectionBounds (out start, out end)) {
+				var text = buffer.GetText (start, end, false);
+				var clipboard = Clipboard.Get (Gdk.Atom.Intern ("CLIPBOARD", false));
+				clipboard.Text = text;
+
+				clipboard = Clipboard.Get (Gdk.Atom.Intern ("PRIMARY", false));
+				clipboard.Text = text;
+			}
 		}
 		
 		public LogViewProgressMonitor GetProgressMonitor ()
@@ -109,21 +182,14 @@ namespace MonoDevelop.Ide.Gui.Components
 			buffer.Clear();
 		}
 		
-		void HandleCustomFontChanged (object sender, PropertyChangedEventArgs e)
+		void HandleCustomFontChanged (object sender, EventArgs e)
 		{
-			UpdateCustomFont ((string)e.NewValue);
+			UpdateCustomFont ();
 		}
 		
-		void UpdateCustomFont (string name)
+		void UpdateCustomFont ()
 		{
-			if (customFont != null) {
-				customFont.Dispose ();
-				customFont = null;
-			}
-			if (!string.IsNullOrEmpty (name)) {
-				customFont = Pango.FontDescription.FromString (name);
-			}
-			textEditorControl.ModifyFont (customFont);
+			textEditorControl.ModifyFont (IdeApp.Preferences.CustomOutputPadFont ?? FontService.DefaultMonospaceFontDescription);
 		}
 		
 		//mechanism to to batch copy text when large amounts are being dumped
@@ -281,10 +347,6 @@ namespace MonoDevelop.Ide.Gui.Components
 				lastTextWrite = null;
 			}
 			IdeApp.Preferences.CustomOutputPadFontChanged -= HandleCustomFontChanged;
-			if (customFont != null) {
-				customFont.Dispose ();
-				customFont = null;
-			}
 		}
 		
 		private abstract class QueuedUpdate
@@ -447,7 +509,11 @@ namespace MonoDevelop.Ide.Gui.Components
 				return;
 			userWarned = true;
 			string title = GettextCatalog.GetString ("Console input not supported");
-			string desc = GettextCatalog.GetString ("Console input is not supported when using the MonoDevelop output console. If your applications needs to read data from the standard input, please set the 'Run in External Console' option in the project options.");
+			string desc = GettextCatalog.GetString (
+				"Console input is not supported when using the {0} output console. If your application needs to read " +
+				"data from the standard input, please set the 'Run in External Console' option in the project options.",
+				BrandingService.ApplicationName
+			);
 			MessageService.ShowWarning (title, desc);
 		}
 		

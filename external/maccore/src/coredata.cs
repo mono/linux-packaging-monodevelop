@@ -14,10 +14,12 @@ using MonoMac.ObjCRuntime;
 namespace MonoMac.CoreData
 {
 	[BaseType (typeof (NSPersistentStore))]
+	// Objective-C exception thrown.  Name: NSInternalInconsistencyException Reason: NSMappedObjectStore must be initialized with initWithPersistentStoreCoordinator:configurationName:URL:options
+	[DisableDefaultCtor]
 	public interface NSAtomicStore {
 
 		[Export ("initWithPersistentStoreCoordinator:configurationName:URL:options:")]
-		IntPtr Constructor (NSPersistentStoreCoordinator coordinator, string configurationName, NSUrl url, NSDictionary options);
+		IntPtr Constructor (NSPersistentStoreCoordinator coordinator, string configurationName, NSUrl url, [NullAllowed] NSDictionary options);
 
 		[Export ("load:")]
 		bool Load (out NSError error);
@@ -54,6 +56,8 @@ namespace MonoMac.CoreData
 
 	}
 	[BaseType (typeof (NSObject))]
+	// Objective-C exception thrown.  Name: NSInvalidArgumentException Reason: NSAtomicStoreCacheNodes must be initialized using initWithObjectID:(NSManagedObjectID *)
+	[DisableDefaultCtor]
 	public interface NSAtomicStoreCacheNode {
 
 		[Export ("initWithObjectID:")]
@@ -82,7 +86,7 @@ namespace MonoMac.CoreData
 		string AttributeValueClassName { get; set; }
 
 		[Export ("defaultValue")]
-		NSAttributeDescription DefaultValue { get; }
+		NSObject DefaultValue { get; set; }
 
 		[Export ("setDefaultValue:")]
 		void SetDefaultValue (NSObject value);
@@ -115,7 +119,7 @@ namespace MonoMac.CoreData
 		[Export ("name")]
 		string Name { get; set; }
 
-		[Export ("isAbstract")]
+		[Export ("Abstract")]
 		bool Abstract { [Bind("isAbstract")] get; set; }
 
 		[Export ("subentitiesByName")]
@@ -291,7 +295,94 @@ namespace MonoMac.CoreData
 		[Export ("propertiesToGroupBy")]
 		NSPropertyDescription [] PropertiesToGroupBy { get; set; }
 	}
+#if !MONOMAC
+	[BaseType (typeof (NSObject), Delegates = new string [] { "WeakDelegate" })]
+	interface NSFetchedResultsController {
 
+		[Export ("initWithFetchRequest:managedObjectContext:sectionNameKeyPath:cacheName:")]
+		IntPtr Constructor (NSFetchRequest fetchRequest, NSManagedObjectContext context, [NullAllowed] string sectionNameKeyPath, [NullAllowed] string name);
+
+		[Wrap ("WeakDelegate")]
+		NSFetchedResultsControllerDelegate Delegate { get; set; }
+
+		[Export ("delegate", ArgumentSemantic.Assign)][NullAllowed]
+		NSObject WeakDelegate { get; set; }
+
+		[Export ("cacheName")]
+		string CacheName { get; }
+
+		[Export ("fetchedObjects")]
+		NSObject[] FetchedObjects { get; }
+
+		[Export ("fetchRequest")]
+		NSFetchRequest FetchRequest { get; }
+
+		[Export ("managedObjectContext")]
+		NSManagedObjectContext ManagedObjectContext { get; }
+
+		[Export ("sectionNameKeyPath")]
+		string SectionNameKeyPath { get; }
+
+		[Export ("sections")]
+		NSFetchedResultsSectionInfo[] Sections { get; }
+
+		[Export ("performFetch:")]
+		bool PerformFetch (out NSError error);
+
+		[Export ("indexPathForObject:")]
+		NSIndexPath FromObject (NSObject obj);
+
+		[Export ("objectAtIndexPath:")]
+		NSObject ObjectAt (NSIndexPath path);
+
+		[Export ("sectionForSectionIndexTitle:atIndex:")]
+		// name like UITableViewSource's similar (and linked) selector
+		int SectionFor (string title, int atIndex);
+
+		[Export ("sectionIndexTitleForSectionName:")]
+		// again named like UITableViewSource
+		string SectionIndexTitles (string sectionName);
+
+		[Static]
+		[Export ("deleteCacheWithName:")]
+		void DeleteCache ([NullAllowed] string name);
+	}
+
+	[BaseType (typeof (NSObject))]
+	[Model]
+	interface NSFetchedResultsControllerDelegate {
+		[Export ("controllerWillChangeContent:")]
+		void WillChangeContent (NSFetchedResultsController controller);
+
+		[Export ("controller:didChangeObject:atIndexPath:forChangeType:newIndexPath:")]
+		void DidChangeObject (NSFetchedResultsController controller, NSObject anObject, NSIndexPath indexPath, NSFetchedResultsChangeType type, NSIndexPath newIndexPath);
+
+		[Export ("controller:didChangeSection:atIndex:forChangeType:")]
+		void DidChangeSection (NSFetchedResultsController controller, NSFetchedResultsSectionInfo sectionInfo, uint sectionIndex, NSFetchedResultsChangeType type);
+
+		[Export ("controllerDidChangeContent:")]
+		void DidChangeContent (NSFetchedResultsController controller);
+
+		[Export ("controller:sectionIndexTitleForSectionName:")]
+		string SectionFor (NSFetchedResultsController controller, string sectionName);
+	}
+
+	[BaseType (typeof (NSObject))]
+	[Model]
+	interface NSFetchedResultsSectionInfo {
+		[Export ("numberOfObjects")]
+		int Count { get; }
+
+		[Export ("objects")]
+		NSObject[] Objects { get; }
+
+		[Export ("name")]
+		string Name { get; }
+
+		[Export ("indexTitle")]
+		string IndexTitle { get; }
+	}
+#endif
 	[Since(5,0)]
 	[BaseType (typeof (NSPersistentStore))]
 	interface NSIncrementalStore {
@@ -348,6 +439,9 @@ namespace MonoMac.CoreData
 	}
 
 	[BaseType (typeof (NSObject))]
+	// 'init' issues a warning: CoreData: error: Failed to call designated initializer on NSManagedObject class 'NSManagedObject' 
+	// then crash while disposing the instance
+	[DisableDefaultCtor]
 	public interface NSManagedObject {
 		[Export ("initWithEntity:insertIntoManagedObjectContext:")]
 		IntPtr Constructor (NSEntityDescription entity, NSManagedObjectContext context);
@@ -572,7 +666,10 @@ namespace MonoMac.CoreData
 		[Export ("parentContext")]
 		NSManagedObjectContext ParentContext { get; set; }
 	}
+
 	[BaseType (typeof (NSObject))]
+	// Objective-C exception thrown.  Name: NSInvalidArgumentException Reason: *** -URIRepresentation cannot be sent to an abstract object of class NSManagedObjectID: Create a concrete instance!
+	[DisableDefaultCtor]
 	public interface NSManagedObjectID {
 
 		[Export ("entity")]
@@ -868,16 +965,17 @@ namespace MonoMac.CoreData
 		[Export ("tryLock")]
 		bool TryLock { get; }
 
+#if MONOMAC
 		[Obsolete("Deprecated in MAC OSX 10.5 and later")]
 		[Static, Export ("metadataForPersistentStoreWithURL:error:")]
 		NSDictionary MetadataForPersistentStoreWithUrl (NSUrl url, out NSError error);
-
+#endif
 		[Field ("NSSQLiteStoreType")]
 		NSString SQLiteStoreType { get; }
-		
+#if MONOMAC
 		[Field ("NSXMLStoreType")]
 		NSString XMLStoreType { get; }
-		
+#endif	
 		[Field ("NSBinaryStoreType")]
 		NSString BinaryStoreType { get; }
 		
@@ -898,10 +996,10 @@ namespace MonoMac.CoreData
 
 		[Field ("NSReadOnlyPersistentStoreOption")]
 		NSString ReadOnlyPersistentStoreOption { get; }
-
+#if MONOMAC
 		[Field ("NSValidateXMLStoreOption")]
 		NSString ValidateXMLStoreOption { get; }
-
+#endif
 		[Field ("NSPersistentStoreTimeoutOption")]
 		NSString PersistentStoreTimeoutOption { get; }
 
@@ -953,11 +1051,12 @@ namespace MonoMac.CoreData
 		[Field ("NSPersistentStoreUbiquitousContentNameKey")]
 		NSString PersistentStoreUbiquitousContentNameKey { get; }
 
-		[Field ("NSPersistentStoreUbiquitousContentUrlLKey")]
+		[Field ("NSPersistentStoreUbiquitousContentURLKey")]
 		NSString PersistentStoreUbiquitousContentUrlLKey { get; }
-
+#if !MONOMAC
 		[Field ("NSPersistentStoreFileProtectionKey")]
 		NSString PersistentStoreFileProtectionKey { get; }
+#endif
 	}
 
 	[BaseType (typeof (NSObject))]

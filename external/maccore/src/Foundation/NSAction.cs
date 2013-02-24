@@ -32,14 +32,17 @@ namespace MonoMac.Foundation {
 
 	// Use this for synchronous operations
 	[Register ("__MonoMac_NSActionDispatcher")]
-	internal class NSActionDispatcher : NSObject {
+	internal sealed class NSActionDispatcher : NSObject {
 
-		public static Selector Selector = new Selector ("apply");
+		public static readonly Selector Selector = new Selector ("apply");
 
-		NSAction action;
+		readonly NSAction action;
 
 		public NSActionDispatcher (NSAction action)
 		{
+			if (action == null)
+				throw new ArgumentNullException ("action");
+
 			this.action = action;
 		}
 
@@ -57,16 +60,18 @@ namespace MonoMac.Foundation {
 		GCHandle gch;
 		NSAction action;
 
+#if !MONOTOUCH
 		// This ctor is so that the runtime can create a new instance of this class
 		// if ObjC wants to call release on an instance we've already called Dispose on.
 		// Since we detach the handle from the managed instance when Dispose is called,
 		// there is no way we can get the existing managed instance (which has possibly 
 		// been freed anyway) when ObjC calls release (which ends up in NSObject.NativeRelease).
-		[Obsolete ("Do not use")]
+		[Obsolete ("Do not use, this method is only used internally")]
 		public NSAsyncActionDispatcher (IntPtr handle)
 			: base (handle)
 		{
 		}
+#endif
 
 		public NSAsyncActionDispatcher (NSAction action)
 		{
@@ -83,7 +88,19 @@ namespace MonoMac.Foundation {
 			} finally {
 				action = null; // this is a one-shot dispatcher
 				gch.Free ();
+
+				//
+				// Although I would like to call Dispose here, to
+				// reduce the load on the GC, we have some useful diagnostic
+				// code in our runtime that is useful to track down
+				// problems, so we are removing the Dispose and letting
+				// the GC and our pipeline do their job.
+				// 
+#if MONOTOUCH
+				// MonoTouch has fixed the above problems, and we can call
+				// Dispose here.
 				Dispose ();
+#endif
 			}
 		}
 	}

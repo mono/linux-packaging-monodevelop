@@ -2,6 +2,7 @@
 // Block support
 //
 // Copyright 2010, Novell, Inc.
+// Copyright 2011, 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -83,7 +84,7 @@ namespace MonoMac.ObjCRuntime {
 		internal static IntPtr global_descriptor_ptr;
 
 		static BlockLiteral () {
-			global_descriptor_ptr = Marshal.AllocHGlobal (Marshal.SizeOf (typeof (int))*2 + Marshal.SizeOf (typeof (IntPtr))*2);
+			global_descriptor_ptr = Marshal.AllocHGlobal (Marshal.SizeOf (typeof (IntPtr))*2 + Marshal.SizeOf (typeof (IntPtr))*2);
 			Marshal.StructureToPtr (global_descriptor, global_descriptor_ptr, false);
 		}
 

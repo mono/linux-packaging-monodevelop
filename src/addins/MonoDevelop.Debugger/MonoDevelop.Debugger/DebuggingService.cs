@@ -37,7 +37,6 @@ using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Projects;
-using MonoDevelop.Projects.Text;
 using MonoDevelop.Debugger.Viewers;
 using ICSharpCode.NRefactory.TypeSystem;
 using ICSharpCode.NRefactory.Semantics;
@@ -46,6 +45,7 @@ using ICSharpCode.NRefactory.Semantics;
  * Some places we should be doing some error handling we used to toss
  * exceptions, now we error out silently, this needs a real solution.
  */
+using MonoDevelop.Ide.TextEditing;
 
 namespace MonoDevelop.Debugger
 {
@@ -71,7 +71,7 @@ namespace MonoDevelop.Debugger
 		static Backtrace currentBacktrace;
 		static int currentFrame;
 		
-		static ExceptionCaughtDialog exceptionDialog;
+		static ExceptionCaughtMessage exceptionDialog;
 		
 		static BusyEvaluatorDialog busyDialog;
 		static bool isBusy;
@@ -90,10 +90,10 @@ namespace MonoDevelop.Debugger
 			
 		static public event EventHandler EvaluationOptionsChanged;
 		
-		static DebuggingService()
+		static DebuggingService ()
 		{
 			executionHandlerFactory = new DebugExecutionHandlerFactory ();
-			TextFileService.LineCountChanged += OnLineCountChanged;
+			TextEditorService.LineCountChanged += OnLineCountChanged;
 			IdeApp.Initialized += delegate {
 				IdeApp.Workspace.StoringUserPreferences += OnStoreUserPrefs;
 				IdeApp.Workspace.LoadingUserPreferences += OnLoadUserPrefs;
@@ -291,13 +291,26 @@ namespace MonoDevelop.Debugger
 			
 			ExceptionInfo val = CurrentFrame.GetException (ops);
 			if (val != null) {
-				exceptionDialog = new ExceptionCaughtDialog (val);
-				exceptionDialog.TransientFor = IdeApp.Workbench.RootWindow;
-				MessageService.PlaceDialog (exceptionDialog, IdeApp.Workbench.RootWindow);
-				exceptionDialog.Destroyed += (o, args) => {
+				HideExceptionCaughtDialog ();
+				exceptionDialog = new ExceptionCaughtMessage (val, CurrentFrame.SourceLocation.FileName, CurrentFrame.SourceLocation.Line, CurrentFrame.SourceLocation.Column);
+				exceptionDialog.ShowButton ();
+				exceptionDialog.Closed += (o, args) => {
 					exceptionDialog = null;
 				};
-				exceptionDialog.Show ();
+			}
+		}
+
+		static void HideExceptionCaughtDialog ()
+		{
+			if (exceptionDialog != null) {
+				exceptionDialog.Dispose ();
+				exceptionDialog = null;
+			}
+		}
+
+		internal static ExceptionCaughtMessage ExceptionCaughtMessage {
+			get {
+				return exceptionDialog;
 			}
 		}
 
@@ -319,7 +332,7 @@ namespace MonoDevelop.Debugger
 			session.BreakpointTraceHandler = BreakpointTraceHandler;
 			session.GetExpressionEvaluator = OnGetExpressionEvaluator;
 			session.ConnectionDialogCreator = delegate {
-				return new GtkConnectionDialog ();
+				return new StatusBarConnectionDialog ();
 			};
 
 			console.CancelRequested += OnCancelRequested;
@@ -339,6 +352,7 @@ namespace MonoDevelop.Debugger
 				oldLayout = null;
 				// Dispatch asynchronously to avoid start/stop races
 				DispatchService.GuiSyncDispatch (delegate {
+					IdeApp.Workbench.HideCommandBar ("Debug");
 					if (IdeApp.Workbench.CurrentLayout == "Debug")
 						IdeApp.Workbench.CurrentLayout = layout;
 				});
@@ -348,12 +362,9 @@ namespace MonoDevelop.Debugger
 			
 			if (!IsDebugging)
 				return;
-			
-			if (exceptionDialog != null) {
-				exceptionDialog.Destroy ();
-				exceptionDialog = null;
-			}
-			
+
+			HideExceptionCaughtDialog ();
+
 			if (busyStatusIcon != null) {
 				busyStatusIcon.Dispose ();
 				busyStatusIcon = null;
@@ -367,7 +378,6 @@ namespace MonoDevelop.Debugger
 			session.TypeResolverHandler = null;
 			session.BreakpointTraceHandler = null;
 			session.GetExpressionEvaluator = null;
-			console.CancelRequested -= OnCancelRequested;
 			
 			// Dispose the session at the end, since it may take a while.
 			DebuggerSession oldSession = session;
@@ -379,6 +389,7 @@ namespace MonoDevelop.Debugger
 			});
 			
 			if (console != null) {
+				console.CancelRequested -= OnCancelRequested;
 				console.Dispose ();
 				console = null;
 			}
@@ -398,6 +409,12 @@ namespace MonoDevelop.Debugger
 		public static bool IsDebugging {
 			get {
 				return session != null;
+			}
+		}
+
+		public static bool IsConnected {
+			get {
+				return IsDebugging && session.IsConnected;
 			}
 		}
 
@@ -521,6 +538,7 @@ namespace MonoDevelop.Debugger
 			DispatchService.GuiSyncDispatch (delegate {
 				oldLayout = IdeApp.Workbench.CurrentLayout;
 				IdeApp.Workbench.CurrentLayout = "Debug";
+				IdeApp.Workbench.ShowCommandBar ("Debug");
 			});
 			
 			try {
@@ -529,6 +547,7 @@ namespace MonoDevelop.Debugger
 				Cleanup ();
 				throw;
 			}
+
 		}
 		
 		static bool ExceptionHandler (Exception ex)
@@ -593,6 +612,7 @@ namespace MonoDevelop.Debugger
 		{
 			currentBacktrace = null;
 			DispatchService.GuiDispatch (delegate {
+				HideExceptionCaughtDialog ();
 				if (ResumedEvent != null)
 					ResumedEvent (null, a);
 				NotifyCallStackChanged ();
@@ -959,6 +979,25 @@ namespace MonoDevelop.Debugger
 		{
 			DebugExecutionHandler h = new DebugExecutionHandler (engine);
 			return h.Execute (command, console);
+		}
+	}
+
+	internal class StatusBarConnectionDialog : IConnectionDialog
+	{
+		public event EventHandler UserCancelled;
+
+		public void SetMessage (DebuggerStartInfo dsi, string message, bool listening, int attemptNumber)
+		{
+			Gtk.Application.Invoke (delegate {
+				IdeApp.Workbench.StatusBar.ShowMessage (MonoDevelop.Ide.Gui.Stock.StatusConnecting, message);
+			});
+		}
+
+		public void Dispose ()
+		{
+			Gtk.Application.Invoke (delegate {
+				IdeApp.Workbench.StatusBar.ShowReady ();
+			});
 		}
 	}
 	

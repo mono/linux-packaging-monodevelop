@@ -82,18 +82,18 @@ namespace MonoDevelop.Ide.Gui.Pads
 			
 			DockItemToolbar toolbar = window.GetToolbar (PositionType.Right);
 
-			buttonStop = new Button (new Gtk.Image ("gtk-stop", IconSize.Menu));
+			buttonStop = new Button (new Gtk.Image (Stock.Stop, IconSize.Menu));
 			buttonStop.Clicked += new EventHandler (OnButtonStopClick);
 			buttonStop.TooltipText = GettextCatalog.GetString ("Stop");
 			toolbar.Add (buttonStop);
 
-			buttonClear = new Button (new Gtk.Image ("gtk-clear", IconSize.Menu));
+			buttonClear = new Button (new Gtk.Image (Stock.Broom, IconSize.Menu));
 			buttonClear.Clicked += new EventHandler (OnButtonClearClick);
 			buttonClear.TooltipText = GettextCatalog.GetString ("Clear console");
 			toolbar.Add (buttonClear);
 
 			buttonPin = new ToggleButton ();
-			buttonPin.Image = new Gtk.Image ((IconId)"md-pin-up", IconSize.Menu);
+			buttonPin.Image = new Gtk.Image (Stock.PinUp, IconSize.Menu);
 			buttonPin.Image.ShowAll ();
 			buttonPin.Clicked += new EventHandler (OnButtonPinClick);
 			buttonPin.TooltipText = GettextCatalog.GetString ("Pin output pad");
@@ -188,15 +188,13 @@ namespace MonoDevelop.Ide.Gui.Pads
 					buttonClear.Sensitive = false;
 				
 				if (monitor.Errors.Length > 0) {
-					Gtk.Image img = ImageService.GetImage (Stock.Error, Gtk.IconSize.Menu);
-					IdeApp.Workbench.StatusBar.ShowMessage (img, monitor.Errors [monitor.Errors.Length - 1].Message);
+					IdeApp.Workbench.StatusBar.ShowMessage (Stock.Error, monitor.Errors [monitor.Errors.Length - 1].Message);
 					IdeApp.Workbench.StatusBar.SetMessageSourcePad (statusSourcePad);
 				} else if (monitor.Messages.Length > 0) {
 					IdeApp.Workbench.StatusBar.ShowMessage (monitor.Messages [monitor.Messages.Length - 1]);
 					IdeApp.Workbench.StatusBar.SetMessageSourcePad (statusSourcePad);
 				} else if (monitor.Warnings.Length > 0) {
-					Gtk.Image img = ImageService.GetImage (Stock.Warning, Gtk.IconSize.Menu);
-					IdeApp.Workbench.StatusBar.ShowMessage (img, monitor.Warnings [monitor.Warnings.Length - 1]);
+					IdeApp.Workbench.StatusBar.ShowMessage (Stock.Warning, monitor.Warnings [monitor.Warnings.Length - 1]);
 					IdeApp.Workbench.StatusBar.SetMessageSourcePad (statusSourcePad);
 				}
 			});

@@ -184,12 +184,15 @@ namespace MonoDevelop.AssemblyBrowser
 			var type = CecilLoader.GetCecilObject ((IUnresolvedTypeDefinition)navigator.DataItem);
 			if (type == null)
 				return null;
+			var types = DesktopService.GetMimeTypeInheritanceChain (data.Document.MimeType);
+			var codePolicy = MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy> (types);
 			var settings = new DecompilerSettings () {
 				AnonymousMethods = true,
 				AutomaticEvents  = true,
 				AutomaticProperties = true,
 				ForEachStatement = true,
 				LockStatement = true,
+				CSharpFormattingOptions = codePolicy.CreateOptions (),
 				HideNonPublicMembers = publicOnly
 			};
 			return DomMethodNodeBuilder.Decompile (data, DomMethodNodeBuilder.GetModule (navigator), type, builder => {
@@ -213,7 +216,7 @@ namespace MonoDevelop.AssemblyBrowser
 			options.Ambience = Ambience;
 			result.AppendLine ();
 			
-			result.Append (AmbienceService.GetDocumentationMarkup (AmbienceService.GetDocumentation (resolved.GetDefinition ()), options));
+			result.Append (AmbienceService.GetDocumentationMarkup (resolved.GetDefinition (), AmbienceService.GetDocumentation (resolved.GetDefinition ()), options));
 			
 			return result.ToString ();
 		}

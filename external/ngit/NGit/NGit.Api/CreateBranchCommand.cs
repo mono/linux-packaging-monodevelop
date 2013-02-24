@@ -97,7 +97,7 @@ namespace NGit.Api
 		/// invalid
 		/// </exception>
 		/// <returns>the newly created branch</returns>
-		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		public override Ref Call()
 		{
 			CheckCallable();
@@ -110,7 +110,7 @@ namespace NGit.Api
 					);
 				if (!force && exists)
 				{
-					throw new RefAlreadyExistsException(MessageFormat.Format(JGitText.Get().refAlreadyExists
+					throw new RefAlreadyExistsException(MessageFormat.Format(JGitText.Get().refAlreadyExists1
 						, name));
 				}
 				ObjectId startAt = GetStartPoint();

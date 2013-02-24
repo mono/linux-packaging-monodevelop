@@ -33,10 +33,13 @@ using System.IO;
 using System.Text;
 
 using Mono.Addins;
+using Mono.Unix.Native;
 using MonoDevelop.Core.FileSystem;
 using System.Collections.Generic;
 using System.Threading;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Net;
 
 namespace MonoDevelop.Core
 {
@@ -64,6 +67,7 @@ namespace MonoDevelop.Core
 				if (args.PathChanged (addinFileSystemExtensionPath))
 					UpdateExtensions ();
 			};
+			UpdateExtensions ();
 		}
 		
 		static void UpdateExtensions ()
@@ -275,8 +279,6 @@ namespace MonoDevelop.Core
 		internal static FileSystemExtension GetFileSystemForPath (string path, bool isDirectory)
 		{
 			Debug.Assert (!String.IsNullOrEmpty (path));
-			if (fileSystemChain == null)
-				UpdateExtensions ();
 			FileSystemExtension nx = fileSystemChain;
 			while (nx != null && !nx.CanHandlePath (path, isDirectory))
 				nx = nx.Next;
@@ -331,7 +333,7 @@ namespace MonoDevelop.Core
 				return absPath;
 				
 			absPath = Path.GetFullPath (absPath);
-			baseDirectoryPath = Path.GetFullPath (baseDirectoryPath.TrimEnd (Path.DirectorySeparatorChar));
+			baseDirectoryPath = Path.GetFullPath (baseDirectoryPath).TrimEnd (Path.DirectorySeparatorChar);
 			
 			fixed (char* bPtr = baseDirectoryPath, aPtr = absPath) {
 				var bEnd = bPtr + baseDirectoryPath.Length;
@@ -463,6 +465,12 @@ namespace MonoDevelop.Core
 		// Atomic rename of a file. It does not fire events.
 		public static void SystemRename (string sourceFile, string destFile)
 		{
+			if (string.IsNullOrEmpty (sourceFile))
+				throw new ArgumentException ("sourceFile");
+
+			if (string.IsNullOrEmpty (destFile))
+				throw new ArgumentException ("destFile");
+
 			//FIXME: use the atomic System.IO.File.Replace on NTFS
 			if (Platform.IsWindows) {
 				string wtmp = null;
@@ -496,7 +504,23 @@ namespace MonoDevelop.Core
 				}
 			}
 			else {
-				Mono.Unix.Native.Syscall.rename (sourceFile, destFile);
+				if (Syscall.rename (sourceFile, destFile) != 0) {
+					switch (Stdlib.GetLastError ()) {
+					case Errno.EACCES:
+					case Errno.EPERM:
+						throw new UnauthorizedAccessException ();
+					case Errno.EINVAL:
+						throw new InvalidOperationException ();
+					case Errno.ENOTDIR:
+						throw new DirectoryNotFoundException ();
+					case Errno.ENOENT:
+						throw new FileNotFoundException ();
+					case Errno.ENAMETOOLONG:
+						throw new PathTooLongException ();
+					default:
+						throw new IOException ();
+					}
+				}
 			}
 		}
 		
@@ -593,6 +617,114 @@ namespace MonoDevelop.Core
 		{
 			Counters.FileChangeNotifications++;
 			eventQueue.RaiseEvent (() => FileChanged, null, args);
+		}
+
+		public static Task<bool> UpdateDownloadedCacheFile (string url, string cacheFile,
+			Func<Stream,bool> validateDownload = null, CancellationToken ct = new CancellationToken ())
+		{
+			var tcs = new TaskCompletionSource<bool> ();
+
+			//HACK: .NET blocks on DNS in BeginGetResponse, so use a threadpool thread
+			// see http://stackoverflow.com/questions/1232139#1232930
+			System.Threading.ThreadPool.QueueUserWorkItem ((state) => {
+				var request = (HttpWebRequest)WebRequest.Create (url);
+
+				try {
+					//check to see if the online file has been modified since it was last downloaded
+					var localNewsXml = new FileInfo (cacheFile);
+					if (localNewsXml.Exists)
+						request.IfModifiedSince = localNewsXml.LastWriteTime;
+
+					request.BeginGetResponse (HandleResponse, new CacheFileDownload {
+						Request = request,
+						Url = url,
+						CacheFile = cacheFile,
+						ValidateDownload = validateDownload,
+						CancellationToken = ct,
+						Tcs = tcs,
+					});
+				} catch (Exception ex) {
+					tcs.SetException (ex);
+				}
+			});
+
+			return tcs.Task;
+		}
+
+		class CacheFileDownload
+		{
+			public HttpWebRequest Request;
+			public string CacheFile, Url;
+			public Func<Stream,bool> ValidateDownload;
+			public CancellationToken CancellationToken;
+			public TaskCompletionSource<bool> Tcs;
+		}
+
+		static void HandleResponse (IAsyncResult ar)
+		{
+			var c = (CacheFileDownload) ar.AsyncState;
+			bool deleteTempFile = true;
+			var tempFile = c.CacheFile + ".temp";
+
+			try {
+				if (c.CancellationToken.IsCancellationRequested)
+					c.Tcs.TrySetCanceled ();
+
+				try {
+					//TODO: limit this size in case open wifi hotspots provide bad data
+					var response = (HttpWebResponse) c.Request.EndGetResponse (ar);
+					if (response.StatusCode == HttpStatusCode.OK) {
+						using (var fs = File.Create (tempFile))
+							response.GetResponseStream ().CopyTo (fs, 2048);
+					}
+				} catch (WebException wex) {
+					var httpResp = wex.Response as HttpWebResponse;
+					if (httpResp != null) {
+						if (httpResp.StatusCode == HttpStatusCode.NotModified) {
+							c.Tcs.TrySetResult (false);
+							return;
+						}
+						//is this valid? should we just return the WebException directly?
+						else if (httpResp.StatusCode == HttpStatusCode.NotFound) {
+							c.Tcs.TrySetException (new FileNotFoundException ("File not found on server", c.Url, wex));
+							return;
+						}
+					}
+					throw;
+				}
+
+				//check the document is valid, might get bad ones from wifi hotspots etc
+				if (c.ValidateDownload != null) {
+					if (c.CancellationToken.IsCancellationRequested)
+						c.Tcs.TrySetCanceled ();
+
+					using (var f = File.OpenRead (tempFile)) {
+						try {
+							if (!c.ValidateDownload (f)) {
+								c.Tcs.TrySetException (new Exception ("Failed to validate downloaded file"));
+								return;
+							}
+						} catch (Exception ex) {
+							c.Tcs.TrySetException (new Exception ("Failed to validate downloaded file", ex));
+						}
+					}
+				}
+
+				if (c.CancellationToken.IsCancellationRequested)
+					c.Tcs.TrySetCanceled ();
+
+				SystemRename (tempFile, c.CacheFile);
+				deleteTempFile = false;
+				c.Tcs.TrySetResult (true);
+			} catch (Exception ex) {
+				c.Tcs.TrySetException (ex);
+			} finally {
+				if (deleteTempFile) {
+					try {
+						File.Delete (tempFile);
+					} catch {}
+				}
+			}
 		}
 	}
 	

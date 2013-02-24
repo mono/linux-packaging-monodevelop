@@ -5,6 +5,7 @@
 //   Miguel de Icaza
 //
 // Copyright 2010, Novell, Inc.
+// Copyright 2011, 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -30,7 +31,7 @@ namespace MonoMac.Foundation {
 	public partial class NSUrlRequest {
 		public override string ToString ()
 		{
-			return Url.AbsoluteString;
+			return Url != null ? Url.AbsoluteString : base.ToString ();
 		}
 	}
 }

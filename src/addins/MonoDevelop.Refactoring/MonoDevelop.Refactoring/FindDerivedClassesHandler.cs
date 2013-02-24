@@ -62,6 +62,8 @@ namespace MonoDevelop.Refactoring
 			ThreadPool.QueueUserWorkItem (delegate {
 				using (var monitor = IdeApp.Workbench.ProgressMonitors.GetSearchProgressMonitor (true, true)) {
 					var cache = new Dictionary<string, TextEditorData> ();
+					monitor.BeginTask (GettextCatalog.GetString ("Searching for derived classes in solution..."), projects.Count);
+
 					Parallel.ForEach (projects, p => {
 						var comp = TypeSystemService.GetCompilation (p);
 						if (comp == null)
@@ -77,14 +79,43 @@ namespace MonoDevelop.Refactoring
 							if (!cache.TryGetValue (type.Region.FileName, out textFile)) {
 								cache [type.Region.FileName] = textFile = TextFileProvider.Instance.GetTextEditorData (type.Region.FileName);
 							}
-							int position = textFile.LocationToOffset (type.Region.BeginLine, type.Region.BeginColumn);
+							int position = textFile.LocationToOffset (type.Region.Begin);
+							string keyword;
+							switch (type.Kind) {
+							case TypeKind.Interface:
+								keyword = "interface";
+								break;
+							case TypeKind.Struct:
+								keyword = "struct";
+								break;
+							case TypeKind.Delegate:
+								keyword = "delegate";
+								break;
+							case TypeKind.Enum:
+								keyword = "enum";
+								break;
+							default:
+								keyword = "class";
+								break;
+							}
+							while (position < textFile.Length - keyword.Length) {
+								if (textFile.GetTextAt (position, keyword.Length) == keyword) {
+									position += keyword.Length;
+									while (position < textFile.Length && textFile.GetCharAt (position) == ' ' || textFile.GetCharAt (position) == '\t')
+										position++;
+									break;
+								}
+								position++;
+							}
 							monitor.ReportResult (new MonoDevelop.Ide.FindInFiles.SearchResult (new FileProvider (type.Region.FileName, p), position, 0));
 						}
+						monitor.Step (1);
 					});
 					foreach (var tf in cache.Values) {
 						if (tf.Parent == null)
 							tf.Dispose ();
 					}
+					monitor.EndTask ();
 				}
 			});
 		}

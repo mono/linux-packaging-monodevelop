@@ -90,27 +90,18 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			new ColorMetaData ("text.background.readonly", GettextCatalog.GetString ("Background of read only text"), ColorsAvailable.Fg),
 			
 			new ColorMetaData ("linenumber", GettextCatalog.GetString ("Line numbers"), ColorsAvailable.FgBg),
-			new ColorMetaData ("linenumber.highlight", GettextCatalog.GetString ("Current line number"), ColorsAvailable.FgBg),
-			
-			
+
 			new ColorMetaData ("iconbar", GettextCatalog.GetString ("Icon bar"), ColorsAvailable.Fg),
 			new ColorMetaData ("iconbar.separator", GettextCatalog.GetString ("Icon bar separator"), ColorsAvailable.Fg),
 			
 			new ColorMetaData ("fold", GettextCatalog.GetString ("Folding colors"), ColorsAvailable.FgBg),
-			new ColorMetaData ("fold.highlight", GettextCatalog.GetString ("Current fold marker colors"), ColorsAvailable.FgBg),
-			new ColorMetaData ("fold.togglemarker", GettextCatalog.GetString ("Folding toggle marker"), ColorsAvailable.Fg),
-			
-			
+			new ColorMetaData ("fold.margin", GettextCatalog.GetString ("Fold margin colors"), ColorsAvailable.FgBg),
+
 			new ColorMetaData ("marker.line", GettextCatalog.GetString ("Current line marker"), ColorsAvailable.Fg),
 			new ColorMetaData ("marker.ruler", GettextCatalog.GetString ("Ruler"), ColorsAvailable.Fg),
 			
 			new ColorMetaData ("marker.line.changed", GettextCatalog.GetString ("Quick diff line changed"), ColorsAvailable.Fg),
 			new ColorMetaData ("marker.line.dirty", GettextCatalog.GetString ("Quick diff line dirty"), ColorsAvailable.Fg),
-			
-			new ColorMetaData ("marker.whitespace", GettextCatalog.GetString ("Whitespace marker"), ColorsAvailable.Fg),
-			new ColorMetaData ("marker.whitespace.eol", GettextCatalog.GetString ("Eol marker"), ColorsAvailable.Fg),
-			
-			new ColorMetaData ("marker.invalidline", GettextCatalog.GetString ("Invalid line marker"), ColorsAvailable.Fg),
 			
 			new ColorMetaData ("marker.bracket", GettextCatalog.GetString ("Bracket marker"), ColorsAvailable.FgBg),
 			
@@ -168,15 +159,25 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			new ColorMetaData ("diff.header-oldfile", GettextCatalog.GetString ("Diff line header old file"), ColorsAvailable.Text),
 			new ColorMetaData ("diff.header-newfile", GettextCatalog.GetString ("Diff line header new file"), ColorsAvailable.Text),
 			new ColorMetaData ("diff.location", GettextCatalog.GetString ("Diff line header location"), ColorsAvailable.Text),
-			
+
+			new ColorMetaData ("tooltip", GettextCatalog.GetString ("Tooltip colors"), ColorsAvailable.FgBg),
+			new ColorMetaData ("tooltip.border", GettextCatalog.GetString ("Tooltip border"), ColorsAvailable.Fg),
+			new ColorMetaData ("tooltip.pager.text", GettextCatalog.GetString ("Tooltip pager text"), ColorsAvailable.Fg),
+			new ColorMetaData ("tooltip.pager.triangle", GettextCatalog.GetString ("Tooltip pager triangle"), ColorsAvailable.Fg),
+			new ColorMetaData ("tooltip.pager.top", GettextCatalog.GetString ("Tooltip pager top color"), ColorsAvailable.Fg),
+			new ColorMetaData ("tooltip.pager.bottom", GettextCatalog.GetString ("Tooltip pager bottom color"), ColorsAvailable.Fg),
+
 			// Keywords
 			new ColorMetaData ("text.punctuation", GettextCatalog.GetString ("Punctuation"), ColorsAvailable.Text),
 			new ColorMetaData ("text.link", GettextCatalog.GetString ("Links"), ColorsAvailable.Text),
 			new ColorMetaData ("text.preprocessor", GettextCatalog.GetString ("Pre processor directive text"), ColorsAvailable.Text),
 			new ColorMetaData ("text.preprocessor.keyword", GettextCatalog.GetString ("Pre processor keywords"), ColorsAvailable.Text),
-			new ColorMetaData ("text.markup", GettextCatalog.GetString ("Text markup"), ColorsAvailable.Text),
-			new ColorMetaData ("text.markup.tag", GettextCatalog.GetString ("Text markup tags"), ColorsAvailable.Text),
-			
+			new ColorMetaData ("xml", GettextCatalog.GetString ("Xml markup"), ColorsAvailable.Text),
+			new ColorMetaData ("xml.tag", GettextCatalog.GetString ("Xml markup tags"), ColorsAvailable.Text),
+			new ColorMetaData ("xml.name", GettextCatalog.GetString ("Xml tag names"), ColorsAvailable.Text),
+			new ColorMetaData ("xml.attribute", GettextCatalog.GetString ("Xml markup attributes"), ColorsAvailable.Text),
+			new ColorMetaData ("xml.cdata", GettextCatalog.GetString ("Xml cdata sections"), ColorsAvailable.Text),
+
 			new ColorMetaData ("comment", GettextCatalog.GetString ("Comments"), ColorsAvailable.Text),
 			new ColorMetaData ("comment.line", GettextCatalog.GetString ("Line comments"), ColorsAvailable.Text),
 			new ColorMetaData ("comment.block", GettextCatalog.GetString ("Block comments"), ColorsAvailable.Text),
@@ -201,6 +202,8 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			new ColorMetaData ("keyword.semantic.type", GettextCatalog.GetString ("Types (semantic)"), ColorsAvailable.Text),
 			new ColorMetaData ("keyword.semantic.field", GettextCatalog.GetString ("Field (semantic)"), ColorsAvailable.Text),
 			new ColorMetaData ("keyword.semantic.property", GettextCatalog.GetString ("Property (semantic)"), ColorsAvailable.Text),
+			new ColorMetaData ("keyword.semantic.method", GettextCatalog.GetString ("Method (semantic)"), ColorsAvailable.Text),
+			new ColorMetaData ("keyword.semantic.event", GettextCatalog.GetString ("Event (semantic)"), ColorsAvailable.Text),
 			new ColorMetaData ("keyword.semantic.error", GettextCatalog.GetString ("Error (semantic)"), ColorsAvailable.Text),
 			
 			new ColorMetaData ("keyword", GettextCatalog.GetString ("Keywords"), ColorsAvailable.Text),

@@ -200,7 +200,6 @@ namespace Mono.Debugging.Evaluation
 			try {
 				return ctx.Adapter.GetObjectValueChildren (GetChildrenContext (options), this, Value, index, count);
 			} catch (Exception ex) {
-				Console.WriteLine (ex);
 				return new ObjectValue [] { Mono.Debugging.Client.ObjectValue.CreateFatalError ("", ex.Message, ObjectValueFlags.ReadOnly) };
 			}
 		}
@@ -219,7 +218,7 @@ namespace Mono.Debugging.Evaluation
 		
 		public IObjectSource ParentSource { get; internal set; }
 
-		EvaluationContext GetChildrenContext (EvaluationOptions options)
+		protected EvaluationContext GetChildrenContext (EvaluationOptions options)
 		{
 			EvaluationContext newCtx = ctx.Clone ();
 			if (options != null)
@@ -257,11 +256,9 @@ namespace Mono.Debugging.Evaluation
 				return new ArrayValueReference (ctx, obj, indices);
 			}
 			
-			if (ctx.Adapter.IsClassInstance (Context, obj)) {
-				ValueReference val = ctx.Adapter.GetMember (GetChildrenContext (options), this, obj, name);
-				return val;
-			}
-					
+			if (ctx.Adapter.IsClassInstance (Context, obj))
+				return ctx.Adapter.GetMember (GetChildrenContext (options), this, obj, name);
+
 			return null;
 		}
 	}

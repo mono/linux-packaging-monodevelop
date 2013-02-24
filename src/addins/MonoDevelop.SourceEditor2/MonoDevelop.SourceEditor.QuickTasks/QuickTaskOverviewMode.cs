@@ -64,7 +64,7 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 			this.parentStrip = parent;
 			Events |= EventMask.ButtonPressMask | EventMask.ButtonReleaseMask | EventMask.ButtonMotionMask | EventMask.PointerMotionMask | EventMask.LeaveNotifyMask;
 			vadjustment = this.parentStrip.VAdjustment;
-			
+
 			vadjustment.ValueChanged += RedrawOnUpdate;
 			vadjustment.Changed += RedrawOnUpdate;
 			parentStrip.TaskProviderUpdated += RedrawOnUpdate;
@@ -302,7 +302,7 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 			}
 		}
 		
-		void MouseMove (double y)
+		protected virtual void MouseMove (double y)
 		{
 			if (button != 1)
 				return;
@@ -310,10 +310,10 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 			position = Math.Max (vadjustment.Lower, Math.Min (position, vadjustment.Upper - vadjustment.PageSize));
 			vadjustment.Value = position;
 		}
-		
+
 		QuickTask hoverTask = null;
 		
-		uint button;
+		protected uint button;
 
 		protected override bool OnButtonPressEvent (EventButton evnt)
 		{
@@ -339,7 +339,7 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 
 		protected void DrawIndicator (Cairo.Context cr, Severity severity)
 		{
-			cr.Rectangle (3, Allocation.Height - IndicatorHeight + 4, Allocation.Width - 6, IndicatorHeight - 6);
+			cr.Rectangle (4, Allocation.Height - IndicatorHeight + 3, Allocation.Width - 6, IndicatorHeight - 6);
 			
 			var darkColor = (HslColor)GetIndicatorColor (severity);
 			darkColor.L *= 0.5;
@@ -461,13 +461,13 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 		
 		protected void DrawLeftBorder (Cairo.Context cr)
 		{
-			cr.MoveTo (0.5, 1.5);
+			cr.MoveTo (0.5, 0);
 			cr.LineTo (0.5, Allocation.Height);
 			if (TextEditor.ColorStyle != null) {
 				var col = (HslColor)TextEditor.ColorStyle.Default.CairoBackgroundColor;
-				col.L *= 0.90;
+				col.L *= 0.88;
 				cr.Color = col;
-				
+			
 			}
 			cr.Stroke ();
 			
@@ -488,7 +488,8 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 			var allocH = Allocation.Height - (int) IndicatorHeight;
 			var adjUpper = vadjustment.Upper;
 			var barY = allocH * vadjustment.Value / adjUpper + barPadding;
-			var barH = allocH * (vadjustment.PageSize / adjUpper) - barPadding - barPadding;
+			const int minBarHeight = 16;
+			var barH = Math.Max (minBarHeight, allocH * (vadjustment.PageSize / adjUpper) - barPadding - barPadding);
 			int barWidth = Allocation.Width - barPadding - barPadding;
 			
 			MonoDevelop.Components.CairoExtensions.RoundedRectangle (cr, 
@@ -538,12 +539,16 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 					cr.Pattern = grad;
 				}
 				cr.Fill ();
-				
+
+				/*
 				cr.Color = (HslColor)Style.Dark (State);
 				cr.MoveTo (-0.5, 0.5);
 				cr.LineTo (Allocation.Width, 0.5);
-				cr.Stroke ();
-				
+
+				cr.MoveTo (-0.5, Allocation.Height - 0.5);
+				cr.LineTo (Allocation.Width, Allocation.Height - 0.5);
+				cr.Stroke ();*/
+
 				if (TextEditor == null)
 					return true;
 				
@@ -551,8 +556,10 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 					DrawSearchResults (cr);
 					DrawSearchIndicator (cr);
 				} else {
-					var severity = DrawQuickTasks (cr);
-					DrawIndicator (cr, severity);
+					if (!Debugger.DebuggingService.IsDebugging) {
+						var severity = DrawQuickTasks (cr);
+						DrawIndicator (cr, severity);
+					}
 				}
 				DrawCaret (cr);
 				

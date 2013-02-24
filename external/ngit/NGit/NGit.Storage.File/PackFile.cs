@@ -85,6 +85,8 @@ namespace NGit.Storage.File
 
 		private readonly FilePath packFile;
 
+		private FilePath keepFile;
+
 		private volatile string packName;
 
 		internal readonly int hash;
@@ -183,6 +185,13 @@ namespace NGit.Storage.File
 			return packFile;
 		}
 
+		/// <returns>the index for this pack file.</returns>
+		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
+		public virtual PackIndex GetIndex()
+		{
+			return Idx();
+		}
+
 		/// <returns>
 		/// name extracted from
 		/// <code>pack-*.pack</code>
@@ -223,6 +232,18 @@ namespace NGit.Storage.File
 		{
 			long offset = Idx().FindOffset(id);
 			return 0 < offset && !IsCorrupt(offset);
+		}
+
+		/// <summary>Determines whether a .keep file exists for this pack file.</summary>
+		/// <remarks>Determines whether a .keep file exists for this pack file.</remarks>
+		/// <returns>true if a .keep file exist.</returns>
+		public virtual bool ShouldBeKept()
+		{
+			if (keepFile == null)
+			{
+				keepFile = new FilePath(packFile.GetPath() + ".keep");
+			}
+			return keepFile.Exists();
 		}
 
 		/// <summary>Get an object from this pack.</summary>
@@ -338,7 +359,7 @@ namespace NGit.Storage.File
 			if (curs.Inflate(this, position, dstbuf, 0) != sz)
 			{
 				throw new EOFException(MessageFormat.Format(JGitText.Get().shortCompressedStreamAt
-					, position));
+					, Sharpen.Extensions.ValueOf(position)));
 			}
 			return dstbuf;
 		}
@@ -465,7 +486,7 @@ namespace NGit.Storage.File
 					{
 						SetCorrupt(src.offset);
 						throw new CorruptObjectException(MessageFormat.Format(JGitText.Get().objectAtHasBadZlibStream
-							, src.offset, GetPackFile()));
+							, Sharpen.Extensions.ValueOf(src.offset), GetPackFile()));
 					}
 				}
 				else
@@ -504,7 +525,7 @@ namespace NGit.Storage.File
 						{
 							SetCorrupt(src.offset);
 							throw new EOFException(MessageFormat.Format(JGitText.Get().shortCompressedStreamAt
-								, src.offset));
+								, Sharpen.Extensions.ValueOf(src.offset)));
 						}
 						expectedCRC = crc1.GetValue();
 					}
@@ -518,7 +539,8 @@ namespace NGit.Storage.File
 			{
 				SetCorrupt(src.offset);
 				CorruptObjectException corruptObject = new CorruptObjectException(MessageFormat.Format
-					(JGitText.Get().objectAtHasBadZlibStream, src.offset, GetPackFile()));
+					(JGitText.Get().objectAtHasBadZlibStream, Sharpen.Extensions.ValueOf(src.offset)
+					, GetPackFile()));
 				Sharpen.Extensions.InitCause(corruptObject, dataFormat);
 				StoredObjectRepresentationNotAvailableException gone;
 				gone = new StoredObjectRepresentationNotAvailableException(src);
@@ -586,7 +608,7 @@ namespace NGit.Storage.File
 					if (validate && crc2.GetValue() != expectedCRC)
 					{
 						throw new CorruptObjectException(MessageFormat.Format(JGitText.Get().objectAtHasBadZlibStream
-							, src.offset, GetPackFile()));
+							, Sharpen.Extensions.ValueOf(src.offset), GetPackFile()));
 					}
 				}
 			}
@@ -801,12 +823,13 @@ namespace NGit.Storage.File
 			if (vers != 2 && vers != 3)
 			{
 				throw new IOException(MessageFormat.Format(JGitText.Get().unsupportedPackVersion, 
-					vers));
+					Sharpen.Extensions.ValueOf(vers)));
 			}
 			if (packCnt != idx.GetObjectCount())
 			{
 				throw new PackMismatchException(MessageFormat.Format(JGitText.Get().packObjectCountMismatch
-					, packCnt, idx.GetObjectCount(), GetPackFile()));
+					, Sharpen.Extensions.ValueOf(packCnt), Sharpen.Extensions.ValueOf(idx.GetObjectCount
+					()), GetPackFile()));
 			}
 			fd.Seek(length - 20);
 			fd.ReadFully(buf, 0, 20);
@@ -921,8 +944,8 @@ namespace NGit.Storage.File
 
 						default:
 						{
-							throw new IOException(MessageFormat.Format(JGitText.Get().unknownObjectType, typeCode
-								));
+							throw new IOException(MessageFormat.Format(JGitText.Get().unknownObjectType, Sharpen.Extensions.ValueOf
+								(typeCode)));
 						}
 					}
 SEARCH_continue: ;
@@ -982,7 +1005,8 @@ SEARCH_break: ;
 			catch (SharpZipBaseException dfe)
 			{
 				CorruptObjectException coe = new CorruptObjectException(MessageFormat.Format(JGitText
-					.Get().objectAtHasBadZlibStream, pos, GetPackFile()));
+					.Get().objectAtHasBadZlibStream, Sharpen.Extensions.ValueOf(pos), GetPackFile())
+					);
 				Sharpen.Extensions.InitCause(coe, dfe);
 				throw coe;
 			}
@@ -1117,8 +1141,8 @@ SEARCH_break: ;
 
 					default:
 					{
-						throw new IOException(MessageFormat.Format(JGitText.Get().unknownObjectType, type
-							));
+						throw new IOException(MessageFormat.Format(JGitText.Get().unknownObjectType, Sharpen.Extensions.ValueOf
+							(type)));
 					}
 				}
 			}
@@ -1177,8 +1201,8 @@ SEARCH_break: ;
 
 				default:
 				{
-					throw new IOException(MessageFormat.Format(JGitText.Get().unknownObjectType, type
-						));
+					throw new IOException(MessageFormat.Format(JGitText.Get().unknownObjectType, Sharpen.Extensions.ValueOf
+						(type)));
 				}
 			}
 			try
@@ -1188,7 +1212,7 @@ SEARCH_break: ;
 			catch (SharpZipBaseException)
 			{
 				throw new CorruptObjectException(MessageFormat.Format(JGitText.Get().objectAtHasBadZlibStream
-					, pos, GetPackFile()));
+					, Sharpen.Extensions.ValueOf(pos), GetPackFile()));
 			}
 		}
 
@@ -1247,8 +1271,8 @@ SEARCH_break: ;
 
 				default:
 				{
-					throw new IOException(MessageFormat.Format(JGitText.Get().unknownObjectType, typeCode
-						));
+					throw new IOException(MessageFormat.Format(JGitText.Get().unknownObjectType, Sharpen.Extensions.ValueOf
+						(typeCode)));
 				}
 			}
 		}

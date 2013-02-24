@@ -38,6 +38,7 @@ using MonoDevelop.Core.Assemblies;
 using MonoDevelop.CSharp.Project;
 using System.Threading;
 using MonoDevelop.Ide;
+using MonoDevelop.Core.ProgressMonitoring;
 
 
 namespace MonoDevelop.CSharp
@@ -123,6 +124,7 @@ namespace MonoDevelop.CSharp
 			foreach (ProjectReference lib in projectItems.GetAll <ProjectReference> ()) {
 				if (lib.ReferenceType == ReferenceType.Project && !(lib.OwnerProject.ParentSolution.FindProjectByName (lib.Reference) is DotNetProject))
 					continue;
+				string refPrefix = string.IsNullOrEmpty (lib.Aliases) ? "" : lib.Aliases + "=";
 				foreach (string fileName in lib.GetReferencedFileNames (configSelector)) {
 					switch (lib.ReferenceType) {
 					case ReferenceType.Package:
@@ -134,7 +136,7 @@ namespace MonoDevelop.CSharp
 						}
 
 						if (alreadyAddedReference.Add (fileName))
-							AppendQuoted (sb, "/r:", fileName);
+							AppendQuoted (sb, "/r:", refPrefix + fileName);
 						
 						if (pkg.GacRoot != null && !gacRoots.Contains (pkg.GacRoot))
 							gacRoots.Add (pkg.GacRoot);
@@ -152,7 +154,7 @@ namespace MonoDevelop.CSharp
 						break;
 					default:
 						if (alreadyAddedReference.Add (fileName))
-							AppendQuoted (sb, "/r:", fileName);
+							AppendQuoted (sb, "/r:", refPrefix + fileName);
 						break;
 					}
 				}
@@ -187,6 +189,15 @@ namespace MonoDevelop.CSharp
 				break;
 			case LangVersion.ISO_2:
 				sb.AppendLine ("/langversion:ISO-2");
+				break;
+			case LangVersion.Version3:
+				sb.AppendLine ("/langversion:3");
+				break;
+			case LangVersion.Version4:
+				sb.AppendLine ("/langversion:4");
+				break;
+			case LangVersion.Version5:
+				sb.AppendLine ("/langversion:5");
 				break;
 			default:
 				string message = "Invalid LangVersion enum value '" + compilerParameters.LangVersion.ToString () + "'";
@@ -329,7 +340,7 @@ namespace MonoDevelop.CSharp
 			ExecutionEnvironment envVars = runtime.GetToolsExecutionEnvironment (project.TargetFramework);
 			string cargs = "/noconfig @\"" + responseFileName + "\"";
 
-			int exitCode = DoCompilation (compilerName, cargs, workingDir, envVars, gacRoots, ref output, ref error);
+			int exitCode = DoCompilation (monitor, compilerName, cargs, workingDir, envVars, gacRoots, ref output, ref error);
 			
 			BuildResult result = ParseOutput (output, error);
 			if (result.CompilerOutput.Trim ().Length != 0)
@@ -411,10 +422,10 @@ namespace MonoDevelop.CSharp
 			return result;
 		}
 		
-		static int DoCompilation (string compilerName, string compilerArgs, string working_dir, ExecutionEnvironment envVars, List<string> gacRoots, ref string output, ref string error) 
+		static int DoCompilation (IProgressMonitor monitor, string compilerName, string compilerArgs, string working_dir, ExecutionEnvironment envVars, List<string> gacRoots, ref string output, ref string error)
 		{
-			output = Path.GetTempFileName();
-			error = Path.GetTempFileName();
+			output = Path.GetTempFileName ();
+			error = Path.GetTempFileName ();
 			
 			StreamWriter outwr = new StreamWriter (output);
 			StreamWriter errwr = new StreamWriter (error);
@@ -438,19 +449,21 @@ namespace MonoDevelop.CSharp
 			pinfo.UseShellExecute = false;
 			pinfo.RedirectStandardOutput = true;
 			pinfo.RedirectStandardError = true;
-			
+
 			MonoDevelop.Core.Execution.ProcessWrapper pw = Runtime.ProcessService.StartProcess (pinfo, outwr, errwr, null);
-			pw.WaitForOutput();
+			using (var mon = new AggregatedOperationMonitor (monitor, pw)) {
+				pw.WaitForOutput ();
+			}
 			int exitCode = pw.ExitCode;
-			outwr.Close();
-			errwr.Close();
+			outwr.Close ();
+			errwr.Close ();
 			pw.Dispose ();
 			return exitCode;
 		}
 		
 		// Snatched from our codedom code, with some changes to make it compatible with csc
 		// (the line+column group is optional is csc)
-		static Regex regexError = new Regex (@"^(\s*(?<file>[^\(]+)(\((?<line>\d*)(,(?<column>\d*[\+]*))?\))?:\s+)*(?<level>\w+)\s+(?<number>..\d+):\s*(?<message>.*)", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+		static Regex regexError = new Regex (@"^(\s*(?<file>.+[^)])(\((?<line>\d*)(,(?<column>\d*[\+]*))?\))?:\s+)*(?<level>\w+)\s+(?<number>..\d+):\s*(?<message>.*)", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
 		static BuildError CreateErrorFromString (string error_string)
 		{
 			// When IncludeDebugInformation is true, prevents the debug symbols stats from braeking this.

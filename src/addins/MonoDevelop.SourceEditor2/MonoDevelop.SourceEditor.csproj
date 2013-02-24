@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.21022</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{F8F92AA4-A376-4679-A9D4-60E7B7FBF477}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>MonoDevelop.SourceEditor</RootNamespace>
+    <AssemblyOriginatorKeyFile>.</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>True</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>True</Optimize>
+    <OutputPath>..\..\..\build\AddIns\DisplayBindings\SourceEditor</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Execution>
+      <Execution clr-version="Net_2_0" />
+    </Execution>
+    <CustomCommands>
+      <CustomCommands>
+        <Command type="Execute" command="mono --debug ../../../build/bin/MonoDevelop.exe" workingdir="" />
+      </CustomCommands>
+    </CustomCommands>
+    <AssemblyName>MonoDevelop.SourceEditor2</AssemblyName>
+    <ConsolePause>False</ConsolePause>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>none</DebugType>
+    <Optimize>True</Optimize>
+    <OutputPath>..\..\..\build\AddIns\DisplayBindings\SourceEditor</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AssemblyName>MonoDevelop.SourceEditor</AssemblyName>
+    <ConsolePause>False</ConsolePause>
+    <Execution>
+      <Execution clr-version="Net_2_0" />
+    </Execution>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\MonoDevelop.Core\MonoDevelop.Core.csproj">
+      <Project>{7525BB88-6142-4A26-93B9-A30C6983390A}</Project>
+      <Name>MonoDevelop.Core</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\core\MonoDevelop.Ide\MonoDevelop.Ide.csproj">
+      <Project>{27096E7F-C91C-4AC6-B289-6897A701DF21}</Project>
+      <Name>MonoDevelop.Ide</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\MonoDevelop.DesignerSupport\MonoDevelop.DesignerSupport.csproj">
+      <Project>{2C24D515-4A2C-445C-8419-C09231913CFA}</Project>
+      <Name>MonoDevelop.DesignerSupport</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\core\Mono.Debugging\Mono.Debugging.csproj">
+      <Project>{90C99ADB-7D4B-4EB4-98C2-40BD1B14C7D2}</Project>
+      <Name>Mono.Debugging</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\MonoDevelop.Debugger\MonoDevelop.Debugger.csproj">
+      <Project>{2357AABD-08C7-4808-A495-8FF2D3CDFDB0}</Project>
+      <Name>MonoDevelop.Debugger</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\core\Mono.Texteditor\Mono.TextEditor.csproj">
+      <Project>{A2329308-3751-4DBD-9A75-5F7B8B024625}</Project>
+      <Name>Mono.TextEditor</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\nrefactory\ICSharpCode.NRefactory\ICSharpCode.NRefactory.csproj">
+      <Project>{3B2A5653-EC97-4001-BB9B-D90F1AF2C371}</Project>
+      <Name>ICSharpCode.NRefactory</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\nrefactory\ICSharpCode.NRefactory.CSharp\ICSharpCode.NRefactory.CSharp.csproj">
+      <Project>{53DCA265-3C3C-42F9-B647-F72BA678122B}</Project>
+      <Name>ICSharpCode.NRefactory.CSharp</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\mono-addins\Mono.Addins\Mono.Addins.csproj">
+      <Project>{91DD5A2D-9FE3-4C3C-9253-876141874DAD}</Project>
+      <Name>Mono.Addins</Name>
+      <Private>False</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Mono.Posix" />
+    <Reference Include="glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="System.Core" />
+    <Reference Include="Mono.Cairo" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="gtk-gui\generated.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\EditActions.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\ExtensibleTextEditor.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\LanguageItemWindow.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\SourceEditorDisplayBinding.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\SourceEditorOptions.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\SourceEditorView.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\SourceEditorWidget.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.OptionPanels\BehaviorPanel.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.OptionPanels\GeneralOptionsPanel.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.OptionPanels\HighlightingPanel.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.OptionPanels\MarkerPanel.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\SourceEditorCommands.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\MarkerOperationsHandler.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\SearchAndReplaceWidget.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\GotoLineNumberWidget.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\LanguageItemTooltipProvider.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\CompileErrorTooltipProvider.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\DebugValueWindow.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\DebugValueTooltipProvider.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.Extension\TemplateCodon.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.Extension\TemplateExtensionNodeLoader.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\IdeViMode.cs" />
+    <Compile Include="gtk-gui\MonoDevelop.SourceEditor.OptionPanels.GeneralOptionsPanel.cs" />
+    <Compile Include="gtk-gui\MonoDevelop.SourceEditor.OptionPanels.MarkerPanel.cs" />
+    <Compile Include="gtk-gui\MonoDevelop.SourceEditor.OptionPanels.BehaviorPanel.cs" />
+    <Compile Include="gtk-gui\MonoDevelop.SourceEditor.OptionPanels.HighlightingPanel.cs" />
+    <Compile Include="gtk-gui\MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs" />
+    <Compile Include="gtk-gui\MonoDevelop.SourceEditor.GotoLineNumberWidget.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\StyledSourceEditorOptions.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\ISourceEditorOptions.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\AutoSave.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\SyntaxModeCodon.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\SyntaxModeService.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\Counters.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\DynamicAbbrevHandler.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\PinnedWatchWidget.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\SourceEditorPrintOperation.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\PrintSettingsWidget.cs" />
+    <Compile Include="gtk-gui\MonoDevelop.SourceEditor.PrintSettingsWidget.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\MessageBubbleCommands.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\MessageBubbleTextMarker.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\MessageBubbleHighlightPopupWindow.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\MessageBubbleCache.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.OptionPanels\ColorShemeEditor.cs" />
+    <Compile Include="gtk-gui\MonoDevelop.SourceEditor.OptionPanels.ColorShemeEditor.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.OptionPanels\NewColorShemeDialog.cs" />
+    <Compile Include="gtk-gui\MonoDevelop.SourceEditor.OptionPanels.NewColorShemeDialog.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.QuickTasks\QuickTaskStrip.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.QuickTasks\ScrollbarCommand.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.QuickTasks\ScrollBarMode.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.QuickTasks\IQuickTaskProvider.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.QuickTasks\QuickTask.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.QuickTasks\QuickTaskMiniMapMode.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.QuickTasks\QuickTaskOverviewMode.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.QuickTasks\IUsageProvider.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\FileRegistry.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="gtk-gui\gui.stetic">
+      <LogicalName>gui.stetic</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="MonoDevelop.SourceEditor.addin.xml">
+      <LogicalName>MonoDevelop.SourceEditor.addin.xml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="MonoDevelop.SourceEditor\searchoptions.png">
+      <LogicalName>searchoptions.png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <ItemGroup>
+    <Folder Include="MonoDevelop.SourceEditor\" />
+    <Folder Include="MonoDevelop.SourceEditor.QuickTasks\" />
+  </ItemGroup>
+</Project>

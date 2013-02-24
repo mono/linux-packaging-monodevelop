@@ -59,6 +59,7 @@ namespace NGit.Api
 	[NUnit.Framework.TestFixture]
 	public class AddCommandTest : RepositoryTestCase
 	{
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestAddNothing()
 		{
@@ -74,7 +75,7 @@ namespace NGit.Api
 		}
 
 		// expected
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestAddNonExistingSingleFile()
 		{
@@ -84,7 +85,7 @@ namespace NGit.Api
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestAddExistingSingleFile()
 		{
@@ -100,7 +101,7 @@ namespace NGit.Api
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestAddExistingSingleSmallFileWithNewLine()
 		{
@@ -125,7 +126,7 @@ namespace NGit.Api
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestAddExistingSingleMediumSizeFileWithNewLine()
 		{
@@ -157,7 +158,7 @@ namespace NGit.Api
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestAddExistingSingleBinaryFile()
 		{
@@ -182,7 +183,7 @@ namespace NGit.Api
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestAddExistingSingleFileInSubDir()
 		{
@@ -199,7 +200,7 @@ namespace NGit.Api
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestAddExistingSingleFileTwice()
 		{
@@ -529,7 +530,7 @@ namespace NGit.Api
 			config.SetBoolean(ConfigConstants.CONFIG_CORE_SECTION, null, ConfigConstants.CONFIG_KEY_FILEMODE
 				, true);
 			config.Save();
-			FS executableFs = new _FS_602();
+			FS executableFs = new _FS_605();
 			Git git = Git.Open(db.Directory, executableFs);
 			string path = "a.txt";
 			WriteTrashFile(path, "content");
@@ -538,7 +539,7 @@ namespace NGit.Api
 			TreeWalk walk = TreeWalk.ForPath(db, path, commit1.Tree);
 			NUnit.Framework.Assert.IsNotNull(walk);
 			NUnit.Framework.Assert.AreEqual(FileMode.EXECUTABLE_FILE, walk.GetFileMode(0));
-			FS nonExecutableFs = new _FS_642();
+			FS nonExecutableFs = new _FS_650();
 			config = ((FileBasedConfig)db.GetConfig());
 			config.SetBoolean(ConfigConstants.CONFIG_CORE_SECTION, null, ConfigConstants.CONFIG_KEY_FILEMODE
 				, false);
@@ -552,9 +553,9 @@ namespace NGit.Api
 			NUnit.Framework.Assert.AreEqual(FileMode.EXECUTABLE_FILE, walk.GetFileMode(0));
 		}
 
-		private sealed class _FS_602 : FS
+		private sealed class _FS_605 : FS
 		{
-			public _FS_602()
+			public _FS_605()
 			{
 			}
 
@@ -591,12 +592,17 @@ namespace NGit.Api
 			public override bool CanExecute(FilePath f)
 			{
 				return true;
+			}
+
+			public override bool IsCaseSensitive()
+			{
+				return false;
 			}
 		}
 
-		private sealed class _FS_642 : FS
+		private sealed class _FS_650 : FS
 		{
-			public _FS_642()
+			public _FS_650()
 			{
 			}
 
@@ -631,6 +637,11 @@ namespace NGit.Api
 			}
 
 			public override bool CanExecute(FilePath f)
+			{
+				return false;
+			}
+
+			public override bool IsCaseSensitive()
 			{
 				return false;
 			}

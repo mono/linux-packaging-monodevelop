@@ -338,7 +338,14 @@ namespace NGit.Dircache
 							}
 							else
 							{
-								Keep(i.GetDirCacheEntry());
+								// update the timestamp of the index with the one from the
+								// file if not set, as we are sure to be in sync here.
+								DirCacheEntry entry = i.GetDirCacheEntry();
+								if (entry.LastModified == 0)
+								{
+									entry.LastModified = f.GetEntryLastModified();
+								}
+								Keep(entry);
 							}
 						}
 						else
@@ -646,10 +653,7 @@ namespace NGit.Dircache
 					case unchecked((int)(0xDFD)):
 					{
 						// 3 4
-						// CAUTION: I put it into removed instead of updated, because
-						// that's what our tests expect
-						// updated.put(name, mId);
-						Remove(name);
+						Keep(dce);
 						break;
 					}
 
@@ -815,13 +819,20 @@ namespace NGit.Dircache
 					else
 					{
 						// 2
-						Update(name, mId, mMode);
+						// 3
+						if (EqualIdAndMode(hId, hMode, mId, mMode))
+						{
+							Keep(dce);
+						}
+						else
+						{
+							Conflict(name, dce, h, m);
+						}
 					}
 				}
 			}
 			else
 			{
-				// 3
 				if (h == null)
 				{
 					if (m == null || EqualIdAndMode(mId, mMode, iId, iMode))
@@ -1115,6 +1126,7 @@ namespace NGit.Dircache
 		{
 			ObjectLoader ol = or.Open(entry.GetObjectId());
 			FilePath parentDir = f.GetParentFile();
+			parentDir.Mkdirs();
 			FilePath tmpFile = FilePath.CreateTempFile("._" + f.GetName(), null, parentDir);
 			WorkingTreeOptions opt = repo.GetConfig().Get(WorkingTreeOptions.KEY);
 			FileOutputStream rawChannel = new FileOutputStream(tmpFile);
@@ -1204,9 +1216,8 @@ namespace NGit.Dircache
 
 		private static bool IsValidPathSegment(CanonicalTreeParser t)
 		{
-			bool isWindows = "Windows".Equals(SystemReader.GetInstance().GetProperty("os.name"
-				));
-			bool isOSX = "Mac OS X".Equals(SystemReader.GetInstance().GetProperty("os.name"));
+			bool isWindows = SystemReader.GetInstance().IsWindows();
+			bool isOSX = SystemReader.GetInstance().IsMacOS();
 			bool ignCase = isOSX || isWindows;
 			int ptr = t.GetNameOffset();
 			byte[] raw = t.GetEntryPathBuffer();

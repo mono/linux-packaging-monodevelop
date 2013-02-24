@@ -46,6 +46,7 @@ namespace MonoMac.ScriptingBridge {
 		[Export ("get")]
 		NSObject Get { get; }
 
+		// part of SBObject.h include file, not in the official documentation
 		[Export ("lastError")]
 		NSError LastError { get; }
 
@@ -74,26 +75,30 @@ namespace MonoMac.ScriptingBridge {
 //	}
 	
 	[BaseType (typeof (SBObject),Delegates=new string [] { "WeakDelegate" }, Events=new Type [] { typeof (SBApplicationDelegate)})]
+	[DisableDefaultCtor] // An uncaught exception was raised: *** -[SBApplication init]: should never be used.
 	interface SBApplication {
 		[Export ("initWithURL:")]
 		IntPtr Constructor (NSUrl url);
 
 		[Export ("initWithProcessIdentifier:")]
 		IntPtr Constructor (int pid);
-		
+
+		[Export ("initWithBundleIdentifier:")]
+		IntPtr Constructor (string ident);
+
 		[Static]
 		[Export ("applicationWithBundleIdentifier:")]
 		SBApplication FromBundleIdentifier (string ident );
 
 		[Static]
-		[Export ("applicationWithURL:url")]
+		[Export ("applicationWithURL:")]
 		SBApplication FromURL (NSUrl url );
 
 		[Static]
-		[Export ("applicationWithProcessIdentifier")]
+		[Export ("applicationWithProcessIdentifier:")]
 		SBApplication FromProcessIdentifier (int pid );
 
-		[Export ("classForScriptingClass")]
+		[Export ("classForScriptingClass:")]
 		Class ClassForScripting (string className );
 
 		[Export ("isRunning")]

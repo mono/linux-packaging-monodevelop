@@ -556,7 +556,15 @@ namespace MonoDevelop.Ide.FindInFiles
 
 		static void LoadHistory (string propertyName, ComboBoxEntry entry)
 		{
-			entry.Entry.Completion = new EntryCompletion ();
+			var ec = new EntryCompletion ();
+/*			entry.Changed += delegate {
+				if (!entry.Entry.HasFocus)
+					entry.Entry.GrabFocus ();
+
+			};*/
+
+
+			entry.Entry.Completion = ec;
 			var store = new ListStore (typeof(string));
 			entry.Entry.Completion.Model = store;
 			entry.Model = store;

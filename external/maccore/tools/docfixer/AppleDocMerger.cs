@@ -1,3 +1,4 @@
+// Copyright 2012 Xamarin Inc
 using System;
 using System.IO;
 using System.Linq;
@@ -108,7 +109,7 @@ namespace macdoc
 				throw new ArgumentNullException ("options.MonodocArchive");
 			
 			if (string.IsNullOrEmpty (options.DocBase) || !Directory.Exists (options.DocBase))
-				throw new ArgumentException ("DocBase isn't valid", "options.DocBase");
+				throw new ArgumentException (string.Format ("DocBase '{0}' isn't valid", options.DocBase), "options.DocBase");
 			
 			var dbPath = Path.Combine (options.DocBase, "..", "..", "docSet.dsidx");
 			if (!File.Exists (dbPath))
@@ -354,10 +355,12 @@ namespace macdoc
 				}
 			}
 			
-			var s = new XmlWriterSettings ();
-			s.Indent = true;
-			s.Encoding = Encoding.UTF8;
-			s.OmitXmlDeclaration = true;
+			var s = new XmlWriterSettings () {
+				Indent = true,
+				Encoding = Encoding.UTF8,
+				OmitXmlDeclaration = true,
+				NewLineChars = Environment.NewLine
+			};
 			using (var output = File.CreateText (xmldocpath)){
 				var xmlw = XmlWriter.Create (output, s);
 				xmldoc.Save (xmlw);

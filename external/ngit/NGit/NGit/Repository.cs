@@ -51,6 +51,7 @@ using NGit.Events;
 using NGit.Internal;
 using NGit.Revwalk;
 using NGit.Storage.File;
+using NGit.Transport;
 using NGit.Treewalk;
 using NGit.Util;
 using NGit.Util.IO;
@@ -399,7 +400,53 @@ namespace NGit
 			RevWalk rw = new RevWalk(this);
 			try
 			{
-				return Resolve(rw, revstr);
+				object resolved = Resolve(rw, revstr);
+				if (resolved is string)
+				{
+					return GetRef((string)resolved).GetLeaf().GetObjectId();
+				}
+				else
+				{
+					return (ObjectId)resolved;
+				}
+			}
+			finally
+			{
+				rw.Release();
+			}
+		}
+
+		/// <summary>
+		/// Simplify an expression, but unlike
+		/// <see cref="Resolve(string)">Resolve(string)</see>
+		/// it will not
+		/// resolve a branch passed or resulting from the expression, such as @{-}.
+		/// Thus this method can be used to process an expression to a method that
+		/// expects a branch or revision id.
+		/// </summary>
+		/// <param name="revstr"></param>
+		/// <returns>object id or ref name from resolved expression</returns>
+		/// <exception cref="NGit.Errors.AmbiguousObjectException">NGit.Errors.AmbiguousObjectException
+		/// 	</exception>
+		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
+		public virtual string Simplify(string revstr)
+		{
+			RevWalk rw = new RevWalk(this);
+			try
+			{
+				object resolved = Resolve(rw, revstr);
+				if (resolved != null)
+				{
+					if (resolved is string)
+					{
+						return (string)resolved;
+					}
+					else
+					{
+						return ((AnyObjectId)resolved).GetName();
+					}
+				}
+				return null;
 			}
 			finally
 			{
@@ -408,27 +455,42 @@ namespace NGit
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		private ObjectId Resolve(RevWalk rw, string revstr)
+		private object Resolve(RevWalk rw, string revstr)
 		{
-			char[] rev = revstr.ToCharArray();
-			RevObject @ref = null;
-			for (int i = 0; i < rev.Length; ++i)
+			char[] revChars = revstr.ToCharArray();
+			RevObject rev = null;
+			string name = null;
+			int done = 0;
+			for (int i = 0; i < revChars.Length; ++i)
 			{
-				switch (rev[i])
+				switch (revChars[i])
 				{
 					case '^':
 					{
-						if (@ref == null)
+						if (rev == null)
 						{
-							@ref = ParseSimple(rw, new string(rev, 0, i));
-							if (@ref == null)
+							if (name == null)
+							{
+								if (done == 0)
+								{
+									name = new string(revChars, done, i);
+								}
+								else
+								{
+									done = i + 1;
+									break;
+								}
+							}
+							rev = ParseSimple(rw, name);
+							name = null;
+							if (rev == null)
 							{
 								return null;
 							}
 						}
-						if (i + 1 < rev.Length)
+						if (i + 1 < revChars.Length)
 						{
-							switch (rev[i + 1])
+							switch (revChars[i + 1])
 							{
 								case '0':
 								case '1':
@@ -442,15 +504,15 @@ namespace NGit
 								case '9':
 								{
 									int j;
-									@ref = rw.ParseCommit(@ref);
-									for (j = i + 1; j < rev.Length; ++j)
+									rev = rw.ParseCommit(rev);
+									for (j = i + 1; j < revChars.Length; ++j)
 									{
-										if (!char.IsDigit(rev[j]))
+										if (!char.IsDigit(revChars[j]))
 										{
 											break;
 										}
 									}
-									string parentnum = new string(rev, i + 1, j - i - 1);
+									string parentnum = new string(revChars, i + 1, j - i - 1);
 									int pnum;
 									try
 									{
@@ -463,17 +525,18 @@ namespace NGit
 									}
 									if (pnum != 0)
 									{
-										RevCommit commit = (RevCommit)@ref;
+										RevCommit commit = (RevCommit)rev;
 										if (pnum > commit.ParentCount)
 										{
-											@ref = null;
+											rev = null;
 										}
 										else
 										{
-											@ref = commit.GetParent(pnum - 1);
+											rev = commit.GetParent(pnum - 1);
 										}
 									}
 									i = j - 1;
+									done = j;
 									break;
 								}
 
@@ -481,11 +544,11 @@ namespace NGit
 								{
 									int k;
 									string item = null;
-									for (k = i + 2; k < rev.Length; ++k)
+									for (k = i + 2; k < revChars.Length; ++k)
 									{
-										if (rev[k] == '}')
+										if (revChars[k] == '}')
 										{
-											item = new string(rev, i + 2, k - i - 2);
+											item = new string(revChars, i + 2, k - i - 2);
 											break;
 										}
 									}
@@ -494,29 +557,29 @@ namespace NGit
 									{
 										if (item.Equals("tree"))
 										{
-											@ref = rw.ParseTree(@ref);
+											rev = rw.ParseTree(rev);
 										}
 										else
 										{
 											if (item.Equals("commit"))
 											{
-												@ref = rw.ParseCommit(@ref);
+												rev = rw.ParseCommit(rev);
 											}
 											else
 											{
 												if (item.Equals("blob"))
 												{
-													@ref = rw.Peel(@ref);
-													if (!(@ref is RevBlob))
+													rev = rw.Peel(rev);
+													if (!(rev is RevBlob))
 													{
-														throw new IncorrectObjectTypeException(@ref, Constants.TYPE_BLOB);
+														throw new IncorrectObjectTypeException(rev, Constants.TYPE_BLOB);
 													}
 												}
 												else
 												{
 													if (item.Equals(string.Empty))
 													{
-														@ref = rw.Peel(@ref);
+														rev = rw.Peel(rev);
 													}
 													else
 													{
@@ -530,27 +593,28 @@ namespace NGit
 									{
 										throw new RevisionSyntaxException(revstr);
 									}
+									done = k;
 									break;
 								}
 
 								default:
 								{
-									@ref = rw.ParseAny(@ref);
-									if (@ref is RevCommit)
+									rev = rw.ParseAny(rev);
+									if (rev is RevCommit)
 									{
-										RevCommit commit = ((RevCommit)@ref);
+										RevCommit commit = ((RevCommit)rev);
 										if (commit.ParentCount == 0)
 										{
-											@ref = null;
+											rev = null;
 										}
 										else
 										{
-											@ref = commit.GetParent(0);
+											rev = commit.GetParent(0);
 										}
 									}
 									else
 									{
-										throw new IncorrectObjectTypeException(@ref, Constants.TYPE_COMMIT);
+										throw new IncorrectObjectTypeException(rev, Constants.TYPE_COMMIT);
 									}
 									break;
 								}
@@ -558,46 +622,60 @@ namespace NGit
 						}
 						else
 						{
-							@ref = rw.Peel(@ref);
-							if (@ref is RevCommit)
+							rev = rw.Peel(rev);
+							if (rev is RevCommit)
 							{
-								RevCommit commit = ((RevCommit)@ref);
+								RevCommit commit = ((RevCommit)rev);
 								if (commit.ParentCount == 0)
 								{
-									@ref = null;
+									rev = null;
 								}
 								else
 								{
-									@ref = commit.GetParent(0);
+									rev = commit.GetParent(0);
 								}
 							}
 							else
 							{
-								throw new IncorrectObjectTypeException(@ref, Constants.TYPE_COMMIT);
+								throw new IncorrectObjectTypeException(rev, Constants.TYPE_COMMIT);
 							}
 						}
+						done = i + 1;
 						break;
 					}
 
 					case '~':
 					{
-						if (@ref == null)
+						if (rev == null)
 						{
-							@ref = ParseSimple(rw, new string(rev, 0, i));
-							if (@ref == null)
+							if (name == null)
+							{
+								if (done == 0)
+								{
+									name = new string(revChars, done, i);
+								}
+								else
+								{
+									done = i + 1;
+									break;
+								}
+							}
+							rev = ParseSimple(rw, name);
+							name = null;
+							if (rev == null)
 							{
 								return null;
 							}
 						}
-						@ref = rw.Peel(@ref);
-						if (!(@ref is RevCommit))
+						rev = rw.Peel(rev);
+						if (!(rev is RevCommit))
 						{
-							throw new IncorrectObjectTypeException(@ref, Constants.TYPE_COMMIT);
+							throw new IncorrectObjectTypeException(rev, Constants.TYPE_COMMIT);
 						}
 						int l;
-						for (l = i + 1; l < rev.Length; ++l)
+						for (l = i + 1; l < revChars.Length; ++l)
 						{
-							if (!char.IsDigit(rev[l]))
+							if (!char.IsDigit(revChars[l]))
 							{
 								break;
 							}
@@ -605,7 +683,7 @@ namespace NGit
 						int dist;
 						if (l - i > 1)
 						{
-							string distnum = new string(rev, i + 1, l - i - 1);
+							string distnum = new string(revChars, i + 1, l - i - 1);
 							try
 							{
 								dist = System.Convert.ToInt32(distnum);
@@ -621,47 +699,153 @@ namespace NGit
 						}
 						while (dist > 0)
 						{
-							RevCommit commit = (RevCommit)@ref;
+							RevCommit commit = (RevCommit)rev;
 							if (commit.ParentCount == 0)
 							{
-								@ref = null;
+								rev = null;
 								break;
 							}
 							commit = commit.GetParent(0);
 							rw.ParseHeaders(commit);
-							@ref = commit;
+							rev = commit;
 							--dist;
 						}
 						i = l - 1;
+						done = l;
 						break;
 					}
 
 					case '@':
 					{
+						if (rev != null)
+						{
+							throw new RevisionSyntaxException(revstr);
+						}
+						if (i + 1 < revChars.Length && revChars[i + 1] != '{')
+						{
+							continue;
+						}
 						int m;
 						string time = null;
-						for (m = i + 2; m < rev.Length; ++m)
+						for (m = i + 2; m < revChars.Length; ++m)
 						{
-							if (rev[m] == '}')
+							if (revChars[m] == '}')
 							{
-								time = new string(rev, i + 2, m - i - 2);
+								time = new string(revChars, i + 2, m - i - 2);
 								break;
 							}
 						}
 						if (time != null)
 						{
-							string refName = new string(rev, 0, i);
-							Ref resolved = RefDatabase.GetRef(refName);
-							if (resolved == null)
+							if (time.Equals("upstream"))
 							{
-								return null;
+								if (name == null)
+								{
+									name = new string(revChars, done, i);
+								}
+								if (name.Equals(string.Empty))
+								{
+									// Currently checked out branch, HEAD if
+									// detached
+									name = Constants.HEAD;
+								}
+								if (!NGit.Repository.IsValidRefName("x/" + name))
+								{
+									throw new RevisionSyntaxException(revstr);
+								}
+								Ref @ref = GetRef(name);
+								name = null;
+								if (@ref == null)
+								{
+									return null;
+								}
+								if (@ref.IsSymbolic())
+								{
+									@ref = @ref.GetLeaf();
+								}
+								name = @ref.GetName();
+								RemoteConfig remoteConfig;
+								try
+								{
+									remoteConfig = new RemoteConfig(GetConfig(), "origin");
+								}
+								catch (URISyntaxException)
+								{
+									throw new RevisionSyntaxException(revstr);
+								}
+								string remoteBranchName = GetConfig().GetString(ConfigConstants.CONFIG_BRANCH_SECTION
+									, NGit.Repository.ShortenRefName(@ref.GetName()), ConfigConstants.CONFIG_KEY_MERGE
+									);
+								IList<RefSpec> fetchRefSpecs = remoteConfig.FetchRefSpecs;
+								foreach (RefSpec refSpec in fetchRefSpecs)
+								{
+									if (refSpec.MatchSource(remoteBranchName))
+									{
+										RefSpec expandFromSource = refSpec.ExpandFromSource(remoteBranchName);
+										name = expandFromSource.GetDestination();
+										break;
+									}
+								}
+								if (name == null)
+								{
+									throw new RevisionSyntaxException(revstr);
+								}
 							}
-							@ref = ResolveReflog(rw, resolved, time);
+							else
+							{
+								if (time.Matches("^-\\d+$"))
+								{
+									if (name != null)
+									{
+										throw new RevisionSyntaxException(revstr);
+									}
+									else
+									{
+										string previousCheckout = ResolveReflogCheckout(-System.Convert.ToInt32(time));
+										if (ObjectId.IsId(previousCheckout))
+										{
+											rev = ParseSimple(rw, previousCheckout);
+										}
+										else
+										{
+											name = previousCheckout;
+										}
+									}
+								}
+								else
+								{
+									if (name == null)
+									{
+										name = new string(revChars, done, i);
+									}
+									if (name.Equals(string.Empty))
+									{
+										name = Constants.HEAD;
+									}
+									if (!NGit.Repository.IsValidRefName("x/" + name))
+									{
+										throw new RevisionSyntaxException(revstr);
+									}
+									Ref @ref = GetRef(name);
+									name = null;
+									if (@ref == null)
+									{
+										return null;
+									}
+									// @{n} means current branch, not HEAD@{1} unless
+									// detached
+									if (@ref.IsSymbolic())
+									{
+										@ref = @ref.GetLeaf();
+									}
+									rev = ResolveReflog(rw, @ref, time);
+								}
+							}
 							i = m;
 						}
 						else
 						{
-							i = m - 1;
+							throw new RevisionSyntaxException(revstr);
 						}
 						break;
 					}
@@ -669,47 +853,36 @@ namespace NGit
 					case ':':
 					{
 						RevTree tree;
-						if (@ref == null)
+						if (rev == null)
 						{
-							// We might not yet have parsed the left hand side.
-							ObjectId id;
-							try
+							if (name == null)
 							{
-								if (i == 0)
-								{
-									id = Resolve(rw, Constants.HEAD);
-								}
-								else
-								{
-									id = Resolve(rw, new string(rev, 0, i));
-								}
+								name = new string(revChars, done, i);
 							}
-							catch (RevisionSyntaxException)
+							if (name.Equals(string.Empty))
 							{
-								throw new RevisionSyntaxException(revstr);
+								name = Constants.HEAD;
 							}
-							if (id == null)
-							{
-								return null;
-							}
-							tree = rw.ParseTree(id);
+							rev = ParseSimple(rw, name);
+							name = null;
 						}
-						else
+						if (rev == null)
 						{
-							tree = rw.ParseTree(@ref);
+							return null;
 						}
-						if (i == rev.Length - 1)
+						tree = rw.ParseTree(rev);
+						if (i == revChars.Length - 1)
 						{
 							return tree.Copy();
 						}
-						TreeWalk tw = TreeWalk.ForPath(rw.GetObjectReader(), new string(rev, i + 1, rev.Length
-							 - i - 1), tree);
+						TreeWalk tw = TreeWalk.ForPath(rw.GetObjectReader(), new string(revChars, i + 1, 
+							revChars.Length - i - 1), tree);
 						return tw != null ? tw.GetObjectId(0) : null;
 					}
 
 					default:
 					{
-						if (@ref != null)
+						if (rev != null)
 						{
 							throw new RevisionSyntaxException(revstr);
 						}
@@ -717,7 +890,28 @@ namespace NGit
 					}
 				}
 			}
-			return @ref != null ? @ref.Copy() : ResolveSimple(revstr);
+			if (rev != null)
+			{
+				return rev.Copy();
+			}
+			if (name != null)
+			{
+				return name;
+			}
+			if (done == revstr.Length)
+			{
+				return null;
+			}
+			name = Sharpen.Runtime.Substring(revstr, done);
+			if (!NGit.Repository.IsValidRefName("x/" + name))
+			{
+				throw new RevisionSyntaxException(revstr);
+			}
+			if (GetRef(name) != null)
+			{
+				return name;
+			}
+			return ResolveSimple(name);
 		}
 
 		private static bool IsHex(char c)
@@ -753,10 +947,13 @@ namespace NGit
 			{
 				return ObjectId.FromString(revstr);
 			}
-			Ref r = RefDatabase.GetRef(revstr);
-			if (r != null)
+			if (NGit.Repository.IsValidRefName("x/" + revstr))
 			{
-				return r.GetObjectId();
+				Ref r = RefDatabase.GetRef(revstr);
+				if (r != null)
+				{
+					return r.GetObjectId();
+				}
 			}
 			if (AbbreviatedObjectId.IsId(revstr))
 			{
@@ -777,6 +974,25 @@ namespace NGit
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
+		private string ResolveReflogCheckout(int checkoutNo)
+		{
+			IList<ReflogEntry> reflogEntries = new ReflogReader(this, Constants.HEAD).GetReverseEntries
+				();
+			foreach (ReflogEntry entry in reflogEntries)
+			{
+				CheckoutEntry checkout = entry.ParseCheckout();
+				if (checkout != null)
+				{
+					if (checkoutNo-- == 1)
+					{
+						return checkout.GetFromBranch();
+					}
+				}
+			}
+			return null;
+		}
+
+		/// <exception cref="System.IO.IOException"></exception>
 		private RevCommit ResolveReflog(RevWalk rw, Ref @ref, string time)
 		{
 			int number;
@@ -785,11 +1001,6 @@ namespace NGit
 				number = System.Convert.ToInt32(time);
 			}
 			catch (FormatException)
-			{
-				throw new RevisionSyntaxException(MessageFormat.Format(JGitText.Get().invalidReflogRevision
-					, time));
-			}
-			if (number < 0)
 			{
 				throw new RevisionSyntaxException(MessageFormat.Format(JGitText.Get().invalidReflogRevision
 					, time));
@@ -1114,7 +1325,7 @@ namespace NGit
 		/// </exception>
 		public virtual DirCache ReadDirCache()
 		{
-			return DirCache.Read(GetIndexFile(), FileSystem);
+			return DirCache.Read(this);
 		}
 
 		/// <summary>Create a new in-core index representation, lock it, and read from disk.</summary>
@@ -1147,13 +1358,13 @@ namespace NGit
 		{
 			// we want DirCache to inform us so that we can inform registered
 			// listeners about index changes
-			IndexChangedListener l = new _IndexChangedListener_900(this);
-			return DirCache.Lock(GetIndexFile(), FileSystem, l);
+			IndexChangedListener l = new _IndexChangedListener_1042(this);
+			return DirCache.Lock(this, l);
 		}
 
-		private sealed class _IndexChangedListener_900 : IndexChangedListener
+		private sealed class _IndexChangedListener_1042 : IndexChangedListener
 		{
-			public _IndexChangedListener_900(Repository _enclosing)
+			public _IndexChangedListener_1042(Repository _enclosing)
 			{
 				this._enclosing = _enclosing;
 			}
@@ -1317,6 +1528,10 @@ namespace NGit
 						{
 							return false;
 						}
+						if (p == '/')
+						{
+							return false;
+						}
 						components++;
 						break;
 					}
@@ -1337,6 +1552,7 @@ namespace NGit
 					case '[':
 					case '*':
 					case '\\':
+					case '\u007F':
 					{
 						return false;
 					}
@@ -1465,21 +1681,7 @@ namespace NGit
 		/// </exception>
 		public virtual string ReadMergeCommitMsg()
 		{
-			if (IsBare || Directory == null)
-			{
-				throw new NoWorkTreeException();
-			}
-			FilePath mergeMsgFile = new FilePath(Directory, Constants.MERGE_MSG);
-			try
-			{
-				return RawParseUtils.Decode(IOUtil.ReadFully(mergeMsgFile));
-			}
-			catch (FileNotFoundException)
-			{
-				// MERGE_MSG file has disappeared in the meantime
-				// ignore it
-				return null;
-			}
+			return ReadCommitMsgFile(Constants.MERGE_MSG);
 		}
 
 		/// <summary>Write new content to the file $GIT_DIR/MERGE_MSG.</summary>
@@ -1487,7 +1689,7 @@ namespace NGit
 		/// Write new content to the file $GIT_DIR/MERGE_MSG. In this file operations
 		/// triggering a merge will store a template for the commit message of the
 		/// merge commit. If <code>null</code> is specified as message the file will
-		/// be deleted
+		/// be deleted.
 		/// </remarks>
 		/// <param name="msg">
 		/// the message which should be written or <code>null</code> to
@@ -1497,22 +1699,7 @@ namespace NGit
 		public virtual void WriteMergeCommitMsg(string msg)
 		{
 			FilePath mergeMsgFile = new FilePath(gitDir, Constants.MERGE_MSG);
-			if (msg != null)
-			{
-				FileOutputStream fos = new FileOutputStream(mergeMsgFile);
-				try
-				{
-					fos.Write(Sharpen.Runtime.GetBytesForString(msg, Constants.CHARACTER_ENCODING));
-				}
-				finally
-				{
-					fos.Close();
-				}
-			}
-			else
-			{
-				FileUtils.Delete(mergeMsgFile, FileUtils.SKIP_MISSING);
-			}
+			WriteCommitMsg(mergeMsgFile, msg);
 		}
 
 		/// <summary>Return the information stored in the file $GIT_DIR/MERGE_HEAD.</summary>
@@ -1522,11 +1709,10 @@ namespace NGit
 		/// should be merged together with HEAD.
 		/// </remarks>
 		/// <returns>
-		/// a list of commits which IDs are listed in the MERGE_HEAD
-		/// file or
+		/// a list of commits which IDs are listed in the MERGE_HEAD file or
 		/// <code>null</code>
-		/// if this file doesn't exist. Also if the file
-		/// exists but is empty
+		/// if this file doesn't exist. Also if the file exists
+		/// but is empty
 		/// <code>null</code>
 		/// will be returned
 		/// </returns>
@@ -1620,6 +1806,128 @@ namespace NGit
 			IList<ObjectId> heads = (head != null) ? Sharpen.Collections.SingletonList(head) : 
 				null;
 			WriteHeadsFile(heads, Constants.CHERRY_PICK_HEAD);
+		}
+
+		/// <summary>Write original HEAD commit into $GIT_DIR/ORIG_HEAD.</summary>
+		/// <remarks>Write original HEAD commit into $GIT_DIR/ORIG_HEAD.</remarks>
+		/// <param name="head">
+		/// an object id of the original HEAD commit or <code>null</code>
+		/// to delete the file
+		/// </param>
+		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
+		public virtual void WriteOrigHead(ObjectId head)
+		{
+			IList<ObjectId> heads = head != null ? Sharpen.Collections.SingletonList(head) : 
+				null;
+			WriteHeadsFile(heads, Constants.ORIG_HEAD);
+		}
+
+		/// <summary>Return the information stored in the file $GIT_DIR/ORIG_HEAD.</summary>
+		/// <remarks>Return the information stored in the file $GIT_DIR/ORIG_HEAD.</remarks>
+		/// <returns>
+		/// object id from ORIG_HEAD file or
+		/// <code>null</code>
+		/// if this file
+		/// doesn't exist. Also if the file exists but is empty
+		/// <code>null</code>
+		/// will be returned
+		/// </returns>
+		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
+		/// <exception cref="NGit.Errors.NoWorkTreeException">
+		/// if this is bare, which implies it has no working directory.
+		/// See
+		/// <see cref="IsBare()">IsBare()</see>
+		/// .
+		/// </exception>
+		public virtual ObjectId ReadOrigHead()
+		{
+			if (IsBare || Directory == null)
+			{
+				throw new NoWorkTreeException();
+			}
+			byte[] raw = ReadGitDirectoryFile(Constants.ORIG_HEAD);
+			return raw != null ? ObjectId.FromString(raw, 0) : null;
+		}
+
+		/// <summary>Return the information stored in the file $GIT_DIR/SQUASH_MSG.</summary>
+		/// <remarks>
+		/// Return the information stored in the file $GIT_DIR/SQUASH_MSG. In this
+		/// file operations triggering a squashed merge will store a template for the
+		/// commit message of the squash commit.
+		/// </remarks>
+		/// <returns>
+		/// a String containing the content of the SQUASH_MSG file or
+		/// <code>null</code>
+		/// if this file doesn't exist
+		/// </returns>
+		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
+		/// <exception cref="NGit.Errors.NoWorkTreeException">
+		/// if this is bare, which implies it has no working directory.
+		/// See
+		/// <see cref="IsBare()">IsBare()</see>
+		/// .
+		/// </exception>
+		public virtual string ReadSquashCommitMsg()
+		{
+			return ReadCommitMsgFile(Constants.SQUASH_MSG);
+		}
+
+		/// <summary>Write new content to the file $GIT_DIR/SQUASH_MSG.</summary>
+		/// <remarks>
+		/// Write new content to the file $GIT_DIR/SQUASH_MSG. In this file
+		/// operations triggering a squashed merge will store a template for the
+		/// commit message of the squash commit. If <code>null</code> is specified as
+		/// message the file will be deleted.
+		/// </remarks>
+		/// <param name="msg">
+		/// the message which should be written or <code>null</code> to
+		/// delete the file
+		/// </param>
+		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
+		public virtual void WriteSquashCommitMsg(string msg)
+		{
+			FilePath squashMsgFile = new FilePath(gitDir, Constants.SQUASH_MSG);
+			WriteCommitMsg(squashMsgFile, msg);
+		}
+
+		/// <exception cref="System.IO.IOException"></exception>
+		private string ReadCommitMsgFile(string msgFilename)
+		{
+			if (IsBare || Directory == null)
+			{
+				throw new NoWorkTreeException();
+			}
+			FilePath mergeMsgFile = new FilePath(Directory, msgFilename);
+			try
+			{
+				return RawParseUtils.Decode(IOUtil.ReadFully(mergeMsgFile));
+			}
+			catch (FileNotFoundException)
+			{
+				// the file has disappeared in the meantime ignore it
+				return null;
+			}
+		}
+
+		/// <exception cref="System.IO.IOException"></exception>
+		private void WriteCommitMsg(FilePath msgFile, string msg)
+		{
+			if (msg != null)
+			{
+				FileOutputStream fos = new FileOutputStream(msgFile);
+				try
+				{
+					fos.Write(Sharpen.Runtime.GetBytesForString(msg, Constants.CHARACTER_ENCODING));
+				}
+				finally
+				{
+					fos.Close();
+				}
+			}
+			else
+			{
+				FileUtils.Delete(msgFile, FileUtils.SKIP_MISSING);
+			}
 		}
 
 		/// <summary>Read a file from the git directory.</summary>

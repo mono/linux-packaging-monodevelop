@@ -108,7 +108,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ClassPad
 				if (!builder.HasChild (ns.Name, typeof(NamespaceData)))
 					builder.AddChild (new ProjectNamespaceData (project, ns));
 			}
-			bool nestedNs = builder.Options ["NestedNamespaces"];
+//			bool nestedNs = builder.Options ["NestedNamespaces"];
 			bool publicOnly = builder.Options ["PublicApiOnly"];
 			
 			foreach (var type in namesp.Types) {
@@ -140,9 +140,9 @@ namespace MonoDevelop.Ide.Gui.Pads.ClassPad
 	/*
 	public class CompilationUnitNamespaceData : NamespaceData
 	{
-		IParsedFile unit;
+		IUnresolvedFile unit;
 		
-		public CompilationUnitNamespaceData (IParsedFile unit, INamespace fullNamespace) : base (fullNamespace)
+		public CompilationUnitNamespaceData (IUnresolvedFile unit, INamespace fullNamespace) : base (fullNamespace)
 		{
 			this.unit = unit;
 		}

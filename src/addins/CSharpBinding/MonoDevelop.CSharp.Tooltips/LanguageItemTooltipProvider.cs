@@ -41,10 +41,15 @@ using System.Text;
 using MonoDevelop.Core;
 using System.Collections.Generic;
 using System.Linq;
+using MonoDevelop.CSharp.Resolver;
+using MonoDevelop.Ide.CodeCompletion;
+using MonoDevelop.CSharp.Completion;
+using MonoDevelop.Components;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.SourceEditor
 {
-	public class LanguageItemTooltipProvider: ITooltipProvider
+	public class LanguageItemTooltipProvider: TooltipProvider, IDisposable
 	{
 		public LanguageItemTooltipProvider()
 		{
@@ -52,12 +57,12 @@ namespace MonoDevelop.SourceEditor
 
 		class ToolTipData
 		{
-			public CompilationUnit Unit;
+			public SyntaxTree Unit;
 			public ResolveResult Result;
 			public AstNode Node;
 			public CSharpAstResolver Resolver;
 
-			public ToolTipData (ICSharpCode.NRefactory.CSharp.CompilationUnit unit, ICSharpCode.NRefactory.Semantics.ResolveResult result, ICSharpCode.NRefactory.CSharp.AstNode node, CSharpAstResolver file)
+			public ToolTipData (ICSharpCode.NRefactory.CSharp.SyntaxTree unit, ICSharpCode.NRefactory.Semantics.ResolveResult result, ICSharpCode.NRefactory.CSharp.AstNode node, CSharpAstResolver file)
 			{
 				this.Unit = unit;
 				this.Result = result;
@@ -68,162 +73,162 @@ namespace MonoDevelop.SourceEditor
 
 		#region ITooltipProvider implementation 
 		
-		public TooltipItem GetItem (Mono.TextEditor.TextEditor editor, int offset)
+		public override TooltipItem GetItem (Mono.TextEditor.TextEditor editor, int offset)
 		{
 			var doc = IdeApp.Workbench.ActiveDocument;
 			if (doc == null || doc.ParsedDocument == null)
 				return null;
-			var unit = doc.ParsedDocument.GetAst<CompilationUnit> ();
+			var unit = doc.ParsedDocument.GetAst<SyntaxTree> ();
 			if (unit == null)
 				return null;
 
-			var file = doc.ParsedDocument.ParsedFile as CSharpParsedFile;
+			var file = doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile;
 			if (file == null)
 				return null;
 			
 			ResolveResult result;
 			AstNode node;
 			var loc = editor.OffsetToLocation (offset);
-			if (!doc.TryResolveAt (loc, out result, out node))
+			if (!doc.TryResolveAt (loc, out result, out node)) {
+				if (node is CSharpTokenNode) {
+					int startOffset2 = editor.LocationToOffset (node.StartLocation);
+					int endOffset2 = editor.LocationToOffset (node.EndLocation);
+					return new TooltipItem (new ToolTipData (unit, result, node, null), startOffset2, endOffset2 - startOffset2);
+				}
 				return null;
+			}
+			if (node == lastNode)
+				return lastResult;
 			var resolver = new CSharpAstResolver (doc.Compilation, unit, file);
 			resolver.ApplyNavigator (new NodeListResolveVisitorNavigator (node), CancellationToken.None);
 
-			int startOffset = offset;
-			int endOffset = offset;
-			return new TooltipItem (new ToolTipData (unit, result, node, resolver), startOffset, endOffset - startOffset);
+			var hoverNode = node.GetNodeAt (loc) ?? node;
+
+			int startOffset = editor.LocationToOffset (hoverNode.StartLocation);
+			int endOffset = editor.LocationToOffset (hoverNode.EndLocation);
+			return lastResult = new TooltipItem (new ToolTipData (unit, result, node, resolver), startOffset, endOffset - startOffset);
 		}
 		
-		ResolveResult lastResult = null;
-		LanguageItemWindow lastWindow = null;
-		static Ambience ambience = new MonoDevelop.CSharp.CSharpAmbience ();
-		public Gtk.Window CreateTooltipWindow (Mono.TextEditor.TextEditor editor, int offset, Gdk.ModifierType modifierState, TooltipItem item)
+		AstNode lastNode = null;
+		static TooltipInformationWindow lastWindow = null;
+
+		TooltipItem lastResult;
+
+		static void DestroyLastTooltipWindow ()
+		{
+			if (lastWindow != null) {
+				lastWindow.Destroy ();
+				lastWindow = null;
+			}
+		}
+
+		#region IDisposable implementation
+
+		public void Dispose ()
+		{
+			DestroyLastTooltipWindow ();
+		}
+
+		#endregion
+
+		protected override Gtk.Window CreateTooltipWindow (Mono.TextEditor.TextEditor editor, int offset, Gdk.ModifierType modifierState, TooltipItem item)
 		{
 			var doc = IdeApp.Workbench.ActiveDocument;
 			if (doc == null)
 				return null;
 
 			var titem = (ToolTipData)item.Item;
-			string tooltip = null;
-			if (titem.Result is UnknownIdentifierResolveResult) {
-				tooltip = string.Format ("error CS0103: The name `{0}' does not exist in the current context", ((UnknownIdentifierResolveResult)titem.Result).Identifier);
-			} else if (titem.Result is UnknownMemberResolveResult) {
-				var ur = (UnknownMemberResolveResult)titem.Result;
-				if (ur.TargetType.Kind != TypeKind.Unknown)
-					tooltip = string.Format ("error CS0117: `{0}' does not contain a definition for `{1}'", ur.TargetType.FullName, ur.MemberName);
-			} else if (titem.Result.IsError) {
-				tooltip = "Resolve error.";
-			} else if (titem.Result != null) {
-				var ev = new ErrorVisitor (titem.Resolver);
-				if (titem.Node is AstType && titem.Node.Parent is VariableDeclarationStatement && titem.Node.GetText () == "var") {
-					titem.Node.Parent.AcceptVisitor (ev);
-				}
-				if (ev.ErrorResolveResult != null) {
-					Console.WriteLine (ev.ErrorResolveResult);
-					tooltip = string.Format ("Error while resolving: '{0}'", ev.ErrorNode.GetText ());
-				} else {
-					tooltip = CreateTooltip (titem.Result, ambience);
-				}
-			} else {
-				return null;
-			}
 
-
-			if (lastResult != null && lastWindow.IsRealized && 
-				titem.Result != null && lastResult.Type.Equals (titem.Result.Type))
-				return lastWindow;
-			var result = new LanguageItemWindow (tooltip);
-			lastWindow = result;
-			lastResult = titem.Result;
-			if (result.IsEmpty)
+			var tooltipInformation = CreateTooltip (titem, offset, null);
+			if (tooltipInformation == null || string.IsNullOrEmpty (tooltipInformation.SignatureMarkup))
 				return null;
+
+			var result = new TooltipInformationWindow ();
+			result.ShowArrow = true;
+			result.AddOverload (tooltipInformation);
+			result.RepositionWindow ();
 			return result;
 		}
 
-		static string paramStr = GettextCatalog.GetString ("Parameter");
-		static string localStr = GettextCatalog.GetString ("Local variable");
-		static string methodStr = GettextCatalog.GetString ("Method");
-		
-		static string namespaceStr = GettextCatalog.GetString ("Namespace");		
-		static string GetString (IType type)
+		public override Gtk.Window ShowTooltipWindow (TextEditor editor, int offset, Gdk.ModifierType modifierState, int mouseX, int mouseY, TooltipItem item)
 		{
-			switch (type.Kind) {
-			case TypeKind.Class:
-				return GettextCatalog.GetString ("Class");
-			case TypeKind.Interface:
-				return GettextCatalog.GetString ("Interface");
-			case TypeKind.Struct:
-				return GettextCatalog.GetString ("Struct");
-			case TypeKind.Delegate:
-				return GettextCatalog.GetString ("Delegate");
-			case TypeKind.Enum:
-				return GettextCatalog.GetString ("Enum");
+			var titem = (ToolTipData)item.Item;
+			if (lastNode != null && lastWindow != null && lastWindow.IsRealized && titem.Node != null && lastNode == titem.Node)
+				return lastWindow;
 			
-			case TypeKind.Dynamic:
-				return GettextCatalog.GetString ("Dynamic");
-			case TypeKind.TypeParameter:
-				return GettextCatalog.GetString ("Type parameter");
+			DestroyLastTooltipWindow ();
+
+			var tipWindow = CreateTooltipWindow (editor, offset, modifierState, item) as TooltipInformationWindow;
+			if (tipWindow == null)
+				return null;
+
+			var hoverNode = titem.Node.GetNodeAt (editor.OffsetToLocation (offset)) ?? titem.Node;
+			var p1 = editor.LocationToPoint (hoverNode.StartLocation);
+			var p2 = editor.LocationToPoint (hoverNode.EndLocation);
+			var positionWidget = editor.TextArea;
+			var caret = new Gdk.Rectangle ((int)p1.X - positionWidget.Allocation.X, (int)p2.Y - positionWidget.Allocation.Y, (int)(p2.X - p1.X), (int)editor.LineHeight);
+
+			tipWindow.ShowPopup (positionWidget, caret, PopupPosition.Top);
 			
-			case TypeKind.Array:
-				return GettextCatalog.GetString ("Array");
-			case TypeKind.Pointer:
-				return GettextCatalog.GetString ("Pointer");
-			}
-			
-			return null;
-		}
-		
-		static string GetString (IMember member)
-		{
-			switch (member.EntityType) {
-			case EntityType.Field:
-				var field = member as IField;
-				if (field.IsConst)
-					return GettextCatalog.GetString ("Constant");
-				return GettextCatalog.GetString ("Field");
-			case EntityType.Property:
-				return GettextCatalog.GetString ("Property");
-			case EntityType.Indexer:
-				return GettextCatalog.GetString ("Indexer");
-				
-			case EntityType.Event:
-				return GettextCatalog.GetString ("Event");
-			}
-			return GettextCatalog.GetString ("Member");
-		}
-		
-		string GetConst (object obj)
-		{
-			if (obj is string)
-				return '"' + obj.ToString () + '"';
-			if (obj is char)
-				return "'" + obj + "'";
-			return obj.ToString ();
+			lastWindow = tipWindow;
+			lastNode   = titem.Node;
+			return tipWindow;
 		}
 
-		public string CreateTooltip (ResolveResult result, Ambience ambience)
+
+		TooltipInformation CreateTooltip (ToolTipData data, int offset, Ambience ambience)
 		{
-			OutputSettings settings = new OutputSettings (OutputFlags.ClassBrowserEntries | OutputFlags.IncludeParameterName | OutputFlags.IncludeKeywords | OutputFlags.IncludeMarkup | OutputFlags.UseFullName);
-			// Approximate value for usual case
-			StringBuilder s = new StringBuilder (150);
-			string doc = null;
-			if (result is UnknownIdentifierResolveResult) {
-				s.Append (String.Format (GettextCatalog.GetString ("Unresolved identifier '{0}'"), ((UnknownIdentifierResolveResult)result).Identifier));
-			} else if (result.IsError) {
-				s.Append (GettextCatalog.GetString ("Resolve error."));
-			} else if (result is LocalResolveResult) {
+			ResolveResult result = data.Result;
+			var doc = IdeApp.Workbench.ActiveDocument;
+			if (doc == null)
+				return null;
+			try {
+				if (data.Node is ExternAliasDeclaration) {
+					var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+					var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+					sig.BreakLineAfterReturnType = false;
+					return sig.GetExternAliasTooltip ((ExternAliasDeclaration)data.Node, doc.Project as DotNetProject);
+				}
+				if (result == null && data.Node is CSharpTokenNode) {
+					var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+					var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+					sig.BreakLineAfterReturnType = false;
+					return sig.GetKeywordTooltip (data.Node);
+				}
+				if (data.Node is PrimitiveType && ((PrimitiveType)data.Node).KnownTypeCode == KnownTypeCode.Void) {
+					var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+					var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+					sig.BreakLineAfterReturnType = false;
+					return sig.GetKeywordTooltip ("void", null);
+				}
+
+				if (result is UnknownIdentifierResolveResult) {
+					return new TooltipInformation () {
+						SignatureMarkup = string.Format ("error CS0103: The name `{0}' does not exist in the current context", ((UnknownIdentifierResolveResult)result).Identifier)
+					};
+				} else if (result is UnknownMemberResolveResult) {
+					var ur = (UnknownMemberResolveResult)result;
+					if (ur.TargetType.Kind != TypeKind.Unknown) {
+						return new TooltipInformation () {
+							SignatureMarkup = string.Format ("error CS0117: `{0}' does not contain a definition for `{1}'", ur.TargetType.FullName, ur.MemberName)
+						};
+					}
+				} else if (result.IsError) {
+					return new TooltipInformation () {
+						SignatureMarkup = "Unknown resolve error."
+					};
+				}
+
+			if (result is LocalResolveResult) {
 				var lr = (LocalResolveResult)result;
-				s.Append ("<small><i>");
-				s.Append (lr.IsParameter ? paramStr : localStr);
-				s.Append ("</i></small>\n");
-				s.Append (ambience.GetString (lr.Variable.Type, settings));
-				s.Append (" ");
-				s.Append (lr.Variable.Name);
+				var tooltipInfo = new TooltipInformation ();
+				var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+				var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+				sig.BreakLineAfterReturnType =  false;
+				tooltipInfo.SignatureMarkup = sig.GetLocalVariableMarkup (lr.Variable);
+				return tooltipInfo;
 			} else if (result is MethodGroupResolveResult) {
 				var mrr = (MethodGroupResolveResult)result;
-				s.Append ("<small><i>");
-				s.Append (methodStr);
-				s.Append ("</i></small>\n");
 				var allMethods = new List<IMethod> (mrr.Methods);
 				foreach (var l in mrr.GetExtensionMethods ()) {
 					allMethods.AddRange (l);
@@ -231,57 +236,51 @@ namespace MonoDevelop.SourceEditor
 				
 				var method = allMethods.FirstOrDefault ();
 				if (method != null) {
-					s.Append (ambience.GetString (method, settings));
-					if (allMethods.Count > 1) {
-						int overloadCount = allMethods.Count - 1;
-						s.Append (string.Format (GettextCatalog.GetPluralString (" (+{0} overload)", " (+{0} overloads)", overloadCount), overloadCount));
-					}
-					doc = AmbienceService.GetDocumentationSummary (method);
+					return MemberCompletionData.CreateTooltipInformation (
+						doc.Compilation,
+						doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile,
+						doc.Editor,
+						doc.GetFormattingPolicy (),
+						method, 
+						false);
 				}
 			} else if (result is MemberResolveResult) {
 				var member = ((MemberResolveResult)result).Member;
-				s.Append ("<small><i>");
-				s.Append (GetString (member));
-				s.Append ("</i></small>\n");
-				var field = member as IField;
-				if (field != null && field.IsConst) {
-					s.Append (ambience.GetString (field.Type, settings));
-					s.Append (" ");
-					s.Append (field.Name);
-					s.Append (" = ");
-					s.Append (GetConst (field.ConstantValue));
-					s.Append (";");
-				} else {
-					s.Append (ambience.GetString (member, settings));
-				}
-				doc = AmbienceService.GetDocumentationSummary (member);
+				return MemberCompletionData.CreateTooltipInformation (
+					doc.Compilation,
+					doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile,
+					doc.Editor,
+					doc.GetFormattingPolicy (),
+					member, 
+					false);
 			} else if (result is NamespaceResolveResult) {
-				s.Append ("<small><i>");
-				s.Append (namespaceStr);
-				s.Append ("</i></small>\n");
-				s.Append (ambience.GetString (((NamespaceResolveResult)result).NamespaceName, settings));
-			} else {
-				var tr = result;
-				var typeString = GetString (tr.Type);
-				if (!string.IsNullOrEmpty (typeString)) {
-					s.Append ("<small><i>");
-					s.Append (typeString);
-					s.Append ("</i></small>\n");
+				var tooltipInfo = new TooltipInformation ();
+				var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+				var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+				sig.BreakLineAfterReturnType =  false;
+				try {
+					tooltipInfo.SignatureMarkup = sig.GetMarkup (((NamespaceResolveResult)result).Namespace);
+				} catch (Exception e) {
+					LoggingService.LogError ("Got exception while creating markup for :" + ((NamespaceResolveResult)result).Namespace, e);
+					return new TooltipInformation ();
 				}
-				settings.OutputFlags |= OutputFlags.UseFullName | OutputFlags.UseFullInnerTypeName;
-				s.Append (ambience.GetString (tr.Type, settings));
-				doc = AmbienceService.GetDocumentationSummary (tr.Type.GetDefinition ());
+				return tooltipInfo;
+			} else {
+				return MemberCompletionData.CreateTooltipInformation (
+					doc.Compilation,
+					doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile,
+					doc.Editor,
+					doc.GetFormattingPolicy (),
+					result.Type, 
+					false);
 			}
-			
-			if (!string.IsNullOrEmpty (doc)) {
-				s.Append ("\n<small>");
-				s.Append (AmbienceService.GetDocumentationMarkup ("<summary>" + doc + "</summary>"));
-				s.Append ("</small>");
+			} catch (Exception e) {
+				LoggingService.LogError ("Error while creating tooltip.", e);
+				return null;
 			}
-			return s.ToString ();
-		}
 		
-
+			return null;
+		}
 		class ErrorVisitor : DepthFirstAstVisitor
 		{
 			readonly CSharpAstResolver resolver;
@@ -324,68 +323,14 @@ namespace MonoDevelop.SourceEditor
 		}
 
 		
-		public void GetRequiredPosition (Mono.TextEditor.TextEditor editor, Gtk.Window tipWindow, out int requiredWidth, out double xalign)
+		protected override void GetRequiredPosition (Mono.TextEditor.TextEditor editor, Gtk.Window tipWindow, out int requiredWidth, out double xalign)
 		{
-			LanguageItemWindow win = (LanguageItemWindow) tipWindow;
-			requiredWidth = win.SetMaxWidth (win.Screen.Width);
+			var win = (TooltipInformationWindow) tipWindow;
+			requiredWidth = win.Allocation.Width;
 			xalign = 0.5;
 		}
-		
-		public bool IsInteractive (Mono.TextEditor.TextEditor editor, Gtk.Window tipWindow)
-		{
-			return false;
-		}
-		
+
 		#endregion 
-		
-		public class LanguageItemWindow: MonoDevelop.Components.TooltipWindow
-		{
-			public bool IsEmpty { get; set; }
-			
-			public LanguageItemWindow (string tooltip)
-			{
-				if (string.IsNullOrEmpty (tooltip)|| tooltip == "?") {
-					IsEmpty = true;
-					return;
-				}
-	
-				var label = new MonoDevelop.Components.FixedWidthWrapLabel () {
-					Wrap = Pango.WrapMode.WordChar,
-					Indent = -20,
-					BreakOnCamelCasing = true,
-					BreakOnPunctuation = true,
-					Markup = tooltip,
-				};
-				this.BorderWidth = 3;
-				Add (label);
-				UpdateFont (label);
-				
-				EnableTransparencyControl = true;
-			}
-			
-			//return the real width
-			public int SetMaxWidth (int maxWidth)
-			{
-				var label = Child as MonoDevelop.Components.FixedWidthWrapLabel;
-				if (label == null)
-					return Allocation.Width;
-				label.MaxWidth = maxWidth;
-				return label.RealWidth;
-			}
-			
-			protected override void OnStyleSet (Style previous_style)
-			{
-				base.OnStyleSet (previous_style);
-				UpdateFont (Child as MonoDevelop.Components.FixedWidthWrapLabel);
-			}
-			
-			void UpdateFont (MonoDevelop.Components.FixedWidthWrapLabel label)
-			{
-				if (label == null)
-					return;
-				label.FontDescription = MonoDevelop.Ide.Fonts.FontService.GetFontDescription ("LanguageTooltips");
-				
-			}
-		}
+
 	}
 }

@@ -41,7 +41,6 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
 using System.IO;
 using System.Text;
 using NGit;
@@ -60,7 +59,7 @@ namespace NGit
 	/// with this instance can alter at any time, if this instance is modified to
 	/// represent a different object name.
 	/// </remarks>
-	public abstract class AnyObjectId : IComparable
+	public abstract class AnyObjectId : System.IComparable<object>
 	{
 		/// <summary>Compare to object identifier byte sequences for equality.</summary>
 		/// <remarks>Compare to object identifier byte sequences for equality.</remarks>
@@ -557,7 +556,8 @@ namespace NGit
 		/// <summary>Return an abbreviation (prefix) of this object SHA-1.</summary>
 		/// <remarks>
 		/// Return an abbreviation (prefix) of this object SHA-1.
-		/// This implementation does not guaranteeing uniqueness. Callers should
+		/// <p>
+		/// This implementation does not guarantee uniqueness. Callers should
 		/// instead use
 		/// <see cref="ObjectReader.Abbreviate(AnyObjectId, int)">ObjectReader.Abbreviate(AnyObjectId, int)
 		/// 	</see>

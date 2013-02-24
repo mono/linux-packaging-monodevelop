@@ -134,12 +134,6 @@ MKDIR_P = @MKDIR_P@
 MONO = @MONO@
 MONODOC_CFLAGS = @MONODOC_CFLAGS@
 MONODOC_LIBS = @MONODOC_LIBS@
-MONO_ADDINS_CFLAGS = @MONO_ADDINS_CFLAGS@
-MONO_ADDINS_GUI_CFLAGS = @MONO_ADDINS_GUI_CFLAGS@
-MONO_ADDINS_GUI_LIBS = @MONO_ADDINS_GUI_LIBS@
-MONO_ADDINS_LIBS = @MONO_ADDINS_LIBS@
-MONO_ADDINS_SETUP_CFLAGS = @MONO_ADDINS_SETUP_CFLAGS@
-MONO_ADDINS_SETUP_LIBS = @MONO_ADDINS_SETUP_LIBS@
 MONO_GAC_PREFIX = @MONO_GAC_PREFIX@
 MONO_NUNIT_CFLAGS = @MONO_NUNIT_CFLAGS@
 MONO_NUNIT_LIBS = @MONO_NUNIT_LIBS@
@@ -442,7 +436,6 @@ check: check-recursive
 all-am: Makefile
 installdirs: installdirs-recursive
 installdirs-am:
-install: install-recursive
 install-exec: install-exec-recursive
 install-data: install-data-recursive
 uninstall: uninstall-recursive
@@ -551,6 +544,13 @@ uninstall-am:
 
 
 all:
+
+install:
+	mkdir -p $(DESTDIR)$(prefix)/lib/monodevelop/bin
+	cp -rf bin $(DESTDIR)$(prefix)/lib/monodevelop/
+	cp -rf AddIns $(DESTDIR)$(prefix)/lib/monodevelop/
+	cp -rf locale $(DESTDIR)$(prefix)/lib/monodevelop/
+	cp -rf data $(DESTDIR)$(prefix)/lib/monodevelop/
 
 clean-local:
 	rm -rf bin AddIns locale data

@@ -97,8 +97,11 @@ namespace MonoDevelop.Ide.CodeCompletion
 		
 		public static void PostProcessKeyEvent (CompletionTextEditorExtension ext, ICompletionWidget widget, Gdk.Key key, Gdk.ModifierType modifier)
 		{
+		}
+
+		public static void UpdateCursorPosition (CompletionTextEditorExtension ext, ICompletionWidget widget)
+		{	
 			// Called after the key has been processed by the editor
-		
 			if (methods.Count == 0)
 				return;
 				
@@ -121,7 +124,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			UpdateWindow (ext, widget);
 		}
 		
-		public static void ShowWindow (CompletionTextEditorExtension ext, ICompletionWidget widget, CodeCompletionContext ctx, IParameterDataProvider provider)
+		public static void ShowWindow (CompletionTextEditorExtension ext, ICompletionWidget widget, CodeCompletionContext ctx, ParameterDataProvider provider)
 		{
 			if (provider.Count == 0)
 				return;
@@ -142,6 +145,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 		public static void HideWindow (CompletionTextEditorExtension ext, ICompletionWidget widget)
 		{
 			methods.Clear ();
+			if (window != null)
+				window.ChangeOverload ();
 			UpdateWindow (ext, widget);
 		}
 		
@@ -161,36 +166,18 @@ namespace MonoDevelop.Ide.CodeCompletion
 		
 		static void UpdateOverload (CompletionTextEditorExtension ext, ICompletionWidget widget)
 		{
-			if (methods.Count == 0)
+			if (methods.Count == 0 || window == null)
 				return;
 			
 			// If the user enters more parameters than the current overload has,
 			// look for another overload with more parameters.
-			
 			MethodData md = methods [methods.Count - 1];
-			int cparam = ext.GetCurrentParameterIndex (md.MethodProvider.StartOffset);
-			
-			if (cparam > md.MethodProvider.GetParameterCount (md.CurrentOverload) && !md.MethodProvider.AllowParameterList (md.CurrentOverload)) {
-				// Look for an overload which has more parameters
-				int bestOverload = -1;
-				int bestParamCount = int.MaxValue;
-				for (int n=0; n<md.MethodProvider.Count; n++) {
-					int pc = md.MethodProvider.GetParameterCount (n);
-					if (pc < bestParamCount && pc >= cparam) {
-						bestOverload = n;
-						bestParamCount = pc;
-					}
-				}
-				if (bestOverload == -1) {
-					for (int n=0; n<md.MethodProvider.Count; n++) {
-						if (md.MethodProvider.AllowParameterList (n)) {
-							bestOverload = n;
-							break;
-						}
-					}
-				}
-				if (bestOverload != -1)
-					md.CurrentOverload = bestOverload;
+
+			int bestOverload = ext.GuessBestMethodOverload (md.MethodProvider, md.CurrentOverload);
+			if (bestOverload != -1) {
+				md.CurrentOverload = bestOverload;
+				window.ChangeOverload ();
+				UpdateWindow (ext, widget);
 			}
 		}
 		
@@ -227,7 +214,6 @@ namespace MonoDevelop.Ide.CodeCompletion
 				int curParam = window.Ext != null ? window.Ext.GetCurrentParameterIndex (lastMethod.MethodProvider.StartOffset) : 0;
 				var geometry2 = DesktopService.GetUsableMonitorGeometry (window.Screen, window.Screen.GetMonitorAtPoint (X, Y));
 				window.ShowParameterInfo (lastMethod.MethodProvider, lastMethod.CurrentOverload, curParam - 1, geometry2.Width);
-				window.ChangeOverload ();
 				PositionParameterInfoWindow (window.Allocation);
 				window.Show ();
 			}
@@ -293,8 +279,16 @@ namespace MonoDevelop.Ide.CodeCompletion
 		
 	class MethodData
 	{
-		public IParameterDataProvider MethodProvider;
+		public ParameterDataProvider MethodProvider;
 		public CodeCompletionContext CompletionContext;
-		public int CurrentOverload;
+		int currentOverload;
+		public int CurrentOverload {
+			get {
+				return currentOverload;
+			}
+			set {
+				currentOverload = value;
+			}
+		}
 	}
 }

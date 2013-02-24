@@ -11,6 +11,7 @@ namespace WinDoc
 {
 	static class Program
 	{
+		static readonly string externalMonodocPath = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.CommonApplicationData), "Monodoc");
 		static string monodocDir;
 
 		[STAThread]
@@ -23,14 +24,28 @@ namespace WinDoc
 				{ "docdir=", dir => docSources.Add (dir) },
 			}.Parse (args);
 
-			SetupLogging ();
-			PrepareCache ();
-			ExtractImages ();
+			if (initialUrl.StartsWith ("mdoc://")) {
+				initialUrl = initialUrl.Substring ("mdoc://".Length); // Remove leading scheme
+				initialUrl = initialUrl.Substring (0, initialUrl.Length - 1); // Remove trailing '/'
+				initialUrl = Uri.UnescapeDataString (initialUrl); // Unescape URL
+			}
+
+			// Don't crash if any of these steps fails
+			try {
+				PrepareCache ();
+				SetupLogging ();
+				ExtractImages ();
+			} catch (Exception e) {
+				Console.WriteLine ("Non-fatal exception during initialization: {0}", e);
+			}
 
 			// Load documentation
+			Directory.SetCurrentDirectory (Path.GetDirectoryName (typeof (Program).Assembly.Location));
 			Root = RootTree.LoadTree (null);
 			foreach (var dir in docSources)
 				Root.AddSource (dir);
+			if (Directory.Exists (externalMonodocPath))
+				Root.AddSource (externalMonodocPath);
 			
 			var winDocPath = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.ApplicationData), "WinDoc");
 			if (!Directory.Exists (winDocPath))
@@ -57,11 +72,8 @@ namespace WinDoc
 		{
 			monodocDir = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.ApplicationData), "WinDoc", "Caches");
 			var mdocimages = Path.Combine (monodocDir, "mdocimages");
-			if (!Directory.Exists (mdocimages)){
-				try {
-					Directory.CreateDirectory (mdocimages);
-				} catch {}
-			}
+			if (!Directory.Exists (mdocimages))
+				Directory.CreateDirectory (mdocimages);
 		}
 		
 		static void ExtractImages ()

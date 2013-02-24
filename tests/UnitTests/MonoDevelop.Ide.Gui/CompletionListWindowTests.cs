@@ -36,7 +36,7 @@ using MonoDevelop.Ide.Gui.Content;
 namespace MonoDevelop.Ide.Gui
 {
 	[TestFixture()]
-	public class CompletionListWindowTests
+	public class CompletionListWindowTests : UnitTests.TestBase
 	{
 		class TestCompletionWidget : ICompletionWidget 
 		{
@@ -211,7 +211,6 @@ namespace MonoDevelop.Ide.Gui
 				CompletionWidget = new TestCompletionWidget (),
 				AutoSelect = settings.AutoSelect,
 				CodeCompletionContext = new CodeCompletionContext (),
-				CompleteWithSpaceOrPunctuation = settings.CompleteWithSpaceOrPunctuation,
 				AutoCompleteEmptyMatch = settings.AutoCompleteEmptyMatch,
 				DefaultCompletionString = settings.DefaultCompletionString
 			};
@@ -246,18 +245,7 @@ namespace MonoDevelop.Ide.Gui
 			
 			Assert.AreEqual ("AbAbAb", output);
 		}
-		
-		[Test()]
-		public void TestPunctuationCompletionShouldNotComplete ()
-		{
-			string output = RunSimulation ("", "aaa ", true, false, 
-				"AbAb",
-				"AbAbAb", 
-				"AbAbAbAb");
-			
-			Assert.AreEqual (null, output);
-		}
-		
+
 		[Test()]
 		public void TestTabCompletion ()
 		{
@@ -290,7 +278,8 @@ namespace MonoDevelop.Ide.Gui
 			
 			Assert.AreEqual ("AbAbAb", output);
 		}
-		
+
+		[Ignore("\n now always commits")]
 		[Test()]
 		public void TestReturnCompletionWithAutoSelectOff ()
 		{
@@ -492,6 +481,7 @@ namespace MonoDevelop.Ide.Gui
 			Assert.AreEqual ("/AbAb", output);
 		}
 
+		[Ignore("Behavior was changed - commit with '.' now works everytime")]
 		[Test]
 		public void TestMatchPunctuationCommitOnSpaceAndPunctuation3 ()
 		{
@@ -694,7 +684,7 @@ namespace MonoDevelop.Ide.Gui
 		[Test]
 		public void TestSelectFirst ()
 		{
-			string output = RunSimulation ("", "Are\t", true, true, false, "AreSame", "AreEqual", "AreDifferent");
+			string output = RunSimulation ("", "Are\t", true, true, false, "AreDifferent", "Differenx", "AreDiffereny");
 			Assert.AreEqual ("AreDifferent", output);
 		}
 
@@ -736,6 +726,78 @@ namespace MonoDevelop.Ide.Gui
 			string output = RunSimulation ("", "View\t", true, true, false, "view", "View");
 			Assert.AreEqual ("View", output);
 		}
+
+		/// <summary>
+		/// Bug 6897 - Case insensitive matching issues
+		/// </summary>
+		[Test]
+		public void TestBug6897 ()
+		{
+			string output = RunSimulation ("", "io\t", true, true, false, "InvalidOperationException", "IO");
+			Assert.AreEqual ("IO", output);
+		}
+
+		[Test]
+		public void TestBug6897Case2 ()
+		{
+			string output = RunSimulation ("", "io\t", true, true, false, "InvalidOperationException", "IOException");
+			Assert.AreEqual ("IOException", output);
+		}
+
+		/// <summary>
+		/// Bug 7288 - Completion not selecting the correct entry
+		/// </summary>
+		[Test]
+		public void TestBug7288 ()
+		{
+			string output = RunSimulation ("", "pages\t", true, true, false, "pages", "PageSystem");
+			Assert.AreEqual ("pages", output);
+		}
+
+		/// <summary>
+		/// Bug 7420 - Prefer properties over named parameters
+		/// </summary>
+		[Test]
+		public void TestBug7420 ()
+		{
+			string output = RunSimulation ("", "val\t", true, true, false, "Value", "value:");
+			Assert.AreEqual ("Value", output);
+
+			output = RunSimulation ("", "val\t", true, true, false, "Value", "value", "value:");
+			Assert.AreEqual ("value", output);
+		}
+
+		/// <summary>
+		/// Bug 7522 - Code completion list should give preference to shorter words
+		/// </summary>
+		[Test]
+		public void TestBug7522 ()
+		{
+			string output = RunSimulation ("", "vis\t", true, true, false, "VisibilityNotifyEvent", "Visible");
+			Assert.AreEqual ("Visible", output);
+		}
+
+		/// <summary>
+		/// Bug 8257 - Incorrect entry selected in code completion list
+		/// </summary>
+		[Test]
+		public void TestBug8257 ()
+		{
+			string output = RunSimulation ("", "childr\t", true, true, false, "children", "ChildRequest");
+			Assert.AreEqual ("children", output);
+		}
+
+		
+		/// <summary>
+		/// Bug 9114 - Code completion fumbles named parameters 
+		/// </summary>
+		[Test]
+		public void TestBug9114 ()
+		{
+			string output = RunSimulation ("", "act\t", true, true, false, "act:", "Action");
+			Assert.AreEqual ("act:", output);
+		}
+
 
 		[TestFixtureSetUp] 
 		public void SetUp()

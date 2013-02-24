@@ -54,6 +54,7 @@ namespace MonoDevelop.SourceEditor
 		
 		SourceEditorView view;
 		ExtensionContext extensionContext;
+		Adjustment cachedHAdjustment, cachedVAdjustment;
 		
 		public ITextEditorExtension Extension {
 			get;
@@ -168,8 +169,20 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 
+		void UnregisterAdjustments ()
+		{
+			if (cachedHAdjustment != null)
+				cachedHAdjustment.ValueChanged -= HAdjustment_ValueChanged;
+			if (cachedVAdjustment != null)
+				cachedVAdjustment.ValueChanged -= VAdjustment_ValueChanged;
+			cachedHAdjustment = null;
+			cachedVAdjustment = null;
+		}
+
 		protected override void OnDestroyed ()
 		{
+			UnregisterAdjustments ();
+
 			ExtensionContext = null;
 			view = null;
 			base.OnDestroyed ();
@@ -181,9 +194,9 @@ namespace MonoDevelop.SourceEditor
 		
 		void OnTooltipProviderChanged (object s, ExtensionNodeEventArgs a)
 		{
-			ITooltipProvider provider;
+			TooltipProvider provider;
 			try {
-				provider = (ITooltipProvider) a.ExtensionObject;
+				provider = (TooltipProvider) a.ExtensionObject;
 			} catch (Exception e) {
 				LoggingService.LogError ("Can't create tooltip provider:"+ a.ExtensionNode, e);
 				return;
@@ -202,7 +215,7 @@ namespace MonoDevelop.SourceEditor
 		
 		protected override void OptionsChanged (object sender, EventArgs args)
 		{
-			if (view.Control != null) {
+			if (view != null && view.Control != null) {
 				if (!Options.ShowFoldMargin)
 					this.Document.ClearFoldSegments ();
 			}
@@ -363,7 +376,7 @@ namespace MonoDevelop.SourceEditor
 			char insertionChar = '\0';
 			bool insertMatchingBracket = false;
 			IDisposable undoGroup = null;
-			if (skipChar == null && Options.AutoInsertMatchingBracket && braceIndex >= 0) {
+			if (skipChar == null && Options.AutoInsertMatchingBracket && braceIndex >= 0 && !IsSomethingSelected) {
 				if (!inStringOrComment) {
 					char closingBrace = closingBrackets [braceIndex];
 					char openingBrace = openBrackets [braceIndex];
@@ -394,21 +407,25 @@ namespace MonoDevelop.SourceEditor
 			if (insertMatchingBracket)
 				undoGroup = Document.OpenUndoGroup ();
 
+			var oldMode = Caret.IsInInsertMode;
 			if (skipChar != null) {
-				Caret.Offset++;
+				Caret.IsInInsertMode = false;
 				skipChars.Remove (skipChar);
-			} else {
-				if (Extension != null) {
-					if (ExtensionKeyPress (key, ch, state)) 
-						result = base.OnIMProcessedKeyPressEvent (key, ch, state);
-					if (returnBetweenBraces)
-						HitReturn ();
-				} else {
-					result = base.OnIMProcessedKeyPressEvent (key, ch, state);
-					if (returnBetweenBraces)
-						HitReturn ();
-				}
 			}
+			if (Extension != null) {
+				if (ExtensionKeyPress (key, ch, state)) 
+					result = base.OnIMProcessedKeyPressEvent (key, ch, state);
+				if (returnBetweenBraces)
+					HitReturn ();
+			} else {
+				result = base.OnIMProcessedKeyPressEvent (key, ch, state);
+				if (returnBetweenBraces)
+					HitReturn ();
+			}
+			if (skipChar != null) {
+				Caret.IsInInsertMode = oldMode;
+			}
+
 			if (insertMatchingBracket) {
 				GetTextEditorData ().EnsureCaretIsNotVirtual ();
 				int offset = Caret.Offset;
@@ -631,25 +648,9 @@ namespace MonoDevelop.SourceEditor
 				var result = template.InsertTemplateContents (document);
 
 				var links = result.TextLinks;
-				if (PropertyService.Get ("OnTheFlyFormatting", true)) {
-					var prettyPrinter = CodeFormatterService.GetFormatter (Document.MimeType);
-					if (prettyPrinter != null) {
-						int endOffset = result.InsertPosition + result.Code.Length;
-						//						string oldText = Document.GetTextAt (result.InsertPosition, result.Code.Length);
-						//						var policies = document.Project != null ? document.Project.Policies : null;
-						var oldVersion = Document.Version;
-						prettyPrinter.OnTheFlyFormat (document, result.InsertPosition, endOffset);
-						foreach (var textLink in links) {
-							for (int i = 0; i < textLink.Links.Count; i++) {
-								var segment = textLink.Links [i];
-								var translatedOffset = oldVersion.MoveOffsetTo (Document.Version, result.InsertPosition + segment.Offset) - result.InsertPosition;
-								textLink.Links [i] = new TextSegment (translatedOffset, segment.Length);
-							}
-						}
-					}
-				}
 
 				var tle = new TextLinkEditMode (this, result.InsertPosition, links);
+				tle.TextLinkMode = TextLinkMode.General;
 				if (tle.ShouldStartTextLinkMode) {
 					tle.OldMode = CurrentMode;
 					tle.StartMode ();
@@ -658,22 +659,32 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 
-		protected override void HAdjustmentValueChanged ()
+		protected override void OnScrollAdjustmentsSet()
 		{
-			base.HAdjustmentValueChanged ();
+			UnregisterAdjustments ();
+			if (HAdjustment != null) {
+				cachedHAdjustment = HAdjustment;
+				HAdjustment.ValueChanged += HAdjustment_ValueChanged;
+			}
+			if (VAdjustment != null) {
+				cachedVAdjustment = VAdjustment;
+				VAdjustment.ValueChanged += VAdjustment_ValueChanged;
+			}
+		}
+
+		void VAdjustment_ValueChanged (object sender, EventArgs e)
+		{
+			CompletionWindowManager.HideWindow ();
+			ParameterInformationWindowManager.HideWindow (null, view);
+		}
+
+		void HAdjustment_ValueChanged (object sender, EventArgs e)
+		{
 			if (!isInKeyStroke) {
 				CompletionWindowManager.HideWindow ();
 				ParameterInformationWindowManager.HideWindow (null, view);
 			}
 		}
-		
-		protected override void VAdjustmentValueChanged ()
-		{
-			base.VAdjustmentValueChanged ();
-			CompletionWindowManager.HideWindow ();
-			ParameterInformationWindowManager.HideWindow (null, view);
-		}
-		
 		
 #endregion
 		
@@ -981,12 +992,6 @@ namespace MonoDevelop.SourceEditor
 		internal void OnPulseCaretCommand ()
 		{
 			StartCaretPulseAnimation ();
-		}
-		
-		[CommandHandler (MonoDevelop.SourceEditor.SourceEditorCommands.ToggleCodeFocus)]
-		internal void OnToggleCodeFocus ()
-		{
-			foldMarkerMargin.IsInCodeFocusMode = !foldMarkerMargin.IsInCodeFocusMode;
 		}
 		
 		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.TransposeCharacters)]

@@ -205,6 +205,7 @@ namespace GuiCompare
 			"System.AddIn",
 			"System.AddIn.Contract",
 			"System.Configuration",
+			"System.ComponentModel.DataAnnotations",
 			"System.Core", 
 			// "System.Configuration.Install",
 			"System.Data",
@@ -797,12 +798,17 @@ namespace GuiCompare
 		// 
 		// Constructor
 		//
-		public InfoManager (MainWindow main)
+		public InfoManager (MainWindow main, string profilePath)
 		{
 			this.main = main;
 			
-			string corlibdir = System.IO.Path.GetDirectoryName (typeof (int).Assembly.Location);
-			monodir = System.IO.Path.GetFullPath (System.IO.Path.Combine (corlibdir, "..")); 
+			if (profilePath == null) {
+				string corlibdir = System.IO.Path.GetDirectoryName (typeof (int).Assembly.Location);
+				monodir = System.IO.Path.GetFullPath (System.IO.Path.Combine (corlibdir, "..")); 
+			} else {
+				monodir = profilePath;
+			}
+			
 			moondir = System.IO.Path.Combine (monodir, @"../moonlight/plugin");
 	
 			// Work around limitation in Stetic, there is no way
@@ -860,9 +866,9 @@ namespace GuiCompare
 			Populate (sub, "Silverlight 4.0", GetVersionPath ("2.1", "net_2_1"), "SL4", api_sl4);
 		}
 		
-		static string GetVersionPath (string version, string profile)
+		string GetVersionPath (string version, string profile)
 		{
-			if (string.IsNullOrEmpty (Environment.GetEnvironmentVariable ("MONO_PATH")))
+			if (!monodir.Contains (Path.Combine ("mcs", "class", "lib")))
 				return version;
 
 			// Developer's version pointing to /mcs/class/lib/<profile>/

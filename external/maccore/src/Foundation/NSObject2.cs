@@ -1,3 +1,24 @@
+// Copyright 2011, 2012 Xamarin Inc
+//
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to
+// the following conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+// WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
 using System;
 using System.Reflection;
 using System.Collections.Generic;
@@ -14,7 +35,8 @@ using MonoMac.CoreGraphics;
 namespace MonoMac.Foundation {
 
 	public partial class NSObject {
-		static IntPtr selConformsToProtocol = Selector.GetHandle ("conformsToProtocol:");
+		static readonly IntPtr selConformsToProtocol = Selector.GetHandle ("conformsToProtocol:");
+		static readonly IntPtr selEncodeWithCoder = Selector.GetHandle ("encodeWithCoder:");
 		
 		[Export ("encodeWithCoder:")]
 		public virtual void EncodeTo (NSCoder coder)
@@ -23,9 +45,9 @@ namespace MonoMac.Foundation {
 				throw new ArgumentNullException ("coder");
 			
 			if (IsDirectBinding) {
-				Messaging.void_objc_msgSend_intptr (this.Handle, selAwakeFromNib, coder.Handle);
+				Messaging.void_objc_msgSend_intptr (this.Handle, selEncodeWithCoder, coder.Handle);
 			} else {
-				Messaging.void_objc_msgSendSuper_intptr (this.SuperHandle, selAwakeFromNib, coder.Handle);
+				Messaging.void_objc_msgSendSuper_intptr (this.SuperHandle, selEncodeWithCoder, coder.Handle);
 			}
 		}
 
@@ -105,6 +127,11 @@ namespace MonoMac.Foundation {
 				else if (t == typeof (CATransform3D))
 					return NSValue.FromCATransform3D ((CATransform3D) obj);
 #endif
+				// last chance for types like CGPath, CGColor... that are not NSObject but are CFObject
+				// see https://bugzilla.xamarin.com/show_bug.cgi?id=8458
+				INativeObject native = (obj as INativeObject);
+				if (native != null)
+					return Runtime.GetNSObject (native.Handle);
 				return null;
 			}
 		}
@@ -120,5 +147,22 @@ namespace MonoMac.Foundation {
 			}
 			
 		}
+
+		public override string ToString ()
+		{
+			return Description ?? base.ToString ();
+		}
+
+                public virtual void Invoke (NSAction action, double delay)
+                {
+                        var d = new NSAsyncActionDispatcher (action);
+                        PerformSelector (NSActionDispatcher.Selector, d, delay);
+                }
+
+                public virtual void Invoke (NSAction action, TimeSpan delay)
+                {
+                        var d = new NSAsyncActionDispatcher (action);
+                        PerformSelector (NSActionDispatcher.Selector, d, delay.TotalSeconds);
+                }
 	}
 }

@@ -85,7 +85,7 @@ namespace MonoDevelop.VersionControl.Views
 		
 		public Ide.Gui.Document Document {
 			get {
-				return info.Document.WorkbenchWindow.Document;
+				return info.Document.ParentDocument;
 			}
 		}
 		public VersionControlItem VersionControlItem {
@@ -472,10 +472,10 @@ namespace MonoDevelop.VersionControl.Views
 				if (highlightAnnotation == null)
 					return;
 				int i = 1;
-				foreach (var content in widget.info.Document.WorkbenchWindow.SubViewContents) {
-					DiffView diffView = content as DiffView;
+				foreach (var view in widget.info.Document.ParentDocument.Views) {
+					DiffView diffView = view.GetContent<DiffView> ();
 					if (diffView != null) {
-						widget.info.Document.WorkbenchWindow.SwitchView (i);
+						view.Select ();
 						var rev = widget.info.History.FirstOrDefault (h => h.ToString () == highlightAnnotation.Revision);
 						if (rev == null)
 							return;
@@ -493,10 +493,10 @@ namespace MonoDevelop.VersionControl.Views
 				if (highlightAnnotation == null)
 					return;
 				int i = 1;
-				foreach (var content in widget.info.Document.WorkbenchWindow.SubViewContents) {
-					LogView logView = content as LogView;
+				foreach (var view in widget.info.Document.ParentDocument.Views) {
+					LogView logView = view.GetContent<LogView> ();
 					if (logView != null) {
-						widget.info.Document.WorkbenchWindow.SwitchView (i);
+						view.Select ();
 						var rev = widget.info.History.FirstOrDefault (h => h.ToString () == highlightAnnotation.Revision);
 						if (rev == null)
 							return;
@@ -524,7 +524,7 @@ namespace MonoDevelop.VersionControl.Views
 			{
 				StatusBarContext ctx = IdeApp.Workbench.StatusBar.CreateContext ();
 				ctx.AutoPulse = true;
-				ctx.ShowMessage (ImageService.GetImage ("md-version-control", IconSize.Menu), GettextCatalog.GetString ("Retrieving history"));
+				ctx.ShowMessage ("md-version-control", GettextCatalog.GetString ("Retrieving history"));
 				
 				ThreadPool.QueueUserWorkItem (delegate {
 					try {
@@ -575,14 +575,14 @@ namespace MonoDevelop.VersionControl.Views
 					
 					if (lineCount > 0)
 						annotations.RemoveRange (startLine - 1, lineCount);
-					if (!string.IsNullOrEmpty (e.InsertedText)) {
+					if (!string.IsNullOrEmpty (e.InsertedText.Text)) {
 						for (int i=0; i<lineCount; ++i)
 							annotations.Insert (startLine - 1, locallyModified);
 					}
 					return;
 				} else if (0 == e.RemovalLength) {
 					// insert
-					tokens = e.InsertedText.Split (new string[]{Environment.NewLine}, StringSplitOptions.None);
+					tokens = e.InsertedText.Text.Split (new string[]{Environment.NewLine}, StringSplitOptions.None);
 						lineCount = tokens.Length - 1;
 						for (int i=0; i<lineCount; ++i) {
 							annotations.Insert (Math.Min (startLine, annotations.Count), locallyModified);

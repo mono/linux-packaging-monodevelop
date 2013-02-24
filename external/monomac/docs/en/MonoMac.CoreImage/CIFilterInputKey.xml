@@ -57,8 +57,9 @@
         <ReturnType>MonoMac.Foundation.NSString</ReturnType>
       </ReturnValue>
       <Docs>
-        <summary>To be added.</summary>
-        <value>To be added.</value>
+        <summary>Represents the value associated with the constant kCIInputBackgroundImageKey</summary>
+        <value>
+        </value>
         <remarks>To be added.</remarks>
       </Docs>
     </Member>
@@ -185,8 +186,9 @@
         <ReturnType>MonoMac.Foundation.NSString</ReturnType>
       </ReturnValue>
       <Docs>
-        <summary>To be added.</summary>
-        <value>To be added.</value>
+        <summary>Represents the value associated with the constant kCIInputImageKey</summary>
+        <value>
+        </value>
         <remarks>To be added.</remarks>
       </Docs>
     </Member>
@@ -353,6 +355,22 @@
     <Member MemberName="Transform">
       <MemberSignature Language="C#" Value="public static MonoMac.Foundation.NSString Transform { get; }" />
       <MemberSignature Language="ILAsm" Value=".property class MonoMac.Foundation.NSString Transform" />
+      <MemberType>Property</MemberType>
+      <AssemblyInfo>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
+      </AssemblyInfo>
+      <ReturnValue>
+        <ReturnType>MonoMac.Foundation.NSString</ReturnType>
+      </ReturnValue>
+      <Docs>
+        <summary>To be added.</summary>
+        <value>To be added.</value>
+        <remarks>To be added.</remarks>
+      </Docs>
+    </Member>
+    <Member MemberName="Version">
+      <MemberSignature Language="C#" Value="public static MonoMac.Foundation.NSString Version { get; }" />
+      <MemberSignature Language="ILAsm" Value=".property class MonoMac.Foundation.NSString Version" />
       <MemberType>Property</MemberType>
       <AssemblyInfo>
         <AssemblyVersion>0.0.0.0</AssemblyVersion>

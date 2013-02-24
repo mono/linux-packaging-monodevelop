@@ -57,7 +57,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			if (String.Compare (Path.GetExtension (file), ".sln", true) == 0) {
 				string tmp;
 				string version = GetSlnFileVersion (file, out tmp);
-				return version == format.SlnVersion;
+				return format.SupportsSlnVersion (version);
 			}
 			return false;
 		}
@@ -308,12 +308,19 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					if (p is UnknownSolutionItem)
 						continue;
 					
-					list.Add (String.Format (
-						"\t\t{0}.{1}.ActiveCfg = {2}", p.ItemId, ToSlnConfigurationId (cc), ToSlnConfigurationId (cce.ItemConfiguration)));
+                    // <ProjectGuid>...</ProjectGuid> in some Visual Studio generated F# project files 
+                    // are missing "{"..."}" in their guid. This is not generally a problem since it
+                    // is a valid GUID format. However the solution file format requires that these are present. 
+                    string itemGuid = p.ItemId;
+                    if (!itemGuid.StartsWith("{") && !itemGuid.EndsWith("}")) 
+                        itemGuid = "{" + itemGuid + "}";
+
+                    list.Add (String.Format (
+                        "\t\t{0}.{1}.ActiveCfg = {2}", itemGuid, ToSlnConfigurationId (cc), ToSlnConfigurationId (cce.ItemConfiguration)));
 
 					if (cce.Build)
 						list.Add (String.Format (
-							"\t\t{0}.{1}.Build.0 = {2}", p.ItemId, ToSlnConfigurationId (cc), ToSlnConfigurationId (cce.ItemConfiguration)));
+                            "\t\t{0}.{1}.Build.0 = {2}", itemGuid, ToSlnConfigurationId (cc), ToSlnConfigurationId (cce.ItemConfiguration)));
 				}
 			}
 			
@@ -596,6 +603,9 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				ProjectExtensionUtil.BeginLoadOperation ();
 				sol = new Solution ();
 				monitor.BeginTask (string.Format (GettextCatalog.GetString ("Loading solution: {0}"), fileName), 1);
+				var projectLoadMonitor = monitor as IProjectLoadProgressMonitor;
+				if (projectLoadMonitor != null)
+					projectLoadMonitor.CurrentSolution = sol;
 				LoadSolution (sol, fileName, format, monitor);
 			} catch (Exception ex) {
 				monitor.ReportError (GettextCatalog.GetString ("Could not load solution: {0}", fileName), ex);
@@ -694,7 +704,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				string projTypeGuid = match.Groups [1].Value.ToUpper ();
 				string projectName = match.Groups [2].Value;
 				string projectPath = match.Groups [3].Value;
-				string projectGuid = match.Groups [4].Value;
+				string projectGuid = match.Groups [4].Value.ToUpper ();
 
 				if (projTypeGuid == MSBuildProjectService.FolderTypeGuid) {
 					//Solution folder
@@ -934,7 +944,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					continue;
 				}
 
-				string projGuid = t [0];
+				string projGuid = t [0].ToUpper ();
 				string slnConfig = t [1];
 
 				if (!slnData.ItemsByGuid.ContainsKey (projGuid)) {
@@ -1060,7 +1070,9 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				return;
 
 			for (int i = 0; i < sec.Count - 2; i ++) {
+				// Guids should be upper case for VS compatibility
 				KeyValuePair<string, string> pair = SplitKeyValue (lines [i + sec.Start + 1].Trim ());
+				pair = new KeyValuePair<string, string> (pair.Key.ToUpper (), pair.Value.ToUpper ());
 
 				SolutionItem folderItem;
 				SolutionItem item;

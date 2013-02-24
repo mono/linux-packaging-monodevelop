@@ -45,6 +45,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using NGit;
+using NGit.Api;
+using NGit.Api.Errors;
 using NGit.Dircache;
 using NGit.Junit;
 using NGit.Revwalk;
@@ -94,6 +96,20 @@ namespace NGit
 		protected internal virtual FilePath WriteTrashFile(string name, string data)
 		{
 			return JGitTestUtil.WriteTrashFile(db, name, data);
+		}
+
+		/// <exception cref="System.IO.IOException"></exception>
+		protected internal virtual FilePath WriteTrashFile(string subdir, string name, string
+			 data)
+		{
+			return JGitTestUtil.WriteTrashFile(db, subdir, name, data);
+		}
+
+		/// <exception cref="System.IO.IOException"></exception>
+		protected internal virtual string Read(string name)
+		{
+			return base.Read (name);
+			return JGitTestUtil.Read(db, name);
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
@@ -407,6 +423,10 @@ namespace NGit
 		public static long FsTick(FilePath lastFile)
 		{
 			long sleepTime = 1;
+			if (lastFile != null && !lastFile.Exists())
+			{
+				throw new FileNotFoundException(lastFile.GetPath());
+			}
 			FilePath tmp = FilePath.CreateTempFile("FileTreeIteratorWithTimeControl", null);
 			try
 			{
@@ -452,6 +472,107 @@ namespace NGit
 			// update the HEAD
 			RefUpdate refUpdate = db.UpdateRef(Constants.HEAD);
 			refUpdate.Link(branchName);
+		}
+
+		/// <summary>Writes a number of files in the working tree.</summary>
+		/// <remarks>
+		/// Writes a number of files in the working tree. The first content specified
+		/// will be written into a file named '0', the second into a file named "1"
+		/// and so on. If <code>null</code> is specified as content then this file is
+		/// skipped.
+		/// </remarks>
+		/// <param name="ensureDistinctTimestamps">
+		/// if set to <code>true</code> then between two write operations
+		/// this method will wait to ensure that the second file will get
+		/// a different lastmodification timestamp than the first file.
+		/// </param>
+		/// <param name="contents">the contents which should be written into the files</param>
+		/// <returns>the File object associated to the last written file.</returns>
+		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
+		/// <exception cref="System.Exception">System.Exception</exception>
+		protected internal virtual FilePath WriteTrashFiles(bool ensureDistinctTimestamps
+			, params string[] contents)
+		{
+			FilePath f = null;
+			for (int i = 0; i < contents.Length; i++)
+			{
+				if (contents[i] != null)
+				{
+					if (ensureDistinctTimestamps && (f != null))
+					{
+						FsTick(f);
+					}
+					f = WriteTrashFile(Sharpen.Extensions.ToString(i), contents[i]);
+				}
+			}
+			return f;
+		}
+
+		/// <summary>
+		/// Commit a file with the specified contents on the specified branch,
+		/// creating the branch if it didn't exist before.
+		/// </summary>
+		/// <remarks>
+		/// Commit a file with the specified contents on the specified branch,
+		/// creating the branch if it didn't exist before.
+		/// <p>
+		/// It switches back to the original branch after the commit if there was
+		/// one.
+		/// </remarks>
+		/// <param name="filename"></param>
+		/// <param name="contents"></param>
+		/// <param name="branch"></param>
+		/// <returns>the created commit</returns>
+		protected internal virtual RevCommit CommitFile(string filename, string contents, 
+			string branch)
+		{
+			try
+			{
+				Git git = new Git(db);
+				string originalBranch = git.GetRepository().GetFullBranch();
+				if (git.GetRepository().GetRef(branch) == null)
+				{
+					git.BranchCreate().SetName(branch).Call();
+				}
+				git.Checkout().SetName(branch).Call();
+				WriteTrashFile(filename, contents);
+				git.Add().AddFilepattern(filename).Call();
+				RevCommit commit = git.Commit().SetMessage(branch + ": " + filename).Call();
+				if (originalBranch != null)
+				{
+					git.Checkout().SetName(originalBranch).Call();
+				}
+				return commit;
+			}
+			catch (IOException e)
+			{
+				throw new RuntimeException(e);
+			}
+			catch (GitAPIException e)
+			{
+				throw new RuntimeException(e);
+			}
+		}
+
+		protected internal virtual DirCacheEntry CreateEntry(string path, FileMode mode)
+		{
+			return CreateEntry(path, mode, DirCacheEntry.STAGE_0, path);
+		}
+
+		protected internal virtual DirCacheEntry CreateEntry(string path, FileMode mode, 
+			string content)
+		{
+			return CreateEntry(path, mode, DirCacheEntry.STAGE_0, content);
+		}
+
+		protected internal virtual DirCacheEntry CreateEntry(string path, FileMode mode, 
+			int stage, string content)
+		{
+			DirCacheEntry entry = new DirCacheEntry(path, stage);
+			entry.FileMode = mode;
+			entry.SetObjectId(new ObjectInserter.Formatter().IdFor(Constants.OBJ_BLOB, Constants
+				.Encode(content)));
+			return entry;
 		}
 	}
 }

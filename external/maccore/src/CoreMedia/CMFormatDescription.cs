@@ -5,6 +5,7 @@
 //   Miguel de Icaza (miguel@xamarin.com)
 //   Frank Krueger
 //   Mono Team
+//   Marek Safar (marek.safar@gmail.com)	
 //     
 // Copyright 2010 Novell, Inc
 // Copyright 2012 Xamarin Inc
@@ -17,11 +18,15 @@ using MonoMac.Foundation;
 using MonoMac.CoreFoundation;
 using MonoMac.ObjCRuntime;
 using MonoMac.CoreVideo;
-#if !COREBUILD
 using MonoMac.AudioToolbox;
-#endif
 
 namespace MonoMac.CoreMedia {
+
+	public enum CMFormatDescriptionError {
+		None				= 0,
+		InvalidParameter	= -12710,
+		AllocationFailed	= -12711,
+	}
 
 	[Since (4,0)]
 	public class CMFormatDescription : INativeObject, IDisposable {
@@ -93,6 +98,7 @@ namespace MonoMac.CoreMedia {
 		[DllImport(Constants.CoreMediaLibrary)]
 		extern static uint CMFormatDescriptionGetMediaSubType (IntPtr handle);
 		
+		[Obsolete ("Use specific SubType property")]
 		public uint MediaSubType
 		{
 			get
@@ -100,7 +106,49 @@ namespace MonoMac.CoreMedia {
 				return CMFormatDescriptionGetMediaSubType (handle);
 			}
 		}
-		
+
+		public AudioFormatType AudioFormatType {
+			get {
+				return MediaType == CMMediaType.Audio ? (AudioFormatType) MediaSubType : 0;
+			}
+		}
+
+		public CMSubtitleFormatType SubtitleFormatType {
+			get {
+				return MediaType == CMMediaType.Subtitle ? (CMSubtitleFormatType) MediaSubType : 0;
+			}
+		}
+
+		public CMClosedCaptionFormatType ClosedCaptionFormatType {
+			get {
+				return MediaType == CMMediaType.ClosedCaption ? (CMClosedCaptionFormatType) MediaSubType : 0;				
+			}
+		}
+
+		public CMMuxedStreamType MuxedStreamType {
+			get {
+				return MediaType == CMMediaType.Muxed ? (CMMuxedStreamType) MediaSubType : 0;	
+			}
+		}
+
+		public CMVideoCodecType VideoCodecType {
+			get {
+				return MediaType == CMMediaType.Video ? (CMVideoCodecType) MediaSubType : 0;
+			}
+		}
+
+		public CMMetadataFormatType MetadataFormatType {
+			get {
+				return MediaType == CMMediaType.Metadata ? (CMMetadataFormatType) MediaSubType : 0;
+			}
+		}
+
+		public CMTimeCodeFormatType TimeCodeFormatType {
+			get {
+				return MediaType == CMMediaType.TimeCode ? (CMTimeCodeFormatType) MediaSubType : 0;				
+			}
+		}
+
 		[DllImport(Constants.CoreMediaLibrary)]
 		extern static CMMediaType CMFormatDescriptionGetMediaType (IntPtr handle);
 		
@@ -119,7 +167,39 @@ namespace MonoMac.CoreMedia {
 		{
 			return CMFormatDescriptionGetTypeID ();
 		}
+
 #if !COREBUILD
+
+		[DllImport (Constants.CoreMediaLibrary)]
+		extern static CMFormatDescriptionError CMFormatDescriptionCreate (IntPtr allocator, CMMediaType mediaType, uint mediaSubtype, IntPtr extensions, out IntPtr handle);
+
+		public static CMFormatDescription Create (CMMediaType mediaType, uint mediaSubtype, out CMFormatDescriptionError error)
+		{
+			IntPtr handle;
+			error = CMFormatDescriptionCreate (IntPtr.Zero, mediaType, mediaSubtype, IntPtr.Zero, out handle);
+			if (error != CMFormatDescriptionError.None)
+				return null;
+
+			return Create (mediaType, handle, true);
+		}
+
+		public static CMFormatDescription Create (IntPtr handle, bool owns)
+		{
+			return Create (CMFormatDescriptionGetMediaType (handle), handle, owns);
+		}
+
+		static CMFormatDescription Create (CMMediaType type, IntPtr handle, bool owns)
+		{		
+			switch (type) {
+			case CMMediaType.Video:
+				return new CMVideoFormatDescription (handle);
+			case CMMediaType.Audio:
+				return new CMAudioFormatDescription (handle);
+			default:
+				return new CMFormatDescription (handle);
+			}
+		}
+
 		[DllImport (Constants.CoreMediaLibrary)]
 		extern static IntPtr CMAudioFormatDescriptionGetStreamBasicDescription (IntPtr handle);
 
@@ -142,9 +222,9 @@ namespace MonoMac.CoreMedia {
 			get {
 				int size;
 				var res = CMAudioFormatDescriptionGetChannelLayout (handle, out size);
-				if (res == IntPtr.Zero)
+				if (res == IntPtr.Zero || size == 0)
 					return null;
-				return AudioChannelLayout.FromHandle (handle);
+				return AudioChannelLayout.FromHandle (res);
 			}
 		}
 
@@ -213,7 +293,9 @@ namespace MonoMac.CoreMedia {
 		}
 
 		[DllImport (Constants.CoreMediaLibrary)]
-		extern static Size CMVideoFormatDescriptionGetDimensions (IntPtr handle);
+		internal extern static Size CMVideoFormatDescriptionGetDimensions (IntPtr handle);
+
+		[Obsolete ("Use CMVideoFormatDescription")]
 		public Size  VideoDimensions {
 			get {
 				return CMVideoFormatDescriptionGetDimensions (handle);
@@ -221,8 +303,9 @@ namespace MonoMac.CoreMedia {
 		}
 
 		[DllImport (Constants.CoreMediaLibrary)]
-		extern static RectangleF CMVideoFormatDescriptionGetCleanAperture (IntPtr handle, bool originIsAtTopLeft);
+		internal extern static RectangleF CMVideoFormatDescriptionGetCleanAperture (IntPtr handle, bool originIsAtTopLeft);
 
+		[Obsolete ("Use CMVideoFormatDescription")]
 		public RectangleF GetVideoCleanAperture (bool originIsAtTopLeft)
 		{
 			return CMVideoFormatDescriptionGetCleanAperture (handle, originIsAtTopLeft);
@@ -230,6 +313,8 @@ namespace MonoMac.CoreMedia {
 
 		[DllImport (Constants.CoreMediaLibrary)]
 		extern static IntPtr CMVideoFormatDescriptionGetExtensionKeysCommonWithImageBuffers ();
+
+		// Belongs to CMVideoFormatDescription
 		public static NSObject [] GetExtensionKeysCommonWithImageBuffers ()
 		{
 			var arr = CMVideoFormatDescriptionGetExtensionKeysCommonWithImageBuffers ();
@@ -237,8 +322,9 @@ namespace MonoMac.CoreMedia {
 		}
 
 		[DllImport (Constants.CoreMediaLibrary)]
-		extern static SizeF CMVideoFormatDescriptionGetPresentationDimensions (IntPtr handle, bool usePixelAspectRatio, bool useCleanAperture);
+		internal extern static SizeF CMVideoFormatDescriptionGetPresentationDimensions (IntPtr handle, bool usePixelAspectRatio, bool useCleanAperture);
 
+		[Obsolete ("Use CMVideoFormatDescription")]
 		public SizeF GetVideoPresentationDimensions (bool usePixelAspectRatio, bool useCleanAperture)
 		{
 			return CMVideoFormatDescriptionGetPresentationDimensions (handle, usePixelAspectRatio, useCleanAperture);
@@ -247,13 +333,97 @@ namespace MonoMac.CoreMedia {
 		[DllImport (Constants.CoreMediaLibrary)]
 		extern static int CMVideoFormatDescriptionMatchesImageBuffer (IntPtr handle, IntPtr imageBufferRef);
 
+		// Belongs to CMVideoFormatDescription
 		public bool VideoMatchesImageBuffer (CVImageBuffer imageBuffer)
 		{
 			if (imageBuffer == null)
 				throw new ArgumentNullException ("imageBuffer");
 			return CMVideoFormatDescriptionMatchesImageBuffer (handle, imageBuffer.Handle) != 0;
 		}
-			
+#endif
+	}
+
+	[Since (4,0)]
+	public class CMAudioFormatDescription : CMFormatDescription {
+		
+		internal CMAudioFormatDescription (IntPtr handle)
+			: base (handle)
+		{
+		}
+
+		internal CMAudioFormatDescription (IntPtr handle, bool owns)
+			: base (handle, owns)
+		{
+		}
+
+		// TODO: Move more audio specific methods here
+	}
+
+	[Since (4,0)]
+	public class CMVideoFormatDescription : CMFormatDescription {
+		
+		internal CMVideoFormatDescription (IntPtr handle)
+			: base (handle)
+		{
+		}
+
+		internal CMVideoFormatDescription (IntPtr handle, bool owns)
+			: base (handle, owns)
+		{
+		}
+
+		[DllImport (Constants.CoreMediaLibrary)]
+		static extern CMFormatDescriptionError CMVideoFormatDescriptionCreate (IntPtr allocator,
+			CMVideoCodecType codecType,
+			int width, int height,
+			IntPtr extensions,
+			out IntPtr outDesc);
+
+		public CMVideoFormatDescription (CMVideoCodecType codecType, Size size)
+			: base (IntPtr.Zero)
+		{
+			var error = CMVideoFormatDescriptionCreate (IntPtr.Zero, codecType, size.Width, size.Height, IntPtr.Zero, out handle);
+			if (error != CMFormatDescriptionError.None)
+				throw new ArgumentException (error.ToString ());
+		}
+
+#if !COREBUILD
+		public Size Dimensions {
+			get {
+				return CMVideoFormatDescriptionGetDimensions (handle);
+			}
+		}
+
+		[DllImport (Constants.CoreMediaLibrary)]
+		static extern CMFormatDescriptionError CMVideoFormatDescriptionCreateForImageBuffer (IntPtr allocator, 
+			IntPtr imageBuffer,
+			out IntPtr outDesc);
+
+		public static CMVideoFormatDescription CreateForImageBuffer (CVImageBuffer imageBuffer, out CMFormatDescriptionError error)
+		{
+			if (imageBuffer == null)
+				throw new ArgumentNullException ("imageBuffer");
+
+			IntPtr desc;
+			error = CMVideoFormatDescriptionCreateForImageBuffer (IntPtr.Zero, imageBuffer.handle, out desc);
+			if (error != CMFormatDescriptionError.None)
+				return null;
+
+			return new CMVideoFormatDescription (desc, true);
+		}
+
+		[DllImport (Constants.CoreMediaLibrary)]
+		extern static RectangleF CMVideoFormatDescriptionGetCleanAperture (IntPtr handle, bool originIsAtTopLeft);
+
+		public RectangleF GetCleanAperture (bool originIsAtTopLeft)
+		{
+			return CMVideoFormatDescriptionGetCleanAperture (handle, originIsAtTopLeft);
+		}
+
+		public SizeF GetPresentationDimensions (bool usePixelAspectRatio, bool useCleanAperture)
+		{
+			return CMVideoFormatDescriptionGetPresentationDimensions (handle, usePixelAspectRatio, useCleanAperture);
+		}
 #endif
 	}
 }

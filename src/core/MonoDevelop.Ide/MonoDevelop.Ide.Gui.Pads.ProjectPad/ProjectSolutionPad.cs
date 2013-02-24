@@ -38,7 +38,7 @@ using System.Text;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
-	public class ProjectSolutionPad: SolutionPad
+	class ProjectSolutionPad: SolutionPad
 	{
 		public ProjectSolutionPad ()
 		{
@@ -59,6 +59,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				}
 				return null;
 			});
+			TreeView.ShowSelectionPopupButton = true;
 		}
 		
 		protected override void OnSelectionChanged (object sender, EventArgs args)
@@ -83,9 +84,11 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		
 		void OnWindowChanged (object ob, EventArgs args)
 		{
-			DispatchService.GuiDispatch (new MessageHandler (SelectActiveFile));
+			Gtk.Application.Invoke (delegate {
+				SelectActiveFile ();
+			});
 		}
-		
+
 		void SelectActiveFile ()
 		{
 			Document doc = IdeApp.Workbench.ActiveDocument;

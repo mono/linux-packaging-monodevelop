@@ -43,6 +43,7 @@ using Gdk;
 using MonoDevelop.Core;
 using MonoDevelop.Components.PropertyGrid.PropertyEditors;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MonoDevelop.Components.PropertyGrid
 {
@@ -53,7 +54,7 @@ namespace MonoDevelop.Components.PropertyGrid
 		object currentObject;
 		object[] propertyProviders;
 
-		PropertyGridTree tree;
+		PropertyGridTable tree;
 		HSeparator helpSeparator;
 		HSeparator toolbarSeparator;
 		VPaned vpaned;
@@ -61,7 +62,6 @@ namespace MonoDevelop.Components.PropertyGrid
 		IToolbarProvider toolbar;
 		RadioButton catButton;
 		RadioButton alphButton;
-		ToggleButton helpButton;
 
 		string descTitle, descText;
 		Label descTitleLabel;
@@ -116,31 +116,27 @@ namespace MonoDevelop.Components.PropertyGrid
 			
 			catButton.Active = true;
 			
-			toolbar.Insert (new SeparatorToolItem (), 2);
-			helpButton = new ToggleButton ();
-			helpButton.Relief = ReliefStyle.None;
-			helpButton.Image = new Gtk.Image (Gtk.Stock.Help, IconSize.Menu);
-			helpButton.TooltipText = GettextCatalog.GetString ("Show help panel");
-			helpButton.Clicked += delegate {
-				ShowHelp = helpButton.Active;
-				MonoDevelop.Core.PropertyService.Set (PROP_HELP_KEY, helpButton.Active);
-			};
-			toolbar.Insert (helpButton, 3);
-			
 			#endregion
 
 			vpaned = new VPaned ();
 
-			tree = new PropertyGridTree (editorManager, this);
+			tree = new PropertyGridTable (editorManager, this);
 			tree.Changed += delegate {
 				Update ();
 			};
+
+			CompactScrolledWindow sw = new CompactScrolledWindow ();
+			sw.AddWithViewport (tree);
+			((Gtk.Viewport)sw.Child).ShadowType = Gtk.ShadowType.None;
+			sw.ShadowType = Gtk.ShadowType.None;
+			sw.HscrollbarPolicy = PolicyType.Never;
+			sw.VscrollbarPolicy = PolicyType.Automatic;
 
 			VBox tbox = new VBox ();
 			toolbarSeparator = new HSeparator ();
 			toolbarSeparator.Visible = true;
 			tbox.PackStart (toolbarSeparator, false, false, 0);
-			tbox.PackStart (tree, true, true, 0);
+			tbox.PackStart (sw, true, true, 0);
 			helpSeparator = new HSeparator ();
 			tbox.PackStart (helpSeparator, false, false, 0);
 			helpSeparator.NoShowAll = true;
@@ -151,8 +147,6 @@ namespace MonoDevelop.Components.PropertyGrid
 
 			base.PackEnd (vpaned);
 			base.FocusChain = new Gtk.Widget [] { vpaned };
-			
-			helpButton.Active = ShowHelp = MonoDevelop.Core.PropertyService.Get<bool> (PROP_HELP_KEY, true);
 			
 			Populate ();
 			UpdateTabs ();
@@ -222,6 +216,7 @@ namespace MonoDevelop.Components.PropertyGrid
 		}
 		
 		TabRadioToolButton firstTab;
+		SeparatorToolItem tabSectionSeparator;
 		
 		private void AddPropertyTab (PropertyTab tab)
 		{
@@ -231,7 +226,7 @@ namespace MonoDevelop.Components.PropertyGrid
 				rtb = new TabRadioToolButton (null);
 				rtb.Active = true;
 				firstTab = rtb;
-				toolbar.Insert (new SeparatorToolItem (), FirstTabIndex - 1);
+				toolbar.Insert (tabSectionSeparator = new SeparatorToolItem (), FirstTabIndex - 1);
 			}
 			else
 				rtb = new TabRadioToolButton (firstTab);
@@ -276,11 +271,11 @@ namespace MonoDevelop.Components.PropertyGrid
 		
 		void UpdateTabs ()
 		{
-			foreach (Gtk.Widget w in toolbar.Children) {
-				TabRadioToolButton but = w as TabRadioToolButton;
-				if (but != null)
-					but.Visible = currentObject != null && but.Tab.CanExtend (currentObject);
-			}
+			bool visible = currentObject != null && toolbar.Children.OfType<TabRadioToolButton> ().Count (but => but.Tab.CanExtend (currentObject)) > 1;
+			foreach (var w in toolbar.Children.OfType<TabRadioToolButton> ())
+				w.Visible = visible;
+			if (tabSectionSeparator != null)
+				tabSectionSeparator.Visible = visible;
 		}
 	
 		//TODO: add more intelligence for editing state etc. Maybe need to know which property has changed, then 
@@ -343,7 +338,8 @@ namespace MonoDevelop.Components.PropertyGrid
 		{
 			get { return descFrame != null; }
 			set {
-				if (value == ShowHelp)
+				// Disable for now. Documentation is shown in tooltips
+/*				if (value == ShowHelp)
 					return;
 				if (value) {
 					AddHelpPane ();
@@ -355,7 +351,7 @@ namespace MonoDevelop.Components.PropertyGrid
 					descTextView = null;
 					descTitleLabel = null;
 					helpSeparator.Hide ();
-				}
+				}*/
 			}
 		}
 		

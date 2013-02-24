@@ -10,6 +10,7 @@ using MonoDevelop.Ide;
 using System.Collections.Generic;
 using MonoDevelop.Core.Assemblies;
 using System.Threading.Tasks;
+using System.ServiceModel;
 
 namespace MonoDevelop.WebReferences.Commands
 {
@@ -45,18 +46,18 @@ namespace MonoDevelop.WebReferences.Commands
 			dialog.NamespacePrefix = project.DefaultNamespace;
 			
 			try {
-				if (MessageService.RunCustomDialog (dialog) == (int)Gtk.ResponseType.Ok) {
-					dialog.SelectedService.GenerateFiles (project, dialog.Namespace, dialog.ReferenceName);
-					IdeApp.ProjectOperations.Save(project);
-				}
-			}
-			catch(Exception exception) {
+				if (MessageService.RunCustomDialog (dialog) != (int)Gtk.ResponseType.Ok)
+					return;
+
+				dialog.SelectedService.GenerateFiles (project, dialog.Namespace, dialog.ReferenceName);
+				IdeApp.ProjectOperations.Save(project);
+			} catch (Exception exception) {
 				MessageService.ShowException (exception);
 			} finally {
 				dialog.Destroy ();
 			}
 		}
-		
+
 		[CommandUpdateHandler (MonoDevelop.WebReferences.WebReferenceCommands.Update)]
 		[CommandUpdateHandler (MonoDevelop.WebReferences.WebReferenceCommands.UpdateAll)]
 		void CanUpdateWebReferences (CommandInfo ci)
@@ -89,7 +90,15 @@ namespace MonoDevelop.WebReferences.Commands
 				DispatchService.ThreadDispatch (() => {
 					for (int i = 0; i < items.Count; i ++) {
 						DispatchService.GuiDispatch (() => UpdateReferenceContext.SetProgressFraction (Math.Max (0.1, (double)i / items.Count)));
-						items [i].Update();
+						try {
+							items [i].Update();
+						} catch (Exception ex) {
+							DispatchService.GuiSyncDispatch (() => {
+								MessageService.ShowException (ex, GettextCatalog.GetString ("Failed to update Web Reference '{0}'", items [i].Name));
+								DisposeUpdateContext ();
+							});
+							return;
+						}
 					}
 					
 					DispatchService.GuiDispatch (() => {
@@ -138,6 +147,51 @@ namespace MonoDevelop.WebReferences.Commands
 
 			IdeApp.ProjectOperations.Save(project);
 			IdeApp.Workbench.StatusBar.ShowMessage("Deleted all Web References");
+		}
+
+		[CommandUpdateHandler (MonoDevelop.WebReferences.WebReferenceCommands.Configure)]
+		void CanConfigureWebReferences (CommandInfo ci)
+		{
+			var item = (WebReferenceItem) CurrentNode.DataItem;
+			ci.Enabled = WCFConfigWidget.IsSupported (item);
+		}
+
+		/// <summary>Execute the command for configuring a web reference in a project.</summary>
+		[CommandHandler (MonoDevelop.WebReferences.WebReferenceCommands.Configure)]
+		public void Configure ()
+		{
+			var item = (WebReferenceItem) CurrentNode.DataItem;
+
+			if (!WCFConfigWidget.IsSupported (item))
+				return;
+
+			WCF.ReferenceGroup refgroup;
+			WCF.ClientOptions options;
+
+			try {
+				refgroup = WCF.ReferenceGroup.Read (item.MapFile.FilePath);
+				if (refgroup == null || refgroup.ClientOptions == null)
+					return;
+				options = refgroup.ClientOptions;
+			} catch {
+				return;
+			}
+
+			var dialog = new WebReferenceDialog (item, options);
+
+			try {
+				if (MessageService.RunCustomDialog (dialog) != (int)Gtk.ResponseType.Ok)
+					return;
+				if (!dialog.Modified)
+					return;
+				
+				refgroup.Save (item.MapFile.FilePath);
+				UpdateReferences (new [] { item });
+			} catch (Exception exception) {
+				MessageService.ShowException (exception);
+			} finally {
+				dialog.Destroy ();
+			}
 		}
 	}	
 }

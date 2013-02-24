@@ -41,89 +41,33 @@ using Mono.TextEditor;
 using ICSharpCode.NRefactory.TypeSystem;
 using ICSharpCode.NRefactory.Completion;
 using MonoDevelop.Ide.TypeSystem;
+using ICSharpCode.NRefactory.CSharp.TypeSystem;
 
 namespace MonoDevelop.CSharp.Completion
 {
-	public class IndexerParameterDataProvider : IParameterDataProvider
+	class IndexerParameterDataProvider : AbstractParameterDataProvider
 	{
-		AstNode resolvedExpression;
-		static CSharpAmbience ambience = new CSharpAmbience ();
-		//CSharpCompletionTextEditorExtension ext;
+//		AstNode resolvedExpression;
 		List<IProperty> indexers;
-		int startOffset;
 
-		public int StartOffset {
-			get {
-				return startOffset;
-			}
-		}
+		ICompilation compilation;
+		CSharpUnresolvedFile file;
 		
-		public IndexerParameterDataProvider (int startOffset, CSharpCompletionTextEditorExtension ext, IType type, AstNode resolvedExpression)
+		public IndexerParameterDataProvider (int startOffset, CSharpCompletionTextEditorExtension ext, IType type, IEnumerable<IProperty> indexers, AstNode resolvedExpression) : base (ext, startOffset)
 		{
-			this.startOffset = startOffset;
-//			this.ext = ext;
-		
-			this.resolvedExpression = resolvedExpression;
-			indexers = new List<IProperty> (type.GetProperties (p => p.IsIndexer));
+			compilation = ext.UnresolvedFileCompilation;
+			file = ext.CSharpUnresolvedFile;
+			//			this.resolvedExpression = resolvedExpression;
+			this.indexers = new List<IProperty> (indexers);
+		}
+
+		public override TooltipInformation CreateTooltipInformation (int overload, int currentParameter, bool smartWrap)
+		{
+			return MethodParameterDataProvider.CreateTooltipInformation (ext, compilation, file, indexers[overload], currentParameter, smartWrap);
 		}
 
 		#region IParameterDataProvider implementation
-		public string GetHeading (int overload, string[] parameterMarkup, int currentParameter)
-		{
-			StringBuilder result = new StringBuilder ();
-//			int curLen = 0;
-			result.Append (ambience.GetString (indexers [overload].ReturnType, OutputFlags.ClassBrowserEntries));
-			result.Append (' ');
-			result.Append ("<b>");
-			result.Append (resolvedExpression);
-			result.Append ("</b>");
-			result.Append ('[');
-			int parameterCount = 0;
-			foreach (string parameter in parameterMarkup) {
-				if (parameterCount > 0)
-					result.Append (", ");
-				result.Append (parameter);
-				parameterCount++;
-			}
-			result.Append (']');
-			return result.ToString ();
-		}
-		
-		public string GetDescription (int overload, int currentParameter)
-		{
-			StringBuilder result = new StringBuilder ();
-			var curParameter = currentParameter >= 0 && currentParameter < indexers [overload].Parameters.Count ? indexers [overload].Parameters [currentParameter] : null;
-			if (curParameter != null) {
-				string docText = AmbienceService.GetDocumentation (indexers [overload]);
-				if (!string.IsNullOrEmpty (docText)) {
-					var paramRegex = new Regex ("(\\<param\\s+name\\s*=\\s*\"" + curParameter.Name + "\"\\s*\\>.*?\\</param\\>)", RegexOptions.Compiled);
-					var match = paramRegex.Match (docText);
-					if (match.Success) {
-						result.AppendLine ();
-						string text = match.Groups [1].Value;
-						text = "<summary>" + AmbienceService.GetDocumentationSummary (indexers [overload]) + "</summary>" + text;
-						result.Append (AmbienceService.GetDocumentationMarkup (text, new AmbienceService.DocumentationFormatOptions {
-							HighlightParameter = curParameter.Name,
-							MaxLineLength = 60
-						}));
-					}
-				}
-			}
-			
-			return result.ToString ();
-		}
-		
-		public string GetParameterDescription (int overload, int paramIndex)
-		{
-			var indexer = indexers[overload];
-			
-			if (paramIndex < 0 || paramIndex >= indexer.Parameters.Count)
-				return "";
-			
-			return ambience.GetString (indexer, indexer.Parameters [paramIndex], OutputFlags.AssemblyBrowserDescription | OutputFlags.HideExtensionsParameter | OutputFlags.IncludeGenerics | OutputFlags.IncludeModifiers | OutputFlags.IncludeParameterName | OutputFlags.HighlightName);
-		}
-
-		public int GetParameterCount (int overload)
+		public override int GetParameterCount (int overload)
 		{
 			if (overload >= Count)
 				return -1;
@@ -131,15 +75,21 @@ namespace MonoDevelop.CSharp.Completion
 			return indexer != null && indexer.Parameters != null ? indexer.Parameters.Count : 0;
 		}
 
-		public bool AllowParameterList (int overload)
+		public override bool AllowParameterList (int overload)
 		{
 			if (overload >= Count)
 				return false;
 			var lastParam = indexers[overload].Parameters.LastOrDefault ();
 			return lastParam != null && lastParam.IsParams;
 		}
-		
-		public int Count {
+
+		public override string GetParameterName (int overload, int paramIndex)
+		{
+			var indexer = indexers[overload];
+			return indexer.Parameters[paramIndex].Name;
+		}
+
+		public override int Count {
 			get {
 				return indexers != null ? indexers.Count : 0;
 			}

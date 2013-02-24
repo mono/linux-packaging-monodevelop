@@ -1273,16 +1273,22 @@ namespace MonoDevelop.Components.Commands
 		{
 			CommandTargetRoute targetRoute = new CommandTargetRoute (initialTarget);
 			object cmdTarget = GetFirstCommandTarget (targetRoute);
-			
-			while (cmdTarget != null)
-			{
-				if (visitor.Visit (cmdTarget))
-					return cmdTarget;
 
-				cmdTarget = GetNextCommandTarget (targetRoute, cmdTarget);
+			visitor.Start ();
+
+			try {
+				while (cmdTarget != null)
+				{
+					if (visitor.Visit (cmdTarget))
+						return cmdTarget;
+
+					cmdTarget = GetNextCommandTarget (targetRoute, cmdTarget);
+				}
+			} catch (Exception ex) {
+				LoggingService.LogError ("Error while visiting command targets", ex);
+			} finally {
+				visitor.End ();
 			}
-			
-			visitor.Visit (null);
 			return null;
 		}
 		
@@ -1569,8 +1575,8 @@ namespace MonoDevelop.Components.Commands
 						newFocused = w;
 					}
 					if (w.IsActive && w.Type == Gtk.WindowType.Toplevel && !(w is Gtk.Dialog)) {
-						win = w;
-						break;
+						if (win == null)
+							win = w;
 					}
 					if (lastFocused == w) {
 						lastFocusedExists = true;
@@ -1744,13 +1750,16 @@ namespace MonoDevelop.Components.Commands
 			if (hasFocus != appHasFocus) {
 				// The last focused window has been destroyed. Wait a few ms since another app's window
 				// may gain focus again
+
 				DateTime now = DateTime.Now;
-				if (now < focusCheckDelayTimeout)
-					return;
-				if (!hasFocus && !lastFocusedExists) {
+				if (focusCheckDelayTimeout == DateTime.MinValue) {
 					focusCheckDelayTimeout = now.AddMilliseconds (100);
 					return;
 				}
+
+				if (now < focusCheckDelayTimeout)
+					return;
+
 				focusCheckDelayTimeout = DateTime.MinValue;
 				
 				appHasFocus = hasFocus;
@@ -1761,7 +1770,8 @@ namespace MonoDevelop.Components.Commands
 					if (ApplicationFocusOut != null)
 						ApplicationFocusOut (this, EventArgs.Empty);
 				}
-			}
+			} else
+				focusCheckDelayTimeout = DateTime.MinValue;
 		}
 		
 		public void ReportError (object commandId, string message, Exception ex)
@@ -1794,6 +1804,10 @@ namespace MonoDevelop.Components.Commands
 			if (CommandTargetScanFinished != null)
 				CommandTargetScanFinished (this, EventArgs.Empty);
 		}
+
+		internal bool ApplicationHasFocus {
+			get { return appHasFocus; }
+		}
 		
 		/// <summary>
 		/// Raised when there is an exception while executing or updating the status of a command
@@ -1813,12 +1827,12 @@ namespace MonoDevelop.Components.Commands
 		/// <summary>
 		/// Fired when the application gets the focus
 		/// </summary>
-		public event EventHandler ApplicationFocusIn;
+		internal event EventHandler ApplicationFocusIn;
 		
 		/// <summary>
 		/// Fired when the application loses the focus
 		/// </summary>
-		public event EventHandler ApplicationFocusOut;
+		internal event EventHandler ApplicationFocusOut;
 		
 		/// <summary>
 		/// Fired when the command route scan starts

@@ -70,7 +70,7 @@ namespace NGit.Api
 		}
 
 		/// <exception cref="NGit.Errors.NoWorkTreeException"></exception>
-		/// <exception cref="System.IO.IOException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestClean()
 		{
@@ -83,13 +83,13 @@ namespace NGit.Api
 			ICollection<string> cleanedFiles = git.Clean().Call();
 			status = git.Status().Call();
 			files = status.GetUntracked();
-			NUnit.Framework.Assert.IsTrue(files.Count == 0);
+			NUnit.Framework.Assert.AreEqual(0, files.Count);
 			NUnit.Framework.Assert.IsTrue(cleanedFiles.Contains("File2.txt"));
 			NUnit.Framework.Assert.IsTrue(cleanedFiles.Contains("File3.txt"));
 		}
 
 		/// <exception cref="NGit.Errors.NoWorkTreeException"></exception>
-		/// <exception cref="System.IO.IOException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestCleanWithPaths()
 		{
@@ -104,13 +104,13 @@ namespace NGit.Api
 			ICollection<string> cleanedFiles = git.Clean().SetPaths(paths).Call();
 			status = git.Status().Call();
 			files = status.GetUntracked();
-			NUnit.Framework.Assert.IsTrue(files.Count == 1);
+			NUnit.Framework.Assert.AreEqual(1, files.Count);
 			NUnit.Framework.Assert.IsTrue(cleanedFiles.Contains("File3.txt"));
-			NUnit.Framework.Assert.IsTrue(!cleanedFiles.Contains("File2.txt"));
+			NUnit.Framework.Assert.IsFalse(cleanedFiles.Contains("File2.txt"));
 		}
 
 		/// <exception cref="NGit.Errors.NoWorkTreeException"></exception>
-		/// <exception cref="System.IO.IOException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestCleanWithDryRun()
 		{
@@ -123,7 +123,7 @@ namespace NGit.Api
 			ICollection<string> cleanedFiles = git.Clean().SetDryRun(true).Call();
 			status = git.Status().Call();
 			files = status.GetUntracked();
-			NUnit.Framework.Assert.IsTrue(files.Count == 2);
+			NUnit.Framework.Assert.AreEqual(2, files.Count);
 			NUnit.Framework.Assert.IsTrue(cleanedFiles.Contains("File2.txt"));
 			NUnit.Framework.Assert.IsTrue(cleanedFiles.Contains("File3.txt"));
 		}

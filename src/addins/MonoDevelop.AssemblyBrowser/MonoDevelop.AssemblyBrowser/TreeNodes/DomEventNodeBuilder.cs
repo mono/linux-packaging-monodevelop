@@ -82,7 +82,7 @@ namespace MonoDevelop.AssemblyBrowser
 		
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
 		{
-			return true;
+			return false;
 		}
 		
 		#region IAssemblyBrowserNodeBuilder
@@ -132,7 +132,7 @@ namespace MonoDevelop.AssemblyBrowser
 			options.Ambience = Ambience;
 			result.AppendLine ();
 			
-			result.Append (AmbienceService.GetDocumentationMarkup (AmbienceService.GetDocumentation (resolved), options));
+			result.Append (AmbienceService.GetDocumentationMarkup (resolved, AmbienceService.GetDocumentation (resolved), options));
 			
 			return result.ToString ();
 		}

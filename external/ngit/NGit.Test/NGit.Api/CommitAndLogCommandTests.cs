@@ -57,12 +57,9 @@ namespace NGit.Api
 	[NUnit.Framework.TestFixture]
 	public class CommitAndLogCommandTests : RepositoryTestCase
 	{
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
 		/// <exception cref="System.IO.IOException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestSomeCommits()
 		{
@@ -102,12 +99,8 @@ namespace NGit.Api
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestLogWithFilter()
 		{
@@ -157,11 +150,7 @@ namespace NGit.Api
 		}
 
 		// try to do a commit without specifying a message. Should fail!
-		/// <exception cref="NGit.Errors.UnmergedPathException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
-		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestWrongParams()
 		{
@@ -179,12 +168,7 @@ namespace NGit.Api
 		// expected
 		// try to work with Commands after command has been invoked. Should throw
 		// exceptions
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Errors.UnmergedPathException"></exception>
-		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestMultipleInvocations()
 		{
@@ -216,14 +200,14 @@ namespace NGit.Api
 
 		// expected
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestMergeEmptyBranches()
 		{
+			if (!FS.DETECTED.SupportsExecute())
+				return;
+
 			Git git = new Git(db);
 			git.Commit().SetMessage("initial commit").Call();
 			RefUpdate r = db.UpdateRef("refs/heads/side");
@@ -241,16 +225,12 @@ namespace NGit.Api
 			RevCommit[] parents = commit.Parents;
 			NUnit.Framework.Assert.AreEqual(parents[0], firstSide);
 			NUnit.Framework.Assert.AreEqual(parents[1], second);
-			NUnit.Framework.Assert.IsTrue(parents.Length == 2);
+			NUnit.Framework.Assert.AreEqual(2, parents.Length);
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestAddUnstagedChanges()
 		{
@@ -279,15 +259,15 @@ namespace NGit.Api
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoFilepatternException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
-		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestModeChange()
 		{
+			if (Runtime.GetProperty("os.name").StartsWith("Windows"))
+			{
+				return;
+			}
+			// SKIP
 			Git git = new Git(db);
 			// create file
 			FilePath file = new FilePath(db.WorkTree, "a.txt");
@@ -310,14 +290,10 @@ namespace NGit.Api
 				();
 		}
 
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Errors.UnmergedPathException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
-		/// <exception cref="NGit.Errors.IncorrectObjectTypeException"></exception>
 		/// <exception cref="NGit.Errors.MissingObjectException"></exception>
+		/// <exception cref="NGit.Errors.IncorrectObjectTypeException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestCommitRange()
 		{
@@ -349,12 +325,9 @@ namespace NGit.Api
 			NUnit.Framework.Assert.AreEqual(l, -1);
 		}
 
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
 		/// <exception cref="System.IO.IOException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestCommitAmend()
 		{
@@ -378,12 +351,8 @@ namespace NGit.Api
 				));
 		}
 
-		/// <exception cref="NGit.Api.Errors.NoHeadException"></exception>
-		/// <exception cref="NGit.Api.Errors.NoMessageException"></exception>
-		/// <exception cref="NGit.Errors.UnmergedPathException"></exception>
-		/// <exception cref="NGit.Api.Errors.ConcurrentRefUpdateException"></exception>
 		/// <exception cref="NGit.Api.Errors.JGitInternalException"></exception>
-		/// <exception cref="NGit.Api.Errors.WrongRepositoryStateException"></exception>
+		/// <exception cref="NGit.Api.Errors.GitAPIException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestInsertChangeId()
 		{

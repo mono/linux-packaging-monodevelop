@@ -66,6 +66,11 @@ namespace MonoDevelop.Projects
 				return items;
 			}
 		}
+
+		internal SolutionFolderItemCollection GetItemsWithoutCreating ()
+		{
+			return items;
+		}
 		
 		[ItemProperty]
 		[ProjectPathItemProperty ("File", Scope="*")]
@@ -336,7 +341,9 @@ namespace MonoDevelop.Projects
 					}
 					if (!found) {
 						SolutionConfiguration sconf = new SolutionConfiguration (iconf.Id);
-						sconf.AddItem (eitem);
+						// Add all items to the new configuration
+						foreach (var it in ParentSolution.GetAllSolutionItems<SolutionEntityItem> ())
+							sconf.AddItem (it);
 						ParentSolution.Configurations.Add (sconf);
 					}
 				}

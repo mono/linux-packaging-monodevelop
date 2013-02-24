@@ -1,0 +1,4 @@
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.CBinding.Autotools.dll.mdb
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.CBinding.Autotools.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/CBinding/CBinding.Autotools/obj/Debug/MonoDevelop.CBinding.Autotools.dll
+/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/CBinding/CBinding.Autotools/obj/Debug/MonoDevelop.CBinding.Autotools.dll.mdb

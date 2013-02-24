@@ -41,6 +41,8 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+using System.Collections.Generic;
+using NGit;
 using NGit.Revwalk;
 using Sharpen;
 
@@ -88,18 +90,130 @@ namespace NGit.Revwalk
 		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
 		public static int Count(RevWalk walk, RevCommit start, RevCommit end)
 		{
+			return Find(walk, start, end).Count;
+		}
+
+		/// <summary>
+		/// Find commits that are reachable from <code>start</code> until a commit
+		/// that is reachable from <code>end</code> is encountered.
+		/// </summary>
+		/// <remarks>
+		/// Find commits that are reachable from <code>start</code> until a commit
+		/// that is reachable from <code>end</code> is encountered. In other words,
+		/// Find of commits that are in <code>start</code>, but not in
+		/// <code>end</code>.
+		/// <p>
+		/// Note that this method calls
+		/// <see cref="RevWalk.Reset()">RevWalk.Reset()</see>
+		/// at the beginning.
+		/// Also note that the existing rev filter on the walk is left as-is, so be
+		/// sure to set the right rev filter before calling this method.
+		/// </remarks>
+		/// <param name="walk">the rev walk to use</param>
+		/// <param name="start">the commit to start counting from</param>
+		/// <param name="end">
+		/// the commit where counting should end, or null if counting
+		/// should be done until there are no more commits
+		/// </param>
+		/// <returns>the commits found</returns>
+		/// <exception cref="NGit.Errors.MissingObjectException">NGit.Errors.MissingObjectException
+		/// 	</exception>
+		/// <exception cref="NGit.Errors.IncorrectObjectTypeException">NGit.Errors.IncorrectObjectTypeException
+		/// 	</exception>
+		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
+		public static IList<RevCommit> Find(RevWalk walk, RevCommit start, RevCommit end)
+		{
 			walk.Reset();
 			walk.MarkStart(start);
 			if (end != null)
 			{
 				walk.MarkUninteresting(end);
 			}
-			int count = 0;
-			for (RevCommit c = walk.Next(); c != null; c = walk.Next())
+			IList<RevCommit> commits = new AList<RevCommit>();
+			foreach (RevCommit c in walk)
 			{
-				count++;
+				commits.AddItem(c);
 			}
-			return count;
+			return commits;
+		}
+
+		/// <summary>
+		/// Find the list of branches a given commit is reachable from when following
+		/// parent.s
+		/// <p>
+		/// Note that this method calls
+		/// <see cref="RevWalk.Reset()">RevWalk.Reset()</see>
+		/// at the beginning.
+		/// <p>
+		/// In order to improve performance this method assumes clock skew among
+		/// committers is never larger than 24 hours.
+		/// </summary>
+		/// <param name="commit">the commit we are looking at</param>
+		/// <param name="revWalk">The RevWalk to be used.</param>
+		/// <param name="refs">the set of branches we want to see reachability from</param>
+		/// <returns>the list of branches a given commit is reachable from</returns>
+		/// <exception cref="NGit.Errors.MissingObjectException">NGit.Errors.MissingObjectException
+		/// 	</exception>
+		/// <exception cref="NGit.Errors.IncorrectObjectTypeException">NGit.Errors.IncorrectObjectTypeException
+		/// 	</exception>
+		/// <exception cref="System.IO.IOException">System.IO.IOException</exception>
+		public static IList<Ref> FindBranchesReachableFrom(RevCommit commit, RevWalk revWalk
+			, ICollection<Ref> refs)
+		{
+			IList<Ref> result = new AList<Ref>();
+			// searches from branches can be cut off early if any parent of the
+			// search-for commit is found. This is quite likely, so optimize for this.
+			revWalk.MarkStart(Arrays.AsList(commit.Parents));
+			ObjectIdSubclassMap<ObjectId> cutOff = new ObjectIdSubclassMap<ObjectId>();
+			int SKEW = 24 * 3600;
+			// one day clock skew
+			foreach (Ref @ref in refs)
+			{
+				RevObject maybehead = revWalk.ParseAny(@ref.GetObjectId());
+				if (!(maybehead is RevCommit))
+				{
+					continue;
+				}
+				RevCommit headCommit = (RevCommit)maybehead;
+				// if commit is in the ref branch, then the tip of ref should be
+				// newer than the commit we are looking for. Allow for a large
+				// clock skew.
+				if (headCommit.CommitTime + SKEW < commit.CommitTime)
+				{
+					continue;
+				}
+				IList<ObjectId> maybeCutOff = new AList<ObjectId>(cutOff.Size());
+				// guess rough size
+				revWalk.ResetRetain();
+				revWalk.MarkStart(headCommit);
+				RevCommit current;
+				Ref found = null;
+				while ((current = revWalk.Next()) != null)
+				{
+					if (AnyObjectId.Equals(current, commit))
+					{
+						found = @ref;
+						break;
+					}
+					if (cutOff.Contains(current))
+					{
+						break;
+					}
+					maybeCutOff.AddItem(current.ToObjectId());
+				}
+				if (found != null)
+				{
+					result.AddItem(@ref);
+				}
+				else
+				{
+					foreach (ObjectId id in maybeCutOff)
+					{
+						cutOff.AddIfAbsent(id);
+					}
+				}
+			}
+			return result;
 		}
 	}
 }

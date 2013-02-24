@@ -29,6 +29,7 @@ using Mono.TextEditor.Highlighting;
 using Mono.MHex.Rendering;
 using Gdk;
 using MonoDevelop.Core;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.HexEditor
 {
@@ -41,19 +42,17 @@ namespace MonoDevelop.HexEditor
 		{
 			this.hexEditor = hexEditor;
 			SetStyle ();
-			PropertyService.PropertyChanged += delegate(object sender, PropertyChangedEventArgs e) {
-				if (e.Key == "ColorScheme") {
-					SetStyle ();
-					this.hexEditor.Options.RaiseChanged ();
-					this.hexEditor.PurgeLayoutCaches ();
-					this.hexEditor.Repaint ();
-				}
+			IdeApp.Preferences.ColorSchemeChanged += delegate {
+				SetStyle ();
+				this.hexEditor.Options.RaiseChanged ();
+				this.hexEditor.PurgeLayoutCaches ();
+				this.hexEditor.Repaint ();
 			};
 		}
 		
 		void SetStyle ()
 		{
-			colorStyle = SyntaxModeService.GetColorStyle (hexEditor.Style, PropertyService.Get ("ColorScheme", "Default"));
+			colorStyle = SyntaxModeService.GetColorStyle (IdeApp.Preferences.ColorScheme);
 		}
 		
 		public override Color HexOffset {
@@ -70,7 +69,7 @@ namespace MonoDevelop.HexEditor
 		
 		public override Color HexOffsetHighlighted {
 			get {
-				return Mono.TextEditor.Highlighting.ColorScheme.ToGdkColor (colorStyle.LineNumberFgHighlighted);
+				return Mono.TextEditor.Highlighting.ColorScheme.ToGdkColor (colorStyle.LineMarker);
 			}
 		}
 		

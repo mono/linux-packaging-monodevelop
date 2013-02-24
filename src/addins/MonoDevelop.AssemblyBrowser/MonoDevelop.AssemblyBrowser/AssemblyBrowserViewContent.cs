@@ -32,6 +32,7 @@ using MonoDevelop.Refactoring;
 using System;
 using MonoDevelop.Ide.TypeSystem;
 using ICSharpCode.NRefactory.TypeSystem;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.AssemblyBrowser
 {
@@ -39,6 +40,15 @@ namespace MonoDevelop.AssemblyBrowser
 	{
 		AssemblyBrowserWidget widget;
 		
+		protected override void OnWorkbenchWindowChanged (EventArgs e)
+		{
+			base.OnWorkbenchWindowChanged (e);
+			if (WorkbenchWindow != null) {
+				var toolbar = WorkbenchWindow.GetToolbar (this);
+				widget.SetToolbar (toolbar);
+			}
+		}
+
 		public override Gtk.Widget Control {
 			get {
 				return widget;
@@ -53,6 +63,7 @@ namespace MonoDevelop.AssemblyBrowser
 		
 		public AssemblyBrowserViewContent()
 		{
+			ContentName = GettextCatalog.GetString ("Assembly Browser");
 			widget = new AssemblyBrowserWidget ();
 			IsDisposed = false;
 		}

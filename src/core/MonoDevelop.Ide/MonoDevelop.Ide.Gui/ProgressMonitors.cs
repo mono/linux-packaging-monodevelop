@@ -71,7 +71,7 @@ namespace MonoDevelop.Ide.Gui
 			Pad pad = IdeApp.Workbench.GetPad<ErrorListPad> ();
 			ErrorListPad errorPad = (ErrorListPad) pad.Content;
 			AggregatedProgressMonitor mon = new AggregatedProgressMonitor (errorPad.GetBuildProgressMonitor ());
-			mon.AddSlaveMonitor (GetStatusProgressMonitor (statusText, Stock.BuildCombine, false, true, false, pad));
+			mon.AddSlaveMonitor (GetStatusProgressMonitor (statusText, Stock.StatusBuild, false, true, false, pad));
 			return mon;
 		}
 		
@@ -87,7 +87,7 @@ namespace MonoDevelop.Ide.Gui
 		
 		public IProgressMonitor GetLoadProgressMonitor (bool lockGui)
 		{
-			return GetStatusProgressMonitor (GettextCatalog.GetString ("Loading..."), Stock.OpenFileIcon, true, false, lockGui);
+			return GetStatusProgressMonitor (GettextCatalog.GetString ("Loading..."), Stock.StatusSolutionOperation, true, false, lockGui);
 		}
 		
 		public IProgressMonitor GetProjectLoadProgressMonitor (bool lockGui)
@@ -97,12 +97,12 @@ namespace MonoDevelop.Ide.Gui
 		
 		public IProgressMonitor GetSaveProgressMonitor (bool lockGui)
 		{
-			return GetStatusProgressMonitor (GettextCatalog.GetString ("Saving..."), Stock.SaveIcon, true, false, lockGui);
+			return GetStatusProgressMonitor (GettextCatalog.GetString ("Saving..."), Stock.StatusSolutionOperation, true, false, lockGui);
 		}
 		
 		public IConsole CreateConsole (bool closeOnDispose)
 		{
-			return (IConsole) GetOutputProgressMonitor ("MonoDevelop.Ide.ApplicationOutput", GettextCatalog.GetString ("Application Output"), Stock.RunProgramIcon, true, true);
+			return (IConsole) GetOutputProgressMonitor ("MonoDevelop.Ide.ApplicationOutput", GettextCatalog.GetString ("Application Output"), Stock.MessageLog, true, true);
 		}
 		
 		/******************************/

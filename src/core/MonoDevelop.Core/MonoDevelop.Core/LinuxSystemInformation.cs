@@ -29,9 +29,9 @@ using System.Text;
 
 namespace MonoDevelop.Core
 {
-	public class LinuxSystemInformation : UnixSystemInformation
+	class LinuxSystemInformation : UnixSystemInformation
 	{
-		protected override void AppendOperatingSystem (StringBuilder sb)
+		internal override void AppendOperatingSystem (StringBuilder sb)
 		{
 			sb.AppendLine ("\tLinux");
 			base.AppendOperatingSystem (sb);

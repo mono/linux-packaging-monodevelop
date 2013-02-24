@@ -26,8 +26,10 @@
 //
 
 using System;
-using System.Runtime.Serialization;
 using System.Text;
+using System.Globalization;
+using System.Runtime.Serialization;
+
 using Mono.Debugging.Backend;
 using Mono.Debugging.Client;
 
@@ -143,19 +145,23 @@ namespace Mono.Debugging.Evaluation
 				char c = text[i];
 				string txt;
 				switch (c) {
-					case '"': txt = "\\\""; break;
-					case '\0': txt = @"\0"; break;
-					case '\\': txt = @"\\"; break;
-					case '\a': txt = @"\a"; break;
-					case '\b': txt = @"\b"; break;
-					case '\f': txt = @"\f"; break;
-					case '\v': txt = @"\v"; break;
-					case '\n': txt = @"\n"; break;
-					case '\r': txt = @"\r"; break;
-					case '\t': txt = @"\t"; break;
-					default:
+				case '"': txt = "\\\""; break;
+				case '\0': txt = @"\0"; break;
+				case '\\': txt = @"\\"; break;
+				case '\a': txt = @"\a"; break;
+				case '\b': txt = @"\b"; break;
+				case '\f': txt = @"\f"; break;
+				case '\v': txt = @"\v"; break;
+				case '\n': txt = @"\n"; break;
+				case '\r': txt = @"\r"; break;
+				case '\t': txt = @"\t"; break;
+				default:
+					if (char.GetUnicodeCategory (c) == UnicodeCategory.OtherNotAssigned) {
+						sb.AppendFormat ("\\u{0:x4}", (int) c);
+					} else {
 						sb.Append (c);
-						continue;
+					}
+					continue;
 				}
 				sb.Append (txt);
 			}
@@ -183,6 +189,20 @@ namespace Mono.Debugging.Evaluation
 	}
 
 	[Serializable]
+	public class EvaluatorAbortedException: EvaluatorException
+	{
+		protected EvaluatorAbortedException (SerializationInfo info, StreamingContext context)
+			: base (info, context)
+		{
+		}
+
+		public EvaluatorAbortedException ()
+			: base ("Aborted.")
+		{
+		}
+	}
+
+	[Serializable]
 	public class NotSupportedExpressionException: EvaluatorException
 	{
 		protected NotSupportedExpressionException (SerializationInfo info, StreamingContext context)
@@ -190,7 +210,7 @@ namespace Mono.Debugging.Evaluation
 		{
 		}
 		
-		public NotSupportedExpressionException ( )
+		public NotSupportedExpressionException ()
 			: base ("Expression not supported.")
 		{
 		}

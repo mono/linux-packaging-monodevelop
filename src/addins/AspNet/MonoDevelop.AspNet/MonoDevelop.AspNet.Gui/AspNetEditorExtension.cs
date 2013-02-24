@@ -111,7 +111,7 @@ namespace MonoDevelop.AspNet.Gui
 			info.AspNetDocument.RootNode.AcceptVisit (v);
 			var t = new ICSharpCode.NRefactory.TypeSystem.Implementation.DefaultUnresolvedTypeDefinition (info.ClassName);
 			var dom = refman.TypeCtx.Compilation;
-			var baseType = dom.LookupType (info.BaseType);
+			var baseType = ReflectionHelper.ParseReflectionName (info.BaseType).Resolve (dom);
 			foreach (var m in CodeBehind.GetDesignerMembers (v.Members.Values, baseType, null)) {
 				t.Members.Add (new ICSharpCode.NRefactory.TypeSystem.Implementation.DefaultUnresolvedField (t, m.Name) {
 					Accessibility = Accessibility.Protected,
@@ -309,7 +309,7 @@ namespace MonoDevelop.AspNet.Gui
 			return base.GetParameterCompletionCommandOffset (out cpos);
 		}
 		
-		public override IParameterDataProvider HandleParameterCompletion (CodeCompletionContext completionContext, char completionChar)
+		public override ParameterDataProvider HandleParameterCompletion (CodeCompletionContext completionContext, char completionChar)
 		{
 			if (Tracker.Engine.CurrentState is AspNetExpressionState && documentBuilder != null && localDocumentInfo != null) {
 				return documentBuilder.HandleParameterCompletion (defaultDocument, completionContext, documentInfo, localDocumentInfo, completionChar);
@@ -344,7 +344,8 @@ namespace MonoDevelop.AspNet.Gui
 			if (!HasDoc) {
 				AddAspBeginExpressions (list);
 				string aspPrefix = "asp:";
-				foreach (var cls in WebTypeContext.ListSystemControlClasses (TypeSystemService.GetCompilation (project).LookupType ("System.Web.UI", "Control"), project))
+				var type = ReflectionHelper.ParseReflectionName ("System.Web.UI.Control").Resolve (TypeSystemService.GetCompilation (project));
+				foreach (var cls in WebTypeContext.ListSystemControlClasses (type, project))
 					list.Add (new AspTagCompletionData (aspPrefix, cls));
 				
 				base.GetElementCompletions (list);
@@ -455,7 +456,8 @@ namespace MonoDevelop.AspNet.Gui
 				
 				if (meth != null) {
 					IType argType = meth.Parameters [0].Type;
-					if (argType != null && argType.IsBaseType (argType.GetDefinition ().Compilation.LookupType ("System.Web.UI", "Control"))) {
+					var type = ReflectionHelper.ParseReflectionName ("System.Web.UI.Control").Resolve (argType.GetDefinition ().Compilation);
+					if (argType != null && argType.IsBaseType (type)) {
 						list.AddRange (refman.GetControlCompletionData (argType));
 						return;
 					}
@@ -473,7 +475,7 @@ namespace MonoDevelop.AspNet.Gui
 				
 				foreach (IProperty prop in GetUniqueMembers<IProperty> (controlClass.GetProperties ()))
 					if (GetPersistenceMode (prop) != System.Web.UI.PersistenceMode.Attribute)
-						list.Add (prop.Name, prop.GetStockIcon (), AmbienceService.GetDocumentationSummary (prop));
+						list.Add (prop.Name, prop.GetStockIcon (), AmbienceService.GetSummaryMarkup (prop));
 				return;
 			}
 		}
@@ -562,7 +564,7 @@ namespace MonoDevelop.AspNet.Gui
 			if (HasDoc && !string.IsNullOrEmpty (aspDoc.Info.InheritedClass)) {
 				projectDatabase = TypeSystemService.GetCompilation (project);
 				if (projectDatabase != null)
-					codeBehindClass = projectDatabase.FindType (aspDoc.Info.InheritedClass);
+					codeBehindClass = ReflectionHelper.ParseReflectionName (aspDoc.Info.InheritedClass).Resolve (projectDatabase);
 			}
 		}
 		
@@ -601,7 +603,7 @@ namespace MonoDevelop.AspNet.Gui
 			
 			IType controlClass = refman.GetControlType (name.Prefix, name.Name);
 			if (controlClass == null) {
-				controlClass = database.LookupType ("System.Web.UI.WebControls", "WebControl");
+				controlClass = ReflectionHelper.ParseReflectionName ("System.Web.UI.WebControls.WebControl").Resolve (database);
 				if (controlClass == null) {
 					LoggingService.LogWarning ("Could not obtain IType for System.Web.UI.WebControls.WebControl");
 					return;
@@ -618,13 +620,13 @@ namespace MonoDevelop.AspNet.Gui
 			foreach (var prop in GetUniqueMembers<IProperty> (controlClass.GetProperties ()))
 				if (prop.Accessibility == Accessibility.Public && (existingAtts == null || !existingAtts.ContainsKey (prop.Name)))
 				if (GetPersistenceMode (prop) == System.Web.UI.PersistenceMode.Attribute)
-					list.Add (prop.Name, prop.GetStockIcon (), AmbienceService.GetDocumentationSummary (prop));
+						list.Add (prop.Name, prop.GetStockIcon (), AmbienceService.GetSummaryMarkup (prop));
 			
 			//similarly add events
 			foreach (var eve in GetUniqueMembers<IEvent> (controlClass.GetEvents ())) {
 				string eveName = "On" + eve.Name;
 				if (eve.Accessibility == Accessibility.Public && (existingAtts == null || !existingAtts.ContainsKey (eveName)))
-					list.Add (eveName, eve.GetStockIcon (), AmbienceService.GetDocumentationSummary (eve));
+					list.Add (eveName, eve.GetStockIcon (), AmbienceService.GetSummaryMarkup (eve));
 			}
 		}
 		
@@ -639,7 +641,7 @@ namespace MonoDevelop.AspNet.Gui
 				LoggingService.LogWarning ("Could not obtain IType for {0}", tagName.FullName);
 				
 				var database = WebTypeContext.GetSystemWebDom (project);
-				controlClass = database.LookupType ("System.Web.UI.WebControls", "WebControl");
+				controlClass = ReflectionHelper.ParseReflectionName ("System.Web.UI.WebControls.WebControl").Resolve (database);
 
 				if (controlClass == null) {
 					LoggingService.LogWarning ("Could not obtain IType for System.Web.UI.WebControls.WebControl");
@@ -725,7 +727,7 @@ namespace MonoDevelop.AspNet.Gui
 				if (retCls != null && retCls.Kind == TypeKind.Enum) {
 					foreach (var enumVal in retCls.GetFields ())
 						if (enumVal.IsPublic && enumVal.IsStatic)
-							list.Add (enumVal.Name, "md-literal", AmbienceService.GetDocumentationSummary (enumVal));
+							list.Add (enumVal.Name, "md-literal", AmbienceService.GetSummaryMarkup (enumVal));
 					return;
 				}
 			}

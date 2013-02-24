@@ -64,31 +64,31 @@ namespace MonoDevelop.CSharp
 			}
 		}
 		
-		public static ICSharpCode.NRefactory.CSharp.CompilationUnit Parse (this ICSharpCode.NRefactory.CSharp.CSharpParser parser, TextEditorData data)
+		public static ICSharpCode.NRefactory.CSharp.SyntaxTree Parse (this ICSharpCode.NRefactory.CSharp.CSharpParser parser, TextEditorData data)
 		{
 			using (var stream = data.OpenStream ()) {
 				return parser.Parse (stream, data.Document.FileName);
 			}
 		}
 		
-		public static AstNode ParseSnippet (this ICSharpCode.NRefactory.CSharp.CSharpParser parser, TextEditorData data)
-		{
-			using (var stream = new  StreamReader (data.OpenStream ())) {
-				var result = parser.ParseExpression (stream);
-				if (!parser.HasErrors)
-					return result;
-			}
-			parser.ErrorPrinter.Reset ();
-			using (var stream = new  StreamReader (data.OpenStream ())) {
-				var result = parser.ParseStatements (stream);
-				if (!parser.HasErrors)
-					return result.FirstOrDefault ();
-			}
-			parser.ErrorPrinter.Reset ();
-			using (var stream = data.OpenStream ()) {
-				return parser.Parse (stream, data.Document.FileName);
-			}
-		}
+//		public static AstNode ParseSnippet (this ICSharpCode.NRefactory.CSharp.CSharpParser parser, TextEditorData data)
+//		{
+//			using (var stream = new  StreamReader (data.OpenStream ())) {
+//				var result = parser.ParseExpression (stream);
+//				if (!parser.HasErrors)
+//					return result;
+//			}
+//			parser.ErrorPrinter.Reset ();
+//			using (var stream = new  StreamReader (data.OpenStream ())) {
+//				var result = parser.ParseStatements (stream);
+//				if (!parser.HasErrors)
+//					return result.FirstOrDefault ();
+//			}
+//			parser.ErrorPrinter.Reset ();
+//			using (var stream = data.OpenStream ()) {
+//				return parser.Parse (stream, data.Document.FileName);
+//			}
+//		}
 		
 		public static MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy GetFormattingPolicy (this MonoDevelop.Ide.Gui.Document doc)
 		{
@@ -121,8 +121,8 @@ namespace MonoDevelop.CSharp
 			if (parsedDocument == null)
 				return false;
 
-			var unit = parsedDocument.GetAst<CompilationUnit> ();
-			var parsedFile = parsedDocument.ParsedFile as CSharpParsedFile;
+			var unit = parsedDocument.GetAst<SyntaxTree> ();
+			var parsedFile = parsedDocument.ParsedFile as CSharpUnresolvedFile;
 			
 			if (unit == null || parsedFile == null)
 				return false;

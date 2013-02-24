@@ -4,6 +4,7 @@
 // Authors: Mono Team
 //     
 // Copyright 2011 Novell, Inc
+// Copyright 2011, 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -34,7 +35,8 @@ namespace MonoMac.CoreVideo {
 	public struct CVTime {
 		public long TimeValue;
 		public long TimeScale;
-		public int Flags;
+		public CVTimeFlags TimeFlags;
+		public int Flags { get { return (int) TimeFlags; } set { TimeFlags = (CVTimeFlags) value; }}
 
 		static IntPtr CoreVideo_libraryHandle = Dlfcn.dlopen (Constants.CoreVideoLibrary, 0);
 
@@ -57,7 +59,7 @@ namespace MonoMac.CoreVideo {
 			
 			CVTime b = (CVTime) other;
 			
-			return (TimeValue == b.TimeValue) && (TimeScale == b.TimeScale) && (Flags == b.Flags);
+			return (TimeValue == b.TimeValue) && (TimeScale == b.TimeScale) && (TimeFlags == b.TimeFlags);
 		}
 		
 		public override int GetHashCode ()

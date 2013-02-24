@@ -29,12 +29,11 @@ using System;
 using System.Collections.Generic;
 
 using Gtk;
-using MonoDevelop.Projects;
 using MonoDevelop.Core;
 using MonoDevelop.Components;
 using System.Linq;
 using ICSharpCode.NRefactory.Completion;
-using MonoDevelop.Ide.Gui.Content;
+using Mono.TextEditor.PopupWindow;
 
 namespace MonoDevelop.Ide.CodeCompletion
 {
@@ -42,7 +41,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 	{
 		const int declarationWindowMargin = 3;
 		
-		DeclarationViewWindow declarationviewwindow = new DeclarationViewWindow ();
+		TooltipInformationWindow declarationviewwindow = new TooltipInformationWindow ();
 		ICompletionData currentData;
 		Widget parsingMessage;
 		int initialWordLength;
@@ -57,26 +56,84 @@ namespace MonoDevelop.Ide.CodeCompletion
 		public int Y { get; private set; }
 		
 		public int InitialWordLength {
-			get { return this.initialWordLength; }
+			get { return initialWordLength; }
 		}
 		
 		IMutableCompletionDataList mutableList;
 		ICompletionDataList completionDataList;
 		public ICompletionDataList CompletionDataList {
-			get { return this.completionDataList; }
+			get { return completionDataList; }
 			set {
-				this.completionDataList = value;
+				completionDataList = value;
 			}
 		}
-		
-		public CompletionListWindow ()
+
+		bool previewCompletionString;
+		Entry previewEntry;
+		public override string PartialWord {
+			get {
+				if (previewEntry != null)
+					return previewEntry.Text;
+				return base.PartialWord;
+			}
+		}
+
+		public bool PreviewCompletionString {
+			get {
+				return previewCompletionString;
+			}
+			set {
+				if (value) {
+					previewEntry = new Entry ();
+					previewEntry.Changed += delegate (object sender, EventArgs e) {
+						List.CompletionString = previewEntry.Text;
+
+						UpdateWordSelection ();
+						List.QueueDraw ();
+					};
+					previewEntry.KeyPressEvent += delegate(object o, KeyPressEventArgs args) {
+						var keyAction = PreProcessKey (args.Event.Key, (char)args.Event.KeyValue, args.Event.State);
+						if (keyAction.HasFlag (KeyActions.Complete))
+							CompleteWord ();
+
+						if (keyAction.HasFlag (KeyActions.CloseWindow)) {
+							Destroy ();
+						}
+
+						args.RetVal = !keyAction.HasFlag (KeyActions.Process);
+					};
+					WordCompleted += delegate (object sender, CodeCompletionContextEventArgs e) {
+						Destroy ();
+					};
+					vbox.PackStart (previewEntry, false, true, 0);
+
+					previewEntry.Activated += (sender, e) => CompleteWord ();
+					previewEntry.Show ();
+					FocusOutEvent += (o, args) => Destroy ();
+					GLib.Timeout.Add (10, delegate {
+						previewEntry.GrabFocus ();
+						return false;
+					});
+
+				}
+				previewCompletionString = value;
+			}
+		}
+
+		public CompletionListWindow (WindowType type = WindowType.Popup) : base(type) 
 		{
-			TypeHint = Gdk.WindowTypeHint.Utility;
+			if (IdeApp.Workbench != null)
+				this.TransientFor = IdeApp.Workbench.RootWindow;
+			TypeHint = Gdk.WindowTypeHint.Combo;
 			SizeAllocated += new SizeAllocatedHandler (ListSizeChanged);
 			Events = Gdk.EventMask.PropertyChangeMask;
 			WindowTransparencyDecorator.Attach (this);
 			DataProvider = this;
 			HideDeclarationView ();
+			List.ListScrolled += (object sender, EventArgs e) => {
+				HideDeclarationView ();
+				UpdateDeclarationView ();
+			};
 		}
 
 		bool completionListClosed;
@@ -138,13 +195,18 @@ namespace MonoDevelop.Ide.CodeCompletion
 		
 		public void ToggleCategoryMode ()
 		{
-			this.List.InCategoryMode = !this.List.InCategoryMode;
-			this.ResetSizes ();
-			this.List.QueueDraw ();
+			List.InCategoryMode = !List.InCategoryMode;
+			ResetSizes ();
+			List.QueueDraw ();
 		}
 		
 		public bool PreProcessKeyEvent (Gdk.Key key, char keyChar, Gdk.ModifierType modifier)
 		{
+			if (key == Gdk.Key.Escape) {
+				CompletionWindowManager.HideWindow ();
+				return true;
+			}
+
 			KeyActions ka = KeyActions.None;
 			bool keyHandled = false;
 			foreach (ICompletionKeyHandler handler in CompletionDataList.KeyHandler) {
@@ -203,7 +265,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 			base.SelectEntry (s);
 			UpdateDeclarationView ();
 		}
-		
+
+
 		internal bool ShowListWindow (char firstChar, ICompletionDataList list, ICompletionWidget completionWidget, CodeCompletionContext completionContext)
 		{
 			if (list == null)
@@ -221,11 +284,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 			CompletionWidget = completionWidget;
 			CompletionDataList = list;
 
-			CompleteWithSpaceOrPunctuation = PropertyService.Get ("CompleteWithSpaceOrPunctuation", true);
-			
 			CodeCompletionContext = completionContext;
 			mutableList = completionDataList as IMutableCompletionDataList;
-			List.PreviewCompletionString = completionDataList.CompletionSelectionMode == CompletionSelectionMode.OwnTextField;
+			PreviewCompletionString = completionDataList.CompletionSelectionMode == CompletionSelectionMode.OwnTextField;
 
 			if (mutableList != null) {
 				mutableList.Changing += OnCompletionDataChanging;
@@ -235,9 +296,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 					OnCompletionDataChanging (null, null);
 			}
 			if (FillList ()) {
-				this.AutoSelect = list.AutoSelect;
-				this.AutoCompleteEmptyMatch = list.AutoCompleteEmptyMatch;
-				this.CloseOnSquareBrackets = list.CloseOnSquareBrackets;
+				AutoSelect = list.AutoSelect;
+				AutoCompleteEmptyMatch = list.AutoCompleteEmptyMatch;
+				CloseOnSquareBrackets = list.CloseOnSquareBrackets;
 				// makes control-space in midle of words to work
 				string text = completionWidget.GetCompletionText (completionContext);
 				DefaultCompletionString = completionDataList.DefaultCompletionString ?? "";
@@ -269,10 +330,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 					CompleteWord ();
 					CompletionWindowManager.HideWindow ();
 					return false;
-				} else {
-					ShowAll ();
-					UpdateDeclarationView ();
 				}
+				ShowAll ();
+				UpdateDeclarationView ();
 				return true;
 			}
 			CompletionWindowManager.HideWindow ();
@@ -294,7 +354,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			if ((completionDataList.Count == 0) && !IsChanging)
 				return false;
 			
-			this.Style = CompletionWidget.GtkStyle;
+			Style = CompletionWidget.GtkStyle;
 			
 			if (PropertyService.Get ("HideObsoleteItems", false)) {
 				foreach (var item in completionDataList.Where (x => x.DisplayFlags.HasFlag (DisplayFlags.Obsolete)).ToList ())
@@ -386,7 +446,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 		
 		protected virtual void OnWordCompleted (CodeCompletionContextEventArgs e)
 		{
-			EventHandler<CodeCompletionContextEventArgs> handler = this.WordCompleted;
+			var handler = WordCompleted;
 			if (handler != null)
 				handler (this, e);
 		}
@@ -423,14 +483,14 @@ namespace MonoDevelop.Ide.CodeCompletion
 		}
 		
 		bool declarationViewHidden = true;
-		int declarationViewX = -1, declarationViewY = -1;
-		uint declarationViewTimer = 0;
-		uint declarationViewWindowOpacityTimer = 0;
-		
+		uint declarationViewTimer;
+
 		void UpdateDeclarationView ()
 		{
-			if (completionDataList == null || List.SelectionFilterIndex >= completionDataList.Count || List.SelectionFilterIndex == -1)
+			if (completionDataList == null || List.SelectionFilterIndex >= completionDataList.Count || List.SelectionFilterIndex == -1) {
+				HideDeclarationView ();
 				return;
+			}
 			if (List.GdkWindow == null)
 				return;
 			RemoveDeclarationViewTimer ();
@@ -445,8 +505,38 @@ namespace MonoDevelop.Ide.CodeCompletion
 				HideDeclarationView ();
 				return;
 			}
+
 			var data = completionDataList [List.SelectedItem];
-			
+			if (data != currentData)
+				HideDeclarationView ();
+
+			declarationViewTimer = GLib.Timeout.Add (150, DelayedTooltipShow);
+		}
+		
+		void HideDeclarationView ()
+		{
+			RemoveDeclarationViewTimer ();
+			if (declarationviewwindow != null) {
+				declarationviewwindow.Hide ();
+			}
+			declarationViewHidden = true;
+		}
+		
+		void RemoveDeclarationViewTimer ()
+		{
+			if (declarationViewTimer != 0) {
+				GLib.Source.Remove (declarationViewTimer);
+				declarationViewTimer = 0;
+			}
+		}
+		
+		bool DelayedTooltipShow ()
+		{
+			var selectedItem = List.SelectedItem;
+			if (selectedItem < 0 || selectedItem >= completionDataList.Count)
+				return false;
+			var data = completionDataList [selectedItem];
+
 			IEnumerable<ICompletionData> filteredOverloads;
 			if (data.HasOverloads) {
 				filteredOverloads = data.OverloadedData;
@@ -455,21 +545,15 @@ namespace MonoDevelop.Ide.CodeCompletion
 			} else {
 				filteredOverloads = new ICompletionData[] { data };
 			}
-			
-			var overloads = new List<ICompletionData> (filteredOverloads);
+
 			
 			if (data != currentData) {
-				HideDeclarationView ();
-				
 				declarationviewwindow.Clear ();
-				declarationviewwindow.Realize ();
-				
+				var overloads = new List<ICompletionData> (filteredOverloads);
 				foreach (var overload in overloads) {
-					bool hasMarkup = (overload.DisplayFlags & DisplayFlags.DescriptionHasMarkup) != 0;
-					declarationviewwindow.AddOverload (hasMarkup ? overload.Description : GLib.Markup.EscapeText (overload.Description));
+					declarationviewwindow.AddOverload ((CompletionData)overload);
 				}
 				
-				declarationviewwindow.Multiple = data.HasOverloads;
 				currentData = data;
 				if (data.HasOverloads) {
 					for (int i = 0; i < overloads.Count; i++) {
@@ -480,123 +564,32 @@ namespace MonoDevelop.Ide.CodeCompletion
 					}
 				}
 			}
-			
-			if (declarationviewwindow.DescriptionMarkup.Length == 0) {
-				HideDeclarationView ();
-				return;
-			}
-			
-			if (currentData != null)
-				declarationViewTimer = GLib.Timeout.Add (250, DelayedTooltipShow);
-		}
-		
-		void HideDeclarationView ()
-		{
-			RemoveDeclarationViewTimer ();
-			if (declarationviewwindow != null) {
-				declarationviewwindow.Hide ();
-				declarationviewwindow.Opacity = 0;
-			}
-			declarationViewHidden = true;
-			declarationViewX = declarationViewY = -1; 
-		}
-		
-		void RemoveDeclarationViewTimer ()
-		{
-			if (declarationViewWindowOpacityTimer != 0) {
-				GLib.Source.Remove (declarationViewWindowOpacityTimer);
-				declarationViewWindowOpacityTimer = 0;
-			}
-			if (declarationViewTimer != 0) {
-				GLib.Source.Remove (declarationViewTimer);
-				declarationViewTimer = 0;
-			}
-		}
-		
-		class OpacityTimer
-		{
-			public double Opacity { get; private set; }
-			
-			CompletionListWindow window;
-//			static int num = 0;
-//			int id;
-			public OpacityTimer (CompletionListWindow window)
-			{
-//				id = num++;
-				this.window = window;
-				Opacity = 0.0;
-				window.declarationviewwindow.Opacity = Opacity;
-			}
-			
-			public bool Timer ()
-			{
-				Opacity = System.Math.Min (1.0, Opacity + 0.33);
-				window.declarationviewwindow.Opacity = Opacity;
-				bool result = Math.Round (Opacity * 10.0) < 10;
-				if (!result)
-					window.declarationViewWindowOpacityTimer = 0;
-				return result;
-			}
-		}
-		
-		bool DelayedTooltipShow ()
-		{
-			Gdk.Rectangle rect = List.GetRowArea (List.SelectionFilterIndex);
-			if (rect.IsEmpty)
-				return false;
-			int listpos_x = 0, listpos_y = 0, i = 0;
-			while ((listpos_x == 0 || listpos_y == 0) && (i++ < 10))
-				GetPosition (out listpos_x, out listpos_y);
-			if (i >= 10)
-				return false;
-			int vert = listpos_y + rect.Y;
-			int lvWidth = 0, lvHeight = 0;
-			while (lvWidth == 0)
-				this.GdkWindow.GetSize (out lvWidth, out lvHeight);
-			
-			if (vert >= listpos_y + lvHeight - 2 || vert < listpos_y) {
+
+			if (declarationviewwindow.Overloads == 0) {
 				HideDeclarationView ();
 				return false;
 			}
-			
-/*			if (vert >= listpos_y + lvHeight - 2) {
-				vert = listpos_y + lvHeight - rect.Height;
-			} else if (vert < listpos_y) {
-				vert = listpos_y;
-			}*/
-			
+
+			Gdk.Rectangle rect = List.GetRowArea (selectedItem);
+			if (rect.IsEmpty || rect.Bottom < (int)List.vadj.Value || rect.Y > List.Allocation.Height + (int)List.vadj.Value)
+				return false;
+
 			if (declarationViewHidden && Visible) {
-				declarationviewwindow.Move (this.Screen.Width + 1, vert);
-				declarationviewwindow.SetFixedWidth (-1);
-				declarationviewwindow.ReshowWithInitialSize ();
-				declarationviewwindow.Show ();
-				if (declarationViewWindowOpacityTimer != 0) 
-					GLib.Source.Remove (declarationViewWindowOpacityTimer);
-				declarationViewWindowOpacityTimer = GLib.Timeout.Add (50, new OpacityTimer (this).Timer);
+				declarationviewwindow.ShowArrow = true;
+				int ox;
+				int oy;
+				base.GdkWindow.GetOrigin (out ox, out oy);
+				declarationviewwindow.MaximumYTopBound = oy;
+				int y = rect.Y + Theme.Padding - (int)List.vadj.Value;
+				declarationviewwindow.ShowPopup (this, 
+				                                 new Gdk.Rectangle (Gui.Styles.TooltipInfoSpacing, 
+				                                                    Math.Min (Allocation.Height, Math.Max (0, y)), 
+				                                                    Allocation.Width, 
+				                                                    rect.Height), 
+				                                 PopupPosition.Left);
 				declarationViewHidden = false;
 			}
 			
-			Gdk.Rectangle geometry = DesktopService.GetUsableMonitorGeometry (Screen, Screen.GetMonitorAtWindow (GdkWindow));
-		
-			Requisition req = declarationviewwindow.SizeRequest ();
-			int dvwWidth = req.Width;
-			int horiz = listpos_x + lvWidth + declarationWindowMargin;
-			if (geometry.Right - horiz >= lvWidth) {
-				if (geometry.Right - horiz < dvwWidth)
-					declarationviewwindow.SetFixedWidth (geometry.Right - horiz);
-			} else {
-				if (listpos_x - dvwWidth - declarationWindowMargin < 0) {
-					declarationviewwindow.SetFixedWidth (listpos_x - declarationWindowMargin);
-					dvwWidth = declarationviewwindow.SizeRequest ().Width;
-				}
-				horiz = curXPos - dvwWidth - declarationWindowMargin;
-			}
-			
-			if (declarationViewX != horiz || declarationViewY != vert) {
-				declarationviewwindow.Move (horiz, vert);
-				declarationViewX = horiz;
-				declarationViewY = vert;
-			}
 			declarationViewTimer = 0;
 			return false;
 		}
@@ -655,7 +648,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			string iconName = ((CompletionData)completionDataList[n]).Icon;
 			if (string.IsNullOrEmpty (iconName))
 				return null;
-			return ImageService.GetPixbuf (iconName, Gtk.IconSize.Menu);
+			return ImageService.GetPixbuf (iconName, IconSize.Menu);
 		}
 		
 		#endregion
@@ -667,12 +660,12 @@ namespace MonoDevelop.Ide.CodeCompletion
 		void OnCompletionDataChanging (object s, EventArgs args)
 		{
 			if (parsingMessage == null) {
-				VBox box = new VBox ();
-				box.PackStart (new Gtk.HSeparator (), false, false, 0);
-				HBox hbox = new HBox ();
+				var box = new VBox ();
+				box.PackStart (new HSeparator (), false, false, 0);
+				var hbox = new HBox ();
 				hbox.BorderWidth = 3;
-				hbox.PackStart (new Gtk.Image ("md-parser", Gtk.IconSize.Menu), false, false, 0);
-				Gtk.Label lab = new Gtk.Label (GettextCatalog.GetString ("Gathering class information..."));
+				hbox.PackStart (new Image ("md-parser", IconSize.Menu), false, false, 0);
+				var lab = new Label (GettextCatalog.GetString ("Gathering class information..."));
 				lab.Xalign = 0;
 				hbox.PackStart (lab, true, true, 3);
 				hbox.ShowAll ();
@@ -687,17 +680,16 @@ namespace MonoDevelop.Ide.CodeCompletion
 			HideFooter ();
 			
 			//try to capture full selection state so as not to interrupt user
-			string last = null;
 
 			if (Visible) {
-				last = List.AutoSelect ? CurrentCompletionText : PartialWord;
+				string last = List.AutoSelect ? CurrentCompletionText : PartialWord;
 				//don't reset the user-entered word when refilling the list
-				var tmp = this.List.AutoSelect;
+				var tmp = List.AutoSelect;
 				// Fill the list before resetting so that we get the correct size
 				FillList ();
 				ResetSizes ();
-				this.List.AutoSelect = tmp;
-				if (last != null )
+				List.AutoSelect = tmp;
+				if (last != null)
 					SelectEntry (last);
 			}
 		}

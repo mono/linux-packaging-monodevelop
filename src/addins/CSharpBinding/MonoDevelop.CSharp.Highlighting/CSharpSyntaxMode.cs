@@ -41,12 +41,12 @@ using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Ide.TypeSystem;
 using ICSharpCode.NRefactory.CSharp.Resolver;
-using System.IO;
 using ICSharpCode.NRefactory.Semantics;
-using ICSharpCode.NRefactory;
 using ICSharpCode.NRefactory.CSharp.TypeSystem;
 using MonoDevelop.SourceEditor.QuickTasks;
 using System.Threading;
+using System.Diagnostics;
+using MonoDevelop.Core;
 
 
 namespace MonoDevelop.CSharp.Highlighting
@@ -65,14 +65,20 @@ namespace MonoDevelop.CSharp.Highlighting
 		}
 	}
 	
-	public class CSharpSyntaxMode : Mono.TextEditor.Highlighting.SyntaxMode, IQuickTaskProvider
+	class CSharpSyntaxMode : SyntaxMode, IQuickTaskProvider, IDisposable
 	{
-		Document guiDocument;
-		CompilationUnit unit;
-		CSharpParsedFile parsedFile;
+		readonly Document guiDocument;
+
+		SyntaxTree unit;
+		CSharpUnresolvedFile parsedFile;
 		ICompilation compilation;
 		CSharpAstResolver resolver;
-		CancellationTokenSource src = null;
+		CancellationTokenSource src;
+
+		public bool SemanticHighlightingEnabled {
+			get;
+			set;
+		}
 
 		internal class StyledTreeSegment : TreeSegment
 		{
@@ -91,7 +97,7 @@ namespace MonoDevelop.CSharp.Highlighting
 		{
 			public bool GetStyle (Chunk chunk, ref int endOffset, out string style)
 			{
-				var segment = GetSegmentsAt (chunk.Offset).FirstOrDefault (s => s.Offset == chunk.Offset);
+				var segment = GetSegmentsAt (chunk.Offset).FirstOrDefault ();
 				if (segment == null) {
 					style = null;
 					return false;
@@ -109,43 +115,36 @@ namespace MonoDevelop.CSharp.Highlighting
 			}
 		}
 		
-		HighlightingSegmentTree highlightedSegmentCache = new HighlightingSegmentTree ();
-		
+		Dictionary<DocumentLine, HighlightingVisitior> lineSegments = new Dictionary<DocumentLine, HighlightingVisitior> ();
+
 		public bool DisableConditionalHighlighting {
 			get;
 			set;
 		}
-		
-		protected override void OnDocumentSet (EventArgs e)
-		{
-			if (guiDocument != null) {
-				guiDocument.DocumentParsed -= HandleDocumentParsed;
-				highlightedSegmentCache.RemoveListener (guiDocument.Editor.Document);
-			}
-			guiDocument = null;
-			
-			base.OnDocumentSet (e);
-		}
-		
+
 		void HandleDocumentParsed (object sender, EventArgs e)
 		{
 			if (src != null)
 				src.Cancel ();
 			resolver = null;
-			if (guiDocument != null && MonoDevelop.Core.PropertyService.Get ("EnableSemanticHighlighting", true)) {
+			if (guiDocument != null && SemanticHighlightingEnabled) {
 				var parsedDocument = guiDocument.ParsedDocument;
 				if (parsedDocument != null) {
-					unit = parsedDocument.GetAst<CompilationUnit> ();
-					parsedFile = parsedDocument.ParsedFile as CSharpParsedFile;
+					unit = parsedDocument.GetAst<SyntaxTree> ();
+					parsedFile = parsedDocument.ParsedFile as CSharpUnresolvedFile;
 					if (guiDocument.Project != null && guiDocument.IsCompileableInProject) {
 						src = new CancellationTokenSource ();
 						var cancellationToken = src.Token;
+						compilation = guiDocument.Compilation;
+						var newResolver = new CSharpAstResolver (compilation, unit, parsedFile);
 						System.Threading.Tasks.Task.Factory.StartNew (delegate {
-							Thread.Sleep (100);
-							compilation = guiDocument.Compilation;
-							var newResolver = new CSharpAstResolver (compilation, unit, parsedFile);
 							var visitor = new QuickTaskVisitor (newResolver, cancellationToken);
-							unit.AcceptVisitor (visitor);
+							try {
+								unit.AcceptVisitor (visitor);
+							} catch (Exception ex) {
+								LoggingService.LogError ("Error while analyzing the file for the semantic highlighting.", ex);
+								return;
+							}
 							if (!cancellationToken.IsCancellationRequested) {
 								Gtk.Application.Invoke (delegate {
 									if (cancellationToken.IsCancellationRequested)
@@ -156,11 +155,17 @@ namespace MonoDevelop.CSharp.Highlighting
 									resolver = newResolver;
 									quickTasks = visitor.QuickTasks;
 									OnTasksUpdated (EventArgs.Empty);
+									foreach (var kv in lineSegments) {
+										try {
+											kv.Value.tree.RemoveListener ();
+										} catch (Exception) {
+										}
+									}
+									lineSegments.Clear ();
 									var textEditor = editorData.Parent;
 									if (textEditor != null) {
-										var margin = textEditor.TextViewMargin;
 										if (!parsedDocument.HasErrors) {
-											highlightedSegmentCache.Clear ();
+											var margin = textEditor.TextViewMargin;
 											margin.PurgeLayoutCache ();
 											textEditor.QueueDraw ();
 										}
@@ -173,13 +178,437 @@ namespace MonoDevelop.CSharp.Highlighting
 			}
 		}
 
+		class HighlightingVisitior : DepthFirstAstVisitor
+		{
+			readonly CSharpAstResolver resolver;
+			readonly CancellationToken cancellationToken;
+			readonly int lineNumber;
+			readonly int lineOffset;
+			internal HighlightingSegmentTree tree = new HighlightingSegmentTree ();
+
+			public HighlightingVisitior (CSharpAstResolver resolver, CancellationToken cancellationToken, int lineNumber, int lineOffset)
+			{
+				if (resolver == null)
+					throw new ArgumentNullException ("resolver");
+				this.resolver = resolver;
+				this.cancellationToken = cancellationToken;
+				this.lineNumber = lineNumber;
+				this.lineOffset = lineOffset;
+			}
+
+			void Colorize (AstNode node, string style)
+			{
+				var start = lineOffset + node.StartLocation.Column - 1;
+				var end   = lineOffset + node.EndLocation.Column - 1;
+
+				tree.AddStyle (start, end, style);
+			}
+
+			public override void VisitCSharpTokenNode (CSharpTokenNode token)
+			{
+				if (token.StartLocation.Line != lineNumber)
+					return;
+				var mod = token as CSharpModifierToken;
+				if (mod != null && mod.Modifier == Modifiers.Partial)
+					Colorize (token, contextualHighlightKeywords["partial"]);
+			}
+
+			protected override void VisitChildren (AstNode node)
+			{
+				for (var child = node.FirstChild; child != null; child = child.NextSibling) {
+					if (child.StartLocation.Line <= lineNumber && child.EndLocation.Line >= lineNumber)
+						child.AcceptVisitor(this);
+				}
+			}
+
+			public override void VisitConstraint (Constraint constraint)
+			{
+				base.VisitConstraint (constraint);
+				if (constraint.WhereKeyword.StartLocation.Line == lineNumber)
+					Colorize (constraint.WhereKeyword, contextualHighlightKeywords["where"]);
+			}
+
+			public override void VisitIdentifierExpression (IdentifierExpression identifierExpression)
+			{
+				foreach (var tp in identifierExpression.TypeArguments) {
+					tp.AcceptVisitor (this);
+				}
+				if (identifierExpression.StartLocation.Line != lineNumber)
+					return;
+				if (isInAccessor && identifierExpression.Identifier == "value") {
+					Colorize (identifierExpression, contextualHighlightKeywords["value"]);
+					return;
+				}
+
+				var result = resolver.Resolve (identifierExpression, cancellationToken);
+				if (result.IsError) {
+					Colorize (identifierExpression, "keyword.semantic.error");
+					return;
+				}
+
+				if (result is MemberResolveResult) {
+					var member = ((MemberResolveResult)result).Member;
+					switch (member.EntityType) {
+					case EntityType.Field:
+						Colorize (identifierExpression.IdentifierToken, "keyword.semantic.field");
+						break;
+					case EntityType.Property:
+						Colorize (identifierExpression.IdentifierToken, "keyword.semantic.property");
+						break;
+					case EntityType.Method:
+						Colorize (identifierExpression.IdentifierToken, "keyword.semantic.method");
+						break;
+					case EntityType.Event:
+						Colorize (identifierExpression.IdentifierToken, "keyword.semantic.event");
+						break;
+					}
+					return;
+				}
+
+				if (result is MethodGroupResolveResult) {
+					Colorize (identifierExpression.IdentifierToken, "keyword.semantic.method");
+					return;
+				}
+
+				if (result is TypeResolveResult) {
+					Colorize (identifierExpression.IdentifierToken, "keyword.semantic.type");
+					return;
+				}
+			}
+
+			bool isInAccessor;
+			public override void VisitAccessor(Accessor accessor)
+			{
+				isInAccessor = true;
+				try {
+					base.VisitAccessor(accessor);
+				} finally {
+					isInAccessor = false;
+				}
+			}
+			public override void VisitExternAliasDeclaration (ExternAliasDeclaration externAliasDeclaration)
+			{
+				base.VisitExternAliasDeclaration (externAliasDeclaration);
+				if (externAliasDeclaration.AliasToken.StartLocation.Line == lineNumber)
+					Colorize (externAliasDeclaration.AliasToken, "keyword.namespace");
+			}
+
+			public override void VisitTypeDeclaration (TypeDeclaration typeDeclaration)
+			{
+				base.VisitTypeDeclaration (typeDeclaration);
+				if (typeDeclaration.NameToken.StartLocation.Line == lineNumber)
+					Colorize (typeDeclaration.NameToken, "keyword.semantic.type.declaration");
+			}
+
+			public override void VisitPropertyDeclaration (PropertyDeclaration propertyDeclaration)
+			{
+				base.VisitPropertyDeclaration (propertyDeclaration);
+				if (propertyDeclaration.NameToken.StartLocation.Line == lineNumber)
+					Colorize (propertyDeclaration.NameToken, "keyword.semantic.property.declaration");
+				if (!propertyDeclaration.Getter.IsNull) {
+					var getKeyword = propertyDeclaration.Getter.GetChildByRole (PropertyDeclaration.GetKeywordRole);
+					if (getKeyword != null && getKeyword.StartLocation.Line == lineNumber)
+						Colorize (getKeyword, contextualHighlightKeywords ["get"]);
+				}
+				if (!propertyDeclaration.Setter.IsNull) {
+					var setKeyword = propertyDeclaration.Setter.GetChildByRole (PropertyDeclaration.SetKeywordRole);
+					if (setKeyword != null &&setKeyword.StartLocation.Line == lineNumber)
+						Colorize (setKeyword, contextualHighlightKeywords ["set"]);
+				}
+			}
+
+			public override void VisitArrayInitializerExpression (ArrayInitializerExpression arrayInitializerExpression)
+			{
+				foreach (var a in arrayInitializerExpression.Elements) {
+					var namedElement = a as NamedExpression;
+					if (namedElement != null) {
+						if (namedElement.NameToken.StartLocation.Line == lineNumber) {
+							var result = resolver.Resolve (namedElement, cancellationToken);
+							if (result.IsError)
+								Colorize (namedElement.NameToken, "keyword.semantic.error");
+						}
+						namedElement.Expression.AcceptVisitor (this);
+					} else {
+						a.AcceptVisitor (this);
+					}
+				}
+			}
+
+			public override void VisitEventDeclaration (EventDeclaration eventDeclaration)
+			{
+				base.VisitEventDeclaration (eventDeclaration);
+				foreach (var init in eventDeclaration.Variables)
+					if (init.NameToken.StartLocation.Line == lineNumber)
+						Colorize (init.NameToken, "keyword.semantic.event.declaration");
+			}
+
+			public override void VisitCustomEventDeclaration (CustomEventDeclaration eventDeclaration)
+			{
+				base.VisitCustomEventDeclaration (eventDeclaration);
+				Colorize (eventDeclaration.NameToken, "keyword.semantic.event.declaration");
+				if (!eventDeclaration.AddAccessor.IsNull) {
+					var addKeyword = eventDeclaration.AddAccessor.GetChildByRole (CustomEventDeclaration.AddKeywordRole);
+					if (addKeyword != null && addKeyword.StartLocation.Line == lineNumber)
+						Colorize (addKeyword, contextualHighlightKeywords ["add"]);
+				}
+				if (!eventDeclaration.RemoveAccessor.IsNull) {
+					var removeKeyword = eventDeclaration.RemoveAccessor.GetChildByRole (CustomEventDeclaration.RemoveKeywordRole);
+					if (removeKeyword != null && removeKeyword.StartLocation.Line == lineNumber)
+						Colorize (removeKeyword, contextualHighlightKeywords ["remove"]);
+				}
+			}
+
+			public override void VisitTypeParameterDeclaration (TypeParameterDeclaration typeParameterDeclaration)
+			{
+				base.VisitTypeParameterDeclaration (typeParameterDeclaration);
+				if (typeParameterDeclaration.NameToken.StartLocation.Line == lineNumber)
+					Colorize (typeParameterDeclaration.NameToken, "keyword.semantic.type.declaration");
+			}
+
+			public override void VisitConstructorDeclaration (ConstructorDeclaration constructorDeclaration)
+			{
+				base.VisitConstructorDeclaration (constructorDeclaration);
+				if (constructorDeclaration.NameToken.StartLocation.Line == lineNumber)
+					Colorize (constructorDeclaration.NameToken, "keyword.semantic.type.declaration");
+			}
+
+			public override void VisitDestructorDeclaration (DestructorDeclaration destructorDeclaration)
+			{
+				base.VisitDestructorDeclaration (destructorDeclaration);
+				if (destructorDeclaration.NameToken.StartLocation.Line == lineNumber)
+					Colorize (destructorDeclaration.NameToken, "keyword.semantic.type.declaration");
+			}
+
+			public override void VisitMethodDeclaration (MethodDeclaration methodDeclaration)
+			{
+				base.VisitMethodDeclaration (methodDeclaration);
+				if (methodDeclaration.NameToken.StartLocation.Line == lineNumber)
+					Colorize (methodDeclaration.NameToken, "keyword.semantic.method.declaration");
+			}
+
+			public override void VisitFieldDeclaration (FieldDeclaration fieldDeclaration)
+			{
+				fieldDeclaration.ReturnType.AcceptVisitor (this);
+				foreach (var init in fieldDeclaration.Variables)
+					if (init.NameToken.StartLocation.Line == lineNumber)
+						Colorize (init.NameToken, "keyword.semantic.field.declaration");
+			}
+
+			public override void VisitFixedFieldDeclaration (FixedFieldDeclaration fixedFieldDeclaration)
+			{
+				base.VisitFixedFieldDeclaration (fixedFieldDeclaration);
+				foreach (var init in fixedFieldDeclaration.Variables)
+					if (init.NameToken.StartLocation.Line == lineNumber)
+						Colorize (init.NameToken, "keyword.semantic.field.declaration");
+			}
+
+			public override void VisitUsingDeclaration (UsingDeclaration usingDeclaration)
+			{
+			}
+
+			public override void VisitUsingAliasDeclaration (UsingAliasDeclaration usingDeclaration)
+			{
+			}
+
+			public override void VisitComposedType (ComposedType composedType)
+			{
+				if (composedType.StartLocation.Line != lineNumber) {
+					base.VisitComposedType (composedType);
+					return;
+				}
+				var result = resolver.Resolve (composedType, cancellationToken);
+				if (result.IsError) {
+					// if csharpSyntaxMode.guiDocument.Project != null
+					Colorize (composedType, "keyword.semantic.error");
+					return;
+				}
+				if (result is TypeResolveResult) {
+					Colorize (composedType, "keyword.semantic.type");
+				}
+
+			}
+
+			public override void VisitSimpleType (SimpleType simpleType)
+			{
+				if (simpleType.StartLocation.Line != lineNumber) {
+					base.VisitSimpleType (simpleType);
+					return;
+				}
+				var result = resolver.Resolve (simpleType, cancellationToken);
+				if (result.IsError) {
+					// if csharpSyntaxMode.guiDocument.Project != null
+					Colorize (simpleType, "keyword.semantic.error");
+					return;
+				}
+				if (result is TypeResolveResult) {
+					Colorize (simpleType, "keyword.semantic.type");
+				}
+
+			}
+
+			public override void VisitMemberType (MemberType memberType)
+			{
+				if (memberType.MemberNameToken.StartLocation.Line != lineNumber) {
+					base.VisitMemberType (memberType);
+					return;
+				}
+
+				var result = resolver.Resolve (memberType, cancellationToken);
+
+				if (result.IsError) {
+					// if && csharpSyntaxMode.guiDocument.Project != null
+					Colorize (memberType.MemberNameToken, "keyword.semantic.error");
+				}
+				if (result is TypeResolveResult) {
+					Colorize (memberType.MemberNameToken, "keyword.semantic.type");
+				}
+			}
+
+
+			public override void VisitMemberReferenceExpression (MemberReferenceExpression memberReferenceExpression)
+			{
+				base.VisitMemberReferenceExpression (memberReferenceExpression);
+				if (memberReferenceExpression.MemberNameToken.StartLocation.Line != lineNumber)
+					return;
+				var result = resolver.Resolve (memberReferenceExpression, cancellationToken);
+				if (result.IsError) {
+					// if && csharpSyntaxMode.guiDocument.Project != null
+					Colorize (memberReferenceExpression.MemberNameToken, "keyword.semantic.error");
+				}
+
+				if (result is MemberResolveResult) {
+					var member = ((MemberResolveResult)result).Member;
+					switch (member.EntityType) {
+					case EntityType.Field:
+						if (!member.IsStatic && !((IField)member).IsConst)
+							Colorize (memberReferenceExpression.MemberNameToken, "keyword.semantic.field");
+						break;
+					case EntityType.Property:
+						Colorize (memberReferenceExpression.MemberNameToken, "keyword.semantic.property");
+						break;
+					case EntityType.Method:
+						Colorize (memberReferenceExpression.MemberNameToken, "keyword.semantic.method");
+						break;
+					case EntityType.Event:
+						Colorize (memberReferenceExpression.MemberNameToken, "keyword.semantic.event");
+						break;
+					}
+				}
+
+				if (result is MethodGroupResolveResult) {
+					Colorize (memberReferenceExpression.MemberNameToken, "keyword.semantic.method");
+				}
+
+				if (result is TypeResolveResult) {
+					Colorize (memberReferenceExpression.MemberNameToken, "keyword.semantic.type");
+				}
+			}
+
+			public override void VisitPointerReferenceExpression (PointerReferenceExpression pointerReferenceExpression)
+			{
+				base.VisitPointerReferenceExpression (pointerReferenceExpression);
+				var result = resolver.Resolve (pointerReferenceExpression, cancellationToken);
+				if (result.IsError) {
+					// if && csharpSyntaxMode.guiDocument.Project != null
+					Colorize (pointerReferenceExpression.MemberNameToken, "keyword.semantic.error");
+				}
+
+				if (result is MemberResolveResult) {
+					var member = ((MemberResolveResult)result).Member;
+					switch (member.EntityType) {
+					case EntityType.Field:
+						if (!member.IsStatic && !((IField)member).IsConst)
+							Colorize (pointerReferenceExpression.MemberNameToken, "keyword.semantic.field");
+						break;
+					case EntityType.Property:
+						Colorize (pointerReferenceExpression.MemberNameToken, "keyword.semantic.property");
+						break;
+					case EntityType.Method:
+						Colorize (pointerReferenceExpression.MemberNameToken, "keyword.semantic.method");
+						break;
+					}
+				}
+
+				if (result is MethodGroupResolveResult) {
+					Colorize (pointerReferenceExpression.MemberNameToken, "keyword.semantic.method");
+				}
+
+				if (result is TypeResolveResult) {
+					Colorize (pointerReferenceExpression.MemberNameToken, "keyword.semantic.type");
+				}
+			}
+			public override void VisitQueryWhereClause (QueryWhereClause queryWhereClause)
+			{
+				base.VisitQueryWhereClause (queryWhereClause);
+				if (queryWhereClause.WhereKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryWhereClause.WhereKeyword, contextualHighlightKeywords["where"]);
+
+			}
+			public override void VisitQueryFromClause (QueryFromClause queryFromClause)
+			{
+				base.VisitQueryFromClause (queryFromClause);
+				if (queryFromClause.FromKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryFromClause.FromKeyword, contextualHighlightKeywords["from"]);
+			}
+
+			public override void VisitQuerySelectClause (QuerySelectClause querySelectClause)
+			{
+				base.VisitQuerySelectClause (querySelectClause);
+				if (querySelectClause.SelectKeyword.StartLocation.Line == lineNumber)
+					Colorize (querySelectClause.SelectKeyword, contextualHighlightKeywords["select"]);
+			}
+
+			public override void VisitQueryGroupClause (QueryGroupClause queryGroupClause)
+			{
+				base.VisitQueryGroupClause (queryGroupClause);
+				if (queryGroupClause.GroupKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryGroupClause.GroupKeyword, contextualHighlightKeywords["group"]);
+				if (queryGroupClause.ByKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryGroupClause.ByKeyword, contextualHighlightKeywords["by"]);
+			}
+
+			public override void VisitQueryContinuationClause (QueryContinuationClause queryContinuationClause)
+			{
+				base.VisitQueryContinuationClause (queryContinuationClause);
+				if (queryContinuationClause.IntoKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryContinuationClause.IntoKeyword, contextualHighlightKeywords["into"]);
+			}
+
+			public override void VisitQueryJoinClause (QueryJoinClause queryJoinClause)
+			{
+				base.VisitQueryJoinClause (queryJoinClause);
+				if (queryJoinClause.IntoKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryJoinClause.IntoKeyword, contextualHighlightKeywords["into"]);
+				if (queryJoinClause.JoinKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryJoinClause.JoinKeyword, contextualHighlightKeywords["join"]);
+				if (queryJoinClause.OnKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryJoinClause.OnKeyword, contextualHighlightKeywords["on"]);
+				if (queryJoinClause.EqualsKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryJoinClause.EqualsKeyword, contextualHighlightKeywords["equals"]);
+			}
+
+			public override void VisitQueryLetClause (QueryLetClause queryLetClause)
+			{
+				base.VisitQueryLetClause (queryLetClause);
+				if (queryLetClause.LetKeyword.StartLocation.Line == lineNumber)
+					Colorize (queryLetClause.LetKeyword, contextualHighlightKeywords["let"]);
+			}
+
+			public override void VisitQueryOrdering (QueryOrdering queryOrdering)
+			{
+				base.VisitQueryOrdering (queryOrdering);
+				if (queryOrdering.DirectionToken.StartLocation.Line == lineNumber)
+					Colorize (queryOrdering.DirectionToken, contextualHighlightKeywords[queryOrdering.DirectionToken.GetText ()]);
+			}
+		}
+
 		class QuickTaskVisitor : DepthFirstAstVisitor
 		{
 			internal List<QuickTask> QuickTasks = new List<QuickTask> ();
 			readonly CSharpAstResolver resolver;
 			readonly CancellationToken cancellationToken;
 
-			public QuickTaskVisitor (ICSharpCode.NRefactory.CSharp.Resolver.CSharpAstResolver resolver, CancellationToken cancellationToken)
+			public QuickTaskVisitor (CSharpAstResolver resolver, CancellationToken cancellationToken)
 			{
 				this.resolver = resolver;
 			}
@@ -194,7 +623,6 @@ namespace MonoDevelop.CSharp.Highlighting
 			public override void VisitIdentifierExpression (IdentifierExpression identifierExpression)
 			{
 				base.VisitIdentifierExpression (identifierExpression);
-				
 				var result = resolver.Resolve (identifierExpression, cancellationToken);
 				if (result.IsError) {
 					QuickTasks.Add (new QuickTask (string.Format ("error CS0103: The name `{0}' does not exist in the current context", identifierExpression.Identifier), identifierExpression.StartLocation, Severity.Error));
@@ -213,18 +641,29 @@ namespace MonoDevelop.CSharp.Highlighting
 		
 		static CSharpSyntaxMode ()
 		{
-			MonoDevelop.Debugger.DebuggingService.DisableConditionalCompilation += (EventHandler<DocumentEventArgs>)DispatchService.GuiDispatch (new EventHandler<DocumentEventArgs> (OnDisableConditionalCompilation));
+			MonoDevelop.Debugger.DebuggingService.DisableConditionalCompilation += DispatchService.GuiDispatch (new EventHandler<DocumentEventArgs> (OnDisableConditionalCompilation));
 			IdeApp.Workspace.ActiveConfigurationChanged += delegate {
 				foreach (var doc in IdeApp.Workbench.Documents) {
 					TextEditorData data = doc.Editor;
 					if (data == null)
 						continue;
+					// Force syntax mode reparse (required for #if directives)
+					doc.Editor.Document.SyntaxMode = doc.Editor.Document.SyntaxMode;
 					doc.ReparseDocument ();
+				}
+			};
+			CommentTag.SpecialCommentTagsChanged += (sender, e) => {
+				UpdateCommentRule ();
+				var actDoc = IdeApp.Workbench.ActiveDocument;
+				if (actDoc != null && actDoc.Editor != null) {
+					actDoc.UpdateParseDocument ();
+					actDoc.Editor.Parent.TextViewMargin.PurgeLayoutCache ();
+					actDoc.Editor.Parent.QueueDraw ();
 				}
 			};
 		}
 		
-		static void OnDisableConditionalCompilation (object s, MonoDevelop.Ide.Gui.DocumentEventArgs e)
+		static void OnDisableConditionalCompilation (object s, DocumentEventArgs e)
 		{
 			var mode = e.Document.Editor.Document.SyntaxMode as CSharpSyntaxMode;
 			if (mode == null)
@@ -233,14 +672,14 @@ namespace MonoDevelop.CSharp.Highlighting
 			e.Document.Editor.Document.CommitUpdateAll ();
 		}
 		
-		Dictionary<string, string> contextualHighlightKeywords = new Dictionary<string, string> ();
-		static readonly string[] ContextualHighlightKeywordList = new string[] {
-			"value"
-		};
-		
-		static readonly HashSet<string> ContextualDehighlightKeywordList = new HashSet<string> (new string[] {
-			"get", "set", "add", "remove", "var", "global", "partial", 
-			"where",
+		static Dictionary<string, string> contextualHighlightKeywords;
+		static readonly string[] ContextualKeywords = new string[] {
+			"value", //*
+			"get", "set", "add", "remove",  //*
+			"var", //*
+			"global",
+			"partial", //* 
+			"where",  //*
 			"select",
 			"group",
 			"by",
@@ -253,67 +692,128 @@ namespace MonoDevelop.CSharp.Highlighting
 			"join",
 			"on",
 			"equals"
-		});
-		
-		public CSharpSyntaxMode ()
-		{
-			var provider = new ResourceXmlProvider (typeof(IXmlProvider).Assembly, typeof(IXmlProvider).Assembly.GetManifestResourceNames ().First (s => s.Contains ("CSharpSyntaxMode")));
-			using (XmlReader reader = provider.Open ()) {
-				SyntaxMode baseMode = SyntaxMode.Read (reader);
-				rules = new List<Rule> (baseMode.Rules);
-				keywords = new List<Keywords> (baseMode.Keywords);
-				spans = new List<Span> (baseMode.Spans.Where (span => span.Begin.Pattern != "#")).ToArray ();
-				matches = baseMode.Matches;
-				prevMarker = baseMode.PrevMarker;
-				SemanticRules = new List<SemanticRule> (baseMode.SemanticRules);
-				keywordTable = baseMode.keywordTable;
-				keywordTableIgnoreCase = baseMode.keywordTableIgnoreCase;
-				properties = baseMode.Properties;
-			}
-			
-			foreach (var word in ContextualHighlightKeywordList) {
-				contextualHighlightKeywords[word] = keywordTable[word].Color;
-				keywordTable.Remove (word);
-			}
-			
-			AddSemanticRule ("Comment", new HighlightUrlSemanticRule ("comment"));
-			AddSemanticRule ("XmlDocumentation", new HighlightUrlSemanticRule ("comment"));
-			AddSemanticRule ("String", new HighlightUrlSemanticRule ("string"));
-		}
-		
-		void EnsureGuiDocument ()
-		{
-			if (guiDocument != null)
-				return;
-			try {
-				if (File.Exists (Document.FileName))
-					guiDocument = IdeApp.Workbench.GetDocument (Document.FileName);
-			} catch (Exception) {
-				guiDocument = null;
-			}
-			if (guiDocument != null) {
+		};
 
-				guiDocument.Closed += delegate {
-					if (src != null)
-						src.Cancel ();
-				};
-				guiDocument.DocumentParsed += HandleDocumentParsed;
-				highlightedSegmentCache = new HighlightingSegmentTree ();
-				highlightedSegmentCache.InstallListener (guiDocument.Editor.Document);
-				if (guiDocument.ParsedDocument != null)
-					HandleDocumentParsed (this, EventArgs.Empty);
+		#region Syntax mode rule cache
+		static List<Rule> _rules;
+		static List<Mono.TextEditor.Highlighting.Keywords> _keywords;
+		static Span[] _spans;
+		static Match[] _matches;
+		static Marker[] _prevMarker;
+		static List<SemanticRule> _SemanticRules;
+		static Rule _commentRule;
+		static Dictionary<string, Mono.TextEditor.Highlighting.Keywords> _keywordTable;
+		static Dictionary<string, Mono.TextEditor.Highlighting.Keywords> _keywordTableIgnoreCase;
+		static Dictionary<string, List<string>> _properties;
+		#endregion
+
+		static void UpdateCommentRule ()
+		{
+			if (_commentRule == null)
+				return;
+			var joinedTasks = string.Join ("", CommentTag.SpecialCommentTags.Select (t => t.Tag));
+			_commentRule.Delimiter = new string ("&()<>{}[]~!%^*-+=|\\#/:;\"' ,\t.?".Where (c => joinedTasks.IndexOf (c) < 0).ToArray ());
+			_commentRule.Keywords = new[] {
+				new Keywords {
+					Color = "comment.keyword.todo",
+					Words = CommentTag.SpecialCommentTags.Select (t => t.Tag)
+				}
+			};
+		}
+
+		public CSharpSyntaxMode (Document document)
+		{
+			this.guiDocument = document;
+			guiDocument.DocumentParsed += HandleDocumentParsed;
+			SemanticHighlightingEnabled = PropertyService.Get ("EnableSemanticHighlighting", true);
+			PropertyService.PropertyChanged += HandlePropertyChanged;
+			if (guiDocument.ParsedDocument != null)
+				HandleDocumentParsed (this, EventArgs.Empty);
+
+			bool loadRules = _rules == null;
+
+			if (loadRules) {
+				var provider = new ResourceXmlProvider (typeof(IXmlProvider).Assembly, typeof(IXmlProvider).Assembly.GetManifestResourceNames ().First (s => s.Contains ("CSharpSyntaxMode")));
+				using (XmlReader reader = provider.Open ()) {
+					SyntaxMode baseMode = SyntaxMode.Read (reader);
+					_rules = new List<Rule> (baseMode.Rules.Where (r => r.Name != "Comment"));
+					_rules.Add (new Rule (this) {
+						Name = "PreProcessorComment"
+					});
+
+					_commentRule = new Rule (this) {
+						Name = "Comment",
+						IgnoreCase = true
+					};
+					UpdateCommentRule ();
+
+					_rules.Add (_commentRule);
+					_keywords = new List<Keywords> (baseMode.Keywords);
+					_spans = new List<Span> (baseMode.Spans.Where (span => span.Begin.Pattern != "#")).ToArray ();
+					_matches = baseMode.Matches;
+					_prevMarker = baseMode.PrevMarker;
+					_SemanticRules = new List<SemanticRule> (baseMode.SemanticRules);
+					_keywordTable = baseMode.keywordTable;
+					_keywordTableIgnoreCase = baseMode.keywordTableIgnoreCase;
+					_properties = baseMode.Properties;
+				}
+
+				contextualHighlightKeywords = new Dictionary<string, string> ();
+				foreach (var word in ContextualKeywords) {
+					if (_keywordTable.ContainsKey (word)) {
+						contextualHighlightKeywords[word] = _keywordTable[word].Color;
+					} else {
+						Console.WriteLine ("missing keyword:"+word);
+					}
+				}
+
+				foreach (var word in ContextualKeywords) {
+					_keywordTable.Remove (word);
+				}
+			}
+
+			rules = _rules;
+			keywords = _keywords;
+			spans = _spans;
+			matches = _matches;
+			prevMarker = _prevMarker;
+			SemanticRules = _SemanticRules;
+			keywordTable = _keywordTable;
+			keywordTableIgnoreCase = _keywordTableIgnoreCase;
+			properties = _properties;
+
+			if (loadRules) {
+				AddSemanticRule ("Comment", new HighlightUrlSemanticRule ("comment"));
+				AddSemanticRule ("XmlDocumentation", new HighlightUrlSemanticRule ("comment"));
+				AddSemanticRule ("String", new HighlightUrlSemanticRule ("string"));
 			}
 		}
-		
+
+		#region IDisposable implementation
+
+		public void Dispose ()
+		{
+			if (src != null)
+				src.Cancel ();
+			guiDocument.DocumentParsed -= HandleDocumentParsed;
+			PropertyService.PropertyChanged -= HandlePropertyChanged;
+		}
+
+		#endregion
+
+		void HandlePropertyChanged (object sender, PropertyChangedEventArgs e)
+		{
+			if (e.Key == "EnableSemanticHighlighting")
+				SemanticHighlightingEnabled = PropertyService.Get ("EnableSemanticHighlighting", true);
+		}
+
 		public override SpanParser CreateSpanParser (DocumentLine line, CloneableStack<Span> spanStack)
 		{
-			EnsureGuiDocument ();
 			return new CSharpSpanParser (this, spanStack ?? line.StartSpan.Clone ());
 		}
 		
 		public override ChunkParser CreateChunkParser (SpanParser spanParser, ColorScheme style, DocumentLine line)
 		{
-			EnsureGuiDocument ();
 			return new CSharpChunkParser (this, spanParser, style, line);
 		}
 		
@@ -344,7 +844,7 @@ namespace MonoDevelop.CSharp.Highlighting
 				TagColor = "text.preprocessor";
 				if (disabled || !IsValid) {
 					Color = "comment.block";
-					Rule = "String";
+					Rule = "PreProcessorComment";
 				} else {
 					Color = "text";
 					Rule = "<root>";
@@ -411,46 +911,14 @@ namespace MonoDevelop.CSharp.Highlighting
 		
 		protected class CSharpChunkParser : ChunkParser, IResolveVisitorNavigator
 		{
-			HashSet<string> tags = new HashSet<string> ();
-			/*
-			sealed class SemanticResolveVisitorNavigator : IResolveVisitorNavigator
-			{
-				readonly Dictionary<AstNode, ResolveVisitorNavigationMode> dict = new Dictionary<AstNode, ResolveVisitorNavigationMode> ();
-				
-				public void AddNode (AstNode node)
-				{
-					dict [node] = ResolveVisitorNavigationMode.Resolve;
-					for (var ancestor = node.Parent; ancestor != null && !dict.ContainsKey(ancestor); ancestor = ancestor.Parent) {
-						dict.Add (ancestor, ResolveVisitorNavigationMode.Scan);
-					}
-				}
-				
-				public void ProcessConversion (Expression expression, ResolveResult result, Conversion conversion, IType targetType)
-				{
-					
-				}
-				
-				public void Resolved (AstNode node, ResolveResult result)
-				{
 
-				}
-				
-				public ResolveVisitorNavigationMode Scan (AstNode node)
-				{
-					if (node is Expression || node is AstType)
-						return ResolveVisitorNavigationMode.Resolve;
-					return ResolveVisitorNavigationMode.Scan;
-				}
-				
-				public void Reset ()
-				{
-					dict.Clear ();
-				}
-			}*/
-			CSharpSyntaxMode csharpSyntaxMode;
+			HashSet<string> tags = new HashSet<string> ();
 			
+			CSharpSyntaxMode csharpSyntaxMode;
+			int lineNumber;
 			public CSharpChunkParser (CSharpSyntaxMode csharpSyntaxMode, SpanParser spanParser, ColorScheme style, DocumentLine line) : base (csharpSyntaxMode, spanParser, style, line)
 			{
+				lineNumber = line.LineNumber;
 				this.csharpSyntaxMode = csharpSyntaxMode;
 				foreach (var tag in CommentTag.SpecialCommentTags) {
 					tags.Add (tag.Tag);
@@ -461,18 +929,12 @@ namespace MonoDevelop.CSharp.Highlighting
 			#region IResolveVisitorNavigator implementation
 			ResolveVisitorNavigationMode IResolveVisitorNavigator.Scan(AstNode node)
 			{
-/*				if (node.StartLocation.Line <= lineNumber && node.EndLocation.Line >= lineNumber) {*/
-					if (node is SimpleType || node is MemberType
-					    || node is IdentifierExpression || node is MemberReferenceExpression
-					    || node is InvocationExpression)
-					{
-						return ResolveVisitorNavigationMode.Resolve;
-					} else {
-						return ResolveVisitorNavigationMode.Scan;
-					}
-/*				} else {
-					return ResolveVisitorNavigationMode.Skip;
-				}*/
+				if (node is SimpleType || node is MemberType
+					|| node is IdentifierExpression || node is MemberReferenceExpression
+					|| node is InvocationExpression) {
+					return ResolveVisitorNavigationMode.Resolve;
+				}
+				return ResolveVisitorNavigationMode.Scan;
 			}
 			
 			void IResolveVisitorNavigator.Resolved(AstNode node, ResolveResult result)
@@ -483,197 +945,32 @@ namespace MonoDevelop.CSharp.Highlighting
 			{
 			}
 			#endregion
-			string GetSemanticStyle (ParsedDocument parsedDocument, Chunk chunk, ref int endOffset)
+			static int TokenLength (AstNode node)
 			{
-				string style;
-				bool found = csharpSyntaxMode.highlightedSegmentCache.GetStyle (chunk, ref endOffset, out style);
-				if (!found && !csharpSyntaxMode.highlightedSegmentCache.IsDirty) {
-					style = GetSemanticStyleFromAst (parsedDocument, chunk, ref endOffset);
-					csharpSyntaxMode.highlightedSegmentCache.AddStyle (chunk.Offset, style == null ? chunk.EndOffset : endOffset, style);
-				}
-				return style;
+				Debug.Assert (node.StartLocation.Line == node.EndLocation.Line);
+				return node.EndLocation.Column - node.StartLocation.Column;
 			}
-			
-			string GetSemanticStyleFromAst (ParsedDocument parsedDocument, Chunk chunk, ref int endOffset)
-			{
-				var unit = csharpSyntaxMode.unit;
-				if (unit == null || csharpSyntaxMode.resolver == null)
-					return null;
-				
-				var loc = doc.OffsetToLocation (chunk.Offset);
-				var node = unit.GetNodeAt (loc, n => n is Identifier || n is AstType || n is CSharpTokenNode);
-				var word = wordbuilder.ToString ();
-				string color;
-				while (node != null && !(node is Statement || node is EntityDeclaration)) {
-					if (node is CSharpTokenNode || node is ICSharpCode.NRefactory.CSharp.Comment || node is PreProcessorDirective)
-						break;
-					if (node is SimpleType) {
-						var st = (SimpleType)node;
-						
-						var result = csharpSyntaxMode.resolver.Resolve (st);
-						if (result.IsError && csharpSyntaxMode.guiDocument.Project != null) {
-							endOffset = chunk.Offset + st.Identifier.Length;
-							return "keyword.semantic.error";
-						}
-						if (result is TypeResolveResult && st.IdentifierToken.Contains (loc) && unit.GetNodeAt<UsingDeclaration> (loc) == null) {
-							endOffset = chunk.Offset + st.Identifier.Length;
-							return "keyword.semantic.type";
-						}
-						return null;
-					}
-					if (node is ICSharpCode.NRefactory.CSharp.MemberType) {
-						var mt = (ICSharpCode.NRefactory.CSharp.MemberType)node;
-						
-						var result = csharpSyntaxMode.resolver.Resolve (mt);
-						if (result.IsError && csharpSyntaxMode.guiDocument.Project != null) {
-							endOffset = chunk.Offset + mt.MemberName.Length;
-							return "keyword.semantic.error";
-						}
-						if (result is TypeResolveResult && mt.MemberNameToken.Contains (loc) && unit.GetNodeAt<UsingDeclaration> (loc) == null) {
-							endOffset = chunk.Offset + mt.MemberName.Length;
-							return "keyword.semantic.type";
-						}
-						return null;
-					}
-					
-					if (node is Identifier) {
-						if (node.Parent is TypeDeclaration && node.Role == Roles.Identifier) {
-							endOffset = chunk.Offset + ((Identifier)node).Name.Length;
-							return "keyword.semantic.type";
-						}
 
-						if (node.Parent is PropertyDeclaration) {
-							endOffset = chunk.Offset + ((Identifier)node).Name.Length;
-							return "keyword.semantic.property";
-						}
-
-						if (node.Parent is VariableInitializer && node.Parent.Parent is FieldDeclaration) {
-							var field = node.Parent.Parent as FieldDeclaration;
-							if (field.Modifiers.HasFlag (Modifiers.Const) || field.Modifiers.HasFlag (Modifiers.Static | Modifiers.Readonly))
-								return null;
-							endOffset = chunk.Offset + ((Identifier)node).Name.Length;
-							return "keyword.semantic.field";
-						}
-						if (node.Parent is FixedVariableInitializer /*|| node.Parent is EnumMemberDeclaration*/) {
-							endOffset = chunk.Offset + ((Identifier)node).Name.Length;
-							return "keyword.semantic.field";
-						}
-					}
-					
-					var id = node as IdentifierExpression;
-					if (id != null) {
-						var result = csharpSyntaxMode.resolver.Resolve (id);
-						if (result.IsError && csharpSyntaxMode.guiDocument.Project != null) {
-							endOffset = chunk.Offset + id.Identifier.Length;
-							return "keyword.semantic.error";
-						}
-						
-						if (result is MemberResolveResult) {
-							var member = ((MemberResolveResult)result).Member;
-							if (member is IField) {
-								var field = member as IField;
-								if (field.IsConst || field.IsStatic && field.IsReadOnly)
-									return null;
-								endOffset = chunk.Offset + id.Identifier.Length;
-								return "keyword.semantic.field";
-							}
-							if (member is IProperty) {
-								endOffset = chunk.Offset + id.Identifier.Length;
-								return "keyword.semantic.property";
-							}
-						}
-						if (result is TypeResolveResult) {
-							if (!result.IsError && csharpSyntaxMode.guiDocument.Project != null) {
-								endOffset = chunk.Offset + id.Identifier.Length;
-								return "keyword.semantic.type";
-							}
-						}
-					}
-					
-					var memberReferenceExpression = node as MemberReferenceExpression;
-					if (memberReferenceExpression != null) {
-						if (!memberReferenceExpression.MemberNameToken.Contains (loc)) 
-							return null;
-						
-						var result = csharpSyntaxMode.resolver.Resolve (memberReferenceExpression);
-						if (result.IsError && csharpSyntaxMode.guiDocument.Project != null) {
-							endOffset = chunk.Offset + memberReferenceExpression.MemberName.Length;
-							return "keyword.semantic.error";
-						}
-						
-						if (result is MemberResolveResult) {
-							var member = ((MemberResolveResult)result).Member;
-							if (member is IField && !member.IsStatic && !((IField)member).IsConst) {
-								endOffset = chunk.Offset + memberReferenceExpression.MemberName.Length;
-								return "keyword.semantic.field";
-							}
-						}
-						if (result is TypeResolveResult) {
-							if (!result.IsError && csharpSyntaxMode.guiDocument.Project != null) {
-								endOffset = chunk.Offset + memberReferenceExpression.MemberName.Length;
-								return "keyword.semantic.type";
-							}
-						}
-					}
-					node = node.Parent;
-				}
-
-				if (csharpSyntaxMode.contextualHighlightKeywords.TryGetValue (word, out color)) {
-					if (node == null)
-						return null;
-					switch (word) {
-					case "value":
-						// highlight 'value' in property setters and event add/remove
-						var n = node.Parent;
-						while (n != null) {
-							if (n is Accessor && n.Role == PropertyDeclaration.SetterRole) {
-								endOffset = chunk.Offset + "value".Length;
-								return color;
-							}
-							n = n.Parent;
-						}
-						return null;
-					}
-					endOffset = chunk.Offset + word.Length;
-					if (node is CSharpTokenNode)
-						return color;
-					return spanParser.CurSpan != null ? spanParser.CurSpan.Color : "text";
-				}
-
-				if (ContextualDehighlightKeywordList.Contains (word)) {
-					if (node == null)
-						return null;
-					if (node is Identifier) {
-						switch (((Identifier)node).Name) {
-						case "var": 
-							if (node.Parent != null) {
-								var vds = node.Parent.Parent as VariableDeclarationStatement;
-								if (node.Parent.Parent is ForeachStatement && ((ForeachStatement)node.Parent.Parent).VariableType.StartLocation == node.StartLocation ||
-									vds != null && node.StartLocation == vds.Type.StartLocation)
-									return null;
-							}
-							endOffset = chunk.Offset + "var".Length;
-							return spanParser.CurSpan != null ? spanParser.CurSpan.Color : "text";
-						}
-					} else if (node is CSharpTokenNode)
-						return color;
-					endOffset = chunk.Offset + word.Length;
-					return spanParser.CurSpan != null ? spanParser.CurSpan.Color : "text";
-				}
-
-				return null;
-			}
-			
 			protected override void AddRealChunk (Chunk chunk)
 			{
 				var document = csharpSyntaxMode.guiDocument;
 				var parsedDocument = document != null ? document.ParsedDocument : null;
-				if (parsedDocument != null && MonoDevelop.Core.PropertyService.Get ("EnableSemanticHighlighting", true)) {
+				if (parsedDocument != null && csharpSyntaxMode.SemanticHighlightingEnabled && csharpSyntaxMode.resolver != null) {
 					int endLoc = -1;
 					string semanticStyle = null;
-					if (spanParser.CurSpan == null || spanParser.CurSpan is DefineSpan) {
+					if (spanParser.CurSpan == null || spanParser.CurSpan is DefineSpan || spanParser.CurSpan is AbstractBlockSpan) {
 						try {
-							semanticStyle = GetSemanticStyle (parsedDocument, chunk, ref endLoc);
+							HighlightingVisitior visitor;
+							if (!csharpSyntaxMode.lineSegments.TryGetValue (line, out visitor)) {
+								visitor = new HighlightingVisitior (csharpSyntaxMode.resolver, default (CancellationToken), lineNumber, base.line.Offset);
+								visitor.tree.InstallListener (doc);
+								csharpSyntaxMode.unit.AcceptVisitor (visitor);
+								csharpSyntaxMode.lineSegments[line] = visitor;
+							}
+							string style;
+							if (visitor.tree.GetStyle (chunk, ref endLoc, out style)) {
+								semanticStyle = style;
+							}
 						} catch (Exception e) {
 							Console.WriteLine ("Error in semantic highlighting: " + e);
 						}
@@ -712,7 +1009,7 @@ namespace MonoDevelop.CSharp.Highlighting
 			{
 				HashSet<string> symbols;
 
-				MonoDevelop.Projects.Project GetProject (Mono.TextEditor.TextDocument doc)
+				MonoDevelop.Projects.Project GetProject (TextDocument doc)
 				{
 					// There is no reference between document & higher level infrastructure,
 					// therefore it's a bit tricky to find the right project.
@@ -734,7 +1031,7 @@ namespace MonoDevelop.CSharp.Highlighting
 					return project;
 				}
 
-				public ConditinalExpressionEvaluator (Mono.TextEditor.TextDocument doc, IEnumerable<string> symbols)
+				public ConditinalExpressionEvaluator (TextDocument doc, IEnumerable<string> symbols)
 				{
 					this.symbols = new HashSet<string> (symbols);
 					var project = GetProject (doc);
@@ -785,23 +1082,24 @@ namespace MonoDevelop.CSharp.Highlighting
 				
 				public override object VisitUnaryOperatorExpression (UnaryOperatorExpression unaryOperatorExpression, object data)
 				{
-					bool result = (bool)(unaryOperatorExpression.Expression.AcceptVisitor (this, data) ?? (object)false);
+					bool result = (bool)(unaryOperatorExpression.Expression.AcceptVisitor (this, data) ?? false);
 					if (unaryOperatorExpression.Operator ==  UnaryOperatorType.Not)
 						return !result;
 					return result;
 				}
-				
+
+
 				public override object VisitPrimitiveExpression (PrimitiveExpression primitiveExpression, object data)
 				{
 					if (primitiveExpression.Value is bool)
-						return (bool)primitiveExpression.Value;
+						return primitiveExpression.Value;
 					return false;
 				}
 
 				public override object VisitBinaryOperatorExpression (BinaryOperatorExpression binaryOperatorExpression, object data)
 				{
-					bool left = (bool)(binaryOperatorExpression.Left.AcceptVisitor (this, data) ?? (object)false);
-					bool right = (bool)(binaryOperatorExpression.Right.AcceptVisitor (this, data) ?? (object)false);
+					bool left = (bool)(binaryOperatorExpression.Left.AcceptVisitor (this, data) ?? false);
+					bool right = (bool)(binaryOperatorExpression.Right.AcceptVisitor (this, data) ?? false);
 					switch (binaryOperatorExpression.Operator) {
 					case BinaryOperatorType.InEquality:
 						return left != right;
@@ -821,6 +1119,7 @@ namespace MonoDevelop.CSharp.Highlighting
 				{
 					return parenthesizedExpression.Expression.AcceptVisitor (this, data);
 				}
+
 			}
 			
 			void ScanPreProcessorElse (ref int i)
@@ -875,10 +1174,7 @@ namespace MonoDevelop.CSharp.Highlighting
 			{
 				int length = CurText.Length - textOffset;
 				string parameter = CurText.Substring (textOffset + 3, length - 3);
-				AstNode expr;
-				using (var reader = new StringReader (parameter)) {
-					expr = new CSharpParser ().ParseExpression (reader);
-				}
+				AstNode expr = new CSharpParser ().ParseExpression (parameter);
 				bool result = false;
 				if (expr != null && !expr.IsNull) {
 					object o = expr.AcceptVisitor (new ConditinalExpressionEvaluator (doc, Defines), null);
@@ -914,10 +1210,7 @@ namespace MonoDevelop.CSharp.Highlighting
 				DocumentLine line = doc.GetLineByOffset (i);
 				int length = line.Offset + line.Length - i;
 				string parameter = doc.GetTextAt (i + 5, length - 5);
-				AstNode expr;
-				using (var reader = new StringReader (parameter)) {
-					expr = new CSharpParser ().ParseExpression (reader);
-				}
+				AstNode expr= new CSharpParser ().ParseExpression (parameter);
 				bool result;
 				if (expr != null && !expr.IsNull) {
 					var visitResult = expr.AcceptVisitor (new ConditinalExpressionEvaluator (doc, Defines), null);
@@ -954,45 +1247,43 @@ namespace MonoDevelop.CSharp.Highlighting
 				FoundSpanBegin (preprocessorSpan, i, 0);
 			}
 
-			protected override void ScanSpan (ref int i)
+			protected override bool ScanSpan (ref int i)
 			{
 				if (CSharpSyntaxMode.DisableConditionalHighlighting) {
-					base.ScanSpan (ref i);
-					return;
+					return base.ScanSpan (ref i);
 				}
 				int textOffset = i - StartOffset;
 
-				if (textOffset < CurText.Length && CurText [textOffset] == '#' && IsFirstNonWsChar (textOffset)) {
+				if (textOffset < CurText.Length && CurRule.Name != "Comment" && CurRule.Name != "String" && CurText [textOffset] == '#' && IsFirstNonWsChar (textOffset)) {
 
-					if (CurText.IsAt (textOffset, "#define")) {
+					if (CurText.IsAt (textOffset, "#define") && (spanStack == null || !spanStack.Any (span => span is IfBlockSpan && !((IfBlockSpan)span).IsValid))) {
 						int length = CurText.Length - textOffset;
 						string parameter = CurText.Substring (textOffset + "#define".Length, length - "#define".Length).Trim ();
-
 						var defineSpan = new DefineSpan (parameter);
 						FoundSpanBegin (defineSpan, i, 0);
 					}
 	
 					if (CurText.IsAt (textOffset, "#else")) {
 						ScanPreProcessorElse (ref i);
-						return;
+						return true;
 					}
 	
 					if (CurText.IsAt (textOffset, "#if")) {
 						ScanPreProcessorIf (textOffset, ref i);
-						return;
+						return true;
 					}
 	
 					if (CurText.IsAt (textOffset, "#elif") && spanStack != null && spanStack.Any (span => span is IfBlockSpan)) {
 						ScanPreProcessorElseIf (ref i);
-						return;
+						return true;
 					}
 	
 					var preprocessorSpan = CreatePreprocessorSpan ();
 					FoundSpanBegin (preprocessorSpan, i, 1);
-					return;
+					return true;
 				}
 
-				base.ScanSpan (ref i);
+				return base.ScanSpan (ref i);
 			}
 			
 			public static Span CreatePreprocessorSpan ()
@@ -1014,7 +1305,7 @@ namespace MonoDevelop.CSharp.Highlighting
 				}
 			}
 			
-			protected override bool ScanSpanEnd (Mono.TextEditor.Highlighting.Span cur, ref int i)
+			protected override bool ScanSpanEnd (Span cur, ref int i)
 			{
 				if (cur is IfBlockSpan || cur is ElseIfBlockSpan || cur is ElseBlockSpan) {
 					int textOffset = i - StartOffset;
@@ -1052,7 +1343,7 @@ namespace MonoDevelop.CSharp.Highlighting
 		#region IQuickTaskProvider implementation
 		public event EventHandler TasksUpdated;
 
-		protected virtual void OnTasksUpdated (System.EventArgs e)
+		protected virtual void OnTasksUpdated (EventArgs e)
 		{
 			var handler = TasksUpdated;
 			if (handler != null)

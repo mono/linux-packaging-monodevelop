@@ -41,6 +41,10 @@ using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Projects;
 using ICSharpCode.NRefactory.Completion;
 using ICSharpCode.NRefactory.Documentation;
+using ICSharpCode.NRefactory.CSharp.Refactoring;
+using ICSharpCode.NRefactory.CSharp.Resolver;
+using ICSharpCode.NRefactory.CSharp.TypeSystem;
+using System.IO;
 
 namespace MonoDevelop.CSharp.Completion
 {
@@ -50,16 +54,15 @@ namespace MonoDevelop.CSharp.Completion
 		OutputFlags flags;
 		bool hideExtensionParameter = true;
 		static CSharpAmbience ambience = new CSharpAmbience ();
-		bool descriptionCreated = false;
-		
-		string description, completionString;
+
+		string completionString;
 		string displayText;
 		
 		Dictionary<string, CompletionData> overloads;
 		
 		Mono.TextEditor.TextEditorData Editor {
 			get {
-				return editorCompletion.textEditorData;
+				return editorCompletion.TextEditorData;
 			}
 		}
 		
@@ -71,8 +74,7 @@ namespace MonoDevelop.CSharp.Completion
 		
 		public override string Description {
 			get {
-				CheckDescription ();
-				return description;
+				return "";
 			}
 		}
 		
@@ -106,9 +108,15 @@ namespace MonoDevelop.CSharp.Completion
 		}
 		
 		public bool IsDelegateExpected { get; set; }
-		
+
+		ICompilation compilation;
+		CSharpUnresolvedFile file;
+
 		public MemberCompletionData (CSharpCompletionTextEditorExtension  editorCompletion, IEntity entity, OutputFlags flags)
 		{
+			compilation = editorCompletion.UnresolvedFileCompilation;
+			file = editorCompletion.CSharpUnresolvedFile;
+
 			this.editorCompletion = editorCompletion;
 			this.flags = flags;
 			SetMember (entity);
@@ -252,60 +260,375 @@ namespace MonoDevelop.CSharp.Completion
 		void SetMember (IEntity entity)
 		{
 			this.Entity = entity;
-			if (entity is IParameter) {
-				this.completionString = ((IParameter)entity).Name;
-			} else {
-				this.completionString = ambience.GetString (entity, OutputFlags.None);
-			}
-			descriptionCreated = false;
-			displayText = entity.Name;
+			this.completionString = displayText = entity.Name;
 		}
-		
-		void CheckDescription ()
+
+		TypeSystemAstBuilder GetBuilder (ICompilation compilation)
 		{
-			if (descriptionCreated)
-				return;
-			
-			var sb = new StringBuilder ();
-
-			descriptionCreated = true;
-			if (Entity is IMethod && ((IMethod)Entity).IsExtensionMethod)
-				sb.Append (GettextCatalog.GetString ("(Extension) "));
-			sb.Append (ambience.GetString (Entity, 
-				OutputFlags.ClassBrowserEntries | OutputFlags.IncludeReturnType | OutputFlags.IncludeKeywords | OutputFlags.UseFullName | OutputFlags.IncludeParameterName | OutputFlags.IncludeMarkup  | (HideExtensionParameter ? OutputFlags.HideExtensionsParameter : OutputFlags.None)));
-
-			var m = (IMember)Entity;
-			if (m.IsObsolete ()) {
-				sb.AppendLine ();
-				sb.Append (GettextCatalog.GetString ("[Obsolete]"));
-				DisplayFlags |= DisplayFlags.Obsolete;
+			var ctx = editorCompletion.CSharpUnresolvedFile.GetTypeResolveContext (editorCompletion.UnresolvedFileCompilation, editorCompletion.Document.Editor.Caret.Location) as CSharpTypeResolveContext;
+			var state = new CSharpResolver (ctx);
+			var builder = new TypeSystemAstBuilder (state);
+			builder.AddAnnotations = true;
+			var dt = state.CurrentTypeDefinition;
+			var declaring = ctx.CurrentTypeDefinition != null ? ctx.CurrentTypeDefinition.DeclaringTypeDefinition : null;
+			if (declaring != null) {
+				while (dt != null) {
+					if (dt.Equals (declaring)) {
+						builder.AlwaysUseShortTypeNames = true;
+						break;
+					}
+					dt = dt.DeclaringTypeDefinition;
+				}
 			}
-			
-			var returnType = m.ReturnType;
-			if (returnType.Kind == TypeKind.Delegate) {
-				sb.AppendLine ();
-				sb.AppendLine (GettextCatalog.GetString ("Delegate information"));
-				sb.Append (ambience.GetString (returnType, OutputFlags.ReformatDelegates | OutputFlags.IncludeReturnType | OutputFlags.IncludeParameters | OutputFlags.IncludeParameterName));
-			}
-			
-			string docMarkup = AmbienceService.GetDocumentationMarkup ("<summary>" + AmbienceService.GetDocumentationSummary ((IMember)Entity) + "</summary>", new AmbienceService.DocumentationFormatOptions {
-				Ambience = ambience
-			});
-			
-			if (!string.IsNullOrEmpty (docMarkup)) {
-				sb.AppendLine ();
-				sb.Append (docMarkup);
-			}
-			description = sb.ToString ();
+			return builder;
 		}
-		
+
+		internal class MyAmbience  : IAmbience
+		{
+			TypeSystemAstBuilder builder;
+
+			public MyAmbience (TypeSystemAstBuilder builder)
+			{
+				this.builder = builder;
+				ConversionFlags = ICSharpCode.NRefactory.TypeSystem.ConversionFlags.StandardConversionFlags;
+			}
+
+			public ConversionFlags ConversionFlags { get; set; }
+			
+			#region ConvertEntity
+			public string ConvertEntity(IEntity entity)
+			{
+				if (entity == null)
+					throw new ArgumentNullException("entity");
+				
+				StringWriter writer = new StringWriter();
+				ConvertEntity(entity, new TextWriterOutputFormatter(writer), FormattingOptionsFactory.CreateMono ());
+				return writer.ToString();
+			}
+			
+			public void ConvertEntity(IEntity entity, IOutputFormatter formatter, CSharpFormattingOptions formattingPolicy)
+			{
+				if (entity == null)
+					throw new ArgumentNullException("entity");
+				if (formatter == null)
+					throw new ArgumentNullException("formatter");
+				if (formattingPolicy == null)
+					throw new ArgumentNullException("options");
+				
+				TypeSystemAstBuilder astBuilder = CreateAstBuilder();
+				EntityDeclaration node = astBuilder.ConvertEntity(entity);
+				PrintModifiers(node.Modifiers, formatter);
+				
+				if ((ConversionFlags & ConversionFlags.ShowDefinitionKeyword) == ConversionFlags.ShowDefinitionKeyword) {
+					if (node is TypeDeclaration) {
+						switch (((TypeDeclaration)node).ClassType) {
+						case ClassType.Class:
+							formatter.WriteKeyword("class");
+							break;
+						case ClassType.Struct:
+							formatter.WriteKeyword("struct");
+							break;
+						case ClassType.Interface:
+							formatter.WriteKeyword("interface");
+							break;
+						case ClassType.Enum:
+							formatter.WriteKeyword("enum");
+							break;
+						default:
+							throw new Exception("Invalid value for ClassType");
+						}
+						formatter.Space();
+					} else if (node is DelegateDeclaration) {
+						formatter.WriteKeyword("delegate");
+						formatter.Space();
+					} else if (node is EventDeclaration) {
+						formatter.WriteKeyword("event");
+						formatter.Space();
+					}
+				}
+				
+				if ((ConversionFlags & ConversionFlags.ShowReturnType) == ConversionFlags.ShowReturnType) {
+					var rt = node.GetChildByRole(Roles.Type);
+					if (!rt.IsNull) {
+						rt.AcceptVisitor(new CSharpOutputVisitor(formatter, formattingPolicy));
+						formatter.Space();
+					}
+				}
+				
+				if (entity is ITypeDefinition)
+					WriteTypeDeclarationName((ITypeDefinition)entity, formatter, formattingPolicy);
+				else
+					WriteMemberDeclarationName((IMember)entity, formatter, formattingPolicy);
+				
+				if ((ConversionFlags & ConversionFlags.ShowParameterList) == ConversionFlags.ShowParameterList && HasParameters(entity)) {
+					formatter.WriteToken(entity.EntityType == EntityType.Indexer ? "[" : "(");
+					bool first = true;
+					foreach (var param in node.GetChildrenByRole(Roles.Parameter)) {
+						if (first) {
+							first = false;
+						} else {
+							formatter.WriteToken(",");
+							formatter.Space();
+						}
+						param.AcceptVisitor(new CSharpOutputVisitor(formatter, formattingPolicy));
+					}
+					formatter.WriteToken(entity.EntityType == EntityType.Indexer ? "]" : ")");
+				}
+				
+				if ((ConversionFlags & ConversionFlags.ShowBody) == ConversionFlags.ShowBody && !(node is TypeDeclaration)) {
+					IProperty property = entity as IProperty;
+					if (property != null) {
+						formatter.Space();
+						formatter.WriteToken("{");
+						formatter.Space();
+						if (property.CanGet) {
+							formatter.WriteKeyword("get");
+							formatter.WriteToken(";");
+							formatter.Space();
+						}
+						if (property.CanSet) {
+							formatter.WriteKeyword("set");
+							formatter.WriteToken(";");
+							formatter.Space();
+						}
+						formatter.WriteToken("}");
+					} else {
+						formatter.WriteToken(";");
+					}
+				}
+			}
+			
+			bool HasParameters(IEntity e)
+			{
+				switch (e.EntityType) {
+				case EntityType.TypeDefinition:
+					return ((ITypeDefinition)e).Kind == TypeKind.Delegate;
+				case EntityType.Indexer:
+				case EntityType.Method:
+				case EntityType.Operator:
+				case EntityType.Constructor:
+				case EntityType.Destructor:
+					return true;
+				default:
+					return false;
+				}
+			}
+			
+			TypeSystemAstBuilder CreateAstBuilder()
+			{
+				return builder;
+			}
+			
+			void WriteTypeDeclarationName(ITypeDefinition typeDef, IOutputFormatter formatter, CSharpFormattingOptions formattingPolicy)
+			{
+				TypeSystemAstBuilder astBuilder = CreateAstBuilder();
+				if (typeDef.DeclaringTypeDefinition != null) {
+					WriteTypeDeclarationName(typeDef.DeclaringTypeDefinition, formatter, formattingPolicy);
+					formatter.WriteToken(".");
+				} else if ((ConversionFlags & ConversionFlags.UseFullyQualifiedTypeNames) == ConversionFlags.UseFullyQualifiedTypeNames) {
+					formatter.WriteIdentifier(typeDef.Namespace);
+					formatter.WriteToken(".");
+				}
+				formatter.WriteIdentifier(typeDef.Name);
+				if ((ConversionFlags & ConversionFlags.ShowTypeParameterList) == ConversionFlags.ShowTypeParameterList) {
+					var outputVisitor = new CSharpOutputVisitor(formatter, formattingPolicy);
+					outputVisitor.WriteTypeParameters(astBuilder.ConvertEntity(typeDef).GetChildrenByRole(Roles.TypeParameter));
+				}
+			}
+			
+			void WriteMemberDeclarationName(IMember member, IOutputFormatter formatter, CSharpFormattingOptions formattingPolicy)
+			{
+				TypeSystemAstBuilder astBuilder = CreateAstBuilder();
+				if ((ConversionFlags & ConversionFlags.ShowDeclaringType) == ConversionFlags.ShowDeclaringType) {
+					ConvertType(member.DeclaringType, formatter, formattingPolicy);
+					formatter.WriteToken(".");
+				}
+				switch (member.EntityType) {
+				case EntityType.Indexer:
+					formatter.WriteKeyword("this");
+					break;
+				case EntityType.Constructor:
+					formatter.WriteIdentifier(member.DeclaringType.Name);
+					break;
+				case EntityType.Destructor:
+					formatter.WriteToken("~");
+					formatter.WriteIdentifier(member.DeclaringType.Name);
+					break;
+				case EntityType.Operator:
+					switch (member.Name) {
+					case "op_Implicit":
+						formatter.WriteKeyword("implicit");
+						formatter.Space();
+						formatter.WriteKeyword("operator");
+						formatter.Space();
+						ConvertType(member.ReturnType, formatter, formattingPolicy);
+						break;
+					case "op_Explicit":
+						formatter.WriteKeyword("explicit");
+						formatter.Space();
+						formatter.WriteKeyword("operator");
+						formatter.Space();
+						ConvertType(member.ReturnType, formatter, formattingPolicy);
+						break;
+					default:
+						formatter.WriteKeyword("operator");
+						formatter.Space();
+						var operatorType = OperatorDeclaration.GetOperatorType(member.Name);
+						if (operatorType.HasValue)
+							formatter.WriteToken(OperatorDeclaration.GetToken(operatorType.Value));
+						else
+							formatter.WriteIdentifier(member.Name);
+						break;
+					}
+					break;
+				default:
+					formatter.WriteIdentifier(member.Name);
+					break;
+				}
+				if ((ConversionFlags & ConversionFlags.ShowTypeParameterList) == ConversionFlags.ShowTypeParameterList && member.EntityType == EntityType.Method) {
+					var outputVisitor = new CSharpOutputVisitor(formatter, formattingPolicy);
+					outputVisitor.WriteTypeParameters(astBuilder.ConvertEntity(member).GetChildrenByRole(Roles.TypeParameter));
+				}
+			}
+			
+			void PrintModifiers(Modifiers modifiers, IOutputFormatter formatter)
+			{
+				foreach (var m in CSharpModifierToken.AllModifiers) {
+					if ((modifiers & m) == m) {
+						formatter.WriteKeyword(CSharpModifierToken.GetModifierName(m));
+						formatter.Space();
+					}
+				}
+			}
+#endregion
+			
+			public string ConvertVariable(IVariable v)
+			{
+				TypeSystemAstBuilder astBuilder = CreateAstBuilder();
+				AstNode astNode = astBuilder.ConvertVariable(v);
+				return astNode.GetText().TrimEnd(';', '\r', '\n');
+			}
+			
+			public string ConvertType(IType type)
+			{
+				if (type == null)
+					throw new ArgumentNullException("type");
+				
+				TypeSystemAstBuilder astBuilder = CreateAstBuilder();
+				AstType astType = astBuilder.ConvertType(type);
+				return astType.GetText();
+			}
+			
+			public void ConvertType(IType type, IOutputFormatter formatter, CSharpFormattingOptions formattingPolicy)
+			{
+				TypeSystemAstBuilder astBuilder = CreateAstBuilder();
+				AstType astType = astBuilder.ConvertType(type);
+				astType.AcceptVisitor(new CSharpOutputVisitor(formatter, formattingPolicy));
+			}
+			
+			public string WrapComment(string comment)
+			{
+				return "// " + comment;
+			}
+		}
+
+		public static TooltipInformation CreateTooltipInformation (CSharpCompletionTextEditorExtension editorCompletion, CSharpResolver resolver, IEntity entity, bool smartWrap)
+		{
+			return CreateTooltipInformation (editorCompletion.UnresolvedFileCompilation, editorCompletion.CSharpUnresolvedFile, resolver, editorCompletion.TextEditorData, editorCompletion.FormattingPolicy, entity, smartWrap);
+		}
+
+		public static TooltipInformation CreateTooltipInformation (ICompilation compilation, CSharpUnresolvedFile file, TextEditorData textEditorData, MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy formattingPolicy, IEntity entity, bool smartWrap, bool createFooter = false)
+		{
+			return CreateTooltipInformation (compilation, file, null, textEditorData, formattingPolicy, entity, smartWrap, createFooter);
+		}
+
+		public static TooltipInformation CreateTooltipInformation (ICompilation compilation, CSharpUnresolvedFile file, CSharpResolver resolver, TextEditorData textEditorData, MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy formattingPolicy, IEntity entity, bool smartWrap, bool createFooter = false)
+		{
+			var tooltipInfo = new TooltipInformation ();
+			if (resolver == null)
+				resolver = file != null ? file.GetResolver (compilation, textEditorData.Caret.Location) : new CSharpResolver (compilation);
+			var sig = new SignatureMarkupCreator (resolver, formattingPolicy.CreateOptions ());
+			sig.BreakLineAfterReturnType = smartWrap;
+			try {
+				tooltipInfo.SignatureMarkup = sig.GetMarkup (entity);
+			} catch (Exception e) {
+				LoggingService.LogError ("Got exception while creating markup for :" + entity, e);
+				return new TooltipInformation ();
+			}
+			tooltipInfo.SummaryMarkup = AmbienceService.GetSummaryMarkup (entity) ?? "";
+			
+			if (entity is IMember) {
+				var evt = (IMember)entity;
+				if (evt.ReturnType.Kind == TypeKind.Delegate) {
+					tooltipInfo.AddCategory (GettextCatalog.GetString ("Delegate Info"), sig.GetDelegateInfo (evt.ReturnType));
+				}
+			}
+			if (entity is IMethod) {
+				var method = (IMethod)entity;
+				if (method.IsExtensionMethod) {
+					tooltipInfo.AddCategory (GettextCatalog.GetString ("Extension Method from"), method.DeclaringTypeDefinition.FullName);
+				}
+			}
+			if (createFooter) {
+				if (entity is IType) {
+					var type = entity as IType;
+					var def = type.GetDefinition ();
+					if (def != null) {
+						if (!string.IsNullOrEmpty(def.ParentAssembly.AssemblyName)) {
+							var project = def.GetSourceProject ();
+							if (project != null) {
+								var relPath = FileService.AbsoluteToRelativePath (project.BaseDirectory, def.Region.FileName);
+								tooltipInfo.FooterMarkup = "<small>" + GettextCatalog.GetString ("Project:\t{0}", AmbienceService.EscapeText (def.ParentAssembly.AssemblyName)) + "</small>" + Environment.NewLine +
+									"<small>" + GettextCatalog.GetString ("File:\t\t{0} (line {1})", AmbienceService.EscapeText (relPath), def.Region.Begin.Line) + "</small>";
+							}
+						}
+					}
+
+				} else if (entity.DeclaringTypeDefinition != null) {
+					var project = entity.DeclaringTypeDefinition.GetSourceProject ();
+					if (project != null) {
+						var relPath = FileService.AbsoluteToRelativePath (project.BaseDirectory, entity.Region.FileName);
+						tooltipInfo.FooterMarkup = 
+							"<small>" + GettextCatalog.GetString ("Project:\t{0}", AmbienceService.EscapeText (project.Name)) + "</small>" + Environment.NewLine +
+							"<small>" + GettextCatalog.GetString ("From:\t{0}", AmbienceService.EscapeText (entity.DeclaringType.FullName)) + "</small>" + Environment.NewLine +
+							"<small>" + GettextCatalog.GetString ("File:\t\t{0} (line {1})", AmbienceService.EscapeText (relPath), entity.Region.Begin.Line) + "</small>";
+					}
+				}
+			}
+			return tooltipInfo;
+		}
+
+		public static TooltipInformation CreateTooltipInformation (ICompilation compilation, CSharpUnresolvedFile file, TextEditorData textEditorData, MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy formattingPolicy, IType type, bool smartWrap, bool createFooter = false)
+		{
+			var tooltipInfo = new TooltipInformation ();
+			var resolver = file != null ? file.GetResolver (compilation, textEditorData.Caret.Location) : new CSharpResolver (compilation);
+			var sig = new SignatureMarkupCreator (resolver, formattingPolicy.CreateOptions ());
+			sig.BreakLineAfterReturnType = smartWrap;
+			try {
+				tooltipInfo.SignatureMarkup = sig.GetMarkup (type);
+			} catch (Exception e) {
+				LoggingService.LogError ("Got exception while creating markup for :" + type, e);
+				return new TooltipInformation ();
+			}
+			var def = type.GetDefinition ();
+			if (def != null) {
+				if (createFooter && !string.IsNullOrEmpty(def.ParentAssembly.AssemblyName))
+					tooltipInfo.FooterMarkup = "<small> From " + AmbienceService.EscapeText (def.ParentAssembly.AssemblyName) + "</small>";
+				tooltipInfo.SummaryMarkup = AmbienceService.GetSummaryMarkup (def) ?? "";
+			}
+			return tooltipInfo;
+		}
+
+		public override TooltipInformation CreateTooltipInformation (bool smartWrap)
+		{
+			return CreateTooltipInformation (compilation, file, editorCompletion.TextEditorData, editorCompletion.FormattingPolicy, Entity, smartWrap);
+		}
+
 
 		#region IOverloadedCompletionData implementation 
 	
 		class OverloadSorter : IComparer<ICompletionData>
 		{
-			OutputFlags flags = OutputFlags.ClassBrowserEntries | OutputFlags.IncludeParameterName;
-			
 			public OverloadSorter ()
 			{
 			}
@@ -323,17 +646,16 @@ namespace MonoDevelop.CSharp.Completion
 				}
 				
 				if (mx is IMethod && my is IMethod) {
-					IMethod mmx = (IMethod) mx;//, mmy = (IMethod) my;
-					result = (mmx.TypeParameters.Count).CompareTo (mmx.TypeParameters.Count);
+					IMethod mmx = (IMethod) mx, mmy = (IMethod) my;
+					result = (mmx.TypeParameters.Count).CompareTo (mmy.TypeParameters.Count);
 					if (result != 0)
 						return result;
-					result = (mmx.Parameters.Count).CompareTo (mmx.Parameters.Count);
+					result = (mmx.Parameters.Count).CompareTo (mmy.Parameters.Count);
 					if (result != 0)
 						return result;
 				}
-				
-				string sx = ambience.GetString (mx, flags);
-				string sy = ambience.GetString (my, flags);
+				string sx = mx.ReflectionName;// ambience.GetString (mx, flags);
+				string sy = my.ReflectionName;// ambience.GetString (my, flags);
 				result = sx.Length.CompareTo (sy.Length);
 				return result == 0? string.Compare (sx, sy) : result;
 			}
@@ -366,56 +688,21 @@ namespace MonoDevelop.CSharp.Completion
 				overloads = new Dictionary<string, CompletionData> ();
 			
 			if (overload.Entity is IMember && Entity is IMember) {
-				// filter virtual & overriden members that came from base classes
+				// filter overriden members that came from base classes
 				// note that the overload tree is traversed top down.
 				var member = Entity as IMember;
-				if ((member.IsVirtual || member.IsOverride) && member.DeclaringType != null && ((IMember)overload.Entity).DeclaringType != null && member.DeclaringType.ReflectionName != ((IMember)overload.Entity).DeclaringType.ReflectionName) {
-					string str1 = ambience.GetString (member as IMember, flags);
-					string str2 = ambience.GetString (overload.Entity as IMember, flags);
-					if (str1 == str2) {
-						if (string.IsNullOrEmpty (AmbienceService.GetDocumentationSummary ((IMember)Entity)) && !string.IsNullOrEmpty (AmbienceService.GetDocumentationSummary ((IMember)overload.Entity)))
-							SetMember (overload.Entity as IMember);
-						return;
-					}
-				}
-				
+				if (member.IsOverride)
+					return;
+
 				string MemberId = (overload.Entity as IMember).GetIdString ();
-				if (Entity is IMethod && overload.Entity is IMethod) {
-					string signature1 = ambience.GetString (Entity as IMember, OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics | OutputFlags.GeneralizeGenerics);
-					string signature2 = ambience.GetString (overload.Entity as IMember, OutputFlags.IncludeParameters | OutputFlags.IncludeGenerics | OutputFlags.GeneralizeGenerics);
-					if (signature1 == signature2)
-						return;
-				}
-				
 				if (MemberId != (this.Entity as IMember).GetIdString () && !overloads.ContainsKey (MemberId)) {
-//					if (((IMethod)overload.Member).IsPartial)
-//						return;
 					overloads[MemberId] = overload;
 					
 					//if any of the overloads is obsolete, we should not mark the item obsolete
 					if (!(overload.Entity as IMember).IsObsolete ())
 						DisplayFlags &= ~DisplayFlags.Obsolete;
-/*					
-					//make sure that if there are generic overloads, we show a generic signature
-					if (overload.Member is IType && Member is IType && ((IType)Member).TypeParameters.Count == 0 && ((IType)overload.Member).TypeParameters.Count > 0) {
-						displayText = overload.DisplayText;
-					}
-					if (overload.Member is IMethod && Member is IMethod && ((IMethod)Member).TypeParameters.Count == 0 && ((IMethod)overload.Member).TypeParameters.Count > 0) {
-						displayText = overload.DisplayText;
-					}*/
 				}
 			}
-			
-			
-			// always set the member with the least type parameters as the main member.
-//			if (Member is ITypeParameterMember && overload.Member is ITypeParameterMember) {
-//				if (((ITypeParameterMember)Member).TypeParameters.Count > ((ITypeParameterMember)overload.Member).TypeParameters.Count) {
-//					INode member = Member;
-//					SetMember (overload.Member);
-//					overload.Member = member;
-//				}
-//			}
-			
 		}
 		
 		#endregion
@@ -427,6 +714,9 @@ namespace MonoDevelop.CSharp.Completion
 		}
 		#endregion
 
-
+		public override string ToString ()
+		{
+			return string.Format ("[MemberCompletionData: Entity={0}]", Entity);
+		}
 	}
 }

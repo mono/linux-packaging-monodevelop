@@ -2,6 +2,7 @@
 // Authors:
 //   Miguel de Icaza
 //
+// Copyright 2011, 2012 Xamarin Inc
 // Copyright 2010, Novell, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining
@@ -51,11 +52,12 @@ namespace MonoMac.CoreImage {
 	}
 	
 	public partial class CIContext {
+#if MONOMAC
 		public static CIContext FromContext (CGContext ctx, CIContextOptions options)
 		{
 			NSDictionary dict = options == null ? null : options.ToDictionary ();
 
-			return FromContext (ctx, options);
+			return FromContext (ctx, dict);
 		}
 		
 		public static CIContext FromContext (CGContext ctx)
@@ -67,11 +69,15 @@ namespace MonoMac.CoreImage {
 		{
 			return CreateCGLayer (size, null);
 		}
-
-#if !MONOMAC
+#else
 		public static CIContext FromOptions (CIContextOptions options)
 		{
 			return FromOptions (options == null ? null : options.ToDictionary ());
+		}
+		
+		public CGImage CreateCGImage (CIImage image, System.Drawing.RectangleF fromRect, CIFormat ciImageFormat, CGColorSpace colorSpace)
+		{
+			return CreateCGImage (image, fromRect, CIImage.CIFormatToInt (ciImageFormat), colorSpace);
 		}
 #endif
 	}

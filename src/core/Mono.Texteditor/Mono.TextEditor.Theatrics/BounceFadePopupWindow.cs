@@ -90,6 +90,10 @@ namespace Mono.TextEditor.Theatrics
 
 		public virtual void Popup ()
 		{
+			if (editor.GdkWindow == null){
+				editor.Realized += HandleRealized;
+				return;
+			}
 			editor.GdkWindow.GetOrigin (out x, out y);
 			bounds = CalculateInitialBounds ();
 			x = x + bounds.X - (int)(ExpandWidth / 2);
@@ -107,12 +111,25 @@ namespace Mono.TextEditor.Theatrics
 			Show ();
 		}
 
+		void HandleRealized (object sender, EventArgs e)
+		{
+			editor.Realized -= HandleRealized;
+			Popup ();
+		}
+
+		Gtk.Adjustment vAdjustment;
+		Gtk.Adjustment hAdjustment;
 		protected void ListenToEvents ()
 		{
-			editor.VAdjustment.ValueChanged += HandleEditorVAdjustmentValueChanged;
-			editor.HAdjustment.ValueChanged += HandleEditorHAdjustmentValueChanged;
-			vValue = editor.VAdjustment.Value;
-			hValue = editor.HAdjustment.Value;
+			if (vAdjustment == null) {
+				vAdjustment = editor.VAdjustment;
+				hAdjustment = editor.HAdjustment;
+
+				vAdjustment.ValueChanged += HandleEditorVAdjustmentValueChanged;
+				hAdjustment.ValueChanged += HandleEditorHAdjustmentValueChanged;
+			}
+			vValue = vAdjustment.Value;
+			hValue = hAdjustment.Value;
 		}
 
 		protected override void OnShown ()
@@ -122,8 +139,12 @@ namespace Mono.TextEditor.Theatrics
 		
 		protected void DetachEvents ()
 		{
-			editor.VAdjustment.ValueChanged -= HandleEditorVAdjustmentValueChanged;
-			editor.HAdjustment.ValueChanged -= HandleEditorHAdjustmentValueChanged;
+			if (vAdjustment == null)
+				return;
+			vAdjustment.ValueChanged -= HandleEditorVAdjustmentValueChanged;
+			hAdjustment.ValueChanged -= HandleEditorHAdjustmentValueChanged;
+			vAdjustment = null;
+			hAdjustment = null;
 		}
 
 		protected override void OnHidden ()
@@ -197,5 +218,165 @@ namespace Mono.TextEditor.Theatrics
 		
 		
 		
+	}
+
+	/// <summary>
+	/// Tooltip that "bounces", then fades away.
+	/// </summary>
+	public abstract class BounceFadePopupWidget : Gtk.Widget
+	{
+		Stage<BounceFadePopupWidget> stage = new Stage<BounceFadePopupWidget> ();
+		Gdk.Pixbuf textImage = null;
+		TextEditor editor;
+		
+		protected double scale = 0.0;
+		protected double opacity = 1.0;
+		
+		public BounceFadePopupWidget (TextEditor editor)
+		{
+			if (!IsComposited)
+				throw new InvalidOperationException ("Only works with composited screen. Check Widget.IsComposited.");
+			if (editor == null)
+				throw new ArgumentNullException ("Editor");
+			WidgetFlags |= Gtk.WidgetFlags.NoWindow;
+			this.editor = editor;
+			Events = EventMask.ExposureMask;
+			Duration = 500;
+			ExpandWidth = 12;
+			ExpandHeight = 2;
+			BounceEasing = Easing.Sine;
+			
+			var rgbaColormap = Screen.RgbaColormap;
+			if (rgbaColormap == null)
+				return;
+			Colormap = rgbaColormap;
+
+			stage.ActorStep += OnAnimationActorStep;
+			stage.Iteration += OnAnimationIteration;
+			stage.UpdateFrequency = 10;
+		}
+		
+		protected TextEditor Editor { get { return editor; } }
+		
+		/// <summary>Duration of the animation, in milliseconds.</summary>
+		public uint Duration { get; set; }
+		
+		/// <summary>The number of pixels by which the window's width will expand</summary>
+		public uint ExpandWidth { get; set; }
+		
+		/// <summary>The number of pixels by which the window's height will expand</summary>
+		public uint ExpandHeight { get; set; }
+
+		/// <summary>The easing used for the bounce part of the animation.</summary>
+		public Easing BounceEasing { get; set; }
+
+		int xExpandedOffset, yExpandedOffset;
+		Cairo.Rectangle userspaceArea;
+		Cairo.Rectangle bounds;
+
+		public virtual void Popup ()
+		{
+			if (editor.GdkWindow == null){
+				editor.Realized += HandleRealized;
+				return;
+			}
+
+			bounds = CalculateInitialBounds ();
+
+			//GTK uses integer position coords, so round fractions down, we'll add them back later as draw offsets
+			int x = (int) System.Math.Floor (bounds.X);
+			int y = (int) System.Math.Floor (bounds.Y);
+
+			//capture any lost fractions to pass as an offset to Draw
+			userspaceArea = new Cairo.Rectangle (bounds.X - x, bounds.Y - y, bounds.Width, bounds.Height);
+
+			//lose half-pixels on the expansion, it's not a big deal
+			xExpandedOffset = (int) (System.Math.Floor (ExpandWidth / 2d));
+			yExpandedOffset = (int) (System.Math.Floor (ExpandHeight / 2d));
+
+			//round the width/height up to make sure we have room for restored fractions
+			int width = System.Math.Max (1, (int) (System.Math.Ceiling (bounds.Width) + ExpandWidth));
+			int height = System.Math.Max (1, (int) (System.Math.Ceiling (bounds.Height) + ExpandHeight));
+			this.SetSizeRequest (width, height);
+			editor.TextArea.AddTopLevelWidget (this, x - xExpandedOffset, y - yExpandedOffset);
+
+			stage.AddOrReset (this, Duration);
+			stage.Play ();
+			Show ();
+		}
+
+		void HandleRealized (object sender, EventArgs e)
+		{
+			editor.Realized -= HandleRealized;
+			Popup ();
+		}
+
+		void OnAnimationIteration (object sender, EventArgs args)
+		{
+			QueueDraw ();
+		}
+		
+		protected virtual bool OnAnimationActorStep (Actor<BounceFadePopupWidget> actor)
+		{
+			if (actor.Expired) {
+				OnAnimationCompleted ();
+				return false;
+			}
+			
+			// for the first half, use an easing
+			if (actor.Percent < 0.5) {
+				scale = Choreographer.Compose (actor.Percent * 2, BounceEasing);
+				opacity = 1.0;
+			}
+			//for the second half, vary opacity linearly from 1 to 0.
+			else {
+				scale = Choreographer.Compose (1.0, BounceEasing);
+				opacity = 1 - 2 * (actor.Percent - 0.5);
+			}
+			return true;
+		}
+
+		protected override bool OnExposeEvent (EventExpose evnt)
+		{
+			try {
+				var alloc = Allocation;
+				using (var cr = CairoHelper.Create (evnt.Window)) {
+					cr.Translate (alloc.X, alloc.Y);
+					cr.Translate (xExpandedOffset * (1 - scale), yExpandedOffset * (1 - scale));
+					var scaleX = (alloc.Width / userspaceArea.Width - 1) * scale + 1;
+					var scaleY = (alloc.Height / userspaceArea.Height - 1) * scale + 1;
+					cr.Scale (scaleX, scaleY);
+					Draw (cr, userspaceArea);
+				}
+			} catch (Exception e) {
+				Console.WriteLine ("Exception in animation:" + e);
+			}
+			return true;
+		}
+
+		protected abstract void Draw (Cairo.Context context, Cairo.Rectangle area);
+
+		protected virtual void OnAnimationCompleted ()
+		{
+			StopPlaying ();
+		}
+		
+		protected override void OnDestroyed ()
+		{
+			base.OnDestroyed ();
+			StopPlaying ();
+		}
+		
+		internal virtual void StopPlaying ()
+		{
+			stage.Playing = false;
+			
+			if (textImage != null) {
+				textImage.Dispose ();
+				textImage = null;
+			}
+		}
+
+		protected abstract Cairo.Rectangle CalculateInitialBounds ();
 	}
 }

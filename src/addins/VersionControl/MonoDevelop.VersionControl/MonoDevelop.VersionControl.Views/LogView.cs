@@ -15,9 +15,7 @@ namespace MonoDevelop.VersionControl.Views
 	
 	public class LogView : BaseView, ILogView 
 	{
-		string filepath;
 		LogWidget widget;
-		Repository vc;
 		VersionInfo vinfo;
 		
 		ListStore changedpathstore;
@@ -71,8 +69,6 @@ namespace MonoDevelop.VersionControl.Views
 		
 		void CreateControlFromInfo ()
 		{
-			this.vc = info.Item.Repository;
-			this.filepath = info.Item.Path;
 			var lw = new LogWidget (info);
 			
 			widget = lw;
@@ -83,16 +79,15 @@ namespace MonoDevelop.VersionControl.Views
 			lw.History = this.info.History;
 			vinfo   = this.info.VersionInfo;
 		
+			if (WorkbenchWindow != null)
+				widget.SetToolbar (WorkbenchWindow.GetToolbar (this));
 		}
 		
 		public LogView (string filepath, bool isDirectory, Revision [] history, Repository vc) 
 			: base (Path.GetFileName (filepath) + " Log")
 		{
-			this.vc = vc;
-			this.filepath = filepath;
-			
 			try {
-				this.vinfo = vc.GetVersionInfo (filepath, false);
+				this.vinfo = vc.GetVersionInfo (filepath);
 			}
 			catch (Exception ex) {
 				MessageService.ShowException (ex, GettextCatalog.GetString ("Version control command failed."));
@@ -115,6 +110,13 @@ namespace MonoDevelop.VersionControl.Views
 					CreateControlFromInfo ();
 				return widget; 
 			}
+		}
+
+		protected override void OnWorkbenchWindowChanged (EventArgs e)
+		{
+			base.OnWorkbenchWindowChanged (e);
+			if (WorkbenchWindow != null && widget != null)
+				widget.SetToolbar (WorkbenchWindow.GetToolbar (this));
 		}
 		
 		public override void Dispose ()

@@ -28,16 +28,33 @@ namespace MonoDevelop.VersionControl
 			this.remoteStatus = remoteStatus;
 			this.remoteRevision = remoteRevision;
 		}
+
+		public bool Equals (VersionInfo obj)
+		{
+			VersionInfo other = obj as VersionInfo;
+			if (other == null)
+				return false;
+			return localPath == other.localPath &&
+				repositoryPath == other.repositoryPath &&
+				isDirectory == other.isDirectory &&
+				status == other.status &&
+				revision == other.revision &&
+				remoteStatus == other.remoteStatus &&
+				remoteRevision == other.remoteRevision;
+		}
 		
 		internal void Init (Repository repo)
 		{
 			ownerRepository = repo;
+			RequiresRefresh = false;
 		}
 		
 		public static VersionInfo CreateUnversioned (FilePath path, bool isDirectory)
 		{
 			return new VersionInfo (path, "", isDirectory, VersionStatus.Unversioned, null, VersionStatus.Unversioned, null);
 		}
+
+		internal bool RequiresRefresh { get; set; }
 		
 		public bool IsVersioned {
 			get { return (status & VersionStatus.Versioned) != 0; }

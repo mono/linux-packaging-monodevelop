@@ -59,7 +59,7 @@ namespace NGit.Util
 			{
 				return gitExe.GetParentFile().GetParentFile();
 			}
-			if (IsMacOS())
+			if (SystemReader.GetInstance().IsMacOS())
 			{
 				// On MacOSX, PATH is shorter when Eclipse is launched from the
 				// Finder than from a terminal. Therefore try to launch bash as a
@@ -91,6 +91,11 @@ namespace NGit.Util
 		{
 		}
 
+		public override bool IsCaseSensitive()
+		{
+			return !SystemReader.GetInstance().IsMacOS();
+		}
+
 		public override ProcessStartInfo RunInShell(string cmd, string[] args)
 		{
 			IList<string> argv = new AList<string>(4 + args.Length);
@@ -102,24 +107,6 @@ namespace NGit.Util
 			ProcessStartInfo proc = new ProcessStartInfo();
 			proc.SetCommand(argv);
 			return proc;
-		}
-
-		private static bool IsMacOS()
-		{
-			string osDotName = AccessController.DoPrivileged(new _PrivilegedAction_103());
-			return "Mac OS X".Equals(osDotName);
-		}
-
-		private sealed class _PrivilegedAction_103 : PrivilegedAction<string>
-		{
-			public _PrivilegedAction_103()
-			{
-			}
-
-			public string Run()
-			{
-				return Runtime.GetProperty("os.name");
-			}
 		}
 	}
 }

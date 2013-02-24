@@ -71,6 +71,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			this.fileName = fileName;
 			this.project = project;
 			Counters.GuiProjectsLoaded++;
+			GuiBuilderService.NotifyGuiProjectLoaded ();
 		}
 		
 		void Load ()
@@ -191,7 +192,21 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			}
 		}
 		
-		public void Save (bool saveMdProject)
+		public void SaveAll (bool saveMdProject)
+		{
+			if (gproject != null)
+				gproject.SetAllWidgetsModified ();
+			SaveProject (saveMdProject);
+		}
+
+		public void SaveWindow (bool saveMdProject, string modifiedWindow)
+		{
+			if (gproject != null)
+				gproject.SetWidgetModified (modifiedWindow);
+			SaveProject (saveMdProject);
+		}
+
+		public void SaveProject (bool saveMdProject)
 		{
 			if (disposed)
 				return;
@@ -233,6 +248,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 		{
 			if (disposed)
 				return;
+			GuiBuilderService.NotifyGuiProjectUnloaded ();
 			Counters.GuiProjectsLoaded--;
 			disposed = true;
 			if (watcher != null)
@@ -374,7 +390,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			string pref = GetReferenceLibraryPath (args.ProjectReference);
 			if (pref != null) {
 				gproject.AddWidgetLibrary (pref);
-				Save (false);
+				SaveProject (false);
 			}
 		}
 		
@@ -385,11 +401,11 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			string pref = GetReferenceLibraryPath (args.ProjectReference);
 			if (pref != null) {
 				gproject.RemoveWidgetLibrary (pref);
-				Save (false);
+				SaveProject (false);
 			}
 		}
 
-		string GetReferenceLibraryPath (ProjectReference pref)
+		string GetReferenceLibraryPath (MonoDevelop.Projects.ProjectReference pref)
 		{
 			string path = null;
 			
@@ -415,7 +431,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			dlg.AddAllFilesFilter ();
 			if (dlg.Run ()) {
 				SteticProject.ImportGlade (dlg.SelectedFile);
-				Save (true);
+				SaveAll (true);
 			}
 		}
 		
@@ -548,7 +564,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			ArrayList libs = new ArrayList ();
 			string[] internalLibs;
 			
-			foreach (ProjectReference pref in project.References) {
+			foreach (var pref in project.References) {
 				string wref = GetReferenceLibraryPath (pref);
 				if (wref != null)
 					libs.Add (wref);
@@ -581,7 +597,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 			}
 			
 			if (needsSave)
-				Save (true);
+				SaveAll (true);
 		}
 		
 		bool LibrariesChanged (string[] oldLibs, string[] internalLibs, string[] newLibs)

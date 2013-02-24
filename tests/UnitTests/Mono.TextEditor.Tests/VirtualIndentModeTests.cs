@@ -27,6 +27,8 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using System.Linq;
+using Gtk;
+using UnitTests;
 
 namespace Mono.TextEditor.Tests
 {
@@ -417,6 +419,54 @@ namespace Mono.TextEditor.Tests
 			DeleteActions.Backspace (data);
 			Assert.AreEqual ("", data.Document.Text);
 			Assert.AreEqual (new DocumentLocation (1, 1), data.Caret.Location);
+		}
+
+		/// <summary>
+		/// Bug 5949 - Movement across empty line is not symmetric
+		/// </summary>
+		[Test()]
+		public void TestBug5949 ()
+		{
+			var data = CreateData ();
+			data.Document.Text = "\t\tfoo\n\n\t\tbar";
+			data.Caret.Location = new DocumentLocation (3, 1);
+			CaretMoveActions.Left (data);
+			Assert.AreEqual (new DocumentLocation (2, 3), data.Caret.Location);
+		}
+
+		/// <summary>
+		/// Bug 5956 - Backspacing ignores virtual indents
+		/// </summary>
+		[Test()]
+		public void TestBug5956 ()
+		{
+			var data = CreateData ();
+			data.Document.Text = "\t\tfoo\n\n\t\tbar";
+			data.Caret.Location = new DocumentLocation (3, 1);
+			DeleteActions.Backspace (data);
+			Assert.AreEqual (new DocumentLocation (2, 3), data.Caret.Location);
+			Assert.AreEqual ("\t\tfoo\n\t\t\t\tbar", data.Document.Text);
+		}
+
+		/// <summary>
+		/// Bug 7012 - Paste does not replace entire selection made by the Shift key.
+		/// </summary>
+		[Ignore("Test broken.")]
+		[Test()]
+		public void TestBug7012 ()
+		{
+			var data = CreateData ();
+			data.Document.Text = "\n\t\tthrow new NotImplementedException();";
+			var loc1 = new DocumentLocation (1, data.IndentationTracker.GetVirtualIndentationColumn (1, 1));
+			var loc2 = new DocumentLocation (3, data.GetLine (2).Length);
+			data.Caret.Location = loc2;
+			data.SetSelection (loc1, loc2);
+			var clipboard = Clipboard.Get (Mono.TextEditor.ClipboardActions.CopyOperation.CLIPBOARD_ATOM);
+			clipboard.Text = "Console.WriteLine(\"Hello\");";
+			
+			ClipboardActions.Paste (data);
+			
+			Assert.AreEqual ("\t\tConsole.WriteLine(\"Hello\");", data.Document.Text);
 		}
 	}
 }

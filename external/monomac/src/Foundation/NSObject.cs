@@ -29,27 +29,24 @@ using MonoMac.ObjCRuntime;
 
 namespace MonoMac.Foundation {
 	public class NSObjectFlag {
-		public static NSObjectFlag Empty = null;
+		public static readonly NSObjectFlag Empty = null;
 
 		NSObjectFlag () {}
 	}
 
 	[StructLayout(LayoutKind.Sequential)]
 	public partial class NSObject : INativeObject, IDisposable {
-		public static Assembly MonoMacAssembly = typeof (NSObject).Assembly;
+		public static readonly Assembly MonoMacAssembly = typeof (NSObject).Assembly;
 
 		static IntPtr selAlloc = Selector.GetHandle ("alloc");
 		static IntPtr selAwakeFromNib = Selector.GetHandle ("awakeFromNib");
 		static IntPtr selDoesNotRecognizeSelector = Selector.GetHandle ("doesNotRecognizeSelector:");
-		static IntPtr selDrain = Selector.GetHandle ("drain:");
 		static IntPtr selPerformSelectorOnMainThreadWithObjectWaitUntilDone = Selector.GetHandle ("performSelectorOnMainThread:withObject:waitUntilDone:");
 		static IntPtr selPerformSelectorWithObjectAfterDelay = Selector.GetHandle ("performSelector:withObject:afterDelay:");
 		static IntPtr selRelease = Selector.GetHandle ("release");
 		static IntPtr selRespondsToSelector = Selector.GetHandle ("respondsToSelector:");
 		static IntPtr selRetain = Selector.GetHandle ("retain");
 		static IntPtr selRetainCount = Selector.GetHandle ("retainCount");
-
-		static MonoMac_Disposer disposer = new MonoMac_Disposer ();
 
 		private IntPtr handle;
 		private IntPtr super;
@@ -70,10 +67,8 @@ namespace MonoMac.Foundation {
 
 		// This is just here as a constructor chain that can will
 		// only do Init at the most derived class.
-		public NSObject (NSObjectFlag x)
+		public NSObject (NSObjectFlag x) : this ()
 		{
-			AllocIfNeeded ();
-			InitializeObject ();
 		}
 
 		public NSObject (IntPtr handle) {
@@ -93,6 +88,8 @@ namespace MonoMac.Foundation {
 
 		[Export ("respondsToSelector:")]
 		public virtual bool RespondsToSelector (Selector sel) {
+			if (sel == null)
+				throw new ArgumentNullException ("sel");
 			if (IsDirectBinding) {
 				return Messaging.bool_objc_msgSend_intptr (Handle, selRespondsToSelector, sel.Handle);
 			} else {
@@ -102,6 +99,8 @@ namespace MonoMac.Foundation {
 
 		[Export ("doesNotRecognizeSelector:")]
 		public virtual void DoesNotRecognizeSelector (Selector sel) {
+			if (sel == null)
+				throw new ArgumentNullException ("sel");
 			Console.WriteLine ("CRITICAL WARNING: [{0} {1}] is not recognized", this.GetType (), sel.Name);
 
 			Messaging.void_objc_msgSendSuper_intptr (SuperHandle, selDoesNotRecognizeSelector, sel.Handle);
@@ -124,21 +123,23 @@ namespace MonoMac.Foundation {
 						Messaging.void_objc_msgSendSuper (SuperHandle, selRelease);
 					else
 						Messaging.void_objc_msgSend (handle, selRelease);
-
-					Marshal.FreeHGlobal (SuperHandle);
+					
+					if (super != IntPtr.Zero) {
+						Marshal.FreeHGlobal (super);
+						super = IntPtr.Zero;
+					}
 				} else {
-					bool calldrain = false;
-
-					if (Class.IsCustomType (this.GetType ()))
-						calldrain = disposer.AddSuper (SuperHandle);
-					else
-						calldrain = disposer.AddDirect (handle);
-
-					if (calldrain)
-						Messaging.void_objc_msgSend_intptr_intptr_bool (disposer.Handle, selPerformSelectorOnMainThreadWithObjectWaitUntilDone, selDrain, IntPtr.Zero, false);
+					if (Class.IsCustomType (this.GetType ())) {
+						MonoMac_Disposer.AddSuper (SuperHandle);
+					} else {
+						MonoMac_Disposer.AddDirect (handle);
+						if (super != IntPtr.Zero) {
+							Marshal.FreeHGlobal (super);
+							super = IntPtr.Zero;
+						}
+					}
 				}
 				handle = IntPtr.Zero;
-				super = IntPtr.Zero;
 			}
 		}
 
@@ -255,11 +256,13 @@ namespace MonoMac.Foundation {
 		}
 
 		[Export ("performSelector:withObject:afterDelay:")]
-		public virtual void PerformSelector (Selector sel, NSObject obj, float delay) {
+		public virtual void PerformSelector (Selector sel, NSObject obj, double delay) {
+			if (sel == null)
+				throw new ArgumentNullException ("sel");
 			if (IsDirectBinding) {
-				Messaging.void_objc_msgSend_intptr_intptr_float (this.Handle, selPerformSelectorWithObjectAfterDelay, sel.Handle, obj == null ? IntPtr.Zero : obj.Handle, delay);
+				Messaging.void_objc_msgSend_intptr_intptr_double (this.Handle, selPerformSelectorWithObjectAfterDelay, sel.Handle, obj == null ? IntPtr.Zero : obj.Handle, delay);
 			} else {
-				Messaging.void_objc_msgSendSuper_intptr_intptr_float (this.SuperHandle, selPerformSelectorWithObjectAfterDelay, sel.Handle, obj == null ? IntPtr.Zero : obj.Handle, delay);
+				Messaging.void_objc_msgSendSuper_intptr_intptr_double (this.SuperHandle, selPerformSelectorWithObjectAfterDelay, sel.Handle, obj == null ? IntPtr.Zero : obj.Handle, delay);
 			}
 		}
 
@@ -316,50 +319,61 @@ namespace MonoMac.Foundation {
 
 		[Register ("__MonoMac_Disposer")][Preserve (AllMembers=true)]
 		internal class MonoMac_Disposer : NSObject {
-			List <IntPtr> direct_handles;
-			List <IntPtr> super_handles;
-			object lock_obj;
+			static readonly List <IntPtr> direct_handles = new List<IntPtr> ();
+			static readonly List <IntPtr> super_handles = new List<IntPtr> ();
+			static readonly object lock_obj = new object ();
+			static readonly IntPtr class_ptr = Class.GetHandle ("__MonoMac_Disposer");
+			static readonly IntPtr selDrain = Selector.sel_registerName ("drain:");
+			static readonly IntPtr selPerformSelectorOnMainThreadWithObjectWaitUntilDone = Selector.sel_registerName ("performSelectorOnMainThread:withObject:waitUntilDone:");
+			
+			private MonoMac_Disposer () { }
 	
-
-			internal MonoMac_Disposer () {
-				super_handles = new List <IntPtr> ();
-				direct_handles = new List <IntPtr> ();
-				lock_obj = new object ();
-			}
-	
-			internal bool AddDirect (IntPtr handle) {
-				if (this.handle == handle)
-					return false;
-
-				lock (lock_obj) {
-					direct_handles.Add (handle);
-					return direct_handles.Count == 1;
-				}
+			internal static void AddDirect (IntPtr handle) {
+				Add (direct_handles, handle);
 			}
 
-			internal bool AddSuper (IntPtr handle) {
-				if (this.handle == handle)
-					return false;
+			internal static void AddSuper (IntPtr handle) {
+				Add (super_handles, handle);
+			}
 
+			static void Add (List<IntPtr> list, IntPtr handle)
+			{
+				bool call_drain;
 				lock (lock_obj) {
-					super_handles.Add (handle);
-					return super_handles.Count == 1;
+					list.Add (handle);
+					call_drain = list.Count == 1;
 				}
+				if (!call_drain)
+					return;
+
+				Messaging.void_objc_msgSend_intptr_intptr_bool (class_ptr, selPerformSelectorOnMainThreadWithObjectWaitUntilDone, selDrain, IntPtr.Zero, false);
 			}
 	
 			[Export ("drain:")]
-			internal void Drain (NSObject ctx) {
+			internal static void Drain (NSObject ctx) {
+				List<IntPtr> direct = null;
+				List<IntPtr> super = null;
+
 				lock (lock_obj) {
-					foreach (IntPtr x in super_handles) {
+					if (direct_handles.Count > 0) {
+						direct = new List<IntPtr> (direct_handles);
+						direct_handles.Clear ();
+					}
+
+					if (super_handles.Count > 0) {
+						super = new List<IntPtr> (super_handles);
+						super_handles.Clear ();
+					}
+				}
+
+				if (super != null)
+					foreach (IntPtr x in super) {
 						Messaging.void_objc_msgSendSuper (x, selRelease);
 						Marshal.FreeHGlobal (x);
 					}
-					super_handles.Clear ();
-					foreach (IntPtr x in direct_handles) {
+				if (direct != null)
+					foreach (IntPtr x in direct)
 						Messaging.void_objc_msgSend (x, selRelease);
-					}
-					direct_handles.Clear ();
-				}
 			}
 		}
 	}

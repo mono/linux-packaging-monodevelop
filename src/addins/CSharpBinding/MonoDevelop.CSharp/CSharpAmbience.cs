@@ -198,7 +198,21 @@ namespace MonoDevelop.CSharp
 		}
 		
 		static Dictionary<TypeKind, string> classTypes = new Dictionary<TypeKind, string> ();
-		
+
+		public override MonoDevelop.Ide.CodeCompletion.TooltipInformation GetTooltip (IEntity entity)
+		{
+			if (entity == null)
+				throw new ArgumentNullException ("entity");
+			return MonoDevelop.CSharp.Completion.MemberCompletionData.CreateTooltipInformation (
+				entity.Compilation,
+				null,
+				null,
+				new CSharpFormattingPolicy (),
+				entity,
+				false,
+				true);
+		}
+
 		static string GetString (TypeKind classType)
 		{
 			string res;
@@ -244,11 +258,11 @@ namespace MonoDevelop.CSharp
 		public void AppendType (StringBuilder sb, IType type, OutputSettings settings)
 		{
 			if (type.Kind == TypeKind.Unknown) {
-				sb.Append (type.Name);
+				sb.Append (settings.IncludeMarkup ? settings.Markup (type.Name) : type.Name);
 				return;
 			}
 			if (type.Kind == TypeKind.TypeParameter) {
-				sb.Append (type.Name);
+				sb.Append (settings.IncludeMarkup ? settings.Markup (type.Name) : type.Name);
 				return;
 			}
 			if (type.DeclaringType != null) {
@@ -347,9 +361,9 @@ namespace MonoDevelop.CSharp
 			var typeDef = type as ITypeDefinition ?? type.GetDefinition ();
 			if (typeDef != null) {
 				if (settings.UseFullName) {
-					sb.Append (typeDef.FullName);
+					sb.Append (settings.IncludeMarkup ? settings.Markup (typeDef.FullName) : typeDef.FullName);
 				} else {
-					sb.Append (typeDef.Name);
+					sb.Append (settings.IncludeMarkup ? settings.Markup (typeDef.Name) : typeDef.Name);
 				}
 				
 				if (typeDef.TypeParameterCount > 0) {
@@ -373,18 +387,18 @@ namespace MonoDevelop.CSharp
 				sb.Append ("out ");
 			}
 		}
-		
+
 		protected override string GetTypeReferenceString (IType reference, OutputSettings settings)
 		{
 			if (reference == null)
 				return "null";
 			var type = reference;
 			if (type.Kind == TypeKind.Unknown) {
-				return reference.Name;
+				return settings.IncludeMarkup ? settings.Markup (reference.Name) : reference.Name;
 			}
 			
 			if (reference.Kind == TypeKind.TypeParameter)
-				return reference.FullName;
+				return settings.IncludeMarkup ? settings.Markup (reference.Name) : reference.FullName;
 			
 			var sb = new StringBuilder ();
 			if (type is ITypeDefinition && ((ITypeDefinition)type).IsSynthetic && ((ITypeDefinition)type).Name == "$Anonymous$") {
@@ -394,7 +408,7 @@ namespace MonoDevelop.CSharp
 					sb.Append ("\t");
 					sb.Append (GetTypeReferenceString (property.ReturnType, settings) ?? "?");
 					sb.Append (" ");
-					sb.Append (property.Name);
+					sb.Append (settings.IncludeMarkup ? settings.Markup (property.Name) : property.Name);
 					sb.Append (";");
 				}
 				sb.AppendLine ();
@@ -409,12 +423,12 @@ namespace MonoDevelop.CSharp
 		protected override string GetTypeString (IType t, OutputSettings settings)
 		{
 			if (t.Kind == TypeKind.Unknown) {
-				return t.Name;
+				return settings.IncludeMarkup ? settings.Markup (t.Name) : t.Name;
 			}
 			
 			if (t.Kind == TypeKind.TypeParameter)
-				return t.FullName;
-			
+				return settings.IncludeMarkup ? settings.Markup (t.FullName) : t.FullName;
+
 			var typeWithElementType = t as TypeWithElementType;
 			if (typeWithElementType != null) {
 				var sb = new StringBuilder ();
@@ -495,7 +509,7 @@ namespace MonoDevelop.CSharp
 			}
 			
 			if (settings.UseFullName && !string.IsNullOrEmpty (type.Namespace)) 
-				result.Append (type.Namespace + ".");
+				result.Append ((settings.IncludeMarkup ? settings.Markup (t.Namespace) : type.Namespace) + ".");
 			
 			if (settings.UseFullInnerTypeName && type.DeclaringTypeDefinition != null) {
 				bool includeGenerics = settings.IncludeGenerics;
@@ -506,7 +520,7 @@ namespace MonoDevelop.CSharp
 				result.Append (typeString);
 				result.Append (settings.Markup ("."));
 			}
-			result.Append (settings.EmitName (type, type.Name));
+			result.Append (settings.EmitName (type, settings.IncludeMarkup ? settings.Markup (t.Name) : type.Name));
 			if (settings.IncludeGenerics && type.TypeParameterCount > 0) {
 				result.Append (settings.Markup ("<"));
 				for (int i = 0; i < type.TypeParameterCount; i++) {
@@ -551,7 +565,7 @@ namespace MonoDevelop.CSharp
 			return result.ToString ();
 		}
 		
-		static string GetOperator (string methodName)
+		internal static string GetOperator (string methodName)
 		{
 			switch (methodName) {
 			case "op_Subtraction":
@@ -847,7 +861,7 @@ namespace MonoDevelop.CSharp
 				
 				result.Append (GetTypeReferenceString (parameter.Type, settings));
 				result.Append (" ");
-				
+
 				if (settings.HighlightName) {
 					result.Append (settings.EmitName (parameter, settings.Highlight (Format (FilterName (parameter.Name)))));
 				} else {
@@ -874,7 +888,7 @@ namespace MonoDevelop.CSharp
 				sb.Append (settings.Markup ("."));
 			}
 		}
-		
+
 		void AppendParameterList (StringBuilder result, OutputSettings settings, IEnumerable<IParameter> parameterList)
 		{
 			if (parameterList == null)
@@ -940,173 +954,6 @@ namespace MonoDevelop.CSharp
 				break;
 			}
 		}
-		
-/*
-		new const string nullString = "Null";
-
-		protected override IDomVisitor<OutputSettings, string> OutputVisitor {
-			get {
-				return this;
-			}
-		}
-		
-		public CSharpAmbience () : base ("C#", "text/x-csharp")
-		{
-			
-			parameterModifiers[ParameterModifiers.In]       = "";
-			parameterModifiers[ParameterModifiers.Out]      = "out";
-			parameterModifiers[ParameterModifiers.Ref]      = "ref";
-			parameterModifiers[ParameterModifiers.Params]   = "params";
-			parameterModifiers[ParameterModifiers.Optional] = "";
-			
-			modifiers[Modifiers.Private]              = "private";
-			modifiers[Modifiers.Internal]             = "internal";
-			modifiers[Modifiers.Protected]            = "protected";
-			modifiers[Modifiers.Public]               = "public";
-			modifiers[Modifiers.Abstract]             = "abstract";
-			modifiers[Modifiers.Virtual]              = "virtual";
-			modifiers[Modifiers.Sealed]               = "sealed";
-			modifiers[Modifiers.Static]               = "static";
-			modifiers[Modifiers.Override]             = "override";
-			modifiers[Modifiers.Readonly]             = "readonly";
-			modifiers[Modifiers.Const]                = "const";
-			modifiers[Modifiers.Partial]              = "partial";
-			modifiers[Modifiers.Extern]               = "extern";
-			modifiers[Modifiers.Volatile]             = "volatile";
-			modifiers[Modifiers.Unsafe]               = "unsafe";
-			modifiers[Modifiers.Overloads]            = "";
-			modifiers[Modifiers.WithEvents]           = "";
-			modifiers[Modifiers.Default]              = "";
-			modifiers[Modifiers.Fixed]                = "";
-			modifiers[Modifiers.ProtectedAndInternal] = "protected internal";
-			modifiers[Modifiers.ProtectedOrInternal]  = "internal protected";
-		}
-		
-		public static string NormalizeTypeName (string typeName)
-		{
-			if (typeName == null)
-				return null;
-			int idx = typeName.IndexOf ('`');
-			if (idx > 0) 
-				return typeName.Substring (0, idx);
-			return typeName;
-		}
-		
-		public string Visit (IParameter parameter, OutputSettings settings)
-		{
-		}
-		
-		
-		public CSharpFormattingPolicy GetPolicy (OutputSettings settings)
-		{
-			IEnumerable<string> types = DesktopService.GetMimeTypeInheritanceChain (MonoDevelop.CSharp.Formatting.CSharpFormatter.MimeType);
-			return settings.PolicyParent != null ? settings.PolicyParent.Get<CSharpFormattingPolicy> (types) : MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<CSharpFormattingPolicy> (types);
-		}
-		
-		public string Visit (IType type, OutputSettings settings)
-		{
-			
-		}
-		
-		void OutputConstraints (StringBuilder result, OutputSettings settings, IEnumerable<ITypeParameter> typeParameters)
-		{
-			if (settings.IncludeConstraints && typeParameters.Any (p => p.Constraints.Any () || (p.TypeParameterModifier & TypeParameterModifier.HasDefaultConstructorConstraint) != 0)) {
-				result.Append (settings.Markup (" "));
-				result.Append (settings.EmitKeyword ("where"));
-				int typeParameterCount = 0;
-				foreach (var p in typeParameters) {
-					if (!p.Constraints.Any () && (p.TypeParameterModifier & TypeParameterModifier.HasDefaultConstructorConstraint) == 0)
-						continue;
-					if (typeParameterCount != 0)
-						result.Append (settings.Markup (", "));
-					
-					typeParameterCount++;
-					result.Append (settings.EmitName (p, p.Name));
-					result.Append (settings.Markup (" : "));
-					int constraintCount = 0;
-			
-					if ((p.TypeParameterModifier & TypeParameterModifier.HasDefaultConstructorConstraint) != 0) {
-						result.Append (settings.EmitKeyword ("new"));
-						result.Append (settings.Markup ("()"));
-						constraintCount++;
-					}
-					
-					foreach (var c in p.Constraints) {
-						if (constraintCount != 0)
-							result.Append (settings.Markup (", "));
-						constraintCount++;
-						if (c.DecoratedFullName == DomReturnType.ValueType.DecoratedFullName) {
-							result.Append (settings.EmitKeyword ("struct"));
-							continue;
-						}
-						if (c.DecoratedFullName == DomReturnType.TypeReturnType.DecoratedFullName) {
-							result.Append (settings.EmitKeyword ("class"));
-							continue;
-						}
-						result.Append (this.GetString (c, settings));
-					}
-				}
-			}
-		}
-
-
-		static void PrintObject (StringBuilder result, OutputSettings settings, object o)
-		{
-			if (o is string) {
-				result.Append (settings.Markup ("\""));
-				result.Append (o);
-				result.Append (settings.Markup ("\""));
-			} else if (o is char) {
-				result.Append (settings.Markup ("'"));
-				result.Append (o);
-				result.Append (settings.Markup ("'"));
-			} else if (o is bool) {
-				result.Append (((bool)o) ? "true" : "false");
-			} else if (o is CodePrimitiveExpression) {
-				CodePrimitiveExpression cpe = (CodePrimitiveExpression)o;
-				PrintObject (result, settings, cpe.Value);
-			} else 
-				result.Append (o);
-		}
-		
-		public string Visit (IAttribute attribute, OutputSettings settings)
-		{
-			StringBuilder result = new StringBuilder ();
-			result.Append (settings.Markup ("["));
-			string attrName = GetString (attribute.AttributeType, settings);
-			if (attrName.EndsWith ("Attribute"))
-				attrName = attrName.Substring (0, attrName.Length - "Attribute".Length);
-			result.Append (attrName);
-			CSharpFormattingPolicy policy = GetPolicy (settings);
-			if (policy.BeforeMethodCallParentheses)
-				result.Append (settings.Markup (" "));
-			result.Append (settings.Markup ("("));
-			bool first = true;
-			if (attribute.PositionalArguments != null) {
-				foreach (object o in attribute.PositionalArguments) {
-					if (!first)
-						result.Append (settings.Markup (", "));
-					first = false;
-					PrintObject (result, settings, o);
-				}
-			}
-			result.Append (settings.Markup (")]"));
-			return result.ToString ();
-		}
-		
-		public string Visit (LocalVariable var, OutputSettings settings)
-		{
-			StringBuilder result = new StringBuilder ();
-			
-			if (settings.IncludeReturnType) {
-				result.Append (GetString (var.ReturnType, settings));
-				result.Append (" ");
-			}
-			result.Append (settings.EmitName (var, FilterName (Format (var.Name))));
-			
-			return result.ToString ();
-		}
-*/
 	}
 		
 }

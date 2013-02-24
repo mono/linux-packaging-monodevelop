@@ -39,7 +39,7 @@ using MonoDevelop.Ide.Gui.Components;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
-	public class SolutionNodeBuilder: TypeNodeBuilder
+	class SolutionNodeBuilder: TypeNodeBuilder
 	{
 		SolutionItemChangeEventHandler globalItemAddedRemoved;
 		SolutionItemChangeEventHandler combineEntryAdded;
@@ -92,7 +92,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
 		{
 			Solution solution = dataObject as Solution;
-			label = GLib.Markup.EscapeText (GettextCatalog.GetString ("Solution {0}", solution.Name));
+			label = GLib.Markup.EscapeText (solution.Name);
 			icon = Context.GetIcon (Stock.Solution);
 		}
 
@@ -195,7 +195,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		}
 	}
 	
-	public class SolutionNodeCommandHandler: NodeCommandHandler
+	class SolutionNodeCommandHandler: NodeCommandHandler
 	{
 		public override void RenameItem (string newName)
 		{
@@ -225,7 +225,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				sol.RootFolder.Items.Add (it);
 			}
 			else {
-				CombineNodeCommandHandler.DropFile (sol.RootFolder, (IFileItem) dataObject, operation);
+				SolutionFolderNodeCommandHandler.DropFile (sol.RootFolder, (IFileItem) dataObject, operation);
 			}
 			IdeApp.ProjectOperations.Save (sol);
 		}

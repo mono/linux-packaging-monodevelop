@@ -116,36 +116,8 @@ namespace MonoMac.Foundation {
 
 	}
 
-
 	[BaseType (typeof (NSObject))]
-	public interface NSOrthography {
-		[Export ("dominantScript")]
-		NSString DominantScript { get;  }
-
-		[Export ("languageMap")]
-		NSDictionary LanguageMap { get;  }
-
-		[Export ("dominantLanguage")]
-		string DominantLanguage { get;  }
-
-		[Export ("allScripts")]
-		string [] AllScripts { get;  }
-
-		[Export ("allLanguages")]
-		string [] AllLanguages { get;  }
-
-		[Export ("languagesForScript:")]
-		string [] LanguagesForScript (string script);
-
-		[Export ("dominantLanguageForScript:")]
-		string GetDominantLanguageForScript (string forScript);
-
-		[Export ("initWithDominantScript:languageMap:")]
-		IntPtr Constructor (string script, NSDictionary map);
-
-	}
-
-	[BaseType (typeof (NSObject))]
+	[DisableDefaultCtor] // An uncaught exception was raised: *** -range cannot be sent to an abstract object of class NSTextCheckingResult: Create a concrete instance!
 	public interface NSTextCheckingResult {
 		[Export ("resultType")]
 		NSTextCheckingType ResultType { get;  }
@@ -396,4 +368,242 @@ namespace MonoMac.Foundation {
 		[Field ("NSTaskDidTerminateNotification")]
 		NSString NSTaskDidTerminateNotification { get; }
 	}
+
+	[BaseType (typeof (NSObject))]
+	[DisableDefaultCtor] // return invalid handle
+	public interface NSFileHandle 
+	{
+		[Export ("availableData")]
+		NSData AvailableData ();
+		
+		[Export ("readDataToEndOfFile")]
+		NSData ReadDataToEndOfFile ();
+
+		[Export ("readDataOfLength:")]
+		NSData ReadDataOfLength (uint length);
+
+		[Export ("writeData:")]
+		void WriteData (NSData data);
+
+		[Export ("offsetInFile")]
+		ulong OffsetInFile ();
+
+		[Export ("seekToEndOfFile")]
+		ulong SeekToEndOfFile ();
+
+		[Export ("seekToFileOffset:")]
+		void SeekToFileOffset (ulong offset);
+
+		[Export ("truncateFileAtOffset:")]
+		void TruncateFileAtOffset (ulong offset);
+
+		[Export ("synchronizeFile")]
+		void SynchronizeFile ();
+
+		[Export ("closeFile")]
+		void CloseFile ();
+		
+		[Static]
+		[Export ("fileHandleWithStandardInput")]
+		NSFileHandle FromStandardInput ();
+		
+		[Static]
+		[Export ("fileHandleWithStandardOutput")]
+		NSFileHandle FromStandardOutput ();
+
+		[Static]
+		[Export ("fileHandleWithStandardError")]
+		NSFileHandle FromStandardError ();
+
+		[Static]
+		[Export ("fileHandleWithNullDevice")]
+		NSFileHandle FromNullDevice ();
+
+		[Static]
+		[Export ("fileHandleForReadingAtPath:")]
+		NSFileHandle OpenRead (string path);
+
+		[Static]
+		[Export ("fileHandleForWritingAtPath:")]
+		NSFileHandle OpenWrite (string path);
+
+		[Static]
+		[Export ("fileHandleForUpdatingAtPath:")]
+		NSFileHandle OpenUpdate (string path);
+
+		[Static]
+		[Export ("fileHandleForReadingFromURL:error:")]
+		NSFileHandle OpenReadUrl (NSUrl url, out NSError error);
+
+		[Static]
+		[Export ("fileHandleForWritingToURL:error:")]
+		NSFileHandle OpenWriteUrl (NSUrl url, out NSError error);
+
+		[Static]
+		[Export ("fileHandleForUpdatingURL:error:")]
+		NSFileHandle OpenUpdateUrl (NSUrl url, out NSError error);
+		
+		[Export ("readInBackgroundAndNotifyForModes:")]
+		void ReadInBackground (NSString [] notifyRunLoopModes);
+		
+		[Export ("readInBackgroundAndNotify")]
+		void ReadInBackground ();
+
+		[Export ("readToEndOfFileInBackgroundAndNotifyForModes:")]
+		void ReadToEndOfFileInBackground (NSString [] notifyRunLoopModes);
+
+		[Export ("readToEndOfFileInBackgroundAndNotify")]
+		void ReadToEndOfFileInBackground ();
+
+		[Export ("acceptConnectionInBackgroundAndNotifyForModes:")]
+		void AcceptConnectionInBackground (NSString [] notifyRunLoopModes);
+
+		[Export ("acceptConnectionInBackgroundAndNotify")]
+		void AcceptConnectionInBackground ();
+
+		[Export ("waitForDataInBackgroundAndNotifyForModes:")]
+		void WaitForDataInBackgroundAnd (NSString notifyRunLoopModes);
+
+		[Export ("waitForDataInBackgroundAndNotify")]
+		void WaitForDataInBackground ();
+		
+		[Export ("initWithFileDescriptor:closeOnDealloc:")]
+		IntPtr Constructor (int fd, bool closeOnDealloc);
+		
+		[Export ("initWithFileDescriptor:")]
+		IntPtr Constructor (int fd);
+
+		[Export ("fileDescriptor")]
+		int FileDescriptor { get; }
+	}
+	
+	[BaseType (typeof (NSObject))]
+	public interface NSPipe {
+		
+		[Export ("fileHandleForReading")]
+		NSFileHandle ReadHandle { get; }
+		
+		[Export ("fileHandleForWriting")]
+		NSFileHandle WriteHandle { get; }
+
+		[Static]
+		[Export ("pipe")]
+		NSPipe Create ();
+	}
+
+	[BaseType (typeof (NSObject))]
+	public interface NSValueTransformer {
+		[Export ("reverseTransformedValue:")]
+		NSObject ReverseTransformedValue (NSObject value);
+
+		[Export ("transformedValue:")]
+		NSObject TransformedValue (NSObject value);
+	}
+
+	[MountainLion]
+	[BaseType (typeof (NSObject))]
+	public interface NSUserNotification 
+	{
+		[Export ("title")]
+		string Title { get; set; }
+		
+		[Export ("subtitle")]
+		string Subtitle { get; set; }
+		
+		[Export ("informativeText")]
+		string InformativeText { get; set; }
+		
+		[Export ("actionButtonTitle")]
+		string ActionButtonTitle { get; set; }
+		
+		[Export ("userInfo")]
+		NSDictionary UserInfo { get; set; }
+		
+		[Export ("deliveryDate")]
+		NSDate DeliveryDate { get; set; }
+		
+		[Export ("deliveryTimeZone")]
+		NSTimeZone DeliveryTimeZone { get; set; }
+		
+		[Export ("deliveryRepeatInterval")]
+		NSDateComponents DeliveryRepeatInterval { get; set; }
+		
+		[Export ("actualDeliveryDate")]
+		NSDate ActualDeliveryDate { get; }
+		
+		[Export ("presented")]
+		bool Presented { [Bind("isPresented")] get; }
+		
+		[Export ("remote")]
+		bool Remote { [Bind("isRemote")] get; }
+		
+		[Export ("soundName")]
+		string SoundName { get; set; }
+		
+		[Export ("hasActionButton")]
+		bool HasActionButton { get; set; }
+		
+		[Export ("activationType")]
+		NSUserNotificationActivationType ActivationType { get; }
+		
+		[Export ("otherButtonTitle")]
+		string OtherButtonTitle { get; set; }
+
+		[Field ("NSUserNotificationDefaultSoundName")]
+		NSString NSUserNotificationDefaultSoundName { get; }
+	}
+	
+	[MountainLion]
+	[BaseType (typeof (NSObject),
+	           Delegates=new string [] {"WeakDelegate"},
+	Events=new Type [] { typeof (NSUserNotificationCenterDelegate) })]
+	[DisableDefaultCtor] // crash with: NSUserNotificationCenter designitated initializer is _centerForBundleIdentifier
+	public interface NSUserNotificationCenter 
+	{
+		[Export ("defaultUserNotificationCenter")][Static]
+		NSUserNotificationCenter DefaultUserNotificationCenter { get; }
+		
+		[Export ("delegate")][NullAllowed]
+		NSObject WeakDelegate { get; set; }
+		
+		[Wrap ("WeakDelegate")][NullAllowed]
+		NSUserNotificationCenterDelegate Delegate { get; set; }
+		
+		[Export ("scheduledNotifications")]
+		NSUserNotification [] ScheduledNotifications { get; set; }
+		
+		[Export ("scheduleNotification:")][PostGet ("ScheduledNotifications")]
+		void ScheduleNotification (NSUserNotification notification);
+		
+		[Export ("removeScheduledNotification:")][PostGet ("ScheduledNotifications")]
+		void RemoveScheduledNotification (NSUserNotification notification);
+		
+		[Export ("deliveredNotifications")]
+		NSUserNotification [] DeliveredNotifications { get; }
+		
+		[Export ("deliverNotification:")][PostGet ("DeliveredNotifications")]
+		void DeliverNotification (NSUserNotification notification);
+		
+		[Export ("removeDeliveredNotification:")][PostGet ("DeliveredNotifications")]
+		void RemoveDeliveredNotification (NSUserNotification notification);
+		
+		[Export ("removeAllDeliveredNotifications")][PostGet ("DeliveredNotifications")]
+		void RemoveAllDeliveredNotifications ();
+	}
+	
+	[MountainLion]
+	[BaseType (typeof (NSObject))]
+	[Model]
+	public interface NSUserNotificationCenterDelegate 
+	{
+		[Export ("userNotificationCenter:didDeliverNotification:"), EventArgs ("UNCDidDeliverNotification")]
+		void DidDeliverNotification (NSUserNotificationCenter center, NSUserNotification notification);
+		
+		[Export ("userNotificationCenter:didActivateNotification:"), EventArgs ("UNCDidActivateNotification")]
+		void DidActivateNotification (NSUserNotificationCenter center, NSUserNotification notification);
+		
+		[Export ("userNotificationCenter:shouldPresentNotification:"), DelegateName ("UNCShouldPresentNotification"), DefaultValue (false)]
+		bool ShouldPresentNotification (NSUserNotificationCenter center, NSUserNotification notification);
+	}
+
 }

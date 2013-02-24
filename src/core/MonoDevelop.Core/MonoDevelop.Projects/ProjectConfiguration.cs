@@ -46,6 +46,26 @@ namespace MonoDevelop.Projects
 		{
 		}
 
+		[ProjectPathItemProperty("IntermediateOutputPath")]
+		private FilePath intermediateOutputDirectory;
+
+		public virtual FilePath IntermediateOutputDirectory {
+			get {
+				if (!intermediateOutputDirectory.IsNullOrEmpty)
+					return intermediateOutputDirectory;
+				if (!string.IsNullOrEmpty (Platform))
+					return ParentItem.BaseIntermediateOutputPath.Combine (Platform, Name);
+				return ParentItem.BaseIntermediateOutputPath.Combine (Name);
+			}
+			set {
+				if (value.IsNullOrEmpty)
+					value = FilePath.Null;
+				if (intermediateOutputDirectory == value)
+					return;
+				intermediateOutputDirectory = value;
+			}
+		}
+
 		[ProjectPathItemProperty("OutputPath")]
 		private FilePath outputDirectory = "." + Path.DirectorySeparatorChar;
 		public virtual FilePath OutputDirectory {
@@ -115,6 +135,7 @@ namespace MonoDevelop.Projects
 
 			ProjectConfiguration projectConf = conf as ProjectConfiguration;
 
+			intermediateOutputDirectory = projectConf.intermediateOutputDirectory;
 			outputDirectory = projectConf.outputDirectory;
 			debugMode = projectConf.debugMode;
 			pauseConsoleOutput = projectConf.pauseConsoleOutput;
@@ -129,6 +150,9 @@ namespace MonoDevelop.Projects
 			runWithWarnings = projectConf.runWithWarnings;
 		}
 
+		public new Project ParentItem {
+			get { return (Project) base.ParentItem; }
+		}
 	}
 
 }

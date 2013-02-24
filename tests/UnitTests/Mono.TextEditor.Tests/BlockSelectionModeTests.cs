@@ -44,7 +44,7 @@ namespace Mono.TextEditor.Tests
 1234567890");
 			data.MainSelection.SelectionMode = SelectionMode.Block;
 			data.InsertAtCaret ("hello");
-			Console.WriteLine (data.Text);
+
 			Check (data, @"1234567890
 1234hello<-567890
 1234hello567890
@@ -113,6 +113,30 @@ namespace Mono.TextEditor.Tests
 123467890
 123467890
 1234->$67890
+1234567890");
+		}
+
+		/// <summary>
+		/// Bug 5724 - Tab-indent loses selection in block selection
+		/// </summary>
+		[Test]
+		public void TestBug5724 ()
+		{
+			var data = Create (
+@"1234567890
+1234<-567890
+1234567890
+1234567890
+123456->$7890
+1234567890");
+			data.MainSelection.SelectionMode = SelectionMode.Block;
+			MiscActions.InsertTab (data);
+			Check (data, 
+@"1234567890
+1234	<-7890
+1234	7890
+1234	7890
+1234	->$7890
 1234567890");
 		}
 

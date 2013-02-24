@@ -33,7 +33,6 @@ using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
-using MonoDevelop.Ide.Commands;
 using Document = Mono.TextEditor.TextDocument;
 using Services = MonoDevelop.Projects.Services;
 using System.Threading;
@@ -46,6 +45,7 @@ using MonoDevelop.Ide.TypeSystem;
 using Mono.TextEditor.Highlighting;
 using MonoDevelop.SourceEditor.QuickTasks;
 using ICSharpCode.NRefactory.CSharp;
+using ICSharpCode.NRefactory.Semantics;
 
 namespace MonoDevelop.SourceEditor
 {
@@ -66,17 +66,17 @@ namespace MonoDevelop.SourceEditor
 //		bool canShowClassBrowser;
 		ISourceEditorOptions options {
 			get {
-				return this.textEditor.Options;
+				return textEditor.Options;
 			}
 		}
 		
-		bool isDisposed = false;
+		bool isDisposed;
 		
 		ParsedDocument parsedDocument;
 		
-		readonly MonoDevelop.SourceEditor.ExtensibleTextEditor textEditor;
-		MonoDevelop.SourceEditor.ExtensibleTextEditor splittedTextEditor;
-		MonoDevelop.SourceEditor.ExtensibleTextEditor lastActiveEditor;
+		readonly ExtensibleTextEditor textEditor;
+		ExtensibleTextEditor splittedTextEditor;
+		ExtensibleTextEditor lastActiveEditor;
 		
 		public MonoDevelop.SourceEditor.ExtensibleTextEditor TextEditor {
 			get {
@@ -84,15 +84,9 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		
-		public TextEditorContainer TextEditorContainer {
-			get {
-				return lastActiveEditor == textEditor ? textEditorContainer : splittedTextEditorContainer;
-			}
-		}
-		
 		public Ambience Ambience {
 			get {
-				string fileName = this.view.IsUntitled ? this.view.UntitledName : this.view.ContentName;
+				string fileName = view.IsUntitled ? view.UntitledName : view.ContentName;
 				return AmbienceService.GetAmbienceForFile (fileName);
 			}
 		}
@@ -113,7 +107,7 @@ namespace MonoDevelop.SourceEditor
 			if (secondsw != null)
 				secondsw.RemoveQuickTaskProvider (provider);
 		}		
-		
+
 		
 		List<IUsageProvider> usageProvider = new List<IUsageProvider> ();
 		public void AddUsageTaskProvider (IUsageProvider provider)
@@ -176,7 +170,7 @@ namespace MonoDevelop.SourceEditor
 		class DecoratedScrolledWindow : HBox
 		{
 			SourceEditorWidget parent;
-			SmartScrolledWindow scrolledWindow;
+			ScrolledWindow scrolledWindow;
 			
 			QuickTaskStrip strip;
 			
@@ -196,54 +190,18 @@ namespace MonoDevelop.SourceEditor
 			{
 				this.parent = parent;
 				this.strip = new QuickTaskStrip ();
-				/*
-				Border border = new Border ();
-				border.HeightRequest = 1;
-				PackStart (border, false, true, 0);
-								 
-				HBox box = new HBox ();
-				
-				border = new Border ();
-				border.WidthRequest = 1;
-				box.PackStart (border, false, true, 0);
-				
-				scrolledWindow = new ScrolledWindow ();
-				scrolledWindow.BorderWidth = 0;
-				scrolledWindow.ShadowType = ShadowType.None;
-				scrolledWindow.ButtonPressEvent += PrepareEvent;
-				box.PackStart (scrolledWindow, true, true, 0);
-				
-				
-				border = new Border ();
-				border.WidthRequest = 1;
-				box.PackStart (border, false, true, 0);
-				
-				PackStart (box, true, true, 0);
-				
-				border = new Border ();
-				border.HeightRequest = 1;
-				PackStart (border, false, true, 0);*/
-				
-				scrolledWindow = new SmartScrolledWindow ();
-//				scrolledWindow.BorderWidth = 0;
-//				scrolledWindow.ShadowType = ShadowType.In;
+
+				scrolledWindow = new CompactScrolledWindow ();
 				scrolledWindow.ButtonPressEvent += PrepareEvent;
 				PackStart (scrolledWindow, true, true, 0);
-				if (parent.quickTaskProvider.Count > 0) {
-					strip.VAdjustment = scrolledWindow.Vadjustment;
-					scrolledWindow.ReplaceVScrollBar (strip);
-				} else {
-					strip.Visible = false;
-				}
+				strip.VAdjustment = scrolledWindow.Vadjustment;
+				PackEnd (strip, false, true, 0);
+
 				parent.quickTaskProvider.ForEach (p => AddQuickTaskProvider (p));
 			}
 			
 			public void AddQuickTaskProvider (IQuickTaskProvider p)
 			{
-				if (!strip.Visible) {
-					strip.VAdjustment = scrolledWindow.Vadjustment;
-					scrolledWindow.ReplaceVScrollBar (strip);
-				}
 				p.TasksUpdated += HandleTasksUpdated; 
 			}
 
@@ -261,10 +219,6 @@ namespace MonoDevelop.SourceEditor
 
 			public void AddUsageProvider (IUsageProvider p)
 			{
-				if (!strip.Visible) {
-					strip.VAdjustment = scrolledWindow.Vadjustment;
-					scrolledWindow.ReplaceVScrollBar (strip);
-				}
 				p.UsagesUpdated += (sender, e) => strip.Update (p);
 			}
 			
@@ -272,7 +226,7 @@ namespace MonoDevelop.SourceEditor
 			{
 				if (scrolledWindow.Child != null)
 					RemoveEvents ();
-				
+
 				scrolledWindow.ButtonPressEvent -= PrepareEvent;
 				base.OnDestroyed ();
 			}
@@ -282,14 +236,14 @@ namespace MonoDevelop.SourceEditor
 				args.RetVal = true;
 			}
 		
-			public void SetTextEditor (TextEditorContainer container)
+			public void SetTextEditor (TextEditor container)
 			{
 				scrolledWindow.Child = container;
-				this.strip.TextEditor = container.TextEditorWidget;
+				this.strip.TextEditor = container;
 //				container.TextEditorWidget.EditorOptionsChanged += OptionsChanged;
-				container.TextEditorWidget.Caret.ModeChanged += parent.UpdateLineColOnEventHandler;
-				container.TextEditorWidget.Caret.PositionChanged += parent.CaretPositionChanged;
-				container.TextEditorWidget.SelectionChanged += parent.UpdateLineColOnEventHandler;
+				container.Caret.ModeChanged += parent.UpdateLineColOnEventHandler;
+				container.Caret.PositionChanged += parent.CaretPositionChanged;
+				container.SelectionChanged += parent.UpdateLineColOnEventHandler;
 			}
 			
 			void OptionsChanged (object sender, EventArgs e)
@@ -300,20 +254,20 @@ namespace MonoDevelop.SourceEditor
 			
 			void RemoveEvents ()
 			{
-				TextEditorContainer container = scrolledWindow.Child as TextEditorContainer;
+				var container = scrolledWindow.Child as TextEditor;
 				if (container == null) {
 					LoggingService.LogError ("can't remove events from text editor container.");
 					return;
 				}
 //				container.TextEditorWidget.EditorOptionsChanged -= OptionsChanged;
-				container.TextEditorWidget.Caret.ModeChanged -= parent.UpdateLineColOnEventHandler;
-				container.TextEditorWidget.Caret.PositionChanged -= parent.CaretPositionChanged;
-				container.TextEditorWidget.SelectionChanged -= parent.UpdateLineColOnEventHandler;
+				container.Caret.ModeChanged -= parent.UpdateLineColOnEventHandler;
+				container.Caret.PositionChanged -= parent.CaretPositionChanged;
+				container.SelectionChanged -= parent.UpdateLineColOnEventHandler;
 			}
 			
-			public TextEditorContainer RemoveTextEditor ()
+			public TextEditor RemoveTextEditor ()
 			{
-				TextEditorContainer child = scrolledWindow.Child as TextEditorContainer;
+				var child = scrolledWindow.Child as TextEditor;
 				if (child == null)
 					return null;
 				RemoveEvents ();
@@ -323,20 +277,21 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		
-		TextEditorContainer textEditorContainer;
 		public SourceEditorWidget (SourceEditorView view)
 		{
 			this.view = view;
 			vbox.SetSizeRequest (32, 32);
 			this.lastActiveEditor = this.textEditor = new MonoDevelop.SourceEditor.ExtensibleTextEditor (view);
-			this.textEditor.FocusInEvent += (o, s) => lastActiveEditor = (ExtensibleTextEditor)o;
-			this.textEditor.FocusOutEvent += delegate {
-				if (this.splittedTextEditor == null || !splittedTextEditor.HasFocus)
+			this.textEditor.TextArea.FocusInEvent += (o, s) => {
+				lastActiveEditor = (ExtensibleTextEditor)((TextArea)o).GetTextEditorData ().Parent;
+				view.FireCompletionContextChanged ();
+			};
+			this.textEditor.TextArea.FocusOutEvent += delegate {
+				if (this.splittedTextEditor == null || !splittedTextEditor.TextArea.HasFocus)
 					OnLostFocus ();
 			};
 			mainsw = new DecoratedScrolledWindow (this);
-			this.textEditorContainer = new TextEditorContainer (textEditor);
-			mainsw.SetTextEditor (textEditorContainer);
+			mainsw.SetTextEditor (textEditor);
 			
 			vbox.PackStart (mainsw, true, true, 0);
 			
@@ -355,12 +310,16 @@ namespace MonoDevelop.SourceEditor
 				RemoveErrorUndelinesResetTimerId ();
 				StopParseInfoThread ();
 				KillWidgets ();
-				
+
+				foreach (var provider in quickTaskProvider.ToArray ()) {
+					RemoveQuickTaskProvider (provider);
+				}
+
 				this.lastActiveEditor = null;
 				this.splittedTextEditor = null;
 				view = null;
 				
-				IdeApp.Workbench.StatusBar.ClearCaretState ();
+//				IdeApp.Workbench.StatusBar.ClearCaretState ();
 				if (parseInformationUpdaterWorkerThread != null) {
 					parseInformationUpdaterWorkerThread.Dispose ();
 					parseInformationUpdaterWorkerThread = null;
@@ -375,8 +334,6 @@ namespace MonoDevelop.SourceEditor
 
 		void OnLostFocus ()
 		{
-			//clears search status messages
-			IdeApp.Workbench.StatusBar.ShowReady ();
 		}
 
 		void UpdateLineColOnEventHandler (object sender, EventArgs e)
@@ -387,8 +344,7 @@ namespace MonoDevelop.SourceEditor
 		void ResetFocusChain ()
 		{
 			List<Widget> focusChain = new List<Widget> ();
-			
-			focusChain.Add (this.textEditor);
+			focusChain.Add (this.textEditor.TextArea);
 			if (this.searchAndReplaceWidget != null) {
 				focusChain.Add (this.searchAndReplaceWidget);
 			}
@@ -431,7 +387,7 @@ namespace MonoDevelop.SourceEditor
 			if (!options.ShowFoldMargin)
 				return;
 			// don't update parsed documents that contain errors - the foldings from there may be invalid.
-			if (doc.HasFoldSegments && parsedDocument.Errors.Any (err => err.ErrorType == ErrorType.Error))
+			if (parsedDocument.HasErrors)
 				return;
 			try {
 				List<FoldSegment > foldSegments = new List<FoldSegment> ();
@@ -645,13 +601,7 @@ namespace MonoDevelop.SourceEditor
 		
 		public bool EditorHasFocus {
 			get {
-				Gtk.Container c = vbox;
-				while (c != null) {
-					if (c.FocusChild == textEditor)
-						return true;
-					c = c.FocusChild as Gtk.Container;
-				}
-				return false;
+				return TextEditor.TextArea.HasFocus;
 			}
 		}
 
@@ -696,9 +646,7 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		DecoratedScrolledWindow secondsw;
-		TextEditorContainer splittedTextEditorContainer;
-		
-		
+
 		public void Split (bool vSplit)
 		{
 			double vadjustment = this.mainsw.Vadjustment.Value;
@@ -720,20 +668,25 @@ namespace MonoDevelop.SourceEditor
 				}
 			};
 			secondsw = new DecoratedScrolledWindow (this);
-			this.splittedTextEditor = new MonoDevelop.SourceEditor.ExtensibleTextEditor (view, this.textEditor.Options, textEditor.Document);
-			this.splittedTextEditor.FocusInEvent += (o, s) => lastActiveEditor = (ExtensibleTextEditor)o;
-			this.splittedTextEditor.FocusOutEvent += delegate {
-				 if (!textEditor.HasFocus)
+			splittedTextEditor = new MonoDevelop.SourceEditor.ExtensibleTextEditor (view, textEditor.Options, textEditor.Document);
+			splittedTextEditor.TextArea.FocusInEvent += (o, s) => {
+				lastActiveEditor = (ExtensibleTextEditor)((TextArea)o).GetTextEditorData ().Parent;
+				view.FireCompletionContextChanged ();
+			};
+			splittedTextEditor.TextArea.FocusOutEvent += delegate {
+				 if (!textEditor.TextArea.HasFocus)
 					OnLostFocus ();
 			};
-			this.splittedTextEditor.Extension = textEditor.Extension;
-			
-			this.splittedTextEditorContainer = new TextEditorContainer (this.splittedTextEditor);
-			secondsw.SetTextEditor (this.splittedTextEditorContainer);
+			splittedTextEditor.Extension = textEditor.Extension;
+			if (textEditor.GetTextEditorData ().HasIndentationTracker)
+				splittedTextEditor.GetTextEditorData ().IndentationTracker = textEditor.GetTextEditorData ().IndentationTracker;
+			splittedTextEditor.Document.BracketMatcher = textEditor.Document.BracketMatcher;
+
+			secondsw.SetTextEditor (splittedTextEditor);
 			splitContainer.Add2 (secondsw);
 			
 			vbox.PackStart (splitContainer, true, true, 0);
-			this.splitContainer.Position = (vSplit ? vbox.Allocation.Height : vbox.Allocation.Width) / 2 - 1;
+			splitContainer.Position = (vSplit ? vbox.Allocation.Height : vbox.Allocation.Width) / 2 - 1;
 			
 			vbox.ShowAll ();
 			secondsw.Vadjustment.Value = mainsw.Vadjustment.Value = vadjustment; 
@@ -744,16 +697,16 @@ namespace MonoDevelop.SourceEditor
 		{
 			// destroy old scrolled window to work around Bug 526721 - When splitting window vertically, 
 			// the slider under left split is not shown unitl window is resized
-			double vadjustment = this.mainsw.Vadjustment.Value;
-			double hadjustment = this.mainsw.Hadjustment.Value;
+			double vadjustment = mainsw.Vadjustment.Value;
+			double hadjustment = mainsw.Hadjustment.Value;
 			
-			var removedTextEditor = this.mainsw.RemoveTextEditor ();
-			this.mainsw.Destroy ();
+			var removedTextEditor = mainsw.RemoveTextEditor ();
+			mainsw.Destroy ();
 			
-			this.mainsw = new DecoratedScrolledWindow (this);
-			this.mainsw.SetTextEditor (removedTextEditor);
-			this.mainsw.Vadjustment.Value = vadjustment; 
-			this.mainsw.Hadjustment.Value = hadjustment;
+			mainsw = new DecoratedScrolledWindow (this);
+			mainsw.SetTextEditor (removedTextEditor);
+			mainsw.Vadjustment.Value = vadjustment; 
+			mainsw.Hadjustment.Value = hadjustment;
 			lastActiveEditor = textEditor;
 		}
 
@@ -787,9 +740,9 @@ namespace MonoDevelop.SourceEditor
 			if (messageBar == null) {
 				messageBar = new MonoDevelop.Components.InfoBar (MessageType.Warning);
 				messageBar.SetMessageLabel (GettextCatalog.GetString (
-					"<b>The file \"{0}\" has been changed outside of MonoDevelop.</b>\n" +
+					"<b>The file \"{0}\" has been changed outside of {1}.</b>\n" +
 					"Do you want to keep your changes, or reload the file from disk?",
-					EllipsizeMiddle (Document.FileName, 50)));
+					EllipsizeMiddle (Document.FileName, 50), BrandingService.ApplicationName));
 				
 				var b1 = new Button (GettextCatalog.GetString ("_Reload from disk"));
 				b1.Image = ImageService.GetImage (Gtk.Stock.Refresh, IconSize.Button);
@@ -942,7 +895,7 @@ namespace MonoDevelop.SourceEditor
 			view.WorkbenchWindow.ShowNotification = true;
 			
 			// Ensure that one file with incorret EOL markers is shown.
-			var currentView = IdeApp.Workbench.ActiveDocument.PrimaryView as SourceEditorView;
+			var currentView = IdeApp.Workbench.ActiveDocument.PrimaryView.GetContent<SourceEditorView> ();
 			if (currentView == null || !currentView.IsDirty || !currentView.SourceEditorWidget.HasIncorrectEolMarker || currentView.SourceEditorWidget.UseIncorrectMarkers)
 				view.WorkbenchWindow.SelectWindow ();
 		}
@@ -953,11 +906,11 @@ namespace MonoDevelop.SourceEditor
 			TextEditor.Visible = false;
 			if (messageBar == null) {
 				messageBar = new MonoDevelop.Components.InfoBar (MessageType.Warning);
-				messageBar.SetMessageLabel (GettextCatalog.GetString (
+				messageBar.SetMessageLabel (BrandingService.BrandApplicationName (GettextCatalog.GetString (
 						"<b>An autosave file has been found for this file.</b>\n" +
 						"This could mean that another instance of MonoDevelop is editing this " +
 						"file, or that MonoDevelop crashed with unsaved changes.\n\n" +
-					    "Do you want to use the original file, or load from the autosave file?"));
+					    "Do you want to use the original file, or load from the autosave file?")));
 				
 				Button b1 = new Button (GettextCatalog.GetString("_Use original file"));
 				b1.Image = ImageService.GetImage (Gtk.Stock.Refresh, IconSize.Button);
@@ -1060,14 +1013,14 @@ namespace MonoDevelop.SourceEditor
 		
 		internal void UpdateLineCol ()
 		{
-			int offset = TextEditor.Caret.Offset;
-			if (offset < 0 || offset > TextEditor.Document.TextLength)
-				return;
-			DocumentLocation location = TextEditor.LogicalToVisualLocation (TextEditor.Caret.Location);
-			IdeApp.Workbench.StatusBar.ShowCaretState (TextEditor.Caret.Line,
-			                                           location.Column,
-			                                           TextEditor.IsSomethingSelected ? TextEditor.SelectionRange.Length : 0,
-			                                           TextEditor.Caret.IsInInsertMode);
+//			int offset = TextEditor.Caret.Offset;
+//			if (offset < 0 || offset > TextEditor.Document.TextLength)
+//				return;
+//			DocumentLocation location = TextEditor.LogicalToVisualLocation (TextEditor.Caret.Location);
+//			IdeApp.Workbench.StatusBar.ShowCaretState (TextEditor.Caret.Line,
+//			                                           location.Column,
+//			                                           TextEditor.IsSomethingSelected ? TextEditor.SelectionRange.Length : 0,
+//			                                           TextEditor.Caret.IsInInsertMode);
 		}
 		
 		#endregion
@@ -1174,7 +1127,7 @@ namespace MonoDevelop.SourceEditor
 				searchAndReplaceWidgetFrame.Child = searchAndReplaceWidget = new SearchAndReplaceWidget (TextEditor, searchAndReplaceWidgetFrame);
 				searchAndReplaceWidget.Destroyed += (sender, e) => RemoveSearchWidget ();
 				searchAndReplaceWidgetFrame.ShowAll ();
-				this.TextEditorContainer.AddAnimatedWidget (searchAndReplaceWidgetFrame, 300, Easing.ExponentialInOut, Blocking.Downstage, TextEditor.Allocation.Width - 400, -searchAndReplaceWidget.Allocation.Height);
+				this.TextEditor.AddAnimatedWidget (searchAndReplaceWidgetFrame, 300, Mono.TextEditor.Theatrics.Easing.ExponentialInOut, Blocking.Downstage, TextEditor.Allocation.Width - 400, -searchAndReplaceWidget.Allocation.Height);
 //				this.PackEnd (searchAndReplaceWidget);
 //				this.SetChildPacking (searchAndReplaceWidget, false, false, CHILD_PADDING, PackType.End);
 				//		searchAndReplaceWidget.ShowAll ();
@@ -1214,7 +1167,7 @@ namespace MonoDevelop.SourceEditor
 				gotoLineNumberWidgetFrame.Child = gotoLineNumberWidget = new GotoLineNumberWidget (textEditor, gotoLineNumberWidgetFrame);
 				gotoLineNumberWidget.Destroyed += (sender, e) => RemoveSearchWidget ();
 				gotoLineNumberWidgetFrame.ShowAll ();
-				TextEditorContainer.AddAnimatedWidget (gotoLineNumberWidgetFrame, 300, Easing.ExponentialInOut, Mono.TextEditor.Theatrics.Blocking.Downstage, this.TextEditor.Allocation.Width - 400, -gotoLineNumberWidget.Allocation.Height);
+				TextEditor.AddAnimatedWidget (gotoLineNumberWidgetFrame, 300, Mono.TextEditor.Theatrics.Easing.ExponentialInOut, Mono.TextEditor.Theatrics.Blocking.Downstage, this.TextEditor.Allocation.Width - 400, -gotoLineNumberWidget.Allocation.Height);
 				
 				ResetFocusChain ();
 			}
@@ -1296,6 +1249,18 @@ namespace MonoDevelop.SourceEditor
 		{
 			DomRegion region;
 			var res = TextEditor.GetLanguageItem (TextEditor.Caret.Offset, out region);
+			if (res is UnknownIdentifierResolveResult) {
+				var uir = (UnknownIdentifierResolveResult)res;
+				IdeApp.HelpOperations.SearchHelpFor (uir.Identifier);
+				return;
+			}
+
+			if (res is UnknownMemberResolveResult) {
+				var uir = (UnknownMemberResolveResult)res;
+				IdeApp.HelpOperations.SearchHelpFor (uir.MemberName);
+				return;
+			}
+
 			string url = HelpService.GetMonoDocHelpUrl (res);
 			if (url != null)
 				IdeApp.HelpOperations.ShowHelp (url);
@@ -1305,7 +1270,7 @@ namespace MonoDevelop.SourceEditor
 		{
 			DomRegion region;
 			var res = TextEditor.GetLanguageItem (TextEditor.Caret.Offset, out region);
-			if (res == null || !IdeApp.HelpOperations.CanShowHelp (res))
+			if (res == null || !IdeApp.HelpOperations.CanShowHelp (res) && !(res is UnknownIdentifierResolveResult || res is UnknownMemberResolveResult))
 				cinfo.Bypass = true;
 		}
 		
@@ -1360,7 +1325,7 @@ namespace MonoDevelop.SourceEditor
 				}
 				string startLineText = Document.GetTextAt (startLine.Offset, startLine.Length);
 				string endLineText = Document.GetTextAt (endLine.Offset, endLine.Length);
-				if (startLineText.StartsWith (blockStart) && endLineText.EndsWith (blockEnd)) {
+				if (startLineText.StartsWith (blockStart) && endLineText.EndsWith (blockEnd, StringComparison.Ordinal)) {
 					textEditor.Remove (endLine.Offset + endLine.Length - blockEnd.Length, blockEnd.Length);
 					textEditor.Remove (startLine.Offset, blockStart.Length);
 					if (TextEditor.IsSomethingSelected) {
@@ -1395,7 +1360,7 @@ namespace MonoDevelop.SourceEditor
 					continue;
 				string text = Document.GetTextAt (line);
 				string trimmedText = text.TrimStart ();
-				if (!trimmedText.StartsWith (commentTag)) {
+				if (!trimmedText.StartsWith (commentTag, StringComparison.Ordinal)) {
 					comment = true;
 					break;
 				}
@@ -1569,7 +1534,7 @@ namespace MonoDevelop.SourceEditor
 			// may be null if no line is assigned to the error.
 			Wave = true;
 			
-			ColorName = info.ErrorType == ErrorType.Warning ? Mono.TextEditor.Highlighting.ColorScheme.WarningUnderlineString : Mono.TextEditor.Highlighting.ColorScheme.ErrorUnderlineString;
+			ColorName = info.ErrorType == ErrorType.Warning ? ColorScheme.WarningUnderlineString : ColorScheme.ErrorUnderlineString;
 			StartCol = Info.Region.BeginColumn + 1;
 			if (Info.Region.EndColumn > StartCol) {
 				EndCol = Info.Region.EndColumn;

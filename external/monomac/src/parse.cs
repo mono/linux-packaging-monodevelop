@@ -98,24 +98,25 @@ class SourceStream : Stream {
 
 class Declaration {
 	public string selector, retval, parameters;
-	public bool is_abstract, is_static;
+	public bool is_abstract, is_static, appearance;
 	
-	public Declaration (string selector, string retval, string parameters, bool is_abstract, bool is_static)
+	public Declaration (string selector, string retval, string parameters, bool is_abstract, bool is_static, bool appearance)
 	{
 		this.selector = selector;
 		this.retval = retval;
 		this.parameters = parameters;
 		this.is_abstract = is_abstract;
 		this.is_static = is_static;
+		this.appearance = appearance;
 	}
 	
 }
 
 class Declarations {
 	List<Declaration> decls = new List<Declaration> ();
-	StreamWriter gencs;
+	TextWriter gencs;
 	
-	public Declarations (StreamWriter gencs)
+	public Declarations (TextWriter gencs)
 	{
 		this.gencs = gencs;
 	}
@@ -163,7 +164,7 @@ class Declarations {
 
 	List<string> ignore = new List<string> ();
 	
-	public void Generate ()
+	public void Generate (string extraAttribute)
 	{
 		var copy = decls;
 		var properties = (from d in copy
@@ -180,10 +181,14 @@ class Declarations {
 			if (ignore.Contains (d.selector) || properties.Contains (d.selector))
 				continue;
 
+			if (extraAttribute != null)
+				gencs.WriteLine ("\t\t[{0}]", extraAttribute);
 			if (d.is_abstract)
 				gencs.WriteLine ("\t\t[Abstract]");
 			if (d.is_static)
 				gencs.WriteLine ("\t\t[Static]");
+			if (d.appearance)
+				gencs.WriteLine ("\t\t[Appearance]");
 			gencs.WriteLine ("\t\t[Export (\"{0}\")]", d.selector);
 			gencs.WriteLine ("\t\t{0} {1} ({2});", d.retval, TrivialParser.AsMethod (TrivialParser.CleanSelector (d.selector)), d.parameters);
 			gencs.WriteLine ();
@@ -210,16 +215,17 @@ class Declarations {
 }
 
 class TrivialParser {
-	StreamWriter gencs, other;
+	TextWriter gencs, other;
 	StreamReader r;
 
 	// Used to limit which APIs to include in the binding
 	string limit;
+	string extraAttribute;
 	OptionSet options;
 	
 	ArrayList types = new ArrayList ();
 	
-	void ProcessProperty (string line)
+	void ProcessProperty (string line, bool appearance)
 	{
 		bool ro = false;
 		string getter = null;
@@ -268,7 +274,12 @@ class TrivialParser {
 				break;
 			selector.Append (c);
 		}
+		if (extraAttribute != null)
+			gencs.WriteLine ("\t\t[{0}]", extraAttribute);
+		if (appearance)
+			gencs.WriteLine ("\t\t[Appearance]");
 		gencs.WriteLine ("\t\t[Export (\"{0}\")]", selector);
+			
 		gencs.WriteLine ("\t\t{0} {1} {{ {2} {3} }}",
 				 RemapType (type.ToString ()), AsMethod (selector.ToString ()),
 				 getter != null ? "[Bind (\"" + getter + "\")] get;" : "get;",
@@ -278,6 +289,9 @@ class TrivialParser {
 
 	public static string AsMethod (string msg)
 	{
+		if (msg.Length == 0)
+			return msg;
+		
 		return Char.ToUpper (msg [0]) + msg.Substring (1);
 	}
 	
@@ -318,7 +332,6 @@ class TrivialParser {
 	
 	string MakeParameters (string sig)
 	{
-		//Console.WriteLine ("Making Parameters: [{0}]", sig);
 		int colon = sig.IndexOf (':');
 		if (colon == -1)
 			return "";
@@ -393,6 +406,7 @@ class TrivialParser {
 			return "uint";
 		case "NSUInteger":
 			return "uint";
+		case "instancetype":
 		case "id":
 			return "NSObject";
 		case "BOOL":
@@ -404,17 +418,24 @@ class TrivialParser {
 			return "NSUrl";
 		case "NSTimeInterval":
 			return "double";
+		case "dispatch_queue_t":
+			return "DispatchQueue";
+		case "SCNVector4":
+			return "Vector4";
+		case "SCNVector3":
+			return "Vector3";
 		}
 		return type;
 	}
 	
-	Regex rx = new Regex ("(NS_AVAILABLE\\(.*\\)|NS_AVAILABLE_MAC\\([0-9_]+\\))");
+	Regex rx = new Regex ("(NS_AVAILABLE\\(.*\\)|NS_AVAILABLE_IOS\\([0-9_]+\\)|NS_AVAILABLE_MAC\\([0-9_]+\\)|__OSX_AVAILABLE_STARTING\\([_A-Z0-9,]+\\))");
 	Regex rx2 = new Regex ("AVAILABLE_MAC_OS_X_VERSION[_A-Z0-9]*");
 	Regex rx3 = new Regex ("AVAILABLE_MAC_OS_X_VERSION[_A-Z0-9]*");
+	Regex rx4 = new Regex ("UI_APPEARANCE_SELECTOR");
 	
 	string CleanDeclaration (string line)
 	{
-		return rx3.Replace (rx2.Replace (rx.Replace (line, ""), ""), "");
+		return rx4.Replace (rx3.Replace (rx2.Replace (rx.Replace (line, ""), ""), ""), "");
 	}
 
 	public static string CleanSelector (string selector)
@@ -429,6 +450,10 @@ class TrivialParser {
 	
 	Declaration ProcessDeclaration (bool isProtocol, string line, bool is_optional)
 	{
+		bool debug = false;
+		if (line.IndexOf ("6_0") != -1)
+			debug = true;
+
 		if (limit != null){
 			if (!HasLimitKeyword (line))
 				return null;
@@ -436,7 +461,8 @@ class TrivialParser {
 			if (line.IndexOf (limit) == -1)
 				return null;
 		}
-		
+
+		var appearance = (line.IndexOf ("UI_APPEARANCE_SELECTOR") != -1);
 		line = CleanDeclaration (line);
 		if (line.Length == 0)
 			return null;
@@ -447,7 +473,7 @@ class TrivialParser {
 			if (is_abstract)
 				gencs.WriteLine ("\t\t[Abstract]");
 
-			ProcessProperty (line);
+			ProcessProperty (line, appearance);
 			return null;
 		}
 		//Console.WriteLine ("PROCESSING: {0}", line);
@@ -460,13 +486,14 @@ class TrivialParser {
 		//Console.WriteLine ("->{0}\np={1} q-p={2}", line, p, q-p);
 		string retval = RemapType (line.Substring (p+1, q-p-1));
 		p = line.IndexOf (';');
-		string signature = line.Substring (q+1, p-q);
+		string signature = line.Substring (q+1, p-q).Trim (new char [] { ' ', ';' });
+		//Console.WriteLine ("SIG: {0} {1}", line, p);
 		string selector = MakeSelector (signature);
 		string parameters = MakeParameters (signature);
 
 		//Console.WriteLine ("signature: {0}", signature);
 		//Console.WriteLine ("selector: {0}", selector);
-		return new Declaration (selector, retval, parameters, is_abstract, is_static);
+		return new Declaration (selector, retval, parameters, is_abstract, is_static, appearance);
 	}
 	
 	void ProcessInterface (string iface)
@@ -477,6 +504,8 @@ class TrivialParser {
 
 		//Console.WriteLine ("**** {0} ", iface);
 		types.Add (cols [1]);
+		if (extraAttribute != null)
+			gencs.Write ("\n\t[{0}]", extraAttribute);
 		if (cols.Length >= 4)
 			gencs.WriteLine ("\n\t[BaseType (typeof ({0}))]", cols [3]);
 		gencs.WriteLine ("\t{0}interface {1} {{", limit == null ? "" : "public partial ", cols [1]);
@@ -485,7 +514,7 @@ class TrivialParser {
 			if (line == "{")
 				need_close = true;
 		}
-			
+
 		var decl = new Declarations (gencs);
 		while ((line = r.ReadLine ()) != null && !line.StartsWith ("@end")){
 			string full = "";
@@ -500,7 +529,7 @@ class TrivialParser {
 			}
 			break;
 		}
-		decl.Generate ();
+		decl.Generate (extraAttribute);
 		gencs.WriteLine ("\t}");
 	}
 
@@ -510,6 +539,8 @@ class TrivialParser {
 		string line;
 
 		types.Add (d [1]);
+		if (extraAttribute != null)
+			gencs.WriteLine ("\n\t[{0}]", extraAttribute);
 		gencs.WriteLine ("\n\t[BaseType (typeof ({0}))]", d.Length > 2 ? d [2] : "NSObject");
 		gencs.WriteLine ("\t[Model]");
 		gencs.WriteLine ("\tinterface {0} {{", d [1]);
@@ -532,7 +563,7 @@ class TrivialParser {
 			if (line.StartsWith ("@end"))
 				break;
 		}
-		decl.Generate ();
+		decl.Generate (extraAttribute);
 		gencs.WriteLine ("\t}");
 	}
 
@@ -542,9 +573,15 @@ class TrivialParser {
 		
 		Environment.Exit (0);
 	}
+
+	string Clean (string prefix, string line)
+	{
+		return line.Substring (line.IndexOf (prefix));
+	}
 	
 	TrivialParser ()
 	{
+#if false
 		try {
 			gencs = File.CreateText ("gen.cs");
 		} catch {
@@ -556,9 +593,13 @@ class TrivialParser {
 		} catch {
 			other = File.CreateText ("/tmp/other.c");
 		}
-		
+#endif
+		gencs = Console.Out;
+		other = new StringWriter ();
+
 		options = new OptionSet () {
 			{ "limit=", "Limit methods to methods for the specific API level (ex: 5_0)", arg => limit = arg },
+			{ "extra=", "Extra attribute to add, for example: 'Since(6,0)'", arg => extraAttribute = arg },
 			{ "help", "Shows the help", a => ShowHelp () }
 		};
 	}
@@ -597,17 +638,14 @@ class TrivialParser {
 						line = line.Substring (p);
 					}
 					
-					if (line.StartsWith ("@interface"))
-						ProcessInterface (line);
-					if (line.StartsWith ("@protocol") && !line.EndsWith (";")) // && line.IndexOf ("<") != -1)
-						ProcessProtocol (line);
+					if (line.IndexOf ("@interface") != -1)
+						ProcessInterface (Clean ("@interface", line));
+					if (line.IndexOf ("@protocol") != -1 && !line.EndsWith (";")) // && line.IndexOf ("<") != -1)
+						ProcessProtocol (Clean ("@protocol", line));
 					
 					other.WriteLine (line);
 				}
 			}
-		}
-		foreach (string s in types){
-			Console.WriteLine ("\t\ttypeof ({0}),", s);
 		}
 		gencs.Close ();
 		other.Close ();

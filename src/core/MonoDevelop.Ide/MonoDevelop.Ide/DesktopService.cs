@@ -30,6 +30,7 @@ using Mono.Addins;
 using MonoDevelop.Ide.Desktop;
 using MonoDevelop.Core;
 using System.IO;
+using MonoDevelop.Components.MainToolbar;
 
 namespace MonoDevelop.Ide
 {
@@ -138,9 +139,10 @@ namespace MonoDevelop.Ide
 			return PlatformService.GetPixbufForType (mimeType, size);
 		}
 
-		public static bool SetGlobalMenu (MonoDevelop.Components.Commands.CommandManager commandManager, string commandMenuAddinPath)
+		public static bool SetGlobalMenu (MonoDevelop.Components.Commands.CommandManager commandManager,
+			string commandMenuAddinPath, string appMenuAddinPath)
 		{
-			return PlatformService.SetGlobalMenu (commandManager, commandMenuAddinPath);
+			return PlatformService.SetGlobalMenu (commandManager, commandMenuAddinPath, appMenuAddinPath);
 		}
 		
 		// Used for preserve the file attributes when monodevelop opens & writes a file.
@@ -216,6 +218,16 @@ namespace MonoDevelop.Ide
 		internal static void GrabDesktopFocus (Gtk.Window window)
 		{
 			PlatformService.GrabDesktopFocus (window);
+		}
+
+		public static void SetMainWindowDecorations (Gtk.Window window)
+		{
+			PlatformService.SetMainWindowDecorations (window);
+		}
+
+		internal static MainToolbar CreateMainToolbar (Gtk.Window window)
+		{
+			return PlatformService.CreateMainToolbar (window);
 		}
 	}
 }

@@ -2,6 +2,8 @@
 // Authors:
 //   Miguel de Icaza (miguel@gnome.org)
 //
+// Copyright 2011, 2012 Xamarin Inc
+//
 // The class can be either constructed from a string (from user code)
 // or from a handle (from iphone-sharp.dll internal calls).  This
 // delays the creation of the actual managed string until actually
@@ -42,6 +44,22 @@ namespace MonoMac.CoreLocation {
 		RegionMonitoringFailure,
 		[Since (4,0)]
 		RegionMonitoringSetupDelayed,
+		
+		// ios5 osx10.8
+		RegionMonitoringResponseDelayed,
+		// ios5 osx10.7
+		GeocodeFoundNoResult,
+		// ios5 osx10.8
+		GeocodeFoundPartialResult,
+		// ios5 osx10.7
+		GeocodeCanceled,
+
+		// ios6
+		DeferredFailed,
+		DeferredNotUpdatingLocation,
+		DeferredAccuracyTooLow,
+		DeferredDistanceFiltered,
+		DeferredCanceled
 	}
 
 	public enum CLDeviceOrientation {
@@ -60,4 +78,11 @@ namespace MonoMac.CoreLocation {
 		Denied,
 		Authorized
 	}
+
+	public enum CLActivityType {
+		Other = 1,
+		AutomotiveNavigation,
+ 		Fitness,
+		OtherNavigation
+    }
 }

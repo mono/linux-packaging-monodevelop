@@ -103,6 +103,15 @@ namespace MonoDevelop.Components
 			return new HslColor (color);
 		}
 		
+		public static implicit operator HslColor (Cairo.Color color)
+		{
+			return new HslColor (color.ToGdkColor ());
+		}
+		
+		public HslColor (Cairo.Color color) : this (color.ToGdkColor ())
+		{
+		}
+
 		public HslColor (Color color) : this ()
 		{
 			double r = color.Red   / (double)ushort.MaxValue;

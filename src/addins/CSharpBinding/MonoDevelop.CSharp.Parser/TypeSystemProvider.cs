@@ -34,12 +34,13 @@ using MonoDevelop.Ide.Tasks;
 using Mono.CSharp;
 using System.Linq;
 using ICSharpCode.NRefactory;
+using MonoDevelop.CSharp.Refactoring.CodeActions;
 
 namespace MonoDevelop.CSharp.Parser
 {
-	public class TypeSystemParser : ITypeSystemParser
+	public class TypeSystemParser : MonoDevelop.Ide.TypeSystem.TypeSystemParser
 	{
-		public ParsedDocument Parse (bool storeAst, string fileName, System.IO.TextReader content, MonoDevelop.Projects.Project project = null)
+		public override ParsedDocument Parse (bool storeAst, string fileName, System.IO.TextReader content, MonoDevelop.Projects.Project project = null)
 		{
 			var parser = new ICSharpCode.NRefactory.CSharp.CSharpParser (GetCompilerArguments (project));
 			parser.GenerateTypeSystemMode = !storeAst;
@@ -59,8 +60,11 @@ namespace MonoDevelop.CSharp.Parser
 					if (comment != null) {
 						VisitComment (result, comment, tagComments);
 					} else {
-						if (storeAst)
-							VisitPreprocessorDirective (result, special as SpecialsBag.PreProcessorDirective);
+						if (storeAst) {
+							var ppd = special as SpecialsBag.PreProcessorDirective;
+							if  (ppd != null)
+								VisitPreprocessorDirective (result, ppd);
+						}
 					}
 				}
 			};
@@ -77,13 +81,15 @@ namespace MonoDevelop.CSharp.Parser
 			result.LastWriteTimeUtc = pf.LastWriteTime.Value;
 			result.ParsedFile = pf;
 			result.Add (GenerateFoldings (unit, result));
+			result.CreateRefactoringContext = (doc, token) => new MDRefactoringContext (doc, doc.Editor.Caret.Location, token);
+
 			if (storeAst) {
 				result.Ast = unit;
 			}
 			return result;
 		}
 		
-		IEnumerable<FoldingRegion> GenerateFoldings (CompilationUnit unit, ParsedDocument doc)
+		IEnumerable<FoldingRegion> GenerateFoldings (SyntaxTree unit, ParsedDocument doc)
 		{
 			foreach (var fold in doc.ConditionalRegions.ToFolds ())
 				yield return fold;
@@ -117,79 +123,79 @@ namespace MonoDevelop.CSharp.Parser
 					Foldings.Add (new FoldingRegion (new DomRegion (firstChild.StartLocation, node.EndLocation), FoldType.Undefined));
 				}
 			}
-			public override object VisitCompilationUnit (CompilationUnit unit, object data)
+			public override object VisitSyntaxTree (SyntaxTree unit, object data)
 			{
 				AddUsings (unit);
-				return base.VisitCompilationUnit (unit, data);
+				return base.VisitSyntaxTree (unit, data);
 			}
 
 			public override object VisitNamespaceDeclaration (NamespaceDeclaration namespaceDeclaration, object data)
 			{
 				AddUsings (namespaceDeclaration);
-				if (!namespaceDeclaration.RBraceToken.IsNull)
+				if (!namespaceDeclaration.RBraceToken.IsNull && namespaceDeclaration.LBraceToken.StartLocation.Line != namespaceDeclaration.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (namespaceDeclaration.LBraceToken.GetPrevNode ().EndLocation, namespaceDeclaration.RBraceToken.EndLocation), FoldType.Undefined));
 				return base.VisitNamespaceDeclaration (namespaceDeclaration, data);
 			}
 			
 			public override object VisitTypeDeclaration (TypeDeclaration typeDeclaration, object data)
 			{
-				if (!typeDeclaration.RBraceToken.IsNull)
+				if (!typeDeclaration.RBraceToken.IsNull && typeDeclaration.LBraceToken.StartLocation.Line != typeDeclaration.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (typeDeclaration.LBraceToken.GetPrevNode ().EndLocation, typeDeclaration.RBraceToken.StartLocation), FoldType.Type));
 				return base.VisitTypeDeclaration (typeDeclaration, data);
 			}
 			
 			public override object VisitMethodDeclaration (MethodDeclaration methodDeclaration, object data)
 			{
-				if (!methodDeclaration.Body.IsNull)
+				if (!methodDeclaration.Body.IsNull && methodDeclaration.Body.LBraceToken.StartLocation.Line != methodDeclaration.Body.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (methodDeclaration.Body.LBraceToken.GetPrevNode ().EndLocation, methodDeclaration.Body.RBraceToken.StartLocation), FoldType.Member));
 				return base.VisitMethodDeclaration (methodDeclaration, data);
 			}
 			
 			public override object VisitConstructorDeclaration (ConstructorDeclaration constructorDeclaration, object data)
 			{
-				if (!constructorDeclaration.Body.IsNull)
+				if (!constructorDeclaration.Body.IsNull && constructorDeclaration.Body.LBraceToken.StartLocation.Line != constructorDeclaration.Body.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (constructorDeclaration.Body.LBraceToken.GetPrevNode ().EndLocation, constructorDeclaration.Body.RBraceToken.StartLocation), FoldType.Member));
 				return base.VisitConstructorDeclaration (constructorDeclaration, data);
 			}
 			
 			public override object VisitDestructorDeclaration (DestructorDeclaration destructorDeclaration, object data)
 			{
-				if (!destructorDeclaration.Body.IsNull)
+				if (!destructorDeclaration.Body.IsNull && destructorDeclaration.Body.LBraceToken.StartLocation.Line != destructorDeclaration.Body.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (destructorDeclaration.Body.LBraceToken.GetPrevNode ().EndLocation, destructorDeclaration.Body.RBraceToken.StartLocation), FoldType.Member));
 				return base.VisitDestructorDeclaration (destructorDeclaration, data);
 			}
 			
 			public override object VisitOperatorDeclaration (OperatorDeclaration operatorDeclaration, object data)
 			{
-				if (!operatorDeclaration.Body.IsNull)
+				if (!operatorDeclaration.Body.IsNull && operatorDeclaration.Body.LBraceToken.StartLocation.Line != operatorDeclaration.Body.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (operatorDeclaration.Body.LBraceToken.GetPrevNode ().EndLocation, operatorDeclaration.Body.RBraceToken.StartLocation), FoldType.Member));
 				return base.VisitOperatorDeclaration (operatorDeclaration, data);
 			}
 			
 			public override object VisitPropertyDeclaration (PropertyDeclaration propertyDeclaration, object data)
 			{
-				if (!propertyDeclaration.LBraceToken.IsNull)
+				if (!propertyDeclaration.LBraceToken.IsNull && propertyDeclaration.LBraceToken.StartLocation.Line != propertyDeclaration.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (propertyDeclaration.LBraceToken.GetPrevNode ().EndLocation, propertyDeclaration.RBraceToken.StartLocation), FoldType.Member));
 				return base.VisitPropertyDeclaration (propertyDeclaration, data);
 			}
 			
 			public override object VisitIndexerDeclaration (IndexerDeclaration indexerDeclaration, object data)
 			{
-				if (!indexerDeclaration.LBraceToken.IsNull)
+				if (!indexerDeclaration.LBraceToken.IsNull && indexerDeclaration.LBraceToken.StartLocation.Line != indexerDeclaration.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (indexerDeclaration.LBraceToken.GetPrevNode ().EndLocation, indexerDeclaration.RBraceToken.StartLocation), FoldType.Member));
 				return base.VisitIndexerDeclaration (indexerDeclaration, data);
 			}
 			
 			public override object VisitCustomEventDeclaration (CustomEventDeclaration eventDeclaration, object data)
 			{
-				if (!eventDeclaration.LBraceToken.IsNull)
+				if (!eventDeclaration.LBraceToken.IsNull && eventDeclaration.LBraceToken.StartLocation.Line != eventDeclaration.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (eventDeclaration.LBraceToken.GetPrevNode ().EndLocation, eventDeclaration.RBraceToken.StartLocation), FoldType.Member));
 				return base.VisitCustomEventDeclaration (eventDeclaration, data);
 			}
 			
 			public override object VisitSwitchStatement (SwitchStatement switchStatement, object data)
 			{
-				if (!switchStatement.RBraceToken.IsNull)
+				if (!switchStatement.RBraceToken.IsNull && switchStatement.LBraceToken.StartLocation.Line != switchStatement.RBraceToken.StartLocation.Line)
 					Foldings.Add (new FoldingRegion (new DomRegion (switchStatement.LBraceToken.GetPrevNode ().EndLocation, switchStatement.RBraceToken.StartLocation), FoldType.Member));
 				return base.VisitSwitchStatement (switchStatement, data);
 			}
@@ -321,14 +327,14 @@ namespace MonoDevelop.CSharp.Parser
 				break;
 			}
 		}
-		
-		public static CompilerSettings GetCompilerArguments (MonoDevelop.Projects.Project project)
+
+		public static ICSharpCode.NRefactory.CSharp.CompilerSettings GetCompilerArguments (MonoDevelop.Projects.Project project)
 		{
-			var compilerArguments = new CompilerSettings ();
-			compilerArguments.TabSize = 1;
+			var compilerArguments = new ICSharpCode.NRefactory.CSharp.CompilerSettings ();
+	///		compilerArguments.TabSize = 1;
 
 			if (project == null || MonoDevelop.Ide.IdeApp.Workspace == null) {
-				compilerArguments.Unsafe = true;
+				compilerArguments.AllowUnsafeBlocks = true;
 				return compilerArguments;
 			}
 
@@ -340,14 +346,14 @@ namespace MonoDevelop.CSharp.Parser
 				
 			if (!string.IsNullOrEmpty (par.DefineSymbols)) {
 				foreach (var sym in par.DefineSymbols.Split (';', ',', ' ', '\t').Where (s => !string.IsNullOrWhiteSpace (s)))
-					compilerArguments.AddConditionalSymbol (sym);
+					compilerArguments.ConditionalSymbols.Add (sym);
 			}
 			
-			compilerArguments.Unsafe = par.UnsafeCode;
-			compilerArguments.Version = ConvertLanguageVersion (par.LangVersion);
-			compilerArguments.Checked = par.GenerateOverflowChecks;
+			compilerArguments.AllowUnsafeBlocks = par.UnsafeCode;
+			compilerArguments.LanguageVersion = ConvertLanguageVersion (par.LangVersion);
+			compilerArguments.CheckForOverflow = par.GenerateOverflowChecks;
 			compilerArguments.WarningLevel = par.WarningLevel;
-			compilerArguments.EnhancedWarnings = par.TreatWarningsAsErrors;
+			compilerArguments.TreatWarningsAsErrors = par.TreatWarningsAsErrors;
 			if (!string.IsNullOrEmpty (par.NoWarnings)) {
 				foreach (var warning in par.NoWarnings.Split (';', ',', ' ', '\t')) {
 					int w;
@@ -356,24 +362,30 @@ namespace MonoDevelop.CSharp.Parser
 					} catch (Exception) {
 						continue;
 					}
-					compilerArguments.SetIgnoreWarning (w);
+					compilerArguments.DisabledWarnings.Add (w);
 				}
 			}
 			
 			return compilerArguments;
 		}
 		
-		static Mono.CSharp.LanguageVersion ConvertLanguageVersion (LangVersion ver)
+		static Version ConvertLanguageVersion (LangVersion ver)
 		{
 			switch (ver) {
 			case LangVersion.Default:
-				return Mono.CSharp.LanguageVersion.Default;
+				return new Version (5, 0, 0, 0);
 			case LangVersion.ISO_1:
-				return Mono.CSharp.LanguageVersion.ISO_1;
+				return new Version (1, 0, 0, 0);
 			case LangVersion.ISO_2:
-				return Mono.CSharp.LanguageVersion.ISO_2;
+				return new Version (2, 0, 0, 0);
+			case LangVersion.Version3:
+				return new Version (3, 0, 0, 0);
+			case LangVersion.Version4:
+				return new Version (4, 0, 0, 0);
+			case LangVersion.Version5:
+				return new Version (5, 0, 0, 0);
 			}
-			return Mono.CSharp.LanguageVersion.Default;
+			return new Version (5, 0, 0, 0);;
 		}
 	}
 	

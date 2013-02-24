@@ -165,6 +165,27 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 			return configObject.Platform;
 		}
+
+		ProjectConfigurationInfo[] GetConfigurations (SolutionEntityItem item, ConfigurationSelector configuration)
+		{
+			// Returns a list of project/configuration information for the provided item and all its references
+			List<ProjectConfigurationInfo> configs = new List<ProjectConfigurationInfo> ();
+			var c = item.GetConfiguration (configuration);
+			configs.Add (new ProjectConfigurationInfo () {
+				ProjectFile = item.FileName,
+				Configuration = c.Name,
+				Platform = GetExplicitPlatform (c)
+			});
+			foreach (var refProject in item.GetReferencedItems (configuration).OfType<Project> ()) {
+				var refConfig = refProject.GetConfiguration (configuration);
+				configs.Add (new ProjectConfigurationInfo () {
+					ProjectFile = refProject.FileName,
+					Configuration = refConfig.Name,
+					Platform = GetExplicitPlatform (refConfig)
+				});
+			}
+			return configs.ToArray ();
+		}
 		
 		IEnumerable<string> IAssemblyReferenceHandler.GetAssemblyReferences (ConfigurationSelector configuration)
 		{
@@ -172,8 +193,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				// Get the references list from the msbuild project
 				SolutionEntityItem item = (SolutionEntityItem) Item;
 				RemoteProjectBuilder builder = GetProjectBuilder ();
-				SolutionItemConfiguration configObject = item.GetConfiguration (configuration);
-				foreach (string s in builder.GetAssemblyReferences (configObject.Name, GetExplicitPlatform (configObject)))
+				var configs = GetConfigurations (item, configuration);
+				foreach (string s in builder.GetAssemblyReferences (configs))
 					yield return s;
 			}
 			else {
@@ -193,12 +214,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				SolutionEntityItem item = Item as SolutionEntityItem;
 				if (item != null) {
 					
-					SolutionItemConfiguration configObject = item.GetConfiguration (configuration);
-				
 					LogWriter logWriter = new LogWriter (monitor.Log);
 					RemoteProjectBuilder builder = GetProjectBuilder ();
-					MSBuildResult[] results = builder.RunTarget (target, configObject.Name, GetExplicitPlatform (configObject),
-						logWriter, verbosity);
+					var configs = GetConfigurations (item, configuration);
+					MSBuildResult[] results = builder.RunTarget (target, configs, logWriter, verbosity);
 					System.Runtime.Remoting.RemotingServices.Disconnect (logWriter);
 					
 					BuildResult br = new BuildResult ();
@@ -274,6 +293,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				globalGroup = p.AddNewPropertyGroup (false);
 			
 			string itemGuid = globalGroup.GetPropertyValue ("ProjectGuid");
+			if (itemGuid == null)
+				throw new UserException ("Project file doesn't have a valid ProjectGuid");
+
+			itemGuid = itemGuid.ToUpper ();
 			string projectTypeGuids = globalGroup.GetPropertyValue ("ProjectTypeGuids");
 			string itemType = globalGroup.GetPropertyValue ("ItemType");
 
@@ -285,6 +308,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						subtypeGuids.Add (guid);
 				}
 			}
+			// Enable xbuild by default only for standard .NET projects - not for subtypes
+			//UseXbuild = subtypeGuids.Count == 0;
 			
 			try {
 				timer.Trace ("Create item instance");
@@ -324,14 +349,13 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			if (!string.IsNullOrEmpty (typeGuids)) {
 				DotNetProjectSubtypeNode st = MSBuildProjectService.GetDotNetProjectSubtype (typeGuids);
 				if (st != null) {
-					item = st.CreateInstance (language);
 					useXBuild = useXBuild || st.UseXBuild;
-					if (st.IsMigration) {
-						MigrateProject (monitor, st, p, fileName, language);
-						
+					Type migratedType = null;
+
+					if (st.IsMigration && (migratedType = MigrateProject (monitor, st, p, fileName, language)) != null) {
 						var oldSt = st;
-						st = MSBuildProjectService.GetItemSubtypeNodes ()
-							.Where (t => t.CanHandleItem ((SolutionEntityItem)item)).Last ();
+						st = MSBuildProjectService.GetItemSubtypeNodes ().Last (t => t.CanHandleType (migratedType));
+
 						for (int i = 0; i < subtypeGuids.Count; i++) {
 							if (string.Equals (subtypeGuids[i], oldSt.Guid, StringComparison.OrdinalIgnoreCase)) {
 								subtypeGuids[i] = st.Guid;
@@ -339,16 +363,21 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 								break;
 							}
 						}
+
 						if (oldSt != null)
 							throw new Exception ("Unable to correct flavor GUID");
+
 						var gg = string.Join (";", subtypeGuids) + ";" + TypeGuid;
 						p.GetGlobalPropertyGroup ().SetPropertyValue ("ProjectTypeGuids", gg.ToUpper ());
 						p.Save (fileName);
 					}
+
+					item = st.CreateInstance (language);
 					st.UpdateImports ((SolutionEntityItem)item, targetImports);
 				} else
 					throw new UnknownSolutionItemTypeException (typeGuids);
 			}
+
 			if (item == null && itemClass != null)
 				item = (SolutionItem) Activator.CreateInstance (itemClass);
 			
@@ -365,22 +394,33 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					
 				item = (SolutionItem) Activator.CreateInstance (dt.ValueType);
 			}
+
 			return item;
 		}
 
-		void MigrateProject (IProgressMonitor monitor, DotNetProjectSubtypeNode st, MSBuildProject p, string fileName, string language)
+		Type MigrateProject (IProgressMonitor monitor, DotNetProjectSubtypeNode st, MSBuildProject p, string fileName, string language)
 		{
 			var projectLoadMonitor = monitor as IProjectLoadProgressMonitor;
 			if (projectLoadMonitor == null) {
+				// projectLoadMonitor will be null when running through md-tool, but
+				// this is not fatal if migration is not required, so just ignore it. --abock
+				if (!st.IsMigrationRequired)
+					return null;
+
 				LoggingService.LogError (Environment.StackTrace);
 				monitor.ReportError ("Could not open unmigrated project and no migrator was supplied", null);
 				throw new Exception ("Could not open unmigrated project and no migrator was supplied");
 			}
 			
-			var migrationType = projectLoadMonitor.ShouldMigrateProject ();
+			var migrationType = st.MigrationHandler.CanPromptForMigration
+				? st.MigrationHandler.PromptForMigration (projectLoadMonitor, p, fileName, language)
+				: projectLoadMonitor.ShouldMigrateProject ();
 			if (migrationType == MigrationType.Ignore) {
-				monitor.ReportError (string.Format ("MonoDevelop cannot open the project '{0}' unless it is migrated.", Path.GetFileName (fileName)), null);
-				throw new Exception ("The user choose not to migrate the project");
+				if (st.IsMigrationRequired) {
+					monitor.ReportError (string.Format ("{1} cannot open the project '{0}' unless it is migrated.", Path.GetFileName (fileName), BrandingService.ApplicationName), null);
+					throw new Exception ("The user choose not to migrate the project");
+				} else
+					return null;
 			}
 			
 			var baseDir = (FilePath) Path.GetDirectoryName (fileName);
@@ -399,8 +439,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					File.Copy (file, Path.Combine (backupDir, Path.GetFileName (file)));
 			}
 			
-			if (!st.MigrationHandler.Migrate (projectLoadMonitor, p, fileName, language))
+			var type = st.MigrationHandler.Migrate (projectLoadMonitor, p, fileName, language);
+			if (type == null)
 				throw new Exception ("Could not migrate the project");
+
+			return type;
 		}
 		
 		FileFormat GetFileFormat ()
@@ -1772,7 +1815,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			if (instance is ProjectFile)
 				return prop.IsExtendedProperty (typeof(ProjectFile));
 			if (instance is ProjectReference)
-				return prop.IsExtendedProperty (typeof(ProjectReference)) || prop.Name == "Package";
+				return prop.IsExtendedProperty (typeof(ProjectReference)) || prop.Name == "Package" || prop.Name == "Aliases";
 			if (instance is DotNetProjectConfiguration)
 				if (prop.Name == "CodeGeneration")
 					return false;

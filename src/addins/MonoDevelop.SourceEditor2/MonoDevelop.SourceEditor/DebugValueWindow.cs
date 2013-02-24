@@ -64,15 +64,20 @@ namespace MonoDevelop.SourceEditor
 		}
 	}
 	
-	public class DebugValueWindow : BaseWindow
+	public class DebugValueWindow : PopoverWindow
 	{
 		ObjectValueTreeView tree;
 		ScrolledWindow sw;
 //		PinWindow pinWindow;
 //		TreeIter currentPinIter;
 		
-		public DebugValueWindow (Mono.TextEditor.TextEditor editor, int offset, StackFrame frame, ObjectValue value, PinnedWatch watch)
+		public DebugValueWindow (Mono.TextEditor.TextEditor editor, int offset, StackFrame frame, ObjectValue value, PinnedWatch watch): base (Gtk.WindowType.Toplevel)
 		{
+			this.TypeHint = WindowTypeHint.PopupMenu;
+			this.AllowShrink = false;
+			this.AllowGrow = false;
+			this.Decorated = false;
+
 			TransientFor = (Gtk.Window) editor.Toplevel;
 			
 			// Avoid getting the focus when the window is shown. We'll get it when the mouse enters the window
@@ -84,7 +89,7 @@ namespace MonoDevelop.SourceEditor
 			
 			tree = new ObjectValueTreeView ();
 			sw.Add (tree);
-			Add (sw);
+			ContentBox.Add (sw);
 			
 			tree.Frame = frame;
 			tree.CompactView = true;
@@ -120,6 +125,9 @@ namespace MonoDevelop.SourceEditor
 			tree.EndEditing += delegate {
 				Modal = false;
 			};
+
+			ShowArrow = true;
+			Theme.CornerRadius = 3;
 		}
 
 //		void HandlePinWindowButtonPressEvent (object o, ButtonPressEventArgs args)
@@ -177,8 +185,7 @@ namespace MonoDevelop.SourceEditor
 				AcceptFocus = true;
 			return base.OnEnterNotifyEvent (evnt);
 		}
-		
-		
+
 		void OnTreeSizeChanged (object s, SizeAllocatedArgs a)
 		{
 			int x,y,w,h;
@@ -203,6 +210,8 @@ namespace MonoDevelop.SourceEditor
 				sw.HscrollbarPolicy = PolicyType.Never;
 				sw.WidthRequest = -1;
 			}
+			// Force a redraw of the whole window. This is a workaround for bug 7538
+			QueueDraw ();
 		}
 		
 		protected override void OnSizeAllocated (Gdk.Rectangle allocation)
@@ -219,8 +228,11 @@ namespace MonoDevelop.SourceEditor
 			if (y < geometry.Top + edgeGap)
 				y = geometry.Top + edgeGap;
 			
-			if (y != oldY)
+			if (y != oldY) {
 				Move (x, y);
+				// If the window is moved, hide the arrow since it will be pointing to the wrong place
+				ShowArrow = false;
+			}
 			
 			base.OnSizeAllocated (allocation);
 		}

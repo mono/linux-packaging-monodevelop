@@ -7,6 +7,7 @@
 //
 // Copyright 2010 Reinforce Lab.
 // Copyright 2010 Novell, Inc
+// Copyright 2011, 2012 Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -30,14 +31,12 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Runtime.InteropServices;
 using MonoMac.AudioToolbox;
 
- namespace MonoMac.AudioUnit
+namespace MonoMac.AudioUnit
 {
-        public enum AudioComponentType {
+    public enum AudioComponentType : uint {
 		Output = 0x61756f75, //'auou',
 		MusicDevice=0x61756d75, // 'aumu'
 		MusicEffect=0x61756d66, // 'aumf'
@@ -57,62 +56,69 @@ using MonoMac.AudioToolbox;
 		System=0x73797320, // 'sys'
 #else
 		Remote=0x72696f63, // 'rioc'
-		VoiceProcessingIO = 0x7670696f // 'vpio'
 #endif
+		VoiceProcessingIO = 0x7670696f // 'vpio'
 	}
 
 	public enum AudioTypeMusicDevice {
+		[Obsolete]
 		None,
 #if MONOMAC
-		DlsSynth=0x646c7320, // 'dls'
+		DlsSynth	= 0x646c7320, // 'dls '
 #endif
+		Sampler		= 0x73616d70 // 'samp'
 	}
 
 	public enum AudioTypeConverter {
-			
 		AU=0x636f6e76, // 'conv'
-#if MONOMAC
 		Varispeed=0x76617269, // 'vari'
 		DeferredRenderer=0x64656672, // 'defr'
-		TimePitch=0x746d7074, // 'tmpt'
 		Splitter=0x73706c74, // 'splt'
 		Merger=0x6d657267, // 'merg'
+		NewTimePitch=0x6e757470, // 'nutp'
+#if MONOMAC
+		TimePitch=0x746d7074, // 'tmpt'
+		RoundTripAAC=0x72616163, // 'raac'
 #else
 		AUiPodTime=0x6970746d, // 'iptm'
+		AUiPodTimeOther=0x6970746f // 'ipto
 #endif
 	}
 
 	public enum AudioTypeEffect {
-#if MONOMAC
-		Delay=0x64656c79, // 'dely'
-		LowPassFilter=0x6c706173, // 'lpas'
-		HighPassFilter=0x68706173, // 'hpas'
-		BandPassFilter=0x62706173, // 'bpas'
-		HighShelfFilter=0x68736866, // 'hshf'
-		LowShelfFilter=0x6c736866, // 'lshf'
-		ParametricEQ=0x706d6571, // 'pmeq'
-		GraphicEQ=0x67726571, // 'greq'
 		PeakLimiter=0x6c6d7472, // 'lmtr'
 		DynamicsProcessor=0x64636d70, // 'dcmp'
+		LowPassFilter=0x6c706173, // 'lpas'
+		HighPassFilter=0x68706173, // 'hpas'
+		HighShelfFilter=0x68736866, // 'hshf'
+		LowShelfFilter=0x6c736866, // 'lshf'
+		DCFilter=0x6463666c, // 'dcfl'
+		ParametricEQ=0x706d6571, // 'pmeq'
+		Delay=0x64656c79, // 'dely'
+		Distortion=0x64697374, // 'dist'
+		BandPassFilter=0x62706173, // 'bpas'
+#if MONOMAC
+		GraphicEQ=0x67726571, // 'greq'
 		MultiBandCompressor=0x6d636d70, // 'mcmp'
 		MatrixReverb=0x6d726576, // 'mrev'
 		SampleDelay=0x73646c79, // 'sdly'
 		Pitch=0x70697463, // 'pitc'
 		AUFilter=0x66696c74, // 'filt'
 		NetSend=0x6e736e64, // 'nsnd'
-		Distortion=0x64697374, // 'dist'
 		RogerBeep=0x726f6772, // 'rogr'
 #else
 		AUiPodEQ=0x69706571, // 'ipeq'
+		Reverb2=0x72766232, // 'rvb2'
+		NBandEq=0x6e626571, // 'nbeq'
 #endif
 	}
 
 	public enum AudioTypeMixer {
 		MultiChannel=0x6d636d78, // 'mcmx'
+		Matrix=0x6d786d78, // 'mxmx'
 #if MONOMAC
 		Stereo=0x736d7872, // 'smxr'
 		ThreeD=0x33646d78, // '3dmx'
-		Matrix=0x6d786d78, // 'mxmx'
 #else
 		Embedded3D=0x3364656d, // '3dem'
 #endif
@@ -129,18 +135,21 @@ using MonoMac.AudioToolbox;
 
 	public enum AudioTypeGenerator {
 #if MONOMAC
-		ScheduledSoundPlayer=0x7373706c, // 'sspl'
-		AudioFilePlayer=0x6166706c, // 'afpl'
 		NetReceive=0x6e726376, // 'nrcv'
 #endif
-        }
+		ScheduledSoundPlayer=0x7373706c, // 'sspl'
+		AudioFilePlayer=0x6166706c, // 'afpl'
+    }
         
-        public enum AudioComponentManufacturerType {
+    public enum AudioComponentManufacturerType : uint
+    {
 		Apple = 0x6170706c // little endian 0x6c707061 //'appl'
-        }
+    }
 	
+	// Why is this a class ??
 	[StructLayout(LayoutKind.Sequential)]
-	public class AudioComponentDescription {
+	public class AudioComponentDescription
+	{
 		[MarshalAs(UnmanagedType.U4)] 
 		public AudioComponentType ComponentType;
 		
@@ -160,8 +169,8 @@ using MonoMac.AudioToolbox;
 			ComponentType = type;
 			ComponentSubType = subType;
 			ComponentManufacturer = AudioComponentManufacturerType.Apple;
-			//ComponentFlags = 0;
-			//ComponentFlagsMask = 0;
+//			ComponentFlags = 0;
+//			ComponentFlagsMask = 0;
 		}
 
 		public static AudioComponentDescription CreateGeneric (AudioComponentType type, int subType)
@@ -204,9 +213,10 @@ using MonoMac.AudioToolbox;
 			return new AudioComponentDescription (AudioComponentType.Generator, (int) generator);
 		}
 
-		static string fmt = "[componetType={0}, subType={1}]";
 		public override string ToString ()
 		{
+			const string fmt = "[componetType={0}, subType={1}]";
+
 			switch (ComponentType){
 			case AudioComponentType.Output:
 				return String.Format (fmt, ComponentType, (AudioTypeOutput) ComponentSubType);

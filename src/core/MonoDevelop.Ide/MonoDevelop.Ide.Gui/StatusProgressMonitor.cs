@@ -30,12 +30,13 @@
 using System.Collections.Generic;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Ide.ProgressMonitoring;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Ide.Gui
 {
 	internal class StatusProgressMonitor: BaseProgressMonitor
 	{
-		Gtk.Image icon;
+		IconId icon;
 		bool showErrorDialogs;
 		bool showTaskTitles;
 		bool lockGui;
@@ -50,11 +51,10 @@ namespace MonoDevelop.Ide.Gui
 			this.showTaskTitles = showTaskTitles;
 			this.title = title;
 			this.statusSourcePad = statusSourcePad;
-			if (!string.IsNullOrEmpty (iconName))
-				icon = ImageService.GetImage (iconName, Gtk.IconSize.Menu);
+			icon = iconName;
 			statusBar = IdeApp.Workbench.StatusBar.CreateContext ();
 			statusBar.StatusSourcePad = statusSourcePad;
-			statusBar.BeginProgress (icon, title);
+			statusBar.BeginProgress (iconName, title);
 			if (lockGui)
 				IdeApp.Workbench.LockGui ();
 		}
@@ -84,31 +84,31 @@ namespace MonoDevelop.Ide.Gui
 		{
 			if (lockGui)
 				IdeApp.Workbench.UnlockGui ();
-			
-			statusBar.Dispose ();
 
-			if (Errors.Count > 0 || Warnings.Count > 0) {
-				if (Errors.Count > 0) {
-					Gtk.Image img = ImageService.GetImage (Stock.Error, Gtk.IconSize.Menu);
-					IdeApp.Workbench.StatusBar.ShowMessage (img, Errors [Errors.Count - 1]);
-				} else if (SuccessMessages.Count == 0) {
-					Gtk.Image img = ImageService.GetImage (Stock.Warning, Gtk.IconSize.Menu);
-					IdeApp.Workbench.StatusBar.ShowMessage (img, Warnings [Warnings.Count - 1]);
+			statusBar.EndProgress ();
+			try {
+				if (Errors.Count > 0 || Warnings.Count > 0) {
+					if (Errors.Count > 0) {
+						statusBar.ShowError (Errors [Errors.Count - 1]);
+					} else if (SuccessMessages.Count == 0) {
+						statusBar.ShowWarning (Warnings [Warnings.Count - 1]);
+					}
+					
+					base.OnCompleted ();
+					
+					if (showErrorDialogs)
+						ShowResultDialog ();
+					return;
 				}
 				
-				base.OnCompleted ();
+				if (SuccessMessages.Count > 0)
+					statusBar.ShowMessage (MonoDevelop.Ide.Gui.Stock.StatusSuccess, SuccessMessages [SuccessMessages.Count - 1]);
 				
-				if (showErrorDialogs)
-					ShowResultDialog ();
-				
-				IdeApp.Workbench.StatusBar.SetMessageSourcePad (statusSourcePad);
-				return;
+			} finally {
+				statusBar.StatusSourcePad = statusSourcePad;
+				statusBar.Dispose ();
 			}
-			
-			if (SuccessMessages.Count > 0)
-				IdeApp.Workbench.StatusBar.ShowMessage (SuccessMessages [SuccessMessages.Count - 1]);
-			
-			IdeApp.Workbench.StatusBar.SetMessageSourcePad (statusSourcePad);
+
 			base.OnCompleted ();
 		}
 	}

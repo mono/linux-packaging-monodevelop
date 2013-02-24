@@ -148,6 +148,13 @@ namespace NGit.Treewalk
 		/// </summary>
 		private long canonLen = -1;
 
+		/// <summary>
+		/// The offset of the content id in
+		/// <see cref="IdBuffer()">IdBuffer()</see>
+		/// 
+		/// </summary>
+		private int contentIdOffset;
+
 		/// <summary>Cached value of isEntryIgnored().</summary>
 		/// <remarks>
 		/// Cached value of isEntryIgnored(). 0 if not ignored, 1 if ignored, -1 if
@@ -275,8 +282,15 @@ namespace NGit.Treewalk
 						DirCacheEntry ent = i.GetDirCacheEntry();
 						if (ent != null && CompareMetadata(ent) == WorkingTreeIterator.MetadataDiff.EQUAL)
 						{
-							return i.IdBuffer;
+							contentIdOffset = i.IdOffset;
+							contentIdFromPtr = ptr;
+							return contentId = i.IdBuffer;
 						}
+						contentIdOffset = 0;
+					}
+					else
+					{
+						contentIdOffset = 0;
 					}
 				}
 				switch (mode & FileMode.TYPE_MASK)
@@ -517,7 +531,6 @@ namespace NGit.Treewalk
 			}
 		}
 
-		/// <exception cref="System.IO.IOException"></exception>
 		private InputStream FilterClean(InputStream @in)
 		{
 			return new EolCanonicalizingInputStream(@in, true);
@@ -535,7 +548,7 @@ namespace NGit.Treewalk
 		{
 			get
 			{
-				return 0;
+				return contentIdOffset;
 			}
 		}
 
@@ -746,9 +759,9 @@ namespace NGit.Treewalk
 			return ignoreNode;
 		}
 
-		private sealed class _IComparer_607 : IComparer<WorkingTreeIterator.Entry>
+		private sealed class _IComparer_615 : IComparer<WorkingTreeIterator.Entry>
 		{
-			public _IComparer_607()
+			public _IComparer_615()
 			{
 			}
 
@@ -782,7 +795,7 @@ namespace NGit.Treewalk
 			}
 		}
 
-		private static readonly IComparer<WorkingTreeIterator.Entry> ENTRY_CMP = new _IComparer_607
+		private static readonly IComparer<WorkingTreeIterator.Entry> ENTRY_CMP = new _IComparer_615
 			();
 
 		internal static int LastPathChar(WorkingTreeIterator.Entry e)
@@ -863,6 +876,35 @@ namespace NGit.Treewalk
 			DIFFER_BY_TIMESTAMP
 		}
 
+		/// <summary>Is the file mode of the current entry different than the given raw mode?
+		/// 	</summary>
+		/// <param name="rawMode"></param>
+		/// <returns>true if different, false otherwise</returns>
+		public virtual bool IsModeDifferent(int rawMode)
+		{
+			// Determine difference in mode-bits of file and index-entry. In the
+			// bitwise presentation of modeDiff we'll have a '1' when the two modes
+			// differ at this position.
+			int modeDiff = EntryRawMode ^ rawMode;
+			if (modeDiff == 0)
+			{
+				return false;
+			}
+			// Do not rely on filemode differences in case of symbolic links
+			if (FileMode.SYMLINK.Equals(rawMode))
+			{
+				return false;
+			}
+			// Ignore the executable file bits if WorkingTreeOptions tell me to
+			// do so. Ignoring is done by setting the bits representing a
+			// EXECUTABLE_FILE to '0' in modeDiff
+			if (!state.options.IsFileMode())
+			{
+				modeDiff &= ~FileMode.EXECUTABLE_FILE.GetBits();
+			}
+			return modeDiff != 0;
+		}
+
 		/// <summary>
 		/// Compare the metadata (mode, length, modification-timestamp) of the
 		/// current entry and a
@@ -894,26 +936,9 @@ namespace NGit.Treewalk
 			{
 				return WorkingTreeIterator.MetadataDiff.DIFFER_BY_METADATA;
 			}
-			// Determine difference in mode-bits of file and index-entry. In the
-			// bitwise presentation of modeDiff we'll have a '1' when the two modes
-			// differ at this position.
-			int modeDiff = EntryRawMode ^ entry.RawMode;
-			// Do not rely on filemode differences in case of symbolic links
-			if (modeDiff != 0 && !FileMode.SYMLINK.Equals(entry.RawMode))
+			if (IsModeDifferent(entry.RawMode))
 			{
-				// Ignore the executable file bits if WorkingTreeOptions tell me to
-				// do so. Ignoring is done by setting the bits representing a
-				// EXECUTABLE_FILE to '0' in modeDiff
-				if (!state.options.IsFileMode())
-				{
-					modeDiff &= ~FileMode.EXECUTABLE_FILE.GetBits();
-				}
-				if (modeDiff != 0)
-				{
-					// Report a modification if the modes still (after potentially
-					// ignoring EXECUTABLE_FILE bits) differ
-					return WorkingTreeIterator.MetadataDiff.DIFFER_BY_METADATA;
-				}
+				return WorkingTreeIterator.MetadataDiff.DIFFER_BY_METADATA;
 			}
 			// Git under windows only stores seconds so we round the timestamp
 			// Java gives us if it looks like the timestamp in index is seconds

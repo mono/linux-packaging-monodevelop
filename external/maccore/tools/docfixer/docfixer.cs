@@ -3,7 +3,9 @@
 //
 // TODO:
 //   Remove <h2...> Overview</h2> from merged docs
-//   
+//
+// Copyright 2012 Xamarin Inc
+//
 using System;
 using System.IO;
 using System.Linq;
@@ -16,6 +18,16 @@ using Mono.Cecil;
 public partial class DocGenerator
 {
 	public static int Main (string[] args)
+	{
+		try {
+			return Main2 (args);
+		} catch (Exception ex) {
+			Console.WriteLine ("Unexpected exception: {0}", ex);
+			return 1;
+		}
+	}
+
+	public static int Main2 (string[] args)
 	{
 		bool show_help = false;
 		bool useRawDoc = false;
@@ -67,7 +79,7 @@ public partial class DocGenerator
 		if (useRawDoc)
 			mdocArchive = new MDocDirectoryArchive (Path.Combine (monodocPath, "en"));
 		else
-			mdocArchive = MDocZipArchive.ExtractAndLoad (Path.Combine (monodocPath, "MonoTouch-lib.zip"));
+			mdocArchive = MDocZipArchive.ExtractAndLoad (Path.Combine (monodocPath, ArchiveName));
 		mergerOptions.MonodocArchive = mdocArchive;
 		var merger = new AppleDocMerger (mergerOptions);
 		merger.MergeDocumentation ();

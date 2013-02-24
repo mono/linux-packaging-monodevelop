@@ -120,14 +120,11 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 		Mono.TextEditor.Highlighting.ColorScheme LoadStyle (string styleName, bool showException = true)
 		{
 			try {
-				return Mono.TextEditor.Highlighting.SyntaxModeService.GetColorStyle (Style, styleName);
+				return Mono.TextEditor.Highlighting.SyntaxModeService.GetColorStyle (styleName);
 			} catch (Exception e) {
 				if (showException)
 					MessageService.ShowError ("Error while importing color style.", e.InnerException.Message);
-				var result = new Mono.TextEditor.Highlighting.DefaultStyle (Style);
-				result.Name = styleName;
-				result.Description = "Error";
-				return result;
+				return Mono.TextEditor.Highlighting.SyntaxModeService.DefaultColorStyle;
 			}
 		
 		}
@@ -241,17 +238,22 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 		{
 			this.enableSemanticHighlightingCheckbutton.Sensitive = this.enableHighlightingCheckbutton.Active;
 		}
+
+		internal static void UpdateActiveDocument ()
+		{
+			if (IdeApp.Workbench.ActiveDocument != null) {
+				IdeApp.Workbench.ActiveDocument.UpdateParseDocument ();
+				IdeApp.Workbench.ActiveDocument.Editor.Parent.TextViewMargin.PurgeLayoutCache ();
+				IdeApp.Workbench.ActiveDocument.Editor.Parent.QueueDraw ();
+			}
+		}
 		
 		public virtual void ApplyChanges ()
 		{
 			DefaultSourceEditorOptions.Instance.EnableSyntaxHighlighting = this.enableHighlightingCheckbutton.Active;
 			if (DefaultSourceEditorOptions.Instance.EnableSemanticHighlighting != this.enableSemanticHighlightingCheckbutton.Active) {
 				DefaultSourceEditorOptions.Instance.EnableSemanticHighlighting = this.enableSemanticHighlightingCheckbutton.Active;
-				if (IdeApp.Workbench.ActiveDocument != null) {
-					IdeApp.Workbench.ActiveDocument.UpdateParseDocument ();
-					IdeApp.Workbench.ActiveDocument.Editor.Parent.TextViewMargin.PurgeLayoutCache ();
-					IdeApp.Workbench.ActiveDocument.Editor.Parent.QueueDraw ();
-				}
+				UpdateActiveDocument ();
 			}
 			TreeIter selectedIter;
 			if (styleTreeview.Selection.GetSelected (out selectedIter)) {

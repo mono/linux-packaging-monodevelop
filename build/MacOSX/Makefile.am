@@ -1,10 +1,24 @@
 BUNDLE_VERSION=$(VERSION)
 MAC_APP_DIR=MonoDevelop.app
+APP_NAME=MonoDevelop
 MACOS=$(MAC_APP_DIR)/Contents/MacOS
 MAC_APP_LIB_DIR=$(MACOS)/lib/monodevelop
 ADDINS=$(MACOS)/lib/monodevelop/AddIns
 EXTRAS=$(top_srcdir)/../extras
 ARTIFACTS=$(top_srcdir)/../../artifacts
+
+# In which commit did the MonoDevelop version change? 00000000 if uncommitted
+commit_of_last_version_change    := $(shell LANG=C git blame $(top_srcdir)/configure.in | grep AC_INIT | sed 's/ .*//')
+
+# How many commits have passed since $(-commit-of-last-version-change)?
+# "0" when commit hash is invalid (e.g. 00000000)
+num_commits_since_version_change := $(shell LANG=C git rev-list --count $(commit_of_last_version_change)..HEAD)
+
+PACKAGE_VERSION_MAJOR=0$(word 1, $(subst ., ,$(VERSION)))
+PACKAGE_VERSION_MINOR=$(word 2, $(subst ., ,$(VERSION)))
+PACKAGE_VERSION_REV=0$(word 3, $(subst ., ,$(VERSION)))
+PACKAGE_VERSION_BUILD=$(num_commits_since_version_change)
+PACKAGE_UPDATE_ID=$(shell echo $(PACKAGE_VERSION_MAJOR) $(PACKAGE_VERSION_MINOR) $(PACKAGE_VERSION_REV) $(PACKAGE_VERSION_BUILD) | awk '{printf "%d%02d%02d%04d",$$1,$$2,$$3,$$4}')
 
 CLEANFILES = render.exe
 #DISTCLEANFILES = 
@@ -19,7 +33,7 @@ dmg: render.exe app
 	./make-dmg-bundle.sh
 
 monostub: monostub.m
-	gcc -Wall -m32 monostub.m -o monostub -framework AppKit
+	gcc -Wall -mmacosx-version-min=10.6 -m32 -o monostub monostub.m -framework AppKit
 
 clean-local:
 	rm -rf MonoDevelop.app
@@ -52,8 +66,8 @@ app: monostub
 	cp -pR ../locale $(MAC_APP_DIR)/Contents/MacOS/share
 	mkdir -p $(MAC_APP_DIR)/Contents/MacOS/share/monodevelop
 	cp ../../COPYING $(MAC_APP_DIR)/Contents/MacOS/share/monodevelop/COPYING.LGPL2.1
-
-	sed -e "s/@BUNDLE_VERSION@/$(BUNDLE_VERSION)/" -e "s/@ASSEMBLY_VERSION@/$(ASSEMBLY_VERSION)/" Info.plist.in > $(MAC_APP_DIR)/Contents/Info.plist
+	
+	sed -e "s/@BUNDLE_VERSION@/$(BUNDLE_VERSION)/" -e "s/@ASSEMBLY_VERSION@/$(ASSEMBLY_VERSION)/" -e "s/@APP_NAME@/$(APP_NAME)/" -e "s|@RELEASE_ID@|$(PACKAGE_UPDATE_ID)|" Info.plist.in > $(MAC_APP_DIR)/Contents/Info.plist
 	cp ../../theme-icons/Mac/*.icns $(MAC_APP_DIR)/Contents/Resources/
 
 # copy monodevelop.pc and monodevelop-core-addins.pc to Contents/MacOS/lib/pkgconfig
@@ -70,7 +84,7 @@ app: monostub
 	@echo ""
 	@echo "Copying launch scripts into app bundle"
 	@echo ""
-	cp monostub $(MACOS)/monodevelop
+	cp monostub $(MACOS)/MonoDevelop
 	cp monostub $(MACOS)/mdtool
 
 # Remove addins that don't work on OSX
@@ -125,16 +139,16 @@ app: monostub
 
 	pushd ../..; make buildinfo; popd
 
-	echo "a3140c14-ef90-4019-ae6c-9d93804d6611 $$(cat release-info)" > "$(MACOS)/updateinfo"
+	echo "a3140c14-ef90-4019-ae6c-9d93804d6611 $(PACKAGE_UPDATE_ID)" > "$(MACOS)/updateinfo"
 
-	echo "Release ID: $$(cat release-info)" > "$(MACOS)/lib/monodevelop/bin/buildinfo"
+	echo "Release ID: $(PACKAGE_UPDATE_ID)" > "$(MACOS)/lib/monodevelop/bin/buildinfo"
 	@cat ../bin/buildinfo >> "$(MACOS)/lib/monodevelop/bin/buildinfo"
 
 # touch the directory so that update dependencies work
 	touch MonoDevelop.app
 
 	@echo ""
-	@echo "MONODEVELOP RELEASE: $$(cat release-info)"
+	@echo "MONODEVELOP RELEASE: $(PACKAGE_UPDATE_ID)"
 	@echo "$$(cat ../../vcrevision)"
 	@if test -f missing-stuff; then echo ""; echo "Missing stuff:"; cat missing-stuff; fi
 	@echo ""

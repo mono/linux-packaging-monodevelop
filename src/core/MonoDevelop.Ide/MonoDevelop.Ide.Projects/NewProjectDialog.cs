@@ -96,6 +96,9 @@ namespace MonoDevelop.Ide.Projects {
 				chk_combine_directory.Hide ();
 				lbl_subdirectory.Hide ();
 			}
+
+			TreeIter iter;
+			ExpandCategory ("C#", out iter);
 		}
 		
 		public void SelectTemplate (string id)
@@ -149,14 +152,16 @@ namespace MonoDevelop.Ide.Projects {
 			} while (catStore.IterNext (ref trial));
 			return false;
 		}
-		
-		void SelectCategory (string category)
+
+		bool ExpandCategory (string category, out TreeIter result)
 		{
 			string[] cats = category.Split ('/');
 			
 			TreeIter iter;
-			if (!catStore.GetIterFirst (out iter))
-				return;
+			if (!catStore.GetIterFirst (out iter)) {
+				result = TreeIter.Zero;
+				return false;
+			}
 			
 			TreeIter nextIter = iter;
 			for (int i = 0; i < cats.Length; i++) {
@@ -171,7 +176,15 @@ namespace MonoDevelop.Ide.Projects {
 			}
 			
 			lst_template_types.ExpandToPath (catStore.GetPath (iter));
-			lst_template_types.Selection.SelectIter (iter);
+			result = iter;
+			return true;
+		}
+		
+		void SelectCategory (string category)
+		{
+			TreeIter iter;
+			if (ExpandCategory (category, out iter))
+				lst_template_types.Selection.SelectIter (iter);
 		}
 		
 		void InitializeView()
@@ -425,13 +438,16 @@ namespace MonoDevelop.Ide.Projects {
 				return false;
 			}
 			
-			ProjectCreateInformation cinfo = CreateProjectCreateInformation ();
 			
 			try {
+				ProjectCreateInformation cinfo = CreateProjectCreateInformation ();
 				if (newSolution)
 					newItem = item.CreateWorkspaceItem (cinfo);
 				else
 					newItem = item.CreateProject (parentFolder, cinfo);
+			} catch (UserException ex) {
+				MessageService.ShowError (ex.Message, ex.Details);
+				return false;
 			} catch (Exception ex) {
 				MessageService.ShowException (ex, GettextCatalog.GetString ("The project could not be created"));
 				return false;

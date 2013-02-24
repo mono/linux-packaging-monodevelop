@@ -62,6 +62,7 @@ namespace MonoDevelop.Projects
 		}
 		
 		[Test()]
+		[Ignore ("We don't install the msbuild assemblies in the right place for this tests")]
 		public void Resources ()
 		{
 			string solFile = Util.GetSampleProject ("resources-tester", "ResourcesTester.sln");
@@ -209,7 +210,7 @@ namespace MonoDevelop.Projects
 			Assert.AreEqual ("cc SomeProject", cmd.GetCommandArgs (p, c.Selector));
 			
 			cmd.WorkingDir = NormalizePath ("/some/${ProjectName}/place");
-			Assert.AreEqual (NormalizePath ("/some/SomeProject/place"), (string)cmd.GetCommandWorkingDir (p, c.Selector));
+			Assert.AreEqual (Path.GetFullPath (NormalizePath ("/some/SomeProject/place")), (string)cmd.GetCommandWorkingDir (p, c.Selector));
 		}
 		
 		[Test()]

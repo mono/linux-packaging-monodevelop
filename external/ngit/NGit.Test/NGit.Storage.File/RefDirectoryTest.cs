@@ -57,7 +57,7 @@ namespace NGit.Storage.File
 	{
 		private Repository diskRepo;
 
-		private TestRepository repo;
+		private TestRepository<Repository> repo;
 
 		private RefDirectory refdir;
 
@@ -324,6 +324,23 @@ namespace NGit.Storage.File
 
 		/// <exception cref="System.IO.IOException"></exception>
 		[NUnit.Framework.Test]
+		public virtual void TestReadNotExistingBranchConfig()
+		{
+			NUnit.Framework.Assert.IsNull(refdir.GetRef("config"), "find branch config");
+			NUnit.Framework.Assert.IsNull(refdir.GetRef("refs/heads/config"), "find branch config"
+				);
+		}
+
+		/// <exception cref="System.IO.IOException"></exception>
+		[NUnit.Framework.Test]
+		public virtual void TestReadBranchConfig()
+		{
+			WriteLooseRef("refs/heads/config", A);
+			NUnit.Framework.Assert.IsNotNull(refdir.GetRef("config"), "find branch config");
+		}
+
+		/// <exception cref="System.IO.IOException"></exception>
+		[NUnit.Framework.Test]
 		public virtual void TestGetRefs_HeadsOnly_AllLoose()
 		{
 			IDictionary<string, Ref> heads;
@@ -436,7 +453,7 @@ namespace NGit.Storage.File
 			WriteLooseRef("refs/heads/my/a/b/c", B);
 			int[] count = new int[1];
 			ListenerHandle listener = Repository.GetGlobalListenerList().AddRefsChangedListener
-				(new _RefsChangedListener_481(count));
+				(new _RefsChangedListener_498(count));
 			refs = refdir.GetRefs(RefDatabase.ALL);
 			refs = refdir.GetRefs(RefDatabase.ALL);
 			listener.Remove();
@@ -447,9 +464,9 @@ namespace NGit.Storage.File
 			NUnit.Framework.Assert.AreEqual(B, refs.Get("refs/heads/my/a/b/c").GetObjectId());
 		}
 
-		private sealed class _RefsChangedListener_481 : RefsChangedListener
+		private sealed class _RefsChangedListener_498 : RefsChangedListener
 		{
-			public _RefsChangedListener_481(int[] count)
+			public _RefsChangedListener_498(int[] count)
 			{
 				this.count = count;
 			}
@@ -833,6 +850,66 @@ namespace NGit.Storage.File
 			NUnit.Framework.Assert.AreEqual(v1_0.GetObject(), tag.GetPeeledObjectId());
 		}
 
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
+		public virtual void Test_repack()
+		{
+			IDictionary<string, Ref> all;
+			WritePackedRefs("# pack-refs with: peeled \n" + A.Name + " refs/heads/master\n" +
+				 B.Name + " refs/heads/other\n" + v1_0.Name + " refs/tags/v1.0\n" + "^" + v1_0.GetObject
+				().Name + "\n");
+			//
+			//
+			//
+			//
+			all = refdir.GetRefs(RefDatabase.ALL);
+			NUnit.Framework.Assert.AreEqual(4, all.Count);
+			NUnit.Framework.Assert.AreEqual(RefStorage.LOOSE, all.Get(Constants.HEAD).GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(RefStorage.PACKED, all.Get("refs/heads/master").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(A.Id, all.Get("refs/heads/master").GetObjectId());
+			NUnit.Framework.Assert.AreEqual(RefStorage.PACKED, all.Get("refs/heads/other").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(RefStorage.PACKED, all.Get("refs/tags/v1.0").GetStorage
+				());
+			repo.Update("refs/heads/master", B.Id);
+			RevTag v0_1 = repo.Tag("v0.1", A);
+			repo.Update("refs/tags/v0.1", v0_1);
+			all = refdir.GetRefs(RefDatabase.ALL);
+			NUnit.Framework.Assert.AreEqual(5, all.Count);
+			NUnit.Framework.Assert.AreEqual(RefStorage.LOOSE, all.Get(Constants.HEAD).GetStorage
+				());
+			// Why isn't the next ref LOOSE_PACKED?
+			NUnit.Framework.Assert.AreEqual(RefStorage.LOOSE, all.Get("refs/heads/master").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(B.Id, all.Get("refs/heads/master").GetObjectId());
+			NUnit.Framework.Assert.AreEqual(RefStorage.PACKED, all.Get("refs/heads/other").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(RefStorage.PACKED, all.Get("refs/tags/v1.0").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(RefStorage.LOOSE, all.Get("refs/tags/v0.1").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(v0_1.Id, all.Get("refs/tags/v0.1").GetObjectId());
+			all = refdir.GetRefs(RefDatabase.ALL);
+			refdir.Pack(new AList<string>(all.Keys));
+			all = refdir.GetRefs(RefDatabase.ALL);
+			NUnit.Framework.Assert.AreEqual(5, all.Count);
+			NUnit.Framework.Assert.AreEqual(RefStorage.LOOSE, all.Get(Constants.HEAD).GetStorage
+				());
+			// Why isn't the next ref LOOSE_PACKED?
+			NUnit.Framework.Assert.AreEqual(RefStorage.PACKED, all.Get("refs/heads/master").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(B.Id, all.Get("refs/heads/master").GetObjectId());
+			NUnit.Framework.Assert.AreEqual(RefStorage.PACKED, all.Get("refs/heads/other").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(RefStorage.PACKED, all.Get("refs/tags/v1.0").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(RefStorage.PACKED, all.Get("refs/tags/v0.1").GetStorage
+				());
+			NUnit.Framework.Assert.AreEqual(v0_1.Id, all.Get("refs/tags/v0.1").GetObjectId());
+		}
+
 		/// <exception cref="System.IO.IOException"></exception>
 		[NUnit.Framework.Test]
 		public virtual void TestGetRef_EmptyDatabase()
@@ -1025,6 +1102,64 @@ namespace NGit.Storage.File
 			NUnit.Framework.Assert.IsTrue(master_p2.IsPeeled());
 			NUnit.Framework.Assert.IsNull(master_p2.GetPeeledObjectId());
 			NUnit.Framework.Assert.AreSame(master_p2, refdir.Peel(master_p2));
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
+		public virtual void TestRefsChangedStackOverflow()
+		{
+			FileRepository newRepo = CreateBareRepository();
+			RefDatabase refDb = newRepo.RefDatabase;
+			FilePath packedRefs = new FilePath(newRepo.Directory, "packed-refs");
+			NUnit.Framework.Assert.IsTrue(packedRefs.CreateNewFile());
+			AtomicReference<StackOverflowError> error = new AtomicReference<StackOverflowError
+				>();
+			AtomicReference<IOException> exception = new AtomicReference<IOException>();
+			AtomicInteger changeCount = new AtomicInteger();
+			newRepo.Listeners.AddRefsChangedListener(new _RefsChangedListener_1156(refDb, changeCount
+				, error, exception));
+			refDb.GetRefs("ref");
+			refDb.GetRefs("ref");
+			NUnit.Framework.Assert.IsNull(error.Get());
+			NUnit.Framework.Assert.IsNull(exception.Get());
+			NUnit.Framework.Assert.AreEqual(1, changeCount.Get());
+		}
+
+		private sealed class _RefsChangedListener_1156 : RefsChangedListener
+		{
+			public _RefsChangedListener_1156(RefDatabase refDb, AtomicInteger changeCount, AtomicReference
+				<StackOverflowError> error, AtomicReference<IOException> exception)
+			{
+				this.refDb = refDb;
+				this.changeCount = changeCount;
+				this.error = error;
+				this.exception = exception;
+			}
+
+			public void OnRefsChanged(RefsChangedEvent @event)
+			{
+				try
+				{
+					refDb.GetRefs("ref");
+					changeCount.IncrementAndGet();
+				}
+				catch (StackOverflowError soe)
+				{
+					error.Set(soe);
+				}
+				catch (IOException ioe)
+				{
+					exception.Set(ioe);
+				}
+			}
+
+			private readonly RefDatabase refDb;
+
+			private readonly AtomicInteger changeCount;
+
+			private readonly AtomicReference<StackOverflowError> error;
+
+			private readonly AtomicReference<IOException> exception;
 		}
 
 		/// <exception cref="System.IO.IOException"></exception>

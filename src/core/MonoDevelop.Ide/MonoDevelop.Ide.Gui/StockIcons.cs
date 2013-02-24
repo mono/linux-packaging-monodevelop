@@ -54,12 +54,12 @@ namespace MonoDevelop.Ide.Gui
 		public static readonly IconId Empty = "md-empty";
 		public static readonly IconId EmptyFileIcon = "md-empty-file-icon";
 		public static readonly IconId Enum = "md-enum";
-		public static readonly IconId Error = Gtk.Stock.DialogError;
+		public static readonly IconId Error = "md-error";
 		public static readonly IconId Event = "md-event";
 		public static readonly IconId ExecutionMarker = "md-execution-marker";
 		public static readonly IconId Field = "md-field";
 		public static readonly IconId FileXmlIcon = "md-file-xml-icon";
-		public static readonly IconId FindIcon = Gtk.Stock.Find;
+		public static readonly IconId FindIcon = "md-magnify";
 		public static readonly IconId FindInFiles = "md-find-in-files";
 		public static readonly IconId FindNextIcon = "md-find-next-icon";
 		public static readonly IconId FullScreen = Gtk.Stock.Fullscreen;
@@ -104,7 +104,6 @@ namespace MonoDevelop.Ide.Gui
 		public static readonly IconId PrivateMethod = "md-private-method";
 		public static readonly IconId PrivateProperty = "md-private-property";
 		public static readonly IconId PrivateStruct = "md-private-struct";
-		public static readonly IconId PropertiesIcon = "md-properties-icon";
 		public static readonly IconId Property = "md-property";
 		public static readonly IconId ProtectedClass = "md-protected-class";
 		public static readonly IconId ProtectedDelegate = "md-protected-delegate";
@@ -124,6 +123,7 @@ namespace MonoDevelop.Ide.Gui
 		public static readonly IconId ReplaceIcon = Gtk.Stock.FindAndReplace;
 		public static readonly IconId ReplaceInFiles = "md-replace-in-files";
 		public static readonly IconId ResourceFileIcon = "md-resource-file-icon";
+		public static readonly IconId Console = "md-console";
 		public static readonly IconId RunProgramIcon = Gtk.Stock.Execute;
 		public static readonly IconId SaveAllIcon = "md-save-all-icon";
 		public static readonly IconId SaveAsIcon = Gtk.Stock.SaveAs;
@@ -137,13 +137,29 @@ namespace MonoDevelop.Ide.Gui
 		public static readonly IconId TipOfTheDay = "md-tip-of-the-day";
 		public static readonly IconId ToggleBookmark = "md-toggle-bookmark";
 		public static readonly IconId UndoIcon = Gtk.Stock.Undo;
-		public static readonly IconId Warning = Gtk.Stock.DialogWarning;
+		public static readonly IconId Warning = "md-warning";
 		public static readonly IconId WebSearchIcon = "md-web-search-icon";
 		public static readonly IconId XmlFileIcon = "md-xml-file-icon";
 		public static readonly IconId Addin = "md-addin";
 		public static readonly IconId SolutionFolderOpen = "md-solution-folder-open";
 		public static readonly IconId SolutionFolderClosed = "md-solution-folder-closed";
 		public static readonly IconId Package = "md-package";
-
+		public static readonly IconId StatusSolutionOperation = "md-status-open";
+		public static readonly IconId StatusDownload = "md-status-download";
+		public static readonly IconId StatusUpload = "md-status-upload";
+		public static readonly IconId StatusSearch = "md-status-search";
+		public static readonly IconId StatusBuild = "md-status-build";
+		public static readonly IconId StatusSteady = "md-status-steady";
+		public static readonly IconId StatusSuccess = "md-status-success";
+		public static readonly IconId StatusWarning = "md-status-warning";
+		public static readonly IconId StatusError = "md-status-error";
+		public static readonly IconId StatusConnecting = "md-status-connecting";
+		public static readonly IconId Broom = "md-clear";
+		public static readonly IconId Stop = "md-stop";
+		public static readonly IconId MessageLog = "md-message-log";
+		public static readonly IconId Drive = "md-drive";
+		public static readonly IconId Letters = "md-letters";
+		public static readonly IconId Hammer = "md-hammer";
+		public static readonly IconId Monkey = "md-monkey";
 	}
 }

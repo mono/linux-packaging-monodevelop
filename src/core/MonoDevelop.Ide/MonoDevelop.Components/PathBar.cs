@@ -31,6 +31,7 @@ using System.Linq;
 using Gtk;
 using Gdk;
 using MonoDevelop.Ide;
+using MonoDevelop.Ide.Gui;
 
 namespace MonoDevelop.Components
 {
@@ -42,6 +43,8 @@ namespace MonoDevelop.Components
 	
 	public class PathEntry 
 	{
+		Gdk.Pixbuf darkIcon;
+
 		public Gdk.Pixbuf Icon {
 			get;
 			private set;
@@ -96,9 +99,22 @@ namespace MonoDevelop.Components
 				return (Icon != null ? Icon.GetHashCode () : 0) ^ (Markup != null ? Markup.GetHashCode () : 0);
 			}
 		}
+
+		internal Gdk.Pixbuf DarkIcon {
+			get {
+				if (darkIcon == null && Icon != null) {
+					darkIcon = Icon;
+					if (Styles.BreadcrumbGreyscaleIcons)
+						darkIcon = ImageService.MakeGrayscale (darkIcon);
+					if (Styles.BreadcrumbInvertedIcons)
+						darkIcon = ImageService.MakeInverted (darkIcon);
+				}
+				return darkIcon;
+			}
+		}
 	}
 	
-	public class PathBar : Gtk.DrawingArea
+	class PathBar : Gtk.DrawingArea
 	{
 		PathEntry[] leftPath  = new PathEntry[0];
 		PathEntry[] rightPath = new PathEntry[0];
@@ -108,18 +124,32 @@ namespace MonoDevelop.Components
 		//HACK: a surrogate widget object to pass to style calls instead of "this" when using "button" hint.
 		// This avoids GTK-Criticals in themes which try to cast the widget object to a button.
 		Gtk.Button styleButton = new Gtk.Button ();
-		
-		int[] leftWidths, rightWidths;
+
+		// The widths array contains the widths of the items at the left and the right
+		int[] widths;
+
 		int height;
-		
+		int textHeight;
+
 		bool pressed, hovering, menuVisible;
 		int hoverIndex = -1;
 		int activeIndex = -1;
-		
-		const int padding = 2;
-		const int spacing = 10;
+
+		const int leftPadding = 6;
+		const int rightPadding = 6;
+		const int topPadding = 2;
+		const int bottomPadding = 4;
+		const int iconSpacing = 4;
+		const int padding = 3;
+		const int buttonPadding = 2;
+		const int arrowLeftPadding = 10;
+		const int arrowRightPadding = 10;
+		const int arrowSize = 6;
+		const int spacing = arrowLeftPadding + arrowRightPadding + arrowSize;
+		const int minRegionSelectorWidth = 30;
 		
 		Func<int, Widget> createMenuForItem;
+		Widget menuWidget;
 		
 		public PathBar (Func<int, Widget> createMenuForItem)
 		{
@@ -142,14 +172,17 @@ namespace MonoDevelop.Components
 		{
 			if (ArrSame (this.leftPath, path))
 				return;
+
+			HideMenu ();
+
 			this.Path = path ?? new PathEntry[0];
 			this.leftPath = Path.Where (p => p.Position == EntryPosition.Left).ToArray ();
 			this.rightPath = Path.Where (p => p.Position == EntryPosition.Right).ToArray ();
 			
 			activeIndex = -1;
-			leftWidths = rightWidths = null;
+			widths = null;
 			EnsureWidths ();
-			QueueDraw ();
+			QueueResize ();
 		}
 		
 		bool ArrSame (PathEntry[] a, PathEntry[] b)
@@ -171,7 +204,7 @@ namespace MonoDevelop.Components
 			
 			if (activeIndex != index) {
 				activeIndex = index;
-				leftWidths = rightWidths = null;
+				widths = null;
 				QueueResize ();
 			}
 		}
@@ -180,104 +213,212 @@ namespace MonoDevelop.Components
 		{
 			EnsureWidths ();
 			requisition.Width = Math.Max (WidthRequest, 0);
-			requisition.Height = height + padding * 2;
+			requisition.Height = height + topPadding + bottomPadding;
 		}
 		
 		protected override bool OnExposeEvent (EventExpose evnt)
 		{
-			bool usePaintBox = !Gtk.Settings.Default.ThemeName.Contains ("Equinox");
-			if (usePaintBox) {
-				//HACK: paint the button background as if it were bigger, but it stays clipped to the real area,
-				// so we get the content but not the border. This might break with crazy themes.
-				// Themes that don't work need to be filtered out.
-				//FIXME: we can't use the style's actual internal padding because GTK# hasn't wrapped GtkBorder AFAICT
-				// (default-border, inner-border, default-outside-border, etc - see http://git.gnome.org/browse/gtk+/tree/gtk/gtkbutton.c)
-				const int boxpadding = 4;
-				Style.PaintBox (Style, evnt.Window, StateType.Normal, ShadowType.None, evnt.Area, styleButton, "button", 
-				                - boxpadding, - padding, Allocation.Width + boxpadding * 2, Allocation.Height + boxpadding * 2);
-			}
-			
-			if (leftWidths == null || rightWidths == null)
-				return true;
-			
-			int xpos = padding, ypos = padding;
-			for (int i = 0; i < leftPath.Length; i++) {
-				bool last = i == leftPath.Length - 1;
-				
-				int x = xpos;
-				xpos += leftWidths [i];
-				xpos += spacing;
-				
-				if (hoverIndex >= 0 && hoverIndex < Path.Length && leftPath [i] == Path [hoverIndex] && (menuVisible || pressed || hovering)) {
-					if (usePaintBox) {
-						Style.PaintBox (Style, GdkWindow,
-						                (pressed || menuVisible) ? StateType.Active : StateType.Prelight,
-						                (pressed || menuVisible) ? ShadowType.In : ShadowType.Out,
-						                evnt.Area, styleButton, "button",
-						                x - padding, ypos - padding, leftWidths [i] + padding + padding /*+ (last ? padding : spacing)*/,
-						                height + padding * 2);
-					} else {
-						evnt.Window.DrawRectangle (Style.DarkGC (StateType.Normal), false, x - padding, ypos - padding, leftWidths [i] + padding + padding, height + padding);
+			using (var ctx = Gdk.CairoHelper.Create (GdkWindow)) {
+
+				ctx.Rectangle (0, 0, Allocation.Width, Allocation.Height);
+				Cairo.LinearGradient g = new Cairo.LinearGradient (0, 0, 0, Allocation.Height);
+				g.AddColorStop (0, Styles.BreadcrumbBackgroundColor);
+				g.AddColorStop (1, Styles.BreadcrumbGradientEndColor);
+				ctx.Pattern = g;
+				ctx.Fill ();
+
+				if (widths == null)
+					return true;
+
+				// Calculate the total required with, and the reduction to be applied in case it doesn't fit the available space
+
+				int totalWidth = widths.Sum ();
+				totalWidth += leftPadding + (arrowSize + arrowRightPadding) * leftPath.Length - 1;
+				totalWidth += rightPadding + arrowSize * rightPath.Length - 1;
+
+				int[] currentWidths = widths;
+				bool widthReduced = false;
+
+				int overflow = totalWidth - Allocation.Width;
+				if (overflow > 0) {
+					currentWidths = ReduceWidths (overflow);
+					widthReduced = true;
+				}
+
+				// Render the paths
+
+				int textTopPadding = topPadding + (height - textHeight) / 2;
+				int xpos = leftPadding, ypos = topPadding;
+
+				for (int i = 0; i < leftPath.Length; i++) {
+					bool last = i == leftPath.Length - 1;
+
+					// Reduce the item size when required
+					int itemWidth = currentWidths [i];
+					int x = xpos;
+					xpos += itemWidth;
+
+					if (hoverIndex >= 0 && hoverIndex < Path.Length && leftPath [i] == Path [hoverIndex] && (menuVisible || pressed || hovering))
+						DrawButtonBorder (ctx, x - padding, itemWidth + padding + padding);
+
+					int textOffset = 0;
+					if (leftPath [i].DarkIcon != null) {
+						int iy = (height - leftPath [i].DarkIcon.Height) / 2 + topPadding;
+						Gdk.CairoHelper.SetSourcePixbuf (ctx, leftPath [i].DarkIcon, x, iy);
+						ctx.Paint ();
+						textOffset += leftPath [i].DarkIcon.Width + iconSpacing;
 					}
-				}
-				
-				int textOffset = 0;
-				if (leftPath [i].Icon != null) {
-					GdkWindow.DrawPixbuf (Style.BaseGC (State), leftPath [i].Icon, 0, 0, x, ypos, -1, -1, RgbDither.None, 0, 0);
-					textOffset += leftPath [i].Icon.Width + padding;
-				}
-				
-				layout.Attributes = (i == activeIndex) ? boldAtts : null;
-				layout.SetMarkup (leftPath [i].Markup);
-				Style.PaintLayout (Style, GdkWindow, State, false, evnt.Area, this, "", x + textOffset, ypos, layout);
-				if (!last) {
-					if (leftPath [i].IsPathEnd) {
-						Style.PaintVline (Style, GdkWindow, State, evnt.Area, this, "", ypos, ypos + height, xpos - spacing / 2);
-					} else {
-						int arrowH = Math.Min (height, spacing);
-						int arrowY = ypos + (height - arrowH) / 2;
-						Style.PaintArrow (Style, GdkWindow, State, ShadowType.None, evnt.Area, this, "", ArrowType.Right,
-						                  true, xpos - spacing, arrowY, spacing, arrowH);
-					}
-				}
-			}
-			
-			int xposRight = Allocation.Width - padding;
-			for (int i = 0; i < rightPath.Length; i++) {
-//				bool last = i == rightPath.Length - 1;
-				
-				xposRight -= rightWidths [i];
-				xposRight -= spacing;
 					
-				int x = xposRight;
-				
-				if (hoverIndex >= 0 && hoverIndex < Path.Length && rightPath [i] == Path [hoverIndex] && (menuVisible || pressed || hovering)) {
-					if (usePaintBox) {
-						Style.PaintBox (Style, GdkWindow,
-						                (pressed || menuVisible) ? StateType.Active : StateType.Prelight,
-						                (pressed || menuVisible) ? ShadowType.In : ShadowType.Out,
-						                evnt.Area, this, "button",
-						                x - padding, ypos - padding, rightWidths [i] + padding + padding /*+ (last ? padding : spacing)*/,
-						                height + padding * 2);
-					} else {
-						evnt.Window.DrawRectangle (Style.DarkGC (StateType.Normal), false, x - padding, ypos - padding, rightWidths [i] + padding + padding, height + padding);
+					layout.Attributes = (i == activeIndex) ? boldAtts : null;
+					layout.SetMarkup (leftPath [i].Markup);
+
+					ctx.Save ();
+
+					// If size is being reduced, ellipsize it
+					bool showText = true;
+					if (widthReduced) {
+						int w = itemWidth - textOffset;
+						if (w > 0) {
+							ctx.Rectangle (x + textOffset, textTopPadding, w, height);
+							ctx.Clip ();
+						} else
+							showText = false;
+					} else
+						layout.Width = -1;
+
+					if (showText) {
+						// Text
+						ctx.Color = Styles.BreadcrumbTextColor.ToCairoColor ();
+						ctx.MoveTo (x + textOffset, textTopPadding);
+						PangoCairoHelper.ShowLayout (ctx, layout);
+					}
+					ctx.Restore ();
+
+					if (!last) {
+						xpos += arrowLeftPadding;
+						if (leftPath [i].IsPathEnd) {
+							Style.PaintVline (Style, GdkWindow, State, evnt.Area, this, "", ypos, ypos + height, xpos - arrowSize / 2);
+						} else {
+							int arrowH = Math.Min (height, arrowSize);
+							int arrowY = ypos + (height - arrowH) / 2;
+							DrawPathSeparator (ctx, xpos, arrowY, arrowH);
+						}
+						xpos += arrowSize + arrowRightPadding;
 					}
 				}
 				
-				int textOffset = 0;
-				if (rightPath [i].Icon != null) {
-					GdkWindow.DrawPixbuf (Style.BaseGC (State), rightPath [i].Icon, 0, 0, x, ypos, -1, -1, RgbDither.None, 0, 0);
-					textOffset += rightPath [i].Icon.Width + padding;
+				int xposRight = Allocation.Width - rightPadding;
+				for (int i = 0; i < rightPath.Length; i++) {
+					//				bool last = i == rightPath.Length - 1;
+
+					// Reduce the item size when required
+					int itemWidth = currentWidths [i + leftPath.Length];
+					xposRight -= itemWidth;
+					xposRight -= arrowSize;
+						
+					int x = xposRight;
+					
+					if (hoverIndex >= 0 && hoverIndex < Path.Length && rightPath [i] == Path [hoverIndex] && (menuVisible || pressed || hovering))
+						DrawButtonBorder (ctx, x - padding, itemWidth + padding + padding);
+					
+					int textOffset = 0;
+					if (rightPath [i].DarkIcon != null) {
+						Gdk.CairoHelper.SetSourcePixbuf (ctx, rightPath [i].DarkIcon, x, ypos);
+						ctx.Paint ();
+						textOffset += rightPath [i].DarkIcon.Width + padding;
+					}
+					
+					layout.Attributes = (i == activeIndex) ? boldAtts : null;
+					layout.SetMarkup (rightPath [i].Markup);
+
+					ctx.Save ();
+
+					// If size is being reduced, ellipsize it
+					bool showText = true;
+					if (widthReduced) {
+						int w = itemWidth - textOffset;
+						if (w > 0) {
+							ctx.Rectangle (x + textOffset, textTopPadding, w, height);
+							ctx.Clip ();
+						} else
+							showText = false;
+					} else
+						layout.Width = -1;
+
+					if (showText) {
+						// Text
+						ctx.Color = Styles.BreadcrumbTextColor.ToCairoColor ();
+						ctx.MoveTo (x + textOffset, textTopPadding);
+						PangoCairoHelper.ShowLayout (ctx, layout);
+					}
+
+					ctx.Restore ();
 				}
-				
-				layout.Attributes = (i == activeIndex) ? boldAtts : null;
-				layout.SetMarkup (rightPath [i].Markup);
-				Style.PaintLayout (Style, GdkWindow, State, false, evnt.Area, this, "", x + textOffset, ypos, layout);
+
+				ctx.MoveTo (0, Allocation.Height - 0.5);
+				ctx.RelLineTo (Allocation.Width, 0);
+				ctx.Color = Styles.BreadcrumbBottomBorderColor;
+				ctx.LineWidth = 1;
+				ctx.Stroke ();
 			}
-			
+
 			return true;
 		}
-		
+
+		void DrawPathSeparator (Cairo.Context ctx, double x, double y, double size)
+		{
+			ctx.MoveTo (x, y);
+			ctx.LineTo (x + arrowSize, y + size / 2);
+			ctx.LineTo (x, y + size);
+			ctx.ClosePath ();
+			ctx.Color = CairoExtensions.ColorShade (Style.Dark (State).ToCairoColor (), 0.6);
+			ctx.Fill ();
+		}
+
+		void DrawButtonBorder (Cairo.Context ctx, double x, double width)
+		{
+			x -= buttonPadding;
+			width += buttonPadding;
+			double y = topPadding - buttonPadding;
+			double height = Allocation.Height - topPadding - bottomPadding + buttonPadding * 2;
+
+			ctx.Rectangle (x, y, width, height);
+			ctx.Color = Styles.BreadcrumbButtonFillColor;
+			ctx.Fill ();
+
+			ctx.Rectangle (x + 0.5, y + 0.5, width - 1, height - 1);
+			ctx.Color = Styles.BreadcrumbButtonBorderColor;
+			ctx.LineWidth = 1;
+			ctx.Stroke ();
+		}
+
+		int[] ReduceWidths (int overflow)
+		{
+			int minItemWidth = 30;
+			int[] currentWidths = new int[widths.Length];
+			Array.Copy (widths, currentWidths, widths.Length);
+			int itemsToShrink = widths.Count (i => i > minItemWidth);
+			while (overflow > 0 && itemsToShrink > 0) {
+				int itemSizeReduction = overflow / itemsToShrink;
+				if (itemSizeReduction == 0)
+					itemSizeReduction = 1;
+				int reduced = 0;
+				for (int n = 0; n < widths.Length && reduced < overflow; n++) {
+					if (currentWidths [n] > minItemWidth) {
+						var nw = currentWidths [n] - itemSizeReduction;
+						if (nw <= minItemWidth) {
+							nw = minItemWidth;
+							itemsToShrink--;
+						}
+						reduced += currentWidths [n] - nw;
+						currentWidths [n] = nw;
+					}
+				}
+				overflow -= reduced;
+			}
+			return currentWidths;
+		}
+
 		protected override bool OnButtonPressEvent (EventButton evnt)
 		{
 			if (hovering) {
@@ -301,11 +442,13 @@ namespace MonoDevelop.Components
 		{
 			if (hoverIndex < 0)
 				return;
-			
-			Gtk.Widget widget = createMenuForItem (hoverIndex);
-			if (widget == null)
+
+			HideMenu ();
+
+			menuWidget = createMenuForItem (hoverIndex);
+			if (menuWidget == null)
 				return;
-			widget.Hidden += delegate {
+			menuWidget.Hidden += delegate {
 				
 				menuVisible = false;
 				QueueDraw ();
@@ -313,18 +456,25 @@ namespace MonoDevelop.Components
 				//FIXME: for some reason the menu's children don't get activated if we destroy 
 				//directly here, so use a timeout to delay it
 				GLib.Timeout.Add (100, delegate {
-					widget.Destroy ();
+					HideMenu ();
 					return false;
 				});
 			};
 			menuVisible = true;
-			if (widget is Menu) {
-				((Menu)widget).Popup (null, null, PositionFunc, 0, Gtk.Global.CurrentEventTime);
+			if (menuWidget is Menu) {
+				((Menu)menuWidget).Popup (null, null, PositionFunc, 0, Gtk.Global.CurrentEventTime);
 			} else {
-				PositionWidget (widget);
-				widget.ShowAll ();
+				PositionWidget (menuWidget);
+				menuWidget.ShowAll ();
 			}
-				
+		}
+
+		public void HideMenu ()
+		{
+			if (menuWidget != null) {
+				menuWidget.Destroy ();
+				menuWidget = null;
+			}
 		}
 		
 		public int GetHoverXPosition (out int w)
@@ -333,14 +483,14 @@ namespace MonoDevelop.Components
 				int idx = leftPath.TakeWhile (p => p != Path[hoverIndex]).Count ();
 				
 				if (idx >= 0) {
-					w = leftWidths[idx];
-					return leftWidths.Take (idx).Sum () + idx * spacing;
+					w = widths[idx];
+					return widths.Take (idx).Sum () + idx * spacing;
 				}
 			} else {
 				int idx = rightPath.TakeWhile (p => p != Path[hoverIndex]).Count ();
 				if (idx >= 0) {
-					w = rightWidths[idx];
-					return Allocation.Width - padding - rightWidths[idx] - spacing;
+					w = widths[idx + leftPath.Length];
+					return Allocation.Width - padding - widths[idx + leftPath.Length] - spacing;
 				}
 			}
 			w = Allocation.Width;
@@ -434,18 +584,18 @@ namespace MonoDevelop.Components
 		int GetItemAt (int x, int y)
 		{
 			int xpos = padding, xposRight = Allocation.Width - padding;
-			if (leftWidths == null || x < xpos || x > xposRight)
+			if (widths == null || x < xpos || x > xposRight)
 				return -1;
 			
 			//could do a binary search, but probably not worth it
 			for (int i = 0; i < leftPath.Length; i++) {
-				xpos += leftWidths[i] + spacing;
+				xpos += widths[i] + spacing;
 				if (x < xpos)
 					return IndexOf (leftPath[i]);
 			}
 			
 			for (int i = 0; i < rightPath.Length; i++) {
-				xposRight -= rightWidths[i] - spacing;
+				xposRight -= widths[i + leftPath.Length] - spacing;
 				if (x > xposRight)
 					return IndexOf (rightPath[i]);
 			}
@@ -460,31 +610,42 @@ namespace MonoDevelop.Components
 			layout = new Pango.Layout (PangoContext);
 		}
 		
-		int[] CreateWidthArray (PathEntry[] path)
+		void CreateWidthArray (int[] result, int index, PathEntry[] path)
 		{
-			var result = new int[path.Length];
+			// Assume that there will be icons of at least 16 pixels. This avoids
+			// annoying path bar height changes when switching between empty and full paths
+			int maxIconHeight = 16;
+
 			for (int i = 0; i < path.Length; i++) {
 				layout.Attributes = (i == activeIndex)? boldAtts : null;
 				layout.SetMarkup (path[i].Markup);
+				layout.Width = -1;
 				int w, h;
 				layout.GetPixelSize (out w, out h);
-				height = Math.Max (h, height);
-				result[i] = w + (path[i].Icon != null ? path[i].Icon.Width + padding : 0);
+				textHeight = Math.Max (h, textHeight);
+				if (path[i].DarkIcon != null) {
+					maxIconHeight = Math.Max (path[i].DarkIcon.Height, maxIconHeight);
+					w += path[i].DarkIcon.Width + iconSpacing;
+				}
+				result[i + index] = w;
 			}
-			return result;
+			height = Math.Max (height, maxIconHeight);
+			height = Math.Max (height, textHeight);
 		}
 
 		void EnsureWidths ()
 		{
-			if (leftWidths != null) 
+			if (widths != null) 
 				return;
 			
 			layout.SetText ("#");
 			int w;
 			layout.GetPixelSize (out w, out this.height);
-			
-			leftWidths = CreateWidthArray (leftPath);
-			rightWidths = CreateWidthArray (rightPath);
+			textHeight = height;
+
+			widths = new int [leftPath.Length + rightPath.Length];
+			CreateWidthArray (widths, 0, leftPath);
+			CreateWidthArray (widths, leftPath.Length, rightPath);
 		}
 		
 		protected override void OnStyleSet (Style previous)
@@ -502,7 +663,7 @@ namespace MonoDevelop.Components
 			layout = null;
 			boldAtts.Dispose ();
 			
-			leftWidths = rightWidths = null;
+			widths = null;
 		}
 		
 		public override void Destroy ()

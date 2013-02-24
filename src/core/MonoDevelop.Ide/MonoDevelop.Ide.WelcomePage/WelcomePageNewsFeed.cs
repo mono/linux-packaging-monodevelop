@@ -27,32 +27,40 @@
 using Gtk;
 using System;
 using MonoDevelop.Core;
+using System.Collections.Generic;
 using System.Xml;
 using System.Xml.Linq;
+using System.Linq;
 using System.IO;
 using System.Net;
 
 namespace MonoDevelop.Ide.WelcomePage
 {
-	class WelcomePageNewsFeed : VBox
+	public class WelcomePageNewsFeed : WelcomePageSection
 	{
 		string newsUrl;
 		string id;
-		XElement defaultContent;
+		int limit;
 		bool destroyed;
+		Gtk.VBox box;
 		
-		public WelcomePageNewsFeed (XElement el)
+		public WelcomePageNewsFeed (string title, string newsUrl, string id, int limit = 5): base (title)
 		{
-			newsUrl = (string) el.Attribute ("src");
+			box = new VBox (false, Styles.WelcomeScreen.Pad.News.Item.MarginBottom);
 			if (string.IsNullOrEmpty (newsUrl))
 				throw new Exception ("News feed is missing src attribute");
-			id = (string) el.Attribute ("id");
 			if (string.IsNullOrEmpty (id))
 				throw new Exception ("News feed is missing id attribute");
-			
-			defaultContent = el;
+
+			this.newsUrl = newsUrl;
+			this.id = id;
+			this.limit = limit;
+
 			UpdateNews ();
 			LoadNews ();
+			SetContent (box);
+			ContentAlignment.TopPadding += 10;
+			WidthRequest = Styles.WelcomeScreen.Pad.News.Width;
 		}
 		
 		protected override void OnDestroyed ()
@@ -60,15 +68,24 @@ namespace MonoDevelop.Ide.WelcomePage
 			destroyed = true;
 			base.OnDestroyed ();
 		}
+
+		protected virtual IEnumerable<Gtk.Widget> OnLoadNews (XElement news)
+		{
+			foreach (var child in news.Elements ()) {
+				if (child.Name != "link" && child.Name != "Link")
+					throw new Exception ("Unexpected child '" + child.Name + "'");
+				yield return new WelcomePageFeedItem (child);
+			}
+		}
 		
 		void LoadNews ()
 		{
 			//can get called from async handler
 			if (destroyed)
 				return;
-			
-			foreach (var c in Children) {
-				this.Remove (c);
+
+			foreach (var c in box.Children) {
+				box.Remove (c);
 				c.Destroy ();
 			}
 			
@@ -76,17 +93,13 @@ namespace MonoDevelop.Ide.WelcomePage
 				var news = GetNewsXml ();
 				if (news.FirstNode == null) {
 					var label = new Label (GettextCatalog.GetString ("No news found.")) { Xalign = 0, Xpad = 6 };
-					this.PackStart (label, true, false, 0);
+					box.PackStart (label, true, false, 0);
 				} else {
-					foreach (var child in news.Elements ()) {
-						if (child.Name != "link" && child.Name != "Link")
-							throw new Exception ("Unexpected child '" + child.Name + "'");
-						var button = new WelcomePageLinkButton (child);
-						this.PackStart (button, true, false, 0);
-					}
+					foreach (var child in OnLoadNews (news).Take (limit))
+						box.PackStart (child, true, false, 0);
 				}
 			} catch (Exception ex) {
-				LoggingService.LogWarning ("Error loading welcome page news.", ex);
+				LoggingService.LogWarning ("Error loading news feed.", ex);
 			}
 			this.ShowAll ();
 		}
@@ -116,75 +129,31 @@ namespace MonoDevelop.Ide.WelcomePage
 				return;
 			}
 			LoggingService.LogInfo ("Updating Welcome Page from '{0}'.", newsUrl);
-			
-			//HACK: .NET blocks on DNS in BeginGetResponse, so use a threadpool thread
-			// see http://stackoverflow.com/questions/1232139#1232930
-			System.Threading.ThreadPool.QueueUserWorkItem ((state) => {
-				var request = (HttpWebRequest)WebRequest.Create (newsUrl);
-				
+
+			FileService.UpdateDownloadedCacheFile (newsUrl, CacheFile, s => {
+				using (var reader = XmlReader.Create (s, GetSafeReaderSettings ())) {
+					return reader.ReadToDescendant ("links");
+				}
+			}).ContinueWith (t => {
 				try {
-					//check to see if the online news file has been modified since it was last downloaded
-					string localCachedNewsFile = CacheFile;
-					var localNewsXml = new FileInfo (localCachedNewsFile);
-					if (localNewsXml.Exists)
-						request.IfModifiedSince = localNewsXml.LastWriteTime;
-					
-					request.BeginGetResponse (HandleResponse, request);
+					if (t.IsCanceled)
+						return;
+
+					if (!t.Result) {
+						LoggingService.LogInfo ("Welcome Page already up-to-date.");
+						return;
+					}
+
+					LoggingService.LogInfo ("Welcome Page updated.");
+					Gtk.Application.Invoke (delegate { LoadNews (); });
+
 				} catch (Exception ex) {
 					LoggingService.LogWarning ("Welcome Page news file could not be downloaded.", ex);
+				} finally {
 					lock (updateLock)
 						isUpdating = false;
 				}
 			});
-		}
-		
-		void HandleResponse (IAsyncResult ar)
-		{
-			string localCachedNewsFile = CacheFile;
-			try {
-				var request = (HttpWebRequest) ar.AsyncState;
-				var tempFile = localCachedNewsFile + ".temp";
-				//FIXME: limit this size in case open wifi hotspots provide bad data
-				var response = (HttpWebResponse) request.EndGetResponse (ar);
-				if (response.StatusCode == HttpStatusCode.OK) {
-					using (var fs = File.Create (tempFile))
-						response.GetResponseStream ().CopyTo (fs, 2048);
-				}
-				
-				//check the document is valid, might get bad ones from wifi hotspots etc
-				try {
-					var updateDoc = new XmlDocument ();
-					using (var reader = XmlReader.Create (tempFile, GetSafeReaderSettings ()))
-						updateDoc.Load (reader);
-					updateDoc.SelectSingleNode ("/links");
-				} catch (Exception ex) {
-					LoggingService.LogWarning ("Welcome Page news file is bad, keeping old version.", ex);
-					File.Delete (tempFile);
-					return;
-				}
-				
-				if (File.Exists (localCachedNewsFile))
-					File.Delete (localCachedNewsFile);
-				File.Move (tempFile, localCachedNewsFile);
-				
-				Gtk.Application.Invoke (delegate {
-					LoadNews ();
-				});
-			} catch (System.Net.WebException wex) {
-				var httpResp = wex.Response as HttpWebResponse;
-				if (httpResp != null && httpResp.StatusCode == HttpStatusCode.NotModified) {
-					LoggingService.LogInfo ("Welcome Page already up-to-date.");
-				} else if (httpResp != null && httpResp.StatusCode == HttpStatusCode.NotFound) {
-					LoggingService.LogInfo ("Welcome Page update file not found.", newsUrl);
-				} else {
-					LoggingService.LogWarning ("Welcome Page news file could not be downloaded.", wex);
-				}
-			} catch (Exception ex) {
-				LoggingService.LogWarning ("Welcome Page news file could not be downloaded.", ex);
-			} finally {
-				lock (updateLock)
-					isUpdating = false;
-			}
 		}
 		
 		static XmlReaderSettings GetSafeReaderSettings ()
@@ -221,7 +190,7 @@ namespace MonoDevelop.Ide.WelcomePage
 				}
 			}
 			
-			return defaultContent;
+			return new XElement ("News");
 		}
 	}
 }

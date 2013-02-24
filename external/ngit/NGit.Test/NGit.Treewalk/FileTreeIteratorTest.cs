@@ -184,6 +184,35 @@ namespace NGit.Treewalk
 
 		/// <exception cref="System.Exception"></exception>
 		[NUnit.Framework.Test]
+		public virtual void TestDirCacheMatchingId()
+		{
+			FilePath f = WriteTrashFile("file", "content");
+			Git git = new Git(db);
+			WriteTrashFile("file", "content");
+			FsTick(f);
+			git.Add().AddFilepattern("file").Call();
+			DirCacheEntry dce = db.ReadDirCache().GetEntry("file");
+			TreeWalk tw = new TreeWalk(db);
+			FileTreeIterator fti = new FileTreeIterator(trash, db.FileSystem, ((FileBasedConfig
+				)db.GetConfig()).Get(WorkingTreeOptions.KEY));
+			tw.AddTree(fti);
+			DirCacheIterator dci = new DirCacheIterator(db.ReadDirCache());
+			tw.AddTree(dci);
+			fti.SetDirCacheIterator(tw, 1);
+			while (tw.Next() && !tw.PathString.Equals("file"))
+			{
+			}
+			//
+			NUnit.Framework.Assert.AreEqual(WorkingTreeIterator.MetadataDiff.EQUAL, fti.CompareMetadata
+				(dce));
+			ObjectId fromRaw = ObjectId.FromRaw(fti.IdBuffer, fti.IdOffset);
+			NUnit.Framework.Assert.AreEqual("6b584e8ece562ebffc15d38808cd6b98fc3d97ea", fromRaw
+				.GetName());
+			NUnit.Framework.Assert.IsFalse(fti.IsModified(dce, false));
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
 		public virtual void TestIsModifiedSymlink()
 		{
 			FilePath f = WriteTrashFile("symlink", "content");
@@ -205,6 +234,32 @@ namespace NGit.Treewalk
 
 		/// <exception cref="System.Exception"></exception>
 		[NUnit.Framework.Test]
+		public virtual void TestIsModifiedFileSmudged()
+		{
+			FilePath f = WriteTrashFile("file", "content");
+			Git git = new Git(db);
+			// The idea of this test is to check the smudged handling
+			// Hopefully fsTick will make sure our entry gets smudged
+			FsTick(f);
+			WriteTrashFile("file", "content");
+			git.Add().AddFilepattern("file").Call();
+			WriteTrashFile("file", "conten2");
+			DirCacheEntry dce = db.ReadDirCache().GetEntry("file");
+			FileTreeIterator fti = new FileTreeIterator(trash, db.FileSystem, ((FileBasedConfig
+				)db.GetConfig()).Get(WorkingTreeOptions.KEY));
+			while (!fti.EntryPathString.Equals("file"))
+			{
+				fti.Next(1);
+			}
+			// If the fsTick trick does not work we could skip the compareMetaData
+			// test and hope that we are usually testing the intended code path.
+			NUnit.Framework.Assert.AreEqual(WorkingTreeIterator.MetadataDiff.SMUDGED, fti.CompareMetadata
+				(dce));
+			NUnit.Framework.Assert.IsTrue(fti.IsModified(dce, false));
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
 		public virtual void SubmoduleHeadMatchesIndex()
 		{
 			Git git = new Git(db);
@@ -214,10 +269,10 @@ namespace NGit.Treewalk
 			string path = "sub";
 			DirCache cache = db.LockDirCache();
 			DirCacheEditor editor = cache.Editor();
-			editor.Add(new _PathEdit_227(id, path));
+			editor.Add(new _PathEdit_278(id, path));
 			editor.Commit();
 			Git.CloneRepository().SetURI(db.Directory.ToURI().ToString()).SetDirectory(new FilePath
-				(db.WorkTree, path)).Call();
+				(db.WorkTree, path)).Call().GetRepository().Close();
 			TreeWalk walk = new TreeWalk(db);
 			DirCacheIterator indexIter = new DirCacheIterator(db.ReadDirCache());
 			FileTreeIterator workTreeIter = new FileTreeIterator(db);
@@ -228,9 +283,9 @@ namespace NGit.Treewalk
 			NUnit.Framework.Assert.IsTrue(indexIter.IdEqual(workTreeIter));
 		}
 
-		private sealed class _PathEdit_227 : DirCacheEditor.PathEdit
+		private sealed class _PathEdit_278 : DirCacheEditor.PathEdit
 		{
-			public _PathEdit_227(RevCommit id, string baseArg1) : base(baseArg1)
+			public _PathEdit_278(RevCommit id, string baseArg1) : base(baseArg1)
 			{
 				this.id = id;
 			}
@@ -255,7 +310,7 @@ namespace NGit.Treewalk
 			string path = "sub";
 			DirCache cache = db.LockDirCache();
 			DirCacheEditor editor = cache.Editor();
-			editor.Add(new _PathEdit_259(id, path));
+			editor.Add(new _PathEdit_311(id, path));
 			editor.Commit();
 			FilePath submoduleRoot = new FilePath(db.WorkTree, path);
 			NUnit.Framework.Assert.IsTrue(submoduleRoot.Mkdir());
@@ -272,9 +327,9 @@ namespace NGit.Treewalk
 			NUnit.Framework.Assert.AreEqual(ObjectId.ZeroId, workTreeIter.EntryObjectId);
 		}
 
-		private sealed class _PathEdit_259 : DirCacheEditor.PathEdit
+		private sealed class _PathEdit_311 : DirCacheEditor.PathEdit
 		{
-			public _PathEdit_259(RevCommit id, string baseArg1) : base(baseArg1)
+			public _PathEdit_311(RevCommit id, string baseArg1) : base(baseArg1)
 			{
 				this.id = id;
 			}
@@ -299,7 +354,7 @@ namespace NGit.Treewalk
 			string path = "sub";
 			DirCache cache = db.LockDirCache();
 			DirCacheEditor editor = cache.Editor();
-			editor.Add(new _PathEdit_293(id, path));
+			editor.Add(new _PathEdit_345(id, path));
 			editor.Commit();
 			NUnit.Framework.Assert.IsNotNull(Git.Init().SetDirectory(new FilePath(db.WorkTree
 				, path)).Call().GetRepository());
@@ -314,9 +369,9 @@ namespace NGit.Treewalk
 			NUnit.Framework.Assert.AreEqual(ObjectId.ZeroId, workTreeIter.EntryObjectId);
 		}
 
-		private sealed class _PathEdit_293 : DirCacheEditor.PathEdit
+		private sealed class _PathEdit_345 : DirCacheEditor.PathEdit
 		{
-			public _PathEdit_293(RevCommit id, string baseArg1) : base(baseArg1)
+			public _PathEdit_345(RevCommit id, string baseArg1) : base(baseArg1)
 			{
 				this.id = id;
 			}
@@ -341,10 +396,10 @@ namespace NGit.Treewalk
 			string path = "sub";
 			DirCache cache = db.LockDirCache();
 			DirCacheEditor editor = cache.Editor();
-			editor.Add(new _PathEdit_326(id, path));
+			editor.Add(new _PathEdit_378(id, path));
 			editor.Commit();
 			Git.CloneRepository().SetURI(db.Directory.ToURI().ToString()).SetDirectory(new FilePath
-				(db.WorkTree, path)).Call();
+				(db.WorkTree, path)).Call().GetRepository().Close();
 			TreeWalk walk = new TreeWalk(db);
 			DirCacheIterator indexIter = new DirCacheIterator(db.ReadDirCache());
 			FileTreeIterator workTreeIter = new FileTreeIterator(db.WorkTree, db.FileSystem, 
@@ -356,9 +411,9 @@ namespace NGit.Treewalk
 			NUnit.Framework.Assert.IsTrue(indexIter.IdEqual(workTreeIter));
 		}
 
-		private sealed class _PathEdit_326 : DirCacheEditor.PathEdit
+		private sealed class _PathEdit_378 : DirCacheEditor.PathEdit
 		{
-			public _PathEdit_326(RevCommit id, string baseArg1) : base(baseArg1)
+			public _PathEdit_378(RevCommit id, string baseArg1) : base(baseArg1)
 			{
 				this.id = id;
 			}
@@ -383,10 +438,10 @@ namespace NGit.Treewalk
 			string path = "sub/dir1/dir2";
 			DirCache cache = db.LockDirCache();
 			DirCacheEditor editor = cache.Editor();
-			editor.Add(new _PathEdit_359(id, path));
+			editor.Add(new _PathEdit_412(id, path));
 			editor.Commit();
 			Git.CloneRepository().SetURI(db.Directory.ToURI().ToString()).SetDirectory(new FilePath
-				(db.WorkTree, path)).Call();
+				(db.WorkTree, path)).Call().GetRepository().Close();
 			TreeWalk walk = new TreeWalk(db);
 			DirCacheIterator indexIter = new DirCacheIterator(db.ReadDirCache());
 			FileTreeIterator workTreeIter = new FileTreeIterator(db);
@@ -397,9 +452,9 @@ namespace NGit.Treewalk
 			NUnit.Framework.Assert.IsTrue(indexIter.IdEqual(workTreeIter));
 		}
 
-		private sealed class _PathEdit_359 : DirCacheEditor.PathEdit
+		private sealed class _PathEdit_412 : DirCacheEditor.PathEdit
 		{
-			public _PathEdit_359(RevCommit id, string baseArg1) : base(baseArg1)
+			public _PathEdit_412(RevCommit id, string baseArg1) : base(baseArg1)
 			{
 				this.id = id;
 			}
@@ -411,6 +466,45 @@ namespace NGit.Treewalk
 			}
 
 			private readonly RevCommit id;
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[NUnit.Framework.Test]
+		public virtual void IdOffset()
+		{
+			Git git = new Git(db);
+			WriteTrashFile("fileAinfsonly", "A");
+			FilePath fileBinindex = WriteTrashFile("fileBinindex", "B");
+			FsTick(fileBinindex);
+			git.Add().AddFilepattern("fileBinindex").Call();
+			WriteTrashFile("fileCinfsonly", "C");
+			TreeWalk tw = new TreeWalk(db);
+			DirCacheIterator indexIter = new DirCacheIterator(db.ReadDirCache());
+			FileTreeIterator workTreeIter = new FileTreeIterator(db);
+			tw.AddTree(indexIter);
+			tw.AddTree(workTreeIter);
+			workTreeIter.SetDirCacheIterator(tw, 0);
+			AssertEntry("d46c305e85b630558ee19cc47e73d2e5c8c64cdc", "a,", tw);
+			AssertEntry("58ee403f98538ec02409538b3f80adf610accdec", "a,b", tw);
+			AssertEntry("0000000000000000000000000000000000000000", "a", tw);
+			AssertEntry("b8d30ff397626f0f1d3538d66067edf865e201d6", "a0b", tw);
+			// The reason for adding this test. Check that the id is correct for
+			// mixed
+			AssertEntry("8c7e5a667f1b771847fe88c01c3de34413a1b220", "fileAinfsonly", tw);
+			AssertEntry("7371f47a6f8bd23a8fa1a8b2a9479cdd76380e54", "fileBinindex", tw);
+			AssertEntry("96d80cd6c4e7158dbebd0849f4fb7ce513e5828c", "fileCinfsonly", tw);
+			NUnit.Framework.Assert.IsFalse(tw.Next());
+		}
+
+		/// <exception cref="NGit.Errors.MissingObjectException"></exception>
+		/// <exception cref="NGit.Errors.IncorrectObjectTypeException"></exception>
+		/// <exception cref="NGit.Errors.CorruptObjectException"></exception>
+		/// <exception cref="System.IO.IOException"></exception>
+		private void AssertEntry(string sha1string, string path, TreeWalk tw)
+		{
+			NUnit.Framework.Assert.IsTrue(tw.Next());
+			NUnit.Framework.Assert.AreEqual(path, tw.PathString);
+			NUnit.Framework.Assert.AreEqual(sha1string, tw.GetObjectId(1).GetName());
 		}
 
 		private static string NameOf(AbstractTreeIterator i)

@@ -70,7 +70,6 @@ namespace MonoDevelop.Ide.Commands
 				ci.Icon = pad.Icon;
 				ci.UseMarkup = true;
 				ci.Description = GettextCatalog.GetString ("Show {0}", pad.Title);
-				ci.Checked = pad.Visible;
 
 				ActionCommand cmd = IdeApp.CommandService.GetActionCommand ("Pad|" + pad.Id);
 				if (cmd != null) ci.AccelKey = cmd.AccelKey; 
@@ -157,13 +156,13 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandInfo info)
 		{
-			info.Enabled = !String.Equals ("Default", IdeApp.Workbench.CurrentLayout, StringComparison.OrdinalIgnoreCase);
+			info.Enabled = !String.Equals ("Solution", IdeApp.Workbench.CurrentLayout, StringComparison.OrdinalIgnoreCase);
 		}
 		protected override void Run ()
 		{
 			if (MessageService.Confirm (GettextCatalog.GetString ("Are you sure you want to delete the active layout?"), AlertButton.Delete)) {
 				string clayout = IdeApp.Workbench.CurrentLayout;
-				IdeApp.Workbench.CurrentLayout = "Default";
+				IdeApp.Workbench.CurrentLayout = "Solution";
 				IdeApp.Workbench.DeleteLayout (clayout);
 			}
 		}

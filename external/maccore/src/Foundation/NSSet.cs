@@ -6,6 +6,7 @@
 //
 // Copyright 2009, Novell, Inc.
 // Copyright 2010, Novell, Inc.
+// Copyright 2012, Xamarin Inc
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -36,10 +37,14 @@ using MonoMac.ObjCRuntime;
 
 namespace MonoMac.Foundation {
 
-	public partial class NSSet {
-		static IntPtr selSetWithArray = Selector.sel_registerName ("setWithArray:");
+	public partial class NSSet : IEnumerable<NSObject> {
+		internal static IntPtr selSetWithArray = Selector.sel_registerName ("setWithArray:");
 
-		public NSSet (NSObject [] objs) : this (NSArray.FromNSObjects (objs))
+		public NSSet (params NSObject [] objs) : this (NSArray.FromNSObjects (objs))
+		{
+		}
+
+		public NSSet (params object [] objs) : this (NSArray.FromObjects (objs))
 		{
 		}
 
@@ -58,5 +63,49 @@ namespace MonoMac.Foundation {
 			NSArray a = NSArray.FromNSObjects (values);
 			return (NSSet) Runtime.GetNSObject (MonoMac.ObjCRuntime.Messaging.IntPtr_objc_msgSend_IntPtr (class_ptr, selSetWithArray, a.Handle));
 		}
+
+		public IEnumerator<NSObject> GetEnumerator ()
+		{
+			var enumerator = _GetEnumerator ();
+			NSObject obj;
+			
+			while ((obj = enumerator.NextObject ()) != null)
+				yield return obj as NSObject;
+		}
+
+		IEnumerator IEnumerable.GetEnumerator ()
+		{
+			var enumerator = _GetEnumerator ();
+			NSObject obj;
+			
+			while ((obj = enumerator.NextObject ()) != null)
+				yield return obj;
+		}
+
+		public static NSSet operator + (NSSet first, NSSet second)
+		{
+			if (first == null)
+				return second;
+			if (second == null)
+				return first;
+			return first.SetByAddingObjectsFromSet (second);
+		}
+
+		public static NSSet operator - (NSSet first, NSSet second)
+		{
+			if (first == null)
+				return null;
+			if (second == null)
+				return first;
+			var copy = new NSMutableSet (first);
+			copy.MinusSet (second);
+			return copy;
+		}
+
+		public bool Contains (object obj)
+		{
+			return Contains (NSObject.FromObject (obj));
+		}
 	}
+		
 }

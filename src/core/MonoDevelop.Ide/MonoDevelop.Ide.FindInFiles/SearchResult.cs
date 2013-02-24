@@ -34,13 +34,41 @@ namespace MonoDevelop.Ide.FindInFiles
 		
 		public int Offset { get; set; }
 		public int Length { get; set; }
-		
+
 		public virtual string FileName {
 			get {
 				return FileProvider.FileName;
 			}
 		}
-		
+
+		#region Cached data
+		public int LineNumber {
+			get;
+			set;
+		}
+
+		public string Markup {
+			get; 
+			set;
+		}
+
+		public uint StartIndex {
+			get;
+			set;
+		}
+
+		public uint EndIndex {
+			get;
+			set;
+		}
+
+		public Gdk.Pixbuf Pixbuf {
+			get;
+			set;
+		}
+		#endregion
+
+
 		protected SearchResult (int offset, int length)
 		{
 			Offset = offset;
