@@ -28,7 +28,13 @@ override_dh_clideps:
 			--exclude-moduleref=libigemacintegration.dylib \
 			--exclude-moduleref=/usr/lib/libobjc.dylib \
 			--exclude-moduleref=glibsharpglue-2 \
-			--exclude-moduleref=gtksharpglue-2
+			--exclude-moduleref=gtksharpglue-2 \
+			--exclude-moduleref=libsvn_client-1.so.0 \
+			--exclude-moduleref=libapr-0.so.0 \
+			--exclude-moduleref=ole32.dll \
+			--exclude-moduleref=fusion \
+			--exclude-moduleref=/System/Library/Frameworks/ApplicationServices.framework/Frameworks/CoreGraphics.framework/CoreGraphics \
+			--exclude-moduleref=libgtk-quartz-2.0.dylib
 
 override_dh_auto_test:
 	# skip "make test"
