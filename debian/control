@@ -24,7 +24,7 @@ Build-Depends-Indep: autoconf,
                      libmono-cecil-cil-dev,
                      libnunit-cil-dev (>= 2.6),
                      libsvn-dev,
-                     mono-devel (>= 2.10),
+                     mono-devel (>= 3.0),
                      mono-gmcs,
                      monodoc-base (>= 1.1.9)
 Standards-Version: 3.9.2
