@@ -95,15 +95,3 @@ Description: VersionControl plugin for MonoDevelop
  This package enables version control integration (currently only Subversion)
  for MonoDevelop.
 
-#Package: monodevelop-moonlight
-#Architecture: all
-#Depends: ${shlibs:Depends},
-#         ${misc:Depends},
-#         ${cli:Depends},
-#         monodevelop (= ${source:Version}),
-#         moonlight-web-devel
-#Description: Moonlight plugin for MonoDevelop
-# MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
-# languages.
-# .
-# This package enables Moonlight developnment with MonoDevelop.
