@@ -92,6 +92,6 @@ Description: VersionControl plugin for MonoDevelop
  MonoDevelop is a GNOME IDE primarily designed for C# and other CLI (.NET)
  languages. It is the unbranded version of Xamarin Studio.
  .
- This package enables version control integration (currently only Subversion)
+ This package enables version control integration (Subversion and Git)
  for MonoDevelop.
 
