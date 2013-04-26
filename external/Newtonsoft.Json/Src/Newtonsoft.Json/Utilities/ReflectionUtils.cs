@@ -33,6 +33,8 @@ using System.Runtime.Serialization.Formatters;
 using System.Text;
 #if NETFX_CORE
 using IConvertible = Newtonsoft.Json.Utilities.Convertible;
+#endif
+#if NETFX_CORE || PORTABLE
 using ICustomAttributeProvider = Newtonsoft.Json.Utilities.CustomAttributeProvider;
 #endif
 #if NET20
@@ -44,6 +46,32 @@ using Newtonsoft.Json.Serialization;
 
 namespace Newtonsoft.Json.Utilities
 {
+#if NETFX_CORE || PORTABLE
+  internal enum MemberTypes
+  {
+    Property,
+    Field,
+    Event,
+    Method,
+    Other
+  }
+
+  internal class CustomAttributeProvider
+  {
+    private readonly object _underlyingObject;
+
+    public CustomAttributeProvider(object o)
+    {
+      _underlyingObject = o;
+    }
+
+    public object UnderlyingObject
+    {
+      get { return _underlyingObject; }
+    }
+  }
+#endif
+
 #if NETFX_CORE
   internal enum TypeCode
   {
@@ -66,15 +94,6 @@ namespace Newtonsoft.Json.Utilities
     Decimal
   }
 
-  internal enum MemberTypes
-  {
-    Property,
-    Field,
-    Event,
-    Method,
-    Other
-  }
-  
   [Flags]
   internal enum BindingFlags
   {
@@ -99,21 +118,6 @@ namespace Newtonsoft.Json.Utilities
     OptionalParamBinding = 262144,
     IgnoreReturn = 16777216
   }
-
-  internal class CustomAttributeProvider
-  {
-    private readonly object _underlyingObject;
-
-    public CustomAttributeProvider(object o)
-    {
-      _underlyingObject = o;
-    }
-
-    public object UnderlyingObject
-    {
-      get { return _underlyingObject; }
-    }
-  }
 #endif
 
   internal static class ReflectionUtils
@@ -122,7 +126,7 @@ namespace Newtonsoft.Json.Utilities
 
     static ReflectionUtils()
     {
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
       EmptyTypes = Type.EmptyTypes;
 #else
       EmptyTypes = new Type[0];
@@ -131,7 +135,7 @@ namespace Newtonsoft.Json.Utilities
 
     public static ICustomAttributeProvider GetCustomAttributeProvider(this object o)
     {
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
       return (ICustomAttributeProvider)o;
 #else
       return new ICustomAttributeProvider(o);
@@ -186,7 +190,7 @@ namespace Newtonsoft.Json.Utilities
         case FormatterAssemblyStyle.Simple:
           return RemoveAssemblyDetails(fullyQualifiedTypeName);
         case FormatterAssemblyStyle.Full:
-          return t.AssemblyQualifiedName;
+          return fullyQualifiedTypeName;
         default:
           throw new ArgumentOutOfRangeException();
       }
@@ -274,7 +278,7 @@ namespace Newtonsoft.Json.Utilities
       if (nonPublic)
         bindingFlags = bindingFlags | BindingFlags.NonPublic;
 
-      return t.GetConstructor(bindingFlags, null, ReflectionUtils.EmptyTypes, null);
+      return t.GetConstructors(bindingFlags).SingleOrDefault(c => !c.GetParameters().Any());
     }
 
     public static bool IsNullable(Type t)
@@ -653,23 +657,26 @@ namespace Newtonsoft.Json.Utilities
       // update: I think this is fixed in .NET 3.5 SP1 - leave this in for now...
       List<MemberInfo> distinctMembers = new List<MemberInfo>(targetMembers.Count);
 
-      var groupedMembers = targetMembers.GroupBy(m => m.Name).Select(g => new { Count = g.Count(), Members = g.Cast<MemberInfo>() });
-      foreach (var groupedMember in groupedMembers)
+      foreach (var groupedMember in targetMembers.GroupBy(m => m.Name))
       {
-        if (groupedMember.Count == 1)
+        int count = groupedMember.Count();
+        IList<MemberInfo> members = groupedMember.ToList();
+
+        if (count == 1)
         {
-          distinctMembers.Add(groupedMember.Members.First());
+          distinctMembers.Add(members.First());
         }
         else
         {
-          var members = groupedMember.Members.Where(m => !IsOverridenGenericMember(m, bindingAttr) || m.Name == "Item");
+          var resolvedMembers = members.Where(m => !IsOverridenGenericMember(m, bindingAttr) || m.Name == "Item");
 
-          distinctMembers.AddRange(members);
+          distinctMembers.AddRange(resolvedMembers);
         }
       }
 
       return distinctMembers;
     }
+
 
     private static bool IsOverridenGenericMember(MemberInfo memberInfo, BindingFlags bindingAttr)
     {
@@ -702,33 +709,47 @@ namespace Newtonsoft.Json.Utilities
     {
       T[] attributes = GetAttributes<T>(attributeProvider, inherit);
 
-      return attributes.SingleOrDefault();
+      return (attributes != null) ? attributes.SingleOrDefault() : null;
     }
 
-#if !NETFX_CORE
+#if !(NETFX_CORE)
     public static T[] GetAttributes<T>(ICustomAttributeProvider attributeProvider, bool inherit) where T : Attribute
     {
       ValidationUtils.ArgumentNotNull(attributeProvider, "attributeProvider");
 
+      object provider;
+
+#if !PORTABLE
+      provider = attributeProvider;
+#else
+      provider = attributeProvider.UnderlyingObject;
+#endif
+
       // http://hyperthink.net/blog/getcustomattributes-gotcha/
       // ICustomAttributeProvider doesn't do inheritance
 
-      if (attributeProvider is Type)
-        return (T[])((Type)attributeProvider).GetCustomAttributes(typeof(T), inherit);
+      if (provider is Type)
+        return (T[])((Type)provider).GetCustomAttributes(typeof(T), inherit);
 
-      if (attributeProvider is Assembly)
-        return (T[])Attribute.GetCustomAttributes((Assembly)attributeProvider, typeof(T), inherit);
+      if (provider is Assembly)
+        return (T[])Attribute.GetCustomAttributes((Assembly)provider, typeof(T));
 
-      if (attributeProvider is MemberInfo)
-        return (T[])Attribute.GetCustomAttributes((MemberInfo)attributeProvider, typeof(T), inherit);
+      if (provider is MemberInfo)
+        return (T[])Attribute.GetCustomAttributes((MemberInfo)provider, typeof(T), inherit);
 
-      if (attributeProvider is Module)
-        return (T[])Attribute.GetCustomAttributes((Module)attributeProvider, typeof(T), inherit);
+#if !PORTABLE
+      if (provider is Module)
+        return (T[])Attribute.GetCustomAttributes((Module)provider, typeof(T), inherit);
+#endif
 
-      if (attributeProvider is ParameterInfo)
-        return (T[])Attribute.GetCustomAttributes((ParameterInfo)attributeProvider, typeof(T), inherit);
+      if (provider is ParameterInfo)
+        return (T[])Attribute.GetCustomAttributes((ParameterInfo)provider, typeof(T), inherit);
 
+#if !PORTABLE
       return (T[])attributeProvider.GetCustomAttributes(typeof(T), inherit);
+#else
+      throw new Exception("Cannot get attributes from '{0}'.".FormatWith(CultureInfo.InvariantCulture, provider));
+#endif
     }
 #else
     public static T[] GetAttributes<T>(ICustomAttributeProvider attributeProvider, bool inherit) where T : Attribute
@@ -977,6 +998,67 @@ namespace Newtonsoft.Json.Utilities
           }
         }
       }
+    }
+
+    public static bool IsMethodOverridden(Type currentType, Type methodDeclaringType, string method)
+    {
+      bool isMethodOverriden = currentType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+        .Any(info =>
+             info.Name == method &&
+             // check that the method overrides the original on DynamicObjectProxy
+             info.DeclaringType != methodDeclaringType
+             // todo - find out whether there is a way to do this in winrt
+#if !NETFX_CORE
+             && info.GetBaseDefinition().DeclaringType == methodDeclaringType
+#endif
+        );
+
+      return isMethodOverriden;
+    }
+
+    public static object GetDefaultValue(Type type)
+    {
+      if (!type.IsValueType())
+        return null;
+
+      switch (ConvertUtils.GetTypeCode(type))
+      {
+        case TypeCode.Boolean:
+          return false;
+        case TypeCode.Char:
+        case TypeCode.SByte:
+        case TypeCode.Byte:
+        case TypeCode.Int16:
+        case TypeCode.UInt16:
+        case TypeCode.Int32:
+        case TypeCode.UInt32:
+          return 0;
+        case TypeCode.Int64:
+        case TypeCode.UInt64:
+          return 0L;
+        case TypeCode.Single:
+          return 0f;
+        case TypeCode.Double:
+          return 0.0;
+        case TypeCode.Decimal:
+          return 0m;
+        case TypeCode.DateTime:
+          return new DateTime();
+      }
+
+      if (type == typeof(Guid))
+        return new Guid();
+
+#if !NET20
+      if (type == typeof(DateTimeOffset))
+        return new DateTimeOffset();
+#endif
+
+      if (IsNullable(type))
+        return null;
+
+      // possibly use IL initobj for perf here?
+      return Activator.CreateInstance(type);
     }
   }
 }

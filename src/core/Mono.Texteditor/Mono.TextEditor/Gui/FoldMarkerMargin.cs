@@ -226,11 +226,11 @@ namespace Mono.TextEditor
 		
 		internal protected override void OptionsChanged ()
 		{
-			foldBgGC = editor.ColorStyle.Default.CairoBackgroundColor;
-			foldLineGC = editor.ColorStyle.FoldLine.CairoColor;
-			foldLineHighlightedGC = editor.ColorStyle.Default.CairoColor;
+			foldBgGC = editor.ColorStyle.PlainText.Background;
+			foldLineGC = editor.ColorStyle.FoldLineColor.GetColor ("color");
+			foldLineHighlightedGC = editor.ColorStyle.PlainText.Foreground;
 			
-			HslColor hslColor = new HslColor (editor.ColorStyle.Default.CairoBackgroundColor);
+			HslColor hslColor = new HslColor (editor.ColorStyle.PlainText.Background);
 			double brightness = HslColor.Brightness (hslColor);
 			if (brightness < 0.5) {
 				hslColor.L = hslColor.L * 0.85 + hslColor.L * 0.25;
@@ -239,14 +239,15 @@ namespace Mono.TextEditor
 			}
 			
 			foldLineHighlightedGCBg = hslColor;
-			foldToggleMarkerGC = editor.ColorStyle.Default.CairoColor;
-			lineStateChangedGC = editor.ColorStyle.LineChangedBg;
-			lineStateDirtyGC = editor.ColorStyle.LineDirtyBg;
+			foldToggleMarkerGC = editor.ColorStyle.FoldCross.GetColor ("color");
+			foldToggleMarkerBackground = editor.ColorStyle.FoldCross.GetColor ("secondcolor");
+			lineStateChangedGC = editor.ColorStyle.QuickDiffChanged.GetColor ("color");
+			lineStateDirtyGC = editor.ColorStyle.QuickDiffDirty.GetColor ("color");
 			
 			marginWidth = editor.LineHeight;
 		}
 		
-		Cairo.Color foldBgGC, foldLineGC, foldLineHighlightedGC, foldLineHighlightedGCBg, foldToggleMarkerGC;
+		Cairo.Color foldBgGC, foldLineGC, foldLineHighlightedGC, foldLineHighlightedGCBg, foldToggleMarkerGC, foldToggleMarkerBackground;
 		Cairo.Color lineStateChangedGC, lineStateDirtyGC;
 		
 		public override void Dispose ()
@@ -262,19 +263,19 @@ namespace Mono.TextEditor
 			var drawArea = new Cairo.Rectangle (System.Math.Floor (x + (Width - foldSegmentSize) / 2) + 0.5, 
 			                                    System.Math.Floor (y + (editor.LineHeight - foldSegmentSize) / 2) + 0.5, foldSegmentSize, foldSegmentSize);
 			ctx.Rectangle (drawArea);
-			ctx.Color = foldBgGC;
+			ctx.Color = isOpen ? foldBgGC : foldToggleMarkerBackground;
 			ctx.FillPreserve ();
 			ctx.Color = isSelected ? foldLineHighlightedGC  : foldLineGC;
 			ctx.Stroke ();
 			
-			ctx.DrawLine (foldToggleMarkerGC,
+			ctx.DrawLine (isSelected ? foldLineHighlightedGC  : foldToggleMarkerGC,
 			              drawArea.X  + drawArea.Width * 2 / 10,
 			              drawArea.Y + drawArea.Height / 2,
 			              drawArea.X + drawArea.Width - drawArea.Width * 2 / 10,
 			              drawArea.Y + drawArea.Height / 2);
 			
 			if (!isOpen)
-				ctx.DrawLine (foldToggleMarkerGC,
+				ctx.DrawLine (isSelected ? foldLineHighlightedGC  : foldToggleMarkerGC,
 				              drawArea.X + drawArea.Width / 2,
 				              drawArea.Y + drawArea.Height * 2 / 10,
 				              drawArea.X  + drawArea.Width / 2,
@@ -330,24 +331,7 @@ namespace Mono.TextEditor
 			}
 
 			if (editor.Options.HighlightCaretLine && editor.Caret.Line == line) {
-				cr.Rectangle (x, y, Width, lineHeight);
-				cr.Color = foldBgGC;
-				cr.FillPreserve ();
-
-				var color = editor.ColorStyle.LineMarker;
-				cr.Color = new Cairo.Color (color.R, color.G, color.B, 0.5);
-				cr.Fill ();
-
-				var realTopY = System.Math.Floor (y + cr.LineWidth / 2) + 0.5;
-				cr.MoveTo (x, realTopY);
-				cr.LineTo (x + Width, realTopY);
-
-				var realBottomY = System.Math.Floor (y + lineHeight - cr.LineWidth / 2) + 0.5;
-				cr.MoveTo (x, realBottomY);
-				cr.LineTo (x + Width, realBottomY);
-
-				cr.Color = color;
-				cr.Stroke ();
+				editor.TextViewMargin.DrawCaretLineMarker (cr, x, y, Width, lineHeight);
 			} else {
 				var bgGC = foldBgGC;
 				if (editor.TextViewMargin.BackgroundRenderer != null) {

@@ -33,11 +33,17 @@ namespace Newtonsoft.Json
   /// <summary>
   /// The exception thrown when an error occurs while reading Json text.
   /// </summary>
-#if !(SILVERLIGHT || WINDOWS_PHONE || NETFX_CORE)
+#if !(SILVERLIGHT || WINDOWS_PHONE || NETFX_CORE || PORTABLE)
   [Serializable]
 #endif
-  public class JsonWriterException : Exception
+  public class JsonWriterException : JsonException
   {
+    /// <summary>
+    /// Gets the path to the JSON where the error occurred.
+    /// </summary>
+    /// <value>The path to the JSON where the error occurred.</value>
+    public string Path { get; private set; }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="JsonWriterException"/> class.
     /// </summary>
@@ -66,7 +72,7 @@ namespace Newtonsoft.Json
     {
     }
 
-#if !(WINDOWS_PHONE || SILVERLIGHT || NETFX_CORE)
+#if !(WINDOWS_PHONE || SILVERLIGHT || NETFX_CORE || PORTABLE)
     /// <summary>
     /// Initializes a new instance of the <see cref="JsonWriterException"/> class.
     /// </summary>
@@ -79,5 +85,23 @@ namespace Newtonsoft.Json
     {
     }
 #endif
+
+    internal JsonWriterException(string message, Exception innerException, string path)
+      : base(message, innerException)
+    {
+      Path = path;
+    }
+
+    internal static JsonWriterException Create(JsonWriter writer, string message, Exception ex)
+    {
+      return Create(writer.ContainerPath, message, ex);
+    }
+
+    internal static JsonWriterException Create(string path, string message, Exception ex)
+    {
+      message = JsonPosition.FormatMessage(null, path, message);
+
+      return new JsonWriterException(message, ex, path);
+    }
   }
 }

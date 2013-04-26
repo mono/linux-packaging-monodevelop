@@ -90,14 +90,6 @@ namespace MonoMac.AudioToolbox {
     	public double Maximum;
 	}
 
-	[StructLayout (LayoutKind.Sequential)]
-	public struct AudioClassDescription
-	{
-    	public AudioFormatType Type;
-    	public AudioFormatType SubType;
-    	public AudioFormatType Manufacturer;
-	}
-
 	public enum AudioBalanceFadeType
 	{
 		MaxUnityGain = 0,
@@ -246,46 +238,7 @@ namespace MonoMac.AudioToolbox {
 		}	
 	}
 
-	public static class AudioFormatAvailability
-	{
-		public static AudioValueRange[] GetAvailableEncodeBitRates (AudioFormatType format)
-		{
-			return GetAvailable<AudioValueRange> (AudioFormatProperty.AvailableEncodeBitRates, format);
-		}
-
-		public static AudioValueRange[] GetAvailableEncodeSampleRates (AudioFormatType format)
-		{
-			return GetAvailable<AudioValueRange> (AudioFormatProperty.AvailableEncodeSampleRates, format);
-		}
-
-		public static AudioClassDescription[] GetEncodeFormats (AudioFormatType format)
-		{
-			return GetAvailable<AudioClassDescription> (AudioFormatProperty.EncodeFormatIDs, format);
-		}
-
-		public static AudioClassDescription[] GetDecodeFormats (AudioFormatType format)
-		{
-			return GetAvailable<AudioClassDescription> (AudioFormatProperty.DecodeFormatIDs, format);
-		}
-
-		unsafe static T[] GetAvailable<T> (AudioFormatProperty prop, AudioFormatType format) where T : struct
-		{		
-			uint size;
-			if (AudioFormatPropertyNative.AudioFormatGetPropertyInfo (prop, sizeof (AudioFormatType), ref format, out size) != 0)
-				return null;
-
-			var data = new T[size / Marshal.SizeOf (typeof (T))];
-			fixed (T* ptr = data) {
-				var res = AudioFormatPropertyNative.AudioFormatGetProperty (prop, sizeof (AudioFormatType), ref format, ref size, (IntPtr)ptr);
-				if (res != 0)
-					return null;
-
-				return data;
-			}
-		}
-	}
-
-	static class AudioFormatPropertyNative
+	static partial class AudioFormatPropertyNative
 	{
 		[DllImport (Constants.AudioToolboxLibrary)]
 		public extern static AudioFormatError AudioFormatGetPropertyInfo (AudioFormatProperty propertyID, int inSpecifierSize, ref AudioFormatType inSpecifier,
@@ -313,6 +266,10 @@ namespace MonoMac.AudioToolbox {
 
 		[DllImport (Constants.AudioToolboxLibrary)]
 		public unsafe extern static AudioFormatError AudioFormatGetProperty (AudioFormatProperty propertyID, int inSpecifierSize, ref int inSpecifier,
+			ref int ioDataSize, IntPtr outPropertyData);
+
+		[DllImport (Constants.AudioToolboxLibrary)]
+		public unsafe extern static AudioFormatError AudioFormatGetProperty (AudioFormatProperty propertyID, int inSpecifierSize, IntPtr inSpecifier,
 			ref int ioDataSize, IntPtr outPropertyData);
 
 		[DllImport (Constants.AudioToolboxLibrary)]
@@ -377,8 +334,8 @@ namespace MonoMac.AudioToolbox {
 	{
 		FormatInfo					= 0x666d7469,	// 'fmti'
 		FormatName					= 0x666e616d,	// 'fnam'
-		EncodeFormatIDs				= 0x61636f66,	// 'acof'	// TODO: Add to Converter
-		DecodeFormatIDs				= 0x61636966,	// 'acif'	// TODO: Add to Converter
+		EncodeFormatIDs				= 0x61636f66,	// 'acof'
+		DecodeFormatIDs				= 0x61636966,	// 'acif'
 		FormatList					= 0x666c7374,	// 'flst'
 		ASBDFromESDS 				= 0x65737364,	// 'essd'	// TODO: FromElementaryStreamDescriptor
 		ChannelLayoutFromESDS 		= 0x6573636c,	// 'escl'	// TODO:
@@ -388,7 +345,7 @@ namespace MonoMac.AudioToolbox {
 		FormatIsExternallyFramed	= 0x66657866,	// 'fexf'
 		FormatIsEncrypted			= 0x63727970,	// 'cryp'
 		Encoders					= 0x6176656e,	// 'aven'	
-		Decoders					= 0x61766565,	// 'avde'
+		Decoders					= 0x61766465,	// 'avde'
 		AvailableEncodeChannelLayoutTags	= 0x6165636c,	// 'aecl'
 		AvailableEncodeNumberChannels		= 0x61766e63,	// 'avnc'
 		AvailableEncodeBitRates		= 0x61656272,	// 'aebr'
@@ -417,7 +374,7 @@ namespace MonoMac.AudioToolbox {
 		ID3TagToDictionary			= 0x69643364,	// 'id3d' // TODO:
 
 #if !MONOMAC
-		HardwareCodecCapabilities	= 0x68776363,	// 'hwcc' // TODO:
+		HardwareCodecCapabilities	= 0x68776363,	// 'hwcc'
 #endif
 	}
 }

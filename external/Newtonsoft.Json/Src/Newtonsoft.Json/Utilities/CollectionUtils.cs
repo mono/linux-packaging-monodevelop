@@ -102,10 +102,8 @@ namespace Newtonsoft.Json.Utilities
     {
       ValidationUtils.ArgumentNotNull(type, "type");
 
-#if !NETFX_CORE
       if (typeof(IDictionary).IsAssignableFrom(type))
         return true;
-#endif
       if (ReflectionUtils.ImplementsGenericDefinition(type, typeof (IDictionary<,>)))
         return true;
 
@@ -136,7 +134,7 @@ namespace Newtonsoft.Json.Utilities
       }
       else
       {
-        throw new Exception("Can not create ListWrapper for type {0}.".FormatWith(CultureInfo.InvariantCulture, list.GetType()));
+        throw new ArgumentException("Can not create ListWrapper for type {0}.".FormatWith(CultureInfo.InvariantCulture, list.GetType()), "list");
       }
     }
 
@@ -159,26 +157,23 @@ namespace Newtonsoft.Json.Utilities
 
         return (IWrappedDictionary)ReflectionUtils.CreateGeneric(typeof(DictionaryWrapper<,>), new[] { dictionaryKeyType, dictionaryValueType }, instanceCreator, dictionary);
       }
-#if !NETFX_CORE
       else if (dictionary is IDictionary)
       {
         return new DictionaryWrapper<object, object>((IDictionary)dictionary);
       }
-#endif
       else
       {
-        throw new Exception("Can not create DictionaryWrapper for type {0}.".FormatWith(CultureInfo.InvariantCulture, dictionary.GetType()));
+        throw new ArgumentException("Can not create DictionaryWrapper for type {0}.".FormatWith(CultureInfo.InvariantCulture, dictionary.GetType()), "dictionary");
       }
     }
 
-    public static object CreateAndPopulateList(Type listType, Action<IList, bool> populateList)
+    public static IList CreateList(Type listType, out bool isReadOnlyOrFixedSize)
     {
       ValidationUtils.ArgumentNotNull(listType, "listType");
-      ValidationUtils.ArgumentNotNull(populateList, "populateList");
 
       IList list;
       Type collectionType;
-      bool isReadOnlyOrFixedSize = false;
+      isReadOnlyOrFixedSize = false;
 
       if (listType.IsArray)
       {
@@ -237,22 +232,7 @@ namespace Newtonsoft.Json.Utilities
       }
 
       if (list == null)
-        throw new Exception("Cannot create and populate list type {0}.".FormatWith(CultureInfo.InvariantCulture, listType));
-
-      populateList(list, isReadOnlyOrFixedSize);
-
-      // create readonly and fixed sized collections using the temporary list
-      if (isReadOnlyOrFixedSize)
-      {
-        if (listType.IsArray)
-          list = ToArray(((List<object>)list).ToArray(), ReflectionUtils.GetCollectionItemType(listType));
-        else if (ReflectionUtils.InheritsGenericDefinition(listType, typeof(ReadOnlyCollection<>)))
-          list = (IList)ReflectionUtils.CreateInstance(listType, list);
-      }
-      else if (list is IWrappedCollection)
-      {
-        return ((IWrappedCollection) list).UnderlyingCollection;
-      }
+        throw new InvalidOperationException("Cannot create and populate list type {0}.".FormatWith(CultureInfo.InvariantCulture, listType));
 
       return list;
     }
@@ -345,6 +325,84 @@ namespace Newtonsoft.Json.Utilities
         index++;
       }
       return -1;
+    }
+
+    private static IList<int> GetDimensions(IList values)
+    {
+      IList<int> dimensions = new List<int>();
+
+      IList currentArray = values;
+      while (true)
+      {
+        dimensions.Add(currentArray.Count);
+        if (currentArray.Count == 0)
+          break;
+
+        object v = currentArray[0];
+        if (v is IList)
+          currentArray = (IList)v;
+        else
+          break;
+      }
+
+      return dimensions;
+    }
+
+    private static void CopyFromJaggedToMultidimensionalArray(IList values, Array multidimensionalArray, int[] indices)
+    {
+      int dimension = indices.Length;
+      if (dimension == multidimensionalArray.Rank)
+      {
+        multidimensionalArray.SetValue(JaggedArrayGetValue(values, indices), indices);
+        return;
+      }
+
+      int dimensionLength = multidimensionalArray.GetLength(dimension);
+      IList list = (IList)JaggedArrayGetValue(values, indices);
+      int currentValuesLength = list.Count;
+      if (currentValuesLength != dimensionLength)
+        throw new Exception("Cannot deserialize non-cubical array as multidimensional array.");
+
+      int[] newIndices = new int[dimension + 1];
+      for (int i = 0; i < dimension; i++)
+      {
+        newIndices[i] = indices[i];
+      }
+
+      for (int i = 0; i < multidimensionalArray.GetLength(dimension); i++)
+      {
+        newIndices[dimension] = i;
+        CopyFromJaggedToMultidimensionalArray(values, multidimensionalArray, newIndices);
+      }
+    }
+
+    private static object JaggedArrayGetValue(IList values, int[] indices)
+    {
+      IList currentList = values;
+      for (int i = 0; i < indices.Length; i++)
+      {
+        int index = indices[i];
+        if (i == indices.Length - 1)
+          return currentList[index];
+        else
+          currentList = (IList)currentList[index];
+      }
+      return currentList;
+    }
+
+    public static Array ToMultidimensionalArray(IList values, Type type, int rank)
+    {
+      IList<int> dimensions = GetDimensions(values);
+
+      while (dimensions.Count < rank)
+      {
+        dimensions.Add(0);
+      }
+
+      Array multidimensionalArray = Array.CreateInstance(type, dimensions.ToArray());
+      CopyFromJaggedToMultidimensionalArray(values, multidimensionalArray, new int[0]);
+
+      return multidimensionalArray;
     }
   }
 }

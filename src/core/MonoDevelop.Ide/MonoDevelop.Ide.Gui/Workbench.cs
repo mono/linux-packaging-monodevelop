@@ -95,7 +95,13 @@ namespace MonoDevelop.Ide.Gui
 				IdeApp.FocusIn += delegate(object o, EventArgs args) {
 					CheckFileStatus ();
 				};
-				
+
+				TypeSystem.TypeSystemService.ProjectContentLoaded += delegate {
+					var doc = ActiveDocument;
+					if (doc != null)
+						doc.ReparseDocument ();
+				};
+
 				pads = null;	// Make sure we get an up to date pad list.
 				monitor.Step (1);
 			} finally {
@@ -514,7 +520,7 @@ namespace MonoDevelop.Ide.Gui
 			newContent.UntitledName = defaultName;
 			newContent.IsDirty = true;
 			workbench.ShowView (newContent, true);
-			DisplayBindingService.AttachSubWindows (newContent.WorkbenchWindow);
+			DisplayBindingService.AttachSubWindows (newContent.WorkbenchWindow, binding);
 			
 			var document = WrapDocument (newContent.WorkbenchWindow);
 			document.StartReparseThread ();
@@ -1191,11 +1197,11 @@ namespace MonoDevelop.Ide.Gui
 				fileInfo.NewContent = newContent;
 				return;
 			}
-			
+
 			Counters.OpenDocumentTimer.Trace ("Showing view");
 			
 			workbench.ShowView (newContent, fileInfo.Options.HasFlag (OpenDocumentOptions.BringToFront));
-			DisplayBindingService.AttachSubWindows (newContent.WorkbenchWindow);
+			DisplayBindingService.AttachSubWindows (newContent.WorkbenchWindow, binding);
 			newContent.WorkbenchWindow.DocumentType = binding.Name;
 			
 			IEditableTextBuffer ipos = (IEditableTextBuffer) newContent.GetContent (typeof(IEditableTextBuffer));

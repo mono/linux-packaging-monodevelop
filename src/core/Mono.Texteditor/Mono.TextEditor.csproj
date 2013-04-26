@@ -46,24 +46,31 @@
     <Reference Include="Mono.Posix" />
     <Reference Include="glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
+      <Package>glib-sharp-2.0</Package>
     </Reference>
     <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
+      <Package>gtk-sharp-2.0</Package>
     </Reference>
     <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
+      <Package>gtk-sharp-2.0</Package>
     </Reference>
     <Reference Include="gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
+      <Package>gtk-sharp-2.0</Package>
     </Reference>
     <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
+      <Package>gtk-sharp-2.0</Package>
     </Reference>
     <Reference Include="System.Drawing" />
     <Reference Include="System" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
     <Reference Include="Mono.Cairo" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Mono.TextEditor.Highlighting\Rule.cs" />
@@ -71,11 +78,9 @@
     <Compile Include="Mono.TextEditor.Highlighting\Chunk.cs" />
     <Compile Include="Mono.TextEditor\TextEditorOptions.cs" />
     <Compile Include="Mono.TextEditor\TextEditorData.cs" />
-    <Compile Include="Mono.TextEditor.Highlighting\ChunkStyle.cs" />
     <Compile Include="Mono.TextEditor.Highlighting\Match.cs" />
     <Compile Include="Mono.TextEditor.Highlighting\Span.cs" />
     <Compile Include="Mono.TextEditor.Highlighting\SyntaxMode.cs" />
-    <Compile Include="Mono.TextEditor.Highlighting\SyntaxModeService.cs" />
     <Compile Include="Mono.TextEditor.Highlighting\XmlReadHelper.cs" />
     <Compile Include="AssemblyInfo.cs" />
     <Compile Include="Mono.TextEditor.Highlighting\Marker.cs" />
@@ -83,9 +88,7 @@
     <Compile Include="Mono.TextEditor\SearchResult.cs" />
     <Compile Include="Mono.TextEditor\Caret.cs" />
     <Compile Include="Mono.TextEditor\ISearchEngine.cs" />
-    <Compile Include="Mono.TextEditor.Highlighting\IXmlProvider.cs" />
     <Compile Include="Mono.TextEditor\BookmarkMarker.cs" />
-    <Compile Include="Mono.TextEditor.Highlighting\ReferencedChunkStyle.cs" />
     <Compile Include="gtk-gui\generated.cs" />
     <Compile Include="Mono.TextEditor\EditMode.cs" />
     <Compile Include="Mono.TextEditor\SimpleEditMode.cs" />
@@ -95,7 +98,6 @@
     <Compile Include="Mono.TextEditor\HelperMethods.cs" />
     <Compile Include="Mono.TextEditor\LinkEventArgs.cs" />
     <Compile Include="Mono.TextEditor\SearchRequest.cs" />
-    <Compile Include="Mono.TextEditor\ITextEditorOptions.cs" />
     <Compile Include="Mono.TextEditor\TextLinkEditMode.cs" />
     <Compile Include="Mono.TextEditor.PopupWindow\TooltipWindow.cs" />
     <Compile Include="Mono.TextEditor.PopupWindow\ListWindow.cs" />
@@ -141,7 +143,6 @@
     <Compile Include="Mono.TextEditor\IIndentationTracker.cs" />
     <Compile Include="Mono.TextEditor.Highlighting\ISyntaxMode.cs" />
     <Compile Include="Mono.TextEditor.Utils\TextFileUtility.cs" />
-    <Compile Include="Mono.TextEditor.Highlighting\ColorScheme.cs" />
     <Compile Include="Mono.TextEditor\Actions\BookmarkActions.cs" />
     <Compile Include="Mono.TextEditor\Actions\CaretMoveActions.cs" />
     <Compile Include="Mono.TextEditor\Actions\ClipboardActions.cs" />
@@ -208,6 +209,15 @@
     <Compile Include="Mono.TextEditor\Standalone\StringTextSource.cs" />
     <Compile Include="Mono.TextEditor.Utils\HtmlWriter.cs" />
     <Compile Include="Mono.TextEditor.PopupWindow\WindowTransparencyDecorator.cs" />
+    <Compile Include="Mono.TextEditor.Highlighting\SyntaxModeService.cs" />
+    <Compile Include="Mono.TextEditor.Highlighting\ChunkStyle.cs" />
+    <Compile Include="Mono.TextEditor.Highlighting\TextWeight.cs" />
+    <Compile Include="Mono.TextEditor.Highlighting\ColorDescriptionAttribute.cs" />
+    <Compile Include="Mono.TextEditor.Highlighting\ColorScheme.cs" />
+    <Compile Include="Mono.TextEditor.Highlighting\IStreamProvider.cs" />
+    <Compile Include="Mono.TextEditor.Highlighting\AmbientColor.cs" />
+    <Compile Include="Mono.TextEditor\ITextEditorOptions.cs" />
+    <Compile Include="Mono.TextEditor.Vi\ViModeAbortException.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Mono.TextEditor.dll.config">
@@ -254,12 +264,6 @@
     <EmbeddedResource Include="SyntaxModes\CSyntaxMode.xml">
       <LogicalName>CSyntaxMode.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Styles\OblivionStyle.xml">
-      <LogicalName>OblivionStyle.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Styles\VisualStudioStyle.xml">
-      <LogicalName>VisualStudioStyle.xml</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
     </EmbeddedResource>
@@ -278,17 +282,11 @@
     <EmbeddedResource Include="SyntaxModes\RubySyntaxMode.xml">
       <LogicalName>RubySyntaxMode.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Styles\Styles.xsd">
-      <LogicalName>Styles.xsd</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="SyntaxModes\CssSyntaxMode.xml">
       <LogicalName>CssSyntaxMode.xml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="SyntaxModes\JaySyntaxMode.xml">
       <LogicalName>JaySyntaxMode.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Styles\DefaultStyle.xml">
-      <LogicalName>DefaultStyle.xml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="SyntaxModes\CGSyntaxMode.xml">
       <LogicalName>CGSyntaxMode.xml</LogicalName>
@@ -302,21 +300,6 @@
     <EmbeddedResource Include="SyntaxModes\ShellScriptSyntaxMode.xml">
       <LogicalName>ShellScriptSyntaxMode.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Styles\SolarizedLightStyle.xml">
-      <LogicalName>SolarizedLightStyle.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Styles\SolarizedDarkStyle.xml">
-      <LogicalName>SolarizedDarkStyle.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Styles\MonokaiStyle.xml">
-      <LogicalName>MonokaiStyle.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Styles\NightshadeStyle.xml">
-      <LogicalName>NightshadeStyle.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Styles\TangoStyle.xml">
-      <LogicalName>TangoStyle.xml</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="SyntaxModes\RazorSyntaxMode.xml">
       <LogicalName>RazorSyntaxMode.xml</LogicalName>
     </EmbeddedResource>
@@ -325,6 +308,33 @@
     </EmbeddedResource>
     <EmbeddedResource Include="SyntaxModes\AspNetAshxSyntaxMode.xml">
       <LogicalName>AspNetAshxSyntaxMode.xml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Styles\DefaultStyle.json">
+      <LogicalName>DefaultStyle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="SyntaxModes\HtmlSyntaxMode.xml">
+      <LogicalName>HtmlSyntaxMode.xml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Styles\MonokaiStyle.json">
+      <LogicalName>MonokaiStyle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Styles\NightshadeStyle.json">
+      <LogicalName>NightshadeStyle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Styles\OblivionStyle.json">
+      <LogicalName>OblivionStyle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Styles\SolarizedDarkStyle.json">
+      <LogicalName>SolarizedDarkStyle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Styles\SolarizedLightStyle.json">
+      <LogicalName>SolarizedLightStyle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Styles\TangoStyle.json">
+      <LogicalName>TangoStyle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Styles\VisualStudioStyle.json">
+      <LogicalName>VisualStudioStyle.json</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
@@ -350,6 +360,10 @@
     <ProjectReference Include="..\..\..\external\nrefactory\ICSharpCode.NRefactory\ICSharpCode.NRefactory.csproj">
       <Project>{3B2A5653-EC97-4001-BB9B-D90F1AF2C371}</Project>
       <Name>ICSharpCode.NRefactory</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
     </ProjectReference>
   </ItemGroup>
 </Project>

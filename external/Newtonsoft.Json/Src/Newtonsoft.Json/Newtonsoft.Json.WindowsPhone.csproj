@@ -77,6 +77,7 @@
     <Compile Include="Converters\VersionConverter.cs" />
     <Compile Include="Converters\XmlNodeConverter.cs" />
     <Compile Include="DateFormatHandling.cs" />
+    <Compile Include="DateParseHandling.cs" />
     <Compile Include="DateTimeZoneHandling.cs" />
     <Compile Include="FormatterAssemblyStyle.cs" />
     <Compile Include="DefaultValueHandling.cs" />
@@ -89,6 +90,8 @@
     <Compile Include="JsonConverter.cs" />
     <Compile Include="JsonConverterAttribute.cs" />
     <Compile Include="JsonConverterCollection.cs" />
+    <Compile Include="JsonDictionaryAttribute.cs" />
+    <Compile Include="JsonException.cs" />
     <Compile Include="JsonIgnoreAttribute.cs" />
     <Compile Include="JsonObjectAttribute.cs" />
     <Compile Include="JsonPosition.cs" />
@@ -136,13 +139,16 @@
     <Compile Include="Serialization\DefaultContractResolver.cs" />
     <Compile Include="Serialization\DefaultReferenceResolver.cs" />
     <Compile Include="Serialization\DefaultSerializationBinder.cs" />
+    <Compile Include="Serialization\DiagnosticsTraceWriter.cs" />
     <Compile Include="Serialization\DynamicValueProvider.cs" />
     <Compile Include="Serialization\ErrorContext.cs" />
     <Compile Include="Serialization\ErrorEventArgs.cs" />
     <Compile Include="Serialization\IContractResolver.cs" />
     <Compile Include="Serialization\IReferenceResolver.cs" />
+    <Compile Include="Serialization\ITraceWriter.cs" />
     <Compile Include="Serialization\IValueProvider.cs" />
     <Compile Include="Serialization\JsonArrayContract.cs" />
+    <Compile Include="Serialization\JsonContainerContract.cs" />
     <Compile Include="Serialization\JsonContract.cs" />
     <Compile Include="Serialization\JsonDictionaryContract.cs" />
     <Compile Include="Serialization\JsonDynamicContract.cs" />
@@ -159,10 +165,13 @@
     <Compile Include="Serialization\JsonSerializerInternalWriter.cs" />
     <Compile Include="Serialization\JsonStringContract.cs" />
     <Compile Include="Serialization\LateBoundMetadataTypeAttribute.cs" />
+    <Compile Include="Serialization\MemoryTraceWriter.cs" />
     <Compile Include="Serialization\ObjectConstructor.cs" />
     <Compile Include="Serialization\OnErrorAttribute.cs" />
     <Compile Include="Serialization\ReflectionValueProvider.cs" />
     <Compile Include="StreamingContext.cs" />
+    <Compile Include="StringEscapeHandling.cs" />
+    <Compile Include="TraceLevel.cs" />
     <Compile Include="TypeNameHandling.cs" />
     <Compile Include="Utilities\Base64Encoder.cs" />
     <Compile Include="Utilities\BidirectionalDictionary.cs" />

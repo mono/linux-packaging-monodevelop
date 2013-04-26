@@ -26,9 +26,11 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+#if !PORTABLE
 using System.Collections.Specialized;
+#endif
 using System.ComponentModel;
-#if !(NET35 || NET20 || WINDOWS_PHONE)
+#if !(NET35 || NET20 || WINDOWS_PHONE || PORTABLE)
 using System.Dynamic;
 using System.Linq.Expressions;
 #endif
@@ -46,11 +48,14 @@ namespace Newtonsoft.Json.Linq
   /// <summary>
   /// Represents a JSON object.
   /// </summary>
+  /// <example>
+  ///   <code lang="cs" source="..\Src\Newtonsoft.Json.Tests\Documentation\LinqToJsonTests.cs" region="LinqToJsonCreateParse" title="Parsing a JSON Object from Text" />
+  /// </example>
   public class JObject : JContainer, IDictionary<string, JToken>, INotifyPropertyChanged
-#if !(PocketPC || SILVERLIGHT || NETFX_CORE)
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     , ICustomTypeDescriptor
 #endif
-#if !(PocketPC || SILVERLIGHT || NET20 || NETFX_CORE)
+#if !(SILVERLIGHT || NET20 || NETFX_CORE || PORTABLE)
     , INotifyPropertyChanging
 #endif
   {
@@ -70,7 +75,7 @@ namespace Newtonsoft.Json.Linq
     /// </summary>
     public event PropertyChangedEventHandler PropertyChanged;
 
-#if !(PocketPC || SILVERLIGHT || NET20 || NETFX_CORE)
+#if !(SILVERLIGHT || NET20 || NETFX_CORE || PORTABLE)
     /// <summary>
     /// Occurs when a property value is changing.
     /// </summary>
@@ -114,7 +119,10 @@ namespace Newtonsoft.Json.Linq
     internal override bool DeepEquals(JToken node)
     {
       JObject t = node as JObject;
-      return (t != null && ContentsEqual(t));
+      if (t == null)
+        return false;
+
+      return _properties.Compare(t._properties);
     }
 
     internal override void InsertItem(int index, JToken item, bool skipParentCheck)
@@ -150,17 +158,19 @@ namespace Newtonsoft.Json.Linq
     internal void InternalPropertyChanged(JProperty childProperty)
     {
       OnPropertyChanged(childProperty.Name);
-#if !SILVERLIGHT && !NETFX_CORE
-      OnListChanged(new ListChangedEventArgs(ListChangedType.ItemChanged, IndexOfItem(childProperty)));
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+      if (_listChanged != null)
+        OnListChanged(new ListChangedEventArgs(ListChangedType.ItemChanged, IndexOfItem(childProperty)));
 #endif
-#if SILVERLIGHT || !(NET20 || NET35)
-      OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, childProperty, childProperty, IndexOfItem(childProperty)));
+#if SILVERLIGHT || !(NET20 || NET35 || PORTABLE)
+      if (_collectionChanged != null)
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, childProperty, childProperty, IndexOfItem(childProperty)));
 #endif
     }
 
     internal void InternalPropertyChanging(JProperty childProperty)
     {
-#if !PocketPC && !SILVERLIGHT && !NET20 && !NETFX_CORE
+#if !(SILVERLIGHT || NET20 || NETFX_CORE || PORTABLE)
       OnPropertyChanging(childProperty.Name);
 #endif
     }
@@ -185,7 +195,7 @@ namespace Newtonsoft.Json.Linq
     /// <returns>An <see cref="IEnumerable{JProperty}"/> of this object's properties.</returns>
     public IEnumerable<JProperty> Properties()
     {
-      return ChildrenTokens.Cast<JProperty>();
+      return _properties.Cast<JProperty>();
     }
 
     /// <summary>
@@ -263,7 +273,7 @@ namespace Newtonsoft.Json.Linq
         }
         else
         {
-#if !PocketPC && !SILVERLIGHT && !NET20 && !NETFX_CORE
+#if !(SILVERLIGHT || NET20 || NETFX_CORE || PORTABLE)
           OnPropertyChanging(propertyName);
 #endif
           Add(new JProperty(propertyName, value));
@@ -284,14 +294,17 @@ namespace Newtonsoft.Json.Linq
       if (reader.TokenType == JsonToken.None)
       {
         if (!reader.Read())
-          throw new Exception("Error reading JObject from JsonReader.");
+          throw JsonReaderException.Create(reader, "Error reading JObject from JsonReader.");
+      }
+
+      while (reader.TokenType == JsonToken.Comment)
+      {
+        reader.Read();
       }
 
       if (reader.TokenType != JsonToken.StartObject)
       {
-          throw new Exception(
-              "Error reading JObject from JsonReader. Current JsonReader item is not an object: {0}".FormatWith(
-                  CultureInfo.InvariantCulture, reader.TokenType));
+        throw JsonReaderException.Create(reader, "Error reading JObject from JsonReader. Current JsonReader item is not an object: {0}".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
       }
 
       JObject o = new JObject();
@@ -307,14 +320,17 @@ namespace Newtonsoft.Json.Linq
     /// </summary>
     /// <param name="json">A <see cref="String"/> that contains JSON.</param>
     /// <returns>A <see cref="JObject"/> populated from the string that contains JSON.</returns>
+    /// <example>
+    ///   <code lang="cs" source="..\Src\Newtonsoft.Json.Tests\Documentation\LinqToJsonTests.cs" region="LinqToJsonCreateParse" title="Parsing a JSON Object from Text" />
+    /// </example>
     public static new JObject Parse(string json)
     {
-      JsonReader jsonReader = new JsonTextReader(new StringReader(json));
+      JsonReader reader = new JsonTextReader(new StringReader(json));
 
-      JObject o = Load(jsonReader);
+      JObject o = Load(reader);
 
-      if (jsonReader.Read() && jsonReader.TokenType != JsonToken.Comment)
-        throw new Exception("Additional text found in JSON string after parsing content.");
+      if (reader.Read() && reader.TokenType != JsonToken.Comment)
+        throw JsonReaderException.Create(reader, "Additional text found in JSON string after parsing content.");
 
       return o;
     }
@@ -354,12 +370,68 @@ namespace Newtonsoft.Json.Linq
     {
       writer.WriteStartObject();
 
-      foreach (JProperty property in ChildrenTokens)
+      for (int i = 0; i < _properties.Count; i++)
       {
-        property.WriteTo(writer, converters);
+        _properties[i].WriteTo(writer, converters);
       }
 
       writer.WriteEndObject();
+    }
+
+    /// <summary>
+    /// Gets the <see cref="Newtonsoft.Json.Linq.JToken"/> with the specified property name.
+    /// </summary>
+    /// <param name="propertyName">Name of the property.</param>
+    /// <value>The <see cref="Newtonsoft.Json.Linq.JToken"/> with the specified property name.</value>
+    public JToken GetValue(string propertyName)
+    {
+      return GetValue(propertyName, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Gets the <see cref="Newtonsoft.Json.Linq.JToken"/> with the specified property name.
+    /// The exact property name will be searched for first and if no matching property is found then
+    /// the <see cref="StringComparison"/> will be used to match a property.
+    /// </summary>
+    /// <param name="propertyName">Name of the property.</param>
+    /// <param name="comparison">One of the enumeration values that specifies how the strings will be compared.</param>
+    /// <value>The <see cref="Newtonsoft.Json.Linq.JToken"/> with the specified property name.</value>
+    public JToken GetValue(string propertyName, StringComparison comparison)
+    {
+      if (propertyName == null)
+        return null;
+
+      // attempt to get value via dictionary first for performance
+      JProperty property = Property(propertyName);
+      if (property != null)
+        return property.Value;
+
+      // test above already uses this comparison so no need to repeat
+      if (comparison != StringComparison.Ordinal)
+      {
+        foreach (JProperty p in _properties)
+        {
+          if (string.Equals(p.Name, propertyName, comparison))
+            return p.Value;
+        }
+      }
+
+      return null;
+    }
+
+    /// <summary>
+    /// Tries to get the <see cref="Newtonsoft.Json.Linq.JToken"/> with the specified property name.
+    /// The exact property name will be searched for first and if no matching property is found then
+    /// the <see cref="StringComparison"/> will be used to match a property.
+    /// </summary>
+    /// <param name="propertyName">Name of the property.</param>
+    /// <param name="value">The value.</param>
+    /// <param name="comparison">One of the enumeration values that specifies how the strings will be compared.</param>
+    /// <returns>true if a value was successfully retrieved; otherwise, false.</returns>
+    public bool TryGetValue(string propertyName, StringComparison comparison, out JToken value)
+    {
+      value = GetValue(propertyName, comparison);
+      return (value != null);
     }
 
     #region IDictionary<string,JToken> Members
@@ -456,13 +528,13 @@ namespace Newtonsoft.Json.Linq
         throw new ArgumentNullException("array");
       if (arrayIndex < 0)
         throw new ArgumentOutOfRangeException("arrayIndex", "arrayIndex is less than 0.");
-      if (arrayIndex >= array.Length)
+      if (arrayIndex >= array.Length && arrayIndex != 0)
         throw new ArgumentException("arrayIndex is equal to or greater than the length of array.");
       if (Count > array.Length - arrayIndex)
         throw new ArgumentException("The number of elements in the source JObject is greater than the available space from arrayIndex to the end of the destination array.");
 
       int index = 0;
-      foreach (JProperty property in ChildrenTokens)
+      foreach (JProperty property in _properties)
       {
         array[arrayIndex + index] = new KeyValuePair<string, JToken>(property.Name, property.Value);
         index++;
@@ -498,7 +570,7 @@ namespace Newtonsoft.Json.Linq
     /// </returns>
     public IEnumerator<KeyValuePair<string, JToken>> GetEnumerator()
     {
-      foreach (JProperty property in ChildrenTokens)
+      foreach (JProperty property in _properties)
       {
         yield return new KeyValuePair<string, JToken>(property.Name, property.Value);
       }
@@ -514,7 +586,7 @@ namespace Newtonsoft.Json.Linq
         PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
     }
 
-#if !PocketPC && !SILVERLIGHT && !NET20 && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE || NET20)
     /// <summary>
     /// Raises the <see cref="PropertyChanging"/> event with the provided arguments.
     /// </summary>
@@ -526,7 +598,7 @@ namespace Newtonsoft.Json.Linq
     }
 #endif
 
-#if !PocketPC && !SILVERLIGHT && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     // include custom type descriptor on JObject rather than use a provider because the properties are specific to a type
     #region ICustomTypeDescriptor
     /// <summary>
@@ -685,7 +757,7 @@ namespace Newtonsoft.Json.Linq
     #endregion
 #endif
 
-#if !(NET35 || NET20 || WINDOWS_PHONE)
+#if !(NET35 || NET20 || WINDOWS_PHONE || PORTABLE)
     /// <summary>
     /// Returns the <see cref="T:System.Dynamic.DynamicMetaObject"/> responsible for binding operations performed on this object.
     /// </summary>

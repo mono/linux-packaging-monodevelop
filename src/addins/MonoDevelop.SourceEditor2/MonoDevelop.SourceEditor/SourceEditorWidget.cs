@@ -156,6 +156,36 @@ namespace MonoDevelop.SourceEditor
 		public Gtk.VBox Vbox {
 			get { return this.vbox; }
 		}
+
+		public bool SearchWidgetHasFocus {
+			get {
+				if (HasAnyFocusedChild (searchAndReplaceWidget) || HasAnyFocusedChild (gotoLineNumberWidget))
+					return true;
+				return false;
+			}
+		}
+
+		static bool HasAnyFocusedChild (Widget widget)
+		{
+			// Seems that this is the only reliable way doing it on os x and linux :/
+			if (widget == null)
+				return false;
+			var stack = new Stack<Widget> ();
+			stack.Push (widget);
+			while (stack.Count > 0) {
+				var cur = stack.Pop ();
+				if (cur.HasFocus) {
+					return true;
+				}
+				var c = cur as Gtk.Container;
+				if (c!= null) {
+					foreach (var child in c.Children) {
+						stack.Push (child);
+					}
+				}
+			}
+			return false;
+		}
 		
 		public class Border : Gtk.DrawingArea
 		{
@@ -185,7 +215,7 @@ namespace MonoDevelop.SourceEditor
 					return scrolledWindow.Vadjustment;
 				}
 			}
-			
+
 			public DecoratedScrolledWindow (SourceEditorWidget parent)
 			{
 				this.parent = parent;
@@ -197,7 +227,35 @@ namespace MonoDevelop.SourceEditor
 				strip.VAdjustment = scrolledWindow.Vadjustment;
 				PackEnd (strip, false, true, 0);
 
-				parent.quickTaskProvider.ForEach (p => AddQuickTaskProvider (p));
+				parent.quickTaskProvider.ForEach (AddQuickTaskProvider);
+
+				QuickTaskStrip.EnableFancyFeatures.Changed += FancyFeaturesChanged;
+				FancyFeaturesChanged (null, null);
+			}
+
+			void FancyFeaturesChanged (object sender, EventArgs e)
+			{
+				if (QuickTaskStrip.EnableFancyFeatures) {
+					scrolledWindow.VScrollbar.SizeRequested += SuppressSize;
+					scrolledWindow.VScrollbar.ExposeEvent += SuppressExpose;
+				} else {
+					scrolledWindow.VScrollbar.SizeRequested -= SuppressSize;
+					scrolledWindow.VScrollbar.ExposeEvent -= SuppressExpose;
+				}
+				QueueResize ();
+			}
+
+			[GLib.ConnectBefore]
+			static void SuppressExpose (object o, ExposeEventArgs args)
+			{
+				args.RetVal = true;
+			}
+
+			[GLib.ConnectBefore]
+			static void SuppressSize (object o, SizeRequestedArgs args)
+			{
+				args.Requisition = Requisition.Zero;
+				args.RetVal = true;
 			}
 			
 			public void AddQuickTaskProvider (IQuickTaskProvider p)
@@ -227,6 +285,7 @@ namespace MonoDevelop.SourceEditor
 				if (scrolledWindow.Child != null)
 					RemoveEvents ();
 
+				QuickTaskStrip.EnableFancyFeatures.Changed -= FancyFeaturesChanged;
 				scrolledWindow.ButtonPressEvent -= PrepareEvent;
 				base.OnDestroyed ();
 			}
@@ -249,7 +308,7 @@ namespace MonoDevelop.SourceEditor
 			void OptionsChanged (object sender, EventArgs e)
 			{
 				TextEditor editor = (TextEditor)sender;
-				scrolledWindow.ModifyBg (StateType.Normal, editor.ColorStyle.Default.BackgroundColor);
+				scrolledWindow.ModifyBg (StateType.Normal, (Mono.TextEditor.HslColor)editor.ColorStyle.PlainText.Background);
 			}
 			
 			void RemoveEvents ()
@@ -1534,7 +1593,6 @@ namespace MonoDevelop.SourceEditor
 			// may be null if no line is assigned to the error.
 			Wave = true;
 			
-			ColorName = info.ErrorType == ErrorType.Warning ? ColorScheme.WarningUnderlineString : ColorScheme.ErrorUnderlineString;
 			StartCol = Info.Region.BeginColumn + 1;
 			if (Info.Region.EndColumn > StartCol) {
 				EndCol = Info.Region.EndColumn;
@@ -1553,6 +1611,13 @@ namespace MonoDevelop.SourceEditor
 				}
 				EndCol = Info.Region.BeginColumn + o - start + 1;
 			}
+		}
+
+		public override void Draw (TextEditor editor, Cairo.Context cr, Pango.Layout layout, bool selected, int startOffset, int endOffset, double y, double startXPos, double endXPos)
+		{
+			Color = Info.ErrorType == ErrorType.Warning ? editor.ColorStyle.UnderlineWarning.GetColor ("color") : editor.ColorStyle.UnderlineError.GetColor ("color");
+
+			base.Draw (editor, cr, layout, selected, startOffset, endOffset, y, startXPos, endXPos);
 		}
 	}
 }

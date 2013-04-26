@@ -1,11 +1,37 @@
-﻿#if !(SILVERLIGHT || NETFX_CORE)
+﻿#region License
+// Copyright (c) 2007 James Newton-King
+//
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+#endregion
+
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
 using System;
 #if !NETFX_CORE
+using System.Collections.Generic;
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 #if !NETFX_CORE
 using System.Data;
@@ -207,6 +233,42 @@ namespace Newtonsoft.Json.Tests.Converters
       Assert.AreEqual(49.99, (double)table.Rows[0]["price"], 0.01);
       Assert.AreEqual(54.99, (double)table.Rows[1]["price"], 0.01);
       Assert.IsInstanceOfType(typeof(System.DBNull), table.Rows[2]["price"]);
+    }
+
+    [Test]
+    public void SerializeKeyValuePairWithDataTableKey()
+    {
+      DataTable table = new DataTable();
+      DataColumn idColumn = new DataColumn("id", typeof(int));
+      idColumn.AutoIncrement = true;
+
+      DataColumn itemColumn = new DataColumn("item");
+      table.Columns.Add(idColumn);
+      table.Columns.Add(itemColumn);
+
+      DataRow r = table.NewRow();
+      r["item"] = "item!";
+      r.EndEdit();
+      table.Rows.Add(r);
+
+      KeyValuePair<DataTable, int> pair = new KeyValuePair<DataTable, int>(table, 1);
+      string serializedpair = JsonConvert.SerializeObject(pair, Formatting.Indented);
+
+      Assert.AreEqual(@"{
+  ""Key"": [
+    {
+      ""id"": 0,
+      ""item"": ""item!""
+    }
+  ],
+  ""Value"": 1
+}", serializedpair);
+
+      var pair2 = (KeyValuePair<DataTable, int>)JsonConvert.DeserializeObject(serializedpair, typeof(KeyValuePair<DataTable, int>));
+
+      Assert.AreEqual(1, pair2.Value);
+      Assert.AreEqual(1, pair2.Key.Rows.Count);
+      Assert.AreEqual("item!", pair2.Key.Rows[0]["item"]);
     }
   }
 }

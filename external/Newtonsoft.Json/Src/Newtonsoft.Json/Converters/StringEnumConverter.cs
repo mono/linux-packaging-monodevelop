@@ -40,9 +40,6 @@ namespace Newtonsoft.Json.Converters
   /// <summary>
   /// Converts an <see cref="Enum"/> to and from its name string value.
   /// </summary>
-  /// <summary>
-  /// Converts an <see cref="Enum"/> to and from its name string value.
-  /// </summary>
   public class StringEnumConverter : JsonConverter
   {
     private readonly Dictionary<Type, BidirectionalDictionary<string, string>> _enumMemberNamesPerType = new Dictionary<Type, BidirectionalDictionary<string, string>>();
@@ -110,7 +107,7 @@ namespace Newtonsoft.Json.Converters
       if (reader.TokenType == JsonToken.Null)
       {
         if (!ReflectionUtils.IsNullableType(objectType))
-          throw new Exception("Cannot convert null value to {0}.".FormatWith(CultureInfo.InvariantCulture, objectType));
+          throw JsonSerializationException.Create(reader, "Cannot convert null value to {0}.".FormatWith(CultureInfo.InvariantCulture, objectType));
 
         return null;
       }
@@ -128,7 +125,7 @@ namespace Newtonsoft.Json.Converters
       if (reader.TokenType == JsonToken.Integer)
         return ConvertUtils.ConvertOrCast(reader.Value, CultureInfo.InvariantCulture, t);
 
-      throw new Exception("Unexpected token when parsing enum. Expected String or Integer, got {0}.".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
+      throw JsonSerializationException.Create(reader, "Unexpected token when parsing enum. Expected String or Integer, got {0}.".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
     }
 
     /// <summary>
@@ -168,11 +165,11 @@ namespace Newtonsoft.Json.Converters
             string s;
             if (map.TryGetBySecond(n2, out s))
             {
-              throw new Exception("Enum name '{0}' already exists on enum '{1}'."
+              throw new InvalidOperationException("Enum name '{0}' already exists on enum '{1}'."
                 .FormatWith(CultureInfo.InvariantCulture, n2, t.Name));
             }
 
-            map.Add(n1, n2);
+            map.Set(n1, n2);
           }
 
           _enumMemberNamesPerType[t] = map;

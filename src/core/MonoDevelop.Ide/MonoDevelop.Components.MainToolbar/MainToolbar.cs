@@ -259,7 +259,6 @@ namespace MonoDevelop.Components.MainToolbar
 			IdeApp.CommandService.RegisterCommandBar (this);
 			this.ShowAll ();
 			this.statusArea.statusIconBox.HideAll ();
-			RemoveDecorationsWorkaround = w => { };
 		}
 
 		protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
@@ -292,13 +291,17 @@ namespace MonoDevelop.Components.MainToolbar
 
 		void TrackStartupProject ()
 		{
-			if (currentStartupProject != null && ((currentSolution != null && currentStartupProject != currentSolution.StartupItem) || currentSolution == null))
+			if (currentStartupProject != null && ((currentSolution != null && currentStartupProject != currentSolution.StartupItem) || currentSolution == null)) {
+				currentStartupProject.ExecutionTargetsChanged -= HandleExecutionTargetsChanged;
 				currentStartupProject.Saved -= HandleProjectSaved;
+			}
 
 			if (currentSolution != null) {
 				currentStartupProject = currentSolution.StartupItem;
-				if (currentStartupProject != null)
+				if (currentStartupProject != null) {
+					currentStartupProject.ExecutionTargetsChanged += HandleExecutionTargetsChanged;
 					currentStartupProject.Saved += HandleProjectSaved;
+				}
 			}
 			else
 				currentStartupProject = null;
@@ -310,6 +313,11 @@ namespace MonoDevelop.Components.MainToolbar
 		}
 
 		void HandleSolutionSaved (object sender, WorkspaceItemEventArgs e)
+		{
+			UpdateCombos ();
+		}
+
+		void HandleExecutionTargetsChanged (object sender, EventArgs e)
 		{
 			UpdateCombos ();
 		}
@@ -407,7 +415,6 @@ namespace MonoDevelop.Components.MainToolbar
 				};
 				PositionPopup ();
 				popup.ShowAll ();
-				RemoveDecorationsWorkaround (popup);
 			}
 			popup.Update (matchEntry.Entry.Text);
 
@@ -682,8 +689,6 @@ namespace MonoDevelop.Components.MainToolbar
 			if (ci.Enabled)
 				IdeApp.CommandService.DispatchCommand (ci.Command.Id);
 		}
-
-		public Action<Gtk.Window> RemoveDecorationsWorkaround;
 
 		#region ICommandBar implementation
 		bool toolbarEnabled = true;

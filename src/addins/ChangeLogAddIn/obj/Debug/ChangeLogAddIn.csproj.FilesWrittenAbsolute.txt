@@ -1,7 +1,7 @@
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.ChangeLogAddIn.addin.xml
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.Policies.xml
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.gtk-gui.gui.stetic
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/ChangeLogAddIn/ChangeLogAddIn.dll.mdb
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/ChangeLogAddIn/ChangeLogAddIn.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.dll.mdb
+/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.ChangeLogAddIn.addin.xml
+/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.Policies.xml
+/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.gtk-gui.gui.stetic
+/tmp/monodevelop/main/build/AddIns/ChangeLogAddIn/ChangeLogAddIn.dll.mdb
+/tmp/monodevelop/main/build/AddIns/ChangeLogAddIn/ChangeLogAddIn.dll
+/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.dll
+/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.dll.mdb

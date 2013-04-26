@@ -36,7 +36,8 @@ namespace MonoDevelop.DesignerSupport.Toolbox
 	public class CodeTemplateToolboxProvider : IToolboxDynamicProvider
 	{
 		static string category = MonoDevelop.Core.GettextCatalog.GetString ("Text Snippets");
-		
+
+
 		public System.Collections.Generic.IEnumerable<ItemToolboxNode> GetDynamicItems (IToolboxConsumer consumer)
 		{
 			
@@ -46,17 +47,18 @@ namespace MonoDevelop.DesignerSupport.Toolbox
 				foreach (CodeTemplate ct in CodeTemplateService.GetCodeTemplatesForFile (editor.Name)) {
 					if (ct.CodeTemplateContext != CodeTemplateContext.Standard)
 						continue;
-					TemplateToolboxNode n = new TemplateToolboxNode (ct);
-					n.Description = ct.Description;
-					n.Name = ct.Shortcut;
-					n.Category = category;
-					n.Icon = ImageService.GetPixbuf ("md-template", Gtk.IconSize.Menu);
-					yield return n;
+					yield return new TemplateToolboxNode (ct) {
+						Category = category,
+						Icon = ImageService.GetPixbuf ("md-template", Gtk.IconSize.Menu)
+					};
 				}
 			}
 			yield break;
 		}
 		
-		public event EventHandler ItemsChanged;
+		public event EventHandler ItemsChanged {
+			add { CodeTemplateService.TemplatesChanged += value; }
+			remove { CodeTemplateService.TemplatesChanged -= value; }
+		}
 	}
 }

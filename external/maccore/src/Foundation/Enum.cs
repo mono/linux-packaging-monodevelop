@@ -79,6 +79,27 @@ namespace MonoMac.Foundation  {
 		Binary = 200
 	}
 
+	public enum NSPropertyListMutabilityOptions {
+		Immutable = 0,
+		MutableContainers = 1,
+		MutableContainersAndLeaves = 2
+	}
+
+	// Should mirror NSPropertyListMutabilityOptions
+	public enum NSPropertyListWriteOptions {
+		Immutable = 0,
+		MutableContainers = 1,
+		MutableContainersAndLeaves = 2
+	}
+
+	// Should mirror NSPropertyListMutabilityOptions, but currently
+	// not implemented (always use Immutable/0)
+	public enum NSPropertyListReadOptions {
+		Immutable = 0,
+		MutableContainers = 1,
+		MutableContainersAndLeaves = 2
+	}
+
 	public enum NSNetServicesStatus {
 		UnknownError = -72000,
 		CollisionError = -72001,
@@ -154,7 +175,7 @@ namespace MonoMac.Foundation  {
 
 		WithoutOverwriting  = 2,
 			
-		[Obsolete ("no longer available")]
+		[Obsolete ("No longer available")]
 		Coordinated = 1 << 2,
 			
 		[Since (4,0)]
@@ -537,9 +558,12 @@ namespace MonoMac.Foundation  {
 		LongestEffectiveRangeNotRequired = 1 << 20
 	}
 
+#if !MONOMAC
+	// MonoMac AppKit redefines this with more values
 	public enum NSUnderlineStyle {
 		None, Single
 	}
+#endif
 
 	public enum NSWritingDirection {
 		Natural = -1, LeftToRight = 0, RightToLeft = -1
@@ -584,4 +608,8 @@ namespace MonoMac.Foundation  {
 		None, Default, All 
 	}
 	
+	public enum NSDateComponentsWrappingBehavior {
+		None = 0,
+		WrapCalendarComponents = 1 << 0,
+	}
 }

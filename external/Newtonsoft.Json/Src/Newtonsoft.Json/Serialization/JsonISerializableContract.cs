@@ -23,7 +23,7 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 #endregion
 
-#if !SILVERLIGHT && !PocketPC && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
 using System;
 
 namespace Newtonsoft.Json.Serialization
@@ -31,7 +31,7 @@ namespace Newtonsoft.Json.Serialization
   /// <summary>
   /// Contract details for a <see cref="Type"/> used by the <see cref="JsonSerializer"/>.
   /// </summary>
-  public class JsonISerializableContract : JsonContract
+  public class JsonISerializableContract : JsonContainerContract
   {
     /// <summary>
     /// Gets or sets the ISerializable object constructor.

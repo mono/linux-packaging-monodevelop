@@ -30,9 +30,9 @@ using Newtonsoft.Json.Tests.TestObjects;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 
 namespace Newtonsoft.Json.Tests.Serialization
@@ -41,11 +41,6 @@ namespace Newtonsoft.Json.Tests.Serialization
   public class MissingMemberHandlingTests : TestFixtureBase
   {
     [Test]
-    [ExpectedException(typeof(JsonSerializationException)
-#if !NETFX_CORE
-      , ExpectedMessage = @"Could not find member 'Price' on object of type 'ProductShort'. Line 4, position 11."
-#endif
-      )]
     public void MissingMemberDeserialize()
     {
       Product product = new Product();
@@ -67,7 +62,12 @@ namespace Newtonsoft.Json.Tests.Serialization
       //  ]
       //}
 
-      ProductShort deserializedProductShort = (ProductShort)JsonConvert.DeserializeObject(output, typeof(ProductShort), new JsonSerializerSettings { MissingMemberHandling = MissingMemberHandling.Error });
+      ExceptionAssert.Throws<JsonSerializationException>(
+        @"Could not find member 'Price' on object of type 'ProductShort'. Path 'Price', line 4, position 11.",
+        () =>
+          {
+            ProductShort deserializedProductShort = (ProductShort)JsonConvert.DeserializeObject(output, typeof(ProductShort), new JsonSerializerSettings { MissingMemberHandling = MissingMemberHandling.Error });
+          });
     }
 
     [Test]
@@ -126,16 +126,16 @@ namespace Newtonsoft.Json.Tests.Serialization
     }
 
     [Test]
-    [ExpectedException(typeof(JsonSerializationException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Could not find member 'Missing' on object of type 'DoubleClass'. Line 1, position 11."
-#endif
-      )]
     public void MissingMemeber()
     {
       string json = @"{""Missing"":1}";
 
-      JsonConvert.DeserializeObject<DoubleClass>(json, new JsonSerializerSettings { MissingMemberHandling = MissingMemberHandling.Error });
+      ExceptionAssert.Throws<JsonSerializationException>(
+        "Could not find member 'Missing' on object of type 'DoubleClass'. Path 'Missing', line 1, position 11.",
+        () =>
+          {
+            JsonConvert.DeserializeObject<DoubleClass>(json, new JsonSerializerSettings { MissingMemberHandling = MissingMemberHandling.Error });
+          });
     }
 
     [Test]

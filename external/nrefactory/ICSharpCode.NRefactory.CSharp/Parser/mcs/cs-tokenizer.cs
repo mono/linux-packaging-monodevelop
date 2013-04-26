@@ -197,7 +197,7 @@ namespace Mono.CSharp
 		readonly int tab_size;
 		bool handle_get_set = false;
 		bool handle_remove_add = false;
-		bool handle_where = false;
+		bool handle_where;
 		bool handle_typeof = false;
 		bool lambda_arguments_parsing;
 		List<Location> escaped_identifiers;
@@ -710,7 +710,7 @@ namespace Mono.CSharp
 				}
 				break;
 			case Token.WHERE:
-				if (!handle_where && !query_parsing)
+				if (!(handle_where && current_token != Token.COLON) && !query_parsing)
 					res = -1;
 				break;
 			case Token.FROM:
@@ -719,7 +719,7 @@ namespace Mono.CSharp
 				// followed by any token except ; , =
 				// 
 				if (!query_parsing) {
-					if (lambda_arguments_parsing) {
+					if (lambda_arguments_parsing || parsing_block == 0) {
 						res = -1;
 						break;
 					}
@@ -742,7 +742,7 @@ namespace Mono.CSharp
 					case Token.UINT:
 					case Token.ULONG:
 						next_token = xtoken ();
-						if (next_token == Token.SEMICOLON || next_token == Token.COMMA || next_token == Token.EQUALS)
+						if (next_token == Token.SEMICOLON || next_token == Token.COMMA || next_token == Token.EQUALS || next_token == Token.ASSIGN)
 							goto default;
 						
 						res = Token.FROM_FIRST;
@@ -782,6 +782,7 @@ namespace Mono.CSharp
 			case Token.NAMESPACE:
 				// TODO: some explanation needed
 				check_incorrect_doc_comment ();
+				parsing_modifiers = false;
 				break;
 				
 			case Token.PARTIAL:
@@ -815,8 +816,17 @@ namespace Mono.CSharp
 					Report.Error (267, Location,
 						"The `partial' modifier can be used only immediately before `class', `struct', `interface', or `void' keyword");
 					return token ();
-				}					
+				}
 
+				// HACK: A token is not a keyword so we need to restore identifiers buffer
+				// which has been overwritten before we grabbed the identifier
+				id_builder[0] = 'p';
+				id_builder[1] = 'a';
+				id_builder[2] = 'r';
+				id_builder[3] = 't';
+				id_builder[4] = 'i';
+				id_builder[5] = 'a';
+				id_builder[6] = 'l';
 				res = -1;
 				break;
 
@@ -839,8 +849,10 @@ namespace Mono.CSharp
 					case Token.IDENTIFIER:
 						PushPosition ();
 						xtoken ();
-						if (xtoken () != Token.ARROW)
+						if (xtoken () != Token.ARROW) {
+							PopPosition ();
 							goto default;
+						}
 
 						PopPosition ();
 						break;
@@ -964,8 +976,12 @@ namespace Mono.CSharp
 					//
 					// Expression inside parens is single type, (int[])
 					//
-					if (is_type)
+					if (is_type) {
+						if (current_token == Token.SEMICOLON)
+							return Token.OPEN_PARENS;
+
 						return Token.OPEN_PARENS_CAST;
+					}
 
 					//
 					// Expression is possible cast, look at next token, (T)null
@@ -1022,6 +1038,7 @@ namespace Mono.CSharp
 					continue;
 
 				case Token.IDENTIFIER:
+				case Token.AWAIT:
 					switch (ptoken) {
 					case Token.DOT:
 						if (bracket_level == 0) {
@@ -1182,16 +1199,26 @@ namespace Mono.CSharp
 			return false;
 		}
 
+		List<Location> genericLocs = new List<Location> ();
+
+		public List<Location> GetGenericDimensionLocations ()
+		{
+			return genericLocs;
+		}
+
 		bool parse_generic_dimension (out int dimension)
 		{
 			dimension = 1;
 
 		again:
 			int the_token = token ();
-			if (the_token == Token.OP_GENERICS_GT)
+			if (the_token == Token.OP_GENERICS_GT) {
+				genericLocs.Add (Location);
 				return true;
+			}
 			else if (the_token == Token.COMMA) {
 				dimension++;
+				genericLocs.Add (Location);
 				goto again;
 			}
 
@@ -1263,6 +1290,8 @@ namespace Mono.CSharp
 			case Token.OPEN_BRACKET:
 			case Token.OP_GENERICS_GT:
 			case Token.INTERR:
+			case Token.OP_COALESCING:
+			case Token.COLON:
 				next_token = Token.INTERR_NULLABLE;
 				break;
 				
@@ -1401,7 +1430,7 @@ namespace Mono.CSharp
 							// if we have not seen anything in between
 							// report this error
 							//
-							Report.Warning (78, 4, Location, "The 'l' suffix is easily confused with the digit '1' (use 'L' for clarity)");
+							Report.Warning (78, 4, Location, "The `l' suffix is easily confused with the digit `1' (use `L' for clarity)");
 						}
 
 						goto case 'L';
@@ -1557,13 +1586,13 @@ namespace Mono.CSharp
 		//
 		// Invoked if we know we have .digits or digits
 		//
-		int is_number (int c)
+		int is_number (int c, bool dotLead)
 		{
 			ILiteralConstant res;
 
 #if FULL_AST
 			int read_start = reader.Position - 1;
-			if (c == '.') {
+			if (dotLead) {
 				//
 				// Caller did peek_char
 				//
@@ -1574,7 +1603,7 @@ namespace Mono.CSharp
 			var loc = Location;
 			bool hasLeadingDot = c == '.';
 
-			if (c >= '0' && c <= '9'){
+			if (!dotLead){
 				if (c == '0'){
 					int peek = peek_char ();
 
@@ -1588,7 +1617,7 @@ namespace Mono.CSharp
 					}
 				}
 				decimal_digits (c);
-				c = get_char ();
+				c = peek_char ();
 			}
 
 			//
@@ -1597,9 +1626,12 @@ namespace Mono.CSharp
 			//
 			bool is_real = false;
 			if (c == '.'){
+				if (!dotLead)
+					get_char ();
+
 				if (decimal_digits ('.')){
 					is_real = true;
-					c = get_char ();
+					c = peek_char ();
 				} else {
 					putback ('.');
 					number_pos--;
@@ -1613,6 +1645,7 @@ namespace Mono.CSharp
 			
 			if (c == 'e' || c == 'E'){
 				is_real = true;
+				get_char ();
 				if (number_pos == MaxNumberLength)
 					Error_NumericConstantTooLong ();
 				number_builder [number_pos++] = (char) c;
@@ -1635,18 +1668,17 @@ namespace Mono.CSharp
 				}
 					
 				decimal_digits (c);
-				c = get_char ();
+				c = peek_char ();
 			}
 
 			var type = real_type_suffix (c);
 			if (type == TypeCode.Empty && !is_real) {
-				putback (c);
 				res = adjust_int (c, loc);
 			} else {
 				is_real = true;
 
-				if (type == TypeCode.Empty) {
-					putback (c);
+				if (type != TypeCode.Empty) {
+					get_char ();
 				}
 
 				res = adjust_real (type, loc);
@@ -3510,7 +3542,7 @@ namespace Mono.CSharp
 				case '0': case '1': case '2': case '3': case '4':
 				case '5': case '6': case '7': case '8': case '9':
 					tokens_seen = true;
-					return is_number (c);
+					return is_number (c, false);
 
 				case '\n': // white space
 					any_token_seen |= tokens_seen;
@@ -3522,7 +3554,7 @@ namespace Mono.CSharp
 					tokens_seen = true;
 					d = peek_char ();
 					if (d >= '0' && d <= '9')
-						return is_number (c);
+						return is_number (c, true);
 
 					ltb.CreateOptional (current_source, ref_line, col, ref val);
 					return Token.DOT;
@@ -3674,6 +3706,8 @@ namespace Mono.CSharp
 		{
 			int d;
 			if (handle_typeof) {
+				genericLocs.Clear ();
+				genericLocs.Add (Location);
 				PushPosition ();
 				if (parse_generic_dimension (out d)) {
 					val = d;

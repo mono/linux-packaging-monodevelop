@@ -1,7 +1,7 @@
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.action.png
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.missing.png
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.dll.config
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.dll.mdb
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.dll.mdb
+/tmp/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.action.png
+/tmp/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.missing.png
+/tmp/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.dll.config
+/tmp/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.dll.mdb
+/tmp/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libsteticui.dll
+/tmp/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.dll
+/tmp/monodevelop/main/src/addins/MonoDevelop.GtkCore/libsteticui/obj/Debug/libsteticui.dll.mdb

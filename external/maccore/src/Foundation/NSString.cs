@@ -70,9 +70,15 @@ namespace MonoMac.Foundation {
 	[Register ("NSString")]
 #endif
 	public partial class NSString : NSObject {
-		static IntPtr selUTF8String = Selector.sel_registerName ("UTF8String");
-		static IntPtr selInitWithUTF8String = Selector.sel_registerName ("initWithUTF8String:");
-		static IntPtr selInitWithCharactersLength = Selector.sel_registerName ("initWithCharacters:length:");
+		const string selUTF8String = "UTF8String";
+		const string selInitWithUTF8String = "initWithUTF8String:";
+		const string selInitWithCharactersLength = "initWithCharacters:length:";
+
+#if MONOMAC
+		static IntPtr selUTF8StringHandle = Selector.GetHandle (selUTF8String);
+		static IntPtr selInitWithUTF8StringHandle = Selector.GetHandle (selInitWithUTF8String);
+		static IntPtr selInitWithCharactersLengthHandle = Selector.GetHandle (selInitWithCharactersLength);
+#endif
 
 #if COREBUILD
 		static IntPtr class_ptr = Class.GetHandle ("NSString");
@@ -90,8 +96,13 @@ namespace MonoMac.Foundation {
 			
 			unsafe {
 				fixed (char *ptrFirstChar = str){
-					var handle = Messaging.intptr_objc_msgSend (class_ptr, Selector.Alloc);
-					handle = Messaging.intptr_objc_msgsend_intptr_int (handle, selInitWithCharactersLength, (IntPtr) ptrFirstChar, str.Length);
+#if MONOMAC
+					var handle = Messaging.intptr_objc_msgSend (class_ptr, Selector.AllocHandle);
+					handle = Messaging.intptr_objc_msgsend_intptr_int (handle, selInitWithCharactersLengthHandle, (IntPtr) ptrFirstChar, str.Length);
+					#else
+					var handle = Messaging.intptr_objc_msgSend (class_ptr, Selector.GetHandle (Selector.Alloc));
+					handle = Messaging.intptr_objc_msgsend_intptr_int (handle, Selector.GetHandle (selInitWithCharactersLength), (IntPtr) ptrFirstChar, str.Length);
+#endif
 					return handle;
 				}
 			}
@@ -101,7 +112,11 @@ namespace MonoMac.Foundation {
 		{
 			if (handle == IntPtr.Zero)
 				return;
-			Messaging.void_objc_msgSend (handle, Selector.Release);
+#if MONOMAC
+			Messaging.void_objc_msgSend (handle, Selector.ReleaseHandle);
+#else
+			Messaging.void_objc_msgSend (handle, Selector.GetHandle (Selector.Release));
+#endif
 		}
 
 	
@@ -112,7 +127,7 @@ namespace MonoMac.Foundation {
 
 			IntPtr bytes = Marshal.StringToHGlobalAuto (str);
 
-			Handle = (IntPtr) Messaging.intptr_objc_msgSend_intptr (Handle, selInitWithUTF8String, bytes);
+			Handle = (IntPtr) Messaging.intptr_objc_msgSend_intptr (Handle, Selector.GetHandle (selInitWithUTF8String), bytes);
 
 			Marshal.FreeHGlobal (bytes);
 		}
@@ -124,7 +139,11 @@ namespace MonoMac.Foundation {
 
 			unsafe {
 				fixed (char *ptrFirstChar = str){
-					Handle = Messaging.intptr_objc_msgsend_intptr_int (Handle, selInitWithCharactersLength, (IntPtr) ptrFirstChar, str.Length);
+#if MONOMAC
+					Handle = Messaging.intptr_objc_msgsend_intptr_int (Handle, selInitWithCharactersLengthHandle, (IntPtr) ptrFirstChar, str.Length);
+#else
+					Handle = Messaging.intptr_objc_msgsend_intptr_int (Handle, Selector.GetHandle (selInitWithCharactersLength), (IntPtr) ptrFirstChar, str.Length);
+#endif
 				}
 			}
 		}
@@ -155,8 +174,12 @@ namespace MonoMac.Foundation {
 		{
 			if (usrhandle == IntPtr.Zero)
 				return null;
-			
-			return Marshal.PtrToStringAuto (Messaging.intptr_objc_msgSend (usrhandle, selUTF8String));
+
+#if MONOMAC
+			return Marshal.PtrToStringAuto (Messaging.intptr_objc_msgSend (usrhandle, selUTF8StringHandle));
+#else
+			return Marshal.PtrToStringAuto (Messaging.intptr_objc_msgSend (usrhandle, Selector.GetHandle (selUTF8String)));
+#endif
 		}
 
 		public static bool Equals (NSString a, NSString b)
@@ -196,7 +219,7 @@ namespace MonoMac.Foundation {
 			return (int) this.Handle;
 		}
 #if !MONOMAC && !COREBUILD
-		[Obsolete ("Use the version with a `ref float actualFontSize`")]
+		[Advice ("Use the version with a `ref float actualFontSize`")]
 		public System.Drawing.SizeF DrawString (System.Drawing.PointF point, float width, MonoTouch.UIKit.UIFont font, float minFontSize, float actualFontSize, MonoTouch.UIKit.UILineBreakMode breakMode, MonoTouch.UIKit.UIBaselineAdjustment adjustment)
 		{
 			float temp = actualFontSize;

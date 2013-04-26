@@ -873,7 +873,7 @@ namespace Mono.Debugging.Client
 		{
 		}
 		
-		Mono.Debugging.Evaluation.ExpressionEvaluator defaultResolver = new Mono.Debugging.Evaluation.NRefactoryEvaluator ();
+		Mono.Debugging.Evaluation.ExpressionEvaluator defaultResolver = new Mono.Debugging.Evaluation.NRefactoryExpressionEvaluator ();
 		Dictionary <string, IExpressionEvaluator> evaluators = new Dictionary <string, IExpressionEvaluator> ();
 
 		internal IExpressionEvaluator FindExpressionEvaluator (StackFrame frame)
@@ -927,8 +927,8 @@ namespace Mono.Debugging.Client
 		{
 			if (TypeResolverHandler != null)
 				return TypeResolverHandler (identifier, location);
-			else
-				return null;
+
+			return null;
 		}
 		
 		internal ThreadInfo[] GetThreads (long processId)
@@ -1216,16 +1216,16 @@ namespace Mono.Debugging.Client
 		{
 			if (exceptionHandler != null)
 				return exceptionHandler (ex);
-			else
-				return false;
+
+			return false;
 		}
 		
-		internal void AdjustBreakpointLocation (Breakpoint b, int newLine)
+		internal void AdjustBreakpointLocation (Breakpoint b, int newLine, int newColumn)
 		{
 			lock (breakpoints) {
 				try {
 					adjustingBreakpoints = true;
-					Breakpoints.AdjustBreakpointLine (b, newLine);
+					Breakpoints.AdjustBreakpointLine (b, newLine, newColumn);
 				} finally {
 					adjustingBreakpoints = false;
 				}

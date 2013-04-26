@@ -47,8 +47,8 @@ CORE_SOURCES =	$(EXTRA_CORE_SOURCES)			\
 # Sources that are not part of CORE_SOURCES or the generated templates
 MONOMAC_SOURCES = $(EXTRA_MONOMAC_SOURCES) \
 	./Foundation/NSObjectMac.cs			\
-	./Foundation/NSSearchPath.cs		\
 	./AppKit/AppKitSynchronizationContext.cs	\
+	./AppKit/AppKitThreadAccessException.cs	\
 	./AppKit/ActionDispatcher.cs			\
 	./AppKit/BeginSheet.cs				\
 	./AppKit/DoubleWrapper.cs			\
@@ -57,12 +57,15 @@ MONOMAC_SOURCES = $(EXTRA_MONOMAC_SOURCES) \
 	./AppKit/NSActionCell.cs			\
 	./AppKit/NSApplication.cs			\
 	./AppKit/NSApplicationDelegate.cs		\
-	./AppKit/NSBitmapImageRep.cs			\
-	./AppKit/NSButton.cs				\
+	./AppKit/NSArrayController.cs			\
 	./AppKit/NSBezierPath.cs			\
+	./AppKit/NSBitmapImageRep.cs			\
+	./AppKit/NSBrowser.cs				\
+	./AppKit/NSButton.cs				\
 	./AppKit/NSCell.cs				\
 	./AppKit/NSColor.cs				\
 	./AppKit/NSControl.cs				\
+	./AppKit/NSDocument.cs				\
 	./AppKit/NSEvent.cs				\
 	./AppKit/NSGradient.cs				\
 	./AppKit/NSGraphics.cs				\
@@ -76,13 +79,17 @@ MONOMAC_SOURCES = $(EXTRA_MONOMAC_SOURCES) \
 	./AppKit/NSOpenGLPixelFormat.cs			\
 	./AppKit/NSPopUpButton.cs			\
 	./AppKit/NSPopUpButtonCell.cs			\
+	./AppKit/NSScreen.cs				\
 	./AppKit/NSSharingService.cs			\
 	./AppKit/NSSegmentedControl.cs			\
+	./AppKit/NSSpeechSynthesizer.cs			\
+	./AppKit/NSSpellChecker.cs			\
+	./AppKit/NSSound.cs				\
 	./AppKit/NSTableView.cs				\
         ./AppKit/NSToolbarItem.cs                       \
+	./AppKit/NSTreeController.cs			\
         ./AppKit/NSWindow.cs				\
 	./CoreVideo/CVDisplayLink.cs			\
-	./Growl/Constants.cs				\
 	./QTKit/QTCaptureDevice.cs			\
 	./QTKit/QTMovie.cs				\
 	./WebKit/DomNode.cs				\
@@ -177,7 +184,6 @@ APIS = \
 	appkit.cs		\
 	corewlan.cs		\
 	foundation-desktop.cs 	\
-	growl.cs		\
 	imagekit.cs		\
 	qtkit.cs		\
 	pdfkit.cs		\
@@ -192,13 +198,13 @@ parse.exe: parse.cs $(MACCORE_DIR)/src/Options.cs
 	gmcs -debug parse.cs $(MACCORE_DIR)/src/Options.cs
 
 core.dll: $(CORE_SOURCES) $(SHARED_CORE_SOURCES) Makefile
-	gmcs -target:library -debug -unsafe -out:core.dll -define:MONOMAC,MONOMAC_BOOTSTRAP,COREBUILD $(CORE_SOURCES) $(SHARED_CORE_SOURCES) -r:System.Drawing
+	gmcs -target:library -debug -unsafe -out:core.dll -define:MONOMAC,MONOMAC_BOOTSTRAP,COREBUILD$(CORE_DLL_DEFINES) $(CORE_SOURCES) $(SHARED_CORE_SOURCES) -r:System.Drawing
 
 _bmac.exe: $(APIS) core.dll $(GENERATOR_SOURCES)
 	gmcs -unsafe -out:_bmac.exe -debug $(DEFINES) -define:GENERATOR,MONOMAC,MONOMAC_BOOTSTRAP $(GENERATOR_SOURCES) -r:core.dll -r:System.Drawing
 
 generated_sources: _bmac.exe $(APIS) 
-	mono --debug _bmac.exe -a -d=MONOMAC --core --sourceonly=generated_sources -v -tmpdir=. $(APIS) --baselib=core.dll --ns=MonoMac.ObjCRuntime -r=System.Drawing
+	mono --debug _bmac.exe -a -d=MONOMAC $(BMAC_DEFINES) --core --sourceonly=generated_sources -v -tmpdir=. $(APIS) --baselib=core.dll --ns=MonoMac.ObjCRuntime -r=System.Drawing
 
 bmac.exe: $(TARGET) $(GENERATOR_SOURCES)
 	gmcs -unsafe -out:bmac.exe -debug $(DEFINES) -define:GENERATOR,MONOMAC,MONOMAC_BOOTSTRAP $(GENERATOR_SOURCES) -r:$(TARGET) -r:System.Drawing

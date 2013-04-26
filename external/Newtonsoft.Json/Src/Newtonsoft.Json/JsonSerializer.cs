@@ -55,12 +55,17 @@ namespace Newtonsoft.Json
     private JsonConverterCollection _converters;
     private IContractResolver _contractResolver;
     private IReferenceResolver _referenceResolver;
+    private ITraceWriter _traceWriter;
     private SerializationBinder _binder;
     private StreamingContext _context;
     private Formatting? _formatting;
     private DateFormatHandling? _dateFormatHandling;
     private DateTimeZoneHandling? _dateTimeZoneHandling;
+    private DateParseHandling? _dateParseHandling;
     private CultureInfo _culture;
+    private int? _maxDepth;
+    private bool _maxDepthSet;
+    private bool? _checkAdditionalContent;
 
     /// <summary>
     /// Occurs when the <see cref="JsonSerializer"/> errors during serialization and deserialization.
@@ -103,6 +108,22 @@ namespace Newtonsoft.Json
           throw new ArgumentNullException("value", "Serialization binder cannot be null.");
 
         _binder = value;
+      }
+    }
+
+    /// <summary>
+    /// Gets or sets the <see cref="ITraceWriter"/> used by the serializer when writing trace messages.
+    /// </summary>
+    /// <value>The trace writer.</value>
+    public virtual ITraceWriter TraceWriter
+    {
+      get
+      {
+        return _traceWriter;
+      }
+      set
+      {
+        _traceWriter = value;
       }
     }
 
@@ -313,6 +334,15 @@ namespace Newtonsoft.Json
     }
 
     /// <summary>
+    /// Get or set how date formatted strings, e.g. "\/Date(1198908717056)\/" and "2012-03-21T05:40Z", are parsed when reading JSON.
+    /// </summary>
+    public virtual DateParseHandling DateParseHandling
+    {
+      get { return _dateParseHandling ?? JsonSerializerSettings.DefaultDateParseHandling; }
+      set { _dateParseHandling = value; }
+    }
+
+    /// <summary>
     /// Gets or sets the culture used when reading JSON. Defaults to <see cref="CultureInfo.InvariantCulture"/>.
     /// </summary>
     public virtual CultureInfo Culture
@@ -320,6 +350,40 @@ namespace Newtonsoft.Json
       get { return _culture ?? JsonSerializerSettings.DefaultCulture; }
       set { _culture = value; }
     }
+
+    /// <summary>
+    /// Gets or sets the maximum depth allowed when reading JSON. Reading past this depth will throw a <see cref="JsonReaderException"/>.
+    /// </summary>
+    public virtual int? MaxDepth
+    {
+      get { return _maxDepth; }
+      set
+      {
+        if (value <= 0)
+          throw new ArgumentException("Value must be positive.", "value");
+
+        _maxDepth = value;
+        _maxDepthSet = true;
+      }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether there will be a check for additional JSON content after deserializing an object.
+    /// </summary>
+    /// <value>
+    /// 	<c>true</c> if there will be a check for additional JSON content after deserializing an object; otherwise, <c>false</c>.
+    /// </value>
+    public virtual bool CheckAdditionalContent
+    {
+      get { return _checkAdditionalContent ?? JsonSerializerSettings.DefaultCheckAdditionalContent; }
+      set { _checkAdditionalContent = value; }
+    }
+
+    internal bool IsCheckAdditionalContentSet()
+    {
+      return (_checkAdditionalContent != null);
+    }
+
     #endregion
 
     /// <summary>
@@ -364,13 +428,17 @@ namespace Newtonsoft.Json
         jsonSerializer.DefaultValueHandling = settings.DefaultValueHandling;
         jsonSerializer.ConstructorHandling = settings.ConstructorHandling;
         jsonSerializer.Context = settings.Context;
+        jsonSerializer._checkAdditionalContent = settings._checkAdditionalContent;
 
-        // reader specific
-        // unset values won't override reader set values
+        // reader/writer specific
+        // unset values won't override reader/writer set values
         jsonSerializer._formatting = settings._formatting;
         jsonSerializer._dateFormatHandling = settings._dateFormatHandling;
         jsonSerializer._dateTimeZoneHandling = settings._dateTimeZoneHandling;
+        jsonSerializer._dateParseHandling = settings._dateParseHandling;
         jsonSerializer._culture = settings._culture;
+        jsonSerializer._maxDepth = settings._maxDepth;
+        jsonSerializer._maxDepthSet = settings._maxDepthSet;
 
         if (settings.Error != null)
           jsonSerializer.Error += settings.Error;
@@ -379,6 +447,8 @@ namespace Newtonsoft.Json
           jsonSerializer.ContractResolver = settings.ContractResolver;
         if (settings.ReferenceResolver != null)
           jsonSerializer.ReferenceResolver = settings.ReferenceResolver;
+        if (settings.TraceWriter != null)
+          jsonSerializer.TraceWriter = settings.TraceWriter;
         if (settings.Binder != null)
           jsonSerializer.Binder = settings.Binder;
       }
@@ -478,15 +548,31 @@ namespace Newtonsoft.Json
         previousDateTimeZoneHandling = reader.DateTimeZoneHandling;
         reader.DateTimeZoneHandling = _dateTimeZoneHandling.Value;
       }
+      DateParseHandling? previousDateParseHandling = null;
+      if (_dateParseHandling != null && reader.DateParseHandling != _dateParseHandling)
+      {
+        previousDateParseHandling = reader.DateParseHandling;
+        reader.DateParseHandling = _dateParseHandling.Value;
+      }
+      int? previousMaxDepth = null;
+      if (_maxDepthSet && reader.MaxDepth != _maxDepth)
+      {
+        previousMaxDepth = reader.MaxDepth;
+        reader.MaxDepth = _maxDepth;
+      }
 
       JsonSerializerInternalReader serializerReader = new JsonSerializerInternalReader(this);
-      object value = serializerReader.Deserialize(reader, objectType);
+      object value = serializerReader.Deserialize(reader, objectType, CheckAdditionalContent);
 
       // reset reader back to previous options
       if (previousCulture != null)
         reader.Culture = previousCulture;
       if (previousDateTimeZoneHandling != null)
         reader.DateTimeZoneHandling = previousDateTimeZoneHandling.Value;
+      if (previousDateParseHandling != null)
+        reader.DateParseHandling = previousDateParseHandling.Value;
+      if (_maxDepthSet)
+        reader.MaxDepth = previousMaxDepth;
 
       return value;
     }

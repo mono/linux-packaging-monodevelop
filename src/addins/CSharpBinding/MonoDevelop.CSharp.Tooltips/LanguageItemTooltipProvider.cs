@@ -24,7 +24,6 @@
 // THE SOFTWARE.
 //
 //
-
 using System;
 using Mono.TextEditor;
 using MonoDevelop.Ide.TypeSystem;
@@ -51,7 +50,7 @@ namespace MonoDevelop.SourceEditor
 {
 	public class LanguageItemTooltipProvider: TooltipProvider, IDisposable
 	{
-		public LanguageItemTooltipProvider()
+		public LanguageItemTooltipProvider ()
 		{
 		}
 
@@ -93,6 +92,7 @@ namespace MonoDevelop.SourceEditor
 				if (node is CSharpTokenNode) {
 					int startOffset2 = editor.LocationToOffset (node.StartLocation);
 					int endOffset2 = editor.LocationToOffset (node.EndLocation);
+
 					return new TooltipItem (new ToolTipData (unit, result, node, null), startOffset2, endOffset2 - startOffset2);
 				}
 				return null;
@@ -111,7 +111,6 @@ namespace MonoDevelop.SourceEditor
 		
 		AstNode lastNode = null;
 		static TooltipInformationWindow lastWindow = null;
-
 		TooltipItem lastResult;
 
 		static void DestroyLastTooltipWindow ()
@@ -169,12 +168,13 @@ namespace MonoDevelop.SourceEditor
 			var caret = new Gdk.Rectangle ((int)p1.X - positionWidget.Allocation.X, (int)p2.Y - positionWidget.Allocation.Y, (int)(p2.X - p1.X), (int)editor.LineHeight);
 
 			tipWindow.ShowPopup (positionWidget, caret, PopupPosition.Top);
-			
+			tipWindow.EnterNotifyEvent += delegate {
+				editor.HideTooltip (false);
+			};
 			lastWindow = tipWindow;
-			lastNode   = titem.Node;
+			lastNode = titem.Node;
 			return tipWindow;
 		}
-
 
 		TooltipInformation CreateTooltip (ToolTipData data, int offset, Ambience ambience)
 		{
@@ -183,6 +183,37 @@ namespace MonoDevelop.SourceEditor
 			if (doc == null)
 				return null;
 			try {
+
+				if (result is AliasNamespaceResolveResult) {
+					var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+					var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+					sig.BreakLineAfterReturnType = false;
+					return sig.GetAliasedNamespaceTooltip ((AliasNamespaceResolveResult)result);
+				}
+				
+				if (result is AliasTypeResolveResult) {
+					var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+					var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+					sig.BreakLineAfterReturnType = false;
+					return sig.GetAliasedTypeTooltip ((AliasTypeResolveResult)result);
+				}
+				
+				if (data.Node is TypeOfExpression) {
+					var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+					var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+					sig.BreakLineAfterReturnType = false;
+					return sig.GetTypeOfTooltip ((TypeOfExpression)data.Node, result as TypeOfResolveResult);
+				}
+				if (data.Node is PrimitiveType && data.Node.Parent is Constraint) {
+					var t = (PrimitiveType)data.Node;
+					if (t.Keyword == "class" || t.Keyword == "new" || t.Keyword == "struct") {
+						var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+						var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+						sig.BreakLineAfterReturnType = false;
+						return sig.GetConstraintTooltip (t.Keyword);
+					}
+					return null;
+				}
 				if (data.Node is ExternAliasDeclaration) {
 					var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
 					var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
@@ -218,62 +249,70 @@ namespace MonoDevelop.SourceEditor
 						SignatureMarkup = "Unknown resolve error."
 					};
 				}
-
-			if (result is LocalResolveResult) {
-				var lr = (LocalResolveResult)result;
-				var tooltipInfo = new TooltipInformation ();
-				var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
-				var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
-				sig.BreakLineAfterReturnType =  false;
-				tooltipInfo.SignatureMarkup = sig.GetLocalVariableMarkup (lr.Variable);
-				return tooltipInfo;
-			} else if (result is MethodGroupResolveResult) {
-				var mrr = (MethodGroupResolveResult)result;
-				var allMethods = new List<IMethod> (mrr.Methods);
-				foreach (var l in mrr.GetExtensionMethods ()) {
-					allMethods.AddRange (l);
-				}
+				if (result is LocalResolveResult) {
+					var lr = (LocalResolveResult)result;
+					var tooltipInfo = new TooltipInformation ();
+					var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+					var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+					sig.BreakLineAfterReturnType = false;
+					tooltipInfo.SignatureMarkup = sig.GetLocalVariableMarkup (lr.Variable);
+					return tooltipInfo;
+				} else if (result is MethodGroupResolveResult) {
+					var mrr = (MethodGroupResolveResult)result;
+					var allMethods = new List<IMethod> (mrr.Methods);
+					foreach (var l in mrr.GetExtensionMethods ()) {
+						allMethods.AddRange (l);
+					}
 				
-				var method = allMethods.FirstOrDefault ();
-				if (method != null) {
-					return MemberCompletionData.CreateTooltipInformation (
+					var method = allMethods.FirstOrDefault ();
+					if (method != null) {
+						return MemberCompletionData.CreateTooltipInformation (
 						doc.Compilation,
 						doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile,
 						doc.Editor,
 						doc.GetFormattingPolicy (),
 						method, 
 						false);
-				}
-			} else if (result is MemberResolveResult) {
-				var member = ((MemberResolveResult)result).Member;
-				return MemberCompletionData.CreateTooltipInformation (
+					}
+				} else if (result is CSharpInvocationResolveResult) {
+					var member = ((CSharpInvocationResolveResult)result).ReducedMethod ?? (IMethod)((CSharpInvocationResolveResult)result).Member;
+					return MemberCompletionData.CreateTooltipInformation (
+						doc.Compilation,
+						doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile,
+						doc.Editor,
+						doc.GetFormattingPolicy (),
+						member, 
+						false);
+				} else if (result is MemberResolveResult) {
+					var member = ((MemberResolveResult)result).Member;
+					return MemberCompletionData.CreateTooltipInformation (
 					doc.Compilation,
 					doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile,
 					doc.Editor,
 					doc.GetFormattingPolicy (),
 					member, 
 					false);
-			} else if (result is NamespaceResolveResult) {
-				var tooltipInfo = new TooltipInformation ();
-				var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
-				var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
-				sig.BreakLineAfterReturnType =  false;
-				try {
-					tooltipInfo.SignatureMarkup = sig.GetMarkup (((NamespaceResolveResult)result).Namespace);
-				} catch (Exception e) {
-					LoggingService.LogError ("Got exception while creating markup for :" + ((NamespaceResolveResult)result).Namespace, e);
-					return new TooltipInformation ();
-				}
-				return tooltipInfo;
-			} else {
-				return MemberCompletionData.CreateTooltipInformation (
+				}else if (result is NamespaceResolveResult) {
+					var tooltipInfo = new TooltipInformation ();
+					var resolver = (doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile).GetResolver (doc.Compilation, doc.Editor.Caret.Location);
+					var sig = new SignatureMarkupCreator (resolver, doc.GetFormattingPolicy ().CreateOptions ());
+					sig.BreakLineAfterReturnType = false;
+					try {
+						tooltipInfo.SignatureMarkup = sig.GetMarkup (((NamespaceResolveResult)result).Namespace);
+					} catch (Exception e) {
+						LoggingService.LogError ("Got exception while creating markup for :" + ((NamespaceResolveResult)result).Namespace, e);
+						return new TooltipInformation ();
+					}
+					return tooltipInfo;
+				} else {
+					return MemberCompletionData.CreateTooltipInformation (
 					doc.Compilation,
 					doc.ParsedDocument.ParsedFile as CSharpUnresolvedFile,
 					doc.Editor,
 					doc.GetFormattingPolicy (),
 					result.Type, 
 					false);
-			}
+				}
 			} catch (Exception e) {
 				LoggingService.LogError ("Error while creating tooltip.", e);
 				return null;
@@ -285,13 +324,13 @@ namespace MonoDevelop.SourceEditor
 		{
 			readonly CSharpAstResolver resolver;
 			readonly CancellationToken cancellationToken;
-
 			ResolveResult errorResolveResult;
+
 			public ResolveResult ErrorResolveResult {
 				get {
 					return errorResolveResult;
 				}
-			}			
+			}
 
 			AstNode errorNode;
 
@@ -325,7 +364,7 @@ namespace MonoDevelop.SourceEditor
 		
 		protected override void GetRequiredPosition (Mono.TextEditor.TextEditor editor, Gtk.Window tipWindow, out int requiredWidth, out double xalign)
 		{
-			var win = (TooltipInformationWindow) tipWindow;
+			var win = (TooltipInformationWindow)tipWindow;
 			requiredWidth = win.Allocation.Width;
 			xalign = 0.5;
 		}

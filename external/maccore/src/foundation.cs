@@ -4,10 +4,11 @@
 // Authors:
 //   Geoff Norton
 //   Miguel de Icaza
+//   Aaron Bockover
 //
 // Copyright 2009, Novell, Inc.
 // Copyright 2010, Novell, Inc.
-// Copyright 2011-2012 Xamarin Inc.
+// Copyright 2011-2013 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -51,7 +52,9 @@ namespace MonoMac.Foundation
 	public delegate int NSComparator (NSObject obj1, NSObject obj2);
 	public delegate void NSAttributedRangeCallback (NSDictionary attrs, NSRange range, ref bool stop);
 	public delegate void NSAttributedStringCallback (NSObject value, NSRange range, ref bool stop);
-	
+
+	public delegate bool NSEnumerateErrorHandler (NSUrl url, NSError error);
+
 	[BaseType (typeof (NSObject))]
 	public interface NSArray {
 		[Export ("count")]
@@ -84,7 +87,7 @@ namespace MonoMac.Foundation
 
 	[Since (3,2)]
 	[BaseType (typeof (NSObject))]
-	public interface NSAttributedString {
+	public partial interface NSAttributedString {
 		[Export ("string")]
 		string Value { get; }
 
@@ -230,7 +233,7 @@ namespace MonoMac.Foundation
 		void DrawString (PointF point);
 
 		[Since (6,0)]
-		[Export ("drawAtPoint:")]
+		[Export ("drawInRect:")]
 		void DrawString (RectangleF rect);
 
 		[Since (6,0)]
@@ -343,10 +346,18 @@ namespace MonoMac.Foundation
 		//- (NSRange)rangeOfUnit:(NSCalendarUnit)smaller inUnit:(NSCalendarUnit)larger forDate:(NSDate *)date;
 		//- (NSUInteger)ordinalityOfUnit:(NSCalendarUnit)smaller inUnit:(NSCalendarUnit)larger forDate:(NSDate *)date;
 		//- (BOOL)rangeOfUnit:(NSCalendarUnit)unit startDate:(NSDate **)datep interval:(NSTimeInterval *)tip forDate:(NSDate *)date AVAILABLE_MAC_OS_X_VERSION_10_5_AND_LATER;
-		//- (NSDate *)dateFromComponents:(NSDateComponents *)comps;
-		//- (NSDateComponents *)components:(NSUInteger)unitFlags fromDate:(NSDate *)date;
-		//- (NSDate *)dateByAddingComponents:(NSDateComponents *)comps toDate:(NSDate *)date options:(NSUInteger)opts;
-		//- (NSDateComponents *)components:(NSUInteger)unitFlags fromDate:(NSDate *)startingDate toDate:(NSDate *)resultDate options:(NSUInteger)opts;
+
+		[Export ("components:fromDate:")]
+		NSDateComponents Components (NSCalendarUnit unitFlags, NSDate fromDate);
+
+		[Export ("components:fromDate:toDate:options:")]
+		NSDateComponents Components (NSCalendarUnit unitFlags, NSDate fromDate, NSDate toDate, NSDateComponentsWrappingBehavior opts);
+
+		[Export ("dateByAddingComponents:toDate:options:")]
+		NSDate DateByAddingComponents (NSDateComponents comps, NSDate date, NSDateComponentsWrappingBehavior opts);
+
+		[Export ("dateFromComponents:")]
+		NSDate DateFromComponents (NSDateComponents comps);
 
 		[Field ("NSGregorianCalendar"), Internal]
 		NSString NSGregorianCalendar { get; }
@@ -849,7 +860,173 @@ namespace MonoMac.Foundation
 		[Export ("gregorianStartDate")]
 		NSDate GregorianStartDate { get; set; }
 	}
+
+	public delegate void NSFileHandleUpdateHandler (NSFileHandle handle);
+
+	public interface NSFileHandleReadEventArgs {
+		[Export ("NSFileHandleNotificationDataItem")]
+		NSData AvailableData { get; }
+
+		[Export ("NSFileHandleError", ArgumentSemantic.Assign)]
+		int UnixErrorCode { get; }
+	}
+
+	public interface NSFileHandleConnectionAcceptedEventArgs {
+		[Export ("NSFileHandleNotificationFileHandleItem")]
+		NSFileHandle NearSocketConnection { get; }
+		
+		[Export ("NSFileHandleError", ArgumentSemantic.Assign)]
+		int UnixErrorCode { get; }
+	}
 	
+	[BaseType (typeof (NSObject))]
+	[DisableDefaultCtor] // return invalid handle
+	public interface NSFileHandle 
+	{
+		[Export ("availableData")]
+		NSData AvailableData ();
+		
+		[Export ("readDataToEndOfFile")]
+		NSData ReadDataToEndOfFile ();
+
+		[Export ("readDataOfLength:")]
+		NSData ReadDataOfLength (uint length);
+
+		[Export ("writeData:")]
+		void WriteData (NSData data);
+
+		[Export ("offsetInFile")]
+		ulong OffsetInFile ();
+
+		[Export ("seekToEndOfFile")]
+		ulong SeekToEndOfFile ();
+
+		[Export ("seekToFileOffset:")]
+		void SeekToFileOffset (ulong offset);
+
+		[Export ("truncateFileAtOffset:")]
+		void TruncateFileAtOffset (ulong offset);
+
+		[Export ("synchronizeFile")]
+		void SynchronizeFile ();
+
+		[Export ("closeFile")]
+		void CloseFile ();
+		
+		[Static]
+		[Export ("fileHandleWithStandardInput")]
+		NSFileHandle FromStandardInput ();
+		
+		[Static]
+		[Export ("fileHandleWithStandardOutput")]
+		NSFileHandle FromStandardOutput ();
+
+		[Static]
+		[Export ("fileHandleWithStandardError")]
+		NSFileHandle FromStandardError ();
+
+		[Static]
+		[Export ("fileHandleWithNullDevice")]
+		NSFileHandle FromNullDevice ();
+
+		[Static]
+		[Export ("fileHandleForReadingAtPath:")]
+		NSFileHandle OpenRead (string path);
+
+		[Static]
+		[Export ("fileHandleForWritingAtPath:")]
+		NSFileHandle OpenWrite (string path);
+
+		[Static]
+		[Export ("fileHandleForUpdatingAtPath:")]
+		NSFileHandle OpenUpdate (string path);
+
+		[Static]
+		[Export ("fileHandleForReadingFromURL:error:")]
+		NSFileHandle OpenReadUrl (NSUrl url, out NSError error);
+
+		[Static]
+		[Export ("fileHandleForWritingToURL:error:")]
+		NSFileHandle OpenWriteUrl (NSUrl url, out NSError error);
+
+		[Static]
+		[Export ("fileHandleForUpdatingURL:error:")]
+		NSFileHandle OpenUpdateUrl (NSUrl url, out NSError error);
+		
+		[Export ("readInBackgroundAndNotifyForModes:")]
+		void ReadInBackground (NSString [] notifyRunLoopModes);
+		
+		[Export ("readInBackgroundAndNotify")]
+		void ReadInBackground ();
+
+		[Export ("readToEndOfFileInBackgroundAndNotifyForModes:")]
+		void ReadToEndOfFileInBackground (NSString [] notifyRunLoopModes);
+
+		[Export ("readToEndOfFileInBackgroundAndNotify")]
+		void ReadToEndOfFileInBackground ();
+
+		[Export ("acceptConnectionInBackgroundAndNotifyForModes:")]
+		void AcceptConnectionInBackground (NSString [] notifyRunLoopModes);
+
+		[Export ("acceptConnectionInBackgroundAndNotify")]
+		void AcceptConnectionInBackground ();
+
+		[Export ("waitForDataInBackgroundAndNotifyForModes:")]
+		void WaitForDataInBackground (NSString [] notifyRunLoopModes);
+
+		[Export ("waitForDataInBackgroundAndNotify")]
+		void WaitForDataInBackground ();
+		
+		[Export ("initWithFileDescriptor:closeOnDealloc:")]
+		IntPtr Constructor (int fd, bool closeOnDealloc);
+		
+		[Export ("initWithFileDescriptor:")]
+		IntPtr Constructor (int fd);
+
+		[Export ("fileDescriptor")]
+		int FileDescriptor { get; }
+
+		[Export ("setReadabilityHandler:")]
+		void SetReadabilityHandler ([NullAllowed] NSFileHandleUpdateHandler readCallback);
+
+		[Export ("setWriteabilityHandler:")]
+		void SetWriteabilityHandle ([NullAllowed] NSFileHandleUpdateHandler writeCallback);
+
+		[Field ("NSFileHandleOperationException")]
+		NSString OperationException { get; }
+
+		[Field ("NSFileHandleReadCompletionNotification")]
+		[Notification (typeof (NSFileHandleReadEventArgs))]
+		NSString ReadCompletionNotification { get; }
+		
+		[Field ("NSFileHandleReadToEndOfFileCompletionNotification")]
+		[Notification (typeof (NSFileHandleReadEventArgs))]
+		NSString ReadToEndOfFileCompletionNotification { get; }
+		
+		[Field ("NSFileHandleConnectionAcceptedNotification")]
+		[Notification (typeof (NSFileHandleConnectionAcceptedEventArgs))]
+		NSString ConnectionAcceptedNotification { get; }
+
+		
+		[Field ("NSFileHandleDataAvailableNotification")]
+		[Notification]
+		NSString DataAvailableNotification { get; }
+	}
+	
+	[BaseType (typeof (NSObject))]
+	public interface NSPipe {
+		
+		[Export ("fileHandleForReading")]
+		NSFileHandle ReadHandle { get; }
+		
+		[Export ("fileHandleForWriting")]
+		NSFileHandle WriteHandle { get; }
+
+		[Static]
+		[Export ("pipe")]
+		NSPipe Create ();
+	}
+
 	//@interface NSFormatter : NSObject <NSCopying, NSCoding>
 	[BaseType (typeof (NSObject))]
 	public interface NSFormatter {
@@ -1607,8 +1784,8 @@ namespace MonoMac.Foundation
 		[Export ("setOrthography:range:")]
 		void SetOrthographyrange (NSOrthography orthography, NSRange range);
 
-		[Export ("orthographyAtIndex:effectiveRange:"), Internal]
-		NSOrthography GetOrthography (int charIndex, IntPtr effectiveRangePtr);
+		[Export ("orthographyAtIndex:effectiveRange:")]
+		NSOrthography GetOrthography (int charIndex, ref NSRange effectiveRange);
 
 		[Export ("stringEditedInRange:changeInLength:")]
 		void StringEditedInRange (NSRange newRange, int delta);
@@ -1619,14 +1796,14 @@ namespace MonoMac.Foundation
 		[Export ("sentenceRangeForRange:")]
 		NSRange GetSentenceRangeForRange (NSRange range);
 
-		[Export ("tagAtIndex:scheme:tokenRange:sentenceRange:"), Internal]
-		string GetTag (int charIndex, NSString tagScheme, IntPtr tokenRangePtr, IntPtr sentenceRangePtr);
+		[Export ("tagAtIndex:scheme:tokenRange:sentenceRange:")]
+		string GetTag (int charIndex, NSString tagScheme, ref NSRange tokenRange, ref NSRange sentenceRange);
 
 		[Export ("tagsInRange:scheme:options:tokenRanges:"), Internal]
-		NSString [] GetTangsInRange (NSRange range, NSString tagScheme, NSLinguisticTaggerOptions opts, IntPtr refToNSArrayTokenRanges);
+		NSString [] GetTagsInRange (NSRange range, NSString tagScheme, NSLinguisticTaggerOptions opts, ref NSArray tokenRanges);
 
 		[Export ("possibleTagsAtIndex:scheme:tokenRange:sentenceRange:scores:"), Internal]
-		NSString [] GetPossibleTags (int charIndex, NSString tagScheme, IntPtr tokenRangePointer, IntPtr sentenceRangePointer, IntPtr IntPtrToReturnArrayScores);
+		NSString [] GetPossibleTags (int charIndex, NSString tagScheme, ref NSRange tokenRange, ref NSRange sentenceRange, ref NSArray scores);
 
 		//Detected properties
 		[Export ("string")]
@@ -2398,7 +2575,7 @@ namespace MonoMac.Foundation
 
 		[Export("URLByResolvingBookmarkData:options:relativeToURL:bookmarkDataIsStale:error:")]
 		[Static]
-		NSUrl FromBookmarkData (NSData data, NSUrlBookmarkResolutionOptions options, [NullAllowed] NSUrl relativeToUrl, bool isStale, out NSError error);
+		NSUrl FromBookmarkData (NSData data, NSUrlBookmarkResolutionOptions options, [NullAllowed] NSUrl relativeToUrl, out bool isStale, out NSError error);
 
 		[Export("writeBookmarkData:toURL:options:error:")]
 		[Static]
@@ -2408,7 +2585,7 @@ namespace MonoMac.Foundation
 		bool StartAccessingSecurityScopedResource();
 
 		[Export("stopAccessingSecurityScopedResource")]
-		bool StopAccessingSecurityScopedResource();
+		void StopAccessingSecurityScopedResource();
 
 #endif
 
@@ -2726,18 +2903,19 @@ namespace MonoMac.Foundation
 
 		[Since (5,0)]
 		[Field ("NSURLUbiquitousItemPercentDownloadedKey")]
-		[Obsolete ("Use NSMetadataQuery.UbiquitousItemPercentDownloadedKey on NSMetadataItem")]
+		[Obsolete ("Deprecated in iOS 6.0. Use NSMetadataQuery.UbiquitousItemPercentDownloadedKey on NSMetadataItem")]
 		NSString UbiquitousItemPercentDownloadedKey { get; }
 
 		[Since (5,0)]
-		[Obsolete ("Use NSMetadataQuery.NSMetadataUbiquitousItemPercentUploadedKey on NSMetadataItem")]
+		[Obsolete ("Deprecated in iOS 6.0. Use NSMetadataQuery.NSMetadataUbiquitousItemPercentUploadedKey on NSMetadataItem")]
 		[Field ("NSURLUbiquitousItemPercentUploadedKey")]
 		NSString UbiquitousItemPercentUploadedKey { get; }
-#if !MONOMAC
+
 		[Since (5,1)]
+		[MountainLion]
 		[Field ("NSURLIsExcludedFromBackupKey")]
 		NSString IsExcludedFromBackupKey { get; }
-#endif
+
 		[Export ("bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:")]
 		NSData CreateBookmarkData (NSUrlBookmarkCreationOptions options, string [] resourceValues, [NullAllowed] NSUrl relativeUrl, out NSError error);
 
@@ -3636,7 +3814,7 @@ namespace MonoMac.Foundation
 	}
 #endif
 	[BaseType (typeof (NSStream))]
-	[DisableDefaultCtor] // crash when used
+	[DefaultCtorVisibility (Visibility.Protected)]
 	public interface NSInputStream {
 		[Export ("hasBytesAvailable")]
 		bool HasBytesAvailable ();
@@ -3777,7 +3955,7 @@ namespace MonoMac.Foundation
 
 		[Static]
 		[Export ("setDefaultPlaceholder:forMarker:withBinding:")]
-		NSObject SetDefaultPlaceholder (NSObject placeholder, NSObject marker, string binding);
+		void SetDefaultPlaceholder (NSObject placeholder, NSObject marker, string binding);
 #endif
 		[Export ("objectDidEndEditing:")]
 		void ObjectDidEndEditing (NSObject editor);
@@ -4087,7 +4265,7 @@ namespace MonoMac.Foundation
 #if MONOMAC
 	[DisableDefaultCtor] // An uncaught exception was raised: -[__NSCFDictionary removeObjectForKey:]: attempt to remove nil key
 #endif
-	public interface NSBundle {
+	public partial interface NSBundle {
 		[Export ("mainBundle")][Static]
 		NSBundle MainBundle { get; }
 
@@ -4110,13 +4288,13 @@ namespace MonoMac.Foundation
 		NSBundle [] AllFrameworks { get; }
 
 		[Export ("load")]
-		void Load ();
+		bool Load ();
 
 		[Export ("isLoaded")]
 		bool IsLoaded { get; }
 
 		[Export ("unload")]
-		void Unload ();
+		bool Unload ();
 
 		[Export ("bundlePath")]
 		string BundlePath { get; }
@@ -4192,7 +4370,7 @@ namespace MonoMac.Foundation
 #else
 		// http://developer.apple.com/library/ios/#documentation/uikit/reference/NSBundle_UIKitAdditions/Introduction/Introduction.html
 		[Export ("loadNibNamed:owner:options:")]
-		NSArray LoadNib (string nibName, NSObject owner, [NullAllowed] NSDictionary options);
+		NSArray LoadNib (string nibName, [NullAllowed] NSObject owner, [NullAllowed] NSDictionary options);
 #endif
 		[Export ("bundleURL")]
 		[Since (4,0)]
@@ -4398,7 +4576,7 @@ namespace MonoMac.Foundation
 		void Remove (uint index);
 
 		[Export ("shiftIndexesStartingAtIndex:by:")]
-		void ShiftIndexes (uint startIndex, uint delta);
+		void ShiftIndexes (uint startIndex, int delta);
 	}
 	
 	[BaseType (typeof (NSObject), Delegates=new string [] { "WeakDelegate" }, Events=new Type [] { typeof (NSNetServiceDelegate)})]
@@ -4466,7 +4644,12 @@ namespace MonoMac.Foundation
 		bool GetStreams (IntPtr ptrToInputStorage, IntPtr ptrToOutputStorage);
 		
 		[Export ("TXTRecordData")]
-		NSData TxtRecordData { get; set; }
+		NSData GetTxtRecordData ();
+
+		[Export ("setTXTRecordData:")]
+		bool SetTxtRecordData (NSData data);
+
+		//NSData TxtRecordData { get; set; }
 
 		[Export ("startMonitoring")]
 		void StartMonitoring ();
@@ -4604,7 +4787,7 @@ namespace MonoMac.Foundation
 
 		[Since (4,0)]
 		[Export ("addObserverForName:object:queue:usingBlock:")]
-		void AddObserver (string name, NSObject obj, NSOperationQueue queue, NSNotificationHandler handler);
+		NSObject AddObserver (string name, NSObject obj, NSOperationQueue queue, NSNotificationHandler handler);
 	}
 
 #if MONOMAC
@@ -4668,7 +4851,7 @@ namespace MonoMac.Foundation
 	[BaseType (typeof (NSObject))]
 	// init returns NIL
 	[DisableDefaultCtor]
-	public interface NSValue {
+	public partial interface NSValue {
 		[Export ("getValue:")]
 		void StoreValueAtAddress (IntPtr value);
 
@@ -4737,18 +4920,6 @@ namespace MonoMac.Foundation
 
 		[Export ("rangeValue")]
 		NSRange RangeValue { get; }
-
-		[Static, Export ("valueWithSCNVector3:")]
-		MonoMac.OpenGL.Vector3 FromVector (MonoMac.OpenGL.Vector3 vector);
-		
-		[Static, Export ("valueWithSCNVector4:")]
-		MonoMac.OpenGL.Vector3 FromVector (MonoMac.OpenGL.Vector4 vector);
-
-		[Export ("SCNVector3Value")]
-		MonoMac.OpenGL.Vector3 Vector3Value { get; }
-
-		[Export ("SCNVector4Value")]
-		MonoMac.OpenGL.Vector4 Vector4Value { get; }
 #else
 		[Static, Export ("valueWithCMTime:"), Since (4,0)]
 		NSValue FromCMTime (CMTime time);
@@ -5230,16 +5401,16 @@ namespace MonoMac.Foundation
 		NSDecimalNumber Divide (NSDecimalNumber d, NSObject Behavior);
 
 		[Export ("decimalNumberByRaisingToPower:")]
-		NSDecimalNumber RaiseTo (NSDecimalNumber d);
+		NSDecimalNumber RaiseTo (uint power);
 
 		[Export ("decimalNumberByRaisingToPower:withBehavior:")]
-		NSDecimalNumber RaiseTo (NSDecimalNumber d, NSObject Behavior);
+		NSDecimalNumber RaiseTo (uint power, NSObject Behavior);
 		
 		[Export ("decimalNumberByMultiplyingByPowerOf10:")]
-		NSDecimalNumber MultiplyPowerOf10 (NSDecimalNumber d);
+		NSDecimalNumber MultiplyPowerOf10 (short power);
 
 		[Export ("decimalNumberByMultiplyingByPowerOf10:withBehavior:")]
-		NSDecimalNumber MultiplyPowerOf10 (NSDecimalNumber d, NSObject Behavior);
+		NSDecimalNumber MultiplyPowerOf10 (short power, NSObject Behavior);
 
 		[Export ("decimalNumberByRoundingAccordingToBehavior:")]
 		NSDecimalNumber Rounding (NSObject behavior);
@@ -5356,7 +5527,7 @@ namespace MonoMac.Foundation
 		string OperatingSystemVersionString { get; }
 
 		[Export ("physicalMemory")]
-		long PhysicalMemory { get; }
+		ulong PhysicalMemory { get; }
 		
 		[Export ("processorCount")]
 		int ProcessorCount { get; }
@@ -5412,12 +5583,13 @@ namespace MonoMac.Foundation
 		void Cancel ();
 
 		[Since (6,0)]
+		[MountainLion]
 		[Export ("itemAtURL:willMoveToURL:")]
 		void WillMove (NSUrl oldUrl, NSUrl newUrl);
 	}
 	
 	[BaseType (typeof (NSObject))]
-	public interface NSFileManager {
+	public partial interface NSFileManager {
 		[Field("NSFileType")]
 		NSString NSFileType { get; }
 
@@ -5585,13 +5757,16 @@ namespace MonoMac.Foundation
 		bool RemoveFileAtPath (string path, IntPtr handler);
 #endif
 		[Export ("currentDirectoryPath")]
-		string CurrentDirectory { get; [Bind ("changeCurrentDirectoryPath:")] set; }
+		string GetCurrentDirectory ();
+
+		[Export ("changeCurrentDirectoryPath:")]
+		bool ChangeCurrentDirectory (string path);
 
 		[Export ("fileExistsAtPath:")]
 		bool FileExists (string path);
 
 		[Export ("fileExistsAtPath:isDirectory:")]
-		bool FileExists (string path, bool isDirectory);
+		bool FileExists (string path, ref bool isDirectory);
 
 		[Export ("isReadableFileAtPath:")]
 		bool IsReadableFile (string path);
@@ -5648,7 +5823,7 @@ namespace MonoMac.Foundation
 
 		[Since (4,0)]
 		[Export ("enumeratorAtURL:includingPropertiesForKeys:options:errorHandler:")]
-		NSDirectoryEnumerator GetEnumerator (NSUrl url, [NullAllowed] NSArray properties, NSDirectoryEnumerationOptions options, out NSError error);
+		NSDirectoryEnumerator GetEnumerator (NSUrl url, [NullAllowed] NSArray properties, NSDirectoryEnumerationOptions options, [NullAllowed] NSEnumerateErrorHandler handler);
 
 		[Since (4,0)]
 		[Export ("URLForDirectory:inDomain:appropriateForURL:create:error:")]
@@ -5708,14 +5883,15 @@ namespace MonoMac.Foundation
                 NSUrl GetUrlForPublishingUbiquitousItem (NSUrl url, out NSDate expirationDate, out NSError error);
 
 		[Since (6,0)]
+		[MountainLion]
 		[Export ("ubiquityIdentityToken")]
 		NSObject UbiquityIdentityToken { get; }
-#if !MONOMAC
+
 		[Since (6,0)]
+		[MountainLion]
 		[Field ("NSUbiquityIdentityDidChangeNotification")]
 		[Notification]
 		NSString UbiquityIdentityDidChangeNotification { get; }
-#endif
 	}
 
 	[BaseType(typeof(NSObject))]
@@ -5784,7 +5960,7 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSObject))]
 	[Model]
-	interface NSFilePresenter {
+	partial interface NSFilePresenter {
 		[Abstract]
 		[Export ("presentedItemURL")]
 		NSUrl PresentedItemURL { get; }
@@ -6159,7 +6335,7 @@ namespace MonoMac.Foundation
 		IntPtr Constructor (NSUrlRequest request, [NullAllowed] NSCachedUrlResponse cachedResponse, NSUrlProtocolClient client);
 
 		[Export ("client")]
-		NSObject WeakClient { get; set; }
+		NSObject WeakClient { get; }
 
 		[Export ("request")]
 		NSUrlRequest Request { get; }
@@ -6206,5 +6382,27 @@ namespace MonoMac.Foundation
 		void UnregisterClass (Class protocolClass);
 	}
 
+	[BaseType (typeof(NSObject))]
+	[DisableDefaultCtor]
+	public interface NSPropertyListSerialization {
+		[Static, Export ("dataWithPropertyList:format:options:error:")]
+		NSData DataWithPropertyList (NSObject plist, NSPropertyListFormat format,
+			NSPropertyListWriteOptions options, out NSError error);
+
+		[Static, Export ("writePropertyList:toStream:format:options:error:")]
+		int WritePropertyList (NSObject plist, NSOutputStream stream, NSPropertyListFormat format,
+			NSPropertyListWriteOptions options, out NSError error);
+
+		[Static, Export ("propertyListWithData:options:format:error:")]
+		NSObject PropertyListWithData (NSData data, NSPropertyListReadOptions options,
+			ref NSPropertyListFormat format, out NSError error);
+
+		[Static, Export ("propertyListWithStream:options:format:error:")]
+		NSObject PropertyListWithStream (NSInputStream stream, NSPropertyListReadOptions options,
+			ref NSPropertyListFormat format, out NSError error);
+
+		[Static, Export ("propertyList:isValidForFormat:")]
+		bool IsValidForFormat (NSObject plist, NSPropertyListFormat format);
+	}
 }
 

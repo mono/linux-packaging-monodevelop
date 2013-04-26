@@ -27,7 +27,7 @@ using System;
 using System.Collections.Generic;
 using Newtonsoft.Json.Utilities;
 using System.Globalization;
-#if !(NET35 || NET20 || WINDOWS_PHONE)
+#if !(NET35 || NET20 || WINDOWS_PHONE || PORTABLE)
 using System.Dynamic;
 using System.Linq.Expressions;
 #endif
@@ -70,6 +70,15 @@ namespace Newtonsoft.Json.Linq
     /// Initializes a new instance of the <see cref="JValue"/> class with the given value.
     /// </summary>
     /// <param name="value">The value.</param>
+    public JValue(char value)
+      : this(value, JTokenType.String)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="JValue"/> class with the given value.
+    /// </summary>
+    /// <param name="value">The value.</param>
     [CLSCompliant(false)]
     public JValue(ulong value)
       : this(value, JTokenType.Integer)
@@ -81,6 +90,15 @@ namespace Newtonsoft.Json.Linq
     /// </summary>
     /// <param name="value">The value.</param>
     public JValue(double value)
+      : this(value, JTokenType.Float)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="JValue"/> class with the given value.
+    /// </summary>
+    /// <param name="value">The value.</param>
+    public JValue(float value)
       : this(value, JTokenType.Float)
     {
     }
@@ -117,7 +135,7 @@ namespace Newtonsoft.Json.Linq
     /// </summary>
     /// <param name="value">The value.</param>
     public JValue(Guid value)
-      : this(value, JTokenType.String)
+      : this(value, JTokenType.Guid)
     {
     }
 
@@ -126,7 +144,7 @@ namespace Newtonsoft.Json.Linq
     /// </summary>
     /// <param name="value">The value.</param>
     public JValue(Uri value)
-      : this(value, JTokenType.String)
+      : this(value, (value != null) ? JTokenType.Uri : JTokenType.Null)
     {
     }
 
@@ -135,7 +153,7 @@ namespace Newtonsoft.Json.Linq
     /// </summary>
     /// <param name="value">The value.</param>
     public JValue(TimeSpan value)
-      : this(value, JTokenType.String)
+      : this(value, JTokenType.TimeSpan)
     {
     }
 
@@ -153,6 +171,8 @@ namespace Newtonsoft.Json.Linq
       JValue other = node as JValue;
       if (other == null)
         return false;
+      if (other == this)
+        return true;
 
       return ValuesEquals(this, other);
     }
@@ -205,19 +225,28 @@ namespace Newtonsoft.Json.Linq
           if (objA is DateTime)
           {
 #endif
-            DateTime date1 = Convert.ToDateTime(objA, CultureInfo.InvariantCulture);
-            DateTime date2 = Convert.ToDateTime(objB, CultureInfo.InvariantCulture);
+            DateTime date1 = (DateTime)objA;
+            DateTime date2;
+
+#if !NET20
+            if (objB is DateTimeOffset)
+              date2 = ((DateTimeOffset)objB).DateTime;
+            else
+#endif
+              date2 = Convert.ToDateTime(objB, CultureInfo.InvariantCulture);
 
             return date1.CompareTo(date2);
 #if !NET20
           }
           else
           {
-            if (!(objB is DateTimeOffset))
-              throw new ArgumentException("Object must be of type DateTimeOffset.");
-
             DateTimeOffset date1 = (DateTimeOffset) objA;
-            DateTimeOffset date2 = (DateTimeOffset) objB;
+            DateTimeOffset date2;
+
+            if (objB is DateTimeOffset)
+              date2 = (DateTimeOffset)objB;
+            else
+              date2 = new DateTimeOffset(Convert.ToDateTime(objB, CultureInfo.InvariantCulture));
 
             return date1.CompareTo(date2);
           }
@@ -275,7 +304,7 @@ namespace Newtonsoft.Json.Linq
       return d1.CompareTo(d2);
     }
 
-#if !(NET35 || NET20 || WINDOWS_PHONE)
+#if !(NET35 || NET20 || WINDOWS_PHONE || PORTABLE)
     private static bool Operation(ExpressionType operation, object objA, object objB, out object result)
     {
       if (objA is string || objB is string)
@@ -416,7 +445,7 @@ namespace Newtonsoft.Json.Linq
     {
       if (value == null)
         return JTokenType.Null;
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
       else if (value == DBNull.Value)
         return JTokenType.Null;
 #endif
@@ -500,10 +529,20 @@ namespace Newtonsoft.Json.Linq
     /// <param name="converters">A collection of <see cref="JsonConverter"/> which will be used when writing the token.</param>
     public override void WriteTo(JsonWriter writer, params JsonConverter[] converters)
     {
+      if (converters != null && converters.Length > 0 && _value != null)
+      {
+        JsonConverter matchingConverter = JsonSerializer.GetMatchingConverter(converters, _value.GetType());
+        if (matchingConverter != null)
+        {
+          matchingConverter.WriteJson(writer, _value, new JsonSerializer());
+          return;
+        }
+      }
+
       switch (_valueType)
       {
         case JTokenType.Comment:
-          writer.WriteComment(_value.ToString());
+          writer.WriteComment((_value != null) ? _value.ToString() : null);
           return;
         case JTokenType.Raw:
           writer.WriteRawValue((_value != null) ? _value.ToString() : null);
@@ -514,22 +553,18 @@ namespace Newtonsoft.Json.Linq
         case JTokenType.Undefined:
           writer.WriteUndefined();
           return;
-      }
-
-      JsonConverter matchingConverter;
-      if (_value != null && ((matchingConverter = JsonSerializer.GetMatchingConverter(converters, _value.GetType())) != null))
-      {
-        matchingConverter.WriteJson(writer, _value, new JsonSerializer());
-        return;
-      }
-
-      switch (_valueType)
-      {
         case JTokenType.Integer:
           writer.WriteValue(Convert.ToInt64(_value, CultureInfo.InvariantCulture));
           return;
         case JTokenType.Float:
-          writer.WriteValue(Convert.ToDouble(_value, CultureInfo.InvariantCulture));
+          if (_value is decimal)
+            writer.WriteValue((decimal)_value);
+          else if (_value is double)
+            writer.WriteValue((double)_value);
+          else if (_value is float)
+            writer.WriteValue((float)_value);
+          else
+            writer.WriteValue(Convert.ToDouble(_value, CultureInfo.InvariantCulture));
           return;
         case JTokenType.String:
           writer.WriteValue((_value != null) ? _value.ToString() : null);
@@ -679,7 +714,7 @@ namespace Newtonsoft.Json.Linq
         return _value.ToString();
     }
 
-#if !(NET35 || NET20 || WINDOWS_PHONE)
+#if !(NET35 || NET20 || WINDOWS_PHONE || PORTABLE)
     /// <summary>
     /// Returns the <see cref="T:System.Dynamic.DynamicMetaObject"/> responsible for binding operations performed on this object.
     /// </summary>

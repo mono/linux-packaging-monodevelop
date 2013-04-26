@@ -23,7 +23,7 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 #endregion
 
-#if !SILVERLIGHT && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json.Tests.Serialization;
@@ -31,9 +31,9 @@ using Newtonsoft.Json.Tests.TestObjects;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 using Newtonsoft.Json;
 using System.IO;
@@ -113,6 +113,35 @@ namespace Newtonsoft.Json.Tests.Converters
 
       return node;
     }
+
+#if !NET20
+    [Test]
+    public void SerializeEmptyDocument()
+    {
+      XmlDocument doc = new XmlDocument();
+      doc.LoadXml("<root />");
+
+      string json = JsonConvert.SerializeXmlNode(doc, Formatting.Indented, true);
+      Assert.AreEqual("null", json);
+
+      doc = new XmlDocument();
+      doc.LoadXml("<root></root>");
+
+      json = JsonConvert.SerializeXmlNode(doc, Formatting.Indented, true);
+      Assert.AreEqual("null", json);
+
+
+      XDocument doc1 = XDocument.Parse("<root />");
+
+      json = JsonConvert.SerializeXNode(doc1, Formatting.Indented, true);
+      Assert.AreEqual("null", json);
+
+      doc1 = XDocument.Parse("<root></root>");
+
+      json = JsonConvert.SerializeXNode(doc1, Formatting.Indented, true);
+      Assert.AreEqual("null", json);
+    }
+#endif
 
     [Test]
     public void DocumentSerializeIndented()
@@ -383,12 +412,12 @@ namespace Newtonsoft.Json.Tests.Converters
     ""@class"": ""vevent"",
     ""a"": {
       ""@class"": ""url"",
-      ""@href"": ""http://www.web2con.com/"",
       ""span"": {
         ""@class"": ""summary"",
         ""#text"": ""Web 2.0 Conference"",
         ""#cdata-section"": ""my escaped text""
-      }
+      },
+      ""@href"": ""http://www.web2con.com/""
     }
   }
 }";
@@ -481,7 +510,7 @@ namespace Newtonsoft.Json.Tests.Converters
     [Test]
     public void OtherElementDataTypes()
     {
-      string jsonText = @"{""?xml"":{""@version"":""1.0"",""@standalone"":""no""},""root"":{""person"":[{""@id"":""1"",""Float"":2.5,""Integer"":99},{""@id"":""2"",""Boolean"":true,""date"":""\/Date(954374400000)\/""}]}}";
+      string jsonText = @"{""?xml"":{""@version"":""1.0"",""@standalone"":""no""},""root"":{""person"":[{""@id"":""1"",""Float"":2.5,""Integer"":99},{""Boolean"":true,""@id"":""2"",""date"":""\/Date(954374400000)\/""}]}}";
 
       XmlDocument newDoc = (XmlDocument)DeserializeXmlNode(jsonText);
 
@@ -491,17 +520,25 @@ namespace Newtonsoft.Json.Tests.Converters
     }
 
     [Test]
-    [ExpectedException(typeof(JsonSerializationException), ExpectedMessage = "XmlNodeConverter can only convert JSON that begins with an object.")]
     public void NoRootObject()
     {
-      XmlDocument newDoc = (XmlDocument)JsonConvert.DeserializeXmlNode(@"[1]");
+      ExceptionAssert.Throws<JsonSerializationException>(
+        "XmlNodeConverter can only convert JSON that begins with an object.",
+        () =>
+          {
+            XmlDocument newDoc = (XmlDocument)JsonConvert.DeserializeXmlNode(@"[1]");
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonSerializationException), ExpectedMessage = "JSON root object has multiple properties. The root object must have a single property in order to create a valid XML document. Consider specifing a DeserializeRootElementName.")]
     public void RootObjectMultipleProperties()
     {
-      XmlDocument newDoc = (XmlDocument)JsonConvert.DeserializeXmlNode(@"{Prop1:1,Prop2:2}");
+      ExceptionAssert.Throws<JsonSerializationException>(
+        "JSON root object has multiple properties. The root object must have a single property in order to create a valid XML document. Consider specifing a DeserializeRootElementName.",
+        () =>
+        {
+          XmlDocument newDoc = (XmlDocument)JsonConvert.DeserializeXmlNode(@"{Prop1:1,Prop2:2}");
+        });
     }
 
     [Test]
@@ -613,22 +650,30 @@ namespace Newtonsoft.Json.Tests.Converters
     }
 
     [Test]
-    [ExpectedException(typeof(JsonSerializationException), ExpectedMessage = "JSON root object has multiple properties. The root object must have a single property in order to create a valid XML document. Consider specifing a DeserializeRootElementName.")]
     public void MultipleRootPropertiesXmlDocument()
     {
       string json = @"{""count"": 773840,""photos"": null}";
 
-      JsonConvert.DeserializeXmlNode(json);
+      ExceptionAssert.Throws<JsonSerializationException>(
+        "JSON root object has multiple properties. The root object must have a single property in order to create a valid XML document. Consider specifing a DeserializeRootElementName.",
+        () =>
+        {
+          JsonConvert.DeserializeXmlNode(json);
+        });
     }
 
 #if !NET20
     [Test]
-    [ExpectedException(typeof(JsonSerializationException), ExpectedMessage = "JSON root object has multiple properties. The root object must have a single property in order to create a valid XML document. Consider specifing a DeserializeRootElementName.")]
     public void MultipleRootPropertiesXDocument()
     {
       string json = @"{""count"": 773840,""photos"": null}";
 
-      JsonConvert.DeserializeXNode(json);
+      ExceptionAssert.Throws<JsonSerializationException>(
+        "JSON root object has multiple properties. The root object must have a single property in order to create a valid XML document. Consider specifing a DeserializeRootElementName.",
+        () =>
+        {
+          JsonConvert.DeserializeXNode(json);
+        });
     }
 #endif
 
@@ -1008,7 +1053,6 @@ namespace Newtonsoft.Json.Tests.Converters
     }
 
     [Test]
-    [ExpectedException(typeof(JsonSerializationException), ExpectedMessage = "XmlNodeConverter cannot convert JSON with an empty property name to XML.")]
     public void EmptyPropertyName()
     {
       string json = @"{
@@ -1090,7 +1134,12 @@ namespace Newtonsoft.Json.Tests.Converters
   }
 }";
 
-      DeserializeXmlNode(json);
+      ExceptionAssert.Throws<JsonSerializationException>(
+        "XmlNodeConverter cannot convert JSON with an empty property name to XML.",
+        () =>
+        {
+          DeserializeXmlNode(json);
+        });
     }
 
     [Test]
@@ -1261,6 +1310,27 @@ namespace Newtonsoft.Json.Tests.Converters
         null
       ]
     }
+  }
+}", json);
+    }
+
+    [Test]
+    public void EmtpyElementWithArrayAttributeShouldWriteElement()
+    {
+      string xml = @"<root>
+<Reports d1p1:Array=""true"" xmlns:d1p1=""http://james.newtonking.com/projects/json"" />
+</root>";
+
+      XmlDocument d = new XmlDocument();
+      d.LoadXml(xml);
+
+      string json = JsonConvert.SerializeXmlNode(d, Formatting.Indented);
+
+      Assert.AreEqual(@"{
+  ""root"": {
+    ""Reports"": [
+      {}
+    ]
   }
 }", json);
     }
@@ -1795,6 +1865,16 @@ namespace Newtonsoft.Json.Tests.Converters
 </Grid>";
 
       Assert.AreEqual(expectedXaml, xaml2);
+    }
+
+    [Test]
+    public void DeserializeAttributePropertyNotAtStart()
+    {
+      string json = @"{""item"": {""@action"": ""update"", ""@itemid"": ""1"", ""elements"": [{""@action"": ""none"", ""@id"": ""2""},{""@action"": ""none"", ""@id"": ""3""}],""@description"": ""temp""}}";
+
+      XmlDocument xmldoc = JsonConvert.DeserializeXmlNode(json);
+
+      Assert.AreEqual(@"<item action=""update"" itemid=""1"" description=""temp""><elements action=""none"" id=""2"" /><elements action=""none"" id=""3"" /></item>", xmldoc.InnerXml);
     }
   }
 }

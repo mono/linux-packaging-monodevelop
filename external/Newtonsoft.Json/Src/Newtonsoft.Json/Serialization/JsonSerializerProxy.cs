@@ -49,6 +49,12 @@ namespace Newtonsoft.Json.Serialization
       set { _serializer.ReferenceResolver = value; }
     }
 
+    public override ITraceWriter TraceWriter
+    {
+      get { return _serializer.TraceWriter; }
+      set { _serializer.TraceWriter = value; }
+    }
+
     public override JsonConverterCollection Converters
     {
       get { return _serializer.Converters; }
@@ -144,6 +150,30 @@ namespace Newtonsoft.Json.Serialization
       set { _serializer.DateTimeZoneHandling = value; }
     }
 
+    public override DateParseHandling DateParseHandling
+    {
+      get { return _serializer.DateParseHandling; }
+      set { _serializer.DateParseHandling = value; }
+    }
+
+    public override CultureInfo Culture
+    {
+      get { return _serializer.Culture; }
+      set { _serializer.Culture = value; }
+    }
+
+    public override int? MaxDepth
+    {
+      get { return _serializer.MaxDepth; }
+      set { _serializer.MaxDepth = value; }
+    }
+
+    public override bool CheckAdditionalContent
+    {
+      get { return _serializer.CheckAdditionalContent; }
+      set { _serializer.CheckAdditionalContent = value; }
+    }
+
     internal JsonSerializerInternalBase GetInternalSerializer()
     {
       if (_serializerReader != null)
@@ -171,7 +201,7 @@ namespace Newtonsoft.Json.Serialization
     internal override object DeserializeInternal(JsonReader reader, Type objectType)
     {
       if (_serializerReader != null)
-        return _serializerReader.Deserialize(reader, objectType);
+        return _serializerReader.Deserialize(reader, objectType, false);
       else
         return _serializer.Deserialize(reader, objectType);
     }

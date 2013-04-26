@@ -24,6 +24,8 @@
 #endregion
 
 using System;
+using Newtonsoft.Json.Utilities;
+
 #if NET20
 using Newtonsoft.Json.Utilities.LinqBridge;
 #endif
@@ -35,6 +37,10 @@ namespace Newtonsoft.Json.Serialization
   /// </summary>
   public class JsonProperty
   {
+    internal Required? _required;
+    internal bool _hasExplicitDefaultValue;
+    internal object _defaultValue;
+
     // use to cache contract during deserialization
     internal JsonContract PropertyContract { get; set; }
     
@@ -106,16 +112,45 @@ namespace Newtonsoft.Json.Serialization
     public bool Writable { get; set; }
 
     /// <summary>
+    /// Gets a value indicating whether this <see cref="JsonProperty"/> has a member attribute.
+    /// </summary>
+    /// <value><c>true</c> if has a member attribute; otherwise, <c>false</c>.</value>
+    public bool HasMemberAttribute { get; set; }
+
+    /// <summary>
     /// Gets the default value.
     /// </summary>
     /// <value>The default value.</value>
-    public object DefaultValue { get; set; }
+    public object DefaultValue
+    {
+      get
+      {
+        return _defaultValue;
+      }
+      set
+      {
+        _hasExplicitDefaultValue = true;
+        _defaultValue = value;
+      }
+    }
+
+    internal object GetResolvedDefaultValue()
+    {
+      if (!_hasExplicitDefaultValue && PropertyType != null)
+        return ReflectionUtils.GetDefaultValue(PropertyType);
+
+      return _defaultValue;
+    }
 
     /// <summary>
     /// Gets a value indicating whether this <see cref="JsonProperty"/> is required.
     /// </summary>
     /// <value>A value indicating whether this <see cref="JsonProperty"/> is required.</value>
-    public Required Required { get; set; }
+    public Required Required
+    {
+      get { return _required ?? Required.Default; }
+      set { _required = value; }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this property preserves object references.
@@ -183,5 +218,29 @@ namespace Newtonsoft.Json.Serialization
     {
       return PropertyName;
     }
+
+    /// <summary>
+    /// Gets or sets the converter used when serializing the property's collection items.
+    /// </summary>
+    /// <value>The collection's items converter.</value>
+    public JsonConverter ItemConverter { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this property's collection items are serialized as a reference.
+    /// </summary>
+    /// <value>Whether this property's collection items are serialized as a reference.</value>
+    public bool? ItemIsReference { get; set; }
+
+    /// <summary>
+    /// Gets or sets the the type name handling used when serializing the property's collection items.
+    /// </summary>
+    /// <value>The collection's items type name handling.</value>
+    public TypeNameHandling? ItemTypeNameHandling { get; set; }
+
+    /// <summary>
+    /// Gets or sets the the reference loop handling used when serializing the property's collection items.
+    /// </summary>
+    /// <value>The collection's items reference loop handling.</value>
+    public ReferenceLoopHandling? ItemReferenceLoopHandling { get; set; }
   }
 }

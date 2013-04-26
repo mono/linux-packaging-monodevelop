@@ -113,11 +113,18 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			if (index < 0)
 				yield break;
 					
-			var targetResult = resolver.Resolve(invoke.Target);
-			if (targetResult is MethodGroupResolveResult) {
-				foreach (var method in ((MethodGroupResolveResult)targetResult).Methods) {
+			var targetResult = resolver.Resolve(invoke.Target) as MethodGroupResolveResult;
+			if (targetResult != null) {
+				foreach (var method in targetResult.Methods) {
 					if (index < method.Parameters.Count) {
 						yield return method.Parameters [index].Type;
+					}
+				}
+				foreach (var extMethods in targetResult.GetExtensionMethods ()) {
+					foreach (var extMethod in extMethods) {
+						if (index + 1 < extMethod.Parameters.Count) {
+							yield return extMethod.Parameters [index + 1].Type;
+						}
 					}
 				}
 			}
@@ -167,7 +174,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			return resolver.Compilation.FindType(KnownTypeCode.Object);
 		}
 
-		internal static IEnumerable<IType> GetValidTypes(CSharpAstResolver resolver, Expression expr)
+		internal static IEnumerable<IType> GetValidTypes(CSharpAstResolver resolver, AstNode expr)
 		{
 			if (expr.Parent is DirectionExpression) {
 				var parent = expr.Parent.Parent;
@@ -272,7 +279,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			return Enumerable.Empty<IType>();
 		}
 		static readonly IType[] emptyTypes = new IType[0];
-		internal static AstType GuessAstType(RefactoringContext context, Expression expr)
+		public static AstType GuessAstType(RefactoringContext context, AstNode expr)
 		{
 			var type = GetValidTypes(context.Resolver, expr).ToArray();
 			var typeInference = new TypeInference(context.Compilation);
@@ -283,8 +290,26 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			return context.CreateShortType(inferedType);
 		}
 
-		internal static IType GuessType(RefactoringContext context, Expression expr)
+		public static IType GuessType(RefactoringContext context, AstNode expr)
 		{
+			if (expr is SimpleType && expr.Role == Roles.TypeArgument) {
+				if (expr.Parent is MemberReferenceExpression || expr.Parent is IdentifierExpression) {
+					var rr = context.Resolve (expr.Parent);
+					var argumentNumber = expr.Parent.GetChildrenByRole (Roles.TypeArgument).TakeWhile (c => c != expr).Count ();
+					
+					var mgrr = rr as MethodGroupResolveResult;
+					if (mgrr != null && mgrr.Methods.Any () && mgrr.Methods.First ().TypeArguments.Count > argumentNumber)
+						return mgrr.Methods.First ().TypeParameters[argumentNumber]; 
+				} else if (expr.Parent is MemberType || expr.Parent is SimpleType) {
+					var rr = context.Resolve (expr.Parent);
+					var argumentNumber = expr.Parent.GetChildrenByRole (Roles.TypeArgument).TakeWhile (c => c != expr).Count ();
+					var mgrr = rr as TypeResolveResult;
+					if (mgrr != null &&  mgrr.Type.TypeParameterCount > argumentNumber) {
+						return mgrr.Type.GetDefinition ().TypeParameters[argumentNumber]; 
+					}
+				}
+			}
+
 			var type = GetValidTypes(context.Resolver, expr).ToArray();
 			var typeInference = new TypeInference(context.Compilation);
 			typeInference.Algorithm = TypeInferenceAlgorithm.Improved;

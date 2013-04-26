@@ -134,6 +134,9 @@ namespace MonoMac.CoreAnimation {
 	
 		[Export ("frameInterval")]
 		int FrameInterval { get; set;  }
+
+		[Export ("duration")]
+		double Duration { get; }
 	}
 #endif
 
@@ -922,8 +925,8 @@ namespace MonoMac.CoreAnimation {
 		[Export ("values", ArgumentSemantic.Copy)]
 		NSObject [] Values { get; set; }
 	
-		[Export ("path")][Internal]
-		IntPtr _Path { get; set; }
+		[Export ("path")]
+		CGPath Path { get; set; }
 	
 		[Export ("keyTimes", ArgumentSemantic.Copy)][NullAllowed]
 		NSNumber [] KeyTimes { get; set; }
@@ -1145,10 +1148,10 @@ namespace MonoMac.CoreAnimation {
 		bool Asynchronous { [Bind ("isAsynchronous")]get; set; }	
 
 		[Export ("canDrawInCGLContext:pixelFormat:forLayerTime:displayTime:")]
-		bool CanDrawInCGLContext (CGLContext glContext, CGLPixelFormat pixelFormat, double timeInterval, CVTimeStamp timeStamp);
+		bool CanDrawInCGLContext (CGLContext glContext, CGLPixelFormat pixelFormat, double timeInterval, ref CVTimeStamp timeStamp);
 
 		[Export ("drawInCGLContext:pixelFormat:forLayerTime:displayTime:")]
-		void DrawInCGLContext (CGLContext glContext, CGLPixelFormat pixelFormat, double timeInterval, CVTimeStamp timeStamp);
+		void DrawInCGLContext (CGLContext glContext, CGLPixelFormat pixelFormat, double timeInterval, ref CVTimeStamp timeStamp);
 
 		[Export ("copyCGLPixelFormatForDisplayMask:")]
 		CGLPixelFormat CopyCGLPixelFormatForDisplayMask (UInt32 mask);
@@ -1239,8 +1242,9 @@ namespace MonoMac.CoreAnimation {
 		[Export ("contents")]
 		NSObject WeakContents { get; set;  }
 
+		[Internal][Sealed]
 		[Export ("contents")]
-		CGImage Contents { get; set;  }
+		IntPtr _Contents { get; set; }
 
 		[Export ("contentsRect")]
 		RectangleF ContentsRect { get; set;  }

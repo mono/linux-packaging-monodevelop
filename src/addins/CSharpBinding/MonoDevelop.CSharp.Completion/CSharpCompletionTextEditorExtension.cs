@@ -288,6 +288,7 @@ namespace MonoDevelop.CSharp.Completion
 				LoggingService.LogError ("Error while getting completion data.", e);
 			}
 			list.AutoCompleteEmptyMatch = engine.AutoCompleteEmptyMatch;
+			list.AutoCompleteEmptyMatchOnCurlyBrace = engine.AutoCompleteEmptyMatchOnCurlyBracket;
 			list.AutoSelect = engine.AutoSelect;
 			list.DefaultCompletionString = engine.DefaultCompletionString;
 			list.CloseOnSquareBrackets = engine.CloseOnSquareBrackets;
@@ -657,6 +658,16 @@ namespace MonoDevelop.CSharp.Completion
 						overloads.Add (this);
 					}
 					overloads.Add (data);
+				}
+
+				public override void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
+				{
+					var currentWord = GetCurrentWord (window);
+					if (CompletionText == "new()" && keyChar == '(') {
+						window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, currentWord, "new");
+					} else {
+						window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, currentWord, CompletionText);
+					}
 				}
 
 			}

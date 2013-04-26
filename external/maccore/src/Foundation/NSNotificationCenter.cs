@@ -60,7 +60,7 @@ namespace MonoMac.Foundation {
 
 	// The C# overloads
 	public partial class NSNotificationCenter {
-		static Selector postSelector = new Selector ("post:");
+		const string postSelector = "post:";
 
 		class ObservedData 
 		{
@@ -71,7 +71,7 @@ namespace MonoMac.Foundation {
 
 		List <ObservedData> __mt_ObserverList_var = new List <ObservedData> ();
 
-		[Obsolete ("Use AddObserver(NSString, Action<NSNotification>, NSObject)")]
+		[Advice ("Use AddObserver(NSString, Action<NSNotification>, NSObject)")]
 		public NSObject AddObserver (string aName, Action<NSNotification> notify, NSObject fromObject)
 		{
 			return AddObserver (new NSString (aName), notify, fromObject);
@@ -84,7 +84,7 @@ namespace MonoMac.Foundation {
 			
 			var proxy = new InternalNSNotificationHandler (this, notify);
 			
-			AddObserver (proxy, postSelector, aName, fromObject);
+			AddObserver (proxy, new Selector (postSelector), aName, fromObject);
 
 			return proxy;
 		}
@@ -94,13 +94,13 @@ namespace MonoMac.Foundation {
 			return AddObserver (aName, notify, null);
 		}
 
-		[Obsolete ("Use AddObserver(NSString, Action<NSNotification>) instead")]
+		[Advice ("Use AddObserver(NSString, Action<NSNotification>) instead")]
 		public NSObject AddObserver (string aName, Action<NSNotification> notify)
 		{
 			return AddObserver (aName, notify, null);
 		}
 
-		[Obsolete ("Use AddObserver(NSObject, Selector, NSString, NSObject) instead")]
+		[Advice ("Use AddObserver(NSObject, Selector, NSString, NSObject) instead")]
 		public void AddObserver (NSObject observer, Selector aSelector, string aname, NSObject anObject)
 		{
 			AddObserver (observer, aSelector, new NSString (aname), anObject);

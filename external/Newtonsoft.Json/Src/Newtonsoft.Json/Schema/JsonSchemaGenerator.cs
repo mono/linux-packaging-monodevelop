@@ -182,7 +182,7 @@ namespace Newtonsoft.Json.Schema
       if (containerAttribute != null && !string.IsNullOrEmpty(containerAttribute.Description))
         return containerAttribute.Description;
 
-#if !PocketPC && !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
       DescriptionAttribute descriptionAttribute = ReflectionUtils.GetAttribute<DescriptionAttribute>(type);
       if (descriptionAttribute != null)
         return descriptionAttribute.Description;
@@ -238,7 +238,7 @@ namespace Newtonsoft.Json.Schema
       // test for unresolved circular reference
       if (_stack.Any(tc => tc.Type == type))
       {
-        throw new Exception("Unresolved circular reference for type '{0}'. Explicitly define an Id for the type using a JsonObject/JsonArray attribute or automatically generate a type Id using the UndefinedSchemaIdHandling property.".FormatWith(CultureInfo.InvariantCulture, type));
+        throw new JsonException("Unresolved circular reference for type '{0}'. Explicitly define an Id for the type using a JsonObject/JsonArray attribute or automatically generate a type Id using the UndefinedSchemaIdHandling property.".FormatWith(CultureInfo.InvariantCulture, type));
       }
 
       JsonContract contract = ContractResolver.ResolveContract(type);
@@ -330,21 +330,21 @@ namespace Newtonsoft.Json.Schema
               }
             }
             break;
-#if !SILVERLIGHT && !PocketPC && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
           case JsonContractType.Serializable:
             CurrentSchema.Type = AddNullType(JsonSchemaType.Object, valueRequired);
             CurrentSchema.Id = GetTypeId(type, false);
             GenerateISerializableContract(type, (JsonISerializableContract) contract);
             break;
 #endif
-#if !(NET35 || NET20 || WINDOWS_PHONE)
+#if !(NET35 || NET20 || WINDOWS_PHONE || PORTABLE)
           case JsonContractType.Dynamic:
 #endif
           case JsonContractType.Linq:
             CurrentSchema.Type = JsonSchemaType.Any;
             break;
           default:
-            throw new Exception("Unexpected contract type: {0}".FormatWith(CultureInfo.InvariantCulture, contract));
+            throw new JsonException("Unexpected contract type: {0}".FormatWith(CultureInfo.InvariantCulture, contract));
         }
       }
 
@@ -389,7 +389,7 @@ namespace Newtonsoft.Json.Schema
         CurrentSchema.AllowAdditionalProperties = false;
     }
 
-#if !SILVERLIGHT && !PocketPC && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     private void GenerateISerializableContract(Type type, JsonISerializableContract contract)
     {
       CurrentSchema.AllowAdditionalProperties = true;
@@ -430,7 +430,7 @@ namespace Newtonsoft.Json.Schema
         case TypeCode.Empty:
         case TypeCode.Object:
           return schemaType | JsonSchemaType.String;
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
         case TypeCode.DBNull:
           return schemaType | JsonSchemaType.Null;
 #endif
@@ -457,7 +457,7 @@ namespace Newtonsoft.Json.Schema
         case TypeCode.String:
           return schemaType | JsonSchemaType.String;
         default:
-          throw new Exception("Unexpected type code '{0}' for type '{1}'.".FormatWith(CultureInfo.InvariantCulture, typeCode, type));
+          throw new JsonException("Unexpected type code '{0}' for type '{1}'.".FormatWith(CultureInfo.InvariantCulture, typeCode, type));
       }
     }
   }

@@ -53,7 +53,7 @@ namespace MonoMac.WebKit {
 		DomCssRuleType Type { get; }
 
 		[Export ("cssText")]
-		string CssText { get; }
+		string CssText { get; set; }
 
 		[Export ("parentStyleSheet")]
 		DomCssStyleSheet ParentStyleSheet { get;  }
@@ -76,7 +76,7 @@ namespace MonoMac.WebKit {
 	[DisableDefaultCtor] // An uncaught exception was raised: +[DOMCSSStyleDeclaration init]: should never be used
 	interface DomCssStyleDeclaration {
 		[Export ("cssText")]
-		string CssText { get; }
+		string CssText { get; set; }
 
 		[Export ("length")]
 		int Count { get; }
@@ -138,7 +138,7 @@ namespace MonoMac.WebKit {
 	[DisableDefaultCtor] // An uncaught exception was raised: +[DOMCSSValue init]: should never be used
 	interface DomCssValue {
 		[Export ("cssText")]
-		string CssText { get; }
+		string CssText { get; set; }
 
 		[Export ("cssValueType")]
 		DomCssValueType Type { get; }
@@ -233,7 +233,7 @@ namespace MonoMac.WebKit {
 		string Name { get; }
 
 		[Export ("nodeValue")]
-		string Value { get; }
+		string NodeValue { get; set; }
 
 		[Export ("nodeType")]
 		DomNodeType NodeType { get;  }
@@ -325,7 +325,7 @@ namespace MonoMac.WebKit {
 		[Export ("lookupNamespaceURI:")]
 		string LookupNamespace (string prefix);
 
-		[Export ("compareDocumentPosition")]
+		[Export ("compareDocumentPosition:")]
 		DomDocumentPosition CompareDocumentPosition (DomNode other);
 
 		//
@@ -506,7 +506,7 @@ namespace MonoMac.WebKit {
 	[DisableDefaultCtor] // An uncaught exception was raised: +[DOMCharacterData init]: should never be used
 	interface DomCharacterData {
 		[Export ("data")]
-		string Data { get; }
+		string Data { get; set; }
 
 		[Export ("length")]
 		int Count { get; }
@@ -546,7 +546,7 @@ namespace MonoMac.WebKit {
 		string XmlEncoding { get;  }
 
 		[Export ("xmlVersion")]
-		string XmlVersion { get;  }
+		string XmlVersion { get; set; }
 
 		[Export ("xmlStandalone")]
 		bool XmlStandalone { get; set;  }
@@ -1062,7 +1062,7 @@ namespace MonoMac.WebKit {
 		[Export ("clear")]
 		void Clear ();
 
-		[Export ("captureEvent")]
+		[Export ("captureEvents")]
 		void CaptureEvents ();
 
 		[Export ("releaseEvents")]
@@ -1075,6 +1075,97 @@ namespace MonoMac.WebKit {
 	//////////////////////////
 	// DomElement subclasses
 
+	[BaseType (typeof (DomHtmlElement), Name="DOMHTMLInputElement")]
+	[DisableDefaultCtor] // An uncaught exception was raised: +[DOMHTMLElement init]: should never be used
+	interface DomHtmlInputElement {
+		[Export ("accept")]
+		string Accept { get; set; }
+
+		[Export ("alt")]
+		string Alt { get; set; }
+
+		[Export ("autofocus")]
+		bool Autofocus { get; set; }
+
+		[Export ("defaultChecked")]
+		bool defaultChecked { get; set; }
+
+		[Export ("checked")]
+		bool Checked { get; set; }
+
+		[Export ("disabled")]
+		bool Disabled { get; set; }
+
+//		[Export ("form")]
+//		DomHtmlFormElement Form { get; }
+
+//		[Export ("files")]
+//		DomFileList Files { get; }
+
+		[Export ("indeterminate")]
+		bool Indeterminate { get; set; }
+
+		[Export ("maxLength")]
+		int MaxLength { get; set; }
+
+		[Export ("multiple")]
+		bool Multiple { get; set; }
+
+		[Export ("name")]
+		string Name { get; set; }
+
+		[Export ("readOnly")]
+		bool ReadOnly { get; set; }
+
+		[Export ("size")]
+		string Size { get; set; }
+
+		[Export ("src")]
+		string Src { get; set; }
+
+		[Export ("type")]
+		string Type { get; set; }
+
+		[Export ("defaultValue")]
+		string DefaultValue { get; set; }
+
+		[Export ("value")]
+		string Value { get; set; }
+
+		[Export ("willValidate")]
+		bool WillValidate { get; }
+
+		[Export ("selectionStart")]
+		int SelectionStart { get; set; }
+
+		[Export ("selectionEnd")]
+		int SelectionEnd { get; set; }
+
+		[Export ("align")]
+		string Align { get; set; }
+
+		[Export ("useMap")]
+		string UseMap { get; set; }
+	
+		[Export ("accessKey")]
+		string AccessKey { get; set; }
+	
+		[Export ("altDisplayString")]
+		string AltDisplayString { get; }
+	
+		[Export ("absoluteImageURL")]
+		NSUrl AbsoluteImageURL { get; }
+
+		[Export ("select")]
+		void Select ();
+
+		[Export ("setSelectionRange:end:")]
+		void SetSelectionRange (int start, int end);
+
+		[Export ("click")]
+		void Click ();
+	}
+	
 	[BaseType (typeof (DomElement), Name="DOMHTMLElement")]
 	[DisableDefaultCtor] // An uncaught exception was raised: +[DOMHTMLElement init]: should never be used
 	interface DomHtmlElement {
@@ -1502,7 +1593,7 @@ namespace MonoMac.WebKit {
 
 	[BaseType (typeof (NSObject))]
 	[Model]
-	interface WebPolicyDelegate  {
+	partial interface WebPolicyDelegate  {
 		[Export ("webView:decidePolicyForNavigationAction:request:frame:decisionListener:"), EventArgs ("WebNavigationPolicy")]
 		void DecidePolicyForNavigation (WebView webView, NSDictionary actionInformation, NSUrlRequest request, WebFrame frame, NSObject decisionToken);
 

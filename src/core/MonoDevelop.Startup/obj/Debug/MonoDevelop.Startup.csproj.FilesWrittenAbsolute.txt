@@ -1,6 +1,6 @@
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/bin/MonoDevelop.exe.addins
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/bin/MonoDevelop.exe.config
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/bin/MonoDevelop.exe.mdb
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/bin/MonoDevelop.exe
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.exe
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.exe.mdb
+/tmp/monodevelop/main/build/bin/MonoDevelop.exe.addins
+/tmp/monodevelop/main/build/bin/MonoDevelop.exe.config
+/tmp/monodevelop/main/build/bin/MonoDevelop.exe.mdb
+/tmp/monodevelop/main/build/bin/MonoDevelop.exe
+/tmp/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.exe
+/tmp/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.exe.mdb

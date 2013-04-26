@@ -1343,9 +1343,7 @@
     <Compile Include="MonoDevelop.Components\CellRendererComboBox.cs" />
     <Compile Include="MonoDevelop.Components\TreeViewCellContainer.cs" />
     <Compile Include="MonoDevelop.Components\TreeViewState.cs" />
-    <Compile Include="MonoDevelop.Components\NotebookButtonBar.cs">
-      <DeployService-Deploy>True</DeployService-Deploy>
-    </Compile>
+    <Compile Include="MonoDevelop.Components\NotebookButtonBar.cs" />
     <Compile Include="MonoDevelop.Components\MenuButton.cs" />
     <Compile Include="MonoDevelop.Components\FixedWidthWrapLabel.cs" />
     <Compile Include="MonoDevelop.Components\InvisibleFrame.cs" />
@@ -1914,10 +1912,13 @@
     <Folder Include="MonoDevelop.Ide.TextEditing\" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="gtkrc">
+    <Content Include="gtkrc.win32">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="gtkrc.win32">
+    <Content Include="gtkrc.mac">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="gtkrc">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

@@ -29,9 +29,9 @@ using Newtonsoft.Json.Serialization;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 using Newtonsoft.Json.Tests.TestObjects;
 using Newtonsoft.Json.Linq;
@@ -177,11 +177,11 @@ namespace Newtonsoft.Json.Tests.Serialization
 }", json);
     }
 
-#if !(NET35 || NET20 || WINDOWS_PHONE)
+#if !(NET35 || NET20 || WINDOWS_PHONE || PORTABLE)
     [Test]
     public void DynamicCamelCasePropertyNames()
     {
-      dynamic o = new DynamicTests.TestDynamicObject();
+      dynamic o = new TestDynamicObject();
       o.Text = "Text!";
       o.Integer = int.MaxValue;
 
@@ -192,6 +192,7 @@ namespace Newtonsoft.Json.Tests.Serialization
         });
 
       Assert.AreEqual(@"{
+  ""explicit"": false,
   ""text"": ""Text!"",
   ""integer"": 2147483647,
   ""int"": 0,
