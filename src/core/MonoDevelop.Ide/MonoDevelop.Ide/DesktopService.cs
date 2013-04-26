@@ -220,6 +220,12 @@ namespace MonoDevelop.Ide
 			PlatformService.GrabDesktopFocus (window);
 		}
 
+		public static void RemoveWindowShadow (Gtk.Window window)
+		{
+			PlatformService.RemoveWindowShadow (window);
+		}
+
+
 		public static void SetMainWindowDecorations (Gtk.Window window)
 		{
 			PlatformService.SetMainWindowDecorations (window);
@@ -228,6 +234,16 @@ namespace MonoDevelop.Ide
 		internal static MainToolbar CreateMainToolbar (Gtk.Window window)
 		{
 			return PlatformService.CreateMainToolbar (window);
+		}
+
+		public static bool GetIsFullscreen (Gtk.Window window)
+		{
+			return PlatformService.GetIsFullscreen (window);
+		}
+
+		public static void SetIsFullscreen (Gtk.Window window, bool isFullscreen)
+		{
+			PlatformService.SetIsFullscreen (window, isFullscreen);
 		}
 	}
 }

@@ -1,7 +1,7 @@
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.DocFood.addin.xml
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.DocFood.config.xml
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.gtk-gui.gui.stetic
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.DocFood.dll.mdb
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.DocFood.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.dll.mdb
+/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.DocFood.addin.xml
+/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.DocFood.config.xml
+/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.gtk-gui.gui.stetic
+/tmp/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.DocFood.dll.mdb
+/tmp/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.DocFood.dll
+/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.dll
+/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.dll.mdb

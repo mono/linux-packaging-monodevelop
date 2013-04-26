@@ -1,5 +1,6 @@
 //
 // Copyright 2011, Novell, Inc.
+// Copyright 2012 Xamarin Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -33,6 +34,13 @@ namespace MonoMac.AppKit {
 			using (NSData data = NSData.FromStream (stream)) {
 				return new NSImage (data);
 			}
+		}
+
+		// note: if needed override the protected Get|Set methods
+		public string Name { 
+			get { return GetName (); }
+			// ignore return value (bool)
+			set { SetName (value); }
 		}
 	}
 }

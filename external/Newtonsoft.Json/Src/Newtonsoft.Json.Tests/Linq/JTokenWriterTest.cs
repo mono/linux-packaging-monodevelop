@@ -29,9 +29,9 @@ using System.Text;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 using Newtonsoft.Json;
 using System.IO;
@@ -173,6 +173,22 @@ namespace Newtonsoft.Json.Tests.Linq
   fail,
   fail
 ]", writer.Token.ToString());
+    }
+
+    [Test]
+    public void DateTimeZoneHandling()
+    {
+      JTokenWriter writer = new JTokenWriter
+      {
+        DateTimeZoneHandling = Json.DateTimeZoneHandling.Utc
+      };
+
+      writer.WriteValue(new DateTime(2000, 1, 1, 1, 1, 1, DateTimeKind.Unspecified));
+
+      JValue value = (JValue) writer.Token;
+      DateTime dt = (DateTime)value.Value;
+
+      Assert.AreEqual(new DateTime(2000, 1, 1, 1, 1, 1, DateTimeKind.Utc), dt);
     }
   }
 }

@@ -40,9 +40,9 @@ using Newtonsoft.Json.Utilities;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 
 namespace Newtonsoft.Json.Tests
@@ -50,69 +50,40 @@ namespace Newtonsoft.Json.Tests
   [TestFixture]
   public class JsonConvertTest : TestFixtureBase
   {
-#if Entities
     [Test]
-    public void EntitiesTest()
+    public void DeserializeObject_EmptyString()
     {
-      Purchase purchase = new Purchase() { Id = 1 };
-      purchase.PurchaseLine.Add(new PurchaseLine() { Id = 1, Purchase = purchase });
-      purchase.PurchaseLine.Add(new PurchaseLine() { Id = 2, Purchase = purchase });
-
-      StringWriter sw = new StringWriter();
-      JsonSerializer serializer = new JsonSerializer();
-      serializer.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
-
-      using (JsonWriter jw = new JsonTextWriter(sw))
-      {
-        jw.Formatting = Formatting.Indented;
-
-        serializer.Serialize(jw, purchase);
-      }
-
-      string json = sw.ToString();
-
-      Assert.AreEqual(@"{
-  ""Id"": 1,
-  ""PurchaseLine"": [
-    {
-      ""Id"": 1,
-      ""PurchaseReference"": {
-        ""EntityKey"": null,
-        ""RelationshipName"": ""EntityDataModel.PurchasePurchaseLine"",
-        ""SourceRoleName"": ""PurchaseLine"",
-        ""TargetRoleName"": ""Purchase"",
-        ""RelationshipSet"": null,
-        ""IsLoaded"": false
-      },
-      ""EntityState"": 1,
-      ""EntityKey"": null
-    },
-    {
-      ""Id"": 2,
-      ""PurchaseReference"": {
-        ""EntityKey"": null,
-        ""RelationshipName"": ""EntityDataModel.PurchasePurchaseLine"",
-        ""SourceRoleName"": ""PurchaseLine"",
-        ""TargetRoleName"": ""Purchase"",
-        ""RelationshipSet"": null,
-        ""IsLoaded"": false
-      },
-      ""EntityState"": 1,
-      ""EntityKey"": null
+      object result = JsonConvert.DeserializeObject(string.Empty);
+      Assert.IsNull(result);
     }
-  ],
-  ""EntityState"": 1,
-  ""EntityKey"": null
-}", json);
 
-      Purchase newPurchase = JsonConvert.DeserializeObject<Purchase>(json);
-      Assert.AreEqual(1, newPurchase.Id);
-
-      Assert.AreEqual(2, newPurchase.PurchaseLine.Count);
-      Assert.AreEqual(1, newPurchase.PurchaseLine.ElementAt(0).Id);
-      Assert.AreEqual(2, newPurchase.PurchaseLine.ElementAt(1).Id);
+    [Test]
+    public void DeserializeObject_Integer()
+    {
+      object result = JsonConvert.DeserializeObject("1");
+      Assert.AreEqual(1L, result);
     }
-#endif
+
+    [Test]
+    public void DeserializeObject_Integer_EmptyString()
+    {
+      int? value = JsonConvert.DeserializeObject<int?>("");
+      Assert.IsNull(value);
+    }
+
+    [Test]
+    public void DeserializeObject_Decimal_EmptyString()
+    {
+      decimal? value = JsonConvert.DeserializeObject<decimal?>("");
+      Assert.IsNull(value);
+    }
+
+    [Test]
+    public void DeserializeObject_DateTime_EmptyString()
+    {
+      DateTime? value = JsonConvert.DeserializeObject<DateTime?>("");
+      Assert.IsNull(value);
+    }
 
     [Test]
     public void EscapeJavaScriptString()
@@ -271,7 +242,7 @@ now brown cow?", '"', true);
       value = null;
       Assert.AreEqual("null", JsonConvert.ToString(value));
 
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
       value = DBNull.Value;
       Assert.AreEqual("null", JsonConvert.ToString(value));
 #endif
@@ -289,7 +260,7 @@ now brown cow?", '"', true);
     [Test]
     public void TestInvalidStrings()
     {
-      ExceptionAssert.Throws<JsonReaderException>("Additional text encountered after finished reading JSON content: t. Line 1, position 19.",
+      ExceptionAssert.Throws<JsonReaderException>("Additional text encountered after finished reading JSON content: t. Path '', line 1, position 19.",
       () =>
       {
         string orig = @"this is a string ""that has quotes"" ";
@@ -604,7 +575,7 @@ now brown cow?", '"', true);
         {
           Assert.AreEqual(value, parsed);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
           long valueTicks = GetTicks(value);
           long parsedTicks = GetTicks(parsed);
@@ -630,7 +601,7 @@ now brown cow?", '"', true);
       {
         Assert.AreEqual(value, parsed);
       }
-      catch (Exception ex)
+      catch (Exception)
       {
         // JavaScript ticks aren't as precise, recheck after rounding
         long valueTicks = GetTicks(value);
@@ -665,7 +636,7 @@ now brown cow?", '"', true);
       return (T)converter.ReadJson(reader, typeof(T), null, null);
     }
 
-#if !(NET20 || NET35 || SILVERLIGHT)
+#if !(NET20 || NET35 || SILVERLIGHT || PORTABLE)
     [Test]
     public void Async()
     {
@@ -737,5 +708,46 @@ now brown cow?", '"', true);
       Assert.AreEqual("Existing,Appended", p.Name);
     }
 #endif
+
+    [Test]
+    public void SerializeObjectDateTimeZoneHandling()
+    {
+      string json = JsonConvert.SerializeObject(
+        new DateTime(2000, 1, 1, 1, 1, 1, DateTimeKind.Unspecified),
+        new JsonSerializerSettings
+        {
+          DateTimeZoneHandling = DateTimeZoneHandling.Utc
+        });
+
+      Assert.AreEqual(@"""2000-01-01T01:01:01Z""", json);
+    }
+
+    //[Test]
+    public void StackOverflowTest()
+    {
+      StringBuilder sb = new StringBuilder();
+
+      int depth = 900;
+      for (int i = 0; i < depth; i++)
+      {
+        sb.Append("{'A':");
+      }
+
+      // invalid json
+      sb.Append("{***}");
+      for (int i = 0; i < depth; i++)
+      {
+        sb.Append("}");
+      }
+
+      string json = sb.ToString();
+      JsonSerializer serializer = new JsonSerializer() { };
+      serializer.Deserialize<Nest>(new JsonTextReader(new StringReader(json)));
+    }
+
+    public class Nest
+    {
+      public Nest A { get; set; }
+    }
   }
 }

@@ -31,17 +31,15 @@ using MonoMac.ObjCRuntime;
 namespace MonoMac.Foundation {
 	[Register ("NSAutoreleasePool", true)]
 	public class NSAutoreleasePool : NSObject, IDisposable {
-		static IntPtr class_ptr = Class.GetHandle ("NSAutoreleasePool");
-
-		public override IntPtr ClassHandle { get { return class_ptr; } }
+		public override IntPtr ClassHandle { get { return Class.GetHandle ("NSAutoreleasePool"); } }
 
 		[Export ("init")]
 		public NSAutoreleasePool () : base (NSObjectFlag.Empty)
 		{
 			if (IsDirectBinding) {
-				Handle = Messaging.intptr_objc_msgSend (this.Handle, Selector.Init);
+				Handle = Messaging.intptr_objc_msgSend (this.Handle, Selector.GetHandle ("init"));
 			} else {
-				Handle = Messaging.intptr_objc_msgSendSuper (this.SuperHandle, Selector.Init);
+				Handle = Messaging.intptr_objc_msgSendSuper (this.SuperHandle, Selector.GetHandle ("init"));
 			}
 		}
 

@@ -247,7 +247,7 @@ namespace Mono.Debugging.Soft
 						return cx.RuntimeInvoke (method, obj, new Value[0]);
 				}
 
-				if (fromType.IsGenericType && fromType.FullName.StartsWith ("System.Nullable`")) {
+				if (fromType.IsGenericType && fromType.FullName.StartsWith ("System.Nullable`1", StringComparison.InvariantCulture)) {
 					method = OverloadResolve (cx, "get_Value", fromType, new TypeMirror[0], true, false, false);
 					if (method != null) {
 						obj = cx.RuntimeInvoke (method, obj, new Value[0]);
@@ -359,6 +359,18 @@ namespace Mono.Debugging.Soft
 		public override object GetBaseValue (EvaluationContext ctx, object val)
 		{
 			return val;
+		}
+
+		public override bool NullableHasValue (EvaluationContext ctx, object type, object obj)
+		{
+			ValueReference hasValue = GetMember (ctx, type, obj, "has_value");
+
+			return (bool) hasValue.ObjectValue;
+		}
+
+		public override ValueReference NullableGetValue (EvaluationContext ctx, object type, object obj)
+		{
+			return GetMember (ctx, type, obj, "value");
 		}
 
 		public override object GetEnclosingType (EvaluationContext ctx)
@@ -567,9 +579,8 @@ namespace Mono.Debugging.Soft
 		// if the local does not have a name, constructs one from the index
 		static string GetLocalName (SoftEvaluationContext cx, LocalVariable local)
 		{
-			var name = local.Name;
 			if (!string.IsNullOrEmpty (local.Name) || cx.SourceCodeAvailable)
-				return name;
+				return local.Name;
 			return "loc" + local.Index;
 		}
 		
@@ -658,9 +669,14 @@ namespace Mono.Debugging.Soft
 			return false;
 		}
 
+		static bool IsAnonymousType (TypeMirror type)
+		{
+			return type.Name.StartsWith ("<>__AnonType", StringComparison.InvariantCulture);
+		}
+
 		protected override ValueReference GetMember (EvaluationContext ctx, object t, object co, string name)
 		{
-			TypeMirror type = (TypeMirror) t;
+			TypeMirror type = t as TypeMirror;
 
 			while (type != null) {
 				FieldInfoMirror field = FindByName (type.GetFields(), f => f.Name, name, ctx.CaseSensitive);
@@ -671,7 +687,7 @@ namespace Mono.Debugging.Soft
 				if (prop != null && (IsStatic (prop) || co != null)) {
 					// Optimization: if the property has a CompilerGenerated backing field, use that instead.
 					// This way we avoid overhead of invoking methods on the debugee when the value is requested.
-					string cgFieldName = string.Format ("<{0}>k__BackingField", prop.Name);
+					string cgFieldName = string.Format ("<{0}>{1}", prop.Name, IsAnonymousType (type) ? "" : "k__BackingField");
 					if ((field = FindByName (type.GetFields (), f => f.Name, cgFieldName, true)) != null && IsCompilerGenerated (field))
 						return new FieldValueReference (ctx, field, co, type, prop.Name, ObjectValueFlags.Property);
 
@@ -788,7 +804,7 @@ namespace Mono.Debugging.Soft
 			HashSet<string> namespaces = new HashSet<string> ();
 			string namspacePrefix = namspace.Length > 0 ? namspace + "." : "";
 			foreach (TypeMirror type in cx.Session.GetAllTypes ()) {
-				if (type.Namespace == namspace || type.Namespace.StartsWith (namspacePrefix)) {
+				if (type.Namespace == namspace || type.Namespace.StartsWith (namspacePrefix, StringComparison.InvariantCulture)) {
 					namespaces.Add (type.Namespace);
 					types.Add (type.FullName);
 				}
@@ -941,6 +957,19 @@ namespace Mono.Debugging.Soft
 			return null;
 		}
 
+		public override object GetParentType (EvaluationContext ctx, object type)
+		{
+			TypeMirror tm = type as TypeMirror;
+
+			if (tm != null) {
+				int plus = tm.FullName.LastIndexOf ('+');
+
+				return plus != -1 ? GetType (ctx, tm.FullName.Substring (0, plus)) : null;
+			}
+
+			return ((Type) type).DeclaringType;
+		}
+
 		public override IEnumerable<object> GetNestedTypes (EvaluationContext ctx, object type)
 		{
 			TypeMirror t = (TypeMirror) type;
@@ -948,9 +977,9 @@ namespace Mono.Debugging.Soft
 				yield return nt;
 		}
 		
-		public override string GetTypeName (EvaluationContext ctx, object val)
+		public override string GetTypeName (EvaluationContext ctx, object type)
 		{
-			TypeMirror tm = val as TypeMirror;
+			TypeMirror tm = type as TypeMirror;
 			if (tm != null) {
 				if (IsGeneratedType (tm)) {
 					// Return the name of the container-type.
@@ -959,7 +988,7 @@ namespace Mono.Debugging.Soft
 				
 				return tm.FullName;
 			} else
-				return ((Type)val).FullName;
+				return ((Type)type).FullName;
 		}
 		
 		public override object GetValueType (EvaluationContext ctx, object val)
@@ -1141,7 +1170,10 @@ namespace Mono.Debugging.Soft
 		public override bool IsTypeLoaded (EvaluationContext ctx, object type)
 		{
 			TypeMirror tm = (TypeMirror) type;
-			
+
+			if (tm.VirtualMachine.Version.AtLeast (2, 23))
+				return tm.IsInitialized;
+
 			return IsTypeLoaded (ctx, tm.FullName);
 		}
 		
@@ -1150,10 +1182,13 @@ namespace Mono.Debugging.Soft
 			SoftEvaluationContext ctx = (SoftEvaluationContext) gctx;
 			TypeMirror tm = (TypeMirror) type;
 
-			if (IsTypeLoaded (ctx, type))
+			if (!tm.VirtualMachine.Version.AtLeast (2, 23))
+				return IsTypeLoaded (gctx, tm.FullName);
+
+			if (tm.IsInitialized)
 				return true;
 
-			if (!ctx.Options.AllowTargetInvoke)
+			if (!tm.Attributes.HasFlag (TypeAttributes.BeforeFieldInit))
 				return false;
 
 			MethodMirror cctor = OverloadResolve (ctx, ".cctor", tm, new TypeMirror[0], false, true, false);

@@ -27,13 +27,13 @@
 
 using System;
 using System.IO;
-using System.Reflection;
 using System.Collections.Generic;
 
 using Mono.Addins;
 using Mono.PkgConfig;
 using MonoDevelop.Core.AddIns;
 using MonoDevelop.Core.Serialization;
+using System.Reflection;
 
 namespace MonoDevelop.Core.Assemblies
 {
@@ -151,9 +151,11 @@ namespace MonoDevelop.Core.Assemblies
 			int star = pattern.IndexOf ('*');
 
 			if (star != -1) {
-				if (string.IsNullOrEmpty (profile)) {
+				if (star == 0)
 					return true;
-				}
+
+				if (string.IsNullOrEmpty (profile))
+					return false;
 
 				var prefix = pattern.Substring (0, star);
 				return profile.StartsWith (prefix);
@@ -161,33 +163,52 @@ namespace MonoDevelop.Core.Assemblies
 
 			return profile == pattern;
 		}
-		
+
+		[Obsolete ("Use CanReferenceAssembliesTargetingFramework() instead")]
 		public bool IsCompatibleWithFramework (TargetFrameworkMoniker fxId)
 		{
-			foreach (var sfx in SupportedFrameworks) {
-				if (sfx.Identifier != fxId.Identifier)
+			return CanReferenceAssembliesTargetingFramework (fxId);
+		}
+
+		public bool CanReferenceAssembliesTargetingFramework (TargetFrameworkMoniker fxId)
+		{
+			var fx = Runtime.SystemAssemblyService.GetTargetFramework (fxId);
+
+			return fx != null && CanReferenceAssembliesTargetingFramework (fx);
+		}
+
+		/// <summary>
+		/// Determines whether projects targeting this framework can reference assemblies targeting the framework specified by fx.
+		/// </summary>
+		/// <returns><c>true</c> if projects targeting this framework can reference assemblies targeting the framework specified by fx; otherwise, <c>false</c>.</returns>
+		/// <param name="fx">The target framework</param>
+		public bool CanReferenceAssembliesTargetingFramework (TargetFramework fx)
+		{
+			foreach (var sfx in fx.SupportedFrameworks) {
+				if (sfx.Identifier != id.Identifier)
 					continue;
 
-				if (!ProfileMatchesPattern (fxId.Profile, sfx.Profile))
+				if (!ProfileMatchesPattern (id.Profile, sfx.Profile))
 					continue;
 
-				var version = new Version (fxId.Version);
+				var version = new Version (id.Version);
 
 				if (version >= sfx.MinimumVersion && version <= sfx.MaximumVersion)
 					return true;
 			}
 
-			// FIXME: this is a hack until we have .NETPortable profiles for MonoTouch & MonoDroid
-			if (fxId.Identifier == ".NETPortable" && fxId.Version == "4.0") {
+			// FIXME: this is a hack for systems w/o Portable Class Library definitions
+			if (fx.Id.Identifier == TargetFrameworkMoniker.ID_PORTABLE) {
 				switch (id.Identifier) {
+				case TargetFrameworkMoniker.ID_NET_FRAMEWORK:
+					return new Version (fx.Id.Version).CompareTo (new Version (id.Version)) <= 0;
 				case TargetFrameworkMoniker.ID_MONOTOUCH:
 				case TargetFrameworkMoniker.ID_MONODROID:
 					return true;
 				}
 			}
 
-			return fxId.Identifier == this.id.Identifier
-				&& new Version (fxId.Version).CompareTo (new Version (this.id.Version)) <= 0;
+			return fx.Id.Identifier == id.Identifier && new Version (fx.Id.Version).CompareTo (new Version (id.Version)) <= 0;
 		}
 		
 		internal string GetCorlibVersion ()
@@ -362,6 +383,9 @@ namespace MonoDevelop.Core.Assemblies
 							ainfo.InGac = reader.ReadContentAsBoolean ();
 					} while (reader.ReadToFollowing ("File"));
 				} else {
+
+					// HACK: we were using EnumerateFiles but it's broken in some Mono releases
+					// https://bugzilla.xamarin.com/show_bug.cgi?id=2975
 					var files = System.IO.Directory.GetFiles (dir, "*.dll");
 					foreach (var f in files) {
 						try {
@@ -381,7 +405,7 @@ namespace MonoDevelop.Core.Assemblies
 			
 			var supportedFrameworksDir = dir.Combine ("SupportedFrameworks");
 			if (Directory.Exists (supportedFrameworksDir)) {
-				foreach (var sfx in Directory.EnumerateFiles (supportedFrameworksDir))
+				foreach (var sfx in Directory.GetFiles (supportedFrameworksDir))
 					fx.SupportedFrameworks.Add (SupportedFramework.Load (fx, sfx));
 			}
 			

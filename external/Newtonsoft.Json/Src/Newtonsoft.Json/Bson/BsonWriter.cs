@@ -105,7 +105,7 @@ namespace Newtonsoft.Json.Bson
     /// <param name="text">Text to place inside the comment.</param>
     public override void WriteComment(string text)
     {
-      throw new JsonWriterException("Cannot write JSON comment as BSON.");
+      throw JsonWriterException.Create(this, "Cannot write JSON comment as BSON.", null);
     }
 
     /// <summary>
@@ -114,7 +114,7 @@ namespace Newtonsoft.Json.Bson
     /// <param name="name">The name of the constructor.</param>
     public override void WriteStartConstructor(string name)
     {
-      throw new JsonWriterException("Cannot write JSON constructor as BSON.");
+      throw JsonWriterException.Create(this, "Cannot write JSON constructor as BSON.", null);
     }
 
     /// <summary>
@@ -123,7 +123,7 @@ namespace Newtonsoft.Json.Bson
     /// <param name="json">The raw JSON to write.</param>
     public override void WriteRaw(string json)
     {
-      throw new JsonWriterException("Cannot write raw JSON as BSON.");
+      throw JsonWriterException.Create(this, "Cannot write raw JSON as BSON.", null);
     }
 
     /// <summary>
@@ -132,7 +132,7 @@ namespace Newtonsoft.Json.Bson
     /// <param name="json">The raw JSON to write.</param>
     public override void WriteRawValue(string json)
     {
-      throw new JsonWriterException("Cannot write raw JSON as BSON.");
+      throw JsonWriterException.Create(this, "Cannot write raw JSON as BSON.", null);
     }
 
     /// <summary>
@@ -210,7 +210,7 @@ namespace Newtonsoft.Json.Bson
       else
       {
         if (token.Type != BsonType.Object && token.Type != BsonType.Array)
-          throw new JsonWriterException("Error writing {0} value. BSON must start with an Object or Array.".FormatWith(CultureInfo.InvariantCulture, token.Type));
+          throw JsonWriterException.Create(this, "Error writing {0} value. BSON must start with an Object or Array.".FormatWith(CultureInfo.InvariantCulture, token.Type), null);
 
         _parent = token;
         _root = token;
@@ -268,7 +268,7 @@ namespace Newtonsoft.Json.Bson
     public override void WriteValue(uint value)
     {
       if (value > int.MaxValue)
-        throw new JsonWriterException("Value is too large to fit in a signed 32 bit integer. BSON does not support unsigned values.");
+        throw JsonWriterException.Create(this, "Value is too large to fit in a signed 32 bit integer. BSON does not support unsigned values.", null);
 
       base.WriteValue(value);
       AddValue(value, BsonType.Integer);
@@ -292,7 +292,7 @@ namespace Newtonsoft.Json.Bson
     public override void WriteValue(ulong value)
     {
       if (value > long.MaxValue)
-        throw new JsonWriterException("Value is too large to fit in a signed 64 bit integer. BSON does not support unsigned values.");
+        throw JsonWriterException.Create(this, "Value is too large to fit in a signed 64 bit integer. BSON does not support unsigned values.", null);
 
       base.WriteValue(value);
       AddValue(value, BsonType.Long);
@@ -357,7 +357,7 @@ namespace Newtonsoft.Json.Bson
     {
       base.WriteValue(value);
       string s = null;
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
       s = value.ToString(CultureInfo.InvariantCulture);
 #else
       s = value.ToString();
@@ -403,6 +403,7 @@ namespace Newtonsoft.Json.Bson
     public override void WriteValue(DateTime value)
     {
       base.WriteValue(value);
+      value = JsonConvert.EnsureDateTime(value, DateTimeZoneHandling);
       AddValue(value, BsonType.Date);
     }
 
@@ -463,15 +464,16 @@ namespace Newtonsoft.Json.Bson
     /// <summary>
     /// Writes a <see cref="T:Byte[]"/> value that represents a BSON object id.
     /// </summary>
-    /// <param name="value"></param>
+    /// <param name="value">The Object ID value to write.</param>
     public void WriteObjectId(byte[] value)
     {
       ValidationUtils.ArgumentNotNull(value, "value");
 
       if (value.Length != 12)
-        throw new Exception("An object id must be 12 bytes");
+        throw JsonWriterException.Create(this, "An object id must be 12 bytes", null);
 
       // hack to update the writer state
+      UpdateScopeWithFinishedValue();
       AutoComplete(JsonToken.Undefined);
       AddValue(value, BsonType.Oid);
     }
@@ -486,6 +488,7 @@ namespace Newtonsoft.Json.Bson
       ValidationUtils.ArgumentNotNull(pattern, "pattern");
 
       // hack to update the writer state
+      UpdateScopeWithFinishedValue();
       AutoComplete(JsonToken.Undefined);
       AddToken(new BsonRegex(pattern, options));
     }

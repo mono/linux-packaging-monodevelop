@@ -23,17 +23,16 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 #endregion
 
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
 using System;
-#if !SILVERLIGHT && !NETFX_CORE
 using System.Data.SqlTypes;
-#endif
 using System.Globalization;
 using Newtonsoft.Json.Utilities;
 using System.Collections.Generic;
 
 namespace Newtonsoft.Json.Converters
 {
-#if !SILVERLIGHT && !PocketPC && !NET20
+#if !NET20
   internal interface IBinary
   {
     byte[] ToArray();
@@ -45,7 +44,7 @@ namespace Newtonsoft.Json.Converters
   /// </summary>
   public class BinaryConverter : JsonConverter
   {
-#if !SILVERLIGHT && !PocketPC && !NET20
+#if !NET20
     private const string BinaryTypeName = "System.Data.Linq.Binary";
 #endif
 
@@ -70,18 +69,17 @@ namespace Newtonsoft.Json.Converters
 
     private byte[] GetByteArray(object value)
     {
-#if !SILVERLIGHT && !PocketPC && !NET20 && !NETFX_CORE
+#if !(NET20)
       if (value.GetType().AssignableToTypeName(BinaryTypeName))
       {
         IBinary binary = DynamicWrapper.CreateWrapper<IBinary>(value);
         return binary.ToArray();
       }
 #endif
-#if !SILVERLIGHT && !NETFX_CORE
       if (value is SqlBinary)
         return ((SqlBinary) value).Value;
-#endif
-      throw new Exception("Unexpected value type when writing binary: {0}".FormatWith(CultureInfo.InvariantCulture, value.GetType()));
+
+      throw new JsonSerializationException("Unexpected value type when writing binary: {0}".FormatWith(CultureInfo.InvariantCulture, value.GetType()));
     }
 
     /// <summary>
@@ -101,7 +99,7 @@ namespace Newtonsoft.Json.Converters
       if (reader.TokenType == JsonToken.Null)
       {
         if (!ReflectionUtils.IsNullable(objectType))
-          throw new Exception("Cannot convert null value to {0}.".FormatWith(CultureInfo.InvariantCulture, objectType));
+          throw JsonSerializationException.Create(reader, "Cannot convert null value to {0}.".FormatWith(CultureInfo.InvariantCulture, objectType));
 
         return null;
       }
@@ -121,19 +119,19 @@ namespace Newtonsoft.Json.Converters
       }
       else
       {
-        throw new Exception("Unexpected token parsing binary. Expected String or StartArray, got {0}.".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
+        throw JsonSerializationException.Create(reader, "Unexpected token parsing binary. Expected String or StartArray, got {0}.".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
       }
 
       
-#if !SILVERLIGHT && !PocketPC && !NET20
+#if !NET20
       if (t.AssignableToTypeName(BinaryTypeName))
         return Activator.CreateInstance(t, data);
 #endif
-#if !SILVERLIGHT && !NETFX_CORE
+
       if (t == typeof(SqlBinary))
         return new SqlBinary(data);
-#endif
-      throw new Exception("Unexpected object type when writing binary: {0}".FormatWith(CultureInfo.InvariantCulture, objectType));
+
+      throw JsonSerializationException.Create(reader, "Unexpected object type when writing binary: {0}".FormatWith(CultureInfo.InvariantCulture, objectType));
     }
 
     private byte[] ReadByteArray(JsonReader reader)
@@ -153,11 +151,11 @@ namespace Newtonsoft.Json.Converters
             // skip
             break;
           default:
-            throw new Exception("Unexpected token when reading bytes: {0}".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
+            throw JsonSerializationException.Create(reader, "Unexpected token when reading bytes: {0}".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
         }
       }
 
-      throw new Exception("Unexpected end when reading bytes.");
+      throw JsonSerializationException.Create(reader, "Unexpected end when reading bytes.");
     }
 
     /// <summary>
@@ -169,15 +167,16 @@ namespace Newtonsoft.Json.Converters
     /// </returns>
     public override bool CanConvert(Type objectType)
     {
-#if !SILVERLIGHT && !PocketPC && !NET20
+#if !NET20
       if (objectType.AssignableToTypeName(BinaryTypeName))
         return true;
 #endif
-#if !SILVERLIGHT && !NETFX_CORE
+
       if (objectType == typeof(SqlBinary) || objectType == typeof(SqlBinary?))
         return true;
-#endif
+
       return false;
     }
   }
 }
+#endif

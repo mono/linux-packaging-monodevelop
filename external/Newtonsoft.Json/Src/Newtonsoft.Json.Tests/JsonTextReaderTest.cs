@@ -30,9 +30,9 @@ using System.Text;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 using Newtonsoft.Json;
 using System.IO;
@@ -44,6 +44,73 @@ namespace Newtonsoft.Json.Tests
   [TestFixture]
   public class JsonTextReaderTest : TestFixtureBase
   {
+    [Test]
+    public void SurrogatePairValid()
+    {
+      string json = @"{ ""MATHEMATICAL ITALIC CAPITAL ALPHA"": ""\uD835\uDEE2"" }";
+
+      JsonTextReader reader = new JsonTextReader(new StringReader(json));
+
+      Assert.IsTrue(reader.Read());
+      Assert.IsTrue(reader.Read());
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.String, reader.TokenType);
+
+      string s = reader.Value.ToString();
+      Assert.AreEqual(2, s.Length);
+
+      StringInfo stringInfo = new StringInfo(s);
+      Assert.AreEqual(1, stringInfo.LengthInTextElements);
+    }
+
+    [Test]
+    public void SurrogatePairReplacement()
+    {
+      // existing good surrogate pair
+      Assert.AreEqual("ABC \ud800\udc00 DEF", ReadString("ABC \\ud800\\udc00 DEF"));
+
+      // invalid surrogates (two high back-to-back)
+      Assert.AreEqual("ABC \ufffd\ufffd DEF", ReadString("ABC \\ud800\\ud800 DEF"));
+
+      // invalid surrogates (two high back-to-back)
+      Assert.AreEqual("ABC \ufffd\ufffd\u1234 DEF", ReadString("ABC \\ud800\\ud800\\u1234 DEF"));
+
+      // invalid surrogates (three high back-to-back)
+      Assert.AreEqual("ABC \ufffd\ufffd\ufffd DEF", ReadString("ABC \\ud800\\ud800\\ud800 DEF"));
+
+      // invalid surrogates (high followed by a good surrogate pair)
+      Assert.AreEqual("ABC \ufffd\ud800\udc00 DEF", ReadString("ABC \\ud800\\ud800\\udc00 DEF"));
+
+      // invalid high surrogate at end of string
+      Assert.AreEqual("ABC \ufffd", ReadString("ABC \\ud800"));
+
+      // high surrogate not followed by low surrogate
+      Assert.AreEqual("ABC \ufffd DEF", ReadString("ABC \\ud800 DEF"));
+
+      // low surrogate not preceded by high surrogate
+      Assert.AreEqual("ABC \ufffd\ufffd DEF", ReadString("ABC \\udc00\\ud800 DEF"));
+
+      // make sure unencoded invalid surrogate characters don't make it through
+      Assert.AreEqual("\ufffd\ufffd\ufffd", ReadString("\udc00\ud800\ud800"));
+
+      Assert.AreEqual("ABC \ufffd\b", ReadString("ABC \\ud800\\b"));
+      Assert.AreEqual("ABC \ufffd ", ReadString("ABC \\ud800 "));
+      Assert.AreEqual("ABC \b\ufffd", ReadString("ABC \\b\\ud800"));
+    }
+
+    private string ReadString(string input)
+    {
+      MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(@"""" + input + @""""));
+
+      JsonTextReader reader = new JsonTextReader(new StreamReader(ms));
+      reader.Read();
+
+      string s = (string)reader.Value;
+
+      return s;
+    }
+
     [Test]
     public void CloseInput()
     {
@@ -100,7 +167,7 @@ namespace Newtonsoft.Json.Tests
     {
       string json = @"{""DefaultConverter"":new Date(0, ""hi""),""MemberConverter"":""1970-01-01T00:00:00Z""}";
 
-      JsonReader reader = new JsonTextReader(new StringReader(json));
+      JsonReader reader = new JsonTextReader(new StreamReader(new SlowStream(json, new UTF8Encoding(false), 1)));
 
       Assert.IsTrue(reader.Read());
       Assert.IsTrue(reader.Read());
@@ -122,11 +189,6 @@ namespace Newtonsoft.Json.Tests
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Additional text encountered after finished reading JSON content: ,. Line 5, position 2."
-#endif
-      )]
     public void ParseAdditionalContent_Comma()
     {
       string json = @"[
@@ -136,17 +198,18 @@ namespace Newtonsoft.Json.Tests
 ],";
 
       JsonTextReader reader = new JsonTextReader(new StringReader(json));
-      while (reader.Read())
-      {
-      }
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Additional text encountered after finished reading JSON content: ,. Path '', line 5, position 2.",
+        () =>
+          {
+            while (reader.Read())
+            {
+            }
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Additional text encountered after finished reading JSON content: c. Line 5, position 2."
-#endif
-      )]
     public void ParseAdditionalContent_Text()
     {
       string json = @"[
@@ -173,7 +236,12 @@ namespace Newtonsoft.Json.Tests
       reader.Read();
       Assert.AreEqual(5, reader.LineNumber);
 
-      reader.Read();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Additional text encountered after finished reading JSON content: c. Path '', line 5, position 2.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
@@ -194,19 +262,20 @@ namespace Newtonsoft.Json.Tests
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Additional text encountered after finished reading JSON content: a. Line 1, position 5."
-#endif
-      )]
     public void ParseAdditionalContent_WhitespaceThenText()
     {
       string json = @"'hi' a";
 
       JsonTextReader reader = new JsonTextReader(new StringReader(json));
-      while (reader.Read())
-      {
-      }
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Additional text encountered after finished reading JSON content: a. Path '', line 1, position 5.",
+        () =>
+          {
+            while (reader.Read())
+            {
+            }
+          });
     }
 
     [Test]
@@ -416,27 +485,28 @@ namespace Newtonsoft.Json.Tests
     }
 
     [Test]
-    [ExpectedException(typeof(ArgumentNullException)
-#if !NETFX_CORE
-      , ExpectedMessage = @"Value cannot be null.
-Parameter name: reader"
-#endif
-      )]
     public void NullTextReader()
     {
-      new JsonTextReader(null);
+      ExceptionAssert.Throws<ArgumentNullException>(
+        @"Value cannot be null.
+Parameter name: reader",
+        () =>
+          {
+            new JsonTextReader(null);
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unterminated string. Expected delimiter: '. Line 1, position 3."
-#endif
-      )]
     public void UnexpectedEndOfString()
     {
       JsonReader reader = new JsonTextReader(new StringReader("'hi"));
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unterminated string. Expected delimiter: '. Path '', line 1, position 3.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
@@ -479,7 +549,7 @@ Parameter name: reader"
     public void NullCharReading()
     {
       string json = "\0{\0'\0h\0i\0'\0:\0[\01\0,\0'\0'\0\0,\0null\0]\0,\0do\0:true\0}\0\0/*\0sd\0f\0*/\0/*\0sd\0f\0*/ \0";
-      JsonTextReader reader = new JsonTextReader(new StringReader(json));
+      JsonTextReader reader = new JsonTextReader(new StreamReader(new SlowStream(json, new UTF8Encoding(false), 1)));
 
       Assert.IsTrue(reader.Read());
       Assert.AreEqual(JsonToken.StartObject, reader.TokenType);
@@ -597,54 +667,58 @@ Parameter name: reader"
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected end while parsing unicode character. Line 1, position 4."
-#endif
-      )]
     public void UnexpectedEndOfHex()
     {
       JsonReader reader = new JsonTextReader(new StringReader(@"'h\u123"));
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected end while parsing unicode character. Path '', line 1, position 4.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unterminated string. Expected delimiter: '. Line 1, position 3."
-#endif
-      )]
     public void UnexpectedEndOfControlCharacter()
     {
       JsonReader reader = new JsonTextReader(new StringReader(@"'h\"));
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unterminated string. Expected delimiter: '. Path '', line 1, position 3.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Error reading bytes. Unexpected token: Boolean. Line 1, position 4."
-#endif
-      )]
     public void ReadBytesWithBadCharacter()
     {
       JsonReader reader = new JsonTextReader(new StringReader(@"true"));
-      reader.ReadAsBytes();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Error reading bytes. Unexpected token: Boolean. Path '', line 1, position 4.",
+        () =>
+          {
+            reader.ReadAsBytes();
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unterminated string. Expected delimiter: '. Line 1, position 17."
-#endif
-      )]
     public void ReadBytesWithUnexpectedEnd()
     {
       string helloWorld = "Hello world!";
       byte[] helloWorldData = Encoding.UTF8.GetBytes(helloWorld);
 
       JsonReader reader = new JsonTextReader(new StringReader(@"'" + Convert.ToBase64String(helloWorldData)));
-      reader.ReadAsBytes();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unterminated string. Expected delimiter: '. Path '', line 1, position 17.",
+        () =>
+          {
+            reader.ReadAsBytes();
+          });
     }
 
     [Test]
@@ -658,16 +732,17 @@ Parameter name: reader"
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected end while parsing unquoted property name. Line 1, position 4."
-#endif
-      )]
     public void UnexpectedEndWhenParsingUnquotedProperty()
     {
       JsonReader reader = new JsonTextReader(new StringReader(@"{aww"));
       Assert.IsTrue(reader.Read());
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected end while parsing unquoted property name. Path '', line 1, position 4.",
+        () =>
+        {
+          reader.Read();
+        });
     }
 
     [Test]
@@ -710,7 +785,7 @@ Parameter name: reader"
         count++;
       }
 
-      JsonTextReader reader = new JsonTextReader(new StringReader(json));
+      JsonTextReader reader = new JsonTextReader(new StreamReader(new SlowStream(json, new UTF8Encoding(false), 1)));
       Assert.IsTrue(reader.Read());
       Assert.AreEqual(7, reader.LineNumber);
 
@@ -1126,11 +1201,6 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = @"Invalid character after parsing property name. Expected ':' but got: "". Line 3, position 9."
-#endif
-      )]
     public void MissingColon()
     {
       string json = @"{
@@ -1148,7 +1218,12 @@ bye", reader.Value);
       reader.Read();
       Assert.AreEqual(JsonToken.Boolean, reader.TokenType);
 
-      reader.Read();
+      ExceptionAssert.Throws<JsonReaderException>(
+        @"Invalid character after parsing property name. Expected ':' but got: "". Path 'A', line 3, position 9.",
+        () =>
+        {
+          reader.Read();
+        });
     }
 
     [Test]
@@ -1222,17 +1297,18 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected character encountered while parsing value: }. Line 1, position 1."
-#endif
-      )]
     public void ReadBadCharInArray()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"[}"));
 
       reader.Read();
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected character encountered while parsing value: }. Path '', line 1, position 1.",
+        () =>
+        {
+          reader.Read();
+        });
     }
 
     [Test]
@@ -1254,16 +1330,16 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected end when reading bytes. Line 1, position 1."
-#endif
-      )]
     public void ReadAsBytesNoContentWrappedObject()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"{"));
 
-      reader.ReadAsBytes();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected end when reading bytes. Path '', line 1, position 1.",
+        () =>
+        {
+          reader.ReadAsBytes();
+        });
     }
 
 #if !NET20
@@ -1278,44 +1354,43 @@ bye", reader.Value);
 #endif
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Error reading decimal. Unexpected token: StartConstructor. Line 1, position 9."
-#endif
-      )]
     public void ReadAsDecimalBadContent()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"new Date()"));
 
-      Assert.IsNull(reader.ReadAsDecimal());
-      Assert.AreEqual(JsonToken.None, reader.TokenType);
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Error reading decimal. Unexpected token: StartConstructor. Path '', line 1, position 9.",
+        () =>
+        {
+          reader.ReadAsDecimal();
+        });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Error reading bytes. Unexpected token: StartConstructor. Line 1, position 9."
-#endif
-      )]
     public void ReadAsBytesBadContent()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"new Date()"));
 
-      reader.ReadAsBytes();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Error reading bytes. Unexpected token: StartConstructor. Path '', line 1, position 9.",
+        () =>
+        {
+          reader.ReadAsBytes();
+        });
     }
 
 #if !NET20
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Error reading date. Unexpected token: StartConstructor. Line 1, position 9."
-#endif
-      )]
     public void ReadAsDateTimeOffsetBadContent()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"new Date()"));
 
-      reader.ReadAsDateTimeOffset();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Error reading date. Unexpected token: StartConstructor. Path '', line 1, position 9.",
+        () =>
+        {
+          reader.ReadAsDateTimeOffset();
+        });
     }
 #endif
 
@@ -1331,29 +1406,29 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected end when reading bytes. Line 1, position 2."
-#endif
-      )]
     public void ReadAsBytesIntegerArrayWithNoEnd()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"[1"));
 
-      reader.ReadAsBytes();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected end when reading bytes. Path '[0]', line 1, position 2.",
+        () =>
+        {
+          reader.ReadAsBytes();
+        });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected token when reading bytes: Float. Line 1, position 4."
-#endif
-      )]
     public void ReadAsBytesArrayWithBadContent()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"[1.0]"));
 
-      reader.ReadAsBytes();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected token when reading bytes: Float. Path '[0]', line 1, position 4.",
+        () =>
+        {
+          reader.ReadAsBytes();
+        });
     }
 
     [Test]
@@ -1448,11 +1523,6 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Could not convert string to DateTimeOffset: blablahbla. Line 1, position 22."
-#endif
-      )]
     public void ReadAsDateTimeOffsetBadString()
     {
       string json = @"{""Offset"":""blablahbla""}";
@@ -1465,7 +1535,12 @@ bye", reader.Value);
       Assert.IsTrue(reader.Read());
       Assert.AreEqual(JsonToken.PropertyName, reader.TokenType);
 
-      reader.ReadAsDateTimeOffset();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Could not convert string to DateTimeOffset: blablahbla. Path 'Offset', line 1, position 22.",
+        () =>
+        {
+          reader.ReadAsDateTimeOffset();
+        });
     }
 
     [Test]
@@ -1605,11 +1680,6 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(FormatException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Input string was not in a correct format."
-#endif
-      )]
     public void ReadAsIntDecimal()
     {
       string json = @"{""Name"": 1.1}";
@@ -1622,70 +1692,77 @@ bye", reader.Value);
       Assert.IsTrue(reader.Read());
       Assert.AreEqual(JsonToken.PropertyName, reader.TokenType);
 
-      reader.ReadAsInt32();
-      Assert.AreEqual(JsonToken.Integer, reader.TokenType);
-      Assert.AreEqual(typeof(int), reader.ValueType);
-      Assert.AreEqual(1, reader.Value);
+      ExceptionAssert.Throws<FormatException>(
+        "Input string was not in a correct format.",
+        () =>
+        {
+          reader.ReadAsInt32();
+        });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Error parsing null value. Line 0, position 0."
-#endif
-      )]
     public void MatchWithInsufficentCharacters()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"nul"));
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Error parsing null value. Path '', line 0, position 0.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Error parsing null value. Line 0, position 0."
-#endif
-      )]
     public void MatchWithWrongCharacters()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"nulz"));
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Error parsing null value. Path '', line 0, position 0.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Error parsing null value. Line 1, position 4."
-#endif
-      )]
     public void MatchWithNoTrailingSeperator()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"nullz"));
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Error parsing null value. Path '', line 1, position 4.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected end while parsing comment. Line 1, position 6."
-#endif
-      )]
     public void UnclosedComment()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"/* sdf"));
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected end while parsing comment. Path '', line 1, position 6.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Error parsing comment. Expected: *, got s. Line 1, position 1."
-#endif
-      )]
     public void BadCommentStart()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader(@"/sdf"));
-      reader.Read();
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Error parsing comment. Expected: *, got s. Path '', line 1, position 1.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
@@ -1857,31 +1934,31 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected end while parsing constructor. Line 1, position 7."
-#endif
-      )]
     public void ParseConstructorWithUnexpectedEnd()
     {
       string json = "new Dat";
       JsonTextReader reader = new JsonTextReader(new StringReader(json));
 
-      reader.Read();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected end while parsing constructor. Path '', line 1, position 7.",
+        () =>
+        {
+          reader.Read();
+        });
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected character while parsing constructor: !. Line 1, position 9."
-#endif
-      )]
     public void ParseConstructorWithUnexpectedCharacter()
     {
       string json = "new Date !";
       JsonTextReader reader = new JsonTextReader(new StringReader(json));
 
-      reader.Read();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected character while parsing constructor: !. Path '', line 1, position 9.",
+        () =>
+        {
+          reader.Read();
+        });
     }
 
     [Test]
@@ -1923,16 +2000,16 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Error parsing boolean value. Line 1, position 4."
-#endif
-      )]
     public void ParseIncompleteCommentSeperator()
     {
       JsonTextReader reader = new JsonTextReader(new StringReader("true/"));
 
-      reader.Read();
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Error parsing boolean value. Path '', line 1, position 4.",
+        () =>
+        {
+          reader.Read();
+        });
     }
 
     [Test]
@@ -1949,24 +2026,24 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Unexpected character while parsing constructor: ,. Line 1, position 8."
-#endif
-      )]
     public void ParseConstructorWithBadCharacter()
     {
       string json = "new Date,()";
       JsonTextReader reader = new JsonTextReader(new StringReader(json));
 
-      Assert.IsTrue(reader.Read());
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Unexpected character while parsing constructor: ,. Path '', line 1, position 8.",
+        () =>
+          {
+            Assert.IsTrue(reader.Read());
+          });
     }
 
     [Test]
     public void ParseContentDelimitedByNonStandardWhitespace()
     {
       string json = "\x00a0{\x00a0'h\x00a0i\x00a0'\x00a0:\x00a0[\x00a0true\x00a0,\x00a0new\x00a0Date\x00a0(\x00a0)\x00a0]\x00a0/*\x00a0comment\x00a0*/\x00a0}\x00a0";
-      JsonTextReader reader = new JsonTextReader(new StringReader(json));
+      JsonTextReader reader = new JsonTextReader(new StreamReader(new SlowStream(json, new UTF8Encoding(false), 1)));
 
       Assert.IsTrue(reader.Read());
       Assert.AreEqual(JsonToken.StartObject, reader.TokenType);
@@ -2010,7 +2087,7 @@ bye", reader.Value);
         ""Sizes"":/*comment*/[/*comment*/
           ""Small""/*comment*/]/*comment*/}/*comment*/";
 
-      JsonTextReader reader = new JsonTextReader(new StringReader(json));
+      JsonTextReader reader = new JsonTextReader(new StreamReader(new SlowStream(json, new UTF8Encoding(false), 1)));
 
       Assert.IsTrue(reader.Read());
       Assert.AreEqual(JsonToken.Comment, reader.TokenType);
@@ -2114,17 +2191,18 @@ bye", reader.Value);
     }
 
     [Test]
-    [ExpectedException(typeof(JsonReaderException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Additional text encountered after finished reading JSON content: }. Line 1, position 2."
-#endif
-      )]
     public void UnexpectedEndTokenWhenParsingOddEndToken()
     {
-        JsonReader reader = new JsonTextReader(new StringReader(@"{}}"));
-        Assert.IsTrue(reader.Read());
-        Assert.IsTrue(reader.Read());
-        reader.Read();
+      JsonReader reader = new JsonTextReader(new StringReader(@"{}}"));
+      Assert.IsTrue(reader.Read());
+      Assert.IsTrue(reader.Read());
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "Additional text encountered after finished reading JSON content: }. Path '', line 1, position 2.",
+        () =>
+          {
+            reader.Read();
+          });
     }
 
     [Test]
@@ -2132,7 +2210,7 @@ bye", reader.Value);
     {
       double d;
 
-      d = Convert.ToDouble("6.0221418e23");
+      d = Convert.ToDouble("6.0221418e23", CultureInfo.InvariantCulture);
       Console.WriteLine(d.ToString(new CultureInfo("fr-FR")));
       Console.WriteLine(d.ToString("0.#############################################################################"));
 
@@ -2193,6 +2271,390 @@ bye", reader.Value);
       Assert.AreEqual(602214180000000000000000m, reader.Value);
 
       reader.Read();
+    }
+
+    [Test]
+    public void MaxDepth()
+    {
+      string json = "[[]]";
+
+      JsonTextReader reader = new JsonTextReader(new StringReader(json))
+        {
+          MaxDepth = 1
+        };
+
+      Assert.IsTrue(reader.Read());
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "The reader's MaxDepth of 1 has been exceeded. Path '[0]', line 1, position 2.",
+        () =>
+          {
+            Assert.IsTrue(reader.Read());
+          });
+    }
+
+    [Test]
+    public void MaxDepthDoesNotRecursivelyError()
+    {
+      string json = "[[[[]]],[[]]]";
+
+      JsonTextReader reader = new JsonTextReader(new StringReader(json))
+      {
+        MaxDepth = 1
+      };
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(0, reader.Depth);
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "The reader's MaxDepth of 1 has been exceeded. Path '[0]', line 1, position 2.",
+        () =>
+        {
+          Assert.IsTrue(reader.Read());
+        });
+      Assert.AreEqual(1, reader.Depth);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(2, reader.Depth);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(3, reader.Depth);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(3, reader.Depth);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(2, reader.Depth);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(1, reader.Depth);
+
+      ExceptionAssert.Throws<JsonReaderException>(
+        "The reader's MaxDepth of 1 has been exceeded. Path '[1]', line 1, position 9.",
+        () =>
+        {
+          Assert.IsTrue(reader.Read());
+        });
+      Assert.AreEqual(1, reader.Depth);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(2, reader.Depth);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(2, reader.Depth);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(1, reader.Depth);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(0, reader.Depth);
+
+      Assert.IsFalse(reader.Read());
+    }
+
+    [Test]
+    public void ReadingFromSlowStream()
+    {
+      string json = "[false, true, true, false, 'test!', 1.11, 0e-10, 0E-10, 0.25e-5, 0.3e10, 6.0221418e23, 'Purple\\r \\n monkey\\'s:\\tdishwasher']";
+
+      JsonTextReader reader = new JsonTextReader(new StreamReader(new SlowStream(json, new UTF8Encoding(false), 1)));
+
+      Assert.IsTrue(reader.Read());
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(false, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.Boolean, reader.TokenType);
+      Assert.AreEqual(true, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.Boolean, reader.TokenType);
+      Assert.AreEqual(true, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.Boolean, reader.TokenType);
+      Assert.AreEqual(false, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.String, reader.TokenType);
+      Assert.AreEqual("test!", reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.Float, reader.TokenType);
+      Assert.AreEqual(1.11d, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.Float, reader.TokenType);
+      Assert.AreEqual(0d, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.Float, reader.TokenType);
+      Assert.AreEqual(0d, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.Float, reader.TokenType);
+      Assert.AreEqual(0.0000025d, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.Float, reader.TokenType);
+      Assert.AreEqual(3000000000d, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.Float, reader.TokenType);
+      Assert.AreEqual(602214180000000000000000d, reader.Value);
+
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(JsonToken.String, reader.TokenType);
+      Assert.AreEqual(reader.Value, "Purple\r \n monkey's:\tdishwasher");
+
+      Assert.IsTrue(reader.Read());
+    }
+
+    [Test]
+    public void DateParseHandling()
+    {
+      string json = @"[""1970-01-01T00:00:00Z"",""\/Date(0)\/""]";
+
+      JsonTextReader reader = new JsonTextReader(new StringReader(json));
+      reader.DateParseHandling = Json.DateParseHandling.DateTime;
+
+      Assert.IsTrue(reader.Read());
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(new DateTime(JsonConvert.InitialJavaScriptDateTicks, DateTimeKind.Utc), reader.Value);
+      Assert.AreEqual(typeof(DateTime), reader.ValueType);
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(new DateTime(JsonConvert.InitialJavaScriptDateTicks, DateTimeKind.Utc), reader.Value);
+      Assert.AreEqual(typeof(DateTime), reader.ValueType);
+      Assert.IsTrue(reader.Read());
+
+#if !NET20
+      reader = new JsonTextReader(new StringReader(json));
+      reader.DateParseHandling = Json.DateParseHandling.DateTimeOffset;
+
+      Assert.IsTrue(reader.Read());
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(new DateTimeOffset(JsonConvert.InitialJavaScriptDateTicks, TimeSpan.Zero), reader.Value);
+      Assert.AreEqual(typeof(DateTimeOffset), reader.ValueType);
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(new DateTimeOffset(JsonConvert.InitialJavaScriptDateTicks, TimeSpan.Zero), reader.Value);
+      Assert.AreEqual(typeof(DateTimeOffset), reader.ValueType);
+      Assert.IsTrue(reader.Read());
+#endif
+
+      reader = new JsonTextReader(new StringReader(json));
+      reader.DateParseHandling = Json.DateParseHandling.None;
+
+      Assert.IsTrue(reader.Read());
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(@"1970-01-01T00:00:00Z", reader.Value);
+      Assert.AreEqual(typeof(string), reader.ValueType);
+      Assert.IsTrue(reader.Read());
+      Assert.AreEqual(@"/Date(0)/", reader.Value);
+      Assert.AreEqual(typeof(string), reader.ValueType);
+      Assert.IsTrue(reader.Read());
+
+#if !NET20
+      reader = new JsonTextReader(new StringReader(json));
+      reader.DateParseHandling = Json.DateParseHandling.DateTime;
+
+      Assert.IsTrue(reader.Read());
+      reader.ReadAsDateTimeOffset();
+      Assert.AreEqual(new DateTimeOffset(JsonConvert.InitialJavaScriptDateTicks, TimeSpan.Zero), reader.Value);
+      Assert.AreEqual(typeof(DateTimeOffset), reader.ValueType);
+      reader.ReadAsDateTimeOffset();
+      Assert.AreEqual(new DateTimeOffset(JsonConvert.InitialJavaScriptDateTicks, TimeSpan.Zero), reader.Value);
+      Assert.AreEqual(typeof(DateTimeOffset), reader.ValueType);
+      Assert.IsTrue(reader.Read());
+
+
+      reader = new JsonTextReader(new StringReader(json));
+      reader.DateParseHandling = Json.DateParseHandling.DateTimeOffset;
+
+      Assert.IsTrue(reader.Read());
+      reader.ReadAsDateTime();
+      Assert.AreEqual(new DateTime(JsonConvert.InitialJavaScriptDateTicks, DateTimeKind.Utc), reader.Value);
+      Assert.AreEqual(typeof(DateTime), reader.ValueType);
+      reader.ReadAsDateTime();
+      Assert.AreEqual(new DateTime(JsonConvert.InitialJavaScriptDateTicks, DateTimeKind.Utc), reader.Value);
+      Assert.AreEqual(typeof(DateTime), reader.ValueType);
+      Assert.IsTrue(reader.Read());
+#endif
+    }
+
+    [Test]
+    public void ResetJsonTextReaderErrorCount()
+    {
+      ToggleReaderError toggleReaderError = new ToggleReaderError(new StringReader("{'first':1,'second':2,'third':3}"));
+      JsonTextReader jsonTextReader = new JsonTextReader(toggleReaderError);
+
+      Assert.IsTrue(jsonTextReader.Read());
+
+      toggleReaderError.Error = true;
+
+      ExceptionAssert.Throws<Exception>(
+        "Read error",
+        () => jsonTextReader.Read());
+      ExceptionAssert.Throws<Exception>(
+        "Read error",
+        () => jsonTextReader.Read());
+
+      toggleReaderError.Error = false;
+
+      Assert.IsTrue(jsonTextReader.Read());
+      Assert.AreEqual("first", jsonTextReader.Value);
+
+      toggleReaderError.Error = true;
+
+      ExceptionAssert.Throws<Exception>(
+        "Read error",
+        () => jsonTextReader.Read());
+
+      toggleReaderError.Error = false;
+
+      Assert.IsTrue(jsonTextReader.Read());
+      Assert.AreEqual(1L, jsonTextReader.Value);
+
+      toggleReaderError.Error = true;
+
+      ExceptionAssert.Throws<Exception>(
+        "Read error",
+        () => jsonTextReader.Read());
+      ExceptionAssert.Throws<Exception>(
+        "Read error",
+        () => jsonTextReader.Read());
+      ExceptionAssert.Throws<Exception>(
+        "Read error",
+        () => jsonTextReader.Read());
+
+      toggleReaderError.Error = false;
+
+      //a reader use to skip to the end after 3 errors in a row
+      //Assert.IsFalse(jsonTextReader.Read());
+    }
+
+    [Test]
+    public void WriteReadBoundaryDecimals()
+    {
+      StringWriter sw = new StringWriter();
+      JsonTextWriter writer = new JsonTextWriter(sw);
+
+      writer.WriteStartArray();
+      writer.WriteValue(decimal.MaxValue);
+      writer.WriteValue(decimal.MinValue);
+      writer.WriteEndArray();
+
+      string json = sw.ToString();
+
+      StringReader sr = new StringReader(json);
+      JsonTextReader reader = new JsonTextReader(sr);
+
+      Assert.IsTrue(reader.Read());
+
+      decimal? max = reader.ReadAsDecimal();
+      Assert.AreEqual(decimal.MaxValue, max);
+
+      decimal? min = reader.ReadAsDecimal();
+      Assert.AreEqual(decimal.MinValue, min);
+
+      Assert.IsTrue(reader.Read());
+    }
+  }
+
+  public class ToggleReaderError : TextReader
+  {
+    private readonly TextReader _inner;
+
+    public bool Error { get; set; }
+
+    public ToggleReaderError(TextReader inner)
+    {
+      _inner = inner;
+    }
+
+    public override int Read(char[] buffer, int index, int count)
+    {
+      if (Error)
+        throw new Exception("Read error");
+
+      return _inner.Read(buffer, index, 1);
+    }
+  }
+
+  public class SlowStream : Stream
+  {
+    byte[] bytes;
+    int totalBytesRead;
+    int bytesPerRead;
+
+    public SlowStream(byte[] content, int bytesPerRead)
+    {
+      this.bytes = content;
+      this.totalBytesRead = 0;
+      this.bytesPerRead = bytesPerRead;
+    }
+
+    public SlowStream(string content, Encoding encoding, int bytesPerRead)
+      : this(encoding.GetBytes(content), bytesPerRead)
+    {
+    }
+
+    public override bool CanRead
+    {
+      get { return true; }
+    }
+
+    public override bool CanSeek
+    {
+      get { return false; }
+    }
+
+    public override bool CanWrite
+    {
+      get { return false; }
+    }
+
+    public override void Flush()
+    {
+    }
+
+    public override long Length
+    {
+      get { throw new NotSupportedException(); }
+    }
+
+    public override long Position
+    {
+      get { throw new NotSupportedException(); }
+      set { throw new NotSupportedException(); }
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+      int toReturn = Math.Min(count, this.bytesPerRead);
+      toReturn = Math.Min(toReturn, this.bytes.Length - this.totalBytesRead);
+      if (toReturn > 0)
+      {
+        Array.Copy(this.bytes, this.totalBytesRead, buffer, offset, toReturn);
+      }
+
+      this.totalBytesRead += toReturn;
+      return toReturn;
+    }
+
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+      throw new NotSupportedException();
+    }
+
+    public override void SetLength(long value)
+    {
+      throw new NotSupportedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+      throw new NotSupportedException();
     }
   }
 }

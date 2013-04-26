@@ -86,6 +86,10 @@
       <Name>Mono.Addins</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -127,7 +131,6 @@
     <Compile Include="MonoDevelop.SourceEditor\MarkerOperationsHandler.cs" />
     <Compile Include="MonoDevelop.SourceEditor\SearchAndReplaceWidget.cs" />
     <Compile Include="MonoDevelop.SourceEditor\GotoLineNumberWidget.cs" />
-    <Compile Include="MonoDevelop.SourceEditor\LanguageItemTooltipProvider.cs" />
     <Compile Include="MonoDevelop.SourceEditor\CompileErrorTooltipProvider.cs" />
     <Compile Include="MonoDevelop.SourceEditor\DebugValueWindow.cs" />
     <Compile Include="MonoDevelop.SourceEditor\DebugValueTooltipProvider.cs" />

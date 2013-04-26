@@ -93,9 +93,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			this.TypeHint = WindowTypeHint.Menu;
 			Theme.CornerRadius = 4;
 			var style = SyntaxModeService.GetColorStyle (IdeApp.Preferences.ColorScheme);
-			var completion = style.GetChunkStyle ("completion");
-
-			Theme.SetFlatColor (completion.CairoBackgroundColor);
+			Theme.SetFlatColor (style.CompletionText.Background);
 		}
 
 		protected virtual void DoubleClick ()
@@ -176,6 +174,11 @@ namespace MonoDevelop.Ide.CodeCompletion
 		public bool AutoCompleteEmptyMatch {
 			get { return list.AutoCompleteEmptyMatch; }
 			set { list.AutoCompleteEmptyMatch = value; }
+		}
+		
+		public bool AutoCompleteEmptyMatchOnCurlyBrace {
+			get { return list.AutoCompleteEmptyMatchOnCurlyBrace; }
+			set { list.AutoCompleteEmptyMatchOnCurlyBrace = value; }
 		}
 		
 		public string DefaultCompletionString {
@@ -288,9 +291,11 @@ namespace MonoDevelop.Ide.CodeCompletion
 					list.AutoSelect = list.AutoCompleteEmptyMatch = true;
 				endOffset = CompletionWidget.CaretOffset - 1;
 				if (list.SelectionEnabled) {
+					if (keyChar == '{' && !list.AutoCompleteEmptyMatchOnCurlyBrace && string.IsNullOrEmpty (list.CompletionString))
+					    return KeyActions.CloseWindow | KeyActions.Process;
 					return KeyActions.Complete | KeyActions.Process | KeyActions.CloseWindow;
 				}
-				return KeyActions.CloseWindow | KeyActions.Process;
+			    return KeyActions.CloseWindow | KeyActions.Process;
 			}
 			
 			return KeyActions.Process;
@@ -412,9 +417,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 				return KeyActions.CloseWindow | KeyActions.Process;
 
 			// special case end with punctuation like 'param:' -> don't input double punctuation, otherwise we would end up with 'param::'
-			if (char.IsPunctuation (keyChar)) {
+			if (char.IsPunctuation (keyChar) && keyChar != '_') {
 				foreach (var item in FilteredItems) {
-					if (DataProvider.GetText (item).EndsWith (keyChar.ToString ())) {
+					if (DataProvider.GetText (item).EndsWith (keyChar.ToString (), StringComparison.Ordinal)) {
 						list.SelectedItem = item;
 						return KeyActions.Complete | KeyActions.CloseWindow | KeyActions.Ignore;
 					}

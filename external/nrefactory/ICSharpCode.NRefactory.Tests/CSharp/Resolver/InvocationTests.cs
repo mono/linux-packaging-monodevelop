@@ -302,7 +302,7 @@ class DerivedClass : MiddleClass {
 			var rr = Resolve<CSharpInvocationResolveResult>(program);
 			Assert.IsFalse(rr.IsError);
 			
-			var m = (SpecializedMethod)rr.Member;
+			var m = (IMethod)rr.Member;
 			Assert.AreEqual("X", m.TypeArguments.Single().Name);
 			Assert.AreEqual("T", m.Parameters[0].Type.Name);
 			Assert.AreEqual("X", m.Parameters[1].Type.Name);
@@ -489,7 +489,7 @@ class Test : IVisitor<object, object> {
 }";
 			var rr = Resolve<CSharpInvocationResolveResult>(program);
 			Assert.IsFalse(rr.IsError);
-			var typeArguments = ((SpecializedMethod)rr.Member).TypeArguments;
+			var typeArguments = ((IMethod)rr.Member).TypeArguments;
 			Assert.AreEqual("System.Object", typeArguments[0].ReflectionName);
 			Assert.AreEqual("System.Object", typeArguments[1].ReflectionName);
 		}
@@ -753,6 +753,50 @@ class Test {
 			// This is because the conversion exists even though it is invalid.
 			var rr = Resolve<CSharpInvocationResolveResult>(program);
 			Assert.AreEqual(OverloadResolutionErrors.AmbiguousMatch, rr.OverloadResolutionErrors);
+		}
+		
+		[Test]
+		public void IndexerWithMoreSpecificParameterTypesIsPreferred()
+		{
+			string program = @"
+class A {
+	public static void Test(B<object> b) {
+		x = $b[4]$;
+	}
+}
+public class B<T> {
+	public string this[T key] {
+		get { return ""1""; }
+	}
+	public int this[object key] {
+		get { return 2; }
+	}
+}";
+			var rr = Resolve<CSharpInvocationResolveResult>(program);
+			Assert.IsFalse(rr.IsError);
+			Assert.AreEqual("System.Int32", rr.Member.ReturnType.FullName);
+		}
+		
+		[Test]
+		public void MethodWithMoreSpecificParameterTypesIsPreferred()
+		{
+			string program = @"
+class A {
+	public static void Test(B<object> b) {
+		$b.M(4)$;
+	}
+}
+public class B<T> {
+	public string M(T key) {
+		return ""1"";
+	}
+	public int M(object key) {
+		return 2;
+	}
+}";
+			var rr = Resolve<CSharpInvocationResolveResult>(program);
+			Assert.IsFalse(rr.IsError);
+			Assert.AreEqual("System.Int32", rr.Member.ReturnType.FullName);
 		}
 	}
 }

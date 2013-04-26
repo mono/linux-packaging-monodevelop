@@ -407,6 +407,10 @@ namespace MonoDevelop.Ide.Desktop
 			window.Present ();
 		}
 
+		internal virtual void RemoveWindowShadow (Gtk.Window window)
+		{
+		}
+
 		internal virtual void SetMainWindowDecorations (Gtk.Window window)
 		{
 		}
@@ -414,6 +418,22 @@ namespace MonoDevelop.Ide.Desktop
 		internal virtual MainToolbar CreateMainToolbar (Gtk.Window window)
 		{
 			return new MainToolbar ();
+		}
+
+		public virtual bool GetIsFullscreen (Gtk.Window window)
+		{
+			return ((bool?) window.Data ["isFullScreen"]) ?? false;
+		}
+
+		public virtual void SetIsFullscreen (Gtk.Window window, bool isFullscreen)
+		{
+			window.Data ["isFullScreen"] = isFullscreen;
+			if (isFullscreen) {
+				window.Fullscreen ();
+			} else {
+				window.Unfullscreen ();
+				SetMainWindowDecorations (window);
+			}
 		}
 	}
 }

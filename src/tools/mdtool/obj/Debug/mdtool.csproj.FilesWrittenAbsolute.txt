@@ -1,3 +1,2 @@
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/bin/mdtool.exe.config
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/bin/mdtool.exe
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/tools/mdtool/obj/Debug/mdtool.exe
+/tmp/monodevelop/main/build/bin/mdtool.exe
+/tmp/monodevelop/main/src/tools/mdtool/obj/Debug/mdtool.exe

@@ -38,9 +38,10 @@ using System.Security;
 [assembly: AssemblyTitle("Json.NET Silverlight")]
 #elif PocketPC
 [assembly: AssemblyTitle("Json.NET Compact")]
+#elif PORTABLE
+[assembly: AssemblyTitle("Json.NET Portable")]
 #elif NETFX_CORE
-[assembly: AssemblyTitle("Json.NET Metro")]
-[assembly: AllowPartiallyTrustedCallers]
+[assembly: AssemblyTitle("Json.NET WinRT")]
 #elif NET20
 [assembly: AssemblyTitle("Json.NET .NET 2.0")]
 [assembly: AllowPartiallyTrustedCallers]
@@ -68,7 +69,7 @@ using System.Security;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
-
+#if !PORTABLE
 // Setting ComVisible to false makes the types in this assembly not visible 
 // to COM componenets.  If you need to access a type in this assembly from 
 // COM, set the ComVisible attribute to true on that type.
@@ -76,6 +77,7 @@ using System.Security;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("9ca358aa-317b-4925-8ada-4a29e943a363")]
+#endif
 
 // Version information for an assembly consists of the following four values:
 //
@@ -88,7 +90,7 @@ using System.Security;
 // by using the '*' as shown below:
 [assembly: AssemblyVersion("4.5.0.0")]
 #if !PocketPC
-[assembly: AssemblyFileVersion("4.5.1.14719")]
+[assembly: AssemblyFileVersion("4.5.11.15520")]
 #endif
 
 [assembly: CLSCompliant(true)]

@@ -54,7 +54,6 @@ namespace Newtonsoft.Json
       Array,
       ConstructorStart,
       Constructor,
-      Bytes,
       Closed,
       Error
     }
@@ -69,7 +68,7 @@ namespace Newtonsoft.Json
 /* StartObject                 */new[]{ State.ObjectStart,      State.ObjectStart,      State.Error,        State.Error,      State.ObjectStart,      State.ObjectStart,      State.ObjectStart,      State.ObjectStart,      State.Error,    State.Error },
 /* StartArray                  */new[]{ State.ArrayStart,       State.ArrayStart,       State.Error,        State.Error,      State.ArrayStart,       State.ArrayStart,       State.ArrayStart,       State.ArrayStart,       State.Error,    State.Error },
 /* StartConstructor            */new[]{ State.ConstructorStart, State.ConstructorStart, State.Error,        State.Error,      State.ConstructorStart, State.ConstructorStart, State.ConstructorStart, State.ConstructorStart, State.Error,    State.Error },
-/* StartProperty               */new[]{ State.Property,         State.Error,            State.Property,     State.Property,   State.Error,            State.Error,            State.Error,            State.Error,            State.Error,    State.Error },
+/* Property                    */new[]{ State.Property,         State.Error,            State.Property,     State.Property,   State.Error,            State.Error,            State.Error,            State.Error,            State.Error,    State.Error },
 /* Comment                     */new[]{ State.Start,            State.Property,         State.ObjectStart,  State.Object,     State.ArrayStart,       State.Array,            State.Constructor,      State.Constructor,      State.Error,    State.Error },
 /* Raw                         */new[]{ State.Start,            State.Property,         State.ObjectStart,  State.Object,     State.ArrayStart,       State.Array,            State.Constructor,      State.Constructor,      State.Error,    State.Error },
 /* Value (this will be copied) */new[]{ State.Start,            State.Object,           State.Error,        State.Error,      State.Array,            State.Array,            State.Constructor,      State.Constructor,      State.Error,    State.Error }
@@ -143,21 +142,6 @@ namespace Newtonsoft.Json
       }
     }
 
-    internal string ContainerPath
-    {
-      get
-      {
-        if (_currentPosition.Type == JsonContainerType.None)
-          return string.Empty;
-
-        IEnumerable<JsonPosition> positions = (_currentPosition.InsideContainer())
-          ? _stack
-          : _stack.Concat(new[] { _currentPosition });
-
-        return JsonPosition.BuildPath(positions);
-      }
-    }
-    
     /// <summary>
     /// Gets the state of the writer.
     /// </summary>
@@ -185,8 +169,19 @@ namespace Newtonsoft.Json
           case State.Start:
             return WriteState.Start;
           default:
-            throw new JsonWriterException("Invalid state: " + _currentState);
+            throw JsonWriterException.Create(this, "Invalid state: " + _currentState, null);
         }
+      }
+    }
+
+    internal string ContainerPath
+    {
+      get
+      {
+        if (_currentPosition.Type == JsonContainerType.None)
+          return string.Empty;
+
+        return JsonPosition.BuildPath(_stack);
       }
     }
 
@@ -200,12 +195,21 @@ namespace Newtonsoft.Json
         if (_currentPosition.Type == JsonContainerType.None)
           return string.Empty;
 
-        return JsonPosition.BuildPath(_stack.Concat(new[] { _currentPosition }));
+        bool insideContainer = (_currentState != State.ArrayStart
+          && _currentState != State.ConstructorStart
+          && _currentState != State.ObjectStart);
+
+        IEnumerable<JsonPosition> positions = (!insideContainer)
+          ? _stack
+          : _stack.Concat(new[] { _currentPosition });
+
+        return JsonPosition.BuildPath(positions);
       }
     }
 
     private DateFormatHandling _dateFormatHandling;
     private DateTimeZoneHandling _dateTimeZoneHandling;
+    private StringEscapeHandling _stringEscapeHandling;
 
     /// <summary>
     /// Indicates how JSON text output is formatted.
@@ -226,12 +230,21 @@ namespace Newtonsoft.Json
     }
 
     /// <summary>
-    /// Get or set how <see cref="DateTime"/> time zones are handling when writing JSON.
+    /// Get or set how <see cref="DateTime"/> time zones are handling when writing JSON text.
     /// </summary>
     public DateTimeZoneHandling DateTimeZoneHandling
     {
       get { return _dateTimeZoneHandling; }
       set { _dateTimeZoneHandling = value; }
+    }
+
+    /// <summary>
+    /// Get or set how strings are escaped when writing JSON text.
+    /// </summary>
+    public StringEscapeHandling StringEscapeHandling
+    {
+      get { return _stringEscapeHandling; }
+      set { _stringEscapeHandling = value; }
     }
 
     /// <summary>
@@ -247,49 +260,31 @@ namespace Newtonsoft.Json
       CloseOutput = true;
     }
 
-    private void UpdateScopeWithFinishedValue()
+    internal void UpdateScopeWithFinishedValue()
     {
-      if (_currentPosition.Type == JsonContainerType.Array
-        || _currentPosition.Type == JsonContainerType.Constructor)
-      {
-        if (_currentPosition.Position == null)
-          _currentPosition.Position = 0;
-        else
+      if (_currentPosition.HasIndex)
           _currentPosition.Position++;
-      }
     }
 
     private void Push(JsonContainerType value)
     {
-      UpdateScopeWithFinishedValue();
-
-      if (_currentPosition.Type == JsonContainerType.None)
-      {
-        _currentPosition.Type = value;
-      }
-      else
-      {
+      if (_currentPosition.Type != JsonContainerType.None)
         _stack.Add(_currentPosition);
-        var state = new JsonPosition
-        {
-          Type = value
-        };
-        _currentPosition = state;
-      }
+
+      _currentPosition = new JsonPosition(value);
     }
 
     private JsonContainerType Pop()
     {
-      JsonPosition oldPosition;
+      JsonPosition oldPosition = _currentPosition;
+
       if (_stack.Count > 0)
       {
-        oldPosition = _currentPosition;
         _currentPosition = _stack[_stack.Count - 1];
         _stack.RemoveAt(_stack.Count - 1);
       }
       else
       {
-        oldPosition = _currentPosition;
         _currentPosition = new JsonPosition();
       }
 
@@ -319,8 +314,14 @@ namespace Newtonsoft.Json
     /// </summary>
     public virtual void WriteStartObject()
     {
-      AutoComplete(JsonToken.StartObject);
-      Push(JsonContainerType.Object);
+      InternalWriteStart(JsonToken.StartObject, JsonContainerType.Object);
+    }
+
+    internal void InternalWriteStart(JsonToken token, JsonContainerType container)
+    {
+      UpdateScopeWithFinishedValue();
+      AutoComplete(token);
+      Push(container);
     }
 
     /// <summary>
@@ -328,7 +329,7 @@ namespace Newtonsoft.Json
     /// </summary>
     public virtual void WriteEndObject()
     {
-      AutoCompleteClose(JsonToken.EndObject);
+      InternalWriteEnd(JsonContainerType.Object);
     }
 
     /// <summary>
@@ -336,8 +337,7 @@ namespace Newtonsoft.Json
     /// </summary>
     public virtual void WriteStartArray()
     {
-      AutoComplete(JsonToken.StartArray);
-      Push(JsonContainerType.Array);
+      InternalWriteStart(JsonToken.StartArray, JsonContainerType.Array);
     }
 
     /// <summary>
@@ -345,7 +345,7 @@ namespace Newtonsoft.Json
     /// </summary>
     public virtual void WriteEndArray()
     {
-      AutoCompleteClose(JsonToken.EndArray);
+      InternalWriteEnd(JsonContainerType.Array);
     }
 
     /// <summary>
@@ -354,8 +354,7 @@ namespace Newtonsoft.Json
     /// <param name="name">The name of the constructor.</param>
     public virtual void WriteStartConstructor(string name)
     {
-      AutoComplete(JsonToken.StartConstructor);
-      Push(JsonContainerType.Constructor);
+      InternalWriteStart(JsonToken.StartConstructor, JsonContainerType.Constructor);
     }
 
     /// <summary>
@@ -363,7 +362,12 @@ namespace Newtonsoft.Json
     /// </summary>
     public virtual void WriteEndConstructor()
     {
-      AutoCompleteClose(JsonToken.EndConstructor);
+      InternalWriteEnd(JsonContainerType.Constructor);
+    }
+
+    internal void InternalWriteEnd(JsonContainerType container)
+    {
+      AutoCompleteClose(container);
     }
 
     /// <summary>
@@ -371,6 +375,11 @@ namespace Newtonsoft.Json
     /// </summary>
     /// <param name="name">The name of the property.</param>
     public virtual void WritePropertyName(string name)
+    {
+      InternalWritePropertyName(name);
+    }
+
+    internal void InternalWritePropertyName(string name)
     {
       _currentPosition.PropertyName = name;
       AutoComplete(JsonToken.PropertyName);
@@ -431,13 +440,22 @@ namespace Newtonsoft.Json
             WritePropertyName(reader.Value.ToString());
             break;
           case JsonToken.Comment:
-            WriteComment(reader.Value.ToString());
+            WriteComment((reader.Value != null) ? reader.Value.ToString() : null);
             break;
           case JsonToken.Integer:
             WriteValue(Convert.ToInt64(reader.Value, CultureInfo.InvariantCulture));
             break;
           case JsonToken.Float:
-            WriteValue(Convert.ToDouble(reader.Value, CultureInfo.InvariantCulture));
+            object value = reader.Value;
+
+            if (value is decimal)
+              WriteValue((decimal)value);
+            else if (value is double)
+              WriteValue((double)value);
+            else if (value is float)
+              WriteValue((float)value);
+            else
+              WriteValue(Convert.ToDouble(value, CultureInfo.InvariantCulture));
             break;
           case JsonToken.String:
             WriteValue(reader.Value.ToString());
@@ -461,10 +479,15 @@ namespace Newtonsoft.Json
             WriteEndConstructor();
             break;
           case JsonToken.Date:
-            WriteValue((DateTime)reader.Value);
+#if !PocketPC && !NET20
+            if (reader.Value is DateTimeOffset)
+              WriteValue((DateTimeOffset)reader.Value);
+            else
+#endif
+              WriteValue(Convert.ToDateTime(reader.Value, CultureInfo.InvariantCulture));
             break;
           case JsonToken.Raw:
-            WriteRawValue((string)reader.Value);
+            WriteRawValue((reader.Value != null) ? reader.Value.ToString() : null);
             break;
           case JsonToken.Bytes:
             WriteValue((byte[])reader.Value);
@@ -482,17 +505,17 @@ namespace Newtonsoft.Json
     private void WriteConstructorDate(JsonReader reader)
     {
       if (!reader.Read())
-        throw new Exception("Unexpected end when reading date constructor.");
+        throw JsonWriterException.Create(this, "Unexpected end when reading date constructor.", null);
       if (reader.TokenType != JsonToken.Integer)
-        throw new Exception("Unexpected token when reading date constructor. Expected Integer, got " + reader.TokenType);
+        throw JsonWriterException.Create(this, "Unexpected token when reading date constructor. Expected Integer, got " + reader.TokenType, null);
 
       long ticks = (long)reader.Value;
       DateTime date = JsonConvert.ConvertJavaScriptTicksToDateTime(ticks);
 
       if (!reader.Read())
-        throw new Exception("Unexpected end when reading date constructor.");
+        throw JsonWriterException.Create(this, "Unexpected end when reading date constructor.", null);
       if (reader.TokenType != JsonToken.EndConstructor)
-        throw new Exception("Unexpected token when reading date constructor. Expected EndConstructor, got " + reader.TokenType);
+        throw JsonWriterException.Create(this, "Unexpected token when reading date constructor. Expected EndConstructor, got " + reader.TokenType, null);
 
       WriteValue(date);
     }
@@ -537,7 +560,7 @@ namespace Newtonsoft.Json
           WriteEndConstructor();
           break;
         default:
-          throw new JsonWriterException("Unexpected type when writing end: " + type);
+          throw JsonWriterException.Create(this, "Unexpected type when writing end: " + type, null);
       }
     }
 
@@ -546,21 +569,6 @@ namespace Newtonsoft.Json
       while (Top > 0)
       {
         WriteEnd();
-      }
-    }
-
-    private JsonContainerType GetTypeForCloseToken(JsonToken token)
-    {
-      switch (token)
-      {
-        case JsonToken.EndObject:
-          return JsonContainerType.Object;
-        case JsonToken.EndArray:
-          return JsonContainerType.Array;
-        case JsonToken.EndConstructor:
-          return JsonContainerType.Constructor;
-        default:
-          throw new JsonWriterException("No type for token: " + token);
       }
     }
 
@@ -575,16 +583,14 @@ namespace Newtonsoft.Json
         case JsonContainerType.Constructor:
           return JsonToken.EndConstructor;
         default:
-          throw new JsonWriterException("No close token for type: " + type);
+          throw JsonWriterException.Create(this, "No close token for type: " + type, null);
       }
     }
 
-    private void AutoCompleteClose(JsonToken tokenBeingClosed)
+    private void AutoCompleteClose(JsonContainerType type)
     {
       // write closing symbol and calculate new state
-
       int levelsToComplete = 0;
-      JsonContainerType type = GetTypeForCloseToken(tokenBeingClosed);
 
       if (_currentPosition.Type == type)
       {
@@ -606,11 +612,14 @@ namespace Newtonsoft.Json
       }
 
       if (levelsToComplete == 0)
-        throw new JsonWriterException("No token to close.");
+        throw JsonWriterException.Create(this, "No token to close.", null);
 
       for (int i = 0; i < levelsToComplete; i++)
       {
         JsonToken token = GetCloseTokenForType(Pop());
+
+        if (_currentState == State.Property)
+          WriteNull();
 
         if (_formatting == Formatting.Indented)
         {
@@ -637,7 +646,7 @@ namespace Newtonsoft.Json
             _currentState = State.Start;
             break;
           default:
-            throw new JsonWriterException("Unknown JsonType: " + currentLevelType);
+            throw JsonWriterException.Create(this, "Unknown JsonType: " + currentLevelType, null);
         }
       }
     }
@@ -673,39 +682,26 @@ namespace Newtonsoft.Json
 
     internal void AutoComplete(JsonToken tokenBeingWritten)
     {
-      if (tokenBeingWritten != JsonToken.StartObject
-        && tokenBeingWritten != JsonToken.StartArray
-        && tokenBeingWritten != JsonToken.StartConstructor)
-        UpdateScopeWithFinishedValue();
-
       // gets new state based on the current state and what is being written
       State newState = StateArray[(int)tokenBeingWritten][(int)_currentState];
 
       if (newState == State.Error)
-      {
-        throw new JsonWriterException("Token {0} in state {1} would result in an invalid JSON object.".FormatWith(CultureInfo.InvariantCulture, tokenBeingWritten.ToString(), _currentState.ToString()));
-      }
+        throw JsonWriterException.Create(this, "Token {0} in state {1} would result in an invalid JSON object.".FormatWith(CultureInfo.InvariantCulture, tokenBeingWritten.ToString(), _currentState.ToString()), null);
 
       if ((_currentState == State.Object || _currentState == State.Array || _currentState == State.Constructor) && tokenBeingWritten != JsonToken.Comment)
       {
         WriteValueDelimiter();
       }
-      else if (_currentState == State.Property)
-      {
-        if (_formatting == Formatting.Indented)
-          WriteIndentSpace();
-      }
 
       if (_formatting == Formatting.Indented)
       {
-        WriteState writeState = WriteState;
+        if (_currentState == State.Property)
+          WriteIndentSpace();
 
         // don't indent a property when it is the first token to be written (i.e. at the start)
-        if ((tokenBeingWritten == JsonToken.PropertyName && writeState != WriteState.Start) ||
-            writeState == WriteState.Array || writeState == WriteState.Constructor)
-        {
+        if ((_currentState == State.Array || _currentState == State.ArrayStart || _currentState == State.Constructor || _currentState == State.ConstructorStart)
+          || (tokenBeingWritten == JsonToken.PropertyName && _currentState != State.Start))
           WriteIndent();
-        }
       }
 
       _currentState = newState;
@@ -717,6 +713,12 @@ namespace Newtonsoft.Json
     /// </summary>
     public virtual void WriteNull()
     {
+      InternalWriteNull();
+    }
+
+    internal void InternalWriteNull()
+    {
+      UpdateScopeWithFinishedValue();
       AutoComplete(JsonToken.Null);
     }
 
@@ -725,6 +727,12 @@ namespace Newtonsoft.Json
     /// </summary>
     public virtual void WriteUndefined()
     {
+      InternalWriteUndefined();
+    }
+
+    internal void InternalWriteUndefined()
+    {
+      UpdateScopeWithFinishedValue();
       AutoComplete(JsonToken.Undefined);
     }
 
@@ -733,6 +741,11 @@ namespace Newtonsoft.Json
     /// </summary>
     /// <param name="json">The raw JSON to write.</param>
     public virtual void WriteRaw(string json)
+    {
+      InternalWriteRaw();
+    }
+
+    internal void InternalWriteRaw()
     {
     }
 
@@ -743,6 +756,7 @@ namespace Newtonsoft.Json
     public virtual void WriteRawValue(string json)
     {
       // hack. want writer to change state as if a value had been written
+      UpdateScopeWithFinishedValue();
       AutoComplete(JsonToken.Undefined);
       WriteRaw(json);
     }
@@ -753,7 +767,13 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="String"/> value to write.</param>
     public virtual void WriteValue(string value)
     {
-      AutoComplete(JsonToken.String);
+      InternalWriteValue(JsonToken.String);
+    }
+
+    internal void InternalWriteValue(JsonToken token)
+    {
+      UpdateScopeWithFinishedValue();
+      AutoComplete(token);
     }
 
     /// <summary>
@@ -762,7 +782,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Int32"/> value to write.</param>
     public virtual void WriteValue(int value)
     {
-      AutoComplete(JsonToken.Integer);
+      InternalWriteValue(JsonToken.Integer);
     }
 
     /// <summary>
@@ -772,7 +792,7 @@ namespace Newtonsoft.Json
     [CLSCompliant(false)]
     public virtual void WriteValue(uint value)
     {
-      AutoComplete(JsonToken.Integer);
+      InternalWriteValue(JsonToken.Integer);
     }
 
     /// <summary>
@@ -781,7 +801,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Int64"/> value to write.</param>
     public virtual void WriteValue(long value)
     {
-      AutoComplete(JsonToken.Integer);
+      InternalWriteValue(JsonToken.Integer);
     }
 
     /// <summary>
@@ -791,7 +811,7 @@ namespace Newtonsoft.Json
     [CLSCompliant(false)]
     public virtual void WriteValue(ulong value)
     {
-      AutoComplete(JsonToken.Integer);
+      InternalWriteValue(JsonToken.Integer);
     }
 
     /// <summary>
@@ -800,7 +820,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Single"/> value to write.</param>
     public virtual void WriteValue(float value)
     {
-      AutoComplete(JsonToken.Float);
+      InternalWriteValue(JsonToken.Float);
     }
 
     /// <summary>
@@ -809,7 +829,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Double"/> value to write.</param>
     public virtual void WriteValue(double value)
     {
-      AutoComplete(JsonToken.Float);
+      InternalWriteValue(JsonToken.Float);
     }
 
     /// <summary>
@@ -818,7 +838,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Boolean"/> value to write.</param>
     public virtual void WriteValue(bool value)
     {
-      AutoComplete(JsonToken.Boolean);
+      InternalWriteValue(JsonToken.Boolean);
     }
 
     /// <summary>
@@ -827,7 +847,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Int16"/> value to write.</param>
     public virtual void WriteValue(short value)
     {
-      AutoComplete(JsonToken.Integer);
+      InternalWriteValue(JsonToken.Integer);
     }
 
     /// <summary>
@@ -837,7 +857,7 @@ namespace Newtonsoft.Json
     [CLSCompliant(false)]
     public virtual void WriteValue(ushort value)
     {
-      AutoComplete(JsonToken.Integer);
+      InternalWriteValue(JsonToken.Integer);
     }
 
     /// <summary>
@@ -846,7 +866,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Char"/> value to write.</param>
     public virtual void WriteValue(char value)
     {
-      AutoComplete(JsonToken.String);
+      InternalWriteValue(JsonToken.String);
     }
 
     /// <summary>
@@ -855,7 +875,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Byte"/> value to write.</param>
     public virtual void WriteValue(byte value)
     {
-      AutoComplete(JsonToken.Integer);
+      InternalWriteValue(JsonToken.Integer);
     }
 
     /// <summary>
@@ -865,7 +885,7 @@ namespace Newtonsoft.Json
     [CLSCompliant(false)]
     public virtual void WriteValue(sbyte value)
     {
-      AutoComplete(JsonToken.Integer);
+      InternalWriteValue(JsonToken.Integer);
     }
 
     /// <summary>
@@ -874,7 +894,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Decimal"/> value to write.</param>
     public virtual void WriteValue(decimal value)
     {
-      AutoComplete(JsonToken.Float);
+      InternalWriteValue(JsonToken.Float);
     }
 
     /// <summary>
@@ -883,7 +903,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="DateTime"/> value to write.</param>
     public virtual void WriteValue(DateTime value)
     {
-      AutoComplete(JsonToken.Date);
+      InternalWriteValue(JsonToken.Date);
     }
 
 #if !PocketPC && !NET20
@@ -893,7 +913,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="DateTimeOffset"/> value to write.</param>
     public virtual void WriteValue(DateTimeOffset value)
     {
-      AutoComplete(JsonToken.Date);
+      InternalWriteValue(JsonToken.Date);
     }
 #endif
 
@@ -903,7 +923,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="Guid"/> value to write.</param>
     public virtual void WriteValue(Guid value)
     {
-      AutoComplete(JsonToken.String);
+      InternalWriteValue(JsonToken.String);
     }
 
     /// <summary>
@@ -912,7 +932,7 @@ namespace Newtonsoft.Json
     /// <param name="value">The <see cref="TimeSpan"/> value to write.</param>
     public virtual void WriteValue(TimeSpan value)
     {
-      AutoComplete(JsonToken.String);
+      InternalWriteValue(JsonToken.String);
     }
 
     /// <summary>
@@ -1134,7 +1154,7 @@ namespace Newtonsoft.Json
       if (value == null)
         WriteNull();
       else
-        AutoComplete(JsonToken.Bytes);
+        InternalWriteValue(JsonToken.Bytes);
     }
 
     /// <summary>
@@ -1146,7 +1166,7 @@ namespace Newtonsoft.Json
       if (value == null)
         WriteNull();
       else
-        AutoComplete(JsonToken.String);
+        InternalWriteValue(JsonToken.String);
     }
 
     /// <summary>
@@ -1212,7 +1232,7 @@ namespace Newtonsoft.Json
           case TypeCode.Decimal:
             WriteValue(convertible.ToDecimal(CultureInfo.InvariantCulture));
             return;
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
           case TypeCode.DBNull:
             WriteNull();
             return;
@@ -1247,7 +1267,7 @@ namespace Newtonsoft.Json
         return;
       }
 
-      throw new ArgumentException("Unsupported type: {0}. Use the JsonSerializer class to get the object's JSON representation.".FormatWith(CultureInfo.InvariantCulture, value.GetType()));
+      throw JsonWriterException.Create(this, "Unsupported type: {0}. Use the JsonSerializer class to get the object's JSON representation.".FormatWith(CultureInfo.InvariantCulture, value.GetType()), null);
     }
     #endregion
 
@@ -1256,6 +1276,11 @@ namespace Newtonsoft.Json
     /// </summary>
     /// <param name="text">Text to place inside the comment.</param>
     public virtual void WriteComment(string text)
+    {
+      InternalWriteComment();
+    }
+
+    internal void InternalWriteComment()
     {
       AutoComplete(JsonToken.Comment);
     }
@@ -1266,13 +1291,17 @@ namespace Newtonsoft.Json
     /// <param name="ws">The string of white space characters.</param>
     public virtual void WriteWhitespace(string ws)
     {
+      InternalWriteWhitespace(ws);
+    }
+
+    internal void InternalWriteWhitespace(string ws)
+    {
       if (ws != null)
       {
         if (!StringUtils.IsWhiteSpace(ws))
-          throw new JsonWriterException("Only white space characters should be used.");
+          throw JsonWriterException.Create(this, "Only white space characters should be used.", null);
       }
     }
-
 
     void IDisposable.Dispose()
     {

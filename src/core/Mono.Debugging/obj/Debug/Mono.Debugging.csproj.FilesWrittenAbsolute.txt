@@ -1,4 +1,4 @@
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/bin/Mono.Debugging.dll.mdb
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/bin/Mono.Debugging.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/core/Mono.Debugging/obj/Debug/Mono.Debugging.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/core/Mono.Debugging/obj/Debug/Mono.Debugging.dll.mdb
+/tmp/monodevelop/main/build/bin/Mono.Debugging.dll.mdb
+/tmp/monodevelop/main/build/bin/Mono.Debugging.dll
+/tmp/monodevelop/main/src/core/Mono.Debugging/obj/Debug/Mono.Debugging.dll
+/tmp/monodevelop/main/src/core/Mono.Debugging/obj/Debug/Mono.Debugging.dll.mdb

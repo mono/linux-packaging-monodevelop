@@ -116,6 +116,7 @@ namespace MonoDevelop.CSharp.Refactoring.CodeActions
 			}
 			operationsRunning++;
 			mode.StartMode ();
+			DesktopService.RemoveWindowShadow (helpWindow);
 			mode.Exited += delegate(object s, InsertionCursorEventArgs iCArgs) {
 				if (iCArgs.Success) {
 					if (iCArgs.InsertionPoint.LineAfter == NewLineInsertion.None && 
@@ -161,6 +162,20 @@ namespace MonoDevelop.CSharp.Refactoring.CodeActions
 					);
 					return;
 				}
+				if (declaringType.Kind == TypeKind.Enum) {
+					foreach (var node in nodes.Reverse ()) {
+						var output = OutputNode (CodeGenerationService.CalculateBodyIndentLevel (declaringType), node);
+						var point = mode.InsertionPoints.First ();
+						var offset = loadedDocument.Editor.LocationToOffset (point.Location);
+						var text = output.Text + ",";
+						var delta = point.Insert (editor, text);
+						output.RegisterTrackedSegments (this, delta + offset);
+					}
+					tcs.SetResult (null);
+					return;
+				}
+
+
 				var helpWindow = new Mono.TextEditor.PopupWindow.InsertionCursorLayoutModeHelpWindow ();
 				helpWindow.TransientFor = MonoDevelop.Ide.IdeApp.Workbench.RootWindow;
 				helpWindow.TitleText = operation;
@@ -178,7 +193,8 @@ namespace MonoDevelop.CSharp.Refactoring.CodeActions
 						foreach (var node in nodes.Reverse ()) {
 							var output = OutputNode (CodeGenerationService.CalculateBodyIndentLevel (declaringType), node);
 							var offset = loadedDocument.Editor.LocationToOffset (iCArgs.InsertionPoint.Location);
-							var delta = iCArgs.InsertionPoint.Insert (editor, output.Text);
+							var text = output.Text;
+							var delta = iCArgs.InsertionPoint.Insert (editor, text);
 							output.RegisterTrackedSegments (this, delta + offset);
 						}
 						tcs.SetResult (null);

@@ -281,9 +281,26 @@ namespace Mono.Debugging.Evaluation
 		public abstract object TryCast (EvaluationContext ctx, object val, object type);
 
 		public abstract object GetValueType (EvaluationContext ctx, object val);
-		public abstract string GetTypeName (EvaluationContext ctx, object val);
+		public abstract string GetTypeName (EvaluationContext ctx, object type);
 		public abstract object[] GetTypeArgs (EvaluationContext ctx, object type);
 		public abstract object GetBaseType (EvaluationContext ctx, object type);
+
+		public virtual bool IsNullableType (EvaluationContext ctx, object type)
+		{
+			return type != null && GetTypeName (ctx, type).StartsWith ("System.Nullable`1", StringComparison.InvariantCulture);
+		}
+
+		public virtual bool NullableHasValue (EvaluationContext ctx, object type, object obj)
+		{
+			ValueReference hasValue = GetMember (ctx, type, obj, "HasValue");
+
+			return (bool) hasValue.ObjectValue;
+		}
+
+		public virtual ValueReference NullableGetValue (EvaluationContext ctx, object type, object obj)
+		{
+			return GetMember (ctx, type, obj, "Value");
+		}
 		
 		public virtual bool IsFlagsEnumType (EvaluationContext ctx, object type)
 		{
@@ -363,9 +380,6 @@ namespace Mono.Debugging.Evaluation
 			if (t == null || IsTypeLoaded (ctx, t))
 				return t;
 
-			if (!ctx.Options.AllowTargetInvoke)
-				return null;
-
 			if (ForceLoadType (ctx, t))
 				return t;
 
@@ -400,7 +414,8 @@ namespace Mono.Debugging.Evaluation
 
 		protected virtual ObjectValue CreateObjectValueImpl (EvaluationContext ctx, Mono.Debugging.Backend.IObjectValueSource source, ObjectPath path, object obj, ObjectValueFlags flags)
 		{
-			string typeName = obj != null ? GetValueTypeName (ctx, obj) : "";
+			object type = obj != null ? GetValueType (ctx, obj) : null;
+			string typeName = type != null ? GetTypeName (ctx, type) : "";
 
 			if (obj == null || IsNull (ctx, obj)) {
 				return ObjectValue.CreateNullObject (source, path, GetDisplayTypeName (typeName), flags);
@@ -412,15 +427,13 @@ namespace Mono.Debugging.Evaluation
 				return ObjectValue.CreateObject (source, path, GetDisplayTypeName (typeName), ctx.Evaluator.TargetObjectToExpression (ctx, obj), flags, null);
 			}
 			else {
-				object type = GetValueType (ctx, obj);
 				EvaluationResult tvalue = null;
 				TypeDisplayData tdata = null;
 				string tname;
 
-				if (typeName.StartsWith ("System.Nullable`1")) {
-					ValueReference hasValue = GetMember (ctx, type, obj, "HasValue");
-					if ((bool) hasValue.ObjectValue) {
-						ValueReference value = GetMember (ctx, type, obj, "Value");
+				if (IsNullableType (ctx, type)) {
+					if (NullableHasValue (ctx, type, obj)) {
+						ValueReference value = NullableGetValue (ctx, type, obj);
 
 						tdata = GetTypeDisplayData (ctx, value.Type);
 						obj = value.Value;
@@ -470,6 +483,16 @@ namespace Mono.Debugging.Evaluation
 
 			if (IsPrimitive (ctx, obj))
 				return new ObjectValue[0];
+
+			if (IsNullableType (ctx, type)) {
+				if (NullableHasValue (ctx, type, obj)) {
+					ValueReference value = NullableGetValue (ctx, type, obj);
+
+					return GetObjectValueChildren (ctx, objectSource, value.Type, value.Value, firstItemIndex, count, dereferenceProxy);
+				} else {
+					return new ObjectValue[0];
+				}
+			}
 
 			bool showRawView = false;
 			
@@ -718,13 +741,13 @@ namespace Mono.Debugging.Evaluation
 				// Local variables
 				
 				foreach (ValueReference vc in GetLocalVariables (ctx))
-					if (vc.Name.StartsWith (partialWord))
+					if (vc.Name.StartsWith (partialWord, StringComparison.InvariantCulture))
 						data.Items.Add (new CompletionItem (vc.Name, vc.Flags));
 				
 				// Parameters
 				
 				foreach (ValueReference vc in GetParameters (ctx))
-					if (vc.Name.StartsWith (partialWord))
+					if (vc.Name.StartsWith (partialWord, StringComparison.InvariantCulture))
 						data.Items.Add (new CompletionItem (vc.Name, vc.Flags));
 				
 				// Members
@@ -737,7 +760,7 @@ namespace Mono.Debugging.Evaluation
 				object type = GetEnclosingType (ctx);
 				
 				foreach (ValueReference vc in GetMembers (ctx, null, type, thisobj != null ? thisobj.Value : null))
-					if (vc.Name.StartsWith (partialWord))
+					if (vc.Name.StartsWith (partialWord, StringComparison.InvariantCulture))
 						data.Items.Add (new CompletionItem (vc.Name, vc.Flags));
 				
 				if (data.Items.Count > 0)
@@ -818,6 +841,17 @@ namespace Mono.Debugging.Evaluation
 		public virtual IEnumerable<object> GetNestedTypes (EvaluationContext ctx, object type)
 		{
 			yield break;
+		}
+
+		public virtual object GetParentType (EvaluationContext ctx, object type)
+		{
+			if ((type is Type))
+				return ((Type) type).DeclaringType;
+
+			var name = GetTypeName (ctx, type);
+			int plus = name.LastIndexOf ('+');
+
+			return plus != -1 ? GetType (ctx, name.Substring (0, plus)) : null;
 		}
 		
 		public virtual object CreateArray (EvaluationContext ctx, object type, object[] values)

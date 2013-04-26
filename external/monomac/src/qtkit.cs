@@ -266,6 +266,7 @@ namespace MonoMac.QTKit
 	[BaseType (typeof (QTCaptureInput))]
 	[DisableDefaultCtor] // crash without warning
 	interface QTCaptureDeviceInput {
+		[Static]
 		[Export ("deviceInputWithDevice:")]
 		QTCaptureDeviceInput FromDevice (QTCaptureDevice device);
 
@@ -857,7 +858,7 @@ namespace MonoMac.QTKit
 		string[] MovieUnfilteredPasteboardTypes ();
 
 		[Static, Export ("movieTypesWithOptions:")]
-		string[] MovieTypesWithOptions ([Target] QTMovie qTMovieInitialization, QTMovieFileTypeOptions types);
+		string[] MovieTypesWithOptions (QTMovieFileTypeOptions types);
 
 		[Static, Export ("movie")]
 		QTMovie Movie { get; }

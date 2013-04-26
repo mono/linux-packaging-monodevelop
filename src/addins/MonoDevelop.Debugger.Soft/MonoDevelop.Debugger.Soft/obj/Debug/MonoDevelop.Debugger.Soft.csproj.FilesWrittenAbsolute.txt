@@ -1,5 +1,5 @@
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.Manifest.addin.xml
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll.mdb
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.dll
-/home/builder/data/lanes/monodevelop_private-linux-bigsplash/a8219130/source/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.dll.mdb
+/tmp/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.Manifest.addin.xml
+/tmp/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll.mdb
+/tmp/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll
+/tmp/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.dll
+/tmp/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.dll.mdb

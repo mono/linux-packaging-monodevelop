@@ -1,4 +1,29 @@
-﻿using System;
+﻿#region License
+// Copyright (c) 2007 James Newton-King
+//
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+#endregion
+
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.Serialization.Formatters;
@@ -26,12 +51,18 @@ namespace Newtonsoft.Json
     internal const Formatting DefaultFormatting = Formatting.None;
     internal const DateFormatHandling DefaultDateFormatHandling = DateFormatHandling.IsoDateFormat;
     internal const DateTimeZoneHandling DefaultDateTimeZoneHandling = DateTimeZoneHandling.RoundtripKind;
+    internal const DateParseHandling DefaultDateParseHandling = DateParseHandling.DateTime;
     internal static readonly CultureInfo DefaultCulture;
+    internal const bool DefaultCheckAdditionalContent = false;
 
     internal Formatting? _formatting;
     internal DateFormatHandling? _dateFormatHandling;
     internal DateTimeZoneHandling? _dateTimeZoneHandling;
+    internal DateParseHandling? _dateParseHandling;
     internal CultureInfo _culture;
+    internal bool? _checkAdditionalContent;
+    internal int? _maxDepth;
+    internal bool _maxDepthSet;
 
     /// <summary>
     /// Gets or sets how reference loops (e.g. a class referencing itself) is handled.
@@ -107,6 +138,12 @@ namespace Newtonsoft.Json
     public IReferenceResolver ReferenceResolver { get; set; }
 
     /// <summary>
+    /// Gets or sets the <see cref="ITraceWriter"/> used by the serializer when writing trace messages.
+    /// </summary>
+    /// <value>The trace writer.</value>
+    public ITraceWriter TraceWriter { get; set; }
+
+    /// <summary>
     /// Gets or sets the <see cref="SerializationBinder"/> used by the serializer when resolving type names.
     /// </summary>
     /// <value>The binder.</value>
@@ -123,6 +160,22 @@ namespace Newtonsoft.Json
     /// </summary>
     /// <value>The context.</value>
     public StreamingContext Context { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum depth allowed when reading JSON. Reading past this depth will throw a <see cref="JsonReaderException"/>.
+    /// </summary>
+    public int? MaxDepth
+    {
+      get { return _maxDepth; }
+      set
+      {
+        if (value <= 0)
+          throw new ArgumentException("Value must be positive.", "value");
+
+        _maxDepth = value;
+        _maxDepthSet = true;
+      }
+    }
 
     /// <summary>
     /// Indicates how JSON text output is formatted.
@@ -152,12 +205,33 @@ namespace Newtonsoft.Json
     }
 
     /// <summary>
+    /// Get or set how date formatted strings, e.g. "\/Date(1198908717056)\/" and "2012-03-21T05:40Z", are parsed when reading JSON.
+    /// </summary>
+    public DateParseHandling DateParseHandling
+    {
+      get { return _dateParseHandling ?? DefaultDateParseHandling; }
+      set { _dateParseHandling = value; }
+    }
+
+    /// <summary>
     /// Gets or sets the culture used when reading JSON. Defaults to <see cref="CultureInfo.InvariantCulture"/>.
     /// </summary>
     public CultureInfo Culture
     {
       get { return _culture ?? DefaultCulture; }
       set { _culture = value; }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether there will be a check for additional content after deserializing an object.
+    /// </summary>
+    /// <value>
+    /// 	<c>true</c> if there will be a check for additional content after deserializing an object; otherwise, <c>false</c>.
+    /// </value>
+    public bool CheckAdditionalContent
+    {
+      get { return _checkAdditionalContent ?? DefaultCheckAdditionalContent; }
+      set { _checkAdditionalContent = value; }
     }
 
     static JsonSerializerSettings()

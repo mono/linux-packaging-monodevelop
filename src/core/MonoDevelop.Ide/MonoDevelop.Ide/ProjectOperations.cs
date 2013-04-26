@@ -49,6 +49,8 @@ using MonoDevelop.Core.Instrumentation;
 using Mono.TextEditor;
 using System.Diagnostics;
 using ICSharpCode.NRefactory.Documentation;
+using ICSharpCode.NRefactory.TypeSystem.Implementation;
+using System.Text;
 
 namespace MonoDevelop.Ide
 {
@@ -224,9 +226,11 @@ namespace MonoDevelop.Ide
 				entity = ((ICSharpCode.NRefactory.TypeSystem.IType)element).GetDefinition ();
 			if (entity == null)
 				return false;
-			
 			if (entity.Region.IsEmpty) {
-				return !string.IsNullOrEmpty (entity.ParentAssembly.UnresolvedAssembly.Location);
+				var parentAssembly = entity.ParentAssembly;
+				if (parentAssembly == null)
+					return false;
+				return !string.IsNullOrEmpty (parentAssembly.UnresolvedAssembly.Location);
 			}
 			return true;
 		}
@@ -267,6 +271,9 @@ namespace MonoDevelop.Ide
 
 			if (entity == null && element is ICSharpCode.NRefactory.TypeSystem.IType)
 				entity = ((ICSharpCode.NRefactory.TypeSystem.IType)element).GetDefinition ();
+			if (entity is SpecializedMember) 
+				entity = ((SpecializedMember)entity).MemberDefinition;
+
 			if (entity == null) {
 				LoggingService.LogError ("Unknown element:" + element);
 				return;
@@ -2066,17 +2073,26 @@ namespace MonoDevelop.Ide
 
 		public TextEditorData GetTextEditorData (FilePath filePath, out bool isOpen)
 		{
+			bool hadBom;
+			Encoding encoding;
+			return GetTextEditorData (filePath, out hadBom, out encoding, out isOpen);
+		}
+
+		public TextEditorData GetTextEditorData (FilePath filePath, out bool hadBom, out Encoding encoding, out bool isOpen)
+		{
 			foreach (var doc in IdeApp.Workbench.Documents) {
 				if (doc.FileName == filePath) {
 					isOpen = true;
+					hadBom = false;
+					encoding = Encoding.Default;
 					return doc.Editor;
 				}
 			}
-			
-			TextFile file = TextFile.ReadFile (filePath);
+
+			var text = Mono.TextEditor.Utils.TextFileUtility.ReadAllText (filePath, out hadBom, out encoding);
 			TextEditorData data = new TextEditorData ();
 			data.Document.FileName = filePath;
-			data.Text = file.Text;
+			data.Text = text;
 			isOpen = false;
 			return data;
 		}

@@ -34,9 +34,9 @@ using Newtonsoft.Json.Utilities;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 using Newtonsoft.Json.Schema;
 using System.IO;
@@ -90,7 +90,7 @@ namespace Newtonsoft.Json.Tests.Schema
       Assert.IsTrue(o.IsValid(schema));
     }
 
-#if !PocketPC && !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
     [Test]
     public void Generate_DefaultValueAttributeTestClass()
     {
@@ -257,27 +257,6 @@ namespace Newtonsoft.Json.Tests.Schema
     }
 
     [Test]
-    public void Generate_NumberFormatInfo()
-    {
-      JsonSchemaGenerator generator = new JsonSchemaGenerator();
-      JsonSchema schema = generator.Generate(typeof(NumberFormatInfo));
-
-      string json = schema.ToString();
-
-      Console.WriteLine(json);
-
-      //      Assert.AreEqual(@"{
-      //  ""type"": ""object"",
-      //  ""additionalProperties"": {
-      //    ""type"": ""array"",
-      //    ""items"": {
-      //      ""type"": ""string""
-      //    }
-      //  }
-      //}", json);
-    }
-
-    [Test]
     public void CircularReferenceError()
     {
       ExceptionAssert.Throws<Exception>(@"Unresolved circular reference for type 'Newtonsoft.Json.Tests.TestObjects.CircularReferenceClass'. Explicitly define an Id for the type using a JsonObject/JsonArray attribute or automatically generate a type Id using the UndefinedSchemaIdHandling property.",
@@ -331,7 +310,7 @@ namespace Newtonsoft.Json.Tests.Schema
       Assert.IsTrue(v.IsValid(schema));
     }
 
-#if !SILVERLIGHT && !PocketPC && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     [Test]
     public void GenerateSchemaForISerializable()
     {
@@ -346,7 +325,7 @@ namespace Newtonsoft.Json.Tests.Schema
     }
 #endif
 
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
     [Test]
     public void GenerateSchemaForDBNull()
     {
@@ -389,7 +368,12 @@ namespace Newtonsoft.Json.Tests.Schema
     {
       JsonSchemaGenerator generator = new JsonSchemaGenerator();
       generator.UndefinedSchemaIdHandling = UndefinedSchemaIdHandling.UseTypeName;
-      generator.ContractResolver = new CustomDirectoryInfoMapper();
+      generator.ContractResolver = new CustomDirectoryInfoMapper
+        {
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+          IgnoreSerializableAttribute = true
+#endif
+        };
 
       JsonSchema schema = generator.Generate(typeof(DirectoryInfo), true);
 
@@ -468,7 +452,12 @@ namespace Newtonsoft.Json.Tests.Schema
       JTokenWriter jsonWriter = new JTokenWriter();
       JsonSerializer serializer = new JsonSerializer();
       serializer.Converters.Add(new IsoDateTimeConverter());
-      serializer.ContractResolver = new CustomDirectoryInfoMapper();
+      serializer.ContractResolver = new CustomDirectoryInfoMapper
+        {
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+          IgnoreSerializableInterface = true
+#endif
+        };
       serializer.Serialize(jsonWriter, temp);
 
       List<string> errors = new List<string>();
@@ -483,9 +472,14 @@ namespace Newtonsoft.Json.Tests.Schema
     {
       JsonSchemaGenerator generator = new JsonSchemaGenerator();
       generator.UndefinedSchemaIdHandling = UndefinedSchemaIdHandling.UseTypeName;
-      generator.ContractResolver = new CamelCasePropertyNamesContractResolver();
+      generator.ContractResolver = new CamelCasePropertyNamesContractResolver()
+        {
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+          IgnoreSerializableAttribute = true
+#endif
+        };
 
-      JsonSchema schema = generator.Generate(typeof (Version), true);
+      JsonSchema schema = generator.Generate(typeof(Version), true);
 
       string json = schema.ToString();
 
@@ -524,6 +518,76 @@ namespace Newtonsoft.Json.Tests.Schema
   }
 }", json);
     }
+
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+    [Test]
+    public void GenerateSchemaSerializable()
+    {
+      JsonSchemaGenerator generator = new JsonSchemaGenerator();
+      generator.ContractResolver = new DefaultContractResolver
+        {
+          IgnoreSerializableAttribute = false
+        };
+      generator.UndefinedSchemaIdHandling = UndefinedSchemaIdHandling.UseTypeName;
+
+      JsonSchema schema = generator.Generate(typeof (Version), true);
+
+      string json = schema.ToString();
+
+      Assert.AreEqual(@"{
+  ""id"": ""System.Version"",
+  ""type"": [
+    ""object"",
+    ""null""
+  ],
+  ""additionalProperties"": false,
+  ""properties"": {
+    ""_Major"": {
+      ""required"": true,
+      ""type"": ""integer""
+    },
+    ""_Minor"": {
+      ""required"": true,
+      ""type"": ""integer""
+    },
+    ""_Build"": {
+      ""required"": true,
+      ""type"": ""integer""
+    },
+    ""_Revision"": {
+      ""required"": true,
+      ""type"": ""integer""
+    }
+  }
+}", json);
+
+      JTokenWriter jsonWriter = new JTokenWriter();
+      JsonSerializer serializer = new JsonSerializer();
+      serializer.ContractResolver  = new DefaultContractResolver
+        {
+          IgnoreSerializableAttribute = false
+        };
+      serializer.Serialize(jsonWriter, new Version(1, 2, 3, 4));
+
+      List<string> errors = new List<string>();
+      jsonWriter.Token.Validate(schema, (sender, args) => errors.Add(args.Message));
+
+      Assert.AreEqual(0, errors.Count);
+
+      Assert.AreEqual(@"{
+  ""_Major"": 1,
+  ""_Minor"": 2,
+  ""_Build"": 3,
+  ""_Revision"": 4
+}", jsonWriter.Token.ToString());
+
+      Version version = jsonWriter.Token.ToObject<Version>(serializer);
+      Assert.AreEqual(1, version.Major);
+      Assert.AreEqual(2, version.Minor);
+      Assert.AreEqual(3, version.Build);
+      Assert.AreEqual(4, version.Revision);
+    }
+#endif
 
     public enum SortTypeFlag
     {
@@ -687,6 +751,33 @@ namespace Newtonsoft.Json.Tests.Schema
   }
 }", json);
     }
+
+    [Test]
+    public void GenerateForNullableInt32()
+    {
+      JsonSchemaGenerator jsonSchemaGenerator = new JsonSchemaGenerator();
+
+      JsonSchema jsonSchema = jsonSchemaGenerator.Generate(typeof(NullableInt32TestClass));
+      string json = jsonSchema.ToString();
+
+      Assert.AreEqual(@"{
+  ""type"": ""object"",
+  ""properties"": {
+    ""Value"": {
+      ""required"": true,
+      ""type"": [
+        ""integer"",
+        ""null""
+      ]
+    }
+  }
+}", json);
+    }
+  }
+
+  public class NullableInt32TestClass
+  {
+    public int? Value { get; set; }
   }
 
   public class DMDSLBase

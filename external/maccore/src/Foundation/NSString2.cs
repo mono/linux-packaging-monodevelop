@@ -33,37 +33,62 @@ using MonoMac.ObjCRuntime;
 namespace MonoMac.Foundation {
 
 	public partial class NSString {
-		//static Selector selDataUsingEncoding = new Selector ("dataUsingEncoding:");
-		static IntPtr selDataUsingEncodingAllow = Selector.sel_registerName ("dataUsingEncoding:allowLossyConversion:");
-		static IntPtr selInitWithDataEncoding = Selector.sel_registerName ("initWithData:encoding:");
+		const string selDataUsingEncodingAllow = "dataUsingEncoding:allowLossyConversion:";
+		const string selInitWithDataEncoding = "initWithData:encoding:";
 
-		[Obsolete("Use Encode instead")]
+#if MONOMAC
+		static IntPtr selDataUsingEncodingAllowHandle = Selector.GetHandle (selDataUsingEncodingAllow);
+		static IntPtr selInitWithDataEncodingHandle = Selector.GetHandle (selInitWithDataEncoding);
+#endif
+
+		[Advice ("Use Encode instead")]
 		public NSData DataUsingEncoding (NSStringEncoding enc)
 		{
-			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, selDataUsingEncodingAllow, (int) enc, 0));
+#if MONOMAC
+			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, selDataUsingEncodingAllowHandle, (int) enc, 0));
+			#else
+			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, Selector.GetHandle (selDataUsingEncodingAllow), (int) enc, 0));
+#endif
 		}
 
-		[Obsolete("Use Encode instead")]
+		[Advice ("Use Encode instead")]
 		public NSData DataUsingEncoding (NSStringEncoding enc, bool allowLossyConversion)
 		{
-			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, selDataUsingEncodingAllow, (int) enc, allowLossyConversion ? 1 : 0));
+#if MONOMAC
+			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, selDataUsingEncodingAllowHandle, (int) enc, allowLossyConversion ? 1 : 0));
+			#else
+			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, Selector.GetHandle (selDataUsingEncodingAllow), (int) enc, allowLossyConversion ? 1 : 0));
+#endif
 		}
 
 		public NSData Encode (NSStringEncoding enc)
 		{
-			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, selDataUsingEncodingAllow, (int) enc, 0));
+#if MONOMAC
+			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, selDataUsingEncodingAllowHandle, (int) enc, 0));
+			#else
+			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, Selector.GetHandle (selDataUsingEncodingAllow), (int) enc, 0));
+#endif
 		}
 
 		public NSData Encode (NSStringEncoding enc, bool allowLossyConversion)
 		{
-			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, selDataUsingEncodingAllow, (int) enc, allowLossyConversion ? 1 : 0));
+#if MONOMAC
+			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, selDataUsingEncodingAllowHandle, (int) enc, allowLossyConversion ? 1 : 0));
+#else
+			return new NSData (Messaging.IntPtr_objc_msgSend_int_int (Handle, Selector.GetHandle (selDataUsingEncodingAllow), (int) enc, allowLossyConversion ? 1 : 0));
+#endif
 		}
 
 		public static NSString FromData (NSData data, NSStringEncoding encoding)
 		{
 			// Allocate a string, do not init
-			IntPtr h = Messaging.IntPtr_objc_msgSend (Class.GetHandle ("NSString"), Selector.Alloc);
-			h = Messaging.IntPtr_objc_msgSend_IntPtr_int (h, selInitWithDataEncoding, data.Handle, (int)encoding);
+#if MONOMAC
+			IntPtr h = Messaging.IntPtr_objc_msgSend (Class.GetHandle ("NSString"), Selector.AllocHandle);
+			h = Messaging.IntPtr_objc_msgSend_IntPtr_int (h, selInitWithDataEncodingHandle, data.Handle, (int)encoding);
+#else
+			IntPtr h = Messaging.IntPtr_objc_msgSend (Class.GetHandle ("NSString"), Selector.GetHandle (Selector.Alloc));
+			h = Messaging.IntPtr_objc_msgSend_IntPtr_int (h, Selector.GetHandle (selInitWithDataEncoding), data.Handle, (int)encoding);
+#endif
 			return new NSString (h);
 		}
 

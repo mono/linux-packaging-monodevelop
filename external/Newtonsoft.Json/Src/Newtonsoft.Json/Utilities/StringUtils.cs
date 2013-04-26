@@ -45,6 +45,21 @@ namespace Newtonsoft.Json.Utilities
     public const char LineFeed = '\n';
     public const char Tab = '\t';
 
+    public static string FormatWith(this string format, IFormatProvider provider, object arg0)
+    {
+      return format.FormatWith(provider, new[] { arg0 });
+    }
+
+    public static string FormatWith(this string format, IFormatProvider provider, object arg0, object arg1)
+    {
+      return format.FormatWith(provider, new[] { arg0, arg1 });
+    }
+
+    public static string FormatWith(this string format, IFormatProvider provider, object arg0, object arg1, object arg2)
+    {
+      return format.FormatWith(provider, new[] { arg0, arg1, arg2 });
+    }
+
     public static string FormatWith(this string format, IFormatProvider provider, params object[] args)
     {
       ValidationUtils.ArgumentNotNull(format, "format");
@@ -102,14 +117,14 @@ namespace Newtonsoft.Json.Utilities
         return value.Length;
     }
 
-    public static string ToCharAsUnicode(char c)
+    public static void ToCharAsUnicode(char c, char[] buffer)
     {
-      char h1 = MathUtils.IntToHex((c >> 12) & '\x000f');
-      char h2 = MathUtils.IntToHex((c >> 8) & '\x000f');
-      char h3 = MathUtils.IntToHex((c >> 4) & '\x000f');
-      char h4 = MathUtils.IntToHex(c & '\x000f');
-
-      return new string(new[] { '\\', 'u', h1, h2, h3, h4 });
+      buffer[0] = '\\';
+      buffer[1] = 'u';
+      buffer[2] = MathUtils.IntToHex((c >> 12) & '\x000f');
+      buffer[3] = MathUtils.IntToHex((c >> 8) & '\x000f');
+      buffer[4] = MathUtils.IntToHex((c >> 4) & '\x000f');
+      buffer[5] = MathUtils.IntToHex(c & '\x000f');
     }
 
     public static TSource ForgivingCaseSensitiveFind<TSource>(this IEnumerable<TSource> source, Func<TSource, string> valueSelector, string testValue)
@@ -140,17 +155,47 @@ namespace Newtonsoft.Json.Utilities
       if (!char.IsUpper(s[0]))
         return s;
 
-      string camelCase = null;
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < s.Length; i++)
+      {
+        bool hasNext = (i + 1 < s.Length);
+        if ((i == 0 || !hasNext) || char.IsUpper(s[i + 1]))
+        {
+          char lowerCase;
 #if !NETFX_CORE
-      camelCase = char.ToLower(s[0], CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
+          lowerCase = char.ToLower(s[i], CultureInfo.InvariantCulture);
 #else
-      camelCase = char.ToLower(s[0]).ToString();
+          lowerCase = char.ToLower(s[i]);
 #endif
 
-      if (s.Length > 1)
-        camelCase += s.Substring(1);
+          sb.Append(lowerCase);
+        }
+        else
+        {
+          sb.Append(s.Substring(i));
+          break;
+        }
+      }
 
-      return camelCase;
+      return sb.ToString();
+    }
+
+    public static bool IsHighSurrogate(char c)
+    {
+#if !(SILVERLIGHT || PORTABLE)
+      return char.IsHighSurrogate(c);
+#else
+      return (c >= 55296 && c <= 56319);
+#endif
+    }
+
+    public static bool IsLowSurrogate(char c)
+    {
+#if !(SILVERLIGHT || PORTABLE)
+      return char.IsLowSurrogate(c);
+#else
+      return (c >= 56320 && c <= 57343);
+#endif
     }
   }
 }

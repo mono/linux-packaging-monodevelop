@@ -25,7 +25,9 @@
 
 using System;
 using System.Collections.Generic;
+#if !PORTABLE
 using System.Collections.Specialized;
+#endif
 using System.Threading;
 using Newtonsoft.Json.Utilities;
 using System.Collections;
@@ -43,31 +45,49 @@ namespace Newtonsoft.Json.Linq
   /// Represents a token that can contain other tokens.
   /// </summary>
   public abstract class JContainer : JToken, IList<JToken>
-#if !(SILVERLIGHT || NETFX_CORE)
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     , ITypedList, IBindingList
-#else
-    , IList, INotifyCollectionChanged
+#elif !PORTABLE
+    , INotifyCollectionChanged
 #endif
-#if !(SILVERLIGHT || NET20 || NET35 || NETFX_CORE)
+    , IList
+#if !(SILVERLIGHT || NET20 || NET35 || NETFX_CORE || PORTABLE)
     , INotifyCollectionChanged
 #endif
   {
-#if !SILVERLIGHT && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+    internal ListChangedEventHandler _listChanged;
+    internal AddingNewEventHandler _addingNew;
+
     /// <summary>
     /// Occurs when the list changes or an item in the list changes.
     /// </summary>
-    public event ListChangedEventHandler ListChanged;
+    public event ListChangedEventHandler ListChanged
+    {
+      add { _listChanged += value; }
+      remove { _listChanged -= value; }
+    }
 
     /// <summary>
     /// Occurs before an item is added to the collection.
     /// </summary>
-    public event AddingNewEventHandler AddingNew;
+    public event AddingNewEventHandler AddingNew
+    {
+      add { _addingNew += value; }
+      remove { _addingNew -= value; }
+    }
 #endif
-#if SILVERLIGHT || !(NET20 || NET35)
+#if SILVERLIGHT || !(NET20 || NET35 || PORTABLE)
+    internal NotifyCollectionChangedEventHandler _collectionChanged;
+
     /// <summary>
     /// Occurs when the items list of the collection has changed, or the collection is reset.
     /// </summary>
-    public event NotifyCollectionChangedEventHandler CollectionChanged;
+    public event NotifyCollectionChangedEventHandler CollectionChanged
+    {
+      add { _collectionChanged += value; }
+      remove { _collectionChanged -= value; }
+    }
 #endif
 
     /// <summary>
@@ -84,6 +104,7 @@ namespace Newtonsoft.Json.Linq
     }
 
     internal JContainer(JContainer other)
+      : this()
     {
       ValidationUtils.ArgumentNotNull(other, "c");
 
@@ -99,14 +120,19 @@ namespace Newtonsoft.Json.Linq
         throw new InvalidOperationException("Cannot change {0} during a collection change event.".FormatWith(CultureInfo.InvariantCulture, GetType()));
     }
 
- #if !SILVERLIGHT && !NETFX_CORE
+    internal virtual IList<JToken> CreateChildrenCollection()
+    {
+      return new List<JToken>();
+    }
+
+ #if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     /// <summary>
     /// Raises the <see cref="AddingNew"/> event.
     /// </summary>
     /// <param name="e">The <see cref="AddingNewEventArgs"/> instance containing the event data.</param>
     protected virtual void OnAddingNew(AddingNewEventArgs e)
     {
-      AddingNewEventHandler handler = AddingNew;
+      AddingNewEventHandler handler = _addingNew;
       if (handler != null)
         handler(this, e);
     }
@@ -117,7 +143,7 @@ namespace Newtonsoft.Json.Linq
     /// <param name="e">The <see cref="ListChangedEventArgs"/> instance containing the event data.</param>
     protected virtual void OnListChanged(ListChangedEventArgs e)
     {
-      ListChangedEventHandler handler = ListChanged;
+      ListChangedEventHandler handler = _listChanged;
 
       if (handler != null)
       {
@@ -133,14 +159,14 @@ namespace Newtonsoft.Json.Linq
       }
     }
 #endif
-#if SILVERLIGHT || !(NET20 || NET35)
+#if SILVERLIGHT || !(NET20 || NET35 || PORTABLE)
     /// <summary>
     /// Raises the <see cref="CollectionChanged"/> event.
     /// </summary>
     /// <param name="e">The <see cref="NotifyCollectionChangedEventArgs"/> instance containing the event data.</param>
     protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
     {
-      NotifyCollectionChangedEventHandler handler = CollectionChanged;
+      NotifyCollectionChangedEventHandler handler = _collectionChanged;
 
       if (handler != null)
       {
@@ -170,28 +196,22 @@ namespace Newtonsoft.Json.Linq
 
     internal bool ContentsEqual(JContainer container)
     {
-      JToken t1 = First;
-      JToken t2 = container.First;
-
-      if (t1 == t2)
+      if (container == this)
         return true;
 
-      do
-      {
-        if (t1 == null && t2 == null)
-          return true;
+      IList<JToken> t1 = ChildrenTokens;
+      IList<JToken> t2 = container.ChildrenTokens;
 
-        if (t1 != null && t2 != null && t1.DeepEquals(t2))
-        {
-          t1 = (t1 != Last) ? t1.Next : null;
-          t2 = (t2 != container.Last) ? t2.Next : null;
-        }
-        else
-        {
+      if (t1.Count != t2.Count)
+        return false;
+
+      for (int i = 0; i < t1.Count; i++)
+      {
+        if (!t1[i].DeepEquals(t2[i]))
           return false;
-        }
       }
-      while (true);
+
+      return true;
     }
 
     /// <summary>
@@ -332,12 +352,12 @@ namespace Newtonsoft.Json.Linq
       
       ChildrenTokens.Insert(index, item);
 
-#if !SILVERLIGHT && !NETFX_CORE
-      if (ListChanged != null)
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+      if (_listChanged != null)
         OnListChanged(new ListChangedEventArgs(ListChangedType.ItemAdded, index));
 #endif
-#if SILVERLIGHT || !(NET20 || NET35)
-      if (CollectionChanged != null)
+#if SILVERLIGHT || !(NET20 || NET35 || PORTABLE)
+      if (_collectionChanged != null)
         OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
 #endif
     }
@@ -366,11 +386,13 @@ namespace Newtonsoft.Json.Linq
 
       ChildrenTokens.RemoveAt(index);
 
-#if !SILVERLIGHT && !NETFX_CORE
-      OnListChanged(new ListChangedEventArgs(ListChangedType.ItemDeleted, index));
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+      if (_listChanged != null)
+        OnListChanged(new ListChangedEventArgs(ListChangedType.ItemDeleted, index));
 #endif
-#if SILVERLIGHT || !(NET20 || NET35)
-      OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
+#if SILVERLIGHT || !(NET20 || NET35 || PORTABLE)
+      if (_collectionChanged != null)
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
 #endif
     }
 
@@ -428,11 +450,13 @@ namespace Newtonsoft.Json.Linq
       existing.Previous = null;
       existing.Next = null;
 
-#if !SILVERLIGHT && !NETFX_CORE
-      OnListChanged(new ListChangedEventArgs(ListChangedType.ItemChanged, index));
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+      if (_listChanged != null)
+        OnListChanged(new ListChangedEventArgs(ListChangedType.ItemChanged, index));
 #endif
-#if SILVERLIGHT || !(NET20 || NET35)
-      OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, item, existing, index));
+#if SILVERLIGHT || !(NET20 || NET35 || PORTABLE)
+      if (_collectionChanged != null)
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, item, existing, index));
 #endif
     }
 
@@ -449,11 +473,13 @@ namespace Newtonsoft.Json.Linq
 
       ChildrenTokens.Clear();
 
-#if !SILVERLIGHT && !NETFX_CORE
-      OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
+      if (_listChanged != null)
+        OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
 #endif
-#if SILVERLIGHT || !(NET20 || NET35)
-      OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+#if SILVERLIGHT || !(NET20 || NET35 || PORTABLE)
+      if (_collectionChanged != null)
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 #endif
     }
 
@@ -477,7 +503,7 @@ namespace Newtonsoft.Json.Linq
         throw new ArgumentNullException("array");
       if (arrayIndex < 0)
         throw new ArgumentOutOfRangeException("arrayIndex", "arrayIndex is less than 0.");
-      if (arrayIndex >= array.Length)
+      if (arrayIndex >= array.Length && arrayIndex != 0)
         throw new ArgumentException("arrayIndex is equal to or greater than the length of array.");
       if (Count > array.Length - arrayIndex)
         throw new ArgumentException("The number of elements in the source JObject is greater than the available space from arrayIndex to the end of the destination array.");
@@ -592,19 +618,19 @@ namespace Newtonsoft.Json.Linq
       ClearItems();
     }
 
-    internal void ReadTokenFrom(JsonReader r)
+    internal void ReadTokenFrom(JsonReader reader)
     {
-      int startDepth = r.Depth;
+      int startDepth = reader.Depth;
 
-      if (!r.Read())
-        throw new Exception("Error reading {0} from JsonReader.".FormatWith(CultureInfo.InvariantCulture, GetType().Name));
+      if (!reader.Read())
+        throw JsonReaderException.Create(reader, "Error reading {0} from JsonReader.".FormatWith(CultureInfo.InvariantCulture, GetType().Name));
 
-      ReadContentFrom(r);
+      ReadContentFrom(reader);
 
-      int endDepth = r.Depth;
+      int endDepth = reader.Depth;
 
       if (endDepth > startDepth)
-        throw new Exception("Unexpected end of content while loading {0}.".FormatWith(CultureInfo.InvariantCulture, GetType().Name));
+        throw JsonReaderException.Create(reader, "Unexpected end of content while loading {0}.".FormatWith(CultureInfo.InvariantCulture, GetType().Name));
     }
 
     internal void ReadContentFrom(JsonReader r)
@@ -721,7 +747,7 @@ namespace Newtonsoft.Json.Linq
       return hashCode;
     }
 
-#if !SILVERLIGHT && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     string ITypedList.GetListName(PropertyDescriptor[] listAccessors)
     {
       return string.Empty;
@@ -900,7 +926,7 @@ namespace Newtonsoft.Json.Linq
 
     #region IBindingList Members
 
-#if !SILVERLIGHT && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     void IBindingList.AddIndex(PropertyDescriptor property)
     {
     }
@@ -911,10 +937,10 @@ namespace Newtonsoft.Json.Linq
       OnAddingNew(args);
 
       if (args.NewObject == null)
-        throw new Exception("Could not determine new value to add to '{0}'.".FormatWith(CultureInfo.InvariantCulture, GetType()));
+        throw new JsonException("Could not determine new value to add to '{0}'.".FormatWith(CultureInfo.InvariantCulture, GetType()));
 
       if (!(args.NewObject is JToken))
-        throw new Exception("New item to be added to collection must be compatible with {0}.".FormatWith(CultureInfo.InvariantCulture, typeof (JToken)));
+        throw new JsonException("New item to be added to collection must be compatible with {0}.".FormatWith(CultureInfo.InvariantCulture, typeof(JToken)));
 
       JToken newItem = (JToken)args.NewObject;
       Add(newItem);

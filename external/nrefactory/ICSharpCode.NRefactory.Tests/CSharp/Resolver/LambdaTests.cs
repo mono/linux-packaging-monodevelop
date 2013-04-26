@@ -376,7 +376,7 @@ class TestClass {
 }";
 			var rr = Resolve<CSharpInvocationResolveResult>(program);
 			Assert.IsFalse(rr.IsError);
-			SpecializedMethod m = (SpecializedMethod)rr.Member;
+			var m = (IMethod)rr.Member;
 			Assert.AreEqual("System.Int32", m.TypeArguments[0].ReflectionName);
 			Assert.AreEqual("System.Converter`2[[``0],[System.Int32]]", m.Parameters[0].Type.ReflectionName);
 			
@@ -634,6 +634,39 @@ class TestClass {
 			var mrr = Resolve<CSharpInvocationResolveResult>(program);
 			Assert.IsFalse(mrr.IsError);
 			Assert.AreEqual("System.Int32", mrr.Type.ReflectionName);
+		}
+
+		[Test]
+		public void AsyncLambdaWithAwait()
+		{
+			string program = @"
+using System;
+using System.Threading.Tasks;
+
+class A
+{
+	public Task OpenAsync ()
+	{
+		return null;
+	}
+}
+
+class C
+{
+	async void Foo ()
+	{
+			await $Test (async () => { await new A().OpenAsync (); })$;
+	}
+	
+	T Test<T> (Func<T> func)
+	{
+		return default (T);
+	}
+}
+";
+			var mrr = Resolve<CSharpInvocationResolveResult>(program);
+			Assert.IsFalse(mrr.IsError);
+			Assert.AreEqual("System.Threading.Tasks.Task", mrr.Type.ReflectionName);
 		}
 	}
 }

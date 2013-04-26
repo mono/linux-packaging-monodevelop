@@ -4,9 +4,12 @@
 SHARED_SOURCE = \
 	./AudioToolbox/AudioBufferList.cs		\
 	./AudioToolbox/AudioBuffers.cs			\
+	./AudioToolbox/AudioClassDescription.cs		\
+	./AudioToolbox/AudioConverter.cs		\
 	./AudioToolbox/AudioFile.cs			\
-	./AudioToolbox/AudioFileGlobalInfo.cs   \
+	./AudioToolbox/AudioFileGlobalInfo.cs   	\
 	./AudioToolbox/AudioFileStream.cs		\
+	./AudioToolbox/AudioFormatAvailability.cs	\
 	./AudioToolbox/AudioQueue.cs			\
 	./AudioToolbox/AudioServices.cs			\
 	./AudioToolbox/AudioSession.cs			\
@@ -40,7 +43,7 @@ SHARED_SOURCE = \
 	./CoreAnimation/CADefs.cs			\
 	./CoreAnimation/CALayer.cs			\
 	./CoreAnimation/CATextLayer.cs			\
-	./CoreAnimation/CAMediaTimingFunction.cs			\
+	./CoreAnimation/CAMediaTimingFunction.cs	\
 	./CoreFoundation/CFArray.cs                     \
 	./CoreFoundation/CFBoolean.cs                   \
 	./CoreFoundation/CFDictionary.cs                \
@@ -115,12 +118,14 @@ SHARED_SOURCE = \
 	./Foundation/NSNotificationCenter.cs		\
 	./Foundation/NSNumber.cs			\
 	./Foundation/NSNumber2.cs			\
-	./Foundation/NSObject2.cs			\
 	./Foundation/NSOutputStream.cs			\
+	./Foundation/NSPropertyListSerialization.cs	\
 	./Foundation/NSRunLoop.cs			\
+	./Foundation/NSSearchPath.cs		\
 	./Foundation/NSSet.cs				\
 	./Foundation/NSStream.cs			\
 	./Foundation/NSString2.cs			\
+	./Foundation/NSThread.cs			\
 	./Foundation/NSTimer.cs				\
 	./Foundation/NSUrl.cs				\
 	./Foundation/NSUrlConnection.cs			\
@@ -156,6 +161,7 @@ SHARED_CORE_SOURCE = \
 	./CoreFoundation/CFUrl.cs                       \
 	./CoreFoundation/CFRunLoop.cs                   \
 	./CoreFoundation/Dispatch.cs                    \
+	./CoreFoundation/DispatchQueueSynchronizationContext.cs  \
 	./CoreFoundation/CFData.cs			\
 	./CoreFoundation/CFDataBuffer.cs		\
 	./CoreFoundation/CFIndex.cs			\
@@ -198,6 +204,7 @@ SHARED_CORE_SOURCE = \
 	./CoreVideo/CVPixelBufferPoolSettings.cs	\
 	./CoreVideo/CVPixelFormatDescription.cs		\
 	./CoreVideo/CVPixelBufferAttributes.cs	\
+	./Foundation/AdviceAttribute.cs			\
 	./Foundation/ConnectAttribute.cs		\
 	./Foundation/Enum.cs 				\
 	./Foundation/DictionaryContainer.cs		\
@@ -206,9 +213,11 @@ SHARED_CORE_SOURCE = \
 	./Foundation/NSAction.cs			\
 	./Foundation/NSDecimal.cs			\
 	./Foundation/NSRange.cs				\
+	./Foundation/NSObject2.cs			\
 	./Foundation/NSString.cs			\
 	./Foundation/RegisterAttribute.cs		\
 	./Foundation/PreserveAttribute.cs		\
+	./Foundation/LinkerSafeAttribute.cs		\
         ./ObjCRuntime/AdoptsAttribute.cs               	\
         ./ObjCRuntime/ArgumentSemantic.cs               \
         ./ObjCRuntime/AlphaAttribute.cs                 \
@@ -217,6 +226,7 @@ SHARED_CORE_SOURCE = \
         ./ObjCRuntime/INativeObject.cs                  \
 	./ObjCRuntime/LionAttribute.cs			\
         ./ObjCRuntime/SinceAttribute.cs                 \
+        ./ObjCRuntime/ThreadSafeAttribute.cs                 \
         ./ObjCRuntime/TypeConverter.cs                  \
 	./MonoNativeFunctionWrapperAttribute.cs			\
 	./MonoPInvokeCallbackAttribute.cs

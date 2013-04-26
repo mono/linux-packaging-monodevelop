@@ -42,7 +42,7 @@ namespace Newtonsoft.Json.Serialization
       else if (context is JsonSerializerProxy)
         internalSerializer = ((JsonSerializerProxy) context).GetInternalSerializer();
       else
-        throw new Exception("The DefaultReferenceResolver can only be used internally.");
+        throw new JsonException("The DefaultReferenceResolver can only be used internally.");
 
       return internalSerializer.DefaultReferenceMappings;
     }
@@ -63,7 +63,7 @@ namespace Newtonsoft.Json.Serialization
       {
         _referenceCount++;
         reference = _referenceCount.ToString(CultureInfo.InvariantCulture);
-        mappings.Add(reference, value);
+        mappings.Set(reference, value);
       }
 
       return reference;
@@ -71,7 +71,7 @@ namespace Newtonsoft.Json.Serialization
 
     public void AddReference(object context, string reference, object value)
     {
-      GetMappings(context).Add(reference, value);
+      GetMappings(context).Set(reference, value);
     }
 
     public bool IsReferenced(object context, object value)

@@ -36,7 +36,7 @@ namespace Newtonsoft.Json.Linq
   public class JConstructor : JContainer
   {
     private string _name;
-    private readonly IList<JToken> _values = new List<JToken>();
+    private readonly List<JToken> _values = new List<JToken>();
 
     /// <summary>
     /// Gets the container's children tokens.
@@ -184,11 +184,16 @@ namespace Newtonsoft.Json.Linq
       if (reader.TokenType == JsonToken.None)
       {
         if (!reader.Read())
-          throw new Exception("Error reading JConstructor from JsonReader.");
+          throw JsonReaderException.Create(reader, "Error reading JConstructor from JsonReader.");
+      }
+
+      while (reader.TokenType == JsonToken.Comment)
+      {
+        reader.Read();
       }
 
       if (reader.TokenType != JsonToken.StartConstructor)
-        throw new Exception("Error reading JConstructor from JsonReader. Current JsonReader item is not a constructor: {0}".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
+        throw JsonReaderException.Create(reader, "Error reading JConstructor from JsonReader. Current JsonReader item is not a constructor: {0}".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
 
       JConstructor c = new JConstructor((string)reader.Value);
       c.SetLineInfo(reader as IJsonLineInfo);

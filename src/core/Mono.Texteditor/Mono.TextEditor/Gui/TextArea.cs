@@ -387,6 +387,7 @@ namespace Mono.TextEditor
 					Options.Zoom += Options.Zoom * (args.Magnification / 4d);
 				});
 			}
+			OptionsChanged (this, EventArgs.Empty);
 		}
 
 		public void RunAction (Action<TextEditorData> action)
@@ -624,10 +625,12 @@ namespace Mono.TextEditor
 			imContext.FocusOut ();
 			RemoveFocusOutTimerId ();
 
-			if (tipWindow != null && currentTooltipProvider != null && currentTooltipProvider.IsInteractive (textEditorData.Parent, tipWindow))
-				DelayedHideTooltip ();
-			else
+			if (tipWindow != null && currentTooltipProvider != null) {
+				if (!currentTooltipProvider.IsInteractive (textEditorData.Parent, tipWindow))
+					DelayedHideTooltip ();
+			} else {
 				HideTooltip ();
+			}
 
 			TextViewMargin.StopCaretThread ();
 			Document.CommitLineUpdate (Caret.Line);
@@ -656,7 +659,6 @@ namespace Mono.TextEditor
 			Style = Style.Attach (GdkWindow);
 
 			imContext.ClientWindow = this.GdkWindow;
-			OptionsChanged (this, EventArgs.Empty);
 			Caret.PositionChanged += CaretPositionChanged;
 		}	
 
@@ -713,7 +715,7 @@ namespace Mono.TextEditor
 			if (this.textEditorData.ColorStyle != null && GdkWindow != null) {
 				settingWidgetBg = true; //prevent infinite recusion
 				
-				this.ModifyBg (StateType.Normal, this.textEditorData.ColorStyle.Default.BackgroundColor);
+				this.ModifyBg (StateType.Normal, (HslColor)this.textEditorData.ColorStyle.PlainText.Background);
 				settingWidgetBg = false;
 			}
 		}
@@ -723,7 +725,7 @@ namespace Mono.TextEditor
 		{
 			base.OnStyleSet (previous_style);
 			if (!settingWidgetBg && textEditorData.ColorStyle != null) {
-				textEditorData.ColorStyle.UpdateFromGtkStyle (this.Style);
+//				textEditorData.ColorStyle.UpdateFromGtkStyle (this.Style);
 				SetWidgetBgFromStyle ();
 			}
 		}
@@ -771,36 +773,32 @@ namespace Mono.TextEditor
 				if (margin is IDisposable)
 					((IDisposable)margin).Dispose ();
 			}
-			ClearTooltipProviders ();
+			textEditorData.ClearTooltipProviders ();
 			
 			this.textEditorData.SelectionChanged -= TextEditorDataSelectionChanged;
 			this.textEditorData.Dispose (); 
-			this.Realized -= OptionsChanged;
-			
+
 			base.OnDestroyed ();
 		}
 		
+		[Obsolete("This method has been moved to TextEditorData. Will be removed in future versions.")]
 		public void ClearTooltipProviders ()
 		{
-			foreach (var tp in tooltipProviders) {
-				var disposableProvider = tp as IDisposable;
-				if (disposableProvider == null)
-					continue;
-				disposableProvider.Dispose ();
-			}
-			tooltipProviders.Clear ();
+			textEditorData.ClearTooltipProviders ();
 		}
-
+		
+		[Obsolete("This method has been moved to TextEditorData. Will be removed in future versions.")]
 		public void AddTooltipProvider (TooltipProvider provider)
 		{
-			tooltipProviders.Add (provider);
+			textEditorData.AddTooltipProvider (provider);
 		}
 		
+		[Obsolete("This method has been moved to TextEditorData. Will be removed in future versions.")]
 		public void RemoveTooltipProvider (TooltipProvider provider)
 		{
-			tooltipProviders.Remove (provider);
+			textEditorData.RemoveTooltipProvider (provider);
 		}
-		
+
 		internal void RedrawMargin (Margin margin)
 		{
 			if (isDisposed)
@@ -1350,10 +1348,12 @@ namespace Mono.TextEditor
 		protected override bool OnLeaveNotifyEvent (Gdk.EventCrossing e)
 		{
 			isMouseTrapped = false;
-			if (tipWindow != null && currentTooltipProvider.IsInteractive (textEditorData.Parent, tipWindow))
-				DelayedHideTooltip ();
-			else
+			if (tipWindow != null && currentTooltipProvider != null) {
+				if (!currentTooltipProvider.IsInteractive (textEditorData.Parent, tipWindow))
+					DelayedHideTooltip ();
+			} else {
 				HideTooltip ();
+			}
 			textViewMargin.HideCodeSegmentPreviewWindow ();
 			
 			if (GdkWindow != null)
@@ -2266,7 +2266,7 @@ namespace Mono.TextEditor
 				                                                    System.Math.Min (editor.TextViewMargin.charWidth / 2, width), 
 				                                                    width,
 				                                                    editor.LineHeight + 2 * extend * editor.Options.Zoom);
-				Cairo.Color color = editor.ColorStyle.Default.CairoColor;
+				Cairo.Color color = editor.ColorStyle.PlainText.Foreground;
 				color.A = 0.8;
 				cr.LineWidth = editor.Options.Zoom;
 				cr.Color = color;
@@ -2330,7 +2330,7 @@ namespace Mono.TextEditor
 				                                                    System.Math.Min (editor.TextViewMargin.charWidth / 2, width), 
 				                                                    width,
 				                                                    (int)(region.Height + 2 * animationPosition * editor.Options.Zoom));
-				Cairo.Color color = editor.ColorStyle.Default.CairoColor;
+				Cairo.Color color = editor.ColorStyle.PlainText.Foreground;
 				color.A = 0.8;
 				cr.LineWidth = editor.Options.Zoom;
 				cr.Color = color;
@@ -2525,7 +2525,7 @@ namespace Mono.TextEditor
 				//draw the shadow
 				FoldingScreenbackgroundRenderer.DrawRoundRectangle (cr, true, true,
 					shadowOffset, shadowOffset, corner, width, height);
-				var color = TextViewMargin.DimColor (Editor.ColorStyle.SearchTextMainBg, 0.3);
+				var color = TextViewMargin.DimColor (Editor.ColorStyle.SearchResultMain.GetColor ("color"), 0.3);
 				color.A = 0.5 * opacity * opacity;
 				cr.Color = color;
 				cr.Fill ();
@@ -2534,13 +2534,13 @@ namespace Mono.TextEditor
 				FoldingScreenbackgroundRenderer.DrawRoundRectangle (cr, true, true, 0, 0, corner, width, height);
 				using (var gradient = new Cairo.LinearGradient (0, 0, 0, height)) {
 					color = ColorLerp (
-						TextViewMargin.DimColor (Editor.ColorStyle.SearchTextMainBg, 1.1),
-						Editor.ColorStyle.SearchTextMainBg,
+						TextViewMargin.DimColor (Editor.ColorStyle.SearchResultMain.GetColor ("color"), 1.1),
+						Editor.ColorStyle.SearchResultMain.GetColor ("color"),
 						1 - opacity);
 					gradient.AddColorStop (0, color);
 					color = ColorLerp (
-						TextViewMargin.DimColor (Editor.ColorStyle.SearchTextMainBg, 0.9),
-						Editor.ColorStyle.SearchTextMainBg,
+						TextViewMargin.DimColor (Editor.ColorStyle.SearchResultMain.GetColor ("color"), 0.9),
+						Editor.ColorStyle.SearchResultMain.GetColor ("color"),
 						1 - opacity);
 					gradient.AddColorStop (1, color);
 					cr.Pattern = gradient;
@@ -2589,7 +2589,11 @@ namespace Mono.TextEditor
 		#endregion
 	
 		#region Tooltips
-		
+		[Obsolete("This property has been moved to TextEditorData.  Will be removed in future versions.")]
+		public IEnumerable<TooltipProvider> TooltipProviders {
+			get { return textEditorData.TooltipProviders; }
+		}
+
 		// Tooltip fields
 		const int TooltipTimeout = 650;
 		TooltipItem tipItem;
@@ -2598,20 +2602,14 @@ namespace Mono.TextEditor
 		uint tipHideTimeoutId = 0;
 		uint tipShowTimeoutId = 0;
 		static Gtk.Window tipWindow;
-		internal List<TooltipProvider> tooltipProviders = new List<TooltipProvider> ();
-		TooltipProvider currentTooltipProvider;
-		
+		static TooltipProvider currentTooltipProvider;
+
 		// Data for the next tooltip to be shown
 		int nextTipOffset = 0;
 		int nextTipX=0; int nextTipY=0;
 		Gdk.ModifierType nextTipModifierState = ModifierType.None;
 		DateTime nextTipScheduledTime; // Time at which we want the tooltip to show
 		
-		public IEnumerable<TooltipProvider> TooltipProviders {
-			get { return tooltipProviders; }
-		}
-		
-
 		void ShowTooltip (Gdk.ModifierType modifierState)
 		{
 			if (mx < TextViewMargin.XOffset + TextViewMargin.TextStartPosition) {
@@ -2681,7 +2679,7 @@ namespace Mono.TextEditor
 			TooltipProvider provider = null;
 			TooltipItem item = null;
 			
-			foreach (TooltipProvider tp in tooltipProviders) {
+			foreach (TooltipProvider tp in textEditorData.tooltipProviders) {
 				try {
 					item = tp.GetItem (editor, nextTipOffset);
 				} catch (Exception e) {

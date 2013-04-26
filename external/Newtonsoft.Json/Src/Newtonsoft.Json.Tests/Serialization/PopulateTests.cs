@@ -30,9 +30,9 @@ using Newtonsoft.Json.Tests.TestObjects;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 
 namespace Newtonsoft.Json.Tests.Serialization
@@ -48,6 +48,22 @@ namespace Newtonsoft.Json.Tests.Serialization
       JsonConvert.PopulateObject(@"{""Name"":""James""}", p);
 
       Assert.AreEqual("James", p.Name);
+    }
+
+    [Test]
+    public void PopulateArray()
+    {
+      IList<Person> people = new List<Person>
+        {
+          new Person { Name = "Initial" }
+        };
+
+      JsonConvert.PopulateObject(@"[{""Name"":""James""}, null]", people);
+
+      Assert.AreEqual(3, people.Count);
+      Assert.AreEqual("Initial", people[0].Name);
+      Assert.AreEqual("James", people[1].Name);
+      Assert.AreEqual(null, people[2]);
     }
 
     [Test]
@@ -140,7 +156,7 @@ namespace Newtonsoft.Json.Tests.Serialization
     [Test]
     public void PopulateWithBadJson()
     {
-      ExceptionAssert.Throws<JsonSerializationException>("Unexpected initial token 'Integer' when populating object. Expected JSON object or array. Line 1, position 1.",
+      ExceptionAssert.Throws<JsonSerializationException>("Unexpected initial token 'Integer' when populating object. Expected JSON object or array. Path '', line 1, position 1.",
         () =>
         {
           JsonConvert.PopulateObject("1", new Person());

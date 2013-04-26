@@ -1,3 +1,28 @@
+#region License
+// Copyright (c) 2007 James Newton-King
+//
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+#endregion
+
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -6,9 +31,9 @@ using Newtonsoft.Json.Tests.TestObjects;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 using Newtonsoft.Json.Linq;
 using System.IO;
@@ -27,6 +52,17 @@ namespace Newtonsoft.Json.Tests.Linq
   [TestFixture]
   public class JObjectTests : TestFixtureBase
   {
+    [Test]
+    public void WritePropertyWithNoValue()
+    {
+      var o = new JObject();
+      o.Add(new JProperty("novalue"));
+
+      Assert.AreEqual(@"{
+  ""novalue"": null
+}", o.ToString());
+    }
+
     [Test]
     public void Keys()
     {
@@ -113,16 +149,16 @@ namespace Newtonsoft.Json.Tests.Linq
     }
 
     [Test]
-    [ExpectedException(typeof(ArgumentException)
-#if !NETFX_CORE
-      , ExpectedMessage = "Can not add property PropertyNameValue to Newtonsoft.Json.Linq.JObject. Property with the same name already exists on object."
-#endif
-      )]
     public void DuplicatePropertyNameShouldThrow()
     {
-      JObject o = new JObject();
-      o.Add("PropertyNameValue", null);
-      o.Add("PropertyNameValue", null);
+      ExceptionAssert.Throws<ArgumentException>(
+        "Can not add property PropertyNameValue to Newtonsoft.Json.Linq.JObject. Property with the same name already exists on object.",
+        () =>
+        {
+          JObject o = new JObject();
+          o.Add("PropertyNameValue", null);
+          o.Add("PropertyNameValue", null);
+        });
     }
 
     [Test]
@@ -227,57 +263,57 @@ namespace Newtonsoft.Json.Tests.Linq
     }
 
     [Test]
-    [ExpectedException(typeof(ArgumentNullException)
-#if !NETFX_CORE
-      , ExpectedMessage = @"Value cannot be null.
-Parameter name: array"
-#endif
-      )]
     public void GenericCollectionCopyToNullArrayShouldThrow()
     {
-      JObject o = new JObject();
-      ((ICollection<KeyValuePair<string, JToken>>)o).CopyTo(null, 0);
+      ExceptionAssert.Throws<ArgumentException>(
+        @"Value cannot be null.
+Parameter name: array",
+        () =>
+        {
+          JObject o = new JObject();
+          ((ICollection<KeyValuePair<string, JToken>>)o).CopyTo(null, 0);
+        });
     }
 
     [Test]
-    [ExpectedException(typeof(ArgumentOutOfRangeException)
-#if !NETFX_CORE
-      , ExpectedMessage = @"arrayIndex is less than 0.
-Parameter name: arrayIndex"
-#endif
-      )]
     public void GenericCollectionCopyToNegativeArrayIndexShouldThrow()
     {
-      JObject o = new JObject();
-      ((ICollection<KeyValuePair<string, JToken>>)o).CopyTo(new KeyValuePair<string, JToken>[1], -1);
+      ExceptionAssert.Throws<ArgumentOutOfRangeException>(
+        @"arrayIndex is less than 0.
+Parameter name: arrayIndex",
+        () =>
+        {
+          JObject o = new JObject();
+          ((ICollection<KeyValuePair<string, JToken>>)o).CopyTo(new KeyValuePair<string, JToken>[1], -1);
+        });
     }
 
     [Test]
-    [ExpectedException(typeof(ArgumentException)
-#if !NETFX_CORE
-      , ExpectedMessage = @"arrayIndex is equal to or greater than the length of array."
-#endif
-      )]
     public void GenericCollectionCopyToArrayIndexEqualGreaterToArrayLengthShouldThrow()
     {
-      JObject o = new JObject();
-      ((ICollection<KeyValuePair<string, JToken>>)o).CopyTo(new KeyValuePair<string, JToken>[1], 1);
+      ExceptionAssert.Throws<ArgumentException>(
+        @"arrayIndex is equal to or greater than the length of array.",
+        () =>
+        {
+          JObject o = new JObject();
+          ((ICollection<KeyValuePair<string, JToken>>)o).CopyTo(new KeyValuePair<string, JToken>[1], 1);
+        });
     }
 
     [Test]
-    [ExpectedException(typeof(ArgumentException)
-#if !NETFX_CORE
-      , ExpectedMessage = @"The number of elements in the source JObject is greater than the available space from arrayIndex to the end of the destination array."
-#endif
-      )]
     public void GenericCollectionCopyToInsufficientArrayCapacity()
     {
-      JObject o = new JObject();
-      o.Add("PropertyNameValue", new JValue(1));
-      o.Add("PropertyNameValue2", new JValue(2));
-      o.Add("PropertyNameValue3", new JValue(3));
+      ExceptionAssert.Throws<ArgumentException>(
+        @"The number of elements in the source JObject is greater than the available space from arrayIndex to the end of the destination array.",
+        () =>
+        {
+          JObject o = new JObject();
+          o.Add("PropertyNameValue", new JValue(1));
+          o.Add("PropertyNameValue2", new JValue(2));
+          o.Add("PropertyNameValue3", new JValue(3));
 
-      ((ICollection<KeyValuePair<string, JToken>>)o).CopyTo(new KeyValuePair<string, JToken>[3], 1);
+          ((ICollection<KeyValuePair<string, JToken>>)o).CopyTo(new KeyValuePair<string, JToken>[3], 1);
+        });
     }
 
     [Test]
@@ -363,7 +399,7 @@ Parameter name: arrayIndex"
     [Test]
     public void Parse_ShouldThrowOnUnexpectedToken()
     {
-      ExceptionAssert.Throws<Exception>("Error reading JObject from JsonReader. Current JsonReader item is not an object: StartArray",
+      ExceptionAssert.Throws<JsonReaderException>("Error reading JObject from JsonReader. Current JsonReader item is not an object: StartArray. Path '', line 1, position 1.",
         () =>
         {
           string json = @"[""prop""]";
@@ -400,15 +436,13 @@ Parameter name: arrayIndex"
     public void Blog()
     {
       ExceptionAssert.Throws<JsonReaderException>(
-        "Invalid property identifier character: ]. Line 3, position 5.",
+        "Invalid property identifier character: ]. Path 'name', line 3, position 5.",
         () =>
         {
-          JObject person = JObject.Parse(@"{
+          JObject.Parse(@"{
     ""name"": ""James"",
     ]!#$THIS IS: BAD JSON![{}}}}]
   }");
-
-          // Invalid property identifier character: ]. Line 3, position 9.
         });
     }
 
@@ -648,7 +682,7 @@ Parameter name: arrayIndex"
       Assert.AreEqual(p4, l[1]);
     }
 
-#if !PocketPC && !SILVERLIGHT && !NET20 && !NETFX_CORE
+#if !(SILVERLIGHT || NET20 || NETFX_CORE || PORTABLE)
     [Test]
     public void PropertyChanging()
     {
@@ -1205,7 +1239,7 @@ Parameter name: arrayIndex"
       });
     }
 
-#if !SILVERLIGHT && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     [Test]
     public void IBindingListSortDirection()
     {
@@ -1271,19 +1305,27 @@ Parameter name: arrayIndex"
     }
 
     [Test]
-    [ExpectedException(typeof(NotSupportedException))]
     public void IBindingListApplySort()
     {
-      IBindingList l = new JObject();
-      l.ApplySort(null, ListSortDirection.Ascending);
+      ExceptionAssert.Throws<NotSupportedException>(
+        "Specified method is not supported.",
+        () =>
+        {
+          IBindingList l = new JObject();
+          l.ApplySort(null, ListSortDirection.Ascending);
+        });
     }
 
     [Test]
-    [ExpectedException(typeof(NotSupportedException))]
     public void IBindingListRemoveSort()
     {
-      IBindingList l = new JObject();
-      l.RemoveSort();
+      ExceptionAssert.Throws<NotSupportedException>(
+        "Specified method is not supported.",
+        () =>
+        {
+          IBindingList l = new JObject();
+          l.RemoveSort();
+        });
     }
 
     [Test]
@@ -1295,11 +1337,15 @@ Parameter name: arrayIndex"
     }
 
     [Test]
-    [ExpectedException(typeof(NotSupportedException))]
     public void IBindingListFind()
     {
-      IBindingList l = new JObject();
-      l.Find(null, null);
+      ExceptionAssert.Throws<NotSupportedException>(
+        "Specified method is not supported.",
+        () =>
+        {
+          IBindingList l = new JObject();
+          l.Find(null, null);
+        });
     }
 
     [Test]
@@ -1310,18 +1356,22 @@ Parameter name: arrayIndex"
     }
 
     [Test]
-    [ExpectedException(typeof(Exception), ExpectedMessage = "Could not determine new value to add to 'Newtonsoft.Json.Linq.JObject'.")]
     public void IBindingListAddNew()
     {
-      IBindingList l = new JObject();
-      l.AddNew();
+      ExceptionAssert.Throws<JsonException>(
+        "Could not determine new value to add to 'Newtonsoft.Json.Linq.JObject'.",
+        () =>
+        {
+          IBindingList l = new JObject();
+          l.AddNew();
+        });
     }
 
     [Test]
     public void IBindingListAddNewWithEvent()
     {
       JObject o = new JObject();
-      o.AddingNew += (s, e) => e.NewObject = new JProperty("Property!");
+      o._addingNew += (s, e) => e.NewObject = new JProperty("Property!");
 
       IBindingList l = o;
       object newObject = l.AddNew();
@@ -1391,7 +1441,7 @@ Parameter name: arrayIndex"
       Assert.AreEqual(2, (int)o["Test1"]);
     }
 #endif
-#if SILVERLIGHT || !(NET20 || NET35)
+#if SILVERLIGHT || !(NET20 || NET35 || PORTABLE)
     [Test]
     public void CollectionChanged()
     {
@@ -1402,7 +1452,7 @@ Parameter name: arrayIndex"
       NotifyCollectionChangedAction? changedType = null;
       int? index = null;
 
-      o.CollectionChanged += (s, a) =>
+      o._collectionChanged += (s, a) =>
       {
         changedType = a.Action;
         index = a.NewStartingIndex;
@@ -1521,7 +1571,7 @@ Parameter name: arrayIndex"
       Assert.AreEqual("Name2", value);
     }
 
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
     [Test]
     public void WriteObjectNullDBNullValue()
     {
@@ -1580,7 +1630,7 @@ Parameter name: arrayIndex"
     [Test]
     public void NumberTooBigForInt64()
     {
-      ExceptionAssert.Throws<JsonReaderException>("JSON integer 307953220000517141511 is too large or small for an Int64.",
+      ExceptionAssert.Throws<JsonReaderException>("JSON integer 307953220000517141511 is too large or small for an Int64. Path 'code', line 1, position 30.",
         () =>
         {
           string json = @"{""code"": 307953220000517141511}";
@@ -1592,7 +1642,7 @@ Parameter name: arrayIndex"
     [Test]
     public void ParseIncomplete()
     {
-      ExceptionAssert.Throws<Exception>("Unexpected end of content while loading JObject.",
+      ExceptionAssert.Throws<Exception>("Unexpected end of content while loading JObject. Path 'foo', line 1, position 6.",
         () =>
         {
           JObject.Parse("{ foo:");
@@ -1631,7 +1681,7 @@ Parameter name: arrayIndex"
     [Test]
     public void LoadFromNestedObjectIncomplete()
     {
-      ExceptionAssert.Throws<Exception>("Unexpected end of content while loading JObject.",
+      ExceptionAssert.Throws<JsonReaderException>("Unexpected end of content while loading JObject. Path 'short.error.code', line 6, position 15.",
       () =>
       {
         string jsonText = @"{
@@ -1652,7 +1702,7 @@ Parameter name: arrayIndex"
       });
     }
 
-#if !SILVERLIGHT && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     [Test]
     public void GetProperties()
     {
@@ -1729,7 +1779,7 @@ Parameter name: arrayIndex"
     [Test]
     public void ParseAdditionalContent()
     {
-      ExceptionAssert.Throws<JsonReaderException>("Additional text encountered after finished reading JSON content: ,. Line 10, position 2.",
+      ExceptionAssert.Throws<JsonReaderException>("Additional text encountered after finished reading JSON content: ,. Path '', line 10, position 2.",
       () =>
       {
         string json = @"{
@@ -1745,6 +1795,140 @@ Parameter name: arrayIndex"
 
         JObject o = JObject.Parse(json);
       });
+    }
+
+    [Test]
+    public void DeepEqualsIgnoreOrder()
+    {
+      JObject o1 = new JObject(
+        new JProperty("null", null),
+        new JProperty("integer", 1),
+        new JProperty("string", "string!"),
+        new JProperty("decimal", 0.5m),
+        new JProperty("array", new JArray(1, 2)));
+
+      Assert.IsTrue(o1.DeepEquals(o1));
+
+      JObject o2 = new JObject(
+        new JProperty("null", null),
+        new JProperty("string", "string!"),
+        new JProperty("decimal", 0.5m),
+        new JProperty("integer", 1),
+        new JProperty("array", new JArray(1, 2)));
+
+      Assert.IsTrue(o1.DeepEquals(o2));
+
+      JObject o3 = new JObject(
+        new JProperty("null", null),
+        new JProperty("string", "string!"),
+        new JProperty("decimal", 0.5m),
+        new JProperty("integer", 2),
+        new JProperty("array", new JArray(1, 2)));
+
+      Assert.IsFalse(o1.DeepEquals(o3));
+
+      JObject o4 = new JObject(
+        new JProperty("null", null),
+        new JProperty("string", "string!"),
+        new JProperty("decimal", 0.5m),
+        new JProperty("integer", 1),
+        new JProperty("array", new JArray(2, 1)));
+
+      Assert.IsFalse(o1.DeepEquals(o4));
+
+      JObject o5 = new JObject(
+        new JProperty("null", null),
+        new JProperty("string", "string!"),
+        new JProperty("decimal", 0.5m),
+        new JProperty("integer", 1));
+
+      Assert.IsFalse(o1.DeepEquals(o5));
+
+      Assert.IsFalse(o1.DeepEquals(null));
+    }
+
+    [Test]
+    public void ToListOnEmptyObject()
+    {
+      JObject o = JObject.Parse(@"{}");
+      IList<JToken> l1 = o.ToList<JToken>();
+      Assert.AreEqual(0, l1.Count);
+
+      IList<KeyValuePair<string, JToken>> l2 = o.ToList<KeyValuePair<string, JToken>>();
+      Assert.AreEqual(0, l2.Count);
+
+      o = JObject.Parse(@"{'hi':null}");
+      
+      l1 = o.ToList<JToken>();
+      Assert.AreEqual(1, l1.Count);
+
+      l2 = o.ToList<KeyValuePair<string, JToken>>();
+      Assert.AreEqual(1, l2.Count);
+    }
+
+    [Test]
+    public void EmptyObjectDeepEquals()
+    {
+      Assert.IsTrue(JToken.DeepEquals(new JObject(), new JObject()));
+
+      JObject a = new JObject();
+      JObject b = new JObject();
+
+      b.Add("hi", "bye");
+      b.Remove("hi");
+
+      Assert.IsTrue(JToken.DeepEquals(a, b));
+      Assert.IsTrue(JToken.DeepEquals(b, a));
+    }
+
+    [Test]
+    public void GetValueBlogExample()
+    {
+      JObject o = JObject.Parse(@"{
+        'name': 'Lower',
+        'NAME': 'Upper'
+      }");
+
+      string exactMatch = (string)o.GetValue("NAME", StringComparison.OrdinalIgnoreCase);
+      // Upper
+
+      string ignoreCase = (string)o.GetValue("Name", StringComparison.OrdinalIgnoreCase);
+      // Lower
+
+      Assert.AreEqual("Upper", exactMatch);
+      Assert.AreEqual("Lower", ignoreCase);
+    }
+
+    [Test]
+    public void GetValue()
+    {
+      JObject a = new JObject();
+      a["Name"] = "Name!";
+      a["name"] = "name!";
+      a["title"] = "Title!";
+
+      Assert.AreEqual(null, a.GetValue("NAME", StringComparison.Ordinal));
+      Assert.AreEqual(null, a.GetValue("NAME"));
+      Assert.AreEqual(null, a.GetValue("TITLE"));
+      Assert.AreEqual("Name!", (string)a.GetValue("NAME", StringComparison.OrdinalIgnoreCase));
+      Assert.AreEqual("name!", (string)a.GetValue("name", StringComparison.Ordinal));
+      Assert.AreEqual(null, a.GetValue(null, StringComparison.Ordinal));
+      Assert.AreEqual(null, a.GetValue(null));
+
+      JToken v;
+      Assert.IsFalse(a.TryGetValue("NAME", StringComparison.Ordinal, out v));
+      Assert.AreEqual(null, v);
+
+      Assert.IsFalse(a.TryGetValue("NAME", out v));
+      Assert.IsFalse(a.TryGetValue("TITLE", out v));
+
+      Assert.IsTrue(a.TryGetValue("NAME", StringComparison.OrdinalIgnoreCase, out v));
+      Assert.AreEqual("Name!", (string)v);
+
+      Assert.IsTrue(a.TryGetValue("name", StringComparison.Ordinal, out v));
+      Assert.AreEqual("name!", (string)v);
+
+      Assert.IsFalse(a.TryGetValue(null, StringComparison.Ordinal, out v));
     }
   }
 }

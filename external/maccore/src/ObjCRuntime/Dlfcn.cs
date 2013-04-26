@@ -31,6 +31,7 @@
 using System;
 using System.Runtime.InteropServices;
 using MonoMac.Foundation;
+using MonoMac.CoreFoundation;
 using System.Drawing;
 
 namespace MonoMac.ObjCRuntime {
@@ -115,6 +116,38 @@ namespace MonoMac.ObjCRuntime {
 				return;
 			Marshal.WriteInt64 (indirect, value);
 		}
+
+		public static void SetString (IntPtr handle, string symbol, string value)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return;
+			Marshal.WriteIntPtr (indirect, value == null ? IntPtr.Zero : NSString.CreateNative (value));
+		}
+#if !(GENERATOR || COREBUILD)
+
+		public static void SetString (IntPtr handle, string symbol, NSString value)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return;
+			var strHandle = value == null ? IntPtr.Zero : value.Handle;
+			if (strHandle != IntPtr.Zero)
+				CFObject.CFRetain (strHandle);
+			Marshal.WriteIntPtr (indirect, strHandle);
+		}
+
+		public static void SetArray (IntPtr handle, string symbol, NSArray array)
+		{
+			var indirect = dlsym (handle, symbol);
+			if (indirect == IntPtr.Zero)
+				return;
+			var arrayHandle = array == null ? IntPtr.Zero : array.Handle;
+			if (arrayHandle != IntPtr.Zero)
+				CFObject.CFRetain (arrayHandle);
+			Marshal.WriteIntPtr (indirect, arrayHandle);
+		}
+#endif
 
 		public static IntPtr GetIntPtr (IntPtr handle, string symbol)
 		{

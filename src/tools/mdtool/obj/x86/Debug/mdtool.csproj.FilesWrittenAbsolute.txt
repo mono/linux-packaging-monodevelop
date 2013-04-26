@@ -1,0 +1,5 @@
+/tmp/monodevelop/main/build/bin/mdtool.exe.config
+/tmp/monodevelop/main/build/bin/mdtool.exe.mdb
+/tmp/monodevelop/main/build/bin/mdtool.exe
+/tmp/monodevelop/main/src/tools/mdtool/obj/x86/Debug/mdtool.exe
+/tmp/monodevelop/main/src/tools/mdtool/obj/x86/Debug/mdtool.exe.mdb

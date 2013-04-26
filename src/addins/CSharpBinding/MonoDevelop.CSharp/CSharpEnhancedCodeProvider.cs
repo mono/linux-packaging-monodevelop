@@ -34,9 +34,10 @@ using System.IO;
 using System.CodeDom;
 using System.CodeDom.Compiler;
 using Microsoft.CSharp;
-using ICSharpCode.OldNRefactory;
-using ICSharpCode.OldNRefactory.Parser;
-using ICSharpCode.OldNRefactory.Visitors;
+using ICSharpCode.NRefactory.CSharp;
+using Mono.Cecil;
+using MonoDevelop.Ide.TypeSystem;
+using ICSharpCode.NRefactory.TypeSystem;
 
 namespace MonoDevelop.CSharp
 {
@@ -58,61 +59,32 @@ namespace MonoDevelop.CSharp
 			return ParseInternal (codeStream);
 		}
 		
+		static readonly Lazy<IUnresolvedAssembly> mscorlib = new Lazy<IUnresolvedAssembly>(
+			delegate {
+			return new CecilLoader().LoadAssemblyFile(typeof(object).Assembly.Location);
+		});
+		
+		static readonly Lazy<IUnresolvedAssembly> systemCore = new Lazy<IUnresolvedAssembly>(
+			delegate {
+			return new CecilLoader().LoadAssemblyFile(typeof(System.Linq.Enumerable).Assembly.Location);
+		});
+
+		static readonly Lazy<ICompilation> Compilation = new Lazy<ICompilation>(
+			delegate {
+				var project = new CSharpProjectContent().AddAssemblyReferences (new [] { mscorlib.Value, systemCore.Value });
+				return project.CreateCompilation();
+		});
+
 		static CodeCompileUnit ParseInternal (TextReader codeStream)
 		{
-			IParser parser = ParserFactory.CreateParser (
-				SupportedLanguage.CSharp,
-				codeStream);
-			parser.ParseMethodBodies = true;
-			parser.Parse ();
-			
-			if (parser.Errors.Count > 0)
-				throw new ArgumentException (parser.Errors.ErrorOutput);
-			
-			var cdv = new CodeDomVisitor (); // new CodeDomVisitor (parser.Lexer.SpecialTracker.CurrentSpecials);
-			parser.CompilationUnit.AcceptVisitor (cdv, null);
-			
-			parser.Dispose ();
-			
-			CodeCompileUnit ccu = cdv.codeCompileUnit;
-			
-			//C# parser seems to insist on putting imports in the "Global" namespace; fix it up
-			for (int i = 0; i < ccu.Namespaces.Count; i++) {
-				CodeNamespace global = ccu.Namespaces [i];
-				if ((global.Name == "Global") && (global.Types.Count == 0)) {
-					global.Name = "";
-					ccu.Namespaces.RemoveAt (i);
-					ccu.Namespaces.Insert (0, global);
-					
-					//clear out repeat imports...
-					for (int j = 1; j < ccu.Namespaces.Count; j++) {
-						CodeNamespace cn = ccu.Namespaces [j];
-						
-						//why can't we remove imports? will have to collect ones to keep
-						//then clear and refill
-						CodeNamespaceImportCollection imps = new CodeNamespaceImportCollection ();
-						
-						for (int m = 0; m < cn.Imports.Count; m++) {
-							bool found = false;
-							
-							for (int n = 0; n < global.Imports.Count; n++)
-								if (global.Imports [n] == cn.Imports [m])
-									found = true;
-						
-							if (!found)
-								imps.Add (cn.Imports [m]);
-						}
-						
-						cn.Imports.Clear ();
-						
-						foreach (CodeNamespaceImport imp in imps)
-							cn.Imports.Add (imp);
-					}
-					
-					break;
-				}
-			}
-			return ccu;
+			var cs = codeStream.ReadToEnd ();
+			var tree = SyntaxTree.Parse (cs, "a.cs");
+			if (tree.Errors.Count > 0)
+				throw new ArgumentException ("Stream contained errors.");
+
+			var convertVisitor = new CodeDomConvertVisitor ();
+		
+			return convertVisitor.Convert (Compilation.Value, tree, tree.ToTypeSystem ());
 		}
 		
 		private class CodeParser : ICodeParser

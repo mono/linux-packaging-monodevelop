@@ -32,7 +32,7 @@ using System.Reflection;
 using Newtonsoft.Json.Utilities.LinqBridge;
 #endif
 
-#if !(SILVERLIGHT || NETFX_CORE)
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
 using System.Data.SqlTypes;
 #endif
 #if NETFX_CORE
@@ -41,6 +41,7 @@ using IConvertible = Newtonsoft.Json.Utilities.Convertible;
 
 namespace Newtonsoft.Json.Utilities
 {
+#if NETFX_CORE
   internal class Convertible
   {
     private object _underlyingValue;
@@ -120,6 +121,7 @@ namespace Newtonsoft.Json.Utilities
       return Convert.ToUInt64(_underlyingValue, provider);
     }
   }
+#endif
 
   internal static class ConvertUtils
   {
@@ -134,7 +136,7 @@ namespace Newtonsoft.Json.Utilities
 
     public static TypeCode GetTypeCode(object o)
     {
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
       return System.Convert.GetTypeCode(o);
 #else
       return GetTypeCode(o.GetType());
@@ -217,6 +219,15 @@ namespace Newtonsoft.Json.Utilities
       return (
         t == typeof(bool) || t == typeof(byte) || t == typeof(char) || t == typeof(DateTime) || t == typeof(decimal) || t == typeof(double) || t == typeof(short) || t == typeof(int) ||
         t == typeof(long) || t == typeof(sbyte) || t == typeof(float) || t == typeof(string) || t == typeof(ushort) || t == typeof(uint) || t == typeof(ulong) || t.IsEnum());
+#endif
+    }
+
+    public static TimeSpan ParseTimeSpan(string input)
+    {
+#if !(NET35 || NET20 || PORTABLE || WINDOWS_PHONE)
+      return TimeSpan.Parse((string) input, CultureInfo.InvariantCulture);
+#else
+      return TimeSpan.Parse((string)input);
 #endif
     }
 
@@ -328,16 +339,12 @@ namespace Newtonsoft.Json.Utilities
         if (targetType == typeof (Guid))
           return new Guid((string) initialValue);
         if (targetType == typeof (Uri))
-          return new Uri((string) initialValue);
-        if (targetType == typeof (TimeSpan))
-#if !(NET35 || NET20 || SILVERLIGHT)
-          return TimeSpan.Parse((string) initialValue, CultureInfo.InvariantCulture);
-#else
-          return TimeSpan.Parse((string)initialValue);
-#endif
+          return new Uri((string) initialValue, UriKind.RelativeOrAbsolute);
+        if (targetType == typeof(TimeSpan))
+          return ParseTimeSpan((string) initialValue);
       }
 
-#if !PocketPC && !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
       // see if source or target types have a TypeConverter that converts between the two
       TypeConverter toConverter = GetConverter(initialType);
 
@@ -361,7 +368,7 @@ namespace Newtonsoft.Json.Utilities
 #endif
       }
 #endif
-#if !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
       // handle DBNull and INullable
       if (initialValue == DBNull.Value)
       {
@@ -371,12 +378,12 @@ namespace Newtonsoft.Json.Utilities
         throw new Exception("Can not convert null {0} into non-nullable {1}.".FormatWith(CultureInfo.InvariantCulture, initialType, targetType));
       }
 #endif
-#if !SILVERLIGHT && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
       if (initialValue is INullable)
         return EnsureTypeAssignable(ToValue((INullable)initialValue), initialType, targetType);
 #endif
 
-      throw new Exception("Can not convert from {0} to {1}.".FormatWith(CultureInfo.InvariantCulture, initialType, targetType));
+      throw new InvalidOperationException("Can not convert from {0} to {1}.".FormatWith(CultureInfo.InvariantCulture, initialType, targetType));
     }
     #endregion
 
@@ -393,7 +400,16 @@ namespace Newtonsoft.Json.Utilities
     /// </returns>
     public static bool TryConvert(object initialValue, CultureInfo culture, Type targetType, out object convertedValue)
     {
-      return MiscellaneousUtils.TryAction<object>(delegate { return Convert(initialValue, culture, targetType); }, out convertedValue);
+      try
+      {
+        convertedValue = Convert(initialValue, culture, targetType);
+        return true;
+      }
+      catch
+      {
+        convertedValue = null;
+        return false;
+      }
     }
     #endregion
 
@@ -445,10 +461,10 @@ namespace Newtonsoft.Json.Utilities
           return null;
       }
 
-      throw new Exception("Could not cast or convert from {0} to {1}.".FormatWith(CultureInfo.InvariantCulture, (initialType != null) ? initialType.ToString() : "{null}", targetType));
+      throw new ArgumentException("Could not cast or convert from {0} to {1}.".FormatWith(CultureInfo.InvariantCulture, (initialType != null) ? initialType.ToString() : "{null}", targetType));
     }
 
-#if !SILVERLIGHT && !NETFX_CORE
+#if !(SILVERLIGHT || NETFX_CORE || PORTABLE)
     public static object ToValue(INullable nullableValue)
     {
       if (nullableValue == null)
@@ -464,11 +480,11 @@ namespace Newtonsoft.Json.Utilities
       else if (nullableValue is SqlDateTime)
         return ToValue((SqlDateTime)nullableValue);
 
-      throw new Exception("Unsupported INullable type: {0}".FormatWith(CultureInfo.InvariantCulture, nullableValue.GetType()));
+      throw new ArgumentException("Unsupported INullable type: {0}".FormatWith(CultureInfo.InvariantCulture, nullableValue.GetType()));
     }
 #endif
 
-#if !PocketPC && !NETFX_CORE
+#if !(NETFX_CORE || PORTABLE)
     internal static TypeConverter GetConverter(Type t)
     {
       return JsonTypeReflector.GetTypeConverter(t);

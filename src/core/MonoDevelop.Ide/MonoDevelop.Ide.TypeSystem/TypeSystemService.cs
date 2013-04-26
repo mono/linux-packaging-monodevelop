@@ -226,10 +226,24 @@ namespace MonoDevelop.Ide.TypeSystem
 							if (projectFile != null)
 								QueueParseJob (wrapper, new [] { projectFile });
 						}
-						if (cachedAssemblyContents.ContainsKey (file.FileName))
-							CheckModifiedFile (cachedAssemblyContents[file.FileName]);
+						AssemblyContext ctx;
+						if (cachedAssemblyContents.TryGetValue (file.FileName, out ctx))
+							CheckModifiedFile (ctx);
 					}
 				}
+
+				foreach (var content in projectContents.Values.ToArray ()) {
+					var files = new List<ProjectFile> ();
+					foreach (var file in e) {
+						var f = content.Project.GetProjectFile (file.FileName);
+						if (f == null || f.BuildAction != BuildAction.Compile)
+							continue;
+						files.Add (f);
+					}
+					if (files.Count > 0)
+						QueueParseJob (content, files);
+				}
+
 			};
 			if (IdeApp.ProjectOperations != null) {
 				IdeApp.ProjectOperations.EndBuild += HandleEndBuild;
@@ -727,7 +741,7 @@ namespace MonoDevelop.Ide.TypeSystem
 		static void ReloadAllReferences (IEnumerable<ProjectContentWrapper> contents)
 		{
 			foreach (var wrapper in contents)
-				wrapper.ReloadAssemblyReferences ();
+				wrapper.ReconnectAssemblyReferences ();
 		}
 		
 		[Serializable]
@@ -1159,28 +1173,32 @@ namespace MonoDevelop.Ide.TypeSystem
 				}
 			}
 
-			bool HasCyclicRefs (ProjectContentWrapper wrapper)
+			bool HasCyclicRefs (ProjectContentWrapper wrapper, HashSet<Project> nonCyclicCache)
 			{
+				if (nonCyclicCache.Contains (wrapper.Project))
+					return false;
 				foreach (var referencedProject in wrapper.ReferencedProjects) {
 					ProjectContentWrapper w;
-					if (referencedProject == Project || projectContents.TryGetValue (referencedProject, out w) && HasCyclicRefs (w)) {
+					if (referencedProject == Project || referencedProject == wrapper.Project || projectContents.TryGetValue (referencedProject, out w) && HasCyclicRefs (w, nonCyclicCache)) {
 						return true;
 					}
 				}
+				nonCyclicCache.Add (wrapper.Project);
 				return false;
 			}
 
-			public void ReloadAssemblyReferences ()
+			public void ReconnectAssemblyReferences ()
 			{
 				var netProject = this.Project as DotNetProject;
 				if (netProject == null)
 					return;
 				try {
 					var contexts = new List<IAssemblyReference> ();
+					var nonCyclicCache =new HashSet<Project> ();
 					foreach (var referencedProject in ReferencedProjects) {
 						ProjectContentWrapper wrapper;
 						if (projectContents.TryGetValue (referencedProject, out wrapper)) {
-							if (HasCyclicRefs (wrapper))
+							if (HasCyclicRefs (wrapper, nonCyclicCache))
 								continue;
 							contexts.Add (new UnresolvedAssemblyDecorator (wrapper));
 						}
@@ -1404,7 +1422,7 @@ namespace MonoDevelop.Ide.TypeSystem
 			if (args.SolutionItem is Project) {
 				var wrapper = LoadProject ((Project)args.SolutionItem);
 				if (wrapper != null)
-					wrapper.ReloadAssemblyReferences ();
+					wrapper.ReconnectAssemblyReferences ();
 			}
 		}
 		
@@ -1946,7 +1964,6 @@ namespace MonoDevelop.Ide.TypeSystem
 					CheckModifiedFile (loadedContext);
 					return loadedContext;
 				}
-				var newcachedAssemblyContents = new Dictionary<string, AssemblyContext> (cachedAssemblyContents);
 
 				string cache = GetCacheDirectory (fileName);
 				if (cache != null) {
@@ -1955,6 +1972,7 @@ namespace MonoDevelop.Ide.TypeSystem
 					if (deserialized != null) {
 						deserialized.CtxLoader = new LazyAssemblyLoader (fileName, cache);
 						CheckModifiedFile (deserialized);
+						var newcachedAssemblyContents = new Dictionary<string, AssemblyContext> (cachedAssemblyContents);
 						newcachedAssemblyContents [fileName] = deserialized;
 						cachedAssemblyContents = newcachedAssemblyContents;
 						OnAssemblyLoaded (new AssemblyLoadedEventArgs (deserialized.CtxLoader));
@@ -1973,6 +1991,7 @@ namespace MonoDevelop.Ide.TypeSystem
 					SerializeObject (Path.Combine (cache, "assembly.descriptor"), result);
 					
 					result.CtxLoader = new LazyAssemblyLoader (fileName, cache);
+					var newcachedAssemblyContents = new Dictionary<string, AssemblyContext> (cachedAssemblyContents);
 					newcachedAssemblyContents [fileName] = result;
 					cachedAssemblyContents = newcachedAssemblyContents;
 					OnAssemblyLoaded (new AssemblyLoadedEventArgs (result.CtxLoader));

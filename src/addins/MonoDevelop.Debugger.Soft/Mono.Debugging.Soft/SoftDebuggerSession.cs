@@ -126,7 +126,7 @@ namespace Mono.Debugging.Soft
 		
 		void StartConnection (SoftDebuggerStartInfo dsi)
 		{
-			this.startArgs = dsi.StartArgs;
+			startArgs = dsi.StartArgs;
 			
 			RegisterUserAssemblies (dsi);
 			
@@ -142,7 +142,7 @@ namespace Mono.Debugging.Soft
 					string appName;
 					VirtualMachine vm;
 					startArgs.ConnectionProvider.EndConnect (ar, out vm, out appName);
-					this.remoteProcessName = appName;
+					remoteProcessName = appName;
 					ConnectionStarted (vm);
 					return;
 				} catch (Exception ex) {
@@ -158,7 +158,7 @@ namespace Mono.Debugging.Soft
 				}
 				try {
 					if (timeBetweenAttempts > 0)
-						System.Threading.Thread.Sleep (timeBetweenAttempts);
+						Thread.Sleep (timeBetweenAttempts);
 					ConnectionStarting (startArgs.ConnectionProvider.BeginConnect (dsi, callback), dsi, false, 0);
 				} catch (Exception ex2) {
 					OnConnectionError (ex2);
@@ -430,8 +430,6 @@ namespace Mono.Debugging.Soft
 				EventType.AssemblyUnload, EventType.UserBreak, EventType.UserLog);
 			try {
 				unhandledExceptionRequest = vm.CreateExceptionRequest (null, false, true);
-				if (assemblyFilters != null && assemblyFilters.Count > 0)
-					unhandledExceptionRequest.AssemblyFilter = assemblyFilters;
 				unhandledExceptionRequest.Enable ();
 			} catch (NotSupportedException) {
 				//Mono < 2.6.3 doesn't support catching unhandled exceptions
@@ -575,7 +573,7 @@ namespace Mono.Debugging.Soft
 
 		protected override void OnAttachToProcess (long processId)
 		{
-			throw new System.NotSupportedException ();
+			throw new NotSupportedException ();
 		}
 
 		protected override void OnContinue ()
@@ -595,7 +593,7 @@ namespace Mono.Debugging.Soft
 
 		protected override void OnDetach ()
 		{
-			throw new System.NotSupportedException ();
+			throw new NotSupportedException ();
 		}
 
 		protected override void OnExit ()
@@ -605,10 +603,12 @@ namespace Mono.Debugging.Soft
 			if (vm != null) {
 				try {
 					vm.Exit (0);
+				} catch (VMDisconnectedException ex) {
+					// The VM was already disconnected, ignore.
 				} catch (SocketException se) {
 					// This will often happen during normal operation
 					LoggingService.LogError ("Error closing debugger session", se);
-				}catch (IOException ex) {
+				} catch (IOException ex) {
 					// This will often happen during normal operation
 					LoggingService.LogError ("Error closing debugger session", ex);
 				}
@@ -744,33 +744,30 @@ namespace Mono.Debugging.Soft
 
 				if (ev is FunctionBreakpoint) {
 					var fb = (FunctionBreakpoint) ev;
-					bool generic;
 
-					bi.Location = FindLocationByFunction (fb.FunctionName, fb.ParamTypes, fb.Line, out generic);
-					if (bi.Location != null) {
-						fb.SetResolvedFileName (bi.Location.SourceFile);
-						bi.FileName = fb.FileName;
+					foreach (var location in FindFunctionLocations (fb.FunctionName, fb.ParamTypes)) {
+						bi.FileName = location.SourceFile;
+						bi.Location = location;
 
 						InsertBreakpoint (fb, bi);
 						bi.SetStatus (BreakEventStatus.Bound, null);
+					}
 
-						// Note: if the type or method is generic, there may be more instances so don't assume we are done resolving the breakpoint
-						if (generic)
-							pending_bes.Add (bi);
-					} else {
+					if (bi.Location == null) {
+						// FIXME: handle types like GenericType<>, GenericType<SomeOtherType>, and GenericType<...>+NestedGenricType<...>
 						int dot = fb.FunctionName.LastIndexOf ('.');
 						if (dot != -1)
 							bi.TypeName = fb.FunctionName.Substring (0, dot);
 
-						pending_bes.Add (bi);
 						bi.SetStatus (BreakEventStatus.NotBound, null);
+						pending_bes.Add (bi);
 					}
 				} else if (ev is Breakpoint) {
 					var bp = (Breakpoint) ev;
 					bool insideLoadedRange;
 					bool generic;
 
-					bi.Location = FindLocationByFile (bp.FileName, bp.Line, out generic, out insideLoadedRange);
+					bi.Location = FindLocationByFile (bp.FileName, bp.Line, bp.Column, out generic, out insideLoadedRange);
 					bi.FileName = bp.FileName;
 
 					if (bi.Location != null) {
@@ -902,8 +899,8 @@ namespace Mono.Debugging.Soft
 			
 			breakpoints[request] = bi;
 			
-			if (bi.Location.LineNumber != bp.Line)
-				bi.AdjustBreakpointLocation (bi.Location.LineNumber);
+			if (bi.Location.LineNumber != bp.Line || bi.Location.ColumnNumber != bp.Column)
+				bi.AdjustBreakpointLocation (bi.Location.LineNumber, bi.Location.ColumnNumber);
 		}
 		
 		void InsertCatchpoint (Catchpoint cp, BreakInfo bi, TypeMirror excType)
@@ -917,28 +914,121 @@ namespace Mono.Debugging.Soft
 			bi.Requests.Add (request);
 		}
 		
-		bool CheckMethodParams (MethodMirror method, string[] paramTypes)
+		static bool CheckTypeName (string typeName, string name)
+		{
+			// if the name provided is empty, it matches anything.
+			if (name.Length == 0)
+				return true;
+
+			if (name.StartsWith ("global::")) {
+				if (typeName != name.Substring ("global::".Length))
+					return false;
+			} else if (name.StartsWith ("::")) {
+				if (typeName != name.Substring ("::".Length))
+					return false;
+			} else {
+				// be a little more flexible with what we match... i.e. "Console" should match "System.Console"
+				if (typeName.Length > name.Length) {
+					if (!typeName.EndsWith (name))
+						return false;
+
+					char delim = typeName[typeName.Length - name.Length];
+					if (delim != '.' && delim != '+')
+						return false;
+				} else if (typeName != name) {
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		static bool CheckTypeName (TypeMirror type, string name)
+		{
+			if (name.Length == 0) {
+				// empty name matches anything
+				return true;
+			}
+
+			if (name[name.Length - 1] == '?') {
+				// canonicalize the user-specified nullable type
+				return CheckTypeName (type, string.Format ("System.Nullable<{0}>", name.Substring (0, name.Length - 1)));
+			} else if (type.IsArray) {
+				int startIndex = name.LastIndexOf ('[');
+				int endIndex = name.Length - 1;
+
+				if (startIndex == -1 || name[endIndex] != ']') {
+					// the user-specified type is not an array
+					return false;
+				}
+
+				var rank = name.Substring (startIndex + 1, endIndex - (startIndex + 1)).Split (new char[] { ',' });
+				if (rank.Length != type.GetArrayRank ())
+					return false;
+
+				return CheckTypeName (type.GetElementType (), name.Substring (0, startIndex).TrimEnd ());
+			} else if (type.IsPointer) {
+				if (name.Length < 2 || name[name.Length - 1] != '*')
+					return false;
+
+				return CheckTypeName (type.GetElementType (), name.Substring (0, name.Length - 1).TrimEnd ());
+			} else if (type.IsGenericType) {
+				int startIndex = name.IndexOf ('<');
+				int endIndex = name.Length - 1;
+
+				if (startIndex == -1 || name[endIndex] != '>') {
+					// the user-specified type is not a generic type
+					return false;
+				}
+
+				// make sure that the type name matches (minus generics)
+				string subName = name.Substring (0, startIndex);
+				string typeName = type.FullName;
+				int tick;
+
+				if ((tick = typeName.IndexOf ('`')) != -1)
+					typeName = typeName.Substring (0, tick);
+
+				if (!CheckTypeName (typeName, subName))
+					return false;
+
+				string[] paramTypes;
+				if (!FunctionBreakpoint.TryParseParameters (name, startIndex + 1, endIndex, out paramTypes))
+					return false;
+
+				TypeMirror[] argTypes = type.GetGenericArguments ();
+				if (paramTypes.Length != argTypes.Length)
+					return false;
+
+				for (int i = 0; i < paramTypes.Length; i++) {
+					if (!CheckTypeName (argTypes[i], paramTypes[i]))
+						return false;
+				}
+			} else if (!CheckTypeName (type.CSharpName, name)) {
+				if (!CheckTypeName (type.FullName, name))
+					return false;
+			}
+
+			return true;
+		}
+
+		static bool CheckMethodParams (MethodMirror method, string[] paramTypes)
 		{
 			if (paramTypes == null) {
 				// User supplied no params to match against, match anything we find.
 				return true;
 			}
-			
-			int i = 0;
-			foreach (var param in method.GetParameters ()) {
-				if (i == paramTypes.Length) {
-					// This method has too many parameters...
+
+			var parameters = method.GetParameters ();
+			if (parameters.Length != paramTypes.Length)
+				return false;
+
+			for (int i = 0; i < paramTypes.Length; i++) {
+				if (!CheckTypeName (parameters[i].ParameterType, paramTypes[i]))
 					return false;
-				}
-				
-				if (param.ParameterType.FullName != paramTypes[i] &&
-				    param.ParameterType.CSharpName != paramTypes[i])
-					return false;
-				
-				i++;
 			}
-			
-			return i == paramTypes.Length;
+
+			return true;
 		}
 		
 		bool IsGenericMethod (MethodMirror method)
@@ -946,41 +1036,39 @@ namespace Mono.Debugging.Soft
 			return vm.Version.AtLeast (2, 12) && method.IsGenericMethod;
 		}
 		
-		Location FindLocationByFunction (string function, string[] paramTypes, int line, out bool genericTypeOrMethod)
+		IEnumerable<Location> FindFunctionLocations (string function, string[] paramTypes)
 		{
-			genericTypeOrMethod = false;
-			
 			if (!started)
-				return null;
-			
-			int dot = function.LastIndexOf ('.');
-			if (dot == -1 || dot + 1 == function.Length)
-				return null;
-			
-			string methodName = function.Substring (dot + 1);
-			string typeName = function.Substring (0, dot);
+				yield break;
 			
 			if (vm.Version.AtLeast (2, 9)) {
+				int dot = function.LastIndexOf ('.');
+				if (dot == -1 || dot + 1 == function.Length)
+					yield break;
+
+				// FIXME: handle types like GenericType<>, GenericType<SomeOtherType>, and GenericType<...>+NestedGenricType<...>
+				string methodName = function.Substring (dot + 1);
+				string typeName = function.Substring (0, dot);
+
+				// FIXME: need a way of querying all types so we can substring match typeName (e.g. user may have typed "Console" instead of "System.Console")
 				foreach (var type in vm.GetTypes (typeName, false)) {
 					ProcessType (type);
 					
-					foreach (var method in type.GetMethodsByNameFlags (methodName, BindingFlags.Default, false)) {
+					foreach (var method in type.GetMethodsByNameFlags (methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static, false)) {
 						if (!CheckMethodParams (method, paramTypes))
 							continue;
 						
 						Location location = GetLocFromMethod (method);
-						if (location != null) {
-							genericTypeOrMethod = type.IsGenericType || IsGenericMethod (method);
-							return location;
-						}
+						if (location != null)
+							yield return location;
 					}
 				}
 			}
 			
-			return null;
+			yield break;
 		}
 		
-		Location FindLocationByFile (string file, int line, out bool genericTypeOrMethod, out bool insideLoadedRange)
+		Location FindLocationByFile (string file, int line, int column, out bool genericTypeOrMethod, out bool insideLoadedRange)
 		{
 			genericTypeOrMethod = false;
 			insideLoadedRange = false;
@@ -1021,7 +1109,7 @@ namespace Mono.Debugging.Soft
 					bool genericMethod;
 					bool insideRange;
 					
-					target_loc = GetLocFromType (type, filename, line, out genericMethod, out insideRange);
+					target_loc = GetLocFromType (type, filename, line, column, out genericMethod, out insideRange);
 					if (insideRange)
 						insideLoadedRange = true;
 					
@@ -1309,6 +1397,12 @@ namespace Mono.Debugging.Soft
 				case EventType.AssemblyUnload: {
 					var aue = (AssemblyUnloadEvent) e;
 
+					if (assemblyFilters != null) {
+						int index = assemblyFilters.IndexOf (aue.Assembly);
+						if (index != -1)
+							assemblyFilters.RemoveAt (index);
+					}
+
 					// Mark affected breakpoints as pending again
 					var affectedBreakpoints = new List<KeyValuePair<EventRequest, BreakInfo>> (
 						breakpoints.Where (x=> (x.Value.Location.Method.DeclaringType.Assembly.Location.Equals (aue.Assembly.Location, StringComparison.OrdinalIgnoreCase)))
@@ -1479,13 +1573,14 @@ namespace Mono.Debugging.Soft
 					foreach (var es in dequeuing) {
 						try {
 							 HandleBreakEventSet (es.ToArray (), true);
-						} catch (VMDisconnectedException ex) {
-							if (!HandleException (ex))
-								OnDebuggerOutput (true, ex.ToString ());
-							break;
 						} catch (Exception ex) {
 							if (!HandleException (ex))
 								OnDebuggerOutput (true, ex.ToString ());
+
+							if (ex is VMDisconnectedException || ex is IOException || ex is SocketException) {
+								OnTargetEvent (new TargetEventArgs (TargetEventType.TargetExited));
+								break;
+							}
 						}
 					}
 				}
@@ -1509,13 +1604,13 @@ namespace Mono.Debugging.Soft
 			}
 			
 			if (!string.IsNullOrEmpty (bp.ConditionExpression)) {
-				string res = EvaluateExpression (thread, bp.ConditionExpression);
+				string res = EvaluateExpression (thread, bp.ConditionExpression, bp);
 				if (bp.BreakIfConditionChanges) {
 					if (res == binfo.LastConditionValue)
 						return true;
 					binfo.LastConditionValue = res;
 				} else {
-					if (res != null && res.ToLower () == "false")
+					if (res == null || res.ToLowerInvariant () != "true")
 						return true;
 				}
 			}
@@ -1550,7 +1645,7 @@ namespace Mono.Debugging.Soft
 				if (j == -1)
 					break;
 				string se = exp.Substring (i + 1, j - i - 1);
-				se = EvaluateExpression (thread, se);
+				se = EvaluateExpression (thread, se, null);
 				sb.Append (exp.Substring (last, i - last));
 				sb.Append (se);
 				last = j + 1;
@@ -1559,18 +1654,99 @@ namespace Mono.Debugging.Soft
 			sb.Append (exp.Substring (last, exp.Length - last));
 			return sb.ToString ();
 		}
-		
-		string EvaluateExpression (ThreadMirror thread, string exp)
+
+		static SourceLocation GetSourceLocation (MDB.StackFrame frame)
 		{
+			return new SourceLocation (frame.Method.Name, frame.FileName, frame.LineNumber, frame.ColumnNumber);
+		}
+
+		static string FormatSourceLocation (Breakpoint bp)
+		{
+			if (string.IsNullOrEmpty (bp.FileName))
+				return null;
+
+			var location = Path.GetFileName (bp.FileName);
+			if (bp.OriginalLine > 0) {
+				location += ":" + bp.OriginalLine;
+				if (bp.OriginalColumn > 0)
+					location += "," + bp.OriginalColumn;
+			}
+
+			return location;
+		}
+
+		static bool IsBoolean (ValueReference vr)
+		{
+			if (vr.Type is Type && ((Type) vr.Type) == typeof (bool))
+				return true;
+
+			if (vr.Type is TypeMirror && ((TypeMirror) vr.Type).FullName == "System.Boolean")
+				return true;
+
+			return false;
+		}
+		
+		string EvaluateExpression (ThreadMirror thread, string expression, Breakpoint bp)
+		{
+			MDB.StackFrame[] frames = null;
+
 			try {
-				MDB.StackFrame[] frames = thread.GetFrames ();
+				frames = thread.GetFrames ();
 				if (frames.Length == 0)
 					return string.Empty;
+
 				EvaluationOptions ops = Options.EvaluationOptions.Clone ();
 				ops.AllowTargetInvoke = true;
+
 				var ctx = new SoftEvaluationContext (this, frames[0], ops);
-				ValueReference val = ctx.Evaluator.Evaluate (ctx, exp);
+
+				if (bp != null) {
+					// validate conditional breakpoint expressions so that we can provide error reporting to the user
+					var vr = ctx.Evaluator.ValidateExpression (ctx, expression);
+					if (!vr.IsValid) {
+						string message = string.Format ("Invalid expression in conditional breakpoint. {0}", vr.Message);
+						string location = FormatSourceLocation (bp);
+
+						if (!string.IsNullOrEmpty (location))
+							message = location + ": " + message;
+
+						OnDebuggerOutput (true, message);
+						return string.Empty;
+					}
+
+					// resolve types...
+					if (ctx.SourceCodeAvailable)
+						expression = ctx.Evaluator.Resolve (this, GetSourceLocation (frames[0]), expression);
+				}
+
+				ValueReference val = ctx.Evaluator.Evaluate (ctx, expression);
+				if (bp != null && !bp.BreakIfConditionChanges && !IsBoolean (val)) {
+					string message = string.Format ("Expression in conditional breakpoint did not evaluate to a boolean value: {0}", bp.ConditionExpression);
+					string location = FormatSourceLocation (bp);
+
+					if (!string.IsNullOrEmpty (location))
+						message = location + ": " + message;
+
+					OnDebuggerOutput (true, message);
+					return string.Empty;
+				}
+
 				return val.CreateObjectValue (false).Value;
+			} catch (EvaluatorException ex) {
+				string message;
+
+				if (bp != null) {
+					message = string.Format ("Failed to evaluate expression in conditional breakpoint. {0}", ex.Message);
+					string location = FormatSourceLocation (bp);
+
+					if (!string.IsNullOrEmpty (location))
+						message = location + ": " + message;
+				} else {
+					message = ex.ToString ();
+				}
+
+				OnDebuggerOutput (true, message);
+				return string.Empty;
 			} catch (Exception ex) {
 				OnDebuggerOutput (true, ex.ToString ());
 				return string.Empty;
@@ -1634,7 +1810,6 @@ namespace Mono.Debugging.Soft
 		void ResolveBreakpoints (TypeMirror type)
 		{
 			var resolved = new List<BreakInfo> ();
-			string typeName = type.FullName;
 			Location loc;
 			
 			ProcessType (type);
@@ -1642,32 +1817,25 @@ namespace Mono.Debugging.Soft
 			// First, resolve FunctionBreakpoints
 			foreach (var bi in pending_bes.Where (b => b.BreakEvent is FunctionBreakpoint)) {
 				var bp = (FunctionBreakpoint) bi.BreakEvent;
-				int dot = bp.FunctionName.LastIndexOf ('.');
-				string ftypeName = bp.FunctionName.Substring (0, dot);
-				
-				if (ftypeName == typeName) {
-					string methodName = bp.FunctionName.Substring (dot + 1);
+
+				if (CheckTypeName (type, bi.TypeName)) {
+					string methodName = bp.FunctionName.Substring (bi.TypeName.Length + 1);
 					
-					foreach (var method in type.GetMethodsByNameFlags (methodName, BindingFlags.Default, false)) {
+					foreach (var method in type.GetMethodsByNameFlags (methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static, false)) {
 						if (!CheckMethodParams (method, bp.ParamTypes))
 							continue;
 						
 						loc = GetLocFromMethod (method);
 						if (loc != null) {
-							string paramList = bp.ParamTypes != null ? "(" + string.Join (",", bp.ParamTypes) + ")" : "";
+							string paramList = "(" + string.Join (", ", bp.ParamTypes ?? GetParamTypes (method)) + ")";
 							OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint for '{0}{1}' to {2}:{3} [0x{4:x5}].\n",
 							                                        bp.FunctionName, paramList, loc.SourceFile, loc.LineNumber, loc.ILOffset));
-							
-							if (bp.ParamTypes == null)
-								bp.ParamTypes = GetParamTypes (method);
-							
-							bp.SetResolvedFileName (loc.SourceFile);
+
 							ResolvePendingBreakpoint (bi, loc);
 							
 							// Note: if the type or method is generic, there may be more instances so don't assume we are done resolving the breakpoint
-							if (!type.IsGenericType && !IsGenericMethod (method))
+							if (bp.ParamTypes != null && !type.IsGenericType && !IsGenericMethod (method))
 								resolved.Add (bi);
-							break;
 						}
 					}
 				}
@@ -1679,16 +1847,16 @@ namespace Mono.Debugging.Soft
 
 			// Now resolve normal Breakpoints
 			foreach (string s in type_to_source [type]) {
-				foreach (var bi in pending_bes.Where (b => b.BreakEvent is Breakpoint)) {
+				foreach (var bi in pending_bes.Where (b => (b.BreakEvent is Breakpoint) && !(b.BreakEvent is FunctionBreakpoint))) {
 					var bp = (Breakpoint) bi.BreakEvent;
 					if (PathsAreEqual (PathToFileName (bp.FileName), s)) {
 						bool insideLoadedRange;
 						bool genericMethod;
 						
-						loc = GetLocFromType (type, s, bp.Line, out genericMethod, out insideLoadedRange);
+						loc = GetLocFromType (type, s, bp.Line, bp.Column, out genericMethod, out insideLoadedRange);
 						if (loc != null) {
-							OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint at '{0}:{1}' to {2} [0x{3:x5}].\n",
-							                                        s, bp.Line, loc.Method.FullName, loc.ILOffset));
+							OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint at '{0}:{1},{2}' to {3} [0x{4:x5}].\n",
+							                                        s, bp.Line, bp.Column, loc.Method.Name, loc.ILOffset));
 							ResolvePendingBreakpoint (bi, loc);
 							
 							// Note: if the type or method is generic, there may be more instances so don't assume we are done resolving the breakpoint
@@ -1710,7 +1878,7 @@ namespace Mono.Debugging.Soft
 			// Thirdly, resolve pending catchpoints
 			foreach (var bi in pending_bes.Where (b => b.BreakEvent is Catchpoint)) {
 				var cp = (Catchpoint) bi.BreakEvent;
-				if (cp.ExceptionName == typeName) {
+				if (cp.ExceptionName == type.FullName) {
 					ResolvePendingCatchpoint (bi, type);
 					resolved.Add (bi);
 				}
@@ -1826,7 +1994,7 @@ namespace Mono.Debugging.Soft
 			return false;
 		}
 		
-		Location GetLocFromType (TypeMirror type, string file, int line, out bool genericMethod, out bool insideTypeRange)
+		Location GetLocFromType (TypeMirror type, string file, int line, int column, out bool genericMethod, out bool insideTypeRange)
 		{
 			Location target_loc = null;
 			bool fuzzy = true;
@@ -1834,8 +2002,9 @@ namespace Mono.Debugging.Soft
 			insideTypeRange = false;
 			genericMethod = false;
 			
-			//Console.WriteLine ("Trying to resolve {0}:{1} in type {2}", file, line, type.Name);
+			//Console.WriteLine ("Trying to resolve {0}:{1},{2} in type {3}", file, line, column, type.Name);
 			foreach (MethodMirror method in type.GetMethods ()) {
+				List<Location> locations = new List<Location> ();
 				int rangeFirstLine = int.MaxValue;
 				int rangeLastLine = -1;
 				
@@ -1860,22 +2029,29 @@ namespace Mono.Debugging.Soft
 									if (target_loc.LineNumber - line > location.LineNumber - line) {
 										// Grab the location closest to the requested line
 										//Console.WriteLine ("\t\tLocation is closest match. (ILOffset = 0x{0:x5})", location.ILOffset);
+										locations.Clear ();
+										locations.Add (location);
 										target_loc = location;
 									}
 								} else if (target_loc.LineNumber != line) {
 									// Previous match was a fuzzy match, but now we've found an exact line match
 									//Console.WriteLine ("\t\tLocation is exact line match. (ILOffset = 0x{0:x5})", location.ILOffset);
+									locations.Clear ();
+									locations.Add (location);
 									target_loc = location;
 									fuzzy = false;
-								} else if (location.ILOffset < target_loc.ILOffset) {
-									// Line number matches exactly, but has an earlier ILOffset
-									//Console.WriteLine ("\t\tLocation has an earlier ILOffset. (ILOffset = 0x{0:x5})", location.ILOffset);
-									target_loc = location;
+								} else {
+									// Line number matches exactly, use the location with the lowest ILOffset
+									if (location.ILOffset < target_loc.ILOffset)
+										target_loc = location;
+
+									locations.Add (location);
 									fuzzy = false;
 								}
 							} else {
 								//Console.WriteLine ("\t\tLocation is first possible match. (ILOffset = 0x{0:x5})", location.ILOffset);
 								fuzzy = location.LineNumber != line;
+								locations.Add (location);
 								target_loc = location;
 							}
 						}
@@ -1891,8 +2067,25 @@ namespace Mono.Debugging.Soft
 					// If we got a fuzzy match, then we need to make sure that there isn't a better
 					// match in another method (e.g. code might have been extracted out into another
 					// method by the compiler.
-					if (!fuzzy)
+					if (!fuzzy) {
+						// Exact line match... now find the best column match.
+						locations.Sort (new LocationComparer ());
+
+						// Find the closest-matching location based on column.
+						target_loc = locations[0];
+						for (int i = 1; i < locations.Count; i++) {
+							if (locations[i].ColumnNumber > column)
+								break;
+
+							// if the column numbers match, then target_loc should have the lower ILOffset (which we want)
+							if (target_loc.ColumnNumber == locations[i].ColumnNumber)
+								continue;
+
+							target_loc = locations[i];
+						}
+
 						return target_loc;
+					}
 				}
 			}
 			
@@ -1935,9 +2128,6 @@ namespace Mono.Debugging.Soft
 			}
 			if (found) {
 				assemblyFilters.Add (asm);
-				unhandledExceptionRequest.Disable ();
-				unhandledExceptionRequest.AssemblyFilter = assemblyFilters;
-				unhandledExceptionRequest.Enable ();
 				return true;
 			} else {
 				return false;
@@ -2224,6 +2414,24 @@ namespace Mono.Debugging.Soft
 		
 		[System.Runtime.InteropServices.DllImport ("libc")]
 		static extern int uname (IntPtr buf);
+	}
+
+	class LocationComparer : IComparer<Location>
+	{
+		public int Compare (Location loc0, Location loc1)
+		{
+			if (loc0.LineNumber < loc1.LineNumber)
+				return -1;
+			else if (loc0.LineNumber > loc1.LineNumber)
+				return 1;
+
+			if (loc0.ColumnNumber < loc1.ColumnNumber)
+				return -1;
+			else if (loc0.ColumnNumber > loc1.ColumnNumber)
+				return 1;
+
+			return loc0.ILOffset - loc1.ILOffset;
+		}
 	}
 	
 	class BreakInfo: BreakEventInfo

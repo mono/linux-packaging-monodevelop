@@ -25,31 +25,131 @@
 
 using System;
 using System.Xml;
+using System.Collections.Generic;
 
 namespace Mono.Debugging.Client
 {
 	[Serializable]
 	public class FunctionBreakpoint : Breakpoint
 	{
-		public FunctionBreakpoint (string functionName, string language) : base (null, 1/*, 1*/)
+		public FunctionBreakpoint (string functionName, string language) : base (null, 1, 1)
 		{
 			FunctionName = functionName;
 			Language = language;
+		}
+
+		static bool SkipArrayRank (string text, ref int index, int endIndex)
+		{
+			char c;
+
+			while (index < endIndex) {
+				if ((c = text[index++]) == ']')
+					return true;
+
+				if (c != ',' && !char.IsWhiteSpace (c) && !char.IsDigit (c))
+					return false;
+			}
+
+			return false;
+		}
+
+		static bool SkipGenericArgs (string text, ref int index, int endIndex)
+		{
+			char c;
+
+			while (index < endIndex) {
+				if ((c = text[index++]) == '>')
+					return true;
+
+				if (c == '<') {
+					if (!SkipGenericArgs (text, ref index, endIndex))
+						return false;
+
+					while (index < endIndex && !char.IsWhiteSpace (text[index]))
+						index++;
+
+					// the only chars allowed after a '>' are: '>', '[', and ','
+					if (">[,".IndexOf (text[index]) == -1)
+						return false;
+				} else if (c == '[') {
+					if (!SkipArrayRank (text, ref index, endIndex))
+						return false;
+
+					while (index < endIndex && !char.IsWhiteSpace (text[index]))
+						index++;
+
+					// the only chars allowed after a ']' are: '>', '[', and ','
+					if (">[,".IndexOf (text[index]) == -1)
+						return false;
+				} else if (c != '.' && c != '+' && c != ',' && !char.IsWhiteSpace (c) && !char.IsLetterOrDigit (c)) {
+					return false;
+				}
+			}
+
+			return false;
+		}
+
+		public static bool TryParseParameters (string text, int startIndex, int endIndex, out string[] paramTypes)
+		{
+			List<string> parsedParamTypes = new List<string> ();
+			int index = startIndex;
+			int start;
+			char c;
+
+			paramTypes = null;
+
+			while (index < endIndex) {
+				while (char.IsWhiteSpace (text[index]))
+					index++;
+
+				start = index;
+				while (index < endIndex) {
+					if ((c = text[index]) == ',')
+						break;
+
+					index++;
+
+					if (c == '<') {
+						if (!SkipGenericArgs (text, ref index, endIndex))
+							return false;
+					} else if (c == '[') {
+						if (!SkipArrayRank (text, ref index, endIndex))
+							return false;
+					}
+				}
+
+				parsedParamTypes.Add (text.Substring (start, index - start).TrimEnd ());
+
+				if (index < endIndex)
+					index++;
+			}
+
+			paramTypes = parsedParamTypes.ToArray ();
+
+			return true;
 		}
 		
 		internal FunctionBreakpoint (XmlElement elem) : base (elem)
 		{
 			FunctionName = elem.GetAttribute ("function");
 			
-			string s = elem.GetAttribute ("language");
-			if (string.IsNullOrEmpty (s))
+			string text = elem.GetAttribute ("language");
+			if (string.IsNullOrEmpty (text))
 				Language = "C#";
 			else
-				Language = s;
-			
-			s = elem.GetAttribute ("params");
-			if (!string.IsNullOrEmpty (s))
-				ParamTypes = s.Split (new char [] { ',' });
+				Language = text;
+
+			if (elem.HasAttribute ("params")) {
+				string[] paramTypes;
+
+				text = elem.GetAttribute ("params").Trim ();
+				if (text.Length > 0 && TryParseParameters (text, 0, text.Length, out paramTypes))
+					ParamTypes = paramTypes;
+				else
+					ParamTypes = new string[0];
+			}
+
+			FileName = null;
 		}
 		
 		internal override XmlElement ToXml (XmlDocument doc)
@@ -60,7 +160,7 @@ namespace Mono.Debugging.Client
 			elem.SetAttribute ("language", Language);
 			
 			if (ParamTypes != null)
-				elem.SetAttribute ("params", string.Join (",", ParamTypes));
+				elem.SetAttribute ("params", string.Join (", ", ParamTypes));
 			
 			return elem;
 		}
@@ -77,17 +177,13 @@ namespace Mono.Debugging.Client
 			get; set;
 		}
 		
-		public void SetResolvedFileName (string resolvedFileName)
-		{
-			FileName = resolvedFileName;
-		}
-		
 		public override void CopyFrom (BreakEvent ev)
 		{
 			base.CopyFrom (ev);
 			
 			FunctionBreakpoint bp = (FunctionBreakpoint) ev;
 			FunctionName = bp.FunctionName;
+			ParamTypes = bp.ParamTypes;
 		}
 	}
 }

@@ -29,9 +29,9 @@ using System.Text;
 #if !NETFX_CORE
 using NUnit.Framework;
 #else
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using TestFixture = Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute;
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
 #endif
 using Newtonsoft.Json.Bson;
 using System.IO;
@@ -378,7 +378,7 @@ namespace Newtonsoft.Json.Tests.Bson
     [Test]
     public void WriteComment()
     {
-      ExceptionAssert.Throws<JsonWriterException>("Cannot write JSON comment as BSON.",
+      ExceptionAssert.Throws<JsonWriterException>("Cannot write JSON comment as BSON. Path ''.",
       () =>
       {
         MemoryStream ms = new MemoryStream();
@@ -392,7 +392,7 @@ namespace Newtonsoft.Json.Tests.Bson
     [Test]
     public void WriteConstructor()
     {
-      ExceptionAssert.Throws<JsonWriterException>("Cannot write JSON constructor as BSON.",
+      ExceptionAssert.Throws<JsonWriterException>("Cannot write JSON constructor as BSON. Path ''.",
       () =>
       {
         MemoryStream ms = new MemoryStream();
@@ -406,7 +406,7 @@ namespace Newtonsoft.Json.Tests.Bson
     [Test]
     public void WriteRaw()
     {
-      ExceptionAssert.Throws<JsonWriterException>("Cannot write raw JSON as BSON.",
+      ExceptionAssert.Throws<JsonWriterException>("Cannot write raw JSON as BSON. Path ''.",
       () =>
       {
         MemoryStream ms = new MemoryStream();
@@ -420,7 +420,7 @@ namespace Newtonsoft.Json.Tests.Bson
     [Test]
     public void WriteRawValue()
     {
-      ExceptionAssert.Throws<JsonWriterException>("Cannot write raw JSON as BSON.",
+      ExceptionAssert.Throws<JsonWriterException>("Cannot write raw JSON as BSON. Path ''.",
       () =>
       {
         MemoryStream ms = new MemoryStream();
@@ -652,7 +652,7 @@ namespace Newtonsoft.Json.Tests.Bson
     [Test]
     public void WriteValueOutsideOfObjectOrArray()
     {
-      ExceptionAssert.Throws<JsonWriterException>("Error writing String value. BSON must start with an Object or Array.",
+      ExceptionAssert.Throws<JsonWriterException>("Error writing String value. BSON must start with an Object or Array. Path ''.",
       () =>
       {
         MemoryStream stream = new MemoryStream();
@@ -663,6 +663,22 @@ namespace Newtonsoft.Json.Tests.Bson
           writer.Flush();
         }
       });
+    }
+
+    [Test]
+    public void DateTimeZoneHandling()
+    {
+      MemoryStream ms = new MemoryStream();
+      JsonWriter writer = new BsonWriter(ms)
+      {
+        DateTimeZoneHandling = Json.DateTimeZoneHandling.Utc
+      };
+
+      writer.WriteStartArray();
+      writer.WriteValue(new DateTime(2000, 1, 1, 1, 1, 1, DateTimeKind.Unspecified));
+      writer.WriteEndArray();
+
+      Assert.AreEqual("10-00-00-00-09-30-00-C8-88-07-6B-DC-00-00-00-00", (BitConverter.ToString(ms.ToArray())));
     }
   }
 }

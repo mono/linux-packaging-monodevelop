@@ -1,5 +1,10 @@
 [Bb]in/
 [Oo]bj/
 [Ww]orking/
+TestResults/
+AppPackages/
 *.suo
 *.user
+_ReSharper.*
+*.ReSharper.user
+*.resharper.user

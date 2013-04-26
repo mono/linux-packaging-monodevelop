@@ -483,7 +483,7 @@ namespace MonoMac.AudioToolbox {
 		}
 	}
 
-	public enum AudioChannelLayoutTag {
+	public enum AudioChannelLayoutTag : uint {
 		UseChannelDescriptions   = (0<<16) | 0,     
 		UseChannelBitmap         = (1<<16) | 0,     
 		
@@ -628,7 +628,7 @@ namespace MonoMac.AudioToolbox {
 		DTS_6_1_D                = (182<<16) | 7,                         
 		
 		DiscreteInOrder          = (147<<16) | 0,                       // needs to be ORed with the actual number of channels  
-		Unknown                  = unchecked ((int)(0xFFFF0000))                           // needs to be ORed with the actual number of channels  
+		Unknown                  = 0xFFFF0000                           // needs to be ORed with the actual number of channels  
 	}
 
 	public static class AudioChannelLayoutTagExtensions
@@ -665,7 +665,7 @@ namespace MonoMac.AudioToolbox {
 			}
 		}
 
-		[Obsolete ("Use the strongly typed AudioTag instead")]
+		[Advice ("Use the strongly typed AudioTag instead")]
 		public int Tag {
 			get {
 				return (int) AudioTag;
@@ -675,7 +675,7 @@ namespace MonoMac.AudioToolbox {
 			}
 		}
 
-		[Obsolete ("Use ChannelUsage instead")]
+		[Advice ("Use ChannelUsage instead")]
 		public int Bitmap {
 			get {
 				return (int) ChannelUsage;
