@@ -65,9 +65,6 @@ namespace MonoDevelop.Components.Docking
 		DockItemToolbar toolbarRight;
 
 		DockItemTitleTab titleTab;
-		bool allowPlaceholderDocking;
-		static Gdk.Cursor fleurCursor = new Gdk.Cursor (Gdk.CursorType.Fleur);
-		static Gdk.Cursor handCursor = new Gdk.Cursor (Gdk.CursorType.LeftPtr);
 
 		DockVisualStyle regionStyle;
 		DockVisualStyle itemStyle;

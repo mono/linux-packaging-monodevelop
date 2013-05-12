@@ -69,6 +69,7 @@
     <Compile Include="history.cs" />
     <Compile Include="IndexSearcher.cs" />
     <Compile Include="IndexUpdateManager.cs" />
+    <Compile Include="Logger.cs" />
     <Compile Include="MainWindow.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -105,6 +106,9 @@
     <EmbeddedResource Include="SearchTextBox.resx">
       <DependentUpon>SearchTextBox.cs</DependentUpon>
     </EmbeddedResource>
+    <Content Include="monodoc.dll.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>

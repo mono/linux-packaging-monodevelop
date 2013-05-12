@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/Mono.TextTemplating.Tests.dll.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/Mono.TextTemplating.Tests.dll
-/tmp/monodevelop/main/src/addins/TextTemplating/Mono.TextTemplating.Tests/obj/Debug/Mono.TextTemplating.Tests.dll
-/tmp/monodevelop/main/src/addins/TextTemplating/Mono.TextTemplating.Tests/obj/Debug/Mono.TextTemplating.Tests.dll.mdb

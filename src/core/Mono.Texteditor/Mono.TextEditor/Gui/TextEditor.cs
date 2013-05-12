@@ -142,8 +142,7 @@ namespace Mono.TextEditor
 		protected override void OnSizeAllocated (Rectangle allocation)
 		{
 			base.OnSizeAllocated (allocation);
-			if (textArea.Allocation != allocation)
-				textArea.SizeAllocate (allocation);
+			CurrentMode.AllocateTextArea (this, textArea, allocation);
 			SetChildrenPositions (allocation);
 		}
 
@@ -1218,7 +1217,11 @@ namespace Mono.TextEditor
 		{
 			textArea.SetCaretTo (line, column, highlight, centerCaret);
 		}
-		
+		public event EventHandler BeginHover {
+			add { textArea.BeginHover += value; }
+			remove { textArea.BeginHover -= value; }
+		}
+
 	}
 }
 

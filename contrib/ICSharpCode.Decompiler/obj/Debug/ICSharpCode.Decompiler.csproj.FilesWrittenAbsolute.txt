@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/bin/ICSharpCode.Decompiler.dll.mdb
-/tmp/monodevelop/main/build/bin/ICSharpCode.Decompiler.dll
-/tmp/monodevelop/main/contrib/ICSharpCode.Decompiler/obj/Debug/ICSharpCode.Decompiler.dll
-/tmp/monodevelop/main/contrib/ICSharpCode.Decompiler/obj/Debug/ICSharpCode.Decompiler.dll.mdb

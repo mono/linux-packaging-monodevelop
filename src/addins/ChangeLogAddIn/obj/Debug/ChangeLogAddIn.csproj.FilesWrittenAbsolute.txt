@@ -1,7 +1,0 @@
-/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.ChangeLogAddIn.addin.xml
-/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.Policies.xml
-/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.gtk-gui.gui.stetic
-/tmp/monodevelop/main/build/AddIns/ChangeLogAddIn/ChangeLogAddIn.dll.mdb
-/tmp/monodevelop/main/build/AddIns/ChangeLogAddIn/ChangeLogAddIn.dll
-/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.dll
-/tmp/monodevelop/main/src/addins/ChangeLogAddIn/obj/Debug/ChangeLogAddIn.dll.mdb

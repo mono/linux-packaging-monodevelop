@@ -30,9 +30,7 @@ using System.Linq;
 using System.Text;
 
 using MonoDevelop.Ide.Gui.Content;
-
 using MonoDevelop.CSharp.Formatting;
-using MonoDevelop.CSharp.Parser;
 
 namespace MonoDevelop.CSharp.Formatting
 {
@@ -75,7 +73,6 @@ namespace MonoDevelop.CSharp.Formatting
 		int cursor;
 		CSharpFormattingPolicy policy;
 		TextStylePolicy textPolicy;
-		// Constructors
 
 		public CSharpIndentEngine (CSharpFormattingPolicy policy, TextStylePolicy textPolicy)
 		{
@@ -146,9 +143,7 @@ namespace MonoDevelop.CSharp.Formatting
 		public bool IsInsideStringLiteral {
 			get { return (stack.PeekInside (0) & (Inside.StringLiteral)) != 0; }
 		}
-		
-		
-		
+
 		string TabsToSpaces (string indent)
 		{
 			StringBuilder builder;
@@ -326,7 +321,7 @@ namespace MonoDevelop.CSharp.Formatting
 		}
 		
 		//directive keywords that we care about
-		static string[] directiveKeywords = new string [] {"region", "endregion" };
+		static string[] directiveKeywords = new string [] { "region", "endregion" };
 		
 		string GetDirectiveKeyword (char currentChar)
 		{
@@ -338,11 +333,11 @@ namespace MonoDevelop.CSharp.Formatting
 				return null;
 			
 			for (int i = 0; i < directiveKeywords.Length; i++) {
-				if (directiveKeywords[i].StartsWith (str)) {
+				if (directiveKeywords[i].StartsWith (str, StringComparison.Ordinal)) {
 					if (str == directiveKeywords[i])
 						return directiveKeywords[i];
-					else
-						return null;
+
+					return null;
 				}
 			}
 			
@@ -444,8 +439,7 @@ namespace MonoDevelop.CSharp.Formatting
 			
 			// got a "/*" - might start a MultiLineComment
 			if ((inside & (Inside.StringOrChar | Inside.Comment)) != 0) {
-//				if ((inside & Inside.MultiLineComment) != 0)
-//					Console.WriteLine ("Watch out! Nested /* */ comment detected!");
+				// if ((inside & Inside.MultiLineComment) != 0) - user seems to have nested /* */ comments...
 				return;
 			}
 			
@@ -555,12 +549,12 @@ namespace MonoDevelop.CSharp.Formatting
 				switch (style) {
 				case GotoLabelIndentStyle.LeftJustify:
 					needsReindent = true;
-			//		curIndent = " ";
+					//curIndent = " ";
 					break;
 				case GotoLabelIndentStyle.OneLess:
 					needsReindent = true;
 					TrimIndent ();
-			//		curIndent += " ";
+					//curIndent += " ";
 					break;
 				default:
 					break;
@@ -690,9 +684,9 @@ namespace MonoDevelop.CSharp.Formatting
 				}
 			} else {
 				stack.Push (Inside.Block, keyword, curLineNr, 0);
-// Destroys one lined expression block 'var s = "".Split (new char[] {' '});'
-//				if (inside == Inside.ParenList)
-//					TrimIndent ();
+				// Destroys one lined expression block 'var s = "".Split (new char[] {' '});'
+				//if (inside == Inside.ParenList)
+				//	TrimIndent ();
 			}
 			
 			keyword = String.Empty;
@@ -783,7 +777,7 @@ namespace MonoDevelop.CSharp.Formatting
 					break;
 				}
 
-								/* not escaped... error!! but what can we do,
+				/* not escaped... error!! but what can we do,
 				 * eh? allow folding across multiple lines I
 				 * guess... */
 				break;
@@ -890,7 +884,7 @@ namespace MonoDevelop.CSharp.Formatting
 		{
 			var after = stack.PeekInside (0);
 			if ((after & Inside.ParenList) == Inside.ParenList && pc == '(') {
-//				var indent = stack.PeekIndent (0);
+				//var indent = stack.PeekIndent (0);
 				var kw = stack.PeekKeyword (0);
 				var line = stack.PeekLineNr (0);
 				stack.Pop ();

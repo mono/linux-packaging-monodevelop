@@ -1,4 +1,4 @@
-﻿// Copyright (c) AlphaSierraPapa for the SharpDevelop Team
+﻿// Copyright (c) 2010-2013 AlphaSierraPapa for the SharpDevelop Team
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
 // software and associated documentation files (the "Software"), to deal in the Software
@@ -62,7 +62,8 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 		
 		protected TColor valueKeywordColor;
 		protected TColor externAliasKeywordColor;
-		
+		protected TColor varKeywordTypeColor;
+
 		/// <summary>
 		/// Used for 'in' modifiers on type parameters.
 		/// </summary>
@@ -97,6 +98,11 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 				return;
 			}
 			if (rr is TypeResolveResult) {
+				if (blockDepth > 0 && identifier.Name == "var" && rr.Type.Kind != TypeKind.Null && rr.Type.Name != "var" ) {
+					Colorize(identifier, varKeywordTypeColor);
+					return;
+				}
+
 				TColor color;
 				if (TryGetTypeHighlighting (rr.Type.Kind, out color)) {
 					Colorize(identifier, color);
@@ -155,7 +161,8 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 			if (end.IsNull)
 				return;
 			Debug.Assert(node == end.Parent);
-			for (var child = node.FirstChild; child != end && !cancellationToken.IsCancellationRequested; child = child.NextSibling) {
+			for (var child = node.FirstChild; child != end; child = child.NextSibling) {
+				cancellationToken.ThrowIfCancellationRequested();
 				if (child.StartLocation < regionEnd && child.EndLocation > regionStart)
 					child.AcceptVisitor(this);
 			}
@@ -168,7 +175,8 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 		protected void VisitChildrenAfter(AstNode node, AstNode start)
 		{
 			Debug.Assert(start.IsNull || start.Parent == node);
-			for (var child = (start.IsNull ? node.FirstChild : start.NextSibling); child != null && !cancellationToken.IsCancellationRequested; child = child.NextSibling) {
+			for (var child = (start.IsNull ? node.FirstChild : start.NextSibling); child != null; child = child.NextSibling) {
+				cancellationToken.ThrowIfCancellationRequested();
 				if (child.StartLocation < regionEnd && child.EndLocation > regionStart)
 					child.AcceptVisitor(this);
 			}
@@ -213,6 +221,7 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 					break;
 			}
 			// "value" is handled in VisitIdentifierExpression()
+			// "alias" is handled in VisitExternAliasDeclaration()
 		}
 		
 		public override void VisitSimpleType(SimpleType simpleType)
@@ -257,7 +266,7 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 			Expression target = invocationExpression.Target;
 			if (target is IdentifierExpression || target is MemberReferenceExpression || target is PointerReferenceExpression) {
 				var invocationRR = resolver.Resolve(invocationExpression, cancellationToken) as CSharpInvocationResolveResult;
-				if (invocationRR != null && IsInactiveConditionalMethod(invocationRR.Member)) {
+				if (invocationRR != null && invocationExpression.Parent is ExpressionStatement && IsInactiveConditionalMethod(invocationRR.Member)) {
 					// mark the whole invocation statement as inactive code
 					Colorize(invocationExpression.Parent, inactiveCodeColor);
 					return;
@@ -286,8 +295,11 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 		{
 			if (member.EntityType != EntityType.Method || member.ReturnType.Kind != TypeKind.Void)
 				return false;
-			while (member.IsOverride)
+			while (member.IsOverride) {
 				member = (IParameterizedMember)InheritanceHelper.GetBaseMember(member);
+				if (member == null)
+					return false;
+			}
 			return IsInactiveConditional(member.Attributes);
 		}
 		
@@ -342,12 +354,6 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 		
 		public override void VisitMethodDeclaration(MethodDeclaration methodDeclaration)
 		{
-//			var result = resolver.Resolve (methodDeclaration, cancellationToken) as MemberResolveResult;
-//			if (IsInactiveConditionalMethod(result.Member as IMethod)) {
-//				Colorize(methodDeclaration, inactiveCodeColor);
-//				return;
-//			}
-//			
 			var nameToken = methodDeclaration.NameToken;
 			VisitChildrenUntil(methodDeclaration, nameToken);
 			if (!methodDeclaration.PrivateImplementationType.IsNull) {
@@ -514,6 +520,10 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 				case TypeKind.Delegate:
 					color = delegateTypeColor;
 					return true;
+				case TypeKind.Unknown:
+				case TypeKind.Null:
+					color = syntaxErrorColor;
+					return true;
 				default:
 					color = default (TColor);
 					return false;
@@ -575,7 +585,7 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 				Colorize(comment, inactiveCodeColor);
 			}
 		}
-		
+
 		public override void VisitPreProcessorDirective(PreProcessorDirective preProcessorDirective)
 		{
 		}
@@ -603,6 +613,14 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 					a.AcceptVisitor (this);
 				}
 			}
+		}
+
+		int blockDepth;
+		public override void VisitBlockStatement(BlockStatement blockStatement)
+		{
+			blockDepth++;
+			base.VisitBlockStatement(blockStatement);
+			blockDepth--;
 		}
 	}
 }

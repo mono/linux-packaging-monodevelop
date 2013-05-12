@@ -1,5 +1,0 @@
-/tmp/monodevelop/main/src/addins/prj2make-sharp-lib/obj/Debug/prj2makesharplib.prj2make-sharp-lib.addin.xml
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.MsVisualStudio/MonoDevelop.MsVisualStudio.dll.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.MsVisualStudio/MonoDevelop.MsVisualStudio.dll
-/tmp/monodevelop/main/src/addins/prj2make-sharp-lib/obj/Debug/MonoDevelop.MsVisualStudio.dll
-/tmp/monodevelop/main/src/addins/prj2make-sharp-lib/obj/Debug/MonoDevelop.MsVisualStudio.dll.mdb

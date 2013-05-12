@@ -1,9 +1,0 @@
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.MonoDevelop.VersionControl.Git.addin.xml
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.gtk-gui.gui.stetic
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.icons.arrow_branch.png
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.icons.server.png
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.icons.tag_blue.png
-/tmp/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Git.dll.mdb
-/tmp/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Git.dll
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.dll
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.dll.mdb

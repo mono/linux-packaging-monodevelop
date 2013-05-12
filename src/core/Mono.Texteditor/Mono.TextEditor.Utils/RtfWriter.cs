@@ -26,6 +26,7 @@
 using System;
 using System.Text;
 using System.Collections.Generic;
+using Mono.TextEditor.Highlighting;
 
 namespace Mono.TextEditor.Utils
 {
@@ -51,13 +52,12 @@ namespace Mono.TextEditor.Utils
 
 		public static string GenerateRtf (TextEditorData data)
 		{
-			return GenerateRtf (data.Document, data.Document.SyntaxMode, data.ColorStyle, data.Options);
+			return GenerateRtf (ColoredSegment.GetChunks (data, new TextSegment (0, data.Length)), data.ColorStyle, data.Options);
 		}
 
-		static void AppendRtfText (StringBuilder rtfText, TextDocument doc, int start, int end, ref bool appendSpace)
+		static void AppendRtfText (StringBuilder rtfText, string text, ref bool appendSpace)
 		{
-			for (int i = start; i < end; i++) {
-				char ch = doc.GetCharAt (i);
+			foreach (char ch in text) {
 				switch (ch) {
 				case '\\':
 					rtfText.Append (@"\\");
@@ -92,78 +92,58 @@ namespace Mono.TextEditor.Utils
 				}
 			}
 		}
-		public static string GenerateRtf (TextDocument doc, Mono.TextEditor.Highlighting.ISyntaxMode mode, Mono.TextEditor.Highlighting.ColorScheme style, ITextEditorOptions options)
+		internal static string GenerateRtf (List<List<ColoredSegment>> chunks, Mono.TextEditor.Highlighting.ColorScheme style, ITextEditorOptions options)
 		{
 			var rtfText = new StringBuilder ();
 			var colorList = new List<Cairo.Color> ();
 
-			var selection = new TextSegment (0, doc.TextLength);
-			int startLineNumber = doc.OffsetToLineNumber (selection.Offset);
-			int endLineNumber = doc.OffsetToLineNumber (selection.EndOffset);
-			
 			bool isItalic = false;
 			bool isBold = false;
 			int curColor = -1;
-			foreach (var line in doc.GetLinesBetween (startLineNumber, endLineNumber)) {
+			foreach (var line in chunks) {
 				bool appendSpace = false;
-				if (mode == null) {
-					AppendRtfText (rtfText, doc, System.Math.Max (selection.Offset, line.Offset), System.Math.Min (line.EndOffset, selection.EndOffset), ref appendSpace);
-					continue;
-				}
-				foreach (var chunk in mode.GetChunks (style, line, line.Offset, line.Length)) {
-					int start = System.Math.Max (selection.Offset, chunk.Offset);
-					int end = System.Math.Min (chunk.EndOffset, selection.EndOffset);
-					var chunkStyle = style.GetChunkStyle (chunk);
-					if (start < end) {
-						if (isBold != (chunkStyle.FontWeight == Xwt.Drawing.FontWeight.Bold)) {
-							isBold = chunkStyle.FontWeight == Xwt.Drawing.FontWeight.Bold;
-							rtfText.Append (isBold ? @"\b" : @"\b0");
-							appendSpace = true;
-						}
-						if (isItalic != (chunkStyle.FontStyle == Xwt.Drawing.FontStyle.Italic)) {
-							isItalic = chunkStyle.FontStyle == Xwt.Drawing.FontStyle.Italic;
-							rtfText.Append (isItalic ? @"\i" : @"\i0");
-							appendSpace = true;
-						}
-						var foreground = style.GetForeground (chunkStyle);
-						if (!colorList.Contains (foreground)) 
-							colorList.Add (foreground);
-						int color = colorList.IndexOf (foreground);
-						if (curColor != color) {
-							curColor = color;
-							rtfText.Append (@"\cf" + (curColor + 1));
-							appendSpace = true;
-						}
-						AppendRtfText (rtfText, doc, start, end, ref appendSpace);
+				foreach (var chunk in line) {
+					var chunkStyle = style.GetChunkStyle (chunk.Style);
+					if (isBold != (chunkStyle.FontWeight == Xwt.Drawing.FontWeight.Bold)) {
+						isBold = chunkStyle.FontWeight == Xwt.Drawing.FontWeight.Bold;
+						rtfText.Append (isBold ? @"\b" : @"\b0");
+						appendSpace = true;
 					}
+					if (isItalic != (chunkStyle.FontStyle == Xwt.Drawing.FontStyle.Italic)) {
+						isItalic = chunkStyle.FontStyle == Xwt.Drawing.FontStyle.Italic;
+						rtfText.Append (isItalic ? @"\i" : @"\i0");
+						appendSpace = true;
+					}
+					var foreground = style.GetForeground (chunkStyle);
+					if (!colorList.Contains (foreground)) 
+						colorList.Add (foreground);
+					int color = colorList.IndexOf (foreground);
+					if (curColor != color) {
+						curColor = color;
+						rtfText.Append (@"\cf" + (curColor + 1));
+						appendSpace = true;
+					}
+					AppendRtfText (rtfText, chunk.Text, ref appendSpace);
 				}
-				rtfText.Append (@"\par");
-				rtfText.AppendLine ();
+				rtfText.AppendLine (@"\line");
 			}
 			
 			var rtf = new StringBuilder();
 
-			rtf.Append (@"{\rtf1\ansi\deff0\adeflang1025");
-			
-			// font table
-			rtf.Append (@"{\fonttbl");
-
-			rtf.Append (@"{\f0\fnil\fprq1\fcharset128 " + options.Font.Family + ";}");
-
-			rtf.Append ("}");
-			
+			rtf.AppendLine (@"{\rtf1\ansi\deff0\adeflang1025");
+			rtf.AppendLine (@"{\fonttbl");
+			rtf.AppendLine (@"{\f0\fnil\fprq1\fcharset128 " + options.Font.Family + ";}");
+			rtf.AppendLine ("}");
 			rtf.Append (CreateColorTable (colorList));
-			
-			rtf.Append (@"\viewkind4\uc1\pard");
-
-			rtf.Append (@"\f0");
+			rtf.AppendLine (@"\viewkind4\uc1\pard");
+			rtf.AppendLine (@"\f0");
 			try {
 				string fontName = options.Font.ToString ();
 				double fontSize = Double.Parse (fontName.Substring (fontName.LastIndexOf (' ')  + 1), System.Globalization.CultureInfo.InvariantCulture) * 2;
 				rtf.Append (@"\fs");
 				rtf.Append (fontSize);
 			} catch (Exception) {};
-			rtf.Append (@"\cf1");
+			rtf.AppendLine (@"\cf1");
 			rtf.Append (rtfText.ToString ());
 			rtf.Append("}");
 			return rtf.ToString ();

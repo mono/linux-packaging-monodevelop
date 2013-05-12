@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/bin/mdhost.exe.mdb
-/tmp/monodevelop/main/build/bin/mdhost.exe
-/tmp/monodevelop/main/src/tools/mdhost/obj/Debug/mdhost.exe
-/tmp/monodevelop/main/src/tools/mdhost/obj/Debug/mdhost.exe.mdb

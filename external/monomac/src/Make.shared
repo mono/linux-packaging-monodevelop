@@ -103,6 +103,7 @@ SHARED_SOURCE = \
 	./Foundation/NSDate.cs				\
 	./Foundation/NSDictionary.cs			\
 	./Foundation/NSError.cs				\
+	./Foundation/NSErrorException.cs	\
 	./Foundation/NSFileManager.cs			\
 	./Foundation/NSHttpCookie.cs			\
 	./Foundation/NSHttpCookieStorage.cs		\
@@ -129,6 +130,7 @@ SHARED_SOURCE = \
 	./Foundation/NSTimer.cs				\
 	./Foundation/NSUrl.cs				\
 	./Foundation/NSUrlConnection.cs			\
+	./Foundation/NSUrlCredential.cs			\
 	./Foundation/NSUrlProtocol.cs		\
 	./Foundation/NSUrlProtocolClient.cs	\
 	./Foundation/NSUserDefaults.cs			\
@@ -208,6 +210,7 @@ SHARED_CORE_SOURCE = \
 	./Foundation/ConnectAttribute.cs		\
 	./Foundation/Enum.cs 				\
 	./Foundation/DictionaryContainer.cs		\
+	./Foundation/FieldAttribute.cs			\
 	./Foundation/ExportAttribute.cs			\
 	./Foundation/ModelAttribute.cs			\
 	./Foundation/NSAction.cs			\

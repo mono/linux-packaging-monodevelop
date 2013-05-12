@@ -70,6 +70,13 @@ namespace MonoDevelop.Debugger
 
 	internal class DebugHandler: CommandHandler
 	{
+		IBuildTarget GetRunTarget ()
+		{
+			return IdeApp.ProjectOperations.CurrentSelectedSolution != null && IdeApp.ProjectOperations.CurrentSelectedSolution.StartupItem != null ? 
+				IdeApp.ProjectOperations.CurrentSelectedSolution.StartupItem : 
+				IdeApp.ProjectOperations.CurrentSelectedBuildTarget;
+		}
+
 		protected override void Run ()
 		{
 			if (DebuggingService.IsPaused) {
@@ -84,11 +91,12 @@ namespace MonoDevelop.Debugger
 			
 			if (!IdeApp.Preferences.BuildBeforeExecuting) {
 				if (IdeApp.Workspace.IsOpen) {
-					CheckResult cr = CheckBeforeDebugging (IdeApp.ProjectOperations.CurrentSelectedSolution);
+					var it = GetRunTarget ();
+					CheckResult cr = CheckBeforeDebugging (it);
 					if (cr == DebugHandler.CheckResult.Cancel)
 						return;
 					if (cr == DebugHandler.CheckResult.Run) {
-						ExecuteSolution (IdeApp.ProjectOperations.CurrentSelectedSolution);
+						ExecuteSolution (it);
 						return;
 					}
 					// Else continue building
@@ -100,13 +108,13 @@ namespace MonoDevelop.Debugger
 			}
 			
 			if (IdeApp.Workspace.IsOpen) {
-				Solution sol = IdeApp.ProjectOperations.CurrentSelectedSolution;
-				IAsyncOperation op = IdeApp.ProjectOperations.Build (sol);
+				var it = GetRunTarget ();
+				IAsyncOperation op = IdeApp.ProjectOperations.Build (it);
 				op.Completed += delegate {
 					if (op.SuccessWithWarnings && !IdeApp.Preferences.RunWithWarnings)
 						return;
 					if (op.Success)
-						ExecuteSolution (sol);
+						ExecuteSolution (it);
 				};
 			} else {
 				Document doc = IdeApp.Workbench.ActiveDocument;
@@ -123,12 +131,12 @@ namespace MonoDevelop.Debugger
 			}
 		}
 
-		void ExecuteSolution (Solution sol)
+		void ExecuteSolution (IBuildTarget target)
 		{
-			if (IdeApp.ProjectOperations.CanDebug (sol))
-				IdeApp.ProjectOperations.Debug (sol);
+			if (IdeApp.ProjectOperations.CanDebug (target))
+				IdeApp.ProjectOperations.Debug (target);
 			else
-				IdeApp.ProjectOperations.Execute (sol);
+				IdeApp.ProjectOperations.Execute (target);
 		}
 
 		void ExecuteDocument (Document doc)
@@ -161,10 +169,10 @@ namespace MonoDevelop.Debugger
 			}
 
 			if (IdeApp.Workspace.IsOpen) {
-				var sol = IdeApp.ProjectOperations.CurrentSelectedSolution;
-				bool canExecute = sol != null && (
-					IdeApp.ProjectOperations.CanDebug (sol) ||
-					(!DebuggingService.IsDebuggingSupported && IdeApp.ProjectOperations.CanExecute (sol))
+				var target = GetRunTarget ();
+				bool canExecute = target != null && (
+					IdeApp.ProjectOperations.CanDebug (target) ||
+					(!DebuggingService.IsDebuggingSupported && IdeApp.ProjectOperations.CanExecute (target))
 				);
 
 				info.Enabled = canExecute && (IdeApp.ProjectOperations.CurrentRunOperation.IsCompleted || !DebuggingService.IsDebuggingSupported);
@@ -179,7 +187,7 @@ namespace MonoDevelop.Debugger
 			if (IdeApp.Preferences.BuildBeforeExecuting)
 				return CheckResult.BuildBeforeRun;
 			
-			if (!IdeApp.Workspace.NeedsBuilding ())
+			if (!target.NeedsBuilding (IdeApp.Workspace.ActiveConfiguration))
 				return CheckResult.Run;
 			
 			AlertButton bBuild = new AlertButton (GettextCatalog.GetString ("Build"));
@@ -461,14 +469,23 @@ namespace MonoDevelop.Debugger
 	{
 		protected override void Run ()
 		{
-			foreach (BreakEvent bp in DebuggingService.Breakpoints)
-				bp.Enabled = false;
+			bool enable = false;
+
+			foreach (BreakEvent bp in DebuggingService.Breakpoints) {
+				if (!bp.Enabled) {
+					enable = true;
+					break;
+				}
+			}
+
+			foreach (BreakEvent bp in DebuggingService.Breakpoints) {
+				bp.Enabled = enable;
+			}
 		}
 		
 		protected override void Update (CommandInfo info)
 		{
-			info.Enabled = !DebuggingService.Breakpoints.IsReadOnly
-				&& DebuggingService.Breakpoints.Any (b => b.Enabled);
+			info.Enabled = !DebuggingService.Breakpoints.IsReadOnly && DebuggingService.Breakpoints.Count > 0;
 			info.Visible = DebuggingService.IsFeatureSupported (DebuggerFeatures.Breakpoints);
 		}
 	}

@@ -342,6 +342,7 @@ namespace MonoMac.Foundation  {
 
 	[Flags]
 	public enum NSComparisonPredicateOptions {
+		None=0x00,
 		CaseInsensitive=0x01,
 		DiacriticInsensitive=0x02
 	}	
@@ -611,5 +612,13 @@ namespace MonoMac.Foundation  {
 	public enum NSDateComponentsWrappingBehavior {
 		None = 0,
 		WrapCalendarComponents = 1 << 0,
+	}
+
+	public enum NSUrlRequestNetworkServiceType {
+		Default,
+		VoIP,
+		Video,
+		Background,
+		Voice
 	}
 }

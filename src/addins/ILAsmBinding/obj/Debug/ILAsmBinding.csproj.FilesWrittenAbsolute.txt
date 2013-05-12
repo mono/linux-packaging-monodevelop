@@ -1,7 +1,0 @@
-/tmp/monodevelop/main/src/addins/ILAsmBinding/obj/Debug/ILAsmBinding.ILAsmConsoleProject.xpt.xml
-/tmp/monodevelop/main/src/addins/ILAsmBinding/obj/Debug/ILAsmBinding.ILAsmBinding.addin.xml
-/tmp/monodevelop/main/src/addins/ILAsmBinding/obj/Debug/ILAsmBinding.gtk-gui.gui.stetic
-/tmp/monodevelop/main/build/AddIns/BackendBindings/ILAsmBinding.dll.mdb
-/tmp/monodevelop/main/build/AddIns/BackendBindings/ILAsmBinding.dll
-/tmp/monodevelop/main/src/addins/ILAsmBinding/obj/Debug/ILAsmBinding.dll
-/tmp/monodevelop/main/src/addins/ILAsmBinding/obj/Debug/ILAsmBinding.dll.mdb

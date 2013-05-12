@@ -82,7 +82,7 @@ namespace MonoDevelop.Debugger
 				foreach (var t in dom.FindType (typeof (Exception)).GetSubTypeDefinitions ())
 					classes.Add (t.ReflectionName);
 			} else {
-				// no nead to unload this assembly context, it's not cached.
+				// no need to unload this assembly context, it's not cached.
 				var unresolvedAssembly = TypeSystemService.LoadAssemblyContext (Runtime.SystemAssemblyService.CurrentRuntime, MonoDevelop.Core.Assemblies.TargetFramework.Default, typeof(Uri).Assembly.Location);
 				var mscorlib = TypeSystemService.LoadAssemblyContext (Runtime.SystemAssemblyService.CurrentRuntime, MonoDevelop.Core.Assemblies.TargetFramework.Default, typeof(object).Assembly.Location);
 				if (unresolvedAssembly != null && mscorlib != null) {
@@ -97,9 +97,9 @@ namespace MonoDevelop.Debugger
 		{
 			tstateExc.Save ();
 			storeExceptions.Clear ();
-			string filter = entryFilter.Text.ToLower ();
+			string filter = entryFilter.Text;
 			foreach (string t in classes) {
-				if ((filter.Length == 0 || t.ToLower().IndexOf (filter) != -1) && !selectedClasses.Contains (t))
+				if ((filter.Length == 0 || t.IndexOf (filter, StringComparison.OrdinalIgnoreCase) != -1) && !selectedClasses.Contains (t))
 					storeExceptions.AppendValues (t);
 			}
 			tstateExc.Load ();
@@ -185,12 +185,12 @@ namespace MonoDevelop.Debugger
 			}
 		}
 		
-		protected virtual void OnEntryFilterActivated (object sender, System.EventArgs e)
+		protected virtual void OnEntryFilterActivated (object sender, EventArgs e)
 		{
 			OnButtonAddClicked (null, null);
 		}
 		
-		protected virtual void OnButtonOkClicked (object sender, System.EventArgs e)
+		protected virtual void OnButtonOkClicked (object sender, EventArgs e)
 		{
 			foreach (Catchpoint cp in new List<Catchpoint> (DebuggingService.Breakpoints.GetCatchpoints ())) {
 				if (!selectedClasses.Contains (cp.ExceptionName))

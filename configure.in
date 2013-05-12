@@ -1,4 +1,4 @@
-AC_INIT([monodevelop], 4.0.4, [monodevelop-list@lists.ximian.com])
+AC_INIT([monodevelop], 4.0.5, [monodevelop-list@lists.ximian.com])
 AC_PREREQ(2.53)
 AM_INIT_AUTOMAKE([1.10 tar-ustar])
 AM_MAINTAINER_MODE
@@ -12,7 +12,7 @@ ASSEMBLY_VERSION=4.0.0.0
 # the C# side of things. It should be one of the following two formats:
 # 1) "VERSION_NUMBER"					"2.0"
 # 2) "VERSION_NUMBER BUILD_TYPE BUILD_NUMBER"		"2.0 Alpha 1"
-PACKAGE_VERSION_LABEL="4.0.4"
+PACKAGE_VERSION_LABEL="4.0.5"
 
 AC_PATH_PROG(MONO, mono)
 AC_PATH_PROG(MCS, gmcs)
@@ -23,6 +23,22 @@ fi
 
 if test "x$MCS" = "x" ; then
   AC_MSG_ERROR([Can't find "gmcs" in your PATH])
+fi
+
+AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
+
+# On OSX use Mono's private copy of pkg-config if it exists
+OSX_PKG_CONFIG=/Library/Frameworks/Mono.framework/Versions/Current/bin/pkg-config
+if test -e $OSX_PKG_CONFIG; then
+	PKG_CONFIG=$OSX_PKG_CONFIG
+elif test "x$PKG_CONFIG" = "xno"; then
+	AC_MSG_ERROR([You need to install pkg-config])
+fi
+
+MONO_REQUIRED_VERSION=2.10.9
+
+if ! $PKG_CONFIG --atleast-version=$MONO_REQUIRED_VERSION mono; then
+	AC_MSG_ERROR([You need mono $MONO_REQUIRED_VERSION or newer])
 fi
 
 #ensure we have the same env as when configured
@@ -96,14 +112,12 @@ Please see http://www.mono-project.org/ to download latest mono sources or packa
 fi
 
 if test "x$has_mono" = "xtrue"; then
+    AC_PATH_PROG(RUNTIME, mono, no)
+    AC_PATH_PROG(CSC, dmcs, no)
     if test `uname -s` = "Darwin"; then
-	AC_PATH_PROG(RUNTIME, mono, no)
-	AC_PATH_PROG(CSC, dmcs, no)
 	LIB_PREFIX=
 	LIB_SUFFIX=.dylib
     else
-	AC_PATH_PROG(RUNTIME, mono, no)
-	AC_PATH_PROG(CSC, dmcs, no)
 	LIB_PREFIX=.so
 	LIB_SUFFIX=
     fi

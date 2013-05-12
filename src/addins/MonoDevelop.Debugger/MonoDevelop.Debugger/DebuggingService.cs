@@ -164,7 +164,7 @@ namespace MonoDevelop.Debugger
 					List<string> prios = new List<string> ();
 					int i = 0;
 					foreach (DebuggerEngineExtensionNode de in AddinManager.GetExtensionNodes (FactoriesPath)) {
-						if (de.Id.StartsWith ("Mono.Debugger.Soft")) // Give priority to soft debugger by default
+						if (de.Id.StartsWith ("Mono.Debugger.Soft", StringComparison.Ordinal)) // Give priority to soft debugger by default
 							prios.Insert (i++, de.Id);
 						else
 							prios.Add (de.Id);
@@ -270,8 +270,8 @@ namespace MonoDevelop.Debugger
 			DebuggerEngine engine = GetFactoryForCommand (command);
 			if (engine != null)
 				return engine.SupportedFeatures;
-			else
-				return DebuggerFeatures.None;
+
+			return DebuggerFeatures.None;
 		}
 
 		public static void ShowExpressionEvaluator (string expression)
@@ -344,68 +344,72 @@ namespace MonoDevelop.Debugger
 			});
 
 		}
-		
+
+		static object cleanup_lock = new object ();
 		static void Cleanup ()
 		{
+			DebuggerSession currentSession;
+			StatusBarIcon currentIcon;
+			IConsole currentConsole;
+
+			lock (cleanup_lock) {
+				if (!IsDebugging)
+					return;
+
+				currentIcon = busyStatusIcon;
+				currentSession = session;
+				currentConsole = console;
+
+				currentBacktrace = null;
+				busyStatusIcon = null;
+				session = null;
+				console = null;
+			}
+
 			if (oldLayout != null) {
 				string layout = oldLayout;
 				oldLayout = null;
-				// Dispatch asynchronously to avoid start/stop races
+
+				// Dispatch synchronously to avoid start/stop races
 				DispatchService.GuiSyncDispatch (delegate {
 					IdeApp.Workbench.HideCommandBar ("Debug");
 					if (IdeApp.Workbench.CurrentLayout == "Debug")
 						IdeApp.Workbench.CurrentLayout = layout;
 				});
 			}
-			
-			currentBacktrace = null;
-			
-			if (!IsDebugging)
-				return;
 
-			DispatchService.GuiSyncDispatch (delegate {
-				HideExceptionCaughtDialog ();
-			});
+			currentSession.BusyStateChanged -= OnBusyStateChanged;
+			currentSession.TargetEvent -= OnTargetEvent;
+			currentSession.TargetStarted -= OnStarted;
 
-			if (busyStatusIcon != null) {
-				busyStatusIcon.Dispose ();
-				busyStatusIcon = null;
+			currentSession.BreakpointTraceHandler = null;
+			currentSession.GetExpressionEvaluator = null;
+			currentSession.TypeResolverHandler = null;
+			currentSession.OutputWriter = null;
+			currentSession.LogWriter = null;
+			
+			if (currentConsole != null) {
+				currentConsole.CancelRequested -= OnCancelRequested;
+				currentConsole.Dispose ();
 			}
 			
-			session.TargetEvent -= OnTargetEvent;
-			session.TargetStarted -= OnStarted;
-			session.OutputWriter = null;
-			session.LogWriter = null;
-			session.BusyStateChanged -= OnBusyStateChanged;
-			session.TypeResolverHandler = null;
-			session.BreakpointTraceHandler = null;
-			session.GetExpressionEvaluator = null;
-			
-			// Dispose the session at the end, since it may take a while.
-			DebuggerSession oldSession = session;
-			session = null;
-			
 			DispatchService.GuiDispatch (delegate {
+				HideExceptionCaughtDialog ();
+
+				if (currentIcon != null) {
+					currentIcon.Dispose ();
+					currentIcon = null;
+				}
+
 				if (StoppedEvent != null)
 					StoppedEvent (null, new EventArgs ());
-			});
-			
-			if (console != null) {
-				console.CancelRequested -= OnCancelRequested;
-				console.Dispose ();
-				console = null;
-			}
-			
-			DispatchService.GuiDispatch (delegate {
+
 				NotifyCallStackChanged ();
 				NotifyCurrentFrameChanged ();
 				NotifyLocationChanged ();
 			});
-			
-			if (oldSession != null) {
-				oldSession.BusyStateChanged -= OnBusyStateChanged;
-				oldSession.Dispose ();
-			}
+
+			currentSession.Dispose ();
 		}
 
 		public static bool IsDebugging {
@@ -809,7 +813,7 @@ namespace MonoDevelop.Debugger
 		{
 			if (currentBacktrace != null) {
 				var sf = GetCurrentVisibleFrame ();
-				if (!string.IsNullOrEmpty (sf.SourceLocation.FileName) && System.IO.File.Exists (sf.SourceLocation.FileName) && sf.SourceLocation.Line != -1) {
+				if (sf != null && !string.IsNullOrEmpty (sf.SourceLocation.FileName) && System.IO.File.Exists (sf.SourceLocation.FileName) && sf.SourceLocation.Line != -1) {
 					Document document = IdeApp.Workbench.OpenDocument (sf.SourceLocation.FileName, sf.SourceLocation.Line, 1, OpenDocumentOptions.Debugger);
 					OnDisableConditionalCompilation (new DocumentEventArgs (document));
 				}
@@ -835,9 +839,9 @@ namespace MonoDevelop.Debugger
 					
 					//ensure that soft debugger is prioritised over newly installed debuggers
 					if (i1 < 0 )
-						i1 = d1.Id.StartsWith ("Mono.Debugger.Soft")? 0 : engs.Count;
+						i1 = d1.Id.StartsWith ("Mono.Debugger.Soft", StringComparison.Ordinal) ? 0 : engs.Count;
 					if (i2 < 0)
-						i2 = d2.Id.StartsWith ("Mono.Debugger.Soft")? 0 : engs.Count;
+						i2 = d2.Id.StartsWith ("Mono.Debugger.Soft", StringComparison.Ordinal) ? 0 : engs.Count;
 					
 					if (i1 == i2)
 						return d1.Name.CompareTo (d2.Name);

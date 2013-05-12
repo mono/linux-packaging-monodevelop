@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/tests/MonoDevelop.Debugger.Tests.TestApp.exe.mdb
-/tmp/monodevelop/main/build/tests/MonoDevelop.Debugger.Tests.TestApp.exe
-/tmp/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests.TestApp/obj/Debug/MonoDevelop.Debugger.Tests.TestApp.exe
-/tmp/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests.TestApp/obj/Debug/MonoDevelop.Debugger.Tests.TestApp.exe.mdb

@@ -1,5 +1,0 @@
-/tmp/monodevelop/main/src/tools/mdmonitor/obj/Debug/Mono.Instrumentation.Monitor.gtk-gui.gui.stetic
-/tmp/monodevelop/main/build/bin/mdmonitor.exe.mdb
-/tmp/monodevelop/main/build/bin/mdmonitor.exe
-/tmp/monodevelop/main/src/tools/mdmonitor/obj/Debug/mdmonitor.exe
-/tmp/monodevelop/main/src/tools/mdmonitor/obj/Debug/mdmonitor.exe.mdb

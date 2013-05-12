@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/AddIns/NUnit/NUnitRunner.dll.mdb
-/tmp/monodevelop/main/build/AddIns/NUnit/NUnitRunner.dll
-/tmp/monodevelop/main/src/addins/NUnit/NUnitRunner/obj/Debug/NUnitRunner.dll
-/tmp/monodevelop/main/src/addins/NUnit/NUnitRunner/obj/Debug/NUnitRunner.dll.mdb

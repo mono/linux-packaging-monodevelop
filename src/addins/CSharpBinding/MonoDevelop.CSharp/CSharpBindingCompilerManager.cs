@@ -174,11 +174,20 @@ namespace MonoDevelop.CSharp
 			if (configuration.SignAssembly) {
 				if (File.Exists (configuration.AssemblyKeyFile))
 					AppendQuoted (sb, "/keyfile:", configuration.AssemblyKeyFile);
+				if (configuration.DelaySign)
+					sb.AppendLine ("/delaySign");
 			}
-			
-			if (configuration.DebugMode) {
-//				sb.AppendLine ("/debug:+");
-				sb.AppendLine ("/debug:full");
+
+			var debugType = compilerParameters.DebugType;
+			if (string.IsNullOrEmpty (debugType)) {
+				debugType = configuration.DebugMode ? "full" : "none";
+			} else if (string.Equals (debugType, "pdbonly", StringComparison.OrdinalIgnoreCase)) {
+				//old Mono compilers don't support pdbonly
+				if (monoRuntime != null && !monoRuntime.HasMultitargetingMcs)
+					debugType = "full";
+			}
+			if (!string.Equals (debugType, "none", StringComparison.OrdinalIgnoreCase)) {
+					sb.AppendLine ("/debug:" + debugType);
 			}
 
 			if (compilerParameters.LangVersion != LangVersion.Default) {

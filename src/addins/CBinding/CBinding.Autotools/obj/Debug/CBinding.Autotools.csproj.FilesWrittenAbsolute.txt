@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.CBinding.Autotools.dll.mdb
-/tmp/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.CBinding.Autotools.dll
-/tmp/monodevelop/main/src/addins/CBinding/CBinding.Autotools/obj/Debug/MonoDevelop.CBinding.Autotools.dll
-/tmp/monodevelop/main/src/addins/CBinding/CBinding.Autotools/obj/Debug/MonoDevelop.CBinding.Autotools.dll.mdb

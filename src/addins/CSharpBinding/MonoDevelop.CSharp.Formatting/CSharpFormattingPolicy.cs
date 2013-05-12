@@ -63,7 +63,8 @@ namespace MonoDevelop.CSharp.Formatting
 		
 		static CSharpFormattingPolicy ()
 		{
-			PolicyService.InvariantPolicies.Set<CSharpFormattingPolicy> (new CSharpFormattingPolicy (), "text/x-csharp");
+			if (!PolicyService.InvariantPolicies.ReadOnly)
+				 PolicyService.InvariantPolicies.Set<CSharpFormattingPolicy> (new CSharpFormattingPolicy (), "text/x-csharp");
 		}
 		
 		protected CSharpFormattingPolicy (CSharpFormattingOptions options)
@@ -437,69 +438,7 @@ namespace MonoDevelop.CSharp.Formatting
 		}
 		
 		#endregion
-		
-		#region Force Braces
-		[ItemProperty]
-		public BraceForcement IfElseBraceForcement {
-			get {
-				return options.IfElseBraceForcement;
-			}
-			set {
-				options.IfElseBraceForcement = value;
-			}
-		}
-		
-		[ItemProperty]
-		public BraceForcement ForBraceForcement {
-			get {
-				return options.ForBraceForcement;
-			}
-			set {
-				options.ForBraceForcement = value;
-			}
-		}
-		
-		[ItemProperty]
-		public BraceForcement ForEachBraceForcement {
-			get {
-				return options.ForEachBraceForcement;
-			}
-			set {
-				options.ForEachBraceForcement = value;
-			}
-		}
-		
-		[ItemProperty]
-		public BraceForcement WhileBraceForcement {
-			get {
-				return options.WhileBraceForcement;
-			}
-			set {
-				options.WhileBraceForcement = value;
-			}
-		}
-		
-		[ItemProperty]
-		public BraceForcement UsingBraceForcement {
-			get {
-				return options.UsingBraceForcement;
-			}
-			set {
-				options.UsingBraceForcement = value;
-			}
-		}
-		
-		[ItemProperty]
-		public BraceForcement FixedBraceForcement {
-			get {
-				return options.FixedBraceForcement;
-			}
-			set {
-				options.FixedBraceForcement = value;
-			}
-		}
-		#endregion
-		
+
 		#region NewLines
 		[ItemProperty]
 		public NewLinePlacement ElseNewLinePlacement {
@@ -1438,7 +1377,170 @@ namespace MonoDevelop.CSharp.Formatting
 			}
 		}
 		#endregion
-		
+
+		#region Wrapping
+		[ItemProperty]
+		public Wrapping MethodCallArgumentWrapping {
+			get {
+				return options.MethodCallArgumentWrapping;
+			}
+			set {
+				options.MethodCallArgumentWrapping = value;
+			}
+		}
+
+		[ItemProperty]
+		public NewLinePlacement NewLineAferMethodCallOpenParentheses {
+			get {
+				return options.NewLineAferMethodCallOpenParentheses;
+			}
+			set {
+				options.NewLineAferMethodCallOpenParentheses = value;
+			}
+		}
+
+		[ItemProperty]
+		public NewLinePlacement MethodCallClosingParenthesesOnNewLine {
+			get {
+				return options.MethodCallClosingParenthesesOnNewLine;
+			}
+			set {
+				options.MethodCallClosingParenthesesOnNewLine = value;
+			}
+		}
+
+		[ItemProperty]
+		public bool AlignToFirstMethodCallArgument {
+			get {
+				return options.AlignToFirstMethodCallArgument;
+			}
+			set {
+				options.AlignToFirstMethodCallArgument = value;
+			}
+		}
+
+		[ItemProperty]
+		public Wrapping MethodDeclarationParameterWrapping {
+			get {
+				return options.MethodDeclarationParameterWrapping;
+			}
+			set {
+				options.MethodDeclarationParameterWrapping = value;
+			}
+		}
+
+		[ItemProperty]
+		public NewLinePlacement NewLineAferMethodDeclarationOpenParentheses {
+			get {
+				return options.NewLineAferMethodDeclarationOpenParentheses;
+			}
+			set {
+				options.NewLineAferMethodDeclarationOpenParentheses = value;
+			}
+		}
+
+		[ItemProperty]
+		public NewLinePlacement MethodDeclarationClosingParenthesesOnNewLine {
+			get {
+				return options.MethodDeclarationClosingParenthesesOnNewLine;
+			}
+			set {
+				options.MethodDeclarationClosingParenthesesOnNewLine = value;
+			}
+		}
+
+		[ItemProperty]
+		public bool AlignToFirstMethodDeclarationParameter {
+			get {
+				return options.AlignToFirstMethodDeclarationParameter;
+			}
+			set {
+				options.AlignToFirstMethodDeclarationParameter = value;
+			}
+		}
+	
+		[ItemProperty]
+		public Wrapping IndexerDeclarationParameterWrapping {
+			get {
+				return options.IndexerDeclarationParameterWrapping;
+			}
+			set {
+				options.IndexerDeclarationParameterWrapping = value;
+			}
+		}
+
+		[ItemProperty]
+		public NewLinePlacement NewLineAferIndexerDeclarationOpenBracket {
+			get {
+				return options.NewLineAferIndexerDeclarationOpenBracket;
+			}
+			set {
+				options.NewLineAferIndexerDeclarationOpenBracket = value;
+			}
+		}
+
+		[ItemProperty]
+		public NewLinePlacement IndexerDeclarationClosingBracketOnNewLine {
+			get {
+				return options.IndexerDeclarationClosingBracketOnNewLine;
+			}
+			set {
+				options.IndexerDeclarationClosingBracketOnNewLine = value;
+			}
+		}
+
+		[ItemProperty]
+		public bool AlignToFirstIndexerDeclarationParameter {
+			get {
+				return options.AlignToFirstIndexerDeclarationParameter;
+			}
+			set {
+				options.AlignToFirstIndexerDeclarationParameter = value;
+			}
+		}
+
+		[ItemProperty]
+		public Wrapping IndexerArgumentWrapping {
+			get {
+				return options.IndexerArgumentWrapping;
+			}
+			set {
+				options.IndexerArgumentWrapping = value;
+			}
+		}
+
+		[ItemProperty]
+		public NewLinePlacement NewLineAferIndexerOpenBracket {
+			get {
+				return options.NewLineAferIndexerOpenBracket;
+			}
+			set {
+				options.NewLineAferIndexerOpenBracket = value;
+			}
+		}
+
+		[ItemProperty]
+		public NewLinePlacement IndexerClosingBracketOnNewLine {
+			get {
+				return options.IndexerClosingBracketOnNewLine;
+			}
+			set {
+				options.IndexerClosingBracketOnNewLine = value;
+			}
+		}
+
+		[ItemProperty]
+		public bool AlignToFirstIndexerArgument {
+			get {
+				return options.AlignToFirstIndexerArgument;
+			}
+			set {
+				options.AlignToFirstIndexerArgument = value;
+			}
+		}
+
+		#endregion
+
 		public CSharpFormattingPolicy ()
 		{
 			this.options = FormattingOptionsFactory.CreateMono ();

@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/TextTransform.exe.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/TextTransform.exe
-/tmp/monodevelop/main/src/addins/TextTemplating/TextTransform/obj/Debug/TextTransform.exe
-/tmp/monodevelop/main/src/addins/TextTemplating/TextTransform/obj/Debug/TextTransform.exe.mdb

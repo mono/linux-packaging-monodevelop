@@ -60,12 +60,7 @@ namespace MonoDevelop.Ide.CodeFormatting
 			if (formatter == null)
 				return;
 			using (var undo = doc.Editor.OpenUndoGroup ()) {
-				var loc = doc.Editor.Caret.Location;
-				var text = formatter.FormatText (doc.Project != null ? doc.Project.Policies : null, doc.Editor.Text);
-				if (text != null) {
-					doc.Editor.Replace (0, doc.Editor.Length, text);
-					doc.Editor.Caret.Location = loc;
-				}
+				formatter.OnTheFlyFormat (doc, 0, doc.Editor.Length);
 			}
 		}
 	}
@@ -115,11 +110,11 @@ namespace MonoDevelop.Ide.CodeFormatting
 					}
 				}
 
-				int newOffset = version.MoveOffsetTo (editor.Version, selection.Offset);
-				int newEndOffset = version.MoveOffsetTo (editor.Version, selection.EndOffset);
-				
-				editor.SetSelection (newOffset, newEndOffset);
-
+				if (editor.IsSomethingSelected) { 
+					int newOffset = version.MoveOffsetTo (editor.Version, selection.Offset);
+					int newEndOffset = version.MoveOffsetTo (editor.Version, selection.EndOffset);
+					editor.SetSelection (newOffset, newEndOffset);
+				}
 			}
 		}
 	}

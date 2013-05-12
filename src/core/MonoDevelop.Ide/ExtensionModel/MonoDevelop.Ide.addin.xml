@@ -7,7 +7,7 @@
        description = "The MonoDevelop IDE application."
        category    = "MonoDevelop Core"
        isroot      = "true"
-       version     = "4.0.4"
+       version     = "4.0.5"
        compatVersion = "4.0">
 	
 	<Runtime>
@@ -15,7 +15,7 @@
 	</Runtime>
 	
 	<Dependencies>
-		<Addin id="Core" version="4.0.4"/>
+		<Addin id="Core" version="4.0.5"/>
 	</Dependencies>
 
 	<!-- Extension ponts -->
@@ -240,6 +240,9 @@
 		<FileFilter id = "Project"
 		            _label = "MD 1.0 Project Files"
 		            extensions = "*.mdp"/>
+		<FileFilter id = "Workbench"
+					_label = "MD Workbench"
+					extensions = "*.mdw"/>
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
@@ -266,7 +269,8 @@
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/Fonts">
-		<Font name ="Editor" _displayName="Text Editor" default ="_DEFAULT_MONOSPACE"/>
+        <Font name ="Editor" _displayName="Text Editor" default ="_DEFAULT_MONOSPACE"/>
+        <Font name ="Editor(Gutter)" _displayName="Text Editor Line Numbers" default =""/>
 		<Font name ="Pad" _displayName="Pads" default ="_DEFAULT_SANS"/>
 		<Font name ="OutputPad" _displayName="Output Pads" default ="_DEFAULT_MONOSPACE"/>
 	</Extension>

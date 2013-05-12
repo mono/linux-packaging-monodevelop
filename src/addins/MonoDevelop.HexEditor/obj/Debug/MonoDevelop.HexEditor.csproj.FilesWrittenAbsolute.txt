@@ -1,6 +1,0 @@
-/tmp/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MHex.gtk-gui.gui.stetic
-/tmp/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MHex.MonoDevelop.HexEditor.addin.xml
-/tmp/monodevelop/main/build/AddIns/DisplayBindings/HexEditor/MonoDevelop.HexEditor.dll.mdb
-/tmp/monodevelop/main/build/AddIns/DisplayBindings/HexEditor/MonoDevelop.HexEditor.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MonoDevelop.HexEditor.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MonoDevelop.HexEditor.dll.mdb

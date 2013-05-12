@@ -1,4 +1,4 @@
-﻿// Copyright (c) AlphaSierraPapa for the SharpDevelop Team
+﻿// Copyright (c) 2010-2013 AlphaSierraPapa for the SharpDevelop Team
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
 // software and associated documentation files (the "Software"), to deal in the Software
@@ -95,6 +95,69 @@ class TestClass {
 			var result = Resolve<InvocationResolveResult>(program);
 			Assert.That(result.Type.GetProperties().Select(p => p.Name), Is.EquivalentTo(new[] { "a", "b", "c" }));
 			Assert.That(result.Type.GetProperties().Single(p => p.Name == "c").ReturnType.GetProperties().Select(p => p.Name), Is.EquivalentTo(new[] { "d", "e", "f" }));
+		}
+
+		[Test]
+		public void DeclaringTypeIsSetCorrectlyForMembersOfAnonymousType()
+		{
+			string program = @"using System;
+class TestClass {
+	void F() {
+		var o = $new { Prop = 0 }$;
+	}
+}";
+			var result = Resolve<InvocationResolveResult>(program);
+			var prop = result.Type.GetProperties().Single();
+			Assert.That(prop.DeclaringType, Is.EqualTo(result.Type));
+			Assert.That(prop.Getter.DeclaringType, Is.EqualTo(result.Type));
+			Assert.That(prop.Getter.IsAccessor, Is.True);
+			Assert.That(prop.Getter.AccessorOwner, Is.EqualTo(prop));
+			Assert.That(prop.Setter, Is.Null);
+		}
+		
+		[Test]
+		public void CanRoundtripAnonymousTypeThroughTypeReference()
+		{
+			string program = @"using System;
+class TestClass {
+	void F() {
+		var o = $new { Prop = 0 }$;
+	}
+}";
+			var result = Resolve<InvocationResolveResult>(program);
+			Assert.AreEqual(TypeKind.Anonymous, result.Type.Kind);
+			IType typeAfterRoundtrip = result.Type.ToTypeReference().Resolve(result.Member.Compilation);
+			Assert.AreEqual(result.Type, typeAfterRoundtrip);
+		}
+		
+		[Test]
+		public void CanRoundtripAnonymousTypePropertyThroughMemberReference()
+		{
+			string program = @"using System;
+class TestClass {
+	void F() {
+		var o = $new { Prop = 0 }$;
+	}
+}";
+			var result = Resolve<InvocationResolveResult>(program);
+			IProperty prop = result.Type.GetProperties().Single();
+			IProperty propAfterRoundtrip = (IProperty)prop.ToMemberReference().Resolve(result.Member.Compilation.TypeResolveContext);
+			Assert.AreEqual(prop, propAfterRoundtrip);
+		}
+		
+		[Test]
+		public void CanRoundtripAnonymousTypeGetterThroughMemberReference()
+		{
+			string program = @"using System;
+class TestClass {
+	void F() {
+		var o = $new { Prop = 0 }$;
+	}
+}";
+			var result = Resolve<InvocationResolveResult>(program);
+			IMethod getter = result.Type.GetProperties().Single().Getter;
+			IMethod getterAfterRoundtrip = (IMethod)getter.ToMemberReference().Resolve(result.Member.Compilation.TypeResolveContext);
+			Assert.AreEqual(getter, getterAfterRoundtrip);
 		}
 	}
 }

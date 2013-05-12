@@ -852,16 +852,24 @@ namespace MonoDevelop.SourceEditor
 		internal bool UseIncorrectMarkers { get; set; }
 		internal bool HasIncorrectEolMarker {
 			get {
+				string eol = DetectedEolMarker;
+				if (eol == null)
+					return false;
+				return eol != textEditor.Options.DefaultEolMarker;
+			}
+		}
+		string DetectedEolMarker {
+			get {
 				if (textEditor.IsDisposed) {
 					LoggingService.LogWarning ("SourceEditorWidget.cs: HasIncorrectEolMarker was called on disposed source editor widget." + Environment.NewLine + Environment.StackTrace);
-					return false;
+					return null;
 				}
 				var firstLine = Document.GetLine (1);
 				if (firstLine != null && firstLine.DelimiterLength > 0) {
 					string firstDelimiter = Document.GetTextAt (firstLine.Length, firstLine.DelimiterLength);
-					return firstDelimiter != textEditor.Options.DefaultEolMarker;
+					return firstDelimiter;
 				}
-				return false;
+				return null;
 			}
 		}
 
@@ -903,8 +911,10 @@ namespace MonoDevelop.SourceEditor
 			
 			if (messageBar == null) {
 				messageBar = new MonoDevelop.Components.InfoBar (MessageType.Warning);
+				string detectedEol = DetectedEolMarker.Replace ("\n", "NL").Replace ("\r", "CR");
+				string defaultEol = textEditor.Options.DefaultEolMarker.Replace ("\n", "NL").Replace ("\r", "CR");
 				messageBar.SetMessageLabel (GettextCatalog.GetString (
-					"<b>The file \"{0}\" has line endings which differ from the policy settings.</b>\n" +
+					"<b>The file \"{0}\" has line endings (" + detectedEol + ") which differ from the policy settings(" + defaultEol + ").</b>\n" +
 					"Do you want to convert the line endings?",
 					EllipsizeMiddle (Document.FileName, 50)));
 				
@@ -1262,10 +1272,21 @@ namespace MonoDevelop.SourceEditor
 		
 		void SetSearchPatternToSelection ()
 		{
+			if (!TextEditor.IsSomethingSelected) {
+				int start = textEditor.Caret.Offset;
+				int end = start;
+				while (start - 1 >= 0 && DynamicAbbrevHandler.IsIdentifierPart (textEditor.GetCharAt (start - 1)))
+					start--;
+
+				while (end < textEditor.Length && DynamicAbbrevHandler.IsIdentifierPart (textEditor.GetCharAt (end)))
+					end++;
+				textEditor.Caret.Offset = end;
+				TextEditor.SetSelection (start, end);
+			}
+
 			if (TextEditor.IsSomethingSelected) {
 				var pattern = FormatPatternToSelectionOption (TextEditor.SelectedText);
-					
-				TextEditor.SearchPattern = pattern;
+				SearchAndReplaceOptions.SearchPattern = pattern;
 				SearchAndReplaceWidget.UpdateSearchHistory (TextEditor.SearchPattern);
 			}
 			if (searchAndReplaceWidget != null)
@@ -1615,7 +1636,7 @@ namespace MonoDevelop.SourceEditor
 
 		public override void Draw (TextEditor editor, Cairo.Context cr, Pango.Layout layout, bool selected, int startOffset, int endOffset, double y, double startXPos, double endXPos)
 		{
-			Color = Info.ErrorType == ErrorType.Warning ? editor.ColorStyle.UnderlineWarning.GetColor ("color") : editor.ColorStyle.UnderlineError.GetColor ("color");
+			Color = Info.ErrorType == ErrorType.Warning ? editor.ColorStyle.UnderlineWarning.Color : editor.ColorStyle.UnderlineError.Color;
 
 			base.Draw (editor, cr, layout, selected, startOffset, endOffset, y, startXPos, endXPos);
 		}

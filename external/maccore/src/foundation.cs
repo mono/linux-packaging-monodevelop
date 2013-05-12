@@ -288,6 +288,7 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[Protocol]
 	public interface NSCacheDelegate {
 		[Export ("cache:willEvictObject:"), EventArgs ("NSObject")]
 		void WillEvictObject (NSCache cache, NSObject obj);
@@ -1041,6 +1042,7 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[Protocol]
 	public interface NSKeyedArchiverDelegate {
 		[Export ("archiver:didEncodeObject:"), EventArgs ("NSObject")]
 		void EncodedObject (NSKeyedArchiver archiver, NSObject obj);
@@ -1060,6 +1062,7 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[Protocol]
 	public interface NSKeyedUnarchiverDelegate {
 		[Export ("unarchiver:didDecodeObject:"), DelegateName ("NSDecoderCallback"), DefaultValue (null)]
 		NSObject DecodedObject (NSKeyedUnarchiver unarchiver, NSObject obj);
@@ -1303,6 +1306,7 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[Protocol]
 	public interface NSMetadataQueryDelegate {
 		[Export ("metadataQuery:replacementObjectForResultObject:"), DelegateName ("NSMetadataQueryObject"), DefaultValue(null)]
 		NSObject ReplacementObjectForResultObject (NSMetadataQuery query, NSMetadataItem result);
@@ -1445,13 +1449,13 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSData))]
 	public interface NSMutableData {
-		[Static, Export ("dataWithCapacity:")]
+		[Static, Export ("dataWithCapacity:")] [Autorelease]
 		NSMutableData FromCapacity (int capacity);
 
-		[Static, Export ("dataWithLength:")]
+		[Static, Export ("dataWithLength:")] [Autorelease]
 		NSMutableData FromLength (int length);
 		
-		[Static, Export ("data")]
+		[Static, Export ("data")] [Autorelease]
 		NSMutableData Create ();
 		
 		[Export ("setLength:")]
@@ -2364,8 +2368,9 @@ namespace MonoMac.Foundation
 		[Export ("initWithUUIDString:")]
 		IntPtr Constructor (string str);
 
-		[Export ("initWithUUIDBytes:"), Internal]
-		IntPtr Constructor (IntPtr bytes, bool unused);
+		// bound manually to keep the managed/native signatures identical
+		//[Export ("initWithUUIDBytes:"), Internal]
+		//IntPtr Constructor (IntPtr bytes, bool unused);
 
 		[Export ("getUUIDBytes:"), Internal]
 		void GetUuidBytes (IntPtr uuid);
@@ -2586,6 +2591,12 @@ namespace MonoMac.Foundation
 
 		[Export("stopAccessingSecurityScopedResource")]
 		void StopAccessingSecurityScopedResource();
+	
+		[Export("filePathURL")]
+		NSUrl FilePathUrl { get; }
+
+		[Export("fileReferenceURL")]
+		NSUrl FileReferenceUrl { get; }		
 
 #endif
 
@@ -3051,6 +3062,7 @@ namespace MonoMac.Foundation
 		[Since (5,0)]
 		[Static]
 		[Export ("sendAsynchronousRequest:queue:completionHandler:")]
+		[Async (ResultTypeName = "NSUrlAsyncResult")]
 		void SendAsynchronousRequest (NSUrlRequest request, NSOperationQueue queue, NSUrlConnectionDataResponse completionHandler);
 		
 #if !MONOMAC
@@ -3062,6 +3074,7 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSObject), Name="NSURLConnectionDelegate")]
 	[Model]
+	[Protocol]
 	public interface NSUrlConnectionDelegate {
 		[Export ("connection:willSendRequest:redirectResponse:")]
 		NSUrlRequest WillSendRequest (NSUrlConnection connection, NSUrlRequest request, NSUrlResponse response);
@@ -3102,6 +3115,7 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSUrlConnectionDelegate), Name="NSUrlConnectionDownloadDelegate")]
 	[Model]
+	[Protocol]
 	public interface NSUrlConnectionDownloadDelegate {
 		[Export ("connection:didWriteData:totalBytesWritten:expectedTotalBytes:")]
 		void WroteData (NSUrlConnection connection, long bytesWritten, long totalBytesWritten, long expectedTotalBytes);
@@ -3150,8 +3164,9 @@ namespace MonoMac.Foundation
 		//[Export ("certificates")]
 		//IntPtr [] Certificates { get; }
 	
-		[Export ("initWithTrust:")]
-		IntPtr Constructor (IntPtr SecTrustRef_trust, bool ignored);
+		// bound manually to keep the managed/native signatures identical
+		//[Export ("initWithTrust:")]
+		//IntPtr Constructor (IntPtr SecTrustRef_trust, bool ignored);
 	
 		[Static]
 		[Export ("credentialForTrust:")]
@@ -3431,6 +3446,12 @@ namespace MonoMac.Foundation
 		[Export ("mainDocumentURL")]
 		NSUrl MainDocumentURL { get; }
 
+		[Export ("networkServiceType")]
+		NSUrlRequestNetworkServiceType NetworkServiceType { get; }
+
+		[Export ("allowsCellularAccess")]
+		bool AllowsCellularAccess { get; }
+		
 		[Export ("HTTPMethod")]
 		string HttpMethod { get; }
 
@@ -3565,7 +3586,10 @@ namespace MonoMac.Foundation
 		[New][Export ("HTTPShouldHandleCookies")]
 		bool ShouldHandleCookies { get; set; }
 
-		[Export ("allowsCellularAccess")]
+		[Export ("networkServiceType")]
+		NSUrlRequestNetworkServiceType NetworkServiceType { set; get; }
+		
+		[New] [Export ("allowsCellularAccess")]
 		bool AllowsCellularAccess { get; set; }
 	}
 	
@@ -3695,6 +3719,7 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[Protocol]
 	public interface NSStreamDelegate {
 		[Export ("stream:handleEvent:"), EventArgs ("NSStream"), EventName ("OnEvent")]
 		void HandleEvent (NSStream theStream, NSStreamEvent streamEvent);
@@ -3781,6 +3806,53 @@ namespace MonoMac.Foundation
 		[Export ("stringByReplacingCharactersInRange:withString:")]
 		NSString Replace (NSRange range, NSString replacement);
 
+		// start methods from NSStringPathExtensions category
+
+		[Static]
+		[Export("pathWithComponents:")]
+		string[] PathWithComponents( string[] components );
+
+		[Export("pathComponents")]
+		string[] PathComponents { get; }
+
+		[Export("isAbsolutePath")]
+		bool IsAbsolutePath { get; }
+
+		[Export("lastPathComponent")]
+		NSString LastPathComponent { get; }
+
+		[Export("stringByDeletingLastPathComponent")]
+		NSString DeleteLastPathComponent();
+ 
+ 		[Export("stringByAppendingPathComponent:")]
+ 		NSString AppendPathComponent( NSString str );
+
+ 		[Export("pathExtension")]
+ 		NSString PathExtension { get; }
+
+ 		[Export("stringByDeletingPathExtension")]
+ 		NSString DeletePathExtension();
+
+ 		[Export("stringByAppendingPathExtension:")]
+ 		NSString AppendPathExtension( NSString str );
+ 
+ 		[Export("stringByAbbreviatingWithTildeInPath")]
+ 		NSString AbbreviateTildeInPath();
+
+ 		[Export("stringByExpandingTildeInPath")]
+ 		NSString ExpandTildeInPath();
+ 
+ 		[Export("stringByStandardizingPath")]
+ 		NSString StandarizePath();
+
+ 		[Export("stringByResolvingSymlinksInPath")]
+ 		NSString ResolveSymlinksInPath();
+
+		[Export("stringsByAppendingPaths:")]
+ 		string[] AppendPaths( string[] paths );
+
+		// end methods from NSStringPathExtensions category
+
 		[Since (6,0)]
 		[Export ("capitalizedStringWithLocale:")]
 		string Capitalize (NSLocale locale);
@@ -3839,12 +3911,6 @@ namespace MonoMac.Foundation
 		[Static]
 		[Export ("inputStreamWithURL:")]
 		NSInputStream FromUrl (NSUrl url);
-
-		[Export ("_scheduleInCFRunLoop:forMode:")]
-		void ScheduleInCFRunLoop (CFRunLoop runloop, NSString mode);
-
-		[Export ("_unscheduleFromCFRunLoop:forMode:")]
-		void UnscheduleInCFRunLoop (CFRunLoop runloop, NSString mode);
 	}
 
 	//
@@ -3928,7 +3994,7 @@ namespace MonoMac.Foundation
 
 		[Field ("NSKeyValueChangeNotificationIsPriorKey")]
 		NSString ChangeNotificationIsPriorKey { get; }
-
+#if MONOMAC
 		// Cocoa Bindings added by Kenneth J. Pouncey 2010/11/17
 		[Export ("exposedBindings")]
 		NSString[] ExposedBindings ();
@@ -3947,7 +4013,7 @@ namespace MonoMac.Foundation
 
 		[Export ("optionDescriptionsForBinding:")]
 		NSObject[] BindingOptionDescriptions (string aBinding);
-#if MONOMAC
+
 		// NSPlaceholders (informal) protocol
 		[Static]
 		[Export ("defaultPlaceholderForMarker:withBinding:")]
@@ -3956,7 +4022,7 @@ namespace MonoMac.Foundation
 		[Static]
 		[Export ("setDefaultPlaceholder:forMarker:withBinding:")]
 		void SetDefaultPlaceholder (NSObject placeholder, NSObject marker, string binding);
-#endif
+
 		[Export ("objectDidEndEditing:")]
 		void ObjectDidEndEditing (NSObject editor);
 
@@ -3966,7 +4032,7 @@ namespace MonoMac.Foundation
 		[Export ("commitEditingWithDelegate:didCommitSelector:contextInfo:")]
 		//void CommitEditingWithDelegateDidCommitSelectorContextInfo (NSObject objDelegate, Selector didCommitSelector, IntPtr contextInfo);
 		void CommitEditing (NSObject objDelegate, Selector didCommitSelector, IntPtr contextInfo);
-
+#endif
 		[Export ("copy")]
 		NSObject Copy ();
 		
@@ -4367,6 +4433,10 @@ namespace MonoMac.Foundation
 
 		[Export ("pathForSoundResource:")]
 		string PathForSoundResource (string resource);
+
+		[Export("appStoreReceiptURL")]
+		NSUrl AppStoreReceiptUrl { get; }
+
 #else
 		// http://developer.apple.com/library/ios/#documentation/uikit/reference/NSBundle_UIKitAdditions/Introduction/Introduction.html
 		[Export ("loadNibNamed:owner:options:")]
@@ -4659,6 +4729,7 @@ namespace MonoMac.Foundation
 	}
 
 	[Model, BaseType (typeof (NSObject))]
+	[Protocol]
 	public interface NSNetServiceDelegate {
 		[Export ("netServiceWillPublish:")]
 		void WillPublish (NSNetService sender);
@@ -4716,6 +4787,7 @@ namespace MonoMac.Foundation
 	}
 
 	[Model, BaseType (typeof (NSObject))]
+	[Protocol]
 	public interface NSNetServiceBrowserDelegate {
 		[Export ("netServiceBrowserWillSearch:")]
 		void SearchStarted (NSNetServiceBrowser sender);
@@ -4880,6 +4952,9 @@ namespace MonoMac.Foundation
 	
 		[Export ("isEqualToValue:")]
 		bool IsEqualTo (NSValue value);
+		
+		[Export ("valueWithRange:")][Static]
+		NSValue FromRange(NSRange range);
 	
 #if MONOMAC
 		[Static, Export ("valueWithCMTime:"), Lion]
@@ -5534,6 +5609,24 @@ namespace MonoMac.Foundation
 		
 		[Export ("activeProcessorCount")]
 		int ActiveProcessorCount { get; }
+
+		[Export ("systemUptime")]
+		double SystemUptime { get; }
+
+		[Export ("enableSuddenTermination")]
+		void EnableSuddenTermination  ();
+	
+		[Export ("disableSuddenTermination")]
+		void DisableSuddenTermination ();
+
+		[Export ("enableAutomaticTermination:")]
+		void EnableAutomaticTermination (string reason);
+
+		[Export ("disableAutomaticTermination:")]
+		void DisableAutomaticTermination (string reason);
+
+		[Export ("automaticTerminationSupportEnabled")]
+		bool AutomaticTerminationSupportEnabled { get; set; }
 	}
 
 	[BaseType (typeof (NSMutableData))]
@@ -5896,6 +5989,7 @@ namespace MonoMac.Foundation
 
 	[BaseType(typeof(NSObject))]
 	[Model]
+	[Protocol]
 	public interface NSFileManagerDelegate {
 		[Export("fileManager:shouldCopyItemAtPath:toPath:")]
 		bool ShouldCopyItemAtPath(NSFileManager fm, NSString srcPath, NSString dstPath);
@@ -5960,6 +6054,7 @@ namespace MonoMac.Foundation
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[Protocol]
 	partial interface NSFilePresenter {
 		[Abstract]
 		[Export ("presentedItemURL")]

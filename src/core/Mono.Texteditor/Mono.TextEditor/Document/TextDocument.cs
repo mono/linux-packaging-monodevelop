@@ -58,8 +58,10 @@ namespace Mono.TextEditor
 			}
 			set {
 				if (mimeType != value) {
-					mimeType = value;
-					SyntaxMode = SyntaxModeService.GetSyntaxMode (this);
+					lock (this) {
+						mimeType = value;
+						SyntaxMode = SyntaxModeService.GetSyntaxMode (this, value);
+					}
 				}
 			}
 		}
@@ -477,7 +479,8 @@ namespace Mono.TextEditor
 			if (lineNr < DocumentLocation.MinLine)
 				return DocumentLocation.Empty;
 			DocumentLine line = GetLine (lineNr);
-			return new DocumentLocation (lineNr, System.Math.Min (line.LengthIncludingDelimiter, offset - line.Offset) + 1);
+			var col = System.Math.Max (1, System.Math.Min (line.LengthIncludingDelimiter, offset - line.Offset) + 1);
+			return new DocumentLocation (lineNr, col);
 		}
 
 		public string GetLineIndent (int lineNumber)
@@ -1404,12 +1407,21 @@ namespace Mono.TextEditor
 
 		public void AddMarker (TextSegmentMarker marker)
 		{
+			CommitLineUpdate (GetLineByOffset (marker.Offset));
 			textSegmentMarkerTree.Add (marker);
 		}
 
-		public void RemoveMarker (TextSegmentMarker marker)
+		/// <summary>
+		/// Removes a marker from the document.
+		/// </summary>
+		/// <returns><c>true</c>, if marker was removed, <c>false</c> otherwise.</returns>
+		/// <param name="marker">Marker.</param>
+		public bool RemoveMarker (TextSegmentMarker marker)
 		{
-			textSegmentMarkerTree.Remove (marker);
+			bool wasRemoved = textSegmentMarkerTree.Remove (marker);
+			if (wasRemoved)
+				CommitLineUpdate (GetLineByOffset (marker.Offset));
+			return wasRemoved;
 		}
 
 		#endregion

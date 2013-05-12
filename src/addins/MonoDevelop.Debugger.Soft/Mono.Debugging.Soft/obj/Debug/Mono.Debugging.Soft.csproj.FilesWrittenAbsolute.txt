@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft.dll.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/obj/Debug/Mono.Debugging.Soft.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/Mono.Debugging.Soft/obj/Debug/Mono.Debugging.Soft.dll.mdb

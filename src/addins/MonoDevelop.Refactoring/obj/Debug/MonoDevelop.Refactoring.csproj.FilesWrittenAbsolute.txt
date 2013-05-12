@@ -1,6 +1,0 @@
-/tmp/monodevelop/main/src/addins/MonoDevelop.Refactoring/obj/Debug/MonoDevelop.Refactoring.MonoDevelop.Refactoring.addin.xml
-/tmp/monodevelop/main/src/addins/MonoDevelop.Refactoring/obj/Debug/MonoDevelop.Refactoring.gtk-gui.gui.stetic
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.Refactoring/obj/Debug/MonoDevelop.Refactoring.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.Refactoring/obj/Debug/MonoDevelop.Refactoring.dll.mdb

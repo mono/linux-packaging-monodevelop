@@ -208,9 +208,11 @@ ALL_FILES := $(EXTS) \
 		$(wildcard templates/*)
 
 WILDCARDED_FILES := $(wildcard $(ALL_FILES))
-EXTRA_DIST = \
-	$(wildcard $(ALL_FILES))
-
+EXTRA_DIST = $(wildcard $(ALL_FILES)) Styles/DefaultStyle.json \
+	Styles/MonokaiStyle.json Styles/NightshadeStyle.json \
+	Styles/OblivionStyle.json Styles/SolarizedDarkStyle.json \
+	Styles/SolarizedLightStyle.json Styles/TangoStyle.json \
+	Styles/VisualStudioStyle.json
 all: all-am
 
 .SUFFIXES:

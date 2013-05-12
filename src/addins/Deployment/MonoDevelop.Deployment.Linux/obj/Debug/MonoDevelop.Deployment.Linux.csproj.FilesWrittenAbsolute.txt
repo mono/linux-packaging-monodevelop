@@ -1,8 +1,0 @@
-/tmp/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.gtk-gui.gui.stetic
-/tmp/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.MonoDevelop.Deployment.Linux.DesktopInfo.xml
-/tmp/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.MonoDevelop.Deployment.Linux.addin.xml
-/tmp/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.app.desktop.xft.xml
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.Deployment/MonoDevelop.Deployment.Linux.dll
-/tmp/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.dll
-/tmp/monodevelop/main/src/addins/Deployment/MonoDevelop.Deployment.Linux/obj/Debug/MonoDevelop.Deployment.Linux.dll.mdb

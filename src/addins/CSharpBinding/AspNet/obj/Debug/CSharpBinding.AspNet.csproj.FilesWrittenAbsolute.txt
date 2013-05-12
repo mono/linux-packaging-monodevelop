@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.CSharpBinding.AspNet.dll.mdb
-/tmp/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.CSharpBinding.AspNet.dll
-/tmp/monodevelop/main/src/addins/CSharpBinding/AspNet/obj/Debug/MonoDevelop.CSharpBinding.AspNet.dll
-/tmp/monodevelop/main/src/addins/CSharpBinding/AspNet/obj/Debug/MonoDevelop.CSharpBinding.AspNet.dll.mdb

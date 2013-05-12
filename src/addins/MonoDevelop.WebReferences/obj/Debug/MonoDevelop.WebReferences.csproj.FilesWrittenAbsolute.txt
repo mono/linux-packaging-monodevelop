@@ -1,8 +1,0 @@
-/tmp/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.MonoDevelop.WebReferences.addin.xml
-/tmp/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.MonoDevelop.WebReferences.Resources.disco.html
-/tmp/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.MonoDevelop.WebReferences.Resources.wsdl.html
-/tmp/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.MonoDevelop.WebReferences.Resources.WebReferenceItem.png
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.WebReferences/MonoDevelop.WebReferences.dll.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.WebReferences/MonoDevelop.WebReferences.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.dll.mdb

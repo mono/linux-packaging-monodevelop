@@ -1,8 +1,0 @@
-/tmp/monodevelop/main/src/addins/TextTemplating/MonoDevelop.TextTemplating/obj/Debug/MonoDevelop.TextTemplating.MonoDevelop.TextTemplating.addin.xml
-/tmp/monodevelop/main/src/addins/TextTemplating/MonoDevelop.TextTemplating/obj/Debug/MonoDevelop.TextTemplating.T4SyntaxMode.xml
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/Templates/T4TemplateCSharp.xft.xml
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/Templates/T4PreprocessedTemplateCSharp.xft.xml
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/MonoDevelop.TextTemplating.dll.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/MonoDevelop.TextTemplating.dll
-/tmp/monodevelop/main/src/addins/TextTemplating/MonoDevelop.TextTemplating/obj/Debug/MonoDevelop.TextTemplating.dll
-/tmp/monodevelop/main/src/addins/TextTemplating/MonoDevelop.TextTemplating/obj/Debug/MonoDevelop.TextTemplating.dll.mdb

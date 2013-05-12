@@ -31,6 +31,8 @@ using System.Collections.Generic;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core;
+using System.Security.Permissions;
+using System.Security;
 
 
 namespace MonoDevelop.Ide.FindInFiles
@@ -104,11 +106,15 @@ namespace MonoDevelop.Ide.FindInFiles
 		public override IEnumerable<FileProvider> GetFiles (IProgressMonitor monitor, FilterOptions filterOptions)
 		{
 			if (IdeApp.Workspace.IsOpen) {
+				var alreadyVisited = new HashSet<string> ();
 				foreach (Project project in IdeApp.Workspace.GetAllProjects ()) {
 					monitor.Log.WriteLine (GettextCatalog.GetString ("Looking in project '{0}'", project.Name));
 					foreach (ProjectFile file in project.Files.Where (f => filterOptions.NameMatches (f.Name) && File.Exists (f.Name))) {
-						if (!IncludeBinaryFiles && !DesktopService.GetMimeTypeIsText (DesktopService.GetMimeTypeForUri (file.Name)))
+						if (!IncludeBinaryFiles && !DesktopService.GetFileIsText (file.FilePath))
+								continue;
+						if (alreadyVisited.Contains (file.Name))
 							continue;
+						alreadyVisited.Add (file.Name);
 						yield return new FileProvider (file.Name, project);
 					}
 				}
@@ -144,9 +150,14 @@ namespace MonoDevelop.Ide.FindInFiles
 		{
 			if (IdeApp.Workspace.IsOpen) {
 				monitor.Log.WriteLine (GettextCatalog.GetString ("Looking in project '{0}'", project.Name));
+				var alreadyVisited = new HashSet<string> ();
 				foreach (ProjectFile file in project.Files.Where (f => filterOptions.NameMatches (f.Name) && File.Exists (f.Name))) {
-					if (!IncludeBinaryFiles && !DesktopService.GetMimeTypeIsText (DesktopService.GetMimeTypeForUri (file.Name)))
+					if (!IncludeBinaryFiles && !DesktopService.GetFileIsText (file.Name))
 						continue;
+
+					if (alreadyVisited.Contains (file.Name))
+						continue;
+					alreadyVisited.Add (file.Name);
 					yield return new FileProvider (file.Name, project);
 				}
 			}
@@ -211,22 +222,51 @@ namespace MonoDevelop.Ide.FindInFiles
 		{
 			if (monitor != null)
 				monitor.Log.WriteLine (GettextCatalog.GetString ("Looking in '{0}'", path));
-			foreach (string fileMask in filterOptions.FileMask.Split (',', ';')) {
-				string[] files;
+			var directoryStack = new Stack<string> ();
+			directoryStack.Push (path);
+
+			while (directoryStack.Count > 0) {
+				var curPath = directoryStack.Pop ();
+
 				try {
-					files = Directory.GetFiles (path, fileMask, recurse ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+					var readPermission = new FileIOPermission(FileIOPermissionAccess.Read, curPath);
+					readPermission.Demand ();
 				} catch (Exception e) {
-					LoggingService.LogError ("Can't access path " + path, e);
+					LoggingService.LogError ("Can't access path " + curPath, e);
 					yield break;
 				}
-				
-				foreach (string fileName in files) {
-					if (fileName.StartsWith (".") && !IncludeHiddenFiles)
-						continue;
-					if (!IncludeBinaryFiles && !DesktopService.GetMimeTypeIsText (DesktopService.GetMimeTypeForUri (fileName))) 
+
+				foreach (string fileName in Directory.EnumerateFiles (curPath, "*")) {
+					if (!IncludeHiddenFiles) {
+						if (Platform.IsWindows) {
+							var attr = File.GetAttributes (fileName);
+							if (attr.HasFlag (FileAttributes.Hidden))
+								continue;
+						}
+						if (Path.GetFileName (fileName).StartsWith (".", StringComparison.Ordinal))
+							continue;
+					}
+
+					if (!IncludeBinaryFiles && !DesktopService.GetFileIsText (fileName))
 						continue;
 					yield return fileName;
 				}
+
+				if (recurse) {
+					foreach (string directoryName in Directory.EnumerateDirectories (curPath)) {
+						if (!IncludeHiddenFiles) {
+							if (Platform.IsWindows) {
+								var attr = File.GetAttributes (directoryName);
+								if (attr.HasFlag (FileAttributes.Hidden))
+									continue;
+							}
+							if (Path.GetFileName (directoryName).StartsWith (".", StringComparison.Ordinal))
+								continue;
+						}
+						directoryStack.Push (directoryName);
+					}
+				}
+
 			}
 		}
 		

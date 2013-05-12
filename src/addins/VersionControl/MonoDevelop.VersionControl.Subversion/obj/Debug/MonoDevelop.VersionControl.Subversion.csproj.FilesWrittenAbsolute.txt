@@ -1,7 +1,0 @@
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.gtk-gui.objects.xml
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.MonoDevelop.VersionControl.Subversion.addin.xml
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.gtk-gui.gui.stetic
-/tmp/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.dll.mdb
-/tmp/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.dll
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.dll
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion/obj/Debug/MonoDevelop.VersionControl.Subversion.dll.mdb
