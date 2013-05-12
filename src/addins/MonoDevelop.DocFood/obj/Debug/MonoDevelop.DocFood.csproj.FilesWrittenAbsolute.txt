@@ -1,7 +1,0 @@
-/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.DocFood.addin.xml
-/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.DocFood.config.xml
-/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.gtk-gui.gui.stetic
-/tmp/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.DocFood.dll.mdb
-/tmp/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.DocFood.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.dll.mdb

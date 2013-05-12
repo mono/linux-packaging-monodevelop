@@ -49,7 +49,8 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	$(top_srcdir)/xbuild.include ChangeLog
+	$(top_srcdir)/Makefile.include $(top_srcdir)/xbuild.include \
+	ChangeLog
 @ENABLE_MACPLATFORM_TRUE@am__append_1 = $(TEST_PROJECTS_MAC)
 @ENABLE_MACPLATFORM_TRUE@am__append_2 = $(TEST_ASSEMBLIES_MAC)
 subdir = tests
@@ -351,7 +352,7 @@ EXTRA_DIST = \
 
 SUBDIRS = UnitTests MacPlatform.Tests UserInterfaceTests
 HARNESS = $(top_srcdir)/external/mdtestharness/nunit-console-x86.exe -domain=multiple
-RUN_TEST = $(MD_LAUNCH_SETUP) $(MONO) $(HARNESS)
+RUN_TEST = $(MDTOOL_RUN) run-md-tests
 TEST_DIR = $(top_builddir)/build/tests
 EXTERNAL = $(top_builddir)/external
 TEST_PROJECTS_MAC = \
@@ -371,10 +372,25 @@ TEST_ASSEMBLIES_COMMON = \
 	$(EXTERNAL)/ngit/bin/NGit.Test.dll
 
 TEST_ASSEMBLIES = $(TEST_ASSEMBLIES_COMMON) $(am__append_2)
+build_deps = $(addprefix -r:, $(DEPS))
+build_sources = $(addprefix $(srcdir)/, $(FILES)) $(GENERATED_FILES)
+build_resources = $(addprefix $(srcdir)/, $(RES))
+build_test_sources = $(addprefix $(srcdir)/, $(TESTFILES)) $(GENERATED_FILES)
+MD_BIN_PATH = $(abs_top_builddir)/build/bin
+MD_LAUNCH_SETUP = \
+	PATH="$(PATH)" \
+	PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
+	LD_LIBRARY_PATH="$(LD_LIBRARY_PATH)" \
+	DYLD_FALLBACK_LIBRARY_PATH="$(DYLD_FALLBACK_LIBRARY_PATH)" \
+	MONO_GAC_PREFIX="$(MONO_GAC_PREFIX)" \
+	MONODEVELOP_LOCALE_PATH="$(abs_top_builddir)/build/locale" \
+	MONO_ADDINS_REGISTRY="$(MD_BIN_PATH)"
+
+MDTOOL_RUN = $(MD_LAUNCH_SETUP) exec -a "mdtool" $(RUNTIME) --debug "$(MD_BIN_PATH)/mdtool.exe"
 all: all-recursive
 
 .SUFFIXES:
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/xbuild.include $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/xbuild.include $(top_srcdir)/Makefile.include $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -395,7 +411,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe);; \
 	esac;
-$(top_srcdir)/xbuild.include:
+$(top_srcdir)/xbuild.include $(top_srcdir)/Makefile.include:
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -755,6 +771,10 @@ test:
 			$(RUN_TEST) $$asm || exit $?; \
 		done; \
 	fi
+
+# workaroundfor lack of abs_top_builddir variable in automake < 1.10. Will break if mdtool isn't 
+# launched from top_srcdir (i.e. where this script is located)
+abs_top_builddir ?= $(top_builddir)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

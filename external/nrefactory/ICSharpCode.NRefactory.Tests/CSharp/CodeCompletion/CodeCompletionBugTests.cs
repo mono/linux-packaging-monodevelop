@@ -304,6 +304,30 @@ namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 			return loader.LoadAssemblyFile(typeof(System.Linq.Enumerable).Assembly.Location);
 		});
 
+		public static void CreateCompilation (string parsedText, out IProjectContent pctx, out SyntaxTree syntaxTree, out CSharpUnresolvedFile unresolvedFile, bool expectErrors, params IUnresolvedAssembly[] references)
+		{
+			pctx = new CSharpProjectContent();
+			var refs = new List<IUnresolvedAssembly> { mscorlib.Value, systemCore.Value, systemAssembly.Value, systemXmlLinq.Value };
+			if (references != null)
+				refs.AddRange (references);
+			
+			pctx = pctx.AddAssemblyReferences(refs);
+			
+			syntaxTree = new CSharpParser().Parse(parsedText, "program.cs");
+			syntaxTree.Freeze();
+			if (!expectErrors && syntaxTree.Errors.Count > 0) {
+				Console.WriteLine ("----");
+				Console.WriteLine (parsedText);
+				Console.WriteLine ("----");
+				foreach (var error in syntaxTree.Errors)
+					Console.WriteLine (error.Message);
+				Assert.Fail ("Parse error.");
+			}
+
+			unresolvedFile = syntaxTree.ToTypeSystem();
+			pctx = pctx.AddOrUpdateFiles(unresolvedFile);
+		}
+
 		public static CSharpCompletionEngine CreateEngine(string text, out int cursorPosition, params IUnresolvedAssembly[] references)
 		{
 			string parsedText;
@@ -317,26 +341,18 @@ namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 					parsedText = editorText = text.Substring(0, cursorPosition) + text.Substring(cursorPosition + 1);
 				}
 			} else {
-					parsedText = text.Substring(0, cursorPosition) + new string(' ', endPos - cursorPosition) + text.Substring(endPos + 1);
-					editorText = text.Substring(0, cursorPosition) + text.Substring(cursorPosition + 1, endPos - cursorPosition - 1) + text.Substring(endPos + 1);
-					cursorPosition = endPos - 1; 
+				parsedText = text.Substring(0, cursorPosition) + new string(' ', endPos - cursorPosition) + text.Substring(endPos + 1);
+				editorText = text.Substring(0, cursorPosition) + text.Substring(cursorPosition + 1, endPos - cursorPosition - 1) + text.Substring(endPos + 1);
+				cursorPosition = endPos - 1; 
 			}
 			var doc = new ReadOnlyDocument(editorText);
 
-			IProjectContent pctx = new CSharpProjectContent();
-			var refs = new List<IUnresolvedAssembly> { mscorlib.Value, systemCore.Value, systemAssembly.Value, systemXmlLinq.Value };
-			if (references != null)
-				refs.AddRange (references);
-
-			pctx = pctx.AddAssemblyReferences(refs);
-
-			var syntaxTree = new CSharpParser().Parse(parsedText, "program.cs");
-			syntaxTree.Freeze();
-
-			var unresolvedFile = syntaxTree.ToTypeSystem();
-			pctx = pctx.AddOrUpdateFiles(unresolvedFile);
-
+			IProjectContent pctx;
+			SyntaxTree syntaxTree;
+			CSharpUnresolvedFile unresolvedFile;
+			CreateCompilation (parsedText, out pctx, out syntaxTree, out unresolvedFile, true, references);
 			var cmp = pctx.CreateCompilation();
+
 			var loc = cursorPosition > 0 ? doc.GetLocation(cursorPosition) : new TextLocation (1, 1);
 
 			var rctx = new CSharpTypeResolveContext(cmp.MainAssembly);
@@ -4752,12 +4768,11 @@ class MainClass
 			Assert.IsNotNull (provider.Find ("Math"), "'Math' not found.");
 		}
 		
-		[Ignore("Mcs bug")]
 		[Test]
 		public void TestConditionalExpression ()
 		{
 			CompletionDataList provider = CreateProvider (
-@"using System;
+				@"using System;
 
 class MainClass
 {
@@ -5248,7 +5263,6 @@ public class Test
 		/// <summary>
 		/// Bug 4624 - [AutoComplete] Attribute autocomplete inserts entire attribute class name. 
 		/// </summary>
-		[Ignore("MCS BUG")]
 		[Test]
 		public void TestBug4624()
 		{
@@ -5993,7 +6007,55 @@ public class Testing
 			});
 		}
 
+		/// <summary>
+		/// NullReferenceException when inserting space after 'in' modifier
+		/// </summary>
+		[Test]
+		public void TestCrashContravariantTypeParameter ()
+		{
+			CompletionDataList provider = CreateProvider (
+				@"public delegate void ModelCollectionChangedEventHandler<in$ $T>();
+");
+			Assert.AreEqual(0, provider.Count);
+		}
 
+		[Test]
+		public void TestSwitchCase ()
+		{
+
+			CombinedProviderTest(
+				@"using System;
+class Test
+{
+	public void Test (ConsoleColor color)
+	{
+		$switch (c$
+	}
+}
+", provider => {
+				Assert.IsNotNull(provider.Find("color"));
+			});
+		}
+
+		[Test]
+		public void TestSwitchCaseCase ()
+		{
+
+			CombinedProviderTest(
+				@"using System;
+class Test
+{
+	public void Test (ConsoleColor color)
+	{
+		switch (color) {
+			$case $
+		}
+	}
+}
+", provider => {
+				Assert.IsNotNull(provider.Find("ConsoleColor"));
+			});
+		}
 
 
 	}

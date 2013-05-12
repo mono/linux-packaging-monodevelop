@@ -1,6 +1,0 @@
-/tmp/monodevelop/main/build/bin/MonoDevelop.exe.addins
-/tmp/monodevelop/main/build/bin/MonoDevelop.exe.config
-/tmp/monodevelop/main/build/bin/MonoDevelop.exe.mdb
-/tmp/monodevelop/main/build/bin/MonoDevelop.exe
-/tmp/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.exe
-/tmp/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.exe.mdb

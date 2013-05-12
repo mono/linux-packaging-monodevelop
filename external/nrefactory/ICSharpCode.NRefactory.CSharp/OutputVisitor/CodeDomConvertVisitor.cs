@@ -1,4 +1,4 @@
-// Copyright (c) AlphaSierraPapa for the SharpDevelop Team
+// Copyright (c) 2010-2013 AlphaSierraPapa for the SharpDevelop Team
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
 // software and associated documentation files (the "Software"), to deal in the Software
@@ -1243,6 +1243,7 @@ namespace ICSharpCode.NRefactory.CSharp
 		CodeObject IAstVisitor<CodeObject>.VisitSyntaxTree(SyntaxTree syntaxTree)
 		{
 			CodeCompileUnit cu = new CodeCompileUnit();
+			var globalImports = new List<CodeNamespaceImport> ();
 			foreach (AstNode node in syntaxTree.Children) {
 				CodeObject o = node.AcceptVisitor(this);
 				
@@ -1253,6 +1254,20 @@ namespace ICSharpCode.NRefactory.CSharp
 				CodeTypeDeclaration td = o as CodeTypeDeclaration;
 				if (td != null) {
 					cu.Namespaces.Add(new CodeNamespace() { Types = { td } });
+				}
+				
+				var import = o as CodeNamespaceImport;
+				if (import != null)
+					globalImports.Add (import);
+			}
+			foreach (var gi in globalImports) {
+				for (int j = 0; j < cu.Namespaces.Count; j++) {
+					var cn = cu.Namespaces [j];
+					bool found = cn.Imports
+						.Cast<CodeNamespaceImport> ()
+							.Any (ns => ns.Namespace == gi.Namespace);
+					if (!found)
+						cn.Imports.Add (gi);
 				}
 			}
 			return cu;
@@ -1326,12 +1341,12 @@ namespace ICSharpCode.NRefactory.CSharp
 
 		CodeObject IAstVisitor<CodeObject>.VisitNewLine(NewLineNode newLineNode)
 		{
-			throw new NotSupportedException();
+			return null;
 		}
 
 		CodeObject IAstVisitor<CodeObject>.VisitWhitespace(WhitespaceNode whitespaceNode)
 		{
-			throw new NotSupportedException();
+			return null;
 		}
 
 		CodeObject IAstVisitor<CodeObject>.VisitText(TextNode textNode)

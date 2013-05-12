@@ -132,7 +132,7 @@ namespace Mono.TextEditor.Highlighting
 			}
 			if (result != null) {
 				// crop to begin
-				if (result.Offset != offset) {
+				if (result.Offset < offset) {
 					while (result != null && result.EndOffset < offset) {
 						result = result.Next;
 					}
@@ -145,11 +145,11 @@ namespace Mono.TextEditor.Highlighting
 			}
 			while (result != null) {
 				// crop to end
-				if (result.EndOffset > offset + length) {
+				if (result.EndOffset >= offset + length) {
 					result.Length = offset + length - result.Offset;
+					result.Next = null;
 					if (result.Length < 0) {
 						result.Length = 0;
-						result.Next = null;
 						yield break;
 					}
 				}
@@ -420,11 +420,9 @@ namespace Mono.TextEditor.Highlighting
 								}
 							}
 							if (!mismatch) {
-								for (int j = 0; j < cur.Escape.Length - 1 && i < maxEnd;j++) {
-									ParseChar (ref i, CurText [textIndex]);
-									i++;
-								}
-//								ScanSpanEnd (cur, ref i);
+								int j = i + cur.Escape.Length - 1;
+								ParseChar (ref i, CurText [textIndex]);
+								i = j;
 								continue;
 							}
 						}

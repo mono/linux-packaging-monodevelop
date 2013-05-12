@@ -173,6 +173,11 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 	
 	class SolutionFolderNodeCommandHandler: NodeCommandHandler
 	{
+		public override void ActivateItem ()
+		{
+			CurrentNode.Expanded = !CurrentNode.Expanded;
+		}
+
 		public override void RenameItem (string newName)
 		{
 			if (newName.IndexOfAny (new char [] { '\'', '(', ')', '"', '{', '}', '|' } ) != -1) {
@@ -219,10 +224,23 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		internal static void DropFile (SolutionFolder folder, IFileItem fileItem, DragOperation operation)
 		{
 			FilePath dest = folder.BaseDirectory.Combine (fileItem.FileName.FileName);
-			if (operation == DragOperation.Copy)
+			if (operation == DragOperation.Copy) {
+				if (dest == fileItem.FileName)
+					dest = ProjectOperations.GetTargetCopyName (dest, false);
 				FileService.CopyFile (fileItem.FileName, dest);
-			else
+			}
+			else {
+				var pf = fileItem as ProjectFile;
+				if (pf != null && pf.Project != null)
+					pf.Project.Files.Remove (pf);
+				var fn = fileItem as SolutionFolderFileNode;
+				if (fn != null) {
+					if (fn.Parent == folder)
+						return;
+					fn.Parent.Files.Remove (fileItem.FileName);
+				}
 				FileService.MoveFile (fileItem.FileName, dest);
+			}
 			folder.Files.Add (dest);
 		}
 			

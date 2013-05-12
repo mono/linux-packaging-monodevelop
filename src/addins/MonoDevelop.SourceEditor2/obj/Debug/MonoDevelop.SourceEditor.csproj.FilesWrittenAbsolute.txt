@@ -1,7 +1,0 @@
-/tmp/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.gtk-gui.gui.stetic
-/tmp/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.MonoDevelop.SourceEditor.addin.xml
-/tmp/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.MonoDevelop.SourceEditor.searchoptions.png
-/tmp/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll.mdb
-/tmp/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor2.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor2.dll.mdb

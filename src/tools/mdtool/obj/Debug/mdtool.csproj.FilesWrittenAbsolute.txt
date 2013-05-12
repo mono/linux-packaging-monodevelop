@@ -1,2 +1,0 @@
-/tmp/monodevelop/main/build/bin/mdtool.exe
-/tmp/monodevelop/main/src/tools/mdtool/obj/Debug/mdtool.exe

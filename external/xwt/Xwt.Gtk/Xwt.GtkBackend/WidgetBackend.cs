@@ -583,12 +583,16 @@ namespace Xwt.GtkBackend
 				Widget.SizeAllocated -= HandleWidgetSizeAllocated;;
 			}
 		}
-		
+
+		Gdk.Rectangle lastAllocation;
 		void HandleWidgetBoundsChanged (object o, Gtk.SizeAllocatedArgs args)
 		{
-			Toolkit.Invoke (delegate {
-				EventSink.OnBoundsChanged ();
-			});
+			if (Widget.Allocation != lastAllocation) {
+				lastAllocation = Widget.Allocation;
+				Toolkit.Invoke (delegate {
+					EventSink.OnBoundsChanged ();
+				});
+			}
 		}
 		
 		enum SizeCheckStep
@@ -971,12 +975,20 @@ namespace Xwt.GtkBackend
 
 			if (DragDropInfo.DragDataRequests == 0) {
 				if (DragDropInfo.DragDataForMotion) {
-					// This is a workaround to what seems to be a mac gtk bug.
-					// Suggested action is set to all when no control key is pressed
+					// If no specific action is set, it means that no key has been pressed.
+					// In that case, use Move or Copy or Link as default (when allowed, in this order).
 					var cact = ConvertDragAction (context.Actions);
-					if (cact == DragDropAction.All)
-						cact = DragDropAction.Move;
-					
+					if (cact != DragDropAction.Copy && cact != DragDropAction.Move && cact != DragDropAction.Link) {
+						if (cact.HasFlag (DragDropAction.Move))
+							cact = DragDropAction.Move;
+						else if (cact.HasFlag (DragDropAction.Copy))
+							cact = DragDropAction.Copy;
+						else if (cact.HasFlag (DragDropAction.Link))
+							cact = DragDropAction.Link;
+						else
+							cact = DragDropAction.None;
+					}
+
 					DragOverEventArgs da = new DragOverEventArgs (DragDropInfo.LastDragPosition, DragDropInfo.DragData, cact);
 					Toolkit.Invoke (delegate {
 						EventSink.OnDragOver (da);

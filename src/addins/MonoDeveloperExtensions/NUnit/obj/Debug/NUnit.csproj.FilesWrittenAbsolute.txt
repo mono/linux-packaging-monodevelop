@@ -1,4 +1,0 @@
-/tmp/monodevelop/main/build/AddIns/MonoDeveloperExtensions/MonoDeveloperExtensions_nunit.dll.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDeveloperExtensions/MonoDeveloperExtensions_nunit.dll
-/tmp/monodevelop/main/src/addins/MonoDeveloperExtensions/NUnit/obj/Debug/MonoDeveloperExtensions_nunit.dll
-/tmp/monodevelop/main/src/addins/MonoDeveloperExtensions/NUnit/obj/Debug/MonoDeveloperExtensions_nunit.dll.mdb

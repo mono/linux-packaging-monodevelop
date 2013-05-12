@@ -81,6 +81,8 @@ namespace Mono.Cecil.Mdb {
 		{
 			var locals = entry.GetLocals ();
 			foreach (var local in locals) {
+				if (body.Variables.Count <= local.Index)
+					continue;
 				var variable = body.Variables [local.Index];
 				variable.Name = local.Name;
 

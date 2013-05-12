@@ -1,4 +1,4 @@
-﻿// Copyright (c) AlphaSierraPapa for the SharpDevelop Team
+﻿// Copyright (c) 2010-2013 AlphaSierraPapa for the SharpDevelop Team
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
 // software and associated documentation files (the "Software"), to deal in the Software
@@ -372,6 +372,6 @@ namespace ICSharpCode.NRefactory.TypeSystem.TestCase
 		public const int SOf  = sizeof(float);
 		public const int SOd  = sizeof(double);
 		public const int SObl = sizeof(bool);
-		public const int SOe  = sizeof(MyEnum);
+	    public static readonly unsafe int SOe = sizeof(MyEnum);
 	}
 }

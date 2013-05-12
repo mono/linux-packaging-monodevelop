@@ -78,7 +78,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			}
 			yield return new CodeAction(message, script => {
 				script.CreateNewType(CreateType(context, service, node, classType));
-			});
+			}, node);
 
 			if (node.Parent is TypeDeclaration || classType != ClassType.Class)
 				yield break;
@@ -88,7 +88,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 					Script.InsertPosition.Before,
 					CreateType(context, service, node, classType)
 				);
-			});
+			}, node);
 		}
 
 		static void ModifyClassTypeBasedOnTypeGuessing(RefactoringContext context, AstNode node, ref ClassType classType)
@@ -289,8 +289,13 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 				var decl = new EventDeclaration {
 					ReturnType = context.CreateShortType(evt.ReturnType),
 					Modifiers = GetModifiers (evt),
-					Name = evt.Name
+					Variables = {
+						new VariableInitializer {
+							Name = evt.Name
+						}
+					}
 				};
+				decl.Variables.Add(new VariableInitializer(evt.Name));
 				result.AddChild(decl, Roles.TypeMemberRole);
 			}
 		}

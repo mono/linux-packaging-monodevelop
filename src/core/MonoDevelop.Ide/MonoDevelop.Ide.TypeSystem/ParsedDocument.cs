@@ -31,6 +31,7 @@ using System.Linq;
 using System.Threading;
 using ICSharpCode.NRefactory;
 using ICSharpCode.NRefactory.Semantics;
+using Mono.TextEditor;
 
 
 namespace MonoDevelop.Ide.TypeSystem
@@ -79,10 +80,10 @@ namespace MonoDevelop.Ide.TypeSystem
 			}
 		}
 		
-		List<FoldingRegion> foldings = new List<FoldingRegion> ();
+		IEnumerable<FoldingRegion> foldings = null;
 		public virtual IEnumerable<FoldingRegion> Foldings {
 			get {
-				return foldings;
+				return foldings ?? Enumerable.Empty<FoldingRegion> ();
 			}
 		}
 		
@@ -181,10 +182,17 @@ namespace MonoDevelop.Ide.TypeSystem
 		{
 			conditionalRegions.Add (region);
 		}
+
+		List<FoldingRegion> EnsureFoldingList ()
+		{
+			if (this.foldings == null || !(foldings is List<FoldingRegion>))
+				this.foldings = new List<FoldingRegion> ();
+			return (List<FoldingRegion>)foldings;
+		}
 		
 		public void Add (FoldingRegion region)
 		{
-			foldings.Add (region);
+			EnsureFoldingList ().Add (region);
 		}
 		
 		public void Add (IEnumerable<Comment> comments)
@@ -204,7 +212,13 @@ namespace MonoDevelop.Ide.TypeSystem
 		
 		public void Add (IEnumerable<FoldingRegion> folds)
 		{
-			this.foldings.AddRange (folds);
+			if (foldings == null) {
+				this.foldings = folds;
+				return;
+			}
+			if (foldings != null && !(foldings is List<FoldingRegion>))
+				EnsureFoldingList ().AddRange (foldings);
+			EnsureFoldingList ().AddRange (folds);
 		}
 		
 		public void Add (IEnumerable<ConditionalRegion> conditionalRegions)
@@ -234,13 +248,10 @@ namespace MonoDevelop.Ide.TypeSystem
 			}
 		}
 
-		public virtual ITypeResolveContext GetTypeResolveContext (ICompilation compilation, TextLocation loc)
-		{
-			return null;
-		}
 		#endregion
 
 		public Func<MonoDevelop.Ide.Gui.Document, CancellationToken, object> CreateRefactoringContext;
+		public Func<TextEditorData, object, CancellationToken, object> CreateRefactoringContextWithEditor;
 	}
 	
 	public class DefaultParsedDocument : ParsedDocument, IUnresolvedFile
@@ -300,11 +311,6 @@ namespace MonoDevelop.Ide.TypeSystem
 			get {
 				return attributes;
 			}
-		}
-		
-		public override ITypeResolveContext GetTypeResolveContext (ICompilation compilation, TextLocation loc)
-		{
-			return null;
 		}
 
 		public IList<IUnresolvedAttribute> ModuleAttributes {
@@ -366,7 +372,7 @@ namespace MonoDevelop.Ide.TypeSystem
 		{
 			return parsedFile.GetTopLevelTypeDefinition (location);
 		}
-		
+
 		public override IUnresolvedTypeDefinition GetInnermostTypeDefinition (TextLocation location)
 		{
 			return parsedFile.GetInnermostTypeDefinition (location);
@@ -381,11 +387,6 @@ namespace MonoDevelop.Ide.TypeSystem
 			get {
 				return parsedFile.TopLevelTypeDefinitions;
 			}
-		}
-		
-		public override ITypeResolveContext GetTypeResolveContext (ICompilation compilation, TextLocation loc)
-		{
-			return parsedFile.GetTypeResolveContext (compilation, loc);
 		}
 		#endregion
 	}

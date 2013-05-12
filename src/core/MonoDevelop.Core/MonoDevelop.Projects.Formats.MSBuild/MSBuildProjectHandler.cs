@@ -86,7 +86,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				return subtypeGuids;
 			}
 		}
-		
+
 		public MSBuildProjectHandler ()
 		{
 		}
@@ -544,9 +544,28 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			
 			foreach (MSBuildItem buildItem in msproject.GetAllItems ()) {
 				ProjectItem it = ReadItem (ser, buildItem);
-				if (it != null) {
-					EntityItem.Items.Add (it);
+
+				if (it == null) continue;
+
+				if (it is ProjectFile) {
+					ProjectFile file = (ProjectFile)it;
+
+					if (file.IsWildcard)  {
+						foreach (ProjectFile wildcardItem in file.ResolveWildcardItems ()) {
+							EntityItem.Items.Add (wildcardItem);
+							
+							// Thanks to IsOriginatedFromWildcard, this item will not be saved back to disk.
+							System.Diagnostics.Debug.Assert (wildcardItem.IsOriginatedFromWildcard);
+						}
+
+						// Add to wildcard items (so it can be re-saved) instead of Items (where tools will 
+						// try to compile and display these nonstandard items
+						EntityItem.WildcardItems.Add (it);
+						continue;
+					}
 				}
+
+				EntityItem.Items.Add (it);
 			}
 			
 			timer.Trace ("Read configurations");
@@ -984,18 +1003,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			// Convert debug property
 			
 			foreach (SolutionItemConfiguration conf in eitem.Configurations) {
-				DotNetProjectConfiguration cp = conf as MonoDevelop.Projects.DotNetProjectConfiguration;
-				if (cp != null) {
-					if (newProject)
-						cp.ExtendedProperties ["ErrorReport"] = "prompt";
-					
-					string debugType = (string) cp.ExtendedProperties ["DebugType"];
-					if (cp.DebugMode) {
-						if (debugType != "full" && debugType != "pdbonly")
-							cp.ExtendedProperties ["DebugType"] = "full";
-					}
-					else if (debugType != "none" && debugType != "pdbonly")
-						cp.ExtendedProperties ["DebugType"] = "none";
+				if (newProject && conf is DotNetProjectConfiguration) {
+					conf.ExtendedProperties ["ErrorReport"] = "prompt";
 				}
 			}
 			
@@ -1088,9 +1097,9 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				oldItems [item.Name + "<" + item.Include] = new ItemInfo () { Item=item };
 			
 			// Add the new items
-			foreach (object ob in ((SolutionEntityItem)Item).Items)
+			foreach (object ob in ((SolutionEntityItem)Item).Items.Concat (((SolutionEntityItem)Item).WildcardItems))
 				SaveItem (monitor, ser, msproject, ob, oldItems);
-			
+
 			foreach (ItemInfo itemInfo in oldItems.Values) {
 				if (!itemInfo.Added)
 					msproject.RemoveItem (itemInfo.Item);
@@ -1100,9 +1109,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				var moniker = dotNetProject.TargetFramework.Id;
 				bool supportsMultipleFrameworks = TargetFormat.FrameworkVersions.Length > 0;
 				var def = dotNetProject.GetDefaultTargetFrameworkForFormat (GetFileFormat ());
-				bool isDefaultIdentifier = def.Identifier == moniker.Identifier;
-				bool isDefaultVersion = isDefaultIdentifier && def.Version == moniker.Version;
-				bool isDefaultProfile = isDefaultVersion && def.Profile == moniker.Profile;
 
 				// If the format only supports one fx version, or the version is the default, there is no need to store it.
 				// However, is there is already a value set, do not remove it.
@@ -1153,10 +1159,20 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 		void SetIfPresentOrNotDefaultValue (MSBuildPropertySet propGroup, string name, string value, string defaultValue)
 		{
+			bool hasDefaultValue = string.IsNullOrEmpty (value) || value == defaultValue;
 			var prop = propGroup.GetProperty (name);
 			if (prop != null) {
-				prop.Value = value;
-			} else if (value != defaultValue) {
+				//if the value is default or empty, only remove the element if it was not already the default or empty
+				//to avoid unnecessary project file churn
+				if (hasDefaultValue) {
+					var existing = prop.Value;
+					bool alreadyHadDefaultValue = string.IsNullOrEmpty (existing) || existing == defaultValue;
+					if (!alreadyHadDefaultValue)
+						propGroup.RemoveProperty (name);
+				} else {
+					prop.Value = value;
+				}
+			} else if (!hasDefaultValue) {
 				propGroup.SetPropertyValue (name, value, false);
 			}
 		}
@@ -1234,6 +1250,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		
 		void SaveProjectFile (MSBuildSerializer ser, MSBuildProject msproject, ProjectFile file, Dictionary<string,ItemInfo> oldItems)
 		{
+			if (file.IsOriginatedFromWildcard) return;
+
 			string itemName = (file.Subtype == Subtype.Directory)? "Folder" : file.BuildAction;
 
 			string path = MSBuildProjectService.ToMSBuildPath (Item.ItemDirectory, file.FilePath);
@@ -1734,7 +1752,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			new ItemMember (typeof(SolutionEntityItem), "SchemaVersion"),
 			new ItemMember (typeof(SolutionEntityItem), "ProjectGuid"),
 			new ItemMember (typeof(SolutionEntityItem), "ProjectTypeGuids"),
-			new ItemMember (typeof(DotNetProjectConfiguration), "DebugType"),
 			new ItemMember (typeof(DotNetProjectConfiguration), "ErrorReport"),
 			new ItemMember (typeof(DotNetProjectConfiguration), "TargetFrameworkVersion", new object[] { new MergeToProjectAttribute () }),
 			new ItemMember (typeof(ProjectReference), "RequiredTargetFramework"),

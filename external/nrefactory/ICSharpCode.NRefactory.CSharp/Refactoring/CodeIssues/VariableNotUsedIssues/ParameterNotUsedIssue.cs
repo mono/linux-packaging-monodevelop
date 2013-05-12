@@ -87,7 +87,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			}
 		}
 
-		class GatherVisitor : GatherVisitorBase
+		class GatherVisitor : GatherVisitorBase<ParameterNotUsedIssue>
 		{
 			GetDelgateUsagesVisitor usedDelegates;
 			bool currentTypeIsPartial;
@@ -111,6 +111,10 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 				// Only some methods are candidates for the warning
 
 				if (methodDeclaration.Body.IsNull)
+					return;
+				if (methodDeclaration.Modifiers.HasFlag (Modifiers.Virtual) || 
+				    methodDeclaration.Modifiers.HasFlag (Modifiers.New) ||
+				    methodDeclaration.Modifiers.HasFlag (Modifiers.Partial))
 					return;
 				var methodResolveResult = ctx.Resolve(methodDeclaration) as MemberResolveResult;
 				if (methodResolveResult == null)

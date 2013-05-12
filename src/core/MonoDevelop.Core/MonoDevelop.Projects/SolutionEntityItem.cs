@@ -51,7 +51,9 @@ namespace MonoDevelop.Projects
 		internal object MemoryProbe = Counters.ItemsInMemory.CreateMemoryProbe ();
 			
 		ProjectItemCollection items;
-		
+		ProjectItemCollection wildcardItems;
+		ItemCollection<SolutionEntityItem> dependencies = new ItemCollection<SolutionEntityItem> ();
+
 		SolutionItemEventArgs thisItemArgs;
 		
 		FileStatusTracker<SolutionItemEventArgs> fileStatusTracker;
@@ -74,6 +76,7 @@ namespace MonoDevelop.Projects
 		public SolutionEntityItem ()
 		{
 			items = new ProjectItemCollection (this);
+			wildcardItems = new ProjectItemCollection (this);
 			thisItemArgs = new SolutionItemEventArgs (this);
 			configurations = new SolutionItemConfigurationCollection (this);
 			configurations.ConfigurationAdded += new ConfigurationEventHandler (OnConfigurationAddedToCollection);
@@ -89,13 +92,14 @@ namespace MonoDevelop.Projects
 			
 			Counters.ItemsLoaded--;
 			
-			foreach (var item in items) {
+			foreach (var item in items.Concat (wildcardItems)) {
 				IDisposable disp = item as IDisposable;
 				if (disp != null)
 					disp.Dispose ();
 			}
 			
 			// items = null;
+			// wildcardItems = null;
 			// thisItemArgs = null;
 			// fileStatusTracker = null;
 			// fileFormat = null;
@@ -209,7 +213,24 @@ namespace MonoDevelop.Projects
 		public ProjectItemCollection Items {
 			get { return items; }
 		}
+
+		internal ProjectItemCollection WildcardItems {
+			get { return wildcardItems; }
+		}
 		
+		/// <summary>
+		/// Projects that need to be built before building this one
+		/// </summary>
+		/// <value>The dependencies.</value>
+		public ItemCollection<SolutionEntityItem> ItemDependencies {
+			get { return dependencies; }
+		}
+
+		public override IEnumerable<SolutionItem> GetReferencedItems (ConfigurationSelector configuration)
+		{
+			return base.GetReferencedItems (configuration).Concat (dependencies);
+		}
+
 		void IWorkspaceFileObject.ConvertToFormat (FileFormat format, bool convertChildren)
 		{
 			this.FileFormat = format;

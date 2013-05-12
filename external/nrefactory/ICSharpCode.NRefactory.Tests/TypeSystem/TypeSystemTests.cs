@@ -1,4 +1,4 @@
-﻿// Copyright (c) AlphaSierraPapa for the SharpDevelop Team
+﻿// Copyright (c) 2010-2013 AlphaSierraPapa for the SharpDevelop Team
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
 // software and associated documentation files (the "Software"), to deal in the Software
@@ -73,6 +73,7 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			Assert.AreEqual(0, method.Parameters.Count);
 			Assert.AreEqual(0, method.Attributes.Count);
 			Assert.IsTrue(method.HasBody);
+			Assert.IsNull(method.AccessorOwner);
 		}
 		
 		[Test]
@@ -244,6 +245,14 @@ namespace ICSharpCode.NRefactory.TypeSystem
 				new[] { compilation.FindType(KnownTypeCode.Int32) }
 			));
 			Assert.AreEqual(m12, m2);
+		}
+		
+		[Test]
+		public void SpecializedMethod_AccessorOwner()
+		{
+			// NRefactory bug #143 - Accessor Owner throws null reference exception in some cases now
+			var method = compilation.FindType(typeof(GenericClass<string, object>)).GetMethods(m => m.Name == "GetIndex").Single();
+			Assert.IsNull(method.AccessorOwner);
 		}
 		
 		[Test]
@@ -1249,7 +1258,7 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		}
 
 		[Test]
-		public void ConstantFields()
+		public unsafe void ConstantFields()
 		{
 			ITypeDefinition type = GetTypeDefinition(typeof(ConstantFieldTest));
 			AssertConstantField<byte>(type, "Cb", 42);

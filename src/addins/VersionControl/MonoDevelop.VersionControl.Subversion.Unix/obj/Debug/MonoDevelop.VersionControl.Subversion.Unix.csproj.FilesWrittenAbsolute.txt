@@ -1,6 +1,0 @@
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/obj/Debug/MonoDevelop.VersionControl.Subversion.Unix.MonoDevelop.VersionControl.Subversion.Unix.addin.xml
-/tmp/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.Unix.dll.config
-/tmp/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.Unix.dll.mdb
-/tmp/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.Unix.dll
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/obj/Debug/MonoDevelop.VersionControl.Subversion.Unix.dll
-/tmp/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/obj/Debug/MonoDevelop.VersionControl.Subversion.Unix.dll.mdb

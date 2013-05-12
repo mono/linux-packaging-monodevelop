@@ -32,7 +32,8 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 	[IssueDescription("Call to static member via a derived class",
 	                   Description = "Suggests using the class declaring a static function when calling it.",
 	                   Category = IssueCategories.CodeQualityIssues,
-	                   Severity = Severity.Suggestion)]
+	                   Severity = Severity.Suggestion,
+                       ResharperDisableKeyword = "AccessToStaticMemberViaDerivedType")]
 	public class ReferenceToStaticMemberViaDerivedTypeIssue : ICodeIssueProvider
 	{
 		#region ICodeIssueProvider implementation
@@ -41,7 +42,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			return new GatherVisitor(context).GetIssues();
 		}
 
-		class GatherVisitor : GatherVisitorBase
+		class GatherVisitor : GatherVisitorBase<ReferenceToStaticMemberViaDerivedTypeIssue>
 		{
 			readonly BaseRefactoringContext context;
 			
@@ -107,7 +108,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 				string description = string.Format("{0} '{1}'", context.TranslateString("Use base class"), newType.GetText());
 				return new CodeAction(description, script => {
 					script.Replace(targetExpression, newType);
-				});
+				}, targetExpression);
 			}
 			
 			sealed class ContainsTypeVisitor : TypeVisitor

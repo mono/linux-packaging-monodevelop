@@ -1,6 +1,0 @@
-/tmp/monodevelop/main/src/addins/MonoDevelop.AssemblyBrowser/obj/Debug/MonoDevelop.AssemblyBrowser.gtk-gui.gui.stetic
-/tmp/monodevelop/main/src/addins/MonoDevelop.AssemblyBrowser/obj/Debug/MonoDevelop.AssemblyBrowser.MonoDevelop.AssemblyBrowser.addin.xml
-/tmp/monodevelop/main/build/AddIns/DisplayBindings/AssemblyBrowser/MonoDevelop.AssemblyBrowser.dll.mdb
-/tmp/monodevelop/main/build/AddIns/DisplayBindings/AssemblyBrowser/MonoDevelop.AssemblyBrowser.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.AssemblyBrowser/obj/Debug/MonoDevelop.AssemblyBrowser.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.AssemblyBrowser/obj/Debug/MonoDevelop.AssemblyBrowser.dll.mdb

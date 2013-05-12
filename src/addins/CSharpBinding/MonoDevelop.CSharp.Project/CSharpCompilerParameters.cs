@@ -26,9 +26,8 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 using System;
-using System.Xml;
-using System.Diagnostics;
-using System.ComponentModel;
+using System.Collections.Generic;
+
 using MonoDevelop.Projects;
 using MonoDevelop.Core.Serialization;
 
@@ -88,7 +87,9 @@ namespace MonoDevelop.CSharp.Project
 		
 		[ItemProperty("WarningsNotAsErrors", DefaultValue="")]
 		string warningsNotAsErrors = "";
-		
+
+		[ItemProperty("DebugType", DefaultValue="")]
+		string debugType = "";
 		
 		#region Members required for backwards compatibility. Not used for anything else.
 		
@@ -157,17 +158,35 @@ namespace MonoDevelop.CSharp.Project
 		
 		public override void AddDefineSymbol (string symbol)
 		{
-			definesymbols += symbol + ";";
+			var symbols = new List<string> (definesymbols.Split (new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
+
+			symbols.Add (symbol);
+
+			definesymbols = string.Join (";", symbols) + ";";
 		}
 
 		public override bool HasDefineSymbol (string symbol)
 		{
-			return definesymbols.Contains (symbol);
+			var symbols = definesymbols.Split (new char[] { ';' });
+
+			foreach (var sym in symbols) {
+				if (sym == symbol)
+					return true;
+			}
+
+			return false;
 		}
 
 		public override void RemoveDefineSymbol (string symbol)
 		{
-			definesymbols = definesymbols.Replace (symbol + ";", "");
+			var symbols = new List<string> (definesymbols.Split (new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
+
+			symbols.Remove (symbol);
+
+			if (symbols.Count > 0)
+				definesymbols = string.Join (";", symbols) + ";";
+			else
+				definesymbols = string.Empty;
 		}
 		
 #region Code Generation
@@ -225,7 +244,16 @@ namespace MonoDevelop.CSharp.Project
 				platformTarget = value ?? string.Empty;
 			}
 		}
-		
+
+		public string DebugType {
+			get {
+				return debugType;
+			}
+			set {
+				debugType = value;
+			}
+		}
+
 #endregion
 
 #region Errors and Warnings 

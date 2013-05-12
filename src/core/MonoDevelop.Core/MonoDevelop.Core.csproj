@@ -72,9 +72,16 @@
     <Reference Include="ICSharpCode.SharpZipLib" />
     <Reference Include="monodoc, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756">
       <Private>False</Private>
+      <SpecificVersion>False</SpecificVersion>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Web" />
+    <Reference Include="nunit.core">
+      <HintPath>..\..\..\external\mdtestharness\lib\nunit.core.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.core.interfaces">
+      <HintPath>..\..\..\external\mdtestharness\lib\nunit.core.interfaces.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MonoDevelop.Core\StringParserService.cs" />
@@ -437,6 +444,8 @@
     <Compile Include="MonoDevelop.Core\IWebCertificateProvider.cs" />
     <Compile Include="MonoDevelop.Core.Execution\ExecutionTarget.cs" />
     <Compile Include="MonoDevelop.Core.Assemblies\SupportedFramework.cs" />
+    <Compile Include="MonoDevelop.Projects.Extensions\UnknownProjectTypeNode.cs" />
+    <Compile Include="MonoDevelop.Core\InternalTestRunner.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile.am" />
@@ -467,6 +476,12 @@
     </EmbeddedResource>
     <EmbeddedResource Include="frameworks\framework_NET_4_5.xml">
       <LogicalName>framework_NET_4_5.xml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="frameworks\framework_NET_3_5_client.xml">
+      <LogicalName>framework_NET_3_5_client.xml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="frameworks\framework_NET_4_0_client.xml">
+      <LogicalName>framework_NET_4_0_client.xml</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />

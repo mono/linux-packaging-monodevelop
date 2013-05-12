@@ -38,18 +38,21 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		public IEnumerable<CodeAction> GetActions(RefactoringContext context)
 		{
 			var varDecl = GetVariableDeclarationStatement(context);
+			AstNode node;
 			IType type;
 			if (varDecl != null) {
 				type = context.Resolve(varDecl.Variables.First().Initializer).Type;
+				node = varDecl;
 			} else {
 				var foreachStatement = GetForeachStatement(context);
 				if (foreachStatement == null) {
 					yield break;
 				}
 				type = context.Resolve(foreachStatement.VariableType).Type;
+				node = foreachStatement;
 			}
-			
-			if (!(!type.Equals(SpecialType.NullType) && !type.Equals(SpecialType.UnknownType))) {
+
+			if (!(!type.Equals(SpecialType.NullType) && !type.Equals(SpecialType.UnknownType) && !ContainsAnonymousType(type))) {
 				yield break;
 			}
 			yield return new CodeAction (context.TranslateString("Use explicit type"), script => {
@@ -59,9 +62,18 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 					var foreachStatement = GetForeachStatement (context);
 					script.Replace (foreachStatement.VariableType, context.CreateShortType (type));
 				}
-			});
+			}, node);
 		}
-		
+
+		static bool ContainsAnonymousType (IType type)
+		{
+			if (type.Kind == TypeKind.Anonymous)
+				return true;
+
+			var arrayType = type as ArrayType;
+			return arrayType != null && ContainsAnonymousType (arrayType.ElementType);
+		}
+
 		static readonly AstType varType = new SimpleType ("var");
 
 		static VariableDeclarationStatement GetVariableDeclarationStatement (RefactoringContext context)

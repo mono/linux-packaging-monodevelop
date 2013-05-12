@@ -1,7 +1,0 @@
-/tmp/monodevelop/main/src/addins/MonoDevelop.RegexToolkit/obj/Debug/MonoDevelop.RegexToolkit.gtk-gui.gui.stetic
-/tmp/monodevelop/main/src/addins/MonoDevelop.RegexToolkit/obj/Debug/MonoDevelop.RegexToolkit.MonoDevelop.RegexToolkit.addin.xml
-/tmp/monodevelop/main/src/addins/MonoDevelop.RegexToolkit/obj/Debug/MonoDevelop.RegexToolkit.RegexElements.xml
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.RegexToolkit/MonoDevelop.RegexToolkit.dll.mdb
-/tmp/monodevelop/main/build/AddIns/MonoDevelop.RegexToolkit/MonoDevelop.RegexToolkit.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.RegexToolkit/obj/Debug/MonoDevelop.RegexToolkit.dll
-/tmp/monodevelop/main/src/addins/MonoDevelop.RegexToolkit/obj/Debug/MonoDevelop.RegexToolkit.dll.mdb

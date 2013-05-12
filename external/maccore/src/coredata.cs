@@ -347,6 +347,7 @@ namespace MonoMac.CoreData
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[Protocol]
 	interface NSFetchedResultsControllerDelegate {
 		[Export ("controllerWillChangeContent:")]
 		void WillChangeContent (NSFetchedResultsController controller);
@@ -366,6 +367,7 @@ namespace MonoMac.CoreData
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[Protocol]
 	interface NSFetchedResultsSectionInfo {
 		[Export ("numberOfObjects")]
 		int Count { get; }
@@ -648,6 +650,7 @@ namespace MonoMac.CoreData
 		IntPtr Constructor (NSManagedObjectContextConcurrencyType ct);
 
 		[Export ("performBlock:")]
+		[Async]
 		void Perform (/* non null */ NSAction action);
 
 		[Export ("performBlockAndWait:")]

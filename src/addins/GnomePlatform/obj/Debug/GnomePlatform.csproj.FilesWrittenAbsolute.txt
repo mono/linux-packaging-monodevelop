@@ -1,6 +1,0 @@
-/tmp/monodevelop/main/src/addins/GnomePlatform/obj/Debug/GnomePlatform.GnomePlatform.addin.xml
-/tmp/monodevelop/main/build/AddIns/GnomePlatform.dll.config
-/tmp/monodevelop/main/build/AddIns/GnomePlatform.dll.mdb
-/tmp/monodevelop/main/build/AddIns/GnomePlatform.dll
-/tmp/monodevelop/main/src/addins/GnomePlatform/obj/Debug/GnomePlatform.dll
-/tmp/monodevelop/main/src/addins/GnomePlatform/obj/Debug/GnomePlatform.dll.mdb

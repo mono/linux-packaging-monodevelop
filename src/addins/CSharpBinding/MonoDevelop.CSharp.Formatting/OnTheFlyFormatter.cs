@@ -146,7 +146,7 @@ namespace MonoDevelop.CSharp.Formatting
 			return sb.ToString ();
 		}
 		
-		static AstFormattingVisitor GetFormattingChanges (PolicyContainer policyParent, IEnumerable<string> mimeTypeChain, MonoDevelop.Ide.Gui.Document document, string input, DomRegion formattingRegion, ref int formatStartOffset, ref int formatLength, bool formatLastStatementOnly)
+		static FormattingChanges GetFormattingChanges (PolicyContainer policyParent, IEnumerable<string> mimeTypeChain, MonoDevelop.Ide.Gui.Document document, string input, DomRegion formattingRegion, ref int formatStartOffset, ref int formatLength, bool formatLastStatementOnly)
 		{
 			using (var stubData = TextEditorData.CreateImmutable (input)) {
 				stubData.Document.FileName = document.FileName;
@@ -166,19 +166,23 @@ namespace MonoDevelop.CSharp.Formatting
 				
 				var policy = policyParent.Get<CSharpFormattingPolicy> (mimeTypeChain);
 				
-				var formattingVisitor = new AstFormattingVisitor (policy.CreateOptions (), stubData.Document, document.Editor.CreateNRefactoryTextEditorOptions ()) {
-					HadErrors = hadErrors,
-				};
+				var formattingVisitor = new ICSharpCode.NRefactory.CSharp.CSharpFormatter (policy.CreateOptions (), document.Editor.CreateNRefactoryTextEditorOptions ());
+				formattingVisitor.FormattingMode = FormattingMode.Intrusive;
 				formattingVisitor.AddFormattingRegion (formattingRegion);
 
-				compilationUnit.AcceptVisitor (formattingVisitor);
+
+				var changes = formattingVisitor.AnalyzeFormatting (stubData.Document, compilationUnit);
 
 				if (formatLastStatementOnly) {
 					AstNode node = compilationUnit.GetAdjacentNodeAt<Statement> (stubData.OffsetToLocation (formatStartOffset + formatLength - 1));
 					if (node != null) {
 						while (node.Role == Roles.EmbeddedStatement || node.Role == IfElseStatement.TrueRole || node.Role == IfElseStatement.FalseRole)
 							node = node.Parent;
-						var start = stubData.LocationToOffset (node.StartLocation);
+						// include indentation if node starts in new line
+						var formatNode = node.GetPrevNode ();
+						if (formatNode.Role != Roles.NewLine)
+							formatNode = node;
+						var start = stubData.LocationToOffset (formatNode.StartLocation);
 						if (start > formatStartOffset) {
 							var end = stubData.LocationToOffset (node.EndLocation);
 							formatStartOffset = start;
@@ -186,7 +190,7 @@ namespace MonoDevelop.CSharp.Formatting
 						}
 					}
 				}
-				return formattingVisitor;
+				return changes;
 			}
 		}
 		
@@ -214,6 +218,7 @@ namespace MonoDevelop.CSharp.Formatting
 					startDelta = startOffset - seg.Offset;
 					formatLength = endOffset - startOffset + startDelta;
 					realTextDelta = seg.Offset - formatStartOffset;
+					formattingRegion = new DomRegion (data.Editor.OffsetToLocation (formatStartOffset), data.Editor.OffsetToLocation (endOffset));
 				} else {
 					formatStartOffset = startOffset;
 					formatLength = endOffset - startOffset;
@@ -222,14 +227,16 @@ namespace MonoDevelop.CSharp.Formatting
 				}
 			} else {
 				var seg = ext.typeSystemSegmentTree.GetMemberSegmentAt (startOffset - 1);
-				if (seg == null)
+				if (seg == null) {
 					return;
+				}
 				var member = seg.Entity;
-				if (member == null || member.Region.IsEmpty || member.BodyRegion.End.IsEmpty)
+				if (member == null)
 					return;
 	
 				// Build stub
 				text = BuildStub (data, seg, startOffset, endOffset, out formatStartOffset);
+				formattingRegion = new DomRegion (data.Editor.OffsetToLocation (formatStartOffset), data.Editor.OffsetToLocation (endOffset));
 
 				formatLength = endOffset - seg.Offset;
 				realTextDelta = seg.Offset - formatStartOffset;

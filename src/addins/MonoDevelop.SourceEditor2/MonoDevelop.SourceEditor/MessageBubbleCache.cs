@@ -47,7 +47,6 @@ namespace MonoDevelop.SourceEditor
 		internal Cairo.Color gcLight, gcSelected;
 		
 		internal Pango.FontDescription fontDescription;
-		internal Gdk.Cursor arrowCursor = new Gdk.Cursor (Gdk.CursorType.Arrow);
 
 		public MessageBubbleCache (TextEditor editor)
 		{
@@ -81,7 +80,6 @@ namespace MonoDevelop.SourceEditor
 				fontDescription.Dispose ();
 				fontDescription = null;
 			}
-			arrowCursor.Dispose ();
 		}
 
 		static string GetFirstLine (ErrorText errorText)
@@ -110,8 +108,8 @@ namespace MonoDevelop.SourceEditor
 		void SetColors ()
 		{
 			ColorScheme style = editor.ColorStyle;
-			errorGc = (HslColor)(style.MessageBubbleError.GetColor ("color"));
-			warningGc = (HslColor)(style.MessageBubbleWarning.GetColor ("color"));
+			errorGc = (HslColor)(style.MessageBubbleError.Color);
+			warningGc = (HslColor)(style.MessageBubbleWarning.Color);
 			errorMatrix = CreateColorMatrix (editor, true);
 			warningMatrix = CreateColorMatrix (editor, false);
 			
@@ -156,7 +154,7 @@ namespace MonoDevelop.SourceEditor
 			Cairo.Color[,,,,] colorMatrix = new Cairo.Color[2, 2, 3, 2, 2];
 			
 			ColorScheme style = editor.ColorStyle;
-			var baseColor = (isError ? style.MessageBubbleError : style.MessageBubbleWarning).GetColor ("secondcolor");
+			var baseColor = (isError ? style.MessageBubbleError : style.MessageBubbleWarning).SecondColor;
 			
 			AdjustColorMatrix (colorMatrix, 0, baseColor);
 			
@@ -176,12 +174,17 @@ namespace MonoDevelop.SourceEditor
 				}
 			}
 			var selectionColor = style.SelectedText.Background;
+			const double bubbleAlpha = 0.1;
 			for (int i = 0; i < 2; i++) {
 				for (int j = 0; j < 2; j++) {
 					for (int k = 0; k < 3; k++) {
 						for (int l = 0; l < 2; l++) {
 							var color = colorMatrix [i, j, k, l, 0];
-							colorMatrix [i, j, k, l, 1] = new Cairo.Color ((color.R + selectionColor.R * 2.5) / 3.5, (color.G + selectionColor.G * 2.5) / 3.5, (color.B + selectionColor.B * 2.5) / 3.5);
+							colorMatrix [i, j, k, l, 1] = new Cairo.Color (
+								(color.R * bubbleAlpha + selectionColor.R * (1 - bubbleAlpha)), 
+								(color.G * bubbleAlpha + selectionColor.G * (1 - bubbleAlpha)), 
+								(color.B * bubbleAlpha + selectionColor.B * (1 - bubbleAlpha))
+							);
 						}
 					}
 				}
