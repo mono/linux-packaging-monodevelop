@@ -1,3 +1,37 @@
+monodevelop (4.0.5+dfsg-1) unstable; urgency=low
+
+  * [a01b51d] Imported Upstream version 4.0+dfsg
+  * [fce0339] Remove obsolete patch 
+    fix_gettext_install_location_53282c9.patch
+  * [8845d36] Remove obsolete patch link_system_nunit.patch - xbuild always 
+    searches for system libraries to link against if we delete the bundled 
+    versions.
+  * [9060006] Remove obsolete patch use_libsvn1.patch - we don't need this, 
+    since we can --exclude-moduleref these days when never-used libs are 
+    referenced in platform-specific code.
+  * [ec61152] Remove obsolete patch use_libapr1.patch - we don't need this, 
+    since we can --exclude-moduleref these days when never-used libs are 
+    referenced in platform-specific code.
+  * [182e98c] Strangely, if you have multiple versions of the same library 
+    installed (i.e. MVC) then the lowest numbered is used for xbuild 
+    assembly references, which breaks the build. Force MVC3 since that 
+    works (i.e. the code requires a Razor-capable MVC)
+  * [9596fba] Exclude a bundle of extra Mac/Windows-specific modulerefs
+  * [55ba361] Specifically require mono-devel 3.0+, to pull in MVC3
+  * [dd232c9] Reference Xamarin Studio in debian/control, so searches in
+    apt-cache match this package
+  * [6adcafb] Remove the commented Moonlight stuff in debian/control, that 
+    stuff is never coming back
+  * [b66fae7] Fix package description for monodevelop-versioncontrol to 
+    mention Git.
+  * [4bfbce8] Specifically depend on the SGen garbage collector, since 
+    upstream now recommends its use with MonoDevelop
+  * [76fb6c7] Imported Upstream version 4.0.4+dfsg
+  * [f2b85f9] Refresh list of files removed by +dfsg
+  * [846e28a] Imported Upstream version 4.0.5+dfsg
+
+ -- Jo Shields <directhex@apebox.org>  Sun, 12 May 2013 09:46:03 +0100
+
 monodevelop (3.0.3.2+dfsg-1) unstable; urgency=low
 
   * [3fd89ae] Imported Upstream version 3.0.3.2+dfsg
