@@ -1,7 +1,9 @@
---- a/monodevelop.in
-+++ b/monodevelop.in
-@@ -16,6 +16,9 @@
- 	_MONO_OPTIONS=$MONO_OPTIONS
+Index: monodevelop/monodevelop.in
+===================================================================
+--- monodevelop.orig/monodevelop.in	2013-10-10 12:00:23.300558627 +0200
++++ monodevelop/monodevelop.in	2013-10-10 12:00:23.296558662 +0200
+@@ -25,6 +25,9 @@
+ 	MONO_OPTIONS="$MONO_OPTIONS --gc=sgen"
  fi
  
 +# Monodevelop menus don't work with Ubuntu appmenu
