@@ -1,3 +1,16 @@
+monodevelop (4.0.12+dfsg-1) unstable; urgency=low
+
+  * [5dcb6e1] Fix debian/watch for new source tarball name format
+  * [5c68cb5] Refresh list of files removed by get-orig-source to 
+    reflect 4.0.12
+  * [96d60a0] Imported Upstream version 4.0.12+dfsg
+  * [b989752] Refresh debian/patches/no_appmenu to ensure it applies
+  * [2a4c351] Ensure every assembly in external/ is cleaned properly
+  * [92762f7] Add more excluded Mac-specific modulerefs
+  * [bc698ba] Add symlinks to NUnit assemblies (Closes: #714246)
+
+ -- Jo Shields <directhex@apebox.org>  Thu, 10 Oct 2013 14:50:04 +0200
+
 monodevelop (4.0.5+dfsg-1) unstable; urgency=low
 
   * [a01b51d] Imported Upstream version 4.0+dfsg
