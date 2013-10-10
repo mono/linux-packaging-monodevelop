@@ -37,6 +37,7 @@ using System.ComponentModel.Design;
 using ICSharpCode.NRefactory.CSharp.Analysis;
 using ICSharpCode.NRefactory.Utils;
 using System.Collections.Generic;
+using ICSharpCode.NRefactory.Analysis;
 
 namespace ICSharpCode.NRefactory.CSharp.Refactoring
 {
@@ -84,6 +85,13 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			get { return resolver.Compilation; }
 		}
 
+		/// <summary>
+		/// Gets the type graph for the current compilation.
+		/// </summary>
+		public virtual TypeGraph TypeGraph {
+			get { return new TypeGraph(Compilation.Assemblies); }
+		}
+		
 		public BaseRefactoringContext (ICSharpCode.NRefactory.CSharp.Resolver.CSharpAstResolver resolver, System.Threading.CancellationToken cancellationToken)
 		{
 			this.resolver = resolver;
@@ -123,7 +131,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			return resolver.GetConversion(expression, cancellationToken);
 		}
 		
-		public TypeSystemAstBuilder CreateTypeSytemAstBuilder(AstNode node)
+		public TypeSystemAstBuilder CreateTypeSystemAstBuilder(AstNode node)
 		{
 			var csResolver = resolver.GetResolverStateBefore(node);
 			return new TypeSystemAstBuilder(csResolver);

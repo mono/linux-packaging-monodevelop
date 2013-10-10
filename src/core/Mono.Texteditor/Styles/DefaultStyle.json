@@ -69,26 +69,36 @@
 		{ "name": "Quick Diff(Changed)", "color":"orangesicle" },
 		
 		{ "name": "Brace Matching(Rectangle)", "color":"orangesicle", "secondcolor":"orangesicle-light" },
-		{ "name": "Usages(Rectangle)", "color":"orangesicle", "secondcolor":"orangesicle-light" },
+		{ "name": "Usages(Rectangle)", "color":"#B1DFF9", "secondcolor":"#B1DFF9" },
+		{ "name": "Changing usages(Rectangle)", "color":"#FFD6DD", "secondcolor":"#FFD6DD" },
 		
 		{ "name": "Breakpoint Marker", "color":"white", "secondcolor":"#AB616B" },
 		{ "name": "Breakpoint Marker(Disabled)", "color":"#AB616B", "secondcolor":"white" },
 		{ "name": "Breakpoint Marker(Invalid)", "color":"#eddcdc", "secondcolor":"#eddcdc" },
 		
-        { "name": "Current Line Marker", "color":"aluminium1", "secondcolor":"aluminium2"},
-        { "name": "Current Line Marker(Inactive)", "color":"aluminium2", "secondcolor":"aluminium3"},
-		
-        { "name": "Debugger Current Line Marker", "color":"#ffff00", "secondcolor":"#ffffcc", "bordercolor":"#666600" },
-        { "name": "Debugger Stack Line Marker", "color":"#80ff80", "secondcolor":"#ccffcc", "bordercolor":"#336633"},
-        
-        { "name": "Primary Link", "color":"chameleon3", "secondcolor":"chameleon2"},
-        { "name": "Primary Link(Highlighted)", "color":"chameleon3", "secondcolor":"chameleon1"},
-        { "name": "Secondary Link", "color":"aluminium2", "secondcolor":"white"},
-        { "name": "Secondary Link(Highlighted)", "color":"aluminium3", "secondcolor":"aluminium1"},
-        
-        { "name": "Message Bubble Error", "color":"aluminium5", "secondcolor":"#f5eae7"},
-        { "name": "Message Bubble Warning", "color":"aluminium5", "secondcolor":"#f4eeda"}
-    ],
+		{ "name": "Current Line Marker", "color":"aluminium1", "secondcolor":"aluminium2"},
+		{ "name": "Current Line Marker(Inactive)", "color":"aluminium2", "secondcolor":"aluminium3"},
+
+		{ "name": "Debugger Current Line Marker", "color":"#ffff00", "secondcolor":"#ffffcc", "bordercolor":"#666600" },
+		{ "name": "Debugger Stack Line Marker", "color":"#80ff80", "secondcolor":"#ccffcc", "bordercolor":"#336633"},
+
+		{ "name": "Primary Link", "color":"chameleon3", "secondcolor":"chameleon2"},
+		{ "name": "Primary Link(Highlighted)", "color":"chameleon3", "secondcolor":"chameleon1"},
+		{ "name": "Secondary Link", "color":"aluminium2", "secondcolor":"white"},
+		{ "name": "Secondary Link(Highlighted)", "color":"aluminium3", "secondcolor":"aluminium1"},
+
+		{ "name": "Message Bubble Error Marker", "color":"#df6962"},
+		{ "name": "Message Bubble Error Tag", "color":"#d83f3f", "secondcolor":"white"},
+		{ "name": "Message Bubble Error Counter", "color":"white", "secondcolor":"#d83f3f"},
+		{ "name": "Message Bubble Error IconMargin", "color":"#d83f3f", "bordercolor":"#b12a2"},
+		{ "name": "Message Bubble Error Line", "color":"#fbe4e6"},
+
+		{ "name": "Message Bubble Warning Marker", "color":"#b28d37"},
+		{ "name": "Message Bubble Warning Tag", "color":"#e68100", "secondcolor":"white"},
+		{ "name": "Message Bubble Warning Counter", "color":"white", "secondcolor":"#e68100"},
+		{ "name": "Message Bubble Warning IconMargin", "color":"#e68100", "bordercolor":"#c76f00"},
+		{ "name": "Message Bubble Warning Line", "color":"#fff1da"}
+	],
 
 	"text":[
 		{ "name": "Plain Text", "fore":"text-black", "back":"white" },
@@ -184,6 +194,8 @@
 
 		{ "name": "User Variable Usage", "fore":"text-black" },
 		{ "name": "User Variable Declaration", "fore":"text-black" },
+
+		{ "name": "String Format Items", "fore":"#FF0000" },
 
 		{ "name": "Syntax Error", "fore":"invalid-red" },
 		

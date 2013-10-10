@@ -346,7 +346,8 @@ namespace MonoDevelop.Ide.Gui
 			}
 			
 			if (content.IsDirty) {
-				IdeApp.ProjectOperations.MarkFileDirty (content.ContentName);
+				if (!String.IsNullOrEmpty (content.ContentName))
+					IdeApp.ProjectOperations.MarkFileDirty (content.ContentName);
 			} else if (content.IsReadOnly) {
 				newTitle += "+";
 			}
@@ -380,20 +381,34 @@ namespace MonoDevelop.Ide.Gui
 
 			OnClosed (args);
 
-			foreach (IAttachableViewContent sv in SubViewContents) {
-				sv.Dispose ();
-			}
-			
-			content.ContentNameChanged -= new EventHandler(SetTitleEvent);
-			content.DirtyChanged -= HandleDirtyChanged;
-			content.BeforeSave         -= new EventHandler(BeforeSave);
-			content.ContentChanged     -= new EventHandler (OnContentChanged);
-			content.WorkbenchWindow     = null;
-			content.Dispose ();
-			
-			DetachFromPathedDocument ();
 			Destroy ();
 			return true;
+		}
+
+		protected override void OnDestroyed ()
+		{
+			base.OnDestroyed ();
+			if (viewContents != null) {
+				foreach (IAttachableViewContent sv in SubViewContents) {
+					sv.Dispose ();
+				}
+				viewContents = null;
+			}
+
+			if (content != null) {
+				content.ContentNameChanged -= new EventHandler(SetTitleEvent);
+				content.DirtyChanged       -= HandleDirtyChanged;
+				content.BeforeSave         -= new EventHandler(BeforeSave);
+				content.ContentChanged     -= new EventHandler (OnContentChanged);
+				content.WorkbenchWindow     = null;
+				content.Dispose ();
+				content = null;
+			}
+
+			DetachFromPathedDocument ();
+			commandHandler = null;
+			document = null;
+			extensionContext = null;
 		}
 		
 		#region lazy UI element creation
@@ -611,8 +626,6 @@ namespace MonoDevelop.Ide.Gui
 			}
 
 			subViewContent = viewContents[newIndex] as IAttachableViewContent;
-			if (subViewContent != null)
-				subViewContent.Selected ();
 
 			DetachFromPathedDocument ();
 			
@@ -628,6 +641,8 @@ namespace MonoDevelop.Ide.Gui
 
 			foreach (var t in documentToolbars)
 				t.Value.Container.Visible = ActiveViewContent == t.Key;
+			if (subViewContent != null)
+				subViewContent.Selected ();
 
 			OnActiveViewContentChanged (new ActiveViewContentEventArgs (this.ActiveViewContent));
 		}

@@ -8,7 +8,7 @@
 //       Eric Maupin <ermau@xamarin.com>
 // 
 // Copyright (c) 2011 Carlos Alberto Cortez
-// Copyright (c) 2012 Luís Reis
+// Copyright (c) 2012 Luï¿½s Reis
 // Copyright (c) 2012 Thomas Ziegler
 // Copyright (c) 2012 Xamarin, Inc.
 // 
@@ -34,11 +34,11 @@ using System.Windows;
 using System.Windows.Threading;
 using Xwt.Backends;
 using Xwt.Drawing;
-using Xwt.Engine;
+
 
 namespace Xwt.WPFBackend
 {
-	public class WPFEngine : Xwt.Backends.EngineBackend
+	public class WPFEngine : Xwt.Backends.ToolkitEngineBackend
 	{
 		System.Windows.Application application;
 
@@ -49,54 +49,65 @@ namespace Xwt.WPFBackend
 			if (application == null)
 				application = new System.Windows.Application ();
 
-			WidgetRegistry.RegisterBackend (typeof (Window), typeof (WindowBackend));
-			WidgetRegistry.RegisterBackend (typeof (Dialog), typeof (DialogBackend));
-			WidgetRegistry.RegisterBackend (typeof (Notebook), typeof (NotebookBackend));
-			WidgetRegistry.RegisterBackend (typeof (Menu), typeof (MenuBackend));
-			WidgetRegistry.RegisterBackend (typeof (MenuItem), typeof (MenuItemBackend));
-			WidgetRegistry.RegisterBackend (typeof (CheckBoxMenuItem), typeof (CheckboxMenuItemBackend));
-			WidgetRegistry.RegisterBackend (typeof (RadioButtonMenuItem), typeof (RadioButtonMenuItemBackend));
-			WidgetRegistry.RegisterBackend (typeof (SeparatorMenuItem), typeof (SeparatorMenuItemBackend));
-			WidgetRegistry.RegisterBackend (typeof (Table), typeof (BoxBackend));
-			WidgetRegistry.RegisterBackend (typeof (Box), typeof (BoxBackend));
-			WidgetRegistry.RegisterBackend (typeof (Label), typeof (LabelBackend));
-			WidgetRegistry.RegisterBackend (typeof (TextEntry), typeof (TextEntryBackend));
-			WidgetRegistry.RegisterBackend (typeof (Button), typeof (ButtonBackend));
-			WidgetRegistry.RegisterBackend (typeof (ToggleButton), typeof (ToggleButtonBackend));
-			WidgetRegistry.RegisterBackend (typeof (MenuButton), typeof (MenuButtonBackend));
-			WidgetRegistry.RegisterBackend (typeof (CheckBox), typeof (CheckBoxBackend));
-			WidgetRegistry.RegisterBackend (typeof (TreeView), typeof (TreeViewBackend));
-			WidgetRegistry.RegisterBackend (typeof (TreeStore), typeof (TreeStoreBackend));
-			WidgetRegistry.RegisterBackend (typeof (ImageView), typeof (ImageViewBackend));
-			WidgetRegistry.RegisterBackend (typeof (Separator), typeof (SeparatorBackend));
-			WidgetRegistry.RegisterBackend (typeof (Image), typeof (ImageHandler));
-			WidgetRegistry.RegisterBackend (typeof (Font), typeof (FontBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof (Clipboard), typeof (ClipboardBackend));
-			WidgetRegistry.RegisterBackend (typeof (ComboBox), typeof (ComboBoxBackend));
-			WidgetRegistry.RegisterBackend (typeof (ComboBoxEntry), typeof (ComboBoxEntryBackend));
-			WidgetRegistry.RegisterBackend (typeof (ScrollView), typeof (ScrollViewBackend));
-			WidgetRegistry.RegisterBackend (typeof (Frame), typeof (FrameBackend));
-			WidgetRegistry.RegisterBackend (typeof (Canvas), typeof (CanvasBackend));
-			WidgetRegistry.RegisterBackend (typeof (Context), typeof (ContextBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof (Gradient), typeof (GradientBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof (TextLayout), typeof (TextLayoutBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof (Widget), typeof (CustomWidgetBackend));
-			WidgetRegistry.RegisterBackend (typeof (Paned), typeof (PanedBackend));
-			WidgetRegistry.RegisterBackend (typeof (ScrollAdjustment), typeof (ScrollAdjustmentBackend));
-			WidgetRegistry.RegisterBackend (typeof (OpenFileDialog), typeof (OpenFileDialogBackend));
-			WidgetRegistry.RegisterBackend (typeof (SelectFolderDialog), typeof (SelectFolderDialogBackend));
-			WidgetRegistry.RegisterBackend (typeof (IAlertDialogBackend), typeof (AlertDialogBackend));
-			WidgetRegistry.RegisterBackend (typeof (ImageBuilder), typeof (ImageBuilderBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof (ImagePattern), typeof (ImagePatternBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof (ListView), typeof (ListViewBackend));
-			WidgetRegistry.RegisterBackend (typeof (ListStore), typeof (ListDataSource));
-			WidgetRegistry.RegisterBackend (typeof (ListBox), typeof (ListBoxBackend));
-			WidgetRegistry.RegisterBackend (typeof (Placement), typeof (BoxBackend));
-			WidgetRegistry.RegisterBackend (typeof (Popover), typeof (PopoverBackend));
-			WidgetRegistry.RegisterBackend (typeof (ProgressBar), typeof (ProgressBarBackend));
-			WidgetRegistry.RegisterBackend (typeof (RichTextView), typeof (RichTextViewBackend));
-			WidgetRegistry.RegisterBackend (typeof (LinkLabel), typeof (LinkLabelBackend));
-			WidgetRegistry.RegisterBackend (typeof (Spinner), typeof (SpinnerBackend));
+			application.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+			RegisterBackend<IWindowBackend, WindowBackend> ();
+			RegisterBackend<IDialogBackend, DialogBackend> ();
+			RegisterBackend<INotebookBackend, NotebookBackend> ();
+			RegisterBackend<IMenuBackend, MenuBackend> ();
+			RegisterBackend<IMenuItemBackend, MenuItemBackend> ();
+			RegisterBackend<ICheckBoxMenuItemBackend, CheckboxMenuItemBackend> ();
+			RegisterBackend<IRadioButtonMenuItemBackend, RadioButtonMenuItemBackend> ();
+			RegisterBackend<ISeparatorMenuItemBackend, SeparatorMenuItemBackend> ();
+			RegisterBackend<IBoxBackend, BoxBackend> ();
+			RegisterBackend<ILabelBackend, LabelBackend> ();
+			RegisterBackend<ITextEntryBackend, TextEntryBackend> ();
+			RegisterBackend<IButtonBackend, ButtonBackend> ();
+			RegisterBackend<IToggleButtonBackend, ToggleButtonBackend> ();
+			RegisterBackend<IMenuButtonBackend, MenuButtonBackend> ();
+			RegisterBackend<ICheckBoxBackend, CheckBoxBackend> ();
+			RegisterBackend<ITreeViewBackend, TreeViewBackend> ();
+			RegisterBackend<ITreeStoreBackend, TreeStoreBackend> ();
+			RegisterBackend<IImageViewBackend, ImageViewBackend> ();
+			RegisterBackend<ISeparatorBackend, SeparatorBackend> ();
+			RegisterBackend<ImageBackendHandler, ImageHandler> ();
+			RegisterBackend<FontBackendHandler, WpfFontBackendHandler> ();
+			RegisterBackend<ClipboardBackend, WpfClipboardBackend> ();
+			RegisterBackend<IComboBoxBackend, ComboBoxBackend> ();
+			RegisterBackend<IComboBoxEntryBackend, ComboBoxEntryBackend> ();
+			RegisterBackend<IScrollViewBackend, ScrollViewBackend> ();
+			RegisterBackend<IFrameBackend, FrameBackend> ();
+			RegisterBackend<ICanvasBackend, CanvasBackend> ();
+			RegisterBackend<ContextBackendHandler, WpfContextBackendHandler> ();
+			RegisterBackend<DrawingPathBackendHandler, WpfContextBackendHandler> ();
+			RegisterBackend<GradientBackendHandler, WpfGradientBackendHandler> ();
+			RegisterBackend<TextLayoutBackendHandler, WpfTextLayoutBackendHandler> ();
+			RegisterBackend<ICustomWidgetBackend, CustomWidgetBackend> ();
+			RegisterBackend<IPanedBackend, PanedBackend> ();
+			RegisterBackend<IScrollAdjustmentBackend, ScrollAdjustmentBackend> ();
+			RegisterBackend<IOpenFileDialogBackend, OpenFileDialogBackend> ();
+			RegisterBackend<ISaveFileDialogBackend, SaveFileDialogBackend> ();
+			RegisterBackend<ISelectFolderDialogBackend, SelectFolderDialogBackend> ();
+			RegisterBackend<IAlertDialogBackend, AlertDialogBackend> ();
+			RegisterBackend<ImageBuilderBackendHandler, WpfImageBuilderBackendHandler> ();
+			RegisterBackend<ImagePatternBackendHandler, WpfImagePatternBackendHandler> ();
+			RegisterBackend<IListViewBackend, ListViewBackend> ();
+			RegisterBackend<IListStoreBackend, ListDataSource> ();
+			RegisterBackend<IListBoxBackend, ListBoxBackend> ();
+			RegisterBackend<IPopoverBackend, PopoverBackend> ();
+			RegisterBackend<IProgressBarBackend, ProgressBarBackend> ();
+			RegisterBackend<IRichTextViewBackend, RichTextViewBackend> ();
+			RegisterBackend<ILinkLabelBackend, LinkLabelBackend> ();
+			RegisterBackend<ISpinnerBackend, SpinnerBackend> ();
+			RegisterBackend<DesktopBackend, WpfDesktopBackend>();
+			RegisterBackend<IExpanderBackend, ExpanderBackend>();
+			RegisterBackend<IDatePickerBackend, DatePickerBackend>();
+			RegisterBackend<ISelectColorDialogBackend, SelectColorDialogBackend>();
+			RegisterBackend<IRadioButtonBackend, RadioButtonBackend>();
+			RegisterBackend<ISpinButtonBackend, SpinButtonBackend>();
+			RegisterBackend<ISliderBackend, SliderBackend> ();
+			RegisterBackend<IScrollbarBackend, ScrollbarBackend> ();
+			RegisterBackend<IEmbeddedWidgetBackend, EmbedNativeWidgetBackend>();
 		}
 
 		public override void DispatchPendingEvents()
@@ -147,13 +158,13 @@ namespace Xwt.WPFBackend
 
 		public override object GetNativeWidget (Widget w)
 		{
-			var backend = (IWpfWidgetBackend) WidgetRegistry.GetBackend (w);
+			var backend = (IWpfWidgetBackend) Toolkit.GetBackend (w);
 			return backend.Widget;
 		}
 
 		public override object GetNativeParentWindow (Widget w)
 		{
-			var backend = (IWpfWidgetBackend) WidgetRegistry.GetBackend (w);
+			var backend = (IWpfWidgetBackend)Toolkit.GetBackend (w);
 
 			FrameworkElement e = backend.Widget;
 			while ((e = e.Parent as FrameworkElement) != null)
@@ -165,8 +176,13 @@ namespace Xwt.WPFBackend
 		
 		public override bool HasNativeParent (Widget w)
 		{
-			var backend = (IWpfWidgetBackend) WidgetRegistry.GetBackend (w);
+			var backend = (IWpfWidgetBackend)Toolkit.GetBackend (w);
 			return backend.Widget.Parent != null;
+		}
+
+		public override object GetNativeImage (Image image)
+		{
+			return DataConverter.AsImageSource (Toolkit.GetBackend (image));
 		}
 	}
 }

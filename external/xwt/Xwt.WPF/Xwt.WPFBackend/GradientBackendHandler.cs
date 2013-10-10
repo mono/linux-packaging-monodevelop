@@ -1,4 +1,4 @@
-﻿// 
+// 
 // GradientBackendHandler.cs
 //  
 // Author:
@@ -26,104 +26,45 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Linq;
 
 using Xwt.Backends;
 using Color = Xwt.Drawing.Color;
-using DrawingColor = System.Drawing.Color;
+using System.Windows.Media;
+using SW = System.Windows;
 
 namespace Xwt.WPFBackend
 {
-	public class GradientBackendHandler
-		: Backend, IGradientBackendHandler
+	public class WpfGradientBackendHandler
+		: GradientBackendHandler
 	{
-		public object CreateLinear (double x0, double y0, double x1, double y1)
+		public override object CreateLinear (double x0, double y0, double x1, double y1)
 		{
-			return new LinearGradient (
-				new PointF ((float) x0, (float) y0),
-				new PointF ((float) x1, (float) y1));
-		}
-
-		public object CreateRadial (double cx0, double cy0, double radius0, double cx1, double cy1, double radius1)
-		{
-			return new RadialGradient (cx0, cy0, radius0, cx1, cy1, radius1);
-		}
-
-		public void AddColorStop (object backend, double position, Color color)
-		{
-			((GradientBase)backend).ColorStops.Add (new Tuple<double, Color> (position, color));
-		}
-	}
-
-	internal class RadialGradient
-		: GradientBase
-	{
-		GraphicsPath path;
-		double cx0, cy0, r0;
-		double cx1, cy1, r1;
-
-		public RadialGradient (double cx0, double cy0, double radius0, double cx1, double cy1, double radius1)
-		{
-			this.cx0 = cx0;
-			this.cy0 = cy0;
-			this.r0 = radius0;
-
-			this.cx1 = cx1;
-			this.cy1 = cy1;
-			this.r1 = radius1;
-		}
-
-		public override Brush CreateBrush ()
-		{
-			var path = new GraphicsPath ();
-			path.AddEllipse (new RectangleF ((float)(cx0 - r0), (float)(cy0 - r0), (float)(r0 * 2), (float)(r0 * 2)));
-
-			var brush = new PathGradientBrush (path);
-
-			var orderedStops = ColorStops.OrderBy (t => t.Item1).ToArray ();
-			var colors = orderedStops.Select (i => i.Item2.ToDrawingColor ()).ToArray ();
-			var stops = orderedStops.Select (i => (float) (i.Item1)).ToArray ();
-
-			brush.InterpolationColors = new ColorBlend (colors.Length) {
-				Colors = colors,
-				Positions = stops
+			return new LinearGradientBrush () {
+				StartPoint = new SW.Point (x0, y0),
+				EndPoint = new SW.Point (x1, y1),
+				MappingMode = BrushMappingMode.Absolute
 			};
-			return brush;
 		}
-	}
 
-	internal class LinearGradient
-		: GradientBase
-	{
-		public LinearGradient (PointF start, PointF end)
+		public override void Dispose (object backend)
 		{
-			Start = start;
-			End = end;
 		}
 
-		public override System.Drawing.Brush CreateBrush ()
+		public override object CreateRadial (double cx0, double cy0, double radius0, double cx1, double cy1, double radius1)
 		{
-			if (ColorStops.Count == 0)
-				throw new ArgumentException ();
-
-			var stops = ColorStops.OrderBy (t => t.Item1).ToArray ();
-			var first = stops[0];
-			var last = stops[stops.Length - 1];
-
-			var brush = new System.Drawing.Drawing2D.LinearGradientBrush (Start, End, first.Item2.ToDrawingColor (),
-													last.Item2.ToDrawingColor ());
-			return brush;
-
+			return new RadialGradientBrush () {
+				GradientOrigin = new SW.Point (cx0, cy0),
+				Center = new SW.Point (cx1, cy1),
+				RadiusX = radius1,
+				RadiusY = radius1,
+				MappingMode = BrushMappingMode.Absolute
+			};
 		}
-		internal readonly PointF Start;
-		internal readonly PointF End;
-	}
 
-	internal abstract class GradientBase
-	{
-		internal readonly List<Tuple<double, Color>> ColorStops = new List<Tuple<double, Color>> ();
-		public abstract Brush CreateBrush ();
+		public override void AddColorStop (object backend, double position, Color color)
+		{
+			((GradientBrush)backend).GradientStops.Add (new GradientStop (color.ToWpfColor (), position));
+		}
 	}
 }

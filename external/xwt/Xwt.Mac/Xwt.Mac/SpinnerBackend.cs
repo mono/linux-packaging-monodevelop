@@ -26,7 +26,7 @@
 
 using System;
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 using MonoMac.AppKit;
 using MonoMac.Foundation;
@@ -42,7 +42,6 @@ namespace Xwt.Mac
 		{
 			var widget = new ProgressIndicatorView ();
 			ViewObject = widget;
-			Widget.SizeToFit ();
 
 			widget.Indeterminate = true;
 			widget.Style = NSProgressIndicatorStyle.Spinning;

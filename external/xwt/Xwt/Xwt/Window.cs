@@ -26,17 +26,18 @@
 
 using System;
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 namespace Xwt
 {
+	[BackendType (typeof(IWindowBackend))]
 	public class Window: WindowFrame
 	{
 		Widget child;
 		WidgetSpacing padding;
 		Menu mainMenu;
 		bool shown;
-		
+
 		protected new class WindowBackendHost: WindowFrame.WindowBackendHost
 		{
 		}
@@ -48,7 +49,7 @@ namespace Xwt
 		
 		public Window ()
 		{
-			Padding = 6;
+			Padding = 12;
 		}
 		
 		public Window (string title): base (title)
@@ -58,7 +59,12 @@ namespace Xwt
 		IWindowBackend Backend {
 			get { return (IWindowBackend) BackendHost.Backend; } 
 		}
-		
+
+		public WindowLocation InitialLocation {
+			get { return initialLocation; }
+			set { initialLocation = value; }
+		}
+
 		public WidgetSpacing Padding {
 			get { return padding; }
 			set {
@@ -110,7 +116,7 @@ namespace Xwt
 			}
 			set {
 				mainMenu = value;
-				Backend.SetMainMenu ((IMenuBackend)WidgetRegistry.GetBackend (mainMenu));
+				Backend.SetMainMenu ((IMenuBackend)BackendHost.ToolkitEngine.GetSafeBackend (mainMenu));
 			}
 		}
 		
@@ -123,15 +129,15 @@ namespace Xwt
 					child.SetParentWindow (null);
 				this.child = value;
 				child.SetParentWindow (this);
-				Backend.SetChild ((IWidgetBackend)WidgetRegistry.GetBackend (child));
-				if (!Application.EngineBackend.HandlesSizeNegotiation)
+				Backend.SetChild ((IWidgetBackend)BackendHost.ToolkitEngine.GetSafeBackend (child));
+				if (!BackendHost.EngineBackend.HandlesSizeNegotiation)
 					Widget.QueueWindowSizeNegotiation (this);
 			}
 		}
 		
 		protected override void OnReallocate ()
 		{
-			if (child != null && !Application.EngineBackend.HandlesSizeNegotiation) {
+			if (child != null && !BackendHost.EngineBackend.HandlesSizeNegotiation) {
 				child.Surface.Reallocate ();
 			}
 		}
@@ -140,13 +146,13 @@ namespace Xwt
 		bool heightSet;
 		bool locationSet;
 		Rectangle initialBounds;
+		WindowLocation initialLocation = WindowLocation.CenterParent;
 
 		internal override void SetBackendSize (double width, double height)
 		{
-			if (shown || Application.EngineBackend.HandlesSizeNegotiation) {
+			if (shown)
 				base.SetBackendSize (width, height);
-			}
-			if (!shown) {
+			else {
 				if (width != -1) {
 					initialBounds.Width = width;
 					widthSet = true;
@@ -160,7 +166,7 @@ namespace Xwt
 
 		internal override void SetBackendLocation (double x, double y)
 		{
-			if (shown || Application.EngineBackend.HandlesSizeNegotiation)
+			if (shown || BackendHost.EngineBackend.HandlesSizeNegotiation)
 				base.SetBackendLocation (x, y);
 			if (!shown) {
 				locationSet = true;
@@ -172,11 +178,11 @@ namespace Xwt
 		{
 			get
 			{
-				return shown ? base.BackendBounds : initialBounds;
+				return shown || BackendHost.EngineBackend.HandlesSizeNegotiation ? base.BackendBounds : initialBounds;
 			}
 			set
 			{
-				if (shown || Application.EngineBackend.HandlesSizeNegotiation)
+				if (shown || BackendHost.EngineBackend.HandlesSizeNegotiation)
 					base.BackendBounds = value;
 				if (!shown) {
 					widthSet = heightSet = locationSet = true;
@@ -185,7 +191,14 @@ namespace Xwt
 			}
 		}
 
-		internal void AdjustSize ()
+		internal void OnChildPlacementChanged (Widget child)
+		{
+			Backend.UpdateChildPlacement (child.GetBackend ());
+			if (!BackendHost.EngineBackend.HandlesSizeNegotiation)
+				Widget.QueueWindowSizeNegotiation (this);
+		}
+
+		internal override void AdjustSize ()
 		{
 			if (child == null)
 				return;
@@ -194,36 +207,58 @@ namespace Xwt
 
 			var size = shown ? Size : initialBounds.Size;
 
-			var w = s.GetPreferredWidth ();
+			var wc = (shown || widthSet) ? SizeConstraint.WithSize (size.Width - padding.HorizontalSpacing) : SizeConstraint.Unconstrained;
+			var hc = (shown || heightSet) ? SizeConstraint.WithSize (size.Height - padding.VerticalSpacing) : SizeConstraint.Unconstrained;
 
-			if (!shown && !widthSet)
-				size.Width = w.NaturalSize + padding.HorizontalSpacing;
+			var ws = s.GetPreferredSize (wc, hc, true);
 
-			var h = s.GetPreferredHeightForWidth (size.Width - padding.HorizontalSpacing);
+			if (!shown) {
+				if (!widthSet)
+					size.Width = ws.Width + padding.HorizontalSpacing;
+				if (!heightSet)
+					size.Height = ws.Height + padding.VerticalSpacing;
+			}
 
-			if (!shown && !heightSet)
-				size.Height = h.NaturalSize + padding.VerticalSpacing;
+			Size mMinSize, mDecorationsSize;
+			Backend.GetMetrics (out mMinSize, out mDecorationsSize);
 
-			if (w.MinSize + padding.HorizontalSpacing > size.Width)
-				size.Width = w.MinSize + padding.HorizontalSpacing;
-			if (h.MinSize + padding.VerticalSpacing > size.Height)
-				size.Height = h.MinSize + padding.VerticalSpacing;
+			if (ws.Width < mMinSize.Width)
+				ws.Width = mMinSize.Width;
+			if (ws.Height < mMinSize.Height)
+				ws.Height = mMinSize.Height;
 
-			if (!Application.EngineBackend.HandlesSizeNegotiation || !shown) {
-	
+			if (ws.Width > size.Width)
+				size.Width = ws.Width;
+			if (ws.Height > size.Height)
+				size.Height = ws.Height;
+
+			if (!shown) {
 				shown = true;
+
+				if (!locationSet && initialLocation != WindowLocation.Manual) {
+					Point center;
+					if (initialLocation == WindowLocation.CenterScreen || TransientFor == null)
+						center = Desktop.PrimaryScreen.VisibleBounds.Center;
+					else
+						center = TransientFor.ScreenBounds.Center;
+					initialBounds.X = center.X - size.Width / 2;
+					initialBounds.Y = center.Y - size.Height / 2;
+					locationSet = true;
+				}
 	
 				if (size != Size) {
 					if (locationSet)
-						Backend.Bounds = initialBounds;
+						Backend.Bounds = new Rectangle (initialBounds.X, initialBounds.Y, size.Width, size.Height);
 					else
-						Size = size + Backend.ImplicitMinSize;
-				}
-				else if (locationSet)
+						Backend.SetSize (size.Width, size.Height);
+				} else if (locationSet && !shown)
 					Backend.Move (initialBounds.X, initialBounds.Y);
 	
-				Backend.SetMinSize (Backend.ImplicitMinSize + new Size (w.MinSize + padding.HorizontalSpacing, h.MinSize + padding.VerticalSpacing));
+			} else {
+				if (size != Size)
+					Backend.SetSize (size.Width, size.Height);
 			}
+			Backend.SetMinSize (mDecorationsSize + new Size (ws.Width + padding.HorizontalSpacing, ws.Height + padding.VerticalSpacing));
 		}
 	}
 }

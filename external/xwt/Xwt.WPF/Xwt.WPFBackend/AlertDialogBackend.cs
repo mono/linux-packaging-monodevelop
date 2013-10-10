@@ -28,7 +28,7 @@ using System.Collections.Generic;
 using System.Windows;
 
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 namespace Xwt.WPFBackend
 {
@@ -48,6 +48,10 @@ namespace Xwt.WPFBackend
 			this.defaultResult = MessageBoxResult.Cancel;
 		}
 
+		public void Initialize (ApplicationContext actx)
+		{
+		}
+
 		public Command Run (WindowFrame transientFor, MessageDescription message)
 		{
 			this.icon = GetIcon (message.Icon);
@@ -59,7 +63,7 @@ namespace Xwt.WPFBackend
 				message.SecondaryText = String.Empty;
 			}
 
-			var wb = (WindowFrameBackend)WidgetRegistry.GetBackend (transientFor);
+			var wb = (WindowFrameBackend)Toolkit.GetBackend (transientFor);
 			if (wb != null) {
 				this.dialogResult = MessageBox.Show (wb.Window, message.Text,message.SecondaryText,
 													this.buttons, this.icon, this.defaultResult, this.options);
@@ -77,20 +81,17 @@ namespace Xwt.WPFBackend
 			set;
 		}
 
-		MessageBoxImage GetIcon (string iconText)
+		MessageBoxImage GetIcon (Xwt.Drawing.Image icon)
 		{
-			switch (iconText) {
-			case StockIcons.Error:
+			if (icon == Xwt.StockIcons.Error)
 				return MessageBoxImage.Error;
-			case StockIcons.Warning:
+			if (icon == Xwt.StockIcons.Warning)
 				return MessageBoxImage.Warning;
-			case StockIcons.Information:
+			if (icon == Xwt.StockIcons.Information)
 				return MessageBoxImage.Information;
-			case StockIcons.Question:
+			if (icon == Xwt.StockIcons.Question)
 				return MessageBoxImage.Question;
-			default:
-				return MessageBoxImage.None;
-			}
+			return MessageBoxImage.None;
 		}
 
 		Command ConvertResultToCommand (MessageBoxResult dialogResult)

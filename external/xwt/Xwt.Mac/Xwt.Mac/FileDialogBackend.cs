@@ -29,6 +29,7 @@ using MonoMac.AppKit;
 using System.IO;
 using System.Linq;
 
+
 namespace Xwt.Mac
 {
 	public abstract class FileDialogBackend
@@ -95,7 +96,7 @@ namespace Xwt.Mac
 
 		#region IBackend implementation
 
-		public void InitializeBackend (object frontend)
+		public void InitializeBackend (object frontend, ApplicationContext context)
 		{
 
 		}

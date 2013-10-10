@@ -26,7 +26,7 @@
 
 using System;
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 namespace Xwt.GtkBackend
 {
@@ -72,17 +72,17 @@ namespace Xwt.GtkBackend
 		
 		public void Add (IWidgetBackend widget, NotebookTab tab)
 		{
-			Widget.AppendPage (GetWidget (widget), CreateLabel (tab));
+			Widget.AppendPage (GetWidgetWithPlacement (widget), CreateLabel (tab));
 		}
 
 		public void Remove (IWidgetBackend widget)
 		{
-			Widget.Remove (GetWidget (widget));
+			Widget.Remove (GetWidgetWithPlacement (widget));
 		}
 		
 		public void UpdateLabel (NotebookTab tab, string hint)
 		{
-			IWidgetBackend widget = (IWidgetBackend) WidgetRegistry.GetBackend (tab.Child);
+			IWidgetBackend widget = (IWidgetBackend) Toolkit.GetBackend (tab.Child);
 			Widget.SetTabLabel (GetWidget (widget), CreateLabel (tab));
 		}
 		

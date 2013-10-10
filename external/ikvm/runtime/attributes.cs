@@ -787,6 +787,45 @@ namespace IKVM.Attributes
 		}
 	}
 
+	[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+	public sealed class JavaResourceAttribute : Attribute
+	{
+		private readonly string javaName;
+		private readonly string resourceName;
+
+		public JavaResourceAttribute(string javaName, string resourceName)
+		{
+			this.javaName = javaName;
+			this.resourceName = resourceName;
+		}
+
+		public string JavaName
+		{
+			get { return javaName; }
+		}
+
+		public string ResourceName
+		{
+			get { return resourceName; }
+		}
+	}
+
+	[AttributeUsage(AttributeTargets.Class | AttributeTargets.Delegate | AttributeTargets.Enum | AttributeTargets.Interface | AttributeTargets.Struct | AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Parameter, AllowMultiple = false)]
+	public sealed class DynamicAnnotationAttribute : Attribute
+	{
+		private readonly object[] definition;
+
+		public DynamicAnnotationAttribute(object[] definition)
+		{
+			this.definition = definition;
+		}
+
+		public object[] Definition
+		{
+			get { return definition; }
+		}
+	}
+
 	// used in custom modifier for access stubs
 	public static class AccessStub { }
 }

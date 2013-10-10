@@ -134,6 +134,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 				HideDeclarationView ();
 				UpdateDeclarationView ();
 			};
+			List.WordsFiltered += delegate {
+				RepositionDeclarationViewWindow ();
+			};
 		}
 
 		bool completionListClosed;
@@ -143,6 +146,14 @@ namespace MonoDevelop.Ide.CodeCompletion
 				completionDataList.OnCompletionListClosed (EventArgs.Empty);
 				completionListClosed = true;
 			}
+		}
+
+		void ReleaseObjects ()
+		{
+			CompletionWidget = null;
+			CompletionDataList = null;
+
+			CodeCompletionContext = null;
 		}
 
 		protected override void OnDestroyed ()
@@ -171,6 +182,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 				declarationviewwindow.Destroy ();
 				declarationviewwindow = null;
 			}
+			ReleaseObjects ();
 			base.OnDestroyed ();
 		}
 
@@ -344,9 +356,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 		{
 			public int Compare (ICompletionData a, ICompletionData b)
 			{
-				return ((a.DisplayFlags & DisplayFlags.Obsolete) == (b.DisplayFlags & DisplayFlags.Obsolete))
-					? StringComparer.OrdinalIgnoreCase.Compare (a.DisplayText, b.DisplayText)
-					: (a.DisplayFlags & DisplayFlags.Obsolete) != 0 ? 1 : -1;
+				if (a is IComparable && b is IComparable)
+					return ((IComparable)a).CompareTo (b);
+				return CompletionData.Compare (a, b);
 			}
 		}
 		
@@ -367,7 +379,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			//which makes completion triggering noticeably more responsive
 			if (!completionDataList.IsSorted)
 				completionDataList.Sort (new DataItemComparer ());
-			
+
 			Reposition (true);
 			return true;
 		}
@@ -469,6 +481,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 		{
 			Hide ();
 			HideDeclarationView ();
+			ReleaseObjects ();
 		}
 
 		protected override void DoubleClick ()
@@ -530,6 +543,25 @@ namespace MonoDevelop.Ide.CodeCompletion
 				declarationViewTimer = 0;
 			}
 		}
+
+		void RepositionDeclarationViewWindow ()
+		{
+			if (declarationviewwindow == null || base.GdkWindow == null)
+				return;
+			var selectedItem = List.SelectedItem;
+			Gdk.Rectangle rect = List.GetRowArea (selectedItem);
+			if (rect.IsEmpty || rect.Bottom < (int)List.vadj.Value || rect.Y > List.Allocation.Height + (int)List.vadj.Value)
+				return;
+
+			declarationviewwindow.ShowArrow = true;
+			int ox;
+			int oy;
+			base.GdkWindow.GetOrigin (out ox, out oy);
+			declarationviewwindow.MaximumYTopBound = oy;
+			int y = rect.Y + Theme.Padding - (int)List.vadj.Value;
+			declarationviewwindow.ShowPopup (this, new Gdk.Rectangle (Gui.Styles.TooltipInfoSpacing, Math.Min (Allocation.Height, Math.Max (0, y)), Allocation.Width, rect.Height), PopupPosition.Left);
+			declarationViewHidden = false;
+		}
 		
 		bool DelayedTooltipShow ()
 		{
@@ -571,24 +603,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 				return false;
 			}
 
-			Gdk.Rectangle rect = List.GetRowArea (selectedItem);
-			if (rect.IsEmpty || rect.Bottom < (int)List.vadj.Value || rect.Y > List.Allocation.Height + (int)List.vadj.Value)
-				return false;
-
 			if (declarationViewHidden && Visible) {
-				declarationviewwindow.ShowArrow = true;
-				int ox;
-				int oy;
-				base.GdkWindow.GetOrigin (out ox, out oy);
-				declarationviewwindow.MaximumYTopBound = oy;
-				int y = rect.Y + Theme.Padding - (int)List.vadj.Value;
-				declarationviewwindow.ShowPopup (this, 
-				                                 new Gdk.Rectangle (Gui.Styles.TooltipInfoSpacing, 
-				                                                    Math.Min (Allocation.Height, Math.Max (0, y)), 
-				                                                    Allocation.Width, 
-				                                                    rect.Height), 
-				                                 PopupPosition.Left);
-				declarationViewHidden = false;
+				RepositionDeclarationViewWindow ();
 			}
 			
 			declarationViewTimer = 0;
@@ -619,11 +635,16 @@ namespace MonoDevelop.Ide.CodeCompletion
 			return completionDataList[n].DisplayText;
 		}
 		
-		string IListDataProvider.GetDescription (int n)
+		string IListDataProvider.GetDescription (int n, bool isSelected)
 		{
-			return ((CompletionData)completionDataList[n]).DisplayDescription;
+			return ((CompletionData)completionDataList[n]).GetDisplayDescription (isSelected);
 		}
-		
+
+		string IListDataProvider.GetRightSideDescription (int n, bool isSelected)
+		{
+			return ((CompletionData)completionDataList[n]).GetRightSideDescription (isSelected);
+		}
+
 		bool IListDataProvider.HasMarkup (int n)
 		{
 			return completionDataList[n].DisplayFlags.HasFlag (DisplayFlags.Obsolete);
@@ -642,6 +663,11 @@ namespace MonoDevelop.Ide.CodeCompletion
 		string IListDataProvider.GetCompletionText (int n)
 		{
 			return completionDataList[n].CompletionText;
+		}
+		static DataItemComparer defaultComparer = new DataItemComparer ();
+		int IListDataProvider.CompareTo (int n, int m)
+		{
+			return defaultComparer.Compare (completionDataList [n], completionDataList [m]);
 		}
 		
 		Gdk.Pixbuf IListDataProvider.GetIcon (int n)

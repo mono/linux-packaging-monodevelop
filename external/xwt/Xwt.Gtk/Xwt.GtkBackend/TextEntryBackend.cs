@@ -26,7 +26,7 @@
 using System;
 using Xwt.Backends;
 using Xwt.Drawing;
-using Xwt.Engine;
+
 
 namespace Xwt.GtkBackend
 {
@@ -55,6 +55,24 @@ namespace Xwt.GtkBackend
 			}
 			set {
 				Widget.Text = value;
+			}
+		}
+
+		public Alignment TextAlignment {
+			get {
+				if (Widget.Xalign == 0)
+					return Alignment.Start;
+				else if (Widget.Xalign == 1)
+					return Alignment.End;
+				else
+					return Alignment.Center;
+			}
+			set {
+				switch (value) {
+				case Alignment.Start: Widget.Xalign = 0; break;
+				case Alignment.End: Widget.Xalign = 1; break;
+				case Alignment.Center: Widget.Xalign = 0.5f; break;
+				}
 			}
 		}
 		
@@ -134,6 +152,10 @@ namespace Xwt.GtkBackend
 				Widget.HasFrame = value;
 			}
 		}
+
+		public bool MultiLine {
+			get; set;
+		}
 		
 		public override void EnableEvent (object eventId)
 		{
@@ -157,7 +179,7 @@ namespace Xwt.GtkBackend
 
 		void HandleChanged (object sender, EventArgs e)
 		{
-			Toolkit.Invoke (delegate {
+			ApplicationContext.InvokeUserCode (delegate {
 				EventSink.OnChanged ();
 			});
 		}

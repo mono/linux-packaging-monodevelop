@@ -1,0 +1,15 @@
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.XmlEditor/obj/Debug/MonoDevelop.XmlEditor.MonoDevelop.XmlEditor.addin.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.XmlEditor/obj/Debug/MonoDevelop.XmlEditor.MonoDevelop.Xml.Formatting.MonoXmlPolicy.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.XmlEditor/obj/Debug/MonoDevelop.XmlEditor.gtk-gui.gui.stetic
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/schemas/appconfig.xsd
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/schemas/MonoDevelopAddIn.xsd
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/schemas/manifest.xsd
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/schemas/nant.xsd
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/schemas/readme.txt
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/schemas/W3C-License.html
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/schemas/XMLSchema.xsd
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/schemas/xslt.xsd
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll.mdb
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.XmlEditor/MonoDevelop.XmlEditor.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.XmlEditor/obj/Debug/MonoDevelop.XmlEditor.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.XmlEditor/obj/Debug/MonoDevelop.XmlEditor.dll.mdb

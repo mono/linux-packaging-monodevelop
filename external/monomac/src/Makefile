@@ -79,8 +79,10 @@ MONOMAC_SOURCES = $(EXTRA_MONOMAC_SOURCES) \
 	./AppKit/NSMenuItem.cs				\
 	./AppKit/NSOpenGLContext.cs			\
 	./AppKit/NSOpenGLPixelFormat.cs			\
+	./AppKit/NSPageLayout.cs			\
 	./AppKit/NSPopUpButton.cs			\
 	./AppKit/NSPopUpButtonCell.cs			\
+	./AppKit/NSPrintPanel.cs			\
 	./AppKit/NSScreen.cs				\
 	./AppKit/NSSharingService.cs			\
 	./AppKit/NSSegmentedControl.cs			\
@@ -90,6 +92,7 @@ MONOMAC_SOURCES = $(EXTRA_MONOMAC_SOURCES) \
 	./AppKit/NSTableView.cs				\
         ./AppKit/NSToolbarItem.cs                       \
 	./AppKit/NSTreeController.cs			\
+	./AppKit/NSView.cs				\
         ./AppKit/NSWindow.cs				\
 	./CoreVideo/CVDisplayLink.cs			\
 	./Foundation/ObjCException.cs			\
@@ -157,7 +160,7 @@ endif
 ifeq ($(HAVE_ASYNC),1)
 	ASYNC_TARGETS = MonoMac.CFNetwork.dll
 	UPDATE_FILES = MonoMac.dll* MonoMac.CFNetwork.dll*
-	MCS ?= mcs
+	MCS ?= mcs -sdk:4
 else
 	ASYNC_TARGETS = 
 	UPDATE_FILES = MonoMac.dll*
@@ -211,7 +214,7 @@ _bmac.exe: $(APIS) core.dll $(GENERATOR_SOURCES)
 	$(MCS) -unsafe -out:_bmac.exe -debug $(DEFINES) -define:GENERATOR,MONOMAC,MONOMAC_BOOTSTRAP $(GENERATOR_SOURCES) -r:core.dll -r:System.Drawing
 
 generated_sources: _bmac.exe $(APIS) 
-	mono --debug _bmac.exe -a -d=MONOMAC $(BMAC_DEFINES) --core --sourceonly=generated_sources -v -tmpdir=. $(APIS) --baselib=core.dll --ns=MonoMac.ObjCRuntime -r=System.Drawing
+	mono --debug _bmac.exe -a -d=MONOMAC $(BMAC_DEFINES) --core --sourceonly=generated_sources -v -tmpdir=. $(APIS) --baselib=core.dll --ns=MonoMac.ObjCRuntime -r=System.Drawing $(BMAC_OPTIONS)
 
 bmac.exe: $(TARGET) $(GENERATOR_SOURCES)
 	$(MCS) -unsafe -out:bmac.exe -debug $(DEFINES) -define:GENERATOR,MONOMAC,MONOMAC_BOOTSTRAP $(GENERATOR_SOURCES) -r:$(TARGET) -r:System.Drawing

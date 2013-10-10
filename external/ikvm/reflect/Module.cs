@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2009-2012 Jeroen Frijters
+  Copyright (C) 2009-2013 Jeroen Frijters
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -78,7 +78,7 @@ namespace IKVM.Reflection
 		{
 			if (!imported)
 			{
-				module.stream.Dispose();
+				module.Dispose();
 			}
 		}
 
@@ -207,7 +207,16 @@ namespace IKVM.Reflection
 			throw new NotSupportedException();
 		}
 
-		public virtual bool __GetSectionInfo(int rva, out string name, out int characteristics)
+		public bool __GetSectionInfo(int rva, out string name, out int characteristics)
+		{
+			int virtualAddress;
+			int virtualSize;
+			int pointerToRawData;
+			int sizeOfRawData;
+			return __GetSectionInfo(rva, out name, out characteristics, out virtualAddress, out virtualSize, out pointerToRawData, out sizeOfRawData);
+		}
+
+		public virtual bool __GetSectionInfo(int rva, out string name, out int characteristics, out int virtualAddress, out int virtualSize, out int pointerToRawData, out int sizeOfRawData)
 		{
 			throw new NotSupportedException();
 		}
@@ -287,6 +296,11 @@ namespace IKVM.Reflection
 			throw new NotSupportedException();
 		}
 
+		public virtual CustomModifiers __ResolveTypeSpecCustomModifiers(int typeSpecToken, Type[] genericTypeArguments, Type[] genericMethodArguments)
+		{
+			throw new NotSupportedException();
+		}
+
 		public int MetadataToken
 		{
 			get { return IsResource() ? 0 : 1; }
@@ -353,7 +367,7 @@ namespace IKVM.Reflection
 			{
 				throw new MissingModuleException((MissingModule)this);
 			}
-			return parser.Expand(type, this.Assembly, throwOnError, className, false, ignoreCase);
+			return parser.Expand(type, this, throwOnError, className, false, ignoreCase);
 		}
 
 		public Type[] GetTypes()

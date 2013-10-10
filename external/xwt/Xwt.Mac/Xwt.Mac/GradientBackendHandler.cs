@@ -33,9 +33,9 @@ using System.Collections.Generic;
 
 namespace Xwt.Mac
 {
-	public class GradientBackendHandler: IGradientBackendHandler
+	public class MacGradientBackendHandler: GradientBackendHandler
 	{
-		public object CreateLinear (double x0, double y0, double x1, double y1)
+		public override object CreateLinear (double x0, double y0, double x1, double y1)
 		{
 			return new GradientInfo () {
 				Linear = true,
@@ -44,7 +44,11 @@ namespace Xwt.Mac
 			};
 		}
 
-		public object CreateRadial (double cx0, double cy0, double radius0, double cx1, double cy1, double radius1)
+		public override void Dispose (object backend)
+		{
+		}
+
+		public override object CreateRadial (double cx0, double cy0, double radius0, double cx1, double cy1, double radius1)
 		{
 			return new GradientInfo () {
 				Linear = false,
@@ -54,8 +58,8 @@ namespace Xwt.Mac
 				EndRadius = (float)radius1
 			};
 		}
-	
-		public void AddColorStop (object backend, double position, Xwt.Drawing.Color color)
+
+		public override void AddColorStop (object backend, double position, Xwt.Drawing.Color color)
 		{
 			GradientInfo gr = (GradientInfo) backend;
 			gr.Colors.Add (color.ToCGColor ());

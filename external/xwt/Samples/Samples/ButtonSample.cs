@@ -57,8 +57,9 @@ namespace Samples
 			};
 			PackStart (b2);
 			
-			PackStart (new Button (Image.FromIcon (StockIcons.ZoomIn, IconSize.Medium)));
-			
+			PackStart (new Button (StockIcons.ZoomIn.WithSize (22)));
+			PackStart (new Button (new CustomImage ().WithSize (22)));
+
 			MenuButton mb = new MenuButton ("This is a Menu Button");
 			Menu men = new Menu ();
 			men.Items.Add (new MenuItem ("First"));
@@ -95,12 +96,12 @@ namespace Samples
 
 			var button = new Xwt.Button ("Click to add a child");
 			button.Clicked += delegate {
-				child.PackStart (new Xwt.Label ("Child" + child.Children.Count ()), BoxMode.Fill);
+				child.PackStart (new Xwt.Label ("Child" + child.Children.Count ()));
 			};
 
 			var content = new Xwt.VBox ();
-			content.PackStart (button, BoxMode.Fill);
-			content.PackStart (container, BoxMode.Fill);
+			content.PackStart (button);
+			content.PackStart (container);
 
 			PackStart (content);
 		}

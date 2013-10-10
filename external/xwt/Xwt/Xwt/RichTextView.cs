@@ -35,6 +35,7 @@ using Xwt.Formats;
 
 namespace Xwt
 {
+	[BackendType (typeof(IRichTextViewBackend))]
 	public class RichTextView : Widget
 	{
 		protected new class WidgetBackendHost : Widget.WidgetBackendHost, IRichTextViewEventSink
@@ -86,6 +87,7 @@ namespace Xwt
 			var buffer = Backend.CreateBuffer ();
 			format.Parse (input, buffer);
 			Backend.SetBuffer (buffer);
+			OnPreferredSizeChanged ();
 		}
 
 		protected override BackendHost CreateBackendHost ()
@@ -98,8 +100,10 @@ namespace Xwt
 			if (navigateToUrl != null)
 				navigateToUrl (this, e);
 
-			if (!e.Handled)
-				Application.EngineBackend.ShowWebBrowser (e);
+			if (!e.Handled && e.Uri != null) {
+				Desktop.OpenUrl (e.Uri);
+				e.SetHandled ();
+			}
 		}
 	}
 

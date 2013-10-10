@@ -207,10 +207,10 @@ namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 				return new CompletionData (entity.Name);
 			}
 
-			public ICompletionData CreateTypeCompletionData (ICSharpCode.NRefactory.TypeSystem.IType type, bool fullName, bool isInAttributeContext)
+			public ICompletionData CreateTypeCompletionData (ICSharpCode.NRefactory.TypeSystem.IType type, bool fullName, bool isInAttributeContext, bool addForTypeCreation)
 			{
-				string name = fullName ? builder.ConvertType(type).GetText() : type.Name; 
-				if (isInAttributeContext && name.EndsWith("Attribute") && name.Length > "Attribute".Length) {
+				string name = fullName ? builder.ConvertType(type).ToString() : type.Name; 
+				if (isInAttributeContext && name.EndsWith("Attribute", StringComparison.Ordinal) && name.Length > "Attribute".Length) {
 					name = name.Substring(0, name.Length - "Attribute".Length);
 				}
 				return new CompletionData (name);
@@ -218,7 +218,7 @@ namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 
 			public ICompletionData CreateMemberCompletionData(IType type, IEntity member)
 			{
-				string name = builder.ConvertType(type).GetText(); 
+				string name = builder.ConvertType(type).ToString(); 
 				return new EntityCompletionData (member, name + "."+ member.Name);
 			}
 
@@ -258,7 +258,7 @@ namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 				return new OverrideCompletionData (m.Name, declarationBegin);
 			}
 
-			public ICompletionData CreateImportCompletionData(IType type, bool useFullName)
+			public ICompletionData CreateImportCompletionData(IType type, bool useFullName, bool addForTypeCreation)
 			{
 				return new ImportCompletionData (type, useFullName);
 			}
@@ -267,7 +267,12 @@ namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 			{
 				return Enumerable.Empty<ICompletionData> ();
 			}
-			
+
+			public ICompletionData CreateFormatItemCompletionData(string format, string description, object example)
+			{
+				return new CompletionData (format + " - " + description +":" + example);
+			}
+
 			public IEnumerable<ICompletionData> CreatePreProcessorDefinesCompletionData ()
 			{
 				yield return new CompletionData ("DEBUG");
@@ -373,18 +378,20 @@ namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 				mb.AddSymbol(sym);
 			}
 			var engine = new CSharpCompletionEngine(doc, mb, new TestFactory(new CSharpResolver (rctx)), pctx, rctx);
-
+			engine.AutomaticallyAddImports = true;
 			engine.EolMarker = Environment.NewLine;
 			engine.FormattingPolicy = FormattingOptionsFactory.CreateMono();
 			return engine;
 		}
-
-		public static CompletionDataList CreateProvider(string text, bool isCtrlSpace, params IUnresolvedAssembly[] references)
+		
+		public static CompletionDataList CreateProvider(string text, bool isCtrlSpace, Action<CSharpCompletionEngine> engineCallback, params IUnresolvedAssembly[] references)
 		{
 			int cursorPosition;
 			var engine = CreateEngine(text, out cursorPosition, references);
+			if (engineCallback != null)
+				engineCallback(engine);
 			var data = engine.GetCompletionData (cursorPosition, isCtrlSpace);
-			
+
 			return new CompletionDataList () {
 				Data = data,
 				AutoCompleteEmptyMatch = engine.AutoCompleteEmptyMatch,
@@ -393,6 +400,11 @@ namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 			};
 		}
 		
+		public static CompletionDataList CreateProvider(string text, bool isCtrlSpace, params IUnresolvedAssembly[] references)
+		{
+			return CreateProvider(text, isCtrlSpace, null, references);
+		}
+
 		Tuple<ReadOnlyDocument, CSharpCompletionEngine> GetContent(string text, SyntaxTree syntaxTree)
 		{
 			var doc = new ReadOnlyDocument(text);
@@ -4291,7 +4303,7 @@ public class Test
 @"
 public class Test
 {
-	$public $
+	$public p$
 }
 
 ");
@@ -6057,6 +6069,64 @@ class Test
 			});
 		}
 
+		/// <summary>
+		/// Bug 11906 - Intellisense choice injects full name on edit of existing name.
+		/// </summary>
+		[Test]
+		public void TestBug11906()
+		{
+			// The bug was caused by completion popping up in the middle of a word.
+			var provider = CreateProvider(@"using System;
+using System.Threading.Tasks;
 
+enum Test_Struct {
+	Some_Value1,
+	Some_Value2,
+	Some_Value3
+}
+
+public class Test
+{
+	public static void Main (string[] args)
+	{
+		Test_Struct v1 = Test_Struct.Some_$V$Value2;
+	}
+}");
+			Assert.IsTrue(provider == null || provider.Count == 0);
+		}
+
+		[Ignore("Parser bug")]
+		[Test]
+		public void TestBugWithLambdaParameter()
+		{
+			CombinedProviderTest(@"using System.Collections.Generic;
+
+		class C
+		{
+			public static void Main (string[] args)
+			{
+				List<string> list;
+				$list.Find(l => l.Name == l.Name ? l$
+			}
+		}", provider => {
+				Assert.IsNotNull(provider.Find("l"));
+			});
+		}
+
+		[Test]
+		public void TestLexerBug ()
+		{
+			CompletionDataList provider = CreateProvider (
+				@"
+public class TestMe : System.Object
+{
+/*
+
+	//*/
+	$override $
+}");
+			Assert.IsNotNull (provider, "provider not found.");
+			Assert.IsNotNull (provider.Find ("Equals"), "method 'Equals' not found.");
+		}
 	}
 }

@@ -31,16 +31,26 @@ using MonoMac.CoreGraphics;
 
 namespace Xwt.Mac
 {
-	public class ImagePatternBackendHandler: IImagePatternBackendHandler
+	public class MacImagePatternBackendHandler: ImagePatternBackendHandler
 	{
-		public object Create (object img)
+		public override object Create (ImageDescription img)
 		{
-			NSImage nimg = (NSImage) img;
-			RectangleF bounds = new RectangleF (PointF.Empty, nimg.Size);
-			CGImage cgimg = nimg.AsCGImage (RectangleF.Empty, null, null);
-			return new CGPattern (bounds, CGAffineTransform.MakeScale (1f, -1f), bounds.Width, bounds.Height,
-			                      CGPatternTiling.ConstantSpacing, true, ctx => ctx.DrawImage (bounds, cgimg));
+			NSImage nimg = img.ToNSImage ();
+			return new ImagePatternInfo () {
+				Image = nimg,
+				Alpha = img.Alpha
+			};
 		}
+
+		public override void Dispose (object img)
+		{
+		}
+	}
+
+	class ImagePatternInfo
+	{
+		public NSImage Image;
+		public double Alpha;
 	}
 }
 

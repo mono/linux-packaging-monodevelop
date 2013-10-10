@@ -40,6 +40,8 @@ using ICSharpCode.NRefactory.Semantics;
 using MonoDevelop.CodeActions;
 using MonoDevelop.Refactoring;
 using MonoDevelop.Projects;
+using MonoDevelop.Core.ProgressMonitoring;
+using ICSharpCode.NRefactory.Refactoring;
 
 namespace MonoDevelop.CodeActions
 {
@@ -160,7 +162,7 @@ namespace MonoDevelop.CodeActions
 
 			foreach (var fix_ in fixes.Where (f => f.BoundToIssue != null)) {
 				var fix = fix_;
-				foreach (var inspector_ in RefactoringService.GetInspectors (document.Editor.MimeType).Where (i => i.GetSeverity () != ICSharpCode.NRefactory.CSharp.Severity.None)) {
+				foreach (var inspector_ in RefactoringService.GetInspectors (document.Editor.MimeType).Where (i => i.GetSeverity () != Severity.None)) {
 					var inspector = inspector_;
 
 					if (inspector.IdString.IndexOf (fix.BoundToIssue.FullName, StringComparison.Ordinal) < 0)
@@ -201,17 +203,25 @@ namespace MonoDevelop.CodeActions
 					node,
 					ref resolveResult
 				);
+
+				foreach (var t in possibleNamespaces.Where (tp => tp.OnlyAddReference)) {
+					var menuItem = new Gtk.MenuItem (t.GetImportText ());
+					menuItem.Activated += delegate {
+						new ResolveCommandHandler.AddImport (document, resolveResult, null, t.Reference, true, node).Run ();
+						menu.Destroy ();
+					};
+					menu.Add (menuItem);
+					items++;
+				}
 	
 				bool addUsing = !(resolveResult is AmbiguousTypeResolveResult);
 				if (addUsing) {
 					foreach (var t in possibleNamespaces.Where (tp => tp.IsAccessibleWithGlobalUsing)) {
 						string ns = t.Namespace;
 						var reference = t.Reference;
-						var menuItem = new Gtk.MenuItem (string.Format ("using {0};", ns));
+						var menuItem = new Gtk.MenuItem (t.GetImportText ());
 						menuItem.Activated += delegate {
 							new ResolveCommandHandler.AddImport (document, resolveResult, ns, reference, true, node).Run ();
-							if (reference != null)
-								document.Project.Items.Add (reference);
 							menu.Destroy ();
 						};
 						menu.Add (menuItem);
@@ -224,7 +234,7 @@ namespace MonoDevelop.CodeActions
 					foreach (var t in possibleNamespaces) {
 						string ns = t.Namespace;
 						var reference = t.Reference;
-						var menuItem = new Gtk.MenuItem (GettextCatalog.GetString ("{0}", ns + "." + document.Editor.GetTextBetween (node.StartLocation, node.EndLocation)));
+						var menuItem = new Gtk.MenuItem (t.GetInsertNamespaceText (document.Editor.GetTextBetween (node.StartLocation, node.EndLocation)));
 						menuItem.Activated += delegate {
 							new ResolveCommandHandler.AddImport (document, resolveResult, ns, reference, false, node).Run ();
 							menu.Destroy ();

@@ -54,6 +54,12 @@ namespace Xwt.WPFBackend
 			set { TextBox.Text = value; }
 		}
 
+		public virtual Alignment TextAlignment
+		{
+			get { return DataConverter.ToXwtAlignment (TextBox.TextAlignment); }
+			set { TextBox.TextAlignment = DataConverter.ToTextAlignment (value); }
+		}
+
 		public string PlaceholderText
 		{
 			get { return TextBox.PlaceholderText; }
@@ -70,6 +76,11 @@ namespace Xwt.WPFBackend
 		{
 			get { return TextBox.ShowFrame; }
 			set { TextBox.ShowFrame = value; }
+		}
+
+		// TODO
+		public bool MultiLine {
+			get; set;
 		}
 
 		public override void EnableEvent (object eventId)
@@ -114,7 +125,7 @@ namespace Xwt.WPFBackend
 
 		private void OnTextChanged (object s, TextChangedEventArgs e)
 		{
-			Xwt.Engine.Toolkit.Invoke (EventSink.OnChanged);
+			Context.InvokeUserCode (EventSink.OnChanged);
 		}
 	}
 }

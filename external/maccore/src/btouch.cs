@@ -89,6 +89,7 @@ class BindingTouch {
 		bool pmode = true;
 		bool nostdlib = false;
 		bool clean_mono_path = false;
+		bool native_exception_marshalling = false;
 		bool inline_selectors = false;
 		List<string> sources;
 		var resources = new List<string> ();
@@ -131,6 +132,7 @@ class BindingTouch {
 			{ "use-zero-copy", v=> zero_copy = true },
 			{ "nostdlib", "Does not reference mscorlib.dll library", l => nostdlib = true },
 			{ "no-mono-path", "Launches compiler with empty MONO_PATH", l => clean_mono_path = true },
+			{ "native-exception-marshalling", "Eanble the marshalling support for Objective-C exceptions", l => native_exception_marshalling = true },
 			{ "inline-selectors:", "If Selector.GetHandle is inlined and does not need to be cached (default: false)", v => inline_selectors = string.Equals ("true", v, StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty (v) },
 #if !MONOMAC
 			{ "link-with=,", "Link with a native library {0:FILE} to the binding, embedded as a resource named {1:ID}",
@@ -182,7 +184,7 @@ class BindingTouch {
 			var tmpass = Path.Combine (tmpdir, "temp.dll");
 
 			// -nowarn:436 is to avoid conflicts in definitions between core.dll and the sources
-			var cargs = String.Format ("-unsafe -target:library {0} -nowarn:436 -out:{1} -r:{2} {3} {4} {5} -r:{6} {7} {8} {9}",
+			var cargs = String.Format ("-debug -unsafe -target:library {0} -nowarn:436 -out:{1} -r:{2} {3} {4} {5} -r:{6} {7} {8} {9}",
 						   string.Join (" ", sources.ToArray ()),
 						   tmpass, Environment.GetCommandLineArgs ()[0],
 						   string.Join (" ", core_sources.ToArray ()), refs, unsafef ? "-unsafe" : "",
@@ -255,6 +257,7 @@ class BindingTouch {
 				CoreNSObject = CoreObject,
 				BaseDir = basedir != null ? basedir : tmpdir,
 				ZeroCopyStrings = zero_copy,
+				NativeExceptionMarshalling = native_exception_marshalling,
 #if MONOMAC
 				OnlyX86 = true,
 #endif

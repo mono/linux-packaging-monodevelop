@@ -30,10 +30,10 @@ using System;
 using System.Collections.Generic;
 
 using Mono.TextEditor;
+using MonoDevelop.Debugger;
 using MonoDevelop.Components;
 using Mono.Debugging.Client;
 using TextEditor = Mono.TextEditor.TextEditor;
-using MonoDevelop.Debugger;
 
 using ICSharpCode.NRefactory.TypeSystem;
 using ICSharpCode.NRefactory.Semantics;
@@ -85,6 +85,98 @@ namespace MonoDevelop.SourceEditor
 
 			return index;
 		}
+
+		static string GetLocalExpression (TextEditor editor, LocalResolveResult lr, DomRegion expressionRegion)
+		{
+			var start = new DocumentLocation (expressionRegion.BeginLine, expressionRegion.BeginColumn);
+			var end   = new DocumentLocation (expressionRegion.EndLine, expressionRegion.EndColumn);
+			var ed = (ExtensibleTextEditor) editor;
+
+			// In a setter, the 'value' variable will have a begin line/column of 0,0 which is an undefined offset
+			if (lr.Variable.Region.BeginLine != 0 && lr.Variable.Region.BeginColumn != 0) {
+				// Use the start and end offsets of the variable region so that we get the "@" in variable names like "@class"
+				start = new DocumentLocation (lr.Variable.Region.BeginLine, lr.Variable.Region.BeginColumn);
+				end = new DocumentLocation (lr.Variable.Region.EndLine, lr.Variable.Region.EndColumn);
+			}
+
+			string expression = ed.GetTextBetween (start, end).Trim ();
+
+			// Note: When the LocalResolveResult is a parameter, the Variable.Region includes the type
+			if (lr.IsParameter) {
+				int index = IndexOfLastWhiteSpace (expression);
+				if (index != -1)
+					expression = expression.Substring (index + 1);
+			}
+
+			return expression;
+		}
+
+		static string GetMemberExpression (TextEditor editor, MemberResolveResult mr, DomRegion expressionRegion)
+		{
+			var ed = (ExtensibleTextEditor) editor;
+			string expression = null;
+			string member = null;
+
+			if (mr.Member != null) {
+				if (mr.Member is IProperty) {
+					// Visual Studio will evaluate Properties if you hover over their definitions...
+					var prop = (IProperty) mr.Member;
+
+					if (prop.CanGet) {
+						if (prop.IsStatic)
+							expression = prop.FullName;
+						else
+							member = prop.Name;
+					} else {
+						return null;
+					}
+				} else if (mr.Member is IField) {
+					var field = (IField) mr.Member;
+
+					if (field.IsStatic)
+						expression = field.FullName;
+					else
+						member = field.Name;
+				} else {
+					return null;
+				}
+			} else {
+				return null;
+			}
+
+			if (expression == null) {
+				if (mr.TargetResult != null) {
+					var targetRegion = mr.TargetResult.GetDefinitionRegion ();
+
+					if (mr.TargetResult is LocalResolveResult) {
+						expression = GetLocalExpression (editor, (LocalResolveResult) mr.TargetResult, targetRegion);
+					} else if (mr.TargetResult is MemberResolveResult) {
+						expression = GetMemberExpression (editor, (MemberResolveResult) mr.TargetResult, targetRegion);
+					} else if (mr.TargetResult is InitializedObjectResolveResult) {
+						return null;
+					} else if (mr.TargetResult is ThisResolveResult) {
+						return member;
+					} else if (!targetRegion.IsEmpty) {
+						var start = new DocumentLocation (targetRegion.BeginLine, targetRegion.BeginColumn);
+						var end   = new DocumentLocation (targetRegion.EndLine, targetRegion.EndColumn);
+						expression = ed.GetTextBetween (start, end).Trim ();
+					}
+
+					if (expression == null) {
+						var start = new DocumentLocation (expressionRegion.BeginLine, expressionRegion.BeginColumn);
+						var end   = new DocumentLocation (expressionRegion.EndLine, expressionRegion.EndColumn);
+						return ed.GetTextBetween (start, end).Trim ();
+					}
+				}
+
+				if (!string.IsNullOrEmpty (expression))
+					expression += "." + member;
+				else
+					expression = member;
+			}
+
+			return expression;
+		}
 		
 		public override TooltipItem GetItem (TextEditor editor, int offset)
 		{
@@ -99,20 +191,16 @@ namespace MonoDevelop.SourceEditor
 				return null;
 			
 			var ed = (ExtensibleTextEditor)editor;
-			
-			string expression = null;
 			int startOffset = 0, length = 0;
+			DomRegion expressionRegion;
+			string expression = null;
+			ResolveResult res;
+
 			if (ed.IsSomethingSelected && offset >= ed.SelectionRange.Offset && offset <= ed.SelectionRange.EndOffset) {
 				expression = ed.SelectedText;
 				startOffset = ed.SelectionRange.Offset;
 				length = ed.SelectionRange.Length;
-			} else {
-				DomRegion expressionRegion;
-				ResolveResult res = ed.GetLanguageItem (offset, out expressionRegion);
-				
-				if (res == null || res.IsError || res.GetType () == typeof (ResolveResult))
-					return null;
-				
+			} else if ((res = ed.GetLanguageItem (offset, out expressionRegion)) != null && !res.IsError && res.GetType () != typeof (ResolveResult)) {
 				//Console.WriteLine ("res is a {0}", res.GetType ().Name);
 				
 				if (expressionRegion.IsEmpty)
@@ -120,10 +208,14 @@ namespace MonoDevelop.SourceEditor
 
 				if (res is NamespaceResolveResult ||
 				    res is ConversionResolveResult ||
+				    res is ConstantResolveResult ||
 				    res is ForEachResolveResult ||
 				    res is TypeIsResolveResult ||
 				    res is TypeOfResolveResult ||
 				    res is ErrorResolveResult)
+					return null;
+
+				if (res.IsCompileTimeConstant)
 					return null;
 				
 				var start = new DocumentLocation (expressionRegion.BeginLine, expressionRegion.BeginColumn);
@@ -134,23 +226,7 @@ namespace MonoDevelop.SourceEditor
 				length = endOffset - startOffset;
 				
 				if (res is LocalResolveResult) {
-					var lr = (LocalResolveResult) res;
-					
-					// Use the start and end offsets of the variable region so that we get the "@" in variable names like "@class"
-					start = new DocumentLocation (lr.Variable.Region.BeginLine, lr.Variable.Region.BeginColumn);
-					end = new DocumentLocation (lr.Variable.Region.EndLine, lr.Variable.Region.EndColumn);
-					startOffset = editor.Document.LocationToOffset (start);
-					endOffset = editor.Document.LocationToOffset (end);
-
-					expression = ed.GetTextBetween (startOffset, endOffset).Trim ();
-
-					// Note: When the LocalResolveResult is a parameter, the Variable.Region includes the type
-					if (lr.IsParameter) {
-						int index = IndexOfLastWhiteSpace (expression);
-						if (index != -1)
-							expression = expression.Substring (index + 1);
-					}
-
+					expression = GetLocalExpression (editor, (LocalResolveResult) res, expressionRegion);
 					length = expression.Length;
 				} else if (res is InvocationResolveResult) {
 					var ir = (InvocationResolveResult) res;
@@ -160,48 +236,22 @@ namespace MonoDevelop.SourceEditor
 					
 					expression = ir.Member.DeclaringType.FullName;
 				} else if (res is MemberResolveResult) {
-					var mr = (MemberResolveResult) res;
-					
-					if (mr.TargetResult == null) {
-						// User is hovering over a member definition...
-						
-						if (mr.Member is IProperty) {
-							// Visual Studio will evaluate Properties if you hover over their definitions...
-							var prop = (IProperty) mr.Member;
-							
-							if (prop.CanGet) {
-								if (prop.IsStatic)
-									expression = prop.FullName;
-								else
-									expression = prop.Name;
-							} else {
-								return null;
-							}
-						} else if (mr.Member is IField) {
-							var field = (IField) mr.Member;
-							
-							if (field.IsStatic)
-								expression = field.FullName;
-							else
-								expression = field.Name;
-						} else {
-							return null;
-						}
-					}
-					
-					// If the TargetResult is not null, then treat it like any other ResolveResult.
-				} else if (res is ConstantResolveResult) {
-					// Fall through...
+					expression = GetMemberExpression (editor, (MemberResolveResult) res, expressionRegion);
+				} else if (res is NamedArgumentResolveResult) {
+					expression = ed.GetTextBetween (start, end);
 				} else if (res is ThisResolveResult) {
-					// Fall through...
+					expression = ed.GetTextBetween (start, end);
 				} else if (res is TypeResolveResult) {
-					// Fall through...
+					expression = ed.GetTextBetween (start, end);
 				} else {
 					return null;
 				}
-				
-				if (expression == null)
-					expression = ed.GetTextBetween (start, end);
+			} else {
+				var data = editor.GetTextEditorData ();
+				startOffset = data.FindCurrentWordStart (offset);
+				int endOffset = data.FindCurrentWordEnd (offset);
+
+				expression = ed.GetTextBetween (ed.OffsetToLocation (startOffset), ed.OffsetToLocation (endOffset));
 			}
 			
 			if (string.IsNullOrEmpty (expression))

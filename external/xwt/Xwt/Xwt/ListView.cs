@@ -27,10 +27,11 @@
 using System;
 using Xwt.Backends;
 using System.ComponentModel;
-using Xwt.Engine;
+
 
 namespace Xwt
 {
+	[BackendType (typeof(IListViewBackend))]
 	public class ListView: Widget, IColumnContainer, IScrollableWidget
 	{
 		ListViewColumnCollection columns;
@@ -47,9 +48,14 @@ namespace Xwt
 			
 			public void OnSelectionChanged ()
 			{
-				((ListView)Parent).OnSelectionChanged (EventArgs.Empty);
+				Parent.OnSelectionChanged (EventArgs.Empty);
 			}
 			
+			public void OnRowActivated (int rowIndex)
+			{
+				Parent.OnRowActivated (new ListViewRowEventArgs (rowIndex));
+			}
+
 			public override Size GetDefaultNaturalSize ()
 			{
 				return Xwt.Backends.DefaultNaturalSizes.ListView;
@@ -59,6 +65,7 @@ namespace Xwt
 		static ListView ()
 		{
 			MapEvent (TableViewEvent.SelectionChanged, typeof(ListView), "OnSelectionChanged");
+			MapEvent (ListViewEvent.RowActivated, typeof(ListView), "OnRowActivated");
 		}
 		
 		public ListView (IListDataSource source): this ()
@@ -109,8 +116,8 @@ namespace Xwt
 			}
 			set {
 				if (dataSource != value) {
+					Backend.SetSource (value, value is IFrontend ? (IBackend)BackendHost.ToolkitEngine.GetSafeBackend (value) : null);
 					dataSource = value;
-					Backend.SetSource (dataSource, dataSource is IFrontend ? (IBackend) WidgetRegistry.GetBackend (dataSource) : null);
 				}
 			}
 		}
@@ -192,7 +199,33 @@ namespace Xwt
 				selectionChanged -= value;
 				BackendHost.OnAfterEventRemove (TableViewEvent.SelectionChanged, selectionChanged);
 			}
-		}	
+		}
+		
+		/// <summary>
+		/// Raises the row activated event.
+		/// </summary>
+		/// <param name="a">The alpha component.</param>
+		protected virtual void OnRowActivated (ListViewRowEventArgs a)
+		{
+			if (rowActivated != null)
+				rowActivated (this, a);
+		}
+		
+		EventHandler<ListViewRowEventArgs> rowActivated;
+		
+		/// <summary>
+		/// Occurs when the user double-clicks on a row
+		/// </summary>
+		public event EventHandler<ListViewRowEventArgs> RowActivated {
+			add {
+				BackendHost.OnBeforeEventAdd (ListViewEvent.RowActivated, rowActivated);
+				rowActivated += value;
+			}
+			remove {
+				rowActivated -= value;
+				BackendHost.OnAfterEventRemove (ListViewEvent.RowActivated, rowActivated);
+			}
+		}
 	}
 }
 

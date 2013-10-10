@@ -28,7 +28,7 @@ using System;
 using System.Security;
 using Xwt;
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 namespace Xwt.GtkBackend
 {
@@ -103,7 +103,7 @@ namespace Xwt.GtkBackend
 		{
 			if (ClickEnabled) {
 				var uri = !string.IsNullOrEmpty (link)? new Uri (link, UriKind.RelativeOrAbsolute) : null;
-				Xwt.Engine.Toolkit.Invoke (() => {
+				ApplicationContext.InvokeUserCode (() => {
 					EventSink.OnNavigateToUrl (uri);
 				});
 			}

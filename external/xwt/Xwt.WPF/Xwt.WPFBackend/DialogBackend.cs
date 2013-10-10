@@ -32,7 +32,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using Xwt.Backends;
-using Xwt.Engine;
+
 using SWC = System.Windows.Controls;
 
 namespace Xwt.WPFBackend
@@ -81,6 +81,7 @@ namespace Xwt.WPFBackend
 			separator.InvalidateMeasure ();
 			separator.Measure (new System.Windows.Size (double.PositiveInfinity, double.PositiveInfinity));
 			s.Height += buttonContainer.DesiredSize.Height + separator.DesiredSize.Height;
+			s.Width = System.Math.Max(buttonContainer.DesiredSize.Width, separator.DesiredSize.Width);
 			base.SetMinSize (s);
 		}
 
@@ -109,7 +110,6 @@ namespace Xwt.WPFBackend
 			if (parent != null)
 				Window.Owner = ((WindowFrameBackend) parent).Window;
 			Window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-			Window.ShowInTaskbar = false;
 			Window.ShowDialog ();
 		}
 
@@ -128,7 +128,7 @@ namespace Xwt.WPFBackend
 
 		private void OnButtonClicked (DialogButton button)
 		{
-			Toolkit.Invoke (() => DialogEventSink.OnDialogButtonClicked (button));
+			Context.InvokeUserCode (() => DialogEventSink.OnDialogButtonClicked (button));
 		}
 
 		private static readonly ItemsPanelTemplate PanelTemplate;

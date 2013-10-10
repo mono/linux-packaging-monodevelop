@@ -84,7 +84,10 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 					.Where(m => m.DeclaringTypeDefinition != null && m.DeclaringTypeDefinition.Kind == TypeKind.Interface)
 					.ToArray();
 
-				result = result.Where(item => !DeclaringTypeDefinition.Members.Any(m => m.IsExplicitInterfaceImplementation && m.ImplementedInterfaceMembers.Contains(item))).ToArray();
+				IEnumerable<IMember> otherMembers = DeclaringTypeDefinition.Members;
+				if (SymbolKind == SymbolKind.Accessor)
+					otherMembers = DeclaringTypeDefinition.GetAccessors(options: GetMemberOptions.IgnoreInheritedMembers);
+				result = result.Where(item => !otherMembers.Any(m => m.IsExplicitInterfaceImplementation && m.ImplementedInterfaceMembers.Contains(item))).ToArray();
 
 				return result;
 			}
@@ -130,7 +133,7 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 			if (IsExplicitInterfaceImplementation && ImplementedInterfaceMembers.Count == 1) {
 				return new ExplicitInterfaceImplementationMemberReference(declTypeRef, ImplementedInterfaceMembers[0].ToMemberReference());
 			} else {
-				return new DefaultMemberReference(this.EntityType, declTypeRef, this.Name);
+				return new DefaultMemberReference(this.SymbolKind, declTypeRef, this.Name);
 			}
 		}
 		

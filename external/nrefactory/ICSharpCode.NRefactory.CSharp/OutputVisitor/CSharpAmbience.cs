@@ -96,7 +96,7 @@ namespace ICSharpCode.NRefactory.CSharp
 				WriteMemberDeclarationName((IMember)entity, formatter, formattingPolicy);
 			
 			if ((ConversionFlags & ConversionFlags.ShowParameterList) == ConversionFlags.ShowParameterList && HasParameters(entity)) {
-				formatter.WriteToken(entity.EntityType == EntityType.Indexer ? "[" : "(");
+				formatter.WriteToken(entity.SymbolKind == SymbolKind.Indexer ? "[" : "(");
 				bool first = true;
 				foreach (var param in node.GetChildrenByRole(Roles.Parameter)) {
 					if (first) {
@@ -107,7 +107,7 @@ namespace ICSharpCode.NRefactory.CSharp
 					}
 					param.AcceptVisitor(new CSharpOutputVisitor(formatter, formattingPolicy));
 				}
-				formatter.WriteToken(entity.EntityType == EntityType.Indexer ? "]" : ")");
+				formatter.WriteToken(entity.SymbolKind == SymbolKind.Indexer ? "]" : ")");
 			}
 			
 			if ((ConversionFlags & ConversionFlags.ShowBody) == ConversionFlags.ShowBody && !(node is TypeDeclaration)) {
@@ -135,14 +135,14 @@ namespace ICSharpCode.NRefactory.CSharp
 		
 		bool HasParameters(IEntity e)
 		{
-			switch (e.EntityType) {
-				case EntityType.TypeDefinition:
+			switch (e.SymbolKind) {
+				case SymbolKind.TypeDefinition:
 					return ((ITypeDefinition)e).Kind == TypeKind.Delegate;
-				case EntityType.Indexer:
-				case EntityType.Method:
-				case EntityType.Operator:
-				case EntityType.Constructor:
-				case EntityType.Destructor:
+				case SymbolKind.Indexer:
+				case SymbolKind.Method:
+				case SymbolKind.Operator:
+				case SymbolKind.Constructor:
+				case SymbolKind.Destructor:
 					return true;
 				default:
 					return false;
@@ -184,18 +184,18 @@ namespace ICSharpCode.NRefactory.CSharp
 				ConvertType(member.DeclaringType, formatter, formattingPolicy);
 				formatter.WriteToken(".");
 			}
-			switch (member.EntityType) {
-				case EntityType.Indexer:
+			switch (member.SymbolKind) {
+				case SymbolKind.Indexer:
 					formatter.WriteKeyword("this");
 					break;
-				case EntityType.Constructor:
+				case SymbolKind.Constructor:
 					formatter.WriteIdentifier(member.DeclaringType.Name);
 					break;
-				case EntityType.Destructor:
+				case SymbolKind.Destructor:
 					formatter.WriteToken("~");
 					formatter.WriteIdentifier(member.DeclaringType.Name);
 					break;
-				case EntityType.Operator:
+				case SymbolKind.Operator:
 					switch (member.Name) {
 						case "op_Implicit":
 							formatter.WriteKeyword("implicit");
@@ -226,7 +226,7 @@ namespace ICSharpCode.NRefactory.CSharp
 					formatter.WriteIdentifier(member.Name);
 					break;
 			}
-			if ((ConversionFlags & ConversionFlags.ShowTypeParameterList) == ConversionFlags.ShowTypeParameterList && member.EntityType == EntityType.Method) {
+			if ((ConversionFlags & ConversionFlags.ShowTypeParameterList) == ConversionFlags.ShowTypeParameterList && member.SymbolKind == SymbolKind.Method) {
 				var outputVisitor = new CSharpOutputVisitor(formatter, formattingPolicy);
 				outputVisitor.WriteTypeParameters(astBuilder.ConvertEntity(member).GetChildrenByRole(Roles.TypeParameter));
 			}
@@ -247,7 +247,7 @@ namespace ICSharpCode.NRefactory.CSharp
 		{
 			TypeSystemAstBuilder astBuilder = CreateAstBuilder();
 			AstNode astNode = astBuilder.ConvertVariable(v);
-			return astNode.GetText().TrimEnd(';', '\r', '\n');
+			return astNode.ToString().TrimEnd(';', '\r', '\n', (char)8232);
 		}
 		
 		public string ConvertType(IType type)
@@ -257,7 +257,7 @@ namespace ICSharpCode.NRefactory.CSharp
 			
 			TypeSystemAstBuilder astBuilder = CreateAstBuilder();
 			AstType astType = astBuilder.ConvertType(type);
-			return astType.GetText();
+			return astType.ToString();
 		}
 		
 		public void ConvertType(IType type, IOutputFormatter formatter, CSharpFormattingOptions formattingPolicy)
@@ -265,6 +265,11 @@ namespace ICSharpCode.NRefactory.CSharp
 			TypeSystemAstBuilder astBuilder = CreateAstBuilder();
 			AstType astType = astBuilder.ConvertType(type);
 			astType.AcceptVisitor(new CSharpOutputVisitor(formatter, formattingPolicy));
+		}
+		
+		public string ConvertConstantValue(object constantValue)
+		{
+			return CSharpOutputVisitor.PrintPrimitiveValue(constantValue);
 		}
 		
 		public string WrapComment(string comment)

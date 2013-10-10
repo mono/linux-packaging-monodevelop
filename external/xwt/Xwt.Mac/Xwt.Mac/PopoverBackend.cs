@@ -32,6 +32,7 @@ using MonoMac.Foundation;
 using MonoMac.AppKit;
 using MonoMac.ObjCRuntime;
 
+
 namespace Xwt.Mac
 {
 	public class PopoverBackend : IPopoverBackend
@@ -62,8 +63,8 @@ namespace Xwt.Mac
 			
 			public override void LoadView ()
 			{
-				var backend = (IMacViewBackend)Xwt.Engine.WidgetRegistry.GetBackend (child);
-				view = ((IWidgetBackend)backend).NativeWidget as NSView;
+				var backend = (ViewBackend)Toolkit.GetBackend (child);
+				view = ((ViewBackend)backend).NativeWidget as NSView;
 				ForceChildLayout ();
 				backend.SetAutosizeMode (true);
 				// FIXME: unset when the popover is closed
@@ -95,7 +96,7 @@ namespace Xwt.Mac
 			this.sink = sink;
 		}
 
-		public void InitializeBackend (object frontend)
+		public void InitializeBackend (object frontend, ApplicationContext context)
 		{
 		}
 
@@ -113,9 +114,9 @@ namespace Xwt.Mac
 			popover = new NSPopover ();
 			popover.Behavior = NSPopoverBehavior.Transient;
 			popover.ContentViewController = controller;
-			IMacViewBackend backend = (IMacViewBackend)Xwt.Engine.WidgetRegistry.GetBackend (referenceWidget);
-			var reference = backend.View;
-			popover.Show (System.Drawing.RectangleF.Empty,
+			ViewBackend backend = (ViewBackend)Toolkit.GetBackend (referenceWidget);
+			var reference = backend.Widget;
+			popover.Show (positionRect.ToRectangleF (),
 			              reference,
 			              ToRectEdge (orientation));
 		}

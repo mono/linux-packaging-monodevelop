@@ -29,7 +29,7 @@ using MonoMac.AppKit;
 using Xwt.Backends;
 using System.Collections.Generic;
 using MonoMac.Foundation;
-using Xwt.Engine;
+
 
 namespace Xwt.Mac
 {
@@ -49,10 +49,16 @@ namespace Xwt.Mac
 			Table = CreateView ();
 			scroll = new ScrollView ();
 			scroll.DocumentView = Table;
+			scroll.BorderType = NSBorderType.BezelBorder;
 			ViewObject = scroll;
-			Table.SizeToFit ();
 			Widget.AutoresizingMask = NSViewResizingMask.HeightSizable | NSViewResizingMask.WidthSizable;
 			Widget.AutoresizesSubviews = true;
+		}
+
+		protected override void Dispose (bool disposing)
+		{
+			base.Dispose (disposing);
+			Util.DrainObjectCopyPool ();
 		}
 		
 		public ScrollPolicy VerticalScrollPolicy {
@@ -142,7 +148,7 @@ namespace Xwt.Mac
 
 		void HandleTreeSelectionDidChange (NSNotification notif)
 		{
-			Toolkit.Invoke (delegate {
+			ApplicationContext.InvokeUserCode (delegate {
 				EventSink.OnSelectionChanged ();
 			});
 		}
@@ -155,13 +161,15 @@ namespace Xwt.Mac
 		public virtual object AddColumn (ListViewColumn col)
 		{
 			var tcol = new NSTableColumn ();
+			tcol.Editable = true;
 			cols.Add (tcol);
 			var c = CellUtil.CreateCell (this, col.Views);
 			tcol.DataCell = c;
 			Table.AddColumn (tcol);
 			var hc = new NSTableHeaderCell ();
-			hc.Title = col.Title;
+			hc.Title = col.Title ?? "";
 			tcol.HeaderCell = hc;
+			Widget.InvalidateIntrinsicContentSize ();
 			return tcol;
 		}
 		
@@ -188,6 +196,8 @@ namespace Xwt.Mac
 		
 		public abstract object GetValue (object pos, int nField);
 		
+		public abstract void SetValue (object pos, int nField, object value);
+
 		float ICellSource.RowHeight {
 			get { return Table.RowHeight; }
 			set { Table.RowHeight = value; }
@@ -217,7 +227,7 @@ namespace Xwt.Mac
 	
 	class ScrollView: NSScrollView, IViewObject
 	{
-		public Widget Frontend { get; set; }
+		public ViewBackend Backend { get; set; }
 		public NSView View {
 			get { return this; }
 		}

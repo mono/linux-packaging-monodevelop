@@ -139,28 +139,28 @@ namespace MonoDevelop.CSharp
 			if (entity == null)
 				throw new ArgumentNullException ("entity");
 			string result;
-			switch (entity.EntityType) {
-			case EntityType.TypeDefinition:
+			switch (entity.SymbolKind) {
+			case SymbolKind.TypeDefinition:
 				result = GetTypeMarkup ((ITypeDefinition)entity);
 				break;
-			case EntityType.Field:
+			case SymbolKind.Field:
 				result = GetFieldMarkup ((IField)entity);
 				break;
-			case EntityType.Property:
-			case EntityType.Indexer:
+			case SymbolKind.Property:
+			case SymbolKind.Indexer:
 				result = GetPropertyMarkup ((IProperty)entity);
 				break;
-			case EntityType.Event:
+			case SymbolKind.Event:
 				result = GetEventMarkup ((IEvent)entity);
 				break;
-			case EntityType.Method:
-			case EntityType.Operator:
+			case SymbolKind.Method:
+			case SymbolKind.Operator:
 				result = GetMethodMarkup ((IMethod)entity);
 				break;
-			case EntityType.Constructor:
+			case SymbolKind.Constructor:
 				result = GetConstructorMarkup ((IMethod)entity);
 				break;
-			case EntityType.Destructor:
+			case SymbolKind.Destructor:
 				result = GetDestructorMarkup ((IMethod)entity);
 				break;
 			default:
@@ -190,7 +190,7 @@ namespace MonoDevelop.CSharp
 
 			switch (entity.Accessibility) {
 			case Accessibility.Internal:
-				if (entity.EntityType != EntityType.TypeDefinition)
+				if (entity.SymbolKind != SymbolKind.TypeDefinition)
 					result.Append (Highlight ("internal ", colorStyle.KeywordModifiers));
 				break;
 			case Accessibility.ProtectedAndInternal:
@@ -210,9 +210,14 @@ namespace MonoDevelop.CSharp
 				result.Append (Highlight ("public ", colorStyle.KeywordModifiers));
 				break;
 			}
+			var field = entity as IField;
 
-			if (entity is IField && ((IField)entity).IsConst) {
-				result.Append (Highlight ("const ", colorStyle.KeywordModifiers));
+			if (field != null) {
+				if (field.IsFixed) {
+					result.Append (Highlight ("fixed ", colorStyle.KeywordModifiers));
+				} else if (field.IsConst) {
+					result.Append (Highlight ("const ", colorStyle.KeywordModifiers));
+				}
 			} else if (entity.IsStatic) {
 				result.Append (Highlight ("static ", colorStyle.KeywordModifiers));
 			} else if (entity.IsSealed) {
@@ -235,7 +240,6 @@ namespace MonoDevelop.CSharp
 					result.Append (Highlight ("virtual ", colorStyle.KeywordModifiers));
 				}
 			}
-			var field = entity as IField;
 			if (field != null) {
 				if (field.IsVolatile)
 					result.Append (Highlight ("volatile ", colorStyle.KeywordModifiers));
@@ -607,7 +611,7 @@ namespace MonoDevelop.CSharp
 			var result = new StringBuilder ();
 
 			if (variable.IsConst)
-				result.Append (Highlight ("const", colorStyle.KeywordModifiers));
+				result.Append (Highlight ("const ", colorStyle.KeywordModifiers));
 
 			result.Append (GetTypeReferenceString (variable.Type));
 			if (BreakLineAfterReturnType) {
@@ -652,7 +656,19 @@ namespace MonoDevelop.CSharp
 
 			result.Append (HighlightSemantically (CSharpAmbience.FilterName (field.Name), colorStyle.UserFieldDeclaration));
 
-			if (field.IsConst) {
+			if (field.IsFixed){
+				if (formattingOptions.SpaceBeforeArrayDeclarationBrackets) {
+					result.Append (" [");
+				} else {
+					result.Append ("[");
+				}
+				if (formattingOptions.SpacesWithinBrackets)
+					result.Append (" ");
+				AppendConstant (result, field.Type, field.ConstantValue);
+				if (formattingOptions.SpacesWithinBrackets)
+					result.Append (" ");
+				result.Append ("]");
+			} else if (field.IsConst) {
 				if (isEnum && !(field.DeclaringTypeDefinition.Attributes.Any (attr => attr.AttributeType.FullName == "System.FlagsAttribute"))) {
 					return result.ToString ();
 				}
@@ -683,7 +699,7 @@ namespace MonoDevelop.CSharp
 
 			AppendExplicitInterfaces (result, method);
 
-			if (method.EntityType == EntityType.Operator) {
+			if (method.SymbolKind == SymbolKind.Operator) {
 				result.Append ("operator ");
 				result.Append (CSharpAmbience.GetOperator (method.Name));
 			} else {
@@ -785,7 +801,7 @@ namespace MonoDevelop.CSharp
 
 			AppendExplicitInterfaces (result, property);
 			
-			if (property.EntityType == EntityType.Indexer) {
+			if (property.SymbolKind == SymbolKind.Indexer) {
 				result.Append (Highlight ("this", colorStyle.KeywordAccessors));
 			} else {
 				result.Append (HighlightSemantically (CSharpAmbience.FilterName (property.Name), colorStyle.UserPropertyDeclaration));

@@ -25,19 +25,20 @@
 // THE SOFTWARE.
 
 using System;
-using Xwt.Engine;
+
 using MonoMac.Foundation;
 using MonoMac.AppKit;
 using MonoMac.ObjCRuntime;
+using MonoMac.CoreGraphics;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Xwt.Backends;
 
 namespace Xwt.Mac
 {
-	class MacEngine: Xwt.Backends.EngineBackend
+	public class MacEngine: Xwt.Backends.ToolkitEngineBackend
 	{
-		static AppDelegate appDelegate = new AppDelegate ();
+		static AppDelegate appDelegate;
 		static NSAutoreleasePool pool;
 		
 		public static AppDelegate App {
@@ -48,55 +49,76 @@ namespace Xwt.Mac
 		{
 			NSApplication.Init ();
 			//Hijack ();
+			if (pool != null)
+				pool.Dispose ();
 			pool = new NSAutoreleasePool ();
+			appDelegate = new AppDelegate (IsGuest);
 			NSApplication.SharedApplication.Delegate = appDelegate;
 
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Window), typeof(WindowBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Label), typeof(LabelBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.HBox), typeof(BoxBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.VBox), typeof(BoxBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Button), typeof(ButtonBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Notebook), typeof(NotebookBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.TreeView), typeof(TreeViewBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.ListView), typeof(ListViewBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Canvas), typeof(CanvasBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Drawing.Image), typeof(ImageHandler));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Drawing.Context), typeof(ContextBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Drawing.ImageBuilder), typeof(ImageBuilderBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Drawing.ImagePattern), typeof(ImagePatternBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Drawing.Gradient), typeof(GradientBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Drawing.TextLayout), typeof(TextLayoutBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Drawing.Font), typeof(FontBackendHandler));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Menu), typeof(MenuBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.MenuItem), typeof(MenuItemBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.CheckBoxMenuItem), typeof(CheckBoxMenuItemBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.RadioButtonMenuItem), typeof(RadioButtonMenuItemBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.SeparatorMenuItem), typeof(SeparatorMenuItemBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.ComboBox), typeof(ComboBoxBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.ComboBoxEntry), typeof(ComboBoxEntryBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.TextEntry), typeof(TextEntryBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.ImageView), typeof(ImageViewBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Table), typeof(BoxBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.CheckBox), typeof(CheckBoxBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Frame), typeof(FrameBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.ScrollView), typeof(ScrollViewBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.ToggleButton), typeof(ToggleButtonBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.VSeparator), typeof(SeparatorBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.HSeparator), typeof(SeparatorBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.HPaned), typeof(PanedBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.VPaned), typeof(PanedBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Backends.IAlertDialogBackend), typeof(AlertDialogBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.StatusIcon), typeof(StatusIconBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.ProgressBar), typeof(ProgressBarBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.ListStore), typeof(Xwt.DefaultListStoreBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.LinkLabel), typeof (LinkLabelBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Placement), typeof(BoxBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Spinner), typeof(SpinnerBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.SpinButton), typeof(SpinButtonBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Expander), typeof(ExpanderBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.Popover), typeof (PopoverBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.SelectFolderDialog), typeof(SelectFolderDialogBackend));
-			WidgetRegistry.RegisterBackend (typeof(Xwt.OpenFileDialog), typeof(OpenFileDialogBackend));
+			// If NSPrincipalClass is not set, set it now. This allows running
+			// the application without a bundle
+			var info = NSBundle.MainBundle.InfoDictionary;
+			if (info.ValueForKey ((NSString)"NSPrincipalClass") == null)
+				info.SetValueForKey ((NSString)"NSApplication", (NSString)"NSPrincipalClass");
+		}
+
+		public override void InitializeBackends ()
+		{
+			base.InitializeBackends ();
+			RegisterBackend <Xwt.Backends.ICustomWidgetBackend, CustomWidgetBackend> ();
+			RegisterBackend <Xwt.Backends.IWindowBackend, WindowBackend> ();
+			RegisterBackend <Xwt.Backends.ILabelBackend, LabelBackend> ();
+			RegisterBackend <Xwt.Backends.IBoxBackend, BoxBackend> ();
+			RegisterBackend <Xwt.Backends.IButtonBackend, ButtonBackend> ();
+			RegisterBackend <Xwt.Backends.IMenuButtonBackend, MenuButtonBackend> ();
+			RegisterBackend <Xwt.Backends.INotebookBackend, NotebookBackend> ();
+			RegisterBackend <Xwt.Backends.ITreeViewBackend, TreeViewBackend> ();
+			RegisterBackend <Xwt.Backends.IListViewBackend, ListViewBackend> ();
+			RegisterBackend <Xwt.Backends.ICanvasBackend, CanvasBackend> ();
+			RegisterBackend <Xwt.Backends.ImageBackendHandler, ImageHandler> ();
+			RegisterBackend <Xwt.Backends.ContextBackendHandler, MacContextBackendHandler> ();
+			RegisterBackend <Xwt.Backends.DrawingPathBackendHandler, MacPathBackendHandler> ();
+			RegisterBackend <Xwt.Backends.ImageBuilderBackendHandler, MacImageBuilderBackendHandler> ();
+			RegisterBackend <Xwt.Backends.ImagePatternBackendHandler, MacImagePatternBackendHandler> ();
+			RegisterBackend <Xwt.Backends.GradientBackendHandler, MacGradientBackendHandler> ();
+			RegisterBackend <Xwt.Backends.TextLayoutBackendHandler, MacTextLayoutBackendHandler> ();
+			RegisterBackend <Xwt.Backends.FontBackendHandler, MacFontBackendHandler> ();
+			RegisterBackend <Xwt.Backends.IMenuBackend, MenuBackend> ();
+			RegisterBackend <Xwt.Backends.IMenuItemBackend, MenuItemBackend> ();
+			RegisterBackend <Xwt.Backends.ICheckBoxMenuItemBackend, CheckBoxMenuItemBackend> ();
+			RegisterBackend <Xwt.Backends.IRadioButtonMenuItemBackend, RadioButtonMenuItemBackend> ();
+			RegisterBackend <Xwt.Backends.IRadioButtonBackend, RadioButtonBackend> ();
+			RegisterBackend <Xwt.Backends.ISeparatorMenuItemBackend, SeparatorMenuItemBackend> ();
+			RegisterBackend <Xwt.Backends.IComboBoxBackend, ComboBoxBackend> ();
+			RegisterBackend <Xwt.Backends.IComboBoxEntryBackend, ComboBoxEntryBackend> ();
+			RegisterBackend <Xwt.Backends.ITextEntryBackend, TextEntryBackend> ();
+			RegisterBackend <Xwt.Backends.IImageViewBackend, ImageViewBackend> ();
+			RegisterBackend <Xwt.Backends.ICheckBoxBackend, CheckBoxBackend> ();
+			RegisterBackend <Xwt.Backends.IFrameBackend, FrameBackend> ();
+			RegisterBackend <Xwt.Backends.IScrollViewBackend, ScrollViewBackend> ();
+			RegisterBackend <Xwt.Backends.IToggleButtonBackend, ToggleButtonBackend> ();
+			RegisterBackend <Xwt.Backends.ISeparatorBackend, SeparatorBackend> ();
+			RegisterBackend <Xwt.Backends.IPanedBackend, PanedBackend> ();
+			RegisterBackend <Xwt.Backends.IAlertDialogBackend, AlertDialogBackend> ();
+			RegisterBackend <Xwt.Backends.IStatusIconBackend, StatusIconBackend> ();
+			RegisterBackend <Xwt.Backends.IProgressBarBackend, ProgressBarBackend> ();
+			RegisterBackend <Xwt.Backends.IListStoreBackend, Xwt.DefaultListStoreBackend> ();
+			RegisterBackend <Xwt.Backends.ILinkLabelBackend, LinkLabelBackend> ();
+			RegisterBackend <Xwt.Backends.ISpinnerBackend, SpinnerBackend> ();
+			RegisterBackend <Xwt.Backends.ISpinButtonBackend, SpinButtonBackend> ();
+			RegisterBackend <Xwt.Backends.IExpanderBackend, ExpanderBackend> ();
+			RegisterBackend <Xwt.Backends.IPopoverBackend, PopoverBackend> ();
+			RegisterBackend <Xwt.Backends.ISelectFolderDialogBackend, SelectFolderDialogBackend> ();
+			RegisterBackend <Xwt.Backends.IOpenFileDialogBackend, OpenFileDialogBackend> ();
+			RegisterBackend <Xwt.Backends.ClipboardBackend, MacClipboardBackend> ();
+			RegisterBackend <Xwt.Backends.DesktopBackend, MacDesktopBackend> ();
+			RegisterBackend <Xwt.Backends.IMenuButtonBackend, MenuButtonBackend> ();
+			RegisterBackend <Xwt.Backends.IListBoxBackend, ListBoxBackend> ();
+			RegisterBackend <Xwt.Backends.IDialogBackend, DialogBackend> ();
+			RegisterBackend <Xwt.Backends.IRichTextViewBackend, RichTextViewBackend> ();
+			RegisterBackend <Xwt.Backends.IScrollbarBackend, ScrollbarBackend> ();
+			RegisterBackend <Xwt.Backends.IDatePickerBackend, DatePickerBackend> ();
+			RegisterBackend <Xwt.Backends.ISliderBackend, SliderBackend> ();
 		}
 
 		public override void RunApplication ()
@@ -135,31 +157,37 @@ namespace Xwt.Mac
 			if (action == null)
 				throw new ArgumentNullException ("action");
 
-			NSApplication.SharedApplication.BeginInvokeOnMainThread (delegate {
+			NSRunLoop.Main.BeginInvokeOnMainThread (delegate {
 				action ();
 			});
 		}
 		
 		public override object TimerInvoke (Func<bool> action, TimeSpan timeSpan)
 		{
-			throw new NotImplementedException ();
+			NSTimer timer = null;
+			timer = NSTimer.CreateRepeatingScheduledTimer (timeSpan, delegate {
+				if (!action ())
+					timer.Invalidate ();
+			});
+			return timer;
 		}
 		
 		public override void CancelTimerInvoke (object id)
 		{
-			throw new NotImplementedException ();
+			((NSTimer)id).Invalidate ();
 		}
 		
 		public override object GetNativeWidget (Widget w)
 		{
-			IMacViewBackend wb = (IMacViewBackend)WidgetRegistry.GetBackend (w);
-			return wb.View;
+			ViewBackend wb = (ViewBackend)Toolkit.GetBackend (w);
+			wb.SetAutosizeMode (true);
+			return wb.Widget;
 		}
 
 		public override bool HasNativeParent (Widget w)
 		{
-			IMacViewBackend wb = (IMacViewBackend)WidgetRegistry.GetBackend (w);
-			return wb.View.Superview != null;
+			ViewBackend wb = (ViewBackend)Toolkit.GetBackend (w);
+			return wb.Widget.Superview != null;
 		}
 		
 		public override Xwt.Backends.IWindowFrameBackend GetBackendForWindow (object nativeWindow)
@@ -167,8 +195,33 @@ namespace Xwt.Mac
 			throw new NotImplementedException ();
 		}
 
+		public override object GetBackendForContext (object nativeContext)
+		{
+			return new CGContextBackend {
+				Context = (CGContext)nativeContext
+			};
+		}
+
 		public override void DispatchPendingEvents ()
 		{
+			var until = NSDate.DistantPast;
+			var app = NSApplication.SharedApplication;
+			var p = new NSAutoreleasePool ();
+			while (true) {
+				var ev = app.NextEvent (NSEventMask.AnyEvent, until, NSRunLoop.NSDefaultRunLoopMode, true);
+				if (ev != null)
+					app.SendEvent (ev);
+				else
+					break;
+			}
+			p.Dispose ();
+		}
+
+		public override object RenderWidget (Widget w)
+		{
+			var view = ((ViewBackend)w.GetBackend ()).Widget;
+			view.LockFocus ();
+			return new NSImage (view.DataWithPdfInsideRect (view.Bounds));
 		}
 	}
 
@@ -177,8 +230,9 @@ namespace Xwt.Mac
 		bool launched;
 		List<WindowBackend> pendingWindows = new List<WindowBackend> ();
 		
-		public AppDelegate ()
+		public AppDelegate (bool launched)
 		{
+			this.launched = launched;
 		}
 		
 		internal void ShowWindow (WindowBackend w)
@@ -196,6 +250,12 @@ namespace Xwt.Mac
 			launched = true;
 			foreach (var w in pendingWindows)
 				w.InternalShow ();
+		}
+
+		public override void ScreenParametersChanged (NSNotification notification)
+		{
+			if (MacDesktopBackend.Instance != null)
+				MacDesktopBackend.Instance.NotifyScreensChanged ();
 		}
 	}
 }

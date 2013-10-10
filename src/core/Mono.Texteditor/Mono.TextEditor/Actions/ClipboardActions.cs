@@ -82,13 +82,13 @@ namespace Mono.TextEditor
 			{
 			}
 
-			string GetCopiedPlainText ()
+			string GetCopiedPlainText (string eol = "\n")
 			{
 				var plainText = new StringBuilder ();
 				bool first = true;
 				foreach (var line in copiedColoredChunks) {
 					if (!first) {
-						plainText.AppendLine ();
+						plainText.Append (eol);
 					} else {
 						first = false;
 					}
@@ -106,10 +106,6 @@ namespace Mono.TextEditor
 					return;
 				switch (info) {
 				case TextType:
-					// Windows specific hack to work around bug: Bug 661973 - copy operation in TextEditor braks text lines with duplicate line endings when the file has CRLF
-					// Remove when https://bugzilla.gnome.org/show_bug.cgi?id=640439 is fixed.
-
-
 					selection_data.Text = GetCopiedPlainText ();
 					break;
 				case RichTextType:
@@ -373,9 +369,7 @@ namespace Mono.TextEditor
 				clipboard.RequestText (delegate(Clipboard clp, string text) {
 					if (string.IsNullOrEmpty (text))
 						return;
-					using (var undo = data.OpenUndoGroup ()) {
-						result = PastePlainText (data, insertionOffset, text, preserveSelection);
-					}
+					result = PastePlainText (data, insertionOffset, text, preserveSelection);
 				});
 			}
 			
@@ -385,34 +379,34 @@ namespace Mono.TextEditor
 		static int PastePlainText (TextEditorData data, int offset, string text, bool preserveSelection = false, byte[] copyData = null)
 		{
 			int inserted = 0;
-			using (var undo = data.OpenUndoGroup ()) {
-				var version = data.Document.Version;
-				if (!preserveSelection)
-					data.DeleteSelectedText (!data.IsSomethingSelected || data.MainSelection.SelectionMode != SelectionMode.Block);
-				data.EnsureCaretIsNotVirtual ();
-				if (data.IsSomethingSelected && data.MainSelection.SelectionMode == SelectionMode.Block) {
-					var selection = data.MainSelection;
-					var visualInsertLocation = data.LogicalToVisualLocation (selection.Anchor);
-					for (int lineNumber = selection.MinLine; lineNumber <= selection.MaxLine; lineNumber++) {
-						var lineSegment = data.GetLine (lineNumber);
-						int insertOffset = lineSegment.GetLogicalColumn (data, visualInsertLocation.Column) - 1;
-						string textToInsert;
-						if (lineSegment.Length < insertOffset) {
-							int visualLastColumn = lineSegment.GetVisualColumn (data, lineSegment.Length + 1);
-							int charsToInsert = visualInsertLocation.Column - visualLastColumn;
-							int spaceCount = charsToInsert % data.Options.TabSize;
-							textToInsert = new string ('\t', (charsToInsert - spaceCount) / data.Options.TabSize) + new string (' ', spaceCount) + text;
-							insertOffset = lineSegment.Length;
-						} else {
-							textToInsert = text;
-						}
-						inserted = data.Insert (lineSegment.Offset + insertOffset, textToInsert);
+			var undo = data.OpenUndoGroup ();
+			var version = data.Document.Version;
+			if (!preserveSelection)
+				data.DeleteSelectedText (!data.IsSomethingSelected || data.MainSelection.SelectionMode != SelectionMode.Block);
+			data.EnsureCaretIsNotVirtual ();
+			if (data.IsSomethingSelected && data.MainSelection.SelectionMode == SelectionMode.Block) {
+				var selection = data.MainSelection;
+				var visualInsertLocation = data.LogicalToVisualLocation (selection.Anchor);
+				for (int lineNumber = selection.MinLine; lineNumber <= selection.MaxLine; lineNumber++) {
+					var lineSegment = data.GetLine (lineNumber);
+					int insertOffset = lineSegment.GetLogicalColumn (data, visualInsertLocation.Column) - 1;
+					string textToInsert;
+					if (lineSegment.Length < insertOffset) {
+						int visualLastColumn = lineSegment.GetVisualColumn (data, lineSegment.Length + 1);
+						int charsToInsert = visualInsertLocation.Column - visualLastColumn;
+						int spaceCount = charsToInsert % data.Options.TabSize;
+						textToInsert = new string ('\t', (charsToInsert - spaceCount) / data.Options.TabSize) + new string (' ', spaceCount) + text;
+						insertOffset = lineSegment.Length;
+					} else {
+						textToInsert = text;
 					}
-				} else {
-					offset = version.MoveOffsetTo (data.Document.Version, offset);
-					inserted = data.PasteText (offset, text, copyData);
+					inserted = data.Insert (lineSegment.Offset + insertOffset, textToInsert);
 				}
+			} else {
+				offset = version.MoveOffsetTo (data.Document.Version, offset);
+				inserted = data.PasteText (offset, text, copyData, ref undo);
 			}
+			undo.Dispose ();
 			return inserted;
 		}
 		

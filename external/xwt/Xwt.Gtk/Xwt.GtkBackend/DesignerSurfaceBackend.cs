@@ -25,7 +25,7 @@
 // THE SOFTWARE.
 using System;
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 namespace Xwt.GtkBackend
 {
@@ -42,7 +42,7 @@ namespace Xwt.GtkBackend
 		
 		public void Load (Widget w)
 		{
-			var wb = (IGtkWidgetBackend) WidgetRegistry.GetBackend (w);
+			var wb = (IGtkWidgetBackend) Toolkit.GetBackend (w);
 			box.Add (wb.Widget);
 		}
 	}

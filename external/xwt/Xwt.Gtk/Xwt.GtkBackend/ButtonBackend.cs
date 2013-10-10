@@ -26,13 +26,15 @@
 
 using System;
 using Xwt.Backends;
-using Xwt.Engine;
+using Xwt.Drawing;
+
 
 namespace Xwt.GtkBackend
 {
 	public class ButtonBackend: WidgetBackend, IButtonBackend
 	{
 		protected bool ignoreClickEvents;
+		ImageDescription image;
 		
 		public ButtonBackend ()
 		{
@@ -54,13 +56,15 @@ namespace Xwt.GtkBackend
 			get { return (IButtonEventSink)base.EventSink; }
 		}
 		
-		public void SetContent (string label, object imageBackend, ContentPosition position)
+		public void SetContent (string label, ImageDescription image, ContentPosition position)
 		{
+			this.image = image;
+
 			if (label != null && label.Length == 0)
 				label = null;
 			
 			Button b = (Button) Frontend;
-			if (label != null && imageBackend == null && b.Type == ButtonType.Normal) {
+			if (label != null && image.Backend == null && b.Type == ButtonType.Normal) {
 				Widget.Label = label;
 				return;
 			}
@@ -75,9 +79,9 @@ namespace Xwt.GtkBackend
 			Gtk.Widget contentWidget = null;
 			
 			Gtk.Widget imageWidget = null;
-			if (imageBackend != null)
-				imageWidget = new Gtk.Image ((Gdk.Pixbuf)imageBackend);
-			
+			if (image.Backend != null)
+				imageWidget = new ImageBox (ApplicationContext, image.WithDefaultSize (Gtk.IconSize.Button));
+
 			if (label != null && imageWidget == null) {
 				contentWidget = new Gtk.Label (label); 
 			}
@@ -137,7 +141,7 @@ namespace Xwt.GtkBackend
 		public void SetButtonType (ButtonType type)
 		{
 			Button b = (Button) Frontend;
-			SetContent (b.Label, WidgetRegistry.GetBackend (b.Image), b.ImagePosition);
+			SetContent (b.Label, image, b.ImagePosition);
 		}
 		
 		public override void EnableEvent (object eventId)
@@ -163,7 +167,7 @@ namespace Xwt.GtkBackend
 		void HandleWidgetClicked (object sender, EventArgs e)
 		{
 			if (!ignoreClickEvents) {
-				Toolkit.Invoke (delegate {
+				ApplicationContext.InvokeUserCode (delegate {
 					EventSink.OnClicked ();
 				});
 			}

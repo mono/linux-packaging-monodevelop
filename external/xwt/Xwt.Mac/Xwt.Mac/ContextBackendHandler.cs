@@ -27,59 +27,73 @@
 
 using System;
 using Xwt.Backends;
-using Xwt.Engine;
+
 using MonoMac.AppKit;
 using Xwt.Drawing;
 using MonoMac.Foundation;
 using MonoMac.CoreGraphics;
 using System.Drawing;
+using System.Collections.Generic;
 
 namespace Xwt.Mac
 {
 	class CGContextBackend {
 		public CGContext Context;
 		public SizeF Size;
-		public GradientInfo Gradient;
 		public CGAffineTransform? InverseViewTransform;
+		public Stack<ContextStatus> StatusStack = new Stack<ContextStatus> ();
+		public ContextStatus CurrentStatus = new ContextStatus ();
 	}
 
-	public class ContextBackendHandler: IContextBackendHandler
+	class ContextStatus
+	{
+		public object Pattern;
+	}
+
+	public class MacContextBackendHandler: ContextBackendHandler
 	{
 		const double degrees = System.Math.PI / 180d;
 
-		public void Save (object backend)
+		public override void Save (object backend)
 		{
-			((CGContextBackend)backend).Context.SaveState ();
+			var ct = (CGContextBackend) backend;
+			ct.Context.SaveState ();
+			ct.StatusStack.Push (ct.CurrentStatus);
+			var newStatus = new ContextStatus ();
+			newStatus.Pattern = ct.CurrentStatus.Pattern;
+			ct.CurrentStatus = newStatus;
 		}
 		
-		public void Restore (object backend)
+		public override void Restore (object backend)
 		{
-			((CGContextBackend)backend).Context.RestoreState ();
+			var ct = (CGContextBackend) backend;
+			ct.Context.RestoreState ();
+			ct.CurrentStatus = ct.StatusStack.Pop ();
 		}
 
-		public void SetGlobalAlpha (object backend, double alpha)
+		public override void SetGlobalAlpha (object backend, double alpha)
 		{
 			((CGContextBackend)backend).Context.SetAlpha ((float)alpha);
 		}
 
-		public void Arc (object backend, double xc, double yc, double radius, double angle1, double angle2)
+		public override void Arc (object backend, double xc, double yc, double radius, double angle1, double angle2)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			ctx.AddArc ((float)xc, (float)yc, (float)radius, (float)(angle1 * degrees), (float)(angle2 * degrees), false);
 		}
 
-		public void ArcNegative (object backend, double xc, double yc, double radius, double angle1, double angle2)
+		public override void ArcNegative (object backend, double xc, double yc, double radius, double angle1, double angle2)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			ctx.AddArc ((float)xc, (float)yc, (float)radius, (float)(angle1 * degrees), (float)(angle2 * degrees), true);
 		}
 
-		public void Clip (object backend)
+		public override void Clip (object backend)
 		{
 			((CGContextBackend)backend).Context.Clip ();
 		}
 
-		public void ClipPreserve (object backend)
+		public override void ClipPreserve (object backend)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			using (CGPath oldPath = ctx.CopyPath ()) {
@@ -87,30 +101,36 @@ namespace Xwt.Mac
 				ctx.AddPath (oldPath);
 			}
 		}
-		
-		public void ClosePath (object backend)
+
+		public override void ClosePath (object backend)
 		{
 			((CGContextBackend)backend).Context.ClosePath ();
 		}
 
-		public void CurveTo (object backend, double x1, double y1, double x2, double y2, double x3, double y3)
+		public override void CurveTo (object backend, double x1, double y1, double x2, double y2, double x3, double y3)
 		{
 			((CGContextBackend)backend).Context.AddCurveToPoint ((float)x1, (float)y1, (float)x2, (float)y2, (float)x3, (float)y3);
 		}
 
-		public void Fill (object backend)
+		public override void Fill (object backend)
 		{
 			CGContextBackend gc = (CGContextBackend)backend;
 			CGContext ctx = gc.Context;
 			SetupContextForDrawing (ctx);
 
-			if (gc.Gradient != null)
-				GradientBackendHandler.Draw (ctx, gc.Gradient);
-			else
+			if (gc.CurrentStatus.Pattern is GradientInfo) {
+				MacGradientBackendHandler.Draw (ctx, ((GradientInfo)gc.CurrentStatus.Pattern));
+			}
+			else if (gc.CurrentStatus.Pattern is ImagePatternInfo) {
+				SetupPattern (gc);
 				ctx.DrawPath (CGPathDrawingMode.Fill);
+			}
+			else {
+				ctx.DrawPath (CGPathDrawingMode.Fill);
+			}
 		}
 
-		public void FillPreserve (object backend)
+		public override void FillPreserve (object backend)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			using (CGPath oldPath = ctx.CopyPath ()) {
@@ -119,55 +139,55 @@ namespace Xwt.Mac
 			}
 		}
 
-		public void LineTo (object backend, double x, double y)
+		public override void LineTo (object backend, double x, double y)
 		{
 			((CGContextBackend)backend).Context.AddLineToPoint ((float)x, (float)y);
 		}
 
-		public void MoveTo (object backend, double x, double y)
+		public override void MoveTo (object backend, double x, double y)
 		{
 			((CGContextBackend)backend).Context.MoveTo ((float)x, (float)y);
 		}
 
-		public void NewPath (object backend)
+		public override void NewPath (object backend)
 		{
 			((CGContextBackend)backend).Context.BeginPath ();
 		}
 
-		public void Rectangle (object backend, double x, double y, double width, double height)
+		public override void Rectangle (object backend, double x, double y, double width, double height)
 		{
 			((CGContextBackend)backend).Context.AddRect (new RectangleF ((float)x, (float)y, (float)width, (float)height));
 		}
 
-		public void RelCurveTo (object backend, double dx1, double dy1, double dx2, double dy2, double dx3, double dy3)
+		public override void RelCurveTo (object backend, double dx1, double dy1, double dx2, double dy2, double dx3, double dy3)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			PointF p = ctx.GetPathCurrentPoint ();
 			ctx.AddCurveToPoint ((float)(p.X + dx1), (float)(p.Y + dy1), (float)(p.X + dx2), (float)(p.Y + dy2), (float)(p.X + dx3), (float)(p.Y + dy3));
 		}
 
-		public void RelLineTo (object backend, double dx, double dy)
+		public override void RelLineTo (object backend, double dx, double dy)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			PointF p = ctx.GetPathCurrentPoint ();
 			ctx.AddLineToPoint ((float)(p.X + dx), (float)(p.Y + dy));
 		}
 
-		public void RelMoveTo (object backend, double dx, double dy)
+		public override void RelMoveTo (object backend, double dx, double dy)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			PointF p = ctx.GetPathCurrentPoint ();
 			ctx.MoveTo ((float)(p.X + dx), (float)(p.Y + dy));
 		}
 
-		public void Stroke (object backend)
+		public override void Stroke (object backend)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			SetupContextForDrawing (ctx);
 			ctx.DrawPath (CGPathDrawingMode.Stroke);
 		}
 
-		public void StrokePreserve (object backend)
+		public override void StrokePreserve (object backend)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			SetupContextForDrawing (ctx);
@@ -177,10 +197,10 @@ namespace Xwt.Mac
 			}
 		}
 		
-		public void SetColor (object backend, Xwt.Drawing.Color color)
+		public override void SetColor (object backend, Xwt.Drawing.Color color)
 		{
 			CGContextBackend gc = (CGContextBackend)backend;
-			gc.Gradient = null;
+			gc.CurrentStatus.Pattern = null;
 			CGContext ctx = gc.Context;
 			ctx.SetFillColorSpace (Util.DeviceRGBColorSpace);
 			ctx.SetStrokeColorSpace (Util.DeviceRGBColorSpace);
@@ -188,12 +208,12 @@ namespace Xwt.Mac
 			ctx.SetStrokeColor ((float)color.Red, (float)color.Green, (float)color.Blue, (float)color.Alpha);
 		}
 		
-		public void SetLineWidth (object backend, double width)
+		public override void SetLineWidth (object backend, double width)
 		{
 			((CGContextBackend)backend).Context.SetLineWidth ((float)width);
 		}
 		
-		public void SetLineDash (object backend, double offset, params double[] pattern)
+		public override void SetLineDash (object backend, double offset, params double[] pattern)
 		{
 			float[] array = new float[pattern.Length];
 			for (int n=0; n<pattern.Length; n++)
@@ -203,128 +223,143 @@ namespace Xwt.Mac
 			((CGContextBackend)backend).Context.SetLineDash ((float)offset, array);
 		}
 		
-		public void SetPattern (object backend, object p)
+		public override void SetPattern (object backend, object p)
 		{
 			CGContextBackend gc = (CGContextBackend)backend;
-			gc.Gradient = p as GradientInfo;
-			if (gc.Gradient != null || !(p is CGPattern))
-				return;
-			CGContext ctx = gc.Context;
-			CGPattern pattern = (CGPattern)p;
-			float[] alpha = new[] { 1.0f };
-			ctx.SetFillColorSpace (Util.PatternColorSpace);
-			ctx.SetStrokeColorSpace (Util.PatternColorSpace);
-			ctx.SetFillPattern (pattern, alpha);
-			ctx.SetStrokePattern (pattern, alpha);
+			gc.CurrentStatus.Pattern = p;
 		}
-		
-		public void SetFont (object backend, Xwt.Drawing.Font font)
+
+		void SetupPattern (CGContextBackend gc)
 		{
-			((CGContextBackend)backend).Context.SelectFont (font.Family, (float)font.Size, CGTextEncoding.FontSpecific);
+			gc.Context.SetPatternPhase (new SizeF (0, 0));
+
+			if (gc.CurrentStatus.Pattern is GradientInfo)
+				return;
+
+			if (gc.CurrentStatus.Pattern is ImagePatternInfo) {
+
+				var pi = (ImagePatternInfo) gc.CurrentStatus.Pattern;
+				RectangleF bounds = new RectangleF (PointF.Empty, new SizeF (pi.Image.Size.Width, pi.Image.Size.Height));
+				var t = CGAffineTransform.Multiply (CGAffineTransform.MakeScale (1f, -1f), gc.Context.GetCTM ());
+
+				CGPattern pattern;
+				if (pi.Image is CustomImage) {
+					pattern = new CGPattern (bounds, t, bounds.Width, bounds.Height, CGPatternTiling.ConstantSpacing, true, c => {
+						c.TranslateCTM (0, bounds.Height);
+						c.ScaleCTM (1f, -1f);
+						((CustomImage)pi.Image).DrawInContext (c);
+					});
+				} else {
+					RectangleF empty = RectangleF.Empty;
+					CGImage cgimg = ((NSImage)pi.Image).AsCGImage (ref empty, null, null);
+					pattern = new CGPattern (bounds, t, bounds.Width, bounds.Height,
+					                         CGPatternTiling.ConstantSpacing, true, c => c.DrawImage (bounds, cgimg));
+				}
+
+				CGContext ctx = gc.Context;
+				float[] alpha = new[] { (float)pi.Alpha };
+				ctx.SetFillColorSpace (Util.PatternColorSpace);
+				ctx.SetStrokeColorSpace (Util.PatternColorSpace);
+				ctx.SetFillPattern (pattern, alpha);
+				ctx.SetStrokePattern (pattern, alpha);
+			}
 		}
 		
-		public void DrawTextLayout (object backend, TextLayout layout, double x, double y)
+		public override void DrawTextLayout (object backend, TextLayout layout, double x, double y)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
 			SetupContextForDrawing (ctx);
-			TextLayoutBackendHandler.Draw (ctx, WidgetRegistry.GetBackend (layout), x, y);
-		}
-		
-		public void DrawImage (object backend, object img, double x, double y, double alpha)
-		{
-			CGContext ctx = ((CGContextBackend)backend).Context;
-			NSImage image = (NSImage)img;
-			var rect = new RectangleF (PointF.Empty, image.Size);
-			ctx.SaveState ();
-			ctx.SetAlpha ((float)alpha);
-			ctx.TranslateCTM ((float)x, (float)y + rect.Height);
-			ctx.ScaleCTM (1f, -1f);
-			ctx.DrawImage (rect, image.AsCGImage (RectangleF.Empty, null, null));
-			ctx.RestoreState ();
-		}
-		
-		public void DrawImage (object backend, object img, double x, double y, double width, double height, double alpha)
-		{
-			var srcRect = new Rectangle (Point.Zero, ((NSImage)img).Size.ToXwtSize ());
-			var destRect = new Rectangle (x, y, width, height);
-			DrawImage (backend, img, srcRect, destRect, alpha);
+			MacTextLayoutBackendHandler.Draw (ctx, Toolkit.GetBackend (layout), x, y);
 		}
 
-		public void DrawImage (object backend, object img, Rectangle srcRect, Rectangle destRect, double alpha)
+		public override void DrawImage (object backend, ImageDescription img, double x, double y)
+		{
+			var srcRect = new Rectangle (Point.Zero, img.Size);
+			var destRect = new Rectangle (x, y, img.Size.Width, img.Size.Height);
+			DrawImage (backend, img, srcRect, destRect);
+		}
+
+		public override void DrawImage (object backend, ImageDescription img, Rectangle srcRect, Rectangle destRect)
 		{
 			CGContext ctx = ((CGContextBackend)backend).Context;
-			NSImage image = (NSImage) img;
-			var rect = new RectangleF (0, 0, (float)destRect.Width, (float)destRect.Height);
+			NSImage image = img.ToNSImage ();
 			ctx.SaveState ();
-			ctx.SetAlpha ((float)alpha);
-			ctx.TranslateCTM ((float)destRect.X, (float)destRect.Y + rect.Height);
-			ctx.ScaleCTM (1f, -1f);
-			ctx.DrawImage (rect, image.AsCGImage (RectangleF.Empty, null, null).WithImageInRect (srcRect.ToRectangleF ()));
+			ctx.SetAlpha ((float)img.Alpha);
+
+			double rx = destRect.Width / srcRect.Width;
+			double ry = destRect.Height / srcRect.Height;
+			ctx.AddRect (new RectangleF ((float)destRect.X, (float)destRect.Y, (float)destRect.Width, (float)destRect.Height));
+			ctx.Clip ();
+			ctx.TranslateCTM ((float)(destRect.X - (srcRect.X * rx)), (float)(destRect.Y - (srcRect.Y * ry)));
+			ctx.ScaleCTM ((float)rx, (float)ry);
+
+			if (image is CustomImage) {
+				((CustomImage)image).DrawInContext ((CGContextBackend)backend);
+			} else {
+				RectangleF rr = new RectangleF (0, 0, (float)image.Size.Width, image.Size.Height);
+				ctx.ScaleCTM (1f, -1f);
+				ctx.DrawImage (new RectangleF (0, -image.Size.Height, image.Size.Width, image.Size.Height), image.AsCGImage (ref rr, NSGraphicsContext.CurrentContext, null));
+			}
+
 			ctx.RestoreState ();
 		}
 		
-		public void Rotate (object backend, double angle)
+		public override void Rotate (object backend, double angle)
 		{
 			((CGContextBackend)backend).Context.RotateCTM ((float)(angle * degrees));
 		}
 		
-		public void Scale (object backend, double scaleX, double scaleY)
+		public override void Scale (object backend, double scaleX, double scaleY)
 		{
 			((CGContextBackend)backend).Context.ScaleCTM ((float)scaleX, (float)scaleY);
 		}
 		
-		public void Translate (object backend, double tx, double ty)
+		public override void Translate (object backend, double tx, double ty)
 		{
 			((CGContextBackend)backend).Context.TranslateCTM ((float)tx, (float)ty);
 		}
 		
-		public void TransformPoint (object backend, ref double x, ref double y)
+		public override Matrix GetCTM (object backend)
 		{
 			CGAffineTransform t = GetContextTransform ((CGContextBackend)backend);
-
-			PointF p = t.TransformPoint (new PointF ((float)x, (float)y));
-			x = p.X;
-			y = p.Y;
+			Matrix ctm = new Matrix (t.xx, t.yx, t.xy, t.yy, t.x0, t.y0);
+			return ctm;
 		}
 
-		public void TransformDistance (object backend, ref double dx, ref double dy)
+		public override object CreatePath ()
 		{
-			CGAffineTransform t = GetContextTransform ((CGContextBackend)backend);
-			// remove translational elements from CTM
-			t.x0 = 0;
-			t.y0 = 0;
-
-			PointF p = t.TransformPoint (new PointF ((float)dx, (float)dy));
-			dx = p.X;
-			dy = p.Y;
+			return new CGPath ();
 		}
 
-		public void TransformPoints (object backend, Point[] points)
+		public override object CopyPath (object backend)
 		{
-			CGAffineTransform t = GetContextTransform ((CGContextBackend)backend);
+			return ((CGContextBackend)backend).Context.CopyPath ();
+		}
 
-			PointF p;
-			for (int i = 0; i < points.Length; ++i) {
-				p = t.TransformPoint (new PointF ((float)points[i].X, (float)points[i].Y));
-				points[i].X = p.X;
-				points[i].Y = p.Y;
+		public override void AppendPath (object backend, object otherBackend)
+		{
+			CGContext dest = ((CGContextBackend)backend).Context;
+			CGContextBackend src = otherBackend as CGContextBackend;
+
+			if (src != null) {
+				using (var path = src.Context.CopyPath ())
+					dest.AddPath (path);
+			} else {
+				dest.AddPath ((CGPath)otherBackend);
 			}
 		}
 
-		public void TransformDistances (object backend, Distance[] vectors)
+		public override bool IsPointInFill (object backend, double x, double y)
 		{
-			CGAffineTransform t = GetContextTransform ((CGContextBackend)backend);
-			t.x0 = 0;
-			t.y0 = 0;
-			PointF p;
-			for (int i = 0; i < vectors.Length; ++i) {
-				p = t.TransformPoint (new PointF ((float)vectors[i].Dx, (float)vectors[i].Dy));
-				vectors[i].Dx = p.X;
-				vectors[i].Dy = p.Y;
-			}
+			return ((CGContextBackend)backend).Context.PathContainsPoint (new PointF ((float)x, (float)y), CGPathDrawingMode.Fill);
 		}
 
-		public void Dispose (object backend)
+		public override bool IsPointInStroke (object backend, double x, double y)
+		{
+			return ((CGContextBackend)backend).Context.PathContainsPoint (new PointF ((float)x, (float)y), CGPathDrawingMode.Stroke);
+		}
+
+		public override void Dispose (object backend)
 		{
 			((CGContextBackend)backend).Context.Dispose ();
 		}

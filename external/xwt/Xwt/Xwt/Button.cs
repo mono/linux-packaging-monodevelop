@@ -27,9 +27,11 @@
 using System;
 using Xwt.Backends;
 using Xwt.Drawing;
+using System.ComponentModel;
 
 namespace Xwt
 {
+	[BackendType (typeof(IButtonBackend))]
 	public class Button: Widget
 	{
 		EventHandler clicked;
@@ -87,33 +89,37 @@ namespace Xwt
 			get { return (IButtonBackend) BackendHost.Backend; }
 		}
 		
+		[DefaultValue ("")]
 		public string Label {
-			get { return label; }
+			get { return label ?? ""; }
 			set {
 				label = value;
-				Backend.SetContent (label, XwtObject.GetBackend (image), imagePosition);
+				Backend.SetContent (label, image != null ? image.ImageDescription : ImageDescription.Null, imagePosition);
 				OnPreferredSizeChanged ();
 			}
 		}
-		
+
+		[DefaultValue (null)]
 		public Image Image {
 			get { return image; }
 			set {
 				image = value;
-				Backend.SetContent (label, XwtObject.GetBackend (value), imagePosition); 
+				Backend.SetContent (label, image != null ? image.ImageDescription : ImageDescription.Null, imagePosition); 
 				OnPreferredSizeChanged ();
 			}
 		}
 		
+		[DefaultValue (ContentPosition.Left)]
 		public ContentPosition ImagePosition {
 			get { return imagePosition; }
 			set {
 				imagePosition = value;
-				Backend.SetContent (label, XwtObject.GetBackend (image), imagePosition); 
+				Backend.SetContent (label, image != null ? image.ImageDescription : ImageDescription.Null, imagePosition); 
 				OnPreferredSizeChanged ();
 			}
 		}
 		
+		[DefaultValue (ButtonStyle.Normal)]
 		public ButtonStyle Style {
 			get { return style; }
 			set {
@@ -123,6 +129,7 @@ namespace Xwt
 			}
 		}
 		
+		[DefaultValue (ButtonType.Normal)]
 		public ButtonType Type {
 			get { return type; }
 			set {

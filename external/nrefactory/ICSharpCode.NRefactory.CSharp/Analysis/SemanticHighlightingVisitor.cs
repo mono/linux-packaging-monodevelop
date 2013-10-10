@@ -24,6 +24,7 @@ using ICSharpCode.NRefactory.CSharp.Resolver;
 using ICSharpCode.NRefactory.Semantics;
 using ICSharpCode.NRefactory.TypeSystem;
 using System.Threading;
+using ICSharpCode.NRefactory.CSharp.Completion;
 
 namespace ICSharpCode.NRefactory.CSharp.Analysis
 {
@@ -77,7 +78,10 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 		/// Used for inactive code (excluded by preprocessor or ConditionalAttribute)
 		/// </summary>
 		protected TColor inactiveCodeColor;
-		
+
+		protected TColor stringFormatItemColor;
+
+
 		protected TColor syntaxErrorColor;
 		
 		protected TextLocation regionStart;
@@ -260,18 +264,53 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 			Colorize(memberNameToken, rr);
 			VisitChildrenAfter(memberReferenceExpression, memberNameToken);
 		}
-		
+
+		void HighlightStringFormatItems(PrimitiveExpression expr)
+		{
+			if (!(expr.Value is string))
+				return;
+			int line = expr.StartLocation.Line;
+			int col = expr.StartLocation.Column;
+			TextLocation start = TextLocation.Empty;
+			for (int i = 0; i < expr.LiteralValue.Length; i++) {
+				char ch = expr.LiteralValue [i];
+
+				if (NewLine.GetDelimiterType(ch, i + 1 < expr.LiteralValue.Length ? expr.LiteralValue [i + 1] : '\0') != UnicodeNewline.Unknown) {
+					line++;
+					col = 1;
+					continue;
+				}
+
+				if (ch == '{' && start.IsEmpty)
+					start = new TextLocation(line, col);
+				col++;
+				if (ch == '}' &&!start.IsEmpty) {
+					Colorize(start, new TextLocation(line, col), stringFormatItemColor);
+					start = TextLocation.Empty;
+				}
+			}
+
+		}
+
 		public override void VisitInvocationExpression(InvocationExpression invocationExpression)
 		{
 			Expression target = invocationExpression.Target;
 			if (target is IdentifierExpression || target is MemberReferenceExpression || target is PointerReferenceExpression) {
 				var invocationRR = resolver.Resolve(invocationExpression, cancellationToken) as CSharpInvocationResolveResult;
-				if (invocationRR != null && invocationExpression.Parent is ExpressionStatement && IsInactiveConditionalMethod(invocationRR.Member)) {
-					// mark the whole invocation statement as inactive code
-					Colorize(invocationExpression.Parent, inactiveCodeColor);
-					return;
+				if (invocationRR != null) {
+					if (invocationExpression.Parent is ExpressionStatement && IsInactiveConditionalMethod(invocationRR.Member)) {
+						// mark the whole invocation statement as inactive code
+						Colorize(invocationExpression.Parent, inactiveCodeColor);
+						return;
+					}
+
+					if (invocationRR.Arguments.Count > 1 && CSharpCompletionEngine.FormatItemMethods.Contains(invocationRR.Member.FullName)) {
+						var expr = invocationExpression.Arguments.First() as PrimitiveExpression; 
+						if (expr != null)
+							HighlightStringFormatItems(expr);
+					}
 				}
-				
+
 				VisitChildrenUntil(invocationExpression, target);
 				
 				// highlight the method call
@@ -293,7 +332,7 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 		#region IsInactiveConditional helper methods
 		bool IsInactiveConditionalMethod(IParameterizedMember member)
 		{
-			if (member.EntityType != EntityType.Method || member.ReturnType.Kind != TypeKind.Void)
+			if (member.SymbolKind != SymbolKind.Method || member.ReturnType.Kind != TypeKind.Void)
 				return false;
 			while (member.IsOverride) {
 				member = (IParameterizedMember)InheritanceHelper.GetBaseMember(member);
@@ -461,21 +500,21 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 		
 		bool TryGetMemberColor(IMember member, out TColor color)
 		{
-			switch (member.EntityType) {
-				case EntityType.Field:
+			switch (member.SymbolKind) {
+				case SymbolKind.Field:
 					color = fieldAccessColor;
 					return true;
-				case EntityType.Property:
+				case SymbolKind.Property:
 					color = propertyAccessColor;
 					return true;
-				case EntityType.Event:
+				case SymbolKind.Event:
 					color = eventAccessColor;
 					return true;
-				case EntityType.Method:
+				case SymbolKind.Method:
 					color = methodCallColor;
 					return true;
-				case EntityType.Constructor:
-				case EntityType.Destructor:
+				case SymbolKind.Constructor:
+				case SymbolKind.Destructor:
 					return TryGetTypeHighlighting (member.DeclaringType.Kind, out color);
 				default:
 					color = default (TColor);

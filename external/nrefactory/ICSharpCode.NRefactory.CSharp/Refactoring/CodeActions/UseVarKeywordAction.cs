@@ -33,7 +33,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 {
 	[ContextAction("Use 'var' keyword",
 	               Description = "Converts local variable declaration to be implicit typed.",
-	               BoundToIssue = typeof (ICSharpCode.NRefactory.CSharp.Refactoring.UseVarKeywordIssue))]
+	               BoundToIssue = typeof (ICSharpCode.NRefactory.CSharp.Refactoring.SuggestUseVarKeywordEvidentIssue))]
 	public class UseVarKeywordAction : ICodeActionProvider
 	{
 		public IEnumerable<CodeAction> GetActions(RefactoringContext context)
@@ -52,12 +52,10 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			}, (AstNode)varDecl ?? foreachStmt);
 		}
 		
-		static readonly AstType varType = new SimpleType ("var");
-
 		static VariableDeclarationStatement GetVariableDeclarationStatement (RefactoringContext context)
 		{
 			var result = context.GetNode<VariableDeclarationStatement> ();
-			if (result != null && result.Variables.Count == 1 && !result.Variables.First ().Initializer.IsNull && result.Type.Contains (context.Location) && !result.Type.IsMatch (varType))
+			if (result != null && result.Variables.Count == 1 && !result.Variables.First ().Initializer.IsNull && result.Type.Contains (context.Location) && !result.Type.IsVar ())
 				return result;
 			return null;
 		}
@@ -65,7 +63,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		static ForeachStatement GetForeachStatement (RefactoringContext context)
 		{
 			var result = context.GetNode<ForeachStatement> ();
-			if (result != null && result.VariableType.Contains (context.Location) && !result.VariableType.IsMatch (varType))
+			if (result != null && result.VariableType.Contains (context.Location) && !result.VariableType.IsVar ())
 				return result;
 			return null;
 		}

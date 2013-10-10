@@ -32,6 +32,8 @@ using Gtk;
 
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide.Navigation;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Ide.Commands
 {
@@ -39,7 +41,8 @@ namespace MonoDevelop.Ide.Commands
 	{
 		CloseAllButThis,
 		CopyPathName,
-		ToggleMaximize
+		ToggleMaximize,
+		ReopenClosedTab,
 	}
 	
 	class CloseAllButThisHandler : CommandHandler
@@ -70,6 +73,19 @@ namespace MonoDevelop.Ide.Commands
 			clipboard.Text = document.FileName;
 			clipboard = Clipboard.Get (Gdk.Atom.Intern ("PRIMARY", false));
 			clipboard.Text = document.FileName;
+		}
+	}
+
+	class ReopenClosedTabHandler : CommandHandler
+	{
+		protected override void Run ()
+		{
+			NavigationHistoryService.OpenLastClosedDocument ();
+		}
+
+		protected override void Update (CommandInfo info)
+		{
+			info.Enabled = NavigationHistoryService.HasClosedDocuments;
 		}
 	}
 }

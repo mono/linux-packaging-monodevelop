@@ -37,7 +37,8 @@ namespace Mono.TextEditor.Highlighting
 	{
 		None = 0,
 		StartsLine = 1,
-		FirstNonWs = 2
+		FirstNonWs = 2,
+		NewWord = 4
 	}
 
 	[Flags]
@@ -94,7 +95,27 @@ namespace Mono.TextEditor.Highlighting
 			set;
 		}
 
-		public string Escape {
+		string endTagColor;
+		public string EndTagColor {
+			get {
+				return endTagColor ?? TagColor;
+			}
+			set {
+				endTagColor = value;
+			}
+		}
+
+		string beginTagColor;
+		public string BeginTagColor {
+			get {
+				return beginTagColor ?? TagColor;
+			}
+			set {
+				beginTagColor = value;
+			}
+		}
+
+		public Regex Escape {
 			get;
 			set;
 		}
@@ -136,7 +157,7 @@ namespace Mono.TextEditor.Highlighting
 
 		public override string ToString ()
 		{
-			return String.Format ("[Span: Color={0}, Rule={1}, Begin={2}, End={3}, Escape={4}, stopAtEol={5}]", Color, Rule, Begin, End, String.IsNullOrEmpty (Escape) ? "not set" : "'" + Escape +"'", StopAtEol);
+			return String.Format ("[Span: Color={0}, Rule={1}, Begin={2}, End={3}, Escape={4}, stopAtEol={5}]", Color, Rule, Begin, End, Escape == null ? "not set" : "'" + Escape +"'", StopAtEol);
 		}
 		
 		public Span Clone ()
@@ -158,6 +179,8 @@ namespace Mono.TextEditor.Highlighting
 			newSpan.Rule = Rule;
 			newSpan.StopAtEol = StopAtEol;
 			newSpan.TagColor = TagColor;
+			newSpan.BeginTagColor = beginTagColor;
+			newSpan.EndTagColor = endTagColor;
 			return newSpan;
 		}
 		
@@ -179,7 +202,8 @@ namespace Mono.TextEditor.Highlighting
 			result.TagColor   = reader.GetAttribute ("tagColor");
 			result.NextColor  = reader.GetAttribute ("nextColor");
 
-			result.Escape = reader.GetAttribute ("escape");
+			string escape = reader.GetAttribute("escape");
+			result.Escape = string.IsNullOrEmpty(escape) ? null : new Regex(escape);
 
 			string stopateol = reader.GetAttribute ("stopateol");
 			if (!String.IsNullOrEmpty (stopateol)) {
@@ -200,12 +224,14 @@ namespace Mono.TextEditor.Highlighting
 						string beginFlags = reader.GetAttribute ("flags");
 						if (!string.IsNullOrEmpty (beginFlags))
 							result.BeginFlags = (SpanBeginFlags)Enum.Parse (typeof(SpanBeginFlags), beginFlags);
+						result.BeginTagColor = reader.GetAttribute ("color");
 						result.Begin = new Regex (reader.ReadElementString ());
 						return true;
 					case "End":
 						string endFlags = reader.GetAttribute ("flags");
 						if (!string.IsNullOrEmpty (endFlags))
 							result.EndFlags = (SpanEndFlags)Enum.Parse (typeof(SpanEndFlags), endFlags);
+						result.EndTagColor = reader.GetAttribute ("color");
 						result.End = new Regex (reader.ReadElementString ());
 						return true;
 					case "Exit":

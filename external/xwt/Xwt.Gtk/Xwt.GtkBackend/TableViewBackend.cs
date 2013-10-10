@@ -26,7 +26,8 @@
 
 using System;
 using Xwt.Backends;
-using Xwt.Engine;
+using Gtk;
+
 
 namespace Xwt.GtkBackend
 {
@@ -98,7 +99,7 @@ namespace Xwt.GtkBackend
 
 		void HandleWidgetSelectionChanged (object sender, EventArgs e)
 		{
-			Toolkit.Invoke (delegate {
+			ApplicationContext.InvokeUserCode (delegate {
 				EventSink.OnSelectionChanged ();
 			});
 		}
@@ -118,13 +119,13 @@ namespace Xwt.GtkBackend
 			if (col.HeaderView == null)
 				tc.Title = col.Title;
 			else
-				tc.Widget = CellUtil.CreateCellRenderer (col.HeaderView);
+				tc.Widget = CellUtil.CreateCellRenderer (ApplicationContext, col.HeaderView);
 		}
 		
 		void MapColumn (ListViewColumn col, Gtk.TreeViewColumn tc)
 		{
 			foreach (var v in col.Views) {
-				CellUtil.CreateCellRenderer (this, tc, v);
+				CellUtil.CreateCellRenderer (ApplicationContext, this, tc, v, Widget.Model);
 			}
 		}
 		
@@ -142,6 +143,14 @@ namespace Xwt.GtkBackend
 			}
 			else if (change == ListViewColumnChange.Title)
 				MapTitle (col, tc);
+			else if (change == ListViewColumnChange.IsResizeable)
+				tc.Resizable = col.IsResizeable;
+			else if (change == ListViewColumnChange.SortDirection)
+				tc.SortOrder = (SortType)col.SortDirection;
+			else if (change == ListViewColumnChange.SortDataField)
+				tc.SortColumnId = col.SortDataField.Index;
+			else if (change == ListViewColumnChange.IsSortIndicatorShown)
+				tc.SortIndicator = col.IsSortIndicatorShown;
 		}
 
 		public void SelectAll ()
@@ -177,6 +186,12 @@ namespace Xwt.GtkBackend
 		{
 			((Gtk.TreeViewColumn)target).AddAttribute (cr, field, col);
 		}
+
+		public void SetCellDataFunc (object target, Gtk.CellRenderer cr, Gtk.CellLayoutDataFunc dataFunc)
+		{
+			((Gtk.TreeViewColumn)target).SetCellDataFunc (cr, dataFunc);
+		}
+
 		#endregion
 	}
 	

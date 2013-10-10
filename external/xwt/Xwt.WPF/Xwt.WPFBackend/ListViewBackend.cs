@@ -29,7 +29,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using Xwt.Engine;
+
 using Xwt.WPFBackend.Utilities;
 using SWC = System.Windows.Controls;
 using Xwt.Backends;
@@ -198,7 +198,7 @@ namespace Xwt.WPFBackend
 
 		private void OnSelectionChanged (object sender, SelectionChangedEventArgs e)
 		{
-			Toolkit.Invoke (ListViewEventSink.OnSelectionChanged);
+			Context.InvokeUserCode (ListViewEventSink.OnSelectionChanged);
 		}
 
 		private bool headersVisible;

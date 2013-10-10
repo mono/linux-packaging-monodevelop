@@ -511,6 +511,22 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 		}
 		
 		[Test]
+		public void ByteEnumSubtraction()
+		{
+			string program = @"enum E : byte {
+  A = 1,
+  B = 2
+}
+class Test {
+	const int $j = E.A - E.B$;
+}
+";
+			// result is 255 in C# 2.0 and later (was -1 in C# 1.x)
+			var rr = Resolve<MemberResolveResult>(program);
+			Assert.AreEqual(255, rr.ConstantValue);
+		}
+		
+		[Test]
 		public void UserDefinedNeedsLiftingDueToImplicitConversion()
 		{
 			string program = @"struct S {}
@@ -686,7 +702,7 @@ class Test {
 			Assert.IsFalse(irr.IsError);
 			Assert.IsTrue(irr.IsLiftedOperator);
 		}
-
+		
 		[Test]
 		public void IsLiftedProperty2()
 		{
@@ -701,5 +717,33 @@ class Test {
 			Assert.IsFalse(irr.IsError);
 			Assert.IsTrue(irr.IsLiftedOperator);
 		}
+
+		[Ignore("Resolver bug. Fixme!")]
+		[Test]
+		public void TestLiftedOperatorBug()
+		{
+			string program = @"
+using System;
+
+struct C<T>
+{
+	public static C<T> operator+(C<T> u, C<T> u2)
+	{
+		return u;
+	}
+
+	public C ()
+	{
+		int? foo = 4;
+		var a = $new C<int> () + foo$;
+	}
+}";
+			var irr = Resolve<OperatorResolveResult>(program);
+			Assert.IsFalse(irr.IsError);
+			Assert.IsTrue(irr.IsLiftedOperator);
+		}
+
+
+
 	}
 }

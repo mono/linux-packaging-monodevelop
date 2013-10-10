@@ -28,6 +28,7 @@ using System;
 using Xwt.Backends;
 using Xwt.Drawing;
 using Xwt.CairoBackend;
+using System.Runtime.InteropServices;
 
 
 namespace Xwt.GtkBackend
@@ -36,7 +37,7 @@ namespace Xwt.GtkBackend
 	{
 		Color? bgColor, textColor;
 		int wrapHeight, wrapWidth;
-		
+
 		public LabelBackend ()
 		{
 			Widget = new Gtk.Label ();
@@ -103,6 +104,17 @@ namespace Xwt.GtkBackend
 			set { Label.Text = value; }
 		}
 
+		public void SetFormattedText (FormattedText text)
+		{
+			Label.Text = text.Text;
+			var list = new FastPangoAttrList ();
+			TextIndexer indexer = new TextIndexer (text.Text);
+			list.AddAttributes (indexer, text.Attributes);
+			gtk_label_set_attributes (Label.Handle, list.Handle);
+		}
+
+		[DllImport (GtkInterop.LIBGTK, CallingConvention=CallingConvention.Cdecl)]
+		static extern void gtk_label_set_attributes (IntPtr label, IntPtr attrList);
 
 		public Xwt.Drawing.Color TextColor {
 			get {

@@ -70,22 +70,22 @@ namespace MonoDevelop.Projects
 		}
 
 		[ItemProperty("subtype")]
-		private Subtype subtype;
+		Subtype subtype;
 		public Subtype Subtype {
 			get { return subtype; }
 			set {
 				subtype = value;
-				OnChanged ();
+				OnChanged ("Subtype");
 			}
 		}
 
 		[ItemProperty("data", DefaultValue = "")]
-		private string data = "";
+		string data = "";
 		public string Data {
 			get { return data; }
 			set {
 				data = value;
-				OnChanged ();
+				OnChanged ("Data");
 			}
 		}
 
@@ -104,6 +104,10 @@ namespace MonoDevelop.Projects
 						projectFile.dependsOn = Path.GetFileName (FilePath);
 				}
 
+				// If the file is a link, rename the link too
+				if (IsLink && Link.FileName == oldFileName.FileName)
+					link = Path.Combine (Path.GetDirectoryName (link), filename.FileName);
+
 				if (project != null)
 					project.NotifyFileRenamedInProject (new ProjectFileRenamedEventArgs (project, this, oldFileName));
 			}
@@ -116,7 +120,7 @@ namespace MonoDevelop.Projects
 			get { return buildaction; }
 			set {
 				buildaction = string.IsNullOrEmpty (value) ? MonoDevelop.Projects.BuildAction.None : value;
-				OnChanged ();
+				OnChanged ("BuildAction");
 			}
 		}
 
@@ -139,120 +143,13 @@ namespace MonoDevelop.Projects
 			get { return FilePath; }
 		}
 
-		internal bool IsWildcard {
-			get {
-				return Name.Contains("*");
-			}
-		}
-
 		/// <summary>
 		/// Set to true if this ProjectFile was created at load time by
 		/// a ProjectFile containing wildcards.  If true, this instance
 		/// should not be saved to a csproj file.
 		/// </summary>
-		internal bool IsOriginatedFromWildcard
-		{
-			get;
-			private set;
-		}
-
-		private const string RecursiveDirectoryWildcard = "**";
-
-		private string GetWildcardDirectoryName (string path)
-		{
-			int indexOfLast = path.LastIndexOfAny (new char[] {
-				Path.DirectorySeparatorChar, 
-				Path.AltDirectorySeparatorChar });
-
-			if (indexOfLast < 0) 
-			{
-				return String.Empty;
-			}
-			else
-			{
-				return path.Substring (0, indexOfLast);
-			}
-		}
-
-		private string GetWildcardFileName (string path)
-		{
-			int indexOfLast = path.LastIndexOfAny (new char[] {
-				Path.DirectorySeparatorChar, 
-				Path.AltDirectorySeparatorChar });
-			
-			if (indexOfLast < 0) 
-			{
-				return path;
-			}
-			else if(indexOfLast == path.Length)
-			{
-				return String.Empty;
-			}
-			else
-			{
-				return path.Substring (indexOfLast + 1, path.Length - (indexOfLast + 1));
-			}
-		}
-
-		internal IEnumerable<string> ResolveWildcardFilePath ()
-		{
-			if (String.IsNullOrWhiteSpace(filename)) yield break;
-
-			string dir = GetWildcardDirectoryName (filename);
-			string file = GetWildcardFileName (filename);
-
-			if (String.IsNullOrEmpty (dir)) yield break;
-			if (String.IsNullOrEmpty (file)) yield break;
-
-			if (dir.EndsWith (RecursiveDirectoryWildcard))
-			{
-				dir = dir.Substring (0, dir.Length - RecursiveDirectoryWildcard.Length);
-
-				if (!Directory.Exists (dir))
-				{
-					yield break; // Invalid directory
-				}
-
-				List<string> directories = new List<string> ();
-
-				RecursiveAddChildDirectories (directories, dir);
-
-				foreach (var resolvedDir in directories)
-				{
-					foreach (var resolvedFile in Directory.GetFiles (resolvedDir, file))
-					{
-						yield return resolvedFile;
-					}
-				}
-			}
-			else
-			{
-				foreach (var resolvedFile in Directory.GetFiles (dir, file))
-				{
-					yield return resolvedFile;
-				}
-			}
-		}
-
-		private void RecursiveAddChildDirectories (List<string> directories, string directory)
-		{
-			directories.Add (directory);
-
-			foreach (var child in Directory.GetDirectories (directory))
-			{
-				RecursiveAddChildDirectories (directories, child);
-			}
-		}
-
-		internal IEnumerable<ProjectFile> ResolveWildcardItems ()
-		{
-			foreach (var resolvedFilePath in ResolveWildcardFilePath ())
-			{
-				ProjectFile projectFile = (ProjectFile) this.Clone ();
-				projectFile.Name = resolvedFilePath;
-				projectFile.IsOriginatedFromWildcard = true;
-				yield return projectFile;
-			}
+		internal bool IsOriginatedFromWildcard {
+			get; set;
 		}
 
 		/// <summary>
@@ -265,7 +162,7 @@ namespace MonoDevelop.Projects
 					return Link;
 				if (project != null) {
 					var rel = project.GetRelativeChildPath (FilePath);
-					if (!rel.ToString ().StartsWith (".."))
+					if (!rel.ToString ().StartsWith ("..", StringComparison.Ordinal))
 						return rel;
 				}
 				return FilePath.FileName;
@@ -284,7 +181,7 @@ namespace MonoDevelop.Projects
 			get { return contentType; }
 			set {
 				contentType = value;
-				OnChanged ();
+				OnChanged ("ContentType");
 			}
 		}
 
@@ -299,7 +196,7 @@ namespace MonoDevelop.Projects
 			set {
 				if (visible != value) {
 					visible = value;
-					OnChanged ();
+					OnChanged ("Visible");
 				}
 			}
 		}
@@ -315,7 +212,7 @@ namespace MonoDevelop.Projects
 			set {
 				if (generator != value) {
 					generator = value;
-					OnChanged ();
+					OnChanged ("Generator");
 				}
 			}
 		}
@@ -331,7 +228,7 @@ namespace MonoDevelop.Projects
 			set {
 				if (customToolNamespace != value) {
 					customToolNamespace = value;
-					OnChanged ();
+					OnChanged ("CustomToolNamespace");
 				}
 			}
 		}
@@ -348,7 +245,7 @@ namespace MonoDevelop.Projects
 			set {
 				if (lastGenOutput != value) {
 					lastGenOutput = value;
-					OnChanged ();
+					OnChanged ("LastGenOutput");
 				}
 			}
 		}
@@ -365,10 +262,14 @@ namespace MonoDevelop.Projects
 			get { return link; }
 			set {
 				if (link != value) {
-					if (value.IsAbsolute || value.ToString ().StartsWith (".."))
+					if (value.IsAbsolute || value.ToString ().StartsWith ("..", StringComparison.Ordinal))
 						throw new ArgumentException ("value");
+
+					var oldLink = link;
 					link = value;
-					OnChanged ();
+
+					OnVirtualPathChanged (oldLink, link);
+					OnChanged ("Link");
 				}
 			}
 		}
@@ -398,7 +299,7 @@ namespace MonoDevelop.Projects
 			set {
 				if (copyToOutputDirectory != value) {
 					copyToOutputDirectory = value;
-					OnChanged ();
+					OnChanged ("CopyToOutputDirectory");
 				}
 			}
 		}
@@ -410,7 +311,9 @@ namespace MonoDevelop.Projects
 
 			set {
 				if (dependsOn != value) {
-					var oldPath = !string.IsNullOrEmpty (dependsOn) ? FilePath.ParentDirectory.Combine (Path.GetFileName (dependsOn)) : FilePath.Empty;
+					var oldPath = !string.IsNullOrEmpty (dependsOn)
+						? FilePath.ParentDirectory.Combine (Path.GetFileName (dependsOn))
+						: FilePath.Empty;
 					dependsOn = value;
 	
 					if (dependsOnFile != null) {
@@ -421,7 +324,7 @@ namespace MonoDevelop.Projects
 					if (project != null && value != null)
 						project.UpdateDependency (this, oldPath);
 	
-					OnChanged ();
+					OnChanged ("DependsOn");
 				}
 			}
 		}
@@ -468,7 +371,10 @@ namespace MonoDevelop.Projects
 
 				//don't allow cyclic references
 				if (parentPath == FilePath) {
-					MonoDevelop.Core.LoggingService.LogWarning ("Cyclic dependency in project '{0}': file '{1}' depends on '{2}'", project == null ? "(none)" : project.Name, FilePath, parentPath);
+					LoggingService.LogWarning (
+						"Cyclic dependency in project '{0}': file '{1}' depends on '{2}'",
+						project == null ? "(none)" : project.Name, FilePath, parentPath
+					);
 					return true;
 				}
 
@@ -497,13 +403,16 @@ namespace MonoDevelop.Projects
 			}
 			set {
 				resourceId = value;
-				OnChanged ();
+				OnChanged ("ResourceId");
 			}
 		}
 
 		internal void SetProject (Project project)
 		{
 			this.project = project;
+
+			if (project != null)
+				OnVirtualPathChanged (FilePath.Null, ProjectVirtualPath);
 		}
 
 		public override string ToString ()
@@ -524,10 +433,40 @@ namespace MonoDevelop.Projects
 		{
 		}
 
-		protected virtual void OnChanged ()
+		internal event EventHandler<ProjectFileVirtualPathChangedEventArgs> VirtualPathChanged;
+
+		void OnVirtualPathChanged (FilePath oldVirtualPath, FilePath newVirtualPath)
+		{
+			var handler = VirtualPathChanged;
+
+			if (handler != null)
+				handler (this, new ProjectFileVirtualPathChangedEventArgs (this, oldVirtualPath, newVirtualPath));
+		}
+
+		protected virtual void OnChanged (string property)
 		{
 			if (project != null)
-				project.NotifyFilePropertyChangedInProject (this);
+				project.NotifyFilePropertyChangedInProject (this, property);
 		}
+
+		[Obsolete ("Use OnChanged(string property) instead.")]
+		protected virtual void OnChanged ()
+		{
+			OnChanged (null);
+		}
+	}
+
+	internal class ProjectFileVirtualPathChangedEventArgs : EventArgs
+	{
+		public ProjectFileVirtualPathChangedEventArgs (ProjectFile projectFile, FilePath oldPath, FilePath newPath)
+		{
+			ProjectFile = projectFile;
+			OldVirtualPath = oldPath;
+			NewVirtualPath = newPath;
+		}
+
+		public ProjectFile ProjectFile { get; private set; }
+		public FilePath OldVirtualPath { get; private set; }
+		public FilePath NewVirtualPath { get; private set; }
 	}
 }

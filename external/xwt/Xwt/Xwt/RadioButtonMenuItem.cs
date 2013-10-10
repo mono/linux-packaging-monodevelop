@@ -31,9 +31,10 @@ using System.Linq;
 
 namespace Xwt
 {
+	[BackendType (typeof(IRadioButtonMenuItemBackend))]
 	public class RadioButtonMenuItem: MenuItem
 	{
-		RadioButtonGroup radioGroup;
+		RadioButtonMenuItemGroup radioGroup;
 		
 		public RadioButtonMenuItem ()
 		{
@@ -61,7 +62,7 @@ namespace Xwt
 			}
 		}
 		
-		public RadioButtonGroup RadioButtonGroup {
+		public RadioButtonMenuItemGroup Group {
 			get { return radioGroup; }
 			set {
 				if (radioGroup != null)
@@ -92,7 +93,7 @@ namespace Xwt
 		}
 	}
 	
-	public class RadioButtonGroup
+	public class RadioButtonMenuItemGroup
 	{
 		internal List<object> Items = new List<object> ();
 	}

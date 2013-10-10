@@ -1,7 +1,7 @@
 /*
   Copyright (C) 2002, 2004, 2005, 2006, 2007 Jeroen Frijters
   Copyright (C) 2006 Active Endpoints, Inc.
-  Copyright (C) 2006 - 2011 Volker Berlin (i-net software)
+  Copyright (C) 2006 - 2013 Volker Berlin (i-net software)
   Copyright (C) 2011 Karsten Heinrich (i-net software)
 
   This software is provided 'as-is', without any express or implied
@@ -1350,8 +1350,8 @@ namespace ikvm.awt
                 throw new java.lang.IllegalArgumentException("null Composite");
             }
             this.javaComposite = comp;
-            composite = CompositeHelper.Create(comp,g);
-            java.awt.Paint oldPaint = javaPaint;
+            java.awt.Paint oldPaint = getPaint(); //getPaint() is never null
+            composite = CompositeHelper.Create(comp, g);
             javaPaint = null;
             setPaint(oldPaint);
         }
@@ -1420,10 +1420,13 @@ namespace ikvm.awt
             if (paint is java.awt.TexturePaint)
             {
                 java.awt.TexturePaint texture = (java.awt.TexturePaint)paint;
-                brush = new TextureBrush(
-                    J2C.ConvertImage(texture.getImage()),
-                    J2C.ConvertRect(texture.getAnchorRect()),
-                    composite.GetImageAttributes());
+                Bitmap txtr = J2C.ConvertImage(texture.getImage());
+                java.awt.geom.Rectangle2D anchor = texture.getAnchorRect();
+                TextureBrush txtBrush;
+                brush = txtBrush = new TextureBrush(txtr, new Rectangle(0, 0, txtr.Width, txtr.Height), composite.GetImageAttributes());
+                txtBrush.TranslateTransform((float)anchor.getX(), (float)anchor.getY());
+                txtBrush.ScaleTransform((float)anchor.getWidth() / txtr.Width, (float)anchor.getHeight() / txtr.Height);
+                txtBrush.WrapMode = WrapMode.Tile;
                 pen.Brush = brush;
                 return;
             }
@@ -1486,7 +1489,104 @@ namespace ikvm.awt
                 return;
             }
 
-            throw new NotImplementedException("setPaint("+paint.GetType().FullName+")");
+            if (paint is java.awt.RadialGradientPaint )
+            {
+                java.awt.RadialGradientPaint gradient = (java.awt.RadialGradientPaint)paint;
+                GraphicsPath path = new GraphicsPath();
+                SizeF size = GetSize();
+
+                PointF center = J2C.ConvertPoint(gradient.getCenterPoint());
+
+                float radius = gradient.getRadius();
+                int factor = (int)Math.Ceiling(Math.Max(size.Width, size.Height) / radius);
+
+                float diameter = radius * factor;
+                path.AddEllipse(center.X - diameter, center.Y - diameter, diameter * 2, diameter * 2);
+
+                java.awt.Color[] javaColors = gradient.getColors();
+                float[] fractions = gradient.getFractions();
+                int length = javaColors.Length;
+                ColorBlend colorBlend = new ColorBlend(length * factor);
+                Color[] colors = colorBlend.Colors;
+                float[] positions = colorBlend.Positions;
+
+                for (int c = 0, j = length - 1; j >= 0; )
+                {
+                    positions[c] = (1 - fractions[j]) / factor;
+                    colors[c++] = composite.GetColor(javaColors[j--]);
+                }
+
+                java.awt.MultipleGradientPaint.CycleMethod.__Enum cycle = (java.awt.MultipleGradientPaint.CycleMethod.__Enum)gradient.getCycleMethod().ordinal();
+                for (int f = 1; f < factor; f++)
+                {
+                    int off = f * length;
+                    for (int c = 0, j = length - 1; j >= 0; j--, c++)
+                    {
+                        switch (cycle)
+                        {
+                            case java.awt.MultipleGradientPaint.CycleMethod.__Enum.REFLECT:
+                                if (f % 2 == 0)
+                                {
+                                    positions[off + c] = (f + 1 - fractions[j]) / factor;
+                                    colors[off + c] = colors[c];
+                                }
+                                else
+                                {
+                                    positions[off + c] = (f + fractions[c]) / factor;
+                                    colors[off + c] = colors[j];
+                                }
+                                break;
+                            case java.awt.MultipleGradientPaint.CycleMethod.__Enum.NO_CYCLE:
+                                positions[off + c] = (f + 1 - fractions[j]) / factor;
+                                break;
+                            default: //CycleMethod.REPEAT
+                                positions[off + c] = (f + 1 - fractions[j]) / factor;
+                                colors[off + c] = colors[c];
+                                break;
+                        }
+                    }
+                }
+                if (cycle == java.awt.MultipleGradientPaint.CycleMethod.__Enum.NO_CYCLE && factor > 1)
+                {
+                    Array.Copy(colors, 0, colors, colors.Length - length, length);
+                    Color color = colors[length - 1];
+                    for (int i = colors.Length - length - 1; i >= 0; i--)
+                    {
+                        colors[i] = color;
+                    }
+                }
+
+                PathGradientBrush pathBrush = new PathGradientBrush(path);
+                pathBrush.CenterPoint = center;
+                pathBrush.InterpolationColors = colorBlend;
+
+                brush = pathBrush;
+                pen.Brush = brush;
+                return;
+            }
+
+            //generic paint to brush conversion for custom paints
+            //the tranform of the graphics should not change between the creation and it usage
+            using (Matrix transform = g.Transform)
+            {
+                SizeF size = GetSize();
+                int width = (int)size.Width;
+                int height = (int)size.Height;
+                java.awt.Rectangle bounds = new java.awt.Rectangle(0, 0, width, height);
+
+                java.awt.PaintContext context = paint.createContext(ColorModel.getRGBdefault(), bounds, bounds, C2J.ConvertMatrix(transform), getRenderingHints());
+                WritableRaster raster = (WritableRaster)context.getRaster(0, 0, width, height);
+                BufferedImage txtrImage = new BufferedImage(context.getColorModel(), raster, true, null);
+                Bitmap txtr = J2C.ConvertImage(txtrImage);
+
+                TextureBrush txtBrush;
+                brush = txtBrush = new TextureBrush(txtr, new Rectangle(0, 0, width, height), composite.GetImageAttributes());
+                transform.Invert();
+                txtBrush.Transform = transform;
+                txtBrush.WrapMode = WrapMode.Tile;
+                pen.Brush = brush;
+                return;
+            }
         }
 
 		public override void setStroke(java.awt.Stroke stroke)

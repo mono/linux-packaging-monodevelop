@@ -30,6 +30,7 @@ using NUnit.Framework;
 
 namespace ICSharpCode.NRefactory.CSharp
 {
+	#if !__MonoCS__
 	[TestFixture]
 	public class CodeDomConvertVisitorTests : ResolverTestBase
 	{
@@ -39,7 +40,7 @@ namespace ICSharpCode.NRefactory.CSharp
 		public override void SetUp()
 		{
 			base.SetUp();
-			unresolvedFile = new CSharpUnresolvedFile("test.cs");
+			unresolvedFile = new CSharpUnresolvedFile();
 			unresolvedFile.RootUsingScope.Usings.Add(MakeReference("System"));
 			unresolvedFile.RootUsingScope.Usings.Add(MakeReference("System.Collections.Generic"));
 			unresolvedFile.RootUsingScope.Usings.Add(MakeReference("System.Linq"));
@@ -481,4 +482,5 @@ namespace ICSharpCode.NRefactory.CSharp
 		}
 		#endregion
 	}
+#endif
 }

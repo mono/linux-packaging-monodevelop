@@ -37,9 +37,9 @@ namespace Xwt.Mac
 
 		public override void Initialize ()
 		{
-			ViewObject = new MacButton (EventSink);
+			ViewObject = new MacButton (EventSink, ApplicationContext);
 			Widget.SetButtonType (NSButtonType.Switch);
-			Widget.SizeToFit ();
+			Widget.Title = "";
 		}
 		
 		#region ICheckBoxBackend implementation
@@ -50,6 +50,7 @@ namespace Xwt.Mac
 		public void SetContent (string label)
 		{
 			Widget.Title = label;
+			ResetFittingSize ();
 		}
 
 		public bool Active {

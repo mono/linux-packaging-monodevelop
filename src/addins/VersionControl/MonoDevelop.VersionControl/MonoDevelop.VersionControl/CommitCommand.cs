@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections;
+using System.Linq;
 using MonoDevelop.VersionControl.Dialogs;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
@@ -11,28 +12,57 @@ namespace MonoDevelop.VersionControl
 	{
 		public static bool Commit (VersionControlItemList items, bool test)
 		{
-			if (items.Count != 1)
-				return false;
+			int filesToCommit = 0;
+			VersionControlItemList[] itemListsByRepo = items.SplitByRepository ();
 
-			VersionControlItem item = items [0];
-			if (item.VersionInfo.CanCommit) {
-				if (test) return true;
-				ChangeSet cset  = item.Repository.CreateChangeSet (item.Path);
+			foreach (VersionControlItemList itemList in itemListsByRepo) {
+				// Generate base folder path.
+				FilePath basePath = itemList.FindMostSpecificParent ();
+				Repository repo = itemList.First ().Repository;
+
+				ChangeSet cset = repo.CreateChangeSet (basePath);
 				cset.GlobalComment = VersionControlService.GetCommitComment (cset.BaseLocalPath);
-				
-				foreach (VersionInfo vi in item.Repository.GetDirectoryVersionInfo (item.Path, false, true))
-					if (vi.HasLocalChanges)
-						cset.AddFile (vi);
+
+				foreach (var item in itemList) {
+					if (!item.VersionInfo.CanCommit)
+						continue;
+
+					if (item.Path.IsDirectory) {
+						// We don't run checks for directories, we throw dialog if there are no changes.
+						if (test)
+							return true;
+
+						foreach (VersionInfo vi in repo.GetDirectoryVersionInfo (item.Path, false, true))
+							if (vi.HasLocalChanges) {
+								filesToCommit++;
+								cset.AddFile (vi);
+							}
+					} else {
+						VersionInfo vi = repo.GetVersionInfo (item.Path);
+						if (vi.HasLocalChanges) {
+							if (test)
+								return true;
+
+							filesToCommit++;
+							cset.AddFile (vi);
+						}
+					}
+				}
+
+				// In case of no local changes.
+				if (test)
+					return false;
+
 				if (!cset.IsEmpty) {
-					Commit (item.Repository, cset, false);
+					Commit (repo, cset, false);
 				} else {
 					MessageService.ShowMessage (GettextCatalog.GetString ("There are no changes to be committed."));
-					return false;
+					continue;
 				}
 			}
-			return false;
+			return filesToCommit != 0;
 		}
-		
+
 		public static bool Commit (Repository vc, ChangeSet changeSet, bool test)
 		{
 			try {
@@ -43,7 +73,8 @@ namespace MonoDevelop.VersionControl
 				}
 				
 				if (vc.GetVersionInfo (changeSet.BaseLocalPath).CanCommit) {
-					if (test) return true;
+					if (test)
+						return true;
 
 					if (!VersionControlService.NotifyPrepareCommit (vc, changeSet))
 						return false;

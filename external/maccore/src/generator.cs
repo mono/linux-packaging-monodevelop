@@ -1027,6 +1027,7 @@ public class Generator {
 	
 	public bool BindThirdPartyLibrary = false;
 	public bool InlineSelectors;
+	public bool NativeExceptionMarshalling = false;
 	public string BaseDir { get { return basedir; } set { basedir = value; }}
 	string basedir;
 	public List<string> GeneratedFiles = new List<string> ();
@@ -1478,7 +1479,7 @@ public class Generator {
 	{
 		var sb = new StringBuilder ();
 		
-		if (HasAttribute (mi, typeof (MarshalNativeExceptionsAttribute)))
+		if (NativeExceptionMarshalling && HasAttribute (mi, typeof (MarshalNativeExceptionsAttribute)))
 #if MONOMAC
 			sb.Append ("monomac_");
 #else
@@ -1663,7 +1664,7 @@ public class Generator {
 		marshal_types.Add (new MarshalType (typeof (CGContext), "IntPtr", "{0}.Handle", "new CGContext ("));
 		marshal_types.Add (new MarshalType (typeof (CGImage), "IntPtr", "{0}.Handle", "new CGImage ("));
 		marshal_types.Add (new MarshalType (typeof (NSObject), "IntPtr", "{0}.Handle", "Runtime.GetNSObject ("));
-		marshal_types.Add (new MarshalType (typeof (Selector), "IntPtr", "{0}.Handle", "new Selector ("));
+		marshal_types.Add (new MarshalType (typeof (Selector), "IntPtr", "{0}.Handle", "Selector.FromHandle ("));
 		marshal_types.Add (new MarshalType (typeof (Class), "IntPtr", "{0}.Handle", "new Class ("));
 		marshal_types.Add (new MarshalType (typeof (NSString), "IntPtr", "{0}.Handle", "new NSString ("));
 		marshal_types.Add (new MarshalType (typeof (CFRunLoop), "IntPtr", "{0}.Handle", "new CFRunLoop ("));
@@ -2786,7 +2787,7 @@ public class Generator {
 					print (init_binding_type);
 				}
 				
-				var may_throw = HasAttribute (mi, typeof (MarshalNativeExceptionsAttribute));
+				var may_throw = NativeExceptionMarshalling && HasAttribute (mi, typeof (MarshalNativeExceptionsAttribute));
 				
 				if (may_throw) {
 					print ("try {");
@@ -3436,6 +3437,8 @@ public class Generator {
 			bool is_static_class = type.GetCustomAttributes (typeof (StaticAttribute), true).Length > 0 || is_category_class;
 			bool is_model = type.GetCustomAttributes (typeof (ModelAttribute), true).Length > 0;
 			bool is_protocol = HasAttribute (type, typeof (ProtocolAttribute));
+			string class_visibility = HasAttribute (type, typeof (InternalAttribute)) ? "internal" : "public";
+
 			var default_ctor_visibility = GetAttribute<DefaultCtorVisibilityAttribute> (type);
 			object [] btype = type.GetCustomAttributes (typeof (BaseTypeAttribute), true);
 			BaseTypeAttribute bta = btype.Length > 0 ? ((BaseTypeAttribute) btype [0]) : null;
@@ -3466,7 +3469,8 @@ public class Generator {
 
 			PrintPlatformAttributes (type);
 
-			print ("public unsafe {0}partial class {1} {2} {{",
+			print ("{0} unsafe {1}partial class {2} {3} {{",
+			       class_visibility,
 			       class_mod,
 			       TypeName,
 			       base_type != typeof (object) && TypeName != "NSObject" && !is_category_class ? ": " + FormatType (type, base_type) : "");
@@ -3488,12 +3492,13 @@ public class Generator {
 
 			// Regular bindings (those that are not-static) or categories need this
 			if (!is_static_class || is_category_class){
-				print ("[CompilerGenerated]");
-
 				if (is_category_class)
 					objc_type_name = FormatType (null, bta.BaseType);
 				
-				print ("static readonly IntPtr class_ptr = Class.GetHandle (\"{0}\");\n", is_model ? "NSObject" : objc_type_name);
+				if (!is_model && !external) {
+					print ("[CompilerGenerated]");
+					print ("static readonly IntPtr class_ptr = Class.GetHandle (\"{0}\");\n", objc_type_name);
+				}
 			}
 			
 			if (!is_static_class){
@@ -3991,6 +3996,7 @@ public class Generator {
 			if (!is_static_class){
 				object [] disposeAttr = type.GetCustomAttributes (typeof (DisposeAttribute), true);
 				if (disposeAttr.Length > 0 || instance_fields_to_clear_on_dispose.Count > 0){
+					print ("[CompilerGenerated]");
 					print ("protected override void Dispose (bool disposing)");
 					print ("{");
 					indent++;

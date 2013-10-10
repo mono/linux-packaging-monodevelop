@@ -43,7 +43,7 @@ namespace Mono.TextEditor
 	public class TextEditorData : IDisposable
 	{
 		ITextEditorOptions    options;
-		readonly TextDocument document; 
+		TextDocument document; 
 		readonly Caret        caret;
 		
 		static Adjustment emptyAdjustment = new Adjustment (0, 0, 0, 0, 0, 0);
@@ -89,13 +89,13 @@ namespace Mono.TextEditor
 		
 		public string FileName {
 			get {
-				return Document.FileName;
+				return Document != null ? Document.FileName : null;
 			}
 		}
 		
 		public string MimeType {
 			get {
-				return Document.MimeType;
+				return Document != null ? Document.MimeType : null;
 			}
 		}
 
@@ -487,6 +487,8 @@ namespace Mono.TextEditor
 
 		void DetachDocument ()
 		{
+			if (document == null)
+				return;
 			document.BeginUndo -= OnBeginUndo;
 			document.EndUndo -= OnEndUndo;
 
@@ -498,6 +500,7 @@ namespace Mono.TextEditor
 			document.TextSet -= HandleDocTextSet;
 			document.Folded -= HandleTextEditorDataDocumentFolded;
 			document.FoldTreeUpdated -= HandleFoldTreeUpdated;
+			document = null;
 		}
 
 		public void Dispose ()
@@ -509,6 +512,8 @@ namespace Mono.TextEditor
 			options = options.Kill ();
 			HeightTree.Dispose ();
 			DetachDocument ();
+			ClearTooltipProviders ();
+			tooltipProviders = null;
 		}
 
 		/// <summary>
@@ -1117,6 +1122,15 @@ namespace Mono.TextEditor
 			return EnsureIsNotVirtual (Caret.Location);
 		}
 
+		public bool IsCaretInVirtualLocation {
+			get {
+				DocumentLine documentLine = Document.GetLine (Caret.Line);
+				if (documentLine == null)
+					return true;
+				return Caret.Column > documentLine.Length + 1;
+			}
+		}
+
 		int EnsureIsNotVirtual (DocumentLocation loc)
 		{
 			return EnsureIsNotVirtual (loc.Line, loc.Column);
@@ -1185,10 +1199,20 @@ namespace Mono.TextEditor
 			set;
 		}
 
-		public int PasteText (int offset, string text, byte[] copyData = null)
+		public int PasteText (int offset, string text, byte[] copyData, ref IDisposable undoGroup)
 		{
-			if (TextPasteHandler != null)
-				text = TextPasteHandler.FormatPlainText (offset, text, copyData);
+			if (TextPasteHandler != null) {
+				var newText = TextPasteHandler.FormatPlainText (offset, text, copyData);
+				if (newText != text) {
+					var inserted = Insert (offset, text);
+					undoGroup.Dispose ();
+					undoGroup = OpenUndoGroup ();
+					var result = Replace (offset, inserted, newText);
+					if (Paste != null)
+						Paste (offset, text, result);
+					return result;
+				}
+			}
 			var insertedChars = Insert (offset, text);
 			if (Paste != null)
 				Paste (offset, text, insertedChars);
@@ -1285,7 +1309,7 @@ namespace Mono.TextEditor
 		
 		public int LineCount {
 			get {
-				return Document.LineCount;
+				return Document != null ? Document.LineCount : 0;
 			}
 		}
 		

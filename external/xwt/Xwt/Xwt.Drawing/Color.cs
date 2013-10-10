@@ -25,12 +25,19 @@
 // THE SOFTWARE.
 
 using System;
+using System.ComponentModel;
+using System.Windows.Markup;
 
 namespace Xwt.Drawing
 {
+	[TypeConverter (typeof(ColorValueConverter))]
+	[ValueSerializer (typeof(ColorValueSerializer))]
+	[Serializable]
 	public struct Color
 	{
 		double r, g, b, a;
+
+		[NonSerialized]
 		HslColor hsl;
 		
 		public double Red {
@@ -198,9 +205,12 @@ namespace Xwt.Drawing
 		
 		public static bool TryParse (string name, out Color color)
 		{
+			if (name == null)
+				throw new ArgumentNullException ("name");
+
 			uint val;
-			if (!TryParseColourFromHex (name, out val)) {
-				color = Colors.White;
+			if (name.Length == 0 || !TryParseColourFromHex (name, out val)) {
+				color = default (Color);
 				return false;
 			}
 			color = Color.FromBytes ((byte)(val >> 24), (byte)((val >> 16) & 0xff), (byte)((val >> 8) & 0xff), (byte)(val & 0xff));
@@ -212,7 +222,7 @@ namespace Xwt.Drawing
 		{
 			val = 0;
 			
-			if (str.Length > 9)
+			if (str[0] != '#' || str.Length > 9)
 				return false;
 			
 			if (!uint.TryParse (str.Substring (1), System.Globalization.NumberStyles.HexNumber, null, out val))
@@ -246,12 +256,59 @@ namespace Xwt.Drawing
 		
 		public override int GetHashCode ()
 		{
-			return r.GetHashCode () ^ g.GetHashCode () ^ b.GetHashCode () ^ a.GetHashCode ();
+			unchecked {
+				var hash = r.GetHashCode ();
+				hash = (hash * 397) ^ g.GetHashCode ();
+				hash = (hash * 397) ^ b.GetHashCode ();
+				hash = (hash * 397) ^ a.GetHashCode ();
+				return hash;
+			}
 		}
 		
 		public override string ToString ()
 		{
 			return string.Format ("[Color: Red={0}, Green={1}, Blue={2}, Alpha={3}]", Red, Green, Blue, Alpha);
+		}
+	}
+
+	class ColorValueConverter: TypeConverter
+	{
+		public override bool CanConvertTo (ITypeDescriptorContext context, Type destinationType)
+		{
+			return destinationType == typeof(string);
+		}
+		
+		public override bool CanConvertFrom (ITypeDescriptorContext context, Type sourceType)
+		{
+			return sourceType == typeof(string);
+		}
+	}
+	
+	class ColorValueSerializer: ValueSerializer
+	{
+		public override bool CanConvertFromString (string value, IValueSerializerContext context)
+		{
+			return true;
+		}
+		
+		public override bool CanConvertToString (object value, IValueSerializerContext context)
+		{
+			return true;
+		}
+		
+		public override string ConvertToString (object value, IValueSerializerContext context)
+		{
+			Color s = (Color) value;
+			return "#" + ((int)(s.Red * 255)).ToString ("x2") + ((int)(s.Green * 255)).ToString ("x2") + ((int)(s.Blue * 255)).ToString ("x2") + ((int)(s.Alpha * 255)).ToString ("x2");
+		}
+		
+		public override object ConvertFromString (string value, IValueSerializerContext context)
+		{
+			Color c;
+			if (!Color.TryParse (value, out c))
+				return c;
+			else
+				throw new InvalidOperationException ("Could not parse color value: " + value);
 		}
 	}
 }

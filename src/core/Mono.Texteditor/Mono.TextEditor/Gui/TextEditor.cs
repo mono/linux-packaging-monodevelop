@@ -441,6 +441,12 @@ namespace Mono.TextEditor
 			}
 		}
 
+		public ActionMargin ActionMargin {
+			get {
+				return textArea.ActionMargin;
+			}
+		}
+
 		public Margin IconMargin {
 			get { return textArea.IconMargin; }
 		}
@@ -583,14 +589,19 @@ namespace Mono.TextEditor
 			}
 		}
 
+		internal bool UpdatePreeditLineHeight ()
+		{
+			return textArea.UpdatePreeditLineHeight ();
+		}
+
 		internal void ResetIMContext ()
 		{
 			textArea.ResetIMContext ();
 		}
 
-		internal bool ContainsPreedit (int line, int length)
+		internal bool ContainsPreedit (int offset, int length)
 		{
-			return textArea.ContainsPreedit (line, length);
+			return textArea.ContainsPreedit (offset, length);
 		}
 
 		internal void FireLinkEvent (string link, uint button, ModifierType modifierState)

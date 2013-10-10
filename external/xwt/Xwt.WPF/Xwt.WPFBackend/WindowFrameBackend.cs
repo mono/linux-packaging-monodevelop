@@ -31,7 +31,7 @@ using System.Text;
 using System.Windows;
 
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 namespace Xwt.WPFBackend
 {
@@ -45,9 +45,10 @@ namespace Xwt.WPFBackend
 		{
 		}
 
-		void IBackend.InitializeBackend (object frontend)
+		void IBackend.InitializeBackend (object frontend, ApplicationContext context)
 		{
 			this.frontend = (WindowFrame) frontend;
+			Context = context;
 		}
 
 		void IWindowFrameBackend.Initialize (IWindowFrameEventSink eventSink)
@@ -55,6 +56,8 @@ namespace Xwt.WPFBackend
 			this.eventSink = eventSink;
 			Initialize ();
 		}
+
+		public ApplicationContext Context { get; private set; }
 
 		public virtual void Initialize ()
 		{
@@ -117,9 +120,9 @@ namespace Xwt.WPFBackend
 			}
 		}
 
-		public void SetIcon (object imageBackend)
+		public void SetIcon (ImageDescription imageBackend)
 		{
-			window.Icon = DataConverter.AsImageSource (imageBackend);
+			window.Icon = imageBackend.ToImageSource ();
 		}
 
 		string IWindowFrameBackend.Title {
@@ -130,7 +133,18 @@ namespace Xwt.WPFBackend
 		bool IWindowFrameBackend.Visible
 		{
 			get { return window.Visibility == Visibility.Visible; }
-			set { window.Visibility = value ? Visibility.Visible : Visibility.Hidden; }
+			set {
+				if (value)
+					window.Show ();
+				else
+					window.Hide ();
+			}
+		}
+
+		public double Opacity
+		{
+			get { return window.Opacity; }
+			set { window.Opacity = value; }
 		}
 
 		void IWindowFrameBackend.Present ()
@@ -138,23 +152,39 @@ namespace Xwt.WPFBackend
 			window.Activate ();
 		}
 
+		
+		bool IWindowFrameBackend.FullScreen {
+			get {
+				return false;
+			}
+			set {
+			}
+		}
+
+		object IWindowFrameBackend.Screen {
+			get {
+				var sb = Bounds;
+				return System.Windows.Forms.Screen.FromRectangle (new System.Drawing.Rectangle ((int)sb.X, (int)sb.Y, (int)sb.Width, (int)sb.Height));
+			}
+		}
+
 		public void Move (double x, double y)
 		{
 			var value = ToNonClientRect (new Rectangle (x, y, 1, 1));
 			window.Top = value.Top;
 			window.Left = value.Left;
-			Toolkit.Invoke (delegate
+			Context.InvokeUserCode (delegate
 			{
 				eventSink.OnBoundsChanged (Bounds);
 			});
 		}
 
-		public void Resize (double width, double height)
+		public void SetSize (double width, double height)
 		{
 			var value = ToNonClientRect (new Rectangle (0, 0, width, height));
 			window.Width = value.Width;
 			window.Height = value.Height;
-			Toolkit.Invoke (delegate
+			Context.InvokeUserCode (delegate
 			{
 				eventSink.OnBoundsChanged (Bounds);
 			});
@@ -172,7 +202,7 @@ namespace Xwt.WPFBackend
 				window.Left = value.Left;
 				window.Width = value.Width;
 				window.Height = value.Height;
-				Toolkit.Invoke (delegate {
+				Context.InvokeUserCode (delegate {
 					eventSink.OnBoundsChanged (Bounds);
 				});
 			}
@@ -224,7 +254,7 @@ namespace Xwt.WPFBackend
 
 		void BoundsChangedHandler (object o, EventArgs args)
 		{
-			Toolkit.Invoke (delegate () {
+			Context.InvokeUserCode (delegate () {
 				eventSink.OnBoundsChanged (Bounds);
 			});
 		}
@@ -233,7 +263,7 @@ namespace Xwt.WPFBackend
 		{
 			if((bool)e.NewValue)
 			{
-				Toolkit.Invoke (delegate ()
+				Context.InvokeUserCode (delegate ()
 				{
 					eventSink.OnShown ();
 				});
@@ -244,7 +274,7 @@ namespace Xwt.WPFBackend
 		{
 			if((bool)e.NewValue == false)
 			{
-				Toolkit.Invoke (delegate ()
+				Context.InvokeUserCode (delegate ()
 				{
 					eventSink.OnHidden ();
 				});
@@ -253,7 +283,7 @@ namespace Xwt.WPFBackend
 
 		private void ClosingHandler (object sender, System.ComponentModel.CancelEventArgs e)
 		{
-			Toolkit.Invoke (delegate ()
+			Context.InvokeUserCode (delegate ()
 			{
 				e.Cancel = eventSink.OnCloseRequested ();
 			});
@@ -302,8 +332,8 @@ namespace Xwt.WPFBackend
 			loc.Y += border.Height;
 
 			if (((IWindowFrameBackend)this).Decorated) {
-				size.Height -= SystemParameters.CaptionHeight;
-				loc.Y += SystemParameters.CaptionHeight;
+                size.Height -= SystemParameters.WindowCaptionHeight;
+                loc.Y += SystemParameters.WindowCaptionHeight;
 			}
 			if (HasMenu) {
 				size.Height -= SystemParameters.MenuBarHeight;

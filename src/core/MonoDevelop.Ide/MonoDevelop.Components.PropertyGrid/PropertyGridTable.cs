@@ -273,7 +273,7 @@ namespace MonoDevelop.Components.PropertyGrid
 			base.OnSizeAllocated (allocation);
 			int y = 0;
 			MeasureHeight (rows, ref y);
-			if (currentEditorRow != null)
+			if (currentEditor != null && currentEditorRow != null)
 				children [currentEditor] = currentEditorRow.EditorBounds;
 			foreach (var cr in children) {
 				var r = cr.Value;
@@ -371,11 +371,12 @@ namespace MonoDevelop.Components.PropertyGrid
 				if (r.IsCategory) {
 					var rh = h + CategoryTopBottomPadding*2;
 					ctx.Rectangle (0, y, Allocation.Width, rh);
-					Cairo.LinearGradient gr = new LinearGradient (0, y, 0, rh);
-					gr.AddColorStop (0, new Cairo.Color (248d/255d, 248d/255d, 248d/255d));
-					gr.AddColorStop (1, new Cairo.Color (240d/255d, 240d/255d, 240d/255d));
-					ctx.Pattern = gr;
-					ctx.Fill ();
+					using (var gr = new LinearGradient (0, y, 0, rh)) {
+						gr.AddColorStop (0, new Cairo.Color (248d/255d, 248d/255d, 248d/255d));
+						gr.AddColorStop (1, new Cairo.Color (240d/255d, 240d/255d, 240d/255d));
+						ctx.Pattern = gr;
+						ctx.Fill ();
+					}
 
 					if (lastCategory == null || lastCategory.Expanded || lastCategory.AnimatingExpand) {
 						ctx.MoveTo (0, y + 0.5);
@@ -572,9 +573,21 @@ namespace MonoDevelop.Components.PropertyGrid
 			if (row != null) {
 				tooltipWindow = new TooltipPopoverWindow ();
 				tooltipWindow.ShowArrow = true;
-				var s = "<b>" + row.Property.DisplayName + "</b>\n\n";
-				s += GLib.Markup.EscapeText (row.Property.Description);
-				tooltipWindow.Markup = s;
+				var s = new System.Text.StringBuilder ("<b>" + row.Property.DisplayName + "</b>");
+				s.AppendLine ();
+				s.AppendLine ();
+				s.Append (GLib.Markup.EscapeText (row.Property.Description));
+				if (row.Property.Converter.CanConvertTo (typeof(string))) {
+					var value = Convert.ToString (row.Property.GetValue (row.Instace));
+					if (!string.IsNullOrEmpty (value)) {
+						const int chunkLength = 200;
+						var multiLineValue = string.Join (Environment.NewLine, Enumerable.Range (0, (int)Math.Ceiling ((double)value.Length / chunkLength)).Select (n => string.Concat (value.Skip (n * chunkLength).Take (chunkLength))));
+						s.AppendLine ();
+						s.AppendLine ();
+						s.Append ("Value: " + multiLineValue);
+					}
+				}
+				tooltipWindow.Markup = s.ToString ();
 				tooltipWindow.ShowPopup (this, new Gdk.Rectangle (0, row.EditorBounds.Y, Allocation.Width, row.EditorBounds.Height), PopupPosition.Right);
 			}
 		}
@@ -653,6 +666,7 @@ namespace MonoDevelop.Components.PropertyGrid
 			if (editSession != null) {
 				Remove (currentEditor);
 				currentEditor.Destroy ();
+				currentEditor = null;
 				editSession.Dispose ();
 				editSession = null;
 				currentEditorRow = null;
@@ -666,6 +680,9 @@ namespace MonoDevelop.Components.PropertyGrid
 			currentEditorRow = row;
 			var cell = GetCell (row);
 			editSession = cell.StartEditing (row.EditorBounds, State);
+			if (editSession == null)
+				return;
+
 			currentEditor = (Gtk.Widget) editSession.Editor;
 			Add (currentEditor);
 			SetAllocation (currentEditor, row.EditorBounds);

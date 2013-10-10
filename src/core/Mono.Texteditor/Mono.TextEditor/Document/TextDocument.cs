@@ -327,6 +327,10 @@ namespace Mono.TextEditor
 		
 		public char GetCharAt (int offset)
 		{
+			if (offset < 0)
+				throw new ArgumentException ("offset < 0");
+			if (offset >= TextLength)
+				throw new ArgumentException ("offset >= TextLength");
 			return buffer.GetCharAt (offset);
 		}
 
@@ -1529,7 +1533,7 @@ namespace Mono.TextEditor
 		
 		public static bool IsWordSeparator (char ch)
 		{
-			return Char.IsWhiteSpace (ch) || (Char.IsPunctuation (ch) && ch != '_');
+			return !(char.IsLetterOrDigit (ch) || ch == '_');
 		}
 
 		public bool IsWholeWordAt (int offset, int length)

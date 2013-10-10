@@ -367,10 +367,7 @@ namespace MonoDevelop.Projects
 			Assert.AreEqual (0, res.ErrorCount);
 			Assert.AreEqual (0, res.WarningCount);
 			Assert.AreEqual (3, res.BuildCount);
-			Assert.IsFalse (p.NeedsBuilding (config));
-			Assert.IsFalse (lib1.NeedsBuilding (config));
-			Assert.IsFalse (lib2.NeedsBuilding (config));
-			
+
 			Assert.IsTrue (File.Exists (Util.Combine (p.BaseDirectory, "bin", "Debug", "console-with-libs-mdp.exe")));
 			Assert.IsTrue (File.Exists (Util.Combine (p.BaseDirectory, "bin", "Debug", GetMdb ("console-with-libs-mdp.exe"))));
 			Assert.IsTrue (File.Exists (Util.Combine (lib1.BaseDirectory, "bin", "Debug", "library1.dll")));
@@ -380,20 +377,10 @@ namespace MonoDevelop.Projects
 			
 			// Build the project, but not the references
 			
-			p.SetNeedsBuilding (true);
-			lib1.SetNeedsBuilding (true);
-			lib2.SetNeedsBuilding (true);
-			Assert.IsTrue (p.NeedsBuilding (config));
-			Assert.IsTrue (lib1.NeedsBuilding (config));
-			Assert.IsTrue (lib2.NeedsBuilding (config));
-			
 			res = p.Build (Util.GetMonitor (), config, false);
 			Assert.AreEqual (0, res.ErrorCount);
 			Assert.AreEqual (0, res.WarningCount);
 			Assert.AreEqual (1, res.BuildCount);
-			Assert.IsTrue (p.NeedsBuilding (config));   // True because references require building
-			Assert.IsTrue (lib1.NeedsBuilding (config));
-			Assert.IsTrue (lib2.NeedsBuilding (config));
 		}
 		
 		[Test()]

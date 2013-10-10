@@ -107,7 +107,7 @@ namespace ICSharpCode.NRefactory.GtkDemo
 
 		void CSharpGenerateCodeButtonClick(object sender, EventArgs e)
 		{
-			this.textview1.Buffer.Text = unit.GetText();
+			this.textview1.Buffer.Text = unit.ToString();
 		}
 		
 		void SelectionChanged (object sender, EventArgs e)
@@ -253,7 +253,7 @@ namespace ICSharpCode.NRefactory.GtkDemo
 					0, assemblies.Length,
 					delegate (int i) {
 						Stopwatch w = Stopwatch.StartNew();
-						CecilLoader loader = new CecilLoader();
+						AssemblyLoader loader = AssemblyLoader.Create();
 						projectContents[i] = loader.LoadAssemblyFile(assemblies[i].Location);
 					});
 				return projectContents;

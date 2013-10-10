@@ -336,6 +336,7 @@ namespace MonoDevelop.Ide.Gui
 				return;
 			
 			rootWidget.Remove (topMenu);
+			topMenu.Destroy ();
 			topMenu = null;
 		}
 		
@@ -682,6 +683,9 @@ namespace MonoDevelop.Ide.Gui
 				if (content.Initialized)
 					content.PadContent.Dispose();
 			}
+
+			rootWidget.Destroy ();
+			Destroy ();
 		}
 		
 		public bool Close() 
@@ -1187,7 +1191,14 @@ namespace MonoDevelop.Ide.Gui
 				ignorePageSwitch = false;
 			}
 		}
-		
+
+		internal void ReorderTab (int oldPlacement, int newPlacement)
+		{
+			DockNotebookTab tab = (DockNotebookTab)tabControl.GetTab (oldPlacement);
+			DockNotebookTab targetTab = (DockNotebookTab)tabControl.GetTab (newPlacement);
+			tabControl.ReorderTab (tab, targetTab);
+		}
+
 		#endregion
 
 		#region Dock Item management
