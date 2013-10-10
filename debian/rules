@@ -42,7 +42,8 @@ override_dh_clideps:
 			--exclude-moduleref=ole32.dll \
 			--exclude-moduleref=fusion \
 			--exclude-moduleref=/System/Library/Frameworks/ApplicationServices.framework/Frameworks/CoreGraphics.framework/CoreGraphics \
-			--exclude-moduleref=libgtk-quartz-2.0.dylib
+			--exclude-moduleref=libgtk-quartz-2.0.dylib \
+			--exclude-moduleref=libgtk-quartz-2.0
 
 override_dh_auto_test:
 	# skip "make test"
