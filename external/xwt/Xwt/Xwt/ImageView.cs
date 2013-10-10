@@ -26,9 +26,11 @@
 using System;
 using Xwt.Drawing;
 using Xwt.Backends;
+using System.ComponentModel;
 
 namespace Xwt
 {
+	[BackendType (typeof(IImageViewBackend))]
 	public class ImageView: Widget
 	{
 		Image image;
@@ -45,12 +47,13 @@ namespace Xwt
 		IImageViewBackend Backend {
 			get { return (IImageViewBackend) BackendHost.Backend; }
 		}
-		
+
+		[DefaultValue (null)]
 		public Image Image {
 			get { return image; }
 			set {
 				image = value;
-				Backend.SetImage (XwtObject.GetBackend (value)); 
+				Backend.SetImage (image != null ? image.ImageDescription : ImageDescription.Null); 
 				OnPreferredSizeChanged ();
 			}
 		}

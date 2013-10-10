@@ -20,6 +20,12 @@ namespace MonoDevelop.VersionControl
 		string vcsName;
 
 		int references;
+
+		public MonoDevelop.Core.FilePath RootPath
+		{
+			get;
+			protected set;
+		}
 		
 		public event EventHandler NameChanged;
 		
@@ -126,7 +132,8 @@ namespace MonoDevelop.VersionControl
 			if (vinfo.IsVersioned) {
 				operations = VersionControlOperation.Commit | VersionControlOperation.Update | VersionControlOperation.Log;
 				if (exists) {
-					operations |= VersionControlOperation.Remove;
+					if (!vinfo.HasLocalChange (VersionStatus.ScheduledDelete))
+						operations |= VersionControlOperation.Remove;
 					if (vinfo.HasLocalChanges || vinfo.IsDirectory)
 						operations |= VersionControlOperation.Revert;
 				}
@@ -166,7 +173,8 @@ namespace MonoDevelop.VersionControl
 		public IEnumerable<VersionInfo> GetVersionInfo (IEnumerable<FilePath> paths, VersionInfoQueryFlags queryFlags = VersionInfoQueryFlags.None)
 		{
 			if ((queryFlags & VersionInfoQueryFlags.IgnoreCache) != 0) {
-				var res = OnGetVersionInfo (paths, (queryFlags & VersionInfoQueryFlags.IncludeRemoteStatus) != 0);
+				// We shouldn't use IEnumerable because elements don't save property modifications.
+				var res = OnGetVersionInfo (paths, (queryFlags & VersionInfoQueryFlags.IncludeRemoteStatus) != 0).ToList ();
 				infoCache.SetStatus (res);
 				return res;
 			}
@@ -332,7 +340,7 @@ namespace MonoDevelop.VersionControl
 		}
 		
 		
-		// Returns a path to the last version of the file updated from the repository
+		// Returns the content of the file in the base revision of the working copy.
 		public abstract string GetBaseText (FilePath localFile);
 		
 		// Returns the revision history of a file
@@ -434,8 +442,8 @@ namespace MonoDevelop.VersionControl
 
 		public void Revert (FilePath[] localPaths, bool recurse, IProgressMonitor monitor)
 		{
-			OnRevert (localPaths, recurse, monitor);
 			ClearCachedVersionInfo (localPaths);
+			OnRevert (localPaths, recurse, monitor);
 		}
 
 		public void Revert (FilePath localPath, bool recurse, IProgressMonitor monitor)
@@ -447,16 +455,16 @@ namespace MonoDevelop.VersionControl
 
 		public void RevertRevision (FilePath localPath, Revision revision, IProgressMonitor monitor)
 		{
-			OnRevertRevision (localPath, revision, monitor);
 			ClearCachedVersionInfo (localPath);
+			OnRevertRevision (localPath, revision, monitor);
 		}
 
 		protected abstract void OnRevertRevision (FilePath localPath, Revision revision, IProgressMonitor monitor);
 
 		public void RevertToRevision (FilePath localPath, Revision revision, IProgressMonitor monitor)
 		{
-			OnRevertToRevision (localPath, revision, monitor);
 			ClearCachedVersionInfo (localPath);
+			OnRevertToRevision (localPath, revision, monitor);
 		}
 		
 		protected abstract void OnRevertToRevision (FilePath localPath, Revision revision, IProgressMonitor monitor);
@@ -515,44 +523,60 @@ namespace MonoDevelop.VersionControl
 		// files. The default implementetions performs a system file delete.
 		public void DeleteFile (FilePath localPath, bool force, IProgressMonitor monitor)
 		{
-			DeleteFiles (new FilePath[] { localPath }, force, monitor);
+			DeleteFile (localPath, force, monitor, true);
+		}
+
+		public void DeleteFile (FilePath localPath, bool force, IProgressMonitor monitor, bool keepLocal)
+		{
+			DeleteFiles (new FilePath[] { localPath }, force, monitor, keepLocal);
 		}
 
 		public void DeleteFiles (FilePath[] localPaths, bool force, IProgressMonitor monitor)
 		{
-			ClearCachedVersionInfo (localPaths);
-			OnDeleteFiles (localPaths, force, monitor);
+			DeleteFiles (localPaths, force, monitor, true);
 		}
 
-		protected virtual void OnDeleteFiles (FilePath[] localPaths, bool force, IProgressMonitor monitor)
+		public void DeleteFiles (FilePath[] localPaths, bool force, IProgressMonitor monitor, bool keepLocal)
 		{
-			foreach (string localPath in localPaths) {
-				if (Directory.Exists (localPath))
-					Directory.Delete (localPath, true);
-				else
-					File.Delete (localPath);
-			}
+			OnDeleteFiles (localPaths, force, monitor, keepLocal);
+			ClearCachedVersionInfo (localPaths);
+		}
+
+		[Obsolete ("Use overload the overload with keepLocal parameter")]
+		protected abstract void OnDeleteFiles (FilePath[] localPaths, bool force, IProgressMonitor monitor);
+
+		protected virtual void OnDeleteFiles (FilePath[] localPaths, bool force, IProgressMonitor monitor, bool keepLocal)
+		{
+			OnDeleteFiles (localPaths, force, monitor);
 		}
 
 		public void DeleteDirectory (FilePath localPath, bool force, IProgressMonitor monitor)
 		{
-			DeleteDirectories (new FilePath[] { localPath }, force, monitor);
+			DeleteDirectory (localPath, force, monitor, true);
+		}
+
+		public void DeleteDirectory (FilePath localPath, bool force, IProgressMonitor monitor, bool keepLocal)
+		{
+			DeleteDirectories (new FilePath[] { localPath }, force, monitor, keepLocal);
 		}
 
 		public void DeleteDirectories (FilePath[] localPaths, bool force, IProgressMonitor monitor)
 		{
-			ClearCachedVersionInfo (localPaths);
-			OnDeleteDirectories (localPaths, force, monitor);
+			DeleteDirectories (localPaths, force, monitor, true);
 		}
-		
-		protected virtual void OnDeleteDirectories (FilePath[] localPaths, bool force, IProgressMonitor monitor)
+
+		public void DeleteDirectories (FilePath[] localPaths, bool force, IProgressMonitor monitor, bool keepLocal)
 		{
-			foreach (string localPath in localPaths) {
-				if (Directory.Exists (localPath))
-					Directory.Delete (localPath, true);
-				else
-					File.Delete (localPath);
-			}
+			OnDeleteDirectories (localPaths, force, monitor, keepLocal);
+			ClearCachedVersionInfo (localPaths);
+		}
+
+		[Obsolete ("Use overload the overload with keepLocal parameter")]
+		protected abstract void OnDeleteDirectories (FilePath[] localPaths, bool force, IProgressMonitor monitor);
+
+		protected virtual void OnDeleteDirectories (FilePath[] localPaths, bool force, IProgressMonitor monitor, bool keepLocal)
+		{
+			OnDeleteDirectories (localPaths, force, monitor);
 		}
 		
 		// Creates a local directory.
@@ -737,6 +761,24 @@ namespace MonoDevelop.VersionControl
 		/// A revision
 		/// </param>
 		protected abstract RevisionPath[] OnGetRevisionChanges (Revision revision);
+
+		// Ignores a file for version control operations.
+		public void Ignore (FilePath[] localPath)
+		{
+			ClearCachedVersionInfo (localPath);
+			OnIgnore (localPath);
+		}
+
+		protected abstract void OnIgnore (FilePath[] localPath);
+
+		// Unignores a file for version control operations.
+		public void Unignore (FilePath[] localPath)
+		{
+			ClearCachedVersionInfo (localPath);
+			OnUnignore (localPath);
+		}
+
+		protected abstract void OnUnignore (FilePath[] localPath);
 	}
 	
 	public class Annotation
@@ -799,6 +841,7 @@ namespace MonoDevelop.VersionControl
 		}
 	}
 
+	[Flags]
 	public enum VersionInfoQueryFlags
 	{
 		None = 0,

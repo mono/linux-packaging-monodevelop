@@ -29,6 +29,7 @@ using System.ComponentModel;
 
 namespace Xwt
 {
+	[BackendType (typeof(ITextEntryBackend))]
 	public class TextEntry: Widget
 	{
 		EventHandler changed;
@@ -69,7 +70,12 @@ namespace Xwt
 			get { return Backend.Text; }
 			set { Backend.Text = value; }
 		}
-		
+
+		public Alignment TextAlignment {
+			get { return Backend.TextAlignment; }
+			set { Backend.TextAlignment = value; }
+		}
+
 		[DefaultValue ("")]
 		public string PlaceholderText {
 			get { return Backend.PlaceholderText; }
@@ -88,6 +94,12 @@ namespace Xwt
 			set { Backend.ShowFrame = value; }
 		}
 		
+		[DefaultValue (true)]
+		public bool MultiLine {
+			get { return Backend.MultiLine; }
+			set { Backend.MultiLine = value; }
+		}
+
 		protected virtual void OnChanged (EventArgs e)
 		{
 			if (changed != null)

@@ -249,7 +249,7 @@ namespace Xwt.WPFBackend
 				viewport = newViewport;
 				if (!viewportAdjustmentQueued) {
 					viewportAdjustmentQueued = true;
-					Xwt.Engine.Toolkit.QueueExitAction (delegate
+					Application.MainLoop.QueueExitAction (delegate
 					{
 						// Adjust the position, if it now falls outside the extents.
 						// Doing it in an exit action to make sure the adjustement
@@ -281,22 +281,22 @@ namespace Xwt.WPFBackend
 
 		protected double VerticalPageIncrement
 		{
-			get { return (this.verticalBackend != null) ? this.verticalBackend.PageIncrement : ViewportHeight; }
+			get { return (this.verticalBackend != null) ? this.verticalBackend.PageIncrement : 10; }
 		}
 
 		protected double HorizontalPageIncrement
 		{
-			get { return (this.horizontalBackend != null) ? this.horizontalBackend.PageIncrement : ViewportWidth; }
+			get { return (this.horizontalBackend != null) ? this.horizontalBackend.PageIncrement : 10; }
 		}
 
 		protected double VerticalStepIncrement
 		{
-			get { return (this.verticalBackend != null) ? this.verticalBackend.StepIncrement : 12; }
+			get { return (this.verticalBackend != null) ? this.verticalBackend.StepIncrement : 1; }
 		}
 
 		protected double HorizontalStepIncrement
 		{
-			get { return (this.horizontalBackend != null) ? this.horizontalBackend.StepIncrement : 12; }
+			get { return (this.horizontalBackend != null) ? this.horizontalBackend.StepIncrement : 1; }
 		}
 
 		protected override WSize MeasureOverride (WSize constraint)
@@ -348,7 +348,8 @@ namespace Xwt.WPFBackend
 
 			child.Arrange (new Rect (0, 0, childSize.Width, childSize.Height));
 			child.UpdateLayout ();
-			((IWidgetSurface)(((IWpfWidget)child).Backend.Frontend)).Reallocate ();
+			if (child is IWpfWidget)
+				((IWidgetSurface)(((IWpfWidget)child).Backend.Frontend)).Reallocate ();
 
 			return finalSize;
 		}

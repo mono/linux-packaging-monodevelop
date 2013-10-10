@@ -28,6 +28,7 @@ using Xwt.Backends;
 
 namespace Xwt
 {
+	[BackendType (typeof(IScrollViewBackend))]
 	public class ScrollView: Widget
 	{
 		Widget child;
@@ -81,18 +82,9 @@ namespace Xwt
 		
 		protected override void OnReallocate ()
 		{
+			if (child != null && !child.SupportsCustomScrolling)
+				Backend.SetChildSize (child.Surface.GetPreferredSize (SizeConstraint.Unconstrained, SizeConstraint.Unconstrained));
 			base.OnReallocate ();
-			if (child != null && !child.SupportsCustomScrolling) {
-				if (child.Surface.SizeRequestMode == SizeRequestMode.HeightForWidth) {
-					var w = child.Surface.GetPreferredWidth ();
-					var h = child.Surface.GetPreferredHeightForWidth (w.NaturalSize);
-					Backend.SetChildSize (new Size (w.NaturalSize, h.NaturalSize));
-				} else {
-					var h = child.Surface.GetPreferredHeight ();
-					var w = child.Surface.GetPreferredWidthForHeight (h.NaturalSize);
-					Backend.SetChildSize (new Size (w.NaturalSize, h.NaturalSize));
-				}
-			}
 		}
 		
 		public ScrollPolicy VerticalScrollPolicy {

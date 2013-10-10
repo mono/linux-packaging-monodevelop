@@ -167,7 +167,8 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Run ()
 		{
-			IdeApp.Workbench.ActiveDocument.Close ();
+			if (IdeApp.Workbench.ActiveDocument != null)
+				IdeApp.Workbench.ActiveDocument.Close ();
 		}
 
 		protected override void Update (CommandInfo info)
@@ -217,9 +218,7 @@ namespace MonoDevelop.Ide.Commands
 		internal static bool CanPrint ()
 		{
 			IPrintable print;
-			//HACK: disable printing on Windows while it doesn't work
-			return !Platform.IsWindows
-				&& IdeApp.Workbench.ActiveDocument != null
+			return IdeApp.Workbench.ActiveDocument != null
 				&& (print = IdeApp.Workbench.ActiveDocument.GetContent<IPrintable> ()) != null
 				&& print.CanPrint;
 		}
@@ -235,6 +234,12 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Update (CommandInfo info)
 		{
 			info.Enabled = PrintHandler.CanPrint ();
+
+			//HACK: disable print preview on Win32 because it doesn't work
+			if (Platform.IsWindows) {
+				info.Enabled = false;
+				info.Visible = false;
+			}
 		}
 	}
 	
@@ -403,4 +408,5 @@ namespace MonoDevelop.Ide.Commands
 	// MonoDevelop.Ide.Commands.FileTabCommands.CloseAllButThis    Implemented in FileTabCommands.cs
 	// MonoDevelop.Ide.Commands.CopyPathNameHandler                Implemented in FileTabCommands.cs
 	// MonoDevelop.Ide.Commands.FileTabCommands.ToggleMaximize     Implemented in FileTabCommands.cs
+	// MonoDevelop.Ide.Commands.FileTabCommands.ReopenClosedTab    Implemented in FileTabCommands.cs
 }

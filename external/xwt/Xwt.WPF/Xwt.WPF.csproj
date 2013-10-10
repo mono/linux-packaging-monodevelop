@@ -15,7 +15,7 @@
     <DebugType>full</DebugType>
     <Optimize>False</Optimize>
     <OutputPath>bin\Debug</OutputPath>
-    <DefineConstants>DEBUG;</DefineConstants>
+    <DefineConstants>DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>False</ConsolePause>
@@ -35,9 +35,15 @@
     <AssemblyOriginatorKeyFile>..\xwt.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
-    <Reference Include="PresentationFramework.Aero" />
+    <Reference Include="PresentationCore">
+      <Package>/Users/lluis/prog/work/libs/PresentationCore.dll</Package>
+    </Reference>
+    <Reference Include="PresentationFramework">
+      <Package>/Users/lluis/prog/work/libs/PresentationFramework.dll</Package>
+    </Reference>
+    <Reference Include="PresentationFramework.Aero">
+      <Package>/Users/lluis/prog/work/libs/PresentationFramework.Aero.dll</Package>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
@@ -48,6 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="Xwt.WPFBackend.CellViews\CanvasCellViewBackend.cs" />
     <Compile Include="Xwt.WPFBackend.Interop\NativeStockIcon.cs" />
     <Compile Include="Xwt.WPFBackend.Utilities\CellUtil.cs" />
     <Compile Include="Xwt.WPFBackend.Utilities\ImageToImageSourceConverter.cs" />
@@ -56,22 +63,33 @@
     <Compile Include="Xwt.WPFBackend\Backend.cs" />
     <Compile Include="Xwt.WPFBackend\BooleanToValueConverter.cs" />
     <Compile Include="Xwt.WPFBackend\ButtonBackend.cs" />
-    <Compile Include="Xwt.WPFBackend\CanvasBackend.cs" />
     <Compile Include="Xwt.WPFBackend\CheckBoxBackend.cs" />
     <Compile Include="Xwt.WPFBackend\CheckboxMenuItemBackend.cs" />
     <Compile Include="Xwt.WPFBackend\ClipboardBackend.cs" />
     <Compile Include="Xwt.WPFBackend\ComboBoxBackend.cs" />
     <Compile Include="Xwt.WPFBackend\ComboBoxEntryBackend.cs" />
     <Compile Include="Xwt.WPFBackend\ComboBoxTextEntryBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\DatePickerBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\EmbedNativeWidgetBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\ScrollbarBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\SliderBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\SpinButtonBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\RadioButtonBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\ImagePatternBackendHandler.cs" />
+    <Compile Include="Xwt.WPFBackend\GradientBackendHandler.cs" />
+    <Compile Include="Xwt.WPFBackend\SelectColorDialogBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\TextLayoutBackendHandler.cs" />
+    <Compile Include="Xwt.WPFBackend\ImageBuilderBackendHandler.cs" />
+    <Compile Include="Xwt.WPFBackend\DrawingContext.cs" />
+    <Compile Include="Xwt.WPFBackend\ContextBackendHandler.cs" />
     <Compile Include="Xwt.WPFBackend\ExRichTextBox.cs" />
+    <Compile Include="Xwt.WPFBackend\SaveFileDialogBackend.cs" />
     <Compile Include="Xwt.WPFBackend\LinkLabelBackend.cs" />
     <Compile Include="Xwt.WPFBackend\PopoverBackend.cs" />
     <Compile Include="Xwt.WPFBackend\ProgressBarBackend.cs" />
     <Compile Include="Xwt.WPFBackend\CustomWidgetBackend.cs" />
     <Compile Include="Xwt.WPFBackend\DelegatedCommand.cs" />
     <Compile Include="Xwt.WPFBackend\DialogBackend.cs" />
-    <Compile Include="Xwt.WPFBackend\DrawingContext.cs" />
-    <Compile Include="Xwt.WPFBackend\ContextBackendHandler.cs" />
     <Compile Include="Xwt.WPFBackend\DropDownButton.cs" />
     <Compile Include="Xwt.WPFBackend\ExCanvas.cs" />
     <Compile Include="Xwt.WPFBackend\ExComboBox.cs" />
@@ -79,17 +97,15 @@
     <Compile Include="Xwt.WPFBackend\ExListBox.cs" />
     <Compile Include="Xwt.WPFBackend\ExListView.cs" />
     <Compile Include="Xwt.WPFBackend\ExListViewItem.cs" />
+    <Compile Include="Xwt.WPFBackend\ExpanderBackend.cs" />
     <Compile Include="Xwt.WPFBackend\ExScrollViewer.cs" />
     <Compile Include="Xwt.WPFBackend\ExTextBox.cs" />
     <Compile Include="Xwt.WPFBackend\ExTreeView.cs" />
     <Compile Include="Xwt.WPFBackend\ExTreeViewItem.cs" />
     <Compile Include="Xwt.WPFBackend\FileDialogBackend.cs" />
     <Compile Include="Xwt.WPFBackend\FrameBackend.cs" />
-    <Compile Include="Xwt.WPFBackend\GradientBackendHandler.cs" />
-    <Compile Include="Xwt.WPFBackend\ImageBuilderBackendHandler.cs" />
     <Compile Include="Xwt.WPFBackend\ImageHandler.cs" />
     <Compile Include="Xwt.WPFBackend.Interop\NativeMethods.cs" />
-    <Compile Include="Xwt.WPFBackend\ImagePatternBackendHandler.cs" />
     <Compile Include="Xwt.WPFBackend\ImageViewBackend.cs" />
     <Compile Include="Xwt.WPFBackend\LabelBackend.cs" />
     <Compile Include="Xwt.WPFBackend\BoxBackend.cs" />
@@ -114,8 +130,6 @@
     <Compile Include="Xwt.WPFBackend\SeparatorMenuItemBackend.cs" />
     <Compile Include="Xwt.WPFBackend\SpinnerBackend.cs" />
     <Compile Include="Xwt.WPFBackend\TextEntryBackend.cs" />
-    <Compile Include="Xwt.WPFBackend\TextLayoutBackendHandler.cs" />
-    <Compile Include="Xwt.WPFBackend\TextLayoutContext.cs" />
     <Compile Include="Xwt.WPFBackend\Timeout.cs" />
     <Compile Include="Xwt.WPFBackend\ToggleButtonBackend.cs" />
     <Compile Include="Xwt.WPFBackend\TreeStoreBackend.cs" />
@@ -125,6 +139,7 @@
     <Compile Include="Xwt.WPFBackend\TreeViewDropAdorner.cs" />
     <Compile Include="Xwt.WPFBackend\Util.cs" />
     <Compile Include="Xwt.WPFBackend\ValuesContainer.cs" />
+    <Compile Include="Xwt.WPFBackend\CanvasBackend.cs" />
     <Compile Include="Xwt.WPFBackend\WidgetBackend.cs" />
     <Compile Include="Xwt.WPFBackend\WindowBackend.cs" />
     <Compile Include="Xwt.WPFBackend\WindowFrameBackend.cs" />
@@ -133,6 +148,8 @@
     <Compile Include="Xwt.WPFBackend\ScrollAdjustmentBackend.cs" />
     <Compile Include="Xwt.WPFBackend\CustomScrollViewPort.cs" />
     <Compile Include="Xwt.WPFBackend\RichTextViewBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\WpfDesktopBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\WindowsSpinButton.xaml.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
@@ -156,7 +173,6 @@
       <SubType>Designer</SubType>
     </Resource>
   </ItemGroup>
-  <ItemGroup />
   <ItemGroup>
     <EmbeddedResource Include="icons\list-add.png" />
     <EmbeddedResource Include="icons\list-remove.png" />

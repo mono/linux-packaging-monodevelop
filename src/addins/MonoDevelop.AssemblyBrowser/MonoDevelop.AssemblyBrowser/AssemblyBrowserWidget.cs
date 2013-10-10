@@ -51,6 +51,8 @@ using MonoDevelop.SourceEditor;
 using XmlDocIdLib;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace MonoDevelop.AssemblyBrowser
 {
@@ -371,7 +373,13 @@ namespace MonoDevelop.AssemblyBrowser
 			
 		ITreeNavigator SearchMember (string helpUrl)
 		{
-			return SearchMember (TreeView.GetRootNode (), helpUrl);
+			var nav = SearchMember (TreeView.GetRootNode (), helpUrl);
+			if (nav != null)
+				return nav;
+			// Constructor may be a generated default without implementation.
+			if (helpUrl.StartsWith ("M:", StringComparison.Ordinal) && helpUrl.EndsWith (".#ctor", StringComparison.Ordinal))
+				return SearchMember ("T" + helpUrl.Substring (1, helpUrl.Length - 1 - ".#ctor".Length));
+			return null;
 		}
 		
 		static void AppendTypeReference (StringBuilder result, ITypeReference type)
@@ -408,6 +416,10 @@ namespace MonoDevelop.AssemblyBrowser
 			if (type is IUnresolvedTypeDefinition) {
 				result.Append (((IUnresolvedTypeDefinition)type).FullName);
 			}
+
+			if (type is TypeParameterReference) {
+				result.Append ("`" +((TypeParameterReference)type).Index);
+			}
 		}
 		
 		static void AppendHelpParameterList (StringBuilder result, IList<IUnresolvedParameter> parameters)
@@ -437,13 +449,13 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			StringBuilder sb;
 			
-			switch (member.EntityType) {
-			case EntityType.TypeDefinition:
+			switch (member.SymbolKind) {
+			case SymbolKind.TypeDefinition:
 				var type = member as IUnresolvedTypeDefinition;
 				if (type.TypeParameters.Count == 0)
 					return "T:" + type.FullName;
 				return "T:" + type.FullName + "`" + type.TypeParameters.Count;
-			case EntityType.Method:
+			case SymbolKind.Method:
 				var method = (IUnresolvedMethod)member;
 				sb = new StringBuilder ();
 				sb.Append ("M:");
@@ -456,7 +468,7 @@ namespace MonoDevelop.AssemblyBrowser
 				}
 				AppendHelpParameterList (sb, method.Parameters);
 				return sb.ToString ();
-			case EntityType.Constructor:
+			case SymbolKind.Constructor:
 				var constructor = (IUnresolvedMethod)member;
 				sb = new StringBuilder ();
 				sb.Append ("M:");
@@ -464,16 +476,16 @@ namespace MonoDevelop.AssemblyBrowser
 				sb.Append (".#ctor");
 				AppendHelpParameterList (sb, constructor.Parameters);
 				return sb.ToString ();
-			case EntityType.Destructor: // todo
+			case SymbolKind.Destructor: // todo
 				return "todo";
-			case EntityType.Property:
+			case SymbolKind.Property:
 				sb = new StringBuilder ();
 				sb.Append ("P:");
 				sb.Append (member.DeclaringTypeDefinition.ReflectionName);
 				sb.Append (".");
 				sb.Append (member.Name);
 				return sb.ToString ();
-			case EntityType.Indexer:
+			case SymbolKind.Indexer:
 				var indexer = (IUnresolvedProperty)member;
 				sb = new StringBuilder ();
 				sb.Append ("P:");
@@ -481,21 +493,21 @@ namespace MonoDevelop.AssemblyBrowser
 				sb.Append (".Item");
 				AppendHelpParameterList (sb, indexer.Parameters);
 				return sb.ToString ();
-			case EntityType.Field:
+			case SymbolKind.Field:
 				sb = new StringBuilder ();
 				sb.Append ("F:");
 				sb.Append (member.DeclaringTypeDefinition.ReflectionName);
 				sb.Append (".");
 				sb.Append (member.Name);
 				return sb.ToString ();
-			case EntityType.Event:
+			case SymbolKind.Event:
 				sb = new StringBuilder ();
 				sb.Append ("E:");
 				sb.Append (member.DeclaringTypeDefinition.ReflectionName);
 				sb.Append (".");
 				sb.Append (member.Name);
 				return sb.ToString ();
-			case EntityType.Operator: // todo
+			case SymbolKind.Operator: // todo
 				return "todo";
 			}
 			return "unknown entity: " + member;
@@ -569,7 +581,7 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			if (nav == null)
 				return null;
-			bool searchType = helpUrl.StartsWith ("T:");
+			bool searchType = helpUrl.StartsWith ("T:", StringComparison.Ordinal);
 			do {
 				if (IsMatch (nav, helpUrl, searchType)) {
 					inspectEditor.ClearSelection ();
@@ -1173,36 +1185,88 @@ namespace MonoDevelop.AssemblyBrowser
 			ITreeNavigator nav = SearchMember (url);
 			if (definitions == null) // we've been disposed
 				return;
-			if (nav == null) {
-				if (currentAssembly != null) {
-					var cecilObject = loader.GetCecilObject (currentAssembly.UnresolvedAssembly);
-					if (cecilObject != null) {
-						foreach (var reference in cecilObject.MainModule.AssemblyReferences) {
-							string fileName = currentAssembly.LookupAssembly (reference.FullName);
-							if (string.IsNullOrEmpty (fileName))
-								continue;
-							AddReferenceByFileName (fileName, true);
-							nav = SearchMember (url);
-							if (nav != null)
-								break;
-						}
-					}
+			if (nav != null)
+				return;
+			if (currentAssembly != null) {
+				OpenFromAssembly (url, currentAssembly);
+			} else {
+				OpenFromAssemblyNames (url);
+			}
+		}
 
-				} else {
-					foreach (var definition in definitions.ToArray ()) {
-						var cecilObject = loader.GetCecilObject (definition.UnresolvedAssembly);
-						if (cecilObject == null)
-							continue;
-						foreach (var assemblyNameReference in cecilObject.MainModule.AssemblyReferences) {
-							AddReferenceByAssemblyName (assemblyNameReference);
-						}
+		void OpenFromAssembly (string url, AssemblyLoader currentAssembly)
+		{
+			var cecilObject = loader.GetCecilObject (currentAssembly.UnresolvedAssembly);
+			if (cecilObject == null)
+				return;
+
+			int i = 0;
+			System.Action loadNext = null;
+			var references = cecilObject.MainModule.AssemblyReferences;
+			loadNext = () => {
+				var reference = references [i];
+				string fileName = currentAssembly.LookupAssembly (reference.FullName);
+				if (string.IsNullOrEmpty (fileName)) {
+					LoggingService.LogWarning ("Assembly browser: Can't find assembly: " + reference.FullName + ".");
+					if (++i == references.Count)
+						LoggingService.LogError ("Assembly browser: Can't find: " + url + ".");
+					else
+						loadNext ();
+					return;
+				}
+				var result = AddReferenceByFileName (fileName, true);
+				result.LoadingTask.ContinueWith (t2 => {
+					t2.Wait ();
+					if (definitions == null) // disposed
+						return;
+					var nav = SearchMember (url);
+					if (nav == null) {
+						if (++i == references.Count)
+							LoggingService.LogError ("Assembly browser: Can't find: " + url + ".");
+						else
+							loadNext ();
+					}
+				}, TaskScheduler.Current);
+			};
+		}
+
+		void OpenFromAssemblyNames (string url)
+		{
+			List<Task> tasks = new List<Task> ();
+			foreach (var definition in definitions.ToArray ()) {
+				var cecilObject = loader.GetCecilObject (definition.UnresolvedAssembly);
+				if (cecilObject == null) {
+					LoggingService.LogWarning ("Assembly browser: Can't find assembly: " + definition.UnresolvedAssembly.FullAssemblyName + ".");
+					continue;
+				}
+				foreach (var assemblyNameReference in cecilObject.MainModule.AssemblyReferences) {
+					var result = AddReferenceByAssemblyName (assemblyNameReference);
+					if (result == null) {
+						LoggingService.LogWarning ("Assembly browser: Can't find assembly: " + assemblyNameReference.FullName + ".");
+					} else {
+						tasks.Add (result.LoadingTask);
 					}
 				}
-				nav = SearchMember (url);
 			}
-			if (nav == null) {
-				LoggingService.LogError ("Can't open: " + url + " (not found).");
-			}
+			if (tasks.Count == 0) {
+				var nav = SearchMember (url);
+				if (nav == null) {
+					LoggingService.LogError ("Assembly browser: Can't find: " + url + ".");
+				}
+				return;
+			};
+			Task.Factory.ContinueWhenAll (tasks.ToArray (), tarr => {
+				var exceptions = tarr.Where (t => t.IsFaulted).Select (t => t.Exception).ToArray ();
+				if (exceptions != null) {
+					throw new AggregateException (exceptions).Flatten ();
+				}
+				if (definitions == null) // disposed
+					return;
+				var nav = SearchMember (url);
+				if (nav == null) {
+					LoggingService.LogError ("Assembly browser: Can't find: " + url + ".");
+				}
+			}, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Current);
 		}
 		
 		public void SelectAssembly (string fileName)

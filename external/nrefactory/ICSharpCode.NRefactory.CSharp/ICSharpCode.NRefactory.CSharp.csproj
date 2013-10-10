@@ -42,11 +42,13 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>none</DebugType>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <OutputPath>..\bin\Release\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugType>full</DebugType>
     <DebugSymbols>True</DebugSymbols>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <OutputPath>..\bin\Debug\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'net_4_5_Debug' ">
     <Optimize>False</Optimize>
@@ -59,6 +61,7 @@
     <DebugSymbols>True</DebugSymbols>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <OutputPath>..\bin\net_4_5_Debug\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'net_4_5_Release' ">
     <Optimize>True</Optimize>
@@ -70,6 +73,7 @@
     <DebugType>none</DebugType>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <OutputPath>..\bin\net_4_5_Release\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -115,7 +119,6 @@
     <Compile Include="Ast\Expressions\ConditionalExpression.cs" />
     <Compile Include="Ast\Expressions\DefaultValueExpression.cs" />
     <Compile Include="Ast\Expressions\DirectionExpression.cs" />
-    <Compile Include="Ast\Expressions\EmptyExpression.cs" />
     <Compile Include="Ast\Expressions\Expression.cs" />
     <Compile Include="Ast\Expressions\IdentifierExpression.cs" />
     <Compile Include="Ast\Expressions\IndexerExpression.cs" />
@@ -280,6 +283,7 @@
     <Compile Include="Refactoring\CodeActions\ConvertSwitchToIfAction.cs" />
     <Compile Include="Refactoring\CodeActions\CreateCustomEventImplementationAction.cs" />
     <Compile Include="Refactoring\CodeActions\CreateOverloadWithoutParameterAction.cs" />
+    <Compile Include="Refactoring\CodeActions\ImplementNotImplementedProperty.cs" />
     <Compile Include="Refactoring\CodeActions\JoinDeclarationAndAssignmentAction.cs" />
     <Compile Include="Refactoring\CodeActions\JoinStringAction.cs" />
     <Compile Include="Refactoring\CodeActions\MergeNestedIfAction.cs" />
@@ -287,48 +291,56 @@
     <Compile Include="Refactoring\CodeActions\PutInsideUsingAction.cs" />
     <Compile Include="Refactoring\CodeActions\SplitDeclarationListAction.cs" />
     <Compile Include="Refactoring\CodeActions\UseStringFormatAction.cs" />
-    <Compile Include="Refactoring\CodeIssues\AccessToClosureIssues\AccessToClosureIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\AccessToClosureIssues\AccessToDisposedClosureIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\AccessToClosureIssues\AccessToModifiedClosureIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\AccessToClosureIssues\LocalVariableNamePicker.cs" />
-    <Compile Include="Refactoring\CodeIssues\AssignmentMadeToSameVariableIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\BitwiseOperationOnNonFlagsEnumIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\CastExpressionOfIncompatibleTypeIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\CompareBooleanWithTrueOrFalseIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\CompareFloatWithEqualityOperatorIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ConstantConditionIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\DoubleNegationIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ExpressionIsAlwaysOfProvidedTypeIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ExpressionIsNeverOfProvidedTypeIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ExpressionOfCompatibleTypeCastIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\MethodNeverReturnsIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\MethodOverloadHidesOptionalParameterIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\MissingStringComparisonIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\NegativeRelationalExpressionIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ExplicitConversionInForEachIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ForControlVariableNotModifiedIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\IdenticalConditionalBranchIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\MultipleEnumerationIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantArrayInitializerCommaIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantAssignmentIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantAttributeParenthesesIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantCaseLabelIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantElseIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantFieldInitializerIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantObjectCreationArgumentListIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantObjectOrCollectionInitializerIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantTypeCastIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ReferenceEqualsCalledWithValueTypeIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ResultOfAsyncCallShouldNotBeIgnoredIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\UnreachableCodeIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\VariableHidesMemberIssue\LocalVariableHidesMemberIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\VariableHidesMemberIssue\ParameterHidesMemberIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\VariableHidesMemberIssue\VariableHidesMemberIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\VariableNotUsedIssues\LocalVariableNotUsedIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\VariableNotUsedIssues\ParameterNotUsedIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\TypeParameterNotUsedIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\VariableOnlyAssignedIssues\ParameterOnlyAssignedIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\VariableOnlyAssignedIssues\VariableOnlyAssignedIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\NotWorking\AccessToClosureIssues\AccessToClosureIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\NotWorking\AccessToClosureIssues\AccessToDisposedClosureIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\NotWorking\AccessToClosureIssues\AccessToModifiedClosureIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\NotWorking\AccessToClosureIssues\LocalVariableNamePicker.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\CompilerWarnings\CS1717AssignmentMadeToSameVariableIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\BitwiseOperationOnNonFlagsEnumIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\CastExpressionOfIncompatibleTypeIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\CompareBooleanWithTrueOrFalseIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\CompareFloatWithEqualityOperatorIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\CompilerErrors\CS0029InvalidConversionIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\CompilerErrors\CS1729TypeHasNoConstructorWithNArgumentsIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ConstantConditionIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\DoubleNegationOperatorIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ExpressionIsAlwaysOfProvidedTypeIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ExpressionIsNeverOfProvidedTypeIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Custom\MethodNeverReturnsIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\MethodOverloadHidesOptionalParameterIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\MissingStringComparisonIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Custom\NegativeRelationalExpressionIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ExplicitConversionInForEachIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\CodeQuality\ForControlVariableIsNeverModifiedIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\CodeQuality\ConditionalTernaryEqualBranchIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\MultipleEnumerationIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantCommaInArrayInitializerIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\RedundantAssignmentIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\RedundantAttributeParenthesesIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantCaseLabelIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantIfElseBlockIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInDeclaration\RedundantDefaultFieldInitializerIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\RedundantObjectCreationArgumentListIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantObjectOrCollectionInitializerIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithSingleCallToFirstIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithSingleCallToFirstOrDefaultIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithSingleCallToLastIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithSingleCallToLastOrDefaultIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithSingleCallToLongCountIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithSingleCallToSingleIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithSingleCallToSingleOrDefaultIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantCastIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ReferenceEqualsCalledWithValueTypeIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ResultOfAsyncCallShouldNotBeIgnoredIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithSingleCallToCountIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\UnreachableCodeIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\CodeQuality\LocalVariableHidesMemberIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\CodeQuality\ParameterHidesMemberIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInDeclaration\LocalVariableNotUsedIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\VariableNotUsedIssues\ParameterNotUsedIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInDeclaration\UnusedTypeParameterIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\VariableOnlyAssignedIssues\ParameterOnlyAssignedIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\VariableOnlyAssignedIssues\VariableOnlyAssignedIssue.cs" />
     <Compile Include="Refactoring\DocumentScript.cs" />
     <Compile Include="Refactoring\CodeActions\ExtractAnonymousMethodAction.cs" />
     <Compile Include="Refactoring\UsingHelper.cs" />
@@ -360,6 +372,7 @@
     <Compile Include="Resolver\NodeListResolveVisitorNavigator.cs" />
     <Compile Include="Resolver\OverloadResolution.cs" />
     <Compile Include="Resolver\OverloadResolutionErrors.cs" />
+    <Compile Include="Resolver\RenameCallbackArguments.cs" />
     <Compile Include="Resolver\ResolveAtLocation.cs" />
     <Compile Include="Resolver\ResolveVisitor.cs" />
     <Compile Include="Resolver\TypeInference.cs" />
@@ -401,18 +414,16 @@
     <Compile Include="Refactoring\ContextActionAttribute.cs" />
     <Compile Include="Refactoring\IssueAttribute.cs" />
     <Compile Include="Refactoring\CodeIssues\IssueCategories.cs" />
-    <Compile Include="Refactoring\Severity.cs" />
-    <Compile Include="Refactoring\IssueMarker.cs" />
     <Compile Include="Refactoring\CodeIssues\GatherVisitorBase.cs" />
-    <Compile Include="Refactoring\CodeIssues\ConditionalToNullCoalescingIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\NotImplementedExceptionIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantInternalIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantNamespaceUsageIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantPrivateIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantThisIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantUsingIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\StringIsNullOrEmptyIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\UseVarKeywordIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\Opportunities\ConvertConditionalTernaryToNullCoalescingIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Custom\NotImplementedExceptionIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Custom\RedundantInternalIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantNameQualifierIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Custom\RedundantPrivateIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantThisQualifierIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantUsingDirectiveIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithStringIsNullOrEmptyIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\Opportunities\SuggestUseVarKeywordEvidentIssue.cs" />
     <Compile Include="Refactoring\CodeActions\UseVarKeywordAction.cs" />
     <Compile Include="Refactoring\CodeActions\UseExplicitTypeAction.cs" />
     <Compile Include="Refactoring\CodeActions\SplitStringAction.cs" />
@@ -438,17 +449,17 @@
     <Compile Include="Refactoring\CodeActions\ConvertDecToHexAction.cs" />
     <Compile Include="Refactoring\CodeActions\CheckIfParameterIsNullAction.cs" />
     <Compile Include="Refactoring\CodeActions\AddAnotherAccessorAction.cs" />
-    <Compile Include="Refactoring\CodeIssues\InconsistentNamingIssue\NamingStyle.cs" />
-    <Compile Include="Refactoring\CodeIssues\InconsistentNamingIssue\NamingRule.cs" />
-    <Compile Include="Refactoring\CodeIssues\InconsistentNamingIssue\AffectedEntity.cs" />
-    <Compile Include="Refactoring\CodeIssues\InconsistentNamingIssue\DefaultRules.cs" />
-    <Compile Include="Refactoring\CodeIssues\InconsistentNamingIssue\InconsistentNamingIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\ConstraintViolations\InconsistentNamingIssue\NamingStyle.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\ConstraintViolations\InconsistentNamingIssue\NamingRule.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\ConstraintViolations\InconsistentNamingIssue\AffectedEntity.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\ConstraintViolations\InconsistentNamingIssue\DefaultRules.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\ConstraintViolations\InconsistentNamingIssue\InconsistentNamingIssue.cs" />
     <Compile Include="Refactoring\CodeActions\CreateMethodDeclarationAction.cs" />
-    <Compile Include="Refactoring\CodeIssues\InconsistentNamingIssue\NamingConventionService.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\ConstraintViolations\InconsistentNamingIssue\NamingConventionService.cs" />
     <Compile Include="Refactoring\CodeActions\CreateIndexerAction.cs" />
     <Compile Include="Refactoring\CodeActions\InlineLocalVariableAction.cs" />
     <Compile Include="Refactoring\CodeActions\DeclareLocalVariableAction.cs" />
-    <Compile Include="Refactoring\CodeIssues\InconsistentNamingIssue\WordParser.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\ConstraintViolations\InconsistentNamingIssue\WordParser.cs" />
     <Compile Include="Refactoring\CodeActions\CreateConstructorDeclarationAction.cs" />
     <Compile Include="Refactoring\CodeActions\CreateClassDeclarationAction.cs" />
     <Compile Include="Refactoring\CodeActions\CreateDelegateAction.cs" />
@@ -468,43 +479,42 @@
     <Compile Include="Refactoring\CodeActions\ImplementAbstractMembersAction.cs" />
     <Compile Include="Refactoring\CodeActions\RemoveRedundantCatchTypeAction.cs" />
     <Compile Include="Refactoring\CodeActions\AddCatchTypeAction.cs" />
-    <Compile Include="Refactoring\CodeIssues\IncorrectExceptionParameterOrderingIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\CallToVirtualFunctionFromConstructorIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\IncorrectExceptionParameterOrderingIssue.cs" />
     <Compile Include="Refactoring\CodeActions\StaticMethodInvocationToExtensionMethodInvocationAction.cs" />
     <Compile Include="Refactoring\CodeActions\ExtensionMethodInvocationToStaticMethodInvocationAction.cs" />
     <Compile Include="Refactoring\CodeActions\IterateViaForeachAction.cs" />
     <Compile Include="Refactoring\CodeActions\ExtractFieldAction.cs" />
     <Compile Include="Completion\ICompletionContextProvider.cs" />
-    <Compile Include="Refactoring\CodeIssues\ValueParameterUnusedIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\CodeQuality\ValueParameterNotUsedIssue.cs" />
     <Compile Include="Refactoring\NamingHelper.cs" />
     <Compile Include="Refactoring\CodeActions\ConvertToInitializer\ConvertToInitializerAction.cs" />
     <Compile Include="Refactoring\CodeActions\ConvertToInitializer\StatementsToInitializerConverter.cs" />
     <Compile Include="Refactoring\CodeActions\MoveToOuterScopeAction.cs" />
-    <Compile Include="Refactoring\CodeIssues\VariableDeclaredInWideScopeIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ParameterCanBeDemotedIssue\ParameterCanBeDemotedIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ParameterCanBeDemotedIssue\ITypeCriterion.cs" />
-    <Compile Include="Refactoring\CodeIssues\ParameterCanBeDemotedIssue\HasMemberCriterion.cs" />
-    <Compile Include="Refactoring\CodeIssues\ParameterCanBeDemotedIssue\TypeCriteriaCollector.cs" />
-    <Compile Include="Refactoring\CodeIssues\ReferenceToStaticMemberViaDerivedTypeIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ParameterCanBeDemotedIssue\IsTypeCriterion.cs" />
-    <Compile Include="Refactoring\CodeIssues\OptionalParameterCouldBeSkippedIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantCatchIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantToStringIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\CallToObjectEqualsViaBaseIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\IncorrectCallToObjectGetHashCodeIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\NotWorking\VariableDeclaredInWideScopeIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ParameterCanBeDemotedIssue\ParameterCanBeDemotedIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ParameterCanBeDemotedIssue\ITypeCriterion.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ParameterCanBeDemotedIssue\HasMemberCriterion.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ParameterCanBeDemotedIssue\TypeCriteriaCollector.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\AccessToStaticMemberViaDerivedTypeIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ParameterCanBeDemotedIssue\IsTypeCriterion.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\OptionalParameterCouldBeSkippedIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantCatchIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantToStringCallIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\CallToObjectEqualsViaBaseIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\IncorrectCallToObjectGetHashCodeIssue.cs" />
     <Compile Include="Refactoring\CodeActions\ExtractMethod\VariableUsageAnalyzation.cs" />
-    <Compile Include="Refactoring\CodeIssues\FormatStringIssues\FormatStringIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\FormatStringIssues\FormatStringHelper.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\FormatStringIssues\FormatStringIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\FormatStringIssues\FormatStringHelper.cs" />
     <Compile Include="Refactoring\CodeActions\ConvertToInitializer\ConvertInitializerToExplicitInitializationsAction.cs" />
-    <Compile Include="Refactoring\CodeIssues\ExceptionRethrowIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ThreadStaticOnInstanceFieldIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\StaticFieldInGenericTypeIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ExceptionRethrowIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\CodeQuality\ThreadStaticAtInstanceFieldIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\CodeQuality\StaticFieldInGenericTypeIssue.cs" />
     <Compile Include="Parser\SeekableStreamReader.cs" />
     <Compile Include="Refactoring\CodeActions\ConvertAnonymousDelegateToLambdaAction.cs" />
     <Compile Include="Refactoring\CodeActions\ConvertLambdaToAnonymousDelegateAction.cs" />
-    <Compile Include="Refactoring\CodeIssues\ParameterCanBeDemotedIssue\IsArrayTypeCriterion.cs" />
-    <Compile Include="Refactoring\CodeIssues\ParameterCanBeDemotedIssue\SupportsIndexingCriterion.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantWhereWithPredicateIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ParameterCanBeDemotedIssue\IsArrayTypeCriterion.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ParameterCanBeDemotedIssue\SupportsIndexingCriterion.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\ReplaceWithSingleCallToAnyIssue.cs" />
     <Compile Include="Refactoring\CodeActions\ConvertToInitializer\AccessPath.cs" />
     <Compile Include="Refactoring\LocalReferenceFinder.cs" />
     <Compile Include="Refactoring\CodeActions\SortUsingsAction.cs" />
@@ -513,13 +523,11 @@
     <Compile Include="Resolver\AliasTypeResolveResult.cs" />
     <Compile Include="Resolver\AliasNamespaceResolveResult.cs" />
     <Compile Include="Resolver\ReducedExtensionMethod.cs" />
-    <Compile Include="Refactoring\CodeIssues\SimplifyAnonymousMethodToDelegateIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\CompilerErrors\CS0127ReturnMustNotBeFollowedByAnyExpression.cs" />
-    <Compile Include="Analysis\AbiComparer.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\SimplifyAnonymousMethodToDelegateIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\CompilerErrors\CS0127ReturnMustNotBeFollowedByAnyExpression.cs" />
     <Compile Include="Refactoring\CreateChangedEvent.cs" />
     <Compile Include="Refactoring\CodeActions\SimplifyIfFlowAction.cs" />
     <Compile Include="Refactoring\CodeActions\SimplifyIfInLoopsFlowAction.cs" />
-    <Compile Include="Refactoring\CodeIssues\NoDefaultConstructorIssue.cs" />
     <Compile Include="Refactoring\CodeActions\InvertIfAndSimplify.cs" />
     <Compile Include="Formatter\CSharpFormatter.cs" />
     <Compile Include="Formatter\FormattingVisitor.cs" />
@@ -528,17 +536,23 @@
     <Compile Include="Formatter\FormattingVisitor_Statements.cs" />
     <Compile Include="Formatter\FormattingVisitor_Expressions.cs" />
     <Compile Include="Formatter\FormattingChanges.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantNullCheckIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ConstructorIssues\StaticConstructorParameterIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ConstructorIssues\StaticConstructorAccessModifierIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\RedundantBaseConstructorIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ConstructorIssues\RedudantConstructorIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ConstructorIssues\PublicConstructorInAbstractClass.cs" />
-    <Compile Include="Refactoring\CodeIssues\ConvertToStaticMethodIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\ParameterCanBeDemotedIssue\ParameterCanBeIEnumerableIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\DuplicateBodyMethodIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\DuplicateExpressionsInConditionsIssue.cs" />
-    <Compile Include="Refactoring\CodeIssues\DuplicateIfInIfChainIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInCode\RedundantComparisonWithNullIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ConstructorIssues\StaticConstructorParameterIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\ConstructorIssues\StaticConstructorAccessModifierIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInDeclaration\RedundantBaseConstructorCallIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\RedundanciesInDeclaration\EmptyConstructorIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\PracticesAndImprovements\PublicConstructorInAbstractClass.cs" />
+    <Compile Include="Refactoring\CodeIssues\NotWorking\ConvertToStaticMethodIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\NotWorking\ParameterCanBeIEnumerableIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\NotWorking\DuplicateBodyMethodIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\DuplicateExpressionsInConditionsIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\DuplicateIfInIfChainIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\UseBlockInsteadColonIssue.cs" />
+    <Compile Include="Refactoring\CodeIssues\Custom\LockThisIssue.cs" />
+    <Compile Include="Refactoring\CodeActions\AutoLinqSumAction.cs" />
+    <Compile Include="Refactoring\CodeIssues\Uncategorized\DisposeMethodInNonIDisposableTypeIssue.cs" />
+    <Compile Include="Refactoring\CodeActions\ConvertIfToNullCoalescingAction.cs" />
+    <Compile Include="Refactoring\CodeIssues\Synced\CodeQuality\DoNotCallOverridableMethodsInConstructorIssue.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ICSharpCode.NRefactory\ICSharpCode.NRefactory.csproj">

@@ -31,6 +31,7 @@ using Xwt.Backends;
 using Gtk;
 using Cairo;
 
+
 namespace Xwt.GtkBackend
 {
 	public class PopoverBackend : IPopoverBackend
@@ -199,7 +200,7 @@ namespace Xwt.GtkBackend
 			this.sink = sink;
 		}
 
-		public void InitializeBackend (object frontend)
+		public void InitializeBackend (object frontend, ApplicationContext context)
 		{
 			this.frontend = (Popover) frontend;
 		}
@@ -215,17 +216,21 @@ namespace Xwt.GtkBackend
 		public void Show (Xwt.Popover.Position orientation, Xwt.Widget reference, Xwt.Rectangle positionRect, Widget child)
 		{
 			var parent = reference.ParentWindow;
-			popover = new PopoverWindow ((Gtk.Widget)((WidgetBackend)Xwt.Engine.WidgetRegistry.GetBackend (child)).NativeWidget, orientation);
+			popover = new PopoverWindow ((Gtk.Widget)((WidgetBackend)Toolkit.GetBackend (child)).NativeWidget, orientation);
 			popover.SetPadding (frontend.Padding);
-			popover.TransientFor = ((WindowFrameBackend)Xwt.Engine.WidgetRegistry.GetBackend (parent)).Window;
+			popover.TransientFor = ((WindowFrameBackend)Toolkit.GetBackend (parent)).Window;
 			popover.DestroyWithParent = true;
 			popover.Hidden += (o, args) => {
 				popover.ReleaseInnerWidget ();
 				sink.OnClosed ();
 				popover.Destroy ();
 			};
-			
-			var position = new Point (reference.ScreenBounds.Center.X, popover.ArrowPosition == Popover.Position.Top ? reference.ScreenBounds.Bottom : reference.ScreenBounds.Top);
+
+			var screenBounds = reference.ScreenBounds;
+			if (positionRect == Rectangle.Zero)
+				positionRect = new Rectangle (Point.Zero, screenBounds.Size);
+			positionRect = positionRect.Offset (screenBounds.Location);
+			var position = new Point (positionRect.Center.X, popover.ArrowPosition == Popover.Position.Top ? positionRect.Bottom : positionRect.Top);
 			popover.ShowAll ();
 			popover.GrabFocus ();
 			int w, h;

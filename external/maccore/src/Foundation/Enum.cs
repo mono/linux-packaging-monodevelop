@@ -336,15 +336,16 @@ namespace MonoMac.Foundation  {
 		EndsWith,
 		In,
 		CustomSelector,
-		Contains,
+		Contains = 99,
 		Between
 	}
 
 	[Flags]
 	public enum NSComparisonPredicateOptions {
-		None=0x00,
-		CaseInsensitive=0x01,
-		DiacriticInsensitive=0x02
+		None                 = 0x00,
+		CaseInsensitive      = 1<<0,
+		DiacriticInsensitive = 1<<1,
+		Normalized           = 1<<2
 	}	
 	
 	public enum NSCompoundPredicateType {
@@ -621,4 +622,11 @@ namespace MonoMac.Foundation  {
 		Background,
 		Voice
 	}
+
+	[Flags]
+	public enum NSSortOptions {
+		Concurrent = 1 << 0,
+		Stable = 1 << 4
+	}
+	
 }

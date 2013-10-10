@@ -28,10 +28,11 @@ using System;
 using Xwt.Backends;
 using System.ComponentModel;
 using Xwt.Drawing;
-using Xwt.Engine;
+
 
 namespace Xwt
 {
+	[BackendType (typeof(IMenuItemBackend))]
 	public class MenuItem: XwtComponent, ICellContainer
 	{
 		CellViewCollection cells;
@@ -70,8 +71,7 @@ namespace Xwt
 		public MenuItem (Command command): this ()
 		{
 			Label = command.Label;
-			if (!string.IsNullOrEmpty (command.Icon))
-				Image = Image.FromIcon (command.Icon, IconSize.Small);
+			Image = command.Icon;
 		}
 		
 		public MenuItem (string label): this ()
@@ -103,7 +103,7 @@ namespace Xwt
 		
 		public Image Image {
 			get { return image; }
-			set { image = value; Backend.SetImage (XwtObject.GetBackend (value)); }
+			set { image = value; Backend.SetImage (image != null ? image.ImageDescription : ImageDescription.Null); }
 		}
 		
 		public void Show ()
@@ -127,8 +127,8 @@ namespace Xwt
 		public Menu SubMenu {
 			get { return subMenu; }
 			set {
+				Backend.SetSubmenu ((IMenuBackend)BackendHost.ToolkitEngine.GetSafeBackend (value));
 				subMenu = value;
-				Backend.SetSubmenu ((IMenuBackend) WidgetRegistry.GetBackend (subMenu));
 			}
 		}
 		

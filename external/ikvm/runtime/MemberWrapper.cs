@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2002-2012 Jeroen Frijters
+  Copyright (C) 2002-2013 Jeroen Frijters
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -58,11 +58,11 @@ namespace IKVM.Internal
 	abstract class MemberWrapper
 	{
 		private HandleWrapper handle;
-		private TypeWrapper declaringType;
-		private Modifiers modifiers;
+		private readonly TypeWrapper declaringType;
+		private readonly Modifiers modifiers;
 		private MemberFlags flags;
-		private string name;
-		private string sig;
+		private readonly string name;
+		private readonly string sig;
 
 		private sealed class HandleWrapper
 		{
@@ -356,7 +356,7 @@ namespace IKVM.Internal
 	interface ICustomInvoke
 	{
 #if !STATIC_COMPILER && !FIRST_PASS && !STUB_GENERATOR
-		object Invoke(object obj, object[] args, ikvm.@internal.CallerID callerID);
+		object Invoke(object obj, object[] args);
 #endif
 	}
 
@@ -476,7 +476,7 @@ namespace IKVM.Internal
 					parameterTypes[i] = argTypes[i].EnsureLoadable(loader).ClassObject;
 				}
 				java.lang.Class[] checkedExceptions = GetExceptions();
-				if (this.Name == StringConstants.INIT)
+				if (this.IsConstructor)
 				{
 					method = new java.lang.reflect.Constructor(
 						this.DeclaringType.ClassObject,
@@ -786,7 +786,7 @@ namespace IKVM.Internal
 #if FIRST_PASS
 			return null;
 #else
-			if (ReferenceEquals(Name, StringConstants.INIT))
+			if (IsConstructor)
 			{
 				java.lang.reflect.Constructor cons = (java.lang.reflect.Constructor)ToMethodOrConstructor(false);
 				if (obj == null)
@@ -1007,6 +1007,11 @@ namespace IKVM.Internal
 		{
 			get { return false; }
 		}
+
+		internal bool IsConstructor
+		{
+			get { return (object)Name == (object)StringConstants.INIT; }
+		}
 	}
 
 	// placeholder for <clinit> method that exist in ClassFile but not in TypeWrapper
@@ -1090,8 +1095,8 @@ namespace IKVM.Internal
 
 	sealed class SimpleCallMethodWrapper : MethodWrapper
 	{
-		private SimpleOpCode call;
-		private SimpleOpCode callvirt;
+		private readonly SimpleOpCode call;
+		private readonly SimpleOpCode callvirt;
 
 		internal SimpleCallMethodWrapper(TypeWrapper declaringType, string name, string sig, MethodInfo method, TypeWrapper returnType, TypeWrapper[] parameterTypes, Modifiers modifiers, MemberFlags flags, SimpleOpCode call, SimpleOpCode callvirt)
 			: base(declaringType, name, sig, method, returnType, parameterTypes, modifiers, flags)
@@ -1491,7 +1496,7 @@ namespace IKVM.Internal
 #else
 			if (jniAccessor == null)
 			{
-				jniAccessor = IKVM.NativeCode.sun.reflect.ReflectionFactory.NewFieldAccessorJNI(this);
+				Interlocked.CompareExchange(ref jniAccessor, IKVM.NativeCode.sun.reflect.ReflectionFactory.NewFieldAccessorJNI(this), null);
 			}
 			return jniAccessor;
 #endif
@@ -1913,8 +1918,8 @@ namespace IKVM.Internal
 
 	sealed class CompiledAccessStubFieldWrapper : FieldWrapper
 	{
-		private MethodInfo getter;
-		private MethodInfo setter;
+		private readonly MethodInfo getter;
+		private readonly MethodInfo setter;
 
 		private static Modifiers GetModifiers(PropertyInfo property)
 		{

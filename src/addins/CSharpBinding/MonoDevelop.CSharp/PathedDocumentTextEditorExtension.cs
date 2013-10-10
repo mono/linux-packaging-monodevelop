@@ -43,20 +43,39 @@ namespace MonoDevelop.CSharp
 	{
 		public override void Dispose ()
 		{
-			Document.Editor.Caret.PositionChanged -= UpdatePath;
+			if (caret != null) {
+				caret.PositionChanged -= UpdatePath;
+				caret = null;
+			}
+			if (ext != null) {
+				ext.TypeSegmentTreeUpdated -= HandleTypeSegmentTreeUpdated;
+				ext = null;
+			}
+			currentPath = null;
+			lastType = null;
+			lastMember = null;
 			base.Dispose ();
 		}
 
 		bool isPathSet;
+
+		Mono.TextEditor.Caret caret;
+		CSharpCompletionTextEditorExtension ext;
 		
 		public override void Initialize ()
 		{
 			CurrentPath = new PathEntry[] { new PathEntry (GettextCatalog.GetString ("No selection")) { Tag = null } };
 			isPathSet = false;
 			UpdatePath (null, null);
-			Document.Editor.Caret.PositionChanged += UpdatePath;
-			var ext = Document.GetContent<CSharpCompletionTextEditorExtension> ();
-			ext.TypeSegmentTreeUpdated += (o, s) => UpdatePath (null, null);
+			caret = Document.Editor.Caret;
+			caret.PositionChanged += UpdatePath;
+			ext = Document.GetContent<CSharpCompletionTextEditorExtension> ();
+			ext.TypeSegmentTreeUpdated += HandleTypeSegmentTreeUpdated;
+		}
+
+		void HandleTypeSegmentTreeUpdated (object sender, EventArgs e)
+		{
+			UpdatePath (null, null);
 		}
 
 		#region IPathedDocument implementation
@@ -97,6 +116,9 @@ namespace MonoDevelop.CSharp
 						if (member is FieldDeclaration) {
 							foreach (var variable in ((FieldDeclaration)member).Variables)
 								memberList.Add (variable);
+						} else if (member is FixedFieldDeclaration) {
+							foreach (var variable in ((FixedFieldDeclaration)member).Variables)
+								memberList.Add (variable);
 						} else if (member is EventDeclaration) {
 							foreach (var variable in ((EventDeclaration)member).Variables)
 								memberList.Add (variable);
@@ -114,6 +136,9 @@ namespace MonoDevelop.CSharp
 					foreach (var member in type.Members) {
 						if (member is FieldDeclaration) {
 							foreach (var variable in ((FieldDeclaration)member).Variables)
+								memberList.Add (variable);
+						} if (member is FixedFieldDeclaration) {
+							foreach (var variable in ((FixedFieldDeclaration)member).Variables)
 								memberList.Add (variable);
 						} else {
 							memberList.Add (member);
@@ -179,6 +204,9 @@ namespace MonoDevelop.CSharp
 				}
 				if (node is EntityDeclaration)
 					return ((EntityDeclaration)node).Name;
+				if (node is FixedVariableInitializer) {
+					return ((FixedVariableInitializer)node).Name;
+				}
 				return ((VariableInitializer)node).Name;
 			}
 
@@ -370,8 +398,22 @@ namespace MonoDevelop.CSharp
 				return;
 
 			var loc = Document.Editor.Caret.Location;
+			var compExt = Document.GetContent<CSharpCompletionTextEditorExtension> ();
+			var caretOffset = Document.Editor.Caret.Offset;
+			var segType = compExt.GetTypeAt (caretOffset);
+			if (segType != null)
+				loc = segType.Region.Begin;
 
 			var curType = (EntityDeclaration)unit.GetNodeAt (loc, n => n is TypeDeclaration || n is DelegateDeclaration);
+
+
+			var segMember = compExt.GetMemberAt (caretOffset);
+			if (segMember != null) {
+				loc = segMember.Region.Begin;
+			} else {
+				loc = Document.Editor.Caret.Location;
+			}
+
 			var curMember = unit.GetNodeAt<EntityDeclaration> (loc);
 			if (curType == curMember)
 				curMember = null;

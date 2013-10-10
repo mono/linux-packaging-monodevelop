@@ -582,14 +582,14 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 					// For all but the last identifier:
 					UsingScope usingScope;
 					for (int i = 0; i < identifiers.Count - 1; i++) {
-						usingScope = new UsingScope(resolver.CurrentUsingScope.UnresolvedUsingScope, identifiers[i].Name);
+						usingScope = new UsingScope(resolver.CurrentUsingScope.UnresolvedUsingScope, identifiers[i]);
 						usingScope.Region = region;
 						PushUsingScope(usingScope);
 					}
 					// Last using scope:
-					usingScope = new UsingScope(resolver.CurrentUsingScope.UnresolvedUsingScope, identifiers.Last().Name);
+					usingScope = new UsingScope(resolver.CurrentUsingScope.UnresolvedUsingScope, identifiers.Last());
 					usingScope.Region = region;
-					var cv = new TypeSystemConvertVisitor(new CSharpUnresolvedFile(region.FileName ?? string.Empty), usingScope);
+					var cv = new TypeSystemConvertVisitor(new CSharpUnresolvedFile(), usingScope);
 					ApplyVisitorToUsings(cv, namespaceDeclaration.Children);
 					PushUsingScope(usingScope);
 				}
@@ -653,31 +653,31 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 		#region Track CurrentMember
 		ResolveResult IAstVisitor<ResolveResult>.VisitFieldDeclaration(FieldDeclaration fieldDeclaration)
 		{
-			return VisitFieldOrEventDeclaration(fieldDeclaration, EntityType.Field);
+			return VisitFieldOrEventDeclaration(fieldDeclaration, SymbolKind.Field);
 		}
 		
 		ResolveResult IAstVisitor<ResolveResult>.VisitFixedFieldDeclaration(FixedFieldDeclaration fixedFieldDeclaration)
 		{
-			return VisitFieldOrEventDeclaration(fixedFieldDeclaration, EntityType.Field);
+			return VisitFieldOrEventDeclaration(fixedFieldDeclaration, SymbolKind.Field);
 		}
 		
 		ResolveResult IAstVisitor<ResolveResult>.VisitEventDeclaration(EventDeclaration eventDeclaration)
 		{
-			return VisitFieldOrEventDeclaration(eventDeclaration, EntityType.Event);
+			return VisitFieldOrEventDeclaration(eventDeclaration, SymbolKind.Event);
 		}
 		
-		ResolveResult VisitFieldOrEventDeclaration(EntityDeclaration fieldOrEventDeclaration, EntityType entityType)
+		ResolveResult VisitFieldOrEventDeclaration(EntityDeclaration fieldOrEventDeclaration, SymbolKind symbolKind)
 		{
 			//int initializerCount = fieldOrEventDeclaration.GetChildrenByRole(Roles.Variable).Count;
 			CSharpResolver oldResolver = resolver;
 			for (AstNode node = fieldOrEventDeclaration.FirstChild; node != null; node = node.NextSibling) {
-				if (node.Role == Roles.Variable) {
+				if (node.Role == Roles.Variable || node.Role == FixedFieldDeclaration.VariableRole) {
 					IMember member;
 					if (unresolvedFile != null) {
 						member = GetMemberFromLocation(node);
 					} else {
 						string name = ((VariableInitializer)node).Name;
-						member = AbstractUnresolvedMember.Resolve(resolver.CurrentTypeResolveContext, entityType, name);
+						member = AbstractUnresolvedMember.Resolve(resolver.CurrentTypeResolveContext, symbolKind, name);
 					}
 					resolver = resolver.WithCurrentMember(member);
 					
@@ -797,15 +797,15 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 					member = GetMemberFromLocation(memberDeclaration);
 				} else {
 					// Re-discover the method:
-					EntityType entityType = memberDeclaration.EntityType;
+					SymbolKind symbolKind = memberDeclaration.SymbolKind;
 					var parameterTypes = TypeSystemConvertVisitor.GetParameterTypes(memberDeclaration.GetChildrenByRole(Roles.Parameter), InterningProvider.Dummy);
-					if (entityType == EntityType.Constructor) {
+					if (symbolKind == SymbolKind.Constructor) {
 						string name = memberDeclaration.HasModifier(Modifiers.Static) ? ".cctor" : ".ctor";
 						member = AbstractUnresolvedMember.Resolve(
-							resolver.CurrentTypeResolveContext, entityType, name,
+							resolver.CurrentTypeResolveContext, symbolKind, name,
 							parameterTypeReferences: parameterTypes);
-					} else if (entityType == EntityType.Destructor) {
-						member = AbstractUnresolvedMember.Resolve(resolver.CurrentTypeResolveContext, entityType, "Finalize");
+					} else if (symbolKind == SymbolKind.Destructor) {
+						member = AbstractUnresolvedMember.Resolve(resolver.CurrentTypeResolveContext, symbolKind, "Finalize");
 					} else {
 						string[] typeParameterNames = memberDeclaration.GetChildrenByRole(Roles.TypeParameter).Select(tp => tp.Name).ToArray();
 						AstType explicitInterfaceAstType = memberDeclaration.GetChildByRole(EntityDeclaration.PrivateImplementationTypeRole);
@@ -814,7 +814,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 							explicitInterfaceType = explicitInterfaceAstType.ToTypeReference();
 						}
 						member = AbstractUnresolvedMember.Resolve(
-							resolver.CurrentTypeResolveContext, entityType, memberDeclaration.Name,
+							resolver.CurrentTypeResolveContext, symbolKind, memberDeclaration.Name,
 							explicitInterfaceType, typeParameterNames, parameterTypes);
 					}
 				}
@@ -868,7 +868,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 						explicitInterfaceType = explicitInterfaceAstType.ToTypeReference();
 					}
 					member = AbstractUnresolvedMember.Resolve(
-						resolver.CurrentTypeResolveContext, propertyOrIndexerDeclaration.EntityType, name,
+						resolver.CurrentTypeResolveContext, propertyOrIndexerDeclaration.SymbolKind, name,
 						explicitInterfaceType, parameterTypeReferences: parameterTypeReferences);
 				}
 				// We need to use the property as current member so that indexer parameters can be resolved correctly.
@@ -918,9 +918,9 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 					string name = eventDeclaration.Name;
 					AstType explicitInterfaceAstType = eventDeclaration.PrivateImplementationType;
 					if (explicitInterfaceAstType.IsNull) {
-						member = AbstractUnresolvedMember.Resolve(resolver.CurrentTypeResolveContext, EntityType.Event, name);
+						member = AbstractUnresolvedMember.Resolve(resolver.CurrentTypeResolveContext, SymbolKind.Event, name);
 					} else {
-						member = AbstractUnresolvedMember.Resolve(resolver.CurrentTypeResolveContext, EntityType.Event, name,
+						member = AbstractUnresolvedMember.Resolve(resolver.CurrentTypeResolveContext, SymbolKind.Event, name,
 						                                          explicitInterfaceAstType.ToTypeReference());
 					}
 				}
@@ -1169,7 +1169,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 						Name = "get_" + name,
 						Accessibility = Accessibility.Public,
 						ReturnType = returnTypeRef,
-						EntityType = EntityType.Accessor,
+						SymbolKind = SymbolKind.Accessor,
 						AccessorOwner = property
 					};
 					unresolvedProperties.Add(property);
@@ -1432,11 +1432,6 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				ScanChildren(directionExpression);
 				return null;
 			}
-		}
-		
-		ResolveResult IAstVisitor<ResolveResult>.VisitEmptyExpression(EmptyExpression emptyExpression)
-		{
-			return errorResult;
 		}
 		
 		ResolveResult IAstVisitor<ResolveResult>.VisitIndexerExpression(IndexerExpression indexerExpression)
@@ -1963,7 +1958,8 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				if (pd.ParameterModifier == ParameterModifier.Ref || pd.ParameterModifier == ParameterModifier.Out)
 					type = new ByReferenceType(type);
 				
-				IParameter p = new DefaultParameter(type, pd.Name, MakeRegion(pd),
+				IParameter p = new DefaultParameter(type, pd.Name,
+				                                    region: MakeRegion(pd),
 				                                    isRef: pd.ParameterModifier == ParameterModifier.Ref,
 				                                    isOut: pd.ParameterModifier == ParameterModifier.Out);
 				// The parameter declaration must be scanned in the current context (without the new parameter)
@@ -2010,7 +2006,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 			bool isEndpointUnreachable;
 			
 			// The actual return type is set when the lambda is applied by the conversion.
-			// For async lambdas, this is the unpacked task type
+			// For async lambdas, this includes the task type
 			IType actualReturnType;
 			
 			internal override bool IsUndecided {
@@ -2034,10 +2030,13 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 						Analyze();
 						if (returnValues.Count == 1) {
 							bodyRR = returnValues[0];
-							if (actualReturnType.Kind != TypeKind.Void) {
-								var conv = storedContext.conversions.ImplicitConversion(bodyRR, actualReturnType);
-								if (!conv.IsIdentityConversion)
-									bodyRR = new ConversionResolveResult(actualReturnType, bodyRR, conv, storedContext.CheckForOverflow);
+							if (actualReturnType != null) {
+								IType unpackedActualReturnType = isAsync ? visitor.UnpackTask(actualReturnType) : actualReturnType;
+								if (unpackedActualReturnType.Kind != TypeKind.Void) {
+									var conv = storedContext.conversions.ImplicitConversion(bodyRR, unpackedActualReturnType);
+									if (!conv.IsIdentityConversion)
+										bodyRR = new ConversionResolveResult(unpackedActualReturnType, bodyRR, conv, storedContext.CheckForOverflow);
+								}
 							}
 							return bodyRR;
 						}
@@ -2107,6 +2106,12 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				return inferredReturnType;
 			}
 			
+			public override IType ReturnType {
+				get {
+					return actualReturnType ?? SpecialType.UnknownType;
+				}
+			}
+			
 			public override bool IsImplicitlyTyped {
 				get { return false; }
 			}
@@ -2136,8 +2141,6 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 					// Explicitly typed lambdas do not use a nested visitor
 					throw new InvalidOperationException();
 				}
-				if (isAsync)
-					returnType = parentVisitor.UnpackTask(returnType);
 				if (actualReturnType != null) {
 					if (actualReturnType.Equals(returnType))
 						return; // return type already set
@@ -2146,10 +2149,11 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				actualReturnType = returnType;
 				visitor.undecidedLambdas.Remove(this);
 				Analyze();
-				Log.WriteLine("Applying return type {0} to explicitly-typed lambda {1}", returnType, this.LambdaExpression);
-				if (returnType.Kind != TypeKind.Void) {
+				IType unpackedReturnType = isAsync ? visitor.UnpackTask(returnType) : returnType;
+				Log.WriteLine("Applying return type {0} to explicitly-typed lambda {1}", unpackedReturnType, this.LambdaExpression);
+				if (unpackedReturnType.Kind != TypeKind.Void) {
 					for (int i = 0; i < returnExpressions.Count; i++) {
-						visitor.ProcessConversion(returnExpressions[i], returnValues[i], returnType);
+						visitor.ProcessConversion(returnExpressions[i], returnValues[i], unpackedReturnType);
 					}
 				}
 			}
@@ -2192,6 +2196,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 			readonly List<LambdaTypeHypothesis> hypotheses = new List<LambdaTypeHypothesis>();
 			internal IList<IParameter> parameters = new List<IParameter>();
 			
+			internal IType actualReturnType;
 			internal LambdaTypeHypothesis winningHypothesis;
 			internal ResolveResult bodyResult;
 			internal readonly ResolveVisitor parentVisitor;
@@ -2235,7 +2240,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 			{
 				this.lambda = lambda;
 				foreach (var pd in lambda.Parameters) {
-					parameters.Add(new DefaultParameter(SpecialType.UnknownType, pd.Name, parentVisitor.MakeRegion(pd)));
+					parameters.Add(new DefaultParameter(SpecialType.UnknownType, pd.Name, region: parentVisitor.MakeRegion(pd)));
 				}
 				RegisterUndecidedLambda();
 			}
@@ -2337,6 +2342,10 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				GetAnyHypothesis().MergeInto(parentVisitor, SpecialType.UnknownType);
 			}
 			
+			public override IType ReturnType {
+				get { return actualReturnType ?? SpecialType.UnknownType; }
+			}
+			
 			public override bool IsImplicitlyTyped {
 				get { return true; }
 			}
@@ -2401,7 +2410,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				if (parameterDeclarations != null) {
 					int i = 0;
 					foreach (var pd in parameterDeclarations) {
-						lambdaParameters[i] = new DefaultParameter(parameterTypes[i], pd.Name, visitor.MakeRegion(pd));
+						lambdaParameters[i] = new DefaultParameter(parameterTypes[i], pd.Name, region: visitor.MakeRegion(pd));
 						visitor.resolver = visitor.resolver.AddVariable(lambdaParameters[i]);
 						i++;
 						visitor.Scan(pd);
@@ -2409,7 +2418,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				} else {
 					for (int i = 0; i < parameterTypes.Length; i++) {
 						var p = lambda.Parameters[i];
-						lambdaParameters[i] = new DefaultParameter(parameterTypes[i], p.Name, p.Region);
+						lambdaParameters[i] = new DefaultParameter(parameterTypes[i], p.Name, region: p.Region);
 						visitor.resolver = visitor.resolver.AddVariable(lambdaParameters[i]);
 					}
 				}
@@ -2465,6 +2474,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				else if (lambda.winningHypothesis != null)
 					throw new InvalidOperationException("Trying to merge conflicting hypotheses");
 				
+				lambda.actualReturnType = returnType;
 				if (lambda.IsAsync)
 					returnType = parentVisitor.UnpackTask(returnType);
 				
@@ -2472,7 +2482,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				lambda.parameters = lambdaParameters; // replace untyped parameters with typed parameters
 				if (lambda.BodyExpression is Expression && returnValues.Count == 1) {
 					lambda.bodyResult = returnValues[0];
-					if (!returnType.IsKnownType(KnownTypeCode.Void)) {
+					if (returnType.Kind != TypeKind.Void) {
 						var conv = storedContext.conversions.ImplicitConversion(lambda.bodyResult, returnType);
 						if (!conv.IsIdentityConversion)
 							lambda.bodyResult = new ConversionResolveResult(returnType, lambda.bodyResult, conv, storedContext.CheckForOverflow);
@@ -2628,7 +2638,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 						inferredReturnType = resolver.Compilation.FindType(KnownTypeCode.Task);
 						Log.WriteLine("Lambda return type was inferred to: " + inferredReturnType);
 						return;
-					} 
+					}
 
 					TypeInference ti = new TypeInference(resolver.Compilation, resolver.conversions);
 					bool tiSuccess;
@@ -2759,7 +2769,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 		{
 			var compilation = resolver.Compilation;
 			ResolveResult expression = Resolve(foreachStatement.InExpression);
-			bool isImplicitlyTypedVariable = IsVar(foreachStatement.VariableType);
+			bool isImplicitlyTypedVariable = foreachStatement.VariableType.IsVar();
 			var memberLookup = resolver.CreateMemberLookup();
 			
 			IType collectionType, enumeratorType, elementType;
@@ -2934,7 +2944,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 		ResolveResult IAstVisitor<ResolveResult>.VisitVariableDeclarationStatement(VariableDeclarationStatement variableDeclarationStatement)
 		{
 			bool isConst = (variableDeclarationStatement.Modifiers & Modifiers.Const) != 0;
-			if (!isConst && IsVar(variableDeclarationStatement.Type) && variableDeclarationStatement.Variables.Count == 1) {
+			if (!isConst && variableDeclarationStatement.Type.IsVar() && variableDeclarationStatement.Variables.Count == 1) {
 				VariableInitializer vi = variableDeclarationStatement.Variables.Single();
 				StoreCurrentState(variableDeclarationStatement.Type);
 				IType type = Resolve(vi.Initializer).Type;
@@ -3120,12 +3130,6 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 		#endregion
 		
 		#region Local Variable Type Inference
-		static bool IsVar(AstNode returnType)
-		{
-			SimpleType st = returnType as SimpleType;
-			return st != null && st.Identifier == "var" && st.TypeArguments.Count == 0;
-		}
-		
 		IVariable MakeVariable(IType type, Identifier variableName)
 		{
 			return new SimpleVariable(MakeRegion(variableName), type, variableName.Name);
@@ -3149,6 +3153,10 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				this.region = region;
 				this.type = type;
 				this.name = name;
+			}
+			
+			public SymbolKind SymbolKind {
+				get { return SymbolKind.Variable; }
 			}
 			
 			public string Name {
@@ -3475,6 +3483,12 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 			public override IType GetInferredReturnType(IType[] parameterTypes)
 			{
 				return bodyExpression.Type;
+			}
+			
+			public override IType ReturnType {
+				get {
+					return bodyExpression.Type;
+				}
 			}
 			
 			public override string ToString()
@@ -3967,14 +3981,14 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 			IType conversionOperatorReturnType = ResolveType(documentationReference.ConversionOperatorReturnType);
 			IParameter[] parameters = documentationReference.Parameters.Select(ResolveXmlDocParameter).ToArray();
 			
-			if (documentationReference.EntityType == EntityType.TypeDefinition) {
+			if (documentationReference.SymbolKind == SymbolKind.TypeDefinition) {
 				if (declaringTypeDef != null)
 					return new TypeResolveResult(declaringTypeDef);
 				else
 					return errorResult;
 			}
 			
-			if (documentationReference.EntityType == EntityType.None) {
+			if (documentationReference.SymbolKind == SymbolKind.None) {
 				// might be a type, member or ctor
 				string memberName = documentationReference.MemberName;
 				ResolveResult rr;
@@ -4012,10 +4026,10 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 			// Indexer or operator
 			if (declaringTypeDef == null)
 				return errorResult;
-			if (documentationReference.EntityType == EntityType.Indexer) {
+			if (documentationReference.SymbolKind == SymbolKind.Indexer) {
 				var indexers = declaringTypeDef.Properties.Where(p => p.IsIndexer && !p.IsExplicitInterfaceImplementation);
 				return FindByParameters(indexers, parameters);
-			} else if (documentationReference.EntityType == EntityType.Operator) {
+			} else if (documentationReference.SymbolKind == SymbolKind.Operator) {
 				var opType = documentationReference.OperatorType;
 				string memberName = OperatorDeclaration.GetName(opType);
 				var methods = declaringTypeDef.Methods.Where(m => m.IsOperator && m.Name == memberName);

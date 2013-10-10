@@ -49,8 +49,8 @@ namespace Mono.TextEditor
 		TextEditorData textEditorData;
 		
 		protected IconMargin       iconMargin;
+		protected ActionMargin     actionMargin;
 		protected GutterMargin     gutterMargin;
-//		protected DashedLineMargin dashedLineMargin;
 		protected FoldMarkerMargin foldMarkerMargin;
 		protected TextViewMargin   textViewMargin;
 		
@@ -323,15 +323,15 @@ namespace Mono.TextEditor
 
 			iconMargin = new IconMargin (editor);
 			gutterMargin = new GutterMargin (editor);
-//			dashedLineMargin = new DashedLineMargin (this);
+			actionMargin = new ActionMargin (editor);
 			foldMarkerMargin = new FoldMarkerMargin (editor);
 			textViewMargin = new TextViewMargin (editor);
 
 			margins.Add (iconMargin);
 			margins.Add (gutterMargin);
+			margins.Add (actionMargin);
 			margins.Add (foldMarkerMargin);
-//			margins.Add (dashedLineMargin);
-			
+
 			margins.Add (textViewMargin);
 			this.textEditorData.SelectionChanged += TextEditorDataSelectionChanged;
 			this.textEditorData.UpdateAdjustmentsRequested += TextEditorDatahandleUpdateAdjustmentsRequested;
@@ -423,17 +423,17 @@ namespace Mono.TextEditor
 			window.ShowAll ();
 		}
 		
-		internal int preeditOffset, preeditLine, preeditCursorCharIndex;
+		internal int preeditOffset = -1, preeditLine, preeditCursorCharIndex;
 		internal string preeditString;
 		internal Pango.AttrList preeditAttrs;
 		internal bool preeditHeightChange;
 		
-		internal bool ContainsPreedit (int line, int length)
+		internal bool ContainsPreedit (int offset, int length)
 		{
 			if (string.IsNullOrEmpty (preeditString))
 				return false;
 			
-			return line <= preeditOffset && preeditOffset <= line + length;
+			return offset <= preeditOffset && preeditOffset <= offset + length;
 		}
 
 		void PreeditStringChanged (object sender, EventArgs e)
@@ -444,31 +444,41 @@ namespace Mono.TextEditor
 					preeditOffset = Caret.Offset;
 					preeditLine = Caret.Line;
 				}
+				if (UpdatePreeditLineHeight ())
+					QueueDraw ();
+			} else {
+				preeditOffset = -1;
+				preeditString = null;
+				preeditAttrs = null;
+				preeditCursorCharIndex = 0;
+				if (UpdatePreeditLineHeight ())
+					QueueDraw ();
+			}
+			this.textViewMargin.ForceInvalidateLine (preeditLine);
+			this.textEditorData.Document.CommitLineUpdate (preeditLine);
+		}
+
+		internal bool UpdatePreeditLineHeight ()
+		{
+			if (!string.IsNullOrEmpty (preeditString)) {
 				using (var preeditLayout = PangoUtil.CreateLayout (this)) {
 					preeditLayout.SetText (preeditString);
 					preeditLayout.Attributes = preeditAttrs;
 					int w, h;
 					preeditLayout.GetSize (out w, out h);
 					var calcHeight = System.Math.Ceiling (h / Pango.Scale.PangoScale);
-					if (LineHeight != calcHeight) {
+					if (LineHeight < calcHeight) {
 						textEditorData.HeightTree.SetLineHeight (preeditLine, calcHeight);
 						preeditHeightChange = true;
-						QueueDraw ();
+						return true;
 					}
 				}
-			} else {
-				preeditOffset = -1;
-				preeditString = null;
-				preeditAttrs = null;
-				preeditCursorCharIndex = 0;
-				if (preeditHeightChange) {
-					preeditHeightChange = false;
-					textEditorData.HeightTree.Rebuild ();
-					QueueDraw ();
-				}
+			} else if (preeditHeightChange) {
+				preeditHeightChange = false;
+				textEditorData.HeightTree.Rebuild ();
+				return true;
 			}
-			this.textViewMargin.ForceInvalidateLine (preeditLine);
-			this.textEditorData.Document.CommitLineUpdate (preeditLine);
+			return false;
 		}
 
 		void CaretPositionChanged (object sender, DocumentLocationEventArgs args) 
@@ -777,6 +787,7 @@ namespace Mono.TextEditor
 			
 			this.textEditorData.SelectionChanged -= TextEditorDataSelectionChanged;
 			this.textEditorData.Dispose (); 
+			longestLine = null;
 
 			base.OnDestroyed ();
 		}
@@ -1102,8 +1113,11 @@ namespace Mono.TextEditor
 			ResetMouseState ();
 			return base.OnButtonReleaseEvent (e);
 		}
-		
-		protected void ResetMouseState ()
+
+		/// <summary>
+		/// Use this method with care.
+		/// </summary>
+		public void ResetMouseState ()
 		{
 			mouseButtonPressed = 0;
 			textViewMargin.inDrag = false;
@@ -1149,38 +1163,38 @@ namespace Mono.TextEditor
 
 		protected override void OnDragDataReceived (DragContext context, int x, int y, SelectionData selection_data, uint info, uint time_)
 		{
-			using (var undo = OpenUndoGroup ()) {
-				int dragOffset = Document.LocationToOffset (dragCaretPos);
-				if (context.Action == DragAction.Move) {
-					if (CanEdit (Caret.Line) && !selection.IsEmpty) {
-						var selectionRange = selection.GetSelectionRange (textEditorData);
-						if (selectionRange.Offset < dragOffset)
-							dragOffset -= selectionRange.Length;
-						Caret.PreserveSelection = true;
-						textEditorData.DeleteSelection (selection);
-						Caret.PreserveSelection = false;
-	
-						selection = Selection.Empty;
-					}
+			var undo = OpenUndoGroup ();
+			int dragOffset = Document.LocationToOffset (dragCaretPos);
+			if (context.Action == DragAction.Move) {
+				if (CanEdit (Caret.Line) && !selection.IsEmpty) {
+					var selectionRange = selection.GetSelectionRange (textEditorData);
+					if (selectionRange.Offset < dragOffset)
+						dragOffset -= selectionRange.Length;
+					Caret.PreserveSelection = true;
+					textEditorData.DeleteSelection (selection);
+					Caret.PreserveSelection = false;
+
+					selection = Selection.Empty;
 				}
-				if (selection_data.Length > 0 && selection_data.Format == 8) {
-					Caret.Offset = dragOffset;
-					if (CanEdit (dragCaretPos.Line)) {
-						int offset = Caret.Offset;
-						if (!selection.IsEmpty && selection.GetSelectionRange (textEditorData).Offset >= offset) {
-							var start = Document.OffsetToLocation (selection.GetSelectionRange (textEditorData).Offset + selection_data.Text.Length);
-							var end = Document.OffsetToLocation (selection.GetSelectionRange (textEditorData).Offset + selection_data.Text.Length + selection.GetSelectionRange (textEditorData).Length);
-							selection = new Selection (start, end);
-						}
-						textEditorData.PasteText (offset, selection_data.Text, null);
-						Caret.Offset = offset + selection_data.Text.Length;
-						MainSelection = new Selection (Document.OffsetToLocation (offset), Document.OffsetToLocation (offset + selection_data.Text.Length));
-					}
-					dragOver = false;
-					context = null;
-				}
-				mouseButtonPressed = 0;
 			}
+			if (selection_data.Length > 0 && selection_data.Format == 8) {
+				Caret.Offset = dragOffset;
+				if (CanEdit (dragCaretPos.Line)) {
+					int offset = Caret.Offset;
+					if (!selection.IsEmpty && selection.GetSelectionRange (textEditorData).Offset >= offset) {
+						var start = Document.OffsetToLocation (selection.GetSelectionRange (textEditorData).Offset + selection_data.Text.Length);
+						var end = Document.OffsetToLocation (selection.GetSelectionRange (textEditorData).Offset + selection_data.Text.Length + selection.GetSelectionRange (textEditorData).Length);
+						selection = new Selection (start, end);
+					}
+					textEditorData.PasteText (offset, selection_data.Text, null, ref undo);
+					Caret.Offset = offset + selection_data.Text.Length;
+					MainSelection = new Selection (Document.OffsetToLocation (offset), Document.OffsetToLocation (offset + selection_data.Text.Length));
+				}
+				dragOver = false;
+				context = null;
+			}
+			mouseButtonPressed = 0;
+			undo.Dispose ();
 			base.OnDragDataReceived (context, x, y, selection_data, info, time_);
 		}
 		
@@ -1390,6 +1404,10 @@ namespace Mono.TextEditor
 		
 		public Margin IconMargin {
 			get { return iconMargin; }
+		}
+
+		public ActionMargin ActionMargin {
+			get { return actionMargin; }
 		}
 		
 		public DocumentLocation LogicalToVisualLocation (DocumentLocation location)

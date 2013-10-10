@@ -300,12 +300,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		
 		public static string ToMSBuildPath (string baseDirectory, string absPath)
 		{
-			absPath = EscapeString (absPath);
 			if (baseDirectory != null) {
-				absPath = FileService.NormalizeRelativePath (FileService.AbsoluteToRelativePath (
-				         baseDirectory, absPath));
+				absPath = FileService.NormalizeRelativePath (FileService.AbsoluteToRelativePath (baseDirectory, absPath));
 			}
-			return absPath.Replace ('/', '\\');
+			return EscapeString (absPath).Replace ('/', '\\');
 		}
 		
 		internal static string ToMSBuildPathRelative (string baseDirectory, string absPath)
@@ -369,7 +367,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			
 			// If we're on Windows, don't need to fix file casing.
 			if (Platform.IsWindows) {
-				resultPath = Path.GetFullPath (path);
+				resultPath = FileService.GetFullPath (path);
 				return true;
 			}
 			
@@ -611,6 +609,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		{
 			if (type == typeof(bool))
 				return new MSBuildBoolDataType ();
+			else if (type == typeof(bool?))
+				return new MSBuildNullableBoolDataType ();
 			else
 				return base.CreateConfigurationDataType (type);
 		}
@@ -642,6 +642,37 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		}
 
 		public bool RawValue { get; private set; }
+	}
+
+	class MSBuildNullableBoolDataType: PrimitiveDataType
+	{
+		public MSBuildNullableBoolDataType (): base (typeof(bool))
+		{
+		}
+
+		internal protected override DataNode OnSerialize (SerializationContext serCtx, object mapData, object value)
+		{
+			return new MSBuildNullableBoolDataValue (Name, (bool?) value);
+		}
+
+		internal protected override object OnDeserialize (SerializationContext serCtx, object mapData, DataNode data)
+		{
+			var d = (DataValue)data;
+			if (string.IsNullOrEmpty (d.Value))
+				return (bool?) null;
+			return (bool?) String.Equals (d.Value, "true", StringComparison.OrdinalIgnoreCase);
+		}
+	}
+
+	class MSBuildNullableBoolDataValue : DataValue
+	{
+		public MSBuildNullableBoolDataValue (string name, bool? value)
+			: base (name, value.HasValue? (value.Value? "True" : "False") : null)
+		{
+			RawValue = value;
+		}
+
+		public bool? RawValue { get; private set; }
 	}
 	
 	public class MSBuildResourceHandler: IResourceHandler

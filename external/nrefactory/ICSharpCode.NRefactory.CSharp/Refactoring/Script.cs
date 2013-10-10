@@ -29,6 +29,8 @@ using System.IO;
 using ICSharpCode.NRefactory.Editor;
 using ICSharpCode.NRefactory.TypeSystem;
 using System.Threading.Tasks;
+using System.Linq;
+using System.Text;
 
 namespace ICSharpCode.NRefactory.CSharp.Refactoring
 {
@@ -176,7 +178,55 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			output.RegisterTrackedSegments(this, startOffset);
 			CorrectFormatting (null, newNode);
 		}
-		
+
+		/// <summary>
+		/// Changes the modifier of a given entity declaration.
+		/// </summary>
+		/// <param name="entity">The entity.</param>
+		/// <param name="modifiers">The new modifiers.</param>
+		public void ChangeModifier(EntityDeclaration entity, Modifiers modifiers)
+		{
+			var dummyEntity = new MethodDeclaration ();
+			dummyEntity.Modifiers = modifiers;
+
+			int offset;
+			int endOffset;
+
+			if (entity.ModifierTokens.Any ()) {
+				offset = GetCurrentOffset(entity.ModifierTokens.First ().StartLocation);
+				endOffset = GetCurrentOffset(entity.ModifierTokens.Last ().GetNextSibling (s => s.Role != Roles.NewLine && s.Role != Roles.Whitespace).StartLocation);
+			} else {
+				var child = entity.FirstChild;
+				while (child.NodeType == NodeType.Whitespace || child.Role == Roles.Attribute)
+					child = child.NextSibling;
+				offset = endOffset = GetCurrentOffset(entity.StartLocation);
+			}
+
+			var sb = new StringBuilder();
+			foreach (var modifier in dummyEntity.ModifierTokens) {
+				sb.Append(modifier.ToString());
+				sb.Append(' ');
+			}
+
+			Replace(offset, endOffset - offset, sb.ToString());
+		}
+
+
+		/// <summary>
+		/// Adds an attribute section to a given entity.
+		/// </summary>
+		/// <param name="entity">The entity to add the attribute to.</param>
+		/// <param name="attr">The attribute to add.</param>
+		public void AddAttribute(EntityDeclaration entity, AttributeSection attr)
+		{
+			var node = entity.FirstChild;
+			while (node.NodeType == NodeType.Whitespace || node.Role == Roles.Attribute) {
+				node = node.NextSibling;
+			}
+			InsertBefore(node, attr);
+		}
+
+
 		public virtual Task Link (params AstNode[] nodes)
 		{
 			// Default implementation: do nothing
@@ -216,6 +266,29 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		}
 		
 		public abstract void Remove (AstNode node, bool removeEmptyLine = true);
+
+		/// <summary>
+		/// Safely removes an attribue from it's section (removes empty sections).
+		/// </summary>
+		/// <param name="attr">The attribute to be removed.</param>
+		public void RemoveAttribute(Attribute attr)
+		{
+			AttributeSection section = (AttributeSection)attr.Parent;
+			if (section.Attributes.Count == 1) {
+				Remove(section);
+				return;
+			}
+
+			var newSection = (AttributeSection)section.Clone();
+			int i = 0;
+			foreach (var a in section.Attributes) {
+				if (a == attr)
+					break;
+				i++;
+			}
+			newSection.Attributes.Remove (newSection.Attributes.ElementAt (i));
+			Replace(section, newSection);
+		}
 		
 		public abstract void FormatText (IEnumerable<AstNode> nodes);
 
@@ -346,56 +419,19 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		}
 		
 		/// <summary>
-		/// Renames the specified entity.
+		/// Renames the specified symbol.
 		/// </summary>
-		/// <param name='entity'>
-		/// The Entity to rename
+		/// <param name='symbol'>
+		/// The symbol to rename
 		/// </param>
 		/// <param name='name'>
 		/// The new name, if null the user is prompted for a new name.
 		/// </param>
-		public virtual void Rename(IEntity entity, string name = null)
+		public virtual void Rename(ISymbol symbol, string name = null)
 		{
 		}
 		
-		/// <summary>
-		/// Renames the specified entity.
-		/// </summary>
-		/// <param name='type'>
-		/// The Entity to rename
-		/// </param>
-		/// <param name='name'>
-		/// The new name, if null the user is prompted for a new name.
-		/// </param>
-		public virtual void RenameTypeParameter (IType type, string name = null)
-		{
-		}
-		
-		/// <summary>
-		/// Renames the specified variable.
-		/// </summary>
-		/// <param name='variable'>
-		/// The Variable to rename
-		/// </param>
-		/// <param name='name'>
-		/// The new name, if null the user is prompted for a new name.
-		/// </param>
-		public virtual void Rename(IVariable variable, string name = null)
-		{
-		}
-
-		/// <summary>
-		/// Renames the specified namespace.
-		/// </summary>
-		/// <param name="ns">The namespace</param>
-		/// <param name='name'>
-		/// The new name, if null the user is prompted for a new name.
-		/// </param>
-		public virtual void Rename(INamespace ns, string name = null)
-		{
-		}
-
-		public virtual void DoGlobalOperationOn(IEntity entity, Action<RefactoringContext, Script, AstNode> callback, string operationDescripton = null)
+		public virtual void DoGlobalOperationOn(IEnumerable<IEntity> entity, Action<RefactoringContext, Script, IEnumerable<AstNode>> callback, string operationDescripton = null)
 		{
 		}
 

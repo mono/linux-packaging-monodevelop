@@ -1,0 +1,11 @@
+<ExtensionModel>
+
+<ExtensionPoint path = "/MonoDevelop/Ide/CommandBar" name = "Main toolbar">
+	<Description>Main toolbar items.</Description>
+	<ExtensionNodeSet id="MonoDevelop.Components.Commands.ItemSet"/>
+</ExtensionPoint>
+
+<Extension path = "/MonoDevelop/Ide/CommandBar">
+</Extension>
+
+</ExtensionModel>

@@ -66,15 +66,26 @@ namespace Xwt.WPFBackend.Utilities
 
 			ImageCellView imageView = view as ImageCellView;
 			if (imageView != null) {
-				FrameworkElementFactory factory = new FrameworkElementFactory (typeof (SWC.Image));
+				FrameworkElementFactory factory = new FrameworkElementFactory (typeof (ImageBox));
 				factory.SetValue (FrameworkElement.MarginProperty, CellMargins);
 
 				if (imageView.ImageField != null) {
 					var binding = new Binding (dataPath + "[" + imageView.ImageField.Index + "]")
 					{ Converter = new ImageToImageSourceConverter () };
 
-					factory.SetBinding (SWC.Image.SourceProperty, binding);
+					factory.SetBinding (ImageBox.ImageSourceProperty, binding);
 				}
+
+				return factory;
+			}
+
+			CanvasCellView canvasView = view as CanvasCellView;
+			if (canvasView != null)
+			{
+				FrameworkElementFactory factory = new FrameworkElementFactory(typeof(CanvasCellViewBackend));
+				factory.SetValue(FrameworkElement.MarginProperty, CellMargins);
+
+				factory.SetValue(CanvasCellViewBackend.CellViewProperty, view);
 
 				return factory;
 			}

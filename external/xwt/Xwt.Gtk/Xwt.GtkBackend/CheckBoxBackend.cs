@@ -25,7 +25,7 @@
 // THE SOFTWARE.
 using System;
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 namespace Xwt.GtkBackend
 {
@@ -93,7 +93,12 @@ namespace Xwt.GtkBackend
 		
 		public void SetContent (IWidgetBackend widget)
 		{
-			throw new NotImplementedException ();
+			var w = (WidgetBackend)widget;
+			if (Widget.Children.Length > 0)
+				Widget.Remove(Widget.Children[0]);
+
+			if (w != null)
+				Widget.Add(w.Widget);
 		}
 		
 		public override object Font {
@@ -156,7 +161,7 @@ namespace Xwt.GtkBackend
 			}
 			
 			if (toggleEventEnabled) {
-				Toolkit.Invoke (delegate {
+				ApplicationContext.InvokeUserCode (delegate {
 					EventSink.OnToggled ();
 				});
 			}
@@ -167,7 +172,7 @@ namespace Xwt.GtkBackend
 			if (internalActiveUpdate)
 				return;
 			
-			Toolkit.Invoke (delegate {
+			ApplicationContext.InvokeUserCode (delegate {
 				EventSink.OnClicked ();
 			});
 		}

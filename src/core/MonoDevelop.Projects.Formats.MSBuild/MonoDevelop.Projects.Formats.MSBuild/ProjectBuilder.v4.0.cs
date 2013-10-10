@@ -157,7 +157,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			var p = engine.GetLoadedProjects (file).FirstOrDefault ();
 			if (p == null)
 				p = engine.LoadProject (file);
-			
+
 			p.SetProperty ("Configuration", configuration);
 			if (!string.IsNullOrEmpty (platform))
 				p.SetProperty ("Platform", platform);

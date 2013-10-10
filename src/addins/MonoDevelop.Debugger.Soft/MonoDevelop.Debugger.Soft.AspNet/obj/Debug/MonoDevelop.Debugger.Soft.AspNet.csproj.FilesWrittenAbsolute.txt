@@ -1,0 +1,5 @@
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet/obj/Debug/MonoDevelop.Debugger.Soft.AspNet.Manifest.addin.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet.dll.mdb
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet/obj/Debug/MonoDevelop.Debugger.Soft.AspNet.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet/obj/Debug/MonoDevelop.Debugger.Soft.AspNet.dll.mdb

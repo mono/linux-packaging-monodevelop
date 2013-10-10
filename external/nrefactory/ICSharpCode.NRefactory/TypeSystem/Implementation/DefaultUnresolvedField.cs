@@ -36,12 +36,12 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 		
 		public DefaultUnresolvedField()
 		{
-			this.EntityType = EntityType.Field;
+			this.SymbolKind = SymbolKind.Field;
 		}
 		
 		public DefaultUnresolvedField(IUnresolvedTypeDefinition declaringType, string name)
 		{
-			this.EntityType = EntityType.Field;
+			this.SymbolKind = SymbolKind.Field;
 			this.DeclaringTypeDefinition = declaringType;
 			this.Name = name;
 			if (declaringType != null)
@@ -49,7 +49,7 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 		}
 		
 		public bool IsConst {
-			get { return constantValue != null; }
+			get { return constantValue != null && !IsFixed; }
 		}
 		
 		public bool IsReadOnly {
@@ -65,6 +65,14 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 			set {
 				ThrowIfFrozen();
 				flags[FlagFieldIsVolatile] = value;
+			}
+		}
+
+		public bool IsFixed {
+			get { return flags[FlagFieldIsFixedSize]; }
+			set {
+				ThrowIfFrozen();
+				flags[FlagFieldIsFixedSize] = value;
 			}
 		}
 		

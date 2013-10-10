@@ -1,4 +1,4 @@
-// 
+﻿// 
 // CompletionDataWrapper.cs
 //  
 // Author:
@@ -96,7 +96,18 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 
 		Dictionary<string, ICompletionData> typeDisplayText = new Dictionary<string, ICompletionData> ();
 		Dictionary<IType, ICompletionData> addedTypes = new Dictionary<IType, ICompletionData> ();
+
+		public ICompletionData AddConstructors(IType type, bool showFullName, bool isInAttributeContext = false)
+		{
+			return InternalAddType(type, showFullName, isInAttributeContext, true);
+		}
+
 		public ICompletionData AddType(IType type, bool showFullName, bool isInAttributeContext = false)
+		{
+			return InternalAddType(type, showFullName, isInAttributeContext, false);
+		}
+
+		ICompletionData InternalAddType(IType type, bool showFullName, bool isInAttributeContext, bool addConstrurs)
 		{
 			if (type == null)
 				throw new ArgumentNullException("type");
@@ -106,10 +117,25 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 				return addedTypes[type];
 
 			var def = type.GetDefinition();
-			if (def != null && def.ParentAssembly != completion.ctx.CurrentAssembly && !def.IsBrowsable())
-				return null;
+			if (def != null && def.ParentAssembly != completion.ctx.CurrentAssembly) {
+				switch (completion.EditorBrowsableBehavior) {
+					case EditorBrowsableBehavior.Ignore:
+						break;
+					case EditorBrowsableBehavior.Normal:
+						var state = def.GetEditorBrowsableState();
+						if (state != System.ComponentModel.EditorBrowsableState.Always)
+							return null;
+						break;
+					case EditorBrowsableBehavior.IncludeAdvanced:
+						if (!def.IsBrowsable())
+							return null;
+						break;
+					default:
+						throw new ArgumentOutOfRangeException();
+				}
+			}
 			ICompletionData usedType;
-			var data = Factory.CreateTypeCompletionData(type, showFullName, isInAttributeContext);
+			var data = Factory.CreateTypeCompletionData(type, showFullName, isInAttributeContext, addConstrurs);
 			var text = data.DisplayText;
 			if (typeDisplayText.TryGetValue(text, out usedType)) {
 				usedType.AddOverload(data);
@@ -155,31 +181,49 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 			result.Add (Factory.CreateVariableCompletionData (variable));
 		}
 
+		public void AddTypeImport(ITypeDefinition type, bool useFullName, bool addForTypeCreation)
+		{
+			result.Add(Factory.CreateImportCompletionData(type, useFullName, addForTypeCreation));
+		}
+
 		public ICompletionData AddMember (IMember member)
 		{
 			var newData = Factory.CreateEntityCompletionData (member);
 			
-			if (member.ParentAssembly != completion.ctx.CurrentAssembly && !member.IsBrowsable ())
-				return null;
-
+			if (member.ParentAssembly != completion.ctx.CurrentAssembly) {
+				switch (completion.EditorBrowsableBehavior) {
+					case EditorBrowsableBehavior.Ignore:
+						break;
+					case EditorBrowsableBehavior.Normal:
+						var state = member.GetEditorBrowsableState();
+						if (state != System.ComponentModel.EditorBrowsableState.Always)
+							return null;
+						break;
+					case EditorBrowsableBehavior.IncludeAdvanced:
+						if (!member.IsBrowsable())
+							return null;
+						break;
+					default:
+						throw new ArgumentOutOfRangeException();
+				}
+			}
 			string memberKey = newData.DisplayText;
 			if (memberKey == null)
 				return null;
 
-			if (member is IMember) {
-				newData.CompletionCategory = GetCompletionCategory (member.DeclaringTypeDefinition);
-			}
+			newData.CompletionCategory = GetCompletionCategory (member.DeclaringTypeDefinition);
+
 			List<ICompletionData> existingData;
 			data.TryGetValue (memberKey, out existingData);
 			if (existingData != null) {
-				if (member.EntityType == EntityType.Field || member.EntityType == EntityType.Property || member.EntityType == EntityType.Event)
+				if (member.SymbolKind == SymbolKind.Field || member.SymbolKind == SymbolKind.Property || member.SymbolKind == SymbolKind.Event)
 					return null;
 				var a = member as IEntity;
 				foreach (var d in existingData) {
 					if (!(d is IEntityCompletionData))
 						continue;
 					var b = ((IEntityCompletionData)d).Entity;
-					if (a == null || b == null || a.EntityType == b.EntityType) {
+					if (a == null || b == null || a.SymbolKind == b.SymbolKind) {
 						d.AddOverload (newData);
 						return d;
 					} 

@@ -338,7 +338,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			}
 		}
 		
-		AstType ConvertNamespace(string ns)
+		public AstType ConvertNamespace(string namespaceName)
 		{
 			if (resolver != null) {
 				// Look if there's an alias to the target namespace
@@ -346,27 +346,27 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 					for (ResolvedUsingScope usingScope = resolver.CurrentUsingScope; usingScope != null; usingScope = usingScope.Parent) {
 						foreach (var pair in usingScope.UsingAliases) {
 							NamespaceResolveResult nrr = pair.Value as NamespaceResolveResult;
-							if (nrr != null && nrr.NamespaceName == ns)
+							if (nrr != null && nrr.NamespaceName == namespaceName)
 								return new SimpleType(pair.Key);
 						}
 					}
 				}
 			}
 			
-			int pos = ns.LastIndexOf('.');
+			int pos = namespaceName.LastIndexOf('.');
 			if (pos < 0) {
-				if (IsValidNamespace(ns)) {
-					return new SimpleType(ns);
+				if (IsValidNamespace(namespaceName)) {
+					return new SimpleType(namespaceName);
 				} else {
 					return new MemberType {
 						Target = new SimpleType("global"),
 						IsDoubleColon = true,
-						MemberName = ns
+						MemberName = namespaceName
 					};
 				}
 			} else {
-				string parentNamespace = ns.Substring(0, pos);
-				string localNamespace = ns.Substring(pos + 1);
+				string parentNamespace = namespaceName.Substring(0, pos);
+				string localNamespace = namespaceName.Substring(pos + 1);
 				return new MemberType {
 					Target = ConvertNamespace(parentNamespace),
 					MemberName = localNamespace
@@ -436,7 +436,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			} else if (rr.IsCompileTimeConstant) {
 				return ConvertConstantValue(rr.Type, rr.ConstantValue);
 			} else {
-				return new EmptyExpression();
+				return new ErrorExpression();
 			}
 		}
 		
@@ -486,27 +486,27 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		{
 			if (entity == null)
 				throw new ArgumentNullException("entity");
-			switch (entity.EntityType) {
-				case EntityType.TypeDefinition:
+			switch (entity.SymbolKind) {
+				case SymbolKind.TypeDefinition:
 					return ConvertTypeDefinition((ITypeDefinition)entity);
-				case EntityType.Field:
+				case SymbolKind.Field:
 					return ConvertField((IField)entity);
-				case EntityType.Property:
+				case SymbolKind.Property:
 					return ConvertProperty((IProperty)entity);
-				case EntityType.Indexer:
+				case SymbolKind.Indexer:
 					return ConvertIndexer((IProperty)entity);
-				case EntityType.Event:
+				case SymbolKind.Event:
 					return ConvertEvent((IEvent)entity);
-				case EntityType.Method:
+				case SymbolKind.Method:
 					return ConvertMethod((IMethod)entity);
-				case EntityType.Operator:
+				case SymbolKind.Operator:
 					return ConvertOperator((IMethod)entity);
-				case EntityType.Constructor:
+				case SymbolKind.Constructor:
 					return ConvertConstructor((IMethod)entity);
-				case EntityType.Destructor:
+				case SymbolKind.Destructor:
 					return ConvertDestructor((IMethod)entity);
 				default:
-					throw new ArgumentException("Invalid value for EntityType: " + entity.EntityType);
+					throw new ArgumentException("Invalid value for SymbolKind: " + entity.SymbolKind);
 			}
 		}
 		
@@ -717,7 +717,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			foreach (IParameter p in method.Parameters) {
 				decl.Parameters.Add(ConvertParameter(p));
 			}
-			if (method.IsExtensionMethod && decl.Parameters.Any() && decl.Parameters.First().ParameterModifier == ParameterModifier.None)
+			if (method.IsExtensionMethod && method.ReducedFrom == null && decl.Parameters.Any() && decl.Parameters.First().ParameterModifier == ParameterModifier.None)
 				decl.Parameters.First().ParameterModifier = ParameterModifier.This;
 			
 			if (this.ShowTypeParameters && this.ShowTypeParameterConstraints && !method.IsOverride && !method.IsExplicitInterfaceImplementation) {
@@ -770,7 +770,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		#endregion
 		
 		#region Convert Modifiers
-		static Modifiers ModifierFromAccessibility(Accessibility accessibility)
+		public static Modifiers ModifierFromAccessibility(Accessibility accessibility)
 		{
 			switch (accessibility) {
 				case Accessibility.Private:

@@ -1,9 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 
-using System.Runtime.InteropServices;
 using MonoDevelop.Core;
 using MonoDevelop.VersionControl.Subversion.Gui;
 
@@ -11,19 +9,15 @@ namespace MonoDevelop.VersionControl.Subversion
 {
 	public abstract class SubversionVersionControl : VersionControlSystem
 	{
-		internal static string GetTextBase(string sourcefile)
+		internal static string GetDirectoryDotSvn (FilePath path)
 		{
-			return Path.Combine (Path.GetDirectoryName(sourcefile), ".svn", "text-base", Path.GetFileName(sourcefile) + ".svn-base");
-		}
-		
-		internal static string GetDirectoryDotSvn (string sourcepath)
-		{
-			return Path.Combine(sourcepath, ".svn");
-		}
+			if (path.IsEmpty || path.ParentDirectory.IsEmpty || path.IsNull || path.ParentDirectory.IsNull)
+				return String.Empty;
 
-		internal static bool IsVersioned (FilePath sourcefile)
-		{
-			return File.Exists (GetTextBase (sourcefile)) || Directory.Exists (GetDirectoryDotSvn (sourcefile));
+			if (Directory.Exists (path.Combine (".svn")))
+				return path;
+
+			return GetDirectoryDotSvn (path.ParentDirectory);
 		}
 
 		public override string Name
@@ -37,16 +31,11 @@ namespace MonoDevelop.VersionControl.Subversion
 
 		public override Repository GetRepositoryReference (FilePath path, string id)
 		{
-			try {
-				if (!IsVersioned (path))
-					return null;
-				string url = GetPathUrl (path);
-				return new SubversionRepository (this, url, path);
-			} catch (Exception ex) {
-				// No SVN
-				LoggingService.LogError (ex.ToString ());
-				return null;
-			}
+			string svnPath = GetDirectoryDotSvn (path);
+			if (svnPath != String.Empty)
+				return new SubversionRepository (this, String.Empty, svnPath);
+
+			return null;
 		}
 
 		protected override Repository OnCreateRepositoryInstance ()
@@ -62,18 +51,11 @@ namespace MonoDevelop.VersionControl.Subversion
 
 	public abstract class SubversionBackend
 	{
-		string GetTextBase (string sourcefile)
-		{
-			return SubversionVersionControl.GetTextBase (sourcefile);
-		}
-		
-		string GetDirectoryDotSvn (string sourcepath)
-		{
-			return SubversionVersionControl.GetDirectoryDotSvn (sourcepath);
-		}
+		public abstract string GetTextBase (string sourcefile);
 
-		public string GetPathToBaseText (FilePath sourcefile) {
-			return GetTextBase (sourcefile);
+		string GetDirectoryDotSvn (FilePath path)
+		{
+			return SubversionVersionControl.GetDirectoryDotSvn (path);
 		}
 
 		public Revision[] GetHistory (Repository repo, FilePath sourcefile, Revision since)
@@ -105,7 +87,13 @@ namespace MonoDevelop.VersionControl.Subversion
 		/// <param name='revision'>
 		/// Revision.
 		/// </param>
+		[Obsolete ("Use the overload with rootPath parameter")]
 		public abstract string GetTextAtRevision (string repositoryPath, Revision revision);
+
+		public virtual string GetTextAtRevision (string repositoryPath, Revision revision, string rootPath)
+		{
+			return GetTextAtRevision (repositoryPath, revision);
+		}
 		
 		internal protected virtual VersionControlOperation GetSupportedOperations (Repository repo, VersionInfo vinfo, VersionControlOperation defaultValue)
 		{
@@ -117,12 +105,11 @@ namespace MonoDevelop.VersionControl.Subversion
 		public VersionInfo GetVersionInfo (Repository repo, FilePath localPath, bool getRemoteStatus)
 		{
 			// Check for directory before checking for file, since directory links may appear as files
-			if (Directory.Exists (GetDirectoryDotSvn (localPath)) || Directory.Exists (localPath))
+			if (Directory.Exists (localPath))
 				return GetDirStatus (repo, localPath, getRemoteStatus);
-			else if (File.Exists (GetTextBase(localPath)) || File.Exists (localPath))
+			if (File.Exists (localPath))
 				return GetFileStatus (repo, localPath, getRemoteStatus);
-			else
-				return VersionInfo.CreateUnversioned (localPath, false);
+			return VersionInfo.CreateUnversioned (localPath, false);
 		}
 
 		private VersionInfo GetFileStatus (Repository repo, FilePath sourcefile, bool getRemoteStatus)
@@ -204,6 +191,10 @@ namespace MonoDevelop.VersionControl.Subversion
 
 		public abstract void Delete (FilePath path, bool force, IProgressMonitor monitor);
 
+		public abstract void Ignore (FilePath[] paths);
+
+		public abstract void Unignore (FilePath[] paths);
+
 		public IEnumerable<DirectoryEntry> List (FilePath path, bool recurse)
 		{
 			return List (path, recurse, SvnRevision.Head);
@@ -280,7 +271,21 @@ namespace MonoDevelop.VersionControl.Subversion
 	}
 	
 
-	public class SubversionException : ApplicationException {
-		public SubversionException(string message) : base(message) { }
+	public class SubversionException : ApplicationException
+	{
+		public int ErrorCode {
+			get;
+			private set;
+		}
+		
+		public SubversionException (string message, int errorCode) : base (message)
+		{
+			ErrorCode = errorCode;
+		}
+
+		public SubversionException (string message) : base (message)
+		{
+			ErrorCode = 0;
+		}
 	}
 }

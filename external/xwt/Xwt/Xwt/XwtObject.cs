@@ -25,7 +25,7 @@
 // THE SOFTWARE.
 
 using System;
-using Xwt.Engine;
+
 using Xwt.Backends;
 
 namespace Xwt
@@ -33,18 +33,28 @@ namespace Xwt
 	public abstract class XwtObject: IFrontend
 	{
 		object backend;
+
+		internal Toolkit ToolkitEngine { get; set; }
 		
-		protected XwtObject (object backend)
+		protected XwtObject (object backend): this (backend, Toolkit.CurrentEngine)
+		{
+		}
+		
+		protected XwtObject (object backend, Toolkit toolkit)
 		{
 			this.backend = backend;
+			ToolkitEngine = Toolkit.CurrentEngine;
 		}
 
 		protected XwtObject ()
 		{
+			ToolkitEngine = Toolkit.CurrentEngine;
 		}
 
-		protected abstract IBackendHandler BackendHandler { get; }
-		
+		Toolkit IFrontend.ToolkitEngine {
+			get { return ToolkitEngine; }
+		}
+
 		protected object Backend {
 			get {
 				LoadBackend ();
@@ -58,7 +68,7 @@ namespace Xwt
 		object IFrontend.Backend {
 			get { return Backend; }
 		}
-		
+
 		protected void LoadBackend ()
 		{
 			if (backend == null) {

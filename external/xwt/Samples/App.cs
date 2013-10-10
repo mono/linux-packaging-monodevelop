@@ -12,14 +12,13 @@ namespace Samples
 			Application.Initialize (type);
 			
 			MainWindow w = new MainWindow ();
-			w.Title = "Xwt Demo Application";
-			w.Width = 500;
-			w.Height = 400;
 			w.Show ();
 			
 			Application.Run ();
 			
 			w.Dispose ();
+
+			Application.Dispose ();
 		}
 	}
 }	

@@ -166,7 +166,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 				try {
 					ResolveResult rr = resolveVisitor.GetResolveResult(node);
 					if (rr == null)
-						Debug.Fail (node.GetType () + " resolved to null.", node.StartLocation + ":'" + node.GetText () + "'");
+						Debug.Fail (node.GetType () + " resolved to null.", node.StartLocation + ":'" + node.ToString () + "'");
 					return rr;
 				} finally {
 					resolveVisitor.cancellationToken = CancellationToken.None;
@@ -231,7 +231,7 @@ namespace ICSharpCode.NRefactory.CSharp.Resolver
 		ResolveVisitor.ConversionWithTargetType GetConversionWithTargetType(Expression expr, CancellationToken cancellationToken)
 		{
 			if (expr == null || expr.IsNull)
-				throw new ArgumentNullException("expr");
+				return new ResolveVisitor.ConversionWithTargetType(Conversion.None, SpecialType.UnknownType);
 			lock (resolveVisitor) {
 				InitResolver();
 				resolveVisitor.cancellationToken = cancellationToken;

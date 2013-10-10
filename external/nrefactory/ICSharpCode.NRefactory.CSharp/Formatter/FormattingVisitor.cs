@@ -149,6 +149,8 @@ namespace ICSharpCode.NRefactory.CSharp
 			do {
 				line--;
 			} while (line > 0 && IsSpacing(document.GetLineByNumber(line)));
+			if (line > 0 && !IsSpacing(document.GetLineByNumber(line)))
+			    line++;
 			int end = document.GetOffset(loc.Line, 1);
 			int start = document.GetOffset(line + 1, 1);
 			var sb = new StringBuilder ();
@@ -359,7 +361,7 @@ namespace ICSharpCode.NRefactory.CSharp
 				return;
 			}
 			
-			var prev = keywordNode.GetPrevNode ();
+			var prev = keywordNode.GetPrevNode (NoWhitespacePredicate);
 			if (prev is Comment || prev is PreProcessorDirective)
 				return;
 			
@@ -447,9 +449,7 @@ namespace ICSharpCode.NRefactory.CSharp
 
 				case BraceStyle.BannerStyle:
 				case BraceStyle.EndOfLine:
-					var prev = lbrace.GetPrevNode();
-					while (prev is NewLineNode)
-						prev = prev.GetPrevNode();
+					var prev = lbrace.GetPrevNode (NoWhitespacePredicate);
 					if (prev is PreProcessorDirective)
 						return;
 					int prevOffset = document.GetOffset(prev.EndLocation);
@@ -467,9 +467,7 @@ namespace ICSharpCode.NRefactory.CSharp
 					}
 					break;
 				case BraceStyle.EndOfLineWithoutSpace:
-					prev = lbrace.GetPrevNode();
-					while (prev is NewLineNode)
-						prev = prev.GetPrevNode();
+					prev = lbrace.GetPrevNode (NoWhitespacePredicate);
 					if (prev is PreProcessorDirective)
 						return;
 					prevOffset = document.GetOffset(prev.EndLocation);
@@ -478,9 +476,7 @@ namespace ICSharpCode.NRefactory.CSharp
 					break;
 
 				case BraceStyle.NextLine:
-					prev = lbrace.GetPrevNode();
-					while (prev is NewLineNode)
-						prev = prev.GetPrevNode();
+					prev = lbrace.GetPrevNode (NoWhitespacePredicate);
 					if (prev is PreProcessorDirective)
 						return;
 					prevOffset = document.GetOffset(prev.EndLocation);
@@ -488,9 +484,7 @@ namespace ICSharpCode.NRefactory.CSharp
 					AddChange(prevOffset, braceOffset - prevOffset, options.EolMarker + curIndent.IndentString);
 					break;
 				case BraceStyle.NextLineShifted:
-					prev = lbrace.GetPrevNode();
-					while (prev is NewLineNode)
-						prev = prev.GetPrevNode();
+					prev = lbrace.GetPrevNode (NoWhitespacePredicate);
 					if (prev is PreProcessorDirective)
 						return;
 					prevOffset = document.GetOffset(prev.EndLocation);
@@ -500,9 +494,7 @@ namespace ICSharpCode.NRefactory.CSharp
 					curIndent.Pop();
 					break;
 				case BraceStyle.NextLineShifted2:
-					prev = lbrace.GetPrevNode();
-					while (prev is NewLineNode)
-						prev = prev.GetPrevNode();
+					prev = lbrace.GetPrevNode (NoWhitespacePredicate);
 					if (prev is PreProcessorDirective)
 						return;
 					prevOffset = document.GetOffset(prev.EndLocation);

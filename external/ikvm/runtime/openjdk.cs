@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2007-2011 Jeroen Frijters
+  Copyright (C) 2007-2013 Jeroen Frijters
   Copyright (C) 2009 Volker Berlin (i-net software)
 
   This software is provided 'as-is', without any express or implied
@@ -89,7 +89,6 @@ using srFieldAccessor = sun.reflect.FieldAccessor;
 using srLangReflectAccess = sun.reflect.LangReflectAccess;
 using srReflection = sun.reflect.Reflection;
 using srReflectionFactory = sun.reflect.ReflectionFactory;
-using StubGenerator = ikvm.@internal.stubgen.StubGenerator;
 using Annotation = java.lang.annotation.Annotation;
 using smJavaIOAccess = sun.misc.JavaIOAccess;
 using smLauncher = sun.misc.Launcher;
@@ -865,6 +864,7 @@ namespace IKVM.NativeCode.java
 							TypeWrapper fieldType = fw.FieldTypeWrapper;
 							try
 							{
+								fieldType = fieldType.EnsureLoadable(tw.GetClassLoader());
 								fieldType.Finish();
 							}
 							catch (RetargetableJavaException x)
@@ -965,7 +965,7 @@ namespace IKVM.NativeCode.java
 								ilgenObjGetter.EmitLdc_I4(field.getOffset());
 								ilgenObjGetter.Emit(OpCodes.Ldloc, objGetterThis);
 								fw.EmitGet(ilgenObjGetter);
-								fw.FieldTypeWrapper.EmitConvSignatureTypeToStackType(ilgenObjGetter);
+								fieldType.EmitConvSignatureTypeToStackType(ilgenObjGetter);
 								ilgenObjGetter.Emit(OpCodes.Stelem_Ref);
 
 								// Setter
@@ -973,8 +973,8 @@ namespace IKVM.NativeCode.java
 								ilgenObjSetter.Emit(OpCodes.Ldarg_1);
 								ilgenObjSetter.EmitLdc_I4(field.getOffset());
 								ilgenObjSetter.Emit(OpCodes.Ldelem_Ref);
-								fw.FieldTypeWrapper.EmitCheckcast(null, ilgenObjSetter);
-								fw.FieldTypeWrapper.EmitConvStackTypeToSignatureType(ilgenObjSetter, null);
+								fieldType.EmitCheckcast(ilgenObjSetter);
+								fieldType.EmitConvStackTypeToSignatureType(ilgenObjSetter, null);
 								fw.EmitSet(ilgenObjSetter);
 							}
 						}
@@ -2427,6 +2427,14 @@ namespace IKVM.NativeCode.java
 						ClassLoaderWrapper classLoaderWrapper = ClassLoaderWrapper.GetClassLoaderWrapper(loader);
 						tw = classLoaderWrapper.LoadClassByDottedName(name);
 					}
+					catch (ClassNotFoundException x)
+					{
+						throw new global::java.lang.ClassNotFoundException(x.Message);
+					}
+					catch (ClassLoadingException x)
+					{
+						throw x.InnerException;
+					}
 					catch (RetargetableJavaException x)
 					{
 						throw x.ToJava();
@@ -2529,18 +2537,18 @@ namespace IKVM.NativeCode.java
 				return TypeWrapper.FromClass(thisClass).SigName;
 			}
 
-			public static object getClassLoader0(jlClass thisClass)
+			public static global::java.lang.ClassLoader getClassLoader0(jlClass thisClass)
 			{
 				return TypeWrapper.FromClass(thisClass).GetClassLoader().GetJavaClassLoader();
 			}
 
-			public static object getSuperclass(jlClass thisClass)
+			public static jlClass getSuperclass(jlClass thisClass)
 			{
 				TypeWrapper super = TypeWrapper.FromClass(thisClass).BaseTypeWrapper;
 				return super != null ? super.ClassObject : null;
 			}
 
-			public static object getInterfaces(jlClass thisClass)
+			public static jlClass[] getInterfaces(jlClass thisClass)
 			{
 #if FIRST_PASS
 				return null;
@@ -2555,7 +2563,7 @@ namespace IKVM.NativeCode.java
 #endif
 			}
 
-			public static object getComponentType(jlClass thisClass)
+			public static jlClass getComponentType(jlClass thisClass)
 			{
 				TypeWrapper tw = TypeWrapper.FromClass(thisClass);
 				return tw.IsArray ? tw.ElementTypeWrapper.ClassObject : null;
@@ -2587,15 +2595,15 @@ namespace IKVM.NativeCode.java
 
 			public static object[] getEnclosingMethod0(jlClass thisClass)
 			{
-				TypeWrapper tw = TypeWrapper.FromClass(thisClass);
-				tw.Finish();
-				string[] enc = tw.GetEnclosingMethod();
-				if (enc == null)
-				{
-					return null;
-				}
 				try
 				{
+					TypeWrapper tw = TypeWrapper.FromClass(thisClass);
+					tw.Finish();
+					string[] enc = tw.GetEnclosingMethod();
+					if (enc == null)
+					{
+						return null;
+					}
 					return new object[] { tw.GetClassLoader().LoadClassByDottedName(enc[0]).ClassObject, enc[1], enc[2] == null ? null : enc[2].Replace('.', '/') };
 				}
 				catch (RetargetableJavaException x)
@@ -2604,7 +2612,7 @@ namespace IKVM.NativeCode.java
 				}
 			}
 
-			public static object getDeclaringClass(jlClass thisClass)
+			public static jlClass getDeclaringClass(jlClass thisClass)
 			{
 				try
 				{
@@ -2650,7 +2658,7 @@ namespace IKVM.NativeCode.java
 					AssemblyClassLoader acl = wrapper.GetClassLoader() as AssemblyClassLoader;
 					if (acl != null)
 					{
-						pd = (ProtectionDomain)acl.GetProtectionDomain();
+						pd = acl.GetProtectionDomain();
 					}
 				}
 				return pd;
@@ -2664,7 +2672,7 @@ namespace IKVM.NativeCode.java
 #endif
 			}
 
-			public static object getPrimitiveClass(string name)
+			public static jlClass getPrimitiveClass(string name)
 			{
 				// note that this method isn't used anymore (because it is an intrinsic (during core class library compilation))
 				// it still remains for compat because it might be invoked through reflection by evil code
@@ -2700,7 +2708,7 @@ namespace IKVM.NativeCode.java
 				return tw.GetGenericSignature();
 			}
 
-			internal static object AnnotationsToMap(object[] objAnn)
+			internal static object AnnotationsToMap(ClassLoaderWrapper loader, object[] objAnn)
 			{
 #if FIRST_PASS
 				return null;
@@ -2714,6 +2722,11 @@ namespace IKVM.NativeCode.java
 						if (a != null)
 						{
 							map.put(a.annotationType(), FreezeOrWrapAttribute(a));
+						}
+						else if (obj is IKVM.Attributes.DynamicAnnotationAttribute)
+						{
+							a = (Annotation)JVM.NewAnnotation(loader.GetJavaClassLoader(), ((IKVM.Attributes.DynamicAnnotationAttribute)obj).Definition);
+							map.put(a.annotationType(), a);
 						}
 					}
 				}
@@ -2753,7 +2766,7 @@ namespace IKVM.NativeCode.java
 				{
 					throw x.ToJava();
 				}
-				return AnnotationsToMap(wrapper.GetDeclaredAnnotations());
+				return AnnotationsToMap(wrapper.GetClassLoader(), wrapper.GetDeclaredAnnotations());
 #endif
 			}
 
@@ -2890,7 +2903,7 @@ namespace IKVM.NativeCode.java
 #endif
 			}
 
-			public static object getDeclaredClasses0(jlClass thisClass)
+			public static jlClass[] getDeclaredClasses0(jlClass thisClass)
 			{
 #if FIRST_PASS
 				return null;
@@ -2932,12 +2945,30 @@ namespace IKVM.NativeCode.java
 
 		static class ClassLoader
 		{
-			public static object defineClass0(jlClassLoader thisClassLoader, string name, byte[] b, int off, int len, object pd)
+			public static global::java.net.URL getBootstrapResource(string name)
+			{
+				foreach (global::java.net.URL url in ClassLoaderWrapper.GetBootstrapClassLoader().GetResources(name))
+				{
+					return url;
+				}
+				return null;
+			}
+
+			public static global::java.util.Enumeration getBootstrapResources(string name)
+			{
+#if FIRST_PASS
+				return null;
+#else
+				return new global::ikvm.runtime.EnumerationWrapper(ClassLoaderWrapper.GetBootstrapClassLoader().GetResources(name));
+#endif
+			}
+
+			public static jlClass defineClass0(jlClassLoader thisClassLoader, string name, byte[] b, int off, int len, ProtectionDomain pd)
 			{
 				return defineClass1(thisClassLoader, name, b, off, len, pd, null);
 			}
 
-			public static object defineClass1(jlClassLoader thisClassLoader, string name, byte[] b, int off, int len, object pd, string source)
+			public static jlClass defineClass1(jlClassLoader thisClassLoader, string name, byte[] b, int off, int len, ProtectionDomain pd, string source)
 			{
 				// it appears the source argument is only used for trace messages in HotSpot. We'll just ignore it for now.
 				Profiler.Enter("ClassLoader.defineClass");
@@ -2976,7 +3007,7 @@ namespace IKVM.NativeCode.java
 				}
 			}
 
-			public static object defineClass2(jlClassLoader thisClassLoader, string name, jnByteBuffer bb, int off, int len, ProtectionDomain pd, string source)
+			public static jlClass defineClass2(jlClassLoader thisClassLoader, string name, jnByteBuffer bb, int off, int len, ProtectionDomain pd, string source)
 			{
 #if FIRST_PASS
 				return null;
@@ -2987,12 +3018,12 @@ namespace IKVM.NativeCode.java
 #endif
 			}
 
-			public static void resolveClass0(jlClassLoader thisClassLoader, object clazz)
+			public static void resolveClass0(jlClassLoader thisClassLoader, jlClass clazz)
 			{
 				// no-op
 			}
 
-			public static object findBootstrapClass(jlClassLoader thisClassLoader, string name)
+			public static jlClass findBootstrapClass(jlClassLoader thisClassLoader, string name)
 			{
 #if FIRST_PASS
 				return null;
@@ -3010,14 +3041,14 @@ namespace IKVM.NativeCode.java
 #endif
 			}
 
-			public static object findLoadedClass0(jlClassLoader thisClassLoader, string name)
+			public static jlClass findLoadedClass0(jlClassLoader thisClassLoader, string name)
 			{
 				if (name == null)
 				{
 					return null;
 				}
 				ClassLoaderWrapper loader = ClassLoaderWrapper.GetClassLoaderWrapper(thisClassLoader);
-				TypeWrapper tw = loader.GetLoadedClass(name);
+				TypeWrapper tw = loader.FindLoadedClass(name);
 				return tw != null ? tw.ClassObject : null;
 			}
 
@@ -3136,6 +3167,15 @@ namespace IKVM.NativeCode.java
 			{
 				IKVM.Runtime.FloatConverter converter = new IKVM.Runtime.FloatConverter();
 				return IKVM.Runtime.FloatConverter.ToFloat(bits, ref converter);
+			}
+		}
+
+		static class LangHelper
+		{
+			// NOTE the array may contain duplicates!
+			public static string[] getBootClassPackages()
+			{
+				return ClassLoaderWrapper.GetBootstrapClassLoader().GetPackages();
 			}
 		}
 
@@ -3692,7 +3732,7 @@ namespace IKVM.NativeCode.java
 				public static object getDeclaredAnnotationsImpl(object thisField)
 				{
 					FieldWrapper fw = FieldWrapper.FromField(thisField);
-					return Class.AnnotationsToMap(fw.DeclaringType.GetFieldAnnotations(fw));
+					return Class.AnnotationsToMap(fw.DeclaringType.GetClassLoader(), fw.DeclaringType.GetFieldAnnotations(fw));
 				}
 			}
 
@@ -3701,7 +3741,7 @@ namespace IKVM.NativeCode.java
 				public static object getDeclaredAnnotationsImpl(object methodOrConstructor)
 				{
 					MethodWrapper mw = MethodWrapper.FromMethodOrConstructor(methodOrConstructor);
-					return Class.AnnotationsToMap(mw.DeclaringType.GetMethodAnnotations(mw));
+					return Class.AnnotationsToMap(mw.DeclaringType.GetClassLoader(), mw.DeclaringType.GetMethodAnnotations(mw));
 				}
 
 				public static object[][] getParameterAnnotationsImpl(object methodOrConstructor)
@@ -3725,6 +3765,10 @@ namespace IKVM.NativeCode.java
 							if (a != null)
 							{
 								list.Add(Class.FreezeOrWrapAttribute(a));
+							}
+							else if (obj is IKVM.Attributes.DynamicAnnotationAttribute)
+							{
+								list.Add((Annotation)JVM.NewAnnotation(mw.DeclaringType.GetClassLoader().GetJavaClassLoader(), ((IKVM.Attributes.DynamicAnnotationAttribute)obj).Definition));
 							}
 						}
 						ann[i] = list.ToArray();
@@ -5265,6 +5309,48 @@ namespace IKVM.NativeCode.java
 			}
 		}
 
+		namespace zip
+		{
+			static class ClassStubZipEntry
+			{
+				public static void expandIkvmClasses(object _zipFile, object _entries)
+				{
+#if !FIRST_PASS
+					juzZipFile zipFile = (juzZipFile)_zipFile;
+					global::java.util.LinkedHashMap entries = (global::java.util.LinkedHashMap)_entries;
+
+					try
+					{
+						string path = zipFile.getName();
+						juzZipEntry entry = (juzZipEntry)entries.get(JVM.JarClassList);
+						if (entry != null && VirtualFileSystem.IsVirtualFS(path))
+						{
+							using (VirtualFileSystem.ZipEntryStream stream = new VirtualFileSystem.ZipEntryStream(zipFile, entry))
+							{
+								entries.remove(entry.name);
+								System.IO.BinaryReader br = new System.IO.BinaryReader(stream);
+								int count = br.ReadInt32();
+								for (int i = 0; i < count; i++)
+								{
+									global::java.util.zip.ClassStubZipEntry classEntry = new global::java.util.zip.ClassStubZipEntry(path, br.ReadString());
+									classEntry.setMethod(global::java.util.zip.ClassStubZipEntry.STORED);
+									classEntry.setTime(entry.getTime());
+									entries.put(classEntry.name, classEntry);
+								}
+							}
+						}
+					}
+					catch (global::java.io.IOException)
+					{
+					}
+					catch (System.IO.IOException)
+					{
+					}
+#endif
+				}
+			}
+		}
+
 		static class TimeZone
 		{
 			private static string GetCurrentTimeZoneID()
@@ -6163,7 +6249,7 @@ namespace IKVM.NativeCode.sun.reflect
 	static class ReflectionFactory
 	{
 #if !FIRST_PASS
-		private static object[] ConvertArgs(TypeWrapper[] argumentTypes, object[] args)
+		private static object[] ConvertArgs(ClassLoaderWrapper loader, TypeWrapper[] argumentTypes, object[] args)
 		{
 			object[] nargs = new object[args == null ? 0 : args.Length];
 			if (nargs.Length != argumentTypes.Length)
@@ -6189,7 +6275,7 @@ namespace IKVM.NativeCode.sun.reflect
 				}
 				else
 				{
-					if (args[i] != null && !argumentTypes[i].IsInstance(args[i]))
+					if (args[i] != null && !argumentTypes[i].EnsureLoadable(loader).IsInstance(args[i]))
 					{
 						throw new jlIllegalArgumentException();
 					}
@@ -6219,7 +6305,7 @@ namespace IKVM.NativeCode.sun.reflect
 					}
 					throw new jlIllegalArgumentException("object is not an instance of declaring class");
 				}
-				args = ConvertArgs(mw.GetParameters(), args);
+				args = ConvertArgs(mw.DeclaringType.GetClassLoader(), mw.GetParameters(), args);
 				// if the method is an interface method, we must explicitly run <clinit>,
 				// because .NET reflection doesn't
 				if (mw.DeclaringType.IsInterface)
@@ -6229,7 +6315,7 @@ namespace IKVM.NativeCode.sun.reflect
 				object retval;
 				try
 				{
-					retval = ((ICustomInvoke)mw).Invoke(obj, args, callerID);
+					retval = ((ICustomInvoke)mw).Invoke(obj, args);
 				}
 				catch (MethodAccessException x)
 				{
@@ -6324,7 +6410,23 @@ namespace IKVM.NativeCode.sun.reflect
 			internal FastMethodAccessorImpl(jlrMethod method, bool nonvirtual)
 			{
 				MethodWrapper mw = MethodWrapper.FromMethodOrConstructor(method);
-				mw.DeclaringType.Finish();
+				TypeWrapper[] parameters;
+				try
+				{
+					mw.DeclaringType.Finish();
+					parameters = mw.GetParameters();
+					for (int i = 0; i < parameters.Length; i++)
+					{
+						// the EnsureLoadable shouldn't fail, because we don't allow a java.lang.reflect.Method
+						// to "escape" if it has an unloadable type in the signature
+						parameters[i] = parameters[i].EnsureLoadable(mw.DeclaringType.GetClassLoader());
+						parameters[i].Finish();
+					}
+				}
+				catch (RetargetableJavaException x)
+				{
+					throw x.ToJava();
+				}
 				mw.ResolveMethod();
 				DynamicMethod dm = DynamicMethodUtils.Create("__<Invoker>", mw.DeclaringType.TypeAsBaseType, !mw.IsPublic || !mw.DeclaringType.IsPublic || nonvirtual, typeof(object), new Type[] { typeof(object), typeof(object[]), typeof(global::ikvm.@internal.CallerID) });
 				CodeEmitter ilgen = CodeEmitter.Create(dm);
@@ -6338,7 +6440,7 @@ namespace IKVM.NativeCode.sun.reflect
 
 				// check args length
 				CodeEmitterLabel argsLengthOK = ilgen.DefineLabel();
-				if (mw.GetParameters().Length == 0)
+				if (parameters.Length == 0)
 				{
 					// zero length array may be null
 					ilgen.Emit(OpCodes.Ldarg_1);
@@ -6346,28 +6448,27 @@ namespace IKVM.NativeCode.sun.reflect
 				}
 				ilgen.Emit(OpCodes.Ldarg_1);
 				ilgen.Emit(OpCodes.Ldlen);
-				ilgen.EmitLdc_I4(mw.GetParameters().Length);
+				ilgen.EmitLdc_I4(parameters.Length);
 				ilgen.EmitBeq(argsLengthOK);
 				ilgen.Emit(OpCodes.Newobj, illegalArgumentExceptionCtor);
 				ilgen.Emit(OpCodes.Throw);
 				ilgen.MarkLabel(argsLengthOK);
 
 				int thisCount = mw.IsStatic ? 0 : 1;
-				CodeEmitterLocal[] args = new CodeEmitterLocal[mw.GetParameters().Length + thisCount];
+				CodeEmitterLocal[] args = new CodeEmitterLocal[parameters.Length + thisCount];
 				if (!mw.IsStatic)
 				{
 					args[0] = ilgen.DeclareLocal(mw.DeclaringType.TypeAsSignatureType);
 				}
 				for (int i = thisCount; i < args.Length; i++)
 				{
-					mw.GetParameters()[i - thisCount].Finish();
-					args[i] = ilgen.DeclareLocal(mw.GetParameters()[i - thisCount].TypeAsSignatureType);
+					args[i] = ilgen.DeclareLocal(parameters[i - thisCount].TypeAsSignatureType);
 				}
 				ilgen.BeginExceptionBlock();
 				if (!mw.IsStatic)
 				{
 					ilgen.Emit(OpCodes.Ldarg_0);
-					mw.DeclaringType.EmitCheckcast(null, ilgen);
+					mw.DeclaringType.EmitCheckcast(ilgen);
 					mw.DeclaringType.EmitConvStackTypeToSignatureType(ilgen, null);
 					ilgen.Emit(OpCodes.Stloc, args[0]);
 				}
@@ -6376,7 +6477,7 @@ namespace IKVM.NativeCode.sun.reflect
 					ilgen.Emit(OpCodes.Ldarg_1);
 					ilgen.EmitLdc_I4(i - thisCount);
 					ilgen.Emit(OpCodes.Ldelem_Ref);
-					TypeWrapper tw = mw.GetParameters()[i - thisCount];
+					TypeWrapper tw = parameters[i - thisCount];
 					EmitUnboxArg(ilgen, tw);
 					tw.EmitConvStackTypeToSignatureType(ilgen, null);
 					ilgen.Emit(OpCodes.Stloc, args[i]);
@@ -6602,7 +6703,7 @@ namespace IKVM.NativeCode.sun.reflect
 				}
 				else
 				{
-					type.EmitCheckcast(null, ilgen);
+					type.EmitCheckcast(ilgen);
 				}
 			}
 
@@ -6661,31 +6762,6 @@ namespace IKVM.NativeCode.sun.reflect
 			}
 		}
 
-		private sealed class ConstructorAccessorImpl : srConstructorAccessor
-		{
-			private readonly MethodWrapper mw;
-
-			internal ConstructorAccessorImpl(jlrConstructor constructor)
-			{
-				mw = MethodWrapper.FromMethodOrConstructor(constructor);
-			}
-
-			[IKVM.Attributes.HideFromJava]
-			public object newInstance(object[] args)
-			{
-				args = ConvertArgs(mw.GetParameters(), args);
-				try
-				{
-					return ((ICustomInvoke)mw).Invoke(null, args, null);
-				}
-				catch (MethodAccessException x)
-				{
-					// this can happen if we're calling a non-public method and the call stack doesn't have ReflectionPermission.MemberAccess
-					throw new jlIllegalAccessException().initCause(x);
-				}
-			}
-		}
-
 		private sealed class FastConstructorAccessorImpl : srConstructorAccessor
 		{
 			private delegate object Invoker(object[] args);
@@ -6694,7 +6770,23 @@ namespace IKVM.NativeCode.sun.reflect
 			internal FastConstructorAccessorImpl(jlrConstructor constructor)
 			{
 				MethodWrapper mw = MethodWrapper.FromMethodOrConstructor(constructor);
-				mw.DeclaringType.Finish();
+				TypeWrapper[] parameters;
+				try
+				{
+					mw.DeclaringType.Finish();
+					parameters = mw.GetParameters();
+					for (int i = 0; i < parameters.Length; i++)
+					{
+						// the EnsureLoadable shouldn't fail, because we don't allow a java.lang.reflect.Method
+						// to "escape" if it has an unloadable type in the signature
+						parameters[i] = parameters[i].EnsureLoadable(mw.DeclaringType.GetClassLoader());
+						parameters[i].Finish();
+					}
+				}
+				catch (RetargetableJavaException x)
+				{
+					throw x.ToJava();
+				}
 				mw.ResolveMethod();
 				DynamicMethod dm = DynamicMethodUtils.Create("__<Invoker>", mw.DeclaringType.TypeAsTBD, !mw.IsPublic || !mw.DeclaringType.IsPublic, typeof(object), new Type[] { typeof(object[]) });
 				CodeEmitter ilgen = CodeEmitter.Create(dm);
@@ -6702,7 +6794,7 @@ namespace IKVM.NativeCode.sun.reflect
 
 				// check args length
 				CodeEmitterLabel argsLengthOK = ilgen.DefineLabel();
-				if (mw.GetParameters().Length == 0)
+				if (parameters.Length == 0)
 				{
 					// zero length array may be null
 					ilgen.Emit(OpCodes.Ldarg_0);
@@ -6710,17 +6802,16 @@ namespace IKVM.NativeCode.sun.reflect
 				}
 				ilgen.Emit(OpCodes.Ldarg_0);
 				ilgen.Emit(OpCodes.Ldlen);
-				ilgen.EmitLdc_I4(mw.GetParameters().Length);
+				ilgen.EmitLdc_I4(parameters.Length);
 				ilgen.EmitBeq(argsLengthOK);
 				ilgen.Emit(OpCodes.Newobj, FastMethodAccessorImpl.illegalArgumentExceptionCtor);
 				ilgen.Emit(OpCodes.Throw);
 				ilgen.MarkLabel(argsLengthOK);
 
-				CodeEmitterLocal[] args = new CodeEmitterLocal[mw.GetParameters().Length];
+				CodeEmitterLocal[] args = new CodeEmitterLocal[parameters.Length];
 				for (int i = 0; i < args.Length; i++)
 				{
-					mw.GetParameters()[i].Finish();
-					args[i] = ilgen.DeclareLocal(mw.GetParameters()[i].TypeAsSignatureType);
+					args[i] = ilgen.DeclareLocal(parameters[i].TypeAsSignatureType);
 				}
 				ilgen.BeginExceptionBlock();
 				for (int i = 0; i < args.Length; i++)
@@ -6728,7 +6819,7 @@ namespace IKVM.NativeCode.sun.reflect
 					ilgen.Emit(OpCodes.Ldarg_0);
 					ilgen.EmitLdc_I4(i);
 					ilgen.Emit(OpCodes.Ldelem_Ref);
-					TypeWrapper tw = mw.GetParameters()[i];
+					TypeWrapper tw = parameters[i];
 					FastMethodAccessorImpl.EmitUnboxArg(ilgen, tw);
 					tw.EmitConvStackTypeToSignatureType(ilgen, null);
 					ilgen.Emit(OpCodes.Stloc, args[i]);
@@ -7080,7 +7171,8 @@ namespace IKVM.NativeCode.sun.reflect
 
 				private bool IsSpecialType(TypeWrapper tw)
 				{
-					return tw.IsNonPrimitiveValueType
+					return tw.IsUnloadable
+						|| tw.IsNonPrimitiveValueType
 						|| tw.IsGhost
 						|| tw.IsFakeNestedType;
 				}
@@ -7855,15 +7947,24 @@ namespace IKVM.NativeCode.sun.reflect
 
 			private Delegate GenerateFastGetter(Type delegateType, Type fieldType, FieldWrapper fw)
 			{
-				fw.FieldTypeWrapper.Finish();
-				fw.DeclaringType.Finish();
+				TypeWrapper fieldTypeWrapper;
+				try
+				{
+					fieldTypeWrapper = fw.FieldTypeWrapper.EnsureLoadable(fw.DeclaringType.GetClassLoader());
+					fieldTypeWrapper.Finish();
+					fw.DeclaringType.Finish();
+				}
+				catch (RetargetableJavaException x)
+				{
+					throw x.ToJava();
+				}
 				fw.ResolveField();
 				DynamicMethod dm = DynamicMethodUtils.Create("__<Getter>", fw.DeclaringType.TypeAsBaseType, !fw.IsPublic || !fw.DeclaringType.IsPublic, fieldType, new Type[] { typeof(IReflectionException), typeof(object), typeof(object) });
 				CodeEmitter ilgen = CodeEmitter.Create(dm);
 				if (fw.IsStatic)
 				{
 					fw.EmitGet(ilgen);
-					fw.FieldTypeWrapper.EmitConvSignatureTypeToStackType(ilgen);
+					fieldTypeWrapper.EmitConvSignatureTypeToStackType(ilgen);
 				}
 				else
 				{
@@ -7871,7 +7972,7 @@ namespace IKVM.NativeCode.sun.reflect
 					ilgen.Emit(OpCodes.Ldarg_1);
 					ilgen.Emit(OpCodes.Castclass, fw.DeclaringType.TypeAsBaseType);
 					fw.EmitGet(ilgen);
-					fw.FieldTypeWrapper.EmitConvSignatureTypeToStackType(ilgen);
+					fieldTypeWrapper.EmitConvSignatureTypeToStackType(ilgen);
 					CodeEmitterLocal local = ilgen.DeclareLocal(fieldType);
 					ilgen.Emit(OpCodes.Stloc, local);
 					CodeEmitterLabel label = ilgen.DefineLabel();
@@ -7892,8 +7993,17 @@ namespace IKVM.NativeCode.sun.reflect
 
 			private Delegate GenerateFastSetter(Type delegateType, Type fieldType, FieldWrapper fw)
 			{
-				fw.FieldTypeWrapper.Finish();
-				fw.DeclaringType.Finish();
+				TypeWrapper fieldTypeWrapper;
+				try
+				{
+					fieldTypeWrapper = fw.FieldTypeWrapper.EnsureLoadable(fw.DeclaringType.GetClassLoader());
+					fieldTypeWrapper.Finish();
+					fw.DeclaringType.Finish();
+				}
+				catch (RetargetableJavaException x)
+				{
+					throw x.ToJava();
+				}
 				fw.ResolveField();
 				DynamicMethod dm = DynamicMethodUtils.Create("__<Setter>", fw.DeclaringType.TypeAsBaseType, !fw.IsPublic || !fw.DeclaringType.IsPublic, null, new Type[] { typeof(IReflectionException), typeof(object), fieldType, typeof(object) });
 				CodeEmitter ilgen = CodeEmitter.Create(dm);
@@ -7903,8 +8013,8 @@ namespace IKVM.NativeCode.sun.reflect
 					{
 						ilgen.BeginExceptionBlock();
 						ilgen.Emit(OpCodes.Ldarg_2);
-						fw.FieldTypeWrapper.EmitCheckcast(null, ilgen);
-						fw.FieldTypeWrapper.EmitConvStackTypeToSignatureType(ilgen, null);
+						fieldTypeWrapper.EmitCheckcast(ilgen);
+						fieldTypeWrapper.EmitConvStackTypeToSignatureType(ilgen, null);
 						fw.EmitSet(ilgen);
 						CodeEmitterLabel label = ilgen.DefineLabel();
 						ilgen.EmitLeave(label);
@@ -7930,9 +8040,9 @@ namespace IKVM.NativeCode.sun.reflect
 					ilgen.Emit(OpCodes.Ldarg_2);
 					if (fieldType == typeof(object))
 					{
-						fw.FieldTypeWrapper.EmitCheckcast(null, ilgen);
+						fieldTypeWrapper.EmitCheckcast(ilgen);
 					}
-					fw.FieldTypeWrapper.EmitConvStackTypeToSignatureType(ilgen, null);
+					fieldTypeWrapper.EmitConvStackTypeToSignatureType(ilgen, null);
 					fw.EmitSet(ilgen);
 					CodeEmitterLabel label = ilgen.DefineLabel();
 					ilgen.EmitLeave(label);
@@ -8037,11 +8147,7 @@ namespace IKVM.NativeCode.sun.reflect
 #else
 			jlrConstructor cons = (jlrConstructor)constructor;
 			MethodWrapper mw = MethodWrapper.FromMethodOrConstructor(constructor);
-			if (mw is ICustomInvoke)
-			{
-				return new ConstructorAccessorImpl(cons);
-			}
-			else if (ActivatorConstructorAccessor.IsSuitable(mw))
+			if (ActivatorConstructorAccessor.IsSuitable(mw))
 			{
 				// we special case public default constructors, because in that case using Activator.CreateInstance()
 				// is almost as fast as FastConstructorAccessorImpl, but it saves us significantly in working set and

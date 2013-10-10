@@ -40,6 +40,7 @@ using MonoDevelop.Core;
 using System.Threading.Tasks;
 using ICSharpCode.NRefactory.TypeSystem;
 using System.IO;
+using ICSharpCode.NRefactory.Refactoring;
 
 namespace MonoDevelop.CodeIssues
 {
@@ -162,7 +163,7 @@ namespace MonoDevelop.CodeIssues
 			get {
 				if (issueControl == null)
 					issueControl = new CodeIssuePadControl ();
-				return (Gtk.Widget)Xwt.Engine.WidgetRegistry.GetNativeWidget (issueControl);
+				return (Gtk.Widget)Xwt.Toolkit.CurrentEngine.GetNativeWidget (issueControl);
 			}
 		}
 	}

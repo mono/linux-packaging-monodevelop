@@ -32,14 +32,14 @@ using System.Drawing;
 
 namespace Xwt.Mac
 {
-	public class ImageBuilderBackendHandler: IImageBuilderBackendHandler
+	public class MacImageBuilderBackendHandler: ImageBuilderBackendHandler
 	{
-		public ImageBuilderBackendHandler ()
+		public MacImageBuilderBackendHandler ()
 		{
 		}
 
 		#region IImageBuilderBackendHandler implementation
-		public object CreateImageBuilder (int width, int height, ImageFormat format)
+		public override object CreateImageBuilder (int width, int height, ImageFormat format)
 		{
 			var flags = CGBitmapFlags.ByteOrderDefault;
 			int bytesPerRow;
@@ -58,24 +58,34 @@ namespace Xwt.Mac
 			default:
 				throw new NotImplementedException ("ImageFormat: " + format.ToString ());
 			}
+
+			var bmp = new CGBitmapContext (IntPtr.Zero, width, height, 8, bytesPerRow, Util.DeviceRGBColorSpace, flags);
+			bmp.TranslateCTM (0, height);
+			bmp.ScaleCTM (1, -1);
 			return new CGContextBackend {
-				Context = new CGBitmapContext (IntPtr.Zero, width, height, 8, bytesPerRow, Util.DeviceRGBColorSpace, flags),
-				Size = new SizeF (width, height)
+				Context = bmp,
+				Size = new SizeF (width, height),
+				InverseViewTransform = bmp.GetCTM ().Invert ()
 			};
 		}
 
-		public object CreateContext (object backend)
+		public override object CreateContext (object backend)
 		{
 			return backend;
 		}
 
-		public object CreateImage (object backend)
+		public override object CreateImage (object backend)
 		{
 			var gc = (CGContextBackend)backend;
-			return new NSImage (((CGBitmapContext)gc.Context).ToImage (), gc.Size);
+			var img = new NSImage (((CGBitmapContext)gc.Context).ToImage (), gc.Size);
+			var imageData = img.AsTiff ();
+			var imageRep = (NSBitmapImageRep) NSBitmapImageRep.ImageRepFromData (imageData);
+			var im = new NSImage ();
+			im.AddRepresentation (imageRep);
+			return im;
 		}
 
-		public void Dispose (object backend)
+		public override void Dispose (object backend)
 		{
 			((CGContextBackend)backend).Context.Dispose ();
 		}

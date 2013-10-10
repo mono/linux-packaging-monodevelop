@@ -4,6 +4,7 @@ using System.Net;
 using System.Linq;
 using System.Threading;
 using System.Xml.Linq;
+using System.Collections.Generic;
 
 namespace macdoc
 {
@@ -18,6 +19,7 @@ namespace macdoc
 		}
 		
 		readonly string[] searchPaths = new[] {
+			"/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/Documentation/DocSets",
 			"/Applications/Xcode.app/Contents/Developer/Documentation/DocSets/",
 			"/Library/Developer/Shared/Documentation/DocSets/",
 			"/Developer/Platforms/iPhoneOS.platform/Developer/Documentation/DocSets/"
@@ -34,7 +36,7 @@ namespace macdoc
 		readonly XNamespace atomNamespace = "http://www.w3.org/2005/Atom";
 		readonly string baseApplicationPath;
 
-		XDocument appleFeed;
+		Dictionary<string, XDocument> appleFeeds = new Dictionary<string, XDocument> ();
 		
 		public AppleDocHandler (string baseApplicationPath)
 		{
@@ -44,18 +46,19 @@ namespace macdoc
 		// We load the atom field that contains a timeline of the modifications down to documentation by Apple
 		XDocument LoadAppleFeed (string feedUrl)
 		{
-			if (appleFeed != null)
+			XDocument appleFeed;
+			if (appleFeeds.TryGetValue (feedUrl, out appleFeed))
 				return appleFeed;
-			
+
 			WebClient wc = new WebClient ();
 			var feed = wc.DownloadString (feedUrl);
-			return appleFeed = XDocument.Parse (feed);
+			return appleFeeds[feedUrl] = XDocument.Parse (feed);
 		}
 
 		// This method transforms the Atom XML data into a POCO for the the most recent item of the feed
 		AppleDocInformation GetLatestAppleDocInformation (XDocument feed)
 		{
-			var latestEntry = feed.Descendants (atomNamespace + "entry").LastOrDefault ();
+			var latestEntry = feed.Descendants (atomNamespace + "entry").FirstOrDefault ();
 			if (latestEntry == null)
 				return null;
 			
@@ -98,6 +101,7 @@ namespace macdoc
 				return false;
 
 			var installedVersion = GetAppleDocVersion (path);
+			Logger.Log ("Installed doc version {0}, compared to remote {1}", installedVersion.ToString (), infos.Version.ToString ());
 			return installedVersion >= infos.Version;
 		}
 
@@ -106,6 +110,7 @@ namespace macdoc
 		// is given the completion percentage
 		public bool CheckAppleDocFreshness (string atomFeed, out AppleDocInformation infos)
 		{
+			Logger.Log ("Downloading Apple feed at {0}", atomFeed);
 			var feed = LoadAppleFeed (atomFeed);
 			infos = GetLatestAppleDocInformation (feed);
 			var needRefresh = !CheckAppleDocAvailabilityAndFreshness (infos);
@@ -129,6 +134,7 @@ namespace macdoc
 				return true;
 			
 			var mergedVersion = CloneFillWithZeros (new Version (File.ReadAllText (statusFile)));
+			Logger.Log ("Comparing merged {0} with downloaded {1}", mergedVersion.ToString (), infos.Version.ToString ());
 			return mergedVersion != infos.Version;
 		}
 		

@@ -38,9 +38,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.cs" />
-    <Compile Include="Xwt\ReliefFrame.cs">
-      <SubType>Component</SubType>
-    </Compile>
     <Compile Include="Xwt\Widget.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -53,14 +50,10 @@
     <Compile Include="Xwt\Label.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Xwt.Engine\WidgetRegistry.cs">
-      <SubType>Component</SubType>
-    </Compile>
     <Compile Include="Xwt.Backends\IWidgetBackend.cs" />
     <Compile Include="Xwt.Backends\ILabelBackend.cs" />
     <Compile Include="Xwt.Backends\IWindowBackend.cs" />
     <Compile Include="Xwt\Application.cs" />
-    <Compile Include="Xwt.Backends\EngineBackend.cs" />
     <Compile Include="Xwt.Backends\IBackend.cs" />
     <Compile Include="Xwt\XwtComponent.cs">
       <SubType>Component</SubType>
@@ -98,11 +91,9 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Xwt\DataStore.cs" />
-    <Compile Include="Xwt\SizeRequestMode.cs" />
     <Compile Include="Xwt\Rectangle.cs" />
     <Compile Include="Xwt\Point.cs" />
     <Compile Include="Xwt\Size.cs" />
-    <Compile Include="Xwt\WidgetSize.cs" />
     <Compile Include="Xwt\Alignment.cs" />
     <Compile Include="Xwt.Drawing\Image.cs" />
     <Compile Include="Xwt\TreeStore.cs">
@@ -114,17 +105,14 @@
     <Compile Include="Xwt\CellViewCollection.cs" />
     <Compile Include="Xwt\CellView.cs" />
     <Compile Include="Xwt\TextCellView.cs" />
-    <Compile Include="Xwt\IconTextCellView.cs" />
     <Compile Include="Xwt\ComboBoxCellView.cs" />
     <Compile Include="Xwt.Backends\ITreeViewBackend.cs" />
     <Compile Include="Xwt.Backends\ITreeStoreBackend.cs" />
     <Compile Include="Xwt\XwtObject.cs" />
-    <Compile Include="Xwt.Backends\IBackendHandler.cs" />
     <Compile Include="Xwt.Backends\ImageBackendHandler.cs" />
     <Compile Include="Xwt\ImageCellView.cs" />
     <Compile Include="Xwt.Drawing\Context.cs" />
     <Compile Include="Xwt\Distance.cs" />
-    <Compile Include="Xwt.Backends\IContextBackendHandler.cs" />
     <Compile Include="Xwt\Canvas.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -137,10 +125,7 @@
     <Compile Include="Xwt.Drawing\RadialGradient.cs" />
     <Compile Include="Xwt.Drawing\TextLayout.cs" />
     <Compile Include="Xwt.Drawing\Font.cs" />
-	<Compile Include="Xwt.Drawing\Matrix.cs" />
-    <Compile Include="Xwt.Backends\IGradientBackendHandler.cs" />
-    <Compile Include="Xwt.Backends\IFontBackendHandler.cs" />
-    <Compile Include="Xwt.Backends\ITextLayoutBackendHandler.cs" />
+    <Compile Include="Xwt.Drawing\Matrix.cs" />
     <Compile Include="Xwt\ButtonEventArgs.cs" />
     <Compile Include="Xwt\MouseMovedEventArgs.cs" />
     <Compile Include="Xwt\SelectionMode.cs" />
@@ -245,16 +230,12 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Xwt.Backends\IComboBoxEntryBackend.cs" />
-    <Compile Include="Xwt.Engine\Toolkit.cs" />
     <Compile Include="Xwt\TreeViewStatus.cs" />
     <Compile Include="Xwt\Clipboard.cs" />
-    <Compile Include="Xwt.Backends\IClipboardBackend.cs" />
     <Compile Include="Xwt\PointerButton.cs" />
     <Compile Include="Xwt.Drawing\ImageBuilder.cs" />
-    <Compile Include="Xwt.Backends\IImageBuilderBackendHandler.cs" />
     <Compile Include="Xwt.Drawing\ImageFormat.cs" />
     <Compile Include="Xwt.Drawing\ImagePattern.cs" />
-    <Compile Include="Xwt.Backends\IImagePatternBackendHandler.cs" />
     <Compile Include="Xwt\CheckBoxMenuItem.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -342,6 +323,7 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Xwt.Backends\IExpandBackend.cs" />
+    <Compile Include="Xwt.Backends\ToolkitEngineBackend.cs" />
     <Compile Include="Xwt\MouseScrolledEventArgs.cs" />
     <Compile Include="Xwt\LinkLabel.cs">
       <SubType>Component</SubType>
@@ -365,6 +347,79 @@
     <Compile Include="Xwt.Backends\IRichTextViewBackend.cs" />
     <Compile Include="Xwt.Formats\TextFormat.cs" />
     <Compile Include="Xwt.Formats\MarkdownTextFormat.cs" />
+    <Compile Include="Xwt.Backends\ContextBackendHandler.cs" />
+    <Compile Include="Xwt.Backends\BackendHandler.cs" />
+    <Compile Include="Xwt.Backends\GradientBackendHandler.cs" />
+    <Compile Include="Xwt.Backends\FontBackendHandler.cs" />
+    <Compile Include="Xwt.Backends\ImagePatternBackendHandler.cs" />
+    <Compile Include="Xwt.Backends\ImageBuilderBackendHandler.cs" />
+    <Compile Include="Xwt.Backends\TextLayoutBackendHandler.cs" />
+    <Compile Include="Xwt.Backends\ClipboardBackend.cs" />
+    <Compile Include="Xwt.Backends\ApplicationContext.cs" />
+    <Compile Include="Xwt\Toolkit.cs" />
+    <Compile Include="Xwt.Drawing\DrawingPath.cs" />
+    <Compile Include="Xwt.Backends\DrawingPathBackendHandler.cs" />
+    <Compile Include="Xwt\Desktop.cs" />
+    <Compile Include="Xwt\Screen.cs" />
+    <Compile Include="Xwt.Backends\DesktopBackend.cs" />
+    <Compile Include="Xwt.Backends\BackendTypeAttribute.cs" />
+    <Compile Include="Xwt.Backends\IEmbeddedWidgetBackend.cs" />
+    <Compile Include="Xwt\ListViewRowEventArgs.cs" />
+    <Compile Include="Xwt\TreeViewRowEventArgs.cs" />
+    <Compile Include="Xwt\CanvasCellView.cs" />
+    <Compile Include="Xwt\SegmentedButton.cs" />
+    <Compile Include="Xwt.Backends\ISegmentedButtonBackend.cs" />
+    <Compile Include="Xwt.Backends\SystemBackend.cs" />
+    <Compile Include="Xwt.Backends\WindowsSystemBackend.cs" />
+    <Compile Include="Xwt.Backends\MacSystemBackend.cs" />
+    <Compile Include="Xwt.Backends\GnomeSystemBackend.cs" />
+    <Compile Include="Xwt\DesktopType.cs" />
+    <Compile Include="Xwt.Backends\StockIconId.cs" />
+    <Compile Include="Xwt.Drawing\DrawingImage.cs" />
+    <Compile Include="Xwt.Drawing\BitmapImage.cs" />
+    <Compile Include="Xwt.Formats\PlainTextFormat.cs" />
+    <Compile Include="Xwt.Drawing\ImageFileType.cs" />
+    <Compile Include="Xwt\Slider.cs" />
+    <Compile Include="Xwt.Backends\ISliderBackend.cs" />
+    <Compile Include="Xwt.Drawing\VectorImage.cs" />
+    <Compile Include="Xwt\RadioButton.cs" />
+    <Compile Include="Xwt.Backends\IRadioButtonBackend.cs" />
+    <Compile Include="Xwt\FormattedText.cs" />
+    <Compile Include="Xwt.Drawing\BackgroundTextAttribute.cs" />
+    <Compile Include="Xwt.Drawing\FontWeightTextAttribute.cs" />
+    <Compile Include="Xwt.Drawing\FontStyleTextAttribute.cs" />
+    <Compile Include="Xwt.Drawing\UnderlineTextAttribute.cs" />
+    <Compile Include="Xwt.Drawing\StrikethroughTextAttribute.cs" />
+    <Compile Include="Xwt.Drawing\FontTextAttribute.cs" />
+    <Compile Include="Xwt.Drawing\ColorTextAttribute.cs" />
+    <Compile Include="Xwt.Drawing\LinkTextAttribute.cs" />
+    <Compile Include="Xwt.Drawing\TextAttribute.cs" />
+    <Compile Include="Xwt\WidgetEventArgs.cs" />
+    <Compile Include="Xwt.Backends\IImageCellViewFrontend.cs" />
+    <Compile Include="Xwt.Backends\ICellViewFrontend.cs" />
+    <Compile Include="Xwt.Backends\ITextCellViewFrontend.cs" />
+    <Compile Include="Xwt.Backends\ICanvasCellViewFrontend.cs" />
+    <Compile Include="Xwt.Backends\ICheckBoxCellViewFrontend.cs" />
+    <Compile Include="Xwt.Backends\ExtensionMethods.cs" />
+    <Compile Include="Xwt\Scrollbar.cs" />
+    <Compile Include="Xwt\HScrollbar.cs" />
+    <Compile Include="Xwt\VScrollbar.cs" />
+    <Compile Include="Xwt.Backends\IScrollbarBackend.cs" />
+    <Compile Include="Xwt\SizeConstraint.cs" />
+    <Compile Include="Xwt\WidgetAlignment.cs" />
+    <Compile Include="Xwt.Backends\IChildPlacementHandler.cs" />
+    <Compile Include="Xwt\TableCalc.cs" />
+    <Compile Include="Xwt\VSlider.cs" />
+    <Compile Include="Xwt\HSlider.cs" />
+    <Compile Include="Xwt.Backends\ResourceManager.cs" />
+    <Compile Include="Xwt.Backends\DisposableResourceBackendHandler.cs" />
+    <Compile Include="Xwt.Motion\Animation.cs" />
+    <Compile Include="Xwt.Motion\AnimationExtensions.cs" />
+    <Compile Include="Xwt.Motion\Easing.cs" />
+    <Compile Include="Xwt.Motion\Tweener.cs" />
+    <Compile Include="Xwt.Motion\IAnimatable.cs" />
+    <Compile Include="Xwt\WindowLocation.cs" />
+    <Compile Include="Xwt.Motion\ObjectTransforms.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup />
@@ -378,4 +433,7 @@
     </MonoDevelop>
   </ProjectExtensions>
   <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Xwt.Motion\" />
+  </ItemGroup>
 </Project>

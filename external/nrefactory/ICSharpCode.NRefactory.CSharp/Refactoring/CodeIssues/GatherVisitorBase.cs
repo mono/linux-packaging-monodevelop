@@ -1,4 +1,4 @@
-// 
+﻿// 
 // GatherVisitorBase.cs
 //  
 // Author:
@@ -29,6 +29,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using ICSharpCode.NRefactory.CSharp.Refactoring;
 using ICSharpCode.NRefactory.TypeSystem;
+using Mono.CSharp;
 
 namespace ICSharpCode.NRefactory.CSharp
 {
@@ -40,15 +41,20 @@ namespace ICSharpCode.NRefactory.CSharp
 		/// <summary>
 		/// The issue provider. May be <c>null</c> if none was specified.
 		/// </summary>
-		protected readonly T IssueProvider;
+		protected readonly T QualifierDirectiveEvidentIssueProvider;
 
 		protected readonly BaseRefactoringContext ctx;
 		bool isDisabled;
+		bool isDisabledOnce;
 		bool isGloballySuppressed;
+        bool isPragmaDisabled;
 		List<DomRegion> suppressedRegions =new List<DomRegion> ();
 
 		[SuppressMessage("Microsoft.Design", "CA1000:DoNotDeclareStaticMembersOnGenericTypes")]
 		static string disableString;
+
+		[SuppressMessage("Microsoft.Design", "CA1000:DoNotDeclareStaticMembersOnGenericTypes")]
+		static string disableOnceString;
 
 		[SuppressMessage("Microsoft.Design", "CA1000:DoNotDeclareStaticMembersOnGenericTypes")]
 		static string restoreString;
@@ -56,12 +62,16 @@ namespace ICSharpCode.NRefactory.CSharp
 		[SuppressMessage("Microsoft.Design", "CA1000:DoNotDeclareStaticMembersOnGenericTypes")]
 		static string suppressMessageCategory;
 
-		[SuppressMessage("Microsoft.Design", "CA1000:DoNotDeclareStaticMembersOnGenericTypes")]
-		static string suppressMessageCheckId;
+        [SuppressMessage("Microsoft.Design", "CA1000:DoNotDeclareStaticMembersOnGenericTypes")]
+        static string suppressMessageCheckId;
+        
+        [SuppressMessage("Microsoft.Design", "CA1000:DoNotDeclareStaticMembersOnGenericTypes")]
+        static int pragmaWarning;
 
 		static void SetDisableKeyword(string disableKeyword)
 		{
 			disableString = "disable " + disableKeyword;
+			disableOnceString = "disable once " + disableKeyword;
 			restoreString = "restore " + disableKeyword;
 		}
 
@@ -76,21 +86,22 @@ namespace ICSharpCode.NRefactory.CSharp
 				SetDisableKeyword(attr.ResharperDisableKeyword);
 			suppressMessageCheckId  = attr.SuppressMessageCheckId;
 			suppressMessageCategory = attr.SuppressMessageCategory;
+            pragmaWarning           = attr.PragmaWarning;
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="ICSharpCode.NRefactory.CSharp.GatherVisitorBase"/> class.
+		/// Initializes a new instance of the <see cref="GatherVisitorBase{T}"/> class.
 		/// </summary>
 		/// <param name='ctx'>
 		/// The refactoring context.
 		/// </param>
-		/// <param name='issueProvider'>
+		/// <param name='qualifierDirectiveEvidentIssueProvider'>
 		/// The issue provider.
 		/// </param>
-		public GatherVisitorBase (BaseRefactoringContext ctx, T issueProvider = default(T))
+		public GatherVisitorBase (BaseRefactoringContext ctx, T qualifierDirectiveEvidentIssueProvider = default(T))
 		{
 			this.ctx = ctx;
-			this.IssueProvider = issueProvider;
+			this.QualifierDirectiveEvidentIssueProvider = qualifierDirectiveEvidentIssueProvider;
 			if (suppressMessageCheckId != null) {
 				foreach (var attr in this.ctx.Compilation.MainAssembly.AssemblyAttributes) {
 					if (attr.AttributeType.Name == "SuppressMessageAttribute" && attr.AttributeType.Namespace == "System.Diagnostics.CodeAnalysis") {
@@ -137,11 +148,24 @@ namespace ICSharpCode.NRefactory.CSharp
 					isDisabled &= txt.IndexOf(restoreString, StringComparison.InvariantCulture) < 0;
 				} else {
 					isDisabled |= txt.IndexOf(disableString, StringComparison.InvariantCulture) > 0;
+					isDisabledOnce |= txt.IndexOf(disableOnceString, StringComparison.InvariantCulture) > 0;
 				}
 			}
 		}
 
-		public override void VisitAttribute(Attribute attribute)
+	    public override void VisitPreProcessorDirective(PreProcessorDirective preProcessorDirective)
+	    {
+            if (pragmaWarning == 0)
+                return;
+	        
+            var warning = preProcessorDirective as PragmaWarningPreprocssorDirective;
+            if (warning == null)
+                return;
+            if (warning.WarningList.Contains(pragmaWarning))
+                isPragmaDisabled = warning.Disable;
+	    }
+
+	    public override void VisitAttribute(Attribute attribute)
 		{
 			base.VisitAttribute(attribute);
 			if (suppressMessageCheckId == null)
@@ -162,7 +186,11 @@ namespace ICSharpCode.NRefactory.CSharp
 
 		protected bool IsSuppressed(TextLocation location)
 		{
-			return isDisabled || isGloballySuppressed || suppressedRegions.Any(r => r.IsInside(location));
+			if (isDisabledOnce) {
+				isDisabledOnce = false;
+				return true;
+			}
+            return isDisabled || isGloballySuppressed || isPragmaDisabled || suppressedRegions.Any(r => r.IsInside(location));
 		}
 
 		protected void AddIssue(AstNode node, string title, System.Action<Script> fix = null)

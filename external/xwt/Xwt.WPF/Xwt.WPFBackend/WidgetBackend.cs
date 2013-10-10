@@ -39,7 +39,7 @@ using SWC = System.Windows.Controls; // When we need to resolve ambigituies.
 using SW = System.Windows; // When we need to resolve ambigituies.
 
 using Xwt.Backends;
-using Xwt.Engine;
+
 using Color = Xwt.Drawing.Color;
 
 namespace Xwt.WPFBackend
@@ -134,6 +134,11 @@ namespace Xwt.WPFBackend
 			}
 		}
 
+		public bool BackgroundColorSet
+		{
+			get { return customBackgroundColor.HasValue; }
+		}
+
 		SWM.Color GetWidgetColor ()
 		{
 			if (Widget is Control) {
@@ -149,7 +154,7 @@ namespace Xwt.WPFBackend
 			return SystemColors.ControlColor;
 		}
 
-		void SetWidgetColor (Color value)
+		protected virtual void SetWidgetColor (Color value)
 		{
 			if ((Widget is Control))
 				((Control)Widget).Background = ResPool.GetSolidBrush (value);
@@ -168,12 +173,17 @@ namespace Xwt.WPFBackend
 			}
 		}
 
+		public double Opacity {
+			get { return Widget.Opacity; }
+			set { Widget.Opacity = value; }
+		}
+
 		FontData GetWidgetFont ()
 		{
 			if (!(Widget is Control)) {
-				double size = FontBackendHandler.GetPointsFromDeviceUnits (SystemFonts.MessageFontSize);
+				double size = WpfFontBackendHandler.GetPointsFromDeviceUnits (SystemFonts.MessageFontSize);
 
-				return new FontData (SystemFonts.MessageFontFamily, size, Drawing.FontSizeUnit.Points) {
+				return new FontData (SystemFonts.MessageFontFamily, size) {
 					Style = SystemFonts.MessageFontStyle,
 					Weight = SystemFonts.MessageFontWeight
 				};
@@ -215,7 +225,7 @@ namespace Xwt.WPFBackend
 		}
 
 		public Size Size {
-			get { return new Size (Widget.ActualWidth, Widget.ActualHeight); }
+			get { return new Size (Widget.RenderSize.Width, Widget.RenderSize.Height); }
 		}
 
 		public virtual bool Visible {
@@ -235,30 +245,21 @@ namespace Xwt.WPFBackend
 
 		public Point ConvertToScreenCoordinates (Point widgetCoordinates)
 		{
-			double wratio = WidthPixelRatio;
-			double hratio = HeightPixelRatio;
-
 			var p = Widget.PointToScreen (new System.Windows.Point (
-				widgetCoordinates.X / wratio, widgetCoordinates.Y / hratio));
+				widgetCoordinates.X, widgetCoordinates.Y));
 
-			return new Point (p.X * wratio, p.Y * hratio);
+			return new Point (p.X, p.Y);
 		}
 
 		SW.Size lastNaturalSize;
 
-		void GetWidgetDesiredSize (double availableWidth, double availableHeight, out SW.Size minSize, out SW.Size naturalSize)
+		void GetWidgetDesiredSize (double availableWidth, double availableHeight, out SW.Size size)
 		{
 			// Calculates the desired size of widget.
 
 			if (!Widget.IsMeasureValid) {
 				try {
 					calculatingPreferredSize = true;
-					gettingNaturalSize = true;
-					Widget.Measure (new System.Windows.Size (availableWidth, availableHeight));
-					lastNaturalSize = Widget.DesiredSize;
-					gettingNaturalSize = false;
-
-					Widget.InvalidateMeasure ();
 					Widget.Measure (new System.Windows.Size (availableWidth, availableHeight));
 				}
 				finally {
@@ -266,46 +267,21 @@ namespace Xwt.WPFBackend
 					gettingNaturalSize = false;
 				}
 			}
-			minSize = Widget.DesiredSize;
-			naturalSize = lastNaturalSize;
+			size = Widget.DesiredSize;
 		}
 
-		// The GetPreferred* methods are called when the corresponding OnGetPreferred* methods in the
-		// XWT widget are not overriden, or if they are overriden and the new implementation calls
-		// base.OnGetPreferred*. For this reason, we have to ensure that the widget's MeasureOverride
-		// method doesn't end calling the frontend OnGetPreferred* methods. To avoid it we set
+		// The GetPreferredSize method is called when the corresponding OnGetPreferredSize method in the
+		// XWT widget is not overriden, or if it is overriden and the new implementation calls
+		// base.OnGetPreferredSize. For this reason, we have to ensure that the widget's MeasureOverride
+		// method doesn't end calling the frontend OnGetPreferredSize method. To avoid it we set
 		// the calculatingPreferredSize flag to true, and we check this flag in MeasureOverride
 
-		public virtual WidgetSize GetPreferredWidth ()
+		public virtual Size GetPreferredSize (SizeConstraint widthConstraint, SizeConstraint heightConstraint)
 		{
-			SW.Size minSize, natSize;
+			SW.Size size;
 			Widget.InvalidateMeasure ();
-			GetWidgetDesiredSize (Double.PositiveInfinity, Double.PositiveInfinity, out minSize, out natSize);
-			return new WidgetSize (minSize.Width * WidthPixelRatio - Frontend.Margin.HorizontalSpacing, natSize.Width * WidthPixelRatio - Frontend.Margin.HorizontalSpacing);
-		}
-
-		public virtual WidgetSize GetPreferredHeight ()
-		{
-			SW.Size minSize, natSize;
-			Widget.InvalidateMeasure ();
-			GetWidgetDesiredSize (Double.PositiveInfinity, Double.PositiveInfinity, out minSize, out natSize);
-			return new WidgetSize (minSize.Height * WidthPixelRatio - Frontend.Margin.VerticalSpacing, natSize.Height * HeightPixelRatio - Frontend.Margin.VerticalSpacing);
-		}
-
-		public virtual WidgetSize GetPreferredWidthForHeight (double height)
-		{
-			SW.Size minSize, natSize;
-			Widget.InvalidateMeasure ();
-			GetWidgetDesiredSize (Double.PositiveInfinity, height, out minSize, out natSize);
-			return new WidgetSize (minSize.Width * WidthPixelRatio - Frontend.Margin.HorizontalSpacing, natSize.Width * WidthPixelRatio - Frontend.Margin.HorizontalSpacing);
-		}
-
-		public virtual WidgetSize GetPreferredHeightForWidth (double width)
-		{
-			SW.Size minSize, natSize;
-			Widget.InvalidateMeasure ();
-			GetWidgetDesiredSize (width, Double.PositiveInfinity, out minSize, out natSize);
-			return new WidgetSize (minSize.Height * HeightPixelRatio - Frontend.Margin.VerticalSpacing, natSize.Height * HeightPixelRatio - Frontend.Margin.VerticalSpacing);
+			GetWidgetDesiredSize (widthConstraint.IsConstrained ? widthConstraint.AvailableSize : Double.PositiveInfinity, heightConstraint.IsConstrained ? heightConstraint.AvailableSize : Double.PositiveInfinity, out size);
+			return new Size (size.Width, size.Height);
 		}
 
 		/// <summary>
@@ -316,68 +292,45 @@ namespace Xwt.WPFBackend
 		/// <returns></returns>
 		public System.Windows.Size MeasureOverride (System.Windows.Size constraint, System.Windows.Size wpfMeasure)
 		{
-			// Calculate the natural size, if that's what is being measured
+			var defNaturalSize = eventSink.GetDefaultNaturalSize ();
 
-			if (gettingNaturalSize) {
-				var defNaturalSize = eventSink.GetDefaultNaturalSize ();
-
-				// -2 means use the WPF default, -1 use the XWT default, any other other value is used as custom natural size
-				var nw = DefaultNaturalWidth;
-				if (nw == -1) {
-					nw = defNaturalSize.Width;
-					if (nw == 0)
-						nw = wpfMeasure.Width;
-					wpfMeasure.Width = nw;
-				}
-				else if (nw != -2)
-					wpfMeasure.Width = nw;
-
-				var nh = DefaultNaturalHeight;
-				if (nh == -1) {
-					nh = defNaturalSize.Height;
-					if (nh == 0)
-						nh = wpfMeasure.Height;
-					wpfMeasure.Height = nh;
-				}
-				else if (nh != -2)
-					wpfMeasure.Height = nh;
+			// -2 means use the WPF default, -1 use the XWT default, any other other value is used as custom natural size
+			var nw = DefaultNaturalWidth;
+			if (nw == -1) {
+				nw = defNaturalSize.Width;
+				if (nw == 0)
+					nw = wpfMeasure.Width;
+				wpfMeasure.Width = nw;
 			}
+			else if (nw != -2)
+				wpfMeasure.Width = nw;
+
+			var nh = DefaultNaturalHeight;
+			if (nh == -1) {
+				nh = defNaturalSize.Height;
+				if (nh == 0)
+					nh = wpfMeasure.Height;
+				wpfMeasure.Height = nh;
+			}
+			else if (nh != -2)
+				wpfMeasure.Height = nh;
 
 			// If we are calculating the default preferred size of the widget we end here.
 			// See note above about when GetPreferred* methods are called.
 			if (calculatingPreferredSize)
 				return wpfMeasure;
 
-			Toolkit.Invoke (delegate
-			{
-				if (eventSink.GetSizeRequestMode () == SizeRequestMode.HeightForWidth) {
+			if ((enabledEvents & WidgetEvent.PreferredSizeCheck) != 0) {
+				Context.InvokeUserCode (delegate
+				{
 					// Calculate the preferred width through the frontend if there is an overriden OnGetPreferredWidth, but only do it
-					// if we are not given a constraint. If there is a width constraint, we'll use that constraint value for calculating the height 
-					if ((enabledEvents & WidgetEvent.PreferredWidthCheck) != 0 && constraint.Width == Double.PositiveInfinity) {
-						var ws = eventSink.OnGetPreferredWidth ();
-						wpfMeasure.Width = constraint.Width = gettingNaturalSize ? ws.NaturalSize : ws.MinSize;
-					}
-
-					// Now calculate the preferred height for that width, also using the override if available
-					if ((enabledEvents & WidgetEvent.PreferredHeightForWidthCheck) != 0) {
-						var ws = eventSink.OnGetPreferredHeightForWidth (constraint.Width);
-						wpfMeasure.Height = gettingNaturalSize ? ws.NaturalSize : ws.MinSize;
-					}
-				}
-				else {
-					// Calculate the preferred height through the frontend, if there is an overriden OnGetPreferredHeight
-					if ((enabledEvents & WidgetEvent.PreferredHeightCheck) != 0 && constraint.Height == Double.PositiveInfinity) {
-						var ws = eventSink.OnGetPreferredHeight ();
-						wpfMeasure.Height = constraint.Height = gettingNaturalSize ? ws.NaturalSize : ws.MinSize;
-					}
-
-					// Now calculate the preferred width for that height, also using the override if available
-					if ((enabledEvents & WidgetEvent.PreferredWidthForHeightCheck) != 0) {
-						var ws = eventSink.OnGetPreferredWidthForHeight (constraint.Height);
-						wpfMeasure.Width = gettingNaturalSize ? ws.NaturalSize : ws.MinSize;
-					}
-				}
-			});
+					// if we are not given a constraint. If there is a width constraint, we'll use that constraint value for calculating the height
+					var cw = double.IsPositiveInfinity (constraint.Width) ? SizeConstraint.Unconstrained : constraint.Width;
+					var ch = double.IsPositiveInfinity (constraint.Height) ? SizeConstraint.Unconstrained : constraint.Height;
+					var ws = eventSink.GetPreferredSize (cw, ch);
+					wpfMeasure = new System.Windows.Size (ws.Width, ws.Height);
+				});
+			}
 			return wpfMeasure;
 		}
 
@@ -400,30 +353,53 @@ namespace Xwt.WPFBackend
 			get { return -2; }
 		}
 
+		public virtual void UpdateChildPlacement (IWidgetBackend childBackend)
+		{
+			SetChildPlacement (childBackend);
+		}
+
+		public static void SetChildPlacement (IWidgetBackend childBackend)
+		{
+			var w = ((WidgetBackend)childBackend);
+			w.Widget.Margin = new Thickness (w.Frontend.MarginLeft, w.Frontend.MarginTop, w.Frontend.MarginRight, w.Frontend.MarginBottom);
+			switch (w.Frontend.HorizontalPlacement) {
+				case WidgetPlacement.Start: w.Widget.HorizontalAlignment = HorizontalAlignment.Left; break;
+				case WidgetPlacement.Center: w.Widget.HorizontalAlignment = HorizontalAlignment.Center; break;
+				case WidgetPlacement.End: w.Widget.HorizontalAlignment = HorizontalAlignment.Right; break;
+				case WidgetPlacement.Fill: w.Widget.HorizontalAlignment = HorizontalAlignment.Stretch; break;
+			}
+			switch (w.Frontend.VerticalPlacement) {
+				case WidgetPlacement.Start: w.Widget.VerticalAlignment = VerticalAlignment.Top; break;
+				case WidgetPlacement.Center: w.Widget.VerticalAlignment = VerticalAlignment.Center; break;
+				case WidgetPlacement.End: w.Widget.VerticalAlignment = VerticalAlignment.Bottom; break;
+				case WidgetPlacement.Fill: w.Widget.VerticalAlignment = VerticalAlignment.Stretch; break;
+			}
+		}
+
 		public void SetMinSize (double width, double height)
 		{
 			if (width == -1)
 				Widget.ClearValue (FrameworkElement.MinWidthProperty);
 			else
-				Widget.MinWidth = width / WidthPixelRatio;
+				Widget.MinWidth = width;
 
 			if (height == -1)
 				Widget.ClearValue (FrameworkElement.MinHeightProperty);
 			else
-				Widget.MinHeight = height / HeightPixelRatio;
+				Widget.MinHeight = height;
 		}
 
-		public void SetNaturalSize (double width, double height)
+		public void SetSizeRequest (double width, double height)
 		{
 			if (width == -1)
 				Widget.ClearValue (FrameworkElement.WidthProperty);
 			else
-				Widget.Width = width / WidthPixelRatio;
+				Widget.Width = width;
 
 			if (height == -1)
 				Widget.ClearValue (FrameworkElement.HeightProperty);
 			else
-				Widget.Height = height / HeightPixelRatio;
+				Widget.Height = height;
 		}
 
 		public void SetCursor (CursorType cursor)
@@ -452,8 +428,6 @@ namespace Xwt.WPFBackend
 		
 		public virtual void UpdateLayout ()
 		{
-			Xwt.Widget frontend = (Xwt.Widget)Frontend;
-			widget.Margin = new Thickness (frontend.Margin.Left, frontend.Margin.Top, frontend.Margin.Right, frontend.Margin.Bottom);
 		}
 
 		public override void EnableEvent (object eventId)
@@ -465,7 +439,7 @@ namespace Xwt.WPFBackend
 						Widget.KeyDown += WidgetKeyDownHandler;
 						break;
 					case WidgetEvent.KeyReleased:
-						Widget.KeyDown += WidgetKeyUpHandler;
+						Widget.KeyUp += WidgetKeyUpHandler;
 						break;
 					case WidgetEvent.ButtonPressed:
 						Widget.MouseDown += WidgetMouseDownHandler;
@@ -552,7 +526,7 @@ namespace Xwt.WPFBackend
 			}
 		}
 
-		protected double WidthPixelRatio
+		public double aWidthPixelRatio
 		{
 			get
 			{
@@ -565,7 +539,7 @@ namespace Xwt.WPFBackend
 			}
 		}
 
-		protected double HeightPixelRatio
+		public double aHeightPixelRatio
 		{
 			get
 			{
@@ -578,16 +552,11 @@ namespace Xwt.WPFBackend
 			}
 		}
 
-		protected double DPI
-		{
-			get { return WidthPixelRatio * 96; }
-		}
-
 		void WidgetKeyDownHandler (object sender, System.Windows.Input.KeyEventArgs e)
 		{
 			KeyEventArgs args;
 			if (MapToXwtKeyArgs (e, out args)) {
-				Toolkit.Invoke (delegate {
+				Context.InvokeUserCode (delegate {
 					eventSink.OnKeyPressed (args);
 				});
 				if (args.Handled)
@@ -599,7 +568,8 @@ namespace Xwt.WPFBackend
 		{
 			KeyEventArgs args;
 			if (MapToXwtKeyArgs (e, out args)) {
-				Toolkit.Invoke (delegate {
+				Context.InvokeUserCode (delegate
+				{
 					eventSink.OnKeyReleased (args);
 				});
 				if (args.Handled)
@@ -622,7 +592,7 @@ namespace Xwt.WPFBackend
 		void WidgetMouseDownHandler (object o, MouseButtonEventArgs e)
 		{
 			var args = ToXwtButtonArgs (e);
-			Toolkit.Invoke (delegate () {
+			Context.InvokeUserCode (delegate () {
 				eventSink.OnButtonPressed (args);
 			});
 			if (args.Handled)
@@ -632,7 +602,8 @@ namespace Xwt.WPFBackend
 		void WidgetMouseUpHandler (object o, MouseButtonEventArgs e)
 		{
 			var args = ToXwtButtonArgs (e);
-			Toolkit.Invoke (delegate () {
+			Context.InvokeUserCode (delegate ()
+			{
 				eventSink.OnButtonReleased (args);
 			});
 			if (args.Handled)
@@ -643,8 +614,8 @@ namespace Xwt.WPFBackend
 		{
 			var pos = e.GetPosition (Widget);
 			return new ButtonEventArgs () {
-				X = pos.X * WidthPixelRatio,
-				Y = pos.Y * HeightPixelRatio,
+				X = pos.X,
+				Y = pos.Y,
 				MultiplePress = e.ClickCount,
 				Button = e.ChangedButton.ToXwtButton ()
 			};
@@ -652,12 +623,12 @@ namespace Xwt.WPFBackend
 
 		void WidgetGotFocusHandler (object o, RoutedEventArgs e)
 		{
-			Toolkit.Invoke (this.eventSink.OnGotFocus);
+			Context.InvokeUserCode (this.eventSink.OnGotFocus);
 		}
 
 		void WidgetLostFocusHandler (object o, RoutedEventArgs e)
 		{
-			Toolkit.Invoke (eventSink.OnLostFocus);
+			Context.InvokeUserCode (eventSink.OnLostFocus);
 		}
 
 		DragDropData DragDropInfo {
@@ -772,7 +743,7 @@ namespace Xwt.WPFBackend
 				return;
 
 			DragStartData dragData = null;
-			Toolkit.Invoke (delegate {
+			Context.InvokeUserCode (delegate {
 				dragData = eventSink.OnDragStarted ();
 			});
 
@@ -837,21 +808,21 @@ namespace Xwt.WPFBackend
 
 		protected virtual void OnDragFinished (object sender, DragFinishedEventArgs e)
 		{
-			Toolkit.Invoke (delegate {
+			Context.InvokeUserCode (delegate {
 				this.eventSink.OnDragFinished (e);
 			});
 		}
 
 		protected virtual void OnDragOver (object sender, DragOverEventArgs e)
 		{
-			Toolkit.Invoke (delegate {
+			Context.InvokeUserCode (delegate {
 				eventSink.OnDragOver (e);
 			});
 		}
 
 		protected virtual void OnDragLeave (object sender, EventArgs e)
 		{
-			Toolkit.Invoke (delegate {
+			Context.InvokeUserCode (delegate {
 				eventSink.OnDragLeave (e);
 			});
 		}
@@ -887,7 +858,7 @@ namespace Xwt.WPFBackend
 
 			if ((enabledEvents & WidgetEvent.DragOverCheck) > 0) {
 				var checkArgs = new DragOverCheckEventArgs (pos, types, proposedAction);
-				Toolkit.Invoke (delegate {
+				Context.InvokeUserCode (delegate {
 					eventSink.OnDragOverCheck (checkArgs);
 				});
 				if (checkArgs.AllowedAction == DragDropAction.None) {
@@ -932,7 +903,7 @@ namespace Xwt.WPFBackend
 
 			if ((enabledEvents & WidgetEvent.DragDropCheck) > 0) {
 				var checkArgs = new DragCheckEventArgs (pos, types, actualEffect.ToXwtDropAction ());
-				bool res = Toolkit.Invoke (delegate {
+				bool res = Context.InvokeUserCode (delegate {
 					eventSink.OnDragDropCheck (checkArgs);
 				});
 
@@ -947,7 +918,7 @@ namespace Xwt.WPFBackend
 				FillDataStore (store, e.Data, DragDropInfo.TargetTypes);
 
 				var args = new DragEventArgs (pos, store, actualEffect.ToXwtDropAction ());
-				Toolkit.Invoke (delegate {
+				Context.InvokeUserCode (delegate {
 					eventSink.OnDragDrop (args);
 				});
 
@@ -963,21 +934,23 @@ namespace Xwt.WPFBackend
 
 		private void WidgetMouseEnteredHandler (object sender, MouseEventArgs e)
 		{
-			Toolkit.Invoke (eventSink.OnMouseEntered);
+			Context.InvokeUserCode (eventSink.OnMouseEntered);
 		}
 
 		private void WidgetMouseExitedHandler (object sender, MouseEventArgs e)
 		{
-			Toolkit.Invoke (eventSink.OnMouseExited);
+			Context.InvokeUserCode (eventSink.OnMouseExited);
 		}
 
 		private void WidgetMouseMoveHandler (object sender, MouseEventArgs e)
 		{
-			Toolkit.Invoke (() => {
-				var p = e.GetPosition (Widget);
-				eventSink.OnMouseMoved (new MouseMovedEventArgs (
-					e.Timestamp, p.X * WidthPixelRatio, p.Y * HeightPixelRatio));
+			var p = e.GetPosition (Widget);
+			var a = new MouseMovedEventArgs(e.Timestamp, p.X, p.Y);
+			Context.InvokeUserCode (() => {
+				eventSink.OnMouseMoved(a);
 			});
+			if (a.Handled)
+				e.Handled = true;
 		}
 
 		private int mouseScrollCumulation = 0;
@@ -988,14 +961,18 @@ namespace Xwt.WPFBackend
 			int jumps = mouseScrollCumulation / 120;
 			mouseScrollCumulation %= 120;
 			var p = e.GetPosition(Widget);
-			Toolkit.Invoke (delegate {
+			Context.InvokeUserCode (delegate {
 				for (int i = 0; i < jumps; i++) {
-					eventSink.OnMouseScrolled(new MouseScrolledEventArgs(
-						e.Timestamp, p.X * WidthPixelRatio, p.Y * HeightPixelRatio, ScrollDirection.Up));
+					var a = new MouseScrolledEventArgs(e.Timestamp, p.X, p.Y, ScrollDirection.Up);
+					eventSink.OnMouseScrolled(a);
+					if (a.Handled)
+						e.Handled = true;
 				}
 				for (int i = 0; i > jumps; i--) {
-					eventSink.OnMouseScrolled(new MouseScrolledEventArgs(
-						e.Timestamp, p.X * WidthPixelRatio, p.Y * HeightPixelRatio, ScrollDirection.Down));
+					var a = new MouseScrolledEventArgs(e.Timestamp, p.X, p.Y, ScrollDirection.Down);
+					eventSink.OnMouseScrolled(a);
+					if (a.Handled)
+						e.Handled = true;
 				}
 			});
 		}
@@ -1003,7 +980,7 @@ namespace Xwt.WPFBackend
 		private void WidgetOnSizeChanged (object sender, SizeChangedEventArgs e)
 		{
 			if (Widget.IsVisible)
-				Toolkit.Invoke (this.eventSink.OnBoundsChanged);
+				Context.InvokeUserCode (this.eventSink.OnBoundsChanged);
 		}
 	}
 

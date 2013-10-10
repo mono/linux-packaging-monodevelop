@@ -26,9 +26,11 @@
 
 using System;
 using Xwt.Backends;
+using System.ComponentModel;
 
 namespace Xwt
 {
+	[BackendType (typeof(ISpinnerBackend))]
 	public class Spinner : Widget
 	{
 		ISpinnerBackend Backend {
@@ -39,6 +41,7 @@ namespace Xwt
 		{
 		}
 
+		[DefaultValue (false)]
 		public bool Animate {
 			get {
 				return Backend.IsAnimating;

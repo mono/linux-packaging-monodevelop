@@ -32,8 +32,8 @@ namespace ICSharpCode.NRefactory.CSharp
 	{
 		public static readonly Role<ConstructorInitializer> InitializerRole = new Role<ConstructorInitializer>("Initializer", ConstructorInitializer.Null);
 		
-		public override EntityType EntityType {
-			get { return EntityType.Constructor; }
+		public override SymbolKind SymbolKind {
+			get { return SymbolKind.Constructor; }
 		}
 		
 		public CSharpTokenNode LParToken {
@@ -140,6 +140,15 @@ namespace ICSharpCode.NRefactory.CSharp
 		public ConstructorInitializerType ConstructorInitializerType {
 			get;
 			set;
+		}
+		
+		public CSharpTokenNode Keyword {
+			get {
+				if (ConstructorInitializerType == ConstructorInitializerType.Base)
+					return GetChildByRole(BaseKeywordRole);
+				else
+					return GetChildByRole(ThisKeywordRole);
+			}
 		}
 		
 		public CSharpTokenNode LParToken {

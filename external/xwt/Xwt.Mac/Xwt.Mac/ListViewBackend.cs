@@ -77,6 +77,11 @@ namespace Xwt.Mac
 		{
 			return source.GetValue ((int)pos, nField);
 		}
+		
+		public override void SetValue (object pos, int nField, object value)
+		{
+			source.SetValue ((int)pos, nField, value);
+		}
 
 		// TODO
 		public bool BorderVisible { get; set; }
@@ -112,7 +117,7 @@ namespace Xwt.Mac
 
 		public override MonoMac.Foundation.NSObject GetObjectValue (NSTableView tableView, NSTableColumn tableColumn, int row)
 		{
-			return new TableRow () { Row = row };
+			return NSObject.FromObject (row);
 		}
 
 		public override int GetRowCount (NSTableView tableView)

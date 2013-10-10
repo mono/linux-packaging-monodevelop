@@ -32,6 +32,10 @@ namespace MonoDevelop.VersionControl
 				if (path == prj.BaseDirectory || path.IsChildPathOf (prj.BaseDirectory))
 					return VersionControlService.GetRepository (prj);
 			}
+			foreach (Solution sol in IdeApp.Workspace.GetAllSolutions ()) {
+				if (path == sol.BaseDirectory || path.IsChildPathOf (sol.BaseDirectory))
+					return VersionControlService.GetRepository (sol);
+			}
 			return null;
 		}
 		
@@ -49,15 +53,15 @@ namespace MonoDevelop.VersionControl
 		public override void MoveFile (FilePath source, FilePath dest)
 		{
 			IProgressMonitor monitor = new NullProgressMonitor ();
-			
+
 			Repository srcRepo = GetRepository (source);
 			Repository dstRepo = GetRepository (dest);
 			
-			if (dstRepo.CanMoveFilesFrom (srcRepo, source, dest))
+			if (dstRepo != null && dstRepo.CanMoveFilesFrom (srcRepo, source, dest))
 				srcRepo.MoveFile (source, dest, true, monitor);
 			else {
 				CopyFile (source, dest, true);
-				srcRepo.DeleteFile (source, true, monitor);
+				srcRepo.DeleteFile (source, true, monitor, false);
 			}
 		}
 		
@@ -74,7 +78,7 @@ namespace MonoDevelop.VersionControl
 		public override void DeleteFile (FilePath file)
 		{
 			Repository repo = GetRepository (file);
-			repo.DeleteFile (file, true, new NullProgressMonitor ());
+			repo.DeleteFile (file, true, new NullProgressMonitor (), false);
 		}
 		
 		public override void CreateDirectory (FilePath path)
@@ -95,14 +99,14 @@ namespace MonoDevelop.VersionControl
 				srcRepo.MoveDirectory (sourcePath, destPath, true, monitor);
 			else {
 				CopyDirectory (sourcePath, destPath);
-				srcRepo.DeleteDirectory (sourcePath, true, monitor);
+				srcRepo.DeleteDirectory (sourcePath, true, monitor, false);
 			}
 		}
-		
+
 		public override void DeleteDirectory (FilePath path)
 		{
 			Repository repo = GetRepository (path);
-			repo.DeleteDirectory (path, true, new NullProgressMonitor ());
+			repo.DeleteDirectory (path, true, new NullProgressMonitor (), false);
 		}
 		
 		public override bool RequestFileEdit (FilePath file)

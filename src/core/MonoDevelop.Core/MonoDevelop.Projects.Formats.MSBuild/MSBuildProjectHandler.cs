@@ -548,15 +548,12 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				if (it == null) continue;
 
 				if (it is ProjectFile) {
-					ProjectFile file = (ProjectFile)it;
+					var file = (ProjectFile)it;
 
-					if (file.IsWildcard)  {
-						foreach (ProjectFile wildcardItem in file.ResolveWildcardItems ()) {
-							EntityItem.Items.Add (wildcardItem);
-							
-							// Thanks to IsOriginatedFromWildcard, this item will not be saved back to disk.
-							System.Diagnostics.Debug.Assert (wildcardItem.IsOriginatedFromWildcard);
-						}
+					if (file.Name.IndexOf ('*') > -1)  {
+						// Thanks to IsOriginatedFromWildcard, these expanded items will not be saved back to disk.
+						foreach (var expandedItem in ResolveWildcardItems (file))
+							EntityItem.Items.Add (expandedItem);
 
 						// Add to wildcard items (so it can be re-saved) instead of Items (where tools will 
 						// try to compile and display these nonstandard items
@@ -695,6 +692,66 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 			
 			Item.NeedsReload = false;
+		}
+
+		const string RecursiveDirectoryWildcard = "**";
+		static readonly char[] directorySeparators = new [] {
+			Path.DirectorySeparatorChar,
+			Path.AltDirectorySeparatorChar
+		};
+
+		static string GetWildcardDirectoryName (string path)
+		{
+			int indexOfLast = path.LastIndexOfAny (directorySeparators);
+			if (indexOfLast < 0)
+				return String.Empty;
+			return path.Substring (0, indexOfLast);
+		}
+
+		static string GetWildcardFileName (string path)
+		{
+			int indexOfLast = path.LastIndexOfAny (directorySeparators);
+			if (indexOfLast < 0)
+				return path;
+			if (indexOfLast == path.Length)
+				return String.Empty;
+			return path.Substring (indexOfLast + 1, path.Length - (indexOfLast + 1));
+		}
+
+		static IEnumerable<string> ExpandWildcardFilePath (string filePath)
+		{
+			if (String.IsNullOrWhiteSpace (filePath))
+				throw new ArgumentException ("Not a wildcard path");
+
+			string dir = GetWildcardDirectoryName (filePath);
+			string file = GetWildcardFileName (filePath);
+
+			if (String.IsNullOrEmpty (dir) || String.IsNullOrEmpty (file))
+				return null;
+
+			SearchOption searchOption = SearchOption.TopDirectoryOnly;
+			if (dir.EndsWith (RecursiveDirectoryWildcard, StringComparison.Ordinal)) {
+				dir = dir.Substring (0, dir.Length - RecursiveDirectoryWildcard.Length);
+				searchOption = SearchOption.AllDirectories;
+			}
+
+			if (!Directory.Exists (dir))
+				return null;
+
+			return Directory.GetFiles (dir, file, searchOption);
+		}
+
+		static IEnumerable<ProjectFile> ResolveWildcardItems (ProjectFile wildcardFile)
+		{
+			var paths = ExpandWildcardFilePath (wildcardFile.Name);
+			if (paths == null)
+				yield break;
+			foreach (var resolvedFilePath in paths) {
+				var projectFile = (ProjectFile)wildcardFile.Clone ();
+				projectFile.Name = resolvedFilePath;
+				projectFile.IsOriginatedFromWildcard = true;
+				yield return projectFile;
+			}
 		}
 
 		MSBuildPropertyGroup ExtractMergedtoprojectProperties (MSBuildSerializer ser, MSBuildPropertySet pgroup, SolutionItemConfiguration ob)
@@ -1149,10 +1206,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				msproject.SetProjectExtensions ("MonoDevelop", sw.ToString ());
 			} else
 				msproject.RemoveProjectExtensions ("MonoDevelop");
-			
+
 			// Don't save the file to disk if the content did not change
 			msproject.Save (eitem.FileName);
-			
+
 			if (projectBuilder != null)
 				projectBuilder.Refresh ();
 		}
@@ -1446,7 +1503,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				if (name == "Include")
 					ditem.ItemData.Add (new DataValue ("Include", buildItem.Include));
 				else if (buildItem.HasMetadata (name)) {
-					string data = buildItem.GetMetadata (name);
+					string data = buildItem.GetMetadata (name, !prop.DataType.IsSimpleType);
 					ditem.ItemData.Add (GetDataNode (prop, data));
 				}
 			}
@@ -1712,7 +1769,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		string GetXmlString (DataNode node)
 		{
 			if (node is DataValue)
-				return EscapeText (((DataValue)node).Value);
+				return ((DataValue)node).Value;
 			else {
 				StringWriter sw = new StringWriter ();
 				XmlTextWriter xw = new XmlTextWriter (sw);
@@ -1763,49 +1820,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		internal static readonly IList<string> UnsupportedItems = new string[] {
 			"BootstrapperFile", "AppDesigner", "WebReferences", "WebReferenceUrl", "Service"
 		};
-		
-		public static string EscapeText (string text)
-		{
-			var result = new StringBuilder ();
-			foreach (char ch in text) {
-				switch (ch) {
-				case '<':
-					result.Append ("&lt;");
-					break;
-				case '>':
-					result.Append ("&gt;");
-					break;
-				case '&':
-					result.Append ("&amp;");
-					break;
-				case '\'':
-					result.Append ("&apos;");
-					break;
-				case '"':
-					result.Append ("&quot;");
-					break;
-				default:
-					int charValue = (int)ch;
-					if (IsSpecialChar (charValue)) {
-						result.AppendFormat ("&#x{0:X};", charValue);
-					} else {
-						result.Append (ch);
-					}
-					break;
-				}
-			}
-			return result.ToString ();
-		}
-		
-		static bool IsSpecialChar (int charValue)
-		{
-			return 
-				0x01 <= charValue && charValue <= 0x08 ||
-				0x0B <= charValue && charValue <= 0x0C ||
-				0x0E <= charValue && charValue <= 0x1F ||
-				0x7F <= charValue && charValue <= 0x84 ||
-				0x86 <= charValue && charValue <= 0x9F;
-		}
 		
 		public static string UnescapeText (string text)
 		{

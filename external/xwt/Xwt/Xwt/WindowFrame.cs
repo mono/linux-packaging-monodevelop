@@ -51,13 +51,15 @@
 // THE SOFTWARE.
 using System;
 using Xwt.Backends;
-using Xwt.Engine;
+
 using System.ComponentModel;
 using Xwt.Drawing;
+using Xwt.Motion;
 
 namespace Xwt
 {
-	public class WindowFrame: XwtComponent
+	[BackendType (typeof(IWindowFrameBackend))]
+	public class WindowFrame: XwtComponent, IAnimatable
 	{
 		EventHandler boundsChanged;
 		EventHandler shown;
@@ -153,6 +155,8 @@ namespace Xwt
 				if (value.Height < 0)
 					value.Height = 0;
 				BackendBounds = value;
+				if (Visible)
+					AdjustSize ();
 			}
 		}
 
@@ -172,6 +176,8 @@ namespace Xwt
 				if (value < 0)
 					value = 0;
 				SetBackendSize (value, -1);
+				if (Visible)
+					AdjustSize ();
 			}
 		}
 		
@@ -181,9 +187,15 @@ namespace Xwt
 				if (value < 0)
 					value = 0;
 				SetBackendSize (-1, value);
+				if (Visible)
+					AdjustSize ();
 			}
 		}
-		
+
+		/// <summary>
+		/// Size of the window, not including the decorations
+		/// </summary>
+		/// <value>The size.</value>
 		public Size Size {
 			get { return BackendBounds.Size; }
 			set {
@@ -192,6 +204,8 @@ namespace Xwt
 				if (value.Height < 0)
 					value.Height = 0;
 				SetBackendSize (value.Width, value.Height);
+				if (Visible)
+					AdjustSize ();
 			}
 		}
 		
@@ -207,7 +221,7 @@ namespace Xwt
 
         public Image Icon {
             get { return icon; }
-            set { Backend.SetIcon((value as IFrontend).Backend); }
+			set { icon = value; Backend.SetIcon (icon != null ? icon.ImageDescription : ImageDescription.Null); }
         }
 		
 		public bool Decorated {
@@ -237,12 +251,45 @@ namespace Xwt
 			get { return Backend.Visible; }
 			set { Backend.Visible = value; }
 		}
-		
-		public void Show ()
-		{
-			Visible = true;
+
+		public double Opacity {
+			get { return Backend.Opacity; }
+			set { Backend.Opacity = value; }
 		}
 		
+		/// <summary>
+		/// Gets or sets a value indicating whether this window is in full screen mode
+		/// </summary>
+		/// <value><c>true</c> if the window is in full screen mode; otherwise, <c>false</c>.</value>
+		public bool FullScreen {
+			get { return Backend.FullScreen; }
+			set { Backend.FullScreen = value; }
+		}
+
+		/// <summary>
+		/// Gets the screen on which most of the area of this window is placed
+		/// </summary>
+		/// <value>The screen.</value>
+		public Screen Screen {
+			get {
+				if (!Visible)
+					throw new InvalidOperationException ("The window is not visible");
+				return Desktop.GetScreen (Backend.Screen);
+			}
+		}
+
+		public void Show ()
+		{
+			if (!Visible) {
+				AdjustSize ();
+				Visible = true;
+			}
+		}
+		
+		internal virtual void AdjustSize ()
+		{
+		}
+
 		/// <summary>
 		/// Presents a window to the user. This may mean raising the window in the stacking order,
 		/// deiconifying it, moving it to the current desktop, and/or giving it the keyboard focus
@@ -280,8 +327,7 @@ namespace Xwt
 
 		internal virtual void SetBackendSize (double width, double height)
 		{
-			size = new Size (width != -1 ? width : Width, height != -1 ? height : Height);
-			Backend.Resize (size.Width, size.Height);
+			Backend.SetSize (width, height);
 		}
 
 		internal virtual void SetBackendLocation (double x, double y)
@@ -318,7 +364,7 @@ namespace Xwt
 		{
 			if (!pendingReallocation) {
 				pendingReallocation = true;
-				Toolkit.QueueExitAction (delegate {
+				BackendHost.ToolkitEngine.QueueExitAction (delegate {
 					pendingReallocation = false;
 					OnReallocate ();
 				});
@@ -329,6 +375,14 @@ namespace Xwt
 		{
 		}
 		
+		void IAnimatable.BatchBegin ()
+		{
+		}
+
+		void IAnimatable.BatchCommit ()
+		{
+		}
+
 		public event EventHandler BoundsChanged {
 			add {
 				boundsChanged += value;

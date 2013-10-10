@@ -26,11 +26,12 @@
 
 using System;
 using Xwt.Drawing;
-using Xwt.Engine;
+
 using Xwt.Backends;
 
 namespace Xwt
 {
+	[BackendType (typeof(IPopoverBackend))]
 	public class Popover : XwtComponent
 	{
 		public enum Position {

@@ -48,7 +48,7 @@ namespace IKVM.Internal
 		private WorkaroundBaseClass workaroundBaseClass;
 
 		internal AotTypeWrapper(ClassFile f, CompilerClassLoader loader)
-			: base(f, loader)
+			: base(f, loader, null)
 		{
 		}
 
@@ -580,7 +580,10 @@ namespace IKVM.Internal
 				}
 				else
 				{
-					attribs |= MethodAttributes.Virtual;
+					if((modifiers & Modifiers.Private) == 0)
+					{
+						attribs |= MethodAttributes.Virtual;
+					}
 					if((modifiers & Modifiers.Final) != 0)
 					{
 						attribs |= MethodAttributes.Final;
@@ -1118,7 +1121,7 @@ namespace IKVM.Internal
 			}
 		}
 
-		internal override void EmitCheckcast(TypeWrapper context, CodeEmitter ilgen)
+		internal override void EmitCheckcast(CodeEmitter ilgen)
 		{
 			if(IsGhost)
 			{
@@ -1142,11 +1145,11 @@ namespace IKVM.Internal
 			}
 			else
 			{
-				base.EmitCheckcast(context, ilgen);
+				base.EmitCheckcast(ilgen);
 			}
 		}
 
-		internal override void EmitInstanceOf(TypeWrapper context, CodeEmitter ilgen)
+		internal override void EmitInstanceOf(CodeEmitter ilgen)
 		{
 			if(IsGhost)
 			{
@@ -1158,7 +1161,7 @@ namespace IKVM.Internal
 			}
 			else
 			{
-				base.EmitInstanceOf(context, ilgen);
+				base.EmitInstanceOf(ilgen);
 			}
 		}
 

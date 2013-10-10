@@ -319,11 +319,12 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				}
 			}
 		}
-		
+
+		static HashSet<string> propertiesThatAffectDisplay = new HashSet<string> (new string[] { null, "DependsOn", "Link", "Visible" });
 		void OnFilePropertyChanged (object sender, ProjectFileEventArgs e)
 		{
-			foreach (ProjectFileEventInfo args in e) {
-				ITreeBuilder tb = Context.GetTreeBuilder (args.Project);
+			foreach (var project in e.Where (x => propertiesThatAffectDisplay.Contains (x.Property)).Select (x => x.Project).Distinct ()) {
+				ITreeBuilder tb = Context.GetTreeBuilder (project);
 				if (tb != null) tb.UpdateAll ();
 			}
 		}
@@ -416,6 +417,20 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 					return;
 				}
 			}
+		}
+
+		[CommandHandler (ProjectCommands.EditSolutionItem)]
+		public void OnEditProject ()
+		{
+			Project project = (Project) CurrentNode.DataItem;
+			IdeApp.Workbench.OpenDocument (project.FileName);
+		}
+
+		[CommandUpdateHandler (ProjectCommands.EditSolutionItem)]
+		public void OnEditProjectUpdate (CommandInfo info)
+		{
+			var p = (Project) CurrentNode.DataItem;
+			info.Visible = !IdeApp.Workbench.Documents.Any (d => d.FileName == p.FileName);
 		}
 		
 		public override DragOperation CanDragNode ()

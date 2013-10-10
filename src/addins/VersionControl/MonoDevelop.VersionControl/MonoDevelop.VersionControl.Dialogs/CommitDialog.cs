@@ -75,17 +75,22 @@ namespace MonoDevelop.VersionControl.Dialogs
 			foreach (ChangeSetItem info in changeSet.Items) {
 				Gdk.Pixbuf statusicon = VersionControlService.LoadIconForStatus (info.Status);
 				string lstatus = VersionControlService.GetStatusLabel (info.Status);
-				
-				string localpath = (!info.LocalPath.IsChildPathOf (changeSet.BaseLocalPath)?
-				                    ".":
-				                    (string) info.LocalPath.ToRelative (changeSet.BaseLocalPath)); 
+				string localpath;
+
+				if (info.IsDirectory)
+					localpath = (!info.LocalPath.IsChildPathOf (changeSet.BaseLocalPath)?
+									".":
+									(string) info.LocalPath.ToRelative (changeSet.BaseLocalPath));
+				else
+					localpath = System.IO.Path.GetFileName((string) info.LocalPath);
+
 				if (localpath.Length > 0 && localpath[0] == System.IO.Path.DirectorySeparatorChar) localpath = localpath.Substring(1);
 				if (localpath == "") { localpath = "."; } // not sure if this happens
 				
 				store.AppendValues (statusicon, lstatus, localpath, true, info);
 				selected.Add (info.LocalPath);
 			}
-			
+
 			if (string.IsNullOrEmpty (changeSet.GlobalComment)) {
 				AuthorInformation aInfo;
 				CommitMessageFormat fmt = VersionControlService.GetCommitMessageFormat (changeSet, out aInfo);
@@ -96,11 +101,12 @@ namespace MonoDevelop.VersionControl.Dialogs
 				
 			textview.Buffer.Changed += OnTextChanged;
 			
-			// Focus the text view and move the insert point to the begining. Makes it easier to insert
+			// Focus the text view and move the insert point to the beginning. Makes it easier to insert
 			// a comment header.
 			textview.Buffer.MoveMark (textview.Buffer.InsertMark, textview.Buffer.StartIter);
 			textview.Buffer.MoveMark (textview.Buffer.SelectionBound, textview.Buffer.StartIter);
 			textview.GrabFocus ();
+			textview.Buffer.MarkSet += OnMarkSet;
 		}
 
 		void HandleAllowCommitChanged (object sender, EventArgs e)
@@ -121,6 +127,46 @@ namespace MonoDevelop.VersionControl.Dialogs
 
 		protected void OnButtonCommitClicked (object sender, System.EventArgs e)
 		{
+			// In case we have local unsaved files with changes, throw a dialog for the user.
+			System.Collections.Generic.List<Document> docList = new System.Collections.Generic.List<Document> ();
+			foreach (var item in IdeApp.Workbench.Documents) {
+				if (!item.IsDirty || !selected.Contains (item.FileName))
+					continue;
+				docList.Add (item);
+			}
+
+			if (docList.Count != 0) {
+				AlertButton response = MessageService.GenericAlert (
+					MonoDevelop.Ide.Gui.Stock.Question,
+					GettextCatalog.GetString ("You are trying to commit files which have unsaved changes."),
+					GettextCatalog.GetString ("Do you want to save the changes before committing?"),
+					new AlertButton[] {
+						AlertButton.Cancel,
+						new AlertButton ("Don't Save"),
+						AlertButton.Save
+					}
+				);
+
+				if (response == AlertButton.Cancel)
+					return;
+
+				if (response == AlertButton.Save) {
+					// Go through all the items and save them.
+					foreach (var item in docList)
+						item.Save ();
+
+					// Check if save failed on any item and abort.
+					foreach (var item in docList)
+						if (item.IsDirty) {
+							MessageService.ShowMessage (GettextCatalog.GetString (
+								"Some files could not be saved. Commit operation aborted"));
+							return;
+						}
+				}
+
+				docList.Clear ();
+			}
+
 			// Update the change set
 			ArrayList todel = new ArrayList ();
 			foreach (ChangeSetItem it in changeSet.Items) {
@@ -158,10 +204,26 @@ namespace MonoDevelop.VersionControl.Dialogs
 			}
 			Respond (Gtk.ResponseType.Ok);
 		}
+
+		void UpdatePositionLabel (TextIter iter)
+		{
+			int row = iter.Line + 1;
+			int col = iter.LineOffset + 1;
+			label3.Text = String.Format ("{0}/{1}", row, col);
+		}
+
+		void OnMarkSet (object o, MarkSetArgs e)
+		{
+			if (e.Mark != textview.Buffer.InsertMark)
+				return;
+
+			UpdatePositionLabel (e.Location);
+		}
 		
 		void OnTextChanged (object s, EventArgs args)
 		{
 			changeSet.GlobalComment = Message;
+			UpdatePositionLabel (textview.Buffer.GetIterAtOffset (textview.Buffer.CursorPosition));
 		}
 		
 		public void EndCommit (bool success)

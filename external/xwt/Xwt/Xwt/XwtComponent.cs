@@ -26,7 +26,7 @@
 
 using System;
 using System.ComponentModel;
-using Xwt.Engine;
+
 using System.Collections.Generic;
 using System.Reflection;
 using Xwt.Backends;
@@ -47,15 +47,19 @@ namespace Xwt
 		{
 			return new BackendHost ();
 		}
-		
+
 		protected BackendHost BackendHost {
 			get { return backendHost; }
+		}
+		
+		Toolkit IFrontend.ToolkitEngine {
+			get { return backendHost.ToolkitEngine; }
 		}
 		
 		object IFrontend.Backend {
 			get { return backendHost.Backend; }
 		}
-		
+
 		protected static void MapEvent (object eventId, Type type, string methodName)
 		{
 			EventUtil.MapEvent (eventId, type, methodName);

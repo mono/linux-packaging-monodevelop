@@ -46,7 +46,7 @@ namespace MonoDevelop.Projects
 		Package,
 		Custom,
 		[Obsolete]
-		Gac = Package
+		Gac
 	}
 	
 	/// <summary>
@@ -104,6 +104,10 @@ namespace MonoDevelop.Projects
 		{
 			if (referenceType == ReferenceType.Assembly)
 				specificVersion = false;
+#pragma warning disable 612
+			if (referenceType == ReferenceType.Gac)
+				referenceType = ReferenceType.Package;
+#pragma warning restore 612
 			this.referenceType = referenceType;
 			this.reference     = reference;
 			UpdatePackageReference ();
@@ -144,7 +148,15 @@ namespace MonoDevelop.Projects
 		public Project OwnerProject {
 			get { return ownerProject; }
 		}
-		
+
+		// This property is used by the serializer. It ensures that the obsolete Gac value is not serialized
+		internal ReferenceType internalReferenceType {
+			get { return referenceType; }
+			#pragma warning disable 612
+			set { referenceType = value == ReferenceType.Gac ? ReferenceType.Package : value; }
+			#pragma warning restore 612
+		}
+
 		public ReferenceType ReferenceType {
 			get {
 				return referenceType;
@@ -229,10 +241,25 @@ namespace MonoDevelop.Projects
 					if (!IsExactVersion && SpecificVersion)
 						return GettextCatalog.GetString ("Specified version not found: expected {0}, found {1}", GetVersionNum (StoredReference), GetVersionNum (Reference));
 					if (notFound) {
-						if (ownerProject != null)
-							return GettextCatalog.GetString ("Assembly not available for {0} (in {1})", TargetFramework.Name, TargetRuntime.DisplayName);
-						else
-							return GettextCatalog.GetString ("Assembly not found");
+						if (ownerProject != null) {
+							bool isDefaultRuntime = Runtime.SystemAssemblyService.DefaultRuntime == TargetRuntime;
+							var hintPath = ExtendedProperties ["_OriginalMSBuildReferenceHintPath"] as string;
+							bool probablyFrameworkAssembly = string.IsNullOrEmpty (hintPath);
+
+							if (TargetRuntime.IsInstalled (TargetFramework) || !probablyFrameworkAssembly) {
+								if (isDefaultRuntime)
+									return GettextCatalog.GetString ("Assembly not found for framework {0}", TargetFramework.Name);
+
+								return GettextCatalog.GetString ("Assembly not found for framework {0} (in {1})", TargetFramework.Name, TargetRuntime.DisplayName);
+							}
+
+							if (isDefaultRuntime)
+								return GettextCatalog.GetString ("Framework {0} is not installed", TargetFramework.Name);
+
+							return GettextCatalog.GetString ("Framework {0} is not installed (in {1})", TargetFramework.Name, TargetRuntime.DisplayName);
+						}
+
+						return GettextCatalog.GetString ("Assembly not found");
 					}
 				} else if (ReferenceType == ReferenceType.Project) {
 					if (ownerProject != null && ownerProject.ParentSolution != null) {

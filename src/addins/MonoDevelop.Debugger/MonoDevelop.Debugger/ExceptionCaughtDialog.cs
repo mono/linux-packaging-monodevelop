@@ -49,8 +49,6 @@ namespace MonoDevelop.Debugger
 			stackStore = new TreeStore (typeof(string), typeof(string), typeof(int), typeof(int));
 			treeStack.Model = stackStore;
 			var crt = new CellRendererText ();
-			crt.WrapWidth = 200;
-			crt.WrapMode = Pango.WrapMode.WordChar;
 			treeStack.AppendColumn ("", crt, "markup", 0);
 			treeStack.ShowExpanders = false;
 			
@@ -94,7 +92,7 @@ namespace MonoDevelop.Debugger
 			stackStore.Clear ();
 			valueView.ClearValues ();
 
-			labelType.Markup = GettextCatalog.GetString ("<b>{0}</b> has been thrown", exception.Type);
+			labelType.Markup = GettextCatalog.GetString ("A <b>{0}</b> was thrown.", exception.Type);
 			labelMessage.Text = string.IsNullOrEmpty (exception.Message) ?
 			                    string.Empty : 
 			                    exception.Message;
@@ -120,7 +118,7 @@ namespace MonoDevelop.Debugger
 			}
 
 			foreach (ExceptionStackFrame frame in exc.StackTrace) {
-				string text = GLib.Markup.EscapeText (frame.DisplayText);
+				string text = string.Format ("<b>{0}</b>", GLib.Markup.EscapeText (frame.DisplayText));
 				if (!string.IsNullOrEmpty (frame.File)) {
 					text += "\n<small>" + GLib.Markup.EscapeText (frame.File);
 					if (frame.Line > 0) {
@@ -130,6 +128,7 @@ namespace MonoDevelop.Debugger
 					}
 					text += "</small>";
 				}
+
 				if (!it.Equals (TreeIter.Zero))
 					stackStore.AppendValues (it, text, frame.File, frame.Line, frame.Column);
 				else
@@ -166,9 +165,11 @@ namespace MonoDevelop.Debugger
 			box.Spacing = 6;
 			box.PackStart (widget, true, true, 0);
 			HButtonBox buttonBox = new HButtonBox ();
+			buttonBox.Layout = ButtonBoxStyle.End;
 			buttonBox.BorderWidth = 6;
+			buttonBox.Spacing = 12;
 
-			var copy = new Gtk.Button (GettextCatalog.GetString ("Copy to Clipboard"));
+			var copy = new Gtk.Button (GettextCatalog.GetString ("Copy"));
 			buttonBox.PackStart (copy, false, false, 0);
 			copy.Clicked += HandleCopyClicked;
 

@@ -50,6 +50,7 @@ namespace Xwt
 		}
 	}
 
+	[BackendType (typeof(ILinkLabelBackend))]
 	public class LinkLabel: Label
 	{
 		protected new class WidgetBackendHost : Label.WidgetBackendHost, ILinkLabelEventSink
@@ -113,8 +114,10 @@ namespace Xwt
 			if (navigateToUrl != null)
 				navigateToUrl (this, e);
 
-			// this method checks for e.Handled
-			Application.EngineBackend.ShowWebBrowser (e);
+			if (!e.Handled && e.Uri != null) {
+				Desktop.OpenUrl (e.Uri);
+				e.SetHandled ();
+			}
 		}
 
 		static void DummyHandleNavigateToUrl (object sender, NavigateToUrlEventArgs e)

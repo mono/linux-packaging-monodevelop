@@ -26,10 +26,11 @@
 using System;
 using Xwt.Backends;
 using Xwt.Drawing;
-using Xwt.Engine;
+
 
 namespace Xwt
 {
+	[BackendType (typeof(IDialogBackend))]
 	public class Dialog: Window
 	{
 		DialogButtonCollection commands;
@@ -94,8 +95,11 @@ namespace Xwt
 		
 		public Command Run (WindowFrame parent)
 		{
-			Toolkit.InvokePlatformCode (delegate {
-				Backend.RunLoop ((IWindowFrameBackend) WidgetRegistry.GetBackend (parent));
+			BackendHost.ToolkitEngine.ValidateObject (parent);
+			AdjustSize ();
+
+			BackendHost.ToolkitEngine.InvokePlatformCode (delegate {
+				Backend.RunLoop ((IWindowFrameBackend) Toolkit.GetBackend (parent));
 			});
 			return resultCommand;
 		}

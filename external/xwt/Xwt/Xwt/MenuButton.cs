@@ -26,10 +26,11 @@
 using System;
 using Xwt.Backends;
 using Xwt.Drawing;
-using Xwt.Engine;
+
 
 namespace Xwt
 {
+	[BackendType (typeof(IMenuButtonBackend))]
 	public class MenuButton: Button
 	{
 		Menu menu;
@@ -86,7 +87,11 @@ namespace Xwt
 		
 		IMenuBackend CreateMenu ()
 		{
-			return ((IMenuBackend)WidgetRegistry.GetBackend (OnCreateMenu()));
+			Menu menu = null;
+			BackendHost.ToolkitEngine.Invoke (delegate {
+				menu = OnCreateMenu();
+			});
+			return ((IMenuBackend)BackendHost.ToolkitEngine.GetSafeBackend (menu));
 		}
 		
 		protected virtual Menu OnCreateMenu ()

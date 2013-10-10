@@ -34,11 +34,11 @@ using System.Windows;
 using SWC = System.Windows.Controls;
 using SWMI = System.Windows.Media.Imaging;
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 namespace Xwt.WPFBackend
 {
-	public class MenuItemBackend : IMenuItemBackend
+	public class MenuItemBackend : Backend, IMenuItemBackend
 	{
 		object item;
 		SWC.MenuItem menuItem;
@@ -60,10 +60,6 @@ namespace Xwt.WPFBackend
 		public void Initialize (IMenuItemEventSink eventSink)
 		{
 			this.eventSink = eventSink;
-		}
-
-		public void InitializeBackend (object frontend)
-		{
 		}
 
 		public object Item {
@@ -102,20 +98,12 @@ namespace Xwt.WPFBackend
 			set { this.menuItem.Visibility = (value) ? Visibility.Visible : Visibility.Collapsed; }
 		}
 
-		public void SetImage (object imageBackend)
+		public void SetImage (ImageDescription imageBackend)
 		{
-			if (imageBackend == null)
+			if (imageBackend.IsNull)
 				this.menuItem.Icon = null;
 			else
-			{
-				var img = (SWMI.BitmapSource) imageBackend;
-				this.menuItem.Icon = new System.Windows.Controls.Image
-				{
-					Source = img,
-					Width = img.Width,
-					Height = img.Height
-				};
-			}
+				this.menuItem.Icon = new ImageBox (Context) { ImageSource = imageBackend };
 		}
 
 		public void SetSubmenu (IMenuBackend menu)
@@ -155,7 +143,7 @@ namespace Xwt.WPFBackend
 			this.type = type;
 		}
 
-		public void EnableEvent (object eventId)
+		public override void EnableEvent (object eventId)
 		{
 			if (menuItem == null)
 				return;
@@ -169,7 +157,7 @@ namespace Xwt.WPFBackend
 			}
 		}
 
-		public void DisableEvent (object eventId)
+		public override void DisableEvent (object eventId)
 		{
 			if (menuItem == null)
 				return;
@@ -185,7 +173,7 @@ namespace Xwt.WPFBackend
 
 		void MenuItemClickHandler (object sender, EventArgs args)
 		{
-			Toolkit.Invoke (eventSink.OnClicked);
+			Context.InvokeUserCode (eventSink.OnClicked);
 		}
 	}
 }

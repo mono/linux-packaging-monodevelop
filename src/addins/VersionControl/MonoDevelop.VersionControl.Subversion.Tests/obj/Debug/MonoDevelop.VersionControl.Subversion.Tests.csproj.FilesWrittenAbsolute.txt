@@ -1,0 +1,4 @@
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/tests/MonoDevelop.VersionControl.Subversion.Tests.dll.mdb
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/tests/MonoDevelop.VersionControl.Subversion.Tests.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Tests/obj/Debug/MonoDevelop.VersionControl.Subversion.Tests.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Tests/obj/Debug/MonoDevelop.VersionControl.Subversion.Tests.dll.mdb

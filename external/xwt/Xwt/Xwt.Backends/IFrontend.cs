@@ -25,11 +25,13 @@
 // THE SOFTWARE.
 using System;
 
+
 namespace Xwt.Backends
 {
-	interface IFrontend
+	internal interface IFrontend
 	{
 		object Backend { get; }
+		Toolkit ToolkitEngine { get; }
 	}
 }
 

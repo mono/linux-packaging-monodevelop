@@ -691,6 +691,7 @@ namespace Mono.CSharp
 		readonly MemberKind kind;
 		protected readonly ModuleContainer module;
 		protected TypeSpec type;
+		bool defined;
 
 		public PredefinedType (ModuleContainer module, MemberKind kind, string ns, string name, int arity)
 			: this (module, kind, ns, name)
@@ -753,7 +754,11 @@ namespace Mono.CSharp
 			if (type != null)
 				return true;
 
-			type = Resolve (module, kind, ns, name, arity, false, false);
+			if (!defined) {
+				defined = true;
+				type = Resolve (module, kind, ns, name, arity, false, false);
+			}
+
 			return type != null;
 		}
 
@@ -771,12 +776,13 @@ namespace Mono.CSharp
 			// fake namespaces when type is optional and does not exist (e.g. System.Linq).
 			//
 			Namespace type_ns = module.GlobalRootNamespace.GetNamespace (ns, required);
+
 			IList<TypeSpec> found = null;
 			if (type_ns != null)
 				found = type_ns.GetAllTypes (name);
 
 			if (found == null) {
-				if (reportErrors )
+				if (reportErrors)
 					module.Compiler.Report.Error (518, "The predefined type `{0}.{1}' is not defined or imported", ns, name);
 
 				return null;
@@ -829,15 +835,22 @@ namespace Mono.CSharp
 			}
 
 			if (best_match == null && reportErrors) {
-				Location loc;
-				if (found[0].MemberDefinition is MemberCore) {
-					loc = ((MemberCore) found[0].MemberDefinition).Location;
-				} else {
-					loc = Location.Null;
-					module.Compiler.Report.SymbolRelatedToPreviousError (found[0]);
-				}
+				var found_member = found[0];
 
-				module.Compiler.Report.Error (520, loc, "The predefined type `{0}.{1}' is not declared correctly", ns, name);
+				if (found_member.Kind == MemberKind.MissingType) {
+					// CSC: should be different error number
+					module.Compiler.Report.Error (518, "The predefined type `{0}.{1}' is defined in an assembly that is not referenced.", ns, name);
+				} else {
+					Location loc;
+					if (found_member.MemberDefinition is MemberCore) {
+						loc = ((MemberCore) found_member.MemberDefinition).Location;
+					} else {
+						loc = Location.Null;
+						module.Compiler.Report.SymbolRelatedToPreviousError (found_member);
+					}
+
+					module.Compiler.Report.Error (520, loc, "The predefined type `{0}.{1}' is not declared correctly", ns, name);
+				}
 			}
 
 			return best_match;
@@ -984,15 +997,7 @@ namespace Mono.CSharp
 
 	partial class TypeManager {
 
-	/// <summary>
-	///   Returns the C# name of a type if possible, or the full type name otherwise
-	/// </summary>
-	static public string CSharpName (TypeSpec t)
-	{
-		return t.GetSignatureForError ();
-	}
-
-	static public string CSharpName (IList<TypeSpec> types)
+	static public string CSharpName(IList<TypeSpec> types)
 	{
 		if (types.Count == 0)
 			return string.Empty;
@@ -1002,7 +1007,7 @@ namespace Mono.CSharp
 			if (i > 0)
 				sb.Append (",");
 
-			sb.Append (CSharpName (types [i]));
+			sb.Append (types [i].GetSignatureForError ());
 		}
 		return sb.ToString ();
 	}
@@ -1090,7 +1095,7 @@ namespace Mono.CSharp
 		rc.Compiler.Report.SymbolRelatedToPreviousError (t);
 		rc.Compiler.Report.Error (208, loc,
 			"Cannot take the address of, get the size of, or declare a pointer to a managed type `{0}'",
-			CSharpName (t));
+			t.GetSignatureForError ());
 
 		return false;	
 	}

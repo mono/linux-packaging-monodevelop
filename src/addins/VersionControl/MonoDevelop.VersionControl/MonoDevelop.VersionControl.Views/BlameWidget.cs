@@ -101,15 +101,27 @@ namespace MonoDevelop.VersionControl.Views
 			this.info = info;
 			var sourceEditor = info.Document.GetContent<MonoDevelop.SourceEditor.SourceEditorView> ();
 			
-			vAdjustment = new Adjustment (0, 0, 0, 0, 0, 0);
+			vAdjustment = new Adjustment (
+				sourceEditor.TextEditor.VAdjustment.Value, 
+				sourceEditor.TextEditor.VAdjustment.Lower, 
+				sourceEditor.TextEditor.VAdjustment.Upper, 
+				sourceEditor.TextEditor.VAdjustment.StepIncrement, 
+				sourceEditor.TextEditor.VAdjustment.PageIncrement, 
+				sourceEditor.TextEditor.VAdjustment.PageSize);
 			vAdjustment.Changed += HandleAdjustmentChanged;
 			
 			vScrollBar = new VScrollbar (vAdjustment);
 			AddChild (vScrollBar);
 			
-			hAdjustment = new Adjustment (0, 0, 0, 0, 0, 0);
+			hAdjustment = new Adjustment (
+				sourceEditor.TextEditor.HAdjustment.Value, 
+				sourceEditor.TextEditor.HAdjustment.Lower, 
+				sourceEditor.TextEditor.HAdjustment.Upper, 
+				sourceEditor.TextEditor.HAdjustment.StepIncrement, 
+				sourceEditor.TextEditor.HAdjustment.PageIncrement, 
+				sourceEditor.TextEditor.HAdjustment.PageSize);
 			hAdjustment.Changed += HandleAdjustmentChanged;
-			
+
 			hScrollBar = new HScrollbar (hAdjustment);
 			AddChild (hScrollBar);
 			
@@ -177,7 +189,7 @@ namespace MonoDevelop.VersionControl.Views
 				children.ForEach (child => callback (child.Child));
 		}
 		
-		public void AddChild (Gtk.Widget child)
+		void AddChild (Gtk.Widget child)
 		{
 			child.Parent = this;
 			children.Add (new ContainerChild (this, child));
@@ -205,8 +217,14 @@ namespace MonoDevelop.VersionControl.Views
 		protected override void OnDestroyed ()
 		{
 			base.OnDestroyed ();
-			children.ForEach (child => child.Child.Destroy ());
-			children.Clear ();
+			hScrollBar.Destroy ();
+			hAdjustment.Destroy ();
+
+			vScrollBar.Destroy ();
+			vAdjustment.Destroy ();
+
+			editor.Destroy ();
+			overview.Destroy ();
 		}
 		 
 		protected override void OnSizeAllocated (Rectangle allocation)
@@ -358,6 +376,9 @@ namespace MonoDevelop.VersionControl.Views
 			Pango.Layout layout;
 
 			double dragPosition = -1;
+
+			TextDocument document;
+
 			public BlameRenderer (BlameWidget widget)
 			{
 				this.widget = widget;
@@ -365,8 +386,9 @@ namespace MonoDevelop.VersionControl.Views
 				annotations = new List<Annotation> ();
 				UpdateAnnotations (null, null);
 	//			widget.Document.Saved += UpdateAnnotations;
-				widget.Editor.Document.TextReplacing += EditorDocumentTextReplacing;
-				widget.Editor.Document.LineChanged += EditorDocumentLineChanged;
+				document = widget.Editor.Document;
+				document.TextReplacing += EditorDocumentTextReplacing;
+				document.LineChanged += EditorDocumentLineChanged;
 				widget.vScrollBar.ValueChanged += delegate {
 					QueueDraw ();
 				};
@@ -388,8 +410,11 @@ namespace MonoDevelop.VersionControl.Views
 			{
 				base.OnDestroyed ();
 //				widget.Document.Saved -= UpdateAnnotations;
-				widget.Editor.Document.TextReplacing -= EditorDocumentTextReplacing;
-				widget.Editor.Document.LineChanged -= EditorDocumentLineChanged;
+				if (document != null) { 
+					document.TextReplacing -= EditorDocumentTextReplacing;
+					document.LineChanged -= EditorDocumentLineChanged;
+					document = null;
+				}
 				if (layout != null) {
 					layout.Dispose ();
 					layout = null;

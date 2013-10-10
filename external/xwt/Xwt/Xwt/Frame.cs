@@ -27,9 +27,12 @@ using System;
 using Xwt.Backends;
 using System.ComponentModel;
 using Xwt.Drawing;
+using System.Windows.Markup;
 
 namespace Xwt
 {
+	[BackendType (typeof(IFrameBackend))]
+	[ContentProperty("Content")]
 	public class Frame: Widget
 	{
 		Widget child;
@@ -90,6 +93,7 @@ namespace Xwt
 			}
 		}
 
+		[DefaultValue (0d)]
 		public double PaddingLeft {
 			get { return padding.Left; }
 			set {
@@ -98,6 +102,7 @@ namespace Xwt
 			}
 		}
 
+		[DefaultValue (0d)]
 		public double PaddingRight {
 			get { return padding.Right; }
 			set {
@@ -106,6 +111,7 @@ namespace Xwt
 			}
 		}
 
+		[DefaultValue (0d)]
 		public double PaddingTop {
 			get { return padding.Top; }
 			set {
@@ -114,6 +120,7 @@ namespace Xwt
 			}
 		}
 
+		[DefaultValue (0d)]
 		public double PaddingBottom {
 			get { return padding.Bottom; }
 			set {
@@ -132,39 +139,43 @@ namespace Xwt
 			get { return borderWidth; }
 			set {
 				borderWidth = value;
-				UpdatePadding ();
+				UpdateBorderWidth ();
 			}
 		}
 
+		[DefaultValue (0d)]
 		public double BorderWidthLeft {
 			get { return borderWidth.Left; }
 			set {
 				borderWidth.Left = value;
-				UpdatePadding (); 
+				UpdateBorderWidth (); 
 			}
 		}
 
+		[DefaultValue (0d)]
 		public double BorderWidthRight {
 			get { return borderWidth.Right; }
 			set {
 				borderWidth.Right = value;
-				UpdatePadding (); 
+				UpdateBorderWidth (); 
 			}
 		}
 
+		[DefaultValue (0d)]
 		public double BorderWidthTop {
 			get { return borderWidth.Top; }
 			set {
 				borderWidth.Top = value;
-				UpdatePadding (); 
+				UpdateBorderWidth (); 
 			}
 		}
 
+		[DefaultValue (0d)]
 		public double BorderWidthBottom {
 			get { return borderWidth.Bottom; }
 			set {
 				borderWidth.Bottom = value;
-				UpdatePadding (); 
+				UpdateBorderWidth (); 
 			}
 		}
 
@@ -178,7 +189,8 @@ namespace Xwt
 			get { return Backend.BorderColor; }
 			set { Backend.BorderColor = value; }
 		}
-		
+
+		[DefaultValue (null)]
 		public new Widget Content {
 			get { return child; }
 			set {

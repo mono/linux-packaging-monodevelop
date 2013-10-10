@@ -29,9 +29,9 @@ namespace ICSharpCode.NRefactory.CSharp
 {
 	public class IssueCategories
 	{
-		public const string Improvements      = "Code Improvements";
 		public const string CodeQualityIssues = "Code Quality Issues";
 		public const string ConstraintViolations = "Constraint Violations";
+        public const string PracticesAndImprovements = "Common Practices and Code Improvements";
 		public const string Redundancies = "Redundancies";
 		public const string Opportunities = "Language Usage Opportunities";
 		public const string Notifications = "Code Notifications";

@@ -1,0 +1,14 @@
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.templates.EmptyVBFile.xft.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.templates.EmptyVBProject.xpt.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.templates.VBConsoleApplicationProject.xpt.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.templates.VBGtkSharp2Project.xpt.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.VBNetBinding.addin.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.templates.AssemblyInfo.xft.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.md1format.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.icons.VB.FileIcon
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.icons.vb-icon-32.png
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/VBNetBinding.gtk-gui.gui.stetic
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.VBNetBinding.dll.mdb
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.VBNetBinding.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/MonoDevelop.VBNetBinding.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VBNetBinding/obj/Debug/MonoDevelop.VBNetBinding.dll.mdb

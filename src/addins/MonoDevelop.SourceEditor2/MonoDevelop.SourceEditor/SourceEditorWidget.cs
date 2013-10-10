@@ -44,8 +44,8 @@ using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Ide.TypeSystem;
 using Mono.TextEditor.Highlighting;
 using MonoDevelop.SourceEditor.QuickTasks;
-using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory.Semantics;
+using ICSharpCode.NRefactory.Refactoring;
 
 namespace MonoDevelop.SourceEditor
 {
@@ -236,9 +236,11 @@ namespace MonoDevelop.SourceEditor
 			void FancyFeaturesChanged (object sender, EventArgs e)
 			{
 				if (QuickTaskStrip.EnableFancyFeatures) {
+					GtkWorkarounds.SetOverlayScrollbarPolicy (scrolledWindow, PolicyType.Automatic, PolicyType.Never);
 					scrolledWindow.VScrollbar.SizeRequested += SuppressSize;
 					scrolledWindow.VScrollbar.ExposeEvent += SuppressExpose;
 				} else {
+					GtkWorkarounds.SetOverlayScrollbarPolicy (scrolledWindow, PolicyType.Automatic, PolicyType.Automatic);
 					scrolledWindow.VScrollbar.SizeRequested -= SuppressSize;
 					scrolledWindow.VScrollbar.ExposeEvent -= SuppressExpose;
 				}
@@ -377,7 +379,8 @@ namespace MonoDevelop.SourceEditor
 				this.lastActiveEditor = null;
 				this.splittedTextEditor = null;
 				view = null;
-				
+				parsedDocument = null;
+
 //				IdeApp.Workbench.StatusBar.ClearCaretState ();
 				if (parseInformationUpdaterWorkerThread != null) {
 					parseInformationUpdaterWorkerThread.Dispose ();
@@ -1044,6 +1047,9 @@ namespace MonoDevelop.SourceEditor
 		public void Reload ()
 		{
 			try {
+				if (!System.IO.File.Exists (view.ContentName))
+					return;
+
 				view.StoreSettings ();
 				reloadSettings = true;
 				view.Load (view.ContentName);
@@ -1634,11 +1640,11 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 
-		public override void Draw (TextEditor editor, Cairo.Context cr, Pango.Layout layout, bool selected, int startOffset, int endOffset, double y, double startXPos, double endXPos)
+		public override void Draw (TextEditor editor, Cairo.Context cr, double y, LineMetrics metrics)
 		{
 			Color = Info.ErrorType == ErrorType.Warning ? editor.ColorStyle.UnderlineWarning.Color : editor.ColorStyle.UnderlineError.Color;
 
-			base.Draw (editor, cr, layout, selected, startOffset, endOffset, y, startXPos, endXPos);
+			base.Draw (editor, cr, y, metrics);
 		}
 	}
 }

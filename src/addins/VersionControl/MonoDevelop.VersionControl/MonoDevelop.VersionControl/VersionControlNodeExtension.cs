@@ -296,7 +296,8 @@ namespace MonoDevelop.VersionControl
 		protected void UpdateStatus(CommandInfo item) {
 			TestCommand(Commands.Status, item);
 		}
-		
+
+		[AllowMultiSelection]
 		[CommandHandler (Commands.Commit)]
 		protected void OnCommit() {
 			RunCommand (Commands.Commit, false);
@@ -343,12 +344,12 @@ namespace MonoDevelop.VersionControl
 		[AllowMultiSelection]
 		[CommandHandler (Commands.Revert)]
 		protected void OnRevert() {
-			RunCommand(Commands.Revert, false);
+			RunCommand(Commands.Revert, false, false);
 		}
 		
 		[CommandUpdateHandler (Commands.Revert)]
 		protected void UpdateRevert(CommandInfo item) {
-			TestCommand(Commands.Revert, item);
+			TestCommand(Commands.Revert, item, false);
 		}
 		
 		[AllowMultiSelection]
@@ -394,9 +395,36 @@ namespace MonoDevelop.VersionControl
 		protected void UpdateCreatePatch(CommandInfo item) {
 			TestCommand(Commands.CreatePatch, item);
 		}
-			
-		private void TestCommand(Commands cmd, CommandInfo item) {
-			TestResult res = RunCommand(cmd, true);
+
+		[AllowMultiSelection]
+		[CommandHandler (Commands.Ignore)]
+		protected void OnIgnore ()
+		{
+			RunCommand(Commands.Ignore, false);
+		}
+
+		[CommandUpdateHandler (Commands.Ignore)]
+		protected void UpdateIgnore (CommandInfo item)
+		{
+			TestCommand(Commands.Ignore, item);
+		}
+
+		[AllowMultiSelection]
+		[CommandHandler (Commands.Unignore)]
+		protected void OnUnignore ()
+		{
+			RunCommand(Commands.Unignore, false);
+		}
+
+		[CommandUpdateHandler (Commands.Unignore)]
+		protected void UpdateUnignore (CommandInfo item)
+		{
+			TestCommand(Commands.Unignore, item);
+		}
+
+		private void TestCommand(Commands cmd, CommandInfo item, bool projRecurse = true)
+		{
+			TestResult res = RunCommand(cmd, true, projRecurse);
 			if (res == TestResult.NoVersionControl && cmd == Commands.Log) {
 				// Use the update command to show the "not available" message
 				item.Icon = null;
@@ -406,9 +434,9 @@ namespace MonoDevelop.VersionControl
 				item.Visible = res == TestResult.Enable;
 		}
 		
-		private TestResult RunCommand (Commands cmd, bool test)
+		private TestResult RunCommand (Commands cmd, bool test, bool projRecurse = true)
 		{
-			VersionControlItemList items = GetItems ();
+			VersionControlItemList items = GetItems (projRecurse);
 
 			foreach (VersionControlItem it in items) {
 				if (it.Repository == null) {
@@ -463,6 +491,12 @@ namespace MonoDevelop.VersionControl
 					break;
 				case Commands.CreatePatch:
 					res = CreatePatchCommand.CreatePatch (items, test);
+					break;
+				case Commands.Ignore:
+					res = IgnoreCommand.Ignore (items, test);
+					break;
+				case Commands.Unignore:
+					res = UnignoreCommand.Unignore (items, test);
 					break;
 				}
 			}

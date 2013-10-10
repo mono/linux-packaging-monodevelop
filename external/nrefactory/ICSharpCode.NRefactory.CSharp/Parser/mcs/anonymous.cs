@@ -316,8 +316,11 @@ namespace Mono.CSharp {
 
 			var hoisted = localVariable.HoistedVariant;
 			if (hoisted != null && hoisted.Storey != this && hoisted.Storey is StateMachine) {
-				// TODO: It's too late the field is defined in HoistedLocalVariable ctor
+				//
+				// Variable is already hoisted but we need it in storey which can be shared
+				//
 				hoisted.Storey.hoisted_locals.Remove (hoisted);
+				hoisted.Storey.Members.Remove (hoisted.Field);
 				hoisted = null;
 			}
 
@@ -570,6 +573,9 @@ namespace Mono.CSharp {
 		protected virtual void EmitHoistedParameters (EmitContext ec, List<HoistedParameter> hoisted)
 		{
 			foreach (HoistedParameter hp in hoisted) {
+				if (hp == null)
+					continue;
+
 				//
 				// Parameters could be proxied via local fields for value type storey
 				//
@@ -726,6 +732,12 @@ namespace Mono.CSharp {
 			this.field = field;
 		}
 
+		public Field Field {
+			get {
+				return field;
+			}
+		}
+
 		public AnonymousMethodStorey Storey {
 			get {
 				return storey;
@@ -846,11 +858,7 @@ namespace Mono.CSharp {
 
 		#region Properties
 
-		public Field Field {
-			get {
-				return field;
-			}
-		}
+		public bool IsAssigned { get; set; }
 
 		public ParameterReference Parameter {
 			get {
@@ -888,12 +896,6 @@ namespace Mono.CSharp {
 		public HoistedThis (AnonymousMethodStorey storey, Field field)
 			: base (storey, field)
 		{
-		}
-
-		public Field Field {
-			get {
-				return field;
-			}
 		}
 	}
 
@@ -1002,12 +1004,12 @@ namespace Mono.CSharp {
 					return delegate_type;
 
 				ec.Report.Error (835, loc, "Cannot convert `{0}' to an expression tree of non-delegate type `{1}'",
-					GetSignatureForError (), TypeManager.CSharpName (delegate_type));
+					GetSignatureForError (), delegate_type.GetSignatureForError ());
 				return null;
 			}
 
 			ec.Report.Error (1660, loc, "Cannot convert `{0}' to non-delegate type `{1}'",
-				      GetSignatureForError (), TypeManager.CSharpName (delegate_type));
+				      GetSignatureForError (), delegate_type.GetSignatureForError ());
 			return null;
 		}
 
@@ -1019,7 +1021,7 @@ namespace Mono.CSharp {
 			if (!ec.IsInProbingMode)
 				ec.Report.Error (1661, loc,
 					"Cannot convert `{0}' to delegate type `{1}' since there is a parameter mismatch",
-					GetSignatureForError (), TypeManager.CSharpName (delegate_type));
+					GetSignatureForError (), delegate_type.GetSignatureForError ());
 
 			return false;
 		}
@@ -1031,7 +1033,7 @@ namespace Mono.CSharp {
 					return false;
 				
 				ec.Report.Error (1593, loc, "Delegate `{0}' does not take `{1}' arguments",
-					      TypeManager.CSharpName (delegate_type), Parameters.Count.ToString ());
+					      delegate_type.GetSignatureForError (), Parameters.Count.ToString ());
 				return false;
 			}
 
@@ -1045,10 +1047,10 @@ namespace Mono.CSharp {
 						return false;
 					
 					if (p_mod == Parameter.Modifier.NONE)
-						ec.Report.Error (1677, loc, "Parameter `{0}' should not be declared with the `{1}' keyword",
-							      (i + 1).ToString (), Parameter.GetModifierSignature (Parameters.FixedParameters [i].ModFlags));
+						ec.Report.Error (1677, Parameters[i].Location, "Parameter `{0}' should not be declared with the `{1}' keyword",
+							      (i + 1).ToString (), Parameter.GetModifierSignature (Parameters [i].ModFlags));
 					else
-						ec.Report.Error (1676, loc, "Parameter `{0}' must be declared with the `{1}' keyword",
+						ec.Report.Error (1676, Parameters[i].Location, "Parameter `{0}' must be declared with the `{1}' keyword",
 							      (i+1).ToString (), Parameter.GetModifierSignature (p_mod));
 					error = true;
 				}
@@ -1058,21 +1060,20 @@ namespace Mono.CSharp {
 
 				TypeSpec type = invoke_pd.Types [i];
 				
-				// We assume that generic parameters are always inflated
-				if (TypeManager.IsGenericParameter (type))
-					continue;
-				
-				if (TypeManager.HasElementType (type) && TypeManager.IsGenericParameter (TypeManager.GetElementType (type)))
+				//
+				// Assumes that generic mvar parameters are always inflated
+				//
+				if (ImplicitDelegateCreation.ContainsMethodTypeParameter (type))
 					continue;
 				
 				if (!TypeSpecComparer.IsEqual (invoke_pd.Types [i], Parameters.Types [i])) {
 					if (ignore_errors)
 						return false;
 					
-					ec.Report.Error (1678, loc, "Parameter `{0}' is declared as type `{1}' but should be `{2}'",
+					ec.Report.Error (1678, Parameters [i].Location, "Parameter `{0}' is declared as type `{1}' but should be `{2}'",
 						      (i+1).ToString (),
-						      TypeManager.CSharpName (Parameters.Types [i]),
-						      TypeManager.CSharpName (invoke_pd.Types [i]));
+						      Parameters.Types [i].GetSignatureForError (),
+						      invoke_pd.Types [i].GetSignatureForError ());
 					error = true;
 				}
 			}
@@ -1376,7 +1377,7 @@ namespace Mono.CSharp {
 					return null;
 				}
 
-				b = b.ConvertToAsyncTask (ec, ec.CurrentMemberDefinition.Parent.PartialContainer, p, return_type, loc);
+				b = b.ConvertToAsyncTask (ec, ec.CurrentMemberDefinition.Parent.PartialContainer, p, return_type, delegate_type, loc);
 			}
 
 			return CompatibleMethodFactory (return_type ?? InternalType.ErrorType, delegate_type, p, b);
@@ -1662,18 +1663,25 @@ namespace Mono.CSharp {
 					if (src_block.HasCapturedThis) {
 						//
 						// Remove hoisted 'this' request when simple instance method is
-						// enough (no hoisted variables only 'this')
+						// enough. No hoisted variables only 'this' and don't need to
+						// propagate this to value type state machine.
 						//
-						if (src_block.ParametersBlock.StateMachine == null)
-							top_block.RemoveThisReferenceFromChildrenBlock (src_block);
+						StateMachine sm_parent = null;
+						var pb = src_block.ParametersBlock;
+						do {
+							sm_parent = pb.StateMachine;
+							pb = pb.Parent == null ? null : pb.Parent.ParametersBlock;
+						} while (sm_parent == null && pb != null);
 
-						//
-						// Special case where parent class is used to emit instance method
-						// because currect storey is of value type (async host). We cannot
-						// use ldftn on non-boxed instances either to share mutated state
-						//
-						if (sm != null && sm.Kind == MemberKind.Struct) {
-							parent = sm.Parent.PartialContainer;
+						if (sm_parent == null) {
+							top_block.RemoveThisReferenceFromChildrenBlock (src_block);
+						} else if (sm_parent.Kind == MemberKind.Struct) {
+							//
+							// Special case where parent class is used to emit instance method
+							// because currect storey is of value type (async host). We cannot
+							// use ldftn on non-boxed instances either to share mutated state
+							//
+							parent = sm_parent.Parent.PartialContainer;
 						}
 					}
 
@@ -1739,6 +1747,7 @@ namespace Mono.CSharp {
 				//
 				method = DoCreateMethodHost (ec);
 				method.Define ();
+				method.PrepareEmit ();
 			}
 
 			bool is_static = (method.ModFlags & Modifiers.STATIC) != 0;
@@ -1865,7 +1874,7 @@ namespace Mono.CSharp {
 
 		public override string GetSignatureForError ()
 		{
-			return TypeManager.CSharpName (type);
+			return type.GetSignatureForError ();
 		}
 	}
 
@@ -2004,7 +2013,7 @@ namespace Mono.CSharp {
 			}
 
 			var li_other = LocalVariable.CreateCompilerGenerated (CurrentType, equals_block, loc);
-			equals_block.AddStatement (new BlockVariableDeclaration (new TypeExpression (li_other.Type, loc), li_other));
+			equals_block.AddStatement (new BlockVariable (new TypeExpression (li_other.Type, loc), li_other));
 			var other_variable = new LocalVariableReference (li_other, loc);
 
 			MemberAccess system_collections_generic = new MemberAccess (new MemberAccess (
@@ -2087,6 +2096,7 @@ namespace Mono.CSharp {
 
 			equals.Block = equals_block;
 			equals.Define ();
+			equals.PrepareEmit ();
 			Members.Add (equals);
 
 			//
@@ -2116,7 +2126,7 @@ namespace Mono.CSharp {
 			hashcode_top.AddStatement (new Unchecked (hashcode_block, loc));
 
 			var li_hash = LocalVariable.CreateCompilerGenerated (Compiler.BuiltinTypes.Int, hashcode_top, loc);
-			hashcode_block.AddStatement (new BlockVariableDeclaration (new TypeExpression (li_hash.Type, loc), li_hash));
+			hashcode_block.AddStatement (new BlockVariable (new TypeExpression (li_hash.Type, loc), li_hash));
 			LocalVariableReference hash_variable_assign = new LocalVariableReference (li_hash, loc);
 			hashcode_block.AddStatement (new StatementExpression (
 				new SimpleAssign (hash_variable_assign, rs_hashcode)));
@@ -2141,6 +2151,7 @@ namespace Mono.CSharp {
 			hashcode_block.AddStatement (new Return (hash_variable, loc));
 			hashcode.Block = hashcode_top;
 			hashcode.Define ();
+			hashcode.PrepareEmit ();
 			Members.Add (hashcode);
 
 			//
@@ -2151,6 +2162,7 @@ namespace Mono.CSharp {
 			tostring_block.AddStatement (new Return (string_concat, loc));
 			tostring.Block = tostring_block;
 			tostring.Define ();
+			tostring.PrepareEmit ();
 			Members.Add (tostring);
 
 			return true;

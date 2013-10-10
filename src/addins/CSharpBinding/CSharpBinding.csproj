@@ -56,11 +56,6 @@
       <Name>MonoDevelop.Debugger</Name>
       <Private>False</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\core\Mono.Debugging\Mono.Debugging.csproj">
-      <Project>{90C99ADB-7D4B-4EB4-98C2-40BD1B14C7D2}</Project>
-      <Name>Mono.Debugging</Name>
-      <Private>False</Private>
-    </ProjectReference>
     <ProjectReference Include="..\MonoDevelop.DesignerSupport\MonoDevelop.DesignerSupport.csproj">
       <Project>{2C24D515-4A2C-445C-8419-C09231913CFA}</Project>
       <Name>MonoDevelop.DesignerSupport</Name>
@@ -99,6 +94,26 @@
     <ProjectReference Include="..\..\..\external\mono-addins\Mono.Addins\Mono.Addins.csproj">
       <Project>{91DD5A2D-9FE3-4C3C-9253-876141874DAD}</Project>
       <Name>Mono.Addins</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\debugger-libs\Mono.Debugging\Mono.Debugging.csproj">
+      <Project>{90C99ADB-7D4B-4EB4-98C2-40BD1B14C7D2}</Project>
+      <Name>Mono.Debugging</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\nrefactory\ICSharpCode.NRefactory.IKVM\ICSharpCode.NRefactory.IKVM.csproj">
+      <Project>{A727169F-D94F-443F-B305-B057D7F3B420}</Project>
+      <Name>ICSharpCode.NRefactory.IKVM</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\NUnit\MonoDevelop.NUnit.csproj">
+      <Project>{A7A4246D-CEC4-42DF-A3C1-C31B9F51C4EC}</Project>
+      <Name>MonoDevelop.NUnit</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
@@ -290,6 +305,9 @@
     <Compile Include="MonoDevelop.CSharp.Completion\ArrayTypeParameterDataProvider.cs" />
     <Compile Include="MonoDevelop.CSharp.CodeGeneration\ImplementInterfaceMembersGenerator.cs" />
     <Compile Include="MonoDevelop.CSharp.Completion\TypeParameterDataProvider.cs" />
+    <Compile Include="MonoDevelop.CSharp.Refactoring.CodeActions\Actions\ConvertToEnumAction.cs" />
+    <Compile Include="MonoDevelop.CSharp.Refactoring.CodeActions\Actions\ConvertToEnumDialog.cs" />
+    <Compile Include="MonoDevelop.CSharp.UnitTests\UnitTestTextEditorExtension.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile.am" />
@@ -311,5 +329,6 @@
     <Folder Include="MonoDevelop.CSharp.Refactoring.CodeIssues\" />
     <Folder Include="MonoDevelop.CSharp.Refactoring.CodeIssues\NamingInspection\" />
     <Folder Include="MonoDevelop.CSharp.Tooltips\" />
+    <Folder Include="MonoDevelop.CSharp.UnitTests\" />
   </ItemGroup>
 </Project>

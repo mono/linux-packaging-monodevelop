@@ -1,0 +1,7 @@
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.DocFood.addin.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.DocFood.config.xml
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.gtk-gui.gui.stetic
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.DocFood.dll.mdb
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/BackendBindings/MonoDevelop.DocFood.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.dll
+/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.DocFood/obj/Debug/MonoDevelop.DocFood.dll.mdb

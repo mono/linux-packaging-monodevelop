@@ -53,6 +53,28 @@ namespace ICSharpCode.NRefactory.CSharp.CodeIssues
 }"
 				);
 		}
+		
+		[Test]
+		public void MethodThatCallsInstanceMethodOnParameter()
+		{
+			Test<ConvertToStaticMethodIssue>(
+				@"class TestClass
+{
+	string $Test (string txt)
+	{
+		return txt.Trim ();
+	}
+}",
+				@"class TestClass
+{
+	static string Test (string txt)
+	{
+		return txt.Trim ();
+	}
+}"
+				);
+		}
+		
 		[Test]
 		public void TestWithVirtualFunction() {
 			
@@ -65,26 +87,26 @@ namespace ICSharpCode.NRefactory.CSharp.CodeIssues
 }";
             TestWrongContext<ConvertToStaticMethodIssue>(input);
 		}
-		
+
 		[Test]
-		public void TestWithInterface() {
-			
+		public void TestWithInterfaceImplementation() {
 			var input = @"interface IBase {
     void Test();
 }
 class TestClass : IBase
 {
-	public virtual void $Test ()
+	public void $Test ()
 	{
 		int a = 2;
 	}
 }";
             TestWrongContext<ConvertToStaticMethodIssue>(input);
 		}
+
 		[Test]
 		public void TestWithStaticFunction()
 		{
-			
+
 			var input = @"class TestClass
 {
 	static void $Test ()
@@ -92,9 +114,91 @@ class TestClass : IBase
 		int a = 2;
 	}
 }";
+			TestWrongContext<ConvertToStaticMethodIssue>(input);
+		}
+
+		[Test]
+		public void TestDoNotWarnOnAttributes()
+		{
+
+			var input = @"using System;
+class TestClass
+{
+	[Obsolete]
+	public void $Test ()
+	{
+		int a = 2;
+	}
+}";
+			TestWrongContext<ConvertToStaticMethodIssue>(input);
+		}
+
+		[Test]
+		public void TestDoNotWarnOnEmptyMethod()
+		{
+
+			var input = @"using System;
+class TestClass
+{
+	public void $Test ()
+	{
+	}
+}";
+			TestWrongContext<ConvertToStaticMethodIssue>(input);
+		}
+
+		[Test]
+		public void TestDoNotWarnOnInterfaceMethod()
+		{
+
+			var input = @"using System;
+interface ITestInterface
+{
+	void $Test ();
+}";
+			TestWrongContext<ConvertToStaticMethodIssue>(input);
+		}
+
+		[Test]
+		public void TestDoNotWarnOnNotImplementedMethod()
+		{
+			var input = @"using System;
+class TestClass
+{
+	public void $Test ()
+	{
+		throw new NotImplementedExceptionIssue();
+	}
+}";
+			TestWrongContext<ConvertToStaticMethodIssue>(input);
+		}
+
+		[Test]
+		public void TestPropertyAccess()
+		{
+			var input = @"using System;
+class TestClass
+{
+	public int Foo { get; set; }
+	public void $Test ()
+	{
+		System.Console.WriteLine (Foo);
+	}
+}";
+			TestWrongContext<ConvertToStaticMethodIssue>(input);
+		}
+		
+		[Test]
+		public void DoNotWarnOnMarshalByRefObject() {
+			
+			var input = @"class TestClass : System.MarshalByRefObject
+{
+	public void $Test ()
+	{
+		int a = 2;
+	}
+}";
             TestWrongContext<ConvertToStaticMethodIssue>(input);
 		}
-	
 	}
-    
 }

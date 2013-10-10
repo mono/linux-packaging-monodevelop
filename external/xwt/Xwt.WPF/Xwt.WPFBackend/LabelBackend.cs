@@ -55,6 +55,10 @@ namespace Xwt.WPFBackend
 			}
 		}
 
+		public void SetFormattedText (FormattedText text)
+		{
+		}
+
 		public Xwt.Drawing.Color TextColor {
 			get {
 				SWM.Color color = SystemColors.ControlColor;
@@ -101,14 +105,6 @@ namespace Xwt.WPFBackend
 				else
 					Label.TextBlock.TextWrapping = TextWrapping.Wrap;
 			}
-		}
-
-		public override WidgetSize GetPreferredWidth ()
-		{
-			if (Label.TextBlock.TextWrapping == TextWrapping.Wrap)
-				return new WidgetSize (0);
-			else
-				return base.GetPreferredWidth ();
 		}
 	}
 

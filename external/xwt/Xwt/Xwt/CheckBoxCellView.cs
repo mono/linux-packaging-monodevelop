@@ -29,28 +29,58 @@ using System;
 using Xwt.Drawing;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.ComponentModel;
+using Xwt.Backends;
 
 namespace Xwt
 {
-	public class CheckBoxCellView: CellView
+	public sealed class CheckBoxCellView: CellView, ICheckBoxCellViewFrontend
 	{
+		bool active;
+		bool editable;
+
+		public IDataField<bool> ActiveField { get; set; }
+		public IDataField<bool> EditableField { get; set; }
+
 		public CheckBoxCellView ()
 		{
 		}
 		
-		public CheckBoxCellView (DataField field)
+		public CheckBoxCellView (IDataField<bool> field)
 		{
 			ActiveField = field;
 		}
 		
-		public DataField ActiveField { get; set; }
+		[DefaultValue (false)]
+		public bool Active {
+			get { return GetValue (ActiveField, active); }
+			set { active = value; }
+		}
 		
-		public event EventHandler ActiveChanged;
-		
-		public void RaiseActiveChanged ()
+		[DefaultValue (false)]
+		public bool Editable {
+			get {
+				return GetValue (EditableField, editable);
+			}
+			set {
+				editable = value;
+			}
+		}
+
+		public event EventHandler<WidgetEventArgs> Toggled;
+
+		/// <summary>
+		/// Raises the toggled event
+		/// </summary>
+		/// <returns><c>true</c>, if the event was handled, <c>false</c> otherwise.</returns>
+		public bool RaiseToggled ()
 		{
-			if (ActiveChanged != null)
-				ActiveChanged (this, EventArgs.Empty);
+			if (Toggled != null) {
+				var args = new WidgetEventArgs ();
+				Toggled (this, args);
+				return args.Handled;
+			}
+			return false;
 		}
 	}
 }

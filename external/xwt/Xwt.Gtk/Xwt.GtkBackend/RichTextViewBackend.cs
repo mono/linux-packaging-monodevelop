@@ -28,7 +28,7 @@ using System.Collections.Generic;
 
 using Xwt;
 using Xwt.Backends;
-using Xwt.Engine;
+
 
 namespace Xwt.GtkBackend
 {
@@ -145,7 +145,7 @@ namespace Xwt.GtkBackend
 					Uri = link.Href
 				};
 				label.NavigateToUrl += HandleNavigateToUrl;
-				Widget.AddChildAtAnchor ((Gtk.Widget) WidgetRegistry.GetNativeWidget (label), link.Anchor);
+				Widget.AddChildAtAnchor ((Gtk.Widget) ApplicationContext.Toolkit.GetNativeWidget (label), link.Anchor);
 				links [i] = label;
 			}
 		}

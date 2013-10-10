@@ -27,9 +27,11 @@
 using System;
 using Xwt.Drawing;
 using Xwt.Backends;
+using System.ComponentModel;
 
 namespace Xwt
 {
+	[BackendType (typeof(ILabelBackend))]
 	public class Label: Widget
 	{
 		ILabelBackend Backend {
@@ -44,7 +46,8 @@ namespace Xwt
 		{
 			Backend.Text = text;
 		}
-		
+
+		[DefaultValue ("")]
 		public string Text {
 			get { return Backend.Text; }
 			set {
@@ -53,11 +56,22 @@ namespace Xwt
 			}
 		}
 
+		string markup;
+		public string Markup {
+			get { return markup; }
+			set {
+				markup = value;
+				var t = FormattedText.FromMarkup (markup);
+				Backend.SetFormattedText (t);
+			}
+		}
+
 		public Color TextColor {
 			get { return Backend.TextColor; }
 			set { Backend.TextColor = value; }
 		}
-		
+
+		[DefaultValue (Alignment.Start)]
 		public Alignment TextAlignment {
 			get { return Backend.TextAlignment; }
 			set {
@@ -66,6 +80,7 @@ namespace Xwt
 			}
 		}
 		
+		[DefaultValue (EllipsizeMode.None)]
 		public EllipsizeMode Ellipsize {
 			get { return Backend.Ellipsize; }
 			set {
@@ -74,6 +89,7 @@ namespace Xwt
 			}
 		}
 
+		[DefaultValue (WrapMode.None)]
 		public WrapMode Wrap {
 			get { return Backend.Wrap; }
 			set {

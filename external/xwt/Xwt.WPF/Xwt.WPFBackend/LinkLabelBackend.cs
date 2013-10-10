@@ -68,6 +68,10 @@ namespace Xwt.WPFBackend
 			}
 		}
 
+		public void SetFormattedText(FormattedText text)
+		{
+		}
+
 		public Alignment TextAlignment
 		{
 			get { return DataConverter.ToXwtAlignment (Widget.HorizontalContentAlignment); }
@@ -124,7 +128,7 @@ namespace Xwt.WPFBackend
 
 		void HandleClicked (object sender, EventArgs e)
 		{
-			Xwt.Engine.Toolkit.Invoke (() => {
+			Context.InvokeUserCode (() => {
 				EventSink.OnNavigateToUrl (Uri);
 			});
 		}
