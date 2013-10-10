@@ -1,3 +1,9 @@
+monodevelop (4.0.12+dfsg-2) unstable; urgency=low
+
+  * [622568c] Use OS-provided Mono.Addins, not bundled project
+
+ -- Jo Shields <directhex@apebox.org>  Thu, 10 Oct 2013 17:21:21 +0200
+
 monodevelop (4.0.12+dfsg-1) unstable; urgency=low
 
   * [5dcb6e1] Fix debian/watch for new source tarball name format
