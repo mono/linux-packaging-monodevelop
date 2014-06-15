@@ -1,0 +1,59 @@
+Description: build without Metacity themes support
+Author: Alberts Muktupāvels <alberts.muktupavels@gmail.com>
+Author: Dmitry Shachnev <mitya57@gmail.com>
+Forwarded: not-needed
+Last-Update: 2014-06-15
+
+--- a/src/addins/MonoDevelop.GtkCore/libsteticui/WidgetDesignerBackend.cs
++++ b/src/addins/MonoDevelop.GtkCore/libsteticui/WidgetDesignerBackend.cs
+@@ -77,21 +77,9 @@
+ 			wrapper = ObjectWrapper.Lookup (container);
+ 			TopLevelWindow window = container as TopLevelWindow;
+ 			
+-			if (window != null) {
+-				preview = Stetic.Metacity.Preview.Create (window);
+-				if (preview == null)
+-					preview = Stetic.Windows.Preview.Create (window);
+-				if (preview == null) {
+-					// Use a regular box.
+-					EventBox eventBox = new EventBox ();
+-					eventBox.Add (container);
+-					preview = eventBox;
+-				}
+-			} else {
+-				EventBox eventBox = new EventBox ();
+-				eventBox.Add (container);
+-				preview = eventBox;
+-			}
++			EventBox eventBox = new EventBox ();
++			eventBox.Add (container);
++			preview = eventBox;
+ 			
+ 			resizableFixed.Put (preview, container);
+ 
+@@ -660,8 +648,7 @@
+ 				PropagateExpose (cw, ev);*/
+ 
+ 			Gdk.Rectangle rect = child.Allocation;
+-			if (Stetic.Metacity.Preview.ThemeError) 
+-				GdkWindow.DrawRectangle (this.Style.BackgroundGC (StateType.Normal), true, rect.X, rect.Y, rect.Width, rect.Height);
++			GdkWindow.DrawRectangle (this.Style.BackgroundGC (StateType.Normal), true, rect.X, rect.Y, rect.Width, rect.Height);
+ 			
+ 			Pixbuf sh = Shadow.AddShadow (rect.Width, rect.Height);
+ 			GdkWindow.DrawPixbuf (this.Style.BackgroundGC (StateType.Normal), sh, 0, 0, rect.X - 5, rect.Y - 5, sh.Width, sh.Height, RgbDither.None, 0, 0); 
+--- a/src/addins/MonoDevelop.GtkCore/libsteticui/libsteticui.csproj
++++ b/src/addins/MonoDevelop.GtkCore/libsteticui/libsteticui.csproj
+@@ -104,13 +104,6 @@
+     <Compile Include="GuiDispatchServerSink.cs" />
+     <Compile Include="GuiDispatchServerSinkProvider.cs" />
+     <Compile Include="LibraryCache.cs" />
+-    <Compile Include="Metacity\ButtonFunction.cs" />
+-    <Compile Include="Metacity\ButtonLayout.cs" />
+-    <Compile Include="Metacity\FrameFlags.cs" />
+-    <Compile Include="Metacity\FrameType.cs" />
+-    <Compile Include="Metacity\ObjectManager.cs" />
+-    <Compile Include="Metacity\Preview.cs" />
+-    <Compile Include="Metacity\Theme.cs" />
+     <Compile Include="Palette.cs" />
+     <Compile Include="PaletteBackend.cs" />
+     <Compile Include="PluggableWidget.cs" />
