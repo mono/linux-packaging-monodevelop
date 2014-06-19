@@ -1,3 +1,18 @@
+monodevelop (4.0.12+dfsg-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload, with maintainer’s permission.
+
+  [ Mirco Bauer ]
+  * [c665d03] Added debian/gbp.conf to not rely on uploader's
+    ~/.gbp.conf for a consistent debian/changelog
+
+  [ Dmitry Shachnev ]
+  * [a426228] Build without libmetacity support (closes: #751597).
+    The current libmetacity code does not work anyway (as it relies on
+    removed gconf schema), and it is not compatible with Metacity 3.x.
+
+ -- Dmitry Shachnev <mitya57@gmail.com>  Thu, 19 Jun 2014 12:48:20 +0400
+
 monodevelop (4.0.12+dfsg-2) unstable; urgency=low
 
   * [622568c] Use OS-provided Mono.Addins, not bundled project
