@@ -1,3 +1,15 @@
+monodevelop (4.0.12+dfsg-5) unstable; urgency=medium
+
+  * [5fde005] Include a non-minified version of jquery-iframe-auto-height, 
+    from https://github.com/house9/jquery-iframe-auto-height/tree/v1.9.0 
+    .
+    This file isn't even used, it's just included via an SVN external 
+    which pulls in an entire repository for something not related to 
+    this jQuery plugin. (Closes: #736741)
+  * Rebuild for new NUnit (Closes: #762226)
+
+ -- Jo Shields <jo.shields@xamarin.com>  Mon, 22 Sep 2014 10:13:49 +0100
+
 monodevelop (4.0.12+dfsg-4) unstable; urgency=medium
 
   * No-change rebuild, for servicemodel ABI bump
