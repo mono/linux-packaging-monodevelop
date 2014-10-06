@@ -1,14 +1,14 @@
-Index: monodevelop/monodevelop.in
+Index: xamarin-pkg-monodevelop/monodevelop.in
 ===================================================================
---- monodevelop.orig/monodevelop.in	2013-10-10 12:00:23.300558627 +0200
-+++ monodevelop/monodevelop.in	2013-10-10 12:00:23.296558662 +0200
-@@ -25,6 +25,9 @@
- 	MONO_OPTIONS="$MONO_OPTIONS --gc=sgen"
- fi
+--- xamarin-pkg-monodevelop.orig/monodevelop.in	2014-10-06 11:05:40.665790543 +0100
++++ xamarin-pkg-monodevelop/monodevelop.in	2014-10-06 11:05:40.665790543 +0100
+@@ -15,6 +15,9 @@
+ 
+ _MD_REDIRECT_LOG="${MD_REDIRECT_LOG:-${XDG_CONFIG_HOME:-$HOME/.config}/MonoDevelop/log}"
  
 +# Monodevelop menus don't work with Ubuntu appmenu
 +export UBUNTU_MENUPROXY=0
 +
  if [ -n "$_MD_REDIRECT_LOG" ]; then
  	mkdir -p `dirname "$_MD_REDIRECT_LOG"`
- 	$MONO_EXEC $_MONO_OPTIONS "$EXE_PATH" $* 2>&1 | tee "$_MD_REDIRECT_LOG"
+ 	$MONO_EXEC $MONO_OPTIONS "$EXE_PATH" $* 2>&1 | tee "$_MD_REDIRECT_LOG"
