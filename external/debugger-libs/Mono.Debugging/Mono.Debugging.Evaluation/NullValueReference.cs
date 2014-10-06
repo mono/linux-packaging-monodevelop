@@ -32,12 +32,11 @@ namespace Mono.Debugging.Evaluation
 {
 	public class NullValueReference: ValueReference
 	{
-		object type;
+		readonly object type;
 		object obj;
 		bool valueCreated;
 
-		public NullValueReference (EvaluationContext ctx, object type)
-			: base (ctx)
+		public NullValueReference (EvaluationContext ctx, object type) : base (ctx)
 		{
 			this.type = type;
 		}
@@ -51,7 +50,7 @@ namespace Mono.Debugging.Evaluation
 				return obj;
 			}
 			set {
-				throw new NotSupportedException();
+				throw new NotSupportedException ();
 			}
 		}
 		
@@ -90,7 +89,7 @@ namespace Mono.Debugging.Evaluation
 			return null;
 		}
 
-		public override ObjectValue[] GetChildren (Mono.Debugging.Client.ObjectPath path, int index, int count, EvaluationOptions options)
+		public override ObjectValue[] GetChildren (ObjectPath path, int index, int count, EvaluationOptions options)
 		{
 			return new ObjectValue [0];
 		}

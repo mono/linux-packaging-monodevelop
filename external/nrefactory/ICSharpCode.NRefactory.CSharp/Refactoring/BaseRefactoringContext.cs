@@ -52,6 +52,13 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		}
 
 		/// <summary>
+		/// Gets the default namespace which should be defined in this file.
+		/// </summary>
+		public abstract string DefaultNamespace {
+			get;
+		}
+
+		/// <summary>
 		/// Gets a value indicating if 'var' keyword should be used or explicit types.
 		/// </summary>
 		public virtual bool UseExplicitTypes {
@@ -159,12 +166,15 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		/// <param name="statement">
 		/// The statement to start the analysis.
 		/// </param>
+		/// <param name="recursiveDetectorVisitor">
+		/// TODO.
+		/// </param>
 		/// <returns>
 		/// The reachability analysis object.
 		/// </returns>
-		public ReachabilityAnalysis CreateReachabilityAnalysis (Statement statement)
+		public ReachabilityAnalysis CreateReachabilityAnalysis (Statement statement, ReachabilityAnalysis.RecursiveDetectorVisitor recursiveDetectorVisitor = null)
 		{
-			return ReachabilityAnalysis.Create (statement, resolver, CancellationToken);
+			return ReachabilityAnalysis.Create (statement, resolver, recursiveDetectorVisitor, CancellationToken);
 		}
 
 		/// <summary>
@@ -186,6 +196,92 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		}
 
 		#endregion
+
+
+		#region Naming
+		public virtual string GetNameProposal (string name, TextLocation loc, bool camelCase = true)
+		{
+			string baseName = (camelCase ? char.ToLower (name [0]) : char.ToUpper (name [0])) + name.Substring (1);
+
+			var type = RootNode.GetNodeAt<TypeDeclaration>(loc);
+			if (type == null)
+				return baseName;
+
+			int number = -1;
+			string proposedName;
+			do {
+				proposedName = AppendNumberToName (baseName, number++);
+			} while (type.Members.Select (m => m.GetChildByRole (Roles.Identifier)).Any (n => n.Name == proposedName));
+			return proposedName;
+		}
+		
+		public virtual string GetLocalNameProposal (string name, TextLocation loc, bool camelCase = true)
+		{
+			string baseName = (camelCase ? char.ToLower (name [0]) : char.ToUpper (name [0])) + name.Substring (1);
+			var node = RootNode.GetNodeAt(loc);
+			if (node == null)
+				return baseName;
+			
+			var context = GetResolverStateBefore (node);
+			int number = -1;
+			string proposedName;
+			do {
+				proposedName = AppendNumberToName (baseName, number++);
+			} while (!(context.ResolveSimpleName (proposedName, EmptyList<IType>.Instance) is UnknownIdentifierResolveResult));
+			return proposedName;
+		}
+
+		static string AppendNumberToName (string baseName, int number)
+		{
+			return baseName + (number > 0 ? (number + 1).ToString () : "");
+		}
+		#endregion
+
+		#region Text stuff
+		public virtual TextEditorOptions TextEditorOptions {
+			get {
+				return TextEditorOptions.Default;
+			}
+		}
+
+		public virtual bool IsSomethingSelected {
+			get {
+				return SelectionStart != TextLocation.Empty;
+			}
+		}
+
+		public virtual string SelectedText {
+			get { return string.Empty; }
+		}
+
+		public virtual TextLocation SelectionStart {
+			get {
+				return TextLocation.Empty;
+			}
+		}
+
+		public virtual TextLocation SelectionEnd {
+			get {
+				return TextLocation.Empty;
+			}
+		}
+
+		public abstract int GetOffset (TextLocation location);
+
+		public abstract IDocumentLine GetLineByOffset (int offset);
+
+		public int GetOffset (int line, int col)
+		{
+			return GetOffset (new TextLocation (line, col));
+		}
+
+		public abstract TextLocation GetLocation (int offset);
+
+		public abstract string GetText (int offset, int length);
+
+		public abstract string GetText (ISegment segment);
+		#endregion
+
 
 		/// <summary>
 		/// Translates the english input string to the context language.

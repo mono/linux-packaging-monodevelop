@@ -53,8 +53,8 @@ namespace Xwt.Backends
 		void SetSize (double width, double height);
 
 		bool Visible { get; set; }
-		string Title { get; set; }
-		
+		bool Sensitive { get; set; }
+		string Title { get; set; }		
 		bool Decorated { get; set; }
 		bool ShowInTaskbar { get; set; }
 		void SetTransientFor (IWindowFrameBackend window);
@@ -68,6 +68,18 @@ namespace Xwt.Backends
 		/// deiconifying it, moving it to the current desktop, and/or giving it the keyboard focus
 		/// </summary>
 		void Present ();
+
+		/// <summary>
+		/// Closes the window
+		/// </summary>
+		/// <returns><c>true</c> if the window could be closed</returns>
+		/// <remarks>
+		/// Closes the window like if the user clicked on the close window button.
+		/// The CloseRequested event is fired and subscribers can cancel the closing,
+		/// so there is no guarantee that the window will actually close.
+		/// This method doesn't dispose the window. The Dispose method has to be called.
+		/// </remarks>
+		bool Close ();
 
 		/// <summary>
 		/// Gets or sets a value indicating whether this window is in full screen mode
@@ -88,6 +100,7 @@ namespace Xwt.Backends
 		void OnShown ();
 		void OnHidden ();
 		bool OnCloseRequested ();
+		void OnClosed ();
 	}
 
 	[Flags]
@@ -96,7 +109,8 @@ namespace Xwt.Backends
 		BoundsChanged = 1,
 		Shown = 2,
 		Hidden = 4,
-		CloseRequested = 8
+		CloseRequested = 8,
+		Closed = 16
 	}
 }
 

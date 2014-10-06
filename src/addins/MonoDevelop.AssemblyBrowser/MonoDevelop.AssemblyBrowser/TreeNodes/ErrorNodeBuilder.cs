@@ -37,7 +37,7 @@ using MonoDevelop.Ide.Gui.Components;
 
 namespace MonoDevelop.AssemblyBrowser
 {
-	public class ErrorNodeBuilder : TypeNodeBuilder
+	class ErrorNodeBuilder : TypeNodeBuilder
 	{
 		public override Type NodeDataType {
 			get { return typeof(Error); }
@@ -48,11 +48,11 @@ namespace MonoDevelop.AssemblyBrowser
 			return "Error";
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			Error error = (Error)dataObject;
-			label = error.Message;
-			icon = Context.GetIcon (Stock.Error);
+			nodeInfo.Label = error.Message;
+			nodeInfo.Icon = Context.GetIcon (Stock.Error);
 		}
 	}
 }

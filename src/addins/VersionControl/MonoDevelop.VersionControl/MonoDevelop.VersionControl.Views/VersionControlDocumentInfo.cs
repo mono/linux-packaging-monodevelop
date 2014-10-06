@@ -25,15 +25,10 @@
 // THE SOFTWARE.
 
 using System;
-using System.Linq;
-using System.IO;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
-using System.Collections.Generic;
 using System.Threading;
 using MonoDevelop.Core;
-using MonoDevelop.Ide.Gui.Content;
-using Mono.Addins;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -55,7 +50,8 @@ namespace MonoDevelop.VersionControl.Views
 			get;
 			set;
 		}
-		
+
+		[Obsolete ("Use Item.VersionInfo instead of this.")]
 		public VersionInfo VersionInfo {
 			get;
 			set;
@@ -86,7 +82,7 @@ namespace MonoDevelop.VersionControl.Views
 				lock (updateLock) {
 					try {
 						History      = Item.Repository.GetHistory (Item.Path, null);
-						VersionInfo  = Item.Repository.GetVersionInfo (Item.Path);
+						VersionInfo  = Item.Repository.GetVersionInfo (Item.Path, VersionInfoQueryFlags.IgnoreCache);
 					} catch (Exception ex) {
 						LoggingService.LogError ("Error retrieving history", ex);
 					}
@@ -94,23 +90,30 @@ namespace MonoDevelop.VersionControl.Views
 					DispatchService.GuiDispatch (delegate {
 						OnUpdated (EventArgs.Empty);
 					});
-					isUpdated = true;
+					mre.Set ();
 				}
 			});
 		}
-		
+
 		object updateLock = new object ();
-		bool isUpdated = false;
-		
+		ManualResetEvent mre = new ManualResetEvent (false);
+
+		// Runs an action in the GUI thread.
 		public void RunAfterUpdate (Action act) 
 		{
-			if (isUpdated) {
+			if (mre == null) {
 				act ();
 				return;
 			}
-			while (!isUpdated)
-				Thread.Sleep (10);
-			act ();
+
+			ThreadPool.QueueUserWorkItem (delegate {
+				mre.WaitOne ();
+				mre.Dispose ();
+				mre = null;
+				DispatchService.GuiDispatch (delegate {
+					act ();
+				});
+			});
 		}
 		
 		protected virtual void OnUpdated (EventArgs e)

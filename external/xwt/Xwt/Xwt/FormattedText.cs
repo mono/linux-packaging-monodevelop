@@ -105,6 +105,18 @@ namespace Xwt
 			case "u":
 				span.Add (new UnderlineTextAttribute ());
 				break;
+			case "a":
+				Uri href = null;
+				ReadXmlAttributes (markup, ref k, (name, val) => {
+					if (name == "href") {
+						href = new Uri (val, UriKind.RelativeOrAbsolute);
+						return true;
+					}
+					return false;
+				});
+				span.Add (new LinkTextAttribute () { Target = href });
+				break;
+
 			case "span":
 				ParseAttributes (span, markup, ref k);
 				break;
@@ -160,6 +172,18 @@ namespace Xwt
 
 		bool ParseAttributes (SpanInfo span, string markup, ref int i)
 		{
+			return ReadXmlAttributes (markup, ref i, (name, val) => {
+				var attr = CreateAttribute (name, val);
+				if (attr != null) {
+					span.Add (attr);
+					return true;
+				}
+				return false;
+			});
+		}
+
+		bool ReadXmlAttributes (string markup, ref int i, Func<string,string,bool> callback)
+		{
 			int k = i;
 
 			while (true) {
@@ -183,13 +207,11 @@ namespace Xwt
 					return false;
 
 				string val = markup.Substring (k, n - k);
-				var attr = CreateAttribute (name, val);
-				if (attr != null) {
+				if (callback (name, val))
 					i = n + 1;
-					span.Add (attr);
-				}
 				else
 					return false;
+				k = i;
 			}
 		}
 
@@ -197,6 +219,7 @@ namespace Xwt
 		{
 			switch (name) {
 			case "font":
+			case "font-desc":
 			case "font_desc":
 				return new FontTextAttribute () { Font = Font.FromName (val) };
 
@@ -208,11 +231,19 @@ namespace Xwt
 				return new FontSizeTextAttribute () { Size = s };
 */
 			case "font_weight":
+			case "font-weight":
 			case "weight":
 				FontWeight w;
 				if (!Enum.TryParse<FontWeight> (val, true, out w))
 					return null;
 				return new FontWeightTextAttribute () { Weight = w };
+
+			case "font_style":
+			case "font-style":
+				FontStyle s;
+				if (!Enum.TryParse<FontStyle> (val, true, out s))
+					return null;
+				return new FontStyleTextAttribute () { Style = s };
 
 			case "foreground":
 			case "fgcolor":
@@ -223,6 +254,7 @@ namespace Xwt
 				return new ColorTextAttribute () { Color = c };
 
 			case "background":
+			case "background-color":
 			case "bgcolor":
 				Color bc;
 				if (!Color.TryParse (val, out bc))
@@ -230,12 +262,23 @@ namespace Xwt
 				return new BackgroundTextAttribute () { Color = bc };
 
 			case "underline":
-				return new UnderlineTextAttribute ();
-				
+				return new UnderlineTextAttribute () {
+					Underline = ParseBool (val, false)
+				};
+
 			case "strikethrough":
-				return new StrikethroughTextAttribute ();
+				return new StrikethroughTextAttribute () {
+					Strikethrough = ParseBool (val, false)
+				};
 			}
 			return null;
+		}
+
+		bool ParseBool (string s, bool defaultValue)
+		{
+			if (s.Length == 0)
+				return defaultValue;
+			return string.Equals (s, "true", StringComparison.OrdinalIgnoreCase);
 		}
 		
 		bool ReadId (string markup, ref int i, out string tag)

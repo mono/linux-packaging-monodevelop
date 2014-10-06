@@ -46,6 +46,11 @@ namespace Xwt.WPFBackend
 	public class WpfContextBackendHandler
 		: ContextBackendHandler
 	{
+		public override double GetScaleFactor (object backend)
+		{
+			var c = (DrawingContext)backend;
+			return c.ScaleFactor;
+		}
 		public override void Save (object backend)
 		{
 			var c = (DrawingContext) backend;
@@ -249,7 +254,7 @@ namespace Xwt.WPFBackend
 		{
 			var c = (DrawingContext) backend;
 			var t = (TextLayoutBackend)Toolkit.GetBackend (layout);
-			t.FormattedText.SetForegroundBrush (c.Brush);
+			t.SetDefaultForeground (c.ColorBrush);
 			c.Context.DrawText (t.FormattedText, new SW.Point (x, y));
 		}
 
@@ -297,6 +302,13 @@ namespace Xwt.WPFBackend
 			c.PushTransform (t);
 		}
 
+		public override void ModifyCTM (object backend, Drawing.Matrix m)
+		{
+			var c = (DrawingContext)backend;
+			MatrixTransform t = new MatrixTransform (m.M11, m.M12, m.M21, m.M22, m.OffsetX, m.OffsetY);
+			c.PushTransform (t);
+		}
+
 		public override Drawing.Matrix GetCTM (object backend)
 		{
 			var c = (DrawingContext)backend;
@@ -318,8 +330,7 @@ namespace Xwt.WPFBackend
         {
 			var c = (DrawingContext)backend;
 			var other = (DrawingContext)otherBackend;
-			foreach (var s in other.Path.Segments)
-				c.Path.Segments.Add (s);
+			c.AppendPath (other);
 		}
 
 		public override bool IsPointInFill (object backend, double x, double y)

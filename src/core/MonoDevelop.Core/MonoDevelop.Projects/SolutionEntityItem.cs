@@ -109,6 +109,35 @@ namespace MonoDevelop.Projects
 			base.Dispose ();
 		}
 
+		protected override void OnBoundToSolution ()
+		{
+			base.OnBoundToSolution ();
+			ParentSolution.SolutionItemRemoved += HandleSolutionItemRemoved;
+			ParentSolution.SolutionItemAdded += HandleSolutionItemAdded;
+		}
+
+		protected override void OnUnboundFromSolution ()
+		{
+			base.OnUnboundFromSolution ();
+			ParentSolution.SolutionItemAdded -= HandleSolutionItemAdded;
+			ParentSolution.SolutionItemRemoved -= HandleSolutionItemRemoved;
+		}
+
+		void HandleSolutionItemAdded (object sender, SolutionItemChangeEventArgs e)
+		{
+			if (e.Reloading && dependencies.Count > 0 && (e.SolutionItem is SolutionEntityItem) && (e.ReplacedItem is SolutionEntityItem)) {
+				int i = dependencies.IndexOf ((SolutionEntityItem)e.ReplacedItem);
+				if (i != -1)
+					dependencies [i] = (SolutionEntityItem) e.SolutionItem;
+			}
+		}
+
+		void HandleSolutionItemRemoved (object sender, SolutionItemChangeEventArgs e)
+		{
+			if (!e.Reloading && (e.SolutionItem is SolutionEntityItem))
+				dependencies.Remove ((SolutionEntityItem)e.SolutionItem);
+		}
+
 		
 		internal override void SetItemHandler (ISolutionItemHandler handler)
 		{
@@ -188,7 +217,15 @@ namespace MonoDevelop.Projects
 				NotifyModified ("FileName");
 			}
 		}
-		
+
+		public bool Enabled {
+			get { return ParentSolution != null ? ParentSolution.IsSolutionItemEnabled (FileName) : true; }
+			set { 
+				if (ParentSolution != null)
+					ParentSolution.SetSolutionItemEnabled (FileName, value);
+			}
+		}
+
 		public FileFormat FileFormat {
 			get {
 				if (ParentSolution != null) {
@@ -208,6 +245,11 @@ namespace MonoDevelop.Projects
 				NeedsReload = false;
 				NotifyModified ("FileFormat");
 			}
+		}
+
+		public virtual bool SupportsConfigurations ()
+		{
+			return SupportsBuild ();
 		}
 		
 		public ProjectItemCollection Items {

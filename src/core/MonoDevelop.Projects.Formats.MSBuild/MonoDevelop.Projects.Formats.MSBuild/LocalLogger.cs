@@ -35,15 +35,15 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 	public class LocalLogger: Logger
 	{
 		IEventSource eventSource;
-		List<MSBuildResult> results = new List<MSBuildResult> ();
-		string basePath;
+		readonly List<MSBuildTargetResult> results = new List<MSBuildTargetResult> ();
+		readonly string projectFile;
 		
-		public LocalLogger (string basePath)
+		public LocalLogger (string projectFile)
 		{
-			this.basePath = basePath;
+			this.projectFile = projectFile;
 		}
 		
-		public List<MSBuildResult> BuildResult {
+		public List<MSBuildTargetResult> BuildResult {
 			get { return results; }
 		}
 		
@@ -62,18 +62,22 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 		void EventSourceWarningRaised (object sender, BuildWarningEventArgs e)
 		{
-			string file = e.File;
-			if (file != null)
-				file = Path.GetFullPath (Path.Combine (basePath, file));
-			results.Add (new MSBuildResult (true, file, e.LineNumber, e.ColumnNumber, e.Code, e.Message));
+			//NOTE: as of Mono 3.2.7, e.ProjectFile does not exist, so we use our projectFile variable instead
+			results.Add (new MSBuildTargetResult (
+				projectFile, true, e.Subcategory, e.Code, e.File,
+				e.LineNumber, e.ColumnNumber, e.ColumnNumber, e.EndLineNumber,
+				e.Message, e.HelpKeyword)
+			);
 		}
 
 		void EventSourceErrorRaised (object sender, BuildErrorEventArgs e)
 		{
-			string file = e.File;
-			if (file != null)
-				file = Path.GetFullPath (Path.Combine (basePath, file));
-			results.Add (new MSBuildResult (false, file, e.LineNumber, e.ColumnNumber, e.Code, e.Message));
+			//NOTE: as of Mono 3.2.7, e.ProjectFile does not exist, so we use our projectFile variable instead
+			results.Add (new MSBuildTargetResult (
+				projectFile, false, e.Subcategory, e.Code, e.File,
+				e.LineNumber, e.ColumnNumber, e.ColumnNumber, e.EndLineNumber,
+				e.Message, e.HelpKeyword)
+			);;
 		}
 	}
 }

@@ -1,4 +1,4 @@
-AC_INIT([monodevelop], 4.0.12, [monodevelop-list@lists.ximian.com])
+AC_INIT([monodevelop], m4_esyscmd_s([grep ^Version ../version.config|cut -d '=' -f 2|tr -d '\n']), [monodevelop-list@lists.ximian.com])
 AC_PREREQ(2.53)
 AM_INIT_AUTOMAKE([1.10 tar-ustar])
 AM_MAINTAINER_MODE
@@ -6,13 +6,15 @@ AM_MAINTAINER_MODE
 #capture aclocal flags for autoreconf
 AC_SUBST(ACLOCAL_FLAGS)
 
-ASSEMBLY_VERSION=4.0.12.0
+ASSEMBLY_VERSION=4.0.0.0
 
 # This is parsed in BuildVariables.cs. Keep the format consistent to avoid breaking
 # the C# side of things. It should be one of the following two formats:
 # 1) "VERSION_NUMBER"					"2.0"
 # 2) "VERSION_NUMBER BUILD_TYPE BUILD_NUMBER"		"2.0 Alpha 1"
-PACKAGE_VERSION_LABEL="4.0.12"
+PACKAGE_VERSION_LABEL="m4_esyscmd_s([grep ^Label ../version.config|cut -d "=" -f 2|tr -d '\n'])"
+
+COMPAT_ADDIN_VERSION=m4_esyscmd_s([grep ^CompatVersion ../version.config|cut -d "=" -f 2|tr -d '\n'])
 
 AC_PATH_PROG(MONO, mono)
 AC_PATH_PROG(MCS, gmcs)
@@ -27,15 +29,7 @@ fi
 
 AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
 
-# On OSX use Mono's private copy of pkg-config if it exists
-OSX_PKG_CONFIG=/Library/Frameworks/Mono.framework/Versions/Current/bin/pkg-config
-if test -e $OSX_PKG_CONFIG; then
-	PKG_CONFIG=$OSX_PKG_CONFIG
-elif test "x$PKG_CONFIG" = "xno"; then
-	AC_MSG_ERROR([You need to install pkg-config])
-fi
-
-MONO_REQUIRED_VERSION=2.10.9
+MONO_REQUIRED_VERSION=3.0.4
 
 if ! $PKG_CONFIG --atleast-version=$MONO_REQUIRED_VERSION mono; then
 	AC_MSG_ERROR([You need mono $MONO_REQUIRED_VERSION or newer])
@@ -103,7 +97,6 @@ if test "x$MSGMERGE" = "xno"; then
         AC_MSG_ERROR([You need to install msgmerge from intltool])
 fi
 
-MONO_REQUIRED_VERSION=2.8
 PKG_CHECK_MODULES(UNMANAGED_DEPENDENCIES_MONO,mono >= $MONO_REQUIRED_VERSION, has_mono=true, has_mono=false)
 
 if test "x$has_mono" = "xfalse"; then
@@ -222,7 +215,7 @@ fi
 
 AM_CONDITIONAL(ENABLE_MACPLATFORM, [test x$enable_macplatform = xyes])
 
-# Mac bundle 
+# Mac bundle
 AC_ARG_ENABLE(macbundle,
 	AC_HELP_STRING([--enable-macbundle],
 		[enable Mac bundle packaging [default=no]]),
@@ -242,7 +235,7 @@ fi
 AM_CONDITIONAL(ENABLE_WINDOWSPLATFORM, [test x$enable_windowsplatform = xyes])
 
 dnl Intl
-ALL_LINGUAS="cs da de es fr ja pt_BR tr pl it zh_TW zh_CN ru sl ca gl pt sv nl id hu nb"
+ALL_LINGUAS="cs da de es fr ja pt_BR tr pl it zh_TW zh_CN ru sl ca gl pt sv nl id hu nb ko"
 AC_SUBST(ALL_LINGUAS)
 GETTEXT_PACKAGE=monodevelop
 AC_SUBST(GETTEXT_PACKAGE)
@@ -254,6 +247,7 @@ AC_SUBST(LIB_SUFFIX)
 AC_SUBST(LIB_PREFIX)
 AC_SUBST(ASSEMBLY_VERSION)
 AC_SUBST(PACKAGE_VERSION_LABEL)
+AC_SUBST(COMPAT_ADDIN_VERSION)
 AC_SUBST(SQLITE_XML)
 AC_SUBST(CSC_FLAGS)
 
@@ -284,8 +278,8 @@ src/core/Mono.Texteditor/Makefile
 src/core/MonoDevelop.Core/Makefile
 src/core/MonoDevelop.Projects.Formats.MSBuild/Makefile
 src/core/MonoDevelop.Ide/Makefile
-src/core/MonoDevelop.Ide/BuildVariables.cs
 src/core/MonoDevelop.Startup/Makefile
+src/core/MonoDevelop.TextEditor.Tests/Makefile
 src/tools/Makefile
 src/tools/mdhost/Makefile
 src/tools/mdtool/Makefile
@@ -308,7 +302,6 @@ src/addins/CSharpBinding/Autotools/Makefile
 src/addins/CSharpBinding/AspNet/Makefile
 src/addins/ILAsmBinding/Makefile
 src/addins/VBNetBinding/Makefile
-src/addins/prj2make-sharp-lib/Makefile
 src/addins/ChangeLogAddIn/Makefile
 src/addins/MonoDevelop.GtkCore/Makefile
 src/addins/MonoDevelop.GtkCore/libstetic/Makefile
@@ -319,8 +312,6 @@ src/addins/TextTemplating/TextTransform/Makefile
 src/addins/TextTemplating/MonoDevelop.TextTemplating/Makefile
 src/addins/TextTemplating/Mono.TextTemplating.Tests/Makefile
 src/addins/AspNet/Makefile
-src/addins/AspNet/MonoDevelop.AspNet/Makefile
-src/addins/AspNet/MonoDevelop.AspNet.Mvc/Makefile
 src/addins/MonoDevelop.Autotools/Makefile
 src/addins/MonoDevelop.DesignerSupport/Makefile
 src/addins/MonoDevelop.WebReferences/Makefile
@@ -333,19 +324,28 @@ src/addins/CBinding/Makefile
 src/addins/GnomePlatform/Makefile
 src/addins/MacPlatform/Makefile
 src/addins/WindowsPlatform/Makefile
+src/addins/WindowsPlatform/WindowsAPICodePack/Makefile
+src/addins/WindowsPlatform/WindowsAPICodePack/Core/Makefile
+src/addins/WindowsPlatform/WindowsAPICodePack/Shell/Makefile
+src/addins/WindowsPlatform/WindowsPlatform/Makefile
 src/addins/MonoDevelop.AssemblyBrowser/Makefile
 src/addins/MonoDevelop.SourceEditor2/Makefile
-src/addins/MonoDevelop.XmlEditor/Makefile
+src/addins/Xml/Makefile
 src/addins/MonoDevelop.Refactoring/Makefile
 src/addins/MonoDevelop.Debugger/Makefile
+src/addins/MonoDevelop.Debugger.Gdb/Makefile
 src/addins/MonoDevelop.Debugger.Soft/Makefile
 src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/Makefile
 src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.AspNet/Makefile
 src/addins/MonoDevelop.HexEditor/Makefile
 src/addins/MonoDevelop.DocFood/Makefile
+src/addins/MonoDevelop.PackageManagement/Makefile
+src/addins/MonoDevelop.PackageManagement/MonoDevelop.PackageManagement.Tests/Makefile
 tests/Makefile
 tests/UnitTests/Makefile
 tests/UserInterfaceTests/Makefile
+tests/TestRunner/Makefile
+tests/Ide.Tests/Makefile
 tests/MacPlatform.Tests/Makefile
 Makefile
 monodevelop
@@ -363,6 +363,9 @@ echo ""
 echo "Configuration summary"
 echo ""
 echo "   * Installation prefix = $prefix"
+echo "   * Version = $VERSION"
+echo "   * Version Label = $PACKAGE_VERSION_LABEL"
+echo "   * Compat Version = $COMPAT_ADDIN_VERSION"
 echo "   * C# compiler = $CSC"
 echo "   * Mono class library development extensions: $enable_monoextensions"
 echo "   * Version control providers:"

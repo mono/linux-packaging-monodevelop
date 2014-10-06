@@ -123,8 +123,14 @@ namespace MonoDevelop.CSharp
 			sb.AppendLine ();
 			
 			foreach (ProjectReference lib in projectItems.GetAll <ProjectReference> ()) {
-				if (lib.ReferenceType == ReferenceType.Project && !(lib.OwnerProject.ParentSolution.FindProjectByName (lib.Reference) is DotNetProject))
-					continue;
+				if (lib.ReferenceType == ReferenceType.Project) {
+					var ownerProject = lib.OwnerProject;
+					if (ownerProject != null) {
+						var parentSolution = ownerProject.ParentSolution;
+						if (parentSolution != null && !(parentSolution.FindProjectByName (lib.Reference) is DotNetProject))
+							continue;
+					}
+				} 
 				string refPrefix = string.IsNullOrEmpty (lib.Aliases) ? "" : lib.Aliases + "=";
 				foreach (string fileName in lib.GetReferencedFileNames (configSelector)) {
 					switch (lib.ReferenceType) {
@@ -252,13 +258,10 @@ namespace MonoDevelop.CSharp
 				if (!string.IsNullOrEmpty (compilerParameters.WarningsNotAsErrors))
 					sb.AppendLine ("-warnaserror-:" + compilerParameters.WarningsNotAsErrors);
 			}
-			
-			if (compilerParameters.DefineSymbols.Length > 0) {
-				string define_str = string.Join (";", compilerParameters.DefineSymbols.Split (new char [] {',', ' ', ';'}, StringSplitOptions.RemoveEmptyEntries));
-				if (define_str.Length > 0) {
-					AppendQuoted (sb, "/define:", define_str);
-					sb.AppendLine ();
-				}
+
+			foreach (var define in configuration.GetDefineSymbols ()) {
+				AppendQuoted (sb, "/define:", define);
+				sb.AppendLine ();
 			}
 
 			CompileTarget ctarget = configuration.CompileTarget;
@@ -294,7 +297,7 @@ namespace MonoDevelop.CSharp
 						break;
 					case "EmbeddedResource":
 						string fname = finfo.Name;
-						if (string.Compare (Path.GetExtension (fname), ".resx", true) == 0)
+						if (string.Compare (Path.GetExtension (fname), ".resx", StringComparison.OrdinalIgnoreCase) == 0)
 							fname = Path.ChangeExtension (fname, ".resources");
 						sb.Append ('"');sb.Append ("/res:");
 						sb.Append (fname);sb.Append (',');sb.Append (finfo.ResourceId);
@@ -304,11 +307,8 @@ namespace MonoDevelop.CSharp
 						continue;
 				}
 			}
-			if (compilerParameters.GenerateXmlDocumentation) 
-				AppendQuoted (sb, "/doc:", Path.ChangeExtension (outputName, ".xml"));
-			
-			if (!string.IsNullOrEmpty (compilerParameters.AdditionalArguments)) 
-				sb.AppendLine (compilerParameters.AdditionalArguments);
+			if (!compilerParameters.DocumentationFile.IsNullOrEmpty) 
+				AppendQuoted (sb, "/doc:", compilerParameters.DocumentationFile);
 			
 			if (!string.IsNullOrEmpty (compilerParameters.NoWarnings)) 
 				AppendQuoted (sb, "/nowarn:", compilerParameters.NoWarnings);
@@ -322,30 +322,23 @@ namespace MonoDevelop.CSharp
 			string error  = "";
 			
 			File.WriteAllText (responseFileName, sb.ToString ());
-			
 
-			
 			monitor.Log.WriteLine (compilerName + " /noconfig " + sb.ToString ().Replace ('\n',' '));
-			
-			string workingDir = ".";
-			if (configuration.ParentItem != null) {
-				workingDir = configuration.ParentItem.BaseDirectory;
-				if (workingDir == null)
-					// Dummy projects created for single files have no filename
-					// and so no BaseDirectory.
-					// This is a workaround for a bug in 
-					// ProcessStartInfo.WorkingDirectory - not able to handle null
-					workingDir = ".";
-			}
 
-			LoggingService.LogInfo (compilerName + " " + sb.ToString ());
-			
+			// Dummy projects created for single files have no filename
+			// and so no BaseDirectory.
+			string workingDir = null;
+			if (configuration.ParentItem != null)
+				workingDir = configuration.ParentItem.BaseDirectory;
+
+			LoggingService.LogInfo (compilerName + " " + sb);
+
 			ExecutionEnvironment envVars = runtime.GetToolsExecutionEnvironment (project.TargetFramework);
 			string cargs = "/noconfig @\"" + responseFileName + "\"";
 
 			int exitCode = DoCompilation (monitor, compilerName, cargs, workingDir, envVars, gacRoots, ref output, ref error);
 			
-			BuildResult result = ParseOutput (output, error);
+			BuildResult result = ParseOutput (workingDir, output, error);
 			if (result.CompilerOutput.Trim ().Length != 0)
 				monitor.Log.WriteLine (result.CompilerOutput);
 			
@@ -378,7 +371,7 @@ namespace MonoDevelop.CSharp
 			}
 		}
 		
-		static BuildResult ParseOutput (string stdout, string stderr)
+		static BuildResult ParseOutput (string basePath, string stdout, string stderr)
 		{
 			BuildResult result = new BuildResult ();
 			
@@ -401,13 +394,13 @@ namespace MonoDevelop.CSharp
 					if (curLine.Length == 0) 
 						continue;
 					
-					if (curLine.StartsWith ("Unhandled Exception: System.TypeLoadException") || 
-					    curLine.StartsWith ("Unhandled Exception: System.IO.FileNotFoundException")) {
+					if (curLine.StartsWith ("Unhandled Exception: System.TypeLoadException", StringComparison.Ordinal) ||
+					    curLine.StartsWith ("Unhandled Exception: System.IO.FileNotFoundException", StringComparison.Ordinal)) {
 						result.ClearErrors ();
 						typeLoadException = true;
 					}
 					
-					BuildError error = CreateErrorFromString (curLine);
+					BuildError error = CreateErrorFromString (basePath, curLine);
 					
 					if (error != null)
 						result.Append (error);
@@ -436,7 +429,9 @@ namespace MonoDevelop.CSharp
 			ProcessStartInfo pinfo = new ProcessStartInfo (compilerName, compilerArgs);
 			pinfo.StandardErrorEncoding = Encoding.UTF8;
 			pinfo.StandardOutputEncoding = Encoding.UTF8;
-			pinfo.WorkingDirectory = working_dir;
+
+			// The "." is a workaround for a bug in ProcessStartInfo.WorkingDirectory - not able to handle null
+			pinfo.WorkingDirectory = working_dir ?? ".";
 			
 			if (gacRoots.Count > 0) {
 				// Create the gac prefix string
@@ -458,16 +453,17 @@ namespace MonoDevelop.CSharp
 				pw.WaitForOutput ();
 			}
 			int exitCode = pw.ExitCode;
-			outwr.Close ();
+			bool cancelRequested = pw.CancelRequested;
+			outwr.Close();
 			errwr.Close ();
-			pw.Dispose ();
-			return exitCode;
+			pw.Dispose();
+			return cancelRequested ? 0 : exitCode;
 		}
 		
 		// Snatched from our codedom code, with some changes to make it compatible with csc
 		// (the line+column group is optional is csc)
 		static Regex regexError = new Regex (@"^(\s*(?<file>.+[^)])(\((?<line>\d*)(,(?<column>\d*[\+]*))?\))?:\s+)*(?<level>\w+)\s+(?<number>..\d+):\s*(?<message>.*)", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
-		static BuildError CreateErrorFromString (string error_string)
+		static BuildError CreateErrorFromString (string basePath, string error_string)
 		{
 			// When IncludeDebugInformation is true, prevents the debug symbols stats from braeking this.
 			if (error_string.StartsWith ("WROTE SYMFILE") ||
@@ -481,7 +477,14 @@ namespace MonoDevelop.CSharp
 				return null;
 			
 			BuildError error = new BuildError ();
-			error.FileName = match.Result ("${file}") ?? "";
+			FilePath filename = match.Result ("${file}");
+			if (filename.IsNullOrEmpty) {
+				filename = FilePath.Empty;
+			} else if (!filename.IsAbsolute && basePath != null) {
+				filename = filename.ToAbsolute (basePath);
+			}
+			error.FileName = filename;
+
 			
 			string line = match.Result ("${line}");
 			error.Line = !string.IsNullOrEmpty (line) ? Int32.Parse (line) : 0;

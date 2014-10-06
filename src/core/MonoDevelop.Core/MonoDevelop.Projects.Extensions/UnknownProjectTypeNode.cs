@@ -32,6 +32,8 @@ namespace MonoDevelop.Projects.Extensions
 {
 	class UnknownProjectTypeNode: ExtensionNode
 	{
+		#pragma warning disable 649
+
 		[NodeAttribute ("_instructions", Localizable=true)]
 		string instructions;
 
@@ -50,9 +52,27 @@ namespace MonoDevelop.Projects.Extensions
 		[NodeAttribute ("product")]
 		string requiresProduct { get; set; }
 
+		[NodeAttribute ("loadFiles", "If true, MonoDevelop will show the project files in the solution pad")]
+		bool loadFiles = true;
+
+		[NodeAttribute ("extension", "Extension of the project file")]
+		string extension = "";
+
+		#pragma warning restore 649
+
 		public bool IsSolvable {
 			get {
 				return requiresProduct != null || requiresAddin != null;
+			}
+		}
+
+		public bool LoadFiles {
+			get { return loadFiles; }
+		}
+
+		public string Extension {
+			get {
+				return this.extension;
 			}
 		}
 

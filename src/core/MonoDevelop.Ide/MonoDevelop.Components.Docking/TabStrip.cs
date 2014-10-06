@@ -101,7 +101,7 @@ namespace MonoDevelop.Components.Docking
 				currentTab = box.Children.Length - 1;
 		}
 
-		public void SetTabLabel (Gtk.Widget page, Gdk.Pixbuf icon, string label)
+		public void SetTabLabel (Gtk.Widget page, Xwt.Drawing.Image icon, string label)
 		{
 			foreach (DockItemTitleTab tab in box.Children) {
 				if (tab.Page == page) {
@@ -280,9 +280,9 @@ namespace MonoDevelop.Components.Docking
 					gc.Dispose ();
 		
 					Gdk.GC bgc = new Gdk.GC (GdkWindow);
-					var c = new HslColor (TabStrip.VisualStyle.PadBackgroundColor.Value);
-					c.L *= 0.7;
-					bgc.RgbFgColor = c;
+					var c = TabStrip.VisualStyle.PadBackgroundColor.Value.ToXwtColor ();
+					c.Light *= 0.7;
+					bgc.RgbFgColor = c.ToGdkColor ();
 					evnt.Window.DrawLine (bgc, alloc.X, alloc.Y + alloc.Height - 1, alloc.X + alloc.Width - 1, alloc.Y + alloc.Height - 1);
 					bgc.Dispose ();
 				}	

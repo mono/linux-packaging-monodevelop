@@ -31,11 +31,12 @@ using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using System.IO;
 using System.Xml;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.RegexToolkit
 {
 	[System.ComponentModel.ToolboxItem(true)]
-	public partial class RegexToolkitWidget : Gtk.Bin
+	partial class RegexToolkitWidget : Gtk.Bin
 	{
 		ListStore optionsStore;
 		TreeStore resultStore;
@@ -93,7 +94,7 @@ namespace MonoDevelop.RegexToolkit
 			this.resultsTreeview.HeadersVisible = false;
 			var col = new TreeViewColumn ();
 			this.resultsTreeview.AppendColumn (col);
-			var pix = new CellRendererPixbuf ();
+			var pix = new CellRendererImage ();
 			
 			col.PackStart (pix, false);
 			col.AddAttribute (pix, "stock_id", 0);

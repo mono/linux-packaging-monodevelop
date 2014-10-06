@@ -32,6 +32,8 @@ using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Ide.TypeSystem;
 using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory.CSharp.TypeSystem;
+using Mono.CSharp.Nullable;
+using GLib;
 
 namespace MonoDevelop.Ide.FindInFiles
 {
@@ -41,9 +43,13 @@ namespace MonoDevelop.Ide.FindInFiles
 		IAssembly GenerateAssembly(Project project, string code)
 		{
 			var wrapper = TypeSystemService.LoadProject (project);
-			project.Files.Add (new ProjectFile ("test.cs", BuildAction.Compile));
-			TypeSystemService.ParseFile (project, "test.cs", "text/x-csharp", code);
-			return wrapper.Compilation.MainAssembly;
+			TypeSystemService.ParseFile ("test.cs", "text/x-csharp", code, wrapper);
+			wrapper.RequestLoad ();
+			do {
+				System.Threading.Thread.Sleep (10);
+			} while (!wrapper.IsLoaded);
+			var result = wrapper.Compilation.MainAssembly;
+			return result;
 		}
 
 		List<IMember> CollectMembers (string code, string typeName, Predicate<IUnresolvedMember> filter1, Predicate<IMember> filter2,
@@ -60,8 +66,10 @@ namespace MonoDevelop.Ide.FindInFiles
 			var members = baseType.GetMembers (filter1).Concat (baseType.GetConstructors (filter1));
 			if (filter2 != null)
 				members = members.Where (m => filter2(m));
-			return MemberCollector.CollectMembers (solution, members.First (), ReferenceFinder.RefactoryScope.Solution,
+			var result = MemberCollector.CollectMembers (solution, members.First (), ReferenceFinder.RefactoryScope.Solution,
 				includeOverloads, matchDeclaringType).ToList ();
+			TypeSystemService.UnloadProject (project, true);
+			return result;
 		}
 
 		List<IMember> CollectMembers (string code, string typeName, string memberName, Predicate<IMember> searchMemberFilter,
@@ -503,6 +511,7 @@ class D : B, IA, IB { }
 			var result3 = MemberCollector.GetBaseTypes (new [] {A, B, C, D, IA, IB}).ToList ();
 			VerifyResult (result3, new Predicate<ITypeDefinition>[] 
 			             {t => t == A, t => t == IA, t => t == IB});
+			TypeSystemService.UnloadProject (project, true);
 		}
 
 		[Test]

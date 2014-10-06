@@ -28,16 +28,16 @@
 
 
 using System;
-using System.Collections.Generic;
-using Mono.Debugging.Backend;
-using System.Diagnostics;
 using System.Threading;
+using System.Collections.Generic;
+
+using Mono.Debugging.Backend;
 
 namespace Mono.Debugging.Client
 {
 	public delegate void TargetEventHandler (object sender, TargetEventArgs args);
-	public delegate void ProcessEventHandler(int process_id);
-	public delegate void ThreadEventHandler(int thread_id);
+	public delegate void ProcessEventHandler (int processId);
+	public delegate void ThreadEventHandler (int threadId);
 	public delegate bool ExceptionHandler (Exception ex);
 	public delegate string TypeResolverHandler (string identifier, SourceLocation location);
 	public delegate void BreakpointTraceHandler (BreakEvent be, string trace);
@@ -46,24 +46,18 @@ namespace Mono.Debugging.Client
 	
 	public abstract class DebuggerSession: IDisposable
 	{
-		InternalDebuggerSession frontend;
-		Dictionary<BreakEvent,BreakEventInfo> breakpoints = new Dictionary<BreakEvent,BreakEventInfo> ();
+		readonly Dictionary<BreakEvent, BreakEventInfo> breakpoints = new Dictionary<BreakEvent, BreakEventInfo> ();
+		readonly Dictionary<string, string> resolvedExpressionCache = new Dictionary<string, string> ();
+		readonly InternalDebuggerSession frontend;
+		readonly object slock = new object ();
 		BreakpointStore breakpointStore;
-		OutputWriterDelegate outputWriter;
-		OutputWriterDelegate logWriter;
+		DebuggerSessionOptions options;
+		ProcessInfo[] currentProcesses;
+		ThreadInfo activeThread;
+		bool ownedBreakpointStore;
+		bool adjustingBreakpoints;
 		bool disposed;
 		bool attached;
-		bool ownedBreakpointStore;
-		object slock = new object ();
-		object olock = new object ();
-		ThreadInfo activeThread;
-		BreakEventHitHandler customBreakpointHitHandler;
-		ExceptionHandler exceptionHandler;
-		DebuggerSessionOptions options;
-		Dictionary<string,string> resolvedExpressionCache = new Dictionary<string, string> ();
-		bool adjustingBreakpoints;
-		
-		ProcessInfo[] currentProcesses;
 
 		/// <summary>
 		/// Reports a debugger event
@@ -132,7 +126,7 @@ namespace Mono.Debugging.Client
 		/// </summary>
 		public event EventHandler<BusyStateEventArgs> BusyStateChanged;
 		
-		public DebuggerSession ()
+		protected DebuggerSession ()
 		{
 			UseOperationThread = true;
 			frontend = new InternalDebuggerSession (this);
@@ -167,8 +161,7 @@ namespace Mono.Debugging.Client
 		/// in the debugged process.
 		/// </remarks>
 		public ExceptionHandler ExceptionHandler {
-			get { return exceptionHandler; }
-			set { exceptionHandler = value; }
+			get; set;
 		}
 		
 		/// <summary>
@@ -208,12 +201,7 @@ namespace Mono.Debugging.Client
 		/// continue or stop.
 		/// </remarks>
 		public BreakEventHitHandler CustomBreakEventHitHandler {
-			get {
-				return customBreakpointHitHandler;
-			}
-			set {
-				customBreakpointHitHandler = value;
-			}
+			get; set;
 		}
 		
 		/// <summary>
@@ -243,7 +231,7 @@ namespace Mono.Debugging.Client
 						breakpointStore.BreakEventModified -= OnBreakpointModified;
 						breakpointStore.BreakEventEnableStatusChanged -= OnBreakpointStatusChanged;
 						breakpointStore.CheckingReadOnly -= BreakpointStoreCheckingReadOnly;
-						breakpointStore.ResetAdjustedBreakpoints ();
+						breakpointStore.ResetBreakpoints ();
 					}
 
 					breakpointStore = value;
@@ -252,12 +240,10 @@ namespace Mono.Debugging.Client
 					if (breakpointStore != null) {
 						if (IsConnected) {
 							Dispatch (delegate {
-								lock (slock) {
-									if (IsConnected) {
-										lock (breakpointStore) {
-											foreach (BreakEvent bp in breakpointStore)
-												AddBreakEvent (bp);
-										}
+								if (IsConnected) {
+									lock (breakpointStore) {
+										foreach (BreakEvent bp in breakpointStore)
+											AddBreakEvent (bp);
 									}
 								}
 							});
@@ -271,15 +257,38 @@ namespace Mono.Debugging.Client
 				}
 			}
 		}
-		
+
+		readonly Queue<Action> actionsQueue = new Queue<Action>();
+
 		void Dispatch (Action action)
 		{
 			if (UseOperationThread) {
-				ThreadPool.QueueUserWorkItem (delegate {
-					lock (slock) {
-						action ();
+				lock (actionsQueue) {
+					actionsQueue.Enqueue (action);
+					if (actionsQueue.Count == 1) {
+						ThreadPool.QueueUserWorkItem (delegate {
+							while (true) {
+								Action actionToExecute = null;
+								lock (actionsQueue) {
+									if (actionsQueue.Count > 0) {
+										actionToExecute = actionsQueue.Peek ();
+									} else {
+										return;
+									}
+								}
+								try {
+									lock (slock) {
+										actionToExecute ();
+									}
+								} finally {
+									lock (actionsQueue) {
+										actionsQueue.Dequeue ();
+									}
+								}
+							}
+						});
 					}
-				});
+				}
 			} else {
 				lock (slock) {
 					action ();
@@ -378,11 +387,7 @@ namespace Mono.Debugging.Client
 		/// <c>true</c> if attached to process; otherwise, <c>false</c>.
 		/// </value>
 		public bool AttachedToProcess {
-			get {
-				lock (slock) {
-					return attached; 
-				}
-			}
+			get { return attached; }
 		}
 		
 		/// <summary>
@@ -505,6 +510,47 @@ namespace Mono.Debugging.Client
 				});
 			}
 		}
+
+		/// <summary>
+		/// Sets the next statement on the active thread.
+		/// </summary>
+		/// <param name="fileName">File name.</param>
+		/// <param name="line">Line.</param>
+		/// <param name="column">Column.</param>
+		public void SetNextStatement (string fileName, int line, int column)
+		{
+			if (fileName == null)
+				throw new ArgumentNullException ("fileName");
+
+			if (fileName.Length == 0)
+				throw new ArgumentException ("Path cannot be empty.", "fileName");
+
+			if (line < 1)
+				throw new ArgumentOutOfRangeException ("line");
+
+			if (column < 1)
+				throw new ArgumentOutOfRangeException ("column");
+
+			if (!IsConnected || IsRunning || !CanSetNextStatement)
+				throw new NotSupportedException ();
+
+			OnSetNextStatement (ActiveThread.Id, fileName, line, column);
+		}
+
+		/// <summary>
+		/// Sets the next statement on the active thread.
+		/// </summary>
+		/// <param name="ilOffset">The IL offset.</param>
+		public void SetNextStatement (int ilOffset)
+		{
+			if (ilOffset < 0)
+				throw new ArgumentOutOfRangeException ("ilOffset");
+
+			if (!IsConnected || IsRunning || !CanSetNextStatement)
+				throw new NotSupportedException ();
+
+			OnSetNextStatement (ActiveThread.Id, ilOffset);
+		}
 		
 		/// <summary>
 		/// Returns the status of a breakpoint for this debugger session.
@@ -618,67 +664,47 @@ namespace Mono.Debugging.Client
 		
 		void OnBreakpointAdded (object s, BreakEventArgs args)
 		{
-			lock (breakpoints) {
-				if (adjustingBreakpoints)
-					return;
-			}
+			if (adjustingBreakpoints)
+				return;
 
-			lock (slock) {
-				if (IsConnected) {
-					Dispatch (delegate {
-						lock (slock) {
-							if (IsConnected)
-								AddBreakEvent (args.BreakEvent);
-						}
-					});
-				}
+			if (IsConnected) {
+				Dispatch (delegate {
+					if (IsConnected)
+						AddBreakEvent (args.BreakEvent);
+				});
 			}
 		}
 		
 		void OnBreakpointRemoved (object s, BreakEventArgs args)
 		{
-			lock (breakpoints) {
-				if (adjustingBreakpoints)
-					return;
-			}
+			if (adjustingBreakpoints)
+				return;
 
-			lock (slock) {
-				if (IsConnected) {
-					Dispatch (delegate {
-						lock (slock) {
-							if (IsConnected)
-								RemoveBreakEvent (args.BreakEvent);
-						}
-					});
-				}
+			if (IsConnected) {
+				Dispatch (delegate {
+					if (IsConnected)
+						RemoveBreakEvent (args.BreakEvent);
+				});
 			}
 		}
 		
 		void OnBreakpointModified (object s, BreakEventArgs args)
 		{
-			lock (slock) {
-				if (IsConnected) {
-					Dispatch (delegate {
-						lock (slock) {
-							if (IsConnected)
-								UpdateBreakEvent (args.BreakEvent);
-						}
-					});
-				}
+			if (IsConnected) {
+				Dispatch (delegate {
+					if (IsConnected)
+						UpdateBreakEvent (args.BreakEvent);
+				});
 			}
 		}
 		
 		void OnBreakpointStatusChanged (object s, BreakEventArgs args)
 		{
-			lock (slock) {
-				if (IsConnected) {
-					Dispatch (delegate {
-						lock (slock) {
-							if (IsConnected)
-								UpdateBreakEventStatus (args.BreakEvent);
-						}
-					});
-				}
+			if (IsConnected) {
+				Dispatch (delegate {
+					if (IsConnected)
+						UpdateBreakEventStatus (args.BreakEvent);
+				});
 			}
 		}
 
@@ -797,12 +823,7 @@ namespace Mono.Debugging.Client
 		/// This callback is invoked to print debuggee output
 		/// </remarks>
 		public OutputWriterDelegate OutputWriter {
-			get { return outputWriter; }
-			set {
-				lock (olock) {
-					outputWriter = value;
-				}
-			}
+			get; set;
 		}
 		
 		/// <summary>
@@ -812,12 +833,18 @@ namespace Mono.Debugging.Client
 		/// This callback is invoked to print debugger log messages
 		/// </remarks>
 		public OutputWriterDelegate LogWriter {
-			get { return logWriter; }
-			set {
-				lock (olock) {
-					logWriter = value;
-				}
-			}
+			get; set;
+		}
+
+		/// <summary>
+		/// Gets or sets the debug writer.
+		/// </summary>
+		/// <remarks>
+		/// This callback is invoked to print debugge messages
+		/// called via System.Diagnostics.Debugger.Log
+		/// </remarks>
+		public DebugWriterDelegate DebugWriter {
+			get; set;
 		}
 		
 		/// <summary>
@@ -846,9 +873,6 @@ namespace Mono.Debugging.Client
 		
 		public virtual string ResolveExpression (string expression, SourceLocation location)
 		{
-			if (TypeResolverHandler == null)
-				return expression;
-
 			string key = expression + " " + location;
 			string resolved;
 			if (!resolvedExpressionCache.TryGetValue (key, out resolved)) {
@@ -896,8 +920,8 @@ namespace Mono.Debugging.Client
 		{
 		}
 		
-		Mono.Debugging.Evaluation.ExpressionEvaluator defaultResolver = new Mono.Debugging.Evaluation.NRefactoryExpressionEvaluator ();
-		Dictionary <string, IExpressionEvaluator> evaluators = new Dictionary <string, IExpressionEvaluator> ();
+		readonly Mono.Debugging.Evaluation.ExpressionEvaluator defaultResolver = new Mono.Debugging.Evaluation.NRefactoryExpressionEvaluator ();
+		readonly Dictionary <string, IExpressionEvaluator> evaluators = new Dictionary <string, IExpressionEvaluator> ();
 
 		internal IExpressionEvaluator FindExpressionEvaluator (StackFrame frame)
 		{
@@ -1094,9 +1118,11 @@ namespace Mono.Debugging.Client
 			lock (slock) {
 				if (!HasExited) {
 					IsConnected = true;
-					lock (breakpointStore) {
-						foreach (BreakEvent bp in breakpointStore)
-							AddBreakEvent (bp);
+					if (breakpointStore != null) {
+						lock (breakpointStore) {
+							foreach (BreakEvent bp in breakpointStore)
+								AddBreakEvent (bp);
+						}
 					}
 				}
 			}
@@ -1104,17 +1130,28 @@ namespace Mono.Debugging.Client
 		
 		internal protected void OnTargetOutput (bool isStderr, string text)
 		{
-			lock (olock) {
-				if (outputWriter != null)
-					outputWriter (isStderr, text);
-			}
+			var writer = OutputWriter;
+
+			if (writer != null)
+				writer (isStderr, text);
 		}
 		
 		internal protected void OnDebuggerOutput (bool isStderr, string text)
 		{
-			lock (olock) {
-				if (logWriter != null)
-					logWriter (isStderr, text);
+			var writer = LogWriter;
+
+			if (writer != null)
+				writer (isStderr, text);
+		}
+
+		internal protected void OnTargetDebug (int level, string category, string message)
+		{
+			var writer = DebugWriter;
+
+			if (writer != null) {
+				writer (level, category, message);
+			} else {
+				OnDebuggerOutput (false, string.Format ("[{0}:{1}] {2}", level, category, message));
 			}
 		}
 		
@@ -1141,11 +1178,19 @@ namespace Mono.Debugging.Client
 		{
 			lock (breakpoints) {
 				// Make a copy of the breakpoints table since it can be modified while iterating
-				Dictionary<BreakEvent, BreakEventInfo> breakpointsCopy = new Dictionary<BreakEvent, BreakEventInfo> (breakpoints);
+				var breakpointsCopy = new Dictionary<BreakEvent, BreakEventInfo> (breakpoints);
+
 				foreach (KeyValuePair<BreakEvent, BreakEventInfo> bps in breakpointsCopy) {
 					Breakpoint bp = bps.Key as Breakpoint;
 					if (bp != null && bps.Value.Status == BreakEventStatus.NotBound) {
-						if (string.Compare (System.IO.Path.GetFullPath (bp.FileName), fullFilePath, System.IO.Path.DirectorySeparatorChar == '\\') == 0)
+						StringComparer comparer;
+
+						if (System.IO.Path.DirectorySeparatorChar == '\\')
+							comparer = StringComparer.InvariantCultureIgnoreCase;
+						else
+							comparer = StringComparer.InvariantCulture;
+
+						if (comparer.Compare (System.IO.Path.GetFullPath (bp.FileName), fullFilePath) == 0)
 							RetryEventBind (bps.Value);
 					}
 				}
@@ -1189,17 +1234,20 @@ namespace Mono.Debugging.Client
 		/// </remarks>
 		internal protected void UnbindSourceFileBreakpoints (string fullFilePath)
 		{
-			List<BreakEventInfo> toUpdate = new List<BreakEventInfo> ();
+			var toUpdate = new List<BreakEventInfo> ();
+
 			lock (breakpoints) {
 				// Make a copy of the breakpoints table since it can be modified while iterating
-				Dictionary<BreakEvent, BreakEventInfo> breakpointsCopy = new Dictionary<BreakEvent, BreakEventInfo> (breakpoints);
+				var breakpointsCopy = new Dictionary<BreakEvent, BreakEventInfo> (breakpoints);
+
 				foreach (KeyValuePair<BreakEvent, BreakEventInfo> bps in breakpointsCopy) {
-					Breakpoint bp = bps.Key as Breakpoint;
+					var bp = bps.Key as Breakpoint;
 					if (bp != null && bps.Value.Status == BreakEventStatus.Bound) {
 						if (System.IO.Path.GetFullPath (bp.FileName) == fullFilePath)
 							toUpdate.Add (bps.Value);
 					}
 				}
+
 				foreach (BreakEventInfo be in toUpdate) {
 					breakpoints.Remove (be.BreakEvent);
 					NotifyBreakEventStatusChanged (be.BreakEvent);
@@ -1215,9 +1263,9 @@ namespace Mono.Debugging.Client
 			Breakpoints.NotifyStatusChanged (be);
 		}
 		
-		string GetBreakEventErrorMessage (BreakEvent be)
+		static string GetBreakEventErrorMessage (BreakEvent be)
 		{
-			Breakpoint bp = be as Breakpoint;
+			var bp = be as Breakpoint;
 			if (bp != null)
 				return string.Format ("Could not insert breakpoint at '{0}:{1}'", bp.FileName, bp.Line);
 			Catchpoint cp = (Catchpoint) be;
@@ -1239,20 +1287,22 @@ namespace Mono.Debugging.Client
 		/// </remarks>
 		protected virtual bool HandleException (Exception ex)
 		{
-			if (exceptionHandler != null)
-				return exceptionHandler (ex);
+			if (ExceptionHandler != null)
+				return ExceptionHandler (ex);
 
 			return false;
 		}
 		
 		internal void AdjustBreakpointLocation (Breakpoint b, int newLine, int newColumn)
 		{
-			lock (breakpoints) {
-				try {
-					adjustingBreakpoints = true;
-					Breakpoints.AdjustBreakpointLine (b, newLine, newColumn);
-				} finally {
-					adjustingBreakpoints = false;
+			lock (slock) {
+				lock (breakpoints) {
+					try {
+						adjustingBreakpoints = true;
+						Breakpoints.AdjustBreakpointLine (b, newLine, newColumn);
+					} finally {
+						adjustingBreakpoints = false;
+					}
 				}
 			}
 		}
@@ -1334,7 +1384,7 @@ namespace Mono.Debugging.Client
 		protected abstract void OnStepInstruction ();
 
 		/// <summary>
-		// Called to step one instruction, but step over method calls
+		/// Called to step one instruction, but step over method calls
 		/// </summary>
 		/// <remarks>
 		/// This method can only be called when the debuggee is stopped by the debugger
@@ -1356,6 +1406,39 @@ namespace Mono.Debugging.Client
 		/// This method can only be called when the debuggee is stopped by the debugger
 		/// </remarks>
 		protected abstract void OnContinue ();
+
+		/// <summary>
+		/// Checks whether or not the debugger supports setting the next statement to use when the debugger is resumed.
+		/// </summary>
+		/// <remarks>
+		/// This method is generally used to determine whether or not UI menu items should be shown.
+		/// </remarks>
+		/// <value><c>true</c> if the debugger supports setting the next statement to use when the debugger is resumed; otherwise, <c>false</c>.</value>
+		public virtual bool CanSetNextStatement {
+			get { return false; }
+		}
+
+		/// <summary>
+		/// Sets the next statement to be executed when the debugger is resumed.
+		/// </summary>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger.
+		/// </remarks>
+		protected virtual void OnSetNextStatement (long threadId, string fileName, int line, int column)
+		{
+			throw new NotSupportedException ();
+		}
+
+		/// <summary>
+		/// Sets the next statement to be executed when the debugger is resumed.
+		/// </summary>
+		/// <remarks>
+		/// This method can only be called when the debuggee is stopped by the debugger.
+		/// </remarks>
+		protected virtual void OnSetNextStatement (long threadId, int ilOffset)
+		{
+			throw new NotSupportedException ();
+		}
 		
 		//breakpoints etc
 
@@ -1494,11 +1577,25 @@ namespace Mono.Debugging.Client
 				return frontend;
 			}
 		}
+
+		protected virtual void OnFetchFrames (ThreadInfo[] threads)
+		{
+		}
+
+		/// <summary>
+		/// Calling this method is optional.
+		/// It's usefull to call this method so underlying debugger can optimize speed of fetching multiple frames on <paramref name="threads"/>.
+		/// </summary>
+		/// <param name="threads">Array of threads to fetch frames.</param>
+		public void FetchFrames (ThreadInfo[] threads)
+		{
+			OnFetchFrames (threads);
+		}
 	}
 	
 	class InternalDebuggerSession: IDebuggerSessionFrontend
 	{
-		DebuggerSession session;
+		readonly DebuggerSession session;
 		
 		public InternalDebuggerSession (DebuggerSession session)
 		{
@@ -1542,6 +1639,7 @@ namespace Mono.Debugging.Client
 	}
 
 	public delegate void OutputWriterDelegate (bool isStderr, string text);
+	public delegate void DebugWriterDelegate (int level, string category, string message);
 
 	public class BusyStateEventArgs: EventArgs
 	{

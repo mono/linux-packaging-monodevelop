@@ -98,7 +98,7 @@ namespace MonoDevelop.Ide.Commands
 				IdeApp.Workspace.OpenWorkspaceItem (file, dlg.CloseCurrentWorkspace);
 			}
 			else
-				IdeApp.Workbench.OpenDocument (file, dlg.Encoding);
+				IdeApp.Workbench.OpenDocument (file, null, dlg.Encoding, OpenDocumentOptions.DefaultInternal);
 		}
 		
 	}
@@ -122,11 +122,7 @@ namespace MonoDevelop.Ide.Commands
 
 		protected override void Update (CommandInfo info)
 		{
-			bool hasdirty = false;
-			for(int i = 0; i < IdeApp.Workbench.Documents.Count; i++) {
-				hasdirty |= IdeApp.Workbench.Documents [i].IsDirty;
-			}
-			info.Enabled = hasdirty;
+			info.Enabled = IdeApp.Workbench.Documents.Any (v => v.IsDirty);
 		}
 	}
 	//MonoDevelop.Ide.Commands.FileCommands.NewProject
@@ -228,7 +224,12 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Run ()
 		{
-			IdeApp.Workbench.ActiveDocument.GetContent<IPrintable> ().PrintPreviewDocument (PrintingSettings.Instance);
+			try {
+				IdeApp.Workbench.ActiveDocument.GetContent<IPrintable> ().PrintPreviewDocument (PrintingSettings.Instance);
+			} catch (Exception e) {
+				LoggingService.LogError ("Error while generating the print preview", e);
+				MessageService.ShowError (GettextCatalog.GetString ("Error while generating the print preview"), e.Message);
+			}
 		}
 
 		protected override void Update (CommandInfo info)
@@ -276,11 +277,11 @@ namespace MonoDevelop.Ide.Commands
 				var cmd = new CommandInfo (acceleratorKeyPrefix + ri.DisplayName.Replace ("_", "__")) {
 					Description = GettextCatalog.GetString ("Open {0}", ri.FileName)
 				};
-				Gdk.Pixbuf icon = DesktopService.GetPixbufForFile (ri.FileName, IconSize.Menu);
+/*				Gdk.Pixbuf icon = DesktopService.GetIconForFile (ri.FileName, IconSize.Menu);
 				#pragma warning disable 618
 				if (icon != null)
 					cmd.Icon = ImageService.GetStockId (icon, IconSize.Menu);
-				#pragma warning restore 618
+				#pragma warning restore 618*/
 				info.Add (cmd, ri.FileName);
 				i++;
 			}

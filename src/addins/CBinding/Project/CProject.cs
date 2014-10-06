@@ -93,8 +93,9 @@ namespace CBinding
 		private void Init ()
 		{
 			packages.Project = this;
-			
-			IdeApp.Workspace.ItemAddedToSolution += OnEntryAddedToCombine;
+
+			if (IdeApp.IsInitialized)
+				IdeApp.Workspace.ItemAddedToSolution += OnEntryAddedToCombine;
 		}
 		
 		public CProject ()
@@ -175,11 +176,12 @@ namespace CBinding
 				}
 			}			
 		}
-		
-		public override string ProjectType {
-			get { return "Native"; }
+
+		public override IEnumerable<string> GetProjectTypes ()
+		{
+			yield return "Native";
 		}
-		
+
 		public override string[] SupportedLanguages {
 			get { return new string[] { "C", "CPP", "Objective C", "Objective C++" }; }
 		}
@@ -205,17 +207,14 @@ namespace CBinding
 			foreach (var p in base.GetReferencedItems (configuration))
 				yield return p;
 
-			List<string> project_names = new List<string> ();
-			
+			if (ParentSolution == null)
+				yield break;
+
 			foreach (Package p in Packages) {
 				if (p.IsProject && p.Name != Name) {
-					project_names.Add (p.Name);
-				}
-			}
-			
-			foreach (SolutionItem e in ParentFolder.Items) {
-				if (e is CProject && project_names.Contains (e.Name)) {
-					yield return e;
+					var cp = ParentSolution.FindProjectByName (p.Name) as CProject;
+					if (cp != null)
+						yield return cp;
 				}
 			}
 		}

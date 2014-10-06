@@ -49,7 +49,7 @@ namespace MonoDevelop.Ide.Templates
 		private List<ProjectReference> references = new List<ProjectReference> ();
 
 		private XmlElement projectOptions = null;
-
+		private List<ProjectTemplatePackageReference> packageReferences = new List<ProjectTemplatePackageReference> ();
 
 		protected ProjectDescriptor ()
 		{
@@ -105,6 +105,15 @@ namespace MonoDevelop.Ide.Templates
 			if (projectDescriptor.projectOptions == null)
 				projectDescriptor.projectOptions = xmlElement.OwnerDocument.CreateElement ("Options");
 
+			if (xmlElement ["Packages"] != null) {
+				foreach (XmlNode xmlNode in xmlElement["Packages"].ChildNodes) {
+					if (xmlNode is XmlElement) {
+						var packageReference = ProjectTemplatePackageReference.Create ((XmlElement)xmlNode);
+						projectDescriptor.packageReferences.Add (packageReference);
+					}
+				}
+			}
+
 			return projectDescriptor;
 		}
 
@@ -113,6 +122,10 @@ namespace MonoDevelop.Ide.Templates
 			if (string.IsNullOrEmpty (projectOptions.GetAttribute ("language")) && !string.IsNullOrEmpty (defaultLanguage))
 				projectOptions.SetAttribute ("language", defaultLanguage);
 
+			if (!Services.ProjectService.CanCreateProject (type)) {
+				LoggingService.LogError ("Could not create project of type '" + type + "'. Project skipped");
+				return null;
+			}
 			Project project = Services.ProjectService.CreateProject (type, projectCreateInformation, projectOptions);
 			return project;
 		}
@@ -152,8 +165,10 @@ namespace MonoDevelop.Ide.Templates
 					projectFile.BuildAction = BuildAction.EmbeddedResource;
 					project.Files.Add (projectFile);
 				} catch (Exception ex) {
+					if (!IdeApp.IsInitialized)
+						throw;
+					LoggingService.LogError (string.Format ("File {0} could not be written.", resourceTemplate.Name), ex);
 					MessageService.ShowException (ex, GettextCatalog.GetString ("File {0} could not be written.", resourceTemplate.Name));
-					LoggingService.LogError (GettextCatalog.GetString ("File {0} could not be written.", resourceTemplate.Name), ex);
 				}
 			}
 
@@ -161,8 +176,10 @@ namespace MonoDevelop.Ide.Templates
 				try {
 					fileTemplate.AddToProject (policyParent, project, defaultLanguage, project.BaseDirectory, null);
 				} catch (Exception ex) {
+					if (!IdeApp.IsInitialized)
+						throw;
+					LoggingService.LogError (string.Format ("File {0} could not be written.", fileTemplate.Name), ex);
 					MessageService.ShowException (ex, GettextCatalog.GetString ("File {0} could not be written.", fileTemplate.Name));
-					LoggingService.LogError (GettextCatalog.GetString ("File {0} could not be written.", fileTemplate.Name), ex);
 				}
 			}
 		}
@@ -194,7 +211,7 @@ namespace MonoDevelop.Ide.Templates
 
 		public ProjectCreateInformation CreateProjectCI (ProjectCreateInformation projectCI)
 		{
-			var projectCreateInformation = projectCI;
+			var projectCreateInformation = new ProjectCreateInformation (projectCI);
 			var substitution = new string[,] { { "ProjectName", projectCreateInformation.ProjectName } };
 
 			projectCreateInformation.ProjectName = StringParserService.Parse (name, substitution);
@@ -209,6 +226,16 @@ namespace MonoDevelop.Ide.Templates
 				Directory.CreateDirectory (projectCreateInformation.ProjectBasePath);
 
 			return projectCreateInformation;
+		}
+
+		public bool HasPackages ()
+		{
+			return packageReferences.Any ();
+		}
+
+		public IList<ProjectTemplatePackageReference> GetPackageReferences ()
+		{
+			return packageReferences;
 		}
 	}
 }

@@ -1,21 +1,21 @@
-// 
+//
 // PropertyGridTable.cs
-//  
+//
 // Author:
 //       Lluis Sanchez <lluis@xamarin.com>
-// 
+//
 // Copyright (c) 2012 Xamarin Inc
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -30,6 +30,8 @@ using System.ComponentModel;
 using System.Collections.Generic;
 using Cairo;
 using System.Linq;
+using Mono.TextEditor;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Components.PropertyGrid
 {
@@ -42,8 +44,8 @@ namespace MonoDevelop.Components.PropertyGrid
 		Gtk.Widget currentEditor;
 		TableRow currentEditorRow;
 		bool draggingDivider;
-		Gdk.Pixbuf discloseDown;
-		Gdk.Pixbuf discloseUp;
+		Xwt.Drawing.Image discloseDown;
+		Xwt.Drawing.Image discloseUp;
 		bool heightMeasured;
 
 		const int CategoryTopBottomPadding = 6;
@@ -90,8 +92,8 @@ namespace MonoDevelop.Components.PropertyGrid
 			CanFocus = true;
 			resizeCursor = new Cursor (CursorType.SbHDoubleArrow);
 			handCursor = new Cursor (CursorType.Hand1);
-			discloseDown = Gdk.Pixbuf.LoadFromResource ("disclose-arrow-down.png");
-			discloseUp = Gdk.Pixbuf.LoadFromResource ("disclose-arrow-up.png");
+			discloseDown = Xwt.Drawing.Image.FromResource ("disclose-arrow-down-light-16.png");
+			discloseUp = Xwt.Drawing.Image.FromResource ("disclose-arrow-up-light-16.png");
 		}
 
 		protected override void OnDestroyed ()
@@ -150,17 +152,17 @@ namespace MonoDevelop.Components.PropertyGrid
 		internal void Populate (PropertyDescriptorCollection properties, object instance)
 		{
 			bool categorised = PropertySort == PropertySort.Categorized;
-		
+
 			//transcribe browsable properties
 			var sorted = new List<PropertyDescriptor>();
 
 			foreach (PropertyDescriptor descriptor in properties)
 				if (descriptor.IsBrowsable)
 					sorted.Add (descriptor);
-			
+
 			if (sorted.Count == 0)
 				return;
-			
+
 			if (!categorised) {
 				if (PropertySort != PropertySort.NoSort)
 					sorted.Sort ((a,b) => a.DisplayName.CompareTo (b.DisplayName));
@@ -192,7 +194,7 @@ namespace MonoDevelop.Components.PropertyGrid
 			QueueDraw ();
 			QueueResize ();
 		}
-		
+
 		internal void Update (PropertyDescriptorCollection properties, object instance)
 		{
 			foreach (PropertyDescriptor pd in properties)
@@ -200,7 +202,7 @@ namespace MonoDevelop.Components.PropertyGrid
 			QueueDraw ();
 			QueueResize ();
 		}
-		
+
 		bool UpdateProperty (PropertyDescriptor pd, object instance, IEnumerable<TableRow> rowList)
 		{
 			foreach (var row in rowList) {
@@ -215,12 +217,12 @@ namespace MonoDevelop.Components.PropertyGrid
 			}
 			return false;
 		}
-	
+
 		void AppendProperty (PropertyDescriptor prop, object instance)
 		{
 			AppendProperty (rows, prop, new InstanceData (instance));
 		}
-		
+
 		void AppendProperty (List<TableRow> rowList, PropertyDescriptor prop, object instance)
 		{
 			TableRow row = new TableRow () {
@@ -246,12 +248,17 @@ namespace MonoDevelop.Components.PropertyGrid
 			e.Initialize (this, editorManager, row.Property, row.Instace);
 			return e;
 		}
-		
+
 		protected override void ForAll (bool includeInternals, Gtk.Callback callback)
 		{
 			base.ForAll (includeInternals, callback);
-			foreach (var c in children.Keys.ToArray ())
+			foreach (var c in children.Keys.ToArray ()) {
+				if (c.Parent == null) {
+					LoggingService.LogError ("Error found unparented child in property grid:" + c.GetType ());
+					continue;
+				}
 				callback (c);
+			}
 		}
 
 		protected override void OnSizeRequested (ref Requisition requisition)
@@ -273,7 +280,7 @@ namespace MonoDevelop.Components.PropertyGrid
 			base.OnSizeAllocated (allocation);
 			int y = 0;
 			MeasureHeight (rows, ref y);
-			if (currentEditor != null && currentEditorRow != null)
+			if (currentEditor != null && currentEditorRow != null && children.ContainsKey (currentEditor))
 				children [currentEditor] = currentEditorRow.EditorBounds;
 			foreach (var cr in children) {
 				var r = cr.Value;
@@ -286,14 +293,14 @@ namespace MonoDevelop.Components.PropertyGrid
 			children [w] = rect;
 			QueueResize ();
 		}
-		
+
 		protected override void OnAdded (Gtk.Widget widget)
 		{
 			children.Add (widget, new Gdk.Rectangle (0,0,0,0));
 			widget.Parent = this;
 			QueueResize ();
 		}
-		
+
 		protected override void OnRemoved (Gtk.Widget widget)
 		{
 			children.Remove (widget);
@@ -338,16 +345,16 @@ namespace MonoDevelop.Components.PropertyGrid
 				int dx = (int)((double)Allocation.Width * dividerPosition);
 				ctx.LineWidth = 1;
 				ctx.Rectangle (0, 0, dx, Allocation.Height);
-				ctx.Color = LabelBackgroundColor;
+				ctx.SetSourceColor (LabelBackgroundColor);
 				ctx.Fill ();
 				ctx.Rectangle (dx, 0, Allocation.Width - dx, Allocation.Height);
-				ctx.Color = new Cairo.Color (1, 1, 1);
+				ctx.SetSourceRGB (1, 1, 1);
 				ctx.Fill ();
 				ctx.MoveTo (dx + 0.5, 0);
 				ctx.RelLineTo (0, Allocation.Height);
-				ctx.Color = DividerColor;
+				ctx.SetSourceColor (DividerColor);
 				ctx.Stroke ();
-	
+
 				int y = 0;
 				Draw (ctx, rows, dx, PropertyLeftPadding, ref y);
 			}
@@ -374,7 +381,7 @@ namespace MonoDevelop.Components.PropertyGrid
 					using (var gr = new LinearGradient (0, y, 0, rh)) {
 						gr.AddColorStop (0, new Cairo.Color (248d/255d, 248d/255d, 248d/255d));
 						gr.AddColorStop (1, new Cairo.Color (240d/255d, 240d/255d, 240d/255d));
-						ctx.Pattern = gr;
+						ctx.SetSource (gr);
 						ctx.Fill ();
 					}
 
@@ -384,16 +391,15 @@ namespace MonoDevelop.Components.PropertyGrid
 					}
 					ctx.MoveTo (0, y + rh - 0.5);
 					ctx.LineTo (Allocation.Width, y + rh - 0.5);
-					ctx.Color = DividerColor;
+					ctx.SetSourceColor (DividerColor);
 					ctx.Stroke ();
 
 					ctx.MoveTo (x, y + CategoryTopBottomPadding);
-					ctx.Color = CategoryLabelColor;
+					ctx.SetSourceColor (CategoryLabelColor);
 					Pango.CairoHelper.ShowLayout (ctx, layout);
 
 					var img = r.Expanded ? discloseUp : discloseDown;
-					CairoHelper.SetSourcePixbuf (ctx, img, Allocation.Width - img.Width - CategoryTopBottomPadding, y + (rh - img.Height) / 2);
-					ctx.Paint ();
+					ctx.DrawImage (this, img, Allocation.Width - img.Width - CategoryTopBottomPadding, y + Math.Round ((rh - img.Height) / 2));
 
 					y += rh;
 					lastCategory = r;
@@ -406,7 +412,7 @@ namespace MonoDevelop.Components.PropertyGrid
 					ctx.Rectangle (0, y, dividerX, h + PropertyTopBottomPadding*2);
 					ctx.Clip ();
 					ctx.MoveTo (x, y + PropertyTopBottomPadding);
-					ctx.Color = Style.Text (state).ToCairoColor ();
+					ctx.SetSourceColor (Style.Text (state).ToCairoColor ());
 					Pango.CairoHelper.ShowLayout (ctx, layout);
 					ctx.Restore ();
 
@@ -435,10 +441,10 @@ namespace MonoDevelop.Components.PropertyGrid
 						// Repaing the background because the cairo clip doesn't work for gdk primitives
 						int dx = (int)((double)Allocation.Width * dividerPosition);
 						ctx.Rectangle (0, y, dx, Allocation.Height - y);
-						ctx.Color = LabelBackgroundColor;
+						ctx.SetSourceColor (LabelBackgroundColor);
 						ctx.Fill ();
 						ctx.Rectangle (dx + 1, y, Allocation.Width - dx - 1, Allocation.Height - y);
-						ctx.Color = new Cairo.Color (1, 1, 1);
+						ctx.SetSourceRGB (1, 1, 1);
 						ctx.Fill ();
 					}
 				}
@@ -753,13 +759,13 @@ namespace MonoDevelop.Components.PropertyGrid
 		}
 	}
 
-	class InstanceData 
+	class InstanceData
 	{
-		public InstanceData (object instance) 
+		public InstanceData (object instance)
 		{
 			Instance = instance;
 		}
-		
+
 		public object Instance;
 	}
 }

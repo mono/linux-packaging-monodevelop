@@ -70,6 +70,11 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		/// </summary>
 		ShowBody = 0x200,
 		
+		/// <summary>
+		/// Use fully qualified names for members.
+		/// </summary>
+		UseFullyQualifiedEntityNames = 0x400,
+		
 		StandardConversionFlags = ShowParameterNames |
 			ShowAccessibility |
 			ShowParameterList |
@@ -79,15 +84,21 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			ShowDefinitionKeyword |
 			ShowBody,
 		
-		All = 0x3ff,
+		All = 0x7ff,
 	}
 	
+	/// <summary>
+	/// Ambiences are used to convert type system symbols to text (usually for displaying the symbol to the user; e.g. in editor tooltips).
+	/// </summary>
 	public interface IAmbience
 	{
 		ConversionFlags ConversionFlags { get; set; }
 		
+		[Obsolete("Use ConvertSymbol() instead")]
 		string ConvertEntity(IEntity entity);
+		string ConvertSymbol(ISymbol symbol);
 		string ConvertType(IType type);
+		[Obsolete("Use ConvertSymbol() instead")]
 		string ConvertVariable(IVariable variable);
 		string ConvertConstantValue(object constantValue);
 		

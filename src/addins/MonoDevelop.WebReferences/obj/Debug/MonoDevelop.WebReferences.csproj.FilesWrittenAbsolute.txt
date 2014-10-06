@@ -1,8 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.MonoDevelop.WebReferences.addin.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.MonoDevelop.WebReferences.Resources.disco.html
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.MonoDevelop.WebReferences.Resources.wsdl.html
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.MonoDevelop.WebReferences.Resources.WebReferenceItem.png
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.WebReferences/MonoDevelop.WebReferences.dll.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.WebReferences/MonoDevelop.WebReferences.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.dll.mdb

@@ -74,7 +74,14 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 		
 		public override IMember Specialize(TypeParameterSubstitution substitution)
 		{
+			if (TypeParameterSubstitution.Identity.Equals(substitution))
+				return this;
 			return new SpecializedField(this, substitution);
+		}
+		
+		IMemberReference IField.ToReference()
+		{
+			return (IMemberReference)ToReference();
 		}
 	}
 }

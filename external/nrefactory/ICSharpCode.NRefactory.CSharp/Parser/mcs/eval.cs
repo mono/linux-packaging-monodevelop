@@ -25,6 +25,11 @@ namespace Mono.CSharp
 {
 
 	/// <summary>
+	/// Experimental!
+	/// </summary>
+	public delegate void ValueModificationHandler (string variableName, int row, int column, object value);
+
+	/// <summary>
 	///   Evaluator: provides an API to evaluate C# statements and
 	///   expressions dynamically.
 	/// </summary>
@@ -71,6 +76,8 @@ namespace Mono.CSharp
 		readonly ModuleContainer module;
 		readonly ReflectionImporter importer;
 		readonly CompilationSourceFile source_file;
+
+		int? listener_id;
 		
 		public Evaluator (CompilerContext ctx)
 		{
@@ -288,6 +295,30 @@ namespace Mono.CSharp
 			return compiled;
 		}
 
+		static MethodInfo listener_proxy_value;
+		internal void EmitValueChangedCallback (EmitContext ec, string name, TypeSpec type, Location loc)
+		{
+			if (listener_id == null)
+				listener_id = ListenerProxy.Register (ModificationListener);
+
+			if (listener_proxy_value == null)
+				listener_proxy_value = typeof (ListenerProxy).GetMethod ("ValueChanged");
+
+#if STATIC
+			throw new NotSupportedException ();
+#else
+			// object value, int row, int col, string name, int listenerId
+			if (type.IsStructOrEnum)
+				ec.Emit (OpCodes.Box, type);
+
+			ec.EmitInt (loc.Row);
+			ec.EmitInt (loc.Column);
+			ec.Emit (OpCodes.Ldstr, name);
+			ec.EmitInt (listener_id.Value);
+			ec.Emit (OpCodes.Call, listener_proxy_value);
+#endif
+		}
+
 		/// <summary>
 		///   Evaluates and expression or statement and returns any result values.
 		/// </summary>
@@ -338,6 +369,11 @@ namespace Mono.CSharp
 				Console.WriteLine ("Interrupted!\n{0}", e);
 			} finally {
 				invoking = false;
+
+				if (listener_id != null) {
+					ListenerProxy.Unregister (listener_id.Value);
+					listener_id = null;
+				}
 			}
 
 			//
@@ -367,8 +403,14 @@ namespace Mono.CSharp
 				if (parser == null){
 					return null;
 				}
-				
-				Class parser_result = parser.InteractiveResult;
+
+				Class host = parser.InteractiveResult;
+
+				var base_class_imported = importer.ImportType (base_class);
+				var baseclass_list = new List<FullNamedExpression> (1) {
+					new TypeExpression (base_class_imported, host.Location)
+				};
+				host.SetBaseTypes (baseclass_list);
 
 #if NET_4_0
 				var access = AssemblyBuilderAccess.RunAndCollect;
@@ -380,13 +422,15 @@ namespace Mono.CSharp
 				module.SetDeclaringAssembly (a);
 
 				// Need to setup MemberCache
-				parser_result.CreateContainer ();
+				host.CreateContainer ();
+				// Need to setup base type
+				host.DefineContainer ();
 
-				var method = parser_result.Members[0] as Method;
+				var method = host.Members[0] as Method;
 				BlockContext bc = new BlockContext (method, method.Block, ctx.BuiltinTypes.Void);
 
 				try {
-					method.Block.Resolve (null, bc, method);
+					method.Block.Resolve (bc, method);
 				} catch (CompletionResult cr) {
 					prefix = cr.BaseText;
 					return cr.Result;
@@ -437,6 +481,11 @@ namespace Mono.CSharp
 			return result;
 		}
 
+		/// <summary>
+		/// Experimental!
+		/// </summary>
+		public ValueModificationHandler ModificationListener { get; set; }
+
 		enum InputKind {
 			EOF,
 			StatementOrExpression,
@@ -456,7 +505,7 @@ namespace Mono.CSharp
 		//
 		InputKind ToplevelOrStatement (SeekableStreamReader seekable)
 		{
-			Tokenizer tokenizer = new Tokenizer (seekable, source_file, new ParserSession ());
+			Tokenizer tokenizer = new Tokenizer (seekable, source_file, new ParserSession (), ctx.Report);
 			
 			// Prefer contextual block keywords over identifiers
 			tokenizer.parsing_block++;
@@ -726,6 +775,7 @@ namespace Mono.CSharp
 			}
 			
 			module.EmitContainer ();
+
 			if (Report.Errors != 0){
 				if (undo != null)
 					undo.ExecuteUndo ();
@@ -1035,9 +1085,7 @@ namespace Mono.CSharp
 		static public string help {
 			get {
 				return "Static methods:\n" +
-#if !NET_2_1
 					"  Describe (object);       - Describes the object's type\n" +
-#endif
 					"  LoadPackage (package);   - Loads the given Package (like -pkg:FILE)\n" +
 					"  LoadAssembly (assembly); - Loads the given assembly (like -r:ASSEMBLY)\n" +
 					"  ShowVars ();             - Shows defined local variables.\n" +
@@ -1213,10 +1261,6 @@ namespace Mono.CSharp
 	public class Undo
 	{
 		List<Action> undo_actions;
-		
-		public Undo ()
-		{
-		}
 
 		public void AddTypeContainer (TypeContainer current_container, TypeDefinition tc)
 		{
@@ -1228,10 +1272,13 @@ namespace Mono.CSharp
 			if (undo_actions == null)
 				undo_actions = new List<Action> ();
 
-			var existing = current_container.Containers.FirstOrDefault (l => l.Basename == tc.Basename);
-			if (existing != null) {
-				current_container.RemoveContainer (existing);
-				undo_actions.Add (() => current_container.AddTypeContainer (existing));
+			if (current_container.Containers != null)
+			{
+				var existing = current_container.Containers.FirstOrDefault (l => l.Basename == tc.Basename);
+				if (existing != null) {
+					current_container.RemoveContainer (existing);
+					undo_actions.Add (() => current_container.AddTypeContainer (existing));
+				}
 			}
 
 			undo_actions.Add (() => current_container.RemoveContainer (tc));
@@ -1249,5 +1296,38 @@ namespace Mono.CSharp
 			undo_actions = null;
 		}
 	}
-	
+
+	static class ListenerProxy
+	{
+		static readonly Dictionary<int, ValueModificationHandler> listeners = new Dictionary<int, ValueModificationHandler> ();
+
+		static int counter;
+
+		public static int Register (ValueModificationHandler listener)
+		{
+			lock (listeners) {
+				var id = counter++;
+				listeners.Add (id, listener);
+				return id;
+			}
+		}
+
+		public static void Unregister (int listenerId)
+		{
+			lock (listeners) {
+				listeners.Remove (listenerId);
+			}
+		}
+
+		public static void ValueChanged (object value, int row, int col, string name, int listenerId)
+		{
+			ValueModificationHandler action;
+			lock (listeners) {
+				if (!listeners.TryGetValue (listenerId, out action))
+					return;
+			}
+
+			action (name, row, col, value);
+		}
+	}
 }

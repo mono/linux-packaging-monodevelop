@@ -73,7 +73,7 @@ namespace Mono.Debugging.Client
 			return false;
 		}
 
-		List<BreakEvent> breakpoints = new List<BreakEvent> ();
+		readonly List<BreakEvent> breakpoints = new List<BreakEvent> ();
 		
 		public int Count {
 			get {
@@ -83,8 +83,8 @@ namespace Mono.Debugging.Client
 
 		public bool IsReadOnly {
 			get {
-				ReadOnlyCheckEventArgs args = new ReadOnlyCheckEventArgs ();
-				EventHandler<ReadOnlyCheckEventArgs> checkingReadOnly = CheckingReadOnly;
+				var args = new ReadOnlyCheckEventArgs ();
+				var checkingReadOnly = CheckingReadOnly;
 				if (checkingReadOnly != null)
 					checkingReadOnly (this, args);
 				return args.IsReadOnly;
@@ -103,10 +103,19 @@ namespace Mono.Debugging.Client
 		
 		public Breakpoint Add (string filename, int line, int column, bool activate)
 		{
+			if (filename == null)
+				throw new ArgumentNullException ("filename");
+
+			if (line < 1)
+				throw new ArgumentOutOfRangeException ("line");
+
+			if (column < 1)
+				throw new ArgumentOutOfRangeException ("column");
+
 			if (IsReadOnly)
 				return null;
 
-			Breakpoint bp = new Breakpoint (filename, line, column);
+			var bp = new Breakpoint (filename, line, column);
 			Add (bp);
 
 			return bp;
@@ -119,6 +128,9 @@ namespace Mono.Debugging.Client
 		
 		public bool Add (BreakEvent bp)
 		{
+			if (bp == null)
+				throw new ArgumentNullException ("bp");
+
 			if (IsReadOnly)
 				return false;
 
@@ -131,10 +143,13 @@ namespace Mono.Debugging.Client
 		
 		public Catchpoint AddCatchpoint (string exceptionName)
 		{
+			if (exceptionName == null)
+				throw new ArgumentNullException ("exceptionName");
+
 			if (IsReadOnly)
 				return null;
 
-			Catchpoint cp = new Catchpoint (exceptionName);
+			var cp = new Catchpoint (exceptionName);
 			Add (cp);
 
 			return cp;
@@ -142,13 +157,17 @@ namespace Mono.Debugging.Client
 		
 		public bool Remove (string filename, int line, int column)
 		{
+			if (filename == null)
+				throw new ArgumentNullException ("filename");
+
 			if (IsReadOnly)
 				return false;
 
 			filename = Path.GetFullPath (filename);
 			
-			for (int n=0; n<breakpoints.Count; n++) {
-				Breakpoint bp = breakpoints [n] as Breakpoint;
+			for (int n = 0; n < breakpoints.Count; n++) {
+				var bp = breakpoints[n] as Breakpoint;
+
 				if (bp != null && FileNameEquals (bp.FileName, filename) &&
 				    (bp.OriginalLine == line || bp.Line == line) &&
 				    (bp.OriginalColumn == column || bp.Column == column)) {
@@ -162,11 +181,15 @@ namespace Mono.Debugging.Client
 		
 		public bool RemoveCatchpoint (string exceptionName)
 		{
+			if (exceptionName == null)
+				throw new ArgumentNullException ("exceptionName");
+
 			if (IsReadOnly)
 				return false;
 
-			for (int n=0; n<breakpoints.Count; n++) {
-				Catchpoint cp = breakpoints [n] as Catchpoint;
+			for (int n = 0; n < breakpoints.Count; n++) {
+				var cp = breakpoints[n] as Catchpoint;
+
 				if (cp != null && cp.ExceptionName == exceptionName) {
 					breakpoints.RemoveAt (n);
 					OnBreakEventRemoved (cp);
@@ -175,9 +198,28 @@ namespace Mono.Debugging.Client
 			}
 			return true;
 		}
+
+		public void RemoveRunToCursorBreakpoints ()
+		{
+			if (IsReadOnly)
+				return;
+
+			for (int n = 0; n < breakpoints.Count; n++) {
+				var bp = breakpoints[n] as RunToCursorBreakpoint;
+
+				if (bp != null) {
+					breakpoints.RemoveAt (n);
+					OnBreakEventRemoved (bp);
+					n--;
+				}
+			}
+		}
 		
 		public bool Remove (BreakEvent bp)
 		{
+			if (bp == null)
+				throw new ArgumentNullException ("bp");
+
 			if (!IsReadOnly && breakpoints.Remove (bp)) {
 				OnBreakEventRemoved (bp);
 				return true;
@@ -188,10 +230,19 @@ namespace Mono.Debugging.Client
 		
 		public Breakpoint Toggle (string filename, int line, int column)
 		{
+			if (filename == null)
+				throw new ArgumentNullException ("filename");
+
+			if (line < 1)
+				throw new ArgumentOutOfRangeException ("line");
+
+			if (column < 1)
+				throw new ArgumentOutOfRangeException ("column");
+
 			if (IsReadOnly)
 				return null;
 			
-			ReadOnlyCollection<Breakpoint> col = GetBreakpointsAtFileLine (filename, line);
+			var col = GetBreakpointsAtFileLine (filename, line);
 			if (col.Count > 0) {
 				// Remove only the most-recently-added breakpoint on the specified line
 				Remove (col[col.Count - 1]);
@@ -200,30 +251,35 @@ namespace Mono.Debugging.Client
 
 			return Add (filename, line, column);
 		}
-		
+
+		public ReadOnlyCollection<BreakEvent> GetBreakevents ()
+		{
+			return breakpoints.AsReadOnly ();
+		}
+
 		public ReadOnlyCollection<Breakpoint> GetBreakpoints ()
 		{
-			List<Breakpoint> list = new List<Breakpoint> ();
-			foreach (BreakEvent be in breakpoints) {
-				if (be is Breakpoint)
-					list.Add ((Breakpoint)be);
+			var list = new List<Breakpoint> ();
+
+			foreach (var bp in breakpoints.OfType<Breakpoint> ()) {
+				if (!(bp is RunToCursorBreakpoint))
+					list.Add (bp);
 			}
+
 			return list.AsReadOnly ();
 		}
 		
 		public ReadOnlyCollection<Catchpoint> GetCatchpoints ()
 		{
-			List<Catchpoint> list = new List<Catchpoint> ();
-			foreach (BreakEvent be in breakpoints) {
-				if (be is Catchpoint)
-					list.Add ((Catchpoint) be);
-			}
-			return list.AsReadOnly ();
+			return breakpoints.OfType<Catchpoint> ().ToList ().AsReadOnly ();
 		}
 		
 		public ReadOnlyCollection<Breakpoint> GetBreakpointsAtFile (string filename)
 		{
-			List<Breakpoint> list = new List<Breakpoint> ();
+			if (filename == null)
+				throw new ArgumentNullException ("filename");
+
+			var list = new List<Breakpoint> ();
 			
 			try {
 				filename = Path.GetFullPath (filename);
@@ -231,9 +287,8 @@ namespace Mono.Debugging.Client
 				return list.AsReadOnly ();
 			}
 			
-			foreach (BreakEvent be in breakpoints) {
-				Breakpoint bp = be as Breakpoint;
-				if (bp != null && FileNameEquals (bp.FileName, filename))
+			foreach (var bp in breakpoints.OfType<Breakpoint> ()) {
+				if (!(bp is RunToCursorBreakpoint) && FileNameEquals (bp.FileName, filename))
 					list.Add (bp);
 			}
 			
@@ -242,7 +297,10 @@ namespace Mono.Debugging.Client
 		
 		public ReadOnlyCollection<Breakpoint> GetBreakpointsAtFileLine (string filename, int line)
 		{
-			List<Breakpoint> list = new List<Breakpoint> ();
+			if (filename == null)
+				throw new ArgumentNullException ("filename");
+
+			var list = new List<Breakpoint> ();
 			
 			try {
 				filename = Path.GetFullPath (filename);
@@ -250,9 +308,8 @@ namespace Mono.Debugging.Client
 				return list.AsReadOnly ();
 			}
 			
-			foreach (BreakEvent be in breakpoints) {
-				Breakpoint bp = be as Breakpoint;
-				if (bp != null && FileNameEquals (bp.FileName, filename) && (bp.OriginalLine == line || bp.Line == line))
+			foreach (var bp in breakpoints.OfType<Breakpoint> ()) {
+				if (!(bp is RunToCursorBreakpoint) && FileNameEquals (bp.FileName, filename) && (bp.OriginalLine == line || bp.Line == line))
 					list.Add (bp);
 			}
 			
@@ -271,20 +328,21 @@ namespace Mono.Debugging.Client
 
 		public void Clear ()
 		{
-			List<BreakEvent> oldList = new List<BreakEvent> (breakpoints);
+			var oldList = new List<BreakEvent> (breakpoints);
+
 			foreach (BreakEvent bp in oldList)
 				Remove (bp);
 		}
 
 		public void ClearBreakpoints ()
 		{
-			foreach (Breakpoint bp in GetBreakpoints ())
+			foreach (var bp in GetBreakpoints ())
 				Remove (bp);
 		}
 
 		public void ClearCatchpoints ()
 		{
-			foreach (Catchpoint bp in GetCatchpoints ())
+			foreach (var bp in GetCatchpoints ())
 				Remove (bp);
 		}
 
@@ -317,12 +375,12 @@ namespace Mono.Debugging.Client
 			NotifyBreakEventChanged (bp);
 		}
 		
-		internal void ResetAdjustedBreakpoints ()
+		internal void ResetBreakpoints ()
 		{
 			if (IsReadOnly)
 				return;
 			
-			foreach (Breakpoint bp in breakpoints.OfType<Breakpoint> ().ToArray ()) {
+			foreach (var bp in breakpoints.ToArray ()) {
 				if (bp.Reset ())
 					NotifyBreakEventChanged (bp);
 			}
@@ -375,6 +433,12 @@ namespace Mono.Debugging.Client
 
 		public static bool FileNameEquals (string file1, string file2)
 		{
+			if (file1 == null)
+				return file2 == null;
+
+			if (file2 == null)
+				return false;
+
 			if (PathComparer.Compare (file1, file2) == 0)
 				return true;
 
@@ -403,7 +467,7 @@ namespace Mono.Debugging.Client
 			OnChanged ();
 			EventHandler<BreakEventArgs> breakEventAdded = BreakEventAdded;
 			if (breakEventAdded != null)
-				breakEventAdded (this, new BreakEventArgs ((BreakEvent)be));
+				breakEventAdded (this, new BreakEventArgs (be));
 			if (be is Breakpoint) {
 				EventHandler<BreakpointEventArgs> breakpointAdded = BreakpointAdded;
 				if (breakpointAdded != null)
@@ -420,7 +484,7 @@ namespace Mono.Debugging.Client
 			OnChanged ();
 			EventHandler<BreakEventArgs> breakEventRemoved = BreakEventRemoved;
 			if (breakEventRemoved != null)
-				breakEventRemoved (this, new BreakEventArgs ((BreakEvent)be));
+				breakEventRemoved (this, new BreakEventArgs (be));
 			if (be is Breakpoint) {
 				EventHandler<BreakpointEventArgs> breakpointRemoved = BreakpointRemoved;
 				if (breakpointRemoved != null)
@@ -444,7 +508,7 @@ namespace Mono.Debugging.Client
 			try {
 				EventHandler<BreakEventArgs> breakEventStatusChanged = BreakEventStatusChanged;
 				if (breakEventStatusChanged != null)
-					breakEventStatusChanged (this, new BreakEventArgs ((BreakEvent)be));
+					breakEventStatusChanged (this, new BreakEventArgs (be));
 				if (be is Breakpoint) {
 					EventHandler<BreakpointEventArgs> breakpointStatusChanged = BreakpointStatusChanged;
 					if (breakpointStatusChanged != null)
@@ -464,7 +528,7 @@ namespace Mono.Debugging.Client
 			try {
 				EventHandler<BreakEventArgs> breakEventModified = BreakEventModified;
 				if (breakEventModified != null)
-					breakEventModified (this, new BreakEventArgs ((BreakEvent)be));
+					breakEventModified (this, new BreakEventArgs (be));
 				if (be is Breakpoint) {
 					EventHandler<BreakpointEventArgs > breakpointModified = BreakpointModified;
 					if (breakpointModified != null)
@@ -482,10 +546,11 @@ namespace Mono.Debugging.Client
 		
 		internal void NotifyBreakEventUpdated (BreakEvent be)
 		{
+
 			try {
 				EventHandler<BreakEventArgs> breakEventUpdated = BreakEventUpdated;
 				if (breakEventUpdated != null)
-					breakEventUpdated (this, new BreakEventArgs ((BreakEvent)be));
+					breakEventUpdated (this, new BreakEventArgs (be));
 				if (be is Breakpoint) {
 					EventHandler<BreakpointEventArgs> breakpointUpdated = BreakpointUpdated;
 					if (breakpointUpdated != null)

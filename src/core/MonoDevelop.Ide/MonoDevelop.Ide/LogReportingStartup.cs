@@ -41,13 +41,8 @@ namespace MonoDevelop.Ide
 
 		protected override void Run ()
 		{
-			System.Threading.ThreadPool.QueueUserWorkItem (delegate {
-				// Process cached crash reports if there are any and uploading is enabled
-				LogReportingService.ProcessCache ();
-			});
-			
 			// Attach a handler for when exceptions need to be processed
-			LogReportingService.UnhandledErrorOccured = (enabled, ex, willShutdown) => {
+			LoggingService.UnhandledErrorOccured = (enabled, ex, willShutdown) => {
 				var doNotSend = new AlertButton (GettextCatalog.GetString ("Do _Not Send"));
 				var sendOnce = new AlertButton (GettextCatalog.GetString ("_Send This Time"));
 				var alwaysSend = new AlertButton (GettextCatalog.GetString ("_Always Send"));

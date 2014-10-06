@@ -1,3 +1,33 @@
+//
+// CommitDialog.cs
+//
+// Authors:
+//       Thiago Becker    (GSoC)
+//       Rafael Giorgetti (GSoC)
+//       Lluis Sanchez Gual <lluis@novell.com>
+//       Michael Hutchinson  <mhutchinson@novell.com>
+//       Ungureanu Marius <teromario@yahoo.com>
+//
+// Copyright (c) 2006-2011 Novell, Inc (http://www.novell.com)
+// Copyright (c) 2013 Xamarin (http://www.xamarin.com)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
 
 using System;
 using System.Collections;
@@ -8,6 +38,7 @@ using MonoDevelop.Ide.Gui;
 using Mono.Addins;
 using MonoDevelop.Ide;
 using MonoDevelop.Projects;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.VersionControl.Dialogs
 {
@@ -18,24 +49,25 @@ namespace MonoDevelop.VersionControl.Dialogs
 		ArrayList extensions = new ArrayList ();
 		ChangeSet changeSet;
 		string oldMessage;
+		bool responseSensitive;
 
 		public CommitDialog (ChangeSet changeSet)
 		{
 			Build ();
 
-			store = new ListStore(typeof (Gdk.Pixbuf), typeof (string), typeof (string), typeof(bool), typeof(object));
+			store = new ListStore(typeof (Xwt.Drawing.Image), typeof (string), typeof (string), typeof(bool), typeof(object));
 			fileList.Model = store;
 			this.changeSet = changeSet;
 			oldMessage = changeSet.GlobalComment;
 
 			CellRendererText crt = new CellRendererText ();
-			var crp = new CellRendererPixbuf ();
+			var crp = new CellRendererImage ();
 			TreeViewColumn colStatus = new TreeViewColumn ();
 			colStatus.Title = GettextCatalog.GetString ("Status");
 			colStatus.PackStart (crp, false);
 			colStatus.PackStart (crt, true);
 			colStatus.Spacing = 2;
-			colStatus.AddAttribute (crp, "pixbuf", 0);
+			colStatus.AddAttribute (crp, "image", 0);
 			colStatus.AddAttribute (crt, "text", 1);
 			CellRendererToggle cellToggle = new CellRendererToggle();
 			cellToggle.Toggled += new ToggledHandler(OnCommitToggledHandler);
@@ -58,6 +90,7 @@ namespace MonoDevelop.VersionControl.Dialogs
 					continue;
 				}
 				if (ext.Initialize (changeSet)) {
+					ext.CommitMessageTextViewHook (textview);
 					if (separatorRequired) {
 						HSeparator sep = new HSeparator ();
 						sep.Show ();
@@ -73,7 +106,7 @@ namespace MonoDevelop.VersionControl.Dialogs
 			HandleAllowCommitChanged (null, null);
 
 			foreach (ChangeSetItem info in changeSet.Items) {
-				Gdk.Pixbuf statusicon = VersionControlService.LoadIconForStatus (info.Status);
+				Xwt.Drawing.Image statusicon = VersionControlService.LoadIconForStatus (info.Status);
 				string lstatus = VersionControlService.GetStatusLabel (info.Status);
 				string localpath;
 
@@ -100,6 +133,7 @@ namespace MonoDevelop.VersionControl.Dialogs
 				Message = changeSet.GlobalComment;
 				
 			textview.Buffer.Changed += OnTextChanged;
+			responseSensitive = !string.IsNullOrEmpty (Message);
 			
 			// Focus the text view and move the insert point to the beginning. Makes it easier to insert
 			// a comment header.
@@ -107,11 +141,13 @@ namespace MonoDevelop.VersionControl.Dialogs
 			textview.Buffer.MoveMark (textview.Buffer.SelectionBound, textview.Buffer.StartIter);
 			textview.GrabFocus ();
 			textview.Buffer.MarkSet += OnMarkSet;
+
+			SetResponseSensitive (ResponseType.Ok, responseSensitive);
 		}
 
 		void HandleAllowCommitChanged (object sender, EventArgs e)
 		{
-			bool allowCommit = true;
+			bool allowCommit = responseSensitive;
 			foreach (CommitDialogExtension ext in extensions)
 				allowCommit &= ext.AllowCommit;
 			SetResponseSensitive (Gtk.ResponseType.Ok, allowCommit);
@@ -121,11 +157,23 @@ namespace MonoDevelop.VersionControl.Dialogs
 		{
 			if (type != Gtk.ResponseType.Ok) {
 				changeSet.GlobalComment = oldMessage;
-			}
+			} else if (!ButtonCommitClicked ())
+				return;
+
 			base.OnResponse (type);
 		}
 
-		protected void OnButtonCommitClicked (object sender, System.EventArgs e)
+		protected override void OnDestroyed ()
+		{
+			foreach (var ob in extensions) {
+				var ext = ob as CommitDialogExtension;
+				if (ext != null)
+					ext.Destroy ();
+			}
+			base.OnDestroyed ();
+		}
+
+		bool ButtonCommitClicked ()
 		{
 			// In case we have local unsaved files with changes, throw a dialog for the user.
 			System.Collections.Generic.List<Document> docList = new System.Collections.Generic.List<Document> ();
@@ -148,7 +196,7 @@ namespace MonoDevelop.VersionControl.Dialogs
 				);
 
 				if (response == AlertButton.Cancel)
-					return;
+					return false;
 
 				if (response == AlertButton.Save) {
 					// Go through all the items and save them.
@@ -160,7 +208,7 @@ namespace MonoDevelop.VersionControl.Dialogs
 						if (item.IsDirty) {
 							MessageService.ShowMessage (GettextCatalog.GetString (
 								"Some files could not be saved. Commit operation aborted"));
-							return;
+							return false;
 						}
 				}
 
@@ -189,7 +237,6 @@ namespace MonoDevelop.VersionControl.Dialogs
 					MessageService.ShowException (ex);
 					res = false;
 				}
-				System.Console.WriteLine ("RES: " + res);
 				if (!res) {
 					// Commit failed. Rollback the previous extensions
 					for (int m=0; m<n; m++) {
@@ -198,11 +245,10 @@ namespace MonoDevelop.VersionControl.Dialogs
 							ext.OnEndCommit (changeSet, false);
 						} catch {}
 					}
-					return;
+					return false;
 				}
-				Hide ();
 			}
-			Respond (Gtk.ResponseType.Ok);
+			return true;
 		}
 
 		void UpdatePositionLabel (TextIter iter)
@@ -223,6 +269,8 @@ namespace MonoDevelop.VersionControl.Dialogs
 		void OnTextChanged (object s, EventArgs args)
 		{
 			changeSet.GlobalComment = Message;
+			responseSensitive = !string.IsNullOrEmpty (Message);
+			SetResponseSensitive (ResponseType.Ok, responseSensitive);
 			UpdatePositionLabel (textview.Buffer.GetIterAtOffset (textview.Buffer.CursorPosition));
 		}
 		

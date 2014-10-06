@@ -45,7 +45,7 @@ namespace MonoDevelop.Components.Docking
 		ExtendedLabel labelWidget;
 		int labelWidth;
 		DockVisualStyle visualStyle;
-		Image tabIcon;
+		Gtk.Widget tabIcon;
 		DockFrame frame;
 		string label;
 		ImageButton btnDock;
@@ -56,9 +56,11 @@ namespace MonoDevelop.Components.Docking
 
 		static Gdk.Cursor fleurCursor = new Gdk.Cursor (Gdk.CursorType.Fleur);
 
-		static Gdk.Pixbuf pixClose;
-		static Gdk.Pixbuf pixAutoHide;
-		static Gdk.Pixbuf pixDock;
+		static Xwt.Drawing.Image pixClose;
+		static Xwt.Drawing.Image pixAutoHide;
+		static Xwt.Drawing.Image pixDock;
+
+		static double PixelScale = GtkWorkarounds.GetPixelScale ();
 
 		const int TopPadding = 5;
 		const int BottomPadding = 7;
@@ -69,9 +71,9 @@ namespace MonoDevelop.Components.Docking
 
 		static DockItemTitleTab ()
 		{
-			pixClose = Gdk.Pixbuf.LoadFromResource ("stock-close-12.png");
-			pixAutoHide = Gdk.Pixbuf.LoadFromResource ("stock-auto-hide.png");
-			pixDock = Gdk.Pixbuf.LoadFromResource ("stock-dock.png");
+			pixClose = Xwt.Drawing.Image.FromResource ("pad-close-light-9.png");
+			pixAutoHide = Xwt.Drawing.Image.FromResource ("pad-minimize-light-9.png");
+			pixDock = Xwt.Drawing.Image.FromResource ("pad-dock-light-9.png");
 		}
 		
 		public DockItemTitleTab (DockItem item, DockFrame frame)
@@ -126,10 +128,10 @@ namespace MonoDevelop.Components.Docking
 			WidthRequest = r;
 
 			if (visualStyle != null)
-				HeightRequest = visualStyle.PadTitleHeight != null ? visualStyle.PadTitleHeight.Value : -1;
+				HeightRequest = visualStyle.PadTitleHeight != null ? (int)(visualStyle.PadTitleHeight.Value * PixelScale) : -1;
 		}
 
-		public void SetLabel (Gtk.Widget page, Gdk.Pixbuf icon, string label)
+		public void SetLabel (Gtk.Widget page, Xwt.Drawing.Image icon, string label)
 		{
 			this.label = label;
 			this.page = page;
@@ -143,7 +145,7 @@ namespace MonoDevelop.Components.Docking
 			box.Spacing = 2;
 			
 			if (icon != null) {
-				tabIcon = new Gtk.Image (icon);
+				tabIcon = new Xwt.ImageView (icon).ToGtkWidget ();
 				tabIcon.Show ();
 				box.PackStart (tabIcon, false, false, 0);
 			} else
@@ -410,9 +412,9 @@ namespace MonoDevelop.Components.Docking
 			var alloc = Allocation;
 
 			Gdk.GC bgc = new Gdk.GC (GdkWindow);
-			var c = new HslColor (VisualStyle.PadBackgroundColor.Value);
-			c.L *= 0.7;
-			bgc.RgbFgColor = c;
+			var c = VisualStyle.PadBackgroundColor.Value.ToXwtColor ();
+			c.Light *= 0.7;
+			bgc.RgbFgColor = c.ToGdkColor ();
 			bool first = true;
 			bool last = true;
 			TabStrip tabStrip = null;
@@ -454,13 +456,13 @@ namespace MonoDevelop.Components.Docking
 				using (var g = new Cairo.LinearGradient (x, y + 1, x, y + Allocation.Height - 1)) {
 					g.AddColorStop (0, Styles.DockTabBarGradientStart);
 					g.AddColorStop (1, Styles.DockTabBarGradientEnd);
-					ctx.Pattern = g;
+					ctx.SetSource (g);
 					ctx.Fill ();
 				}
 
 				ctx.MoveTo (x + 0.5, y + 0.5);
 				ctx.LineTo (x + Allocation.Width - 0.5d, y + 0.5);
-				ctx.Color = Styles.DockTabBarGradientTop;
+				ctx.SetSourceColor (Styles.DockTabBarGradientTop);
 				ctx.Stroke ();
 
 				if (active) {
@@ -470,7 +472,7 @@ namespace MonoDevelop.Components.Docking
 						g.AddColorStop (0, new Cairo.Color (0, 0, 0, 0.01));
 						g.AddColorStop (0.5, new Cairo.Color (0, 0, 0, 0.08));
 						g.AddColorStop (1, new Cairo.Color (0, 0, 0, 0.01));
-						ctx.Pattern = g;
+						ctx.SetSource (g);
 						ctx.Fill ();
 					}
 

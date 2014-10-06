@@ -332,22 +332,68 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 			public ICompilation Compilation {
 				get { return compilation; }
 			}
-			
+	
 			public bool InternalsVisibleTo(IAssembly assembly)
 			{
-				return assembly == this;
+				if (this == assembly)
+					return true;
+				foreach (string shortName in GetInternalsVisibleTo()) {
+					if (assembly.AssemblyName == shortName)
+						return true;
+				}
+				return false;
 			}
-			
+
+			volatile string[] internalsVisibleTo;
+
+			string[] GetInternalsVisibleTo()
+			{
+				var result = this.internalsVisibleTo;
+				if (result != null) {
+					return result;
+				} else {
+					using (var busyLock = BusyManager.Enter(this)) {
+						Debug.Assert(busyLock.Success);
+						if (!busyLock.Success) {
+							return new string[0];
+						}
+						internalsVisibleTo = (
+							from attr in this.AssemblyAttributes
+							where attr.AttributeType.Name == "InternalsVisibleToAttribute"
+							&& attr.AttributeType.Namespace == "System.Runtime.CompilerServices"
+							&& attr.PositionalArguments.Count == 1
+							select GetShortName(attr.PositionalArguments.Single().ConstantValue as string)
+						).ToArray();
+					}
+					return internalsVisibleTo;
+				}
+			}
+
+			static string GetShortName(string fullAssemblyName)
+			{
+				if (fullAssemblyName == null)
+					return null;
+				int pos = fullAssemblyName.IndexOf(',');
+				if (pos < 0)
+					return fullAssemblyName;
+				else
+					return fullAssemblyName.Substring(0, pos);
+			}
+
 			public ITypeDefinition GetTypeDefinition(TopLevelTypeName topLevelTypeName)
 			{
 				IUnresolvedTypeDefinition td;
 				ITypeReference typeRef;
 				if (unresolvedAssembly.typeDefinitions.TryGetValue(topLevelTypeName, out td))
 					return GetTypeDefinition(td);
-				else if (unresolvedAssembly.typeForwarders.TryGetValue(topLevelTypeName, out typeRef))
-					return typeRef.Resolve(compilation.TypeResolveContext).GetDefinition();
-				else
-					return null;
+				if (unresolvedAssembly.typeForwarders.TryGetValue(topLevelTypeName, out typeRef)) {
+					// Protect against cyclic type forwarders:
+					using (var busyLock = BusyManager.Enter(typeRef)) {
+						if (busyLock.Success)
+							return typeRef.Resolve(compilation.TypeResolveContext).GetDefinition();
+					}
+				}
+				return null;
 			}
 			
 			ITypeDefinition GetTypeDefinition(IUnresolvedTypeDefinition unresolved)
@@ -462,7 +508,68 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 					else
 						return null;
 				}
+				
+				public ISymbolReference ToReference()
+				{
+					return new NamespaceReference(new DefaultAssemblyReference(assembly.AssemblyName), ns.FullName);
+				}
 			}
+		}
+	}
+	
+	public sealed class NamespaceReference : ISymbolReference
+	{
+		IAssemblyReference assemblyReference;
+		string fullName;
+		
+		public NamespaceReference(IAssemblyReference assemblyReference, string fullName)
+		{
+			if (assemblyReference == null)
+				throw new ArgumentNullException("assemblyReference");
+			this.assemblyReference = assemblyReference;
+			this.fullName = fullName;
+		}
+		
+		public ISymbol Resolve(ITypeResolveContext context)
+		{
+			IAssembly assembly = assemblyReference.Resolve(context);
+			INamespace parent = assembly.RootNamespace;
+			
+			string[] parts = fullName.Split('.');
+			
+			int i = 0;
+			while (i < parts.Length && parent != null) {
+				parent = parent.GetChildNamespace(parts[i]);
+				i++;
+			}
+			
+			return parent;
+		}
+	}
+	
+	public sealed class MergedNamespaceReference : ISymbolReference
+	{
+		string externAlias;
+		string fullName;
+		
+		public MergedNamespaceReference(string externAlias, string fullName)
+		{
+			this.externAlias = externAlias;
+			this.fullName = fullName;
+		}
+		
+		public ISymbol Resolve(ITypeResolveContext context)
+		{
+			string[] parts = fullName.Split('.');
+			INamespace parent = context.Compilation.GetNamespaceForExternAlias(externAlias);
+			
+			int i = 0;
+			while (i < parts.Length && parent != null) {
+				parent = parent.GetChildNamespace(parts[i]);
+				i++;
+			}
+			
+			return parent;
 		}
 	}
 }

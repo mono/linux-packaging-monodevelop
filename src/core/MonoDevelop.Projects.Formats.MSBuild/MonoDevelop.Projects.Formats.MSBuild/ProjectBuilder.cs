@@ -25,32 +25,33 @@
 // THE SOFTWARE.
 
 using System;
-using System.Threading;
 using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Runtime.Remoting;
 using Microsoft.Build.BuildEngine;
 using Microsoft.Build.Framework;
 using System.Collections.Generic;
 using System.Collections;
+using System.Reflection;
+
+//this is the builder for the deprecated build engine API
+using System.Linq;
+
+
+#pragma warning disable 618
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
 	public class ProjectBuilder: MarshalByRefObject, IProjectBuilder
 	{
-		Engine engine;
-		string file;
+		readonly string file;
 		ILogWriter currentLogWriter;
-		MDConsoleLogger consoleLogger;
-		BuildEngine buildEngine;
+		readonly MDConsoleLogger consoleLogger;
+		readonly BuildEngine buildEngine;
 
-		public ProjectBuilder (BuildEngine buildEngine, Engine engine, string file)
+		public ProjectBuilder (BuildEngine buildEngine, string file)
 		{
 			this.file = file;
-			this.engine = engine;
 			this.buildEngine = buildEngine;
 			consoleLogger = new MDConsoleLogger (LoggerVerbosity.Normal, LogWriteLine, null, null);
-			Refresh ();
 		}
 
 		public void Dispose ()
@@ -63,36 +64,74 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			buildEngine.UnloadProject (file);
 		}
 		
+		public void RefreshWithContent (string projectContent)
+		{
+			buildEngine.UnloadProject (file);
+			buildEngine.SetUnsavedProjectContent (file, projectContent);
+		}
+
 		void LogWriteLine (string txt)
 		{
 			if (currentLogWriter != null)
 				currentLogWriter.WriteLine (txt);
 		}
-		
-		public MSBuildResult[] RunTarget (string target, ProjectConfigurationInfo[] configurations, ILogWriter logWriter,
-			MSBuildVerbosity verbosity)
+
+		//HACK: Mono does not implement 3.5 CustomMetadataNames API
+		FieldInfo evaluatedMetadataField = typeof(BuildItem).GetField ("evaluatedMetadata", BindingFlags.NonPublic | BindingFlags.Instance);
+
+		public MSBuildResult Run (
+			ProjectConfigurationInfo[] configurations, ILogWriter logWriter, MSBuildVerbosity verbosity,
+			string[] runTargets, string[] evaluateItems, string[] evaluateProperties)
 		{
-			MSBuildResult[] result = null;
-			BuildEngine.RunSTA (delegate
-			{
+			MSBuildResult result = null;
+			BuildEngine.RunSTA (delegate {
 				try {
 					var project = SetupProject (configurations);
 					currentLogWriter = logWriter;
 
-					LocalLogger logger = new LocalLogger (Path.GetDirectoryName (file));
-					engine.UnregisterAllLoggers ();
-					engine.RegisterLogger (logger);
-					engine.RegisterLogger (consoleLogger);
+					buildEngine.Engine.UnregisterAllLoggers ();
 
-					consoleLogger.Verbosity = GetVerbosity (verbosity);
+					var logger = new LocalLogger (file);
+					buildEngine.Engine.RegisterLogger (logger);
+					if (logWriter != null) {
+						buildEngine.Engine.RegisterLogger (consoleLogger);
+						consoleLogger.Verbosity = GetVerbosity (verbosity);
+					}
 
-					// We are using this BuildProject overload and the BuildSettings.None argument as a workaround to
-					// an xbuild bug which causes references to not be resolved after the project has been built once.
-					engine.BuildProject (project, new string[] { target }, new Hashtable (), BuildSettings.None);
-					
-					result = logger.BuildResult.ToArray ();
+					if (runTargets != null && runTargets.Length > 0) {
+						// We are using this BuildProject overload and the BuildSettings.None argument as a workaround to
+						// an xbuild bug which causes references to not be resolved after the project has been built once.
+						buildEngine.Engine.BuildProject (project, runTargets, new Hashtable (), BuildSettings.None);
+					}
+
+					result = new MSBuildResult (logger.BuildResult.ToArray ());
+
+					if (evaluateProperties != null) {
+						foreach (var name in evaluateProperties)
+							result.Properties [name] = project.GetEvaluatedProperty (name);
+					}
+
+					if (evaluateItems != null) {
+						foreach (var name in evaluateItems) {
+							BuildItemGroup grp = project.GetEvaluatedItemsByName (name);
+							var list = new List<MSBuildEvaluatedItem> ();
+							foreach (BuildItem item in grp) {
+								var evItem = new MSBuildEvaluatedItem (name, UnescapeString (item.FinalItemSpec));
+								foreach (DictionaryEntry de in (IDictionary) evaluatedMetadataField.GetValue (item)) {
+									evItem.Metadata [(string)de.Key] = UnescapeString ((string)de.Value);
+								}
+								list.Add (evItem);
+							}
+							result.Items[name] = list;
+						}
+					}
 				} catch (InvalidProjectFileException ex) {
-					result = new MSBuildResult[] { new MSBuildResult (false, ex.ProjectFile ?? file, ex.LineNumber, ex.ColumnNumber, ex.ErrorCode, ex.Message) };
+					var r = new MSBuildTargetResult (
+						file, false, ex.ErrorSubcategory, ex.ErrorCode, ex.ProjectFile,
+						ex.LineNumber, ex.ColumnNumber, ex.EndLineNumber, ex.EndColumnNumber,
+						ex.BaseMessage, ex.HelpKeyword);
+					logWriter.WriteLine (r.ToString ());
+					result = new MSBuildResult (new [] { r });
 				} finally {
 					currentLogWriter = null;
 				}
@@ -107,7 +146,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				return LoggerVerbosity.Quiet;
 			case MSBuildVerbosity.Minimal:
 				return LoggerVerbosity.Minimal;
-			case MSBuildVerbosity.Normal:
 			default:
 				return LoggerVerbosity.Normal;
 			case MSBuildVerbosity.Detailed:
@@ -116,37 +154,42 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				return LoggerVerbosity.Diagnostic;
 			}
 		}
-
-		public string[] GetAssemblyReferences (ProjectConfigurationInfo[] configurations)
-		{
-			string[] refsArray = null;
-
-			BuildEngine.RunSTA (delegate
-			{
-				var project = SetupProject (configurations);
-				
-				// We are using this BuildProject overload and the BuildSettings.None argument as a workaround to
-				// an xbuild bug which causes references to not be resolved after the project has been built once.
-				engine.BuildProject (project, new string[] { "ResolveAssemblyReferences" }, new Hashtable (), BuildSettings.None);
-				BuildItemGroup grp = project.GetEvaluatedItemsByName ("ReferencePath");
-				List<string> refs = new List<string> ();
-				foreach (BuildItem item in grp)
-					refs.Add (UnescapeString (item.Include));
-				refsArray = refs.ToArray ();
-			});
-			return refsArray;
-		}
 		
 		Project SetupProject (ProjectConfigurationInfo[] configurations)
 		{
 			Project project = null;
 
 			foreach (var pc in configurations) {
-				var p = engine.GetLoadedProject (pc.ProjectFile);
-				if (p == null) {
-					p = new Project (engine);
-					p.Load (pc.ProjectFile);
+				var p = buildEngine.Engine.GetLoadedProject (pc.ProjectFile);
+
+				if (p != null && pc.ProjectFile == file) {
+					// building the project may create new items and/or modify some properties,
+					// so we always need to use a new instance of the project when building
+					buildEngine.Engine.UnloadProject (p);
+					p = null;
 				}
+
+				Environment.CurrentDirectory = Path.GetDirectoryName (file);
+
+				if (p == null) {
+					p = new Project (buildEngine.Engine);
+					var content = buildEngine.GetUnsavedProjectContent (pc.ProjectFile);
+					if (content == null) {
+						p.Load (pc.ProjectFile);
+					} else {
+						p.FullFileName = pc.ProjectFile;
+
+						if (HasXbuildFileBug ()) {
+							// Workaround for Xamarin bug #14295: Project.Load incorrectly resets the FullFileName property
+							var t = p.GetType ();
+							t.InvokeMember ("PushThisFileProperty", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.InvokeMethod, null, p, new object[] { p.FullFileName });
+							t.InvokeMember ("DoLoad", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.InvokeMethod, null, p, new object[] { new StringReader (content) });
+						} else {
+							p.Load (new StringReader (content));
+						}
+					}
+				}
+
 				p.GlobalProperties.SetProperty ("Configuration", pc.Configuration);
 				if (!string.IsNullOrEmpty (pc.Platform))
 					p.GlobalProperties.SetProperty ("Platform", pc.Platform);
@@ -158,6 +201,19 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 			Environment.CurrentDirectory = Path.GetDirectoryName (file);
 			return project;
+		}
+
+		bool? hasXbuildFileBug;
+
+		bool HasXbuildFileBug ()
+		{
+			if (hasXbuildFileBug == null) {
+				var p = new Project ();
+				p.FullFileName = "foo";
+				p.LoadXml ("<Project xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\"/>");
+				hasXbuildFileBug = p.FullFileName.Length == 0;
+			}
+			return hasXbuildFileBug.Value;
 		}
 		
 		public override object InitializeLifetimeService ()

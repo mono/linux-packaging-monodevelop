@@ -399,7 +399,23 @@ class Activator {
 			var result = Resolve<TypeResolveResult>(program);
 			Assert.AreEqual("Testnamespace.Activator", result.Type.FullName);
 		}
-		
+
+		[Test]
+		public void NamespaceDefinitionOverwritesTypeName ()
+		{
+			// Classes in the current namespace are preferred over classes from
+			// imported namespaces
+			string program = @"using System;
+namespace $Auto.Test$ {
+	class Auto
+ 	{
+	}
+}
+";
+			var result = Resolve<NamespaceResolveResult>(program);
+			Assert.AreEqual("Auto.Test", result.NamespaceName);
+		}
+
 		[Test]
 		public void ParentNamespaceTypeLookup()
 		{
@@ -1092,6 +1108,42 @@ namespace Test
 			var nrr = Resolve<NamespaceResolveResult>(program);
 			Assert.AreEqual("A.B.C.D", nrr.NamespaceName);
 		}
+		
+		[Test]
+		public void CuriouslyRecurringInnerClass()
+		{
+			string program = @"
+	abstract class Table<T>
+	{
+		internal T[] records = {};
+	}
+	
+	sealed class ConcreteTable : Table<ConcreteTable.Record>
+	{
+		internal struct Record
+		{
+			public int Value;
+		}
+		
+		int First()
+		{
+			return $records[0].Value$;
+		}
+	}";
+			var rr = Resolve<MemberResolveResult>(program);
+			Assert.IsFalse(rr.IsError);
+			Assert.AreEqual("ConcreteTable+Record.Value", rr.Member.ReflectionName);
+		}
+		
+		[Test]
+		public void UsingStatementReferringToMissingNestedType()
+		{
+			string program = @"using System;
+using $A.B$;
 
+class A { }";
+			var rr = Resolve<UnknownMemberResolveResult>(program);
+			
+		}
 	}
 }

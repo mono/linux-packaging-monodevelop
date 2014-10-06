@@ -70,47 +70,30 @@ namespace MonoDevelop.NUnit
 			attributes |= NodeAttributes.UseMarkup;
 		}
 */
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			UnitTest test = dataObject as UnitTest;
+			nodeInfo.Icon = test.StatusIcon;
 			
 			if (test.Status == TestStatus.Running) {
-				icon = CircleImage.Running;
-				label = test.Title;
+				nodeInfo.Label = test.Title;
 				return;
 			} else if (test.Status == TestStatus.Loading) {
-				icon = CircleImage.Loading;
-				label = test.Title + GettextCatalog.GetString (" (Loading)");
+				nodeInfo.Label = test.Title + GettextCatalog.GetString (" (Loading)");
 				return;
 			} else if (test.Status == TestStatus.LoadError) {
-				icon = CircleImage.Failure;
-				label = test.Title + GettextCatalog.GetString (" (Load failed)");
+				nodeInfo.Label = test.Title + GettextCatalog.GetString (" (Load failed)");
 				return;
 			} else {
-				label = test.Title;
+				nodeInfo.Label = test.Title;
 
 				UnitTestResult res = test.GetLastResult ();
-				if (res == null)
-					icon = CircleImage.None;
-				else if (res.ErrorsAndFailures > 0 && res.Passed > 0)
-					icon = test.IsHistoricResult ? CircleImage.OldSuccessAndFailure : CircleImage.SuccessAndFailure;
-				else if (res.IsInconclusive)
-					icon = test.IsHistoricResult ? CircleImage.OldInconclusive : CircleImage.Inconclusive;
-				else if (res.IsFailure)
-					icon = test.IsHistoricResult ? CircleImage.OldFailure : CircleImage.Failure;
-				else if (res.IsSuccess)
-					icon = test.IsHistoricResult ? CircleImage.OldSuccess : CircleImage.Success;
-				else if (res.IsNotRun)
-					icon = CircleImage.NotRun;
-				else
-					icon = CircleImage.None;
-
 				if (res != null && treeBuilder.Options ["ShowTestCounters"] && (test is UnitTestGroup)) {
-					label += string.Format (GettextCatalog.GetString (" ({0} passed, {1} failed, {2} not run)"), res.Passed, res.ErrorsAndFailures, res.TestsNotRun);
+					nodeInfo.Label += string.Format (GettextCatalog.GetString (" ({0} passed, {1} failed, {2} not run)"), res.Passed, res.ErrorsAndFailures, res.TestsNotRun);
 				}
 
 				if (treeBuilder.Options ["ShowTestTime"]) {
-					label += "   Time: {0}ms" + (res.Time.TotalMilliseconds);
+					nodeInfo.Label += "   Time: {0}ms" + (res.Time.TotalMilliseconds);
 				}
 			}
 		}

@@ -56,7 +56,7 @@ namespace Xwt.WPFBackend
 		{
 			// Source
 			public bool AutodetectDrag;
-			public Rect DragRect;
+			public Rect DragRect = Rect.Empty;
 			// Target
 			public TransferDataType [] TargetTypes = new TransferDataType [0];
 		}
@@ -216,6 +216,15 @@ namespace Xwt.WPFBackend
 
 		public void SetFocus ()
 		{
+			if (Widget.IsLoaded)
+				Widget.Focus ();
+			else
+				Widget.Loaded += DeferredFocus;
+		}
+
+		void DeferredFocus (object sender, RoutedEventArgs e)
+		{
+			Widget.Loaded -= DeferredFocus;
 			Widget.Focus ();
 		}
 
@@ -391,15 +400,7 @@ namespace Xwt.WPFBackend
 
 		public void SetSizeRequest (double width, double height)
 		{
-			if (width == -1)
-				Widget.ClearValue (FrameworkElement.WidthProperty);
-			else
-				Widget.Width = width;
-
-			if (height == -1)
-				Widget.ClearValue (FrameworkElement.HeightProperty);
-			else
-				Widget.Height = height;
+			// Nothing needs to be done here
 		}
 
 		public void SetCursor (CursorType cursor)
@@ -424,6 +425,14 @@ namespace Xwt.WPFBackend
 				Widget.Cursor = Cursors.SizeWE;
 			else if (cursor == CursorType.ResizeLeftRight)
 				widget.Cursor = Cursors.SizeWE;
+			else if (cursor == CursorType.Move)
+				widget.Cursor = Cursors.SizeAll;
+			else if (cursor == CursorType.Wait)
+				widget.Cursor = Cursors.Wait;
+			else if (cursor == CursorType.Help)
+				widget.Cursor = Cursors.Help;
+			else
+				Widget.Cursor = Cursors.Arrow;
 		}
 		
 		public virtual void UpdateLayout ()
@@ -436,10 +445,13 @@ namespace Xwt.WPFBackend
 				var ev = (WidgetEvent)eventId;
 				switch (ev) {
 					case WidgetEvent.KeyPressed:
-						Widget.KeyDown += WidgetKeyDownHandler;
+						Widget.PreviewKeyDown += WidgetKeyDownHandler;
 						break;
 					case WidgetEvent.KeyReleased:
-						Widget.KeyUp += WidgetKeyUpHandler;
+						Widget.PreviewKeyUp += WidgetKeyUpHandler;
+						break;
+					case WidgetEvent.PreviewTextInput:
+						TextCompositionManager.AddPreviewTextInputHandler(Widget, WidgetPreviewTextInputHandler);
 						break;
 					case WidgetEvent.ButtonPressed:
 						Widget.MouseDown += WidgetMouseDownHandler;
@@ -487,10 +499,13 @@ namespace Xwt.WPFBackend
 				var ev = (WidgetEvent)eventId;
 				switch (ev) {
 					case WidgetEvent.KeyPressed:
-						Widget.KeyDown -= WidgetKeyDownHandler;
+						Widget.PreviewKeyDown -= WidgetKeyDownHandler;
 						break;
 					case WidgetEvent.KeyReleased:
-						Widget.KeyUp -= WidgetKeyUpHandler;
+						Widget.PreviewKeyUp -= WidgetKeyUpHandler;
+						break;
+					case WidgetEvent.PreviewTextInput:
+						TextCompositionManager.RemovePreviewTextInputHandler(Widget, WidgetPreviewTextInputHandler);
 						break;
 					case WidgetEvent.ButtonPressed:
 						Widget.MouseDown -= WidgetMouseDownHandler;
@@ -587,6 +602,17 @@ namespace Xwt.WPFBackend
 
 			result = new KeyEventArgs (key, KeyboardUtil.GetModifiers (), e.IsRepeat, e.Timestamp);
 			return true;
+		}
+
+		void WidgetPreviewTextInputHandler (object sender, System.Windows.Input.TextCompositionEventArgs e)
+		{
+			PreviewTextInputEventArgs args = new PreviewTextInputEventArgs(e.Text);
+			Context.InvokeUserCode(delegate
+			{
+				eventSink.OnPreviewTextInput(args);
+			});
+			if (args.Handled)
+				e.Handled = true;
 		}
 
 		void WidgetMouseDownHandler (object o, MouseButtonEventArgs e)
@@ -829,12 +855,6 @@ namespace Xwt.WPFBackend
 
 		void WidgetDragOverHandler (object sender, System.Windows.DragEventArgs e)
 		{
-			var types = e.Data.GetFormats ().Select (t => t.ToXwtTransferType ()).ToArray ();
-			var pos = e.GetPosition (Widget).ToXwtPoint ();
-			var proposedAction = DetectDragAction (e.KeyStates);
-
-			e.Handled = true; // Prevent default handlers from being used.
-
 			if (Adorner != null) {
 				var w = GetParentWindow ();
 				var v = (UIElement)w.Content;
@@ -855,6 +875,16 @@ namespace Xwt.WPFBackend
 
 				Adorner.Offset = e.GetPosition (v);
 			}
+			CheckDrop (sender, e);
+		}
+
+		void CheckDrop (object sender, System.Windows.DragEventArgs e)
+		{
+			var types = e.Data.GetFormats ().Select (t => t.ToXwtTransferType ()).ToArray ();
+			var pos = e.GetPosition (Widget).ToXwtPoint ();
+			var proposedAction = DetectDragAction (e.KeyStates);
+
+			e.Handled = true; // Prevent default handlers from being used.
 
 			if ((enabledEvents & WidgetEvent.DragOverCheck) > 0) {
 				var checkArgs = new DragOverCheckEventArgs (pos, types, proposedAction);
@@ -892,6 +922,12 @@ namespace Xwt.WPFBackend
 
 		void WidgetDropHandler (object sender, System.Windows.DragEventArgs e)
 		{
+			// Do a DragOverCheck before proceeding to the drop. This is required since in some cases the DragOver
+			// handler may not be called.
+			CheckDrop (sender, e);
+			if (e.Effects == DragDropEffects.None)
+				return;
+
 			WidgetDragLeaveHandler (sender, e);
 
 			var types = e.Data.GetFormats ().Select (t => t.ToXwtTransferType ()).ToArray ();

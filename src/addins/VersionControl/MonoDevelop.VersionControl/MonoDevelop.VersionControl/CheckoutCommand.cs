@@ -2,6 +2,7 @@ using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
 using MonoDevelop.VersionControl.Dialogs;
 using MonoDevelop.Ide;
+using System.Linq;
 
 namespace MonoDevelop.VersionControl
 {
@@ -10,6 +11,7 @@ namespace MonoDevelop.VersionControl
 		protected override void Update (CommandInfo info)
 		{
 			info.Enabled = VersionControlService.CheckVersionControlInstalled ();
+			info.Visible = !VersionControlService.IsGloballyDisabled;
 		}
 
 		protected override void Run()
@@ -46,33 +48,46 @@ namespace MonoDevelop.VersionControl
 		protected override IProgressMonitor CreateProgressMonitor ()
 		{
 			return new MonoDevelop.Core.ProgressMonitoring.AggregatedProgressMonitor (
-				new MonoDevelop.Ide.ProgressMonitoring.MessageDialogProgressMonitor (true, true, true, true),
-				base.CreateProgressMonitor ()
+				base.CreateProgressMonitor (),
+				new MonoDevelop.Ide.ProgressMonitoring.MessageDialogProgressMonitor (true, true, true, true)
 			);
 		}
 		
 		protected override void Run () 
 		{
-			vc.Checkout (path, null, true, Monitor);
+			if (System.IO.Directory.Exists (path) && System.IO.Directory.EnumerateFileSystemEntries (path).Any ()) {
+				if (MessageService.AskQuestion (GettextCatalog.GetString (
+					    "Checkout path is not empty. Do you want to delete its contents?"),
+					    path,
+					    AlertButton.Cancel,
+					    AlertButton.Ok) == AlertButton.Cancel)
+					return;
+				FileService.DeleteDirectory (path);
+				FileService.CreateDirectory (path);
+			}
+
+			try {
+				vc.Checkout (path, null, true, Monitor);
+			} catch (VersionControlException e) {
+				Monitor.ReportError (GettextCatalog.GetString (e.Message), null);
+				return;
+			}
+
+			if (Monitor.IsCancelRequested) {
+				Monitor.ReportSuccess (GettextCatalog.GetString ("Checkout operation cancelled"));
+				return;
+			}
+
+			if (!System.IO.Directory.Exists (path)) {
+				Monitor.ReportError (GettextCatalog.GetString ("Checkout folder does not exist"), null);
+				return;
+			}
+
 			string projectFn = null;
 			
-			string[] list = System.IO.Directory.GetFiles(path);
-			foreach (string str in list ) {
-				if (str.EndsWith(".mds")) {
-					projectFn = str;
-					break;
-				}
-			}
-			if ( projectFn == null ) {
-				foreach ( string str in list ) {
-					if (str.EndsWith(".mdp")) {
-						projectFn = str;
-						break;
-					}
-				}	
-			}
-			if ( projectFn == null ) {
-				foreach (string str in list ) {
+			string[] list = System.IO.Directory.GetFiles (path);
+			if (projectFn == null) {
+				foreach (string str in list) {
 					if (MonoDevelop.Projects.Services.ProjectService.IsWorkspaceItemFile (str)) {
 						projectFn = str;
 						break;

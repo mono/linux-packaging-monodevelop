@@ -40,6 +40,7 @@ using MonoDevelop.Ide.StandardHeader;
 using System.Text;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide.CodeFormatting;
+using MonoDevelop.Projects.SharedAssetsProjects;
 
 namespace MonoDevelop.Ide.Templates
 {
@@ -272,7 +273,11 @@ namespace MonoDevelop.Ide.Templates
 					content = formatted;
 			}
 			
-			MemoryStream ms = new MemoryStream ();
+			var ms = new MemoryStream ();
+
+			var bom = Encoding.UTF8.GetPreamble ();
+			ms.Write (bom, 0, bom.Length);
+
 			byte[] data;
 			if (AddStandardHeader) {
 				string header = StandardHeaderService.GetHeader (policyParent, fileName, true);
@@ -334,7 +339,11 @@ namespace MonoDevelop.Ide.Templates
 			}
 			
 			//need a default namespace or if there is no project, substitutions can get very messed up
-			string ns = netProject != null ? netProject.GetDefaultNamespace (fileName) : "Application";
+			string ns;
+			if (project is IDotNetFileContainer)
+				ns = ((IDotNetFileContainer)project).GetDefaultNamespace (fileName);
+			else
+				ns = "Application";
 			
 			//need an 'identifier' for tag substitution, e.g. class name or page name
 			//if not given an identifier, use fileName

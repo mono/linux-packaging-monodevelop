@@ -25,32 +25,38 @@
 // THE SOFTWARE.
 
 using System;
-using System.Collections.Generic;
-using Mono.Debugging.Client;
-using MonoDevelop.Core.Execution;
-using MonoDevelop.Core.Assemblies;
-using MonoDevelop.Core;
 using System.IO;
 using System.Reflection;
+using System.Collections.Generic;
+
 using Mono.Debugging.Soft;
-using MDLS = MonoDevelop.Core.LoggingService;
+using Mono.Debugging.Client;
+
+using MonoDevelop.Core;
+using MonoDevelop.Core.Execution;
+using MonoDevelop.Core.Assemblies;
 
 namespace MonoDevelop.Debugger.Soft
 {
-	public class SoftDebuggerEngine: IDebuggerEngine
+	public class SoftDebuggerEngine: DebuggerEngineBackend
 	{
 		static SoftDebuggerEngine ()
 		{
-			Mono.Debugging.Soft.LoggingService.CustomLogger = new MDLogger ();
+			DebuggerLoggingService.CustomLogger = new MDLogger ();
 		}
 		
-		public bool CanDebugCommand (ExecutionCommand cmd)
+		public override bool CanDebugCommand (ExecutionCommand cmd)
 		{
 			var netCmd = cmd as DotNetExecutionCommand;
 			if (netCmd == null)
 				return false;
 
 			return CanDebugRuntime (netCmd.TargetRuntime);
+		}
+
+		public override bool IsDefaultDebugger (ExecutionCommand cmd)
+		{
+			return true;
 		}
 
 		public static bool CanDebugRuntime (TargetRuntime runtime)
@@ -62,7 +68,7 @@ namespace MonoDevelop.Debugger.Soft
 			return mrun.AssemblyContext.GetAssemblyLocation ("Mono.Debugger.Soft", null) != null;
 		}
 		
-		public DebuggerStartInfo CreateDebuggerStartInfo (ExecutionCommand c)
+		public override DebuggerStartInfo CreateDebuggerStartInfo (ExecutionCommand c)
 		{
 			var cmd = (DotNetExecutionCommand) c;
 			var runtime = (MonoTargetRuntime)cmd.TargetRuntime;
@@ -89,12 +95,7 @@ namespace MonoDevelop.Debugger.Soft
 			return dsi;
 		}
 		
-		public ProcessInfo[] GetAttachableProcesses ()
-		{
-			return new ProcessInfo [0];
-		}
-		
-		public DebuggerSession CreateSession ()
+		public override DebuggerSession CreateSession ()
 		{
 			return new SoftDebuggerSession ();
 		}
@@ -126,7 +127,7 @@ namespace MonoDevelop.Debugger.Soft
 				} catch (Exception ex) {
 					dsi.LogMessage = GettextCatalog.GetString ("Could not get assembly name for user assembly '{0}'. " +
 						"Debugger will now debug all code, not just user code.", file);
-					MDLS.LogError ("Error getting assembly name for user assembly '" + file + "'", ex);
+					LoggingService.LogError ("Error getting assembly name for user assembly '" + file + "'", ex);
 					return;
 				}
 			}
@@ -139,7 +140,7 @@ namespace MonoDevelop.Debugger.Soft
 		{
 			public void LogError (string message, Exception ex)
 			{
-				MonoDevelop.Core.LoggingService.LogError (message, ex);
+				LoggingService.LogError (message, ex);
 			}
 			
 			public void LogAndShowException (string message, Exception ex)
@@ -150,7 +151,7 @@ namespace MonoDevelop.Debugger.Soft
 
 			public void LogMessage (string messageFormat, params object[] args)
 			{
-				MonoDevelop.Core.LoggingService.LogInfo (messageFormat, args);
+				LoggingService.LogInfo (messageFormat, args);
 			}
 		}
 	}

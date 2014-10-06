@@ -30,6 +30,7 @@ using System.Collections.Generic;
 using MonoDevelop.Core.Serialization;
 using MonoDevelop.Core;
 using Mono.Debugging.Client;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.Debugger
 {
@@ -91,7 +92,8 @@ namespace MonoDevelop.Debugger
 			lock (watches) {
 				foreach (PinnedWatch w in watches) {
 					foreach (Breakpoint bp in bps.GetBreakpoints ()) {
-						if (bp.HitAction == HitAction.PrintExpression && bp.TraceExpression == "{" + w.Expression + "}" && bp.FileName == w.File && bp.Line == w.Line)
+						if ((bp.HitAction & HitAction.PrintExpression) != HitAction.None &&
+							bp.TraceExpression == "{" + w.Expression + "}" && bp.FileName == w.File && bp.Line == w.Line)
 							Bind (w, bp);
 					}
 				}
@@ -270,8 +272,10 @@ namespace MonoDevelop.Debugger
 					batchChanged.Add (watch);
 				return;
 			}
-			if (WatchChanged != null)
-				WatchChanged (this, new PinnedWatchEventArgs (watch));
+			DispatchService.GuiDispatch (() => {
+				if (WatchChanged != null)
+					WatchChanged (this, new PinnedWatchEventArgs (watch));
+			});
 		}
 		
 		void OnChanged ()
@@ -306,7 +310,7 @@ namespace MonoDevelop.Debugger
 		}
 
 		public PinnedWatch Watch {
-			get { return this.watch; }
+			get { return watch; }
 		}
 	}
 }

@@ -47,7 +47,7 @@ using ICSharpCode.NRefactory.TypeSystem.Implementation;
 
 namespace MonoDevelop.CSharp.Refactoring
 {
-	public class CSharpCodeGenerator : CodeGenerator
+	class CSharpCodeGenerator : CodeGenerator
 	{
 		static CSharpAmbience ambience = new CSharpAmbience ();
 		
@@ -282,7 +282,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			var def = type.GetDefinition ();
 			if (def != null) {
 				using (var stringWriter = new System.IO.StringWriter ()) {
-					var formatter = new TextWriterOutputFormatter (stringWriter);
+					var formatter = new TextWriterTokenWriter (stringWriter);
 					stringWriter.NewLine = EolMarker; 
 					var visitor = new CSharpOutputVisitor (formatter, FormattingOptionsFactory.CreateMono ());
 					var shortType = CreateShortType (def.Compilation, file, loc, resolved);
@@ -379,17 +379,20 @@ namespace MonoDevelop.CSharp.Refactoring
 			bodyEndOffset = result.Length;
 			AppendLine (result);
 		}
-		
+
+		internal static string[] MonoTouchComments = {
+			" NOTE: Don't call the base implementation on a Model class",
+			" see http://docs.xamarin.com/guides/ios/application_fundamentals/delegates,_protocols,_and_events"
+		};
+
 		void AppendMonoTouchTodo (StringBuilder result, CodeGenerationOptions options, out int bodyStartOffset, out int bodyEndOffset)
 		{
 			AppendIndent (result);
 			bodyStartOffset = result.Length;
-			result.AppendLine ("// NOTE: Don't call the base implementation on a Model class");
-			
-			AppendIndent (result);
-			result.AppendLine ("// see http://docs.xamarin.com/ios/tutorials/Events%2c_Protocols_and_Delegates ");
-
-			AppendIndent (result);
+			foreach (var cmt in MonoTouchComments) {
+				result.AppendLine ("//" + cmt);
+				AppendIndent (result);
+			}
 			result.Append ("throw new ");
 			result.Append (options.GetShortType ("System", "NotImplementedException"));
 
@@ -497,7 +500,15 @@ namespace MonoDevelop.CSharp.Refactoring
 					if (options.ImplementingType.Properties.Any ()) 
 						result.Append (": ");
 					int i = 0;
+					var properties = new List<IProperty> ();
+
 					foreach (IProperty property in options.ImplementingType.Properties) {
+						if (properties.Any (p => p.Name == property.Name))
+							continue;
+						properties.Add (property); 
+					}
+
+					foreach (IProperty property in properties) {
 						if (property.IsStatic || !property.IsPublic)
 							continue;
 						if (i > 0)
@@ -508,7 +519,7 @@ namespace MonoDevelop.CSharp.Refactoring
 						result.Append ("}");
 					}
 					result.Append ("]\"");
-					foreach (IProperty property in options.ImplementingType.Properties) {
+					foreach (IProperty property in properties) {
 						if (property.IsStatic || !property.IsPublic)
 							continue;
 						result.Append (", ");
@@ -550,9 +561,9 @@ namespace MonoDevelop.CSharp.Refactoring
 										astBuilder.AddMethod (m);
 										
 										astBuilder.RunTransformations (o => false);
-										
+
 										var visitor = new ThrowsExceptionVisitor ();
-										astBuilder.CompilationUnit.AcceptVisitor (visitor);
+										astBuilder.SyntaxTree.AcceptVisitor (visitor);
 										skipBody = visitor.Throws;
 										if (skipBody)
 											break;
@@ -624,7 +635,42 @@ namespace MonoDevelop.CSharp.Refactoring
 				AppendReturnType (result, options, p.Type);
 				result.Append (" ");
 				result.Append (CSharpAmbience.FilterName (p.Name));
+				if (p.ConstantValue != null) {
+					result.Append (" = ");
+					if (p.Type.Kind == TypeKind.Enum) {
+						bool found = false;
+						foreach (var literal in GetEnumLiterals(p.Type)) {
+							if (literal.ConstantValue.Equals (p.ConstantValue)) {
+								AppendReturnType (result, options, p.Type);
+								result.Append ("."+ literal.Name);
+								found = true;
+								break;
+							}
+						}
+						if (!found) {
+							result.Append ("(");
+							AppendReturnType (result, options, p.Type);
+							result.Append (")" + p.ConstantValue); 
+						}
+					} else if (p.ConstantValue is char) {
+						result.Append ("'" + p.ConstantValue + "'");
+					} else if (p.ConstantValue is string)  {
+						result.Append ("\"" + CSharpTextEditorIndentation.ConvertToStringLiteral ((string)p.ConstantValue) + "\"");
+					} else if (p.ConstantValue is bool)  {
+						result.Append ((bool)p.ConstantValue ? "true" : "false");
+					} else {
+						result.Append (p.ConstantValue);
+					}
+				} 
 			}
+		}
+
+		public IEnumerable<IField> GetEnumLiterals(IType type)
+		{
+			if (type.Kind != TypeKind.Enum)
+				throw new ArgumentException ("Type is no enum.");
+			foreach (var field in type.GetFields (f => f.IsConst && f.IsPublic))
+				yield return field;
 		}
 		
 		static string GetModifiers (ITypeDefinition implementingType, IUnresolvedTypeDefinition implementingPart, IMember member)
@@ -776,7 +822,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			return new CodeGeneratorMemberResult (result.ToString (), regions);
 		}
 		
-		static bool IsMonoTouchModelMember (IMember member)
+		internal static bool IsMonoTouchModelMember (IMember member)
 		{
 			if (member == null || member.DeclaringType == null)
 				return false;
@@ -846,7 +892,7 @@ namespace MonoDevelop.CSharp.Refactoring
 		static bool InsertUsingAfter (AstNode node)
 		{
 			return node is NewLineNode && IsCommentOrUsing (node.GetNextSibling (s => !(s is NewLineNode))) ||
-				IsCommentOrUsing (node);
+				IsCommentOrUsing (node) || (node is PreProcessorDirective);
 		}
 
 		static bool IsCommentOrUsing (AstNode node)
@@ -898,7 +944,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			int offset = 0;
 			if (node != null) {
 				var loc = InsertUsingAfter (node) ? node.EndLocation : node.StartLocation;
-				offset = doc.Editor.LocationToOffset (loc);
+				offset = Math.Max (0, doc.Editor.LocationToOffset (loc));
 			}
 			
 			lines = policy.BlankLinesAfterUsings;
@@ -978,7 +1024,7 @@ namespace MonoDevelop.CSharp.Refactoring
 		{
 			using (var stringWriter = new System.IO.StringWriter ()) {
 //				formatter.Indentation = indentLevel;
-				var formatter = new TextWriterOutputFormatter (stringWriter);
+				var formatter = new TextWriterTokenWriter (stringWriter);
 				stringWriter.NewLine = doc.Editor.EolMarker;
 				
 				var visitor = new CSharpOutputVisitor (formatter, doc.GetFormattingOptions ());
@@ -997,55 +1043,11 @@ namespace MonoDevelop.CSharp.Refactoring
 		
 		public override void CompleteStatement (MonoDevelop.Ide.Gui.Document doc)
 		{
-			var file = doc.Editor;
-			var caretLocation = file.Caret.Location;
-			
-			int pos = file.LocationToOffset (caretLocation.Line + 1, 1);
-			var line = new StringBuilder ();
-			int lineNr = caretLocation.Line + 1, column = 1, maxColumn = 1, lastPos = pos;
-			if (true) 
-				while (lineNr == caretLocation.Line + 1) {
-					maxColumn = column;
-					lastPos = pos;
-					line.Append (file.GetCharAt (pos));
-					pos++;
-					var loc = file.OffsetToLocation (pos);
-					lineNr = loc.Line;
-					column = loc.Column;
-				}
-			string trimmedline = line.ToString ().Trim ();
-			string indent = line.ToString ().Substring (0, line.Length - line.ToString ().TrimStart (' ', '\t').Length);
-			if (trimmedline.EndsWith (";") || trimmedline.EndsWith ("{")) {
-				file.Caret.Location = caretLocation;
-				return;
+			var fixer = new ConstructFixer (doc.GetFormattingOptions (), doc.Editor.CreateNRefactoryTextEditorOptions ());
+			int newOffset;
+			if (fixer.TryFix (doc.Editor.Document, doc.Editor.Caret.Offset, out newOffset)) {
+				doc.Editor.Caret.Offset = newOffset;
 			}
-			int caretLine = caretLocation.Line;
-			int caretColumn = caretLocation.Column;
-			if (trimmedline.StartsWith ("if") || 
-				trimmedline.StartsWith ("while") ||
-				trimmedline.StartsWith ("switch") ||
-				trimmedline.StartsWith ("for") ||
-				trimmedline.StartsWith ("foreach")) {
-				if (!trimmedline.EndsWith (")")) {
-					file.Insert (lastPos, " () {" + file.EolMarker + indent + file.Options.IndentationString + file.EolMarker + indent + "}");
-					caretColumn = maxColumn + 1;
-				} else {
-					file.Insert (lastPos, " {" + file.EolMarker + indent + file.Options.IndentationString + file.EolMarker + indent + "}");
-					caretColumn = indent.Length + 1;
-					caretLine++;
-				}
-			} else if (trimmedline.StartsWith ("do")) {
-				file.Insert (lastPos, " {" + file.EolMarker + indent + file.Options.IndentationString + file.EolMarker + indent + "} while ();");
-				caretColumn = indent.Length + 1;
-				caretLine++;
-			} else {
-				file.Insert (lastPos, ";" + file.EolMarker + indent);
-				caretColumn = indent.Length;
-				caretLine++;
-			}
-			file.Caret.Location = new DocumentLocation (caretLine, caretColumn);
 		}
-		
-		
 	}
 }

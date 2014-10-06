@@ -24,7 +24,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 using MonoDevelop.Core;
@@ -33,7 +32,7 @@ using NGit.Transport;
 
 namespace MonoDevelop.VersionControl.Git
 {
-	public class GitCredentials: CredentialsProvider
+	sealed class GitCredentials: CredentialsProvider
 	{
 		bool HasReset {
 			get; set;
@@ -76,8 +75,9 @@ namespace MonoDevelop.VersionControl.Git
 				
 			HasReset = false;
 			if (result) {
+				var user = items.OfType<CredentialItem.Username> ().FirstOrDefault ();
 				if (passwordItem != null) {
-					PasswordService.AddWebPassword (new Uri (uri.ToString ()), new string (passwordItem.GetValue ()));
+					PasswordService.AddWebUserNameAndPassword (new Uri (uri.ToString ()), user.GetValue (), new string (passwordItem.GetValue ()));
 				} else if (passphraseItem != null) {
 					PasswordService.AddWebPassword (new Uri (uri.ToString ()), passphraseItem.GetValue ());
 				}
@@ -90,7 +90,7 @@ namespace MonoDevelop.VersionControl.Git
 			HasReset = true;
 		}
 		
-		bool TryGetPassphrase (URIish uri, CredentialItem[] items, out CredentialItem.StringType passphraseItem)
+		static bool TryGetPassphrase (URIish uri, CredentialItem[] items, out CredentialItem.StringType passphraseItem)
 		{
 			var actualUrl = new Uri (uri.ToString ());
 			var passphrase = (CredentialItem.StringType) items.FirstOrDefault (i => i is CredentialItem.StringType);
@@ -110,7 +110,7 @@ namespace MonoDevelop.VersionControl.Git
 			return false;
 		}
 		
-		bool TryGetUsernamePassword (URIish uri, CredentialItem[] items, out CredentialItem.Password passwordItem)
+		static bool TryGetUsernamePassword (URIish uri, CredentialItem[] items, out CredentialItem.Password passwordItem)
 		{
 			var actualUrl = new Uri (uri.ToString ());
 			var username = (CredentialItem.Username) items.FirstOrDefault (i => i is CredentialItem.Username);
@@ -119,10 +119,10 @@ namespace MonoDevelop.VersionControl.Git
 			if (items.Length == 2 && username != null && password != null) {
 				passwordItem = password;
 
-				var passwordValue = PasswordService.GetWebPassword (actualUrl);
-				if (passwordValue != null) {
-					username.SetValue (actualUrl.UserInfo);
-					password.SetValueNoCopy (passwordValue.ToArray ());
+				var cred = PasswordService.GetWebUserNameAndPassword (actualUrl);
+				if (cred != null) {
+					username.SetValue (cred.Item1);
+					password.SetValueNoCopy (cred.Item2.ToArray ());
 					return true;
 				}
 			} else {

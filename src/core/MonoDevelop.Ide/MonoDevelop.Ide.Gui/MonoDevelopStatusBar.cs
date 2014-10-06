@@ -46,7 +46,7 @@ namespace MonoDevelop.Ide
 		Label modeLabel;
 		Label cursorLabel;
 		MiniButton feedbackButton;
-		Gtk.Widget resizeGrip = new Gtk.Label ("");
+		Gtk.EventBox resizeGrip = new Gtk.EventBox ();
 
 		const int ResizeGripWidth = 14;
 
@@ -92,9 +92,9 @@ namespace MonoDevelop.Ide
 			
 			if (FeedbackService.Enabled) {
 				CustomFrame fr = new CustomFrame (0, 0, 1, 0);
-				Gdk.Pixbuf px = Gdk.Pixbuf.LoadFromResource ("balloon.png");
+				var px = Xwt.Drawing.Image.FromResource ("feedback-light-16.png");
 				HBox b = new HBox (false, 3);
-				b.PackStart (new Gtk.Image (px));
+				b.PackStart (new Xwt.ImageView (px).ToGtkWidget ());
 				b.PackStart (new Gtk.Label ("Feedback"));
 				Gtk.Alignment al = new Gtk.Alignment (0f, 0f, 1f, 1f);
 				al.RightPadding = 5;
@@ -137,7 +137,14 @@ namespace MonoDevelop.Ide
 
 			resizeGrip.WidthRequest = ResizeGripWidth;
 			resizeGrip.HeightRequest = 0;
+			resizeGrip.VisibleWindow = false;
 			mainBox.PackStart (resizeGrip, false, false, 0);
+
+			resizeGrip.ButtonPressEvent += delegate (object o, ButtonPressEventArgs args) {
+				if (args.Event.Button == 1) {
+					GdkWindow.BeginResizeDrag (Gdk.WindowEdge.SouthEast, (int)args.Event.Button, (int)args.Event.XRoot, (int)args.Event.YRoot, args.Event.Time);
+				}
+			};
 
 			// Status panels
 

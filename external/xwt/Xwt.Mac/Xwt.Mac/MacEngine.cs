@@ -119,6 +119,10 @@ namespace Xwt.Mac
 			RegisterBackend <Xwt.Backends.IScrollbarBackend, ScrollbarBackend> ();
 			RegisterBackend <Xwt.Backends.IDatePickerBackend, DatePickerBackend> ();
 			RegisterBackend <Xwt.Backends.ISliderBackend, SliderBackend> ();
+			RegisterBackend <Xwt.Backends.IEmbeddedWidgetBackend, EmbedNativeWidgetBackend> ();
+			RegisterBackend <Xwt.Backends.KeyboardHandler, MacKeyboardHandler> ();
+			RegisterBackend <Xwt.Backends.IPasswordEntryBackend, PasswordEntryBackend> ();
+			RegisterBackend <Xwt.Backends.IWebViewBackend, WebViewBackend> ();
 		}
 
 		public override void RunApplication ()
@@ -165,10 +169,13 @@ namespace Xwt.Mac
 		public override object TimerInvoke (Func<bool> action, TimeSpan timeSpan)
 		{
 			NSTimer timer = null;
-			timer = NSTimer.CreateRepeatingScheduledTimer (timeSpan, delegate {
+			var runLoop = NSRunLoop.Current;
+			timer = NSTimer.CreateRepeatingTimer (timeSpan, delegate {
 				if (!action ())
 					timer.Invalidate ();
 			});
+			runLoop.AddTimer (timer, NSRunLoop.NSDefaultRunLoopMode);
+			runLoop.AddTimer (timer, NSRunLoop.NSRunLoopModalPanelMode);
 			return timer;
 		}
 		
@@ -195,7 +202,7 @@ namespace Xwt.Mac
 			throw new NotImplementedException ();
 		}
 
-		public override object GetBackendForContext (object nativeContext)
+		public override object GetBackendForContext (object nativeWidget, object nativeContext)
 		{
 			return new CGContextBackend {
 				Context = (CGContext)nativeContext
@@ -221,7 +228,13 @@ namespace Xwt.Mac
 		{
 			var view = ((ViewBackend)w.GetBackend ()).Widget;
 			view.LockFocus ();
-			return new NSImage (view.DataWithPdfInsideRect (view.Bounds));
+			var img = new NSImage (view.DataWithPdfInsideRect (view.Bounds));
+			var imageData = img.AsTiff ();
+			var imageRep = (NSBitmapImageRep)NSBitmapImageRep.ImageRepFromData (imageData);
+			var im = new NSImage ();
+			im.AddRepresentation (imageRep);
+			im.Size = new System.Drawing.SizeF ((float)view.Bounds.Width, (float)view.Bounds.Height);
+			return im;
 		}
 	}
 

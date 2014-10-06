@@ -56,7 +56,9 @@ namespace Mono.CSharp {
 			3000, 3001, 3002, 3003, 3005, 3006, 3007, 3008, 3009,
 			3010, 3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019,
 			3021, 3022, 3023, 3024, 3026, 3027,
-			4014
+			4014, 4024, 4025, 4026,
+			7035, 7080, 7081, 7082, 7095,
+			8009,
 		};
 
 		static HashSet<int> AllWarningsHashSet;
@@ -100,6 +102,9 @@ namespace Mono.CSharp {
 				break;
 			case LanguageVersion.V_5:
 				version = "5.0";
+				break;
+			case LanguageVersion.V_6:
+				version = "6.0";
 				break;
 			default:
 				throw new InternalErrorException ("Invalid feature version", compiler.Settings.Version);
@@ -954,7 +959,7 @@ namespace Mono.CSharp {
 			if (timers == null)
 				return;
 
-			Dictionary<TimerType, string> timer_names = new Dictionary<TimerType,string> () {
+			Dictionary<TimerType, string> timer_names = new Dictionary<TimerType,string> {
 				{ TimerType.ParseTotal, "Parsing source files" },
 				{ TimerType.AssemblyBuilderSetup, "Assembly builder setup" },
 				{ TimerType.CreateTypeTotal, "Compiled types created" },
@@ -1053,7 +1058,7 @@ namespace Mono.CSharp {
 
 			public override bool IsEnabled (int code, bool previous)
 			{
-				return this.code == code ? false : previous;
+				return this.code != code && previous;
 			}
 		}
 
@@ -1079,7 +1084,7 @@ namespace Mono.CSharp {
 
 			public override bool IsEnabled(int code, bool previous)
 			{
-				return this.code == code ? true : previous;
+				return this.code == code || previous;
 			}
 		}
 

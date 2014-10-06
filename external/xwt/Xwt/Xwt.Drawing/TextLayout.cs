@@ -200,7 +200,7 @@ namespace Xwt.Drawing
 				var t = FormattedText.FromMarkup (markup);
 				Text = t.Text;
 				ClearAttributes ();
-				foreach (var at in attributes)
+				foreach (var at in t.Attributes)
 					AddAttribute (at);
 			}
 		}
@@ -234,7 +234,7 @@ namespace Xwt.Drawing
 		/// <param name="color">The color of the text background.</param>
 		/// <param name="startIndex">Start index of the first character to apply the background color to.</param>
 		/// <param name="count">The number of characters to apply the background color to.</param>
-		public void SetBackgound (Color color, int startIndex, int count)
+		public void SetBackground (Color color, int startIndex, int count)
 		{
 			AddAttribute (new BackgroundTextAttribute () { StartIndex = startIndex, Count = count, Color = color });
 		}

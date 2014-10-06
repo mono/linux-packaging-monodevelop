@@ -1,17 +1,13 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Threading;
-using Mono.Addins;
 
 using Gtk;
 
 using MonoDevelop.Core;
-using MonoDevelop.Components.Commands;
-using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -74,11 +70,11 @@ namespace MonoDevelop.VersionControl.Views
 			
 			CellRendererToggle cellToggle = new CellRendererToggle();
 //			cellToggle.Toggled += new ToggledHandler(OnCommitToggledHandler);
-			var crc = new CellRendererIcon ();
+			var crc = new CellRendererImage ();
 			crc.StockId = "vc-comment";
 			colCommit = new TreeViewColumn ();
 			colCommit.Spacing = 2;
-			colCommit.Widget = new Gtk.Image ("vc-commit", Gtk.IconSize.Menu);
+			colCommit.Widget = new Xwt.ImageView (Xwt.Drawing.Image.FromResource ("commit-light-16.png")).ToGtkWidget ();
 			colCommit.Widget.Show ();
 			colCommit.PackStart (cellToggle, false);
 			colCommit.PackStart (crc, false);
@@ -88,12 +84,12 @@ namespace MonoDevelop.VersionControl.Views
 			colCommit.Visible = false;
 			
 			CellRendererText crt = new CellRendererText();
-			var crp = new CellRendererPixbuf ();
+			var crp = new CellRendererImage ();
 			TreeViewColumn colStatus = new TreeViewColumn ();
 			colStatus.Title = GettextCatalog.GetString ("Status");
 			colStatus.PackStart (crp, false);
 			colStatus.PackStart (crt, true);
-			colStatus.AddAttribute (crp, "pixbuf", ColIcon);
+			colStatus.AddAttribute (crp, "image", ColIcon);
 			colStatus.AddAttribute (crp, "visible", ColShowStatus);
 			colStatus.AddAttribute (crt, "text", ColStatus);
 			colStatus.AddAttribute (crt, "foreground", ColStatusColor);
@@ -101,11 +97,11 @@ namespace MonoDevelop.VersionControl.Views
 			TreeViewColumn colFile = new TreeViewColumn ();
 			colFile.Title = GettextCatalog.GetString ("File");
 			colFile.Spacing = 2;
-			crp = new CellRendererPixbuf ();
+			crp = new CellRendererImage ();
 			diffRenderer = new CellRendererDiff ();
 			colFile.PackStart (crp, false);
 			colFile.PackStart (diffRenderer, true);
-			colFile.AddAttribute (crp, "pixbuf", ColIconFile);
+			colFile.AddAttribute (crp, "image", ColIconFile);
 			colFile.AddAttribute (crp, "visible", ColShowStatus);
 			colFile.SetCellDataFunc (diffRenderer, new TreeCellDataFunc (SetDiffCellData));
 			
@@ -113,7 +109,7 @@ namespace MonoDevelop.VersionControl.Views
 			filelist.AppendColumn(colCommit);
 			filelist.AppendColumn(colFile);
 			
-			filestore = new TreeStore (typeof (Gdk.Pixbuf), typeof (string), typeof (string[]), typeof(bool), typeof(bool), typeof(string), typeof(bool), typeof (bool), typeof(Gdk.Pixbuf), typeof(bool), typeof(string));
+			filestore = new TreeStore (typeof (Xwt.Drawing.Image), typeof (string), typeof (string[]), typeof(bool), typeof(bool), typeof(string), typeof(bool), typeof (bool), typeof(Xwt.Drawing.Image), typeof(bool), typeof(string));
 			filelist.Model = filestore;
 			filelist.TestExpandRow += new Gtk.TestExpandRowHandler (OnTestExpandRow);
 			
@@ -223,7 +219,7 @@ namespace MonoDevelop.VersionControl.Views
 		
 		TreeIter AppendFileInfo (ChangeSetItem n)
 		{
-			Gdk.Pixbuf statusicon = VersionControlService.LoadIconForStatus(n.Status);
+			Xwt.Drawing.Image statusicon = VersionControlService.LoadIconForStatus(n.Status);
 			string lstatus = VersionControlService.GetStatusLabel (n.Status);
 			
 			string scolor = null;
@@ -235,11 +231,11 @@ namespace MonoDevelop.VersionControl.Views
 			bool hasComment = false; //GetCommitMessage (n.LocalPath).Length > 0;
 			bool commit = true; //changeSet.ContainsFile (n.LocalPath);
 			
-			Gdk.Pixbuf fileIcon;
+			Xwt.Drawing.Image fileIcon;
 			if (n.IsDirectory)
-				fileIcon = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.ClosedFolder, Gtk.IconSize.Menu);
+				fileIcon = ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.ClosedFolder, Gtk.IconSize.Menu);
 			else
-				fileIcon = DesktopService.GetPixbufForFile (n.LocalPath, Gtk.IconSize.Menu);
+				fileIcon = DesktopService.GetIconForFile (n.LocalPath, Gtk.IconSize.Menu);
 			
 			TreeIter it = filestore.AppendValues (statusicon, lstatus, GLib.Markup.EscapeText (localpath).Split ('\n'), commit, false, n.LocalPath.ToString (), true, hasComment, fileIcon, n.HasLocalChanges, scolor);
 			if (!n.IsDirectory)
@@ -271,12 +267,12 @@ namespace MonoDevelop.VersionControl.Views
 		
 		void OnRowActivated (object o, RowActivatedArgs args)
 		{
-			OnOpen (null, null);
+			OnOpen ();
 		}
 		
 		void OnDiffLineActivated (object o, EventArgs a)
 		{
-			OnOpen (null, null);
+			OnOpen ();
 		}
 		
 		private void OnTestExpandRow (object sender, Gtk.TestExpandRowArgs args)
@@ -291,16 +287,19 @@ namespace MonoDevelop.VersionControl.Views
 			}
 		}
 		
-		void OnOpen (object s, EventArgs args)
+		void OnOpen ()
 		{
 			string[] files = GetCurrentFiles ();
 			if (files.Length == 0)
 				return;
 			else if (files.Length == 1) {
 				TreePath[] rows = filelist.Selection.GetSelectedRows ();
-				int line = -1;
-				if (rows.Length == 1 && rows [0].Depth == 2)
-					line = diffRenderer.GetSelectedLine (rows[0]);
+				int line = 1;
+				if (rows.Length == 1 && rows [0].Depth == 2) {
+					line = diffRenderer.GetSelectedLine (rows [0]);
+					if (line == -1)
+						line = 1;
+				}
 				IdeApp.Workbench.OpenDocument (files [0], line, 0);
 			}
 			else {

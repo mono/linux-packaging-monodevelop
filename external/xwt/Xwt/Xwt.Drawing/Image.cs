@@ -40,6 +40,8 @@ namespace Xwt.Drawing
 		internal NativeImageRef NativeRef;
 		internal double requestedAlpha = 1;
 
+		static int[] supportedScales = { 2 };
+
 		internal Image ()
 		{
 		}
@@ -90,14 +92,42 @@ namespace Xwt.Drawing
 		}
 
 
-		internal ImageDescription ImageDescription {
-			get {
-				return new ImageDescription () {
-					Alpha = requestedAlpha,
-					Size = Size,
-					Backend = Backend
-				};
+		internal ImageDescription GetImageDescription (Toolkit toolkit)
+		{
+			InitForToolkit (toolkit);
+			return new ImageDescription () {
+				Alpha = requestedAlpha,
+				Size = Size,
+				Backend = Backend
+			};
+		}
+
+		internal void InitForToolkit (Toolkit t)
+		{
+			if (ToolkitEngine != t) {
+				var nr = NativeRef.LoadForToolkit (t);
+				ToolkitEngine = t;
+				Backend = nr.Backend;
 			}
+		}
+
+		/// <summary>
+		/// Loads an image from a resource
+		/// </summary>
+		/// <returns>An image</returns>
+		/// <param name="resource">Resource name</param>
+		/// <remarks>
+		/// This method will look for alternative versions of the image with different resolutions.
+		/// For example, if a resource is named "foo.png", this method will load
+		/// other resources with the name "foo@XXX.png", where XXX can be any arbitrary string. For example "foo@2x.png".
+		/// Each of those resources will be considered different versions of the same image.
+		/// </remarks>
+		public static Image FromResource (string resource)
+		{
+			if (resource == null)
+				throw new ArgumentNullException ("resource");
+
+			return FromResource (Assembly.GetCallingAssembly (), resource);
 		}
 
 		/// <summary>
@@ -142,6 +172,8 @@ namespace Xwt.Drawing
 				throw new ArgumentNullException ("resource");
 			
 			var toolkit = Toolkit.CurrentEngine;
+			if (toolkit == null)
+				throw new ToolkitNotInitializedException ();
 
 			var name = Path.GetFileNameWithoutExtension (resource);
 
@@ -151,7 +183,9 @@ namespace Xwt.Drawing
 
 			var reqSize = toolkit.ImageBackendHandler.GetSize (img);
 
-			List<object> altImages = new List<object> ();
+			var ext = GetExtension (resource);
+			var altImages = new List<Tuple<string,object>> ();
+
 			foreach (var r in assembly.GetManifestResourceNames ()) {
 				int i = r.LastIndexOf ('@');
 				if (i != -1) {
@@ -159,88 +193,115 @@ namespace Xwt.Drawing
 					if (rname == resource || rname == name) {
 						var rim = toolkit.ImageBackendHandler.LoadFromResource (assembly, r);
 						if (rim != null)
-							altImages.Add (rim);
+							altImages.Add (new Tuple<string, object> (r, rim));
 					}
 				}
 			}
 			if (altImages.Count > 0) {
-				altImages.Insert (0, img);
-				img = toolkit.ImageBackendHandler.CreateMultiResolutionImage (altImages);
+				altImages.Insert (0, new Tuple<string, object> (resource, img));
+				if (ext == ".9.png")
+					return CreateComposedNinePatch (toolkit, altImages);
+				img = toolkit.ImageBackendHandler.CreateMultiResolutionImage (altImages.Select (i => i.Item2));
 			}
-			return new Image (img, toolkit) {
+			var res = new Image (img, toolkit) {
 				requestedSize = reqSize
 			};
+			res.NativeRef.SetResourceSource (assembly, resource);
+			if (ext == ".9.png")
+				res = new NinePatchImage (res.ToBitmap ());
+			return res;
 		}
 
 		public static Image CreateMultiSizeIcon (IEnumerable<Image> images)
 		{
-			return new Image (Toolkit.CurrentEngine.ImageBackendHandler.CreateMultiSizeIcon (images.Select (i => i.GetBackend ())));
+			if (Toolkit.CurrentEngine == null)
+				throw new ToolkitNotInitializedException ();
+
+			var allImages = images.ToArray ();
+
+			var img = new Image (Toolkit.CurrentEngine.ImageBackendHandler.CreateMultiSizeIcon (allImages.Select (i => i.GetBackend ())));
+
+			if (allImages.All (i => i.NativeRef.HasNativeSource)) {
+				var sources = allImages.Select (i => i.NativeRef.NativeSource).ToArray ();
+				img.NativeRef.SetSources (sources);
+			}
+			return img;
 		}
 
-/*		static bool ParseImageName (string resourceId, string fileName, out int size, out int scale)
+		public static Image CreateMultiResolutionImage (IEnumerable<Image> images)
 		{
-			if (!fileName.StartsWith (resourceId)) {
-				size = -1;
-				scale = -1;
-				return false;
-			}
-
-			size = -1;
-			int i = fileName.LastIndexOf ('.');
-			if (i < 0)
-				i = fileName.Length - 1;
-
-			scale = ParseScale (fileName, ref i);
-			size = ParseSize (fileName, ref i);
-
-			return i == resourceId.Length - 1;
+			if (Toolkit.CurrentEngine == null)
+				throw new ToolkitNotInitializedException ();
+			return new Image (Toolkit.CurrentEngine.ImageBackendHandler.CreateMultiResolutionImage (images.Select (i => i.GetBackend ())));
 		}
-
-		static int ParseScale (string s, ref int i)
-		{
-			if (i > 1 && s [i] >= '0' && s [i] <= '9' && s [i - 1] == '@') {
-				var scale = s [i] - '0';
-				i = i - 2;
-				return scale;
-			} else
-				return 1;
-		}
-
-		static int ParseSize (string s, ref int i)
-		{
-			int end = i;
-			int n = i;
-			while (n >= 0 && char.IsDigit (s[n]))
-				n--;
-			if (end == n || n < 0 || s [n] != 'x')
-				return -1;
-
-			var x = n;
-			var n2 = end;
-			n--;
-
-			while (n >= 0 && n2 > x && s[n] == s[n2]) {
-				n--;
-				n2--;
-			}
-			if (n2 == x && n >= 0 && s[n] == '_') {
-				i = n - 1;
-				return int.Parse (s.Substring (x + 1, end - x - 1));
-			}
-			else
-				return -1;
-		}*/
 
 		public static Image FromFile (string file)
 		{
 			var toolkit = Toolkit.CurrentEngine;
-			return new Image (toolkit.ImageBackendHandler.LoadFromFile (file), toolkit);
+			if (toolkit == null)
+				throw new ToolkitNotInitializedException ();
+
+			var ext = GetExtension (file);
+			var img = toolkit.ImageBackendHandler.LoadFromFile (file);
+
+			List<Tuple<string,object>> altImages = null;
+			foreach (var s in supportedScales) {
+				var fn = file.Substring (0, file.Length - ext.Length) + "@" + s + ext;
+				if (File.Exists (fn)) {
+					if (altImages == null) {
+						altImages = new List<Tuple<string, object>> ();
+						altImages.Add (new Tuple<string, object> (file, img));
+					}
+					altImages.Add (new Tuple<string, object> (fn, toolkit.ImageBackendHandler.LoadFromFile (fn)));
+				}
+			}
+
+			if (altImages != null) {
+				if (ext == ".9.png")
+					return CreateComposedNinePatch (toolkit, altImages);
+				img = toolkit.ImageBackendHandler.CreateMultiResolutionImage (altImages.Select (i => i.Item2));
+			}
+
+			var res = new Image (img, toolkit);
+			if (ext == ".9.png")
+				res = new NinePatchImage (res.ToBitmap ());
+			return res;
+		}
+
+		static Image CreateComposedNinePatch (Toolkit toolkit, List<Tuple<string,object>> altImages)
+		{
+			var npImage = new NinePatchImage ();
+			foreach (var fi in altImages) {
+				int i = fi.Item1.LastIndexOf ('@');
+				double scaleFactor;
+				if (i == -1)
+					scaleFactor = 1;
+				else {
+					int j = fi.Item1.IndexOf ('x', ++i);
+					if (!double.TryParse (fi.Item1.Substring (i, j - i), out scaleFactor)) {
+						toolkit.ImageBackendHandler.Dispose (fi.Item2);
+						continue;
+					}
+				}
+				npImage.AddFrame (new Image (fi.Item2, toolkit).ToBitmap (), scaleFactor);
+			}
+			return npImage;
 		}
 		
 		public static Image FromStream (Stream stream)
 		{
 			var toolkit = Toolkit.CurrentEngine;
+			if (toolkit == null)
+				throw new ToolkitNotInitializedException ();
 			return new Image (toolkit.ImageBackendHandler.LoadFromStream (stream), toolkit);
+		}
+
+		static string GetExtension (string fileName)
+		{
+			if (fileName.EndsWith (".9.png", StringComparison.Ordinal))
+				return ".9.png";
+			else
+				return Path.GetExtension (fileName);
 		}
 		
 		public void Save (string file, ImageFileType fileType)
@@ -491,8 +552,7 @@ namespace Xwt.Drawing
 		/// <param name="format">Bitmap format</param>
 		public BitmapImage ToBitmap (ImageFormat format = ImageFormat.ARGB32)
 		{
-			var s = GetFixedSize ();
-			return ToBitmap ((int)s.Width, (int)s.Height);
+			return ToBitmap (1d);
 		}
 
 		/// <summary>
@@ -505,7 +565,7 @@ namespace Xwt.Drawing
 		{
 			if (renderTarget.ParentWindow == null)
 				throw new InvalidOperationException ("renderTarget is not bound to a window");
-			return ToBitmap (renderTarget.ParentWindow, format);
+			return ToBitmap (renderTarget.ParentWindow.Screen.ScaleFactor, format);
 		}
 
 		/// <summary>
@@ -516,7 +576,7 @@ namespace Xwt.Drawing
 		/// <param name="format">Bitmap format</param>
 		public BitmapImage ToBitmap (WindowFrame renderTarget, ImageFormat format = ImageFormat.ARGB32)
 		{
-			return ToBitmap (renderTarget.Screen, format);
+			return ToBitmap (renderTarget.Screen.ScaleFactor, format);
 		}
 
 		/// <summary>
@@ -527,21 +587,20 @@ namespace Xwt.Drawing
 		/// <param name="format">Bitmap format</param>
 		public BitmapImage ToBitmap (Screen renderTarget, ImageFormat format = ImageFormat.ARGB32)
 		{
-			var s = GetFixedSize ();
-			return ToBitmap ((int)(s.Width * renderTarget.ScaleFactor), (int)(s.Height * renderTarget.ScaleFactor), format);
+			return ToBitmap (renderTarget.ScaleFactor, format);
 		}
 
 		/// <summary>
 		/// Converts the image to a bitmap
 		/// </summary>
 		/// <returns>The bitmap.</returns>
-		/// <param name="pixelWidth">Width of the image in real pixels</param>
-		/// <param name="pixelHeight">Height of the image in real pixels</param>
+		/// <param name="scaleFactor">Scale factor of the bitmap</param>
 		/// <param name="format">Bitmap format</param>
-		public BitmapImage ToBitmap (int pixelWidth, int pixelHeight, ImageFormat format = ImageFormat.ARGB32)
+		public BitmapImage ToBitmap (double scaleFactor, ImageFormat format = ImageFormat.ARGB32)
 		{
-			var bmp = ToolkitEngine.ImageBackendHandler.ConvertToBitmap (Backend, pixelWidth, pixelHeight, format);
-			return new BitmapImage (bmp);
+			var s = GetFixedSize ();
+			var bmp = ToolkitEngine.ImageBackendHandler.ConvertToBitmap (Backend, s.Width, s.Height, scaleFactor, format);
+			return new BitmapImage (bmp, s);
 		}
 
 		protected virtual Size GetDefaultSize ()
@@ -556,6 +615,67 @@ namespace Xwt.Drawing
 		int referenceCount = 1;
 		Toolkit toolkit;
 
+		NativeImageSource[] sources;
+
+		public struct NativeImageSource {
+			// Source file or resource name
+			public string Source;
+
+			// Assembly that contains the resource
+			public Assembly ResourceAssembly;
+
+			public Func<Stream[]> ImageLoader;
+		}
+
+		public object Backend {
+			get { return backend; }
+		}
+
+		public Toolkit Toolkit {
+			get { return toolkit; }
+		}
+
+		public NativeImageSource NativeSource {
+			get { return sources[0]; }
+		}
+
+		public bool HasNativeSource {
+			get { return sources != null; }
+		}
+
+		public void SetSources (NativeImageSource[] sources)
+		{
+			this.sources = sources;
+		}
+
+		public void SetFileSource (string file)
+		{
+			sources = new [] { 
+				new NativeImageSource {
+					Source = file,
+				}
+			};
+		}
+
+		public void SetResourceSource (Assembly asm, string name)
+		{
+			sources = new [] { 
+				new NativeImageSource {
+					Source = name,
+					ResourceAssembly = asm
+				}
+			};
+		}
+
+		public void SetStreamSource (Func<Stream[]> imageLoader)
+		{
+			sources = new [] { 
+				new NativeImageSource {
+					ImageLoader = imageLoader
+				}
+			};
+		}
+
 		public int ReferenceCount {
 			get { return referenceCount; }
 		}
@@ -564,9 +684,68 @@ namespace Xwt.Drawing
 		{
 			this.backend = backend;
 			this.toolkit = toolkit;
+			NextRef = this;
 
 			if (toolkit.ImageBackendHandler.DisposeHandleOnUiThread)
 				ResourceManager.RegisterResource (backend, toolkit.ImageBackendHandler.Dispose);
+		}
+
+		public NativeImageRef LoadForToolkit (Toolkit targetToolkit)
+		{
+			NativeImageRef newRef = null;
+			var r = NextRef;
+			while (r != this) {
+				if (r.toolkit == targetToolkit) {
+					newRef = r;
+					break;
+				}
+				r = r.NextRef;
+			}
+			if (newRef != null)
+				return newRef;
+
+			object newBackend;
+
+			if (sources != null) {
+				var frames = new List<object> ();
+				foreach (var s in sources) {
+					if (s.ImageLoader != null) {
+						var streams = s.ImageLoader ();
+						try {
+							if (streams.Length == 1) {
+								newBackend = targetToolkit.ImageBackendHandler.LoadFromStream (streams [0]);
+							} else {
+								var backends = new object[streams.Length];
+								for (int n = 0; n < backends.Length; n++) {
+									backends [n] = targetToolkit.ImageBackendHandler.LoadFromStream (streams [n]);
+								}
+								newBackend = targetToolkit.ImageBackendHandler.CreateMultiResolutionImage (backends);
+							}
+						} finally {
+							foreach (var st in streams)
+								st.Dispose ();
+						}
+					}
+					else if (s.ResourceAssembly != null)
+						newBackend = targetToolkit.ImageBackendHandler.LoadFromResource (s.ResourceAssembly, s.Source);
+					else if (s.Source != null)
+						newBackend = targetToolkit.ImageBackendHandler.LoadFromFile (s.Source);
+					else
+						throw new NotSupportedException ();
+					frames.Add (newBackend);
+				}
+				newBackend = targetToolkit.ImageBackendHandler.CreateMultiSizeIcon (frames);
+			} else {
+				using (var s = new MemoryStream ()) {
+					toolkit.ImageBackendHandler.SaveToStream (backend, s, ImageFileType.Png);
+					s.Position = 0;
+					newBackend = targetToolkit.ImageBackendHandler.LoadFromStream (s);
+				}
+			}
+			newRef = new NativeImageRef (newBackend, targetToolkit);
+			newRef.NextRef = NextRef;
+			NextRef = newRef;
+			return newRef;
 		}
 
 		public void AddReference ()
@@ -586,6 +765,11 @@ namespace Xwt.Drawing
 					ResourceManager.FreeResource (backend);
 			}
 		}
+
+		/// <summary>
+		/// Reference to the next native image, for a different toolkit
+		/// </summary>
+		public NativeImageRef NextRef { get; set; }
 	}
 }
 

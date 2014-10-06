@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{A7A4246D-CEC4-42DF-A3C1-C31B9F51C4EC}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -20,9 +20,12 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DefineConstants>DEBUG</DefineConstants>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\NUnit\MonoDevelop.NUnit.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\build\AddIns\NUnit\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -30,14 +33,11 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\NUnit\MonoDevelop.NUnit.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="nunit.core">
-      <HintPath>lib\nunit.core.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.framework">
-      <HintPath>lib\nunit.framework.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Xml" />
     <Reference Include="glade-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
@@ -60,14 +60,20 @@
     </Reference>
     <Reference Include="Mono.Posix" />
     <Reference Include="Mono.Cairo" />
-    <Reference Include="nunit.core.interfaces">
-      <HintPath>lib\nunit.core.interfaces.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.util">
-      <HintPath>lib\nunit.util.dll</HintPath>
-    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Core" />
+    <Reference Include="nunit.framework">
+      <HintPath>..\..\..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.core">
+      <HintPath>..\..\..\packages\NUnit.Runners.2.6.3\tools\lib\nunit.core.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.core.interfaces">
+      <HintPath>..\..\..\packages\NUnit.Runners.2.6.3\tools\lib\nunit.core.interfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.util">
+      <HintPath>..\..\..\packages\NUnit.Runners.2.6.3\tools\lib\nunit.util.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\core\MonoDevelop.Core\MonoDevelop.Core.csproj">
@@ -100,31 +106,54 @@
       <Name>Mono.Addins</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="templates\NUnitAssemblyGroup.xpt.xml">
       <LogicalName>NUnitAssemblyGroup.xpt.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\NUnit.Running.png">
-      <LogicalName>NUnit.Running.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\unit-running-16.png">
+      <LogicalName>unit-running-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\NUnit.Failed.png">
-      <LogicalName>NUnit.Failed.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\unit-running-16%402x.png">
+      <LogicalName>unit-running-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\NUnit.SuccessAndFailed.png">
-      <LogicalName>NUnit.SuccessAndFailed.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\unit-failed-16.png">
+      <LogicalName>unit-failed-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\NUnit.None.png">
-      <LogicalName>NUnit.None.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\unit-failed-16%402x.png">
+      <LogicalName>unit-failed-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\NUnit.NotRun.png">
-      <LogicalName>NUnit.NotRun.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\unit-mixed-results-16.png">
+      <LogicalName>unit-mixed-results-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\NUnit.Loading.png">
-      <LogicalName>NUnit.Loading.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\unit-mixed-results-16%402x.png">
+      <LogicalName>unit-mixed-results-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\NUnit.Success.png">
-      <LogicalName>NUnit.Success.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\unit-not-yet-run-16.png">
+      <LogicalName>unit-not-yet-run-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-not-yet-run-16%402x.png">
+      <LogicalName>unit-not-yet-run-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-skipped-16.png">
+      <LogicalName>unit-skipped-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-skipped-16%402x.png">
+      <LogicalName>unit-skipped-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-loading-16.png">
+      <LogicalName>unit-loading-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-success-16.png">
+      <LogicalName>unit-success-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-success-16%402x.png">
+      <LogicalName>unit-success-light-16@2x.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="templates\NUnitTestClass.xft.xml">
       <LogicalName>NUnitTestClass.xft.xml</LogicalName>
@@ -135,32 +164,43 @@
     <EmbeddedResource Include="templates\NUnitProject.xpt.xml">
       <LogicalName>NUnitProject.xpt.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\nunit.png">
-      <LogicalName>nunit.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\project-nunit-overlay-32.png">
+      <LogicalName>project-nunit-overlay-light-32.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\nunit-overlay-32.png">
-      <LogicalName>nunit-overlay-32.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="md1format.xml">
-      <LogicalName>md1format.xml</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\project-nunit-overlay-32%402x.png">
+      <LogicalName>project-nunit-overlay-light-32@2x.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\unit-test-16.png">
-      <LogicalName>unit-test-16.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\pad-unit-test-16.png">
+      <LogicalName>pad-unit-test-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\unit-test-24.png">
-      <LogicalName>unit-test-24.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\pad-unit-test-16%402x.png">
+      <LogicalName>pad-unit-test-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Gui\NUnit.Inconclusive.png">
-      <LogicalName>NUnit.Inconclusive.png</LogicalName>
+    <EmbeddedResource Include="Gui\icons\light\pad-unit-test-results-16.png">
+      <LogicalName>pad-unit-test-results-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\pad-unit-test-results-16%402x.png">
+      <LogicalName>pad-unit-test-results-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-inconclusive-16.png">
+      <LogicalName>unit-inconclusive-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-inconclusive-16%402x.png">
+      <LogicalName>unit-inconclusive-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-run-16.png">
+      <LogicalName>unit-run-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Gui\icons\light\unit-run-16%402x.png">
+      <LogicalName>unit-run-light-16@2x.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.cs" />
     <Compile Include="Commands\NUnitCommands.cs" />
-    <Compile Include="Gui\CircleImage.cs" />
     <Compile Include="Gui\TestPad.cs" />
     <Compile Include="Gui\TestResultsPad.cs" />
     <Compile Include="Gui\TestNodeBuilder.cs" />
@@ -169,7 +209,6 @@
     <Compile Include="Gui\NUnitAssemblyGroupNodeBuilder.cs" />
     <Compile Include="Gui\NUnitAssemblyGroupConfigurationNodeBuilder.cs" />
     <Compile Include="Gui\TestAssemblyNodeBuilder.cs" />
-    <Compile Include="Project\NUnitAssemblyGroupFileFormat.cs" />
     <Compile Include="Project\NUnitAssemblyGroupProject.cs" />
     <Compile Include="Project\TestAssembly.cs" />
     <Compile Include="Project\TestAssemblyCollection.cs" />
@@ -191,7 +230,6 @@
     <Compile Include="Services\NUnitOptions.cs" />
     <Compile Include="Services\IResultsStore.cs" />
     <Compile Include="Services\UnitTestResultsStore.cs" />
-    <Compile Include="Services\XmlResultsStore.cs" />
     <Compile Include="Services\WorkspaceTestGroup.cs" />
     <Compile Include="gtk-gui\generated.cs" />
     <Compile Include="Services\UnitTestResult.cs" />
@@ -199,9 +237,23 @@
     <Compile Include="Services\NUnitProjectServiceExtension.cs" />
     <Compile Include="Gui\NUnitOptionsPanel.cs" />
     <Compile Include="gtk-gui\MonoDevelop.NUnit.NUnitOptionsWidget.cs" />
+    <Compile Include="Services\TcpTestListener.cs" />
+    <Compile Include="Gui\TestStatusIcon.cs" />
+    <Compile Include="AddinInfo.cs" />
+    <Compile Include="Gui\AbstractUnitTestEditorExtension.cs" />
+    <Compile Include="Services\AbstractResultsStore.cs" />
+    <Compile Include="Services\BinaryResultsStore.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile.am" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Target Name="BeforeBuild">
+    <PropertyGroup>
+      <NuGet>$(SolutionDir)\external\nuget-binary\NuGet.exe</NuGet>
+      <NuGet Condition="$(OS)=='Unix'">mono $(NuGet)</NuGet>
+    </PropertyGroup>
+    <Exec Condition="Exists('$(SolutionDir)\..\.git')" Command="$(NuGet) restore -SolutionDirectory $(SolutionDir)" />
+  </Target>
 </Project>

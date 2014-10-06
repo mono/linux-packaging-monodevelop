@@ -51,6 +51,9 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		
 		public override bool CanBuildNode (Type dataType)
 		{
+			if (typeof(SolutionFolder).IsAssignableFrom (dataType))
+				return false;
+
 			return typeof(IFolderItem).IsAssignableFrom (dataType);
 		}
 		
@@ -105,7 +108,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			return ((IFolderItem)dataObject).BaseDirectory;
 		}
 		
-		public override void BuildNode (ITreeBuilder builder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder builder, object dataObject, NodeInfo nodeInfo)
 		{
 			string thisPath = GetFolderPath (dataObject);
 			
@@ -113,18 +116,18 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			{
 				ProjectFolder pf = (ProjectFolder) dataObject;
 				if (pf.Project == null || !ProjectFolderCommandHandler.PathExistsInProject (pf.Project, thisPath)) {
-					Gdk.Pixbuf gicon = Context.GetComposedIcon (icon, "fade");
+					var gicon = Context.GetComposedIcon (nodeInfo.Icon, "fade");
 					if (gicon == null) {
-						gicon = ImageService.MakeTransparent (icon, 0.5);
-						Context.CacheComposedIcon (icon, "fade", gicon);
+						gicon = nodeInfo.Icon.WithAlpha (0.5);
+						Context.CacheComposedIcon (nodeInfo.Icon, "fade", gicon);
 					}
-					icon = gicon;
-					gicon = Context.GetComposedIcon (closedIcon, "fade");
+					nodeInfo.Icon = gicon;
+					gicon = Context.GetComposedIcon (nodeInfo.ClosedIcon, "fade");
 					if (gicon == null) {
-						gicon = ImageService.MakeTransparent (closedIcon, 0.5);
-						Context.CacheComposedIcon (closedIcon, "fade", gicon);
+						gicon = nodeInfo.ClosedIcon.WithAlpha (0.5);
+						Context.CacheComposedIcon (nodeInfo.ClosedIcon, "fade", gicon);
 					}
-					closedIcon = gicon;
+					nodeInfo.ClosedIcon = gicon;
 				}
 			}
 		}
@@ -263,13 +266,12 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		{
 			foreach (FileEventInfo e in args) {
 				Project project = GetProjectForFile (e.FileName);
-				if (project == null) return;
-				
+
 				ITreeBuilder tb = Context.GetTreeBuilder ();
 				
 				if (e.IsDirectory) {
 					if (tb.MoveToObject (new ProjectFolder (e.FileName, project))) {
-						if (tb.Options ["ShowAllFiles"] && !ProjectFolderCommandHandler.PathExistsInProject (project, e.FileName)) {
+						if (tb.Options ["ShowAllFiles"] && (project == null || !ProjectFolderCommandHandler.PathExistsInProject (project, e.FileName))) {
 							tb.Remove ();
 							return;
 						}
@@ -355,7 +357,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			if (targetPath == source)
 				targetPath = ProjectOperations.GetTargetCopyName (targetPath, false);
 			
-			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (GettextCatalog.GetString("Copying files..."), Stock.StatusSolutionOperation, true))
+			using (IProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (GettextCatalog.GetString("Copying files..."), Stock.StatusWorking, true))
 			{
 				bool move = operation == DragOperation.Move;
 				IdeApp.ProjectOperations.TransferFiles (monitor, null, source, targetProject, targetPath, move, false);

@@ -38,6 +38,7 @@ using MonoDevelop.Components.Commands;
 using MonoDevelop.Core.Collections;
 using MonoDevelop.Ide.Gui.Components;
 using System.Linq;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
@@ -56,50 +57,54 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			var file = (ProjectFile) dataObject;
 			return file.Link.IsNullOrEmpty ? file.FilePath.FileName : file.Link.FileName;
 		}
-		
-		public override void GetNodeAttributes (ITreeNavigator treeNavigator, object dataObject, ref NodeAttributes attributes)
+
+		public override void GetNodeAttributes (ITreeNavigator parentNode, object dataObject, ref NodeAttributes attributes)
 		{
-			ProjectFile file = (ProjectFile) dataObject;
+			var file = (ProjectFile) dataObject;
+
+			if ((file.Flags & ProjectItemFlags.Hidden) != 0) {
+				attributes |= NodeAttributes.Hidden;
+				return;
+			}
 
 			attributes |= NodeAttributes.AllowRename;
 
-			if (!file.Visible && !treeNavigator.Options ["ShowAllFiles"])
+			if (!file.Visible && !parentNode.Options ["ShowAllFiles"])
 				attributes |= NodeAttributes.Hidden;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			ProjectFile file = (ProjectFile) dataObject;
 
-			label = GLib.Markup.EscapeText (file.Link.IsNullOrEmpty ? file.FilePath.FileName : file.Link.FileName);
+			nodeInfo.Label = GLib.Markup.EscapeText (file.Link.IsNullOrEmpty ? file.FilePath.FileName : file.Link.FileName);
 			if (!File.Exists (file.FilePath)) {
-				label = "<span foreground='red'>" + label + "</span>";
+				nodeInfo.Label = "<span foreground='red'>" + nodeInfo.Label + "</span>";
 			}
 			
-			icon = DesktopService.GetPixbufForFile (file.FilePath, Gtk.IconSize.Menu);
+			nodeInfo.Icon = DesktopService.GetIconForFile (file.FilePath, Gtk.IconSize.Menu);
 			
-			if (file.IsLink && icon != null) {
-				var overlay = ImageService.GetPixbuf ("md-link-overlay", Gtk.IconSize.Menu);
-				var cached = Context.GetComposedIcon (icon, overlay);
+			if (file.IsLink && nodeInfo.Icon != null) {
+				var overlay = ImageService.GetIcon ("md-link-overlay").WithSize (Xwt.IconSize.Small);
+				var cached = Context.GetComposedIcon (nodeInfo.Icon, overlay);
 				if (cached != null)
-					icon = cached;
+					nodeInfo.Icon = cached;
 				else {
-					var res = icon.Copy ();
-					overlay.Composite (res,
-					                   0,  0,
-					                   icon.Width, icon.Width,
-					                   0, 0,
-					                   1, 1, Gdk.InterpType.Bilinear, 255); 
-					Context.CacheComposedIcon (icon, overlay, res);
-					icon = res;
+					var ib = new Xwt.Drawing.ImageBuilder (nodeInfo.Icon.Width, nodeInfo.Icon.Height);
+					ib.Context.DrawImage (nodeInfo.Icon, 0, 0);
+					ib.Context.DrawImage (overlay, 0, 0);
+					var res = ib.ToVectorImage ();
+					ib.Dispose ();
+					Context.CacheComposedIcon (nodeInfo.Icon, overlay, res);
+					nodeInfo.Icon = res;
 				}
 			}
 		}
 		
 		public override object GetParentObject (object dataObject)
 		{
-			ProjectFile file = (ProjectFile) dataObject;
-			FilePath dir = !file.IsLink ? file.FilePath.ParentDirectory : file.Project.BaseDirectory.Combine (file.ProjectVirtualPath).ParentDirectory;
+			var file = (ProjectFile) dataObject;
+			var dir = !file.IsLink ? file.FilePath.ParentDirectory : file.Project.BaseDirectory.Combine (file.ProjectVirtualPath).ParentDirectory;
 			
 			if (!string.IsNullOrEmpty (file.DependsOn)) {
 				ProjectFile groupUnder = file.Project.Files.GetFile (file.FilePath.ParentDirectory.Combine (file.DependsOn));
@@ -109,16 +114,33 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			
 			if (dir == file.Project.BaseDirectory)
 				return file.Project;
-			else
-			    return new ProjectFolder (dir, file.Project, null);
+
+			return new ProjectFolder (dir, file.Project, null);
 		}
 		
 		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
 		{
 			if (otherNode.DataItem is ProjectFolder)
 				return 1;
-			else
+
+			if (!(thisNode.DataItem is ProjectFile))
 				return DefaultSort;
+			if (!(otherNode.DataItem is ProjectFile))
+				return DefaultSort;
+
+			string name1 = thisNode.NodeName;
+			string name2 = otherNode.NodeName;
+
+			//Compare filenames without extension
+			string path1 = Path.GetFileNameWithoutExtension (name1);
+			string path2 = Path.GetFileNameWithoutExtension (name2);
+			int cmp = string.Compare (path1, path2, StringComparison.CurrentCultureIgnoreCase);
+			if (cmp != 0)
+				return cmp;
+			//Compare extensions
+			string ext1 = Path.GetExtension (name1);
+			string ext2 = Path.GetExtension (name2);
+			return string.Compare (ext1, ext2, StringComparison.CurrentCultureIgnoreCase);
 		}
 		
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
@@ -135,8 +157,6 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				foreach (ProjectFile pf in file.DependentChildren)
 					treeBuilder.AddChild (pf);
 		}
-
-
 	}
 	
 	class ProjectFileNodeCommandHandler: NodeCommandHandler
@@ -151,11 +171,11 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		public override void RenameItem (string newName)
 		{
 			ProjectFile newProjectFile = null;
-			ProjectFile file = (ProjectFile) CurrentNode.DataItem;
+			var file = (ProjectFile) CurrentNode.DataItem;
 			
-			FilePath oldPath, newPath, newLink = FilePath.Null, oldLink = FilePath.Null;
+			FilePath oldPath, newPath, newLink = FilePath.Null;
 			if (file.IsLink) {
-				oldLink = file.ProjectVirtualPath;
+				var oldLink = file.ProjectVirtualPath;
 				newLink = oldLink.ParentDirectory.Combine (newName);
 				oldPath = file.Project.BaseDirectory.Combine (oldLink);
 				newPath = file.Project.BaseDirectory.Combine (newLink);
@@ -183,9 +203,9 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 					if (file.Project != null)
 						IdeApp.ProjectOperations.Save (file.Project);
 				}
-			} catch (System.ArgumentException) { // new file name with wildcard (*, ?) characters in it
+			} catch (ArgumentException) { // new file name with wildcard (*, ?) characters in it
 				MessageService.ShowWarning (GettextCatalog.GetString ("The name you have chosen contains illegal characters. Please choose a different name."));
-			} catch (System.IO.IOException ex) {
+			} catch (IOException ex) {
 				MessageService.ShowException (ex, GettextCatalog.GetString ("There was an error renaming the file."));
 			}
 		}
@@ -193,7 +213,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		public override void ActivateItem ()
 		{
 			ProjectFile file = (ProjectFile) CurrentNode.DataItem;
-			IdeApp.Workbench.OpenDocument (file.FilePath);
+			IdeApp.Workbench.OpenDocument (file.FilePath, file.Project);
 		}
 		
 		public override void ActivateMultipleItems ()
@@ -202,7 +222,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			for (int i = 0; i < CurrentNodes.Length; i++) {
 				// Only bring the last file to the front
 				file = (ProjectFile) CurrentNodes [i].DataItem;
-				IdeApp.Workbench.OpenDocument (file.FilePath, i == CurrentNodes.Length - 1);
+				IdeApp.Workbench.OpenDocument (file.FilePath, file.Project, i == CurrentNodes.Length - 1);
 			}
 		}
 		
@@ -244,7 +264,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				bool move = operation == DragOperation.Move;
 				var opText = move ? GettextCatalog.GetString ("Moving file...") : GettextCatalog.GetString ("Copying file...");
 
-				using (var monitor = IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (opText, Stock.StatusSolutionOperation, true))
+				using (var monitor = IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (opText, Stock.StatusWorking, true))
 					IdeApp.ProjectOperations.TransferFiles (monitor, pf.Project, pf.FilePath, target.Project, targetPath, move, true);
 
 				pf = target.Project.Files.GetFile (targetPath);
@@ -274,19 +294,19 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		[AllowMultiSelection]
 		public override void DeleteMultipleItems ()
 		{
+			var projects = new Set<SolutionEntityItem> ();
+			var files = new List<ProjectFile> ();
 			bool hasChildren = false;
-			List<ProjectFile> files = new List<ProjectFile> ();
-			Set<SolutionEntityItem> projects = new Set<SolutionEntityItem> ();
-			foreach (ITreeNavigator node in CurrentNodes) {
-				ProjectFile pf = (ProjectFile) node.DataItem;
+
+			foreach (var node in CurrentNodes) {
+				var pf = (ProjectFile) node.DataItem;
 				projects.Add (pf.Project);
 				if (pf.HasChildren)
 					hasChildren = true;
 				files.Add (pf);
 			}
-			
-			AlertButton removeFromProject = new AlertButton (GettextCatalog.GetString ("_Remove from Project"), Gtk.Stock.Remove);
-			
+
+			var removeFromProject = new AlertButton (GettextCatalog.GetString ("_Remove from Project"), Gtk.Stock.Remove);
 			string question, secondaryText;
 			
 			secondaryText = GettextCatalog.GetString ("The Delete option permanently removes the file from your hard disk. " +
@@ -307,28 +327,28 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				else
 					question = GettextCatalog.GetString ("Are you sure you want to remove the selected files from the project?");
 			}
-			
-			AlertButton result = MessageService.AskQuestion (question, secondaryText,
-			                                                 AlertButton.Delete, AlertButton.Cancel, removeFromProject);
+
+			var result = MessageService.AskQuestion (question, secondaryText, AlertButton.Delete, AlertButton.Cancel, removeFromProject);
 			if (result != removeFromProject && result != AlertButton.Delete) 
 				return;
-			   
-			foreach (ProjectFile file in files) {
-				Project project = file.Project;
+
+			foreach (var file in files) {
+				var project = file.Project;
 				var inFolder = project.Files.GetFilesInVirtualPath (file.ProjectVirtualPath.ParentDirectory).ToList ();
-				if (inFolder.Count == 1 && inFolder [0] == file) {
+
+				if (inFolder.Count == 1 && inFolder [0] == file && project.Files.GetFileWithVirtualPath (file.ProjectVirtualPath.ParentDirectory) == null) {
 					// This is the last project file in the folder. Make sure we keep
 					// a reference to the folder, so it is not deleted from the tree.
-					ProjectFile folderFile = new ProjectFile (project.BaseDirectory.Combine (file.ProjectVirtualPath.ParentDirectory));
+					var folderFile = new ProjectFile (project.BaseDirectory.Combine (file.ProjectVirtualPath.ParentDirectory));
 					folderFile.Subtype = Subtype.Directory;
 					project.Files.Add (folderFile);
 				}
-				
+
 				if (file.HasChildren) {
-					foreach (ProjectFile f in file.DependentChildren) {
-						project.Files.Remove (f);
+					foreach (var child in file.DependentChildren) {
+						project.Files.Remove (child);
 						if (result == AlertButton.Delete)
-							FileService.DeleteFile (f.Name);
+							FileService.DeleteFile (child.Name);
 					}
 				}
 			
@@ -406,10 +426,11 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		[CommandUpdateHandler (FileCommands.SetBuildAction)]
 		public void OnSetBuildActionUpdate (CommandArrayInfo info)
 		{
-			Set<string> toggledActions = new Set<string> ();
+			var toggledActions = new Set<string> ();
 			Project proj = null;
-			foreach (ITreeNavigator node in CurrentNodes) {
-				ProjectFile finfo = (ProjectFile) node.DataItem;
+
+			foreach (var node in CurrentNodes) {
+				var finfo = (ProjectFile) node.DataItem;
 				
 				//disallow multi-slect on more than one project, since available build actions may differ
 				if (proj == null && finfo.Project != null) {
@@ -420,6 +441,9 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				}
 				toggledActions.Add (finfo.BuildAction);
 			}
+
+			if (proj == null)
+				return;
 			
 			foreach (string action in proj.GetBuildActions ()) {
 				if (action == "--") {
@@ -437,13 +461,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		[AllowMultiSelection]
 		public void OnShowProperties ()
 		{
-			foreach (Pad pad in IdeApp.Workbench.Pads) {
-				if (pad.Id == "MonoDevelop.DesignerSupport.PropertyPad") {
-					pad.Visible = true;
-					pad.BringToFront (true);
-					return;
-				}
-			}
+			IdeApp.Workbench.Pads.PropertyPad.BringToFront (true);
 		}
 		
 		//NOTE: This command is slightly odd, as it operates on a tri-state value, 

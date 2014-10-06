@@ -31,13 +31,12 @@ namespace ICSharpCode.NRefactory.CSharp
 			foreach (Type type in typeof(AstNode).Assembly.GetExportedTypes()) {
 				if (type.IsSubclassOf (typeof(AstNode))) {
 					foreach (FieldInfo field in type.GetFields()) {
-						Console.WriteLine (field);
 						if (field.FieldType.IsSubclassOf(typeof(Role))) {
-							Assert.IsTrue(field.IsPublic);
-							Assert.IsTrue(field.IsStatic);
-							Assert.IsTrue(field.IsInitOnly);
-							Assert.IsTrue(field.Name.EndsWith("Role", StringComparison.Ordinal));
-							Assert.IsNotNull(field.GetValue(null));
+							Assert.IsTrue(field.IsPublic, field + " should be public");
+							Assert.IsTrue(field.IsStatic, field + " should be static");
+							Assert.IsTrue(field.IsInitOnly, field + " should be readonly");
+							Assert.That(field.Name, Is.StringEnding("Role"));
+							Assert.IsNotNull(field.GetValue(null), field + " should not have null value");
 						}
 					}
 				}
@@ -58,6 +57,58 @@ namespace ICSharpCode.NRefactory.CSharp
 				if (type.IsSubclassOf(typeof(AstNode))) {
 					Assert.IsTrue(type.BaseType.IsAbstract, type.FullName);
 				}
+			}
+		}
+		
+		[Test]
+		public void NullNodesCallVisitNullNode()
+		{
+			foreach (Type type in typeof(AstNode).Assembly.GetExportedTypes()) {
+				if (type.IsSubclassOf(typeof(AstNode))) {
+					var nullField = type.GetField("Null");
+					if (nullField != null) {
+						AstNode nullNode = (AstNode)nullField.GetValue(null);
+						Assert.IsTrue(nullNode.IsNull, nullNode.GetType().Name + " should be a null node");
+						var v1 = new VisitNullNodeTest();
+						var v2 = new VisitNullNodeTest<string>();
+						var v3 = new VisitNullNodeTest<string, string>();
+						nullNode.AcceptVisitor(v1);
+						nullNode.AcceptVisitor(v2);
+						nullNode.AcceptVisitor(v3, null);
+						Assert.IsTrue(v1.called, nullNode.GetType().Name + " should call 'void VisitNullNode();'");
+						Assert.IsTrue(v2.called, nullNode.GetType().Name + " should call 'T VisitNullNode();'");
+						Assert.IsTrue(v3.called, nullNode.GetType().Name + " should call 'S VisitNullNode(T data);'");
+					}
+				}
+			}
+		}
+		
+		class VisitNullNodeTest : DepthFirstAstVisitor 
+		{
+			internal bool called;
+			public override void VisitNullNode(AstNode nullNode)
+			{
+				called = true;
+			}
+		}
+		
+		class VisitNullNodeTest<T> : DepthFirstAstVisitor<T> 
+		{
+			internal bool called;
+			public override T VisitNullNode(AstNode nullNode)
+			{
+				called = true;
+				return base.VisitNullNode(nullNode);
+			}
+		}
+		
+		class VisitNullNodeTest<T, S> : DepthFirstAstVisitor<T, S> 
+		{
+			internal bool called;
+			public override S VisitNullNode(AstNode nullNode, T data)
+			{
+				called = true;
+				return base.VisitNullNode(nullNode, data);
 			}
 		}
 	}

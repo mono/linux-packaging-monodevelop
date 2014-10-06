@@ -28,6 +28,7 @@
 
 
 using System.IO;
+using System.Linq;
 using System.Collections.Generic;
 
 using MonoDevelop.Projects;
@@ -53,8 +54,8 @@ namespace MonoDevelop.NUnit
 		public NUnitProjectTestSuite (DotNetProject project): base (project.Name, project)
 		{
 			storeId = Path.GetFileName (project.FileName);
-			resultsPath = Path.Combine (project.BaseDirectory, "test-results");
-			ResultsStore = new XmlResultsStore (resultsPath, storeId);
+			resultsPath = MonoDevelop.NUnit.RootTest.GetTestResultsDirectory (project.BaseDirectory);
+			ResultsStore = new BinaryResultsStore (resultsPath, storeId);
 			this.project = project;
 			project.NameChanged += new SolutionItemRenamedEventHandler (OnProjectRenamed);
 			IdeApp.ProjectOperations.EndBuild += new BuildEventHandler (OnProjectBuilt);
@@ -62,8 +63,11 @@ namespace MonoDevelop.NUnit
 		
 		public static NUnitProjectTestSuite CreateTest (DotNetProject project)
 		{
+			if (!project.ParentSolution.GetConfiguration (IdeApp.Workspace.ActiveConfiguration).BuildEnabledForItem (project))
+				return null;
+
 			foreach (var p in project.References)
-				if (p.Reference.IndexOf ("GuiUnit") != -1 || p.Reference.IndexOf ("nunit.framework") != -1 || p.Reference.IndexOf ("nunit.core") != -1)
+				if (p.Reference.IndexOf ("GuiUnit", StringComparison.OrdinalIgnoreCase) != -1 || p.Reference.IndexOf ("nunit.framework") != -1 || p.Reference.IndexOf ("nunit.core") != -1 || p.Reference.IndexOf ("nunitlite") != -1)
 					return new NUnitProjectTestSuite (project);
 			return null;
 		}
@@ -111,8 +115,13 @@ namespace MonoDevelop.NUnit
 		
 		void OnProjectBuilt (object s, BuildEventArgs args)
 		{
-			if (RefreshRequired)
+			if (RefreshRequired) {
 				UpdateTests ();
+			} else {
+				Gtk.Application.Invoke (delegate {
+					OnProjectBuiltWithoutTestChange (EventArgs.Empty);
+				});
+			}
 		}
 
 		public override void GetCustomTestRunner (out string assembly, out string type)
@@ -127,6 +136,19 @@ namespace MonoDevelop.NUnit
 			var r = project.ExtendedProperties ["TestRunnerCommand"];
 			command = r != null ? project.BaseDirectory.Combine (r.ToString ()).ToString () : null;
 			args = (string)project.ExtendedProperties ["TestRunnerArgs"];
+			if (command == null && args == null) {
+				var guiUnit = project.References.FirstOrDefault (pref => pref.ReferenceType == ReferenceType.Assembly && StringComparer.OrdinalIgnoreCase.Equals (Path.GetFileName (pref.Reference), "GuiUnit.exe"));
+				if (guiUnit != null) {
+					command = guiUnit.Reference;
+				}
+
+				var projectReference = project.References.FirstOrDefault (pref => pref.ReferenceType == ReferenceType.Project && pref.Reference.StartsWith ("GuiUnit", StringComparison.OrdinalIgnoreCase));
+				if (IdeApp.IsInitialized && command == null && projectReference != null) {
+					var guiUnitProject = IdeApp.Workspace.GetAllProjects ().First (f => f.Name == projectReference.Reference);
+					if (guiUnitProject != null)
+						command = guiUnitProject.GetOutputFileName (IdeApp.Workspace.ActiveConfiguration);
+				}
+			}
 		}
 
 		protected override string AssemblyPath {
@@ -150,6 +172,15 @@ namespace MonoDevelop.NUnit
 					}
 				}
 			}
+		}
+
+		public event EventHandler ProjectBuiltWithoutTestChange;
+
+		protected virtual void OnProjectBuiltWithoutTestChange (EventArgs e)
+		{
+			var handler = ProjectBuiltWithoutTestChange;
+			if (handler != null)
+				handler (this, e);
 		}
 	}
 }

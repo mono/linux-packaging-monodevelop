@@ -30,7 +30,9 @@ using Mono.Addins;
 using MonoDevelop.Ide.Desktop;
 using MonoDevelop.Core;
 using System.IO;
+using MonoDevelop.Components;
 using MonoDevelop.Components.MainToolbar;
+using MonoDevelop.Ide.Fonts;
 
 namespace MonoDevelop.Ide
 {
@@ -41,9 +43,8 @@ namespace MonoDevelop.Ide
 
 		static PlatformService PlatformService {
 			get {
-				if (platformService == null) {
-					Initialize ();
-				}
+				if (platformService == null)
+					throw new InvalidOperationException ("Not initialized");
 				return platformService;
 			}
 		}
@@ -59,7 +60,8 @@ namespace MonoDevelop.Ide
 				platformService = new DefaultPlatformService ();
 				LoggingService.LogFatalError ("A platform service implementation has not been found.");
 			}
-			Runtime.ProcessService.SetExternalConsoleHandler (PlatformService.StartConsoleProcess);
+			if (PlatformService.CanOpenTerminal)
+				Runtime.ProcessService.SetExternalConsoleHandler (PlatformService.StartConsoleProcess);
 			
 			FileService.FileRemoved += DispatchService.GuiDispatch (
 				new EventHandler<FileEventArgs> (NotifyFileRemoved));
@@ -69,6 +71,8 @@ namespace MonoDevelop.Ide
 			// Ensure we initialize the native toolkit on the UI thread immediately
 			// so that we can safely access this property later in other threads
 			GC.KeepAlive (NativeToolkit);
+
+			FontService.Initialize ();
 		}
 		
 		/// <summary>
@@ -87,7 +91,8 @@ namespace MonoDevelop.Ide
 		{
 			return PlatformService.GetApplications (filename);
 		}
-		
+
+		[Obsolete ("Use FontService")]
 		public static string DefaultMonospaceFont {
 			get { return PlatformService.DefaultMonospaceFont; }
 		}
@@ -96,10 +101,7 @@ namespace MonoDevelop.Ide
 			get { return PlatformService.Name; }
 		}
 
-		/// <summary>
-		/// Used in the text editor. Valid values are found in MonoDevelop.SourceEditor.ControlLeftRightMode in the
-		/// source editor project.
-		/// </summary>
+		[Obsolete]
 		public static string DefaultControlLeftRightBehavior {
 			get {
 				return PlatformService.DefaultControlLeftRightBehavior;
@@ -168,15 +170,36 @@ namespace MonoDevelop.Ide
 		{
 			return PlatformService.GetMimeTypeInheritanceChain (mimeType);
 		}
-		
-		public static Gdk.Pixbuf GetPixbufForFile (string filename, Gtk.IconSize size)
+
+		public static IEnumerable<string> GetMimeTypeInheritanceChainForFile (string filename)
 		{
-			return PlatformService.GetPixbufForFile (filename, size);
+			return GetMimeTypeInheritanceChain (GetMimeTypeForUri (filename));
 		}
 		
-		public static Gdk.Pixbuf GetPixbufForType (string mimeType, Gtk.IconSize size)
+		public static Xwt.Drawing.Image GetIconForFile (string filename)
 		{
-			return PlatformService.GetPixbufForType (mimeType, size);
+			return PlatformService.GetIconForFile (filename);
+		}
+
+		public static Xwt.Drawing.Image GetIconForFile (string filename, Gtk.IconSize size)
+		{
+			return PlatformService.GetIconForFile (filename).WithSize (size);
+		}
+		
+		public static Xwt.Drawing.Image GetIconForType (string mimeType)
+		{
+			return PlatformService.GetIconForType (mimeType);
+		}
+
+		public static Xwt.Drawing.Image GetIconForType (string mimeType, Gtk.IconSize size)
+		{
+			return PlatformService.GetIconForType (mimeType).WithSize (size);
+		}
+
+		public static bool ShowContextMenu (MonoDevelop.Components.Commands.CommandManager commandManager,
+			Gtk.Widget widget, double x, double y, MonoDevelop.Components.Commands.CommandEntrySet entrySet, object initialCommandTarget = null)
+		{
+			return PlatformService.ShowContextMenu (commandManager, widget, x, y, entrySet, initialCommandTarget);
 		}
 
 		public static bool SetGlobalMenu (MonoDevelop.Components.Commands.CommandManager commandManager,
@@ -207,10 +230,19 @@ namespace MonoDevelop.Ide
 				return PlatformService.CanOpenTerminal;
 			}
 		}
-		
-		public static void OpenInTerminal (FilePath directory)
+
+		/// <summary>
+		/// Opens an external terminal window.
+		/// </summary>
+		/// <param name="workingDirectory">Working directory.</param>
+		/// <param name="environmentVariables">Environment variables.</param>
+		/// <param name="windowTitle">Window title.</param>
+		public static void OpenTerminal (
+			FilePath workingDirectory,
+			IDictionary<string, string> environmentVariables = null,
+			string windowTitle = null)
 		{
-			PlatformService.OpenInTerminal (directory);
+			PlatformService.OpenTerminal (workingDirectory, environmentVariables, windowTitle);
 		}
 		
 		public static RecentFiles RecentFiles {

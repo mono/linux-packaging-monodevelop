@@ -56,10 +56,10 @@ namespace Mono.CSharp
 			//
 			// Returns true when object at local position has dynamic attribute flag
 			//
-			public bool IsDynamicObject (MetadataImporter importer)
+			public bool IsDynamicObject ()
 			{
 				if (provider != null)
-					ReadAttribute (importer);
+					ReadAttribute ();
 
 				return flags != null && Position < flags.Length && flags[Position];
 			}
@@ -67,23 +67,32 @@ namespace Mono.CSharp
 			//
 			// Returns true when DynamicAttribute exists
 			//
-			public bool HasDynamicAttribute (MetadataImporter importer)
+			public bool HasDynamicAttribute ()
 			{
 				if (provider != null)
-					ReadAttribute (importer);
+					ReadAttribute ();
 
 				return flags != null;
 			}
 
-			void ReadAttribute (MetadataImporter importer)
+			IList<CustomAttributeData> GetCustomAttributes ()
 			{
-				IList<CustomAttributeData> cad;
-				if (provider is MemberInfo) {
-					cad = CustomAttributeData.GetCustomAttributes ((MemberInfo) provider);
-				} else if (provider is ParameterInfo) {
-					cad = CustomAttributeData.GetCustomAttributes ((ParameterInfo) provider);
-				} else {
-					provider = null;
+				var mi = provider as MemberInfo;
+				if (mi != null)
+					return CustomAttributeData.GetCustomAttributes (mi);
+
+				var pi = provider as ParameterInfo;
+				if (pi != null)
+					return CustomAttributeData.GetCustomAttributes (pi);
+
+				provider = null;
+				return null;
+			}
+
+			void ReadAttribute ()
+			{
+				var cad = GetCustomAttributes ();
+				if (cad == null) {
 					return;
 				}
 
@@ -152,7 +161,7 @@ namespace Mono.CSharp
 
 		public FieldSpec CreateField (FieldInfo fi, TypeSpec declaringType)
 		{
-			Modifiers mod = 0;
+			Modifiers mod;
 			var fa = fi.Attributes;
 			switch (fa & FieldAttributes.FieldAccessMask) {
 				case FieldAttributes.Public:
@@ -181,6 +190,12 @@ namespace Mono.CSharp
 
 			try {
 				field_type = ImportType (fi.FieldType, new DynamicTypeReader (fi));
+
+				//
+				// Private field has private type which is not fixed buffer
+				//
+				if (field_type == null)
+					return null;
 			} catch (Exception e) {
 				// TODO: I should construct fake TypeSpec based on TypeRef signature
 				// but there is no way to do it with System.Reflection
@@ -324,13 +339,15 @@ namespace Mono.CSharp
 					//    IFoo<A<T>> foo;	// A<T> is definition in this case
 					// }
 					//
-					// TODO: Is full logic from CreateType needed here as well?
-					//
 					if (!IsMissingType (type) && type.IsGenericTypeDefinition) {
-						var targs = CreateGenericArguments (0, type.GetGenericArguments (), dtype);
+						var start_pos = spec.DeclaringType == null ? 0 : spec.DeclaringType.MemberDefinition.TypeParametersCount;
+						var targs = CreateGenericArguments (start_pos, type.GetGenericArguments (), dtype);
 						spec = spec.MakeGenericType (module, targs);
 					}
 				}
+
+				if (spec == null)
+					return null;
 
 				++dtype.Position;
 				tspec[index] = spec;
@@ -368,7 +385,7 @@ namespace Mono.CSharp
 				kind = MemberKind.Method;
 				if (tparams == null && !mb.DeclaringType.IsInterface && name.Length > 6) {
 					if ((mod & (Modifiers.STATIC | Modifiers.PUBLIC)) == (Modifiers.STATIC | Modifiers.PUBLIC)) {
-						if (name[2] == '_' && name[1] == 'p' && name[0] == 'o') {
+						if (name[2] == '_' && name[1] == 'p' && name[0] == 'o' && (mb.Attributes & MethodAttributes.SpecialName) != 0) {
 							var op_type = Operator.GetType (name);
 							if (op_type.HasValue && parameters.Count > 0 && parameters.Count < 3) {
 								kind = MemberKind.Operator;
@@ -417,6 +434,8 @@ namespace Mono.CSharp
 						else
 							mod |= Modifiers.VIRTUAL;
 					}
+				} else if (parameters.HasExtensionMethodType) {
+					mod |= Modifiers.METHOD_EXTENSION;
 				}
 			}
 
@@ -494,7 +513,7 @@ namespace Mono.CSharp
 				} else if (i == 0 && method.IsStatic && (parent.Modifiers & Modifiers.METHOD_EXTENSION) != 0 &&
 					HasAttribute (CustomAttributeData.GetCustomAttributes (method), "ExtensionAttribute", CompilerServicesNamespace)) {
 					mod = Parameter.Modifier.This;
-					types[i] = ImportType (p.ParameterType);
+					types[i] = ImportType (p.ParameterType, new DynamicTypeReader (p));
 				} else {
 					types[i] = ImportType (p.ParameterType, new DynamicTypeReader (p));
 
@@ -714,7 +733,7 @@ namespace Mono.CSharp
 			TypeSpec spec;
 			if (import_cache.TryGetValue (type, out spec)) {
 				if (spec.BuiltinType == BuiltinTypeSpec.Type.Object) {
-					if (dtype.IsDynamicObject (this))
+					if (dtype.IsDynamicObject ())
 						return module.Compiler.BuiltinTypes.Dynamic;
 
 					return spec;
@@ -723,7 +742,7 @@ namespace Mono.CSharp
 				if (!spec.IsGeneric || type.IsGenericTypeDefinition)
 					return spec;
 
-				if (!dtype.HasDynamicAttribute (this))
+				if (!dtype.HasDynamicAttribute ())
 					return spec;
 
 				// We've found same object in the cache but this one has a dynamic custom attribute
@@ -748,6 +767,8 @@ namespace Mono.CSharp
 					return spec;
 
 				var targs = CreateGenericArguments (0, type.GetGenericArguments (), dtype);
+				if (targs == null)
+					return null;
 				if (declaringType == null) {
 					// Simple case, no nesting
 					spec = CreateType (type_def, null, new DynamicTypeReader (), canImportBaseType);
@@ -857,9 +878,10 @@ namespace Mono.CSharp
 
 				if (kind == MemberKind.Class) {
 					if ((ma & TypeAttributes.Sealed) != 0) {
-						mod |= Modifiers.SEALED;
 						if ((ma & TypeAttributes.Abstract) != 0)
 							mod |= Modifiers.STATIC;
+						else
+							mod |= Modifiers.SEALED;
 					} else if ((ma & TypeAttributes.Abstract) != 0) {
 						mod |= Modifiers.ABSTRACT;
 					}
@@ -1150,6 +1172,14 @@ namespace Mono.CSharp
 				throw new NotImplementedException ("Unknown element type " + type.ToString ());
 			}
 
+			TypeSpec compiled_type;
+			if (compiled_types.TryGetValue (type, out compiled_type)) {
+				if (compiled_type.BuiltinType == BuiltinTypeSpec.Type.Object && dtype.IsDynamicObject ())
+					return module.Compiler.BuiltinTypes.Dynamic;
+
+				return compiled_type;
+			}
+
 			return CreateType (type, dtype, true);
 		}
 
@@ -1257,6 +1287,23 @@ namespace Mono.CSharp
 			public string DefaultIndexerName;
 			public bool? CLSAttributeValue;
 			public TypeSpec CoClass;
+
+			static bool HasMissingType (ConstructorInfo ctor)
+			{
+#if STATIC
+				//
+				// Mimic odd csc behaviour where missing type on predefined
+				// attributes means the attribute is silently ignored. This can
+				// happen with PCL facades
+				//
+				foreach (var p in ctor.GetParameters ()) {
+					if (p.ParameterType.__ContainsMissingType)
+						return true;
+				}
+#endif
+
+				return false;
+			}
 			
 			public static AttributesBag Read (MemberInfo mi, MetadataImporter importer)
 			{
@@ -1331,6 +1378,9 @@ namespace Mono.CSharp
 							if (dt.Namespace != "System")
 								continue;
 
+							if (HasMissingType (a.Constructor))
+								continue;
+
 							if (bag == null)
 								bag = new AttributesBag ();
 
@@ -1347,6 +1397,9 @@ namespace Mono.CSharp
 						// Interface only attribute
 						if (name == "CoClassAttribute") {
 							if (dt.Namespace != "System.Runtime.InteropServices")
+								continue;
+
+							if (HasMissingType (a.Constructor))
 								continue;
 
 							if (bag == null)
@@ -1372,7 +1425,7 @@ namespace Mono.CSharp
 		protected AttributesBag cattrs;
 		protected readonly MetadataImporter importer;
 
-		public ImportedDefinition (MemberInfo provider, MetadataImporter importer)
+		protected ImportedDefinition (MemberInfo provider, MetadataImporter importer)
 		{
 			this.provider = provider;
 			this.importer = importer;
@@ -1798,6 +1851,16 @@ namespace Mono.CSharp
 			}
 		}
 
+		bool ITypeDefinition.IsCyclicTypeForwarder {
+			get {
+#if STATIC
+				return ((MetaType) provider).__IsCyclicTypeForwarder;
+#else
+				return false;
+#endif
+			}
+		}
+
 		public override string Name {
 			get {
 				if (name == null) {
@@ -1893,7 +1956,7 @@ namespace Mono.CSharp
 
 		}
 
-		public static void Error_MissingDependency (IMemberContext ctx, List<TypeSpec> types, Location loc)
+		public static void Error_MissingDependency (IMemberContext ctx, List<MissingTypeSpecReference> missing, Location loc)
 		{
 			// 
 			// Report details about missing type and most likely cause of the problem.
@@ -1904,8 +1967,8 @@ namespace Mono.CSharp
 
 			var report = ctx.Module.Compiler.Report;
 
-			for (int i = 0; i < types.Count; ++i) {
-				var t = types [i];
+			for (int i = 0; i < missing.Count; ++i) {
+				var t = missing [i].Type;
 
 				//
 				// Report missing types only once
@@ -1915,20 +1978,28 @@ namespace Mono.CSharp
 
 				string name = t.GetSignatureForError ();
 
-				if (t.MemberDefinition.DeclaringAssembly == ctx.Module.DeclaringAssembly) {
+				var caller = missing[i].Caller;
+				if (caller.Kind != MemberKind.MissingType)
+					report.SymbolRelatedToPreviousError (caller);
+
+				var definition = t.MemberDefinition;
+				if (definition.DeclaringAssembly == ctx.Module.DeclaringAssembly) {
 					report.Error (1683, loc,
 						"Reference to type `{0}' claims it is defined in this assembly, but it is not defined in source or any added modules",
 						name);
-				} else if (t.MemberDefinition.DeclaringAssembly.IsMissing) {
-					if (t.MemberDefinition.IsTypeForwarder) {
+				} else if (definition.DeclaringAssembly.IsMissing) {
+					if (definition.IsTypeForwarder) {
 						report.Error (1070, loc,
 							"The type `{0}' has been forwarded to an assembly that is not referenced. Consider adding a reference to assembly `{1}'",
-							name, t.MemberDefinition.DeclaringAssembly.FullName);
+							name, definition.DeclaringAssembly.FullName);
 					} else {
 						report.Error (12, loc,
 							"The type `{0}' is defined in an assembly that is not referenced. Consider adding a reference to assembly `{1}'",
-							name, t.MemberDefinition.DeclaringAssembly.FullName);
+							name, definition.DeclaringAssembly.FullName);
 					}
+				} else if (definition.IsTypeForwarder) {
+					report.Error (731, loc, "The type forwarder for type `{0}' in assembly `{1}' has circular dependency",
+						name, definition.DeclaringAssembly.FullName);
 				} else {
 					report.Error (1684, loc,
 						"Reference to type `{0}' claims it is defined assembly `{1}', but it could not be found",
@@ -2107,7 +2178,13 @@ namespace Mono.CSharp
 						if (get == null && set == null)
 							continue;
 
-						imported = importer.CreateProperty (p, declaringType, get, set);
+						try {
+							imported = importer.CreateProperty (p, declaringType, get, set);
+						} catch (Exception ex) {
+							throw new InternalErrorException (ex, "Could not import property `{0}' inside `{1}'",
+								p.Name, declaringType.GetSignatureForError ());
+						}
+
 						if (imported == null)
 							continue;
 
@@ -2216,6 +2293,12 @@ namespace Mono.CSharp
 		}
 
 		bool ITypeDefinition.IsTypeForwarder {
+			get {
+				return false;
+			}
+		}
+
+		bool ITypeDefinition.IsCyclicTypeForwarder {
 			get {
 				return false;
 			}

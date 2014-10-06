@@ -36,13 +36,19 @@ using System.Linq;
 using MonoDevelop.Ide;
 using ICSharpCode.NRefactory.CSharp;
 using System.Text;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.CSharp
 {
-	public class PathedDocumentTextEditorExtension : TextEditorExtension, IPathedDocument
+	class PathedDocumentTextEditorExtension : TextEditorExtension, IPathedDocument
 	{
 		public override void Dispose ()
 		{
+			IdeApp.Workspace.FileAddedToProject -= HandleProjectChanged;
+			IdeApp.Workspace.FileRemovedFromProject -= HandleProjectChanged;
+			IdeApp.Workspace.WorkspaceItemUnloaded -= HandleWorkspaceItemUnloaded;
+			IdeApp.Workspace.WorkspaceItemLoaded -= HandleWorkspaceItemLoaded;;
+
 			if (caret != null) {
 				caret.PositionChanged -= UpdatePath;
 				caret = null;
@@ -58,19 +64,55 @@ namespace MonoDevelop.CSharp
 		}
 
 		bool isPathSet;
-
 		Mono.TextEditor.Caret caret;
 		CSharpCompletionTextEditorExtension ext;
-		
+
+		List<DotNetProject> ownerProjects = new List<DotNetProject> ();
+
 		public override void Initialize ()
 		{
 			CurrentPath = new PathEntry[] { new PathEntry (GettextCatalog.GetString ("No selection")) { Tag = null } };
 			isPathSet = false;
-			UpdatePath (null, null);
+			// Delay the execution of UpdateOwnerProjects since it may end calling Document.AttachToProject,
+			// which shouldn't be called while the extension chain is being initialized.
+			Gtk.Application.Invoke (delegate {
+				UpdateOwnerProjects ();
+				UpdatePath (null, null);
+			});
 			caret = Document.Editor.Caret;
 			caret.PositionChanged += UpdatePath;
 			ext = Document.GetContent<CSharpCompletionTextEditorExtension> ();
 			ext.TypeSegmentTreeUpdated += HandleTypeSegmentTreeUpdated;
+			IdeApp.Workspace.FileAddedToProject += HandleProjectChanged;
+			IdeApp.Workspace.FileRemovedFromProject += HandleProjectChanged;
+			IdeApp.Workspace.WorkspaceItemUnloaded += HandleWorkspaceItemUnloaded;
+			IdeApp.Workspace.WorkspaceItemLoaded += HandleWorkspaceItemLoaded;;
+		}
+
+		void HandleWorkspaceItemLoaded (object sender, WorkspaceItemEventArgs e)
+		{
+			if (ownerProjects != null)
+				return;
+			UpdateOwnerProjects (e.Item.GetAllProjects ().OfType<DotNetProject> ());
+		}
+
+		void HandleWorkspaceItemUnloaded (object sender, WorkspaceItemEventArgs e)
+		{
+			if (ownerProjects == null)
+				return;
+			foreach (var p in e.Item.GetAllProjects ().OfType<DotNetProject> ()) {
+				ownerProjects.Remove (p); 
+			}
+			if (ownerProjects.Count == 0) {
+				ownerProjects = null;
+				Document.AttachToProject (null);
+			}
+		}
+
+		void HandleProjectChanged (object sender, ProjectFileEventArgs e)
+		{
+			UpdateOwnerProjects ();
+			UpdatePath (null, null);
 		}
 
 		void HandleTypeSegmentTreeUpdated (object sender, EventArgs e)
@@ -78,7 +120,31 @@ namespace MonoDevelop.CSharp
 			UpdatePath (null, null);
 		}
 
+		void UpdateOwnerProjects (IEnumerable<DotNetProject> allProjects)
+		{
+			var projects = new HashSet<DotNetProject> (allProjects.Where (p => p.IsFileInProject (Document.FileName)));
+			if (ownerProjects == null || !projects.SetEquals (ownerProjects)) {
+				ownerProjects = projects.OrderBy (p => p.Name).ToList ();
+				var dnp = Document.Project as DotNetProject;
+				if (ownerProjects.Count > 0 && (dnp == null || !ownerProjects.Contains (dnp))) {
+					// If the project for the document is not a DotNetProject but there is a project containing this file
+					// in the current solution, then use that project
+					var pp = Document.Project != null ? ownerProjects.FirstOrDefault (p => p.ParentSolution == Document.Project.ParentSolution) : null;
+					if (pp != null)
+						Document.AttachToProject (pp);
+				}
+			}
+		}
+
+		void UpdateOwnerProjects ()
+		{
+			UpdateOwnerProjects (IdeApp.Workspace.GetAllSolutionItems<DotNetProject> ());
+			if (Document.Project == null && ownerProjects.Count > 0)
+				Document.AttachToProject (ownerProjects[0]);
+		}
+
 		#region IPathedDocument implementation
+
 		public event EventHandler<DocumentPathChangedEventArgs> PathChanged;
 
 		protected virtual void OnPathChanged (DocumentPathChangedEventArgs e)
@@ -87,7 +153,7 @@ namespace MonoDevelop.CSharp
 			if (handler != null)
 				handler (this, e);
 		}
-		
+
 		class DataProvider : DropDownBoxListWindow.IListDataProvider
 		{
 			readonly PathedDocumentTextEditorExtension ext;
@@ -102,8 +168,27 @@ namespace MonoDevelop.CSharp
 				this.tag = tag;
 				Reset ();
 			}
-			
+
 			#region IListDataProvider implementation
+
+			void AddTypeToMemberList (TypeDeclaration type)
+			{
+				foreach (var member in type.Members) {
+					if (member is FieldDeclaration) {
+						foreach (var variable in ((FieldDeclaration)member).Variables)
+							memberList.Add (variable);
+					} else if (member is FixedFieldDeclaration) {
+						foreach (var variable in ((FixedFieldDeclaration)member).Variables)
+							memberList.Add (variable);
+					} else if (member is EventDeclaration) {
+						foreach (var variable in ((EventDeclaration)member).Variables)
+							memberList.Add (variable);
+					} else {
+						memberList.Add (member);
+					}
+				}
+			}
+
 			public void Reset ()
 			{
 				memberList.Clear ();
@@ -111,47 +196,25 @@ namespace MonoDevelop.CSharp
 					var unit = tag as SyntaxTree;
 					memberList.AddRange (unit.GetTypes (true));
 				} else if (tag is TypeDeclaration) {
-					var type = (TypeDeclaration)tag;
-					foreach (var member in type.Members) {
-						if (member is FieldDeclaration) {
-							foreach (var variable in ((FieldDeclaration)member).Variables)
-								memberList.Add (variable);
-						} else if (member is FixedFieldDeclaration) {
-							foreach (var variable in ((FixedFieldDeclaration)member).Variables)
-								memberList.Add (variable);
-						} else if (member is EventDeclaration) {
-							foreach (var variable in ((EventDeclaration)member).Variables)
-								memberList.Add (variable);
-						} else {
-							memberList.Add (member);
-						}
-					}
+					AddTypeToMemberList ((TypeDeclaration)tag);
 				} else if (tag is Accessor) {
 					var acc = (Accessor)tag;
 					var parent = (EntityDeclaration)acc.Parent;
 					memberList.AddRange (parent.Children.OfType<Accessor> ());
 				} else if (tag is EntityDeclaration) {
 					var entity = (EntityDeclaration)tag;
-					var type = (TypeDeclaration)entity.Parent;
-					foreach (var member in type.Members) {
-						if (member is FieldDeclaration) {
-							foreach (var variable in ((FieldDeclaration)member).Variables)
-								memberList.Add (variable);
-						} if (member is FixedFieldDeclaration) {
-							foreach (var variable in ((FixedFieldDeclaration)member).Variables)
-								memberList.Add (variable);
-						} else {
-							memberList.Add (member);
-						}
+					var type = entity.Parent as TypeDeclaration;
+					if (type != null) {
+						AddTypeToMemberList (type);
 					}
-				} 
+				}
 
 				memberList.Sort ((x, y) => {
-					var result = String.Compare (GetName (x), GetName(y), StringComparison.OrdinalIgnoreCase);
+					var result = String.Compare (GetName (x), GetName (y), StringComparison.OrdinalIgnoreCase);
 					if (result == 0)
-						result = GetTypeParameters(x).CompareTo (GetTypeParameters(y));
+						result = GetTypeParameters (x).CompareTo (GetTypeParameters (y));
 					if (result == 0)
-						result = GetParameters(x).CompareTo (GetParameters(y));
+						result = GetParameters (x).CompareTo (GetParameters (y));
 
 					// partial methods without body should come last
 					if (result == 0 && x is MethodDeclaration && y is MethodDeclaration) {
@@ -189,6 +252,17 @@ namespace MonoDevelop.CSharp
 						}
 						return sb.ToString ();
 					}
+					var delegateDecl = node as DelegateDeclaration;
+					if (delegateDecl != null) {
+						var sb = new StringBuilder ();
+						sb.Append (delegateDecl.Name);
+						var parentType = delegateDecl.Parent as TypeDeclaration;
+						while (parentType != null) {
+							sb.Insert (0, parentType.Name + ".");
+							parentType = parentType.Parent as TypeDeclaration;
+						}
+						return sb.ToString ();
+					}
 				}
 				
 				if (node is Accessor) {
@@ -196,12 +270,15 @@ namespace MonoDevelop.CSharp
 						return "get";
 					if (node.Role == PropertyDeclaration.SetterRole)
 						return "set";
-					if (node.Role == CustomEventDeclaration.AddAccessorRole) 
+					if (node.Role == CustomEventDeclaration.AddAccessorRole)
 						return "add";
 					if (node.Role == CustomEventDeclaration.RemoveAccessorRole)
 						return "remove";
 					return node.ToString ();
 				}
+				if (node is OperatorDeclaration)
+					return "operator";
+
 				if (node is EntityDeclaration)
 					return ((EntityDeclaration)node).Name;
 				if (node is FixedVariableInitializer) {
@@ -212,6 +289,10 @@ namespace MonoDevelop.CSharp
 
 			public string GetMarkup (int n)
 			{
+				if (tag is DotNetProject) {
+					return GLib.Markup.EscapeText (ext.ownerProjects [n].Name);
+				}
+
 				var node = memberList [n];
 				if (tag is SyntaxTree) {
 					var type = node;
@@ -228,89 +309,109 @@ namespace MonoDevelop.CSharp
 				return ext.GetEntityMarkup (node);
 			}
 			
-			public Gdk.Pixbuf GetIcon (int n)
+			public Xwt.Drawing.Image GetIcon (int n)
 			{
 				string icon;
-				var node = memberList [n];
-				if (node is EntityDeclaration) {
-					icon = ((EntityDeclaration)node).GetStockIcon (false);
+				if (tag is DotNetProject) {
+					icon = ext.ownerProjects [n].StockIcon;
 				} else {
-					icon = ((EntityDeclaration)node.Parent).GetStockIcon (false);
+					var node = memberList [n];
+					if (node is EntityDeclaration) {
+						icon = ((EntityDeclaration)node).GetStockIcon ();
+					} else {
+						icon = ((EntityDeclaration)node.Parent).GetStockIcon ();
+					}
 				}
-				return ImageService.GetPixbuf (icon, Gtk.IconSize.Menu);
+				return ImageService.GetIcon (icon, Gtk.IconSize.Menu);
 			}
-			
+
 			public object GetTag (int n)
 			{
-				return memberList[n];
+				if (tag is DotNetProject)
+					return ext.ownerProjects [n];
+				else
+					return memberList [n];
 			}
-			
+
 			public void ActivateItem (int n)
 			{
-				var node = memberList [n];
-				var extEditor = ext.Document.GetContent<IExtensibleTextEditor> ();
-				if (extEditor != null) {
-					int line, col;
-					if (node is OperatorDeclaration) { 
-						line = Math.Max (1, ((OperatorDeclaration)node).OperatorToken.StartLocation.Line);
-						col = Math.Max (1, ((OperatorDeclaration)node).OperatorToken.StartLocation.Column);
-					} else if (node is EntityDeclaration && !(node is Accessor)) {
-						line = Math.Max (1, ((EntityDeclaration)node).NameToken.StartLocation.Line);
-						col = Math.Max (1, ((EntityDeclaration)node).NameToken.StartLocation.Column);
-					} else {
-						line = node.StartLocation.Line;
-						col = node.StartLocation.Column;
+				if (tag is DotNetProject) {
+					ext.Document.AttachToProject (ext.ownerProjects [n]);
+				} else {
+					var node = memberList [n];
+					var extEditor = ext.Document.GetContent<IExtensibleTextEditor> ();
+					if (extEditor != null) {
+						int line, col;
+						if (node is OperatorDeclaration) { 
+							line = Math.Max (1, ((OperatorDeclaration)node).OperatorToken.StartLocation.Line);
+							col = Math.Max (1, ((OperatorDeclaration)node).OperatorToken.StartLocation.Column);
+						} else if (node is IndexerDeclaration) { 
+							line = Math.Max (1, ((IndexerDeclaration)node).ThisToken.StartLocation.Line);
+							col = Math.Max (1, ((IndexerDeclaration)node).ThisToken.StartLocation.Column);
+						} else if (node is EntityDeclaration && !(node is Accessor)) {
+							line = Math.Max (1, ((EntityDeclaration)node).NameToken.StartLocation.Line);
+							col = Math.Max (1, ((EntityDeclaration)node).NameToken.StartLocation.Column);
+						} else {
+							line = node.StartLocation.Line;
+							col = node.StartLocation.Column;
+						}
+						extEditor.SetCaretTo (line, col);
 					}
-					extEditor.SetCaretTo (line, col);
 				}
 			}
-			
+
 			public int IconCount {
 				get {
-					return memberList.Count;
+					if (tag is DotNetProject)
+						return ext.ownerProjects.Count;
+					else
+						return memberList.Count;
 				}
 			}
+
 			#endregion
+
 		}
-		
+
 		class CompilationUnitDataProvider : DropDownBoxListWindow.IListDataProvider
 		{
 			Document Document {
 				get;
 				set;
 			}
-			
+
 			public CompilationUnitDataProvider (Document document)
 			{
 				this.Document = document;
 			}
-			
+
 			#region IListDataProvider implementation
+
 			public void Reset ()
 			{
 			}
-			
+
 			public string GetMarkup (int n)
 			{
 				return GLib.Markup.EscapeText (Document.ParsedDocument.UserRegions.ElementAt (n).Name);
 			}
 			
-			internal static Gdk.Pixbuf Pixbuf {
+			internal static Xwt.Drawing.Image Pixbuf {
 				get {
-					return ImageService.GetPixbuf (Gtk.Stock.Add, Gtk.IconSize.Menu);
+					return ImageService.GetIcon (Gtk.Stock.Add, Gtk.IconSize.Menu);
 				}
 			}
 			
-			public Gdk.Pixbuf GetIcon (int n)
+			public Xwt.Drawing.Image GetIcon (int n)
 			{
 				return Pixbuf;
 			}
-			
+
 			public object GetTag (int n)
 			{
 				return Document.ParsedDocument.UserRegions.ElementAt (n);
 			}
-			
+
 			public void ActivateItem (int n)
 			{
 				var reg = Document.ParsedDocument.UserRegions.ElementAt (n);
@@ -318,7 +419,7 @@ namespace MonoDevelop.CSharp
 				if (extEditor != null)
 					extEditor.SetCaretTo (Math.Max (1, reg.Region.BeginLine), reg.Region.BeginColumn);
 			}
-			
+
 			public int IconCount {
 				get {
 					if (Document.ParsedDocument == null)
@@ -326,9 +427,11 @@ namespace MonoDevelop.CSharp
 					return Document.ParsedDocument.UserRegions.Count ();
 				}
 			}
+
 			#endregion
+
 		}
-		
+
 		public Gtk.Widget CreatePathWidget (int index)
 		{
 			PathEntry[] path = CurrentPath;
@@ -336,11 +439,14 @@ namespace MonoDevelop.CSharp
 				return null;
 			var tag = path [index].Tag;
 			var window = new DropDownBoxListWindow (tag == null ? (DropDownBoxListWindow.IListDataProvider)new CompilationUnitDataProvider (Document) : new DataProvider (this, tag));
+			window.FixedRowHeight = 22;
+			window.MaxVisibleRows = 14;
 			window.SelectItem (path [index].Tag);
 			return window;
 		}
-		
+
 		PathEntry[] currentPath;
+
 		public PathEntry[] CurrentPath {
 			get {
 				return currentPath;
@@ -350,23 +456,23 @@ namespace MonoDevelop.CSharp
 				isPathSet = true;
 			}
 		}
-		
+
 		static PathEntry GetRegionEntry (ParsedDocument unit, Mono.TextEditor.DocumentLocation loc)
 		{
 			PathEntry entry;
 			if (!unit.UserRegions.Any ())
 				return null;
-			var reg = unit.UserRegions.Where (r => r.Region.IsInside (loc)).LastOrDefault ();
+			var reg = unit.UserRegions.LastOrDefault (r => r.Region.IsInside (loc));
 			if (reg == null) {
 				entry = new PathEntry (GettextCatalog.GetString ("No region"));
 			} else {
 				entry = new PathEntry (CompilationUnitDataProvider.Pixbuf,
-						                       GLib.Markup.EscapeText (reg.Name));
+				                       GLib.Markup.EscapeText (reg.Name));
 			}
 			entry.Position = EntryPosition.Right;
 			return entry;
 		}
-		
+
 		void ClearPath ()
 		{
 			var prev = CurrentPath;
@@ -378,7 +484,9 @@ namespace MonoDevelop.CSharp
 		string lastTypeMarkup;
 		EntityDeclaration lastMember;
 		string lastMemberMarkup;
+		MonoDevelop.Projects.Project lastProject;
 		AstAmbience amb;
+
 		string GetEntityMarkup (AstNode node)
 		{
 			if (amb == null)
@@ -406,6 +514,7 @@ namespace MonoDevelop.CSharp
 
 			var curType = (EntityDeclaration)unit.GetNodeAt (loc, n => n is TypeDeclaration || n is DelegateDeclaration);
 
+			var curProject = ownerProjects != null && ownerProjects.Count > 1 ? Document.Project : null;
 
 			var segMember = compExt.GetMemberAt (caretOffset);
 			if (segMember != null) {
@@ -415,15 +524,15 @@ namespace MonoDevelop.CSharp
 			}
 
 			var curMember = unit.GetNodeAt<EntityDeclaration> (loc);
-			if (curType == curMember)
+			if (curType == curMember || curType is DelegateDeclaration)
 				curMember = null;
-			if (isPathSet && curType == lastType && lastMember == curMember)
+			if (isPathSet && curType == lastType && curMember == lastMember && curProject == lastProject)
 				return;
 
 			var curTypeMakeup = GetEntityMarkup (curType);
 			var curMemberMarkup = GetEntityMarkup (curMember);
 			if (isPathSet && curType != null && lastType != null && curType.StartLocation == lastType.StartLocation && curTypeMakeup == lastTypeMarkup &&
-			    curMember != null && lastMember != null && curMember.StartLocation == lastMember.StartLocation && curMemberMarkup == lastMemberMarkup)
+				curMember != null && lastMember != null && curMember.StartLocation == lastMember.StartLocation && curMemberMarkup == lastMemberMarkup && curProject == lastProject)
 				return;
 
 			lastType = curType;
@@ -432,33 +541,43 @@ namespace MonoDevelop.CSharp
 			lastMember = curMember;
 			lastMemberMarkup = curMemberMarkup;
 
+			lastProject = curProject;
+
+			var result = new List<PathEntry> ();
+
+			if (ownerProjects != null && ownerProjects.Count > 1) {
+				// Current project if there is more than one
+				result.Add (new PathEntry (ImageService.GetIcon (Document.Project.StockIcon, Gtk.IconSize.Menu), GLib.Markup.EscapeText (Document.Project.Name)) { Tag = Document.Project });
+			}
+
 			if (curType == null) {
 				if (CurrentPath != null && CurrentPath.Length == 1 && CurrentPath [0].Tag is IUnresolvedFile)
 					return;
+				if (CurrentPath != null && CurrentPath.Length == 2 && CurrentPath [1].Tag is IUnresolvedFile)
+					return;
 				var prevPath = CurrentPath;
-				CurrentPath = new PathEntry[] { new PathEntry (GettextCatalog.GetString ("No selection")) { Tag = unit } };
+				result.Add (new PathEntry (GettextCatalog.GetString ("No selection")) { Tag = unit });
+				CurrentPath = result.ToArray ();
 				OnPathChanged (new DocumentPathChangedEventArgs (prevPath));	
 				return;
 			}
-			
-			//	ThreadPool.QueueUserWorkItem (delegate {
-			var result = new List<PathEntry> ();
 
 			if (curType != null) {
 				var type = curType;
+				var pos = result.Count;
 				while (type != null) {
 					var declaringType = type.Parent as TypeDeclaration;
-					result.Insert (0, new PathEntry (ImageService.GetPixbuf (type.GetStockIcon (false), Gtk.IconSize.Menu), GetEntityMarkup (type)) { Tag = (AstNode)declaringType ?? unit });
+					result.Insert (pos, new PathEntry (ImageService.GetIcon (type.GetStockIcon (), Gtk.IconSize.Menu), GetEntityMarkup (type)) { Tag = (AstNode)declaringType ?? unit });
 					type = declaringType;
 				}
 			}
 				
 			if (curMember != null) {
-				result.Add (new PathEntry (ImageService.GetPixbuf (curMember.GetStockIcon (true), Gtk.IconSize.Menu), curMemberMarkup) { Tag = curMember });
+				result.Add (new PathEntry (ImageService.GetIcon (curMember.GetStockIcon (), Gtk.IconSize.Menu), curMemberMarkup) { Tag = curMember });
 				if (curMember is Accessor) {
 					var parent = curMember.Parent as EntityDeclaration;
 					if (parent != null)
-						result.Insert (result.Count - 1, new PathEntry (ImageService.GetPixbuf (parent.GetStockIcon (true), Gtk.IconSize.Menu), GetEntityMarkup (parent)) { Tag = parent });
+						result.Insert (result.Count - 1, new PathEntry (ImageService.GetIcon (parent.GetStockIcon (), Gtk.IconSize.Menu), GetEntityMarkup (parent)) { Tag = parent });
 				}
 			}
 				
@@ -473,7 +592,7 @@ namespace MonoDevelop.CSharp
 				noSelection = new PathEntry (GettextCatalog.GetString ("No selection")) { Tag = curType };
 			}
 
-			if (noSelection != null) 
+			if (noSelection != null)
 				result.Add (noSelection);
 
 			var prev = CurrentPath;
@@ -494,8 +613,8 @@ namespace MonoDevelop.CSharp
 			//		});
 			//	});
 		}
+
 		#endregion
+
 	}
-
-
 }

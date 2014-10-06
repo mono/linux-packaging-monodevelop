@@ -1,5 +1,4 @@
 
-using System;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide;
@@ -19,7 +18,6 @@ namespace MonoDevelop.VersionControl
 		Publish,
 		Checkout,
 		Repository,
-		Commit,
 		Revert,
 		Lock,
 		Unlock,
@@ -28,12 +26,13 @@ namespace MonoDevelop.VersionControl
 		HideAnnotations,
 		CreatePatch,
 		Ignore,
-		Unignore
+		Unignore,
+		ResolveConflicts
 	}
 	
 	class SolutionVersionControlCommandHandler: CommandHandler
 	{
-		VersionControlItemList GetItems ()
+		static VersionControlItemList GetItems ()
 		{
 			VersionControlItemList list = new VersionControlItemList ();
 			
@@ -63,6 +62,11 @@ namespace MonoDevelop.VersionControl
 		
 		protected override void Update (CommandInfo info)
 		{
+			if (VersionControlService.IsGloballyDisabled) {
+				info.Visible = false;
+				return;
+			}
+
 			VersionControlItemList items = GetItems ();
 			info.Enabled = items.Count > 0 && RunCommand (items, true);
 		}
@@ -75,7 +79,7 @@ namespace MonoDevelop.VersionControl
 	
 	class FileVersionControlCommandHandler: CommandHandler
 	{
-		protected VersionControlItemList GetItems ()
+		protected static VersionControlItemList GetItems ()
 		{
 			VersionControlItemList list = new VersionControlItemList ();
 			VersionControlItem it = GetItem ();
@@ -85,7 +89,7 @@ namespace MonoDevelop.VersionControl
 			return list;
 		}
 		
-		protected VersionControlItem GetItem ()
+		protected static VersionControlItem GetItem ()
 		{
 			Document doc = IdeApp.Workbench.ActiveDocument;
 			if (doc == null || !doc.IsFile)
@@ -110,6 +114,11 @@ namespace MonoDevelop.VersionControl
 		
 		protected override void Update (CommandInfo info)
 		{
+			if (VersionControlService.IsGloballyDisabled) {
+				info.Visible = false;
+				return;
+			}
+
 			VersionControlItemList items = GetItems ();
 			info.Enabled = items.Count > 0 && RunCommand (items, true);
 		}
@@ -132,15 +141,7 @@ namespace MonoDevelop.VersionControl
 	{
 		protected override bool RunCommand (VersionControlItemList items, bool test)
 		{
-			return StatusView.Show (items, test);
-		}
-	}
-
-	class CommitCommandHandler: FileVersionControlCommandHandler
-	{
-		protected override bool RunCommand (VersionControlItemList items, bool test)
-		{
-			return CommitCommand.Commit (items, test);
+			return StatusView.Show (items, test, true);
 		}
 	}
 

@@ -25,9 +25,6 @@
 // THE SOFTWARE.
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.ProgressMonitoring;
-using MonoDevelop.VersionControl;
-using MonoDevelop.VersionControl.Subversion;
 using MonoDevelop.VersionControl.Tests;
 using NUnit.Framework;
 using System.Diagnostics;
@@ -36,11 +33,9 @@ using System.IO;
 namespace MonoDevelop.VersionControl.Subversion.Tests
 {
 	[TestFixture]
-	public abstract class BaseSvnUtilsTest : BaseRepoUtilsTest
+	abstract class BaseSvnUtilsTest : BaseRepoUtilsTest
 	{
-		protected SubversionBackend backend;
-		protected SubversionRepository repo;
-		protected Process svnServe = null;
+		protected Process SvnServe = null;
 
 		[SetUp]
 		public override void Setup ()
@@ -49,13 +44,13 @@ namespace MonoDevelop.VersionControl.Subversion.Tests
 			ProcessStartInfo info;
 
 			// Generate directories and a svn util.
-			rootCheckout = new FilePath (FileService.CreateTempDirectory () + Path.DirectorySeparatorChar);
+			LocalPath = new FilePath (FileService.CreateTempDirectory () + Path.DirectorySeparatorChar);
 
 			// Create repo in "repo".
 			svnAdmin = new Process ();
 			info = new ProcessStartInfo ();
 			info.FileName = "svnadmin";
-			info.Arguments = "create " + rootUrl + Path.DirectorySeparatorChar + "repo";
+			info.Arguments = "create " + RemotePath + Path.DirectorySeparatorChar + "repo";
 			info.WindowStyle = ProcessWindowStyle.Hidden;
 			svnAdmin.StartInfo = info;
 			svnAdmin.Start ();
@@ -64,16 +59,16 @@ namespace MonoDevelop.VersionControl.Subversion.Tests
 			// Create host (Win32)
 			// This needs to be done after doing the svnAdmin creation.
 			// And before checkout.
-			if (svnServe != null) {
+			if (SvnServe != null) {
 				info = new ProcessStartInfo ();
 				info.FileName = "svnserve";
-				info.Arguments = "-dr " + rootUrl;
+				info.Arguments = "-dr " + RemotePath;
 				info.WindowStyle = ProcessWindowStyle.Hidden;
-				svnServe.StartInfo = info;
-				svnServe.Start ();
+				SvnServe.StartInfo = info;
+				SvnServe.Start ();
 
 				// Create user to auth.
-				using (var perm = File. CreateText (rootUrl + Path.DirectorySeparatorChar + "repo" +
+				using (var perm = File. CreateText (RemotePath + Path.DirectorySeparatorChar + "repo" +
 				                                    Path.DirectorySeparatorChar + "conf" + Path.DirectorySeparatorChar + "svnserve.conf")) {
 					perm.WriteLine ("[general]");
 					perm.WriteLine ("anon-access = write");
@@ -82,104 +77,51 @@ namespace MonoDevelop.VersionControl.Subversion.Tests
 			}
 
 			// Check out the repository.
-			Checkout (rootCheckout);
-			repo = GetRepo (repoLocation, rootCheckout);
-		}
-
-		[TearDown]
-		public override void TearDown ()
-		{
-			DeleteDirectory (rootUrl);
-			DeleteDirectory (rootCheckout);
+			Checkout (LocalPath, RemoteUrl);
+			Repo = GetRepo (LocalPath, RemoteUrl);
+			DotDir = ".svn";
 		}
 
 		[Test]
-		public override void CheckoutExists ()
+		[Ignore ("Subversion fails to revert special kind revisions.")]
+		public override void RevertsRevision ()
 		{
-			Assert.True (Directory.Exists (rootCheckout + ".svn"));
 		}
 
-		[Test]
-		public override void FileIsAdded ()
+		protected override NUnit.Framework.Constraints.IResolveConstraint IsCorrectType ()
 		{
-			string added = rootCheckout + "testfile";
-			File.Create (added).Close ();
-			backend.Add (added, false, new NullProgressMonitor ());
-
-			foreach (var vi in backend.Status (repo, added, SvnRevision.First))
-				Assert.AreEqual (VersionStatus.ScheduledAdd, (VersionStatus.ScheduledAdd & vi.Status));
+			return Is.InstanceOf<SubversionRepository> ();
 		}
 
-		[Test]
-		public override void FileIsCommitted ()
-		{
-			string added = rootCheckout + "testfile";
-			File.Create (added).Close ();
-			backend.Add (added, false, new NullProgressMonitor ());
-			backend.Commit (new FilePath[] { rootCheckout }, "File committed", new NullProgressMonitor ());
-
-			foreach (var vi in backend.Status (repo, added, SvnRevision.First))
-				Assert.AreEqual (VersionStatus.Versioned, vi.Status);
+		protected override VersionStatus InitialValue {
+			get { return VersionStatus.Unversioned; }
 		}
 
-		[Test]
-		public override void UpdateIsDone ()
+		protected override void TestValidUrl ()
 		{
-			FilePath second = new FilePath (FileService.CreateTempDirectory () + Path.DirectorySeparatorChar);
-			Checkout (second);
-
-			string added = second + "testfile";
-			File.Create (added).Close ();
-			backend.Add (added, false, new NullProgressMonitor ());
-			backend.Commit (new FilePath[] { second }, "Check text", new NullProgressMonitor ());
-
-			backend.Update (rootCheckout, true, new NullProgressMonitor ());
-			Assert.True (File.Exists (rootCheckout + "testfile"));
-			DeleteDirectory (second);
+			var repo2 = (SubversionRepository)Repo;
+			Assert.IsTrue (repo2.IsUrlValid ("svn://svnrepo.com:80/repo"));
+			Assert.IsTrue (repo2.IsUrlValid ("svn+ssh://user@host.com:80/repo"));
+			Assert.IsTrue (repo2.IsUrlValid ("http://svnrepo.com:80/repo"));
+			Assert.IsTrue (repo2.IsUrlValid ("https://svnrepo.com:80/repo"));
 		}
 
-		[Test]
-		public override void Reverts ()
+		protected override Revision GetHeadRevision ()
 		{
-			string added = rootCheckout + "testfile";
-			string content = "text";
-
-			File.Create (added).Close ();
-			backend.Add (added, false, new NullProgressMonitor ());
-			backend.Commit (new FilePath[] { rootCheckout }, "File committed", new NullProgressMonitor ());
-
-			// Revert to head.
-			File.WriteAllText (added, content);
-
-			backend.Revert (new FilePath[] { added }, false, new NullProgressMonitor ());
-			Assert.AreEqual (backend.GetTextBase (added), File.ReadAllText (added));
-
-			// Revert revision.
-			File.AppendAllText (added, content);
-			File.Copy (added, added + "2");
-
-			backend.Commit (new FilePath[] { added }, "File modified", new NullProgressMonitor ());
-			backend.RevertRevision (added, new SvnRevision (repo, 2), new NullProgressMonitor ());
-			backend.Commit (new FilePath[] { added }, "File reverted", new NullProgressMonitor ());
-
-			Assert.AreNotEqual (File.ReadAllText (added + "2"), File.ReadAllText (added));
+			return SvnRevision.Head;
 		}
 
-		#region Util
-
-		public override void Checkout (string path)
+		protected override void BlameExtraInternals (Annotation [] annotations)
 		{
-			backend.Checkout (repoLocation,
-			                  path, SvnRevision.Head,
-			                  true, new NullProgressMonitor ());
+			for (int i = 0; i < 2; i++) {
+				Assert.IsFalse (annotations [i].HasEmail);
+				// Subversion for Unix gives an author.
+//				Assert.IsNull (annotations [i].Author);
+				Assert.IsNull (annotations [i].Email);
+			}
+			Assert.IsFalse (annotations [2].HasEmail);
+			Assert.IsFalse (annotations [2].HasDate);
 		}
-
-		public virtual SubversionRepository GetRepo (string url, string path)
-		{
-			return null;
-		}
-
-		#endregion
 	}
 }
 

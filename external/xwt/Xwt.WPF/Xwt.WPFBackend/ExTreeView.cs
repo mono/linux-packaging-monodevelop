@@ -40,6 +40,8 @@ using System.Windows.Input;
 
 namespace Xwt.WPFBackend
 {
+	using Keyboard = System.Windows.Input.Keyboard;
+
 	public class ExTreeView
 		: SWC.TreeView, IWpfWidget
 	{
@@ -53,8 +55,11 @@ namespace Xwt.WPFBackend
 		{
 			if (SelectionMode == SWC.SelectionMode.Single)
 			{
-				if (Items.Count > 0)
-					SelectItem(Items[0]);
+				if (SelectedItems.Count == 0)
+				{
+					if (Items.Count > 0)
+						SelectItem(Items[0]);
+				}
 			}
 		}
 

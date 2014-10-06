@@ -70,13 +70,11 @@ namespace CBinding.Navigation
 		
 		public override void BuildNode (ITreeBuilder treeBuilder,
 		                                object dataObject,
-		                                ref string label,
-		                                ref Gdk.Pixbuf icon,
-		                                ref Gdk.Pixbuf closedIcon)
+		                                NodeInfo nodeInfo)
 		{
-			label = "Globals";
-			icon = Context.GetIcon (Stock.OpenFolder);
-			closedIcon = Context.GetIcon (Stock.ClosedFolder);
+			nodeInfo.Label = "Globals";
+			nodeInfo.Icon = Context.GetIcon (Stock.OpenFolder);
+			nodeInfo.ClosedIcon = Context.GetIcon (Stock.ClosedFolder);
 		}
 		
 		public override void BuildChildNodes (ITreeBuilder treeBuilder, object dataObject)

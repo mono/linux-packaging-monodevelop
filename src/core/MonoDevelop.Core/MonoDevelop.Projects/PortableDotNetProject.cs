@@ -27,6 +27,8 @@ using System;
 using System.Xml;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Assemblies;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace MonoDevelop.Projects
 {
@@ -44,9 +46,12 @@ namespace MonoDevelop.Projects
 			: base (languageName, projectCreateInfo, projectOptions)
 		{
 		}
-		
-		public override string ProjectType {
-			get { return "PortableDotNet"; }
+
+		public override IEnumerable<string> GetProjectTypes ()
+		{
+			yield return "PortableDotNet";
+			foreach (var t in base.GetProjectTypes ())
+				yield return t;
 		}
 		
 		public override bool SupportsFormat (FileFormat format)
@@ -64,13 +69,7 @@ namespace MonoDevelop.Projects
 		
 		public override bool SupportsFramework (TargetFramework framework)
 		{
-			if (framework.Id.Identifier == TargetFrameworkMoniker.ID_PORTABLE && framework.Id.Version == "4.0")
-				return true;
-
-			if (!framework.CanReferenceAssembliesTargetingFramework (TargetFrameworkMoniker.PORTABLE_4_0))
-				return false;
-
-			return base.SupportsFramework (framework);
+			return framework.Id.Identifier == TargetFrameworkMoniker.ID_PORTABLE;
 		}
 		
 		public override TargetFrameworkMoniker GetDefaultTargetFrameworkForFormat (FileFormat format)
@@ -86,8 +85,16 @@ namespace MonoDevelop.Projects
 		
 		public override TargetFrameworkMoniker GetDefaultTargetFrameworkId ()
 		{
-			// Profile136 includes .NET 4.0+, Silverlight 5, Windows Phone 8, and Xamarin.iOS/Android, so make that our default.
-			return new TargetFrameworkMoniker (".NETPortable", "4.0", "Profile136");
+			// Profile78 includes .NET 4.5+, Windows Phone 8, and Xamarin.iOS/Android, so make that our default.
+			// Note: see also: PortableLibrary.xpt.xml
+			return new TargetFrameworkMoniker (".NETPortable", "4.5", "Profile78");
+		}
+
+		protected internal override IEnumerable<string> OnGetReferencedAssemblies (ConfigurationSelector configuration, bool includeProjectReferences)
+		{
+			var res = base.OnGetReferencedAssemblies (configuration, includeProjectReferences);
+			var asms = TargetRuntime.AssemblyContext.GetAssemblies (TargetFramework).Where (a => a.Package.IsFrameworkPackage).Select (a => a.Location);
+			return res.Concat (asms).Distinct ();
 		}
 	}
 }

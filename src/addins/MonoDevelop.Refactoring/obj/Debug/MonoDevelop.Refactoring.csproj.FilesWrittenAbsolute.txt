@@ -1,6 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Refactoring/obj/Debug/MonoDevelop.Refactoring.MonoDevelop.Refactoring.addin.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Refactoring/obj/Debug/MonoDevelop.Refactoring.gtk-gui.gui.stetic
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.Refactoring/MonoDevelop.Refactoring.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Refactoring/obj/Debug/MonoDevelop.Refactoring.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Refactoring/obj/Debug/MonoDevelop.Refactoring.dll.mdb

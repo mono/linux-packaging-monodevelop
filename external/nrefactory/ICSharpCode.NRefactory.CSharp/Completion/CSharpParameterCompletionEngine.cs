@@ -57,7 +57,7 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 			if (currentMember == null && currentType == null) { 
 				return null;
 			}
-			baseUnit = ParseStub("x] = a[1");
+			baseUnit = ParseStub("x]");
 			
 			//var memberLocation = currentMember != null ? currentMember.Region.Begin : currentType.Region.Begin;
 			var mref = baseUnit.GetNodeAt(location, n => n is IndexerExpression); 
@@ -183,20 +183,93 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 		
 		public IParameterDataProvider GetParameterDataProvider(int offset, char completionChar)
 		{
-			if (offset <= 0) {
+			//Ignoring completionChar == '\0' because it usually means moving with arrow keys, tab or enter
+			//we don't want to trigger on those events but it probably should be handled somewhere else
+			//since our job is to resolve method and not to decide when to display tooltip or not
+			if (offset <= 0 || completionChar == '\0') {
 				return null;
 			}
-			if (completionChar != '(' && completionChar != '<' && completionChar != '[' && completionChar != ',') {
-				return null;
-			}
-			
-			SetOffset(offset);
-			if (IsInsideCommentStringOrDirective()) {
-				return null;
+			SetOffset (offset);
+			int startOffset;
+			string text;
+			if (currentMember == null && currentType == null) {
+				//In case of attributes parse all file
+				startOffset = 0;
+				text = document.Text;
+			} else {
+				var memberText = GetMemberTextToCaret ();
+				text = memberText.Item1;
+				startOffset = document.GetOffset (memberText.Item2);
 			}
 
+			var parenStack = new Stack<int> ();
+			var chevronStack = new Stack<int> ();
+			var squareStack = new Stack<int> ();
+			var bracketStack = new Stack<int> ();
+
+			var lex = new MiniLexer (text);
+			bool failed = lex.Parse ((ch, off) => {
+				if (lex.IsInString || lex.IsInChar || lex.IsInVerbatimString || lex.IsInSingleComment || lex.IsInMultiLineComment || lex.IsInPreprocessorDirective)
+					return false;
+				switch (ch) {
+				case '(':
+					parenStack.Push (startOffset + off);
+					break;
+				case ')':
+					if (parenStack.Count == 0) {
+						return true;
+					}
+					parenStack.Pop ();
+					break;
+				case '<':
+					chevronStack.Push (startOffset + off);
+					break;
+				case '>':
+					//Don't abort if we don't have macthing '<' for '>' it could be if (i > 0) Foo($
+					if (chevronStack.Count == 0) {
+						return false;
+					}
+					chevronStack.Pop ();
+					break;
+				case '[':
+					squareStack.Push (startOffset + off);
+					break;
+				case ']':
+					if (squareStack.Count == 0) {
+						return true;
+					}
+					squareStack.Pop ();
+					break;
+				case '{':
+					bracketStack.Push (startOffset + off);
+					break;
+				case '}':
+					if (bracketStack.Count == 0) {
+						return true;
+					}
+					bracketStack.Pop ();
+					break;
+				}
+				return false;
+			});
+			if (failed)
+				return null;
+			int result = -1;
+			if (parenStack.Count > 0)
+				result = parenStack.Pop ();
+			if (squareStack.Count > 0)
+				result = Math.Max (result, squareStack.Pop ());
+			if (chevronStack.Count > 0)
+				result = Math.Max (result, chevronStack.Pop ());
+
+			//If we are inside { bracket we don't want to display anything
+			if (bracketStack.Count > 0 && bracketStack.Pop () > result)
+				return null;
+			if (result == -1)
+				return null;
+			SetOffset (result + 1);
 			ResolveResult resolveResult;
-			switch (completionChar) {
+			switch (document.GetCharAt (result)) {
 				case '(':
 					var invoke = GetInvocationBeforeCursor(true) ?? GetConstructorInitializerBeforeCursor();
 					if (invoke == null) {
@@ -216,23 +289,23 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 					}
 					if (invoke.Node is ObjectCreateExpression) {
 						var createType = ResolveExpression(((ObjectCreateExpression)invoke.Node).Type);
-						if (createType.Item1.Type.Kind == TypeKind.Unknown)
+						if (createType.Result.Type.Kind == TypeKind.Unknown)
 							return null;
-						return factory.CreateConstructorProvider(document.GetOffset(invoke.Node.StartLocation), createType.Item1.Type);
+						return factory.CreateConstructorProvider(document.GetOffset(invoke.Node.StartLocation), createType.Result.Type);
 					}
 					
 					if (invoke.Node is ICSharpCode.NRefactory.CSharp.Attribute) {
 						var attribute = ResolveExpression(invoke);
-						if (attribute == null || attribute.Item1 == null) {
+						if (attribute == null || attribute.Result == null) {
 							return null;
 						}
-						return factory.CreateConstructorProvider(document.GetOffset(invoke.Node.StartLocation), attribute.Item1.Type);
+						return factory.CreateConstructorProvider(document.GetOffset(invoke.Node.StartLocation), attribute.Result.Type);
 					}
 					var invocationExpression = ResolveExpression(invoke);
-					if (invocationExpression == null || invocationExpression.Item1 == null || invocationExpression.Item1.IsError) {
+					if (invocationExpression == null || invocationExpression.Result == null || invocationExpression.Result.IsError) {
 						return null;
 					}
-					resolveResult = invocationExpression.Item1;
+					resolveResult = invocationExpression.Result;
 					if (resolveResult is MethodGroupResolveResult) {
 						return factory.CreateMethodDataProvider(document.GetOffset(invoke.Node.StartLocation), CollectMethods(invoke.Node, resolveResult as MethodGroupResolveResult));
 					}
@@ -259,68 +332,12 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 					//					return new NRefactoryParameterDataProvider (textEditorData, result.Expression, resolvedType);
 					//				}
 					break;
-				case ',':
-					invoke = GetInvocationBeforeCursor(true) ?? GetIndexerBeforeCursor();
-					if (invoke == null) {
-						invoke = GetTypeBeforeCursor();
-						if (invoke != null) {
-							if (GetCurrentParameterIndex(document.GetOffset(invoke.Node.StartLocation), offset) < 0)
-								return null;
-							var typeExpression = ResolveExpression(invoke);
-							if (typeExpression == null || typeExpression.Item1 == null || typeExpression.Item1.IsError) {
-								return null;
-							}
-							
-							return factory.CreateTypeParameterDataProvider(document.GetOffset(invoke.Node.StartLocation), CollectAllTypes(typeExpression.Item1.Type));
-						}
-						return null;
-					}
-					if (GetCurrentParameterIndex(document.GetOffset(invoke.Node.StartLocation), offset) < 0)
-						return null;
-					if (invoke.Node is ArrayCreateExpression)
-						return null;
-					if (invoke.Node is ObjectCreateExpression) {
-						var createType = ResolveExpression(((ObjectCreateExpression)invoke.Node).Type);
-						return factory.CreateConstructorProvider(document.GetOffset(invoke.Node.StartLocation), createType.Item1.Type);
-					}
-					
-					if (invoke.Node is ICSharpCode.NRefactory.CSharp.Attribute) {
-						var attribute = ResolveExpression(invoke);
-						if (attribute == null || attribute.Item1 == null) {
-							return null;
-						}
-						return factory.CreateConstructorProvider(document.GetOffset(invoke.Node.StartLocation), attribute.Item1.Type);
-					}
-					
-					invocationExpression = ResolveExpression(invoke);
-					
-					if (invocationExpression == null || invocationExpression.Item1 == null || invocationExpression.Item1.IsError) {
-						return null;
-					}
-					
-					resolveResult = invocationExpression.Item1;
-					if (resolveResult is MethodGroupResolveResult) {
-						return factory.CreateMethodDataProvider(document.GetOffset(invoke.Node.StartLocation), CollectMethods(invoke.Node, resolveResult as MethodGroupResolveResult));
-					}
-					if (resolveResult is MemberResolveResult) {
-						if (resolveResult.Type.Kind == TypeKind.Delegate) {
-							return factory.CreateDelegateDataProvider(document.GetOffset(invoke.Node.StartLocation), resolveResult.Type);
-						}
-						var mr = resolveResult as MemberResolveResult;
-						if (mr.Member is IMethod) {
-							return factory.CreateMethodDataProvider(document.GetOffset(invoke.Node.StartLocation), new [] { (IMethod)mr.Member });
-						}
-					}
-					if (resolveResult != null) {
-						return factory.CreateIndexerParameterDataProvider(document.GetOffset(invoke.Node.StartLocation), resolveResult.Type, GetAccessibleIndexers (resolveResult.Type), invoke.Node);
-					}
-					break;
 				case '<':
 					invoke = GetMethodTypeArgumentInvocationBeforeCursor();
 					if (invoke != null) {
 						var tExpr2 = ResolveExpression(invoke);
-						if (tExpr2 != null && tExpr2.Item1 is MethodGroupResolveResult && !tExpr2.Item1.IsError) {
-							return factory.CreateTypeParameterDataProvider(document.GetOffset(invoke.Node.StartLocation), CollectMethods(invoke.Node, tExpr2.Item1 as MethodGroupResolveResult));
+						if (tExpr2 != null && tExpr2.Result is MethodGroupResolveResult && !tExpr2.Result.IsError) {
+							return factory.CreateTypeParameterDataProvider(document.GetOffset(invoke.Node.StartLocation), CollectMethods(invoke.Node, tExpr2.Result as MethodGroupResolveResult));
 						}
 					}
 					invoke = GetTypeBeforeCursor();
@@ -328,11 +345,11 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 						return null;
 					}
 					var tExpr = ResolveExpression(invoke);
-					if (tExpr == null || tExpr.Item1 == null || tExpr.Item1.IsError) {
+					if (tExpr == null || tExpr.Result == null || tExpr.Result.IsError) {
 						return null;
 					}
 
-					return factory.CreateTypeParameterDataProvider(document.GetOffset(invoke.Node.StartLocation), CollectAllTypes(tExpr.Item1.Type));
+					return factory.CreateTypeParameterDataProvider(document.GetOffset(invoke.Node.StartLocation), CollectAllTypes(tExpr.Result.Type));
 				case '[':
 					invoke = GetIndexerBeforeCursor();
 					if (invoke == null) {
@@ -342,10 +359,10 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 						return null;
 					}
 					var indexerExpression = ResolveExpression(invoke);
-					if (indexerExpression == null || indexerExpression.Item1 == null || indexerExpression.Item1.IsError) {
+					if (indexerExpression == null || indexerExpression.Result == null || indexerExpression.Result.IsError) {
 						return null;
 					}
-					return factory.CreateIndexerParameterDataProvider(document.GetOffset(invoke.Node.StartLocation), indexerExpression.Item1.Type, GetAccessibleIndexers (indexerExpression.Item1.Type), invoke.Node);
+					return factory.CreateIndexerParameterDataProvider(document.GetOffset(invoke.Node.StartLocation), indexerExpression.Result.Type, GetAccessibleIndexers (indexerExpression.Result.Type), invoke.Node);
 			}
 			return null;
 		}

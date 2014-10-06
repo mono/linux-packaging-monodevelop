@@ -28,7 +28,7 @@ using System;
 namespace MonoDevelop.VersionControl.Git
 {
 	[System.ComponentModel.ToolboxItem(true)]
-	public partial class GitCommitDialogExtensionWidget : Gtk.Bin
+	partial class GitCommitDialogExtensionWidget : Gtk.Bin
 	{
 		public GitCommitDialogExtensionWidget ()
 		{
@@ -48,7 +48,7 @@ namespace MonoDevelop.VersionControl.Git
 		}
 		
 		public string AuthorMail {
-			get { return entryName.Text; }
+			get { return entryEmail.Text; }
 		}
 
 		protected void OnCheckAuthorToggled (object sender, System.EventArgs e)

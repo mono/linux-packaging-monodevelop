@@ -89,14 +89,7 @@ namespace ICSharpCode.NRefactory.ConsistencyCheck.Xml
 		
 		static string ToString(object val)
 		{
-			if (val == null)
-				return "null";
-			else if (val is string)
-				return "\"" + CSharpOutputVisitor.ConvertString((string)val) + "\"";
-			else if (val is char)
-				return "'" + CSharpOutputVisitor.ConvertChar((char)val) + "'";
-			else
-				return val.ToString();
+			return TextWriterTokenWriter.PrintPrimitiveValue(val);
 		}
 	}
 }

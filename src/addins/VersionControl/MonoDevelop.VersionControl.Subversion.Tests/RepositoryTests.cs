@@ -25,72 +25,111 @@
 // THE SOFTWARE.
 
 using MonoDevelop.Core;
-using MonoDevelop.Core.ProgressMonitoring;
-using MonoDevelop.VersionControl;
 using MonoDevelop.VersionControl.Subversion;
 using MonoDevelop.VersionControl.Subversion.Unix;
 using NUnit.Framework;
 using System.IO;
+using System.Linq;
 using System;
+using MonoDevelop.VersionControl;
 
 namespace VersionControl.Subversion.Unix.Tests
 {
 	[TestFixture]
-	public class UnixSvnUtilsTest : MonoDevelop.VersionControl.Subversion.Tests.BaseSvnUtilsTest
+	sealed class UnixSvnUtilsTest : MonoDevelop.VersionControl.Subversion.Tests.BaseSvnUtilsTest
 	{
+		SubversionBackend SvnClient {
+			get { return Repo.Svn; }
+		}
+
+		new SubversionRepository Repo {
+			get { return (SubversionRepository) base.Repo; }
+		}
+
 		[SetUp]
 		public override void Setup ()
 		{
-			rootUrl = new FilePath (FileService.CreateTempDirectory ());
-			repoLocation = "file://" + rootUrl + "/repo";
-			backend = new UnixSvnBackend ();
+			RemotePath = new FilePath (FileService.CreateTempDirectory ());
+			RemoteUrl = "file://" + RemotePath + "/repo";
 			base.Setup ();
 		}
 
 		[Test]
-		public override void LogIsProper ()
+		public void ListUrls ()
 		{
-			string added = rootCheckout + "testfile";
-			File.Create (added).Close ();
-			backend.Add (added, false, new NullProgressMonitor ());
-			backend.Commit (new FilePath[] { rootCheckout }, "File committed", new NullProgressMonitor ());
-			foreach (var rev in backend.Log (repo, added, SvnRevision.First, SvnRevision.Working)) {
-				Assert.AreEqual ("File committed", rev.Message);
-				foreach (var change in rev.ChangedFiles) {
-					Assert.AreEqual (RevisionAction.Add, change.Action);
-					Assert.AreEqual (repoLocation + "//testfile", change.Path);
-				}
-			}
+			AddFile ("test", "data", true, true);
+			AddDirectory ("foo", true, true);
+			var items = SvnClient.ListUrl (Repo.Url, false).ToArray ();
+			Assert.AreEqual (2, items.Length, "#1");
+			Assert.IsTrue (items.Any (item => item.Name == "test" && !item.IsDirectory), "#2a");
+			Assert.IsTrue (items.Any (item => item.Name == "foo" && item.IsDirectory), "#2b");
 		}
 
-		[Test]
-		public override void DiffIsProper ()
+		protected override void TestDiff ()
 		{
-			string added = rootCheckout + "testfile";
-			File.Create (added).Close ();
-			backend.Add (added, false, new NullProgressMonitor ());
-			backend.Commit (new FilePath[] { rootCheckout }, "File committed", new NullProgressMonitor ());
-			File.AppendAllText (added, "text" + Environment.NewLine);
-
-			string difftext = @"Index: " + added + @"
-===================================================================
---- " + added + @"	(revision 1)
-+++ " + added + @"	(working copy)
+			string difftext = @"--- testfile	(revision 1)
++++ testfile	(working copy)
 @@ -0,0 +1 @@
 +text
 ";
-
-			Assert.AreEqual (difftext, backend.GetUnifiedDiff (added, false, false));
+			Assert.AreEqual (difftext, Repo.GenerateDiff (LocalPath + "testfile", Repo.GetVersionInfo (LocalPath + "testfile", VersionInfoQueryFlags.IgnoreCache)).Content);
 		}
 
-		#region Util
+		// Tests that fail due to Subversion giving wrong data.
+		[Test]
+		[Ignore ("Fix Subversion")]
+		public override void MovesDirectory ()
+		{
+			base.MovesDirectory ();
+		}
 
-		public override SubversionRepository GetRepo (string url, string path)
+		[Test]
+		[Ignore ("Fix Subversion")]
+		public override void DeletesDirectory ()
+		{
+			base.DeletesDirectory ();
+		}
+
+		[Test]
+		[Ignore ("Test fails on Lock")]
+		public override void LocksEntities ()
+		{
+			base.UnlocksEntities ();
+		}
+
+		protected override void PostLock ()
+		{
+			string added = LocalPath + "testfile";
+			Assert.Throws<Exception> (delegate {
+				File.WriteAllText (added, "text");
+			});
+		}
+
+		[Test]
+		[Ignore ("Test fails on Unlock")]
+		public override void UnlocksEntities ()
+		{
+			base.UnlocksEntities ();
+		}
+
+		protected override void PostUnlock ()
+		{
+			string added = LocalPath + "testfile";
+			Assert.DoesNotThrow (delegate {
+				File.WriteAllText (added, "text");
+			});
+		}
+
+		protected override void TestValidUrl ()
+		{
+			base.TestValidUrl ();
+			Assert.IsTrue (Repo.IsUrlValid ("file:///dir/repo"));
+		}
+
+		protected override Repository GetRepo (string path, string url)
 		{
 			return new SubversionRepository (new SvnClient (), url, path);
 		}
-
-		#endregion
 	}
 }
 

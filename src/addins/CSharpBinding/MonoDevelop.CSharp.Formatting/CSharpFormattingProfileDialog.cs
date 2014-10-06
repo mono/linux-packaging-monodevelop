@@ -31,19 +31,22 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
 using ICSharpCode.NRefactory.CSharp;
+using MonoDevelop.Components;
+
+
 namespace MonoDevelop.CSharp.Formatting
 {
-	public partial class CSharpFormattingProfileDialog : Gtk.Dialog
+	partial class CSharpFormattingProfileDialog : Dialog
 	{
-		Mono.TextEditor.TextEditor texteditor = new Mono.TextEditor.TextEditor ();
-		CSharpFormattingPolicy profile;
-		Gtk.TreeStore indentOptions, bacePositionOptions, newLineOptions, whiteSpaceOptions, wrappingOptions;
+		readonly Mono.TextEditor.TextEditor texteditor = new Mono.TextEditor.TextEditor ();
+		readonly CSharpFormattingPolicy profile;
+		TreeStore indentOptions, bacePositionOptions, newLineOptions, whiteSpaceOptions, wrappingOptions;
 		
-		static Dictionary<Wrapping, string> arrayInitializerTranslationDictionary = new Dictionary<Wrapping, string> ();
-		static Dictionary<BraceStyle, string> braceStyleTranslationDictionary = new Dictionary<BraceStyle, string> ();
+		static readonly Dictionary<Wrapping, string> arrayInitializerTranslationDictionary = new Dictionary<Wrapping, string> ();
+		static readonly Dictionary<BraceStyle, string> braceStyleTranslationDictionary = new Dictionary<BraceStyle, string> ();
 		//static Dictionary<BraceForcement, string> braceForcementTranslationDictionary = new Dictionary<BraceForcement, string> ();
-		static Dictionary<PropertyFormatting, string> propertyFormattingTranslationDictionary = new Dictionary<PropertyFormatting, string> ();
-		static Dictionary<NewLinePlacement, string>  newLinePlacementTranslationDictionary = new Dictionary<NewLinePlacement, string> ();
+		static readonly Dictionary<PropertyFormatting, string> propertyFormattingTranslationDictionary = new Dictionary<PropertyFormatting, string> ();
+		static readonly Dictionary<NewLinePlacement, string>  newLinePlacementTranslationDictionary = new Dictionary<NewLinePlacement, string> ();
 		
 		static CSharpFormattingProfileDialog ()
 		{
@@ -113,7 +116,9 @@ namespace MonoDevelop.CSharp.Formatting
 			get { return myProperty;} 
 			set { myProperty = value;} 
 		}
-		
+
+		string Simple { get { ; } set { ; } }
+
 		int myOtherProperty;
 		int MyOtherProperty { 
 			get { 
@@ -125,6 +130,13 @@ namespace MonoDevelop.CSharp.Formatting
 					myOtherProperty = value;
 			} 
 		}
+		
+		int MyAutoProperty { 
+			get;
+			set;
+		}
+
+		int MyOtherAutoProperty { get; set; }
 	}";
 		
 		const string spaceExample = @"class ClassDeclaration { 
@@ -408,11 +420,12 @@ namespace TestSpace {
 		const int exampleTextColumn = 2;
 		const int toggleVisibleColumn = 3;
 		const int comboVisibleColumn = 4;
-		protected ListStore comboBoxStore = new ListStore (typeof (string), typeof (string));
+		protected ListStore ComboBoxStore = new ListStore (typeof (string), typeof (string));
 		
 		
 		public CSharpFormattingProfileDialog (CSharpFormattingPolicy profile)
 		{
+			// ReSharper disable once DoNotCallOverridableMethodsInConstructor
 			this.Build ();
 			this.profile = profile;
 			this.Title = profile.IsBuiltIn ? GettextCatalog.GetString ("Show built-in profile") : GettextCatalog.GetString ("Edit Profile");
@@ -430,7 +443,6 @@ namespace TestSpace {
 					UpdateExample (blankLineExample);
 					return;
 				case 3: // white spaces
-					treeView = treeviewInsertWhiteSpaceCategory;
 					return;
 				case 4:
 					treeView = treeviewNewLines;
@@ -439,8 +451,8 @@ namespace TestSpace {
 					return;
 				}
 				
-				var model = treeView.Model;
-				Gtk.TreeIter iter;
+				TreeModel model;
+				TreeIter iter;
 				if (treeView.Selection.GetSelected (out model, out iter))
 					UpdateExample (model, iter);
 			};
@@ -451,7 +463,7 @@ namespace TestSpace {
 			comboboxCategories.AppendText (GettextCatalog.GetString ("Wrapping"));
 			comboboxCategories.AppendText (GettextCatalog.GetString ("White Space"));
 			comboboxCategories.AppendText (GettextCatalog.GetString ("New Lines"));
-			comboboxCategories.Changed += delegate(object sender, EventArgs e) {
+			comboboxCategories.Changed += delegate {
 				texteditor.Text = "";
 				notebookCategories.Page = comboboxCategories.Active;
 			};
@@ -469,16 +481,16 @@ namespace TestSpace {
 			ShowAll ();
 			
 			#region Indent options
-			indentOptions = new Gtk.TreeStore (typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
+			indentOptions = new TreeStore (typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
 			
-			TreeViewColumn column = new TreeViewColumn ();
+			var column = new TreeViewColumn ();
 			// pixbuf column
-			var pixbufCellRenderer = new CellRendererPixbuf ();
+			var pixbufCellRenderer = new CellRendererImage ();
 			column.PackStart (pixbufCellRenderer, false);
 			column.SetCellDataFunc (pixbufCellRenderer, RenderIcon);
 			
 			// text column
-			CellRendererText cellRendererText = new CellRendererText ();
+			var cellRendererText = new CellRendererText ();
 			cellRendererText.Ypad = 1;
 			column.PackStart (cellRendererText, true);
 			column.SetAttributes (cellRendererText, "text", 1);
@@ -489,11 +501,11 @@ namespace TestSpace {
 			treeviewIndentOptions.AppendColumn (column);
 			
 			column = new TreeViewColumn ();
-			CellRendererCombo cellRendererCombo = new CellRendererCombo ();
+			var cellRendererCombo = new CellRendererCombo ();
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
 			cellRendererCombo.TextColumn = 1;
-			cellRendererCombo.Model = comboBoxStore;
+			cellRendererCombo.Model = ComboBoxStore;
 			cellRendererCombo.HasEntry = false;
 			cellRendererCombo.Editable = !profile.IsBuiltIn;
 
@@ -503,7 +515,7 @@ namespace TestSpace {
 			column.SetAttributes (cellRendererCombo, "visible", comboVisibleColumn);
 			column.SetCellDataFunc (cellRendererCombo, ComboboxDataFunc);
 			
-			CellRendererToggle cellRendererToggle = new CellRendererToggle ();
+			var cellRendererToggle = new CellRendererToggle ();
 			cellRendererToggle.Ypad = 1;
 			cellRendererToggle.Activatable = !profile.IsBuiltIn;
 			cellRendererToggle.Toggled += new CellRendererToggledHandler (this, treeviewIndentOptions, indentOptions).Toggled;
@@ -529,14 +541,35 @@ namespace TestSpace {
 			AddOption (indentOptions, category, "IndentSwitchBody", GettextCatalog.GetString ("Indent 'switch' body"), spaceExample);
 			AddOption (indentOptions, category, "IndentCaseBody", GettextCatalog.GetString ("Indent 'case' body"), spaceExample);
 			AddOption (indentOptions, category, "IndentBreakStatements", GettextCatalog.GetString ("Indent 'break' statements"), spaceExample);
-			
-			AddOption (indentOptions, category, "AlignEmbeddedIfStatements", GettextCatalog.GetString ("Align embedded 'if' statements"), "class AClass { void AMethod () { if (a) if (b) { int c; } } } ");
-			AddOption (indentOptions, category, "AlignEmbeddedUsingStatements", GettextCatalog.GetString ("Align embedded 'using' statements"), "class AClass { void AMethod () {using (IDisposable a = null) using (IDisposable b = null) { int c; } } }");
+			AddOption (indentOptions, category, "IndentPreprocessorDirectives", GettextCatalog.GetString ("Indent pre processor directives"), 
+				@"#define DEBUG
+class Test {
+	#if DEBUG
+	void Example ()
+	{
+	}
+	#endif
+}
+");
+
+			AddOption (indentOptions, category, "IndentBlocksInsideExpressions", GettextCatalog.GetString ("Indent blocks inside expressions"), 
+				@"
+class Test
+{
+	void Example ()
+	{
+		Test(delegate {
+			Call ();
+		});
+	}
+}
+");
+			AddOption (indentOptions, category, "AlignEmbeddedStatements", GettextCatalog.GetString ("Align embedded statements"), "class AClass { void AMethod () { if (a) if (b) { int c; } } } ");
 			treeviewIndentOptions.ExpandAll ();
 			#endregion
 			
 			#region Brace options
-			bacePositionOptions = new Gtk.TreeStore (typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
+			bacePositionOptions = new TreeStore (typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
 			
 			column = new TreeViewColumn ();
 			// pixbuf column
@@ -559,7 +592,7 @@ namespace TestSpace {
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
 			cellRendererCombo.TextColumn = 1;
-			cellRendererCombo.Model = comboBoxStore;
+			cellRendererCombo.Model = ComboBoxStore;
 			cellRendererCombo.HasEntry = false;
 			cellRendererCombo.Editable = !profile.IsBuiltIn;
 			cellRendererCombo.Edited += new ComboboxEditedHandler (this, bacePositionOptions).ComboboxEdited;
@@ -593,10 +626,14 @@ namespace TestSpace {
 			AddOption (bacePositionOptions, "StatementBraceStyle", GettextCatalog.GetString ("Statements"), spaceExample);
 			
 			category = AddOption (bacePositionOptions, "PropertyBraceStyle", GettextCatalog.GetString ("Property declaration"), propertyExample);
+			AddOption (bacePositionOptions, category, "AutoPropertyFormatting", GettextCatalog.GetString ("Allow automatic property in one line"), propertyExample);
+			AddOption (bacePositionOptions, category, "SimplePropertyFormatting", GettextCatalog.GetString ("Allow simple property in one line"), propertyExample);
+
+
 			AddOption (bacePositionOptions, category, "PropertyGetBraceStyle", GettextCatalog.GetString ("Get declaration"), propertyExample);
-			AddOption (bacePositionOptions, category, "AllowPropertyGetBlockInline", GettextCatalog.GetString ("Allow one line get"), propertyExample);
+			AddOption (bacePositionOptions, category, "SimpleGetBlockFormatting", GettextCatalog.GetString ("Allow one line get"), propertyExample);
 			AddOption (bacePositionOptions, category, "PropertySetBraceStyle", GettextCatalog.GetString ("Set declaration"), propertyExample);
-			AddOption (bacePositionOptions, category, "AllowPropertySetBlockInline", GettextCatalog.GetString ("Allow one line set"), propertyExample);
+			AddOption (bacePositionOptions, category, "SimpleSetBlockFormatting", GettextCatalog.GetString ("Allow one line set"), propertyExample);
 			
 			
 			category = AddOption (bacePositionOptions, "EventBraceStyle", GettextCatalog.GetString ("Event declaration"), eventExample);
@@ -609,7 +646,7 @@ namespace TestSpace {
 			#endregion
 			
 			#region New line options
-			newLineOptions = new Gtk.TreeStore (typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
+			newLineOptions = new TreeStore (typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
 
 			column = new TreeViewColumn ();
 			// pixbuf column
@@ -631,7 +668,7 @@ namespace TestSpace {
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
 			cellRendererCombo.TextColumn = 1;
-			cellRendererCombo.Model = comboBoxStore;
+			cellRendererCombo.Model = ComboBoxStore;
 			cellRendererCombo.HasEntry = false;
 			cellRendererCombo.Editable = !profile.IsBuiltIn;
 			cellRendererCombo.Edited += new ComboboxEditedHandler (this, newLineOptions).ComboboxEdited;
@@ -656,11 +693,50 @@ namespace TestSpace {
 			AddOption (newLineOptions, "FinallyNewLinePlacement", GettextCatalog.GetString ("Place 'finally' on new line"), simpleCatch);
 			AddOption (newLineOptions, "WhileNewLinePlacement", GettextCatalog.GetString ("Place 'while' on new line"), simpleDoWhile);
 			AddOption (newLineOptions, "ArrayInitializerWrapping", GettextCatalog.GetString ("Place array initializers on new line"), simpleArrayInitializer);
+			AddOption (newLineOptions, "EmbeddedStatementPlacement", GettextCatalog.GetString ("Place embedded statements on new line"), @"class Test
+{
+	public void Example ()
+	{
+		if (true)
+			Call ();
+		
+		foreach (var o in col) DoSomething (o);
+	}
+}");
+			string constructorInitializer=@"class Test
+{
+
+	public Test () : base ()
+	{
+
+	}
+
+	public Test ()
+		: base ()
+	{
+
+	}
+
+	public Test () :
+		base ()
+	{
+
+	}
+
+	public Test ()
+		:
+		base ()
+	{
+
+	}
+}";
+			AddOption (newLineOptions, "NewLineBeforeConstructorInitializerColon", GettextCatalog.GetString("Place constructor initializer ':' on new line"), constructorInitializer);
+			AddOption (newLineOptions, "NewLineAfterConstructorInitializerColon", GettextCatalog.GetString("Place constructor initializer 'base/this' on new line"), constructorInitializer);
 			treeviewNewLines.ExpandAll ();
 			#endregion
 			
 			#region Wrapping options
-			wrappingOptions = new Gtk.TreeStore (typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
+			wrappingOptions = new TreeStore (typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
 
 			column = new TreeViewColumn ();
 			// pixbuf column
@@ -683,7 +759,7 @@ namespace TestSpace {
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
 			cellRendererCombo.TextColumn = 1;
-			cellRendererCombo.Model = comboBoxStore;
+			cellRendererCombo.Model = ComboBoxStore;
 			cellRendererCombo.HasEntry = false;
 			cellRendererCombo.Editable = !profile.IsBuiltIn;
 			cellRendererCombo.Edited += new ComboboxEditedHandler (this, wrappingOptions).ComboboxEdited;
@@ -730,7 +806,7 @@ namespace TestSpace {
 			#endregion
 
 			#region White space options
-			whiteSpaceOptions = new Gtk.TreeStore (typeof (string), typeof (string), typeof (string), typeof(bool), typeof(bool));
+			whiteSpaceOptions = new TreeStore (typeof (string), typeof (string), typeof (string), typeof(bool), typeof(bool));
 			
 			
 			column = new TreeViewColumn ();
@@ -753,7 +829,7 @@ namespace TestSpace {
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
 			cellRendererCombo.TextColumn = 1;
-			cellRendererCombo.Model = comboBoxStore;
+			cellRendererCombo.Model = ComboBoxStore;
 			cellRendererCombo.HasEntry = false;
 			cellRendererCombo.Editable = !profile.IsBuiltIn;
 			cellRendererCombo.Edited += new ComboboxEditedHandler (this, whiteSpaceOptions).ComboboxEdited;
@@ -959,7 +1035,25 @@ delegate void BarFoo ();
 			AddOption (whiteSpaceOptions, category, "AroundMultiplicativeOperatorParentheses", GettextCatalog.GetString ("Multiplicative (*, /, %) operators"), operatorExample);
 			AddOption (whiteSpaceOptions, category, "AroundShiftOperatorParentheses", GettextCatalog.GetString ("Shift (<<, >>) operators"), operatorExample);
 			AddOption (whiteSpaceOptions, category, "AroundNullCoalescingOperator", GettextCatalog.GetString ("Null coalescing (??) operator"), operatorExample);
-			
+			AddOption (whiteSpaceOptions, category, "SpaceAfterUnsafeAddressOfOperator", GettextCatalog.GetString ("Unsafe addressof operator (&)"), @"unsafe class ClassDeclaration { 
+	public void TestMethod ()
+	{
+		int* a = &x;
+	}
+}");
+			AddOption (whiteSpaceOptions, category, "SpaceAfterUnsafeAsteriskOfOperator", GettextCatalog.GetString ("Unsafe asterisk operator (*)"), @"unsafe class ClassDeclaration { 
+	public void TestMethod ()
+	{
+		int a = *x;
+	}
+}");
+			AddOption (whiteSpaceOptions, category, "SpaceAroundUnsafeArrowOperator", GettextCatalog.GetString ("Unsafe arrow operator (->)"), @"unsafe class ClassDeclaration { 
+	public void TestMethod ()
+	{
+		x->Foo();
+	}
+}");
+
 			category = AddOption (whiteSpaceOptions, upperCategory, null, GettextCatalog.GetString ("Conditional Operator (?:)"), condOpExample);
 			AddOption (whiteSpaceOptions, category, "ConditionalOperatorBeforeConditionSpace", GettextCatalog.GetString ("before '?'"), condOpExample);
 			AddOption (whiteSpaceOptions, category, "ConditionalOperatorAfterConditionSpace", GettextCatalog.GetString ("after '?'"), condOpExample);
@@ -972,6 +1066,10 @@ delegate void BarFoo ();
 	}";
 			category = AddOption (whiteSpaceOptions, upperCategory, null, GettextCatalog.GetString ("Array Declarations"), example);
 			AddOption (whiteSpaceOptions, category, "SpacesBeforeArrayDeclarationBrackets", GettextCatalog.GetString ("before opening bracket"), example);
+
+			category = AddOption (whiteSpaceOptions, upperCategory, null, GettextCatalog.GetString ("Other"), example);
+			AddOption (whiteSpaceOptions, category, "SpaceBeforeSemicolon", GettextCatalog.GetString ("before semicolon"), example);
+
 			/*
 			whiteSpaceOptions= new ListStore (typeof (Option), typeof (bool), typeof (bool)); 
 			column = new TreeViewColumn ();
@@ -1050,7 +1148,9 @@ delegate void BarFoo ();
 			entryBetweenFields.Text = profile.BlankLinesBetweenFields.ToString ();
 			entryBetweenEvents.Text = profile.BlankLinesBetweenEventFields.ToString ();
 			entryBetweenMembers.Text = profile.BlankLinesBetweenMembers.ToString ();
-			
+			entryInsideRegion.Text = profile.BlankLinesInsideRegion.ToString ();
+			entryAroundRegion.Text = profile.BlankLinesAroundRegion.ToString ();
+
 			entryBeforUsings.Changed += HandleEntryBeforUsingsChanged;
 			entryAfterUsings.Changed += HandleEntryBeforUsingsChanged;
 			entryBeforeFirstDeclaration.Changed += HandleEntryBeforUsingsChanged;
@@ -1058,15 +1158,15 @@ delegate void BarFoo ();
 			entryBetweenFields.Changed += HandleEntryBeforUsingsChanged;
 			entryBetweenEvents.Changed += HandleEntryBeforUsingsChanged;
 			entryBetweenMembers.Changed += HandleEntryBeforUsingsChanged;
+			entryAroundRegion.Changed += HandleEntryBeforUsingsChanged;
+			entryInsideRegion.Changed += HandleEntryBeforUsingsChanged;
 			#endregion
 		}
 		
-		int SetFlag (Gtk.Entry entry, int oldValue)
+		static int SetFlag (Entry entry, int oldValue)
 		{
 			int newValue;
-			if (int.TryParse (entry.Text, out newValue)) 
-				return newValue;
-			return oldValue;
+			return int.TryParse (entry.Text, out newValue) ? newValue : oldValue;
 		}
 
 		void HandleEntryBeforUsingsChanged (object sender, EventArgs e)
@@ -1078,7 +1178,9 @@ delegate void BarFoo ();
 			profile.BlankLinesBetweenFields = SetFlag (entryBetweenFields, profile.BlankLinesBetweenFields);
 			profile.BlankLinesBetweenMembers = SetFlag (entryBetweenMembers, profile.BlankLinesBetweenMembers);
 			profile.BlankLinesBetweenEventFields = SetFlag (entryBetweenEvents, profile.BlankLinesBetweenMembers);
-			UpdateExample (blankLineExample);
+			profile.BlankLinesAroundRegion = SetFlag (entryAroundRegion, profile.BlankLinesAroundRegion);
+			profile.BlankLinesInsideRegion = SetFlag (entryInsideRegion, profile.BlankLinesInsideRegion);
+	UpdateExample (blankLineExample);
 		}
 		
 		static PropertyInfo GetPropertyByName (string name)
@@ -1090,7 +1192,7 @@ delegate void BarFoo ();
 		}
 		
 		
-		Gtk.TreeIter AddOption (Gtk.TreeStore model, string propertyName, string displayName, string example)
+		static TreeIter AddOption (TreeStore model, string propertyName, string displayName, string example)
 		{
 			bool isBool = false;
 			if (!string.IsNullOrEmpty (propertyName)) {
@@ -1098,10 +1200,10 @@ delegate void BarFoo ();
 				isBool = info.PropertyType == typeof (bool);
 			}
 			
-			return model.AppendValues (propertyName, displayName, example, !string.IsNullOrEmpty (propertyName) ? isBool : false, !string.IsNullOrEmpty (propertyName) ? !isBool : false);
+			return model.AppendValues (propertyName, displayName, example, !string.IsNullOrEmpty (propertyName) && isBool, !string.IsNullOrEmpty (propertyName) && !isBool);
 		}
 		
-		Gtk.TreeIter AddOption (Gtk.TreeStore model, Gtk.TreeIter parent, string propertyName, string displayName, string example)
+		static TreeIter AddOption (TreeStore model, TreeIter parent, string propertyName, string displayName, string example)
 		{
 			bool isBool = false;
 			if (!string.IsNullOrEmpty (propertyName)) {
@@ -1109,20 +1211,20 @@ delegate void BarFoo ();
 				isBool = info.PropertyType == typeof (bool);
 			}
 			
-			return model.AppendValues (parent, propertyName, displayName, example, !string.IsNullOrEmpty (propertyName) ? isBool : false, !string.IsNullOrEmpty (propertyName) ? !isBool : false);
+			return model.AppendValues (parent, propertyName, displayName, example, !string.IsNullOrEmpty (propertyName) && isBool, !string.IsNullOrEmpty (propertyName) && !isBool);
 		}
 		
 		void TreeSelectionChanged (object sender, EventArgs e)
 		{
-			Gtk.TreeSelection treeSelection = (Gtk.TreeSelection)sender;
-			var model = treeSelection.TreeView.Model;
-			Gtk.TreeIter iter;
+			var treeSelection = (TreeSelection)sender;
+			TreeModel model;
+			TreeIter iter;
 			if (treeSelection.GetSelected (out model, out iter)) {
 				var info = GetProperty (model, iter);
 				if (info != null && info.PropertyType != typeof (bool)) {
-					comboBoxStore.Clear ();
+					ComboBoxStore.Clear ();
 					foreach (var v in Enum.GetValues (info.PropertyType)) {
-						comboBoxStore.AppendValues (v.ToString (),  TranslateValue (v));
+						ComboBoxStore.AppendValues (v.ToString (),  TranslateValue (v));
 					}
 				}
 				
@@ -1139,14 +1241,13 @@ delegate void BarFoo ();
 		
 		void UpdateExample (string example)
 		{
-			var formatter = new CSharpFormatter ();
 			string text;
 			if (!string.IsNullOrEmpty (example)) {
 				text = Environment.NewLine != "\n" ? example.Replace ("\n", Environment.NewLine) : example;
 			} else {
 				text = "";
 			}
-			texteditor.Document.Text = formatter.FormatText (profile, null, CSharpFormatter.MimeType, text, 0, text.Length);
+			texteditor.Document.Text = CSharpFormatter.FormatText (profile, null, CSharpFormatter.MimeType, text, 0, text.Length);
 		}
 		
 		static PropertyInfo GetProperty (TreeModel model, TreeIter iter)
@@ -1160,16 +1261,16 @@ delegate void BarFoo ();
 		object GetValue (string propertyName)
 		{
 			var info = GetPropertyByName (propertyName);
-			return info.GetValue (this.profile, null);
+			return info.GetValue (profile, null);
 		}
 		
-		void RenderIcon (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter) 
+		static void RenderIcon (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter) 
 		{
-			var pixbufCellRenderer = (CellRendererPixbuf)cell;
+			var pixbufCellRenderer = (CellRendererImage)cell;
 			if (model.IterHasChild (iter)) {
-				pixbufCellRenderer.Pixbuf = ImageService.GetPixbuf (((TreeView)col.TreeView).GetRowExpanded (model.GetPath (iter)) ? MonoDevelop.Ide.Gui.Stock.OpenFolder : MonoDevelop.Ide.Gui.Stock.ClosedFolder, IconSize.Menu);
+				pixbufCellRenderer.Image = ImageService.GetIcon (((TreeView)col.TreeView).GetRowExpanded (model.GetPath (iter)) ? MonoDevelop.Ide.Gui.Stock.OpenFolder : MonoDevelop.Ide.Gui.Stock.ClosedFolder, IconSize.Menu);
 			} else {
-				pixbufCellRenderer.Pixbuf = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.Property, IconSize.Menu);
+				pixbufCellRenderer.Image = ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.Property, IconSize.Menu);
 			}
 		}
 		
@@ -1181,7 +1282,7 @@ delegate void BarFoo ();
 				cellRenderer.Text = "<invalid>";
 				return;
 			}
-			object value = info.GetValue (this.profile, null);
+			object value = info.GetValue (profile, null);
 			
 			cellRenderer.Text = value is Enum ? TranslateValue (value) : value.ToString ();
 		}
@@ -1192,17 +1293,17 @@ delegate void BarFoo ();
 			var info = GetProperty (model, iter);
 			if (info == null || info.PropertyType != typeof(bool)) 
 				return;
-			bool value = (bool)info.GetValue (this.profile, null);
+			bool value = (bool)info.GetValue (profile, null);
 			cellRenderer.Active = value;
 		}
 		
 		class CellRendererToggledHandler
 		{
-			CSharpFormattingProfileDialog dialog;
-			Gtk.TreeStore model;
-			Gtk.TreeView treeView;
+			readonly CSharpFormattingProfileDialog dialog;
+			readonly TreeStore model;
+			readonly TreeView treeView;
 			
-			public CellRendererToggledHandler (CSharpFormattingProfileDialog dialog, Gtk.TreeView treeView, Gtk.TreeStore model)
+			public CellRendererToggledHandler (CSharpFormattingProfileDialog dialog, TreeView treeView, TreeStore model)
 			{
 				this.dialog = dialog;
 				this.model = model;
@@ -1228,10 +1329,10 @@ delegate void BarFoo ();
 		
 		class ComboboxEditedHandler
 		{
-			CSharpFormattingProfileDialog dialog;
-			Gtk.TreeStore model;
+			readonly CSharpFormattingProfileDialog dialog;
+			readonly TreeStore model;
 			
-			public ComboboxEditedHandler (CSharpFormattingProfileDialog dialog, Gtk.TreeStore model)
+			public ComboboxEditedHandler (CSharpFormattingProfileDialog dialog, TreeStore model)
 			{
 				this.dialog = dialog;
 				this.model = model;

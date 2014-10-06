@@ -34,13 +34,11 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml;
 
 using MonoDevelop.Projects;
 using MonoDevelop.Core.Serialization;
 using MonoDevelop.Projects.Extensions;
 using MonoDevelop.Core;
-using MonoDevelop.Core.ProgressMonitoring;
 using System.Reflection;
 using System.Linq;
 
@@ -55,7 +53,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		
 		public bool CanReadFile (string file, MSBuildFileFormat format)
 		{
-			if (String.Compare (Path.GetExtension (file), ".sln", true) == 0) {
+			if (String.Compare (Path.GetExtension (file), ".sln", StringComparison.OrdinalIgnoreCase) == 0) {
 				string tmp;
 				string version = GetSlnFileVersion (file, out tmp);
 				return format.SupportsSlnVersion (version);
@@ -124,9 +122,14 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				slnData.UpdateVersion (format);
 
 				sw.WriteLine ();
+
 				//Write Header
 				sw.WriteLine ("Microsoft Visual Studio Solution File, Format Version " + slnData.VersionString);
 				sw.WriteLine (slnData.HeaderComment);
+				if (slnData.VisualStudioVersion != null)
+					sw.WriteLine ("VisualStudioVersion = {0}", slnData.VisualStudioVersion);
+				if (slnData.MinimumVisualStudioVersion != null)
+					sw.WriteLine ("MinimumVisualStudioVersion = {0}", slnData.MinimumVisualStudioVersion);
 
 				//Write the projects
 				monitor.BeginTask (GettextCatalog.GetString ("Saving projects"), 1);
@@ -243,7 +246,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						WriteDataItem (writer, data);
 						writer.WriteLine ("\tEndProjectSection");
 					}
-					if (item.ItemDependencies.Count > 0) {
+					if (item.ItemDependencies.Count > 0 || handler.UnresolvedProjectDependencies != null) {
 						writer.WriteLine ("\tProjectSection(ProjectDependencies) = postProject");
 						foreach (var dep in item.ItemDependencies)
 							writer.WriteLine ("\t\t{0} = {0}", dep.ItemId);
@@ -314,9 +317,9 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 				foreach (SolutionConfigurationEntry cce in cc.Configurations) {
 					SolutionEntityItem p = cce.Item;
-					
-					// Ignore unknown projects. We deal with them below
-					if (p is UnknownSolutionItem)
+
+					// Don't save configurations for shared projects
+					if (!p.SupportsConfigurations ())
 						continue;
 					
                     // <ProjectGuid>...</ProjectGuid> in some Visual Studio generated F# project files 
@@ -339,11 +342,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				}
 			}
 			
-			// Dump config lines for unknown projects
-			foreach (UnknownSolutionItem item in sol.GetAllSolutionItems<UnknownSolutionItem> ()) {
-				ItemSlnData data = ItemSlnData.ForItem (item);
-				list.AddRange (data.ConfigLines);
-			}
 		}
 
 		void WriteNestedProjects (SolutionFolder folder, SolutionFolder root, StreamWriter writer)
@@ -693,12 +691,12 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				while (reader.Peek () >= 0) {
 					s = GetNextLine (reader, lines).Trim ();
 
-					if (String.Compare (s, "Global", true) == 0) {
+					if (String.Compare (s, "Global", StringComparison.OrdinalIgnoreCase) == 0) {
 						ParseGlobal (reader, lines, globals);
 						continue;
 					}
 
-					if (s.StartsWith ("Project")) {
+					if (s.StartsWith ("Project", StringComparison.Ordinal)) {
 						Section sec = new Section ();
 						projectSections.Add (sec);
 
@@ -708,6 +706,22 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						sec.Count = (e < 0) ? 1 : (e - sec.Start + 1);
 
 						continue;
+					}
+
+					if (s.StartsWith ("VisualStudioVersion = ", StringComparison.Ordinal)) {
+						Version v;
+						if (Version.TryParse (s.Substring ("VisualStudioVersion = ".Length), out v))
+							data.VisualStudioVersion = v;
+						else
+							monitor.Log.WriteLine ("Ignoring unparseable VisualStudioVersion value in sln file");
+					}
+
+					if (s.StartsWith ("MinimumVisualStudioVersion = ", StringComparison.Ordinal)) {
+						Version v;
+						if (Version.TryParse (s.Substring ("MinimumVisualStudioVersion = ".Length), out v))
+							data.MinimumVisualStudioVersion = v;
+						else
+							monitor.Log.WriteLine ("Ignoring unparseable MinimumVisualStudioVersion value in sln file");
 					}
 				}
 			}
@@ -743,6 +757,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				string projectName = match.Groups [2].Value;
 				string projectPath = match.Groups [3].Value;
 				string projectGuid = match.Groups [4].Value.ToUpper ();
+				List<string> projLines;
 
 				if (projTypeGuid == MSBuildProjectService.FolderTypeGuid) {
 					//Solution folder
@@ -751,7 +766,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					MSBuildProjectService.InitializeItemHandler (sfolder);
 					MSBuildProjectService.SetId (sfolder, projectGuid);
 
-					List<string> projLines = lines.GetRange (sec.Start + 1, sec.Count - 2);
+					projLines = lines.GetRange (sec.Start + 1, sec.Count - 2);
 					DeserializeSolutionItem (sol, sfolder, projLines);
 					
 					foreach (string f in ReadFolderFiles (projLines))
@@ -789,28 +804,24 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				SolutionEntityItem item = null;
 				
 				try {
-					item = ProjectExtensionUtil.LoadSolutionItem (monitor, projectPath, delegate {
-						return MSBuildProjectService.LoadItem (monitor, projectPath, format, projTypeGuid, projectGuid);
-					});
-					
-					if (item == null) {
-						LoggingService.LogWarning (GettextCatalog.GetString (
-							"Unknown project type guid '{0}' on line #{1}. Ignoring.",
-							projTypeGuid,
-							sec.Start + 1));
-						monitor.ReportWarning (GettextCatalog.GetString (
-							"{0}({1}): Unsupported or unrecognized project : '{2}'.", 
-							fileName, sec.Start + 1, projectPath));
-						continue;
+					if (sol.IsSolutionItemEnabled (projectPath)) {
+						item = ProjectExtensionUtil.LoadSolutionItem (monitor, projectPath, delegate {
+							return MSBuildProjectService.LoadItem (monitor, projectPath, format, projTypeGuid, projectGuid);
+						});
+						
+						if (item == null) {
+							throw new UnknownSolutionItemTypeException (projTypeGuid);
+						}
+					} else {
+						var uitem = new UnloadedSolutionItem () {
+							FileName = projectPath
+						};
+						var h = new MSBuildHandler (projTypeGuid, projectGuid) {
+							Item = uitem,
+						};
+						uitem.SetItemHandler (h);
+						item = uitem;
 					}
-
-					MSBuildHandler handler = (MSBuildHandler) item.ItemHandler;
-					List<string> projLines = lines.GetRange (sec.Start + 1, sec.Count - 2);
-					DataItem it = GetSolutionItemData (projLines);
-
-					handler.UnresolvedProjectDependencies = ReadSolutionItemDependencies (projLines);
-					handler.SlnProjectContent = projLines.ToArray ();
-					handler.ReadSlnData (it);
 					
 				} catch (Exception e) {
 					// If we get a TargetInvocationException from using Activator.CreateInstance we
@@ -818,14 +829,17 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					while (e is TargetInvocationException)
 						e = ((TargetInvocationException) e).InnerException;
 					
+					bool loadAsProject = false;
+
 					if (e is UnknownSolutionItemTypeException) {
 						var name = ((UnknownSolutionItemTypeException)e).TypeName;
 
 						var relPath = new FilePath (path).ToRelative (sol.BaseDirectory);
 						if (!string.IsNullOrEmpty (name)) {
 							var guids = name.Split (';');
-							var projectInfo = MSBuildProjectService.GetUnknownProjectTypeInfo (guids);
+							var projectInfo = MSBuildProjectService.GetUnknownProjectTypeInfo (guids, fileName);
 							if (projectInfo != null) {
+								loadAsProject = projectInfo.LoadFiles;
 								LoggingService.LogWarning (string.Format ("Could not load {0} project '{1}'. {2}", projectInfo.Name, relPath, projectInfo.GetInstructions ()));
 								monitor.ReportWarning (GettextCatalog.GetString ("Could not load {0} project '{1}'. {2}", projectInfo.Name, relPath, projectInfo.GetInstructions ()));
 							} else {
@@ -847,17 +861,34 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 							"Error while trying to load the project '{0}': {1}", projectPath, e.Message));
 					}
 
-					var uitem = new UnknownSolutionItem () {
-						FileName = projectPath,
-						LoadError = e.Message,
-					};
+					SolutionEntityItem uitem;
+					if (loadAsProject) {
+						uitem = new UnknownProject () {
+							FileName = projectPath,
+							LoadError = e.Message,
+						};
+					} else {
+						uitem = new UnknownSolutionItem () {
+							FileName = projectPath,
+							LoadError = e.Message,
+						};
+					}
+
 					var h = new MSBuildHandler (projTypeGuid, projectGuid) {
 						Item = uitem,
 					};
 					uitem.SetItemHandler (h);
 					item = uitem;
 				}
-				
+
+				MSBuildHandler handler = (MSBuildHandler) item.ItemHandler;
+				projLines = lines.GetRange (sec.Start + 1, sec.Count - 2);
+				DataItem it = GetSolutionItemData (projLines);
+
+				handler.UnresolvedProjectDependencies = ReadSolutionItemDependencies (projLines);
+				handler.SlnProjectContent = projLines.ToArray ();
+				handler.ReadSlnData (it);
+
 				if (!items.ContainsKey (projectGuid)) {
 					items.Add (projectGuid, item);
 					sortedList.Add (item);
@@ -874,7 +905,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 
 			// Resolve project dependencies
-			foreach (var it in items.OfType<SolutionEntityItem> ()) {
+			foreach (var it in items.Values.OfType<SolutionEntityItem> ()) {
 				MSBuildHandler handler = (MSBuildHandler) it.ItemHandler;
 				if (handler.UnresolvedProjectDependencies != null) {
 					foreach (var id in handler.UnresolvedProjectDependencies.ToArray ()) {
@@ -934,6 +965,17 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 
 			data.GlobalExtra = globalLines;
 			monitor.EndTask ();
+
+			// When reloading a project, keep the solution data and item id
+			sol.SolutionItemAdded += delegate(object sender, SolutionItemChangeEventArgs e) {
+				if (e.Reloading) {
+					ItemSlnData.TransferData (e.ReplacedItem, e.SolutionItem);
+					var ih = e.SolutionItem.ItemHandler as MSBuildHandler;
+					if (ih != null)
+						ih.ItemId = e.ReplacedItem.ItemId;
+				}
+			};
+
 			return folder;
 		}
 
@@ -1030,13 +1072,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				}
 
 				SolutionEntityItem item;
-				if (slnData.ItemsByGuid.TryGetValue (projGuid, out item)) {
-					if (item is UnknownSolutionItem) {
-						ItemSlnData data = ItemSlnData.ForItem (item);
-						data.ConfigLines.Add (lines [lineNum]);
-						extras.RemoveAt (extras.Count - 1);
-						continue;
-					}
+				if (slnData.ItemsByGuid.TryGetValue (projGuid, out item) && item.SupportsConfigurations ()) {
 					string key = projGuid + "." + slnConfig;
 					SolutionConfigurationEntry combineConfigEntry = null;
 					if (cache.ContainsKey (key)) {

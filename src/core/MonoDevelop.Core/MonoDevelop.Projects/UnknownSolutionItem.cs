@@ -43,6 +43,12 @@ namespace MonoDevelop.Projects
 		{
 			NeedsReload = false;
 		}
+
+		public override bool SupportsConfigurations ()
+		{
+			// The item is unknown, but we still want to read/write its configurations
+			return true;
+		}
 		
 		public override FilePath FileName {
 			get { return fileName; }
@@ -61,10 +67,14 @@ namespace MonoDevelop.Projects
 			get { return loadError; }
 			set { loadError = value; }
 		}
-		
+
 		public bool UnloadedEntry {
 			get { return unloaded; }
-			set { unloaded = value; }
+			set {
+				unloaded = value;
+				if (value)
+					loadError = GettextCatalog.GetString ("Unavailable");
+			}
 		}
 		
 		public override string Name {
@@ -76,6 +86,11 @@ namespace MonoDevelop.Projects
 			}
 			set { }
 		}
+
+		internal protected override bool OnGetSupportsTarget (string target)
+		{
+			return false;
+		}
 		
 		protected override void OnClean (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
@@ -83,7 +98,9 @@ namespace MonoDevelop.Projects
 		
 		protected override BuildResult OnBuild (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
-			return null;
+			var r = new BuildResult ();
+			r.AddError ("Project unavailable");
+			return r;
 		}
 		
 		protected internal override void OnExecute (IProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
@@ -101,6 +118,14 @@ namespace MonoDevelop.Projects
 		
 		protected internal override void OnSave (IProgressMonitor monitor)
 		{
+		}
+	}
+
+	public class UnloadedSolutionItem: UnknownSolutionItem
+	{
+		public UnloadedSolutionItem ()
+		{
+			UnloadedEntry = true;
 		}
 	}
 }

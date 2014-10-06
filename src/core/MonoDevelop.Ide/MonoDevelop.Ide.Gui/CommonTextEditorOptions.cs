@@ -40,11 +40,9 @@ namespace MonoDevelop.Ide.Gui
 		public CommonTextEditorOptions ()
 		{
 			PropertyService.PropertyChanged += PropertyServiceChanged;
-			base.FontName = PropertyService.Get ("FontName", MonoDevelop.Ide.DesktopService.DefaultMonospaceFont);
+			base.FontName = PropertyService.Get ("FontName", FontService.MonospaceFontName);
 			base.ColorScheme = IdeApp.Preferences.ColorScheme;
-			base.UseAntiAliasing = PropertyService.Get ("UseAntiAliasing", true);
 			FontService.RegisterFontChangedCallback ("Editor", UpdateFont);
-			FontService.RegisterFontChangedCallback ("Editor(Gutter)", UpdateFont);
 		}
 		
 		public override void Dispose ()
@@ -73,14 +71,7 @@ namespace MonoDevelop.Ide.Gui
 				base.ColorScheme = val;
 				break;
 			}
-			case "UseAntiAliasing":
-				base.UseAntiAliasing = (bool) e.NewValue;
-				break;
 			}
-		}
-		
-		public override bool UseAntiAliasing {
-			set { throw new InvalidOperationException ("Set via global source editor options"); }
 		}
 		
 		public override string ColorScheme {

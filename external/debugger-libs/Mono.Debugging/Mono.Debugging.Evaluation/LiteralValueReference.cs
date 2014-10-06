@@ -33,12 +33,13 @@ namespace Mono.Debugging.Evaluation
 {
 	public class LiteralValueReference: ValueReference
 	{
-		string name;
-		object value;
-		object type;
-		object objValue;
+		bool isVoidReturn;
 		bool objLiteral;
 		bool objCreated;
+		object objValue;
+		object value;
+		object type;
+		string name;
 
 		LiteralValueReference (EvaluationContext ctx): base (ctx)
 		{
@@ -46,7 +47,7 @@ namespace Mono.Debugging.Evaluation
 
 		public static LiteralValueReference CreateTargetBaseObjectLiteral (EvaluationContext ctx, string name, object value)
 		{
-			LiteralValueReference val = new LiteralValueReference (ctx);
+			var val = new LiteralValueReference (ctx);
 			var type = ctx.Adapter.GetValueType (ctx, value);
 			val.name = name;
 			val.value = value;
@@ -57,7 +58,7 @@ namespace Mono.Debugging.Evaluation
 
 		public static LiteralValueReference CreateTargetObjectLiteral (EvaluationContext ctx, string name, object value)
 		{
-			LiteralValueReference val = new LiteralValueReference (ctx);
+			var val = new LiteralValueReference (ctx);
 			val.name = name;
 			val.value = value;
 			val.type = ctx.Adapter.GetValueType (ctx, value);
@@ -67,7 +68,7 @@ namespace Mono.Debugging.Evaluation
 		
 		public static LiteralValueReference CreateObjectLiteral (EvaluationContext ctx, string name, object value)
 		{
-			LiteralValueReference val = new LiteralValueReference (ctx);
+			var val = new LiteralValueReference (ctx);
 			val.name = name;
 			val.objValue = value;
 			val.objLiteral = true;
@@ -76,12 +77,13 @@ namespace Mono.Debugging.Evaluation
 		
 		public static LiteralValueReference CreateVoidReturnLiteral (EvaluationContext ctx, string name)
 		{
-			LiteralValueReference val = new LiteralValueReference (ctx);
-			val.name = name;
+			var val = new LiteralValueReference (ctx);
 			val.value = val.objValue = new EvaluationResult ("No return value.");
 			val.type = typeof (EvaluationResult);
+			val.isVoidReturn = true;
 			val.objLiteral = true;
 			val.objCreated = true;
+			val.name = name;
 			return val;
 		}
 		
@@ -96,10 +98,7 @@ namespace Mono.Debugging.Evaluation
 		
 		public override object ObjectValue {
 			get {
-				if (objLiteral)
-					return objValue;
-				else
-					return base.ObjectValue;
+				return objLiteral ? objValue : base.ObjectValue;
 			}
 		}
 
@@ -137,8 +136,9 @@ namespace Mono.Debugging.Evaluation
 			if (ObjectValue is EvaluationResult) {
 				EvaluationResult exp = (EvaluationResult) ObjectValue;
 				return Mono.Debugging.Client.ObjectValue.CreateObject (this, new ObjectPath (Name), "", exp, Flags, null);
-			} else
-				return base.OnCreateObjectValue (options);
+			}
+
+			return base.OnCreateObjectValue (options);
 		}
 
 		public override ValueReference GetChild (string name, EvaluationOptions options)
@@ -150,10 +150,11 @@ namespace Mono.Debugging.Evaluation
 
 			if (name [0] == '[' && Context.Adapter.IsArray (Context, obj)) {
 				// Parse the array indices
-				string[] sinds = name.Substring (1, name.Length - 2).Split (',');
-				int[] indices = new int [sinds.Length];
-				for (int n=0; n<sinds.Length; n++)
-					indices [n] = int.Parse (sinds [n]);
+				var tokens = name.Substring (1, name.Length - 2).Split (',');
+				var indices = new int [tokens.Length];
+
+				for (int n = 0; n < tokens.Length; n++)
+					indices[n] = int.Parse (tokens[n]);
 
 				return new ArrayValueReference (Context, obj, indices);
 			}
@@ -166,6 +167,14 @@ namespace Mono.Debugging.Evaluation
 			}
 
 			return null;
+		}
+
+		public override ObjectValue[] GetChildren (ObjectPath path, int index, int count, EvaluationOptions options)
+		{
+			if (isVoidReturn)
+				return new ObjectValue[0];
+
+			return base.GetChildren (path, index, count, options);
 		}
 	}
 }

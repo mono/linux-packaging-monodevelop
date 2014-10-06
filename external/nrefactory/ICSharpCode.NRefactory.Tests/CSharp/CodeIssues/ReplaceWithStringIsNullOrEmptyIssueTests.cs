@@ -86,6 +86,56 @@ namespace ICSharpCode.NRefactory.CSharp.CodeIssues
 		}
 
 		[Test]
+		public void TestInspectorNegatedStringEmpty ()
+		{
+			var input = @"class Foo
+{
+	void Bar (string str)
+	{
+		if (null != str && str != string.Empty)
+			;
+	}
+}";
+
+			TestRefactoringContext context;
+			var issues = GetIssues (new ReplaceWithStringIsNullOrEmptyIssue (), input, out context);
+			Assert.AreEqual (1, issues.Count);
+			CheckFix (context, issues, @"class Foo
+{
+	void Bar (string str)
+	{
+		if (!string.IsNullOrEmpty (str))
+			;
+	}
+}");
+		}
+
+		[Test]
+		public void TestInspectorStringEmpty ()
+		{
+			var input = @"class Foo
+{
+	void Bar (string str)
+	{
+		if (null == str || str == string.Empty)
+			;
+	}
+}";
+
+			TestRefactoringContext context;
+			var issues = GetIssues (new ReplaceWithStringIsNullOrEmptyIssue (), input, out context);
+			Assert.AreEqual (1, issues.Count);
+			CheckFix (context, issues, @"class Foo
+{
+	void Bar (string str)
+	{
+		if (string.IsNullOrEmpty (str))
+			;
+	}
+}");
+		}
+
+		[Test]
 		public void TestInspectorCaseNS3 ()
 		{
 			var input = @"class Foo
@@ -511,5 +561,26 @@ namespace ICSharpCode.NRefactory.CSharp.CodeIssues
 			var issues = GetIssues (new ReplaceWithStringIsNullOrEmptyIssue (), input, out context);
 			Assert.AreEqual (0, issues.Count);
 		}
+
+		[Test]
+		public void TestInspectorCaseNS1WithParentheses ()
+		{
+			Test<ReplaceWithStringIsNullOrEmptyIssue>(@"class Foo
+{
+	void Bar (string str)
+	{
+		if ((str != null) && (str) != """")
+			;
+	}
+}", @"class Foo
+{
+	void Bar (string str)
+	{
+		if (!string.IsNullOrEmpty (str))
+			;
+	}
+}");
+		}
+
 	}
 }

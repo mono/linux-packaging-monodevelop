@@ -1,12 +1,4 @@
-<Addin id          = "NUnit"
-       namespace   = "MonoDevelop"
-       name        = "NUnit support"
-       author      = "Lluis Sanchez, John Luke"
-       copyright   = "MIT X11"
-       url         = "http://monodevelop.com"
-       description = "Integrates NUnit into the MonoDevelop IDE."
-       category    = "Testing"
-       version     = "4.0.12">
+<ExtensionModel>
 
 	<Runtime>
 		<Import assembly="MonoDevelop.NUnit.dll" />
@@ -15,19 +7,14 @@
 		<Import assembly="nunit.framework.dll" />
 		<Import assembly="nunit.util.dll" />
 	</Runtime>
-	
-	<Dependencies>
-		<Addin id="Core" version="4.0.12"/>
-		<Addin id="Ide" version="4.0.12"/>
-	</Dependencies>
-	
+
 	<!-- Extension Points -->
 
 	<ExtensionPoint path = "/MonoDevelop/NUnit/TestProviders" name = "Test providers">
 		<Description>Test providers. Specified classes must implement ITestProvider.</Description>
 		<ExtensionNode name ="Class" />
 	</ExtensionPoint>
-	
+
 	<ExtensionPoint path = "/MonoDevelop/NUnit/ContextMenu/TestChart">
 		<ExtensionNodeSet id="MonoDevelop.Components.Commands.ItemSet"/>
 	</ExtensionPoint>
@@ -63,23 +50,13 @@
 
 	<!-- Extensions -->
 
-	<Extension path="/MonoDevelop/Core/SupportPackages">
-		<Condition id="PackageNotInstalled" name="mono-nunit" version="2.7">
-			<Package name="nunit" version="2.4" clrVersion="Default">
-				<Assembly file="nunit.core.dll" />
-				<Assembly file="nunit.core.interfaces.dll" />
-				<Assembly file="nunit.framework.dll" />
-			</Package>
-		</Condition>
-	</Extension>
-
 	<Extension path = "/MonoDevelop/Ide/Pads">
 		<SolutionPad id = "MonoDevelop.NUnit.TestPad" defaultLayout="*" defaultPlacement = "Right" defaultStatus="AutoHide" _label = "Unit Tests" icon = "nunit-pad-icon" class = "MonoDevelop.NUnit.TestPad">
 			<PadOption id = "ShowTestTime" _label = "Show Test Time" defaultValue = "False" />
 			<PadOption id = "ShowTestCounters" _label = "Show Test Counters" defaultValue = "False" />
 			<NodeBuilder id = "TestNode" class = "MonoDevelop.NUnit.TestNodeBuilder"/>
 		</SolutionPad>
-		<Pad id="MonoDevelop.NUnit.TestResultsPad" _label="Test Results" icon="nunit-pad-icon" class="MonoDevelop.NUnit.TestResultsPad" defaultPlacement = "Bottom" defaultLayout="UnitTesting" defaultStatus="AutoHide"/>
+		<Pad id="MonoDevelop.NUnit.TestResultsPad" _label="Test Results" icon="nunit-results-pad-icon" class="MonoDevelop.NUnit.TestResultsPad" defaultPlacement = "Bottom" defaultLayout="UnitTesting" defaultStatus="AutoHide"/>
 	</Extension>
 
 	<Extension path="/MonoDevelop/Ide/WorkbenchLayouts">
@@ -88,25 +65,25 @@
 			<LayoutPad id="MonoDevelop.NUnit.TestResultsPad" status="Dockable" />
 		</Layout>
 	</Extension>
-	
+
 	<Extension path = "/MonoDevelop/Ide/Pads/ProjectPad">
 		<NodeBuilder id = "NUnitAssemblyGroupNodeBuilder" class = "MonoDevelop.NUnit.NUnitAssemblyGroupNodeBuilder"/>
 		<NodeBuilder id = "NUnitAssemblyGroupConfigurationNodeBuilder" class = "MonoDevelop.NUnit.NUnitAssemblyGroupConfigurationNodeBuilder"/>
 		<NodeBuilder id = "TestAssemblyNodeBuilder" class = "MonoDevelop.NUnit.TestAssemblyNodeBuilder"/>
 	</Extension>
-	
+
 	<Extension path = "/MonoDevelop/Ide/Commands">
 		<Category _name = "NUnit" id = "NUnit">
-		<Command id = "MonoDevelop.NUnit.Commands.TestCommands.RunAllTests" 
+		<Command id = "MonoDevelop.NUnit.Commands.TestCommands.RunAllTests"
 			_label = "Run Unit Tests"
 			_description="Runs all tests of the current selected project."
 			shortcut="Control|T"
 			defaultHandler="MonoDevelop.NUnit.Commands.RunAllTestsHandler"/>
-		<Command id = "MonoDevelop.NUnit.Commands.TestCommands.RunTestWith" 
+		<Command id = "MonoDevelop.NUnit.Commands.TestCommands.RunTestWith"
 			_label = "Run With"
 			type="array"
 			_description="Runs tests using a special execution mode."/>
-		<Command id = "MonoDevelop.NUnit.Commands.TestCommands.DebugTest" 
+		<Command id = "MonoDevelop.NUnit.Commands.TestCommands.DebugTest"
 			_label = "Debug Test"
 			type="array" />
 		<Command id = "MonoDevelop.NUnit.Commands.TestCommands.RunTest" _label = "Run Test" />
@@ -128,7 +105,7 @@
 	<Extension path = "/MonoDevelop/Ide/MainMenu/Run">
 		<CommandItem id = "MonoDevelop.NUnit.Commands.TestCommands.RunAllTests" />
 	</Extension>
-	
+
 	<Extension path = "/MonoDevelop/NUnit/ContextMenu/ProjectPad/NUnitAssemblyGroup">
 		<CommandItem id = "MonoDevelop.Ide.Commands.EditCommands.Delete" />
 	</Extension>
@@ -159,6 +136,8 @@
 		<CommandItem id = "MonoDevelop.NUnit.Commands.TestCommands.GoToFailure" />
 		<CommandItem id = "MonoDevelop.NUnit.Commands.TestCommands.ShowTestCode" />
 		<CommandItem id = "MonoDevelop.NUnit.Commands.TestCommands.SelectTestInTree" />
+		<SeparatorItem id = "s1" />
+		<CommandItem id = "MonoDevelop.Ide.Commands.EditCommands.Copy" />
 	</Extension>
 
 	<Extension path = "/MonoDevelop/NUnit/ContextMenu/TestChart">
@@ -177,7 +156,7 @@
 		<Section id = "Configurations"
 					 _label = "Configurations" />
 	</Extension>
-	
+
 	<Extension path = "/MonoDevelop/NUnit/UnitTestOptions/ConfigurationOptions">
 		<Section id = "NUnitOptionsPanel"
 					 _label = "${Configuration}"
@@ -192,24 +171,21 @@
   	<Extension path = "/MonoDevelop/Ide/FileTemplates">
 		<FileTemplate id = "NUnitTestClass" resource = "NUnitTestClass.xft.xml"/>
 	</Extension>
-  
-	<Extension path = "/MonoDevelop/ProjectModel/FileFormats">
-		<FileFormat id="NUnitAssemblyGroupFileFormat"
-		            class="MonoDevelop.NUnit.NUnitAssemblyGroupFileFormat"/>
-	</Extension>
 
 	<Extension path = "/MonoDevelop/NUnit/TestProviders">
 		<Class id="SystemTestProvider" class="MonoDevelop.NUnit.SystemTestProvider" />
 	</Extension>
-  
+
 	<Extension path = "/MonoDevelop/Core/StockIcons">
-		<StockIcon stockid = "nunit-pad-icon" resource = "unit-test-16.png" size="Menu" />
+		<StockIcon stockid = "nunit-pad-icon" resource = "pad-unit-test-light-16.png" size="Menu" />
+		<StockIcon stockid = "nunit-results-pad-icon" resource = "pad-unit-test-results-light-16.png" size="Menu" />
+		<StockIcon stockid = "nunit-run" resource = "unit-run-light-16.png" size="Menu" />
 	</Extension>
 
 	<Extension path = "/MonoDevelop/ProjectModel/ProjectServiceExtensions">
 		<Class class = "MonoDevelop.NUnit.NUnitProjectServiceExtension" />
 	</Extension>
-	
+
 	<Extension path = "/MonoDevelop/ProjectModel/SerializableClasses">
 		<DataType class = "MonoDevelop.NUnit.NUnitAssemblyGroupProject" />
 	</Extension>
@@ -227,4 +203,4 @@
 			name = "TestRunnerArgs" type = "System.String" external="false" />
 	</Extension>
 
-</Addin>
+</ExtensionModel>

@@ -24,34 +24,47 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using Mono.Debugging.Evaluation;
 using Mono.Debugger.Soft;
 using Mono.Debugging.Client;
 
 namespace Mono.Debugging.Soft
 {
-	public class PropertyValueReference: ValueReference
+	public class PropertyValueReference: SoftValueReference
 	{
 		PropertyInfoMirror property;
-		object obj;
 		TypeMirror declaringType;
-		Value[] indexerArgs;
 		ObjectValueFlags flags;
+		MethodMirror getter;
+		Value[] indexerArgs;
+		object obj, value;
+		bool haveValue;
 		
 		public PropertyValueReference (EvaluationContext ctx, PropertyInfoMirror property, object obj, TypeMirror declaringType, MethodMirror getter, Value[] indexerArgs): base (ctx)
 		{
-			this.property = property;
-			this.obj = obj;
 			this.declaringType = declaringType;
 			this.indexerArgs = indexerArgs;
-			
-			flags = ObjectValueFlags.Property;
+			this.property = property;
+			this.getter = getter;
+			this.obj = obj;
+
+			var objectMirror = obj as ObjectMirror;
+			if (objectMirror != null)
+				EnsureContextHasDomain (objectMirror.Domain);
+
+			flags = GetFlags (property, getter);
+		}
+
+		internal static ObjectValueFlags GetFlags (PropertyInfoMirror property, MethodMirror getter)
+		{
+			var flags = ObjectValueFlags.Property;
+
 			if (property.GetSetMethod (true) == null)
 				flags |= ObjectValueFlags.ReadOnly;
-			
+
 			if (getter.IsStatic)
 				flags |= ObjectValueFlags.Global;
+
 			if (getter.IsPublic)
 				flags |= ObjectValueFlags.Public;
 			else if (getter.IsPrivate)
@@ -62,9 +75,11 @@ namespace Mono.Debugging.Soft
 				flags |= ObjectValueFlags.Internal;
 			else if (getter.IsFamilyOrAssembly)
 				flags |= ObjectValueFlags.InternalProtected;
-			
+
 			if (property.DeclaringType.IsValueType)
 				flags |= ObjectValueFlags.ReadOnly; // Setting property values on structs is not supported by sdb
+
+			return flags;
 		}
 		
 		public override ObjectValueFlags Flags {
@@ -93,27 +108,57 @@ namespace Mono.Debugging.Soft
 
 		public override object Value {
 			get {
-				Context.AssertTargetInvokeAllowed ();
-				SoftEvaluationContext ctx = (SoftEvaluationContext) Context;
-				return ctx.RuntimeInvoke (property.GetGetMethod (true), obj ?? declaringType, indexerArgs);
+				return GetValue (Context);
 			}
 			set {
-				Context.AssertTargetInvokeAllowed ();
-				SoftEvaluationContext ctx = (SoftEvaluationContext) Context;
-				Value[] args = new Value [indexerArgs != null ? indexerArgs.Length + 1 : 1];
-				if (indexerArgs != null)
-					indexerArgs.CopyTo (args, 0);
-				args [args.Length - 1] = (Value) value;
-				MethodMirror setter = property.GetSetMethod (true);
-				if (setter == null)
-					throw new EvaluatorException ("Property is read-only");
-				ctx.RuntimeInvoke (setter, obj ?? declaringType, args);
+				SetValue (Context, value);
 			}
 		}
-		
+
+		public override object GetValue (EvaluationContext ctx)
+		{
+			if (!haveValue) {
+				value = ((SoftEvaluationContext) ctx).RuntimeInvoke (getter, obj ?? declaringType, indexerArgs);
+				haveValue = true;
+			}
+
+			return value;
+		}
+
+		public override void SetValue (EvaluationContext ctx, object value)
+		{
+			ctx.AssertTargetInvokeAllowed ();
+
+			var args = new Value [indexerArgs != null ? indexerArgs.Length + 1 : 1];
+			if (indexerArgs != null)
+				indexerArgs.CopyTo (args, 0);
+
+			args [args.Length - 1] = (Value) value;
+
+			var setter = property.GetSetMethod (true);
+			if (setter == null)
+				throw new EvaluatorException ("Property is read-only");
+
+			this.value = null;
+			haveValue = false;
+
+			((SoftEvaluationContext) ctx).RuntimeInvoke (setter, obj ?? declaringType, args);
+
+			this.value = value;
+			haveValue = true;
+		}
+
 		protected override bool CanEvaluate (EvaluationOptions options)
 		{
-			return options.AllowTargetInvoke;
+			if (options.AllowTargetInvoke)
+				return true;
+
+			try {
+				GetValue (Context.WithOptions (options));
+				return true;
+			} catch (ImplicitEvaluationDisabledException) {
+				return false;
+			}
 		}
 	}
 }

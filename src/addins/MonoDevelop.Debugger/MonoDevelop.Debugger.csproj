@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{2357AABD-08C7-4808-A495-8FF2D3CDFDB0}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -22,9 +22,11 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\MonoDevelop.Debugger\MonoDevelop.Debugger.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\build\AddIns\MonoDevelop.Debugger</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -33,6 +35,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\MonoDevelop.Debugger\MonoDevelop.Debugger.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -111,13 +116,9 @@
     <Compile Include="MonoDevelop.Debugger\DebugCommands.cs" />
     <Compile Include="MonoDevelop.Debugger\Extensions.cs" />
     <Compile Include="MonoDevelop.Debugger\AttachToProcessDialog.cs" />
-    <Compile Include="MonoDevelop.Debugger\ExceptionsDialog.cs" />
-    <Compile Include="gtk-gui\MonoDevelop.Debugger.ExceptionsDialog.cs" />
     <Compile Include="gtk-gui\MonoDevelop.Debugger.AttachToProcessDialog.cs" />
     <Compile Include="MonoDevelop.Debugger\ExpressionEvaluatorDialog.cs" />
     <Compile Include="gtk-gui\MonoDevelop.Debugger.ExpressionEvaluatorDialog.cs" />
-    <Compile Include="MonoDevelop.Debugger\BreakpointPropertiesDialog.cs" />
-    <Compile Include="gtk-gui\MonoDevelop.Debugger.BreakpointPropertiesDialog.cs" />
     <Compile Include="MonoDevelop.Debugger\DebugExecutionModeSet.cs" />
     <Compile Include="MonoDevelop.Debugger\IDebuggerEngine.cs" />
     <Compile Include="MonoDevelop.Debugger\ImmediatePad.cs" />
@@ -125,8 +126,6 @@
     <Compile Include="gtk-gui\MonoDevelop.Debugger.BusyEvaluatorDialog.cs" />
     <Compile Include="MonoDevelop.Debugger\DebuggerOptionsPanelWidget.cs" />
     <Compile Include="gtk-gui\MonoDevelop.Debugger.DebuggerOptionsPanelWidget.cs" />
-    <Compile Include="MonoDevelop.Debugger\AddTracePointDialog.cs" />
-    <Compile Include="gtk-gui\MonoDevelop.Debugger.AddTracePointDialog.cs" />
     <Compile Include="MonoDevelop.Debugger\PinnedWatch.cs" />
     <Compile Include="MonoDevelop.Debugger\PinnedWatchStore.cs" />
     <Compile Include="MonoDevelop.Debugger\DebuggerEngine.cs" />
@@ -136,11 +135,18 @@
     <Compile Include="gtk-gui\MonoDevelop.Debugger.Viewers.ValueVisualizerDialog.cs" />
     <Compile Include="MonoDevelop.Debugger.Visualizer\TextVisualizer.cs" />
     <Compile Include="MonoDevelop.Debugger.Visualizer\PixbufVisualizer.cs" />
-    <Compile Include="MonoDevelop.Debugger.Visualizer\IValueVisualizer.cs" />
     <Compile Include="MonoDevelop.Debugger\ExpressionEvaluatorExtensionNode.cs" />
-    <Compile Include="gtk-gui\MonoDevelop.Debugger.ExceptionCaughtWidget.cs" />
     <Compile Include="MonoDevelop.Debugger\TreePathComparer.cs" />
     <Compile Include="MonoDevelop.Debugger\TreePathReference.cs" />
+    <Compile Include="MonoDevelop.Debugger\DebuggerConsoleView.cs" />
+    <Compile Include="MonoDevelop.Debugger.Visualizer\CStringVisualizer.cs" />
+    <Compile Include="MonoDevelop.Debugger.Visualizer\ValueVisualizer.cs" />
+    <Compile Include="MonoDevelop.Debugger\InfoFrame.cs" />
+    <Compile Include="AddinInfo.cs" />
+    <Compile Include="MonoDevelop.Debugger\IDebuggerExpressionResolver.cs" />
+    <Compile Include="MonoDevelop.Debugger\DebuggerEngineBackend.cs" />
+    <Compile Include="MonoDevelop.Debugger\BreakpointPropertiesDialog.cs" />
+    <Compile Include="MonoDevelop.Debugger\TextEntryWithCodeCompletion.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="MonoDevelop.Debugger.addin.xml">
@@ -149,65 +155,161 @@
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\debug-overlay-16.png">
-      <LogicalName>debug-overlay-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\debug-overlay-16.png">
+      <LogicalName>debug-overlay-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\debug-overlay-22.png">
-      <LogicalName>debug-overlay-22.png</LogicalName>
+    <EmbeddedResource Include="icons\light\debug-overlay-16%402x.png">
+      <LogicalName>debug-overlay-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\debug-overlay-32.png">
-      <LogicalName>debug-overlay-32.png</LogicalName>
+    <EmbeddedResource Include="icons\light\debug-overlay-22.png">
+      <LogicalName>debug-overlay-light-22.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\view-debug-breakpoints-16.png">
-      <LogicalName>view-debug-breakpoints-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\debug-overlay-22%402x.png">
+      <LogicalName>debug-overlay-light-22@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\view-debug-call-stack-16.png">
-      <LogicalName>view-debug-call-stack-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\debug-overlay-24.png">
+      <LogicalName>debug-overlay-light-24.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\view-debug-locals-16.png">
-      <LogicalName>view-debug-locals-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\debug-overlay-24%402x.png">
+      <LogicalName>debug-overlay-light-24@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\view-debug-threads-16.png">
-      <LogicalName>view-debug-threads-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\debug-overlay-32.png">
+      <LogicalName>debug-overlay-light-32.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\view-debug-watch-16.png">
-      <LogicalName>view-debug-watch-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\debug-overlay-32%402x.png">
+      <LogicalName>debug-overlay-light-32@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\debug-overlay-24.png">
-      <LogicalName>debug-overlay-24.png</LogicalName>
+    <EmbeddedResource Include="icons\light\breakpoint-16.png">
+      <LogicalName>breakpoint-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\icoDebug-Pause.png">
-      <LogicalName>icoDebug-Pause.png</LogicalName>
+    <EmbeddedResource Include="icons\light\breakpoint-16%402x.png">
+      <LogicalName>breakpoint-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\icoDebug-StepIn.png">
-      <LogicalName>icoDebug-StepIn.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-call-stack-16.png">
+      <LogicalName>pad-call-stack-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\icoDebug-StepOut.png">
-      <LogicalName>icoDebug-StepOut.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-call-stack-16%402x.png">
+      <LogicalName>pad-call-stack-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\icoDebug-StepOver.png">
-      <LogicalName>icoDebug-StepOver.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-locals-16.png">
+      <LogicalName>pad-locals-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\icoDebug-Continue.png">
-      <LogicalName>icoDebug-Continue.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-locals-16%402x.png">
+      <LogicalName>pad-locals-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\bug-16.png">
-      <LogicalName>bug-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-threads-16.png">
+      <LogicalName>pad-threads-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\lightning.png">
-      <LogicalName>lightning.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-threads-16%402x.png">
+      <LogicalName>pad-threads-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\MonoDevelop.Close.Selected.Over.png">
-      <LogicalName>MonoDevelop.Close.Selected.Over.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-watch-16.png">
+      <LogicalName>pad-watch-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\MonoDevelop.Close.Selected.png">
-      <LogicalName>MonoDevelop.Close.Selected.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-watch-16%402x.png">
+      <LogicalName>pad-watch-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\exception-icon.png">
-      <LogicalName>exception-icon.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pause-16.png">
+      <LogicalName>pause-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\exception-icon%402x.png">
-      <LogicalName>exception-icon@2x.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pause-16%402x.png">
+      <LogicalName>pause-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\step-in-16.png">
+      <LogicalName>step-in-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\step-in-16%402x.png">
+      <LogicalName>step-in-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\step-out-16.png">
+      <LogicalName>step-out-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\step-out-16%402x.png">
+      <LogicalName>step-out-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\step-over-16.png">
+      <LogicalName>step-over-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\step-over-16%402x.png">
+      <LogicalName>step-over-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\continue-16.png">
+      <LogicalName>continue-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\continue-16%402x.png">
+      <LogicalName>continue-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-debugger-16.png">
+      <LogicalName>prefs-debugger-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-debugger-16%402x.png">
+      <LogicalName>prefs-debugger-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\lightning-16.png">
+      <LogicalName>lightning-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\lightning-16%402x.png">
+      <LogicalName>lightning-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\exception-48.png">
+      <LogicalName>exception-light-48.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\exception-48%402x.png">
+      <LogicalName>exception-light-48@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-breakpoint-15.png">
+      <LogicalName>gutter-breakpoint-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-breakpoint-15%402x.png">
+      <LogicalName>gutter-breakpoint-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-breakpoint-disabled-15.png">
+      <LogicalName>gutter-breakpoint-disabled-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-breakpoint-disabled-15%402x.png">
+      <LogicalName>gutter-breakpoint-disabled-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-breakpoint-invalid-15.png">
+      <LogicalName>gutter-breakpoint-invalid-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-breakpoint-invalid-15%402x.png">
+      <LogicalName>gutter-breakpoint-invalid-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-execution-15.png">
+      <LogicalName>gutter-execution-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-execution-15%402x.png">
+      <LogicalName>gutter-execution-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-stack-15.png">
+      <LogicalName>gutter-stack-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-stack-15%402x.png">
+      <LogicalName>gutter-stack-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-tracepoint-15.png">
+      <LogicalName>gutter-tracepoint-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-tracepoint-15%402x.png">
+      <LogicalName>gutter-tracepoint-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-tracepoint-disabled-15.png">
+      <LogicalName>gutter-tracepoint-disabled-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-tracepoint-disabled-15%402x.png">
+      <LogicalName>gutter-tracepoint-disabled-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-tracepoint-invalid-15.png">
+      <LogicalName>gutter-tracepoint-invalid-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-tracepoint-invalid-15%402x.png">
+      <LogicalName>gutter-tracepoint-invalid-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\stack-pointer-16.png">
+      <LogicalName>stack-pointer-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\stack-pointer-16%402x.png">
+      <LogicalName>stack-pointer-light-16@2x.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />

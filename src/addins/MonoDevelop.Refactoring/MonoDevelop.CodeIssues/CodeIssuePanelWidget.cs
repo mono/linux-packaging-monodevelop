@@ -28,24 +28,40 @@ using MonoDevelop.Ide.Gui.Dialogs;
 using Gtk;
 using MonoDevelop.Core;
 using System.Linq;
-using System.Text;
 using MonoDevelop.SourceEditor;
 using MonoDevelop.Refactoring;
 using System.Collections.Generic;
 using Mono.TextEditor;
-using MonoDevelop.SourceEditor.QuickTasks;
-using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory.Refactoring;
+using GLib;
+using MonoDevelop.Components;
+using Gdk;
+using MonoDevelop.SourceEditor.QuickTasks;
 
 namespace MonoDevelop.CodeIssues
 {
 	class CodeIssuePanel : OptionsPanel
 	{
 		CodeIssuePanelWidget widget;
-		
-		public override Gtk.Widget CreatePanelWidget ()
+
+		public CodeIssuePanelWidget Widget {
+			get {
+				EnsureWidget ();
+				return widget;
+			}
+		}
+
+		void EnsureWidget ()
 		{
-			return widget = new CodeIssuePanelWidget ("text/x-csharp");
+			if (widget != null)
+				return;
+			widget = new CodeIssuePanelWidget ("text/x-csharp");
+		}
+		
+		public override Widget CreatePanelWidget ()
+		{
+			EnsureWidget ();
+			return widget;
 		}
 		
 		public override void ApplyChanges ()
@@ -54,18 +70,54 @@ namespace MonoDevelop.CodeIssues
 		}
 	}
 	
-	[System.ComponentModel.ToolboxItem(true)]
-	partial class CodeIssuePanelWidget : Gtk.Bin
+	partial class CodeIssuePanelWidget : Bin
 	{
 		readonly string mimeType;
-		Gtk.TreeStore treeStore = new Gtk.TreeStore (typeof(string), typeof(CodeIssueProvider));
+		readonly TreeStore treeStore = new TreeStore (typeof(string), typeof(BaseCodeIssueProvider), typeof (string));
+		readonly Dictionary<BaseCodeIssueProvider, Severity> severities = new Dictionary<BaseCodeIssueProvider, Severity> ();
+		readonly Dictionary<BaseCodeIssueProvider, bool> enableState = new Dictionary<BaseCodeIssueProvider, bool> ();
 
-		Dictionary<CodeIssueProvider, Severity> severities = new Dictionary<CodeIssueProvider, Severity> ();
 		void GetAllSeverities ()
 		{
 			foreach (var node in RefactoringService.GetInspectors (mimeType)) {
 				severities [node] = node.GetSeverity ();
+				enableState [node] = node.GetIsEnabled ();
+				if (node.HasSubIssues) {
+					foreach (var subIssue in node.SubIssues) {
+						severities [subIssue] = subIssue.GetSeverity ();
+						enableState [subIssue] = subIssue.GetIsEnabled ();
+					}
+				}
 			}
+		}
+
+		public void SelectCodeIssue (string idString)
+		{
+			TreeIter iter;
+			if (!treeStore.GetIterFirst (out iter))
+				return;
+			SelectCodeIssue (idString, iter);
+		}
+
+		bool SelectCodeIssue (string idString, TreeIter iter)
+		{
+			do {
+				var provider = treeStore.GetValue (iter, 1) as BaseCodeIssueProvider; 
+				if (provider != null && provider.IdString == idString) {
+					treeviewInspections.ExpandToPath (treeStore.GetPath (iter));
+					treeviewInspections.Selection.SelectIter (iter);
+					return true;
+				}
+
+				TreeIter childIterator;
+				if (treeStore.IterChildren (out childIterator, iter)) {
+					do {
+						if (SelectCodeIssue (idString, childIterator))
+							return true;
+					} while (treeStore.IterNext (ref childIterator));
+				}
+			} while (treeStore.IterNext (ref iter));
+			return false;
 		}
 
 		static string GetDescription (Severity severity)
@@ -86,21 +138,18 @@ namespace MonoDevelop.CodeIssues
 			}
 		}
 
-		Gdk.Color GetColor (Severity severity)
+		Xwt.Drawing.Image GetIcon (Severity severity)
 		{
 			switch (severity) {
-			case Severity.None:
-				return Style.Base (StateType.Normal);
 			case Severity.Error:
-				return (HslColor)DefaultSourceEditorOptions.Instance.GetColorStyle ().UnderlineError.Color;
+				return QuickTaskOverviewMode.ErrorImage;
 			case Severity.Warning:
-				return (HslColor)DefaultSourceEditorOptions.Instance.GetColorStyle ().UnderlineWarning.Color;
+				return QuickTaskOverviewMode.WarningImage;
 			case Severity.Hint:
-				return (HslColor)DefaultSourceEditorOptions.Instance.GetColorStyle ().UnderlineHint.Color;
 			case Severity.Suggestion:
-				return (HslColor)DefaultSourceEditorOptions.Instance.GetColorStyle ().UnderlineSuggestion.Color;
+				return QuickTaskOverviewMode.SuggestionImage;
 			default:
-				throw new ArgumentOutOfRangeException ();
+				return QuickTaskOverviewMode.OkImage;
 			}
 		}
 
@@ -108,45 +157,135 @@ namespace MonoDevelop.CodeIssues
 		{
 			categories.Clear ();
 			treeStore.Clear ();
-			foreach (var node in severities.Keys) {
-				if (!string.IsNullOrEmpty (filter) && node.Title.IndexOf (filter, StringComparison.OrdinalIgnoreCase) < 0)
-					continue;
-				Gtk.TreeIter iter;
-				if (!categories.TryGetValue (node.Category, out iter)) {
-					iter = treeStore.AppendValues ("<b>" + node.Category + "</b>");
-					categories [node.Category] = iter;
+
+			var grouped = severities.Keys.OfType<CodeIssueProvider> ()
+				.Where (node => string.IsNullOrEmpty (filter) || node.Title.IndexOf (filter, StringComparison.OrdinalIgnoreCase) > 0)
+				.GroupBy (node => node.Category)
+				.OrderBy (g => g.Key, StringComparer.Ordinal);
+
+			foreach (var g in grouped) {
+				TreeIter categoryIter = treeStore.AppendValues ("<b>" + g.Key + "</b>", null, null);
+				categories [g.Key] = categoryIter;
+
+				foreach (var node in g.OrderBy (n => n.Title, StringComparer.Ordinal)) {
+					var title = node.Title;
+					MarkupSearchResult (filter, ref title);
+					var nodeIter = treeStore.AppendValues (categoryIter, title, node, node.Description);
+					if (node.HasSubIssues) {
+						foreach (var subIssue in node.SubIssues) {
+							title = subIssue.Title;
+							MarkupSearchResult (filter, ref title);
+							treeStore.AppendValues (nodeIter, title, subIssue, subIssue.Description);
+						}
+					}
 				}
-				var title = node.Title;
-				if (!string.IsNullOrEmpty (filter)) {
-					var idx = title.IndexOf (filter, StringComparison.OrdinalIgnoreCase);
-					title = title.Substring (0, idx) + "<span bgcolor=\"yellow\">" + title.Substring (idx, filter.Length) + "</span>" + title.Substring (idx + filter.Length);
-				}
-				treeStore.AppendValues (iter, title, node);
 			}
 			treeviewInspections.ExpandAll ();
 		}
-		
+
+		public static void MarkupSearchResult (string filter, ref string title)
+		{
+			if (!string.IsNullOrEmpty (filter)) {
+				var idx = title.IndexOf (filter, StringComparison.OrdinalIgnoreCase);
+				if (idx >= 0) {
+					title =
+						Markup.EscapeText (title.Substring (0, idx)) +
+						"<span bgcolor=\"yellow\">" +
+						Markup.EscapeText (title.Substring (idx, filter.Length)) +
+						"</span>" +
+						Markup.EscapeText (title.Substring (idx + filter.Length));
+					return;
+				}
+			}
+			title = Markup.EscapeText (title);
+		}
+
+
+		class CustomCellRenderer : CellRendererCombo
+		{
+			public Xwt.Drawing.Image Icon {
+				get;
+				set;
+			}
+
+			protected override void Render (Gdk.Drawable window, Widget widget, Gdk.Rectangle background_area, Gdk.Rectangle cell_area, Gdk.Rectangle expose_area, CellRendererState flags)
+			{
+				int w = 10;
+				var newCellArea = new Gdk.Rectangle (cell_area.X + w, cell_area.Y, cell_area.Width - w, cell_area.Height);
+				using (var ctx = CairoHelper.Create (window)) {
+					ctx.DrawImage (widget, Icon, cell_area.X - 4, cell_area.Y + Math.Round ((cell_area.Height - Icon.Height) / 2));
+				}
+
+				base.Render (window, widget, background_area, newCellArea, expose_area, flags);
+			}
+		}
+
 		public CodeIssuePanelWidget (string mimeType)
 		{
 			this.mimeType = mimeType;
+			// ReSharper disable once DoNotCallOverridableMethodsInConstructor
 			Build ();
 
-			var col1 = treeviewInspections.AppendColumn ("Title", new CellRendererText (), "markup", 0);
-			col1.Expand = true;
+			// ensure selected row remains visible
+			treeviewInspections.SizeAllocated += (o, args) => {
+				TreeIter iter;
+				if (treeviewInspections.Selection.GetSelected (out iter)) {
+					var path = treeviewInspections.Model.GetPath (iter);
+					treeviewInspections.ScrollToCell (path, treeviewInspections.Columns[0], false, 0f, 0f);
+				}
+			};
+			treeviewInspections.TooltipColumn = 2;
+			treeviewInspections.HasTooltip = true;
 
+			var toggleRenderer = new CellRendererToggle ();
+			toggleRenderer.Toggled += delegate(object o, ToggledArgs args) {
+				TreeIter iter;
+				if (treeStore.GetIterFromString (out iter, args.Path)) {
+					var provider = (BaseCodeIssueProvider)treeStore.GetValue (iter, 1);
+					enableState[provider] = !enableState[provider];
+				}
+			};
+
+			var titleCol = new TreeViewColumn ();
+			treeviewInspections.AppendColumn (titleCol);
+			titleCol.PackStart (toggleRenderer, false);
+			titleCol.Sizing = TreeViewColumnSizing.Autosize;
+			titleCol.SetCellDataFunc (toggleRenderer, delegate (TreeViewColumn treeColumn, CellRenderer cell, TreeModel model, TreeIter iter) {
+				var provider = (BaseCodeIssueProvider)model.GetValue (iter, 1);
+				if (provider == null) {
+					toggleRenderer.Visible = false;
+					return;
+				}
+				toggleRenderer.Visible = true;
+				toggleRenderer.Active = enableState[provider];
+			});
+
+
+			var cellRendererText = new CellRendererText {
+				Ellipsize = Pango.EllipsizeMode.End
+			};
+			titleCol.PackStart (cellRendererText, true);
+			titleCol.AddAttribute (cellRendererText, "markup", 0);
+			titleCol.Expand = true;
+
+			searchentryFilter.ForceFilterButtonVisible = true;
+			searchentryFilter.RoundedShape = true;
+			searchentryFilter.HasFrame = true;
 			searchentryFilter.Ready = true;
 			searchentryFilter.Visible = true;
 			searchentryFilter.Entry.Changed += ApplyFilter;
 
-			var comboRenderer = new CellRendererCombo ();
-			comboRenderer.Alignment = Pango.Alignment.Center;
+
+			var comboRenderer = new CustomCellRenderer {
+				Alignment = Pango.Alignment.Center
+			};
 			var col = treeviewInspections.AppendColumn ("Severity", comboRenderer);
 			col.Sizing = TreeViewColumnSizing.GrowOnly;
 			col.MinWidth = 100;
 			col.Expand = false;
 
 			var comboBoxStore = new ListStore (typeof(string), typeof(Severity));
-			comboBoxStore.AppendValues (GetDescription (Severity.None), Severity.None);
+//			comboBoxStore.AppendValues (GetDescription (Severity.None), Severity.None);
 			comboBoxStore.AppendValues (GetDescription (Severity.Error), Severity.Error);
 			comboBoxStore.AppendValues (GetDescription (Severity.Warning), Severity.Warning);
 			comboBoxStore.AppendValues (GetDescription (Severity.Hint), Severity.Hint);
@@ -158,17 +297,17 @@ namespace MonoDevelop.CodeIssues
 			comboRenderer.Editable = true;
 			comboRenderer.HasEntry = false;
 			
-			comboRenderer.Edited += delegate(object o, Gtk.EditedArgs args) {
-				Gtk.TreeIter iter;
+			comboRenderer.Edited += delegate(object o, EditedArgs args) {
+				TreeIter iter;
 				if (!treeStore.GetIterFromString (out iter, args.Path))
 					return;
 
-				Gtk.TreeIter storeIter;
+				TreeIter storeIter;
 				if (!comboBoxStore.GetIterFirst (out storeIter))
 					return;
 				do {
 					if ((string)comboBoxStore.GetValue (storeIter, 0) == args.NewText) {
-						var provider = (CodeIssueProvider)treeStore.GetValue (iter, 1);
+						var provider = (BaseCodeIssueProvider)treeStore.GetValue (iter, 1);
 						var severity = (Severity)comboBoxStore.GetValue (storeIter, 1);
 						severities[provider] = severity;
 						return;
@@ -176,8 +315,8 @@ namespace MonoDevelop.CodeIssues
 				} while (comboBoxStore.IterNext (ref storeIter));
 			};
 			
-			col.SetCellDataFunc (comboRenderer, delegate (Gtk.TreeViewColumn tree_column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter) {
-				var provider = (CodeIssueProvider)model.GetValue (iter, 1);
+			col.SetCellDataFunc (comboRenderer, delegate (TreeViewColumn treeColumn, CellRenderer cell, TreeModel model, TreeIter iter) {
+				var provider = (BaseCodeIssueProvider)model.GetValue (iter, 1);
 				if (provider == null) {
 					comboRenderer.Visible = false;
 					return;
@@ -185,11 +324,10 @@ namespace MonoDevelop.CodeIssues
 				var severity = severities[provider];
 				comboRenderer.Visible = true;
 				comboRenderer.Text = GetDescription (severity);
-				comboRenderer.BackgroundGdk = GetColor (severity);
+				comboRenderer.Icon = GetIcon (severity);
 			});
 			treeviewInspections.HeadersVisible = false;
 			treeviewInspections.Model = treeStore;
-			treeviewInspections.Selection.Changed += HandleSelectionChanged;
 			GetAllSeverities ();
 			FillInspectors (null);
 		}
@@ -199,24 +337,15 @@ namespace MonoDevelop.CodeIssues
 			FillInspectors (searchentryFilter.Entry.Text.Trim ());
 		}
 
-		Dictionary<string, TreeIter> categories = new Dictionary<string, TreeIter> ();
+		readonly Dictionary<string, TreeIter> categories = new Dictionary<string, TreeIter> ();
 
-		void HandleSelectionChanged (object sender, EventArgs e)
-		{
-			labelDescription.Text = "";
-			Gtk.TreeIter iter;
-			if (!treeviewInspections.Selection.GetSelected (out iter))
-				return;
-			var actionNode = (CodeIssueProvider)treeStore.GetValue (iter, 1);
-			if (actionNode != null)
-				labelDescription.Markup = "<b>" + actionNode.Title + "</b>" + Environment.NewLine + actionNode.Description;
-		}
 
 		public void ApplyChanges ()
 		{
 			foreach (var kv in severities)
 				kv.Key.SetSeverity (kv.Value);
+			foreach (var kv in enableState)
+				kv.Key.SetIsEnabled (kv.Value);
 		}
 	}
 }
-

@@ -89,7 +89,8 @@ namespace Mono.TextEditor
 
 		public DocumentLine GetLineByOffset (int offset)
 		{
-			return Get (OffsetToLineNumber (offset));
+			var lineNumber = OffsetToLineNumber (offset);
+			return lineNumber >= 0 ? Get (lineNumber) : null;
 		}
 
 		public void TextReplaced (object sender, DocumentChangeEventArgs args)
@@ -121,32 +122,50 @@ namespace Mono.TextEditor
 			}
 			var iter = startNode;
 			iter = iter.GetNextNode ();
+			int lineNumber = iter.LineNumber;
 			TreeNode line;
 			do {
 				line = iter;
 				iter = iter.GetNextNode ();
-				RemoveLine (line);
+				RemoveLine (line, lineNumber);
 			} while (line != endNode);
-			ChangeLength (startNode, startNode.LengthIncludingDelimiter - charsRemoved + charsLeft, endNode.DelimiterLength);
+			ChangeLength (startNode, startNode.LengthIncludingDelimiter - charsRemoved + charsLeft, endNode.UnicodeNewline);
+		}
+
+		public bool LineEndingMismatch {
+			get;
+			set;
 		}
 
 		//bool inInit;
-		public void Initalize (string text)
+		public void Initalize (string text, out DocumentLine longestLine)
 		{
+			LineEndingMismatch = false;
 			Clear ();
+			longestLine = Get (1);
 			if (string.IsNullOrEmpty (text))
 				return;
 			var nodes = new List<TreeNode> ();
 
-			int offset = 0;
+			var delimiterType = UnicodeNewline.Unknown;
+			int offset = 0, maxLength = 0;
 			while (true) {
 				var delimiter = NextDelimiter (text, offset);
 				if (delimiter.IsInvalid)
 					break;
-
 				int delimiterEndOffset = delimiter.Offset + delimiter.Length;
-				var newLine = new TreeNode (delimiterEndOffset - offset, delimiter.Length);
+				var length = delimiterEndOffset - offset;
+				var newLine = new TreeNode (length, delimiter.UnicodeNewline);
 				nodes.Add (newLine);
+				if (length > maxLength) {
+					maxLength = length;
+					longestLine = newLine;
+				}
+				if (offset > 0) {
+					LineEndingMismatch |= delimiterType != delimiter.UnicodeNewline;
+				} else {
+					delimiterType = delimiter.UnicodeNewline;
+				}
 				offset = delimiterEndOffset;
 			}
 			var lastLine = new TreeNode (text.Length - offset, 0);
@@ -202,8 +221,8 @@ namespace Mono.TextEditor
 				int newLineLength = lineOffset + line.LengthIncludingDelimiter - (offset + textOffset);
 				int delimiterEndOffset = delimiter.Offset + delimiter.Length;
 				int curLineLength = offset + delimiterEndOffset - lineOffset;
-				int oldDelimiterLength = line.DelimiterLength;
-				ChangeLength (line, curLineLength, delimiter.Length);
+				var oldDelimiterLength = line.UnicodeNewline;
+				ChangeLength (line, curLineLength, delimiter.UnicodeNewline);
 				line = InsertAfter (line, newLineLength, oldDelimiterLength);
 				textOffset = delimiterEndOffset;
 				lineOffset += curLineLength;
@@ -218,7 +237,13 @@ namespace Mono.TextEditor
 			public static readonly Delimiter Invalid = new Delimiter (-1, 0);
 
 			public readonly int Offset;
-			public readonly int Length;
+			public readonly UnicodeNewline UnicodeNewline;
+
+			public int Length {
+				get {
+					return UnicodeNewline == UnicodeNewline.CRLF ? 2 : 1;
+				}
+			}
 
 			public int EndOffset {
 				get { return Offset + Length; }
@@ -230,10 +255,10 @@ namespace Mono.TextEditor
 				}
 			}
 
-			public Delimiter (int offset, int length)
+			public Delimiter (int offset, UnicodeNewline unicodeNewline)
 			{
 				Offset = offset;
-				Length = length;
+				UnicodeNewline = unicodeNewline;
 			}
 		}
 
@@ -242,12 +267,27 @@ namespace Mono.TextEditor
 			fixed (char* start = text) {
 				char* p = start + offset;
 				char* endPtr = start + text.Length;
+
 				while (p < endPtr) {
-					char* nextp = p + 1;
-					char nextChar = nextp < endPtr ? *nextp : '\0';
-					var nl = NewLine.GetDelimiterLength (*p, nextChar);
-					if (nl > 0)
-						return new Delimiter ((int)(p - start), nl);
+					switch (*p) {
+					case NewLine.CR:
+						char* nextp = p + 1;
+						if (nextp < endPtr && *nextp == NewLine.LF)
+							return new Delimiter ((int)(p - start), UnicodeNewline.CRLF);
+						return new Delimiter ((int)(p - start), UnicodeNewline.CR);
+					case NewLine.LF:
+						return new Delimiter ((int)(p - start), UnicodeNewline.LF);
+					case NewLine.NEL:
+						return new Delimiter ((int)(p - start), UnicodeNewline.NEL);
+					case NewLine.VT:
+						return new Delimiter ((int)(p - start), UnicodeNewline.VT);
+					case NewLine.FF:
+						return new Delimiter ((int)(p - start), UnicodeNewline.FF);
+					case NewLine.LS:
+						return new Delimiter ((int)(p - start), UnicodeNewline.LS);
+					case NewLine.PS:
+						return new Delimiter ((int)(p - start), UnicodeNewline.PS);
+					}
 					p++;
 				}
 				return Delimiter.Invalid;
@@ -324,7 +364,7 @@ namespace Mono.TextEditor
 			public int Count = 1;
 			public int TotalLength;
 
-			public TreeNode (int length, int delimiterLength) : base(length, delimiterLength)
+			public TreeNode (int length, UnicodeNewline newLine) : base(length, newLine)
 			{
 			}
 
@@ -409,9 +449,9 @@ namespace Mono.TextEditor
 			tree.Count = 1;
 		}
 
-		TreeNode InsertAfter (TreeNode segment, int length, int delimiterLength)
+		TreeNode InsertAfter (TreeNode segment, int length, UnicodeNewline newLine)
 		{
-			var result = new TreeNode (length, delimiterLength) { StartSpan = segment.StartSpan };
+			var result = new TreeNode (length, newLine) { StartSpan = segment.StartSpan };
 			if (segment == null) {
 				tree.Root = result;
 				tree.Count = 1;
@@ -431,13 +471,13 @@ namespace Mono.TextEditor
 
 		void ChangeLength (TreeNode line, int newLength)
 		{
-			ChangeLength (line, newLength, line.DelimiterLength);
+			ChangeLength (line, newLength, line.UnicodeNewline);
 		}
 
-		void ChangeLength (TreeNode line, int newLength, int delimiterLength)
+		void ChangeLength (TreeNode line, int newLength, UnicodeNewline newLine)
 		{
 			line.LengthIncludingDelimiter = newLength;
-			line.DelimiterLength = delimiterLength;
+			line.UnicodeNewline = newLine;
 			OnLineChanged (new LineEventArgs (line));
 			line.UpdateAugmentedData ();
 		}
@@ -505,13 +545,13 @@ namespace Mono.TextEditor
 			return result + 1;
 		}
 
-		void RemoveLine (TreeNode line)
+		void RemoveLine (TreeNode line, int lineNumber)
 		{
 			var parent = line.parent;
 			tree.Remove (line);
 			if (parent != null)
 				parent.UpdateAugmentedData ();
-			OnLineRemoved (new LineEventArgs (line));
+			OnLineRemoved (new LineEventArgs (line, lineNumber));
 		}
 
 		TreeNode GetNode (int index)

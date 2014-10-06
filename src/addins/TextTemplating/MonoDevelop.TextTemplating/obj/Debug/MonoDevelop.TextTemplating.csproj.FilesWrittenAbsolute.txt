@@ -1,8 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/TextTemplating/MonoDevelop.TextTemplating/obj/Debug/MonoDevelop.TextTemplating.MonoDevelop.TextTemplating.addin.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/TextTemplating/MonoDevelop.TextTemplating/obj/Debug/MonoDevelop.TextTemplating.T4SyntaxMode.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/Templates/T4TemplateCSharp.xft.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/Templates/T4PreprocessedTemplateCSharp.xft.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/MonoDevelop.TextTemplating.dll.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/MonoDevelop.TextTemplating.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/TextTemplating/MonoDevelop.TextTemplating/obj/Debug/MonoDevelop.TextTemplating.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/TextTemplating/MonoDevelop.TextTemplating/obj/Debug/MonoDevelop.TextTemplating.dll.mdb

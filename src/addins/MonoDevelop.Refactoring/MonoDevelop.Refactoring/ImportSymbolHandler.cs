@@ -111,6 +111,7 @@ namespace MonoDevelop.Refactoring
 			this.ambience = AmbienceService.GetAmbience (doc.Editor.MimeType);
 			this.type = type;
 			this.unit = doc.ParsedDocument;
+			this.DisplayFlags |= ICSharpCode.NRefactory.Completion.DisplayFlags.IsImportCompletion;
 		}
 		
 		bool initialized = false;
@@ -132,21 +133,24 @@ namespace MonoDevelop.Refactoring
 		public override void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, Gdk.Key closeChar, char keyChar, Gdk.ModifierType modifier)
 		{
 			Initialize ();
-			string text = insertNamespace ? type.Namespace + "." + type.Name : type.Name;
-			if (text != GetCurrentWord (window)) {
-				if (window.WasShiftPressed && generateUsing) 
-					text = type.Namespace + "." + text;
-				window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, GetCurrentWord (window), text);
-			}
-			
-			if (!window.WasShiftPressed && generateUsing) {
-				var generator = CodeGenerator.CreateGenerator (doc);
-				if (generator != null) {
-					generator.AddGlobalNamespaceImport (doc, type.Namespace);
-					// reparse
-					doc.UpdateParseDocument ();
+			using (var undo = doc.Editor.OpenUndoGroup ()) {
+				string text = insertNamespace ? type.Namespace + "." + type.Name : type.Name;
+				if (text != GetCurrentWord (window)) {
+					if (window.WasShiftPressed && generateUsing) 
+						text = type.Namespace + "." + text;
+					window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, GetCurrentWord (window), text);
+				}
+				
+				if (!window.WasShiftPressed && generateUsing) {
+					var generator = CodeGenerator.CreateGenerator (doc);
+					if (generator != null) {
+						generator.AddGlobalNamespaceImport (doc, type.Namespace);
+						// reparse
+						doc.UpdateParseDocument ();
+					}
 				}
 			}
+			ka |= KeyActions.Ignore;
 		}
 		#endregion
 		
@@ -222,7 +226,7 @@ namespace MonoDevelop.Refactoring
 			var lookup = new MemberLookup (null, doc.Compilation.MainAssembly);
 
 			List<ImportSymbolCompletionData> typeList = new List<ImportSymbolCompletionData> ();
-			foreach (var type in dom.GetAllTypeDefinitions ()) {
+			foreach (var type in dom.GetTopLevelTypeDefinitons ()) {
 				if (!lookup.IsAccessible (type, false))
 					continue;
 				typeList.Add (new ImportSymbolCompletionData (doc, cache, type));

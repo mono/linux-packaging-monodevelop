@@ -23,40 +23,28 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-using System;
 using System.Collections.Generic;
-using ICSharpCode.NRefactory.CSharp.Refactoring;
-using ICSharpCode.NRefactory.CSharp;
-using ICSharpCode.NRefactory;
 using System.Threading;
 using MonoDevelop.Core;
-using ICSharpCode.NRefactory.Refactoring; 
+using ICSharpCode.NRefactory.Refactoring;
+using Mono.TextEditor;
+using System;
 
 namespace MonoDevelop.CodeIssues
 {
-	/// <summary>
-	/// A code issue provider is a factory that creates code issues of a given document.
-	/// </summary>
-	public abstract class CodeIssueProvider
+	public abstract class BaseCodeIssueProvider
 	{
+		public virtual CodeIssueProvider Parent {
+			get {
+				return null;
+			}
+		}
 		/// <summary>
 		/// Gets or sets the type of the MIME the provider is attached to.
 		/// </summary>
-		string mimeType;
-		public string MimeType {
-			get {
-				return mimeType;
-			}
-			set {
-				mimeType = value;
-				UpdateSeverity ();
-			}
+		public abstract string MimeType {
+			get;
 		}
-
-		/// <summary>
-		/// Gets or sets the category of the issue provider (used in the option panel).
-		/// </summary>
-		public string Category { get; set; }
 
 		/// <summary>
 		/// Gets or sets the title of the issue provider (used in the option panel).
@@ -68,17 +56,7 @@ namespace MonoDevelop.CodeIssues
 		/// </summary>
 		public string Description { get; set; }
 
-		/// <summary>
-		/// Gets or sets the default severity. Note that GetSeverity () should be called to get the valid value inside the IDE.
-		/// </summary>
-		public Severity DefaultSeverity { get; set; }
-
-		/// <summary>
-		/// Gets or sets a value indicating how this issue should be marked inside the text editor.
-		/// Note: There is only one code issue provider generated therfore providers need to be state less.
-		/// </summary>
-		public IssueMarker IssueMarker { get; set; }
-
+		
 		/// <summary>
 		/// Gets the identifier string used as property ID tag.
 		/// </summary>
@@ -89,32 +67,141 @@ namespace MonoDevelop.CodeIssues
 		}
 
 		/// <summary>
+		/// Gets or sets the default severity. Note that GetSeverity () should be called to get the valid value inside the IDE.
+		/// </summary>
+		public Severity DefaultSeverity { get; set; }
+
+		/// <summary>
+		/// Gets or sets a value indicating whether this issue is enabled. Note that GetIsEnabled () should be called to get the valid value inside the IDE.
+		/// </summary>
+		/// <value><c>true</c> if this instance is enabled; otherwise, <c>false</c>.</value>
+		public bool IsEnabledByDefault { get; set; }
+
+		/// <summary>
 		/// Gets the current (user defined) severity.
 		/// </summary>
-		Severity severity;
+		protected Severity severity;
+
 		public Severity GetSeverity ()
 		{
 			return severity;
 		}
 
-		protected void UpdateSeverity ()
-		{
-			severity = PropertyService.Get<Severity> (IdString, DefaultSeverity);
-		}
-		
 		/// <summary>
 		/// Sets the user defined severity.
 		/// </summary>
 		public void SetSeverity (Severity severity)
 		{
+			if (this.severity == severity)
+				return;
 			this.severity = severity;
 			PropertyService.Set (IdString, severity);
+		}
+
+
+		protected bool isEnabled;
+		
+		public bool GetIsEnabled ()
+		{
+			return isEnabled;
+		}
+		
+		/// <summary>
+		/// Sets the user defined severity.
+		/// </summary>
+		public void SetIsEnabled (bool isEnabled)
+		{
+			if (this.isEnabled == isEnabled)
+				return;
+			this.isEnabled = isEnabled;
+			PropertyService.Set (IdString + ".isEnabled", isEnabled);
+		}
+
+		protected void UpdateSeverity ()
+		{
+			severity = PropertyService.Get<Severity> (IdString, DefaultSeverity);
+			isEnabled = PropertyService.Get<bool> (IdString+ ".isEnabled", IsEnabledByDefault);
 		}
 
 		/// <summary>
 		/// Gets all the code issues inside a document.
 		/// </summary>
 		public abstract IEnumerable<CodeIssue> GetIssues (object refactoringContext, CancellationToken cancellationToken);
+
+		public virtual bool CanDisableOnce { get { return false; } }
+
+		public virtual bool CanDisableAndRestore { get { return false; } }
+
+		public virtual bool CanDisableWithPragma { get { return false; } }
+
+		public virtual bool CanSuppressWithAttribute { get { return false; } }
+
+		public virtual void DisableOnce (MonoDevelop.Ide.Gui.Document document, DocumentRegion loc)
+		{
+			throw new NotSupportedException ();
+		}
+
+		public virtual void DisableAndRestore (MonoDevelop.Ide.Gui.Document document, DocumentRegion loc)
+		{
+			throw new NotSupportedException ();
+		}
+
+		public virtual void DisableWithPragma (MonoDevelop.Ide.Gui.Document document, DocumentRegion loc)
+		{
+			throw new NotSupportedException ();
+		}
+
+		public virtual void SuppressWithAttribute (MonoDevelop.Ide.Gui.Document document, DocumentRegion loc)
+		{
+			throw new NotSupportedException ();
+		}
+	}
+
+
+	/// <summary>
+	/// A code issue provider is a factory that creates code issues of a given document.
+	/// </summary>
+	public abstract class CodeIssueProvider : BaseCodeIssueProvider
+	{
+		string mimeType;
+		public override string MimeType {
+			get {
+				return mimeType;
+			}
+		}
+
+		public void SetMimeType (string mimeType)
+		{
+			this.mimeType = mimeType;
+			UpdateSeverity ();
+		}
+
+		/// <summary>
+		/// Gets or sets the category of the issue provider (used in the option panel).
+		/// </summary>
+		public string Category { get; set; }
+
+		/// <summary>
+		/// If true this issue has sub issues.
+		/// </summary>
+		public abstract bool HasSubIssues { get; }
+
+		/// <summary>
+		/// Gets the sub issues of this issue. If HasSubIssus == false an InvalidOperationException is thrown.
+		/// </summary>
+		public virtual IEnumerable<BaseCodeIssueProvider> SubIssues { get { throw new InvalidOperationException (); } }
+
+		/// <summary>
+		/// Gets the effective set of providers. The effective set of providers
+		/// is either the sub issues (if it has sub issues) or simply itself (otherwise).
+		/// </summary>
+		/// <returns>The effective provider set.</returns>
+		public IEnumerable<BaseCodeIssueProvider> GetEffectiveProviderSet()
+		{
+			if (HasSubIssues)
+				return SubIssues;
+			return new[] { this };
+		}
 	}
 }
 

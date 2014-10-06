@@ -73,9 +73,6 @@ namespace MonoDevelop.CSharp.Highlighting
 	{
 		readonly Document guiDocument;
 
-		SyntaxTree unit;
-		CSharpUnresolvedFile parsedFile;
-		ICompilation compilation;
 		CSharpAstResolver resolver;
 		CancellationTokenSource src;
 
@@ -126,7 +123,20 @@ namespace MonoDevelop.CSharp.Highlighting
 			set;
 		}
 
-
+		public static IEnumerable<string> GetDefinedSymbols (MonoDevelop.Projects.Project project)
+		{
+			var workspace = IdeApp.Workspace;
+			if (workspace == null || project == null)
+				yield break;
+			var configuration = project.GetConfiguration (workspace.ActiveConfiguration) as DotNetProjectConfiguration;
+			if (configuration != null) {
+				foreach (string s in configuration.GetDefineSymbols ())
+					yield return s;
+				// Workaround for mcs defined symbol
+				if (configuration.TargetRuntime.RuntimeId == "Mono") 
+					yield return "__MonoCS__";
+			}
+		}
 
 		void HandleDocumentParsed (object sender, EventArgs e)
 		{
@@ -144,14 +154,14 @@ namespace MonoDevelop.CSharp.Highlighting
 						var newResolverTask = guiDocument.GetSharedResolver ();
 						var cancellationToken = src.Token;
 						System.Threading.Tasks.Task.Factory.StartNew (delegate {
+							if (newResolverTask == null)
+								return;
 							var newResolver = newResolverTask.Result;
 							if (newResolver == null)
 								return;
-							unit = newResolver.RootNode as SyntaxTree;
-							parsedFile = newResolver.UnresolvedFile;
 							var visitor = new QuickTaskVisitor (newResolver, cancellationToken);
 							try {
-								unit.AcceptVisitor (visitor);
+								newResolver.RootNode.AcceptVisitor (visitor);
 							} catch (Exception ex) {
 								LoggingService.LogError ("Error while analyzing the file for the semantic highlighting.", ex);
 								return;
@@ -163,7 +173,7 @@ namespace MonoDevelop.CSharp.Highlighting
 									var editorData = guiDocument.Editor;
 									if (editorData == null)
 										return;
-									compilation = newResolver.Compilation;
+//									compilation = newResolver.Compilation;
 									resolver = newResolver;
 									quickTasks = visitor.QuickTasks;
 									OnTasksUpdated (EventArgs.Empty);
@@ -282,6 +292,7 @@ namespace MonoDevelop.CSharp.Highlighting
 			public QuickTaskVisitor (CSharpAstResolver resolver, CancellationToken cancellationToken)
 			{
 				this.resolver = resolver;
+				this.cancellationToken = cancellationToken;
 			}
 			
 			protected override void VisitChildren (AstNode node)
@@ -296,7 +307,7 @@ namespace MonoDevelop.CSharp.Highlighting
 				base.VisitIdentifierExpression (identifierExpression);
 				var result = resolver.Resolve (identifierExpression, cancellationToken);
 				if (result.IsError) {
-					QuickTasks.Add (new QuickTask (string.Format ("error CS0103: The name `{0}' does not exist in the current context", identifierExpression.Identifier), identifierExpression.StartLocation, Severity.Error));
+					QuickTasks.Add (new QuickTask (() => string.Format ("error CS0103: The name `{0}' does not exist in the current context", identifierExpression.Identifier), identifierExpression.StartLocation, Severity.Error));
 				}
 			}
 
@@ -309,6 +320,24 @@ namespace MonoDevelop.CSharp.Highlighting
 				}
 			}
 
+			public override void VisitSimpleType (SimpleType simpleType)
+			{
+				base.VisitSimpleType (simpleType);
+				var result = resolver.Resolve (simpleType, cancellationToken);
+				if (result.IsError) {
+					QuickTasks.Add (new QuickTask (string.Format ("error CS0246: The type or namespace name `{0}' could not be found. Are you missing an assembly reference?", simpleType.Identifier), simpleType.StartLocation, Severity.Error));
+				}
+			}
+
+			public override void VisitMemberType (MemberType memberType)
+			{
+				base.VisitMemberType (memberType);
+				var result = resolver.Resolve (memberType, cancellationToken);
+				if (result.IsError) {
+					QuickTasks.Add (new QuickTask (string.Format ("error CS0246: The type or namespace name `{0}' could not be found. Are you missing an assembly reference?", memberType.MemberName), memberType.StartLocation, Severity.Error));
+				}
+			}
+
 			public override void VisitComment (ICSharpCode.NRefactory.CSharp.Comment comment)
 			{
 			}
@@ -317,16 +346,26 @@ namespace MonoDevelop.CSharp.Highlighting
 		static CSharpSyntaxMode ()
 		{
 			MonoDevelop.Debugger.DebuggingService.DisableConditionalCompilation += DispatchService.GuiDispatch (new EventHandler<DocumentEventArgs> (OnDisableConditionalCompilation));
-			IdeApp.Workspace.ActiveConfigurationChanged += delegate {
-				foreach (var doc in IdeApp.Workbench.Documents) {
-					TextEditorData data = doc.Editor;
-					if (data == null)
-						continue;
-					// Force syntax mode reparse (required for #if directives)
-					doc.Editor.Parent.TextViewMargin.PurgeLayoutCache ();
-					doc.ReparseDocument ();
-				}
-			};
+			if (IdeApp.Workspace != null) {
+				IdeApp.Workspace.ActiveConfigurationChanged += delegate {
+					foreach (var doc in IdeApp.Workbench.Documents) {
+						TextEditorData data = doc.Editor;
+						if (data == null)
+							continue;
+						// Force syntax mode reparse (required for #if directives)
+						var editor = doc.Editor;
+						if (editor != null) {
+							if (data.Document.SyntaxMode is SyntaxMode) {
+								((SyntaxMode)data.Document.SyntaxMode).UpdateDocumentHighlighting ();
+								SyntaxModeService.WaitUpdate (data.Document);
+							}
+							editor.Parent.TextViewMargin.PurgeLayoutCache ();
+							doc.ReparseDocument ();
+							editor.Parent.QueueDraw ();
+						}
+					}
+				};
+			}
 			CommentTag.SpecialCommentTagsChanged += (sender, e) => {
 				UpdateCommentRule ();
 				var actDoc = IdeApp.Workbench.ActiveDocument;
@@ -415,11 +454,11 @@ namespace MonoDevelop.CSharp.Highlighting
 				using (var reader = provider.Open ()) {
 					SyntaxMode baseMode = SyntaxMode.Read (reader);
 					_rules = new List<Rule> (baseMode.Rules.Where (r => r.Name != "Comment"));
-					_rules.Add (new Rule (this) {
+					_rules.Add (new Rule {
 						Name = "PreProcessorComment"
 					});
 
-					_commentRule = new Rule (this) {
+					_commentRule = new Rule {
 						Name = "Comment",
 						IgnoreCase = true
 					};
@@ -644,9 +683,10 @@ namespace MonoDevelop.CSharp.Highlighting
 					try {
 						HighlightingVisitior visitor;
 						if (!csharpSyntaxMode.lineSegments.TryGetValue (line, out visitor)) {
-							visitor = new HighlightingVisitior (csharpSyntaxMode.resolver, default (CancellationToken), lineNumber, base.line.Offset, line.Length);
+							var resolver = csharpSyntaxMode.resolver;
+							visitor = new HighlightingVisitior (resolver, default (CancellationToken), lineNumber, base.line.Offset, line.Length);
 							visitor.tree.InstallListener (doc);
-							csharpSyntaxMode.unit.AcceptVisitor (visitor);
+							resolver.RootNode.AcceptVisitor (visitor);
 							csharpSyntaxMode.lineSegments[line] = visitor;
 						}
 						string style;
@@ -712,6 +752,8 @@ namespace MonoDevelop.CSharp.Highlighting
 					return project;
 				}
 
+
+
 				public ConditinalExpressionEvaluator (TextDocument doc, IEnumerable<string> symbols)
 				{
 					this.symbols = new HashSet<string> (symbols);
@@ -727,22 +769,9 @@ namespace MonoDevelop.CSharp.Highlighting
 						project = IdeApp.Workspace.GetProjectContainingFile (doc.FileName);
 					
 					if (project != null) {
-						var configuration = project.GetConfiguration (IdeApp.Workspace.ActiveConfiguration) as DotNetProjectConfiguration;
-						if (configuration != null) {
-							var cparams = configuration.CompilationParameters as CSharpCompilerParameters;
-							if (cparams != null) {
-								string[] syms = cparams.DefineSymbols.Split (';', ',', ' ', '\t');
-								foreach (string s in syms) {
-									string ss = s.Trim ();
-									if (ss.Length > 0 && !symbols.Contains (ss))
-										this.symbols.Add (ss);
-								}
-							}
-							// Workaround for mcs defined symbol
-							if (configuration.TargetRuntime.RuntimeId == "Mono") 
-								this.symbols.Add ("__MonoCS__");
-						} else {
-							Console.WriteLine ("NO CONFIGURATION");
+						foreach (var ss in GetDefinedSymbols (project)) {
+							if (!symbols.Contains (ss))
+								this.symbols.Add (ss);
 						}
 					}
 /*					var parsedDocument = TypeSystemService.ParseFile (document.ProjectContent, doc.FileName, doc.MimeType, doc.Text);
@@ -952,7 +981,7 @@ namespace MonoDevelop.CSharp.Highlighting
 				}
 				int textOffset = i - StartOffset;
 
-				if (textOffset < CurText.Length && CurRule.Name != "Comment" && CurRule.Name != "String" && CurText [textOffset] == '#' && IsFirstNonWsChar (textOffset)) {
+				if (textOffset < CurText.Length && CurRule.Name != "Comment" && CurRule.Name != "String" && CurRule.Name != "VerbatimString" && CurText [textOffset] == '#' && IsFirstNonWsChar (textOffset)) {
 
 					if (CurText.IsAt (textOffset, "#define") && (spanStack == null || !spanStack.Any (span => span is IfBlockSpan && !((IfBlockSpan)span).IsValid))) {
 						int length = CurText.Length - textOffset;

@@ -100,7 +100,7 @@ namespace MonoDevelop.Ide.Templates
             return solutionDescriptor;
         }
 
-        public WorkspaceItem CreateEntry (ProjectCreateInformation projectCreateInformation, string defaultLanguage)
+		public WorkspaceItemCreatedInformation CreateEntry (ProjectCreateInformation projectCreateInformation, string defaultLanguage)
         {
             WorkspaceItem workspaceItem = null;
 
@@ -137,6 +137,8 @@ namespace MonoDevelop.Ide.Templates
             else
                 localProjectCI = projectCreateInformation;
 
+			var workspaceItemCreatedInfo = new WorkspaceItemCreatedInformation (workspaceItem);
+
             Solution solution = workspaceItem as Solution;
             if (solution != null) {
                 for ( int i = 0; i < entryDescriptors.Count; i++ ) {
@@ -147,10 +149,13 @@ namespace MonoDevelop.Ide.Templates
                     else
 	                    entryProjectCI = localProjectCI;
 
-                    ISolutionItemDescriptor solutionItem = entryDescriptors[i];
+					var solutionItemDesc = entryDescriptors[i];
 
-                    SolutionEntityItem info = solutionItem.CreateItem (entryProjectCI, defaultLanguage);
-                    entryDescriptors[i].InitializeItem (solution.RootFolder, entryProjectCI, defaultLanguage, info);
+					SolutionEntityItem info = solutionItemDesc.CreateItem (entryProjectCI, defaultLanguage);
+					if (info == null)
+						continue;
+
+					solutionItemDesc.InitializeItem (solution.RootFolder, entryProjectCI, defaultLanguage, info);
 
                     IConfigurationTarget configurationTarget = info as IConfigurationTarget;
                     if (configurationTarget != null) {
@@ -165,6 +170,9 @@ namespace MonoDevelop.Ide.Templates
                         }
                     }
 
+					if ((info is Project) && (solutionItemDesc is ProjectDescriptor)) {
+						workspaceItemCreatedInfo.AddPackageReferenceForCreatedProject ((Project)info, (ProjectDescriptor)solutionItemDesc);
+					}
                     solution.RootFolder.Items.Add (info);
 					if (startupProject == info.Name)
 						solution.StartupItem = info;
@@ -177,7 +185,12 @@ namespace MonoDevelop.Ide.Templates
 				workspaceItem.ConvertToFormat (f, true);
 			}
 			
-            return workspaceItem;
+			return workspaceItemCreatedInfo;
         }
+
+		public bool HasPackages ()
+		{
+			return entryDescriptors.OfType<ProjectDescriptor> ().Any (descriptor => descriptor.HasPackages ());
+		}
 	}
 }

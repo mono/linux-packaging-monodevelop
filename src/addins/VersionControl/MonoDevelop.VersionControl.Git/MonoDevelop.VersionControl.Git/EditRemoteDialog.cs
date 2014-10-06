@@ -24,14 +24,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 
 namespace MonoDevelop.VersionControl.Git
 {
-	public partial class EditRemoteDialog : Gtk.Dialog
+	partial class EditRemoteDialog : Gtk.Dialog
 	{
-		RemoteSource remote;
-		bool updating;
+		readonly RemoteSource remote;
+		readonly bool updating;
 		
 		public EditRemoteDialog (RemoteSource remote, bool isNew)
 		{

@@ -26,6 +26,7 @@
 using System;
 using NUnit.Framework;
 
+
 namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 {
 	[TestFixture]
@@ -203,7 +204,6 @@ namespace ICSharpCode.NRefactory.CSharp.CodeCompletion
 		/// <summary>
 		/// Bug 11609 - Completion engine offers namespaces when user types anonymous method parameter name
 		/// </summary>
-		[Ignore]
 		[Test]
 		public void TestBug11609 ()
 		{
@@ -222,10 +222,91 @@ namespace MyApplication
         {}
     }
 }
+", provider => Assert.AreEqual(0, provider.Count, "provider needs to be empty"));
+		}
+
+		/// <summary>
+		/// Bug 13365 - Suggestion context lost after ( in lambda args
+		/// </summary>
+		[Test]
+		public void TestBug13365 ()
+		{
+			CodeCompletionBugTests.CombinedProviderTest (@"using System;
+using System.Threading.Tasks;
+
+namespace MyApplication
+{
+   class MyClass
+   {
+        void MyMethod ()
+        {
+            $Task.Factory.StartNew ((a$
+        }
+    }
+}
 ", provider => {
-				Assert.AreEqual (0, provider.Count, "provider needs to be empty");
+
+				Assert.IsFalse (provider.AutoSelect);
 			});
 		}
+
+		[Test]
+		public void TestLambda ()
+		{
+			CodeCompletionBugTests.CombinedProviderTest (@"using System;
+using System.IO;
+
+class Foo
+{
+	static void Foo (Action<File> act) {}
+
+	public static void Main (string[] args)
+	{
+		$Foo((File f$
+	}
+}
+", provider => Assert.AreEqual(0, provider.Count, "provider needs to be empty"));
+		}
+
+		/// <summary>
+		/// Bug 16491 - Wrong completion on multiple parameter lambdas
+		/// </summary>
+		[Test]
+		public void TestBug16491 ()
+		{
+			CodeCompletionBugTests.CombinedProviderTest (@"
+using System;
+using System.IO;
+
+class Foo
+{
+	public static void Main (string[] args)
+	{
+		$new Action<int, int> ((x, y$
+	}
+}
+", provider => Assert.AreEqual(0, provider.Count, "provider needs to be empty"));
+
+		}
+
+		[Test]
+		public void TestBug16491Case2 ()
+		{
+			CodeCompletionBugTests.CombinedProviderTest (@"
+using System;
+using System.IO;
+
+class Foo
+{
+	public static void Main (string[] args)
+	{
+		new Action<int, int> ((x$, y$)
+	}
+}
+", provider => Assert.AreEqual(0, provider.Count, "provider needs to be empty"));
+
+		}
+
 
 	}
 }

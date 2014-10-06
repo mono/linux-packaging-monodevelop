@@ -43,27 +43,25 @@ namespace MonoDevelop.Ide.CodeCompletion
 		public virtual string Description { get; set; }
 		public virtual string CompletionText { get; set; }
 
-		[Obsolete("Use GetDisplayDescription (bool isSelected)")]
-		public virtual string DisplayDescription { get; set; }
-
 		public virtual string GetDisplayDescription (bool isSelected)
 		{
-			return DisplayDescription;
+			return null;
 		}
-
 
 		public virtual string GetRightSideDescription (bool isSelected)
 		{
 			return "";
 		}
 
-
 		public virtual CompletionCategory CompletionCategory { get; set; }
 		public virtual DisplayFlags DisplayFlags { get; set; }
 
 		public virtual TooltipInformation CreateTooltipInformation (bool smartWrap)
 		{
-			return new TooltipInformation ();
+			var tt = new TooltipInformation ();
+			if (!string.IsNullOrEmpty (Description))
+				tt.AddCategory (null, Description);
+			return tt;
 		}
 
 		public virtual bool HasOverloads { 
@@ -74,13 +72,13 @@ namespace MonoDevelop.Ide.CodeCompletion
 		
 		public virtual IEnumerable<ICompletionData> OverloadedData {
 			get {
-				throw new System.InvalidOperationException ();
+				throw new InvalidOperationException ();
 			}
 		}
 		
 		public virtual void AddOverload (ICompletionData data)
 		{
-			throw new System.InvalidOperationException ();
+			throw new InvalidOperationException ();
 		}
 		
 		public CompletionData (string text) : this (text, null, null) {}
@@ -126,11 +124,22 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 		public static int Compare (ICompletionData a, ICompletionData b)
 		{
-			var result =  ((a.DisplayFlags & DisplayFlags.Obsolete) == (b.DisplayFlags & DisplayFlags.Obsolete))
-				? StringComparer.OrdinalIgnoreCase.Compare (a.DisplayText, b.DisplayText)
-					: (a.DisplayFlags & DisplayFlags.Obsolete) != 0 ? 1 : -1;
-			if (result == 0)
-				result = StringComparer.OrdinalIgnoreCase.Compare (a.Description, b.Description);
+			var result =  ((a.DisplayFlags & DisplayFlags.Obsolete) == (b.DisplayFlags & DisplayFlags.Obsolete)) ? StringComparer.OrdinalIgnoreCase.Compare (a.DisplayText, b.DisplayText) : (a.DisplayFlags & DisplayFlags.Obsolete) != 0 ? 1 : -1;
+			if (result == 0) {
+				var aIsImport = (a.DisplayFlags & DisplayFlags.IsImportCompletion) != 0;
+				var bIsImport = (b.DisplayFlags & DisplayFlags.IsImportCompletion) != 0;
+				if (!aIsImport && bIsImport)
+					return -1;
+				if (aIsImport && !bIsImport)
+					return 1;
+				if (aIsImport && bIsImport)
+					return StringComparer.Ordinal.Compare (a.Description, b.Description);
+				var ca = a as CompletionData;
+				var cb = b as CompletionData;
+				if (ca != null && cb != null && !ca.Icon.IsNull && !cb.Icon.IsNull) {
+					return cb.Icon.Name.CompareTo (ca.Icon.Name);
+				}
+			}
 			return result;
 		}
 

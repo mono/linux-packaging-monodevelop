@@ -35,9 +35,11 @@ using System.Collections.Generic;
 using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Components;
+using Mono.TextEditor;
 
 using StockIcons = MonoDevelop.Ide.Gui.Stock;
 using Xwt.Motion;
+using MonoDevelop.Ide.Fonts;
 
 namespace MonoDevelop.Components.MainToolbar
 {
@@ -63,14 +65,14 @@ namespace MonoDevelop.Components.MainToolbar
 			public double        BuildAnimationProgress { get; set; }
 			public double        BuildAnimationOpacity { get; set; }
 			public Gdk.Rectangle ChildAllocation { get; set; }
-			public Gdk.Pixbuf    CurrentPixbuf { get; set; }
+			public Xwt.Drawing.Image CurrentPixbuf { get; set; }
 			public string        CurrentText { get; set; }
 			public bool          CurrentTextIsMarkup { get; set; }
 			public double        ErrorAnimationProgress { get; set; }
 			public double        HoverProgress { get; set; }
 			public string        LastText { get; set; }
 			public bool          LastTextIsMarkup { get; set; }
-			public Gdk.Pixbuf    LastPixbuf { get; set; }
+			public Xwt.Drawing.Image LastPixbuf { get; set; }
 			public Gdk.Point     MousePosition { get; set; }
 			public Pango.Context Pango { get; set; }
 			public double        ProgressBarAlpha { get; set; }
@@ -113,6 +115,26 @@ namespace MonoDevelop.Components.MainToolbar
 		}
 
 		public int MaxWidth { get; set; }
+
+		void messageBoxToolTip (object o, QueryTooltipArgs e)
+		{
+			if (theme.IsEllipsized && (e.X < messageBox.Allocation.Width)) {
+				var label = new Label ();
+				if (renderArg.CurrentTextIsMarkup) {
+					label.Markup = renderArg.CurrentText;
+				} else {
+					label.Text = renderArg.CurrentText;
+				}
+
+				label.Wrap = true;
+				label.WidthRequest = messageBox.Allocation.Width;
+				
+				e.Tooltip.Custom = label;
+				e.RetVal = true;
+			} else {
+				e.RetVal = false;
+			}
+		}
 
 		public StatusArea ()
 		{
@@ -161,6 +183,9 @@ namespace MonoDevelop.Components.MainToolbar
 			contentBox.PackEnd (statusIconBox, false, false, 0);
 			contentBox.PackEnd (statusIconSeparator = new StatusAreaSeparator (), false, false, 0);
 			contentBox.PackEnd (buildResultWidget = CreateBuildResultsWidget (Orientation.Horizontal), false, false, 0);
+
+			HasTooltip = true;
+			QueryTooltip += messageBoxToolTip;
 
 			mainAlign = new Alignment (0, 0.5f, 1, 0);
 			mainAlign.LeftPadding = 12;
@@ -277,19 +302,17 @@ namespace MonoDevelop.Components.MainToolbar
 				box = new VBox ();
 			box.Spacing = 3;
 			
-			Gdk.Pixbuf errorIcon = ImageService.GetPixbuf (StockIcons.Error, IconSize.Menu);
-			Gdk.Pixbuf noErrorIcon = ImageService.MakeGrayscale (errorIcon); // creates a new pixbuf instance
-			Gdk.Pixbuf warningIcon = ImageService.GetPixbuf (StockIcons.Warning, IconSize.Menu);
-			Gdk.Pixbuf noWarningIcon = ImageService.MakeGrayscale (warningIcon); // creates a new pixbuf instance
+			var errorIcon = ImageService.GetIcon (StockIcons.Error).WithSize (Xwt.IconSize.Small);
+			var warningIcon = ImageService.GetIcon (StockIcons.Warning).WithSize (Xwt.IconSize.Small);
+
+			var errorImage = new Xwt.ImageView (errorIcon);
+			var warningImage = new Xwt.ImageView (warningIcon);
 			
-			Gtk.Image errorImage = new Gtk.Image (errorIcon);
-			Gtk.Image warningImage = new Gtk.Image (warningIcon);
-			
-			box.PackStart (errorImage, false, false, 0);
+			box.PackStart (errorImage.ToGtkWidget (), false, false, 0);
 			Label errors = new Gtk.Label ();
 			box.PackStart (errors, false, false, 0);
 			
-			box.PackStart (warningImage, false, false, 0);
+			box.PackStart (warningImage.ToGtkWidget (), false, false, 0);
 			Label warnings = new Gtk.Label ();
 			box.PackStart (warnings, false, false, 0);
 			box.NoShowAll = true;
@@ -297,20 +320,29 @@ namespace MonoDevelop.Components.MainToolbar
 			
 			TaskEventHandler updateHandler = delegate {
 				int ec=0, wc=0;
+
 				foreach (Task t in TaskService.Errors) {
 					if (t.Severity == TaskSeverity.Error)
 						ec++;
 					else if (t.Severity == TaskSeverity.Warning)
 						wc++;
 				}
-				errors.Visible = ec > 0;
-				errors.Text = ec.ToString ();
-				errorImage.Visible = ec > 0;
 
-				warnings.Visible = wc > 0;
-				warnings.Text = wc.ToString ();
-				warningImage.Visible = wc > 0;
+
+				using (var font = FontService.SansFont.CopyModified (0.8d)) {
+					errors.Visible = ec > 0;
+					errors.ModifyFont (font);
+					errors.Text = ec.ToString ();
+					errorImage.Visible = ec > 0;
+
+					warnings.Visible = wc > 0;
+					warnings.ModifyFont (font);
+					warnings.Text = wc.ToString ();
+					warningImage.Visible = wc > 0;
+				}
+
 				ebox.Visible = ec > 0 || wc > 0;
+
 				UpdateSeparators ();
 			};
 			
@@ -320,8 +352,6 @@ namespace MonoDevelop.Components.MainToolbar
 			TaskService.Errors.TasksRemoved += updateHandler;
 			
 			box.Destroyed += delegate {
-				noErrorIcon.Dispose ();
-				noWarningIcon.Dispose ();
 				TaskService.Errors.TasksAdded -= updateHandler;
 				TaskService.Errors.TasksRemoved -= updateHandler;
 			};
@@ -363,7 +393,7 @@ namespace MonoDevelop.Components.MainToolbar
 				renderArg.MousePosition         = tracker.MousePosition;
 				renderArg.Pango                 = PangoContext;
 
-				theme.Render (context, renderArg);
+				theme.Render (context, renderArg, this);
 			}
 			return base.OnExposeEvent (evnt);
 		}
@@ -381,7 +411,7 @@ namespace MonoDevelop.Components.MainToolbar
 			throw new NotImplementedException ();
 		}
 
-		public StatusBarIcon ShowStatusIcon (Gdk.Pixbuf pixbuf)
+		public StatusBarIcon ShowStatusIcon (Xwt.Drawing.Image pixbuf)
 		{
 			DispatchService.AssertGuiThread ();
 			StatusIcon icon = new StatusIcon (this, pixbuf);
@@ -427,24 +457,29 @@ namespace MonoDevelop.Components.MainToolbar
 			internal EventBox box;
 			string tip;
 			DateTime alertEnd;
-			Gdk.Pixbuf icon;
+			Xwt.Drawing.Image icon;
 			uint animation;
-			Gtk.Image image;
+			Xwt.ImageView image;
 			
 			int astep;
-			Gdk.Pixbuf[] images;
+			Xwt.Drawing.Image[] images;
 			TooltipPopoverWindow tooltipWindow;
 			bool mouseOver;
+			uint tipShowTimeoutId;
+			DateTime scheduledTipTime;
+			const int TooltipTimeout = 350;
 			
-			public StatusIcon (StatusArea statusBar, Gdk.Pixbuf icon)
+			public StatusIcon (StatusArea statusBar, Xwt.Drawing.Image icon)
 			{
+				if (!icon.HasFixedSize)
+					icon = icon.WithSize (IconSize.Menu);
+
 				this.statusBar = statusBar;
 				this.icon = icon;
 				box = new EventBox ();
 				box.VisibleWindow = false;
-				image = new Image (icon);
-				image.SetPadding (0, 0);
-				box.Child = image;
+				image = new Xwt.ImageView (icon);
+				box.Child = image.ToGtkWidget ();
 				box.Events |= Gdk.EventMask.EnterNotifyMask | Gdk.EventMask.LeaveNotifyMask;
 				box.EnterNotifyEvent += HandleEnterNotifyEvent;
 				box.LeaveNotifyEvent += HandleLeaveNotifyEvent;
@@ -466,6 +501,25 @@ namespace MonoDevelop.Components.MainToolbar
 			
 			void ShowTooltip ()
 			{
+				scheduledTipTime = DateTime.Now + TimeSpan.FromMilliseconds (TooltipTimeout);
+				if (tipShowTimeoutId == 0)
+					tipShowTimeoutId = GLib.Timeout.Add (TooltipTimeout, ShowTooltipEvent);
+			}
+
+			bool ShowTooltipEvent ()
+			{
+				tipShowTimeoutId = 0;
+
+				if (!mouseOver)
+					return false;
+
+				int remainingMs = (int) (scheduledTipTime - DateTime.Now).TotalMilliseconds;
+				if (remainingMs > 50) {
+					// Still some significant time left. Re-schedule the timer
+					tipShowTimeoutId = GLib.Timeout.Add ((uint) remainingMs, ShowTooltipEvent);
+					return false;
+				}
+
 				if (!string.IsNullOrEmpty (tip)) {
 					HideTooltip ();
 					tooltipWindow = new TooltipPopoverWindow ();
@@ -473,6 +527,7 @@ namespace MonoDevelop.Components.MainToolbar
 					tooltipWindow.Text = tip;
 					tooltipWindow.ShowPopup (box, PopupPosition.Top);
 				}
+				return false;
 			}
 			
 			void HideTooltip ()
@@ -488,7 +543,7 @@ namespace MonoDevelop.Components.MainToolbar
 				HideTooltip ();
 				statusBar.HideStatusIcon (this);
 				if (images != null) {
-					foreach (Gdk.Pixbuf img in images) {
+					foreach (Xwt.Drawing.Image img in images) {
 						img.Dispose ();
 					}
 				}
@@ -516,11 +571,13 @@ namespace MonoDevelop.Components.MainToolbar
 				get { return box; }
 			}
 			
-			public Gdk.Pixbuf Image {
+			public Xwt.Drawing.Image Image {
 				get { return icon; }
 				set {
 					icon = value;
-					image.Pixbuf = icon;
+					if (!icon.HasFixedSize)
+						icon = icon.WithSize (IconSize.Menu);
+					image.Image = icon;
 				}
 			}
 			
@@ -535,23 +592,23 @@ namespace MonoDevelop.Components.MainToolbar
 				animation = GLib.Timeout.Add (60, new GLib.TimeoutHandler (AnimateIcon));
 				
 				if (images == null) {
-					images = new Gdk.Pixbuf [10];
+					images = new Xwt.Drawing.Image [10];
 					for (int n=0; n<10; n++)
-						images [n] = ImageService.MakeTransparent (icon, ((double)(9-n))/10.0);
+						images [n] = icon.WithAlpha (((double)(9-n))/10.0);
 				}
 			}
 			
 			bool AnimateIcon ()
 			{
 				if (DateTime.Now >= alertEnd && astep == 0) {
-					image.Pixbuf = icon;
+					image.Image = icon;
 					animation = 0;
 					return false;
 				}
 				if (astep < 10)
-					image.Pixbuf = images [astep];
+					image.Image = images [astep];
 				else
-					image.Pixbuf = images [20 - astep - 1];
+					image.Image = images [20 - astep - 1];
 				
 				astep = (astep + 1) % 20;
 				return true;
@@ -681,13 +738,13 @@ namespace MonoDevelop.Components.MainToolbar
 			// load image now
 			if (ImageService.IsAnimation (image, Gtk.IconSize.Menu)) {
 				iconAnimation = ImageService.GetAnimatedIcon (image, Gtk.IconSize.Menu);
-				renderArg.CurrentPixbuf = iconAnimation.FirstFrame;
-				currentIconAnimation = iconAnimation.StartAnimation (delegate (Gdk.Pixbuf p) {
-					renderArg.CurrentPixbuf = p;
+				renderArg.CurrentPixbuf = iconAnimation.FirstFrame.WithSize (14,14);
+				currentIconAnimation = iconAnimation.StartAnimation (delegate (Xwt.Drawing.Image p) {
+					renderArg.CurrentPixbuf = p.WithSize (14,14);
 					QueueDraw ();
 				});
 			} else {
-				renderArg.CurrentPixbuf = ImageService.GetPixbuf (image, Gtk.IconSize.Menu);
+				renderArg.CurrentPixbuf = ImageService.GetIcon (image).WithSize (14,14);
 			}
 
 			iconLoaded = true;
@@ -846,7 +903,7 @@ namespace MonoDevelop.Components.MainToolbar
 					gr.AddColorStop (0, new Cairo.Color (0, 0, 0, 0));
 					gr.AddColorStop (0.5, new Cairo.Color (0, 0, 0, 0.2));
 					gr.AddColorStop (1, new Cairo.Color (0, 0, 0, 0));
-					ctx.Pattern = gr;
+					ctx.SetSource (gr);
 					ctx.Fill ();
 				}
 			}

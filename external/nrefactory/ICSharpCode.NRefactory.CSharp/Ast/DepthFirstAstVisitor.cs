@@ -44,6 +44,14 @@ namespace ICSharpCode.NRefactory.CSharp
 			}
 		}
 		
+		public virtual void VisitNullNode(AstNode nullNode)
+		{
+			// Should we call VisitChildren here?
+			// We usually want to ignore null nodes.
+			// Older NR versions (before VisitNullNode was introduced) didn't call VisitChildren() with null nodes;
+			// so changing this might break VisitChildren() overrides that expect the node to be part of the AST.
+		}
+		
 		public virtual void VisitSyntaxTree (SyntaxTree syntaxTree)
 		{
 			VisitChildren (syntaxTree);
@@ -614,6 +622,11 @@ namespace ICSharpCode.NRefactory.CSharp
 			VisitChildren (namedExpression);
 		}
 
+		public virtual void VisitErrorNode(AstNode errorNode)
+		{
+			VisitChildren(errorNode);
+		}
+
 		public virtual void VisitPatternPlaceholder(AstNode placeholder, PatternMatching.Pattern pattern)
 		{
 			VisitChildren (placeholder);
@@ -634,6 +647,15 @@ namespace ICSharpCode.NRefactory.CSharp
 				next = child.NextSibling;
 				child.AcceptVisitor (this);
 			}
+			return default (T);
+		}
+		
+		public virtual T VisitNullNode(AstNode nullNode)
+		{
+			// Should we call VisitChildren here?
+			// We usually want to ignore null nodes.
+			// Older NR versions (before VisitNullNode was introduced) didn't call VisitChildren() with null nodes;
+			// so changing this might break VisitChildren() overrides that expect the node to be part of the AST.
 			return default (T);
 		}
 		
@@ -1206,7 +1228,12 @@ namespace ICSharpCode.NRefactory.CSharp
 		{
 			return VisitChildren (namedExpression);
 		}
-		
+
+		public virtual T VisitErrorNode(AstNode errorNode)
+		{
+			return VisitChildren(errorNode);
+		}
+
 		public virtual T VisitPatternPlaceholder(AstNode placeholder, PatternMatching.Pattern pattern)
 		{
 			return VisitChildren (placeholder);
@@ -1227,6 +1254,15 @@ namespace ICSharpCode.NRefactory.CSharp
 				next = child.NextSibling;
 				child.AcceptVisitor (this, data);
 			}
+			return default (S);
+		}
+		
+		public virtual S VisitNullNode(AstNode nullNode, T data)
+		{
+			// Should we call VisitChildren here?
+			// We usually want to ignore null nodes.
+			// Older NR versions (before VisitNullNode was introduced) didn't call VisitChildren() with null nodes;
+			// so changing this might break VisitChildren() overrides that expect the node to be part of the AST.
 			return default (S);
 		}
 		
@@ -1799,7 +1835,12 @@ namespace ICSharpCode.NRefactory.CSharp
 		{
 			return VisitChildren (namedExpression, data);
 		}
-		
+
+		public virtual S VisitErrorNode(AstNode errorNode, T data)
+		{
+			return VisitChildren(errorNode, data);
+		}
+
 		public virtual S VisitPatternPlaceholder(AstNode placeholder, PatternMatching.Pattern pattern, T data)
 		{
 			return VisitChildren (placeholder, data);

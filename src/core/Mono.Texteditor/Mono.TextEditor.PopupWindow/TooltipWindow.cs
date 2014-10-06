@@ -37,17 +37,16 @@ namespace Mono.TextEditor.PopupWindow
 {
 	public class TooltipWindow : Gtk.Window
 	{
-		bool nudgeVertical = false;
-		bool nudgeHorizontal = false;
 		WindowTransparencyDecorator decorator;
-		FixedWidthWrapLabel label;
-		
+		readonly Label label;
+		string markup;
+
 		public string Markup {
 			get {
-				return label.Markup;
+				return markup;
 			}
 			set {
-				label.Markup = value;
+				label.Markup = markup = value;
 			}
 		}
 		
@@ -64,11 +63,9 @@ namespace Mono.TextEditor.PopupWindow
 			//fake widget name for stupid theme engines
 			this.Name = "gtk-tooltip";
 			
-			label = new FixedWidthWrapLabel ();
-			label.Wrap = Pango.WrapMode.WordChar;
-			label.Indent = -20;
-			label.BreakOnCamelCasing = true;
-			label.BreakOnPunctuation = true;
+			label = new Label ();
+			label.UseMarkup = true;
+			label.Ellipsize =  Pango.EllipsizeMode.End;
 			this.BorderWidth = 3;
 			this.Title = "tooltip";
 			Add (label);
@@ -78,19 +75,19 @@ namespace Mono.TextEditor.PopupWindow
 		
 		public int SetMaxWidth (int maxWidth)
 		{
-			FixedWidthWrapLabel l = (FixedWidthWrapLabel)Child;
-			l.MaxWidth = maxWidth;
-			return l.RealWidth;
+			var l = (Label)Child;
+			l.Layout.Width = maxWidth;
+			int pw, ph;
+			l.Layout.GetPixelSize (out pw, out ph);
+			return pw;
 		}
 		
 		public bool NudgeVertical {
-			get { return nudgeVertical; }
-			set { nudgeVertical = value; }
+			get; set;
 		}
 		
 		public bool NudgeHorizontal {
-			get { return nudgeHorizontal; }
-			set { nudgeHorizontal = value; }
+			get; set;
 		}
 		
 		public bool EnableTransparencyControl {
@@ -115,7 +112,7 @@ namespace Mono.TextEditor.PopupWindow
 		
 		protected override void OnSizeAllocated (Gdk.Rectangle allocation)
 		{
-			if (nudgeHorizontal || nudgeVertical) {
+			if (NudgeHorizontal || NudgeVertical) {
 				int x, y;
 				this.GetPosition (out x, out y);
 				int oldY = y, oldX = x;
@@ -133,14 +130,14 @@ namespace Mono.TextEditor.PopupWindow
 //				}
 				
 				Gdk.Rectangle geometry = Screen.GetUsableMonitorGeometry (Screen.GetMonitorAtPoint (x, y));
-				if (nudgeHorizontal) {
+				if (NudgeHorizontal) {
 					if (allocation.Width <= geometry.Width && x + allocation.Width >= geometry.Left + geometry.Width - edgeGap)
 						x = geometry.Left + (geometry.Width - allocation.Width - edgeGap);
 					if (x <= geometry.Left + edgeGap)
 						x = geometry.Left + edgeGap;
 				}
 				
-				if (nudgeVertical) {
+				if (NudgeVertical) {
 					if (allocation.Height <= geometry.Height && y + allocation.Height >= geometry.Top + geometry.Height - edgeGap)
 						y = geometry.Top + (geometry.Height - allocation.Height - edgeGap);
 					if (y <= geometry.Top + edgeGap)

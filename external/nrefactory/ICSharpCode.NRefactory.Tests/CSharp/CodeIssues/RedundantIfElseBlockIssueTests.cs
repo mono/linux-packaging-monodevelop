@@ -25,6 +25,8 @@
 // THE SOFTWARE.
 using ICSharpCode.NRefactory.CSharp.Refactoring;
 using NUnit.Framework;
+using ICSharpCode.NRefactory.CSharp.CodeActions;
+using System.Linq;
 
 namespace ICSharpCode.NRefactory.CSharp.CodeIssues
 {
@@ -241,5 +243,79 @@ class TestClass
 }";
 			Test<RedundantIfElseBlockIssue>(input, 0);
 		}
+
+		[Test]
+
+		public void TestNecessaryElseBecauseOfVarDeclaration()
+		{
+
+			var input = @"
+class TestClass
+{
+	void TestMethod (int i)
+	{
+		if (i > 0) {
+			int a = 1;
+			return;
+		} else {
+			int a = 2;
+			return;
+		}
+	}
+}";
+			Test<RedundantIfElseBlockIssue>(input, 0);
+		}
+
+		[Test]
+		public void TestNecessaryElseBecauseOfVarDeclarationInDifferentStatement()
+		{
+			var input = @"
+class TestClass
+{
+	void TestMethod (int i)
+	{
+		{
+			int a = 1;
+		}
+		if (i > 0) {
+			return;
+		} else {
+			int a = 2;
+			return;
+		}
+	}
+}";
+			Test<RedundantIfElseBlockIssue>(input, 0);
+		}
+
+		[Test]
+		public void TestReturn2()
+		{
+			var input = @"
+class TestClass
+{
+	bool? EvaluateCondition (Expression expr)
+	{
+		ResolveResult rr = EvaluateConstant (expr);
+		if (rr != null && rr.IsCompileTimeConstant)
+			return rr.ConstantValue as bool?;
+		else
+			return null;
+	}
+}";
+			var output = @"
+class TestClass
+{
+	bool? EvaluateCondition (Expression expr)
+	{
+		ResolveResult rr = EvaluateConstant (expr);
+		if (rr != null && rr.IsCompileTimeConstant)
+			return rr.ConstantValue as bool?;
+		return null;
+	}
+}";
+			Test<RedundantIfElseBlockIssue>(input, 1, output);
+		}
+
 	}
 }

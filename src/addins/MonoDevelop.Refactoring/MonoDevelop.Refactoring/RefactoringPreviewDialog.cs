@@ -33,13 +33,15 @@ using MonoDevelop.Core;
 using Mono.TextEditor;
 using MonoDevelop.Ide;
 using ICSharpCode.NRefactory.TypeSystem;
+using MonoDevelop.Components;
+using MonoDevelop.Ide.Fonts;
 
 
 namespace MonoDevelop.Refactoring
 {
 	public partial class RefactoringPreviewDialog : Gtk.Dialog
 	{
-		TreeStore store = new TreeStore (typeof(Gdk.Pixbuf), typeof(string), typeof(object), typeof (bool));
+		TreeStore store = new TreeStore (typeof(Xwt.Drawing.Image), typeof(string), typeof(object), typeof (bool));
 
 		const int pixbufColumn = 0;
 		const int textColumn = 1;
@@ -57,9 +59,9 @@ namespace MonoDevelop.Refactoring
 			TreeViewColumn column = new TreeViewColumn ();
 
 			// pixbuf column
-			var pixbufCellRenderer = new CellRendererPixbuf ();
+			var pixbufCellRenderer = new CellRendererImage ();
 			column.PackStart (pixbufCellRenderer, false);
-			column.SetAttributes (pixbufCellRenderer, "pixbuf", pixbufColumn);
+			column.SetAttributes (pixbufCellRenderer, "image", pixbufColumn);
 			column.AddAttribute (pixbufCellRenderer, "visible", statusVisibleColumn);
 			
 			// text column
@@ -113,7 +115,9 @@ namespace MonoDevelop.Refactoring
 			if (treeviewPreview.Selection.IterIsSelected (iter)) {
 				cellRendererText.Text = text;
 			} else {
-				cellRendererText.Markup = "<span foreground=\"" + MonoDevelop.Components.PangoCairoHelper.GetColorString (Style.Text (StateType.Insensitive)) + "\">" + text + "</span>";
+				var color = Style.Text (StateType.Insensitive);
+				var c = string.Format ("#{0:X02}{1:X02}{2:X02}", color.Red / 256, color.Green / 256, color.Blue / 256);
+				cellRendererText.Markup = "<span foreground=\"" + c + "\">" + text + "</span>";
 			}
 		}
 		
@@ -163,7 +167,7 @@ namespace MonoDevelop.Refactoring
 			
 			TreeIter result;
 			if (!fileDictionary.TryGetValue (replaceChange.FileName, out result))
-				fileDictionary[replaceChange.FileName] = result = store.AppendValues (DesktopService.GetPixbufForFile (replaceChange.FileName, IconSize.Menu), System.IO.Path.GetFileName (replaceChange.FileName), null, true);
+				fileDictionary[replaceChange.FileName] = result = store.AppendValues (DesktopService.GetIconForFile (replaceChange.FileName, IconSize.Menu), System.IO.Path.GetFileName (replaceChange.FileName), null, true);
 			return result;
 		}
 
@@ -172,9 +176,9 @@ namespace MonoDevelop.Refactoring
 			foreach (Change change in changes) {
 				TreeIter iter = GetFile (change);
 				if (iter.Equals (TreeIter.Zero)) {
-					iter = store.AppendValues (ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.ReplaceIcon, IconSize.Menu), change.Description, change, true);
+					iter = store.AppendValues (ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.ReplaceIcon, IconSize.Menu), change.Description, change, true);
 				} else {
-					iter = store.AppendValues (iter, ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.ReplaceIcon, IconSize.Menu), change.Description, change, true);
+					iter = store.AppendValues (iter, ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.ReplaceIcon, IconSize.Menu), change.Description, change, true);
 				}
 				TextReplaceChange replaceChange = change as TextReplaceChange;
 				if (replaceChange != null && replaceChange.Offset >= 0)
@@ -192,14 +196,12 @@ namespace MonoDevelop.Refactoring
 		class CellRendererDiff : Gtk.CellRendererText
 		{
 			Pango.Layout layout;
-			Pango.FontDescription font;
 			bool diffMode;
 			int width, height, lineHeight;
 			string[] lines;
 
 			public CellRendererDiff ()
 			{
-				font = Pango.FontDescription.FromString (DesktopService.DefaultMonospaceFont);
 			}
 
 			void DisposeLayout ()
@@ -215,10 +217,6 @@ namespace MonoDevelop.Refactoring
 			{
 				isDisposed = true;
 				DisposeLayout ();
-				if (font != null) {
-					font.Dispose ();
-					font = null;
-				}
 				base.OnDestroyed ();
 			}
 
@@ -244,28 +242,28 @@ namespace MonoDevelop.Refactoring
 							}
 						}
 						DisposeLayout ();
-						layout = CreateLayout (container, lines[maxlin]);
+						CreateLayout (container, lines[maxlin]);
 						layout.GetPixelSize (out width, out lineHeight);
 						height = lineHeight * lines.Length;
 					} else
 						width = height = 0;
 				} else {
 					DisposeLayout ();
-					layout = CreateLayout (container, text);
+					CreateLayout (container, text);
 					layout.GetPixelSize (out width, out height);
 				}
 			}
 
-			Pango.Layout CreateLayout (Widget container, string text)
+			void CreateLayout (Widget container, string text)
 			{
-				Pango.Layout layout = new Pango.Layout (container.PangoContext);
+				layout = new Pango.Layout (container.PangoContext);
 				layout.SingleParagraphMode = false;
 				if (diffMode) {
-					layout.FontDescription = font;
+					layout.FontDescription = FontService.MonospaceFont;
 					layout.SetText (text);
-				} else
+				} else {
 					layout.SetMarkup (text);
-				return layout;
+				}
 			}
 
 			protected override void Render (Drawable window, Widget widget, Gdk.Rectangle background_area, Gdk.Rectangle cell_area, Gdk.Rectangle expose_area, CellRendererState flags)

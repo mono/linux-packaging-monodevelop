@@ -15,32 +15,34 @@ using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
 using Mono.TextEditor;
 using MonoDevelop.Components;
+using System.Text;
 
 namespace MonoDevelop.VersionControl.Views
 {
-	internal class StatusView : BaseView 
+	internal class StatusView : BaseView
 	{
 		string filepath;
 		Repository vc;
 		bool disposed;
-		
+
 		Widget widget;
 		VBox main;
 		Label status;
 		Gtk.Button showRemoteStatus;
 		Gtk.Button buttonCommit;
 		Gtk.Button buttonRevert;
-		
+
 		FileTreeView filelist;
-		TreeViewColumn colCommit, colRemote;
+		TreeViewColumn colCommit, colRemote, colFile;
 		TreeStore filestore;
 		ScrolledWindow scroller;
 		CellRendererDiff diffRenderer;
-		
+		CellRendererToggle cellToggle;
+
 		Box commitBox;
 		TextView commitText;
 		Gtk.Label labelCommit;
-		
+
 		List<VersionInfo> statuses;
 		bool remoteStatus = false;
 
@@ -52,11 +54,11 @@ namespace MonoDevelop.VersionControl.Views
 			public Lazy<DiffInfo> Diff {
 				get; set;
 			}
-			
+
 			public VersionInfo VersionInfo {
 				get; private set;
 			}
-			
+
 			public DiffData (Repository vc, FilePath root, VersionInfo info, bool remote)
 			{
 				VersionInfo = info;
@@ -76,11 +78,12 @@ namespace MonoDevelop.VersionControl.Views
 
 		List<DiffData> localDiff = new List<DiffData> ();
 		List<DiffData> remoteDiff = new List<DiffData> ();
-		
+
 		bool updatingComment;
 		ChangeSet changeSet;
 		bool firstLoad = true;
-		
+		VersionControlItemList fileList;
+
 		const int ColIcon = 0;
 		const int ColStatus = 1;
 		const int ColPath = 2;
@@ -96,125 +99,127 @@ namespace MonoDevelop.VersionControl.Views
 		const int ColStatusColor = 12;
 		const int ColStatusRemoteDiff = 13;
 		const int ColRenderAsText = 14;
-		
+
 		delegate void DiffDataHandler (List<DiffData> diffdata);
-		
-		public static bool Show (VersionControlItemList items, bool test)
+
+		public static bool Show (VersionControlItemList items, bool test, bool solution)
 		{
-			if (items.Count != 1)
+			FilePath path = items.FindMostSpecificParent ();
+			bool isSingleDirectory = false;
+
+			if (!Directory.Exists (path) && !File.Exists (path))
 				return false;
 
-			VersionControlItem item = items [0];
-			if (item.VersionInfo.IsVersioned) {
+			if (!path.IsDirectory)
+				path = path.ParentDirectory;
+			else if (items.Count == 1)
+				isSingleDirectory = true;
+
+			if (items.Any (v => v.VersionInfo.IsVersioned)) {
 				if (test)
 					return true;
 
-				if (!BringStatusViewToFront (item.Path)) {
-					StatusView d = new StatusView (item.Path, item.Repository);
+				if (!BringStatusViewToFront (path)) {
+					StatusView d = new StatusView (path, items [0].Repository, isSingleDirectory || solution ? null : items);
 					IdeApp.Workbench.OpenDocument (d, true);
 				}
 				return true;
 			}
 			return false;
 		}
-		
-		public StatusView (string filepath, Repository vc) 
-			: base (Path.GetFileName (filepath) + " Status") 
+
+		void Init ()
 		{
-			this.vc = vc;
-			this.filepath = filepath;
-			changeSet = vc.CreateChangeSet (filepath);
-			
 			main = new VBox(false, 6);
 			widget = main;
-			
+
 			buttonCommit = new Gtk.Button () {
-				Image = new Gtk.Image ("vc-commit", Gtk.IconSize.Menu),
+				Image = new Xwt.ImageView (Xwt.Drawing.Image.FromResource ("commit-light-16.png")).ToGtkWidget (),
 				Label = GettextCatalog.GetString ("Commit...")
 			};
 			buttonCommit.Image.Show ();
 			buttonRevert = new Gtk.Button () {
-				Image = new Gtk.Image ("vc-revert-command", Gtk.IconSize.Menu),
+				Image = new Xwt.ImageView (Xwt.Drawing.Image.FromResource ("revert-light-16.png")).ToGtkWidget (),
 				Label = GettextCatalog.GetString ("Revert")
 			};
 			buttonRevert.Image.Show ();
 			showRemoteStatus = new Gtk.Button () {
-				Image = new Gtk.Image ("vc-remote-status", Gtk.IconSize.Menu),
+				Image = new Xwt.ImageView (Xwt.Drawing.Image.FromResource ("remote-status-light-16.png")).ToGtkWidget (),
 				Label = GettextCatalog.GetString ("Show Remote Status")
 			};
 			showRemoteStatus.Image.Show ();
 
 			status = new Label("");
 			main.PackStart(status, false, false, 0);
-			
+
 			scroller = new ScrolledWindow();
 			scroller.ShadowType = Gtk.ShadowType.None;
 			filelist = new FileTreeView();
 			filelist.Selection.Mode = Gtk.SelectionMode.Multiple;
-			
+
 			scroller.Add(filelist);
 			scroller.HscrollbarPolicy = PolicyType.Automatic;
 			scroller.VscrollbarPolicy = PolicyType.Automatic;
 			filelist.RowActivated += OnRowActivated;
 			filelist.DiffLineActivated += OnDiffLineActivated;
-			
-			CellRendererToggle cellToggle = new CellRendererToggle();
+
+			cellToggle = new CellRendererToggle();
 			cellToggle.Toggled += new ToggledHandler(OnCommitToggledHandler);
-			var crc = new CellRendererIcon ();
+			var crc = new CellRendererImage ();
 			crc.StockId = "vc-comment";
 			colCommit = new TreeViewColumn ();
 			colCommit.Spacing = 2;
-			colCommit.Widget = new Gtk.Image ("vc-commit", Gtk.IconSize.Menu);
+			colCommit.Widget = new Xwt.ImageView (Xwt.Drawing.Image.FromResource ("commit-light-16.png")).ToGtkWidget ();
 			colCommit.Widget.Show ();
 			colCommit.PackStart (cellToggle, false);
 			colCommit.PackStart (crc, false);
 			colCommit.AddAttribute (cellToggle, "active", ColCommit);
 			colCommit.AddAttribute (cellToggle, "visible", ColShowToggle);
 			colCommit.AddAttribute (crc, "visible", ColShowComment);
-			
+
 			CellRendererText crt = new CellRendererText();
-			var crp = new CellRendererPixbuf ();
+			var crp = new CellRendererImage ();
 			TreeViewColumn colStatus = new TreeViewColumn ();
 			colStatus.Title = GettextCatalog.GetString ("Status");
 			colStatus.PackStart (crp, false);
 			colStatus.PackStart (crt, true);
-			colStatus.AddAttribute (crp, "pixbuf", ColIcon);
+			colStatus.AddAttribute (crp, "image", ColIcon);
 			colStatus.AddAttribute (crp, "visible", ColShowStatus);
 			colStatus.AddAttribute (crt, "text", ColStatus);
 			colStatus.AddAttribute (crt, "foreground", ColStatusColor);
-			
-			TreeViewColumn colFile = new TreeViewColumn ();
+
+			colFile = new TreeViewColumn ();
 			colFile.Title = GettextCatalog.GetString ("File");
 			colFile.Spacing = 2;
-			crp = new CellRendererPixbuf ();
+			crp = new CellRendererImage ();
 			diffRenderer = new CellRendererDiff ();
 			colFile.PackStart (crp, false);
 			colFile.PackStart (diffRenderer, true);
-			colFile.AddAttribute (crp, "pixbuf", ColIconFile);
+			colFile.AddAttribute (crp, "image", ColIconFile);
 			colFile.AddAttribute (crp, "visible", ColShowStatus);
 			colFile.SetCellDataFunc (diffRenderer, new TreeCellDataFunc (SetDiffCellData));
-			
+
 			crt = new CellRendererText();
-			crp = new CellRendererPixbuf ();
+			crp = new CellRendererImage ();
 			colRemote = new TreeViewColumn ();
 			colRemote.Title = GettextCatalog.GetString ("Remote Status");
 			colRemote.PackStart (crp, false);
 			colRemote.PackStart (crt, true);
-			colRemote.AddAttribute (crp, "pixbuf", ColRemoteIcon);
+			colRemote.AddAttribute (crp, "image", ColRemoteIcon);
 			colRemote.AddAttribute (crt, "text", ColRemoteStatus);
 			colRemote.AddAttribute (crt, "foreground", ColStatusColor);
-			
+
 			filelist.AppendColumn(colStatus);
 			filelist.AppendColumn(colRemote);
 			filelist.AppendColumn(colCommit);
 			filelist.AppendColumn(colFile);
-			
+
 			colRemote.Visible = false;
 
-			filestore = new TreeStore (typeof (Gdk.Pixbuf), typeof (string), typeof (string[]), typeof (string), typeof(bool), typeof(bool), typeof(string), typeof(bool), typeof (bool), typeof(Gdk.Pixbuf), typeof(bool), typeof (Gdk.Pixbuf), typeof(string), typeof(bool), typeof(bool));
+			filestore = new TreeStore (typeof (Xwt.Drawing.Image), typeof (string), typeof (string[]), typeof (string), typeof(bool), typeof(bool), typeof(string), typeof(bool), typeof (bool), typeof(Xwt.Drawing.Image), typeof(bool), typeof (Xwt.Drawing.Image), typeof(string), typeof(bool), typeof(bool));
 			filelist.Model = filestore;
 			filelist.TestExpandRow += new Gtk.TestExpandRowHandler (OnTestExpandRow);
-			
+
 			commitBox = new VBox ();
 
 			HeaderBox commitMessageLabelBox = new HeaderBox ();
@@ -224,13 +229,13 @@ namespace MonoDevelop.VersionControl.Views
 			HBox labBox = new HBox ();
 			labelCommit = new Gtk.Label (GettextCatalog.GetString ("Commit message:"));
 			labelCommit.Xalign = 0;
-			labBox.PackStart (new Gtk.Image ("vc-comment", Gtk.IconSize.Menu), false, false, 0);
+			labBox.PackStart (new Xwt.ImageView (Xwt.Drawing.Image.FromResource ("comment-light-16.png")).ToGtkWidget (), false, false, 0);
 			labBox.PackStart (labelCommit, true, true, 3);
 
 			commitMessageLabelBox.Add (labBox);
 			commitMessageLabelBox.ShowAll ();
 			//commitBox.PackStart (commitMessageLabelBox, false, false, 0);
-			
+
 			Gtk.ScrolledWindow frame = new Gtk.ScrolledWindow ();
 			frame.HeightRequest = 75;
 			frame.ShadowType = ShadowType.None;
@@ -239,19 +244,19 @@ namespace MonoDevelop.VersionControl.Views
 			commitText.Buffer.Changed += OnCommitTextChanged;
 			frame.Add (commitText);
 			commitBox.PackStart (frame, true, true, 0);
-			
+
 			var paned = new VPanedThin ();
 			paned.HandleWidget = commitMessageLabelBox;
 			paned.Pack1 (scroller, true, true);
 			paned.Pack2 (commitBox, false, false);
 			main.PackStart (paned, true, true, 0);
-			
+
 			main.ShowAll();
 			status.Visible = false;
-			
+
 			filelist.Selection.Changed += new EventHandler(OnCursorChanged);
 			VersionControlService.FileStatusChanged += OnFileStatusChanged;
-			
+
 			filelist.HeadersClickable = true;
 			filestore.SetSortFunc (0, CompareNodes);
 			colStatus.SortColumnId = 0;
@@ -261,12 +266,26 @@ namespace MonoDevelop.VersionControl.Views
 			colCommit.SortColumnId = 2;
 			filestore.SetSortFunc (3, CompareNodes);
 			colFile.SortColumnId = 3;
-			
+
 			filestore.SetSortColumnId (3, Gtk.SortType.Ascending);
-			
+
 			filelist.DoPopupMenu = DoPopupMenu;
-			
+
 			StartUpdate();
+		}
+
+		public StatusView (string filepath, Repository vc, VersionControlItemList list)
+			: base (Path.GetFileName (filepath) + " Status")
+		{
+			this.vc = vc;
+			this.filepath = Directory.Exists (filepath) ? filepath : Path.GetDirectoryName (filepath);
+
+			fileList = list;
+			if (list != null)
+				firstLoad = false;
+
+			changeSet = vc.CreateChangeSet (filepath);
+			Init ();
 		}
 
 		protected override void OnWorkbenchWindowChanged (EventArgs e)
@@ -282,7 +301,7 @@ namespace MonoDevelop.VersionControl.Views
 
 			var btnRefresh = new Gtk.Button () {
 				Label = GettextCatalog.GetString ("Refresh"),
-				Image = new Gtk.Image (Gtk.Stock.Refresh, IconSize.Menu)
+				Image = new Xwt.ImageView (ImageService.GetIcon ("vc-status-refresh", IconSize.Menu)).ToGtkWidget ()
 			};
 			btnRefresh.Image.Show ();
 
@@ -291,50 +310,51 @@ namespace MonoDevelop.VersionControl.Views
 
 			buttonRevert.Clicked += new EventHandler (OnRevert);
 			toolbar.Add (buttonRevert);
-			
+
 			showRemoteStatus.Clicked += new EventHandler(OnShowRemoteStatusClicked);
-			toolbar.Add (showRemoteStatus);
-			
+			if (vc.SupportsRemoteStatus)
+				toolbar.Add (showRemoteStatus);
+
 			var btnCreatePatch = new Gtk.Button () {
-				Image = new Gtk.Image ("vc-diff", Gtk.IconSize.Menu), 
+				Image = new Xwt.ImageView (Xwt.Drawing.Image.FromResource ("diff-light-16.png")).ToGtkWidget (),
 				Label = GettextCatalog.GetString ("Create Patch")
 			};
 			btnCreatePatch.Image.Show ();
 			btnCreatePatch.Clicked += new EventHandler (OnCreatePatch);
 			toolbar.Add (btnCreatePatch);
-			
+
 			toolbar.Add (new Gtk.SeparatorToolItem ());
-			
+
 			var btnOpen = new Gtk.Button () {
-				Image = new Gtk.Image (Gtk.Stock.Open, IconSize.Menu), 
+				Image = new Xwt.ImageView (ImageService.GetIcon (Gtk.Stock.Open, IconSize.Menu)).ToGtkWidget (),
 				Label = GettextCatalog.GetString ("Open")
 			};
 			btnOpen.Image.Show ();
 			btnOpen.Clicked += new EventHandler (OnOpen);
 			toolbar.Add (btnOpen);
-			
+
 			toolbar.Add (new Gtk.SeparatorToolItem ());
-			
+
 			var btnExpand = new Gtk.Button (GettextCatalog.GetString ("Expand All"));
 			btnExpand.Clicked += new EventHandler (OnExpandAll);
 			toolbar.Add (btnExpand);
-			
+
 			var btnCollapse = new Gtk.Button (GettextCatalog.GetString ("Collapse All"));
 			btnCollapse.Clicked += new EventHandler (OnCollapseAll);
 			toolbar.Add (btnCollapse);
-			
+
 			toolbar.Add (new Gtk.SeparatorToolItem ());
-			
+
 			var btnSelectAll = new Gtk.Button (GettextCatalog.GetString ("Select All"));
 			btnSelectAll.Clicked += new EventHandler (OnSelectAll);
 			toolbar.Add (btnSelectAll);
-			
+
 			var btnSelectNone = new Gtk.Button (GettextCatalog.GetString ("Select None"));
 			btnSelectNone.Clicked += new EventHandler (OnSelectNone);
 			toolbar.Add (btnSelectNone);
 			toolbar.ShowAll ();
 		}
-		
+
 		public override string StockIconId {
 			get { return "vc-status"; }
 		}
@@ -344,7 +364,7 @@ namespace MonoDevelop.VersionControl.Views
 			int col, val=0;
 			SortType type;
 			filestore.GetSortColumnId (out col, out type);
-			
+
 			switch (col) {
 				case 0: val = ColStatus; break;
 				case 1: val = ColRemoteStatus; break;
@@ -355,17 +375,17 @@ namespace MonoDevelop.VersionControl.Views
 			object o2 = filestore.GetValue (b, val);
 			if (o1 is string[]) o1 = ((string[])o1)[0];
 			if (o2 is string[]) o2 = ((string[])o2)[0];
-			
+
 			if (o1 == null && o2 == null)
 				return 0;
 			else if (o1 == null)
 				return 1;
 			else if (o2 == null)
 				return -1;
-			
+
 			return ((IComparable)o1).CompareTo (o2);
 		}
-		
+
 		public override void Dispose ()
 		{
 			disposed = true;
@@ -373,14 +393,31 @@ namespace MonoDevelop.VersionControl.Views
 				colCommit.Destroy ();
 				colCommit = null;
 			}
-			
 			if (colRemote != null) {
 				colRemote.Destroy ();
 				colRemote = null;
 			}
+			if (colFile != null) {
+				colFile.Destroy ();
+				colFile = null;
+			}
 			if (filestore != null) {
 				filestore.Dispose ();
 				filestore = null;
+			}
+			if (filelist != null) {
+				filelist.DoPopupMenu = null;
+				filelist.RowActivated -= OnRowActivated;
+				filelist.DiffLineActivated -= OnDiffLineActivated;
+				filelist.TestExpandRow -= OnTestExpandRow;
+				filelist.Selection.Changed -= OnCursorChanged;
+				filelist.Destroy ();
+				filelist = null;
+			}
+			if (cellToggle != null) {
+				cellToggle.Toggled -= OnCommitToggledHandler;
+				cellToggle.Destroy ();
+				cellToggle = null;
 			}
 			if (this.diffRenderer != null) {
 				this.diffRenderer.Destroy ();
@@ -391,43 +428,58 @@ namespace MonoDevelop.VersionControl.Views
 				widget.Destroy ();
 				widget = null;
 			}
+			localDiff.Clear ();
+			remoteDiff.Clear ();
 			base.Dispose ();
 		}
-		
-		public override Gtk.Widget Control { 
+
+		public override Gtk.Widget Control {
 			get {
 				return widget;
 			}
 		}
-		
+
 		void StartUpdate ()
 		{
 			if (!remoteStatus)
 				status.Text = GettextCatalog.GetString ("Scanning for changes...");
 			else
 				status.Text = GettextCatalog.GetString ("Scanning for local and remote changes...");
-			
+
 			status.Visible = true;
 			scroller.Visible = false;
 			commitBox.Visible = false;
-			
+
 			showRemoteStatus.Sensitive = false;
 			buttonCommit.Sensitive = false;
-			
+
 			ThreadPool.QueueUserWorkItem (delegate {
+				if (fileList != null) {
+					var group = fileList.GroupBy (v => v.IsDirectory || v.WorkspaceObject is SolutionItem);
+					foreach (var item in group) {
+						// Is directory.
+						if (item.Key) {
+							foreach (var directory in item)
+								changeSet.AddFiles (vc.GetDirectoryVersionInfo (directory.Path, remoteStatus, true));
+						} else
+							changeSet.AddFiles (item.Select (v => v.VersionInfo).ToArray ());
+					}
+					changeSet.AddFiles (fileList.Where (v => !v.IsDirectory).Select (v => v.VersionInfo).ToArray ());
+					fileList = null;
+				}
 				List<VersionInfo> newList = new List<VersionInfo> ();
-				newList.AddRange (vc.GetDirectoryVersionInfo(filepath, remoteStatus, true));
+				newList.AddRange (vc.GetDirectoryVersionInfo (filepath, remoteStatus, true));
 				DispatchService.GuiDispatch (delegate {
 					if (!disposed)
 						LoadStatus (newList);
 				});
 			});
 		}
-		
+
 		void LoadStatus (List<VersionInfo> newList)
 		{
 			statuses = newList.Where (f => FileVisible (f)).ToList ();
-			
+
 			// Remove from the changeset files/folders which have been deleted
 			var toRemove = new List<ChangeSetItem> ();
 			foreach (ChangeSetItem item in changeSet.Items) {
@@ -441,18 +493,18 @@ namespace MonoDevelop.VersionControl.Views
 				if (!found)
 					toRemove.Add (item);
 			}
-			foreach (var item in toRemove) 
+			foreach (var item in toRemove)
 				changeSet.RemoveItem (item);
-			
+
 			Update();
 		}
-		
+
 		void UpdateControlStatus ()
 		{
 			// Set controls to the correct state according to the changes found
 			showRemoteStatus.Sensitive = !remoteStatus;
 			TreeIter it;
-			
+
 			if (!filestore.GetIterFirst (out it)) {
 				commitBox.Visible = false;
 				buttonCommit.Sensitive = false;
@@ -467,10 +519,9 @@ namespace MonoDevelop.VersionControl.Views
 				scroller.Visible = true;
 				commitBox.Visible = true;
 				colRemote.Visible = remoteStatus;
-				
+
 				try {
-					if (vc.GetVersionInfo (filepath).CanCommit)
-						buttonCommit.Sensitive = true;
+					buttonCommit.Sensitive = statuses.Any (v => v.CanCommit);
 				} catch (Exception ex) {
 					LoggingService.LogError (ex.ToString ());
 					buttonCommit.Sensitive = true;
@@ -478,26 +529,26 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			UpdateSelectionStatus ();
 		}
-		
+
 		void UpdateSelectionStatus ()
 		{
 			buttonRevert.Sensitive = filelist.Selection.CountSelectedRows () != 0;
 			buttonCommit.Sensitive = !changeSet.IsEmpty;
 			commitBox.Visible = filelist.Selection.CountSelectedRows () != 0;
 		}
-		
+
 		void Update ()
 		{
 			localDiff.Clear ();
 			remoteDiff.Clear ();
-			
+
 			filestore.Clear();
 			diffRenderer.Reset ();
-			
+
 			if (statuses.Count > 0) {
 				try {
 					filelist.FreezeChildNotify ();
-					
+
 					foreach (VersionInfo n in statuses) {
 						if (firstLoad)
 							changeSet.AddFile (n);
@@ -524,43 +575,41 @@ namespace MonoDevelop.VersionControl.Views
 				firstLoad = false;
 			}
 		}
-		
+
 		TreeIter AppendFileInfo (VersionInfo n)
 		{
-			Gdk.Pixbuf statusicon = VersionControlService.LoadIconForStatus(n.Status);
+			Xwt.Drawing.Image statusicon = VersionControlService.LoadIconForStatus(n.Status);
 			string lstatus = VersionControlService.GetStatusLabel (n.Status);
-			
-			Gdk.Pixbuf rstatusicon = VersionControlService.LoadIconForStatus(n.RemoteStatus);
+
+			Xwt.Drawing.Image rstatusicon = VersionControlService.LoadIconForStatus(n.RemoteStatus);
 			string rstatus = VersionControlService.GetStatusLabel (n.RemoteStatus);
 
 			string scolor = n.HasLocalChanges && n.HasRemoteChanges ? "red" : null;
-			
+
 			string localpath = n.LocalPath.ToRelative (filepath);
 			if (localpath.Length > 0 && localpath[0] == Path.DirectorySeparatorChar) localpath = localpath.Substring(1);
 			if (localpath == "") { localpath = "."; } // not sure if this happens
-			
+
 			bool hasComment = GetCommitMessage (n.LocalPath).Length > 0;
 			bool commit = changeSet.ContainsFile (n.LocalPath);
-			
-			Gdk.Pixbuf fileIcon;
-			if (n.IsDirectory)
-				fileIcon = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.ClosedFolder, Gtk.IconSize.Menu);
-			else
-				fileIcon = DesktopService.GetPixbufForFile (n.LocalPath, Gtk.IconSize.Menu);
 
-			
-			
+			Xwt.Drawing.Image fileIcon;
+			if (n.IsDirectory)
+				fileIcon = ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.ClosedFolder, Gtk.IconSize.Menu);
+			else
+				fileIcon = DesktopService.GetIconForFile (n.LocalPath, Gtk.IconSize.Menu);
+
 			TreeIter it = filestore.AppendValues (statusicon, lstatus, GLib.Markup.EscapeText (localpath).Split ('\n'), rstatus, commit, false, n.LocalPath.ToString (), true, hasComment, fileIcon, n.HasLocalChanges, rstatusicon, scolor, n.HasRemoteChange (VersionStatus.Modified));
 			if (!n.IsDirectory)
 				filestore.AppendValues (it, statusicon, "", new string[0], "", false, true, n.LocalPath.ToString (), false, false, fileIcon, false, null, null, false);
 			return it;
 		}
-		
+
 		string[] GetCurrentFiles ()
 		{
 			TreePath[] paths = filelist.Selection.GetSelectedRows ();
 			string[] files = new string [paths.Length];
-			
+
 			for (int n=0; n<paths.Length; n++) {
 				TreeIter iter;
 				filestore.GetIter (out iter, paths [n]);
@@ -568,11 +617,11 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			return files;
 		}
-		
+
 		void OnCursorChanged (object o, EventArgs args)
 		{
 			UpdateSelectionStatus ();
-			
+
 			string[] files = GetCurrentFiles ();
 			if (files.Length > 0) {
 				commitBox.Visible = true;
@@ -581,7 +630,7 @@ namespace MonoDevelop.VersionControl.Views
 					labelCommit.Text = GettextCatalog.GetString ("Commit message for file '{0}':", Path.GetFileName (files[0]));
 				else
 					labelCommit.Text = GettextCatalog.GetString ("Commit message (multiple selection):");
-				
+
 				// If all selected files have the same message,
 				// then show it so it can be modified. If not, show
 				// a blank message
@@ -602,14 +651,14 @@ namespace MonoDevelop.VersionControl.Views
 				commitBox.Visible = false;
 			}
 		}
-		
+
 		void OnCommitTextChanged (object o, EventArgs args)
 		{
 			if (updatingComment)
 				return;
-				
+
 			string msg = commitText.Buffer.Text;
-			
+
 			// Update the comment in all selected files
 			string[] files = GetCurrentFiles ();
 			foreach (string file in files)
@@ -622,7 +671,7 @@ namespace MonoDevelop.VersionControl.Views
 				filestore.GetIter (out iter, path);
 				if (filestore.IterDepth (iter) != 0)
 					filestore.IterParent (out iter, iter);
-				
+
 				bool curv = (bool) filestore.GetValue (iter, ColShowComment);
 				if (curv != (msg.Length > 0))
 					filestore.SetValue (iter, ColShowComment, msg.Length > 0);
@@ -632,13 +681,13 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			UpdateSelectionStatus ();
 		}
-		
-		string GetCommitMessage (string file)
+
+		static string GetCommitMessage (string file)
 		{
 			string txt = VersionControlService.GetCommitComment (file);
-			return txt != null ? txt : String.Empty;
+			return txt ?? String.Empty;
 		}
-		
+
 		void SetCommitMessage (string file, string text)
 		{
 			if (text.Length > 0) {
@@ -650,24 +699,24 @@ namespace MonoDevelop.VersionControl.Views
 				VersionControlService.SetCommitComment (file, text, true);
 			}
 		}
-		
+
 		void OnRowActivated (object o, RowActivatedArgs args)
 		{
 			OnOpen (null, null);
 		}
-		
+
 		void OnDiffLineActivated (object o, EventArgs a)
 		{
 			OnOpen (null, null);
 		}
-		
+
 		void OnCommitToggledHandler(object o, ToggledArgs args) {
 			TreeIter pos;
 			if (!filestore.GetIterFromString (out pos, args.Path))
 				return;
 
 			string localpath = (string) filestore.GetValue (pos, ColFullPath);
-			
+
 			if (changeSet.ContainsFile (localpath)) {
 				changeSet.RemoveFile (localpath);
 			} else {
@@ -678,7 +727,7 @@ namespace MonoDevelop.VersionControl.Views
 			filestore.SetValue (pos, ColCommit, changeSet.ContainsFile (localpath));
 			UpdateSelectionStatus ();
 		}
-		
+
 		VersionInfo GetVersionInfo (string file)
 		{
 			foreach (VersionInfo vi in statuses)
@@ -686,12 +735,12 @@ namespace MonoDevelop.VersionControl.Views
 					return vi;
 			return null;
 		}
-		
+
 		void OnShowRemoteStatusClicked(object src, EventArgs args) {
 			remoteStatus = true;
 			StartUpdate ();
 		}
-		
+
 		void OnCommitClicked (object src, EventArgs args)
 		{
 			// Nothing to commit
@@ -706,12 +755,11 @@ namespace MonoDevelop.VersionControl.Views
 				  AlertButton.Cancel, AlertButton.Proceed) != AlertButton.Proceed)
 					return;
 			}
-			
-			if (!CommitCommand.Commit (vc, changeSet.Clone (), false))
-				return;
+
+			CommitCommand.Commit (vc, changeSet.Clone ());
 		}
 
-		
+
 		void OnTestExpandRow (object sender, Gtk.TestExpandRowArgs args)
 		{
 			bool filled = (bool) filestore.GetValue (args.Iter, ColFilled);
@@ -720,17 +768,16 @@ namespace MonoDevelop.VersionControl.Views
 				TreeIter iter;
 				filestore.IterChildren (out iter, args.Iter);
 				string fileName = (string) filestore.GetValue (args.Iter, ColFullPath);
-				bool remoteDiff = (bool) filestore.GetValue (args.Iter, ColStatusRemoteDiff);
-				FillDiffInfo (iter, fileName, GetDiffData (remoteDiff));
+				FillDiffInfo (iter, fileName, GetDiffData (remoteStatus));
 			}
 		}
-		
+
 		void DoPopupMenu (Gdk.EventButton evnt)
 		{
 			object commandChain = this;
 			CommandEntrySet opset = new CommandEntrySet ();
 			VersionControlItemList items = GetSelectedItems ();
-			
+
 			foreach (object ob in AddinManager.GetExtensionNodes ("/MonoDevelop/VersionControl/StatusViewCommands")) {
 				if (ob is TypeExtensionNode) {
 					TypeExtensionNode node = (TypeExtensionNode) ob;
@@ -749,7 +796,7 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			IdeApp.CommandService.ShowContextMenu (filelist, evnt, opset, commandChain);
 		}
-		
+
 		public VersionControlItemList GetSelectedItems ()
 		{
 			string[] files = GetCurrentFiles ();
@@ -760,22 +807,22 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			return items;
 		}
-		
+
 		class CommandRouter: ICommandDelegatorRouter
 		{
 			object handler;
 			public object Next;
-			
+
 			public CommandRouter (object handler)
 			{
 				this.handler = handler;
 			}
-			
+
 			public object GetNextCommandTarget ()
 			{
 				return Next;
 			}
-			
+
 			public object GetDelegatedCommandTarget ()
 			{
 				return handler;
@@ -785,22 +832,22 @@ namespace MonoDevelop.VersionControl.Views
 		internal static object ParseCommandId (ExtensionNode codon)
 		{
 			string id = codon.Id;
-			if (id.StartsWith ("@"))
+			if (id.StartsWith ("@", StringComparison.Ordinal))
 				return id.Substring (1);
 			else
 				return id;
 		}
-		
+
 		void OnExpandAll (object s, EventArgs args)
 		{
 			filelist.ExpandAll ();
 		}
-		
+
 		void OnCollapseAll (object s, EventArgs args)
 		{
 			filelist.CollapseAll ();
 		}
-		
+
 		void OnSelectAll (object s, EventArgs args)
 		{
 			TreeIter pos;
@@ -816,7 +863,7 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			UpdateSelectionStatus ();
 		}
-		
+
 		void OnSelectNone (object s, EventArgs args)
 		{
 			TreeIter pos;
@@ -825,31 +872,31 @@ namespace MonoDevelop.VersionControl.Views
 					string localpath = (string) filestore.GetValue (pos, ColFullPath);
 					if (changeSet.ContainsFile (localpath)) {
 						changeSet.RemoveFile (localpath);
-					} 
+					}
 					filestore.SetValue (pos, ColCommit, changeSet.ContainsFile (localpath));
 				} while (filestore.IterNext (ref pos));
 			}
 			UpdateSelectionStatus ();
 		}
-		
+
 		/// <summary>
-		/// Handler for "Create Patch" toolbar button click. 
+		/// Handler for "Create Patch" toolbar button click.
 		/// </summary>
 		void OnCreatePatch (object s, EventArgs args)
 		{
 			CreatePatchCommand.CreatePatch (changeSet, false);
 		}
-		
+
 		void OnRefresh (object s, EventArgs args)
 		{
 			StartUpdate ();
 		}
-		
+
 		void OnRevert (object s, EventArgs args)
 		{
 			RevertCommand.Revert (GetSelectedItems (), false);
 		}
-		
+
 		void OnOpen (object s, EventArgs args)
 		{
 			string[] files = GetCurrentFiles ();
@@ -857,20 +904,23 @@ namespace MonoDevelop.VersionControl.Views
 				return;
 			else if (files.Length == 1) {
 				TreePath[] rows = filelist.Selection.GetSelectedRows ();
-				int line = -1;
-				if (rows.Length == 1 && rows [0].Depth == 2)
-					line = diffRenderer.GetSelectedLine (rows[0]);
+				int line = 1;
+				if (rows.Length == 1 && rows [0].Depth == 2) {
+					line = diffRenderer.GetSelectedLine (rows [0]);
+					if (line == -1)
+						line = 1;
+				}
 				IdeApp.Workbench.OpenDocument (files [0], line, 0);
 			}
 			else {
-				AlertButton openAll = new AlertButton (GettextCatalog.GetString ("_Open All")); 
+				AlertButton openAll = new AlertButton (GettextCatalog.GetString ("_Open All"));
 				if (MessageService.AskQuestion (GettextCatalog.GetString ("Do you want to open all {0} files?", files.Length), AlertButton.Cancel, openAll) == openAll) {
 					for (int n=0; n<files.Length; n++)
 						IdeApp.Workbench.OpenDocument (files[n], n==0);
 				}
 			}
 		}
-		
+
 		void OnFileStatusChanged (object s, FileUpdateEventArgs args)
 		{
 			if (args.Any (f => f.FilePath == filepath || (f.FilePath.IsChildPathOf (filepath) && f.IsDirectory))) {
@@ -883,23 +933,26 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			UpdateControlStatus ();
 		}
-		
+
 		bool OnFileStatusChanged (FileUpdateEventInfo args)
 		{
 			if (!args.FilePath.IsChildPathOf (filepath) && args.FilePath != filepath)
 				return true;
-			
+
 			if (args.IsDirectory) {
 				StartUpdate ();
 				return false;
 			}
-			
+
 			bool found = false;
 			int oldStatusIndex;
 			TreeIter oldStatusIter = TreeIter.Zero;
-			
+
 			// Locate the file in the status object list
-			for (oldStatusIndex=0; oldStatusIndex<statuses.Count; oldStatusIndex++) {
+			if (statuses == null)
+				return false;
+
+			for (oldStatusIndex = 0; oldStatusIndex < statuses.Count; oldStatusIndex++) {
 				if (statuses [oldStatusIndex].LocalPath == args.FilePath) {
 					found = true;
 					break;
@@ -935,7 +988,7 @@ namespace MonoDevelop.VersionControl.Views
 				LoggingService.LogError (ex.ToString ());
 				return true;
 			}
-			
+
 			if (found) {
 				if (!FileVisible (newInfo)) {
 					// Just remove the file from the change set
@@ -944,9 +997,9 @@ namespace MonoDevelop.VersionControl.Views
 					filestore.Remove (ref oldStatusIter);
 					return true;
 				}
-				
+
 				statuses [oldStatusIndex] = newInfo;
-				
+
 				// Update the tree
 				AppendFileInfo (newInfo);
 				filestore.Remove (ref oldStatusIter);
@@ -960,8 +1013,8 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			return true;
 		}
-		
-		bool FileVisible (VersionInfo vinfo)
+
+		static bool FileVisible (VersionInfo vinfo)
 		{
 			return vinfo != null && (vinfo.HasLocalChanges || vinfo.HasRemoteChanges);
 		}
@@ -978,7 +1031,7 @@ namespace MonoDevelop.VersionControl.Views
 		{
 			bool asText = true;
 			string[] text = null;
-			
+
 			DiffData info = ddata.FirstOrDefault (d => d.VersionInfo.LocalPath == file);
 			if (info == null) {
 				// This should be impossible. We shouldn't generate a diff for a file
@@ -989,10 +1042,10 @@ namespace MonoDevelop.VersionControl.Views
 				text = new [] { GettextCatalog.GetString ("Loading data...") };
 				ThreadPool.QueueUserWorkItem (delegate {
 					// Here we just touch the  property so that the Lazy<T> creates
-					// the value. Do not capture the TreeIter as it may invalidate 
+					// the value. Do not capture the TreeIter as it may invalidate
 					// before the diff data has asyncronously loaded.
 					GC.KeepAlive (info.Diff.Value);
-					Gtk.Application.Invoke (delegate { if (!disposed) FillDifs (GetDiffData (this.remoteStatus)); });
+					Gtk.Application.Invoke (delegate { if (!disposed) FillDifs (); });
 				});
 			} else if (info.Exception != null) {
 				text = new [] { GettextCatalog.GetString ("Could not get diff information. ") + info.Exception.Message };
@@ -1002,12 +1055,12 @@ namespace MonoDevelop.VersionControl.Views
 				text = info.Diff.Value.Content.Split ('\n');
 				asText = false;
 			}
-			
+
 			filestore.SetValue (iter, ColRenderAsText, asText);
 			filestore.SetValue (iter, ColPath, text);
 		}
-		
-		void FillDifs (List<DiffData> ddata)
+
+		void FillDifs ()
 		{
 			if (disposed)
 				return;
@@ -1016,20 +1069,19 @@ namespace MonoDevelop.VersionControl.Views
 			TreeIter it;
 			if (!filestore.GetIterFirst (out it))
 				return;
-				
+
 			do {
 				bool filled = (bool) filestore.GetValue (it, ColFilled);
 				if (filled) {
 					string fileName = (string) filestore.GetValue (it, ColFullPath);
-					bool remoteDiff = (bool) filestore.GetValue (it, ColStatusRemoteDiff);
 					TreeIter citer;
 					filestore.IterChildren (out citer, it);
-					FillDiffInfo (citer, fileName, GetDiffData (remoteDiff));
+					FillDiffInfo (citer, fileName, GetDiffData (remoteStatus));
 				}
 			}
 			while (filestore.IterNext (ref it));
 		}
-		
+
 		void SetDiffCellData (Gtk.TreeViewColumn tree_column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
 		{
 			if (disposed)
@@ -1050,25 +1102,46 @@ namespace MonoDevelop.VersionControl.Views
 				StatusView view = doc.GetContent<StatusView> ();
 				if (view != null && view.filepath == filepath) {
 					doc.Select ();
+					view.StartUpdate ();
 					return true;
 				}
 			}
 			return false;
+		}
+
+		[CommandHandler (MonoDevelop.Ide.Commands.EditCommands.Copy)]
+		protected void OnCopy ()
+		{
+			StringBuilder sb = new StringBuilder ();
+			TreeIter iter;
+			foreach (var p in filelist.Selection.GetSelectedRows ()) {
+				if (!filestore.GetIter (out iter, p))
+					continue;
+
+				string[] data = (string[])filestore.GetValue (iter, ColPath);
+				foreach (var line in data)
+					sb.AppendLine (line);
+			}
+
+			var clipboard = Clipboard.Get (Gdk.Atom.Intern ("CLIPBOARD", false));
+			clipboard.Text = sb.ToString ();
+			clipboard = Clipboard.Get (Gdk.Atom.Intern ("PRIMARY", false));
+			clipboard.Text = sb.ToString ();
 		}
 	}
 
 	class FileTreeView: TreeView
 	{
 		const Gdk.ModifierType selectionModifiers = Gdk.ModifierType.ShiftMask | Gdk.ModifierType.ControlMask;
-		
+
 		protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
 		{
 			bool keepPos = false;
 			double vpos = 0;
-			
+
 			bool ctxMenu = evnt.TriggersContextMenu ();
 			bool handled = false;
-			
+
 			if (!ctxMenu) {
 				TreePath path;
 				GetPathAtPos ((int)evnt.X, (int)evnt.Y, out path);
@@ -1082,26 +1155,26 @@ namespace MonoDevelop.VersionControl.Views
 					}
 				}
 			}
-			
+
 			handled = handled || (
 				IsClickedNodeSelected ((int)evnt.X, (int)evnt.Y)
 				&& this.Selection.GetSelectedRows ().Length > 1
 				&& (evnt.State & selectionModifiers) == 0);
-			
+
 			if (!handled)
 				handled = base.OnButtonPressEvent (evnt);
-			
+
 			if (ctxMenu) {
 				if (DoPopupMenu != null)
 					DoPopupMenu (evnt);
 				handled = true;
 			}
-			
+
 			if (keepPos)
 				Vadjustment.Value = vpos;
 			return handled;
 		}
-		
+
 		bool IsClickedNodeSelected (int x, int y)
 		{
 			Gtk.TreePath path;
@@ -1117,14 +1190,14 @@ namespace MonoDevelop.VersionControl.Views
 				DoPopupMenu (null);
 			return true;
 		}
-		
+
 		internal Gdk.Point? CursorLocation { get; private set; }
-		
+
 		protected override bool OnMotionNotifyEvent (Gdk.EventMotion evnt)
 		{
 			TreePath path;
 			GetPathAtPos ((int)evnt.X, (int)evnt.Y, out path);
-			
+
 			// Diff cells need to be redrawn so they can show the updated selected line
 			if (path != null && path.Depth == 2) {
 				CursorLocation = new Gdk.Point ((int)evnt.X, (int)evnt.Y);
@@ -1134,10 +1207,10 @@ namespace MonoDevelop.VersionControl.Views
 				CursorLocation = null;
 				QueueDraw ();
 			}
-			
+
 			return base.OnMotionNotifyEvent (evnt);
 		}
-		
+
 		protected override bool OnLeaveNotifyEvent (Gdk.EventCrossing evnt)
 		{
 			if (CursorLocation.HasValue) {
@@ -1146,7 +1219,7 @@ namespace MonoDevelop.VersionControl.Views
 			}
 			return base.OnLeaveNotifyEvent (evnt);
 		}
-		
+
 		protected override bool OnScrollEvent (Gdk.EventScroll evnt)
 		{
 			QueueDraw ();

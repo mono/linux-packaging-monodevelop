@@ -37,15 +37,15 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 	public class TooltipInformationWindow : PopoverWindow
 	{
-		List<TooltipInformation> overloads = new List<TooltipInformation> ();
+		readonly List<TooltipInformation> overloads = new List<TooltipInformation> ();
 		int current_overload;
 		
 		public int CurrentOverload {
 			get {
-				return this.current_overload; 
+				return current_overload; 
 			}
 			set {
-				this.current_overload = value;
+				current_overload = value;
 				ShowOverload ();
 			}
 		}
@@ -56,7 +56,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			}
 		}
 		
-		MonoDevelop.Components.FixedWidthWrapLabel headlabel;
+		readonly FixedWidthWrapLabel headLabel;
 		public bool Multiple{
 			get {
 				return overloads.Count > 1;
@@ -65,7 +65,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 		public void AddOverload (TooltipInformation tooltipInformation)
 		{
-			if (tooltipInformation == null || string.IsNullOrEmpty (tooltipInformation.SignatureMarkup))
+			if (tooltipInformation == null || tooltipInformation.IsEmpty)
 				return;
 			overloads.Add (tooltipInformation);
 
@@ -80,12 +80,11 @@ namespace MonoDevelop.Ide.CodeCompletion
 		public void AddOverload (CompletionData data)
 		{
 			var tooltipInformation = data.CreateTooltipInformation (false);
-			if (string.IsNullOrEmpty (tooltipInformation.SignatureMarkup))
+			if (tooltipInformation.IsEmpty)
 				return;
 
 			using (var layout = new Pango.Layout (PangoContext)) {
-				var des = FontService.GetFontDescription ("Editor");
-				layout.FontDescription = des;
+				layout.FontDescription = FontService.GetFontDescription ("Editor");
 				layout.SetMarkup (tooltipInformation.SignatureMarkup);
 				int w, h;
 				layout.GetPixelSize (out w, out h);
@@ -99,7 +98,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 		protected override void OnSizeRequested (ref Requisition requisition)
 		{
 			base.OnSizeRequested (ref requisition);
-			var w = Math.Max (headlabel.WidthRequest, headlabel.RealWidth);
+			var w = Math.Max (headLabel.WidthRequest, headLabel.RealWidth);
 			requisition.Width = (int)Math.Max (w + ContentBox.LeftPadding + ContentBox.RightPadding, requisition.Width);
 		}
 
@@ -109,15 +108,17 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 			if (current_overload >= 0 && current_overload < overloads.Count) {
 				var o = overloads[current_overload];
-				headlabel.BreakOnCamelCasing = false;
-				headlabel.BreakOnPunctuation = false;
-				headlabel.Markup = o.SignatureMarkup;
-				headlabel.Visible = true;
+				headLabel.Markup = o.SignatureMarkup;
+				headLabel.Visible = !string.IsNullOrEmpty (o.SignatureMarkup);
+				int x, y;
+				GetPosition (out x, out y);
+				var geometry = DesktopService.GetUsableMonitorGeometry (Screen, Screen.GetMonitorAtPoint (x, y));
+				headLabel.MaxWidth = Math.Max (geometry.Width / 5, 480);
 
 				if (Theme.DrawPager && overloads.Count > 1) {
-					headlabel.WidthRequest = headlabel.RealWidth + 70;
+					headLabel.WidthRequest = headLabel.RealWidth + 70;
 				} else {
-					headlabel.WidthRequest = -1;
+					headLabel.WidthRequest = -1;
 				}
 				foreach (var cat in o.Categories) {
 					descriptionBox.PackStart (CreateCategory (cat.Item1, cat.Item2), true, true, 4);
@@ -128,13 +129,14 @@ namespace MonoDevelop.Ide.CodeCompletion
 				}
 				if (!string.IsNullOrEmpty (o.FooterMarkup)) {
 
-					var contentLabel = new MonoDevelop.Components.FixedWidthWrapLabel ();
+					var contentLabel = new FixedWidthWrapLabel ();
 					contentLabel.Wrap = Pango.WrapMode.WordChar;
-					contentLabel.BreakOnCamelCasing = true;
+					contentLabel.BreakOnCamelCasing = false;
+					contentLabel.BreakOnPunctuation = false;
 					contentLabel.MaxWidth = 400;
-					contentLabel.BreakOnPunctuation = true;
 					contentLabel.Markup = o.FooterMarkup.Trim ();
-					contentLabel.ModifyFg (StateType.Normal, (HslColor)foreColor);
+					contentLabel.ModifyFg (StateType.Normal, foreColor.ToGdkColor ());
+					contentLabel.FontDescription = FontService.GetFontDescription ("Editor");
 
 					descriptionBox.PackEnd (contentLabel, true, true, 4);
 				}
@@ -185,18 +187,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 			ClearDescriptions ();
 			overloads.Clear ();
 			Theme.DrawPager = false;
-			headlabel.Markup = "";
+			headLabel.Markup = "";
 			current_overload = 0;
-		}
-		
-		public void SetFixedWidth (int w)
-		{
-			if (w != -1) {
-				headlabel.MaxWidth = w;
-			} else {
-				headlabel.MaxWidth = -1;
-			}
-			QueueResize ();
 		}
 
 		VBox CreateCategory (string categoryName, string categoryContentMarkup)
@@ -205,66 +197,75 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 			vbox.Spacing = 2;
 
-			var catLabel = new MonoDevelop.Components.FixedWidthWrapLabel ();
-			catLabel.Text = categoryName;
-			catLabel.ModifyFg (StateType.Normal, (HslColor)foreColor);
+			if (categoryName != null) {
+				var catLabel = new FixedWidthWrapLabel ();
+				catLabel.Text = categoryName;
+				catLabel.ModifyFg (StateType.Normal, foreColor.ToGdkColor ());
+				catLabel.FontDescription = FontService.GetFontDescription ("Editor");
+				vbox.PackStart (catLabel, false, true, 0);
+			}
 
-			vbox.PackStart (catLabel, false, true, 0);
-
-			var contentLabel = new MonoDevelop.Components.FixedWidthWrapLabel ();
+			var contentLabel = new FixedWidthWrapLabel ();
 			contentLabel.Wrap = Pango.WrapMode.WordChar;
-			contentLabel.BreakOnCamelCasing = true;
+			contentLabel.BreakOnCamelCasing = false;
+			contentLabel.BreakOnPunctuation = false;
 			contentLabel.MaxWidth = 400;
-			contentLabel.BreakOnPunctuation = true;
 			contentLabel.Markup = categoryContentMarkup.Trim ();
-			contentLabel.ModifyFg (StateType.Normal, (HslColor)foreColor);
+			contentLabel.ModifyFg (StateType.Normal, foreColor.ToGdkColor ());
+			contentLabel.FontDescription = FontService.GetFontDescription ("Editor");
 
 			vbox.PackStart (contentLabel, true, true, 0);
 
 			return vbox;
 		}
 
-		VBox descriptionBox = new VBox (false, 0);
-		VBox vb2 = new VBox (false, 0);
+		readonly VBox descriptionBox = new VBox (false, 0);
+		readonly VBox vb2 = new VBox (false, 0);
 		Cairo.Color foreColor;
+
+		internal void SetDefaultScheme ()
+		{
+			var scheme = Mono.TextEditor.Highlighting.SyntaxModeService.GetColorStyle (IdeApp.Preferences.ColorScheme);
+			Theme.SetSchemeColors (scheme);
+			foreColor = scheme.PlainText.Foreground;
+			headLabel.ModifyFg (StateType.Normal, foreColor.ToGdkColor ());
+		}
+
 		public TooltipInformationWindow () : base ()
 		{
 			TypeHint = Gdk.WindowTypeHint.Tooltip;
 			this.SkipTaskbarHint = true;
 			this.SkipPagerHint = true;
-			if (IdeApp.Workbench != null)
-				this.TransientFor = IdeApp.Workbench.RootWindow;
 			this.AllowShrink = false;
 			this.AllowGrow = false;
 			this.CanFocus = false;
 			this.CanDefault = false;
 			this.Events |= Gdk.EventMask.EnterNotifyMask; 
 			
-			headlabel = new MonoDevelop.Components.FixedWidthWrapLabel ();
-			headlabel.Indent = -20;
-			var des = FontService.GetFontDescription ("Editor").Copy ();
-			des.Size = des.Size * 9 / 10;
-			headlabel.FontDescription = des;
-//			headlabel.MaxWidth = 400;
-			headlabel.Wrap = Pango.WrapMode.WordChar;
-			headlabel.BreakOnCamelCasing = true;
-//			headlabel.BreakOnPunctuation = true;
-			descriptionBox.Spacing = 4;
-			VBox vb = new VBox (false, 8);
-			vb.PackStart (headlabel, true, true, 0);
-			vb.PackStart (descriptionBox, true, true, 0);
+			headLabel = new FixedWidthWrapLabel ();
+			headLabel.Indent = -20;
+			headLabel.FontDescription = FontService.GetFontDescription ("Editor").CopyModified (1.1);
+			headLabel.Wrap = Pango.WrapMode.WordChar;
+			headLabel.BreakOnCamelCasing = false;
+			headLabel.BreakOnPunctuation = false;
 
-			HBox hb = new HBox (false, 0);
-			hb.PackStart (vb, true, true, 0);
+			descriptionBox.Spacing = 4;
+
+			VBox vb = new VBox (false, 8);
+			vb.PackStart (headLabel, true, true, 4);
+			vb.PackStart (descriptionBox, true, true, 4);
+
+			HBox hb = new HBox (false, 4);
+			hb.PackStart (vb, true, true, 6);
+
 			WindowTransparencyDecorator.Attach (this);
 
 			vb2.Spacing = 4;
 			vb2.PackStart (hb, true, true, 0);
 			ContentBox.Add (vb2);
-			var scheme = Mono.TextEditor.Highlighting.SyntaxModeService.GetColorStyle (IdeApp.Preferences.ColorScheme);
-			Theme.SetSchemeColors (scheme);
-			foreColor = scheme.PlainText.Foreground;
-			headlabel.ModifyFg (StateType.Normal, (HslColor)foreColor);
+
+			SetDefaultScheme ();
+
 			ShowAll ();
 			DesktopService.RemoveWindowShadow (this);
 		}

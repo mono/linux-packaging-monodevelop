@@ -1,30 +1,12 @@
-<Addin id          = "CBinding"
-       namespace   = "MonoDevelop"
-       name		   = "C/C++ Language Binding"
-       author      = "Marcos David Marín Amador"
-       copyright   = "MIT X11"
-       url         = "http://www.monodevelop.com"
-       description = "C/C++ Language binding"
-       category    = "Language bindings"
-       version     = "4.0.12">
+<ExtensionModel>
 
-	<Dependencies>
-		<Addin id = "Core" version = "4.0.12"/>
-		<Addin id = "Ide" version = "4.0.12"/>
-		<Addin id = "Deployment" version = "4.0.12"/>
-		<Addin id = "Deployment.Linux" version = "4.0.12"/>
-		<Addin id = "SourceEditor2" version = "4.0.12" />
-		<Addin id = "DesignerSupport" version = "4.0.12" />
-		<Addin id = "Refactoring" version = "4.0.12" />
-	</Dependencies>
-	
 	<Extension path = "/MonoDevelop/Core/StockIcons">
-		<StockIcon stockid = "md-union" resource = "Icons.16x16.Union" size="Menu"/>
-		<StockIcon stockid = "md-protected-union" resource = "Icons.16x16.ProtectedUnion" size="Menu"/>
-		<StockIcon stockid = "md-private-union" resource = "Icons.16x16.PrivateUnion" size="Menu"/>
-		<StockIcon stockid = "md-c-file" resource = "text-x-csrc.16x16.png" size="Menu" />
-		<StockIcon stockid = "md-h-file" resource = "text-x-chdr.16x16.png" size="Menu" />
-		<StockIcon stockid = "md-cpp-file" resource = "text-x-c++src.16x16.png" size="Menu" />
+		<StockIcon stockid = "md-union" resource = "union-16.png" size="Menu"/>
+		<StockIcon stockid = "md-protected-union" resource = "union-protected-16.png" size="Menu"/>
+		<StockIcon stockid = "md-private-union" resource = "union-private-16.png" size="Menu"/>
+		<StockIcon stockid = "md-c-file" icon = "md-file-source" size="Menu" />
+		<StockIcon stockid = "md-h-file" icon = "md-file-header" size="Menu" />
+		<StockIcon stockid = "md-cpp-file" icon = "md-file-source" size="Menu" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/FileFilters">
@@ -187,7 +169,7 @@
 	<Extension path = "/MonoDevelop/Ide/Commands">
 		<Category _name = "C/C++" id = "C/C++">
 			<Command id = "CBinding.CProjectCommands.AddPackage" _label = "Edit Packages..." />
-			<Command id = "CBinding.CProjectCommands.UpdateClassPad" _label = "Update class pad" icon = "res:update" />
+			<Command id = "CBinding.CProjectCommands.UpdateClassPad" _label = "Update class pad" />
 			<Command id = "CBinding.CProjectCommands.ShowPackageDetails" _label = "Details..." />
 		</Category>
 	</Extension>
@@ -230,10 +212,6 @@
 		<SolutionItem type="CBinding.CProject" extension="cproj" guid="{2857B73E-F847-4B02-9238-064979017E93}"/>
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/ProjectModel/MD1SerializationMaps">
-		<SerializationMap resource="md1format.xml" />
-	</Extension>
-	
 <!-- Current Autotools AddIn is very .NET specific
 	<Module>
 	    <Runtime>
@@ -241,7 +219,7 @@
 	    </Runtime>
 	    
 		<Dependencies>
-			<Addin id = "MonoDevelop.Autotools" version = "4.0.12"/>
+			<Addin id = "MonoDevelop.Autotools" version = "4.2.3"/>
 		</Dependencies>
 		
 		<Extension path = "/Autotools/SimpleSetups">
@@ -259,4 +237,8 @@
 			<CommandItem id = "MonoDevelop.Refactoring.RefactoryCommands.GotoDeclaration" insertafter="MonoDevelop.SourceEditor.SourceEditorCommands.MarkerOperations" />
 		</Condition>
 	</Extension>
-</Addin>
+	
+	<Extension path = "/MonoDevelop/Ide/CompletionCharacters">
+		<Complete language="C/C++" commitOnSpace="True" commitChars="{}[]().,:;+-*/%&amp;|^!~=&lt;&gt;?@#'&quot;\"/>
+	</Extension>
+</ExtensionModel>

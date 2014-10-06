@@ -39,6 +39,7 @@ using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide.Gui.Dialogs;
 using System.Linq;
+using MonoDevelop.Ide.Tasks;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
@@ -107,45 +108,52 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			return ((Project)dataObject).BaseDirectory;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
-			base.BuildNode (treeBuilder, dataObject, ref label, ref icon, ref closedIcon);
+			base.BuildNode (treeBuilder, dataObject, nodeInfo);
 
 			Project p = dataObject as Project;
 			
 			string escapedProjectName = GLib.Markup.EscapeText (p.Name);
-			string iconName;
-			
+
 			if (p is DotNetProject && ((DotNetProject)p).LanguageBinding == null) {
-				iconName = Gtk.Stock.DialogError;
-				label = GettextCatalog.GetString ("{0} <span foreground='red' size='small'>(Unknown language '{1}')</span>", escapedProjectName, ((DotNetProject)p).LanguageName);
+				nodeInfo.Icon = Context.GetIcon (Stock.Project);
+				nodeInfo.Label = escapedProjectName;
+				nodeInfo.StatusSeverity = TaskSeverity.Error;
+				nodeInfo.StatusMessage = GettextCatalog.GetString ("Unknown language '{0}'", ((DotNetProject)p).LanguageName);
+				nodeInfo.DisabledStyle = true;
+				return;
 			} else if (p is UnknownProject) {
-				iconName = Gtk.Stock.DialogError;
-				label = GettextCatalog.GetString ("{0} <span foreground='red' size='small'>(Unknown project type)</span>", escapedProjectName);
-			} else {
-				iconName = p.StockIcon;
-				if (p.ParentSolution != null && p.ParentSolution.SingleStartup && p.ParentSolution.StartupItem == p)
-					label = "<b>" + escapedProjectName + "</b>";
-				else
-					label = escapedProjectName;
+				var up = (UnknownProject)p;
+				nodeInfo.StatusSeverity = TaskSeverity.Warning;
+				nodeInfo.StatusMessage = up.LoadError.TrimEnd ('.');
+				nodeInfo.Label = escapedProjectName;
+				nodeInfo.DisabledStyle = true;
+				nodeInfo.Icon = Context.GetIcon (p.StockIcon);
+				return;
 			}
-			
-			icon = Context.GetIcon (iconName);
-			
+
+			nodeInfo.Icon = Context.GetIcon (p.StockIcon);
+			if (p.ParentSolution != null && p.ParentSolution.SingleStartup && p.ParentSolution.StartupItem == p)
+				nodeInfo.Label = "<b>" + escapedProjectName + "</b>";
+			else
+				nodeInfo.Label = escapedProjectName;
+
 			// Gray out the project name if it is not selected in the current build configuration
 			
 			SolutionConfiguration conf = p.ParentSolution.GetConfiguration (IdeApp.Workspace.ActiveConfiguration);
 			SolutionConfigurationEntry ce = null;
 			bool noMapping = conf == null || (ce = conf.GetEntryForItem (p)) == null;
 			bool missingConfig = false;
-			if (noMapping || !ce.Build || (missingConfig = p.Configurations [ce.ItemConfiguration] == null)) {
-				Gdk.Pixbuf ticon = Context.GetComposedIcon (icon, "project-no-build");
-				if (ticon == null)
-					ticon = Context.CacheComposedIcon (icon, "project-no-build", ImageService.MakeTransparent (icon, 0.5));
-				icon = ticon;
-				label = missingConfig
-					? "<span foreground='red'>" + label + " <small>(invalid configuration mapping)</small></span>"
-					: "<span foreground='gray'>" + label + " <small>(not built in active configuration)</small></span>";
+			if (p.SupportsBuild () && (noMapping || !ce.Build || (missingConfig = p.Configurations [ce.ItemConfiguration] == null))) {
+				nodeInfo.DisabledStyle = true;
+				if (missingConfig) {
+					nodeInfo.StatusSeverity = TaskSeverity.Error;
+					nodeInfo.StatusMessage = GettextCatalog.GetString ("Invalid configuration mapping");
+				} else {
+					nodeInfo.StatusSeverity = TaskSeverity.Information;
+					nodeInfo.StatusMessage = GettextCatalog.GetString ("Project not built in active configuration");
+				}
 			}
 		}
 
@@ -363,6 +371,13 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			IdeApp.ProjectOperations.ShowOptions (project);
 		}
 		
+		[CommandUpdateHandler (ProjectCommands.SetAsStartupProject)]
+		public void UpdateSetAsStartupProject (CommandInfo ci)
+		{
+			Project project = (Project) CurrentNode.DataItem;
+			ci.Visible = project.CanExecute (new ExecutionContext (Runtime.ProcessService.DefaultExecutionHandler, null, IdeApp.Workspace.ActiveExecutionTarget), IdeApp.Workspace.ActiveConfiguration);
+		}
+
 		[CommandHandler (ProjectCommands.SetAsStartupProject)]
 		public void SetAsStartupProject ()
 		{
@@ -419,18 +434,43 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			}
 		}
 
+		[CommandHandler (ProjectCommands.Unload)]
+		[AllowMultiSelection]
+		public void OnUnload ()
+		{
+			HashSet<Solution> solutions = new HashSet<Solution> ();
+			using (IProgressMonitor m = IdeApp.Workbench.ProgressMonitors.GetProjectLoadProgressMonitor (true)) {
+				m.BeginTask (null, CurrentNodes.Length);
+				foreach (ITreeNavigator nav in CurrentNodes) {
+					Project p = (Project) nav.DataItem;
+					p.Enabled = false;
+					p.ParentFolder.ReloadItem (m, p);
+					m.Step (1);
+					solutions.Add (p.ParentSolution);
+				}
+				m.EndTask ();
+			}
+			IdeApp.ProjectOperations.Save (solutions);
+		}
+
+		[CommandUpdateHandler (ProjectCommands.Unload)]
+		public void OnUpdateUnload (CommandInfo info)
+		{
+			info.Enabled = CurrentNodes.All (nav => ((Project)nav.DataItem).Enabled);
+		}
+
 		[CommandHandler (ProjectCommands.EditSolutionItem)]
 		public void OnEditProject ()
 		{
-			Project project = (Project) CurrentNode.DataItem;
-			IdeApp.Workbench.OpenDocument (project.FileName);
+			var project = (Project) CurrentNode.DataItem;
+			IdeApp.Workbench.OpenDocument (project.FileName, project);
 		}
 
 		[CommandUpdateHandler (ProjectCommands.EditSolutionItem)]
 		public void OnEditProjectUpdate (CommandInfo info)
 		{
-			var p = (Project) CurrentNode.DataItem;
-			info.Visible = !IdeApp.Workbench.Documents.Any (d => d.FileName == p.FileName);
+			var project = (Project) CurrentNode.DataItem;
+			info.Visible = info.Enabled = !string.IsNullOrEmpty (project.FileName) && File.Exists (project.FileName);
 		}
 		
 		public override DragOperation CanDragNode ()

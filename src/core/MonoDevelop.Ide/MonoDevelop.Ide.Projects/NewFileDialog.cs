@@ -27,24 +27,17 @@
 //
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
 
-using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Core;
-using Mono.Addins;
 using MonoDevelop.Ide.Templates;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
 
 using Gtk;
-using MonoDevelop.Components;
-using IconView = MonoDevelop.Components.IconView;
-using Gdk;
 using MonoDevelop.Ide.Gui.Components;
 using System.Linq;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.Ide.Projects
 {
@@ -173,9 +166,10 @@ namespace MonoDevelop.Ide.Projects
 		{
 			string key = "Dialogs.NewFileDialog.LastSelectedCategory";
 			if (proj != null) {
-				key += "." + proj.ProjectType;
-				if (proj is DotNetProject)
-					key += "." + ((DotNetProject)proj).LanguageName;
+				key += "." + proj.GetProjectTypes ().First ();
+				var dnp = proj as DotNetProject;
+				if (dnp != null)
+					key += "." + dnp.LanguageName;
 			}
 			return key;
 		}
@@ -481,6 +475,7 @@ namespace MonoDevelop.Ide.Projects
 					if (!item.Create (project, project, path, titem.Language, filename))
 						return;
 				} catch (Exception ex) {
+					LoggingService.LogError ("Error creating file", ex);
 					MessageService.ShowException (ex);
 					return;
 				}
@@ -752,8 +747,8 @@ namespace MonoDevelop.Ide.Projects
 				Model = templateStore;
 				
 				TreeViewColumn col = new TreeViewColumn ();
-				CellRendererIcon crp = new CellRendererIcon ();
-				crp.StockSize = (uint) Gtk.IconSize.Dnd;
+				CellRendererImage crp = new CellRendererImage ();
+				crp.StockSize = Gtk.IconSize.Dnd;
 				crp.Ypad = 2;
 				col.PackStart (crp, false);
 				col.AddAttribute (crp, "stock-id", 0);
@@ -792,7 +787,8 @@ namespace MonoDevelop.Ide.Projects
 				string name = GLib.Markup.EscapeText (GettextCatalog.GetString (templateItem.Name));
 				if (!string.IsNullOrEmpty (templateItem.Language))
 					name += "\n<span foreground='darkgrey'><small>" + templateItem.Language + "</small></span>";
-				templateStore.AppendValues (templateItem.Template.Icon.IsNull ? "md-project" : templateItem.Template.Icon.ToString (), name, templateItem);
+				string icon = templateItem.Template.Icon;
+				templateStore.AppendValues (string.IsNullOrEmpty (icon) ? "md-file-source" : icon, name, templateItem);
 			}
 			
 			public void Clear ()

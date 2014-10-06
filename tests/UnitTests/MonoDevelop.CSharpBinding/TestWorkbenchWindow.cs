@@ -94,6 +94,10 @@ namespace MonoDevelop.CSharpBinding
 		public void SwitchView (IAttachableViewContent view)
 		{
 		}
+
+		public void SwitchToSingleMode ()
+		{
+		}
 		
 		public int FindView<T> ()
 		{
@@ -116,7 +120,6 @@ namespace MonoDevelop.CSharpBinding
 		}
 
 		public event EventHandler DocumentChanged;
-		public event EventHandler TitleChanged;
 		public event WorkbenchWindowEventHandler Closing;
 		public event WorkbenchWindowEventHandler Closed;
 		public event ActiveViewContentEventHandler ActiveViewContentChanged;

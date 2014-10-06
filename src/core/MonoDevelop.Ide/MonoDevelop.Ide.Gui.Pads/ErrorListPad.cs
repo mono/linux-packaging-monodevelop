@@ -48,10 +48,11 @@ using MonoDevelop.Components.Docking;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Commands;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.Ide.Gui.Pads
 {
-	public class ErrorListPad : IPadContent
+	class ErrorListPad : IPadContent
 	{
 		HPaned control;
 		ScrolledWindow sw;
@@ -66,14 +67,15 @@ namespace MonoDevelop.Ide.Gui.Pads
 		int warningCount;
 		int infoCount;
 		bool initialLogShow = true;
+		IPadWindow window;
 
 		Menu menu;
 		Dictionary<ToggleAction, int> columnsActions = new Dictionary<ToggleAction, int> ();
 		Clipboard clipboard;
 
-		Gdk.Pixbuf iconWarning;
-		Gdk.Pixbuf iconError;
-		Gdk.Pixbuf iconInfo;
+		Xwt.Drawing.Image iconWarning;
+		Xwt.Drawing.Image iconError;
+		Xwt.Drawing.Image iconInfo;
 		
 		const string showErrorsPropertyName = "SharpDevelop.TaskList.ShowErrors";
 		const string showWarningsPropertyName = "SharpDevelop.TaskList.ShowWarnings";
@@ -113,6 +115,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 		void IPadContent.Initialize (IPadWindow window)
 		{
+			this.window = window;
 			window.Title = GettextCatalog.GetString ("Errors");
 
 			DockItemToolbar toolbar = window.GetToolbar (PositionType.Top);
@@ -137,7 +140,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			
 			msgBtn = new ToggleButton ();
 			msgBtn.Active = (bool)PropertyService.Get (showMessagesPropertyName, true);
-			msgBtn.Image = new Gtk.Image (Gtk.Stock.DialogInfo, Gtk.IconSize.Menu);
+			msgBtn.Image = new Gtk.Image (Stock.Information, Gtk.IconSize.Menu);
 			msgBtn.Image.Show ();
 			msgBtn.Toggled += new EventHandler (FilterChanged);
 			msgBtn.TooltipText = GettextCatalog.GetString ("Show Messages");
@@ -155,13 +158,15 @@ namespace MonoDevelop.Ide.Gui.Pads
 			toolbar.Add (logBtn);
 			
 			toolbar.ShowAll ();
+
+			UpdatePadIcon ();
 		}
 		
 		void CreateControl ()
 		{
 			control = new HPaned ();
 
-			store = new Gtk.ListStore (typeof (Gdk.Pixbuf), // image - type
+			store = new Gtk.ListStore (typeof (Xwt.Drawing.Image), // image - type
 			                           typeof (bool),       // read?
 			                           typeof (Task));       // read? -- use Pango weight
 
@@ -196,9 +201,9 @@ namespace MonoDevelop.Ide.Gui.Pads
 			
 			view.RowActivated += new RowActivatedHandler (OnRowActivated);
 			
-			iconWarning = sw.RenderIcon (Stock.Warning, Gtk.IconSize.Menu, "");
-			iconError = sw.RenderIcon (Stock.Error, Gtk.IconSize.Menu, "");
-			iconInfo = sw.RenderIcon (Gtk.Stock.DialogInfo, Gtk.IconSize.Menu, "");
+			iconWarning = ImageService.GetIcon (Ide.Gui.Stock.Warning, Gtk.IconSize.Menu);
+			iconError = ImageService.GetIcon (Ide.Gui.Stock.Error, Gtk.IconSize.Menu);
+			iconInfo = ImageService.GetIcon (Ide.Gui.Stock.Information, Gtk.IconSize.Menu);
 			
 			control.Add1 (sw);
 			
@@ -513,13 +518,13 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 		void AddColumns ()
 		{
-			Gtk.CellRendererPixbuf iconRender = new Gtk.CellRendererPixbuf ();
+			CellRendererImage iconRender = new CellRendererImage ();
 			
 			Gtk.CellRendererToggle toggleRender = new Gtk.CellRendererToggle ();
 			toggleRender.Toggled += new ToggledHandler (ItemToggled);
 			
 			TreeViewColumn col;
-			col = view.AppendColumn ("!", iconRender, "pixbuf", DataColumns.Type);
+			col = view.AppendColumn ("!", iconRender, "image", DataColumns.Type);
 			
 			col = view.AppendColumn ("", toggleRender);
 			col.SetCellDataFunc (toggleRender, new Gtk.TreeCellDataFunc (ToggleDataFunc));
@@ -695,6 +700,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			UpdateErrorsNum ();
 			UpdateWarningsNum ();
 			UpdateMessagesNum ();
+			UpdatePadIcon ();
 		}
 		
 		void TaskChanged (object sender, TaskEventArgs e)
@@ -731,7 +737,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 		{
 			if (tasks.Contains (t)) return;
 			
-			Gdk.Pixbuf stock;
+			Xwt.Drawing.Image stock;
 			
 			switch (t.Severity) {
 				case TaskSeverity.Error:
@@ -754,6 +760,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			tasks [t] = t;
 			
 			store.AppendValues (stock, false, t);
+			UpdatePadIcon ();
 		}
 
 		void UpdateErrorsNum () 
@@ -772,6 +779,16 @@ namespace MonoDevelop.Ide.Gui.Pads
 		{
 			msgBtn.Label = " " + string.Format(GettextCatalog.GetPluralString("{0} Message", "{0} Messages", infoCount), infoCount);
 			msgBtn.Image.Show ();
+		}
+
+		void UpdatePadIcon ()
+		{
+			if (errorCount > 0)
+				window.Icon = "md-errors-list-has-errors";
+			else if (warningCount > 0)
+				window.Icon = "md-errors-list-has-warnings";
+			else
+				window.Icon = "md-errors-list";
 		}
 		
 		private void ItemToggled (object o, ToggledArgs args)
@@ -832,62 +849,6 @@ namespace MonoDevelop.Ide.Gui.Pads
 			int pos = (int) (controlWidth * relPos);
 			pos = Math.Max (30, Math.Min (pos, controlWidth - 30));
 			control.Position = pos;
-		}
-	}
-	
-	class ErrorPadLabelProvider: IDockItemLabelProvider
-	{
-		public Widget CreateLabel (Orientation orientation)
-		{
-			Gtk.Box box;
-			if (orientation == Orientation.Horizontal)
-				box = new HBox ();
-			else
-				box = new VBox ();
-			box.Spacing = 3;
-			
-			Gdk.Pixbuf errorIcon = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.Error, IconSize.Menu);
-			Gdk.Pixbuf noErrorIcon = ImageService.MakeGrayscale (errorIcon); // creates a new pixbuf instance
-			Gdk.Pixbuf warningIcon = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.Warning, IconSize.Menu);
-			Gdk.Pixbuf noWarningIcon = ImageService.MakeGrayscale (warningIcon); // creates a new pixbuf instance
-			
-			Gtk.Image errorImage = new Gtk.Image (errorIcon);
-			Gtk.Image warningImage = new Gtk.Image (warningIcon);
-			
-			box.PackStart (errorImage, false, false, 0);
-			Label errors = new Gtk.Label ();
-			box.PackStart (errors, false, false, 0);
-			
-			box.PackStart (warningImage, false, false, 0);
-			Label warnings = new Gtk.Label ();
-			box.PackStart (warnings, false, false, 0);
-			
-			TaskEventHandler updateHandler = delegate {
-				int ec=0, wc=0;
-				foreach (Task t in TaskService.Errors) {
-					if (t.Severity == TaskSeverity.Error)
-						ec++;
-					else if (t.Severity == TaskSeverity.Warning)
-						wc++;
-				}
-				errors.Text = ec.ToString ();
-				errorImage.Pixbuf = ec > 0 ? errorIcon : noErrorIcon;
-				warnings.Text = wc.ToString ();
-				warningImage.Pixbuf = wc > 0 ? warningIcon : noWarningIcon;
-			};
-			
-			updateHandler (null, null);
-			
-			TaskService.Errors.TasksAdded += updateHandler;
-			TaskService.Errors.TasksRemoved += updateHandler;
-			
-			box.Destroyed += delegate {
-				noErrorIcon.Dispose ();
-				noWarningIcon.Dispose ();
-				TaskService.Errors.TasksAdded -= updateHandler;
-				TaskService.Errors.TasksRemoved -= updateHandler;
-			};
-			return box;
 		}
 	}
 }

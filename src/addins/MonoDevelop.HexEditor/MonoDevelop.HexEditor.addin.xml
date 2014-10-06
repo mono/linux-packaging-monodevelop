@@ -1,22 +1,4 @@
-<Addin id          = "HexEditor"
-       namespace   = "MonoDevelop"
-       name        = "MonoDevelop Hex Editor"
-       author      = "Mike Krüger"
-       copyright   = ""
-       url         = ""
-       description = "Provides a hex editor for MonoDevelop"
-       category    = "IDE extensions"
-       version     = "4.0.12">
-	
-	<Runtime>
-		<Import assembly="MonoDevelop.HexEditor.dll"/>
-	</Runtime>
-
-	<Dependencies>
-		<Addin id="Core" version="4.0.12"/>
-		<Addin id="Ide" version="4.0.12"/>
-		<Addin id="AssemblyBrowser" version="4.0.12"/>
-	</Dependencies>
+<ExtensionModel>
 	<!--
 	<Extension path = "/MonoDevelop/Ide/Commands">
 		<Command id = "MonoDevelop.HexEditor.Commands.ShowHexEditor" _label = "Open with _hex editor" />
@@ -39,4 +21,8 @@
 		</Condition>
 	</Extension>
 	-->
-</Addin>
+	
+	<Extension path="/MonoDevelop/Debugging/ValueVisualizers">
+		<Type class="MonoDevelop.HexEditor.HexEditorVisualizer" />
+	</Extension>
+</ExtensionModel>

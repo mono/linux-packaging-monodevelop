@@ -30,6 +30,7 @@ using System.Xml;
 using System.IO;
 
 using MonoDevelop.Projects;
+using System.Linq;
 
 namespace MonoDevelop.Ide.Templates
 {
@@ -39,7 +40,7 @@ namespace MonoDevelop.Ide.Templates
 		bool requireExists = false;
 		string projectType = null;
 		
-		//these specify the paths within the project in which the file may or may ne be created
+		//these specify the paths within the project in which the file may or may not be created
 		string[] permittedCreationPaths = null;
 		string[] excludedCreationPaths = null;
 		
@@ -83,7 +84,7 @@ namespace MonoDevelop.Ide.Templates
 			if (proj == null)
 				return !requireExists;
 			
-			if (projectType != null && proj.ProjectType != projectType)
+			if (projectType != null && proj.GetProjectTypes ().All (p => p != projectType))
 				return false;
 			
 			//check for permitted creation paths

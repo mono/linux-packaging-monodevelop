@@ -34,9 +34,14 @@ namespace Xwt.Backends
 		int[] SelectedRows { get; }
 		void SelectRow (int pos);
 		void UnselectRow (int pos);
+		void ScrollToRow (int row);
 
 		bool BorderVisible { get; set; }
+		GridLines GridLinesVisible { get; set; }
 		bool HeadersVisible { get; set; }
+
+		int GetRowAtPosition (Point p);
+		Rectangle GetCellBounds (int row, CellView cell, bool includeMargin);
 	}
 	
 	public enum ListViewEvent

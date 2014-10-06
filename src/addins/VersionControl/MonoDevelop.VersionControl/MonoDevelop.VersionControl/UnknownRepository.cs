@@ -86,11 +86,11 @@ namespace MonoDevelop.VersionControl
 		{
 		}
 
-		protected override void OnDeleteFiles (FilePath[] path, bool force, IProgressMonitor monitor)
+		protected override void OnDeleteFiles (FilePath[] path, bool force, IProgressMonitor monitor, bool keepLocal)
 		{
 		}
 
-		protected override void OnDeleteDirectories (FilePath[] path, bool force, IProgressMonitor monitor)
+		protected override void OnDeleteDirectories (FilePath[] path, bool force, IProgressMonitor monitor, bool keepLocal)
 		{
 		}
 
@@ -102,7 +102,7 @@ namespace MonoDevelop.VersionControl
 		{
 		}
 		
-		public override Annotation[] GetAnnotations (MonoDevelop.Core.FilePath repositoryPath)
+		public override Annotation[] GetAnnotations (FilePath repositoryPath)
 		{
 			return new Annotation[0];
 		}

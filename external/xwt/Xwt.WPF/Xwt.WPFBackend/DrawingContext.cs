@@ -60,7 +60,16 @@ namespace Xwt.WPFBackend
 			}
 		}
 
-		public SWM.Matrix CurrentTransform {
+		public SWM.SolidColorBrush ColorBrush
+		{
+			get
+			{
+				return colorBrush;
+			}
+		}
+
+		public SWM.Matrix CurrentTransform
+		{
 			get {
 				TransformCollection children = transforms.Children;
 				Matrix ctm = Matrix.Identity;
@@ -108,6 +117,13 @@ namespace Xwt.WPFBackend
 		internal DrawingContext()
 		{
 			ResetPath ();
+		}
+
+		public void AppendPath (DrawingContext context)
+		{
+			foreach (var f in context.Geometry.Figures)
+				geometry.Figures.Add (f.Clone ());
+			Path = context.geometry.Figures[context.geometry.Figures.Count - 1];
 		}
 
 		public void Save ()

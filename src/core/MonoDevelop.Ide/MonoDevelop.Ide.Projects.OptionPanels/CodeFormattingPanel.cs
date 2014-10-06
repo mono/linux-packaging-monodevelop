@@ -272,18 +272,18 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 			this.panel = panel;
 			this.dialog = dialog;
 			
-			store = new Gtk.ListStore (typeof(MimeTypePanelData), typeof(Gdk.Pixbuf), typeof(string));
+			store = new Gtk.ListStore (typeof(MimeTypePanelData), typeof(Xwt.Drawing.Image), typeof(string));
 			tree.Model = store;
 			
 			boxButtons.Visible = panel.DataObject is PolicySet;
 			Gtk.CellRendererText crt = new Gtk.CellRendererText ();
-			Gtk.CellRendererPixbuf crp = new Gtk.CellRendererPixbuf ();
+			CellRendererImage crp = new CellRendererImage ();
 			
 			Gtk.TreeViewColumn col = new Gtk.TreeViewColumn ();
 			col.Title = GettextCatalog.GetString ("File Type");
 			col.PackStart (crp, false);
 			col.PackStart (crt, true);
-			col.AddAttribute (crp, "pixbuf", 1);
+			col.AddAttribute (crp, "image", 1);
 			col.AddAttribute (crt, "text", 2);
 			tree.AppendColumn (col);
 			store.SetSortColumnId (2, Gtk.SortType.Ascending);
@@ -367,7 +367,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 		void Fill ()
 		{
 			foreach (MimeTypePanelData mt in panel.GetMimeTypeData ()) {
-				store.AppendValues (mt, DesktopService.GetPixbufForType (mt.MimeType, Gtk.IconSize.Menu), mt.TypeDescription);
+				store.AppendValues (mt, DesktopService.GetIconForType (mt.MimeType, Gtk.IconSize.Menu), mt.TypeDescription);
 			}
 		}
 		
@@ -391,7 +391,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 			try {
 				if (MessageService.RunCustomDialog (dlg, this.Toplevel as Gtk.Window) == (int) Gtk.ResponseType.Ok) {
 					MimeTypePanelData mt = panel.AddGlobalMimeType (dlg.MimeType);
-					store.AppendValues (mt, DesktopService.GetPixbufForType (mt.MimeType, Gtk.IconSize.Menu), mt.TypeDescription);
+					store.AppendValues (mt, DesktopService.GetIconForType (mt.MimeType, Gtk.IconSize.Menu), mt.TypeDescription);
 				}
 			} finally {
 				dlg.Destroy ();

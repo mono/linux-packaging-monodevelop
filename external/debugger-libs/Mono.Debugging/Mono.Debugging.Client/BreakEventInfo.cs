@@ -125,13 +125,6 @@ namespace Mono.Debugging.Client
 				BreakEvent.NotifyUpdate ();
 			}
 		}
-
-		[Obsolete ("Use IncrementHitCount() instead")]
-		public void UpdateHitCount (int count)
-		{
-			BreakEvent.CurrentHitCount = count;
-			BreakEvent.NotifyUpdate ();
-		}
 		
 		public void SetStatus (BreakEventStatus s, string statusMessage)
 		{
@@ -157,7 +150,7 @@ namespace Mono.Debugging.Client
 				if (session.BreakpointTraceHandler != null)
 					session.BreakpointTraceHandler (BreakEvent, value);
 				else
-					session.OnDebuggerOutput (false, value + "\n");
+					session.OnTargetDebug (0, "", value + Environment.NewLine);
 			}
 		}
 	}

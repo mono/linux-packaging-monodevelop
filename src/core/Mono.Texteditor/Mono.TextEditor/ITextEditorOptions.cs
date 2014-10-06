@@ -79,7 +79,6 @@ namespace Mono.TextEditor
 
 		bool DrawIndentationMarkers { get; set; }
 
-		bool UseAntiAliasing { get; set; }
 		bool WrapLines { get; set; }
 		string FontName { get;  set; }
 		Pango.FontDescription Font { get;  }
@@ -92,6 +91,8 @@ namespace Mono.TextEditor
 
 		ShowWhitespaces ShowWhitespaces { get; set; }
 		IncludeWhitespaces IncludeWhitespaces { get; set; }
+
+		bool GenerateFormattingUndoStep { get; set; }
 		ColorScheme GetColorStyle ();
 		
 		event EventHandler Changed;

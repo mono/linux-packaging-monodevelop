@@ -43,6 +43,8 @@ using MonoDevelop.Ide;
 using MonoDevelop.Projects;
 using Mono.TextEditor;
 using System.Linq;
+using MonoDevelop.Components;
+using MonoDevelop.Ide.Commands;
 
 namespace MonoDevelop.NUnit
 {
@@ -78,7 +80,7 @@ namespace MonoDevelop.NUnit
 		
 		ArrayList testNavigationHistory = new ArrayList ();
 
-		Button buttonRunAll, buttonRun, buttonStop;
+		Button buttonRunAll, buttonStop;
 		
 		public override void Initialize (NodeBuilder[] builders, TreePadOption[] options, string menuPath)
 		{
@@ -90,20 +92,17 @@ namespace MonoDevelop.NUnit
 			
 			VBox vbox = new VBox ();
 			DockItemToolbar topToolbar = Window.GetToolbar (PositionType.Top);
-			
-			buttonRunAll = new Button (new Gtk.Image (Gtk.Stock.GoUp, IconSize.Menu));
+
+			var hbox = new HBox { Spacing = 6 };
+			hbox.PackStart (new ImageView (ImageService.GetIcon ("nunit-run", IconSize.Menu)), false, false, 0);
+			hbox.PackStart (new Label (GettextCatalog.GetString ("Run All")), false, false, 0);
+			buttonRunAll = new Button (hbox);
 			buttonRunAll.Clicked += new EventHandler (OnRunAllClicked);
 			buttonRunAll.Sensitive = true;
 			buttonRunAll.TooltipText = GettextCatalog.GetString ("Run all tests");
 			topToolbar.Add (buttonRunAll);
 			
-			buttonRun = new Button (new Gtk.Image (Gtk.Stock.Execute, IconSize.Menu));
-			buttonRun.Clicked += new EventHandler (OnRunClicked);
-			buttonRun.Sensitive = true;
-			buttonRun.TooltipText = GettextCatalog.GetString ("Run test");
-			topToolbar.Add (buttonRun);
-			
-			buttonStop = new Button (new Gtk.Image (Gtk.Stock.Stop, IconSize.Menu));
+			buttonStop = new Button (new Gtk.Image (Ide.Gui.Stock.Stop, IconSize.Menu));
 			buttonStop.Clicked += new EventHandler (OnStopClicked);
 			buttonStop.Sensitive = false;
 			buttonStop.TooltipText = GettextCatalog.GetString ("Cancel running test");
@@ -202,7 +201,7 @@ namespace MonoDevelop.NUnit
 			TreeViewColumn col3 = new TreeViewColumn ();
 			col3.Expand = false;
 //			col3.Alignment = 0.5f;
-			col3.Widget = new Gtk.Image (CircleImage.Success);
+			col3.Widget = new ImageView (TestStatusIcon.Success);
 			col3.Widget.Show ();
 			tr = new CellRendererText ();
 //			tr.Xalign = 0.5f;
@@ -213,7 +212,7 @@ namespace MonoDevelop.NUnit
 			TreeViewColumn col4 = new TreeViewColumn ();
 			col4.Expand = false;
 //			col4.Alignment = 0.5f;
-			col4.Widget = new Gtk.Image (CircleImage.Failure);
+			col4.Widget = new ImageView (TestStatusIcon.Failure);
 			col4.Widget.Show ();
 			tr = new CellRendererText ();
 //			tr.Xalign = 0.5f;
@@ -224,7 +223,7 @@ namespace MonoDevelop.NUnit
 			TreeViewColumn col5 = new TreeViewColumn ();
 			col5.Expand = false;
 //			col5.Alignment = 0.5f;
-			col5.Widget = new Gtk.Image (CircleImage.NotRun);
+			col5.Widget = new ImageView (TestStatusIcon.NotRun);
 			col5.Widget.Show ();
 			tr = new CellRendererText ();
 //			tr.Xalign = 0.5f;
@@ -256,14 +255,14 @@ namespace MonoDevelop.NUnit
 			regressionTree = new TreeView ();
 			regressionTree.HeadersVisible = false;
 			regressionTree.RulesHint = true;
-			regressionStore = new ListStore (typeof(object), typeof(string), typeof (Pixbuf));
+			regressionStore = new ListStore (typeof(object), typeof(string), typeof (Xwt.Drawing.Image));
 			
 			CellRendererText trtest2 = new CellRendererText ();
-			var pr = new CellRendererPixbuf ();
+			var pr = new CellRendererImage ();
 			
 			TreeViewColumn col = new TreeViewColumn ();
 			col.PackStart (pr, false);
-			col.AddAttribute (pr, "pixbuf", 2);
+			col.AddAttribute (pr, "image", 2);
 			col.PackStart (trtest2, false);
 			col.AddAttribute (trtest2, "markup", 1);
 			regressionTree.AppendColumn (col);
@@ -281,14 +280,14 @@ namespace MonoDevelop.NUnit
 			failedTree = new TreeView ();
 			failedTree.HeadersVisible = false;
 			failedTree.RulesHint = true;
-			failedStore = new ListStore (typeof(object), typeof(string), typeof (Pixbuf));
+			failedStore = new ListStore (typeof(object), typeof(string), typeof (Xwt.Drawing.Image));
 			
 			trtest2 = new CellRendererText ();
-			pr = new CellRendererPixbuf ();
+			pr = new CellRendererImage ();
 			
 			col = new TreeViewColumn ();
 			col.PackStart (pr, false);
-			col.AddAttribute (pr, "pixbuf", 2);
+			col.AddAttribute (pr, "image", 2);
 			col.PackStart (trtest2, false);
 			col.AddAttribute (trtest2, "markup", 1);
 			failedTree.AppendColumn (col);
@@ -461,11 +460,6 @@ namespace MonoDevelop.NUnit
 				runningTestOperation.Cancel ();
 		}
 		
-		void OnRunClicked (object sender, EventArgs args)
-		{
-			RunSelectedTest (null);
-		}
-			
 		UnitTest GetSelectedTest ()
 		{
 			ITreeNavigator nav = TreeView.GetSelectedNode ();
@@ -473,23 +467,29 @@ namespace MonoDevelop.NUnit
 				return null;
 			return nav.DataItem as UnitTest;
 		}
-		
-		void RunTest (ITreeNavigator nav, IExecutionHandler mode)
+
+		public IAsyncOperation RunTest (UnitTest test, IExecutionHandler mode)
+		{
+			return RunTest (FindTestNode (test), mode, false);
+		}
+
+		IAsyncOperation RunTest (ITreeNavigator nav, IExecutionHandler mode, bool bringToFront = true)
 		{
 			if (nav == null)
-				return;
+				return null;
 			UnitTest test = nav.DataItem as UnitTest;
 			if (test == null)
-				return;
+				return null;
 			NUnitService.ResetResult (test.RootTest);
 			
-			this.buttonRun.Sensitive = false;
 			this.buttonRunAll.Sensitive = false;
 			this.buttonStop.Sensitive = true;
-			
-			IdeApp.Workbench.GetPad<TestPad> ().BringToFront ();
+
+			if (bringToFront)
+				IdeApp.Workbench.GetPad<TestPad> ().BringToFront ();
 			runningTestOperation = testService.RunTest (test, mode);
-			runningTestOperation.Completed += (OperationHandler) DispatchService.GuiDispatch (new OperationHandler (TestSessionCompleted));
+			runningTestOperation.Completed += (OperationHandler) DispatchService.GuiDispatch (new OperationHandler (OnTestSessionCompleted));
+			return runningTestOperation;
 		}
 		
 		void OnRunAllClicked (object sender, EventArgs args)
@@ -502,16 +502,17 @@ namespace MonoDevelop.NUnit
 			RunTest (TreeView.GetSelectedNode (), mode);
 		}
 		
-		void TestSessionCompleted (IAsyncOperation op)
+		void OnTestSessionCompleted (IAsyncOperation op)
 		{
 			if (op.Success)
 				RefreshDetails ();
 			runningTestOperation = null;
-			this.buttonRun.Sensitive = true;
 			this.buttonRunAll.Sensitive = true;
 			this.buttonStop.Sensitive = false;
+
 		}
-		
+
+
 		protected override void OnSelectionChanged (object sender, EventArgs args)
 		{
 			base.OnSelectionChanged (sender, args);
@@ -635,7 +636,7 @@ namespace MonoDevelop.NUnit
 					UnitTestCollection regs = detailsTest.GetRegressions (chart.ReferenceDate, chart.CurrentDate);
 					if (regs.Count > 0) {
 						foreach (UnitTest t in regs)
-							regressionStore.AppendValues (t, t.Name, CircleImage.Failure);
+							regressionStore.AppendValues (t, t.Name, TestStatusIcon.Failure);
 					} else
 						regressionStore.AppendValues (null, GettextCatalog.GetString ("No regressions found."));
 				}
@@ -644,7 +645,7 @@ namespace MonoDevelop.NUnit
 					UnitTestCollection regs = group.GetFailedTests (chart.CurrentDate);
 					if (regs.Count > 0) {
 						foreach (UnitTest t in regs)
-							failedStore.AppendValues (t, t.Name, CircleImage.Failure);
+							failedStore.AppendValues (t, t.Name, TestStatusIcon.Failure);
 					} else
 						failedStore.AppendValues (null, GettextCatalog.GetString ("No failed tests found."));
 				}

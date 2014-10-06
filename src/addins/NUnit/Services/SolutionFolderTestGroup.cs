@@ -33,6 +33,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Projects;
 
 using NUnit.Core;
+using MonoDevelop.Ide.TypeSystem;
 
 namespace MonoDevelop.NUnit
 {
@@ -43,8 +44,8 @@ namespace MonoDevelop.NUnit
 		public SolutionFolderTestGroup (SolutionFolder c): base (c.Name, c)
 		{
 			string storeId = c.ItemId;
-			string resultsPath = Path.Combine (c.BaseDirectory, "test-results");
-			ResultsStore = new XmlResultsStore (resultsPath, storeId);
+			string resultsPath = MonoDevelop.NUnit.RootTest.GetTestResultsDirectory (c.BaseDirectory);
+			ResultsStore = new BinaryResultsStore (resultsPath, storeId);
 			
 			combine = c;
 			combine.ItemAdded += OnEntryChanged;

@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2005-2011 Jeroen Frijters
+  Copyright (C) 2005-2013 Jeroen Frijters
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -23,11 +23,11 @@
 */
 package ikvm.internal;
 
-import cli.System.Reflection.BindingFlags;
 import ikvm.lang.CIL;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
+import java.lang.reflect.GenericSignatureFormatError;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -36,13 +36,15 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.HashMap;
+import sun.reflect.annotation.TypeNotPresentExceptionProxy;
 
 public abstract class AnnotationAttributeBase
     extends cli.System.Attribute
     implements Annotation, Serializable
 {
-    private final HashMap values = new HashMap();
     private final Class annotationType;
+    private HashMap<String, Object> values;
+    private Object[] definition;
     private boolean frozen;
 
     protected AnnotationAttributeBase(Class annotationType)
@@ -106,7 +108,7 @@ public abstract class AnnotationAttributeBase
 
     protected final synchronized void setValue(String name, Object value)
     {
-        if(frozen)
+        if(frozen || definition != null)
         {
             throw new IllegalStateException("Annotation properties have already been defined");
         }
@@ -115,7 +117,7 @@ public abstract class AnnotationAttributeBase
             Class type = annotationType.getMethod(name).getReturnType();
             if(type.isEnum())
             {
-                value = type.getMethod("valueOf", String.class).invoke(null, value.toString());
+                value = Enum.valueOf(type, value.toString());
             }
             else if(type == Class.class)
             {
@@ -162,12 +164,11 @@ public abstract class AnnotationAttributeBase
                 type = type.getComponentType();
                 if(type.isEnum())
                 {
-                    Method valueOf = type.getMethod("valueOf", String.class);
                     cli.System.Array orgarray = (cli.System.Array)value;
                     Object[] array = (Object[])Array.newInstance(type, orgarray.get_Length());
                     for(int i = 0; i < array.length; i++)
                     {
-                        array[i] = valueOf.invoke(null, orgarray.GetValue(i).toString());
+                        array[i] = Enum.valueOf(type, orgarray.GetValue(i).toString());
                     }
                     value = array;
                 }
@@ -190,47 +191,54 @@ public abstract class AnnotationAttributeBase
             {
                 throw new InternalError("Invalid annotation type: " + type);
             }
+            if(values == null)
+            {
+                values = new HashMap<String, Object>();
+            }
             values.put(name, value);
         }
         catch (NoSuchMethodException x)
         {
             throw (NoSuchMethodError)new NoSuchMethodError().initCause(x);
         }
-        catch (IllegalAccessException x)
-        {
-            throw (IllegalAccessError)new IllegalAccessError().initCause(x);
-        }
-        catch (InvocationTargetException x)
-        {
-            throw (InternalError)new InternalError().initCause(x);
-        }
     }
 
     protected final synchronized void setDefinition(Object[] array)
     {
-        if(frozen)
+        if(frozen || definition != null)
         {
             throw new IllegalStateException("Annotation properties have already been defined");
         }
-        frozen = true;
-        // TODO consider checking that the type matches
-        // (or better yet (?), remove the first two redundant elements from the array)
-        decodeValues(values, annotationType, annotationType.getClassLoader(), array);
+        definition = array;
     }
 
     @ikvm.lang.Internal
-    public Map getValues()
+    public final Map getValues()
     {
         return values;
     }
 
     @ikvm.lang.Internal
-    public synchronized void freeze()
+    public final synchronized void freeze()
     {
         if(!frozen)
         {
             frozen = true;
-            setDefaults(values, annotationType);
+            if(values == null)
+            {
+                values = new HashMap<String, Object>();
+            }
+            if(definition == null)
+            {
+                setDefaults(values, annotationType);
+            }
+            else
+            {
+                // TODO consider checking that the type matches
+                // (or better yet (?), remove the first two redundant elements from the array)
+                decodeValues(values, annotationType, annotationType.getClassLoader(), definition);
+                definition = null;
+            }
         }
     }
 
@@ -251,8 +259,7 @@ public abstract class AnnotationAttributeBase
             }
             catch (NoSuchMethodException x)
             {
-                // TODO this probably isn't the right exception
-                throw new IncompatibleClassChangeError("Method " + name + " is missing in annotation " + annotationClass.getName());
+                // ignore values for members that are no longer present
             }
         }
         setDefaults(map, annotationClass);
@@ -273,15 +280,7 @@ public abstract class AnnotationAttributeBase
 
     private static Class classFromSig(ClassLoader loader, String name)
     {
-        if (name.startsWith("L") && name.endsWith(";"))
-        {
-            name = name.substring(1, name.length() - 1).replace('/', '.');
-        }
-        else if (name.startsWith("["))
-        {
-            name = name.replace('/', '.');
-        }
-        else if (name.length() == 1)
+        if (name.length() == 1)
         {
             switch (name.charAt(0))
             {
@@ -304,8 +303,22 @@ public abstract class AnnotationAttributeBase
                 case 'V':
                     return Void.TYPE;
                 default:
-                    throw new TypeNotPresentException(name, null);
+                    throw new GenericSignatureFormatError();
             }
+        }
+
+        if (!isValidTypeSig(name, 0, name.length()))
+        {
+            throw new GenericSignatureFormatError();
+        }
+
+        if (name.charAt(0) == 'L')
+        {
+            name = name.substring(1, name.length() - 1).replace('/', '.');
+        }
+        else // must be an array then
+        {
+            name = name.replace('/', '.');
         }
         try
         {
@@ -317,6 +330,41 @@ public abstract class AnnotationAttributeBase
         }
     }
 
+    private static boolean isValidTypeSig(String sig, int start, int end)
+    {
+        if (start >= end)
+        {
+            return false;
+        }
+        switch (sig.charAt(start))
+        {
+            case 'L':
+                return sig.indexOf(';', start + 1) == end - 1;
+            case '[':
+                while (sig.charAt(start) == '[')
+                {
+                    start++;
+                    if (start == end)
+                    {
+                        return false;
+                    }
+                }
+                return isValidTypeSig(sig, start, end);
+            case 'B':
+            case 'Z':
+            case 'C':
+            case 'S':
+            case 'I':
+            case 'J':
+            case 'F':
+            case 'D':
+                return start == end - 1;
+            default:
+                return false;
+        }
+    }
+
+    @ikvm.lang.Internal
     public static Object newAnnotation(ClassLoader loader, Object definition)
     {
         Object[] array = (Object[])definition;
@@ -328,6 +376,10 @@ public abstract class AnnotationAttributeBase
         if (classNameOrClass instanceof String)
         {
             annotationClass = classFromSig(loader, (String)classNameOrClass);
+            if (!annotationClass.isAnnotation())
+            {
+                return null;
+            }
             array[1] = annotationClass;
         }
         else
@@ -339,6 +391,7 @@ public abstract class AnnotationAttributeBase
         return Proxy.newProxyInstance(annotationClass.getClassLoader(), new Class<?>[] { annotationClass }, newAnnotationInvocationHandler(annotationClass, map));
     }
 
+    @ikvm.lang.Internal
     public static Object decodeElementValue(Object obj, Class type, ClassLoader loader)
         throws IllegalAccessException
     {
@@ -348,7 +401,10 @@ public abstract class AnnotationAttributeBase
             try
             {
                 Object[] error = (Object[])obj;
-                t = (Throwable)Class.forName((String)error[1]).getConstructor(String.class).newInstance(error[2]);
+                Class exception = Class.forName((String)error[1]);
+                t = (Throwable)(error.length == 2
+                    ? exception.newInstance()
+                    : exception.getConstructor(String.class).newInstance(error[2]));
             }
             catch (Exception x)
             {
@@ -398,7 +454,14 @@ public abstract class AnnotationAttributeBase
             byte tag = CIL.unbox_byte(array[0]);
             if (tag != 'c')
                 throw new ClassCastException();
-            return classFromSig(loader, (String)array[1]);
+            try
+            {
+                return classFromSig(loader, (String)array[1]);
+            }
+            catch (TypeNotPresentException x)
+            {
+                return new TypeNotPresentExceptionProxy(x.typeName(), x);
+            }
         }
         else if (type.isArray())
         {
@@ -410,13 +473,18 @@ public abstract class AnnotationAttributeBase
             Object dst = Array.newInstance(type, array.length - 1);
             for (int i = 0; i < array.length - 1; i++)
             {
-                Array.set(dst, i, decodeElementValue(array[i + 1], type, loader));
+                Object val = decodeElementValue(array[i + 1], type, loader);
+                try
+                {
+                    Array.set(dst, i, val);
+                }
+                catch (IllegalArgumentException _)
+                {
+                    // JDKBUG emulate JDK bug
+                    throw new ArrayStoreException(val.getClass().getName());
+                }
             }
             return dst;
-        }
-        else if (type.isAnnotation())
-        {
-            return type.cast(newAnnotation(loader, obj));
         }
         else if (type.isEnum())
         {
@@ -424,7 +492,15 @@ public abstract class AnnotationAttributeBase
             byte tag = CIL.unbox_byte(array[0]);
             if (tag != 'e')
                 throw new ClassCastException();
-            Class enumClass = classFromSig(loader, (String)array[1]);
+            Class enumClass;
+            try
+            {
+                enumClass = classFromSig(loader, (String)array[1]);
+            }
+            catch (TypeNotPresentException x)
+            {
+                return new TypeNotPresentExceptionProxy(x.typeName(), x);
+            }
             try
             {
                 return Enum.valueOf(enumClass, (String)array[2]);
@@ -434,32 +510,29 @@ public abstract class AnnotationAttributeBase
                 throw new EnumConstantNotPresentException(enumClass, (String)array[2]);
             }
         }
-        else
+        else // must be an annotation then
         {
-            throw new ClassCastException();
+            Object ann = newAnnotation(loader, obj);
+            if (!type.isInstance(ann))
+            {
+                // JDKBUG if newAnnotation() returns null (because the class is not an annotation),
+                // the next line will throw a NullPointerException (similar to the JDK)
+                return newAnnotationTypeMismatchExceptionProxy(ann.getClass() + "[" + ann + "]");
+            }
+            return ann;
         }
     }
 
-    protected final Object writeReplace()
+    private final Object writeReplace()
     {
+        freeze();
 	return Proxy.newProxyInstance(annotationType.getClassLoader(),
 	    new Class[] { annotationType },
 	    newAnnotationInvocationHandler(annotationType, values));
     }
 
-    private static cli.System.Reflection.ConstructorInfo annotationInvocationHandlerConstructor;
-
-    private static InvocationHandler newAnnotationInvocationHandler(Class type, Map memberValues)
-    {
-	if (annotationInvocationHandlerConstructor == null)
-	{
-	    cli.System.Type typeofClass = cli.System.Type.GetType("java.lang.Class");
-	    cli.System.Type typeofMap = cli.System.Type.GetType("java.util.Map");
-	    annotationInvocationHandlerConstructor = cli.System.Type.GetType("sun.reflect.annotation.AnnotationInvocationHandler")
-		.GetConstructor(BindingFlags.wrap(BindingFlags.Instance | BindingFlags.NonPublic), null, new cli.System.Type[] { typeofClass, typeofMap }, null);
-	}
-	return (InvocationHandler)annotationInvocationHandlerConstructor.Invoke(new Object[] { type, memberValues });
-    }
+    private static native InvocationHandler newAnnotationInvocationHandler(Class type, Map memberValues);
+    private static native Object newAnnotationTypeMismatchExceptionProxy(String msg);
 
     public final Class<? extends Annotation> annotationType()
     {
@@ -468,16 +541,19 @@ public abstract class AnnotationAttributeBase
 
     public final boolean Equals(Object o)
     {
+        freeze();
         return equals(annotationType, values, o);
     }
 
     public final int GetHashCode()
     {
+        freeze();
         return hashCode(annotationType, values);
     }
 
     public final String ToString()
     {
+        freeze();
         return toString(annotationType, values);
     }
 

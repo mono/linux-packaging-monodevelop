@@ -25,9 +25,8 @@
 //
 //
 
-using System;
-using MonoDevelop.Projects;
 using System.Collections.Generic;
+using System.Linq;
 using MonoDevelop.Core;
 
 namespace MonoDevelop.VersionControl
@@ -45,9 +44,8 @@ namespace MonoDevelop.VersionControl
 				}
 				list.Add (it);
 			}
-			VersionControlItemList[] arr = new VersionControlItemList [t.Count];
-			t.Values.CopyTo (arr, 0);
-			return arr;
+
+			return t.Values.ToArray ();
 		}
 
 		public VersionControlItemList GetFiles ()

@@ -43,8 +43,60 @@ namespace MonoDevelop.Ide.FindInFiles
 		{
 			if (a == null && b == null) return true;
 			if (a == null || b == null) return false;
-			return ParameterListComparer.Instance.Equals (a.Parameters, b.Parameters);
+
+			return Equals (a.Compilation, a.Parameters, b.Parameters);
 		}
+
+		#region Code from NRefactory ParameterListComparer
+
+		public static bool Equals(ICompilation comp, IList<IParameter> x, IList<IParameter> y)
+		{
+			if (x == y)
+				return true;
+			if (x == null || y == null || x.Count != y.Count)
+				return false;
+			for (int i = 0; i < x.Count; i++) {
+				var a = x[i];
+				var b = y[i];
+				if (a == null && b == null)
+					continue;
+				if (a == null || b == null)
+					return false;
+
+				// We want to consider the parameter lists "Method<T>(T a)" and "Method<S>(S b)" as equal.
+				// However, the parameter types are not considered equal, as T is a different type parameter than S.
+				// In order to compare the method signatures, we will normalize all method type parameters.
+				IType aType = a.Type.AcceptVisitor(normalizationVisitor);
+				IType bType = b.Type.AcceptVisitor(normalizationVisitor);
+				bType = comp.Import (bType);
+				if (!aType.Equals(bType))
+					return false;
+			}
+			return true;
+		}
+
+		sealed class NormalizeTypeVisitor : TypeVisitor
+		{
+			public override IType VisitTypeParameter(ITypeParameter type)
+			{
+				if (type.OwnerType == SymbolKind.Method) {
+					return ICSharpCode.NRefactory.TypeSystem.Implementation.DummyTypeParameter.GetMethodTypeParameter(type.Index);
+				} else {
+					return base.VisitTypeParameter(type);
+				}
+			}
+
+			public override IType VisitTypeDefinition(ITypeDefinition type)
+			{
+				if (type.KnownTypeCode == KnownTypeCode.Object)
+					return SpecialType.Dynamic;
+				return base.VisitTypeDefinition(type);
+			}
+		}
+
+		static readonly NormalizeTypeVisitor normalizationVisitor = new NormalizeTypeVisitor();
+
+		#endregion
 
 		/// <summary>
 		/// find all base types(types that are not derived from other types) in the specified types
@@ -86,7 +138,6 @@ namespace MonoDevelop.Ide.FindInFiles
 			if (member.SymbolKind == SymbolKind.Property || !(member is IParameterizedMember)) {
 				members = members.Where (m => m == member || m.DeclaringType.Kind == TypeKind.Interface);
 			}*/
-
 			if (filter != null)
 				members = members.Where (filter);
 			return members;
@@ -102,7 +153,7 @@ namespace MonoDevelop.Ide.FindInFiles
 		/// in the inheritance tree
 		/// </summary>
 		public static IEnumerable<IMember> CollectMembers (Solution solution, IMember member, ReferenceFinder.RefactoryScope scope,
-														   bool includeOverloads = true, bool matchDeclaringType = false)
+			bool includeOverloads = true, bool matchDeclaringType = false)
 		{
 			if (solution == null || member.SymbolKind == SymbolKind.Destructor || member.SymbolKind == SymbolKind.Operator)
 				return new [] { member };
@@ -128,10 +179,12 @@ namespace MonoDevelop.Ide.FindInFiles
 				return GetMembers (declaringType, member, false, memberFilter);
 
 			var searchTypes = new List<ITypeDefinition> ();
-			var interfaces = from t in declaringType.GetAllBaseTypeDefinitions ()
-							 where t.Kind == TypeKind.Interface && GetMembers (t, member, true, memberFilter).Any ()
-							 select t;
-			searchTypes.AddRange (GetBaseTypes (interfaces));
+			if (includeOverloads) {
+				var interfaces = from t in declaringType.GetAllBaseTypeDefinitions ()
+								 where t.Kind == TypeKind.Interface && GetMembers (t, member, true, memberFilter).Any ()
+								 select t;
+				searchTypes.AddRange (GetBaseTypes (interfaces));
+			}
 
 			if (member.DeclaringType.Kind == TypeKind.Class) {
 				var members = GetMembers (declaringType, member, false, memberFilter).ToList ();
@@ -173,6 +226,8 @@ namespace MonoDevelop.Ide.FindInFiles
 					}
 				}
 			}
+			if (!result.Contains (member))
+				result.Add (member);
 			return result;
 		}
 	

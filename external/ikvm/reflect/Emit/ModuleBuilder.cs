@@ -140,7 +140,7 @@ namespace IKVM.Reflection.Emit
 			public override bool Equals(object obj)
 			{
 				MemberRefKey? other = obj as MemberRefKey?;
-				return other != null && Equals(other);
+				return other != null && Equals(other.Value);
 			}
 
 			public override int GetHashCode()
@@ -180,7 +180,7 @@ namespace IKVM.Reflection.Emit
 			public override bool Equals(object obj)
 			{
 				MethodSpecKey? other = obj as MethodSpecKey?;
-				return other != null && Equals(other);
+				return other != null && Equals(other.Value);
 			}
 
 			public override int GetHashCode()
@@ -384,16 +384,16 @@ namespace IKVM.Reflection.Emit
 			moduleType.CreateType();
 		}
 
-		internal void AddTypeForwarder(Type type)
+		internal void AddTypeForwarder(Type type, bool includeNested)
 		{
 			ExportType(type);
-			if (!type.__IsMissing)
+			if (includeNested && !type.__IsMissing)
 			{
 				foreach (Type nested in type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic))
 				{
 					// we export all nested types (i.e. even the private ones)
 					// (this behavior is the same as the C# compiler)
-					AddTypeForwarder(nested);
+					AddTypeForwarder(nested, true);
 				}
 			}
 		}
@@ -401,8 +401,11 @@ namespace IKVM.Reflection.Emit
 		private int ExportType(Type type)
 		{
 			ExportedTypeTable.Record rec = new ExportedTypeTable.Record();
-			// HACK we should *not* set the TypeDefId in this case, but 2.0 and 3.5 peverify gives a warning if it is missing (4.5 doesn't)
-			rec.TypeDefId = type.MetadataToken;
+			if (asm.ImageRuntimeVersion == "v2.0.50727")
+			{
+				// HACK we should *not* set the TypeDefId in this case, but 2.0 and 3.5 peverify gives a warning if it is missing (4.5 doesn't)
+				rec.TypeDefId = type.MetadataToken;
+			}
 			rec.TypeName = this.Strings.Add(type.__Name);
 			string ns = type.__Namespace;
 			rec.TypeNamespace = ns == null ? 0 : this.Strings.Add(ns);
@@ -431,7 +434,6 @@ namespace IKVM.Reflection.Emit
 
 		internal void SetCustomAttribute(int token, CustomAttributeBuilder customBuilder)
 		{
-			Debug.Assert(!customBuilder.IsPseudoCustomAttribute);
 			CustomAttributeTable.Record rec = new CustomAttributeTable.Record();
 			rec.Parent = token;
 			rec.Type = asm.IsWindowsRuntime ? customBuilder.Constructor.ImportTo(this) : GetConstructorToken(customBuilder.Constructor).Token;
@@ -439,14 +441,19 @@ namespace IKVM.Reflection.Emit
 			this.CustomAttribute.AddRecord(rec);
 		}
 
-		internal void AddDeclarativeSecurity(int token, System.Security.Permissions.SecurityAction securityAction, System.Security.PermissionSet permissionSet)
+		private void AddDeclSecurityRecord(int token, int action, int blob)
 		{
 			DeclSecurityTable.Record rec = new DeclSecurityTable.Record();
-			rec.Action = (short)securityAction;
+			rec.Action = (short)action;
 			rec.Parent = token;
-			// like Ref.Emit, we're using the .NET 1.x xml format
-			rec.PermissionSet = this.Blobs.Add(ByteBuffer.Wrap(System.Text.Encoding.Unicode.GetBytes(permissionSet.ToXml().ToString())));
+			rec.PermissionSet = blob;
 			this.DeclSecurity.AddRecord(rec);
+		}
+
+		internal void AddDeclarativeSecurity(int token, System.Security.Permissions.SecurityAction securityAction, System.Security.PermissionSet permissionSet)
+		{
+			// like Ref.Emit, we're using the .NET 1.x xml format
+			AddDeclSecurityRecord(token, (int)securityAction, this.Blobs.Add(ByteBuffer.Wrap(System.Text.Encoding.Unicode.GetBytes(permissionSet.ToXml().ToString()))));
 		}
 
 		internal void AddDeclarativeSecurity(int token, List<CustomAttributeBuilder> declarativeSecurity)
@@ -464,6 +471,11 @@ namespace IKVM.Reflection.Emit
 				{
 					action = (int)cab.GetConstructorArgument(0);
 				}
+				if (cab.IsLegacyDeclSecurity)
+				{
+					AddDeclSecurityRecord(token, action, cab.WriteLegacyDeclSecurityBlob(this));
+					continue;
+				}
 				List<CustomAttributeBuilder> list;
 				if (!ordered.TryGetValue(action, out list))
 				{
@@ -474,22 +486,12 @@ namespace IKVM.Reflection.Emit
 			}
 			foreach (KeyValuePair<int, List<CustomAttributeBuilder>> kv in ordered)
 			{
-				DeclSecurityTable.Record rec = new DeclSecurityTable.Record();
-				rec.Action = (short)kv.Key;
-				rec.Parent = token;
-				rec.PermissionSet = WriteDeclSecurityBlob(kv.Value);
-				this.DeclSecurity.AddRecord(rec);
+				AddDeclSecurityRecord(token, kv.Key, WriteDeclSecurityBlob(kv.Value));
 			}
 		}
 
 		private int WriteDeclSecurityBlob(List<CustomAttributeBuilder> list)
 		{
-			string xml;
-			if (list.Count == 1 && (xml = list[0].GetLegacyDeclSecurity()) != null)
-			{
-				// write .NET 1.1 format
-				return this.Blobs.Add(ByteBuffer.Wrap(System.Text.Encoding.Unicode.GetBytes(xml)));
-			}
 			ByteBuffer namedArgs = new ByteBuffer(100);
 			ByteBuffer bb = new ByteBuffer(list.Count * 100);
 			bb.Write((byte)'.');

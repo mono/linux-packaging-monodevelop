@@ -33,6 +33,8 @@ using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using MonoDevelop.Components.Commands;
 using ICSharpCode.NRefactory;
+using System.Linq;
+using ICSharpCode.NRefactory.Refactoring;
 
 namespace MonoDevelop.SourceEditor.QuickTasks
 {
@@ -40,6 +42,8 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 	{
 		// move that one to AnalysisOptions when the new features are enabled by default.
 		public readonly static PropertyWrapper<bool> EnableFancyFeatures = new PropertyWrapper<bool> ("MonoDevelop.AnalysisCore.AnalysisEnabled", false);
+		public readonly static bool MergeScrollBarAndQuickTasks = !Platform.IsMac;
+
 		static QuickTaskStrip ()
 		{
 			EnableFancyFeatures.Changed += delegate {
@@ -83,7 +87,7 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 		}
 		
 		Dictionary<IQuickTaskProvider, List<QuickTask>> providerTasks = new Dictionary<IQuickTaskProvider, List<QuickTask>> ();
-		Dictionary<IUsageProvider, List<DocumentLocation>> providerUsages = new Dictionary<IUsageProvider, List<DocumentLocation>> ();
+		Dictionary<IUsageProvider, List<Usage>> providerUsages = new Dictionary<IUsageProvider, List<Usage>> ();
 
 		public IEnumerable<QuickTask> AllTasks {
 			get {
@@ -96,7 +100,7 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 				}
 			}
 		}
-		public IEnumerable<TextLocation> AllUsages {
+		public IEnumerable<Usage> AllUsages {
 			get {
 				if (providerUsages == null)
 					yield break;
@@ -174,10 +178,10 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 		
 		public void Update (IUsageProvider provider)
 		{
-/*			if (providerTasks == null)
+			if (providerTasks == null)
 				return;
-			providerUsages [provider] = new List<DocumentLocation> (provider.Usages);
-			OnTaskProviderUpdated (EventArgs.Empty);*/
+			providerUsages [provider] = new List<Usage> (provider.Usages);
+			OnTaskProviderUpdated (EventArgs.Empty);
 		}
 
 		protected virtual void OnTaskProviderUpdated (EventArgs e)
@@ -247,6 +251,57 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 		{
 			 ScrollBarMode = ScrollBarMode.Minimap; 
 		}
+
+		internal enum HoverMode { NextMessage, NextWarning, NextError }
+		internal QuickTask SearchNextTask (HoverMode mode)
+		{
+			var curLoc = (TextLocation)TextEditor.Caret.Location;
+			QuickTask firstTask = null;
+			foreach (var task in AllTasks.OrderBy (t => t.Location) ) {
+				bool isNextTask = task.Location > curLoc;
+				if (mode == HoverMode.NextMessage ||
+				    mode == HoverMode.NextWarning && task.Severity == Severity.Warning ||
+				    mode == HoverMode.NextError && task.Severity == Severity.Error) {
+					if (isNextTask)
+						return task;
+					if (firstTask == null)
+						firstTask = task;
+				}
+			}
+			return firstTask;
+		}
+
+		internal QuickTask SearchPrevTask (HoverMode mode)
+		{
+			var curLoc = (TextLocation)TextEditor.Caret.Location;
+			QuickTask firstTask = null;
+			foreach (var task in AllTasks.OrderByDescending (t => t.Location) ) {
+				bool isNextTask = task.Location < curLoc;
+				if (mode == HoverMode.NextMessage ||
+				    mode == HoverMode.NextWarning && task.Severity == Severity.Warning ||
+				    mode == HoverMode.NextError && task.Severity == Severity.Error) {
+					if (isNextTask)
+						return task;
+					if (firstTask == null)
+						firstTask = task;
+				}
+			}
+			return firstTask;
+		}
+
+		internal void GotoTask (QuickTask quickTask)
+		{
+			if (quickTask == null)
+				return;
+			var line = quickTask.Location.Line;
+			if (line < 1 || line >= TextEditor.LineCount)
+				return;
+			TextEditor.Caret.Location = new TextLocation (line, Math.Max (1, quickTask.Location.Column));
+			TextEditor.CenterToCaret ();
+			TextEditor.StartCaretPulseAnimation ();
+			TextEditor.GrabFocus ();
+		}
+
 		#endregion
 	}
 }

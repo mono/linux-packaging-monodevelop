@@ -33,9 +33,9 @@ namespace MonoDevelop.Debugger.Viewers
 {
 	public partial class ValueVisualizerDialog : Gtk.Dialog
 	{
-		List<IValueVisualizer> visualizers;
+		List<ValueVisualizer> visualizers;
 		Gtk.Widget currentWidget;
-		IValueVisualizer currentVisualizer;
+		ValueVisualizer currentVisualizer;
 		ObjectValue value;
 		
 		public ValueVisualizerDialog ()
@@ -46,37 +46,46 @@ namespace MonoDevelop.Debugger.Viewers
 		public void Show (ObjectValue val)
 		{
 			value = val;
-			visualizers = new List<IValueVisualizer> (DebuggingService.GetValueVisualizers (val));
-			visualizers.Sort (delegate (IValueVisualizer v1, IValueVisualizer v2) {
-				return v1.Name.CompareTo (v2.Name);
-			});
-			foreach (IValueVisualizer vis in visualizers)
+			visualizers = new List<ValueVisualizer> (DebuggingService.GetValueVisualizers (val));
+			visualizers.Sort ((v1, v2) => string.Compare (v1.Name, v2.Name, StringComparison.CurrentCultureIgnoreCase));
+
+			int defaultVis = 0;
+			int n = 0;
+
+			foreach (ValueVisualizer vis in visualizers) {
 				comboVisualizers.AppendText (vis.Name);
-			comboVisualizers.Active = 0;
-			if (val.IsReadOnly || !visualizers.Where (v => v.CanEdit (val)).Any ()) {
-				buttonCancel.Hide ();
-				buttonOk.Label = Gtk.Stock.Close;
+				if (vis.IsDefaultVisualizer (val))
+					defaultVis = n;
+				n++;
+			}
+
+			comboVisualizers.Active = defaultVis;
+			if (val.IsReadOnly || !visualizers.Any (v => v.CanEdit (val))) {
+				buttonCancel.Label = Gtk.Stock.Close;
+				buttonSave.Hide ();
 			}
 		}
 		
-		protected virtual void OnComboVisualizersChanged (object sender, System.EventArgs e)
+		protected virtual void OnComboVisualizersChanged (object sender, EventArgs e)
 		{
 			if (currentWidget != null)
 				mainBox.Remove (currentWidget);
+
 			if (comboVisualizers.Active == -1) {
-				buttonOk.Sensitive = false;
+				buttonSave.Sensitive = false;
 				return;
 			}
-			buttonOk.Sensitive = true;
+
 			currentVisualizer = visualizers [comboVisualizers.Active];
 			currentWidget = currentVisualizer.GetVisualizerWidget (value);
+			buttonSave.Sensitive = currentVisualizer.CanEdit (value);
 			mainBox.PackStart (currentWidget, true, true, 0);
 			currentWidget.Show ();
 		}
 		
-		protected virtual void OnButtonOkClicked (object sender, System.EventArgs e)
+		protected virtual void OnSaveClicked (object sender, EventArgs e)
 		{
-			if (value.IsReadOnly || currentVisualizer == null || currentVisualizer.StoreValue (value))
+			if (currentVisualizer == null || currentVisualizer.StoreValue (value))
 				Respond (Gtk.ResponseType.Ok);
 		}
 	}

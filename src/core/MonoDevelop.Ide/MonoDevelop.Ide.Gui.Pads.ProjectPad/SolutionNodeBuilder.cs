@@ -36,6 +36,8 @@ using MonoDevelop.Ide.Commands;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui.Components;
+using System.IO;
+using System.Linq;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
@@ -89,11 +91,11 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			attributes |= NodeAttributes.AllowRename;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			Solution solution = dataObject as Solution;
-			label = GLib.Markup.EscapeText (solution.Name);
-			icon = Context.GetIcon (Stock.Solution);
+			nodeInfo.Label = GLib.Markup.EscapeText (solution.Name);
+			nodeInfo.Icon = Context.GetIcon (Stock.Solution);
 		}
 
 		public override void BuildChildNodes (ITreeBuilder ctx, object dataObject)
@@ -317,6 +319,20 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 					return;
 				}
 			}
+		}
+
+		[CommandHandler (ProjectCommands.EditSolutionItem)]
+		public void OnEditSolution ()
+		{
+			var solution = (Solution) CurrentNode.DataItem;
+			IdeApp.Workbench.OpenDocument (solution.FileName);
+		}
+
+		[CommandUpdateHandler (ProjectCommands.EditSolutionItem)]
+		public void OnEditSolutionUpdate (CommandInfo info)
+		{
+			var solution = (Solution) CurrentNode.DataItem;
+			info.Visible = info.Enabled = !string.IsNullOrEmpty (solution.FileName) && File.Exists (solution.FileName);
 		}
 		
 /*		[CommandHandler (ProjectCommands.AddNewFiles)]

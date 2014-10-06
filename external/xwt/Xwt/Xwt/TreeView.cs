@@ -69,7 +69,17 @@ namespace Xwt
 			{
 				((TreeView)Parent).OnRowExpanding (new TreeViewRowEventArgs (position));
 			}
-			
+
+			public void OnRowCollapsed (TreePosition position)
+			{
+				((TreeView)Parent).OnRowCollapsed (new TreeViewRowEventArgs (position));
+			}
+
+			public void OnRowCollapsing (TreePosition position)
+			{
+				((TreeView)Parent).OnRowCollapsing (new TreeViewRowEventArgs (position));
+			}
+
 			public override Size GetDefaultNaturalSize ()
 			{
 				return Xwt.Backends.DefaultNaturalSizes.TreeView;
@@ -82,6 +92,8 @@ namespace Xwt
 			MapEvent (TreeViewEvent.RowActivated, typeof(TreeView), "OnRowActivated");
 			MapEvent (TreeViewEvent.RowExpanded, typeof(TreeView), "OnRowExpanded");
 			MapEvent (TreeViewEvent.RowExpanding, typeof(TreeView), "OnRowExpanding");
+			MapEvent (TreeViewEvent.RowCollapsed, typeof(TreeView), "OnRowCollapsed");
+			MapEvent (TreeViewEvent.RowCollapsing, typeof(TreeView), "OnRowCollapsing");
 		}
 	
 		/// <summary>
@@ -101,6 +113,7 @@ namespace Xwt
 		/// </param>
 		public TreeView (ITreeDataSource source): this ()
 		{
+			VerifyConstructorCall (this);
 			DataSource = source;
 		}
 		
@@ -122,7 +135,25 @@ namespace Xwt
 			get { return Backend.HorizontalScrollPolicy; }
 			set { Backend.HorizontalScrollPolicy = value; }
 		}
-		
+
+		ScrollControl verticalScrollAdjustment;
+		public ScrollControl VerticalScrollControl {
+			get {
+				if (verticalScrollAdjustment == null)
+					verticalScrollAdjustment = new ScrollControl (Backend.CreateVerticalScrollControl ());
+				return verticalScrollAdjustment;
+			}
+		}
+
+		ScrollControl horizontalScrollAdjustment;
+		public ScrollControl HorizontalScrollControl {
+			get {
+				if (horizontalScrollAdjustment == null)
+					horizontalScrollAdjustment = new ScrollControl (Backend.CreateHorizontalScrollControl ());
+				return horizontalScrollAdjustment;
+			}
+		}
+
 		/// <summary>
 		/// Gets the tree columns.
 		/// </summary>
@@ -167,6 +198,12 @@ namespace Xwt
 				Backend.HeadersVisible = value;
 			}
 		}
+
+		public GridLines GridLinesVisible
+		{
+			get { return Backend.GridLinesVisible; }
+			set { Backend.GridLinesVisible = value; }
+		}
 		
 		/// <summary>
 		/// Gets or sets the selection mode.
@@ -181,6 +218,20 @@ namespace Xwt
 			set {
 				mode = value;
 				Backend.SetSelectionMode (mode);
+			}
+		}
+
+		/// <summary>
+		/// Gets or sets the row the current event applies to.
+		/// The behavior of this property is undefined when used outside an
+		/// event that supports it.
+		/// </summary>
+		/// <value>
+		/// The current event row.
+		/// </value>
+		public TreePosition CurrentEventRow {
+			get {
+				return Backend.CurrentEventRow;
 			}
 		}
 		
@@ -480,6 +531,58 @@ namespace Xwt
 			remove {
 				rowExpanded -= value;
 				BackendHost.OnAfterEventRemove (TreeViewEvent.RowExpanded, rowExpanded);
+			}
+		}
+
+		/// <summary>
+		/// Raises the row collapsing event.
+		/// </summary>
+		/// <param name="a">The alpha component.</param>
+		protected virtual void OnRowCollapsing (TreeViewRowEventArgs a)
+		{
+			if (rowCollapsing != null)
+				rowCollapsing (this, a);
+		}
+
+		EventHandler<TreeViewRowEventArgs> rowCollapsing;
+
+		/// <summary>
+		/// Occurs just before a row is collapsed.
+		/// </summary>
+		public event EventHandler<TreeViewRowEventArgs> RowCollapsing {
+			add {
+				BackendHost.OnBeforeEventAdd (TreeViewEvent.RowCollapsing, rowCollapsing);
+				rowCollapsing += value;
+			}
+			remove {
+				rowCollapsing -= value;
+				BackendHost.OnAfterEventRemove (TreeViewEvent.RowCollapsing, rowCollapsing);
+			}
+		}
+
+		/// <summary>
+		/// Raises the row collapsing event.
+		/// </summary>
+		/// <param name="a">The alpha component.</param>
+		protected virtual void OnRowCollapsed (TreeViewRowEventArgs a)
+		{
+			if (rowCollapsed != null)
+				rowCollapsed (this, a);
+		}
+
+		EventHandler<TreeViewRowEventArgs> rowCollapsed;
+
+		/// <summary>
+		/// Occurs just before a row is collapsed
+		/// </summary>
+		public event EventHandler<TreeViewRowEventArgs> RowCollapsed {
+			add {
+				BackendHost.OnBeforeEventAdd (TreeViewEvent.RowCollapsed, rowCollapsed);
+				rowCollapsed += value;
+			}
+			remove {
+				rowCollapsed -= value;
+				BackendHost.OnAfterEventRemove (TreeViewEvent.RowCollapsed, rowCollapsed);
 			}
 		}
 	}

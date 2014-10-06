@@ -27,15 +27,17 @@ using System;
 using Gtk;
 using MonoDevelop.Core;
 using System.Xml.Linq;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.Ide.WelcomePage
 {
 	public class WelcomePageBarButton: EventBox
 	{
-		Gtk.Image image;
+		Xwt.ImageView image;
+		Widget imageWidget;
 		Gtk.Label label;
 
-		Gdk.Pixbuf imageNormal, imageHover;
+		Xwt.Drawing.Image imageNormal, imageHover;
 		bool mouseOver;
 		string actionLink;
 		private static Gdk.Cursor hand_cursor = new Gdk.Cursor(Gdk.CursorType.Hand1);
@@ -45,7 +47,23 @@ namespace MonoDevelop.Ide.WelcomePage
 		public string Color { get; set; }
 		public int FontSize { get; set; }
 		protected string Text { get; set; }
-		protected bool Bold { get; set; }
+		protected Pango.Weight FontWeight { get; set; }
+		protected bool Bold { 
+			get { return FontWeight == Pango.Weight.Bold; }
+			set { FontWeight = value ? Pango.Weight.Bold : Pango.Weight.Normal; }
+		}
+		HBox box = new HBox ();
+
+		public int IconTextSpacing {
+			get { return box.Spacing; }
+			set { box.Spacing = value; }
+		}
+
+		public bool MouseOver {
+			get {
+				return mouseOver;
+			}
+		}
 
 		public WelcomePageBarButton (string title, string href, string iconResource = null)
 		{
@@ -58,17 +76,17 @@ namespace MonoDevelop.Ide.WelcomePage
 			this.Text = GettextCatalog.GetString (title);
 			this.actionLink = href;
 			if (!string.IsNullOrEmpty (iconResource)) {
-				imageHover = Gdk.Pixbuf.LoadFromResource (iconResource);
-				imageNormal = ImageService.MakeTransparent (imageHover, 0.7);
+				imageHover = Xwt.Drawing.Image.FromResource (iconResource);
+				imageNormal = imageHover.WithAlpha (0.7);
 			}
 
-			HBox box = new HBox ();
-			box.Spacing = Styles.WelcomeScreen.Links.IconTextSpacing;
-			image = new Image ();
-			label = new Label ();
-			box.PackStart (image, false, false, 0);
+			IconTextSpacing = Styles.WelcomeScreen.Links.IconTextSpacing;
+			image = new Xwt.ImageView ();
+			label = CreateLabel ();
+			imageWidget = image.ToGtkWidget ();
+			box.PackStart (imageWidget, false, false, 0);
 			if (imageNormal == null)
-				image.NoShowAll = true;
+				imageWidget.NoShowAll = true;
 			box.PackStart (label, false, false, 0);
 			box.ShowAll ();
 			Add (box);
@@ -78,16 +96,21 @@ namespace MonoDevelop.Ide.WelcomePage
 			Events |= (Gdk.EventMask.EnterNotifyMask | Gdk.EventMask.LeaveNotifyMask | Gdk.EventMask.ButtonReleaseMask);
 		}
 
-		protected void SetImage (Gdk.Pixbuf normal, Gdk.Pixbuf hover)
+		protected virtual Label CreateLabel ()
+		{
+			return new Label ();
+		}
+
+		protected void SetImage (Xwt.Drawing.Image normal, Xwt.Drawing.Image hover)
 		{
 			imageHover = hover;
 			imageNormal = normal;
 
 			if (imageNormal == null) {
-				image.NoShowAll = true;
+				imageWidget.NoShowAll = true;
 				image.Hide ();
 			} else {
-				image.NoShowAll = false;
+				imageWidget.NoShowAll = false;
 				ShowAll ();
 			}
 
@@ -127,9 +150,9 @@ namespace MonoDevelop.Ide.WelcomePage
 		protected void Update ()
 		{
 			if (imageNormal != null)
-				image.Pixbuf = mouseOver ? imageHover : imageNormal;
+				image.Image = mouseOver ? imageHover : imageNormal;
 			var color = mouseOver ? HoverColor : Color;
-			label.Markup = WelcomePageSection.FormatText (FontFamily, FontSize, Bold, color, Text);
+			label.Markup = WelcomePageSection.FormatText (FontFamily, FontSize, FontWeight, color, Text);
 		}
 	}
 }

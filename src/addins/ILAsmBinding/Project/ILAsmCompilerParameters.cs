@@ -24,23 +24,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
-
 namespace ILAsmBinding
 {
-	public class ILAsmCompilerParameters : MonoDevelop.Projects.ConfigurationParameters
+	class ILAsmCompilerParameters : MonoDevelop.Projects.ConfigurationParameters
 	{
-		public override void AddDefineSymbol (string symbol)
-		{
-			// ILAsm has no symbols to define
-		}
-		public override bool HasDefineSymbol (string symbol)
-		{
-			return false;
-		}
-		public override void RemoveDefineSymbol (string symbol)
-		{
-			// ILAsm has no symbols to define
-		}
 	}
 }

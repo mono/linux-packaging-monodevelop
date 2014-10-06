@@ -39,7 +39,7 @@
 	<EolSpan tagColor = "Preprocessor" rule="text.preprocessor.empty">#warning</EolSpan>
 	<EolSpan tagColor = "Preprocessor" rule="text.preprocessor.empty">#error</EolSpan>
 	<EolSpan tagColor = "Preprocessor" rule="text.preprocessor.line">#line</EolSpan>
-	<EolSpan tagColor = "Preprocessor" rule="text.preprocessor.empty">#region</EolSpan>
+	<EolSpan tagColor = "Preprocessor" color = "Preprocessor(Region Name)" rule="text.preprocessor.empty">#region</EolSpan>
 	<EolSpan tagColor = "Preprocessor" rule="text.preprocessor.empty">#endregion</EolSpan>
 	<EolSpan tagColor = "Preprocessor" rule="text.preprocessor.empty">#pragma</EolSpan>
 	
@@ -58,12 +58,12 @@
 		<End>"</End>
 	</Span>
 
-	<Span color = "String" rule="String" stopateol = "true">
+	<Span color = "String" rule="String" stopateol = "true" escape='\"'>
 		<Begin>"</Begin>
 		<End>"</End>
 	</Span>
 
-	<Span color = "String" rule="String" stopateol = "true">
+	<Span color = "String" rule="String" stopateol = "true" escape="\'">
 		<Begin>&apos;</Begin>
 		<End>&apos;</End>
 	</Span>
@@ -222,7 +222,8 @@
 		<Word>using</Word>
 	</Keywords>
 	
-	<Keywords color = "Keyword(Property)">		<Word>get</Word>
+	<Keywords color = "Keyword(Property)">
+		<Word>get</Word>
 		<Word>set</Word>
 		<Word>add</Word>
 		<Word>remove</Word>
@@ -318,7 +319,7 @@
 	</Rule>
 	
 	<Rule name = "String">
-		<Match color ="String(Escape)">\\(['"\\abfnrtv]|x[0-9a-fA-F]{2,4}|0\d\d)</Match>
+		<Match color ="String(Escape)" ignorecase="True">\\(['"\\abfnrtv]|x[0-9a-fA-F]{2,4}|0\d\d)</Match>
 	</Rule>
 	
 	<Rule name = "VerbatimString">
@@ -328,7 +329,7 @@
 	<Rule name = "XmlDocumentation">
 		<Delimiters>&lt;&gt;</Delimiters>
 
-		<Span color = "Comment(DocTag)" rule = "XmlDocumentationTag">
+		<Span color = "Comment(DocTag)" rule = "XmlDocumentationTag" stopateol = "true">
 			<Begin>&lt;</Begin>
 			<End>&gt;</End>
 		</Span>

@@ -29,6 +29,7 @@ using Mono.TextEditor;
 using MonoDevelop.SourceEditor;
 using System.Text;
 using System.Collections.Generic;
+using MonoDevelop.Ide.TypeSystem;
 
 namespace MonoDevelop.AnalysisCore.Gui
 {
@@ -41,7 +42,9 @@ namespace MonoDevelop.AnalysisCore.Gui
 		public override TooltipItem GetItem (TextEditor editor, int offset)
 		{
 			//get the ResultsEditorExtension from the editor
-			var ed = (ExtensibleTextEditor) editor;
+			var ed =  editor as ExtensibleTextEditor;
+			if (ed == null)
+				return null;
 			var ext = ed.Extension;
 			while (ext != null && !(ext is ResultsEditorExtension))
 				ext = ext.Next;
@@ -70,9 +73,9 @@ namespace MonoDevelop.AnalysisCore.Gui
 					sb.AppendLine ();
 				sb.Append (r.Level.ToString ());
 				sb.Append (": ");
-				sb.Append (r.Message);
+				sb.Append (AmbienceService.EscapeText (r.Message));
 			}
-			
+
 			//FIXME: use a nicer, more specialized tooltip window, with results formatting and hints about 
 			// commands and stuff
 			var win = new LanguageItemWindow ((ExtensibleTextEditor) editor, modifierState, null, sb.ToString (), null);

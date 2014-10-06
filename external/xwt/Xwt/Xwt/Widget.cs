@@ -39,7 +39,7 @@ using Xwt.Motion;
 
 namespace Xwt
 {
-	[BackendType (typeof(IWidgetBackend))]
+	[BackendType (typeof(ICustomWidgetBackend))]
 	public abstract class Widget: XwtComponent, IWidgetSurface, IAnimatable
 	{
 		static bool DebugWidgetLayout = false;
@@ -72,13 +72,14 @@ namespace Xwt
 		EventHandler dragLeave;
 		EventHandler<KeyEventArgs> keyPressed;
 		EventHandler<KeyEventArgs> keyReleased;
+		EventHandler<PreviewTextInputEventArgs> previewTextInput;
 		EventHandler mouseEntered;
 		EventHandler mouseExited;
 		EventHandler<ButtonEventArgs> buttonPressed;
 		EventHandler<ButtonEventArgs> buttonReleased;
 		EventHandler<MouseMovedEventArgs> mouseMoved;
 		EventHandler boundsChanged;
-        EventHandler<MouseScrolledEventArgs> mouseScrolled;
+		EventHandler<MouseScrolledEventArgs> mouseScrolled;
 		
 		EventHandler gotFocus;
 		EventHandler lostFocus;
@@ -98,26 +99,6 @@ namespace Xwt
 		{
 			public WidgetBackendHost ()
 			{
-			}
-			
-			protected override IBackend OnCreateBackend ()
-			{
-				var backend = base.OnCreateBackend ();
-				if (backend == null) {
-					// If this is a custom widget, not implemented in Xwt, then we provide the default
-					// backend, which allows setting a content widget
-					if (!(Parent is XwtWidgetBackend)) {
-						Type t = Parent.GetType ();
-						Type wt = typeof(Widget);
-						while (t != wt) {
-							if (t.Assembly == wt.Assembly)
-								return null; // It's a core widget
-							t = t.BaseType;
-						}
-					}
-					return ToolkitEngine.Backend.CreateBackend<ICustomWidgetBackend> ();
-				}
-				return backend;
 			}
 
 			protected override void OnBackendCreated ()
@@ -186,6 +167,11 @@ namespace Xwt
 			{
 				Parent.OnKeyReleased (args);
 			}
+
+			void IWidgetEventSink.OnPreviewTextInput (PreviewTextInputEventArgs args)
+			{
+				Parent.OnPreviewTextInput (args);
+			}
 			
 			Size IWidgetEventSink.GetPreferredSize (SizeConstraint widthConstraint, SizeConstraint heightConstraint)
 			{
@@ -244,10 +230,10 @@ namespace Xwt
 				Parent.OnBoundsChanged ();
 			}
 
-            void IWidgetEventSink.OnMouseScrolled(MouseScrolledEventArgs args)
-            {
-                Parent.OnMouseScrolled(args);
-            }
+			void IWidgetEventSink.OnMouseScrolled(MouseScrolledEventArgs args)
+			{
+				Parent.OnMouseScrolled(args);
+			}
 		}
 		
 		public Widget ()
@@ -265,6 +251,7 @@ namespace Xwt
 			MapEvent (WidgetEvent.DragLeave, typeof(Widget), "OnDragLeave");
 			MapEvent (WidgetEvent.KeyPressed, typeof(Widget), "OnKeyPressed");
 			MapEvent (WidgetEvent.KeyReleased, typeof(Widget), "OnKeyReleased");
+			MapEvent (WidgetEvent.PreviewTextInput, typeof(Widget), "OnPreviewTextInput");
 			MapEvent (WidgetEvent.GotFocus, typeof(Widget), "OnGotFocus");
 			MapEvent (WidgetEvent.LostFocus, typeof(Widget), "OnLostFocus");
 			MapEvent (WidgetEvent.MouseEntered, typeof(Widget), "OnMouseEntered");
@@ -303,8 +290,10 @@ namespace Xwt
 			if (disposing) {
 				if (BackendHost.BackendCreated)
 					Backend.Dispose ();
-				if (children != null)
-					children.ForEach (c => c.Dispose ());
+				if (children != null) {
+					foreach (var c in DirectChildren)
+						c.Dispose ();
+				}
 			}
 		}
 		
@@ -487,7 +476,15 @@ namespace Xwt
 		
 		[DesignerSerializationVisibility (DesignerSerializationVisibility.Hidden)]
 		public Widget Parent { get; private set; }
-		
+
+		internal Widget InternalParent { get; private set; }
+
+		bool IsInternalChild {
+			get { return ExternalParent != null; }
+		}
+
+		Widget ExternalParent { get; set; }
+
 		[DesignerSerializationVisibility (DesignerSerializationVisibility.Hidden)]
 		public IWidgetSurface Surface {
 			get { return this; }
@@ -828,6 +825,12 @@ namespace Xwt
 			if (keyReleased != null)
 				keyReleased (this, args);
 		}
+
+		internal protected virtual void OnPreviewTextInput (PreviewTextInputEventArgs args)
+		{
+			if (previewTextInput != null)
+				previewTextInput (this, args);
+		}
 		
 		internal protected virtual void OnGotFocus (EventArgs args)
 		{
@@ -907,7 +910,7 @@ namespace Xwt
 			// itself when its size changes
 			if (boundsChanged == null) {
 				BoundsChanged += delegate {
-					OnReallocate ();
+					Reallocate ();
 				};
 			}
 		}
@@ -958,16 +961,7 @@ namespace Xwt
 		
 		void IWidgetSurface.Reallocate ()
 		{
-			reallocationQueue.Remove (this);
-			if (DebugWidgetLayout) {
-				LayoutLog ("Reallocate: {0} - {1}", Size, GetWidgetDesc ());
-				DebugWidgetLayoutIndent += 3;
-			}
-
-			OnReallocate ();
-
-			if (DebugWidgetLayout)
-				DebugWidgetLayoutIndent -= 3;
+			Reallocate ();
 		}
 
 		Size IWidgetSurface.GetPreferredSize (bool includeMargin)
@@ -984,20 +978,33 @@ namespace Xwt
 			if (sizeCached && widthConstraint == cachedWidthConstraint && heightConstraint == cachedHeightConstraint)
 				return cachedSize;
 			else {
+				if (widthRequest != -1 && !widthConstraint.IsConstrained)
+					widthConstraint = SizeConstraint.WithSize (widthRequest);
+
+				if (heightRequest != -1 && !heightConstraint.IsConstrained)
+					heightConstraint = SizeConstraint.WithSize (heightRequest);
+
 				if (DebugWidgetLayout) {
 					LayoutLog ("GetPreferredSize: wc:{0} hc:{1} - {2}", widthConstraint, heightConstraint, GetWidgetDesc ());
 					DebugWidgetLayoutIndent += 3;
 				}
 
-				cachedSize = OnGetPreferredSize (widthConstraint, heightConstraint);
+				if (widthRequest == -1 || heightRequest == -1)
+					cachedSize = OnGetPreferredSize (widthConstraint, heightConstraint);
 
 				if (DebugWidgetLayout)
 					DebugWidgetLayoutIndent -= 3;
 
-				if (minWidth > cachedSize.Width)
+				if (widthRequest != -1)
+					cachedSize.Width = widthRequest;
+				else if (minWidth > cachedSize.Width)
 					cachedSize.Width = minWidth;
-				if (minHeight > cachedSize.Height)
+
+				if (heightRequest != -1)
+					cachedSize.Height = heightRequest;
+				else if (minHeight > cachedSize.Height)
 					cachedSize.Height = minHeight;
+
 				if (cachedSize.Width < 0)
 					cachedSize.Width = 0;
 				if (cachedSize.Height < 0)
@@ -1007,6 +1014,11 @@ namespace Xwt
 					cachedWidthConstraint = widthConstraint;
 					cachedHeightConstraint = heightConstraint;
 				}
+
+				if (DebugWidgetLayout) {
+					LayoutLog ("-> {0}", cachedSize);
+				}
+
 				return cachedSize;
 			}
 		}
@@ -1018,13 +1030,34 @@ namespace Xwt
 		Toolkit IWidgetSurface.ToolkitEngine {
 			get { return BackendHost.ToolkitEngine; }
 		}
-		
+
+		void Reallocate ()
+		{
+			reallocationQueue.Remove (this);
+			if (DebugWidgetLayout) {
+				LayoutLog ("Reallocate: {0} - {1}", Size, GetWidgetDesc ());
+				DebugWidgetLayoutIndent += 3;
+			}
+
+			OnReallocate ();
+
+			if (children != null && !BackendHost.EngineBackend.HandlesSizeNegotiation) {
+				foreach (Widget w in DirectChildren) {
+					if (w.Visible)
+						w.Surface.Reallocate ();
+				}
+			}
+
+			if (DebugWidgetLayout)
+				DebugWidgetLayoutIndent -= 3;
+		}
+
+		/// <summary>
+		/// Called when the size of this widget has changed and its children have to be relocated
+		/// </summary>
+		/// <remarks>It is not necessary to call Reallocate on the children. The Widget class will do it after invoking this method.</remarks>
 		protected virtual void OnReallocate ()
 		{
-			if (children != null) {
-				foreach (Widget w in children)
-					w.Surface.Reallocate ();
-			}
 		}
 
 		/// <summary>
@@ -1034,10 +1067,16 @@ namespace Xwt
 		{
 			return Backend.GetPreferredSize (widthConstraint, heightConstraint);
 		}
-		
-		void OnChildPreferredSizeChanged ()
+
+		protected virtual void OnChildPreferredSizeChanged ()
 		{
-			if (Parent != null && resizeRequestQueue.Contains (Parent)) {
+		}
+
+		void NotifyChildPreferredSizeChanged ()
+		{
+			OnChildPreferredSizeChanged ();
+
+			if (InternalParent != null && resizeRequestQueue.Contains (InternalParent)) {
 				// Size for this widget will be checked when checking the parent
 				ResetCachedSizes ();
 				return;
@@ -1070,7 +1109,7 @@ namespace Xwt
 			// The parent also has to be notified of the size change, since it
 			// may imply a change of the size of the parent. However, we don't do
 			// it immediately, but we queue the resizing request
-			
+
 			ResetCachedSizes ();
 			Backend.UpdateLayout ();
 			if (!BackendHost.EngineBackend.HandlesSizeNegotiation)
@@ -1079,8 +1118,8 @@ namespace Xwt
 
 		internal void OnPlacementChanged ()
 		{
-			if (Parent != null)
-				Parent.OnChildPlacementChanged (this);
+			if (InternalParent != null)
+				InternalParent.OnChildPlacementChanged (this);
 			else if (parentWindow is Window)
 				((Window)parentWindow).OnChildPlacementChanged (this);
 		}
@@ -1110,8 +1149,8 @@ namespace Xwt
 		
 		void NotifySizeChangeToParent ()
 		{
-			if (Parent != null) {
-				QueueForSizeCheck (Parent);
+			if (InternalParent != null) {
+				QueueForSizeCheck (InternalParent);
 				QueueDelayedResizeRequest ();
 			}
 			else if (parentWindow is Window) {
@@ -1173,7 +1212,7 @@ namespace Xwt
 					Array.Sort (depths, items, 0, remaining);
 
 					for (int k=remaining - 1; k>=0; k--)
-						items[k].OnChildPreferredSizeChanged ();
+						items[k].NotifyChildPreferredSizeChanged ();
 
 					n += remaining;
 				}
@@ -1204,16 +1243,16 @@ namespace Xwt
 		
 		int Depth {
 			get {
-				if (Parent != null)
-					return Parent.Depth + 1;
+				if (InternalParent != null)
+					return InternalParent.Depth + 1;
 				return 0;
 			}
 		}
 
 		string GetWidgetDesc ()
 		{
-			if (Parent != null) {
-				int i = Parent.Surface.Children.ToList ().IndexOf (this);
+			if (InternalParent != null) {
+				int i = InternalParent.Surface.Children.ToList ().IndexOf (this);
 				return this + " [" + GetHashCode() + "] (" + i + ")";
 			}
 			else
@@ -1227,21 +1266,57 @@ namespace Xwt
 		
 		IEnumerable<Widget> IWidgetSurface.Children {
 			get {
-				return (IEnumerable<Widget>)children ?? (IEnumerable<Widget>) emptyList; 
+				return ExternalChildren; 
 			}
+		}
+
+		IEnumerable<Widget> DirectChildren {
+			get { return children != null ? children.Where (c => c.InternalParent == this) : emptyList; }
+		}
+
+		IEnumerable<Widget> ExternalChildren {
+			get { return children != null ? children.Where (c => !c.IsInternalChild) : emptyList; }
+		}
+
+		Widget FindExternalParent ()
+		{
+			if (IsInternalChild && Parent != null)
+				return Parent.FindExternalParent ();
+			else
+				return this;
 		}
 
 		protected void RegisterChild (Widget w)
 		{
-			if (w.Parent != null)
-				throw new InvalidOperationException ("Widget is already a child of another widget");
+			if (w == null)
+				return;
+
 			if (w.Surface.ToolkitEngine != Surface.ToolkitEngine)
 				throw new InvalidOperationException ("Widget belongs to a different toolkit");
+
+			var wback = w.Backend as XwtWidgetBackend;
+
+			if (IsInternalChild && !w.IsInternalChild) {
+				if (w.Parent == null)
+					throw new InvalidOperationException ("Widget must be registered as a child widget of " + FindExternalParent ());
+				if (w.Parent != ExternalParent)
+					throw new InvalidOperationException ("Widget is already a child of a widget of type " + w.Parent.GetType ());
+				w.InternalParent = this;
+				if (wback != null)
+					wback.InternalParent = this;
+			} else {
+				if (w.Parent != null)
+					throw new InvalidOperationException ("Widget is already a child of a widget of type " + w.Parent.GetType ());
+				w.Parent = this;
+				w.InternalParent = this;
+				if (wback != null) {
+					wback.Parent = this;
+					wback.InternalParent = this;
+				}
+			}
+
 			if (children == null)
 				children = new List<Widget> ();
-			w.Parent = this;
-			if (w.Backend is XwtWidgetBackend)
-				((XwtWidgetBackend)w.Backend).Parent = this;
 			children.Add (w);
 
 			// Make sure the widget is queued for reallocation
@@ -1250,11 +1325,51 @@ namespace Xwt
 		
 		protected void UnregisterChild (Widget w)
 		{
-			if (children == null || !children.Remove (w))
+			if (w == null)
+				return;
+
+			int i;
+			if (children == null || (i = children.IndexOf (w)) == -1)
 				throw new InvalidOperationException ("Widget is not a child of this widget");
-			w.Parent = null;
-			if (w.Backend is XwtWidgetBackend)
-				((XwtWidgetBackend)w.Backend).Parent = null;
+
+			var wback = w.Backend as XwtWidgetBackend;
+
+			if (w.Parent == this) {
+				if (w.InternalParent != this)
+					throw new InvalidOperationException ("Child widget must be removed from internal container before unregistering it");
+				w.Parent = null;
+				w.InternalParent = null;
+			} else {
+				w.InternalParent = w.Parent;
+			}
+
+			children.RemoveAt (i);
+
+			if (wback != null) {
+				wback.Parent = w.Parent;
+				wback.InternalParent = w.InternalParent;
+			}
+		}
+
+		/// <summary>
+		/// Flags a widget as an internal child of a container
+		/// </summary>
+		/// <param name="child">A widget</param>
+		/// <remarks>
+		/// This method must must be called before the child widget is added to any container.
+		/// Internal children of a widget are not returned in the Children list of the widget, and they
+		/// are not included in the Parent hierarchy chain.
+		/// </remarks>
+		protected T SetInternalChild<T> (T child) where T:Widget
+		{
+			if (child.ExternalParent == this)
+				return child;
+			if (child.ExternalParent != null)
+				throw new InvalidOperationException ("Widget is already an internal child of widget " + child.ExternalParent);
+			if (child.Parent != null)
+				throw new InvalidOperationException ("Widget must be flagged as internal child before being added to a container");
+			child.ExternalParent = this;
+			return child;
 		}
 		
 		void IAnimatable.BatchBegin ()
@@ -1266,7 +1381,7 @@ namespace Xwt
 		}
 
 		/// <summary>
-		/// Raised when the mouse is moved over the widget in a drag&drop operation
+		/// Raised when the mouse is moved over the widget in a drag&amp;drop operation
 		/// </summary>
 		/// <remarks>
 		/// The subscriber of the event should set the value of AllowedAction in the
@@ -1290,7 +1405,7 @@ namespace Xwt
 		}
 		
 		/// <summary>
-		/// Raised when the mouse is moved over the widget in a drag&drop operation
+		/// Raised when the mouse is moved over the widget in a drag&amp;drop operation
 		/// </summary>
 		/// <remarks>
 		/// The subscriber of the event should set the value of AllowedAction in the
@@ -1298,7 +1413,7 @@ namespace Xwt
 		/// the action will be determined by the result of the DragDropCheck event.
 		/// 
 		/// This event provides information about the actual data that is going
-		/// to be dropped. Getting the data may be inneficient in some cross-process drag&drop scenarios,
+		/// to be dropped. Getting the data may be inefficient in some cross-process drag&amp;drop scenarios,
 		/// so if you don't need the actual data to decide the allowed drop operation, 
 		/// and knowing the type of the data is enough, then the DragOverCheck event is a better option.
 		/// </remarks>
@@ -1386,6 +1501,17 @@ namespace Xwt
 			remove {
 				keyReleased -= value;
 				BackendHost.OnAfterEventRemove (WidgetEvent.KeyReleased, keyReleased);
+			}
+		}
+
+		public event EventHandler<PreviewTextInputEventArgs> PreviewTextInput {
+			add {
+				BackendHost.OnBeforeEventAdd (WidgetEvent.PreviewTextInput, previewTextInput);
+				previewTextInput += value;
+			}
+			remove {
+				previewTextInput -= value;
+				BackendHost.OnAfterEventRemove (WidgetEvent.PreviewTextInput, previewTextInput);
 			}
 		}
 		

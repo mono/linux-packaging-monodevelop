@@ -41,11 +41,13 @@ namespace Xwt.CairoBackend
 		public Cairo.Surface TempSurface;
 		public double ScaleFactor = 1;
 		public double PatternAlpha = 1;
+		internal Point Origin = Point.Zero;
 
 		Stack<Data> dataStack = new Stack<Data> ();
 
 		struct Data {
 			public double PatternAlpha;
+			public double GlobalAlpha;
 		}
 
 		public CairoContextBackend (double scaleFactor)
@@ -53,7 +55,7 @@ namespace Xwt.CairoBackend
 			ScaleFactor = scaleFactor;
 		}
 
-		public void Dispose ()
+		public virtual void Dispose ()
 		{
 			IDisposable d = Context;
 			if (d != null) {
@@ -69,7 +71,8 @@ namespace Xwt.CairoBackend
 		{
 			Context.Save ();
 			dataStack.Push (new Data () {
-				PatternAlpha = PatternAlpha
+				PatternAlpha = PatternAlpha,
+				GlobalAlpha = GlobalAlpha
 			});
 		}
 
@@ -78,6 +81,7 @@ namespace Xwt.CairoBackend
 			Context.Restore ();
 			var d = dataStack.Pop ();
 			PatternAlpha = d.PatternAlpha;
+			GlobalAlpha = d.GlobalAlpha;
 		}
 	}
 	
@@ -90,6 +94,12 @@ namespace Xwt.CairoBackend
 		}
 
 		#region IContextBackendHandler implementation
+
+		public override double GetScaleFactor (object backend)
+		{
+			CairoContextBackend gc = (CairoContextBackend)backend;
+			return gc.ScaleFactor;
+		}
 
 		public override void Save (object backend)
 		{
@@ -236,7 +246,7 @@ namespace Xwt.CairoBackend
 		public override void SetColor (object backend, Xwt.Drawing.Color color)
 		{
 			var gtkContext = (CairoContextBackend) backend;
-			gtkContext.Context.Color = new Cairo.Color (color.Red, color.Green, color.Blue, color.Alpha * gtkContext.GlobalAlpha);
+			gtkContext.Context.SetSourceRGBA (color.Red, color.Green, color.Blue, color.Alpha * gtkContext.GlobalAlpha);
 			gtkContext.PatternAlpha = 1;
 		}
 		
@@ -264,9 +274,9 @@ namespace Xwt.CairoBackend
 				cb.PatternAlpha = 1;
 
 			if (p != null)
-				ctx.Pattern = (Cairo.Pattern) p;
+				ctx.SetSource ((Cairo.Pattern) p);
 			else
-				ctx.Pattern = null;
+				ctx.SetSource ((Cairo.Pattern) null);
 		}
 		
 		public override void DrawTextLayout (object backend, TextLayout layout, double x, double y)
@@ -281,12 +291,14 @@ namespace Xwt.CairoBackend
 				var lc = pl.LineCount;
 				var scale = Pango.Scale.PangoScale;
 				double h = 0;
+				var fe = ctx.Context.FontExtents;
+				var baseline = fe.Ascent / (fe.Ascent + fe.Descent);
 				for (int i=0; i<lc; i++) {
 					var line = pl.Lines [i];
 					var ext = new Pango.Rectangle ();
 					var extl = new Pango.Rectangle ();
 					line.GetExtents (ref ext, ref extl);
-					h += (extl.Height / scale);
+					h += h == 0 ? (extl.Height / scale * baseline) : (extl.Height / scale);
 					if (h > layout.Height)
 						break;
 					ctx.Context.MoveTo (x, y + h);
@@ -312,9 +324,9 @@ namespace Xwt.CairoBackend
 			ctx.Context.NewPath();
 			ctx.Context.Rectangle (destRect.X, destRect.Y, destRect.Width, destRect.Height);
 			ctx.Context.Clip ();
-			ctx.Context.Translate (destRect.X-srcRect.X, destRect.Y-srcRect.Y);
 			double sx = destRect.Width / srcRect.Width;
 			double sy = destRect.Height / srcRect.Height;
+			ctx.Context.Translate (destRect.X-srcRect.X*sx, destRect.Y-srcRect.Y*sy);
 			ctx.Context.Scale (sx, sy);
 			img.Alpha *= ctx.GlobalAlpha;
 
@@ -339,17 +351,29 @@ namespace Xwt.CairoBackend
 			CairoContextBackend gc = (CairoContextBackend)backend;
 			gc.Context.Scale (scaleX, scaleY);
 		}
-		
+
 		public override void Translate (object backend, double tx, double ty)
 		{
 			CairoContextBackend gc = (CairoContextBackend)backend;
 			gc.Context.Translate (tx, ty);
 		}
 
+		public override void ModifyCTM (object backend, Matrix m)
+		{
+			CairoContextBackend gc = (CairoContextBackend)backend;
+			Cairo.Matrix t = new Cairo.Matrix (m.M11, m.M12, m.M21, m.M22, m.OffsetX, m.OffsetY);
+			gc.Context.Transform (t);
+		}
+
 		public override Matrix GetCTM (object backend)
 		{
-			Cairo.Matrix t = ((CairoContextBackend)backend).Context.Matrix;
-			Matrix ctm = new Matrix (t.Xx, t.Yx, t.Xy, t.Yy, t.X0, t.Y0);
+			var cb = (CairoContextBackend)backend;
+
+			Cairo.Matrix t = cb.Context.Matrix;
+
+			// Adjust CTM OffsetX, OffsetY for ContextBackend Origin
+			Matrix ctm = new Matrix (t.Xx, t.Yx, t.Xy, t.Yy, t.X0-cb.Origin.X, t.Y0-cb.Origin.Y);
+
 			return ctm;
 		}
 

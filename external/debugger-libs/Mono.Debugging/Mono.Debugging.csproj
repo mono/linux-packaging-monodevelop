@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{90C99ADB-7D4B-4EB4-98C2-40BD1B14C7D2}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -24,10 +24,12 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>bin\Debug\Mono.Debugging.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
-    <Optimize>False</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
     <OutputPath>bin\Release</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -35,6 +37,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>bin\Release\Mono.Debugging.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -116,6 +121,8 @@
     <Compile Include="Mono.Debugging.Backend\IRawValueArray.cs" />
     <Compile Include="Mono.Debugging.Backend\IRawValueString.cs" />
     <Compile Include="Mono.Debugging.Backend\EvaluationResult.cs" />
+    <Compile Include="Mono.Debugging.Client\DebuggerLoggingService.cs" />
+    <Compile Include="Mono.Debugging.Client\RunToCursorBreakpoint.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>

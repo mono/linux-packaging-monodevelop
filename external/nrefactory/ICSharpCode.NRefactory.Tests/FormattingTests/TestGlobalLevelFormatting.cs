@@ -41,6 +41,114 @@ namespace ICSharpCode.NRefactory.CSharp.FormattingTests
 			      @"[assembly: AssemblyDescription   (""""  )   ]",
 			      @"[assembly: AssemblyDescription ("""")]");
 		}
+
+		/// <summary>
+		/// Bug 13361 - Format Document partially removes pragmas (#pragma
+		/// </summary>
+		[Test]
+		public void TestBug13361()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			Test(policy, 
+			     @"#pragma warning disable 0219
+
+class Foo
+{
+	#pragma warning disable 123
+	void Foo ()
+	{
+		#pragma warning disable 123
+	}
+}", @"#pragma warning disable 0219
+
+class Foo
+{
+	#pragma warning disable 123
+	void Foo ()
+	{
+		#pragma warning disable 123
+	}
+}");
+		}
+
+		/// <summary>
+		/// Bug 13413 - Formatter inserts new line between #undef statements in an #if block on every reformat 
+		/// </summary>
+		[Test]
+		public void TestBug13413()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			Test(policy, 
+			     @"#if foo
+#undef a
+#undef b
+#undef c
+#undef d
+#endif
+", @"#if foo
+#undef a
+#undef b
+#undef c
+#undef d
+#endif
+");
+		}
+
+		[Test]
+		public void TestUsingBlankLines ()
+		{
+			var policy = FormattingOptionsFactory.CreateMono();
+			policy.MinimumBlankLinesBeforeUsings = 2;
+			Test(policy,
+			      @"//
+using System;",
+			      @"//
+
+
+using System;");
+		}
+
+		[Test]
+		public void TestUsingBlankLinesCase2 ()
+		{
+			var policy = FormattingOptionsFactory.CreateMono();
+			policy.MinimumBlankLinesBeforeUsings = 2;
+			Test(policy,
+			       @"//
+
+
+using System;",
+			       @"//
+
+
+using System;");
+		}
+
+		[Test]
+		public void TestUsingBlankLinesCase3 ()
+		{
+			var policy = FormattingOptionsFactory.CreateMono();
+			policy.MinimumBlankLinesBeforeUsings = 2;
+			Test(policy,
+			      @"
+
+using System;",
+			      @"
+
+using System;");
+		}
+
+		[Test]
+		public void TestUsingBlankLinesCase4 ()
+		{
+			var policy = FormattingOptionsFactory.CreateMono();
+			policy.MinimumBlankLinesBeforeUsings = 2;
+			Test (policy,
+			      @"using System;",
+			      @"
+
+using System;");
+
+		}
 	}
 }
-

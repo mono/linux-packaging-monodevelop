@@ -46,12 +46,11 @@ using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Core.Execution;
 using MonoDevelop.Core.Instrumentation;
 using System.Diagnostics;
-using MonoDevelop.Projects;
 using System.Collections.Generic;
-using MonoDevelop.Core.LogReporting;
+using MonoDevelop.Ide.Extensions;
+using MonoDevelop.Components.Extensions;
 
 namespace MonoDevelop.Ide
 {
@@ -73,8 +72,14 @@ namespace MonoDevelop.Ide
 		
 		int Run (MonoDevelopOptions options)
 		{
+			LoggingService.LogInfo ("Starting {0} {1}", BrandingService.ApplicationName, IdeVersionInfo.MonoDevelopVersion);
+			LoggingService.LogInfo ("Running on {0}", IdeVersionInfo.GetRuntimeInfo ());
+
+			IdeApp.Customizer = options.IdeCustomizer ?? new IdeCustomizer ();
+			IdeApp.Customizer.Initialize ();
+
 			Counters.Initialization.BeginTiming ();
-			
+
 			if (options.PerfLog) {
 				string logFile = Path.Combine (Environment.CurrentDirectory, "monodevelop.perf-log");
 				LoggingService.LogInfo ("Logging instrumentation service data to file: " + logFile);
@@ -85,13 +90,12 @@ namespace MonoDevelop.Ide
 			Platform.Initialize ();
 			
 			Counters.Initialization.Trace ("Initializing GTK");
-			if (Platform.IsWindows) {
-				CheckWindowsGtk ();
-			}
+			if (Platform.IsWindows && !CheckWindowsGtk ())
+				return 1;
 			SetupExceptionManager ();
 			
 			try {
-				MonoDevelop.Ide.Gui.GLibLogging.Enabled = true;
+				GLibLogging.Enabled = true;
 			} catch (Exception ex) {
 				LoggingService.LogError ("Error initialising GLib logging.", ex);
 			}
@@ -101,9 +105,14 @@ namespace MonoDevelop.Ide
 			var args = options.RemainingArgs.ToArray ();
 			Gtk.Application.Init (BrandingService.ApplicationName, ref args);
 
+			LoggingService.LogInfo ("Using GTK+ {0}", IdeVersionInfo.GetGtkVersion ());
+
+			// XWT initialization
 			FilePath p = typeof(IdeStartup).Assembly.Location;
 			Assembly.LoadFrom (p.ParentDirectory.Combine ("Xwt.Gtk.dll"));
 			Xwt.Application.InitializeAsGuest (Xwt.ToolkitType.Gtk);
+			Xwt.Toolkit.CurrentEngine.RegisterBackend<IExtendedTitleBarWindowBackend,GtkExtendedTitleBarWindowBackend> ();
+			Xwt.Toolkit.CurrentEngine.RegisterBackend<IExtendedTitleBarDialogBackend,GtkExtendedTitleBarDialogBackend> ();
 
 			//default to Windows IME on Windows
 			if (Platform.IsWindows && Mono.TextEditor.GtkWorkarounds.GtkMinorVersion >= 16) {
@@ -118,9 +127,10 @@ namespace MonoDevelop.Ide
 			EndPoint ep = null;
 			
 			DispatchService.Initialize ();
-			
+
 			// Set a synchronization context for the main gtk thread
 			SynchronizationContext.SetSynchronizationContext (new GtkSynchronizationContext ());
+			Runtime.MainSynchronizationContext = SynchronizationContext.Current;
 			
 			AddinManager.AddinLoadError += OnAddinError;
 			
@@ -142,33 +152,19 @@ namespace MonoDevelop.Ide
 			Counters.Initialization.Trace ("Initializing Runtime");
 			Runtime.Initialize (true);
 
-			Counters.Initialization.Trace ("Initializing theme and splash window");
+			IdeApp.Customizer.OnCoreInitialized ();
+
+			Counters.Initialization.Trace ("Initializing theme");
 
 			DefaultTheme = Gtk.Settings.Default.ThemeName;
-			if (!string.IsNullOrEmpty (IdeApp.Preferences.UserInterfaceTheme)) {
-				string theme;
-				if (!ValidateGtkTheme (IdeApp.Preferences.UserInterfaceTheme, out theme))
-					return 1;
+			string theme = IdeApp.Preferences.UserInterfaceTheme;
+			if (string.IsNullOrEmpty (theme))
+				theme = DefaultTheme;
+			ValidateGtkTheme (ref theme);
+			if (theme != DefaultTheme)
 				Gtk.Settings.Default.ThemeName = theme;
-			}
 			
-			//don't show the splash screen on the Mac, so instead we get the expected "Dock bounce" effect
-			//this also enables the Mac platform service to subscribe to open document events before the GUI loop starts.
-			if (Platform.IsMac)
-				options.NoSplash = true;
-			
-			IProgressMonitor monitor = null;
-			if (!options.NoSplash) {
-				try {
-					monitor = new SplashScreenForm ();
-					((SplashScreenForm)monitor).ShowAll ();
-				} catch (Exception ex) {
-					LoggingService.LogError ("Failed to create splash screen", ex);
-				}
-			}
-			if (monitor == null) {
-				monitor = new MonoDevelop.Core.ProgressMonitoring.ConsoleProgressMonitor ();
-			}
+			IProgressMonitor monitor = new MonoDevelop.Core.ProgressMonitoring.ConsoleProgressMonitor ();
 			
 			monitor.BeginTask (GettextCatalog.GetString ("Starting {0}", BrandingService.ApplicationName), 2);
 
@@ -216,23 +212,22 @@ namespace MonoDevelop.Ide
 			
 			Exception error = null;
 			int reportedFailures = 0;
-			
+
 			try {
 				Counters.Initialization.Trace ("Loading Icons");
 				//force initialisation before the workbench so that it can register stock icons for GTK before they get requested
 				ImageService.Initialize ();
 				
 				if (errorsList.Count > 0) {
-					if (monitor is SplashScreenForm)
-						((SplashScreenForm)monitor).Hide ();
 					AddinLoadErrorDialog dlg = new AddinLoadErrorDialog ((AddinError[]) errorsList.ToArray (typeof(AddinError)), false);
 					if (!dlg.Run ())
 						return 1;
-					if (monitor is SplashScreenForm)
-						((SplashScreenForm)monitor).Show ();
 					reportedFailures = errorsList.Count;
 				}
-				
+
+				if (!CheckSCPlugin ())
+					return 1;
+
 				// no alternative for Application.ThreadException?
 				// Application.ThreadException += new ThreadExceptionEventHandler(ShowErrorBox);
 
@@ -253,8 +248,11 @@ namespace MonoDevelop.Ide
 			
 			if (error != null) {
 				LoggingService.LogFatalError (null, error);
-				MessageService.ShowException (error,
-				                              BrandingService.BrandApplicationName (GettextCatalog.GetString ("MonoDevelop failed to start. The following error has been reported: ") + error.Message));
+				string message = BrandingService.BrandApplicationName (GettextCatalog.GetString (
+					"MonoDevelop failed to start. The following error has been reported: {0}",
+					error.Message
+				));
+				MessageService.ShowException (error, message);
 				return 1;
 			}
 
@@ -282,17 +280,53 @@ namespace MonoDevelop.Ide
 			Counters.Initialization.EndTiming ();
 				
 			AddinManager.AddExtensionNodeHandler("/MonoDevelop/Ide/InitCompleteHandlers", OnExtensionChanged);
-			
+			StartLockupTracker ();
 			IdeApp.Run ();
+
+			IdeApp.Customizer.OnIdeShutdown ();
 			
 			// unloading services
 			if (null != socket_filename)
 				File.Delete (socket_filename);
-			
+			lockupCheckRunning = false;
 			Runtime.Shutdown ();
+
+			IdeApp.Customizer.OnCoreShutdown ();
+
 			InstrumentationService.Stop ();
+			AddinManager.AddinLoadError -= OnAddinError;
 			
 			return 0;
+		}
+
+		static DateTime lastIdle;
+		static bool lockupCheckRunning = true;
+
+		[Conditional("DEBUG")]
+		static void StartLockupTracker ()
+		{
+			if (Platform.IsWindows)
+				return;
+			GLib.Timeout.Add (2000, () => {
+				lastIdle = DateTime.Now;
+				return true;
+			});
+			lastIdle = DateTime.Now;
+			var lockupCheckThread = new Thread (delegate () {
+				while (lockupCheckRunning) {
+					const int waitTimeout = 5000;
+					const int maxResponseTime = 10000;
+					Thread.Sleep (waitTimeout); 
+					if ((DateTime.Now - lastIdle).TotalMilliseconds > maxResponseTime) {
+						var pid = Process.GetCurrentProcess ().Id;
+						Mono.Unix.Native.Syscall.kill (pid, Mono.Unix.Native.Signum.SIGQUIT); 
+						return;
+					}
+				}
+			});
+			lockupCheckThread.Name = "Lockup check";
+			lockupCheckThread.IsBackground = true;
+			lockupCheckThread.Start (); 
 		}
 
 		void SetupTheme ()
@@ -302,6 +336,9 @@ namespace MonoDevelop.Ide
 				var gtkrc = "gtkrc";
 				if (Platform.IsWindows) {
 					gtkrc += ".win32";
+					var osv = Environment.OSVersion.Version;
+					if (osv.Major == 6 && osv.Minor < 1)
+						gtkrc += "-vista";
 				} else if (Platform.IsMac) {
 					gtkrc += ".mac";
 				}
@@ -313,26 +350,63 @@ namespace MonoDevelop.Ide
 		[return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
 		static extern bool SetDllDirectory (string lpPathName);
 
-		static void CheckWindowsGtk ()
+		static bool CheckWindowsGtk ()
 		{
 			string location = null;
+			Version version = null;
+			Version minVersion = new Version (2, 12, 22);
+
 			using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Xamarin\GtkSharp\InstallFolder")) {
-				if (key != null) {
+				if (key != null)
 					location = key.GetValue (null) as string;
+			}
+			using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Xamarin\GtkSharp\Version")) {
+				if (key != null)
+					Version.TryParse (key.GetValue (null) as string, out version);
+			}
+
+			//TODO: check build version of GTK# dlls in GAC
+			if (version == null || version < minVersion || location == null || !File.Exists (Path.Combine (location, "bin", "libgtk-win32-2.0-0.dll"))) {
+				LoggingService.LogError ("Did not find required GTK# installation");
+				string url = "http://monodevelop.com/Download";
+				string caption = "Fatal Error";
+				string message =
+					"{0} did not find the required version of GTK#. Please click OK to open the download page, where " +
+					"you can download and install the latest version.";
+				if (DisplayWindowsOkCancelMessage (
+					string.Format (message, BrandingService.ApplicationName, url), caption)
+				) {
+					Process.Start (url);
 				}
+				return false;
 			}
-			if (location == null || !File.Exists (Path.Combine (location, "bin", "libgtk-win32-2.0-0.dll"))) {
-				LoggingService.LogError ("Did not find registered GTK# installation");
-				return;
-			}
+
+			LoggingService.LogInfo ("Found GTK# version " + version);
+
 			var path = Path.Combine (location, @"bin");
 			try {
 				if (SetDllDirectory (path)) {
-					return;
+					return true;
 				}
 			} catch (EntryPointNotFoundException) {
 			}
-			LoggingService.LogError ("Unable to set GTK# dll directory");
+			// this shouldn't happen unless something is weird in Windows
+			LoggingService.LogError ("Unable to set GTK+ dll directory");
+			return true;
+		}
+
+		static bool DisplayWindowsOkCancelMessage (string message, string caption)
+		{
+			var name = typeof(int).Assembly.FullName.Replace ("mscorlib", "System.Windows.Forms");
+			var asm = Assembly.Load (name);
+			var md = asm.GetType ("System.Windows.Forms.MessageBox");
+			var mbb = asm.GetType ("System.Windows.Forms.MessageBoxButtons");
+			var okCancel = Enum.ToObject (mbb, 1);
+			var dr = asm.GetType ("System.Windows.Forms.DialogResult");
+			var ok = Enum.ToObject (dr, 1);
+
+			const BindingFlags flags = BindingFlags.InvokeMethod | BindingFlags.Public | BindingFlags.Static;
+			return md.InvokeMember ("Show", flags, null, null, new object[] { message, caption, okCancel }).Equals (ok);
 		}
 		
 		public bool Initialized {
@@ -375,11 +449,11 @@ namespace MonoDevelop.Ide
 						continue;
 					file += c;
 				}
-				GLib.Idle.Add (delegate(){ return openFile (file); });
+				GLib.Idle.Add (() => OpenFile (file));
 			}
 		}
 
-		bool openFile (string file) 
+		static bool OpenFile (string file) 
 		{
 			if (string.IsNullOrEmpty (file))
 				return false;
@@ -402,7 +476,7 @@ namespace MonoDevelop.Ide
 					MonoDevelop.Projects.Services.ProjectService.IsSolutionItemFile (file)) {
 						IdeApp.Workspace.OpenWorkspaceItem (file);
 				} else {
-						IdeApp.Workbench.OpenDocument (file, line, column);
+					IdeApp.Workbench.OpenDocument (file, null, line, column, OpenDocumentOptions.DefaultInternal);
 				}
 			} catch {
 			}
@@ -410,46 +484,45 @@ namespace MonoDevelop.Ide
 			return false;
 		}
 
-		internal readonly static string[] FailingGtkThemes = new string[] {
-			"QtCurve",
-			"oxygen-gtk"
-		};
-
 		internal static string[] gtkThemeFallbacks = new string[] {
+			"Xamarin",// the best!
 			"Gilouche", // SUSE
 			"Mint-X", // MINT
 			"Radiance", // Ubuntu 'light' theme (MD looks better with the light theme in 4.0 - if that changes switch this one)
 			"Clearlooks" // GTK theme
 		};
 
-		bool ValidateGtkTheme (string requestedTheme, out string validTheme)
+		static void ValidateGtkTheme (ref string theme)
 		{
-			foreach (var theme in FailingGtkThemes) {
-				if (string.Equals (requestedTheme, theme, StringComparison.OrdinalIgnoreCase)) {
-					string msg = theme +" theme not supported";
-					string desc = "Your system is using the " + theme + " GTK+ theme. This theme is known to cause stability issues in MonoDevelop. Please select another theme in the GTK+ Theme Selector.\n\nIf you click on Proceed, MonoDevelop will switch to the default GTK+ theme.";
-					AlertButton res = MessageService.GenericAlert (Gtk.Stock.DialogWarning, msg, desc, AlertButton.Cancel, AlertButton.Proceed);
-					if (res == AlertButton.Cancel) {
-						validTheme = null;
-						return false;
-					}
-					var themes = MonoDevelop.Ide.Gui.OptionPanels.IDEStyleOptionsPanelWidget.InstalledThemes;
-					string fallback = null;
-					foreach (string fb in gtkThemeFallbacks) {
-						var foundTheme = themes.FirstOrDefault (t => string.Compare (fb, t, StringComparison.OrdinalIgnoreCase) == 0);
-						if (foundTheme != null) {
-							fallback = foundTheme;
-							break;
-						}
-					}
+			if (!MonoDevelop.Ide.Gui.OptionPanels.IDEStyleOptionsPanelWidget.IsBadGtkTheme (theme))
+				return;
 
-					validTheme = fallback ?? themes.FirstOrDefault () ?? requestedTheme;
-					return validTheme != null;
-				}
+			var themes = MonoDevelop.Ide.Gui.OptionPanels.IDEStyleOptionsPanelWidget.InstalledThemes;
+
+			string fallback = gtkThemeFallbacks
+				.Select (fb => themes.FirstOrDefault (t => string.Compare (fb, t, StringComparison.OrdinalIgnoreCase) == 0))
+				.FirstOrDefault (t => t != null);
+
+			string message = "Theme Not Supported";
+
+			string detail;
+			if (themes.Count > 0) {
+				detail =
+					"Your system is using the '{0}' GTK+ theme, which is known to be very unstable. MonoDevelop will " +
+					"now switch to an alternate GTK+ theme.\n\n" +
+					"This message will continue to be shown at startup until you set a alternate GTK+ theme as your " +
+					"default in the GTK+ Theme Selector or MonoDevelop Preferences.";
+			} else {
+				detail =
+					"Your system is using the '{0}' GTK+ theme, which is known to be very unstable, and no other GTK+ " +
+					"themes appear to be installed. Please install another GTK+ theme.\n\n" +
+					"This message will continue to be shown at startup until you install a different GTK+ theme and " +
+					"set it as your default in the GTK+ Theme Selector or MonoDevelop Preferences.";
 			}
 
-			validTheme = requestedTheme;
-			return true;
+			MessageService.GenericAlert (Gtk.Stock.DialogWarning, message, BrandingService.BrandApplicationName (detail), AlertButton.Ok);
+
+			theme = fallback ?? themes.FirstOrDefault () ?? theme;
 		}
 		
 		void CheckFileWatcher ()
@@ -474,7 +547,36 @@ namespace MonoDevelop.Ide
 			}
 		}
 
-		void SetupExceptionManager ()
+		bool CheckSCPlugin ()
+		{
+			if (Platform.IsMac && Directory.Exists ("/Library/Contextual Menu Items/SCFinderPlugin.plugin")) {
+				string message = "SCPlugin not supported";
+				string detail = "MonoDevelop has detected that SCPlugin (scplugin.tigris.org) is installed. " +
+				                "SCPlugin is a Subversion extension for Finder that is known to cause crashes in MonoDevelop and" +
+				                "other applications running on Mac OSX 10.9 (Mavericks) or upper. Please uninstall SCPlugin " +
+				                "before proceeding.";
+				var close = new AlertButton (BrandingService.BrandApplicationName (GettextCatalog.GetString ("Close MonoDevelop")));
+				var info = new AlertButton (GettextCatalog.GetString ("More Information"));
+				var cont = new AlertButton (GettextCatalog.GetString ("Continue Anyway"));
+				while (true) {
+					var res = MessageService.GenericAlert (Gtk.Stock.DialogWarning, message, BrandingService.BrandApplicationName (detail), info, cont, close);
+					if (res == close) {
+						LoggingService.LogInternalError ("SCPlugin detected", new Exception ("SCPlugin detected. Closing."));
+						return false;
+					}
+					if (res == info)
+						DesktopService.ShowUrl ("https://bugzilla.xamarin.com/show_bug.cgi?id=21755");
+					if (res == cont) {
+						bool exists = Directory.Exists ("/Library/Contextual Menu Items/SCFinderPlugin.plugin");
+						LoggingService.LogInternalError ("SCPlugin detected", new Exception ("SCPlugin detected. Continuing " + (exists ? "Installed." : "Uninstalled.")));
+						return true;
+					}
+				}
+			}
+			return true;
+		}
+
+		static void SetupExceptionManager ()
 		{
 			System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (sender, e) => {
 				HandleException (e.Exception.Flatten (), false);
@@ -491,13 +593,14 @@ namespace MonoDevelop.Ide
 			};
 		}
 		
-		void HandleException (Exception ex, bool willShutdown)
+		static void HandleException (Exception ex, bool willShutdown)
 		{
-			// Log the crash to the MonoDevelop.log file first:
-			LoggingService.LogError (string.Format ("An unhandled exception has occured. Terminating MonoDevelop? {0}", willShutdown), ex);
-			
-			// Pass it off to the reporting service now.
-			LogReportingService.ReportUnhandledException (ex, willShutdown);
+			var msg = String.Format ("An unhandled exception has occured. Terminating MonoDevelop? {0}", willShutdown);
+
+			if (willShutdown)
+				LoggingService.LogFatalError (msg, ex);
+			else
+				LoggingService.LogCriticalError (msg, ex);
 		}
 		
 		/// <summary>SDBM-style hash, bounded to a range of 1000.</summary>
@@ -513,14 +616,18 @@ namespace MonoDevelop.Ide
 			return (int)(hash % 1000);
 		}
 		
-		public static int Main (string[] args)
+		public static int Main (string[] args, IdeCustomizer customizer = null)
 		{
 			var options = MonoDevelopOptions.Parse (args);
 			if (options.ShowHelp || options.Error != null)
 				return options.Error != null? -1 : 0;
 			
 			LoggingService.Initialize (options.RedirectOutput);
-			
+
+			if (customizer == null)
+				customizer = LoadBrandingCustomizer ();
+			options.IdeCustomizer = customizer;
+
 			int ret = -1;
 			bool retry = false;
 			do {
@@ -557,6 +664,30 @@ namespace MonoDevelop.Ide
 
 			return ret;
 		}
+
+		static IdeCustomizer LoadBrandingCustomizer ()
+		{
+			var pathsString = BrandingService.GetString ("CustomizerAssemblyPath");
+			if (string.IsNullOrEmpty (pathsString))
+				return null;
+
+			var paths = pathsString.Split (new [] {';'}, StringSplitOptions.RemoveEmptyEntries);
+			var type = BrandingService.GetString ("CustomizerType");
+			if (!string.IsNullOrEmpty (type)) {
+				foreach (var path in paths) {
+					var file = BrandingService.GetFile (path.Replace ('/',Path.DirectorySeparatorChar));
+					if (File.Exists (file)) {
+						Assembly asm = Assembly.LoadFrom (file);
+						var t = asm.GetType (type, true);
+						var c = Activator.CreateInstance (t) as IdeCustomizer;
+						if (c == null)
+							throw new InvalidOperationException ("Customizer class specific in the branding file is not an IdeCustomizer subclass");
+						return c;
+					}
+				}
+			}
+			return null;
+		}
 	}
 	
 	public class MonoDevelopOptions
@@ -569,9 +700,9 @@ namespace MonoDevelop.Ide
 		
 		Mono.Options.OptionSet GetOptionSet ()
 		{
-			return new Mono.Options.OptionSet () {
-				{ "no-splash", "Do not display splash screen.", s => NoSplash = true },
-				{ "ipc-tcp", "Use the Tcp channel for inter-process comunication.", s => IpcTcp = true },
+			return new Mono.Options.OptionSet {
+				{ "no-splash", "Do not display splash screen (deprecated).", s => {} },
+				{ "ipc-tcp", "Use the Tcp channel for inter-process communication.", s => IpcTcp = true },
 				{ "new-window", "Do not open in an existing instance of " + BrandingService.ApplicationName, s => NewWindow = true },
 				{ "h|?|help", "Show help", s => ShowHelp = true },
 				{ "perf-log", "Enable performance counter logging", s => PerfLog = true },
@@ -596,7 +727,7 @@ namespace MonoDevelop.Ide
 			}
 			
 			if (opt.ShowHelp) {
-				Console.WriteLine (BrandingService.ApplicationName + " " + BuildVariables.PackageVersionLabel);
+				Console.WriteLine (BrandingService.ApplicationName + " " + BuildInfo.VersionLabel);
 				Console.WriteLine ("Options:");
 				optSet.WriteOptionDescriptions (Console.Out);
 			}
@@ -604,7 +735,6 @@ namespace MonoDevelop.Ide
 			return opt;
 		}
 		
-		public bool NoSplash { get; set; }
 		public bool IpcTcp { get; set; }
 		public bool NewWindow { get; set; }
 		public bool ShowHelp { get; set; }
@@ -612,6 +742,7 @@ namespace MonoDevelop.Ide
 		public bool RedirectOutput { get; set; }
 		public string Error { get; set; }
 		public IList<string> RemainingArgs { get; set; }
+		public IdeCustomizer IdeCustomizer { get; set; }
 	}
 	
 	public class AddinError

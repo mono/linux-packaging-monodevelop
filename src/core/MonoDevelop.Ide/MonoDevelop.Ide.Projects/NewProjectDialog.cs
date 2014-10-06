@@ -33,26 +33,24 @@ using System.Collections;
 using System.IO;
 using System.Text;
 
-using Mono.Addins;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Templates;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Gui.Dialogs;
 
-using MonoDevelop.Components;
-using IconView = MonoDevelop.Components.IconView;
 using Gtk;
 using System.Collections.Generic;
 using MonoDevelop.Ide.Gui.Components;
+using System.Linq;
 using System.Reflection;
+using MonoDevelop.Components;
+using Mono.Addins;
 
 namespace MonoDevelop.Ide.Projects {
 	/// <summary>
 	/// This class displays a new project dialog and sets up and creates a a new project,
 	/// the project types are described in an XML options file
 	/// </summary>
-	public partial class NewProjectDialog: Gtk.Dialog
+	internal partial class NewProjectDialog: Gtk.Dialog
 	{
 		ArrayList alltemplates = new ArrayList();
 		List<Category> categories = new List<Category> ();
@@ -70,7 +68,8 @@ namespace MonoDevelop.Ide.Projects {
 		CombineEntryFeatureSelector featureList;
 		IWorkspaceFileObject newItem;
 		Category recentCategory;
-		List<string> recentIds = new List<string> ();
+		List<string> recentTemplates = new List<string> ();
+		bool disposeNewItem = true;
 			
 		public NewProjectDialog (SolutionFolder parentFolder, bool openCombine, string basePath)
 		{
@@ -108,11 +107,13 @@ namespace MonoDevelop.Ide.Projects {
 			SelectTemplate (iter, id);
 		}
 		
-		ProjectTemplate GetTemplate (string id)
+		ProjectTemplate GetTemplate (string language, string id)
 		{
 			foreach (ProjectTemplate template in ProjectTemplate.ProjectTemplates) {
-				if (template.Id == id)
-					return template;
+				if (template.Id == id) {
+					if (language == null || template.LanguageName == language)
+						return template;
+				}
 			}
 			return null;
 		}
@@ -213,6 +214,10 @@ namespace MonoDevelop.Ide.Projects {
 				cat_text_render.Destroy ();
 				cat_text_render = null;
 			}
+
+			if (disposeNewItem && newItem != null)
+				newItem.Dispose ();
+
 			base.OnDestroyed ();
 		}
 		
@@ -316,6 +321,7 @@ namespace MonoDevelop.Ide.Projects {
 		{
 			if (!btn_new.Sensitive)
 				return;
+			btn_new.Sensitive = false;
 			
 			if (notebook.Page == 0) {
 				if (!CreateProject ())
@@ -348,6 +354,7 @@ namespace MonoDevelop.Ide.Projects {
 						}
 					}
 					notebook.Page++;
+					btn_new.Sensitive = true;
 					btn_new.Label = Gtk.Stock.Ok;
 					return;
 				}
@@ -378,9 +385,25 @@ namespace MonoDevelop.Ide.Projects {
 				IdeApp.ProjectOperations.Save (parentFolder.ParentSolution);
 			else
 				IdeApp.ProjectOperations.Save (newItem);
-			
-			if (openSolution)
-				selectedItem.OpenCreatedSolution();
+
+			if (openSolution) {
+				var op = selectedItem.OpenCreatedSolution ();
+				op.Completed += delegate {
+					if (op.Success) {
+						var sol = IdeApp.Workspace.GetAllSolutions ().FirstOrDefault ();
+						if (sol != null)
+							InstallProjectTemplatePackages (sol);
+					}
+				};
+			}
+			else {
+				// The item is not a solution being opened, so it is going to be added to
+				// an existing item. In this case, it must not be disposed by the dialog.
+				disposeNewItem = false;
+				if (parentFolder != null)
+					InstallProjectTemplatePackages (parentFolder.ParentSolution);
+			}
+
 			Respond (ResponseType.Ok);
 		}
 		
@@ -388,11 +411,18 @@ namespace MonoDevelop.Ide.Projects {
 		{
 			if (templateView.CurrentlySelected != null) {
 				PropertyService.Set ("Dialogs.NewProjectDialog.LastSelectedCategory",  ((ProjectTemplate)templateView.CurrentlySelected).Category);
-				recentIds.Remove (templateView.CurrentlySelected.Id);
-				recentIds.Insert (0, templateView.CurrentlySelected.Id);
-				if (recentIds.Count > 15)
-					recentIds.RemoveAt (recentIds.Count - 1);
-				string strRecent = string.Join (",", recentIds.ToArray ());
+				string template;
+				// keep the old format if the language is not specified
+				if (String.IsNullOrEmpty(templateView.CurrentlySelected.LanguageName)) {
+					template = templateView.CurrentlySelected.Id;
+				} else { // use the newer format with language before id
+					template = templateView.CurrentlySelected.LanguageName + "/" + templateView.CurrentlySelected.Id;
+				}
+				recentTemplates.Remove (template);
+				recentTemplates.Insert (0, template);
+				if (recentTemplates.Count > 15)
+					recentTemplates.RemoveAt (recentTemplates.Count - 1);
+				string strRecent = string.Join (",", recentTemplates.ToArray ());
 				PropertyService.Set ("Dialogs.NewProjectDialog.RecentTemplates", strRecent);
 				PropertyService.SaveProperties ();
 				//PropertyService.Set("Dialogs.NewProjectDialog.LargeImages", ((RadioButton)ControlDictionary["largeIconsRadioButton"]).Checked);
@@ -403,9 +433,10 @@ namespace MonoDevelop.Ide.Projects {
 			string location = ProjectLocation;
 
 			if(solution.Equals("")) solution = name; //This was empty when adding after first combine
-			
+
 			if (
-				!FileService.IsValidPath (solution) || 
+				(CreateSolutionDirectory &&
+				!FileService.IsValidPath (solution)) || 
 			    !FileService.IsValidFileName(name) ||
 				name.IndexOf (' ') >= 0 ||
 				!FileService.IsValidPath(location))
@@ -425,11 +456,18 @@ namespace MonoDevelop.Ide.Projects {
 			
 			if (templateView.CurrentlySelected == null || name.Length == 0)
 				return false;
-				
+
 			ProjectTemplate item = (ProjectTemplate) templateView.CurrentlySelected;
 			
 			try {
-				System.IO.Directory.CreateDirectory (location);
+				if (Directory.Exists (ProjectLocation)) {
+					var question = GettextCatalog.GetString ("Directory {0} already exists.\nDo you want to continue creating the project?", ProjectLocation);
+					var btn = MessageService.AskQuestion (question, AlertButton.No, AlertButton.Yes);
+					if (btn != AlertButton.Yes)
+						return false;
+				}
+
+				Directory.CreateDirectory (location);
 			} catch (IOException) {
 				MessageService.ShowError (GettextCatalog.GetString ("Could not create directory {0}. File already exists.", location));
 				return false;
@@ -437,7 +475,11 @@ namespace MonoDevelop.Ide.Projects {
 				MessageService.ShowError (GettextCatalog.GetString ("You do not have permission to create to {0}", location));
 				return false;
 			}
-			
+
+			if (newItem != null) {
+				newItem.Dispose ();
+				newItem = null;
+			}
 			
 			try {
 				ProjectCreateInformation cinfo = CreateProjectCreateInformation ();
@@ -466,6 +508,16 @@ namespace MonoDevelop.Ide.Projects {
 			cinfo.ParentFolder = parentFolder;
 			cinfo.ActiveConfiguration = IdeApp.Workspace.ActiveConfiguration;
 			return cinfo;
+		}
+
+		void InstallProjectTemplatePackages (Solution sol)
+		{
+			if (!selectedItem.HasPackages ())
+				return;
+
+			foreach (ProjectTemplatePackageInstaller installer in AddinManager.GetExtensionObjects ("/MonoDevelop/Ide/ProjectTemplatePackageInstallers")) {
+				installer.Run (sol, selectedItem.PackageReferencesForCreatedProjects);
+			}
 		}
 
 		// icon view event handlers
@@ -622,10 +674,22 @@ namespace MonoDevelop.Ide.Projects {
 			
 			recentCategory = new Category (GettextCatalog.GetString ("Recent"));
 			string strRecent = PropertyService.Get<string> ("Dialogs.NewProjectDialog.RecentTemplates", "");
-			recentIds = new List<string> (strRecent.Split (new char[] {','}, StringSplitOptions.RemoveEmptyEntries));
 
-			foreach (string id in recentIds) {
-				ProjectTemplate pt = GetTemplate (id);
+			recentTemplates = new List<string> ();
+			foreach (string template in strRecent.Split (new char[] {','}, StringSplitOptions.RemoveEmptyEntries)) {
+				// Some templates can't be identified using only id, sometimes language is needed too
+				string id, language = null;
+				// If the string was serialized with old format leave null value for the language variable
+				int separator = template.IndexOf ('/');
+				if (separator == -1) {
+					id = template;
+				} else { // In other case extract the language
+					language = template.Substring (0, separator);
+					id = template.Substring (separator + 1);
+				}
+				recentTemplates.Add (template);
+
+				ProjectTemplate pt = GetTemplate (language, id);
 				if (pt != null)
 					recentCategory.Templates.Add (new TemplateItem (pt) { DisplayCategory = true });
 			}
@@ -759,8 +823,8 @@ namespace MonoDevelop.Ide.Projects {
 				Model = templateStore;
 				
 				TreeViewColumn col = new TreeViewColumn ();
-				CellRendererIcon crp = new CellRendererIcon ();
-				crp.StockSize = (uint) Gtk.IconSize.Dnd;
+				CellRendererImage crp = new CellRendererImage ();
+				crp.StockSize = Gtk.IconSize.Dnd;
 				crp.Ypad = 2;
 				col.PackStart (crp, false);
 				col.AddAttribute (crp, "stock-id", 0);

@@ -158,16 +158,10 @@ namespace MonoDevelop.Core.Assemblies
 					return false;
 
 				var prefix = pattern.Substring (0, star);
-				return profile.StartsWith (prefix);
+				return profile.StartsWith (prefix, StringComparison.Ordinal);
 			}
 
 			return profile == pattern;
-		}
-
-		[Obsolete ("Use CanReferenceAssembliesTargetingFramework() instead")]
-		public bool IsCompatibleWithFramework (TargetFrameworkMoniker fxId)
-		{
-			return CanReferenceAssembliesTargetingFramework (fxId);
 		}
 
 		public bool CanReferenceAssembliesTargetingFramework (TargetFrameworkMoniker fxId)
@@ -195,17 +189,6 @@ namespace MonoDevelop.Core.Assemblies
 
 				if (version >= sfx.MinimumVersion && version <= sfx.MaximumVersion)
 					return true;
-			}
-
-			// FIXME: this is a hack for systems w/o Portable Class Library definitions
-			if (fx.Id.Identifier == TargetFrameworkMoniker.ID_PORTABLE) {
-				switch (id.Identifier) {
-				case TargetFrameworkMoniker.ID_NET_FRAMEWORK:
-					return new Version (fx.Id.Version).CompareTo (new Version (id.Version)) <= 0;
-				case TargetFrameworkMoniker.ID_MONOTOUCH:
-				case TargetFrameworkMoniker.ID_MONODROID:
-					return true;
-				}
 			}
 
 			return fx.Id.Identifier == id.Identifier && new Version (fx.Id.Version).CompareTo (new Version (id.Version)) <= 0;
@@ -251,10 +234,12 @@ namespace MonoDevelop.Core.Assemblies
 		internal List<TargetFrameworkMoniker> IncludedFrameworks {
 			get { return includedFrameworks; }
 		}
-				
+
 		[ItemProperty (Name="IncludesFramework")]
+		#pragma warning disable 649
 		string includesFramework;
-		
+		#pragma warning restore 649
+
 		internal TargetFrameworkMoniker GetIncludesFramework ()
 		{
 			if (string.IsNullOrEmpty (includesFramework))
@@ -274,11 +259,6 @@ namespace MonoDevelop.Core.Assemblies
 		[ItemProperty]
 		[ItemProperty ("Assembly", Scope="*")]
 		internal AssemblyInfo[] Assemblies {
-			get;
-			set;
-		}
-		
-		internal AssemblyInfo[] AssembliesExpanded {
 			get;
 			set;
 		}
@@ -318,16 +298,18 @@ namespace MonoDevelop.Core.Assemblies
 						fx.clrVersion = ClrVersion.Net_4_0;
 						break;
 					case "4.5":
+					case "4.5.1":
 						fx.clrVersion = ClrVersion.Net_4_5;
 						break;
 					default:
-						throw new Exception ("Unknown RuntimeVersion '" + runtimeVersion + "'");
+						LoggingService.LogInfo ("Framework {0} has unknown RuntimeVersion {1}", moniker, runtimeVersion);
+						return null;
 					}
 				}
 				
 				if (reader.MoveToAttribute ("ToolsVersion") && reader.ReadAttributeValue ()) {
-					string runtimeVersion = reader.ReadContentAsString ();
-					switch (runtimeVersion) {
+					string toolsVersion = reader.ReadContentAsString ();
+					switch (toolsVersion) {
 					case "2.0":
 						fx.toolsVersion = TargetFrameworkToolsVersion.V2_0;
 						break;
@@ -341,15 +323,15 @@ namespace MonoDevelop.Core.Assemblies
 						fx.toolsVersion = TargetFrameworkToolsVersion.V4_5;
 						break;
 					default:
-						throw new Exception ("Unknown ToolsVersion '" + runtimeVersion + "'");
+						LoggingService.LogInfo ("Framework {0} has unknown ToolsVersion {1}", moniker, toolsVersion);
+						return null;
 					}
 				}
 				
 				if (reader.MoveToAttribute ("IncludeFramework") && reader.ReadAttributeValue ()) {
 					string include = reader.ReadContentAsString ();
-					if (!string.IsNullOrEmpty (include)) {
-						fx.IncludedFrameworks.Add (new TargetFrameworkMoniker (fx.Id.Identifier, include));
-					}
+					if (!string.IsNullOrEmpty (include))
+						fx.includesFramework = include;
 				}
 				
 				//this is a Mono-specific extension
@@ -386,7 +368,7 @@ namespace MonoDevelop.Core.Assemblies
 
 					// HACK: we were using EnumerateFiles but it's broken in some Mono releases
 					// https://bugzilla.xamarin.com/show_bug.cgi?id=2975
-					var files = System.IO.Directory.GetFiles (dir, "*.dll");
+					var files = Directory.GetFiles (dir, "*.dll");
 					foreach (var f in files) {
 						try {
 							var an = SystemAssemblyService.GetAssemblyNameObj (dir.Combine (f));

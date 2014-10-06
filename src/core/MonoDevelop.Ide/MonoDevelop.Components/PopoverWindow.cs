@@ -230,6 +230,9 @@ namespace MonoDevelop.Components
 			var screen = parent.Screen;
 			Gdk.Rectangle geometry = GtkWorkarounds.GetUsableMonitorGeometry (screen, screen.GetMonitorAtPoint (x, y));
 
+			// Add some spacing between the screen border and the popover window
+			geometry.Inflate (-5, -5);
+
 			// Flip the orientation if the window doesn't fit the screen.
 
 			int intPos = (int) position;
@@ -315,12 +318,18 @@ namespace MonoDevelop.Components
 
 			Move (x, y);
 			Show ();
-			DesktopService.RemoveWindowShadow (this);
+			if (!ShowWindowShadow)
+				DesktopService.RemoveWindowShadow (this);
 		}
 		
 		public bool SupportsAlpha {
 			get;
 			private set;
+		}
+
+		public bool ShowWindowShadow {
+			get;
+			set;
 		}
 
 		void CheckScreenColormap ()

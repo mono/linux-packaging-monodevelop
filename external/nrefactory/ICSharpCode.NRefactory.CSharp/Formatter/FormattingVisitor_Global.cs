@@ -32,12 +32,26 @@ namespace ICSharpCode.NRefactory.CSharp
 	{
 		int GetGlobalNewLinesFor(AstNode child)
 		{
+			if (child.NextSibling == null)
+				// last node in the document => no extra newlines
+				return 0;
+			if (child.NextSibling.Role == Roles.RBrace)
+				// Last node in a block => no extra newlines, it's handled later by FixClosingBrace()
+				return 0;
+
 			int newLines = 1;
 			var nextSibling = child.GetNextSibling(NoWhitespacePredicate);
+			if (nextSibling is PreProcessorDirective) {
+				var directive = (PreProcessorDirective)nextSibling;
+				if (directive.Type == PreProcessorDirectiveType.Endif)
+					return -1;
+				if (directive.Type == PreProcessorDirectiveType.Undef)
+					return -1;
+			}
 			if ((child is UsingDeclaration || child is UsingAliasDeclaration) && !(nextSibling is UsingDeclaration || nextSibling is UsingAliasDeclaration)) {
-				newLines += policy.BlankLinesAfterUsings;
+				newLines += policy.MinimumBlankLinesAfterUsings;
 			} else if ((child is TypeDeclaration) && (nextSibling is TypeDeclaration)) {
-				newLines += policy.BlankLinesBetweenTypes;
+				newLines += policy.MinimumBlankLinesBetweenTypes;
 			}
 
 			return newLines;
@@ -48,14 +62,14 @@ namespace ICSharpCode.NRefactory.CSharp
 			bool first = true;
 			VisitChildrenToFormat(unit, child => {
 				if (first && (child is UsingDeclaration || child is UsingAliasDeclaration)) {
-					EnsureBlankLinesBefore(child, policy.BlankLinesBeforeUsings);
+					EnsureMinimumBlankLinesBefore(child, policy.MinimumBlankLinesBeforeUsings);
 					first = false;
 				}
 				if (NoWhitespacePredicate(child))
 					FixIndentation(child);
 				child.AcceptVisitor(this);
-				if (NoWhitespacePredicate(child))
-					EnsureNewLinesAfter(child, GetGlobalNewLinesFor(child));
+				if (NoWhitespacePredicate(child) && !first)
+					EnsureMinimumNewLinesAfter(child, GetGlobalNewLinesFor(child));
 			});
 		}
 
@@ -92,6 +106,7 @@ namespace ICSharpCode.NRefactory.CSharp
 		public override void VisitUsingAliasDeclaration(UsingAliasDeclaration usingDeclaration)
 		{
 			ForceSpacesAfter(usingDeclaration.UsingToken, true);
+			ForceSpacesAround(usingDeclaration.AssignToken, policy.SpaceAroundAssignment);
 			FixSemicolon(usingDeclaration.SemicolonToken);
 		}
 
@@ -111,11 +126,11 @@ namespace ICSharpCode.NRefactory.CSharp
 					var next = child.GetNextSibling(NoWhitespacePredicate);
 					var blankLines = 1;
 					if (next is UsingDeclaration || next is UsingAliasDeclaration) {
-						blankLines += policy.BlankLinesBeforeUsings;
+						blankLines += policy.MinimumBlankLinesBeforeUsings;
 					} else {
-						blankLines += policy.BlankLinesBeforeFirstDeclaration;
+						blankLines += policy.MinimumBlankLinesBeforeFirstDeclaration;
 					}
-					EnsureNewLinesAfter(child, blankLines);
+					EnsureMinimumNewLinesAfter(child, blankLines);
 					startFormat = true;
 					return;
 				}
@@ -133,7 +148,7 @@ namespace ICSharpCode.NRefactory.CSharp
 					FixIndentationForceNewLine(child);
 				child.AcceptVisitor(this);
 				if (NoWhitespacePredicate(child))
-					EnsureNewLinesAfter(child, GetGlobalNewLinesFor(child));
+					EnsureMinimumNewLinesAfter(child, GetGlobalNewLinesFor(child));
 			});
 
 			if (policy.IndentNamespaceBody)
@@ -151,8 +166,10 @@ namespace ICSharpCode.NRefactory.CSharp
 			}
 			if (entity.Attributes.Count > 0) {
 				AstNode n = null;
+				entity.Attributes.First().AcceptVisitor(this);
 				foreach (var attr in entity.Attributes.Skip (1)) {
 					FixIndentation(attr);
+					attr.AcceptVisitor(this);
 					n = attr;
 				}
 				if (n != null) {
@@ -205,6 +222,8 @@ namespace ICSharpCode.NRefactory.CSharp
 				}
 				if (child.Role == Roles.LBrace) {
 					startFormat = true;
+					if (braceStyle != BraceStyle.DoNotChange)
+						EnsureMinimumNewLinesAfter(child, GetTypeLevelNewLinesFor(child));
 					return;
 				}
 				if (child.Role == Roles.RBrace) {
@@ -215,14 +234,14 @@ namespace ICSharpCode.NRefactory.CSharp
 					return;
 				if (child.Role == Roles.Comma) {
 					ForceSpacesBeforeRemoveNewLines (child, false);
-					EnsureNewLinesAfter(child, 1);
+					EnsureMinimumNewLinesAfter(child, 1);
 					return;
 				} 
 				if (NoWhitespacePredicate(child))
 					FixIndentationForceNewLine(child);
 				child.AcceptVisitor(this);
 				if (NoWhitespacePredicate(child) && child.GetNextSibling (NoWhitespacePredicate).Role != Roles.Comma)
-					EnsureNewLinesAfter(child, GetTypeLevelNewLinesFor(child));
+					EnsureMinimumNewLinesAfter(child, GetTypeLevelNewLinesFor(child));
 			});
 
 			if (indentBody)
@@ -235,31 +254,61 @@ namespace ICSharpCode.NRefactory.CSharp
 		{
 			var blankLines = 1;
 			var nextSibling = child.GetNextSibling(NoWhitespacePredicate);
-			if (child is PreProcessorDirective || child is Comment)
+			if (child is PreProcessorDirective) {
+				var directive = (PreProcessorDirective)child;
+				if (directive.Type == PreProcessorDirectiveType.Region) {
+					blankLines += policy.MinimumBlankLinesInsideRegion;
+				}
+				if (directive.Type == PreProcessorDirectiveType.Endregion) {
+					if (child.GetNextSibling(NoWhitespacePredicate) is CSharpTokenNode)
+						return 1;
+					blankLines += policy.MinimumBlankLinesAroundRegion;
+				}
+				return blankLines;
+			}
+
+			if (nextSibling is PreProcessorDirective) {
+				var directive = (PreProcessorDirective)nextSibling;
+				if (directive.Type == PreProcessorDirectiveType.Region) {
+					if (child is CSharpTokenNode)
+						return 1;
+					blankLines += policy.MinimumBlankLinesAroundRegion;
+				}
+				if (directive.Type == PreProcessorDirectiveType.Endregion)
+					blankLines += policy.MinimumBlankLinesInsideRegion;
+				if (directive.Type == PreProcessorDirectiveType.Endif)
+					return -1;
+				if (directive.Type == PreProcessorDirectiveType.Undef)
+					return -1;
+				return blankLines;
+			}
+			if (child.Role == Roles.LBrace)
+				return 1;
+			if (child is Comment)
 				return 1;
 			if (child is EventDeclaration) {
 				if (nextSibling is EventDeclaration) {
-					blankLines += policy.BlankLinesBetweenEventFields;
+					blankLines += policy.MinimumBlankLinesBetweenEventFields;
 					return blankLines;
 				}
 			}
 
 			if (child is FieldDeclaration || child is FixedFieldDeclaration) {
 				if (nextSibling is FieldDeclaration || nextSibling is FixedFieldDeclaration) {
-					blankLines += policy.BlankLinesBetweenFields;
+					blankLines += policy.MinimumBlankLinesBetweenFields;
 					return blankLines;
 				}
 			}
 			
 			if (child is TypeDeclaration) {
 				if (nextSibling is TypeDeclaration) {
-					blankLines += policy.BlankLinesBetweenTypes;
+					blankLines += policy.MinimumBlankLinesBetweenTypes;
 					return blankLines;
 				}
 			}
 
 			if (nextSibling.Role == Roles.TypeMemberRole)
-				blankLines += policy.BlankLinesBetweenMembers;
+				blankLines += policy.MinimumBlankLinesBetweenMembers;
 			return blankLines;
 		}
 

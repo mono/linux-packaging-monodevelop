@@ -61,7 +61,7 @@ class Middle : Base {
 class Derived : Middle {
 	public override void Method() {}
 }";
-			var unresolvedFile = Parse(program);
+			Parse(program);
 			ITypeDefinition derived = compilation.MainAssembly.GetTypeDefinition(new TopLevelTypeName("Derived"));
 			var rr = lookup.Lookup(new ResolveResult(derived), "Method", EmptyList<IType>.Instance, true) as MethodGroupResolveResult;
 			Assert.AreEqual(2, rr.MethodsGroupedByDeclaringType.Count());
@@ -88,7 +88,7 @@ class Derived : Base<int> {
 	public override void Method(int a) {}
 	public override void Method(string a) {}
 }";
-			var unresolvedFile = Parse(program);
+			Parse(program);
 			ITypeDefinition derived = compilation.MainAssembly.GetTypeDefinition(new TopLevelTypeName("Derived"));
 			var rr = lookup.Lookup(new ResolveResult(derived), "Method", EmptyList<IType>.Instance, true) as MethodGroupResolveResult;
 			Assert.AreEqual(2, rr.MethodsGroupedByDeclaringType.Count());
@@ -116,7 +116,7 @@ class Base {
 class Derived : Base {
 	public override void Method<S>(S a) {}
 }";
-			var unresolvedFile = Parse(program);
+			Parse(program);
 			ITypeDefinition derived = compilation.MainAssembly.GetTypeDefinition(new TopLevelTypeName("Derived"));
 			var rr = lookup.Lookup(new ResolveResult(derived), "Method", EmptyList<IType>.Instance, true) as MethodGroupResolveResult;
 			Assert.AreEqual(1, rr.MethodsGroupedByDeclaringType.Count());
@@ -325,6 +325,39 @@ public class Test : Base {
 			var rr = Resolve<MemberResolveResult>(program);
 			Assert.IsFalse(rr.IsError);
 			Assert.AreEqual("Base.Field", rr.Member.FullName);
+		}
+		
+		[Test]
+		public void ProtectedBaseIndexer()
+		{
+			string program = @"using System;
+class X {
+	protected int this[int index] { get; }
+}
+class Y : X {
+	int M() {
+		return $base[0]$;
+	}
+}";
+			var rr = Resolve<CSharpInvocationResolveResult>(program);
+			Assert.AreEqual(OverloadResolutionErrors.None, rr.OverloadResolutionErrors);
+			Assert.AreEqual("X.Item", rr.Member.FullName);
+		}
+		
+		[Test]
+		public void ProtectedBaseIndexerError()
+		{
+			string program = @"using System;
+class X {
+	protected int this[int index] { get; }
+}
+class Y : X {
+	int M(X x) {
+		return $x[0]$;
+	}
+}";
+			var rr = Resolve(program);
+			Assert.IsTrue(rr.IsError);
 		}
 		
 		[Test]
@@ -569,10 +602,23 @@ public class G<U, V> : IA<$G<V, string>$>
 		{
 			string program = @"unsafe struct Test {
 	fixed int Field[8];
-	int M() { return $Field$; }
+	int* M() { return $Field$; }
 }";
 			var rr = Resolve<MemberResolveResult>(program);
 			Assert.AreEqual("Test.Field", rr.Member.FullName);
+			Assert.AreEqual("System.Int32*", rr.Type.ToString());
+		}
+
+		[Test]
+		public void FixedFieldTest2()
+		{
+			string program = @"unsafe struct Test {
+	fixed int Field[8];
+	int* M() { return $this.Field$; }
+}";
+			var rr = Resolve<MemberResolveResult>(program);
+			Assert.AreEqual("Test.Field", rr.Member.FullName);
+			Assert.AreEqual("System.Int32*", rr.Type.ToString());
 		}
 
 		[Test]
@@ -594,6 +640,24 @@ public class G<U, V> : IA<$G<V, string>$>
 }";
 			var rr = Resolve<MemberResolveResult>(program);
 			Assert.AreEqual("Test.Field", rr.Member.FullName);
+		}
+		
+		[Test]
+		public void CrossTypeParametersInheritance()
+		{
+			string program = @"using System;
+class BaseClass<A,B> {
+	public A a;
+	public B b;
+}
+class DerivedClass<A,B> : BaseClass<B,A> {
+	object Test() { return $; }
+}";
+			var mrr = Resolve<MemberResolveResult>(program.Replace("$", "$a$"));
+			Assert.AreEqual("B", mrr.Type.Name);
+			
+			mrr = Resolve<MemberResolveResult>(program.Replace("$", "$b$"));
+			Assert.AreEqual("A", mrr.Type.Name);
 		}
 	}
 }

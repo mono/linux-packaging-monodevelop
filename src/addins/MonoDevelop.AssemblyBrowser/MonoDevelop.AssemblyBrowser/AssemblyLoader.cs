@@ -75,9 +75,14 @@ namespace MonoDevelop.AssemblyBrowser
 			if (!File.Exists (fileName))
 				throw new ArgumentException ("File doesn't exist.", "fileName");
 			this.assemblyLoaderTask = Task.Factory.StartNew<AssemblyDefinition> (() => {
-				return AssemblyDefinition.ReadAssembly (FileName, new ReaderParameters () {
-					AssemblyResolver = this
-				});
+				try {
+					return AssemblyDefinition.ReadAssembly (FileName, new ReaderParameters {
+						AssemblyResolver = this
+					});
+				} catch (Exception e) {
+					LoggingService.LogError ("Error while reading assembly " + FileName, e);
+					return null;
+				}
 			}, src.Token);
 			
 			this.unresolvedAssembly = new Lazy<IUnresolvedAssembly> (delegate {
@@ -131,6 +136,12 @@ namespace MonoDevelop.AssemblyBrowser
 			var exe = Path.Combine (path, name.Name + ".exe");
 			if (File.Exists (exe))
 				return exe;
+
+			foreach (var asm in Runtime.SystemAssemblyService.DefaultAssemblyContext.GetAssemblies ()) {
+				if (asm.Name.ToLowerInvariant () == fullAssemblyName.ToLowerInvariant ())
+					return asm.Location;
+			}
+
 			return null;
 		}
 

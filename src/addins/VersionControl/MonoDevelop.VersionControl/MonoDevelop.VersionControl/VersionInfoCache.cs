@@ -23,7 +23,6 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-using System;
 using MonoDevelop.Core;
 using System.Collections.Generic;
 using System.Linq;
@@ -45,11 +44,11 @@ namespace MonoDevelop.VersionControl
 		{
 			rootPath = rootPath.CanonicalPath;
 			lock (fileStatus) {
-				foreach (var p in fileStatus.Where (e => e.Key.IsChildPathOf (rootPath) || e.Key == rootPath).ToArray ())
+				foreach (var p in fileStatus.Where (e => e.Key.IsChildPathOf (rootPath) || e.Key == rootPath))
 					p.Value.RequiresRefresh = true;
 			}
 			lock (directoryStatus) {
-				foreach (var p in directoryStatus.Where (e => e.Key.IsChildPathOf (rootPath) || e.Key == rootPath).ToArray ())
+				foreach (var p in directoryStatus.Where (e => e.Key.IsChildPathOf (rootPath) || e.Key == rootPath))
 					p.Value.RequiresRefresh = true;
 			}
 		}
@@ -58,19 +57,18 @@ namespace MonoDevelop.VersionControl
 		{
 			lock (fileStatus) {
 				VersionInfo vi;
-				fileStatus.TryGetValue (localPath.CanonicalPath, out vi);
+				fileStatus.TryGetValue (localPath, out vi);
 				return vi;
 			}
 		}
 
 		public DirectoryStatus GetDirectoryStatus (FilePath localPath)
 		{
-			lock (fileStatus) {
+			lock (directoryStatus) {
 				DirectoryStatus vis;
 				if (directoryStatus.TryGetValue (localPath.CanonicalPath, out vis))
 					return vis;
-				else
-					return null;
+				return null;
 			}
 		}
 
@@ -83,7 +81,7 @@ namespace MonoDevelop.VersionControl
 					return;
 				}
 				versionInfo.Init (repo);
-				fileStatus [versionInfo.LocalPath.CanonicalPath] = versionInfo;
+				fileStatus [versionInfo.LocalPath] = versionInfo;
 			}
 			if (notify)
 				VersionControlService.NotifyFileStatusChanged (new FileUpdateEventArgs (repo, versionInfo.LocalPath, versionInfo.IsDirectory));
@@ -95,12 +93,12 @@ namespace MonoDevelop.VersionControl
 			lock (fileStatus) {
 				foreach (var versionInfo in versionInfos) {
 					VersionInfo vi;
-					if (fileStatus.TryGetValue (versionInfo.LocalPath.CanonicalPath, out vi) && vi.Equals (versionInfo)) {
+					if (fileStatus.TryGetValue (versionInfo.LocalPath, out vi) && vi.Equals (versionInfo)) {
 						vi.RequiresRefresh = false;
 						continue;
 					}
 					versionInfo.Init (repo);
-					fileStatus [versionInfo.LocalPath.CanonicalPath] = versionInfo;
+					fileStatus [versionInfo.LocalPath] = versionInfo;
 					var a = new FileUpdateEventArgs (repo, versionInfo.LocalPath, versionInfo.IsDirectory);
 					if (args == null)
 						args = a;
@@ -133,7 +131,7 @@ namespace MonoDevelop.VersionControl
 						}
 					}
 				}
-				directoryStatus [localDirectory.CanonicalPath] = new DirectoryStatus () { FileInfo = versionInfos, HasRemoteStatus = hasRemoteStatus };
+				directoryStatus [localDirectory.CanonicalPath] = new DirectoryStatus { FileInfo = versionInfos, HasRemoteStatus = hasRemoteStatus };
 				SetStatus (versionInfos);
 			}
 		}

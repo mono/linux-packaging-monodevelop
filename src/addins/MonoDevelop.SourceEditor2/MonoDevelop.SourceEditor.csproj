@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{F8F92AA4-A376-4679-A9D4-60E7B7FBF477}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -13,7 +13,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>True</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>True</Optimize>
+    <Optimize>false</Optimize>
     <OutputPath>..\..\..\build\AddIns\DisplayBindings\SourceEditor</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -27,10 +27,13 @@
     </CustomCommands>
     <AssemblyName>MonoDevelop.SourceEditor2</AssemblyName>
     <ConsolePause>False</ConsolePause>
+    <DefineConstants>DEBUG</DefineConstants>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\DisplayBindings\SourceEditor\MonoDevelop.SourceEditor2.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
-    <Optimize>True</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
     <OutputPath>..\..\..\build\AddIns\DisplayBindings\SourceEditor</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -39,6 +42,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\DisplayBindings\SourceEditor\MonoDevelop.SourceEditor.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\core\MonoDevelop.Core\MonoDevelop.Core.csproj">
@@ -84,6 +90,11 @@
     <ProjectReference Include="..\..\..\external\debugger-libs\Mono.Debugging\Mono.Debugging.csproj">
       <Project>{90C99ADB-7D4B-4EB4-98C2-40BD1B14C7D2}</Project>
       <Name>Mono.Debugging</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\nrefactory\ICSharpCode.NRefactory.CSharp\ICSharpCode.NRefactory.CSharp.csproj">
+      <Project>{53DCA265-3C3C-42F9-B647-F72BA678122B}</Project>
+      <Name>ICSharpCode.NRefactory.CSharp</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
@@ -172,6 +183,14 @@
     <Compile Include="gtk-gui\MonoDevelop.SourceEditor.OptionPanels.CompletionOptionsPanel.cs" />
     <Compile Include="MonoDevelop.SourceEditor.OptionPanels\CompletionAppearancePanel.cs" />
     <Compile Include="gtk-gui\MonoDevelop.SourceEditor.OptionPanels.CompletionAppearancePanel.cs" />
+    <Compile Include="AddinInfo.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.OptionPanels\CompletionCharactersPanel.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\OverlayMessageWindow.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\HoverCloseButton.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.JSon\JSonIndentationTracker.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.JSon\JSonIndentEngine.cs" />
+    <Compile Include="MonoDevelop.SourceEditor.JSon\JSonTextEditorExtension.cs" />
+    <Compile Include="MonoDevelop.SourceEditor\AbstractUsagesExtension.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
@@ -182,6 +201,90 @@
     </EmbeddedResource>
     <EmbeddedResource Include="MonoDevelop.SourceEditor\searchoptions.png">
       <LogicalName>searchoptions.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-busy-16.png">
+      <LogicalName>issues-busy-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-busy-16%402x.png">
+      <LogicalName>issues-busy-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-error-16.png">
+      <LogicalName>issues-error-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-error-16%402x.png">
+      <LogicalName>issues-error-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-ok-16.png">
+      <LogicalName>issues-ok-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-ok-16%402x.png">
+      <LogicalName>issues-ok-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-suggestion-16.png">
+      <LogicalName>issues-suggestion-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-suggestion-16%402x.png">
+      <LogicalName>issues-suggestion-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-warning-16.png">
+      <LogicalName>issues-warning-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\issues-warning-16%402x.png">
+      <LogicalName>issues-warning-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-bookmark-15.png">
+      <LogicalName>gutter-bookmark-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-bookmark-15%402x.png">
+      <LogicalName>gutter-bookmark-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-error-15.png">
+      <LogicalName>gutter-error-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-error-15%402x.png">
+      <LogicalName>gutter-error-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-warning-15.png">
+      <LogicalName>gutter-warning-light-15.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\gutter-warning-15%402x.png">
+      <LogicalName>gutter-warning-light-15@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-markers-rulers-16.png">
+      <LogicalName>prefs-markers-rulers-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-markers-rulers-16%402x.png">
+      <LogicalName>prefs-markers-rulers-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-syntax-highlighting-16.png">
+      <LogicalName>prefs-syntax-highlighting-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-syntax-highlighting-16%402x.png">
+      <LogicalName>prefs-syntax-highlighting-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-text-editor-general-16.png">
+      <LogicalName>prefs-text-editor-general-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-text-editor-general-16%402x.png">
+      <LogicalName>prefs-text-editor-general-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-text-editor-behavior-16.png">
+      <LogicalName>prefs-text-editor-behavior-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-text-editor-behavior-16%402x.png">
+      <LogicalName>prefs-text-editor-behavior-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-completion-appearance-16.png">
+      <LogicalName>prefs-completion-appearance-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-completion-appearance-16%402x.png">
+      <LogicalName>prefs-completion-appearance-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-completion-behavior-16.png">
+      <LogicalName>prefs-completion-behavior-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-completion-behavior-16%402x.png">
+      <LogicalName>prefs-completion-behavior-light-16@2x.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />

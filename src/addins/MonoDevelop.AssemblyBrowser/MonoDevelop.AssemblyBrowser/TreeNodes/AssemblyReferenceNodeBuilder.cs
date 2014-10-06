@@ -60,11 +60,11 @@ namespace MonoDevelop.AssemblyBrowser
 			return reference.Name;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			var reference = (AssemblyNameReference)dataObject;
-			label = reference.Name;
-			icon = Context.GetIcon (Stock.Reference);
+			nodeInfo.Label = reference.Name;
+			nodeInfo.Icon = Context.GetIcon (Stock.Reference);
 		}
 		
 		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
@@ -90,7 +90,7 @@ namespace MonoDevelop.AssemblyBrowser
 		}
 	}
 	
-	public class ReferenceNodeCommandHandler : NodeCommandHandler
+	class ReferenceNodeCommandHandler : NodeCommandHandler
 	{
 		public override void ActivateItem ()
 		{

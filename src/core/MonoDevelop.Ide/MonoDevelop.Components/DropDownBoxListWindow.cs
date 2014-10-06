@@ -25,32 +25,54 @@
 // THE SOFTWARE.
 
 using System;
-using System.Collections.Generic;
 using MonoDevelop.Ide;
 using Gtk;
-using Mono.TextEditor;
-using MonoDevelop.Ide.TypeSystem;
 using System.Text;
 
 namespace MonoDevelop.Components
 {
 	public class DropDownBoxListWindow : Window
 	{
-		ScrolledWindow vScrollbar;
+		readonly ScrolledWindow vScrollbar;
 		internal ListWidget list;
-		
+
 		public IListDataProvider DataProvider {
 			get;
 			private set;
 		}
-		
-		public DropDownBoxListWindow (IListDataProvider provider) : base(Gtk.WindowType.Popup)
+
+		public int FixedRowHeight {
+			get {
+				return list.FixedRowHeight;
+			}
+			set {
+				list.FixedRowHeight = value;
+				list.CalcRowHeight ();
+			}
+		}
+
+		public int MaxVisibleRows {
+			get {
+				return list.MaxVisibleRows;
+			}
+			set {
+				list.MaxVisibleRows = value;
+				list.CalcVisibleRows ();
+				SetSizeRequest (list.WidthRequest, list.HeightRequest);
+			}
+		}
+
+		public DropDownBoxListWindow (IListDataProvider provider) : this (provider, WindowType.Toplevel)
+		{
+		}
+
+		public DropDownBoxListWindow (IListDataProvider provider, WindowType windowType) : base (windowType)
 		{
 			this.DataProvider = provider;
-			this.TransientFor = MonoDevelop.Ide.IdeApp.Workbench.RootWindow;
+			this.TransientFor = IdeApp.Workbench.RootWindow;
 			this.TypeHint = Gdk.WindowTypeHint.Menu;
+			this.Decorated = false;
 			this.BorderWidth = 1;
-			this.Events |= Gdk.EventMask.KeyPressMask;
 			list = new ListWidget (this);
 			list.SelectItem += delegate {
 				var sel = list.Selection;
@@ -61,7 +83,7 @@ namespace MonoDevelop.Components
 			};
 			SetSizeRequest (list.WidthRequest, list.HeightRequest);
 			vScrollbar = new ScrolledWindow ();
-			vScrollbar.VScrollbar.SizeAllocated += (object o, SizeAllocatedArgs args) => {
+			vScrollbar.VScrollbar.SizeAllocated += (o, args) => {
 				var minWidth = list.WidthRequest + args.Allocation.Width;
 				if (this.Allocation.Width < minWidth)
 					SetSizeRequest (minWidth, list.HeightRequest);
@@ -82,23 +104,6 @@ namespace MonoDevelop.Components
 				}
 			}
 		}
-		
-		protected override void OnMapped ()
-		{
-			base.OnMapped ();
-			Gdk.Pointer.Grab (this.GdkWindow, true, Gdk.EventMask.ButtonPressMask | Gdk.EventMask.ButtonReleaseMask | Gdk.EventMask.PointerMotionMask | Gdk.EventMask.EnterNotifyMask | Gdk.EventMask.LeaveNotifyMask, null, null, Gtk.Global.CurrentEventTime);
-			Gtk.Grab.Add (this);
-			this.GrabBrokenEvent += delegate {
-				Destroy ();
-			};
-		}
-		
-		protected override void OnUnmapped ()
-		{
-			Gtk.Grab.Remove (this);
-			Gdk.Pointer.Ungrab (Gtk.Global.CurrentEventTime);
-			base.OnUnmapped ();
-		}
 
 		void SwitchToSeletedWord ()
 		{
@@ -118,16 +123,16 @@ namespace MonoDevelop.Components
 				if (list.SelectionDisabled)
 					list.SelectionDisabled = false;
 				else
-					list.Selection --;
+					list.Selection--;
 				return true;
 				
 			case Gdk.Key.Down:
 				if (list.SelectionDisabled)
 					list.SelectionDisabled = false;
 				else
-					list.Selection ++;
+					list.Selection++;
 				return true;
-				
+
 			case Gdk.Key.Page_Up:
 				list.Selection -= list.VisibleRows - 1;
 				return true;
@@ -137,7 +142,7 @@ namespace MonoDevelop.Components
 				return true;
 
 			case Gdk.Key.Home:
-				list.Selection = (int)0;
+				list.Selection = 0;
 				return true;
 			
 			case Gdk.Key.End:
@@ -171,7 +176,7 @@ namespace MonoDevelop.Components
 			Destroy ();
 			return base.OnFocusOutEvent (evnt);
 		}
-		
+
 		protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
 		{
 			if (left)
@@ -179,8 +184,8 @@ namespace MonoDevelop.Components
 			return base.OnButtonPressEvent (evnt);
 		}
 
-
 		bool left = true;
+
 		protected override bool OnLeaveNotifyEvent (Gdk.EventCrossing evnt)
 		{
 			left = true;
@@ -189,27 +194,18 @@ namespace MonoDevelop.Components
 
 		protected override bool OnEnterNotifyEvent (Gdk.EventCrossing evnt)
 		{
-			if (evnt.Window == this.GdkWindow)
-				left = false;
+			left &= evnt.Window != GdkWindow;
 			return base.OnEnterNotifyEvent (evnt);
 		}
 
-		protected override bool OnKeyPressEvent (Gdk.EventKey evnt)
+		internal class ListWidget: DrawingArea
 		{
-			ProcessKey (evnt.Key, evnt.State);
-			return base.OnKeyPressEvent (evnt);
-		}
-		
-		internal class ListWidget: Gtk.DrawingArea
-		{
-			int margin = 0;
-			int padding = 4;
+			const int margin = 0;
+			const int padding = 4;
 			int listWidth = 300;
-			
 			Pango.Layout layout;
-			DropDownBoxListWindow win;
-			int selection = 0;
-
+			readonly DropDownBoxListWindow win;
+			int selection;
 			int rowHeight;
 
 			public int RowHeight {
@@ -218,37 +214,45 @@ namespace MonoDevelop.Components
 				}
 			}
 
-		//	bool buttonPressed;
+			public int FixedRowHeight {
+				get;
+				set;
+			}
+			//	bool buttonPressed;
 			bool disableSelection;
-	
+
 			public event EventHandler SelectionChanged;
-					
+
 			public ListWidget (DropDownBoxListWindow win)
 			{
 				this.win = win;
 				this.Events = Gdk.EventMask.ButtonPressMask | Gdk.EventMask.ButtonReleaseMask | Gdk.EventMask.PointerMotionMask | Gdk.EventMask.LeaveNotifyMask;
+				this.CanFocus = true;
 				layout = new Pango.Layout (this.PangoContext);
 				CalcRowHeight ();
 				CalcVisibleRows ();
 			}
-			
-			void CalcRowHeight ()
+
+			internal void CalcRowHeight ()
 			{
-				layout.SetText ("|");
-				int rowWidth;
-				layout.GetPixelSize (out rowWidth, out rowHeight);
-				rowHeight += padding;
-				SetBounds (Allocation);
+				if (FixedRowHeight > 0) {
+					rowHeight = FixedRowHeight;
+				} else {
+					layout.SetText ("|");
+					int rowWidth;
+					layout.GetPixelSize (out rowWidth, out rowHeight);
+					rowHeight += padding;
+				}
+				SetBounds ();
 			}
-			
+
 			protected override bool OnLeaveNotifyEvent (Gdk.EventCrossing evnt)
 			{
 				selection = -1;
 				QueueDraw ();
 				return base.OnLeaveNotifyEvent (evnt);
 			}
-	
-			
+
 			protected override void OnDestroyed ()
 			{
 				if (layout != null) {
@@ -257,7 +261,7 @@ namespace MonoDevelop.Components
 				}
 				base.OnDestroyed ();
 			}
-			
+
 			public void Reset ()
 			{
 				if (win.DataProvider == null) {
@@ -265,19 +269,18 @@ namespace MonoDevelop.Components
 					return;
 				}
 				
-				if (win.DataProvider.IconCount == 0)
-					selection = -1;
-				else
-					selection = 0;
+				selection = win.DataProvider.IconCount == 0 ? -1 : 0;
 				CalcVisibleRows ();
 				disableSelection = false;
 				if (IsRealized) {
 					UpdateStyle ();
 					QueueDraw ();
 				}
-				if (SelectionChanged != null) SelectionChanged (this, EventArgs.Empty);
+				if (SelectionChanged != null)
+					SelectionChanged (this, EventArgs.Empty);
 			}
-			StringBuilder wordSelection = new StringBuilder ();
+
+			readonly StringBuilder wordSelection = new StringBuilder ();
 
 			public StringBuilder WordSelection {
 				get {
@@ -285,8 +288,7 @@ namespace MonoDevelop.Components
 				}
 			}
 
-			public int Selection
-			{
+			public int Selection {
 				get {
 					return selection;
 				}
@@ -303,174 +305,162 @@ namespace MonoDevelop.Components
 							SelectionChanged (this, EventArgs.Empty);
 					}
 					
-					if (disableSelection)
-						disableSelection = false;
+					disableSelection &= !disableSelection;
 	
-					this.QueueDraw ();
+					QueueDraw ();
 				}
 			}
-			
+
 			void UpdatePage ()
 			{
 				var area = GetRowArea (selection);
-				if (area.Y < vadj.Value) {
-					vadj.Value = area.Y;
-					return;
+				var value = vAdjustment.Value;
+				if (area.Y < value) {
+					value = area.Y;
+				} else if (value + Allocation.Height < area.Bottom) {
+					value = Math.Max (0, area.Bottom - vAdjustment.PageSize + 1);
 				}
-				if (vadj.Value + Allocation.Height < area.Bottom) {
-					vadj.Value = System.Math.Max (0, area.Bottom - vadj.PageSize + 1);
-				}
+				vAdjustment.Value = Math.Max (vAdjustment.Lower, Math.Min (value, vAdjustment.Upper - vAdjustment.PageSize));
+
 			}
-			
+
 			public bool SelectionDisabled {
 				get { return disableSelection; }
 				set {
 					disableSelection = value; 
-					this.QueueDraw ();
+					QueueDraw ();
 				}
 			}
 
-			protected override bool OnButtonPressEvent (Gdk.EventButton e)
+			protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
 			{
-				Selection = GetRowByPosition ((int) e.Y);
-				if (e.Type == Gdk.EventType.ButtonPress) {
+				Selection = GetRowByPosition ((int)evnt.Y);
+				if (evnt.Type == Gdk.EventType.ButtonPress) {
 					OnSelectItem (EventArgs.Empty);
 					Destroy ();
 				}
 				//buttonPressed = true;
-				return base.OnButtonPressEvent (e);
+				return base.OnButtonPressEvent (evnt);
 			}
-			
-			protected override bool OnButtonReleaseEvent (Gdk.EventButton e)
-			{
-				//buttonPressed = false;
-				return base.OnButtonReleaseEvent (e);
-			}
-			
-			protected override bool OnMotionNotifyEvent (Gdk.EventMotion e)
+			int curMouseY;
+			protected override bool OnMotionNotifyEvent (Gdk.EventMotion evnt)
 			{
 				int winWidth, winHeight;
-				this.GdkWindow.GetSize (out winWidth, out winHeight);
+				GdkWindow.GetSize (out winWidth, out winHeight);
+				curMouseY = (int)evnt.Y;
+				Selection = GetRowByPosition (curMouseY);
 				
-				Selection = GetRowByPosition ((int) e.Y);
-				
-				return base.OnMotionNotifyEvent (e);
+				return base.OnMotionNotifyEvent (evnt);
 			}
-			
+
+			protected override bool OnKeyPressEvent (Gdk.EventKey evnt)
+			{
+				return win.ProcessKey (evnt.Key, evnt.State);
+			}
+
 			protected override bool OnScrollEvent (Gdk.EventScroll evnt)
 			{
-				var s = GetRowByPosition ((int) evnt.Y);
-				if (Selection != s)
-					Selection = s;
+				var s = GetRowByPosition ((int)evnt.Y);
+				Selection = s;
 				
 				return base.OnScrollEvent (evnt);
 			}
-	
-			protected override bool OnExposeEvent (Gdk.EventExpose args)
+
+			protected override bool OnExposeEvent (Gdk.EventExpose evnt)
 			{
-				base.OnExposeEvent (args);
+				base.OnExposeEvent (evnt);
 				DrawList ();
 				return false;
 			}
-	
+
 			void DrawList ()
 			{
 				int winWidth, winHeight;
-				this.GdkWindow.GetSize (out winWidth, out winHeight);
+				GdkWindow.GetSize (out winWidth, out winHeight);
 
-				int ypos = margin;
 				int lineWidth = winWidth - margin * 2;
-				int xpos = margin + padding;
+				const int xpos = margin + padding;
 
-				int n = (int)(vadj.Value / rowHeight);
+				int n = (int)(vAdjustment.Value / rowHeight);
+				int ypos = (int)(margin + n * rowHeight - vAdjustment.Value);
 				while (ypos < winHeight - margin && n < win.DataProvider.IconCount) {
 					string text = win.DataProvider.GetMarkup (n) ?? "&lt;null&gt;";
-					layout.SetMarkup (text);
 
-					Gdk.Pixbuf icon = win.DataProvider.GetIcon (n);
-					int iconHeight = icon != null ? icon.Height : 24;
-					int iconWidth = icon != null ? icon.Width : 0;
+					var icon = win.DataProvider.GetIcon (n);
+					int iconHeight = icon != null ? (int)icon.Height : 24;
+					int iconWidth = icon != null ? (int)icon.Width : 0;
+
+					layout.Ellipsize = Pango.EllipsizeMode.End;
+					layout.Width = (Allocation.Width - xpos - iconWidth - 2) * (int)Pango.Scale.PangoScale;
+					layout.SetMarkup (PathBar.GetFirstLineFromMarkup (text));
 
 					int wi, he, typos, iypos;
 					layout.GetPixelSize (out wi, out he);
-					if (wi > Allocation.Width) {
-						int idx, trail;
-						if (layout.XyToIndex (
-							(int)((Allocation.Width - xpos - iconWidth - 2) * Pango.Scale.PangoScale),
-							0,
-							out idx,
-							out trail
-						) && idx > 3) {
-							text = AmbienceService.UnescapeText (text);
-							text = text.Substring (0, idx - 3) + "...";
-							text = AmbienceService.EscapeText (text);
-							layout.SetMarkup (text);
-							layout.GetPixelSize (out wi, out he);
-						}
-					}
 					typos = he < rowHeight ? ypos + (rowHeight - he) / 2 : ypos;
 					iypos = iconHeight < rowHeight ? ypos + (rowHeight - iconHeight) / 2 : ypos;
 					
 					if (n == selection) {
 						if (!disableSelection) {
-							this.GdkWindow.DrawRectangle (this.Style.BaseGC (StateType.Selected), 
-							                              true, margin, ypos, lineWidth, he + padding);
-							this.GdkWindow.DrawLayout (this.Style.TextGC (StateType.Selected), 
-								                           xpos + iconWidth + 2, typos, layout);
+							GdkWindow.DrawRectangle (Style.BaseGC (StateType.Selected), 
+								true, margin, ypos, lineWidth, rowHeight);
+							GdkWindow.DrawLayout (Style.TextGC (StateType.Selected), 
+							                      xpos + iconWidth + 2, typos, layout);
 						} else {
-							this.GdkWindow.DrawRectangle (this.Style.BaseGC (StateType.Selected), 
-							                              false, margin, ypos, lineWidth, he + padding);
-							this.GdkWindow.DrawLayout (this.Style.TextGC (StateType.Normal), 
-							                           xpos + iconWidth + 2, typos, layout);
+							GdkWindow.DrawRectangle (Style.BaseGC (StateType.Selected), 
+								false, margin, ypos, lineWidth, rowHeight);
+							GdkWindow.DrawLayout (Style.TextGC (StateType.Normal), 
+							                      xpos + iconWidth + 2, typos, layout);
 						}
 					} else
-						this.GdkWindow.DrawLayout (this.Style.TextGC (StateType.Normal), 
-						                           xpos + iconWidth + 2, typos, layout);
+						GdkWindow.DrawLayout (Style.TextGC (StateType.Normal), 
+						                      xpos + iconWidth + 2, typos, layout);
 					
-					if (icon != null)
-						this.GdkWindow.DrawPixbuf (this.Style.ForegroundGC (StateType.Normal), icon, 0, 0, 
-						                           xpos, iypos, iconWidth, iconHeight, Gdk.RgbDither.None, 0, 0);
+					if (icon != null) {
+						using (var ctx = Gdk.CairoHelper.Create (this.GdkWindow))
+							ctx.DrawImage (this, icon, xpos, iypos);
+					}
 					
 					ypos += rowHeight;
 					n++;
 					
 //reset the markup or it carries over to the next SetText
 					layout.SetMarkup (string.Empty);
-					}
 				}
-			
+			}
+
 			int GetRowByPosition (int ypos)
 			{
-				return (int)(vadj.Value + ypos) / rowHeight;
+				return (int)(vAdjustment.Value + ypos) / rowHeight;
 			}
 
 			public Gdk.Rectangle GetRowArea (int row)
 			{
 				return new Gdk.Rectangle (0, row * rowHeight, Allocation.Width, rowHeight - 1);
 			}
-			
+
 			public int VisibleRows {
 				get {
 					return Allocation.Height / rowHeight;
 				}
 			}
 
-			const int maxVisibleRows = 8;
-			void CalcVisibleRows ()
+			internal int MaxVisibleRows = 8;
+
+			internal void CalcVisibleRows ()
 			{
 				int lvWidth, lvHeight;
-				this.GetSizeRequest (out lvWidth, out lvHeight);
+				GetSizeRequest (out lvWidth, out lvHeight);
 				if (layout == null)
 					return;
-
 				int newHeight;
-				if (this.win.DataProvider.IconCount > maxVisibleRows)
-					newHeight = (rowHeight * maxVisibleRows) + margin * 2;
-				else
-					newHeight = (rowHeight * this.win.DataProvider.IconCount) + margin * 2;
+				newHeight = win.DataProvider.IconCount > MaxVisibleRows ? 
+								(rowHeight * MaxVisibleRows) + margin * 2 :
+								(rowHeight * win.DataProvider.IconCount) + margin * 2;
+				newHeight += 2;
 				listWidth = Math.Min (450, CalcWidth ());
-				this.SetSizeRequest (listWidth, newHeight);
-			} 
+				SetSizeRequest (listWidth, newHeight);
+			}
+
 			internal int CalcWidth ()
 			{
 				if (win.DataProvider.IconCount == 0)
@@ -488,63 +478,68 @@ namespace MonoDevelop.Components
 				layout.SetMarkup (win.DataProvider.GetMarkup (longest) ?? "&lt;null&gt;");
 				int w, h;
 				layout.GetPixelSize (out w, out h);
-				Gdk.Pixbuf icon = win.DataProvider.GetIcon (longest);
-				int iconWidth = icon != null ? icon.Width : 24;
+				var icon = win.DataProvider.GetIcon (longest);
+				int iconWidth = icon != null ? (int) icon.Width : 24;
 				w += iconWidth + 2 + padding * 2 + margin;
 				return w;
 			}
 
-			void SetBounds (Gdk.Rectangle allocation)
+			void SetBounds ()
 			{
-				if (vadj == null)
+				if (vAdjustment == null)
 					return;
-				var h = allocation.Height;
+				var h = Allocation.Height;
 				var height = Math.Max (h, rowHeight * win.DataProvider.IconCount);
-				if (this.win.DataProvider.IconCount < maxVisibleRows) {
-					vadj.SetBounds (0, h, 0, 0, h);
+				if (win.DataProvider.IconCount < MaxVisibleRows) {
+					vAdjustment.SetBounds (0, h, 0, 0, h);
 				} else {
-					vadj.SetBounds (0, height, RowHeight, h, h);
+					vAdjustment.SetBounds (0, height, RowHeight, h, h);
 				}
+				UpdatePage ();
 			}
 
 			protected override void OnSizeAllocated (Gdk.Rectangle allocation)
 			{
 				base.OnSizeAllocated (allocation);
 
-				hadj.SetBounds (0, allocation.Width, 0, 0, allocation.Width);
+				hAdjustment.SetBounds (0, allocation.Width, 0, 0, allocation.Width);
 
-				SetBounds (allocation);
+				SetBounds ();
 
 				UpdatePage ();
 			}
-			
+
 			protected override void OnRealized ()
 			{
 				base.OnRealized ();
 				UpdateStyle ();
 			}
-			
+
 			void UpdateStyle ()
 			{
-				this.GdkWindow.Background = this.Style.Base (StateType.Normal);
+				GdkWindow.Background = Style.Base (StateType.Normal);
 				if (layout != null)
 					layout.Dispose ();
-				layout = new Pango.Layout (this.PangoContext);
+				layout = new Pango.Layout (PangoContext);
 				layout.Wrap = Pango.WrapMode.Char;
-				layout.FontDescription = this.Style.FontDescription.Copy();
+				layout.FontDescription = Style.FontDescription.Copy ();
 				CalcRowHeight ();
 				CalcVisibleRows ();
 			}
 
-			Adjustment hadj;
-			Adjustment vadj;
+			Adjustment hAdjustment;
+			Adjustment vAdjustment;
 
 			protected override void OnSetScrollAdjustments (Adjustment hadj, Adjustment vadj)
 			{
-				this.hadj = hadj;
-				this.vadj = vadj;
-				if (this.vadj != null)
-					this.vadj.ValueChanged += (sender, e) => QueueDraw ();
+				hAdjustment = hadj;
+				vAdjustment = vadj;
+				if (vAdjustment != null)
+					vAdjustment.ValueChanged += delegate {
+						if (selection > -1)
+							Selection = GetRowByPosition (curMouseY);
+						QueueDraw ();
+					};
 				base.OnSetScrollAdjustments (hadj, vadj);
 			}
 
@@ -553,19 +548,24 @@ namespace MonoDevelop.Components
 				if (SelectItem != null)
 					SelectItem (this, e);
 			}
+
 			public event EventHandler SelectItem;
 		}
-		
+
 		public interface IListDataProvider
 		{
 			int IconCount {
 				get;
 			}
+
 			void Reset ();
+
 			string GetMarkup (int n);
-			Gdk.Pixbuf GetIcon (int n);
+
+			Xwt.Drawing.Image GetIcon (int n);
+
 			object GetTag (int n);
-			
+
 			void ActivateItem (int n);
 		}
 	}

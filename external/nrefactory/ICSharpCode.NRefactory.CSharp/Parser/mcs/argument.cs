@@ -34,6 +34,11 @@ namespace Mono.CSharp
 			Default = 3,		// argument created from default parameter value
 			DynamicTypeName = 4,	// System.Type argument for dynamic binding
 			ExtensionType = 5,	// Instance expression inserted as the first argument
+
+			// Conditional instance expression inserted as the first argument
+			ExtensionTypeConditionalAccess = 5 | ConditionalAccessFlag,
+
+			ConditionalAccessFlag = 1 << 7
 		}
 
 		public readonly AType ArgType;
@@ -58,6 +63,12 @@ namespace Mono.CSharp
 
 		public bool IsDefaultArgument {
 			get { return ArgType == AType.Default; }
+		}
+
+		public bool IsExtensionType {
+			get {
+				return (ArgType & AType.ExtensionType) == AType.ExtensionType;
+			}
 		}
 
 		public Parameter.Modifier Modifier {
@@ -105,7 +116,13 @@ namespace Mono.CSharp
 		public virtual void Emit (EmitContext ec)
 		{
 			if (!IsByRef) {
-				Expr.Emit (ec);
+				if (ArgType == AType.ExtensionTypeConditionalAccess) {
+					var ie = new InstanceEmitter (Expr, false);
+					ie.Emit (ec, true);
+				} else {
+					Expr.Emit (ec);
+				}
+
 				return;
 			}
 
@@ -125,6 +142,29 @@ namespace Mono.CSharp
 
 			Expr = res;
 			return this;
+		}
+
+		public void FlowAnalysis (FlowAnalysisContext fc)
+		{
+			if (ArgType == AType.Out) {
+				var vr = Expr as VariableReference;
+				if (vr != null) {
+					if (vr.VariableInfo != null)
+						fc.SetVariableAssigned (vr.VariableInfo);
+
+					return;
+				}
+
+				var fe = Expr as FieldExpr;
+				if (fe != null) {
+					fe.SetFieldAssigned (fc);
+					return;
+				}
+
+				return;
+			}
+
+			Expr.FlowAnalysis (fc);
 		}
 
 		public string GetSignatureForError ()
@@ -152,18 +192,16 @@ namespace Mono.CSharp
 
 		public void Resolve (ResolveContext ec)
 		{
-//			using (ec.With (ResolveContext.Options.DoFlowAnalysis, true)) {
-				// Verify that the argument is readable
-				if (ArgType != AType.Out)
-					Expr = Expr.Resolve (ec);
+			// Verify that the argument is readable
+			if (ArgType != AType.Out)
+				Expr = Expr.Resolve (ec);
 
-				// Verify that the argument is writeable
-				if (Expr != null && IsByRef)
-					Expr = Expr.ResolveLValue (ec, EmptyExpression.OutAccess);
+			// Verify that the argument is writeable
+			if (Expr != null && IsByRef)
+				Expr = Expr.ResolveLValue (ec, EmptyExpression.OutAccess);
 
-				if (Expr == null)
-					Expr = ErrorExpression.Instance;
-//			}
+			if (Expr == null)
+				Expr = ErrorExpression.Instance;
 		}
 	}
 
@@ -253,6 +291,16 @@ namespace Mono.CSharp
 			public void AddOrdered (MovableArgument arg)
 			{
 				ordered.Add (arg);
+			}
+
+			public override void FlowAnalysis (FlowAnalysisContext fc, List<MovableArgument> movable = null)
+			{
+				foreach (var arg in ordered) {
+					if (arg.ArgType != Argument.AType.Out)
+						arg.FlowAnalysis (fc);
+				}
+
+				base.FlowAnalysis (fc, ordered);
 			}
 
 			public override Arguments Emit (EmitContext ec, bool dup_args, bool prepareAwait)
@@ -474,6 +522,36 @@ namespace Mono.CSharp
 				return new Arguments (dups);
 
 			return null;
+		}
+
+		public virtual void FlowAnalysis (FlowAnalysisContext fc, List<MovableArgument> movable = null)
+		{
+			bool has_out = false;
+			foreach (var arg in args) {
+				if (arg.ArgType == Argument.AType.Out) {
+					has_out = true;
+					continue;
+				}
+
+				if (movable == null) {
+					arg.FlowAnalysis (fc);
+					continue;
+				}
+
+				var ma = arg as MovableArgument;
+				if (ma != null && !movable.Contains (ma))
+					arg.FlowAnalysis (fc);
+			}
+
+			if (!has_out)
+				return;
+
+			foreach (var arg in args) {
+				if (arg.ArgType != Argument.AType.Out)
+					continue;
+
+				arg.FlowAnalysis (fc);
+			}
 		}
 
 		public List<Argument>.Enumerator GetEnumerator ()

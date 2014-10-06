@@ -27,11 +27,10 @@ using System;
 using MonoDevelop.Ide.Templates;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
-using System.Linq;
 
 namespace MonoDevelop.VersionControl.Git
 {
-	public class GitSupportFeature: ISolutionItemFeature
+	sealed class GitSupportFeature: ISolutionItemFeature
 	{
 		public FeatureSupportLevel GetSupportLevel (SolutionFolder parentFolder, SolutionItem entry)
 		{
@@ -65,7 +64,7 @@ namespace MonoDevelop.VersionControl.Git
 		{
 			Solution sol = (Solution)o;
 			sol.Saved -= OnSolutionSaved;
-			GitUtil.Init (sol.BaseDirectory, null, null);
+			GitUtil.Init (sol.BaseDirectory, null);
 			
 			GitRepository gitRepo = new GitRepository (sol.BaseDirectory, null);
 			gitRepo.Add (sol.GetItemFiles (true).ToArray (), false, new MonoDevelop.Core.ProgressMonitoring.NullProgressMonitor ());

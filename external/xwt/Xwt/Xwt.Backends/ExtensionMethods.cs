@@ -54,9 +54,9 @@ namespace Xwt.Backends
 				return null;
 		}
 
-		public static ImageDescription ToImageDescription (this Image img)
+		public static ImageDescription ToImageDescription (this Image img, ApplicationContext ctx)
 		{
-			return img != null ? img.ImageDescription : ImageDescription.Null;
+			return img != null ? img.GetImageDescription (ctx.Toolkit) : ImageDescription.Null;
 		}
 
 		public static double GetValue (this WidgetPlacement al)
@@ -69,6 +69,61 @@ namespace Xwt.Backends
 			default:
 				return 0;
 			}
+		}
+
+		public static Widget GetInternalParent (this Widget widget)
+		{
+			return widget.InternalParent;
+		}
+
+		public static void RaiseKeyPressed (this CellView cellView, KeyEventArgs args)
+		{
+			cellView.OnKeyPressed (args);
+		}
+
+		public static void RaiseKeyReleased (this CellView cellView, KeyEventArgs args)
+		{
+			cellView.OnKeyReleased (args);
+		}
+
+		public static void RaiseMouseEntered (this CellView cellView)
+		{
+			cellView.OnMouseEntered ();
+		}
+
+		public static void RaiseMouseExited (this CellView cellView)
+		{
+			cellView.OnMouseExited ();
+		}
+
+		public static void RaiseMouseMoved (this CellView cellView, MouseMovedEventArgs args)
+		{
+			cellView.OnMouseMoved (args);
+		}
+
+		public static void RaiseButtonPressed (this CellView cellView, ButtonEventArgs args)
+		{
+			cellView.OnButtonPressed (args);
+		}
+
+		public static void RaiseButtonReleased (this CellView cellView, ButtonEventArgs args)
+		{
+			cellView.OnButtonReleased (args);
+		}
+
+		public static void SetFileSource (this Image image, string file)
+		{
+			image.NativeRef.SetFileSource (file);
+		}
+
+		public static void SetResourceSource (this Image image, System.Reflection.Assembly asm, string name)
+		{
+			image.NativeRef.SetResourceSource (asm, name);
+		}
+
+		public static void SetStreamSource (this Image image, Func<System.IO.Stream[]> imageLoader)
+		{
+			image.NativeRef.SetStreamSource (imageLoader);
 		}
 	}
 }

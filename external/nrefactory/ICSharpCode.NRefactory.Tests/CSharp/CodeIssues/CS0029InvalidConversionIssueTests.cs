@@ -2,6 +2,7 @@ using System.Linq;
 using ICSharpCode.NRefactory.CSharp.Refactoring;
 using NUnit.Framework;
 using ICSharpCode.NRefactory.CSharp.CodeActions;
+using System;
 
 namespace ICSharpCode.NRefactory.CSharp.CodeIssues
 {
@@ -204,18 +205,21 @@ class TestClass
 		[Test]
 		public void AssignCustomClassToString()
 		{
-			var input = @"
+			Test<CS0029InvalidConversionIssue>(@"
 class TestClass
 {
 	void TestMethod ()
 	{
 		string x = this;
 	}
-}";
-			TestRefactoringContext context;
-			var issues = GetIssues (new CS0029InvalidConversionIssue(), input, out context);
-			Assert.AreEqual(1, issues.Count);
-			Assert.IsFalse(issues[0].Actions.Any());
+}", @"
+class TestClass
+{
+	void TestMethod ()
+	{
+		var x = this;
+	}
+}");
 		}
 
 		/// <summary>
@@ -257,6 +261,28 @@ class TestClass
 	int TestMethod (Enum i)
 	{
 		return (int)i;
+	}
+}";
+			Test<CS0029InvalidConversionIssue>(input, output);
+		}
+
+		[Test]
+		public void TestReturnInMethodChangeReturnType()
+		{
+			var input = @"
+class TestClass
+{
+	int TestMethod ()
+	{
+		return ""foo"";
+	}
+}";
+			var output = @"
+class TestClass
+{
+	string TestMethod ()
+	{
+		return ""foo"";
 	}
 }";
 			Test<CS0029InvalidConversionIssue>(input, output);
@@ -409,8 +435,7 @@ class TestClass
 			Test<CS0029InvalidConversionIssue>(input, output);
 		}
 		
-		// TODO: create resolver unit tests for this issue
-		[Test, Ignore("Resolver bug - GetConversion() returns the explicit conversion instead of the expected identity conversion")]
+		[Test]
 		public void ExplicitConversionFromUnknownType()
 		{
 			string input = @"
@@ -441,6 +466,102 @@ class Project : MissingInterface {}";
 			TestRefactoringContext context;
 			var issues = GetIssues (new CS0029InvalidConversionIssue(), input, out context);
 			Assert.AreEqual(0, issues.Count);
+		}
+
+		[Test]
+		public void TestBinaryOperator()
+		{
+			var input = @"
+class TestClass
+{
+enum Enum{ };
+	void TestMethod (ulong i)
+	{
+		int x;
+		x = i + i;
+	}
+}";
+			var output = @"
+class TestClass
+{
+enum Enum{ };
+	void TestMethod (ulong i)
+	{
+		int x;
+		x = (int)(i + i);
+	}
+}";
+			Test<CS0029InvalidConversionIssue>(input, output);
+		}
+	
+		[Test]
+		public void TestDeclarationFix ()
+		{
+			Test<CS0029InvalidConversionIssue>(@"
+using System.Collections.Generic;
+class TestClass
+{
+	string[] str = new List<string> ();
+}", @"
+using System.Collections.Generic;
+class TestClass
+{
+	List<string> str = new List<string> ();
+}");
+		}
+
+		[Test]
+		public void TestLocalDeclarationFix ()
+		{
+			Test<CS0029InvalidConversionIssue>(@"
+using System.Collections.Generic;
+class TestClass
+{
+	void Foo ()
+	{
+		string[] str = new List<string> ();
+	}
+}", @"
+using System.Collections.Generic;
+class TestClass
+{
+	void Foo ()
+	{
+		var str = new List<string> ();
+	}
+}");
+		}
+
+		[Test]
+		public void LinqQueryBug()
+		{
+			var input = @"
+using System;
+
+public static class FooExt
+{
+	public static May<TOut> Select<TIn, TOut>(this May<TIn> value, Func<TIn, TOut> projection)
+	{
+		return new May<TOut> ();
+	}
+}
+
+public class May<T>
+{
+	public T Property { get; set; }
+}
+
+public class EmptyClass
+{
+	public May<EmptyClass> Foo ()
+	{
+		return 
+			from foo in new May<EmptyClass> ()
+			select foo;
+	}
+}
+";
+			TestWrongContext<CS0029InvalidConversionIssue> (input);
 		}
 	}
 }

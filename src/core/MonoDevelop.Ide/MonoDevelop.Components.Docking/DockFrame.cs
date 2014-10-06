@@ -86,12 +86,15 @@ namespace MonoDevelop.Components.Docking
 			mainBox.ShowAll ();
 			mainBox.NoShowAll = true;
 			CompactGuiLevel = 2;
-			dockBarTop.UpdateVisibility ();
-			dockBarBottom.UpdateVisibility ();
-			dockBarLeft.UpdateVisibility ();
-			dockBarRight.UpdateVisibility ();
+			UpdateDockbarsVisibility ();
 
 			DefaultVisualStyle = new DockVisualStyle ();
+		}
+
+		public bool DockbarsVisible {
+			get {
+				return !OverlayWidgetVisible;
+			}
 		}
 		
 		/// <summary>
@@ -128,15 +131,17 @@ namespace MonoDevelop.Components.Docking
 			OverlayWidgetVisible = true;
 			MinimizeAllAutohidden ();
 			if (animate) {
-				currentOverlayPosition = Allocation.Y + Allocation.Height;
+				currentOverlayPosition = Math.Max (0, Allocation.Y + Allocation.Height);
 				this.Animate (
 					"ShowOverlayWidget", 
 					ShowOverlayWidgetAnimation,
 					easing: Easing.CubicOut);
 			} else {
-				currentOverlayPosition = Allocation.Y;
+				currentOverlayPosition = Math.Max (0, Allocation.Y);
 				QueueResize ();
 			}
+
+			UpdateDockbarsVisibility ();
 		}
 
 		public void RemoveOverlayWidget (bool animate = false)
@@ -164,9 +169,19 @@ namespace MonoDevelop.Components.Docking
 					QueueResize ();
 				}
 			}
+
+			UpdateDockbarsVisibility ();
 		}
 
 		int currentOverlayPosition;
+
+		void UpdateDockbarsVisibility ()
+		{
+			dockBarTop.UpdateVisibility ();
+			dockBarBottom.UpdateVisibility ();
+			dockBarLeft.UpdateVisibility ();
+			dockBarRight.UpdateVisibility ();
+		}
 
 		void ShowOverlayWidgetAnimation (double value)
 		{
@@ -511,11 +526,31 @@ namespace MonoDevelop.Components.Docking
 			DockLayout dl;
 			if (!layouts.TryGetValue (layoutName, out dl))
 				return false;
-			
+
+			var focus = GetActiveWidget ();
+
 			container.LoadLayout (dl);
+
+			// Keep the currently focused widget when switching layouts
+			if (focus != null && focus.IsRealized && focus.Visible)
+				DockItem.SetFocus (focus);
+
 			return true;
 		}
-		
+
+		Gtk.Widget GetActiveWidget ()
+		{
+			Gtk.Widget widget = this;
+			while (widget is Gtk.Container) {
+				Gtk.Widget child = ((Gtk.Container)widget).FocusChild;
+				if (child != null)
+					widget = child;
+				else
+					break;
+			}
+			return widget;
+		}
+
 		public void CreateLayout (string name)
 		{
 			CreateLayout (name, false);
@@ -992,15 +1027,6 @@ namespace MonoDevelop.Components.Docking
 				callback (overlayWidget);
 		}
 		
-		protected override void OnRealized ()
-		{
-			base.OnRealized ();
-			HslColor cLight = new HslColor (Style.Background (Gtk.StateType.Normal));
-			HslColor cDark = cLight;
-			cLight.L *= 0.9;
-			cDark.L *= 0.8;
-		}
-
 		protected override bool OnButtonPressEvent (EventButton evnt)
 		{
 			MinimizeAllAutohidden ();

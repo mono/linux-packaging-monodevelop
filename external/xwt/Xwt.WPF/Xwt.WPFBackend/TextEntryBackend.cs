@@ -27,6 +27,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using Xwt.Backends;
@@ -37,11 +38,26 @@ namespace Xwt.WPFBackend
 	public class TextEntryBackend
 		: WidgetBackend, ITextEntryBackend
 	{
+		bool multiline;
+		string placeholderText;
+
+		PlaceholderTextAdorner Adorner {
+			get; set;
+		}
+
 		public TextEntryBackend()
 		{
-			Widget = new ExTextBox();
-			TextBox.IsReadOnlyCaretVisible = true;
-		}
+			Widget = new ExTextBox { IsReadOnlyCaretVisible = true };
+			TextBox.Loaded += delegate {
+				Adorner = new PlaceholderTextAdorner (TextBox);
+				var layer = AdornerLayer.GetAdornerLayer (TextBox);
+				if (layer != null)
+					layer.Add (Adorner);
+				if (!String.IsNullOrEmpty(placeholderText))
+					Adorner.PlaceholderText = placeholderText;
+			};
+			TextBox.VerticalContentAlignment = VerticalAlignment.Center;
+		}        
 
 		protected override double DefaultNaturalWidth
 		{
@@ -60,10 +76,15 @@ namespace Xwt.WPFBackend
 			set { TextBox.TextAlignment = DataConverter.ToTextAlignment (value); }
 		}
 
-		public string PlaceholderText
-		{
-			get { return TextBox.PlaceholderText; }
-			set { TextBox.PlaceholderText = value; }
+		public string PlaceholderText {
+			get {
+				return placeholderText;
+			}
+			set {
+				placeholderText = value;
+				if (Adorner != null)
+					Adorner.PlaceholderText = value;
+			}
 		}
 
 		public bool ReadOnly
@@ -78,9 +99,60 @@ namespace Xwt.WPFBackend
 			set { TextBox.ShowFrame = value; }
 		}
 
-		// TODO
+		public int CursorPosition {
+			get {
+				return TextBox.SelectionStart;
+			}
+			set {
+				TextBox.SelectionStart = value;
+			}
+		}
+
+		public int SelectionStart {
+			get {
+				return TextBox.SelectionStart;
+			}
+			set {
+				TextBox.Focus();
+				TextBox.Select(value, SelectionLength);
+			}
+		}
+
+		public int SelectionLength {
+			get {
+				return TextBox.SelectionLength;
+			}
+			set {
+				TextBox.Focus();
+				TextBox.Select(SelectionStart, value);
+			}
+		}
+
+		public string SelectedText {
+			get {
+				return TextBox.SelectedText;
+			}
+			set {
+				TextBox.SelectedText = value;
+			}
+		}
+
 		public bool MultiLine {
-			get; set;
+			get { return multiline; }
+			set {
+				if (multiline != value) {
+					multiline = value;
+					if (multiline) {
+						TextBox.VerticalContentAlignment = VerticalAlignment.Top;
+						TextBox.AcceptsReturn = true;
+						TextBox.TextWrapping = TextWrapping.Wrap;
+					} else {
+						TextBox.VerticalContentAlignment = VerticalAlignment.Center;
+						TextBox.AcceptsReturn = false;
+						TextBox.TextWrapping = TextWrapping.NoWrap;
+					}
+				}
+			}
 		}
 
 		public override void EnableEvent (object eventId)
@@ -94,6 +166,12 @@ namespace Xwt.WPFBackend
 					// TODO: Should we ignore this for placeholder changes?
 					case TextEntryEvent.Changed:
 						TextBox.TextChanged += OnTextChanged;
+						break;
+					case TextEntryEvent.Activated:
+						TextBox.KeyDown += OnActivated;
+						break;
+					case TextEntryEvent.SelectionChanged:
+						TextBox.SelectionChanged += OnSelectionChanged;
 						break;
 				}
 			}
@@ -110,6 +188,12 @@ namespace Xwt.WPFBackend
 					case TextEntryEvent.Changed:
 						TextBox.TextChanged -= OnTextChanged;
 						break;
+					case TextEntryEvent.Activated:
+						TextBox.KeyDown -= OnActivated;
+						break;
+					case TextEntryEvent.SelectionChanged:
+						TextBox.SelectionChanged -= OnSelectionChanged;
+						break;
 				}
 			}
 		}
@@ -122,10 +206,21 @@ namespace Xwt.WPFBackend
 		protected new ITextEntryEventSink EventSink {
 			get { return (ITextEntryEventSink)base.EventSink; }
 		}
+		
+		private void OnActivated(object sender, System.Windows.Input.KeyEventArgs e)
+		{
+			if (e.Key == System.Windows.Input.Key.Enter || e.Key == System.Windows.Input.Key.Return)
+				Context.InvokeUserCode (EventSink.OnActivated);
+		}
 
 		private void OnTextChanged (object s, TextChangedEventArgs e)
 		{
 			Context.InvokeUserCode (EventSink.OnChanged);
+		}
+
+		private void OnSelectionChanged (object s, EventArgs e)
+		{
+			Context.InvokeUserCode (EventSink.OnSelectionChanged);
 		}
 	}
 }

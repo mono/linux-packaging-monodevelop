@@ -74,6 +74,7 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		/// Warning: if delay-loading is used and the type system is accessed by multiple threads,
 		/// the callback may be invoked concurrently on multiple threads.
 		/// </remarks>
+		[CLSCompliant(false)]
 		public Action<IUnresolvedEntity, MemberReference> OnEntityLoaded { get; set; }
 		
 		/// <summary>
@@ -753,7 +754,8 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			}
 			CustomMarshalInfo cmi = marshalInfo as CustomMarshalInfo;
 			if (cmi != null) {
-				attr.AddNamedFieldArgument("MarshalType", CreateSimpleConstantValue(KnownTypeReference.String, cmi.ManagedType.FullName));
+				if (cmi.ManagedType != null)
+					attr.AddNamedFieldArgument("MarshalType", CreateSimpleConstantValue(KnownTypeReference.String, cmi.ManagedType.FullName));
 				if (!string.IsNullOrEmpty(cmi.Cookie))
 					attr.AddNamedFieldArgument("MarshalCookie", CreateSimpleConstantValue(KnownTypeReference.String, cmi.Cookie));
 			}
@@ -823,7 +825,13 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		
 		void AddSecurityAttributes(SecurityDeclaration secDecl, IList<IUnresolvedAttribute> targetCollection)
 		{
-			var blobSecDecl = new UnresolvedSecurityDeclarationBlob((int)secDecl.Action, secDecl.GetBlob());
+			byte[] blob;
+			try {
+				blob = secDecl.GetBlob();
+			} catch (NotSupportedException) {
+				return; // https://github.com/icsharpcode/SharpDevelop/issues/284
+			}
+			var blobSecDecl = new UnresolvedSecurityDeclarationBlob((int)secDecl.Action, blob);
 			targetCollection.AddRange(blobSecDecl.UnresolvedAttributes);
 		}
 		#endregion
@@ -1063,14 +1071,36 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		#endregion
 		
 		#region Lazy-Loaded Type Definition
+		/// <summary>
+		/// Given an assembly that was created by the CecilLoader with lazy-loading enabled,
+		/// this method will eagerly load all classes, and free any references to the source Cecil objects.
+		/// 
+		/// The intended usage pattern for this method is:
+		/// 1. use lazy-loading to improve the latency when new assemblies have to be loaded
+		/// 2. later, when the CPU is idle, call FinishLazyLoading() to free up the memory consumed by the Cecil objects
+		/// </summary>
+		public static void FinishLazyLoading(IUnresolvedAssembly assembly)
+		{
+			if (assembly == null)
+				throw new ArgumentNullException("assembly");
+			foreach (var type in assembly.TopLevelTypeDefinitions) {
+				var lctd = type as LazyCecilTypeDefinition;
+				if (lctd != null)
+					lctd.InitAndReleaseReferences();
+			}
+		}
+		
 		sealed class LazyCecilTypeDefinition : AbstractUnresolvedEntity, IUnresolvedTypeDefinition
 		{
-			readonly CecilLoader loader;
+			// loader + cecilTypeDef, used for lazy-loading; and set to null after lazy loading is complete
+			CecilLoader loader;
+			TypeDefinition cecilTypeDef;
+			
 			readonly string namespaceName;
-			readonly TypeDefinition cecilTypeDef;
 			readonly TypeKind kind;
 			readonly IList<IUnresolvedTypeParameter> typeParameters;
 			
+			// lazy-loaded fields
 			IList<ITypeReference> baseTypes;
 			IList<IUnresolvedTypeDefinition> nestedTypes;
 			IList<IUnresolvedMember> members;
@@ -1080,10 +1110,10 @@ namespace ICSharpCode.NRefactory.TypeSystem
 				this.loader = loader;
 				this.cecilTypeDef = typeDefinition;
 				this.SymbolKind = SymbolKind.TypeDefinition;
-				this.namespaceName = cecilTypeDef.Namespace;
-				this.Name = ReflectionHelper.SplitTypeParameterCountFromReflectionName(cecilTypeDef.Name);
+				this.namespaceName = typeDefinition.Namespace;
+				this.Name = ReflectionHelper.SplitTypeParameterCountFromReflectionName(typeDefinition.Name);
 				var tps = new List<IUnresolvedTypeParameter>();
-				InitTypeParameters(cecilTypeDef, tps);
+				InitTypeParameters(typeDefinition, tps);
 				this.typeParameters = FreezableHelper.FreezeList(tps);
 				
 				this.kind = GetTypeKind(typeDefinition);
@@ -1103,7 +1133,7 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			}
 			
 			public override string ReflectionName {
-				get { return cecilTypeDef.FullName; }
+				get { return this.FullTypeName.ReflectionName; }
 			}
 			
 			public FullTypeName FullTypeName {
@@ -1125,12 +1155,27 @@ namespace ICSharpCode.NRefactory.TypeSystem
 					var result = LazyInit.VolatileRead(ref this.baseTypes);
 					if (result != null) {
 						return result;
+					} else {
+						return LazyInit.GetOrSet(ref this.baseTypes, TryInitBaseTypes());
 					}
-					lock (loader.currentModule) {
-						result = new List<ITypeReference>();
-						loader.InitBaseTypes(cecilTypeDef, result);
-						return LazyInit.GetOrSet(ref this.baseTypes, FreezableHelper.FreezeList(result));
-					}
+				}
+			}
+			
+			IList<ITypeReference> TryInitBaseTypes()
+			{
+				var loader = LazyInit.VolatileRead(ref this.loader);
+				var cecilTypeDef = LazyInit.VolatileRead(ref this.cecilTypeDef);
+				if (loader == null || cecilTypeDef == null) {
+					// Cannot initialize because the references to loader/cecilTypeDef
+					// have already been cleared.
+					// This can only happen if the class was loaded by another thread concurrently to the TryInitBaseTypes() call,
+					// so the GetOrSet() call in the property will retrieve the value set by the other thread.
+					return null;
+				}
+				lock (loader.currentModule) {
+					var result = new List<ITypeReference>();
+					loader.InitBaseTypes(cecilTypeDef, result);
+					return FreezableHelper.FreezeList(result);
 				}
 			}
 			
@@ -1139,14 +1184,27 @@ namespace ICSharpCode.NRefactory.TypeSystem
 					var result = LazyInit.VolatileRead(ref this.nestedTypes);
 					if (result != null) {
 						return result;
+					} else {
+						return LazyInit.GetOrSet(ref this.nestedTypes, TryInitNestedTypes());
 					}
-					lock (loader.currentModule) {
-						if (this.nestedTypes != null)
-							return this.nestedTypes;
-						result = new List<IUnresolvedTypeDefinition>();
-						loader.InitNestedTypes(cecilTypeDef, this, result);
-						return LazyInit.GetOrSet(ref this.nestedTypes, FreezableHelper.FreezeList(result));
-					}
+				}
+			}
+			
+			IList<IUnresolvedTypeDefinition> TryInitNestedTypes()
+			{
+				var loader = LazyInit.VolatileRead(ref this.loader);
+				var cecilTypeDef = LazyInit.VolatileRead(ref this.cecilTypeDef);
+				if (loader == null || cecilTypeDef == null) {
+					// Cannot initialize because the references to loader/cecilTypeDef
+					// have already been cleared.
+					// This can only happen if the class was loaded by another thread concurrently to the TryInitNestedTypes() call,
+					// so the GetOrSet() call in the property will retrieve the value set by the other thread.
+					return null;
+				}
+				lock (loader.currentModule) {
+					var result = new List<IUnresolvedTypeDefinition>();
+					loader.InitNestedTypes(cecilTypeDef, this, result);
+					return FreezableHelper.FreezeList(result);
 				}
 			}
 			
@@ -1155,15 +1213,44 @@ namespace ICSharpCode.NRefactory.TypeSystem
 					var result = LazyInit.VolatileRead(ref this.members);
 					if (result != null) {
 						return result;
-					}
-					lock (loader.currentModule) {
-						if (this.members != null)
-							return this.members;
-						result = new List<IUnresolvedMember>();
-						loader.InitMembers(cecilTypeDef, this, result);
-						return LazyInit.GetOrSet(ref this.members, FreezableHelper.FreezeList(result));
+					} else {
+						return LazyInit.GetOrSet(ref this.members, TryInitMembers());
 					}
 				}
+			}
+			
+			IList<IUnresolvedMember> TryInitMembers()
+			{
+				var loader = LazyInit.VolatileRead(ref this.loader);
+				var cecilTypeDef = LazyInit.VolatileRead(ref this.cecilTypeDef);
+				if (loader == null || cecilTypeDef == null) {
+					// Cannot initialize because the references to loader/cecilTypeDef
+					// have already been cleared.
+					// This can only happen if the class was loaded by another thread concurrently to the TryInitMembers() call,
+					// so the GetOrSet() call in the property will retrieve the value set by the other thread.
+					return null;
+				}
+				lock (loader.currentModule) {
+					if (this.members != null)
+						return this.members;
+					var result = new List<IUnresolvedMember>();
+					loader.InitMembers(cecilTypeDef, this, result);
+					return FreezableHelper.FreezeList(result);
+				}
+			}
+			
+			public void InitAndReleaseReferences()
+			{
+				if (LazyInit.VolatileRead(ref this.baseTypes) == null)
+					LazyInit.GetOrSet(ref this.baseTypes, TryInitBaseTypes());
+				if (LazyInit.VolatileRead(ref this.nestedTypes) == null)
+					LazyInit.GetOrSet(ref this.nestedTypes, TryInitNestedTypes());
+				if (LazyInit.VolatileRead(ref this.members) == null)
+					LazyInit.GetOrSet(ref this.members, TryInitMembers());
+				Thread.MemoryBarrier(); // commit lazily-initialized fields to memory before nulling out the references
+				// Allow the GC to collect the cecil type definition
+				loader = null;
+				cecilTypeDef = null;
 			}
 			
 			public IEnumerable<IUnresolvedMethod> Methods {
@@ -1190,6 +1277,10 @@ namespace ICSharpCode.NRefactory.TypeSystem
 				get { return flags[FlagHasExtensionMethods]; }
 				// we always return true or false, never null.
 				// FlagHasNoExtensionMethods is unused in LazyCecilTypeDefinition
+			}
+			
+			public bool IsPartial {
+				get { return false; }
 			}
 			
 			public override object Clone()

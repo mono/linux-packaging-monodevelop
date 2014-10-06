@@ -33,6 +33,8 @@ using System.Linq;
 using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.CodeCompletion;
+using Mono.Addins;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Components.MainToolbar
 {
@@ -62,7 +64,7 @@ namespace MonoDevelop.Components.MainToolbar
 		class NullDataSource : ISearchDataSource
 		{
 			#region ISearchDataSource implementation
-			Gdk.Pixbuf ISearchDataSource.GetIcon (int item)
+			Xwt.Drawing.Image ISearchDataSource.GetIcon (int item)
 			{
 				throw new NotImplementedException ();
 			}
@@ -118,6 +120,9 @@ namespace MonoDevelop.Components.MainToolbar
 			categories.Add (new ProjectSearchCategory (this));
 			categories.Add (new FileSearchCategory (this));
 			categories.Add (new CommandSearchCategory (this));
+			categories.Add (new SearchInSolutionSearchCategory ());
+			categories.AddRange (AddinManager.GetExtensionObjects<SearchCategory> ("/MonoDevelop/Ide/SearchCategories"));
+
 			layout = new Pango.Layout (PangoContext);
 			headerLayout = new Pango.Layout (PangoContext);
 
@@ -126,6 +131,7 @@ namespace MonoDevelop.Components.MainToolbar
 
 			Events = Gdk.EventMask.ButtonPressMask | Gdk.EventMask.ButtonMotionMask | Gdk.EventMask.ButtonReleaseMask | Gdk.EventMask.ExposureMask | Gdk.EventMask.PointerMotionMask;
 			ItemActivated += (sender, e) => OpenFile ();
+			/*
 			SizeRequested += delegate(object o, SizeRequestedArgs args) {
 				if (inResize)
 					return;
@@ -138,8 +144,9 @@ namespace MonoDevelop.Components.MainToolbar
 						Visible = true;
 					inResize = false;
 				}
-			};
+			};*/
 		}
+
 		bool inResize = false;
 
 		public bool SearchForMembers {
@@ -195,7 +202,7 @@ namespace MonoDevelop.Components.MainToolbar
 			// in case of 'string:' it's not clear if the user ment 'tag:pattern'  or 'pattern:line' therefore guess
 			// 'tag:', if no valid tag is found guess 'pattern:'
 			if (!string.IsNullOrEmpty (pattern.Tag) && string.IsNullOrEmpty (pattern.Pattern) && !categories.Any (c => c.IsValidTag (pattern.Tag))) {
-				pattern = new SearchPopupSearchPattern (null, pattern.Tag, pattern.LineNumber, pattern.Column);
+				pattern = new SearchPopupSearchPattern (null, pattern.Tag, pattern.LineNumber, pattern.Column, pattern.UnparsedPattern);
 			}
 
 			this.pattern = pattern;
@@ -213,6 +220,8 @@ namespace MonoDevelop.Components.MainToolbar
 				var cat = _cat;
 				var token = src.Token;
 				cat.GetResults (pattern, maxItems, token).ContinueWith (t => {
+					if (t.IsCanceled)
+						return;
 					if (t.IsFaulted) {
 						LoggingService.LogError ("Error getting search results", t.Exception);
 					} else {
@@ -251,18 +260,18 @@ namespace MonoDevelop.Components.MainToolbar
 			}
 		}
 
+		int calculatedItems;
 		Gdk.Size GetIdealSize ()
 		{
 			Gdk.Size retVal = new Gdk.Size ();
 			int ox, oy;
 			GetPosition (out ox, out oy);
 			Gdk.Rectangle geometry = DesktopService.GetUsableMonitorGeometry (Screen, Screen.GetMonitorAtPoint (ox, oy));
-
+			var maxHeight = geometry.Height * 4 / 5;
 			double startY = yMargin + ChildAllocation.Y;
 			double y = startY;
-			
+			calculatedItems = 0;
 			foreach (var result in results) {
-				//				var category = result.Item1;
 				var dataSrc = result.Item2;
 				if (dataSrc.ItemCount == 0)
 					continue;
@@ -271,21 +280,28 @@ namespace MonoDevelop.Components.MainToolbar
 					layout.SetMarkup (GetRowMarkup (dataSrc, i));
 					int w, h;
 					layout.GetPixelSize (out w, out h);
+					if (y + h + itemSeparatorHeight > maxHeight)
+						break;
 					y += h + itemSeparatorHeight;
+					calculatedItems++;
 				}
 			}
 			retVal.Width = Math.Min (geometry.Width * 4 / 5, 480);
-			if (y == startY) {
+			if (Math.Abs (y - startY) < 1) {
 				layout.SetMarkup (GettextCatalog.GetString ("No matches"));
 				int w, h;
 				layout.GetPixelSize (out w, out h);
-				y += h + itemSeparatorHeight + 4;
+				var realHeight = h + itemSeparatorHeight + 4;
+				y += realHeight;
 			} else {
 				y -= itemSeparatorHeight;
 			}
-			
-			var calculedHeight = Math.Min (geometry.Height * 4 / 5, (int)y + yMargin + results.Count (res => res.Item2.ItemCount > 0) * categorySeparatorHeight);
-			retVal.Height = calculedHeight;
+
+			var calculatedHeight = Math.Min (
+				maxHeight, 
+				(int)y + yMargin + results.Count (res => res.Item2.ItemCount > 0) * categorySeparatorHeight
+			);
+			retVal.Height = calculatedHeight;
 			return retVal;
 		}
 
@@ -294,10 +310,11 @@ namespace MonoDevelop.Components.MainToolbar
 		protected override void OnSizeRequested (ref Requisition requisition)
 		{
 			base.OnSizeRequested (ref requisition);
-
-			Gdk.Size idealSize = GetIdealSize ();
-			requisition.Width += idealSize.Width;
-			requisition.Height += idealSize.Height;
+			if (!inResize) {
+				Gdk.Size idealSize = GetIdealSize ();
+				requisition.Width = idealSize.Width;
+				requisition.Height = idealSize.Height;
+			}
 		}
 
 		ItemIdentifier GetItemAt (double px, double py)
@@ -441,6 +458,18 @@ namespace MonoDevelop.Components.MainToolbar
 			}
 		normalDown:
 			var i = SelectedCategoryIndex;
+
+			// check real upper bound
+			if (selectedItem != null) {
+				var curAbsoluteIndex = selectedItem == topItem ? 1 : 0;
+				for (int j = 0; j < i; j++) {
+					curAbsoluteIndex += Math.Min (maxItems, results [j].Item2.ItemCount);
+				}
+				curAbsoluteIndex += selectedItem.Item + 1;
+				if (curAbsoluteIndex + 1 > calculatedItems)
+					return;
+			}
+
 			var upperBound = Math.Min (maxItems, selectedItem.DataSource.ItemCount);
 			if (selectedItem.Item + 1 < upperBound) {
 				if (topItem.DataSource == selectedItem.DataSource && selectedItem.Item == upperBound - 1)
@@ -816,19 +845,19 @@ namespace MonoDevelop.Components.MainToolbar
 
 			var r = results.Where (res => res.Item2.ItemCount > 0).ToArray ();
 			if (r.Any ()) {
-				context.Color = lightSearchBackground;
+				context.SetSourceColor (lightSearchBackground);
 				context.Rectangle (Allocation.X, Allocation.Y, adjustedMarginSize, Allocation.Height);
 				context.Fill ();
 
-				context.Color = darkSearchBackground;
+				context.SetSourceColor (darkSearchBackground);
 				context.Rectangle (Allocation.X + adjustedMarginSize, Allocation.Y, Allocation.Width - adjustedMarginSize, Allocation.Height);
 				context.Fill ();
 				context.MoveTo (0.5 + Allocation.X + adjustedMarginSize, 0);
 				context.LineTo (0.5 + Allocation.X + adjustedMarginSize, Allocation.Height);
-				context.Color = separatorLine;
+				context.SetSourceColor (separatorLine);
 				context.Stroke ();
 			} else {
-				context.Color = new Cairo.Color (1, 1, 1);
+				context.SetSourceRGB (1, 1, 1);
 				context.Rectangle (Allocation.X, Allocation.Y, Allocation.Width, Allocation.Height);
 				context.Fill ();
 			}
@@ -839,7 +868,7 @@ namespace MonoDevelop.Components.MainToolbar
 				headerLayout.SetText (GettextCatalog.GetString ("Top Result"));
 				headerLayout.GetPixelSize (out w, out h);
 				context.MoveTo (alloc.Left + headerMarginSize - w - xMargin, y);
-				context.Color = headerColor;
+				context.SetSourceColor (headerColor);
 				Pango.CairoHelper.ShowLayout (context, headerLayout);
 
 				var category = topItem.Category;
@@ -847,25 +876,24 @@ namespace MonoDevelop.Components.MainToolbar
 				var i = topItem.Item;
 
 				double x = alloc.X + xMargin + headerMarginSize;
-				context.Color = new Cairo.Color (0, 0, 0);
+				context.SetSourceRGB (0, 0, 0);
 				layout.SetMarkup (GetRowMarkup (dataSrc, i));
 				layout.GetPixelSize (out w, out h);
 				if (selectedItem != null && selectedItem.Category == category && selectedItem.Item == i) {
-					context.Color = selectionBackgroundColor;
+					context.SetSourceColor (selectionBackgroundColor);
 					context.Rectangle (alloc.X + headerMarginSize, y, Allocation.Width - adjustedMarginSize, h);
 					context.Fill ();
-					context.Color = new Cairo.Color (1, 1, 1);
+					context.SetSourceRGB (1, 1, 1);
 				}
 
 				var px = dataSrc.GetIcon (i);
 				if (px != null) {
-					Gdk.CairoHelper.SetSourcePixbuf (context, px, (int)x + marginIconSpacing, (int)y + (h - px.Height) / 2);
-					context.Paint ();
+					context.DrawImage (this, px, (int)x + marginIconSpacing, (int)y + (h - px.Height) / 2);
 					x += px.Width + iconTextSpacing + marginIconSpacing;
 				}
 
 				context.MoveTo (x, y);
-				context.Color = new Cairo.Color (0, 0, 0);
+				context.SetSourceRGB (0, 0, 0);
 				Pango.CairoHelper.ShowLayout (context, layout);
 
 				y += h + itemSeparatorHeight;
@@ -881,8 +909,12 @@ namespace MonoDevelop.Components.MainToolbar
 					continue;
 				headerLayout.SetText (category.Name);
 				headerLayout.GetPixelSize (out w, out h);
+
+				if (y + h > Allocation.Height)
+					break;
+
 				context.MoveTo (alloc.X + headerMarginSize - w - xMargin, y);
-				context.Color = headerColor;
+				context.SetSourceColor (headerColor);
 				Pango.CairoHelper.ShowLayout (context, headerLayout);
 
 				layout.Width = Pango.Units.FromPixels (Allocation.Width - adjustedMarginSize - 35);
@@ -891,39 +923,36 @@ namespace MonoDevelop.Components.MainToolbar
 					if (topItem != null && topItem.Category == category && topItem.Item == i)
 						continue;
 					double x = alloc.X + xMargin + headerMarginSize;
-					context.Color = new Cairo.Color (0, 0, 0);
+					context.SetSourceRGB (0, 0, 0);
 					layout.SetMarkup (GetRowMarkup (dataSrc, i));
 					layout.GetPixelSize (out w, out h);
+					if (y + h + itemSeparatorHeight > Allocation.Height)
+						break;
 					if (selectedItem != null && selectedItem.Category == category && selectedItem.Item == i) {
-						context.Color = selectionBackgroundColor;
+						context.SetSourceColor (selectionBackgroundColor);
 						context.Rectangle (alloc.X + headerMarginSize, y, Allocation.Width - adjustedMarginSize, h);
 						context.Fill ();
-						context.Color = new Cairo.Color (1, 1, 1);
+						context.SetSourceRGB (1, 1, 1);
 					}
 
 					var px = dataSrc.GetIcon (i);
 					if (px != null) {
-						Gdk.CairoHelper.SetSourcePixbuf (context, px, (int)x + marginIconSpacing, (int)y + (h - px.Height) / 2);
-						context.Paint ();
+						context.DrawImage (this, px, (int)x + marginIconSpacing, (int)y + (h - px.Height) / 2);
 						x += px.Width + iconTextSpacing + marginIconSpacing;
 					}
 
 					context.MoveTo (x, y);
-					context.Color = new Cairo.Color (0, 0, 0);
+					context.SetSourceRGB (0, 0, 0);
 					Pango.CairoHelper.ShowLayout (context, layout);
 
 					y += h + itemSeparatorHeight;
 				}
 				if (result != r.Last ()) {
-/*						context.MoveTo (alloc.X, y + categorySeparatorHeight / 2 + 0.5);
-					context.LineTo (alloc.X + alloc.Width, y + categorySeparatorHeight / 2 + 0.5);
-					context.Color = (HslColor)Style.Mid (StateType.Normal);
-					context.Stroke ();*/
 					y += categorySeparatorHeight;
 				}
 			}
 			if (y == alloc.Y + yMargin) {
-				context.Color = new Cairo.Color (0, 0, 0);
+				context.SetSourceRGB (0, 0, 0);
 				layout.SetMarkup (isInSearch ? GettextCatalog.GetString ("Searching...") : GettextCatalog.GetString ("No matches"));
 				context.MoveTo (alloc.X + xMargin, y);
 				Pango.CairoHelper.ShowLayout (context, layout);

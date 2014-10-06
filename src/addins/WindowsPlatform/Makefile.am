@@ -1,1 +1,4 @@
-include $(top_srcdir)/xbuild.include
+
+SUBDIRS = \
+	WindowsPlatform \
+	WindowsAPICodePack 

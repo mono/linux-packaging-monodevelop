@@ -57,6 +57,9 @@ namespace MonoDevelop.Projects
 		
 		[ItemProperty ("Policies", IsExternal = true, SkipEmpty = true)]
 		MonoDevelop.Projects.Policies.PolicyBag policies;
+
+		[ItemProperty ("UseMSBuildEngine")]
+		public bool? UseMSBuildEngine { get; set; }
 		
 		PropertyBag userProperties;
 		
@@ -157,14 +160,9 @@ namespace MonoDevelop.Projects
 		/// </param>
 		/// <remarks>
 		/// This method looks for an imlpementation of a service of the given type.
-		/// The default implementation this instance if the type is an interface
-		/// implemented by this instance. Otherwise, it looks for a service in
-		/// the project extension chain.
 		/// </remarks>
 		public virtual object GetService (Type t)
 		{
-			if (t.IsInstanceOfType (this))
-				return this;
 			return Services.ProjectService.GetExtensionChain (this).GetService (this, t);
 		}
 		
@@ -178,6 +176,8 @@ namespace MonoDevelop.Projects
 				return parentSolution; 
 			}
 			internal set {
+				if (parentSolution != null && parentSolution != value)
+					NotifyUnboundFromSolution (true);
 				parentSolution = value;
 				NotifyBoundToSolution (true);
 			}
@@ -365,6 +365,9 @@ namespace MonoDevelop.Projects
 				return parentFolder;
 			}
 			internal set {
+				if (parentFolder != null && parentFolder.ParentSolution != null && (value == null || value.ParentSolution != parentFolder.ParentSolution))
+					NotifyUnboundFromSolution (false);
+
 				parentFolder = value;
 				if (internalChildren != null) {
 					internalChildren.ParentFolder = value;
@@ -385,16 +388,32 @@ namespace MonoDevelop.Projects
 				var items = folder.GetItemsWithoutCreating ();
 				if (items != null) {
 					foreach (var item in items) {
-						item.NotifyBoundToSolution (includeInternalChildren);
+						item.NotifyBoundToSolution (true);
 					}
 				}
 			}
 			if (includeInternalChildren && internalChildren != null) {
-				internalChildren.NotifyBoundToSolution (includeInternalChildren);
+				internalChildren.NotifyBoundToSolution (true);
 			}
 			OnBoundToSolution ();
 		}
 
+		void NotifyUnboundFromSolution (bool includeInternalChildren)
+		{
+			var folder = this as SolutionFolder;
+			if (folder != null) {
+				var items = folder.GetItemsWithoutCreating ();
+				if (items != null) {
+					foreach (var item in items) {
+						item.NotifyUnboundFromSolution (true);
+					}
+				}
+			}
+			if (includeInternalChildren && internalChildren != null) {
+				internalChildren.NotifyUnboundFromSolution (true);
+			}
+			OnUnboundFromSolution ();
+		}
 
 		/// <summary>
 		/// Gets a value indicating whether this <see cref="MonoDevelop.Projects.SolutionItem"/> has been disposed.
@@ -475,6 +494,21 @@ namespace MonoDevelop.Projects
 			return Services.ProjectService.GetExtensionChain (this).RunTarget (monitor, this, target, configuration);
 		}
 		
+		public bool SupportsTarget (string target)
+		{
+			return Services.ProjectService.GetExtensionChain (this).SupportsTarget (this, target);
+		}
+
+		public bool SupportsBuild ()
+		{
+			return SupportsTarget (ProjectService.BuildTarget);
+		}
+
+		public bool SupportsExecute ()
+		{
+			return Services.ProjectService.GetExtensionChain (this).SupportsExecute (this);
+		}
+
 		/// <summary>
 		/// Cleans the files produced by this solution item
 		/// </summary>
@@ -529,7 +563,7 @@ namespace MonoDevelop.Projects
 		/// <param name='monitor'>
 		/// A progress monitor
 		/// </param>
-		/// <param name='configuration'>
+		/// <param name='solutionConfiguration'>
 		/// Configuration to use to build the project
 		/// </param>
 		/// <param name='buildReferences'>
@@ -599,7 +633,7 @@ namespace MonoDevelop.Projects
 					return true;
 			return false;
 		}
-		
+
 		/// <summary>
 		/// Gets the time of the last build
 		/// </summary>
@@ -656,6 +690,8 @@ namespace MonoDevelop.Projects
 		/// </param>
 		public bool CanExecute (ExecutionContext context, ConfigurationSelector configuration)
 		{
+			if (!SupportsExecute ())
+				return false;
 			return Services.ProjectService.GetExtensionChain (this).CanExecute (this, context, configuration);
 		}
 
@@ -895,8 +931,10 @@ namespace MonoDevelop.Projects
 		/// <param name='hint'>
 		/// Hint about which part of the solution item has been modified. This will typically be the property name.
 		/// </param>
-		protected void NotifyModified (string hint)
+		internal protected void NotifyModified (string hint)
 		{
+			if (!Loading)
+				ItemHandler.OnModified (hint);
 			OnModified (new SolutionItemModifiedEventArgs (this, hint));
 		}
 		
@@ -1045,6 +1083,16 @@ namespace MonoDevelop.Projects
 			return DateTime.MinValue;
 		}
 		
+		internal protected virtual bool OnGetSupportsTarget (string target)
+		{
+			return true;
+		}
+
+		internal protected virtual bool OnGetSupportsExecute ()
+		{
+			return true;
+		}
+
 		/// <summary>
 		/// Determines whether this solution item can be executed using the specified context and configuration.
 		/// </summary>
@@ -1067,10 +1115,25 @@ namespace MonoDevelop.Projects
 			yield break;
 		}
 
+		/// <summary>
+		/// Called just after this item is bound to a solution
+		/// </summary>
 		protected virtual void OnBoundToSolution ()
 		{
 		}
-		
+
+		/// <summary>
+		/// Called just before this item is removed from a solution (ParentSolution is still valid when this method is called)
+		/// </summary>
+		protected virtual void OnUnboundFromSolution ()
+		{
+		}
+
+		internal protected virtual object OnGetService (Type t)
+		{
+			return ItemHandler.GetService (t);
+		}
+
 		/// <summary>
 		/// Occurs when the name of the item changes
 		/// </summary>

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{EF91D0B8-53F6-4622-9F26-3ED27815878A}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -20,9 +20,12 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DefineConstants>DEBUG</DefineConstants>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\BackendBindings\MonoDevelop.VBNetBinding.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\build\AddIns\BackendBindings\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -30,6 +33,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\BackendBindings\MonoDevelop.VBNetBinding.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\core\MonoDevelop.Core\MonoDevelop.Core.csproj">
@@ -78,7 +84,6 @@
     <Compile Include="VBCodeGenerator.cs" />
     <Compile Include="gtk-gui\generated.cs" />
     <Compile Include="Project\VBNetResourceIdBuilder.cs" />
-    <Compile Include="Parser\DomParser.cs" />
     <Compile Include="gtk-gui\MonoDevelop.VBNetBinding.ProjectOptionsPanelWidget.cs" />
     <Compile Include="gtk-gui\MonoDevelop.VBNetBinding.ConfigurationOptionsPanelWidget.cs" />
     <Compile Include="Gui\ProjectOptionsPanelWidget.cs" />
@@ -90,6 +95,7 @@
     <Compile Include="Gui\ImportsOptionsPanel.cs" />
     <Compile Include="gtk-gui\MonoDevelop.VBNetBinding.ImportsOptionsPanelWidget.cs" />
     <Compile Include="Project\VBProjectParameters.cs" />
+    <Compile Include="AddinInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="templates\EmptyVBFile.xft.xml">
@@ -104,14 +110,8 @@
     <EmbeddedResource Include="templates\VBGtkSharp2Project.xpt.xml">
       <LogicalName>VBGtkSharp2Project.xpt.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\VB.FileIcon">
-      <LogicalName>VB.FileIcon</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="VBNetBinding.addin.xml">
       <LogicalName>VBNetBinding.addin.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\vb-icon-32.png">
-      <LogicalName>vb-icon-32.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="templates\AssemblyInfo.xft.xml">
       <LogicalName>AssemblyInfo.xft.xml</LogicalName>
@@ -119,9 +119,9 @@
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="md1format.xml">
-      <LogicalName>md1format.xml</LogicalName>
-    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <ItemGroup>
+    <Folder Include="icons\" />
+  </ItemGroup>
 </Project>

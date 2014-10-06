@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{100568FC-F4E8-439B-94AD-41D11724E45B}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -19,14 +19,19 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>False</ConsolePause>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\MonoDevelop.Refactoring\MonoDevelop.Refactoring.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
-    <Optimize>False</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
     <OutputPath>..\..\..\build\AddIns\MonoDevelop.Refactoring</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>False</ConsolePause>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\MonoDevelop.Refactoring\MonoDevelop.Refactoring.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -95,13 +100,10 @@
     <Compile Include="MonoDevelop.CodeActions\CodeActionProvider.cs" />
     <Compile Include="MonoDevelop.CodeActions\CodeActionAddinNode.cs" />
     <Compile Include="MonoDevelop.CodeActions\CodeActionPanelWidget.cs" />
-    <Compile Include="MonoDevelop.CodeActions\CodeActionWidget.cs" />
     <Compile Include="MonoDevelop.CodeActions\AnalysisCodeAction.cs" />
     <Compile Include="gtk-gui\MonoDevelop.CodeActions.ContextActionPanelWidget.cs" />
     <Compile Include="MonoDevelop.CodeIssues\CodeIssuePanelWidget.cs" />
     <Compile Include="gtk-gui\MonoDevelop.CodeIssues.CodeIssuePanelWidget.cs" />
-    <Compile Include="MonoDevelop.CodeIssues\CodeIssueOptionsDialog.cs" />
-    <Compile Include="gtk-gui\MonoDevelop.CodeIssues.CodeIssueOptionsDialog.cs" />
     <Compile Include="MonoDevelop.CodeActions\ICodeActionProviderSource.cs" />
     <Compile Include="MonoDevelop.CodeIssues\ICodeIssueProviderSource.cs" />
     <Compile Include="MonoDevelop.CodeIssues\CodeAnalysisRunner.cs" />
@@ -110,6 +112,45 @@
     <Compile Include="MonoDevelop.Refactoring\ResolveCommandHandler.cs" />
     <Compile Include="MonoDevelop.Refactoring\ExtensionMethods.cs" />
     <Compile Include="MonoDevelop.CodeIssues\CodeIssuePad.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\IGroupingProvider.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\IssueSummary.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\IssueGroup.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\CategoryGroupingProvider.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\GroupingProviderChainControl.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\GroupingDescriptionAttribute.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\NullGroupingProvider.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\IssueGroupEventArgs.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\GroupingProviderEventArgs.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\AbstractGroupingProvider.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\ProviderGroupingProvider.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\SeverityGroupingProvider.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\AnalysisState.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\AnalysisStateChangeEventArgs.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\CodeAnalysisBatchRunner.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\IIssueTreeNode.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\IIssueSummarySink.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\IssueTreeNodeEventArgs.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\ActionSummary.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\BatchFixer.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\IssueMatch.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\ExactIssueMatcher.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\IActionMatcher.cs" />
+    <Compile Include="AddinInfo.cs" />
+    <Compile Include="MonoDevelop.Refactoring\FindDerivedSymbolsHandler.cs" />
+    <Compile Include="MonoDevelop.Refactoring\FindMemberOverloadsHandler.cs" />
+    <Compile Include="MonoDevelop.Refactoring\FindExtensionMethodHandler.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\Runner\IAnalysisJob.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\Runner\AnalysisJobQueue.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\Runner\CodeIssueEventArgs.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\SolutionAnalysisJob.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\Runner\SimpleAnalysisJob.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\Runner\ProgressMonitorWrapperJob.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\Runner\JobContext.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\Runner\IJobContext.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\Runner\JobSlice.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\Runner\JobStatus.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\ProjectGroupingProvider.cs" />
+    <Compile Include="MonoDevelop.CodeIssues\FileGroupingProvider.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="MonoDevelop.Refactoring\" />
@@ -117,6 +158,7 @@
     <Folder Include="MonoDevelop.AnalysisCore\" />
     <Folder Include="MonoDevelop.CodeIssues\" />
     <Folder Include="MonoDevelop.CodeActions\" />
+    <Folder Include="MonoDevelop.CodeIssues\Runner\" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="MonoDevelop.Refactoring.addin.xml">
@@ -124,6 +166,26 @@
     </EmbeddedResource>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="icons\light\prefs-code-actions-16.png">
+      <LogicalName>prefs-code-actions-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-code-actions-16%402x.png">
+      <LogicalName>prefs-code-actions-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-code-rules-16.png">
+      <LogicalName>prefs-code-rules-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-code-rules-16%402x.png">
+      <LogicalName>prefs-code-rules-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-code-analysis-16.png">
+      <LogicalName>prefs-code-analysis-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-code-analysis-16%402x.png">
+      <LogicalName>prefs-code-analysis-light-16@2x.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

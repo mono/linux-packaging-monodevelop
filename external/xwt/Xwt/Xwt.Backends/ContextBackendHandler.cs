@@ -70,6 +70,8 @@ namespace Xwt.Backends
 		
 		public abstract void Translate (object backend, double tx, double ty);
 
+		public abstract void ModifyCTM (object backend, Matrix transform);
+
 		public abstract Matrix GetCTM (object backend);
 
 		public abstract bool IsPointInStroke (object backend, double x, double y);
@@ -79,6 +81,8 @@ namespace Xwt.Backends
 		/// It doesn't affect colors that have already been set.
 		/// </summary>
 		public abstract void SetGlobalAlpha (object backend, double globalAlpha);
+
+		public abstract double GetScaleFactor (object backend);
 	}
 }
 

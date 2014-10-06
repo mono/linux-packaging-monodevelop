@@ -1,5 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.Manifest.addin.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.dll.mdb

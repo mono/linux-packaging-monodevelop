@@ -63,11 +63,11 @@ namespace MonoDevelop.NUnit
 			return ((NUnitAssemblyGroupProject)dataObject).Name;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			NUnitAssemblyGroupProject project = dataObject as NUnitAssemblyGroupProject;
-			label = project.Name;
-			icon = Context.GetIcon (Stock.Project);
+			nodeInfo.Label = project.Name;
+			nodeInfo.Icon = Context.GetIcon (Stock.Project);
 		}
 
 		public override void BuildChildNodes (ITreeBuilder builder, object dataObject)

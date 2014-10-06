@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{07CC7654-27D6-421D-A64C-0FFA40456FA2}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -15,16 +15,18 @@
     <DebugType>full</DebugType>
     <Optimize>False</Optimize>
     <OutputPath>..\..\..\build\AddIns\BackendBindings\</OutputPath>
-    <DefineConstants>GMCS_SOURCE;NET_2_0;MS_COMPATIBLE</DefineConstants>
+    <DefineConstants>GMCS_SOURCE;NET_2_0;MS_COMPATIBLE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\BackendBindings\MonoDevelop.CSharpBinding.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\build\AddIns\BackendBindings\</OutputPath>
     <DefineConstants>GMCS_SOURCE;NET_2_0;MS_COMPATIBLE;FULL_AST;BOOTSTRAP_BASIC</DefineConstants>
@@ -34,6 +36,9 @@
       <Execution clr-version="Net_2_0" />
     </Execution>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\BackendBindings\MonoDevelop.CSharpBinding.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\core\MonoDevelop.Core\MonoDevelop.Core.csproj">
@@ -116,6 +121,14 @@
       <Name>MonoDevelop.NUnit</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\external\nrefactory\ICSharpCode.NRefactory.CSharp.Refactoring\ICSharpCode.NRefactory.CSharp.Refactoring.csproj">
+      <Project>{2A705FC6-1A9E-4941-9E47-254D79F2D9D5}</Project>
+      <Name>ICSharpCode.NRefactory.CSharp.Refactoring</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\external\nrefactory\ICSharpCode.NRefactory.Xml\ICSharpCode.NRefactory.Xml.csproj">
+      <Project>{DC393B66-92ED-4CAD-AB25-CFEF23F3D7C6}</Project>
+      <Name>ICSharpCode.NRefactory.Xml</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -124,23 +137,18 @@
     <Reference Include="Mono.Posix" />
     <Reference Include="glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
     </Reference>
     <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
     </Reference>
     <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
     </Reference>
     <Reference Include="gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
     </Reference>
     <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
     </Reference>
     <Reference Include="System.Core" />
     <Reference Include="Mono.Cairo" />
@@ -161,26 +169,14 @@
     <EmbeddedResource Include="templates\Library.xpt.xml">
       <LogicalName>Library.xpt.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\C#.FileIcon">
-      <LogicalName>C#.FileIcon</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="CSharpBinding.addin.xml">
       <LogicalName>CSharpBinding.addin.xml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\csharp-icon-32.png">
-      <LogicalName>csharp-icon-32.png</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="templates\AssemblyInfo.xft.xml">
       <LogicalName>AssemblyInfo.xft.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="md1format.xml">
-      <LogicalName>md1format.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\csharp-project-16.png">
-      <LogicalName>csharp-project-16.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="MonoDevelop.CSharp.Formatting\policies\AllmanCSharpPolicy.xml">
       <LogicalName>AllmanCSharpPolicy.xml</LogicalName>
@@ -212,6 +208,9 @@
     <EmbeddedResource Include="templates\PortableLibrary.xpt.xml">
       <LogicalName>PortableLibrary.xpt.xml</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="templates\SharedAssetsProject.xpt.xml">
+      <LogicalName>SharedAssetsProject.xpt.xml</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="gtk-gui\generated.cs" />
@@ -220,9 +219,6 @@
     <Compile Include="MonoDevelop.CSharp.Formatting\CSharpTextEditorIndentation.cs" />
     <Compile Include="MonoDevelop.CSharp.Formatting\CSharpFormattingPolicy.cs" />
     <Compile Include="MonoDevelop.CSharp.Formatting\CSharpFormattingPolicyPanel.cs" />
-    <Compile Include="MonoDevelop.CSharp.Formatting\CSharpFormattingProperties.cs" />
-    <Compile Include="MonoDevelop.CSharp.Formatting\CSharpIndentEngine.cs" />
-    <Compile Include="MonoDevelop.CSharp.Formatting\CSharpIndentEngineStack.cs" />
     <Compile Include="MonoDevelop.CSharp.Formatting\CSharpFormatter.cs" />
     <Compile Include="MonoDevelop.CSharp.Project\CSharpCompilerParameters.cs" />
     <Compile Include="MonoDevelop.CSharp.Project\CSharpProjectParameters.cs" />
@@ -308,6 +304,14 @@
     <Compile Include="MonoDevelop.CSharp.Refactoring.CodeActions\Actions\ConvertToEnumAction.cs" />
     <Compile Include="MonoDevelop.CSharp.Refactoring.CodeActions\Actions\ConvertToEnumDialog.cs" />
     <Compile Include="MonoDevelop.CSharp.UnitTests\UnitTestTextEditorExtension.cs" />
+    <Compile Include="MonoDevelop.CSharp.Refactoring.CodeIssues\BaseNRefactoryIssueProvider.cs" />
+    <Compile Include="MonoDevelop.CSharp.CodeGeneration\PartialGenerator.cs" />
+    <Compile Include="AddinInfo.cs" />
+    <Compile Include="MonoDevelop.CSharp.Refactoring.CodeIssues\Issues\MonoTODOIssue.cs" />
+    <Compile Include="MonoDevelop.CSharp.Refactoring\CSharpCodeGenerationService.cs" />
+    <Compile Include="MonoDevelop.CSharp.CodeGeneration\ExportCodeGenerator.cs" />
+    <Compile Include="MonoDevelop.CSharp.Completion\MonoCSharpCompletionEngine.cs" />
+    <Compile Include="MonoDevelop.CSharp.Completion\ProtocolCompletionData.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile.am" />
@@ -330,5 +334,7 @@
     <Folder Include="MonoDevelop.CSharp.Refactoring.CodeIssues\NamingInspection\" />
     <Folder Include="MonoDevelop.CSharp.Tooltips\" />
     <Folder Include="MonoDevelop.CSharp.UnitTests\" />
+    <Folder Include="MonoDevelop.CSharp.Refactoring.CodeIssues\Issues\" />
+    <Folder Include="icons\" />
   </ItemGroup>
 </Project>

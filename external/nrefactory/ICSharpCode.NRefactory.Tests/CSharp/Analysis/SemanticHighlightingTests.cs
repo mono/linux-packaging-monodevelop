@@ -1,4 +1,4 @@
-//
+﻿//
 // SemanticHighlightingTests.cs
 //
 // Author:
@@ -77,7 +77,7 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 			public string GetColor(TextLocation loc)
 			{
 				foreach (var color in colors) {
-					if (color.Item1.IsInside (loc))
+					if (color.Item1.Contains (loc))
 						return color.Item2;
 				}
 				return null;
@@ -119,7 +119,7 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 
 			foreach (var offset in offsets) {
 				var loc = doc.GetLocation (offset);
-				var color = visitor.GetColor (loc);
+				var color = visitor.GetColor (loc) ?? "defaultTextColor";
 				Assert.AreEqual (keywordColor.Name, color, "Color at " + loc + " is wrong:" + color);
 			}
 		}
@@ -365,20 +365,140 @@ class MyClass {
 		[Test]
 		public void TestStringFormatItemInVerbatimStringColor()
 		{
+			TestColor ("using System;\nclass MyClass {\n\npublic static void Main () { Console.WriteLine (@\" ${0}\n ${1} \n\n ${2} \", 1, 2, 3); } }", stringFormatItemColor);
+		}
+
+		[Test]
+		public void TestFormatItemBug()
+		{
 			TestColor (@"using System;
 class MyClass {
 			public static void Main ()
 			{
-				Console.WriteLine (@"" ${0}
-
- ${1} 
-
-
-${2} "", 1, 2, 3);
+				string str = string.Format ("" ${{ {0} {1} {2} $}} "", 1, 2, 3);
 			}
 		}
-", stringFormatItemColor);
+", defaultTextColor);
 		}
+
+		[Test]
+		public void TestInactiveConditionalCall()
+		{
+			TestColor (@"using System.Diagnostics;
+
+class Test
+{
+	[Conditional(""FOO"")]
+	public void Test22()
+	{
+	}
+
+	public void Foo()
+	{
+		$Test22();
+	}
+}
+", inactiveCodeColor);
+		}
+
+		[Test]
+		public void TestInactiveConditionalCallOverrideTest()
+		{
+			TestColor (@"using System.Diagnostics;
+class TestBase
+{
+	[Conditional(""FOO"")]
+	public virtual void Test22()
+	{
+	}
+}
+
+
+class Test : TestBase
+{
+	public override void Test22()
+	{
+	}
+
+	public void Foo()
+	{
+		$Test22();
+	}
+}
+", inactiveCodeColor);
+		}
+
+		[Test]
+		public void TestInactivePartialCall()
+		{
+			TestColor (@"using System.Diagnostics;
+
+partial class Test
+{
+	partial void FooBar();
+}
+
+partial class Test
+{
+	public void Foo()
+	{
+		$FooBar();
+	}
+}
+", inactiveCodeColor);
+		}
+	
+
+		/// <summary>
+		/// Bug 17011 - XS does not recognize StringBuilder::AppendFormat 
+		/// </summary>
+		[Test]
+		public void TestBug17011()
+		{
+			TestColor (@"
+using System.Text;
+
+class TestClass
+{
+	void Foo(StringBuilder sb)
+	{
+		sb.AppendFormat(""${0} ${1}"", 1, 2);
+	}
+}", stringFormatItemColor);
+		}
+
+
+		/// <summary>
+		///Bug 22247 - Wrong colouring of escaped string formater
+		/// </summary>
+		[Test]
+		public void TestBug22247()
+		{
+			TestColor (@"
+class X
+{
+	public static void Main ()
+	{
+		var l = string.Format(""{{{0:d}$}$}"", 100);
+	}
+}", defaultTextColor);
+		}
+
+		[Test]
+		public void TestStringFormatClosingBrace()
+		{
+			TestColor (@"
+using System.Text;
+
+class TestClass
+{
+	void Foo(StringBuilder sb)
+	{
+		sb.AppendFormat(""{0$}"", 1, 2);
+	}
+}", stringFormatItemColor);
+		}
+
 	}
 }
 

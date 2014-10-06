@@ -31,19 +31,21 @@ using System.Collections.Generic;
 
 namespace MonoDevelop.CSharp
 {
-	public enum ExpandCommands
+	enum ExpandCommands
 	{
 		ExpandSelection,
 		ShrinkSelection
 	}
 	
-	public class ExpandSelectionHandler : CommandHandler
+	class ExpandSelectionHandler : CommandHandler
 	{
 		protected override void Run ()
 		{
-			MonoDevelop.Ide.Gui.Document doc = IdeApp.Workbench.ActiveDocument;
-			CSharpParser parser = new CSharpParser ();
-			var unit = parser.Parse (doc.Editor);
+			var doc = IdeApp.Workbench.ActiveDocument;
+			var parsedDocument = doc.ParsedDocument;
+			if (parsedDocument == null)
+				return;
+			var unit = parsedDocument.GetAst<SyntaxTree> ();
 			if (unit == null)
 				return;
 			var node = unit.GetNodeAt (doc.Editor.Caret.Location);
@@ -61,20 +63,21 @@ namespace MonoDevelop.CSharp
 		}
 	}
 	
-	public class ShrinkSelectionHandler : CommandHandler
+	class ShrinkSelectionHandler : CommandHandler
 	{
-		
 		protected override void Run ()
 		{
-			MonoDevelop.Ide.Gui.Document doc = IdeApp.Workbench.ActiveDocument;
-			CSharpParser parser = new CSharpParser ();
-			var unit = parser.Parse (doc.Editor);
+			var doc = IdeApp.Workbench.ActiveDocument;
+			var parsedDocument = doc.ParsedDocument;
+			if (parsedDocument == null)
+				return;
+			var unit = parsedDocument.GetAst<SyntaxTree> ();
 			if (unit == null)
 				return;
 			var node = unit.GetNodeAt (doc.Editor.Caret.Line, doc.Editor.Caret.Column);
 			if (node == null)
 				return;
-			Stack<AstNode > nodeStack = new Stack<AstNode> ();
+			var nodeStack = new Stack<AstNode> ();
 			nodeStack.Push (node);
 			if (doc.Editor.IsSomethingSelected) {
 				while (node != null && doc.Editor.MainSelection.IsSelected (node.StartLocation, node.EndLocation)) {

@@ -39,7 +39,7 @@ namespace Mono.TextEditor.PopupWindow
 			get;
 		}
 		
-		Gdk.Pixbuf GetIcon (int index);
+		Xwt.Drawing.Image GetIcon (int index);
 		string GetText (int index);
 	}
 	

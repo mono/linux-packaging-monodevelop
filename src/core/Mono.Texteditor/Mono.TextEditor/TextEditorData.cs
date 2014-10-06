@@ -79,8 +79,21 @@ namespace Mono.TextEditor
 				currentMode.AddedToEditor (this);
 				if (oldMode != null)
 					oldMode.RemovedFromEditor (this);
+				OnEditModeChanged (new EditModeChangedEventArgs (oldMode, currentMode));
 			}
 		}
+
+		protected virtual void OnEditModeChanged (EditModeChangedEventArgs e)
+		{
+			var handler = EditModeChanged;
+			if (handler != null)
+				handler (this, e);
+		}
+
+		/// <summary>
+		/// Occurs when the edit mode changed.
+		/// </summary>
+		public event EventHandler<EditModeChangedEventArgs> EditModeChanged;
 		
 		public TextEditor Parent {
 			get;
@@ -190,6 +203,7 @@ namespace Mono.TextEditor
 
 			HeightTree = new HeightTree (this);
 			HeightTree.Rebuild ();
+			IndentationTracker = new DefaultIndentationTracker (document);
 		}
 
 		void HandleFoldTreeUpdated (object sender, EventArgs e)
@@ -277,16 +291,55 @@ namespace Mono.TextEditor
 		ColorScheme colorStyle;
 		public ColorScheme ColorStyle {
 			get {
-				return colorStyle ?? Mono.TextEditor.Highlighting.SyntaxModeService.DefaultColorStyle;
+				return colorStyle ?? SyntaxModeService.DefaultColorStyle;
 			}
 			set {
 				colorStyle = value;
 			}
 		}
+
+		string ConvertToPangoMarkup (string str, bool replaceTabs = true)
+		{
+			if (str == null)
+				throw new ArgumentNullException ("str");
+			var result = new StringBuilder ();
+			foreach (char ch in str) {
+				switch (ch) {
+				case '&':
+					result.Append ("&amp;");
+					break;
+				case '<':
+					result.Append ("&lt;");
+					break;
+				case '>':
+					result.Append ("&gt;");
+					break;
+				case '\t':
+					if (replaceTabs) {
+						result.Append (new string (' ', options.TabSize));
+					} else {
+						result.Append ('\t');
+					}
+					break;
+				default:
+					result.Append (ch);
+					break;
+				}
+			}
+			return result.ToString ();
+		}
 		
 		public string GetMarkup (int offset, int length, bool removeIndent, bool useColors = true, bool replaceTabs = true)
 		{
 			ISyntaxMode mode = Document.SyntaxMode;
+			var style = ColorStyle;
+
+			if (style == null) {
+				var str = Document.GetTextAt (offset, length);
+				if (removeIndent)
+					str = str.TrimStart (' ', '\t');
+				return ConvertToPangoMarkup (str, replaceTabs);
+			}
 
 			int indentLength = SyntaxMode.GetIndentLength (Document, offset, length, false);
 			int curOffset = offset;
@@ -297,8 +350,8 @@ namespace Mono.TextEditor
 				int toOffset = System.Math.Min (line.Offset + line.Length, offset + length);
 				var styleStack = new Stack<ChunkStyle> ();
 
-				foreach (var chunk in mode.GetChunks (ColorStyle, line, curOffset, toOffset - curOffset)) {
-					var chunkStyle = ColorStyle.GetChunkStyle (chunk);
+				foreach (var chunk in mode.GetChunks (style, line, curOffset, toOffset - curOffset)) {
+					var chunkStyle = style.GetChunkStyle (chunk);
 					bool setBold = (styleStack.Count > 0 && styleStack.Peek ().FontWeight != chunkStyle.FontWeight) || 
 						chunkStyle.FontWeight != FontWeight.Normal;
 					bool setItalic = (styleStack.Count > 0 && styleStack.Peek ().FontStyle != chunkStyle.FontStyle) || 
@@ -326,31 +379,7 @@ namespace Mono.TextEditor
 						result.Append (">");
 						styleStack.Push (chunkStyle);
 					}
-
-					for (int i = 0; i < chunk.Length && chunk.Offset + i < Document.TextLength; i++) {
-						char ch = Document.GetCharAt (chunk.Offset + i);
-						switch (ch) {
-						case '&':
-							result.Append ("&amp;");
-							break;
-						case '<':
-							result.Append ("&lt;");
-							break;
-						case '>':
-							result.Append ("&gt;");
-							break;
-						case '\t':
-							if (replaceTabs) {
-								result.Append (new string (' ', options.TabSize));
-							} else {
-								result.Append ('\t');
-							}
-							break;
-						default:
-							result.Append (ch);
-							break;
-						}
-					}
+					result.Append (ConvertToPangoMarkup (Document.GetTextBetween (chunk.Offset, System.Math.Min (chunk.EndOffset, Document.TextLength)), replaceTabs));
 				}
 				while (styleStack.Count > 0) {
 					result.Append ("</span>");
@@ -397,7 +426,7 @@ namespace Mono.TextEditor
 				return "";
 			StringBuilder sb = new StringBuilder ();
 			bool convertTabs = TabsToSpaces;
-			
+			var tabSize = Options.TabSize;
 			for (int i = 0; i < str.Length; i++) {
 				char ch = str [i];
 				switch (ch) {
@@ -406,7 +435,7 @@ namespace Mono.TextEditor
 					break;
 				case '\t':
 					if (convertTabs) {
-						int tabWidth = TextViewMargin.GetNextTabstop (this, loc.Column) - loc.Column;
+						int tabWidth = TextViewMargin.GetNextTabstop (this, loc.Column, tabSize) - loc.Column;
 						sb.Append (new string (' ', tabWidth));
 						loc = new DocumentLocation (loc.Line, loc.Column + tabWidth);
 					} else 
@@ -1006,6 +1035,9 @@ namespace Mono.TextEditor
 		
 		public SearchResult FindNext (bool setSelection)
 		{
+			if (SearchEngine.SearchRequest == null || string.IsNullOrEmpty (SearchEngine.SearchRequest.SearchPattern))
+				return null;
+
 			int startOffset = Caret.Offset;
 			if (IsSomethingSelected && IsMatchAt (startOffset)) {
 				startOffset = MainSelection.GetLeadOffset (this);
@@ -1022,6 +1054,8 @@ namespace Mono.TextEditor
 		
 		public SearchResult FindPrevious (bool setSelection)
 		{
+			if (SearchEngine.SearchRequest == null || string.IsNullOrEmpty (SearchEngine.SearchRequest.SearchPattern))
+				return null;
 			int startOffset = Caret.Offset - SearchEngine.SearchRequest.SearchPattern.Length;
 			if (IsSomethingSelected && IsMatchAt (MainSelection.GetAnchorOffset (this))) 
 				startOffset = MainSelection.GetAnchorOffset (this);
@@ -1138,7 +1172,6 @@ namespace Mono.TextEditor
 
 		int EnsureIsNotVirtual (int line, int column)
 		{
-			Debug.Assert (document.IsInAtomicUndo);
 			DocumentLine documentLine = Document.GetLine (line);
 			if (documentLine == null)
 				return 0;
@@ -1202,11 +1235,19 @@ namespace Mono.TextEditor
 		public int PasteText (int offset, string text, byte[] copyData, ref IDisposable undoGroup)
 		{
 			if (TextPasteHandler != null) {
-				var newText = TextPasteHandler.FormatPlainText (offset, text, copyData);
+				string newText;
+				try {
+					newText = TextPasteHandler.FormatPlainText (offset, text, copyData);
+				} catch (Exception e) {
+					Console.WriteLine ("Text paste handler exception:" + e);
+					newText = text;
+				}
 				if (newText != text) {
 					var inserted = Insert (offset, text);
-					undoGroup.Dispose ();
-					undoGroup = OpenUndoGroup ();
+					if (options.GenerateFormattingUndoStep) {
+						undoGroup.Dispose ();
+						undoGroup = OpenUndoGroup ();
+					}
 					var result = Replace (offset, inserted, newText);
 					if (Paste != null)
 						Paste (offset, text, result);
@@ -1214,6 +1255,10 @@ namespace Mono.TextEditor
 				}
 			}
 			var insertedChars = Insert (offset, text);
+			if (options.GenerateFormattingUndoStep) {
+				undoGroup.Dispose ();
+				undoGroup = OpenUndoGroup ();
+			}
 			if (Paste != null)
 				Paste (offset, text, insertedChars);
 			return insertedChars;
@@ -1356,6 +1401,11 @@ namespace Mono.TextEditor
 		public IDisposable OpenUndoGroup()
 		{
 			return Document.OpenUndoGroup ();
+		}
+
+		public IDisposable OpenUndoGroup(OperationType operationType)
+		{
+			return Document.OpenUndoGroup (operationType);
 		}
 		#endregion
 		

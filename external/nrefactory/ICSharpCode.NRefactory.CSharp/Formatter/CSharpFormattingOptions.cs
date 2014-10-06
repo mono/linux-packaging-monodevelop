@@ -66,6 +66,12 @@ namespace ICSharpCode.NRefactory.CSharp
 		InsideNamespace
 	}
 
+	public enum EmptyLineFormatting {
+		DoNotChange,
+		Indent,
+		DoNotIndent
+	}
+
 	public class CSharpFormattingOptions
 	{
 		public string Name {
@@ -144,21 +150,47 @@ namespace ICSharpCode.NRefactory.CSharp
 			set;
 		}
 
-		public bool AlignEmbeddedUsingStatements { // tested
+		public bool AlignEmbeddedStatements { // tested
 			get;
 			set;
 		}
 
-		public bool AlignEmbeddedIfStatements { // tested
+		public bool AlignElseInIfStatements {
 			get;
 			set;
 		}
 
-		public PropertyFormatting PropertyFormatting { // tested
+
+
+		public PropertyFormatting AutoPropertyFormatting { // tested
 			get;
 			set;
 		}
 
+		public PropertyFormatting SimplePropertyFormatting { // tested
+			get;
+			set;
+		}
+
+		public EmptyLineFormatting EmptyLineFormatting {
+			get;
+			set;
+		}
+
+		public bool IndentPreprocessorDirectives { // tested
+			get;
+			set;
+		}
+
+		public bool AlignToMemberReferenceDot { // TODO!
+			get;
+			set;
+		}
+
+		public bool IndentBlocksInsideExpressions {
+			get;
+			set;
+		}
 		#endregion
 		
 		#region Braces
@@ -222,12 +254,12 @@ namespace ICSharpCode.NRefactory.CSharp
 			set;
 		}
 
-		public bool AllowPropertyGetBlockInline { // tested
+		public PropertyFormatting SimpleGetBlockFormatting { // tested
 			get;
 			set;
 		}
 
-		public bool AllowPropertySetBlockInline { // tested
+		public PropertyFormatting SimpleSetBlockFormatting { // tested
 			get;
 			set;
 		}
@@ -302,6 +334,16 @@ namespace ICSharpCode.NRefactory.CSharp
 		public NewLinePlacement WhileNewLinePlacement { // tested
 			get;
 			set;
+		}
+
+		NewLinePlacement embeddedStatementPlacement = NewLinePlacement.NewLine;
+		public NewLinePlacement EmbeddedStatementPlacement {
+			get {
+				return embeddedStatementPlacement;
+			}
+			set {
+				embeddedStatementPlacement = value;
+			}
 		}
 		#endregion
 		
@@ -405,6 +447,16 @@ namespace ICSharpCode.NRefactory.CSharp
 		}
 
 		public bool SpaceWithinConstructorDeclarationParentheses { // tested
+			get;
+			set;
+		}
+
+		public NewLinePlacement NewLineBeforeConstructorInitializerColon {
+			get;
+			set;
+		}
+
+		public NewLinePlacement NewLineAfterConstructorInitializerColon {
 			get;
 			set;
 		}
@@ -542,7 +594,22 @@ namespace ICSharpCode.NRefactory.CSharp
 			set;
 		}
 
-		public bool SpaceAroundNullCoalescingOperator {
+		public bool SpaceAroundNullCoalescingOperator { // Tested
+			get;
+			set;
+		}
+
+		public bool SpaceAfterUnsafeAddressOfOperator { // Tested
+			get;
+			set;
+		}
+
+		public bool SpaceAfterUnsafeAsteriskOfOperator { // Tested
+			get;
+			set;
+		}
+
+		public bool SpaceAroundUnsafeArrowOperator { // Tested
 			get;
 			set;
 		}
@@ -707,40 +774,60 @@ namespace ICSharpCode.NRefactory.CSharp
 			get;
 			set;
 		}
+
+		public bool RemoveEndOfLineWhiteSpace {
+			get;
+			set;
+		}
+
+		public bool SpaceBeforeSemicolon {
+			get;
+			set;
+		}
 		#endregion
 		
 		#region Blank Lines
-		public int BlankLinesBeforeUsings {
+		public int MinimumBlankLinesBeforeUsings {
 			get;
 			set;
 		}
 
-		public int BlankLinesAfterUsings {
+		public int MinimumBlankLinesAfterUsings {
 			get;
 			set;
 		}
 
-		public int BlankLinesBeforeFirstDeclaration {
+		public int MinimumBlankLinesBeforeFirstDeclaration {
 			get;
 			set;
 		}
 
-		public int BlankLinesBetweenTypes {
+		public int MinimumBlankLinesBetweenTypes {
 			get;
 			set;
 		}
 
-		public int BlankLinesBetweenFields {
+		public int MinimumBlankLinesBetweenFields {
 			get;
 			set;
 		}
 
-		public int BlankLinesBetweenEventFields {
+		public int MinimumBlankLinesBetweenEventFields {
 			get;
 			set;
 		}
 
-		public int BlankLinesBetweenMembers {
+		public int MinimumBlankLinesBetweenMembers {
+			get;
+			set;
+		}
+
+		public int MinimumBlankLinesAroundRegion {
+			get;
+			set;
+		}
+
+		public int MinimumBlankLinesInsideRegion {
 			get;
 			set;
 		}
@@ -848,6 +935,11 @@ namespace ICSharpCode.NRefactory.CSharp
 		}
 
 		public bool AlignToFirstMethodDeclarationParameter {
+			get;
+			set;
+		}
+
+		public NewLinePlacement NewLineBeforeNewQueryClause {
 			get;
 			set;
 		}

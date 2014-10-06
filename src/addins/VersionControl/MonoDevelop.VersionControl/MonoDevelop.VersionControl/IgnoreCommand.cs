@@ -25,15 +25,13 @@
 // THE SOFTWARE.
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
-using MonoDevelop.VersionControl.Dialogs;
 using MonoDevelop.Ide;
 using System;
 using System.Linq;
-using System.Xml;
 
 namespace MonoDevelop.VersionControl
 {
-	class IgnoreCommand : CommandHandler
+	class IgnoreCommand
 	{
 		public static bool Ignore (VersionControlItemList items, bool test)
 		{
@@ -95,7 +93,7 @@ namespace MonoDevelop.VersionControl
 		}
 	}
 
-	class UnignoreCommand : CommandHandler
+	class UnignoreCommand
 	{
 		public static bool Unignore (VersionControlItemList items, bool test)
 		{

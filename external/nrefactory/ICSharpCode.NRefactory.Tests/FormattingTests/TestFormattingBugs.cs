@@ -375,7 +375,127 @@ foo ();
 }");
 		}
 
+		/// <summary>
+		/// Bug 14324 - System.ArgumentOutOfRangeException while formatting C# code
+		/// </summary>
+		[Test]
+		public void TestBug14324()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
 
+			Test(policy,
+			     @"class C
+{
+	public void Test ()
+	{
+		if
+(true ||
+false) {
+}
+	}
+}",
+			     @"class C
+{
+	public void Test ()
+	{
+		if (true ||
+		false) {
+		}
+	}
+}");
+		}
+
+
+
+		/// <summary>
+		/// Bug 14957 - System.InvalidOperationException: Sequence contains no elements
+		/// </summary>
+		[Test]
+		public void TestBug14957()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.SimplePropertyFormatting = PropertyFormatting.ForceOneLine;
+			Test(policy,
+				@"class X
+{
+	public int Foo { get {
+	} }
+}", @"class X
+{
+	public int Foo { get { } }
+}");
+		}
+
+		/// <summary>
+		/// Bug 15218 - Saving causing a crash
+		/// </summary>
+		[Test]
+		public void TestBug15218()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.SimplePropertyFormatting = PropertyFormatting.ForceOneLine;
+			Test(policy,
+				@"class Foo
+{
+	void Bar ()
+	{
+		foo += delegate(object s, EventArgs a)
+		{
+			var myDelegate = delegate()
+			{
+					
+			};
+		};  
+	}
+}
+", @"class Foo
+{
+	void Bar ()
+	{
+		foo += delegate(object s, EventArgs a) {
+			var myDelegate = delegate() {
+					
+			};
+		};  
+	}
+}
+");
+		}
+
+
+		/// <summary>
+		/// Bug 17047 - Smart indent failure
+		/// </summary>
+		[Test]
+		public void TestBug17047()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.ChainedMethodCallWrapping = Wrapping.WrapAlways;
+			Test(policy,
+				@"class Foo
+{
+	void Bar ()
+	{
+		Observable.Merge (shotStats, touchStats)
+			.GroupBy (e => e.Type)
+			.Subscribe (statGroup => {
+				Stats.Add (new StatItemViewModel (statGroup));
+			});
+	}
+}
+", @"class Foo
+{
+	void Bar ()
+	{
+		Observable.Merge (shotStats, touchStats)
+			.GroupBy (e => e.Type)
+			.Subscribe (statGroup => {
+				Stats.Add (new StatItemViewModel (statGroup));
+			});
+	}
+}
+");
+		}
 	}
 }
 

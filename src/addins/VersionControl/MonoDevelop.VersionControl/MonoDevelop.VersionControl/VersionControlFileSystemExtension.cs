@@ -6,6 +6,7 @@ using MonoDevelop.Core.FileSystem;
 using MonoDevelop.Ide;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 
 namespace MonoDevelop.VersionControl
 {
@@ -16,11 +17,11 @@ namespace MonoDevelop.VersionControl
 			// FIXME: don't load this extension if the ide is not loaded.
 			if (IdeApp.ProjectOperations == null || !IdeApp.Workspace.IsOpen)
 				return false;
-			else
-				return GetRepository (path) != null;
+
+			return GetRepository (path) != null;
 		}
 		
-		Repository GetRepository (FilePath path)
+		static Repository GetRepository (FilePath path)
 		{
 			path = path.FullPath;
 			
@@ -42,12 +43,11 @@ namespace MonoDevelop.VersionControl
 		public override void CopyFile (FilePath source, FilePath dest, bool overwrite)
 		{
 			Repository repo = GetRepository (dest);
-			if (repo.RequestFileWritePermission (dest)) {
-				base.CopyFile (source, dest, overwrite);
-				repo.NotifyFileChanged (dest);
-			}
-			else
-				throw new System.IO.IOException ("Write permission denied");
+			if (!repo.RequestFileWritePermission (dest))
+				throw new System.IO.IOException ("Write permission denied.");
+
+			base.CopyFile (source, dest, overwrite);
+			repo.NotifyFileChanged (dest);
 		}
 		
 		public override void MoveFile (FilePath source, FilePath dest)
@@ -84,7 +84,8 @@ namespace MonoDevelop.VersionControl
 		public override void CreateDirectory (FilePath path)
 		{
 			Repository repo = GetRepository (path);
-			repo.CreateLocalDirectory (path);
+			repo.ClearCachedVersionInfo (path);
+			System.IO.Directory.CreateDirectory (path);
 			repo.Add (path, false, new NullProgressMonitor ());
 		}
 		
@@ -108,11 +109,11 @@ namespace MonoDevelop.VersionControl
 			Repository repo = GetRepository (path);
 			repo.DeleteDirectory (path, true, new NullProgressMonitor (), false);
 		}
-		
-		public override bool RequestFileEdit (FilePath file)
+
+		public override void RequestFileEdit (IEnumerable<FilePath> files)
 		{
-			Repository repo = GetRepository (file);
-			return repo.RequestFileWritePermission (file);
+			Repository repo = GetRepository (FilePath.GetCommonRootPath (files));
+			repo.RequestFileWritePermission (files.ToArray ());
 		}
 		
 		public override void NotifyFilesChanged (IEnumerable<FilePath> files)

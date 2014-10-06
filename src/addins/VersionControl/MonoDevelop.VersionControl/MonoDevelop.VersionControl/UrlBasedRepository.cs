@@ -9,11 +9,11 @@ namespace MonoDevelop.VersionControl
 		string url;
 		Uri uri;
 		
-		public UrlBasedRepository ()
+		protected UrlBasedRepository ()
 		{
 		}
 		
-		public UrlBasedRepository (VersionControlSystem vcs): base (vcs)
+		protected UrlBasedRepository (VersionControlSystem vcs): base (vcs)
 		{
 		}
 		
@@ -40,11 +40,10 @@ namespace MonoDevelop.VersionControl
 
 		void CreateUri ()
 		{
-			try {
-				uri = new Uri (url);
-			} catch {
-				uri = null;
-			}
+			if (url == null)
+				return;
+
+			Uri.TryCreate (url, UriKind.Absolute, out uri);
 		}
 		
 		public override void CopyConfigurationFrom (Repository other)

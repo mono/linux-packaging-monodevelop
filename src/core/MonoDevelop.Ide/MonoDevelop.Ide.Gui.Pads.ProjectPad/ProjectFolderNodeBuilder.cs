@@ -44,8 +44,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
 	class ProjectFolderNodeBuilder: FolderNodeBuilder
 	{
-		Gdk.Pixbuf folderOpenIcon;
-		Gdk.Pixbuf folderClosedIcon;
+		Xwt.Drawing.Image folderOpenIcon;
+		Xwt.Drawing.Image folderClosedIcon;
 		
 		EventHandler<FileCopyEventArgs> fileRenamedHandler;
 		EventHandler<FileEventArgs> fileRemovedHandler;
@@ -119,15 +119,15 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			}
 		}
 	
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
-			base.BuildNode (treeBuilder, dataObject, ref label, ref icon, ref closedIcon);
+			base.BuildNode (treeBuilder, dataObject, nodeInfo);
 
 			ProjectFolder folder = (ProjectFolder) dataObject;
 
-			label = GLib.Markup.EscapeText (folder.Name);
-			icon = folderOpenIcon;
-			closedIcon = folderClosedIcon;
+			nodeInfo.Label = GLib.Markup.EscapeText (folder.Name);
+			nodeInfo.Icon = folderOpenIcon;
+			nodeInfo.ClosedIcon = folderClosedIcon;
 		}
 		
 		public override object GetParentObject (object dataObject)
@@ -159,13 +159,23 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				try {
 					if (!FileService.IsValidPath (newFoldername)) {
 						MessageService.ShowWarning (GettextCatalog.GetString ("The name you have chosen contains illegal characters. Please choose a different name."));
-					} else if (File.Exists (newFoldername) || Directory.Exists (newFoldername)) {
+						return;
+					} 
+					if (File.Exists (newFoldername)) {
 						MessageService.ShowWarning (GettextCatalog.GetString ("File or directory name is already in use. Please choose a different one."));
-					} else {
-						FileService.RenameDirectory (oldFoldername, newName);
-						if (folder.Project != null)
-							IdeApp.ProjectOperations.Save (folder.Project);
+						return;
 					}
+					// Don't use Directory.Exists because we want to check for the exact case in case-insensitive file systems
+					var di = Directory.GetDirectories (Path.GetDirectoryName (newFoldername), Path.GetFileName (newFoldername)).FirstOrDefault ();
+					if (di != null) {
+						MessageService.ShowWarning (GettextCatalog.GetString ("File or directory name is already in use. Please choose a different one."));
+						return;
+					}
+
+					FileService.RenameDirectory (oldFoldername, newName);
+					if (folder.Project != null)
+						IdeApp.ProjectOperations.Save (folder.Project);
+
 				} catch (System.ArgumentException) { // new file name with wildcard (*, ?) characters in it
 					MessageService.ShowWarning (GettextCatalog.GetString ("The name you have chosen contains illegal characters. Please choose a different name."));
 				} catch (System.IO.IOException ex) {
@@ -194,7 +204,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 
 			var deleteOnlyQuestion = new QuestionMessage () {
 				AllowApplyToAll = folders.Count > 1,
-				SecondaryText = GettextCatalog.GetString ("The directory and any files it contains will be permanintly removed from your hard disk. ")
+				SecondaryText = GettextCatalog.GetString ("The directory and any files it contains will be permanently removed from your hard disk. ")
 			};
 			deleteOnlyQuestion.Buttons.Add (AlertButton.Cancel);
 			deleteOnlyQuestion.Buttons.Add (AlertButton.Delete);
@@ -202,12 +212,22 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			foreach (var folder in folders) {
 				var project = folder.Project;
 
+				AlertButton result;
+
+				if (project == null) {
+					deleteOnlyQuestion.Text = GettextCatalog.GetString ("Are you sure you want to remove directory {0}?", folder.Name);
+					result = MessageService.AskQuestion (deleteOnlyQuestion);
+					if (result == AlertButton.Delete) {
+						DeleteFolder (folder);
+						continue;
+					} else
+						break;
+				}
+
 				var folderRelativePath = folder.Path.ToRelative (project.BaseDirectory);
 				var files = project.Files.GetFilesInVirtualPath (folderRelativePath).ToList ();
 				var folderPf = project.Files.GetFileWithVirtualPath (folderRelativePath);
 				bool isProjectFolder = files.Count == 0 && folderPf == null;
-
-				AlertButton result;
 
 				//if the parent directory has already been removed, there may be nothing to do
 				if (isProjectFolder) {
@@ -236,14 +256,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				}
 				
 				if (result == AlertButton.Delete) {
-					try {
-						if (Directory.Exists (folder.Path))
-							// FileService events should remove remaining files from the project
-							FileService.DeleteDirectory (folder.Path);
-					} catch (Exception ex) {
-						MessageService.ShowError (GettextCatalog.GetString (
-							"The folder {0} could not be deleted from disk: {1}", folder.Path, ex.Message));
-					}
+					DeleteFolder (folder);
 				} else {
 					//explictly remove the node from the tree, since it currently only tracks real folder deletions
 					folder.Remove ();
@@ -262,7 +275,19 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			}
 			IdeApp.ProjectOperations.Save (projects);
 		}
-		
+
+		static void DeleteFolder (ProjectFolder folder)
+		{
+			try {
+				if (Directory.Exists (folder.Path))
+					// FileService events should remove remaining files from the project
+					FileService.DeleteDirectory (folder.Path);
+			}
+			catch (Exception ex) {
+				MessageService.ShowError (GettextCatalog.GetString ("The folder {0} could not be deleted from disk: {1}", folder.Path, ex.Message));
+			}
+		}
+
 		[CommandUpdateHandler (EditCommands.Delete)]
 		public void UpdateRemoveItem (CommandInfo info)
 		{

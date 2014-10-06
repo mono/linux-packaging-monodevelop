@@ -16,7 +16,7 @@
     <AssemblyOriginatorKeyFile>..\..\external\nrefactory\ICSharpCode.NRefactory.snk</AssemblyOriginatorKeyFile>
     <DelaySign>False</DelaySign>
     <AssemblyOriginatorKeyMode>File</AssemblyOriginatorKeyMode>
-    <ProductVersion>10.0.0</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Platform)' == 'AnyCPU' ">
@@ -56,7 +56,6 @@
     <Compile Include="Ast\DecompilerContext.cs" />
     <Compile Include="Ast\NameVariables.cs" />
     <Compile Include="Ast\NRefactoryExtensions.cs" />
-    <Compile Include="Ast\TextOutputFormatter.cs" />
     <Compile Include="Ast\Transforms\AddCheckedBlocks.cs" />
     <Compile Include="Ast\Transforms\CombineQueryExpressions.cs" />
     <Compile Include="Ast\Transforms\ContextTrackingVisitor.cs" />
@@ -121,6 +120,7 @@
     <Compile Include="ILAst\StateRange.cs" />
     <Compile Include="ILAst\SymbolicExecution.cs" />
     <Compile Include="ILAst\AsyncDecompiler.cs" />
+    <Compile Include="Ast\TextTokenWriter.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\external\cecil\Mono.Cecil.csproj">

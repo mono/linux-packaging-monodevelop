@@ -26,16 +26,20 @@
 //
 
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using Gtk;
 using System.Runtime.InteropServices;
+using Mono.Addins;
 
 namespace MonoDevelop.Components
 {
 	public static class GtkUtil
 	{
 		static Dictionary<TreeView, TreeViewTooltipsData> treeData = new Dictionary<TreeView, TreeViewTooltipsData> ();
-		
+
+		static readonly Xwt.Toolkit gtkToolkit = Xwt.Toolkit.Load (Xwt.ToolkitType.Gtk);
+
 		public static Cairo.Color ToCairoColor (this Gdk.Color color)
 		{
 			return new Cairo.Color ((double)color.Red / ushort.MaxValue,
@@ -43,11 +47,33 @@ namespace MonoDevelop.Components
 			                        (double)color.Blue / ushort.MaxValue);
 		}
 		
+		public static Xwt.Drawing.Color ToXwtColor (this Gdk.Color color)
+		{
+			return new Xwt.Drawing.Color ((double)color.Red / ushort.MaxValue,
+				(double)color.Green / ushort.MaxValue,
+				(double)color.Blue / ushort.MaxValue);
+		}
+
 		public static Gdk.Color ToGdkColor (this Cairo.Color color)
 		{
 			return new Gdk.Color ((byte)(color.R * 255d), (byte)(color.G * 255d), (byte)(color.B * 255d));
 		}
 		
+		public static Gdk.Color ToGdkColor (this Xwt.Drawing.Color color)
+		{
+			return new Gdk.Color ((byte)(color.Red * 255d), (byte)(color.Green * 255d), (byte)(color.Blue * 255d));
+		}
+
+		public static Cairo.Color ToCairoColor (this Xwt.Drawing.Color color)
+		{
+			return new Cairo.Color (color.Red, color.Green, color.Blue, color.Alpha);
+		}
+
+		public static Xwt.Drawing.Color ToXwtColor (this Cairo.Color color)
+		{
+			return new Xwt.Drawing.Color (color.R, color.G, color.B, color.A);
+		}
+
 		/// <summary>
 		/// Makes a color lighter or darker
 		/// </summary>
@@ -57,23 +83,78 @@ namespace MonoDevelop.Components
 		/// </param>
 		public static Gdk.Color AddLight (this Gdk.Color color, double lightAmount)
 		{
-			HslColor c = color;
-			c.L += lightAmount;
-			return c;
+			var c = color.ToXwtColor ();
+			c.Light += lightAmount;
+			return c.ToGdkColor ();
 		}
 
 		public static Cairo.Color AddLight (this Cairo.Color color, double lightAmount)
 		{
-			HslColor c = color;
-			c.L += lightAmount;
-			return c;
+			var c = color.ToXwtColor ();
+			c.Light += lightAmount;
+			return c.ToCairoColor ();
+		}
+
+		public static Xwt.Drawing.Context CreateXwtContext (this Gtk.Widget w)
+		{
+			var c = Gdk.CairoHelper.Create (w.GdkWindow);
+			return gtkToolkit.WrapContext (w, c);
 		}
 
 		public static Gtk.Widget ToGtkWidget (this Xwt.Widget widget)
 		{
-			return (Gtk.Widget) Xwt.Toolkit.CurrentEngine.GetNativeWidget (widget);
+			return (Gtk.Widget) gtkToolkit.GetNativeWidget (widget);
 		}
-		
+
+		public static void DrawImage (this Cairo.Context s, Gtk.Widget widget, Xwt.Drawing.Image image, double x, double y)
+		{
+			gtkToolkit.RenderImage (widget, s, image, x, y);
+		}
+
+		public static Xwt.Drawing.Image ToXwtImage (this Gdk.Pixbuf pix)
+		{
+			return gtkToolkit.WrapImage (pix);
+		}
+
+		public static Gdk.Pixbuf ToPixbuf (this Xwt.Drawing.Image image)
+		{
+			return (Gdk.Pixbuf)gtkToolkit.GetNativeImage (image);
+		}
+
+		public static Gdk.Pixbuf ToPixbuf (this Xwt.Drawing.Image image, Gtk.IconSize size)
+		{
+			return (Gdk.Pixbuf)gtkToolkit.GetNativeImage (image.WithSize (size));
+		}
+
+		public static Xwt.Drawing.Image WithSize (this Xwt.Drawing.Image image, Gtk.IconSize size)
+		{
+			int w, h;
+			if (!Gtk.Icon.SizeLookup (size, out w, out h))
+				return image;
+			if (size == IconSize.Menu)
+				w = h = 16;
+			return image.WithSize (w, h);
+		}
+
+		public static Xwt.Drawing.Image GetImageResource (this RuntimeAddin addin, string resource)
+		{
+			using (var s = addin.GetResource (resource)) {
+				var img = Xwt.Drawing.Image.FromStream (s);
+				int i = resource.LastIndexOf ('.');
+				if (i != -1) {
+					var resource2x = resource.Substring (0, i) + "@2x" + resource.Substring (i);
+					var s2x = addin.GetResource (resource2x);
+					if (s2x != null) {
+						using (s2x) {
+							var img2x = Xwt.Drawing.Image.FromStream (s2x);
+							return Xwt.Drawing.Image.CreateMultiSizeIcon (new Xwt.Drawing.Image[] {img, img2x});
+						}
+					}
+				}
+				return img;
+			}
+		}
+
 		public static void EnableAutoTooltips (this Gtk.TreeView tree)
 		{
 			TreeViewTooltipsData data = new TreeViewTooltipsData ();

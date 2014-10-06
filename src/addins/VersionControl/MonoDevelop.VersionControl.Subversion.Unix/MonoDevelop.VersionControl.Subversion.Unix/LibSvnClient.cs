@@ -3,22 +3,17 @@
 //
 
 using System;
-using System.IO;
-using System.Threading;
-using System.Collections;
 using System.Runtime.InteropServices;
 
-using MonoDevelop.Core;
 using MonoDevelop.VersionControl;
-using MonoDevelop.VersionControl.Subversion.Gui;
 
 using svn_revnum_t = System.IntPtr;
 using off_t = System.Int64;
 using size_t = System.Int32;
 
 namespace MonoDevelop.VersionControl.Subversion.Unix {
-	public abstract class LibSvnClient {
-		public LibSvnClient ()
+	abstract class LibSvnClient {
+		protected LibSvnClient ()
 		{
 			client_version ();
 		}
@@ -149,10 +144,14 @@ namespace MonoDevelop.VersionControl.Subversion.Unix {
 
 		public abstract IntPtr wc_context_create (out IntPtr svn_wc_context_t, IntPtr config, IntPtr result_pool, IntPtr scratch_pool);
 
+		public abstract IntPtr client_get_wc_root (out IntPtr wcroot_abspath, string local_abspath, IntPtr ctx, IntPtr result_pool, IntPtr scratch_pool);
+
 		// TODO: Check if intptr
 		public abstract IntPtr strerror (int statcode, byte[] buf, int bufsize);
 		
 		public abstract IntPtr path_internal_style (string path, IntPtr pool);
+
+		public abstract IntPtr client_upgrade (string wcroot_dir, IntPtr ctx, IntPtr scratch_pool);
 		
 		public class DirEnt {
 			public readonly string Name;
@@ -684,7 +683,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix {
 
 		public delegate IntPtr svn_client_blame_receiver_t (IntPtr baton, Int64 line_no, svn_revnum_t revision, string author, string date, string line, IntPtr pool);
 
-		public delegate void svn_ra_progress_notify_func_t (off_t progress, off_t total, off_t baton, IntPtr pool);
+		public delegate void svn_ra_progress_notify_func_t (off_t progress, off_t total, IntPtr baton, IntPtr pool);
 
 		public delegate IntPtr svn_wc_conflict_resolver_func_t (out IntPtr result, IntPtr description, IntPtr baton, IntPtr pool);
 

@@ -27,22 +27,19 @@ namespace MonoDevelop.VersionControl
 				|| typeof(IWorkspaceObject).IsAssignableFrom (dataType);
 		}
 		
-		public VersionControlNodeExtension ()
-		{
-			VersionControlService.FileStatusChanged += Monitor;
-		}
-
 		protected override void Initialize ()
 		{
 			base.Initialize ();
+			VersionControlService.FileStatusChanged += Monitor;
 		}
 
 		public override void Dispose ()
 		{
+			VersionControlService.FileStatusChanged -= Monitor;
 			base.Dispose ();
 		}
 
-		public override void BuildNode (ITreeBuilder builder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder builder, object dataObject, NodeInfo nodeInfo)
 		{
 			if (!builder.Options["ShowVersionControlOverlays"])
 				return;
@@ -53,8 +50,8 @@ namespace MonoDevelop.VersionControl
 				IWorkspaceObject ce = (IWorkspaceObject) dataObject;
 				Repository rep = VersionControlService.GetRepository (ce);
 				if (rep != null) {
-					AddFolderOverlay (rep, ce.BaseDirectory, ref icon, ref closedIcon, false);
 					rep.GetDirectoryVersionInfo (ce.BaseDirectory, false, false);
+					AddFolderOverlay (rep, ce.BaseDirectory, nodeInfo, false);
 				}
 				return;
 			} else if (dataObject is ProjectFolder) {
@@ -62,8 +59,8 @@ namespace MonoDevelop.VersionControl
 				if (ce.ParentWorkspaceObject != null) {
 					Repository rep = VersionControlService.GetRepository (ce.ParentWorkspaceObject);
 					if (rep != null) {
-						AddFolderOverlay (rep, ce.Path, ref icon, ref closedIcon, true);
 						rep.GetDirectoryVersionInfo (ce.Path, false, false);
+						AddFolderOverlay (rep, ce.Path, nodeInfo, true);
 					}
 				}
 				return;
@@ -91,9 +88,7 @@ namespace MonoDevelop.VersionControl
 			
 			VersionInfo vi = repo.GetVersionInfo (file);
 
-			Gdk.Pixbuf overlay = VersionControlService.LoadOverlayIconForStatus (vi.Status);
-			if (overlay != null)
-				AddOverlay (ref icon, overlay);
+			nodeInfo.OverlayBottomRight = VersionControlService.LoadOverlayIconForStatus (vi.Status);
 		}
 
 /*		public override void PrepareChildNodes (object dataObject)
@@ -114,9 +109,9 @@ namespace MonoDevelop.VersionControl
 			base.PrepareChildNodes (dataObject);
 		}
 */		
-		void AddFolderOverlay (Repository rep, string folder, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon, bool skipVersionedOverlay)
+		static void AddFolderOverlay (Repository rep, string folder, NodeInfo nodeInfo, bool skipVersionedOverlay)
 		{
-			Gdk.Pixbuf overlay = null;
+			Xwt.Drawing.Image overlay = null;
 			VersionInfo vinfo = rep.GetVersionInfo (folder);
 			if (vinfo == null || !vinfo.IsVersioned) {
 				overlay = VersionControlService.LoadOverlayIconForStatus (VersionStatus.Unversioned);
@@ -126,36 +121,7 @@ namespace MonoDevelop.VersionControl
 			} else {
 				overlay = VersionControlService.LoadOverlayIconForStatus (vinfo.Status);
 			}
-			if (overlay != null) {
-				AddOverlay (ref icon, overlay);
-				if (closedIcon != null)
-					AddOverlay (ref closedIcon, overlay);
-			}
-		}
-		
-		void AddOverlay (ref Gdk.Pixbuf icon, Gdk.Pixbuf overlay)
-		{
-			Gdk.Pixbuf cached = Context.GetComposedIcon (icon, overlay);
-			if (cached != null) {
-				icon = cached;
-				return;
-			}
-			
-			int dx = 2;
-			int dy = 2;
-			
-			Gdk.Pixbuf res = new Gdk.Pixbuf (icon.Colorspace, icon.HasAlpha, icon.BitsPerSample, icon.Width + dx, icon.Height + dy);
-			res.Fill (0);
-			icon.CopyArea (0, 0, icon.Width, icon.Height, res, 0, 0);
-			
-			overlay.Composite (res,
-				res.Width - overlay.Width,  res.Height - overlay.Height,
-				overlay.Width, overlay.Height,
-				res.Width - overlay.Width,  res.Height - overlay.Height,
-				1, 1, Gdk.InterpType.Bilinear, 255); 
-			
-			Context.CacheComposedIcon (icon, overlay, res);
-			icon = res;
+			nodeInfo.OverlayBottomRight = overlay;
 		}
 		
 		void Monitor (object sender, FileUpdateEventArgs args)
@@ -287,6 +253,7 @@ namespace MonoDevelop.VersionControl
 			TestCommand(Commands.Log, item);
 		}
 		
+		[AllowMultiSelection]
 		[CommandHandler (Commands.Status)]
 		protected void OnStatus() {
 			RunCommand(Commands.Status, false);
@@ -295,17 +262,6 @@ namespace MonoDevelop.VersionControl
 		[CommandUpdateHandler (Commands.Status)]
 		protected void UpdateStatus(CommandInfo item) {
 			TestCommand(Commands.Status, item);
-		}
-
-		[AllowMultiSelection]
-		[CommandHandler (Commands.Commit)]
-		protected void OnCommit() {
-			RunCommand (Commands.Commit, false);
-		}
-		
-		[CommandUpdateHandler (Commands.Commit)]
-		protected void UpdateCommit (CommandInfo item) {
-			TestCommand(Commands.Commit, item);
 		}
 		
 		[AllowMultiSelection]
@@ -422,6 +378,23 @@ namespace MonoDevelop.VersionControl
 			TestCommand(Commands.Unignore, item);
 		}
 
+		[CommandHandler (Commands.ResolveConflicts)]
+		protected void OnResolveConflicts ()
+		{
+			RunCommand (Commands.ResolveConflicts, false, false);
+		}
+
+		[CommandUpdateHandler (Commands.ResolveConflicts)]
+		protected void UpdateResolveConflicts (CommandInfo item)
+		{
+			if (!(CurrentNode.DataItem is UnknownSolutionItem)) {
+				item.Visible = false;
+				return;
+			}
+
+			TestCommand (Commands.ResolveConflicts, item, false);
+		}
+
 		private void TestCommand(Commands cmd, CommandInfo item, bool projRecurse = true)
 		{
 			TestResult res = RunCommand(cmd, true, projRecurse);
@@ -429,7 +402,10 @@ namespace MonoDevelop.VersionControl
 				// Use the update command to show the "not available" message
 				item.Icon = null;
 				item.Enabled = false;
-				item.Text = GettextCatalog.GetString ("This project or folder is not under version control");
+				if (VersionControlService.IsGloballyDisabled)
+					item.Text = GettextCatalog.GetString ("Version Control support is disabled");
+				else
+					item.Text = GettextCatalog.GetString ("This project or folder is not under version control");
 			} else
 				item.Visible = res == TestResult.Enable;
 		}
@@ -461,10 +437,7 @@ namespace MonoDevelop.VersionControl
 					res = LogCommand.Show (items, test);
 					break;
 				case Commands.Status:
-					res = StatusView.Show (items, test);
-					break;
-				case Commands.Commit:
-					res = CommitCommand.Commit (items, test);
+					res = StatusView.Show (items, test, false);
 					break;
 				case Commands.Add:
 					res = AddCommand.Add (items, test);
@@ -497,6 +470,9 @@ namespace MonoDevelop.VersionControl
 					break;
 				case Commands.Unignore:
 					res = UnignoreCommand.Unignore (items, test);
+					break;
+				case Commands.ResolveConflicts:
+					res = ResolveConflictsCommand.ResolveConflicts (items, test);
 					break;
 				}
 			}

@@ -43,20 +43,26 @@ namespace Xwt.Mac
 		Orientation direction;
 		NSCell trackingCell;
 		ITablePosition tablePosition;
+		ApplicationContext context;
 
 		static CompositeCell ()
 		{
 			Util.MakeCopiable<CompositeCell> ();
 		}
 
-		public CompositeCell (Orientation dir, ICellSource source)
+		public CompositeCell (ApplicationContext context, Orientation dir, ICellSource source)
 		{
 			direction = dir;
+			this.context = context;
 			this.source = source;
 		}
 		
 		public CompositeCell (IntPtr p): base (p)
 		{
+		}
+
+		public ApplicationContext Context {
+			get { return context; }
 		}
 
 		#region ICellDataSource implementation
@@ -76,6 +82,7 @@ namespace Xwt.Mac
 		void ICopiableObject.CopyFrom (object other)
 		{
 			var ob = (CompositeCell)other;
+			context = ob.context;
 			source = ob.source;
 			val = ob.val;
 			tablePosition = ob.tablePosition;
@@ -127,7 +134,9 @@ namespace Xwt.Mac
 		public void Fill ()
 		{
 			foreach (var c in cells) {
-				c.Frontend.Initialize (this);
+				c.Backend.CurrentCell = (NSCell) c;
+				c.Backend.CurrentPosition = tablePosition;
+				c.Backend.Frontend.Load (this);
 				c.Fill ();
 			}
 
@@ -142,7 +151,7 @@ namespace Xwt.Mac
 		}
 
 		IEnumerable<ICellRenderer> VisibleCells {
-			get { return cells.Where (c => c.Frontend.Visible); }
+			get { return cells.Where (c => c.Backend.Frontend.Visible); }
 		}
 
 		SizeF CalcSize ()
@@ -221,6 +230,17 @@ namespace Xwt.Mac
 				return c.Cell.TrackMouse (theEvent, c.Frame, controlView, untilMouseUp);
 			else
 				return base.TrackMouse (theEvent, cellFrame, controlView, untilMouseUp);
+		}
+
+		public RectangleF GetCellRect (RectangleF cellFrame, NSCell cell)
+		{
+			if (tablePosition is TableRow) {
+				foreach (var c in GetCells (cellFrame)) {
+					if (c.Cell == cell)
+						return c.Frame;
+				}
+			}
+			return RectangleF.Empty;
 		}
 
 		CellPos GetHitCell (NSEvent theEvent, RectangleF cellFrame, NSView controlView)

@@ -27,6 +27,10 @@
 using System;
 using Xwt.Backends;
 using Xwt.Drawing;
+using Gtk;
+#if XWT_GTK3
+using TreeModel = Gtk.ITreeModel;
+#endif
 
 
 namespace Xwt.GtkBackend
@@ -58,8 +62,9 @@ namespace Xwt.GtkBackend
 		public Gtk.TreeStore Tree {
 			get { return (Gtk.TreeStore) Store; }
 		}
-		
-		public override Gtk.TreeModel InitializeModel (Type[] columnTypes)
+
+		public override TreeModel InitializeModel (Type[] columnTypes)
+
 		{
 			this.columnTypes = columnTypes;
 			return new Gtk.TreeStore (columnTypes);
@@ -209,7 +214,17 @@ namespace Xwt.GtkBackend
 
 		public TreePosition GetPrevious (TreePosition pos)
 		{
-			throw new NotImplementedException ();
+			IterPos tpos = GetIterPos (pos);
+			Gtk.TreePath path = Tree.GetPath (tpos.Iter);
+			int [] indices = path.Indices;
+			if (indices.Length < 1 || indices [indices.Length - 1] == 0)
+				return null;
+			indices [indices.Length - 1] --;
+			Gtk.TreePath previousPath = new Gtk.TreePath (indices);
+			Gtk.TreeIter previous;
+			if (!Tree.GetIter (out previous, previousPath))
+				return null;
+			return new IterPos (version, previous);
 		}
 
 		public TreePosition GetParent (TreePosition pos)

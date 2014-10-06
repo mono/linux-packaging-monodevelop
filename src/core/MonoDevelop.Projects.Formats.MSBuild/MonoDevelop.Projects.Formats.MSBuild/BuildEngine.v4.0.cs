@@ -27,27 +27,28 @@
 using System;
 using System.Threading;
 using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Remoting;
 using System.Collections.Generic;
-using System.Collections;
-using Microsoft.Build.Framework;
 using Microsoft.Build.Evaluation;
 using Microsoft.Build.Construction;
 using System.Linq;
+using System.Globalization;
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
 	public class BuildEngine: MarshalByRefObject, IBuildEngine
 	{
-		static AutoResetEvent wordDoneEvent = new AutoResetEvent (false);
+		static readonly AutoResetEvent workDoneEvent = new AutoResetEvent (false);
 		static ThreadStart workDelegate;
-		static object workLock = new object ();
+		static readonly object workLock = new object ();
 		static Thread workThread;
+		static CultureInfo uiCulture;
 		static Exception workError;
 
-		ManualResetEvent doneEvent = new ManualResetEvent (false);
-		Dictionary<string,ProjectCollection> engines = new Dictionary<string, ProjectCollection> ();
+		readonly ManualResetEvent doneEvent = new ManualResetEvent (false);
+		readonly Dictionary<string, string> unsavedProjects = new Dictionary<string, string> ();
+
+		readonly ProjectCollection engine = new ProjectCollection { DefaultToolsVersion = MSBuildConsts.Version };
 
 		public void Dispose ()
 		{
@@ -58,9 +59,24 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			get { return doneEvent; }
 		}
 
-		public IProjectBuilder LoadProject (string file, string binDir)
+		public void Ping ()
 		{
-			return new ProjectBuilder (this, GetEngine (binDir), file);
+		}
+
+		public void SetCulture (CultureInfo uiCulture)
+		{
+			BuildEngine.uiCulture = uiCulture;
+		}
+
+		public void SetGlobalProperties (IDictionary<string, string> properties)
+		{
+			foreach (var p in properties)
+				engine.SetGlobalProperty (p.Key, p.Value);
+		}
+
+		public IProjectBuilder LoadProject (string file)
+		{
+			return new ProjectBuilder (this, engine, file);
 		}
 		
 		public void UnloadProject (IProjectBuilder pb)
@@ -68,54 +84,53 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			((ProjectBuilder)pb).Dispose ();
 			RemotingServices.Disconnect ((MarshalByRefObject) pb);
 		}
+
+		internal void SetUnsavedProjectContent (string file, string content)
+		{
+			lock (unsavedProjects)
+				unsavedProjects[file] = content;
+		}
+
+		internal string GetUnsavedProjectContent (string file)
+		{
+			lock (unsavedProjects) {
+				string content;
+				unsavedProjects.TryGetValue (file, out content);
+				return content;
+			}
+		}
 		
 		public override object InitializeLifetimeService ()
 		{
 			return null;
 		}
 
-		ProjectCollection GetEngine (string binDir)
-		{
-			ProjectCollection engine = null;
-			RunSTA (delegate {
-				if (!engines.TryGetValue (binDir, out engine)) {
-					engine = new ProjectCollection ();
-					engine.SetGlobalProperty ("BuildingInsideVisualStudio", "true");
-					
-					//we don't have host compilers in MD, and this is set to true by some of the MS targets
-					//which causes it to always run the CoreCompile task if BuildingInsideVisualStudio is also
-					//true, because the VS in-process compiler would take care of the deps tracking
-					engine.SetGlobalProperty ("UseHostCompilerIfAvailable", "false");
-					engines [binDir] = engine;
-				}
-			});
-			return engine;
-		}
-
 		internal void UnloadProject (string file)
 		{
-			RunSTA (delegate {
-				foreach (var engine in engines.Values) {
-					//unloading projects modifies the collection, so copy it
-					var projects = engine.GetLoadedProjects (file).ToArray ();
+			lock (unsavedProjects)
+				unsavedProjects.Remove (file);
 
-					if (projects.Length == 0) {
-						return;
-					}
+			RunSTA (delegate
+			{
+				//unloading projects modifies the collection, so copy it
+				var projects = engine.GetLoadedProjects (file).ToArray ();
 
-					var rootElement = projects[0].Xml;
+				if (projects.Length == 0) {
+					return;
+				}
 
-					foreach (var p in projects) {
-						engine.UnloadProject (p);
-					}
+				var rootElement = projects[0].Xml;
 
-					//try to unload the projects' XML from the cache
-					try {
-						engine.UnloadProject (rootElement);
-					} catch (InvalidOperationException) {
-						// This could fail if something else is referencing the xml somehow.
-						// But not a big deal, it's just a cache.
-					}
+				foreach (var p in projects) {
+					engine.UnloadProject (p);
+				}
+
+				//try to unload the projects' XML from the cache
+				try {
+					engine.UnloadProject (rootElement);
+				} catch (InvalidOperationException) {
+					// This could fail if something else is referencing the xml somehow.
+					// But not a big deal, it's just a cache.
 				}
 			});
 		}
@@ -130,19 +145,20 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						workThread = new Thread (STARunner);
 						workThread.SetApartmentState (ApartmentState.STA);
 						workThread.IsBackground = true;
+						workThread.CurrentUICulture = uiCulture;
 						workThread.Start ();
 					}
 					else
 						// Awaken the existing thread
 						Monitor.Pulse (threadLock);
 				}
-				wordDoneEvent.WaitOne ();
+				workDoneEvent.WaitOne ();
 			}
 			if (workError != null)
 				throw new Exception ("MSBuild operation failed", workError);
 		}
 
-		static object threadLock = new object ();
+		static readonly object threadLock = new object ();
 		
 		static void STARunner ()
 		{
@@ -154,7 +170,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					catch (Exception ex) {
 						workError = ex;
 					}
-					wordDoneEvent.Set ();
+					workDoneEvent.Set ();
 				}
 				while (Monitor.Wait (threadLock, 60000));
 				

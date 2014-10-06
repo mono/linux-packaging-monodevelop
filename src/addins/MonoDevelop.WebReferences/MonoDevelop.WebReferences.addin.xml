@@ -1,23 +1,5 @@
-<Addin
-	id = "WebReferences"
-    namespace = "MonoDevelop"
-	name = "Project Web References"
-	author = "Gideon de Swardt"
-	copyright = "LGPL"
-	url = "http://www.monodevelop.com"
-	description = "Provides support for adding and maintianing Web References for CSharp and VB projects."
-	category = "Web Development"
-	version = "4.0.12" >
+<ExtensionModel>
     
-    <Runtime>
-    	<Import assembly = "MonoDevelop.WebReferences.dll"/>
-    </Runtime>
-
-	<Dependencies>
-		<Addin id="Core" version="4.0.12"/>
-		<Addin id="Ide" version="4.0.12"/>
-	</Dependencies>
-
 	<ExtensionPoint path = "/MonoDevelop/WebReferences/ContextMenu/ProjectPad/WebReferenceFolder">
 		<ExtensionNodeSet id="MonoDevelop.Components.Commands.ItemSet"/>
 	</ExtensionPoint>
@@ -39,11 +21,9 @@
 			_label = "Add Web Reference"
 			icon = "md-webreference-item" />
 		<Command id = "MonoDevelop.WebReferences.WebReferenceCommands.UpdateAll"
-			_label = "Update Web References"
-			icon = "gtk-reload" />
+			_label = "Update Web References" />
 		<Command id = "MonoDevelop.WebReferences.WebReferenceCommands.Update"
-			_label = "Update Web Reference"
-			icon = "gtk-reload" />
+			_label = "Update Web Reference" />
 		<Command id = "MonoDevelop.WebReferences.WebReferenceCommands.DeleteAll"
 			_label = "Delete All"
 			icon = "gtk-delete" />
@@ -66,6 +46,7 @@
 	<Extension path = "/MonoDevelop/WebReferences/ContextMenu/ProjectPad/WebReferenceFolder">
 		<CommandItem id = "MonoDevelop.WebReferences.WebReferenceCommands.Add" />
 		<CommandItem id = "MonoDevelop.WebReferences.WebReferenceCommands.UpdateAll" />
+		<CommandItem id = "MonoDevelop.WebReferences.WebReferenceCommands.DeleteAll" />
 	</Extension>
 
 	<Extension path = "/MonoDevelop/WebReferences/ContextMenu/ProjectPad/WebReferenceItem">
@@ -84,4 +65,4 @@
 		<DataType class = "MonoDevelop.WebReferences.WS.WebReferences" />
 		<DataType class = "MonoDevelop.WebReferences.WS.WebReferenceUrl" />
 	</Extension>
-</Addin>
+</ExtensionModel>

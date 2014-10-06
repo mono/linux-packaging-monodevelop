@@ -410,8 +410,14 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		{
 			if (rr == null)
 				throw new ArgumentNullException("rr");
+			if (rr is ConversionResolveResult) {
+				// unpack ConversionResolveResult if necessary
+				// (e.g. a boxing conversion or string->object reference conversion)
+				rr = ((ConversionResolveResult)rr).Input;
+			}
+			
 			if (rr is TypeOfResolveResult) {
-				return new TypeOfExpression(ConvertType(((TypeOfResolveResult)rr).Type));
+				return new TypeOfExpression(ConvertType(rr.Type));
 			} else if (rr is ArrayCreateResolveResult) {
 				ArrayCreateResolveResult acrr = (ArrayCreateResolveResult)rr;
 				ArrayCreateExpression ace = new ArrayCreateExpression();
@@ -450,11 +456,82 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 				else
 					return new DefaultValueExpression(ConvertType(type));
 			} else if (type.Kind == TypeKind.Enum) {
-				return new CastExpression(ConvertType(type), ConvertConstantValue(type.GetDefinition().EnumUnderlyingType, constantValue));
+				return ConvertEnumValue(type, (long)CSharpPrimitiveCast.Cast(TypeCode.Int64, constantValue, false));
 			} else {
 				return new PrimitiveExpression(constantValue);
 			}
 		}
+		
+		bool IsFlagsEnum(ITypeDefinition type)
+		{
+			IType flagsAttributeType = type.Compilation.FindType(typeof(System.FlagsAttribute));
+			return type.GetAttribute(flagsAttributeType) != null;
+		}
+		
+		Expression ConvertEnumValue(IType type, long val)
+		{
+			ITypeDefinition enumDefinition = type.GetDefinition();
+			TypeCode enumBaseTypeCode = ReflectionHelper.GetTypeCode(enumDefinition.EnumUnderlyingType);
+			foreach (IField field in enumDefinition.Fields) {
+				if (field.IsConst && object.Equals(CSharpPrimitiveCast.Cast(TypeCode.Int64, field.ConstantValue, false), val))
+					return ConvertType(type).Member(field.Name);
+			}
+			if (IsFlagsEnum(enumDefinition)) {
+				long enumValue = val;
+				Expression expr = null;
+				long negatedEnumValue = ~val;
+				// limit negatedEnumValue to the appropriate range
+				switch (enumBaseTypeCode) {
+					case TypeCode.Byte:
+					case TypeCode.SByte:
+						negatedEnumValue &= byte.MaxValue;
+						break;
+					case TypeCode.Int16:
+					case TypeCode.UInt16:
+						negatedEnumValue &= ushort.MaxValue;
+						break;
+					case TypeCode.Int32:
+					case TypeCode.UInt32:
+						negatedEnumValue &= uint.MaxValue;
+						break;
+				}
+				Expression negatedExpr = null;
+				foreach (IField field in enumDefinition.Fields.Where(fld => fld.IsConst)) {
+					long fieldValue = (long)CSharpPrimitiveCast.Cast(TypeCode.Int64, field.ConstantValue, false);
+					if (fieldValue == 0)
+						continue;	// skip None enum value
+
+					if ((fieldValue & enumValue) == fieldValue) {
+						var fieldExpression = ConvertType(type).Member(field.Name);
+						if (expr == null)
+							expr = fieldExpression;
+						else
+							expr = new BinaryOperatorExpression(expr, BinaryOperatorType.BitwiseOr, fieldExpression);
+
+						enumValue &= ~fieldValue;
+					}
+					if ((fieldValue & negatedEnumValue) == fieldValue) {
+						var fieldExpression = ConvertType(type).Member(field.Name);
+						if (negatedExpr == null)
+							negatedExpr = fieldExpression;
+						else
+							negatedExpr = new BinaryOperatorExpression(negatedExpr, BinaryOperatorType.BitwiseOr, fieldExpression);
+
+						negatedEnumValue &= ~fieldValue;
+					}
+				}
+				if (enumValue == 0 && expr != null) {
+					if (!(negatedEnumValue == 0 && negatedExpr != null && negatedExpr.Descendants.Count() < expr.Descendants.Count())) {
+						return expr;
+					}
+				}
+				if (negatedEnumValue == 0 && negatedExpr != null) {
+					return new UnaryOperatorExpression(UnaryOperatorType.BitNot, negatedExpr);
+				}
+			}
+			return new PrimitiveExpression(CSharpPrimitiveCast.Cast(enumBaseTypeCode, val, false)).CastTo(ConvertType(type));
+		}
+		
 		#endregion
 		
 		#region Convert Parameter
@@ -482,6 +559,27 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		#endregion
 		
 		#region Convert Entity
+		public AstNode ConvertSymbol(ISymbol symbol)
+		{
+			if (symbol == null)
+				throw new ArgumentNullException("symbol");
+			switch (symbol.SymbolKind) {
+				case SymbolKind.Namespace:
+					return ConvertNamespaceDeclaration((INamespace)symbol);
+				case SymbolKind.Variable:
+					return ConvertVariable((IVariable)symbol);
+				case SymbolKind.Parameter:
+					return ConvertParameter((IParameter)symbol);
+				case SymbolKind.TypeParameter:
+					return ConvertTypeParameter((ITypeParameter)symbol);
+				default:
+					IEntity entity = symbol as IEntity;
+					if (entity != null)
+						return ConvertEntity(entity);
+					throw new ArgumentException("Invalid value for SymbolKind: " + symbol.SymbolKind);
+			}
+		}
+		
 		public EntityDeclaration ConvertEntity(IEntity entity)
 		{
 			if (entity == null)
@@ -505,6 +603,9 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 					return ConvertConstructor((IMethod)entity);
 				case SymbolKind.Destructor:
 					return ConvertDestructor((IMethod)entity);
+				case SymbolKind.Accessor:
+					IMethod accessor = (IMethod)entity;
+					return ConvertAccessor(accessor, accessor.AccessorOwner != null ? accessor.AccessorOwner.Accessibility : Accessibility.None);
 				default:
 					throw new ArgumentException("Invalid value for SymbolKind: " + entity.SymbolKind);
 			}
@@ -705,6 +806,8 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		{
 			MethodDeclaration decl = new MethodDeclaration();
 			decl.Modifiers = GetMemberModifiers(method);
+			if (method.IsAsync && ShowModifiers)
+				decl.Modifiers |= Modifiers.Async;
 			decl.ReturnType = ConvertType(method.ReturnType);
 			decl.Name = method.Name;
 			
@@ -752,7 +855,8 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		{
 			ConstructorDeclaration decl = new ConstructorDeclaration();
 			decl.Modifiers = GetMemberModifiers(ctor);
-			decl.Name = ctor.DeclaringTypeDefinition.Name;
+			if (ctor.DeclaringTypeDefinition != null)
+				decl.Name = ctor.DeclaringTypeDefinition.Name;
 			foreach (IParameter p in ctor.Parameters) {
 				decl.Parameters.Add(ConvertParameter(p));
 			}
@@ -763,7 +867,8 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		DestructorDeclaration ConvertDestructor(IMethod dtor)
 		{
 			DestructorDeclaration decl = new DestructorDeclaration();
-			decl.Name = dtor.DeclaringTypeDefinition.Name;
+			if (dtor.DeclaringTypeDefinition != null)
+				decl.Name = dtor.DeclaringTypeDefinition.Name;
 			decl.Body = GenerateBodyBlock();
 			return decl;
 		}
@@ -867,5 +972,10 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			return decl;
 		}
 		#endregion
+		
+		NamespaceDeclaration ConvertNamespaceDeclaration(INamespace ns)
+		{
+			return new NamespaceDeclaration(ns.FullName);
+		}
 	}
 }

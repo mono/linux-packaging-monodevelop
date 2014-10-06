@@ -28,6 +28,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using Xwt.Backends;
 using SWC = System.Windows.Controls;
 using SWM = System.Windows.Media;
 
@@ -35,32 +36,66 @@ namespace Xwt.WPFBackend.Utilities
 {
 	public static class CellUtil
 	{
-		internal static FrameworkElementFactory CreateBoundColumnTemplate (CellViewCollection views, string dataPath = ".")
+		internal static FrameworkElementFactory CreateBoundColumnTemplate (ApplicationContext ctx, Widget parent, CellViewCollection views, string dataPath = ".")
 		{
 			if (views.Count == 1)
-				return CreateBoundCellRenderer (views [0], dataPath);
+                return CreateBoundCellRenderer(ctx, parent, views[0], dataPath);
 			
 			FrameworkElementFactory container = new FrameworkElementFactory (typeof (StackPanel));
-			container.SetValue (StackPanel.OrientationProperty, Orientation.Horizontal);
+			container.SetValue (StackPanel.OrientationProperty, System.Windows.Controls.Orientation.Horizontal);
 
 			foreach (CellView view in views) {
-				container.AppendChild (CreateBoundCellRenderer (view, dataPath));
+                container.AppendChild(CreateBoundCellRenderer(ctx, parent, view, dataPath));
 			}
 
 			return container;
 		}
 
 		private static readonly Thickness CellMargins = new Thickness (2);
-		internal static FrameworkElementFactory CreateBoundCellRenderer (CellView view, string dataPath = ".")
+		internal static FrameworkElementFactory CreateBoundCellRenderer (ApplicationContext ctx, Widget parent, CellView view, string dataPath = ".")
 		{
+            ICellViewFrontend fr = view;
 			TextCellView textView = view as TextCellView;
 			if (textView != null) {
-				FrameworkElementFactory factory = new FrameworkElementFactory (typeof (SWC.TextBlock));
-				factory.SetValue (FrameworkElement.MarginProperty, CellMargins);
+				// if it's an editable textcontrol, use a TextBox, if not use a TextBlock. Reason for this is that 
+				// a user usually expects to be able to edit a text if a text cursor is appearing above a field.
+				FrameworkElementFactory factory;
+				if (textView.EditableField == null)
+				{
+					if (textView.Editable)
+					{
+						factory = new FrameworkElementFactory(typeof(SWC.TextBox));
+						factory.SetValue(FrameworkElement.MarginProperty, CellMargins);
+						factory.SetValue(SWC.TextBox.IsReadOnlyProperty, false);
+						if (textView.TextField != null)
+						{
+							factory.SetBinding(SWC.TextBox.TextProperty, new Binding(dataPath + "[" + textView.TextField.Index + "]"));
+						}
+					}
+					else
+					{
+						factory = new FrameworkElementFactory(typeof(SWC.TextBlock));
+						factory.SetValue(FrameworkElement.MarginProperty, CellMargins);
+						if (textView.TextField != null)
+						{
+							factory.SetBinding(SWC.TextBlock.TextProperty, new Binding(dataPath + "[" + textView.TextField.Index + "]"));
+						}
+					}
+				}
+				else
+				{
+					factory = new FrameworkElementFactory(typeof(SWC.TextBox));
+					factory.SetValue(FrameworkElement.MarginProperty, CellMargins);
+					factory.SetBinding(SWC.TextBox.IsEnabledProperty, new Binding(dataPath + "[" + textView.EditableField.Index + "]"));
+					if (textView.TextField != null)
+					{
+						factory.SetBinding(SWC.TextBox.TextProperty, new Binding(dataPath + "[" + textView.TextField.Index + "]"));
+					}
+				}
 
-				if (textView.TextField != null)
-					factory.SetBinding (SWC.TextBlock.TextProperty, new Binding (dataPath + "[" + textView.TextField.Index + "]"));
-
+                var cb = new CellViewBackend();
+                cb.Initialize(view, factory);
+                fr.AttachBackend(parent, cb);
 				return factory;
 			}
 
@@ -71,24 +106,55 @@ namespace Xwt.WPFBackend.Utilities
 
 				if (imageView.ImageField != null) {
 					var binding = new Binding (dataPath + "[" + imageView.ImageField.Index + "]")
-					{ Converter = new ImageToImageSourceConverter () };
+					{ Converter = new ImageToImageSourceConverter (ctx) };
 
 					factory.SetBinding (ImageBox.ImageSourceProperty, binding);
 				}
 
-				return factory;
+                var cb = new CellViewBackend();
+                cb.Initialize(view, factory);
+                fr.AttachBackend(parent, cb);
+                return factory;
 			}
 
 			CanvasCellView canvasView = view as CanvasCellView;
 			if (canvasView != null)
 			{
-				FrameworkElementFactory factory = new FrameworkElementFactory(typeof(CanvasCellViewBackend));
+                var cb = new CanvasCellViewBackend();
+                FrameworkElementFactory factory = new FrameworkElementFactory(typeof(CanvasCellViewPanel));
 				factory.SetValue(FrameworkElement.MarginProperty, CellMargins);
+				factory.SetValue(CanvasCellViewPanel.CellViewBackendProperty, cb);
 
-				factory.SetValue(CanvasCellViewBackend.CellViewProperty, view);
-
-				return factory;
+                cb.Initialize(view, factory);
+                fr.AttachBackend(parent, cb);
+                return factory;
 			}
+			
+			CheckBoxCellView cellView = view as CheckBoxCellView;
+					if (cellView != null)
+					{
+						FrameworkElementFactory factory = new FrameworkElementFactory(typeof(SWC.CheckBox));
+						if (cellView.EditableField == null)
+						{
+							factory.SetValue(FrameworkElement.IsEnabledProperty, cellView.Editable);
+						}
+						else
+						{
+							factory.SetBinding(SWC.CheckBox.IsEnabledProperty, new Binding(dataPath + "[" + cellView.EditableField.Index + "]"));
+						}
+
+						factory.SetValue(SWC.CheckBox.IsThreeStateProperty, cellView.AllowMixed);
+						factory.SetValue(FrameworkElement.MarginProperty, CellMargins);
+						if (cellView.ActiveField != null)
+						{
+								factory.SetBinding(SWC.CheckBox.IsCheckedProperty, new Binding(dataPath + "[" + cellView.ActiveField.Index + "]"));
+						}
+
+                        var cb = new CellViewBackend();
+                        cb.Initialize(view, factory);
+                        fr.AttachBackend(parent, cb);
+                        return factory;
+					}
 
 			throw new NotImplementedException ();
 		}

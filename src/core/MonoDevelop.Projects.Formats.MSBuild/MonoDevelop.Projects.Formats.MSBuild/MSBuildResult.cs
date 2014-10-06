@@ -1,21 +1,21 @@
-// 
+//
 // MSBuildResult.cs
-//  
+//
 // Author:
-//       Lluis Sanchez Gual <lluis@novell.com>
-// 
-// Copyright (c) 2009 Novell, Inc (http://www.novell.com)
-// 
+//       Michael Hutchinson <m.j.hutchinson@gmail.com>
+//
+// Copyright (c) 2014 Xamarin Inc.
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -25,56 +25,35 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
 	[Serializable]
 	public class MSBuildResult
 	{
-		public MSBuildResult (bool isWarning, string file, int line, int column, string code, string message)
+		readonly MSBuildTargetResult[] errors;
+		readonly Dictionary<string,string> properties;
+		readonly Dictionary<string,List<MSBuildEvaluatedItem>> items;
+
+		public MSBuildResult (MSBuildTargetResult[] errors)
 		{
-			IsWarning = isWarning;
-			File = file;
-			Line = line;
-			Column = column;
-			Code = code;
-			Message = message;
+			this.errors = errors;
+			this.properties = new Dictionary<string,string> ();
+			this.items = new Dictionary<string,List<MSBuildEvaluatedItem>> ();
 		}
-		
-		public bool IsWarning { 
-			get{ return isWarning; }
-			set{ isWarning = value; }
+
+		public MSBuildTargetResult[] Errors {
+			get { return errors; }
 		}
-		bool isWarning;
-		
-		public string File {
-			get{ return file; }
-			set{ file = value; }
+
+		public Dictionary<string,List<MSBuildEvaluatedItem>> Items {
+			get { return items; }
 		}
-		string file;
-		
-		public int Line {
-			get{ return line; }
-			set{ line = value; }
+
+		public Dictionary<string, string> Properties {
+			get { return properties; }
 		}
-		int line;
-		
-		public int Column {
-			get{ return column; }
-			set{ column = value; }
-		}
-		int column;
-		
-		public string Code {
-			get{ return code; }
-			set{ code = value; }
-		}
-		string code;
-		
-		public string Message {
-			get{ return message; }
-			set{ message = value; }
-		}
-		string message;
 	}
+
 }

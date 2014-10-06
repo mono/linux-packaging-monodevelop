@@ -32,11 +32,11 @@ using MonoDevelop.Ide.CodeCompletion;
 namespace MonoDevelop.Components.MainToolbar
 {
 
-	interface ISearchDataSource
+	public interface ISearchDataSource
 	{
 		int ItemCount { get; }
 
-		Gdk.Pixbuf GetIcon (int item);
+		Xwt.Drawing.Image GetIcon (int item);
 		string GetMarkup (int item, bool isSelected);
 		string GetDescriptionMarkup (int item, bool isSelected);
 		TooltipInformation GetTooltip (int item);

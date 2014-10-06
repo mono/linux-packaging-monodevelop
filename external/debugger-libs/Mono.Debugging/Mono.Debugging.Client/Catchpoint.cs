@@ -34,29 +34,44 @@ namespace Mono.Debugging.Client
 	public class Catchpoint: BreakEvent
 	{
 		string exceptionName;
+		bool includeSubclasses;
 		
-		public Catchpoint (string exceptionName)
+		public Catchpoint (string exceptionName) : this (exceptionName, true)
+		{
+		}
+
+		public Catchpoint (string exceptionName, bool includeSubclasses)
 		{
 			this.exceptionName = exceptionName;
+			this.includeSubclasses = includeSubclasses;
 		}
 		
 		internal Catchpoint (XmlElement elem): base (elem)
 		{
 			exceptionName = elem.GetAttribute ("exceptionName");
+
+			var str = elem.GetAttribute ("includeSubclasses");
+			if (string.IsNullOrEmpty (str) || !bool.TryParse (str, out includeSubclasses)) {
+				// fall back to the old default behavior
+				includeSubclasses = true;
+			}
 		}
 
 		internal override XmlElement ToXml (XmlDocument doc)
 		{
 			XmlElement elem = base.ToXml (doc);
 			elem.SetAttribute ("exceptionName", exceptionName);
+			elem.SetAttribute ("includeSubclasses", includeSubclasses.ToString ());
 			return elem;
 		}
 
 		
 		public string ExceptionName {
-			get {
-				return exceptionName;
-			}
+			get { return exceptionName; }
+		}
+
+		public bool IncludeSubclasses {
+			get { return includeSubclasses; }
 		}
 		
 		public override void CopyFrom (BreakEvent ev)
@@ -64,6 +79,7 @@ namespace Mono.Debugging.Client
 			base.CopyFrom (ev);
 			Catchpoint cp = (Catchpoint) ev;
 			exceptionName = cp.exceptionName;
+			includeSubclasses = cp.includeSubclasses;
 		}
 
 	}

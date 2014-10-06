@@ -5,22 +5,39 @@ namespace MonoDevelop.Refactoring
 	public partial class EncapsulateFieldDialog
 	{
 		private global::Gtk.VBox vbox;
+		
 		private global::Gtk.ScrolledWindow GtkScrolledWindow;
+		
 		private global::Gtk.TreeView treeview;
+		
 		private global::Gtk.HBox hbox1;
+		
 		private global::Gtk.Button buttonSelectAll;
+		
 		private global::Gtk.Button buttonUnselectAll;
+		
 		private global::Gtk.HSeparator hseparator2;
+		
 		private global::Gtk.Label labelUpdateRefs;
+		
 		private global::Gtk.HBox hboxUpdateRefs;
+		
 		private global::Gtk.Label labelSpacer;
+		
 		private global::Gtk.VBox vboxUpdateChoices;
+		
 		private global::Gtk.RadioButton radioUpdateExternal;
+		
 		private global::Gtk.RadioButton radioUpdateAll;
+		
 		private global::Gtk.HBox hbox2;
+		
 		private global::Gtk.Image imageError;
+		
 		private global::Gtk.Label labelError;
+		
 		private global::Gtk.Button buttonCancel;
+		
 		private global::Gtk.Button buttonOk;
 
 		protected virtual void Build ()
@@ -122,7 +139,7 @@ namespace MonoDevelop.Refactoring
 			this.vboxUpdateChoices.Name = "vboxUpdateChoices";
 			this.vboxUpdateChoices.Spacing = 6;
 			// Container child vboxUpdateChoices.Gtk.Box+BoxChild
-			this.radioUpdateExternal = new global::Gtk.RadioButton (global::Mono.Unix.Catalog.GetString("_External"));
+			this.radioUpdateExternal = new global::Gtk.RadioButton (global::Mono.Unix.Catalog.GetString ("_External"));
 			this.radioUpdateExternal.CanFocus = true;
 			this.radioUpdateExternal.Name = "radioUpdateExternal";
 			this.radioUpdateExternal.Active = true;
@@ -135,7 +152,7 @@ namespace MonoDevelop.Refactoring
 			w10.Expand = false;
 			w10.Fill = false;
 			// Container child vboxUpdateChoices.Gtk.Box+BoxChild
-			this.radioUpdateAll = new global::Gtk.RadioButton (global::Mono.Unix.Catalog.GetString("_All"));
+			this.radioUpdateAll = new global::Gtk.RadioButton (global::Mono.Unix.Catalog.GetString ("_All"));
 			this.radioUpdateAll.CanFocus = true;
 			this.radioUpdateAll.Name = "radioUpdateAll";
 			this.radioUpdateAll.DrawIndicator = true;

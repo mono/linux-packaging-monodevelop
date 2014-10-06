@@ -27,6 +27,7 @@
 
 using System;
 using System.IO;
+using System.Xml;
 using NUnit.Framework;
 using UnitTests;
 using MonoDevelop.Projects.Extensions;
@@ -34,6 +35,10 @@ using MonoDevelop.CSharp.Project;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.Projects;
+using System.Linq;
+using Mono.CSharp;
+using MonoDevelop.Core.ProgressMonitoring;
+using MonoDevelop.Projects.Formats.MSBuild;
 
 namespace MonoDevelop.Projects
 {
@@ -41,7 +46,6 @@ namespace MonoDevelop.Projects
 	public class MSBuildTests: TestBase
 	{
 		[Test()]
-		[Ignore ("We don't install the msbuild assemblies in the right place for this tests")]
 		public void LoadSaveBuildConsoleProject()
 		{
 			string solFile = Util.GetSampleProject ("console-project", "ConsoleProject.sln");
@@ -70,31 +74,24 @@ namespace MonoDevelop.Projects
 		[Test]
 		public void BuildConsoleProject ()
 		{
-			var current = PropertyService.Get ("MonoDevelop.Ide.BuildWithMSBuild", false);
-			try {
-				PropertyService.Set ("MonoDevelop.Ide.BuildWithMSBuild", true);
-	
-				Solution sol = TestProjectsChecks.CreateConsoleSolution ("console-project-msbuild");
-				sol.Save (Util.GetMonitor ());
+			Solution sol = TestProjectsChecks.CreateConsoleSolution ("console-project-msbuild");
+			sol.Save (Util.GetMonitor ());
 
-				// Ensure the project is buildable
-				var result = sol.Build (Util.GetMonitor (), "Debug");
-				Assert.AreEqual (0, result.ErrorCount, "#1");
+			// Ensure the project is buildable
+			var result = sol.Build (Util.GetMonitor (), "Debug");
+			Assert.AreEqual (0, result.ErrorCount, "#1");
 
-				// Ensure the project is still buildable with xbuild after a rename
-				ProjectOptionsDialog.RenameItem (sol.GetAllProjects () [0], "Test");
-				result = sol.Build (Util.GetMonitor (), "Release");
-				Assert.AreEqual (0, result.ErrorCount, "#2");
-			} finally {
-				PropertyService.Set ("MonoDevelop.Ide.BuildWithMSBuild", current);
-			}
+			// Ensure the project is still buildable with xbuild after a rename
+			ProjectOptionsDialog.RenameItem (sol.GetAllProjects () [0], "Test");
+			result = sol.Build (Util.GetMonitor (), "Release");
+			Assert.AreEqual (0, result.ErrorCount, "#2");
 		}
 
 		[Test]
 		public void CreateConsoleProject ()
 		{
 			Solution sol = TestProjectsChecks.CreateConsoleSolution ("console-project-msbuild");
-			sol.ConvertToFormat (Util.FileFormatMSBuild05, true);
+			sol.ConvertToFormat (Util.FileFormatMSBuild10, true);
 			sol.Save (Util.GetMonitor ());
 			
 			// msbuild format
@@ -105,31 +102,14 @@ namespace MonoDevelop.Projects
 			// Make sure we compare using the same guid
 			Project p = sol.Items [0] as Project;
 			string guid = p.ItemId;
-			solXml = solXml.Replace (guid, "{DC577202-654B-4FDB-95C7-8CC5DDF6D32D}");
-			projectXml = projectXml.Replace (guid, "{DC577202-654B-4FDB-95C7-8CC5DDF6D32D}");
+			solXml = solXml.Replace (guid, "{969F05E2-0E79-4C5B-982C-8F3DD4D46311}");
+			projectXml = projectXml.Replace (guid, "{969F05E2-0E79-4C5B-982C-8F3DD4D46311}");
 			
 			string solFile = Util.GetSampleProjectPath ("generated-console-project", "TestSolution.sln");
 			string projectFile = Util.GetSampleProjectPath ("generated-console-project", "TestProject.csproj");
 			
-			Assert.AreEqual (File.ReadAllText (solFile), solXml);
-			Assert.AreEqual (Util.GetXmlFileInfoset (projectFile), projectXml);
-
-			// MD1 format
-			
-			sol.ConvertToFormat (Util.FileFormatMD1, true);
-			sol.Save (Util.GetMonitor ());
-
-			solXml = Util.GetXmlFileInfoset (sol.FileName);
-			projectXml = Util.GetXmlFileInfoset (((SolutionEntityItem)sol.Items [0]).FileName);
-
-			solFile = Util.GetSampleProjectPath ("generated-console-project", "TestSolution.mds");
-			projectFile = Util.GetSampleProjectPath ("generated-console-project", "TestProject.mdp");
-			
-			Assert.AreEqual (Util.GetXmlFileInfoset (solFile), solXml, "solXml: " + sol.FileName);
-			Assert.AreEqual (Util.GetXmlFileInfoset (projectFile), projectXml, "projectXml: " + ((SolutionEntityItem)sol.Items [0]).FileName);
-			
-//			sol.FileFormat = Services.ProjectService.FileFormats.GetFileFormat ("MSBuild08");
-//			sol.Save (Util.GetMonitor ());
+			Assert.AreEqual (Util.ToWindowsEndings (File.ReadAllText (solFile)), solXml);
+			Assert.AreEqual (Util.ToWindowsEndings (Util.GetXmlFileInfoset (projectFile)), projectXml);
 		}
 		
 		[Test]
@@ -349,6 +329,173 @@ namespace MonoDevelop.Projects
 			
 			Assert.AreEqual (1, p.References.Count);
 			Assert.AreEqual ("some - library", p.References[0].Reference);
+		}
+
+		[Test]
+		public void RoundtripPropertyWithXmlCharacters ()
+		{
+			Solution sol = TestProjectsChecks.CreateConsoleSolution ("roundtrip-property-with-xml");
+			sol.ConvertToFormat (Util.FileFormatMSBuild05, true);
+
+			var value = "Hello<foo>&.exe";
+
+			var p = (DotNetProject) sol.GetAllProjects ().First ();
+			var conf = ((DotNetProjectConfiguration)p.Configurations [0]);
+			conf.OutputAssembly = value;
+			sol.Save (Util.GetMonitor ());
+
+			sol = (Solution) Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), sol.FileName);
+			p = (DotNetProject) sol.GetAllProjects ().First ();
+			conf = ((DotNetProjectConfiguration)p.Configurations [0]);
+
+			Assert.AreEqual (value, conf.OutputAssembly);
+		}
+
+		[Test]
+		public void EvaluateProperties ()
+		{
+			string dir = Path.GetDirectoryName (typeof(Project).Assembly.Location);
+			Environment.SetEnvironmentVariable ("HHH", "EnvTest");
+			Environment.SetEnvironmentVariable ("SOME_PLACE", dir);
+
+			string solFile = Util.GetSampleProject ("property-evaluation-test", "property-evaluation-test.sln");
+			Solution sol = Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solFile) as Solution;
+			var p = (DotNetProject) sol.GetAllProjects ().First ();
+			Assert.AreEqual ("Program1_test1.cs", p.Files[0].FilePath.FileName, "Basic replacement");
+			Assert.AreEqual ("Program2_test1_test2.cs", p.Files[1].FilePath.FileName, "Property referencing same property");
+			Assert.AreEqual ("Program3_$(DebugType).cs", p.Files[2].FilePath.FileName, "Property inside group with non-evaluable condition");
+			Assert.AreEqual ("Program4_yes_value.cs", p.Files[3].FilePath.FileName, "Evaluation of group condition");
+			Assert.AreEqual ("Program5_yes_value.cs", p.Files[4].FilePath.FileName, "Evaluation of property condition");
+			Assert.AreEqual ("Program6_$(FFF).cs", p.Files[5].FilePath.FileName, "Evaluation of property with non-evaluable condition");
+			Assert.AreEqual ("Program7_test1.cs", p.Files[6].FilePath.FileName, "Item conditions are ignored");
+			Assert.AreEqual ("Program8_test1.cs", p.Files[7].FilePath.FileName, "Item group conditions are ignored");
+			Assert.AreEqual ("Program9_$(GGG).cs", p.Files[8].FilePath.FileName, "Non-evaluable property group clears properties");
+			Assert.AreEqual ("Program10_$(AAA", p.Files[9].FilePath.FileName, "Invalid property reference");
+			Assert.AreEqual ("Program11_EnvTest.cs", p.Files[10].FilePath.FileName, "Environment variable");
+
+			var testRef = Path.Combine (dir, "MonoDevelop.Core.dll");
+			var asms = p.GetReferencedAssemblies (sol.Configurations [0].Selector).ToArray ();
+			Assert.IsTrue (asms.Contains (testRef));
+		}
+
+		void LoadBuildVSConsoleProject (string vsVersion, string toolsVersion)
+		{
+			string solFile = Util.GetSampleProject ("ConsoleApp-VS" + vsVersion, "ConsoleApplication.sln");
+			var monitor = new NullProgressMonitor ();
+			var sol = (Solution)Services.ProjectService.ReadWorkspaceItem (monitor, solFile);
+			Assert.IsTrue (monitor.Errors.Length == 0);
+			Assert.IsTrue (monitor.Warnings.Length == 0);
+			var p = (DotNetProject) sol.GetAllProjects ().First ();
+			Assert.AreEqual (toolsVersion, MSBuildProjectService.GetHandler (p).ToolsVersion);
+			var r = sol.Build (monitor, "Debug");
+			Assert.IsTrue (monitor.Errors.Length == 0);
+			Assert.IsTrue (monitor.Warnings.Length == 0);
+			Assert.IsFalse (r.Failed);
+			Assert.IsTrue (r.ErrorCount == 0);
+
+			//there may be a single warning about not being able to find Client profile
+			var f = r.Errors.FirstOrDefault ();
+			var clientProfileError =
+				"Unable to find framework corresponding to the target framework moniker " +
+				"'.NETFramework,Version=v4.0,Profile=Client'";
+
+			if (f != null)
+				Assert.IsTrue (f.ErrorText.Contains (clientProfileError), "Build failed with: " + f.ErrorText);
+
+			string projectFile = ((Project)sol.Items [0]).FileName;
+			string solXml = Util.ReadAllWithWindowsEndings (solFile);
+			string projectXml = Util.ReadAllWithWindowsEndings (projectFile);
+
+			sol.Save (monitor);
+			Assert.IsTrue (monitor.Errors.Length == 0);
+			Assert.IsTrue (monitor.Warnings.Length == 0);
+
+			Assert.AreEqual (projectXml, Util.ReadAllWithWindowsEndings (projectFile));
+		}
+
+		[Test]
+		public void LoadBuildVS2010ConsoleProject ()
+		{
+			LoadBuildVSConsoleProject ("2010", "4.0");
+		}
+
+		[Test]
+		public void LoadBuildVS2012ConsoleProject ()
+		{
+			LoadBuildVSConsoleProject ("2012", "4.0");
+		}
+
+		[Ignore ("ToolsVersion 12.0 does not yet work w/ xbuild")]
+		[Test]
+		public void LoadBuildVS2013ConsoleProject ()
+		{
+			LoadBuildVSConsoleProject ("2013", "12.0");
+		}
+
+		[Test]
+		public void SaveReferenceWithCondition ()
+		{
+			string solFile = Util.GetSampleProject ("console-project-conditional-reference", "ConsoleProject.sln");
+			Solution sol = Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solFile) as Solution;
+
+			string proj = sol.GetAllProjects ().First ().FileName;
+
+			string projectXml1 = Util.GetXmlFileInfoset (proj);
+			sol.Save (new NullProgressMonitor ());
+
+			string projectXml2 = Util.GetXmlFileInfoset (proj);
+			Assert.AreEqual (projectXml1, projectXml2);
+		}
+
+		[Test]
+		public void AddNewImportWithoutConditionToProject ()
+		{
+			Solution sol = TestProjectsChecks.CreateConsoleSolution ("console-project-msbuild");
+			var project = sol.GetAllProjects ().First () as DotNetProject;
+			project.AddImportIfMissing (@"packages\Xamarin.Forms\build\Xamarin.Forms.targets", null);
+			sol.Save (Util.GetMonitor ());
+
+			var doc = new XmlDocument ();
+			doc.Load (project.FileName);
+			var manager = new XmlNamespaceManager (doc.NameTable);
+			manager.AddNamespace ("ms", "http://schemas.microsoft.com/developer/msbuild/2003");
+			XmlElement import = (XmlElement)doc.SelectSingleNode (@"//ms:Import[@Project='packages\Xamarin.Forms\build\Xamarin.Forms.targets']", manager);
+
+			Assert.IsNotNull (import);
+			Assert.IsFalse (import.HasAttribute ("Condition"));
+		}
+
+		[Test]
+		public void AddNewImportWithConditionToProject ()
+		{
+			Solution sol = TestProjectsChecks.CreateConsoleSolution ("console-project-msbuild");
+			var project = sol.GetAllProjects ().First () as DotNetProject;
+			string condition = @"Exists('packages\Xamarin.Forms\build\Xamarin.Forms.targets')";
+			project.AddImportIfMissing (@"packages\Xamarin.Forms\build\Xamarin.Forms.targets", condition);
+			sol.Save (Util.GetMonitor ());
+
+			var doc = new XmlDocument ();
+			doc.Load (project.FileName);
+			var manager = new XmlNamespaceManager (doc.NameTable);
+			manager.AddNamespace ("ms", "http://schemas.microsoft.com/developer/msbuild/2003");
+			XmlElement import = (XmlElement)doc.SelectSingleNode (@"//ms:Import[@Project='packages\Xamarin.Forms\build\Xamarin.Forms.targets']", manager);
+
+			Assert.AreEqual (condition, import.GetAttribute ("Condition"));
+		}
+
+		[Test]
+		public void ProjectWithCustomConfigPropertyGroupBug20554 ()
+		{
+			string solFile = Util.GetSampleProject ("console-project-custom-configs", "ConsoleProject.sln");
+			Solution sol = Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solFile) as Solution;
+
+			string proj = sol.GetAllProjects ().First ().FileName;
+
+			string projectXml1 = Util.GetXmlFileInfoset (proj);
+			sol.Save (new NullProgressMonitor ());
+
+			string projectXml2 = Util.GetXmlFileInfoset (proj);
+			Assert.AreEqual (projectXml1, projectXml2);
 		}
 	}
 }

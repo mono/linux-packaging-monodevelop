@@ -35,7 +35,7 @@ using MonoDevelop.Ide;
 
 namespace MonoDevelop.Gettext.NodeBuilders
 {
-	public class TranslationProjectNodeBuilder : TypeNodeBuilder
+	class TranslationProjectNodeBuilder : TypeNodeBuilder
 	{
 		public override Type CommandHandlerType {
 			get { return typeof(TranslationProjectNodeCommandHandler); }
@@ -53,13 +53,13 @@ namespace MonoDevelop.Gettext.NodeBuilders
 			return project.Name;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			TranslationProject project = dataObject as TranslationProject;
 			if (project == null)
 				return;
-			label = project.Name;
-			icon = Context.GetIcon ("md-gettext-project");
+			nodeInfo.Label = project.Name;
+			nodeInfo.Icon = Context.GetIcon ("md-gettext-project");
 		}
 		
 		public override void OnNodeAdded (object dataObject)

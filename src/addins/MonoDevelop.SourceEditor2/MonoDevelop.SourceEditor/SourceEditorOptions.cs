@@ -33,11 +33,18 @@ using MonoDevelop.Ide.Fonts;
 
 namespace MonoDevelop.SourceEditor
 {
-	public enum ControlLeftRightMode {
+	[Obsolete ("Use WordNavigationStyle")]
+	public enum ControlLeftRightMode
+	{
 		MonoDevelop,
 		Emacs,
 		SharpDevelop
-		
+	}
+
+	public enum WordNavigationStyle
+	{
+		Unix,
+		Windows
 	}
 	
 	public enum LineEndingConversion {
@@ -84,8 +91,7 @@ namespace MonoDevelop.SourceEditor
 			UpdateStylePolicy (currentPolicy);
 			PropertyService.PropertyChanged += UpdatePreferences;
 			FontService.RegisterFontChangedCallback ("Editor", UpdateFont);
-			FontService.RegisterFontChangedCallback ("Editor(Gutter)", UpdateFont);
-			FontService.RegisterFontChangedCallback ("MessageBubbles", UpdateFont);
+			FontService.RegisterFontChangedCallback ("Pad", UpdateFont);
 			
 		}
 		
@@ -181,20 +187,20 @@ namespace MonoDevelop.SourceEditor
 				case "OnTheFlyFormatting":
 					this.OnTheFlyFormatting = (bool)args.NewValue;
 					break;
-				case "ControlLeftRightMode":
-					this.ControlLeftRightMode = (ControlLeftRightMode)args.NewValue;
+				case "WordNavigationStyle":
+					this.WordNavigationStyle = (WordNavigationStyle)args.NewValue;
 					break;
 				case "EnableAnimations":
 					base.EnableAnimations = (bool)args.NewValue;
-					break;
-				case "UseAntiAliasing":
-					base.UseAntiAliasing = (bool)args.NewValue;
 					break;
 				case "DrawIndentationMarkers":
 					base.DrawIndentationMarkers = (bool)args.NewValue;
 					break;
 				case "EnableQuickDiff":
 					base.EnableQuickDiff = (bool)args.NewValue;
+					break;
+				case "GenerateFormattingUndoStep":
+					base.GenerateFormattingUndoStep = (bool)args.NewValue;
 					break;
 				}
 			} catch (Exception ex) {
@@ -224,13 +230,18 @@ namespace MonoDevelop.SourceEditor
 			this.defaultCommentFolding = PropertyService.Get ("DefaultCommentFolding", true);
 			this.useViModes = PropertyService.Get ("UseViModes", false);
 			this.onTheFlyFormatting = PropertyService.Get ("OnTheFlyFormatting", true);
-			var defaultControlMode = (ControlLeftRightMode)Enum.Parse (typeof(ControlLeftRightMode), DesktopService.DefaultControlLeftRightBehavior);
-			this.ControlLeftRightMode = PropertyService.Get ("ControlLeftRightMode", defaultControlMode);
+
+			WordNavigationStyle defaultWordNavigation = WordNavigationStyle.Unix;
+			if (Platform.IsWindows || PropertyService.Get ("ControlLeftRightMode", (string)null) == "SharpDevelop") {
+				defaultWordNavigation = WordNavigationStyle.Windows;
+			}
+			this.WordNavigationStyle = PropertyService.Get ("WordNavigationStyle", defaultWordNavigation);
+
 			base.EnableAnimations = PropertyService.Get ("EnableAnimations", true);
-			base.UseAntiAliasing = PropertyService.Get ("UseAntiAliasing", true);
 			this.EnableHighlightUsages = PropertyService.Get ("EnableHighlightUsages", false);
 			base.DrawIndentationMarkers = PropertyService.Get ("DrawIndentationMarkers", false);
 			this.lineEndingConversion = PropertyService.Get ("LineEndingConversion", LineEndingConversion.Ask);
+			base.GenerateFormattingUndoStep = PropertyService.Get ("GenerateFormattingUndoStep", false);
 			base.ShowWhitespaces = PropertyService.Get ("ShowWhitespaces", Mono.TextEditor.ShowWhitespaces.Never);
 			base.IncludeWhitespaces = PropertyService.Get ("IncludeWhitespaces", Mono.TextEditor.IncludeWhitespaces.All);
 			base.WrapLines = PropertyService.Get ("WrapLines", false);
@@ -341,17 +352,7 @@ namespace MonoDevelop.SourceEditor
 				}
 			}
 		}
-		
-		public bool EnableCodeCompletion {
-			get { return CompletionTextEditorExtension.EnableCodeCompletion; }
-			set { CompletionTextEditorExtension.EnableCodeCompletion.Value = value; }
-		}
-		
-		public bool EnableParameterInsight {
-			get { return CompletionTextEditorExtension.EnableParameterInsight; }
-			set { CompletionTextEditorExtension.EnableParameterInsight.Value = value; }
-		}
-		
+
 		bool underlineErrors;
 		public bool UnderlineErrors {
 			get {
@@ -422,6 +423,7 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		
+
 		#endregion
 		
 		bool useViModes = false;
@@ -458,18 +460,38 @@ namespace MonoDevelop.SourceEditor
 			get { return defaultEolMarker; }
 		}
 
-		ControlLeftRightMode controlLeftRightMode = Platform.IsWindows
-			? ControlLeftRightMode.SharpDevelop
-			: ControlLeftRightMode.MonoDevelop;
-		
+		WordNavigationStyle wordNavigationStyle = Platform.IsWindows
+			? WordNavigationStyle.Windows
+			: WordNavigationStyle.Unix;
+
+		[Obsolete("Use WordNavigationStyle")]
 		public ControlLeftRightMode ControlLeftRightMode {
 			get {
-				return controlLeftRightMode;
+				return WordNavigationStyle == WordNavigationStyle.Unix
+					? ControlLeftRightMode.MonoDevelop
+					: ControlLeftRightMode.SharpDevelop;
 			}
 			set {
-				if (controlLeftRightMode != value) {
-					controlLeftRightMode = value;
-					PropertyService.Set ("ControlLeftRightMode", value);
+				switch (value) {
+				case ControlLeftRightMode.Emacs:
+				case ControlLeftRightMode.MonoDevelop:
+					WordNavigationStyle = WordNavigationStyle.Unix;
+					return;
+				default:
+					WordNavigationStyle = WordNavigationStyle.Windows;
+					return;
+				}
+			}
+		}
+
+		public WordNavigationStyle WordNavigationStyle {
+			get {
+				return wordNavigationStyle;
+			}
+			set {
+				if (wordNavigationStyle != value) {
+					wordNavigationStyle = value;
+					PropertyService.Set ("WordNavigationStyle", value);
 					SetWordFindStrategy ();
 					OnChanged (EventArgs.Empty);
 				}
@@ -491,19 +513,16 @@ namespace MonoDevelop.SourceEditor
 		void SetWordFindStrategy ()
 		{
 			if (useViModes) {
-				this.wordFindStrategy = new Mono.TextEditor.Vi.ViWordFindStrategy ();
+				wordFindStrategy = new Mono.TextEditor.Vi.ViWordFindStrategy ();
 				return;
 			}
 			
-			switch (ControlLeftRightMode) {
-			case ControlLeftRightMode.MonoDevelop:
-				this.wordFindStrategy = new EmacsWordFindStrategy (true);
+			switch (WordNavigationStyle) {
+			case WordNavigationStyle.Windows:
+				wordFindStrategy = new SharpDevelopWordFindStrategy ();
 				break;
-			case ControlLeftRightMode.Emacs:
-				this.wordFindStrategy = new EmacsWordFindStrategy (false);
-				break;
-			case ControlLeftRightMode.SharpDevelop:
-				this.wordFindStrategy = new SharpDevelopWordFindStrategy ();
+			default:
+				wordFindStrategy = new EmacsWordFindStrategy ();
 				break;
 			}
 		}
@@ -604,13 +623,6 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 		
-		public override bool UseAntiAliasing {
-			set {
-				PropertyService.Set ("UseAntiAliasing", value);
-				base.UseAntiAliasing = value;
-			}
-		}
-
 		public override bool DrawIndentationMarkers {
 			set {
 				PropertyService.Set ("DrawIndentationMarkers", value);
@@ -657,7 +669,7 @@ namespace MonoDevelop.SourceEditor
 		
 		public override string GutterFontName {
 			get {
-				return FontService.FilterFontName (FontService.GetUnderlyingFontName ("Editor(Gutter)"));
+				return FontService.FilterFontName (FontService.GetUnderlyingFontName ("Editor"));
 			}
 			set {
 				throw new InvalidOperationException ("Set font through font service");
@@ -671,7 +683,14 @@ namespace MonoDevelop.SourceEditor
 				base.ColorScheme =  newColorScheme;
 			}
 		}
-		
+
+		public override bool GenerateFormattingUndoStep {
+			set {
+				PropertyService.Set ("GenerateFormattingUndoStep", value);
+				base.GenerateFormattingUndoStep = value;
+			}
+		}
+
 		#endregion
 	}
 }

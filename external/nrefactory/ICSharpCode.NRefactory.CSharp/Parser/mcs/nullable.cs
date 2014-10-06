@@ -33,7 +33,7 @@ namespace Mono.CSharp.Nullable
 			this.loc = loc;
 		}
 
-		public override TypeSpec ResolveAsType (IMemberContext ec)
+		public override TypeSpec ResolveAsType (IMemberContext ec, bool allowUnboundTypeArguments = false)
 		{
 			eclass = ExprClass.Type;
 
@@ -85,8 +85,14 @@ namespace Mono.CSharp.Nullable
 
 		public static TypeSpec GetEnumUnderlyingType (ModuleContainer module, TypeSpec nullableEnum)
 		{
+			return MakeType (module, EnumSpec.GetUnderlyingType (GetUnderlyingType (nullableEnum)));
+		}
+
+		public static TypeSpec MakeType (ModuleContainer module, TypeSpec underlyingType)
+		{
 			return module.PredefinedTypes.Nullable.TypeSpec.MakeGenericType (module,
-				new[] { EnumSpec.GetUnderlyingType (GetUnderlyingType (nullableEnum)) });
+				new[] { underlyingType });
+
 		}
 	}
 
@@ -187,6 +193,11 @@ namespace Mono.CSharp.Nullable
 			call.EmitPredefined (ec, NullableInfo.GetHasValue (expr.Type), null);
 		}
 
+		public override void EmitSideEffect (EmitContext ec)
+		{
+			expr.EmitSideEffect (ec);
+		}
+
 		public override Expression EmitToField (EmitContext ec)
 		{
 			if (temp_field == null)
@@ -199,6 +210,11 @@ namespace Mono.CSharp.Nullable
 		{
 			Unwrap uw = obj as Unwrap;
 			return uw != null && expr.Equals (uw.expr);
+		}
+
+		public override void FlowAnalysis (FlowAnalysisContext fc)
+		{
+			expr.FlowAnalysis (fc);
 		}
 
 		public Expression Original {
@@ -394,7 +410,7 @@ namespace Mono.CSharp.Nullable
 				
 			value_target.AddressOf (ec, AddressOp.Store);
 			ec.Emit (OpCodes.Initobj, type);
-			((IMemoryLocation) value_target).AddressOf (ec, Mode);
+			value_target.AddressOf (ec, Mode);
 		}
 	}
 
@@ -417,6 +433,12 @@ namespace Mono.CSharp.Nullable
 		public LiftedConversion (Expression expr, Expression unwrap, TypeSpec type)
 			: this (expr, unwrap as Unwrap, type)
 		{
+		}
+
+		public override bool IsNull {
+			get {
+				return expr.IsNull;
+			}
 		}
 
 		public override bool ContainsEmitWithAwait ()
@@ -480,6 +502,11 @@ namespace Mono.CSharp.Nullable
 			ec.MarkLabel (end_label);
 		}
 
+		public override void FlowAnalysis (FlowAnalysisContext fc)
+		{
+			expr.FlowAnalysis (fc);
+		}
+
 		public void AddressOf (EmitContext ec, AddressOp mode)
 		{
 			unwrap.AddressOf (ec, mode);
@@ -519,6 +546,11 @@ namespace Mono.CSharp.Nullable
 				return null;
 
 			Expression res = base.ResolveOperator (ec, unwrap);
+			if (res == null) {
+				Error_OperatorCannotBeApplied (ec, loc, OperName (Oper), Expr.Type);
+				return null;
+			}
+
 			if (res != this) {
 				if (user_operator == null)
 					return res;
@@ -649,10 +681,10 @@ namespace Mono.CSharp.Nullable
 		{
 			if (rc.IsRuntimeBinder) {
 				if (UnwrapLeft == null && !Left.Type.IsNullableType)
-					Left = Wrap.Create (Left, rc.Module.PredefinedTypes.Nullable.TypeSpec.MakeGenericType (rc.Module, new[] { Left.Type }));
+					Left = LiftOperand (rc, Left);
 
 				if (UnwrapRight == null && !Right.Type.IsNullableType)
-					Right = Wrap.Create (Right, rc.Module.PredefinedTypes.Nullable.TypeSpec.MakeGenericType (rc.Module, new[] { Right.Type }));
+					Right = LiftOperand (rc, Right);
 			} else {
 				if (UnwrapLeft == null && Left != null && Left.Type.IsNullableType) {
 					Left = Unwrap.CreateUnwrapped (Left);
@@ -669,6 +701,21 @@ namespace Mono.CSharp.Nullable
 			eclass = Binary.eclass;	
 
 			return this;
+		}
+
+		Expression LiftOperand (ResolveContext rc, Expression expr)
+		{
+			TypeSpec type;
+			if (expr.IsNull) {
+				type = Left.IsNull ? Right.Type : Left.Type;
+			} else {
+				type = expr.Type;
+			}
+
+			if (!type.IsNullableType)
+				type = NullableInfo.MakeType (rc.Module, type);
+
+			return Wrap.Create (expr, type);
 		}
 
 		public override void Emit (EmitContext ec)
@@ -752,6 +799,9 @@ namespace Mono.CSharp.Nullable
 				if (ec.HasSet (BuilderContext.Options.AsyncBody) && Binary.Right.ContainsEmitWithAwait ()) {
 					Left = Left.EmitToField (ec);
 					Right = Right.EmitToField (ec);
+				} else {
+					UnwrapLeft.Store (ec);
+					UnwrapRight.Store (ec);
 				}
 
 				Left.Emit (ec);
@@ -1008,10 +1058,13 @@ namespace Mono.CSharp.Nullable
 			ec.MarkLabel (end_label);
 		}
 
+		public override void FlowAnalysis (FlowAnalysisContext fc)
+		{
+			Binary.FlowAnalysis (fc);
+		}
+
 		public override SLE.Expression MakeExpression (BuilderContext ctx)
 		{
-			Console.WriteLine (":{0} x {1}", Left.GetType (), Right.GetType ());
-
 			return Binary.MakeExpression (ctx, Left, Right);
 		}
 	}
@@ -1088,24 +1141,35 @@ namespace Mono.CSharp.Nullable
 				if (right.IsNull)
 					return ReducedExpression.Create (left, this);
 
-				if (Convert.ImplicitConversionExists (ec, right, unwrap.Type)) {
-					left = unwrap;
-					ltype = left.Type;
-
-					//
-					// If right is a dynamic expression, the result type is dynamic
-					//
-					if (right.Type.BuiltinType == BuiltinTypeSpec.Type.Dynamic) {
-						type = right.Type;
-
-						// Need to box underlying value type
-						left = Convert.ImplicitBoxingConversion (left, ltype, type);
+				Expression conv;
+				if (right.Type.IsNullableType) {
+					conv = right.Type == ltype ? right : Convert.ImplicitNulableConversion (ec, right, ltype);
+					if (conv != null) {
+						right = conv;
+						type = ltype;
 						return this;
 					}
+				} else {
+					conv = Convert.ImplicitConversion (ec, right, unwrap.Type, loc);
+					if (conv != null) {
+						left = unwrap;
+						ltype = left.Type;
 
-					right = Convert.ImplicitConversion (ec, right, ltype, loc);
-					type = ltype;
-					return this;
+						//
+						// If right is a dynamic expression, the result type is dynamic
+						//
+						if (right.Type.BuiltinType == BuiltinTypeSpec.Type.Dynamic) {
+							type = right.Type;
+
+							// Need to box underlying value type
+							left = Convert.ImplicitBoxingConversion (left, ltype, type);
+							return this;
+						}
+
+						right = conv;
+						type = ltype;
+						return this;
+					}
 				}
 			} else if (TypeSpec.IsReferenceType (ltype)) {
 				if (Convert.ImplicitConversionExists (ec, right, ltype)) {
@@ -1122,23 +1186,22 @@ namespace Mono.CSharp.Nullable
 					//
 					Constant lc = left as Constant;
 					if (lc != null && !lc.IsDefaultValue)
-						return ReducedExpression.Create (lc, this);
+						return ReducedExpression.Create (lc, this, false);
 
 					//
 					// Reduce (left ?? null) to left OR (null-constant ?? right) to right
 					//
-					if (right.IsNull || lc != null)
-						return ReducedExpression.Create (lc != null ? right : left, this);
+					if (right.IsNull || lc != null) {
+						//
+						// Special case null ?? null
+						//
+						if (right.IsNull && ltype == right.Type)
+							return null;
+
+						return ReducedExpression.Create (lc != null ? right : left, this, false);
+					}
 
 					right = Convert.ImplicitConversion (ec, right, ltype, loc);
-					type = ltype;
-					return this;
-				}
-
-				//
-				// Special case null ?? null
-				//
-				if (ltype == right.Type) {
 					type = ltype;
 					return this;
 				}
@@ -1147,16 +1210,22 @@ namespace Mono.CSharp.Nullable
 			}
 
 			TypeSpec rtype = right.Type;
-			if (!Convert.ImplicitConversionExists (ec, unwrap != null ? unwrap : left, rtype) || right.eclass == ExprClass.MethodGroup)
+			if (!Convert.ImplicitConversionExists (ec, unwrap ?? left, rtype) || right.eclass == ExprClass.MethodGroup)
 				return null;
 
 			//
 			// Reduce (null ?? right) to right
 			//
 			if (left.IsNull)
-				return ReducedExpression.Create (right, this).Resolve (ec);
+				return ReducedExpression.Create (right, this, false).Resolve (ec);
 
-			left = Convert.ImplicitConversion (ec, unwrap != null ? unwrap : left, rtype, loc);
+			left = Convert.ImplicitConversion (ec, unwrap ?? left, rtype, loc);
+
+			if (TypeSpec.IsValueType (left.Type) && !left.Type.IsNullableType) {
+				Warning_UnreachableExpression (ec, right.Location);
+				return ReducedExpression.Create (left, this, false).Resolve (ec);
+			}
+
 			type = rtype;
 			return this;
 		}
@@ -1198,7 +1267,15 @@ namespace Mono.CSharp.Nullable
 				unwrap.EmitCheck (ec);
 				ec.Emit (OpCodes.Brfalse, is_null_label);
 
-				left.Emit (ec);
+				//
+				// When both expressions are nullable the unwrap
+				// is needed only for null check not for value uwrap
+				//
+				if (type.IsNullableType && TypeSpecComparer.IsEqual (NullableInfo.GetUnderlyingType (type), unwrap.Type))
+					unwrap.Load (ec);
+				else
+					left.Emit (ec);
+
 				ec.Emit (OpCodes.Br, end_label);
 
 				ec.MarkLabel (is_null_label);
@@ -1221,6 +1298,14 @@ namespace Mono.CSharp.Nullable
 			right.Emit (ec);
 
 			ec.MarkLabel (end_label);
+		}
+
+		public override void FlowAnalysis (FlowAnalysisContext fc)
+		{
+			left.FlowAnalysis (fc);
+			var left_da = fc.BranchDefiniteAssignment ();
+			right.FlowAnalysis (fc);
+			fc.DefiniteAssignment = left_da;
 		}
 
 		protected override void CloneTo (CloneContext clonectx, Expression t)

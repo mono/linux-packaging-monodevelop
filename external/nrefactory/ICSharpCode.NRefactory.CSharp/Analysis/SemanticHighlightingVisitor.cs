@@ -25,6 +25,7 @@ using ICSharpCode.NRefactory.Semantics;
 using ICSharpCode.NRefactory.TypeSystem;
 using System.Threading;
 using ICSharpCode.NRefactory.CSharp.Completion;
+using System.Collections.ObjectModel;
 
 namespace ICSharpCode.NRefactory.CSharp.Analysis
 {
@@ -281,13 +282,21 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 					continue;
 				}
 
-				if (ch == '{' && start.IsEmpty)
+
+				if (ch == '{' && start.IsEmpty) {
+					char next = i + 1 < expr.LiteralValue.Length ? expr.LiteralValue [i + 1] : '\0';
+					if (next == '{') {
+						i++;
+						col += 2;
+						continue;
+					}
 					start = new TextLocation(line, col);
-				col++;
+				}
 				if (ch == '}' &&!start.IsEmpty) {
-					Colorize(start, new TextLocation(line, col), stringFormatItemColor);
+					Colorize(start, new TextLocation(line, col + 1), stringFormatItemColor);
 					start = TextLocation.Empty;
 				}
+				col++;
 			}
 
 		}
@@ -298,13 +307,15 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 			if (target is IdentifierExpression || target is MemberReferenceExpression || target is PointerReferenceExpression) {
 				var invocationRR = resolver.Resolve(invocationExpression, cancellationToken) as CSharpInvocationResolveResult;
 				if (invocationRR != null) {
-					if (invocationExpression.Parent is ExpressionStatement && IsInactiveConditionalMethod(invocationRR.Member)) {
+					if (invocationExpression.Parent is ExpressionStatement && (IsInactiveConditionalMethod(invocationRR.Member) || IsEmptyPartialMethod(invocationRR.Member))) {
 						// mark the whole invocation statement as inactive code
 						Colorize(invocationExpression.Parent, inactiveCodeColor);
 						return;
 					}
 
-					if (invocationRR.Arguments.Count > 1 && CSharpCompletionEngine.FormatItemMethods.Contains(invocationRR.Member.FullName)) {
+					Expression fmtArgumets;
+					IList<Expression> args;
+					if (invocationRR.Arguments.Count > 1 && FormatStringHelper.TryGetFormattingParameters(invocationRR, invocationExpression, out fmtArgumets, out args, null)) {
 						var expr = invocationExpression.Arguments.First() as PrimitiveExpression; 
 						if (expr != null)
 							HighlightStringFormatItems(expr);
@@ -334,14 +345,21 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 		{
 			if (member.SymbolKind != SymbolKind.Method || member.ReturnType.Kind != TypeKind.Void)
 				return false;
-			while (member.IsOverride) {
-				member = (IParameterizedMember)InheritanceHelper.GetBaseMember(member);
-				if (member == null)
-					return false;
+			foreach (var baseMember in InheritanceHelper.GetBaseMembers(member, false)) {
+				if (IsInactiveConditional (baseMember.Attributes))
+					return true;
 			}
 			return IsInactiveConditional(member.Attributes);
 		}
-		
+
+		static bool IsEmptyPartialMethod(IParameterizedMember member)
+		{
+			if (member.SymbolKind != SymbolKind.Method || member.ReturnType.Kind != TypeKind.Void)
+				return false;
+			var method = (IMethod)member;
+			return method.IsPartial && !method.HasBody;
+		}
+
 		bool IsInactiveConditional(IList<IAttribute> attributes)
 		{
 			bool hasConditionalAttribute = false;
@@ -384,6 +402,8 @@ namespace ICSharpCode.NRefactory.CSharp.Analysis
 		bool CheckInterfaceImplementation (EntityDeclaration entityDeclaration)
 		{
 			var result = resolver.Resolve (entityDeclaration, cancellationToken) as MemberResolveResult;
+			if (result == null)
+				return false;
 			if (result.Member.ImplementedInterfaceMembers.Count == 0) {
 				Colorize (entityDeclaration.NameToken, syntaxErrorColor);
 				return false;

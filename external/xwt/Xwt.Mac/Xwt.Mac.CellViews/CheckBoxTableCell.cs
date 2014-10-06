@@ -31,8 +31,6 @@ namespace Xwt.Mac
 {
 	class CheckBoxTableCell: NSButtonCell, ICellRenderer
 	{
-		ICheckBoxCellViewFrontend cellView;
-
 		public CheckBoxTableCell ()
 		{
 			SetButtonType (NSButtonType.Switch);
@@ -42,8 +40,12 @@ namespace Xwt.Mac
 
 		void HandleActivated (object sender, EventArgs e)
 		{
-			if (cellView.Editable && !cellView.RaiseToggled () && cellView.ActiveField != null) {
-				CellContainer.SetValue (cellView.ActiveField, State != NSCellStateValue.Off);
+			var cellView = Frontend;
+			if (cellView.Editable && !cellView.RaiseToggled () && (cellView.StateField != null || cellView.ActiveField != null)) {
+				if (cellView.StateField != null)
+					CellContainer.SetValue (cellView.StateField, State.ToXwtState ());
+				else if (cellView.ActiveField != null)
+					CellContainer.SetValue (cellView.ActiveField, State != NSCellStateValue.Off);
 			}
 		}
 
@@ -51,27 +53,26 @@ namespace Xwt.Mac
 		{
 		}
 
-		public CheckBoxTableCell (ICheckBoxCellViewFrontend cellView): this ()
-		{
-			this.cellView = cellView;
+		ICheckBoxCellViewFrontend Frontend {
+			get { return (ICheckBoxCellViewFrontend) Backend.Frontend; }
 		}
 
-		public ICellViewFrontend Frontend {
-			get { return cellView; }
-		}
+		public CellViewBackend Backend { get; set; }
 
 		public CompositeCell CellContainer { get; set; }
 
 		public void Fill ()
 		{
-			State = cellView.Active ? NSCellStateValue.On : NSCellStateValue.Off;
+			var cellView = Frontend;
+			AllowsMixedState = cellView.AllowMixed || cellView.State == CheckBoxState.Mixed;
+			State = cellView.State.ToMacState ();
 			Editable = cellView.Editable;
 		}
 
 		public void CopyFrom (object other)
 		{
 			var ob = (CheckBoxTableCell)other;
-			cellView = ob.cellView;
+			Backend = ob.Backend;
 		}
 
 		public override void EditWithFrame (System.Drawing.RectangleF aRect, NSView inView, NSText editor, MonoMac.Foundation.NSObject delegateObject, NSEvent theEvent)

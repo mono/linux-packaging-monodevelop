@@ -34,7 +34,7 @@ using System.Linq;
 
 namespace MonoDevelop.AssemblyBrowser
 {
-	public class ReferenceSegment
+	class ReferenceSegment
 	{
 		public TextSegment Segment {
 			get;
@@ -77,7 +77,7 @@ namespace MonoDevelop.AssemblyBrowser
 	}
 	
 		
-	public class ColoredCSharpFormatter : ICSharpCode.Decompiler.ITextOutput
+	class ColoredCSharpFormatter : ICSharpCode.Decompiler.ITextOutput
 	{
 		public StringBuilder sb = new StringBuilder();
 		TextDocument doc;
@@ -132,7 +132,24 @@ namespace MonoDevelop.AssemblyBrowser
 			WriteIndent ();
 			sb.Append (text);
 		}
-		
+
+		void ITextOutput.WritePrimitiveValue (object value, string literalValue)
+		{
+			WriteIndent ();
+			if (value == null) {
+				sb.Append ("null");
+			} else if (value is string) {
+				sb.Append ("\"" + value + "\"");
+			} else if (value is char) {
+				sb.Append ("'" + value + "'");
+			} else if (value is bool) {
+				sb.Append ((bool)value ? "true" : "false");
+			} else {
+				sb.Append (value.ToString());
+			}
+
+		}
+
 		void WriteIndent ()
 		{
 			if (!write_indent)
@@ -155,7 +172,7 @@ namespace MonoDevelop.AssemblyBrowser
 			sb.Append (text);
 		}
 
-		public void AddDebuggerMemberMapping (ICSharpCode.Decompiler.MemberMapping memberMapping)
+		public void AddDebugSymbols (MethodDebugSymbols methodDebugSymbols)
 		{
 		}
 
@@ -172,7 +189,7 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			foldSegmentStarts.Push (Tuple.Create (sb.Length, collapsedText, defaultCollapsed));
 		}
-		
+
 		public void MarkFoldEnd ()
 		{
 			var curFold = foldSegmentStarts.Pop ();

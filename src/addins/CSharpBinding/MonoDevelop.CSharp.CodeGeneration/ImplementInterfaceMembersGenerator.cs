@@ -34,7 +34,7 @@ using System;
 
 namespace MonoDevelop.CodeGeneration
 {
-	public class ImplementInterfaceMembersGenerator : ICodeGenerator
+	class ImplementInterfaceMembersGenerator : ICodeGenerator
 	{
 		public string Icon {
 			get {
@@ -81,7 +81,8 @@ namespace MonoDevelop.CodeGeneration
 				foreach (var baseType in Options.EnclosingType.DirectBaseTypes) {
 					if (baseType.Kind != TypeKind.Interface)
 						continue;
-					foreach (var t in ICSharpCode.NRefactory.CSharp.Refactoring.ImplementInterfaceAction.CollectMembersToImplement (type, baseType, false)) {
+					bool ifm;
+					foreach (var t in ICSharpCode.NRefactory.CSharp.Refactoring.ImplementInterfaceAction.CollectMembersToImplement (type, baseType, false, out ifm)) {
 						yield return t;
 					}
 				}

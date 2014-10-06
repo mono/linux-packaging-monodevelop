@@ -1,6 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MHex.gtk-gui.gui.stetic
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MHex.MonoDevelop.HexEditor.addin.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/DisplayBindings/HexEditor/MonoDevelop.HexEditor.dll.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/DisplayBindings/HexEditor/MonoDevelop.HexEditor.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MonoDevelop.HexEditor.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MonoDevelop.HexEditor.dll.mdb
