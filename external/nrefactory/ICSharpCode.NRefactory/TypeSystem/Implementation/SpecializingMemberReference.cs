@@ -40,12 +40,19 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 		public IMember Resolve(ITypeResolveContext context)
 		{
 			var memberDefinition = memberDefinitionReference.Resolve(context);
+			if (memberDefinition == null)
+				return null;
 			return memberDefinition.Specialize(
 				new TypeParameterSubstitution(
 					classTypeArgumentReferences != null ? classTypeArgumentReferences.Resolve(context) : null,
 					methodTypeArgumentReferences != null ? methodTypeArgumentReferences.Resolve(context) : null
 				)
 			);
+		}
+		
+		ISymbol ISymbolReference.Resolve(ITypeResolveContext context)
+		{
+			return Resolve(context);
 		}
 		
 		public ITypeReference DeclaringTypeReference {

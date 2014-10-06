@@ -43,13 +43,13 @@ namespace MonoDevelop.Ide
 				return "unknown";
 			var mi = t.GetMethod ("GetDisplayName", BindingFlags.NonPublic | BindingFlags.Static);
 			if (mi == null) {
-				LoggingService.LogError ("No Mono.Runtime.GetDiplayName method found.");
+				LoggingService.LogError ("No Mono.Runtime.GetDisplayName method found.");
 				return "error";
 			}
 			return (string)mi.Invoke (null, null); 
 		}
 		
-		static string GetGtkVersion ()
+		public static string GetGtkVersion ()
 		{
 			uint v1 = 2, v2 = 0, v3 = 0;
 			
@@ -70,6 +70,12 @@ namespace MonoDevelop.Ide
 				return "unknown";
 			return v1 +"." + v2 + "."+ v3;
 		}
+		
+		static string GetGtkTheme ()
+		{
+			var settings = Gtk.Settings.Default;
+			return settings != null ? settings.ThemeName : null;
+		}
 
 		static string GetMonoUpdateInfo ()
 		{
@@ -84,6 +90,21 @@ namespace MonoDevelop.Ide
 			}
 			return null;
 
+		}
+
+		public static string GetRuntimeInfo ()
+		{
+			string val;
+			if (IsMono ()) {
+				val = "Mono " + GetMonoVersionNumber ();
+			} else {
+				val = "Microsoft .NET " + Environment.Version;
+			}
+
+			if (IntPtr.Size == 8)
+				val += (" (64-bit)");
+
+			return val;
 		}
 		
 		string ISystemInformationProvider.Title {
@@ -100,21 +121,23 @@ namespace MonoDevelop.Ide
 				sb.AppendLine (SystemInformation.InstallationUuid);
 							
 				sb.AppendLine ("Runtime:");
-				if (IsMono ()) {
-					sb.Append ("\tMono " + GetMonoVersionNumber ());
-				} else {
-					sb.Append ("\tMicrosoft .NET " + Environment.Version);
-				}
-			
-				if (IntPtr.Size == 8)
-					sb.Append (" (64-bit)");
+				sb.Append ("\t");
+				sb.Append (GetRuntimeInfo ());
 				sb.AppendLine ();
-				sb.Append ("\tGTK ");
-				sb.AppendLine (GetGtkVersion ());
-				sb.Append ("\tGTK# (");
-				sb.Append (typeof(Gtk.VBox).Assembly.GetName ().Version);
-				sb.Append (")");
-
+				sb.Append ("\tGTK+ ");
+				sb.Append (GetGtkVersion ());
+				var gtkTheme = GetGtkTheme ();
+				if (!string.IsNullOrEmpty (gtkTheme))
+					sb.AppendLine (" (" + gtkTheme + " theme)");
+				else
+					sb.AppendLine ();
+				if (Platform.IsWindows && !IsMono ()) {
+					using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Xamarin\GtkSharp\Version")) {
+						Version ver;
+						if (key != null && Version.TryParse (key.GetValue (null) as string, out ver))
+							sb.Append ("\tGTK# " + ver);
+					}
+				}
 				if (Platform.IsMac && IsMono ()) {
 					var pkgVer = GetMonoUpdateInfo ();
 					if (!string.IsNullOrEmpty (pkgVer)) {
@@ -131,17 +154,19 @@ namespace MonoDevelop.Ide
 		public static string MonoDevelopVersion {
 			get {
 				string v = "";
-				if (BuildVariables.PackageVersion != BuildVariables.PackageVersionLabel)
-					v += BuildVariables.PackageVersion;
-				if (IdeApp.Version.Revision >= 0) {
+#pragma warning disable 162
+				if (BuildInfo.Version != BuildInfo.VersionLabel)
+					v += BuildInfo.Version;
+#pragma warning restore 162
+				if (Runtime.Version.Revision >= 0) {
 					if (v.Length > 0)
 						v += " ";
-					v += "build " + IdeApp.Version.Revision;
+					v += "build " + Runtime.Version.Revision;
 				}
 				if (v.Length == 0)
-					return BuildVariables.PackageVersionLabel;
+					return BuildInfo.VersionLabel;
 				else
-					return BuildVariables.PackageVersionLabel + " (" + v + ")";
+					return BuildInfo.VersionLabel + " (" + v + ")";
 			}
 		}
 	}

@@ -31,14 +31,15 @@ using System.Linq;
 using System.Text;
 using MonoDevelop.Refactoring;
 using System.Collections.Generic;
+using GLib;
 
 namespace MonoDevelop.CodeActions
 {
-	public class CodeActionPanel : OptionsPanel
+	class CodeActionPanel : OptionsPanel
 	{
 		ContextActionPanelWidget widget;
 		
-		public override Gtk.Widget CreatePanelWidget ()
+		public override Widget CreatePanelWidget ()
 		{
 			return widget = new ContextActionPanelWidget ("text/x-csharp");
 		}
@@ -49,28 +50,41 @@ namespace MonoDevelop.CodeActions
 		}
 	}
 
-	public partial class ContextActionPanelWidget : Gtk.Bin
+	partial class ContextActionPanelWidget : Bin
 	{
-		string mimeType;
+		readonly string mimeType;
 		
-		Gtk.TreeStore treeStore = new Gtk.TreeStore (typeof(string), typeof(bool), typeof(CodeActionProvider));
-		Dictionary<CodeActionProvider, bool> providerStates = new Dictionary<CodeActionProvider, bool> ();
+		readonly TreeStore treeStore = new TreeStore (typeof(string), typeof(bool), typeof(CodeActionProvider), typeof(string));
+		readonly Dictionary<CodeActionProvider, bool> providerStates = new Dictionary<CodeActionProvider, bool> ();
 
 		void GetAllProviderStates ()
 		{
 			string disabledNodes = PropertyService.Get ("ContextActions." + mimeType, "");
 			foreach (var node in RefactoringService.ContextAddinNodes.Where (n => n.MimeType == mimeType)) {
-				providerStates [node] = disabledNodes.IndexOf (node.IdString) < 0;
+				providerStates [node] = disabledNodes.IndexOf (node.IdString, StringComparison.Ordinal) < 0;
 			}
 		}
 
 		public ContextActionPanelWidget (string mimeType)
 		{
 			this.mimeType = mimeType;
+			// ReSharper disable once DoNotCallOverridableMethodsInConstructor
 			this.Build ();
-			
+
+			// ensure selected row remains visible
+			treeviewContextActions.SizeAllocated += (o, args) => {
+				TreeIter iter;
+				if (treeviewContextActions.Selection.GetSelected (out iter)) {
+					var path = treeviewContextActions.Model.GetPath (iter);
+					treeviewContextActions.ScrollToCell (path, treeviewContextActions.Columns[0], false, 0f, 0f);
+				}
+			};
+
 			var col = new TreeViewColumn ();
 			
+			searchentryFilter.ForceFilterButtonVisible = true;
+			searchentryFilter.RoundedShape = true;
+			searchentryFilter.HasFrame = true;
 			searchentryFilter.Ready = true;
 			searchentryFilter.Visible = true;
 			searchentryFilter.Entry.Changed += ApplyFilter;
@@ -87,7 +101,9 @@ namespace MonoDevelop.CodeActions
 			col.PackStart (togRender, false);
 			col.AddAttribute (togRender, "active", 1);
 			
-			var textRender = new CellRendererText ();
+			var textRender = new CellRendererText {
+				Ellipsize = Pango.EllipsizeMode.End
+			};
 			col.PackStart (textRender, true);
 			col.AddAttribute (textRender, "markup", 0);
 			
@@ -96,7 +112,8 @@ namespace MonoDevelop.CodeActions
 			treeviewContextActions.Model = treeStore;
 			GetAllProviderStates ();
 			FillTreeStore (null);
-			treeviewContextActions.Selection.Changed += HandleTreeviewContextActionsSelectionChanged;
+			treeviewContextActions.TooltipColumn = 3;
+			treeviewContextActions.HasTooltip = true;
 		}
 
 		void ApplyFilter (object sender, EventArgs e)
@@ -107,28 +124,14 @@ namespace MonoDevelop.CodeActions
 		public void FillTreeStore (string filter)
 		{
 			treeStore.Clear ();
-			foreach (var node in providerStates.Keys) {
-				if (!string.IsNullOrEmpty (filter) && node.Title.IndexOf (filter, StringComparison.OrdinalIgnoreCase) < 0)
-					continue;
-				
+			var sortedAndFiltered = providerStates.Keys
+				.Where (node => string.IsNullOrEmpty (filter) || node.Title.IndexOf (filter, StringComparison.OrdinalIgnoreCase) > 0)
+				.OrderBy (n => n.Title, StringComparer.Ordinal);
+			foreach (var node in sortedAndFiltered) {
 				var title = node.Title;
-				if (!string.IsNullOrEmpty (filter)) {
-					var idx = title.IndexOf (filter, StringComparison.OrdinalIgnoreCase);
-					title = title.Substring (0, idx) + "<span bgcolor=\"yellow\">" + title.Substring (idx, filter.Length) + "</span>" + title.Substring (idx + filter.Length);
-				}
-				
-				treeStore.AppendValues (title, providerStates [node], node);
+				MonoDevelop.CodeIssues.CodeIssuePanelWidget.MarkupSearchResult (filter, ref title);
+				treeStore.AppendValues (title, providerStates [node], node, node.Description);
 			}
-		}
-
-		void HandleTreeviewContextActionsSelectionChanged (object sender, EventArgs e)
-		{
-			this.labelDescription.Text = "";
-			Gtk.TreeIter iter;
-			if (!treeviewContextActions.Selection.GetSelected (out iter))
-				return;
-			var actionNode = (CodeActionProvider)treeStore.GetValue (iter, 2);
-			this.labelDescription.Markup = "<b>" + actionNode.Title + "</b>" + Environment.NewLine + actionNode.Description;
 		}
 
 		public void ApplyChanges ()

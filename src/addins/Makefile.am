@@ -5,13 +5,14 @@ SUBDIRS = \
 	GnomePlatform \
 	MonoDevelop.DesignerSupport \
 	MonoDevelop.Debugger \
+	MonoDevelop.Debugger.Gdb \
 	Deployment \
 	MonoDevelop.SourceEditor2 \
 	MonoDevelop.Refactoring \
 	VersionControl \
 	MonoDevelop.Autotools \
 	MonoDevelop.Gettext \
-	MonoDevelop.XmlEditor \
+	Xml \
 	TextTemplating \
 	AspNet \
 	CSharpBinding \
@@ -19,7 +20,6 @@ SUBDIRS = \
 	NUnit \
 	MonoDeveloperExtensions \
 	VBNetBinding \
-	prj2make-sharp-lib \
 	MonoDevelop.GtkCore \
 	ChangeLogAddIn \
 	MonoDevelop.WebReferences \
@@ -29,4 +29,6 @@ SUBDIRS = \
 	MonoDevelop.Debugger.Soft \
 	WindowsPlatform \
 	MonoDevelop.HexEditor \
-	MonoDevelop.DocFood
+	MonoDevelop.DocFood \
+	MonoDevelop.PackageManagement
+

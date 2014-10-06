@@ -43,9 +43,10 @@ namespace MonoDevelop.Ide.Gui
 		public static readonly Cairo.Color TabBarBackgroundColor = CairoExtensions.ParseColor ("c2c2c2");
 		public static readonly Cairo.Color TabBarActiveTextColor = new Cairo.Color (0, 0, 0);
 
-		public static readonly Cairo.Color TabBarGradientStartColor = Shift (TabBarBackgroundColor, 0.92);
-		public static readonly Cairo.Color TabBarGradientMidColor = TabBarBackgroundColor;
-		public static readonly Cairo.Color TabBarGradientEndColor = Shift (TabBarBackgroundColor, 0.9);
+		public static readonly Cairo.Color TabBarActiveGradientStartColor = Shift (TabBarBackgroundColor, 0.92);
+		public static readonly Cairo.Color TabBarActiveGradientEndColor = TabBarBackgroundColor;
+		public static readonly Cairo.Color TabBarGradientStartColor = Shift (TabBarBackgroundColor, 1.02);
+		public static readonly Cairo.Color TabBarGradientEndColor = TabBarBackgroundColor;
 		public static readonly Cairo.Color TabBarGradientShadowColor = Shift (TabBarBackgroundColor, 0.8);
 		public static readonly Cairo.Color TabBarHoverActiveTextColor = TabBarActiveTextColor;
 		public static readonly Cairo.Color TabBarInactiveTextColor = Blend (new Cairo.Color (0, 0, 0), TabBarGradientStartColor, 0.4);
@@ -77,8 +78,8 @@ namespace MonoDevelop.Ide.Gui
 		public static readonly Gdk.Color DockFrameBackground = new Gdk.Color (157, 162, 166);
 		public static readonly Gdk.Color DockSeparatorColor = ThinSplitterColor;
 
-		public static readonly Gdk.Color BrowserPadBackground = new Gdk.Color (0xE5, 0xEC, 0xEE);
-		public static readonly Gdk.Color InactiveBrowserPadBackground = ReduceLight (BrowserPadBackground, 0.92);
+		public static readonly Gdk.Color BrowserPadBackground = new Gdk.Color (225, 228, 232);
+		public static readonly Gdk.Color InactiveBrowserPadBackground = new Gdk.Color (240, 240, 240);
 
 		public static readonly Cairo.Color DockBarBackground1 = PadBackground.ToCairoColor ();
 		public static readonly Cairo.Color DockBarBackground2 = Shift (PadBackground.ToCairoColor (), 0.95);
@@ -102,17 +103,19 @@ namespace MonoDevelop.Ide.Gui
 
 		public static readonly Cairo.Color StatusBarInnerColor = new Cairo.Color (0,0,0, 0.08);
 		public static readonly Cairo.Color StatusBarShadowColor1 = new Cairo.Color (0,0,0, 0.06);
-		public static readonly Cairo.Color StatusBarShadowColor2 = new Cairo.Color (0,0,0, 0.03);
+		public static readonly Cairo.Color StatusBarShadowColor2 = new Cairo.Color (0,0,0, 0.02);
 		public static readonly Cairo.Color StatusBarTextColor = CairoExtensions.ParseColor ("555555");
 		public static readonly Cairo.Color StatusBarProgressBackgroundColor = new Cairo.Color (0, 0, 0, 0.1);
-		public static readonly Cairo.Color StatusBarProgressOutlineColor = new Cairo.Color (0, 0, 0, 0.2);
+		public static readonly Cairo.Color StatusBarProgressOutlineColor = new Cairo.Color (0, 0, 0, 0.1);
 
 		public static readonly Pango.FontDescription StatusFont = Pango.FontDescription.FromString ("Normal");
 
-		public static readonly int StatusFontPixelHeight = 12;
-		public static readonly int ProgressBarHeight = 16;
-		public static readonly int ProgressBarInnerPadding = 3;
-		public static readonly int ProgressBarOuterPadding = 3;
+		public static int StatusFontPixelHeight { get { return (int)(11 * PixelScale); } }
+		public static int ProgressBarHeight { get { return (int)(18 * PixelScale); } }
+		public static int ProgressBarInnerPadding { get { return (int)(4 * PixelScale); } }
+		public static int ProgressBarOuterPadding { get { return (int)(4 * PixelScale); } }
+
+		static readonly double PixelScale = Mono.TextEditor.GtkWorkarounds.GetPixelScale ();
 
 		// Toolbar
 
@@ -129,6 +132,14 @@ namespace MonoDevelop.Ide.Gui
 		{
 			public static readonly int PagerTriangleSize = 6;
 			public static readonly int PagerHeight = 16;
+
+			public static readonly Cairo.Color ErrorBackgroundColor = CairoExtensions.ParseColor ("E27267");
+			public static readonly Cairo.Color WarningBackgroundColor = CairoExtensions.ParseColor ("F6C61E");
+			public static readonly Cairo.Color InformationBackgroundColor = CairoExtensions.ParseColor ("709DC9");
+
+			public static readonly Cairo.Color ErrorTextColor = CairoExtensions.ParseColor ("ffffff");
+			public static readonly Cairo.Color WarningTextColor = CairoExtensions.ParseColor ("6D5607");
+			public static readonly Cairo.Color InformationTextColor = CairoExtensions.ParseColor ("ffffff");
 
 			public static class ParamaterWindows
 			{
@@ -165,16 +176,16 @@ namespace MonoDevelop.Ide.Gui
 
 		internal static Cairo.Color ReduceLight (Cairo.Color color, double factor)
 		{
-			var c = new HslColor (color);
-			c.L *= factor;
-			return c;
+			var c = color.ToXwtColor ();
+			c.Light *= factor;
+			return c.ToCairoColor ();
 		}
 
 		internal static Cairo.Color IncreaseLight (Cairo.Color color, double factor)
 		{
-			var c = new HslColor (color);
-			c.L += (1 - c.L) * factor;
-			return c;
+			var c = color.ToXwtColor ();
+			c.Light += (1 - c.Light) * factor;
+			return c.ToCairoColor ();
 		}
 
 		internal static Gdk.Color ReduceLight (Gdk.Color color, double factor)

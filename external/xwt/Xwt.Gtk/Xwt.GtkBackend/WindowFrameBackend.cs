@@ -27,6 +27,7 @@ using System;
 using Xwt.Backends;
 
 using Xwt.Drawing;
+using System.Linq;
 
 namespace Xwt.GtkBackend
 {
@@ -82,6 +83,8 @@ namespace Xwt.GtkBackend
 		{
 			this.eventSink = eventSink;
 			Initialize ();
+
+			#if !XWT_GTK3
 			Window.SizeRequested += delegate(object o, Gtk.SizeRequestedArgs args) {
 				if (!Window.Resizable) {
 					int w = args.Requisition.Width, h = args.Requisition.Height;
@@ -92,6 +95,7 @@ namespace Xwt.GtkBackend
 					args.Requisition = new Gtk.Requisition () { Width = w, Height = h };
 				}
 			};
+			#endif
 		}
 		
 		public virtual void Initialize ()
@@ -159,6 +163,15 @@ namespace Xwt.GtkBackend
 			}
 			set {
 				window.Visible = value;
+			}
+		}
+
+		bool IWindowFrameBackend.Sensitive {
+			get {
+				return window.Sensitive;
+			}
+			set {
+				window.Sensitive = value;
 			}
 		}
 
@@ -235,7 +248,7 @@ namespace Xwt.GtkBackend
 
 		public void SetIcon(ImageDescription icon)
 		{
-			// TODO
+			Window.IconList = ((GtkImage)icon.Backend).Frames.Select (f => f.Pixbuf).ToArray ();
 		}
 		#endregion
 
@@ -246,6 +259,7 @@ namespace Xwt.GtkBackend
 				case WindowFrameEvent.BoundsChanged:
 					Window.AddEvents ((int)Gdk.EventMask.StructureMask);
 					Window.ConfigureEvent += HandleConfigureEvent; break;
+				case WindowFrameEvent.Closed:
 				case WindowFrameEvent.CloseRequested:
 					Window.DeleteEvent += HandleCloseRequested; break;
 				case WindowFrameEvent.Shown:
@@ -262,8 +276,6 @@ namespace Xwt.GtkBackend
 				switch ((WindowFrameEvent)ev) {
 				case WindowFrameEvent.BoundsChanged:
 					Window.ConfigureEvent -= HandleConfigureEvent; break;
-				case WindowFrameEvent.CloseRequested:
-					Window.DeleteEvent -= HandleCloseRequested; break;
 				case WindowFrameEvent.Shown:
 					Window.Shown -= HandleShown; break;
 				case WindowFrameEvent.Hidden:
@@ -296,9 +308,21 @@ namespace Xwt.GtkBackend
 
 		void HandleCloseRequested (object o, Gtk.DeleteEventArgs args)
 		{
+			args.RetVal = !PerformClose (true);
+		}
+
+		internal bool PerformClose (bool userClose)
+		{
+			bool close = false;
 			ApplicationContext.InvokeUserCode(delegate {
-				args.RetVal = EventSink.OnCloseRequested ();
+				close = EventSink.OnCloseRequested ();
 			});
+			if (close) {
+				if (!userClose)
+					Window.Hide ();
+				ApplicationContext.InvokeUserCode(EventSink.OnClosed);
+			}
+			return close;
 		}
 
 		public void Present ()
@@ -306,6 +330,11 @@ namespace Xwt.GtkBackend
 			if (Platform.IsMac)
 				GtkWorkarounds.GrabDesktopFocus ();
 			Window.Present ();
+		}
+
+		public virtual bool Close ()
+		{
+			return PerformClose (false);
 		}
 
 		public virtual void GetMetrics (out Size minSize, out Size decorationSize)

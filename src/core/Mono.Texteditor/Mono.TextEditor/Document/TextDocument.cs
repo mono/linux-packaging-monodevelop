@@ -38,7 +38,7 @@ using System.Threading;
 
 namespace Mono.TextEditor
 {
-	public class TextDocument : AbstractAnnotatable, ICSharpCode.NRefactory.Editor.IDocument
+	public class TextDocument : ICSharpCode.NRefactory.AbstractAnnotatable, ICSharpCode.NRefactory.Editor.IDocument
 	{
 		readonly IBuffer buffer;
 		readonly ILineSplitter splitter;
@@ -125,6 +125,15 @@ namespace Mono.TextEditor
 			get;
 			set;
 		}
+
+		public bool HasLineEndingMismatchOnTextSet {
+			get {
+				return splitter.LineEndingMismatch;
+			}
+			set {
+				splitter.LineEndingMismatch = value;
+			}
+		}
 		
 		protected TextDocument (IBuffer buffer,ILineSplitter splitter)
 		{
@@ -134,6 +143,7 @@ namespace Mono.TextEditor
 			splitter.LineRemoved += HandleSplitterLineSegmentTreeLineRemoved;
 			foldSegmentTree.tree.NodeRemoved += HandleFoldSegmentTreetreeNodeRemoved; 
 			textSegmentMarkerTree.InstallListener (this);
+			this.diffTracker.SetTrackDocument (this); 
 		}
 
 		void HandleFoldSegmentTreetreeNodeRemoved (object sender, RedBlackTree<FoldSegment>.RedBlackTreeNodeEventArgs e)
@@ -177,7 +187,8 @@ namespace Mono.TextEditor
 		}
 
 		public bool SuppressHighlightUpdate { get; set; }
-		
+		internal DocumentLine longestLineAtTextSet;
+
 		public string Text {
 			get {
 				return buffer.Text;
@@ -188,7 +199,7 @@ namespace Mono.TextEditor
 				OnTextReplacing (args);
 				buffer.Text = value;
 				extendingTextMarkers = new List<TextLineMarker> ();
-				splitter.Initalize (value);
+				splitter.Initalize (value, out longestLineAtTextSet);
 				ClearFoldSegments ();
 				OnTextReplaced (args);
 				versionProvider = new TextSourceVersionProvider ();
@@ -228,7 +239,6 @@ namespace Mono.TextEditor
 				throw new ArgumentOutOfRangeException ("count", "must be > 0, was: " + count);
 
 			InterruptFoldWorker ();
-			
 			//int oldLineCount = LineCount;
 			var args = new DocumentChangeEventArgs (offset, count > 0 ? GetTextAt (offset, count) : "", value, anchorMovementType);
 			OnTextReplacing (args);
@@ -251,10 +261,6 @@ namespace Mono.TextEditor
 			splitter.TextReplaced (this, args);
 			versionProvider.AppendChange (args);
 			OnTextReplaced (args);
-			
-			UpdateUndoStackOnReplace (args);
-			if (operation != null)
-				operation.Setup (this, args);
 		}
 		
 		public string GetTextBetween (int startOffset, int endOffset)
@@ -522,8 +528,7 @@ namespace Mono.TextEditor
 		public class UndoOperation
 		{
 			DocumentChangeEventArgs args;
-			int startOffset, length;
-			
+
 			public virtual DocumentChangeEventArgs Args {
 				get {
 					return args;
@@ -539,49 +544,23 @@ namespace Mono.TextEditor
 			{
 			}
 
-			internal virtual bool ChangedLine (int offset, int lastLineOffset, int endOffset)
-			{
-				if (Args == null)
-					return false;
-				return startOffset <= lastLineOffset && offset <= startOffset + length 
-						|| lastLineOffset <= startOffset && startOffset <= endOffset
-						;
-					;
-			}
-			
 			public UndoOperation (DocumentChangeEventArgs args)
 			{
 				this.args = args;
 			}
-			
-			
-			internal void Setup (TextDocument doc, DocumentChangeEventArgs args)
-			{
-				if (args != null) {
-					startOffset = args.Offset;
-					length = args.InsertionLength;
-				}
-			}
-			
-			internal virtual void InformTextReplace (DocumentChangeEventArgs args)
-			{
-				if (args.Offset < startOffset) {
-					startOffset = System.Math.Max (startOffset + args.ChangeDelta, args.Offset);
-				} else if (args.Offset < startOffset + length) {
-					length = System.Math.Max (length + args.ChangeDelta, startOffset - args.Offset);
-				}
-			}
-			
-			public virtual void Undo (TextDocument doc)
+
+			public virtual void Undo (TextDocument doc, bool fireEvent = true)
 			{
 				doc.Replace (args.Offset, args.InsertionLength, args.RemovedText.Text);
-				OnUndoDone ();
+				if (fireEvent)
+					OnUndoDone ();
 			}
 			
-			public virtual void Redo (TextDocument doc)
+			public virtual void Redo (TextDocument doc, bool fireEvent = true)
 			{
 				doc.Replace (args.Offset, args.RemovalLength, args.InsertedText.Text);
-				OnRedoDone ();
+				if (fireEvent)
+					OnRedoDone ();
 			}
 			
 			protected virtual void OnUndoDone ()
@@ -601,7 +580,14 @@ namespace Mono.TextEditor
 		
 		class AtomicUndoOperation : UndoOperation
 		{
+			OperationType operationType;
 			protected List<UndoOperation> operations = new List<UndoOperation> ();
+
+			public OperationType OperationType {
+				get {
+					return operationType;
+				}
+			}
 			
 			public List<UndoOperation> Operations {
 				get {
@@ -614,22 +600,13 @@ namespace Mono.TextEditor
 					return null;
 				}
 			}
-			
-			
-			internal override void InformTextReplace (DocumentChangeEventArgs args)
+
+			public AtomicUndoOperation (OperationType operationType = OperationType.Undefined)
 			{
-				operations.ForEach (o => o.InformTextReplace (args));
+				this.operationType = operationType;
 			}
-			
-			internal override bool ChangedLine (int lineOffset, int lastLineOffset, int lineEndOffset)
-			{
-				foreach (var op in Operations) {
-					if (op.ChangedLine (lineOffset, lastLineOffset, lineEndOffset))
-						return true;
-				}
-				return false;
-			}
-			
+		
+
 			public void Insert (int index, UndoOperation operation)
 			{
 				operations.Insert (index, operation);
@@ -640,22 +617,28 @@ namespace Mono.TextEditor
 				operations.Add (operation);
 			}
 			
-			public override void Undo (TextDocument doc)
+			public override void Undo (TextDocument doc, bool fireEvent = true)
 			{
+				doc.currentAtomicUndoOperationType.Push (operationType);
 				for (int i = operations.Count - 1; i >= 0; i--) {
-					operations [i].Undo (doc);
+					operations [i].Undo (doc, false);
 					doc.OnUndone (new UndoOperationEventArgs (operations[i]));
 				}
-				OnUndoDone ();
+				doc.currentAtomicUndoOperationType.Pop (); 
+				if (fireEvent)
+					OnUndoDone ();
 			}
 			
-			public override void Redo (TextDocument doc)
+			public override void Redo (TextDocument doc, bool fireEvent = true)
 			{
+				doc.currentAtomicUndoOperationType.Push (operationType);
 				foreach (UndoOperation operation in this.operations) {
-					operation.Redo (doc);
+					operation.Redo (doc, false);
 					doc.OnRedone (new UndoOperationEventArgs (operation));
 				}
-				OnRedoDone ();
+				doc.currentAtomicUndoOperationType.Pop (); 
+				if (fireEvent)
+					OnRedoDone ();
 			}
 		}
 		
@@ -671,7 +654,7 @@ namespace Mono.TextEditor
 					isClosed = value;
 				}
 			}
-			
+
 			public override DocumentChangeEventArgs Args {
 				get {
 					return operations.Count > 0 ? operations [operations.Count - 1].Args : null;
@@ -683,19 +666,6 @@ namespace Mono.TextEditor
 		Stack<UndoOperation> undoStack = new Stack<UndoOperation> ();
 		Stack<UndoOperation> redoStack = new Stack<UndoOperation> ();
 		AtomicUndoOperation currentAtomicOperation = null;
-		
-		// The undo stack needs to be updated on replace, because the text editor
-		// draws a replace operation marker at the left margin.
-		public void UpdateUndoStackOnReplace (DocumentChangeEventArgs args)
-		{
-			foreach (UndoOperation op in undoStack) {
-				op.InformTextReplace (args);
-			}
-			// since we're only displaying the undo stack it's not required to update the redo stack
-//			foreach (UndoOperation op in redoStack) {
-//				op.InformTextReplace (args);
-//			}
-		}
 
 		internal int UndoBeginOffset {
 			get {
@@ -752,27 +722,21 @@ namespace Mono.TextEditor
 			Dirty,
 			Changed
 		}
+
+		public DiffTracker diffTracker = new DiffTracker ();
+
+		public DiffTracker DiffTracker {
+			get {
+				return diffTracker;
+			}
+			set {
+				diffTracker = value;
+			}
+		}
 		
 		public LineState GetLineState (DocumentLine line)
 		{
-			if (line == null)
-				return LineState.Unchanged;
-				
-			int lineOffset = line.Offset;
-			int lastLineEnd = line.Offset - line.DelimiterLength;
-			int lineEndOffset = lineOffset + line.LengthIncludingDelimiter;
-			foreach (UndoOperation op in undoStack) {
-				if (op.ChangedLine (lineOffset, lastLineEnd, lineEndOffset)) {
-					if (savePoint != null) {
-						foreach (UndoOperation savedUndo in savePoint) {
-							if (op == savedUndo)
-								return LineState.Changed;
-						}
-					}
-					return LineState.Dirty;
-				}
-			}
-			return LineState.Unchanged;
+			return diffTracker.GetLineState (line);
 		}
 		
 		
@@ -786,6 +750,7 @@ namespace Mono.TextEditor
 				((KeyboardStackUndo)undoStack.Peek ()).IsClosed = true;
 			savePoint = undoStack.ToArray ();
 			this.CommitUpdateAll ();
+			DiffTracker.SetBaseDocument (CreateDocumentSnapshot ());
 		}
 		
 		public void OptimizeTypedUndo ()
@@ -804,7 +769,7 @@ namespace Mono.TextEditor
 				undoStack.Push (keyUndo);
 				keyUndo = new KeyboardStackUndo ();
 			}
-			if (keyUndo.Args != null && keyUndo.Args.Offset + 1 != top.Args.Offset) {
+			if (keyUndo.Args != null && keyUndo.Args.Offset + 1 != top.Args.Offset || !char.IsLetterOrDigit (top.Args.InsertedText.GetCharAt (0))) {
 				keyUndo.IsClosed = true;
 				undoStack.Push (keyUndo);
 				keyUndo = new KeyboardStackUndo ();
@@ -845,13 +810,11 @@ namespace Mono.TextEditor
 				return;
 			OnBeforeUndoOperation (EventArgs.Empty);
 			isInUndo = true;
-			UndoOperation operation = undoStack.Pop ();
+			var operation = undoStack.Pop ();
 			redoStack.Push (operation);
 			operation.Undo (this);
 			isInUndo = false;
 			OnUndone (new UndoOperationEventArgs (operation));
-			this.RequestUpdate (new UpdateAll ());
-			this.CommitDocumentUpdate ();
 		}
 
 		public void RollbackTo (ICSharpCode.NRefactory.Editor.ITextSourceVersion version)
@@ -898,8 +861,6 @@ namespace Mono.TextEditor
 			operation.Redo (this);
 			isInUndo = false;
 			OnRedone (new UndoOperationEventArgs (operation));
-			this.RequestUpdate (new UpdateAll ());
-			this.CommitDocumentUpdate ();
 		}
 		
 		internal protected virtual void OnRedone (UndoOperationEventArgs e)
@@ -910,7 +871,8 @@ namespace Mono.TextEditor
 		}
 		
 		public event EventHandler<UndoOperationEventArgs> Redone;
-		
+		 
+		Stack<OperationType> currentAtomicUndoOperationType =  new Stack<OperationType> ();
 		int atomicUndoLevel;
 
 		public bool IsInAtomicUndo {
@@ -918,17 +880,23 @@ namespace Mono.TextEditor
 				return atomicUndoLevel > 0;
 			}
 		}
+
+		public OperationType CurrentAtomicUndoOperationType {
+			get {
+				return currentAtomicUndoOperationType.Count > 0 ?  currentAtomicUndoOperationType.Peek () : OperationType.Undefined;
+			}
+		}
 		
 		class UndoGroup : IDisposable
 		{
 			TextDocument doc;
 			
-			public UndoGroup (TextDocument doc)
+			public UndoGroup (TextDocument doc, OperationType operationType)
 			{
 				if (doc == null)
 					throw new ArgumentNullException ("doc");
+				doc.BeginAtomicUndo (operationType);
 				this.doc = doc;
-				doc.BeginAtomicUndo ();
 			}
 
 			public void Dispose ()
@@ -942,18 +910,24 @@ namespace Mono.TextEditor
 		
 		public IDisposable OpenUndoGroup()
 		{
-			return new UndoGroup (this);
+			return OpenUndoGroup(OperationType.Undefined);
 		}
-		
-		internal void BeginAtomicUndo ()
+
+		public IDisposable OpenUndoGroup(OperationType operationType)
 		{
+			return new UndoGroup (this, operationType);
+		}
+
+		internal void BeginAtomicUndo (OperationType operationType = OperationType.Undefined)
+		{
+			currentAtomicUndoOperationType.Push (operationType);
 			if (atomicUndoLevel == 0) {
 				if (this.syntaxMode != null && !SuppressHighlightUpdate)
 					Mono.TextEditor.Highlighting.SyntaxModeService.WaitUpdate (this);
 			}
 			if (currentAtomicOperation == null) {
 				Debug.Assert (atomicUndoLevel == 0); 
-				currentAtomicOperation = new AtomicUndoOperation ();
+				currentAtomicOperation = new AtomicUndoOperation (operationType);
 				OnBeginUndo ();
 			}
 			atomicUndoLevel++;
@@ -980,6 +954,7 @@ namespace Mono.TextEditor
 				}
 				currentAtomicOperation = null;
 			}
+			currentAtomicUndoOperationType.Pop ();
 		}
 		
 		protected virtual void OnBeginUndo ()
@@ -1043,12 +1018,12 @@ namespace Mono.TextEditor
 		CancellationTokenSource foldSegmentSrc;
 		Task foldSegmentTask;
 
-		public void UpdateFoldSegments (List<FoldSegment> newSegments, bool startTask = false, bool useApplicationInvoke = false)
+		public void UpdateFoldSegments (List<FoldSegment> newSegments, bool startTask = false, bool useApplicationInvoke = false, CancellationToken masterToken = default(CancellationToken))
 		{
 			if (newSegments == null) {
 				return;
 			}
-			
+
 			InterruptFoldWorker ();
 			bool update;
 			if (!startTask) {
@@ -1065,6 +1040,7 @@ namespace Mono.TextEditor
 				return;
 			}
 			foldSegmentSrc = new CancellationTokenSource ();
+			masterToken.Register (InterruptFoldWorker); 
 			var token = foldSegmentSrc.Token;
 			foldSegmentTask = Task.Factory.StartNew (delegate {
 				var segments = UpdateFoldSegmentWorker (newSegments, out update, token);
@@ -1411,8 +1387,10 @@ namespace Mono.TextEditor
 
 		public void AddMarker (TextSegmentMarker marker)
 		{
-			CommitLineUpdate (GetLineByOffset (marker.Offset));
 			textSegmentMarkerTree.Add (marker);
+			var startLine = OffsetToLineNumber (marker.Offset);
+			var endLine = OffsetToLineNumber (marker.EndOffset);
+			CommitMultipleLineUpdate (startLine, endLine);
 		}
 
 		/// <summary>
@@ -1423,8 +1401,11 @@ namespace Mono.TextEditor
 		public bool RemoveMarker (TextSegmentMarker marker)
 		{
 			bool wasRemoved = textSegmentMarkerTree.Remove (marker);
-			if (wasRemoved)
-				CommitLineUpdate (GetLineByOffset (marker.Offset));
+			if (wasRemoved) {
+				var startLine = OffsetToLineNumber (marker.Offset);
+				var endLine = OffsetToLineNumber (marker.EndOffset);
+				CommitMultipleLineUpdate (startLine, endLine);
+			}
 			return wasRemoved;
 		}
 
@@ -1918,6 +1899,11 @@ namespace Mono.TextEditor
 				Text = text;
 				ReadOnly = true;
 			}
+		}
+
+		public TextDocument CreateDocumentSnapshot ()
+		{
+			return new SnapshotDocument (Text, Version);
 		}
 
 		ICSharpCode.NRefactory.Editor.IDocument ICSharpCode.NRefactory.Editor.IDocument.CreateDocumentSnapshot ()

@@ -31,7 +31,7 @@ using MonoDevelop.Components;
 
 namespace MonoDevelop.Ide
 {
-	public class ThreadedRenderer : IDisposable
+	class ThreadedRenderer : IDisposable
 	{
 		Gtk.Widget owner;
 		SurfaceWrapper surface;
@@ -120,7 +120,7 @@ namespace MonoDevelop.Ide
 
 			using (var context = new Cairo.Context (surface.Surface)) {
 				context.Operator = Cairo.Operator.Source;
-				context.Color = new Cairo.Color (0, 0, 0, 0);
+				context.SetSourceRGBA (0, 0, 0, 0);
 				context.Paint ();
 				context.Operator = Cairo.Operator.Over;
 

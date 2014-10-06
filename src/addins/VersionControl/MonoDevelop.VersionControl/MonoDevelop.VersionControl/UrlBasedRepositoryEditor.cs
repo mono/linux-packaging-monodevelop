@@ -1,6 +1,5 @@
 
 using System;
-using MonoDevelop.Ide;
 using System.Linq;
 using System.Collections.Generic;
 
@@ -9,6 +8,7 @@ namespace MonoDevelop.VersionControl
 	public partial class UrlBasedRepositoryEditor : Gtk.Bin, IRepositoryEditor
 	{
 		UrlBasedRepository repo;
+		public event EventHandler<EventArgs> PathChanged;
 		bool updating;
 		List<string> protocols = new List<string> ();
 
@@ -17,7 +17,7 @@ namespace MonoDevelop.VersionControl
 			Build ();
 			protocols = new List<string> (repo.SupportedProtocols);
 			protocols.AddRange (repo.SupportedNonUrlProtocols);
-				
+
 			this.repo = repo;
 			foreach (string p in protocols)
 				comboProtocol.AppendText (p);
@@ -42,10 +42,14 @@ namespace MonoDevelop.VersionControl
 				return true;
 			}
 		}
+
+		public string RelativePath {
+			get { return repositoryPathEntry.Text; }
+		}
 		
 		void Fill ()
 		{
-			if (repo.Uri != null) {
+			if (repo.Uri != null && repo.Uri.IsAbsoluteUri) {
 				if (repo.Name == repositoryServerEntry.Text)
 					repo.Name = repo.Uri.Host;
 				repositoryServerEntry.Text = repo.Uri.Host;
@@ -53,10 +57,12 @@ namespace MonoDevelop.VersionControl
 				repositoryPathEntry.Text = repo.Uri.PathAndQuery;
 				repositoryUserEntry.Text = repo.Uri.UserInfo;
 				comboProtocol.Active = protocols.IndexOf (repo.Uri.Scheme);
+				if (PathChanged != null)
+					PathChanged (this, new EventArgs ());
 			} else {
 				// The url may have a scheme, but it may be an incomplete or incorrect url. Do the best to select
 				// the correct value in the protocol combo
-				string prot = repo.SupportedProtocols.FirstOrDefault (p => repo.Url.StartsWith (p + "://"));
+				string prot = repo.SupportedProtocols.FirstOrDefault (p => repo.Url.StartsWith (p + "://", StringComparison.Ordinal));
 				if (prot != null) {
 					repositoryServerEntry.Text = string.Empty;
 					repositoryPortSpin.Value = 0;
@@ -85,14 +91,16 @@ namespace MonoDevelop.VersionControl
 		{
 			updating = true;
 			repositoryUrlEntry.Text = repo.Url;
-			if (repo.Uri != null && repo.Name == repositoryServerEntry.Text)
-				repo.Name = repo.Uri.Host;
+			if (repo.Uri != null && repo.Name == repositoryServerEntry.Text) {
+				if (repo.Uri.IsAbsoluteUri)
+					repo.Name = repo.Uri.Host;
+			}
 			updating = false;
 		}
 		
 		void UpdateControls ()
 		{
-			if (repo.Uri != null || repo.SupportedProtocols.Any (p => repositoryUrlEntry.Text.StartsWith (p + "://"))) {
+			if (repo.Uri != null || repo.SupportedProtocols.Any (p => repositoryUrlEntry.Text.StartsWith (p + "://", StringComparison.Ordinal))) {
 				repositoryPathEntry.Sensitive = true;
 				bool isUrl = Protocol != "file";
 				repositoryServerEntry.Sensitive = isUrl;
@@ -161,6 +169,19 @@ namespace MonoDevelop.VersionControl
 			get {
 				return comboProtocol.Active != -1 ? protocols [comboProtocol.Active] : null;
 			}
+		}
+
+		protected void OnRepositoryUrlEntryClipboardPasted (object sender, EventArgs e)
+		{
+			Gtk.Clipboard clip = GetClipboard (Gdk.Atom.Intern ("CLIPBOARD", false));
+			clip.RequestText (delegate (Gtk.Clipboard clp, string text) {
+				if (String.IsNullOrEmpty (text))
+					return;
+
+				Uri url;
+				if (Uri.TryCreate (text, UriKind.Absolute, out url))
+					repositoryUrlEntry.Text = text;
+			});
 		}
 	}
 }

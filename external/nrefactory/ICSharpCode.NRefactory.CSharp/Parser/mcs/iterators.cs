@@ -29,7 +29,8 @@ namespace Mono.CSharp
 		protected bool unwind_protect;
 		protected T machine_initializer;
 		int resume_pc;
-		
+		ExceptionStatement inside_try_block;
+
 		protected YieldStatement (Expression expr, Location l)
 		{
 			this.expr = expr;
@@ -51,6 +52,15 @@ namespace Mono.CSharp
 			machine_initializer.InjectYield (ec, expr, resume_pc, unwind_protect, resume_point);
 		}
 
+		protected override bool DoFlowAnalysis (FlowAnalysisContext fc)
+		{
+			expr.FlowAnalysis (fc);
+
+			RegisterResumePoint ();
+
+			return false;
+		}
+
 		public override bool Resolve (BlockContext bc)
 		{
 			expr = expr.Resolve (bc);
@@ -58,11 +68,22 @@ namespace Mono.CSharp
 				return false;
 
 			machine_initializer = bc.CurrentAnonymousMethod as T;
-
-			if (!bc.CurrentBranching.CurrentUsageVector.IsUnreachable)
-				unwind_protect = bc.CurrentBranching.AddResumePoint (this, this, out resume_pc);
-
+			inside_try_block = bc.CurrentTryBlock;
 			return true;
+		}
+
+		public void RegisterResumePoint ()
+		{
+			if (resume_pc != 0)
+				return;
+
+			if (inside_try_block == null) {
+				resume_pc = machine_initializer.AddResumePoint (this);
+			} else {
+				resume_pc = inside_try_block.AddResumePoint (this, resume_pc, machine_initializer);
+				unwind_protect = true;
+				inside_try_block = null;
+			}
 		}
 	}
 
@@ -73,11 +94,16 @@ namespace Mono.CSharp
 		{
 		}
 
-		public static bool CheckContext (ResolveContext ec, Location loc)
+		public static bool CheckContext (BlockContext bc, Location loc)
 		{
-			if (!ec.CurrentAnonymousMethod.IsIterator) {
-				ec.Report.Error (1621, loc,
+			if (!bc.CurrentAnonymousMethod.IsIterator) {
+				bc.Report.Error (1621, loc,
 					"The yield statement cannot be used inside anonymous method blocks");
+				return false;
+			}
+
+			if (bc.HasSet (ResolveContext.Options.FinallyScope)) {
+				bc.Report.Error (1625, loc, "Cannot yield in the body of a finally clause");
 				return false;
 			}
 
@@ -88,6 +114,14 @@ namespace Mono.CSharp
 		{
 			if (!CheckContext (bc, loc))
 				return false;
+
+			if (bc.HasAny (ResolveContext.Options.TryWithCatchScope)) {
+				bc.Report.Error (1626, loc, "Cannot yield a value in the body of a try block with a catch clause");
+			}
+
+			if (bc.HasSet (ResolveContext.Options.CatchScope)) {
+				bc.Report.Error (1631, loc, "Cannot yield a value in the body of a catch clause");
+			}
 
 			if (!base.Resolve (bc))
 				return false;
@@ -117,9 +151,10 @@ namespace Mono.CSharp
 			loc = l;
 		}
 
-		public override void Error_FinallyClause (Report Report)
-		{
-			Report.Error (1625, loc, "Cannot yield in the body of a finally clause");
+		protected override bool IsLocalExit {
+			get {
+				return false;
+			}
 		}
 
 		protected override void CloneTo (CloneContext clonectx, Statement target)
@@ -127,15 +162,26 @@ namespace Mono.CSharp
 			throw new NotSupportedException ();
 		}
 
-		protected override bool DoResolve (BlockContext ec)
+		protected override bool DoResolve (BlockContext bc)
 		{
-			iterator = ec.CurrentIterator;
-			return Yield.CheckContext (ec, loc);
+			iterator = bc.CurrentIterator;
+			return Yield.CheckContext (bc, loc);
 		}
 
 		protected override void DoEmit (EmitContext ec)
 		{
 			iterator.EmitYieldBreak (ec, unwind_protect);
+		}
+
+		protected override bool DoFlowAnalysis (FlowAnalysisContext fc)
+		{
+			return true;
+		}
+
+		public override Reachability MarkReachable (Reachability rc)
+		{
+			base.MarkReachable (rc);
+			return Reachability.CreateUnreachable ();
 		}
 		
 		public override object Accept (StructuralVisitor visitor)
@@ -161,9 +207,12 @@ namespace Mono.CSharp
 		protected StateMachine (ParametersBlock block, TypeDefinition parent, MemberBase host, TypeParameters tparams, string name, MemberKind kind)
 			: base (block, parent, host, tparams, name, kind)
 		{
+			OriginalTypeParameters = tparams;
 		}
 
 		#region Properties
+
+		public TypeParameters OriginalTypeParameters { get; private set; }
 
 		public StateMachineMethod StateMachineMethod {
 			get {
@@ -265,7 +314,6 @@ namespace Mono.CSharp
 					if (new_storey != null)
 						new_storey = Convert.ImplicitConversionRequired (ec, new_storey, host_method.MemberType, loc);
 
-					ec.CurrentBranching.CurrentUsageVector.Goto ();
 					return true;
 				}
 
@@ -293,10 +341,21 @@ namespace Mono.CSharp
 					new_storey.Emit (ec);
 					ec.Emit (OpCodes.Ret);
 				}
+
+				protected override bool DoFlowAnalysis (FlowAnalysisContext fc)
+				{
+					throw new NotImplementedException ();
+				}
+
+				public override Reachability MarkReachable (Reachability rc)
+				{
+					base.MarkReachable (rc);
+					return Reachability.CreateUnreachable ();
+				}
 			}
 
 			GetEnumeratorMethod (IteratorStorey host, FullNamedExpression returnType, MemberName name)
-				: base (host, null, returnType, Modifiers.DEBUGGER_HIDDEN, name)
+				: base (host, null, returnType, Modifiers.DEBUGGER_HIDDEN, name, ToplevelBlock.Flags.CompilerGenerated | ToplevelBlock.Flags.NoFlowAnalysis)
 			{
 			}
 
@@ -310,7 +369,6 @@ namespace Mono.CSharp
 				var m = new GetEnumeratorMethod (host, returnType, name);
 				var stmt = statement ?? new GetEnumeratorStatement (host, m);
 				m.block.AddStatement (stmt);
-				m.block.IsCompilerGenerated = true;
 				return m;
 			}
 		}
@@ -342,16 +400,20 @@ namespace Mono.CSharp
 					ec.CurrentAnonymousMethod = iterator;
 					iterator.EmitDispose (ec);
 				}
+
+				protected override bool DoFlowAnalysis (FlowAnalysisContext fc)
+				{
+					throw new NotImplementedException ();
+				}
 			}
 
 			public DisposeMethod (IteratorStorey host)
 				: base (host, null, new TypeExpression (host.Compiler.BuiltinTypes.Void, host.Location), Modifiers.PUBLIC | Modifiers.DEBUGGER_HIDDEN,
-					new MemberName ("Dispose", host.Location))
+					new MemberName ("Dispose", host.Location), ToplevelBlock.Flags.CompilerGenerated | ToplevelBlock.Flags.NoFlowAnalysis)
 			{
 				host.Members.Add (this);
 
 				Block.AddStatement (new DisposeMethodStatement (host.Iterator));
-				Block.IsCompilerGenerated = true;
 			}
 		}
 
@@ -546,9 +608,8 @@ namespace Mono.CSharp
 
 			var name = new MemberName ("Current", null, explicit_iface, Location);
 
-			ToplevelBlock get_block = new ToplevelBlock (Compiler, Location) {
-				IsCompilerGenerated = true
-			};
+			ToplevelBlock get_block = new ToplevelBlock (Compiler, ParametersCompiled.EmptyReadOnlyParameters, Location,
+				Block.Flags.CompilerGenerated | Block.Flags.NoFlowAnalysis);
 			get_block.AddStatement (new Return (new DynamicFieldExpr (CurrentField, Location), Location));
 				
 			Property current = new Property (this, type, Modifiers.DEBUGGER_HIDDEN | Modifiers.COMPILER_GENERATED, name, null);
@@ -567,9 +628,8 @@ namespace Mono.CSharp
 				ParametersCompiled.EmptyReadOnlyParameters, null);
 			Members.Add (reset);
 
-			reset.Block = new ToplevelBlock (Compiler, Location) {
-				IsCompilerGenerated = true
-			};
+			reset.Block = new ToplevelBlock (Compiler, reset.ParameterInfo, Location,
+				Block.Flags.CompilerGenerated | Block.Flags.NoFlowAnalysis);
 
 			TypeSpec ex_type = Module.PredefinedTypes.NotSupportedException.Resolve ();
 			if (ex_type == null)
@@ -590,12 +650,13 @@ namespace Mono.CSharp
 	{
 		readonly StateMachineInitializer expr;
 
-		public StateMachineMethod (StateMachine host, StateMachineInitializer expr, FullNamedExpression returnType, Modifiers mod, MemberName name)
+		public StateMachineMethod (StateMachine host, StateMachineInitializer expr, FullNamedExpression returnType,
+			Modifiers mod, MemberName name, ToplevelBlock.Flags blockFlags)
 			: base (host, returnType, mod | Modifiers.COMPILER_GENERATED,
 			  name, ParametersCompiled.EmptyReadOnlyParameters, null)
 		{
 			this.expr = expr;
-			Block = new ToplevelBlock (host.Compiler, ParametersCompiled.EmptyReadOnlyParameters, Location.Null);
+			Block = new ToplevelBlock (host.Compiler, ParametersCompiled.EmptyReadOnlyParameters, Location.Null, blockFlags);
 		}
 
 		public override EmitContext CreateEmitContext (ILGenerator ig, SourceMethodBuilder sourceMethod)
@@ -642,6 +703,21 @@ namespace Mono.CSharp
 				// Don't create sequence point
 				DoEmit (ec);
 			}
+
+			protected override bool DoFlowAnalysis (FlowAnalysisContext fc)
+			{
+				return state_machine.ReturnType.Kind != MemberKind.Void;
+			}
+
+			public override Reachability MarkReachable (Reachability rc)
+			{
+				base.MarkReachable (rc);
+
+				if (state_machine.ReturnType.Kind != MemberKind.Void)
+					rc = Reachability.CreateUnreachable ();
+
+				return rc;
+			}
 		}
 
 		public readonly TypeDefinition Host;
@@ -650,8 +726,7 @@ namespace Mono.CSharp
 		//
 		// The state as we generate the machine
 		//
-		Label move_next_ok;
-		Label iterator_body_end;
+		protected Label move_next_ok;
 		protected Label move_next_error;
 		LocalBuilder skip_finally;
 		protected LocalBuilder current_pc;
@@ -665,11 +740,7 @@ namespace Mono.CSharp
 
 		#region Properties
 
-		public Label BodyEnd {
-			get {
-				return iterator_body_end;
-			}
-		}
+		public Label BodyEnd { get; set; }
 
 		public LocalBuilder CurrentPC
 		{
@@ -706,34 +777,33 @@ namespace Mono.CSharp
 			throw new NotSupportedException ("ET");
 		}
 
-		protected virtual BlockContext CreateBlockContext (ResolveContext rc)
+		protected virtual BlockContext CreateBlockContext (BlockContext bc)
 		{
-			var ctx = new BlockContext (rc, block, ((BlockContext) rc).ReturnType);
+			var ctx = new BlockContext (bc, block, bc.ReturnType);
 			ctx.CurrentAnonymousMethod = this;
+
+			ctx.AssignmentInfoOffset = bc.AssignmentInfoOffset;
+			ctx.EnclosingLoop = bc.EnclosingLoop;
+			ctx.EnclosingLoopOrSwitch = bc.EnclosingLoopOrSwitch;
+			ctx.Switch = bc.Switch;
+
 			return ctx;
 		}
 
-		protected override Expression DoResolve (ResolveContext ec)
+		protected override Expression DoResolve (ResolveContext rc)
 		{
-			var ctx = CreateBlockContext (ec);
+			var bc = (BlockContext) rc;
+			var ctx = CreateBlockContext (bc);
 
 			Block.Resolve (ctx);
 
-			//
-			// Explicit return is required for Task<T> state machine
-			//
-			var task_storey = storey as AsyncTaskStorey;
-			if (task_storey == null || (task_storey.ReturnType != null && !task_storey.ReturnType.IsGenericTask))
-				ctx.CurrentBranching.CurrentUsageVector.Goto ();
-
-			ctx.EndFlowBranching ();
-
-			if (!ec.IsInProbingMode) {
-				var move_next = new StateMachineMethod (storey, this, new TypeExpression (ReturnType, loc), Modifiers.PUBLIC, new MemberName ("MoveNext", loc));
+			if (!rc.IsInProbingMode) {
+				var move_next = new StateMachineMethod (storey, this, new TypeExpression (ReturnType, loc), Modifiers.PUBLIC, new MemberName ("MoveNext", loc), 0);
 				move_next.Block.AddStatement (new MoveNextBodyStatement (this));
 				storey.AddEntryMethod (move_next);
 			}
 
+			bc.AssignmentInfoOffset = ctx.AssignmentInfoOffset;
 			eclass = ExprClass.Value;
 			return this;
 		}
@@ -758,11 +828,18 @@ namespace Mono.CSharp
 			// We only care if the PC is zero (start executing) or non-zero (don't do anything)
 			ec.Emit (OpCodes.Brtrue, move_next_error);
 
-			iterator_body_end = ec.DefineLabel ();
+			BodyEnd = ec.DefineLabel ();
+
+			var async_init = this as AsyncInitializer;
+			if (async_init != null)
+				ec.BeginExceptionBlock ();
 
 			block.EmitEmbedded (ec);
 
-			ec.MarkLabel (iterator_body_end);
+			if (async_init != null)
+				async_init.EmitCatchBlock (ec);
+
+			ec.MarkLabel (BodyEnd);
 
 			EmitMoveNextEpilogue (ec);
 
@@ -772,6 +849,8 @@ namespace Mono.CSharp
 				ec.EmitInt (0);
 				ec.Emit (OpCodes.Ret);
 			}
+
+			ec.MarkLabel (move_next_ok);
 		}
 
 		void EmitMoveNext (EmitContext ec)
@@ -821,26 +900,14 @@ namespace Mono.CSharp
 
 			ec.MarkLabel (labels[0]);
 
-			iterator_body_end = ec.DefineLabel ();
+			BodyEnd = ec.DefineLabel ();
 
 			block.EmitEmbedded (ec);
 
-			ec.MarkLabel (iterator_body_end);
+			ec.MarkLabel (BodyEnd);
 
 			if (async_init != null) {
-				var catch_value = LocalVariable.CreateCompilerGenerated (ec.Module.Compiler.BuiltinTypes.Exception, block, Location);
-
-				ec.BeginCatchBlock (catch_value.Type);
-				catch_value.EmitAssign (ec);
-
-				ec.EmitThis ();
-				ec.EmitInt ((int) IteratorStorey.State.After);
-				ec.Emit (OpCodes.Stfld, storey.PC.Spec);
-
-				((AsyncTaskStorey) async_init.Storey).EmitSetException (ec, new LocalVariableReference (catch_value, Location));
-
-				ec.Emit (OpCodes.Leave, move_next_ok);
-				ec.EndExceptionBlock ();
+				async_init.EmitCatchBlock (ec);
 			}
 
 			ec.Mark (Block.Original.EndLocation);
@@ -936,6 +1003,11 @@ namespace Mono.CSharp
 				throw new NotSupportedException ();
 			}
 
+			protected override bool DoFlowAnalysis (FlowAnalysisContext fc)
+			{
+				throw new NotSupportedException ();
+			}
+
 			protected override void DoEmit (EmitContext ec)
 			{
 				//
@@ -985,8 +1057,8 @@ namespace Mono.CSharp
 				Modifiers.COMPILER_GENERATED, new MemberName (CompilerGeneratedContainer.MakeName (null, null, "Finally", finally_hosts_counter++), loc),
 				ParametersCompiled.EmptyReadOnlyParameters, null);
 
-			method.Block = new ToplevelBlock (method.Compiler, method.ParameterInfo, loc);
-			method.Block.IsCompilerGenerated = true;
+			method.Block = new ToplevelBlock (method.Compiler, method.ParameterInfo, loc,
+				ToplevelBlock.Flags.CompilerGenerated | ToplevelBlock.Flags.NoFlowAnalysis);
 			method.Block.AddStatement (new TryFinallyBlockProxyStatement (this, block));
 
 			// Cannot it add to storey because it'd be emitted before nested
@@ -1095,13 +1167,6 @@ namespace Mono.CSharp
 			EmitLeave (ec, unwind_protect);
 
 			ec.MarkLabel (resume_point);
-		}
-
-		protected override BlockContext CreateBlockContext (ResolveContext rc)
-		{
-			var bc = base.CreateBlockContext (rc);
-			bc.StartFlowBranching (this, rc.CurrentBranching);
-			return bc;
 		}
 
 		public static void CreateIterator (IMethodData method, TypeDefinition parent, Modifiers modifiers)

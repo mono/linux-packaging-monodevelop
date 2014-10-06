@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2008-2012 Jeroen Frijters
+  Copyright (C) 2008-2013 Jeroen Frijters
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -49,9 +49,6 @@ namespace IKVM.Reflection.Emit
 		private StrongNameKeyPair keyPair;
 		private byte[] publicKey;
 		internal readonly string dir;
-		private readonly PermissionSet requiredPermissions;
-		private readonly PermissionSet optionalPermissions;
-		private readonly PermissionSet refusedPermissions;
 		private PEFileKinds fileKind = PEFileKinds.Dll;
 		private MethodInfo entryPoint;
 		private VersionInfo versionInfo;
@@ -66,7 +63,19 @@ namespace IKVM.Reflection.Emit
 		private readonly List<Module> addedModules = new List<Module>();
 		private readonly List<CustomAttributeBuilder> customAttributes = new List<CustomAttributeBuilder>();
 		private readonly List<CustomAttributeBuilder> declarativeSecurity = new List<CustomAttributeBuilder>();
-		private readonly List<Type> typeForwarders = new List<Type>();
+		private readonly List<TypeForwarder> typeForwarders = new List<TypeForwarder>();
+
+		struct TypeForwarder
+		{
+			internal readonly Type Type;
+			internal readonly bool IncludeNested;
+
+			internal TypeForwarder(Type type, bool includeNested)
+			{
+				this.Type = type;
+				this.IncludeNested = includeNested;
+			}
+		}
 
 		private struct ResourceFile
 		{
@@ -76,7 +85,7 @@ namespace IKVM.Reflection.Emit
 			internal ResourceWriter Writer;
 		}
 
-		internal AssemblyBuilder(Universe universe, AssemblyName name, string dir, PermissionSet requiredPermissions, PermissionSet optionalPermissions, PermissionSet refusedPermissions)
+		internal AssemblyBuilder(Universe universe, AssemblyName name, string dir, IEnumerable<CustomAttributeBuilder> customAttributes)
 			: base(universe)
 		{
 			this.name = name.Name;
@@ -105,9 +114,10 @@ namespace IKVM.Reflection.Emit
 				}
 			}
 			this.dir = dir ?? ".";
-			this.requiredPermissions = requiredPermissions;
-			this.optionalPermissions = optionalPermissions;
-			this.refusedPermissions = refusedPermissions;
+			if (customAttributes != null)
+			{
+				this.customAttributes.AddRange(customAttributes);
+			}
 			if (universe.HasMscorlib && !universe.Mscorlib.__IsMissing && universe.Mscorlib.ImageRuntimeVersion != null)
 			{
 				this.imageRuntimeVersion = universe.Mscorlib.ImageRuntimeVersion;
@@ -116,6 +126,7 @@ namespace IKVM.Reflection.Emit
 			{
 				this.imageRuntimeVersion = typeof(object).Assembly.ImageRuntimeVersion;
 			}
+			universe.RegisterDynamicAssembly(this);
 		}
 
 		private void SetVersionHelper(Version version)
@@ -266,7 +277,12 @@ namespace IKVM.Reflection.Emit
 
 		public void __AddTypeForwarder(Type type)
 		{
-			typeForwarders.Add(type);
+			__AddTypeForwarder(type, true);
+		}
+
+		public void __AddTypeForwarder(Type type, bool includeNested)
+		{
+			typeForwarders.Add(new TypeForwarder(type, includeNested));
 		}
 
 		public void SetEntryPoint(MethodInfo entryMethod)
@@ -344,26 +360,7 @@ namespace IKVM.Reflection.Emit
 			{
 				assemblyRecord.Culture = manifestModule.Strings.Add(culture);
 			}
-			int token = 0x20000000 + manifestModule.AssemblyTable.AddRecord(assemblyRecord);
-
-#pragma warning disable 618
-			// this values are obsolete, but we already know that so we disable the warning
-			System.Security.Permissions.SecurityAction requestMinimum = System.Security.Permissions.SecurityAction.RequestMinimum;
-			System.Security.Permissions.SecurityAction requestOptional = System.Security.Permissions.SecurityAction.RequestOptional;
-			System.Security.Permissions.SecurityAction requestRefuse = System.Security.Permissions.SecurityAction.RequestRefuse;
-#pragma warning restore 618
-			if (requiredPermissions != null)
-			{
-				manifestModule.AddDeclarativeSecurity(token, requestMinimum, requiredPermissions);
-			}
-			if (optionalPermissions != null)
-			{
-				manifestModule.AddDeclarativeSecurity(token, requestOptional, optionalPermissions);
-			}
-			if (refusedPermissions != null)
-			{
-				manifestModule.AddDeclarativeSecurity(token, requestRefuse, refusedPermissions);
-			}
+			manifestModule.AssemblyTable.AddRecord(assemblyRecord);
 
 			ResourceSection unmanagedResources = versionInfo != null || win32icon != null || win32manifest != null || win32resources != null
 				? new ResourceSection()
@@ -409,9 +406,9 @@ namespace IKVM.Reflection.Emit
 
 			manifestModule.AddDeclarativeSecurity(0x20000001, declarativeSecurity);
 
-			foreach (Type type in typeForwarders)
+			foreach (TypeForwarder fwd in typeForwarders)
 			{
-				manifestModule.AddTypeForwarder(type);
+				manifestModule.AddTypeForwarder(fwd.Type, fwd.IncludeNested);
 			}
 
 			foreach (ResourceFile resfile in resourceFiles)
@@ -703,14 +700,14 @@ namespace IKVM.Reflection.Emit
 		{
 			foreach (ModuleBuilder module in modules)
 			{
-				if (module.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase))
+				if (module.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
 				{
 					return module;
 				}
 			}
 			foreach (Module module in addedModules)
 			{
-				if (module.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase))
+				if (module.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
 				{
 					return module;
 				}
@@ -743,6 +740,16 @@ namespace IKVM.Reflection.Emit
 		public override bool IsDynamic
 		{
 			get { return true; }
+		}
+
+		public static AssemblyBuilder DefineDynamicAssembly(AssemblyName name, AssemblyBuilderAccess access)
+		{
+			return new Universe().DefineDynamicAssembly(name, access);
+		}
+
+		public static AssemblyBuilder DefineDynamicAssembly(AssemblyName name, AssemblyBuilderAccess access, IEnumerable<CustomAttributeBuilder> assemblyAttributes)
+		{
+			return new Universe().DefineDynamicAssembly(name, access, assemblyAttributes);
 		}
 
 		internal override IList<CustomAttributeData> GetCustomAttributesData(Type attributeType)

@@ -30,6 +30,9 @@ using System.Collections.Generic;
 
 using MonoDevelop.Projects;
 using MonoDevelop.Core.Serialization;
+using MonoDevelop.Core;
+using Mono.Collections.Generic;
+using System.Linq;
 
 namespace MonoDevelop.CSharp.Project
 {
@@ -45,7 +48,7 @@ namespace MonoDevelop.CSharp.Project
 	/// <summary>
 	/// This class handles project specific compiler parameters
 	/// </summary>
-	public class CSharpCompilerParameters: ConfigurationParameters
+	public class CSharpCompilerParameters: DotNetConfigurationParameters
 	{
 		// Configuration parameters
 		
@@ -66,12 +69,9 @@ namespace MonoDevelop.CSharp.Project
 		
 		[ItemProperty ("DefineConstants", DefaultValue = "")]
 		string definesymbols = String.Empty;
-		
-		[ItemProperty ("GenerateDocumentation", DefaultValue = false)]
-		bool generateXmlDocumentation = false;
-		
-		[ItemProperty ("additionalargs", DefaultValue = "")]
-		string additionalArgs = string.Empty;
+
+		[ProjectPathItemProperty ("DocumentationFile")]
+		FilePath documentationFile;
 		
 		[ItemProperty ("LangVersion", DefaultValue = "Default")]
 		string langVersion = "Default";
@@ -104,6 +104,9 @@ namespace MonoDevelop.CSharp.Project
 	
 		[ItemProperty ("CodePage", DefaultValue = null)]
 		internal string codePage;
+
+		[ItemProperty ("GenerateDocumentation", DefaultValue = null)]
+		bool? generateXmlDocumentation = null;
 		
 		#endregion
 		
@@ -132,13 +135,17 @@ namespace MonoDevelop.CSharp.Project
 					codePage = null;
 				}
 			}
+
+			if (generateXmlDocumentation.HasValue && ParentConfiguration != null) {
+				if (generateXmlDocumentation.Value)
+					documentationFile = ParentConfiguration.CompiledOutputName.ChangeExtension (".xml");
+				else
+					documentationFile = null;
+				generateXmlDocumentation = null;
+			}
 		}
 	
-		public string AdditionalArguments {
-			get { return additionalArgs; }
-			set { additionalArgs = value ?? string.Empty; }
-		}
-		
+
 		public LangVersion LangVersion {
 			get {
 				var val = TryLangVersionFromString (langVersion);
@@ -155,32 +162,26 @@ namespace MonoDevelop.CSharp.Project
 				langVersion = v;
 			}
 		}
-		
+
+#region Code Generation
+
+		[Obsolete]
 		public override void AddDefineSymbol (string symbol)
 		{
-			var symbols = new List<string> (definesymbols.Split (new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
-
+			var symbols = new List<string> (GetDefineSymbols ());
 			symbols.Add (symbol);
-
 			definesymbols = string.Join (";", symbols) + ";";
 		}
 
-		public override bool HasDefineSymbol (string symbol)
+		public override IEnumerable<string> GetDefineSymbols ()
 		{
-			var symbols = definesymbols.Split (new char[] { ';' });
-
-			foreach (var sym in symbols) {
-				if (sym == symbol)
-					return true;
-			}
-
-			return false;
+			return definesymbols.Split (';', ',', ' ', '\t').Where (s => !string.IsNullOrWhiteSpace (s));
 		}
 
+		[Obsolete]
 		public override void RemoveDefineSymbol (string symbol)
 		{
-			var symbols = new List<string> (definesymbols.Split (new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
-
+			var symbols = new List<string> (GetDefineSymbols ());
 			symbols.Remove (symbol);
 
 			if (symbols.Count > 0)
@@ -188,8 +189,6 @@ namespace MonoDevelop.CSharp.Project
 			else
 				definesymbols = string.Empty;
 		}
-		
-#region Code Generation
 		
 		public string DefineSymbols {
 			get {
@@ -227,12 +226,12 @@ namespace MonoDevelop.CSharp.Project
 			}
 		}
 		
-		public bool GenerateXmlDocumentation {
+		public FilePath DocumentationFile {
 			get {
-				return generateXmlDocumentation;
+				return documentationFile;
 			}
 			set {
-				generateXmlDocumentation = value;
+				documentationFile = value;
 			}
 		}
 		
@@ -275,7 +274,7 @@ namespace MonoDevelop.CSharp.Project
 			}
 		}
 
-		public bool NoStdLib {
+		public override bool NoStdLib {
 			get {
 				return noStdLib;
 			}

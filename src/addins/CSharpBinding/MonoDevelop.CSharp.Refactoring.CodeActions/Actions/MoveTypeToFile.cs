@@ -37,14 +37,17 @@ using MonoDevelop.Ide.StandardHeader;
 using MonoDevelop.Core.ProgressMonitoring;
 using ICSharpCode.NRefactory;
 using System.Threading;
+using ICSharpCode.NRefactory.CSharp.Refactoring;
 
 namespace MonoDevelop.CSharp.Refactoring.CodeActions
 {
-	public class MoveTypeToFile : MonoDevelop.CodeActions.CodeActionProvider
+	class MoveTypeToFile : MonoDevelop.CodeActions.CodeActionProvider
 	{
 		public override IEnumerable<MonoDevelop.CodeActions.CodeAction> GetActions (MonoDevelop.Ide.Gui.Document document, object refactoringContext, TextLocation loc, CancellationToken cancellationToken)
 		{
-			var context = (MDRefactoringContext)refactoringContext;
+			var context = refactoringContext as MDRefactoringContext;
+			if (context == null)
+				return Enumerable.Empty<MonoDevelop.CodeActions.CodeAction> ();
 			return GetActions (context);
 		}
 		protected IEnumerable<MonoDevelop.CodeActions.CodeAction> GetActions (MDRefactoringContext context)
@@ -62,20 +65,19 @@ namespace MonoDevelop.CSharp.Refactoring.CodeActions
 			} else {
 				title = String.Format (GettextCatalog.GetString ("Move type to file '{0}'"), Path.GetFileName (GetCorrectFileName (context, type)));
 			}
-			yield return new MonoDevelop.CodeActions.DefaultCodeAction (title, (d, l) => {
-				var ctx = new MDRefactoringContext (d, l);
+			yield return new MonoDevelop.CodeActions.DefaultCodeAction (title, (c, s) => {
+				var ctx = (MDRefactoringContext) c;
+				var script = (Script) s;
 				string correctFileName = GetCorrectFileName (ctx, type);
 				if (IsSingleType (ctx)) {
 					FileService.RenameFile (ctx.TextEditor.FileName, correctFileName);
-					if (ctx.Project != null)
-						ctx.Project.Save (new NullProgressMonitor ());
+					if (ctx.FileContainerProject != null)
+						ctx.FileContainerProject.Save (new NullProgressMonitor ());
 					return;
 				}
 				
 				CreateNewFile (ctx, type, correctFileName);
-				using (var script = ctx.StartScript ()) {
-					script.Remove (type);
-				}
+				script.Remove (type);
 			});
 		}
 
@@ -92,16 +94,16 @@ namespace MonoDevelop.CSharp.Refactoring.CodeActions
 				content = content.Remove (start, end - start);
 			}
 			
-			if (context.Project != null) {
-				string header = StandardHeaderService.GetHeader (context.Project, correctFileName, true);
+			if (context.FileContainerProject != null) {
+				string header = StandardHeaderService.GetHeader (context.FileContainerProject, correctFileName, true);
 				if (!string.IsNullOrEmpty (header))
 					content = header + context.TextEditor.EolMarker + StripHeader (content);
 			}
 			content = StripDoubleBlankLines (content);
 			
 			File.WriteAllText (correctFileName, content);
-			context.Project.AddFile (correctFileName);
-			MonoDevelop.Ide.IdeApp.ProjectOperations.Save (context.Project);
+			context.FileContainerProject.AddFile (correctFileName);
+			MonoDevelop.Ide.IdeApp.ProjectOperations.Save (context.FileContainerProject);
 		}
 
 		static bool IsBlankLine (TextDocument doc, int i)

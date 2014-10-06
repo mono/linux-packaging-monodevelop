@@ -25,27 +25,24 @@
 // THE SOFTWARE.
 
 using System;
-using System.Threading;
 using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Runtime.Remoting;
 using Microsoft.Build.Evaluation;
 using Microsoft.Build.Framework;
 using System.Collections.Generic;
-using System.Collections;
 using System.Linq;
 using Microsoft.Build.Logging;
 using Microsoft.Build.Execution;
+using System.Xml;
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
 	public class ProjectBuilder: MarshalByRefObject, IProjectBuilder
 	{
-		ProjectCollection engine;
-		string file;
+		readonly ProjectCollection engine;
+		readonly string file;
 		ILogWriter currentLogWriter;
-		ConsoleLogger consoleLogger;
-		BuildEngine buildEngine;
+		readonly ConsoleLogger consoleLogger;
+		readonly BuildEngine buildEngine;
 
 		public ProjectBuilder (BuildEngine buildEngine, ProjectCollection engine, string file)
 		{
@@ -65,35 +62,76 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		{
 			buildEngine.UnloadProject (file);
 		}
+
+		public void RefreshWithContent (string projectContent)
+		{
+			buildEngine.UnloadProject (file);
+			buildEngine.SetUnsavedProjectContent (file, projectContent);
+		}
 		
 		void LogWriteLine (string txt)
 		{
 			if (currentLogWriter != null)
 				currentLogWriter.WriteLine (txt);
 		}
-		
-		public MSBuildResult[] RunTarget (string target, ProjectConfigurationInfo[] configurations, ILogWriter logWriter,
-			MSBuildVerbosity verbosity)
+
+		public MSBuildResult Run (
+			ProjectConfigurationInfo[] configurations, ILogWriter logWriter, MSBuildVerbosity verbosity,
+			string[] runTargets, string[] evaluateItems, string[] evaluateProperties)
 		{
-			MSBuildResult[] result = null;
-			BuildEngine.RunSTA (delegate
-			{
+			if (runTargets == null || runTargets.Length == 0)
+				throw new ArgumentException ("runTargets is empty");
+
+			MSBuildResult result = null;
+			BuildEngine.RunSTA (delegate {
 				try {
 					var project = SetupProject (configurations);
 					currentLogWriter = logWriter;
 
-					LocalLogger logger = new LocalLogger (Path.GetDirectoryName (file));
-					engine.UnregisterAllLoggers ();
-					engine.RegisterLogger (logger);
-					engine.RegisterLogger (consoleLogger);
+					ILogger[] loggers;
+					var logger = new LocalLogger (file);
+					if (logWriter != null) {
+						consoleLogger.Verbosity = GetVerbosity (verbosity);
+						loggers = new ILogger[] { logger, consoleLogger };
+					} else {
+						loggers = new ILogger[] { logger };
+					}
 
-					consoleLogger.Verbosity = GetVerbosity (verbosity);
-					
-					project.Build (target);
-					
-					result = logger.BuildResult.ToArray ();
-		//		} catch (InvalidProjectFileException ex) {
-		//			result = new MSBuildResult[] { new MSBuildResult (false, ex.ProjectFile ?? file, ex.LineNumber, ex.ColumnNumber, ex.ErrorCode, ex.Message) };
+					//building the project will create items and alter properties, so we use a new instance
+					var pi = project.CreateProjectInstance ();
+
+					pi.Build (runTargets, loggers);
+
+					result = new MSBuildResult (logger.BuildResult.ToArray ());
+
+					if (evaluateProperties != null) {
+						foreach (var name in evaluateProperties) {
+							var prop = pi.GetProperty (name);
+							result.Properties [name] = prop != null? prop.EvaluatedValue : null;
+						}
+					}
+
+					if (evaluateItems != null) {
+						foreach (var name in evaluateItems) {
+							var grp = pi.GetItems (name);
+							var list = new List<MSBuildEvaluatedItem> ();
+							foreach (var item in grp) {
+								var evItem = new MSBuildEvaluatedItem (name, UnescapeString (item.EvaluatedInclude));
+								foreach (var m in item.Metadata) {
+									evItem.Metadata [m.Name] = UnescapeString (m.EvaluatedValue);
+								}
+								list.Add (evItem);
+							}
+							result.Items[name] = list;
+						}
+					}
+				} catch (Microsoft.Build.Exceptions.InvalidProjectFileException ex) {
+					var r = new MSBuildTargetResult (
+						file, false, ex.ErrorSubcategory, ex.ErrorCode, ex.ProjectFile,
+						ex.LineNumber, ex.ColumnNumber, ex.EndLineNumber, ex.EndColumnNumber,
+						ex.BaseMessage, ex.HelpKeyword);
+					logWriter.WriteLine (r.ToString ());
+					result = new MSBuildResult (new [] { r });
 				} finally {
 					currentLogWriter = null;
 				}
@@ -117,26 +155,6 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				return LoggerVerbosity.Diagnostic;
 			}
 		}
-
-		public string[] GetAssemblyReferences (ProjectConfigurationInfo[] configurations)
-		{
-			string[] refsArray = null;
-
-			BuildEngine.RunSTA (delegate
-			{
-				var project = SetupProject (configurations);
-				
-				// We are using this BuildProject overload and the BuildSettings.None argument as a workaround to
-				// an xbuild bug which causes references to not be resolved after the project has been built once.
-				var pi = project.CreateProjectInstance ();
-				pi.Build ("ResolveAssemblyReferences", null);
-				List<string> refs = new List<string> ();
-				foreach (ProjectItemInstance item in pi.GetItems ("ReferencePath"))
-					refs.Add (UnescapeString (item.EvaluatedInclude));
-				refsArray = refs.ToArray ();
-			});
-			return refsArray;
-		}
 		
 		Project SetupProject (ProjectConfigurationInfo[] configurations)
 		{
@@ -155,9 +173,15 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 		Project ConfigureProject (string file, string configuration, string platform)
 		{			
 			var p = engine.GetLoadedProjects (file).FirstOrDefault ();
-			if (p == null)
-				p = engine.LoadProject (file);
-
+			if (p == null) {
+				var content = buildEngine.GetUnsavedProjectContent (file);
+				if (content == null)
+					p = engine.LoadProject (file);
+				else {
+					p = engine.LoadProject (new XmlTextReader (new StringReader (content)));
+					p.FullPath = file;
+				}
+			}
 			p.SetProperty ("Configuration", configuration);
 			if (!string.IsNullOrEmpty (platform))
 				p.SetProperty ("Platform", platform);

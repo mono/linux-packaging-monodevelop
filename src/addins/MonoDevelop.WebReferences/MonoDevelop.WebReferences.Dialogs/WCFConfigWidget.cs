@@ -29,13 +29,14 @@ using System.Collections.Generic;
 using MonoDevelop.WebReferences.WCF;
 using System.ServiceModel.Description;
 using Gtk;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.WebReferences.Dialogs
 {
 	[System.ComponentModel.ToolboxItem(true)]
-	public partial class WCFConfigWidget : Gtk.Bin
+	public partial class WCFConfigWidget : Bin
 	{
-		public WCFConfigWidget (ClientOptions options)
+		public WCFConfigWidget (ClientOptions options, DotNetProject project)
 		{
 			this.Options = options;
 			this.Build ();
@@ -45,6 +46,17 @@ namespace MonoDevelop.WebReferences.Dialogs
 			
 			dictTypes = new List<Type> (DefaultDictionaryTypes);
 			PopulateBox (dictionaryCollection, "Dictionary", dictTypes);
+
+#if NET_4_5
+			listAsync.AppendText (Mono.Unix.Catalog.GetString ("Task-based"));
+#endif
+			listAccess.Active = options.GenerateInternalTypes ? 1 : 0;
+			listAsync.Active = AsyncOptionToIndex;
+
+			if (project is PortableDotNetProject) {
+				listAccess.Sensitive = false;
+				listAsync.Sensitive = false;
+			}
 		}
 		
 		public ClientOptions Options {
@@ -53,26 +65,45 @@ namespace MonoDevelop.WebReferences.Dialogs
 		
 		static readonly Type[] DefaultListTypes = {
 			typeof (Array),
-			typeof (System.Collections.Generic.LinkedList<>),
-			typeof (System.Collections.Generic.List<>),
+			typeof (System.Collections.ArrayList),
+			typeof (LinkedList<>),
+			typeof (List<>),
 			typeof (System.Collections.ObjectModel.Collection<>),
 			typeof (System.Collections.ObjectModel.ObservableCollection<>),
 			typeof (System.ComponentModel.BindingList<>)
 		};
 		
 		static readonly Type[] DefaultDictionaryTypes = {
-			typeof (System.Collections.Generic.Dictionary<,>),
-			typeof (System.Collections.Generic.SortedList<,>),
-			typeof (System.Collections.Generic.SortedDictionary<,>)
+			typeof (Dictionary<, >),
+			typeof (SortedList<, >),
+			typeof (SortedDictionary<, >),
+			typeof (System.Collections.Hashtable),
+			typeof (System.Collections.SortedList),
+			typeof (System.Collections.Specialized.HybridDictionary),
+			typeof (System.Collections.Specialized.ListDictionary),
+			typeof (System.Collections.Specialized.OrderedDictionary)
 		};
+
+		int AsyncOptionToIndex {
+			get {
+				int index = 0;
+#if NET_4_5
+				if (options.GenerateTaskBasedAsynchronousMethod)
+					index = 2;
+#endif
+				if (Options.GenerateAsynchronousMethods)
+					index = 1;
+				return index;
+			}
+		}
 		
 		public bool Modified {
 			get;
 			private set;
 		}
 		
-		List<Type> listTypes;
-		List<Type> dictTypes;
+		readonly List<Type> listTypes;
+		readonly List<Type> dictTypes;
 		
 		static bool? runtimeSupport;
 		
@@ -106,19 +137,15 @@ namespace MonoDevelop.WebReferences.Dialogs
 			var type = typeof (char).Assembly.GetType (name);
 			if (type != null)
 				return type;
-			type = typeof (System.Collections.Generic.LinkedList<>).Assembly.GetType (name);
-			if (type != null)
-				return type;
-			return null;
+			type = typeof (LinkedList<>).Assembly.GetType (name);
+			return type;
 		}
 		
 		internal static string GetTypeName (Type type)
 		{
 			var name = type.FullName;
-			var pos = name.IndexOf ("`");
-			if (pos < 0)
-				return name;
-			return name.Substring (0, pos);
+			var pos = name.IndexOf ("`", StringComparison.Ordinal);
+			return pos < 0 ? name : name.Substring (0, pos);
 		}
 		
 		void PopulateBox (ComboBox box, string category, List<Type> types)
@@ -140,7 +167,7 @@ namespace MonoDevelop.WebReferences.Dialogs
 			box.Active = types.IndexOf (current);
 		}
 		
-		void UpdateBox (ComboBox box, string category, List<Type> types)
+		void UpdateBox (ComboBox box, string category, IList<Type> types)
 		{
 			var mapping = Options.CollectionMappings.FirstOrDefault (m => m.Category == category);
 			if (mapping == null) {
@@ -160,6 +187,18 @@ namespace MonoDevelop.WebReferences.Dialogs
 		{
 			UpdateBox (listCollection, "List", listTypes);
 			UpdateBox (dictionaryCollection, "Dictionary", dictTypes);
+
+			if (listAccess.Sensitive && listAccess.Active != (Options.GenerateInternalTypes ? 1 : 0)) {
+				Options.GenerateInternalTypes = !Options.GenerateInternalTypes;
+				Modified = true;
+			}
+
+			int index = AsyncOptionToIndex;
+			if (listAsync.Sensitive && listAsync.Active != index) {
+				Options.GenerateAsynchronousMethods = listAsync.Active == 1;
+				Options.GenerateTaskBasedAsynchronousMethod = listAsync.Active == 2;
+				Modified = true;
+			}
 		}
 	}
 }

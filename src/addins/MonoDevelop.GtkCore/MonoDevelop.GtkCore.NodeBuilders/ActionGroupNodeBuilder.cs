@@ -57,11 +57,11 @@ namespace MonoDevelop.GtkCore.NodeBuilders
 			return group.Name;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			Stetic.ActionGroupInfo group = (Stetic.ActionGroupInfo) dataObject;
-			label = group.Name;
-			icon = ImageService.GetPixbuf ("md-gtkcore-actiongroup", Gtk.IconSize.Menu);
+			nodeInfo.Label = group.Name;
+			nodeInfo.Icon = Context.GetIcon ("md-gtkcore-actiongroup");
 		}
 		
 		public override void OnNodeAdded (object dataObject)

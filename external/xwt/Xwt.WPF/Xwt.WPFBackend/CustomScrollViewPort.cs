@@ -125,6 +125,9 @@ namespace Xwt.WPFBackend
 			// This is the area we wish to be visible
 			rectangle = visual.TransformToAncestor (this).TransformBounds (rectangle);
 
+			if (visibleRect == rectangle)
+				return rectangle;
+
 			// The co-ordinates are relative to the visible area, so we need to add the visible area offset
 			// to convert to values we can use in VerticalOffset/HorizontalOffset
 			rectangle.X += visibleRect.X;
@@ -149,22 +152,22 @@ namespace Xwt.WPFBackend
 
 		public void MouseWheelDown()
 		{
-			SetVerticalOffset (VerticalOffset + VerticalStepIncrement * 4);
+			SetVerticalOffset (VerticalOffset + 12);
 		}
 
 		public void MouseWheelLeft()
 		{
-			SetHorizontalOffset (HorizontalOffset - HorizontalStepIncrement * 4);
+			SetHorizontalOffset (HorizontalOffset - 12);
 		}
 
 		public void MouseWheelRight()
 		{
-			SetHorizontalOffset (HorizontalOffset + HorizontalStepIncrement * 4);
+			SetHorizontalOffset (HorizontalOffset + 12);
 		}
 
 		public void MouseWheelUp()
 		{
-			SetVerticalOffset (VerticalOffset - VerticalStepIncrement * 4);
+			SetVerticalOffset (VerticalOffset - 12);
 		}
 
 		public void PageDown()
@@ -281,22 +284,22 @@ namespace Xwt.WPFBackend
 
 		protected double VerticalPageIncrement
 		{
-			get { return (this.verticalBackend != null) ? this.verticalBackend.PageIncrement : 10; }
+			get { return (this.verticalBackend != null) ? this.verticalBackend.PageIncrement : ViewportHeight; }
 		}
 
 		protected double HorizontalPageIncrement
 		{
-			get { return (this.horizontalBackend != null) ? this.horizontalBackend.PageIncrement : 10; }
+			get { return (this.horizontalBackend != null) ? this.horizontalBackend.PageIncrement : ViewportWidth; }
 		}
 
 		protected double VerticalStepIncrement
 		{
-			get { return (this.verticalBackend != null) ? this.verticalBackend.StepIncrement : 1; }
+			get { return (this.verticalBackend != null) ? this.verticalBackend.StepIncrement : VerticalPageIncrement / 10; }
 		}
 
 		protected double HorizontalStepIncrement
 		{
-			get { return (this.horizontalBackend != null) ? this.horizontalBackend.StepIncrement : 1; }
+			get { return (this.horizontalBackend != null) ? this.horizontalBackend.StepIncrement : HorizontalPageIncrement / 10; }
 		}
 
 		protected override WSize MeasureOverride (WSize constraint)

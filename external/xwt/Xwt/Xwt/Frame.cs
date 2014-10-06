@@ -57,22 +57,27 @@ namespace Xwt
 		{
 		}
 		
-		public Frame (FrameType frameType): this ()
+		public Frame (FrameType frameType)
 		{
+			VerifyConstructorCall (this);
 			Type = frameType;
 		}
 		
-		public Frame (Widget content): this ()
+		public Frame (Widget content)
 		{
+			VerifyConstructorCall (this);
 			Content = content;
 		}
-		
-		public Frame (Widget content, FrameType frameType): this ()
+
+		[Obsolete ("Use Xwt.FrameBox")]
+		public Frame (Widget content, FrameType frameType)
 		{
+			VerifyConstructorCall (this);
 			Type = frameType;
 			Content = content;
 		}
 		
+		[Obsolete ("Use Xwt.FrameBox")]
 		[DefaultValue (FrameType.WidgetBox)]
 		public FrameType Type {
 			get { return type; }
@@ -135,6 +140,7 @@ namespace Xwt
 			OnPreferredSizeChanged ();
 		}
 		
+		[Obsolete ("Use Xwt.FrameBox")]
 		public WidgetSpacing BorderWidth {
 			get { return borderWidth; }
 			set {
@@ -143,6 +149,7 @@ namespace Xwt
 			}
 		}
 
+		[Obsolete ("Use Xwt.FrameBox")]
 		[DefaultValue (0d)]
 		public double BorderWidthLeft {
 			get { return borderWidth.Left; }
@@ -152,6 +159,7 @@ namespace Xwt
 			}
 		}
 
+		[Obsolete ("Use Xwt.FrameBox")]
 		[DefaultValue (0d)]
 		public double BorderWidthRight {
 			get { return borderWidth.Right; }
@@ -161,6 +169,7 @@ namespace Xwt
 			}
 		}
 
+		[Obsolete ("Use Xwt.FrameBox")]
 		[DefaultValue (0d)]
 		public double BorderWidthTop {
 			get { return borderWidth.Top; }
@@ -170,6 +179,7 @@ namespace Xwt
 			}
 		}
 
+		[Obsolete ("Use Xwt.FrameBox")]
 		[DefaultValue (0d)]
 		public double BorderWidthBottom {
 			get { return borderWidth.Bottom; }
@@ -185,9 +195,18 @@ namespace Xwt
 			OnPreferredSizeChanged ();
 		}
 
+		[Obsolete ("Use Xwt.FrameBox")]
 		public Color BorderColor {
 			get { return Backend.BorderColor; }
 			set { Backend.BorderColor = value; }
+		}
+
+		/// <summary>
+		/// Removes all children of the Frame
+		/// </summary>
+		public void Clear ()
+		{
+			Content = null;
 		}
 
 		[DefaultValue (null)]

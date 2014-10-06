@@ -292,7 +292,7 @@ namespace MonoDevelop.Core.Assemblies
 				return Directory.GetFiles (facades, "*.dll");
 			}
 
-			return null;
+			return new string[0];
 		}
 
 		/// <summary>
@@ -301,6 +301,11 @@ namespace MonoDevelop.Core.Assemblies
 		public virtual ExecutionEnvironment GetToolsExecutionEnvironment (TargetFramework fx)
 		{
 			return new ExecutionEnvironment (GetBackend (fx).GetToolsEnvironmentVariables ());
+		}
+
+		public virtual ExecutionEnvironment GetToolsExecutionEnvironment ()
+		{
+			return new ExecutionEnvironment ();
 		}
 		
 		/// <summary>
@@ -322,7 +327,7 @@ namespace MonoDevelop.Core.Assemblies
 		/// <summary>
 		/// Returns the MSBuild bin path for this runtime.
 		/// </summary>
-		public abstract string GetMSBuildBinPath (TargetFramework fx);
+		public abstract string GetMSBuildBinPath (string toolsVersion);
 		
 		/// <summary>
 		/// Returns the MSBuild extensions path.
@@ -388,7 +393,6 @@ namespace MonoDevelop.Core.Assemblies
 				try {
 					RunInitialization ();
 				} catch (Exception ex) {
-					LogReporting.LogReportingService.ReportUnhandledException (ex, false);
 					LoggingService.LogFatalError ("Unhandled exception in SystemAssemblyService background initialisation thread.", ex);
 				} finally {
 					lock (initEventLock) {
@@ -479,7 +483,7 @@ namespace MonoDevelop.Core.Assemblies
 		/// Set to true if this package is provided by an add-in and is not installed in the system.
 		/// </param>
 		/// <param name="assemblyFiles">
-		/// A <see cref="System.String[]"/>
+		/// The assemblies of the package.
 		/// </param>
 		/// <returns>
 		/// A <see cref="SystemPackage"/>

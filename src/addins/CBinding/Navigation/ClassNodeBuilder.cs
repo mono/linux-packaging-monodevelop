@@ -60,24 +60,22 @@ namespace CBinding.Navigation
 		
 		public override void BuildNode (ITreeBuilder treeBuilder,
 		                                object dataObject,
-		                                ref string label,
-		                                ref Gdk.Pixbuf icon,
-		                                ref Gdk.Pixbuf closedIcon)
+		                                NodeInfo nodeInfo)
 		{
 			Class c = (Class)dataObject;
 				
-			label = c.Name;
+			nodeInfo.Label = c.Name;
 			
 			switch (c.Access)
 			{
 			case AccessModifier.Public:
-				icon = Context.GetIcon (Stock.Class);
+				nodeInfo.Icon = Context.GetIcon (Stock.Class);
 				break;
 			case AccessModifier.Protected:
-				icon = Context.GetIcon (Stock.ProtectedClass);
+				nodeInfo.Icon = Context.GetIcon (Stock.ProtectedClass);
 				break;
 			case AccessModifier.Private:
-				icon = Context.GetIcon (Stock.PrivateClass);
+				nodeInfo.Icon = Context.GetIcon (Stock.PrivateClass);
 				break;
 			}
 		}

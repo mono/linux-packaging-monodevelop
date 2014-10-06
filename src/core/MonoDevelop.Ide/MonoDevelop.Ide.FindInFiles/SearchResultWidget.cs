@@ -38,12 +38,10 @@ using MonoDevelop.Core;
 using System.Text;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Commands;
-using System.IO;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide.Navigation;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Components;
-
 
 namespace MonoDevelop.Ide.FindInFiles
 {
@@ -120,28 +118,38 @@ namespace MonoDevelop.Ide.FindInFiles
 			resultsScroll.Add (treeviewSearchResults);
 			
 			this.ShowAll ();
-			
-			var fileNameColumn = new TreeViewColumn {
+
+			var projectColumn = new TreeViewColumn {
 				Resizable = true,
 				SortColumnId = 0,
-				Title = GettextCatalog.GetString("File")
+				Title = GettextCatalog.GetString ("Project"),
+				FixedWidth = 100
 			};
 
-			fileNameColumn.FixedWidth = 200;
+			var projectPixbufRenderer = new CellRendererImage ();
+			projectColumn.PackStart (projectPixbufRenderer, false);
+			projectColumn.SetCellDataFunc (projectPixbufRenderer, ResultProjectIconDataFunc);
 
-			var fileNamePixbufRenderer = new CellRendererPixbuf ();
+			projectColumn.PackStart (treeviewSearchResults.TextRenderer, true);
+			projectColumn.SetCellDataFunc (treeviewSearchResults.TextRenderer, ResultProjectDataFunc);
+			treeviewSearchResults.AppendColumn (projectColumn);
+
+			var fileNameColumn = new TreeViewColumn {
+				Resizable = true,
+				SortColumnId = 1,
+				Title = GettextCatalog.GetString ("File"),
+				FixedWidth = 200
+			};
+
+			var fileNamePixbufRenderer = new CellRendererImage ();
 			fileNameColumn.PackStart (fileNamePixbufRenderer, false);
 			fileNameColumn.SetCellDataFunc (fileNamePixbufRenderer, FileIconDataFunc);
 			
 			fileNameColumn.PackStart (treeviewSearchResults.TextRenderer, true);
 			fileNameColumn.SetCellDataFunc (treeviewSearchResults.TextRenderer, FileNameDataFunc);
 			treeviewSearchResults.AppendColumn (fileNameColumn);
-			
-//			TreeViewColumn lineColumn = treeviewSearchResults.AppendColumn (GettextCatalog.GetString ("Line"), new CellRendererText (), ResultLineDataFunc);
-//			lineColumn.SortColumnId = 1;
-//			lineColumn.FixedWidth = 50;
-//			
-			
+
+
 			TreeViewColumn textColumn = treeviewSearchResults.AppendColumn (GettextCatalog.GetString ("Text"),
 				treeviewSearchResults.TextRenderer, ResultTextDataFunc);
 			textColumn.SortColumnId = 2;
@@ -155,21 +163,21 @@ namespace MonoDevelop.Ide.FindInFiles
 			pathColumn.Resizable = true;
 			pathColumn.FixedWidth = 500;
 
-			
-			store.SetSortFunc (0, CompareFileNames);
-//			store.SetSortFunc (1, CompareLineNumbers);
+
+			store.SetSortFunc (0, CompareProjectFileNames);
+			store.SetSortFunc (1, CompareFileNames);
 			store.SetSortFunc (3, CompareFilePaths);
 
 			treeviewSearchResults.RowActivated += TreeviewSearchResultsRowActivated;
 			
-			buttonStop = new ToolButton (Stock.Stop) { Sensitive = false };
+			buttonStop = new ToolButton (Ide.Gui.Stock.Stop) { Sensitive = false };
 
 			buttonStop.Clicked += ButtonStopClicked;
-			
+
 			buttonStop.TooltipText = GettextCatalog.GetString ("Stop");
 			toolbar.Insert (buttonStop, -1);
 
-			var buttonClear = new ToolButton (Gtk.Stock.Clear);
+			var buttonClear = new ToolButton (Ide.Gui.Stock.Clear);
 			buttonClear.Clicked += ButtonClearClicked;
 			buttonClear.TooltipText = GettextCatalog.GetString ("Clear results");
 			toolbar.Insert (buttonClear, -1);
@@ -194,11 +202,6 @@ namespace MonoDevelop.Ide.FindInFiles
 		{
 			base.OnRealized ();
 			highlightStyle = SyntaxModeService.GetColorStyle (IdeApp.Preferences.ColorScheme);
-		}
-		
-		protected override void OnStyleSet (Gtk.Style previousStyle)
-		{
-			base.OnStyleSet (previousStyle);
 		}
 
 		void ButtonPinClicked (object sender, EventArgs e)
@@ -245,8 +248,8 @@ namespace MonoDevelop.Ide.FindInFiles
 		public void EndProgress ()
 		{
 			buttonStop.Sensitive = false;
-			newStore.SetSortFunc (0, CompareFileNames);
-			newStore.SetSortFunc (1, CompareLineNumbers);
+			newStore.SetSortFunc (0, CompareProjectFileNames);
+			newStore.SetSortFunc (1, CompareFileNames);
 			newStore.SetSortFunc (3, CompareFilePaths);
 
 			treeviewSearchResults.Model = newStore;
@@ -307,7 +310,6 @@ namespace MonoDevelop.Ide.FindInFiles
 			int offset = 0;
 
 
-
 			// This is a workaround for Bug 559804 - Strings in search result pad are near-invisible
 			// On mac it's not possible to get the white background color with the Base or Background
 			// methods. If this bug is fixed or a better work around is found - remove this hack.
@@ -354,13 +356,13 @@ namespace MonoDevelop.Ide.FindInFiles
 		{
 			if (TreeIter.Zero.Equals (iter))
 				return;
-			var fileNamePixbufRenderer = (CellRendererPixbuf) cell;
+			var fileNamePixbufRenderer = (CellRendererImage) cell;
 			var searchResult = (SearchResult)store.GetValue (iter, SearchResultColumn);
 			if (searchResult == null)
 				return;
-			if (searchResult.Pixbuf == null)
-				searchResult.Pixbuf = DesktopService.GetPixbufForFile (searchResult.FileName, IconSize.Menu);
-			fileNamePixbufRenderer.Pixbuf = searchResult.Pixbuf;
+			if (searchResult.FileIcon == null)
+				searchResult.FileIcon = DesktopService.GetIconForFile (searchResult.FileName, IconSize.Menu);
+			fileNamePixbufRenderer.Image = searchResult.FileIcon;
 		}
 
 
@@ -408,7 +410,18 @@ namespace MonoDevelop.Ide.FindInFiles
 				return -1;
 			return System.IO.Path.GetFileName (searchResult1.FileName).CompareTo (System.IO.Path.GetFileName (searchResult2.FileName));
 		}
-		
+
+		static int CompareProjectFileNames (TreeModel model, TreeIter first, TreeIter second)
+		{
+			var searchResult1 = (SearchResult)model.GetValue (first, SearchResultColumn);
+			var searchResult2 = (SearchResult)model.GetValue (second, SearchResultColumn);
+			if (searchResult1 == null || searchResult2 == null ||
+				searchResult1.Projects == null || searchResult2.Projects == null ||
+				searchResult1.Projects.Count == 0 || searchResult2.Projects.Count == 0)
+				return -1;
+			return System.IO.Path.GetFileName (searchResult1.Projects[0].FileName).CompareTo (System.IO.Path.GetFileName (searchResult2.Projects[0].FileName));
+		}
+
 		static int CompareFilePaths (TreeModel model, TreeIter first, TreeIter second)
 		{
 			var searchResult1 = (SearchResult)model.GetValue (first, SearchResultColumn);
@@ -431,22 +444,35 @@ namespace MonoDevelop.Ide.FindInFiles
 			bool didRead = (bool)store.GetValue (iter, DidReadColumn);
 			pathRenderer.Markup = MarkupText (System.IO.Path.GetDirectoryName (searchResult.FileName), didRead);
 		}
-		
-//		void ResultLineDataFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
-//		{
-//			if (TreeIter.Zero.Equals (iter))
-//				return;
-//			var lineRenderer = (CellRendererText)cell;
-//			var searchResult = (SearchResult)store.GetValue (iter, SearchResultColumn);
-//			if (searchResult == null)
-//				return;
-//			
-//			Document doc = GetDocument (searchResult);
-//			int lineNr = doc.OffsetToLineNumber (searchResult.Offset) + 1;
-//			bool didRead = (bool)store.GetValue (iter, DidReadColumn);
-//			lineRenderer.Markup = MarkupText (lineNr.ToString (), didRead);
-//		}
-//		
+
+		void ResultProjectIconDataFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
+		{
+			if (TreeIter.Zero.Equals (iter))
+				return;
+			var fileNamePixbufRenderer = (CellRendererImage) cell;
+			var searchResult = (SearchResult)store.GetValue (iter, SearchResultColumn);
+			if (searchResult == null)
+				return;
+			if (searchResult.ProjectIcon == null && searchResult.Projects.Count > 0)
+				searchResult.ProjectIcon = ImageService.GetIcon (searchResult.Projects [0].StockIcon).WithSize (Gtk.IconSize.Menu);
+			fileNamePixbufRenderer.Image = searchResult.ProjectIcon;
+		}
+
+		void ResultProjectDataFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
+		{
+			if (TreeIter.Zero.Equals (iter))
+				return;
+			var pathRenderer = (CellRendererText)cell;
+			var searchResult = (SearchResult)store.GetValue (iter, SearchResultColumn);
+			if (searchResult == null)
+				return;
+			bool didRead = (bool)store.GetValue (iter, DidReadColumn);
+			if (searchResult.Projects.Count > 0)
+				pathRenderer.Markup = MarkupText (String.Join (", ", searchResult.Projects.Select (p => p.Name)), didRead);
+			else
+				pathRenderer.Markup = "";
+		}
+
 		void ResultTextDataFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			if (TreeIter.Zero.Equals (iter))
@@ -487,17 +513,19 @@ namespace MonoDevelop.Ide.FindInFiles
 				GLib.Markup.EscapeText (lineText);
 				searchResult.Markup = AdjustColors (markup.Replace ("\t", new string (' ', TextEditorOptions.DefaultOptions.TabSize)));
 
-				uint start;
-				uint end;
-				try {
-					start = (uint)TextViewMargin.TranslateIndexToUTF8 (lineText, col);
-					end = (uint)TextViewMargin.TranslateIndexToUTF8 (lineText, col + searchResult.Length);
-				} catch (Exception e) {
-					LoggingService.LogError ("Exception while translating index to utf8 (column was:" +col + " search result length:" + searchResult.Length + " line text:" + lineText + ")", e);
-					return;
+				if (col >= 0) {
+					uint start;
+					uint end;
+					try {
+						start = (uint)TextViewMargin.TranslateIndexToUTF8 (lineText, col);
+						end = (uint)TextViewMargin.TranslateIndexToUTF8 (lineText, Math.Min (lineText.Length, col + searchResult.Length));
+					} catch (Exception e) {
+						LoggingService.LogError ("Exception while translating index to utf8 (column was:" + col + " search result length:" + searchResult.Length + " line text:" + lineText + ")", e);
+						return;
+					}
+					searchResult.StartIndex = start;
+					searchResult.EndIndex = end;
 				}
-				searchResult.StartIndex = start;
-				searchResult.EndIndex = end;
 			}
 
 
@@ -505,7 +533,7 @@ namespace MonoDevelop.Ide.FindInFiles
 				textRenderer.Markup = searchResult.Markup;
 
 				if (!isSelected) {
-					var searchColor = highlightStyle.SearchResult.Color;
+					var searchColor = searchResult.GetBackgroundMarkerColor (highlightStyle).Color;
 					double b1 = Mono.TextEditor.HslColor.Brightness (searchColor);
 					double b2 = Mono.TextEditor.HslColor.Brightness (AdjustColor (Style.Base (StateType.Normal), (Mono.TextEditor.HslColor)highlightStyle.PlainText.Foreground));
 					double delta = Math.Abs (b1 - b2);
@@ -518,13 +546,15 @@ namespace MonoDevelop.Ide.FindInFiles
 						}
 						searchColor = color1;
 					}
-					var attr = new Pango.AttrBackground ((ushort)(searchColor.R * ushort.MaxValue), (ushort)(searchColor.G * ushort.MaxValue), (ushort)(searchColor.B * ushort.MaxValue));
-					attr.StartIndex = searchResult.StartIndex;
-					attr.EndIndex = searchResult.EndIndex;
+					if (searchResult.StartIndex != searchResult.EndIndex) {
+						var attr = new Pango.AttrBackground ((ushort)(searchColor.R * ushort.MaxValue), (ushort)(searchColor.G * ushort.MaxValue), (ushort)(searchColor.B * ushort.MaxValue));
+						attr.StartIndex = searchResult.StartIndex;
+						attr.EndIndex = searchResult.EndIndex;
 
-					using (var list = textRenderer.Attributes.Copy ()) {
-						list.Insert (attr);
-						textRenderer.Attributes = list;
+						using (var list = textRenderer.Attributes.Copy ()) {
+							list.Insert (attr);
+							textRenderer.Attributes = list;
+						}
 					}
 				}
 			} catch (Exception e) {
@@ -635,6 +665,8 @@ namespace MonoDevelop.Ide.FindInFiles
 				return DocumentLocation.Empty;
 			int lineNr = doc.OffsetToLineNumber (searchResult.Offset);
 			DocumentLine line = doc.GetLine (lineNr);
+			if (line == null)
+				return DocumentLocation.Empty;
 			return new DocumentLocation (lineNr, searchResult.Offset - line.Offset + 1);
 		}
 		
@@ -754,8 +786,12 @@ namespace MonoDevelop.Ide.FindInFiles
 					return null;
 				
 				var buf = doc.GetContent<IEditableTextBuffer> ();
-				if (buf != null)
-					buf.SetCaretTo (Math.Max (Line, 1), Math.Max (Column, 1));
+				if (buf != null) {
+					doc.DisableAutoScroll ();
+					buf.RunWhenLoaded (() => {
+						buf.SetCaretTo (Math.Max (Line, 1), Math.Max (Column, 1));
+					});
+				}
 				
 				return doc;
 			}

@@ -24,34 +24,58 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using System.Collections.Generic;
-using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory.CSharp.Refactoring;
 using MonoDevelop.Ide.Gui;
 using ICSharpCode.NRefactory;
-using System.Threading;
-using MonoDevelop.Refactoring;
+using MonoDevelop.Ide.TypeSystem;
 
 namespace MonoDevelop.CSharp.Refactoring.CodeActions
 {
-	public class NRefactoryCodeAction : MonoDevelop.CodeActions.CodeAction
+	class NRefactoryCodeAction : MonoDevelop.CodeActions.CodeAction
 	{
-		readonly ICSharpCode.NRefactory.CSharp.Refactoring.CodeAction act;
+		readonly CodeAction act;
 		
-		public NRefactoryCodeAction (string id, string title, ICSharpCode.NRefactory.CSharp.Refactoring.CodeAction act)
+		public NRefactoryCodeAction (string id, string title, CodeAction act, object siblingKey = null)
 		{
 			this.IdString = id;
 			this.Title = title;
 			this.act = act;
+			this.SiblingKey = siblingKey;
+			this.Severity = act.Severity;
 			this.DocumentRegion = new Mono.TextEditor.DocumentRegion (act.Start, act.End);
 		}
 
-		public override void Run (Document document, TextLocation loc)
+		public override void Run (IRefactoringContext context, object script)
 		{
-			var context = new MDRefactoringContext (document, loc);
-			using (var script = context.StartScript ())
-				act.Run (script);
+			act.Run ((Script) script);
+		}
+
+		/// <summary>
+		/// All the sibling actions of this action, ie those actions which represent the same kind
+		/// of fix. This list includes the current action. 
+		/// </summary>
+		/// <value>The sibling actions.</value>
+		public IList<MonoDevelop.CodeActions.CodeAction> SiblingActions { get; set; }
+		
+		public override bool SupportsBatchRunning {
+			get{
+				return SiblingActions != null;// && SiblingActions.Count > 1;
+			}
+		}
+		
+		public override void BatchRun (Document document, TextLocation loc)
+		{
+			base.BatchRun (document, loc);
+			var context = MDRefactoringContext.Create (document, loc).Result;
+			if (context == null)
+				return;
+			using (var script = context.StartScript ()) {
+				foreach (var action in SiblingActions) {
+					context.SetLocation (action.DocumentRegion.Begin);
+					action.Run (context, script);
+				}
+			}
 		}
 	}
 	

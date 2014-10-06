@@ -39,7 +39,7 @@ namespace ICSharpCode.NRefactory.CSharp.TypeSystem
 		/// Should be incremented when fixing bugs so that project contents cached on disk
 		/// (which might be incorrect due to the bug) are re-created.
 		/// </summary>
-		internal const int version = 1;
+		internal const int version = 2;
 		
 		readonly CSharpUnresolvedFile unresolvedFile;
 		UsingScope usingScope;
@@ -779,7 +779,7 @@ namespace ICSharpCode.NRefactory.CSharp.TypeSystem
 			a.SymbolKind = SymbolKind.Accessor;
 			a.AccessorOwner = ev;
 			a.Region = ev.BodyRegion;
-			a.BodyRegion = ev.BodyRegion;
+			a.BodyRegion = DomRegion.Empty;
 			a.Accessibility = ev.Accessibility;
 			a.IsAbstract = ev.IsAbstract;
 			a.IsOverride = ev.IsOverride;
@@ -787,7 +787,7 @@ namespace ICSharpCode.NRefactory.CSharp.TypeSystem
 			a.IsStatic = ev.IsStatic;
 			a.IsSynthetic = ev.IsSynthetic;
 			a.IsVirtual = ev.IsVirtual;
-			a.HasBody = true;
+			a.HasBody = true; // even if it's compiler-generated; the body still exists
 			a.ReturnType = KnownTypeReference.Void;
 			a.Parameters.Add(valueParameter);
 			return a;
@@ -827,6 +827,7 @@ namespace ICSharpCode.NRefactory.CSharp.TypeSystem
 			td.IsAbstract = (modifiers & (Modifiers.Abstract | Modifiers.Static)) != 0;
 			td.IsSealed = (modifiers & (Modifiers.Sealed | Modifiers.Static)) != 0;
 			td.IsShadowing = (modifiers & Modifiers.New) != 0;
+			td.IsPartial = (modifiers & Modifiers.Partial) != 0;
 		}
 		
 		static void ApplyModifiers(AbstractUnresolvedMember m, Modifiers modifiers)
@@ -968,7 +969,7 @@ namespace ICSharpCode.NRefactory.CSharp.TypeSystem
 				return interningProvider.Intern(new SimpleConstantValue(targetType, pc.Value));
 			}
 			// cast to the desired type
-			return interningProvider.Intern(new ConstantCast(targetType, c));
+			return interningProvider.Intern(new ConstantCast(targetType, c, true));
 		}
 		
 		IConstantValue ConvertAttributeArgument(Expression expression)
@@ -1006,7 +1007,7 @@ namespace ICSharpCode.NRefactory.CSharp.TypeSystem
 			public override ConstantExpression VisitPrimitiveExpression(PrimitiveExpression primitiveExpression)
 			{
 				object val = interningProvider.InternValue(primitiveExpression.Value);
-				TypeCode typeCode = Type.GetTypeCode(val.GetType());
+				TypeCode typeCode = (val == null ? TypeCode.Object : Type.GetTypeCode(val.GetType()));
 				return interningProvider.Intern(
 					new PrimitiveConstantExpression(typeCode.ToTypeReference(), val));
 			}
@@ -1064,7 +1065,8 @@ namespace ICSharpCode.NRefactory.CSharp.TypeSystem
 				ConstantExpression v = castExpression.Expression.AcceptVisitor(this);
 				if (v == null)
 					return null;
-				return interningProvider.Intern(new ConstantCast(ConvertTypeReference(castExpression.Type), v));
+				var typeReference = ConvertTypeReference(castExpression.Type);
+				return interningProvider.Intern(new ConstantCast(typeReference, v, false));
 			}
 			
 			public override ConstantExpression VisitCheckedExpression(CheckedExpression checkedExpression)
@@ -1124,7 +1126,58 @@ namespace ICSharpCode.NRefactory.CSharp.TypeSystem
 					return null;
 				}
 			}
-			
+
+			public override ConstantExpression VisitObjectCreateExpression(ObjectCreateExpression objectCreateExpression)
+			{
+				if (!objectCreateExpression.Arguments.Any()) {
+					// built in primitive type constants can be created with new
+					// Todo: correctly resolve the type instead of doing the string approach
+					switch (objectCreateExpression.Type.ToString()) {
+						case "System.Boolean":
+						case "bool":
+							return new PrimitiveConstantExpression(KnownTypeReference.Boolean, new bool());
+						case "System.Char":
+						case "char":
+							return new PrimitiveConstantExpression(KnownTypeReference.Char, new char());
+						case "System.SByte":
+						case "sbyte":
+							return new PrimitiveConstantExpression(KnownTypeReference.SByte, new sbyte());
+						case "System.Byte":
+						case "byte":
+							return new PrimitiveConstantExpression(KnownTypeReference.Byte, new byte());
+						case "System.Int16":
+						case "short":
+							return new PrimitiveConstantExpression(KnownTypeReference.Int16, new short());
+						case "System.UInt16":
+						case "ushort":
+							return new PrimitiveConstantExpression(KnownTypeReference.UInt16, new ushort());
+						case "System.Int32":
+						case "int":
+							return new PrimitiveConstantExpression(KnownTypeReference.Int32, new int());
+						case "System.UInt32":
+						case "uint":
+							return new PrimitiveConstantExpression(KnownTypeReference.UInt32, new uint());
+						case "System.Int64":
+						case "long":
+							return new PrimitiveConstantExpression(KnownTypeReference.Int64, new long());
+						case "System.UInt64":
+						case "ulong":
+							return new PrimitiveConstantExpression(KnownTypeReference.UInt64, new ulong());
+						case "System.Single":
+						case "float":
+							return new PrimitiveConstantExpression(KnownTypeReference.Single, new float());
+						case "System.Double":
+						case "double":
+							return new PrimitiveConstantExpression(KnownTypeReference.Double, new double());
+						case "System.Decimal":
+						case "decimal":
+							return new PrimitiveConstantExpression(KnownTypeReference.Decimal, new decimal());
+					}
+				}
+
+				return null;
+			}
+
 			public override ConstantExpression VisitArrayCreateExpression(ArrayCreateExpression arrayCreateExpression)
 			{
 				var initializer = arrayCreateExpression.Initializer;

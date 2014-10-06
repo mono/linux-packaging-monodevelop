@@ -281,7 +281,7 @@ namespace MonoDevelop.SourceEditor
 			resultInformLabelEventBox.BorderWidth = 2;
 			resultInformLabel.Xpad = 2;
 			resultInformLabel.Show ();
-			searchEntry.FilterButtonPixbuf = new Gdk.Pixbuf (typeof(SearchAndReplaceWidget).Assembly, "searchoptions.png");
+			searchEntry.FilterButtonPixbuf = Xwt.Drawing.Image.FromResource ("searchoptions.png");
 
 			if (textEditor.IsSomethingSelected) {
 				if (textEditor.MainSelection.MinLine == textEditor.MainSelection.MaxLine) {
@@ -289,6 +289,7 @@ namespace MonoDevelop.SourceEditor
 				} else {
 					IsInSelectionSearchMode = true;
 					SelectionSegment = textEditor.SelectionRange;
+					SetSearchOptions ();
 				}
 			}
 			SetSearchPattern (SearchAndReplaceOptions.SearchPattern);
@@ -830,6 +831,8 @@ But I leave it in in the case I've missed something. Mike
 		{
 			textEditor.SearchPattern = SearchAndReplaceOptions.SearchPattern;
 			SearchResult result = textEditor.FindNext (true);
+			if (result == null)
+				return null;
 			textEditor.CenterToCaret ();
 
 			if (result == null) {
@@ -849,7 +852,8 @@ But I leave it in in the case I've missed something. Mike
 		{
 			textEditor.SearchPattern = SearchAndReplaceOptions.SearchPattern;
 			SearchResult result = textEditor.FindPrevious (true);
-
+			if (result == null)
+				return null;
 			textEditor.CenterToCaret ();
 			if (result == null) {
 				IdeApp.Workbench.StatusBar.ShowError (GettextCatalog.GetString ("Search pattern not found"));

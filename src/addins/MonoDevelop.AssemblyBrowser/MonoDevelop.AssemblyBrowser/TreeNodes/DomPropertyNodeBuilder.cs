@@ -61,18 +61,18 @@ namespace MonoDevelop.AssemblyBrowser
 			return property.Name;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			var property = (IUnresolvedProperty)dataObject;
 			try {
 				var resolved = Resolve (treeBuilder, property);
-				label = Ambience.GetString (resolved, OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup | OutputFlags.CompletionListFomat);
+				nodeInfo.Label = Ambience.GetString (resolved, OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup | OutputFlags.CompletionListFomat);
 			} catch (Exception) {
-				label = property.Name;
+				nodeInfo.Label = property.Name;
 			}
 			if (property.IsPrivate || property.IsInternal)
-				label = DomMethodNodeBuilder.FormatPrivate (label);
-			icon = ImageService.GetPixbuf (property.GetStockIcon (), Gtk.IconSize.Menu);
+				nodeInfo.Label = DomMethodNodeBuilder.FormatPrivate (nodeInfo.Label);
+			nodeInfo.Icon = Context.GetIcon (property.GetStockIcon ());
 		}
 		
 		public override void BuildChildNodes (ITreeBuilder ctx, object dataObject)

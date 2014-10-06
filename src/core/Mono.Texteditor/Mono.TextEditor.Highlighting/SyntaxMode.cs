@@ -60,16 +60,21 @@ namespace Mono.TextEditor.Highlighting
 
 		void HandleTextReplaced (object sender, DocumentChangeEventArgs e)
 		{
-			if (doc == null || doc.SuppressHighlightUpdate)
+			if (doc == null || doc.SuppressHighlightUpdate || doc.CurrentAtomicUndoOperationType == OperationType.Format)
 				return;
 			SyntaxModeService.StartUpdate (doc, this, e.Offset, e.Offset + e.InsertionLength);
 		}
 
-		void HandleTextSet (object sender, EventArgs e)
+		public void UpdateDocumentHighlighting ()
 		{
 			if (doc == null || doc.SuppressHighlightUpdate)
 				return;
 			SyntaxModeService.StartUpdate (doc, this, 0, doc.TextLength);
+		}
+
+		void HandleTextSet (object sender, EventArgs e)
+		{
+			UpdateDocumentHighlighting ();
 		}
 		
 		public event EventHandler DocumentSet;
@@ -195,12 +200,11 @@ namespace Mono.TextEditor.Highlighting
 
 		public class SpanParser
 		{
-			protected SyntaxMode mode;
+			protected readonly SyntaxMode mode;
 			protected CloneableStack<Span> spanStack;
 			protected Stack<Rule> ruleStack;
-			protected TextDocument doc;
+			protected readonly TextDocument doc;
 
-			internal Func<bool> IsAtWordStart = () => true;
 			int maxEnd;
 
 			public Rule CurRule {
@@ -252,6 +256,8 @@ namespace Mono.TextEditor.Highlighting
 				if (mode == null)
 					throw new ArgumentNullException ("mode");
 				this.doc  = mode.Document;
+				if (this.doc == null)
+					throw new ArgumentException ("Syntax mode isn't bound to any document.", "mode");
 				this.mode = mode;
 				this.SpanStack = spanStack;
 				this.CurRule = mode;
@@ -360,8 +366,10 @@ namespace Mono.TextEditor.Highlighting
 					bool mismatch = false;
 					if ((span.BeginFlags & SpanBeginFlags.FirstNonWs) == SpanBeginFlags.FirstNonWs)
 						mismatch = CurText.Take (i).Any (ch => !char.IsWhiteSpace (ch));
-					if ((span.BeginFlags & SpanBeginFlags.NewWord) == SpanBeginFlags.NewWord)
-						mismatch = !IsAtWordStart ();
+					if ((span.BeginFlags & SpanBeginFlags.NewWord) == SpanBeginFlags.NewWord) {
+						if (textOffset - 1 > 0 && textOffset - 1 < CurText.Length)
+							mismatch = !char.IsWhiteSpace (CurText [textOffset - 1]);
+					}
 					if (mismatch)
 						continue;
 					FoundSpanBegin (span, i, match.Length);
@@ -456,7 +464,6 @@ namespace Mono.TextEditor.Highlighting
 				spanParser.FoundSpanEnd = FoundSpanEnd;
 				spanParser.FoundSpanExit = FoundSpanExit;
 				spanParser.ParseChar += ParseChar;
-				spanParser.IsAtWordStart = () => wordbuilder.Length == 0;
 				if (line == null)
 					throw new ArgumentNullException ("line");
 			}
@@ -839,3 +846,4 @@ namespace Mono.TextEditor.Highlighting
 		}
 	}
 }
+

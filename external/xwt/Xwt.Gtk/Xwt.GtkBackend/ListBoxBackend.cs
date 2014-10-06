@@ -36,6 +36,15 @@ namespace Xwt.GtkBackend
 		public ListBoxBackend ()
 		{
 		}
+
+		public new bool GridLinesVisible {
+			get {
+				return (base.GridLinesVisible == Xwt.GridLines.Horizontal || base.GridLinesVisible == Xwt.GridLines.Both);
+			}
+			set {
+				base.GridLinesVisible = value ?  Xwt.GridLines.Horizontal : Xwt.GridLines.None;
+			}
+		}
 		
 		protected new IListBoxEventSink EventSink {
 			get { return (IListBoxEventSink)((WidgetBackend)this).EventSink; }
@@ -58,7 +67,7 @@ namespace Xwt.GtkBackend
 		{
 			theColumn.Clear ();
 			foreach (var v in views)
-				CellUtil.CreateCellRenderer (ApplicationContext, this, theColumn, v, Widget.Model);
+				CellUtil.CreateCellRenderer (ApplicationContext, Frontend, this, theColumn, v);
 		}
 		
 		public override void EnableEvent (object eventId)

@@ -60,9 +60,9 @@ namespace Mono.TextEditor
 		bool highlightCaretLine = false;
 		bool removeTrailingWhitespaces = true;
 		bool allowTabsAfterNonTabs = true;
-		bool useAntiAliasing = true;
 		string fontName = DEFAULT_FONT;
-		string colorStyle = "Default";
+		public static string DefaultColorStyle = "Default";
+		string colorStyle = DefaultColorStyle;
 		Pango.FontDescription font, gutterFont;
 		
 		double zoom = 1d;
@@ -444,18 +444,6 @@ namespace Mono.TextEditor
 			}
 		}
 		
-		public virtual bool UseAntiAliasing {
-			get {
-				return useAntiAliasing;
-			}
-			set {
-				if (useAntiAliasing != value) {
-					useAntiAliasing = value;
-					OnChanged (EventArgs.Empty);
-				}
-			}
-		}
-
 		bool drawIndentationMarkers = false;
 		public virtual bool DrawIndentationMarkers {
 			get {
@@ -498,7 +486,6 @@ namespace Mono.TextEditor
 		bool wrapLines = false;
 		public virtual bool WrapLines {
 			get {
-				// Doesn't work atm
 				return false;
 //				return wrapLines;
 			}
@@ -536,6 +523,19 @@ namespace Mono.TextEditor
 			}
 		}
 
+		bool generateFormattingUndoStep;
+		public virtual bool GenerateFormattingUndoStep {
+			get {
+				return generateFormattingUndoStep;
+			}
+			set {
+				if (generateFormattingUndoStep != value) {
+					generateFormattingUndoStep = value;
+					OnChanged (EventArgs.Empty);
+				}
+			}
+		}
+
 		public virtual ColorScheme GetColorStyle ()
 		{
 			return SyntaxModeService.GetColorStyle (ColorScheme);
@@ -561,10 +561,10 @@ namespace Mono.TextEditor
 			overrideDocumentEolMarker = other.overrideDocumentEolMarker;
 			defaultEolMarker = other.defaultEolMarker;
 			enableAnimations = other.enableAnimations;
-			useAntiAliasing = other.useAntiAliasing;
 			drawIndentationMarkers = other.drawIndentationMarkers;
 			showWhitespaces = other.showWhitespaces;
 			includeWhitespaces = other.includeWhitespaces;
+			generateFormattingUndoStep = other.generateFormattingUndoStep;
 			DisposeFont ();
 			OnChanged (EventArgs.Empty);
 		}

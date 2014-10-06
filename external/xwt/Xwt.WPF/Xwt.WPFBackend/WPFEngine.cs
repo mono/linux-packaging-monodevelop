@@ -42,6 +42,13 @@ namespace Xwt.WPFBackend
 	{
 		System.Windows.Application application;
 
+		public static WPFEngine Instance { get; private set; }
+
+		public WPFEngine ()
+		{
+			Instance = this;
+		}
+
 		public override void InitializeApplication ()
 		{
 			application = System.Windows.Application.Current;
@@ -108,6 +115,9 @@ namespace Xwt.WPFBackend
 			RegisterBackend<ISliderBackend, SliderBackend> ();
 			RegisterBackend<IScrollbarBackend, ScrollbarBackend> ();
 			RegisterBackend<IEmbeddedWidgetBackend, EmbedNativeWidgetBackend>();
+			RegisterBackend<IPasswordEntryBackend, PasswordEntryBackend> ();
+			RegisterBackend<IWebViewBackend, WebViewBackend> ();
+			RegisterBackend<KeyboardHandler, WpfKeyboardHandler> ();
 		}
 
 		public override void DispatchPendingEvents()
@@ -154,6 +164,13 @@ namespace Xwt.WPFBackend
 			return new WindowFrameBackend () {
 				Window = (System.Windows.Window) nativeWindow
 			};
+		}
+
+		public override object GetBackendForImage (object nativeImage)
+		{
+			if (nativeImage is WpfImage)
+				return nativeImage;
+			return ImageHandler.LoadFromImageSource ((System.Windows.Media.ImageSource) nativeImage);
 		}
 
 		public override object GetNativeWidget (Widget w)

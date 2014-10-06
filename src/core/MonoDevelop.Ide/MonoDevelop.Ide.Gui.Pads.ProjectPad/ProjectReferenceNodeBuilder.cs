@@ -37,6 +37,7 @@ using MonoDevelop.Ide.Commands;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Ide.Tasks;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
@@ -64,48 +65,36 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			return ((ProjectReference)dataObject).Reference;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			ProjectReference pref = (ProjectReference) dataObject;
 			
 			switch (pref.ReferenceType) {
-				case ReferenceType.Project:
-					label = pref.Reference;
-					icon = Context.GetIcon ("md-reference-project");
-					break;
-				case ReferenceType.Assembly:
-					label = Path.GetFileName(pref.Reference);
-					icon = Context.GetIcon ("md-reference-folder");
-					break;
-				case ReferenceType.Package:
-					label = pref.Reference.Split(',')[0];
-					icon = Context.GetIcon ("md-reference-package");
-					break;
-				default:
-					label = pref.Reference;
-					icon = Context.GetIcon (Stock.Reference);
-					break;
+			case ReferenceType.Project:
+				nodeInfo.Label = pref.Reference;
+				nodeInfo.Icon = Context.GetIcon ("md-reference-project");
+				break;
+			case ReferenceType.Assembly:
+				nodeInfo.Label = Path.GetFileName(pref.Reference);
+				nodeInfo.Icon = Context.GetIcon ("md-reference-folder");
+				break;
+			case ReferenceType.Package:
+				nodeInfo.Label = pref.Reference.Split(',')[0];
+				nodeInfo.Icon = Context.GetIcon ("md-reference-package");
+				break;
+			default:
+				nodeInfo.Label = pref.Reference;
+				nodeInfo.Icon = Context.GetIcon (Stock.Reference);
+				break;
 			}
 			
-			label = GLib.Markup.EscapeText (label);
+			nodeInfo.Label = GLib.Markup.EscapeText (nodeInfo.Label);
 
 			if (!pref.IsValid) {
-				label = "<span color='red'>" + label + "</span>";
-				icon = Context.GetIcon ("md-reference-warning");
+				nodeInfo.StatusSeverity = TaskSeverity.Error;
+				nodeInfo.DisabledStyle = true;
+				nodeInfo.StatusMessage = pref.ValidationErrorMessage;
 			}
-		}
-		
-		public override bool HasChildNodes (MonoDevelop.Ide.Gui.Components.ITreeBuilder builder, object dataObject)
-		{
-			ProjectReference pref = (ProjectReference) dataObject;
-			return !pref.IsValid;
-		}
-
-		public override void BuildChildNodes (MonoDevelop.Ide.Gui.Components.ITreeBuilder treeBuilder, object dataObject)
-		{
-			ProjectReference pref = (ProjectReference) dataObject;
-			if (!pref.IsValid)
-				treeBuilder.AddChild (new TreeViewItem (pref.ValidationErrorMessage, Gtk.Stock.DialogWarning));
 		}
 		
 		public override void OnNodeAdded (object dataObject)
@@ -126,8 +115,6 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			if (tb != null)
 				tb.UpdateAll ();
 		}
-
-
 	}
 	
 	class ProjectReferenceNodeCommandHandler: NodeCommandHandler
@@ -136,8 +123,10 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		{
 			ProjectReference pref = CurrentNode.DataItem as ProjectReference;
 			if (pref != null) {
-				foreach (string fileName in pref.GetReferencedFileNames (IdeApp.Workspace.ActiveConfiguration))
-					IdeApp.Workbench.OpenDocument (fileName);
+				foreach (string fileName in pref.GetReferencedFileNames (IdeApp.Workspace.ActiveConfiguration)) {
+					if (File.Exists (fileName))
+						IdeApp.Workbench.OpenDocument (fileName, pref.OwnerProject);
+				}
 			}
 		}
 				
@@ -231,7 +220,13 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				}
 			}
 		}
-		
+
+		[CommandHandler (FileCommands.ShowProperties)]
+		public void OnShowProperties ()
+		{
+			IdeApp.Workbench.Pads.PropertyPad.BringToFront (true);
+		}
+
 		public override DragOperation CanDragNode ()
 		{
 			return DragOperation.Copy;

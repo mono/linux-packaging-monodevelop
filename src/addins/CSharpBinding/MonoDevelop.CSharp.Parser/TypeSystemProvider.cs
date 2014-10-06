@@ -50,7 +50,7 @@ namespace MonoDevelop.CSharp.Parser
 
 			if (project != null) {
 				var projectFile = project.Files.GetFile (fileName);
-				if (projectFile != null && projectFile.BuildAction != BuildAction.Compile)
+				if (projectFile != null && !TypeSystemParserNode.IsCompileBuildAction (projectFile.BuildAction))
 					result.Flags |= ParsedDocumentFlags.NonSerializable;
 			}
 
@@ -84,7 +84,7 @@ namespace MonoDevelop.CSharp.Parser
 			result.ParsedFile = pf;
 			result.Add (GetSemanticTags (unit));
 
-			result.CreateRefactoringContext = (doc, token) => new MDRefactoringContext (doc, doc.Editor.Caret.Location, token);
+			result.CreateRefactoringContext = (doc, token) => MDRefactoringContext.Create (doc, doc.Editor.Caret.Location, token).Result;
 			result.CreateRefactoringContextWithEditor = (data, resolver, token) => new MDRefactoringContext ((DotNetProject)project, data, result, (CSharpAstResolver)resolver, TextLocation.Empty, token);
 
 			if (storeAst) {
@@ -377,7 +377,7 @@ namespace MonoDevelop.CSharp.Parser
 		public static ICSharpCode.NRefactory.CSharp.CompilerSettings GetCompilerArguments (MonoDevelop.Projects.Project project)
 		{
 			var compilerArguments = new ICSharpCode.NRefactory.CSharp.CompilerSettings ();
-	///		compilerArguments.TabSize = 1;
+	//		compilerArguments.TabSize = 1;
 
 			if (project == null || MonoDevelop.Ide.IdeApp.Workspace == null) {
 				compilerArguments.AllowUnsafeBlocks = true;
@@ -385,15 +385,15 @@ namespace MonoDevelop.CSharp.Parser
 			}
 
 			var configuration = project.GetConfiguration (MonoDevelop.Ide.IdeApp.Workspace.ActiveConfiguration) as DotNetProjectConfiguration;
-			var par = configuration != null ? configuration.CompilationParameters as CSharpCompilerParameters : null;
-			
+			if (configuration == null)
+				return compilerArguments;
+
+			foreach (var sym in configuration.GetDefineSymbols ())
+				compilerArguments.ConditionalSymbols.Add (sym);
+
+			var par = configuration.CompilationParameters as CSharpCompilerParameters;
 			if (par == null)
 				return compilerArguments;
-				
-			if (!string.IsNullOrEmpty (par.DefineSymbols)) {
-				foreach (var sym in par.DefineSymbols.Split (';', ',', ' ', '\t').Where (s => !string.IsNullOrWhiteSpace (s)))
-					compilerArguments.ConditionalSymbols.Add (sym);
-			}
 			
 			compilerArguments.AllowUnsafeBlocks = par.UnsafeCode;
 			compilerArguments.LanguageVersion = ConvertLanguageVersion (par.LangVersion);

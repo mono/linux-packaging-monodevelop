@@ -39,9 +39,11 @@ namespace Mono.TextEditor
 		internal const string LIBGOBJECT      = "libgobject-2.0-0.dll";
 		internal const string LIBPANGO        = "libpango-1.0-0.dll";
 		internal const string LIBPANGOCAIRO   = "libpangocairo-1.0-0.dll";
+		internal const string LIBQUARTZ       = "libgtk-quartz-2.0.dylib";
+		internal const string LIBGTKGLUE      = "gtksharpglue-2";
 		
 		/// <summary>
-		/// This doesn't leak Pango layouts, unlike some other ways to create them in GTK# <= 2.12.11
+		/// This doesn't leak Pango layouts, unlike some other ways to create them in GTK# &lt;= 2.12.11
 		/// </summary>
 		public static Pango.Layout CreateLayout (Widget widget)
 		{
@@ -223,7 +225,7 @@ namespace Mono.TextEditor
 		{
 			pango_layout_set_attributes (layout.Handle, list);
 		}
-		
+
 		[StructLayout (LayoutKind.Sequential)]
 		struct PangoAttribute
 		{

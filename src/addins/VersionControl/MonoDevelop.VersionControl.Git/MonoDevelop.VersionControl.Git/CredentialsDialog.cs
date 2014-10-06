@@ -23,18 +23,16 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-using System;
 using System.Linq;
 using System.Collections.Generic;
 using Gtk;
-using NGit;
 using NGit.Transport;
 
 namespace MonoDevelop.VersionControl.Git
 {
-	public partial class CredentialsDialog : Gtk.Dialog
+	partial class CredentialsDialog : Gtk.Dialog
 	{
-		CredentialItem.YesNoType singleYesNoCred;
+		readonly CredentialItem.YesNoType singleYesNoCred;
 		
 		public CredentialsDialog (URIish uri, IEnumerable<CredentialItem> credentials)
 		{
@@ -116,7 +114,7 @@ namespace MonoDevelop.VersionControl.Git
 		protected virtual void OnButtonNoClicked (object sender, System.EventArgs e)
 		{
 			singleYesNoCred.SetValue (false);
-			Respond (ResponseType.Ok);
+			Respond (ResponseType.Cancel);
 		}
 	}
 }

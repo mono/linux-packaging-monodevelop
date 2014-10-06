@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{9BC670A8-1851-40EC-9685-279F4C98433D}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -12,8 +12,7 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>True</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>True</Optimize>
+    <Optimize>false</Optimize>
     <OutputPath>..\..\..\..\build\AddIns\MonoDevelop.Deployment</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -21,9 +20,12 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DefineConstants>DEBUG</DefineConstants>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\..\build\AddIns\MonoDevelop.Deployment\MonoDevelop.Deployment.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\..\build\AddIns\MonoDevelop.Deployment</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -32,6 +34,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\..\build\AddIns\MonoDevelop.Deployment\MonoDevelop.Deployment.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -73,6 +78,11 @@
     <ProjectReference Include="..\..\..\..\external\mono-addins\Mono.Addins\Mono.Addins.csproj">
       <Project>{91DD5A2D-9FE3-4C3C-9253-876141874DAD}</Project>
       <Name>Mono.Addins</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
       <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
@@ -153,29 +163,35 @@
     <Compile Include="MonoDevelop.Deployment.Gui\SshFuseFileCopyConfigurationEditorWidget.cs" />
     <Compile Include="gtk-gui\MonoDevelop.Deployment.Gui.SshFuseFileCopyConfigurationEditorWidget.cs" />
     <Compile Include="MonoDevelop.Deployment.Gui\SshFuseFileCopyConfigurationEditor.cs" />
-    <Compile Include="MonoDevelop.Deployment\MD1Serializer.cs" />
+    <Compile Include="AddinInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="icons\light\package-16.png">
+      <LogicalName>package-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\package-16%402x.png">
+      <LogicalName>package-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\package-32.png">
+      <LogicalName>package-light-32.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\package-32%402x.png">
+      <LogicalName>package-light-32@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\package-48.png">
+      <LogicalName>package-light-48.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\package-48%402x.png">
+      <LogicalName>package-light-48@2x.png</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-x-generic.png">
-      <LogicalName>package-x-generic.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="templates\PackagingProject.xpt.xml">
       <LogicalName>PackagingProject.xpt.xml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="MonoDevelop.Deployment.addin.xml">
       <LogicalName>MonoDevelop.Deployment.addin.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\packaging-32.png">
-      <LogicalName>packaging-32.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\packaging-16.png">
-      <LogicalName>packaging-16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="md1format.xml">
-      <LogicalName>md1format.xml</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />

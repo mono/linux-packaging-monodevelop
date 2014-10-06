@@ -1,7 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.gtk-gui.gui.stetic
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.MonoDevelop.SourceEditor.addin.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor.MonoDevelop.SourceEditor.searchoptions.png
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/DisplayBindings/SourceEditor/MonoDevelop.SourceEditor2.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor2.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/MonoDevelop.SourceEditor2/obj/Debug/MonoDevelop.SourceEditor2.dll.mdb

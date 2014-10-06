@@ -4,7 +4,6 @@ using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.WebReferences.Commands;
 using MonoDevelop.Ide.Gui.Components;
-using MonoDevelop.Ide;
 
 namespace MonoDevelop.WebReferences.NodeBuilders
 {
@@ -27,7 +26,7 @@ namespace MonoDevelop.WebReferences.NodeBuilders
 		}
 		
 		/// <summary>Gets the Addin path for the context menu for the WebReferenceFolderNodeBuilder.</summary>
-		/// <value>A string containing the AddIn path for the context menu for the WebReferenceFolderNodeBuilder.</summary>
+		/// <value>A string containing the AddIn path for the context menu for the WebReferenceFolderNodeBuilder.</value>
 		public override string ContextMenuAddinPath 
 		{
 			get { return "/MonoDevelop/WebReferences/ContextMenu/ProjectPad/WebReferenceFolder"; }
@@ -48,11 +47,12 @@ namespace MonoDevelop.WebReferences.NodeBuilders
 		/// <param name="label">A string containing the label of the node.</param>
 		/// <param name="icon">A Pixbif containing the icon for the node.</param>
 		/// <param name="closedIcon">A Pixbif containing the closed icon for the node.</param>
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
-			label = GettextCatalog.GetString ("Web References");
-			icon = Context.GetIcon (Stock.OpenReferenceFolder);
-			closedIcon = Context.GetIcon (Stock.ClosedReferenceFolder);
+			var folder = (WebReferenceFolder) dataObject;
+			nodeInfo.Label = folder.IsWCF ? GettextCatalog.GetString ("Web Services") : GettextCatalog.GetString ("Web References");
+			nodeInfo.Icon = Context.GetIcon (Stock.OpenReferenceFolder);
+			nodeInfo.ClosedIcon = Context.GetIcon (Stock.ClosedReferenceFolder);
 			
 		}
 		
@@ -65,13 +65,17 @@ namespace MonoDevelop.WebReferences.NodeBuilders
 		}
 		
 		/// <summary>Add entries for all the web references in the project to the tree builder.</summary>
-		/// <param name="builder">An ITreeBuilder containing all the data for the current DotNet project.</param>
+		/// <param name="treeBuilder">An ITreeBuilder containing all the data for the current DotNet project.</param>
 		/// <param name="dataObject">An object containing the data for the current node in the tree.</param>
-		public override void BuildChildNodes (ITreeBuilder builder, object dataObject)
+		public override void BuildChildNodes (ITreeBuilder treeBuilder, object dataObject)
 		{
-			WebReferenceFolder folder = (WebReferenceFolder) dataObject;
-			foreach (WebReferenceItem item in WebReferencesService.GetWebReferenceItems (folder.Project))
-				builder.AddChild(item);
+			var folder = (WebReferenceFolder) dataObject;
+			if (folder.IsWCF)
+				foreach (WebReferenceItem item in WebReferencesService.GetWebReferenceItemsWCF (folder.Project))
+					treeBuilder.AddChild(item);
+			else
+				foreach (WebReferenceItem item in WebReferencesService.GetWebReferenceItemsWS (folder.Project))
+					treeBuilder.AddChild(item);
 		}
 		
 		/// <summary>Compare two object with one another and returns a number based on their sort order.</summary>

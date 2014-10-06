@@ -31,6 +31,7 @@ using System.Text;
 using System.Windows;
 using SWC = System.Windows.Controls;
 using SWM = System.Windows.Media;
+using SWD = System.Windows.Documents;
 
 using Xwt.Backends;
 
@@ -47,6 +48,22 @@ namespace Xwt.WPFBackend
 			get { return (WpfLabel)Widget; }
 		}
 
+		new ILabelEventSink EventSink
+		{
+			get { return (ILabelEventSink)base.EventSink; }
+		}
+
+		public override Size GetPreferredSize (SizeConstraint widthConstraint, SizeConstraint heightConstraint)
+		{
+			var s = base.GetPreferredSize (widthConstraint, heightConstraint);
+
+			// If the label is ellipsized or can wrap then the width can't be dermined unless we have a constraint.
+			// If there is no constraint, just return the smallest size
+			if (!widthConstraint.IsConstrained && (Wrap != WrapMode.None || Ellipsize != EllipsizeMode.None))
+				s.Width = 1;
+			return s;
+		}
+
 		public string Text {
 			get { return Label.TextBlock.Text; }
 			set {
@@ -57,6 +74,95 @@ namespace Xwt.WPFBackend
 
 		public void SetFormattedText (FormattedText text)
 		{
+			var atts = new List<Drawing.TextAttribute> (text.Attributes);
+			atts.Sort ((a, b) => {
+				var c = a.StartIndex.CompareTo (b.StartIndex);
+				if (c == 0)
+					c = -(a.Count.CompareTo (b.Count));
+				return c;
+			});
+
+			int i = 0, attrIndex = 0;
+			Label.TextBlock.Inlines.Clear ();
+			GenerateBlocks (Label.TextBlock.Inlines, text.Text, ref i, text.Text.Length, atts, ref attrIndex);
+		}
+
+		void GenerateBlocks (SWD.InlineCollection col, string text, ref int i, int spanEnd, List<Drawing.TextAttribute> attributes, ref int attrIndex)
+		{
+			while (attrIndex < attributes.Count) {
+				var at = attributes[attrIndex];
+				if (at.StartIndex > spanEnd) {
+					FlushText (col, text, ref i, spanEnd);
+					return;
+				}
+
+				FlushText (col, text, ref i, at.StartIndex);
+
+				var s = new SWD.Span ();
+
+				if (at is Drawing.BackgroundTextAttribute) {
+					s.Background = new SWM.SolidColorBrush (((Drawing.BackgroundTextAttribute)at).Color.ToWpfColor ());
+				}
+				else if (at is Drawing.FontWeightTextAttribute) {
+					s.FontWeight = ((Drawing.FontWeightTextAttribute)at).Weight.ToWpfFontWeight ();
+				}
+				else if (at is Drawing.FontStyleTextAttribute) {
+					s.FontStyle = ((Drawing.FontStyleTextAttribute)at).Style.ToWpfFontStyle ();
+				}
+				else if (at is Drawing.UnderlineTextAttribute) {
+					var xa = (Drawing.UnderlineTextAttribute)at;
+					var dec = new TextDecoration (TextDecorationLocation.Underline, null, 0, TextDecorationUnit.FontRecommended, TextDecorationUnit.FontRecommended);
+					s.TextDecorations.Add (dec);
+				}
+				else if (at is Drawing.StrikethroughTextAttribute) {
+					var xa = (Drawing.UnderlineTextAttribute)at;
+					var dec = new TextDecoration (TextDecorationLocation.Strikethrough, null, 0, TextDecorationUnit.FontRecommended, TextDecorationUnit.FontRecommended);
+					s.TextDecorations.Add (dec);
+				}
+				else if (at is Drawing.FontTextAttribute) {
+					var xa = (Drawing.FontTextAttribute)at;
+					s.FontFamily = new SWM.FontFamily (xa.Font.Family);
+					s.FontSize = WpfFontBackendHandler.GetPointsFromDeviceUnits (xa.Font.Size);
+					s.FontStretch = xa.Font.Stretch.ToWpfFontStretch ();
+					s.FontStyle = xa.Font.Style.ToWpfFontStyle ();
+					s.FontWeight = xa.Font.Weight.ToWpfFontWeight ();
+				}
+				else if (at is Drawing.ColorTextAttribute) {
+					s.Foreground = new SWM.SolidColorBrush (((Drawing.ColorTextAttribute)at).Color.ToWpfColor ());
+				}
+				else if (at is Drawing.LinkTextAttribute) {
+					var link = new SWD.Hyperlink () {
+						NavigateUri = ((Drawing.LinkTextAttribute)at).Target
+					};
+					link.RequestNavigate += new System.Windows.Navigation.RequestNavigateEventHandler (link_RequestNavigate);
+					s = link;
+				}
+
+				col.Add (s);
+
+				var max = i + at.Count;
+				if (max > spanEnd)
+					max = spanEnd;
+
+				attrIndex++;
+				GenerateBlocks (s.Inlines, text, ref i, i + at.Count, attributes, ref attrIndex);
+			}
+			FlushText (col, text, ref i, spanEnd);
+		}
+
+		void link_RequestNavigate (object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+		{
+			Context.InvokeUserCode (delegate {
+				EventSink.OnLinkClicked (e.Uri);
+			});
+		}
+
+		void FlushText (SWD.InlineCollection col, string text, ref int i, int pos)
+		{
+			if (pos > i) {
+				col.Add (text.Substring (i, pos - i));
+				i = pos;
+			}
 		}
 
 		public Xwt.Drawing.Color TextColor {
@@ -75,7 +181,10 @@ namespace Xwt.WPFBackend
 
 		public Alignment TextAlignment {
 			get { return DataConverter.ToXwtAlignment (Label.HorizontalContentAlignment); }
-			set { Label.HorizontalContentAlignment = DataConverter.ToWpfAlignment (value); }
+			set { 
+				Label.HorizontalContentAlignment = DataConverter.ToWpfAlignment (value); 
+				Label.TextBlock.TextAlignment = DataConverter.ToTextAlignment (value);
+			}
 		}
 
 		public EllipsizeMode Ellipsize {
@@ -90,6 +199,7 @@ namespace Xwt.WPFBackend
 					Label.TextBlock.TextTrimming = TextTrimming.None;
 				else
 					Label.TextBlock.TextTrimming = TextTrimming.CharacterEllipsis;
+				Widget.InvalidateMeasure ();
 			}
 		}
 
@@ -115,6 +225,7 @@ namespace Xwt.WPFBackend
 			TextBlock = new SWC.TextBlock ();
 			Content = TextBlock;
 			Padding = new Thickness (0);
+			VerticalContentAlignment = System.Windows.VerticalAlignment.Center;
 		}
 
 		public WidgetBackend Backend { get; set; }

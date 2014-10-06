@@ -1,6 +1,4 @@
-
 using System;
-using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +9,8 @@ namespace MonoDevelop.VersionControl
 	public class ChangeSet
 	{
 		string globalComment = string.Empty;
+		// Commits should be atomic and small. Therefore having a List instead
+		// of a HashSet should be faster in most cases.
 		List<ChangeSetItem> items = new List<ChangeSetItem> ();
 		Repository repo;
 		FilePath basePath;
@@ -19,13 +19,13 @@ namespace MonoDevelop.VersionControl
 		internal protected ChangeSet (Repository repo, FilePath basePath)
 		{
 			this.repo = repo;
-			
-			//make sure the base path has a trailign slash, or ChangeLogWriter's
-			//GetDirectoryName call on it will take us up a directory
+
+			// Make sure the path has a trailing slash or the ChangeLogWriter's
+			// call to GetDirectoryName will take us one extra directory up.
 			string bp = basePath.ToString ();
-			if (bp[bp.Length -1] != System.IO.Path.DirectorySeparatorChar)
+			if (bp [bp.Length - 1] != System.IO.Path.DirectorySeparatorChar)
 				basePath = bp + System.IO.Path.DirectorySeparatorChar;
-			
+
 			this.basePath = basePath;
 		}
 		
@@ -57,13 +57,13 @@ namespace MonoDevelop.VersionControl
 		
 		public string GenerateGlobalComment (CommitMessageFormat format, MonoDevelop.Projects.AuthorInformation userInfo)
 		{
-			return GeneratePathComment (basePath, items, format, userInfo);
+			return GeneratePathComment (basePath.FullPath, items, format, userInfo);
 		}
 		
 		public string GeneratePathComment (string path, IEnumerable<ChangeSetItem> items, 
 			CommitMessageFormat messageFormat, MonoDevelop.Projects.AuthorInformation userInfo)
 		{
-			ChangeLogWriter writer = new ChangeLogWriter (path, userInfo);
+			var writer = new ChangeLogWriter (path, userInfo);
 			writer.MessageFormat = messageFormat;
 			
 			foreach (ChangeSetItem item in items) {
@@ -87,8 +87,8 @@ namespace MonoDevelop.VersionControl
 
 		public bool ContainsFile (FilePath fileName)
 		{
-			for (int n=0; n<items.Count; n++)
-				if (items [n].LocalPath == fileName)
+			foreach (var item in items)
+				if (item.LocalPath == fileName)
 					return true;
 			return false;
 		}
@@ -100,7 +100,11 @@ namespace MonoDevelop.VersionControl
 		
 		public ChangeSetItem AddFile (VersionInfo fileVersionInfo)
 		{
-			ChangeSetItem item = new ChangeSetItem (fileVersionInfo);
+			ChangeSetItem item = GetFileItem (fileVersionInfo.LocalPath);
+			if (item != null)
+				return item;
+
+			item = new ChangeSetItem (fileVersionInfo);
 			items.Add (item);
 			return item;
 		}
@@ -136,7 +140,7 @@ namespace MonoDevelop.VersionControl
 		
 		public ChangeSet Clone ()
 		{
-			ChangeSet cs = (ChangeSet) MemberwiseClone ();
+			var cs = (ChangeSet) MemberwiseClone ();
 			cs.CopyFrom (this);
 			return cs;
 		}
@@ -163,7 +167,7 @@ namespace MonoDevelop.VersionControl
 		public string Comment {
 			get {
 				string txt = VersionControlService.GetCommitComment (LocalPath);
-				return txt != null ? txt : String.Empty;
+				return txt ?? String.Empty;
 			}
 			set { VersionControlService.SetCommitComment (LocalPath, value, true); }
 		}
@@ -186,7 +190,7 @@ namespace MonoDevelop.VersionControl
 		
 		public ChangeSetItem Clone ()
 		{
-			ChangeSetItem cs = (ChangeSetItem) MemberwiseClone ();
+			var cs = (ChangeSetItem) MemberwiseClone ();
 			cs.CopyFrom (this);
 			return cs;
 		}

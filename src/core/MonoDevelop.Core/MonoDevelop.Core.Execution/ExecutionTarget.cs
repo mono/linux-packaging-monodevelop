@@ -23,7 +23,10 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
 using System;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace MonoDevelop.Core.Execution
 {
@@ -32,15 +35,30 @@ namespace MonoDevelop.Core.Execution
 	/// </summary>
 	public abstract class ExecutionTarget
 	{
+		protected ExecutionTarget ()
+		{
+			this.Enabled = true;	
+		}
+
 		/// <summary>
 		/// Display name of the device
 		/// </summary>
 		public abstract string Name { get; }
 
 		/// <summary>
+		/// The display name of the item when it is selected
+		/// </summary>
+		public virtual string FullName { get { return Name; } }
+
+		/// <summary>
 		/// Unique identifier of the target
 		/// </summary>
 		public abstract string Id { get; }
+
+		/// <summary>
+		/// Gets or sets a value indicating whether this <see cref="MonoDevelop.Core.Execution.ExecutionTarget"/> is enabled.
+		/// </summary>
+		public bool Enabled { get; set; }
 
 		public override bool Equals (object obj)
 		{
@@ -52,6 +70,110 @@ namespace MonoDevelop.Core.Execution
 		{
 			return Id.GetHashCode ();
 		}
+
+		public override string ToString ()
+		{
+			return string.Format ("[ExecutionTarget: Name={0}, FullName={1}, Id={2}]", Name, FullName, Id);
+		}
+	}
+
+	public class ExecutionTargetGroup : ExecutionTarget, IList<ExecutionTarget>
+	{
+		List<ExecutionTarget> targets;
+		string name, id;
+
+		public ExecutionTargetGroup (string name, string id)
+		{
+			targets = new List<ExecutionTarget> ();
+			this.name = name;
+			this.id = id;
+		}
+
+		public override string Name {
+			get { return name; }
+		}
+
+		public override string Id {
+			get { return id; }
+		}
+
+		#region IList implementation
+
+		public int IndexOf (ExecutionTarget target)
+		{
+			return targets.IndexOf (target);
+		}
+
+		public void Insert (int index, ExecutionTarget target)
+		{
+			targets.Insert (index, target);
+		}
+
+		public void RemoveAt (int index)
+		{
+			targets.RemoveAt (index);
+		}
+
+		public ExecutionTarget this [int index] {
+			get { return targets[index]; }
+			set { targets[index] = value; }
+		}
+
+		#endregion
+
+		#region ICollection implementation
+
+		public void Add (ExecutionTarget target)
+		{
+			targets.Add (target);
+		}
+
+		public void Clear ()
+		{
+			targets.Clear ();
+		}
+
+		public bool Contains (ExecutionTarget target)
+		{
+			return targets.Contains (target);
+		}
+
+		public void CopyTo (ExecutionTarget[] array, int arrayIndex)
+		{
+			targets.CopyTo (array, arrayIndex);
+		}
+
+		public bool Remove (ExecutionTarget target)
+		{
+			return targets.Remove (target);
+		}
+
+		public int Count {
+			get { return targets.Count; }
+		}
+
+		public bool IsReadOnly {
+			get { return false; }
+		}
+
+		#endregion
+
+		#region IEnumerable implementation
+
+		public IEnumerator<ExecutionTarget> GetEnumerator ()
+		{
+			return targets.GetEnumerator ();
+		}
+
+		#endregion
+
+		#region IEnumerable implementation
+
+		IEnumerator IEnumerable.GetEnumerator ()
+		{
+			return targets.GetEnumerator ();
+		}
+
+		#endregion
 	}
 }
-

@@ -12,7 +12,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
     <NoStdLib>False</NoStdLib>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
     <RunCodeAnalysis>False</RunCodeAnalysis>
     <CodeAnalysisRules>-Microsoft.Design#CA1000;-Microsoft.Design#CA1004;-Microsoft.Design#CA1005;-Microsoft.Design#CA1006;-Microsoft.Design#CA1026;-Microsoft.Design#CA1033;-Microsoft.Design#CA1051;-Microsoft.Design#CA1063;-Microsoft.Naming#CA1702;-Microsoft.Naming#CA1704;-Microsoft.Naming#CA1710;-Microsoft.Naming#CA1716;-Microsoft.Naming#CA1720;-Microsoft.Performance#CA1800;-Microsoft.Security#CA2104</CodeAnalysisRules>
     <SignAssembly>True</SignAssembly>
@@ -23,6 +23,8 @@
     <NoWarn>1591</NoWarn>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
     <DocumentationFile>..\bin\$(Configuration)\ICSharpCode.NRefactory.xml</DocumentationFile>
+    <NoWin32Manifest>False</NoWin32Manifest>
+    <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Platform)' == 'AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -41,6 +43,7 @@
     <Optimize>True</Optimize>
     <DefineConstants>TRACE</DefineConstants>
     <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+    <BaseIntermediateOutputPath>obj\</BaseIntermediateOutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugType>full</DebugType>
@@ -48,7 +51,7 @@
     <OutputPath>..\bin\Debug\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>PdbOnly</DebugType>
     <OutputPath>..\bin\Release\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'net_4_5_Debug' ">
@@ -146,12 +149,14 @@
     <Compile Include="TypeSystem\DefaultSolutionSnapshot.cs" />
     <Compile Include="TypeSystem\DomRegion.cs" />
     <Compile Include="TypeSystem\EntityType.cs" />
+    <Compile Include="TypeSystem\ICodeContext.cs" />
     <Compile Include="TypeSystem\Implementation\BlobReader.cs" />
     <Compile Include="TypeSystem\Implementation\DefaultVariable.cs" />
     <Compile Include="TypeSystem\Implementation\ResolvedAttributeBlob.cs" />
     <Compile Include="TypeSystem\Implementation\UnresolvedAttributeBlob.cs" />
     <Compile Include="TypeSystem\Implementation\UnresolvedSecurityDeclarationBlob.cs" />
     <Compile Include="TypeSystem\ISymbol.cs" />
+    <Compile Include="TypeSystem\TaskType.cs" />
     <Compile Include="TypeSystem\TypeParameterSubstitution.cs" />
     <Compile Include="TypeSystem\TypeSystemExtensions.cs" />
     <Compile Include="TypeSystem\FullTypeName.cs" />
@@ -286,6 +291,9 @@
     <Compile Include="TypeSystem\AssemblyLoader.cs" />
     <Compile Include="Editor\UnicodeNewline.cs" />
     <Compile Include="Completion\FrameworkLookup.cs" />
+    <Compile Include="Utils\ComparableList.cs" />
+    <Compile Include="PatternMatching\AnyNodeOrNull.cs" />
+    <Compile Include="Editor\ITextPasteHandler.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Completion\" />

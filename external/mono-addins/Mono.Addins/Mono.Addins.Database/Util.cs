@@ -73,8 +73,9 @@ namespace Mono.Addins.Database
 		{
 			string testFile = null;
 			int n = 0;
+			var random = new Random ();
 			do {
-				testFile = Path.Combine (path, new Random ().Next ().ToString ());
+				testFile = Path.Combine (path, random.Next ().ToString ());
 				n++;
 			} while (File.Exists (testFile) && n < 100);
 			if (n == 100)
@@ -243,6 +244,16 @@ namespace Mono.Addins.Database
 				yield return gacDir + "_64";
 			if (Directory.Exists (gacDir + "_MSIL"))
 				yield return gacDir + "_MSIL";
+		}
+
+		internal static bool IsManagedAssembly (string file)
+		{
+			try {
+				AssemblyName.GetAssemblyName (file);
+				return true;
+			} catch (BadImageFormatException) {
+				return false;
+			}
 		}
 	}
 }

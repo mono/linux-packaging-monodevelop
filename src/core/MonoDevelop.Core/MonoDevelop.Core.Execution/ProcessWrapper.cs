@@ -20,6 +20,7 @@ namespace MonoDevelop.Core.Execution
 		public ProcessWrapper ()
 		{
 		}
+		public bool CancelRequested { get; private set; }
 		
 		public new void Start ()
 		{
@@ -114,8 +115,15 @@ namespace MonoDevelop.Core.Execution
 				endEventErr.Close ();
 				endEventOut = endEventErr = null;
 			}
-			
-			base.Dispose (disposing);
+
+			// HACK: try/catch is a workaround for broken Process.Dispose implementation in Mono < 3.2.7
+			// https://bugzilla.xamarin.com/show_bug.cgi?id=10883
+			try {
+				base.Dispose (disposing);
+			} catch {
+				if (disposing)
+					throw;
+			}
 		}
 		
 		void CheckDisposed ()
@@ -137,6 +145,7 @@ namespace MonoDevelop.Core.Execution
 			try {
 				if (!done) {
 					try {
+						CancelRequested = true;
 						this.KillProcessTree ();
 					} catch {
 						// Ignore

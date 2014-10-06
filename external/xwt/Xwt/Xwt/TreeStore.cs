@@ -92,6 +92,18 @@ namespace Xwt
 			var pos = Backend.AddChild (position);
 			return new TreeNavigator (Backend, pos);
 		}
+
+		public TreeNavigator InsertNodeAfter (TreePosition positon)
+		{
+			var pos = Backend.InsertAfter (positon);
+			return new TreeNavigator (Backend, pos);
+		}
+
+		public TreeNavigator InsertNodeBefore (TreePosition positon)
+		{
+			var pos = Backend.InsertBefore (positon);
+			return new TreeNavigator (Backend, pos);
+		}
 		
 		public void Clear ()
 		{
@@ -257,6 +269,8 @@ namespace Xwt
 			} else {
 				NodePosition np = GetPosition (pos);
 				Node n = np.ParentList[np.NodeIndex];
+				if (n.Children == null || index >= n.Children.Count)
+					return null;
 				return new NodePosition () { ParentList = n.Children, NodeId = n.Children[index].NodeId, NodeIndex = index, StoreVersion = version };
 			}
 		}

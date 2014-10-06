@@ -23,7 +23,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-
+//#define PROFILE
 using System;
 using System.Linq;
 using MonoDevelop.AnalysisCore;
@@ -41,18 +41,28 @@ using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.CodeIssues;
 using Mono.TextEditor;
 using ICSharpCode.NRefactory.Refactoring;
+using MonoDevelop.CodeActions;
+using System.Diagnostics;
 
 namespace MonoDevelop.CodeIssues
 {
 	public static class CodeAnalysisRunner
 	{
+		static IEnumerable<BaseCodeIssueProvider> EnumerateProvider (CodeIssueProvider p)
+		{
+			if (p.HasSubIssues)
+				return p.SubIssues;
+			return new BaseCodeIssueProvider[] { p };
+		}
+
 		public static IEnumerable<Result> Check (Document input, CancellationToken cancellationToken)
 		{
-			if (!QuickTaskStrip.EnableFancyFeatures)
+			if (!QuickTaskStrip.EnableFancyFeatures || input.Project == null || !input.IsCompileableInProject)
 				return Enumerable.Empty<Result> ();
 
-//			var now = DateTime.Now;
-
+			#if PROFILE
+			var runList = new List<Tuple<long, string>> ();
+			#endif
 			var editor = input.Editor;
 			if (editor == null)
 				return Enumerable.Empty<Result> ();
@@ -62,39 +72,61 @@ namespace MonoDevelop.CodeIssues
 			var codeIssueProvider = RefactoringService.GetInspectors (editor.Document.MimeType).ToArray ();
 			var context = input.ParsedDocument.CreateRefactoringContext != null ?
 				input.ParsedDocument.CreateRefactoringContext (input, cancellationToken) : null;
-//			Console.WriteLine ("start check:"+ (DateTime.Now - now).TotalMilliseconds);
-			Parallel.ForEach (codeIssueProvider, (provider) => {
+			Parallel.ForEach (codeIssueProvider, (parentProvider) => {
 				try {
-					var severity = provider.GetSeverity ();
-					if (severity == Severity.None)
-						return;
-//					var now2 = DateTime.Now;
-					foreach (var r in provider.GetIssues (context, cancellationToken)) {
-						var fixes = new List<GenericFix> (r.Actions.Where (a => a != null).Select (a => 
-							new GenericFix (
-								a.Title,
-								new System.Action (() => a.Run (input, loc))) {
-								DocumentRegion = new DocumentRegion (r.Region.Begin, r.Region.End)
-						}));
-						result.Add (new InspectorResults (
-							provider, 
-							r.Region, 
-							r.Description,
-							severity, 
-							provider.IssueMarker,
-							fixes.ToArray ()
-						));
+					#if PROFILE
+					var clock = new Stopwatch();
+					clock.Start ();
+					#endif
+					foreach (var provider in EnumerateProvider (parentProvider)) {
+						var severity = provider.GetSeverity ();
+						if (severity == Severity.None || !provider.GetIsEnabled ())
+							continue;
+						foreach (var r in provider.GetIssues (context, cancellationToken)) {
+							var fixes = r.Actions == null ? new List<GenericFix> () : new List<GenericFix> (r.Actions.Where (a => a != null).Select (a => {
+								Action batchAction = null;
+								if (a.SupportsBatchRunning)
+									batchAction = () => a.BatchRun (input, loc);
+								return new GenericFix (
+									a.Title,
+									() => {
+										using (var script = context.CreateScript ()) {
+											a.Run (context, script);
+										}
+									},
+									batchAction) {
+									DocumentRegion = new DocumentRegion (r.Region.Begin, r.Region.End),
+									IdString = a.IdString
+								};
+							}));
+							result.Add (new InspectorResults (
+								provider, 
+								r.Region, 
+								r.Description,
+								severity, 
+								r.IssueMarker,
+								fixes.ToArray ()
+							));
+						}
 					}
-/*					var ms = (DateTime.Now - now2).TotalMilliseconds;
-					if (ms > 1000)
-						Console.WriteLine (ms +"\t\t"+ provider.Title);*/
+					#if PROFILE
+					clock.Stop ();
+					lock (runList) {
+						runList.Add (Tuple.Create (clock.ElapsedMilliseconds, parentProvider.Title)); 
+					}
+					#endif
 				} catch (OperationCanceledException) {
 					//ignore
 				} catch (Exception e) {
-					LoggingService.LogError ("CodeAnalysis: Got exception in inspector '" + provider + "'", e);
+					LoggingService.LogError ("CodeAnalysis: Got exception in inspector '" + parentProvider + "'", e);
 				}
 			});
-//			Console.WriteLine ("END check:"+ (DateTime.Now - now).TotalMilliseconds);
+#if PROFILE
+			runList.Sort ();
+			foreach (var item in runList) {
+				Console.WriteLine (item.Item1 +"ms\t: " + item.Item2);
+			}
+#endif
 			return result;
 		}
 	}

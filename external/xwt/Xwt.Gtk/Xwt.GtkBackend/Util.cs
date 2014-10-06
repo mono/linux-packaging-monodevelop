@@ -49,6 +49,11 @@ namespace Xwt.GtkBackend
 				iconSizes[i].Width = w;
 				iconSizes[i].Height = h;
 			}
+			if (Platform.IsWindows) {
+				// Workaround for an issue in GTK for Windows. In windows Menu-sized icons are not 16x16, but 14x14
+				iconSizes[(int)Gtk.IconSize.Menu].Width = 16;
+				iconSizes[(int)Gtk.IconSize.Menu].Height = 16;
+			}
 		}
 
 		public static void SetDragData (TransferDataSource data, Gtk.DragDataGetArgs args)
@@ -200,85 +205,7 @@ namespace Xwt.GtkBackend
 				throw new NotSupportedException ("Unknown image: " + id);
 			return new GtkImage (res);
 		}
-		
-		public static Gtk.IconSize ToGtkSize (Xwt.IconSize size)
-		{
-			switch (size) {
-			case IconSize.Small:
-				return Gtk.IconSize.Menu;
-			case IconSize.Medium:
-				return Gtk.IconSize.Button;
-			case IconSize.Large:
-				return Gtk.IconSize.Dialog;
-			}
-			return Gtk.IconSize.Dialog;
-		}
-		
-		public static Gdk.Color ToGdkColor (this Xwt.Drawing.Color color)
-		{
-			return new Gdk.Color ((byte)(color.Red * 255), (byte)(color.Green * 255), (byte)(color.Blue * 255));
-		}
-		
-		public static Color ToXwtColor (this Gdk.Color color)
-		{
-			return new Color ((double)color.Red / (double)ushort.MaxValue, (double)color.Green / (double)ushort.MaxValue, (double)color.Blue / (double)ushort.MaxValue);
-		}
-		
-		public static ScrollPolicy ConvertScrollPolicy (Gtk.PolicyType p)
-		{
-			switch (p) {
-			case Gtk.PolicyType.Always:
-				return ScrollPolicy.Always;
-			case Gtk.PolicyType.Automatic:
-				return ScrollPolicy.Automatic;
-			case Gtk.PolicyType.Never:
-				return ScrollPolicy.Never;
-			}
-			throw new InvalidOperationException ("Invalid policy value:" + p);
-		}
-		
-		public static Gtk.PolicyType ConvertScrollPolicy (ScrollPolicy p)
-		{
-			switch (p) {
-			case ScrollPolicy.Always:
-				return Gtk.PolicyType.Always;
-			case ScrollPolicy.Automatic:
-				return Gtk.PolicyType.Automatic;
-			case ScrollPolicy.Never:
-				return Gtk.PolicyType.Never;
-			}
-			throw new InvalidOperationException ("Invalid policy value:" + p);
-		}
 
-        public static ScrollDirection ConvertScrollDirection(Gdk.ScrollDirection d)
-        {
-            switch(d) {
-            case Gdk.ScrollDirection.Up:
-                return Xwt.ScrollDirection.Up;
-            case Gdk.ScrollDirection.Down:
-                return Xwt.ScrollDirection.Down;
-            case Gdk.ScrollDirection.Left:
-                return Xwt.ScrollDirection.Left;
-            case Gdk.ScrollDirection.Right:
-                return Xwt.ScrollDirection.Right;
-            }
-            throw new InvalidOperationException("Invalid mouse scroll direction value: " + d);
-        }
-
-        public static Gdk.ScrollDirection ConvertScrollDirection(ScrollDirection d)
-        {
-            switch (d) {
-            case ScrollDirection.Up:
-                return Gdk.ScrollDirection.Up;
-            case ScrollDirection.Down:
-                return Gdk.ScrollDirection.Down;
-            case ScrollDirection.Left:
-                return Gdk.ScrollDirection.Left;
-            case ScrollDirection.Right:
-                return Gdk.ScrollDirection.Right;
-            }
-            throw new InvalidOperationException("Invalid mouse scroll direction value: " + d);
-        }
 
 		public static Gtk.IconSize GetBestSizeFit (double size, Gtk.IconSize[] availablesizes = null)
 		{
@@ -319,6 +246,30 @@ namespace Xwt.GtkBackend
 		public static double GetDefaultScaleFactor ()
 		{
 			return 1;
+		}
+
+		internal static void SetSourceColor (this Cairo.Context cr, Cairo.Color color)
+		{
+			cr.SetSourceRGBA (color.R, color.G, color.B, color.A);
+		}
+
+		//this is needed for building against old Mono.Cairo versions
+		[Obsolete]
+		internal static void SetSource (this Cairo.Context cr, Cairo.Pattern pattern)
+		{
+			cr.Pattern = pattern;
+		}
+
+		[Obsolete]
+		internal static Cairo.Surface GetTarget (this Cairo.Context cr)
+		{
+			return cr.Target;
+		}
+
+		[Obsolete]
+		internal static void Dispose (this Cairo.Context cr)
+		{
+			((IDisposable)cr).Dispose ();
 		}
 	}
 }

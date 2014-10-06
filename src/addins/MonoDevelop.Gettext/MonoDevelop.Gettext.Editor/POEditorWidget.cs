@@ -43,10 +43,11 @@ using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
 using System.ComponentModel;
 using System.Threading;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.Gettext
 {
-	public partial class POEditorWidget : Gtk.Bin, IUndoHandler
+	partial class POEditorWidget : Gtk.Bin, IUndoHandler
 	{
 		TranslationProject project;
 		CatalogHeadersWidget headersEditor;
@@ -122,7 +123,7 @@ namespace MonoDevelop.Gettext
 			fuzzyColumn.SortColumnId = 0;
 				
 			fuzzyColumn.Title = GettextCatalog.GetString ("Fuzzy");
-			var iconRenderer = new CellRendererPixbuf ();
+			var iconRenderer = new CellRendererImage ();
 			fuzzyColumn.PackStart (iconRenderer, false);
 			fuzzyColumn.SetCellDataFunc (iconRenderer, CatalogIconDataFunc);
 			
@@ -158,13 +159,13 @@ namespace MonoDevelop.Gettext
 			treeviewEntries.Selection.Changed += OnEntrySelected;
 			
 			// found in tree view
-			foundInStore = new ListStore (typeof(string), typeof(string), typeof(string), typeof(Pixbuf));
+			foundInStore = new ListStore (typeof(string), typeof(string), typeof(string), typeof(Xwt.Drawing.Image));
 			this.treeviewFoundIn.Model = foundInStore;
 			
 			TreeViewColumn fileColumn = new TreeViewColumn ();
-			var pixbufRenderer = new CellRendererPixbuf ();
+			var pixbufRenderer = new CellRendererImage ();
 			fileColumn.PackStart (pixbufRenderer, false);
-			fileColumn.SetAttributes (pixbufRenderer, "pixbuf", FoundInColumns.Pixbuf);
+			fileColumn.SetAttributes (pixbufRenderer, "image", FoundInColumns.Pixbuf);
 			
 			CellRendererText textRenderer = new CellRendererText ();
 			fileColumn.PackStart (textRenderer, true);
@@ -269,7 +270,7 @@ namespace MonoDevelop.Gettext
 		void CatalogIconDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
 		{
 			CatalogEntry entry = (CatalogEntry)model.GetValue (iter, 0);
-			((CellRendererPixbuf)cell).Pixbuf = ImageService.GetPixbuf (GetStockForEntry (entry), IconSize.Menu);
+			((CellRendererImage)cell).Image = ImageService.GetIcon (GetStockForEntry (entry), IconSize.Menu);
 			cell.CellBackgroundGdk = GetRowColorForEntry (entry);
 		}
 		
@@ -670,7 +671,7 @@ namespace MonoDevelop.Gettext
 							line = "?";
 						}
 						string fullName = System.IO.Path.Combine (System.IO.Path.GetDirectoryName (this.poFileName), file);
-						this.foundInStore.AppendValues (file, line, fullName, DesktopService.GetPixbufForFile (fullName, IconSize.Menu));
+						this.foundInStore.AppendValues (file, line, fullName, DesktopService.GetIconForFile (fullName, IconSize.Menu));
 					}
 				}
 				
@@ -702,9 +703,9 @@ namespace MonoDevelop.Gettext
 			return entry.IsFuzzy ? iconFuzzy : entry.IsTranslated ? iconValid : iconMissing;
 		}
 		
-		static string iconFuzzy   = "silk_error";// "md-translation-fuzzy";
-		static string iconValid   = "silk_accept";//"md-translation-valid";
-		static string iconMissing = "silk_exclamation";//"md-translation-missing";
+		static string iconFuzzy   = "error-light-16.png";// "md-translation-fuzzy";
+		static string iconValid   = "done-light-16.png";//"md-translation-valid";
+		static string iconMissing = "warning-light-16.png";//"md-translation-missing";
 		
 //		static Color translated   = new Color (255, 255, 255);
 		static Color untranslated = new Color (234, 232, 227);

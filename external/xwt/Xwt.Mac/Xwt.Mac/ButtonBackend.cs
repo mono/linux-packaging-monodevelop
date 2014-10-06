@@ -56,8 +56,15 @@ namespace Xwt.Mac
 			((MacButton)Widget).DisableEvent (ev);
 		}
 		
-		public void SetContent (string label, ImageDescription image, ContentPosition imagePosition)
+		public void SetContent (string label, bool useMnemonic, ImageDescription image, ContentPosition imagePosition)
 		{
+			switch (((Button)Frontend).Type) {
+			case ButtonType.Help:
+			case ButtonType.Disclosure:
+				return;
+			}
+			if (useMnemonic)
+				label = label.RemoveMnemonic ();
 			Widget.Title = label ?? "";
 			if (string.IsNullOrEmpty (label))
 				imagePosition = ContentPosition.Center;
@@ -86,7 +93,7 @@ namespace Xwt.Mac
 				break;
 			case ButtonStyle.Borderless:
 			case ButtonStyle.Flat:
-				Widget.BezelStyle = NSBezelStyle.Rounded;
+				Widget.BezelStyle = NSBezelStyle.ShadowlessSquare;
 				Messaging.void_objc_msgSend_bool (Widget.Handle, selSetShowsBorderOnlyWhileMouseInside.Handle, true);
 				break;
 			}
@@ -97,8 +104,17 @@ namespace Xwt.Mac
 		public void SetButtonType (ButtonType type)
 		{
 			switch (type) {
-			case ButtonType.Disclosure: Widget.BezelStyle = NSBezelStyle.Disclosure; break;
-			default: Widget.BezelStyle = NSBezelStyle.Rounded; break;
+			case ButtonType.Disclosure:
+				Widget.BezelStyle = NSBezelStyle.Disclosure;
+				Widget.Title = "";
+				break;
+			case ButtonType.Help:
+				Widget.BezelStyle = NSBezelStyle.HelpButton;
+				Widget.Title = "";
+				break;
+			default:
+				Widget.BezelStyle = NSBezelStyle.Rounded;
+				break;
 			}
 		}
 		
@@ -130,14 +146,12 @@ namespace Xwt.Mac
 			};
 		}
 		
-		public MacButton (ICheckBoxEventSink eventSink, ApplicationContext context)
+		public MacButton ()
 		{
 			Activated += delegate {
-				context.InvokeUserCode (delegate {
-					eventSink.OnClicked ();
-				});
 				OnActivatedInternal ();
 			};
+
 		}
 
 		public MacButton (IRadioButtonEventSink eventSink, ApplicationContext context)

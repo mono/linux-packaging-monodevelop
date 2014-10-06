@@ -52,10 +52,6 @@ namespace Xwt
 			Padding = 12;
 		}
 		
-		public Window (string title): base (title)
-		{
-		}
-		
 		IWindowBackend Backend {
 			get { return (IWindowBackend) BackendHost.Backend; } 
 		}
@@ -202,25 +198,27 @@ namespace Xwt
 		{
 			if (child == null)
 				return;
-			
+
+			Size mMinSize, mDecorationsSize;
+			Backend.GetMetrics (out mMinSize, out mDecorationsSize);
+
 			IWidgetSurface s = child.Surface;
 
 			var size = shown ? Size : initialBounds.Size;
 
-			var wc = (shown || widthSet) ? SizeConstraint.WithSize (size.Width - padding.HorizontalSpacing) : SizeConstraint.Unconstrained;
-			var hc = (shown || heightSet) ? SizeConstraint.WithSize (size.Height - padding.VerticalSpacing) : SizeConstraint.Unconstrained;
+			var wc = (shown || widthSet) ? SizeConstraint.WithSize (Math.Max (size.Width - padding.HorizontalSpacing - mDecorationsSize.Width, mMinSize.Width)) : SizeConstraint.Unconstrained;
+			var hc = (shown || heightSet) ? SizeConstraint.WithSize (Math.Max (size.Height - padding.VerticalSpacing - mDecorationsSize.Height, mMinSize.Height)) : SizeConstraint.Unconstrained;
 
-			var ws = s.GetPreferredSize (wc, hc, true);
+			var ws = s.GetPreferredSize (wc, hc, true) + mDecorationsSize;
+			ws.Width += padding.HorizontalSpacing;
+			ws.Height += padding.VerticalSpacing;
 
 			if (!shown) {
 				if (!widthSet)
-					size.Width = ws.Width + padding.HorizontalSpacing;
+					size.Width = ws.Width;
 				if (!heightSet)
-					size.Height = ws.Height + padding.VerticalSpacing;
+					size.Height = ws.Height;
 			}
-
-			Size mMinSize, mDecorationsSize;
-			Backend.GetMetrics (out mMinSize, out mDecorationsSize);
 
 			if (ws.Width < mMinSize.Width)
 				ws.Width = mMinSize.Width;
@@ -241,8 +239,8 @@ namespace Xwt
 						center = Desktop.PrimaryScreen.VisibleBounds.Center;
 					else
 						center = TransientFor.ScreenBounds.Center;
-					initialBounds.X = center.X - size.Width / 2;
-					initialBounds.Y = center.Y - size.Height / 2;
+					initialBounds.X = Math.Round (center.X - size.Width / 2);
+					initialBounds.Y = Math.Round (center.Y - size.Height / 2);
 					locationSet = true;
 				}
 	
@@ -258,7 +256,7 @@ namespace Xwt
 				if (size != Size)
 					Backend.SetSize (size.Width, size.Height);
 			}
-			Backend.SetMinSize (mDecorationsSize + new Size (ws.Width + padding.HorizontalSpacing, ws.Height + padding.VerticalSpacing));
+			Backend.SetMinSize (new Size (ws.Width, ws.Height));
 		}
 	}
 }

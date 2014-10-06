@@ -163,7 +163,7 @@ namespace Xwt.GtkBackend
 		public Color BorderColor {
 			get {
 				if (borderColor == null)
-					return Util.ToXwtColor (Widget.Style.Dark (Gtk.StateType.Normal));
+					return Widget.Style.Dark (Gtk.StateType.Normal).ToXwtValue ();
 				else
 					return borderColor.Value;
 			}
@@ -202,10 +202,12 @@ namespace Xwt.GtkBackend
 
 	class FrameWidget: Gtk.Frame, IConstraintProvider
 	{
+		#if !XWT_GTK3
 		protected override void OnSizeRequested (ref Gtk.Requisition requisition)
 		{
 			base.OnSizeRequested (ref requisition);
 		}
+		#endif
 
 		public void GetConstraints (Gtk.Widget target, out SizeConstraint width, out SizeConstraint height)
 		{

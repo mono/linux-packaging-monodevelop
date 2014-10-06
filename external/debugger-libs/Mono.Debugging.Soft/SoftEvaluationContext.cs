@@ -37,13 +37,15 @@ namespace Mono.Debugging.Soft
 		int stackVersion;
 		StackFrame frame;
 		bool sourceAvailable;
-		
+
 		public ThreadMirror Thread { get; set; }
+		public AppDomainMirror Domain { get; set; }
 		
 		public SoftEvaluationContext (SoftDebuggerSession session, StackFrame frame, DC.EvaluationOptions options): base (options)
 		{
 			Frame = frame;
 			Thread = frame.Thread;
+			Domain = Thread.Domain;
 
 			string method = frame.Method.Name;
 			if (frame.Method.DeclaringType != null)
@@ -52,11 +54,7 @@ namespace Mono.Debugging.Soft
 			string language;
 
 			if (frame.Method != null) {
-				if (frame.IsNativeTransition) {
-					language = "Transition";
-				} else {
-					language = "Managed";
-				}
+				language = frame.IsNativeTransition ? "Transition" : "Managed";
 			} else {
 				language = "Native";
 			}
@@ -64,7 +62,7 @@ namespace Mono.Debugging.Soft
 			Evaluator = session.GetEvaluator (new DC.StackFrame (frame.ILOffset, location, language, session.IsExternalCode (frame), true));
 			Adapter = session.Adaptor;
 			this.session = session;
-			this.stackVersion = session.StackVersion;
+			stackVersion = session.StackVersion;
 			sourceAvailable = !string.IsNullOrEmpty (frame.FileName) && System.IO.File.Exists (frame.FileName);
 		}
 		
@@ -104,11 +102,13 @@ namespace Mono.Debugging.Soft
 		public override void CopyFrom (EvaluationContext ctx)
 		{
 			base.CopyFrom (ctx);
-			SoftEvaluationContext other = (SoftEvaluationContext) ctx;
+
+			var other = (SoftEvaluationContext) ctx;
 			frame = other.frame;
 			stackVersion = other.stackVersion;
 			Thread = other.Thread;
 			session = other.session;
+			Domain = other.Domain;
 		}
 
 		static bool IsValueTypeOrPrimitive (TypeMirror type)
@@ -125,23 +125,23 @@ namespace Mono.Debugging.Soft
 		{
 			if (values != null) {
 				// Some arguments may need to be boxed
-				ParameterInfoMirror[] mparams = method.GetParameters ();
+				var mparams = method.GetParameters ();
 				if (mparams.Length != values.Length)
 					throw new EvaluatorException ("Invalid number of arguments when calling: " + method.Name);
 				
 				for (int n = 0; n < mparams.Length; n++) {
-					TypeMirror tm = mparams [n].ParameterType;
+					var tm = mparams[n].ParameterType;
 					if (tm.IsValueType || tm.IsPrimitive)
 						continue;
 
-					object type = Adapter.GetValueType (this, values [n]);
-					TypeMirror argTypeMirror = type as TypeMirror;
-					Type argType = type as Type;
+					var type = Adapter.GetValueType (this, values[n]);
+					var argTypeMirror = type as TypeMirror;
+					var argType = type as Type;
 
 					if (IsValueTypeOrPrimitive (argTypeMirror) || IsValueTypeOrPrimitive (argType)) {
 						// A value type being assigned to a parameter which is not a value type. The value has to be boxed.
 						try {
-							values [n] = Thread.Domain.CreateBoxedValue (values [n]);
+							values[n] = Thread.Domain.CreateBoxedValue (values [n]);
 						} catch (NotSupportedException) {
 							// This runtime doesn't support creating boxed values
 							throw new EvaluatorException ("This runtime does not support creating boxed values.");
@@ -152,8 +152,8 @@ namespace Mono.Debugging.Soft
 
 			if (!method.IsStatic && method.DeclaringType.IsClass && !IsValueTypeOrPrimitive (method.DeclaringType)) {
 				object type = Adapter.GetValueType (this, target);
-				TypeMirror targetTypeMirror = type as TypeMirror;
-				Type targetType = type as Type;
+				var targetTypeMirror = type as TypeMirror;
+				var targetType = type as Type;
 
 				if ((target is StructMirror && ((StructMirror) target).Type != method.DeclaringType) ||
 				    (IsValueTypeOrPrimitive (targetTypeMirror) || IsValueTypeOrPrimitive (targetType))) {
@@ -166,10 +166,17 @@ namespace Mono.Debugging.Soft
 					}
 				}
 			}
-			
-			MethodCall mc = new MethodCall (this, method, target, values);
-			Adapter.AsyncExecute (mc, Options.EvaluationTimeout);
-			return mc.ReturnValue;
+
+			try {
+				return method.Evaluate (target is TypeMirror ? null : (Value) target, values);
+			} catch (NotSupportedException) {
+				AssertTargetInvokeAllowed ();
+
+				var mc = new MethodCall (this, method, target, values);
+				Adapter.AsyncExecute (mc, Options.EvaluationTimeout);
+
+				return mc.ReturnValue;
+			}
 		}
 		
 		void UpdateFrame ()

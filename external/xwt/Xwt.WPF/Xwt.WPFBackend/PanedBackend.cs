@@ -229,9 +229,9 @@ namespace Xwt.WPFBackend
 					h = s1.Height + s2.Height + SplitterSize;
 					w = Math.Max (s1.Width, s2.Width);
 				}
-				if (widthConstraint.IsConstrained && w > widthConstraint.AvailableSize)
+				if (direction == Orientation.Horizontal && widthConstraint.IsConstrained && w > widthConstraint.AvailableSize)
 					w = widthConstraint.AvailableSize;
-				if (heightConstraint.IsConstrained && h > heightConstraint.AvailableSize)
+				if (direction == Orientation.Vertical && heightConstraint.IsConstrained && h > heightConstraint.AvailableSize)
 					h = heightConstraint.AvailableSize;
 				return new Size (w, h);
 			}
@@ -289,11 +289,13 @@ namespace Xwt.WPFBackend
 
 				panel1.Size = new GridLength (position, GridUnitType.Star);
 				panel2.Size = new GridLength (availableSize - position, GridUnitType.Star);
-			}
-			else if (panel1.Widget != null)
+			} else if (panel1.Widget != null) {
 				panel1.Size = new GridLength (1, GridUnitType.Star);
-			else if (panel2 != null)
-				panel2.Size = new GridLength (1, GridUnitType.Star);
+				panel2.Size = new GridLength(0);
+			} else if (panel2 != null) {
+				panel2.Size = new GridLength(1, GridUnitType.Star);
+				panel1.Size = new GridLength(0);
+			}
 
 			lastSize = newSize;
 		}

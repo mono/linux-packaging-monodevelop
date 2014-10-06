@@ -26,18 +26,22 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Refactoring;
 using System;
-using MonoDevelop.Ide.TypeSystem;
 using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Core;
+using MonoDevelop.Ide.Gui.Content;
+using MonoDevelop.Ide.Navigation;
+using MonoDevelop.Projects;
+using System.Linq;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.AssemblyBrowser
 {
-	public class AssemblyBrowserViewContent : AbstractViewContent, MonoDevelop.Ide.Gui.Content.IUrlHandler
+	class AssemblyBrowserViewContent : AbstractViewContent, IOpenNamedElementHandler, INavigable
 	{
+		readonly static string[] defaultAssemblies = new string[] { "mscorlib", "System", "System.Core", "System.Xml" };
 		AssemblyBrowserWidget widget;
 		
 		protected override void OnWorkbenchWindowChanged (EventArgs e)
@@ -92,12 +96,41 @@ namespace MonoDevelop.AssemblyBrowser
 			widget = null;
 			GC.Collect ();
 		}
+
+		#region INavigable implementation 
 		
+		public NavigationPoint BuildNavigationPoint ()
+		{
+			return new AssemblyBrowserNavigationPoint ();
+		}
+		
+		#endregion
+
 		#region IUrlHandler implementation 
 		
-		public void Open (string url)
+		public void Open (INamedElement element)
 		{
-			widget.Open (url);
+			var member = element as IUnresolvedEntity;
+			if (member == null) {
+				var entity = element as IMember;
+				if (entity != null)
+					member = entity.UnresolvedMember;
+
+			}
+			if (member == null) {
+				var entity = element as IType;
+				if (entity != null)
+					member = entity.GetDefinition ().Parts [0];
+			}
+			if (member == null)
+				return;
+			var url = AssemblyBrowserWidget.GetIdString (member);
+			try {
+				widget.Open (url);
+			} catch (Exception e) {
+				LoggingService.LogError ("Error while navigating to " + url, e);
+				MessageService.ShowException (e, GettextCatalog.GetString ("{0} could not be opened", url), GettextCatalog.GetString ("Error while opening assembly"));
+			}
 		}
 		
 		#endregion 
@@ -119,5 +152,61 @@ namespace MonoDevelop.AssemblyBrowser
 				return;
 			FindDerivedClassesHandler.FindDerivedClasses (type);
 		}
+
+		public void FillWidget ()
+		{
+			if (Ide.IdeApp.ProjectOperations.CurrentSelectedSolution == null) {
+				foreach (var assembly in defaultAssemblies) {
+					Widget.AddReferenceByAssemblyName (assembly, assembly == defaultAssemblies [0]); 
+				}
+			} else {
+				foreach (var project in Ide.IdeApp.ProjectOperations.CurrentSelectedSolution.GetAllProjects ()) {
+					Widget.AddProject (project, false);
+
+					var netProject = project as DotNetProject;
+					if (netProject == null)
+						continue;
+					foreach (string file in netProject.GetReferencedAssemblies (ConfigurationSelector.Default, false)) {
+						if (!System.IO.File.Exists (file))
+							continue;
+						Widget.AddReferenceByFileName (file, false); 
+					}
+				}
+			}
+		}
+	}
+
+	class AssemblyBrowserNavigationPoint : NavigationPoint
+	{
+		static Document DoShow ()
+		{
+			foreach (var view in Ide.IdeApp.Workbench.Documents) {
+				if (view.GetContent<AssemblyBrowserViewContent> () != null) {
+					view.Window.SelectWindow ();
+					return view;
+				}
+			}
+
+			var binding = DisplayBindingService.GetBindings<AssemblyBrowserDisplayBinding> ().FirstOrDefault ();
+			var assemblyBrowserView = binding != null ? binding.GetViewContent () : new AssemblyBrowserViewContent ();
+			assemblyBrowserView.FillWidget ();
+
+			return Ide.IdeApp.Workbench.OpenDocument (assemblyBrowserView, true);
+		}
+
+		#region implemented abstract members of NavigationPoint
+
+		public override Document ShowDocument ()
+		{
+			return DoShow ();
+		}
+
+		public override string DisplayName {
+			get {
+				return GettextCatalog.GetString ("Assembly Browser");
+			}
+		}
+
+		#endregion
 	}
 }

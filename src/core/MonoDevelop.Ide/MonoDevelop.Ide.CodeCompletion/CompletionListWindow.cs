@@ -40,8 +40,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 	public class CompletionListWindow : ListWindow, IListDataProvider
 	{
 		const int declarationWindowMargin = 3;
-		
-		TooltipInformationWindow declarationviewwindow = new TooltipInformationWindow ();
+
+		TooltipInformationWindow declarationviewwindow;
 		ICompletionData currentData;
 		Widget parsingMessage;
 		int initialWordLength;
@@ -254,7 +254,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 						return false;
 					}
 					
-					if (declarationviewwindow.Multiple) {
+					if (declarationviewwindow != null && declarationviewwindow.Multiple) {
 						if (key == Gdk.Key.Left)
 							declarationviewwindow.OverloadLeft ();
 						else
@@ -368,11 +368,6 @@ namespace MonoDevelop.Ide.CodeCompletion
 				return false;
 			
 			Style = CompletionWidget.GtkStyle;
-			
-			if (PropertyService.Get ("HideObsoleteItems", false)) {
-				foreach (var item in completionDataList.Where (x => x.DisplayFlags.HasFlag (DisplayFlags.Obsolete)).ToList ())
-					completionDataList.Remove (item);
-			}
 			
 			//sort, sinking obsolete items to the bottoms
 			//the string comparison is ordinal as that makes it an order of magnitude faster, which 
@@ -544,9 +539,21 @@ namespace MonoDevelop.Ide.CodeCompletion
 			}
 		}
 
+		void EnsureDeclarationViewWindow ()
+		{
+			if (declarationviewwindow == null) {
+				declarationviewwindow = new TooltipInformationWindow ();
+			} else {
+				declarationviewwindow.SetDefaultScheme ();
+			}
+		}
+
 		void RepositionDeclarationViewWindow ()
 		{
-			if (declarationviewwindow == null || base.GdkWindow == null)
+			if (base.GdkWindow == null)
+				return;
+			EnsureDeclarationViewWindow ();
+			if (declarationviewwindow.Overloads == 0)
 				return;
 			var selectedItem = List.SelectedItem;
 			Gdk.Rectangle rect = List.GetRowArea (selectedItem);
@@ -573,13 +580,11 @@ namespace MonoDevelop.Ide.CodeCompletion
 			IEnumerable<ICompletionData> filteredOverloads;
 			if (data.HasOverloads) {
 				filteredOverloads = data.OverloadedData;
-				if (PropertyService.Get ("HideObsoleteItems", false))
-					filteredOverloads = filteredOverloads.Where (x => !x.DisplayFlags.HasFlag (DisplayFlags.Obsolete));
 			} else {
 				filteredOverloads = new ICompletionData[] { data };
 			}
 
-			
+			EnsureDeclarationViewWindow ();
 			if (data != currentData) {
 				declarationviewwindow.Clear ();
 				var overloads = new List<ICompletionData> (filteredOverloads);
@@ -615,6 +620,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 		{
 			StartOffset = 0;
 			previousWidth = previousHeight = -1;
+			yPosition = WindowPositonY.None;
 			base.ResetState ();
 		}
 		
@@ -647,16 +653,19 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 		bool IListDataProvider.HasMarkup (int n)
 		{
-			return completionDataList[n].DisplayFlags.HasFlag (DisplayFlags.Obsolete);
+			return (completionDataList [n].DisplayFlags & (DisplayFlags.Obsolete | DisplayFlags.MarkedBold)) != 0;
 		}
 		
 		//NOTE: we only ever return markup for items marked as obsolete
 		string IListDataProvider.GetMarkup (int n)
 		{
 			var completionData = completionDataList[n];
-			if (!completionData.HasOverloads && completionData.DisplayFlags.HasFlag (DisplayFlags.Obsolete) || 
-			    completionData.OverloadedData.All (data => data.DisplayFlags.HasFlag (DisplayFlags.Obsolete)))
+			if (!completionData.HasOverloads && (completionData.DisplayFlags & DisplayFlags.Obsolete) != 0 || 
+				completionData.HasOverloads && completionData.OverloadedData.All (data => (data.DisplayFlags & DisplayFlags.Obsolete) != 0))
 				return "<s>" + GLib.Markup.EscapeText (completionDataList[n].DisplayText) + "</s>";
+			
+			if ((completionData.DisplayFlags & DisplayFlags.MarkedBold) != 0)
+				return "<b>" + GLib.Markup.EscapeText (completionDataList[n].DisplayText) + "</b>";
 			return GLib.Markup.EscapeText (completionDataList[n].DisplayText);
 		}
 		
@@ -670,12 +679,12 @@ namespace MonoDevelop.Ide.CodeCompletion
 			return defaultComparer.Compare (completionDataList [n], completionDataList [m]);
 		}
 		
-		Gdk.Pixbuf IListDataProvider.GetIcon (int n)
+		Xwt.Drawing.Image IListDataProvider.GetIcon (int n)
 		{
 			string iconName = ((CompletionData)completionDataList[n]).Icon;
 			if (string.IsNullOrEmpty (iconName))
 				return null;
-			return ImageService.GetPixbuf (iconName, IconSize.Menu);
+			return ImageService.GetIcon (iconName, IconSize.Menu);
 		}
 		
 		#endregion

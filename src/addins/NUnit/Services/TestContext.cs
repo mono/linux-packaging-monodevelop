@@ -40,8 +40,8 @@ namespace MonoDevelop.NUnit
 		DateTime testDate;
 		object contextData;
 		IExecutionHandler executionContext;
-		
-		public TestContext (ITestProgressMonitor monitor, IExecutionHandler executionContext, DateTime testDate)
+
+		public TestContext (ITestProgressMonitor monitor, TestResultsPad resultsPad, IExecutionHandler executionContext, DateTime testDate)
 		{
 			this.monitor = monitor;
 			if (executionContext == null)

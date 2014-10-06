@@ -35,7 +35,7 @@ namespace MonoDevelop.Debugger
 	public class ObjectValuePad: IPadContent
 	{
 		protected ObjectValueTreeView tree;
-		ScrolledWindow scrolled;
+		readonly ScrolledWindow scrolled;
 		bool needsUpdate;
 		IPadWindow container;
 		bool initialResume;
@@ -133,6 +133,8 @@ namespace MonoDevelop.Debugger
 		protected virtual void OnDebuggerStopped (object s, EventArgs a)
 		{
 			tree.ResetChangeTracking ();
+			tree.Frame = null;
+			lastFrame = null;
 			initialResume = true;
 		}
 		

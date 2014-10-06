@@ -23,22 +23,26 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-using System;
 using Gtk;
 using MonoDevelop.Core;
 using MonoDevelop.Components;
 using MonoDevelop.Ide;
+using NGit.Revwalk;
+using NGit;
 
 namespace MonoDevelop.VersionControl.Git
 {
-	public partial class StashManagerDialog : Gtk.Dialog
+	partial class StashManagerDialog : Dialog
 	{
-		ListStore store;
-		StashCollection stashes;
+		readonly GitRepository repository;
+		readonly ListStore store;
+		readonly StashCollection stashes;
 		
 		public StashManagerDialog (GitRepository repo)
 		{
 			this.Build ();
+			repository = repo;
+
 			stashes = repo.GetStashes ();
 			
 			store = new ListStore (typeof(Stash), typeof(string), typeof(string));
@@ -89,6 +93,16 @@ namespace MonoDevelop.VersionControl.Git
 			return (Stash) store.GetValue (it, 0);
 		}
 
+		void ApplyStashAndRemove(Stash s)
+		{
+			using (IdeApp.Workspace.GetFileStatusTracker ()) {
+				GitService.ApplyStash (s).Completed += delegate(IAsyncOperation op) {
+					if (op.Success)
+						stashes.Remove (s);
+				};
+			}
+		}
+
 		protected void OnButtonApplyClicked (object sender, System.EventArgs e)
 		{
 			Stash s = GetSelected ();
@@ -100,6 +114,25 @@ namespace MonoDevelop.VersionControl.Git
 	
 		protected void OnButtonBranchClicked (object sender, System.EventArgs e)
 		{
+			Stash s = GetSelected ();
+			if (s != null) {
+				var dlg = new EditBranchDialog (repository, null, true);
+				try {
+					if (MessageService.RunCustomDialog (dlg) == (int) ResponseType.Ok) {
+						ObjectId commit = repository.RootRepository.Resolve (s.CommitId);
+						var rw = new RevWalk (repository.RootRepository);
+						RevCommit c = rw.ParseCommit (commit);
+						RevCommit old = c.GetParent (0);
+						rw.ParseHeaders (old);
+						repository.CreateBranchFromCommit (dlg.BranchName, old);
+						GitService.SwitchToBranch (repository, dlg.BranchName);
+						ApplyStashAndRemove (s);
+					}
+				} finally {
+					dlg.Destroy ();
+				}
+				Respond (ResponseType.Ok);
+			}
 		}
 	
 		protected void OnButtonDeleteClicked (object sender, System.EventArgs e)
@@ -116,12 +149,7 @@ namespace MonoDevelop.VersionControl.Git
 		{
 			Stash s = GetSelected ();
 			if (s != null) {
-				using (IdeApp.Workspace.GetFileStatusTracker ()) {
-					GitService.ApplyStash (s).Completed += delegate(IAsyncOperation op) {
-						if (op.Success)
-							stashes.Remove (s);
-					};
-				}
+				ApplyStashAndRemove (s);
 				Respond (ResponseType.Ok);
 			}
 		}

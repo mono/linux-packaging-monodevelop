@@ -746,6 +746,106 @@ class C : S
 			});
 			
 		}
+		
+		[Test]
+		public void TestUnfinishedDictionaryInitializer()
+		{
+			CodeCompletionBugTests.CombinedProviderTest(
+				@"class Test
+{
+	public static void Main(string [] args)
+	{
+		var dict = new Dictionary<char, char> {
+			{ a$
+		}
+	}
+}
+",
+				provider => {
+					Assert.IsNotNull(provider.Find("args"), "'args' not found.");
+				});
+		}	
+
+		/// <summary>
+		/// Bug 19908 - [Forms] Autocomplete doesn't work for the Children property of Forms layouts
+		/// </summary>
+		[Test]
+		public void TestBug19908()
+		{
+			CodeCompletionBugTests.CombinedProviderTest(
+				@"using System.Collections.Generic;
+
+class Foo
+{
+	public List<int> Children { get {} }
+}
+
+class Test
+{
+	public static void Main(string [] args)
+	{
+		var dict = new Foo {
+			$c$
+		}
+	}
+}
+",
+				provider => Assert.IsNotNull(provider.Find("Children"), "'Children' not found."));
+		}
+
+		[Test]
+		public void TestBug19908_Case2()
+		{
+			CodeCompletionBugTests.CombinedProviderTest(
+				@"using System.Collections.Generic;
+
+class Foo
+{
+	public IList<int> Children { get {} }
+}
+
+class Test
+{
+	public static void Main(string [] args)
+	{
+		var dict = new Foo {
+			$c$
+		}
+	}
+}
+",
+				provider => {
+					Assert.IsNotNull(provider.Find("Children"), "'Children' not found.");
+				});
+		}
+
+		/// <summary>
+		/// Bug 20110 - [Forms] Autocomplete doesn't work for the Placeholder property 
+		/// </summary>
+		[Test]
+		public void TestBug20110()
+		{
+			CodeCompletionBugTests.CombinedProviderTest(
+				@"
+public class Entry
+{
+	public string Placeholder { get; set; }
+}
+
+class Test
+{
+	public static void Main(string [] args)
+	{
+		var dict = new Entry {
+			$c$
+		};
+	}
+}
+",
+				provider => Assert.IsNotNull(provider.Find("Placeholder"), "'Children' not found."));
+		}
+
+	
 	}
 }
 

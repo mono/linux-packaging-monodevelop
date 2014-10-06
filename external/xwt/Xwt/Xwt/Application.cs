@@ -60,10 +60,11 @@ namespace Xwt
 		public static void Initialize (ToolkitType type)
 		{
 			Initialize (Toolkit.GetBackendType (type));
+			toolkit.Type = type;
 		}
 
 		public static void Initialize (string backendType)
-		{
+		{			
 			if (engine != null)
 				return;
 
@@ -85,6 +86,8 @@ namespace Xwt
 		
 		public static void InitializeAsGuest (string backendType)
 		{
+			if (backendType == null)
+				throw new ArgumentNullException ("backendType");
 			Initialize (backendType);
 			toolkit.ExitUserCode (null);
 		}
@@ -261,7 +264,8 @@ namespace Xwt
 		Gtk = 1,
 		Cocoa = 2,
 		Wpf = 3,
-		XamMac = 4
+		XamMac = 4,
+		Gtk3 = 5,
 	}
 }
 

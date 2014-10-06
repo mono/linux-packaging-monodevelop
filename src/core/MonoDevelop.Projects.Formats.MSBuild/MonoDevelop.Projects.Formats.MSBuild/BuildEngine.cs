@@ -26,26 +26,30 @@
 
 using System;
 using System.Threading;
-using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Remoting;
 using System.Collections.Generic;
-using System.Collections;
 using Microsoft.Build.BuildEngine;
-using Microsoft.Build.Framework;
+using System.Globalization;
+using System.IO;
+
+//this is the builder for the deprecated build engine API
+#pragma warning disable 618
 
 namespace MonoDevelop.Projects.Formats.MSBuild
 {
 	public class BuildEngine: MarshalByRefObject, IBuildEngine
 	{
-		static AutoResetEvent wordDoneEvent = new AutoResetEvent (false);
+		static readonly AutoResetEvent workDoneEvent = new AutoResetEvent (false);
 		static ThreadStart workDelegate;
-		static object workLock = new object ();
+		static readonly object workLock = new object ();
 		static Thread workThread;
+		static CultureInfo uiCulture;
 		static Exception workError;
 
-		ManualResetEvent doneEvent = new ManualResetEvent (false);
-		Dictionary<string,Engine> engines = new Dictionary<string, Engine> ();
+		readonly ManualResetEvent doneEvent = new ManualResetEvent (false);
+		readonly Dictionary<string,string> unsavedProjects = new Dictionary<string, string> ();
+
+		internal readonly Engine Engine = new Engine { DefaultToolsVersion = MSBuildConsts.Version };
 
 		public void Dispose ()
 		{
@@ -56,9 +60,26 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			get { return doneEvent; }
 		}
 
-		public IProjectBuilder LoadProject (string file, string binDir)
+		public void Ping ()
 		{
-			return new ProjectBuilder (this, GetEngine (binDir), file);
+		}
+
+		public void SetCulture (CultureInfo uiCulture)
+		{
+			BuildEngine.uiCulture = uiCulture;
+
+		}
+
+		public void SetGlobalProperties (IDictionary<string, string> properties)
+		{
+			var gp = Engine.GlobalProperties;
+			foreach (var p in properties)
+				gp.SetProperty (p.Key, p.Value);
+		}
+
+		public IProjectBuilder LoadProject (string file)
+		{
+			return new ProjectBuilder (this, file);
 		}
 		
 		public void UnloadProject (IProjectBuilder pb)
@@ -72,33 +93,31 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			return null;
 		}
 
-		Engine GetEngine (string binDir)
-		{
-			Engine engine = null;
-			RunSTA (delegate {
-				if (!engines.TryGetValue (binDir, out engine)) {
-					engine = new Engine (binDir);
-					engine.GlobalProperties.SetProperty ("BuildingInsideVisualStudio", "true");
-					
-					//we don't have host compilers in MD, and this is set to true by some of the MS targets
-					//which causes it to always run the CoreCompile task if BuildingInsideVisualStudio is also
-					//true, because the VS in-process compiler would take care of the deps tracking
-					engine.GlobalProperties.SetProperty ("UseHostCompilerIfAvailable", "false");
-					engines [binDir] = engine;
-				}
-			});
-			return engine;
-		}
-
 		internal void UnloadProject (string file)
 		{
+			lock (unsavedProjects)
+				unsavedProjects.Remove (file);
+
 			RunSTA (delegate {
-				foreach (var engine in engines.Values) {
-					var loadedProj = engine.GetLoadedProject (file);
-					if (loadedProj != null)
-						engine.UnloadProject (loadedProj);
-				}
+				var loadedProj = Engine.GetLoadedProject (file);
+				if (loadedProj != null)
+					Engine.UnloadProject (loadedProj);
 			});
+		}
+
+		internal void SetUnsavedProjectContent (string file, string content)
+		{
+			lock (unsavedProjects)
+				unsavedProjects [file] = content;
+		}
+
+		internal string GetUnsavedProjectContent (string file)
+		{
+			lock (unsavedProjects) {
+				string content;
+				unsavedProjects.TryGetValue (file, out content);
+				return content;
+			}
 		}
 
 		internal static void RunSTA (ThreadStart ts)
@@ -111,19 +130,20 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						workThread = new Thread (STARunner);
 						workThread.SetApartmentState (ApartmentState.STA);
 						workThread.IsBackground = true;
+						workThread.CurrentUICulture = uiCulture;
 						workThread.Start ();
 					}
 					else
 						// Awaken the existing thread
 						Monitor.Pulse (threadLock);
 				}
-				wordDoneEvent.WaitOne ();
+				workDoneEvent.WaitOne ();
 			}
 			if (workError != null)
 				throw new Exception ("MSBuild operation failed", workError);
 		}
 
-		static object threadLock = new object ();
+		static readonly object threadLock = new object ();
 		
 		static void STARunner ()
 		{
@@ -135,7 +155,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					catch (Exception ex) {
 						workError = ex;
 					}
-					wordDoneEvent.Set ();
+					workDoneEvent.Set ();
 				}
 				while (Monitor.Wait (threadLock, 60000));
 				

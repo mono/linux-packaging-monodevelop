@@ -36,16 +36,16 @@ namespace MonoDevelop.WebReferences
 	public abstract class WebServiceDiscoveryResult
 	{
 		WebReferenceItem item;
-		WebServiceEngine engine;
+		readonly WebServiceEngine engine;
 		
-		public WebServiceDiscoveryResult (WebServiceEngine engine, WebReferenceItem item)
+		protected WebServiceDiscoveryResult (WebServiceEngine engine, WebReferenceItem item)
 		{
 			this.item = item;
 			this.engine = engine;
 		}
 
 		public WebReferenceItem Item {
-			get { return this.item; }
+			get { return item; }
 		}
 		
 		CodeDomProvider provider;
@@ -85,7 +85,7 @@ namespace MonoDevelop.WebReferences
 				Directory.CreateDirectory (basePath);
 			
 			// Remove old files from the service directory
-			List<ProjectFile> toRemove = new List<ProjectFile>(project.Files.GetFilesInPath (basePath));
+			var toRemove = new List<ProjectFile>(project.Files.GetFilesInPath (basePath));
 			foreach (ProjectFile f in toRemove)
 				project.Files.Remove (f);
 			
@@ -95,17 +95,27 @@ namespace MonoDevelop.WebReferences
 			// Generate the proxy class
 			string proxySpec = CreateProxyFile (project, basePath, namspace + "." + referenceName, "Reference");
 			
-			ProjectFile mapFile = new ProjectFile (mapSpec);
-			mapFile.BuildAction = BuildAction.None;
-			mapFile.Subtype = Subtype.Code;
-			mapFile.Generator = ProxyGenerator;
-			project.Files.Add (mapFile);
-			
-			ProjectFile proxyFile = new ProjectFile (proxySpec);
-			proxyFile.BuildAction = BuildAction.Compile;
-			proxyFile.Subtype = Subtype.Code;
-			proxyFile.DependsOn = mapFile.FilePath;
-			project.Files.Add (proxyFile);
+			ProjectFile mapFile = project.Files.GetFile (mapSpec);
+			if (mapFile == null) {
+				mapFile = new ProjectFile (mapSpec) {
+					BuildAction = BuildAction.None,
+					Subtype = Subtype.Code,
+					Generator = ProxyGenerator
+				};
+				project.Files.Add (mapFile);
+			} else
+				FileService.NotifyFileChanged (mapSpec);
+
+			ProjectFile proxyFile = project.Files.GetFile (proxySpec);
+			if (proxyFile == null) {
+				proxyFile = new ProjectFile (proxySpec) {
+					BuildAction = BuildAction.Compile,
+					Subtype = Subtype.Code,
+					DependsOn = mapFile.FilePath
+				};
+				project.Files.Add (proxyFile);
+			} else
+				FileService.NotifyFileChanged (proxySpec);
 			
 			mapFile.LastGenOutput = proxyFile.FilePath.FileName;
 			

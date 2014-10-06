@@ -49,7 +49,7 @@ namespace MonoDevelop.Projects
 {
 	[DataInclude(typeof(DotNetProjectConfiguration))]
 	[ProjectModelDataItem ("AbstractDotNetProject")]
-	public abstract class DotNetProject : Project, IAssemblyProject
+	public abstract class DotNetProject : Project, IAssemblyProject, IDotNetFileContainer
 	{
 		bool usePartialTypes = true;
 		ProjectParameters languageParameters;
@@ -140,8 +140,7 @@ namespace MonoDevelop.Projects
 				Configurations.Add (configRelease);
 			}
 
-			if ((projectOptions != null) && (projectOptions.Attributes["TargetFrameworkVersion"] != null))
-				newProjectTargetFrameworkId = TargetFrameworkMoniker.Parse (projectOptions.Attributes["TargetFrameworkVersion"].Value);
+			targetFramework = GetTargetFrameworkForNewProject (projectOptions, GetDefaultTargetFrameworkId ());
 
 			string binPath;
 			if (projectCreateInfo != null) {
@@ -163,8 +162,31 @@ namespace MonoDevelop.Projects
 			}
 		}
 
-		public override string ProjectType {
-			get { return "DotNet"; }
+		TargetFramework GetTargetFrameworkForNewProject (XmlElement projectOptions, TargetFrameworkMoniker defaultMoniker)
+		{
+			if (projectOptions == null)
+				return Runtime.SystemAssemblyService.GetTargetFramework (defaultMoniker);
+
+			var att = projectOptions.Attributes ["TargetFrameworkVersion"];
+			if (att == null) {
+				att = projectOptions.Attributes ["TargetFramework"];
+				if (att == null)
+					return Runtime.SystemAssemblyService.GetTargetFramework (defaultMoniker);
+			}
+
+			var moniker = TargetFrameworkMoniker.Parse (att.Value);
+
+			//if the string did not include a framework identifier, use the project's default
+			var netID = TargetFrameworkMoniker.ID_NET_FRAMEWORK;
+			if (moniker.Identifier == netID && !att.Value.StartsWith (netID, StringComparison.Ordinal))
+				moniker = new TargetFrameworkMoniker (defaultMoniker.Identifier, moniker.Version, moniker.Profile);
+
+			return Runtime.SystemAssemblyService.GetTargetFramework (moniker);
+		}
+
+		public override IEnumerable<string> GetProjectTypes ()
+		{
+			yield return "DotNet";
 		}
 
 		private string languageName;
@@ -191,6 +213,18 @@ namespace MonoDevelop.Projects
 		
 		public ProjectReferenceCollection References {
 			get { return projectReferences; }
+		}
+
+		/// <summary>
+		/// Checks the status of references. To be called when referenced files may have been deleted or created.
+		/// </summary>
+		public void RefreshReferenceStatus ()
+		{
+			for (int n = 0; n < References.Count; n++) {
+				var cp = References [n].GetRefreshedReference ();
+				if (cp != null)
+					References [n] = cp;
+			}
 		}
 
 		public virtual bool CanReferenceProject (DotNetProject targetProject, out string reason)
@@ -288,15 +322,12 @@ namespace MonoDevelop.Projects
 			}
 		}
 		
-		//only used for initializing new projects
-		TargetFrameworkMoniker newProjectTargetFrameworkId;
-		
 		TargetFramework targetFramework;
 
 		public TargetFramework TargetFramework {
 			get {
 				if (targetFramework == null) {
-					var id = newProjectTargetFrameworkId ?? GetDefaultTargetFrameworkId ();
+					var id = GetDefaultTargetFrameworkId ();
 					targetFramework = Runtime.SystemAssemblyService.GetTargetFramework (id);
 				}
 				return targetFramework;
@@ -423,12 +454,17 @@ namespace MonoDevelop.Projects
 			get { return new string[] { "AnyCPU" }; }
 		}
 
-		void CheckReferenceChange (string updatedFile)
+		void CheckReferenceChange (FilePath updatedFile)
 		{
-			foreach (ProjectReference pr in References) {
-				if (pr.ReferenceType == ReferenceType.Assembly) {
-					if (updatedFile == Path.GetFullPath (pr.Reference))
+			for (int n=0; n<References.Count; n++) {
+				ProjectReference pr = References [n];
+				if (pr.ReferenceType == ReferenceType.Assembly && DefaultConfiguration != null) {
+					if (pr.GetReferencedFileNames (DefaultConfiguration.Selector).Any (f => f == updatedFile))
 						pr.NotifyStatusChanged ();
+				} else if (pr.HintPath == updatedFile) {
+					var nr = pr.GetRefreshedReference ();
+					if (nr != null)
+						References [n] = nr;
 				}
 			}
 		}
@@ -558,10 +594,12 @@ namespace MonoDevelop.Projects
 				else if (projectReference.ReferenceType == ReferenceType.Assembly) {
 					// VS COMPAT: Copy the assembly, but also all other assemblies referenced by it
 					// that are located in the same folder
-					foreach (string file in GetAssemblyRefsRec (projectReference.Reference, new HashSet<string> ())) {
+					var visitedAssemblies = new HashSet<string> ();
+					var referencedFiles = projectReference.GetReferencedFileNames (configuration);
+					foreach (string file in referencedFiles.SelectMany (ar => GetAssemblyRefsRec (ar, visitedAssemblies))) {
 						// Indirectly referenced assemblies are only copied if a newer copy doesn't exist. This avoids overwritting directly referenced assemblies
 						// by indirectly referenced stale copies of the same assembly. See bug #655566.
-						bool copyIfNewer = file != projectReference.Reference;
+						bool copyIfNewer = !referencedFiles.Contains (file);
 						list.Add (file, copyIfNewer);
 						if (File.Exists (file + ".config"))
 							list.Add (file + ".config", copyIfNewer);
@@ -570,7 +608,7 @@ namespace MonoDevelop.Projects
 							list.Add (mdbFile, copyIfNewer);
 					}
 				}
-				else if (projectReference.ReferenceType == ReferenceType.Custom) {
+				else {
 					foreach (string refFile in projectReference.GetReferencedFileNames (configuration))
 						list.Add (refFile);
 				}
@@ -705,7 +743,12 @@ namespace MonoDevelop.Projects
 		/// When set to true, it will include assemblies generated by referenced project. When set to false,
 		/// it will only include package and direct assembly references.
 		/// </param>
-		public virtual IEnumerable<string> GetReferencedAssemblies (ConfigurationSelector configuration, bool includeProjectReferences)
+		public IEnumerable<string> GetReferencedAssemblies (ConfigurationSelector configuration, bool includeProjectReferences)
+		{
+			return Services.ProjectService.GetExtensionChain (this).GetReferencedAssemblies (this, configuration, includeProjectReferences);
+		}
+
+		internal protected virtual IEnumerable<string> OnGetReferencedAssemblies (ConfigurationSelector configuration, bool includeProjectReferences)
 		{
 			IAssemblyReferenceHandler handler = this.ItemHandler as IAssemblyReferenceHandler;
 			if (handler != null) {
@@ -725,6 +768,22 @@ namespace MonoDevelop.Projects
 							yield return asm;
 					}
 				}
+			}
+
+			var config = (DotNetProjectConfiguration)GetConfiguration (configuration);
+			bool noStdLib = false;
+			if (config != null) {
+				var parameters = config.CompilationParameters as DotNetConfigurationParameters;
+				if (parameters != null) {
+					noStdLib = parameters.NoStdLib;
+				}
+			}
+
+			// System.Core is an implicit reference
+			if (!noStdLib) {
+				var sa = AssemblyContext.GetAssemblies (TargetFramework).FirstOrDefault (a => a.Name == "System.Core" && a.Package.IsFrameworkPackage);
+				if (sa != null)
+					yield return sa.Location;
 			}
 		}
 
@@ -876,9 +935,12 @@ namespace MonoDevelop.Projects
 		{
 			List<FilePath> col = base.OnGetItemFiles (includeReferencedFiles);
 			if (includeReferencedFiles) {
-				foreach (ProjectReference pref in References)
-					if (pref.ReferenceType == ReferenceType.Assembly)
-						col.Add (pref.Reference);
+				foreach (ProjectReference pref in References) {
+					if (pref.ReferenceType == ReferenceType.Assembly) {
+						foreach (var f in pref.GetReferencedFileNames (DefaultConfiguration.Selector))
+							col.Add (f);
+					}
+				}
 				foreach (DotNetProjectConfiguration c in Configurations) {
 					if (c.SignAssembly)
 						col.Add (c.AssemblyKeyFile);
@@ -894,20 +956,29 @@ namespace MonoDevelop.Projects
 				return false;
 			return LanguageBinding.IsSourceCodeFile (fileName);
 		}
-		
+
 		/// <summary>
 		/// Gets the default namespace for the file, according to the naming policy.
 		/// </summary>
 		/// <remarks>Always returns a valid namespace, even if the fileName is null.</remarks>
 		public virtual string GetDefaultNamespace (string fileName)
 		{
-			DotNetNamingPolicy pol = Policies.Get<DotNetNamingPolicy> ();
+			return GetDefaultNamespace (this, DefaultNamespace, fileName);
+		}
+
+		/// <summary>
+		/// Gets the default namespace for the file, according to the naming policy.
+		/// </summary>
+		/// <remarks>Always returns a valid namespace, even if the fileName is null.</remarks>
+		internal static string GetDefaultNamespace (Project project, string defaultNamespace, string fileName)
+		{
+			DotNetNamingPolicy pol = project.Policies.Get<DotNetNamingPolicy> ();
 
 			string root = null;
 			string dirNamespc = null;
-			string defaultNmspc = !string.IsNullOrEmpty (DefaultNamespace)
-				? DefaultNamespace
-				: SanitisePotentialNamespace (Name) ?? "Application";
+			string defaultNmspc = !string.IsNullOrEmpty (defaultNamespace)
+				? defaultNamespace
+				: SanitisePotentialNamespace (project.Name) ?? "Application";
 			
 			if (string.IsNullOrEmpty (fileName)) {
 				return defaultNmspc;
@@ -916,7 +987,7 @@ namespace MonoDevelop.Projects
 			string dirname = Path.GetDirectoryName (fileName);
 			string relativeDirname = null;
 			if (!String.IsNullOrEmpty (dirname)) {
-				relativeDirname = GetRelativeChildPath (dirname);
+				relativeDirname = project.GetRelativeChildPath (dirname);
 				if (string.IsNullOrEmpty (relativeDirname) || relativeDirname.StartsWith (".."))
 					relativeDirname = null;
 			}
@@ -952,7 +1023,7 @@ namespace MonoDevelop.Projects
 			return defaultNmspc;
 		}
 
-		string GetHierarchicalNamespace (string relativePath)
+		static string GetHierarchicalNamespace (string relativePath)
 		{
 			StringBuilder sb = new StringBuilder (relativePath);
 			for (int i = 0; i < sb.Length; i++) {
@@ -962,7 +1033,7 @@ namespace MonoDevelop.Projects
 			return sb.ToString ();
 		}
 
-		string SanitisePotentialNamespace (string potential)
+		static string SanitisePotentialNamespace (string potential)
 		{
 			StringBuilder sb = new StringBuilder ();
 			foreach (char c in potential) {
@@ -990,12 +1061,17 @@ namespace MonoDevelop.Projects
 		{
 			foreach (ProjectReference pref in References) {
 				if (pref.ReferenceType == ReferenceType.Package) {
-					string newRef = AssemblyContext.GetAssemblyNameForVersion (pref.Reference, pref.Package != null ? pref.Package.Name : null, this.TargetFramework);
-					if (newRef == null) {
+					// package name is only relevant if it's not a framework package
+					var pkg = pref.Package;
+					string packageName = pkg != null && !pkg.IsFrameworkPackage? pkg.Name : null;
+					// find the version of the assembly that's valid for the new framework
+					var newAsm = AssemblyContext.GetAssemblyForVersion (pref.Reference, packageName, TargetFramework);
+					// if it changed, clear assembly resolution caches and update reference
+					if (newAsm == null) {
 						pref.ResetReference ();
-					} else if (newRef != pref.Reference) {
-						pref.Reference = newRef;
-					} else if (!pref.IsValid) {
+					} else if (newAsm.FullName != pref.Reference) {
+						pref.Reference = newAsm.FullName;
+					} else if (!pref.IsValid || newAsm.Package != pref.Package) {
 						pref.ResetReference ();
 					}
 				}
@@ -1164,6 +1240,34 @@ namespace MonoDevelop.Projects
 				LoggingService.LogError (string.Format ("Cannot execute \"{0}\"", dotNetProjectConfig.CompiledOutputName), ex);
 				monitor.ReportError (GettextCatalog.GetString ("Cannot execute \"{0}\"", dotNetProjectConfig.CompiledOutputName), ex);
 			}
+		}
+
+		public void AddImportIfMissing (string name, string condition)
+		{
+			importsAdded.Add (new DotNetProjectImport (name, condition));
+		}
+
+		public void RemoveImport (string name)
+		{
+			importsRemoved.Add (new DotNetProjectImport (name));
+		}
+
+		List <DotNetProjectImport> importsAdded = new List<DotNetProjectImport> ();
+
+		internal IList<DotNetProjectImport> ImportsAdded {
+			get { return importsAdded; }
+		}
+
+		List <DotNetProjectImport> importsRemoved = new List<DotNetProjectImport> ();
+
+		internal IList<DotNetProjectImport> ImportsRemoved {
+			get { return importsRemoved; }
+		}
+
+		public void ImportsSaved ()
+		{
+			importsAdded.Clear ();
+			importsRemoved.Clear ();
 		}
 	}
 }

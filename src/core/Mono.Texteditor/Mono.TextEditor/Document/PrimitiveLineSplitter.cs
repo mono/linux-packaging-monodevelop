@@ -2,6 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ICSharpCode.NRefactory;
+
+
 namespace Mono.TextEditor
 {
 	/// <summary>
@@ -37,12 +40,17 @@ namespace Mono.TextEditor
 				}
 			}
 
-			public PrimitiveLineSegment (PrimitiveLineSplitter splitter, int lineNumber, int offset, int length, int delimiterLength) : base(length, delimiterLength)
+			public PrimitiveLineSegment (PrimitiveLineSplitter splitter, int lineNumber, int offset, int length, UnicodeNewline newLine) : base(length, newLine)
 			{
 				this.splitter = splitter;
 				this.lineNumber = lineNumber;
 				Offset = offset;
 			}
+		}
+
+		public bool LineEndingMismatch {
+			get;
+			set;
 		}
 
 		public int Count {
@@ -53,21 +61,25 @@ namespace Mono.TextEditor
 			get { return GetLinesStartingAt (DocumentLocation.MinLine); }
 		}
 
-		public void Initalize (string text)
+		public void Initalize (string text, out DocumentLine longestLine)
 		{
 			delimiters = new List<LineSplitter.Delimiter> ();
 
-			int offset = 0;
+			int offset = 0, maxLength = 0, maxLine = 0;
 			while (true) {
 				var delimiter = LineSplitter.NextDelimiter (text, offset);
 				if (delimiter.IsInvalid)
 					break;
 
+				var length = delimiter.EndOffset - offset;
+				if (length > maxLength) {
+					maxLength = length;
+					maxLine = delimiters.Count;
+				}
 				delimiters.Add (delimiter);
-
 				offset = delimiter.EndOffset;
 			}
-
+			longestLine = Get (maxLine);
 
 			textLength = text.Length;
 		}
@@ -85,15 +97,15 @@ namespace Mono.TextEditor
 				return null;
 			int startOffset = number > 0 ? delimiters[number - 1].EndOffset : 0;
 			int endOffset;
-			int delimiterLength;
+			UnicodeNewline newLine;
 			if (number < delimiters.Count) {
 				endOffset = delimiters[number].EndOffset;
-				delimiterLength = delimiters[number].Length;
+				newLine = delimiters[number].UnicodeNewline;
 			} else {
 				endOffset = textLength;
-				delimiterLength = 0;
+				newLine = UnicodeNewline.Unknown;
 			}
-			return new PrimitiveLineSegment (this, number, startOffset, endOffset - startOffset, delimiterLength);
+			return new PrimitiveLineSegment (this, number, startOffset, endOffset - startOffset, newLine);
 		}
 
 		public DocumentLine GetLineByOffset (int offset)

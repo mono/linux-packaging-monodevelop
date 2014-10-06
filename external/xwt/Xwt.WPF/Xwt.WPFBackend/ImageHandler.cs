@@ -50,6 +50,11 @@ namespace Xwt.WPFBackend
 			img.StreamSource = stream;
 			img.EndInit();
 
+			return LoadFromImageSource (img);
+		}
+
+		public static object LoadFromImageSource (ImageSource img)
+		{
 			var bmp = img as BitmapSource;
 			if (bmp != null && (bmp.DpiX != 96 || bmp.DpiY != 96))
 				return new WpfImage (ConvertBitmapTo96DPI (bmp));
@@ -173,7 +178,7 @@ namespace Xwt.WPFBackend
 
 			var bitmapImage = img as WriteableBitmap;
 
-			if (!(bitmapImage is WriteableBitmap)) {
+			if (bitmapImage == null) {
 				bitmapImage = new WriteableBitmap (img);
 				((WpfImage)handle).MainFrame = bitmapImage;
 			}
@@ -220,10 +225,10 @@ namespace Xwt.WPFBackend
 				return img.Height;
 		}
 
-		public override object ConvertToBitmap (object img, int width, int height, Xwt.Drawing.ImageFormat format)
+		public override object ConvertToBitmap (object img, double width, double height, double scaleFactor, Xwt.Drawing.ImageFormat format)
 		{
 			var wpfImage = (WpfImage)img;
-			return new WpfImage (wpfImage.GetBestFrame (ApplicationContext, 1, width, height, true));
+			return new WpfImage (wpfImage.GetBestFrame (ApplicationContext, scaleFactor, width, height, true));
 		}
 
 		public override bool HasMultipleSizes (object handle)
@@ -250,21 +255,8 @@ namespace Xwt.WPFBackend
 		public override object CropBitmap(object handle, int srcX, int srcY, int w, int h)
 		{
 			var oldImg = (SWMI.BitmapSource)DataConverter.AsImageSource (handle);
-
-			double width = WidthToDPI (oldImg, w);
-			double height = HeightToDPI (oldImg, h);
-
-			SWM.DrawingVisual visual = new SWM.DrawingVisual ();
-			using (SWM.DrawingContext ctx = visual.RenderOpen ())
-			{
-				//Not sure whether this actually works, untested
-				ctx.DrawImage(oldImg, new System.Windows.Rect (-srcX, -srcY, srcX+width, srcY+height));
-			}
-
-			SWMI.RenderTargetBitmap bmp = new SWMI.RenderTargetBitmap ((int)width, (int)height, oldImg.DpiX, oldImg.DpiY, PixelFormats.Pbgra32);
-			bmp.Render (visual);
-
-			return bmp;
+			var bmp = new CroppedBitmap (oldImg, new Int32Rect (srcX, srcY, w, h));
+			return new WpfImage (bmp);
 		}
 
 		public override void CopyBitmapArea (object srcHandle, int srcX, int srcY, int width, int height, object destHandle, int destX, int destY)
@@ -416,7 +408,7 @@ namespace Xwt.WPFBackend
 		public ImageSource GetBestFrame (ApplicationContext actx, double scaleFactor, double width, double height, bool forceExactSize)
 		{
 			var f = FindFrame (width, height, scaleFactor);
-			if (f == null || (forceExactSize && (f.Width != (int)width || f.Height != (int)height)))
+			if (f == null || (forceExactSize && (Math.Abs (f.Width - width * scaleFactor) > 0.01 || Math.Abs (f.Height - height * scaleFactor) > 0.01)))
 				return RenderFrame (actx, scaleFactor, width, height);
 			else
 				return f;
@@ -426,14 +418,16 @@ namespace Xwt.WPFBackend
 		{
 			ImageDescription idesc = new ImageDescription () {
 				Alpha = 1,
-				Size = new Size (width * scaleFactor, height * scaleFactor)
+				Size = new Size (width, height)
 			};
 			SWM.DrawingVisual visual = new SWM.DrawingVisual ();
 			using (SWM.DrawingContext ctx = visual.RenderOpen ()) {
-				Draw (actx, ctx, 1, 0, 0, idesc);
+				ctx.PushTransform (new ScaleTransform (scaleFactor, scaleFactor));
+				Draw (actx, ctx, scaleFactor, 0, 0, idesc);
+				ctx.Pop ();
 			}
 
-			SWMI.RenderTargetBitmap bmp = new SWMI.RenderTargetBitmap ((int)idesc.Size.Width, (int)idesc.Size.Height, 96, 96, PixelFormats.Pbgra32);
+			SWMI.RenderTargetBitmap bmp = new SWMI.RenderTargetBitmap ((int)(width * scaleFactor), (int)(height * scaleFactor), 96, 96, PixelFormats.Pbgra32);
 			bmp.Render (visual);
 
 			var f = new ImageFrame (bmp, width, height);
@@ -464,6 +458,9 @@ namespace Xwt.WPFBackend
 					dc.PushOpacity (idesc.Alpha);
 
 				var f = GetBestFrame (actx, scaleFactor, idesc.Size.Width, idesc.Size.Height, false);
+				var bmpImage = f as BitmapSource;
+				if (bmpImage != null && (bmpImage.PixelHeight != idesc.Size.Height || bmpImage.PixelWidth != idesc.Size.Width))
+					f = new TransformedBitmap (bmpImage, new ScaleTransform (idesc.Size.Width / bmpImage.PixelWidth, idesc.Size.Height / bmpImage.PixelHeight));
 				dc.DrawImage (f, new Rect (x, y, idesc.Size.Width, idesc.Size.Height));
 
 				if (idesc.Alpha < 1)
@@ -476,7 +473,8 @@ namespace Xwt.WPFBackend
 	{
 		ApplicationContext actx;
 
-		public static readonly DependencyProperty ImageSourceProperty = DependencyProperty.Register ("ImageSource", typeof (ImageDescription), typeof (ImageBox), new PropertyMetadata (ImageDescription.Null));
+		public static readonly DependencyProperty ImageSourceProperty =
+			DependencyProperty.Register ("ImageSource", typeof (ImageDescription), typeof (ImageBox), new FrameworkPropertyMetadata (ImageDescription.Null) { AffectsMeasure = true, AffectsRender = true });
 
 		public ImageBox ()
 		{

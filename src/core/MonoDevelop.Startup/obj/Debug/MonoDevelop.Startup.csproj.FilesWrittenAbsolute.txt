@@ -1,6 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/bin/MonoDevelop.exe.addins
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/bin/MonoDevelop.exe.config
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/bin/MonoDevelop.exe.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/bin/MonoDevelop.exe
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.exe
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.exe.mdb

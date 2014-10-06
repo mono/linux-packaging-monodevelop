@@ -157,7 +157,7 @@ namespace Xwt.Drawing
 			if (!img.HasFixedSize)
 				throw new InvalidOperationException ("Image doesn't have a fixed size");
 
-			var idesc = img.ImageDescription;
+			var idesc = img.GetImageDescription (ToolkitEngine);
 			idesc.Alpha *= alpha;
 			handler.DrawImage (Backend, idesc, x, y);
 		}
@@ -169,7 +169,9 @@ namespace Xwt.Drawing
 		
 		public void DrawImage (Image img, double x, double y, double width, double height, double alpha = 1)
 		{
-			var idesc = img.ImageDescription;
+			if (width <= 0 || height <= 0)
+				return;
+			var idesc = img.GetImageDescription (ToolkitEngine);
 			idesc.Alpha *= alpha;
 			idesc.Size = new Size (width, height);
 			handler.DrawImage (Backend, idesc, x, y);
@@ -185,7 +187,7 @@ namespace Xwt.Drawing
 			if (!img.HasFixedSize)
 				throw new InvalidOperationException ("Image doesn't have a fixed size");
 
-			var idesc = img.ImageDescription;
+			var idesc = img.GetImageDescription (ToolkitEngine);
 			idesc.Alpha *= alpha;
 			handler.DrawImage (Backend, idesc, srcRect, destRect);
 		}
@@ -201,7 +203,6 @@ namespace Xwt.Drawing
 		/// The rotation of the axes takes places after any existing transformation of user space.
 		/// The rotation direction for positive angles is from the positive X axis toward the positive Y axis.
 		/// </remarks>
-		/// </summary>
 		public void Rotate (double angle)
 		{
 			handler.Rotate (Backend, angle);
@@ -223,13 +224,25 @@ namespace Xwt.Drawing
 		}
 
 		/// <summary>
+		/// Modifies the Current Transformation Matrix (CTM) by prepending the Matrix transform specified
+		/// </summary>
+		/// <remarks>
+		/// This enables any 'non-standard' transforms (eg skew, reflection) to be used for drawing,
+		/// and provides the link to the extra transform capabilities provided by Xwt.Drawing.Matrix
+		/// </remarks>
+		public void ModifyCTM (Matrix transform)
+		{
+			handler.ModifyCTM (Backend, transform);
+		}
+
+		/// <summary>
 		/// Returns a copy of the current transformation matrix (CTM)
 		/// </summary>
 		public Matrix GetCTM ()
 		{
 			return handler.GetCTM (Backend);
 		}
-		
+
 		/// <summary>
 		/// Transforms the point (x, y) by the current transformation matrix (CTM)
 		/// </summary>
@@ -345,6 +358,10 @@ namespace Xwt.Drawing
 		public void SetLineDash (double offset, params double[] pattern)
 		{
 			handler.SetLineDash (Backend, offset, pattern);
+		}
+
+		internal double ScaleFactor {
+			get { return handler.GetScaleFactor (Backend); }
 		}
 	}
 }

@@ -32,7 +32,7 @@ using ICSharpCode.NRefactory.CSharp.Resolver;
 
 namespace ICSharpCode.NRefactory.CSharp.Completion
 {
-	class CompletionDataWrapper
+	public class CompletionDataWrapper
 	{
 		CSharpCompletionEngine completion;
 		List<ICompletionData> result = new List<ICompletionData> ();
@@ -48,6 +48,11 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 				return completion.factory;
 			}
 		}
+
+		internal bool AnonymousDelegateAdded {
+			get;
+			set;
+		}
 		
 		public CompletionDataWrapper (CSharpCompletionEngine completion)
 		{
@@ -60,9 +65,11 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 		}
 
 
-		public void AddCustom (string displayText, string description = null, string completionText = null)
+		public ICompletionData AddCustom (string displayText, string description = null, string completionText = null)
 		{
-			result.Add (Factory.CreateLiteralCompletionData (displayText, description, completionText));
+			var literalCompletionData = Factory.CreateLiteralCompletionData(displayText, description, completionText);
+			result.Add(literalCompletionData);
+			return literalCompletionData;
 		}
 		
 		HashSet<string> usedNamespaces = new HashSet<string> ();
@@ -115,7 +122,7 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 				return null;
 			if (addedTypes.ContainsKey (type))
 				return addedTypes[type];
-
+			usedNamespaces.Add(type.Name);
 			var def = type.GetDefinition();
 			if (def != null && def.ParentAssembly != completion.ctx.CurrentAssembly) {
 				switch (completion.EditorBrowsableBehavior) {
@@ -303,6 +310,17 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 				}
 			}
 			return result;
+		}
+		HashSet<string> anonymousSignatures = new HashSet<string> ();
+
+		public bool HasAnonymousDelegateAdded(string signature)
+		{
+			return anonymousSignatures.Contains(signature); 
+		}
+
+		public void AddAnonymousDelegateAdded(string signature)
+		{
+			anonymousSignatures.Add(signature); 
 		}
 	}
 }

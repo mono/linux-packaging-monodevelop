@@ -1,16 +1,5 @@
-using System;
 using System.Linq;
-using System.Collections;
-using System.IO;
-
-using Gtk;
-
-using MonoDevelop.Projects;
-using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Core;
-using MonoDevelop.Components.Commands;
- 
-using MonoDevelop.Components;
 using MonoDevelop.Ide;
 
 namespace MonoDevelop.VersionControl 
@@ -114,7 +103,7 @@ namespace MonoDevelop.VersionControl
 			
 			string msg = GettextCatalog.GetString ("Are you sure you want to remove the selected items from the version control system?");
 			string msg2 = GettextCatalog.GetString ("The files will be kept on disk.");
-			if (MessageService.Confirm (msg, msg2, AlertButton.Delete))
+			if (MessageService.Confirm (msg, msg2, AlertButton.Remove))
 				new RemoveWorker (items).Start();
 			return true;
 		}

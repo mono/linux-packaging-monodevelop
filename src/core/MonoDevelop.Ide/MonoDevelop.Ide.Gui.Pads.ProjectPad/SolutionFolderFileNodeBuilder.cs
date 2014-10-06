@@ -25,6 +25,7 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Core;
@@ -51,13 +52,13 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			return ((SolutionFolderFileNode)dataObject).FileName;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			SolutionFolderFileNode file = (SolutionFolderFileNode) dataObject;
-			label = file.FileName.FileName;
+			nodeInfo.Label = file.FileName.FileName;
 			if (!System.IO.File.Exists (file.FileName))
-				label = "<span foreground='red'>" + label + "</span>";
-			icon = DesktopService.GetPixbufForFile (file.FileName, Gtk.IconSize.Menu);
+				nodeInfo.Label = "<span foreground='red'>" + nodeInfo.Label + "</span>";
+			nodeInfo.Icon = DesktopService.GetIconForFile (file.FileName, Gtk.IconSize.Menu);
 		}
 		
 		public override object GetParentObject (object dataObject)
@@ -82,6 +83,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 	{
 		public override void DeleteMultipleItems ()
 		{
+			var modifiedSolutionsToSave = new HashSet<Solution> ();
 			QuestionMessage msg = new QuestionMessage ();
 			msg.SecondaryText = GettextCatalog.GetString ("The Delete option permanently removes the file from your hard disk. Click Remove from Solution if you only want to remove it from your current solution.");
 			AlertButton removeFromSolution = new AlertButton (GettextCatalog.GetString ("_Remove from Solution"), Gtk.Stock.Remove);
@@ -105,7 +107,13 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				if (result == AlertButton.Delete) {
 					FileService.DeleteFile (file.FileName);
 				}
+
+				if (file.Parent != null && file.Parent.ParentSolution != null) {
+					modifiedSolutionsToSave.Add (file.Parent.ParentSolution);
+				}
 			}
+				
+			IdeApp.ProjectOperations.Save (modifiedSolutionsToSave);
 		}
 		
 		public override void ActivateItem ()

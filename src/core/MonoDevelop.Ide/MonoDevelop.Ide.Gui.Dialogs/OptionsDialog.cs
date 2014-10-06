@@ -41,11 +41,13 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 	{
 		Gtk.HBox mainHBox;
 		Gtk.TreeView tree;
-		Gtk.Image image;
+		Xwt.ImageView image;
 		Gtk.Label labelTitle;
 		Gtk.HBox pageFrame;
 		Gtk.Button buttonCancel;
 		Gtk.Button buttonOk;
+		OptionsDialogHeader imageHeader;
+		Gtk.Alignment textHeader;
 
 		protected TreeStore store;
 		Dictionary<OptionsDialogSection, SectionPage> pages = new Dictionary<OptionsDialogSection, SectionPage> ();
@@ -56,7 +58,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		HashSet<object> modifiedObjects = new HashSet<object> ();
 		bool removeEmptySections;
 		
-		const string emptyCategoryIcon = "md-empty-category";
+		const string emptyCategoryIcon = "md-prefs-generic";
 		const Gtk.IconSize treeIconSize = IconSize.Menu;
 		const Gtk.IconSize headerIconSize = IconSize.Button;
 		
@@ -114,13 +116,19 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			var vbox = new VBox ();
 			mainHBox.PackStart (vbox, true, true, 0);
 			var headerBox = new HBox (false, 6);
-			image = new Image ();
+			image = new Xwt.ImageView ();
 		//	headerBox.PackStart (image, false, false, 0);
 
 			labelTitle = new Label ();
 			labelTitle.Xalign = 0;
-			headerBox.PackStart (labelTitle, true, true, 0);
-			headerBox.BorderWidth = 12;
+			textHeader = new Alignment (0, 0, 1, 1);
+			textHeader.Add (labelTitle);
+			textHeader.BorderWidth = 12;
+			headerBox.PackStart (textHeader, true, true, 0);
+
+			imageHeader = new OptionsDialogHeader ();
+			imageHeader.Hide ();
+			headerBox.PackStart (imageHeader.ToGtkWidget ());
 
 			var fboxHeader = new HeaderBox ();
 			fboxHeader.SetMargins (0, 1, 0, 0);
@@ -128,9 +136,9 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 //			fbox.GradientBackround = true;
 //			fbox.BackgroundColor = new Gdk.Color (255, 255, 255);
 			Realized += delegate {
-				var c = new HslColor (Style.Background (Gtk.StateType.Normal));
-				c.L += 0.09;
-				fboxHeader.BackgroundColor = c;
+				var c = Style.Background (Gtk.StateType.Normal).ToXwtColor ();
+				c.Light += 0.09;
+				fboxHeader.BackgroundColor = c.ToGdkColor ();
 			};
 			vbox.PackStart (fboxHeader, false, false, 0);
 
@@ -152,9 +160,8 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			if (parentWindow != null)
 				TransientFor = parentWindow;
 			
-			ImageService.EnsureStockIconIsLoaded (emptyCategoryIcon, treeIconSize);
-			ImageService.EnsureStockIconIsLoaded (emptyCategoryIcon, headerIconSize);
-			
+			ImageService.EnsureStockIconIsLoaded (emptyCategoryIcon);
+
 			store = new TreeStore (typeof(OptionsDialogSection));
 			tree.Model = store;
 			tree.HeadersVisible = false;
@@ -165,7 +172,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			tree.AppendColumn (col0);
 
 			TreeViewColumn col = new TreeViewColumn ();
-			var crp = new CellRendererPixbuf ();
+			var crp = new CellRendererImage ();
 			col.PackStart (crp, false);
 			col.SetCellDataFunc (crp, PixbufCellDataFunc);
 			var crt = new CellRendererText ();
@@ -194,7 +201,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			TreeIter parent;
 			bool toplevel = !model.IterParent (out parent, iter);
 			
-			var crp = (CellRendererPixbuf) cell;
+			var crp = (CellRendererImage) cell;
 			crp.Visible = !toplevel;
 			
 			if (toplevel) {
@@ -207,15 +214,15 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			// Instead, give this some awareness of the mime system.
 			var mimeSection = section as MonoDevelop.Ide.Projects.OptionPanels.MimetypeOptionsDialogSection;
 			if (mimeSection != null && !string.IsNullOrEmpty (mimeSection.MimeType)) {
-				var pix = DesktopService.GetPixbufForType (mimeSection.MimeType, treeIconSize);
+				var pix = DesktopService.GetIconForType (mimeSection.MimeType, treeIconSize);
 				if (pix != null) {
-					crp.Pixbuf = pix;
+					crp.Image = pix;
 				} else {
-					crp.Pixbuf = ImageService.GetPixbuf (emptyCategoryIcon, treeIconSize);
+					crp.Image = ImageService.GetIcon (emptyCategoryIcon, treeIconSize);
 				}
 			} else {
 				string icon = section.Icon.IsNull? emptyCategoryIcon : section.Icon.ToString ();
-				crp.Pixbuf = ImageService.GetPixbuf (icon, treeIconSize);
+				crp.Image = ImageService.GetIcon (icon, treeIconSize);
 			}
 		}
 		
@@ -274,7 +281,30 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			}
 			base.OnDestroyed ();
 		}
-		
+
+		/// <summary>
+		/// Gets a specific dialog panel from a given section.
+		/// </summary>
+		/// <returns>The panel, or null if the panel wasn't found.</returns>
+		/// <param name="id">The section id.</param>
+		/// <typeparam name="T">The type of the dialog panel.</typeparam>
+		public T GetPanel<T> (string id) where T : class, IOptionsPanel
+		{
+			foreach (OptionsDialogSection section in pages.Keys) {
+				if (section.Id == id) {
+					SectionPage page;
+					if (!pages.TryGetValue (section, out page))
+						return null;
+					foreach (var panel in page.Panels) {
+						var result = panel.Panel as T;
+						if (result != null)
+							return result;
+					}
+				}
+			}
+			return null;
+		}
+
 		public void SelectPanel (string id)
 		{
 			foreach (OptionsDialogSection section in pages.Keys) {
@@ -450,6 +480,16 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		
 		public void ShowPage (OptionsDialogSection section)
 		{
+			if (!IsRealized) {
+				// Defer this until the dialog is realized due to the sizing logic in CreatePageWidget.
+				EventHandler deferredShowPage = null;
+				deferredShowPage = delegate {
+					ShowPage (section);
+					Realized -= deferredShowPage;
+				};
+				Realized += deferredShowPage;
+				return;
+			}
 			SectionPage page;
 			if (!pages.TryGetValue (section, out page))
 				return;
@@ -476,21 +516,29 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			
 			if (page.Widget == null)
 				CreatePageWidget (page);
-			
-			labelTitle.Markup = "<span weight=\"bold\" size=\"large\">" + GLib.Markup.EscapeText (section.Label) + "</span>";
+
+			if (section.HeaderImage == null) {
+				labelTitle.Markup = "<span weight=\"bold\" size=\"large\">" + GLib.Markup.EscapeText (section.Label) + "</span>";
+				textHeader.Show ();
+				imageHeader.Hide ();
+			} else {
+				imageHeader.SetImage (section.HeaderImage, section.HeaderFillerImageResource);
+				imageHeader.Show ();
+				textHeader.Hide ();
+			}
 			
 			//HACK: mimetype panels can't provide stock ID for mimetype images. Give this some awareness of mimetypes.
 			var mimeSection = section as MonoDevelop.Ide.Projects.OptionPanels.MimetypeOptionsDialogSection;
 			if (mimeSection != null && !string.IsNullOrEmpty (mimeSection.MimeType)) {
-				var pix = DesktopService.GetPixbufForType (mimeSection.MimeType, headerIconSize);
+				var pix = DesktopService.GetIconForType (mimeSection.MimeType, headerIconSize);
 				if (pix != null) {
-					image.Pixbuf = pix;
+					image.Image = pix;
 				} else {
-					image.Pixbuf = ImageService.GetPixbuf (emptyCategoryIcon, headerIconSize);
+					image.Image = ImageService.GetIcon (emptyCategoryIcon, headerIconSize);
 				}
 			} else {
 				string icon = section.Icon.IsNull? emptyCategoryIcon : section.Icon.ToString ();
-				image.Pixbuf = ImageService.GetPixbuf (icon, headerIconSize);
+				image.Image = ImageService.GetIcon (icon, headerIconSize);
 			}
 
 /*			var algn = new HeaderBox ();
@@ -704,6 +752,39 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			public List<PanelInstance> Panels;
 			public Gtk.Widget Widget;
 			public Gtk.TreeIter Iter;
+		}
+	}
+
+	class OptionsDialogHeader: Xwt.Canvas
+	{
+		Xwt.Drawing.Image image, filler;
+
+		public void SetImage (Xwt.Drawing.Image image, Xwt.Drawing.Image filler)
+		{
+			this.image = image;
+			this.filler = filler;
+			QueueDraw ();
+		}
+
+		protected override void OnDraw (Xwt.Drawing.Context ctx, Xwt.Rectangle dirtyRect)
+		{
+			base.OnDraw (ctx, dirtyRect);
+			if (image != null) {
+				ctx.DrawImage (image, 0, 0);
+				if (filler != null) {
+					int fillCount = (int)Math.Ceiling ((Bounds.Width - image.Width) / filler.Width);
+					double x = image.Width;
+					while ((fillCount--) > 0) {
+						ctx.DrawImage (filler, x, 0);
+						x += filler.Width;
+					}
+				}
+			}
+		}
+
+		protected override Xwt.Size OnGetPreferredSize (Xwt.SizeConstraint widthConstraint, Xwt.SizeConstraint heightConstraint)
+		{
+			return new Xwt.Size (0, image != null ? image.Height : 0);
 		}
 	}
 }

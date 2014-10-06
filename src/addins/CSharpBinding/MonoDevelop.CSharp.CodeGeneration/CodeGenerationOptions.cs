@@ -25,7 +25,6 @@
 // THE SOFTWARE.
 using System.Linq;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Refactoring;
 using MonoDevelop.Ide;
 using ICSharpCode.NRefactory.TypeSystem;
 using ICSharpCode.NRefactory.CSharp;
@@ -34,7 +33,6 @@ using MonoDevelop.Ide.TypeSystem;
 using MonoDevelop.Core;
 using ICSharpCode.NRefactory.CSharp.Resolver;
 using System;
-using ICSharpCode.NRefactory;
 using System.Threading;
 
 namespace MonoDevelop.CodeGeneration
@@ -71,13 +69,13 @@ namespace MonoDevelop.CodeGeneration
 			get {
 				var doc = Document;
 				var policyParent = doc.Project != null ? doc.Project.Policies : null;
-				var types = MonoDevelop.Ide.DesktopService.GetMimeTypeInheritanceChain (doc.Editor.MimeType);
+				var types = DesktopService.GetMimeTypeInheritanceChain (doc.Editor.MimeType);
 				var codePolicy = policyParent != null ? policyParent.Get<MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy> (types) : MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy> (types);
 				return codePolicy.CreateOptions ();
 			}
 		}
 		
-		AstNode FirstExpressionChild (AstNode parent)
+		static AstNode FirstExpressionChild (AstNode parent)
 		{
 			AstNode node = parent.FirstChild;
 			if (node == null)
@@ -88,7 +86,7 @@ namespace MonoDevelop.CodeGeneration
 			return node;
 		}
 		
-		AstNode NextExpression (AstNode parent)
+		static AstNode NextExpression (AstNode parent)
 		{
 			AstNode node = parent.GetNextNode ();
 			if (node == null)
@@ -99,7 +97,7 @@ namespace MonoDevelop.CodeGeneration
 			return node;
 		}
 		
-		Lazy<CSharpResolver> currentState;
+		readonly Lazy<CSharpResolver> currentState;
 		public CSharpResolver CurrentState {
 			get {
 				return currentState.Value;
@@ -122,7 +120,7 @@ namespace MonoDevelop.CodeGeneration
 				var expr = new IdentifierExpression ("foo");
 				resolvedNode.Add (expr);
 				
-				var ctx = file.GetTypeResolveContext (Document.Compilation, Document.Editor.Caret.Location) as CSharpTypeResolveContext;
+				var ctx = file.GetTypeResolveContext (Document.Compilation, Document.Editor.Caret.Location);
 				
 				var resolver = new CSharpResolver (ctx);
 				
@@ -137,7 +135,9 @@ namespace MonoDevelop.CodeGeneration
 		{
 			var parsedFile = Document.ParsedDocument.ParsedFile as CSharpUnresolvedFile;
 			
-			var csResolver = parsedFile.GetResolver (Document.Compilation, Document.Editor.Caret.Location);
+			var compilation = Document.Compilation;
+			fullType = compilation.Import (fullType);
+			var csResolver = parsedFile.GetResolver (compilation, Document.Editor.Caret.Location);
 			
 			var builder = new ICSharpCode.NRefactory.CSharp.Refactoring.TypeSystemAstBuilder (csResolver);
 			return builder.ConvertType (fullType);
@@ -154,13 +154,14 @@ namespace MonoDevelop.CodeGeneration
 		public static CodeGenerationOptions CreateCodeGenerationOptions (Document document)
 		{
 			document.UpdateParseDocument ();
-			var options = new CodeGenerationOptions () {
+			var options = new CodeGenerationOptions {
 				Document = document
 			};
 			if (document.ParsedDocument != null && document.ParsedDocument.ParsedFile != null) {
 				options.EnclosingPart = document.ParsedDocument.ParsedFile.GetInnermostTypeDefinition (document.Editor.Caret.Location);
-				if (options.EnclosingPart != null)
-					options.EnclosingType = options.EnclosingPart.Resolve (document.Project).GetDefinition ();
+				var project = document.Project;
+				if (options.EnclosingPart != null && project != null)
+					options.EnclosingType = options.EnclosingPart.Resolve (project).GetDefinition ();
 				if (options.EnclosingType != null) {
 					options.EnclosingMember = options.EnclosingType.Members.FirstOrDefault (m => !m.IsSynthetic && m.Region.FileName == document.FileName && m.Region.IsInside (document.Editor.Caret.Location));
 				}

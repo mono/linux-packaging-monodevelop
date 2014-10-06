@@ -33,7 +33,7 @@ using ICSharpCode.NRefactory.CSharp;
 
 namespace MonoDevelop.CSharp.Refactoring.CodeIssues
 {
-	public partial class NameConventionEditRuleDialog : Gtk.Dialog
+	partial class NameConventionEditRuleDialog : Gtk.Dialog
 	{
 		static readonly Dictionary<AffectedEntity, string> EntityName = new Dictionary<AffectedEntity, string> ();
 		static readonly Dictionary<Modifiers, string> AccessibilityName = new Dictionary<Modifiers, string> ();
@@ -82,8 +82,8 @@ namespace MonoDevelop.CSharp.Refactoring.CodeIssues
 
 		NameConventionRule rule;
 
-		TreeStore entityStore       = new TreeStore (typeof(string), typeof(AffectedEntity), typeof(bool));
-		TreeStore accessibiltyStore = new TreeStore (typeof(string), typeof(Modifiers), typeof(bool));
+		ListStore entityStore       = new ListStore (typeof(string), typeof(AffectedEntity), typeof(bool));
+		ListStore accessibiltyStore = new ListStore (typeof(string), typeof(Modifiers), typeof(bool));
 
 		public NameConventionEditRuleDialog (NameConventionRule rule)
 		{
@@ -92,7 +92,6 @@ namespace MonoDevelop.CSharp.Refactoring.CodeIssues
 			this.rule = rule;
 			this.Build ();
 
-			treeviewEntities.AppendColumn ("Entity", new CellRendererText (), "text", 0);
 			var ct1 = new CellRendererToggle ();
 			ct1.Toggled += delegate(object o, Gtk.ToggledArgs args) {
 				TreeIter iter;
@@ -101,9 +100,9 @@ namespace MonoDevelop.CSharp.Refactoring.CodeIssues
 				entityStore.SetValue (iter, 2, !(bool)entityStore.GetValue (iter, 2));
 			};
 			treeviewEntities.AppendColumn ("IsChecked", ct1, "active", 2);
+			treeviewEntities.AppendColumn ("Entity", new CellRendererText (), "text", 0);
 			treeviewEntities.Model = entityStore;
 			
-			treeviewAccessibility.AppendColumn ("Entity", new CellRendererText (), "text", 0);
 			var ct2 = new CellRendererToggle ();
 			ct2.Toggled += delegate(object o, Gtk.ToggledArgs args) {
 				TreeIter iter;
@@ -112,6 +111,7 @@ namespace MonoDevelop.CSharp.Refactoring.CodeIssues
 				accessibiltyStore.SetValue (iter, 2, !(bool)accessibiltyStore.GetValue (iter, 2));
 			};
 			treeviewAccessibility.AppendColumn ("IsChecked", ct2, "active", 2);
+			treeviewAccessibility.AppendColumn ("Entity", new CellRendererText (), "text", 0);
 			treeviewAccessibility.Model = accessibiltyStore;
 			buttonOk.Clicked += (sender, e) => Apply ();
 
@@ -127,13 +127,18 @@ namespace MonoDevelop.CSharp.Refactoring.CodeIssues
 				entryPrefixAllowed.Text = string.Join (", ", rule.AllowedPrefixes); 
 			if (rule.RequiredSuffixes != null)
 				entrySuffix.Text = rule.RequiredSuffixes.FirstOrDefault (); 
+			styleComboBox.AppendText ("PascalCase"); 
+			styleComboBox.AppendText ("CamelCase"); 
+			styleComboBox.AppendText ("ALLUPPER"); 
+			styleComboBox.AppendText ("alllower"); 
+			styleComboBox.AppendText ("Firstupper"); 
+			styleComboBox.AppendText ("PascalCase_underscoreTolerant"); 
+			styleComboBox.AppendText ("PascalCase_UnderscoreTolerant"); 
+			styleComboBox.AppendText ("CamelCase_underscoreTolerant"); 
+			styleComboBox.AppendText ("CamelCase_UnderscoreTolerant"); 
 
-			radiobuttonPascalCase.Active = rule.NamingStyle == NamingStyle.PascalCase;
-			radiobuttonCamelCase.Active = rule.NamingStyle == NamingStyle.CamelCase;
-			radiobuttonAllLower.Active = rule.NamingStyle == NamingStyle.AllLower;
-			radiobuttonAllUpper.Active = rule.NamingStyle == NamingStyle.AllUpper;
-			radiobuttonFirstUpper.Active = rule.NamingStyle == NamingStyle.FirstUpper;
-			
+			styleComboBox.Active = (int)rule.NamingStyle - 1;
+
 			foreach (AffectedEntity ae in Enum.GetValues (typeof (AffectedEntity))) {
 				if (!EntityName.ContainsKey (ae))
 					continue;
@@ -148,22 +153,13 @@ namespace MonoDevelop.CSharp.Refactoring.CodeIssues
 
 			checkbuttonStatic.Active = rule.IncludeStaticEntities;
 			checkbuttonInstanceMembers.Active = rule.IncludeInstanceMembers;
+
 		}
 
 		public void Apply ()
 		{
 			rule.Name = entryRuleName.Text;
-			if (radiobuttonPascalCase.Active) {
-				rule.NamingStyle = NamingStyle.PascalCase;
-			} else if (radiobuttonCamelCase.Active) {
-				rule.NamingStyle = NamingStyle.CamelCase;
-			} else if (radiobuttonAllLower.Active) {
-				rule.NamingStyle = NamingStyle.AllLower;
-			} else if (radiobuttonAllUpper.Active) {
-				rule.NamingStyle = NamingStyle.AllUpper;
-			} else if (radiobuttonFirstUpper.Active) {
-				rule.NamingStyle = NamingStyle.FirstUpper;
-			}
+			rule.NamingStyle = (NamingStyle)(1 + styleComboBox.Active);
 
 			var prefix = entryPrefix.Text.Trim ();
 			if (string.IsNullOrEmpty (prefix)) {

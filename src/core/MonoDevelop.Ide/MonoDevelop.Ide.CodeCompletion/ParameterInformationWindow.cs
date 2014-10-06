@@ -70,22 +70,20 @@ namespace MonoDevelop.Ide.CodeCompletion
 			TypeHint = Gdk.WindowTypeHint.Tooltip;
 			this.SkipTaskbarHint = true;
 			this.SkipPagerHint = true;
-			if (IdeApp.Workbench != null)
-				this.TransientFor = IdeApp.Workbench.RootWindow;
 			this.AllowShrink = false;
 			this.AllowGrow = false;
 			this.CanFocus = false;
 			this.CanDefault = false;
+			Mono.TextEditor.PopupWindow.WindowTransparencyDecorator.Attach (this);
 
 			headlabel = new MonoDevelop.Components.FixedWidthWrapLabel ();
 			headlabel.Indent = -20;
-			var des = FontService.GetFontDescription ("Editor");
-			
-			headlabel.FontDescription = des;
+
+			headlabel.FontDescription = FontService.GetFontDescription ("Editor").CopyModified (1.1);
 			
 			headlabel.Wrap = Pango.WrapMode.WordChar;
-			headlabel.BreakOnCamelCasing = true;
-			headlabel.BreakOnPunctuation = true;
+			headlabel.BreakOnCamelCasing = false;
+			headlabel.BreakOnPunctuation = false;
 			descriptionBox.Spacing = 4;
 			VBox vb = new VBox (false, 0);
 			vb.PackStart (headlabel, true, true, 0);
@@ -102,7 +100,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			Theme.SetSchemeColors (scheme);
 
 			foreColor = scheme.PlainText.Foreground;
-			headlabel.ModifyFg (StateType.Normal, (HslColor)foreColor);
+			headlabel.ModifyFg (StateType.Normal, foreColor.ToGdkColor ());
 			ShowAll ();
 			DesktopService.RemoveWindowShadow (this);
 
@@ -123,7 +121,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 			lastParam = currentParam;
 			ClearDescriptions ();
-			var o = provider.CreateTooltipInformation (overload, _currentParam, false);
+			var o = provider.CreateTooltipInformation (overload, currentParam, false);
 
 			Theme.NumPages = provider.Count;
 			Theme.CurrentPage = overload;
@@ -165,7 +163,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 			
 			var catLabel = new MonoDevelop.Components.FixedWidthWrapLabel ();
 			catLabel.Text = categoryName;
-			catLabel.ModifyFg (StateType.Normal, (HslColor)foreColor);
+			catLabel.ModifyFg (StateType.Normal, foreColor.ToGdkColor ());
+			catLabel.FontDescription = FontService.GetFontDescription ("Editor");
 			
 			vbox.PackStart (catLabel, false, true, 0);
 			
@@ -175,7 +174,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 			contentLabel.BreakOnCamelCasing = true;
 			contentLabel.BreakOnPunctuation = true;
 			contentLabel.Markup = categoryContentMarkup.Trim ();
-			contentLabel.ModifyFg (StateType.Normal, (HslColor)foreColor);
+			contentLabel.ModifyFg (StateType.Normal, foreColor.ToGdkColor ());
+			contentLabel.FontDescription = FontService.GetFontDescription ("Editor");
 			
 			vbox.PackStart (contentLabel, true, true, 0);
 			

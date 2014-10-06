@@ -12,13 +12,6 @@
     <widget-library name="../../../../../build/AddIns/MonoDevelop.Debugger/MonoDevelop.Debugger.dll" />
     <widget-library name="../../../../../build/AddIns/VersionControl/MonoDevelop.VersionControl.dll" internal="true" />
   </import>
-  <icon-factory>
-    <icon-set id="vcs-repository">
-      <source>
-        <property name="Image">resource:repository.png</property>
-      </source>
-    </icon-set>
-  </icon-factory>
   <widget class="Gtk.Dialog" id="MonoDevelop.VersionControl.Dialogs.SelectRepositoryDialog" design-size="617 438">
     <property name="MemberName" />
     <property name="Visible">False</property>
@@ -294,22 +287,6 @@
                       <packing>
                         <property name="Position">0</property>
                         <property name="AutoSize">True</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <widget class="Gtk.Button" id="buttonEditMessage">
-                        <property name="MemberName" />
-                        <property name="CanFocus">True</property>
-                        <property name="UseStock">True</property>
-                        <property name="Type">StockItem</property>
-                        <property name="StockId">gtk-edit</property>
-                        <property name="label">gtk-edit</property>
-                      </widget>
-                      <packing>
-                        <property name="Position">1</property>
-                        <property name="AutoSize">True</property>
-                        <property name="Expand">False</property>
-                        <property name="Fill">False</property>
                       </packing>
                     </child>
                   </widget>
@@ -1004,6 +981,7 @@
             <property name="IsEditable">True</property>
             <property name="InvisibleChar">●</property>
             <signal name="Changed" handler="OnRepositoryUrlEntryChanged" />
+            <signal name="ClipboardPasted" handler="OnRepositoryUrlEntryClipboardPasted" />
           </widget>
           <packing>
             <property name="LeftAttach">1</property>
@@ -1118,7 +1096,7 @@
                 <child>
                   <widget class="Gtk.Label" id="label3">
                     <property name="MemberName" />
-                    <property name="LabelProp" translatable="yes">?/?</property>
+                    <property name="LabelProp" translatable="yes">1/1</property>
                     <property name="MnemonicWidget">textview</property>
                   </widget>
                   <packing>
@@ -1212,12 +1190,10 @@
             <property name="MemberName" />
             <property name="CanDefault">True</property>
             <property name="CanFocus">True</property>
-            <property name="Type">TextAndIcon</property>
-            <property name="Icon">stock:vc-commit Menu</property>
+            <property name="Type">TextOnly</property>
             <property name="Label" translatable="yes">C_ommit</property>
             <property name="UseUnderline">True</property>
-            <property name="ResponseId">-1</property>
-            <signal name="Clicked" handler="OnButtonCommitClicked" />
+            <property name="ResponseId">-5</property>
           </widget>
           <packing>
             <property name="Position">1</property>

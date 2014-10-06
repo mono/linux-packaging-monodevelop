@@ -126,7 +126,6 @@ namespace MonoDevelop.Ide.Gui
 		static void SimulateInput (CompletionListWindow listWindow, string input)
 		{
 			foreach (char ch in input) {
-				KeyActions ka;
 				switch (ch) {
 				case '8':
 					listWindow.PreProcessKeyEvent (Gdk.Key.Up, '\0', Gdk.ModifierType.None);
@@ -796,6 +795,26 @@ namespace MonoDevelop.Ide.Gui
 		{
 			string output = RunSimulation ("", "act\t", true, true, false, "act:", "Action");
 			Assert.AreEqual ("act:", output);
+		}
+
+		/// <summary>
+		/// Bug 17779 - Symbol names with multiple successive letters are filtered out too early
+		/// </summary>
+		[Test]
+		public void TestBug17779 ()
+		{
+			string output = RunSimulation ("", "ID11\t", true, true, false, "ID11Tag");
+			Assert.AreEqual ("ID11Tag", output);
+		}
+
+		/// <summary>
+		/// Bug 21121 - Aggressive completion for delegates
+		/// </summary>
+		[Test]
+		public void TestBug21121 ()
+		{
+			string output = RunSimulation ("", "d)", true, true, false, "d", "delegate ()");
+			Assert.AreEqual ("d", output);
 		}
 
 

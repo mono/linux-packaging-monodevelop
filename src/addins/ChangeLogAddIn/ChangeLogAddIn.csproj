@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{75B9F2DF-4DEA-4007-965D-339563735EBE}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -20,9 +20,12 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DefineConstants>DEBUG</DefineConstants>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\ChangeLogAddIn\ChangeLogAddIn.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\build\AddIns\ChangeLogAddIn\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -30,6 +33,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\ChangeLogAddIn\ChangeLogAddIn.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\core\MonoDevelop.Core\MonoDevelop.Core.csproj">
@@ -82,6 +88,11 @@
       <Name>Mono.Debugging</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Mono.Posix" />
@@ -113,7 +124,7 @@
     <Compile Include="gtk-gui\MonoDevelop.ChangeLogAddIn.ProjectOptionPanelWidget.cs" />
     <Compile Include="ChangeLogService.cs" />
     <Compile Include="ChangeLogPolicy.cs" />
-    <Compile Include="OldChangeLogData.cs" />
+    <Compile Include="AddinInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="ChangeLogAddIn.addin.xml">

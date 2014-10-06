@@ -51,22 +51,13 @@ namespace MonoDevelop.CodeIssues
 			}
 		}
 
-		[NodeAttribute ("mark", Required=false, Localizable=false,  Description="The severity of this action.")]
-		IssueMarker inspectionMark = IssueMarker.Underline;
-		public IssueMarker IssueMarker {
-			get {
-				return inspectionMark;
-			}
-		}
-
 		CodeIssueProvider inspector;
 		public CodeIssueProvider Inspector {
 			get {
 				if (inspector == null) {
 					inspector = (CodeIssueProvider)CreateInstance ();
 					inspector.DefaultSeverity = severity;
-					inspector.MimeType = MimeType;
-					inspector.IssueMarker = IssueMarker;
+					inspector.SetMimeType (MimeType);
 				}
 				return inspector;
 			}

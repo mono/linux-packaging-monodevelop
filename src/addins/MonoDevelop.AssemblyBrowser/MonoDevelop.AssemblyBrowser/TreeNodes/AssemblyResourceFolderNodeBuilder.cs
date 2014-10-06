@@ -33,7 +33,7 @@ using MonoDevelop.Ide.Gui;
 
 namespace MonoDevelop.AssemblyBrowser
 {
-	public class AssemblyResourceFolderNodeBuilder : TypeNodeBuilder
+	class AssemblyResourceFolderNodeBuilder : TypeNodeBuilder
 	{
 		public override Type NodeDataType {
 			get { return typeof(AssemblyResourceFolder); }
@@ -44,11 +44,11 @@ namespace MonoDevelop.AssemblyBrowser
 			return "Resources";
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
-			label = MonoDevelop.Core.GettextCatalog.GetString ("Resources");
-			icon       = Context.GetIcon (Stock.OpenResourceFolder);
-			closedIcon = Context.GetIcon (Stock.ClosedResourceFolder);
+			nodeInfo.Label = MonoDevelop.Core.GettextCatalog.GetString ("Resources");
+			nodeInfo.Icon       = Context.GetIcon (Stock.OpenResourceFolder);
+			nodeInfo.ClosedIcon = Context.GetIcon (Stock.ClosedResourceFolder);
 		}
 		
 		public override void BuildChildNodes (ITreeBuilder ctx, object dataObject)

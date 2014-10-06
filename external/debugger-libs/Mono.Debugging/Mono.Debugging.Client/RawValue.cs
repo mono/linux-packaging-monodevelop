@@ -169,6 +169,21 @@ namespace Mono.Debugging.Client
 				source.SetValue (new int[] { index }, value);
 			}
 		}
+
+		/// <summary>
+		/// Gets the values.
+		/// </summary>
+		/// <returns>The items.</returns>
+		/// <param name="index">The index.</param>
+		/// <param name="count">The number of items to get.</param>
+		/// <remarks>
+		/// This method is useful for incrementally fetching an array in order to avoid
+		/// long waiting periods when the array is too large for ToArray().
+		/// </remarks>
+		public Array GetValues (int index, int count)
+		{
+			return source.GetValues (new int[] { index }, count);
+		}
 		
 		/// <summary>
 		/// Returns an array with all items of the RawValueArray
@@ -222,7 +237,7 @@ namespace Mono.Debugging.Client
 		}
 
 		internal IRawValueString Source {
-			get { return this.source; }
+			get { return source; }
 		}
 
 		/// <summary>
@@ -257,7 +272,7 @@ namespace Mono.Debugging.Client
 		}
 	}
 
-	internal interface IRawObject
+	interface IRawObject
 	{
 		void Connect (DebuggerSession session, EvaluationOptions options);
 	}

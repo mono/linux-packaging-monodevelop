@@ -50,11 +50,11 @@ namespace MonoDevelop.Core
 		static FileServiceErrorHandler errorHandler;
 		
 		static FileSystemExtension fileSystemChain;
-		static FileSystemExtension defaultExtension = Platform.IsWindows ? new DefaultFileSystemExtension () : new UnixFileSystemExtension () ;
+		static readonly FileSystemExtension defaultExtension = Platform.IsWindows ? new DefaultFileSystemExtension () : new UnixFileSystemExtension () ;
 		
-		static EventQueue eventQueue = new EventQueue ();
+		static readonly EventQueue eventQueue = new EventQueue ();
 		
-		static string applicationRootPath = Path.Combine (PropertyService.EntryAssemblyPath, "..");
+		static readonly string applicationRootPath = Path.Combine (PropertyService.EntryAssemblyPath, "..");
 		public static string ApplicationRootPath {
 			get {
 				return applicationRootPath;
@@ -77,7 +77,7 @@ namespace MonoDevelop.Core
 				return;
 			}
 			
-			FileSystemExtension[] extensions = (FileSystemExtension[]) AddinManager.GetExtensionObjects (addinFileSystemExtensionPath, typeof(FileSystemExtension));
+			var extensions = AddinManager.GetExtensionObjects (addinFileSystemExtensionPath, typeof(FileSystemExtension)).Cast<FileSystemExtension> ().ToArray ();
 			for (int n=0; n<extensions.Length - 1; n++) {
 				extensions [n].Next = extensions [n + 1];
 			}
@@ -240,16 +240,11 @@ namespace MonoDevelop.Core
 			}
 		}
 
-		[Obsolete ("Replaced by RequestFileEdit(fileName,throwIfFails)")]
-		public static bool RequestFileEdit (string fileName)
-		{
-			return RequestFileEdit (fileName, false);
-		}
-
 		/// <summary>
 		/// Requests permission for modifying a file
 		/// </summary>
-		/// <param name="fileNames">Files</param>
+		/// <param name="fileName">The file to be modified</param>
+		/// <param name="throwIfFails">If set to false, it will catch the exception that would've been thrown.</param>
 		/// <remarks>This method must be called before trying to write any file. It throws an exception if permission is not granted.</remarks>
 		public static bool RequestFileEdit (FilePath fileName, bool throwIfFails = true)
 		{
@@ -468,7 +463,7 @@ namespace MonoDevelop.Core
 		
 		public static bool IsDirectory (string filename)
 		{
-			return Directory.Exists (filename) && (File.GetAttributes (filename) & FileAttributes.Directory) != 0;
+			return Directory.Exists (filename);
 		}
 		
 		public static string GetFullPath (string path)
@@ -485,7 +480,7 @@ namespace MonoDevelop.Core
 			}
 		}
 
-		static string wildcardMarker = "_" + Guid.NewGuid ().ToString () + "_";
+		static readonly string wildcardMarker = "_" + Guid.NewGuid ().ToString () + "_";
 		
 		public static string CreateTempDirectory ()
 		{
@@ -571,6 +566,36 @@ namespace MonoDevelop.Core
 				}
 			}
 		}
+
+		/// <summary>
+		/// Renames a directory
+		/// </summary>
+		/// <param name="sourceDir">Source directory</param>
+		/// <param name="destDir">Destination directory</param>
+		/// <remarks>
+		/// It works like Directory.Move, but it supports changing the case of a directory name in case-insensitive file systems
+		/// </remarks>
+		public static void SystemDirectoryRename (string sourceDir, string destDir)
+		{
+			if (Directory.Exists (destDir) && string.Equals (Path.GetFullPath (sourceDir), Path.GetFullPath (destDir), StringComparison.CurrentCultureIgnoreCase)) {
+				// If the destination directory exists but we can't find it with the provided name casing, then it means we are just changing the case
+				var existingDir = Directory.GetDirectories (Path.GetDirectoryName (destDir), Path.GetFileName (destDir)).FirstOrDefault ();
+				if (existingDir == null || (Path.GetFileName (existingDir) == Path.GetFileName (sourceDir))) {
+					var temp = destDir + ".renaming";
+					int n = 0;
+					while (Directory.Exists (temp) || File.Exists (temp))
+						temp = destDir + ".renaming_" + (n++);
+					Directory.Move (sourceDir, temp);
+					try {
+						Directory.Move (temp, destDir);
+					} catch {
+						Directory.Move (temp, sourceDir);
+					}
+					return;
+				}
+			}
+			Directory.Move (sourceDir, destDir);
+		}
 		
 		/// <summary>
 		/// Removes the directory if it's empty.
@@ -584,20 +609,11 @@ namespace MonoDevelop.Core
 		}
 		
 		/// <summary>
-		/// Creates a directory if it does not already exist.
-		/// </summary>
-		public static void EnsureDirectoryExists (string directory)
-		{
-			if (!Directory.Exists (directory))
-				Directory.CreateDirectory (directory);
-		}
-		
-		/// <summary>
 		/// Makes the path separators native.
 		/// </summary>
 		public static string MakePathSeparatorsNative (string path)
 		{
-			if (path == null || path.Length == 0)
+			if (string.IsNullOrEmpty (path))
 				return path;
 			char c = Path.DirectorySeparatorChar == '\\'? '/' : '\\'; 
 			return path.Replace (c, Path.DirectorySeparatorChar);
@@ -670,111 +686,72 @@ namespace MonoDevelop.Core
 		}
 
 		public static Task<bool> UpdateDownloadedCacheFile (string url, string cacheFile,
-			Func<Stream,bool> validateDownload = null, CancellationToken ct = new CancellationToken ())
+			Func<Stream,bool> validateDownload = null, CancellationToken ct = default (CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<bool> ();
-
-			//HACK: .NET blocks on DNS in BeginGetResponse, so use a threadpool thread
-			// see http://stackoverflow.com/questions/1232139#1232930
-			System.Threading.ThreadPool.QueueUserWorkItem ((state) => {
-				var request = (HttpWebRequest)WebRequest.Create (url);
-
-				try {
+			return WebRequestHelper.GetResponseAsync (
+				() => (HttpWebRequest)WebRequest.Create (url),
+				r => {
 					//check to see if the online file has been modified since it was last downloaded
 					var localNewsXml = new FileInfo (cacheFile);
 					if (localNewsXml.Exists)
-						request.IfModifiedSince = localNewsXml.LastWriteTime;
-
-					request.BeginGetResponse (HandleResponse, new CacheFileDownload {
-						Request = request,
-						Url = url,
-						CacheFile = cacheFile,
-						ValidateDownload = validateDownload,
-						CancellationToken = ct,
-						Tcs = tcs,
-					});
-				} catch (Exception ex) {
-					tcs.SetException (ex);
-				}
-			});
-
-			return tcs.Task;
-		}
-
-		class CacheFileDownload
-		{
-			public HttpWebRequest Request;
-			public string CacheFile, Url;
-			public Func<Stream,bool> ValidateDownload;
-			public CancellationToken CancellationToken;
-			public TaskCompletionSource<bool> Tcs;
-		}
-
-		static void HandleResponse (IAsyncResult ar)
-		{
-			var c = (CacheFileDownload) ar.AsyncState;
-			bool deleteTempFile = true;
-			var tempFile = c.CacheFile + ".temp";
-
-			try {
-				if (c.CancellationToken.IsCancellationRequested)
-					c.Tcs.TrySetCanceled ();
+						r.IfModifiedSince = localNewsXml.LastWriteTime;
+				},
+				ct
+			).ContinueWith (t => {
+				bool deleteTempFile = true;
+				var tempFile = cacheFile + ".temp";
 
 				try {
-					//TODO: limit this size in case open wifi hotspots provide bad data
-					var response = (HttpWebResponse) c.Request.EndGetResponse (ar);
+					ct.ThrowIfCancellationRequested ();
+
+					if (t.IsFaulted) {
+						var wex = t.Exception.Flatten ().InnerException as WebException;
+						if (wex != null) {
+							var resp = wex.Response as HttpWebResponse;
+							if (resp != null && resp.StatusCode == HttpStatusCode.NotModified)
+								return false;
+						}
+					}
+
+					//TODO: limit this size in case open wifi hotspots provide junk data
+					var response = t.Result;
 					if (response.StatusCode == HttpStatusCode.OK) {
 						using (var fs = File.Create (tempFile))
-							response.GetResponseStream ().CopyTo (fs, 2048);
+								response.GetResponseStream ().CopyTo (fs, 2048);
 					}
-				} catch (WebException wex) {
-					var httpResp = wex.Response as HttpWebResponse;
-					if (httpResp != null) {
-						if (httpResp.StatusCode == HttpStatusCode.NotModified) {
-							c.Tcs.TrySetResult (false);
-							return;
-						}
-						//is this valid? should we just return the WebException directly?
-						else if (httpResp.StatusCode == HttpStatusCode.NotFound) {
-							c.Tcs.TrySetException (new FileNotFoundException ("File not found on server", c.Url, wex));
-							return;
-						}
-					}
-					throw;
-				}
 
-				//check the document is valid, might get bad ones from wifi hotspots etc
-				if (c.ValidateDownload != null) {
-					if (c.CancellationToken.IsCancellationRequested)
-						c.Tcs.TrySetCanceled ();
+					//check the document is valid, might get bad ones from wifi hotspots etc
+					if (validateDownload != null) {
+						ct.ThrowIfCancellationRequested ();
 
-					using (var f = File.OpenRead (tempFile)) {
-						try {
-							if (!c.ValidateDownload (f)) {
-								c.Tcs.TrySetException (new Exception ("Failed to validate downloaded file"));
-								return;
+						using (var f = File.OpenRead (tempFile)) {
+							bool validated;
+							try {
+								validated = validateDownload (f);
+							} catch (Exception ex) {
+								throw new Exception ("Failed to validate downloaded file", ex);
 							}
+							if (!validated) {
+								throw new Exception ("Failed to validate downloaded file");
+							}
+						}
+					}
+
+					ct.ThrowIfCancellationRequested ();
+
+					SystemRename (tempFile, cacheFile);
+					deleteTempFile = false;
+					return true;
+				} finally {
+					if (deleteTempFile) {
+						try {
+							File.Delete (tempFile);
 						} catch (Exception ex) {
-							c.Tcs.TrySetException (new Exception ("Failed to validate downloaded file", ex));
+							LoggingService.LogError ("Failed to delete temp download file", ex);
 						}
 					}
 				}
-
-				if (c.CancellationToken.IsCancellationRequested)
-					c.Tcs.TrySetCanceled ();
-
-				SystemRename (tempFile, c.CacheFile);
-				deleteTempFile = false;
-				c.Tcs.TrySetResult (true);
-			} catch (Exception ex) {
-				c.Tcs.TrySetException (ex);
-			} finally {
-				if (deleteTempFile) {
-					try {
-						File.Delete (tempFile);
-					} catch {}
-				}
-			}
+			}, ct);
 		}
 	}
 	
@@ -852,8 +829,11 @@ namespace MonoDevelop.Core
 					return;
 				}
 			}
-			if (del != null)
-				del.DynamicInvoke (thisObj, args);
+			if (del != null) {
+				Runtime.MainSynchronizationContext.Post (delegate {
+					del.DynamicInvoke (thisObj, args);
+				}, null);
+			}
 		}
 	}
 	

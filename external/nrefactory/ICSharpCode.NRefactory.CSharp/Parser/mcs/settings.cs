@@ -28,9 +28,10 @@ namespace Mono.CSharp {
 		V_3 = 3,
 		V_4 = 4,
 		V_5 = 5,
-		Future = 100,
+		V_6 = 6,
+		Experimental = 100,
 
-		Default = LanguageVersion.V_5,
+		Default = LanguageVersion.V_6,
 	}
 
 	public enum RuntimeVersion
@@ -146,6 +147,7 @@ namespace Mono.CSharp {
 		public int VerboseParserFlag;
 		public int FatalCounter;
 		public bool Stacktrace;
+		public bool BreakOnInternalError;
 		#endregion
 
 		public bool ShowFullPaths;
@@ -158,6 +160,8 @@ namespace Mono.CSharp {
 		public bool StdLib;
 
 		public RuntimeVersion StdLibRuntimeVersion;
+
+		public string RuntimeMetadataVersion;
 
 		public bool WriteMetadataOnly;
 
@@ -301,8 +305,8 @@ namespace Mono.CSharp {
 			UnknownOption
 		}
 
-		static readonly char[] argument_value_separator = new char[] { ';', ',' };
-		static readonly char[] numeric_value_separator = new char[] { ';', ',', ' ' };
+		static readonly char[] argument_value_separator = { ';', ',' };
+		static readonly char[] numeric_value_separator = { ';', ',', ' ' };
 
 		readonly TextWriter output;
 		readonly Report report;
@@ -469,7 +473,7 @@ namespace Mono.CSharp {
 				return;
 			}
 
-			string[] files = null;
+			string[] files;
 			try {
 				files = Directory.GetFiles (path, pattern);
 			} catch (System.IO.DirectoryNotFoundException) {
@@ -576,7 +580,7 @@ namespace Mono.CSharp {
 		public bool ProcessWarningsList (string text, Action<int> action)
 		{
 			bool valid = true;
-			foreach (string wid in text.Split (numeric_value_separator)) {
+			foreach (string wid in text.Split (numeric_value_separator, StringSplitOptions.RemoveEmptyEntries)) {
 				int id;
 				if (!int.TryParse (wid, NumberStyles.AllowLeadingWhite, CultureInfo.InvariantCulture, out id)) {
 					report.Error (1904, "`{0}' is not a valid warning number", wid);
@@ -669,7 +673,8 @@ namespace Mono.CSharp {
 				"   --stacktrace       Shows stack trace at error location\n" +
 				"   --timestamp        Displays time stamps of various compiler events\n" +
 				"   -v                 Verbose parsing (for debugging the parser)\n" +
-				"   --mcs-debug X      Sets MCS debugging level to X\n");
+				"   --mcs-debug X      Sets MCS debugging level to X\n" +
+				"   --break-on-ice     Breaks compilation on internal compiler error");
 		}
 
 		//
@@ -975,7 +980,7 @@ namespace Mono.CSharp {
 					settings.WarningsAreErrors = true;
 					parser_settings.WarningsAreErrors = true;
 				} else {
-					if (!ProcessWarningsList (value, v => settings.AddWarningAsError (v)))
+					if (!ProcessWarningsList (value, settings.AddWarningAsError))
 						return ParseResult.Error;
 				}
 				return ParseResult.Success;
@@ -984,7 +989,7 @@ namespace Mono.CSharp {
 				if (value.Length == 0) {
 					settings.WarningsAreErrors = false;
 				} else {
-					if (!ProcessWarningsList (value, v => settings.AddWarningOnly (v)))
+					if (!ProcessWarningsList (value, settings.AddWarningOnly))
 						return ParseResult.Error;
 				}
 				return ParseResult.Success;
@@ -1005,7 +1010,7 @@ namespace Mono.CSharp {
 					return ParseResult.Error;
 				}
 
-				if (!ProcessWarningsList (value, v => settings.SetIgnoreWarning (v)))
+				if (!ProcessWarningsList (value, settings.SetIgnoreWarning))
 					return ParseResult.Error;
 
 				return ParseResult.Success;
@@ -1132,11 +1137,13 @@ namespace Mono.CSharp {
 
 				switch (value.ToLowerInvariant ()) {
 				case "iso-1":
+				case "1":
 					settings.Version = LanguageVersion.ISO_1;
 					return ParseResult.Success;
 				case "default":
 					settings.Version = LanguageVersion.Default;
 					return ParseResult.Success;
+				case "2":
 				case "iso-2":
 					settings.Version = LanguageVersion.ISO_2;
 					return ParseResult.Success;
@@ -1149,12 +1156,18 @@ namespace Mono.CSharp {
 				case "5":
 					settings.Version = LanguageVersion.V_5;
 					return ParseResult.Success;
-				case "future":
-					settings.Version = LanguageVersion.Future;
+				case "6":
+					settings.Version = LanguageVersion.V_6;
 					return ParseResult.Success;
+				case "experimental":
+					settings.Version = LanguageVersion.Experimental;
+					return ParseResult.Success;
+				case "future":
+					report.Warning (8000, 1, "Language version `future' is no longer supported");
+					goto case "6";
 				}
 
-				report.Error (1617, "Invalid -langversion option `{0}'. It must be `ISO-1', `ISO-2', `3', `4', `5', `Default' or `Future'", value);
+				report.Error (1617, "Invalid -langversion option `{0}'. It must be `ISO-1', `ISO-2', Default or value in range 1 to 6", value);
 				return ParseResult.Error;
 
 			case "/codepage":
@@ -1178,6 +1191,15 @@ namespace Mono.CSharp {
 					}
 					return ParseResult.Error;
 				}
+				return ParseResult.Success;
+
+			case "runtimemetadataversion":
+				if (value.Length == 0) {
+					Error_RequiresArgument (option);
+					return ParseResult.Error;
+				}
+
+				settings.RuntimeMetadataVersion = value;
 				return ParseResult.Success;
 
 			default:
@@ -1419,6 +1441,10 @@ namespace Mono.CSharp {
 
 			case "--metadata-only":
 				settings.WriteMetadataOnly = true;
+				return ParseResult.Success;
+
+			case "--break-on-ice":
+				settings.BreakOnInternalError = true;
 				return ParseResult.Success;
 
 			default:

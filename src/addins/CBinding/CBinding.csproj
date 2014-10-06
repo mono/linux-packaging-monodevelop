@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{7B57882B-AD46-469B-84E7-06DF98D11468}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -22,9 +22,12 @@
       <Execution clr-version="Net_2_0" />
     </Execution>
     <AssemblyOriginatorKeyFile>.</AssemblyOriginatorKeyFile>
+    <DefineConstants>DEBUG</DefineConstants>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\BackendBindings\MonoDevelop.CBinding.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\build\AddIns\BackendBindings\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -33,6 +36,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\BackendBindings\MonoDevelop.CBinding.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -116,6 +122,11 @@
       <Name>Mono.Debugging</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile.am" />
@@ -136,69 +147,6 @@
     </EmbeddedResource>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\Icons.16x16.PrivateUnion">
-      <LogicalName>Icons.16x16.PrivateUnion</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\Icons.16x16.ProtectedUnion">
-      <LogicalName>Icons.16x16.ProtectedUnion</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\Icons.16x16.Union">
-      <LogicalName>Icons.16x16.Union</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\update">
-      <LogicalName>update</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\Icons.16x16.ProjectReference">
-      <LogicalName>Icons.16x16.ProjectReference</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-chdr.16x16.png">
-      <LogicalName>text-x-chdr.16x16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-chdr.22x22.png">
-      <LogicalName>text-x-chdr.22x22.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-chdr.32x32.png">
-      <LogicalName>text-x-chdr.32x32.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-chdr.48x48.png">
-      <LogicalName>text-x-chdr.48x48.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-c++hdr.16x16.png">
-      <LogicalName>text-x-c++hdr.16x16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-c++hdr.22x22.png">
-      <LogicalName>text-x-c++hdr.22x22.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-c++hdr.32x32.png">
-      <LogicalName>text-x-c++hdr.32x32.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-c++hdr.48x48.png">
-      <LogicalName>text-x-c++hdr.48x48.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-csrc.16x16.png">
-      <LogicalName>text-x-csrc.16x16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-csrc.22x22.png">
-      <LogicalName>text-x-csrc.22x22.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-csrc.32x32.png">
-      <LogicalName>text-x-csrc.32x32.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-csrc.48x48.png">
-      <LogicalName>text-x-csrc.48x48.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-c++src.16x16.png">
-      <LogicalName>text-x-c++src.16x16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-c++src.22x22.png">
-      <LogicalName>text-x-c++src.22x22.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-c++src.32x32.png">
-      <LogicalName>text-x-c++src.32x32.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\text-x-c++src.48x48.png">
-      <LogicalName>text-x-c++src.48x48.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="templates\EmptyCHeaderFile.xft.xml">
       <LogicalName>EmptyCHeaderFile.xft.xml</LogicalName>
@@ -227,15 +175,6 @@
     <EmbeddedResource Include="templates\ConsoleCppProject.xpt.xml">
       <LogicalName>ConsoleCppProject.xpt.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\c-icon-32.png">
-      <LogicalName>c-icon-32.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\cpp-icon-32.png">
-      <LogicalName>cpp-icon-32.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="md1format.xml">
-      <LogicalName>md1format.xml</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="templates\ConsoleObjCProject.xpt.xml">
       <LogicalName>ConsoleObjCProject.xpt.xml</LogicalName>
     </EmbeddedResource>
@@ -244,6 +183,18 @@
     </EmbeddedResource>
     <EmbeddedResource Include="templates\EmptyObjCppSourceFile.xft.xml">
       <LogicalName>EmptyObjCppSourceFile.xft.xml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\union-private-16.png">
+      <LogicalName>union-private-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\union-protected-16.png">
+      <LogicalName>union-protected-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\union-16.png">
+      <LogicalName>union-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\update.png">
+      <LogicalName>update.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -323,6 +274,7 @@
     <Compile Include="Parser\CTagsManager.cs" />
     <Compile Include="Parser\ExuberantCTagsManager.cs" />
     <Compile Include="Parser\BsdCTagsManager.cs" />
+    <Compile Include="AddinInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ProjectExtensions>

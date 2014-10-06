@@ -26,9 +26,9 @@
 //
 
 using System;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide;
 using MonoDevelop.Projects;
+using MonoDevelop.Ide.Fonts;
 
 namespace MonoDevelop.VersionControl
 {
@@ -45,12 +45,8 @@ namespace MonoDevelop.VersionControl
 		{
 			this.Build();
 			
-			Pango.FontDescription font = Pango.FontDescription.FromString (
-			   DesktopService.DefaultMonospaceFont);
-			font.Size = Pango.Units.FromPixels (8);
-			textview.ModifyFont (font);
+			textview.ModifyFont (FontService.MonospaceFont.CopyModified (0.8d));
 			textview.AcceptsTab = true;
-			font.Dispose ();
 		}
 		
 		public void Load (CommitMessageFormat format, AuthorInformation uinfo)
@@ -121,14 +117,14 @@ namespace MonoDevelop.VersionControl
 			OnChanged ();
 		}
 		
-		string FromCString (string txt)
+		static string FromCString (string txt)
 		{
-			return txt.Replace ("\\t","\t").Replace ("\\n","\n");
+			return txt.Replace ("\\t", "\t").Replace ("\\n", "\n");
 		}
 		
-		string ToCString (string txt)
+		static string ToCString (string txt)
 		{
-			return txt.Replace ("\t","\\t").Replace ("\n","\\n");
+			return txt.Replace ("\t", "\\t").Replace ("\n", "\\n");
 		}
 		
 		void UpdateBullets ()

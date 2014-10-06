@@ -30,16 +30,17 @@ using MonoDevelop.Ide.Gui;
 using Mono.MHex;
 using Mono.MHex.Data;
 using MonoDevelop.Ide.Gui.Content;
-using MonoDevelop.Components;
+using Xwt;
+using MonoDevelop.Ide.Fonts;
 
 namespace MonoDevelop.HexEditor
 {
-	public class HexEditorView : AbstractViewContent, IUndoHandler, IBookmarkBuffer, IZoomable
+	class HexEditorView : AbstractXwtViewContent, IUndoHandler, IBookmarkBuffer, IZoomable
 	{
 		Mono.MHex.HexEditor hexEditor = new Mono.MHex.HexEditor ();
-		CompactScrolledWindow window = new CompactScrolledWindow ();
+		ScrollView window ;
 		
-		public override Gtk.Widget Control {
+		public override Xwt.Widget Widget {
 			get {
 				return window;
 			}
@@ -47,8 +48,6 @@ namespace MonoDevelop.HexEditor
 		
 		public HexEditorView ()
 		{
-			window.Child = hexEditor;
-			window.ShowAll ();
 			hexEditor.HexEditorStyle = new MonoDevelopHexEditorStyle (hexEditor);
 			SetOptions ();
 			MonoDevelop.SourceEditor.DefaultSourceEditorOptions.Instance.Changed += delegate {
@@ -57,11 +56,13 @@ namespace MonoDevelop.HexEditor
 			hexEditor.HexEditorData.Replaced += delegate {
 				this.IsDirty = true;
 			};
+			window = new ScrollView (hexEditor);
 		}
 		
 		void SetOptions ()
 		{
-			hexEditor.Options.FontName = MonoDevelop.SourceEditor.DefaultSourceEditorOptions.Instance.FontName;
+			var name = FontService.FilterFontName (FontService.GetUnderlyingFontName ("Editor"));
+			hexEditor.Options.FontName = name;
 			hexEditor.PurgeLayoutCaches ();
 			hexEditor.Repaint ();
 		}
@@ -81,15 +82,16 @@ namespace MonoDevelop.HexEditor
 			
 			ContentName = fileName;
 			this.IsDirty = false;
+			hexEditor.SetFocus ();
 		}
+
 		
 		#region IUndoHandler implementation
 		void IUndoHandler.Undo ()
 		{
 			hexEditor.HexEditorData.Undo ();
 		}
-		
-		
+
 		void IUndoHandler.Redo ()
 		{
 			hexEditor.HexEditorData.Redo ();

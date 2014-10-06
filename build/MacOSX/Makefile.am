@@ -1,28 +1,20 @@
 MAC_APP_DIR=MonoDevelop.app
 APP_NAME=MonoDevelop
 MACOS=$(MAC_APP_DIR)/Contents/MacOS
-MAC_APP_LIB_DIR=$(MACOS)/lib/monodevelop
-ADDINS=$(MACOS)/lib/monodevelop/AddIns
+LIB_DIR=$(MAC_APP_DIR)/Contents/Resources/lib
+MAC_APP_LIB_DIR=$(LIB_DIR)/monodevelop
+ADDINS=$(MAC_APP_LIB_DIR)/AddIns
 EXTRAS=$(top_srcdir)/../extras
 ARTIFACTS=$(top_srcdir)/../../artifacts
+MD_CONFIGURE=$(top_srcdir)/../scripts/configure.sh
+SDK_PATH=$(shell xcrun --sdk macosx10.8 --show-sdk-path)
 
-# In which commit did the MonoDevelop version change? 00000000 if uncommitted
-commit_of_last_version_change    := $(shell LANG=C git blame $(top_srcdir)/configure.in | grep AC_INIT | sed 's/ .*//')
-
-# How many commits have passed since $(-commit-of-last-version-change)?
-# "0" when commit hash is invalid (e.g. 00000000)
-num_commits_since_version_change := $(shell LANG=C git rev-list --count $(commit_of_last_version_change)..HEAD)
-
-PACKAGE_VERSION_MAJOR=0$(word 1, $(subst ., ,$(VERSION)))
-PACKAGE_VERSION_MINOR=$(word 2, $(subst ., ,$(VERSION)))
-PACKAGE_VERSION_REV=0$(word 3, $(subst ., ,$(VERSION)))
-PACKAGE_VERSION_BUILD=$(num_commits_since_version_change)
-PACKAGE_UPDATE_ID=$(shell echo $(PACKAGE_VERSION_MAJOR) $(PACKAGE_VERSION_MINOR) $(PACKAGE_VERSION_REV) $(PACKAGE_VERSION_BUILD) | awk '{printf "%d%02d%02d%04d",$$1,$$2,$$3,$$4}')
-BUNDLE_VERSION=$(shell echo $(PACKAGE_VERSION_MAJOR) $(PACKAGE_VERSION_MINOR) $(PACKAGE_VERSION_REV) $(PACKAGE_VERSION_BUILD) | awk '{printf "%d.%d.%d.%d",$$1,$$2,$$3,$$4}')
+PACKAGE_UPDATE_ID=$(shell $(MD_CONFIGURE) get-releaseid)
+BUNDLE_VERSION=$(shell $(MD_CONFIGURE) get-version)
 
 CLEANFILES = render.exe
 #DISTCLEANFILES =
-EXTRA_DIST = dmg-bg.png DS_Store Info.plist.in make-dmg-bundle.sh render.exe
+EXTRA_DIST = dmg-bg.png DS_Store Info.plist.in make-dmg-bundle.sh render.cs
 
 all: app
 
@@ -32,8 +24,8 @@ render.exe: render.cs
 dmg: render.exe app
 	./make-dmg-bundle.sh
 
-monostub: monostub.m
-	gcc -Wall -mmacosx-version-min=10.6 -m32 -o monostub monostub.m -framework AppKit
+monostub: monostub.m $(MONOSTUB_EXTRA_SOURCES)
+	gcc -Wall -mmacosx-version-min=10.6 -m32 -o $@ $^ -framework AppKit -isysroot $(SDK_PATH)
 
 clean-local:
 	rm -rf MonoDevelop.app
@@ -44,7 +36,7 @@ app: monostub
 	@echo "Creating directories in app bundle"
 	@echo ""
 	mkdir -p $(MAC_APP_DIR)/Contents/{MacOS,Resources}
-	mkdir -p $(MAC_APP_DIR)/Contents/MacOS/{lib,share}
+	mkdir -p $(MAC_APP_DIR)/Contents/MacOS/share
 	mkdir -p $(MAC_APP_LIB_DIR)
 
 #	@echo ""
@@ -61,6 +53,7 @@ app: monostub
 	@echo "Copying MonoDevelop into app bundle"
 	@echo ""
 	cp -pR ../AddIns $(MAC_APP_LIB_DIR)
+	cp -pR ../../external/fsharpbinding/monodevelop/bin/mac-linux/Debug $(MAC_APP_LIB_DIR)/AddIns/fsharpbinding
 	cp -pR ../data $(MAC_APP_LIB_DIR)
 	cp -pR ../bin $(MAC_APP_LIB_DIR)
 	cp -pR ../locale $(MAC_APP_DIR)/Contents/MacOS/share
@@ -70,9 +63,9 @@ app: monostub
 	sed -e "s/@BUNDLE_VERSION@/$(BUNDLE_VERSION)/" -e "s/@ASSEMBLY_VERSION@/$(ASSEMBLY_VERSION)/" -e "s/@APP_NAME@/$(APP_NAME)/" -e "s|@RELEASE_ID@|$(PACKAGE_UPDATE_ID)|" Info.plist.in > $(MAC_APP_DIR)/Contents/Info.plist
 	cp ../../theme-icons/Mac/*.icns $(MAC_APP_DIR)/Contents/Resources/
 
-# copy monodevelop.pc and monodevelop-core-addins.pc to Contents/MacOS/lib/pkgconfig
-	mkdir -p $(MACOS)/lib/pkgconfig
-	cp ../../*.pc $(MACOS)/lib/pkgconfig
+# copy monodevelop.pc and monodevelop-core-addins.pc to Contents/Resources/lib/pkgconfig
+	mkdir -p $(LIB_DIR)/pkgconfig
+	cp ../../*.pc $(LIB_DIR)/pkgconfig
 
 # Copy main/monodevelop.xml to MonoDevelop.app/Contents/MacOS/share/mime/packages
 	mkdir -p $(MACOS)/share/{applications,mime,icons,locale,man}
@@ -100,13 +93,13 @@ app: monostub
 	@echo "Removing unneeded files"
 	@echo ""
 
-	rm -rf $(MACOS)/lib/monodevelop/bin/UnitTests.dll* \
-	  $(MACOS)/lib/monodevelop/bin/TestResult.xml \
-	  $(MACOS)/lib/monodevelop/bin/addin-db* \
-	  $(MACOS)/lib/monodevelop/bin/local \
-	  $(MACOS)/lib/monodevelop/bin/repository-cache* \
-	  $(MACOS)/lib/monodevelop/bin/addins-setup.config \
-	  $(MACOS)/lib/monodevelop/AddIns/MonoDevelop.TextTemplating/Mono.TextTemplating.Tests*
+	rm -rf $(MAC_APP_LIB_DIR)/bin/UnitTests.dll* \
+	  $(MAC_APP_LIB_DIR)/bin/TestResult.xml \
+	  $(MAC_APP_LIB_DIR)/bin/addin-db* \
+	  $(MAC_APP_LIB_DIR)/bin/local \
+	  $(MAC_APP_LIB_DIR)/bin/repository-cache* \
+	  $(MAC_APP_LIB_DIR)/bin/addins-setup.config \
+	  $(MAC_APP_LIB_DIR)/AddIns/MonoDevelop.TextTemplating/Mono.TextTemplating.Tests*
 
 # add extras known to work on Mac, if they exist
 	@echo ""
@@ -126,7 +119,7 @@ app: monostub
 	@echo "Copying binary artifacts into app bundle"
 	@echo ""
 
-	mkdir -p $(MACOS)/lib/pkgconfig
+	mkdir -p $(LIB_DIR)/pkgconfig
 	mkdir -p $(MACOS)/MonoDoc.app/
 	test ! -d $(ARTIFACTS)/MonoDoc.app ||  cp -pR $(ARTIFACTS)/MonoDoc.app/* $(MACOS)/MonoDoc.app/
 
@@ -137,19 +130,13 @@ app: monostub
 	@echo "Updating build information"
 	@echo ""
 
-	pushd ../..; make buildinfo; popd
-
-	echo "a3140c14-ef90-4019-ae6c-9d93804d6611 $(PACKAGE_UPDATE_ID)" > "$(MACOS)/updateinfo"
-
-	echo "Release ID: $(PACKAGE_UPDATE_ID)" > "$(MACOS)/lib/monodevelop/bin/buildinfo"
-	@cat ../bin/buildinfo >> "$(MACOS)/lib/monodevelop/bin/buildinfo"
+	$(MD_CONFIGURE) gen-buildinfo "$(MAC_APP_LIB_DIR)/bin"
 
 # touch the directory so that update dependencies work
 	touch MonoDevelop.app
 
 	@echo ""
-	@echo "MONODEVELOP RELEASE: $(PACKAGE_UPDATE_ID)"
-	@echo "$$(cat ../../vcrevision)"
+	@cat "$(MAC_APP_LIB_DIR)/bin/buildinfo"
 	@if test -f missing-stuff; then echo ""; echo "Missing stuff:"; cat missing-stuff; fi
 	@echo ""
 	@rm -f missing-stuff

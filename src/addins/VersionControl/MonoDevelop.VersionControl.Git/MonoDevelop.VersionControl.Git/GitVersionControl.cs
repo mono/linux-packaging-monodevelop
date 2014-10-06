@@ -24,16 +24,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using MonoDevelop.Core;
-using System.IO;
 using System.Collections.Generic;
 
 namespace MonoDevelop.VersionControl.Git
 {
-	public abstract class GitVersionControl : VersionControlSystem
+	abstract class GitVersionControl : VersionControlSystem
 	{
-		Dictionary<FilePath,GitRepository> repositories = new Dictionary<FilePath,GitRepository> ();
+		readonly Dictionary<FilePath,GitRepository> repositories = new Dictionary<FilePath,GitRepository> ();
 		
 		static GitVersionControl ()
 		{
@@ -55,14 +53,13 @@ namespace MonoDevelop.VersionControl.Git
 		{
 			if (path.IsEmpty || path.ParentDirectory.IsEmpty || path.IsNull || path.ParentDirectory.IsNull)
 				return null;
-			if (System.IO.Directory.Exists (path.Combine (".git"))) {
+			if (path.IsGitRepository ()) {
 				GitRepository repo;
 				if (!repositories.TryGetValue (path.CanonicalPath, out repo))
 					repositories [path.CanonicalPath] = repo = new GitRepository (path, null);
 				return repo;
 			}
-			else
-				return GetRepositoryReference (path.ParentDirectory, id);
+			return GetRepositoryReference (path.ParentDirectory, id);
 		}
 		
 		protected override Repository OnCreateRepositoryInstance ()

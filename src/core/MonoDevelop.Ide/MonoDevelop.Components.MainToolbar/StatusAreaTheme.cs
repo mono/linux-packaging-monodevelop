@@ -37,11 +37,17 @@ using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Components;
 
 using StockIcons = MonoDevelop.Ide.Gui.Stock;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Components.MainToolbar
 {
 	internal class StatusAreaTheme : IDisposable
 	{
+		public bool IsEllipsized {
+			get;
+			private set;
+		}
+
 		SurfaceWrapper backgroundSurface, errorSurface;
 		
 		public void Dispose ()
@@ -52,7 +58,7 @@ namespace MonoDevelop.Components.MainToolbar
 				errorSurface.Dispose ();
 		}
 
-		public void Render (Cairo.Context context, StatusArea.RenderArg arg)
+		public void Render (Cairo.Context context, StatusArea.RenderArg arg, Gtk.Widget widget)
 		{
 			context.CachedDraw (surface: ref backgroundSurface, 
 			                    region: arg.Allocation,
@@ -85,7 +91,7 @@ namespace MonoDevelop.Components.MainToolbar
 					gradient.AddColorStop (0.5, targetColor);
 					gradient.AddColorStop (1.0, transparentColor);
 
-					context.Pattern = gradient;
+					context.SetSource (gradient);
 
 					context.Rectangle (x1, arg.Allocation.Y, x2 - x1, arg.Allocation.Height);
 					context.Fill ();
@@ -99,11 +105,10 @@ namespace MonoDevelop.Components.MainToolbar
 			int progress_bar_width = arg.ChildAllocation.Width;
 
 			if (arg.CurrentPixbuf != null) {
-				int y = arg.Allocation.Y + (arg.Allocation.Height - arg.CurrentPixbuf.Height) / 2;
-				Gdk.CairoHelper.SetSourcePixbuf (context, arg.CurrentPixbuf, arg.ChildAllocation.X, y);
-				context.Paint ();
-				progress_bar_x += arg.CurrentPixbuf.Width + Styles.ProgressBarOuterPadding;
-				progress_bar_width -= arg.CurrentPixbuf.Width + Styles.ProgressBarOuterPadding;
+				int y = arg.Allocation.Y + (arg.Allocation.Height - (int)arg.CurrentPixbuf.Size.Height) / 2;
+				context.DrawImage (widget, arg.CurrentPixbuf, arg.ChildAllocation.X, y);
+				progress_bar_x += (int)arg.CurrentPixbuf.Width + Styles.ProgressBarOuterPadding;
+				progress_bar_width -= (int)arg.CurrentPixbuf.Width + Styles.ProgressBarOuterPadding;
 			}
 
 			int center = arg.Allocation.Y + arg.Allocation.Height / 2;
@@ -170,7 +175,7 @@ namespace MonoDevelop.Components.MainToolbar
 				context.MoveTo (arc.Radius * zoom, 0);
 				context.Arc (0, 0, arc.Radius * zoom, 0, arc.ArcLength);
 				context.LineWidth = arc.Thickness * zoom;
-				context.Color = CairoExtensions.ParseColor ("B1DDED", 0.35 * opacity);
+				context.SetSourceColor (CairoExtensions.ParseColor ("B1DDED", 0.35 * opacity));
 				context.Stroke ();
 				context.Rotate (Math.PI * 2 * -progress * arc.Speed);
 
@@ -197,12 +202,12 @@ namespace MonoDevelop.Components.MainToolbar
 		{
 			LayoutRoundedRectangle (context, region, -1, -1);
 			context.LineWidth = 1;
-			context.Color = Styles.StatusBarInnerColor;
+			context.SetSourceColor (Styles.StatusBarInnerColor);
 			context.Stroke ();
 
 			LayoutRoundedRectangle (context, region);
 			context.LineWidth = 1;
-			context.Color = Styles.StatusBarBorderColor;
+			context.SetSourceColor (Styles.StatusBarBorderColor);
 			context.StrokePreserve ();
 		}
 
@@ -215,7 +220,7 @@ namespace MonoDevelop.Components.MainToolbar
 				lg.AddColorStop (0, Styles.StatusBarFill1Color);
 				lg.AddColorStop (1, Styles.StatusBarFill4Color);
 
-				context.Pattern = lg;
+				context.SetSource (lg);
 				context.FillPreserve ();
 			}
 
@@ -229,7 +234,7 @@ namespace MonoDevelop.Components.MainToolbar
 				rg.AddColorStop (1, Styles.WithAlpha (Styles.StatusBarFill1Color, 0));
 
 				context.Scale (region.Width / (double)region.Height, 1.0);
-				context.Pattern = rg;
+				context.SetSource (rg);
 				context.Fill ();
 			}
 			context.Restore ();
@@ -240,7 +245,7 @@ namespace MonoDevelop.Components.MainToolbar
 
 				LayoutRoundedRectangle (context, region, 0, -1);
 				context.LineWidth = 1;
-				context.Pattern = lg;
+				context.SetSource (lg);
 				context.Stroke ();
 			}
 
@@ -250,7 +255,7 @@ namespace MonoDevelop.Components.MainToolbar
 
 				LayoutRoundedRectangle (context, region, 0, -2);
 				context.LineWidth = 1;
-				context.Pattern = lg;
+				context.SetSource (lg);
 				context.Stroke ();
 			}
 
@@ -286,7 +291,7 @@ namespace MonoDevelop.Components.MainToolbar
 					lg.AddColorStop (0.88, Styles.WithAlpha (Styles.StatusBarErrorColor, 0.30 * o));
 					lg.AddColorStop (1.00, Styles.WithAlpha (Styles.StatusBarErrorColor, 0.00 * o));
 
-					c.Pattern = lg;
+					c.SetSource (lg);
 					c.Paint ();
 				}
 			});
@@ -295,16 +300,16 @@ namespace MonoDevelop.Components.MainToolbar
 
 		void DrawProgressBar (Cairo.Context context, double progress, Gdk.Rectangle bounding, StatusArea.RenderArg arg)
 		{
-			LayoutRoundedRectangle (context, new Gdk.Rectangle (bounding.X, bounding.Y, (int) (bounding.Width * progress), bounding.Height));
+			LayoutRoundedRectangle (context, new Gdk.Rectangle (bounding.X, bounding.Y, (int) (bounding.Width * progress), bounding.Height), 0, 0, 1);
 			context.Clip ();
 
-			LayoutRoundedRectangle (context, bounding);
-			context.Color = Styles.WithAlpha (Styles.StatusBarProgressBackgroundColor, Styles.StatusBarProgressBackgroundColor.A * arg.ProgressBarAlpha);
+			LayoutRoundedRectangle (context, bounding, 0, 0, 1);
+			context.SetSourceColor (Styles.WithAlpha (Styles.StatusBarProgressBackgroundColor, Styles.StatusBarProgressBackgroundColor.A * arg.ProgressBarAlpha));
 			context.FillPreserve ();
 
 			context.ResetClip ();
 
-			context.Color = Styles.WithAlpha (Styles.StatusBarProgressOutlineColor, Styles.StatusBarProgressOutlineColor.A * arg.ProgressBarAlpha);
+			context.SetSourceColor (Styles.WithAlpha (Styles.StatusBarProgressOutlineColor, Styles.StatusBarProgressOutlineColor.A * arg.ProgressBarAlpha));
 			context.LineWidth = 1;
 			context.Stroke ();
 		}
@@ -343,9 +348,12 @@ namespace MonoDevelop.Components.MainToolbar
 
 			// Subtract off remainder instead of drop to prefer higher centering when centering an odd number of pixels
 			context.MoveTo (x, y - h / 2 - (h % 2));
-			context.Color = Styles.WithAlpha (FontColor (), opacity);
+			context.SetSourceColor (Styles.WithAlpha (FontColor (), opacity));
 
 			Pango.CairoHelper.ShowLayout (context, pl);
+
+			IsEllipsized = pl.IsEllipsized;
+
 			pl.Dispose ();
 			context.Restore ();
 		}

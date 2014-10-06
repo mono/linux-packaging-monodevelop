@@ -47,7 +47,10 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			this.foldingCheckbutton.Active = DefaultSourceEditorOptions.Instance.ShowFoldMargin;
 			this.foldregionsCheckbutton.Active = DefaultSourceEditorOptions.Instance.DefaultRegionsFolding;
 			this.foldCommentsCheckbutton.Active = DefaultSourceEditorOptions.Instance.DefaultCommentFolding;
-			this.antiAliasingCheckbutton.Active = DefaultSourceEditorOptions.Instance.UseAntiAliasing;
+			//			wordWrapCheckbutton.Active = DefaultSourceEditorOptions.Instance.WrapLines;
+			wordWrapCheckbutton.Visible = false;
+			antiAliasingCheckbutton.Visible = false;
+			GtkLabel15.Visible = false;
 			return this;
 		}
 		
@@ -55,12 +58,12 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 		{
 			DefaultSourceEditorOptions.Instance.DefaultRegionsFolding = this.foldregionsCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.DefaultCommentFolding = this.foldCommentsCheckbutton.Active;
-			DefaultSourceEditorOptions.Instance.UseAntiAliasing = this.antiAliasingCheckbutton.Active;
 			DefaultSourceEditorOptions.Instance.LineEndingConversion = (LineEndingConversion)this.comboboxLineEndings.Active;
 			if (DefaultSourceEditorOptions.Instance.ShowFoldMargin != this.foldingCheckbutton.Active) {
 				DefaultSourceEditorOptions.Instance.ShowFoldMargin = this.foldingCheckbutton.Active;
 				HighlightingPanel.UpdateActiveDocument ();
 			}
+//			DefaultSourceEditorOptions.Instance.WrapLines = wordWrapCheckbutton.Active;
 		}
 
 		public void Initialize (OptionsDialog dialog, object dataObject)

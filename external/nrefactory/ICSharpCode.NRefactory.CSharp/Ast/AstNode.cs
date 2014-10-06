@@ -35,7 +35,7 @@ using ICSharpCode.NRefactory.TypeSystem;
 
 namespace ICSharpCode.NRefactory.CSharp
 {
-	public abstract class AstNode : AbstractAnnotatable, ICSharpCode.NRefactory.TypeSystem.IFreezable, PatternMatching.INode
+	public abstract class AstNode : AbstractAnnotatable, ICSharpCode.NRefactory.TypeSystem.IFreezable, PatternMatching.INode, ICloneable
 	{
 		// the Root role must be available when creating the null nodes, so we can't put it in the Roles class
 		internal static readonly Role<AstNode> RootRole = new Role<AstNode> ("Root");
@@ -59,16 +59,17 @@ namespace ICSharpCode.NRefactory.CSharp
 			
 			public override void AcceptVisitor (IAstVisitor visitor)
 			{
+				visitor.VisitNullNode(this);
 			}
 			
 			public override T AcceptVisitor<T> (IAstVisitor<T> visitor)
 			{
-				return default (T);
+				return visitor.VisitNullNode(this);
 			}
 			
 			public override S AcceptVisitor<T, S> (IAstVisitor<T, S> visitor, T data)
 			{
-				return default (S);
+				return visitor.VisitNullNode(this, data);
 			}
 			
 			protected internal override bool DoMatch (AstNode other, PatternMatching.Match match)
@@ -384,7 +385,12 @@ namespace ICSharpCode.NRefactory.CSharp
 		{
 			return Ancestors.OfType<T>().FirstOrDefault();
 		}
-		
+
+		public AstNode GetParent(Func<AstNode, bool> pred)
+		{
+			return Ancestors.FirstOrDefault(pred);
+		}
+
 		public AstNodeCollection<T> GetChildrenByRole<T> (Role<T> role) where T : AstNode
 		{
 			return new AstNodeCollection<T> (this, role);
@@ -406,11 +412,27 @@ namespace ICSharpCode.NRefactory.CSharp
 			if (child == null || child.IsNull)
 				return;
 			ThrowIfFrozen();
+			if (child == this)
+				throw new ArgumentException ("Cannot add a node to itself as a child.", "child");
 			if (child.parent != null)
 				throw new ArgumentException ("Node is already used in another tree.", "child");
 			if (child.IsFrozen)
 				throw new ArgumentException ("Cannot add a frozen node.", "child");
 			AddChildUnsafe (child, role);
+		}
+		
+		public void AddChildWithExistingRole (AstNode child)
+		{
+			if (child == null || child.IsNull)
+				return;
+			ThrowIfFrozen();
+			if (child == this)
+				throw new ArgumentException ("Cannot add a node to itself as a child.", "child");
+			if (child.parent != null)
+				throw new ArgumentException ("Node is already used in another tree.", "child");
+			if (child.IsFrozen)
+				throw new ArgumentException ("Cannot add a frozen node.", "child");
+			AddChildUnsafe (child, child.Role);
 		}
 		
 		/// <summary>
@@ -611,6 +633,11 @@ namespace ICSharpCode.NRefactory.CSharp
 			copy.CloneAnnotations();
 			
 			return copy;
+		}
+		
+		object ICloneable.Clone()
+		{
+			return Clone();
 		}
 		
 		public abstract void AcceptVisitor (IAstVisitor visitor);
@@ -889,11 +916,17 @@ namespace ICSharpCode.NRefactory.CSharp
 			return this;
 		}
 		
+		/// <summary>
+		/// Returns the root nodes of all subtrees that are fully contained in the specified region.
+		/// </summary>
 		public IEnumerable<AstNode> GetNodesBetween (int startLine, int startColumn, int endLine, int endColumn)
 		{
 			return GetNodesBetween (new TextLocation (startLine, startColumn), new TextLocation (endLine, endColumn));
 		}
 		
+		/// <summary>
+		/// Returns the root nodes of all subtrees that are fully contained between <paramref name="start"/> and <paramref name="end"/> (inclusive).
+		/// </summary>
 		public IEnumerable<AstNode> GetNodesBetween (TextLocation start, TextLocation end)
 		{
 			AstNode node = this;
@@ -902,11 +935,11 @@ namespace ICSharpCode.NRefactory.CSharp
 				if (start <= node.StartLocation && node.EndLocation <= end) {
 					// Remember next before yielding node.
 					// This allows iteration to continue when the caller removes/replaces the node.
-					next = node.NextSibling;
+					next = node.GetNextNode();
 					yield return node;
 				} else {
 					if (node.EndLocation <= start) {
-						next = node.NextSibling;
+						next = node.GetNextNode();
 					} else {
 						next = node.FirstChild;
 					}

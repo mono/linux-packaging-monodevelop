@@ -340,12 +340,27 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 				this.text = text;
 			}
 
-			public void Parse(Action<char> act = null)
+			/// <summary>
+			/// Parsing all text and calling act delegate on almost every character.
+			/// Skipping begining of comments, begining of verbatim strings and escaped characters.
+			/// </summary>
+			/// <param name="act">Return true to abort parsing. Integer argument represent offset in text.</param>
+			/// <returns>True if aborted.</returns>
+			public bool Parse(Func<char, int, bool> act = null)
 			{
-				Parse(0, text.Length, act);
+				return Parse(0, text.Length, act);
 			}
 
-			public void Parse(int start, int length, Action<char> act = null)
+
+			/// <summary>
+			/// Parsing text from start to start+length and calling act delegate on almost every character.
+			/// Skipping begining of comments, begining of verbatim strings and escaped characters.
+			/// </summary>
+			/// <param name="start">Start offset.</param>
+			/// <param name="length">Lenght to parse.</param>
+			/// <param name="act">Return true to abort parsing. Integer argument represent offset in text.</param>
+			/// <returns>True if aborted.</returns>
+			public bool Parse(int start, int length, Func<char, int, bool> act = null)
 			{
 				for (int i = start; i < length; i++) {
 					char ch = text [i];
@@ -416,9 +431,11 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 							break;
 					}
 					if (act != null)
-						act(ch);
+					if (act (ch, i))
+						return true;
 					IsFistNonWs &= ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r';
 				}
+				return false;
 			}
 		}
 
@@ -639,9 +656,10 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 			return bracketStack;
 		}
 		
-		public static void AppendMissingClosingBrackets (StringBuilder wrapper, string memberText, bool appendSemicolon)
+		public static void AppendMissingClosingBrackets (StringBuilder wrapper, bool appendSemicolon)
 		{
-			var bracketStack = GetBracketStack (memberText);
+			var memberText = wrapper.ToString();
+			var bracketStack = GetBracketStack(memberText);
 			bool didAppendSemicolon = !appendSemicolon;
 			//char lastBracket = '\0';
 			while (bracketStack.Count > 0) {
@@ -676,7 +694,7 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 					while (o >= "try".Length) {
 						char ch = memberText [o];
 						if (!char.IsWhiteSpace (ch)) {
-							if (ch == 'y' && memberText [o - 1] == 'r' && memberText [o - 2] == 't') {
+								if (ch == 'y' && memberText [o - 1] == 'r' && memberText [o - 2] == 't' && (o - 3 < 0 || !char.IsLetterOrDigit(memberText [o - 3]))) {
 								wrapper.Append ("} catch {}");
 								didAppendCatch = true;
 							}
@@ -693,6 +711,26 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 				wrapper.Append (';');
 		}
 
+		protected StringBuilder CreateWrapper(string continuation, bool appendSemicolon, string afterContinuation, string memberText, TextLocation memberLocation, ref int closingBrackets, ref int generatedLines)
+		{
+			var wrapper = new StringBuilder();
+			bool wrapInClass = memberLocation != new TextLocation(1, 1);
+			if (wrapInClass) {
+				wrapper.Append("class Stub {");
+				wrapper.AppendLine();
+				closingBrackets++;
+				generatedLines++;
+			}
+			wrapper.Append(memberText);
+			wrapper.Append(continuation);
+			AppendMissingClosingBrackets(wrapper, appendSemicolon);
+			wrapper.Append(afterContinuation);
+			if (closingBrackets > 0) {
+				wrapper.Append(new string('}', closingBrackets));
+			}
+			return wrapper;
+		}
+
 		protected SyntaxTree ParseStub(string continuation, bool appendSemicolon = true, string afterContinuation = null)
 		{
 			var mt = GetMemberTextToCaret();
@@ -704,21 +742,7 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 			var memberLocation = mt.Item2;
 			int closingBrackets = 1;
 			int generatedLines = 0;
-			var wrapper = new StringBuilder();
-			bool wrapInClass = memberLocation != new TextLocation(1, 1);
-			if (wrapInClass) {
-				wrapper.Append("class Stub {");
-				wrapper.AppendLine();
-				closingBrackets++;
-				generatedLines++;
-			}
-			wrapper.Append(memberText);
-			wrapper.Append(continuation);
-			AppendMissingClosingBrackets(wrapper, memberText, appendSemicolon);
-			wrapper.Append(afterContinuation);
-			if (closingBrackets > 0) { 
-				wrapper.Append(new string('}', closingBrackets));
-			}
+			var wrapper = CreateWrapper(continuation, appendSemicolon, afterContinuation, memberText, memberLocation, ref closingBrackets, ref generatedLines);
 			var parser = new CSharpParser ();
 			foreach (var sym in CompletionContextProvider.ConditionalSymbols)
 				parser.CompilerSettings.ConditionalSymbols.Add (sym);
@@ -739,7 +763,7 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 				memberText = CompletionContextProvider.GetMemberTextToCaret(offset, currentType, currentMember);
 			return memberText;
 		}
-		
+
 		protected ExpressionResult GetInvocationBeforeCursor(bool afterBracket)
 		{
 			SyntaxTree baseUnit;
@@ -812,12 +836,26 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 			}
 		}
 		
-		protected Tuple<ResolveResult, CSharpResolver> ResolveExpression (ExpressionResult tuple)
+		protected ExpressionResolveResult ResolveExpression (ExpressionResult tuple)
 		{
 			return ResolveExpression (tuple.Node);
 		}
 
-		protected Tuple<ResolveResult, CSharpResolver> ResolveExpression(AstNode expr)
+		protected class ExpressionResolveResult
+		{
+			public ResolveResult Result { get; set; }
+			public CSharpResolver Resolver { get; set; }
+			public CSharpAstResolver AstResolver { get; set; }
+
+			public ExpressionResolveResult(ResolveResult item1, CSharpResolver item2, CSharpAstResolver item3)
+			{
+				this.Result = item1;
+				this.Resolver = item2;
+				this.AstResolver = item3;
+			}
+		}
+
+		protected ExpressionResolveResult ResolveExpression(AstNode expr)
 		{
 			if (expr == null) {
 				return null;
@@ -835,12 +873,29 @@ namespace ICSharpCode.NRefactory.CSharp.Completion
 				if (root == null) {
 					return null;
 				}
-				if (root is Accessor)
-					root = root.Parent;
-				var csResolver = CompletionContextProvider.GetResolver (GetState(), root);
+				var curState = GetState();
+				// current member needs to be in the setter because of the 'value' parameter
+				if (root is Accessor) {
+					var prop = curState.CurrentMember as IProperty;
+					if (prop != null && prop.CanSet && (root.Role == IndexerDeclaration.SetterRole || root.Role == PropertyDeclaration.SetterRole))
+					    curState = curState.WithCurrentMember(prop.Setter);
+				}
+
+				// Rood should be the 'body' - otherwise the state -> current member isn't correct.
+				var body = root.Children.FirstOrDefault(r => r.Role == Roles.Body);
+				if (body != null && body.Contains(expr.StartLocation))
+					root = body;
+
+				var csResolver = CompletionContextProvider.GetResolver (curState, root);
 				var result = csResolver.Resolve(resolveNode);
 				var state = csResolver.GetResolverStateBefore(resolveNode);
-				return Tuple.Create(result, state);
+				if (state.CurrentMember == null)
+					state = state.WithCurrentMember(curState.CurrentMember);
+				if (state.CurrentTypeDefinition == null)
+					state = state.WithCurrentTypeDefinition(curState.CurrentTypeDefinition);
+				if (state.CurrentUsingScope == null)
+					state = state.WithCurrentUsingScope(curState.CurrentUsingScope);
+				return new ExpressionResolveResult(result, state, csResolver);
 			} catch (Exception e) {
 				Console.WriteLine(e);
 				return null;

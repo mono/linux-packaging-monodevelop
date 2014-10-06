@@ -94,8 +94,9 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 					return result;
 				}
 				result = new List<IAttribute>();
+				var context = parentContext.WithCurrentTypeDefinition(this);
 				foreach (IUnresolvedTypeDefinition part in parts) {
-					ITypeResolveContext parentContextForPart = part.CreateResolveContext(parentContext);
+					ITypeResolveContext parentContextForPart = part.CreateResolveContext(context);
 					foreach (var attr in part.Attributes) {
 						result.Add(attr.CreateResolvedAttribute(parentContextForPart));
 					}
@@ -476,6 +477,10 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 			return Methods.Any(m => m.IsExtensionMethod);
 		}
 		
+		public bool IsPartial {
+			get { return parts.Length > 1 || parts[0].IsPartial; }
+		}
+		
 		public bool? IsReferenceType {
 			get {
 				switch (this.Kind) {
@@ -499,13 +504,13 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 		}
 
 		public IList<IType> TypeArguments {
-			get { 
+			get {
 				// ToList() call is necessary because IList<> isn't covariant
 				return TypeParameters.ToList<IType>();
 			}
 		}
 
-		public bool IsParameterized { 
+		public bool IsParameterized {
 			get { return false; }
 		}
 
@@ -517,9 +522,19 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 				IList<IType> result = LazyInit.VolatileRead(ref this.directBaseTypes);
 				if (result != null) {
 					return result;
-				} else {
-					result = CalculateDirectBaseTypes();
-					return LazyInit.GetOrSet(ref this.directBaseTypes, result);
+				}
+				using (var busyLock = BusyManager.Enter(this)) {
+					if (busyLock.Success) {
+						result = CalculateDirectBaseTypes();
+						return LazyInit.GetOrSet(ref this.directBaseTypes, result);
+					} else {
+						// This can happen for "class Test : $Test.Base$ { public class Base {} }"
+						// and also for the valid code
+						// "class Test : Base<Test.Inner> { public class Inner {} }"
+						
+						// Don't cache the error!
+						return EmptyList<IType>.Instance;
+					}
 				}
 			}
 		}
@@ -693,6 +708,11 @@ namespace ICSharpCode.NRefactory.TypeSystem.Implementation
 					asmRef = null;
 				return new GetClassTypeReference(asmRef, this.Namespace, this.Name, this.TypeParameterCount);
 			}
+		}
+		
+		ISymbolReference ISymbol.ToReference()
+		{
+			return (ISymbolReference)ToTypeReference();
 		}
 		
 		public IEnumerable<IType> GetNestedTypes(Predicate<ITypeDefinition> filter = null, GetMemberOptions options = GetMemberOptions.None)

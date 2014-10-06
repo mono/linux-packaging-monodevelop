@@ -189,11 +189,12 @@ namespace MonoDevelop.AnalysisCore.Gui
 					if (cancellationToken.IsCancellationRequested)
 						return false;
 					var currentResult = (Result)enumerator.Current;
-					
+
 					if (currentResult.InspectionMark != IssueMarker.None) {
 						int start = editor.LocationToOffset (currentResult.Region.Begin);
 						int end = editor.LocationToOffset (currentResult.Region.End);
-
+						if (start >= end)
+							continue;
 						if (currentResult.InspectionMark == IssueMarker.GrayOut) {
 							var marker = new GrayOutMarker (currentResult, TextSegment.FromBounds (start, end));
 							marker.IsVisible = currentResult.Underline;
@@ -208,7 +209,6 @@ namespace MonoDevelop.AnalysisCore.Gui
 							ext.markers.Enqueue (marker);
 						}
 					}
-					
 					ext.tasks.Add (new QuickTask (currentResult.Message, currentResult.Region.Begin, currentResult.Level));
 				}
 				

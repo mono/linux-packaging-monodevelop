@@ -37,40 +37,44 @@ namespace Mono.TextEditor
 	{
 		public static void GotoMatchingBracket (TextEditorData data)
 		{
-			int matchingBracketOffset = data.Document.GetMatchingBracketOffset (data.Caret.Offset);
-			if (matchingBracketOffset == -1 && data.Caret.Offset > 0)
-				matchingBracketOffset = data.Document.GetMatchingBracketOffset (data.Caret.Offset - 1);
+			using (var undoGroup = data.OpenUndoGroup ()) {
+				int matchingBracketOffset = data.Document.GetMatchingBracketOffset (data.Caret.Offset);
+				if (matchingBracketOffset == -1 && data.Caret.Offset > 0)
+					matchingBracketOffset = data.Document.GetMatchingBracketOffset (data.Caret.Offset - 1);
 			
-			if (matchingBracketOffset != -1)
-				data.Caret.Offset = matchingBracketOffset;
+				if (matchingBracketOffset != -1)
+					data.Caret.Offset = matchingBracketOffset;
+			}
 		}
 		
 		public static int RemoveTabInLine (TextEditorData data, DocumentLine line)
 		{
 			if (line.LengthIncludingDelimiter == 0)
 				return 0;
-			char ch = data.Document.GetCharAt (line.Offset); 
-			if (ch == '\t') {
-				data.Remove (line.Offset, 1);
-				data.Document.CommitLineUpdate (line);
-				return 1;
-			} else if (ch == ' ') {
-				int removeCount = 0;
-				for (int i = 0; i < data.Options.IndentationSize;) {
-					ch = data.Document.GetCharAt (line.Offset + i);
-					if (ch == ' ') {
-						removeCount ++;
-						i++;
-					} else if (ch == '\t') {
-						removeCount ++;
-						i += data.Options.TabSize;
-					} else {
-						break;
+			using (var undoGroup = data.OpenUndoGroup ()) {
+				char ch = data.Document.GetCharAt (line.Offset); 
+				if (ch == '\t') {
+					data.Remove (line.Offset, 1);
+					data.Document.CommitLineUpdate (line);
+					return 1;
+				} else if (ch == ' ') {
+					int removeCount = 0;
+					for (int i = 0; i < data.Options.IndentationSize;) {
+						ch = data.Document.GetCharAt (line.Offset + i);
+						if (ch == ' ') {
+							removeCount++;
+							i++;
+						} else if (ch == '\t') {
+							removeCount++;
+							i += data.Options.TabSize;
+						} else {
+							break;
+						}
 					}
+					data.Remove (line.Offset, removeCount);
+					data.Document.CommitLineUpdate (line);
+					return removeCount;
 				}
-				data.Remove (line.Offset, removeCount);
-				data.Document.CommitLineUpdate (line);
-				return removeCount;
 			}
 			return 0;
 		}
@@ -82,7 +86,7 @@ namespace Mono.TextEditor
 			int startLineNr, endLineNr;
 			GetSelectedLines (data, out startLineNr, out endLineNr);
 			
-			using (var undo = data.OpenUndoGroup ()) {
+			using (var undo = data.OpenUndoGroup (OperationType.Format)) {
 				var anchor = data.MainSelection.Anchor;
 				var lead = data.MainSelection.Lead;
 				bool first = true;
@@ -163,7 +167,7 @@ namespace Mono.TextEditor
 			var anchor = data.MainSelection.Anchor;
 			var lead = data.MainSelection.Lead;
 			var indentationString = data.Options.IndentationString;
-			using (var undo = data.OpenUndoGroup ()) {
+			using (var undo = data.OpenUndoGroup (OperationType.Format)) {
 				foreach (DocumentLine line in data.SelectedLines) {
 					if (data.Options.IndentStyle == IndentStyle.Virtual && line.Length == 0)
 						continue;
@@ -223,9 +227,12 @@ namespace Mono.TextEditor
 		{
 			if (!data.CanEditSelection)
 				return;
-			DocumentLine line = data.Document.GetLine (data.Caret.Line);
-			data.Caret.Column = line.Length + 1;
-			InsertNewLine (data);
+
+			using (var undoGroup = data.OpenUndoGroup ()) {
+				DocumentLine line = data.Document.GetLine (data.Caret.Line);
+				data.Caret.Column = line.Length + 1;
+				InsertNewLine (data);
+			}
 		}
 		
 		static void NewLineSmartIndent (TextEditorData data)
@@ -233,7 +240,8 @@ namespace Mono.TextEditor
 			using (var undo = data.OpenUndoGroup ()) {
 				data.EnsureCaretIsNotVirtual ();
 				data.InsertAtCaret (data.EolMarker);
-				data.InsertAtCaret (data.GetIndentationString (data.Caret.Location));
+				var line = data.Document.GetLine (data.Caret.Line);
+				data.InsertAtCaret (data.GetIndentationString (line.EndOffset));
 			}
 		}
 		
@@ -243,8 +251,14 @@ namespace Mono.TextEditor
 				return;
 			
 			using (var undo = data.OpenUndoGroup ()) {
-				if (data.IsSomethingSelected)
+				if (data.IsSomethingSelected) {
+					var end = data.MainSelection.End;
 					data.DeleteSelectedText ();
+					if (end.Column == 1) {
+						CaretMoveActions.InternalCaretMoveHome (data, true, false);
+						return;
+					}
+				}
 				switch (data.Options.IndentStyle) {
 				case IndentStyle.None:
 					data.InsertAtCaret (data.EolMarker);
@@ -419,50 +433,52 @@ namespace Mono.TextEditor
 			DocumentLine line = data.Document.GetLine (data.Caret.Line);
 			if (line == null)
 				return;
-			int transposeOffset = data.Caret.Offset - 1;
-			char ch;
-			if (data.Caret.Column == 0) {
-				DocumentLine lineAbove = data.Document.GetLine (data.Caret.Line - 1);
-				if (lineAbove.Length == 0 && line.Length == 0) 
-					return;
-				
-				if (line.Length != 0) {
-					ch = data.Document.GetCharAt (data.Caret.Offset);
-					data.Remove (data.Caret.Offset, 1);
-					data.Insert (lineAbove.Offset + lineAbove.Length, ch.ToString ());
-					data.Document.CommitLineUpdate (data.Caret.Line - 1);
-					return;
-				}
-				
-				int lastCharOffset = lineAbove.Offset + lineAbove.Length - 1;
-				ch = data.Document.GetCharAt (lastCharOffset);
-				data.Remove (lastCharOffset, 1);
-				data.InsertAtCaret (ch.ToString ());
-				return;
-			}
-			
-			int offset = data.Caret.Offset;
-			if (data.Caret.Column >= line.Length + 1) {
-				offset = line.Offset + line.Length - 1;
-				transposeOffset = offset - 1;
-				// case one char in line:
-				if (transposeOffset < line.Offset) {
+			using (var undoGroup = data.OpenUndoGroup ()) {
+				int transposeOffset = data.Caret.Offset - 1;
+				char ch;
+				if (data.Caret.Column == 0) {
 					DocumentLine lineAbove = data.Document.GetLine (data.Caret.Line - 1);
-					transposeOffset = lineAbove.Offset + lineAbove.Length;
-					ch = data.Document.GetCharAt (offset);
-					data.Remove (offset, 1);
-					data.Insert (transposeOffset, ch.ToString ());
-					data.Caret.Offset = line.Offset;
-					data.Document.CommitLineUpdate (data.Caret.Line - 1);
+					if (lineAbove.Length == 0 && line.Length == 0)
+						return;
+				
+					if (line.Length != 0) {
+						ch = data.Document.GetCharAt (data.Caret.Offset);
+						data.Remove (data.Caret.Offset, 1);
+						data.Insert (lineAbove.Offset + lineAbove.Length, ch.ToString ());
+						data.Document.CommitLineUpdate (data.Caret.Line - 1);
+						return;
+					}
+				
+					int lastCharOffset = lineAbove.Offset + lineAbove.Length - 1;
+					ch = data.Document.GetCharAt (lastCharOffset);
+					data.Remove (lastCharOffset, 1);
+					data.InsertAtCaret (ch.ToString ());
 					return;
 				}
-			}
 			
-			ch = data.Document.GetCharAt (offset);
-			data.Replace (offset, 1, data.Document.GetCharAt (transposeOffset).ToString ());
-			data.Replace (transposeOffset, 1, ch.ToString ());
-			if (data.Caret.Column < line.Length + 1)
-				data.Caret.Offset = offset + 1;
+				int offset = data.Caret.Offset;
+				if (data.Caret.Column >= line.Length + 1) {
+					offset = line.Offset + line.Length - 1;
+					transposeOffset = offset - 1;
+					// case one char in line:
+					if (transposeOffset < line.Offset) {
+						DocumentLine lineAbove = data.Document.GetLine (data.Caret.Line - 1);
+						transposeOffset = lineAbove.Offset + lineAbove.Length;
+						ch = data.Document.GetCharAt (offset);
+						data.Remove (offset, 1);
+						data.Insert (transposeOffset, ch.ToString ());
+						data.Caret.Offset = line.Offset;
+						data.Document.CommitLineUpdate (data.Caret.Line - 1);
+						return;
+					}
+				}
+			
+				ch = data.Document.GetCharAt (offset);
+				data.Replace (offset, 1, data.Document.GetCharAt (transposeOffset).ToString ());
+				data.Replace (transposeOffset, 1, ch.ToString ());
+				if (data.Caret.Column < line.Length + 1)
+					data.Caret.Offset = offset + 1;
+			}
 		}
 		/// <summary>
 		/// Emacs c-l recenter editor command.
@@ -474,16 +490,17 @@ namespace Mono.TextEditor
 
 		public static void DuplicateLine (TextEditorData data)
 		{
-			if (data.IsSomethingSelected) {
-				var selectedText = data.SelectedText;
-				data.ClearSelection ();
-				data.InsertAtCaret (selectedText);
-			}
-			else {
-				DocumentLine line = data.Document.GetLine (data.Caret.Line);
-				if (line == null)
-					return;
-				data.Insert (line.Offset, data.GetTextAt (line.SegmentIncludingDelimiter));
+			using (var undoGroup = data.OpenUndoGroup ()) {
+				if (data.IsSomethingSelected) {
+					var selectedText = data.SelectedText;
+					data.ClearSelection ();
+					data.InsertAtCaret (selectedText);
+				} else {
+					DocumentLine line = data.Document.GetLine (data.Caret.Line);
+					if (line == null)
+						return;
+					data.Insert (line.Offset, data.GetTextAt (line.SegmentIncludingDelimiter));
+				}
 			}
 		}
 	}

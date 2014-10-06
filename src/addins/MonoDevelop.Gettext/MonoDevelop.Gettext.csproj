@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{ADDC9D20-83C5-4245-9B46-2C5F6642CFBC}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -14,16 +14,19 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>True</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>True</Optimize>
+    <Optimize>false</Optimize>
     <OutputPath>..\..\..\build\AddIns\DisplayBindings\Gettext</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DefineConstants>DEBUG</DefineConstants>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\DisplayBindings\Gettext\MonoDevelop.Gettext.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\build\AddIns\DisplayBindings\Gettext</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -31,6 +34,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\DisplayBindings\Gettext\MonoDevelop.Gettext.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -94,6 +100,11 @@
       <Name>Mono.Addins</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.cs" />
@@ -137,6 +148,7 @@
     <Compile Include="MonoDevelop.Gettext\PluralForms.cs" />
     <Compile Include="MonoDevelop.Gettext\TranslationCollection.cs" />
     <Compile Include="MonoDevelop.Gettext.NodeBuilders\ProjectFileNodeBuilderExtension.cs" />
+    <Compile Include="AddinInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
@@ -169,23 +181,29 @@
     <EmbeddedResource Include="icons\gettext-overlay-32.png">
       <LogicalName>gettext-overlay-32.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\translation-fuzzy-16.png">
-      <LogicalName>translation-fuzzy-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\done-16.png">
+      <LogicalName>done-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\translation-missing-16.png">
-      <LogicalName>translation-missing-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\done-16%402x.png">
+      <LogicalName>done-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\translation-valid-16.png">
-      <LogicalName>translation-valid-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\error-16.png">
+      <LogicalName>error-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\silk_accept.png">
-      <LogicalName>silk_accept.png</LogicalName>
+    <EmbeddedResource Include="icons\light\error-16%402x.png">
+      <LogicalName>error-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\silk_error.png">
-      <LogicalName>silk_error.png</LogicalName>
+    <EmbeddedResource Include="icons\light\warning-16.png">
+      <LogicalName>warning-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\silk_exclamation.png">
-      <LogicalName>silk_exclamation.png</LogicalName>
+    <EmbeddedResource Include="icons\light\warning-16%402x.png">
+      <LogicalName>warning-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-language-16.png">
+      <LogicalName>prefs-language-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-language-16%402x.png">
+      <LogicalName>prefs-language-light-16@2x.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

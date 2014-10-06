@@ -31,9 +31,7 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Text;
 using NGit;
-using NGit.Merge;
 using NGit.Treewalk;
-using NGit.Diff;
 using NGit.Dircache;
 using NGit.Revwalk;
 using NGit.Api;
@@ -134,7 +132,7 @@ namespace MonoDevelop.VersionControl.Git
 				int secs = int.Parse (line.Substring (i2, i - i2));
 				DateTime t = new DateTime (1970, 1, 1) + TimeSpan.FromSeconds (secs);
 				string st = t.ToString ("yyyy-MM-ddTHH:mm:ss") + line.Substring (i + 1, 3) + ":" + line.Substring (i + 4, 2);
-				s.DateTime = DateTimeOffset.Parse (st);
+				s.DateTime = DateTimeOffset.Parse (st, System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat);
 				s.Comment = line.Substring (i + 7);
 				i = s.Comment.IndexOf (':');
 				if (i != -1)
@@ -145,7 +143,7 @@ namespace MonoDevelop.VersionControl.Git
 			return s;
 		}
 		
-		public MergeCommandResult Apply (NGit.ProgressMonitor monitor)
+		public MergeCommandResult Apply (ProgressMonitor monitor)
 		{
 			return StashCollection.Apply (monitor, this);
 		}
@@ -153,7 +151,7 @@ namespace MonoDevelop.VersionControl.Git
 	
 	public class StashCollection: IEnumerable<Stash>
 	{
-		NGit.Repository _repo;
+		readonly NGit.Repository _repo;
 		
 		internal StashCollection (NGit.Repository repo)
 		{
@@ -175,12 +173,12 @@ namespace MonoDevelop.VersionControl.Git
 			}
 		}
 		
-		public Stash Create (NGit.ProgressMonitor monitor)
+		public Stash Create (ProgressMonitor monitor)
 		{
 			return Create (monitor, null);
 		}
 		
-		public Stash Create (NGit.ProgressMonitor monitor, string message)
+		public Stash Create (ProgressMonitor monitor, string message)
 		{
 			if (monitor != null) {
 				monitor.Start (1);
@@ -196,7 +194,7 @@ namespace MonoDevelop.VersionControl.Git
 			
 			if (string.IsNullOrEmpty (message)) {
 				// Use the commit summary as message
-				message = parent.Abbreviate (7).ToString () + " " + parent.GetShortMessage ();
+				message = parent.Abbreviate (7) + " " + parent.GetShortMessage ();
 				int i = message.IndexOfAny (new char[] { '\r', '\n' });
 				if (i != -1)
 					message = message.Substring (0, i);
@@ -302,7 +300,7 @@ namespace MonoDevelop.VersionControl.Git
 			}
 		}
 		
-		internal MergeCommandResult Apply (NGit.ProgressMonitor monitor, Stash stash)
+		internal MergeCommandResult Apply (ProgressMonitor monitor, Stash stash)
 		{
 			monitor.Start (1);
 			monitor.BeginTask ("Applying stash", 100);
@@ -322,7 +320,7 @@ namespace MonoDevelop.VersionControl.Git
 			Remove (stashes, s);
 		}
 		
-		public MergeCommandResult Pop (NGit.ProgressMonitor monitor)
+		public MergeCommandResult Pop (ProgressMonitor monitor)
 		{
 			List<Stash> stashes = ReadStashes ();
 			Stash last = stashes.Last ();

@@ -95,9 +95,16 @@ namespace Mono.Addins.CecilReflector
 				// Constructor parameters of type System.Type can't be set because types from the assembly
 				// can't be loaded. The parameter value will be set later using a type name property.
 				for (int n=0; n<cargs.Length; n++) {
-					cargs [n] = att.ConstructorArguments [n].Value;
-					string atype = att.Constructor.Parameters[n].ParameterType.FullName;
-					if (atype == "System.Type") {
+					var atype = Type.GetType (att.Constructor.Parameters[n].ParameterType.FullName);
+					if (atype == null)
+						atype = typeof(IAssemblyReflector).Assembly.GetType (att.Constructor.Parameters[n].ParameterType.FullName);
+
+					if (atype.IsEnum)
+						cargs [n] = Enum.ToObject (atype, att.ConstructorArguments [n].Value);
+					else
+						cargs [n] = att.ConstructorArguments [n].Value;
+
+					if (typeof(System.Type).IsAssignableFrom (atype)) {
 						if (typeParameters == null)
 							typeParameters = new ArrayList ();
 						cargs [n] = typeof(object);
@@ -445,10 +452,14 @@ namespace Mono.Addins.CecilReflector
 				string loc = locator.GetAssemblyLocation (aref.FullName);
 				if (loc == null)
 					continue;
-				AssemblyDefinition asm = LoadAssembly (loc, true);
-				td = GetType (asm, name) as TypeDefinition;
-				if (td != null)
-					return td;
+				try {
+					AssemblyDefinition asm = LoadAssembly (loc, true);
+					td = GetType (asm, name) as TypeDefinition;
+					if (td != null)
+						return td;
+				} catch {
+					Console.WriteLine ("Could not scan dependency '{0}'. Ignoring for now.", aref.FullName);
+				}
 			}
 			return null;
 		}

@@ -1,6 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/obj/Debug/MonoDevelop.VersionControl.Subversion.Unix.MonoDevelop.VersionControl.Subversion.Unix.addin.xml
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.Unix.dll.config
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.Unix.dll.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Subversion.Unix.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/obj/Debug/MonoDevelop.VersionControl.Subversion.Unix.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Subversion.Unix/obj/Debug/MonoDevelop.VersionControl.Subversion.Unix.dll.mdb

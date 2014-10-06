@@ -43,8 +43,7 @@ namespace Mono.TextEditor.Highlighting
 		static Dictionary<string, ColorScheme> styles      = new Dictionary<string, ColorScheme> ();
 		static Dictionary<string, IStreamProvider> syntaxModeLookup = new Dictionary<string, IStreamProvider> ();
 		static Dictionary<string, IStreamProvider> styleLookup      = new Dictionary<string, IStreamProvider> ();
-		static Dictionary<string, string> isLoadedFromFile = new Dictionary<string, string> ();
-		
+
 		public static string[] Styles {
 			get {
 				List<string> result = new List<string> ();
@@ -58,14 +57,6 @@ namespace Mono.TextEditor.Highlighting
 				}
 				return result.ToArray ();
 			}
-		}
-		
-		public static string GetFileNameForStyle (ColorScheme style)
-		{
-			string result;
-			if (!isLoadedFromFile.TryGetValue (style.Name, out result))
-				return null;
-			return result;
 		}
 		
 		public static void InstallSyntaxMode (string mimeType, ISyntaxModeProvider modeProvider)
@@ -83,7 +74,7 @@ namespace Mono.TextEditor.Highlighting
 				LoadStyle (name);
 				return GetColorStyle (name);
 			}
-			return GetColorStyle ("Default");
+			return GetColorStyle (TextEditorOptions.DefaultColorStyle);
 		}
 		
 		public static IStreamProvider GetProvider (SyntaxMode mode)
@@ -107,6 +98,7 @@ namespace Mono.TextEditor.Highlighting
 			if (!styleLookup.ContainsKey (name))
 				throw new System.ArgumentException ("Style " + name + " not found", "name");
 			var provider = styleLookup [name];
+			styleLookup.Remove (name); 
 			var stream = provider.Open ();
 			try {
 				if (provider is UrlStreamProvider) {
@@ -116,6 +108,7 @@ namespace Mono.TextEditor.Highlighting
 					} else {
 						styles [name] = ColorScheme.LoadFrom (stream);
 					}
+					styles [name].FileName = usp.Url;
 				} else {
 					styles [name] = ColorScheme.LoadFrom (stream);
 				}
@@ -196,10 +189,15 @@ namespace Mono.TextEditor.Highlighting
 		
 		public static void Remove (ColorScheme style)
 		{
-			if (styles.ContainsKey (style.Name))
-				styles.Remove (style.Name);
 			if (styleLookup.ContainsKey (style.Name))
 				styleLookup.Remove (style.Name);
+
+			foreach (var kv in styles) {
+				if (kv.Value == style) {
+					styles.Remove (kv.Key); 
+					return;
+				}
+			}
 		}
 		
 		public static void Remove (SyntaxMode mode)
@@ -257,66 +255,71 @@ namespace Mono.TextEditor.Highlighting
 			{
 				return !span.StopAtEol || span.StopAtEol && !string.IsNullOrEmpty (span.Continuation) &&
 					line != null && doc.GetTextAt (line).Trim ().EndsWith (span.Continuation, StringComparison.Ordinal);
-			}
+			} 
 			
 			public void InnerRun ()
 			{
-				bool doUpdate = false;
-				int startLine = doc.OffsetToLineNumber (startOffset);
-				if (startLine < 0)
-					return;
 				try {
-					var lineSegment = doc.GetLine (startLine);
-					if (lineSegment == null)
+					bool doUpdate = false;
+					int startLine = doc.OffsetToLineNumber (startOffset);
+					if (startLine < 0 || mode.Document == null)
 						return;
-					var span = lineSegment.StartSpan;
-					if (span == null)
-						return;
-
-					var spanStack = span.Clone ();
-
-					SyntaxMode.SpanParser parser = mode.CreateSpanParser(null, spanStack);
-
-					foreach (var line in doc.GetLinesStartingAt (startLine)) {
-						if (line == null)
+					try {
+						var lineSegment = doc.GetLine (startLine);
+						if (lineSegment == null)
 							return;
-
-						if (line.Offset > endOffset) {
-							span = line.StartSpan;
-							if (span == null)
+						var span = lineSegment.StartSpan;
+						if (span == null)
+							return;
+	
+						var spanStack = span.Clone ();
+	
+						SyntaxMode.SpanParser parser = mode.CreateSpanParser(null, spanStack);
+	
+						foreach (var line in doc.GetLinesStartingAt (startLine)) {
+							if (line == null)
 								return;
-
-							bool equal = span.Equals(spanStack);
-
-							doUpdate |= !equal;
-
-							if (equal)
-
-								break;
-
+	
+							if (line.Offset > endOffset) {
+								span = line.StartSpan;
+								if (span == null)
+									return;
+	
+								bool equal = span.Equals(spanStack);
+	
+								doUpdate |= !equal;
+	
+								if (equal)
+	
+									break;
+	
+							}
+	
+							line.StartSpan = spanStack.Clone();
+	
+							parser.ParseSpans(line.Offset, line.LengthIncludingDelimiter);
+	
+							while (spanStack.Count > 0 && !EndsWithContinuation(spanStack.Peek(), line))
+	
+								parser.PopSpan();
+	
 						}
-
-						line.StartSpan = spanStack.Clone();
-
-						parser.ParseSpans(line.Offset, line.LengthIncludingDelimiter);
-
-						while (spanStack.Count > 0 && !EndsWithContinuation(spanStack.Peek(), line))
-
-							parser.PopSpan();
-
+	
+					} catch (Exception e) {
+						Console.WriteLine ("Syntax highlighting exception:" + e);
 					}
-
-				} catch (Exception e) {
-					Console.WriteLine ("Syntax highlighting exception:" + e);
+					if (doUpdate) {
+						var storedDoc = doc;
+						Gtk.Application.Invoke (delegate {
+							storedDoc.CommitUpdateAll ();
+						});
+					}
+					IsFinished = true;
+					ManualResetEvent.Set ();
+				} finally {
+					doc = null;
+					mode = null;
 				}
-				if (doUpdate) {
-					Gtk.Application.Invoke (delegate {
-						doc.RequestUpdate (new UpdateAll ());
-						doc.CommitDocumentUpdate ();
-					});
-				}
-				IsFinished = true;
-				ManualResetEvent.Set ();
 			}
 		}
 		
@@ -346,7 +349,11 @@ namespace Mono.TextEditor.Highlighting
 					lock (updateQueue) {
 						worker = updateQueue.Dequeue ();
 					}
-					worker.InnerRun ();
+					try {
+						worker.InnerRun ();
+					} catch (Exception e) {
+						Console.WriteLine ("Exception in syntax mode update thread:" + e);
+					}
 				}
 				queueSignal.WaitOne ();
 			}
@@ -425,9 +432,10 @@ namespace Mono.TextEditor.Highlighting
 				} else if (file.EndsWith (".json", StringComparison.Ordinal)) {
 					using (var stream = File.OpenRead (file)) {
 						string styleName = ScanStyle (stream);
+						if (styleName == TextEditorOptions.DefaultColorStyle)
+							continue;
 						if (!string.IsNullOrEmpty (styleName)) {
 							styleLookup [styleName] = new UrlStreamProvider (file);
-							isLoadedFromFile [styleName] = file;
 						} else {
 							Console.WriteLine ("Invalid .json syntax sheme file : " + file);
 						}
@@ -435,8 +443,9 @@ namespace Mono.TextEditor.Highlighting
 				} else if (file.EndsWith (".vssettings", StringComparison.Ordinal)) {
 					using (var stream = File.OpenRead (file)) {
 						string styleName = Path.GetFileNameWithoutExtension (file);
+						if (styleName == TextEditorOptions.DefaultColorStyle)
+							continue;
 						styleLookup [styleName] = new UrlStreamProvider (file);
-						isLoadedFromFile [styleName] = file;
 					}
 				}
 			}
@@ -500,9 +509,8 @@ namespace Mono.TextEditor.Highlighting
 			}
 		}
 		
-		public static void AddStyle (string fileName, ColorScheme style)
+		public static void AddStyle (ColorScheme style)
 		{
-			isLoadedFromFile [style.Name] = fileName;
 			styles [style.Name] = style;
 		}
 
@@ -531,7 +539,7 @@ namespace Mono.TextEditor.Highlighting
 
 		public static ColorScheme DefaultColorStyle {
 			get {
-				return GetColorStyle ("Default");
+				return GetColorStyle (TextEditorOptions.DefaultColorStyle);
 			}
 		}
 		
@@ -547,3 +555,4 @@ namespace Mono.TextEditor.Highlighting
 		}
 	}
 }
+

@@ -548,6 +548,13 @@ namespace Xwt.Drawing
 				ctx.NativeContextHandler.Translate (ctx.NativeBackend, tx, ty);
 		}
 
+		public override void ModifyCTM (object backend, Matrix t)
+		{
+			var ctx = (VectorBackend)backend;
+			CreateNativePathBackend (ctx);
+			ctx.NativeContextHandler.ModifyCTM (ctx.NativeBackend, t);
+		}
+
 		public override Matrix GetCTM (object backend)
 		{
 			var ctx = (VectorBackend)backend;
@@ -574,6 +581,13 @@ namespace Xwt.Drawing
 			var ctx = (VectorBackend)backend;
 			CreateNativePathBackend (ctx);
 			return ctx.NativePathHandler.IsPointInFill (ctx.NativeBackend, x, y);
+		}
+
+		public override double GetScaleFactor (object backend)
+		{
+			var ctx = (VectorBackend)backend;
+			CreateNativePathBackend (ctx);
+			return ctx.NativeContextHandler.GetScaleFactor (ctx.NativeBackend);
 		}
 
 		public override void Dispose (object backend)

@@ -229,6 +229,13 @@ namespace Mono.Addins.Database
 				return;
 			}
 			
+			string ext = Path.GetExtension (file).ToLower ();
+			if ((ext == ".dll" || ext == ".exe") && !Util.IsManagedAssembly (file)) {
+				// Ignore dlls and exes which are not managed assemblies
+				folderInfo.SetLastScanTime (file, null, false, fs.GetLastWriteTime (file), true);
+				return;
+			}
+
 			if (monitor.LogLevel > 1)
 				monitor.Log ("Scanning file: " + file);
 			
@@ -242,8 +249,6 @@ namespace Mono.Addins.Database
 			AddinDescription config = null;
 			
 			try {
-				string ext = Path.GetExtension (file).ToLower ();
-				
 				if (ext == ".dll" || ext == ".exe")
 					scanSuccessful = ScanAssembly (monitor, file, scanResult, out config);
 				else
@@ -546,30 +551,19 @@ namespace Mono.Addins.Database
 				
 				// Get the config file from the resources, if there is one
 				
-				foreach (string res in reflector.GetResourceNames (asm)) {
-					if (res.EndsWith (".addin") || res.EndsWith (".addin.xml")) {
-						using (Stream s = reflector.GetResourceStream (asm, res)) {
-							AddinDescription ad = AddinDescription.Read (s, Path.GetDirectoryName (filePath));
-							if (config != null) {
-								if (!config.IsExtensionModel && !ad.IsExtensionModel) {
-									// There is more than one add-in definition
-									monitor.ReportError ("Duplicate add-in definition found in assembly: " + filePath, null);
-									return false;
-								}
-								config = AddinDescription.Merge (config, ad);
-							} else
-								config = ad;
-						}
-					}
-				}
+				if (!ScanEmbeddedDescription (monitor, filePath, reflector, asm, out config))
+					return false;
 				
-				if (config == null) {
+				if (config == null || config.IsExtensionModel) {
 					// In this case, only scan the assembly if it has the Addin attribute.
 					AddinAttribute att = (AddinAttribute) reflector.GetCustomAttribute (asm, typeof(AddinAttribute), false);
-					if (att == null)
+					if (att == null) {
+						config = null;
 						return true;
+					}
 
-					config = new AddinDescription ();
+					if (config == null)
+						config = new AddinDescription ();
 				}
 				
 				config.SetBasePath (Path.GetDirectoryName (filePath));
@@ -586,6 +580,29 @@ namespace Mono.Addins.Database
 				monitor.ReportError ("There was an error while scanning assembly: " + filePath, ex);
 				return false;
 			}
+		}
+
+		static bool ScanEmbeddedDescription (IProgressStatus monitor, string filePath, IAssemblyReflector reflector, object asm, out AddinDescription config)
+		{
+			config = null;
+			foreach (string res in reflector.GetResourceNames (asm)) {
+				if (res.EndsWith (".addin") || res.EndsWith (".addin.xml")) {
+					using (Stream s = reflector.GetResourceStream (asm, res)) {
+						AddinDescription ad = AddinDescription.Read (s, Path.GetDirectoryName (filePath));
+						if (config != null) {
+							if (!config.IsExtensionModel && !ad.IsExtensionModel) {
+								// There is more than one add-in definition
+								monitor.ReportError ("Duplicate add-in definition found in assembly: " + filePath, null);
+								return false;
+							}
+							config = AddinDescription.Merge (config, ad);
+						}
+						else
+							config = ad;
+					}
+				}
+			}
+			return true;
 		}
 
 		bool ScanDescription (IProgressStatus monitor, IAssemblyReflector reflector, AddinDescription config, object rootAssembly, AddinScanResult scanResult)
@@ -661,14 +678,14 @@ namespace Mono.Addins.Database
 			if (!config.IsRoot) {
 				foreach (ModuleDescription mod in config.OptionalModules) {
 					try {
-						assemblies.Clear ();
+						var asmList = new List<Tuple<string,object>> ();
 						for (int n=0; n<mod.Assemblies.Count; n++) {
 							string s = mod.Assemblies [n];
 							if (mod.IgnorePaths.Contains (s))
 								continue;
 							string asmFile = Path.Combine (config.BasePath, s);
 							object asm = reflector.LoadAssembly (asmFile);
-							assemblies.Add (asm);
+							asmList.Add (new Tuple<string,object> (asmFile,asm));
 							scanResult.AddPathToIgnore (Path.GetFullPath (asmFile));
 							ScanAssemblyImports (reflector, mod, asm);
 						}
@@ -683,9 +700,9 @@ namespace Mono.Addins.Database
 							scanResult.AddPathToIgnore (Path.GetFullPath (path));
 						}
 						
-						foreach (object asm in assemblies)
-							ScanAssemblyContents (reflector, config, mod, asm, scanResult);
-						
+						foreach (var asm in asmList)
+							ScanSubmodule (monitor, mod, reflector, config, scanResult, asm.Item1, asm.Item2);
+
 					} catch (Exception ex) {
 						ReportReflectionException (monitor, ex, config, scanResult);
 					}
@@ -693,6 +710,37 @@ namespace Mono.Addins.Database
 			}
 			
 			config.StoreFileInfo ();
+			return true;
+		}
+
+		bool ScanSubmodule (IProgressStatus monitor, ModuleDescription mod, IAssemblyReflector reflector, AddinDescription config, AddinScanResult scanResult, string assemblyName, object asm)
+		{
+			AddinDescription mconfig;
+			ScanEmbeddedDescription (monitor, assemblyName, reflector, asm, out mconfig);
+			if (mconfig != null) {
+				if (!mconfig.IsExtensionModel) {
+					monitor.ReportError ("Submodules can't define new add-ins: " + assemblyName, null);
+					return false;
+				}
+				if (mconfig.OptionalModules.Count != 0) {
+					monitor.ReportError ("Submodules can't define nested submodules: " + assemblyName, null);
+					return false;
+				}
+				if (mconfig.ConditionTypes.Count != 0) {
+					monitor.ReportError ("Submodules can't define condition types: " + assemblyName, null);
+					return false;
+				}
+				if (mconfig.ExtensionNodeSets.Count != 0) {
+					monitor.ReportError ("Submodules can't define extension node sets: " + assemblyName, null);
+					return false;
+				}
+				if (mconfig.ExtensionPoints.Count != 0) {
+					monitor.ReportError ("Submodules can't define extension points sets: " + assemblyName, null);
+					return false;
+				}
+				mod.MergeWith (mconfig.MainModule);
+			}
+			ScanAssemblyContents (reflector, config, mod, asm, scanResult);
 			return true;
 		}
 
@@ -772,6 +820,24 @@ namespace Mono.Addins.Database
 			if (catt != null && config.Copyright.Length == 0)
 				config.Copyright = ((AssemblyCopyrightAttribute)catt).Copyright;
 			
+			// Category
+
+			catt = reflector.GetCustomAttribute (asm, typeof(AddinCategoryAttribute), false);
+			if (catt != null && config.Category.Length == 0)
+				config.Category = ((AddinCategoryAttribute)catt).Category;
+			
+			// Url
+
+			catt = reflector.GetCustomAttribute (asm, typeof(AddinUrlAttribute), false);
+			if (catt != null && config.Url.Length == 0)
+				config.Url = ((AddinUrlAttribute)catt).Url;
+			
+			// Flags
+
+			catt = reflector.GetCustomAttribute (asm, typeof(AddinFlagsAttribute), false);
+			if (catt != null)
+				config.Flags |= ((AddinFlagsAttribute)catt).Flags;
+
 			// Localizer
 			
 			AddinLocalizerGettextAttribute locat = (AddinLocalizerGettextAttribute) reflector.GetCustomAttribute (asm, typeof(AddinLocalizerGettextAttribute), false);

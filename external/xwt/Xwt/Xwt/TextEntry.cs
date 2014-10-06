@@ -32,11 +32,13 @@ namespace Xwt
 	[BackendType (typeof(ITextEntryBackend))]
 	public class TextEntry: Widget
 	{
-		EventHandler changed;
+		EventHandler changed, activated, selectionChanged;
 		
 		static TextEntry ()
 		{
 			MapEvent (TextEntryEvent.Changed, typeof(TextEntry), "OnChanged");
+			MapEvent (TextEntryEvent.Activated, typeof(TextEntry), "OnActivated");
+			MapEvent (TextEntryEvent.SelectionChanged, typeof(TextEntry), "OnSelectionChanged");
 		}
 		
 		protected new class WidgetBackendHost: Widget.WidgetBackendHost, ITextEntryEventSink
@@ -45,10 +47,20 @@ namespace Xwt
 			{
 				((TextEntry)Parent).OnChanged (EventArgs.Empty);
 			}
+
+			public void OnActivated ()
+			{
+				((TextEntry)Parent).OnActivated (EventArgs.Empty);
+			}
+
+			public void OnSelectionChanged ()
+			{
+				((TextEntry)Parent).OnSelectionChanged (EventArgs.Empty);
+			}
 			
 			public override Size GetDefaultNaturalSize ()
 			{
-				return Xwt.Backends.DefaultNaturalSizes.TextEntry;
+				return DefaultNaturalSizes.TextEntry;
 			}
 		}
 		
@@ -93,6 +105,30 @@ namespace Xwt
 			get { return Backend.ShowFrame; }
 			set { Backend.ShowFrame = value; }
 		}
+
+		[DefaultValue (0)]
+		public int CursorPosition {
+			get { return Backend.CursorPosition; }
+			set { Backend.CursorPosition = value; }
+		}
+
+		[DefaultValue (0)]
+		public int SelectionStart {
+			get { return Backend.SelectionStart; }
+			set { Backend.SelectionStart = value; }
+		}
+
+		[DefaultValue (0)]
+		public int SelectionLength {
+			get { return Backend.SelectionLength; }
+			set { Backend.SelectionLength = value; }
+		}
+
+		[DefaultValue ("")]
+		public string SelectedText {
+			get { return Backend.SelectedText; }
+			set { Backend.SelectedText = value; }
+		}
 		
 		[DefaultValue (true)]
 		public bool MultiLine {
@@ -114,6 +150,40 @@ namespace Xwt
 			remove {
 				changed -= value;
 				BackendHost.OnAfterEventRemove (TextEntryEvent.Changed, changed);
+			}
+		}
+
+		protected virtual void OnSelectionChanged (EventArgs e)
+		{
+			if (selectionChanged != null)
+				selectionChanged (this, e);
+		}
+
+		public event EventHandler SelectionChanged {
+			add {
+				BackendHost.OnBeforeEventAdd (TextEntryEvent.SelectionChanged, selectionChanged);
+				selectionChanged += value;
+			}
+			remove {
+				selectionChanged -= value;
+				BackendHost.OnAfterEventRemove (TextEntryEvent.SelectionChanged, selectionChanged);
+			}
+		}
+
+		protected virtual void OnActivated (EventArgs e)
+		{
+			if (activated != null)
+				activated (this, e);
+		}
+
+		public event EventHandler Activated {
+			add {
+				BackendHost.OnBeforeEventAdd (TextEntryEvent.Activated, activated);
+				activated += value;
+			}
+			remove {
+				activated -= value;
+				BackendHost.OnAfterEventRemove (TextEntryEvent.Activated, activated);
 			}
 		}
 	}

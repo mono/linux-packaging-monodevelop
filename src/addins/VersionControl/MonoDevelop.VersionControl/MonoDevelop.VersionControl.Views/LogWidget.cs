@@ -25,7 +25,6 @@
 // THE SOFTWARE.
 
 using System;
-using System.IO;
 using Gtk;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
@@ -39,7 +38,7 @@ namespace MonoDevelop.VersionControl.Views
 	[System.ComponentModel.ToolboxItem(true)]
 	public partial class LogWidget : Gtk.Bin
 	{
-		MonoDevelop.VersionControl.Revision[] history;
+		Revision[] history;
 		public Revision[] History {
 			get {
 				return history;
@@ -62,7 +61,7 @@ namespace MonoDevelop.VersionControl.Views
 		CellRendererDiff diffRenderer = new CellRendererDiff ();
 		CellRendererText messageRenderer = new CellRendererText ();
 		CellRendererText textRenderer = new CellRendererText ();
-		CellRendererPixbuf pixRenderer = new CellRendererPixbuf ();
+		CellRendererImage pixRenderer = new CellRendererImage ();
 		
 		bool currentRevisionShortened;
 		
@@ -92,7 +91,7 @@ namespace MonoDevelop.VersionControl.Views
 					double center_x = cell_area.X + Math.Round ((double) (cell_area.Width / 2d));
 					double center_y = cell_area.Y + Math.Round ((double) (cell_area.Height / 2d));
 					cr.Arc (center_x, center_y, 5, 0, 2 * Math.PI);
-					cr.Color = new Cairo.Color (0, 0, 0);
+					cr.SetSourceRGBA (0, 0, 0, 1);
 					cr.Stroke ();
 					if (!FirstNode) {
 						cr.MoveTo (center_x, cell_area.Y - 2);
@@ -125,15 +124,14 @@ namespace MonoDevelop.VersionControl.Views
 			vpaned1 = vpaned1.ReplaceWithWidget (new VPanedThin () { HandleWidget = separator }, true);
 
 			revertButton = new DocumentToolButton ("vc-revert-command", GettextCatalog.GetString ("Revert changes from this revision"));
-//			revertButton.Sensitive = false;
+			revertButton.Sensitive = false;
 			revertButton.Clicked += new EventHandler (RevertRevisionClicked);
 
 			revertToButton = new DocumentToolButton ("vc-revert-command", GettextCatalog.GetString ("Revert to this revision"));
-//			revertToButton.Sensitive = false;
+			revertToButton.Sensitive = false;
 			revertToButton.Clicked += new EventHandler (RevertToRevisionClicked);
 
 			refreshButton = new DocumentToolButton (Gtk.Stock.Refresh, GettextCatalog.GetString ("Refresh"));
-//			refreshButton.Sensitive = false;
 			refreshButton.Clicked += new EventHandler (RefreshClicked);
 
 			searchEntry = new SearchEntry ();
@@ -187,20 +185,20 @@ namespace MonoDevelop.VersionControl.Views
 			scrolledwindowFiles.Child = treeviewFiles;
 			scrolledwindowFiles.ShowAll ();
 			
-			changedpathstore = new TreeStore (typeof (Gdk.Pixbuf), typeof (string), // icon/file name
-				typeof (Gdk.Pixbuf), typeof (string), // icon/operation
+			changedpathstore = new TreeStore (typeof(Xwt.Drawing.Image), typeof (string), // icon/file name
+			                                  typeof(Xwt.Drawing.Image), typeof (string), // icon/operation
 				typeof (string), // path
 				typeof (string), // revision path (invisible)
 				typeof (string []) // diff
 				);
 			
 			TreeViewColumn colChangedFile = new TreeViewColumn ();
-			var crp = new CellRendererPixbuf ();
+			var crp = new CellRendererImage ();
 			var crt = new CellRendererText ();
 			colChangedFile.Title = GettextCatalog.GetString ("File");
 			colChangedFile.PackStart (crp, false);
 			colChangedFile.PackStart (crt, true);
-			colChangedFile.AddAttribute (crp, "pixbuf", 2);
+			colChangedFile.AddAttribute (crp, "image", 2);
 			colChangedFile.AddAttribute (crt, "text", 3);
 			treeviewFiles.AppendColumn (colChangedFile);
 			
@@ -208,7 +206,7 @@ namespace MonoDevelop.VersionControl.Views
 			colOperation.Title = GettextCatalog.GetString ("Operation");
 			colOperation.PackStart (crp, false);
 			colOperation.PackStart (crt, true);
-			colOperation.AddAttribute (crp, "pixbuf", 0);
+			colOperation.AddAttribute (crp, "image", 0);
 			colOperation.AddAttribute (crt, "text", 1);
 			treeviewFiles.AppendColumn (colOperation);
 			
@@ -244,9 +242,9 @@ namespace MonoDevelop.VersionControl.Views
 		protected override void OnRealized ()
 		{
 			base.OnRealized ();
-			var c = new HslColor (Style.Base (StateType.Normal));
-			c.L *= 0.8;
-			commitBox.ModifyBg (StateType.Normal, c);
+			var c = Style.Base (StateType.Normal).ToXwtColor ();
+			c.Light *= 0.8;
+			commitBox.ModifyBg (StateType.Normal, c.ToGdkColor ());
 
 			var tcol = new Gdk.Color (255, 251, 242);
 			textviewDetails.ModifyBase (StateType.Normal, tcol);
@@ -255,7 +253,9 @@ namespace MonoDevelop.VersionControl.Views
 
 		internal void SetToolbar (DocumentToolbar toolbar)
 		{
-			toolbar.Add (revertButton);
+			if (info.Repository.SupportsRevertRevision)
+				toolbar.Add (revertButton);
+
 			toolbar.Add (revertToButton);
 			toolbar.Add (refreshButton);
 
@@ -306,6 +306,7 @@ namespace MonoDevelop.VersionControl.Views
 		{
 			ShowLoading ();
 			info.Start (true);
+			revertButton.Sensitive = revertToButton.Sensitive = false;
 		}
 
 		void HandleTreeviewFilesDiffLineActivated (object sender, EventArgs e)
@@ -320,6 +321,8 @@ namespace MonoDevelop.VersionControl.Views
 			
 			string fileName = (string)changedpathstore.GetValue (iter, colPath);
 			int line = diffRenderer.GetSelectedLine (paths[0]);
+			if (line == -1)
+				line = 1;
 			var doc = IdeApp.Workbench.OpenDocument (fileName, line, 0, OpenDocumentOptions.Default | OpenDocumentOptions.OnlyInternalViewer);
 			int i = 1;
 			foreach (var content in doc.Window.SubViewContents) {
@@ -463,9 +466,9 @@ namespace MonoDevelop.VersionControl.Views
 			var rev = (Revision)model.GetValue (iter, 0);
 			string day;
 			var age = rev.Time - DateTime.Now;
-			if (age.TotalDays == 0) {
+			if (age.Days == 0) {
 				day = GettextCatalog.GetString ("Today");
-			} else if (age.TotalDays == 1) {
+			} else if (age.Days == 1) {
 				day = GettextCatalog.GetString ("Yesterday");
 			} else {
 				day = rev.Time.ToShortDateString ();
@@ -510,8 +513,8 @@ namespace MonoDevelop.VersionControl.Views
 			string author = rev.Author;
 			if (string.IsNullOrEmpty (author))
 				return;
-			int idx = author.IndexOf ("<");
-			if (idx >= 0 && idx < author.IndexOf (">"))
+			int idx = author.IndexOf ("<", StringComparison.Ordinal);
+			if (idx >= 0 && idx < author.IndexOf (">", StringComparison.Ordinal))
 				author = author.Substring (0, idx).Trim ();
 			if (string.IsNullOrEmpty (currentFilter))
 				renderer.Text = author;
@@ -521,20 +524,18 @@ namespace MonoDevelop.VersionControl.Views
 		
 		void AuthorIconFunc (Gtk.TreeViewColumn tree_column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
 		{
-			CellRendererPixbuf renderer = (CellRendererPixbuf)cell;
+			CellRendererImage renderer = (CellRendererImage)cell;
 			var rev = (Revision)model.GetValue (iter, 0);
 			if (string.IsNullOrEmpty (rev.Email))
 				return;
 			ImageLoader img = ImageService.GetUserIcon (rev.Email, 16);
-			if (img.LoadOperation.IsCompleted)
-				renderer.Pixbuf = img.Pixbuf;
-			else {
-				renderer.Pixbuf = null;
-				img.LoadOperation.Completed += delegate {
-					Gtk.Application.Invoke (delegate {
-						if (logstore.IterIsValid (iter))
-							model.EmitRowChanged (model.GetPath (iter), iter);
-					});
+
+			renderer.Image = img.Image;
+			if (img.Downloading) {
+				img.Completed += (sender, e) => {
+					renderer.Image = img.Image;
+					if (logstore.IterIsValid (iter))
+						model.EmitRowChanged (model.GetPath (iter), iter);
 				};
 			}
 		}
@@ -597,28 +598,30 @@ namespace MonoDevelop.VersionControl.Views
 			
 			if (d == null)
 				return;
+
+			revertButton.Sensitive = revertToButton.Sensitive = true;
 			Gtk.TreeIter selectIter = Gtk.TreeIter.Zero;
 			bool select = false;
 			foreach (RevisionPath rp in info.Repository.GetRevisionChanges (d)) {
-				Gdk.Pixbuf actionIcon;
+				Xwt.Drawing.Image actionIcon;
 				string action = null;
 				if (rp.Action == RevisionAction.Add) {
 					action = GettextCatalog.GetString ("Add");
-					actionIcon = ImageService.GetPixbuf (Gtk.Stock.Add, Gtk.IconSize.Menu);
+					actionIcon = ImageService.GetIcon (Gtk.Stock.Add, Gtk.IconSize.Menu);
 				} else if (rp.Action == RevisionAction.Delete) {
 					action = GettextCatalog.GetString ("Delete");
-					actionIcon = ImageService.GetPixbuf (Gtk.Stock.Remove, Gtk.IconSize.Menu);
+					actionIcon = ImageService.GetIcon (Gtk.Stock.Remove, Gtk.IconSize.Menu);
 				} else if (rp.Action == RevisionAction.Modify) {
 					action = GettextCatalog.GetString ("Modify");
-					actionIcon = ImageService.GetPixbuf ("gtk-edit", Gtk.IconSize.Menu);
+					actionIcon = ImageService.GetIcon ("gtk-edit", Gtk.IconSize.Menu);
 				} else if (rp.Action == RevisionAction.Replace) {
 					action = GettextCatalog.GetString ("Replace");
-					actionIcon = ImageService.GetPixbuf ("gtk-edit", Gtk.IconSize.Menu);
+					actionIcon = ImageService.GetIcon ("gtk-edit", Gtk.IconSize.Menu);
 				} else {
 					action = rp.ActionDescription;
-					actionIcon = ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.Empty, Gtk.IconSize.Menu);
+					actionIcon = ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.Empty, Gtk.IconSize.Menu);
 				}
-				Gdk.Pixbuf fileIcon = DesktopService.GetPixbufForFile (rp.Path, Gtk.IconSize.Menu);
+				Xwt.Drawing.Image fileIcon = DesktopService.GetIconForFile (rp.Path, Gtk.IconSize.Menu);
 				var iter = changedpathstore.AppendValues (actionIcon, action, fileIcon, System.IO.Path.GetFileName (rp.Path), System.IO.Path.GetDirectoryName (rp.Path), rp.Path, null);
 				changedpathstore.AppendValues (iter, null, null, null, null, null, rp.Path, null);
 				if (rp.Path == preselectFile) {

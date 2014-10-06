@@ -44,14 +44,13 @@ namespace MonoDevelop.Core.Assemblies
 {
 	public class MonoTargetRuntime: TargetRuntime
 	{
-		string monoVersion;
-		string monoDir;
+		readonly string monoVersion,  monoDir;
 		MonoPlatformExecutionHandler execHandler;
-		Dictionary<string,string> environmentVariables;
+		readonly Dictionary<string,string> environmentVariables;
 		
 		internal static LibraryPcFileCache PcFileCache = new LibraryPcFileCache (new PcFileCacheContext ());
 		
-		MonoRuntimeInfo monoRuntimeInfo;
+		readonly MonoRuntimeInfo monoRuntimeInfo;
 		
 		internal MonoTargetRuntime (MonoRuntimeInfo info)
 		{
@@ -114,7 +113,7 @@ namespace MonoDevelop.Core.Assemblies
 			return GetReferenceFrameworkDirectories (IsInitialized || IsRunning);
 		}
 
-		internal IEnumerable<FilePath> GetReferenceFrameworkDirectories (bool includeMacGlobalDir)
+		IEnumerable<FilePath> GetReferenceFrameworkDirectories (bool includeGlobalDirectories)
 		{
 			//duplicate xbuild's framework folders path logic
 			//see xbuild man page
@@ -124,7 +123,7 @@ namespace MonoDevelop.Core.Assemblies
 					yield return (FilePath) dir;
 			}
 
-			if (Platform.IsMac && true) {
+			if (includeGlobalDirectories && Platform.IsMac) {
 				yield return "/Library/Frameworks/Mono.framework/External/xbuild-frameworks";
 			}
 
@@ -154,7 +153,7 @@ namespace MonoDevelop.Core.Assemblies
 			return execHandler;
 		}
 		
-		protected override void ConvertAssemblyProcessStartInfo (System.Diagnostics.ProcessStartInfo pinfo)
+		protected override void ConvertAssemblyProcessStartInfo (ProcessStartInfo pinfo)
 		{
 			pinfo.Arguments = "\"" + pinfo.FileName + "\" " + pinfo.Arguments;
 			pinfo.FileName = Path.Combine (Path.Combine (MonoRuntimeInfo.Prefix, "bin"), "mono");
@@ -180,9 +179,15 @@ namespace MonoDevelop.Core.Assemblies
 			}
 		}
 		
-		public override string GetMSBuildBinPath (TargetFramework fx)
+		public override string GetMSBuildBinPath (string toolsVersion)
 		{
-			return Path.Combine (monoDir, "2.0");
+			var path = Path.Combine (monoDir, toolsVersion);
+			if (File.Exists (Path.Combine (path, "xbuild.exe")))
+				return path;
+			//HACK: Mono puts xbuild 4.0 in 4.5 directory, even though there is no such thing as ToolsVersion 4.5
+			if (toolsVersion == "4.0")
+				return GetMSBuildBinPath ("4.5");
+			return null;
 		}
 		
 		public override string GetMSBuildExtensionsPath ()
@@ -191,18 +196,30 @@ namespace MonoDevelop.Core.Assemblies
 		}
 		
 		public IEnumerable<string> PkgConfigDirs {
-			get { return PkgConfigPath.Split (Path.PathSeparator); }
+			get { return GetPkgConfigDirs (IsInitialized || IsRunning); }
+		}
+
+		IEnumerable<string> GetPkgConfigDirs (bool includeGlobalDirectories)
+		{
+			foreach (string s in PkgConfigPath.Split (Path.PathSeparator))
+				yield return s;
+			if (includeGlobalDirectories && Platform.IsMac)
+				yield return "/Library/Frameworks/Mono.framework/External/pkgconfig";
 		}
 		
 		public string PkgConfigPath {
 			get { return environmentVariables ["PKG_CONFIG_PATH"]; }
 		}
-		
+
 		public IEnumerable<string> GetAllPkgConfigFiles ()
 		{
-			HashSet<string> packageNames = new HashSet<string> ();
+			var packageNames = new HashSet<string> ();
 			foreach (string pcdir in PkgConfigDirs) {
 				string[] files;
+
+				if (!Directory.Exists (pcdir))
+					continue;
+
 				try {
 					files = Directory.GetFiles (pcdir, "*.pc");
 				} catch (Exception ex) {
@@ -210,6 +227,7 @@ namespace MonoDevelop.Core.Assemblies
 						"Runtime '{0}' error in pc file scan of directory '{1}'", DisplayName, pcdir), ex);
 					continue;
 				}
+
 				foreach (string pcfile in files)
 					if (packageNames.Add (Path.GetFileNameWithoutExtension (pcfile)))
 						yield return pcfile;
@@ -260,6 +278,11 @@ namespace MonoDevelop.Core.Assemblies
 		{
 			MonoTargetRuntimeFactory.UnregisterRuntime (runtime);
 		}
+
+		public override ExecutionEnvironment GetToolsExecutionEnvironment ()
+		{
+			return new ExecutionEnvironment (EnvironmentVariables);
+		}
 	}
 	
 	class PcFileCacheContext: Mono.PkgConfig.IPcFileCacheContext<LibraryPackageInfo>
@@ -285,12 +308,12 @@ namespace MonoDevelop.Core.Assemblies
 			foreach (PackageAssemblyInfo pi in pinfo.Assemblies) {
 				TargetFrameworkMoniker targetFramework = Runtime.SystemAssemblyService.GetTargetFrameworkForAssembly (Runtime.SystemAssemblyService.CurrentRuntime, pi.File);
 				if (commonFramework == null) {
-					commonFramework = Runtime.SystemAssemblyService.GetCoreFramework (targetFramework);
+					commonFramework = Runtime.SystemAssemblyService.GetTargetFramework (targetFramework);
 					if (commonFramework == null)
 						inconsistentFrameworks = true;
 				}
 				else if (targetFramework != null) {
-					TargetFramework newfx = Runtime.SystemAssemblyService.GetCoreFramework (targetFramework);
+					TargetFramework newfx = Runtime.SystemAssemblyService.GetTargetFramework (targetFramework);
 					if (newfx == null)
 						inconsistentFrameworks = true;
 					else {

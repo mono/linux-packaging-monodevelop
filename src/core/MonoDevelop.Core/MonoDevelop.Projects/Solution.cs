@@ -90,7 +90,7 @@ namespace MonoDevelop.Projects
 		/// </summary>
 		public SolutionFolder DefaultSolutionFolder {
 			get {
-				var itemsFolder = (SolutionFolder) RootFolder.Items.Where (item => item.Name == "Solution Items").FirstOrDefault ();
+				var itemsFolder = (SolutionFolder)RootFolder.Items.FirstOrDefault (item => item.Name == "Solution Items");
 				if (itemsFolder == null) {
 					itemsFolder = new SolutionFolder ();
 					itemsFolder.Name = "Solution Items";
@@ -124,7 +124,7 @@ namespace MonoDevelop.Projects
 				if (startupItem == null && singleStartup) {
 					ReadOnlyCollection<SolutionEntityItem> its = GetAllSolutionItems<SolutionEntityItem> ();
 					if (its.Count > 0)
-						startupItem = its [0];
+						startupItem = its.FirstOrDefault (it => it.SupportsExecute ());
 				}
 				return startupItem;
 			}
@@ -235,12 +235,12 @@ namespace MonoDevelop.Projects
 			}
 		}
 
-		public override void LoadUserProperties ()
+		protected override void OnEndLoad ()
 		{
-			base.LoadUserProperties ();
+			base.OnEndLoad ();
 			LoadItemProperties (UserProperties, RootFolder, "MonoDevelop.Ide.ItemProperties");
 		}
-		
+
 		public override void SaveUserProperties ()
 		{
 			CollectItemProperties (UserProperties, RootFolder, "MonoDevelop.Ide.ItemProperties");
@@ -288,7 +288,7 @@ namespace MonoDevelop.Projects
 		
 		public void CreateDefaultConfigurations ()
 		{
-			foreach (SolutionEntityItem item in Items) {
+			foreach (SolutionEntityItem item in Items.Where (it => it.SupportsBuild ())) {
 				foreach (ItemConfiguration conf in item.Configurations) {
 					SolutionConfiguration sc = Configurations [conf.Id];
 					if (sc == null) {
@@ -308,7 +308,7 @@ namespace MonoDevelop.Projects
 		public SolutionConfiguration AddConfiguration (string name, bool createConfigForItems)
 		{
 			SolutionConfiguration conf = new SolutionConfiguration (name);
-			foreach (SolutionEntityItem item in Items) {
+			foreach (SolutionEntityItem item in Items.Where (it => it.SupportsBuild())) {
 				if (createConfigForItems && item.GetConfiguration (new ItemConfigurationSelector (name)) == null) {
 					SolutionItemConfiguration newc = item.CreateConfiguration (name);
 					if (item.DefaultConfiguration != null)
@@ -367,9 +367,15 @@ namespace MonoDevelop.Projects
 			return RootFolder.GetAllProjectsWithTopologicalSort (configuration);
 		}
 
+		[Obsolete("Use GetProjectsContainingFile() (plural) instead")]
 		public override Project GetProjectContainingFile (FilePath fileName) 
 		{
 			return RootFolder.GetProjectContainingFile (fileName);
+		}
+
+		public override IEnumerable<Project> GetProjectsContainingFile (FilePath fileName)
+		{
+			return RootFolder.GetProjectsContainingFile (fileName);
 		}
 		
 		public override bool ContainsItem (IWorkspaceObject obj)
@@ -502,6 +508,31 @@ namespace MonoDevelop.Projects
 			Counters.SolutionsLoaded--;
 		}
 
+		internal bool IsSolutionItemEnabled (string solutionItemPath)
+		{
+			solutionItemPath = GetRelativeChildPath (Path.GetFullPath (solutionItemPath));
+			var list = UserProperties.GetValue<List<string>> ("DisabledProjects");
+			return list == null || !list.Contains (solutionItemPath);
+		}
+
+		public void SetSolutionItemEnabled (string solutionItemPath, bool enabled)
+		{
+			solutionItemPath = GetRelativeChildPath (Path.GetFullPath (solutionItemPath));
+			var list = UserProperties.GetValue<List<string>> ("DisabledProjects");
+			if (!enabled) {
+				if (list == null)
+					list = new List<string> ();
+				if (!list.Contains (solutionItemPath))
+					list.Add (solutionItemPath);
+				UserProperties.SetValue ("DisabledProjects", list);
+			} else if (list != null) {
+				list.Remove (solutionItemPath);
+				if (list.Count == 0)
+					UserProperties.RemoveValue ("DisabledProjects");
+				else
+					UserProperties.SetValue ("DisabledProjects", list);
+			}
+		}
 
 		internal void UpdateDefaultConfigurations ()
 		{
@@ -619,26 +650,44 @@ namespace MonoDevelop.Projects
 			SolutionFolder sf = args.SolutionItem as SolutionFolder;
 			if (sf != null) {
 				foreach (SolutionItem eitem in sf.GetAllItems<SolutionItem> ())
-					SetupNewItem (eitem);
+					SetupNewItem (eitem, null);
 			}
 			else {
-				SetupNewItem (args.SolutionItem);
+				SetupNewItem (args.SolutionItem, args.ReplacedItem);
 			}
 			
 			if (SolutionItemAdded != null)
 				SolutionItemAdded (this, args);
 		}
 		
-		void SetupNewItem (SolutionItem item)
+		void SetupNewItem (SolutionItem item, SolutionItem replacedItem)
 		{
 			ConvertToSolutionFormat (item, false);
 			
 			SolutionEntityItem eitem = item as SolutionEntityItem;
 			if (eitem != null) {
 				eitem.NeedsReload = false;
-				// Register the new entry in every solution configuration
-				foreach (SolutionConfiguration conf in Configurations)
-					conf.AddItem (eitem);
+				if (eitem.SupportsConfigurations () || replacedItem != null) {
+					if (replacedItem == null) {
+						// Register the new entry in every solution configuration
+						foreach (SolutionConfiguration conf in Configurations)
+							conf.AddItem (eitem);
+						// If there is no startup project or it is an invalid one, use the new project as startup if possible
+						if ((StartupItem == null || !StartupItem.SupportsExecute ()) && eitem.SupportsExecute ())
+							StartupItem = eitem;
+					} else {
+						// Reuse the configuration information of the replaced item
+						foreach (SolutionConfiguration conf in Configurations)
+							conf.ReplaceItem ((SolutionEntityItem)replacedItem, eitem);
+						if (StartupItem == replacedItem)
+							StartupItem = eitem;
+						else {
+							int i = MultiStartupItems.IndexOf ((SolutionEntityItem)replacedItem);
+							if (i != -1)
+								MultiStartupItems [i] = eitem;
+						}
+					}
+				}
 			}
 		}
 		
@@ -674,21 +723,23 @@ namespace MonoDevelop.Projects
 		void DetachItem (SolutionEntityItem item, bool reloading)
 		{
 			item.NeedsReload = false;
-			foreach (SolutionConfiguration conf in Configurations)
-				conf.RemoveItem (item);
-			if (!reloading && item is DotNetProject)
-				RemoveReferencesToProject ((DotNetProject) item);
+			if (!reloading) {
+				foreach (SolutionConfiguration conf in Configurations)
+					conf.RemoveItem (item);
+				if (item is Project)
+					RemoveReferencesToProject ((Project)item);
+
+				if (StartupItem == item)
+					StartupItem = null;
+				else
+					MultiStartupItems.Remove (item);
+			}
 			
 			// Update the file name because the file format may have changed
 			item.FileName = item.FileName;
-			
-			if (StartupItem == item)
-				StartupItem = null;
-			else
-				MultiStartupItems.Remove (item);
 		}
 		
-		void RemoveReferencesToProject (DotNetProject projectToRemove)
+		void RemoveReferencesToProject (Project projectToRemove)
 		{
 			if (projectToRemove == null)
 				return;

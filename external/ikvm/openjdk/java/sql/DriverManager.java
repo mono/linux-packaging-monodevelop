@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1996, 2006, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,13 +25,13 @@
 
 package java.sql;
 
-import ikvm.internal.CallerID;
 import java.util.Iterator;
-import java.sql.Driver;
 import java.util.ServiceLoader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-
+import java.util.concurrent.CopyOnWriteArrayList;
+import sun.reflect.CallerSensitive;
+import sun.reflect.Reflection;
 
 /**
  * <P>The basic service for managing a set of JDBC drivers.<br>
@@ -79,6 +79,27 @@ import java.security.PrivilegedAction;
  */
 public class DriverManager {
 
+
+    // List of registered JDBC drivers
+    private final static CopyOnWriteArrayList<DriverInfo> registeredDrivers = new CopyOnWriteArrayList<DriverInfo>();
+    private static volatile int loginTimeout = 0;
+    private static volatile java.io.PrintWriter logWriter = null;
+    private static volatile java.io.PrintStream logStream = null;
+    // Used in println() to synchronize logWriter
+    private final static  Object logSync = new Object();
+
+    /* Prevent the DriverManager class from being instantiated. */
+    private DriverManager(){}
+
+
+    /**
+     * Load the initial JDBC drivers by checking the System property
+     * jdbc.properties and then use the {@code ServiceLoader} mechanism
+     */
+    static {
+        loadInitialDrivers();
+        println("JDBC DriverManager initialized");
+    }
 
     /**
      * The <code>SQLPermission</code> constant that allows the
@@ -160,15 +181,10 @@ public class DriverManager {
      * @return a Connection to the URL
      * @exception SQLException if a database access error occurs
      */
-    @ikvm.internal.HasCallerID
+    @CallerSensitive
     public static Connection getConnection(String url,
         java.util.Properties info) throws SQLException {
-
-        // Gets the classloader of the code that called this method, may
-        // be null.
-        ClassLoader callerCL = CallerID.getCallerID().getCallerClassLoader();
-
-        return (getConnection(url, info, callerCL));
+        return (getConnection(url, info, Reflection.getCallerClass()));
     }
 
     /**
@@ -184,14 +200,10 @@ public class DriverManager {
      * @return a connection to the URL
      * @exception SQLException if a database access error occurs
      */
-    @ikvm.internal.HasCallerID
+    @CallerSensitive
     public static Connection getConnection(String url,
         String user, String password) throws SQLException {
         java.util.Properties info = new java.util.Properties();
-
-        // Gets the classloader of the code that called this method, may
-        // be null.
-        ClassLoader callerCL = CallerID.getCallerID().getCallerClassLoader();
 
         if (user != null) {
             info.put("user", user);
@@ -200,7 +212,7 @@ public class DriverManager {
             info.put("password", password);
         }
 
-        return (getConnection(url, info, callerCL));
+        return (getConnection(url, info, Reflection.getCallerClass()));
     }
 
     /**
@@ -213,17 +225,12 @@ public class DriverManager {
      * @return a connection to the URL
      * @exception SQLException if a database access error occurs
      */
-    @ikvm.internal.HasCallerID
+    @CallerSensitive
     public static Connection getConnection(String url)
         throws SQLException {
 
         java.util.Properties info = new java.util.Properties();
-
-        // Gets the classloader of the code that called this method, may
-        // be null.
-        ClassLoader callerCL = CallerID.getCallerID().getCallerClassLoader();
-
-        return (getConnection(url, info, callerCL));
+        return (getConnection(url, info, Reflection.getCallerClass()));
     }
 
     /**
@@ -237,47 +244,34 @@ public class DriverManager {
      * that can connect to the given URL
      * @exception SQLException if a database access error occurs
      */
-    @ikvm.internal.HasCallerID
+    @CallerSensitive
     public static Driver getDriver(String url)
         throws SQLException {
-        java.util.Vector drivers = null;
 
         println("DriverManager.getDriver(\"" + url + "\")");
 
-        if (!initialized) {
-            initialize();
-        }
+        Class<?> callerClass = Reflection.getCallerClass();
 
-        synchronized (DriverManager.class){
-            // use the read copy of the drivers vector
-            drivers = readDrivers;
-        }
-
-        // Gets the classloader of the code that called this method, may
-        // be null.
-        ClassLoader callerCL = CallerID.getCallerID().getCallerClassLoader();
-
-        // Walk through the loaded drivers attempting to locate someone
+        // Walk through the loaded registeredDrivers attempting to locate someone
         // who understands the given URL.
-        for (int i = 0; i < drivers.size(); i++) {
-            DriverInfo di = (DriverInfo)drivers.elementAt(i);
+        for (DriverInfo aDriver : registeredDrivers) {
             // If the caller does not have permission to load the driver then
             // skip it.
-            if ( getCallerClass(callerCL, di.driverClassName ) !=
-                 di.driverClass ) {
-                println("    skipping: " + di);
-                continue;
-            }
-            try {
-                println("    trying " + di);
-                if (di.driver.acceptsURL(url)) {
-                    // Success!
-                    println("getDriver returning " + di);
-                    return (di.driver);
+            if(isDriverAllowed(aDriver.driver, callerClass)) {
+                try {
+                    if(aDriver.driver.acceptsURL(url)) {
+                        // Success!
+                        println("getDriver returning " + aDriver.driver.getClass().getName());
+                    return (aDriver.driver);
+                    }
+
+                } catch(SQLException sqe) {
+                    // Drop through and try the next driver.
                 }
-            } catch (SQLException ex) {
-                // Drop through and try the next driver.
+            } else {
+                println("    skipping: " + aDriver.driver.getClass().getName());
             }
+
         }
 
         println("getDriver: no suitable driver");
@@ -297,23 +291,16 @@ public class DriverManager {
      */
     public static synchronized void registerDriver(java.sql.Driver driver)
         throws SQLException {
-        if (!initialized) {
-            initialize();
+
+        /* Register the driver if it has not already been added to our list */
+        if(driver != null) {
+            registeredDrivers.addIfAbsent(new DriverInfo(driver));
+        } else {
+            // This is for compatibility with the original DriverManager
+            throw new NullPointerException();
         }
 
-        DriverInfo di = new DriverInfo();
-
-        di.driver = driver;
-        di.driverClass = driver.getClass();
-        di.driverClassName = di.driverClass.getName();
-
-        // Not Required -- drivers.addElement(di);
-
-        writeDrivers.addElement(di);
-        println("registerDriver: " + di);
-
-        /* update the read copy of drivers vector */
-        readDrivers = (java.util.Vector) writeDrivers.clone();
+        println("registerDriver: " + driver);
 
     }
 
@@ -324,40 +311,27 @@ public class DriverManager {
      * @param driver the JDBC Driver to drop
      * @exception SQLException if a database access error occurs
      */
-    @ikvm.internal.HasCallerID
+    @CallerSensitive
     public static synchronized void deregisterDriver(Driver driver)
         throws SQLException {
-        // Gets the classloader of the code that called this method,
-        // may be null.
-        ClassLoader callerCL = CallerID.getCallerID().getCallerClassLoader();
-        println("DriverManager.deregisterDriver: " + driver);
-
-        // Walk through the loaded drivers.
-        int i;
-        DriverInfo di = null;
-        for (i = 0; i < writeDrivers.size(); i++) {
-            di = (DriverInfo)writeDrivers.elementAt(i);
-            if (di.driver == driver) {
-                break;
-            }
-        }
-        // If we can't find the driver just return.
-        if (i >= writeDrivers.size()) {
-            println("    couldn't find driver to unload");
+        if (driver == null) {
             return;
         }
 
-        // If the caller does not have permission to load the driver then
-        // throw a security exception.
-        if (getCallerClass(callerCL, di.driverClassName ) != di.driverClass ) {
-            throw new SecurityException();
+        println("DriverManager.deregisterDriver: " + driver);
+
+        DriverInfo aDriver = new DriverInfo(driver);
+        if(registeredDrivers.contains(aDriver)) {
+            if (isDriverAllowed(driver, Reflection.getCallerClass())) {
+                 registeredDrivers.remove(aDriver);
+            } else {
+                // If the caller does not have permission to load the driver then
+                // throw a SecurityException.
+                throw new SecurityException();
+            }
+        } else {
+            println("    couldn't find driver to unload");
         }
-
-        // Remove the driver.  Other entries in drivers get shuffled down.
-        writeDrivers.removeElementAt(i);
-
-        /* update the read copy of drivers vector */
-        readDrivers = (java.util.Vector) writeDrivers.clone();
     }
 
     /**
@@ -369,36 +343,22 @@ public class DriverManager {
      *
      * @return the list of JDBC Drivers loaded by the caller's class loader
      */
-    @ikvm.internal.HasCallerID
+    @CallerSensitive
     public static java.util.Enumeration<Driver> getDrivers() {
         java.util.Vector<Driver> result = new java.util.Vector<Driver>();
-        java.util.Vector drivers = null;
 
-        if (!initialized) {
-            initialize();
-        }
+        Class<?> callerClass = Reflection.getCallerClass();
 
-        synchronized (DriverManager.class){
-            // use the readcopy of drivers
-            drivers  = readDrivers;
-       }
-
-        // Gets the classloader of the code that called this method, may
-        // be null.
-        ClassLoader callerCL = CallerID.getCallerID().getCallerClassLoader();
-
-        // Walk through the loaded drivers.
-        for (int i = 0; i < drivers.size(); i++) {
-            DriverInfo di = (DriverInfo)drivers.elementAt(i);
+        // Walk through the loaded registeredDrivers.
+        for(DriverInfo aDriver : registeredDrivers) {
             // If the caller does not have permission to load the driver then
             // skip it.
-            if ( getCallerClass(callerCL, di.driverClassName ) != di.driverClass ) {
-                println("    skipping: " + di);
-                continue;
+            if(isDriverAllowed(aDriver.driver, callerClass)) {
+                result.addElement(aDriver.driver);
+            } else {
+                println("    skipping: " + aDriver.getClass().getName());
             }
-            result.addElement(di.driver);
         }
-
         return (result.elements());
     }
 
@@ -488,28 +448,34 @@ public class DriverManager {
 
     //------------------------------------------------------------------------
 
-    // Returns the class object that would be created if the code calling the
-    // driver manager had loaded the driver class, or null if the class
-    // is inaccessible.
-    private static Class getCallerClass(ClassLoader callerClassLoader,
-                                        String driverClassName) {
-        Class callerC = null;
+    // Indicates whether the class object that would be created if the code calling
+    // DriverManager is accessible.
+    private static boolean isDriverAllowed(Driver driver, Class<?> caller) {
+        ClassLoader callerCL = caller != null ? caller.getClassLoader() : null;
+        return isDriverAllowed(driver, callerCL);
+    }
 
-        try {
-            callerC = Class.forName(driverClassName, true, callerClassLoader);
-        }
-        catch (Exception ex) {
-            callerC = null;           // being very careful
+    private static boolean isDriverAllowed(Driver driver, ClassLoader classLoader) {
+        boolean result = false;
+        if(driver != null) {
+            Class<?> aClass = null;
+            try {
+                aClass =  Class.forName(driver.getClass().getName(), true, classLoader);
+            } catch (Exception ex) {
+                result = false;
+            }
+
+             result = ( aClass == driver.getClass() ) ? true : false;
         }
 
-        return callerC;
+        return result;
     }
 
     private static void loadInitialDrivers() {
         String drivers;
         try {
-            drivers = (String)  AccessController.doPrivileged(new PrivilegedAction() {
-                public Object run() {
+            drivers = AccessController.doPrivileged(new PrivilegedAction<String>() {
+                public String run() {
                     return System.getProperty("jdbc.drivers");
                 }
             });
@@ -521,8 +487,8 @@ public class DriverManager {
         // exposed as a java.sql.Driver.class service.
         // ServiceLoader.load() replaces the sun.misc.Providers()
 
-        AccessController.doPrivileged(new PrivilegedAction() {
-            public Object run() {
+        AccessController.doPrivileged(new PrivilegedAction<Void>() {
+            public Void run() {
 
                 ServiceLoader<Driver> loadedDrivers = ServiceLoader.load(Driver.class);
                 Iterator driversIterator = loadedDrivers.iterator();
@@ -541,7 +507,7 @@ public class DriverManager {
                  */
                 try{
                     while(driversIterator.hasNext()) {
-                        println(" Loading done by the java.util.ServiceLoader :  "+driversIterator.next());
+                        driversIterator.next();
                     }
                 } catch(Throwable t) {
                 // Do nothing
@@ -551,26 +517,17 @@ public class DriverManager {
         });
 
         println("DriverManager.initialize: jdbc.drivers = " + drivers);
-        if (drivers == null) {
+
+        if (drivers == null || drivers.equals("")) {
             return;
         }
-        while (drivers.length() != 0) {
-            int x = drivers.indexOf(':');
-            String driver;
-            if (x < 0) {
-                driver = drivers;
-                drivers = "";
-            } else {
-                driver = drivers.substring(0, x);
-                drivers = drivers.substring(x+1);
-            }
-            if (driver.length() == 0) {
-                continue;
-            }
+        String[] driversList = drivers.split(":");
+        println("number of Drivers:" + driversList.length);
+        for (String aDriver : driversList) {
             try {
-                println("DriverManager.Initialize: loading " + driver);
-                Class.forName(driver, true,
-                              ClassLoader.getSystemClassLoader());
+                println("DriverManager.Initialize: loading " + aDriver);
+                Class.forName(aDriver, true,
+                        ClassLoader.getSystemClassLoader());
             } catch (Exception ex) {
                 println("DriverManager.Initialize: load failed: " + ex);
             }
@@ -580,19 +537,19 @@ public class DriverManager {
 
     //  Worker method called by the public getConnection() methods.
     private static Connection getConnection(
-        String url, java.util.Properties info, ClassLoader callerCL) throws SQLException {
-        java.util.Vector drivers = null;
+        String url, java.util.Properties info, Class<?> caller) throws SQLException {
         /*
          * When callerCl is null, we should check the application's
          * (which is invoking this class indirectly)
          * classloader, so that the JDBC driver class outside rt.jar
          * can be loaded from here.
          */
-        synchronized(DriverManager.class) {
-          // synchronize loading of the correct classloader.
-          if(callerCL == null) {
-              callerCL = Thread.currentThread().getContextClassLoader();
-           }
+        ClassLoader callerCL = caller != null ? caller.getClassLoader() : null;
+        synchronized (DriverManager.class) {
+            // synchronize loading of the correct classloader.
+            if (callerCL == null) {
+                callerCL = Thread.currentThread().getContextClassLoader();
+            }
         }
 
         if(url == null) {
@@ -601,40 +558,32 @@ public class DriverManager {
 
         println("DriverManager.getConnection(\"" + url + "\")");
 
-        if (!initialized) {
-            initialize();
-        }
-
-        synchronized (DriverManager.class){
-            // use the readcopy of drivers
-            drivers = readDrivers;
-        }
-
-        // Walk through the loaded drivers attempting to make a connection.
+        // Walk through the loaded registeredDrivers attempting to make a connection.
         // Remember the first exception that gets raised so we can reraise it.
         SQLException reason = null;
-        for (int i = 0; i < drivers.size(); i++) {
-            DriverInfo di = (DriverInfo)drivers.elementAt(i);
 
+        for(DriverInfo aDriver : registeredDrivers) {
             // If the caller does not have permission to load the driver then
             // skip it.
-            if ( getCallerClass(callerCL, di.driverClassName ) != di.driverClass ) {
-                println("    skipping: " + di);
-                continue;
-            }
-            try {
-                println("    trying " + di);
-                Connection result = di.driver.connect(url, info);
-                if (result != null) {
-                    // Success!
-                    println("getConnection returning " + di);
-                    return (result);
+            if(isDriverAllowed(aDriver.driver, callerCL)) {
+                try {
+                    println("    trying " + aDriver.driver.getClass().getName());
+                    Connection con = aDriver.driver.connect(url, info);
+                    if (con != null) {
+                        // Success!
+                        println("getConnection returning " + aDriver.driver.getClass().getName());
+                        return (con);
+                    }
+                } catch (SQLException ex) {
+                    if (reason == null) {
+                        reason = ex;
+                    }
                 }
-            } catch (SQLException ex) {
-                if (reason == null) {
-                    reason = ex;
-                }
+
+            } else {
+                println("    skipping: " + aDriver.getClass().getName());
             }
+
         }
 
         // if we got here nobody could connect.
@@ -646,43 +595,30 @@ public class DriverManager {
         println("getConnection: no suitable driver found for "+ url);
         throw new SQLException("No suitable driver found for "+ url, "08001");
     }
-
-
-    // Class initialization.
-    static void initialize() {
-        if (initialized) {
-            return;
-        }
-        initialized = true;
-        loadInitialDrivers();
-        println("JDBC DriverManager initialized");
-    }
-
-    /* Prevent the DriverManager class from being instantiated. */
-    private DriverManager(){}
-
-    /* write copy of the drivers vector */
-    private static java.util.Vector writeDrivers = new java.util.Vector();
-
-    /* write copy of the drivers vector */
-    private static java.util.Vector readDrivers = new java.util.Vector();
-
-    private static int loginTimeout = 0;
-    private static java.io.PrintWriter logWriter = null;
-    private static java.io.PrintStream logStream = null;
-    private static boolean initialized = false;
-
-    private static Object logSync = new Object();
-
 }
 
-// DriverInfo is a package-private support class.
+/*
+ * Wrapper class for registered Drivers in order to not expose Driver.equals()
+ * to avoid the capture of the Driver it being compared to as it might not
+ * normally have access.
+ */
 class DriverInfo {
-    Driver         driver;
-    Class          driverClass;
-    String         driverClassName;
+
+    final Driver driver;
+    DriverInfo(Driver driver) {
+        this.driver = driver;
+    }
+
+    public boolean equals(Object other) {
+        return (other instanceof DriverInfo)
+                && this.driver == ((DriverInfo) other).driver;
+    }
+
+    public int hashCode() {
+        return driver.hashCode();
+    }
 
     public String toString() {
-        return ("driver[className=" + driverClassName + "," + driver + "]");
+        return ("driver[className="  + driver + "]");
     }
 }

@@ -144,11 +144,35 @@ namespace Xwt.Drawing
 			c.Light += lightIncrement;
 			return c;
 		}
-		
+
+		/// <summary>
+		/// Returns a color which looks more contrasted (or less, if amount is negative)
+		/// </summary>
+		/// <returns>The new color</returns>
+		/// <param name="amount">Amount to change (can be positive or negative).</param>
+		/// <remarks>
+		/// This method adds or removes light to/from the color to make it more contrasted when
+		/// compared to a neutral grey.
+		/// The resulting effect is that light colors are made lighter, and dark colors
+		/// are made darker. If the amount is negative, the effect is inversed (colors are
+		/// made less contrasted)
+		/// </remarks>
+		public Color WithIncreasedContrast (double amount)
+		{
+			return WithIncreasedContrast (new Color (0.5, 0.5, 0.5), amount);
+		}
+
+		/// <summary>
+		/// Returns a color which looks more contrasted (or less, if amount is negative) with
+		/// respect to a provided reference color.
+		/// </summary>
+		/// <returns>The new color</returns>
+		/// <param name="referenceColor">Reference color.</param>
+		/// <param name="amount">Amount to change (can be positive or negative).</param>
 		public Color WithIncreasedContrast (Color referenceColor, double amount)
 		{
 			Color c = this;
-			if (referenceColor.Brightness > Brightness)
+			if (referenceColor.Light > Light)
 				c.Light -= amount;
 			else
 				c.Light += amount;
@@ -269,10 +293,17 @@ namespace Xwt.Drawing
 		{
 			return string.Format ("[Color: Red={0}, Green={1}, Blue={2}, Alpha={3}]", Red, Green, Blue, Alpha);
 		}
+
+		public string ToHexString ()
+		{
+			return "#" + ((int)(Red * 255)).ToString ("x2") + ((int)(Green * 255)).ToString ("x2") + ((int)(Blue * 255)).ToString ("x2") + ((int)(Alpha * 255)).ToString ("x2");
+		}
 	}
 
 	class ColorValueConverter: TypeConverter
 	{
+		static readonly ColorValueSerializer serializer = new ColorValueSerializer ();
+
 		public override bool CanConvertTo (ITypeDescriptorContext context, Type destinationType)
 		{
 			return destinationType == typeof(string);
@@ -281,6 +312,16 @@ namespace Xwt.Drawing
 		public override bool CanConvertFrom (ITypeDescriptorContext context, Type sourceType)
 		{
 			return sourceType == typeof(string);
+		}
+
+		public override object ConvertTo (ITypeDescriptorContext context, System.Globalization.CultureInfo culture, object value, Type destinationType)
+		{
+			return serializer.ConvertToString (value, null);
+		}
+
+		public override object ConvertFrom (ITypeDescriptorContext context, System.Globalization.CultureInfo culture, object value)
+		{
+			return serializer.ConvertFromString ((string)value, null);
 		}
 	}
 	
@@ -299,13 +340,13 @@ namespace Xwt.Drawing
 		public override string ConvertToString (object value, IValueSerializerContext context)
 		{
 			Color s = (Color) value;
-			return "#" + ((int)(s.Red * 255)).ToString ("x2") + ((int)(s.Green * 255)).ToString ("x2") + ((int)(s.Blue * 255)).ToString ("x2") + ((int)(s.Alpha * 255)).ToString ("x2");
+			return s.ToHexString ();
 		}
 		
 		public override object ConvertFromString (string value, IValueSerializerContext context)
 		{
 			Color c;
-			if (!Color.TryParse (value, out c))
+			if (Color.TryParse (value, out c))
 				return c;
 			else
 				throw new InvalidOperationException ("Could not parse color value: " + value);

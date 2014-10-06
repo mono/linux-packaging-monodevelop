@@ -39,7 +39,7 @@ namespace MonoDevelop.Core.Assemblies
 			if (ref_assemblies_folder != null)
 				return ref_assemblies_folder;
 			var fxDir = framework.Id.GetAssemblyDirectoryName ();
-			foreach (var rootDir in ((MonoTargetRuntime)runtime).GetReferenceFrameworkDirectories (true)) {
+			foreach (var rootDir in ((MonoTargetRuntime)runtime).GetReferenceFrameworkDirectories ()) {
 				var dir = rootDir.Combine (fxDir);
 				var frameworkList = dir.Combine ("RedistList", "FrameworkList.xml");
 				if (!File.Exists (frameworkList))
@@ -74,7 +74,7 @@ namespace MonoDevelop.Core.Assemblies
 				case "1.1":
 					subdir = "1.0"; break;
 				case "3.0":
-					// WFC is installed in the 2.0 directory. Others (olive) in 3.0.
+					// WCF is installed in the 2.0 directory. Others (olive) in 3.0.
 					yield return Path.Combine (targetRuntime.MonoDirectory, "2.0");
 					yield return Path.Combine (targetRuntime.MonoDirectory, "3.0");
 					yield break;
@@ -164,7 +164,8 @@ namespace MonoDevelop.Core.Assemblies
 			SystemPackageInfo info = base.GetFrameworkPackageInfo (packageName);
 			if (framework.Id.Version == "3.0" && packageName == "olive") {
 				info.IsCorePackage = false;
-			} else {
+			}
+			if (String.IsNullOrEmpty (info.Name)) {
 				info.Name = "mono";
 			}
 			return info;

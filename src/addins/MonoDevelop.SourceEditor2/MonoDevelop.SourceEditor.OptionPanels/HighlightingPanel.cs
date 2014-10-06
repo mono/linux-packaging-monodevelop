@@ -82,8 +82,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 		void HandleButtonNewClicked (object sender, EventArgs e)
 		{
 			var newShemeDialog = new NewColorShemeDialog ();
-			MessageService.RunCustomDialog (newShemeDialog, dialog);
-			newShemeDialog.Destroy ();
+			MessageService.ShowCustomDialog (newShemeDialog, dialog);
 			ShowStyles ();
 		}
 
@@ -99,7 +98,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			if (sheme == null)
 				return;
 			this.buttonExport.Sensitive = true;
-			string fileName = Mono.TextEditor.Highlighting.SyntaxModeService.GetFileNameForStyle (sheme);
+			string fileName = sheme.FileName;
 			if (fileName == null)
 				return;
 			this.removeButton.Sensitive = true;
@@ -111,9 +110,9 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			TreeIter selectedIter;
 			if (styleTreeview.Selection.GetSelected (out selectedIter)) {
 				var editor = new ColorShemeEditor (this);
-				editor.SetSheme ((Mono.TextEditor.Highlighting.ColorScheme)this.styleStore.GetValue (selectedIter, 1));
-				MessageService.RunCustomDialog (editor, dialog);
-				editor.Destroy ();
+				var colorScheme = (Mono.TextEditor.Highlighting.ColorScheme)this.styleStore.GetValue (selectedIter, 1);
+				editor.SetSheme (colorScheme);
+				MessageService.ShowCustomDialog (editor, dialog);
 			}
 		}
 		
@@ -140,7 +139,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 				string name = style.Name ?? "";
 				string description = style.Description ?? "";
 				// translate only build-in sheme names
-				if (string.IsNullOrEmpty (Mono.TextEditor.Highlighting.SyntaxModeService.GetFileNameForStyle (style))) {
+				if (string.IsNullOrEmpty (style.FileName)) {
 					try {
 						name = GettextCatalog.GetString (name);
 						if (!string.IsNullOrEmpty (description))
@@ -160,11 +159,11 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			TreeIter selectedIter;
 			if (!styleTreeview.Selection.GetSelected (out selectedIter)) 
 				return;
-			var sheme = (Mono.TextEditor.Highlighting.ColorScheme)this.styleStore.GetValue (selectedIter, 1);
+			var sheme = (ColorScheme)this.styleStore.GetValue (selectedIter, 1);
 			
-			string fileName = Mono.TextEditor.Highlighting.SyntaxModeService.GetFileNameForStyle (sheme);
+			string fileName = sheme.FileName;
 			
-			if (fileName != null && fileName.StartsWith (SourceEditorDisplayBinding.SyntaxModePath)) {
+			if (fileName != null && fileName.StartsWith (SourceEditorDisplayBinding.SyntaxModePath, StringComparison.Ordinal)) {
 				Mono.TextEditor.Highlighting.SyntaxModeService.Remove (sheme);
 				File.Delete (fileName);
 				ShowStyles ();
@@ -224,8 +223,11 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 		{
 			if (IdeApp.Workbench.ActiveDocument != null) {
 				IdeApp.Workbench.ActiveDocument.UpdateParseDocument ();
-				IdeApp.Workbench.ActiveDocument.Editor.Parent.TextViewMargin.PurgeLayoutCache ();
-				IdeApp.Workbench.ActiveDocument.Editor.Parent.QueueDraw ();
+				var editor = IdeApp.Workbench.ActiveDocument.Editor;
+				if (editor != null) {
+					editor.Parent.TextViewMargin.PurgeLayoutCache ();
+					editor.Parent.QueueDraw ();
+				}
 			}
 		}
 		

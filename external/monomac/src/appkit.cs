@@ -7055,7 +7055,7 @@ namespace MonoMac.AppKit {
 
 		//Detected properties
 		[Export ("image")]
-		NSImage Image { get; set; }
+		NSImage Image { get; [NullAllowed] set; }
 
 		[Export ("imageAlignment")]
 		NSImageAlignment ImageAlignment { get; set; }
@@ -12543,6 +12543,9 @@ namespace MonoMac.AppKit {
 
 	[BaseType (typeof (NSCell))]
 	public interface NSTextAttachmentCell {
+		[Export ("initImageCell:")]
+		IntPtr Constructor (NSImage  image);
+
 		[Export ("wantsToTrackMouse")]
 		bool WantsToTrackMouse ();
 
@@ -12561,11 +12564,9 @@ namespace MonoMac.AppKit {
 		[Export ("drawWithFrame:inView:characterIndex:")]
 		void DrawWithFrame (RectangleF cellFrame, NSView controlView, uint charIndex);
 
-		[Abstract]
 		[Export ("drawWithFrame:inView:characterIndex:layoutManager:")]
 		void DrawWithFrame (RectangleF cellFrame, NSView controlView, uint charIndex, NSLayoutManager layoutManager);
 
-		[Abstract]
 		[Export ("wantsToTrackMouseForEvent:inRect:ofView:atCharacterIndex:")]
 		bool WantsToTrackMouse (NSEvent theEvent, RectangleF cellFrame, NSView controlView, uint charIndex);
 
@@ -13844,7 +13845,7 @@ namespace MonoMac.AppKit {
 		IntPtr Constructor (NSObject modelObject);
 
 		[Export ("representedObject")]
-		NSTreeNode RepresentedObject { get; }
+		NSObject RepresentedObject { get; }
 
 		[Export ("indexPath")]
 		NSIndexPath IndexPath { get; }
@@ -13890,7 +13891,7 @@ namespace MonoMac.AppKit {
 		NSSortDescriptor [] SortDescriptors { get; set; }
 
 		[Export ("content")]
-		NSTreeController Content { get; set; }
+		NSObject Content { get; set; }
 
 		[Export ("add:")]
 		void Add (NSObject sender);

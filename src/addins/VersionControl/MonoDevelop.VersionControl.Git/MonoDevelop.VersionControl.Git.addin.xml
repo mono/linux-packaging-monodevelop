@@ -1,23 +1,8 @@
-<Addin id          = "VersionControl.Git"
-       namespace   = "MonoDevelop"
-       name        = "Git support"
-       author      = "Dale Ragan, Lluis Sanchez"
-       copyright   = "LGPL"
-       url         = "http://www.monodevelop.com/"
-       description = "Git support for the Version Control Add-in"
-       category    = "Version Control"
-       version     = "4.0.12">
+<ExtensionModel>
  
 	<Runtime>
-		<Import assembly="MonoDevelop.VersionControl.Git.dll"/>
 		<Import assembly="NGit.dll"/>
 	</Runtime>
-
-	<Dependencies>
-	    <Addin id="Core" version="4.0.12"/>
-	    <Addin id="Ide" version="4.0.12"/>
-	    <Addin id="VersionControl" version="4.0.12"/>
-	</Dependencies>
 
 	<Extension path="/MonoDevelop/VersionControl/VersionControlSystems">
 		<Class class="MonoDevelop.VersionControl.Git.GitClient"/>
@@ -26,6 +11,7 @@
 	<Extension path = "/MonoDevelop/Ide/Commands/VersionControl">
 		<Command id = "MonoDevelop.VersionControl.Git.Commands.Push"
 			_label = "Push Changes..."
+			icon = "vc-push"
 			defaultHandler = "MonoDevelop.VersionControl.Git.PushCommandHandler"
 			description = "Push changes to a remote repository."/>
 		<Command id = "MonoDevelop.VersionControl.Git.Commands.SwitchToBranch"
@@ -56,7 +42,7 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/MainMenu/VersionControl">
-		<SeparatorItem insertafter="MonoDevelop.VersionControl.Commands.CommitSolution"/>
+		<SeparatorItem insertafter="MonoDevelop.VersionControl.Commands.SolutionStatus"/>
 		<CommandItem id = "MonoDevelop.VersionControl.Git.Commands.Push" />
 		<ItemSet id = "SwitchToBranch" _label = "Switch to Branch" autohide="true">
 			<CommandItem id = "MonoDevelop.VersionControl.Git.Commands.SwitchToBranch"/>
@@ -93,17 +79,11 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/GlobalOptionsDialog/VersionControl">
-		<Section id = "Git" _label = "Git" class = "MonoDevelop.VersionControl.Git.GitOptionsPanel" />
-	</Extension>
-
-	<Extension path = "/MonoDevelop/Core/StockIcons">
-		<StockIcon stockid = "vc-git-tag" resource = "tag_blue.png"/>
-		<StockIcon stockid = "vc-git-source" resource = "server.png"/>
-		<StockIcon stockid = "vc-git-branch" resource = "arrow_branch.png"/>
+		<Section id = "Git" _label = "Git" class = "MonoDevelop.VersionControl.Git.GitOptionsPanel" icon="md-prefs-git" />
 	</Extension>
 
 <!--	<Extension path = "/MonoDevelop/Ide/ProjectFeatures">
 		<Class class = "MonoDevelop.VersionControl.Git.GitSupportFeature" />
 	</Extension>
 -->
-</Addin>
+</ExtensionModel>

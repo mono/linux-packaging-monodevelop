@@ -26,7 +26,6 @@
 
 using System;
 using MonoDevelop.Projects;
-using MonoDevelop.Core;
 using System.Collections.Generic;
 using MonoDevelop.WebReferences.WCF;
 using MonoDevelop.WebReferences.WS;
@@ -37,7 +36,19 @@ namespace MonoDevelop.WebReferences
 	{
 		public static WebServiceEngineWS WsEngine = new WebServiceEngineWS ();
 		public static WebServiceEngineWCF WcfEngine = new WebServiceEngineWCF ();
-		
+
+		public static IEnumerable<WebReferenceItem> GetWebReferenceItemsWS (DotNetProject project)
+		{
+			foreach (WebReferenceItem item in WsEngine.GetReferenceItems (project))
+				yield return item;
+		}
+
+		public static IEnumerable<WebReferenceItem> GetWebReferenceItemsWCF (DotNetProject project)
+		{
+			foreach (WebReferenceItem item in WcfEngine.GetReferenceItems (project))
+				yield return item;
+		}
+
 		public static IEnumerable<WebReferenceItem> GetWebReferenceItems (DotNetProject project)
 		{
 			foreach (WebReferenceItem item in WcfEngine.GetReferenceItems (project))
@@ -53,29 +64,29 @@ namespace MonoDevelop.WebReferences
 			// this event and just ensure we proxy it to the main thread.
 			if (MonoDevelop.Ide.DispatchService.IsGuiThread) {
 				if (WebReferencesChanged != null)
-					WebReferencesChanged (null, new WebReferencesChangedArgs (project));
+					WebReferencesChanged (null, new WebReferencesChangedEventArgs (project));
 			} else {
 				MonoDevelop.Ide.DispatchService.GuiDispatch (() => {
 					if (WebReferencesChanged != null)
-						WebReferencesChanged (null, new WebReferencesChangedArgs (project));
+						WebReferencesChanged (null, new WebReferencesChangedEventArgs (project));
 				});
 			}
 		}
 		
-		public static event EventHandler<WebReferencesChangedArgs> WebReferencesChanged;
+		public static event EventHandler<WebReferencesChangedEventArgs> WebReferencesChanged;
 	}
 	
-	public class WebReferencesChangedArgs: EventArgs
+	public class WebReferencesChangedEventArgs: EventArgs
 	{
-		DotNetProject project;
+		readonly DotNetProject project;
 		
-		public WebReferencesChangedArgs (DotNetProject project)
+		public WebReferencesChangedEventArgs (DotNetProject project)
 		{
 			this.project = project;
 		}
 		
 		public DotNetProject Project {
-			get { return this.project; }
+			get { return project; }
 		}
 	}
 }

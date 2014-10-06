@@ -26,6 +26,9 @@
 using ICSharpCode.NRefactory;
 using System;
 using Mono.TextEditor;
+using ICSharpCode.NRefactory.CSharp.Refactoring;
+using ICSharpCode.NRefactory.Refactoring;
+using MonoDevelop.Ide.TypeSystem;
 
 namespace MonoDevelop.CodeActions
 {
@@ -45,17 +48,29 @@ namespace MonoDevelop.CodeActions
 		public string IdString { get; set; }
 
 		/// <summary>
-		/// Gets or sets the code issue this action is bound to. 
-		/// This allows to split the action and the issue provider.
-		/// </summary>
-		public Type BoundToIssue { get; set; }
-
-		/// <summary>
 		/// The region of the code action.
 		/// </summary>
 		public DocumentRegion DocumentRegion { get; set; }
+		
+		/// <summary>
+		/// Gets or sets the type of the inspector that is the source of this action.
+		/// </summary>
+		/// <value>The type of the inspector.</value>
+		public Type InspectorType { get; set; }
+		
+		/// <summary>
+		/// Gets or sets the sibling key.
+		/// </summary>
+		/// <value>The sibling key.</value>
+		public object SiblingKey { get; set; }
 
-		public CodeAction ()
+		/// <summary>
+		/// Gets or sets the severity of the code action.
+		/// </summary>
+		/// <value>The severity.</value>
+		public Severity Severity { get; set; }
+
+		protected CodeAction ()
 		{
 			IdString = GetType ().FullName;
 		}
@@ -63,22 +78,39 @@ namespace MonoDevelop.CodeActions
 		/// <summary>
 		/// Performs the specified code action in document at loc.
 		/// </summary>
-		public abstract void Run (MonoDevelop.Ide.Gui.Document document, TextLocation loc);
+		public abstract void Run (IRefactoringContext context, object script);
+
+		/// <summary>
+		/// True if <see cref="BatchRun"/> can be used on the current instance.
+		/// </summary>
+		/// <value><c>true</c> if supports batch running; otherwise, <c>false</c>.</value>
+		public virtual bool SupportsBatchRunning {
+			get{
+				return false;
+			}
+		}
+		
+		public virtual void BatchRun (MonoDevelop.Ide.Gui.Document document, TextLocation loc)
+		{
+			if (!SupportsBatchRunning) {
+				throw new InvalidOperationException ("Batch running is not supported.");
+			}
+		}
 	}
 
 	public class DefaultCodeAction : CodeAction
 	{
-		public Action<MonoDevelop.Ide.Gui.Document, TextLocation> act;
+		public Action<RefactoringContext, Script> act;
 
-		public DefaultCodeAction (string title, Action<MonoDevelop.Ide.Gui.Document, TextLocation> act)
+		public DefaultCodeAction (string title, Action<RefactoringContext, Script> act)
 		{
 			Title = title;
 			this.act = act;
 		}
 
-		public override void Run (MonoDevelop.Ide.Gui.Document document, TextLocation loc)
+		public override void Run (IRefactoringContext context, object script)
 		{
-			act (document, loc);
+			act ((RefactoringContext)context, (Script)script);
 		}
 	}
 

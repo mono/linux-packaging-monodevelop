@@ -40,6 +40,7 @@ using MonoDevelop.Projects;
 using MonoDevelop.Core.Serialization;
 using MonoDevelop.Core.StringParsing;
 using MonoDevelop.Core.Execution;
+using MonoDevelop.Projects.Extensions;
 
 namespace MonoDevelop.Projects
 {
@@ -109,6 +110,10 @@ namespace MonoDevelop.Projects
 				if (oldName != Name)
 					OnNameChanged (new WorkspaceItemRenamedEventArgs (this, oldName, Name));
 				NotifyModified ();
+
+				// Load the user properties after the file name has been set.
+				if (Loading)
+					LoadUserProperties ();
 			}
 		}
 
@@ -158,8 +163,6 @@ namespace MonoDevelop.Projects
 		
 		public virtual object GetService (Type t)
 		{
-			if (t.IsInstanceOfType (this))
-				return this;
 			return Services.ProjectService.GetExtensionChain (this).GetService (this, t);
 		}
 		
@@ -214,9 +217,15 @@ namespace MonoDevelop.Projects
 			return list.AsReadOnly ();
 		}
 
+		[Obsolete("Use GetProjectsContainingFile() (plural) instead")]
 		public virtual Project GetProjectContainingFile (FilePath fileName)
 		{
 			return null;
+		}
+
+		public virtual IEnumerable<Project> GetProjectsContainingFile (FilePath fileName)
+		{
+			yield break;
 		}
 		
 		public virtual ReadOnlyCollection<string> GetConfigurations ()
@@ -244,6 +253,11 @@ namespace MonoDevelop.Projects
 			return Services.ProjectService.GetExtensionChain (this).RunTarget (monitor, this, target, configuration);
 		}
 		
+		public bool SupportsBuild ()
+		{
+			return SupportsTarget (ProjectService.BuildTarget);
+		}
+
 		public void Clean (IProgressMonitor monitor, string configuration)
 		{
 			Clean (monitor, (SolutionConfigurationSelector) configuration);
@@ -254,6 +268,16 @@ namespace MonoDevelop.Projects
 			Services.ProjectService.GetExtensionChain (this).RunTarget (monitor, this, ProjectService.CleanTarget, configuration);
 		}
 		
+		public bool SupportsTarget (string target)
+		{
+			return Services.ProjectService.GetExtensionChain (this).SupportsTarget (this, target);
+		}
+
+		public bool SupportsExecute ()
+		{
+			return Services.ProjectService.GetExtensionChain (this).SupportsExecute (this);
+		}
+
 		public BuildResult Build (IProgressMonitor monitor, string configuration)
 		{
 			return InternalBuild (monitor, (SolutionConfigurationSelector) configuration);
@@ -403,6 +427,16 @@ namespace MonoDevelop.Projects
 			return null;
 		}
 		
+		internal protected virtual bool OnGetSupportsTarget (string target)
+		{
+			return true;
+		}
+
+		internal protected virtual bool OnGetSupportsExecute ()
+		{
+			return true;
+		}
+
 		protected virtual void OnClean (IProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 		}
@@ -454,7 +488,6 @@ namespace MonoDevelop.Projects
 		
 		protected virtual void OnEndLoad ()
 		{
-			LoadUserProperties ();
 		}
 		
 		public virtual void LoadUserProperties ()
@@ -558,7 +591,12 @@ namespace MonoDevelop.Projects
 			if (NameChanged != null)
 				NameChanged (this, e);
 		}
-		
+
+		internal protected virtual object OnGetService (Type t)
+		{
+			return null;
+		}
+
 		protected void NotifyModified ()
 		{
 			OnModified (new WorkspaceItemEventArgs (this));
@@ -652,12 +690,12 @@ namespace MonoDevelop.Projects
 			}
 			set {
 //				needsReload = value;
-				reloadCheckTime.Clear ();
-				foreach (FilePath file in item.GetItemFiles (false)) {
-					if (value)
+				if (value) {
+					reloadCheckTime.Clear ();
+					foreach (FilePath file in item.GetItemFiles (false))
 						reloadCheckTime [file] = DateTime.MinValue;
-					else
-						reloadCheckTime [file] = GetLastWriteTime (file);
+				} else {
+					ResetLoadTimes ();
 				}
 			}
 		}

@@ -34,7 +34,7 @@ using MonoDevelop.Core.ProgressMonitoring;
 
 namespace MonoDevelop.Gettext
 {
-	public class GettextTool: IApplication
+	class GettextTool: IApplication
 	{
 		bool help;
 		string file;
@@ -42,7 +42,7 @@ namespace MonoDevelop.Gettext
 		
 		public int Run (string[] arguments)
 		{
-			Console.WriteLine ("MonoDevelop Gettext Update Tool");
+			Console.WriteLine (BrandingService.BrandApplicationName ("MonoDevelop Gettext Update Tool"));
 			foreach (string s in arguments)
 				ReadArgument (s);
 			

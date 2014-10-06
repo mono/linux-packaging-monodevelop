@@ -30,6 +30,7 @@ using System.Text;
 using System.Collections.Generic;
 using Mono.TextEditor.Highlighting;
 using System.Linq;
+using ICSharpCode.NRefactory;
 
 namespace Mono.TextEditor
 {
@@ -63,12 +64,28 @@ namespace Mono.TextEditor
 		}
 
 		/// <summary>
+		/// Gets the unicode newline for this line. Returns UnicodeNewline.Unknown for no new line (in the last line of the document)
+		/// </summary>
+		public UnicodeNewline UnicodeNewline {
+			get;
+			internal set;
+		}
+
+		/// <summary>
 		/// Gets the length of the line terminator.
 		/// Returns 1 or 2; or 0 at the end of the document.
 		/// </summary>
 		public int DelimiterLength {
-			get;
-			set;
+			get { 
+				switch (UnicodeNewline) {
+				case UnicodeNewline.Unknown:
+					return 0;
+				case UnicodeNewline.CRLF:
+					return 2;
+				default:
+					return 1;
+				}
+			}
 		}
 
 		public bool WasChanged {
@@ -172,10 +189,10 @@ namespace Mono.TextEditor
 		/// </summary>
 		public abstract DocumentLine PreviousLine { get; }
 
-		protected DocumentLine (int length, int delimiterLength)
+		protected DocumentLine (int length, UnicodeNewline unicodeNewline)
 		{
-			LengthIncludingDelimiter          = length;
-			DelimiterLength = delimiterLength;
+			LengthIncludingDelimiter = length;
+			UnicodeNewline = unicodeNewline;
 		}
 
 		internal void AddMarker (TextLineMarker marker)
@@ -225,7 +242,7 @@ namespace Mono.TextEditor
 		/// This method gets the line indentation.
 		/// </summary>
 		/// <param name="doc">
-		/// The <see cref="Document"/> the line belongs to.
+		/// The <see cref="TextDocument"/> the line belongs to.
 		/// </param>
 		/// <returns>
 		/// The indentation of the line (all whitespace chars up to the first non ws char).
@@ -249,9 +266,11 @@ namespace Mono.TextEditor
 			int curVisualColumn = 1;
 			int offset = Offset;
 			int max = offset + Length;
+			var textLength = editor.Document.TextLength;
+			int tabSize = editor.Options != null ? editor.Options.TabSize : 4;
 			for (int i = offset; i < max; i++) {
-				if (i < editor.Document.TextLength && editor.Document.GetCharAt (i) == '\t') {
-					curVisualColumn = TextViewMargin.GetNextTabstop (editor, curVisualColumn);
+				if (i < textLength && editor.Document.GetCharAt (i) == '\t') {
+					curVisualColumn = TextViewMargin.GetNextTabstop (editor, curVisualColumn, tabSize);
 				} else {
 					curVisualColumn++;
 				}
@@ -265,19 +284,21 @@ namespace Mono.TextEditor
 		{
 			int result = 1;
 			int offset = Offset;
+			var tabSize = editor.Options.TabSize;
 			if (editor.Options.IndentStyle == IndentStyle.Virtual && Length == 0 && logicalColumn > DocumentLocation.MinColumn) {
 				foreach (char ch in editor.GetIndentationString (Offset)) {
 					if (ch == '\t') {
-						result += editor.Options.TabSize;
+						result += tabSize;
 						continue;
 					}
 					result++;
 				}
 				return result;
 			}
+
 			for (int i = 0; i < logicalColumn - 1; i++) {
 				if (i < Length && editor.Document.GetCharAt (offset + i) == '\t') {
-					result = TextViewMargin.GetNextTabstop (editor, result);
+					result = TextViewMargin.GetNextTabstop (editor, result, tabSize);
 				} else {
 					result++;
 				}

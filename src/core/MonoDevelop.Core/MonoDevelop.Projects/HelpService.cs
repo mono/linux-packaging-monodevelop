@@ -78,6 +78,13 @@ namespace MonoDevelop.Projects
 					
 					foreach (var node in AddinManager.GetExtensionNodes ("/MonoDevelop/ProjectModel/MonoDocSources"))
 						sources.Add (((MonoDocSourceNode)node).Directory);
+
+					if (Platform.IsWindows) {
+						// windoc defines a special external directory used by XA. we need to read these docs too.
+						// Not sure why it wasn't defined in monodoc.dll
+						var commonAppData = Environment.GetFolderPath (Environment.SpecialFolder.CommonApplicationData);
+						sources.Add (Path.Combine (commonAppData, "Monodoc"));
+					}
 					
 					//remove nonexistent sources
 					foreach (var s in sources.ToList ().Where (d => !Directory.Exists (d)))
@@ -102,7 +109,7 @@ namespace MonoDevelop.Projects
 		/// <remarks>
 		/// The tree is background-loaded the help service, and accessing the property will block until it is finished 
 		/// loading. If you don't wish to block, check the <see cref="TreeInitialized"/> property first.
-		//  </remarks>
+		///  </remarks>
 		public static RootTree HelpTree {
 			get {
 				lock (helpTreeLock) {

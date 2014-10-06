@@ -75,16 +75,6 @@ namespace MonoDevelop.Ide
 			});
 		}
 		
-		public string DefaultProjectFileFormat {
-			get { return PropertyService.Get ("MonoDevelop.DefaultFileFormat", MonoDevelop.Projects.Formats.MSBuild.MSBuildProjectService.DefaultFormat); }
-			set { PropertyService.Set ("MonoDevelop.DefaultFileFormat", value); }
-		}
-		
-		public event EventHandler<PropertyChangedEventArgs> DefaultProjectFileFormatChanged {
-			add { PropertyService.AddPropertyHandler ("MonoDevelop.DefaultFileFormat", value); }
-			remove { PropertyService.RemovePropertyHandler ("MonoDevelop.DefaultFileFormat", value); }
-		}
-		
 		public bool LoadPrevSolutionOnStartup {
 			get { return PropertyService.Get ("SharpDevelop.LoadPrevProjectOnStartup", false); }
 			set { PropertyService.Set ("SharpDevelop.LoadPrevProjectOnStartup", value); }
@@ -230,11 +220,6 @@ namespace MonoDevelop.Ide
 			add { PropertyService.AddPropertyHandler ("MonoDevelop.Ide.DefaultTargetRuntime", value); }
 			remove { PropertyService.RemovePropertyHandler ("MonoDevelop.Ide.DefaultTargetRuntime", value); }
 		}
-
-		public bool BuildWithMSBuild {
-			get { return PropertyService.Get ("MonoDevelop.Ide.BuildWithMSBuild", false); }
-			set { PropertyService.Set ("MonoDevelop.Ide.BuildWithMSBuild", value); }
-		}
 		
 		public MSBuildVerbosity MSBuildVerbosity {
 			get { return PropertyService.Get ("MonoDevelop.Ide.MSBuildVerbosity", MSBuildVerbosity.Normal); }
@@ -318,6 +303,8 @@ namespace MonoDevelop.Ide
 			add { PropertyService.AddPropertyHandler ("ColorScheme", value); }
 			remove { PropertyService.RemovePropertyHandler ("ColorScheme", value); }
 		}
+
+		public readonly PropertyWrapper<bool> BuildBeforeRunningTests = new PropertyWrapper<bool> ("BuildBeforeRunningTests", true);
 	}
 	
 	public enum BeforeCompileAction {

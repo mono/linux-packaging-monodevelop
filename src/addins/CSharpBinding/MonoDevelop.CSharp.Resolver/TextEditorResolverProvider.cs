@@ -45,7 +45,7 @@ using ICSharpCode.NRefactory.CSharp.Refactoring;
 
 namespace MonoDevelop.CSharp.Resolver
 {
-	public class TextEditorResolverProvider : ITextEditorResolverProvider
+	class TextEditorResolverProvider : ITextEditorResolverProvider
 	{
 		#region ITextEditorResolverProvider implementation
 		
@@ -111,7 +111,18 @@ namespace MonoDevelop.CSharp.Resolver
 			var resolver = new CSharpAstResolver (doc.Compilation, unit, parsedFile);
 			resolver.ApplyNavigator (new NodeListResolveVisitorNavigator (node), CancellationToken.None);
 			var state = resolver.GetResolverStateBefore (node, CancellationToken.None);
-			return state.LookupSimpleNameOrTypeName (expression, new List<IType> (), NameLookupMode.Expression);
+
+			var list = new List<IType> ();
+			int indexOf = expression.IndexOf ('`');
+			if (indexOf != -1) {
+				var intType = new PrimitiveType ("int").ToTypeReference ().Resolve (doc.Compilation);
+				var num = expression.Substring (indexOf + 1);
+				int number = int.Parse (num);
+				for (int i = 0; i < number; i++)
+					list.Add (intType);
+				expression = expression.Remove (indexOf);
+			}
+			return state.LookupSimpleNameOrTypeName (expression, list, NameLookupMode.Expression);
 		}
 		
 		
@@ -150,18 +161,18 @@ namespace MonoDevelop.CSharp.Resolver
 		
 		static string GetString (IMember member)
 		{
-			switch (member.EntityType) {
-			case EntityType.Field:
+			switch (member.SymbolKind) {
+			case SymbolKind.Field:
 				var field = member as IField;
 				if (field.IsConst)
 					return GettextCatalog.GetString ("Constant");
 				return GettextCatalog.GetString ("Field");
-			case EntityType.Property:
+			case SymbolKind.Property:
 				return GettextCatalog.GetString ("Property");
-			case EntityType.Indexer:
+			case SymbolKind.Indexer:
 				return GettextCatalog.GetString ("Indexer");
 				
-			case EntityType.Event:
+			case SymbolKind.Event:
 				return GettextCatalog.GetString ("Event");
 			}
 			return GettextCatalog.GetString ("Member");

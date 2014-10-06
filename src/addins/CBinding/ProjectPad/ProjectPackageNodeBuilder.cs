@@ -60,16 +60,14 @@ namespace CBinding.ProjectPad
 		
 		public override void BuildNode (ITreeBuilder treeBuilder,
 		                                object dataObject,
-		                                ref string label,
-		                                ref Gdk.Pixbuf icon,
-		                                ref Gdk.Pixbuf closedIcon)
+		                                NodeInfo nodeInfo)
 		{
-			label = ((Package)dataObject).Name;
+			nodeInfo.Label = ((Package)dataObject).Name;
 			
 			if (((Package)dataObject).IsProject)
-				icon = new Gdk.Pixbuf (Assembly.GetExecutingAssembly (), "Icons.16x16.ProjectReference");
+				nodeInfo.Icon = Context.GetIcon ("md-reference-project");
 			else
-				icon = Context.GetIcon (Stock.Reference);
+				nodeInfo.Icon = Context.GetIcon (Stock.Reference);
 		}
 	}
 	

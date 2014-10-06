@@ -33,9 +33,9 @@ using MonoDevelop.Core;
 
 namespace MonoDevelop.VersionControl.Git
 {
-	public class GitNodeBuilderExtension: NodeBuilderExtension
+	sealed class GitNodeBuilderExtension: NodeBuilderExtension
 	{
-		Dictionary<FilePath,IWorkspaceObject> repos = new Dictionary<FilePath, IWorkspaceObject> ();
+		readonly Dictionary<FilePath,IWorkspaceObject> repos = new Dictionary<FilePath, IWorkspaceObject> ();
 		
 		protected override void Initialize ()
 		{
@@ -56,7 +56,7 @@ namespace MonoDevelop.VersionControl.Git
 			return typeof(IWorkspaceObject).IsAssignableFrom (dataType);
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			IWorkspaceObject ob = (IWorkspaceObject) dataObject;
 			GitRepository rep = VersionControlService.GetRepository (ob) as GitRepository;
@@ -64,7 +64,7 @@ namespace MonoDevelop.VersionControl.Git
 				IWorkspaceObject rob;
 				if (repos.TryGetValue (rep.RootPath.CanonicalPath, out rob)) {
 					if (ob == rob)
-						label += " (" + rep.GetCurrentBranch () + ")";
+						nodeInfo.Label += " (" + rep.GetCurrentBranch () + ")";
 				}
 			}
 		}

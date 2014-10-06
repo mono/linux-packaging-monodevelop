@@ -170,5 +170,198 @@ public class TestClass : IDisposable
 			Test<RedundantCastIssue> (input, 0);
 		}
 
+		
+		/// <summary>
+		/// Bug 14081 - Incorrect redundant cast analysis with explicitly implemented interface member
+		/// </summary>
+		[Test]
+		public void TestBug14081 ()
+		{
+			var input = @"
+using System;
+using System.Collections.Generic;
+public class TestClass
+{
+	public IEnumerator<int> GetEnumerator ()
+	{
+		return ((IEnumerable<int>)new[] { 5 }).GetEnumerator ();
+	}
+}
+";
+			Test<RedundantCastIssue> (input, 0);
+		}
+
+
+		[Test]
+		public void TestConditionalOperator ()
+		{
+			TestWrongContext<RedundantCastIssue> (@"class A {} class B : A {} class C : A {}
+class TestClass
+{
+	void TestMethod (object obj)
+	{	
+		var a = obj != null ? (A)new A () : new B ();
+	}
+}");
+		}
+
+		[Test]
+		public void TestRedundantConditionalOperator ()
+		{
+			Test<RedundantCastIssue> (@"class A {} class B : A {} class C : A {}
+class TestClass
+{
+	void TestMethod (object obj)
+	{	
+		var a = obj != null ? (A)new A () : new A ();
+	}
+}", @"class A {} class B : A {} class C : A {}
+class TestClass
+{
+	void TestMethod (object obj)
+	{	
+		var a = obj != null ? new A () : new A ();
+	}
+}");
+		}
+
+		[Test]
+		public void TestNullCoalesingOperator ()
+		{
+			TestWrongContext<RedundantCastIssue> (@"class A {} class B : A {} class C : A {}
+class TestClass
+{
+	void TestMethod (A obj)
+	{	
+		var a = (A)obj ?? new B ();
+	}
+}");
+		}
+
+		[Test]
+		public void TestRedundantNullCoalesingOperatior ()
+		{
+			Test<RedundantCastIssue> (@"class A {} class B : A {} class C : A {}
+class TestClass
+{
+	void TestMethod (A obj)
+	{	
+		var a = (A)obj ?? new A ();
+	}
+}", @"class A {} class B : A {} class C : A {}
+class TestClass
+{
+	void TestMethod (A obj)
+	{	
+		var a = obj ?? new A ();
+	}
+}");
+		}
+
+
+		[Test]
+		public void TestNonRedundantDoubleCast ()
+		{
+			TestWrongContext<RedundantCastIssue> (@"
+class Foo
+{
+	void Bar ()
+	{	
+		float f = 5.6f;
+		double d = 5.6f;
+		int i = d + (int)f;
+	}
+}");
+		}
+
+		[Test]
+		public void TestNonRedundantFloatCast ()
+		{
+			TestWrongContext<RedundantCastIssue> (@"
+class Foo
+{
+	void Bar ()
+	{	
+		float f = 5.6f;
+		Console.WriteLine (""foo "" + (int)f);
+	}
+}");
+		}
+
+		[Test]
+		public void TestNonRedundantFloatCastCase2 ()
+		{
+			TestWrongContext<RedundantCastIssue> (@"
+using System;
+
+class Foo
+{
+	void Bar ()
+	{	
+		float f = 5.6f;
+		Console.WriteLine (""foo {0}"", (int)f);
+	}
+}");
+		}
+		
+		[Test, Ignore("https://github.com/icsharpcode/NRefactory/issues/118")]
+		public void TestNonRedundantCastDueToOverloading ()
+		{
+			TestWrongContext<RedundantCastIssue> (@"
+class Foo
+{
+	void F(string a) {}
+	void F(object a) {}
+
+	void Bar ()
+	{	
+		F((object)string.Empty);
+	}
+}");
+		}
+
+		/// <summary>
+		/// Bug 17945 - Bad 'unnecessary cast' warning
+		/// </summary>
+		[Test]
+		public void TestBug17945 ()
+		{
+			TestWrongContext<RedundantCastIssue> (@"
+namespace Bug
+{
+    public class C
+    {
+        public C (object o)
+        {
+        }
+ 
+        public C (string o)
+            : this (o as object)
+        {
+        }
+    }
+}
+");
+		}
+
+		[Test]
+		public void TestOverloadSelector ()
+		{
+			TestWrongContext<RedundantCastIssue> (@"
+public class Foo
+{
+	public void Bar (object o)
+	{
+	}
+
+	public void Bar (string o)
+	    
+	{
+ 		Bar ((object)o);
+	}
+}
+
+");
+		}
 	}
 }

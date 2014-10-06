@@ -28,6 +28,7 @@ using MonoDevelop.Ide.Gui.Dialogs;
 
 using Gtk;
 using MonoDevelop.Projects;
+using MonoDevelop.Projects.SharedAssetsProjects;
 
 namespace MonoDevelop.Ide.Projects.OptionPanels
 {
@@ -64,44 +65,19 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 
 			projectNameEntry.Text = project.Name;
 			projectDescriptionTextView.Buffer.Text = project.Description;
-			
-			// TODO msbuild Move to build panel?
+
 			if (project is DotNetProject) {
 				projectDefaultNamespaceEntry.Text = ((DotNetProject)project).DefaultNamespace;
+			} else if (project is SharedAssetsProject) {
+				projectDefaultNamespaceEntry.Text = ((SharedAssetsProject)project).DefaultNamespace;
 			} else {
 				defaultNamespaceLabel.Visible = false;
 				projectDefaultNamespaceEntry.Visible = false;
 			}
 			
-			switch (project.NewFileSearch) 
-			{
-			case NewFileSearch.None:
-				newFilesOnLoadCheckButton.Active = false; 
-				autoInsertNewFilesCheckButton.Active = false;
-				break;
-			case NewFileSearch.OnLoad:
-				newFilesOnLoadCheckButton.Active = true; 
-				autoInsertNewFilesCheckButton.Active = false;
-				break;
-			default:
-				newFilesOnLoadCheckButton.Active = true; 
-				autoInsertNewFilesCheckButton.Active = true;
-				break;
-			}
-			
 			entryVersion.Text = project.Version;
 			checkSolutionVersion.Active = project.SyncVersionWithSolution;
 			entryVersion.Sensitive = !project.SyncVersionWithSolution;
-			
-			newFilesOnLoadCheckButton.Clicked += new EventHandler(AutoLoadCheckBoxCheckedChangeEvent);
-			AutoLoadCheckBoxCheckedChangeEvent(null, null);
-		}			
-
-		void AutoLoadCheckBoxCheckedChangeEvent(object sender, EventArgs e)
-		{
-			autoInsertNewFilesCheckButton.Sensitive = newFilesOnLoadCheckButton.Active;
-			if (newFilesOnLoadCheckButton.Active == false) 
-				autoInsertNewFilesCheckButton.Active = false;
 		}
 		
 		public void Store ()
@@ -113,14 +89,13 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 			}
 			
 			project.Description = projectDescriptionTextView.Buffer.Text;
-			if (project is DotNetProject) 
+			if (project is DotNetProject) {
 				((DotNetProject)project).DefaultNamespace = projectDefaultNamespaceEntry.Text;
-			
-			if (newFilesOnLoadCheckButton.Active) {
-				project.NewFileSearch = autoInsertNewFilesCheckButton.Active ?  NewFileSearch.OnLoadAutoInsert : NewFileSearch.OnLoad;
-			} else {
-				project.NewFileSearch = NewFileSearch.None;
 			}
+			else if (project is SharedAssetsProject) {
+				((SharedAssetsProject)project).DefaultNamespace = projectDefaultNamespaceEntry.Text;
+			}
+
 			if (checkSolutionVersion.Active)
 				project.SyncVersionWithSolution = true;
 			else {

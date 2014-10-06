@@ -28,15 +28,13 @@
 
 using System;
 using System.Linq;
-using System.Collections;
 using System.Collections.Generic;
 
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Components.Commands;
-using Mono.Addins;
 using Gtk;
-using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.Ide.Gui.OptionPanels
 {
@@ -75,7 +73,7 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			TreeViewColumn col = new TreeViewColumn ();
 			col.Title = GettextCatalog.GetString ("Command");
 			col.Spacing = 4;
-			CellRendererIcon crp = new CellRendererIcon ();
+			CellRendererImage crp = new CellRendererImage ();
 			col.PackStart (crp, false);
 			col.AddAttribute (crp, "stock-id", iconCol);
 			col.AddAttribute (crp, "visible", iconVisibleCol);
@@ -118,14 +116,16 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 
 			SelectCurrentScheme ();
 			schemeCombo.Changed += OnKeyBindingSchemeChanged;
-			
+
+			searchEntry.Ready = true;
+			searchEntry.Visible = true;
 			searchEntry.Changed += delegate {
-				processedFilterTerms = searchEntry.Text.Split (new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+				processedFilterTerms = searchEntry.Entry.Text.Split (new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
 					.Select (s => s.ToLower ()).ToArray ();;
 				filterChanged = true;
 				if (!filterTimeoutRunning) {
 					filterTimeoutRunning = true;
-					GLib.Timeout.Add (300, delegate {
+					GLib.Timeout.Add (50, delegate {
 						if (!filterChanged) {
 							if (filterTimeoutRunning)
 								Refilter ();
@@ -138,21 +138,11 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 				};
 			};
 			
-			clearFilterButton.Clicked += ClearFilter;
-			
 			//HACK: workaround for MD Bug 608021: Stetic loses values assigned to "new" properties of custom widget
 			conflicButton.Label = GettextCatalog.GetString ("_View Conflicts");
 			conflicButton.UseUnderline = true;
 		}
 
-		void ClearFilter (object sender, EventArgs e)
-		{
-			searchEntry.Text = "";
-			Refilter ();
-			//stop the timeout from refiltering, if it's already running
-			filterTimeoutRunning = false;
-		}
-		
 		void Refilter ()
 		{
 			keyTreeView.Model = null;
@@ -467,7 +457,7 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 		void SelectCommand (Command cmd)
 		{
 			//item may not be visible if the list is filtered
-			ClearFilter (null, EventArgs.Empty);
+			searchEntry.Entry.Text = "";
 			
 			TreeIter iter;
 			if (!keyStore.GetIterFirst (out iter))

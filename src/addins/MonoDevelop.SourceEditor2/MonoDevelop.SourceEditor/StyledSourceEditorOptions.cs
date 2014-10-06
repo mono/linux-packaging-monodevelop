@@ -41,6 +41,7 @@ namespace MonoDevelop.SourceEditor
 		EventHandler changed;
 		IEnumerable<string> mimeTypes;
 		TextStylePolicy currentPolicy;
+		string lastMimeType;
 
 		public StyledSourceEditorOptions (Project styleParent, string mimeType)
 		{
@@ -51,8 +52,13 @@ namespace MonoDevelop.SourceEditor
 			get { return currentPolicy; }
 		}
 
+
 		public void UpdateStyleParent (Project styleParent, string mimeType)
 		{
+			if (styleParent != null && policyContainer == styleParent.Policies && mimeType == lastMimeType)
+				return;
+			lastMimeType = mimeType;
+
 			if (policyContainer != null)
 				policyContainer.PolicyChanged -= HandlePolicyChanged;
 
@@ -64,15 +70,18 @@ namespace MonoDevelop.SourceEditor
 				policyContainer = styleParent.Policies;
 			else
 				policyContainer = MonoDevelop.Projects.Policies.PolicyService.DefaultPolicies;
-
 			currentPolicy = policyContainer.Get<TextStylePolicy> (mimeTypes);
+
 			policyContainer.PolicyChanged += HandlePolicyChanged;
+			if (changed != null)
+				this.changed (this, EventArgs.Empty);
 		}
 
 		void HandlePolicyChanged (object sender, MonoDevelop.Projects.Policies.PolicyChangedEventArgs args)
 		{
 			currentPolicy = policyContainer.Get<TextStylePolicy> (mimeTypes);
-			this.changed (this, EventArgs.Empty);
+			if (changed != null)
+				this.changed (this, EventArgs.Empty);
 		}
 
 		public bool OverrideDocumentEolMarker {
@@ -236,11 +245,6 @@ namespace MonoDevelop.SourceEditor
 			set { throw new NotSupportedException (); }
 		}
 		
-		public bool UseAntiAliasing {
-			get { return DefaultSourceEditorOptions.Instance.UseAntiAliasing; }
-			set { throw new NotSupportedException (); }
-		}
-
 		public Mono.TextEditor.IWordFindStrategy WordFindStrategy {
 			get { return DefaultSourceEditorOptions.Instance.WordFindStrategy; }
 			set { throw new NotSupportedException (); }
@@ -274,6 +278,11 @@ namespace MonoDevelop.SourceEditor
 		public bool EnableQuickDiff {
 			get { return DefaultSourceEditorOptions.Instance.EnableQuickDiff; }
 			set { DefaultSourceEditorOptions.Instance.EnableQuickDiff = value; }
+		}
+
+		public bool GenerateFormattingUndoStep {
+			get { return DefaultSourceEditorOptions.Instance.GenerateFormattingUndoStep; }
+			set { DefaultSourceEditorOptions.Instance.GenerateFormattingUndoStep = value; }
 		}
 
 		public void ZoomIn ()
@@ -316,17 +325,14 @@ namespace MonoDevelop.SourceEditor
 			get { return DefaultSourceEditorOptions.Instance.EnableAutoCodeCompletion; }
 		}
 
-		public bool EnableCodeCompletion {
-			get { return DefaultSourceEditorOptions.Instance.EnableCodeCompletion; }
-		}
-
 		public bool EnableSemanticHighlighting {
 			get { return DefaultSourceEditorOptions.Instance.EnableSemanticHighlighting; }
 		}
 
 		public IndentStyle IndentStyle {
 			get {
-				if (DefaultSourceEditorOptions.Instance.IndentStyle == Mono.TextEditor.IndentStyle.Smart && CurrentPolicy.RemoveTrailingWhitespace)
+				if ((DefaultSourceEditorOptions.Instance.IndentStyle == Mono.TextEditor.IndentStyle.Smart ||
+					DefaultSourceEditorOptions.Instance.IndentStyle == Mono.TextEditor.IndentStyle.Auto) && CurrentPolicy.RemoveTrailingWhitespace)
 					return IndentStyle.Virtual;
 				return DefaultSourceEditorOptions.Instance.IndentStyle;
 			}

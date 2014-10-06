@@ -39,6 +39,8 @@ namespace ICSharpCode.NRefactory.Xml
 		/// </summary>
 		public static XmlDocumentationElement Get(IEntity entity, bool inheritDocIfMissing = true)
 		{
+			if (entity == null)
+				return null;
 			var documentationComment = entity.Documentation;
 			if (documentationComment != null) {
 				return Create(documentationComment, entity);
@@ -46,6 +48,12 @@ namespace ICSharpCode.NRefactory.Xml
 			
 			IMember member = entity as IMember;
 			if (inheritDocIfMissing && member != null) {
+				if (member.SymbolKind == SymbolKind.Constructor) {
+					// For constructors, the documentation of the base class ctor
+					// isn't really suitable as constructors are not inherited.
+					// We'll use the type's documentation instead:
+					return Get(entity.DeclaringTypeDefinition, inheritDocIfMissing);
+				}
 				foreach (IMember baseMember in InheritanceHelper.GetBaseMembers(member, includeImplementedInterfaces: true)) {
 					documentationComment = baseMember.Documentation;
 					if (documentationComment != null)
@@ -104,6 +112,7 @@ namespace ICSharpCode.NRefactory.Xml
 		{
 			if (text == null)
 				throw new ArgumentNullException("text");
+			this.declaringEntity = declaringEntity;
 			this.textContent = text;
 		}
 		
@@ -112,7 +121,7 @@ namespace ICSharpCode.NRefactory.Xml
 		/// May return null.
 		/// </summary>
 		public IEntity DeclaringEntity {
-			get { return null; }
+			get { return declaringEntity; }
 		}
 		
 		IEntity referencedEntity;
@@ -198,9 +207,13 @@ namespace ICSharpCode.NRefactory.Xml
 			List<XmlDocumentationElement> list = new List<XmlDocumentationElement>();
 			foreach (var child in childObjects) {
 				var childText = child as AXmlText;
+				var childTag = child as AXmlTag;
 				var childElement = child as AXmlElement;
 				if (childText != null) {
 					list.Add(new XmlDocumentationElement(childText.Value, declaringEntity));
+				} else if (childTag != null && childTag.IsCData) {
+					foreach (var text in childTag.Children.OfType<AXmlText>())
+						list.Add(new XmlDocumentationElement(text.Value, declaringEntity));
 				} else if (childElement != null) {
 					if (nestingLevel < 5 && childElement.Name == "inheritdoc") {
 						string cref = childElement.GetAttributeValue("cref");

@@ -28,8 +28,9 @@
 	<Property name="BlockCommentStart">(*</Property>
 	<Property name="BlockCommentEnd">*)</Property>
 	<Property name="StringQuote">"</Property>
-	<Property name="StringQuote">'</Property>
-	
+
+	<Delimiters>&amp;&lt;&gt;~@%^*()-+=|\#/{}[]:;"' ,	?</Delimiters>
+
 	<EolSpan tagColor = "Preprocessor" rule="text.preprocessor">#if</EolSpan>
 	<EolSpan tagColor = "Preprocessor" rule="text.preprocessor">#else</EolSpan>
 	<EolSpan tagColor = "Preprocessor" rule="text.preprocessor">#elif</EolSpan>
@@ -64,22 +65,16 @@
 		<End>"""</End>
 	</Span>
 	
-	<Span color="String" rule="String" stopateol="true">
+	<Span color="String" rule="String" stopateol="true" escape='\"'>
 		<Begin>"</Begin>
 		<End>"</End>
 	</Span>
 	
-	<Span color = "String" rule="String" stopateol = "true">
-		<Begin>&apos;</Begin>
-		<End>&apos;</End>
-	</Span>
-	
-	<Span rule="String" stopateol = "false">
-		<Begin color="Keyword(Iteration)" flags="NewWord">let</Begin>
-		<End>=</End>
+	<Span rule="Let" stopateol = "false">
+		<Begin color="Keyword(Iteration)" flags="NewWord">let </Begin>
+		<End>=|(|&lt;</End>
 	</Span>
 
-  
 <!-- 
 	<Span color="String" rule="String" stopateol="true" escape='\'>
 		<Begin>[]</Begin>
@@ -87,14 +82,27 @@
 	</Span>
 	-->
 
-	<!-- ' is also used for type parameters therefore we need a regex match to find out if something is a string -->
-	<Match expression="(&apos;(.|(\\.+))&apos;)">
-			<Group color = "String"/>
-			<Group color = "String"/>
-			<Group color = "String"/>
-	</Match>
+	<!-- ' is also used for type parameters therefore we need a regex match to find out if something is a char literal 
+         Here we capture unicode literals and escaped chars in a separate group for colouring. Char literals are not part
+         of the 'String' rule, and unicode literal matching will not happen. -->
+<!--	<Match expression="(')(?:(apa|\\U[0-9a-fA-F]{8}|\\u[0-9a-fA-F]{4}|\\[\\'ntbrafv])|([^\\']))(')">
+       <Group color="String"/>
+       <Group color="String(Escape)"/>
+       <Group color="String"/>
+       <Group color="String"/>
+	</Match> -->
+
+	<Match color="String" ignorecase="True">'(\w|\\['ntbrafv])'</Match>
+       
+
 
 	<Match color="Number">CSharpNumber</Match>
+	<Match color="Keyword(Iteration)">(let|use|yield|return|do)(!)?\s</Match>
+	<Match color="Keyword(Iteration)">(let|use|yield|return|do)(!)?$</Match>
+
+	<!-- reserved-ident-keyword F# spec v3.0 section 3.4 -->
+	<Match color="Keyword(Other)">(atomic|break|checked|component|const|constraint|constructor|continue|eager|fixed|fori|functor|include|measure|method|mixin|object|parallel|params|process|protected|pure|recursive|sealed|tailcall|trait|virtual|volatile)[!#]?\s</Match>
+	<Match color="Keyword(Other)">(atomic|break|checked|component|const|constraint|constructor|continue|eager|fixed|fori|functor|include|measure|method|mixin|object|parallel|params|process|protected|pure|recursive|sealed|tailcall|trait|virtual|volatile)[!#]?$</Match>
 
 	<!-- It is really impossible to do some intelligent grouping here, because
 	     it looks weird no matter what we do... some things are context-sensitive,
@@ -114,17 +122,9 @@
 		<Word>with</Word>
 
 		<Word>val</Word>
-		<Word>use</Word>
-		<Word>yield</Word>
-		<Word>let!</Word>
-		<Word>use!</Word>
-		<Word>do!</Word>
-		<Word>yield!</Word>
-		<Word>return!</Word>
 		<Word>while</Word>
 		<Word>for</Word>
 
-		<Word>do</Word>
 		<Word>begin</Word>
 		<Word>done</Word>
 		<Word>elif</Word>
@@ -132,7 +132,6 @@
 		<Word>end</Word>
 		<Word>if</Word>
 		<Word>match</Word>
-		<Word>return</Word>
 		<Word>then</Word>
 		<Word>when</Word>
 
@@ -157,7 +156,6 @@
 		<Word>type</Word>
 
 		<Word>of</Word>
-		<Word>sig</Word>
 		<Word>class</Word>
 		<Word>delegate</Word>
 		<Word>exception</Word>
@@ -176,6 +174,7 @@
 		<Word>lazy</Word>
 		<Word>and</Word>
 		<Word>downcast</Word>
+		<Word>select</Word>
 	</Keywords>
 
 	<Keywords color="Keyword(Constants)">
@@ -214,6 +213,15 @@
 	</Keywords>
 
 	<Keywords color="Keyword(Other)">
+		<!-- reserved OCaml keywords -->
+		<Word>asr</Word>
+		<Word>land</Word>
+		<Word>lor</Word>
+		<Word>lsl</Word>
+		<Word>lsr</Word>
+		<Word>lxor</Word>
+		<Word>mod</Word>
+		<Word>sig</Word>
 	</Keywords>
 
 	<Rule name="text.preprocessor" ignorecase="True">
@@ -276,8 +284,10 @@
 	</Rule>
 
 	<Rule name="String">
-		<Delimiters></Delimiters>
-		<Match color ="String(Escape)">\\(["\\'ntbrafv]|u[0-9a-fA-F]{4,4}|U[0-9a-fA-F]{8,8}|\d\d\d)</Match>
+		<Match color ="String(Escape)" ignorecase="True">\\(U[0-9a-fA-F]{8}|u[0-9a-fA-F]{4}|[\\'ntbrafv])</Match>
+	</Rule>
+	
+	<Rule name="Let">
 	</Rule>
 	
 	<Rule name = "VerbatimString">
@@ -291,7 +301,7 @@
 
 	<Rule name="XmlDocumentation">
 		<Delimiters>&lt;&gt;</Delimiters>
-		<Span color = "Comment(DocTag)" rule = "XmlDocumentationTag">
+		<Span color = "Comment(DocTag)" rule = "XmlDocumentationTag" stopateol = "true">
 			<Begin>&lt;</Begin>
 			<End>&gt;</End>
 		</Span>

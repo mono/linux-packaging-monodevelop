@@ -70,8 +70,11 @@ namespace MonoDevelop.Refactoring.Rename
 			if (options.SelectedItem is IType && ((IType)options.SelectedItem).Kind == TypeKind.TypeParameter)
 				return !string.IsNullOrEmpty (((ITypeParameter)options.SelectedItem).Region.FileName);
 
-			if (options.SelectedItem is IMember) {
-				var cls = ((IMember)options.SelectedItem).DeclaringTypeDefinition;
+			var member = options.SelectedItem as IMember;
+			if (member != null) {
+				if (member.SymbolKind == SymbolKind.Operator)
+					return false;
+				var cls = member.DeclaringTypeDefinition;
 				return cls != null;
 			}
 			return false;
@@ -191,6 +194,12 @@ namespace MonoDevelop.Refactoring.Rename
 					return;
 				}
 
+				var par = options.SelectedItem as IParameter;
+				if (par != null && par.Owner != null && (par.Owner.Accessibility != Accessibility.Private || par.Owner.DeclaringTypeDefinition != null && par.Owner.DeclaringTypeDefinition.Parts.Count > 1)) {
+					MessageService.ShowCustomDialog (new RenameItemDialog (options, this));
+					return;
+				}
+
 				var col = ReferenceFinder.FindReferences (options.SelectedItem, true);
 				if (col == null)
 					return;
@@ -224,7 +233,6 @@ namespace MonoDevelop.Refactoring.Rename
 				tle.SelectPrimaryLink = true;
 				if (tle.ShouldStartTextLinkMode) {
 					var helpWindow = new TableLayoutModeHelpWindow ();
-					helpWindow.TransientFor = IdeApp.Workbench.RootWindow;
 					helpWindow.TitleText = options.SelectedItem is IVariable ? GettextCatalog.GetString ("<b>Local Variable -- Renaming</b>") : GettextCatalog.GetString ("<b>Parameter -- Renaming</b>");
 					helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Key</b>"), GettextCatalog.GetString ("<b>Behavior</b>")));
 					helpWindow.Items.Add (new KeyValuePair<string, string> (GettextCatalog.GetString ("<b>Return</b>"), GettextCatalog.GetString ("<b>Accept</b> this refactoring.")));
@@ -254,6 +262,11 @@ namespace MonoDevelop.Refactoring.Rename
 				get;
 				set;
 			}
+
+			public bool IncludeOverloads {
+				get;
+				set;
+			}
 		}
 		
 		public override List<Change> PerformChanges (RefactoringOptions options, object prop)
@@ -262,14 +275,14 @@ namespace MonoDevelop.Refactoring.Rename
 			List<Change> result = new List<Change> ();
 			IEnumerable<MemberReference> col = null;
 			using (var monitor = new MessageDialogProgressMonitor (true, false, false, true)) {
-				col = ReferenceFinder.FindReferences (options.SelectedItem, true, monitor);
+				col = ReferenceFinder.FindReferences (options.SelectedItem, properties.IncludeOverloads, monitor);
 				if (col == null)
 					return result;
 					
 				if (properties.RenameFile && options.SelectedItem is IType) {
 					var cls = ((IType)options.SelectedItem).GetDefinition ();
 					int currentPart = 1;
-					HashSet<string> alreadyRenamed = new HashSet<string> ();
+					var alreadyRenamed = new HashSet<string> ();
 					foreach (var part in cls.Parts) {
 						if (alreadyRenamed.Contains (part.Region.FileName))
 							continue;
@@ -277,13 +290,16 @@ namespace MonoDevelop.Refactoring.Rename
 							
 						string oldFileName = System.IO.Path.GetFileNameWithoutExtension (part.Region.FileName);
 						string newFileName;
-						if (oldFileName.ToUpper () == properties.NewName.ToUpper () || oldFileName.ToUpper ().EndsWith ("." + properties.NewName.ToUpper ()))
+						var newName = properties.NewName;
+						if (string.IsNullOrEmpty (oldFileName) || string.IsNullOrEmpty (newName))
 							continue;
-						int idx = oldFileName.IndexOf (cls.Name);
+						if (oldFileName.ToUpper () == newName.ToUpper () || oldFileName.ToUpper ().EndsWith ("." + newName.ToUpper (), StringComparison.Ordinal))
+							continue;
+						int idx = oldFileName.IndexOf (cls.Name, StringComparison.Ordinal);
 						if (idx >= 0) {
-							newFileName = oldFileName.Substring (0, idx) + properties.NewName + oldFileName.Substring (idx + cls.Name.Length);
+							newFileName = oldFileName.Substring (0, idx) + newName + oldFileName.Substring (idx + cls.Name.Length);
 						} else {
-							newFileName = currentPart != 1 ? properties.NewName + currentPart : properties.NewName;
+							newFileName = currentPart != 1 ? newName + currentPart : newName;
 							currentPart++;
 						}
 							

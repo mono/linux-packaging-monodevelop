@@ -33,40 +33,21 @@ using ICSharpCode.NRefactory.Semantics;
 using System.Threading.Tasks;
 using MonoDevelop.Core;
 using System.Threading;
+using MonoDevelop.Core.Instrumentation;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.Refactoring
 {
     public static class ExtensionMethods
     {
-		static CancellationTokenSource sharedTokenSource = new CancellationTokenSource ();
-
 		class ResolverAnnotation
 		{
-			public TaskWrapper Task;
+			public CancellationTokenSource SharedTokenSource;
+			public Task<CSharpAstResolver> Task;
 			public CSharpUnresolvedFile ParsedFile;
 		}
 
-		public class TaskWrapper {
-			readonly Task<CSharpAstResolver> underlyingTask;
-
-			public CSharpAstResolver Result {
-				get {
-					if (underlyingTask.IsCanceled)
-						return null;
-					try {
-						return underlyingTask.Result;
-					} catch (Exception e) {
-						LoggingService.LogWarning ("Exception while getting shared AST resolver.", e);
-						return null;
-					}
-				}
-			}
-			public TaskWrapper (Task<CSharpAstResolver> underlyingTask)
-			{
-				this.underlyingTask = underlyingTask;
-			}
-			
-		}
+		public static TimerCounter ResolveCounter = InstrumentationService.CreateTimerCounter("Resolve document", "Parsing");
 
 		/// <summary>
 		/// Returns a full C# syntax tree resolver which is shared between semantic highlighting, source analysis and refactoring.
@@ -74,12 +55,12 @@ namespace MonoDevelop.Refactoring
 		/// resolve navigator.
 		/// Note: The shared resolver is fully resolved.
 		/// </summary>
-		public static TaskWrapper GetSharedResolver (this Document document)
+		public static Task<CSharpAstResolver> GetSharedResolver (this Document document)
 		{
 			var parsedDocument = document.ParsedDocument;
-			if (parsedDocument == null)
+			if (parsedDocument == null || document.IsProjectContextInUpdate || document.Project != null && !(document.Project is DotNetProject))
 				return null;
-			
+
 			var unit       = parsedDocument.GetAst<SyntaxTree> ();
 			var parsedFile = parsedDocument.ParsedFile as CSharpUnresolvedFile;
 			if (unit == null || parsedFile == null)
@@ -91,16 +72,20 @@ namespace MonoDevelop.Refactoring
 			if (resolverAnnotation != null) {
 				if (resolverAnnotation.ParsedFile == parsedFile)
 					return resolverAnnotation.Task;
+				if (resolverAnnotation.SharedTokenSource != null)
+					resolverAnnotation.SharedTokenSource.Cancel ();
 				document.RemoveAnnotations<ResolverAnnotation> ();
 			}
-			sharedTokenSource.Cancel ();
-			sharedTokenSource = new CancellationTokenSource ();
-			var token = sharedTokenSource.Token;
+
+			var tokenSource = new CancellationTokenSource ();
+			var token = tokenSource.Token;
 			var resolveTask = Task.Factory.StartNew (delegate {
 				try {
-					var result = new CSharpAstResolver (compilation, unit, parsedFile);
-					result.ApplyNavigator (new ConstantModeResolveVisitorNavigator (ResolveVisitorNavigationMode.Resolve, null), token);
-					return result;
+					using (var timer = ResolveCounter.BeginTiming ()) {
+						var result = new CSharpAstResolver (compilation, unit, parsedFile);
+						result.ApplyNavigator (new ConstantModeResolveVisitorNavigator (ResolveVisitorNavigationMode.Resolve, null), token);
+						return result;
+					}
 				} catch (OperationCanceledException) {
 					return null;
 				} catch (Exception e) {
@@ -108,15 +93,29 @@ namespace MonoDevelop.Refactoring
 					return null;
 				}
 			}, token);
-			var wrapper = new TaskWrapper (resolveTask);
+
+			var wrapper = resolveTask.ContinueWith (t => {
+				if (t.IsCanceled)
+					return null;
+				if (t.IsFaulted) {
+					var ex = t.Exception.Flatten ().InnerException;
+					if (!(ex is TaskCanceledException))
+						LoggingService.LogWarning ("Exception while getting shared AST resolver.", ex);
+					return null;
+				}
+				return t.Result;
+			}, TaskContinuationOptions.ExecuteSynchronously);
+
 			document.AddAnnotation (new ResolverAnnotation {
 				Task = wrapper,
-				ParsedFile = parsedFile
+				ParsedFile = parsedFile,
+				SharedTokenSource = tokenSource
 			});
+
 			return wrapper;
 		}
 
-		sealed class ConstantModeResolveVisitorNavigator : IResolveVisitorNavigator
+		public sealed class ConstantModeResolveVisitorNavigator : IResolveVisitorNavigator
 		{
 			readonly ResolveVisitorNavigationMode mode;
 			readonly IResolveVisitorNavigator targetForResolveCalls;

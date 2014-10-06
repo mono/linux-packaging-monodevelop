@@ -12,3 +12,5 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("MacPlatform")]
 [assembly: InternalsVisibleTo("MonoDevelop.Debugger")]
 [assembly: InternalsVisibleTo("MonoDevelop.DesignerSupport")]
+[assembly: InternalsVisibleTo("Ide.Tests")]
+[assembly: InternalsVisibleTo("UnitTests")]

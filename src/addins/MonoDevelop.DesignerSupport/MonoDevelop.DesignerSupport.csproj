@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{2C24D515-4A2C-445C-8419-C09231913CFA}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -13,16 +13,19 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>True</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>True</Optimize>
+    <Optimize>false</Optimize>
     <OutputPath>..\..\..\build\AddIns\MonoDevelop.DesignerSupport</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DefineConstants>DEBUG</DefineConstants>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\MonoDevelop.DesignerSupport\MonoDevelop.DesignerSupport.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\build\AddIns\MonoDevelop.DesignerSupport</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -30,6 +33,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\build\AddIns\MonoDevelop.DesignerSupport\MonoDevelop.DesignerSupport.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -93,6 +99,11 @@
       <Name>Mono.Addins</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MonoDevelop.DesignerSupport.Toolbox\ItemToolboxNode.cs" />
@@ -152,28 +163,39 @@
     <Compile Include="gtk-gui\MonoDevelop.DesignerSupport.ClassOutlineSortingPreferencesDialog.cs" />
     <Compile Include="MonoDevelop.DesignerSupport\ClassOutlineSettings.cs" />
     <Compile Include="MonoDevelop.DesignerSupport.Toolbox\IToolboxCustomizer.cs" />
+    <Compile Include="AddinInfo.cs" />
+    <Compile Include="MonoDevelop.DesignerSupport.Projects\ImplicitFrameworkAssemblyReferenceDescriptor.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="MonoDevelop.DesignerSupport.addin.xml">
       <LogicalName>MonoDevelop.DesignerSupport.addin.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\group-by-category.png">
-      <LogicalName>group-by-category.png</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\md-design-listboxtoggle.png">
-      <LogicalName>md-design-listboxtoggle.png</LogicalName>
+    <EmbeddedResource Include="icons\light\compact-display-16.png">
+      <LogicalName>compact-display-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\properties-pad-16.png">
-      <LogicalName>properties-pad-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\compact-display-16%402x.png">
+      <LogicalName>compact-display-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\toolbox-pad-16.png">
-      <LogicalName>toolbox-pad-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-properties-16.png">
+      <LogicalName>pad-properties-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="icons\pad-document-outline-16.png">
-      <LogicalName>pad-document-outline-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\pad-properties-16%402x.png">
+      <LogicalName>pad-properties-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\pad-toolbox-16.png">
+      <LogicalName>pad-toolbox-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\pad-toolbox-16%402x.png">
+      <LogicalName>pad-toolbox-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\pad-document-outline-16.png">
+      <LogicalName>pad-document-outline-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\pad-document-outline-16%402x.png">
+      <LogicalName>pad-document-outline-light-16@2x.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

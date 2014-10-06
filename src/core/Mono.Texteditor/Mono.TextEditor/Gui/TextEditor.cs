@@ -45,6 +45,15 @@ namespace Mono.TextEditor
 	{
 		readonly TextArea textArea;
 
+		internal LayoutCache LayoutCache {
+			get;
+			private set;
+		}
+
+		internal bool IsInKeypress {
+			get { return textArea.IsInKeypress; }
+		}
+
 		public TextArea TextArea {
 			get {
 				return textArea;
@@ -54,7 +63,7 @@ namespace Mono.TextEditor
 		public TextEditor () : this(new TextDocument ())
 		{
 		}
-		
+
 		public TextEditor (TextDocument doc)
 			: this (doc, null)
 		{
@@ -69,6 +78,7 @@ namespace Mono.TextEditor
 		{
 			GtkWorkarounds.FixContainerLeak (this);
 			WidgetFlags |= WidgetFlags.NoWindow;
+			LayoutCache = new LayoutCache (this);
 			this.textArea = new TextArea (doc, options, initialMode);
 			this.textArea.Initialize (this, doc, options, initialMode);
 			this.textArea.EditorOptionsChanged += (sender, e) => OptionsChanged (sender, e);
@@ -99,6 +109,7 @@ namespace Mono.TextEditor
 		{
 			base.OnDestroyed ();
 			UnregisterAdjustments ();
+			LayoutCache.Dispose (); 
 		}
 
 		void UnregisterAdjustments ()
@@ -244,7 +255,9 @@ namespace Mono.TextEditor
 		
 		protected override void ForAll (bool include_internals, Gtk.Callback callback)
 		{
-			containerChildren.ForEach (child => callback (child.Child));
+			foreach (var child in containerChildren.ToArray ()) {
+				callback (child.Child);
+			}
 		}
 
 		void ResizeChild (Rectangle allocation, EditorContainerChild child)
@@ -264,7 +277,7 @@ namespace Mono.TextEditor
 		void SetChildrenPositions (Rectangle allocation)
 		{
 			foreach (EditorContainerChild child in containerChildren.ToArray ()) {
-				if (child.Child == textArea)
+				if (child.Child == textArea || child.Child is Mono.TextEditor.Vi.ViStatusArea)
 					continue;
 				ResizeChild (allocation, child);
 			}
@@ -1103,7 +1116,7 @@ namespace Mono.TextEditor
 		/// <summary>
 		/// Initiate a pulse at the specified document location
 		/// </summary>
-		/// <param name="pulseLocation">
+		/// <param name="pulseStart">
 		/// A <see cref="DocumentLocation"/>
 		/// </param>
 		public void PulseCharacter (DocumentLocation pulseStart)

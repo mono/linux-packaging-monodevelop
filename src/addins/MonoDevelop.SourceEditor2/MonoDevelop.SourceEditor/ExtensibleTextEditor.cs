@@ -45,6 +45,7 @@ using MonoDevelop.SourceEditor.Extension;
 using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Ide.TypeSystem;
 using ICSharpCode.NRefactory.Semantics;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.SourceEditor
 {
@@ -64,10 +65,33 @@ namespace MonoDevelop.SourceEditor
 		public new ISourceEditorOptions Options {
 			get { return (ISourceEditorOptions)base.Options; }
 		}
+
+		static ExtensibleTextEditor ()
+		{
+			var icon = Xwt.Drawing.Image.FromResource ("gutter-bookmark-light-15.png");
+
+			BookmarkMarker.DrawBookmarkFunc = delegate(TextEditor editor, Cairo.Context cr, DocumentLine lineSegment, double x, double y, double width, double height) {
+				if (!lineSegment.IsBookmarked)
+					return;
+				cr.DrawImage (
+					editor, 
+					icon, 
+					Math.Floor (x + (width - icon.Width) / 2), 
+					Math.Floor (y + (height - icon.Height) / 2)
+				);
+			};
+
+		}
 		
 		public ExtensibleTextEditor (SourceEditorView view, ISourceEditorOptions options, Mono.TextEditor.TextDocument doc) : base(doc, options)
 		{
 			Initialize (view);
+		}
+
+		void HandleParseOperationFinished (object sender, EventArgs e)
+		{
+			resolveResult = null;
+			resolveRegion = DomRegion.Empty;
 		}
 		
 		public ExtensibleTextEditor (SourceEditorView view)
@@ -94,7 +118,8 @@ namespace MonoDevelop.SourceEditor
 			};
 			
 			Document.TextReplaced += HandleSkipCharsOnReplace;
-			
+			TypeSystemService.ParseOperationFinished += HandleParseOperationFinished;
+
 			UpdateEditMode ();
 			this.DoPopupMenu = ShowPopup;
 		}
@@ -152,8 +177,8 @@ namespace MonoDevelop.SourceEditor
 			} else {
 		//		if (!(CurrentMode is SimpleEditMode)){
 					SimpleEditMode simpleMode = new SimpleEditMode ();
-					simpleMode.KeyBindings [EditMode.GetKeyCode (Gdk.Key.Tab)] = new TabAction (this).Action;
-					simpleMode.KeyBindings [EditMode.GetKeyCode (Gdk.Key.BackSpace)] = EditActions.AdvancedBackspace;
+					simpleMode.KeyBindings [EditMode.GetKeyCode (Gdk.Key.Tab)] = new TabAction (this).Action;
+					simpleMode.KeyBindings [EditMode.GetKeyCode (Gdk.Key.BackSpace)] = EditActions.AdvancedBackspace;
 					CurrentMode = simpleMode;
 		//		}
 			}
@@ -171,6 +196,7 @@ namespace MonoDevelop.SourceEditor
 
 		protected override void OnDestroyed ()
 		{
+			TypeSystemService.ParseOperationFinished -= HandleParseOperationFinished;
 			UnregisterAdjustments ();
 			resolveResult = null;
 			Extension = null;
@@ -316,6 +342,7 @@ namespace MonoDevelop.SourceEditor
 				return true;
 
 			bool inStringOrComment = false;
+			bool isString = false;
 			DocumentLine line = Document.GetLine (Caret.Line);
 			if (line == null)
 				return true;
@@ -324,15 +351,23 @@ namespace MonoDevelop.SourceEditor
 			var sm = Document.SyntaxMode as SyntaxMode;
 			if (sm != null)
 				Mono.TextEditor.Highlighting.SyntaxModeService.ScanSpans (Document, sm, sm, stack, line.Offset, Caret.Offset);
+
 			foreach (Span span in stack) {
 				if (string.IsNullOrEmpty (span.Color))
 					continue;
-				if (span.Color.StartsWith ("String", StringComparison.Ordinal) || span.Color.StartsWith ("Comment", StringComparison.Ordinal)) {
+				if (span.Color.StartsWith ("String", StringComparison.Ordinal) ||
+				    span.Color.StartsWith ("Comment", StringComparison.Ordinal) ||
+				    span.Color.StartsWith ("Xml Attribute Value", StringComparison.Ordinal)) {
+					//Treat "Xml Attribute Value" as "String" so quotes in SkipChars works in Xml
+					if (span.Color.StartsWith ("Comment", StringComparison.Ordinal)) {
+						isString = false;
+					} else {
+						isString = true;
+					}
 					inStringOrComment = true;
 					break;
 				}
 			}
-
 			// insert template when space is typed (currently disabled - it's annoying).
 			bool templateInserted = false;
 			//!inStringOrComment && (key == Gdk.Key.space) && DoInsertTemplate ();
@@ -348,8 +383,14 @@ namespace MonoDevelop.SourceEditor
 			// special handling for escape chars inside ' and "
 			if (Caret.Offset > 0) {
 				char charBefore = Document.GetCharAt (Caret.Offset - 1);
-				if (inStringOrComment && ch == '"' && charBefore == '\\')
-					skipChar = null;
+				if (ch == '"') {
+					if (!inStringOrComment && charBefore == '"' || 
+						isString && charBefore == '\\' ) {
+						skipChar = null;
+						braceIndex = -1;
+					}
+				}
+
 			}
 			char insertionChar = '\0';
 			bool insertMatchingBracket = false;
@@ -391,8 +432,15 @@ namespace MonoDevelop.SourceEditor
 				skipChars.Remove (skipChar);
 			}
 			if (Extension != null) {
-				if (ExtensionKeyPress (key, ch, state)) 
-					result = base.OnIMProcessedKeyPressEvent (key, ch, state);
+				if (!DefaultSourceEditorOptions.Instance.GenerateFormattingUndoStep) {
+					using (var undo = Document.OpenUndoGroup ()) {
+						if (ExtensionKeyPress (key, ch, state))
+							result = base.OnIMProcessedKeyPressEvent (key, ch, state);
+					}
+				} else {
+					if (ExtensionKeyPress (key, ch, state))
+						result = base.OnIMProcessedKeyPressEvent (key, ch, state);
+				}
 				if (returnBetweenBraces)
 					HitReturn ();
 			} else {
@@ -557,20 +605,26 @@ namespace MonoDevelop.SourceEditor
 			HideTooltip ();
 			const string menuPath = "/MonoDevelop/SourceEditor2/ContextMenu/Editor";
 			var ctx = ExtensionContext ?? AddinManager.AddinEngine;
+
 			CommandEntrySet cset = IdeApp.CommandService.CreateCommandEntrySet (ctx, menuPath);
-			Gtk.Menu menu = IdeApp.CommandService.CreateMenu (cset);
-			var imMenu = CreateInputMethodMenuItem (GettextCatalog.GetString ("_Input Methods"));
-			if (imMenu != null) {
-				menu.Append (new SeparatorMenuItem ());
-				menu.Append (imMenu);
-			}
-			
-			menu.Hidden += HandleMenuHidden; 
-			if (evt != null) {
-				GtkWorkarounds.ShowContextMenu (menu, this, evt);
+
+			if (Platform.IsMac) {
+				IdeApp.CommandService.ShowContextMenu (this, evt, cset, this);
 			} else {
-				var pt = LocationToPoint (this.Caret.Location);
-				GtkWorkarounds.ShowContextMenu (menu, this, new Gdk.Rectangle (pt.X, pt.Y, 1, (int)LineHeight));
+				Gtk.Menu menu = IdeApp.CommandService.CreateMenu (cset);
+				var imMenu = CreateInputMethodMenuItem (GettextCatalog.GetString ("_Input Methods"));
+				if (imMenu != null) {
+					menu.Append (new SeparatorMenuItem ());
+					menu.Append (imMenu);
+				}
+
+				menu.Hidden += HandleMenuHidden;
+				if (evt != null) {
+					GtkWorkarounds.ShowContextMenu (menu, this, evt);
+				} else {
+					var pt = LocationToPoint (this.Caret.Location);
+					GtkWorkarounds.ShowContextMenu (menu, this, new Gdk.Rectangle (pt.X, pt.Y, 1, (int)LineHeight));
+				}
 			}
 		}
 

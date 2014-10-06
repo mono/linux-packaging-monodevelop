@@ -24,15 +24,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using NUnit.Framework;
 
 namespace MonoDevelop.Debugger.Tests.Soft
 {
-	[TestFixture()]
-	public class SdbEvaluationTests: EvaluationTests
+	[TestFixture]
+	public class SdbEvaluationAllowTargetInvokesTests: EvaluationTests
 	{
-		public SdbEvaluationTests (): base ("Mono.Debugger.Soft")
+		public SdbEvaluationAllowTargetInvokesTests (): base ("Mono.Debugger.Soft", true)
+		{
+		}
+	}
+
+	[TestFixture]
+	public class SdbEvaluationNoTargetInvokesTests: EvaluationTests
+	{
+		public SdbEvaluationNoTargetInvokesTests (): base ("Mono.Debugger.Soft", false)
 		{
 		}
 	}

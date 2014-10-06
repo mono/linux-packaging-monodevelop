@@ -26,6 +26,10 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+using Mono.TextEditor.Highlighting;
+using MonoDevelop.Projects;
+using System.Collections.Generic;
+
 namespace MonoDevelop.Ide.FindInFiles
 {
 	public class SearchResult
@@ -62,9 +66,24 @@ namespace MonoDevelop.Ide.FindInFiles
 			set;
 		}
 
-		public Gdk.Pixbuf Pixbuf {
+		public Xwt.Drawing.Image FileIcon {
 			get;
 			set;
+		}
+
+		public Xwt.Drawing.Image ProjectIcon {
+			get;
+			set;
+		}
+
+		private List<Project> projects;
+		public List<Project> Projects {
+			get {
+				if (projects == null) {
+					projects = new List<Project> (IdeApp.Workspace.GetProjectsContainingFile (FileName));
+				}
+				return projects;
+			}
 		}
 		#endregion
 
@@ -85,6 +104,11 @@ namespace MonoDevelop.Ide.FindInFiles
 		public override string ToString ()
 		{
 			return string.Format("[SearchResult: FileProvider={0}, Offset={1}, Length={2}]", FileProvider, Offset, Length);
+		}
+
+		public virtual AmbientColor GetBackgroundMarkerColor (ColorScheme style)
+		{
+			return style.SearchResult;
 		}
 	}
 }

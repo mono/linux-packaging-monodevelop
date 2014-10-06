@@ -41,7 +41,7 @@ using ICSharpCode.NRefactory.CSharp.Completion;
 
 namespace MonoDevelop.CSharp.Formatting
 {
-	public class OnTheFlyFormatter
+	static class OnTheFlyFormatter
 	{
 		public static void Format (MonoDevelop.Ide.Gui.Document data)
 		{
@@ -73,16 +73,8 @@ namespace MonoDevelop.CSharp.Formatting
 			Format (policyParent, mimeTypeChain, data, offset, offset, false, true);
 		}		
 		
-		/// <summary>
-		/// Builds a compileable stub file out of an entity.
-		/// </summary>
-		/// <returns>
-		/// A string representing the stub
-		/// </returns>
-		/// <param name='memberStartOffset'>
-		/// The offset where the member starts in the returned text.
-		/// </param>
-		static string BuildStub (MonoDevelop.Ide.Gui.Document data, CSharpCompletionTextEditorExtension.TypeSystemTreeSegment seg, int startOffset, int endOffset, out int memberStartOffset)
+
+		static string BuildStub (MonoDevelop.Ide.Gui.Document data, CSharpCompletionTextEditorExtension.TypeSystemTreeSegment seg, int endOffset, out int memberStartOffset)
 		{
 			var pf = data.ParsedDocument.ParsedFile as CSharpUnresolvedFile;
 			if (pf == null) {
@@ -119,19 +111,20 @@ namespace MonoDevelop.CSharp.Formatting
 				parent = parent.DeclaringTypeDefinition;
 			}
 
-			memberStartOffset = sb.Length;
-			var text = data.Editor.GetTextBetween (seg.Offset, endOffset);
+			var segmentLine = data.Editor.GetLineByOffset (seg.Offset);
+			memberStartOffset = sb.Length + seg.Offset - segmentLine.Offset;
+			var text = data.Editor.GetTextBetween (Math.Max (0, segmentLine.Offset), endOffset);
 			sb.Append (text);
-
 			var lex = new CSharpCompletionEngineBase.MiniLexer (text);
-			lex.Parse (ch => {
+			lex.Parse ((ch,i) => {
 				if (lex.IsInString || lex.IsInChar || lex.IsInVerbatimString || lex.IsInSingleComment || lex.IsInMultiLineComment || lex.IsInPreprocessorDirective)
-					return;
+					return false;
 				if (ch =='{') {
 					closingBrackets++;
 				} else if (ch =='}') {
 					closingBrackets--;
 				}
+				return false;
 			});
 
 
@@ -203,7 +196,7 @@ namespace MonoDevelop.CSharp.Formatting
 				return;
 			string text;
 			int formatStartOffset, formatLength, realTextDelta;
-			DomRegion formattingRegion = DomRegion.Empty;
+			DomRegion formattingRegion;
 			int startDelta = 1;
 			if (exact) {
 				text = data.Editor.Text;
@@ -214,7 +207,7 @@ namespace MonoDevelop.CSharp.Formatting
 					if (member == null || member.Region.IsEmpty || member.BodyRegion.End.IsEmpty)
 						return;
 
-					text = BuildStub (data, seg, startOffset, endOffset, out formatStartOffset);
+					text = BuildStub (data, seg, endOffset, out formatStartOffset);
 					startDelta = startOffset - seg.Offset;
 					formatLength = endOffset - startOffset + startDelta;
 					realTextDelta = seg.Offset - formatStartOffset;
@@ -235,7 +228,7 @@ namespace MonoDevelop.CSharp.Formatting
 					return;
 	
 				// Build stub
-				text = BuildStub (data, seg, startOffset, endOffset, out formatStartOffset);
+				text = BuildStub (data, seg, startOffset, out formatStartOffset);
 				formattingRegion = new DomRegion (data.Editor.OffsetToLocation (formatStartOffset), data.Editor.OffsetToLocation (endOffset));
 
 				formatLength = endOffset - seg.Offset;
@@ -249,7 +242,7 @@ namespace MonoDevelop.CSharp.Formatting
 			// Do the actual formatting
 //			var originalVersion = data.Editor.Document.Version;
 
-			using (var undo = data.Editor.OpenUndoGroup ()) {
+			using (var undo = data.Editor.OpenUndoGroup (OperationType.Format)) {
 				try {
 					changes.ApplyChanges (formatStartOffset + startDelta, Math.Max (0, formatLength - startDelta - 1), delegate (int replaceOffset, int replaceLength, string insertText) {
 						int translatedOffset = realTextDelta + replaceOffset;

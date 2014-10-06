@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
@@ -9,8 +8,6 @@ using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
 using System.Collections.Generic;
 using MonoDevelop.Core.Assemblies;
-using System.Threading.Tasks;
-using System.ServiceModel;
 
 namespace MonoDevelop.WebReferences.Commands
 {
@@ -22,11 +19,11 @@ namespace MonoDevelop.WebReferences.Commands
 		}
 		
 		/// <summary>Execute the command for adding a new web reference to a project.</summary>
-		[CommandHandler (MonoDevelop.WebReferences.WebReferenceCommands.Add)]
+		[CommandHandler (WebReferenceCommands.Add)]
 		public void NewWebReference()
 		{
 			// Get the project and project folder
-			DotNetProject project = CurrentNode.GetParentDataItem (typeof(DotNetProject), true) as DotNetProject;
+			var project = CurrentNode.GetParentDataItem (typeof(DotNetProject), true) as DotNetProject;
 			
 			// Check and switch the runtime environment for the current project
 			if (project.TargetFramework.Id == TargetFrameworkMoniker.NET_1_1)
@@ -35,14 +32,14 @@ namespace MonoDevelop.WebReferences.Commands
 				question += "Web Service is not supported in this version.";
 				question += "Do you want switch the runtime environment for this project version 2.0 ?";
 				
-				AlertButton switchButton = new AlertButton ("_Switch to .NET2"); 
+				var switchButton = new AlertButton ("_Switch to .NET2"); 
 				if (MessageService.AskQuestion(question, AlertButton.Cancel, switchButton) == switchButton)
 					project.TargetFramework = Runtime.SystemAssemblyService.GetTargetFramework (TargetFrameworkMoniker.NET_2_0);					
 				else
 					return;
 			}
 			
-			WebReferenceDialog dialog = new WebReferenceDialog (project);
+			var dialog = new WebReferenceDialog (project);
 			dialog.NamespacePrefix = project.DefaultNamespace;
 			
 			try {
@@ -58,8 +55,8 @@ namespace MonoDevelop.WebReferences.Commands
 			}
 		}
 
-		[CommandUpdateHandler (MonoDevelop.WebReferences.WebReferenceCommands.Update)]
-		[CommandUpdateHandler (MonoDevelop.WebReferences.WebReferenceCommands.UpdateAll)]
+		[CommandUpdateHandler (WebReferenceCommands.Update)]
+		[CommandUpdateHandler (WebReferenceCommands.UpdateAll)]
 		void CanUpdateWebReferences (CommandInfo ci)
 		{
 			// This does not appear to work.
@@ -67,18 +64,22 @@ namespace MonoDevelop.WebReferences.Commands
 		}
 		
 		/// <summary>Execute the command for updating a web reference in a project.</summary>
-		[CommandHandler (MonoDevelop.WebReferences.WebReferenceCommands.Update)]
+		[CommandHandler (WebReferenceCommands.Update)]
 		public void Update()
 		{
 			UpdateReferences (new [] { (WebReferenceItem) CurrentNode.DataItem });
 		}
 
 		/// <summary>Execute the command for updating all web reference in a project.</summary>
-		[CommandHandler (MonoDevelop.WebReferences.WebReferenceCommands.UpdateAll)]
+		[CommandHandler (WebReferenceCommands.UpdateAll)]
 		public void UpdateAll()
 		{
-			DotNetProject project = ((WebReferenceFolder) CurrentNode.DataItem).Project;
-			UpdateReferences (WebReferencesService.GetWebReferenceItems (project).ToArray ());
+			var folder = (WebReferenceFolder)CurrentNode.DataItem;
+			DotNetProject project = folder.Project;
+			if (folder.IsWCF)
+				UpdateReferences (WebReferencesService.GetWebReferenceItemsWCF (project).ToArray ());
+			else
+				UpdateReferences (WebReferencesService.GetWebReferenceItemsWS (project).ToArray ());
 		}
 		
 		void UpdateReferences (IList<WebReferenceItem> items)
@@ -125,10 +126,10 @@ namespace MonoDevelop.WebReferences.Commands
 		}
 		
 		/// <summary>Execute the command for removing a web reference from a project.</summary>
-		[CommandHandler (MonoDevelop.WebReferences.WebReferenceCommands.Delete)]
+		[CommandHandler (WebReferenceCommands.Delete)]
 		public void Delete()
 		{
-			WebReferenceItem item = (WebReferenceItem) CurrentNode.DataItem;
+			var item = (WebReferenceItem) CurrentNode.DataItem;
 			if (!MessageService.Confirm (GettextCatalog.GetString ("Are you sure you want to delete the web service reference '{0}'?", item.Name), AlertButton.Delete))
 				return;
 			item.Delete();
@@ -137,19 +138,26 @@ namespace MonoDevelop.WebReferences.Commands
 		}
 		
 		/// <summary>Execute the command for removing all web references from a project.</summary>
-		[CommandHandler (MonoDevelop.WebReferences.WebReferenceCommands.DeleteAll)]
+		[CommandHandler (WebReferenceCommands.DeleteAll)]
 		public void DeleteAll()
 		{
-			DotNetProject project = ((WebReferenceFolder) CurrentNode.DataItem).Project;
-			List<WebReferenceItem> items = new List<WebReferenceItem> (WebReferencesService.GetWebReferenceItems (project));
-			foreach (var item in items)
+			var folder = (WebReferenceFolder)CurrentNode.DataItem;
+			DotNetProject project = folder.Project;
+			IEnumerable<WebReferenceItem> items;
+
+			if (folder.IsWCF)
+				items = WebReferencesService.GetWebReferenceItemsWCF (project);
+			else
+				items = WebReferencesService.GetWebReferenceItemsWS (project);
+
+			foreach (var item in items.ToList ())
 				item.Delete();
 
 			IdeApp.ProjectOperations.Save(project);
 			IdeApp.Workbench.StatusBar.ShowMessage("Deleted all Web References");
 		}
 
-		[CommandUpdateHandler (MonoDevelop.WebReferences.WebReferenceCommands.Configure)]
+		[CommandUpdateHandler (WebReferenceCommands.Configure)]
 		void CanConfigureWebReferences (CommandInfo ci)
 		{
 			var item = CurrentNode.DataItem as WebReferenceItem;
@@ -157,7 +165,7 @@ namespace MonoDevelop.WebReferences.Commands
 		}
 
 		/// <summary>Execute the command for configuring a web reference in a project.</summary>
-		[CommandHandler (MonoDevelop.WebReferences.WebReferenceCommands.Configure)]
+		[CommandHandler (WebReferenceCommands.Configure)]
 		public void Configure ()
 		{
 			var item = (WebReferenceItem) CurrentNode.DataItem;

@@ -49,6 +49,7 @@ namespace ICSharpCode.NRefactory.CSharp.FormattingTests
 			Test(policy, @"// THE SOFTWARE.
 
 using    Foo   ;", @"// THE SOFTWARE.
+
 using Foo;");
 		}
 
@@ -70,11 +71,13 @@ using Foo;");
 			      @"
 class Test {
     #region FooBar
+
     #endregion
 }",
 			      @"
 class Test {
 	#region FooBar
+
 	#endregion
 }");
 		}
@@ -103,8 +106,10 @@ class Test {
 			policy.ClassBraceStyle = BraceStyle.DoNotChange;
 
 			Test(policy,
-			     @"			class Test {}",
-			     @"class Test {}");
+			     @"			class Test {
+}",
+			     @"class Test {
+}");
 		}
 
 		[Test]
@@ -117,11 +122,13 @@ class Test {
 			     @"/// <summary>
 		/// olwcowcolwc
 		/// </summary>
-			class Test {}",
+			class Test {
+}",
 			     @"/// <summary>
 /// olwcowcolwc
 /// </summary>
-class Test {}");
+class Test {
+}");
 		}
 
 		[Test]
@@ -133,10 +140,12 @@ class Test {}");
 			Test(policy,
 			      @"					[Attribute1]
 		[Attribute2()]
-          class Test {}",
+          class Test {
+}",
 			      @"[Attribute1]
-[Attribute2()]
-class Test {}");
+[Attribute2 ()]
+class Test {
+}");
 		}
 
 		[Test]
@@ -147,9 +156,11 @@ class Test {}");
 			policy.ClassBraceStyle = BraceStyle.DoNotChange;
 			
 			Test(policy,
-			      @"namespace A { class Test {} }",
+			      @"namespace A { class Test {
+} }",
 			      @"namespace A {
-	class Test {}
+	class Test {
+}
 }");
 		}
 
@@ -162,9 +173,11 @@ class Test {}");
 			policy.IndentNamespaceBody = false;
 			
 			Test(policy,
-			      @"namespace A { class Test {} }",
+			      @"namespace A { class Test {
+} }",
 			      @"namespace A {
-class Test {}
+class Test {
+}
 }");
 		}
 
@@ -473,10 +486,8 @@ set;
 		public void TestIndentPropertyOneLine()
 		{
 			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
-			policy.PropertyFormatting = PropertyFormatting.AllowOneLine;
-			policy.AllowPropertyGetBlockInline = true;
-			policy.AllowPropertySetBlockInline = true;
-			
+			policy.SimplePropertyFormatting = PropertyFormatting.AllowOneLine;
+
 			Test(policy,
 			      @"class Test
 {
@@ -492,10 +503,10 @@ set;
 		public void TestIndentPropertyOneLineCase2()
 		{
 			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
-			policy.PropertyFormatting = PropertyFormatting.AllowOneLine;
-			policy.AllowPropertyGetBlockInline = true;
-			policy.AllowPropertySetBlockInline = true;
-			
+			policy.SimplePropertyFormatting = PropertyFormatting.AllowOneLine;
+			policy.SimpleGetBlockFormatting = PropertyFormatting.AllowOneLine;
+			policy.SimpleSetBlockFormatting = PropertyFormatting.AllowOneLine;
+
 			Test(policy,
 			      @"class Test
 {
@@ -552,10 +563,10 @@ set {
 		}
 
 		[Test]
-		public void TestPropertyAlignment()
+		public void TestAutoPropertyAlignment()
 		{
 			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
-			policy.PropertyFormatting = PropertyFormatting.AllowOneLine;
+			policy.AutoPropertyFormatting = PropertyFormatting.AllowOneLine;
 			var adapter = Test(policy,
 			                    @"class Test
 {
@@ -565,7 +576,7 @@ set {
 {
 	Test TestMe { get; set; }
 }");
-			policy.PropertyFormatting = PropertyFormatting.ForceNewLine;
+			policy.AutoPropertyFormatting = PropertyFormatting.ForceNewLine;
 			Continue(policy, adapter,
 			          @"class Test
 {
@@ -574,7 +585,7 @@ set {
 		set;
 	}
 }");
-			policy.PropertyFormatting = PropertyFormatting.ForceOneLine;
+			policy.AutoPropertyFormatting = PropertyFormatting.ForceOneLine;
 			
 			Continue(policy, adapter,
 			          @"class Test
@@ -582,6 +593,58 @@ set {
 	Test TestMe { get; set; }
 }");
 		}
+
+		[Test]
+		public void TestSimplePropertyAlignment()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.SimplePropertyFormatting = PropertyFormatting.AllowOneLine;
+			var adapter = Test(policy,
+			                   @"class Test
+{
+	Test TestMe { get { ; } set { ; } }
+}",
+			                   @"class Test
+{
+	Test TestMe { get { ; } set { ; } }
+}");
+			policy.SimplePropertyFormatting = PropertyFormatting.ForceNewLine;
+			Continue(policy, adapter,
+			         @"class Test
+{
+	Test TestMe {
+		get { ; }
+		set { ; }
+	}
+}");
+			policy.SimplePropertyFormatting = PropertyFormatting.ForceOneLine;
+
+			Continue(policy, adapter,
+			         @"class Test
+{
+	Test TestMe { get { ; } set { ; } }
+}");
+		}
+
+
+		[Test]
+		public void TestClashingPropertyAlignment()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.SimplePropertyFormatting = PropertyFormatting.ForceOneLine;
+			policy.SimpleGetBlockFormatting = PropertyFormatting.ForceNewLine;
+			Test(policy, @"class Test
+{
+	Test TestMe {
+		get { FooBar (); }
+	}
+}", @"class Test
+{
+	Test TestMe { get { FooBar (); } }
+}");
+		}
+
+
 
 		[Test]
 		public void TestIndentNamespaceBody()
@@ -592,16 +655,19 @@ set {
 			policy.IndentNamespaceBody = true;
 			var adapter = Test(policy,
 			                    @"			namespace Test {
-class FooBar {}
+class FooBar {
+}
 		}",
 			                    @"namespace Test {
-	class FooBar {}
+	class FooBar {
+}
 }");
 			
 			policy.IndentNamespaceBody = false;
 			Continue(policy, adapter,
 			          @"namespace Test {
-class FooBar {}
+class FooBar {
+}
 }");
 		}
 
@@ -695,10 +761,10 @@ set;
 		}
 
 		[Test]
-		public void TestPropertyCorrection()
+		public void TestAutoPropertyCorrection()
 		{
 			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
-			policy.PropertyFormatting = PropertyFormatting.ForceNewLine;
+			policy.AutoPropertyFormatting = PropertyFormatting.ForceNewLine;
 			Test(policy, 
 			     @"class Test
 {
@@ -708,6 +774,24 @@ set;
 	public int Prop {
 		get;
 		private set;
+	}
+}");
+		}
+
+		[Test]
+		public void TestSimplePropertyCorrection()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.SimplePropertyFormatting = PropertyFormatting.ForceNewLine;
+			Test(policy, 
+			     @"class Test
+{
+				public int Prop { get { ; }         private set {; } }
+}", @"class Test
+{
+	public int Prop {
+		get { ; }
+		private set { ; }
 	}
 }");
 		}
@@ -783,7 +867,7 @@ remove {
 		public void TestBug9990()
 		{
 			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
-			policy.PropertyFormatting = PropertyFormatting.ForceNewLine;
+			policy.SimplePropertyFormatting = PropertyFormatting.ForceNewLine;
 			Test(policy, 
 			     @"class Test
 {
@@ -794,5 +878,259 @@ remove {
 	public event EventHandler<UpdateFinishedEventArgs> UpdateFinished = delegate { };
 }");
 		}
+
+		[Test]
+		public void TestPropertyOneLineCorrection()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+
+			Test(policy,
+			      @"class Test
+{
+	int test { get { return test;}
+set { test = value; } }
+}",
+			      @"class Test
+{
+	int test { get { return test; } set { test = value; } }
+}");
+		}
+
+		[Test]
+		public void TestConstructorInitializer()
+		{
+			var policy = FormattingOptionsFactory.CreateMono();
+			Test(policy, @"
+class Foo
+{
+	public Foo ():         base         (0)
+	{
+	}
+}
+", @"
+class Foo
+{
+	public Foo () : base (0)
+	{
+	}
+}
+");
+		}
+		[Test]
+		public void TestConstructorInitializerCase2()
+		{
+			var policy = FormattingOptionsFactory.CreateMono();
+			Test(policy, @"
+class Foo
+{
+public Foo ()         :
+base         (0)
+{
+}
+}
+", @"
+class Foo
+{
+	public Foo () :
+		base (0)
+	{
+	}
+}
+");
+		}
+
+		[Test]
+		public void TestConstructorInitializerColonDontCare()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.NewLineAfterConstructorInitializerColon = NewLinePlacement.DoNotCare;
+			policy.NewLineBeforeConstructorInitializerColon = NewLinePlacement.DoNotCare;
+			Test(policy, @"class A
+{
+	public A ()		:			base ()
+	{
+
+	}
+
+	public A ()			: 			
+						base ()
+	{
+
+	}
+
+	public A ()
+						: 					base ()
+	{
+
+	}
+
+	public A ()				
+		     : 					
+						base ()
+	{
+
+	}
+}",
+				@"class A
+{
+	public A () : base ()
+	{
+
+	}
+
+	public A () :
+		base ()
+	{
+
+	}
+
+	public A ()
+		: base ()
+	{
+
+	}
+
+	public A ()
+		:
+		base ()
+	{
+
+	}
+}");
+		}
+
+		[Test]
+		public void TestConstructorInitializerColonNewLineBeforeSameLineAfter()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.NewLineBeforeConstructorInitializerColon = NewLinePlacement.NewLine;
+			policy.NewLineAfterConstructorInitializerColon = NewLinePlacement.SameLine;
+
+			Test(policy, @"class A
+{
+	public A ()		:			base ()
+	{
+
+	}
+
+	public A ()			: 			
+						base ()
+	{
+
+	}
+
+	public A ()
+						: 					base ()
+	{
+
+	}
+
+	public A ()				
+		     : 					
+						base ()
+	{
+
+	}
+}",
+				@"class A
+{
+	public A ()
+		: base ()
+	{
+
+	}
+
+	public A ()
+		: base ()
+	{
+
+	}
+
+	public A ()
+		: base ()
+	{
+
+	}
+
+	public A ()
+		: base ()
+	{
+
+	}
+}");
+		}
+
+		[Test]
+		public void TestIndentPreprocessorStatementsAdd()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.IndentPreprocessorDirectives = true;
+			
+			Test(policy,
+			     @"class Test
+{
+#region DEBUG
+#endregion
+}", @"class Test
+{
+	#region DEBUG
+
+	#endregion
+}");
+		}
+	
+		[Test]
+		public void TestIndentPreprocessorStatementsRemove()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+			policy.IndentPreprocessorDirectives = false;
+			
+			Test(policy,
+			     @"class Test
+{
+	#region DEBUG
+
+	#endregion
+}", @"class Test
+{
+#region DEBUG
+
+#endregion
+}");
+		}
+
+
+		[Test]
+		public void TestCollectionFieldInitializer ()
+		{
+			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono();
+
+			Test(policy, 
+@"using System.Collections.Generic;
+
+class Foo
+{
+new Dictionary<int,int> o = new Dictionary<int,int> () { 
+		{1, 2 },
+	{1, 2 },
+				{1, 2 },
+		{1, 2 }
+				}; 
+}
+", 
+@"using System.Collections.Generic;
+
+class Foo
+{
+	new Dictionary<int,int> o = new Dictionary<int,int> () { 
+		{ 1, 2 },
+		{ 1, 2 },
+		{ 1, 2 },
+		{ 1, 2 }
+	};
+}
+");
+		}
+
 	}
 }

@@ -43,7 +43,7 @@ namespace Xwt.GtkBackend
 		public override void Initialize ()
 		{
 			Window = new Gtk.Dialog ();
-			Window.VBox.PackStart (CreateMainLayout ());
+			Window.AddContent (CreateMainLayout ());
 			Window.ActionArea.Hide ();
 		}
 		
@@ -90,11 +90,11 @@ namespace Xwt.GtkBackend
 			if (!string.IsNullOrEmpty (btn.Label) && btn.Image == null) {
 				b.Label = btn.Label;
 			} else if (string.IsNullOrEmpty (btn.Label) && btn.Image != null) {
-				var pix = btn.Image.ToImageDescription ();
+				var pix = btn.Image.ToImageDescription (ApplicationContext);
 				b.Image = new ImageBox (ApplicationContext, pix);
 			} else if (!string.IsNullOrEmpty (btn.Label)) {
 				Gtk.Box box = new Gtk.HBox (false, 3);
-				var pix = btn.Image.ToImageDescription ();
+				var pix = btn.Image.ToImageDescription (ApplicationContext);
 				box.PackStart (new ImageBox (ApplicationContext, pix), false, false, 0);
 				box.PackStart (new Gtk.Label (btn.Label), true, true, 0);
 				b.Image = box;
@@ -123,13 +123,32 @@ namespace Xwt.GtkBackend
 
 		public void RunLoop (IWindowFrameBackend parent)
 		{
+			// GTK adds a border to the root widget, for some unknown reason
+			((Gtk.Container)Window.Child).BorderWidth = 0;
 			var p = (WindowFrameBackend) parent;
-			MessageService.RunCustomDialog (Window, p != null ? p.Window : null);
+
+			bool keepRunning;
+			do {
+				var res = MessageService.RunCustomDialog (Window, p != null ? p.Window : null);
+				keepRunning = false;
+				if (res == (int) Gtk.ResponseType.DeleteEvent) {
+					keepRunning = !PerformClose (false);
+				}
+			} while (keepRunning);
 		}
 
 		public void EndLoop ()
 		{
 			Window.Respond (Gtk.ResponseType.Ok);
+		}
+
+		public override bool Close ()
+		{
+			if (PerformClose (false)) {
+				Window.Respond (Gtk.ResponseType.Ok);
+				return true;
+			} else
+				return false;
 		}
 
 		public override void GetMetrics (out Size minSize, out Size decorationSize)

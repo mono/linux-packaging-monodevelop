@@ -1,6 +1,5 @@
 using System;
 using Mono.Debugging.Backend;
-using System.Collections.Generic;
 
 namespace Mono.Debugging.Client
 {
@@ -39,19 +38,21 @@ namespace Mono.Debugging.Client
 			: this (address, addressSpace, location, language, isExternalCode, hasDebugInfo, false, fullModuleName, fullTypeName)
 		{
 		}
-		
+
+		[Obsolete]
 		public StackFrame (long address, string addressSpace, SourceLocation location, string language)
 			: this (address, addressSpace, location, language, string.IsNullOrEmpty (location.FileName), true, "", "")
 		{
 		}
 
+		[Obsolete]
 		public StackFrame (long address, string addressSpace, string module, string method, string filename, int line, string language)
 			: this (address, addressSpace, new SourceLocation (method, filename, line), language)
 		{
 		}
 
 		public StackFrame (long address, SourceLocation location, string language, bool isExternalCode, bool hasDebugInfo)
-			: this (address, "", location, language, string.IsNullOrEmpty (location.FileName), true, "", "")
+			: this (address, "", location, language, string.IsNullOrEmpty (location.FileName) || isExternalCode, hasDebugInfo, "", "")
 		{
 		}
 		
@@ -60,22 +61,20 @@ namespace Mono.Debugging.Client
 		{
 		}
 
-		internal void Attach (DebuggerSession session)
+		internal void Attach (DebuggerSession debugSession)
 		{
-			this.session = session;
+			session = debugSession;
 		}
 		
 		public DebuggerSession DebuggerSession {
 			get { return session; }
 		}
 		
-		public SourceLocation SourceLocation
-		{
+		public SourceLocation SourceLocation {
 			get { return location; }
 		}
 
-		public long Address
-		{
+		public long Address {
 			get { return address; }
 		}
 		
@@ -88,15 +87,13 @@ namespace Mono.Debugging.Client
 			set { sourceBacktrace = value; }
 		}
 
-		internal int Index {
+		public int Index {
 			get { return index; }
-			set { index = value; }
+			internal set { index = value; }
 		}
 
 		public string Language {
-			get {
-				return language;
-			}
+			get { return language; }
 		}
 		
 		public bool IsExternalCode {
@@ -108,15 +105,15 @@ namespace Mono.Debugging.Client
 		}
 		
 		public bool HasDebugInfo {
-			get { return this.hasDebugInfo; }
+			get { return hasDebugInfo; }
 		}
 		
 		public string FullModuleName {
-			get { return this.fullModuleName; }
+			get { return fullModuleName; }
 		}
 		
 		public string FullTypeName {
-			get { return this.fullTypeName; }
+			get { return fullTypeName; }
 		}
 		
 		public ObjectValue[] GetLocalVariables ()
@@ -128,7 +125,8 @@ namespace Mono.Debugging.Client
 		{
 			if (!hasDebugInfo)
 				return new ObjectValue [0];
-			ObjectValue[] values = sourceBacktrace.GetLocalVariables (index, options);
+
+			var values = sourceBacktrace.GetLocalVariables (index, options);
 			ObjectValue.ConnectCallbacks (this, values);
 			return values;
 		}
@@ -142,7 +140,8 @@ namespace Mono.Debugging.Client
 		{
 			if (!hasDebugInfo)
 				return new ObjectValue [0];
-			ObjectValue[] values = sourceBacktrace.GetParameters (index, options);
+
+			var values = sourceBacktrace.GetParameters (index, options);
 			ObjectValue.ConnectCallbacks (this, values);
 			return values;
 		}
@@ -151,17 +150,18 @@ namespace Mono.Debugging.Client
 		{
 			if (!hasDebugInfo)
 				return new ObjectValue [0];
-			IExpressionEvaluator evaluator = session.FindExpressionEvaluator (this);
-			if (evaluator != null)
-				return evaluator.GetLocals (this);
-			return GetAllLocals (session.EvaluationOptions);
+
+			var evaluator = session.FindExpressionEvaluator (this);
+
+			return evaluator != null ? evaluator.GetLocals (this) : GetAllLocals (session.EvaluationOptions);
 		}
 		
 		public ObjectValue[] GetAllLocals (EvaluationOptions options)
 		{
 			if (!hasDebugInfo)
 				return new ObjectValue [0];
-			ObjectValue[] values = sourceBacktrace.GetAllLocals (index, options);
+
+			var values = sourceBacktrace.GetAllLocals (index, options);
 			ObjectValue.ConnectCallbacks (this, values);
 			return values;
 		}
@@ -175,9 +175,11 @@ namespace Mono.Debugging.Client
 		{
 			if (!hasDebugInfo)
 				return null;
-			ObjectValue value = sourceBacktrace.GetThisReference (index, options);
+
+			var value = sourceBacktrace.GetThisReference (index, options);
 			if (value != null)
 				ObjectValue.ConnectCallbacks (this, value);
+
 			return value;
 		}
 		
@@ -190,9 +192,11 @@ namespace Mono.Debugging.Client
 		{
 			if (!hasDebugInfo)
 				return null;
-			ExceptionInfo value = sourceBacktrace.GetException (index, options);
+
+			var value = sourceBacktrace.GetException (index, options);
 			if (value != null)
 				value.ConnectCallback (this);
+
 			return value;
 		}
 		
@@ -203,7 +207,7 @@ namespace Mono.Debugging.Client
 		
 		public ObjectValue[] GetExpressionValues (string[] expressions, bool evaluateMethods)
 		{
-			EvaluationOptions options = session.EvaluationOptions.Clone ();
+			var options = session.EvaluationOptions.Clone ();
 			options.AllowMethodEvaluation = evaluateMethods;
 			return GetExpressionValues (expressions, options);
 		}
@@ -211,25 +215,29 @@ namespace Mono.Debugging.Client
 		public ObjectValue[] GetExpressionValues (string[] expressions, EvaluationOptions options)
 		{
 			if (!hasDebugInfo) {
-				ObjectValue[] vals = new ObjectValue [expressions.Length];
-				for (int n=0; n<expressions.Length; n++)
-					vals [n] = ObjectValue.CreateUnknown (expressions [n]);
+				var vals = new ObjectValue [expressions.Length];
+				for (int n = 0; n < expressions.Length; n++)
+					vals[n] = ObjectValue.CreateUnknown (expressions[n]);
+
 				return vals;
 			}
+
 			if (options.UseExternalTypeResolver) {
-				string[] resolved = new string [expressions.Length];
-				for (int n=0; n<expressions.Length; n++)
-					resolved [n] = ResolveExpression (expressions [n]);
+				var resolved = new string [expressions.Length];
+				for (int n = 0; n < expressions.Length; n++)
+					resolved[n] = ResolveExpression (expressions[n]);
+
 				expressions = resolved;
 			}
-			ObjectValue[] values = sourceBacktrace.GetExpressionValues (index, expressions, options);
+
+			var values = sourceBacktrace.GetExpressionValues (index, expressions, options);
 			ObjectValue.ConnectCallbacks (this, values);
 			return values;
 		}
-		
+
 		public ObjectValue GetExpressionValue (string expression, bool evaluateMethods)
 		{
-			EvaluationOptions options = session.EvaluationOptions.Clone ();
+			var options = session.EvaluationOptions.Clone ();
 			options.AllowMethodEvaluation = evaluateMethods;
 			return GetExpressionValue (expression, options);
 		}
@@ -238,9 +246,11 @@ namespace Mono.Debugging.Client
 		{
 			if (!hasDebugInfo)
 				return ObjectValue.CreateUnknown (expression);
+
 			if (options.UseExternalTypeResolver)
 				expression = ResolveExpression (expression);
-			ObjectValue[] values = sourceBacktrace.GetExpressionValues (index, new string[] { expression }, options);
+
+			var values = sourceBacktrace.GetExpressionValues (index, new [] { expression }, options);
 			ObjectValue.ConnectCallbacks (this, values);
 			return values [0];
 		}
@@ -260,14 +270,13 @@ namespace Mono.Debugging.Client
 		{
 			if (options.UseExternalTypeResolver)
 				expression = ResolveExpression (expression);
+
 			return sourceBacktrace.ValidateExpression (index, expression, options);
 		}
 		
 		public CompletionData GetExpressionCompletionData (string exp)
 		{
-			if (!hasDebugInfo)
-				return null;
-			return sourceBacktrace.GetExpressionCompletionData (index, exp);
+			return hasDebugInfo ? sourceBacktrace.GetExpressionCompletionData (index, exp) : null;
 		}
 		
 		// Returns disassembled code for this stack frame.
@@ -280,21 +289,26 @@ namespace Mono.Debugging.Client
 		public override string ToString()
 		{
 			string loc;
-			if (location.Line != -1 && !string.IsNullOrEmpty (location.FileName))
+
+			if (location.Line != -1 && !string.IsNullOrEmpty (location.FileName)) {
 				loc = " at " + location.FileName + ":" + location.Line;
-			else if (!string.IsNullOrEmpty (location.FileName))
+				if (location.Column != 0)
+					loc += "," + location.Column;
+			} else if (!string.IsNullOrEmpty (location.FileName)) {
 				loc = " at " + location.FileName;
-			else
-				loc = "";
-			return String.Format("0x{0:X} in {1}{2}", address, location.MethodName, loc);
+			} else {
+				loc = string.Empty;
+			}
+
+			return string.Format ("0x{0:X} in {1}{2}", address, location.MethodName, loc);
 		}
 	}
 	
 	[Serializable]
 	public struct ValidationResult
 	{
-		bool isValid;
-		string message;
+		readonly string message;
+		readonly bool isValid;
 		
 		public ValidationResult (bool isValid, string message)
 		{

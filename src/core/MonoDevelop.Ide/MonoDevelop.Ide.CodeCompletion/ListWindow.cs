@@ -64,7 +64,16 @@ namespace MonoDevelop.Ide.CodeCompletion
 		public CompletionTextEditorExtension Extension {
 			get;
 			set;
-		}		
+		}
+
+		public CompletionCharacters CompletionCharacters {
+			get {
+				var ext = Extension;
+				if (ext == null) // May happen in unit tests.
+					return MonoDevelop.Ide.CodeCompletion.CompletionCharacters.FallbackCompletionCharacters;
+				return MonoDevelop.Ide.CodeCompletion.CompletionCharacters.Get (ext.CompletionLanguage);
+			}
+		}
 		
 		public List<int> FilteredItems {
 			get {
@@ -305,12 +314,13 @@ namespace MonoDevelop.Ide.CodeCompletion
 				if (keyChar == '.')
 					list.AutoSelect = list.AutoCompleteEmptyMatch = true;
 				lastCommitCharEndoffset = CompletionWidget.CaretOffset - 1;
-				if (list.SelectionEnabled) {
+
+				if (list.SelectionEnabled && CompletionCharacters.CompleteOn (keyChar)) {
 					if (keyChar == '{' && !list.AutoCompleteEmptyMatchOnCurlyBrace && string.IsNullOrEmpty (list.CompletionString))
 					    return KeyActions.CloseWindow | KeyActions.Process;
 					return KeyActions.Complete | KeyActions.Process | KeyActions.CloseWindow;
 				}
-			    return KeyActions.CloseWindow | KeyActions.Process;
+				return KeyActions.CloseWindow | KeyActions.Process;
 			}
 			
 			return KeyActions.Process;
@@ -435,9 +445,18 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 			// special case end with punctuation like 'param:' -> don't input double punctuation, otherwise we would end up with 'param::'
 			if (char.IsPunctuation (keyChar) && keyChar != '_') {
-				foreach (var item in FilteredItems) {
-					if (DataProvider.GetText (item).EndsWith (keyChar.ToString (), StringComparison.Ordinal)) {
-						list.SelectedItem = item;
+				if (keyChar == ':') {
+					foreach (var item in FilteredItems) {
+						if (DataProvider.GetText (item).EndsWith (keyChar.ToString (), StringComparison.Ordinal)) {
+							list.SelectedItem = item;
+							return KeyActions.Complete | KeyActions.CloseWindow | KeyActions.Ignore;
+						}
+					}
+				} else {
+					var selectedItem = list.SelectedItem;
+					if (selectedItem < 0 || selectedItem >= DataProvider.ItemCount)
+						return KeyActions.CloseWindow;
+					if (DataProvider.GetText (selectedItem).EndsWith (keyChar.ToString (), StringComparison.Ordinal)) {
 						return KeyActions.Complete | KeyActions.CloseWindow | KeyActions.Ignore;
 					}
 				}
@@ -681,7 +700,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 		string GetCompletionText (int n);
 		string GetDescription (int n, bool isSelected);
 		string GetRightSideDescription (int n, bool isSelected);
-		Gdk.Pixbuf GetIcon (int n);
+		Xwt.Drawing.Image GetIcon (int n);
 		int CompareTo (int n, int m);
 	}
 }

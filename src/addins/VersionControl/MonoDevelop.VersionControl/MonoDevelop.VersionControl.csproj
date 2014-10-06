@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{19DE0F35-D204-4FD8-A553-A19ECE05E24D}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -20,9 +20,12 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DefineConstants>DEBUG</DefineConstants>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\..\build\AddIns\VersionControl\MonoDevelop.VersionControl.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>True</Optimize>
     <OutputPath>..\..\..\..\build\AddIns\VersionControl\</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -30,6 +33,9 @@
     <Execution>
       <Execution clr-version="Net_2_0" />
     </Execution>
+    <DebugSymbols>true</DebugSymbols>
+    <NoWarn>1591;1573</NoWarn>
+    <DocumentationFile>..\..\..\..\build\AddIns\VersionControl\MonoDevelop.VersionControl.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\core\MonoDevelop.Core\MonoDevelop.Core.csproj">
@@ -77,6 +83,11 @@
       <Name>Mono.Debugging</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\..\external\xwt\Xwt\Xwt.csproj">
+      <Project>{92494904-35FA-4DC9-BDE9-3A3E87AC49D3}</Project>
+      <Name>Xwt</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Data" />
@@ -102,41 +113,74 @@
     <Reference Include="Mono.Cairo" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="overlay_added.png">
-      <LogicalName>overlay_added.png</LogicalName>
+    <EmbeddedResource Include="icons\light\added-overlay-16.png">
+      <LogicalName>added-overlay-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="overlay_modified.png">
-      <LogicalName>overlay_modified.png</LogicalName>
+    <EmbeddedResource Include="icons\light\added-overlay-16%402x.png">
+      <LogicalName>added-overlay-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="overlay_conflicted.png">
-      <LogicalName>overlay_conflicted.png</LogicalName>
+    <EmbeddedResource Include="icons\light\modified-overlay-16.png">
+      <LogicalName>modified-overlay-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="overlay_normal.png">
-      <LogicalName>overlay_normal.png</LogicalName>
+    <EmbeddedResource Include="icons\light\modified-overlay-16%402x.png">
+      <LogicalName>modified-overlay-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="overlay_locked.png">
-      <LogicalName>overlay_locked.png</LogicalName>
+    <EmbeddedResource Include="icons\light\conflict-overlay-16.png">
+      <LogicalName>conflict-overlay-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\conflict-overlay-16%402x.png">
+      <LogicalName>conflict-overlay-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\locked-overlay-16.png">
+      <LogicalName>locked-overlay-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\locked-overlay-16%402x.png">
+      <LogicalName>locked-overlay-light-16@2x.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="VersionControl.addin.xml">
       <LogicalName>VersionControl.addin.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="overlay_removed.png">
-      <LogicalName>overlay_removed.png</LogicalName>
+    <EmbeddedResource Include="icons\light\removed-overlay-16.png">
+      <LogicalName>removed-overlay-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="repository.png">
-      <LogicalName>repository.png</LogicalName>
+    <EmbeddedResource Include="icons\light\removed-overlay-16%402x.png">
+      <LogicalName>removed-overlay-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="overlay_controled.png">
-      <LogicalName>overlay_controled.png</LogicalName>
+    <EmbeddedResource Include="icons\light\ignored-overlay-16.png">
+      <LogicalName>ignored-overlay-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="overlay_unversioned.png">
-      <LogicalName>overlay_unversioned.png</LogicalName>
+    <EmbeddedResource Include="icons\light\ignored-overlay-16%402x.png">
+      <LogicalName>ignored-overlay-light-16@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="overlay_lock_required.png">
-      <LogicalName>overlay_lock_required.png</LogicalName>
+    <EmbeddedResource Include="icons\light\repository-16.png">
+      <LogicalName>repository-light-16.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="overlay_unlocked.png">
-      <LogicalName>overlay_unlocked.png</LogicalName>
+    <EmbeddedResource Include="icons\light\repository-16%402x.png">
+      <LogicalName>repository-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\versioned-overlay-16.png">
+      <LogicalName>versioned-overlay-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\versioned-overlay-16%402x.png">
+      <LogicalName>versioned-overlay-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\unversioned-overlay-16.png">
+      <LogicalName>unversioned-overlay-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\unversioned-overlay-16%402x.png">
+      <LogicalName>unversioned-overlay-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\lock-required-overlay-16.png">
+      <LogicalName>lock-required-overlay-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\lock-required-overlay-16%402x.png">
+      <LogicalName>lock-required-overlay-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\unlocked-overlay-16.png">
+      <LogicalName>unlocked-overlay-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\unlocked-overlay-16%402x.png">
+      <LogicalName>unlocked-overlay-light-16@2x.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="Policies.xml">
       <LogicalName>Policies.xml</LogicalName>
@@ -144,8 +188,125 @@
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="version-control-16.png">
-      <LogicalName>version-control-16.png</LogicalName>
+    <EmbeddedResource Include="icons\light\version-control-16.png">
+      <LogicalName>version-control-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\version-control-16%402x.png">
+      <LogicalName>version-control-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\log-16.png">
+      <LogicalName>log-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\log-16%402x.png">
+      <LogicalName>log-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\diff-16.png">
+      <LogicalName>diff-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\diff-16%402x.png">
+      <LogicalName>diff-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\pull-16.png">
+      <LogicalName>pull-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\pull-16%402x.png">
+      <LogicalName>pull-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\push-16.png">
+      <LogicalName>push-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\push-16%402x.png">
+      <LogicalName>push-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\refresh-16.png">
+      <LogicalName>refresh-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\refresh-16%402x.png">
+      <LogicalName>refresh-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\local-status-16.png">
+      <LogicalName>local-status-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\local-status-16%402x.png">
+      <LogicalName>local-status-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\commit-16.png">
+      <LogicalName>commit-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\commit-16%402x.png">
+      <LogicalName>commit-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\remote-status-16.png">
+      <LogicalName>remote-status-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\remote-status-16%402x.png">
+      <LogicalName>remote-status-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\vcs-added-16.png">
+      <LogicalName>vcs-added-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\vcs-added-16%402x.png">
+      <LogicalName>vcs-added-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\vcs-removed-16.png">
+      <LogicalName>vcs-removed-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\vcs-removed-16%402x.png">
+      <LogicalName>vcs-removed-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\vcs-conflicted-16.png">
+      <LogicalName>vcs-conflicted-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\vcs-conflicted-16%402x.png">
+      <LogicalName>vcs-conflicted-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\vcs-modified-16.png">
+      <LogicalName>vcs-modified-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\vcs-modified-16%402x.png">
+      <LogicalName>vcs-modified-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\comment-16.png">
+      <LogicalName>comment-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\comment-16%402x.png">
+      <LogicalName>comment-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\revert-16.png">
+      <LogicalName>revert-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\revert-16%402x.png">
+      <LogicalName>revert-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\branch-16.png">
+      <LogicalName>branch-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\branch-16%402x.png">
+      <LogicalName>branch-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\tag-16.png">
+      <LogicalName>tag-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\tag-16%402x.png">
+      <LogicalName>tag-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-git-16.png">
+      <LogicalName>prefs-git-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-git-16%402x.png">
+      <LogicalName>prefs-git-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-commit-message-style-16.png">
+      <LogicalName>prefs-commit-message-style-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-commit-message-style-16%402x.png">
+      <LogicalName>prefs-commit-message-style-light-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-version-control-general-16.png">
+      <LogicalName>prefs-version-control-general-light-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\light\prefs-version-control-general-16%402x.png">
+      <LogicalName>prefs-version-control-general-light-16@2x.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -153,12 +314,10 @@
     <Compile Include="MonoDevelop.VersionControl.Views\CellRendererDiff.cs" />
     <Compile Include="MonoDevelop.VersionControl.Views\LogView.cs" />
     <Compile Include="MonoDevelop.VersionControl.Views\StatusView.cs" />
-    <Compile Include="MonoDevelop.VersionControl.Views\AnnotateView.cs" />
     <Compile Include="MonoDevelop.VersionControl.Dialogs\CommitDialog.cs" />
     <Compile Include="MonoDevelop.VersionControl.Dialogs\EditRepositoryDialog.cs" />
     <Compile Include="MonoDevelop.VersionControl.Dialogs\SelectRepositoryDialog.cs" />
     <Compile Include="MonoDevelop.VersionControl\AddRemoveMoveCommand.cs" />
-    <Compile Include="MonoDevelop.VersionControl\AnnotateCommand.cs" />
     <Compile Include="MonoDevelop.VersionControl\BaseView.cs" />
     <Compile Include="MonoDevelop.VersionControl\ChangeSet.cs" />
     <Compile Include="MonoDevelop.VersionControl\CheckoutCommand.cs" />
@@ -231,44 +390,14 @@
     <Compile Include="MonoDevelop.VersionControl\BlameCommand.cs" />
     <Compile Include="MonoDevelop.VersionControl\VersionInfoCache.cs" />
     <Compile Include="MonoDevelop.VersionControl\IgnoreCommand.cs" />
+    <Compile Include="MonoDevelop.VersionControl\ResolveConflictsCommand.cs" />
+    <Compile Include="MonoDevelop.VersionControl.Dialogs\VersionControlGeneralOptionsPanel.cs" />
+    <Compile Include="MonoDevelop.VersionControl.Dialogs\VersionControlSolutionOptionsPanel.cs" />
+    <Compile Include="AddinInfo.cs" />
+    <Compile Include="MonoDevelop.VersionControl\VersionControlException.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile.am" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <ItemGroup>
-    <Content Include="menu_log.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu_diff.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu_update.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu_status.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu_commit.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu_remote_status.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu_add.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu_remove.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu_resolve.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="comment.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu_revert.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
 </Project>

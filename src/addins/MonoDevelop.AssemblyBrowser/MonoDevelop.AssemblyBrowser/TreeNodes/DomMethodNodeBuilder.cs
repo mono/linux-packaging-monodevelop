@@ -73,21 +73,21 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			return "<span foreground= \"#666666\">" + label + "</span>";	
 		}
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			var method = (IUnresolvedMethod)dataObject;
 			var dt = new DefaultResolvedTypeDefinition (GetContext (treeBuilder), method.DeclaringTypeDefinition);
 			var resolved = (DefaultResolvedMethod)Resolve (treeBuilder, method, dt);
 			try {
-				label = Ambience.GetString (resolved, OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup | OutputFlags.CompletionListFomat);
+				nodeInfo.Label = Ambience.GetString (resolved, OutputFlags.ClassBrowserEntries | OutputFlags.IncludeMarkup | OutputFlags.CompletionListFomat);
 			} catch (Exception) {
-				label = method.Name;
+				nodeInfo.Label = method.Name;
 			}
 
 			if (method.IsPrivate || method.IsInternal)
-				label = DomMethodNodeBuilder.FormatPrivate (label);
+				nodeInfo.Label = DomMethodNodeBuilder.FormatPrivate (nodeInfo.Label);
 			
-			icon = ImageService.GetPixbuf (resolved.GetStockIcon (), Gtk.IconSize.Menu);
+			nodeInfo.Icon = Context.GetIcon (resolved.GetStockIcon ());
 		}
 		
 		#region IAssemblyBrowserNodeBuilder
@@ -123,15 +123,7 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			var types = DesktopService.GetMimeTypeInheritanceChain (data.Document.MimeType);
 			var codePolicy = MonoDevelop.Projects.Policies.PolicyService.GetDefaultPolicy<MonoDevelop.CSharp.Formatting.CSharpFormattingPolicy> (types);
-			DecompilerSettings settings = new DecompilerSettings () {
-				AnonymousMethods = true,
-				AutomaticEvents  = true,
-				AutomaticProperties = true,
-				ForEachStatement = true,
-				LockStatement = true,
-				ShowXmlDocumentation = true,
-				CSharpFormattingOptions = codePolicy.CreateOptions ()
-			};
+			var settings = DomTypeNodeBuilder.CreateDecompilerSettings (false, codePolicy);
 			return Decompile (data, module, currentType, setData, settings);
 		}
 
@@ -153,7 +145,7 @@ namespace MonoDevelop.AssemblyBrowser
 				setData (astBuilder);
 				
 				astBuilder.RunTransformations (o => false);
-				GeneratedCodeSettings.Default.Apply (astBuilder.CompilationUnit);
+				GeneratedCodeSettings.Default.Apply (astBuilder.SyntaxTree);
 				var output = new ColoredCSharpFormatter (data.Document);
 				astBuilder.GenerateCode (output);
 				output.SetDocumentData ();

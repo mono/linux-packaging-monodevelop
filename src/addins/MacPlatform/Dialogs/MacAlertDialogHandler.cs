@@ -36,6 +36,7 @@ using MonoDevelop.Ide;
 using MonoDevelop.Ide.Extensions;
 using MonoDevelop.Components.Extensions;
 using MonoDevelop.MacInterop;
+using MonoDevelop.Components;
 	
 namespace MonoDevelop.MacIntegration
 {
@@ -46,17 +47,21 @@ namespace MonoDevelop.MacIntegration
 			using (var alert = new NSAlert ()) {
 				alert.Window.Title = data.Title ?? BrandingService.ApplicationName;
 
-				if (data.Message.Icon == MonoDevelop.Ide.Gui.Stock.Information) {
+				bool stockIcon = false;
+				if (data.Message.Icon == MonoDevelop.Ide.Gui.Stock.Error || data.Message.Icon == Gtk.Stock.DialogError) {
 					alert.AlertStyle = NSAlertStyle.Critical;
-				} else if (data.Message.Icon == MonoDevelop.Ide.Gui.Stock.Warning) {
-					alert.AlertStyle = NSAlertStyle.Warning;
-				} else { //if (data.Message.Icon == MonoDevelop.Ide.Gui.Stock.Information) {
+					stockIcon = true;
+				} else if (data.Message.Icon == MonoDevelop.Ide.Gui.Stock.Warning || data.Message.Icon == Gtk.Stock.DialogWarning) {
+					alert.AlertStyle = NSAlertStyle.Critical;
+					stockIcon = true;
+				} else {
 					alert.AlertStyle = NSAlertStyle.Informational;
+					stockIcon = data.Message.Icon == MonoDevelop.Ide.Gui.Stock.Information;
 				}
 				
 				//FIXME: use correct size so we don't get horrible scaling?
-				if (!string.IsNullOrEmpty (data.Message.Icon)) {
-					var pix = ImageService.GetPixbuf (data.Message.Icon, Gtk.IconSize.Dialog);
+				if (!stockIcon && !string.IsNullOrEmpty (data.Message.Icon)) {
+					var pix = ImageService.GetIcon (data.Message.Icon, Gtk.IconSize.Dialog).ToPixbuf();
 					byte[] buf = pix.SaveToBuffer ("tiff");
 					unsafe {
 						fixed (byte* b = buf) {
@@ -67,7 +72,7 @@ namespace MonoDevelop.MacIntegration
 					//for some reason the NSAlert doesn't pick up the app icon by default
 					alert.Icon = NSApplication.SharedApplication.ApplicationIconImage;
 				}
-				
+
 				alert.MessageText = data.Message.Text;
 				alert.InformativeText = data.Message.SecondaryText ?? "";
 				

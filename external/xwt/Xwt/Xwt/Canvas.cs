@@ -30,6 +30,7 @@ using Xwt.Backends;
 using Xwt.Drawing;
 using System.Windows.Markup;
 using System.ComponentModel;
+using System.Linq;
 
 namespace Xwt
 {
@@ -61,7 +62,7 @@ namespace Xwt
 		/// <summary>
 		/// Adds a child widget.
 		/// </summary>
-		/// <param name='widget'>
+		/// <param name='w'>
 		/// The widget
 		/// </param>
 		/// <remarks>
@@ -115,8 +116,8 @@ namespace Xwt
 			
 			positions [widget] = bounds;
 			var bk = (IWidgetBackend)Widget.GetBackend (widget);
-			Backend.AddChild (bk, bounds);
 			RegisterChild (widget);
+			Backend.AddChild (bk, bounds);
 		}
 		
 		/// <summary>
@@ -128,12 +129,9 @@ namespace Xwt
 		/// <exception cref="System.ArgumentException">If the widget is not a child of this canvas</exception>
 		public void RemoveChild (Widget widget)
 		{
-			if (positions == null || widget.Parent != this)
-				throw new ArgumentException ("Widget is not a child of the canvas");
-			
+			UnregisterChild (widget);
 			positions.Remove (widget);
 			Backend.RemoveChild ((IWidgetBackend)Widget.GetBackend (widget));
-			UnregisterChild (widget);
 		}
 		
 		/// <summary>
@@ -148,7 +146,7 @@ namespace Xwt
 		/// <exception cref="System.ArgumentException">If the widget is not a child of this canvas</exception>
 		public void SetChildBounds (Widget widget, Rectangle bounds)
 		{
-			if (positions == null || widget.Parent != this)
+			if (positions == null || !positions.ContainsKey (widget))
 				throw new ArgumentException ("Widget is not a child of the canvas");
 			
 			positions [widget] = bounds;
@@ -178,11 +176,18 @@ namespace Xwt
 		public Rectangle GetChildBounds (Widget widget)
 		{
 			Rectangle rect;
-			if (positions == null || widget.Parent != this)
-				throw new ArgumentException ("Widget is not a child of the canvas");
-			if (positions.TryGetValue (widget, out rect))
+			if (positions != null && positions.TryGetValue (widget, out rect))
 				return rect;
-			return Rectangle.Zero;
+			throw new ArgumentException ("Widget is not a child of the canvas");
+		}
+
+		/// <summary>
+		/// Removes all children of the Canvas
+		/// </summary>
+		public void Clear ()
+		{
+			foreach (var c in Children.ToArray ())
+				RemoveChild (c);
 		}
 		
 		protected override BackendHost CreateBackendHost ()

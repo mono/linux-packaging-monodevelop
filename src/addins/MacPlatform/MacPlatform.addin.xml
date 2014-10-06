@@ -1,23 +1,10 @@
-<Addin id          = "MacPlatform"
-       namespace   = "MonoDevelop"
-       name        = "MonoDevelop Mac Platform Support"
-       author      = "Geoff Norton, Michael Hutchinson"
-       copyright   = "MIT X11"
-       url         = "http://monodevelop.com/"
-       description = "Mac Platform Support for MonoDevelop"
-       category    = "Platform Support"
-       flags       = "Hidden"
-       version     = "4.0.12">
+<ExtensionModel>
 	
 	<Runtime>
 		<Import assembly="MonoMac.dll" />
 		<ScanExclude path="MonoMac.dll" />
 	</Runtime>
 
-	<Dependencies>
-	    <Addin id="Ide" version="4.0.12"/>
-	</Dependencies>
-	
 	<Extension path = "/MonoDevelop/Core/PlatformService">
 		<Condition id = "Platform" value = "mac">
 			<Class id      = "PlatformService"
@@ -40,8 +27,12 @@
 			<Command id  = "MonoDevelop.MacIntegration.MacIntegrationCommands.HideOthers"
 					defaultHandler = "MonoDevelop.MacIntegration.MacHideOthersHandler"
 					_label = "_Hide Others"
-					_description = "Hide other windows"
+					_description = "Hide other applications' windows"
 					macShortcut = "Meta|Alt|H" />
+			<Command id  = "MonoDevelop.MacIntegration.MacIntegrationCommands.ShowOthers"
+					defaultHandler = "MonoDevelop.MacIntegration.MacShowOthersHandler"
+					_label = "Show All"
+					_description = "Show all applications' windows" />
 		</Condition>
 	</Extension>
 	
@@ -63,6 +54,7 @@
 			<SeparatorItem id = "HideSeparator" insertbefore="QuitSeparator" />
 			<CommandItem id = "MonoDevelop.MacIntegration.MacIntegrationCommands.HideWindow" />
 			<CommandItem id = "MonoDevelop.MacIntegration.MacIntegrationCommands.HideOthers" />
+			<CommandItem id = "MonoDevelop.MacIntegration.MacIntegrationCommands.ShowOthers" />
 		</Condition>
 	</Extension>
 	
@@ -75,4 +67,12 @@
 			<Class class="MonoDevelop.MacIntegration.MacExceptionDialogHandler" />
 		</Condition>
 	</Extension>
-</Addin>
+
+	<Extension path = "/MonoDevelop/Core/PasswordProvider">
+		<Class class = "MonoDevelop.MacIntegration.MacKeychainPasswordProvider" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/Core/WebCredentialProviders">
+		<Class class = "MonoDevelop.MacIntegration.MacProxyCredentialProvider" />
+	</Extension>
+</ExtensionModel>

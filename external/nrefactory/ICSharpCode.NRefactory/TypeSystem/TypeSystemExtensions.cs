@@ -42,6 +42,8 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		/// </remarks>
 		public static IEnumerable<IType> GetAllBaseTypes(this IType type)
 		{
+			if (type == null)
+				throw new ArgumentNullException("type");
 			BaseTypeCollector collector = new BaseTypeCollector();
 			collector.CollectBaseTypes(type);
 			return collector;
@@ -57,6 +59,8 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		/// </remarks>
 		public static IEnumerable<IType> GetNonInterfaceBaseTypes(this IType type)
 		{
+			if (type == null)
+				throw new ArgumentNullException("type");
 			BaseTypeCollector collector = new BaseTypeCollector();
 			collector.SkipImplementedInterfaces = true;
 			collector.CollectBaseTypes(type);
@@ -237,16 +241,7 @@ namespace ICSharpCode.NRefactory.TypeSystem
 						);
 					}
 				case SymbolKind.Namespace:
-					INamespace ns = (INamespace)symbol;
-					if (ns.ParentNamespace == null) {
-						return compilation.RootNamespace;
-					} else {
-						INamespace importedParent = Import(compilation, ns.ParentNamespace);
-						if (importedParent != null)
-							return importedParent.GetChildNamespace(ns.Name);
-						else
-							return null;
-					}
+					return Import(compilation, (INamespace)symbol);
 				default:
 					if (symbol is IEntity)
 						return Import(compilation, (IEntity)symbol);
@@ -301,7 +296,7 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			if (entity.Compilation == compilation)
 				return entity;
 			if (entity is IMember)
-				return ((IMember)entity).ToMemberReference().Resolve(compilation.TypeResolveContext);
+				return ((IMember)entity).ToReference().Resolve(compilation.TypeResolveContext);
 			else if (entity is ITypeDefinition)
 				return ((ITypeDefinition)entity).ToTypeReference().Resolve(compilation.TypeResolveContext).GetDefinition();
 			else
@@ -319,7 +314,7 @@ namespace ICSharpCode.NRefactory.TypeSystem
 				return null;
 			if (member.Compilation == compilation)
 				return member;
-			return member.ToMemberReference().Resolve(compilation.TypeResolveContext);
+			return member.ToReference().Resolve(compilation.TypeResolveContext);
 		}
 		
 		/// <summary>
@@ -429,6 +424,15 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		{
 			return compilation.Assemblies.SelectMany(a => a.GetAllTypeDefinitions());
 		}
+
+		/// <summary>
+		/// Gets all top level type definitions in the compilation.
+		/// This may include types from referenced assemblies that are not accessible in the main assembly.
+		/// </summary>
+		public static IEnumerable<ITypeDefinition> GetTopLevelTypeDefinitons (this ICompilation compilation)
+		{
+			return compilation.Assemblies.SelectMany(a => a.TopLevelTypeDefinitions);
+		}
 		
 		/// <summary>
 		/// Gets the type (potentially a nested type) defined at the specified location.
@@ -507,6 +511,8 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		#region GetSubTypeDefinitions
 		public static IEnumerable<ITypeDefinition> GetSubTypeDefinitions (this IType baseType)
 		{
+			if (baseType == null)
+				throw new ArgumentNullException ("baseType");
 			var def = baseType.GetDefinition ();
 			if (def == null)
 				return Enumerable.Empty<ITypeDefinition> ();
@@ -518,6 +524,8 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		/// </summary>
 		public static IEnumerable<ITypeDefinition> GetSubTypeDefinitions (this ITypeDefinition baseType)
 		{
+			if (baseType == null)
+				throw new ArgumentNullException ("baseType");
 			foreach (var contextType in baseType.Compilation.GetAllTypeDefinitions ()) {
 				if (contextType.IsDerivedFrom (baseType))
 					yield return contextType;
@@ -686,6 +694,26 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			                     	return typeDef != null && typeDef.FullTypeName == attributeType;
 			                     }, inherit);
 		}
+
+		/// <summary>
+		/// Gets the attribute of the specified attribute type (or derived attribute types).
+		/// </summary>
+		/// <param name="entity">The entity on which the attributes are declared.</param>
+		/// <param name="inherit">
+		/// Specifies whether attributes inherited from base classes and base members (if the given <paramref name="entity"/> in an <c>override</c>)
+		/// should be returned. The default is <c>true</c>.
+		/// </param>
+		/// <returns>
+		/// Returns the attribute that was found; or <c>null</c> if none was found.
+		/// If inherit is true, an from the entity itself will be returned if possible;
+		/// and the base entity will only be searched if none exists.
+		/// </returns>
+		public static IEnumerable<IAttribute> GetAttributes(this IEntity entity, bool inherit = true)
+		{
+			if (entity == null)
+				throw new ArgumentNullException ("entity");
+			return GetAttributes(entity, a => true, inherit);
+		}
 		
 		static IEnumerable<IAttribute> GetAttributes(IEntity entity, Predicate<IType> attributeTypePredicate, bool inherit)
 		{
@@ -739,6 +767,21 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			if (assembly == null)
 				throw new ArgumentNullException ("assembly");
 			return assembly.GetTypeDefinition (new TopLevelTypeName (namespaceName, name, typeParameterCount));
+		}
+		#endregion
+		
+		#region ResolveResult
+		public static ISymbol GetSymbol(this ResolveResult rr)
+		{
+			if (rr is LocalResolveResult) {
+				return ((LocalResolveResult)rr).Variable;
+			} else if (rr is MemberResolveResult) {
+				return ((MemberResolveResult)rr).Member;
+			} else if (rr is TypeResolveResult) {
+				return ((TypeResolveResult)rr).Type.GetDefinition();
+			}
+			
+			return null;
 		}
 		#endregion
 	}

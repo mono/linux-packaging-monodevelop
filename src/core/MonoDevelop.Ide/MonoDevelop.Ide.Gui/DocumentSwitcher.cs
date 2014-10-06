@@ -33,11 +33,9 @@ using System.Linq;
 using Gdk;
 using Gtk;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Components.Commands;
-using MonoDevelop.Ide.Commands;
 using MonoDevelop.Core;
 using Mono.TextEditor;
-
+using MonoDevelop.Components;
 
 namespace MonoDevelop.Ide
 {
@@ -109,7 +107,7 @@ namespace MonoDevelop.Ide
 					}
 					for (int i = cat.FirstVisibleItem; i < cat.Items.Count; i++) {
 						var item = cat.Items[i];
-						int itemWidth = w + item.Icon.Width + 2 + itemPadding * 2;
+						int itemWidth = w + (int)item.Icon.Width + 2 + itemPadding * 2;
 						if (xPos <= x && yPos <= y && x < xPos + itemWidth && y < yPos + iconHeight)
 							return item;
 						yPos += iconHeight;
@@ -177,7 +175,7 @@ namespace MonoDevelop.Ide
 					yPos = padding;
 					cr.MoveTo (xPos, yPos);
 					layout.SetMarkup ("<b>" + cat.Title + "</b>");
-					cr.Color = (HslColor)Style.Text (StateType.Normal);
+					cr.SetSourceColor (Style.Text (StateType.Normal).ToCairoColor ());
 					cr.ShowLayout (layout);
 					
 					if (cat.Items.Count == 0)
@@ -225,25 +223,24 @@ namespace MonoDevelop.Ide
 						}
 						
 						if (item == ActiveItem) {
-							int itemWidth = w + item.Icon.Width + 2 + itemPadding * 2;
+							int itemWidth = w + (int)item.Icon.Width + 2 + itemPadding * 2;
 							cr.Rectangle (xPos, yPos, itemWidth, iconHeight);
 							cr.LineWidth = 1;
-							cr.Color = (HslColor)Style.Base (StateType.Selected);
+							cr.SetSourceColor (Style.Base (StateType.Selected).ToCairoColor ());
 							cr.Fill ();
 						} else if (item == hoverItem) {
-							int itemWidth = w + item.Icon.Width + 2 + itemPadding * 2;
+							int itemWidth = w + (int)item.Icon.Width + 2 + itemPadding * 2;
 							cr.Rectangle (xPos + 0.5, yPos + 0.5, itemWidth - 1, iconHeight);
 							cr.LineWidth = 1;
-							cr.Color = (HslColor)Style.Base (StateType.Selected);
+							cr.SetSourceColor (Style.Base (StateType.Selected).ToCairoColor ());
 							cr.Stroke ();
 						}
-						cr.Color = (HslColor)Style.Text (item == ActiveItem? StateType.Selected : StateType.Normal);
+						cr.SetSourceColor (Style.Text (item == ActiveItem? StateType.Selected : StateType.Normal).ToCairoColor ());
 						cr.MoveTo (xPos + item.Icon.Width + 2 + itemPadding, yPos + (iconHeight - h) / 2);
 						layout.SetText (Ellipsize (item.ListTitle ?? item.Title, maxLength));
 						cr.ShowLayout (layout);
-						Gdk.CairoHelper.SetSourcePixbuf (cr, item.Icon, (int)xPos + itemPadding,
+						cr.DrawImage (this, item.Icon, (int)xPos + itemPadding,
 						                                 (int)(yPos + (iconHeight - item.Icon.Height) / 2));
-						cr.Paint ();
 						yPos += iconHeight;
 						if (++curItem >= maxItems) {
 							curItem = 0;
@@ -466,8 +463,8 @@ namespace MonoDevelop.Ide
 				return;
 			
 			var icon = firstNonEmptyCat.Items[0].Icon;
-			var iconHeight = Math.Max (h, icon.Height + 2) + itemPadding * 2;
-			var iconWidth = icon.Width + 2 + w  + itemPadding * 2;
+			var iconHeight = Math.Max (h, (int)icon.Height + 2) + itemPadding * 2;
+			var iconWidth = (int) icon.Width + 2 + w  + itemPadding * 2;
 				
 			foreach (var cat in categories) {
 				var headerHeight = h + headerDistance;
@@ -490,7 +487,7 @@ namespace MonoDevelop.Ide
 				set;
 			}
 			
-			public Pixbuf Icon {
+			public Xwt.Drawing.Image Icon {
 				get;
 				set;
 			}
@@ -556,7 +553,7 @@ namespace MonoDevelop.Ide
 	internal class DocumentSwitcher : Gtk.Window
 	{
 		List<MonoDevelop.Ide.Gui.Document> documents;
-		Gtk.Image imageTitle = new Gtk.Image ();
+		Xwt.ImageView imageTitle = new Xwt.ImageView ();
 		Label labelFileName = new Label ();
 		Label labelType     = new Label ();
 		Label labelTitle    = new Label ();
@@ -585,7 +582,7 @@ namespace MonoDevelop.Ide
 			var hBox2 = new HBox ();
 			hBox2.PackStart (hBox, false, false, 8);
 			
-			hBox.PackStart (imageTitle, true, false, 2);
+			hBox.PackStart (imageTitle.ToGtkWidget (), true, false, 2);
 			labelTitle.Xalign = 0;
 			labelTitle.HeightRequest = 24;
 			hBox.PackStart (labelTitle, true, true, 2);
@@ -616,7 +613,7 @@ namespace MonoDevelop.Ide
 				if (!pad.Visible)
 					continue;
 				var item = new DocumentList.Item () {
-					Icon = ImageService.GetPixbuf (pad.Icon.Name ?? MonoDevelop.Ide.Gui.Stock.MiscFiles, IconSize.Menu),
+					Icon = ImageService.GetIcon (pad.Icon.Name ?? MonoDevelop.Ide.Gui.Stock.GenericFile, IconSize.Menu),
 					Title = pad.Title,
 					Tag = pad
 				};
@@ -647,7 +644,7 @@ namespace MonoDevelop.Ide
 					labelFileName.Text = labelType.Text = labelTitle.Text = "";
 					return;
 				}
-				imageTitle.Pixbuf = documentList.ActiveItem.Icon;
+				imageTitle.Image = documentList.ActiveItem.Icon;
 				labelFileName.Text = documentList.ActiveItem.Path;
 				labelType.Markup = "<span size=\"small\">" + documentList.ActiveItem.Description + "</span>";
 				labelTitle.Markup = "<span size=\"xx-large\" weight=\"bold\">" + documentList.ActiveItem.Title + "</span>";
@@ -663,20 +660,26 @@ namespace MonoDevelop.Ide
 					return;
 				}
 			}
-			
+
 			documentList.ActiveItem = activeItem;
-			documentList.NextItem (true);
+
+			ModifierType modifiers;
+			if (Gtk.Global.GetCurrentEventState (out modifiers) && modifiers.HasFlag (ModifierType.ShiftMask))
+				documentList.PrevItem (true);
+			else
+				documentList.NextItem (true);
+
 			documentList.RequestClose += delegate(object sender, DocumentList.RequestActionEventArgs e) {
-				try {
-					if (e.SelectItem) {
-						if (documentList.ActiveItem.Tag is Pad) {
-							((Pad)documentList.ActiveItem.Tag).BringToFront (true);
-						} else {
-							((MonoDevelop.Ide.Gui.Document)documentList.ActiveItem.Tag).Select ();
-						}
-					}
-				} finally {
-					DestroyWindow ();
+				object item = e.SelectItem ? documentList.ActiveItem.Tag : null;
+				DestroyWindow();
+
+				// The selected document has to be focused *after* this window is destroyed, becasuse the window
+				// destruction focuses its parent window.
+				if (item != null) {
+					if (item is Pad)
+						((Pad)item).BringToFront(true);
+					else
+						((MonoDevelop.Ide.Gui.Document)item).Select();
 				}
 			};
 			
@@ -685,14 +688,14 @@ namespace MonoDevelop.Ide
 			this.GrabDefault ();
 		}
 		
-		Pixbuf GetIconForDocument (MonoDevelop.Ide.Gui.Document document, Gtk.IconSize iconSize)
+		Xwt.Drawing.Image GetIconForDocument (MonoDevelop.Ide.Gui.Document document, Gtk.IconSize iconSize)
 		{
 			if (!string.IsNullOrEmpty (document.Window.ViewContent.StockIconId))
-				return ImageService.GetPixbuf (document.Window.ViewContent.StockIconId, iconSize);
+				return ImageService.GetIcon (document.Window.ViewContent.StockIconId, iconSize);
 			if (string.IsNullOrEmpty (document.FileName)) 
-				return ImageService.GetPixbuf (MonoDevelop.Ide.Gui.Stock.MiscFiles, iconSize);
+				return ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.GenericFile, iconSize);
 			
-			return DesktopService.GetPixbufForFile (document.FileName, iconSize);
+			return DesktopService.GetIconForFile (document.FileName, iconSize);
 		}
 		
 		

@@ -32,6 +32,7 @@ using MonoDevelop.Ide;
 using MonoDevelop.CodeIssues;
 using MonoDevelop.AnalysisCore.Fixes;
 using Mono.TextEditor;
+using MonoDevelop.Ide.TypeSystem;
 
 namespace MonoDevelop.CodeActions
 {
@@ -77,11 +78,23 @@ namespace MonoDevelop.CodeActions
 				Action = action;
 				Title = action.Label;
 				Result = result;
+				IdString = action.IdString;
 			}
 	
-			public override void Run (MonoDevelop.Ide.Gui.Document document, TextLocation loc)
+			public override void Run (IRefactoringContext context, object script)
 			{
 				Action.Fix ();
+			}
+			
+			public override bool SupportsBatchRunning {
+				get {
+					return Action.SupportsBatchFix;
+				}
+			}
+			
+			public override void BatchRun (MonoDevelop.Ide.Gui.Document document, TextLocation loc)
+			{
+				Action.BatchFix ();
 			}
 
 			public void ShowOptions (object sender, EventArgs e)
@@ -89,6 +102,13 @@ namespace MonoDevelop.CodeActions
 				var inspectorResults = Result as InspectorResults;
 				if (inspectorResults != null)
 					inspectorResults.ShowResultOptionsDialog ();
+			}
+
+			public void HideCodeIssue (object sender, EventArgs e)
+			{
+				var inspectorResults = Result as InspectorResults;
+				if (inspectorResults != null)
+					inspectorResults.Inspector.SetIsEnabled (false);
 			}
 		}
 	}

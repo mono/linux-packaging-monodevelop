@@ -30,48 +30,46 @@ using Mono.Debugging.Client;
 
 namespace MonoDevelop.Debugger.Visualizer
 {
-	public class PixbufVisualizer: IValueVisualizer
+	public class PixbufVisualizer: ValueVisualizer
 	{
 		#region IValueVisualizer implementation
-		public bool CanVisualize (ObjectValue val)
+		public override bool CanVisualize (ObjectValue val)
 		{
 			return val.TypeName == "Gdk.Pixbuf";
 		}
-		
-		public bool CanEdit (ObjectValue val)
+
+		public override bool IsDefaultVisualizer (ObjectValue val)
 		{
-			return false;
+			return true;
 		}
 		
-		public Gtk.Widget GetVisualizerWidget (ObjectValue val)
+		public override Gtk.Widget GetVisualizerWidget (ObjectValue val)
 		{
-			Gdk.Pixbuf pixbuf;
+			var ops = DebuggingService.DebuggerSession.EvaluationOptions.Clone ();
 			string file = Path.GetTempFileName ();
+			Gdk.Pixbuf pixbuf;
+
+			ops.AllowTargetInvoke = true;
+
 			try {
-				RawValue pix = (RawValue) val.GetRawValue ();
+				var pix = (RawValue) val.GetRawValue (ops);
 				pix.CallMethod ("Save", file, "png");
 				pixbuf = new Gdk.Pixbuf (file);
 			} finally {
 				File.Delete (file);
 			}
-			Gtk.ScrolledWindow sc = new Gtk.ScrolledWindow ();
+
+			var sc = new Gtk.ScrolledWindow ();
 			sc.ShadowType = Gtk.ShadowType.In;
 			sc.HscrollbarPolicy = Gtk.PolicyType.Automatic;
 			sc.VscrollbarPolicy = Gtk.PolicyType.Automatic;
-			Gtk.Image image = new Gtk.Image (pixbuf);
+			var image = new Gtk.Image (pixbuf);
 			sc.AddWithViewport (image);
 			sc.ShowAll ();
 			return sc;
 		}
-		
-		
-		public bool StoreValue (ObjectValue val)
-		{
-			return true;
-		}
-		
-		
-		public string Name {
+
+		public override string Name {
 			get {
 				return "Pixbuf";
 			}

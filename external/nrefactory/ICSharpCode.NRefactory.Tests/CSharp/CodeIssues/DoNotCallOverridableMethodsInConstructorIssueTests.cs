@@ -32,8 +32,8 @@ namespace ICSharpCode.NRefactory.CSharp.CodeIssues
 {
 	[TestFixture]
 	public class DoNotCallOverridableMethodsInConstructorIssueTests : InspectionActionTestBase
-	{
-        
+	{ 
+
 		[Test]
 		public void CatchesBadCase()
 		{
@@ -152,6 +152,41 @@ namespace ICSharpCode.NRefactory.CSharp.CodeIssues
 			var issues = GetIssues(new DoNotCallOverridableMethodsInConstructorIssue(), input, out context);
 			Assert.AreEqual(0, issues.Count);
 		}
+
+
+		/// <summary>
+		/// Bug 14450 - False positive of "Virtual member call in constructor"
+		/// </summary>
+		[Test]
+		public void TestBug14450()
+		{
+			var input = @"
+using System;
+
+public class Test {
+    public Test(Action action) {
+        action();
+    }
+}
+";		
+			TestWrongContext<DoNotCallOverridableMethodsInConstructorIssue>(input);
+		}
+		
+		[Test]
+		public void SetVirtualProperty()
+		{
+			var input = @"class Foo
+{
+	Foo()
+	{
+		this.AutoProperty = 1;
+	}
+
+	public virtual int AutoProperty { get; set; }
+}";
+			TestRefactoringContext context;
+            var issues = GetIssues(new DoNotCallOverridableMethodsInConstructorIssue(), input, out context);
+			Assert.AreEqual(1, issues.Count);
+		}
 	}
 }
-

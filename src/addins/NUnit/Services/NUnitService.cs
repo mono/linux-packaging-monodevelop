@@ -56,6 +56,7 @@ namespace MonoDevelop.NUnit
 			IdeApp.Workspace.WorkspaceItemClosed += OnWorkspaceChanged;
 			IdeApp.Workspace.ItemAddedToSolution += OnWorkspaceChanged;
 			IdeApp.Workspace.ItemRemovedFromSolution += OnWorkspaceChanged;
+			IdeApp.Workspace.ActiveConfigurationChanged += OnWorkspaceChanged;
 
 			Mono.Addins.AddinManager.AddExtensionNodeHandler ("/MonoDevelop/NUnit/TestProviders", OnExtensionChange);
 		}
@@ -100,7 +101,9 @@ namespace MonoDevelop.NUnit
 		
 		public IAsyncOperation RunTest (UnitTest test, IExecutionHandler context)
 		{
-			return RunTest (test, context, IdeApp.Preferences.BuildBeforeExecuting);
+			var result = RunTest (test, context, IdeApp.Preferences.BuildBeforeRunningTests);
+			result.Completed += (OperationHandler) DispatchService.GuiDispatch (new OperationHandler (OnTestSessionCompleted));
+			return result;
 		}
 		
 		public IAsyncOperation RunTest (UnitTest test, IExecutionHandler context, bool buildOwnerObject)
@@ -321,6 +324,15 @@ namespace MonoDevelop.NUnit
 		}
 
 		public event EventHandler TestSuiteChanged;
+
+		void OnTestSessionCompleted (IAsyncOperation op)
+		{
+			var handler = TestSessionCompleted;
+			if (handler != null)
+				handler (this, EventArgs.Empty);
+		}
+
+		public event EventHandler TestSessionCompleted;
 	}
 	
 
@@ -333,12 +345,15 @@ namespace MonoDevelop.NUnit
 		bool success;
 		ManualResetEvent waitEvent;
 		IExecutionHandler context;
-		
+		TestResultsPad resultsPad;
+
 		public TestSession (UnitTest test, IExecutionHandler context, TestResultsPad resultsPad)
 		{
 			this.test = test;
 			this.context = context;
 			this.monitor = new TestMonitor (resultsPad);
+			this.resultsPad = resultsPad;
+			resultsPad.InitializeTestRun (test);
 		}
 		
 		public void Start ()
@@ -353,8 +368,8 @@ namespace MonoDevelop.NUnit
 		{
 			try {
 				NUnitService.ResetResult (test);
-				monitor.InitializeTestRun (test);
-				TestContext ctx = new TestContext (monitor, context, DateTime.Now);
+
+				TestContext ctx = new TestContext (monitor, resultsPad, context, DateTime.Now);
 				test.Run (ctx);
 				test.SaveResults ();
 				success = true;

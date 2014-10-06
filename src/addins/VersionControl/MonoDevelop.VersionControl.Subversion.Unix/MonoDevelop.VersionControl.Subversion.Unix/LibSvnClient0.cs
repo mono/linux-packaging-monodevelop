@@ -26,21 +26,14 @@
 // THE SOFTWARE.
 
 using System;
-using System.IO;
-using System.Threading;
-using System.Collections;
 using System.Runtime.InteropServices;
-
-using MonoDevelop.Core;
-using MonoDevelop.VersionControl;
-using MonoDevelop.VersionControl.Subversion.Gui;
 
 using svn_revnum_t = System.IntPtr;
 
 namespace MonoDevelop.VersionControl.Subversion.Unix {
 	
-	public class LibSvnClient0 : LibSvnClient {
-		private const string svnclientlib = "libsvn_client-1.so.0";
+	sealed class LibSvnClient0 : LibSvnClient {
+		const string svnclientlib = "libsvn_client-1.so.0";
 
 		public override IntPtr client_root_url_from_path (ref IntPtr url, string path_or_url, IntPtr ctx, IntPtr pool)
 		{
@@ -304,7 +297,12 @@ namespace MonoDevelop.VersionControl.Subversion.Unix {
 		{
 			return svn_wc_context_create (out svn_wc_context_t, config, result_pool, scratch_pool);
 		}
-		
+
+		public override IntPtr client_get_wc_root (out IntPtr wcroot_abspath, string local_abspath, IntPtr ctx, IntPtr result_pool, IntPtr scratch_pool)
+		{
+			return svn_client_get_wc_root (out wcroot_abspath, local_abspath, ctx, result_pool, scratch_pool);
+		}
+
 		public override IntPtr strerror (int statcode, byte[] buf, int bufsize)
 		{
 			return svn_strerror (statcode, buf, bufsize);
@@ -313,6 +311,11 @@ namespace MonoDevelop.VersionControl.Subversion.Unix {
 		public override IntPtr path_internal_style (string path, IntPtr pool)
 		{
 			return svn_path_internal_style (path, pool);
+		}
+
+		public override IntPtr client_upgrade (string wcroot_dir, IntPtr ctx, IntPtr scratch_pool)
+		{
+			return svn_client_upgrade (wcroot_dir, ctx, scratch_pool);
 		}
 		
 		[DllImport(svnclientlib)] static extern IntPtr svn_client_root_url_from_path (ref IntPtr url, string path_or_url, IntPtr ctx, IntPtr pool);
@@ -450,8 +453,12 @@ namespace MonoDevelop.VersionControl.Subversion.Unix {
 
 		[DllImport(svnclientlib)] static extern IntPtr svn_wc_context_create (out IntPtr svn_wc_context_t, IntPtr svn_config_ensure, IntPtr result_pool, IntPtr scratch_pool);
 
+		[DllImport(svnclientlib)] static extern IntPtr svn_client_get_wc_root (out IntPtr wcroot_abspath, string local_abspath, IntPtr ctx, IntPtr result_pool, IntPtr scratch_pool);
+
 		[DllImport(svnclientlib)] static extern IntPtr svn_strerror (int statcode, byte[] buf, int bufsize);
 		
 		[DllImport(svnclientlib)] static extern IntPtr svn_path_internal_style (string path, IntPtr pool);
+
+		[DllImport(svnclientlib)] static extern IntPtr svn_client_upgrade (string wcroot_dir, IntPtr ctx, IntPtr scratch_pool);
 	}
 }

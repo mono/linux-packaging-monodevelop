@@ -36,11 +36,11 @@ namespace Mono.Debugging.Evaluation
 {
 	public class NRefactoryExpressionEvaluatorVisitor : IAstVisitor<ValueReference>
 	{
-		Dictionary<string,ValueReference> userVariables;
-		EvaluationOptions options;
-		EvaluationContext ctx;
-		object expectedType;
-		string expression;
+		readonly Dictionary<string, ValueReference> userVariables;
+		readonly EvaluationOptions options;
+		readonly EvaluationContext ctx;
+		readonly object expectedType;
+		readonly string expression;
 
 		public NRefactoryExpressionEvaluatorVisitor (EvaluationContext ctx, string expression, object expectedType, Dictionary<string,ValueReference> userVariables)
 		{
@@ -78,15 +78,30 @@ namespace Mono.Debugging.Evaluation
 			}
 		}
 
-		static string GetCommonOperationType (object v1, object v2)
+		long ConvertToInt64 (object val)
+		{
+			if (val is IntPtr)
+				return ((IntPtr) val).ToInt64 ();
+
+			if (ctx.Adapter.IsEnum (ctx, val)) {
+				var type = ctx.Adapter.GetType (ctx, "System.Int64");
+				var result = ctx.Adapter.Cast (ctx, val, type);
+
+				return (long) ctx.Adapter.TargetObjectToObject (ctx, result);
+			}
+
+			return Convert.ToInt64 (val);
+		}
+
+		static Type GetCommonOperationType (object v1, object v2)
 		{
 			if (v1 is double || v2 is double)
-				return "System.Double";
+				return typeof (double);
 
 			if (v1 is float || v2 is float)
-				return "System.Double";
+				return typeof (double);
 
-			return "System.Int64";
+			return typeof (long);
 		}
 
 		static Type GetCommonType (object v1, object v2)
@@ -147,39 +162,6 @@ namespace Mono.Debugging.Evaluation
 			}
 		}
 
-		static object EvaluateStringOperation (BinaryOperatorType op, object v1, object v2)
-		{
-			switch (op) {
-			case BinaryOperatorType.Equality:
-				if (!(v1 == null || v1 is string) || !(v2 == null || v2 is string))
-					throw ParseError ("Invalid operands in binary operator.");
-				return ((string) v1) == ((string) v2);
-			case BinaryOperatorType.InEquality:
-				if (!(v1 == null || v1 is string) || !(v2 == null || v2 is string))
-					throw ParseError ("Invalid operands in binary operator.");
-				return ((string) v1) != ((string) v2);
-			case BinaryOperatorType.Add:
-				if (v1 == null) return v2.ToString ();
-				if (v2 == null) return v1.ToString ();
-				return v1.ToString () + v2.ToString ();
-			default:
-				throw ParseError ("Invalid operands in binary operator.");
-			}
-		}
-
-		static void ConvertValues<T> (EvaluationContext ctx, object actualV1, object actualV2, object toType, out T v1, out T v2)
-		{
-			try {
-				object c1 = ctx.Adapter.Cast (ctx, actualV1, toType);
-				v1 = (T) ctx.Adapter.TargetObjectToObject (ctx, c1);
-
-				object c2 = ctx.Adapter.Cast (ctx, actualV2, toType);
-				v2 = (T) ctx.Adapter.TargetObjectToObject (ctx, c2);
-			} catch {
-				throw ParseError ("Invalid operands in binary operator.");
-			}
-		}
-
 		static bool CheckReferenceEquality (EvaluationContext ctx, object v1, object v2)
 		{
 			if (v1 == null && v2 == null)
@@ -189,12 +171,8 @@ namespace Mono.Debugging.Evaluation
 				return false;
 
 			object objectType = ctx.Adapter.GetType (ctx, "System.Object");
-			object[] argTypes = new object[] {
-				objectType, objectType
-			};
-			object[] args = new object[] {
-				v1, v2
-			};
+			object[] argTypes = { objectType, objectType };
+			object[] args = { v1, v2 };
 
 			object result = ctx.Adapter.RuntimeInvoke (ctx, objectType, null, "ReferenceEquals", argTypes, args);
 			var literal = LiteralValueReference.CreateTargetObjectLiteral (ctx, "result", result);
@@ -202,31 +180,36 @@ namespace Mono.Debugging.Evaluation
 			return (bool) literal.ObjectValue;
 		}
 
-		static bool CheckEquality (EvaluationContext ctx, bool negate, object v1, object v2)
+		static bool CheckEquality (EvaluationContext ctx, bool negate, object targetVal1, object targetVal2, object val1, object val2)
 		{
-			if (v1 == null && v2 == null)
-				return true;
+			if (val1 == null && val2 == null)
+				return !negate;
 
-			if (v1 == null || v2 == null)
-				return false;
+			if (val1 == null || val2 == null)
+				return negate;
 
 			string method = negate ? "op_Inequality" : "op_Equality";
-			object v1type = ctx.Adapter.GetValueType (ctx, v1);
-			object v2type = ctx.Adapter.GetValueType (ctx, v2);
-			object[] argTypes = new object[] { v2type };
+			object v1type = ctx.Adapter.GetValueType (ctx, targetVal1);
+			object v2type = ctx.Adapter.GetValueType (ctx, targetVal2);
+			object[] argTypes = { v1type, v2type };
 			object target, targetType;
 			object[] args;
 
-			if (ctx.Adapter.HasMethod (ctx, v1type, method, argTypes, BindingFlags.Instance | BindingFlags.Public)) {
-				args = new object[] { v2 };
+			if (ctx.Adapter.HasMethod (ctx, v1type, method, argTypes, BindingFlags.Public | BindingFlags.Static)) {
+				args = new [] { targetVal1, targetVal2 };
 				targetType = v1type;
+				target = null;
 				negate = false;
-				target = v1;
+			} else if (ctx.Adapter.HasMethod (ctx, v2type, method, argTypes, BindingFlags.Public | BindingFlags.Static)) {
+				args = new [] { targetVal1, targetVal2 };
+				targetType = v2type;
+				target = null;
+				negate = false;
 			} else {
 				method = ctx.Adapter.IsValueType (v1type) ? "Equals" : "ReferenceEquals";
 				targetType = ctx.Adapter.GetType (ctx, "System.Object");
-				argTypes = new object[] { targetType, targetType };
-				args = new object[] { v1, v2 };
+				argTypes = new [] { targetType, targetType };
+				args = new [] { targetVal1, targetVal2 };
 				target = null;
 			}
 
@@ -237,80 +220,155 @@ namespace Mono.Debugging.Evaluation
 			return negate ? !retval : retval;
 		}
 
+		static ValueReference EvaluateOverloadedOperator (EvaluationContext ctx, string expression, BinaryOperatorType op, object targetVal1, object targetVal2, object val1, object val2)
+		{
+			object v1type = ctx.Adapter.GetValueType (ctx, targetVal1);
+			object v2type = ctx.Adapter.GetValueType (ctx, targetVal2);
+			object[] args = new [] { targetVal1, targetVal2 };
+			object[] argTypes = { v1type, v2type };
+			object targetType = null;
+			string methodName = null;
+
+			switch (op) {
+			case BinaryOperatorType.BitwiseAnd:         methodName = "op_BitwiseAnd"; break;
+			case BinaryOperatorType.BitwiseOr:          methodName = "op_BitwiseOr"; break;
+			case BinaryOperatorType.ExclusiveOr:        methodName = "op_ExclusiveOr"; break;
+			case BinaryOperatorType.GreaterThan:        methodName = "op_GreaterThan"; break;
+			case BinaryOperatorType.GreaterThanOrEqual: methodName = "op_GreaterThanOrEqual"; break;
+			case BinaryOperatorType.Equality:           methodName = "op_Equality"; break;
+			case BinaryOperatorType.InEquality:         methodName = "op_Inequality"; break;
+			case BinaryOperatorType.LessThan:           methodName = "op_LessThan"; break;
+			case BinaryOperatorType.LessThanOrEqual:    methodName = "op_LessThanOrEqual"; break;
+			case BinaryOperatorType.Add:                methodName = "op_Addition"; break;
+			case BinaryOperatorType.Subtract:           methodName = "op_Subtraction"; break;
+			case BinaryOperatorType.Multiply:           methodName = "op_Multiply"; break;
+			case BinaryOperatorType.Divide:             methodName = "op_Division"; break;
+			case BinaryOperatorType.Modulus:            methodName = "op_Modulus"; break;
+			case BinaryOperatorType.ShiftLeft:          methodName = "op_LeftShift"; break;
+			case BinaryOperatorType.ShiftRight:         methodName = "op_RightShift"; break;
+			}
+
+			if (methodName == null)
+				throw ParseError ("Invalid operands in binary operator.");
+
+			if (ctx.Adapter.HasMethod (ctx, v1type, methodName, argTypes, BindingFlags.Public | BindingFlags.Static)) {
+				targetType = v1type;
+			} else if (ctx.Adapter.HasMethod (ctx, v2type, methodName, argTypes, BindingFlags.Public | BindingFlags.Static)) {
+				targetType = v2type;
+			} else {
+				throw ParseError ("Invalid operands in binary operator.");
+			}
+
+			object result = ctx.Adapter.RuntimeInvoke (ctx, targetType, null, methodName, argTypes, args);
+
+			return LiteralValueReference.CreateTargetObjectLiteral (ctx, expression, result);
+		}
+
 		ValueReference EvaluateBinaryOperatorExpression (BinaryOperatorType op, ValueReference left, Expression rightExp)
 		{
 			if (op == BinaryOperatorType.ConditionalAnd) {
-				object val = left.ObjectValue;
+				var val = left.ObjectValue;
 				if (!(val is bool))
 					throw ParseError ("Left operand of logical And must be a boolean.");
-				if (!(bool)val)
+
+				if (!(bool) val)
 					return LiteralValueReference.CreateObjectLiteral (ctx, expression, false);
-				ValueReference vr = rightExp.AcceptVisitor<ValueReference> (this);
+
+				var vr = rightExp.AcceptVisitor<ValueReference> (this);
 				if (vr == null || ctx.Adapter.GetTypeName (ctx, vr.Type) != "System.Boolean")
 					throw ParseError ("Right operand of logical And must be a boolean.");
-				return vr;
-			} else if (op == BinaryOperatorType.ConditionalOr) {
-				object val = left.ObjectValue;
-				if (!(val is bool))
-					throw ParseError ("Left operand of logical Or must be a boolean.");
-				if ((bool)val)
-					return LiteralValueReference.CreateObjectLiteral (ctx, expression, true);
-				ValueReference vr = rightExp.AcceptVisitor<ValueReference> (this);
-				if (vr == null || ctx.Adapter.GetTypeName (ctx, vr.Type) != "System.Boolean")
-					throw ParseError ("Right operand of logical Or must be a boolean.");
+
 				return vr;
 			}
 
-			ValueReference right = rightExp.AcceptVisitor<ValueReference> (this);
-			object targetVal1 = left.Value;
-			object targetVal2 = right.Value;
-			object val1 = left.ObjectValue;
-			object val2 = right.ObjectValue;
+			if (op == BinaryOperatorType.ConditionalOr) {
+				var val = left.ObjectValue;
+				if (!(val is bool))
+					throw ParseError ("Left operand of logical Or must be a boolean.");
 
-			if (op == BinaryOperatorType.Add) {
-				if (val1 is string || val2 is string) {
-					if (!(val1 is string) && val1 != null)
-						val1 = ctx.Adapter.CallToString (ctx, targetVal1);
-					if (!(val2 is string) && val2 != null)
-						val2 = ctx.Adapter.CallToString (ctx, targetVal2);
-					return LiteralValueReference.CreateObjectLiteral (ctx, expression, (string) val1 + (string) val2);
+				if ((bool) val)
+					return LiteralValueReference.CreateObjectLiteral (ctx, expression, true);
+
+				var vr = rightExp.AcceptVisitor<ValueReference> (this);
+				if (vr == null || ctx.Adapter.GetTypeName (ctx, vr.Type) != "System.Boolean")
+					throw ParseError ("Right operand of logical Or must be a boolean.");
+
+				return vr;
+			}
+
+			var right = rightExp.AcceptVisitor<ValueReference> (this);
+			var targetVal1 = left.Value;
+			var targetVal2 = right.Value;
+			var val1 = left.ObjectValue;
+			var val2 = right.ObjectValue;
+			object res = null;
+
+			if (val1 is string || val2 is string) {
+				switch (op) {
+				case BinaryOperatorType.Add:
+					if (val1 != null && val2 != null) {
+						if (!(val1 is string))
+							val1 = ctx.Adapter.CallToString (ctx, targetVal1);
+
+						if (!(val2 is string))
+							val2 = ctx.Adapter.CallToString (ctx, targetVal2);
+
+						res = (string) val1 + (string) val2;
+					} else if (val1 != null) {
+						res = val1.ToString ();
+					} else if (val2 != null) {
+						res = val2.ToString ();
+					}
+
+					return LiteralValueReference.CreateObjectLiteral (ctx, expression, res);
+				case BinaryOperatorType.Equality:
+					if ((val1 == null || val1 is string) && (val2 == null || val2 is string))
+						return LiteralValueReference.CreateObjectLiteral (ctx, expression, ((string) val1) == ((string) val2));
+					break;
+				case BinaryOperatorType.InEquality:
+					if ((val1 == null || val1 is string) && (val2 == null || val2 is string))
+						return LiteralValueReference.CreateObjectLiteral (ctx, expression, ((string) val1) != ((string) val2));
+					break;
+				}
+			}
+
+			if (val1 == null || (!ctx.Adapter.IsPrimitive (ctx, targetVal1) && !ctx.Adapter.IsEnum (ctx, targetVal1))) {
+				switch (op) {
+				case BinaryOperatorType.Equality:
+					return LiteralValueReference.CreateObjectLiteral (ctx, expression, CheckEquality (ctx, false, targetVal1, targetVal2, val1, val2));
+				case BinaryOperatorType.InEquality:
+					return LiteralValueReference.CreateObjectLiteral (ctx, expression, CheckEquality (ctx, true, targetVal1, targetVal2, val1, val2));
+				default:
+					if (val1 != null && val2 != null)
+						return EvaluateOverloadedOperator (ctx, expression, op, targetVal1, targetVal2, val1, val2);
+					break;
 				}
 			}
 
 			if ((op == BinaryOperatorType.ExclusiveOr) && (val1 is bool) && (val2 is bool))
 				return LiteralValueReference.CreateObjectLiteral (ctx, expression, (bool) val1 ^ (bool) val2);
 
-			if ((val1 == null || !ctx.Adapter.IsPrimitive (ctx, targetVal1)) && (val2 == null || !ctx.Adapter.IsPrimitive (ctx, targetVal2))) {
-				switch (op) {
-				case BinaryOperatorType.Equality:
-					return LiteralValueReference.CreateObjectLiteral (ctx, expression, CheckEquality (ctx, false, targetVal1, targetVal2));
-				case BinaryOperatorType.InEquality:
-					return LiteralValueReference.CreateObjectLiteral (ctx, expression, CheckEquality (ctx, true, targetVal1, targetVal2));
-				}
-			}
+			if (val1 == null || val2 == null || (val1 is bool) || (val2 is bool))
+				throw ParseError ("Invalid operands in binary operator.");
 
-			object res;
+			var commonType = GetCommonOperationType (val1, val2);
 
-			if (val1 is string || val2 is string) {
-				res = EvaluateStringOperation (op, val1, val2);
-			} else {
-				if (val1 == null || val2 == null || (val1 is bool) || (val2 is bool))
+			if (commonType == typeof (double)) {
+				double v1, v2;
+
+				try {
+					v1 = Convert.ToDouble (val1);
+					v2 = Convert.ToDouble (val2);
+				} catch {
 					throw ParseError ("Invalid operands in binary operator.");
-
-				string opTypeName = GetCommonOperationType (val1, val2);
-				object opType = ctx.Adapter.GetType (ctx, opTypeName);
-
-				if (opTypeName == "System.Double") {
-					double v1, v2;
-
-					ConvertValues<double> (ctx, targetVal1, targetVal2, opType, out v1, out v2);
-					res = EvaluateOperation (op, v1, v2);
-				} else {
-					long v1, v2;
-
-					ConvertValues<long> (ctx, targetVal1, targetVal2, opType, out v1, out v2);
-					res = EvaluateOperation (op, v1, v2);
 				}
+
+				res = EvaluateOperation (op, v1, v2);
+			} else {
+				var v1 = ConvertToInt64 (val1);
+				var v2 = ConvertToInt64 (val2);
+
+				res = EvaluateOperation (op, v1, v2);
 			}
 
 			if (!(res is bool) && !(res is string)) {
@@ -324,10 +382,41 @@ namespace Mono.Debugging.Evaluation
 					return LiteralValueReference.CreateTargetObjectLiteral (ctx, expression, tval);
 				}
 
-				res = Convert.ChangeType (res, GetCommonType (val1, val2));
+				var targetType = GetCommonType (val1, val2);
+
+				if (targetType != typeof (IntPtr))
+					res = Convert.ChangeType (res, targetType);
+				else
+					res = new IntPtr ((long) res);
 			}
 
 			return LiteralValueReference.CreateObjectLiteral (ctx, expression, res);
+		}
+
+		static string ResolveType (EvaluationContext ctx, TypeReferenceExpression mre, List<object> args)
+		{
+			var memberType = mre.Type as MemberType;
+
+			if (memberType != null) {
+				var name = memberType.MemberName;
+
+				if (memberType.TypeArguments.Count > 0) {
+					name += "`" + memberType.TypeArguments.Count;
+
+					foreach (var arg in memberType.TypeArguments) {
+						var resolved = arg.Resolve (ctx);
+
+						if (resolved == null)
+							return null;
+
+						args.Add (resolved);
+					}
+				}
+
+				return name;
+			}
+
+			return mre.ToString ();
 		}
 
 		static string ResolveType (EvaluationContext ctx, MemberReferenceExpression mre, List<object> args)
@@ -336,6 +425,8 @@ namespace Mono.Debugging.Evaluation
 
 			if (mre.Target is MemberReferenceExpression) {
 				parent = ResolveType (ctx, (MemberReferenceExpression) mre.Target, args);
+			} else if (mre.Target is TypeReferenceExpression) {
+				parent = ResolveType (ctx, (TypeReferenceExpression) mre.Target, args);
 			} else if (mre.Target is IdentifierExpression) {
 				parent = ((IdentifierExpression) mre.Target).Identifier;
 			} else {
@@ -345,8 +436,9 @@ namespace Mono.Debugging.Evaluation
 			name = parent + "." + mre.MemberName;
 			if (mre.TypeArguments.Count > 0) {
 				name += "`" + mre.TypeArguments.Count;
+
 				foreach (var arg in mre.TypeArguments) {
-					object resolved = arg.Resolve (ctx);
+					var resolved = arg.Resolve (ctx);
 
 					if (resolved == null)
 						return null;
@@ -647,12 +739,12 @@ namespace Mono.Debugging.Evaluation
 			return indexer;
 		}
 
-		string ResolveMethodName (MemberReferenceExpression mre, out object[] typeArgs)
+		string ResolveMethodName (MemberReferenceExpression method, out object[] typeArgs)
 		{
-			if (mre.TypeArguments.Count > 0) {
-				List<object> args = new List<object> ();
+			if (method.TypeArguments.Count > 0) {
+				var args = new List<object> ();
 
-				foreach (var arg in mre.TypeArguments) {
+				foreach (var arg in method.TypeArguments) {
 					var type = arg.AcceptVisitor (this);
 					args.Add (type.Type);
 				}
@@ -662,7 +754,25 @@ namespace Mono.Debugging.Evaluation
 				typeArgs = null;
 			}
 
-			return mre.MemberName;
+			return method.MemberName;
+		}
+
+		string ResolveMethodName (IdentifierExpression method, out object[] typeArgs)
+		{
+			if (method.TypeArguments.Count > 0) {
+				var args = new List<object> ();
+
+				foreach (var arg in method.TypeArguments) {
+					var type = arg.AcceptVisitor (this);
+					args.Add (type.Type);
+				}
+
+				typeArgs = args.ToArray ();
+			} else {
+				typeArgs = null;
+			}
+
+			return method.Identifier;
 		}
 
 		public ValueReference VisitInvocationExpression (InvocationExpression invocationExpression)
@@ -674,8 +784,8 @@ namespace Mono.Debugging.Evaluation
 			ValueReference target = null;
 			string methodName;
 
-			object[] types = new object [invocationExpression.Arguments.Count];
-			object[] args = new object [invocationExpression.Arguments.Count];
+			var types = new object [invocationExpression.Arguments.Count];
+			var args = new object [invocationExpression.Arguments.Count];
 			object[] typeArgs = null;
 			int n = 0;
 
@@ -693,19 +803,21 @@ namespace Mono.Debugging.Evaluation
 					invokeBaseMethod = true;
 				methodName = ResolveMethodName (field, out typeArgs);
 			} else if (invocationExpression.Target is IdentifierExpression) {
-				methodName = ((IdentifierExpression) invocationExpression.Target).Identifier;
+				var method = (IdentifierExpression) invocationExpression.Target;
 				var vref = ctx.Adapter.GetThisReference (ctx);
 
-				if (vref != null && ctx.Adapter.HasMethod (ctx, vref.Type, methodName, BindingFlags.Instance)) {
+				methodName = ResolveMethodName (method, out typeArgs);
+
+				if (vref != null && ctx.Adapter.HasMethod (ctx, vref.Type, methodName, typeArgs, null, BindingFlags.Instance)) {
 					// There is an instance method for 'this', although it may not have an exact signature match. Check it now.
-					if (ctx.Adapter.HasMethod (ctx, vref.Type, methodName, types, BindingFlags.Instance)) {
+					if (ctx.Adapter.HasMethod (ctx, vref.Type, methodName, typeArgs, types, BindingFlags.Instance)) {
 						target = vref;
 					} else {
 						// There isn't an instance method with exact signature match.
 						// If there isn't a static method, then use the instance method,
 						// which will report the signature match error when invoked
 						object etype = ctx.Adapter.GetEnclosingType (ctx);
-						if (!ctx.Adapter.HasMethod (ctx, etype, methodName, types, BindingFlags.Static))
+						if (!ctx.Adapter.HasMethod (ctx, etype, methodName, typeArgs, types, BindingFlags.Static))
 							target = vref;
 					}
 				} else {
@@ -786,8 +898,10 @@ namespace Mono.Debugging.Evaluation
 			var member = target.GetChild (memberReferenceExpression.MemberName, ctx.Options);
 
 			if (member == null) {
-				if (ctx.Adapter.IsNull (ctx, target.Value))
-					throw new EvaluatorException ("{0} is null", target.Name);
+				if (!(target is TypeValueReference)) {
+					if (ctx.Adapter.IsNull (ctx, target.Value))
+						throw new EvaluatorException ("{0} is null", target.Name);
+				}
 
 				throw ParseError ("Unknown member: {0}", memberReferenceExpression.MemberName);
 			}
@@ -807,7 +921,7 @@ namespace Mono.Debugging.Evaluation
 
 		public ValueReference VisitNullReferenceExpression (NullReferenceExpression nullReferenceExpression)
 		{
-			throw NotSupported ();
+			return new NullValueReference (ctx, ctx.Adapter.GetType (ctx, "System.Object"));
 		}
 
 		public ValueReference VisitObjectCreateExpression (ObjectCreateExpression objectCreateExpression)
@@ -1362,6 +1476,16 @@ namespace Mono.Debugging.Evaluation
 		}
 
 		public ValueReference VisitPatternPlaceholder (AstNode placeholder, ICSharpCode.NRefactory.PatternMatching.Pattern pattern)
+		{
+			throw NotSupported ();
+		}
+
+		public ValueReference VisitNullNode(AstNode nullNode)
+		{
+			throw NotSupported ();
+		}
+
+		public ValueReference VisitErrorNode (AstNode errorNode)
 		{
 			throw NotSupported ();
 		}

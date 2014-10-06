@@ -1,4 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/tests/Mono.TextTemplating.Tests.dll.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/tests/Mono.TextTemplating.Tests.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/TextTemplating/Mono.TextTemplating.Tests/obj/Debug/Mono.TextTemplating.Tests.dll
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/TextTemplating/Mono.TextTemplating.Tests/obj/Debug/Mono.TextTemplating.Tests.dll.mdb

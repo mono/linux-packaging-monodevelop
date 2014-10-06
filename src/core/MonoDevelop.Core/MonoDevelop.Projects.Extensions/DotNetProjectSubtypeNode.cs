@@ -38,6 +38,8 @@ namespace MonoDevelop.Projects.Extensions
 	[ExtensionNodeChild (typeof(DotNetProjectSubtypeNodeImport), "RemoveImport")]
 	public class DotNetProjectSubtypeNode: ExtensionNode
 	{
+		#pragma warning disable 649
+
 		[NodeAttribute]
 		string guid = null;
 		
@@ -55,12 +57,17 @@ namespace MonoDevelop.Projects.Extensions
 
 		[NodeAttribute]
 		bool useXBuild = false;
+
+		[NodeAttribute]
+		bool requireXBuild = true;
 		
 		[NodeAttribute]
 		string migrationHandler;
 
 		[NodeAttribute]
 		bool migrationRequired = true;
+
+		#pragma warning restore 649
 
 		Type itemType;
 
@@ -100,7 +107,11 @@ namespace MonoDevelop.Projects.Extensions
 		public bool UseXBuild {
 			get { return useXBuild; }
 		}
-		
+
+		public bool RequireXBuild {
+			get { return useXBuild && requireXBuild; }
+		}
+
 		public bool IsMigration {
 			get { return migrationHandler != null; }
 		}
@@ -147,8 +158,8 @@ namespace MonoDevelop.Projects.Extensions
 			MSBuildProjectHandler h = (MSBuildProjectHandler) ProjectExtensionUtil.GetItemHandler (item);
 			UpdateImports (item, h.TargetImports);
 			h.SubtypeGuids.Add (guid);
-			if (UseXBuild)
-				h.ForceUseMSBuild = true;
+			h.UseMSBuildEngineByDefault |= UseXBuild;
+			h.RequireMSBuildEngine |= RequireXBuild;
 		}
 		
 		public void UpdateImports (SolutionEntityItem item, List<string> imports)

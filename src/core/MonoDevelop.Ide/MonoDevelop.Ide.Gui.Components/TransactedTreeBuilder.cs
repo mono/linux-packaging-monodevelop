@@ -29,6 +29,7 @@ using System;
 using System.Collections.Generic;
 using MonoDevelop.Core;
 using System.Collections;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.Ide.Gui.Components
 {
@@ -348,7 +349,12 @@ namespace MonoDevelop.Ide.Gui.Components
 					node = null;
 				}
 			}
-	
+		
+			public void ScrollToNode ()
+			{
+				tree.ScrollToCell (tree.store.GetPath (node.NodeIter));
+			}
+
 			public bool FindChild (object dataObject)
 			{
 				return FindChild (dataObject, false);
@@ -653,19 +659,13 @@ namespace MonoDevelop.Ide.Gui.Components
 
 			void UpdateNode (TreeNode n, NodeBuilder[] chain, NodeAttributes ats, object dataObject)
 			{
-				string text;
-				Gdk.Pixbuf icon;
-				Gdk.Pixbuf closedIcon;
-				TreeBuilder.GetNodeInfo (tree, this, chain, dataObject, out text, out icon, out closedIcon);
+				var ni = new NodeInfo ();
+				n.NodeInfo = TreeBuilder.GetNodeInfo (ni, tree, this, chain, dataObject);
 
-				n.Text = text;
-				n.Icon = icon;
-				n.ClosedIcon = closedIcon;
-				
 				if (chain != null && chain.Length > 0)
 					n.Name = ((TypeNodeBuilder)chain[0]).GetNodeName (this, n.DataItem);
 				else
-					n.Name = n.Text;
+					n.Name = n.NodeInfo.Label;
 				
 				n.Modified = true;
 			}
@@ -673,10 +673,8 @@ namespace MonoDevelop.Ide.Gui.Components
 
 		internal class TreeNode
 		{
-			public string Text;
-			public Gdk.Pixbuf Icon;
-			public Gdk.Pixbuf ClosedIcon;
-			
+			public NodeInfo NodeInfo;
+
 			public bool Selected;
 			public bool Filled;
 			public bool Expanded;
@@ -837,15 +835,11 @@ namespace MonoDevelop.Ide.Gui.Components
 						LoggingService.LogError ("Found invalid iter for node. " + node.DataItem);
 						return;
 					}
-					tree.Store.SetValue (node.NodeIter, ExtensibleTreeView.TextColumn, node.Text);
-					if (node.Icon != null)
-						tree.Store.SetValue (node.NodeIter, ExtensibleTreeView.OpenIconColumn, node.Icon);
-					if (node.ClosedIcon != null)
-						tree.Store.SetValue (node.NodeIter, ExtensibleTreeView.ClosedIconColumn, node.ClosedIcon);
+					tree.Store.SetValue (node.NodeIter, ExtensibleTreeView.NodeInfoColumn, node.NodeInfo);
 				}
 				if (node.Children != null) {
 					foreach (TreeNode cn in node.Children) {
-						Gtk.TreeIter it = tree.Store.AppendValues (node.NodeIter, cn.Text, cn.Icon, cn.ClosedIcon, cn.DataItem, cn.BuilderChain, cn.Filled);
+						Gtk.TreeIter it = tree.Store.AppendValues (node.NodeIter, cn.NodeInfo, cn.DataItem, cn.BuilderChain, cn.Filled, false);
 						if (!cn.Filled)
 							tree.Store.AppendNode (it);	// Dummy node
 						// The OnNodeAdded event was already fired when the node was added. There is no need to fire it again.
@@ -913,6 +907,11 @@ namespace MonoDevelop.Ide.Gui.Components
 				}
 				while (tree.store.IterNext (ref child));
 			}
+		}
+	
+		public void ScrollToCell (Gtk.TreePath treePath)
+		{
+			Tree.ScrollToCell (treePath, null, true, 0, 0);
 		}
 	}
 }

@@ -24,32 +24,32 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using System.Linq;
 using Gtk;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.VersionControl.Git
 {
-	public partial class EditBranchDialog : Gtk.Dialog
+	partial class EditBranchDialog : Dialog
 	{
-		ListStore comboStore;
-		string currentTracking;
-		string oldName;
-		GitRepository repo;
+		readonly ListStore comboStore;
+		readonly string currentTracking;
+		readonly string oldName;
+		readonly GitRepository repo;
 		
 		public EditBranchDialog (GitRepository repo, Branch branch, bool isNew)
 		{
 			this.Build ();
 			this.repo =  repo;
 			
-			comboStore = new ListStore (typeof(string), typeof(Gdk.Pixbuf), typeof (string));
+			comboStore = new ListStore (typeof(string), typeof(Xwt.Drawing.Image), typeof (string));
 			comboSources.Model = comboStore;
-			CellRendererPixbuf crp = new CellRendererPixbuf ();
+			var crp = new CellRendererImage ();
 			comboSources.PackStart (crp, false);
-			comboSources.AddAttribute (crp, "pixbuf", 1);
-			CellRendererText crt = new CellRendererText ();
+			comboSources.AddAttribute (crp, "image", 1);
+			var crt = new CellRendererText ();
 			comboSources.PackStart (crt, true);
 			comboSources.AddAttribute (crt, "text", 2);
 			
@@ -58,26 +58,25 @@ namespace MonoDevelop.VersionControl.Git
 					oldName = branch.Name;
 				currentTracking = branch.Tracking;
 				entryName.Text = branch.Name;
-				if (currentTracking != null)
-					checkTrack.Active = true;
+				checkTrack.Active = currentTracking != null;
 			}
 			
 			foreach (Branch b in repo.GetBranches ()) {
-				AddValues (b.Name, ImageService.GetPixbuf ("vc-git-branch", IconSize.Menu));
+				AddValues (b.Name, ImageService.GetIcon ("vc-branch", IconSize.Menu));
 			}
 			
 			foreach (string t in repo.GetTags ())
-				AddValues (t, ImageService.GetPixbuf ("vc-git-tag", IconSize.Menu));
+				AddValues (t, ImageService.GetIcon ("vc-tag", IconSize.Menu));
 			
 			foreach (RemoteSource r in repo.GetRemotes ()) {
 				foreach (string b in repo.GetRemoteBranches (r.Name))
-					AddValues (r.Name + "/" + b, ImageService.GetPixbuf ("md-web-search-icon", IconSize.Menu));
+					AddValues (r.Name + "/" + b, ImageService.GetIcon ("vc-repository", IconSize.Menu));
 			}
 				
 			UpdateStatus ();
 		}
 		
-		void AddValues (string name, Gdk.Pixbuf icon)
+		void AddValues (string name, Xwt.Drawing.Image icon)
 		{
 			TreeIter it = comboStore.AppendValues (name, icon, name);
 			if (name == currentTracking)
@@ -107,7 +106,7 @@ namespace MonoDevelop.VersionControl.Git
 				labelError.Markup = "<span color='red'>" + GettextCatalog.GetString ("A branch with this name already exists") + "</span>";
 				labelError.Show ();
 				buttonOk.Sensitive = false;
-			} else if (!IsValidBranchName (entryName.Text)) {
+			} else if (!GitUtil.IsValidBranchName (entryName.Text)) {
 				labelError.Markup = "<span color='red'>" + GettextCatalog.GetString (@"A branch name can not:
 Start with '.' or end with '/' or '.lock'
 Contain a ' ', '..', '~', '^', ':', '\', '?', '['") + "</span>";
@@ -115,16 +114,6 @@ Contain a ' ', '..', '~', '^', ':', '\', '?', '['") + "</span>";
 				buttonOk.Sensitive = false;
 			} else
 				labelError.Hide ();
-		}
-
-		static bool IsValidBranchName (string name)
-		{
-			// List from: https://github.com/git/git/blob/master/refs.c#L21
-			if (name.StartsWith (".") || name.EndsWith ("/") || name.EndsWith (".lock"))
-				return false;
-			if (name.Contains (" ") || name.Contains ("~") || name.Contains ("..") || name.Contains ("^") || name.Contains (":") || name.Contains ("\\") || name.Contains ("?") || name.Contains ("["))
-				return false;
-			return true;
 		}
 
 		protected virtual void OnCheckTrackToggled (object sender, System.EventArgs e)

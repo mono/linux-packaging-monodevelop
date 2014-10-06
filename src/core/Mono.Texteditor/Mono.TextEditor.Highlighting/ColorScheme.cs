@@ -42,8 +42,10 @@ namespace Mono.TextEditor.Highlighting
 		public string Description { get; set; }
 		public string Originator { get; set; }
 		public string BaseScheme { get; set; }
+		public string FileName { get; set; }
 
 		#region Ambient Colors
+
 		[ColorDescription("Background(Read Only)",VSSetting="color=Plain Text/Background")]
 		public AmbientColor BackgroundReadOnly { get; private set; }
 		
@@ -83,6 +85,9 @@ namespace Mono.TextEditor.Highlighting
 		[ColorDescription("Tooltip Pager Text")]
 		public AmbientColor TooltipPagerText { get; private set; }
 
+		[ColorDescription("Notification Border")]
+		public AmbientColor NotificationBorder { get; private set; }
+
 		[ColorDescription("Bookmarks")]
 		public AmbientColor Bookmarks { get; private set; }
 
@@ -107,22 +112,22 @@ namespace Mono.TextEditor.Highlighting
 		[ColorDescription("Brace Matching(Rectangle)", VSSetting="color=Brace Matching (Rectangle)/Background,secondcolor=Brace Matching (Rectangle)/Foreground")]
 		public AmbientColor BraceMatchingRectangle { get; private set; }
 		
-		[ColorDescription("Usages(Rectangle)", VSSetting="color=MarkerFormatDefinition/HighlightedReference/Background,secondcolor=MarkerFormatDefinition/HighlightedReference/Background")]
+		[ColorDescription("Usages(Rectangle)", VSSetting="color=MarkerFormatDefinition/HighlightedReference/Background,secondcolor=MarkerFormatDefinition/HighlightedReference/Background,bordercolor=MarkerFormatDefinition/HighlightedReference/Background")]
 		public AmbientColor UsagesRectangle { get; private set; }
 
-		[ColorDescription("Changing usages(Rectangle)", VSSetting="color=MarkerFormatDefinition/HighlightedReference/Background,secondcolor=MarkerFormatDefinition/HighlightedReference/Background")]
+		[ColorDescription("Changing usages(Rectangle)", VSSetting="color=MarkerFormatDefinition/HighlightedReference/Background,secondcolor=MarkerFormatDefinition/HighlightedReference/Background,bordercolor=MarkerFormatDefinition/HighlightedReference/Background")]
 		public AmbientColor ChangingUsagesRectangle { get; private set; }
 
-		[ColorDescription("Breakpoint Marker")]
+		[ColorDescription("Breakpoint Marker", VSSetting = "color=Breakpoint (Enabled)/Background")]
 		public AmbientColor BreakpointMarker { get; private set; }
 
-		[ColorDescription("Breakpoint Marker(Invalid)")]
-		public AmbientColor InvalidBreakpointMarker { get; private set; }
+		[ColorDescription("Breakpoint Marker(Invalid)", VSSetting = "color=Breakpoint (Disabled)/Background")]
+		public AmbientColor BreakpointMarkerInvalid { get; private set; }
 
 		[ColorDescription("Breakpoint Marker(Disabled)")]
 		public AmbientColor BreakpointMarkerDisabled { get; private set; }
 
-		[ColorDescription("Debugger Current Line Marker")]
+		[ColorDescription("Debugger Current Line Marker", VSSetting = "color=Current Statement/Background")]
 		public AmbientColor DebuggerCurrentLineMarker { get; private set; }
 
 		[ColorDescription("Debugger Stack Line Marker")]
@@ -164,6 +169,9 @@ namespace Mono.TextEditor.Highlighting
 		[ColorDescription("Message Bubble Error Tag")]
 		public AmbientColor MessageBubbleErrorTag { get; private set; }
 
+		[ColorDescription("Message Bubble Error Tooltip")]
+		public AmbientColor MessageBubbleErrorTooltip { get; private set; }
+
 		[ColorDescription("Message Bubble Error Line")]
 		public AmbientColor MessageBubbleErrorLine { get; private set; }
 
@@ -179,6 +187,9 @@ namespace Mono.TextEditor.Highlighting
 		[ColorDescription("Message Bubble Warning Tag")]
 		public AmbientColor MessageBubbleWarningTag { get; private set; }
 
+		[ColorDescription("Message Bubble Warning Tooltip")]
+		public AmbientColor MessageBubbleWarningTooltip { get; private set; }
+
 		[ColorDescription("Message Bubble Warning Line")]
 		public AmbientColor MessageBubbleWarningLine { get; private set; }
 
@@ -187,6 +198,7 @@ namespace Mono.TextEditor.Highlighting
 
 		[ColorDescription("Message Bubble Warning IconMargin")]
 		public AmbientColor MessageBubbleWarningIconMargin { get; private set; }
+
 		#endregion
 
 		#region Text Colors
@@ -245,6 +257,9 @@ namespace Mono.TextEditor.Highlighting
 		[ColorDescription("Preprocessor", VSSetting = "Preprocessor Keyword")]
 		public ChunkStyle Preprocessor { get; private set; }
 
+		[ColorDescription("Preprocessor(Region Name)", VSSetting = "Plain Text")]
+		public ChunkStyle PreprocessorRegionName { get; private set; }
+
 		[ColorDescription("Xml Text", VSSetting = "XML Text")]
 		public ChunkStyle XmlText { get; private set; }
 
@@ -271,6 +286,9 @@ namespace Mono.TextEditor.Highlighting
 
 		[ColorDescription("Tooltip Text")] // not defined in vs.net
 		public ChunkStyle TooltipText { get; private set; }
+
+		[ColorDescription("Notification Text")] // not defined in vs.net
+		public ChunkStyle NotificationText { get; private set; }
 
 		[ColorDescription("Completion Text")] //not defined in vs.net
 		public ChunkStyle CompletionText { get; private set; }
@@ -395,15 +413,11 @@ namespace Mono.TextEditor.Highlighting
 		[ColorDescription("Breakpoint Text", VSSetting = "Breakpoint (Enabled)")]
 		public ChunkStyle BreakpointText { get; private set; }
 
-		[ColorDescription("Breakpoint Text(Invalid)", VSSetting = "Breakpoint (Disabled)")]
-		public ChunkStyle BreakpointTextInvalid { get; private set; }
-
 		[ColorDescription("Debugger Current Statement", VSSetting = "Current Statement")]
 		public ChunkStyle DebuggerCurrentLine { get; private set; }
 
 		[ColorDescription("Debugger Stack Line")] // not defined
 		public ChunkStyle DebuggerStackLine { get; private set; }
-
 
 		[ColorDescription("Diff Line(Added)")] //not defined
 		public ChunkStyle DiffLineAdded { get; private set; }
@@ -456,7 +470,6 @@ namespace Mono.TextEditor.Highlighting
 		[ColorDescription("Razor Code", VSSetting="Razor Code")]
 		public ChunkStyle RazorCode { get; private set; }
 
-
 		[ColorDescription("Css Comment", VSSetting="CSS Comment")]
 		public ChunkStyle CssComment { get; private set; }
 
@@ -492,7 +505,6 @@ namespace Mono.TextEditor.Highlighting
 
 		[ColorDescription("Script String", VSSetting="Script String")]
 		public ChunkStyle ScriptString { get; private set; }
-
 
 		#endregion
 
@@ -552,6 +564,13 @@ namespace Mono.TextEditor.Highlighting
 		
 		static Cairo.Color ParseColor (string value)
 		{
+			if (value.Length == 9 && value.StartsWith ("#", StringComparison.Ordinal)) {
+				double r = ((double) int.Parse (value.Substring (1,2), System.Globalization.NumberStyles.HexNumber)) / 255;
+				double g = ((double) int.Parse (value.Substring (3,2), System.Globalization.NumberStyles.HexNumber)) / 255;
+				double b = ((double) int.Parse (value.Substring (5,2), System.Globalization.NumberStyles.HexNumber)) / 255;
+				double a = ((double) int.Parse (value.Substring (7,2), System.Globalization.NumberStyles.HexNumber)) / 255;
+				return new Cairo.Color (r, g, b, a);
+			}
 			return HslColor.Parse (value);
 		}
 
@@ -575,7 +594,7 @@ namespace Mono.TextEditor.Highlighting
 			PropertyDecsription val;
 			if (!textColors.TryGetValue (color, out val)) {
 				Console.WriteLine ("Chunk style : " + color + " is undefined.");
-				return null;
+				return GetChunkStyle ("Plain Text");
 			}
 			return val.Info.GetValue (this, null) as ChunkStyle;
 		}
@@ -598,7 +617,7 @@ namespace Mono.TextEditor.Highlighting
 			// The fields we'd like to extract
 			result.Name = root.XPathSelectElement("name").Value;
 
-			if (result.Name != "Default")
+			if (result.Name != TextEditorOptions.DefaultColorStyle)
 				result.CopyValues (SyntaxModeService.DefaultColorStyle);
 
 			var version = Version.Parse (root.XPathSelectElement("version").Value);
@@ -696,7 +715,7 @@ namespace Mono.TextEditor.Highlighting
 				if (!string.IsNullOrEmpty (BaseScheme))
 					writer.WriteLine ("\t\"baseScheme\":\"{0}\",", BaseScheme);
 
-				var baseStyle = SyntaxModeService.GetColorStyle (BaseScheme ?? "Default");
+				var baseStyle = SyntaxModeService.GetColorStyle (BaseScheme ?? TextEditorOptions.DefaultColorStyle);
 
 				writer.WriteLine ("\t\"colors\":[");
 				bool first = true;
@@ -893,7 +912,7 @@ namespace Mono.TextEditor.Highlighting
 			result.TooltipBorder = new AmbientColor ();
 			result.TooltipBorder.Colors.Add (Tuple.Create ("color", AlphaBlend (result.PlainText.Foreground, result.PlainText.Background, 0.5)));
 
-			var defaultStyle = SyntaxModeService.GetColorStyle (HslColor.Brightness (result.PlainText.Background) < 0.5 ? "Monokai" : "Default");
+			var defaultStyle = SyntaxModeService.GetColorStyle (HslColor.Brightness (result.PlainText.Background) < 0.5 ? "Monokai" : TextEditorOptions.DefaultColorStyle);
 
 			foreach (var color in textColors.Values) {
 				if (color.Info.GetValue (result, null) == null)

@@ -35,7 +35,7 @@ using MonoDevelop.Core;
 
 namespace MonoDevelop.AssemblyBrowser
 {
-	public class ModuleReferenceNodeBuilder : TypeNodeBuilder
+	class ModuleReferenceNodeBuilder : TypeNodeBuilder
 	{
 		public override Type NodeDataType {
 			get { return typeof(ModuleReference); }
@@ -47,11 +47,11 @@ namespace MonoDevelop.AssemblyBrowser
 			return reference.Name;
 		}
 		
-		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, ref string label, ref Gdk.Pixbuf icon, ref Gdk.Pixbuf closedIcon)
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
 			var reference = (ModuleReference)dataObject;
-			label = reference.Name;
-			icon = Context.GetIcon (Stock.MiscFiles);
+			nodeInfo.Label = reference.Name;
+			nodeInfo.Icon = Context.GetIcon (Stock.GenericFile);
 		}
 		
 		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)

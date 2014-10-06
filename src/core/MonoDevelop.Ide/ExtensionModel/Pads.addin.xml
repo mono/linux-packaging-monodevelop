@@ -31,7 +31,7 @@
 		
 	<Pad id = "MonoDevelop.Ide.Gui.Pads.TaskListPad"
 		_label = "Tasks"
-		icon="md-task-list-icon"
+		icon="md-task-list"
 		class = "MonoDevelop.Ide.Gui.Pads.TaskListPad"
 		defaultPlacement = "Bottom"
 		defaultStatus="AutoHide"
@@ -59,6 +59,9 @@
 		<NodeBuilder class = "MonoDevelop.Ide.Gui.Pads.ProjectPad.FileOperationsBuilderExtension"/>
 		<NodeBuilder class = "MonoDevelop.Ide.Gui.Pads.ProjectPad.UnknownEntryNodeBuilder"/>
 		<NodeBuilder class = "MonoDevelop.Ide.Gui.Pads.ProjectPad.SolutionFolderFileNodeBuilder"/>
+		<NodeBuilder class = "MonoDevelop.Ide.Gui.Pads.ProjectPad.PortableFrameworkSubsetNodeBuilder"/>
+		<NodeBuilder class = "MonoDevelop.Ide.Gui.Pads.ProjectPad.ImplicitFrameworkAssemblyReferenceNodeBuilder"/>
+		<NodeBuilder class = "MonoDevelop.Ide.Gui.Pads.ProjectPad.SapNodeBuilder"/>
 	</SolutionPad>
 	
 	<SolutionPad id = "ClassPad" _label = "Classes" icon = "md-class" class = "MonoDevelop.Ide.Gui.Pads.ClassBrowser.ClassBrowserPad" defaultPlacement = "Left" defaultStatus="AutoHide">

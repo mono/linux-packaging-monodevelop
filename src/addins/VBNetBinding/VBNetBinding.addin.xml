@@ -1,18 +1,5 @@
-<Addin id          = "VBBinding"
-       namespace   = "MonoDevelop"
-       name        = "VB.NET Language Binding"
-       author      = "Levi Bard"
-       copyright   = "LGPL"
-       url         = "http://bard.sytes.net/vbnetbinding"
-       description = "VB.NET Language Binding"
-       category    = "Language bindings"
-       version     = "4.0.12">
+<ExtensionModel>
 
-	<Dependencies>
-		<Addin id="Core" version="4.0.12"/>
-		<Addin id="Ide" version="4.0.12"/>
-	</Dependencies>
-	
 	<Extension path = "/MonoDevelop/ProjectModel/MSBuildItemTypes">
 		<DotNetProject 
 			language="VBNet" 
@@ -20,10 +7,6 @@
 			guid="{F184B08F-C81C-45F6-A57F-5ABD9991F28F}" 
 			import="$(MSBuildBinPath)\Microsoft.VisualBasic.targets"
 			resourceHandler="MonoDevelop.VBNetBinding.VBNetResourceIdBuilder"/>
-	</Extension>
-	
-	<Extension path = "/MonoDevelop/ProjectModel/MD1SerializationMaps">
-		<SerializationMap resource="md1format.xml" />
 	</Extension>
 
   	<Extension path = "/MonoDevelop/Ide/FileFilters">
@@ -64,7 +47,7 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Core/StockIcons">
-		<StockIcon stockid = "md-vb-file" resource = "VB.FileIcon" size="Menu" />
+		<StockIcon stockid = "md-vb-file" icon = "md-file-source" size="Menu" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Core/MimeTypes">
@@ -88,4 +71,4 @@
 		<Parser class = "MonoDevelop.VBNetBinding.DomParser" fileExtensions=".vb" />
 	</Extension>-->
 	
-</Addin>
+</ExtensionModel>

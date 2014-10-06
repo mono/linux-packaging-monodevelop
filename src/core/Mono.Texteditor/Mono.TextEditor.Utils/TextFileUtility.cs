@@ -61,6 +61,7 @@ namespace Mono.TextEditor.Utils
 			// Encoding verifiers
 			var verifierList = new List<Verifier> () {
 				new Utf8Verifier (),
+				new GB18030CodePageVerifier (),
 				new WindowsCodePageVerifier (),
 				new UnicodeVerifier (),
 				new BigEndianUnicodeVerifier (),
@@ -155,6 +156,25 @@ namespace Mono.TextEditor.Utils
 			}
 		}
 
+		public static string GetText (byte[] bytes, Encoding encoding, out bool hadBom)
+		{
+			byte[] bom = encoding.GetPreamble ();
+			if (bom != null && bom.Length > 0 && bom.Length <= bytes.Length) {
+				hadBom = true;
+				for (int i = 0; i < bom.Length; i++) {
+					if (bytes [i] != bom [i]) {
+						hadBom = false;
+						break;
+					}
+				}
+			} else {
+				hadBom = false;
+			}
+			if (hadBom) 
+				return encoding.GetString (bytes, bom.Length, bytes.Length - bom.Length);
+			return encoding.GetString (bytes);
+		}
+
 		public static string GetText (Stream inputStream)
 		{
 			using (var stream = OpenStream (inputStream)) {
@@ -201,9 +221,9 @@ namespace Mono.TextEditor.Utils
 				throw new ArgumentNullException ("text");
 			if (encoding == null)
 				throw new ArgumentNullException ("encoding");
-
+			// atomic rename only works in the same directory on linux. The tmp files may be on another partition -> breaks save.
 			string tmpPath = Path.Combine (Path.GetDirectoryName (fileName), ".#" + Path.GetFileName (fileName));
-			using (var stream = new FileStream (tmpPath, FileMode.Create, FileAccess.Write, FileShare.Write)) {
+			using (var stream = new FileStream (tmpPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Write)) {
 				if (hadBom) {
 					var bom = encoding.GetPreamble ();
 					if (bom != null && bom.Length > 0)
@@ -212,11 +232,20 @@ namespace Mono.TextEditor.Utils
 				byte[] bytes = encoding.GetBytes (text);
 				stream.Write (bytes, 0, bytes.Length);
 			}
-			SystemRename (tmpPath, fileName);
+			try {
+				SystemRename (tmpPath, fileName);
+			} catch (Exception) {
+				try {
+					System.IO.File.Delete (tmpPath);
+				} catch {
+					// nothing
+				}
+				throw;
+			}
 		}
 
 		/// <summary>
-		/// Returns a byte array containing the text encoded by a specified encoding & bom.
+		/// Returns a byte array containing the text encoded by a specified encoding &amp; bom.
 		/// </summary>
 		/// <param name="text">The text to encode.</param>
 		/// <param name="encoding">The encoding.</param>
@@ -293,21 +322,8 @@ namespace Mono.TextEditor.Utils
 				throw new ArgumentNullException ("encoding");
 			
 			byte[] content = File.ReadAllBytes (fileName);
-			byte[] bom = encoding.GetPreamble ();
-			if (bom != null && bom.Length > 0 && bom.Length <= content.Length) {
-				hadBom = true;
-				for (int i = 0; i < bom.Length; i++) {
-					if (content [i] != bom [i]) {
-						hadBom= false;
-						break;
-					}
-				}
-			} else {
-				hadBom = false;
-			}
-			return encoding.GetString (content);
+			return GetText (content, encoding, out hadBom); 
 		}
-
 		#endregion
 
 		#region ASCII encoding check
@@ -748,7 +764,92 @@ namespace Mono.TextEditor.Utils
 				}
 			}
 		}
+
+		/// <summary>
+		/// Try to detect chinese encoding.
+		/// </summary>
+		class GB18030CodePageVerifier : Verifier
+		{
+			const byte Valid  = 1;
+			const byte Second = 2;
+			const byte Third  = 3;
+			const byte Fourth  = 4;
+			const byte NotValid  = 5;
+
+			const byte LAST = 6;
+			static byte[][] table;
+			static Encoding EncodingWindows;
+
+			public override byte InitalState { get { return NotValid; } }
+
+			public override Encoding Encoding { get { return EncodingWindows; } }
+
+			public override byte[][] StateTable { get { return table; } }
+
+			public override bool IsEncodingValid (byte state)
+			{
+				return state == Valid; 
+			}
+
+			int WindowsCodePage {
+				get {
+					return 54936;
+				}
+			}
+
+			public override bool IsSupported {
+				get {
+					try {
+						return Encoding.GetEncoding (WindowsCodePage) != null;
+					} catch (Exception) {
+						return false;
+					}
+				}
+			}
+
+			protected override void Init ()
+			{
+				EncodingWindows = Encoding.GetEncoding (WindowsCodePage);
+				table = new byte[LAST][];
+				table [0] = errorTable;
+				for (int i = 1; i < LAST; i++)
+					table [i] = new byte[(int)byte.MaxValue + 1];
+
+				for (int i = 0x00; i <= 0x80; i++)
+					table [Valid] [i] = Valid;
+				for (int i = 0x81; i <= 0xFE; i++)
+					table [Valid] [i] = Second;
+				table [Valid] [0xFF] = Error;
+
+				// need to encounter a multi byte sequence first.
+				for (int i = 0x00; i <= 0x80; i++)
+					table [NotValid] [i] = NotValid;
+				for (int i = 0x81; i <= 0xFE; i++)
+					table [NotValid] [i] = Second;
+				table [NotValid] [0xFF] = Error;
+
+				for (int i = 0x00; i <= 0xFF; i++)
+					table [Second] [i] = Error;
+				for (int i = 0x40; i <= 0xFE; i++)
+					table [Second] [i] = Valid;
+				for (int i = 0x30; i <= 0x39; i++)
+					table [Second] [i] = Third;
+
+				for (int i = 0x00; i <= 0xFF; i++)
+					table [Third] [i] = Error;
+				for (int i = 0x81; i <= 0xFE; i++)
+					table [Third] [i] = Fourth;
+
+				for (int i = 0x00; i <= 0xFF; i++)
+					table [Fourth] [i] = Error;
+				for (int i = 0x30; i <= 0x39; i++)
+					table [Fourth] [i] = Valid;
+			}
+		}
 		#endregion
 	}
 }
+
+
+
 

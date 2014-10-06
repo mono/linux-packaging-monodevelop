@@ -24,46 +24,65 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 using System;
+using System.Linq;
 using Gtk;
 using Xwt.Backends;
 
 namespace Xwt.GtkBackend
 {
-	public class CustomCellRendererToggle: Gtk.CellRendererToggle, ICellDataSource
+	public class CustomCellRendererToggle: CellViewBackend
 	{
-		ICheckBoxCellViewFrontend view;
-		TreeModel treeModel;
-		TreeIter iter;
+		Gtk.CellRendererToggle renderer;
 
-		public CustomCellRendererToggle (ICheckBoxCellViewFrontend view)
+		public CustomCellRendererToggle ()
 		{
-			this.view = view;
+			CellRenderer = renderer = new Gtk.CellRendererToggle ();
+			renderer.Toggled += HandleToggled;
 		}
 
-		public void LoadData (TreeModel treeModel, TreeIter iter)
+		protected override void OnLoadData ()
 		{
-			this.treeModel = treeModel;
-			this.iter = iter;
-			view.Initialize (this);
-
-			Active = view.Active;
-			Activatable = view.Editable;
-			Visible = view.Visible;
+			var view = (ICheckBoxCellViewFrontend) Frontend;
+			renderer.Inconsistent = view.State == CheckBoxState.Mixed;
+			renderer.Active = view.State == CheckBoxState.On;
+			renderer.Activatable = view.Editable;
+			renderer.Visible = view.Visible;
 		}
 
-		public object GetValue (IDataField field)
+		void HandleToggled (object o, ToggledArgs args)
 		{
-			return CellUtil.GetModelValue (treeModel, iter, field.Index);
-		}
+			SetCurrentEventRow ();
 
-		protected override void OnToggled (string path)
-		{
-			if (!view.RaiseToggled () && view.ActiveField != null) {
+			var view = (ICheckBoxCellViewFrontend) Frontend;
+			IDataField field = (IDataField) view.StateField ?? view.ActiveField;
+
+			if (!view.RaiseToggled () && (field != null)) {
+				Type type = field.FieldType;
+
 				Gtk.TreeIter iter;
-				if (treeModel.GetIterFromString (out iter, path))
-					CellUtil.SetModelValue (treeModel, iter, view.ActiveField.Index, view.ActiveField.FieldType, !Active);
+				if (TreeModel.GetIterFromString (out iter, args.Path)) {
+					CheckBoxState newState;
+
+					if (view.AllowMixed && type == typeof(CheckBoxState)) {
+						if (renderer.Inconsistent)
+							newState = CheckBoxState.Off;
+						else if (renderer.Active)
+							newState = CheckBoxState.Mixed;
+						else
+							newState = CheckBoxState.On;
+					} else {
+						if (renderer.Active)
+							newState = CheckBoxState.Off;
+						else
+							newState = CheckBoxState.On;
+					}
+
+					object newValue = type == typeof(CheckBoxState) ?
+						(object) newState : (object) (newState == CheckBoxState.On);
+
+					CellUtil.SetModelValue (TreeModel, iter, field.Index, type, newValue);
+				}
 			}
-			base.OnToggled (path);
 		}
 	}
 }

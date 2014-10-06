@@ -1,4 +1,0 @@
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/TextTransform.exe.mdb
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/TextTransform.exe
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/TextTemplating/TextTransform/obj/Debug/TextTransform.exe
-/home/builder/data/lanes/monodevelop-linux-monodevelop-4.0.12-branch/593d7acb/source/monodevelop/main/src/addins/TextTemplating/TextTransform/obj/Debug/TextTransform.exe.mdb

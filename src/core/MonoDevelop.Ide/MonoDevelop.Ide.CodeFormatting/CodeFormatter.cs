@@ -31,6 +31,7 @@ using System.Collections.Generic;
 using ICSharpCode.NRefactory;
 using ICSharpCode.NRefactory.TypeSystem;
 using ICSharpCode.NRefactory.Semantics;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Ide.CodeFormatting
 {
@@ -47,15 +48,29 @@ namespace MonoDevelop.Ide.CodeFormatting
 		
 		public string FormatText (PolicyContainer policyParent, string input)
 		{
-			return formatter.FormatText (policyParent ?? PolicyService.DefaultPolicies, mimeTypeChain, input);
+			try {
+				return formatter.FormatText (policyParent ?? PolicyService.DefaultPolicies, mimeTypeChain, input);
+			} catch (Exception e) {
+				LoggingService.LogError ("Error while formatting text.", e);
+			}
+			return input;
 		}
 		
-		/// <summary>Formats a subrange of the input text.
+		/// <summary>Formats a subrange of the input text.</summary>
 		/// <returns>The formatted text of the range.</returns>
+		/// <exception cref="T:System.ArgumentOutOfRangeException">When the offsets are out of bounds.</exception>
 		public string FormatText (PolicyContainer policyParent, string input, int fromOffset, int toOffset)
 		{
-			return formatter.FormatText (policyParent ?? PolicyService.DefaultPolicies, mimeTypeChain,
-				input, fromOffset, toOffset);
+			if (fromOffset < 0 || fromOffset > input.Length)
+				throw new ArgumentOutOfRangeException ("fromOffset", "should be >= 0 && < " + input.Length + " was:" + fromOffset);
+			if (toOffset < 0 || toOffset > input.Length)
+				throw new ArgumentOutOfRangeException ("fromOffset", "should be >= 0 && < " + input.Length + " was:" + toOffset);
+			try {
+				return formatter.FormatText (policyParent ?? PolicyService.DefaultPolicies, mimeTypeChain, input, fromOffset, toOffset);
+			} catch (Exception e) {
+				LoggingService.LogError ("Error while formatting text.", e);
+			}
+			return input.Substring (fromOffset, toOffset - fromOffset);
 		}
 		
 		public bool SupportsOnTheFlyFormatting {
@@ -81,18 +96,6 @@ namespace MonoDevelop.Ide.CodeFormatting
 		/// <summary>
 		/// Formats a text document directly with insert/remove operations.
 		/// </summary>
-		/// <param name="textEditorData">
-		/// A <see cref="System.Object"/> that must be from type Mono.TextEditorData.
-		/// </param>
-		/// <param name="dom">
-		/// A <see cref="ITypeResolveContext"/>
-		/// </param>
-		/// <param name="unit">
-		/// A <see cref="IUnresolvedFile"/>
-		/// </param>
-		/// <param name="caretLocation">
-		/// A <see cref="TextLocation"/> that should be the end location to which the parsing should occur.
-		/// </param>
 		public void OnTheFlyFormat (MonoDevelop.Ide.Gui.Document doc, int startOffset, int endOffset)
 		{
 			var adv = formatter as IAdvancedCodeFormatter;

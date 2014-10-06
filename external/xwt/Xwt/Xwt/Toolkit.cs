@@ -83,6 +83,7 @@ namespace Xwt
 
 		public ToolkitType Type {
 			get { return toolkitType; }
+			internal set { toolkitType = value; }
 		}
 
 		internal static void DisposeAll ()
@@ -159,6 +160,8 @@ namespace Xwt
 			switch (type) {
 			case ToolkitType.Gtk:
 				return "Xwt.GtkBackend.GtkEngine, Xwt.Gtk, Version=" + version;
+			case ToolkitType.Gtk3:
+				return "Xwt.GtkBackend.GtkEngine, Xwt.Gtk3, Version=" + version;
 			case ToolkitType.Cocoa:
 				return "Xwt.Mac.MacEngine, Xwt.Mac, Version=" + version;
 			case ToolkitType.Wpf:
@@ -211,6 +214,7 @@ namespace Xwt
 			DrawingPathBackendHandler = Backend.CreateBackend<DrawingPathBackendHandler> ();
 			DesktopBackend = Backend.CreateBackend<DesktopBackend> ();
 			VectorImageRecorderContextHandler = new VectorImageRecorderContextHandler (this);
+			KeyboardHandler = Backend.CreateBackend<KeyboardHandler> ();
 		}
 
 		internal static ToolkitEngineBackend GetToolkitBackend (Type type)
@@ -270,11 +274,13 @@ namespace Xwt
 		
 		internal void InvokePlatformCode (Action a)
 		{
+			int prevCount = inUserCode;
 			try {
+				inUserCode = 1;
 				ExitUserCode (null);
 				a ();
 			} finally {
-				EnterUserCode ();
+				inUserCode = prevCount;
 			}
 		}
 		
@@ -347,22 +353,26 @@ namespace Xwt
 					return externalWidget;
 				nativeWidget = externalWidget.Surface.ToolkitEngine.GetNativeWidget (externalWidget);
 			}
-			return new EmbeddedNativeWidget (nativeWidget, externalWidget);
+			var embedded = CreateObject<EmbeddedNativeWidget> ();
+			embedded.Initialize (nativeWidget, externalWidget);
+			return embedded;
 		}
 
 		public Image WrapImage (object nativeImage)
 		{
-			return new Image (backend.GetBackendForImage (nativeImage));
+			return new Image (backend.GetBackendForImage (nativeImage), this);
 		}
 
-		public Context WrapContext (object nativeContext)
+		public Context WrapContext (object nativeWidget, object nativeContext)
 		{
-			return new Context (backend.GetBackendForContext (nativeContext), this);
+			return new Context (backend.GetBackendForContext (nativeWidget, nativeContext), this);
 		}
 
 		public object ValidateObject (object obj)
 		{
-			if (obj is IFrontend) {
+			if (obj is Image)
+				((Image)obj).InitForToolkit (this);
+			else if (obj is IFrontend) {
 				if (((IFrontend)obj).ToolkitEngine != this)
 					throw new InvalidOperationException ("Object belongs to a different toolkit");
 			}
@@ -392,17 +402,23 @@ namespace Xwt
 
 		public Image RenderWidget (Widget widget)
 		{
-			return new Image (backend.RenderWidget (widget));
+			return new Image (backend.RenderWidget (widget), this);
 		}
 
 		public void RenderImage (object nativeWidget, object nativeContext, Image img, double x, double y)
 		{
+			ValidateObject (img);
 			img.GetFixedSize (); // Ensure that it has a size
-			backend.RenderImage (nativeWidget, nativeContext, img.ImageDescription, x, y);
+			backend.RenderImage (nativeWidget, nativeContext, img.GetImageDescription (this), x, y);
 		}
 
 		public ToolkitFeatures SupportedFeatures {
 			get { return backend.SupportedFeatures; }
+		}
+
+		public void RegisterBackend<TBackend, TImplementation> () where TImplementation: TBackend
+		{
+			backend.RegisterBackend<TBackend, TImplementation> ();
 		}
 
 		internal Image GetStockIcon (string id)
@@ -424,6 +440,7 @@ namespace Xwt
 		internal DrawingPathBackendHandler DrawingPathBackendHandler;
 		internal DesktopBackend DesktopBackend;
 		internal VectorImageRecorderContextHandler VectorImageRecorderContextHandler;
+		internal KeyboardHandler KeyboardHandler;
 	}
 
 	class NativeWindowFrame: WindowFrame

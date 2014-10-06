@@ -201,6 +201,7 @@ namespace ICSharpCode.NRefactory.CSharp.FormattingTests
 			policy.MethodCallArgumentWrapping = Wrapping.WrapAlways;
 			policy.NewLineAferMethodCallOpenParentheses = NewLinePlacement.SameLine;
 			policy.MethodCallClosingParenthesesOnNewLine = NewLinePlacement.SameLine;
+			policy.AlignToFirstMethodCallArgument = true;
 
 			Test(policy, @"class Test
 {
@@ -553,6 +554,7 @@ int j,
 			policy.MethodCallArgumentWrapping = Wrapping.DoNotChange;
 			policy.NewLineAferMethodCallOpenParentheses = NewLinePlacement.NewLine;
 			policy.MethodCallClosingParenthesesOnNewLine = NewLinePlacement.NewLine;
+			policy.AlignToFirstMethodCallArgument = true;
 
 			Test(policy, @"class Test
 {
@@ -583,6 +585,7 @@ int j,
 			policy.MethodCallArgumentWrapping = Wrapping.DoNotChange;
 			policy.NewLineAferMethodCallOpenParentheses = NewLinePlacement.NewLine;
 			policy.MethodCallClosingParenthesesOnNewLine = NewLinePlacement.NewLine;
+			policy.AlignToFirstMethodCallArgument = true;
 
 			Test(policy, @"class Test
 {
@@ -609,7 +612,7 @@ int j,
 		{
 			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono ();
 
-			var adapter = Test (policy, @"class Test
+			Test (policy, @"class Test
 {
 	int Foo (int i, double d, Action a)
 	{
@@ -629,9 +632,9 @@ int j,
 		public void TestNoBlankLinesBetweenEndBraceAndEndParenthesis ()
 		{
 			CSharpFormattingOptions policy = FormattingOptionsFactory.CreateMono ();
-			policy.BlankLinesBetweenMembers = 1;
+			policy.MinimumBlankLinesBetweenMembers = 1;
 
-			var adapter = Test (policy, @"class Test
+			Test (policy, @"class Test
 {
 	int Foo (int i, double d, Action a)
 	{
@@ -870,6 +873,7 @@ int foo)
 		public void TestWrappingWithSpaceIndent()
 		{
 			var policy = FormattingOptionsFactory.CreateMono();
+			policy.AlignToFirstMethodCallArgument = true;
 
 			TextEditorOptions options = new TextEditorOptions();
 			options.IndentSize = options.TabSize = 2;
@@ -894,6 +898,103 @@ int foo)
          3);
   }
 }", FormattingMode.Intrusive, options);
+		}
+
+
+		[Test]
+		public void TestIndexerCase1()
+		{
+			var policy = FormattingOptionsFactory.CreateMono();
+			policy.AlignToFirstIndexerDeclarationParameter = true;
+			policy.IndexerDeclarationParameterWrapping = Wrapping.WrapAlways;
+			Test(policy, @"class ClassDeclaration
+{ 
+	public int this [
+int test,
+string foo,
+double bar]
+	{
+		get {}
+	}
+}",
+				@"class ClassDeclaration
+{
+	public int this [
+		int test,
+		string foo,
+		double bar] {
+		get { }
+	}
+}");
+		}
+			
+		[Test]
+		public void TestIndexerCase2()
+		{
+			var policy = FormattingOptionsFactory.CreateMono();
+			policy.AlignToFirstIndexerDeclarationParameter = true;
+			policy.IndexerDeclarationParameterWrapping = Wrapping.WrapAlways;
+			Test(policy, @"class ClassDeclaration
+{ 
+	public int this [int test,
+string foo,
+double bar]
+	{
+		get {}
+	}
+}",
+				@"class ClassDeclaration
+{
+	public int this [int test,
+	                 string foo,
+	                 double bar] {
+		get { }
+	}
+}");
+		}
+
+		[Test]
+		public void TestIndexerCase3()
+		{
+			var policy = FormattingOptionsFactory.CreateMono();
+			Test(policy, @"class ClassDeclaration { 
+	public int this [int test, string foo, double bar]
+	{
+		get {}
+	}
+	public int this [
+int test,
+string foo,
+double bar]
+	{
+		get {}
+	}
+	public int this [int test,
+string foo,
+double bar]
+	{
+		get {}
+	}
+}",
+				@"class ClassDeclaration
+{
+	public int this [int test, string foo, double bar] {
+		get { }
+	}
+
+	public int this [
+		int test,
+		string foo,
+		double bar] {
+		get { }
+	}
+
+	public int this [int test,
+	                 string foo,
+	                 double bar] {
+		get { }
+	}
+}");
 		}
 	}
 }

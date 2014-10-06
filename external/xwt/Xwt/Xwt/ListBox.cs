@@ -143,6 +143,12 @@ namespace Xwt
 				}
 			}
 		}
+
+		public bool GridLinesVisible
+		{
+			get { return Backend.GridLinesVisible; }
+			set { Backend.GridLinesVisible = value; }
+		}
 		
 		/// <summary>
 		/// Gets or sets the vertical scroll policy.
@@ -268,6 +274,11 @@ namespace Xwt
 		public void UnselectAll ()
 		{
 			Backend.UnselectAll ();
+		}
+
+		public void ScrollToRow (int row)
+		{
+			Backend.ScrollToRow (row);
 		}
 		
 		void HandleModelChanged (object sender, ListRowEventArgs e)

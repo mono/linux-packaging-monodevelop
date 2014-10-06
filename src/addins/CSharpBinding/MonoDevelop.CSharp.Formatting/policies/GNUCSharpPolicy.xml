@@ -40,8 +40,7 @@ THE SOFTWARE.
 	<IndentSwitchBody>True</IndentSwitchBody>
 	<IndentCaseBody>True</IndentCaseBody>
 	<IndentBreakStatements>True</IndentBreakStatements>
-	<AlignEmbeddedUsingStatements>True</AlignEmbeddedUsingStatements>
-	<AlignEmbeddedIfStatements>True</AlignEmbeddedIfStatements>
+	<AlignEmbeddedStatements>True</AlignEmbeddedStatements>
 	<PropertyFormatting>AllowOneLine</PropertyFormatting>
 	<NamespaceBraceStyle>NextLine</NamespaceBraceStyle>
 	<ClassBraceStyle>NextLine</ClassBraceStyle>
@@ -55,8 +54,8 @@ THE SOFTWARE.
 	<PropertyBraceStyle>EndOfLine</PropertyBraceStyle>
 	<PropertyGetBraceStyle>EndOfLine</PropertyGetBraceStyle>
 	<PropertySetBraceStyle>EndOfLine</PropertySetBraceStyle>
-	<AllowPropertyGetBlockInline>True</AllowPropertyGetBlockInline>
-	<AllowPropertySetBlockInline>True</AllowPropertySetBlockInline>
+	<SimpleGetBlockFormatting>AllowOneLine</SimpleGetBlockFormatting>
+	<SimpleSetBlockFormatting>AllowOneLine</SimpleSetBlockFormatting>
 	<EventBraceStyle>EndOfLine</EventBraceStyle>
 	<EventAddBraceStyle>EndOfLine</EventAddBraceStyle>
 	<EventRemoveBraceStyle>EndOfLine</EventRemoveBraceStyle>
@@ -65,7 +64,7 @@ THE SOFTWARE.
 	<StatementBraceStyle>NextLineShifted2</StatementBraceStyle>
 	<AllowIfBlockInline>False</AllowIfBlockInline>
 	<ElseNewLinePlacement>SameLine</ElseNewLinePlacement>
-	<ElseIfNewLinePlacement>DoNotCare</ElseIfNewLinePlacement>
+	<ElseIfNewLinePlacement>SameLine</ElseIfNewLinePlacement>
 	<CatchNewLinePlacement>SameLine</CatchNewLinePlacement>
 	<FinallyNewLinePlacement>SameLine</FinallyNewLinePlacement>
 	<WhileNewLinePlacement>SameLine</WhileNewLinePlacement>
@@ -91,6 +90,8 @@ THE SOFTWARE.
 	<BeforeConstructorDeclarationParameterComma>False</BeforeConstructorDeclarationParameterComma>
 	<AfterConstructorDeclarationParameterComma>True</AfterConstructorDeclarationParameterComma>
 	<WithinConstructorDeclarationParentheses>False</WithinConstructorDeclarationParentheses>
+	<NewLineBeforeConstructorInitializerColon>NewLine</NewLineBeforeConstructorInitializerColon>
+	<NewLineAfterConstructorInitializerColon>SameLine</NewLineAfterConstructorInitializerColon>
 	<BeforeIndexerDeclarationBracket>True</BeforeIndexerDeclarationBracket>
 	<WithinIndexerDeclarationBracket>False</WithinIndexerDeclarationBracket>
 	<BeforeIndexerDeclarationParameterComma>False</BeforeIndexerDeclarationParameterComma>
@@ -156,4 +157,7 @@ THE SOFTWARE.
 	<BlankLinesBetweenFields>0</BlankLinesBetweenFields>
 	<BlankLinesBetweenEventFields>0</BlankLinesBetweenEventFields>
 	<BlankLinesBetweenMembers>1</BlankLinesBetweenMembers>
+	<BlankLinesInsideRegion>1</BlankLinesInsideRegion>
+	<BlankLinesAroundRegion>1</BlankLinesAroundRegion>
+	<IndentBlocksInsideExpressions>False</IndentBlocksInsideExpressions>
 </CSharpFormattingPolicy>
