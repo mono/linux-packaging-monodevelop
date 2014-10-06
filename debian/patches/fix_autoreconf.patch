@@ -1,0 +1,10 @@
+Index: xamarin-pkg-monodevelop/configure.in
+===================================================================
+--- xamarin-pkg-monodevelop.orig/configure.in	2014-10-06 11:11:53.329783563 +0100
++++ xamarin-pkg-monodevelop/configure.in	2014-10-06 11:12:32.557782828 +0100
+@@ -1,4 +1,4 @@
+-AC_INIT([monodevelop], m4_esyscmd_s([grep ^Version ../version.config|cut -d '=' -f 2|tr -d '\n']), [monodevelop-list@lists.ximian.com])
++AC_INIT([monodevelop], m4_esyscmd_s([grep ^Version version.config|cut -d '=' -f 2|tr -d '\n']), [monodevelop-list@lists.ximian.com])
+ AC_PREREQ(2.53)
+ AM_INIT_AUTOMAKE([1.10 tar-ustar])
+ AM_MAINTAINER_MODE
