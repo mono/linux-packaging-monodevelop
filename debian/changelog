@@ -1,3 +1,19 @@
+monodevelop (5.5.0.227-0xamarin1) wheezy; urgency=medium
+
+  * [b2c8331] Imported Upstream version 5.5.0.227
+  * [d210995] Delete obsolete patches
+  * [1b59ae1] Clear patch fizz, via quilt refresh
+  * [3dd147d] Fix error in configure.in which applies for tarball builds but 
+    not git builds when running autoreconf
+  * [21c2a57] Remove Metacity references for good
+  * [3331661] Ensure NUnit 2.6.3 is installed
+  * [fd85c88] Build-depend on NuGet
+  * [a1ae116] Add WebKit to build dependencies, for Xwt moduleref resolution
+  * [9b4cf12] Since the GDB addin is integrated now, declare it in 
+    debian/control
+
+ -- Jo Shields <directhex@apebox.org>  Mon, 06 Oct 2014 11:46:04 +0100
+
 monodevelop (4.0.12+dfsg-5) unstable; urgency=medium
 
   * [5fde005] Include a non-minified version of jquery-iframe-auto-height, 
