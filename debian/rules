@@ -53,6 +53,7 @@ override_dh_auto_install:
 	# install missing DLL maps
 	cp debian/MonoDevelop.SourceEditor2.dll.config debian/tmp/usr/lib/monodevelop/AddIns/DisplayBindings/SourceEditor/
 	cp debian/MonoDevelop.Gettext.dll.config debian/tmp/usr/lib/monodevelop/AddIns/DisplayBindings/Gettext/
+	cp `pkg-config --variable=Libraries nuget-core` debian/tmp/usr/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
 	# fix permissions of .mo files
 	cd $(CURDIR)/debian/tmp/usr/share/locale && find -name "*.mo" -exec chmod -x {} \;
 
