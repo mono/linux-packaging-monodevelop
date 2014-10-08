@@ -1,3 +1,9 @@
+monodevelop (5.5.0.227-0xamarin2) wheezy; urgency=medium
+
+  * [99e533b] Correct NUnit links
+
+ -- Jo Shields <jo.shields@xamarin.com>  Wed, 08 Oct 2014 11:45:55 +0100
+
 monodevelop (5.5.0.227-0xamarin1) wheezy; urgency=medium
 
   * [b2c8331] Imported Upstream version 5.5.0.227
