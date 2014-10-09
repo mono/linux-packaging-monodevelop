@@ -24,14 +24,10 @@ BuildRequires:  pkgconfig(glib-sharp-2.0)
 BuildRequires:  pkgconfig(gnome-sharp-2.0)
 BuildRequires:  pkgconfig(gtk-sharp-2.0)
 BuildRequires:  pkgconfig(libgnomeui-2.0)
-%if 0%{?suse_version} > 1100
 BuildRequires:  pkgconfig(gconf-sharp-2.0)
 BuildRequires:  pkgconfig(gnome-vfs-sharp-2.0)
-BuildRequires:  pkgconfig(gtksourceview-sharp-2.0)
-%endif
 BuildRequires:  autoconf
 BuildRequires:  automake
-BuildRequires:  dos2unix
 BuildRequires:  fdupes
 BuildRequires:  git
 BuildRequires:  hicolor-icon-theme
@@ -46,8 +42,9 @@ BuildRequires:  pkgconfig(mono)
 # mono-find-requires searches for libmono-2.0.so.1:
 BuildRequires:  pkgconfig(mono-2)
 BuildRequires:  pkgconfig(mono-addins)
-BuildRequires:  pkgconfig(mono-nunit)
-BuildRequires:  pkgconfig(monodoc)
+BuildRequires:  pkgconfig(nuget-core)
+BuildRequires:  pkgconfig(nunit) >= 2.6.3
+BuildRequires:  pkgconfig(monodoc) >= 3.8
 BuildRequires:  pkgconfig(wcf)
 # Mono.Cecil.dll requires rsync after it's build
 BuildRequires:  rsync
@@ -66,6 +63,10 @@ Requires:       mono-web
 Requires:       pkgconfig
 Requires:       xsp
 Requires:       mono-devel
+Requires:       mono(nunit.core) = 2.6.3.0
+Requires:       mono(nunit.core.interfaces) = 2.6.3.0
+Requires:       mono(nunit.framework) = 2.6.3.0
+Requires:       mono(nunit.util) = 2.6.3.0
 
 #%define _use_internal_dependency_generator 0
 # TODO: this does not work properly
@@ -92,7 +93,7 @@ a port of SharpDevelop 0.98.
 This package contains development files for the IDE and plugins.
 
 %prep
-%setup -q
+%setup -q -n %{name}-5.5
 
 %build
 %{?env_options}
@@ -106,22 +107,43 @@ make install DESTDIR=%{buildroot} GACUTIL_FLAGS="/package monodevelop /root %{bu
 #
 mkdir -p %{buildroot}%{_prefix}/share/pkgconfig
 mv %{buildroot}%{_prefix}/lib/pkgconfig/* %{buildroot}%{_datadir}/pkgconfig
-dos2unix %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.XmlEditor/schemas/*
-dos2unix %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.AspNet/Schemas/readme.txt
+cp -a /usr/lib/nuget/NuGet.Core.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
+cp -a /usr/lib/nuget/Microsoft.Web.XmlTransform.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
+ln -s /usr/lib/mono/nunit/nunit.core.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/NUnit/
+ln -s /usr/lib/mono/nunit/nunit.core.interfaces.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/NUnit/
+ln -s /usr/lib/mono/nunit/nunit.framework.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/NUnit/
+ln -s /usr/lib/mono/nunit/nunit.util.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/NUnit/
 %find_lang %{name}
 %if 0%{?suse_version} > 1220
 %fdupes %buildroot/%{_prefix}
 %endif
 
 %post
-%desktop_database_post
-%icon_theme_cache_post
-%mime_database_post
+%if 0%{?rhel}%{?fedora}%{?centos}
+  /bin/touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
+  %{_bindir}/update-desktop-database &> /dev/null || :
+%else
+  %if 0%{?suse_version}
+    %desktop_database_post
+    %icon_theme_cache_post
+    %mime_database_post
+  %endif
+%endif
 
 %postun
-%desktop_database_postun
-%icon_theme_cache_postun
-%mime_database_postun
+%if 0%{?rhel}%{?fedora}%{?centos}
+  %{_bindir}/update-desktop-database &> /dev/null || :
+  if [ $1 -eq 0 ] ; then
+    /bin/touch --no-create %{_datadir}/icons/hicolor &>/dev/null
+    %{_bindir}/gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
+  fi
+%else
+  %if 0%{?suse_version}
+    %desktop_database_postun
+    %icon_theme_cache_postun
+    %mime_database_postun
+  %endif
+%endif
 
 %files -f %{name}.lang
 %defattr(-,root,root)
@@ -131,8 +153,8 @@ dos2unix %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.AspNet/Schema
 %{_datadir}/icons/hicolor/*/apps/monodevelop.png
 %{_datadir}/icons/hicolor/scalable/apps/monodevelop.svg
 %{_prefix}/lib/monodevelop
-%{_mandir}/man1/mdtool.1%ext_man
-%{_mandir}/man1/monodevelop.1%ext_man
+%{_mandir}/man1/mdtool.1.gz
+%{_mandir}/man1/monodevelop.1.gz
 %{_datadir}/mime/packages/monodevelop.xml
 
 %files devel
