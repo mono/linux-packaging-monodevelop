@@ -50,7 +50,7 @@ BuildRequires:  pkgconfig(wcf)
 BuildRequires:  rsync
 Url:            http://www.monodevelop.com/
 Version:        5.5.0.227
-Release:        1
+Release:        2
 Summary:        Full-Featured IDE for Mono and Gtk-Sharp
 License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
@@ -63,10 +63,7 @@ Requires:       mono-web
 Requires:       pkgconfig
 Requires:       xsp
 Requires:       mono-devel
-Requires:       mono(nunit.core) = 2.6.3.0
-Requires:       mono(nunit.core.interfaces) = 2.6.3.0
-Requires:       mono(nunit.framework) = 2.6.3.0
-Requires:       mono(nunit.util) = 2.6.3.0
+Requires:       NUnit
 
 #%define _use_internal_dependency_generator 0
 # TODO: this does not work properly
