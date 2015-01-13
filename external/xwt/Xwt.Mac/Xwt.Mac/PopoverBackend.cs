@@ -28,9 +28,9 @@ using System;
 using Xwt;
 using Xwt.Backends;
 
-using MonoMac.Foundation;
-using MonoMac.AppKit;
-using MonoMac.ObjCRuntime;
+using Foundation;
+using AppKit;
+using ObjCRuntime;
 
 
 namespace Xwt.Mac
@@ -113,7 +113,7 @@ namespace Xwt.Mac
 			popover = MakePopover (child);
 			ViewBackend backend = (ViewBackend)Toolkit.GetBackend (referenceWidget);
 			var reference = backend.Widget;
-			popover.Show (positionRect.ToRectangleF (),
+			popover.Show (positionRect.ToCGRect (),
 			              reference,
 			              ToRectEdge (orientation));
 		}

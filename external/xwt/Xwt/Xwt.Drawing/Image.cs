@@ -104,7 +104,7 @@ namespace Xwt.Drawing
 
 		internal void InitForToolkit (Toolkit t)
 		{
-			if (ToolkitEngine != t) {
+			if (ToolkitEngine != t && NativeRef != null) {
 				var nr = NativeRef.LoadForToolkit (t);
 				ToolkitEngine = t;
 				Backend = nr.Backend;
@@ -246,7 +246,7 @@ namespace Xwt.Drawing
 
 			List<Tuple<string,object>> altImages = null;
 			foreach (var s in supportedScales) {
-				var fn = file.Substring (0, file.Length - ext.Length) + "@" + s + ext;
+				var fn = file.Substring (0, file.Length - ext.Length) + "@" + s + "x" + ext;
 				if (File.Exists (fn)) {
 					if (altImages == null) {
 						altImages = new List<Tuple<string, object>> ();
@@ -704,7 +704,7 @@ namespace Xwt.Drawing
 			if (newRef != null)
 				return newRef;
 
-			object newBackend;
+			object newBackend = null;
 
 			if (sources != null) {
 				var frames = new List<object> ();
@@ -725,11 +725,11 @@ namespace Xwt.Drawing
 							foreach (var st in streams)
 								st.Dispose ();
 						}
+					} else if (s.ResourceAssembly != null) {
+						targetToolkit.Invoke (() => newBackend = Image.FromResource (s.ResourceAssembly, s.Source).GetBackend());
 					}
-					else if (s.ResourceAssembly != null)
-						newBackend = targetToolkit.ImageBackendHandler.LoadFromResource (s.ResourceAssembly, s.Source);
 					else if (s.Source != null)
-						newBackend = targetToolkit.ImageBackendHandler.LoadFromFile (s.Source);
+						targetToolkit.Invoke (() => newBackend = Image.FromFile (s.Source).GetBackend());
 					else
 						throw new NotSupportedException ();
 					frames.Add (newBackend);

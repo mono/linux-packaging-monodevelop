@@ -35,6 +35,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 	[IssueDescription("Code is unreachable",
 		Description = "Code is unreachable.",
 		Category = IssueCategories.RedundanciesInCode,
+		IsEnabledByDefault = false,
 		Severity = Severity.Warning)]
 	public class UnreachableCodeIssue : GatherVisitorCodeIssueProvider
 	{

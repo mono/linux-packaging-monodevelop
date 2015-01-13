@@ -109,9 +109,19 @@ namespace MonoDevelop.Core
 			set { PropertyService.Set (ReportCrashesKey, value); }
 		}
 
+		public static event EventHandler<PropertyChangedEventArgs> ReportCrashesChanged {
+			add { PropertyService.AddPropertyHandler (ReportCrashesKey, value); }
+			remove { PropertyService.RemovePropertyHandler (ReportCrashesKey, value); }
+		}
+
 		public static bool? ReportUsage {
 			get { return PropertyService.Get<bool?> (ReportUsageKey); }
 			set { PropertyService.Set (ReportUsageKey, value); }
+		}
+
+		public static event EventHandler<PropertyChangedEventArgs> ReportUsageChanged {
+			add { PropertyService.AddPropertyHandler (ReportUsageKey, value); }
+			remove { PropertyService.RemovePropertyHandler (ReportUsageKey, value); }
 		}
 
 		/// <summary>
@@ -500,11 +510,17 @@ namespace MonoDevelop.Core
 			LogUserError (message, ex);
 		}
 
+		[Obsolete ("Use LogError")]
 		public static void LogUserError (string message, Exception ex)
 		{
 			Log (LogLevel.Error, message + (ex != null? Environment.NewLine + ex : string.Empty));
 		}
 
+		/// <summary>
+		/// Reports that an unexpected error has occurred, but the IDE will continue executing.
+		/// Error information is sent to the crash reporting service
+		/// </summary>
+		/// <param name="ex">Exception</param>
 		public static void LogInternalError (Exception ex)
 		{
 			if (ex != null) {
@@ -514,6 +530,12 @@ namespace MonoDevelop.Core
 			ReportUnhandledException (ex, false, true, "internal");
 		}
 
+		/// <summary>
+		/// Reports that an unexpected error has occurred, but the IDE will continue executing.
+		/// Error information is sent to the crash reporting service
+		/// </summary>
+		/// <param name="message">Error message</param>
+		/// <param name="ex">Exception</param>
 		public static void LogInternalError (string message, Exception ex)
 		{
 			Log (LogLevel.Error, message + (ex != null? Environment.NewLine + ex : string.Empty));
@@ -521,13 +543,18 @@ namespace MonoDevelop.Core
 			ReportUnhandledException (ex, false, true, "internal");
 		}
 
+		[Obsolete ("Use LogInternalError")]
 		public static void LogCriticalError (string message, Exception ex)
 		{
-			Log (LogLevel.Error, message + (ex != null? Environment.NewLine + ex : string.Empty));
-
-			ReportUnhandledException (ex, false, false, "critical");
+			LogInternalError (message, ex);
 		}
 
+		/// <summary>
+		/// Reports that a fatal error has occurred, and that the IDE will shut down.
+		/// Error information is sent to the crash reporting service
+		/// </summary>
+		/// <param name="message">Error message</param>
+		/// <param name="ex">Exception</param>
 		public static void LogFatalError (string message, Exception ex)
 		{
 			Log (LogLevel.Error, message + (ex != null? Environment.NewLine + ex : string.Empty));

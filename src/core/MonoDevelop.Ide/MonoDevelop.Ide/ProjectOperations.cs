@@ -661,7 +661,7 @@ namespace MonoDevelop.Ide
 				try {
 					res = AddWorkspaceItem (parentWorkspace, dlg.SelectedFile);
 				} catch (Exception ex) {
-					MessageService.ShowException (ex, GettextCatalog.GetString ("The file '{0}' could not be loaded.", dlg.SelectedFile));
+					MessageService.ShowError (GettextCatalog.GetString ("The file '{0}' could not be loaded.", dlg.SelectedFile), ex);
 				}
 			}
 
@@ -715,7 +715,7 @@ namespace MonoDevelop.Ide
 				try {
 					res = AddSolutionItem (parentFolder, dlg.SelectedFile);
 				} catch (Exception ex) {
-					MessageService.ShowException (ex, GettextCatalog.GetString ("The file '{0}' could not be loaded.", dlg.SelectedFile));
+					MessageService.ShowError (GettextCatalog.GetString ("The file '{0}' could not be loaded.", dlg.SelectedFile), ex);
 				}
 			}
 			
@@ -1541,8 +1541,8 @@ namespace MonoDevelop.Ide
 							}
 						}
 						catch (Exception ex) {
-							MessageService.ShowException (ex, GettextCatalog.GetString (
-								"An error occurred while attempt to move/copy that file. Please check your permissions."));
+							MessageService.ShowError (GettextCatalog.GetString (
+								"An error occurred while attempt to move/copy that file. Please check your permissions."), ex);
 							newFileList.Add (null);
 						}
 					} finally {
@@ -2149,9 +2149,12 @@ namespace MonoDevelop.Ide
 		{
 			foreach (var doc in IdeApp.Workbench.Documents) {
 				if (doc.FileName == filePath) {
+					var content = doc.GetContent <MonoDevelop.Ide.Gui.Content.IEncodedTextContent> (); 
+					var theEncoding = content != null ? content.SourceEncoding : null;
+
 					isOpen = true;
 					hadBom = false;
-					encoding = Encoding.Default;
+					encoding = theEncoding ?? Encoding.Default;
 					return doc.Editor;
 				}
 			}

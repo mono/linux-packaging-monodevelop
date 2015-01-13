@@ -25,8 +25,8 @@
 // THE SOFTWARE.
 
 using System;
-using MonoMac.AppKit;
-using MonoMac.Foundation;
+using AppKit;
+using Foundation;
 using Xwt.Backends;
 using Xwt.Drawing;
 
@@ -64,7 +64,7 @@ namespace Xwt.Mac
 				this.AddButton (message.Buttons [i].Label);
 			}
 
-			return sortedButtons [this.RunModal () - 1000];
+			return sortedButtons [(int)this.RunModal () - 1000];
 		}
 
 		public bool ApplyToAll { get; set; }

@@ -380,11 +380,18 @@ all:
 
 clean:
 
-@ENABLE_MACPLATFORM_TRUE@all:
+@ENABLE_MACPLATFORM_TRUE@all: Xamarin.Mac.dll
 @ENABLE_MACPLATFORM_TRUE@	$(MAKE) -C monomac/src
+
+@ENABLE_MACPLATFORM_TRUE@Xamarin.Mac.dll: /Library/Frameworks/Xamarin.Mac.framework/Versions/Current/lib/i386/full/Xamarin.Mac.dll
+@ENABLE_MACPLATFORM_TRUE@	cp -p $< $@
+@ENABLE_MACPLATFORM_TRUE@	cp -p $<.mdb $@.mdb
+@ENABLE_MACPLATFORM_TRUE@	cp -p /Library/Frameworks/Xamarin.Mac.framework/Versions/Current/lib/libxammac.dylib .
 
 @ENABLE_MACPLATFORM_TRUE@clean:
 @ENABLE_MACPLATFORM_TRUE@	$(MAKE) -C monomac/src clean
+@ENABLE_MACPLATFORM_TRUE@	rm -f Xamarin.Mac.dll*
+@ENABLE_MACPLATFORM_TRUE@	rm -f libxammac.dylib
 
 install:
 
@@ -407,6 +414,8 @@ dist-clean:
 			rm -f $(TARBALL_PATH)/$$dir.tar.bz2; \
 		fi \
 	done
+
+.PHONY: Xamarin.Mac.dll 
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

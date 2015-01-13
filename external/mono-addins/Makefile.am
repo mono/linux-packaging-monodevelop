@@ -1,5 +1,5 @@
 
-SUBDIRS =  Mono.Addins Mono.Addins.CecilReflector Mono.Addins.Setup Mono.Addins.MSBuild Mono.Addins.Gui mautil Test docs
+SUBDIRS =  Mono.Addins Mono.Addins.CecilReflector Mono.Addins.Setup Mono.Addins.MSBuild Mono.Addins.Gui Mono.Addins.GuiGtk3 mautil Test docs
 
 EXTRA_DIST = COPYING mono-addins.snk Mono.Addins.sln
 
@@ -45,3 +45,7 @@ bin-zip:
 	cp support/ICSharpCode.SharpZipLib.license.txt $(BIN_PACKAGE_DIR)
 	cp support/ICSharpCode.SharpZipLib.dll $(BIN_PACKAGE_DIR)
 	cd $(BIN_PACKAGE_DIR) && zip -r ../$(BIN_PACKAGE_DIR).zip *
+
+nuget:
+	nuget pack Mono.Addins.nuspec
+	nuget pack Mono.Addins.Setup.nuspec

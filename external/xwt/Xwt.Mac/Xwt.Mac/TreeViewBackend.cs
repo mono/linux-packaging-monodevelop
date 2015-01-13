@@ -25,8 +25,8 @@
 // THE SOFTWARE.
 
 using System;
-using MonoMac.AppKit;
-using MonoMac.Foundation;
+using AppKit;
+using Foundation;
 using Xwt.Backends;
 using System.Collections.Generic;
 using System.Reflection;
@@ -80,9 +80,9 @@ namespace Xwt.Mac
 
 		public TreePosition CurrentEventRow { get; set; }
 
-		public override object AddColumn (ListViewColumn col)
+		public override NSTableColumn AddColumn (ListViewColumn col)
 		{
-			NSTableColumn tcol = (NSTableColumn) base.AddColumn (col);
+			NSTableColumn tcol = base.AddColumn (col);
 			if (Tree.OutlineTableColumn == null)
 				Tree.OutlineTableColumn = tcol;
 			return tcol;
@@ -122,7 +122,7 @@ namespace Xwt.Mac
 		{
 			var it = tsource.GetItem (pos);
 			if (it != null)
-				Table.SelectRow (Tree.RowForItem (it), false);
+				Table.SelectRow ((int)Tree.RowForItem (it), false);
 		}
 
 		public void UnselectRow (TreePosition pos)
@@ -162,7 +162,7 @@ namespace Xwt.Mac
 		{
 			var it = tsource.GetItem (pos);
 			if (it != null)
-				ScrollToRow (Tree.RowForItem (it));
+				ScrollToRow ((int)Tree.RowForItem (it));
 		}
 		
 		public void ExpandToRow (TreePosition pos)
@@ -245,7 +245,7 @@ namespace Xwt.Mac
 			return it;
 		}
 		
-		public override bool AcceptDrop (NSOutlineView outlineView, NSDraggingInfo info, NSObject item, int index)
+		public override bool AcceptDrop (NSOutlineView outlineView, NSDraggingInfo info, NSObject item, nint index)
 		{
 			return false;
 		}
@@ -255,10 +255,10 @@ namespace Xwt.Mac
 			throw new NotImplementedException ();
 		}
 
-		public override NSObject GetChild (NSOutlineView outlineView, int childIndex, NSObject ofItem)
+		public override NSObject GetChild (NSOutlineView outlineView, nint childIndex, NSObject item)
 		{
-			var item = (TreeItem) ofItem;
-			var pos = source.GetChild (item != null ? item.Position : null, childIndex);
+			var treeItem = (TreeItem) item;
+			var pos = source.GetChild (treeItem != null ? treeItem.Position : null, (int) childIndex);
 			if (pos != null) {
 				TreeItem res;
 				if (!items.TryGetValue (pos, out res))
@@ -269,7 +269,7 @@ namespace Xwt.Mac
 				return null;
 		}
 
-		public override int GetChildrenCount (NSOutlineView outlineView, NSObject item)
+		public override nint GetChildrenCount (NSOutlineView outlineView, NSObject item)
 		{
 			var it = (TreeItem) item;
 			return source.GetChildrenCount (it != null ? it.Position : null);
@@ -308,7 +308,7 @@ namespace Xwt.Mac
 		{
 		}
 
-		public override NSDragOperation ValidateDrop (NSOutlineView outlineView, NSDraggingInfo info, NSObject item, int index)
+		public override NSDragOperation ValidateDrop (NSOutlineView outlineView, NSDraggingInfo info, NSObject item, nint index)
 		{
 			return NSDragOperation.None;
 		}
