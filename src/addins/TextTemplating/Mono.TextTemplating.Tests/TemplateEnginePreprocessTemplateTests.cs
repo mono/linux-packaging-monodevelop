@@ -60,6 +60,16 @@ namespace Mono.TextTemplating.Tests
 			
 			Assert.AreEqual (expectedOutput, output, output);
 		}
+
+		[Test]
+		public void CaptureEncodingAndExtension ()
+		{
+			string input = InputTemplate_CaptureEncodingAndExtension;
+			string output = Preprocess (input);
+			string expectedOutput = TemplatingEngineHelper.CleanCodeDom (Output_CaptureEncodingAndExtension, "\n");
+
+			Assert.AreEqual (expectedOutput, output, output);
+		}
 		
 		#region Helpers
 		
@@ -145,6 +155,12 @@ Included Method Body Text Block
 #>
 ";
 
+		public static string InputTemplate_CaptureEncodingAndExtension =
+			@"
+<#@ template debug=""false"" language=""C#"" inherits=""Foo"" hostspecific=""trueFromBase"" #>
+<#@ output extension="".cs"" encoding=""utf-8"" #>
+";
+
 		#endregion
 		
 		#region Expected output strings
@@ -168,7 +184,7 @@ namespace Templating {
             return this.GenerationEnvironment.ToString();
         }
         
-        protected virtual void Initialize() {
+        public virtual void Initialize() {
         }
     }
     
@@ -434,7 +450,7 @@ namespace Templating {
             return this.GenerationEnvironment.ToString();
         }
         
-        protected virtual void Initialize() {
+        public virtual void Initialize() {
         }
     }
     
@@ -589,6 +605,34 @@ namespace Templating {
     }
 }
 ";
+
+		public static string Output_CaptureEncodingAndExtension = 
+
+		@"namespace Templating {
+    
+    
+    public partial class PreprocessedTemplate : Foo {
+        
+        public override string TransformText() {
+            this.GenerationEnvironment = null;
+            
+            #line 1 """"
+            this.Write(""\n"");
+            
+            #line default
+            #line hidden
+            return this.GenerationEnvironment.ToString();
+        }
+        
+        public override void Initialize() {
+            if ((this.Host != null)) {
+                this.Host.SetFileExtension("".cs"");
+                this.Host.SetOutputEncoding(System.Text.Encoding.GetEncoding(65001, true));
+            }
+            base.Initialize();
+        }
+    }
+}";
 		#endregion
 	}
 }

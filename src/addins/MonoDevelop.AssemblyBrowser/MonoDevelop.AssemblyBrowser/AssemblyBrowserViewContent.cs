@@ -128,8 +128,7 @@ namespace MonoDevelop.AssemblyBrowser
 			try {
 				widget.Open (url);
 			} catch (Exception e) {
-				LoggingService.LogError ("Error while navigating to " + url, e);
-				MessageService.ShowException (e, GettextCatalog.GetString ("{0} could not be opened", url), GettextCatalog.GetString ("Error while opening assembly"));
+				MessageService.ShowError (GettextCatalog.GetString ("{0} could not be opened", url), e);
 			}
 		}
 		
@@ -157,7 +156,7 @@ namespace MonoDevelop.AssemblyBrowser
 		{
 			if (Ide.IdeApp.ProjectOperations.CurrentSelectedSolution == null) {
 				foreach (var assembly in defaultAssemblies) {
-					Widget.AddReferenceByAssemblyName (assembly, assembly == defaultAssemblies [0]); 
+					Widget.AddReferenceByAssemblyName (assembly); 
 				}
 			} else {
 				foreach (var project in Ide.IdeApp.ProjectOperations.CurrentSelectedSolution.GetAllProjects ()) {
@@ -169,7 +168,7 @@ namespace MonoDevelop.AssemblyBrowser
 					foreach (string file in netProject.GetReferencedAssemblies (ConfigurationSelector.Default, false)) {
 						if (!System.IO.File.Exists (file))
 							continue;
-						Widget.AddReferenceByFileName (file, false); 
+						Widget.AddReferenceByFileName (file); 
 					}
 				}
 			}

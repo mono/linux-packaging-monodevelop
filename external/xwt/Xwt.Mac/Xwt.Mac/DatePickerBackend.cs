@@ -25,8 +25,8 @@
 // THE SOFTWARE.
 using System;
 using Xwt.Backends;
-using MonoMac.AppKit;
-using MonoMac.Foundation;
+using AppKit;
+using Foundation;
 
 namespace Xwt.Mac
 {
@@ -68,7 +68,7 @@ namespace Xwt.Mac
 				return (DateTime)Widget.DateValue;
 			}
 			set {
-				Widget.DateValue = value;
+				Widget.DateValue = (NSDate) value;
 			}
 		}
 

@@ -250,8 +250,8 @@ ALL_FILES := $(EXTS) \
 		$(wildcard templates/*)
 
 WILDCARDED_FILES := $(wildcard $(ALL_FILES))
-EXTRA_DIST = $(wildcard $(ALL_FILES)) gtkrc gtkrc.mac gtkrc.win32 \
-	gtkrc.win32-vista
+EXTRA_DIST = $(wildcard $(ALL_FILES)) gtkrc gtkrc.mac \
+	gtkrc.mac-yosemite gtkrc.win32 gtkrc.win32-vista
 all: all-am
 
 .SUFFIXES:

@@ -1,0 +1,10 @@
+Subversion libraries
+====================
+
+Build steps:
+
+- Grab libserf and run `scons CFLAGS="-arch i386 -arch x86_64" LINKFLAGS="-arch i386 -arch x86_64"`, `scons install`
+- Grab subversion
+- Run `./configure --disable-debug --prefix=/usr/local --with-apr=/usr/bin --with-serf=/usr/local --with-sqlite=/usr --with-zlib=/usr --disable-mod-activation --disable-nls --without-apache-libexecdir --without-berkeley-db --target=i386-darwin CFLAGS="-arch i386 -arch x86_64" LINKFLAGS="-arch i386 -arch x86_64"`
+- Copy libserf and libsvn_* dylibs to mac folder.
+- run `fix_links.sh`

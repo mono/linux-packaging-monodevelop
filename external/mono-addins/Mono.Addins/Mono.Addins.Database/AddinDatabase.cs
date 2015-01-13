@@ -45,7 +45,7 @@ namespace Mono.Addins.Database
 		public const string GlobalDomain = "global";
 		public const string UnknownDomain = "unknown";
 		
-		public const string VersionTag = "001";
+		public const string VersionTag = "002";
 
 		List<Addin> allSetupInfos;
 		List<Addin> addinSetupInfos;
@@ -181,7 +181,7 @@ namespace Mono.Addins.Database
 			}
 			return null;
 		}
-		
+
 		public IEnumerable<Addin> GetInstalledAddins (string domain, AddinSearchFlagsInternal flags)
 		{
 			if (domain == null)
@@ -470,23 +470,23 @@ namespace Mono.Addins.Database
 				}
 			}
 
-			Configuration.SetEnabled (id, true, ainfo.AddinInfo.EnabledByDefault);
+			Configuration.SetEnabled (id, true, ainfo.AddinInfo.EnabledByDefault, false);
 			SaveConfiguration ();
 
 			if (addinEngine != null && addinEngine.IsInitialized)
 				addinEngine.ActivateAddin (id);
 		}
 		
-		public void DisableAddin (string domain, string id)
+		public void DisableAddin (string domain, string id, bool exactVersionMatch = false)
 		{
 			Addin ai = GetInstalledAddin (domain, id, true);
 			if (ai == null)
 				throw new InvalidOperationException ("Add-in '" + id + "' not installed.");
 
-			if (!IsAddinEnabled (domain, id))
+			if (!IsAddinEnabled (domain, id, exactVersionMatch))
 				return;
 			
-			Configuration.SetEnabled (id, false, ai.AddinInfo.EnabledByDefault);
+			Configuration.SetEnabled (id, false, ai.AddinInfo.EnabledByDefault, exactVersionMatch);
 			SaveConfiguration ();
 			
 			// Disable all add-ins which depend on it
@@ -519,7 +519,7 @@ namespace Mono.Addins.Database
 			}
 			catch {
 				// If something goes wrong, enable the add-in again
-				Configuration.SetEnabled (id, true, ai.AddinInfo.EnabledByDefault);
+				Configuration.SetEnabled (id, true, ai.AddinInfo.EnabledByDefault, false);
 				SaveConfiguration ();
 				throw;
 			}
@@ -530,7 +530,7 @@ namespace Mono.Addins.Database
 		
 		public void RegisterForUninstall (string domain, string id, IEnumerable<string> files)
 		{
-			DisableAddin (domain, id);
+			DisableAddin (domain, id, true);
 			Configuration.RegisterForUninstall (id, files);
 			SaveConfiguration ();
 		}
@@ -858,7 +858,7 @@ namespace Mono.Addins.Database
 				return;
 			}
 			
-			CollectModuleExtensionData (conf, conf.MainModule, updateData);
+			CollectModuleExtensionData (conf, conf.MainModule, updateData, addinHash);
 			
 			foreach (ModuleDescription module in conf.OptionalModules) {
 				missingDeps = addinHash.GetMissingDependencies (conf, module);
@@ -869,7 +869,7 @@ namespace Mono.Addins.Database
 					}
 				}
 				else
-					CollectModuleExtensionData (conf, module, updateData);
+					CollectModuleExtensionData (conf, module, updateData, addinHash);
 			}
 		}
 		
@@ -886,16 +886,16 @@ namespace Mono.Addins.Database
 			return w;
 		}
 		
-		void CollectModuleExtensionData (AddinDescription conf, ModuleDescription module, AddinUpdateData updateData)
+		void CollectModuleExtensionData (AddinDescription conf, ModuleDescription module, AddinUpdateData updateData, AddinIndex index)
 		{
 			foreach (Extension ext in module.Extensions) {
 				updateData.RelExtensions++;
 				updateData.RegisterExtension (conf, module, ext);
-				AddChildExtensions (conf, module, updateData, ext.Path, ext.ExtensionNodes, false);
+				AddChildExtensions (conf, module, updateData, index, ext.Path, ext.ExtensionNodes, false);
 			}
 		}
 		
-		void AddChildExtensions (AddinDescription conf, ModuleDescription module, AddinUpdateData updateData, string path, ExtensionNodeDescriptionCollection nodes, bool conditionChildren)
+		void AddChildExtensions (AddinDescription conf, ModuleDescription module, AddinUpdateData updateData, AddinIndex index, string path, ExtensionNodeDescriptionCollection nodes, bool conditionChildren)
 		{
 			// Don't register conditions as extension nodes.
 			if (!conditionChildren)
@@ -906,8 +906,18 @@ namespace Mono.Addins.Database
 					continue;
 				updateData.RelExtensionNodes++;
 				string id = node.GetAttribute ("id");
-				if (id.Length != 0)
-					AddChildExtensions (conf, module, updateData, path + "/" + id, node.ChildNodes, node.NodeName == "Condition");
+				if (id.Length != 0) {
+					bool isCondition = node.NodeName == "Condition";
+					if (isCondition) {
+						// Find the add-in that provides the implementation for this condition.
+						// Store that id in the condition. The add-in engine will ensure the add-in
+						// is loaded when it tries to evaluate this condition.
+						var condAsm = index.FindCondition (conf, module, id);
+						if (condAsm != null)
+							node.SetAttribute (Condition.SourceAddinAttribute, condAsm);
+					}
+					AddChildExtensions (conf, module, updateData, index, path + "/" + id, node.ChildNodes, isCondition);
+				}
 			}
 		}
 		
@@ -1159,7 +1169,7 @@ namespace Mono.Addins.Database
 					// If the process has crashed, try to do a new scan, this time using verbose log,
 					// to give the user more information about the origin of the crash.
 					if (pex != null && !retry) {
-						monitor.ReportError ("Add-in scan operation failed. The Mono runtime may have encountered an error while trying to load an assembly.", null);
+						monitor.ReportError ("Add-in scan operation failed. The runtime may have encountered an error while trying to load an assembly.", null);
 						if (monitor.LogLevel <= 1) {
 							// Re-scan again using verbose log, to make it easy to find the origin of the error.
 							retry = true;
@@ -1169,7 +1179,8 @@ namespace Mono.Addins.Database
 						retry = false;
 					
 					if (!retry) {
-						monitor.ReportError ("Add-in scan operation failed", (ex is ProcessFailedException ? null : ex));
+						var pfex = ex as ProcessFailedException;
+						monitor.ReportError ("Add-in scan operation failed", pfex != null? pfex.InnerException : ex);
 						monitor.Cancel ();
 						return;
 					}
@@ -1904,6 +1915,26 @@ namespace Mono.Addins.Database
 			return null;
 		}
 		
+		public string FindCondition (AddinDescription desc, ModuleDescription mod, string conditionId)
+		{
+			if (desc.ConditionTypes.Any (c => c.Id == conditionId))
+				return desc.AddinId;
+
+			foreach (Dependency dep in mod.Dependencies) {
+				AddinDependency adep = dep as AddinDependency;
+
+				if (adep == null)
+					continue;
+				var descs = FindDescriptions (desc.Domain, adep.FullAddinId);
+				foreach (var d in descs) {
+					var c = FindCondition (d, d.MainModule, conditionId);
+					if (c != null)
+						return c;
+				}
+			}
+			return null;
+		}
+
 		public List<AddinDescription> GetSortedAddins ()
 		{
 			var inserted = new HashSet<string> ();
