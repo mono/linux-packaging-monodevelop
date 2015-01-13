@@ -1,3 +1,9 @@
+monodevelop (5.7.0.660-0xamarin1) wheezy; urgency=medium
+
+  * [b929336] Imported Upstream version 5.7.0.660
+
+ -- Jo Shields <jo.shields@xamarin.com>  Tue, 13 Jan 2015 23:52:15 +0000
+
 monodevelop (5.5.0.227-0xamarin4) wheezy; urgency=medium
 
   * Rebuild against fixed NuGet
