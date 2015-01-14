@@ -50,7 +50,7 @@ BuildRequires:  pkgconfig(wcf)
 BuildRequires:  rsync
 Url:            http://www.monodevelop.com/
 Version:        5.7.0.660
-Release:        0
+Release:        1
 Summary:        Full-Featured IDE for Mono and Gtk-Sharp
 License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
@@ -65,10 +65,14 @@ Requires:       xsp
 Requires:       mono-devel
 Requires:       NUnit
 
-#%define _use_internal_dependency_generator 0
-# TODO: this does not work properly
+%define _use_internal_dependency_generator 0
+%if 0%{?fedora} || 0%{?rhel} || 0%{?centos}
+%define __find_provides env sh -c 'filelist=($(cat)) && { printf "%s\\n" "${filelist[@]}" | %{_prefix}/lib/rpm/redhat/find-provides && printf "%s\\n" "${filelist[@]}" | %{_bindir}/mono-find-provides ; } | sort | uniq'
+%define __find_requires env sh -c 'filelist=($(cat)) && { printf "%s\\n" "${filelist[@]}" | %{_prefix}/lib/rpm/redhat/find-requires && printf "%s\\n" "${filelist[@]}" | %{_bindir}/mono-find-requires ; } | sort | uniq'
+%else
 %define __find_provides env sh -c 'filelist=($(cat)) && { printf "%s\\n" "${filelist[@]}" | %{_prefix}/lib/rpm/find-provides && printf "%s\\n" "${filelist[@]}" | %{_bindir}/mono-find-provides ; } | sort | uniq'
 %define __find_requires env sh -c 'filelist=($(cat)) && { printf "%s\\n" "${filelist[@]}" | %{_prefix}/lib/rpm/find-requires && printf "%s\\n" "${filelist[@]}" | %{_bindir}/mono-find-requires ; } | sort | uniq'
+%endif
 
 %description
 MonoDevelop is a full-featured integrated development
