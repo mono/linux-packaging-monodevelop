@@ -49,8 +49,8 @@ BuildRequires:  pkgconfig(wcf)
 # Mono.Cecil.dll requires rsync after it's build
 BuildRequires:  rsync
 Url:            http://www.monodevelop.com/
-Version:        5.5.0.227
-Release:        2
+Version:        5.7.0.660
+Release:        0
 Summary:        Full-Featured IDE for Mono and Gtk-Sharp
 License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
@@ -90,7 +90,7 @@ a port of SharpDevelop 0.98.
 This package contains development files for the IDE and plugins.
 
 %prep
-%setup -q -n %{name}-5.5
+%setup -q -n %{name}-5.7
 
 %build
 %{?env_options}
