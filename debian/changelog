@@ -1,3 +1,13 @@
+monodevelop (5.7.0.660-0xamarin2) wheezy2; urgency=medium
+
+  * [819c16e] Downgrade to Mvc3, for now. There's a problem with 
+    deploying NuGets in MonoDevelop source, and Mvc4 isn't available 
+    as part of the Mono source, so for now we'll downgrade support 
+    in the addin to Mvc3, which is compatible with completely from-source 
+    builds.
+
+ -- Jo Shields <jo.shields@xamarin.com>  Thu, 15 Jan 2015 19:53:30 +0000
+
 monodevelop (5.7.0.660-0xamarin1) wheezy; urgency=medium
 
   * [b929336] Imported Upstream version 5.7.0.660
