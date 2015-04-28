@@ -29,6 +29,7 @@
 using System;
 using System.Threading;
 using System.Collections.Generic;
+using System.Linq;
 
 using Mono.Debugging.Backend;
 
@@ -181,6 +182,14 @@ namespace Mono.Debugging.Client
 			val.path = path;
 			return val;
 		}
+
+		public static ObjectValue CreateShowMore ()
+		{
+			return new ObjectValue () {
+				flags = ObjectValueFlags.IEnumerable,
+				name = ""
+			};
+		}
 		
 		/// <summary>
 		/// Gets the flags of the value
@@ -318,6 +327,11 @@ namespace Mono.Debugging.Client
 		/// </remarks>
 		public object GetRawValue (EvaluationOptions options)
 		{
+			if (source == null && (IsEvaluating || IsEvaluatingGroup)) {
+				if (!WaitHandle.WaitOne (options.EvaluationTimeout)) {
+					throw new Mono.Debugging.Evaluation.TimeOutException ();
+				}
+			}
 			object res = source.GetRawValue (path, options);
 			IRawObject val = res as IRawObject;
 			if (val != null)
@@ -353,6 +367,11 @@ namespace Mono.Debugging.Client
 		/// </remarks>
 		public void SetRawValue (object value, EvaluationOptions options)
 		{
+			if (source == null && (IsEvaluating || IsEvaluatingGroup)) {
+				if (!WaitHandle.WaitOne (options.EvaluationTimeout)) {
+					throw new Mono.Debugging.Evaluation.TimeOutException ();
+				}
+			}
 			source.SetRawValue (path, value, options);
 		}
 		
@@ -516,6 +535,46 @@ namespace Mono.Debugging.Client
 			}
 
 			return children.ToArray ();
+		}
+
+		public ObjectValue[] GetRangeOfChildren (int index, int count)
+		{
+			return GetRangeOfChildren (index, count, parentFrame.DebuggerSession.EvaluationOptions);
+		}
+
+		public ObjectValue[] GetRangeOfChildren (int index, int count, EvaluationOptions options)
+		{
+			if (IsEvaluating)
+				return new ObjectValue[0];
+
+			if (IsArray) {
+				GetArrayItem (arrayCount - 1);
+				if (index >= ArrayCount)
+					return new ObjectValue[0];
+				return children.Skip (index).Take (System.Math.Min (count, ArrayCount - index)).ToArray ();
+			}
+
+			if (children == null) {
+				children = new List<ObjectValue> ();
+			}
+			if (children.Count < index + count) {
+				if (source != null) {
+					try {
+						ObjectValue[] cs = source.GetChildren (path, children.Count, index + count, options);
+						ConnectCallbacks (parentFrame, cs);
+						children.AddRange (cs);
+					} catch (Exception ex) {
+						if (parentFrame != null)
+							parentFrame.DebuggerSession.OnDebuggerOutput (true, ex.ToString ());
+						children.Add (CreateFatalError ("", ex.Message, ObjectValueFlags.ReadOnly));
+					}
+				}
+			}
+
+			if (index >= children.Count)
+				return new ObjectValue[0];
+
+			return children.Skip (index).Take (System.Math.Min (count, children.Count - index)).ToArray ();
 		}
 		
 		/// <summary>

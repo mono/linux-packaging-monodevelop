@@ -33,6 +33,7 @@ using System;
 using System.IO;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using Microsoft.Win32;
@@ -67,7 +68,7 @@ namespace MonoDevelop.Platform
 		{
 			// Only initialize elements for Win7+.
 			if (TaskbarManager.IsPlatformSupported) {
-				TaskbarManager.Instance.ApplicationId = BrandingService.ProfileDirectoryName + "." + IdeApp.Version;
+				TaskbarManager.Instance.ApplicationId = BrandingService.ProfileDirectoryName;
 			}
 		}
 
@@ -181,12 +182,13 @@ namespace MonoDevelop.Platform
 		const int MonitorInfoFlagsPrimary = 0x01;
 
 		[StructLayout (LayoutKind.Sequential)]
-		unsafe struct MonitorInfo {
+		struct MonitorInfo {
 			public int Size;
 			public Rect Frame;         // Monitor
 			public Rect VisibleFrame;  // Work
 			public int Flags;
-			public fixed byte Device[32];
+			[MarshalAs(UnmanagedType.ByValTStr, SizeConst=32)]
+			public string Device;
 		}
 
 		[UnmanagedFunctionPointer (CallingConvention.Winapi)]
@@ -206,9 +208,7 @@ namespace MonoDevelop.Platform
 			EnumDisplayMonitors (IntPtr.Zero, IntPtr.Zero, delegate (IntPtr hmonitor, IntPtr hdc, IntPtr prect, IntPtr user_data) {
 				var info = new MonitorInfo ();
 
-				unsafe {
-					info.Size = sizeof (MonitorInfo);
-				}
+				info.Size = Marshal.SizeOf (info);
 
 				GetMonitorInfoA (hmonitor, ref info);
 
@@ -299,6 +299,7 @@ namespace MonoDevelop.Platform
 			flags |= AssociationFlags.NoTruncate;
 
 			const uint E_POINTER = 0x80004003;
+			const uint E_NO_ASSOCIATION = 0x80070483;
 
 			var builder = new StringBuilder (512);
 			int size = builder.Length;
@@ -309,124 +310,97 @@ namespace MonoDevelop.Platform
 				builder.Length = size;
 				result = Win32.AssocQueryStringW (flags, str, assoc, extra, builder, ref size);
 			}
+
+			if (result == unchecked((int)E_NO_ASSOCIATION)) {
+				return null;
+			}
+
 			Marshal.ThrowExceptionForHR (result);
 			return builder.ToString ();
-		}
-
-		static string GetDefaultApp (string extension)
-		{
-			string appDefault = null;
-			using (RegistryKey RegKey = Registry.ClassesRoot.OpenSubKey (extension)) {
-				if (RegKey != null)
-					appDefault = (string)RegKey.GetValue ("", null);
-			}
-			return appDefault;
 		}
 
 		public override IEnumerable<DesktopApplication> GetApplications (string filename)
 		{
 			string extension = Path.GetExtension (filename);
 			if (string.IsNullOrEmpty (extension))
-				yield break;
-			string defaultApp = GetDefaultApp (extension);
+				return new DesktopApplication[0];
 
-			foreach (var app in GetAppsByProgID (extension, defaultApp))
-				yield return app;
-
-			foreach (var app in GetAppsByExeName (extension, defaultApp))
-				yield return app;
+			return GetAppsForExtension (extension);
 		}
 
-		const string assocBaseKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\";
-
-		static IEnumerable<DesktopApplication> GetAppsByProgID (string extension, string defaultApp)
+		static IEnumerable<RegistryKey> GetOpenWithProgidsKeys (string extension)
 		{
-			var progIDs = new HashSet<string> ();
-
-			using (RegistryKey RegKey = Registry.CurrentUser.OpenSubKey (assocBaseKey + extension + @"\OpenWithProgids")) {
-				if (RegKey != null) {
-					foreach (string progID in RegKey.GetValueNames ()) {
-						if (progIDs.Add (progID)) {
-							var app = WindowsAppFromProgID (progID, defaultApp);
-							if (app != null)
-								yield return app;
-						}
-					}
-				}
-			}
-
-			using (RegistryKey RegKey = Registry.ClassesRoot.OpenSubKey (extension + @"\OpenWithProgids")) {
-				if (RegKey != null) {
-					foreach (string progID in RegKey.GetValueNames ()) {
-						if (progIDs.Add (progID)) {
-							var app = WindowsAppFromProgID (progID, defaultApp);
-							if (app != null)
-								yield return app;
-						}
-					}
-				}
-			}
+			yield return Registry.CurrentUser.OpenSubKey (@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" + extension);
+			yield return Registry.CurrentUser.OpenSubKey (@"Software\Classes\" + extension);
+			yield return Registry.LocalMachine.OpenSubKey (@"Software\Classes\" + extension);
+			yield return Registry.ClassesRoot.OpenSubKey (extension);
 		}
 
-		static IEnumerable<DesktopApplication> GetAppsByExeName (string extension, string defaultApp)
+		static IEnumerable<DesktopApplication> GetAppsForExtension (string extension)
 		{
-			var exeNames = new HashSet<string> ();
+			var apps = new Dictionary<string,WindowsDesktopApplication> ();
 
-			using (RegistryKey RegKey = Registry.CurrentUser.OpenSubKey (assocBaseKey + extension + @"\OpenWithList")) {
-				if (RegKey != null) {
-					string MRUList = (string)RegKey.GetValue ("MRUList");
-					if(MRUList != null){
-						foreach (char c in MRUList.ToString()) {
-							string exeName = RegKey.GetValue (c.ToString ()).ToString ();
-							if (exeNames.Add (exeName)) {
-								var app = WindowsAppFromExeName (exeName, defaultApp);
-								if (app != null)
-									yield return app;
-							}
+			WindowsDesktopApplication defaultApp = null;
+
+			//first check for the user's preferred app for this file type and use it as the default
+			using (var key = Registry.CurrentUser.OpenSubKey (@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" + extension + @"\UserChoice")) {
+				var progid = key == null ? null : key.GetValue ("ProgId") as string;
+				if (progid != null)
+					apps[progid] = defaultApp = WindowsAppFromName (progid, true, AssociationFlags.None);
+			}
+
+			//look in all the locatiosn where progids can be registered as handler for files
+			//starting with local user and falling back to system
+			foreach (var key in GetOpenWithProgidsKeys (extension)) {
+				if (key == null)
+					continue;
+				using (key) {
+					//if we didn't find a default app yet, check for one
+					if (defaultApp == null) {
+						var defaultProgid = key.GetValue ("") as string;
+						if (defaultProgid != null)
+							apps[defaultProgid] = defaultApp = WindowsAppFromName (defaultProgid, true, AssociationFlags.None);
+					}
+					using (var sk = key.OpenSubKey ("OpenWithProgids")) {
+						if (sk == null)
+							continue;
+						foreach (var progid in sk.GetValueNames ()) {
+							if (!apps.ContainsKey (progid))
+								apps[progid] = WindowsAppFromName (progid, false, AssociationFlags.None);
 						}
 					}
 				}
 			}
 
-			using (RegistryKey RegKey = Registry.ClassesRoot.OpenSubKey (extension + @"\OpenWithList")) {
-				if (RegKey != null) {
-					foreach (string exeName in RegKey.GetSubKeyNames ()) {
-						if (exeNames.Add (exeName)) {
-							var app = WindowsAppFromExeName (exeName, defaultApp);
-							if (app != null)
-								yield return app;
-						}
-					}
+			//return non-duplicate executables, giving precedence to the default
+			var exePaths = new HashSet<string> ();
+
+			if (defaultApp != null) {
+				yield return defaultApp;
+				exePaths.Add (defaultApp.ExePath);
+			}
+
+			foreach (var a in apps.Values) {
+				if (a != null && exePaths.Add (a.ExePath)) {
+					yield return a;
 				}
 			}
 		}
 
-		static WindowsDesktopApplication WindowsAppFromProgID (string progID, string defaultApp)
+		static WindowsDesktopApplication WindowsAppFromName (string appName, bool isDefault, AssociationFlags flags)
 		{
 			try {
-				string displayName = QueryAssociationString (progID, AssociationString.FriendlyAppName, AssociationFlags.None, "open");
-				string exePath = QueryAssociationString (progID, AssociationString.Executable, AssociationFlags.None, "open");
-				if(System.Reflection.Assembly.GetEntryAssembly ().Location == exePath)
+				string displayName = QueryAssociationString (appName, AssociationString.FriendlyAppName, flags, "open");
+				string exePath = QueryAssociationString (appName, AssociationString.Executable, flags, "open");
+				//ignore apps with missing information, it's not worth logging
+				if (exePath == null || displayName == null)
 					return null;
-				return new WindowsDesktopApplication (progID, displayName, exePath, progID.Equals (defaultApp));
+				if (System.Reflection.Assembly.GetEntryAssembly ().Location != exePath)
+					return new WindowsDesktopApplication (appName, displayName, exePath, isDefault);
 			} catch (Exception ex) {
-				LoggingService.LogError (string.Format ("Failed to read info for ProgID '{0}'", progID), ex);
-				return null;
+				LoggingService.LogError (string.Format ("Failed to read info for {0} '{1}'", flags == AssociationFlags.None ? "ProgId" : "ExeName", appName), ex);
 			}
-		}
-
-		static WindowsDesktopApplication WindowsAppFromExeName (string exeName, string defaultApp)
-		{
-			try {
-				string displayName = QueryAssociationString (exeName, AssociationString.FriendlyAppName, AssociationFlags.OpenByExeName, "open");
-				string exePath = QueryAssociationString (exeName, AssociationString.Executable, AssociationFlags.OpenByExeName, "open");
-				if(System.Reflection.Assembly.GetEntryAssembly ().Location == exePath)
-					return null;
-				return new WindowsDesktopApplication (exeName, displayName, exePath, exeName.Equals (defaultApp));
-			} catch (Exception ex) {
-				LoggingService.LogError (string.Format ("Failed to read info for ExeName '{0}'", exeName), ex);
-				return null;
-			}
+			return null;
 		}
 
 		class WindowsDesktopApplication : DesktopApplication
@@ -440,11 +414,8 @@ namespace MonoDevelop.Platform
 
 			public override void Launch (params string[] files)
 			{
-				var pab = new ProcessArgumentBuilder ();
-				foreach (string file in files) {
-					pab.AddQuoted (file);
-					Process.Start (ExePath, pab.ToString ());
-				}
+				foreach (string file in files)
+					Process.Start (ExePath, ProcessArgumentBuilder.Quote (file));
 			}
 		}
 	}

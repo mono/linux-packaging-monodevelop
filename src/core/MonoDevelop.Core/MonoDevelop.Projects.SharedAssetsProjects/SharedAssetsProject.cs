@@ -88,7 +88,7 @@ namespace MonoDevelop.Projects.SharedAssetsProjects
 
 		public override string[] SupportedLanguages {
 			get {
-				return new [] {languageName};
+				return new [] { "", languageName };
 			}
 		}
 
@@ -116,6 +116,11 @@ namespace MonoDevelop.Projects.SharedAssetsProjects
 		}
 
 		internal protected override bool OnGetSupportsExecute ()
+		{
+			return false;
+		}
+
+		public override bool FastCheckNeedsBuild (ConfigurationSelector configuration)
 		{
 			return false;
 		}

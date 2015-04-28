@@ -45,6 +45,7 @@ using System.Collections.Generic;
 using MonoDevelop.Components.AutoTest;
 using MonoDevelop.Ide.TypeSystem;
 using MonoDevelop.Ide.Extensions;
+using MonoDevelop.Ide.Templates;
 
 namespace MonoDevelop.Ide
 {
@@ -453,7 +454,7 @@ namespace MonoDevelop.Ide
 				if (instrumentationStatusIcon == null) {
 					instrumentationStatusIcon = IdeApp.Workbench.StatusBar.ShowStatusIcon (ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.Information));
 					instrumentationStatusIcon.ToolTip = "Instrumentation service enabled";
-					instrumentationStatusIcon.EventBox.ButtonPressEvent += delegate {
+					instrumentationStatusIcon.Clicked += delegate {
 						InstrumentationService.StartMonitor ();
 					};
 				}
@@ -465,8 +466,14 @@ namespace MonoDevelop.Ide
 	
 	public class IdeServices
 	{
+		readonly TemplatingService templatingService = new TemplatingService ();
+
 		public ProjectService ProjectService {
 			get { return MonoDevelop.Projects.Services.ProjectService; }
+		}
+
+		public TemplatingService TemplatingService {
+			get { return templatingService; }
 		}
 	}
 }

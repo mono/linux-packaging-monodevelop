@@ -68,7 +68,7 @@ namespace MonoDevelop.SourceEditor
 
 		static ExtensibleTextEditor ()
 		{
-			var icon = Xwt.Drawing.Image.FromResource ("gutter-bookmark-light-15.png");
+			var icon = Xwt.Drawing.Image.FromResource ("gutter-bookmark-15.png");
 
 			BookmarkMarker.DrawBookmarkFunc = delegate(TextEditor editor, Cairo.Context cr, DocumentLine lineSegment, double x, double y, double width, double height) {
 				if (!lineSegment.IsBookmarked)
@@ -1037,7 +1037,18 @@ namespace MonoDevelop.SourceEditor
 				RunAction (Mono.TextEditor.Vi.ViActions.Join);
 			}
 		}
-		
+
+		[CommandHandler (MonoDevelop.Ide.Commands.EditCommands.SortSelectedLines)]
+		void SortSelectedLines ()
+		{
+			RunAction (MiscActions.SortSelectedLines);
+		}
+
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.EditCommands.SortSelectedLines)]
+		void UpdateSortSelectedLines (CommandInfo ci)
+		{
+			ci.Enabled = GetTextEditorData ().IsMultiLineSelection;
+		}
 #endregion
 	
 	}

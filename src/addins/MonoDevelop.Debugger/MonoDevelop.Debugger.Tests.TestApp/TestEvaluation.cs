@@ -30,6 +30,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Dynamic;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.Debugger.Tests.TestApp
 {
@@ -93,6 +94,8 @@ namespace MonoDevelop.Debugger.Tests.TestApp
 			alist.Add (3);
 			string modifyInLamda = "";
 
+			var debugDisplayMethodTest = new DebuggerDisplayMethodTest ();
+
 			A c = new C ();
 			A b = new B ();
 			A a = new A ();
@@ -129,6 +132,9 @@ namespace MonoDevelop.Debugger.Tests.TestApp
 			dynObj.someString = "Hello dynamic objects!";
 
 			var objWithMethodA = new ClassWithMethodA ();
+
+			bool? nullableBool = null;
+			nullableBool = true;
 
 			var richObject = new RichClass ();
 			byte[] nulledByteArray = null;
@@ -427,6 +433,18 @@ class TheProxy
 	}
 }
 
+[DebuggerDisplay ("{GetDebuggerDisplay(), nq}")]
+class DebuggerDisplayMethodTest
+{
+	int someInt = 32;
+	int someInt2 = 43;
+
+	string GetDebuggerDisplay ()
+	{
+		return "First Int:" + someInt + " Second Int:" + someInt2;
+	}
+}
+
 class Thing<T>
 {
 	public class Done<U>
@@ -490,6 +508,19 @@ struct SimpleStruct
 	public override string ToString ()
 	{
 		return StringField + " " + IntField + " " + NulledIntField;
+	}
+}
+
+class ClassWithCompilerGeneratedNestedClass
+{
+	async Task TestMethodAsync()
+	{
+		await Task.Delay (1);
+	}
+
+	public class NestedClass
+	{
+
 	}
 }
 

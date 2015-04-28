@@ -1,0 +1,15 @@
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/.NETFramework,Version=v4.5.AssemblyAttribute.cs
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.MonoDevelop.Core.addin.xml
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.frameworks.framework_NET_1_1.xml
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.frameworks.framework_NET_2_0.xml
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.frameworks.framework_NET_3_0.xml
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.frameworks.framework_NET_3_5.xml
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.frameworks.framework_NET_4_0.xml
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.frameworks.framework_NET_4_5.xml
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.frameworks.framework_NET_3_5_client.xml
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.frameworks.framework_NET_4_0_client.xml
+/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.Core.dll.config
+/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.Core.dll.mdb
+/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.Core.dll
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.dll
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Core/obj/Debug/MonoDevelop.Core.dll.mdb

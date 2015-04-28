@@ -36,12 +36,12 @@ namespace Mono.Debugging.Evaluation
 {
 	public class ArrayElementGroup: RemoteFrameObject, IObjectValueSource
 	{
-		EvaluationContext ctx;
+		readonly ICollectionAdaptor array;
+		readonly EvaluationContext ctx;
 		int[] baseIndices;
+		int[] dimensions;
 		int firstIndex;
 		int lastIndex;
-		int[] bounds;
-		ICollectionAdaptor array;
 		
 		const int MaxChildCount = 150;
 
@@ -59,7 +59,7 @@ namespace Mono.Debugging.Evaluation
 		{
 			this.array = array;
 			this.ctx = ctx;
-			this.bounds = array.GetDimensions ();
+			this.dimensions = array.GetDimensions ();
 			this.baseIndices = baseIndices;
 			this.firstIndex = firstIndex;
 			this.lastIndex = lastIndex;
@@ -72,18 +72,23 @@ namespace Mono.Debugging.Evaluation
 		public ObjectValue CreateObjectValue ()
 		{
 			Connect ();
-			StringBuilder sb = new StringBuilder ("[");
-			for (int n=0; n<baseIndices.Length; n++) {
-				if (n > 0)
+
+			var sb = new StringBuilder ("[");
+
+			for (int i = 0; i < baseIndices.Length; i++) {
+				if (i > 0)
 					sb.Append (", ");
-				sb.Append (baseIndices [n].ToString ());
+				sb.Append (baseIndices[i].ToString ());
 			}
+
 			if (IsRange) {
 				if (baseIndices.Length > 0)
 					sb.Append (", ");
+
 				sb.Append (firstIndex.ToString ()).Append ("..").Append (lastIndex.ToString ());
 			}
-			if (bounds.Length > 1 && baseIndices.Length < bounds.Length)
+
+			if (dimensions.Length > 1 && baseIndices.Length < dimensions.Length)
 				sb.Append (", ...");
 			
 			sb.Append ("]");
@@ -107,19 +112,19 @@ namespace Mono.Debugging.Evaluation
 				object obj = array.GetElement (idx);
 				return cctx.Adapter.GetObjectValueChildren (cctx, new ArrayObjectSource (array, path[1]), obj, firstItemIndex, count);
 			}
-			
+
 			int lowerBound;
 			int upperBound;
 			bool isLastDimension;
 			
-			if (bounds.Length > 1) {
+			if (dimensions.Length > 1) {
 				int rank = baseIndices.Length;
 				lowerBound = 0;
-				upperBound = bounds [rank] - 1;
-				isLastDimension = rank == bounds.Length - 1;
+				upperBound = dimensions [rank] - 1;
+				isLastDimension = rank == dimensions.Length - 1;
 			} else {
 				lowerBound = 0;
-				upperBound = bounds [0] - 1;
+				upperBound = dimensions [0] - 1;
 				isLastDimension = true;
 			}
 			
@@ -129,8 +134,7 @@ namespace Mono.Debugging.Evaluation
 			if (!IsRange) {
 				initalIndex = lowerBound;
 				len = upperBound + 1;
-			}
-			else {
+			} else {
 				initalIndex = firstIndex;
 				len = lastIndex - firstIndex + 1;
 			}
@@ -161,7 +165,7 @@ namespace Mono.Debugging.Evaluation
 
 				for (int n = 0; n < values.Length; n++) {
 					int index = n + initalIndex + firstItemIndex;
-					string sidx = curIndexStr + index.ToString ();
+					string sidx = curIndexStr + index;
 					ObjectValue val;
 					string ename = "[" + sidx.Replace (",", ", ") + "]";
 					if (index > upperBound)
@@ -171,8 +175,13 @@ namespace Mono.Debugging.Evaluation
 						val = cctx.Adapter.CreateObjectValue (cctx, this, newPath.Append (sidx), elems.GetValue (n), ObjectValueFlags.ArrayElement);
 						if (elems.GetValue (n) != null && !cctx.Adapter.IsNull (cctx, elems.GetValue (n))) {
 							TypeDisplayData tdata = cctx.Adapter.GetTypeDisplayData (cctx, cctx.Adapter.GetValueType (cctx, elems.GetValue (n)));
-							if (!string.IsNullOrEmpty (tdata.NameDisplayString))
-								ename = cctx.Adapter.EvaluateDisplayString (cctx, elems.GetValue (n), tdata.NameDisplayString);
+							if (!string.IsNullOrEmpty (tdata.NameDisplayString)) {
+								try {
+									ename = cctx.Adapter.EvaluateDisplayString (cctx, elems.GetValue (n), tdata.NameDisplayString);
+								} catch (MissingMemberException) {
+									// missing property or otherwise malformed DebuggerDisplay string
+								}
+							}
 						}
 					}
 					val.Name = ename;
@@ -180,10 +189,11 @@ namespace Mono.Debugging.Evaluation
 				}
 				return values;
 			}
-			else if (!isLastDimension && div == 1) {
+
+			if (!isLastDimension && div == 1) {
 				// Return an array element group for each index
 				
-				List<ObjectValue> list = new List<ObjectValue> ();
+				var list = new List<ObjectValue> ();
 				for (int i=0; i<count; i++) {
 					int index = i + initalIndex + firstItemIndex;
 					ObjectValue val;
@@ -203,8 +213,7 @@ namespace Mono.Debugging.Evaluation
 					list.Add (val);
 				}
 				return list.ToArray ();
-			}
-			else {
+			} else {
 				// Too many elements. Split the array.
 				
 				// Don't make divisions of 10 elements, min is 100
@@ -214,7 +223,7 @@ namespace Mono.Debugging.Evaluation
 				// Create the child groups
 				int i = initalIndex + firstItemIndex;
 				len += i;
-				List<ObjectValue> list = new List<ObjectValue> ();
+				var list = new List<ObjectValue> ();
 				while (i < len) {
 					int end = i + div - 1;
 					if (end > len)
@@ -229,21 +238,25 @@ namespace Mono.Debugging.Evaluation
 		
 		internal static string IndicesToString (int[] indices)
 		{
-			StringBuilder sb = new StringBuilder ();
-			for (int n=0; n<indices.Length; n++) {
-				if (n > 0)
+			var sb = new StringBuilder ();
+
+			for (int i = 0; i < indices.Length; i++) {
+				if (i > 0)
 					sb.Append (',');
-				sb.Append (indices [n].ToString ());
+				sb.Append (indices[i].ToString ());
 			}
+
 			return sb.ToString ();
 		}
 		
 		internal static int[] StringToIndices (string str)
 		{
-			string[] sidx = str.Split (',');
-			int[] idx = new int [sidx.Length];
-			for (int n=0; n<sidx.Length; n++)
-				idx [n] = int.Parse (sidx [n]);
+			var sidx = str.Split (',');
+			var idx = new int [sidx.Length];
+
+			for (int i = 0; i < sidx.Length; i++)
+				idx[i] = int.Parse (sidx[i]);
+
 			return idx;
 		}
 		
@@ -252,13 +265,16 @@ namespace Mono.Debugging.Evaluation
 			if (bounds.Length == 0)
 				return "[...]";
 
-			StringBuilder sb = new StringBuilder ("[");
-			for (int n=0; n<bounds.Length; n++) {
-				if (n > 0)
+			var sb = new StringBuilder ("[");
+
+			for (int i = 0; i < bounds.Length; i++) {
+				if (i > 0)
 					sb.Append (", ");
-				sb.Append (bounds [n].ToString ());
+				sb.Append (bounds [i].ToString ());
 			}
+
 			sb.Append ("]");
+
 			return sb.ToString ();
 		}
 		
@@ -302,8 +318,13 @@ namespace Mono.Debugging.Evaluation
 			ObjectValue val = cctx.Adapter.CreateObjectValue (cctx, this, path, elem, ObjectValueFlags.ArrayElement);
 			if (elem != null && !cctx.Adapter.IsNull (cctx, elem)) {
 				TypeDisplayData tdata = cctx.Adapter.GetTypeDisplayData (cctx, cctx.Adapter.GetValueType (cctx, elem));
-				if (!string.IsNullOrEmpty (tdata.NameDisplayString))
-					val.Name = cctx.Adapter.EvaluateDisplayString (cctx, elem, tdata.NameDisplayString);
+				if (!string.IsNullOrEmpty (tdata.NameDisplayString)) {
+					try {
+						val.Name = cctx.Adapter.EvaluateDisplayString (cctx, elem, tdata.NameDisplayString);
+					} catch (MissingMemberException) {
+						// missing property or otherwise malformed DebuggerDisplay string
+					}
+				}
 			}
 			return val;
 		}
@@ -334,8 +355,8 @@ namespace Mono.Debugging.Evaluation
 	
 	class ArrayObjectSource: IObjectSource
 	{
-		ICollectionAdaptor source;
-		string path;
+		readonly ICollectionAdaptor source;
+		readonly string path;
 		
 		public ArrayObjectSource (ICollectionAdaptor source, string path)
 		{

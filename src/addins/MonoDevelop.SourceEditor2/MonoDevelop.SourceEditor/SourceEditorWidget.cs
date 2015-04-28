@@ -383,6 +383,7 @@ namespace MonoDevelop.SourceEditor
 				if (this.splittedTextEditor == null || !splittedTextEditor.TextArea.HasFocus)
 					OnLostFocus ();
 			};
+			IdeApp.FocusOut += (sender, e) => textEditor.TextArea.HideTooltip (false);
 			mainsw = new DecoratedScrolledWindow (this);
 			mainsw.SetTextEditor (textEditor);
 			
@@ -622,8 +623,16 @@ namespace MonoDevelop.SourceEditor
 		
 		void UpdateErrorUndelines (ParsedDocument parsedDocument)
 		{
-			if (!options.UnderlineErrors || parsedDocument == null)
+			if (!options.UnderlineErrors || parsedDocument == null) {
+				Application.Invoke (delegate {
+					var doc = this.TextEditor != null ? this.TextEditor.Document : null;
+					if (doc == null)
+						return;
+					RemoveErrorUnderlines (doc);
+					UpdateQuickTasks (parsedDocument);
+				});
 				return;
+			}
 				
 			Application.Invoke (delegate {
 				if (!quickTaskProvider.Contains (this))
@@ -635,7 +644,7 @@ namespace MonoDevelop.SourceEditor
 						Document doc = this.TextEditor != null ? this.TextEditor.Document : null;
 						if (doc != null) {
 							RemoveErrorUnderlines (doc);
-							
+
 							// Else we underline the error
 							if (parsedDocument.Errors != null) {
 								foreach (var error in parsedDocument.Errors)
@@ -983,15 +992,18 @@ namespace MonoDevelop.SourceEditor
 			hbox.PackStart (label, true, true, 0);
 			var okButton = new Button (Gtk.Stock.Ok);
 			okButton.WidthRequest = 60;
-			hbox.PackEnd (okButton, false, false, 0); 
+
+			// Small amount of vertical padding for the OK button.
+			const int verticalPadding = 2;
+			var vbox = new VBox ();
+			vbox.PackEnd (okButton, true, true, verticalPadding);
+			hbox.PackEnd (vbox, false, false, 0);
 
 			var list = new List<string> ();
 			list.Add (string.Format ("Convert to {0} line endings", GetEolString (textEditor.Options.DefaultEolMarker)));
-			if (multiple)
-				list.Add (string.Format ("Convert all files to {0} line endings", GetEolString (textEditor.Options.DefaultEolMarker)));
+			list.Add (string.Format ("Convert all files to {0} line endings", GetEolString (textEditor.Options.DefaultEolMarker)));
 			list.Add (string.Format ("Keep {0} line endings", GetEolString (DetectedEolMarker)));
-			if (multiple)
-				list.Add (string.Format ("Keep {0} line endings in all files", GetEolString (DetectedEolMarker)));
+			list.Add (string.Format ("Keep {0} line endings in all files", GetEolString (DetectedEolMarker)));
 			var combo = new ComboBox (list.ToArray ());
 			combo.Active = 0;
 			hbox.PackEnd (combo, false, false, 0);
@@ -1000,6 +1012,12 @@ namespace MonoDevelop.SourceEditor
 			container.PackStart (hbox, true, true, containerPadding); 
 			messageOverlayWindow.Child = container; 
 			messageOverlayWindow.ShowOverlay (this.TextEditor);
+
+			// This is hacky, but it will ensure that our combo appears with with the correct size.
+			GLib.Timeout.Add (100, delegate {
+				combo.QueueResize ();
+				return false;
+			});
 
 			messageOverlayWindow.SizeFunc = () => {
 				return okButton.SizeRequest ().Width +
@@ -1015,36 +1033,22 @@ namespace MonoDevelop.SourceEditor
 				RemoveMessageBar ();
 			};
 			okButton.Clicked += delegate {
-				if (multiple) {
-					switch (combo.Active) {
-					case 0:
-						ConvertLineEndings ();
-						view.WorkbenchWindow.ShowNotification = false;
-						view.Save (fileName, view.SourceEncoding);
-						break;
-					case 1:
-						FileRegistry.ConvertLineEndingsInAllFiles ();
-						break;
-					case 2:
-						UseIncorrectMarkers = true;
-						view.WorkbenchWindow.ShowNotification = false;
-						break;
-					case 3:
-						FileRegistry.IgnoreLineEndingsInAllFiles ();
-						break;
-					}
-				} else {
-					switch (combo.Active) {
-					case 0:
-						ConvertLineEndings ();
-						view.WorkbenchWindow.ShowNotification = false;
-						view.Save (fileName, view.SourceEncoding);
-						break;
-					case 1:
-						UseIncorrectMarkers = true;
-						view.WorkbenchWindow.ShowNotification = false;
-						break;
-					}
+				switch (combo.Active) {
+				case 0:
+					ConvertLineEndings ();
+					view.WorkbenchWindow.ShowNotification = false;
+					view.Save (fileName, view.SourceEncoding);
+					break;
+				case 1:
+					FileRegistry.ConvertLineEndingsInAllFiles ();
+					break;
+				case 2:
+					UseIncorrectMarkers = true;
+					view.WorkbenchWindow.ShowNotification = false;
+					break;
+				case 3:
+					FileRegistry.IgnoreLineEndingsInAllFiles ();
+					break;
 				}
 				RemoveMessageBar ();
 			};
@@ -1686,17 +1690,17 @@ namespace MonoDevelop.SourceEditor
 		void UpdateQuickTasks (ParsedDocument doc)
 		{
 			tasks.Clear ();
+			if (doc != null) {
+				foreach (var cmt in doc.TagComments) {
+					var newTask = new QuickTask (cmt.Text, cmt.Region.Begin, Severity.Hint);
+					tasks.Add (newTask);
+				}
 			
-			foreach (var cmt in doc.TagComments) {
-				var newTask = new QuickTask (cmt.Text, cmt.Region.Begin, Severity.Hint);
-				tasks.Add (newTask);
+				foreach (var error in doc.Errors) {
+					var newTask = new QuickTask (error.Message, error.Region.Begin, error.ErrorType == ErrorType.Error ? Severity.Error : Severity.Warning);
+					tasks.Add (newTask);
+				}
 			}
-			
-			foreach (var error in doc.Errors) {
-				var newTask = new QuickTask (error.Message, error.Region.Begin, error.ErrorType == ErrorType.Error ? Severity.Error : Severity.Warning);
-				tasks.Add (newTask);
-			}
-			
 			OnTasksUpdated (EventArgs.Empty);
 		}
 		#endregion

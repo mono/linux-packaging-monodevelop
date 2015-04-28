@@ -600,10 +600,14 @@ namespace Mono.Debugging.Soft
 		
 		static bool IsClosureReferenceField (FieldInfoMirror field)
 		{
-			// mcs is "<>f__ref"
+			// mcs is "$locvar"
+			// old mcs is "<>f__ref"
 			// csc is "CS$<>"
+			// roslyn is "<>8__"
 			return field.Name.StartsWith ("CS$<>", StringComparison.Ordinal) ||
-				field.Name.StartsWith ("<>f__ref", StringComparison.Ordinal);
+				        field.Name.StartsWith ("<>f__ref", StringComparison.Ordinal) ||
+				        field.Name.StartsWith ("$locvar", StringComparison.Ordinal) ||
+				        field.Name.StartsWith ("<>8__", StringComparison.Ordinal);
 		}
 		
 		static bool IsClosureReferenceLocal (LocalVariable local)
@@ -641,7 +645,7 @@ namespace Mono.Debugging.Soft
 			return null;
 		}
 
-		IEnumerable<ValueReference> GetHoistedLocalVariables (SoftEvaluationContext cx, ValueReference vthis)
+		IEnumerable<ValueReference> GetHoistedLocalVariables (SoftEvaluationContext cx, ValueReference vthis, HashSet<FieldInfoMirror> alreadyVisited = null)
 		{
 			if (vthis == null)
 				return new ValueReference [0];
@@ -661,7 +665,11 @@ namespace Mono.Debugging.Soft
 					continue;
 
 				if (IsClosureReferenceField (field)) {
-					list.AddRange (GetHoistedLocalVariables (cx, new FieldValueReference (cx, field, val, type)));
+					alreadyVisited = alreadyVisited ?? new HashSet<FieldInfoMirror> ();
+					if (alreadyVisited.Contains (field))
+						continue;
+					alreadyVisited.Add (field);
+					list.AddRange (GetHoistedLocalVariables (cx, new FieldValueReference (cx, field, val, type), alreadyVisited));
 					continue;
 				}
 
@@ -691,15 +699,19 @@ namespace Mono.Debugging.Soft
 			return null;
 		}
 		
-		ValueReference GetHoistedThisReference (SoftEvaluationContext cx, TypeMirror type, object val)
+		ValueReference GetHoistedThisReference (SoftEvaluationContext cx, TypeMirror type, object val, HashSet<FieldInfoMirror> alreadyVisited = null)
 		{
 			foreach (var field in type.GetFields ()) {
 				if (IsHoistedThisReference (field))
 					return new FieldValueReference (cx, field, val, type, "this", ObjectValueFlags.Literal);
 
 				if (IsClosureReferenceField (field)) {
+					alreadyVisited = alreadyVisited ?? new HashSet<FieldInfoMirror> ();
+					if (alreadyVisited.Contains (field))
+						continue;
+					alreadyVisited.Add (field);
 					var fieldRef = new FieldValueReference (cx, field, val, type);
-					var thisRef = GetHoistedThisReference (cx, field.FieldType, fieldRef.Value);
+					var thisRef = GetHoistedThisReference (cx, field.FieldType, fieldRef.Value, alreadyVisited);
 					if (thisRef != null)
 						return thisRef;
 				}
@@ -1316,9 +1328,18 @@ namespace Mono.Debugging.Soft
 			var tm = (TypeMirror) type;
 
 			foreach (var nested in tm.GetNestedTypes ())
+				if (!IsGeneratedType (nested))
+					yield return nested;
+		}
+
+		public override IEnumerable<object> GetImplementedInterfaces (EvaluationContext ctx, object type)
+		{
+			var tm = (TypeMirror) type;
+
+			foreach (var nested in tm.GetInterfaces ())
 				yield return nested;
 		}
-		
+
 		public override string GetTypeName (EvaluationContext ctx, object type)
 		{
 			var tm = type as TypeMirror;
@@ -1618,6 +1639,17 @@ namespace Mono.Debugging.Soft
 
 		public override object RuntimeInvoke (EvaluationContext ctx, object targetType, object target, string methodName, object[] genericTypeArgs, object[] argTypes, object[] argValues)
 		{
+			object[] outArgs;
+			return RuntimeInvoke (ctx, targetType, target, methodName, genericTypeArgs, argTypes, argValues, false, out outArgs);
+		}
+
+		public override object RuntimeInvoke (EvaluationContext ctx, object targetType, object target, string methodName, object[] genericTypeArgs, object[] argTypes, object[] argValues, out object[] outArgs)
+		{
+			return RuntimeInvoke (ctx, targetType, target, methodName, genericTypeArgs, argTypes, argValues, true, out outArgs);
+		}
+
+		private object RuntimeInvoke (EvaluationContext ctx, object targetType, object target, string methodName, object[] genericTypeArgs, object[] argTypes, object[] argValues,bool enableOutArgs, out object[] outArgs)
+		{
 			var type = ToTypeMirror (ctx, targetType);
 			var soft = (SoftEvaluationContext) ctx;
 
@@ -1663,8 +1695,15 @@ namespace Mono.Debugging.Soft
 					values[n] = (Value) argValues[n];
 				}
 			}
-
-			return soft.RuntimeInvoke (method, target ?? targetType, values);
+			if (enableOutArgs) {
+				Value[] outArgsValue;
+				var result = soft.RuntimeInvoke (method, target ?? targetType, values, out outArgsValue);
+				outArgs = (object[])outArgsValue;
+				return result;
+			} else {
+				outArgs = null;
+				return soft.RuntimeInvoke (method, target ?? targetType, values);
+			}
 		}
 
 		static TypeMirror[] ResolveGenericTypeArguments (MethodMirror method, TypeMirror[] argTypes)
@@ -1987,7 +2026,7 @@ namespace Mono.Debugging.Soft
 
 	class MethodCall: AsyncOperation
 	{
-		const InvokeOptions options = InvokeOptions.DisableBreakpoints | InvokeOptions.SingleThreaded;
+		readonly InvokeOptions options = InvokeOptions.DisableBreakpoints | InvokeOptions.SingleThreaded;
 
 		readonly ManualResetEvent shutdownEvent = new ManualResetEvent (false);
 		readonly SoftEvaluationContext ctx;
@@ -1996,14 +2035,20 @@ namespace Mono.Debugging.Soft
 		readonly object obj;
 		IAsyncResult handle;
 		Exception exception;
-		Value result;
+		InvokeResult result;
 		
-		public MethodCall (SoftEvaluationContext ctx, MethodMirror function, object obj, Value[] args)
+		public MethodCall (SoftEvaluationContext ctx, MethodMirror function, object obj, Value[] args, bool enableOutArgs)
 		{
 			this.ctx = ctx;
 			this.function = function;
 			this.obj = obj;
 			this.args = args;
+			if (enableOutArgs) {
+				this.options |= InvokeOptions.ReturnOutArgs;
+			}
+			if (function.VirtualMachine.Version.AtLeast (2, 40)) {
+				this.options |= InvokeOptions.Virtual;
+			}
 		}
 		
 		public override string Description {
@@ -2020,7 +2065,7 @@ namespace Mono.Debugging.Soft
 				else if (obj is TypeMirror)
 					handle = ((TypeMirror)obj).BeginInvokeMethod (ctx.Thread, function, args, options, null, null);
 				else if (obj is StructMirror)
-					handle = ((StructMirror)obj).BeginInvokeMethod (ctx.Thread, function, args, options, null, null);
+					handle = ((StructMirror)obj).BeginInvokeMethod (ctx.Thread, function, args, options | InvokeOptions.ReturnOutThis, null, null);
 				else if (obj is PrimitiveValue)
 					handle = ((PrimitiveValue)obj).BeginInvokeMethod (ctx.Thread, function, args, options, null, null);
 				else
@@ -2056,13 +2101,13 @@ namespace Mono.Debugging.Soft
 		{
 			try {
 				if (obj is ObjectMirror)
-					result = ((ObjectMirror)obj).EndInvokeMethod (handle);
+					result = ((ObjectMirror)obj).EndInvokeMethodWithResult (handle);
 				else if (obj is TypeMirror)
-					result = ((TypeMirror)obj).EndInvokeMethod (handle);
+					result = ((TypeMirror)obj).EndInvokeMethodWithResult (handle);
 				else if (obj is StructMirror)
-					result = ((StructMirror)obj).EndInvokeMethod (handle);
+					result = ((StructMirror)obj).EndInvokeMethodWithResult (handle);
 				else
-					result = ((PrimitiveValue)obj).EndInvokeMethod (handle);
+					result = ((PrimitiveValue)obj).EndInvokeMethodWithResult (handle);
 			} catch (InvocationException ex) {
 				if (!Aborting && ex.Exception != null) {
 					string ename = ctx.Adapter.GetValueTypeName (ctx, ex.Exception);
@@ -2116,7 +2161,15 @@ namespace Mono.Debugging.Soft
 			get {
 				if (exception != null)
 					throw new EvaluatorException (exception.Message);
-				return result;
+				return result.Result;
+			}
+		}
+
+		public Value[] OutArgs {
+			get {
+				if (exception != null)
+					throw new EvaluatorException (exception.Message);
+				return result.OutArgs;
 			}
 		}
 	}

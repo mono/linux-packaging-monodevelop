@@ -205,7 +205,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			return projectBuilder;
 		}
 
-		void CleanupProjectBuilder ()
+		internal void CleanupProjectBuilder ()
 		{
 			if (projectBuilder != null) {
 				projectBuilder.Dispose ();
@@ -213,7 +213,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			}
 		}
 
-		public void RefreshProjectBuilder ()
+		internal void RefreshProjectBuilder ()
 		{
 			if (projectBuilder != null) {
 				projectBuilder.Refresh ();
@@ -245,7 +245,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			configs.Add (new ProjectConfigurationInfo () {
 				ProjectFile = item.FileName,
 				Configuration = c.Name,
-				Platform = GetExplicitPlatform (c)
+				Platform = GetExplicitPlatform (c),
+				ProjectGuid = ((MSBuildProjectHandler)item.ItemHandler).ItemId
 			});
 			foreach (var refProject in item.GetReferencedItems (configuration).OfType<Project> ()) {
 				var refConfig = refProject.GetConfiguration (configuration);
@@ -253,7 +254,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					configs.Add (new ProjectConfigurationInfo () {
 						ProjectFile = refProject.FileName,
 						Configuration = refConfig.Name,
-						Platform = GetExplicitPlatform (refConfig)
+						Platform = GetExplicitPlatform (refConfig),
+						ProjectGuid = ((MSBuildProjectHandler)refProject.ItemHandler).ItemId
 					});
 				}
 			}
@@ -267,7 +269,11 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 				SolutionEntityItem item = (SolutionEntityItem) Item;
 				RemoteProjectBuilder builder = GetProjectBuilder ();
 				var configs = GetConfigurations (item, configuration);
-				foreach (var r in builder.ResolveAssemblyReferences (configs))
+
+				string[] refs;
+				using (Counters.ResolveMSBuildReferencesTimer.BeginTiming (Item.GetProjectEventMetadata ()))
+					refs = builder.ResolveAssemblyReferences (configs);
+				foreach (var r in refs)
 					yield return r;
 			}
 			else {
@@ -290,7 +296,26 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					LogWriter logWriter = new LogWriter (monitor.Log);
 					RemoteProjectBuilder builder = GetProjectBuilder ();
 					var configs = GetConfigurations (item, configuration);
-					var result = builder.Run (configs, logWriter, MSBuildProjectService.DefaultMSBuildVerbosity, new[] { target }, null, null);
+
+					TimerCounter buildTimer = null;
+					switch (target) {
+					case "Build": buildTimer = Counters.BuildMSBuildProjectTimer; break;
+					case "Clean": buildTimer = Counters.CleanMSBuildProjectTimer; break;
+					}
+
+					var t1 = Counters.RunMSBuildTargetTimer.BeginTiming (Item.GetProjectEventMetadata ());
+					var t2 = buildTimer != null ? buildTimer.BeginTiming (Item.GetProjectEventMetadata ()) : null;
+
+					MSBuildResult result;
+
+					try {
+						result = builder.Run (configs, logWriter, MSBuildProjectService.DefaultMSBuildVerbosity, new[] { target }, null, null);
+					} finally {
+						t1.End ();
+						if (t2 != null)
+							t2.End ();
+					}
+
 					System.Runtime.Remoting.RemotingServices.Disconnect (logWriter);
 					
 					var br = new BuildResult ();
@@ -299,10 +324,12 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						if (err.File != null)
 							file = Path.Combine (Path.GetDirectoryName (err.ProjectFile), err.File);
 
-						if (err.IsWarning)
-							br.AddWarning (file, err.LineNumber, err.ColumnNumber, err.Code, err.Message);
-						else
-							br.AddError (file, err.LineNumber, err.ColumnNumber, err.Code, err.Message);
+						br.Append (new BuildError (file, err.LineNumber, err.ColumnNumber, err.Code, err.Message) {
+							Subcategory = err.Subcategory,
+							EndLine = err.EndLineNumber,
+							EndColumn = err.EndColumnNumber,
+							IsWarning = err.IsWarning
+						});
 					}
 					return br;
 				}
@@ -992,6 +1019,8 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					var privateCopy = buildItem.GetBoolMetadata ("Private");
 					if (privateCopy != null)
 						pref.LocalCopy = privateCopy.Value;
+					var roa = buildItem.GetBoolMetadata ("ReferenceOutputAssembly");
+					pref.ReferenceOutputAssembly = roa == null || roa.Value;
 					ReadBuildItemMetadata (ser, buildItem, pref, typeof(ProjectReference));
 					return pref;
 				}
@@ -1622,7 +1651,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					buildItem.UnsetMetadata ("HintPath");
 			}
 			else if (pref.ReferenceType == ReferenceType.Project) {
-				Project refProj = Item.ParentSolution.FindProjectByName (pref.Reference);
+				Project refProj = Item.ParentSolution != null ? Item.ParentSolution.FindProjectByName (pref.Reference) : null;
 				if (refProj != null) {
 					buildItem = AddOrGetBuildItem (msproject, oldItems, "ProjectReference", MSBuildProjectService.ToMSBuildPath (Item.ItemDirectory, refProj.FileName), pref.Condition);
 					MSBuildProjectHandler handler = refProj.ItemHandler as MSBuildProjectHandler;
@@ -1631,6 +1660,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					else
 						buildItem.UnsetMetadata ("Project");
 					buildItem.SetMetadata ("Name", refProj.Name);
+					if (pref.ReferenceOutputAssembly)
+						buildItem.UnsetMetadata ("ReferenceOutputAssembly");
+					else
+						buildItem.SetMetadata ("ReferenceOutputAssembly", false);
 				} else {
 					monitor.ReportWarning (GettextCatalog.GetString ("Reference to unknown project '{0}' ignored.", pref.Reference));
 					return;
@@ -1706,6 +1739,7 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			foreach (var e in AddinManager.GetExtensionObjects<MSBuildExtension> ("/MonoDevelop/ProjectModel/MSBuildExtensions")) {
 				e.Handler = this;
 				yield return e;
+				e.Handler = null;
 			}
 		}
 

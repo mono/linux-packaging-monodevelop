@@ -45,12 +45,12 @@ namespace Mono.Debugging.Soft
 		{
 			Frame = frame;
 			Thread = frame.Thread;
-			Domain = Thread.Domain;
+			Domain = frame.Domain;
 
 			string method = frame.Method.Name;
 			if (frame.Method.DeclaringType != null)
 				method = frame.Method.DeclaringType.FullName + "." + method;
-			var location = new DC.SourceLocation (method, frame.FileName, frame.LineNumber, frame.ColumnNumber);
+			var location = new DC.SourceLocation (method, frame.FileName, frame.LineNumber, frame.ColumnNumber, frame.Location.SourceFileHash);
 			string language;
 
 			if (frame.Method != null) {
@@ -123,6 +123,18 @@ namespace Mono.Debugging.Soft
 		
 		public Value RuntimeInvoke (MethodMirror method, object target, Value[] values)
 		{
+			Value[] outArgs;
+			return RuntimeInvoke (method, target, values, false, out outArgs);
+		}
+
+		public Value RuntimeInvoke (MethodMirror method, object target, Value[] values, out Value[] outArgs)
+		{
+			return RuntimeInvoke (method, target, values, true, out outArgs);
+		}
+		
+		Value RuntimeInvoke (MethodMirror method, object target, Value[] values, bool enableOutArgs, out Value[] outArgs)
+		{
+			outArgs = null;
 			if (values != null) {
 				// Some arguments may need to be boxed
 				var mparams = method.GetParameters ();
@@ -172,9 +184,11 @@ namespace Mono.Debugging.Soft
 			} catch (NotSupportedException) {
 				AssertTargetInvokeAllowed ();
 
-				var mc = new MethodCall (this, method, target, values);
+				var mc = new MethodCall (this, method, target, values, enableOutArgs);
 				Adapter.AsyncExecute (mc, Options.EvaluationTimeout);
-
+				if (enableOutArgs) {
+					outArgs = mc.OutArgs;
+				}
 				return mc.ReturnValue;
 			}
 		}
@@ -187,6 +201,12 @@ namespace Mono.Debugging.Soft
 					Frame = f;
 					break;
 				}
+			}
+		}
+
+		public override bool SupportIEnumerable {
+			get {
+				return session.VirtualMachine.Version.AtLeast (2, 35);
 			}
 		}
 	}

@@ -102,7 +102,7 @@ namespace MonoDevelop.Ide
 		public WorkspaceItemCollection Items {
 			get {
 				if (items == null)
-					items = new RootWorkspaceItemCollection (this);
+					items = new RootWorkspaceItemCollection (this, 256);
 				return items; 
 			}
 		}
@@ -136,7 +136,22 @@ namespace MonoDevelop.Ide
 				ActiveConfigurationChanged (this, EventArgs.Empty);
 		}
 
-		public ExecutionTarget ActiveExecutionTarget { get; set; }
+		ExecutionTarget activeExecutionTarget;
+		public ExecutionTarget ActiveExecutionTarget {
+			get { return activeExecutionTarget; }
+			set {
+				if (activeExecutionTarget != value) {
+					activeExecutionTarget = value;
+					OnActiveExecutionTargetChanged ();
+				}
+			}
+		}
+
+		void OnActiveExecutionTargetChanged ()
+		{
+			if (ActiveExecutionTargetChanged != null)
+				ActiveExecutionTargetChanged (this, EventArgs.Empty);
+		}
 
 		internal string PreferredActiveExecutionTarget {
 			get { return ActiveExecutionTarget != null ? ActiveExecutionTarget.Id : preferredActiveExecutionTarget; }
@@ -524,7 +539,11 @@ namespace MonoDevelop.Ide
 			return true;
 		}
 
-		bool openingItem;
+		IAsyncOperation openingItemOper;
+
+		internal bool WorkspaceItemIsOpening {
+			get { return openingItemOper != null && !openingItemOper.IsCompleted; }
+		}
 
 		public IAsyncOperation OpenWorkspaceItem (string filename)
 		{
@@ -538,8 +557,8 @@ namespace MonoDevelop.Ide
 		
 		public IAsyncOperation OpenWorkspaceItem (string filename, bool closeCurrent, bool loadPreferences)
 		{
-			if (openingItem)
-				return MonoDevelop.Core.ProgressMonitoring.NullAsyncOperation.Failure;
+			if (openingItemOper != null && !openingItemOper.IsCompleted && closeCurrent)
+				openingItemOper.Cancel ();
 
 			if (filename.StartsWith ("file://", StringComparison.Ordinal))
 				filename = new Uri(filename).LocalPath;
@@ -556,17 +575,21 @@ namespace MonoDevelop.Ide
 					return MonoDevelop.Core.ProgressMonitoring.NullAsyncOperation.Failure;
 			}
 
-			using (var monitor = IdeApp.Workbench.ProgressMonitors.GetProjectLoadProgressMonitor (true)) {
-				bool reloading = IsReloading;
+			var monitor = IdeApp.Workbench.ProgressMonitors.GetProjectLoadProgressMonitor (true);
+			bool reloading = IsReloading;
 
-				openingItem = true;
-				IdeApp.Workbench.LockGui ();
+			var oper = monitor.AsyncOperation;
+			openingItemOper = oper;
+			oper.Completed += delegate {
+				if (oper == openingItemOper)
+					openingItemOper = null;
+			};
+			IdeApp.Workbench.LockGui ();
 
-				DispatchService.BackgroundDispatch (delegate {
-					BackgroundLoadWorkspace (monitor, filename, loadPreferences, reloading);
-				});
-				return monitor.AsyncOperation;
-			}
+			DispatchService.BackgroundDispatch (delegate {
+				BackgroundLoadWorkspace (monitor, filename, loadPreferences, reloading);
+			});
+			return oper;
 		}
 		
 		void ReattachDocumentProjects (IEnumerable<string> closedDocs)
@@ -625,20 +648,17 @@ namespace MonoDevelop.Ide
 				timer.Trace ("Registering to recent list");
 				DesktopService.RecentFiles.AddProject (item.FileName, item.Name);
 				
-				Gtk.Application.Invoke (delegate {
-					// Add the item in the GUI thread. It is not safe to do it in the background thread.
-					Items.Add (item);
-				});
 			} catch (Exception ex) {
 				monitor.ReportError ("Load operation failed.", ex);
 				
 				// Don't use 'finally' to dispose the monitor, since it has to be disposed later
 				monitor.Dispose ();
+				if (item != null)
+					item.Dispose ();
 				timer.End ();
 				return;
 			} finally {
 				Gtk.Application.Invoke ((s,o) => IdeApp.Workbench.UnlockGui ());
-				openingItem = false;
 				if (reloading)
 					SetReloading (false);
 			}
@@ -646,6 +666,13 @@ namespace MonoDevelop.Ide
 			Gtk.Application.Invoke (delegate {
 				using (monitor) {
 					try {
+						// Add the item in the GUI thread. It is not safe to do it in the background thread.
+						if (!monitor.IsCancelRequested)
+							Items.Add (item);
+						else {
+							item.Dispose ();
+							return;
+						}
 						if (IdeApp.ProjectOperations.CurrentSelectedWorkspaceItem == null)
 							IdeApp.ProjectOperations.CurrentSelectedWorkspaceItem = GetAllSolutions ().FirstOrDefault ();
 						if (Items.Count == 1 && loadPreferences) {
@@ -1371,6 +1398,11 @@ namespace MonoDevelop.Ide
 		/// Fired when the active solution configuration has changed
 		/// </summary>
 		public event EventHandler ActiveConfigurationChanged;
+
+		/// <summary>
+		/// Fired when the active execution target has changed
+		/// </summary>
+		public event EventHandler ActiveExecutionTargetChanged;
 		
 		/// <summary>
 		/// Fired when the list of solution configurations has changed
@@ -1399,7 +1431,11 @@ namespace MonoDevelop.Ide
 	{
 		RootWorkspace parent;
 		
-		public RootWorkspaceItemCollection (RootWorkspace parent)
+		public RootWorkspaceItemCollection (RootWorkspace parent) : this(parent, 0)
+		{
+		}
+
+		public RootWorkspaceItemCollection (RootWorkspace parent, int capacity) : base(new List<WorkspaceItem> (capacity))
 		{
 			this.parent = parent;
 		}

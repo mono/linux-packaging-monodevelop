@@ -44,6 +44,7 @@ using Mono.Debugging.Client;
 using Mono.Debugger.Soft;
 using Mono.Debugging.Evaluation;
 using MDB = Mono.Debugger.Soft;
+using System.Security.Cryptography;
 
 namespace Mono.Debugging.Soft
 {
@@ -73,7 +74,6 @@ namespace Mono.Debugging.Soft
 		List<string> userAssemblyNames;
 		ThreadInfo[] current_threads;
 		string remoteProcessName;
-		bool useFullPaths = true;
 		long currentAddress = -1;
 		IAsyncResult connection;
 		ProcessInfo[] procs;
@@ -227,7 +227,6 @@ namespace Mono.Debugging.Soft
 		/// <summary>Starts the debugger listening for a connection over TCP/IP</summary>
 		protected void StartListening (SoftDebuggerStartInfo dsi, out int assignedDebugPort, out int assignedConsolePort)
 		{
-		
 			IPEndPoint dbgEP, conEP;
 			InitForRemoteSession (dsi, out dbgEP, out conEP);
 			
@@ -412,10 +411,7 @@ namespace Mono.Debugging.Soft
 			connection = null;
 			
 			vm = machine;
-			
-			//full paths, from GetSourceFiles (true), are only supported by sdb protocol 2.2 and later
-			useFullPaths = machine.Version.AtLeast (2, 2);
-			
+
 			ConnectOutput (machine.StandardOutput, false);
 			ConnectOutput (machine.StandardError, true);
 			
@@ -789,12 +785,14 @@ namespace Mono.Debugging.Soft
 			if (frames.Length == 0)
 				throw new NotSupportedException ();
 
-			var location = FindLocationByMethod (frames[0].Method, fileName, line, column);
+			bool dummy = false;
+			var location = FindLocationByMethod (frames[0].Method, fileName, line, column, ref dummy);
 			if (location == null)
 				throw new NotSupportedException ();
 
 			try {
 				thread.SetIP (location);
+				currentAddress = location.ILOffset;
 			} catch (ArgumentException) {
 				throw new NotSupportedException ();
 			}
@@ -864,6 +862,35 @@ namespace Mono.Debugging.Soft
 						bi.SetStatus (BreakEventStatus.NotBound, null);
 						pending_bes.Add (bi);
 					}
+				} else if (breakEvent is InstructionBreakpoint) {
+					var bp = (InstructionBreakpoint) breakEvent;
+
+					var insideTypeRange = true;
+					var resolved = false;
+					bool generic;
+
+					bi.FileName = bp.FileName;
+
+					Location location;
+					if ((location = FindLocationByILOffset (bp, bp.FileName, out generic, out insideTypeRange)) != null) {
+						bi.Location = location;
+						InsertBreakpoint (bp, bi);
+						bi.SetStatus (BreakEventStatus.Bound, null);
+						resolved = true;
+					}
+
+					if (resolved) {
+						// Note: if the type or method is generic, there may be more instances so don't assume we are done resolving the breakpoint
+						if (generic)
+							pending_bes.Add (bi);
+					} else {
+						pending_bes.Add (bi);
+						if (insideTypeRange)
+							bi.SetStatus (BreakEventStatus.Invalid, null);
+						else
+							bi.SetStatus (BreakEventStatus.NotBound, null);
+					}
+
 				} else if (breakEvent is Breakpoint) {
 					var bp = (Breakpoint) breakEvent;
 					bool insideLoadedRange;
@@ -921,7 +948,10 @@ namespace Mono.Debugging.Soft
 				 * filter them using the file names used by pending breakpoints.
 				 */
 				if (vm.Version.AtLeast (2, 9)) {
-					var sourceFileList = pending_bes.Where (b => b.FileName != null).Select (b => b.FileName).ToArray ();
+					var sourceFileList = pending_bes.Where (b => b.FileName != null).SelectMany ((b, i) => new [] {
+						Path.GetFileName (b.FileName),
+						b.FileName
+					}).Distinct ().ToArray ();
 					if (sourceFileList.Length > 0) {
 						//HACK: with older versions of sdb that don't support case-insenitive compares,
 						//explicitly try lowercased drivename on windows, since csc (when not hosted in VS) lowercases
@@ -957,6 +987,34 @@ namespace Mono.Debugging.Soft
 
 				return bi;
 			}
+		}
+
+		private Location FindLocationByILOffset (InstructionBreakpoint bp, string filename, out bool isGeneric, out bool insideTypeRange)
+		{
+			var locations = new List<Location> ();
+
+			var typesInFile = new List<TypeMirror> ();
+
+			AddFileToSourceMapping (filename);
+
+			insideTypeRange = true;
+			isGeneric = false;
+
+			if (source_to_type.TryGetValue (filename, out typesInFile)) {
+				foreach (var type in typesInFile) {
+					var method = type.GetMethod(bp.MethodName);
+					if (method != null) {
+						foreach (var location in method.Locations) {
+							if (location.ILOffset == bp.ILOffset) {
+								isGeneric = type.IsGenericType;
+								return location;
+							}
+						}
+					}
+				}
+			}
+
+			return null;
 		}
 
 		protected override void OnRemoveBreakEvent (BreakEventInfo eventInfo)
@@ -1200,8 +1258,36 @@ namespace Mono.Debugging.Soft
 			if (!started)
 				return locations;
 
-			string filename = PathToFileName (file);
+			string filename = Path.GetFileName (file);
 
+			AddFileToSourceMapping (filename);
+
+			// Try already loaded types in the current source file
+			List<TypeMirror> mirrors;
+
+			if (source_to_type.TryGetValue (filename, out mirrors)) {
+				foreach (TypeMirror type in mirrors) {
+					bool genericMethod;
+					bool insideRange;
+
+					var loc = FindLocationByType (type, file, line, column, out genericMethod, out insideRange);
+					if (insideRange)
+						insideLoadedRange = true;
+
+					if (loc != null) {
+						if (genericMethod || type.IsGenericType)
+							genericTypeOrMethod = true;
+
+						locations.Add (loc);
+					}
+				}
+			}
+
+			return locations;
+		}
+
+		private void AddFileToSourceMapping (string filename)
+		{
 			//
 			// Fetch types matching the source file from the debuggee, and add them
 			// to the source file->type mapping tables.
@@ -1226,33 +1312,12 @@ namespace Mono.Debugging.Soft
 				foreach (TypeMirror t in typesInFile)
 					ProcessType (t);
 			}
-
-			// Try already loaded types in the current source file
-			List<TypeMirror> mirrors;
-
-			if (source_to_type.TryGetValue (filename, out mirrors)) {
-				foreach (TypeMirror type in mirrors) {
-					bool genericMethod;
-					bool insideRange;
-					
-					var loc = FindLocationByType (type, filename, line, column, out genericMethod, out insideRange);
-					if (insideRange)
-						insideLoadedRange = true;
-					
-					if (loc != null) {
-						if (genericMethod || type.IsGenericType)
-							genericTypeOrMethod = true;
-
-						locations.Add (loc);
-					}
-				}
-			}
-			
-			return locations;
 		}
-		
-		public override bool CanCancelAsyncEvaluations {
-			get {
+
+		public override bool CanCancelAsyncEvaluations
+		{
+			get
+			{
 				return Adaptor.IsEvaluating;
 			}
 		}
@@ -1439,6 +1504,15 @@ namespace Mono.Debugging.Soft
 				 name.StartsWith ("op_", StringComparison.Ordinal));
 		}
 
+		static bool IsCompilerGenerated (MethodMirror method)
+		{
+			foreach (var attr in method.GetCustomAttributes(false)) {
+				if (attr.Constructor.DeclaringType.FullName == "System.Runtime.CompilerServices.CompilerGeneratedAttribute")
+					return true;
+			}
+			return false;
+		}
+
 		bool IsUserAssembly (AssemblyMirror assembly)
 		{
 			if (userAssemblyNames == null)
@@ -1475,24 +1549,30 @@ namespace Mono.Debugging.Soft
 			if (Options.ProjectAssembliesOnly && !IsUserAssembly (method.DeclaringType.Assembly))
 				return true;
 
-			if (vm.Version.AtLeast (2, 21)) {
-				foreach (var attr in method.GetCustomAttributes (false)) {
-					var attrName = attr.Constructor.DeclaringType.FullName;
+			//With Sdb 2.30 this logic was moved to Runtime no need to spend time on checking this
+			if (!vm.Version.AtLeast (2, 30)) {
+				if (vm.Version.AtLeast (2, 21)) {
+					foreach (var attr in method.GetCustomAttributes (false)) {
+						var attrName = attr.Constructor.DeclaringType.FullName;
 
-					switch (attrName) {
-					case "System.Diagnostics.DebuggerHiddenAttribute":      return true;
-					case "System.Diagnostics.DebuggerStepThroughAttribute": return true;
-					case "System.Diagnostics.DebuggerNonUserCodeAttribute": return Options.ProjectAssembliesOnly;
+						switch (attrName) {
+						case "System.Diagnostics.DebuggerHiddenAttribute":
+							return true;
+						case "System.Diagnostics.DebuggerStepThroughAttribute":
+							return true;
+						case "System.Diagnostics.DebuggerNonUserCodeAttribute":
+							return Options.ProjectAssembliesOnly;
+						}
 					}
 				}
-			}
 
-			if (Options.ProjectAssembliesOnly) {
-				foreach (var attr in method.DeclaringType.GetCustomAttributes (false)) {
-					var attrName = attr.Constructor.DeclaringType.FullName;
+				if (Options.ProjectAssembliesOnly) {
+					foreach (var attr in method.DeclaringType.GetCustomAttributes (false)) {
+						var attrName = attr.Constructor.DeclaringType.FullName;
 
-					if (attrName == "System.Diagnostics.DebuggerNonUserCodeAttribute")
-						return Options.ProjectAssembliesOnly;
+						if (attrName == "System.Diagnostics.DebuggerNonUserCodeAttribute")
+							return Options.ProjectAssembliesOnly;
+					}
 				}
 			}
 
@@ -1555,6 +1635,7 @@ namespace Mono.Debugging.Soft
 			bool steppedInto = false;
 			bool steppedOut = false;
 			bool resume = true;
+			BreakInfo binfo;
 			
 			if (es [0].EventType == EventType.Exception) {
 				var bad = es.FirstOrDefault (ee => ee.EventType != EventType.Exception);
@@ -1567,22 +1648,26 @@ namespace Mono.Debugging.Soft
 					if (exception.Type.FullName != "System.Threading.ThreadAbortException")
 						resume = false;
 				} else {
-					//Set exception for this thread so CatchPoint Print message(tracing) of {$exception} work
+					// Set the exception for this thread so that CatchPoint Print message(tracing) of {$exception} works
 					activeExceptionsByThread [es[0].Thread.ThreadId] = exception;
 					if (!HandleBreakpoint (es [0].Thread, ev.Request)) {
 						etype = TargetEventType.ExceptionThrown;
 						resume = false;
 					}
-					//Remove exception from thread so when program stops because stepFinished/programPause/breakPoint...
-					//we don't have outdatted exception
+
+					// Remove exception from the thread so that when the program stops due to stepFinished/programPause/breakPoint...
+					// we don't have on out-dated exception
 					activeExceptionsByThread.Remove (es[0].Thread.ThreadId);
+
+					// Get the breakEvent so that we can check if we should ignore it later
+					if (breakpoints.TryGetValue (ev.Request, out binfo))
+						breakEvent = binfo.BreakEvent;
 				}
 			} else {
 				//always need to evaluate all breakpoints, some might be tracepoints or conditional bps with counters
 				foreach (Event e in es) {
 					if (e.EventType == EventType.Breakpoint) {
 						var be = (BreakpointEvent) e;
-						BreakInfo binfo;
 
 						if (!HandleBreakpoint (e.Thread, be.Request)) {
 							etype = TargetEventType.TargetHitBreakpoint;
@@ -1657,7 +1742,14 @@ namespace Mono.Debugging.Soft
 							// The method has a Debugger[Hidden,StepThrough,NonUserCode]Attribute on it
 							// Keep calling StepInto until we land somewhere without one of these attributes
 							stepInto = true;
-						} else if (Options.StepOverPropertiesAndOperators && IsPropertyOrOperatorMethod (frame.StackFrame.Method)) {
+						} else if (frame.StackFrame.ILOffset == 0 && IsPropertyOrOperatorMethod (frame.StackFrame.Method) &&
+						           (Options.StepOverPropertiesAndOperators || IsCompilerGenerated (frame.StackFrame.Method))) {
+							//We want to skip property only when we just stepped into property(ILOffset==0)
+							//so if user puts breakpoint inside property we don't want to StepOut for him when he steps after breakpoint is hit
+
+							//mcs.exe and Roslyn are also emmiting Sequence point inside auto-properties so breakpoint can be placed
+							//we want to always skip auto-properties also when StepOverProperties is disabled hence "|| IsCompilerGenerated"
+
 							// We will want to call StepInto once StepOut returns...
 							autoStepInto = true;
 							stepOut = true;
@@ -1666,7 +1758,7 @@ namespace Mono.Debugging.Soft
 							autoStepInto = true;
 							stepOut = true;
 						}
-					} else if (breakEvent != null && IgnoreBreakpoint (frame.StackFrame.Method)) {
+					} else if (etype == TargetEventType.TargetHitBreakpoint && breakEvent != null && IgnoreBreakpoint (frame.StackFrame.Method)) {
 						vm.Resume ();
 						DequeueEventsForFirstThread ();
 						return;
@@ -1725,7 +1817,7 @@ namespace Mono.Debugging.Soft
 					PathComparer.Equals (x.Value.Location.Method.DeclaringType.Assembly.Location, asm.Location)
 				));
 				foreach (var breakpoint in affectedBreakpoints) {
-					string file = PathToFileName (breakpoint.Value.Location.SourceFile);
+					string file = breakpoint.Value.Location.SourceFile;
 					int line = breakpoint.Value.Location.LineNumber;
 					OnDebuggerOutput (false, string.Format ("Re-pending breakpoint at {0}:{1}\n", file, line));
 					breakpoints.Remove (breakpoint.Key);
@@ -2108,8 +2200,8 @@ namespace Mono.Debugging.Soft
 			//get the source file paths
 			//full paths, from GetSourceFiles (true), are only supported by sdb protocol 2.2 and later
 			string[] sourceFiles;
-			if (useFullPaths) {
-				sourceFiles = t.GetSourceFiles (true);
+			if (vm.Version.AtLeast (2, 2)) {
+				sourceFiles = t.GetSourceFiles ().Select ((fullPath) => Path.GetFileName (fullPath)).ToArray ();
 			} else {
 				sourceFiles = t.GetSourceFiles ();
 				
@@ -2242,11 +2334,15 @@ namespace Mono.Debugging.Soft
 			foreach (string s in type_to_source [type]) {
 				foreach (var bi in pending_bes.Where (b => (b.BreakEvent is Breakpoint) && !(b.BreakEvent is FunctionBreakpoint))) {
 					var bp = (Breakpoint) bi.BreakEvent;
-					if (PathsAreEqual (PathToFileName (bp.FileName), s)) {
+					if (PathComparer.Compare (Path.GetFileName (bp.FileName), s) == 0) {
 						bool insideLoadedRange;
 						bool genericMethod;
-						
-						loc = FindLocationByType (type, s, bp.Line, bp.Column, out genericMethod, out insideLoadedRange);
+
+						if (bi.BreakEvent is InstructionBreakpoint) {
+							loc = FindLocationByILOffset ((InstructionBreakpoint)bi.BreakEvent, bp.FileName, out genericMethod, out insideLoadedRange);
+						} else {
+							loc = FindLocationByType (type, bp.FileName, bp.Line, bp.Column, out genericMethod, out insideLoadedRange);
+						}
 						if (loc != null) {
 							OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint at '{0}:{1},{2}' to {3} [0x{4:x5}].\n",
 							                                        s, bp.Line, bp.Column, GetPrettyMethodName (loc.Method), loc.ILOffset));
@@ -2288,11 +2384,6 @@ namespace Mono.Debugging.Soft
 
 			return path;
 		}
-		
-		string PathToFileName (string path)
-		{
-			return useFullPaths ? path : Path.GetFileName (path);
-		}
 
 		[DllImport ("libc")]
 		static extern IntPtr realpath (string path, IntPtr buffer);
@@ -2319,6 +2410,9 @@ namespace Mono.Debugging.Soft
 		{
 			if (path.Length == 0)
 				return path;
+
+			if (IsWindows)
+				return Path.GetFullPath (path);
 
 			try {
 				var alreadyVisted = new HashSet<string> ();
@@ -2371,7 +2465,7 @@ namespace Mono.Debugging.Soft
 			return method.Locations.Count > 0 ? method.Locations[0] : null;
 		}
 		
-		bool CheckBetterMatch (TypeMirror type, string file, int line, Location found)
+		bool CheckBetterMatch (TypeMirror type, string file, int line, int column, Location found)
 		{
 			if (type.Assembly == null)
 				return false;
@@ -2400,10 +2494,18 @@ namespace Mono.Debugging.Soft
 				return false;
 			}
 
-			foreach (var src in mdb.Sources) {
-				if (src.FileName == file) {
-					fileId = src.Index;
-					break;
+			if (File.Exists (file)) {
+				using (var fs = File.OpenRead (file)) {
+					using (var md5 = MD5.Create ()) {
+						var hash = md5.ComputeHash (fs);
+						foreach (var src in mdb.Sources) {
+							if (PathsAreEqual (src.FileName, file) ||
+								(PathComparer.Compare (Path.GetFileName (src.FileName), Path.GetFileName (file)) == 0 && hash.SequenceEqual (src.Checksum))) {
+								fileId = src.Index;
+								break;
+							}
+						}
+					}
 				}
 			}
 
@@ -2416,7 +2518,9 @@ namespace Mono.Debugging.Soft
 					if (entry.File != fileId)
 						continue;
 
-					if (entry.Row >= line && (entry.Row - line) < foundDelta)
+					if ((entry.Row >= line && (entry.Row - line) < foundDelta))
+						return true;
+					if (entry.Row == line && column >= entry.Column && entry.Column > found.ColumnNumber)
 						return true;
 				}
 			}
@@ -2424,20 +2528,39 @@ namespace Mono.Debugging.Soft
 			return false;
 		}
 
-		Location FindLocationByMethod (MethodMirror method, string file, int line, ref bool fuzzy, ref bool insideTypeRange, out List<Location> locations)
+		bool CheckFileMd5 (string file, byte[] hash)
+		{
+			if (File.Exists (file)) {
+				using (var fs = File.OpenRead (file)) {
+					using (var md5 = MD5.Create ()) {
+						if (md5.ComputeHash (fs).SequenceEqual (hash)) {
+							return true;
+						}
+					}
+				}
+			}
+			return false;
+		}
+
+		Location FindLocationByMethod (MethodMirror method, string file, int line, int column, ref bool insideTypeRange)
 		{
 			int rangeFirstLine = int.MaxValue;
 			int rangeLastLine = -1;
 			Location target = null;
-
-			locations = new List<Location> ();
 
 			foreach (var location in method.Locations) {
 				string srcFile = location.SourceFile;
 
 				//Console.WriteLine ("\tExamining {0}:{1}...", srcFile, location.LineNumber);
 
-				if (srcFile != null && PathsAreEqual (PathToFileName (NormalizePath (srcFile)), file)) {
+				//Check if file names match
+				if (srcFile != null && PathComparer.Compare (Path.GetFileName (srcFile), Path.GetFileName (file)) == 0) {
+					//Check if full path match(we don't care about md5 if full path match):
+					//1. For backward compatibility
+					//2. If full path matches user himself probably modified code and is aware of modifications
+					//OR if md5 match, useful for alternative location files with breakpoints
+					if (!PathsAreEqual (NormalizePath (srcFile), file) && !CheckFileMd5 (file, location.SourceFileHash))
+						continue;
 					if (location.LineNumber < rangeFirstLine)
 						rangeFirstLine = location.LineNumber;
 
@@ -2453,29 +2576,25 @@ namespace Mono.Debugging.Soft
 								if (target.LineNumber - line > location.LineNumber - line) {
 									// Grab the location closest to the requested line
 									//Console.WriteLine ("\t\tLocation is closest match. (ILOffset = 0x{0:x5})", location.ILOffset);
-									locations.Clear ();
-									locations.Add (location);
 									target = location;
 								}
 							} else if (target.LineNumber != line) {
 								// Previous match was a fuzzy match, but now we've found an exact line match
 								//Console.WriteLine ("\t\tLocation is exact line match. (ILOffset = 0x{0:x5})", location.ILOffset);
-								locations.Clear ();
-								locations.Add (location);
 								target = location;
-								fuzzy = false;
 							} else {
-								// Line number matches exactly, use the location with the lowest ILOffset
-								if (location.ILOffset < target.ILOffset)
-									target = location;
-
-								locations.Add (location);
-								fuzzy = false;
+								if (target.ColumnNumber == location.ColumnNumber) {
+									// Line number matches exactly, use the location with the lowest ILOffset
+									if (location.ILOffset < target.ILOffset)
+										target = location;
+								} else {
+									// Line number matches exactly and columns are different, use the location with most right + closest column
+									if (column >= location.ColumnNumber && location.ColumnNumber > target.ColumnNumber)
+										target = location;
+								}
 							}
 						} else {
 							//Console.WriteLine ("\t\tLocation is first possible match. (ILOffset = 0x{0:x5})", location.ILOffset);
-							fuzzy = location.LineNumber != line;
-							locations.Add (location);
 							target = location;
 						}
 					}
@@ -2484,89 +2603,50 @@ namespace Mono.Debugging.Soft
 					rangeLastLine = -1;
 				}
 			}
-
-			return target;
-		}
-
-		Location FindLocationByMethod (MethodMirror method, string file, int line, int column)
-		{
-			bool insideTypeRange = false;
-			List<Location> locations;
-			bool fuzzy = true;
-			Location target;
-
-			if ((target = FindLocationByMethod (method, file, line, ref fuzzy, ref insideTypeRange, out locations)) != null) {
-				// If we got a fuzzy match, then we need to make sure that there isn't a better
-				// match in another method (e.g. code might have been extracted out into another
-				// method by the compiler.
-				if (!fuzzy) {
-					// Exact line match... now find the best column match.
-					locations.Sort (new LocationComparer ());
-
-					// Find the closest-matching location based on column.
-					target = locations[0];
-					for (int i = 1; i < locations.Count; i++) {
-						if (locations[i].ColumnNumber > column)
-							break;
-
-						// if the column numbers match, then target_loc should have the lower ILOffset (which we want)
-						if (target.ColumnNumber == locations[i].ColumnNumber)
-							continue;
-
-						target = locations[i];
-					}
-
-					return target;
-				}
-			}
-
-			if (target != null && fuzzy && CheckBetterMatch (method.DeclaringType, file, line, target))
+			if (target != null && CheckBetterMatch (method.DeclaringType, file, line, column, target)) {
+				insideTypeRange = false;
 				return null;
-
+			}
 			return target;
 		}
 
 		Location FindLocationByType (TypeMirror type, string file, int line, int column, out bool genericMethod, out bool insideTypeRange)
 		{
 			Location target = null;
-			bool fuzzy = true;
+			Location methodTarget = null;
 
 			insideTypeRange = false;
+			bool methodInsideTypeRange = false;
 			genericMethod = false;
 
 			//Console.WriteLine ("Trying to resolve {0}:{1},{2} in type {3}", file, line, column, type.Name);
 			foreach (var method in type.GetMethods ()) {
-				List<Location> locations;
+				if ((methodTarget = FindLocationByMethod (method, file, line, column, ref methodInsideTypeRange)) != null) {
+					insideTypeRange |= methodInsideTypeRange;//If any method returns true return true
 
-				if ((target = FindLocationByMethod (method, file, line, ref fuzzy, ref insideTypeRange, out locations)) != null) {
-					genericMethod = IsGenericMethod (method);
-					
-					// If we got a fuzzy match, then we need to make sure that there isn't a better
-					// match in another method (e.g. code might have been extracted out into another
-					// method by the compiler.
-					if (!fuzzy) {
-						// Exact line match... now find the best column match.
-						locations.Sort (new LocationComparer ());
-
-						// Find the closest-matching location based on column.
-						target = locations[0];
-						for (int i = 1; i < locations.Count; i++) {
-							if (locations[i].ColumnNumber > column)
-								break;
-
-							// if the column numbers match, then target_loc should have the lower ILOffset (which we want)
-							if (target.ColumnNumber == locations[i].ColumnNumber)
-								continue;
-
-							target = locations[i];
+					if (target == null) {
+						target = methodTarget;
+						genericMethod = IsGenericMethod (method);
+					} else {
+						if (line == methodTarget.LineNumber) {
+							if (target.LineNumber != line || (column >= methodTarget.ColumnNumber && methodTarget.ColumnNumber > target.ColumnNumber)) {
+								target = methodTarget;
+								genericMethod = IsGenericMethod (method);
+							}
+						} else {
+							if (line != target.LineNumber) {
+								//None of targets has exact line match decide which is closest
+								if (System.Math.Abs (line - target.LineNumber) > System.Math.Abs (line - methodTarget.LineNumber)) {
+									target = methodTarget;
+									genericMethod = IsGenericMethod (method);
+								}
+							}
 						}
-
-						return target;
 					}
 				}
 			}
 			
-			if (target != null && fuzzy && CheckBetterMatch (type, file, line, target)) {
+			if (target != null && CheckBetterMatch (type, file, line, column, target)) {
 				insideTypeRange = false;
 				return null;
 			}

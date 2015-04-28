@@ -190,9 +190,6 @@ namespace Mono.Debugging.Client
 		
 		public ExceptionInfo GetException (EvaluationOptions options)
 		{
-			if (!hasDebugInfo)
-				return null;
-
 			var value = sourceBacktrace.GetException (index, options);
 			if (value != null)
 				value.ConnectCallback (this);
@@ -301,6 +298,11 @@ namespace Mono.Debugging.Client
 			}
 
 			return string.Format ("0x{0:X} in {1}{2}", address, location.MethodName, loc);
+		}
+
+		public void UpdateSourceFile (string newFilePath)
+		{
+			location = new SourceLocation (location.MethodName, newFilePath, location.Line, location.Column, location.FileHash);
 		}
 	}
 	

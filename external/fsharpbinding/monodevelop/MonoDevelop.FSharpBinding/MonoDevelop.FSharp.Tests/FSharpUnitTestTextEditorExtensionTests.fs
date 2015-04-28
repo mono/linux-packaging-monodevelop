@@ -12,6 +12,9 @@ open MonoDevelop.Ide.TypeSystem
 open FsUnit
 open MonoDevelop.Debugger
 
+#if MDVERSION_5_5
+#else
+
 [<TestFixture>]
 type FSharpUnitTestTextEditorExtensionTests() =
     inherit TestBase()
@@ -53,7 +56,7 @@ module Test =
 """
 
     let nunitRef =
-        ProjectReference (ReferenceType.Assembly, __SOURCE_DIRECTORY__ ++ @"../packages/NUnit.2.6.2/lib/nunit.framework.dll" )
+        ProjectReference (ReferenceType.Assembly, __SOURCE_DIRECTORY__ ++ @"../packages/NUnit.2.6.4/lib/nunit.framework.dll" )
 
     let createDoc (text:string) references =
         let doc,viewContent = TestHelpers.createDoc(text) references
@@ -86,7 +89,7 @@ module Test =
             t2.UnitTestIdentifier |> should equal "A+Test.Test Two"
             t2.LineNumber |> should equal 11
             t2.IsIgnored |> should equal true
-        | _ -> NUnit.Framework.Assert.Fail "invalid number of tests returned"
+        | tests -> NUnit.Framework.Assert.Fail ("invalid number of tests returned: {0}", tests.Length)
 
     [<Test>]
     member x.``No tests`` () =
@@ -111,10 +114,10 @@ module Test =
             t2.UnitTestIdentifier |> should equal "A+Test+Test.Test Two"
             t2.LineNumber |> should equal 12
             t2.IsIgnored |> should equal true
-        | _ -> NUnit.Framework.Assert.Fail "invalid number of tests returned"
-
+        | tests -> NUnit.Framework.Assert.Fail ("invalid number of tests returned: {0}", tests.Length)
     [<Test>]
     member x.``Tests present but no NUnit reference`` () =
         let testExtension = createDoc normalAndDoubleTick []
         let tests = testExtension.GatherUnitTests()
         tests.Count |> should equal 0
+#endif

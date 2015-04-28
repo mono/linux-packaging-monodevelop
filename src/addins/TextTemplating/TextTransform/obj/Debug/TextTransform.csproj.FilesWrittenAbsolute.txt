@@ -1,0 +1,5 @@
+/home/directhex/Projects/monodevelop/main/src/addins/TextTemplating/TextTransform/obj/Debug/.NETFramework,Version=v4.5.AssemblyAttribute.cs
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/TextTransform.exe.mdb
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/TextTransform.exe
+/home/directhex/Projects/monodevelop/main/src/addins/TextTemplating/TextTransform/obj/Debug/TextTransform.exe
+/home/directhex/Projects/monodevelop/main/src/addins/TextTemplating/TextTransform/obj/Debug/TextTransform.exe.mdb

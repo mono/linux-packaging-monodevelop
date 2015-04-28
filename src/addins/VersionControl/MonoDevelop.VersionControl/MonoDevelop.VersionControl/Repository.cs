@@ -88,14 +88,8 @@ namespace MonoDevelop.VersionControl
 		// Version control system that manages this repository
 		public VersionControlSystem VersionControlSystem {
 			get {
-				if (vcs == null && vcsName != null) {
-					foreach (VersionControlSystem v in VersionControlService.GetVersionControlSystems ()) {
-						if (v.Id == vcsName) {
-							vcs = v;
-							break;
-						}
-					}
-				}
+				if (vcs == null && vcsName != null)
+					vcs = VersionControlService.GetVersionControlSystems ().FirstOrDefault (v => v.Id == vcsName);
 				return vcs;
 			}
 			
@@ -218,20 +212,40 @@ namespace MonoDevelop.VersionControl
 			return result;
 		}
 
+		RecursiveDirectoryInfoQuery AcquireLockForQuery (FilePath path, bool getRemoteStatus)
+		{
+			RecursiveDirectoryInfoQuery rq;
+			bool query = false;
+			lock (queryLock) {
+				rq = recursiveDirectoryQueryQueue.FirstOrDefault (q => q.Directory == path);
+				if (rq == null) {
+					query = true;
+					var mre = new ManualResetEvent (false);
+					rq = new RecursiveDirectoryInfoQuery {
+						Directory = path,
+						GetRemoteStatus = getRemoteStatus,
+						ResetEvent = mre,
+						Count = 1,
+					};
+				} else
+					Interlocked.Increment (ref rq.Count);
+			}
+			if (query)
+				AddQuery (rq);
+			return rq;
+		}
+
 		public VersionInfo[] GetDirectoryVersionInfo (FilePath localDirectory, bool getRemoteStatus, bool recursive)
 		{
 			try {
 				if (recursive) {
-					using (var mre = new ManualResetEvent (false)) {
-						var rq = new RecursiveDirectoryInfoQuery {
-							Directory = localDirectory,
-							GetRemoteStatus = getRemoteStatus,
-							ResetEvent = mre,
-						};
-						AddQuery (rq);
-						rq.ResetEvent.WaitOne ();
-						return rq.Result;
-					}
+					RecursiveDirectoryInfoQuery rq = AcquireLockForQuery (localDirectory, getRemoteStatus);
+					rq.ResetEvent.WaitOne ();
+
+					lock (queryLock)
+						if (Interlocked.Decrement (ref rq.Count) == 0)
+							rq.ResetEvent.Dispose ();
+					return rq.Result;
 				}
 
 				var status = infoCache.GetDirectoryStatus (localDirectory);
@@ -278,6 +292,7 @@ namespace MonoDevelop.VersionControl
 		{
 			public VersionInfo[] Result;
 			public ManualResetEvent ResetEvent;
+			public int Count;
 		}
 
 		Queue<VersionInfoQuery> fileQueryQueue = new Queue<VersionInfoQuery> ();
@@ -675,10 +690,7 @@ namespace MonoDevelop.VersionControl
 		// it can be a list of files to compare.
 		public DiffInfo[] PathDiff (ChangeSet cset, bool remoteDiff)
 		{
-			List<FilePath> paths = new List<FilePath> ();
-			foreach (ChangeSetItem item in cset.Items)
-				paths.Add (item.LocalPath);
-			return PathDiff (cset.BaseLocalPath, paths.ToArray (), remoteDiff);
+			return PathDiff (cset.BaseLocalPath, cset.Items.Select (i => i.LocalPath).ToArray (), remoteDiff);
 		}
 		
 		/// <summary>
@@ -714,7 +726,7 @@ namespace MonoDevelop.VersionControl
 		static protected DiffInfo[] GenerateUnifiedDiffInfo (string diffContent, FilePath basePath, FilePath[] localPaths)
 		{
 			basePath = basePath.FullPath;
-			ArrayList list = new ArrayList ();
+			var list = new List<DiffInfo> ();
 			using (StringReader sr = new StringReader (diffContent)) {
 				string line;
 				StringBuilder content = new StringBuilder ();
@@ -763,7 +775,7 @@ namespace MonoDevelop.VersionControl
 					list.Add (new DiffInfo (basePath, fileName, content.ToString ()));
 				}
 			}
-			return (DiffInfo[]) list.ToArray (typeof(DiffInfo));
+			return list.ToArray ();
 		}
 		
 		/// <summary>
@@ -862,27 +874,26 @@ namespace MonoDevelop.VersionControl
 	
 	public class DiffInfo
 	{
-		FilePath fileName;
-		FilePath basePath;
-		string content;
-		
 		public DiffInfo (FilePath basePath, FilePath fileName, string content)
 		{
-			this.basePath = basePath;
-			this.fileName = fileName;
-			this.content = content.Replace ("\r","");
+			BasePath = basePath;
+			FileName = fileName;
+			Content = content.Replace ("\r","");
 		}
 		
 		public FilePath FileName {
-			get { return fileName; }
+			get;
+			private set;
 		}
 		
 		public string Content {
-			get { return content; }
+			get;
+			private set;
 		}
 		
 		public FilePath BasePath {
-			get { return basePath; }
+			get;
+			private set;
 		}
 	}
 
