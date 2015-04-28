@@ -194,6 +194,7 @@ namespace Mono.TextEditor
 			info.X = x;
 			info.Y = y;
 			containerChildren.Add (info);
+			SetAdjustments ();
 		}
 		
 		public void MoveTopLevelWidget (Gtk.Widget widget, int x, int y)
@@ -865,6 +866,9 @@ namespace Mono.TextEditor
 			try {
 				action (GetTextEditorData ());
 			} catch (Exception e) {
+				if (Debugger.IsAttached)
+					Debugger.Break ();
+				//TODO: we should really find a way to log this properly
 				Console.WriteLine ("Error while executing " + action + " :" + e);
 			}
 		}

@@ -1,0 +1,6 @@
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/obj/x86/Debug/.NETFramework,Version=v4.0.AssemblyAttribute.cs
+/home/directhex/Projects/monodevelop/main/build/bin/MSBuild/4.0/MonoDevelop.Projects.Formats.MSBuild.exe.config
+/home/directhex/Projects/monodevelop/main/build/bin/MSBuild/4.0/MonoDevelop.Projects.Formats.MSBuild.exe.mdb
+/home/directhex/Projects/monodevelop/main/build/bin/MSBuild/4.0/MonoDevelop.Projects.Formats.MSBuild.exe
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/obj/x86/Debug/MonoDevelop.Projects.Formats.MSBuild.exe
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/obj/x86/Debug/MonoDevelop.Projects.Formats.MSBuild.exe.mdb

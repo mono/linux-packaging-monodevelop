@@ -298,56 +298,82 @@ namespace MonoDevelop.CodeActions
 			ShowFixesMenu (document.Editor.Parent, rect, menu);
 		}
 
+		#if MAC
+		class ClosingMenuDelegate : AppKit.NSMenuDelegate
+		{
+			readonly TextEditorData data;
+
+			public ClosingMenuDelegate (TextEditorData editor_data)
+			{
+				data = editor_data;
+			}
+
+			public override void MenuWillHighlightItem (AppKit.NSMenu menu, AppKit.NSMenuItem item)
+			{
+			}
+
+			public override void MenuDidClose (AppKit.NSMenu menu)
+			{
+				data.SuppressTooltips = false;
+			}
+		}
+		#endif
+
 		bool ShowFixesMenu (Gtk.Widget parent, Gdk.Rectangle evt, FixMenuDescriptor entrySet)
 		{
-			#if MAC
-			parent.GrabFocus ();
-			int x, y;
-			x = (int)evt.X;
-			y = (int)evt.Y;
+			if (parent == null || parent.GdkWindow == null)
+				return true;
+			try {
+				#if MAC
+				parent.GrabFocus ();
+				int x, y;
+				x = (int)evt.X;
+				y = (int)evt.Y;
+				// Explicitly release the grab because the menu is shown on the mouse position, and the widget doesn't get the mouse release event
+				Gdk.Pointer.Ungrab (Gtk.Global.CurrentEventTime);
+				var menu = CreateNSMenu (entrySet);
+				menu.Delegate = new ClosingMenuDelegate (document.Editor);
+				var nsview = MonoDevelop.Components.Mac.GtkMacInterop.GetNSView (parent);
+				var toplevel = parent.Toplevel as Gtk.Window;
+				int trans_x, trans_y;
+				parent.TranslateCoordinates (toplevel, (int)x, (int)y, out trans_x, out trans_y);
 
-			Gtk.Application.Invoke (delegate {
-			// Explicitly release the grab because the menu is shown on the mouse position, and the widget doesn't get the mouse release event
-			Gdk.Pointer.Ungrab (Gtk.Global.CurrentEventTime);
-			var menu = CreateNSMenu (entrySet);
-			var nsview = MonoDevelop.Components.Mac.GtkMacInterop.GetNSView (parent);
-			var toplevel = parent.Toplevel as Gtk.Window;
-			int trans_x, trans_y;
-			parent.TranslateCoordinates (toplevel, (int)x, (int)y, out trans_x, out trans_y);
+				// Window coordinates in gtk are the same for cocoa, with the exception of the Y coordinate, that has to be flipped.
+				var pt = new CoreGraphics.CGPoint ((float)trans_x, (float)trans_y);
+				int w,h;
+				toplevel.GetSize (out w, out h);
+				pt.Y = h - pt.Y;
 
-			// Window coordinates in gtk are the same for cocoa, with the exception of the Y coordinate, that has to be flipped.
-			var pt = new CoreGraphics.CGPoint ((float)trans_x, (float)trans_y);
-			int w,h;
-			toplevel.GetSize (out w, out h);
-			pt.Y = h - pt.Y;
+				var tmp_event = AppKit.NSEvent.MouseEvent (AppKit.NSEventType.LeftMouseDown,
+				pt,
+				0, 0,
+				MonoDevelop.Components.Mac.GtkMacInterop.GetNSWindow (toplevel).WindowNumber,
+				null, 0, 0, 0);
 
-			var tmp_event = AppKit.NSEvent.MouseEvent (AppKit.NSEventType.LeftMouseDown,
-			pt,
-			0, 0,
-			MonoDevelop.Components.Mac.GtkMacInterop.GetNSWindow (toplevel).WindowNumber,
-			null, 0, 0, 0);
+				AppKit.NSMenu.PopUpContextMenu (menu, tmp_event, nsview);
+				#else
+				var menu = CreateGtkMenu (entrySet);
+				menu.Events |= Gdk.EventMask.AllEventsMask;
+				menu.SelectFirst (true);
 
-			AppKit.NSMenu.PopUpContextMenu (menu, tmp_event, nsview);
-			});
-			#else
-			var menu = CreateGtkMenu (entrySet);
-			menu.Events |= Gdk.EventMask.AllEventsMask;
-			menu.SelectFirst (true);
+				menu.Hidden += delegate {
+					document.Editor.SuppressTooltips = false;
+				};
+				menu.ShowAll ();
+				menu.SelectFirst (true);
+				menu.MotionNotifyEvent += (o, args) => {
+					if (args.Event.Window == Editor.Parent.TextArea.GdkWindow) {
+						StartMenuCloseTimer ();
+					} else {
+						CancelMenuCloseTimer ();
+					}
+				};
 
-			menu.Hidden += delegate {
-				document.Editor.SuppressTooltips = false;
-			};
-			menu.ShowAll ();
-			menu.MotionNotifyEvent += (o, args) => {
-				if (args.Event.Window == Editor.Parent.TextArea.GdkWindow) {
-					StartMenuCloseTimer ();
-				} else {
-					CancelMenuCloseTimer ();
-				}
-			};
-
-			GtkWorkarounds.ShowContextMenu (menu, parent, null, evt);
-			#endif
+				GtkWorkarounds.ShowContextMenu (menu, parent, null, evt);
+				#endif
+			} catch (Exception ex) {
+				LoggingService.LogError ("Error while context menu popup.", ex);
+			}
 			return true;
 		}
 		#if MAC
@@ -719,7 +745,7 @@ namespace MonoDevelop.CodeActions
 		void OnQuickFixCommand ()
 		{
 			if (!QuickTaskStrip.EnableFancyFeatures) {
-				Fixes = RefactoringService.GetValidActions (Document, Document.Editor.Caret.Location).Result;
+				Fixes = RefactoringService.GetValidActions (Document, Document.Editor.Caret.Location);
 				currentSmartTagBegin = Document.Editor.Caret.Location;
 				PopupQuickFixMenu (null, null); 
 

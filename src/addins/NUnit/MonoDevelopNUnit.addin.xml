@@ -166,6 +166,7 @@
 	<Extension path = "/MonoDevelop/Ide/ProjectTemplates">
 <!--		<ProjectTemplate id = "NUnitAssemblyGroup" resource = "NUnitAssemblyGroup.xpt.xml"/>-->
 		<ProjectTemplate id = "NUnitProject" resource = "NUnitProject.xpt.xml"/>
+		<ProjectTemplate id = "NUnitProjectVBNet" resource = "NUnitProjectVBNet.xpt.xml"/>
 	</Extension>
 
   	<Extension path = "/MonoDevelop/Ide/FileTemplates">
@@ -177,9 +178,9 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Core/StockIcons">
-		<StockIcon stockid = "nunit-pad-icon" resource = "pad-unit-test-light-16.png" size="Menu" />
-		<StockIcon stockid = "nunit-results-pad-icon" resource = "pad-unit-test-results-light-16.png" size="Menu" />
-		<StockIcon stockid = "nunit-run" resource = "unit-run-light-16.png" size="Menu" />
+		<StockIcon stockid = "nunit-pad-icon" resource = "pad-unit-test-16.png" size="Menu" />
+		<StockIcon stockid = "nunit-results-pad-icon" resource = "pad-unit-test-results-16.png" size="Menu" />
+		<StockIcon stockid = "nunit-run" resource = "unit-run-16.png" size="Menu" />
 	</Extension>
 
 	<Extension path = "/MonoDevelop/ProjectModel/ProjectServiceExtensions">
@@ -203,4 +204,7 @@
 			name = "TestRunnerArgs" type = "System.String" external="false" />
 	</Extension>
 
+	<Extension path="/MonoDevelop/Ide/TemplateImages">
+		<Image id="md-nunit-library-project" resource="nunit-library-project.png" />
+	</Extension>
 </ExtensionModel>

@@ -118,6 +118,7 @@ namespace MonoDevelop.Projects
 				string platformSuffix = string.IsNullOrEmpty (platform) ? string.Empty : "|" + platform;
 				DotNetProjectConfiguration configDebug = CreateConfiguration ("Debug" + platformSuffix) as DotNetProjectConfiguration;
 				configDebug.CompilationParameters = languageBinding.CreateCompilationParameters (projectOptions);
+				DefineSymbols (configDebug.CompilationParameters, projectOptions, "DefineConstantsDebug");
 				configDebug.DebugMode = true;
 				configDebug.ExternalConsole = externalConsole;
 				configDebug.PauseConsoleOutput = externalConsole;
@@ -129,6 +130,7 @@ namespace MonoDevelop.Projects
 					XmlElement releaseProjectOptions = (XmlElement)projectOptions.CloneNode (true);
 					releaseProjectOptions.SetAttribute ("Release", "True");
 					configRelease.CompilationParameters = languageBinding.CreateCompilationParameters (releaseProjectOptions);
+					DefineSymbols (configRelease.CompilationParameters, projectOptions, "DefineConstantsRelease");
 				} else {
 					configRelease.CompilationParameters = languageBinding.CreateCompilationParameters (null);
 				}
@@ -159,6 +161,16 @@ namespace MonoDevelop.Projects
 
 				if (projectCreateInfo != null)
 					dotNetProjectConfig.OutputAssembly = projectCreateInfo.ProjectName;
+			}
+		}
+
+		void DefineSymbols (ConfigurationParameters pars, XmlElement projectOptions, string attributeName)
+		{
+			if (projectOptions != null) {
+				string symbols = projectOptions.GetAttribute (attributeName);
+				if (!String.IsNullOrEmpty (symbols)) {
+					pars.AddDefineSymbol (symbols);
+				}
 			}
 		}
 
@@ -1041,9 +1053,12 @@ namespace MonoDevelop.Projects
 					sb.Append (c);
 				}
 			}
-			if (sb.Length > 0)
+			if (sb.Length > 0) {
+				if (sb[sb.Length - 1] == '.')
+					sb.Remove (sb.Length - 1, 1);
+
 				return sb.ToString ();
-			else
+			} else
 				return null;
 		}
 
@@ -1275,6 +1290,14 @@ namespace MonoDevelop.Projects
 			var handler = ItemHandler as MSBuildProjectHandler;
 			if (handler != null) {
 				handler.RefreshProjectBuilder ();
+			}
+		}
+
+		public void DisposeProjectBuilder ()
+		{
+			var handler = ItemHandler as MSBuildProjectHandler;
+			if (handler != null) {
+				handler.CleanupProjectBuilder ();
 			}
 		}
 	}

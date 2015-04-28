@@ -78,7 +78,6 @@ type FSharpFormatter()  =
             | _ -> false
 
         let config = getConfig style formatting
-        LoggingService.LogInfo("**Fantomas**: Read config - \n{0}", sprintf "%A" config)
 
         match options with
         | Document ->
@@ -87,7 +86,11 @@ type FSharpFormatter()  =
                     let result =
                         trimIfNeeded input (CodeFormatter.formatSourceString isFsiFile input config)
                     //If onTheFly do the replacements in the document
-                    doc |> Option.iter (fun d -> d.Editor.Document.Replace(0, input.Length, result))
+                    doc |> Option.iter (fun d -> 
+                        let line = d.Editor.Caret.Line
+                        let col = d.Editor.Caret.Column
+                        d.Editor.Document.Replace(0, input.Length, result)
+                        d.Editor.SetCaretTo (line, col, false))
                     result
                 with exn -> 
                     LoggingService.LogError("Error occured: {0}", exn.Message)
@@ -138,7 +141,7 @@ type FSharpFormatter()  =
 
     override x.SupportsOnTheFlyFormatting = true
     override x.SupportsCorrectingIndent = false
-    override x.CorrectIndenting(policyParent, mimeTypeChain, data, line) = raise (NotSupportedException())
+    override x.CorrectIndenting(_policyParent, _mimeTypeChain, _data, _line) = raise (NotSupportedException())
 
     override x.OnTheFlyFormat(doc, fromOffset, toOffset) =
         let policyParent : PolicyContainer =

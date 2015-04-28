@@ -55,7 +55,7 @@ namespace MonoDevelop.MacIntegration
 {
 	public class MacPlatformService : PlatformService
 	{
-		const string monoDownloadUrl = "http://www.go-mono.com/mono-downloads/download.html";
+		const string monoDownloadUrl = "http://www.mono-project.com/download/";
 
 		TimerCounter timer = InstrumentationService.CreateTimerCounter ("Mac Platform Initialization", "Platform Service");
 		TimerCounter mimeTimer = InstrumentationService.CreateTimerCounter ("Mac Mime Database", "Platform Service");
@@ -315,7 +315,12 @@ namespace MonoDevelop.MacIntegration
 					}}
 				}}
 
+        style ""menu-item"" {{
+          bg[SELECTED] = ""{0}""
+        }}
+
 				widget_class ""*.<GtkTreeView>*"" style ""treeview""
+        widget_class ""*.<GtkMenuItem>*"" style ""menu-item""
 				",
 				color_hex,
 				text_hex
@@ -729,12 +734,8 @@ namespace MonoDevelop.MacIntegration
 		internal override void SetMainWindowDecorations (Gtk.Window window)
 		{
 			NSWindow w = GtkQuartz.GetWindow (window);
-			w.IsOpaque = false;
-
-			var resource = "maintoolbarbg.png";
-			NSImage img = LoadImage (resource);
-			w.BackgroundColor = NSColor.FromPatternImage (img);
-			w.StyleMask |= NSWindowStyle.TexturedBackground;
+			w.IsOpaque = true;
+			w.StyleMask |= NSWindowStyle.UnifiedTitleAndToolbar;
 		}
 
 		internal override void RemoveWindowShadow (Gtk.Window window)
@@ -745,22 +746,20 @@ namespace MonoDevelop.MacIntegration
 			w.HasShadow = false;
 		}
 
-		internal override MainToolbar CreateMainToolbar (Gtk.Window window)
+		internal override IMainToolbarView CreateMainToolbar (Gtk.Window window)
 		{
-			NSWindow w = GtkQuartz.GetWindow (window);
-			w.IsOpaque = false;
+			return new MonoDevelop.MacIntegration.MainToolbar.MainToolbar (window);
+		}
 
-			var resource = "maintoolbarbg.png";
-			NSImage img = LoadImage (resource);
-			var c = NSColor.FromPatternImage (img);
-			w.BackgroundColor = c;
-			w.StyleMask |= NSWindowStyle.TexturedBackground;
+		internal override void AttachMainToolbar (Gtk.VBox parent, IMainToolbarView toolbar)
+		{
+			var nativeToolbar = (MonoDevelop.MacIntegration.MainToolbar.MainToolbar)toolbar;
+			NSWindow w = GtkQuartz.GetWindow (nativeToolbar.gtkWindow);
+			if (MacSystemInformation.OsVersion >= MacSystemInformation.Yosemite)
+				w.TitleVisibility = NSWindowTitleVisibility.Hidden;
 
-			var result = new MainToolbar () {
-				Background = CairoExtensions.LoadImage (typeof (MacPlatformService).Assembly, resource),
-				TitleBarHeight = GetTitleBarHeight ()
-			};
-			return result;
+			w.Toolbar = nativeToolbar.widget;
+			nativeToolbar.Initialize ();
 		}
 
 		protected override RecentFiles CreateRecentFilesProvider ()
@@ -799,7 +798,9 @@ namespace MonoDevelop.MacIntegration
 			// NSToolbarFullscreenWindow (which is visible on Yosemite in fullscreen).
 			return toplevels.Any (t => t.Key.IsVisible && (t.Value == null || t.Value.Modal) &&
 				!(t.Key.DebugDescription.StartsWith("<NSStatusBarWindow", StringComparison.Ordinal) ||
-				  t.Key.DebugDescription.StartsWith ("<NSToolbarFullScreenWindow", StringComparison.Ordinal)));
+					t.Key.DebugDescription.StartsWith ("<NSToolbarFullScreenWindow", StringComparison.Ordinal) ||
+					t.Key.DebugDescription.StartsWith ("<NSCarbonMenuWindow", StringComparison.Ordinal)
+				));
 		}
 
 		public override void AddChildWindow (Gtk.Window parent, Gtk.Window child)

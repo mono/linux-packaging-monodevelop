@@ -1,0 +1,5 @@
+/home/directhex/Projects/monodevelop/main/src/addins/TextTemplating/Mono.TextTemplating/obj/Debug/.NETFramework,Version=v4.5.AssemblyAttribute.cs
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/Mono.TextTemplating.dll.mdb
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.TextTemplating/Mono.TextTemplating.dll
+/home/directhex/Projects/monodevelop/main/src/addins/TextTemplating/Mono.TextTemplating/obj/Debug/Mono.TextTemplating.dll
+/home/directhex/Projects/monodevelop/main/src/addins/TextTemplating/Mono.TextTemplating/obj/Debug/Mono.TextTemplating.dll.mdb

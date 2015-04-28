@@ -195,12 +195,15 @@ namespace Mono.TextTemplating
 			return null;
 		}
 		
-		//FIXME: implement
 		protected virtual string ResolveAssemblyReference (string assemblyReference)
 		{
-			//foreach (string referencePath in ReferencePaths) {
-			//	
-			//}
+			if (System.IO.Path.IsPathRooted (assemblyReference))
+ 				return assemblyReference;
+ 			foreach (string referencePath in ReferencePaths) {
+ 				var path = System.IO.Path.Combine (referencePath, assemblyReference);
+ 				if (System.IO.File.Exists (path))
+ 					return path;
+ 			}
 			return assemblyReference;
 		}
 		
@@ -373,6 +376,19 @@ namespace Mono.TextTemplating
 			{
 				return hashCode;
 			}
+		}
+
+		/// <summary>
+		/// If non-null, the template's Host property will be the full type of this host.
+		/// </summary>
+		public virtual Type SpecificHostType { get { return null; } }
+
+		/// <summary>
+		/// Gets any additional directive processors to be included in the processing run.
+		/// </summary>
+		public virtual IEnumerable<IDirectiveProcessor> GetAdditionalDirectiveProcessors ()
+		{
+			yield break;
 		}
 	}
 }

@@ -50,14 +50,17 @@ namespace MonoDevelop.Platform
 			}
 		}
 
+		object sync = new object();
 		private void OnRecentFilesChanged (object sender, EventArgs args)
 		{
 			// This event fires several times for a single change. Rather than performing the update
 			// several times we will restart the timer which has a 1 second delay on it. 
 			// While this means the update won't make it to the JumpList immediately it is significantly
 			// better for performance.
-			this.updateTimer.Stop ();
-			this.updateTimer.Start ();
+			lock (sync) {
+				this.updateTimer.Stop ();
+				this.updateTimer.Start ();
+			}
 		}
 
 		private void OnUpdateTimerEllapsed (object sender, EventArgs args)
@@ -101,21 +104,22 @@ namespace MonoDevelop.Platform
 		{
 			this.supportedExtensions = new List<string> ();
 			
-			// Determine the correct value for /HKCR/MonoDevelop[version]/shell/Open/Command
+			// Determine the correct value for /HKCR/XamarinStudio/shell/Open/Command
 			ProcessModule monoDevelopAssembly = Process.GetCurrentProcess ().MainModule;
 			string exePath = monoDevelopAssembly.FileName;
 			string executeString = exePath + " %1";
 			string progId = Taskbar.TaskbarManager.Instance.ApplicationId;
 
-			RegistryKey progIdKey = Registry.ClassesRoot.OpenSubKey (progId + @"\shell\Open\Command", false);
-			if (progIdKey == null) {
-				return false;
-			}
+			using (RegistryKey progIdKey = Registry.ClassesRoot.OpenSubKey (progId + @"\shell\Open\Command", false)) {
+				if (progIdKey == null) {
+					return false;
+				}
 			
-			object path = progIdKey.GetValue (String.Empty);
-			bool isProgIdRegistered = String.Equals (executeString, path as string, StringComparison.OrdinalIgnoreCase);
-			if (!isProgIdRegistered) {
-				return false;
+				object path = progIdKey.GetValue (String.Empty);
+				bool isProgIdRegistered = String.Equals (executeString, path as string, StringComparison.OrdinalIgnoreCase);
+				if (!isProgIdRegistered) {
+					return false;
+				}
 			}
 			
 			string[] subkeyNames = Registry.ClassesRoot.GetSubKeyNames ();
@@ -123,15 +127,16 @@ namespace MonoDevelop.Platform
 				if (subkey[0] != '.') {
 					continue;
 				}
+
+				using (RegistryKey openWithKey = Registry.ClassesRoot.OpenSubKey (Path.Combine (subkey, "OpenWithProgids"))) {
+					if (openWithKey == null) {
+						continue;
+					}
 				
-				RegistryKey openWithKey = Registry.ClassesRoot.OpenSubKey (Path.Combine (subkey, "OpenWithProgids"));
-				if (openWithKey == null) {
-					continue;
-				}
-				
-				string progIdValue = openWithKey.GetValue (progId, null) as string;
-				if (progIdValue == null) {
-					continue;
+					string progIdValue = openWithKey.GetValue (progId, null) as string;
+					if (progIdValue == null) {
+						continue;
+					}
 				}
 				
 				this.supportedExtensions.Add (subkey);

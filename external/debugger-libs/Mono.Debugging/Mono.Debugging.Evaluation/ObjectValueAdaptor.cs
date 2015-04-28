@@ -320,6 +320,11 @@ namespace Mono.Debugging.Evaluation
 		{
 			return true;
 		}
+
+		public virtual bool IsSafeToInvokeMethod (EvaluationContext ctx, object method, object obj)
+		{
+			return true;
+		}
 		
 		public virtual IEnumerable<EnumMember> GetEnumMembers (EvaluationContext ctx, object type)
 		{
@@ -457,22 +462,39 @@ namespace Mono.Debugging.Evaluation
 			} else {
 				tdata = GetTypeDisplayData (ctx, type);
 
-				if (!string.IsNullOrEmpty (tdata.TypeDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
-					tname = EvaluateDisplayString (ctx, obj, tdata.TypeDisplayString);
-				else
+				if (!string.IsNullOrEmpty (tdata.TypeDisplayString) && ctx.Options.AllowDisplayStringEvaluation) {
+					try {
+						tname = EvaluateDisplayString (ctx, obj, tdata.TypeDisplayString);
+					} catch (MissingMemberException) {
+						// missing property or otherwise malformed DebuggerDisplay string
+						tname = GetDisplayTypeName (typeName);
+					}
+				} else {
 					tname = GetDisplayTypeName (typeName);
+				}
 			}
 
 			if (tvalue == null) {
-				if (!string.IsNullOrEmpty (tdata.ValueDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
-					tvalue = new EvaluationResult (EvaluateDisplayString (ctx, obj, tdata.ValueDisplayString));
-				else
+				if (!string.IsNullOrEmpty (tdata.ValueDisplayString) && ctx.Options.AllowDisplayStringEvaluation) {
+					try {
+						tvalue = new EvaluationResult (EvaluateDisplayString (ctx, obj, tdata.ValueDisplayString));
+					} catch (MissingMemberException) {
+						// missing property or otherwise malformed DebuggerDisplay string
+						tvalue = ctx.Evaluator.TargetObjectToExpression (ctx, obj);
+					}
+				} else {
 					tvalue = ctx.Evaluator.TargetObjectToExpression (ctx, obj);
+				}
 			}
 
 			ObjectValue oval = ObjectValue.CreateObject (source, path, tname, tvalue, flags, null);
-			if (!string.IsNullOrEmpty (tdata.NameDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
-				oval.Name = EvaluateDisplayString (ctx, obj, tdata.NameDisplayString);
+			if (!string.IsNullOrEmpty (tdata.NameDisplayString) && ctx.Options.AllowDisplayStringEvaluation) {
+				try {
+					oval.Name = EvaluateDisplayString (ctx, obj, tdata.NameDisplayString);
+				} catch (MissingMemberException) {
+					// missing property or otherwise malformed DebuggerDisplay string
+				}
+			}
 
 			return oval;
 		}
@@ -588,6 +610,19 @@ namespace Mono.Debugging.Evaluation
 						object baseType = GetBaseType (ctx, type, false);
 						if (baseType != null)
 							values.Insert (0, BaseTypeViewSource.CreateBaseTypeView (ctx, objectSource, baseType, proxy));
+					}
+
+					if (ctx.SupportIEnumerable) {
+						var iEnumerableType = GetImplementedInterfaces (ctx, type).FirstOrDefault ((interfaceType) => {
+							string interfaceName = GetTypeName (ctx, interfaceType);
+							if (interfaceName == "System.Collections.IEnumerable")
+								return true;
+							if (interfaceName == "System.Collections.Generic.IEnumerable`1")
+								return true;
+							return false;
+						});
+						if (iEnumerableType != null)
+							values.Add (ObjectValue.CreatePrimitive (new EnumerableSource (proxy, iEnumerableType, ctx), new ObjectPath ("IEnumerator"), "", new EvaluationResult (""), ObjectValueFlags.ReadOnly | ObjectValueFlags.Object | ObjectValueFlags.Group | ObjectValueFlags.IEnumerable));
 					}
 				}
 			}
@@ -863,8 +898,13 @@ namespace Mono.Debugging.Evaluation
 		/// BindingFlags.Static, BindingFlags.Instance, BindingFlags.Public, BindingFlags.NonPublic, BindingFlags.DeclareOnly
 		/// </summary>
 		protected abstract IEnumerable<ValueReference> GetMembers (EvaluationContext ctx, object t, object co, BindingFlags bindingFlags);
-		
+
 		public virtual IEnumerable<object> GetNestedTypes (EvaluationContext ctx, object type)
+		{
+			yield break;
+		}
+
+		public virtual IEnumerable<object> GetImplementedInterfaces (EvaluationContext ctx, object type)
 		{
 			yield break;
 		}
@@ -1042,8 +1082,13 @@ namespace Mono.Debugging.Evaluation
 
 			if (IsClassInstance (ctx, obj)) {
 				TypeDisplayData tdata = GetTypeDisplayData (ctx, GetValueType (ctx, obj));
-				if (!string.IsNullOrEmpty (tdata.ValueDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
-					return new EvaluationResult (EvaluateDisplayString (ctx, obj, tdata.ValueDisplayString));
+				if (!string.IsNullOrEmpty (tdata.ValueDisplayString) && ctx.Options.AllowDisplayStringEvaluation) {
+					try {
+						return new EvaluationResult (EvaluateDisplayString (ctx, obj, tdata.ValueDisplayString));
+					} catch (MissingMemberException) {
+						// missing property or otherwise malformed DebuggerDisplay string
+					}
+				}
 
 				// Return the type name
 				if (ctx.Options.AllowToStringCalls) {
@@ -1054,8 +1099,13 @@ namespace Mono.Debugging.Evaluation
 					}
 				}
 				
-				if (!string.IsNullOrEmpty (tdata.TypeDisplayString) && ctx.Options.AllowDisplayStringEvaluation)
-					return new EvaluationResult ("{" + EvaluateDisplayString (ctx, obj, tdata.TypeDisplayString) + "}");
+				if (!string.IsNullOrEmpty (tdata.TypeDisplayString) && ctx.Options.AllowDisplayStringEvaluation) {
+					try {
+						return new EvaluationResult ("{" + EvaluateDisplayString (ctx, obj, tdata.TypeDisplayString) + "}");
+					} catch (MissingMemberException) {
+						// missing property or otherwise malformed DebuggerDisplay string
+					}
+				}
 				
 				return new EvaluationResult ("{" + GetDisplayTypeName (GetValueTypeName (ctx, obj)) + "}");
 			}
@@ -1221,18 +1271,24 @@ namespace Mono.Debugging.Evaluation
 				}
 				
 				var props = memberExpr.Split (new [] { '.' });
-				ValueReference member = null;
 				object val = obj;
 				
 				for (int k = 0; k < props.Length; k++) {
-					member = GetMember (ctx, null, GetValueType (ctx, val), val, props[k]);
-					if (member == null)
-						break;
-					
-					val = member.Value;
+					var member = GetMember (ctx, null, GetValueType (ctx, val), val, props [k]);
+					if (member != null) {
+						val = member.Value;
+					} else {
+						var methodName = props [k].TrimEnd ('(', ')', ' ');
+						if (HasMethod (ctx, GetValueType (ctx, val), methodName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)) {
+							val = RuntimeInvoke (ctx, GetValueType (ctx, val), val, methodName, new object[0], new object[0]);
+						} else {
+							val = null;
+							break;
+						}
+					}
 				}
 				
-				if (member != null) {
+				if (val != null) {
 					var str = ctx.Evaluator.TargetObjectToString (ctx, val);
 					if (str == null)
 						display.Append ("null");
@@ -1241,7 +1297,7 @@ namespace Mono.Debugging.Evaluation
 					else
 						display.Append (str);
 				} else {
-					display.Append ("{Unknown member '" + memberExpr + "'}");
+					throw new MissingMemberException (GetValueTypeName (ctx, obj), memberExpr);
 				}
 
 				last = j + 1;
@@ -1321,6 +1377,11 @@ namespace Mono.Debugging.Evaluation
 		public object RuntimeInvoke (EvaluationContext ctx, object targetType, object target, string methodName, object[] argTypes, object[] argValues)
 		{
 			return RuntimeInvoke (ctx, targetType, target, methodName, null, argTypes, argValues);
+		}
+
+		public virtual object RuntimeInvoke (EvaluationContext ctx, object targetType, object target, string methodName, object[] genericTypeArgs, object[] argTypes, object[] argValues, out object[] outArgs){
+			outArgs = null;
+			return RuntimeInvoke (ctx, targetType, target, methodName, genericTypeArgs, argTypes, argValues);
 		}
 
 		public abstract object RuntimeInvoke (EvaluationContext ctx, object targetType, object target, string methodName, object[] genericTypeArgs, object[] argTypes, object[] argValues);

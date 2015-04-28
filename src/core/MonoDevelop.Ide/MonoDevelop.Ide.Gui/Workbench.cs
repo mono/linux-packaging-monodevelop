@@ -264,7 +264,7 @@ namespace MonoDevelop.Ide.Gui
 			workbench.Toolbar.HideCommandBar (barId);
 		}
 
-		internal MonoDevelop.Components.MainToolbar.MainToolbar Toolbar {
+		internal MonoDevelop.Components.MainToolbar.MainToolbarController Toolbar {
 			get {
 				return workbench.Toolbar;
 			}
@@ -761,23 +761,8 @@ namespace MonoDevelop.Ide.Gui
 				    GettextCatalog.GetString ("If you don't save, all changes will be permanently lost."),
 				    AlertButton.CloseWithoutSave, AlertButton.Cancel, window.ViewContent.IsUntitled ? AlertButton.SaveAs : AlertButton.Save);
 				if (result == AlertButton.Save || result == AlertButton.SaveAs) {
-					if (window.ViewContent.ContentName == null) {
-						FindDocument (window).Save ();
-						args.Cancel = window.ViewContent.IsDirty;
-					} else {
-						try {
-							if (window.ViewContent.IsFile)
-								window.ViewContent.Save (window.ViewContent.ContentName);
-							else
-								window.ViewContent.Save ();
-							args.Cancel |= window.ViewContent.IsDirty;
-
-						}
-						catch (Exception ex) {
-							args.Cancel = true;
-							MessageService.ShowError (GettextCatalog.GetString ("The document could not be saved."), ex);
-						}
-					}
+					FindDocument (window).Save ();
+					args.Cancel = window.ViewContent.IsDirty;
 					if (args.Cancel)
 						FindDocument (window).Select ();
 				} else {
@@ -998,7 +983,7 @@ namespace MonoDevelop.Ide.Gui
 			var dp = new DocumentUserPrefs ();
 			dp.FileName = FileService.AbsoluteToRelativePath (args.Item.BaseDirectory, document.FileName);
 			if (document.Editor != null) {
-				dp.Line = document.Editor.Caret.Column;
+				dp.Line = document.Editor.Caret.Line;
 				dp.Column = document.Editor.Caret.Column;
 			}
 			return dp;
@@ -1146,13 +1131,13 @@ namespace MonoDevelop.Ide.Gui
 
 		List<FileData> fileStatus;
 		object fileStatusLock = new object ();
-		
+		// http://msdn.microsoft.com/en-us/library/system.io.file.getlastwritetimeutc(v=vs.110).aspx
+		static DateTime NonExistentFile = new DateTime(1601, 1, 1);
 		internal void SaveFileStatus ()
 		{
-			fileStatus = new List<FileData> ();
-			
 //			DateTime t = DateTime.Now;
 			List<FilePath> files = new List<FilePath> (GetKnownFiles ());
+			fileStatus = new List<FileData> (files.Count);
 //			Console.WriteLine ("SaveFileStatus(0) " + (DateTime.Now - t).TotalMilliseconds + "ms " + files.Count);
 			
 			ThreadPool.QueueUserWorkItem (delegate {
@@ -1160,8 +1145,8 @@ namespace MonoDevelop.Ide.Gui
 				lock (fileStatusLock) {
 					foreach (FilePath file in files) {
 						try {
-							FileInfo fi = new FileInfo (file);
-							FileData fd = new FileData (file, fi.Exists ? fi.LastWriteTimeUtc : DateTime.MinValue);
+							DateTime ft = File.GetLastWriteTimeUtc (file);
+							FileData fd = new FileData (file, ft != NonExistentFile ? ft : DateTime.MinValue);
 							fileStatus.Add (fd);
 						} catch {
 							// Ignore
@@ -1182,12 +1167,12 @@ namespace MonoDevelop.Ide.Gui
 //					DateTime t = DateTime.Now;
 					if (fileStatus == null)
 						return;
-					List<FilePath> modified = new List<FilePath> ();
+					List<FilePath> modified = new List<FilePath> (fileStatus.Count);
 					foreach (FileData fd in fileStatus) {
 						try {
-							FileInfo fi = new FileInfo (fd.File);
-							if (fi.Exists) {
-								if (fi.LastWriteTimeUtc != fd.TimeUtc)
+							DateTime ft = File.GetLastWriteTimeUtc (fd.File);
+							if (ft != NonExistentFile) {
+								if (ft != fd.TimeUtc)
 									modified.Add (fd.File);
 							} else if (fd.TimeUtc != DateTime.MinValue) {
 								FileService.NotifyFileRemoved (fd.File);
@@ -1285,7 +1270,7 @@ namespace MonoDevelop.Ide.Gui
 				return fileName;
 			}
 			set {
-				fileName = value.CanonicalPath;
+				fileName = value.CanonicalPath.ResolveFullPath ();
 				if (fileName.IsNullOrEmpty)
 					LoggingService.LogError ("FileName == null\n" + Environment.StackTrace);
 			}
