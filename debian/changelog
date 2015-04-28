@@ -1,3 +1,13 @@
+monodevelop (5.9.0.431-0xamarin1) wheezy; urgency=medium
+
+  * [4b9269d] Make MonoDevelop depend on XBuild (it's default now)
+  * [670fd3b] Imported Upstream version 5.9.0.431
+  * [9021440] de-fuzz debian/patches/update_templates_for_gtk-sharp_2.12.patch
+  * [f5794cc] Bump build deps
+  * [e98deb7] Handle build errors caused by missing MVC5 et al
+
+ -- Jo Shields <jo.shields@xamarin.com>  Tue, 28 Apr 2015 10:17:27 +0100
+
 monodevelop (5.7.0.660-0xamarin2) wheezy2; urgency=medium
 
   * [819c16e] Downgrade to Mvc3, for now. There's a problem with 
