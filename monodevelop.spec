@@ -17,14 +17,15 @@
 
 
 Name:           monodevelop
+BuildRequires:  mono-devel
 BuildRequires:  mono-data
-BuildRequires:  mono-data-postgresql
-BuildRequires:  pkgconfig(glade-sharp-2.0)
-BuildRequires:  pkgconfig(glib-sharp-2.0)
+BuildRequires:  mono-mvc
+BuildRequires:  pkgconfig(glade-sharp-2.0) >= 2.12.20
+BuildRequires:  pkgconfig(glib-sharp-2.0) >= 2.12.20
 BuildRequires:  pkgconfig(gnome-sharp-2.0)
-BuildRequires:  pkgconfig(gtk-sharp-2.0)
+BuildRequires:  pkgconfig(gtk-sharp-2.0) >= 2.12.20
 BuildRequires:  pkgconfig(libgnomeui-2.0)
-BuildRequires:  pkgconfig(gconf-sharp-2.0)
+BuildRequires:  pkgconfig(gconf-sharp-2.0) >= 2.12.20
 BuildRequires:  pkgconfig(gnome-vfs-sharp-2.0)
 BuildRequires:  autoconf
 BuildRequires:  automake
@@ -49,8 +50,8 @@ BuildRequires:  pkgconfig(wcf)
 # Mono.Cecil.dll requires rsync after it's build
 BuildRequires:  rsync
 Url:            http://www.monodevelop.com/
-Version:        5.7.0.660
-Release:        2
+Version:        5.9.0.431
+Release:        1
 Summary:        Full-Featured IDE for Mono and Gtk-Sharp
 License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
@@ -95,7 +96,7 @@ a port of SharpDevelop 0.98.
 This package contains development files for the IDE and plugins.
 
 %prep
-%setup -q -n %{name}-5.7
+%setup -q -n %{name}-5.9
 %patch0 -p 1
 
 %build
