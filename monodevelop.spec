@@ -51,7 +51,7 @@ BuildRequires:  pkgconfig(wcf)
 BuildRequires:  rsync
 Url:            http://www.monodevelop.com/
 Version:        5.9.0.431
-Release:        1
+Release:        2
 Summary:        Full-Featured IDE for Mono and Gtk-Sharp
 License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
@@ -60,7 +60,6 @@ Patch0:		downgrade_to_mvc3.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
 Requires:       mono-basic
-Requires:       mono-entityframework
 Requires:       mono-web
 Requires:       pkgconfig
 Requires:       xsp
