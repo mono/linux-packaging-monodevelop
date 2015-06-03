@@ -1,3 +1,9 @@
+monodevelop (5.9.4.2-0xamarin1) alpha; urgency=low
+
+  * "New release - monodevelop-5.9.4.2.tar.bz2"
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Wed, 03 Jun 2015 12:32:08 -0400
+
 monodevelop (5.9.0.431-0xamarin1) wheezy; urgency=medium
 
   * [4b9269d] Make MonoDevelop depend on XBuild (it's default now)
