@@ -1,6 +1,0 @@
-/home/directhex/Projects/monodevelop/main/tests/TestRunner/obj/Debug/.NETFramework,Version=v4.5.AssemblyAttribute.cs
-/home/directhex/Projects/monodevelop/main/tests/TestRunner/obj/Debug/TestRunner.MonoDevelop.TestRunner.addin.xml
-/home/directhex/Projects/monodevelop/main/build/tests/TestRunner.dll.mdb
-/home/directhex/Projects/monodevelop/main/build/tests/TestRunner.dll
-/home/directhex/Projects/monodevelop/main/tests/TestRunner/obj/Debug/TestRunner.dll
-/home/directhex/Projects/monodevelop/main/tests/TestRunner/obj/Debug/TestRunner.dll.mdb

@@ -1,5 +1,0 @@
-/home/directhex/Projects/monodevelop/main/contrib/ICSharpCode.Decompiler/obj/Debug/.NETFramework,Version=v4.0.AssemblyAttribute.cs
-/home/directhex/Projects/monodevelop/main/build/bin/ICSharpCode.Decompiler.dll.mdb
-/home/directhex/Projects/monodevelop/main/build/bin/ICSharpCode.Decompiler.dll
-/home/directhex/Projects/monodevelop/main/contrib/ICSharpCode.Decompiler/obj/Debug/ICSharpCode.Decompiler.dll
-/home/directhex/Projects/monodevelop/main/contrib/ICSharpCode.Decompiler/obj/Debug/ICSharpCode.Decompiler.dll.mdb
