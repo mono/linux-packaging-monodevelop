@@ -1,5 +1,0 @@
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests.TestApp/obj/x86/Debug/.NETFramework,Version=v4.5.AssemblyAttribute.cs
-/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Debugger.Tests.TestApp.exe.mdb
-/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Debugger.Tests.TestApp.exe
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests.TestApp/obj/x86/Debug/MonoDevelop.Debugger.Tests.TestApp.exe
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests.TestApp/obj/x86/Debug/MonoDevelop.Debugger.Tests.TestApp.exe.mdb
