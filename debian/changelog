@@ -1,3 +1,9 @@
+monodevelop (5.9.5.5-0xamarin1) alpha; urgency=low
+
+  * "New release - monodevelop-5.9.5.5.tar.bz2"
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Mon, 20 Jul 2015 06:17:08 -0400
+
 monodevelop (5.9.4.5-0xamarin2) alpha; urgency=low
 
   * "Bugfix - see git log"
