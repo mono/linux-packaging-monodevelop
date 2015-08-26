@@ -1,0 +1,44 @@
+
+#ignore thumbnails created by windows
+Thumbs.db
+#Ignore files build by Visual Studio
+*.obj
+*.exe
+*.pdb
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.suo
+*.sln.ide/
+*.tlb
+*.tlh
+*.bak
+*.cache
+*.ilk
+*.log
+[Bb]in
+[Dd]ebug*/
+*.lib
+*.sbr
+obj/
+[Rr]elease*/
+_ReSharper*/
+*.ReSharper
+*.ReSharper.user
+[Tt]est[Rr]esult*
+[bB]uild/
+*.pidb
+*.userprefs
+*.swp
+*.DotSettings
+#Ignore custom generated files
+LibGit2Sharp/Core/UniqueIdentifier.cs
+LibGit2Sharp/Core/NativeDllName.cs
+
+!nuget.package/build/
+_NCrunch_LibGit2Sharp/
+packages/
