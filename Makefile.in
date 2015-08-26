@@ -57,7 +57,7 @@ DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/monodevelop.in $(srcdir)/monodevelop.pc.in \
 	$(srcdir)/monodevelop.spec.in $(top_srcdir)/Makefile.include \
 	$(top_srcdir)/configure $(top_srcdir)/xbuild.include AUTHORS \
-	COPYING ChangeLog INSTALL NEWS install-sh missing
+	COPYING ChangeLog NEWS install-sh missing
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
