@@ -5,13 +5,13 @@ Subject: [PATCH] Make "NuGet.exe restore" conditional on git.
 
 As per 6e7f2dfcbc80271fdebdee5418b5ed80fe046086, "nuget restore" should not be called in xbuilds in Tarball builds (due to missing NuGet.exe bundle)
 ---
- main/tests/UserInterfaceTests/UserInterfaceTests.csproj | 4 ++--
+ tests/UserInterfaceTests/UserInterfaceTests.csproj | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/main/tests/UserInterfaceTests/UserInterfaceTests.csproj b/main/tests/UserInterfaceTests/UserInterfaceTests.csproj
+diff --git a/tests/UserInterfaceTests/UserInterfaceTests.csproj b/tests/UserInterfaceTests/UserInterfaceTests.csproj
 index 3f865b5..d175bbb 100644
---- a/main/tests/UserInterfaceTests/UserInterfaceTests.csproj
-+++ b/main/tests/UserInterfaceTests/UserInterfaceTests.csproj
+--- a/tests/UserInterfaceTests/UserInterfaceTests.csproj
++++ b/tests/UserInterfaceTests/UserInterfaceTests.csproj
 @@ -130,7 +130,7 @@
        <NuGet>$(SolutionDir)\external\nuget-binary\NuGet.exe</NuGet>
        <NuGet Condition="$(OS)=='Unix'">mono $(NuGet)</NuGet>
