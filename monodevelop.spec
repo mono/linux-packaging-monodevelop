@@ -29,6 +29,8 @@ BuildRequires:  pkgconfig(gconf-sharp-2.0) >= 2.12.20
 BuildRequires:  pkgconfig(gnome-vfs-sharp-2.0)
 BuildRequires:  autoconf
 BuildRequires:  automake
+BuildRequires:  cmake
+BuildRequires:  libssh2-devel
 BuildRequires:  fdupes
 BuildRequires:  git
 BuildRequires:  hicolor-icon-theme
