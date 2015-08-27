@@ -24,30 +24,148 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+using System.IO;
 using NUnit.Framework;
 using MonoDevelop.Components.AutoTest;
+using System;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using System.Linq;
 
 namespace UserInterfaceTests
 {
 	[TestFixture]
 	public abstract class UITestBase
 	{
+		string currentWorkingDirectory;
+		string testResultFolder;
+		string currentTestResultFolder;
+		string currentTestResultScreenshotFolder;
+
+		int testScreenshotIndex;
+
+		protected readonly List<string> FoldersToClean = new List<string> ();
+
 		public AutoTestClientSession Session {
 			get { return TestService.Session; }
+		}
+
+		public string MonoDevelopBinPath { get; set; }
+
+		protected UITestBase () {}
+
+		protected UITestBase (string mdBinPath)
+		{
+			MonoDevelopBinPath = mdBinPath;
+			currentWorkingDirectory = Directory.GetCurrentDirectory ();
+		}
+
+		[TestFixtureSetUp]
+		public virtual void FixtureSetup ()
+		{
+			testResultFolder = Path.Combine (currentWorkingDirectory, "TestResults");
 		}
 
 		[SetUp]
 		public virtual void SetUp ()
 		{
-			Util.ClearTmpDir ();
+			SetupTestResultFolder ();
+			SetupScreenshotsFolder ();
+			SetupIdeLogFolder ();
 
-			TestService.StartSession ();
+			var mdProfile = Util.CreateTmpDir ();
+			TestService.StartSession (MonoDevelopBinPath, mdProfile);
+			TestService.Session.DebugObject = new UITestDebug ();
+
+			FoldersToClean.Add (mdProfile);
 		}
 
 		[TearDown]
 		public virtual void Teardown ()
 		{
-			TestService.EndSession ();
+			try {
+				if (Session.Query (c => c.Marked ("Xamarin Update")).Any ()) {
+					Assert.Inconclusive ("Xamarin Update is blocking the application focus");
+				}
+				ValidateIdeLogMessages ();
+			} finally {
+				var testStatus = TestContext.CurrentContext.Result.Status;
+				if (testStatus != TestStatus.Passed) {
+					TakeScreenShot (string.Format ("{0}-Test-Failed", TestContext.CurrentContext.Test.Name));
+				}
+
+				File.WriteAllText (Path.Combine (currentTestResultFolder, "MemoryUsage.json"),
+					JsonConvert.SerializeObject (Session.MemoryStats, Formatting.Indented));
+
+				Ide.CloseAll ();
+				TestService.EndSession ();
+
+				OnCleanUp ();
+				if (testStatus == TestStatus.Passed) {
+					if (Directory.Exists (currentTestResultScreenshotFolder))
+						Directory.Delete (currentTestResultScreenshotFolder, true);
+				}
+			}
+		}
+
+		static void ValidateIdeLogMessages ()
+		{
+			var readIdeLog = File.ReadAllText (Environment.GetEnvironmentVariable ("MONODEVELOP_LOG_FILE"));
+			Assert.IsFalse (readIdeLog.Contains ("Gtk-Critical: void gtk_container_remove(GtkContainer , GtkWidget )"),
+				"'Gtk-Critical: void gtk_container_remove' detected");
+		}
+
+		void SetupTestResultFolder ()
+		{
+			currentTestResultFolder = Path.Combine (testResultFolder, TestContext.CurrentContext.Test.FullName);
+			if (Directory.Exists (currentTestResultFolder))
+				Directory.Delete (currentTestResultFolder, true);
+			Directory.CreateDirectory (currentTestResultFolder);
+		}
+
+		void SetupScreenshotsFolder ()
+		{
+			testScreenshotIndex = 1;
+			currentTestResultScreenshotFolder = Path.Combine (currentTestResultFolder, "Screenshots");
+			if (Directory.Exists (currentTestResultScreenshotFolder))
+				Directory.Delete (currentTestResultScreenshotFolder, true);
+			Directory.CreateDirectory (currentTestResultScreenshotFolder);
+		}
+
+		void SetupIdeLogFolder ()
+		{
+			var currentXSIdeLog = Path.Combine (currentTestResultFolder, string.Format ("{0}.Ide.log", TestContext.CurrentContext.Test.FullName));
+			Environment.SetEnvironmentVariable ("MONODEVELOP_LOG_FILE", currentXSIdeLog);
+			Environment.SetEnvironmentVariable ("MONODEVELOP_FILE_LOG_LEVEL", "UpToInfo");
+		}
+
+		protected void TakeScreenShot (string stepName)
+		{
+			stepName = string.Format ("{0:D3}-{1}", testScreenshotIndex++, stepName);
+			var screenshotPath = Path.Combine (currentTestResultScreenshotFolder, stepName) + ".png";
+			Session.TakeScreenshot (screenshotPath);
+		}
+
+		protected virtual void OnCleanUp ()
+		{
+			foreach (var folder in FoldersToClean) {
+				try {
+					if (folder != null && Directory.Exists (folder))
+						Directory.Delete (folder, true);
+				} catch (IOException e) {
+					Console.WriteLine ("Cleanup failed\n" +e.ToString ());
+				}
+			}
+		}
+
+		protected string GetSolutionDirectory ()
+		{
+			try {
+				var dirObj = Session.GetGlobalValue ("MonoDevelop.Ide.IdeApp.ProjectOperations.CurrentSelectedSolution.RootFolder.BaseDirectory");
+			return dirObj != null ? dirObj.ToString () : null;
+			} catch (Exception) {
+				return null;
+			}
 		}
 	}
 }

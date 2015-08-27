@@ -106,6 +106,26 @@ namespace Xwt.GtkBackend
 			}
 		}
 
+		public int FocusedRow {
+			get {
+				Gtk.TreePath path;
+				Gtk.TreeViewColumn column;
+				Widget.GetCursor (out path, out column);
+				if (path == null)
+					return -1;
+				return path.Indices [0];
+			}
+			set {
+				Gtk.TreePath path = new Gtk.TreePath (new [] { value >= 0 ? value : int.MaxValue });
+				Widget.SetCursor (path, null, false);
+			}
+		}
+
+		public int CurrentEventRow {
+			get;
+			internal set;
+		}
+
 		public bool BorderVisible {
 			get {
 				return ScrolledWindow.ShadowType == Gtk.ShadowType.In;
@@ -136,11 +156,10 @@ namespace Xwt.GtkBackend
 
 		public int GetRowAtPosition (Point p)
 		{
-			Gtk.TreePath path;
-			if (Widget.GetPathAtPos ((int)p.X, (int)p.Y, out path))
+			Gtk.TreePath path = GetPathAtPosition (p);
+			if (path != null)
 				return path.Indices [0];
-			else
-				return -1;
+			return -1;
 		}
 
 		public Rectangle GetCellBounds (int row, CellView cell, bool includeMargin)
@@ -153,15 +172,31 @@ namespace Xwt.GtkBackend
 			if (!Widget.Model.GetIterFromString (out iter, path.ToString ()))
 				return Rectangle.Zero;
 
-			col.CellSetCellData (Widget.Model, iter, false, false);
+			if (includeMargin)
+				return ((ICellRendererTarget)this).GetCellBackgroundBounds (col, cr, iter);
+			else
+				return ((ICellRendererTarget)this).GetCellBounds (col, cr, iter);
+		}
 
-			Gdk.Rectangle rect = includeMargin ? Widget.GetBackgroundArea (path, col) : Widget.GetCellArea (path, col);
+		public Rectangle GetRowBounds (int row, bool includeMargin)
+		{
+			Gtk.TreePath path = new Gtk.TreePath (new [] { row });
+			Gtk.TreeIter iter;
+			if (!Widget.Model.GetIterFromString (out iter, path.ToString ()))
+				return Rectangle.Zero;
 
-			int x, y, w, h;
-			col.CellGetPosition (cr, out x, out w);
-			col.CellGetSize (rect, out x, out y, out w, out h);
+			if (includeMargin)
+				return GetRowBackgroundBounds (iter);
+			else
+				return GetRowBounds (iter);
+		}
 
-			return new Rectangle (x, y, w, h);
+		public override void SetCurrentEventRow (string path)
+		{
+			if (path.Contains (":")) {
+				path = path.Split (':') [0];
+			}
+			CurrentEventRow = int.Parse (path);
 		}
 	}
 }

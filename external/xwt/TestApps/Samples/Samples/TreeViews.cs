@@ -70,7 +70,19 @@ namespace Samples
 			store.AddNode ().SetValue (text, "Three").SetValue (desc, "Third").AddChild ()
 				.SetValue (text, "Sub three").SetValue (desc, "Sub third");
 			PackStart (view, true);
-			
+
+			Menu contextMenu = new Menu ();
+			contextMenu.Items.Add (new MenuItem ("Test menu"));
+			view.ButtonPressed += delegate(object sender, ButtonEventArgs e) {
+				TreePosition tmpTreePos;
+				RowDropPosition tmpRowDrop;
+				if ((e.Button == PointerButton.Right) && view.GetDropTargetRow (e.X, e.Y, out tmpRowDrop, out tmpTreePos)) {
+					// Set actual row to selected
+					view.SelectRow (tmpTreePos);
+					contextMenu.Popup(view, e.X, e.Y);
+				}
+			};
+				
 			view.DataSource = store;
 			
 			Label la = new Label ();
@@ -119,11 +131,33 @@ namespace Samples
 				var val = store.GetNavigatorAt (e.Position).GetValue (text);
 				Console.WriteLine("Collapsed: " + val);
 			};
-			
+
+			int addCounter = 0;
+			view.KeyPressed += (sender, e) => {
+				if (e.Key == Key.Insert) {
+					TreeNavigator n;
+					if (view.SelectedRow != null)
+						n = store.InsertNodeAfter (view.SelectedRow).SetValue (text, "Inserted").SetValue (desc, "Desc");
+					else
+						n = store.AddNode ().SetValue (text, "Inserted").SetValue (desc, "Desc");
+					view.ExpandToRow (n.CurrentPosition);
+					view.ScrollToRow (n.CurrentPosition);
+					view.UnselectAll ();
+					view.SelectRow (n.CurrentPosition);
+					view.FocusedRow = n.CurrentPosition;
+				}
+			};
 			Button addButton = new Button ("Add");
 			addButton.Clicked += delegate(object sender, EventArgs e) {
-				var n = store.AddNode ().SetValue (text, "Added").SetValue (desc, "Desc");
+				addCounter++;
+				TreeNavigator n;
+				if (view.SelectedRow != null)
+					n = store.AddNode (view.SelectedRow).SetValue (text, "Added " + addCounter).SetValue (desc, "Desc");
+				else
+					n = store.AddNode ().SetValue (text, "Added " + addCounter).SetValue (desc, "Desc");
+				view.ExpandToRow (n.CurrentPosition);
 				view.ScrollToRow (n.CurrentPosition);
+				view.SelectRow (n.CurrentPosition);
 			};
 			PackStart (addButton);
 			
