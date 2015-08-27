@@ -1,3 +1,4 @@
+0001-Make-NuGet.exe-restore-conditional-on-git.patch
 ship_missing_build_libgit2.sh.patch
 downgrade_to_mvc3.patch
 fix_autoreconf.patch
