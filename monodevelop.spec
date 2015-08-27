@@ -106,6 +106,7 @@ This package contains development files for the IDE and plugins.
 %{?env_options}
 
 %configure --libdir=%{_prefix}/lib --disable-update-mimedb
+cd ./main/external/libgit2sharp/Lib/CustomBuildTasks && xbuild CustomBuildTasks.csproj && mv bin/Debug/* .
 make
 
 %install
