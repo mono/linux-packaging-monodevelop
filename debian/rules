@@ -27,7 +27,7 @@ override_dh_auto_clean:
 	rm -f external/ngit/NGit/obj/Debug/NGit.resources.JGitText.properties
 
 override_dh_auto_build:
-	cd ./main/external/libgit2sharp/Lib/CustomBuildTasks && xbuild CustomBuildTasks.csproj && mv bin/Debug/* .
+	cd ./external/libgit2sharp/Lib/CustomBuildTasks && xbuild CustomBuildTasks.csproj && mv bin/Debug/* .
 	XDG_CONFIG_HOME=$(DEBIAN_DIR) dh_auto_build
 
 override_dh_clideps:
