@@ -237,6 +237,7 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+CMAKE = @CMAKE@
 COMPAT_ADDIN_VERSION = @COMPAT_ADDIN_VERSION@
 CSC = @CSC@
 CSC_FLAGS = @CSC_FLAGS@
@@ -267,6 +268,8 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD_LIBRARY_PATH = @LD_LIBRARY_PATH@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBSSH2_CFLAGS = @LIBSSH2_CFLAGS@
+LIBSSH2_LIBS = @LIBSSH2_LIBS@
 LIB_PREFIX = @LIB_PREFIX@
 LIB_SUFFIX = @LIB_SUFFIX@
 LTLIBOBJS = @LTLIBOBJS@
@@ -1098,11 +1101,14 @@ print_extradist:
 
 all: vcrevision
 
-all-local: vcrevision sln_build
+all-local: vcrevision restore-packages sln_build
 
 clean: clean-local
 
 clean-local: sln_clean
+
+restore-packages:
+	nuget restore
 
 vcrevision:
 	touch vcrevision
@@ -1182,6 +1188,12 @@ check-addins:
 
 test:
 	cd tests && $(MAKE) test assembly=$(assembly)
+
+uitest:
+	cd tests && $(MAKE) uitest assembly=$(assembly) categories=$(categories)
+
+coverage:
+	cd tests && $(MAKE) coverage
 
 app-dir: all
 	cd build && make app-dir

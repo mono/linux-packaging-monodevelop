@@ -111,6 +111,7 @@ namespace Xwt.GtkBackend
 			RegisterBackend<IWebViewBackend, WebViewBackend> ();
 			RegisterBackend<IColorSelectorBackend, ColorSelectorBackend> ();
 			RegisterBackend<IColorPickerBackend, ColorPickerBackend> ();
+			RegisterBackend<ICalendarBackend, CalendarBackend> ();
 
 			string typeName = null;
 			string asmName = null;
@@ -316,10 +317,14 @@ namespace Xwt.GtkBackend
 		{
 			var w = ((WidgetBackend)widget.GetBackend ()).Widget;
 			Gdk.Window win = w.GdkWindow;
-			if (win != null && win.IsViewable)
+			if (win != null && win.IsViewable) {
+				int ww, wh;
+				win.GetSize (out ww, out wh);
+				if (ww == w.Allocation.Width && wh == w.Allocation.Height)
+					return new GtkImage (win.ToPixbuf (0, 0, w.Allocation.Width, w.Allocation.Height));
 				return new GtkImage (win.ToPixbuf (w.Allocation.X, w.Allocation.Y, w.Allocation.Width, w.Allocation.Height));
-			else
-				throw new InvalidOperationException ();
+			}
+			throw new InvalidOperationException ();
 		}
 
 		public override void RenderImage (object nativeWidget, object nativeContext, ImageDescription img, double x, double y)

@@ -262,6 +262,19 @@ namespace Xwt
 				return Backend.SelectedRows;
 			}
 		}
+
+		/// <summary>
+		/// Gets or sets the focused row.
+		/// </summary>
+		/// <value>The row with the keyboard focus.</value>
+		public TreePosition FocusedRow {
+			get {
+				return Backend.FocusedRow;
+			}
+			set {
+				Backend.FocusedRow = value;
+			}
+		}
 		
 		/// <summary>
 		/// Selects a row.
@@ -411,6 +424,50 @@ namespace Xwt
 		public void ExpandToRow (TreePosition pos)
 		{
 			Backend.ExpandToRow (pos);
+		}
+
+		/// <summary>
+		/// Returns the row at the given widget coordinates
+		/// </summary>
+		/// <returns>The row index</returns>
+		/// <param name="x">The x coordinate.</param>
+		/// <param name="y">The y coordinate.</param>
+		public TreePosition GetRowAtPosition (double x, double y)
+		{
+			return GetRowAtPosition (new Point (x, y));
+		}
+
+		/// <summary>
+		/// Returns the row at the given widget coordinates
+		/// </summary>
+		/// <returns>The row index</returns>
+		/// <param name="p">A position, in widget coordinates</param>
+		public TreePosition GetRowAtPosition (Point p)
+		{
+			return Backend.GetRowAtPosition (p);
+		}
+
+		/// <summary>
+		/// Gets the bounds of a cell inside the row at the given position.
+		/// </summary>
+		/// <returns>The cell bounds inside the widget, relative to the widget bounds.</returns>
+		/// <param name="pos">The node position.</param>
+		/// <param name="cell">The cell view.</param>
+		/// <param name="includeMargin">If set to <c>true</c> include margin (the background of the row).</param>
+		public Rectangle GetCellBounds (TreePosition pos, CellView cell, bool includeMargin)
+		{
+			return Backend.GetCellBounds (pos, cell, includeMargin);
+		}
+
+		/// <summary>
+		/// Gets the bounds of the row at the given position.
+		/// </summary>
+		/// <returns>The row bounds inside the widget, relative to the widget bounds.</returns>
+		/// <param name="pos">The node position.</param>
+		/// <param name="includeMargin">If set to <c>true</c> include margin (the background of the row).</param>
+		public Rectangle GetRowBounds (TreePosition pos, bool includeMargin)
+		{
+			return Backend.GetRowBounds (pos, includeMargin);
 		}
 		
 		public bool GetDropTargetRow (double x, double y, out RowDropPosition pos, out TreePosition nodePosition)

@@ -33,6 +33,11 @@ namespace Xwt.GtkBackend
 	{
 		bool gettingPreferredSize;
 
+		protected Gtk.Editable EditableWidget 
+		{
+			get { return Widget as Gtk.Editable; }
+		}
+
 		protected virtual void OnSetBackgroundColor (Color color)
 		{
 			EventsRootWidget.SetBackgroundColor (color);
@@ -89,6 +94,26 @@ namespace Xwt.GtkBackend
 				req.Height = (int) Frontend.MinHeight;
 
 			args.Requisition = req;
+		}
+
+		public void SetMinSize (double width, double height)
+		{
+			if (width != -1 || height != -1) {
+				EnableSizeCheckEvents ();
+				minSizeSet = true;
+				Widget.QueueResize ();
+			}
+			else {
+				minSizeSet = false;
+				DisableSizeCheckEvents ();
+				Widget.QueueResize ();
+			}
+		}
+
+		public void SetSizeRequest (double width, double height)
+		{
+			Widget.WidthRequest = (int)width;
+			Widget.HeightRequest = (int)height;
 		}
 
 		double opacity = 1d;

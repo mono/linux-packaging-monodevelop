@@ -1158,7 +1158,7 @@ namespace ICSharpCode.NRefactory.CSharp
 			StartNode(attributeSection);
 			WriteToken(Roles.LBracket);
 			if (!string.IsNullOrEmpty(attributeSection.AttributeTarget)) {
-				WriteIdentifier(attributeSection.AttributeTargetToken);
+				WriteKeyword(attributeSection.AttributeTarget, Roles.Identifier);
 				WriteToken(Roles.Colon);
 				Space();
 			}
@@ -1509,7 +1509,12 @@ namespace ICSharpCode.NRefactory.CSharp
 			WriteEmbeddedStatement(ifElseStatement.TrueStatement);
 			if (!ifElseStatement.FalseStatement.IsNull) {
 				WriteKeyword(IfElseStatement.ElseKeywordRole);
-				WriteEmbeddedStatement(ifElseStatement.FalseStatement);
+				if (ifElseStatement.FalseStatement is IfElseStatement) {
+					// don't put newline between 'else' and 'if'
+					ifElseStatement.FalseStatement.AcceptVisitor(this);
+				} else {
+					WriteEmbeddedStatement(ifElseStatement.FalseStatement);
+				}
 			}
 			EndNode(ifElseStatement);
 		}
@@ -1671,6 +1676,16 @@ namespace ICSharpCode.NRefactory.CSharp
 					WriteIdentifier(catchClause.VariableNameToken);
 				}
 				Space(policy.SpacesWithinCatchParentheses);
+				RPar();
+			}
+			if (!catchClause.Condition.IsNull) {
+				Space();
+				WriteKeyword(CatchClause.WhenKeywordRole);
+				Space(policy.SpaceBeforeIfParentheses);
+				LPar();
+				Space(policy.SpacesWithinIfParentheses);
+				catchClause.Condition.AcceptVisitor(this);
+				Space(policy.SpacesWithinIfParentheses);
 				RPar();
 			}
 			catchClause.Body.AcceptVisitor(this);

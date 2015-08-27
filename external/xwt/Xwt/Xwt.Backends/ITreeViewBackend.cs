@@ -35,6 +35,7 @@ namespace Xwt.Backends
 		TreePosition[] SelectedRows { get; }
 		void SelectRow (TreePosition pos);
 		void UnselectRow (TreePosition pos);
+		TreePosition FocusedRow { get; set; }
 		
 		bool IsRowSelected (TreePosition pos);
 		bool IsRowExpanded (TreePosition pos);
@@ -48,6 +49,9 @@ namespace Xwt.Backends
 		
 		bool GetDropTargetRow (double x, double y, out RowDropPosition pos, out TreePosition nodePosition);
 
+		TreePosition GetRowAtPosition (Point p);
+		Rectangle GetCellBounds (TreePosition pos, CellView cell, bool includeMargin);
+		Rectangle GetRowBounds (TreePosition pos, bool includeMargin);
 		TreePosition CurrentEventRow { get; }
 	}
 	

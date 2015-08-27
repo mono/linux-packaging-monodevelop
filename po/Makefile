@@ -116,11 +116,12 @@ AUTOCONF = ${SHELL} /home/directhex/Projects/monodevelop/main/missing autoconf
 AUTOHEADER = ${SHELL} /home/directhex/Projects/monodevelop/main/missing autoheader
 AUTOMAKE = ${SHELL} /home/directhex/Projects/monodevelop/main/missing automake-1.14
 AWK = gawk
+CMAKE = /usr/bin/cmake
 COMPAT_ADDIN_VERSION = 5.0
 CSC = /usr/bin/dmcs
 CSC_FLAGS = -debug -codepage:utf8
 CYGPATH_W = echo
-DEFS = -DPACKAGE_NAME=\"monodevelop\" -DPACKAGE_TARNAME=\"monodevelop\" -DPACKAGE_VERSION=\"5.9.6\" -DPACKAGE_STRING=\"monodevelop\ 5.9.6\" -DPACKAGE_BUGREPORT=\"monodevelop-list@lists.ximian.com\" -DPACKAGE_URL=\"\" -DPACKAGE=\"monodevelop\" -DVERSION=\"5.9.6\" -DGETTEXT_PACKAGE=\"monodevelop\"
+DEFS = -DPACKAGE_NAME=\"monodevelop\" -DPACKAGE_TARNAME=\"monodevelop\" -DPACKAGE_VERSION=\"5.10\" -DPACKAGE_STRING=\"monodevelop\ 5.10\" -DPACKAGE_BUGREPORT=\"monodevelop-list@lists.ximian.com\" -DPACKAGE_URL=\"\" -DPACKAGE=\"monodevelop\" -DVERSION=\"5.10\" -DGETTEXT_PACKAGE=\"monodevelop\"
 DYLD_FALLBACK_LIBRARY_PATH = 
 ECHO_C = 
 ECHO_N = -n
@@ -146,6 +147,8 @@ INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
 LD_LIBRARY_PATH = 
 LIBOBJS = 
 LIBS = 
+LIBSSH2_CFLAGS =  
+LIBSSH2_LIBS = -Wl,-z,relro -lssh2 -lgcrypt  
 LIB_PREFIX = .so
 LIB_SUFFIX = 
 LTLIBOBJS = 
@@ -167,12 +170,12 @@ MSGMERGE = /usr/bin/msgmerge
 PACKAGE = monodevelop
 PACKAGE_BUGREPORT = monodevelop-list@lists.ximian.com
 PACKAGE_NAME = monodevelop
-PACKAGE_STRING = monodevelop 5.9.6
+PACKAGE_STRING = monodevelop 5.10
 PACKAGE_TARNAME = monodevelop
 PACKAGE_URL = 
-PACKAGE_VERSION = 5.9.6
-PACKAGE_VERSION_LABEL = 5.9.6
-PATH = /home/directhex/google-cloud-sdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games
+PACKAGE_VERSION = 5.10
+PACKAGE_VERSION_LABEL = 5.10
+PATH = /opt/mono/bin/:/usr/local/bin:/usr/bin:/bin:/usr/bin/X11:/usr/games:/opt/mono/bin
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
@@ -186,11 +189,19 @@ UNMANAGED_DEPENDENCIES_MONO_CFLAGS =
 UNMANAGED_DEPENDENCIES_MONO_LIBS =  
 UPDATE_DESKTOP_DB = 
 UPDATE_MIME_DB = /usr/bin/update-mime-database
+<<<<<<< HEAD
 VERSION = 5.9.6
 abs_builddir = /home/directhex/Projects/monodevelop/main/po
 abs_srcdir = /home/directhex/Projects/monodevelop/main/po
 abs_top_builddir = /home/directhex/Projects/monodevelop/main
 abs_top_srcdir = /home/directhex/Projects/monodevelop/main
+=======
+VERSION = 5.10
+abs_builddir = /var/lib/jenkins/workspace/release-tarball-monodevelop/main/po
+abs_srcdir = /var/lib/jenkins/workspace/release-tarball-monodevelop/main/po
+abs_top_builddir = /var/lib/jenkins/workspace/release-tarball-monodevelop/main
+abs_top_srcdir = /var/lib/jenkins/workspace/release-tarball-monodevelop/main
+>>>>>>> Imported Upstream version 5.10.0.609
 am__leading_dot = .
 am__tar = tar --format=ustar -chf - "$$tardir"
 am__untar = tar -xf -

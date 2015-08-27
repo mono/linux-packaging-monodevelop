@@ -504,7 +504,7 @@ namespace Mono.Addins.Database
 						if (adepid != idName)
 							continue;
 						
-						// The add-in that has been disabled, might be a requeriment of this one, or maybe not
+						// The add-in that has been disabled, might be a requirement of this one, or maybe not
 						// if there is an older version available. Check it now.
 						
 						adepid = Addin.GetFullId (ainfo.AddinInfo.Namespace, adep.AddinId, adep.Version);
@@ -983,7 +983,7 @@ namespace Mono.Addins.Database
 			
 			Addin addin1 = GetInstalledAddin (domain, id1, false);
 			
-			// We can assumbe that if the add-in is not returned here, it may be a root addin.
+			// We can assume that if the add-in is not returned here, it may be a root addin.
 			if (addin1 == null)
 				return false;
 
@@ -1470,11 +1470,17 @@ namespace Mono.Addins.Database
 		public string GetFolderDomain (IProgressStatus progressStatus, string path)
 		{
 			AddinScanFolderInfo folderInfo;
-			if (GetFolderInfoForPath (progressStatus, path, out folderInfo) && folderInfo != null && !folderInfo.SharedFolder)
+
+			if (GetFolderInfoForPath (progressStatus, path, out folderInfo) && folderInfo == null) {
+				if (path.Length > 0 && path [path.Length - 1] != Path.DirectorySeparatorChar)
+					// Try again by appending a directory separator at the end. Some directories are registered like this.
+					GetFolderInfoForPath (progressStatus, path + Path.DirectorySeparatorChar, out folderInfo);
+				else if (path.Length > 0 && path [path.Length - 1] == Path.DirectorySeparatorChar)
+					// Try again by removing the directory separator at the end. Some directories are registered like this.
+					GetFolderInfoForPath (progressStatus, path.TrimEnd (Path.DirectorySeparatorChar), out folderInfo);
+			}
+			if (folderInfo != null && !string.IsNullOrEmpty (folderInfo.Domain))
 				return folderInfo.Domain;
-			else if (path.Length > 0 && path [path.Length - 1] != Path.DirectorySeparatorChar)
-				// Try again by appending a directory separator at the end. Some directories are registered like this.
-				return GetFolderDomain (progressStatus, path + Path.DirectorySeparatorChar);
 			else
 				return UnknownDomain;
 		}
@@ -1520,7 +1526,7 @@ namespace Mono.Addins.Database
 			if (desc == null)
 				return;
 			
-			// If the add-in already existed, the dependencies of the old add-in need to be re-analized
+			// If the add-in already existed, the dependencies of the old add-in need to be re-analyzed
 			
 			Util.AddDependencies (desc, scanResult);
 			if (desc.IsRoot)

@@ -32,6 +32,7 @@ using MonoDevelop.Core;
 using AppKit;
 using CoreGraphics;
 using Foundation;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.MacIntegration.MainToolbar
 {
@@ -74,6 +75,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			get { return (SearchBar)widget.Items[searchEntryIdx + buttonBarCount].View; }
 		}
 
+		// TODO: Remove this when XamMac 2.2 goes stable.
 		static HashSet<object> viewCache = new HashSet<object> ();
 		static HashSet<ButtonBar> buttonBarCache = new HashSet<ButtonBar> ();
 
@@ -124,16 +126,23 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		{
 			var bar = new ButtonBar (barItems);
 			buttonBarCache.Add (bar);
+
+			// Note: We're leaving a 1 dead pixel size here because Apple bug
+			// on Yosemite. Segmented controls have 3px padding on left and right
+			// on Mavericks.
+			nfloat size = 6 + 33 * bar.SegmentCount;
+
 			// By default, Cocoa doesn't want to duplicate items in the toolbar.
 			// Use different Ids to prevent this and not have to subclass.
 			var item = new NSToolbarItem (ButtonBarId + buttonBarCount) {
 				View = bar,
-				MinSize = new CGSize (bar.SegmentCount * 40, bar.FittingSize.Height),
-				MaxSize = new CGSize (bar.SegmentCount * 40, bar.FittingSize.Height),
+				MinSize = new CGSize (size, bar.FittingSize.Height),
+				MaxSize = new CGSize (size, bar.FittingSize.Height),
 			};
 			bar.ResizeRequested += (o, e) => {
-				item.MinSize = new CGSize (bar.SegmentCount * 40, bar.FittingSize.Height);
-				item.MaxSize = new CGSize (bar.SegmentCount * 40, bar.FittingSize.Height);
+				nfloat resize = 6 + 33 * bar.SegmentCount;
+				item.MinSize = new CGSize (resize, bar.FittingSize.Height);
+				item.MaxSize = new CGSize (resize, bar.FittingSize.Height);
 				centeringSpace.UpdateWidth ();
 			};
 			return item;
@@ -166,6 +175,11 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		NSToolbarItem CreateSearchBarToolbarItem ()
 		{
 			var bar = new SearchBar ();
+
+			// Remove the focus from the Gtk system when Cocoa has focus
+			// Fixes BXC #29601
+			bar.GainedFocus += (o, e) => IdeApp.Workbench.RootWindow.Focus = null;
+
 			viewCache.Add (bar);
 			var menuBar = new SearchBar {
 				Frame = new CGRect (0, 0, 180, bar.FittingSize.Height),
@@ -193,10 +207,15 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				MaxSize = new CGSize (360, 22),
 			};
 
-			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResizeNotification, notif => {
+			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResizeNotification, notif => DispatchService.GuiDispatch (() => {
 				// Skip updates with a null Window. Only crashes on Mavericks.
 				// The View gets updated once again when the window resize finishes.
 				if (bar.Window == null)
+					return;
+
+				// We're getting notified about all windows in the application (for example, NSPopovers) that change size when really we only care about
+				// the window the bar is in.
+				if (notif.Object != bar.Window)
 					return;
 
 				double maxSize = Math.Round (bar.Window.Frame.Width * 0.30f);
@@ -204,7 +223,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				item.MinSize = new CGSize ((nfloat)Math.Max (280, minSize), 22);
 				item.MaxSize = new CGSize ((nfloat)Math.Min (700, maxSize), 22);
 				bar.RepositionStatusLayers ();
-			});
+			}));
 			return item;
 		}
 
@@ -271,6 +290,8 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 
 		public void FocusSearchBar ()
 		{
+			searchEntry.Focus ();
+
 			var entry = searchEntry;
 			if (!IsSearchEntryInOverflow)
 				entry.SelectText (entry);
@@ -418,9 +439,14 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 
 				clipItem.PerformSelector (sel);
 
-				var menuBar = (SearchBar)clipItem.Menu.ItemAt (0).View;
-				AttachToolbarEvents (menuBar);
-				menuBar.StringValue = value;
+				foreach (NSMenuItem item in clipItem.Menu.ItemArray ()) {
+					if (item.View is SearchBar) {
+						var menuBar = (SearchBar)item.View;
+						AttachToolbarEvents (menuBar);
+						menuBar.StringValue = value;
+						break;
+					}
+				}
 			}
 		}
 

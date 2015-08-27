@@ -1224,6 +1224,77 @@ namespace Xwt.GtkBackend
 			return new Gtk.ComboBoxEntry ();
 			#endif
 		}
+
+
+		/// <summary>
+		/// Adjusts pointer coordinates to be relative to the widget.
+		/// </summary>
+		/// <returns>The pointer coordinates.</returns>
+		/// <param name="widget">The Widget.</param>
+		/// <param name="eventWindow">The event source window.</param>
+		/// <param name="x">The events pointer x coordinate.</param>
+		/// <param name="y">The events pointer y coordinate.</param>
+		/// <remarks>
+		/// Some widgets have additional child Gdk windows (or real child widgets if
+		/// the widget is a container) on top of their root window.
+		/// In this case pointer events may come from child windows and contain
+		/// wrong coordinates (relative to child window and not to the widget itself).
+		/// 
+		/// CheckPointerCoordinates checks whether the events source window is not
+		/// the widgets root window and adjusts the coordinates to relative
+		/// to the widget and not to its child.
+		///</remarks>
+		public static Xwt.Point CheckPointerCoordinates (this Gtk.Widget widget, Gdk.Window eventWindow, double x, double y)
+		{
+			if (widget.GdkWindow != eventWindow)
+			{
+				int pointer_x, pointer_y;
+				widget.GetPointer (out pointer_x, out pointer_y);
+				return new Xwt.Point (pointer_x, pointer_y);
+			}
+			return new Xwt.Point (x, y);
+		}
+
+
+		[DllImport(GtkInterop.LIBGTK, CallingConvention = CallingConvention.Cdecl)]
+		static extern IntPtr gtk_message_dialog_get_message_area(IntPtr raw);
+		
+		public static Gtk.Box GetMessageArea(this Gtk.MessageDialog dialog)
+		{
+			#if XWT_GTK3
+			// according to Gtk docs MessageArea should always be a Gtk.Box, but we test this
+			// to be on the safe side.
+			var messageArea = dialog.MessageArea as Gtk.Box;
+			return messageArea ?? dialog.ContentArea;
+			#else
+			if (GtkWorkarounds.GtkMajorVersion <= 2 && GtkWorkarounds.GtkMinorVersion < 22) // message area not present before 2.22
+				return dialog.VBox;
+			IntPtr raw_ret = gtk_message_dialog_get_message_area(dialog.Handle);
+			Gtk.Box ret = GLib.Object.GetObject(raw_ret) as Gtk.Box;
+			return ret;
+			#endif
+		}
+
+
+		[DllImport(GtkInterop.LIBGOBJECT, CallingConvention = CallingConvention.Cdecl)]
+		static extern IntPtr g_signal_stop_emission_by_name(IntPtr raw, string name);
+
+		public static void StopSignal (this GLib.Object gobject, string signalid)
+		{
+			g_signal_stop_emission_by_name (gobject.Handle, signalid);
+		}
+
+		[DllImport(GtkInterop.LIBGTK, CallingConvention = CallingConvention.Cdecl)]
+		static extern IntPtr gtk_binding_set_find (string setName);
+		[DllImport(GtkInterop.LIBGTK, CallingConvention = CallingConvention.Cdecl)]
+		static extern void gtk_binding_entry_remove (IntPtr bindingSet, uint keyval, Gdk.ModifierType modifiers);
+
+		public static void RemoveKeyBindingFromClass (GLib.GType gtype, Gdk.Key key, Gdk.ModifierType modifiers)
+		{
+			var bindingSet = gtk_binding_set_find (gtype.ToString ());
+			if (bindingSet != IntPtr.Zero)
+				gtk_binding_entry_remove (bindingSet, (uint)key, modifiers);
+		}
 	}
 	
 	public struct KeyboardShortcut : IEquatable<KeyboardShortcut>
