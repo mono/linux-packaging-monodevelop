@@ -1,5 +1,5 @@
 //
-// IdeApi.cs
+// Ide.cs
 //
 // Author:
 //       Lluis Sanchez Gual <lluis@novell.com>
@@ -26,12 +26,15 @@
 
 using System;
 using System.Threading;
+using System.Linq;
+
 using MonoDevelop.Core;
 using MonoDevelop.Core.Instrumentation;
 using MonoDevelop.Ide.Commands;
-using NUnit.Framework;
 using MonoDevelop.Components.AutoTest;
-using System.Linq;
+
+using NUnit.Framework;
+using System.Collections.Generic;
 
 namespace UserInterfaceTests
 {
@@ -43,26 +46,14 @@ namespace UserInterfaceTests
 
 		public static void OpenFile (FilePath file)
 		{
-			Session.GlobalInvoke ("MonoDevelop.Ide.IdeApp.Workbench.OpenDocument", (FilePath) file, true);
-			Assert.AreEqual (file, Ide.GetActiveDocumentFilename ());
-		}
-
-		public static FilePath OpenTestSolution (string solution)
-		{
-			FilePath path = Util.GetSampleProject (solution);
-
-			RunAndWaitForTimer (
-				() => Session.GlobalInvoke ("MonoDevelop.Ide.IdeApp.Workspace.OpenWorkspaceItem", (string)path),
-				"MonoDevelop.Ide.Counters.OpenWorkspaceItemTimer"
-			);
-
-			return path;
+			Session.GlobalInvoke ("MonoDevelop.Ide.IdeApp.Workbench.OpenDocument", (string) file, true);
+			Assert.AreEqual (file, GetActiveDocumentFilename ());
 		}
 
 		public static void CloseAll ()
 		{
 			Session.ExecuteCommand (FileCommands.CloseWorkspace);
-			Session.ExecuteCommand (FileCommands.CloseAllFiles);
+			Session.ExitApp ();
 		}
 
 		public static FilePath GetActiveDocumentFilename ()
@@ -70,18 +61,13 @@ namespace UserInterfaceTests
 			return Session.GetGlobalValue<FilePath> ("MonoDevelop.Ide.IdeApp.Workbench.ActiveDocument.FileName");
 		}
 
-		public static void BuildSolution ()
+		public static bool BuildSolution (bool isPass = true, int timeoutInSecs = 360)
 		{
-			RunAndWaitForTimer (
-				() => Session.ExecuteCommand (ProjectCommands.BuildSolution),
-				"MonoDevelop.Ide.Counters.BuildItemTimer"
-			);
-
-			var status = GetStatusMessage ();
-			Assert.AreEqual (status, "Build successful.");
+			Session.ExecuteCommand (ProjectCommands.BuildSolution);
+			return isPass == Workbench.IsBuildSuccessful (timeoutInSecs);
 		}
 
-		static void WaitUntil (Func<bool> done, int timeout = 20000, int pollStep = 200)
+		public static void WaitUntil (Func<bool> done, int timeout = 20000, int pollStep = 200)
 		{
 			do {
 				if (done ())
@@ -90,18 +76,17 @@ namespace UserInterfaceTests
 				Thread.Sleep (pollStep);
 			} while (timeout > 0);
 
-			throw new Exception ("Timed out waiting for event");
+			throw new TimeoutException ("Timed out waiting for Function: "+done.Method.Name);
 		}
 
-		//no saner way to do this
-		public static string GetStatusMessage (int timeout = 20000)
+		public static bool ClickButtonAlertDialog (string buttonText)
 		{
-			//wait for any queued messages to pop
-			WaitUntil (
-				() => Session.GetGlobalValue<int> ("MonoDevelop.Ide.IdeApp.Workbench.Toolbar.statusArea.messageQueue.Count") == 0,
-				timeout
-			);
-			return (string) Session.GetGlobalValue ("MonoDevelop.Ide.IdeApp.Workbench.Toolbar.statusArea.renderArg.CurrentText");
+			if (Platform.IsMac) {
+				Ide.WaitUntil (() => Session.Query (c => c.Marked ("Xamarin Studio").Marked ("AppKit.NSPanel")).Any ());
+				return Session.ClickElement (c => c.Marked ("AppKit.NSButton").Text (buttonText));
+			}
+
+			throw new PlatformNotSupportedException ("ClickButtonAlertDialog is only supported on Mac");
 		}
 
 		public static void RunAndWaitForTimer (Action action, string counter, int timeout = 20000)
@@ -114,26 +99,46 @@ namespace UserInterfaceTests
 			WaitUntil (() => c.TotalTime > tt, timeout);
 		}
 
-		public static void CreateProject (string name, string category, string kind, FilePath directory)
+		public readonly static Action EmptyAction = delegate { };
+
+		public readonly static Action WaitForPackageUpdate = delegate {
+			WaitForStatusMessage (new [] {
+				"Package updates are available.",
+				"Packages are up to date.",
+				"No updates found but warnings were reported.",
+				"Packages successfully updated.",
+				"Packages updated with warnings."},
+				timeoutInSecs: 360, pollStepInSecs: 5);
+		};
+
+		public readonly static Action WaitForSolutionCheckedOut = delegate {
+			WaitForStatusMessage (new [] {"Solution checked out", "Solution Loaded."}, timeoutInSecs: 360, pollStepInSecs: 5);
+		};
+
+		public static void WaitForSolutionLoaded (Action<string> afterEachStep)
 		{
-			Session.ExecuteCommand (FileCommands.NewProject);
-			Session.WaitForWindow ("MonoDevelop.Ide.Projects.NewProjectDialog");
+			WaitForStatusMessage (new [] {"Loading..."});
+			afterEachStep ("Loading-Solution");
+			WaitForNoStatusMessage (new [] {"Loading..."});
+			afterEachStep ("Solution-Loaded");
+		}
 
-			Session.SelectWidget ("lst_template_types");
-			Session.SelectTreeviewItem (category);
+		public static void WaitForStatusMessage (string[] statusMessage, int timeoutInSecs = 240, int pollStepInSecs = 1)
+		{
+			PollStatusMessage (statusMessage, timeoutInSecs, pollStepInSecs);
+		}
 
-			Session.SelectWidget ("boxTemplates");
-			var cells = Session.GetTreeviewCells ();
-			var cellName = cells.First (c => c!= null && c.StartsWith (kind + "\n", StringComparison.Ordinal));
-			Session.SelectTreeviewItem (cellName);
+		public static void WaitForNoStatusMessage (string[] statusMessage, int timeoutInSecs = 240, int pollStepInSecs = 1)
+		{
+			PollStatusMessage (statusMessage, timeoutInSecs, pollStepInSecs, false);
+		}
 
-			Gui.EnterText ("txt_name", name);
-			Gui.EnterText ("entry_location", directory);
-
-			RunAndWaitForTimer (
-				() => Gui.PressButton ("btn_new"),
-				"MonoDevelop.Ide.Counters.OpenDocumentTimer"
-			);
+		static void PollStatusMessage (string[] statusMessage, int timeoutInSecs, int pollStepInSecs, bool waitForMessage = true)
+		{
+			Ide.WaitUntil (() => {
+				var actualStatusMessage = Workbench.GetStatusMessage ();
+				return waitForMessage == (statusMessage.Contains (actualStatusMessage, StringComparer.OrdinalIgnoreCase));
+			}, pollStep: pollStepInSecs * 1000, timeout: timeoutInSecs * 1000);
 		}
 	}
 

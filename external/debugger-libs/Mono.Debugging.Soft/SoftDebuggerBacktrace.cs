@@ -129,7 +129,10 @@ namespace Mono.Debugging.Soft
 			} else {
 				methodName = method.Name;
 			}
-			
+
+			if (string.IsNullOrEmpty (methodName))
+				methodName = "[Function Without Name]";
+
 			// Compiler generated anonymous/lambda methods
 			bool special_method = false;
 			if (methodName [0] == '<' && methodName.Contains (">m__")) {
@@ -185,7 +188,7 @@ namespace Mono.Debugging.Soft
 				}
 			}
 
-			var location = new DC.SourceLocation (methodName, fileName, frame.LineNumber, frame.ColumnNumber, frame.Location.SourceFileHash);
+			var location = new DC.SourceLocation (methodName, fileName, frame.LineNumber, frame.ColumnNumber, frame.Location.EndLineNumber, frame.Location.EndColumnNumber, frame.Location.SourceFileHash);
 
 			string addressSpace = string.Empty;
 			bool hasDebugInfo = false;

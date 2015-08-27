@@ -74,6 +74,7 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+CMAKE = @CMAKE@
 COMPAT_ADDIN_VERSION = @COMPAT_ADDIN_VERSION@
 CSC = @CSC@
 CSC_FLAGS = @CSC_FLAGS@
@@ -104,6 +105,8 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD_LIBRARY_PATH = @LD_LIBRARY_PATH@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBSSH2_CFLAGS = @LIBSSH2_CFLAGS@
+LIBSSH2_LIBS = @LIBSSH2_LIBS@
 LIB_PREFIX = @LIB_PREFIX@
 LIB_SUFFIX = @LIB_SUFFIX@
 LTLIBOBJS = @LTLIBOBJS@
@@ -194,7 +197,7 @@ ADDINS = $(MAC_APP_LIB_DIR)/AddIns
 EXTRAS = $(top_srcdir)/../extras
 ARTIFACTS = $(top_srcdir)/../../artifacts
 MD_CONFIGURE = $(top_srcdir)/../scripts/configure.sh
-SDK_PATH = $(shell xcrun --sdk macosx10.8 --show-sdk-path)
+#SDK_PATH=$(shell xcrun --sdk macosx10.8 --show-sdk-path)
 PACKAGE_UPDATE_ID = $(shell $(MD_CONFIGURE) get-releaseid)
 BUNDLE_VERSION = $(shell $(MD_CONFIGURE) get-version)
 CLEANFILES = render.exe
@@ -394,7 +397,8 @@ dmg: render.exe app
 	./make-dmg-bundle.sh
 
 monostub: monostub.m $(MONOSTUB_EXTRA_SOURCES)
-	gcc -Wall -mmacosx-version-min=10.6 -m32 -o $@ $^ -framework AppKit -isysroot $(SDK_PATH)
+	gcc -Wall -mmacosx-version-min=10.9 -m32 -o $@ $^ -framework AppKit
+#	gcc -Wall -mmacosx-version-min=10.9 -m32 -o $@ $^ -framework AppKit -isysroot $(SDK_PATH)
 
 clean-local:
 	rm -rf MonoDevelop.app

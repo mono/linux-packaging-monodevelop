@@ -552,6 +552,11 @@ namespace Mono.Debugging.Evaluation
 			// to avoid problems with objects being invalidated due to evaluations in the target,
 			var list = new List<ValueReference> ();
 			list.AddRange (GetMembersSorted (ctx, objectSource, type, proxy, access));
+
+			// Some implementations of DebuggerProxies(showRawView==true) only have private members
+			if (showRawView && list.Count == 0) {
+				list.AddRange (GetMembersSorted (ctx, objectSource, type, proxy, access | BindingFlags.NonPublic));
+			}
 			var names = new ObjectValueNameTracker (ctx);
 			object tdataType = type;
 			
@@ -766,8 +771,11 @@ namespace Mono.Debugging.Evaluation
 			if (dot != -1) {
 				try {
 					var vr = ctx.Evaluator.Evaluate (ctx, expr.Substring (0, dot), null);
-					if (vr != null)
-						return GetMemberCompletionData (ctx, vr);
+					if (vr != null) {
+						var completionData = GetMemberCompletionData (ctx, vr);
+						completionData.ExpressionLength = expr.Length - dot - 1;
+						return completionData;
+					}
 
 					// FIXME: handle types and namespaces...
 				} catch (Exception ex) {
@@ -1058,8 +1066,8 @@ namespace Mono.Debugging.Evaluation
 					if (em.Value != 0 && (rest & em.Value) == em.Value) {
 						rest &= ~em.Value;
 						if (composed.Length > 0) {
-							composed += "|";
-							composedDisplay += "|";
+							composed += " | ";
+							composedDisplay += " | ";
 						}
 						composed += typeName + "." + em.Name;
 						composedDisplay += em.Name;

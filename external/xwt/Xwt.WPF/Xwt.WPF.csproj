@@ -19,7 +19,7 @@
     <ConsolePause>False</ConsolePause>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>none</DebugType>
+    <DebugType>pdbonly</DebugType>
     <Optimize>False</Optimize>
     <OutputPath>bin\Release</OutputPath>
     <ErrorReport>prompt</ErrorReport>
@@ -90,6 +90,7 @@
     <Compile Include="Xwt.WPFBackend\ExComboBox.cs" />
     <Compile Include="Xwt.WPFBackend\ExGrid.cs" />
     <Compile Include="Xwt.WPFBackend\ExListBox.cs" />
+    <Compile Include="Xwt.WPFBackend\ExListBoxItem.cs" />
     <Compile Include="Xwt.WPFBackend\ExListView.cs" />
     <Compile Include="Xwt.WPFBackend\ExListViewItem.cs" />
     <Compile Include="Xwt.WPFBackend\ExpanderBackend.cs" />
@@ -148,6 +149,7 @@
     <Compile Include="Xwt.WPFBackend\WpfKeyboardHandler.cs" />
     <Compile Include="Xwt.WPFBackend\WebViewBackend.cs" />
     <Compile Include="Xwt.WPFBackend\ScrollControlBackend.cs" />
+    <Compile Include="Xwt.WPFBackend\CalendarBackend.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
