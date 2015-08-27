@@ -54,7 +54,7 @@ override_dh_auto_test:
 	# skip "make test"
 
 override_dh_auto_install:
-	dh_auto_install
+	XDG_CONFIG_HOME=$(DEBIAN_DIR) dh_auto_install
 	# install missing DLL maps
 	cp debian/MonoDevelop.SourceEditor2.dll.config debian/tmp/usr/lib/monodevelop/AddIns/DisplayBindings/SourceEditor/
 	cp debian/MonoDevelop.Gettext.dll.config debian/tmp/usr/lib/monodevelop/AddIns/DisplayBindings/Gettext/
