@@ -3,34 +3,34 @@ Section: devel
 Priority: optional
 Maintainer: Debian CLI Applications Team <pkg-cli-apps-team@lists.alioth.debian.org>
 Uploaders: Mirco Bauer <meebey@debian.org>, Jo Shields <directhex@apebox.org>
-Build-Depends: debhelper (>= 7.0.50)
-Build-Depends-Indep: autoconf,
-                     automake,
-                     autotools-dev,
-                     cli-common-dev (>= 0.8~),
-                     desktop-file-utils,
-                     dh-autoreconf,
-                     cmake,
-                     nuget,
-                     ca-certificates-mono,
-                     libssh2-1-dev,
-                     gtk-sharp2-gapi (>= 2.12.8),
-                     intltool,
-                     libapr1-dev,
-                     libgconf2.0-cil-dev,
-                     libglade2.0-cil-dev,
-                     libgnome2.0-cil-dev,
-                     libgtk2.0-cil-dev,
-                     libgtkspell-dev,
-                     libwebkitgtk-dev,
-                     libnuget-core-cil-dev,
-                     libmono-addins-cil-dev (>= 0.6),
-                     libmono-addins-gui-cil-dev (>= 0.6),
-                     libmono-cecil-cil-dev,
-                     libnunit-cil-dev (>= 2.6.3),
-                     libsvn-dev,
-                     mono-devel (>= 4.0~),
-                     monodoc-base (>= 1.1.9)
+Build-Depends: debhelper (>= 7.0.50),
+               autoconf,
+               automake,
+               autotools-dev,
+               cli-common-dev (>= 0.8~),
+               desktop-file-utils,
+               dh-autoreconf,
+               cmake,
+               nuget,
+               ca-certificates-mono,
+               libssh2-1-dev,
+               gtk-sharp2-gapi (>= 2.12.8),
+               intltool,
+               libapr1-dev,
+               libgconf2.0-cil-dev,
+               libglade2.0-cil-dev,
+               libgnome2.0-cil-dev,
+               libgtk2.0-cil-dev,
+               libgtkspell-dev,
+               libwebkitgtk-dev,
+               libnuget-core-cil-dev,
+               libmono-addins-cil-dev (>= 0.6),
+               libmono-addins-gui-cil-dev (>= 0.6),
+               libmono-cecil-cil-dev,
+               libnunit-cil-dev (>= 2.6.3),
+               libsvn-dev,
+               mono-devel (>= 4.0~),
+               monodoc-base (>= 1.1.9)
 Standards-Version: 3.9.2
 Homepage: http://www.monodevelop.com/
 Vcs-Git: git://git.debian.org/pkg-cli-apps/packages/monodevelop.git
@@ -90,7 +90,7 @@ Description: NUnit plugin for MonoDevelop
  This package enables NUnit integration for MonoDevelop.
 
 Package: monodevelop-versioncontrol
-Architecture: all
+Architecture: any
 Replaces: monodevelop (<< 0.13.1)
 Depends: monodevelop (= ${source:Version}),
          ${cli:Depends},
