@@ -124,6 +124,8 @@ mkdir -p %{buildroot}%{_prefix}/share/pkgconfig
 mv %{buildroot}%{_prefix}/lib/pkgconfig/* %{buildroot}%{_datadir}/pkgconfig
 cp -a /usr/lib/nuget/NuGet.Core.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
 cp -a /usr/lib/nuget/Microsoft.Web.XmlTransform.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
+rm -fr %{buildroot}%{_prefix}/lib/debug
+rm -fr %{buildroot}%{_prefix}/src
 %find_lang %{name}
 %if 0%{?suse_version} > 1220
 %fdupes %buildroot/%{_prefix}
