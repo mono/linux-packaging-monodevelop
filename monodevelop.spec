@@ -64,7 +64,7 @@ Patch0:		downgrade_to_mvc3.patch
 Patch1:		ship_missing_build_libgit2.sh.patch
 Patch2:		0001-Make-NuGet.exe-restore-conditional-on-git.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
-BuildArch:      noarch
+#BuildArch:      noarch
 Requires:       mono-basic
 Requires:       mono-web
 Requires:       pkgconfig
@@ -124,8 +124,6 @@ mkdir -p %{buildroot}%{_prefix}/share/pkgconfig
 mv %{buildroot}%{_prefix}/lib/pkgconfig/* %{buildroot}%{_datadir}/pkgconfig
 cp -a /usr/lib/nuget/NuGet.Core.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
 cp -a /usr/lib/nuget/Microsoft.Web.XmlTransform.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
-rm -fr %{buildroot}%{_prefix}/lib/debug
-rm -fr %{buildroot}%{_prefix}/src
 %find_lang %{name}
 %if 0%{?suse_version} > 1220
 %fdupes %buildroot/%{_prefix}
