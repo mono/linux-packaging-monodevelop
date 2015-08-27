@@ -124,10 +124,6 @@ mkdir -p %{buildroot}%{_prefix}/share/pkgconfig
 mv %{buildroot}%{_prefix}/lib/pkgconfig/* %{buildroot}%{_datadir}/pkgconfig
 cp -a /usr/lib/nuget/NuGet.Core.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
 cp -a /usr/lib/nuget/Microsoft.Web.XmlTransform.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
-ln -s /usr/lib/mono/nunit/nunit.core.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/NUnit/
-ln -s /usr/lib/mono/nunit/nunit.core.interfaces.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/NUnit/
-ln -s /usr/lib/mono/nunit/nunit.framework.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/NUnit/
-ln -s /usr/lib/mono/nunit/nunit.util.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/NUnit/
 %find_lang %{name}
 %if 0%{?suse_version} > 1220
 %fdupes %buildroot/%{_prefix}
