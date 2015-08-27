@@ -61,6 +61,7 @@ License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
 Source:         %{name}-%{version}.tar.bz2
 Patch0:		downgrade_to_mvc3.patch
+Patch1:		ship_missing_build_libgit2.sh.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildArch:      noarch
 Requires:       mono-basic
@@ -101,6 +102,7 @@ This package contains development files for the IDE and plugins.
 %prep
 %setup -q -n monodevelop-%{__majorver}
 %patch0 -p 1
+%patch1 -p 1
 
 %build
 %{?env_options}
