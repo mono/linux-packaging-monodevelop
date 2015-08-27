@@ -692,6 +692,30 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		}
 		
 		[Test]
+		public void VarArgsMethod()
+		{
+			IParameter p = GetTypeDefinition(typeof(ParameterTests)).Methods.Single(m => m.Name == "VarArgsMethod").Parameters.Single();
+			Assert.IsFalse(p.IsOptional);
+			Assert.IsFalse(p.IsRef);
+			Assert.IsFalse(p.IsOut);
+			Assert.IsFalse(p.IsParams);
+			Assert.AreEqual(TypeKind.ArgList, p.Type.Kind);
+			Assert.AreEqual("", p.Name);
+		}
+		
+		[Test]
+		public void VarArgsCtor()
+		{
+			IParameter p = GetTypeDefinition(typeof(VarArgsCtor)).Methods.Single(m => m.IsConstructor).Parameters.Single();
+			Assert.IsFalse(p.IsOptional);
+			Assert.IsFalse(p.IsRef);
+			Assert.IsFalse(p.IsOut);
+			Assert.IsFalse(p.IsParams);
+			Assert.AreEqual(TypeKind.ArgList, p.Type.Kind);
+			Assert.AreEqual("", p.Name);
+		}
+		
+		[Test]
 		public void GenericDelegate_Variance()
 		{
 			ITypeDefinition type = GetTypeDefinition(typeof(GenericDelegate<,>));
@@ -1045,6 +1069,22 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			Assert.That(prop.Getter.IsOverridable, Is.True);
 			Assert.That(prop.Setter.IsOverride, Is.False);
 			Assert.That(prop.Setter.IsOverridable, Is.True);
+		}
+
+		[Test]
+		public void ClassThatOverridesGetterOnly() {
+			ITypeDefinition type = GetTypeDefinition(typeof(ClassThatOverridesGetterOnly));
+			var prop = type.Properties.Single(p => p.Name == "Prop");
+			Assert.AreEqual(Accessibility.Public, prop.Accessibility);
+			Assert.AreEqual(Accessibility.Public, prop.Getter.Accessibility);
+		}
+
+		[Test]
+		public void ClassThatOverridesSetterOnly() {
+			ITypeDefinition type = GetTypeDefinition(typeof(ClassThatOverridesSetterOnly));
+			var prop = type.Properties.Single(p => p.Name == "Prop");
+			Assert.AreEqual(Accessibility.Public, prop.Accessibility);
+			Assert.AreEqual(Accessibility.Protected, prop.Setter.Accessibility);
 		}
 
 		[Test]
@@ -1459,6 +1499,14 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			Assert.AreEqual(inner2, ((TypeOfResolveResult)inner2TypeTestAttr.PositionalArguments[1]).ReferencedType);
 			var inner2MyAttr = attributedInner2.Attributes.Single(a => a.AttributeType.Name == "MyAttribute");
 			Assert.AreEqual(myAttribute2, inner2MyAttr.AttributeType);
+		}
+		
+		[Test]
+		public void ClassWithAttributeOnTypeParameter()
+		{
+			var tp = GetTypeDefinition(typeof(ClassWithAttributeOnTypeParameter<>)).TypeParameters.Single();
+			var attr = tp.Attributes.Single();
+			Assert.AreEqual("DoubleAttribute", attr.AttributeType.Name);
 		}
 	}
 }

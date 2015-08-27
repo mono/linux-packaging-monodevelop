@@ -160,6 +160,12 @@ namespace ICSharpCode.NRefactory.TypeSystem.TestCase
 		public void MethodWithOptionalNullableParameter(int? x = null) {}
 		public void MethodWithOptionalLongParameter(long x = 1) {}
 		public void MethodWithOptionalNullableLongParameter(long? x = 1) {}
+		public void VarArgsMethod(__arglist) {}
+	}
+	
+	public class VarArgsCtor
+	{
+		public VarArgsCtor(__arglist) {}
 	}
 	
 	[ComImport(), Guid("21B8916C-F28E-11D2-A473-00C04F8EF448"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -251,11 +257,21 @@ namespace ICSharpCode.NRefactory.TypeSystem.TestCase
 	}
 
 	public class ClassWithVirtualProperty {
-		public virtual int Prop { get; set; }
+		public virtual int Prop { get; protected set; }
 	}
 	
 	public class ClassThatOverridesAndSealsVirtualProperty : ClassWithVirtualProperty {
-		public sealed override int Prop { get; set; }
+		public sealed override int Prop { get; protected set; }
+	}
+
+	public class ClassThatOverridesGetterOnly : ClassWithVirtualProperty
+	{
+		public override int Prop { get { return 1; } }
+	}
+
+	public class ClassThatOverridesSetterOnly : ClassThatOverridesGetterOnly
+	{
+		public override int Prop { protected set { } }
 	}
 
 	public class ClassThatImplementsProperty : IInterfaceWithProperty {
@@ -438,6 +454,8 @@ namespace ICSharpCode.NRefactory.TypeSystem.TestCase
 			class Inner {}
 		}
 	}
+	
+	public class ClassWithAttributeOnTypeParameter<[Double(2)] T> {}
 
 	[Guid ("790C6E0B-9194-4cc9-9426-A48A63185696"), InterfaceType (ComInterfaceType.InterfaceIsDual)]
 	[ComImport]
