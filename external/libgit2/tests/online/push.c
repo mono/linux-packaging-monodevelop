@@ -9,16 +9,16 @@
 
 static git_repository *_repo;
 
-static char *_remote_url;
+static char *_remote_url = NULL;
 
-static char *_remote_ssh_key;
-static char *_remote_ssh_pubkey;
-static char *_remote_ssh_passphrase;
+static char *_remote_user = NULL;
+static char *_remote_pass = NULL;
 
-static char *_remote_user;
-static char *_remote_pass;
+static char *_remote_ssh_key = NULL;
+static char *_remote_ssh_pubkey = NULL;
+static char *_remote_ssh_passphrase = NULL;
 
-static char *_remote_default;
+static char *_remote_default = NULL;
 
 static int cred_acquire_cb(git_cred **,	const char *, const char *, unsigned int, void *);
 
@@ -319,6 +319,8 @@ void test_online_push__initialize(void)
 	git_vector delete_specs = GIT_VECTOR_INIT;
 	const git_remote_head **heads;
 	size_t heads_len;
+	git_push_options push_opts = GIT_PUSH_OPTIONS_INIT;
+	git_fetch_options fetch_opts = GIT_FETCH_OPTIONS_INIT;
 
 	_repo = cl_git_sandbox_init("push_src");
 
@@ -353,6 +355,7 @@ void test_online_push__initialize(void)
 	git_oid_fromstr(&_tag_tag, "eea4f2705eeec2db3813f2430829afce99cd00b5");
 
 	/* Remote URL environment variable must be set.  User and password are optional.  */
+
 	_remote_url = cl_getenv("GITTEST_REMOTE_URL");
 	_remote_user = cl_getenv("GITTEST_REMOTE_USER");
 	_remote_pass = cl_getenv("GITTEST_REMOTE_PASS");
@@ -370,7 +373,7 @@ void test_online_push__initialize(void)
 
 	record_callbacks_data_clear(&_record_cbs_data);
 
-	cl_git_pass(git_remote_connect(_remote, GIT_DIRECTION_PUSH, NULL));
+	cl_git_pass(git_remote_connect(_remote, GIT_DIRECTION_PUSH, &_record_cbs));
 
 	/* Clean up previously pushed branches.  Fails if receive.denyDeletes is
 	 * set on the remote.  Also, on Git 1.7.0 and newer, you must run
@@ -386,14 +389,16 @@ void test_online_push__initialize(void)
 			delete_specs.length,
 		};
 
-		cl_git_pass(git_remote_upload(_remote, &arr, NULL));
+		memcpy(&push_opts.callbacks, &_record_cbs, sizeof(git_remote_callbacks));
+		cl_git_pass(git_remote_upload(_remote, &arr, &push_opts));
 	}
 
 	git_remote_disconnect(_remote);
 	git_vector_free(&delete_specs);
 
 	/* Now that we've deleted everything, fetch from the remote */
-	cl_git_pass(git_remote_fetch(_remote, NULL, NULL, NULL));
+	memcpy(&fetch_opts.callbacks, &_record_cbs, sizeof(git_remote_callbacks));
+	cl_git_pass(git_remote_fetch(_remote, NULL, &fetch_opts, NULL));
 }
 
 void test_online_push__cleanup(void)
@@ -401,6 +406,14 @@ void test_online_push__cleanup(void)
 	if (_remote)
 		git_remote_free(_remote);
 	_remote = NULL;
+
+	git__free(_remote_url);
+	git__free(_remote_user);
+	git__free(_remote_pass);
+	git__free(_remote_ssh_key);
+	git__free(_remote_ssh_pubkey);
+	git__free(_remote_ssh_passphrase);
+	git__free(_remote_default);
 
 	/* Freed by cl_git_sandbox_cleanup */
 	_repo = NULL;

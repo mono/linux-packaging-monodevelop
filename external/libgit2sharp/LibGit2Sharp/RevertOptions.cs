@@ -1,7 +1,4 @@
-﻿using LibGit2Sharp.Core;
-using LibGit2Sharp.Handlers;
-
-namespace LibGit2Sharp
+﻿namespace LibGit2Sharp
 {
     /// <summary>
     /// Options controlling Revert behavior.
@@ -13,8 +10,7 @@ namespace LibGit2Sharp
         /// By default the revert will be committed if there are no conflicts.
         /// </summary>
         public RevertOptions()
-        {
-        }
+        { }
 
         /// <summary>
         /// When reverting a merge commit, the parent number to consider as

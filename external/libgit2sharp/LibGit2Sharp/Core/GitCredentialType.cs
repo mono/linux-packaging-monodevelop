@@ -34,8 +34,18 @@ namespace LibGit2Sharp.Core
         SshInteractive = (1 << 4),
 
         /// <summary>
-        /// Username only information.
+        /// Username-only information
+        ///
+        /// If the SSH transport does not know which username to use,
+        /// it will ask via this credential type.
         /// </summary>
-        UsernameQuery = (1 << 5),
+        Username = (1 << 5),
+
+        /// <summary>
+        /// Credentials read from memory.
+        ///
+        /// Only available for libssh2+OpenSSL for now.
+        /// </summary>
+        SshMemory = (1 << 6),
     }
 }

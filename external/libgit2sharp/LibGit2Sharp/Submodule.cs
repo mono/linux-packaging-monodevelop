@@ -103,10 +103,7 @@ namespace LibGit2Sharp
         /// <returns>The <see cref="SubmoduleStatus"/> of this submodule.</returns>
         public virtual SubmoduleStatus RetrieveStatus()
         {
-            using (var handle = Proxy.git_submodule_lookup(repo.Handle, Name))
-            {
-                return Proxy.git_submodule_status(handle);
-            }
+            return Proxy.git_submodule_status(repo.Handle, Name);
         }
 
         /// <summary>
@@ -151,8 +148,7 @@ namespace LibGit2Sharp
         {
             get
             {
-                return string.Format(CultureInfo.InvariantCulture,
-                    "{0} => {1}", Name, Url);
+                return string.Format(CultureInfo.InvariantCulture, "{0} => {1}", Name, Url);
             }
         }
 

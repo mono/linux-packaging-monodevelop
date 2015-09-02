@@ -52,7 +52,7 @@ namespace LibGit2Sharp
         /// <summary>
         /// Provides access to diffing functionalities to show changes between the working tree and the index or a tree, changes between the index and a tree, changes between two trees, or changes between two files on disk.
         /// </summary>
-        Diff Diff {get;}
+        Diff Diff { get; }
 
         /// <summary>
         /// Gets the database.
@@ -217,6 +217,11 @@ namespace LibGit2Sharp
         /// <param name="options">Specifies optional parameters controlling merge behavior; if null, the defaults are used.</param>
         /// <returns>The <see cref="MergeResult"/> of the merge.</returns>
         MergeResult Merge(string committish, Signature merger, MergeOptions options);
+
+        /// <summary>
+        /// Access to Rebase functionality.
+        /// </summary>
+        Rebase Rebase { get; }
 
         /// <summary>
         /// Merge the reference that was recently fetched. This will merge

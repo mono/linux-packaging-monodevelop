@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using LibGit2Sharp.Core;
 using LibGit2Sharp.Core.Handles;
 
@@ -76,10 +75,7 @@ namespace LibGit2Sharp
         /// </summary>
         public virtual TagFetchMode TagFetchMode
         {
-            set
-            {
-                Proxy.git_remote_set_autotag(repo.Handle, remote.Name, value);
-            }
+            set { Proxy.git_remote_set_autotag(repo.Handle, remote.Name, value); }
         }
 
         /// <summary>
@@ -87,10 +83,7 @@ namespace LibGit2Sharp
         /// </summary>
         public virtual string Url
         {
-            set
-            {
-                Proxy.git_remote_set_url(repo.Handle, remote.Name, value);
-            }
+            set { Proxy.git_remote_set_url(repo.Handle, remote.Name, value); }
         }
 
         /// <summary>
@@ -98,10 +91,7 @@ namespace LibGit2Sharp
         /// </summary>
         public virtual string PushUrl
         {
-            set
-            {
-                Proxy.git_remote_set_pushurl(repo.Handle, remote.Name, value);
-            }
+            set { Proxy.git_remote_set_pushurl(repo.Handle, remote.Name, value); }
         }
 
         /// <summary>

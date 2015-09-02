@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using LibGit2Sharp.Core;
+﻿using System.Collections.Generic;
 
 namespace LibGit2Sharp
 {
@@ -31,31 +29,19 @@ namespace LibGit2Sharp
         /// <summary>
         /// The status of the merge.
         /// </summary>
-        public virtual MergeTreeStatus Status
-        {
-            get;
-            private set;
-        }
+        public virtual MergeTreeStatus Status { get; private set; }
 
         /// <summary>
         /// The resulting tree of the merge.
         /// <para>This will return <code>null</code> if the merge has been unsuccessful due to conflicts.</para>
         /// </summary>
-        public virtual Tree Tree
-        {
-            get;
-            private set;
-        }
+        public virtual Tree Tree { get; private set; }
 
         /// <summary>
         /// The resulting conflicts from the merge.
         /// <para>This will return <code>null</code> if the merge was successful and there were no conflicts.</para>
         /// </summary>
-        public virtual IEnumerable<Conflict> Conflicts
-        {
-            get;
-            private set;
-        }
+        public virtual IEnumerable<Conflict> Conflicts { get; private set; }
     }
 
     /// <summary>

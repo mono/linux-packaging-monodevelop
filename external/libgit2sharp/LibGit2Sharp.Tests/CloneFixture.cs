@@ -195,19 +195,34 @@ namespace LibGit2Sharp.Tests
             }
         }
 
+        static Credentials CreateUsernamePasswordCredentials (string user, string pass, bool secure)
+        {
+            if (secure)
+            {
+                return new SecureUsernamePasswordCredentials
+                {
+                    Username = user,
+                    Password = Constants.StringToSecureString(pass),
+                };
+            }
+
+            return new UsernamePasswordCredentials
+            {
+                Username = user,
+                Password = pass,
+            };
+        }
+
         [Theory]
-        [InlineData("https://libgit2@bitbucket.org/libgit2/testgitrepository.git", "libgit3", "libgit3")]
-        public void CanCloneFromBBWithCredentials(string url, string user, string pass)
+        [InlineData("https://libgit2@bitbucket.org/libgit2/testgitrepository.git", "libgit3", "libgit3", true)]
+        [InlineData("https://libgit2@bitbucket.org/libgit2/testgitrepository.git", "libgit3", "libgit3", false)]
+        public void CanCloneFromBBWithCredentials(string url, string user, string pass, bool secure)
         {
             var scd = BuildSelfCleaningDirectory();
 
             string clonedRepoPath = Repository.Clone(url, scd.DirectoryPath, new CloneOptions()
             {
-                CredentialsProvider = (_url, _user, _cred) => new UsernamePasswordCredentials
-                {
-                    Username = user,
-                    Password = pass,
-                }
+                CredentialsProvider = (_url, _user, _cred) => CreateUsernamePasswordCredentials (user, pass, secure)
             });
 
             using (var repo = new Repository(clonedRepoPath))
@@ -220,6 +235,66 @@ namespace LibGit2Sharp.Tests
                 Assert.Equal(Path.Combine(scd.RootedDirectoryPath, ".git" + Path.DirectorySeparatorChar), repo.Info.Path);
                 Assert.False(repo.Info.IsBare);
             }
+        }
+
+        [SkippableTheory]
+        [InlineData("https://github.com/libgit2/TestGitRepository.git", "github.com", typeof(CertificateX509))]
+        [InlineData("git@github.com:libgit2/TestGitRepository.git", "github.com", typeof(CertificateSsh))]
+        public void CanInspectCertificateOnClone(string url, string hostname, Type certType)
+        {
+            var scd = BuildSelfCleaningDirectory();
+
+            InconclusiveIf(
+                () =>
+                    certType == typeof (CertificateSsh) && !GlobalSettings.Version.Features.HasFlag(BuiltInFeatures.Ssh),
+                "SSH not supported");
+
+            bool wasCalled = false;
+            bool checksHappy = false;
+
+            var options = new CloneOptions {
+                CertificateCheck = (cert, valid, host) => {
+                    wasCalled = true;
+
+                    Assert.Equal(hostname, host);
+                    Assert.Equal(certType, cert.GetType());
+
+                    if (certType == typeof(CertificateX509)) {
+                        Assert.True(valid);
+                        var x509 = ((CertificateX509)cert).Certificate;
+                        // we get a string with the different fields instead of a structure, so...
+                        Assert.True(x509.Subject.Contains("CN=github.com,"));
+                        checksHappy = true;
+                        return false;
+                    }
+
+                    if (certType == typeof(CertificateSsh)) {
+                        var hostkey = (CertificateSsh)cert;
+                        Assert.True(hostkey.HasMD5);
+                        /*
+                         * Once you've connected and thus your ssh has stored the hostkey,
+                         * you can get the hostkey for a host with
+                         *
+                         *     ssh-keygen -F github.com -l | tail -n 1 | cut -d ' ' -f 2 | tr -d ':'
+                         *
+                         * though GitHub's hostkey won't change anytime soon.
+                         */
+                        Assert.Equal("1627aca576282d36631b564debdfa648",
+                            BitConverter.ToString(hostkey.HashMD5).ToLower().Replace("-", ""));
+                        checksHappy = true;
+                        return false;
+                    }
+
+                    return false;
+                },
+            };
+
+            Assert.Throws<UserCancelledException>(() =>
+                Repository.Clone(url, scd.DirectoryPath, options)
+            );
+
+            Assert.True(wasCalled);
+            Assert.True(checksHappy);
         }
 
         [Fact]

@@ -15,7 +15,7 @@ namespace LibGit2Sharp
     /// <para>To obtain the actual patch of the diff, use the <see cref="Patch"/> class when calling Compare.</para>.
     /// </summary>
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
-    public class TreeChanges : IEnumerable<TreeEntryChanges>
+    public class TreeChanges : IEnumerable<TreeEntryChanges>, IDiffResult
     {
         private readonly List<TreeEntryChanges> changes = new List<TreeEntryChanges>();
         private readonly List<TreeEntryChanges> added = new List<TreeEntryChanges>();
@@ -25,21 +25,23 @@ namespace LibGit2Sharp
         private readonly List<TreeEntryChanges> unmodified = new List<TreeEntryChanges>();
         private readonly List<TreeEntryChanges> renamed = new List<TreeEntryChanges>();
         private readonly List<TreeEntryChanges> copied = new List<TreeEntryChanges>();
+        private readonly List<TreeEntryChanges> conflicted = new List<TreeEntryChanges>();
 
         private readonly IDictionary<ChangeKind, Action<TreeChanges, TreeEntryChanges>> fileDispatcher = Build();
 
         private static IDictionary<ChangeKind, Action<TreeChanges, TreeEntryChanges>> Build()
         {
             return new Dictionary<ChangeKind, Action<TreeChanges, TreeEntryChanges>>
-                       {
-                           { ChangeKind.Modified,    (de, d) => de.modified.Add(d) },
-                           { ChangeKind.Deleted,     (de, d) => de.deleted.Add(d) },
-                           { ChangeKind.Added,       (de, d) => de.added.Add(d) },
-                           { ChangeKind.TypeChanged, (de, d) => de.typeChanged.Add(d) },
-                           { ChangeKind.Unmodified,  (de, d) => de.unmodified.Add(d) },
-                           { ChangeKind.Renamed,     (de, d) => de.renamed.Add(d) },
-                           { ChangeKind.Copied,      (de, d) => de.copied.Add(d) },
-                       };
+            {
+                { ChangeKind.Modified,    (de, d) => de.modified.Add(d) },
+                { ChangeKind.Deleted,     (de, d) => de.deleted.Add(d) },
+                { ChangeKind.Added,       (de, d) => de.added.Add(d) },
+                { ChangeKind.TypeChanged, (de, d) => de.typeChanged.Add(d) },
+                { ChangeKind.Unmodified,  (de, d) => de.unmodified.Add(d) },
+                { ChangeKind.Renamed,     (de, d) => de.renamed.Add(d) },
+                { ChangeKind.Copied,      (de, d) => de.copied.Add(d) },
+                { ChangeKind.Conflicted,  (de, d) => de.conflicted.Add(d) },
+            };
         }
 
         /// <summary>
@@ -88,7 +90,6 @@ namespace LibGit2Sharp
         }
 
         #endregion
-
 
         /// <summary>
         /// List of <see cref="TreeEntryChanges"/> that have been been added.
@@ -146,14 +147,26 @@ namespace LibGit2Sharp
             get { return unmodified; }
         }
 
+        /// <summary>
+        /// List of <see cref="TreeEntryChanges"/> which are conflicted
+        /// </summary>
+        public virtual IEnumerable<TreeEntryChanges> Conflicted
+        {
+            get { return conflicted; }
+        }
+
         private string DebuggerDisplay
         {
             get
             {
                 return string.Format(CultureInfo.InvariantCulture,
-                    "+{0} ~{1} -{2} \u00B1{3} R{4} C{5}",
-                    Added.Count(), Modified.Count(), Deleted.Count(),
-                    TypeChanged.Count(), Renamed.Count(), Copied.Count());
+                                     "+{0} ~{1} -{2} \u00B1{3} R{4} C{5}",
+                                     Added.Count(),
+                                     Modified.Count(),
+                                     Deleted.Count(),
+                                     TypeChanged.Count(),
+                                     Renamed.Count(),
+                                     Copied.Count());
             }
         }
     }

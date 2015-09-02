@@ -87,6 +87,33 @@ namespace LibGit2Sharp.Core
                     "Zero bytes ('\\0') are not allowed. A zero byte has been found at position {0}.", zeroPos), argumentName);
         }
 
+        /// <summary>
+        /// Checks an argument to ensure it isn't a IntPtr.Zero (aka null).
+        /// </summary>
+        /// <param name="argumentValue">The argument value to check.</param>
+        /// <param name="argumentName">The name of the argument.</param>
+        public static void ArgumentNotZeroIntPtr(IntPtr argumentValue, string argumentName)
+        {
+            if (argumentValue == IntPtr.Zero)
+            {
+                throw new ArgumentNullException(argumentName);
+            }
+        }
+
+        /// <summary>
+        /// Checks a pointer argument to ensure it is the expected pointer value.
+        /// </summary>
+        /// <param name="argumentValue">The argument value to check.</param>
+        /// <param name="expectedValue">The expected value.</param>
+        /// <param name="argumentName">The name of the argument.</param>
+        public static void ArgumentIsExpectedIntPtr(IntPtr argumentValue, IntPtr expectedValue, string argumentName)
+        {
+            if (argumentValue != expectedValue)
+            {
+                throw new ArgumentException("Unexpected IntPtr value", argumentName);
+            }
+        }
+
         private static readonly Dictionary<GitErrorCode, Func<string, GitErrorCode, GitErrorCategory, LibGit2SharpException>>
             GitErrorsToLibGit2SharpExceptions =
                 new Dictionary<GitErrorCode, Func<string, GitErrorCode, GitErrorCategory, LibGit2SharpException>>
@@ -107,7 +134,13 @@ namespace LibGit2Sharp.Core
         private static void HandleError(int result)
         {
             string errorMessage;
-            GitError error = NativeMethods.giterr_last().MarshalAsGitError();
+            GitError error = null;
+            var errHandle = NativeMethods.giterr_last();
+
+            if (errHandle != null && !errHandle.IsInvalid)
+            {
+                error = errHandle.MarshalAsGitError();
+            }
 
             if (error == null)
             {
@@ -224,44 +257,21 @@ namespace LibGit2Sharp.Core
         /// <param name="identifier">The <see cref="GitObject"/> identifier to examine.</param>
         public static void GitObjectIsNotNull(GitObject gitObject, string identifier)
         {
-            Func<string, LibGit2SharpException> exceptionBuilder;
-
-            if (string.Equals("HEAD", identifier, StringComparison.Ordinal))
-            {
-                exceptionBuilder = m => new UnbornBranchException(m);
-            }
-            else
-            {
-                exceptionBuilder = m => new NotFoundException(m);
-            }
-
-            GitObjectIsNotNull(gitObject, identifier, exceptionBuilder);
-        }
-
-
-        /// <summary>
-        /// Check that the result of a C call that returns a non-null GitObject
-        /// using the default exception builder.
-        /// <para>
-        ///   The native function is expected to return a valid object value.
-        /// </para>
-        /// </summary>
-        /// <param name="gitObject">The <see cref="GitObject"/> to examine.</param>
-        /// <param name="identifier">The <see cref="GitObject"/> identifier to examine.</param>
-        /// <param name="exceptionBuilder">The builder which constructs an <see cref="LibGit2SharpException"/> from a message.</param>
-        public static void GitObjectIsNotNull(
-            GitObject gitObject,
-            string identifier,
-            Func<string, LibGit2SharpException> exceptionBuilder)
-        {
             if (gitObject != null)
             {
                 return;
             }
 
-            throw exceptionBuilder(string.Format(CultureInfo.InvariantCulture,
-                                                     "No valid git object identified by '{0}' exists in the repository.",
-                                                     identifier));
+            var message = string.Format(CultureInfo.InvariantCulture,
+                                        "No valid git object identified by '{0}' exists in the repository.",
+                                        identifier);
+
+            if (string.Equals("HEAD", identifier, StringComparison.Ordinal))
+            {
+                throw new UnbornBranchException(message);
+            }
+
+            throw new NotFoundException(message);
         }
     }
 }

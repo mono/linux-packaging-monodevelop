@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace LibGit2Sharp
+﻿namespace LibGit2Sharp
 {
     /// <summary>
     /// Class to convey information about the repository that is being operated on
@@ -25,8 +20,7 @@ namespace LibGit2Sharp
         /// <param name="remoteUrl">The URL that this operation will download from.</param>
         internal RepositoryOperationContext(string repositoryPath, string remoteUrl)
             : this(repositoryPath, remoteUrl, string.Empty, string.Empty, 0)
-        {
-        }
+        { }
 
         /// <summary>
         /// Constructor suitable for use on the sub repositories.
@@ -36,10 +30,11 @@ namespace LibGit2Sharp
         /// <param name="parentRepositoryPath">The path to the super repository.</param>
         /// <param name="submoduleName">The logical name of this submodule.</param>
         /// <param name="recursionDepth">The depth of this sub repository from the original super repository.</param>
-        internal RepositoryOperationContext(string repositoryPath,
-                                            string remoteUrl,
-                                            string parentRepositoryPath,
-                                            string submoduleName, int recursionDepth)
+        internal RepositoryOperationContext(
+            string repositoryPath,
+            string remoteUrl,
+            string parentRepositoryPath,
+            string submoduleName, int recursionDepth)
         {
             RepositoryPath = repositoryPath;
             RemoteUrl = remoteUrl;

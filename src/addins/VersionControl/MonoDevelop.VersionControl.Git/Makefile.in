@@ -212,9 +212,7 @@ ALL_FILES := $(EXTS) \
 		$(wildcard templates/*)
 
 WILDCARDED_FILES := $(wildcard $(ALL_FILES))
-EXTRA_DIST = \
-	$(wildcard $(ALL_FILES))
-
+EXTRA_DIST = build_libgit2.sh
 @ENABLE_GIT_FALSE@SKIP = y
 all: all-am
 

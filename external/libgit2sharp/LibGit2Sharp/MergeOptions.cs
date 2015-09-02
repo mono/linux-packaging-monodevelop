@@ -1,6 +1,4 @@
 ﻿using System;
-using LibGit2Sharp.Core;
-using LibGit2Sharp.Handlers;
 
 namespace LibGit2Sharp
 {
@@ -19,8 +17,7 @@ namespace LibGit2Sharp
         /// </para>
         /// </summary>
         public MergeOptions()
-        {
-        }
+        { }
 
         /// <summary>
         /// The type of merge to perform.

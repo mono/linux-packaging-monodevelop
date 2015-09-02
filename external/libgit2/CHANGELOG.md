@@ -1,4 +1,34 @@
-v0.22 + 1
+v0.23 + 1
+-------
+
+### Changes or improvements
+
+* Custom filters can now be registered with wildcard attributes, for
+  example `filter=*`.  Consumers should examine the attributes parameter
+  of the `check` function for details.
+
+### API additions
+
+* `git_config_lock()` has been added, which allow for
+  transactional/atomic complex updates to the configuration, removing
+  the opportunity for concurrent operations and not committing any
+  changes until the unlock.
+
+### API removals
+
+### Breaking API changes
+
+* `git_cert` descendent types now have a proper `parent` member
+
+* It is the responsibility fo the refdb backend to decide what to do
+  with the reflog on ref deletion. The file-based backend must delete
+  it, a database-backed one may wish to archive it.
+
+* `git_config_backend` has gained two entries. `lock` and `unlock`
+  with which to implement the transactional/atomic semantics for the
+  configuration backend.
+
+v0.23
 ------
 
 ### Changes or improvements
@@ -32,7 +62,7 @@ v0.22 + 1
   commit with unstaged changes.
 
 * On Mac OS X, we now use SecureTransport to provide the cryptographic
-support for HTTPS connections insead of OpenSSL.
+  support for HTTPS connections insead of OpenSSL.
 
 * Checkout can now accept an index for the baseline computations via the
   `baseline_index` member.
@@ -41,6 +71,10 @@ support for HTTPS connections insead of OpenSSL.
   `git_remote` struct but has been moved to a `git_fetch_options`. The
   remote functions now take these options or the callbacks instead of
   setting them beforehand.
+
+* `git_submodule` instances are no longer cached or shared across
+  lookup. Each submodule represents the configuration at the time of
+  loading.
 
 * The index now uses diffs for `add_all()` and `update_all()` which
   gives it a speed boost and closer semantics to git.
@@ -64,6 +98,16 @@ support for HTTPS connections insead of OpenSSL.
 * The remote's push and pull URLs now honor the url.$URL.insteadOf
   configuration. This allows modifying URL prefixes to a custom
   value via gitconfig.
+
+* `git_diff_foreach`, `git_diff_blobs`, `git_diff_blob_to_buffer`,
+  and `git_diff_buffers` now accept a new binary callback of type
+  `git_diff_binary_cb` that includes the binary diff information.
+
+* The race condition mitigations described in `racy-git.txt` have been
+  implemented.
+
+* If libcurl is installed, we will use it to connect to HTTP(S)
+  servers.
 
 ### API additions
 
@@ -117,6 +161,9 @@ support for HTTPS connections insead of OpenSSL.
   configuration of the server, and tools can use this to show messages
   about failing to communicate with the server.
 
+* A new error code `GIT_EINVALID` indicates that an argument to a
+  function is invalid, or an invalid operation was requested.
+
 * `git_diff_index_to_workdir()` and `git_diff_tree_to_index()` will now
   produce deltas of type `GIT_DELTA_CONFLICTED` to indicate that the index
   side of the delta is a conflict.
@@ -133,11 +180,20 @@ support for HTTPS connections insead of OpenSSL.
   path. For this, `GIT_CREDTYPE_SSH_MEMORY` and
   `git_cred_ssh_key_memory_new()` have been added.
 
-* `git_blame_options` flags can now be configured to not use similarity
-  heuristics during a blame via GIT_BLAME_FOLLOW_EXACT_RENAMES flag.
+* `git_filter_list_contains` will indicate whether a particular
+  filter will be run in the given filter list.
 
-* `git_blame_options` flags can now be configured to not follow renames
-  at all during a blame via GIT_BLAME_DONT_FOLLOW_RENAMES flag.
+* `git_commit_header_field()` has been added, which allows retrieving
+  the contents of an arbitrary header field.
+
+* `git_submodule_set_branch()` allows to set the configured branch for
+  a submodule.
+
+* `git_blame_options` has been taught how to handle diff find options
+  through its find_options field.
+
+* `git_diff_find_t` has now been taught how to ignore rename handling
+  completely through `GIT_DIFF_FIND_NO_RENAMES`.
 
 ### API removals
 
@@ -153,6 +209,12 @@ support for HTTPS connections insead of OpenSSL.
 * `git_remote_set_fetch_refpecs()` and
   `git_remote_set_push_refspecs()` have been removed. There is no
   longer a way to set the base refspecs at run-time.
+
+* `git_submodule_save()` has been removed. The submodules are no
+  longer configured via the objects.
+
+* `git_submodule_reload_all()` has been removed as we no longer cache
+  submodules.
 
 ### Breaking API changes
 
@@ -217,7 +279,7 @@ support for HTTPS connections insead of OpenSSL.
 * The remote callbacks has gained a new member `push_negotiation`
   which gets called before sending the update commands to the server.
 
-* The following functions now longer act on a remote instance but
+* The following functions no longer act on a remote instance but
   change the repository's configuration. Their signatures have changed
   accordingly:
 
@@ -232,7 +294,7 @@ support for HTTPS connections insead of OpenSSL.
   to fetch options which determine the runtime configuration.
 
 * The `git_remote_autotag_option_t` values have been changed. It has
-  gained a `_FALLBACK` default value to specify no override for the
+  gained a `_UNSPECIFIED` default value to specify no override for the
   configured setting.
 
 * `git_remote_update_tips()` now takes a pointer to the callbacks as
@@ -246,6 +308,17 @@ support for HTTPS connections insead of OpenSSL.
   the `fetch_opts` field instead of callbacks in the
   `remote_callbacks` field.
 
+* The following functions no longer act on a submodule instance but
+  change the repository's configuration. Their signatures have changed
+  accordingly:
+
+    * `git_submodule_set_url()`, `git_submodule_set_ignore()`,
+      `git_submodule_set_update()`,
+      `git_submodule_set_fetch_recurse_submodules()`.
+
+* `git_submodule_status()` no longer takes a submodule instance but a
+  repsitory, a submodule name and an ignore setting.
+
 * The `push` function in the `git_transport` interface now takes a
   pointer to the remote callbacks.
 
@@ -256,6 +329,9 @@ support for HTTPS connections insead of OpenSSL.
 
 * `GIT_EMERGECONFLICT` is now `GIT_ECONFLICT`, which more accurately
   describes the nature of the error.
+
+* It is no longer allowed to call `git_buf_grow()` on buffers
+  borrowing the memory they point to.
 
 v0.22
 ------

@@ -1,7 +1,4 @@
-﻿using LibGit2Sharp.Core;
-using LibGit2Sharp.Handlers;
-
-namespace LibGit2Sharp
+﻿namespace LibGit2Sharp
 {
     /// <summary>
     /// Options controlling CherryPick behavior.
@@ -13,8 +10,7 @@ namespace LibGit2Sharp
         /// By default the cherry pick will be committed if there are no conflicts.
         /// </summary>
         public CherryPickOptions()
-        {
-        }
+        { }
 
         /// <summary>
         /// When cherry picking a merge commit, the parent number to consider as

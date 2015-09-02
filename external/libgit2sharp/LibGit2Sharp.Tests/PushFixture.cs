@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using LibGit2Sharp.Handlers;
@@ -79,6 +80,63 @@ namespace LibGit2Sharp.Tests
         }
 
         [Fact]
+        public void CanInvokePrePushCallbackAndSucceed()
+        {
+            bool packBuilderCalled = false;
+            bool prePushHandlerCalled = false;
+            PackBuilderProgressHandler packBuilderCb = (x, y, z) => { packBuilderCalled = true; return true; };
+            PrePushHandler prePushHook = (IEnumerable<PushUpdate> updates) =>
+            {
+                Assert.True(updates.Count() == 1, "Expected 1 update, received " + updates.Count());
+                prePushHandlerCalled = true;
+                return true;
+            };
+
+            AssertPush(repo => repo.Network.Push(repo.Head));
+            AssertPush(repo => repo.Network.Push(repo.Branches["master"]));
+
+            PushOptions options = new PushOptions()
+            {
+                OnPushStatusError = OnPushStatusError,
+                OnPackBuilderProgress = packBuilderCb,
+                OnNegotiationCompletedBeforePush = prePushHook,
+            };
+
+            AssertPush(repo => repo.Network.Push(repo.Network.Remotes["origin"], "HEAD", @"refs/heads/master", options));
+            Assert.True(packBuilderCalled);
+            Assert.True(prePushHandlerCalled);
+        }
+
+        [Fact]
+        public void CanInvokePrePushCallbackAndFail()
+        {
+            bool packBuilderCalled = false;
+            bool prePushHandlerCalled = false;
+            PackBuilderProgressHandler packBuilderCb = (x, y, z) => { packBuilderCalled = true; return true; };
+            PrePushHandler prePushHook = (IEnumerable<PushUpdate> updates) =>
+            {
+                Assert.True(updates.Count() == 1, "Expected 1 update, received " + updates.Count());
+                prePushHandlerCalled = true;
+                return false;
+            };
+
+            AssertPush(repo => repo.Network.Push(repo.Head));
+            AssertPush(repo => repo.Network.Push(repo.Branches["master"]));
+
+            PushOptions options = new PushOptions()
+            {
+                OnPushStatusError = OnPushStatusError,
+                OnPackBuilderProgress = packBuilderCb,
+                OnNegotiationCompletedBeforePush = prePushHook
+            };
+
+            Assert.Throws<UserCancelledException>(() => { AssertPush(repo => repo.Network.Push(repo.Network.Remotes["origin"], "HEAD", @"refs/heads/master", options)); });
+
+            Assert.False(packBuilderCalled);
+            Assert.True(prePushHandlerCalled);
+        }
+
+        [Fact]
         public void PushingABranchThatDoesNotTrackAnUpstreamBranchThrows()
         {
             Assert.Throws<LibGit2SharpException>(
@@ -124,6 +182,9 @@ namespace LibGit2Sharp.Tests
 
                 // Force push the new commit
                 string pushRefSpec = string.Format("+{0}:{0}", localRepo.Head.CanonicalName);
+
+                var before = DateTimeOffset.Now.TruncateMilliseconds();
+
                 localRepo.Network.Push(localRepo.Network.Remotes.Single(), pushRefSpec);
 
                 AssertRemoteHeadTipEquals(localRepo, second.Sha);
@@ -131,16 +192,16 @@ namespace LibGit2Sharp.Tests
                 AssertRefLogEntry(localRepo, "refs/remotes/origin/master",
                     "update by push",
                     oldId, localRepo.Head.Tip.Id,
-                    Constants.Identity, DateTimeOffset.Now);
+                    Constants.Identity, before);
             }
         }
 
         private static void AssertRemoteHeadTipEquals(IRepository localRepo, string sha)
         {
             var remoteReferences = localRepo.Network.ListReferences(localRepo.Network.Remotes.Single());
-            DirectReference remoteHead = remoteReferences.Single(r => r.CanonicalName == "HEAD");
+            Reference remoteHead = remoteReferences.Single(r => r.CanonicalName == "HEAD");
 
-            Assert.Equal(sha, remoteHead.TargetIdentifier);
+            Assert.Equal(sha, remoteHead.ResolveToDirectReference().TargetIdentifier);
         }
 
         private void UpdateTheRemoteRepositoryWithANewCommit(string remoteRepoPath)

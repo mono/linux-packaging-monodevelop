@@ -98,7 +98,7 @@ namespace LibGit2Sharp
         {
             Commit commit = repository.Head.Tip;
 
-            Ensure.GitObjectIsNotNull(commit, "HEAD", m => new UnbornBranchException(m));
+            Ensure.GitObjectIsNotNull(commit, "HEAD");
 
             return commit;
         }
@@ -219,6 +219,7 @@ namespace LibGit2Sharp
         /// <param name="repository">The <see cref="Repository"/> being worked with.</param>
         /// <param name="message">The description of why a change was made to the repository.</param>
         /// <returns>The generated <see cref="LibGit2Sharp.Commit"/>.</returns>
+        [Obsolete("This method will be removed in the next release. Please use Commit(string, Signature, Signature) instead.")]
         public static Commit Commit(this IRepository repository, string message)
         {
             return repository.Commit(message, (CommitOptions)null);
@@ -234,9 +235,10 @@ namespace LibGit2Sharp
         /// <param name="message">The description of why a change was made to the repository.</param>
         /// <param name="options">The <see cref="CommitOptions"/> that specify the commit behavior.</param>
         /// <returns>The generated <see cref="LibGit2Sharp.Commit"/>.</returns>
+        [Obsolete("This method will be removed in the next release. Please use Commit(string, Signature, Signature, CommitOptions) instead.")]
         public static Commit Commit(this IRepository repository, string message, CommitOptions options)
         {
-            Signature author = repository.Config.BuildSignature(DateTimeOffset.Now, true);
+            Signature author = repository.Config.BuildSignatureOrThrow(DateTimeOffset.Now);
 
             return repository.Commit(message, author, options);
         }
@@ -251,11 +253,11 @@ namespace LibGit2Sharp
         /// <param name="author">The <see cref="Signature"/> of who made the change.</param>
         /// <param name="message">The description of why a change was made to the repository.</param>
         /// <returns>The generated <see cref="LibGit2Sharp.Commit"/>.</returns>
+        [Obsolete("This method will be removed in the next release. Please use Commit(string, Signature, Signature) instead.")]
         public static Commit Commit(this IRepository repository, string message, Signature author)
         {
             return repository.Commit(message, author, (CommitOptions)null);
         }
-
 
         /// <summary>
         /// Stores the content of the <see cref="Repository.Index"/> as a new <see cref="LibGit2Sharp.Commit"/> into the repository.
@@ -268,11 +270,27 @@ namespace LibGit2Sharp
         /// <param name="message">The description of why a change was made to the repository.</param>
         /// <param name="options">The <see cref="CommitOptions"/> that specify the commit behavior.</param>
         /// <returns>The generated <see cref="LibGit2Sharp.Commit"/>.</returns>
+        [Obsolete("This method will be removed in the next release. Please use Commit(string, Signature, Signature, CommitOptions) instead.")]
         public static Commit Commit(this IRepository repository, string message, Signature author, CommitOptions options)
         {
-            Signature committer = repository.Config.BuildSignature(DateTimeOffset.Now, true);
+            Signature committer = repository.Config.BuildSignatureOrThrow(DateTimeOffset.Now);
 
             return repository.Commit(message, author, committer, options);
+        }
+
+        /// <summary>
+        /// Stores the content of the <see cref="Repository.Index"/> as a new <see cref="LibGit2Sharp.Commit"/> into the repository.
+        /// The tip of the <see cref="Repository.Head"/> will be used as the parent of this new Commit.
+        /// Once the commit is created, the <see cref="Repository.Head"/> will move forward to point at it.
+        /// </summary>
+        /// <param name="repository">The <see cref="IRepository"/> being worked with.</param>
+        /// <param name="message">The description of why a change was made to the repository.</param>
+        /// <param name="author">The <see cref="Signature"/> of who made the change.</param>
+        /// <param name="committer">The <see cref="Signature"/> of who added the change to the repository.</param>
+        /// <returns>The generated <see cref="LibGit2Sharp.Commit"/>.</returns>
+        public static Commit Commit(this IRepository repository, string message, Signature author, Signature committer)
+        {
+            return repository.Commit(message, author, committer, default(CommitOptions));
         }
 
         /// <summary>
@@ -357,7 +375,8 @@ namespace LibGit2Sharp
             {
                 throw new ArgumentException(string.Format(CultureInfo.InvariantCulture,
                                                           "Unable to process file '{0}'. This file is not located under the working directory of the repository ('{1}').",
-                                                          normalizedPath, repo.Info.WorkingDirectory));
+                                                          normalizedPath,
+                                                          repo.Info.WorkingDirectory));
             }
 
             return normalizedPath.Substring(repo.Info.WorkingDirectory.Length);
@@ -466,7 +485,7 @@ namespace LibGit2Sharp
 
             if (throwIfNotFound)
             {
-                throw new LibGit2SharpException(string.Format(CultureInfo.InvariantCulture, "Unexpected kind of identifier '{0}'.", identifier));
+                throw new LibGit2SharpException(CultureInfo.InvariantCulture, "Unexpected kind of identifier '{0}'.", identifier);
             }
 
             yield return null;
@@ -599,21 +618,6 @@ namespace LibGit2Sharp
         public static void Reset(this IRepository repository, Commit commit)
         {
             repository.Index.Replace(commit, null, null);
-        }
-
-        /// <summary>
-        /// Stores the content of the <see cref="Repository.Index"/> as a new <see cref="LibGit2Sharp.Commit"/> into the repository.
-        /// The tip of the <see cref="Repository.Head"/> will be used as the parent of this new Commit.
-        /// Once the commit is created, the <see cref="Repository.Head"/> will move forward to point at it.
-        /// </summary>
-        /// <param name="repository">The <see cref="IRepository"/> being worked with.</param>
-        /// <param name="message">The description of why a change was made to the repository.</param>
-        /// <param name="author">The <see cref="Signature"/> of who made the change.</param>
-        /// <param name="committer">The <see cref="Signature"/> of who added the change to the repository.</param>
-        /// <returns>The generated <see cref="LibGit2Sharp.Commit"/>.</returns>
-        public static Commit Commit(this IRepository repository, string message, Signature author, Signature committer)
-        {
-            return repository.Commit(message, author, committer, null);
         }
 
         /// <summary>

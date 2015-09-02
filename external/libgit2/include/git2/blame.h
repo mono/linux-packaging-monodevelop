@@ -9,6 +9,7 @@
 #define INCLUDE_git_blame_h__
 
 #include "common.h"
+#include "diff.h"
 #include "oid.h"
 
 /**
@@ -43,10 +44,6 @@ typedef enum {
 	/** Restrict the search of commits to those reachable following only the
 	 * first parents. */
 	GIT_BLAME_FIRST_PARENT = (1<<4),
-	/** Take less time to generate blame by only following exact matches */
-	GIT_BLAME_FOLLOW_EXACT_RENAMES = (1<<5),
-	/** Take less time to generate blame by not checking for renames */
-	GIT_BLAME_DONT_FOLLOW_RENAMES = (1<<6),
 } git_blame_flag_t;
 
 /**
@@ -56,6 +53,9 @@ typedef enum {
  * `GIT_BLAME_OPTIONS_INIT` macro:
  *     git_blame_options opts = GIT_BLAME_OPTIONS_INIT;
  *
+ *- `find_options` specifies what strategies should be used for
+ *               rename detection. The default is rename with threshold
+ *               heuristics.
  * - `flags` is a combination of the `git_blame_flag_t` values above.
  * - `min_match_characters` is the lower bound on the number of alphanumeric
  *   characters that must be detected as moving/copying within a file for it to
@@ -74,6 +74,8 @@ typedef enum {
 typedef struct git_blame_options {
 	unsigned int version;
 
+	git_diff_find_options find_options;
+
 	uint32_t flags;
 	uint16_t min_match_characters;
 	git_oid newest_commit;
@@ -82,8 +84,12 @@ typedef struct git_blame_options {
 	uint32_t max_line;
 } git_blame_options;
 
+#define GIT_BLAME_DIFF_FIND_OPTIONS_INIT {GIT_DIFF_FIND_OPTIONS_VERSION, \
+	GIT_DIFF_FIND_RENAMES }
+
 #define GIT_BLAME_OPTIONS_VERSION 1
-#define GIT_BLAME_OPTIONS_INIT {GIT_BLAME_OPTIONS_VERSION}
+#define GIT_BLAME_OPTIONS_INIT {GIT_BLAME_OPTIONS_VERSION, \
+	GIT_BLAME_DIFF_FIND_OPTIONS_INIT }
 
 /**
  * Initializes a `git_blame_options` with default values. Equivalent to

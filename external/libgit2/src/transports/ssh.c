@@ -66,6 +66,8 @@ static int gen_proto(git_buf *request, const char *cmd, const char *url)
 	if (!git__prefixcmp(url, prefix_ssh)) {
 		url = url + strlen(prefix_ssh);
 		repo = strchr(url, '/');
+		if (repo && repo[1] == '~')
+			++repo;
 	} else {
 		repo = strchr(url, ':');
 		if (repo) repo++;
@@ -525,10 +527,10 @@ static int _git_ssh_setup_conn(
 		goto done;
 
 	if (t->owner->certificate_check_cb != NULL) {
-		git_cert_hostkey cert = { 0 }, *cert_ptr;
+		git_cert_hostkey cert = {{ 0 }}, *cert_ptr;
 		const char *key;
 
-		cert.cert_type = GIT_CERT_HOSTKEY_LIBSSH2;
+		cert.parent.cert_type = GIT_CERT_HOSTKEY_LIBSSH2;
 
 		key = libssh2_hostkey_hash(session, LIBSSH2_HOSTKEY_HASH_SHA1);
 		if (key != NULL) {

@@ -1,8 +1,4 @@
-﻿using LibGit2Sharp.Core;
-using LibGit2Sharp.Handlers;
-using System;
-
-namespace LibGit2Sharp
+﻿namespace LibGit2Sharp
 {
     /// <summary>
     /// Options controlling the behavior of two trees being merged.
@@ -17,7 +13,6 @@ namespace LibGit2Sharp
         /// </para>
         /// </summary>
         public MergeTreeOptions()
-        {
-        }
+        { }
     }
 }

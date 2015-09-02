@@ -37,23 +37,14 @@ namespace LibGit2Sharp.Core
         /// Restrict the search of commits to those reachable
         /// following only the first parents.
         /// </summary>
-        GIT_BLAME_FIRST_PARENT = (1<<4),
-
-        /// <summary>
-        /// Take less time to generate blame by only following exact matches.
-        /// </summary>
-        GIT_BLAME_FOLLOW_EXACT_RENAMES = (1<<5),
-
-        /// <summary>
-        /// Take less time to generate blame by not checking for renames
-        /// </summary>
-        GIT_BLAME_DONT_FOLLOW_RENAMES = (1<<6),
+        GIT_BLAME_FIRST_PARENT = (1 << 4),
     }
 
     [StructLayout(LayoutKind.Sequential)]
     internal class GitBlameOptions
     {
         public uint version = 1;
+        public GitDiffFindOptions FindOptions;
         public GitBlameOptionFlags flags;
         public UInt16 MinMatchCharacters;
         public GitOid NewestCommit;
@@ -88,15 +79,10 @@ namespace LibGit2Sharp.Core
                 case BlameStrategy.Default:
                     return GitBlameOptionFlags.GIT_BLAME_NORMAL;
 
-                case BlameStrategy.FollowExactRenames:
-                    return GitBlameOptionFlags.GIT_BLAME_FOLLOW_EXACT_RENAMES;
-
-                case BlameStrategy.DontFollowRenames:
-                    return GitBlameOptionFlags.GIT_BLAME_DONT_FOLLOW_RENAMES;
-
                 default:
-                    throw new NotSupportedException(
-                        string.Format(CultureInfo.InvariantCulture, "{0} is not supported at this time", strategy));
+                    throw new NotSupportedException(string.Format(CultureInfo.InvariantCulture,
+                                                                  "{0} is not supported at this time",
+                                                                  strategy));
             }
         }
     }

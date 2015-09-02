@@ -150,6 +150,15 @@ static int checkout_notify(
 	}
 }
 
+GIT_INLINE(bool) is_workdir_base_or_new(
+	const git_oid *workdir_id,
+	const git_diff_file *baseitem,
+	const git_diff_file *newitem)
+{
+	return (git_oid__cmp(&baseitem->id, workdir_id) == 0 ||
+		git_oid__cmp(&newitem->id, workdir_id) == 0);
+}
+
 static bool checkout_is_workdir_modified(
 	checkout_data *data,
 	const git_diff_file *baseitem,
@@ -171,7 +180,7 @@ static bool checkout_is_workdir_modified(
 			return true;
 		}
 
-		if (git_submodule_status(&sm_status, sm) < 0 ||
+		if (git_submodule_status(&sm_status, data->repo, wditem->path, GIT_SUBMODULE_IGNORE_UNSPECIFIED) < 0 ||
 			GIT_SUBMODULE_STATUS_IS_WD_DIRTY(sm_status))
 			rval = true;
 		else if ((sm_oid = git_submodule_wd_id(sm)) == NULL)
@@ -193,8 +202,7 @@ static bool checkout_is_workdir_modified(
 		if (wditem->mtime.seconds == ie->mtime.seconds &&
 			wditem->mtime.nanoseconds == ie->mtime.nanoseconds &&
 			wditem->file_size == ie->file_size)
-			return (git_oid__cmp(&baseitem->id, &ie->id) != 0 &&
-				git_oid_cmp(&newitem->id, &ie->id) != 0);
+			return !is_workdir_base_or_new(&ie->id, baseitem, newitem);
 	}
 
 	/* depending on where base is coming from, we may or may not know
@@ -203,10 +211,13 @@ static bool checkout_is_workdir_modified(
 	if (baseitem->size && wditem->file_size != baseitem->size)
 		return true;
 
-	if (git_diff__oid_for_entry(&oid, data->diff, wditem, NULL) < 0)
+	if (git_diff__oid_for_entry(&oid, data->diff, wditem, wditem->mode, NULL) < 0)
 		return false;
 
-	return (git_oid__cmp(&baseitem->id, &oid) != 0);
+	/* Allow the checkout if the workdir is not modified *or* if the checkout
+	 * target's contents are already in the working directory.
+	 */
+	return !is_workdir_base_or_new(&oid, baseitem, newitem);
 }
 
 #define CHECKOUT_ACTION_IF(FLAG,YES,NO) \
@@ -1288,8 +1299,8 @@ static int checkout_get_actions(
 	if (counts[CHECKOUT_ACTION__CONFLICT] > 0 &&
 		(data->strategy & GIT_CHECKOUT_ALLOW_CONFLICTS) == 0)
 	{
-		giterr_set(GITERR_CHECKOUT, "%d %s checkout",
-			(int)counts[CHECKOUT_ACTION__CONFLICT],
+		giterr_set(GITERR_CHECKOUT, "%"PRIuZ" %s checkout",
+			counts[CHECKOUT_ACTION__CONFLICT],
 			counts[CHECKOUT_ACTION__CONFLICT] == 1 ?
 			"conflict prevents" : "conflicts prevent");
 		error = GIT_ECONFLICT;
@@ -1849,11 +1860,6 @@ static int checkout_create_submodules(
 	git_diff_delta *delta;
 	size_t i;
 
-	/* initial reload of submodules if .gitmodules was changed */
-	if (data->reload_submodules &&
-		(error = git_submodule_reload_all(data->repo, 1)) < 0)
-		return error;
-
 	git_vector_foreach(&data->diff->deltas, i, delta) {
 		if (actions[i] & CHECKOUT_ACTION__DEFER_REMOVE) {
 			/* this has a blocker directory that should only be removed iff
@@ -1874,8 +1880,7 @@ static int checkout_create_submodules(
 		}
 	}
 
-	/* final reload once submodules have been updated */
-	return git_submodule_reload_all(data->repo, 1);
+	return 0;
 }
 
 static int checkout_lookup_head_tree(git_tree **out, git_repository *repo)

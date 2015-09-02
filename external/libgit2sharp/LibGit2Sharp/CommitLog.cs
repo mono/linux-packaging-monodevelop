@@ -22,8 +22,7 @@ namespace LibGit2Sharp
         /// <param name="repo">The repository.</param>
         internal CommitLog(Repository repo)
             : this(repo, new CommitFilter())
-        {
-        }
+        { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CommitLog"/> class.
@@ -74,8 +73,8 @@ namespace LibGit2Sharp
         public ICommitLog QueryBy(CommitFilter filter)
         {
             Ensure.ArgumentNotNull(filter, "filter");
-            Ensure.ArgumentNotNull(filter.Since, "filter.Since");
-            Ensure.ArgumentNotNullOrEmptyString(filter.Since.ToString(), "filter.Since");
+            Ensure.ArgumentNotNull(filter.IncludeReachableFrom, "filter.IncludeReachableFrom");
+            Ensure.ArgumentNotNullOrEmptyString(filter.IncludeReachableFrom.ToString(), "filter.IncludeReachableFrom");
 
             return new CommitLog(repo, filter);
         }
@@ -103,7 +102,7 @@ namespace LibGit2Sharp
             Ensure.ArgumentNotNull(path, "path");
             Ensure.ArgumentNotNull(filter, "filter");
 
-            return new FileHistory(repo, path, new CommitFilter {SortBy = filter.SortBy});
+            return new FileHistory(repo, path, new CommitFilter { SortBy = filter.SortBy });
         }
 
         /// <summary>
