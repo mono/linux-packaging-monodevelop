@@ -1,0 +1,7 @@
+[submodule "external/libgit2"]
+	path = external/libgit2
+	url = git://github.com/mono/libgit2.git
+	branch = xs-5.10-v2
+[submodule "external/libssh2"]
+	path = external/libssh2
+	url = git://github.com/libssh2/libssh2.git

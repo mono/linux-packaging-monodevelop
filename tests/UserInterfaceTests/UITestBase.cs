@@ -78,13 +78,18 @@ namespace UserInterfaceTests
 			TestService.Session.DebugObject = new UITestDebug ();
 
 			FoldersToClean.Add (mdProfile);
+
+			Session.WaitForElement (IdeQuery.DefaultWorkbench);
+			TakeScreenShot ("Application-Started");
+			CloseIfXamarinUpdateOpen ();
+			TakeScreenShot ("Application-Ready");
 		}
 
 		[TearDown]
 		public virtual void Teardown ()
 		{
 			try {
-				if (Session.Query (c => c.Marked ("Xamarin Update")).Any ()) {
+				if (TestContext.CurrentContext.Result.Status != TestStatus.Passed && Session.Query (IdeQuery.XamarinUpdate).Any ()) {
 					Assert.Inconclusive ("Xamarin Update is blocking the application focus");
 				}
 				ValidateIdeLogMessages ();
@@ -110,9 +115,19 @@ namespace UserInterfaceTests
 
 		static void ValidateIdeLogMessages ()
 		{
-			var readIdeLog = File.ReadAllText (Environment.GetEnvironmentVariable ("MONODEVELOP_LOG_FILE"));
-			Assert.IsFalse (readIdeLog.Contains ("Gtk-Critical: void gtk_container_remove(GtkContainer , GtkWidget )"),
-				"'Gtk-Critical: void gtk_container_remove' detected");
+			LogMessageValidator.Validate (Environment.GetEnvironmentVariable ("MONODEVELOP_LOG_FILE"));
+		}
+
+		protected void CloseIfXamarinUpdateOpen ()
+		{
+			try {
+				Session.WaitForElement (IdeQuery.XamarinUpdate, 10 * 1000);
+				TakeScreenShot ("Xamarin-Update-Opened");
+				Session.ClickElement (c => IdeQuery.XamarinUpdate (c).Children ().Button ().Text ("Close"));
+			}
+			catch (TimeoutException) {
+				TestService.Session.DebugObject.Debug ("Xamarin Update did not open");
+			}
 		}
 
 		void SetupTestResultFolder ()
@@ -153,7 +168,7 @@ namespace UserInterfaceTests
 					if (folder != null && Directory.Exists (folder))
 						Directory.Delete (folder, true);
 				} catch (IOException e) {
-					Console.WriteLine ("Cleanup failed\n" +e.ToString ());
+					TestService.Session.DebugObject.Debug ("Cleanup failed\n" +e);
 				}
 			}
 		}
@@ -164,6 +179,7 @@ namespace UserInterfaceTests
 				var dirObj = Session.GetGlobalValue ("MonoDevelop.Ide.IdeApp.ProjectOperations.CurrentSelectedSolution.RootFolder.BaseDirectory");
 			return dirObj != null ? dirObj.ToString () : null;
 			} catch (Exception) {
+				TestService.Session.DebugObject.Debug ("GetSolutionDirectory () returns null");
 				return null;
 			}
 		}
