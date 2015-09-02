@@ -1,0 +1,13 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	worktree = ../../../sm_added_and_uncommited
+	ignorecase = true
+[remote "origin"]
+	fetch = +refs/heads/*:refs/remotes/origin/*
+	url = ../../../../submodule_target_wd
+[branch "master"]
+	remote = origin
+	merge = refs/heads/master
