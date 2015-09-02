@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using LibGit2Sharp.Tests.TestHelpers;
 using Xunit;
 using Xunit.Extensions;
+using Moq;
 
 namespace LibGit2Sharp.Tests
 {
@@ -14,7 +17,7 @@ namespace LibGit2Sharp.Tests
     {
         private static readonly HashSet<Type> explicitOnlyInterfaces = new HashSet<Type>
         {
-            typeof(IBelongToARepository),
+            typeof(IBelongToARepository), typeof(IDiffResult),
         };
 
         [Fact]
@@ -102,6 +105,28 @@ namespace LibGit2Sharp.Tests
                 }
 
                 if (!HasEmptyPublicOrProtectedConstructor(type))
+                {
+                    nonTestableTypes.Add(type, new List<string>());
+                }
+
+                if (type.IsAbstract)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (type.ContainsGenericParameters)
+                    {
+                        var constructType = type.MakeGenericType(Enumerable.Repeat(typeof(object), type.GetGenericArguments().Length).ToArray());
+                        Activator.CreateInstance(constructType, true);
+                    }
+                    else
+                    {
+                        Activator.CreateInstance(type, true);
+                    }
+                }
+                catch
                 {
                     nonTestableTypes.Add(type, new List<string>());
                 }
@@ -244,7 +269,7 @@ namespace LibGit2Sharp.Tests
             var nonVirtualGetEnumeratorMethods = Assembly.GetAssembly(typeof(IRepository))
                 .GetExportedTypes()
                 .Where(t =>
-                    t.Namespace == typeof (IRepository).Namespace &&
+                    t.Namespace == typeof(IRepository).Namespace &&
                     !t.IsSealed &&
                     !t.IsAbstract &&
                     t.GetInterfaces().Any(i => i.IsAssignableFrom(typeof(IEnumerable<>))))
@@ -343,6 +368,52 @@ namespace LibGit2Sharp.Tests
             }
 
             Assert.Equal("", sb.ToString());
+        }
+
+        [Fact]
+        public void PublicExtensionMethodsShouldonlyTargetInterfacesOrEnums()
+        {
+            IEnumerable<string> mis =
+                from m in GetInvalidPublicExtensionMethods()
+                select m.DeclaringType + "." + m.Name;
+
+            var sb = new StringBuilder();
+
+            foreach (var method in mis.Distinct())
+            {
+                sb.AppendFormat("'{0}' is a public extension method that doesn't target an interface or an enum.{1}",
+                    method, Environment.NewLine);
+            }
+
+            Assert.Equal("", sb.ToString());
+        }
+
+        // Inspired from http://stackoverflow.com/a/299526
+
+        static IEnumerable<MethodInfo> GetInvalidPublicExtensionMethods()
+        {
+            var query = from type in (Assembly.GetAssembly(typeof(IRepository))).GetTypes()
+                        where type.IsSealed && !type.IsGenericType && !type.IsNested && type.IsPublic
+                        from method in type.GetMethods(BindingFlags.Static | BindingFlags.Public)
+                        where method.IsDefined(typeof(ExtensionAttribute), false)
+                        let parameterType = method.GetParameters()[0].ParameterType
+                        where parameterType != null && !parameterType.IsInterface && !parameterType.IsEnum
+                        select method;
+            return query;
+        }
+
+        [Fact]
+        public void AllIDiffResultsAreInChangesBuilder()
+        {
+            var diff = typeof(Diff).GetField("ChangesBuilders", BindingFlags.NonPublic | BindingFlags.Static);
+            var changesBuilders = (System.Collections.IDictionary)diff.GetValue(null);
+
+            IEnumerable<Type> diffResults = typeof(Diff).Assembly.GetExportedTypes()
+                .Where(type => type.GetInterface("IDiffResult") != null);
+
+            var nonBuilderTypes = diffResults.Where(diffResult => !changesBuilders.Contains(diffResult));
+            Assert.False(nonBuilderTypes.Any(), "Classes which implement IDiffResult but are not registered under ChangesBuilders in Diff:" + Environment.NewLine +
+                string.Join(Environment.NewLine, nonBuilderTypes.Select(type => type.FullName)));
         }
     }
 

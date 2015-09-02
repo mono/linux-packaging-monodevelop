@@ -1027,8 +1027,11 @@ static int dirload_with_stat(
 	strncomp = (flags & GIT_PATH_DIR_IGNORE_CASE) != 0 ?
 		git__strncasecmp : git__strncmp;
 
-	if ((error = git_path_diriter_init(&diriter, dirpath, flags)) < 0)
+	/* Any error here is equivalent to the dir not existing, skip over it */
+	if ((error = git_path_diriter_init(&diriter, dirpath, flags)) < 0) {
+		error = GIT_ENOTFOUND;
 		goto done;
+	}
 
 	while ((error = git_path_diriter_next(&diriter)) == 0) {
 		if ((error = git_path_diriter_fullpath(&path, &path_len, &diriter)) < 0)
@@ -1117,7 +1120,7 @@ static int fs_iterator__expand_dir(fs_iterator *fi)
 
 	if (error < 0) {
 		git_error_state last_error = { 0 };
-		giterr_capture(&last_error, error);
+		giterr_state_capture(&last_error, error);
 
 		/* these callbacks may clear the error message */
 		fs_iterator__free_frame(ff);
@@ -1125,7 +1128,7 @@ static int fs_iterator__expand_dir(fs_iterator *fi)
 		/* next time return value we skipped to */
 		fi->base.flags &= ~GIT_ITERATOR_FIRST_ACCESS;
 
-		return giterr_restore(&last_error);
+		return giterr_state_restore(&last_error);
 	}
 
 	if (ff->entries.length == 0) {
@@ -1762,6 +1765,18 @@ int git_iterator_current_workdir_path(git_buf **path, git_iterator *iter)
 	return 0;
 }
 
+int git_iterator_index(git_index **out, git_iterator *iter)
+{
+	workdir_iterator *wi = (workdir_iterator *)iter;
+
+	if (iter->type != GIT_ITERATOR_TYPE_WORKDIR)
+		*out = NULL;
+
+	*out = wi->index;
+
+	return 0;
+}
+
 int git_iterator_advance_over_with_status(
 	const git_index_entry **entryptr,
 	git_iterator_status_t *status,
@@ -1831,3 +1846,89 @@ int git_iterator_advance_over_with_status(
 	return error;
 }
 
+int git_iterator_walk(
+	git_iterator **iterators,
+	size_t cnt,
+	git_iterator_walk_cb cb,
+	void *data)
+{
+	const git_index_entry **iterator_item;	/* next in each iterator */
+	const git_index_entry **cur_items;		/* current path in each iter */
+	const git_index_entry *first_match;
+	size_t i, j;
+	int error = 0;
+
+	iterator_item = git__calloc(cnt, sizeof(git_index_entry *));
+	cur_items = git__calloc(cnt, sizeof(git_index_entry *));
+
+	GITERR_CHECK_ALLOC(iterator_item);
+	GITERR_CHECK_ALLOC(cur_items);
+
+	/* Set up the iterators */
+	for (i = 0; i < cnt; i++) {
+		error = git_iterator_current(&iterator_item[i], iterators[i]);
+
+		if (error < 0 && error != GIT_ITEROVER)
+			goto done;
+	}
+
+	while (true) {
+		for (i = 0; i < cnt; i++)
+			cur_items[i] = NULL;
+
+		first_match = NULL;
+
+		/* Find the next path(s) to consume from each iterator */
+		for (i = 0; i < cnt; i++) {
+			if (iterator_item[i] == NULL)
+				continue;
+
+			if (first_match == NULL) {
+				first_match = iterator_item[i];
+				cur_items[i] = iterator_item[i];
+			} else {
+				int path_diff = git_index_entry_cmp(iterator_item[i], first_match);
+
+				if (path_diff < 0) {
+					/* Found an index entry that sorts before the one we're
+					 * looking at.  Forget that we've seen the other and
+					 * look at the other iterators for this path.
+					 */
+					for (j = 0; j < i; j++)
+						cur_items[j] = NULL;
+
+					first_match = iterator_item[i];
+					cur_items[i] = iterator_item[i];
+				} else if (path_diff == 0) {
+					cur_items[i] = iterator_item[i];
+				}
+			}
+		}
+
+		if (first_match == NULL)
+			break;
+
+		if ((error = cb(cur_items, data)) != 0)
+			goto done;
+
+		/* Advance each iterator that participated */
+		for (i = 0; i < cnt; i++) {
+			if (cur_items[i] == NULL)
+				continue;
+
+			error = git_iterator_advance(&iterator_item[i], iterators[i]);
+
+			if (error < 0 && error != GIT_ITEROVER)
+				goto done;
+		}
+	}
+
+done:
+	git__free((git_index_entry **)iterator_item);
+	git__free((git_index_entry **)cur_items);
+
+	if (error == GIT_ITEROVER)
+		error = 0;
+
+	return error;
+}

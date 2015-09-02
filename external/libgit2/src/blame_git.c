@@ -304,21 +304,16 @@ static void blame_chunk(
 }
 
 static int my_emit(
-		xdfenv_t *xe,
-		xdchange_t *xscr,
-		xdemitcb_t *ecb,
-		xdemitconf_t const *xecfg)
+	long start_a, long count_a,
+	long start_b, long count_b,
+	void *cb_data)
 {
-	xdchange_t *xch = xscr;
-	GIT_UNUSED(xe);
-	GIT_UNUSED(xecfg);
-	while (xch) {
-		blame_chunk_cb_data *d = ecb->priv;
-		blame_chunk(d->blame, d->tlno, d->plno, xch->i2, d->target, d->parent);
-		d->plno = xch->i1 + xch->chg1;
-		d->tlno = xch->i2 + xch->chg2;
-		xch = xch->next;
-	}
+	blame_chunk_cb_data *d = (blame_chunk_cb_data *)cb_data;
+
+	blame_chunk(d->blame, d->tlno, d->plno, start_b, d->target, d->parent);
+	d->plno = start_a + count_a;
+	d->tlno = start_b + count_b;
+	
 	return 0;
 }
 
@@ -352,7 +347,7 @@ static int diff_hunks(mmfile_t file_a, mmfile_t file_b, void *cb_data)
 	xdemitconf_t xecfg = {0};
 	xdemitcb_t ecb = {0};
 
-	xecfg.emit_func = (void(*)(void))my_emit;
+	xecfg.hunk_func = my_emit;
 	ecb.priv = cb_data;
 
 	trim_common_tail(&file_a, &file_b, 0);
@@ -427,7 +422,6 @@ static git_blame__origin* find_origin(
 		/* No changes; copy data */
 		git_blame__get_origin(&porigin, blame, parent, origin->path);
 	} else {
-		git_diff_find_options findopts = GIT_DIFF_FIND_OPTIONS_INIT;
 		int i;
 
 		/* Generate a full diff between the two trees */
@@ -436,14 +430,8 @@ static git_blame__origin* find_origin(
 		if (0 != git_diff_tree_to_tree(&difflist, blame->repository, ptree, otree, &diffopts))
 			goto cleanup;
 
-		if (!(blame->options.flags & GIT_BLAME_DONT_FOLLOW_RENAMES)) {
-			/* Let diff find renames based on blame options */
-			findopts.flags = blame->options.flags & GIT_BLAME_FOLLOW_EXACT_RENAMES ?
-				GIT_DIFF_FIND_EXACT_MATCH_ONLY : GIT_DIFF_FIND_RENAMES;
-
-			if (0 != git_diff_find_similar(difflist, &findopts))
-				goto cleanup;
-		}
+		if (0 != git_diff_find_similar(difflist, &blame->options.find_options))
+			goto cleanup;
 
 		/* Find one that matches */
 		for (i=0; i<(int)git_diff_num_deltas(difflist); i++) {

@@ -116,7 +116,7 @@ static int read_header(struct index_header *dest, const void *buffer);
 
 static int parse_index(git_index *index, const char *buffer, size_t buffer_size);
 static bool is_index_extended(git_index *index);
-static int write_index(git_index *index, git_filebuf *file);
+static int write_index(git_oid *checksum, git_index *index, git_filebuf *file);
 
 static void index_entry_free(git_index_entry *entry);
 static void index_entry_reuc_free(git_index_reuc_entry *reuc);
@@ -598,6 +598,38 @@ int git_index_caps(const git_index *index)
 			(index->no_symlinks ? GIT_INDEXCAP_NO_SYMLINKS : 0));
 }
 
+const git_oid *git_index_checksum(git_index *index)
+{
+	return &index->checksum;
+}
+
+/**
+ * Returns 1 for changed, 0 for not changed and <0 for errors
+ */
+static int compare_checksum(git_index *index)
+{
+	int fd, error;
+	ssize_t bytes_read;
+	git_oid checksum = {{ 0 }};
+
+	if ((fd = p_open(index->index_file_path, O_RDONLY)) < 0)
+		return fd;
+
+	if ((error = p_lseek(fd, -20, SEEK_END)) < 0) {
+		p_close(fd);
+		giterr_set(GITERR_OS, "failed to seek to end of file");
+		return -1;
+	}
+
+	bytes_read = p_read(fd, &checksum, GIT_OID_RAWSZ);
+	p_close(fd);
+
+	if (bytes_read < 0)
+		return -1;
+
+	return !!git_oid_cmp(&checksum, &index->checksum);
+}
+
 int git_index_read(git_index *index, int force)
 {
 	int error = 0, updated;
@@ -616,8 +648,8 @@ int git_index_read(git_index *index, int force)
 		return 0;
 	}
 
-	updated = git_futils_filestamp_check(&stamp, index->index_file_path);
-	if (updated < 0) {
+	if ((updated = git_futils_filestamp_check(&stamp, index->index_file_path) < 0) ||
+	    ((updated = compare_checksum(index)) < 0)) {
 		giterr_set(
 			GITERR_INDEX,
 			"Failed to read index: '%s' no longer exists",
@@ -647,21 +679,76 @@ int git_index_read(git_index *index, int force)
 }
 
 int git_index__changed_relative_to(
-	git_index *index, const git_futils_filestamp *fs)
+	git_index *index, const git_oid *checksum)
 {
 	/* attempt to update index (ignoring errors) */
 	if (git_index_read(index, false) < 0)
 		giterr_clear();
 
-	return (index->stamp.mtime != fs->mtime ||
-			index->stamp.size != fs->size ||
-			index->stamp.ino != fs->ino);
+	return !!git_oid_cmp(&index->checksum, checksum);
+}
+
+static bool is_racy_timestamp(git_time_t stamp, git_index_entry *entry)
+{
+	/* Git special-cases submodules in the check */
+	if (S_ISGITLINK(entry->mode))
+		return false;
+
+	/* If we never read the index, we can't have this race either */
+	if (stamp == 0)
+		return false;
+
+	/* If the timestamp is the same or newer than the index, it's racy */
+	return ((int32_t) stamp) <= entry->mtime.seconds;
+}
+
+/*
+ * Force the next diff to take a look at those entries which have the
+ * same timestamp as the current index.
+ */
+static int truncate_racily_clean(git_index *index)
+{
+	size_t i;
+	int error;
+	git_index_entry *entry;
+	git_time_t ts = index->stamp.mtime;
+	git_diff_options diff_opts = GIT_DIFF_OPTIONS_INIT;
+	git_diff *diff;
+
+	/* Nothing to do if there's no repo to talk about */
+	if (!INDEX_OWNER(index))
+		return 0;
+
+	/* If there's no workdir, we can't know where to even check */
+	if (!git_repository_workdir(INDEX_OWNER(index)))
+		return 0;
+
+	diff_opts.flags |= GIT_DIFF_INCLUDE_TYPECHANGE | GIT_DIFF_IGNORE_SUBMODULES | GIT_DIFF_DISABLE_PATHSPEC_MATCH;
+	git_vector_foreach(&index->entries, i, entry) {
+		if (!is_racy_timestamp(ts, entry))
+			continue;
+
+		diff_opts.pathspec.count = 1;
+		diff_opts.pathspec.strings = (char **) &entry->path;
+
+		if ((error = git_diff_index_to_workdir(&diff, INDEX_OWNER(index), index, &diff_opts)) < 0)
+			return error;
+
+		if (git_diff_num_deltas(diff) > 0)
+			entry->file_size = 0;
+
+		git_diff_free(diff);
+	}
+
+	return 0;
 }
 
 int git_index_write(git_index *index)
 {
 	git_indexwriter writer = GIT_INDEXWRITER_INIT;
 	int error;
+
+	truncate_racily_clean(index);
 
 	if ((error = git_indexwriter_init(&writer, index)) == 0)
 		error = git_indexwriter_commit(&writer);
@@ -1141,6 +1228,45 @@ int git_index_add_frombuffer(
 	return 0;
 }
 
+static int add_repo_as_submodule(git_index_entry **out, git_index *index, const char *path)
+{
+	git_repository *sub;
+	git_buf abspath = GIT_BUF_INIT;
+	git_repository *repo = INDEX_OWNER(index);
+	git_reference *head;
+	git_index_entry *entry;
+	struct stat st;
+	int error;
+
+	if (index_entry_create(&entry, INDEX_OWNER(index), path) < 0)
+		return -1;
+
+	if ((error = git_buf_joinpath(&abspath, git_repository_workdir(repo), path)) < 0)
+		return error;
+
+	if ((error = p_stat(abspath.ptr, &st)) < 0) {
+		giterr_set(GITERR_OS, "failed to stat repository dir");
+		return -1;
+	}
+
+	git_index_entry__init_from_stat(entry, &st, !index->distrust_filemode);
+
+	if ((error = git_repository_open(&sub, abspath.ptr)) < 0)
+		return error;
+
+	if ((error = git_repository_head(&head, sub)) < 0)
+		return error;
+
+	git_oid_cpy(&entry->id, git_reference_target(head));
+	entry->mode = GIT_FILEMODE_COMMIT;
+
+	git_reference_free(head);
+	git_repository_free(sub);
+	git_buf_free(&abspath);
+
+	*out = entry;
+	return 0;
+}
 
 int git_index_add_bypath(git_index *index, const char *path)
 {
@@ -1149,9 +1275,43 @@ int git_index_add_bypath(git_index *index, const char *path)
 
 	assert(index && path);
 
-	if ((ret = index_entry_init(&entry, index, path)) < 0 ||
-		(ret = index_insert(index, &entry, 1, false)) < 0)
+	if ((ret = index_entry_init(&entry, index, path)) == 0)
+		ret = index_insert(index, &entry, 1, false);
+
+	/* If we were given a directory, let's see if it's a submodule */
+	if (ret < 0 && ret != GIT_EDIRECTORY)
 		return ret;
+
+	if (ret == GIT_EDIRECTORY) {
+		git_submodule *sm;
+		git_error_state err;
+
+		giterr_state_capture(&err, ret);
+
+		ret = git_submodule_lookup(&sm, INDEX_OWNER(index), path);
+		if (ret == GIT_ENOTFOUND)
+			return giterr_state_restore(&err);
+
+		giterr_state_free(&err);
+
+		/*
+		 * EEXISTS means that there is a repository at that path, but it's not known
+		 * as a submodule. We add its HEAD as an entry and don't register it.
+		 */
+		if (ret == GIT_EEXISTS) {
+			if ((ret = add_repo_as_submodule(&entry, index, path)) < 0)
+				return ret;
+
+			if ((ret = index_insert(index, &entry, 1, false)) < 0)
+				return ret;
+		} else if (ret < 0) {
+			return ret;
+		} else {
+			ret = git_submodule_add_to_index(sm, false);
+			git_submodule_free(sm);
+			return ret;
+		}
+	}
 
 	/* Adding implies conflict was resolved, move conflict entries to REUC */
 	if ((ret = index_conflict_to_reuc(index, path)) < 0 && ret != GIT_ENOTFOUND)
@@ -2074,6 +2234,8 @@ static int parse_index(git_index *index, const char *buffer, size_t buffer_size)
 		goto done;
 	}
 
+	git_oid_cpy(&index->checksum, &checksum_calculated);
+
 #undef seek_forward
 
 	/* Entries are stored case-sensitively on disk, so re-sort now if
@@ -2337,7 +2499,7 @@ static int write_tree_extension(git_index *index, git_filebuf *file)
 	return error;
 }
 
-static int write_index(git_index *index, git_filebuf *file)
+static int write_index(git_oid *checksum, git_index *index, git_filebuf *file)
 {
 	git_oid hash_final;
 	struct index_header header;
@@ -2373,6 +2535,7 @@ static int write_index(git_index *index, git_filebuf *file)
 
 	/* get out the hash for all the contents we've appended to the file */
 	git_filebuf_hash(&hash_final, file);
+	git_oid_cpy(checksum, &hash_final);
 
 	/* write it at the end of the file */
 	return git_filebuf_write(file, hash_final.id, GIT_OID_RAWSZ);
@@ -2727,7 +2890,7 @@ static int index_apply_to_wd_diff(git_index *index, int action, const git_strarr
 		goto cleanup;
 
 	data.pathspec = &ps;
-	error = git_diff_foreach(diff, apply_each_file, NULL, NULL, &data);
+	error = git_diff_foreach(diff, apply_each_file, NULL, NULL, NULL, &data);
 	git_diff_free(diff);
 
 	if (error) /* make sure error is set if callback stopped iteration */
@@ -2935,6 +3098,7 @@ int git_indexwriter_init_for_operation(
 int git_indexwriter_commit(git_indexwriter *writer)
 {
 	int error;
+	git_oid checksum = {{ 0 }};
 
 	if (!writer->should_write)
 		return 0;
@@ -2944,7 +3108,7 @@ int git_indexwriter_commit(git_indexwriter *writer)
 
 	git_vector_sort(&writer->index->reuc);
 
-	if ((error = write_index(writer->index, &writer->file)) < 0) {
+	if ((error = write_index(&checksum, writer->index, &writer->file)) < 0) {
 		git_indexwriter_cleanup(writer);
 		return error;
 	}
@@ -2959,6 +3123,7 @@ int git_indexwriter_commit(git_indexwriter *writer)
 	}
 
 	writer->index->on_disk = 1;
+	git_oid_cpy(&writer->index->checksum, &checksum);
 
 	git_index_free(writer->index);
 	writer->index = NULL;

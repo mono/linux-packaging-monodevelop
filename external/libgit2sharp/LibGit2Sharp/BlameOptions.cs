@@ -21,16 +21,6 @@
 
         // Track copies across all files in all commits. (NOT SUPPORTED IN LIBGIT2 YET)
         //TrackCopiesAnyCommitCopies
-
-        /// <summary>
-        /// Track renames of the file using only exact renames.
-        /// </summary>
-        FollowExactRenames = (1 << 5),
-
-        /// <summary>
-        /// Don't track renames of the file.
-        /// </summary>
-        DontFollowRenames = (1 << 6),
     }
 
     /// <summary>
@@ -68,5 +58,15 @@
         /// If this is set to 0, blame ends with the last line in the file.
         /// </summary>
         public int MaxLine { get; set; }
+
+        /// <summary>
+        /// Disables rename heuristics, only matching renames on unmodified files.
+        /// </summary>
+        public bool FindExactRenames { get; set; }
+
+        /// <summary>
+        /// Fully disable rename checking.
+        /// </summary>
+        public bool FindNoRenames { get; set; }
     }
 }

@@ -231,6 +231,7 @@ namespace LibGit2Sharp.Core
         GIT_DIFF_FLAG_BINARY = (1 << 0),
         GIT_DIFF_FLAG_NOT_BINARY = (1 << 1),
         GIT_DIFF_FLAG_VALID_ID = (1 << 2),
+        GIT_DIFF_FLAG_EXISTS = (1 << 3),
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -332,6 +333,9 @@ namespace LibGit2Sharp.Core
         // turn on all finding features
         GIT_DIFF_FIND_ALL = (0x0ff),
 
+        // does no work trying to find renames
+        GIT_DIFF_FIND_NO_RENAMES = (1 << 8),
+
         // measure similarity ignoring leading whitespace (default)
         GIT_DIFF_FIND_IGNORE_LEADING_WHITESPACE = 0,
         // measure similarity ignoring all whitespace
@@ -349,9 +353,9 @@ namespace LibGit2Sharp.Core
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal class GitDiffFindOptions
+    internal struct GitDiffFindOptions
     {
-        public uint Version = 1;
+        public uint Version;
         public GitDiffFindFlags Flags;
         public UInt16 RenameThreshold;
         public UInt16 RenameFromRewriteThreshold;
@@ -361,5 +365,34 @@ namespace LibGit2Sharp.Core
 
         // TODO
         public IntPtr SimilarityMetric;
+    }
+
+    [Flags]
+    enum GitDiffBinaryType
+    {
+        // There is no binary delta.
+        GIT_DIFF_BINARY_NONE = 0,
+
+        // The binary data is the literal contents of the file. */
+        GIT_DIFF_BINARY_LITERAL,
+
+        // The binary data is the delta from one side to the other. */
+        GIT_DIFF_BINARY_DELTA,
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal class GitDiffBinaryFile
+    {
+        public GitDiffBinaryType Type;
+        public IntPtr Data;
+        public UIntPtr DataLen;
+        public UIntPtr InflatedLen;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal class GitDiffBinary
+    {
+        public GitDiffBinaryFile OldFile;
+        public GitDiffBinaryFile NewFile;
     }
 }

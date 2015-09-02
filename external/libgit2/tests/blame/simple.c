@@ -343,7 +343,7 @@ void test_blame_simple__can_follow_renames(void)
 void test_blame_simple__can_follow_only_exact_renames(void)
 {
 	git_blame_options opts = GIT_BLAME_OPTIONS_INIT;
-	opts.flags |= GIT_BLAME_FOLLOW_EXACT_RENAMES;
+	opts.find_options.flags = GIT_DIFF_FIND_EXACT_MATCH_ONLY;
 
 	cl_git_pass(git_repository_open(&g_repo, cl_fixture("blametest.git")));
 
@@ -359,7 +359,7 @@ void test_blame_simple__can_follow_only_exact_renames(void)
 void test_blame_simple__does_not_follow_renames(void)
 {
 	git_blame_options opts = GIT_BLAME_OPTIONS_INIT;
-	opts.flags |= GIT_BLAME_DONT_FOLLOW_RENAMES;
+	opts.find_options.flags = GIT_DIFF_FIND_NO_RENAMES;
 
 	cl_git_pass(git_repository_open(&g_repo, cl_fixture("blametest.git")));
 
