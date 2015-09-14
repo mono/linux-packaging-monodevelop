@@ -1,3 +1,9 @@
+monodevelop (5.9.6.23-0xamarin1) beta; urgency=medium
+
+  * [0fe326c] Imported Upstream version 5.9.6.23
+
+ -- Jo Shields <jo.shields@xamarin.com>  Mon, 14 Sep 2015 09:26:41 -0400
+
 monodevelop (5.9.6.20-0xamarin1) alpha; urgency=low
 
   * "New release - monodevelop-5.9.6.20.tar.bz2"
