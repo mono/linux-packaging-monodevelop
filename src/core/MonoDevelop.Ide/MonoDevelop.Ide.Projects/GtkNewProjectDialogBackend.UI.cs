@@ -29,6 +29,7 @@ using Gtk;
 using MonoDevelop.Components;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Templates;
+using Mono.TextEditor;
 
 namespace MonoDevelop.Ide.Projects
 {
@@ -72,8 +73,8 @@ namespace MonoDevelop.Ide.Projects
 		void Build ()
 		{
 			BorderWidth = 0;
-			WidthRequest = 901;
-			HeightRequest = 632;
+			WidthRequest = GtkWorkarounds.ConvertToPixelScale (901);
+			HeightRequest = GtkWorkarounds.ConvertToPixelScale (632);
 
 			Name = "wizard_dialog";
 			Title = GettextCatalog.GetString ("New Project");
@@ -130,7 +131,7 @@ namespace MonoDevelop.Ide.Projects
 			var templateCategoriesVBox = new VBox ();
 			templateCategoriesVBox.Name = "templateCategoriesVBox";
 			templateCategoriesVBox.BorderWidth = 0;
-			templateCategoriesVBox.WidthRequest = 220;
+			templateCategoriesVBox.WidthRequest = GtkWorkarounds.ConvertToPixelScale (220);
 			var templateCategoriesScrolledWindow = new ScrolledWindow ();
 			templateCategoriesScrolledWindow.Name = "templateCategoriesScrolledWindow";
 			templateCategoriesScrolledWindow.HscrollbarPolicy = PolicyType.Never;
