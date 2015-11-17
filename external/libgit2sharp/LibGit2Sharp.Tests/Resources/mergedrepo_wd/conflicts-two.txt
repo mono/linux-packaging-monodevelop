@@ -1,0 +1,5 @@
+<<<<<<< HEAD
+!This is another conflict!
+=======
+This is another conflict!!!
+>>>>>>> branch
