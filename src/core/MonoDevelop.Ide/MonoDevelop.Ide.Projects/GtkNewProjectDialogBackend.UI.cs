@@ -86,7 +86,7 @@ namespace MonoDevelop.Ide.Projects
 			// Top banner of dialog.
 			var topLabelEventBox = new EventBox ();
 			topLabelEventBox.Name = "topLabelEventBox";
-			topLabelEventBox.HeightRequest = 52;
+			topLabelEventBox.HeightRequest = GtkWorkarounds.ConvertToPixelScale (52);
 			topLabelEventBox.ModifyBg (StateType.Normal, bannerBackgroundColor);
 			topLabelEventBox.ModifyFg (StateType.Normal, whiteColor);
 			topLabelEventBox.BorderWidth = 0;
@@ -150,7 +150,7 @@ namespace MonoDevelop.Ide.Projects
 			// Templates.
 			var templatesVBox = new VBox ();
 			templatesVBox.Name = "templatesVBox";
-			templatesVBox.WidthRequest = 400;
+			templatesVBox.WidthRequest = GtkWorkarounds.ConvertToPixelScale (400);
 			templatesHBox.PackStart (templatesVBox, false, false, 0);
 			var templatesScrolledWindow = new ScrolledWindow ();
 			templatesScrolledWindow.Name = "templatesScrolledWindow";
@@ -180,21 +180,21 @@ namespace MonoDevelop.Ide.Projects
 			// Template large image.
 			templateImage = new ImageView ();
 			templateImage.Name = "templateImage";
-			templateImage.HeightRequest = 140;
-			templateImage.WidthRequest = 240;
+			templateImage.HeightRequest = GtkWorkarounds.ConvertToPixelScale (140);
+			templateImage.WidthRequest = GtkWorkarounds.ConvertToPixelScale (240);
 			templateVBox.PackStart (templateImage, false, false, 10);
 
 			// Template description.
 			templateNameLabel = new Label ();
 			templateNameLabel.Name = "templateNameLabel";
-			templateNameLabel.WidthRequest = 240;
+			templateNameLabel.WidthRequest = GtkWorkarounds.ConvertToPixelScale (240);
 			templateNameLabel.Wrap = true;
 			templateNameLabel.Xalign = 0;
 			templateNameLabel.Markup = MarkupTemplateName ("TemplateName");
 			templateVBox.PackStart (templateNameLabel, false, false, 0);
 			templateDescriptionLabel = new Label ();
 			templateDescriptionLabel.Name = "templateDescriptionLabel";
-			templateDescriptionLabel.WidthRequest = 240;
+			templateDescriptionLabel.WidthRequest = GtkWorkarounds.ConvertToPixelScale (240);
 			templateDescriptionLabel.Wrap = true;
 			templateDescriptionLabel.Xalign = 0;
 			templateVBox.PackStart (templateDescriptionLabel, false, false, 0);
