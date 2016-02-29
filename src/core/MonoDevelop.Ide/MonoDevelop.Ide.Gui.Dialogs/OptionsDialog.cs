@@ -37,7 +37,7 @@ using MonoDevelop.Components;
 namespace MonoDevelop.Ide.Gui.Dialogs
 {
 	
-	public partial class OptionsDialog : Gtk.Dialog
+	public partial class OptionsDialog : IdeDialog
 	{
 		Gtk.HBox mainHBox;
 		Gtk.TreeView tree;
@@ -82,10 +82,10 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		{
 		}
 		
-		public OptionsDialog (Gtk.Window parentWindow, object dataObject, string extensionPath) : this (parentWindow, dataObject, extensionPath, true)
+		public OptionsDialog (MonoDevelop.Components.Window parentWindow, object dataObject, string extensionPath) : this (parentWindow, dataObject, extensionPath, true)
 		{}
 		
-		public OptionsDialog (Gtk.Window parentWindow, object dataObject, string extensionPath, bool removeEmptySections)
+		public OptionsDialog (MonoDevelop.Components.Window parentWindow, object dataObject, string extensionPath, bool removeEmptySections)
 		{
 			buttonCancel = new Gtk.Button (Gtk.Stock.Cancel);
 			AddActionWidget (this.buttonCancel, ResponseType.Cancel);
@@ -140,6 +140,13 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 				c.Light += 0.09;
 				fboxHeader.BackgroundColor = c.ToGdkColor ();
 			};
+			StyleSet += delegate {
+				if (IsRealized) {
+					var c = Style.Background (Gtk.StateType.Normal).ToXwtColor ();
+					c.Light += 0.09;
+					fboxHeader.BackgroundColor = c.ToGdkColor ();
+				}
+			};
 			vbox.PackStart (fboxHeader, false, false, 0);
 
 			pageFrame = new HBox ();
@@ -192,6 +199,9 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			ExpandCategories ();
 			this.DefaultResponse = Gtk.ResponseType.Ok;
 
+			buttonOk.CanDefault = true;
+			buttonOk.GrabDefault ();
+
 			DefaultWidth = 960;
 			DefaultHeight = 680;
 		}
@@ -241,7 +251,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			}
 		}
 		
-		protected Gtk.Widget MainBox {
+		protected Control MainBox {
 			get { return pageFrame; }
 		}
 		
@@ -275,6 +285,15 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			foreach (PanelInstance pi in panels.Values) {
 				if (pi.Widget != null)
 					pi.Widget.Destroy ();
+				else {
+					var widget = pi.Panel as Gtk.Widget;
+					if (widget != null) {
+						//TODO: Panels shouldn't inherit/implement view directly
+						//Mostly because it will constrcut some UI(in constrcutor calling this.Build())
+						//on Preferences opening that should be defereded until CreatePanelWidget call
+						widget.Destroy ();
+					}
+				}
 				IDisposable disp = pi.Panel as IDisposable;
 				if (disp != null)
 					disp.Dispose ();
@@ -315,7 +334,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			}
 		}
 		
-		public void AddChildSection (IOptionsPanel parent, OptionsDialogSection section, object dataObject)
+		internal void AddChildSection (IOptionsPanel parent, OptionsDialogSection section, object dataObject)
 		{
 			foreach (SectionPage page in pages.Values) {
 				foreach (PanelInstance pi in page.Panels) {
@@ -328,7 +347,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			throw new InvalidOperationException ("Parent options panel not found in the dialog.");
 		}
 		
-		public void RemoveSection (OptionsDialogSection section)
+		internal void RemoveSection (OptionsDialogSection section)
 		{
 			SectionPage page;
 			if (pages.TryGetValue (section, out page))
@@ -371,12 +390,12 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			store.Remove (ref it);
 		}
 		
-		protected TreeIter AddSection (OptionsDialogSection section, object dataObject)
+		internal TreeIter AddSection (OptionsDialogSection section, object dataObject)
 		{
 			return AddSection (TreeIter.Zero, section, dataObject);
 		}
 		
-		protected TreeIter AddSection (TreeIter parentIter, OptionsDialogSection section, object dataObject)
+		internal TreeIter AddSection (TreeIter parentIter, OptionsDialogSection section, object dataObject)
 		{
 			TreeIter it;
 			if (parentIter.Equals (TreeIter.Zero)) {
@@ -398,7 +417,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			return it;
 		}
 		
-		protected virtual void AddChildSections (TreeIter parentIter, OptionsDialogSection section, object dataObject)
+		internal virtual void AddChildSections (TreeIter parentIter, OptionsDialogSection section, object dataObject)
 		{
 			foreach (ExtensionNode nod in section.ChildNodes) {
 				if (nod is OptionsDialogSection)
@@ -459,6 +478,8 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			if (tree.Selection.GetSelected (out it)) {
 				OptionsDialogSection section = (OptionsDialogSection) store.GetValue (it, 0);
 				ShowPage (section);
+
+				this.UseNativeContextMenus ();
 			}
 		}
 		
@@ -478,7 +499,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			return false;
 		}
 		
-		public void ShowPage (OptionsDialogSection section)
+		internal void ShowPage (OptionsDialogSection section)
 		{
 			if (!IsRealized) {
 				// Defer this until the dialog is realized due to the sizing logic in CreatePageWidget.
@@ -584,7 +605,17 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 						nodes.Add (node);
 				}
 			}
-			
+
+			foreach (OptionsPanelNode node in nodes.ToArray ()) {
+				if (!string.IsNullOrEmpty (node.Replaces)) {
+					var replaced = nodes.FindIndex (n => n.Id == node.Replaces);
+					if (replaced != -1) {
+						nodes.Remove (node);
+						nodes [replaced] = node;
+					}
+				}
+			}
+
 			foreach (OptionsPanelNode node in nodes)
 			{
 				PanelInstance pi = null;

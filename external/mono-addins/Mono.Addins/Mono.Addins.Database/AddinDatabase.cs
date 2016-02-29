@@ -470,7 +470,7 @@ namespace Mono.Addins.Database
 				}
 			}
 
-			Configuration.SetEnabled (id, true, ainfo.AddinInfo.EnabledByDefault, false);
+			Configuration.SetEnabled (id, true, ainfo.AddinInfo.EnabledByDefault, true);
 			SaveConfiguration ();
 
 			if (addinEngine != null && addinEngine.IsInitialized)
@@ -1812,7 +1812,7 @@ namespace Mono.Addins.Database
 						if (fileDatabase.Exists (ConfigFile))
 							config = DatabaseConfiguration.Read (ConfigFile);
 						else
-							config = new DatabaseConfiguration ();
+							config = DatabaseConfiguration.ReadAppConfig ();
 					}
 				}
 				return config;

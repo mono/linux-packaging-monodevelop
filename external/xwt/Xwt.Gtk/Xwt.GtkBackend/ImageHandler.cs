@@ -68,6 +68,8 @@ namespace Xwt.GtkBackend
 
 		public override object CreateMultiSizeIcon (IEnumerable<object> images)
 		{
+			if (images.Count () == 1)
+				return images.Cast<GtkImage> ().First ();
 			var frames = images.Cast<GtkImage> ().SelectMany (img => img.Frames);
 			return new GtkImage (frames);
 		}
@@ -188,7 +190,20 @@ namespace Xwt.GtkBackend
 				result = Gtk.IconTheme.Default.LoadIcon (stockId, (int)width, (Gtk.IconLookupFlags)0);
 
 			if (result == null) {
-				return CreateBitmap (Gtk.Stock.MissingImage, width, height, scaleFactor);
+//				return CreateBitmap (Gtk.Stock.MissingImage, width, height, scaleFactor);
+				int w = (int) width;
+				int h = (int) height;
+				Gdk.Pixmap pmap = new Gdk.Pixmap (Gdk.Screen.Default.RootWindow, w, h);
+				Gdk.GC gc = new Gdk.GC (pmap);
+				gc.RgbFgColor = new Gdk.Color (255, 255, 255);
+				pmap.DrawRectangle (gc, true, 0, 0, w, h);
+				gc.RgbFgColor = new Gdk.Color (0, 0, 0);
+				pmap.DrawRectangle (gc, false, 0, 0, (w - 1), (h - 1));
+				gc.SetLineAttributes (3, Gdk.LineStyle.Solid, Gdk.CapStyle.Round, Gdk.JoinStyle.Round);
+				gc.RgbFgColor = new Gdk.Color (255, 0, 0);
+				pmap.DrawLine (gc, (w / 4), (h / 4), ((w - 1) - (w / 4)), ((h - 1) - (h / 4)));
+				pmap.DrawLine (gc, ((w - 1) - (w / 4)), (h / 4), (w / 4), ((h - 1) - (h / 4)));
+				return Gdk.Pixbuf.FromDrawable (pmap, pmap.Colormap, 0, 0, 0, 0, w, h);
 			}
 			return result;
 		}
@@ -386,10 +401,10 @@ namespace Xwt.GtkBackend
 				};
 				if (actx != null) {
 					actx.InvokeUserCode (delegate {
-						drawCallback (c, new Rectangle (x, y, idesc.Size.Width, idesc.Size.Height));
+						drawCallback (c, new Rectangle (x, y, idesc.Size.Width, idesc.Size.Height), idesc, actx.Toolkit);
 					});
 				} else
-					drawCallback (c, new Rectangle (x, y, idesc.Size.Width, idesc.Size.Height));
+					drawCallback (c, new Rectangle (x, y, idesc.Size.Width, idesc.Size.Height), idesc, Toolkit.CurrentEngine);
 			}
 			else {
 				DrawPixbuf (ctx, GetBestFrame (actx, scaleFactor, idesc.Size.Width, idesc.Size.Height, false), x, y, idesc);

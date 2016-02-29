@@ -65,6 +65,15 @@ namespace MonoDevelop.Components.AutoTest
 			if (file == null) {
 				var binDir = Path.GetDirectoryName (typeof(AutoTestClientSession).Assembly.Location);
 				file = Path.Combine (binDir, "MonoDevelop.exe");
+				if (!File.Exists (file)) {
+					file = Path.Combine (binDir, "XamarinStudio.exe");
+				}
+			} else if (!File.Exists (file)) {
+				file = file.Replace ("MonoDevelop.exe", "XamarinStudio.exe");
+			}
+
+			if (!File.Exists (file)) {
+				throw new FileNotFoundException (file);
 			}
 
 			MonoDevelop.Core.Execution.RemotingService.RegisterRemotingChannel ();
@@ -118,7 +127,7 @@ namespace MonoDevelop.Components.AutoTest
 			else
 				try {
 					process.Kill ();
-				} catch (InvalidOperationException invalidExp) {
+				} catch (InvalidOperationException) {
 					Console.WriteLine ("Process has already exited");
 				}
 		}
@@ -202,6 +211,11 @@ namespace MonoDevelop.Components.AutoTest
 		public int ErrorCount (TaskSeverity severity)
 		{
 			return session.ErrorCount (severity);
+		}
+
+		public List<TaskListEntryDTO> GetErrors (TaskSeverity severity)
+		{
+			return session.GetErrors (severity);
 		}
 
 		public void WaitForEvent (string name)
@@ -354,6 +368,14 @@ namespace MonoDevelop.Components.AutoTest
 			}
 		}
 
+		public void SetProperty (Func<AppQuery, AppQuery> query, string propertyName, object value)
+		{
+			AppResult[] results = Query (query);
+			foreach (var result in results) {
+				session.SetProperty (result, propertyName, value);
+			}
+		}
+
 		public bool SetActiveConfiguration (Func<AppQuery, AppQuery> query, string configuration)
 		{
 			AppResult[] results = Query (query);
@@ -378,7 +400,7 @@ namespace MonoDevelop.Components.AutoTest
 		{
 			AutoTestSession.TimerCounterContext context = session.CreateNewTimerContext (counterName);
 			action ();
-			session.WaitForTimerContext (context);
+			session.WaitForTimerContext (context, timeout);
 		}
 
 		public XmlDocument ResultsAsXml (AppResult[] results)

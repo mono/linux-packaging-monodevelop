@@ -35,6 +35,7 @@ using Mono.Debugging.Client;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Core.Assemblies;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.Debugger.Soft
 {
@@ -86,12 +87,12 @@ namespace MonoDevelop.Debugger.Soft
 			var varsCopy = new Dictionary<string, string> (cmd.EnvironmentVariables);
 			var startArgs = (SoftDebuggerLaunchArgs) dsi.StartArgs;
 			startArgs.ExternalConsoleLauncher = delegate (System.Diagnostics.ProcessStartInfo info) {
-				IProcessAsyncOperation oper;
+				ProcessAsyncOperation oper;
 				oper = Runtime.ProcessService.StartConsoleProcess (info.FileName, info.Arguments, info.WorkingDirectory,
-					varsCopy, ExternalConsoleFactory.Instance.CreateConsole (dsi.CloseExternalConsoleOnExit), null);
+					ExternalConsoleFactory.Instance.CreateConsole (dsi.CloseExternalConsoleOnExit), varsCopy);
 				return new ProcessAdapter (oper, Path.GetFileName (info.FileName));
 			};
-
+			startArgs.MonoExecutableFileName = runtime.MonoRuntimeInfo.Force64or32bit.HasValue ? runtime.MonoRuntimeInfo.Force64or32bit.Value ? "mono64" : "mono32" : "mono";
 			return dsi;
 		}
 		
@@ -138,6 +139,18 @@ namespace MonoDevelop.Debugger.Soft
 		
 		class MDLogger : ICustomLogger
 		{
+			public string GetNewDebuggerLogFilename ()
+			{
+				if (PropertyService.Get ("MonoDevelop.Debugger.DebuggingService.DebuggerLogging", false)) {
+					string filename;
+					var logWriter = LoggingService.CreateLogFile ("Debugger", out filename);
+					logWriter.Dispose ();
+					return filename;
+				} else {
+					return null;
+				}
+			}
+
 			public void LogError (string message, Exception ex)
 			{
 				LoggingService.LogError (message, ex);
@@ -157,17 +170,17 @@ namespace MonoDevelop.Debugger.Soft
 	
 	class ProcessAdapter: Mono.Debugger.Soft.ITargetProcess
 	{
-		IProcessAsyncOperation oper;
+		ProcessAsyncOperation oper;
 		string name;
 		
-		public ProcessAdapter (IProcessAsyncOperation oper, string name)
+		public ProcessAdapter (ProcessAsyncOperation oper, string name)
 		{
 			this.oper = oper;
 			this.name = name;
-			oper.Completed += delegate {
+			oper.Task.ContinueWith (t => {
 				if (Exited != null)
 					Exited (this, EventArgs.Empty);
-			};
+			}, Runtime.MainTaskScheduler);
 		}
 		
 		#region IProcess implementation

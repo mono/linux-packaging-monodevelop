@@ -9,6 +9,8 @@
     <AssemblyName>Xwt</AssemblyName>
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>..\xwt.snk</AssemblyOriginatorKeyFile>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>True</DebugSymbols>
@@ -27,6 +29,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>False</ConsolePause>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -327,6 +330,13 @@
     <Compile Include="Xwt\XwtSynchronizationContext.cs" />
     <Compile Include="Xwt\Calendar.cs" />
     <Compile Include="Xwt.Backends\ICalendarBackend.cs" />
+    <Compile Include="Xwt.Drawing\ThemedImage.cs" />
+    <Compile Include="Xwt.Drawing\IImageLoader.cs" />
+    <Compile Include="Xwt\FontSelector.cs" />
+    <Compile Include="Xwt.Backends\IFontSelectorBackend.cs" />
+    <Compile Include="Xwt\SelectFontDialog.cs" />
+    <Compile Include="Xwt.Backends\ISelectFontDialogBackend.cs" />
+    <Compile Include="Xwt.Drawing\StyleSet.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup />

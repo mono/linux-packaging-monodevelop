@@ -27,6 +27,7 @@ using System.IO;
 using System.Collections.Generic;
 using MonoDevelop.Core;
 using System;
+using ProgressMonitor = MonoDevelop.Core.ProgressMonitor;
 using LibGit2Sharp;
 
 namespace MonoDevelop.VersionControl.Git
@@ -70,13 +71,6 @@ namespace MonoDevelop.VersionControl.Git
 			if (!string.IsNullOrEmpty (url))
 				repo.Network.Remotes.Add ("origin", url);
 			return repo;
-		}
-
-		internal static bool IsGitRepository (this FilePath path)
-		{
-			// Maybe check if it has a HEAD file? But this check should be enough.
-			var newPath = path.Combine (".git");
-			return Directory.Exists (newPath) && Directory.Exists (newPath.Combine ("objects")) && Directory.Exists (newPath.Combine ("refs"));
 		}
 	}
 }

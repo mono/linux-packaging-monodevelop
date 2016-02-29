@@ -525,7 +525,9 @@ namespace Mono.Debugging.Soft
 					}
 				}
 
-				return tm.NewInstance (cx.Thread, method, values);
+				lock(method.VirtualMachine) {
+					return tm.NewInstance (cx.Thread, method, values);
+				}
 			}
 
 			if (argValues.Length == 0 && tm.VirtualMachine.Version.AtLeast (2, 31))
@@ -659,8 +661,9 @@ namespace Mono.Debugging.Soft
 
 			// Note: mcs uses the form <${NAME}>c__${KIND}${NUMBER} where the leading '<' seems to have been dropped in 3.4.x
 			//       csc uses the form <${NAME}>d__${NUMBER}
+			//		 roslyn uses the form <${NAME}>d
 
-			return tm.Name.IndexOf (">c__", StringComparison.Ordinal) > 0 || tm.Name.IndexOf (">d__", StringComparison.Ordinal) > 0;
+			return tm.Name.IndexOf (">c__", StringComparison.Ordinal) > 0 || tm.Name.IndexOf (">d", StringComparison.Ordinal) > 0;
 		}
 
 		internal static string GetNameFromGeneratedType (TypeMirror tm)
@@ -1653,7 +1656,9 @@ namespace Mono.Debugging.Soft
 				return true;
 
 			try {
-				tm.InvokeMethod (soft.Thread, cctor, new Value[0], InvokeOptions.DisableBreakpoints | InvokeOptions.SingleThreaded);
+				lock (cctor.VirtualMachine) {
+					tm.InvokeMethod (soft.Thread, cctor, new Value [0], InvokeOptions.DisableBreakpoints | InvokeOptions.SingleThreaded);
+				}
 			} catch {
 				return false;
 			} finally {
@@ -2062,9 +2067,11 @@ namespace Mono.Debugging.Soft
 
 					if (method != null) {
 						ArrayMirror array;
-						
+
 						try {
-							array = sm.Type.InvokeMethod (soft.Thread, method, new [] { sm }, InvokeOptions.DisableBreakpoints | InvokeOptions.SingleThreaded) as ArrayMirror;
+							lock (method.VirtualMachine) {
+								array = sm.Type.InvokeMethod (soft.Thread, method, new [] { sm }, InvokeOptions.DisableBreakpoints | InvokeOptions.SingleThreaded) as ArrayMirror;
+							}
 						} catch {
 							array = null;
 						} finally {

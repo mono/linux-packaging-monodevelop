@@ -8,6 +8,7 @@ using Mono.Addins;
 using Gtk;
 
 using MonoDevelop.Core;
+using MonoDevelop.Components;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui.Components;
@@ -46,7 +47,8 @@ namespace MonoDevelop.VersionControl.Views
 		List<VersionInfo> statuses;
 		bool remoteStatus = false;
 
-		class DiffData {
+		class DiffData
+		{
 			public Exception Exception {
 				get; private set;
 			}
@@ -290,9 +292,9 @@ namespace MonoDevelop.VersionControl.Views
 			Init ();
 		}
 
-		protected override void OnWorkbenchWindowChanged (EventArgs e)
+		protected override void OnWorkbenchWindowChanged ()
 		{
-			base.OnWorkbenchWindowChanged (e);
+			base.OnWorkbenchWindowChanged ();
 			if (WorkbenchWindow == null)
 				return;
 
@@ -355,10 +357,6 @@ namespace MonoDevelop.VersionControl.Views
 			btnSelectNone.Clicked += new EventHandler (OnSelectNone);
 			toolbar.Add (btnSelectNone);
 			toolbar.ShowAll ();
-		}
-
-		public override string StockIconId {
-			get { return "vc-status"; }
 		}
 
 		int CompareNodes (Gtk.TreeModel model, Gtk.TreeIter a, Gtk.TreeIter b)
@@ -436,7 +434,7 @@ namespace MonoDevelop.VersionControl.Views
 			base.Dispose ();
 		}
 
-		public override Gtk.Widget Control {
+		public override Control Control {
 			get {
 				return widget;
 			}
@@ -458,7 +456,7 @@ namespace MonoDevelop.VersionControl.Views
 
 			ThreadPool.QueueUserWorkItem (delegate {
 				if (fileList != null) {
-					var group = fileList.GroupBy (v => v.IsDirectory || v.WorkspaceObject is SolutionItem);
+					var group = fileList.GroupBy (v => v.IsDirectory || v.WorkspaceObject is SolutionFolderItem);
 					foreach (var item in group) {
 						// Is directory.
 						if (item.Key) {
@@ -472,7 +470,7 @@ namespace MonoDevelop.VersionControl.Views
 				}
 				List<VersionInfo> newList = new List<VersionInfo> ();
 				newList.AddRange (vc.GetDirectoryVersionInfo (filepath, remoteStatus, true));
-				DispatchService.GuiDispatch (delegate {
+				Runtime.RunInMainThread (delegate {
 					if (!disposed)
 						LoadStatus (newList);
 				});
@@ -579,7 +577,7 @@ namespace MonoDevelop.VersionControl.Views
 			}
 		}
 
-		TreeIter AppendFileInfo (VersionInfo n)
+		TreeIter AppendFileInfo (VersionInfo n, bool expanded)
 		{
 			Xwt.Drawing.Image statusicon = VersionControlService.LoadIconForStatus(n.Status);
 			string lstatus = VersionControlService.GetStatusLabel (n.Status);
@@ -605,7 +603,15 @@ namespace MonoDevelop.VersionControl.Views
 			TreeIter it = filestore.AppendValues (statusicon, lstatus, GLib.Markup.EscapeText (localpath).Split ('\n'), rstatus, commit, false, n.LocalPath.ToString (), true, hasComment, fileIcon, n.HasLocalChanges, rstatusicon, scolor, n.HasRemoteChange (VersionStatus.Modified));
 			if (!n.IsDirectory)
 				filestore.AppendValues (it, statusicon, "", new string[0], "", false, true, n.LocalPath.ToString (), false, false, fileIcon, false, null, null, false);
+			if (expanded)
+				filelist.ExpandRow (filestore.GetPath (it), open_all: false);
+
 			return it;
+		}
+
+		TreeIter AppendFileInfo (VersionInfo n)
+		{
+			return AppendFileInfo (n, expanded: false);
 		}
 
 		string[] GetCurrentFiles ()
@@ -776,12 +782,17 @@ namespace MonoDevelop.VersionControl.Views
 
 		void OnTestExpandRow (object sender, Gtk.TestExpandRowArgs args)
 		{
-			bool filled = (bool) filestore.GetValue (args.Iter, ColFilled);
+			OnRowExpanded (args.Iter);
+		}
+
+		void OnRowExpanded (TreeIter it)
+		{
+			bool filled = (bool) filestore.GetValue (it, ColFilled);
 			if (!filled) {
-				filestore.SetValue (args.Iter, ColFilled, true);
+				filestore.SetValue (it, ColFilled, true);
 				TreeIter iter;
-				filestore.IterChildren (out iter, args.Iter);
-				string fileName = (string) filestore.GetValue (args.Iter, ColFullPath);
+				filestore.IterChildren (out iter, it);
+				string fileName = (string) filestore.GetValue (it, ColFullPath);
 				FillDiffInfo (iter, fileName, GetDiffData (remoteStatus));
 			}
 		}
@@ -816,7 +827,7 @@ namespace MonoDevelop.VersionControl.Views
 			string[] files = GetCurrentFiles ();
 			VersionControlItemList items = new VersionControlItemList ();
 			foreach (string file in files) {
-				Project prj = IdeApp.Workspace.GetProjectContainingFile (file);
+				Project prj = IdeApp.Workspace.GetProjectsContainingFile (file).FirstOrDefault ();
 				items.Add (new VersionControlItem (vc, prj, file, Directory.Exists (file), null));
 			}
 			return items;
@@ -959,6 +970,7 @@ namespace MonoDevelop.VersionControl.Views
 			}
 
 			bool found = false;
+			bool wasExpanded = false;
 			int oldStatusIndex;
 			TreeIter oldStatusIter = TreeIter.Zero;
 
@@ -979,6 +991,7 @@ namespace MonoDevelop.VersionControl.Views
 				if (filestore.GetIterFirst (out oldStatusIter)) {
 					do {
 						if (args.FilePath == (string) filestore.GetValue (oldStatusIter, ColFullPath)) {
+							wasExpanded = filelist.GetRowExpanded (filestore.GetPath (oldStatusIter));
 							found = true;
 							break;
 						}
@@ -1013,19 +1026,32 @@ namespace MonoDevelop.VersionControl.Views
 				}
 
 				statuses [oldStatusIndex] = newInfo;
+				InvalidateDiffData (args.FilePath, false, newInfo);
+				InvalidateDiffData (args.FilePath, true, newInfo);
 
 				// Update the tree
-				AppendFileInfo (newInfo);
+				AppendFileInfo (newInfo, wasExpanded);
 				filestore.Remove (ref oldStatusIter);
 			}
 			else {
 				if (FileVisible (newInfo)) {
 					statuses.Add (newInfo);
 					changeSet.AddFile (newInfo);
-					AppendFileInfo (newInfo);
+					AppendFileInfo (newInfo, wasExpanded);
 				}
 			}
 			return true;
+		}
+
+		void InvalidateDiffData (FilePath path, bool remote, VersionInfo info)
+		{
+			var ddata = GetDiffData (remote);
+			var index = ddata.FindIndex (dobj => dobj.VersionInfo.LocalPath == path);
+			if (index != -1) {
+				ddata.RemoveAt (index);
+			}
+
+			ddata.Add (new DiffData (vc, filepath, info, remote));
 		}
 
 		static bool FileVisible (VersionInfo vinfo)

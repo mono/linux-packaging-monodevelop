@@ -58,9 +58,14 @@ namespace Mono.Addins.Database
 			var addinName = Addin.GetIdName (addinId);
 
 			AddinStatus s;
+
+			// If the add-in is globaly disabled, it is disabled no matter what the version specific status is
+			if (addinStatus.TryGetValue (addinName, out s)) {
+				if (!s.Enabled)
+					return false;
+			}
+
 			if (addinStatus.TryGetValue (addinId, out s))
-				return s.Enabled && !IsRegisteredForUninstall (addinId);
-			else if (addinStatus.TryGetValue (addinName, out s))
 				return s.Enabled && !IsRegisteredForUninstall (addinId);
 			else
 				return defaultValue;
@@ -76,13 +81,13 @@ namespace Mono.Addins.Database
 			AddinStatus s;
 			addinStatus.TryGetValue (addinName, out s);
 			
-			if (enabled == defaultValue) {
-				addinStatus.Remove (addinName);
-				return;
-			}
 			if (s == null)
 				s = addinStatus [addinName] = new AddinStatus (addinName);
 			s.Enabled = enabled;
+
+			// If enabling a specific version of an add-in, make sure the add-in is enabled as a whole
+			if (enabled && exactVersionMatch)
+				SetEnabled (addinId, true, defaultValue, false);
 		}
 		
 		public void RegisterForUninstall (string addinId, IEnumerable<string> files)
@@ -120,6 +125,34 @@ namespace Mono.Addins.Database
 		}
 		
 		public static DatabaseConfiguration Read (string file)
+		{
+			var config = ReadInternal (file);
+			// Try to read application level config to support disabling add-ins by default.
+			var appConfig = ReadAppConfig ();
+
+			if (appConfig == null)
+				return config;
+
+			// Overwrite app config values with user config values
+			foreach (var entry in config.addinStatus)
+				appConfig.addinStatus [entry.Key] = entry.Value;
+
+			return appConfig;
+		}
+		
+		public static DatabaseConfiguration ReadAppConfig()
+		{
+			var assemblyPath = System.Reflection.Assembly.GetExecutingAssembly ().Location;
+			var assemblyDirectory = Path.GetDirectoryName (assemblyPath);
+			var appAddinsConfigFilePath = Path.Combine (assemblyDirectory, "addins-config.xml");
+
+			if (!File.Exists (appAddinsConfigFilePath))
+				return new DatabaseConfiguration ();
+
+			return ReadInternal (appAddinsConfigFilePath);
+		}
+
+		static DatabaseConfiguration ReadInternal (string file)
 		{
 			DatabaseConfiguration config = new DatabaseConfiguration ();
 			XmlDocument doc = new XmlDocument ();

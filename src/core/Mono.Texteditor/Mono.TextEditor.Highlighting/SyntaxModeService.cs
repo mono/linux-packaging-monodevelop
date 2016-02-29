@@ -68,8 +68,9 @@ namespace Mono.TextEditor.Highlighting
 		
 		public static ColorScheme GetColorStyle (string name)
 		{
-			if (styles.ContainsKey (name))
+			if (styles.ContainsKey (name)) {
 				return styles [name];
+			}
 			if (styleLookup.ContainsKey (name)) {
 				LoadStyle (name);
 				return GetColorStyle (name);
@@ -92,13 +93,24 @@ namespace Mono.TextEditor.Highlighting
 				return styleLookup[style.Name];
 			return null;
 		}
-		
+
+		public static string GetFileName (string name)
+		{
+			if (!styleLookup.ContainsKey (name))
+				throw new System.ArgumentException ("Style " + name + " not found", "name");
+			var provider = styleLookup [name];
+			if (provider is UrlStreamProvider) {
+				var usp = provider as UrlStreamProvider;
+				return usp.Url;
+			}
+			return null;
+		}
+
 		static void LoadStyle (string name)
 		{
 			if (!styleLookup.ContainsKey (name))
 				throw new System.ArgumentException ("Style " + name + " not found", "name");
 			var provider = styleLookup [name];
-			styleLookup.Remove (name); 
 			var stream = provider.Open ();
 			try {
 				if (provider is UrlStreamProvider) {
@@ -112,6 +124,7 @@ namespace Mono.TextEditor.Highlighting
 				} else {
 					styles [name] = ColorScheme.LoadFrom (stream);
 				}
+				styleLookup.Remove (name); 
 			} catch (Exception e) {
 				throw new IOException ("Error while loading style :" + name, e);
 			} finally {
@@ -475,9 +488,10 @@ namespace Mono.TextEditor.Highlighting
 		static string ScanStyle (Stream stream)
 		{
 			try {
-				var file = new StreamReader (stream);
+				var file = Utils.TextFileUtility.OpenStream (stream);
 				file.ReadLine ();
 				var nameLine = file.ReadLine ();
+				file.Close ();
 				var match = nameRegex.Match (nameLine);
 				if (!match.Success)
 					return null;
@@ -539,7 +553,10 @@ namespace Mono.TextEditor.Highlighting
 
 		public static ColorScheme DefaultColorStyle {
 			get {
-				return GetColorStyle (TextEditorOptions.DefaultColorStyle);
+				var defaultStyle = GetColorStyle (TextEditorOptions.DefaultColorStyle);
+				if (defaultStyle == null)
+					Console.WriteLine ("Default style {0} can't be loaded.", TextEditorOptions.DefaultColorStyle);
+				return defaultStyle;
 			}
 		}
 		

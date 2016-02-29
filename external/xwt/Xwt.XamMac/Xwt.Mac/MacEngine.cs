@@ -136,6 +136,7 @@ namespace Xwt.Mac
 			RegisterBackend <Xwt.Backends.ISaveFileDialogBackend, SaveFileDialogBackend> ();
 			RegisterBackend <Xwt.Backends.IColorPickerBackend, ColorPickerBackend> ();
 			RegisterBackend <Xwt.Backends.ICalendarBackend,CalendarBackend> ();
+			RegisterBackend <Xwt.Backends.ISelectFontDialogBackend, SelectFontDialogBackend> ();
 		}
 
 		public override void RunApplication ()
@@ -202,6 +203,20 @@ namespace Xwt.Mac
 			var wb = GetNativeBackend (w);
 			wb.SetAutosizeMode (true);
 			return wb.Widget;
+		}
+
+		public override object GetNativeImage (Xwt.Drawing.Image image)
+		{
+			if (image == null)
+				return null;
+			var img = (NSImage)base.GetNativeImage (image);
+			if (img is CustomImage) {
+				img = ((CustomImage)img).Clone ();
+				var idesc = image.ToImageDescription (ApplicationContext);
+				((CustomImage)img).Image = idesc;
+			}
+			img.Size = new CGSize ((nfloat)image.Size.Width, (nfloat)image.Size.Height);
+			return img;
 		}
 
 		public override bool HasNativeParent (Widget w)

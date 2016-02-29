@@ -45,7 +45,7 @@ namespace MonoDevelop.VersionControl
 			return true;
 		}
 
-		private class UnlockWorker : Task 
+		private class UnlockWorker : VersionControlTask 
 		{
 			VersionControlItemList items;
 						
@@ -62,10 +62,10 @@ namespace MonoDevelop.VersionControl
 				foreach (VersionControlItemList list in items.SplitByRepository ())
 					list[0].Repository.Unlock (Monitor, list.Paths);
 				
-				Monitor.ReportSuccess (GettextCatalog.GetString ("Unlock operation completed."));
 				Gtk.Application.Invoke (delegate {
 					VersionControlService.NotifyFileStatusChanged (items);
 				});
+				Monitor.ReportSuccess (GettextCatalog.GetString ("Unlock operation completed."));
 			}
 		}
 	}

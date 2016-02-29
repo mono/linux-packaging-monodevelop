@@ -99,7 +99,7 @@ namespace MonoDevelop.Core.Assemblies
 		public override string DisplayName {
 			get {
 				if (!IsRunning)
-					return base.DisplayName + " (" + Prefix + ")";
+					return base.DisplayName + " (" + Prefix + ")" + (monoRuntimeInfo.Force64or32bit.HasValue ? monoRuntimeInfo.Force64or32bit.Value ? " (64bit)" : " (32bit)" : "");
 				else
 					return base.DisplayName;
 			}
@@ -109,13 +109,6 @@ namespace MonoDevelop.Core.Assemblies
 
 		public override IEnumerable<FilePath> GetReferenceFrameworkDirectories ()
 		{
-			//during initializion, only return the global directory once (for the running runtime) so that it doesn't
-			//get scanned multiple times
-			return GetReferenceFrameworkDirectories (IsInitialized || IsRunning);
-		}
-
-		IEnumerable<FilePath> GetReferenceFrameworkDirectories (bool includeGlobalDirectories)
-		{
 			//duplicate xbuild's framework folders path logic
 			//see xbuild man page
 			string env;
@@ -124,7 +117,7 @@ namespace MonoDevelop.Core.Assemblies
 					yield return (FilePath) dir;
 			}
 
-			if (includeGlobalDirectories && Platform.IsMac) {
+			if (Platform.IsMac) {
 				yield return "/Library/Frameworks/Mono.framework/External/xbuild-frameworks";
 			}
 

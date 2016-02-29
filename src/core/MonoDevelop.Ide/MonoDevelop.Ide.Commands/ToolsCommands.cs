@@ -25,13 +25,14 @@
 //
 //
 
-
+using MonoDevelop.Components.AutoTest;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide.Gui.Dialogs;
 using System;
 using MonoDevelop.Ide.Updater;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.Ide.Commands
 {
@@ -39,7 +40,9 @@ namespace MonoDevelop.Ide.Commands
 	{
 		AddinManager,
 		ToolList,
-		InstrumentationViewer
+		InstrumentationViewer,
+		ToggleSessionRecorder,
+		ReplaySession,
 	}
 
 	internal class AddinManagerHandler : CommandHandler
@@ -82,7 +85,7 @@ namespace MonoDevelop.Ide.Commands
 					argumentsTool = StringParserService.Parse (customerArguments, IdeApp.Workbench.GetStringTagModel ());
 			}
 
-			DispatchService.BackgroundDispatch (delegate {
+			Task.Run (delegate {
 				RunExternalTool (tool, argumentsTool);
 			});
 		}
@@ -93,7 +96,7 @@ namespace MonoDevelop.Ide.Commands
 			string initialDirectoryTool = StringParserService.Parse (tool.InitialDirectory, IdeApp.Workbench.GetStringTagModel ());
 
 			//Execute tool
-			IProgressMonitor progressMonitor = IdeApp.Workbench.ProgressMonitors.GetRunProgressMonitor ();
+			ProgressMonitor progressMonitor = IdeApp.Workbench.ProgressMonitors.GetRunProgressMonitor ();
 			try {
 				progressMonitor.Log.WriteLine (GettextCatalog.GetString ("Running: {0} {1}", (commandTool), (argumentsTool)));
 				progressMonitor.Log.WriteLine ();
@@ -136,6 +139,61 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Update (CommandInfo info)
 		{
 			info.Visible = MonoDevelop.Core.Instrumentation.InstrumentationService.Enabled;
+		}
+	}
+
+	internal class ToggleSessionRecorderHandler : CommandHandler
+	{
+		protected override void Run ()
+		{
+			if (AutoTestService.CurrentRecordSession == null) {
+				AutoTestService.StartRecordingSession ();
+			} else {
+				var selector = new FileSelectorDialog ("Save session as...", Gtk.FileChooserAction.Save);
+				try {
+					var result = MessageService.RunCustomDialog (selector, MessageService.RootWindow);
+
+					if (result == (int)Gtk.ResponseType.Cancel) {
+						return;
+					}
+
+					AutoTestService.StopRecordingSession (selector.Filename);
+				} finally {
+					selector.Destroy ();
+				}
+			}
+		}
+
+		protected override void Update (CommandInfo info)
+		{
+			info.Visible = IdeApp.Preferences.EnableAutomatedTesting;
+			info.Text = AutoTestService.CurrentRecordSession == null ? "Start Session Recorder" : "Stop Session Recorder";
+		}
+	}
+
+	internal class ReplaySessionHandler : CommandHandler
+	{
+		protected override void Run ()
+		{
+			var selector = new FileSelectorDialog ("Open session");
+			string filename = null;
+			try {
+				var result = MessageService.RunCustomDialog (selector, MessageService.RootWindow);
+
+				if (result == (int)Gtk.ResponseType.Cancel) {
+					return;
+				}
+
+				filename = selector.Filename;
+			} finally {
+				selector.Destroy ();
+			}
+			AutoTestService.ReplaySessionFromFile (filename);
+		}
+
+		protected override void Update (CommandInfo info)
+		{
+			info.Visible = IdeApp.Preferences.EnableAutomatedTesting;
 		}
 	}
 }
