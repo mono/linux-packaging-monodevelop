@@ -25,8 +25,9 @@
 
 using System;
 using MonoDevelop.Ide.Gui.Dialogs;
+using MonoDevelop.Components;
 using MonoDevelop.Core;
-using Mono.TextEditor;
+using MonoDevelop.Ide.Editor;
 using MonoDevelop.Ide;
 
 namespace MonoDevelop.SourceEditor.OptionPanels
@@ -62,7 +63,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			this.Build();
 		}
 		
-		public virtual Gtk.Widget CreatePanelWidget ()
+		public virtual Control CreatePanelWidget ()
 		{
 			this.showLineNumbersCheckbutton.Active = showLineNumbers = DefaultSourceEditorOptions.Instance.ShowLineNumberMargin;
 			this.showLineNumbersCheckbutton.Toggled += delegate {

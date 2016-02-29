@@ -27,7 +27,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
@@ -138,6 +138,11 @@ namespace MonoDevelop.PackageManagement.NodeBuilders
 		protected virtual bool IsPackageInstalled (PackageReference reference)
 		{
 			return reference.IsPackageInstalled (project.DotNetProject);
+		}
+
+		public void ClearPackageReferences ()
+		{
+			packageReferences = null;
 		}
 	}
 }

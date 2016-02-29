@@ -267,8 +267,8 @@ namespace Xwt.Mac
 		static NSImage LoadStockIcon (string id)
 		{
 			switch (id) {
-			case StockIconId.ZoomIn: return NSImageFromResource ("zoom-in.png");
-			case StockIconId.ZoomOut: return NSImageFromResource ("zoom-out.png");
+			case StockIconId.ZoomIn: return NSImageFromResource ("zoom-in-16.png");
+			case StockIconId.ZoomOut: return NSImageFromResource ("zoom-out-16.png");
 			}
 
 			NSImage image = null;
@@ -300,6 +300,8 @@ namespace Xwt.Mac
 		ImageDrawCallback drawCallback;
 		ApplicationContext actx;
 		NSCustomImageRep imgRep;
+
+		internal ImageDescription Image = ImageDescription.Null;
 
 		public CustomImage (ApplicationContext actx, ImageDrawCallback drawCallback)
 		{
@@ -334,7 +336,7 @@ namespace Xwt.Mac
 		{
 			var s = ctx.Size != CGSize.Empty ? ctx.Size : Size;
 			actx.InvokeUserCode (delegate {
-				drawCallback (ctx, new Rectangle (0, 0, s.Width, s.Height));
+				drawCallback (ctx, new Rectangle (0, 0, s.Width, s.Height), Image, actx.Toolkit);
 			});
 		}
 
@@ -342,6 +344,13 @@ namespace Xwt.Mac
 		{
 			return new CustomImage (actx, drawCallback);
 		}
+
+		#if !MONOMAC
+		public override NSObject Copy (NSZone zone)
+		{
+			return new CustomImage (actx, drawCallback);
+		}
+		#endif
 	}
 }
 

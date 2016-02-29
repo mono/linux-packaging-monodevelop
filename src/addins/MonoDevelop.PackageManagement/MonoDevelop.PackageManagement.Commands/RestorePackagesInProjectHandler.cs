@@ -40,8 +40,10 @@ namespace MonoDevelop.PackageManagement.Commands
 
 			ProgressMonitorStatusMessage progressMessage = ProgressMonitorStatusMessageFactory.CreateRestoringPackagesInProjectMessage ();
 			var runner = new PackageRestoreRunner ();
-			DispatchService.BackgroundDispatch (() => {
+			PackageManagementBackgroundDispatcher.Dispatch (() => {
 				runner.Run (project, progressMessage);
+				runner = null;
+				project = null;
 			});
 		}
 

@@ -33,18 +33,19 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Components;
 using CBinding.Parser;
 using MonoDevelop.Ide;
+using MonoDevelop.Ide.Editor;
 
 namespace CBinding.Navigation
 {
 	public class LanguageItemCommandHandler : NodeCommandHandler
 	{
-		public override void ActivateItem ()
+		public override async void ActivateItem ()
 		{
 			LanguageItem item = (LanguageItem)CurrentNode.DataItem;
-			Document doc = IdeApp.Workbench.OpenDocument (item.File);
+			Document doc = await IdeApp.Workbench.OpenDocument (item.File);
 			//bool isMacro = item is Macro;
 			
-			doc.Editor.SetCaretTo ((int)item.Line, 0); // TODO: get column?
+			doc.Editor.CaretLocation = new DocumentLocation ((int)item.Line, 1); // TODO: get column?
 		}
 	}
 }

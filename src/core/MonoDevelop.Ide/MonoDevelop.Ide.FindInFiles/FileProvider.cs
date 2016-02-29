@@ -31,7 +31,8 @@ using MonoDevelop.Ide.Gui;
 using System.Text;
 using MonoDevelop.Core;
 using System;
-using Mono.TextEditor.Utils;
+using MonoDevelop.Core.Text;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.Ide.FindInFiles
 {
@@ -92,7 +93,12 @@ namespace MonoDevelop.Ide.FindInFiles
 			if (buffer != null) {
 				result = buffer.ToString ();
 			} else {
-				var doc = SearchDocument ();
+				Document doc = null;
+
+				var task = SearchDocument ();
+				if (task.Wait (1000)) 
+					doc = task.Result;
+
 				if (doc != null && doc.Editor != null) {
 					result = doc.Editor.Text;
 				} else {
@@ -113,9 +119,11 @@ namespace MonoDevelop.Ide.FindInFiles
 			return result;
 		}
 		
-		Document SearchDocument ()
+		async Task<Document> SearchDocument ()
 		{
-			return IdeApp.Workbench.Documents.FirstOrDefault(d => !string.IsNullOrEmpty (d.FileName) &&  Path.GetFullPath (d.FileName) == Path.GetFullPath (FileName));
+			Document result = null;
+			await Runtime.RunInMainThread (() => result = IdeApp.Workbench.Documents.FirstOrDefault(d => !string.IsNullOrEmpty (d.FileName) &&  Path.GetFullPath (d.FileName) == Path.GetFullPath (FileName)));
+			return result;
 		}
 
 		Document document;
@@ -125,11 +133,11 @@ namespace MonoDevelop.Ide.FindInFiles
 		bool hadBom;
 		Encoding encoding;
 
-		public void BeginReplace (string content)
+		public async void BeginReplace (string content)
 		{
 			somethingReplaced = false;
 			buffer = new StringBuilder (content);
-			document = SearchDocument ();
+			document = await SearchDocument ();
 			if (document != null) {
 				Gtk.Application.Invoke (delegate {
 					undoGroup = document.Editor.OpenUndoGroup ();
@@ -145,7 +153,7 @@ namespace MonoDevelop.Ide.FindInFiles
 			buffer.Insert (offset, replacement);
 			if (document != null) {
 				Gtk.Application.Invoke (delegate {
-					document.Editor.Replace (offset, length, replacement);
+					document.Editor.ReplaceText (offset, length, replacement);
 				});
 				return;
 			}
@@ -159,7 +167,8 @@ namespace MonoDevelop.Ide.FindInFiles
 						undoGroup.Dispose ();
 						undoGroup = null;
 					}
-					document.Editor.Document.CommitUpdateAll (); });
+					/*document.Editor.Document.CommitUpdateAll (); */
+				});
 				return;
 			}
 			if (buffer != null && somethingReplaced) {
@@ -167,6 +176,7 @@ namespace MonoDevelop.Ide.FindInFiles
 				TextFileUtility.WriteText (FileName, buffer.ToString (), encoding, hadBom);
 				DesktopService.SetFileAttributes (FileName, attributes);
 			}
+			FileService.NotifyFileChanged (FileName);
 			buffer = null;
 		}
 	}

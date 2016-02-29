@@ -65,8 +65,11 @@ namespace MonoDevelop.VersionControl.Git
 		static GitCredentials ()
 		{
 			string keyStorage = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.Personal), ".ssh");
-			if (!Directory.Exists (keyStorage))
-				return;
+			if (!Directory.Exists (keyStorage)) {
+				keyStorage = Path.Combine (Environment.ExpandEnvironmentVariables ("%HOME%"), ".ssh");
+				if (!Directory.Exists (keyStorage))
+					return;
+			}
 
 			foreach (var privateKey in Directory.EnumerateFiles (keyStorage)) {
 				string publicKey = privateKey + ".pub";
@@ -88,15 +91,16 @@ namespace MonoDevelop.VersionControl.Git
 			// We always need to run the TryGet* methods as we need the passphraseItem/passwordItem populated even
 			// if the password store contains an invalid password/no password
 			if ((types & SupportedCredentialTypes.UsernamePassword) != 0) {
-				uri = new Uri (url);
-				string username;
-				string password;
-				if (!state.NativePasswordUsed && TryGetUsernamePassword (uri, out username, out password)) {
-					state.NativePasswordUsed = true;
-					return new UsernamePasswordCredentials {
-						Username = username,
-						Password = password
-					};
+				if (Uri.TryCreate (url, UriKind.RelativeOrAbsolute, out uri)) {
+					string username;
+					string password;
+					if (!state.NativePasswordUsed && TryGetUsernamePassword (uri, out username, out password)) {
+						state.NativePasswordUsed = true;
+						return new UsernamePasswordCredentials {
+							Username = username,
+							Password = password
+						};
+					}
 				}
 			}
 
@@ -124,14 +128,12 @@ namespace MonoDevelop.VersionControl.Git
 						state.KeyUsed++;
 					else {
 						SelectFileDialog dlg = null;
-						bool success = false;
-
-						DispatchService.GuiSyncDispatch (() => {
+						bool success = Runtime.RunInMainThread (() => {
 							dlg = new SelectFileDialog (GettextCatalog.GetString ("Select a private SSH key to use."));
 							dlg.ShowHidden = true;
 							dlg.CurrentFolder = Environment.GetFolderPath (Environment.SpecialFolder.Personal);
-							success = dlg.Run ();
-						});
+							return dlg.Run ();
+						}).Result;
 						if (!success || !File.Exists (dlg.SelectedFile + ".pub"))
 							throw new VersionControlException (GettextCatalog.GetString ("Invalid credentials were supplied. Aborting operation."));
 
@@ -143,10 +145,10 @@ namespace MonoDevelop.VersionControl.Git
 						};
 
 						if (KeyHasPassphrase (dlg.SelectedFile)) {
-							DispatchService.GuiSyncDispatch (delegate {
+							result = Runtime.RunInMainThread (delegate {
 								using (var credDlg = new CredentialsDialog (url, types, cred))
-									result = MessageService.ShowCustomDialog (credDlg) == (int)Gtk.ResponseType.Ok;
-							});
+									return MessageService.ShowCustomDialog (credDlg) == (int)Gtk.ResponseType.Ok;
+							}).Result;
 						}
 
 						if (result)
@@ -165,15 +167,15 @@ namespace MonoDevelop.VersionControl.Git
 				return cred;
 			}
 
-			DispatchService.GuiSyncDispatch (delegate {
+			result = Runtime.RunInMainThread (delegate {
 				using (var credDlg = new CredentialsDialog (url, types, cred))
-					result = MessageService.ShowCustomDialog (credDlg) == (int)Gtk.ResponseType.Ok;
-			});
+					return MessageService.ShowCustomDialog (credDlg) == (int)Gtk.ResponseType.Ok;
+			}).Result;
 
 			if (result) {
 				if ((types & SupportedCredentialTypes.UsernamePassword) != 0) {
 					var upcred = (UsernamePasswordCredentials)cred;
-					if (!string.IsNullOrEmpty (upcred.Password)) {
+					if (!string.IsNullOrEmpty (upcred.Password) && uri != null) {
 						PasswordService.AddWebUserNameAndPassword (uri, upcred.Username, upcred.Password);
 					}
 				}

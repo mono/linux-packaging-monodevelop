@@ -108,7 +108,7 @@ namespace MonoDevelop.Components.AutoTest
 			object res = null;
 			Exception error = null;
 
-			if (DispatchService.IsGuiThread) {
+			if (Runtime.IsMainThread) {
 				res = del ();
 				return safe ? SafeObject (res) : res;
 			}
@@ -182,13 +182,34 @@ namespace MonoDevelop.Components.AutoTest
 		public void TakeScreenshot (string screenshotPath)
 		{
 			#if MAC
-			DispatchService.GuiDispatch (delegate {
+			Runtime.RunInMainThread (delegate {
 				try {
 					IntPtr handle = CGDisplayCreateImage (MainDisplayID ());
 					CoreGraphics.CGImage screenshot = ObjCRuntime.Runtime.GetINativeObject <CoreGraphics.CGImage> (handle, true);
 					AppKit.NSBitmapImageRep imgRep =  new AppKit.NSBitmapImageRep (screenshot);
 					var imageData = imgRep.RepresentationUsingTypeProperties (AppKit.NSBitmapImageFileType.Png);
 					imageData.Save (screenshotPath, true);
+				} catch (Exception e) {
+					Console.WriteLine (e);
+					throw;
+				}
+			});
+			#else
+			Sync (delegate {
+				try {
+					using (var bmp = new System.Drawing.Bitmap (System.Windows.Forms.Screen.PrimaryScreen.Bounds.Width,
+						System.Windows.Forms.Screen.PrimaryScreen.Bounds.Height)) {
+						using (var g = System.Drawing.Graphics.FromImage(bmp))
+						{
+							g.CopyFromScreen(System.Windows.Forms.Screen.PrimaryScreen.Bounds.X,
+								System.Windows.Forms.Screen.PrimaryScreen.Bounds.Y,
+								0, 0,
+								bmp.Size,
+								System.Drawing.CopyPixelOperation.SourceCopy);
+						}
+						bmp.Save(screenshotPath);
+					}
+					return null;
 				} catch (Exception e) {
 					Console.WriteLine (e);
 					throw;
@@ -219,6 +240,17 @@ namespace MonoDevelop.Components.AutoTest
 		public int ErrorCount (TaskSeverity severity)
 		{
 			return TaskService.Errors.Count (x => x.Severity == severity);
+		}
+
+		public List<TaskListEntryDTO> GetErrors (TaskSeverity severity)
+		{
+			return TaskService.Errors.Where (x => x.Severity == severity).Select (x => new TaskListEntryDTO () {
+				Line = x.Line,
+				Description = x.Description,
+				File = x.FileName.FileName,
+				Path = x.FileName.FullPath,
+				Project = x.WorkspaceObject.Name
+			}).ToList ();
 		}
 
 		object SafeObject (object ob)
@@ -253,6 +285,8 @@ namespace MonoDevelop.Components.AutoTest
 			
 			if (remaining == null)
 				return res;
+			else if (res == null)
+				return null;
 			else
 				return GetValue (res, res.GetType (), remaining);
 		}
@@ -302,14 +336,20 @@ namespace MonoDevelop.Components.AutoTest
 
 		public void ExecuteOnIdle (Action idleFunc, bool wait = true, int timeout = 20000)
 		{
+			if (Runtime.IsMainThread) {
+				idleFunc ();
+				return;
+			}
+
 			if (wait == false) {
 				GLib.Idle.Add (() => {
 					idleFunc ();
 					return false;
 				});
+
 				return;
 			}
-
+				
 			syncEvent.Reset ();
 			GLib.Idle.Add (() => {
 				idleFunc ();
@@ -324,7 +364,7 @@ namespace MonoDevelop.Components.AutoTest
 
 		// Executes the query outside of a syncEvent wait so it is safe to call from
 		// inside an ExecuteOnIdleAndWait
-		AppResult[] ExecuteQueryNoWait (AppQuery query)
+		internal AppResult[] ExecuteQueryNoWait (AppQuery query)
 		{
 			AppResult[] resultSet = query.Execute ();
 			Sync (() => {
@@ -346,7 +386,6 @@ namespace MonoDevelop.Components.AutoTest
 			} catch (TimeoutException e) {
 				throw new TimeoutException (string.Format ("Timeout while executing ExecuteQuery: {0}", query), e);
 			}
-
 			return resultSet;
 		}
 
@@ -527,6 +566,15 @@ namespace MonoDevelop.Components.AutoTest
 				ExecuteOnIdle (() => result.Flash ());
 			} catch (TimeoutException e) {
 				ThrowOperationTimeoutException ("Flash", result.SourceQuery, result, e);
+			}
+		}
+
+		public void SetProperty (AppResult result, string name, object o)
+		{
+			try {
+				ExecuteOnIdle (() => result.SetProperty (name, o));
+			} catch (TimeoutException e) {
+				ThrowOperationTimeoutException ("SetProperty", result.SourceQuery, result, e);
 			}
 		}
 

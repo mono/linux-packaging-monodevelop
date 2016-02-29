@@ -34,7 +34,7 @@ using Gtk;
 
 namespace Mono.TextEditor
 {
-	public static class GtkWorkarounds
+	static class GtkWorkarounds
 	{
 		const string LIBOBJC ="/usr/lib/libobjc.dylib";
 		const string USER32DLL = "User32.dll";
@@ -1042,7 +1042,7 @@ namespace Mono.TextEditor
 			}
 		}
 
-		static bool canSetOverlayScrollbarPolicy = true;
+		static bool canSetOverlayScrollbarPolicy = Platform.IsMac;
 
 		[DllImport (PangoUtil.LIBQUARTZ)]
 		static extern void gtk_scrolled_window_set_overlay_policy (IntPtr sw, Gtk.PolicyType hpolicy, Gtk.PolicyType vpolicy);

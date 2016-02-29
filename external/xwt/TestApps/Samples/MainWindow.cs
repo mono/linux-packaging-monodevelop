@@ -73,13 +73,15 @@ namespace Samples
 			AddSample (w, "CheckBox", typeof(Checkboxes));
 			AddSample (w, "Clipboard", typeof(ClipboardSample));
 			AddSample (w, "ColorSelector", typeof(ColorSelectorSample));
+			AddSample (w, "FontSelector", typeof(FontSelectorSample));
 			AddSample (w, "ComboBox", typeof(ComboBoxes));
 			AddSample (w, "DatePicker", typeof(DatePickerSample));
 //			AddSample (null, "Designer", typeof(Designer));
 			AddSample (w, "Expander", typeof (ExpanderSample));
 			AddSample (w, "Progress bars", typeof(ProgressBarSample));
 			AddSample (w, "Frames", typeof(Frames));
-			AddSample (w, "Images", typeof(Images));
+			var images = AddSample (w, "Images", typeof(Images));
+			AddSample (images, "Themed", typeof(ThemedImages));
 			AddSample (w, "Labels", typeof(Labels));
 			AddSample (w, "ListBox", typeof(ListBoxSample));
 			AddSample (w, "LinkLabels", typeof(LinkLabels));
