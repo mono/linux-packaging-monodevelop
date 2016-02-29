@@ -1,3 +1,2 @@
-downgrade_to_mvc3.patch
 fix_autoreconf.patch
 no_appmenu
