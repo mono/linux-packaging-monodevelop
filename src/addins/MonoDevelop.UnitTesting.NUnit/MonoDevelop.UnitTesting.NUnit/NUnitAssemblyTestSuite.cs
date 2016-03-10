@@ -384,16 +384,18 @@ namespace MonoDevelop.UnitTesting.NUnit
 			var runnerExe = GetCustomConsoleRunnerCommand ();
 			if (runnerExe != null)
 				return RunWithConsoleRunner (runnerExe, test, suiteName, pathName, testName, testContext);
-			var console = IdeApp.Workbench?.ProgressMonitors.ConsoleFactory.CreateConsole ();
+
+			var console = testContext.ExecutionContext.ConsoleFactory.CreateConsole ();
+
 			ExternalTestRunner runner = new ExternalTestRunner ();
-			runner.Connect (NUnitVersion, testContext.ExecutionContext, console).Wait ();
+			runner.Connect (NUnitVersion, testContext.ExecutionContext.ExecutionHandler, console).Wait ();
 			LocalTestMonitor localMonitor = new LocalTestMonitor (testContext, test, suiteName, testName != null);
 
 			string[] filter = null;
 			if (test != null) {
-				if (test is UnitTestGroup) {
+				if (test is UnitTestGroup && NUnitVersion == NUnitVersion.NUnit2) {
 					filter = CollectTests ((UnitTestGroup)test);
-				} else {
+				} else if (test.TestId != null) {
 					filter = new string [] { test.TestId };
 				}
 			}
@@ -402,7 +404,8 @@ namespace MonoDevelop.UnitTesting.NUnit
 			rd.Runner = runner;
 			rd.Test = this;
 			rd.LocalMonitor = localMonitor;
-			testContext.Monitor.CancelRequested += new TestHandler (rd.Cancel);
+
+			var cancelReg = testContext.Monitor.CancellationToken.Register (rd.Cancel);
 
 			UnitTestResult result;
 			var crashLogFile = Path.GetTempFileName ();
@@ -412,11 +415,12 @@ namespace MonoDevelop.UnitTesting.NUnit
 					string msg = GettextCatalog.GetString ("Could not get a valid path to the assembly. There may be a conflict in the project configurations.");
 					throw new Exception (msg);
 				}
-				System.Runtime.Remoting.RemotingServices.Marshal (localMonitor, null, typeof (IRemoteEventListener));
 
 				string testRunnerAssembly, testRunnerType;
 				GetCustomTestRunner (out testRunnerAssembly, out testRunnerType);
 
+				testContext.Monitor.CancellationToken.ThrowIfCancellationRequested ();
+					
 				result = runner.Run (localMonitor, filter, AssemblyPath, "", new List<string> (SupportAssemblies), testRunnerType, testRunnerAssembly, crashLogFile).Result;
 				if (testName != null)
 					result = localMonitor.SingleTestResult;
@@ -440,10 +444,11 @@ namespace MonoDevelop.UnitTesting.NUnit
 					result = UnitTestResult.CreateFailure (GettextCatalog.GetString ("Canceled"), null);
 				}
 			} finally {
-				File.Delete (crashLogFile);
-				testContext.Monitor.CancelRequested -= new TestHandler (rd.Cancel);
+				if (console != null)
+					console.Dispose ();
+				cancelReg.Dispose ();
 				runner.Dispose ();
-				System.Runtime.Remoting.RemotingServices.Disconnect (localMonitor);
+				File.Delete (crashLogFile);
 			}
 			
 			return result;
@@ -475,7 +480,7 @@ namespace MonoDevelop.UnitTesting.NUnit
 		{
 			var outFile = Path.GetTempFileName ();
 			var xmlOutputConsole = new LocalConsole ();
-			var appDebugOutputConsole = IdeApp.Workbench?.ProgressMonitors.ConsoleFactory.CreateConsole ();
+			var appDebugOutputConsole = testContext.ExecutionContext.ConsoleFactory.CreateConsole ();
 			OperationConsole cons;
 			if (appDebugOutputConsole != null) {
 				cons = new MultipleOperationConsoles (appDebugOutputConsole, xmlOutputConsole);
@@ -492,7 +497,7 @@ namespace MonoDevelop.UnitTesting.NUnit
 
 				bool automaticUpdates = cmd.Command != null && (cmd.Command.Contains ("GuiUnit") || (cmd.Command.Contains ("mdtool.exe") && cmd.Arguments.Contains ("run-md-tests")));
 				if (!string.IsNullOrEmpty(pathName))
-					cmd.Arguments += " -run=\"" + test.TestId + "\"";
+					cmd.Arguments += " -run=\"" + test.TestId.Replace("\"", "\\\"") + "\"";
 				if (automaticUpdates) {
 					tcpListener = new MonoDevelop.UnitTesting.NUnit.External.TcpTestListener (localMonitor, suiteName);
 					cmd.Arguments += " -port=" + tcpListener.Port;
@@ -501,12 +506,14 @@ namespace MonoDevelop.UnitTesting.NUnit
 				// Note that we always dispose the tcp listener as we don't want it listening
 				// forever if the test runner does not try to connect to it
 				using (tcpListener) {
-					var p = testContext.ExecutionContext.Execute (cmd, cons);
-					testContext.Monitor.CancelRequested += p.Cancel;
-					if (testContext.Monitor.IsCancelRequested)
-						p.Cancel ();
-					p.Task.Wait ();
-					testContext.Monitor.CancelRequested -= p.Cancel;
+					var handler = testContext.ExecutionContext.ExecutionHandler;
+
+					if (handler == null)
+						handler = Runtime.ProcessService.DefaultExecutionHandler;
+					
+					var p = handler.Execute (cmd, cons);
+					using (testContext.Monitor.CancellationToken.Register (p.Cancel))
+						p.Task.Wait ();
 
 					if (new FileInfo (outFile).Length == 0)
 						throw new Exception ("Command failed");

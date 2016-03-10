@@ -25,7 +25,11 @@ module Patterns =
     let (|Keyword|_|) ts =
         match ts.TokenInfo.ColorClass, ts.ExtraColorInfo with
         | FSharpTokenColorKind.Keyword, _ -> Some ts
-        | _, Some(_range, extra) when extra = FSharpTokenColorKind.Keyword -> Some ts
+        | _ -> None
+        
+    let (|CustomKeyword|_|) ts =
+        match ts.ExtraColorInfo with
+        | Some(_range, extra) when extra = FSharpTokenColorKind.Keyword -> Some ts
         | _ -> None
 
     let (|Punctuation|_|) (ts : TokenSymbol) =
@@ -298,49 +302,64 @@ module Patterns =
                     |> Option.bind (Array.tryFind (fun (rng : Range.range, _) -> rng.StartLine = lineNo && rng.EndColumn = token.RightColumn + 1))
                 else None
     
-            let tokenSymbol =
-                { TokenInfo = token; SymbolUse = symbol; ExtraColorInfo = extraColor }
-    
-            let highlightMutable isMut =
-                isMut && PropertyService.Get("FSharpBinding.HighlightMutables", true)
+            let highlightMutable isMut = isMut && PropertyService.Get("FSharpBinding.HighlightMutables", false)
 
-            let chunkStyle =
-                match tokenSymbol with
-                | InactiveCode -> style.ExcludedCode
-                | ComputationExpression _name -> style.KeywordTypes
-                | Punctuation -> style.Punctuation
-                | PunctuationBrackets -> style.PunctuationForBrackets
-                | Keyword ts -> Keywords.getType style ts
-                | Comment -> style.CommentsSingleLine
-                | StringLiteral -> style.String
-                | NumberLiteral -> style.Number
-                | Module _ | ActivePatternCase | Record _ | Union _ | TypeAbbreviation | Class _ | Constructor _ -> style.UserTypes
-                | GenericParameter _ -> style.UserTypesTypeParameters
-                | Namespace _ -> style.PlainText
-                | Property fromDef -> if fromDef then style.UserPropertyDeclaration else style.UserPropertyUsage
+            let makeSeg (chunkStyle:ChunkStyle) =
+               ColoredSegment(lineOffset + token.LeftColumn, token.RightColumn - token.LeftColumn + 1, chunkStyle.Name)
+               |> Some
+                //Uncomment to visualise tokens segments
+                //LoggingService.LogInfo (sprintf """Segment: %s S:%i E:%i L:%i - "%s" """ seg.ColorStyleKey seg.Offset seg.EndOffset seg.Length (editor.GetTextBetween (seg.Offset, seg.EndOffset)) )
+         
+            
+            let tryGetStyle =
+                match { TokenInfo = token; SymbolUse = symbol; ExtraColorInfo = extraColor } with
+                | InactiveCode ->
+                    makeSeg style.ExcludedCode
+                | ComputationExpression _name ->
+                    makeSeg style.KeywordTypes
+                | CustomKeyword _ ->   
+                    makeSeg style.KeywordTypes
+                | Module _ | ActivePatternCase | Record _ | Union _ | TypeAbbreviation | Class _ | Constructor _ ->
+                    makeSeg style.UserTypes
+                | GenericParameter _ ->
+                    makeSeg style.UserTypesTypeParameters
+                | Namespace _ ->
+                    makeSeg style.PlainText
+                | Property fromDef ->
+                    if fromDef then makeSeg style.UserPropertyDeclaration 
+                    else makeSeg style.UserPropertyUsage
                 | Field (fromDef, isMut) ->
-                    if highlightMutable isMut then style.UserTypesMutable
-                    elif fromDef then style.UserFieldDeclaration
-                    else style.UserFieldUsage
-                | Function fromDef -> if fromDef then style.UserMethodDeclaration else style.UserMethodUsage
+                    if highlightMutable isMut then makeSeg style.UserTypesMutable
+                    elif fromDef then makeSeg style.UserFieldDeclaration
+                    else makeSeg style.UserFieldUsage
+                | Function fromDef ->
+                    if fromDef then makeSeg style.UserMethodDeclaration
+                    else makeSeg style.UserMethodUsage
                 | Val (su, isMut) ->
-                    if highlightMutable isMut then style.UserTypesMutable
+                    if highlightMutable isMut then makeSeg style.UserTypesMutable
                     //elif su.Symbol.DisplayName.StartsWith "_" then style.ExcludedCode 
-                    elif su.IsFromDefinition then style.UserFieldDeclaration
-                    else style.UserFieldUsage
-                | UnionCase | Enum _ -> style.UserTypesEnums
-                | Delegate _ -> style.UserTypesDelegates
-                | Event fromDef -> if fromDef then style.UserEventDeclaration else style.UserEventUsage
-                | Interface -> style.UserTypesInterfaces
-                | ValueType _ -> style.UserTypesValueTypes
-                | PreprocessorKeyword -> style.Preprocessor
-                | _other -> style.PlainText
-    
-            //let seg = ColoredSegment(lineOffset + token.LeftColumn, max (token.RightColumn - token.LeftColumn + 1) token.FullMatchedLength, chunkStyle.Name)
-            let seg = ColoredSegment(lineOffset + token.LeftColumn, token.RightColumn - token.LeftColumn + 1, chunkStyle.Name)
-            //Uncomment to visualise tokens segments
-            //LoggingService.LogInfo (sprintf """Segment: %s S:%i E:%i L:%i - "%s" """ seg.ColorStyleKey seg.Offset seg.EndOffset seg.Length (editor.GetTextBetween (seg.Offset, seg.EndOffset)) )
-            seg
+                    elif su.IsFromDefinition then makeSeg style.UserFieldDeclaration
+                    else makeSeg style.UserFieldUsage
+                | UnionCase | Enum _ ->
+                    makeSeg style.UserTypesEnums
+                | Delegate _ ->
+                    makeSeg style.UserTypesDelegates
+                | Event fromDef ->
+                    if fromDef then makeSeg style.UserEventDeclaration
+                    else makeSeg style.UserEventUsage
+                | Interface ->
+                    makeSeg style.UserTypesInterfaces
+                | ValueType _ ->
+                    makeSeg style.UserTypesValueTypes
+                //| Keyword ts -> makeSeg (Keywords.getType style ts)
+                //| Comment -> makeSeg style.CommentsSingleLine
+                //| StringLiteral -> makeSeg style.String
+                //| NumberLiteral -> makeSeg style.Number
+                //| Punctuation -> None //makeSeg style.Punctuation
+                //| PunctuationBrackets -> None //makeSeg style.PunctuationForBrackets
+                //| PreprocessorKeyword -> None//Some style.Preprocessor
+                | _other -> None
+            tryGetStyle
             
         let tryGetTokensSymbolsAndColours (context:DocumentContext) =
             maybe {
@@ -349,15 +368,16 @@ module Patterns =
                 let! tokens = pd.Tokens 
                 let symbolsInFile = pd.AllSymbolsKeyed
                 let colourisations = checkResults.GetExtraColorizations()
-                return tokens, symbolsInFile, colourisations }
+                let formatters = checkResults.GetStringFormatterColours()
+                return tokens, symbolsInFile, colourisations, formatters }
 
         let getColouredSegment tokenssymbolscolours lineNumber lineOffset txt style =
             match tokenssymbolscolours with
-            | Some (tokens:_ list, symbols, colours) when tokens.Length >= lineNumber ->
+            | Some (tokens:_ list, symbols, colours, _formatters) when tokens.Length >= lineNumber ->
                 let tokens, _state = tokens.[lineNumber-1]
                 tokens
                 |> Lexer.fixTokens txt
-                |> List.map (fun draft -> makeChunk symbols lineNumber lineOffset colours style {draft.Token with RightColumn=draft.RightColumn} )
+                |> List.choose (fun draft -> makeChunk symbols lineNumber lineOffset colours style {draft.Token with RightColumn = draft.RightColumn} )
                 |> List.toSeq
             | _ -> Seq.empty
 

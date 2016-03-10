@@ -187,6 +187,9 @@ namespace MonoDevelop.SourceEditor
 			widget.TextEditor.Document.TextReplacing += OnTextReplacing;
 			widget.TextEditor.Document.TextReplaced += OnTextReplaced;
 			widget.TextEditor.Document.ReadOnlyCheckDelegate = CheckReadOnly;
+			widget.TextEditor.Document.TextSet += HandleDocumentTextSet;
+
+
 			widget.TextEditor.TextViewMargin.LineShown += TextViewMargin_LineShown;
 			//			widget.TextEditor.Document.DocumentUpdated += delegate {
 			//				this.IsDirty = Document.IsDirty;
@@ -194,7 +197,7 @@ namespace MonoDevelop.SourceEditor
 			
 			widget.TextEditor.Caret.PositionChanged += HandlePositionChanged; 
 			widget.TextEditor.IconMargin.ButtonPressed += OnIconButtonPress;
-
+			widget.TextEditor.TextArea.FocusOutEvent += TextArea_FocusOutEvent;
 			ClipbardRingUpdated += UpdateClipboardRing;
 			
 			TextEditorService.FileExtensionAdded += HandleFileExtensionAdded;
@@ -228,6 +231,13 @@ namespace MonoDevelop.SourceEditor
 				Document.FileName = document.FileName;
 			}
 			FileRegistry.Add (this);
+		}
+
+		void HandleDocumentTextSet (object sender, EventArgs e)
+		{
+			while (editSessions.Count > 0) {
+				EndSession ();
+			}
 		}
 
 		protected override void OnContentNameChanged ()
@@ -971,6 +981,8 @@ namespace MonoDevelop.SourceEditor
 			widget.TextEditor.Document.ReadOnlyCheckDelegate = null;
 			widget.TextEditor.Options.Changed -= HandleWidgetTextEditorOptionsChanged;
 			widget.TextEditor.TextViewMargin.LineShown -= TextViewMargin_LineShown;
+			widget.TextEditor.TextArea.FocusOutEvent -= TextArea_FocusOutEvent;
+			widget.TextEditor.Document.TextSet -= HandleDocumentTextSet;
 
 			TextEditorService.FileExtensionAdded -= HandleFileExtensionAdded;
 			TextEditorService.FileExtensionRemoved -= HandleFileExtensionRemoved;
@@ -1734,7 +1746,7 @@ namespace MonoDevelop.SourceEditor
 		
 		public Style GtkStyle { 
 			get {
-				return widget.Vbox.Style.Copy ();
+				return widget.Vbox.Style;
 			}
 		}
 
@@ -2582,13 +2594,16 @@ namespace MonoDevelop.SourceEditor
 			mode.CurIndex = insertionModeOptions.FirstSelectedInsertionPoint;
 			mode.StartMode ();
 			mode.Exited += delegate(object s, Mono.TextEditor.InsertionCursorEventArgs iCArgs) {
-				insertionModeOptions.ModeExitedAction (new MonoDevelop.Ide.Editor.InsertionCursorEventArgs (iCArgs.Success, 
-					new MonoDevelop.Ide.Editor.InsertionPoint (
-						new MonoDevelop.Ide.Editor.DocumentLocation (iCArgs.InsertionPoint.Location.Line, iCArgs.InsertionPoint.Location.Column),
-						(MonoDevelop.Ide.Editor.NewLineInsertion)iCArgs.InsertionPoint.LineBefore,
-						(MonoDevelop.Ide.Editor.NewLineInsertion)iCArgs.InsertionPoint.LineAfter
-					)
-				));
+				if (insertionModeOptions.ModeExitedAction != null) {
+					insertionModeOptions.ModeExitedAction (new MonoDevelop.Ide.Editor.InsertionCursorEventArgs (iCArgs.Success,
+																												iCArgs.Success ? 
+					                                                                                            new MonoDevelop.Ide.Editor.InsertionPoint (
+						                                                                                            new MonoDevelop.Ide.Editor.DocumentLocation (iCArgs.InsertionPoint.Location.Line, iCArgs.InsertionPoint.Location.Column),
+						                                                                                            (MonoDevelop.Ide.Editor.NewLineInsertion)iCArgs.InsertionPoint.LineBefore, 
+						                                                                                            (MonoDevelop.Ide.Editor.NewLineInsertion)iCArgs.InsertionPoint.LineAfter) 
+					                                                                                            : null
+																											   ));
+				}
 			};
 		}
 
@@ -3131,6 +3146,9 @@ namespace MonoDevelop.SourceEditor
 
 		public event EventHandler<Ide.Editor.LineEventArgs> LineShown;
 
+
+
+
 		#region IEditorActionHost implementation
 
 		void IEditorActionHost.MoveCaretDown ()
@@ -3467,5 +3485,14 @@ namespace MonoDevelop.SourceEditor
 		}
 
 		#endregion
+	
+	
+
+		public event EventHandler FocusLost;
+
+		void TextArea_FocusOutEvent (object o, FocusOutEventArgs args)
+		{
+			FocusLost?.Invoke (this, EventArgs.Empty);
+		}
 	}
 } 

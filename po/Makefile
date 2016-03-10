@@ -246,6 +246,7 @@ MD_LAUNCH_SETUP = \
 	MONODEVELOP_LOCALE_PATH="$(abs_top_builddir)/build/locale"
 
 MDTOOL_RUN = $(MD_LAUNCH_SETUP) exec -a "mdtool" $(RUNTIME)$(SGEN_SUFFIX) --debug "$(MD_BIN_PATH)/mdtool.exe"
+#MDTOOL_RUN = $(MD_LAUNCH_SETUP) "$(MD_BIN_PATH)/mdtool"
 all: all-am
 
 .SUFFIXES:

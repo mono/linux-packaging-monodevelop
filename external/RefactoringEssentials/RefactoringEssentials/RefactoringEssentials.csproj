@@ -43,6 +43,13 @@
   <PropertyGroup>
     <IncludeCopyLocalReferencesInVSIXContainer>false</IncludeCopyLocalReferencesInVSIXContainer>
   </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>false</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>
+    </AssemblyOriginatorKeyFile>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="Common\CodeContractsCodeRefactoringProvider.cs" />
     <Compile Include="Common\NotPortedYetAttribute.cs" />
@@ -158,8 +165,6 @@
     <Compile Include="CSharp\Diagnostics\Custom\CompilerErrors\CS0169FieldIsNeverUsedAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Custom\CompilerErrors\CS0618UsageOfObsoleteMemberAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Custom\CompilerErrors\CS1729TypeHasNoConstructorWithNArgumentsAnalyzer.cs" />
-    <Compile Include="CSharp\Diagnostics\Custom\CompilerErrors\ExpressionIsNeverOfProvidedTypeAnalyzer.cs" />
-    <Compile Include="CSharp\Diagnostics\Custom\CompilerErrors\MissingInterfaceMemberImplementationAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Custom\CompilerErrors\StaticConstructorParameterAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Custom\AdditionalOfTypeAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Custom\BaseMethodParameterNameMismatchAnalyzer.cs" />
@@ -205,7 +210,6 @@
     <Compile Include="CSharp\Diagnostics\Synced\CodeQuality\PolymorphicFieldLikeEventInvocationAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Synced\CodeQuality\PossibleAssignmentToReadonlyFieldAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Synced\CodeQuality\PossibleMultipleEnumerationAnalyzer.cs" />
-    <Compile Include="CSharp\Diagnostics\Synced\CodeQuality\StaticFieldInGenericTypeAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Synced\CodeQuality\ThreadStaticAtInstanceFieldAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Synced\CodeQuality\ValueParameterNotUsedAnalyzer.cs" />
     <Compile Include="CSharp\Diagnostics\Synced\CompilerErrors\ProhibitedModifiersAnalyzer.cs" />
@@ -615,6 +619,7 @@
     <Compile Include="Util\CompositieFormatStringParser\FormatStringSegmentBase.cs" />
     <Compile Include="Util\CompositieFormatStringParser\FormatItem.cs" />
     <Compile Include="Util\CompositieFormatStringParser\CompositeFormatStringParser.cs" />
+    <Compile Include="CSharp\Diagnostics\Synced\CodeQuality\StaticFieldOrAutoPropertyInGenericTypeAnalyzer.cs" />
   </ItemGroup>
   <ItemGroup>
 
@@ -671,15 +676,10 @@
     <Folder Include="CSharp\Diagnostics\CompilerWarnings\" />
     <Folder Include="CSharp\Diagnostics\Synced\ConstraintViolations\InconsistentNamingIssue\" />
     <Folder Include="Samples\VB\" />
-    <Folder Include="Util\CompositieFormatStringParser\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="CodeRefactorings.html.template" />
     <None Include="CodeAnalyzers.html.template" />
-  </ItemGroup>
-  <ItemGroup>
-    <Analyzer Include="..\packages\Microsoft.CodeAnalysis.Analyzers.1.1.0\analyzers\dotnet\cs\Microsoft.CodeAnalysis.Analyzers.dll" />
-    <Analyzer Include="..\packages\Microsoft.CodeAnalysis.Analyzers.1.1.0\analyzers\dotnet\cs\Microsoft.CodeAnalysis.CSharp.Analyzers.dll" />
   </ItemGroup>
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
