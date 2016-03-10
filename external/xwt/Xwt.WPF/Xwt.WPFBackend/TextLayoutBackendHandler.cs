@@ -41,7 +41,7 @@ namespace Xwt.WPFBackend
 	{
 		public override object Create ()
 		{
-			return new TextLayoutBackend ();
+			return new TextLayoutBackend (ApplicationContext);
 		}
 
 		public override void SetWidth (object backend, double value)
@@ -99,7 +99,7 @@ namespace Xwt.WPFBackend
 		public override double GetMeanline (object backend)
 		{
 			var t = (TextLayoutBackend)backend;
-			var fd = (FontData)Toolkit.GetBackend(t.Font);
+			var fd = (FontData)ApplicationContext.Toolkit.GetSafeBackend(t.Font);
 			var tf = new Typeface (fd.Family, fd.Style, fd.Weight, fd.Stretch);
 
 			return t.FormattedText.Baseline + tf.StrikethroughPosition * fd.Size;
@@ -130,6 +130,13 @@ namespace Xwt.WPFBackend
 		string text = String.Empty;
 		Xwt.Drawing.TextTrimming? textTrimming;
 		bool needsRebuild;
+
+		readonly ApplicationContext ApplicationContext;
+
+		public TextLayoutBackend (ApplicationContext actx)
+		{
+			this.ApplicationContext = actx;
+		}
 
 		public System.Windows.Media.FormattedText FormattedText
 		{
@@ -192,7 +199,7 @@ namespace Xwt.WPFBackend
 
 		void ApplyFont ()
 		{
-			var f = (FontData)Toolkit.GetBackend(Font);
+			var f = (FontData)ApplicationContext.Toolkit.GetSafeBackend (Font);
 			FormattedText.SetFontFamily(f.Family);
 			FormattedText.SetFontSize(f.GetDeviceIndependentPixelSize());
 			FormattedText.SetFontStretch(f.Stretch);

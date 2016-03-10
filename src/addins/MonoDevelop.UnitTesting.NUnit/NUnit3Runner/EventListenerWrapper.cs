@@ -142,14 +142,21 @@ namespace NUnit3Runner
 					var msg = e.SelectSingleNode ("reason/message");
 					if (msg != null)
 						res.Message = msg.InnerText;
+				} else if (runResult == "Inconclusive") {
+					res.Inconclusive = 1;
+					var msg = e.SelectSingleNode ("reason/message");
+					if (msg != null)
+						res.Message = msg.InnerText;
 				}
 			}
 
 			res.Time = TimeSpan.FromSeconds (double.Parse (e.GetAttribute ("duration"), CultureInfo.InvariantCulture));
 
 			var output = e.SelectSingleNode ("output");
-			if (output != null)
+			if (output != null) {
+				Console.WriteLine (output.InnerText);
 				res.ConsoleOutput = output.InnerText;
+			}
 			
 			return res;
 		}

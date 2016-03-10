@@ -27,6 +27,8 @@
 //
 
 using System;
+using System.Globalization;
+using System.Text;
 
 using MonoDevelop.Core;
 using MonoDevelop.Components.Commands;
@@ -34,6 +36,7 @@ using MonoDevelop.UnitTesting.Commands;
 using MonoDevelop.Ide.Commands;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
+using MonoDevelop.Ide.TypeSystem;
 
 namespace MonoDevelop.UnitTesting
 {
@@ -66,19 +69,19 @@ namespace MonoDevelop.UnitTesting
 			UnitTest test = dataObject as UnitTest;
 			nodeInfo.Icon = test.StatusIcon;
 
-			var title = RemoveMarkup(test.Title);
-
+			var title = RemoveGenericArgument (test.Title);
+			title = test.Title;
 			if (test.Status == TestStatus.Running) {
-				nodeInfo.Label = title;
+				nodeInfo.Label = Ambience.EscapeText (title);
 				return;
 			} else if (test.Status == TestStatus.Loading) {
-				nodeInfo.Label = title + GettextCatalog.GetString (" (Loading)");
+				nodeInfo.Label = Ambience.EscapeText (title) + GettextCatalog.GetString (" (Loading)");
 				return;
 			} else if (test.Status == TestStatus.LoadError) {
-				nodeInfo.Label = title + GettextCatalog.GetString (" (Load failed)");
+				nodeInfo.Label = Ambience.EscapeText (title) + GettextCatalog.GetString (" (Load failed)");
 				return;
 			} else {
-				nodeInfo.Label = title;
+				nodeInfo.Label = Ambience.EscapeText (title);
 
 				UnitTestResult res = test.GetLastResult ();
 				if (res != null && treeBuilder.Options ["ShowTestCounters"] && (test is UnitTestGroup)) {
@@ -133,19 +136,20 @@ namespace MonoDevelop.UnitTesting
 			if (tb != null) tb.Update ();
 		}
 
-		static string RemoveMarkup (string title)
+		static string RemoveGenericArgument (string title)
 		{
-			var leftAngleIndex = title.IndexOf ('<');
-			if (leftAngleIndex > -1) {
-				var rightAngleIndex = title.IndexOf ('>');
-				if (rightAngleIndex > -1) {
-					title = title.Substring (0, leftAngleIndex) + title.Substring (rightAngleIndex + 1);
+			var leftParen = title.LastIndexOf ('(', title.Length - 1);
+			if (leftParen > -1) {
+				var leftAngleIndex = title.LastIndexOf ('<', leftParen);
+				if (leftAngleIndex > -1) {
+					var rightAngleIndex = title.IndexOf ('>', leftAngleIndex);
+					if (rightAngleIndex > -1) {
+						title = title.Substring (0, leftAngleIndex) + title.Substring (rightAngleIndex + 1);
+					}
 				}
 			}
-
 			return title;
 		}
-
 	}
 	
 	class TestNodeCommandHandler: NodeCommandHandler

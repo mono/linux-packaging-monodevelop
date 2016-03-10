@@ -101,6 +101,8 @@ namespace MonoDevelop.Ide.FindInFiles
 
 				if (doc != null && doc.Editor != null) {
 					result = doc.Editor.Text;
+					encoding = doc.Editor.Encoding;
+					hadBom = doc.Editor.UseBOM;
 				} else {
 					try {
 						if (!File.Exists (FileName))
@@ -173,7 +175,7 @@ namespace MonoDevelop.Ide.FindInFiles
 			}
 			if (buffer != null && somethingReplaced) {
 				object attributes = DesktopService.GetFileAttributes (FileName);
-				TextFileUtility.WriteText (FileName, buffer.ToString (), encoding, hadBom);
+				TextFileUtility.WriteText (FileName, buffer.ToString (), encoding ?? Encoding.UTF8, hadBom);
 				DesktopService.SetFileAttributes (FileName, attributes);
 			}
 			FileService.NotifyFileChanged (FileName);

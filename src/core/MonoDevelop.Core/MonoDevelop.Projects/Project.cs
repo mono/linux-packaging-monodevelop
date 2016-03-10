@@ -153,8 +153,7 @@ namespace MonoDevelop.Projects
 
 				if (creationContext.Project != null) {
 					this.sourceProject = creationContext.Project;
-					IMSBuildPropertySet globalGroup = sourceProject.GetGlobalPropertyGroup ();
-					projectTypeGuids = globalGroup.GetValue ("ProjectTypeGuids");
+					projectTypeGuids = sourceProject.EvaluatedProperties.GetValue ("ProjectTypeGuids");
 					if (projectTypeGuids != null) {
 						var subtypeGuids = new List<string> ();
 						foreach (string guid in projectTypeGuids.Split (';')) {
@@ -2742,7 +2741,7 @@ namespace MonoDevelop.Projects
 				var p2 = evalItem.Metadata.GetProperty (p.Name);
 				if (p2 == null)
 					return false;
-				if (!p.ValueType.Equals (p.Value, p2.Value))
+				if (!p.ValueType.Equals (p.Value, p2.UnevaluatedValue))
 					return false;
 				n++;
 			}

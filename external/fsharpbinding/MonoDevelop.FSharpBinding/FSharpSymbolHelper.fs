@@ -486,6 +486,7 @@ module SymbolTooltips =
                 | _ when constrainedBy.IsEqualityConstraint -> seq { yield asSymbol " : "; yield asKeyword "equality" }
                 | _ when constrainedBy.IsDelegateConstraint -> delegateConstraint constrainedBy.DelegateConstraintData
                 | _ when constrainedBy.IsUnmanagedConstraint -> seq { yield asSymbol " : "; yield asKeyword "unmanaged"}
+                | _ when constrainedBy.IsNonNullableValueTypeConstraint -> seq { yield asSymbol " : "; yield asKeyword "struct" }
                 | _ -> Seq.empty
 
             seq {
@@ -807,7 +808,11 @@ module SymbolTooltips =
         | ActivePattern ap ->
             let signature = getFuncSignature symbol.DisplayContext ap
             Some(signature, getSummaryFromSymbol ap, footerForType symbol)
-
+            
+        | GenericParameter gp ->
+            let signature = formatGenericParameter symbol.DisplayContext gp
+            Some(signature, getSummaryFromSymbol gp, footerForType symbol)
+            
         | other ->
             MonoDevelop.Core.LoggingService.LogWarning (sprintf "F# Tooltip not rendered for: %A" other.Symbol)
             None
