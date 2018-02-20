@@ -18,6 +18,7 @@
 
 Name:           monodevelop
 BuildRequires:  mono-devel >= 5.8
+BuildRequires:  monodoc-core >= 5.8
 BuildRequires:  mono-data
 BuildRequires:  mono-mvc
 BuildRequires:  pkgconfig(glib-sharp-2.0) >= 2.12.20
@@ -41,7 +42,6 @@ BuildRequires:  update-desktop-files
 BuildRequires:  pkgconfig(mono)
 # mono-find-requires searches for libmono-2.0.so.1:
 BuildRequires:  pkgconfig(mono-2)
-BuildRequires:  pkgconfig(monodoc)
 BuildRequires:  pkgconfig(wcf)
 # Mono.Cecil.dll requires rsync after it's build
 BuildRequires:  rsync
