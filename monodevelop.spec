@@ -17,19 +17,16 @@
 
 
 Name:           monodevelop
-BuildRequires:  mono-devel
+BuildRequires:  mono-devel >= 5.8
 BuildRequires:  mono-data
 BuildRequires:  mono-mvc
-BuildRequires:  pkgconfig(glade-sharp-2.0) >= 2.12.20
 BuildRequires:  pkgconfig(glib-sharp-2.0) >= 2.12.20
-BuildRequires:  pkgconfig(gnome-sharp-2.0)
 BuildRequires:  pkgconfig(gtk-sharp-2.0) >= 2.12.20
-BuildRequires:  pkgconfig(libgnomeui-2.0)
 BuildRequires:  pkgconfig(gconf-sharp-2.0) >= 2.12.20
-BuildRequires:  pkgconfig(gnome-vfs-sharp-2.0)
 BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  cmake
+BuildRequires:  msbuild
 BuildRequires:  libssh2-devel
 BuildRequires:  fdupes
 BuildRequires:  git
@@ -44,9 +41,6 @@ BuildRequires:  update-desktop-files
 BuildRequires:  pkgconfig(mono)
 # mono-find-requires searches for libmono-2.0.so.1:
 BuildRequires:  pkgconfig(mono-2)
-BuildRequires:  pkgconfig(mono-addins)
-BuildRequires:  pkgconfig(nuget-core)
-BuildRequires:  pkgconfig(nunit) >= 2.6.3
 BuildRequires:  pkgconfig(monodoc) >= 3.8
 BuildRequires:  pkgconfig(wcf)
 # Mono.Cecil.dll requires rsync after it's build
@@ -98,16 +92,12 @@ a port of SharpDevelop 0.98.
 This package contains development files for the IDE and plugins.
 
 %prep
-%setup -q -n monodevelop-6.0
+%setup -q -n monodevelop-7.4
 
 %build
 %{?env_options}
 
 %configure --libdir=%{_prefix}/lib --disable-update-mimedb
-cd ./external/libgit2sharp/Lib/CustomBuildTasks
-xbuild CustomBuildTasks.csproj
-mv bin/Debug/* .
-cd ../../../../
 make
 
 %install
@@ -116,9 +106,6 @@ make install DESTDIR=%{buildroot} GACUTIL_FLAGS="/package monodevelop /root %{bu
 #
 mkdir -p %{buildroot}%{_prefix}/share/pkgconfig
 mv %{buildroot}%{_prefix}/lib/pkgconfig/* %{buildroot}%{_datadir}/pkgconfig
-cp -a /usr/lib/nuget/NuGet.Core.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
-cp -a /usr/lib/nuget/Microsoft.Web.XmlTransform.dll %{buildroot}%{_prefix}/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
-rm -f %{buildroot}%{_prefix}/lib/monodevelop/AddIns/AspNet/System.Web.Helpers.dll
 %find_lang %{name}
 %if 0%{?suse_version} > 1220
 %fdupes %buildroot/%{_prefix}
