@@ -215,8 +215,9 @@ namespace MonoDevelop.Projects.MSBuild
 					if (c == '\r' || c == '\n') {
 						if (n == s.Length - 1)
 							break; // Default case, consume the whole string
-						var res = s.Substring (0, n + 1);
-						ws = s.Substring (n + 1);
+						int len = n + 1;
+						string res = StringInternPool.AddShared (s, 0, len);
+						ws = StringInternPool.AddShared (s, len, s.Length - len);
 						return res;
 					}
 				}
@@ -236,7 +237,7 @@ namespace MonoDevelop.Projects.MSBuild
 						return res;
 					}
 				}
-				var result = ws.ToString ();
+				string result = StringInternPool.AddShared (sb);
 				ws = null;
 				return result;
 			}

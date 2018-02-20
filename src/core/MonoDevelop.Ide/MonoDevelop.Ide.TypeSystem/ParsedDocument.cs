@@ -38,7 +38,17 @@ namespace MonoDevelop.Ide.TypeSystem
 	public enum ParsedDocumentFlags
 	{
 		None            = 0,
-		NonSerializable = 1
+		NonSerializable = 1,
+
+		/// <summary>
+		/// Used for files where a custom folding extension is taken.
+		/// </summary>
+		SkipFoldings   = 2,
+
+		/// <summary>
+		/// Used for files that have a custom completion extension.
+		/// </summary>
+		HasCustomCompletionExtension = 4
 	}
 
 	public abstract class ParsedDocument
@@ -91,6 +101,12 @@ namespace MonoDevelop.Ide.TypeSystem
 
 		public abstract Task<IReadOnlyList<Error>> GetErrorsAsync (CancellationToken cancellationToken = default(CancellationToken));
 
+		public async Task<bool> HasErrorsAsync (CancellationToken cancellationToken = default (CancellationToken))
+		{
+			return (await GetErrorsAsync (cancellationToken).ConfigureAwait (false)).Any (e => e.ErrorType == ErrorType.Error);
+		}
+
+		[Obsolete ("Use the HasErrorsAsync method for cancellation and async support.")]
 		public bool HasErrors {
 			get {
 				return GetErrorsAsync ().Result.Any (e => e.ErrorType == ErrorType.Error);

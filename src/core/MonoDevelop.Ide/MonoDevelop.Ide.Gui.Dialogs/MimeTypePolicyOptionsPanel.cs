@@ -29,6 +29,7 @@ using System.Collections.Generic;
 using Gtk;
 using System.Linq;
 
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Projects;
@@ -38,7 +39,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 {
 	internal interface IMimeTypePolicyOptionsPanel: IOptionsPanel
 	{
-		void InitializePolicy (PolicyContainer policyContainer, string mimeType, bool isExactMimeType);
+		void InitializePolicy (PolicyContainer policyContainer, PolicyContainer defaultPolicyContainer, string mimeType, bool isExactMimeType);
 		void SetParentSection (MimeTypePolicyOptionsSection section);
 		
 		string Label { get; set; }
@@ -66,6 +67,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		string mimeType;
 		IEnumerable<string> mimeTypeScopes;
 		PolicyContainer policyContainer;
+		PolicyContainer defaultPolicyContainer;
 		bool loaded;
 		object cachedPolicy;
 		bool hasCachedPolicy;
@@ -73,10 +75,11 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		Widget panelWidget;
 		bool isExactMimeType;
 
-		void IMimeTypePolicyOptionsPanel.InitializePolicy (PolicyContainer policyContainer, string mimeType, bool isExactMimeType)
+		void IMimeTypePolicyOptionsPanel.InitializePolicy (PolicyContainer policyContainer, PolicyContainer defaultPolicyContainer, string mimeType, bool isExactMimeType)
 		{
 			this.mimeType = mimeType;
 			this.policyContainer = policyContainer;
+			this.defaultPolicyContainer = defaultPolicyContainer;
 			this.isExactMimeType = isExactMimeType;
 			mimeTypeScopes = DesktopService.GetMimeTypeInheritanceChain (mimeType);
 		}
@@ -229,8 +232,14 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			else if (hasCachedPolicy)
 				pol = cachedPolicy;
 
-			if (pol == null)
-				pol = policyContainer.Get<T> (mimeTypeScopes) ?? PolicyService.GetDefaultPolicy<T> (mimeTypeScopes);
+			if (pol == null) {
+				pol = policyContainer.Get<T> (mimeTypeScopes);
+				if (pol == null && defaultPolicyContainer != null)
+					return defaultPolicyContainer.Get<T> (mimeTypeScopes);
+
+				// If the policy container being edited doesn't have this policy defined (and doesn't inherit it from anyhwere)
+				// then try getting the policy from defaultPolicyContainer.
+			}
 			return (T) pol;
 		}
 		
@@ -268,9 +277,16 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 					panelWidget.Sensitive = true;
 				}
 			};
-			
+
+			defaultSettingsButton.SetCommonAccessibilityAttributes ("MimePanel.DefaultCheckbox", "",
+			                                                        GettextCatalog.GetString ("Check to use the default settings from '{0}'", baseType));
+			defaultSettingsButton.Accessible.AddLinkedUIElement (panelWidget.Accessible);
+
 			box.PackStart (defaultSettingsButton, false, false, 0);
-			box.PackStart (new HSeparator (), false, false, 0);
+			var hsep = new HSeparator ();
+			hsep.Accessible.SetShouldIgnore (true);
+
+			box.PackStart (hsep, false, false, 0);
 			box.ShowAll ();
 			box.PackStart (panelWidget, true, true, 0);
 			panelWidget.Show ();

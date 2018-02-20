@@ -26,16 +26,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using Xwt.Backends;
-
-#if MONOMAC
-using nint = System.Int32;
-using nfloat = System.Single;
-using MonoMac.AppKit;
-#else
 using AppKit;
-#endif
+using Xwt.Backends;
 
 namespace Xwt.Mac
 {
@@ -61,6 +53,8 @@ namespace Xwt.Mac
 				cr = new CanvasTableCell ();
 			else if (cell is ICheckBoxCellViewFrontend)
 				cr = new CheckBoxTableCell ();
+			else if (cell is IRadioButtonCellViewFrontend)
+				cr = new RadioButtonTableCell ();
 			else
 				throw new NotImplementedException ();
 			cr.Backend = new CellViewBackend (table, column);

@@ -95,6 +95,7 @@ namespace MonoDevelop.CodeGeneration
 			}
 			
 			treeView.Model = store;
+			treeView.SearchColumn = -1; // disable the interactive search
 		}
 		
 		void ToggleRendererToggled (object o, ToggledArgs args)
@@ -126,7 +127,7 @@ namespace MonoDevelop.CodeGeneration
 			return result.ToString ();
 		}
 
-		public void GenerateCode ()
+		public void GenerateCode (Gtk.TreeView treeView)
 		{
 			TreeIter iter;
 			if (!store.GetIterFirst (out iter))
@@ -137,7 +138,11 @@ namespace MonoDevelop.CodeGeneration
 				if (include)
 					includedMembers.Add (store.GetValue (iter, 3));
 			} while (store.IterNext (ref iter));
-
+			if (includedMembers.Count == 0) {
+				if (treeView.Selection.GetSelected (out iter)) {
+					includedMembers.Add (store.GetValue (iter, 3));
+				}
+			}
 			var output = new StringBuilder ();
 			string indent = options.Editor.GetVirtualIndentationString (options.Editor.CaretLine);
 			foreach (string nodeText in GenerateCode (includedMembers)) {

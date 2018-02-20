@@ -80,7 +80,7 @@ namespace Xwt.Drawing
 					Backend = handler.WithSettings (handler.SystemSerifFont.Backend, size, style, weight, stretch);
 				else {
 					var fb = handler.Create (fname, size, style, weight, stretch);
-					Backend = fb ?? handler.GetSystemDefaultFont ();
+					Backend = fb ?? handler.WithSettings(handler.GetSystemDefaultFont (), size, style, weight, stretch);
 				}
 			}
 		}
@@ -133,8 +133,11 @@ namespace Xwt.Drawing
 
 		internal static Font FromName (string name, Toolkit toolkit)
 		{
-			if (string.IsNullOrWhiteSpace (name))
-				throw new ArgumentNullException (nameof (name), "Font name cannot be null or empty");
+			if (name == null)
+				throw new ArgumentNullException (nameof (name), "Font name cannot be null");
+			if (name.Length == 0)
+				return toolkit.FontBackendHandler.SystemFont;
+			
 			var handler = toolkit.FontBackendHandler;
 
 			double size = -1;
@@ -186,15 +189,16 @@ namespace Xwt.Drawing
 				return Font.SystemFont;
 		}
 
-		static bool IsFontSupported (string fontNames)
+		static bool IsFontSupported (string fontName)
 		{
-			LoadInstalledFonts ();
-
-			string[] names = fontNames.Split (new [] {','}, StringSplitOptions.RemoveEmptyEntries);
-			if (names.Length == 0)
-				throw new ArgumentException ("Font family name not provided");
+			if (fontName == null)
+				throw new ArgumentNullException(nameof (fontName), "Font family name not provided");
+			if (fontName == string.Empty)
+				return false;
 			
-			return names.Any (name => installedFonts.ContainsKey (name.Trim ()));
+			LoadInstalledFonts ();
+			
+			return installedFonts.ContainsKey (fontName.Trim ());
 		}
 
 		static string GetSupportedFont (string fontNames)
@@ -241,6 +245,12 @@ namespace Xwt.Drawing
 				foreach (var f in Toolkit.CurrentEngine.FontBackendHandler.GetInstalledFonts ())
 					installedFonts [f] = f;
 				installedFontsArray = new ReadOnlyCollection<string> (installedFonts.Values.ToArray ());
+				// add dummy font names for unit tests, the names are not exposed to users
+				// see the FontNameWith* tests (Testing/Tests/FontTests.cs) for details
+				installedFonts.Add("____FakeTestFont 72", "Arial");
+				installedFonts.Add ("____FakeTestFont Rounded MT Bold", "Arial");
+				// HACK: add font mapping for patched pango SF Font support
+				installedFonts ["-apple-system-font"] = ".AppleSystemUIFont";
 			}
 		}
 
@@ -392,11 +402,11 @@ namespace Xwt.Drawing
 		{
 			StringBuilder sb = new StringBuilder (Family);
 			if (Style != FontStyle.Normal)
-				sb.Append (' ').Append (Style);
+				sb.Append (' ').Append (Style.ToString ());
 			if (Weight != FontWeight.Normal)
-				sb.Append (' ').Append (Weight);
+				sb.Append (' ').Append (Weight.ToString ());
 			if (Stretch != FontStretch.Normal)
-				sb.Append (' ').Append (Stretch);
+				sb.Append (' ').Append (Stretch.ToString ());
 			sb.Append (' ').Append (Size.ToString (CultureInfo.InvariantCulture));
 			return sb.ToString ();
 		}

@@ -59,14 +59,18 @@ namespace MonoDevelop.Ide.Gui.Pads
 		int instanceNum;
 		string typeTag;
 
-		public DefaultMonitorPad (string typeTag, string icon, int instanceNum)
+		public DefaultMonitorPad (string typeTag, string icon, int instanceNum, string title, int titleInstanceNum)
 		{
 			this.instanceNum = instanceNum;
 			this.typeTag = typeTag;
+			this.Title = title;
+			this.TitleInstanceNum = titleInstanceNum;
 			
 			this.icon = icon;
 
-			logView = new LogView ();
+			logView = new LogView { Name = typeTag };
+			if (instanceNum > 0)
+				logView.Name += $"-{instanceNum}";
 
 			IdeApp.Workspace.FirstWorkspaceItemOpened += OnCombineOpen;
 			IdeApp.Workspace.LastWorkspaceItemClosed += OnCombineClosed;
@@ -135,21 +139,25 @@ namespace MonoDevelop.Ide.Gui.Pads
 		void OnButtonPinClick (object sender, EventArgs e)
 		{
 			if (buttonPin.Active)
-				((ImageView)buttonPin.Image).SetIcon ("md-pin-down", IconSize.Menu);
+				((ImageView)buttonPin.Image).SetIcon (Stock.PinDown, IconSize.Menu);
 			else
-				((ImageView)buttonPin.Image).SetIcon ("md-pin-down", IconSize.Menu);
+				((ImageView)buttonPin.Image).SetIcon (Stock.PinUp, IconSize.Menu);
 		}
 		
 		public bool AllowReuse {
 			get { return !progressStarted && !buttonPin.Active; }
 		}
-		
+
+		internal bool ClearOnBeginProgress { get; set; } = true;
+
 		public OutputProgressMonitor BeginProgress (string title)
 		{
 			progressStarted = true;
-			
-			logView.Clear ();
-			monitor = (LogViewProgressMonitor) logView.GetProgressMonitor ();
+
+			if (ClearOnBeginProgress)
+				logView.Clear ();
+
+			monitor = (LogViewProgressMonitor) logView.GetProgressMonitor (ClearOnBeginProgress);
 
 			Runtime.RunInMainThread (delegate {
 				Window.HasNewData = false;
@@ -181,7 +189,8 @@ namespace MonoDevelop.Ide.Gui.Pads
 					buttonClear.Sensitive = false;
 				
 				if (monitor.Errors.Length > 0) {
-					IdeApp.Workbench.StatusBar.ShowMessage (Stock.Error, monitor.Errors [monitor.Errors.Length - 1].Message);
+					var e = monitor.Errors [monitor.Errors.Length - 1];
+					IdeApp.Workbench.StatusBar.ShowMessage (Stock.Error, e.DisplayMessage);
 					IdeApp.Workbench.StatusBar.SetMessageSourcePad (statusSourcePad);
 				} else if (monitor.SuccessMessages.Length > 0) {
 					IdeApp.Workbench.StatusBar.ShowMessage (monitor.SuccessMessages [monitor.SuccessMessages.Length - 1]);
@@ -207,6 +216,10 @@ namespace MonoDevelop.Ide.Gui.Pads
 			}
 		}
 
+		public string Title { get; set; }
+
+		public int TitleInstanceNum { get; set; }
+
 		public int InstanceNum {
 			get {
 				return instanceNum;
@@ -218,6 +231,8 @@ namespace MonoDevelop.Ide.Gui.Pads
 			logView.Clear ();
 			IdeApp.Workspace.FirstWorkspaceItemOpened -= OnCombineOpen;
 			IdeApp.Workspace.LastWorkspaceItemClosed -= OnCombineClosed;
+
+			base.Dispose ();
 		}
 	}
 }

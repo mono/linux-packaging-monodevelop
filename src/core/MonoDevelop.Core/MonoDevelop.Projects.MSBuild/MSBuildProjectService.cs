@@ -1,4 +1,4 @@
-// MSBuildProjectService.cs
+﻿// MSBuildProjectService.cs
 //
 // Author:
 //   Lluis Sanchez Gual <lluis@novell.com>
@@ -43,6 +43,8 @@ using Cecil = Mono.Cecil;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
+using MonoDevelop.Core.Execution;
+using System.Xml.Linq;
 
 namespace MonoDevelop.Projects.MSBuild
 {
@@ -53,30 +55,41 @@ namespace MonoDevelop.Projects.MSBuild
 		internal const string GlobalPropertyProvidersExtensionPath = "/MonoDevelop/ProjectModel/MSBuildGlobalPropertyProviders";
 		internal const string UnknownMSBuildProjectTypesExtensionPath = "/MonoDevelop/ProjectModel/UnknownMSBuildProjectTypes";
 		internal const string MSBuildProjectItemTypesPath = "/MonoDevelop/ProjectModel/MSBuildProjectItemTypes";
+		internal const string MSBuildImportSearchPathsPath = "/MonoDevelop/ProjectModel/MSBuildImportSearchPaths";
 
 		public const string GenericItemGuid = "{9344BDBB-3E7F-41FC-A0DD-8665D75EE146}";
 		public const string FolderTypeGuid = "{2150E333-8FDC-42A3-9474-1A3956D46DE8}";
-		
+
 		//NOTE: default toolsversion should match the default format.
 		// remember to update the builder process' app.config too
 		public const string DefaultFormat = "MSBuild12";
-		
+
 		static DataContext dataContext;
-		
-		static IMSBuildGlobalPropertyProvider[] globalPropertyProviders;
-		static BuilderCache builders = new BuilderCache ();
-		static Dictionary<string,Type> genericProjectTypes = new Dictionary<string, Type> ();
-		static Dictionary<string,string> importRedirects = new Dictionary<string, string> ();
-		static UnknownProjectTypeNode[] unknownProjectTypeNodes;
-		static IDictionary<string,TypeExtensionNode> projecItemTypeNodes;
 
-		static AsyncCriticalSection buildersLock = new AsyncCriticalSection ();
+		static IMSBuildGlobalPropertyProvider [] globalPropertyProviders;
+		static Dictionary<string, Type> genericProjectTypes = new Dictionary<string, Type> ();
+		static Dictionary<string, string> importRedirects = new Dictionary<string, string> ();
+		static UnknownProjectTypeNode [] unknownProjectTypeNodes;
+		static IDictionary<string, TypeExtensionNode> projecItemTypeNodes;
+		static ImportSearchPathExtensionNode [] searchPathNodes;
 
+		static Dictionary<TargetRuntime, List<ImportSearchPathExtensionNode>> defaultImportSearchPaths = new Dictionary<TargetRuntime, List<ImportSearchPathExtensionNode>> ();
+		static List<ImportSearchPathExtensionNode> importSearchPaths = new List<ImportSearchPathExtensionNode> ();
 
 		internal static bool ShutDown { get; private set; }
 
-		static ExtensionNode[] itemTypeNodes;
-		
+		static ExtensionNode [] itemTypeNodes;
+
+		/// <summary>
+		/// Occurs when there is a change in any global property provider
+		/// </summary>
+		internal static event EventHandler GlobalPropertyProvidersChanged;
+
+		/// <summary>
+		/// Occurs when import search paths change.
+		/// </summary>
+		public static event EventHandler ImportSearchPathsChanged;
+
 		public static DataContext DataContext {
 			get {
 				if (dataContext == null) {
@@ -86,7 +99,16 @@ namespace MonoDevelop.Projects.MSBuild
 				return dataContext;
 			}
 		}
-		
+
+		internal static IEnumerable<IMSBuildGlobalPropertyProvider> GlobalPropertyProviders {
+			get {
+				if (customGlobalPropertyProviders != null)
+					return globalPropertyProviders.Concat (customGlobalPropertyProviders);
+				else
+					return globalPropertyProviders;
+			}
+		}
+
 		static MSBuildProjectService ()
 		{
 			Services.ProjectService.DataContextChanged += delegate {
@@ -100,7 +122,36 @@ namespace MonoDevelop.Projects.MSBuild
 
 			AddinManager.ExtensionChanged += OnExtensionChanged;
 			LoadExtensionData ();
+
+			specialCharactersEscaped = new Dictionary<char, string> (specialCharacters.Length);
+			specialCharactersUnescaped = new Dictionary<string, char> (specialCharacters.Length);
+			for (int i = 0; i < specialCharacters.Length; ++i) {
+				var escaped = ((int)specialCharacters [i]).ToString ("X");
+				specialCharactersEscaped [specialCharacters [i]] = '%' + escaped;
+				specialCharactersUnescaped [escaped] = specialCharacters [i];
+			}
+
+			SetupDotNetCore ();
 		}
+
+		static void SetupDotNetCore ()
+		{
+			if (Platform.IsWindows)
+				return;
+
+			// Add .NET Core root directory to PATH. Without this, the MSBuild SDK resolver doesn't work.
+
+			string dotnetDir;
+			if (Platform.IsMac)
+				dotnetDir = "/usr/local/share/dotnet";
+			else
+				dotnetDir = "/usr/share/dotnet";
+		
+			var systemPath = Environment.GetEnvironmentVariable ("PATH");
+			if (!systemPath.Split (new char [] { ':' }).Contains (dotnetDir))
+				Environment.SetEnvironmentVariable ("PATH", systemPath + ":" + dotnetDir);
+		}
+	
 
 		static void OnExtensionChanged (object sender, ExtensionEventArgs args)
 		{
@@ -108,8 +159,12 @@ namespace MonoDevelop.Projects.MSBuild
 				args.Path == ImportRedirectsExtensionPath || 
 				args.Path == UnknownMSBuildProjectTypesExtensionPath || 
 				args.Path == GlobalPropertyProvidersExtensionPath ||
-				args.Path == MSBuildProjectItemTypesPath)
+				args.Path == MSBuildProjectItemTypesPath ||
+				args.Path == MSBuildImportSearchPathsPath)
 				LoadExtensionData ();
+
+			if (args.Path == MSBuildImportSearchPathsPath)
+				OnImportSearchPathsChanged ();
 		}
 
 		static void LoadExtensionData ()
@@ -124,7 +179,7 @@ namespace MonoDevelop.Projects.MSBuild
 			globalPropertyProviders = AddinManager.GetExtensionObjects<IMSBuildGlobalPropertyProvider> (GlobalPropertyProvidersExtensionPath);
 
 			foreach (var gpp in globalPropertyProviders)
-				gpp.GlobalPropertiesChanged -= HandleGlobalPropertyProviderChanged;
+				gpp.GlobalPropertiesChanged += HandleGlobalPropertyProviderChanged;
 
 			// Get item type nodes
 
@@ -142,6 +197,8 @@ namespace MonoDevelop.Projects.MSBuild
 			unknownProjectTypeNodes = AddinManager.GetExtensionNodes<UnknownProjectTypeNode> (UnknownMSBuildProjectTypesExtensionPath).ToArray ();
 
 			projecItemTypeNodes = AddinManager.GetExtensionNodes<TypeExtensionNode> (MSBuildProjectItemTypesPath).ToDictionary (e => e.TypeName);
+
+			searchPathNodes = AddinManager.GetExtensionNodes<ImportSearchPathExtensionNode> (MSBuildImportSearchPathsPath).ToArray();
 		}
 
 		static Dictionary<string,Type> customProjectItemTypes = new Dictionary<string,Type> ();
@@ -156,13 +213,124 @@ namespace MonoDevelop.Projects.MSBuild
 			customProjectItemTypes.Remove (name);
 		}
 
-		static async void HandleGlobalPropertyProviderChanged (object sender, EventArgs e)
+		static List<IMSBuildGlobalPropertyProvider> customGlobalPropertyProviders;
+
+		internal static void RegisterGlobalPropertyProvider (IMSBuildGlobalPropertyProvider provider)
 		{
-			using (await buildersLock.EnterAsync ()) {
-				var gpp = (IMSBuildGlobalPropertyProvider)sender;
-				foreach (var builder in builders.GetAllBuilders ())
-					builder.SetGlobalProperties (gpp.GetGlobalProperties ());
+			if (customGlobalPropertyProviders == null)
+				customGlobalPropertyProviders = new List<IMSBuildGlobalPropertyProvider> ();
+			customGlobalPropertyProviders.Add (provider);
+		}
+
+		internal static void UnregisterGlobalPropertyProvider (IMSBuildGlobalPropertyProvider provider)
+		{
+			if (customGlobalPropertyProviders != null)
+				customGlobalPropertyProviders.Remove (provider);
+		}
+
+		/// <summary>
+		/// Registers a custom project import search path. This path will be used as a fallback when evaluating
+		/// an import and targets file is not found using the value assigned by MSBuild to the property.
+		/// </summary>
+		/// <param name="propertyName">Name of the property for which to add a fallback path</param>
+		/// <param name="path">The fallback path</param>
+		public static void RegisterProjectImportSearchPath (string propertyName, FilePath path)
+		{
+			if (!importSearchPaths.Any (sp => sp.Property == propertyName && sp.Path == path)) {
+				importSearchPaths.Add (new ImportSearchPathExtensionNode { Property = propertyName, Path = path });
+				OnImportSearchPathsChanged ();
 			}
+		}
+
+		/// <summary>
+		/// Unregisters a previously registered import search path
+		/// </summary>
+		/// <param name="propertyName">Name of the property for which a fallback path was added.</param>
+		/// <param name="path">The fallback path to remove</param>
+		public static void UnregisterProjectImportSearchPath (string propertyName, FilePath path)
+		{
+			importSearchPaths.RemoveAll (i => i.Property == propertyName && i.Path == path);
+			OnImportSearchPathsChanged ();
+		}
+
+		/// <summary>
+		/// Gets a list of all search paths assigned to properties
+		/// </summary>
+		/// <returns>The search paths</returns>
+		/// <param name="runtime">Runtime for which to get the search paths.</param>
+		/// <param name="includeImplicitImports">If set to <c>true</c>, it returns all search paths, including those registered by
+		/// MSBuild and those registered using RegisterProjectImportSearchPath. If <c>false</c>, it only returns the paths
+		/// registered by RegisterProjectImportSearchPath.</param>
+		internal static IEnumerable<ImportSearchPathExtensionNode> GetProjectImportSearchPaths (TargetRuntime runtime, bool includeImplicitImports)
+		{
+			var result = searchPathNodes.Concat (importSearchPaths);
+			if (includeImplicitImports)
+				result = LoadDefaultProjectImportSearchPaths (runtime).Concat (result);
+			return result;
+		}
+
+		internal static string GetDefaultSdksPath (TargetRuntime runtime)
+		{
+			string binDir;
+			GetNewestInstalledToolsVersion (runtime, true, out binDir);
+			return Path.Combine (binDir, "Sdks");
+		}
+
+		internal static IEnumerable<SdkInfo> FindRegisteredSdks ()
+		{
+			foreach (var node in GetProjectImportSearchPaths (null, false).Where (n => n.Property == "MSBuildSDKsPath")) {
+				if (Directory.Exists (node.Path)) {
+					foreach (var dir in Directory.GetDirectories (node.Path)) {
+						if (File.Exists (Path.Combine (dir, "Sdk", "Sdk.props")))
+							yield return new SdkInfo (Path.GetFileName (dir), null, Path.Combine (dir, "Sdk"));
+					}
+				}
+			}
+		}
+
+		static List<ImportSearchPathExtensionNode> LoadDefaultProjectImportSearchPaths (TargetRuntime runtime)
+		{
+			// Load the default search paths defined in MSBuild.dll.config
+
+			lock (defaultImportSearchPaths) {
+				List<ImportSearchPathExtensionNode> list;
+				if (defaultImportSearchPaths.TryGetValue (runtime, out list))
+					return list;
+
+				list = new List<ImportSearchPathExtensionNode> ();
+				defaultImportSearchPaths [runtime] = list;
+
+				string binDir;
+				GetNewestInstalledToolsVersion (runtime, true, out binDir);
+
+				var configFileName = Platform.IsWindows ? "MSBuild.exe.config" : "MSBuild.dll.config";
+				var configFile = Path.Combine (binDir, configFileName);
+				if (File.Exists (configFile)) {
+					var doc = XDocument.Load (configFile);
+					var projectImportSearchPaths = doc.Root.Elements ("msbuildToolsets").FirstOrDefault ()?.Elements ("toolset")?.FirstOrDefault ()?.Element ("projectImportSearchPaths");
+					if (projectImportSearchPaths != null) {
+						var os = Platform.IsMac ? "osx" : Platform.IsWindows ? "windows" : "unix";
+						foreach (var searchPaths in projectImportSearchPaths.Elements ("searchPaths")) {
+							var pathOs = (string)searchPaths.Attribute ("os")?.Value;
+							if (!string.IsNullOrEmpty (pathOs) && pathOs != os)
+								continue;
+							foreach (var property in searchPaths.Elements ("property"))
+								list.Add (new ImportSearchPathExtensionNode { Property = property.Attribute ("name").Value, Path = property.Attribute ("value").Value });
+						}
+					}
+				}
+				return list;
+			}
+		}
+
+		static void OnImportSearchPathsChanged ()
+		{
+			ImportSearchPathsChanged?.Invoke (null, EventArgs.Empty);
+		}
+
+		static void HandleGlobalPropertyProviderChanged (object sender, EventArgs e)
+		{
+			GlobalPropertyProvidersChanged?.Invoke (null, EventArgs.Empty);
 		}
 
 		static void HandlePropertyChanged (object sender, PropertyChangedEventArgs e)
@@ -222,7 +390,7 @@ namespace MonoDevelop.Projects.MSBuild
 			var node = GetItemTypeNodes ().FirstOrDefault (n => n.CanHandleFile (fileName, typeGuid));
 
 			if (node != null) {
-				item = await node.CreateSolutionItem (monitor, ctx, fileName);
+				item = await node.CreateSolutionItem (monitor, ctx, fileName).ConfigureAwait (false);
 				if (item == null)
 					return null;
 			}
@@ -242,7 +410,7 @@ namespace MonoDevelop.Projects.MSBuild
 				item.NotifyItemReady ();
 			};
 
-			await item.LoadAsync (monitor, fileName, expectedFormat);
+			await item.LoadAsync (monitor, fileName, expectedFormat, itemGuid).ConfigureAwait (false);
 			return item;
 		}
 
@@ -334,7 +502,7 @@ namespace MonoDevelop.Projects.MSBuild
 
 		internal static bool CanCreateProject (string typeGuid, params string[] flavorGuids)
 		{
-			return IsKnownTypeGuid (ConvertTypeAliasToGuid (typeGuid)) && ConvertTypeAliasesToGuids (flavorGuids).All (id => IsKnownFlavorGuid (id));
+			return IsKnownTypeGuid (ConvertTypeAliasToGuid (typeGuid)) && ConvertTypeAliasesToGuids (flavorGuids).All (IsKnownFlavorGuid);
 		}
 
 		internal static SolutionItem CreateSolutionItem (string type, ProjectCreateInformation info, System.Xml.XmlElement projectOptions)
@@ -395,7 +563,7 @@ namespace MonoDevelop.Projects.MSBuild
 		internal static MSBuildSupport GetMSBuildSupportForFlavors (IEnumerable<string> flavorGuids)
 		{
 			foreach (var fid in flavorGuids) {
-				var node = WorkspaceObject.GetModelExtensions (null).OfType<SolutionItemExtensionNode> ().FirstOrDefault (n => n.Guid.Equals (fid, StringComparison.InvariantCultureIgnoreCase));
+				var node = WorkspaceObject.GetModelExtensions (null).OfType<SolutionItemExtensionNode> ().FirstOrDefault (n => n.Guid != null && n.Guid.Equals (fid, StringComparison.InvariantCultureIgnoreCase));
 				if (node != null) {
 					if (node.MSBuildSupport != MSBuildSupport.Supported)
 						return node.MSBuildSupport;
@@ -410,7 +578,7 @@ namespace MonoDevelop.Projects.MSBuild
 			var list = new List<SolutionItemExtensionNode> ();
 			foreach (var fid in flavorGuids) {
 				foreach (var node in WorkspaceObject.GetModelExtensions (null).OfType<SolutionItemExtensionNode> ()) {
-					if (node.SupportsMigration && node.Guid.Equals (fid, StringComparison.InvariantCultureIgnoreCase))
+					if (node.SupportsMigration && node.Guid != null && node.Guid.Equals (fid, StringComparison.InvariantCultureIgnoreCase))
 						list.Add (node);
 				}
 			}
@@ -486,7 +654,7 @@ namespace MonoDevelop.Projects.MSBuild
 
 			var aggregatedMonitor = monitor as AggregatedProgressMonitor;
 			if (aggregatedMonitor != null)
-				return aggregatedMonitor.MasterMonitor as ProjectLoadProgressMonitor;
+				return aggregatedMonitor.LeaderMonitor as ProjectLoadProgressMonitor;
 
 			return null;
 		}
@@ -511,7 +679,7 @@ namespace MonoDevelop.Projects.MSBuild
 
 		internal static bool IsKnownFlavorGuid (string guid)
 		{
-			return WorkspaceObject.GetModelExtensions (null).OfType<SolutionItemExtensionNode> ().Any (n => n.Guid.Equals (guid, StringComparison.InvariantCultureIgnoreCase));
+			return WorkspaceObject.GetModelExtensions (null).OfType<SolutionItemExtensionNode> ().Any (n => n.Guid != null && n.Guid.Equals (guid, StringComparison.InvariantCultureIgnoreCase));
 		}
 
 		internal static bool IsKnownTypeGuid (string guid)
@@ -655,6 +823,10 @@ namespace MonoDevelop.Projects.MSBuild
 					return null;
 				tr.ReadStartElement ();
 				tr.MoveToContent ();
+				while (tr.LocalName != "PropertyGroup" && !tr.EOF) {
+					tr.Skip ();
+					tr.MoveToContent ();
+				}
 				if (tr.LocalName != "PropertyGroup")
 					return null;
 				if (tr.IsEmptyElement)
@@ -671,13 +843,26 @@ namespace MonoDevelop.Projects.MSBuild
 		}
 		
 		static char[] specialCharacters = new char [] {'%', '$', '@', '(', ')', '\'', ';', '?' };
+		static Dictionary<char, string> specialCharactersEscaped;
+		static Dictionary<string, char> specialCharactersUnescaped;
 		
 		public static string EscapeString (string str)
 		{
 			int i = str.IndexOfAny (specialCharacters);
-			while (i != -1) {
-				str = str.Substring (0, i) + '%' + ((int) str [i]).ToString ("X") + str.Substring (i + 1);
-				i = str.IndexOfAny (specialCharacters, i + 3);
+			if (i != -1) {
+				var sb = new System.Text.StringBuilder ();
+				int start = 0;
+				while (i != -1) {
+					sb.Append (str, start, i - start);
+					sb.Append (specialCharactersEscaped [str [i]]);
+					if (i >= str.Length)
+						break;
+					start = i + 1;
+					i = str.IndexOfAny (specialCharacters, start);
+				}
+				if (start < str.Length)
+					sb.Append (str, start, str.Length - start);
+				return sb.ToString ();
 			}
 			return str;
 		}
@@ -696,11 +881,25 @@ namespace MonoDevelop.Projects.MSBuild
 		public static string UnscapeString (string str)
 		{
 			int i = str.IndexOf ('%');
-			while (i != -1 && i < str.Length - 2) {
-				int c;
-				if (int.TryParse (str.Substring (i+1, 2), NumberStyles.HexNumber, null, out c))
-					str = str.Substring (0, i) + (char) c + str.Substring (i + 3);
-				i = str.IndexOf ('%', i + 1);
+			if (i != -1) {
+				var sb = new System.Text.StringBuilder ();
+				int start = 0;
+				while (i != -1) {
+					int c;
+					char ch;
+					var sub = str.Substring (i + 1, 2);
+					if (specialCharactersUnescaped.TryGetValue (sub, out ch)) {
+						sb.Append (str, start, i - start);
+						sb.Append (ch);
+					} else if (int.TryParse (sub, NumberStyles.HexNumber, null, out c)) {
+						sb.Append (str, start, i - start);
+						sb.Append ((char)c);
+					}
+					start = i + 3;
+					i = str.IndexOf ('%', start);
+				}
+				sb.Append (str, start, str.Length - start);
+				return sb.ToString ();
 			}
 			return str;
 		}
@@ -777,56 +976,61 @@ namespace MonoDevelop.Projects.MSBuild
 			}
 			
 			// If we're on Windows, don't need to fix file casing.
-			if (Platform.IsWindows) {
+			//if (Platform.IsWindows) {
 				resultPath = FileService.GetFullPath (path);
 				return true;
-			}
-			
-			// If the path exists with the exact casing specified, then we're done
-			if (System.IO.File.Exists (path) || System.IO.Directory.Exists (path)){
-				resultPath = Path.GetFullPath (path);
-				return true;
-			}
-			
-			// Not on Windows, file doesn't exist. That could mean the project was brought from Windows
-			// and the filename case in the project doesn't match the file on disk, because Windows is
-			// case-insensitive. Since we have an absolute path, search the directory for the file with
-			// the correct case.
-			string[] names = path.Substring (1).Split ('/');
-			string part = "/";
-			
-			for (int n=0; n<names.Length; n++) {
-				string[] entries;
+			//}
 
-				if (names [n] == ".."){
-					if (part == "/")
-						return false; // Can go further back. It's not an existing file
-					part = Path.GetFullPath (part + "/..");
-					continue;
-				}
-				
-				entries = Directory.GetFileSystemEntries (part);
-				
-				string fpath = null;
-				foreach (string e in entries) {
-					if (string.Compare (Path.GetFileName (e), names [n], StringComparison.OrdinalIgnoreCase) == 0) {
-						fpath = e;
-						break;
-					}
-				}
-				if (fpath == null) {
-					// Part of the path does not exist. Can't do any more checking.
-					part = Path.GetFullPath (part);
-					for (; n < names.Length; n++)
-						part += "/" + names[n];
-					resultPath = part;
-					return true;
-				}
+			// Code below and IF above are commented because after we replaced XBuild with MSBuild .targets files
+			// load time of Main.sln(as example) went from 30sec to 2.5min because MSBuild .targets have many more Before/After targets tries
+			// resulting in a lot of Directory.EnumerateFileSystemEntries fetching from hard drive resulting in slow load time.
+			// Since MSBuild.exe doesn't handle file name case mismatches on case-sensetive file system, it doesn't make sense to do this in IDE.
 
-				part = fpath;
-			}
-			resultPath = Path.GetFullPath (part);
-			return true;
+			//// If the path exists with the exact casing specified, then we're done
+			//if (System.IO.File.Exists (path) || System.IO.Directory.Exists (path)){
+			//	resultPath = Path.GetFullPath (path);
+			//	return true;
+			//}
+
+			//// Not on Windows, file doesn't exist. That could mean the project was brought from Windows
+			//// and the filename case in the project doesn't match the file on disk, because Windows is
+			//// case-insensitive. Since we have an absolute path, search the directory for the file with
+			//// the correct case.
+			//string[] names = path.Substring (1).Split ('/');
+			//string part = "/";
+			
+			//for (int n=0; n<names.Length; n++) {
+			//	IEnumerable<string> entries;
+
+			//	if (names [n] == ".."){
+			//		if (part == "/")
+			//			return false; // Can go further back. It's not an existing file
+			//		part = Path.GetFullPath (part + "/..");
+			//		continue;
+			//	}
+				
+			//	entries = Directory.EnumerateFileSystemEntries (part);
+				
+			//	string fpath = null;
+			//	foreach (string e in entries) {
+			//		if (string.Compare (Path.GetFileName (e), names [n], StringComparison.OrdinalIgnoreCase) == 0) {
+			//			fpath = e;
+			//			break;
+			//		}
+			//	}
+			//	if (fpath == null) {
+			//		// Part of the path does not exist. Can't do any more checking.
+			//		part = Path.GetFullPath (part);
+			//		if (n < names.Length)
+			//			part += "/" + string.Join ("/", names, n, names.Length - n);
+			//		resultPath = part;
+			//		return true;
+			//	}
+
+			//	part = fpath;
+			//}
+			//resultPath = Path.GetFullPath (part);
+			//return true;
 		}
 
 		//Given a filename like foo.it.resx, splits it into - foo, it, resx
@@ -869,186 +1073,21 @@ namespace MonoDevelop.Projects.MSBuild
 			return true;
 		}
 
-		static bool runLocal = false;
-		
-		internal static async Task<RemoteProjectBuilder> GetProjectBuilder (TargetRuntime runtime, string minToolsVersion, string file, string solutionFile, int customId, bool lockBuilder = false)
+		internal static string GetNewestInstalledToolsVersion (TargetRuntime runtime, bool requiresMicrosoftBuild, out string binDir)
 		{
-			using (await buildersLock.EnterAsync ())
-			{
-				//attempt to use 14.0 builder first if available
-				string toolsVersion = "14.0";
-				string binDir = runtime.GetMSBuildBinPath ("14.0");
-				if (binDir == null) {
-					toolsVersion = "12.0";
-					binDir = runtime.GetMSBuildBinPath ("12.0");
-					if (binDir == null) {
-						//fall back to 4.0, we know it's always available
-						toolsVersion = "4.0";
-					}
+			string [] supportedToolsVersions;
+			if (requiresMicrosoftBuild || Runtime.Preferences.BuildWithMSBuild || Platform.IsWindows)
+				supportedToolsVersions = new [] { "15.0"};
+			else
+				supportedToolsVersions = new [] { "14.0", "12.0", "4.0" };
+
+			foreach (var toolsVersion in supportedToolsVersions) {
+				binDir = runtime.GetMSBuildBinPath (toolsVersion);
+				if (binDir != null) {
+					return toolsVersion;
 				}
-
-				// Check the ToolsVersion we found can handle the project
-				// The check is only done for the .NET framework since Mono doesn't really have the concept of ToolsVersion.
-				// On Mono we'll just try to build with whatever is installed.
-				Version tv, mtv;
-				if (runtime is MsNetTargetRuntime && Version.TryParse (toolsVersion, out tv) && Version.TryParse (minToolsVersion, out mtv) && tv < mtv) {
-					string error = null;
-					if (minToolsVersion == "12.0")
-						error = "MSBuild 2013 is not installed. Please download and install it from " +
-						"http://www.microsoft.com/en-us/download/details.aspx?id=40760";
-					throw new InvalidOperationException (error ?? string.Format (
-						"Runtime '{0}' does not have MSBuild '{1}' ToolsVersion installed",
-						runtime.Id, toolsVersion)
-					);
-				}
-
-				//one builder per solution
-				string builderKey = runtime.Id + " # " + solutionFile + " # " + customId;
-
-				RemoteBuildEngine builder = null;
-
-				if (lockBuilder) {
-					foreach (var b in builders.GetBuilders (builderKey)) {
-						if (b.Lock ()) {
-							builder = b;
-							break;
-						}
-						b.Unlock ();
-					}
-				} else
-					builder = builders.GetBuilders (builderKey).FirstOrDefault ();
-				
-				if (builder != null) {
-					builder.ReferenceCount++;
-					return new RemoteProjectBuilder (file, builder);
-				}
-
-				return await Task.Run (() => {
-					//always start the remote process explicitly, even if it's using the current runtime and fx
-					//else it won't pick up the assembly redirects from the builder exe
-					var exe = GetExeLocation (runtime, toolsVersion);
-
-					MonoDevelop.Core.Execution.RemotingService.RegisterRemotingChannel ();
-					var pinfo = new ProcessStartInfo (exe) {
-						UseShellExecute = false,
-						CreateNoWindow = true,
-						RedirectStandardError = true,
-						RedirectStandardInput = true,
-					};
-					runtime.GetToolsExecutionEnvironment ().MergeTo (pinfo);
-
-					Process p = null;
-
-					try {
-						IBuildEngine engine;
-						if (!runLocal) {
-							p = runtime.ExecuteAssembly (pinfo);
-
-							// The builder app will write the build engine reference
-							// after reading the process id from the standard input
-							ManualResetEvent ev = new ManualResetEvent (false);
-							string responseKey = "[MonoDevelop]";
-							string sref = null;
-							p.ErrorDataReceived += (sender, e) => {
-								if (e.Data == null) {
-									if (string.IsNullOrEmpty (sref))
-										LoggingService.LogError ("The MSBuild builder exited before initializing");
-									return;
-								}
-
-								if (e.Data.StartsWith (responseKey, StringComparison.Ordinal)) {
-									sref = e.Data.Substring (responseKey.Length);
-									ev.Set ();
-								} else
-									Console.WriteLine (e.Data);
-							};
-							p.BeginErrorReadLine ();
-							p.StandardInput.WriteLine (Process.GetCurrentProcess ().Id.ToString ());
-							if (!ev.WaitOne (TimeSpan.FromSeconds (5)))
-								throw new Exception ("MSBuild process could not be started");
-
-							byte [] data = Convert.FromBase64String (sref);
-							MemoryStream ms = new MemoryStream (data);
-							BinaryFormatter bf = new BinaryFormatter ();
-							engine = (IBuildEngine)bf.Deserialize (ms);
-						} else {
-							var asm = System.Reflection.Assembly.LoadFrom (exe);
-							var t = asm.GetType ("MonoDevelop.Projects.MSBuild.BuildEngine");
-							engine = (IBuildEngine)Activator.CreateInstance (t);
-						}
-						engine.SetCulture (GettextCatalog.UICulture);
-						engine.SetGlobalProperties (GetCoreGlobalProperties (solutionFile));
-						foreach (var gpp in globalPropertyProviders)
-							engine.SetGlobalProperties (gpp.GetGlobalProperties ());
-						builder = new RemoteBuildEngine (p, engine);
-					} catch {
-						if (p != null) {
-							try {
-								p.Kill ();
-							} catch {
-							}
-						}
-						throw;
-					}
-
-					builders.Add (builderKey, builder);
-					builder.ReferenceCount = 1;
-					builder.Disconnected += async delegate {
-						using (await buildersLock.EnterAsync ())
-							builders.Remove (builder);
-					};
-					if (lockBuilder)
-						builder.Lock ();
-					return new RemoteProjectBuilder (file, builder);
-				});
 			}
-		}
-
-		static IDictionary<string,string> GetCoreGlobalProperties (string slnFile)
-		{
-			var dictionary = new Dictionary<string,string> ();
-
-			//this causes build targets to behave how they should inside an IDE, instead of in a command-line process
-			dictionary.Add ("BuildingInsideVisualStudio", "true");
-
-			//we don't have host compilers in MD, and this is set to true by some of the MS targets
-			//which causes it to always run the CoreCompile task if BuildingInsideVisualStudio is also
-			//true, because the VS in-process compiler would take care of the deps tracking
-			dictionary.Add ("UseHostCompilerIfAvailable", "false" );
-
-			if (string.IsNullOrEmpty (slnFile))
-				return dictionary;
-
-			dictionary.Add ("SolutionPath", Path.GetFullPath (slnFile));
-			dictionary.Add ("SolutionName", Path.GetFileNameWithoutExtension (slnFile));
-			dictionary.Add ("SolutionFilename", Path.GetFileName (slnFile));
-			dictionary.Add ("SolutionDir", Path.GetDirectoryName (slnFile) + Path.DirectorySeparatorChar);
-
-			return dictionary;;
-		}
-		
-		static string GetExeLocation (TargetRuntime runtime, string toolsVersion)
-		{
-			FilePath sourceExe = typeof(MSBuildProjectService).Assembly.Location;
-
-			if ((runtime is MsNetTargetRuntime) && int.Parse (toolsVersion.Split ('.')[0]) >= 4)
-				toolsVersion = "dotnet." + toolsVersion;
-
-			var exe = sourceExe.ParentDirectory.Combine ("MSBuild", toolsVersion, "MonoDevelop.Projects.Formats.MSBuild.exe");
-			if (File.Exists (exe))
-				return exe;
-			
-			throw new InvalidOperationException ("Unsupported MSBuild ToolsVersion '" + toolsVersion + "'");
-		}
-
-		internal static async void ReleaseProjectBuilder (RemoteBuildEngine engine)
-		{
-			using (await buildersLock.EnterAsync ()) {
-				if (--engine.ReferenceCount != 0)
-					return;
-				builders.Remove (engine);
-			}
-			engine.Dispose ();
+			throw new Exception ("Did not find MSBuild for runtime " + runtime.Id);
 		}
 
 		static Dictionary<string, string> cultureNamesTable;

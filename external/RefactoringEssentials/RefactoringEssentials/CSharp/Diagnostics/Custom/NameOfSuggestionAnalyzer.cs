@@ -23,7 +23,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
-
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 (nodeContext) =>
                 {
@@ -40,9 +41,6 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
-
             var options = nodeContext.SemanticModel.SyntaxTree.Options as CSharpParseOptions;
             if (options != null && options.LanguageVersion < LanguageVersion.CSharp6)
                 return false;
@@ -65,13 +63,33 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             return true;
         }
 
+        static SyntaxToken? GetTypeName (TypeSyntax syntax)
+        {
+            if (syntax is SimpleNameSyntax sns)
+            {
+                // sns.GetRightmostName ?
+                return sns.Identifier;
+            }
+            if (syntax is QualifiedNameSyntax qns)
+            {
+                return GetTypeName(qns.Right);
+            }
+            if (syntax is AliasQualifiedNameSyntax aqns)
+            {
+                return GetTypeName(aqns.Name);
+            }
+            return null;
+        }
+
         internal static bool CheckExceptionType(SemanticModel model, ObjectCreationExpressionSyntax objectCreateExpression, out ExpressionSyntax paramNode)
         {
             paramNode = null;
-            var type = model.GetTypeInfo(objectCreateExpression).Type;
-            if (type == null)
+            
+            var typeName = GetTypeName (objectCreateExpression.Type)?.Text;
+            if (typeName == null)
                 return false;
-            if (type.Name == typeof(ArgumentException).Name)
+
+            if (typeName == nameof(ArgumentException))
             {
                 if (objectCreateExpression.ArgumentList.Arguments.Count >= 2)
                 {
@@ -79,9 +97,9 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 }
                 return paramNode != null;
             }
-            if (type.Name == typeof(ArgumentNullException).Name ||
-                type.Name == typeof(ArgumentOutOfRangeException).Name ||
-                type.Name == "DuplicateWaitObjectException")
+            if (typeName == nameof(ArgumentNullException) ||
+                typeName == nameof(ArgumentOutOfRangeException) ||
+                typeName == "DuplicateWaitObjectException")
             {
                 if (objectCreateExpression.ArgumentList.Arguments.Count >= 1)
                 {

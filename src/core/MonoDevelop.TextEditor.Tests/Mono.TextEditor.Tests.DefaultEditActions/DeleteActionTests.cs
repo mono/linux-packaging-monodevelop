@@ -25,12 +25,13 @@
 // THE SOFTWARE.
 
 using System;
+using MonoDevelop.Ide.Editor;
 using NUnit.Framework;
 
 namespace Mono.TextEditor.Tests.Actions
 {
 	[TestFixture()]
-	public class DeleteActionTests : TextEditorTestBase
+	class DeleteActionTests : TextEditorTestBase
 	{
 		[Test]
 		public void TestBackspace ()
@@ -214,6 +215,32 @@ namespace Mono.TextEditor.Tests.Actions
 			Check (data, @"      $Word");
 			DeleteActions.NextSubword (data);
 			Check (data, @"      $");
+		}
+
+		[Test]
+		public void AdvancedBackspaceTests ()
+		{
+			var data = Create (@"($)", mimeType: "text/x-csharp");
+			DefaultSourceEditorOptions.Instance.AutoInsertMatchingBracket = true;
+			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
+			Check (data, @"$");
+			data = Create (@"[$]", mimeType:"text/x-csharp");
+			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
+			Check (data, @"$");
+			data = Create ("\"$\"", mimeType:"text/x-csharp");
+			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
+			Check (data, @"$");
+			data = Create ("'$'", mimeType: "text/x-csharp");
+			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
+			Check (data, @"$");
+
+			data = Create (@"// ($)", mimeType: "text/x-csharp");
+			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
+			Check (data, @"// $)");
+
+			data = Create (@""" ($)", mimeType: "text/x-csharp");
+			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
+			Check (data, @""" $)");
 		}
 	}
 }

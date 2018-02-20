@@ -40,8 +40,9 @@ namespace MonoDevelop.Components
 		Gtk.Alignment alignment;
 
 		Gdk.Rectangle currentCaret;
-		Gdk.Window targetWindow;
+		Gdk.Point targetWindowOrigin = new Point (-1, -1);
 		Gtk.Widget parent;
+		Xwt.Widget xwtParent;
 		bool eventProvided;
 
 		Gdk.Size targetSize;
@@ -129,19 +130,84 @@ namespace MonoDevelop.Components
 			ShowPopup (widget, null, caret, position);
 		}
 
+		public void ShowPopup (Xwt.Rectangle onScreenArea, PopupPosition position)
+		{
+			this.parent = IdeApp.Workbench.RootWindow;
+			this.currentCaret = new Rectangle ((int)onScreenArea.X, (int)onScreenArea.Y, (int)onScreenArea.Width, (int)onScreenArea.Height);
+			Theme.TargetPosition = position;
+			targetWindowOrigin = new Point ((int)onScreenArea.X, (int)onScreenArea.Y);
+			RepositionWindow ();
+		}
+
+		internal void ShowPopup (Xwt.Widget widget, Xwt.Rectangle caret, PopupPosition position)
+		{
+			xwtParent = widget;
+			this.currentCaret = new Gdk.Rectangle ((int)caret.X, (int)caret.Y, (int)caret.Width, (int)caret.Height);
+			Theme.TargetPosition = position;
+			var pos = GtkUtil.GetSceenBounds (widget);
+			targetWindowOrigin = new Point ((int)pos.X, (int)pos.Y);
+			RepositionWindow ();
+		}
+
 		void ShowPopup (Gtk.Widget parent, Gdk.EventButton evt, Gdk.Rectangle caret, PopupPosition position)
 		{
 			this.parent = parent;
 			this.currentCaret = caret;
 			Theme.TargetPosition = position;
-
+			Gdk.Window targetWindow;
 			if (evt != null) {
 				eventProvided = true;
 				targetWindow = evt.Window;
 			} else
 				targetWindow = parent.GdkWindow;
-
+			
+			if (targetWindow != null) {
+				int x, y;
+				targetWindow.GetOrigin (out x, out y);
+				targetWindowOrigin = new Point (x, y);
+			}
 			RepositionWindow ();
+		}
+
+		Gdk.Rectangle GetScreenCoordinates (Gdk.Rectangle caret)
+		{
+			if (parent != null)
+				return GtkUtil.ToScreenCoordinates (parent, parent.GdkWindow, caret);
+			if (xwtParent != null) {
+				return GtkUtil.ToScreenCoordinates (xwtParent, caret.ToXwtRectangle ());
+			}
+			return Gdk.Rectangle.Zero;
+		}
+
+		Gdk.Size GetParentSize ()
+		{
+			if (parent != null) {
+				var alloc = parent.Allocation;
+				return new Size (alloc.Width, alloc.Height);
+			}
+			if (xwtParent != null) {
+				var size = xwtParent.Size;
+				return new Size ((int) size.Width, (int) size.Height);
+			}
+			return Size.Empty;
+		}
+
+		bool HasParent {
+			get { return parent != null || xwtParent != null; }
+		}
+
+		Gdk.Rectangle GetUsableMonitorGeometry (Gdk.Rectangle caret)
+		{
+			Screen screen = null;
+			if (parent != null)
+				screen = parent.Screen;
+			else if (xwtParent != null)
+				screen = Gdk.Screen.Default; // FIXME: should we try to get the Screen from the backend?
+
+			if (screen != null)
+				return GtkWorkarounds.GetUsableMonitorGeometry (screen, screen.GetMonitorAtPoint (caret.X, caret.Y));
+			
+			return Gdk.Rectangle.Zero;
 		}
 		
 		void IAnimatable.BatchBegin () { }
@@ -179,6 +245,12 @@ namespace MonoDevelop.Components
 			QueueResize ();
 		}
 
+		protected override void OnDestroyed ()
+		{
+			this.AbortAnimation ("Resize");
+			base.OnDestroyed ();
+		}
+
 		void MaybeReanimate ()
 		{
 			disableSizeCheck = true;
@@ -205,23 +277,22 @@ namespace MonoDevelop.Components
 
 		public virtual void RepositionWindow (Gdk.Rectangle? newCaret = null)
 		{
-			if (parent == null)
+			if (!HasParent)
 				return;
 
-			int x, y;
 			if (newCaret.HasValue) {//Update caret if parameter is given
 				currentCaret = newCaret.Value;
 			}
 			Gdk.Rectangle caret = currentCaret;
-			Gdk.Window window = targetWindow;
-			if (targetWindow == null)
+			if (targetWindowOrigin.X < 0)
 				return;
+			int x = targetWindowOrigin.X;
+			int y = targetWindowOrigin.Y;
 			PopupPosition position = Theme.TargetPosition;
 			this.position = Theme.TargetPosition;
 			UpdatePadding ();
 
-			window.GetOrigin (out x, out y);
-			var alloc = parent.Allocation;
+			var psize = GetParentSize ();
 
 			if (eventProvided) {
 				caret.X = x;
@@ -229,8 +300,8 @@ namespace MonoDevelop.Components
 				caret.Width = caret.Height = 1;
 			} else {
 				if (caret.Equals (Gdk.Rectangle.Zero))
-					caret = new Gdk.Rectangle (0, 0, alloc.Width, alloc.Height);
-				caret = GtkUtil.ToScreenCoordinates (parent, parent.GdkWindow, caret);
+					caret = new Gdk.Rectangle (0, 0, psize.Width, psize.Height);
+				caret = GetScreenCoordinates (caret);
 			}
 
 			caret.Inflate (CaretSpacing, CaretSpacing);
@@ -238,8 +309,7 @@ namespace MonoDevelop.Components
 				caret.Inflate (-1, -1);
 
 			Gtk.Requisition request = SizeRequest ();
-			var screen = parent.Screen;
-			Gdk.Rectangle geometry = GtkWorkarounds.GetUsableMonitorGeometry (screen, screen.GetMonitorAtPoint (caret.X, caret.Y));
+			Gdk.Rectangle geometry = GetUsableMonitorGeometry (caret);
 
 			// Add some spacing between the screen border and the popover window
 			geometry.Inflate (-5, -5);

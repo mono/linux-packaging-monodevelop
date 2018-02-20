@@ -31,7 +31,7 @@ using Xwt.Drawing;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageCellView : CanvasCellView
+	internal class PackageCellView : CanvasCellView
 	{
 		int packageIdFontSize;
 		int packageDescriptionFontSize;
@@ -55,7 +55,7 @@ namespace MonoDevelop.PackageManagement
 			}
 		}
 
-		public IDataField<PackageViewModel> PackageField { get; set; }
+		public IDataField<PackageSearchResultViewModel> PackageField { get; set; }
 		public IDataField<Image> ImageField { get; set; }
 		public IDataField<bool> HasBackgroundColorField { get; set; }
 		public IDataField<double> CheckBoxAlphaField { get; set; }
@@ -72,7 +72,7 @@ namespace MonoDevelop.PackageManagement
 
 		protected override void OnDraw (Context ctx, Rectangle cellArea)
 		{
-			PackageViewModel packageViewModel = GetValue (PackageField);
+			PackageSearchResultViewModel packageViewModel = GetValue (PackageField);
 			if (packageViewModel == null) {
 				return;
 			}
@@ -98,9 +98,11 @@ namespace MonoDevelop.PackageManagement
 			}
 
 			// Package Id.
+			// Use the package id and not the package title to prevent a pango crash if the title
+			// contains Chinese characters.
 			var packageIdTextLayout = new TextLayout ();
 			packageIdTextLayout.Font = packageIdTextLayout.Font.WithSize (packageIdFontSize);
-			packageIdTextLayout.Markup = packageViewModel.GetNameMarkup ();
+			packageIdTextLayout.Markup = packageViewModel.GetIdMarkup ();
 			packageIdTextLayout.Trimming = TextTrimming.WordElipsis;
 			Size packageIdTextSize = packageIdTextLayout.GetSize ();
 			packageIdTextLayout.Width = packageIdWidth;
@@ -161,7 +163,7 @@ namespace MonoDevelop.PackageManagement
 			ctx.Fill ();
 		}
 
-		void DrawCheckBox (Context ctx, PackageViewModel packageViewModel, Rectangle cellArea)
+		void DrawCheckBox (Context ctx, PackageSearchResultViewModel packageViewModel, Rectangle cellArea)
 		{
 			CreateCheckboxImages ();
 
@@ -285,7 +287,7 @@ namespace MonoDevelop.PackageManagement
 
 		protected override void OnButtonPressed (ButtonEventArgs args)
 		{
-			PackageViewModel packageViewModel = GetValue (PackageField);
+			PackageSearchResultViewModel packageViewModel = GetValue (PackageField);
 			if (packageViewModel == null) {
 				base.OnButtonPressed (args);
 				return;
@@ -300,7 +302,7 @@ namespace MonoDevelop.PackageManagement
 			}
 		}
 
-		void OnPackageChecked (PackageViewModel packageViewModel)
+		void OnPackageChecked (PackageSearchResultViewModel packageViewModel)
 		{
 			if (PackageChecked != null) {
 				PackageChecked (this, new PackageCellViewEventArgs (packageViewModel));

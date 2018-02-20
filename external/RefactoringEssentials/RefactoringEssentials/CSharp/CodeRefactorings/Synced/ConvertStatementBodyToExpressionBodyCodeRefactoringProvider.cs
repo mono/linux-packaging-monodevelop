@@ -16,6 +16,9 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             var document = context.Document;
             if (document.Project.Solution.Workspace.Kind == WorkspaceKind.MiscellaneousFiles)
                 return;
+            var options = document.Project.ParseOptions as CSharpParseOptions;
+            if (options != null && options.LanguageVersion < LanguageVersion.CSharp6)
+                return;
             var span = context.Span;
             if (!span.IsEmpty)
                 return;
@@ -114,7 +117,7 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
 
         static void HandlePropertyCase(CodeRefactoringContext context, SyntaxNode root, SyntaxToken token, PropertyDeclarationSyntax property)
         {
-            var getter = property.AccessorList.Accessors.FirstOrDefault(acc => acc.IsKind(SyntaxKind.GetAccessorDeclaration));
+            var getter = property.AccessorList?.Accessors.FirstOrDefault(acc => acc.IsKind(SyntaxKind.GetAccessorDeclaration));
             ExpressionSyntax expr;
             if (getter == null || property.AccessorList.Accessors.Count != 1 || !IsSimpleReturn(getter.Body, out expr))
                 return;

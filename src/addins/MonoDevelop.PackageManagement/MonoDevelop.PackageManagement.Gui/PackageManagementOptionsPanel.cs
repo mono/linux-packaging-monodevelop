@@ -26,21 +26,18 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-using System;
 using MonoDevelop.Components;
-using MonoDevelop.PackageManagement;
 using MonoDevelop.Ide.Gui.Dialogs;
 
 namespace MonoDevelop.PackageManagement.Gui
 {
-	public class PackageManagementOptionsPanel : OptionsPanel
+	internal class PackageManagementOptionsPanel : OptionsPanel
 	{
 		PackageManagementOptionsViewModel optionsViewModel;
 
 		public override Control CreatePanelWidget()
 		{
-			var viewModels = new PackageManagementViewModels ();
-			optionsViewModel = viewModels.PackageManagementOptionsViewModel;
+			optionsViewModel = new PackageManagementOptionsViewModel ();
 			return new PackageManagementOptionsWidget (optionsViewModel);
 		}
 		

@@ -1,4 +1,4 @@
-//
+﻿//
 // TestPad.cs
 //
 // Author:
@@ -34,6 +34,7 @@ using Gdk;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Ide.Gui.Pads;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.UnitTesting.Commands;
 using MonoDevelop.Ide.Gui.Components;
@@ -46,6 +47,9 @@ using MonoDevelop.Components;
 using MonoDevelop.Ide.Commands;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MonoDevelop.Components.AutoTest;
+
+using SCM = System.ComponentModel;
 
 namespace MonoDevelop.UnitTesting
 {
@@ -94,6 +98,8 @@ namespace MonoDevelop.UnitTesting
 			hbox.PackStart (new ImageView (ImageService.GetIcon ("md-execute-all", IconSize.Menu)), false, false, 0);
 			hbox.PackStart (new Label (GettextCatalog.GetString ("Run All")), false, false, 0);
 			buttonRunAll = new Button (hbox);
+			buttonRunAll.Accessible.Name = "TestPad.RunAll";
+			buttonRunAll.Accessible.Description = GettextCatalog.GetString ("Start a test run and run all the tests");
 			buttonRunAll.Clicked += new EventHandler (OnRunAllClicked);
 			buttonRunAll.Sensitive = true;
 			buttonRunAll.TooltipText = GettextCatalog.GetString ("Run all tests");
@@ -103,6 +109,9 @@ namespace MonoDevelop.UnitTesting
 			buttonStop.Clicked += new EventHandler (OnStopClicked);
 			buttonStop.Sensitive = false;
 			buttonStop.TooltipText = GettextCatalog.GetString ("Cancel running test");
+			buttonStop.Accessible.Name = "TestPad.StopAll";
+			buttonStop.Accessible.SetTitle (GettextCatalog.GetString (("Cancel")));
+			buttonStop.Accessible.Description = GettextCatalog.GetString ("Stops the current test run");
 			topToolbar.Add (buttonStop);
 			topToolbar.ShowAll ();
 			
@@ -188,11 +197,14 @@ namespace MonoDevelop.UnitTesting
 			
 			Frame tf = new Frame ();
 			ScrolledWindow sw = new ScrolledWindow ();
-			detailsTree = new TreeView ();
+			detailsTree = new TreeView { Name = "testPadDetailsTree" };
 			
 			detailsTree.HeadersVisible = true;
 			detailsTree.RulesHint = true;
 			detailsStore = new ListStore (typeof(object), typeof(string), typeof (string), typeof (string), typeof (string));
+			SemanticModelAttribute modelAttr = new SemanticModelAttribute ("store__UnitTest", "store__Name","store__Passed",
+				"store__ErrorsAndFailures", "store__Ignored");
+			SCM.TypeDescriptor.AddAttributes (detailsStore, modelAttr);
 			
 			CellRendererText trtest = new CellRendererText ();
 			CellRendererText tr;
@@ -251,10 +263,12 @@ namespace MonoDevelop.UnitTesting
 			tf = new Frame ();
 			sw = new ScrolledWindow ();
 			tf.Add (sw);
-			regressionTree = new TreeView ();
+			regressionTree = new TreeView { Name = "testPadRegressionTree" };
 			regressionTree.HeadersVisible = false;
 			regressionTree.RulesHint = true;
 			regressionStore = new ListStore (typeof(object), typeof(string), typeof (Xwt.Drawing.Image));
+			SemanticModelAttribute regressionModelAttr = new SemanticModelAttribute ("store__UnitTest", "store__Name", "store__Icon");
+			SCM.TypeDescriptor.AddAttributes (detailsStore, regressionModelAttr);
 			
 			CellRendererText trtest2 = new CellRendererText ();
 			var pr = new CellRendererImage ();
@@ -280,6 +294,8 @@ namespace MonoDevelop.UnitTesting
 			failedTree.HeadersVisible = false;
 			failedTree.RulesHint = true;
 			failedStore = new ListStore (typeof(object), typeof(string), typeof (Xwt.Drawing.Image));
+			SemanticModelAttribute failedModelAttr = new SemanticModelAttribute ("store__UnitTest", "store__Name", "store__Icon");
+			SCM.TypeDescriptor.AddAttributes (failedStore, failedModelAttr);
 			
 			trtest2 = new CellRendererText ();
 			pr = new CellRendererImage ();
@@ -339,6 +355,8 @@ namespace MonoDevelop.UnitTesting
 			
 			foreach (UnitTest t in UnitTestService.RootTests)
 				TreeView.AddChild (t);
+			
+			base.TreeView.Tree.Name = "unitTestBrowserTree";
 		}
 		
 		void OnTestSuiteChanged (object sender, EventArgs e)
@@ -480,6 +498,24 @@ namespace MonoDevelop.UnitTesting
 			return RunTest (FindTestNode (test), mode, false);
 		}
 
+		AsyncOperation RunTests (ITreeNavigator[] navs, IExecutionHandler mode, bool bringToFront = true)
+		{
+			if (navs == null)
+				return null;
+			var tests = new List<UnitTest> ();
+			WorkspaceObject ownerObject = null;
+			foreach (var nav in navs) {
+				var test = nav.DataItem as UnitTest;
+				if (test != null) {
+					tests.Add (test);
+					ownerObject = test.OwnerObject;
+				}
+			}
+			if (tests.Count == 0)
+				return null;
+			return RunTests (tests, mode, bringToFront);
+		}
+
 		AsyncOperation RunTest (ITreeNavigator nav, IExecutionHandler mode, bool bringToFront = true)
 		{
 			if (nav == null)
@@ -487,7 +523,13 @@ namespace MonoDevelop.UnitTesting
 			UnitTest test = nav.DataItem as UnitTest;
 			if (test == null)
 				return null;
-			UnitTestService.ResetResult (test.RootTest);
+			return RunTests (new UnitTest [] { test }, mode, bringToFront);
+		}
+
+		AsyncOperation RunTests (IEnumerable<UnitTest> tests, IExecutionHandler mode, bool bringToFront)
+		{
+			foreach (var test in tests)
+				UnitTestService.ResetResult (test.RootTest);
 			
 			this.buttonRunAll.Sensitive = false;
 			this.buttonStop.Sensitive = true;
@@ -496,7 +538,7 @@ namespace MonoDevelop.UnitTesting
 
 			if (bringToFront)
 				IdeApp.Workbench.GetPad<TestPad> ().BringToFront ();
-			runningTestOperation = UnitTestService.RunTest (test, context);
+			runningTestOperation = UnitTestService.RunTests (tests, context);
 			runningTestOperation.Task.ContinueWith (t => OnTestSessionCompleted (), TaskScheduler.FromCurrentSynchronizationContext ());
 			return runningTestOperation;
 		}
@@ -508,7 +550,7 @@ namespace MonoDevelop.UnitTesting
 		
 		void RunSelectedTest (IExecutionHandler mode)
 		{
-			RunTest (TreeView.GetSelectedNode (), mode);
+			RunTests (TreeView.GetSelectedNodes (), mode);
 		}
 		
 		void OnTestSessionCompleted ()
@@ -916,10 +958,19 @@ namespace MonoDevelop.UnitTesting
 		
 		protected override bool OnExposeEvent (Gdk.EventExpose args)
 		{
-			Gdk.GC gc = new Gdk.GC (GdkWindow);
-			gc.ClipRectangle = Allocation;
-			GdkWindow.DrawLayout (gc, padding, padding, layout);
+			using (Gdk.GC gc = new Gdk.GC (GdkWindow)) {
+				gc.ClipRectangle = Allocation;
+				GdkWindow.DrawLayout (gc, padding, padding, layout);
+			}
 			return true;
+		}
+		protected override void OnDestroyed ()
+		{
+			if (layout != null) {
+				layout.Dispose ();
+				layout = null;
+			}
+			base.OnDestroyed ();
 		}
 	}
 }

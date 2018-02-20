@@ -25,7 +25,8 @@ namespace RefactoringEssentials.VB.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
-
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 (nodeContext) =>
                 {
@@ -42,8 +43,6 @@ namespace RefactoringEssentials.VB.Diagnostics
         static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
 
             var options = nodeContext.SemanticModel.SyntaxTree.Options as VisualBasicParseOptions;
             if (options != null && options.LanguageVersion < LanguageVersion.VisualBasic14)

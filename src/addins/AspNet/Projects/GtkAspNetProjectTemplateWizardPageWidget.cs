@@ -59,12 +59,15 @@ namespace MonoDevelop.AspNet.Projects
 				includeUnitTestProjectDescriptionLeftHandPadding.WidthRequest = leftPaddingWidth;
 			}
 
-			double scale = GtkWorkarounds.GetPixelScale ();
+			// Do not use a width request for the configuration box so the left hand side of the
+			// wizard page can expand to fit its contents.
+			configurationVBox.WidthRequest = -1;
 
 			backgroundImage = Xwt.Drawing.Image.FromResource ("aspnet-wizard-page.png");
 			backgroundImageView = new ImageView (backgroundImage);
-			backgroundImageView.Xalign = (float)(1/scale);
-			backgroundImageView.Yalign = (float)(1/scale);
+			backgroundImageView.Xalign = 1.0f;
+			backgroundImageView.Yalign = 1.0f;
+			backgroundImageView.SizeRequested += BackgroundImageViewSizeRequested;
 			backgroundLargeImageVBox.PackStart (backgroundImageView, true, true, 0);
 
 			var separatorColor = Ide.Gui.Styles.NewProjectDialog.ProjectConfigurationSeparatorColor.ToGdkColor ();
@@ -76,9 +79,6 @@ namespace MonoDevelop.AspNet.Projects
 			configurationTableEventBox.ModifyBg (StateType.Normal, backgroundColor);
 			configurationBottomEventBox.ModifyBg (StateType.Normal, backgroundColor);
 			backgroundLargeImageEventBox.ModifyBg (StateType.Normal, backgroundColor);
-
-			if (Platform.IsWindows && scale > 1.0)
-				ScaleWidgets (scale);
 		}
 
 		public GtkAspNetProjectTemplateWizardPageWidget (AspNetProjectTemplateWizardPage wizardPage)
@@ -87,49 +87,11 @@ namespace MonoDevelop.AspNet.Projects
 			WizardPage = wizardPage;
 		}
 
-		void ScaleWidgets (double scale)
-		{
-			ScaleWidgetsWidth (scale, new Widget[] {
-				leftBorderEventBox,
-				configurationVBox,
-				includeLabelPadding,
-				testingLabelPadding,
-				paddingLabel,
-				testingSeparator,
-				mvcDescriptionLeftHandPadding,
-				mvcDescriptionLabel,
-				webFormsDescriptionLeftHandPadding,
-				webFormsDescriptionLabel,
-				webApiDescriptionLeftHandPadding,
-				webApiDescriptionLabel,
-				includeUnitTestProjectDescriptionLabel,
-				includeUnitTestProjectDescriptionLeftHandPadding
-			});
-
-			ScaleWidgetsHeight (scale, new Widget[] {
-				includeLabelPadding,
-				testingLabelPadding,
-				testingSeparator
-			});
-		}
-
-		void ScaleWidgetsWidth (double scale, Widget[] widgets)
-		{
-			foreach (Widget widget in widgets) {
-				widget.WidthRequest = (int)(widget.WidthRequest * scale);
-			}
-		}
-
-		void ScaleWidgetsHeight (double scale, Widget[] widgets)
-		{
-			foreach (Widget widget in widgets) {
-				widget.HeightRequest = (int)(widget.HeightRequest * scale);
-			}
-		}
-
 		public override void Dispose ()
 		{
+			backgroundImageView.SizeRequested -= BackgroundImageViewSizeRequested;
 			Dispose (backgroundImage);
+			base.Dispose ();
 		}
 
 		void Dispose (IDisposable disposable)
@@ -189,6 +151,18 @@ namespace MonoDevelop.AspNet.Projects
 		bool IsYosemiteOrHigher ()
 		{
 			return Platform.OSVersion >= MacSystemInformation.Yosemite;
+		}
+
+		void BackgroundImageViewSizeRequested (object o, SizeRequestedArgs args)
+		{
+			if (args.Requisition.Width <= backgroundImage.Width) {
+				// Ensure there is a gap between the image and the left hand side of the wizard
+				// if the labels have expanded to fit their text.
+				args.Requisition = new Requisition {
+					Height = args.Requisition.Height,
+					Width = args.Requisition.Width + 30
+				};
+			}
 		}
 	}
 }

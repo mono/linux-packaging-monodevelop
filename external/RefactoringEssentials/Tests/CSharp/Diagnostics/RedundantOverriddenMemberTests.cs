@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class RedundantOverriddenMemberTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestInspectorCase1()
         {
             Test<RedundantOverriddenMemberAnalyzer>(@"namespace Demo
@@ -41,7 +40,7 @@ namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestResharperDisable()
         {
             Analyze<RedundantOverriddenMemberAnalyzer>(@"namespace Demo
@@ -65,7 +64,7 @@ namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestInspectorCase2()
         {
             Analyze<RedundantOverriddenMemberAnalyzer>(@"namespace Demo
@@ -88,7 +87,7 @@ namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestTestInspectorCase3()
         {
             Analyze<RedundantOverriddenMemberAnalyzer>(@"namespace Demo
@@ -110,7 +109,7 @@ namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestTestInspectorCase4()
         {
             Test<RedundantOverriddenMemberAnalyzer>(
@@ -150,7 +149,7 @@ namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestTestInspectorCase5()
         {
             Test<RedundantOverriddenMemberAnalyzer>(
@@ -192,7 +191,7 @@ namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestTestInspectorCase6()
         {
             Test<RedundantOverriddenMemberAnalyzer>(
@@ -273,7 +272,7 @@ class C : A
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestRedundantEvent()
         {
             Test<RedundantOverriddenMemberAnalyzer>(@"namespace Demo
@@ -299,7 +298,7 @@ class C : A
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestNonRedundantEvent()
         {
             var input = @"namespace Demo
@@ -318,7 +317,7 @@ class C : A
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestGetHashCode()
         {
             Analyze<RedundantOverriddenMemberAnalyzer>(@"
@@ -337,7 +336,7 @@ class Bar
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestRedundantGetHashCode()
         {
             TestIssue<RedundantOverriddenMemberAnalyzer>(@"
@@ -351,7 +350,7 @@ class Bar
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestPropertyBug()
         {
             Analyze<RedundantOverriddenMemberAnalyzer>(@"
@@ -377,7 +376,7 @@ class Bar : BaseFoo
         /// <summary>
         /// Bug 21533 - Incorrect warning: "Redundant method override"
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug21533()
         {
             Analyze<RedundantOverriddenMemberAnalyzer>(@"
@@ -402,4 +401,4 @@ public class DerivedClass : MyClass
 
 
     }
-}
+}*/

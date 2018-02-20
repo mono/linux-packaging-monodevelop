@@ -99,7 +99,7 @@ namespace MonoDevelop.Core.Assemblies
 		public override string DisplayName {
 			get {
 				if (!IsRunning)
-					return base.DisplayName + " (" + Prefix + ")" + (monoRuntimeInfo.Force64or32bit.HasValue ? monoRuntimeInfo.Force64or32bit.Value ? " (64bit)" : " (32bit)" : "");
+					return base.DisplayName + " (" + Prefix + ")";
 				else
 					return base.DisplayName;
 			}
@@ -126,9 +126,12 @@ namespace MonoDevelop.Core.Assemblies
 		}
 
 		public bool UserDefined { get; internal set; }
-		
+
+		[Obsolete("Use DotNetProject.GetAssemblyDebugInfoFile()")]
 		public override string GetAssemblyDebugInfoFile (string assemblyPath)
 		{
+			if (monoRuntimeInfo.RuntimeVersion != null && monoRuntimeInfo.RuntimeVersion >= new Version (4,9,0))
+				return Path.ChangeExtension (assemblyPath, ".pdb");
 			return assemblyPath + ".mdb";
 		}
 		
@@ -137,13 +140,11 @@ namespace MonoDevelop.Core.Assemblies
 			return new MonoFrameworkBackend ();
 		}
 
-
+		
 		public override IExecutionHandler GetExecutionHandler ()
 		{
 			if (execHandler == null) {
-				string monoPath = Path.Combine (MonoRuntimeInfo.Prefix, "bin");
-				monoPath = Path.Combine (monoPath, MonoRuntimeInfo.Force64or32bit.HasValue ? (MonoRuntimeInfo.Force64or32bit.Value ? "mono64" : "mono32") : "mono");
-				execHandler = new MonoPlatformExecutionHandler (monoPath, environmentVariables);
+				execHandler = new MonoPlatformExecutionHandler (this);
 			}
 			return execHandler;
 		}
@@ -156,7 +157,9 @@ namespace MonoDevelop.Core.Assemblies
 
 		public override string GetToolPath (TargetFramework fx, string toolName)
 		{
+#pragma warning disable CS0618 // Type or member is obsolete
 			if (fx.ClrVersion == ClrVersion.Net_2_0 && toolName == "al")
+#pragma warning restore CS0618 // Type or member is obsolete
 				toolName = "al2";
 			return base.GetToolPath (fx, toolName);
 		}
@@ -176,15 +179,56 @@ namespace MonoDevelop.Core.Assemblies
 		
 		public override string GetMSBuildBinPath (string toolsVersion)
 		{
-			var path = Path.Combine (monoDir, toolsVersion);
-			if (File.Exists (Path.Combine (path, "xbuild.exe")))
-				return path;
-			//HACK: Mono puts xbuild 4.0 in 4.5 directory, even though there is no such thing as ToolsVersion 4.5
+			bool monoUseMSBuild = Runtime.Preferences.BuildWithMSBuild || System.Version.Parse (toolsVersion) >= new System.Version(15, 0);
+
+			if (monoUseMSBuild) {
+				var path = Path.Combine (monoDir, "msbuild", toolsVersion, "bin");
+				if (File.Exists (Path.Combine (path, "MSBuild.exe")) ||
+				    File.Exists (Path.Combine (path, "MSBuild.dll"))) {
+					return path;
+				}
+
+				// ToolsVersion >= 15.0 is supported only by msbuild, so, just
+				// return null here
+				return null;
+			}
+
+			var xbpath = Path.Combine (monoDir, "xbuild", toolsVersion, "bin");
+			if (File.Exists (Path.Combine (xbpath, "xbuild.exe")))
+				return xbpath;
+
 			if (toolsVersion == "4.0")
+				//HACK: Mono puts xbuild 4.0 in 4.5 directory, even though there is no such thing as ToolsVersion 4.5
 				return GetMSBuildBinPath ("4.5");
+
 			return null;
 		}
 		
+		public override string GetMSBuildToolsPath (string toolsVersion)
+		{
+			bool monoUseMSBuild = Runtime.Preferences.BuildWithMSBuild || System.Version.Parse (toolsVersion) >= new System.Version (15, 0);
+
+			if (monoUseMSBuild) {
+				var path = Path.Combine (monoDir, "msbuild", toolsVersion, "bin");
+				if (Directory.Exists (path))
+					return path;
+
+				// ToolsVersion >= 15.0 is supported only by msbuild, so, just
+				// return null here
+				return null;
+			}
+
+			var xbpath = Path.Combine (monoDir, "xbuild", toolsVersion, "bin");
+			if (Directory.Exists (xbpath))
+				return xbpath;
+
+			if (toolsVersion == "4.0")
+				//HACK: Mono puts xbuild 4.0 in 4.5 directory, even though there is no such thing as ToolsVersion 4.5
+				return GetMSBuildToolsPath ("4.5");
+
+			return null;
+		}
+
 		public override string GetMSBuildExtensionsPath ()
 		{
 			return Path.Combine (monoDir, "xbuild");
@@ -210,13 +254,13 @@ namespace MonoDevelop.Core.Assemblies
 		{
 			var packageNames = new HashSet<string> ();
 			foreach (string pcdir in PkgConfigDirs) {
-				string[] files;
+				IEnumerable<string> files;
 
 				if (!Directory.Exists (pcdir))
 					continue;
 
 				try {
-					files = Directory.GetFiles (pcdir, "*.pc");
+					files = Directory.EnumerateFiles (pcdir, "*.pc");
 				} catch (Exception ex) {
 					LoggingService.LogError (string.Format (
 						"Runtime '{0}' error in pc file scan of directory '{1}'", DisplayName, pcdir), ex);
@@ -280,6 +324,49 @@ namespace MonoDevelop.Core.Assemblies
 		public override ExecutionEnvironment GetToolsExecutionEnvironment ()
 		{
 			return new ExecutionEnvironment (EnvironmentVariables);
+		}
+
+		static bool Is64BitPE (Mono.Cecil.TargetArchitecture machine)
+		{
+			return machine == Mono.Cecil.TargetArchitecture.AMD64 ||
+				   machine == Mono.Cecil.TargetArchitecture.IA64 ||
+				   machine == Mono.Cecil.TargetArchitecture.ARM64;
+		}
+
+		/// <summary>
+		/// Get the Mono executable best matching the assembly architecture flags.
+		/// </summary>
+		/// <remarks>Returns a fallback Mono executable, if a match cannot be found.</remarks>
+		/// <returns>The Mono executable that should be used to execute the assembly.</returns>
+		/// <param name="assemblyPath">Assembly path.</param>
+		public string GetMonoExecutableForAssembly (string assemblyPath)
+		{
+			Mono.Cecil.ModuleAttributes peKind;
+			Mono.Cecil.TargetArchitecture machine;
+
+			try {
+				using (var adef = Mono.Cecil.AssemblyDefinition.ReadAssembly (assemblyPath)) {
+					peKind = adef.MainModule.Attributes;
+					machine = adef.MainModule.Architecture;
+				}
+			} catch {
+				peKind = Mono.Cecil.ModuleAttributes.ILOnly;
+				machine = Mono.Cecil.TargetArchitecture.I386;
+			}
+
+			string monoPath;
+
+			if ((peKind & (Mono.Cecil.ModuleAttributes.Required32Bit | Mono.Cecil.ModuleAttributes.Preferred32Bit)) != 0) {
+				monoPath = Path.Combine (MonoRuntimeInfo.Prefix, "bin", "mono32");
+				if (File.Exists (monoPath))
+					return monoPath;
+			} else if (Is64BitPE (machine)) {
+				monoPath = Path.Combine (MonoRuntimeInfo.Prefix, "bin", "mono64");
+				if (File.Exists (monoPath))
+					return monoPath;
+			}
+
+			return monoPath = Path.Combine (MonoRuntimeInfo.Prefix, "bin", "mono");
 		}
 	}
 	

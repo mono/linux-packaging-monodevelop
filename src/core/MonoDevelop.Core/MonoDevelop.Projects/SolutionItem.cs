@@ -52,18 +52,18 @@ using System.Collections.Immutable;
 
 namespace MonoDevelop.Projects
 {
-	public abstract class SolutionItem : SolutionFolderItem, IWorkspaceFileObject, IConfigurationTarget, IBuildTarget, IMSBuildFileObject
+	public abstract class SolutionItem : SolutionFolderItem, IWorkspaceFileObject, IConfigurationTarget, IBuildTarget, IMSBuildFileObject, IRunTarget
 	{
 		internal object MemoryProbe = Counters.ItemsInMemory.CreateMemoryProbe ();
 
 		int loading;
 		ItemCollection<SolutionItem> dependencies = new ItemCollection<SolutionItem> ();
-		SolutionItemEventArgs thisItemArgs;
 		FileStatusTracker<SolutionItemEventArgs> fileStatusTracker;
 		FilePath fileName;
 		string name;
 		SolutionItemExtension itemExtension;
 		MSBuildFileFormat fileFormat;
+		internal string defaultItemId;
 		
 		SolutionItemConfiguration activeConfiguration;
 		SolutionItemConfigurationCollection configurations;
@@ -72,8 +72,7 @@ namespace MonoDevelop.Projects
 		public event ConfigurationEventHandler DefaultConfigurationChanged;
 		public event ConfigurationEventHandler ConfigurationAdded;
 		public event ConfigurationEventHandler ConfigurationRemoved;
-		public event EventHandler<ProjectItemEventArgs> ProjectItemAdded;
-		public event EventHandler<ProjectItemEventArgs> ProjectItemRemoved;
+		public EventHandler RunConfigurationsChanged;
 
 		// When set, it means this item is saved as part of a global solution save operation
 		internal bool SavingSolution { get; set; }
@@ -83,7 +82,6 @@ namespace MonoDevelop.Projects
 			TypeGuid = MSBuildProjectService.GetTypeGuidForItem (this);
 
 			fileFormat = MSBuildFileFormat.DefaultFormat;
-			thisItemArgs = new SolutionItemEventArgs (this);
 			configurations = new SolutionItemConfigurationCollection (this);
 			configurations.ConfigurationAdded += OnConfigurationAddedToCollection;
 			configurations.ConfigurationRemoved += OnConfigurationRemovedFromCollection;
@@ -377,6 +375,24 @@ namespace MonoDevelop.Projects
 			return ItemExtension.OnGetReferencedItems (configuration);
 		}
 
+		public IEnumerable<T>  GetReferencedExtensionsFromFlavor<T> (string projectTypeName, ConfigurationSelector configuration) where T : ProjectExtension
+		{
+			var extensions = new List<T> ();
+			var projects = ParentSolution.GetAllProjects ();
+			var extensionFlavor = Type.GetType (projectTypeName, true);
+
+			foreach (var p in projects) {
+				if (p == this
+					|| !p.GetReferencedItems (configuration).Contains (this))
+					continue;
+
+				T extension = p.GetService (extensionFlavor) as T;
+				if (extension != null)
+					extensions.Add (extension);
+			}
+			return extensions;
+		}
+
 		protected virtual IEnumerable<SolutionItem> OnGetReferencedItems (ConfigurationSelector configuration)
 		{
 			return dependencies;
@@ -396,6 +412,8 @@ namespace MonoDevelop.Projects
 
 		protected virtual void OnInitializeFromTemplate (ProjectCreateInformation projectCreateInfo, XmlElement template)
 		{
+			if (projectCreateInfo.TemplateInitializationCallback != null)
+				projectCreateInfo.TemplateInitializationCallback (this);
 		}
 
 		protected sealed override FilePath GetDefaultBaseDirectory ( )
@@ -404,11 +422,12 @@ namespace MonoDevelop.Projects
 			return file.IsNullOrEmpty ? FilePath.Empty : file.ParentDirectory; 
 		}
 
-		internal Task LoadAsync (ProgressMonitor monitor, FilePath fileName, MSBuildFileFormat format)
+		internal Task LoadAsync (ProgressMonitor monitor, FilePath fileName, MSBuildFileFormat format, string itemGuid)
 		{
 			fileFormat = format;
 			FileName = fileName;
 			Name = Path.GetFileNameWithoutExtension (fileName);
+			defaultItemId = itemGuid;
 			return ItemExtension.OnLoad (monitor);
 		}
 
@@ -442,7 +461,7 @@ namespace MonoDevelop.Projects
 			try {
 				fileStatusTracker.BeginSave ();
 				await OnSave (monitor);
-				OnSaved (thisItemArgs);
+				OnSaved (new SolutionItemSavedEventArgs (this, ParentSolution, SavingSolution));
 			} finally {
 				fileStatusTracker.EndSave ();
 			}
@@ -488,12 +507,17 @@ namespace MonoDevelop.Projects
 			return ItemExtension.OnGetSupportedFeatures ().HasFlag (ProjectFeatures.Configurations);
 		}
 
+		public bool SupportsRunConfigurations ()
+		{
+			return ItemExtension.OnGetSupportedFeatures ().HasFlag (ProjectFeatures.RunConfigurations);
+		}
+
 		protected virtual ProjectFeatures OnGetSupportedFeatures ()
 		{
 			if (IsUnsupportedProject)
 				return ProjectFeatures.Configurations;
 			else
-				return ProjectFeatures.Execute | ProjectFeatures.Build | ProjectFeatures.Configurations;
+				return ProjectFeatures.Execute | ProjectFeatures.Build | ProjectFeatures.Configurations | ProjectFeatures.RunConfigurations;
 		}
 
 		/// <summary>
@@ -572,43 +596,66 @@ namespace MonoDevelop.Projects
 
 		async Task<BuildResult> BuildTask (ProgressMonitor monitor, ConfigurationSelector solutionConfiguration, bool buildReferences, OperationContext operationContext)
 		{
+			BuildResult result = null;
+			bool operationStarted = false;
+
+			if (operationContext == null)
+				operationContext = new OperationContext ();
+
 			if (!buildReferences) {
 				try {
 					SolutionItemConfiguration iconf = GetConfiguration (solutionConfiguration);
 					string confName = iconf != null ? iconf.Id : solutionConfiguration.ToString ();
 					monitor.BeginTask (GettextCatalog.GetString ("Building: {0} ({1})", Name, confName), 1);
 
+					operationStarted = ParentSolution != null && await ParentSolution.BeginBuildOperation (monitor, solutionConfiguration, operationContext);
+
 					using (Counters.BuildProjectTimer.BeginTiming ("Building " + Name, GetProjectEventMetadata (solutionConfiguration))) {
-						return await InternalBuild (monitor, solutionConfiguration, operationContext);
+						result = await InternalBuild (monitor, solutionConfiguration, operationContext);
 					}
 
 				} finally {
+					if (operationStarted)
+						await ParentSolution.EndBuildOperation (monitor, solutionConfiguration, operationContext, result);
+					
 					monitor.EndTask ();
 				}
+				return result;
 			}
 
 			ITimeTracker tt = Counters.BuildProjectAndReferencesTimer.BeginTiming ("Building " + Name, GetProjectEventMetadata (solutionConfiguration));
 			try {
+				operationStarted = ParentSolution != null && await ParentSolution.BeginBuildOperation (monitor, solutionConfiguration, operationContext);
+
 				// Get a list of all items that need to be built (including this),
 				// and build them in the correct order
 
 				var referenced = new List<SolutionItem> ();
 				var visited = new Set<SolutionItem> ();
 				GetBuildableReferencedItems (visited, referenced, this, solutionConfiguration);
-
+				if (Runtime.Preferences.SkipBuildingUnmodifiedProjects)
+					referenced.RemoveAll (si => {
+						if (si is Project p)
+							return !p.FastCheckNeedsBuild (solutionConfiguration);
+						return false;//Don't filter things that don't have FastCheckNeedsBuild
+					});
 				var sortedReferenced = TopologicalSort (referenced, solutionConfiguration);
 
 				SolutionItemConfiguration iconf = GetConfiguration (solutionConfiguration);
 				string confName = iconf != null ? iconf.Id : solutionConfiguration.ToString ();
 				monitor.BeginTask (GettextCatalog.GetString ("Building: {0} ({1})", Name, confName), sortedReferenced.Count);
 
-				return await SolutionFolder.RunParallelBuildOperation (monitor, solutionConfiguration, sortedReferenced, (ProgressMonitor m, SolutionItem item) => {
+				result = await SolutionFolder.RunParallelBuildOperation (monitor, solutionConfiguration, sortedReferenced, (ProgressMonitor m, SolutionItem item) => {
 					return item.Build (m, solutionConfiguration, false, operationContext);
 				}, false);
 			} finally {
 				monitor.EndTask ();
 				tt.End ();
+
+				if (operationStarted)
+					await ParentSolution.EndBuildOperation (monitor, solutionConfiguration, operationContext, result);
 			}
+			return result;
 		}
 
 		async Task<BuildResult> InternalBuild (ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext)
@@ -824,7 +871,6 @@ namespace MonoDevelop.Projects
 		protected virtual void OnGetProjectEventMetadata (IDictionary<string, string> metadata)
 		{
 		}
-		
 		/// <summary>
 		/// Executes this solution item
 		/// </summary>
@@ -837,7 +883,27 @@ namespace MonoDevelop.Projects
 		/// <param name='configuration'>
 		/// Configuration to use to execute the item
 		/// </param>
-		public async Task Execute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
+		public Task Execute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
+		{
+			return Execute (monitor, context, configuration, GetDefaultRunConfiguration ());
+		}
+
+		/// <summary>
+		/// Executes this solution item
+		/// </summary>
+		/// <param name='monitor'>
+		/// A progress monitor
+		/// </param>
+		/// <param name='context'>
+		/// An execution context
+		/// </param>
+		/// <param name='configuration'>
+		/// Configuration to use to execute the item
+		/// </param>
+		/// <param name='runConfiguration'>
+		/// Run configuration to use to execute the item
+		/// </param>
+		public async Task Execute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
 		{
 			SolutionItemConfiguration conf = GetConfiguration (configuration) as SolutionItemConfiguration;
 			if (conf != null) {
@@ -852,7 +918,7 @@ namespace MonoDevelop.Projects
 			if (monitor.CancellationToken.IsCancellationRequested)
 				return;
 
-			await ItemExtension.OnExecute (monitor, context, configuration);
+			await ItemExtension.OnExecute (monitor, context, configuration, runConfiguration ?? GetDefaultRunConfiguration ());
 
 			if (conf != null && !monitor.CancellationToken.IsCancellationRequested) {
 				ExecutionContext localContext = new ExecutionContext (Runtime.ProcessService.DefaultExecutionHandler, context.ConsoleFactory, context.ExecutionTarget);
@@ -860,6 +926,13 @@ namespace MonoDevelop.Projects
 				if (conf.CustomCommands.CanExecute (this, CustomCommandType.AfterExecute, localContext, configuration))
 					await conf.CustomCommands.ExecuteCommand (monitor, this, CustomCommandType.AfterExecute, localContext, configuration);
 			}
+		}
+
+		Task IRunTarget.Execute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, RunConfiguration runConfiguration)
+		{
+			if (runConfiguration != null && !(runConfiguration is SolutionItemRunConfiguration))
+				throw new ArgumentException ("Invalid configuration type");
+			return Execute (monitor, context, configuration, (SolutionItemRunConfiguration)runConfiguration);
 		}
 
 		/// <summary>
@@ -875,9 +948,35 @@ namespace MonoDevelop.Projects
 		/// there is no guarantee that Execute() will actually be called.</remarks>
 		public Task PrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
 		{
-			return BindTask (ct => ItemExtension.OnPrepareExecution (monitor.WithCancellationToken (ct), context, configuration));
+			return PrepareExecution (monitor, context, configuration, GetDefaultRunConfiguration ());
 		}
 
+		/// <summary>
+		/// Prepares the target for execution
+		/// </summary>
+		/// <returns>The execution.</returns>
+		/// <param name="monitor">Monitor for tracking progress</param>
+		/// <param name="context">Execution context</param>
+		/// <param name="configuration">Configuration to execute</param>
+		/// <param name='runConfiguration'>
+		/// Run configuration to use to execute the item
+		/// </param>
+		/// <remarks>This method can be called (it is not mandatory) before Execute() to give the target a chance
+		/// to asynchronously prepare the execution that is going to be done later on. It can be used for example
+		/// to start the simulator that is going to be used for execution. Calling this method is optional, and
+		/// there is no guarantee that Execute() will actually be called.</remarks>
+		public Task PrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+			return BindTask (ct => ItemExtension.OnPrepareExecution (monitor.WithCancellationToken (ct), context, configuration, runConfiguration ?? GetDefaultRunConfiguration ()));
+		}
+
+		Task IRunTarget.PrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, RunConfiguration runConfiguration)
+		{
+			if (runConfiguration != null && !(runConfiguration is SolutionItemRunConfiguration))
+				throw new ArgumentException ("Invalid configuration type");
+			return PrepareExecution (monitor, context, configuration, (SolutionItemRunConfiguration)runConfiguration);
+		}
+	
 		/// <summary>
 		/// Determines whether this solution item can be executed using the specified context and configuration.
 		/// </summary>
@@ -892,58 +991,7 @@ namespace MonoDevelop.Projects
 		/// </param>
 		public bool CanExecute (ExecutionContext context, ConfigurationSelector configuration)
 		{
-			return !IsUnsupportedProject && ItemExtension.OnGetCanExecute (context, configuration);
-		}
-
-		async Task DoExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
-		{
-			SolutionItemConfiguration conf = GetConfiguration (configuration) as SolutionItemConfiguration;
-			if (conf != null && conf.CustomCommands.HasCommands (CustomCommandType.Execute)) {
-				await conf.CustomCommands.ExecuteCommand (monitor, this, CustomCommandType.Execute, context, configuration);
-				return;
-			}
-			await OnExecute (monitor, context, configuration);
-		}
-
-		/// <summary>
-		/// Executes this solution item
-		/// </summary>
-		/// <param name='monitor'>
-		/// A progress monitor
-		/// </param>
-		/// <param name='context'>
-		/// An execution context
-		/// </param>
-		/// <param name='configuration'>
-		/// Configuration to use to execute the item
-		/// </param>
-		protected virtual Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
-		{
-			return Task.FromResult (0);
-		}
-
-		/// <summary>
-		/// Prepares the target for execution
-		/// </summary>
-		/// <returns>The execution.</returns>
-		/// <param name="monitor">Monitor for tracking progress</param>
-		/// <param name="context">Execution context</param>
-		/// <param name="configuration">Configuration to execute</param>
-		/// <remarks>This method can be called (it is not mandatory) before Execute() to give the target a chance
-		/// to asynchronously prepare the execution that is going to be done later on. It can be used for example
-		/// to start the simulator that is going to be used for execution. Calling this method is optional, and
-		/// there is no guarantee that Execute() will actually be called.</remarks>
-		protected virtual Task OnPrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
-		{
-			return Task.FromResult (true);
-		}
-
-		protected virtual bool DoGetCanExecute (ExecutionContext context, ConfigurationSelector configuration)
-		{
-			SolutionItemConfiguration conf = GetConfiguration (configuration) as SolutionItemConfiguration;
-			if (conf != null && conf.CustomCommands.HasCommands (CustomCommandType.Execute))
-				return conf.CustomCommands.CanExecute (this, CustomCommandType.Execute, context, configuration);
-			return OnGetCanExecute (context, configuration);
+			return CanExecute (context, configuration, GetDefaultRunConfiguration ());
 		}
 
 		/// <summary>
@@ -958,6 +1006,112 @@ namespace MonoDevelop.Projects
 		/// <param name='configuration'>
 		/// Configuration to use to execute the item
 		/// </param>
+		/// <param name='runConfiguration'>
+		/// Run configuration to use to execute the item
+		/// </param>
+		public bool CanExecute (ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+			return !IsUnsupportedProject && ItemExtension.OnGetCanExecute (context, configuration, runConfiguration ?? GetDefaultRunConfiguration ());
+		}
+
+		bool IRunTarget.CanExecute (ExecutionContext context, ConfigurationSelector configuration, RunConfiguration runConfiguration)
+		{
+			if (runConfiguration != null && !(runConfiguration is SolutionItemRunConfiguration))
+				throw new ArgumentException ("Invalid configuration type");
+			return CanExecute (context, configuration, (SolutionItemRunConfiguration)runConfiguration);
+		}
+	
+		async Task DoExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+			SolutionItemConfiguration conf = GetConfiguration (configuration) as SolutionItemConfiguration;
+			if (conf != null && conf.CustomCommands.HasCommands (CustomCommandType.Execute)) {
+				await conf.CustomCommands.ExecuteCommand (monitor, this, CustomCommandType.Execute, context, configuration);
+				return;
+			}
+			await OnExecute (monitor, context, configuration, runConfiguration);
+		}
+
+		/// <summary>
+		/// Executes this solution item
+		/// </summary>
+		/// <param name='monitor'>
+		/// A progress monitor
+		/// </param>
+		/// <param name='context'>
+		/// An execution context
+		/// </param>
+		/// <param name='configuration'>
+		/// Configuration to use to execute the item
+		/// </param>
+		protected virtual Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+#pragma warning disable 618 // Type or member is obsolete
+			return OnExecute (monitor, context, configuration);
+#pragma warning restore 618 // Type or member is obsolete
+		}
+
+		[Obsolete ("Use overload that takes a RunConfiguration")]
+		protected virtual Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
+		{
+			return Task.FromResult (0);
+		}
+
+		/// <summary>
+		/// Prepares the target for execution
+		/// </summary>
+		/// <returns>The execution.</returns>
+		/// <param name="monitor">Monitor for tracking progress</param>
+		/// <param name="context">Execution context</param>
+		/// <param name="configuration">Configuration to execute</param>
+		/// <param name="runConfiguration">Run configuration to execute</param>
+		/// <remarks>This method can be called (it is not mandatory) before Execute() to give the target a chance
+		/// to asynchronously prepare the execution that is going to be done later on. It can be used for example
+		/// to start the simulator that is going to be used for execution. Calling this method is optional, and
+		/// there is no guarantee that Execute() will actually be called.</remarks>
+		protected virtual Task OnPrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+#pragma warning disable 618 // Type or member is obsolete
+			return OnPrepareExecution (monitor, context, configuration);
+#pragma warning restore 618 // Type or member is obsolete
+		}
+
+		[Obsolete ("Use overload that takes a RunConfiguration")]
+		protected virtual Task OnPrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
+		{
+			return Task.FromResult (true);
+		}
+
+		bool DoGetCanExecute (ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+			SolutionItemConfiguration conf = GetConfiguration (configuration) as SolutionItemConfiguration;
+			if (conf != null && conf.CustomCommands.HasCommands (CustomCommandType.Execute))
+				return conf.CustomCommands.CanExecute (this, CustomCommandType.Execute, context, configuration);
+			return OnGetCanExecute (context, configuration, runConfiguration);
+		}
+
+		/// <summary>
+		/// Determines whether this solution item can be executed using the specified context and configuration.
+		/// </summary>
+		/// <returns>
+		/// <c>true</c> if this instance can be executed; otherwise, <c>false</c>.
+		/// </returns>
+		/// <param name='context'>
+		/// An execution context
+		/// </param>
+		/// <param name='configuration'>
+		/// Configuration to use to execute the item
+		/// </param>
+		/// <param name='runConfiguration'>
+		/// Run configuration to use to execute the item
+		/// </param>
+		protected virtual bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+#pragma warning disable 618 // Type or member is obsolete
+			return OnGetCanExecute (context, configuration);
+#pragma warning restore 618 // Type or member is obsolete
+		}
+
+		[Obsolete ("Use overload that takes a RunConfiguration")]
 		protected virtual bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration)
 		{
 			SolutionItemConfiguration conf = GetConfiguration (configuration) as SolutionItemConfiguration;
@@ -973,10 +1127,32 @@ namespace MonoDevelop.Projects
 		/// <param name="configuration">The configuration.</param>
 		public IEnumerable<ExecutionTarget> GetExecutionTargets (ConfigurationSelector configuration)
 		{
+			return ItemExtension.OnGetExecutionTargets (new OperationContext (), configuration, GetDefaultRunConfiguration ());
+		}
+
+		/// <summary>
+		/// Gets the execution targets.
+		/// </summary>
+		/// <returns>The execution targets.</returns>
+		/// <param name="configuration">The configuration.</param>
+		public IEnumerable<ExecutionTarget> GetExecutionTargets (ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+			return ItemExtension.OnGetExecutionTargets (new OperationContext (), configuration, runConfiguration ?? GetDefaultRunConfiguration ());
+		}
+
+		IEnumerable<ExecutionTarget> IRunTarget.GetExecutionTargets (ConfigurationSelector configuration, RunConfiguration runConfiguration)
+		{
+			if (runConfiguration != null && !(runConfiguration is SolutionItemRunConfiguration))
+				throw new ArgumentException ("Invalid configuration type");
+			return GetExecutionTargets (configuration, (SolutionItemRunConfiguration)runConfiguration);
+		}
+	
+		protected virtual IEnumerable<ExecutionTarget> OnGetExecutionTargets (ConfigurationSelector configuration, SolutionItemRunConfiguration runConfig)
+		{
 			return ItemExtension.OnGetExecutionTargets (configuration);
 		}
 
-		protected void NotifyExecutionTargetsChanged ()
+		public void NotifyExecutionTargetsChanged ()
 		{
 			ItemExtension.OnExecutionTargetsChanged ();
 		}
@@ -988,6 +1164,49 @@ namespace MonoDevelop.Projects
 			if (ExecutionTargetsChanged != null)
 				ExecutionTargetsChanged (this, EventArgs.Empty);
 		}
+
+		/// <summary>
+		/// Gets the run configurations.
+		/// </summary>
+		/// <returns>The execution targets.</returns>
+		public IEnumerable<SolutionItemRunConfiguration> GetRunConfigurations ()
+		{
+			return ItemExtension.OnGetRunConfigurations (new OperationContext ());
+		}
+
+		IEnumerable<RunConfiguration> IRunTarget.GetRunConfigurations ()
+		{
+			return GetRunConfigurations ();
+		}
+
+		/// <summary>
+		/// Gets the default run configuration for this item.
+		/// </summary>
+		/// <returns>The configuration.</returns>
+		public SolutionItemRunConfiguration GetDefaultRunConfiguration ()
+		{
+			var configs = GetRunConfigurations ();
+			return configs.FirstOrDefault (s => s.IsDefaultConfiguration) ?? configs.FirstOrDefault ();
+		}
+
+		public void NotifyRunConfigurationsChanged ()
+		{
+			ItemExtension.OnRunConfigurationsChanged (new OperationContext ());
+			if (ParentSolution != null)
+				ParentSolution.NotifyRunConfigurationsChanged ();
+		}
+
+		protected virtual void OnRunConfigurationsChanged ()
+		{
+			if (RunConfigurationsChanged != null)
+				RunConfigurationsChanged (this, EventArgs.Empty);
+		}
+
+		protected virtual IEnumerable<SolutionItemRunConfiguration>  OnGetRunConfigurations ()
+		{
+			yield break;
+		}
+
 
 		protected virtual Task OnLoad (ProgressMonitor monitor)
 		{
@@ -1036,7 +1255,7 @@ namespace MonoDevelop.Projects
 			base.OnNameChanged (e);
 		}
 		
-		protected virtual void OnSaved (SolutionItemEventArgs args)
+		protected virtual void OnSaved (SolutionItemSavedEventArgs args)
 		{
 			if (Saved != null)
 				Saved (this, args);
@@ -1193,34 +1412,6 @@ namespace MonoDevelop.Projects
 			return base.OnGetLastBuildTime (configuration);
 		}
 
-		internal protected virtual void OnItemsAdded (IEnumerable<ProjectItem> objs)
-		{
-			ItemExtension.OnItemsAdded (objs);
-		}
-		
-		void DoOnItemsAdded (IEnumerable<ProjectItem> objs)
-		{
-			NotifyModified ("Items");
-			var args = new ProjectItemEventArgs ();
-			args.AddRange (objs.Select (pi => new ProjectItemEventInfo (this, pi)));
-			if (ProjectItemAdded != null)
-				ProjectItemAdded (this, args);
-		}
-
-		internal protected virtual void OnItemsRemoved (IEnumerable<ProjectItem> objs)
-		{
-			ItemExtension.OnItemsRemoved (objs);
-		}
-		
-		void DoOnItemsRemoved (IEnumerable<ProjectItem> objs)
-		{
-			NotifyModified ("Items");
-			var args = new ProjectItemEventArgs ();
-			args.AddRange (objs.Select (pi => new ProjectItemEventInfo (this, pi)));
-			if (ProjectItemRemoved != null)
-				ProjectItemRemoved (this, args);
-		}
-
 		protected virtual void OnDefaultConfigurationChanged (ConfigurationEventArgs args)
 		{
 			ItemExtension.OnDefaultConfigurationChanged (args);
@@ -1324,7 +1515,23 @@ namespace MonoDevelop.Projects
 			// Do nothing by default
 		}
 
-		public event SolutionItemEventHandler Saved;
+		/// <summary>
+		/// Clears data cached in the project.
+		/// </summary>
+		public Task ClearCachedData ()
+		{
+			if (IsExtensionChainCreated)
+				return ItemExtension.OnClearCachedData ();
+			else
+				return Task.CompletedTask;
+		}
+
+		protected virtual Task OnClearCachedData ()
+		{
+			return Task.CompletedTask;
+		}
+
+		public event SolutionItemSavedEventHandler Saved;
 
 		/// <summary>
 		/// Occurs when the object is being disposed
@@ -1388,19 +1595,19 @@ namespace MonoDevelop.Projects
 				return Item.OnGetSupportedFeatures ();
 			}
 
-			internal protected override Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
+			internal protected override Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
 			{
-				return Item.DoExecute (monitor, context, configuration);
+				return Item.DoExecute (monitor, context, configuration, runConfiguration);
 			}
 
-			internal protected override Task OnPrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
+			internal protected override Task OnPrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
 			{
-				return Item.OnPrepareExecution (monitor, context, configuration);
+				return Item.OnPrepareExecution (monitor, context, configuration, runConfiguration);
 			}
 
-			internal protected override bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration)
+			internal protected override bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
 			{
-				return Item.DoGetCanExecute (context, configuration);
+				return Item.DoGetCanExecute (context, configuration, runConfiguration);
 			}
 
 			internal protected override IEnumerable<ExecutionTarget> OnGetExecutionTargets (ConfigurationSelector configuration)
@@ -1408,24 +1615,29 @@ namespace MonoDevelop.Projects
 				yield break;
 			}
 
+			internal protected override IEnumerable<ExecutionTarget> OnGetExecutionTargets (OperationContext ctx, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfig)
+			{
+				return Item.OnGetExecutionTargets (configuration, runConfig);
+			}
+
 			internal protected override void OnExecutionTargetsChanged ()
 			{
 				Item.OnExecutionTargetsChanged ();
 			}
 
+			internal protected override IEnumerable<SolutionItemRunConfiguration> OnGetRunConfigurations (OperationContext ctx)
+			{
+				return Item.OnGetRunConfigurations ();
+			}
+
+			internal protected override void OnRunConfigurationsChanged (OperationContext ctx)
+			{
+				Item.OnRunConfigurationsChanged ();
+			}
+
 			internal protected override void OnReloadRequired (SolutionItemEventArgs args)
 			{
 				Item.DoOnReloadRequired (args);
-			}
-
-			internal protected override void OnItemsAdded (IEnumerable<ProjectItem> objs)
-			{
-				Item.DoOnItemsAdded (objs);
-			}
-
-			internal protected override void OnItemsRemoved (IEnumerable<ProjectItem> objs)
-			{
-				Item.DoOnItemsRemoved (objs);
 			}
 
 			internal protected override void OnDefaultConfigurationChanged (ConfigurationEventArgs args)
@@ -1504,6 +1716,11 @@ namespace MonoDevelop.Projects
 			{
 				return Item.OnCheckHasSolutionData ();
 			}
+
+			internal protected override Task OnClearCachedData ()
+			{
+				return Item.OnClearCachedData ();
+			}
 		}	
 	}
 
@@ -1512,14 +1729,14 @@ namespace MonoDevelop.Projects
 	{
 		public override IEnumerable<StringTagDescription> GetTags ()
 		{
-			yield return new StringTagDescription ("ProjectName", "Project Name");
-			yield return new StringTagDescription ("ProjectDir", "Project Directory");
-			yield return new StringTagDescription ("AuthorName", "Project Author Name");
-			yield return new StringTagDescription ("AuthorEmail", "Project Author Email");
-			yield return new StringTagDescription ("AuthorCopyright", "Project Author Copyright");
-			yield return new StringTagDescription ("AuthorCompany", "Project Author Company");
-			yield return new StringTagDescription ("AuthorTrademark", "Project Trademark");
-			yield return new StringTagDescription ("ProjectFile", "Project File");
+			yield return new StringTagDescription ("ProjectName", GettextCatalog.GetString ("Project Name"));
+			yield return new StringTagDescription ("ProjectDir", GettextCatalog.GetString ("Project Directory"));
+			yield return new StringTagDescription ("AuthorName", GettextCatalog.GetString ("Project Author Name"));
+			yield return new StringTagDescription ("AuthorEmail", GettextCatalog.GetString ("Project Author Email"));
+			yield return new StringTagDescription ("AuthorCopyright", GettextCatalog.GetString ("Project Author Copyright"));
+			yield return new StringTagDescription ("AuthorCompany", GettextCatalog.GetString ("Project Author Company"));
+			yield return new StringTagDescription ("AuthorTrademark", GettextCatalog.GetString ("Project Trademark"));
+			yield return new StringTagDescription ("ProjectFile", GettextCatalog.GetString ("Project File"));
 		}
 
 		public override object GetTagValue (SolutionItem item, string tag)

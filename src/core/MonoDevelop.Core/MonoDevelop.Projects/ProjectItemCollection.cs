@@ -51,7 +51,7 @@ namespace MonoDevelop.Projects
 	
 	public class ProjectItemCollection<T>: ItemCollection<T>, IItemListHandler where T: ProjectItem
 	{
-		SolutionItem parent;
+		Project parent;
 		IItemListHandler parentCollection;
 		List<IItemListHandler> subCollections;
 		
@@ -72,7 +72,7 @@ namespace MonoDevelop.Projects
 			subCollections.Add (subCollection);
 			subCollection.parentCollection = this;
 			IItemListHandler list = subCollection;
-			list.InternalAdd (this.Where (ob => list.CanHandle (ob)), true);
+			list.InternalAdd (this.Where (list.CanHandle), true);
 		}
 		
 		public void Unbind<U> (ProjectItemCollection<U> subCollection) where U:T
@@ -141,13 +141,13 @@ namespace MonoDevelop.Projects
 			if (comesFromParent) {
 				if (subCollections != null) {
 					foreach (IItemListHandler col in subCollections)
-						col.InternalAdd (items.Where (i => col.CanHandle (i)), true);
+						col.InternalAdd (items.Where (col.CanHandle), true);
 				}
 			} else {
 				if (parentCollection != null)
 					parentCollection.InternalAdd (items, false);
 				if (parent != null)
-					parent.OnItemsAdded (items);
+					parent.NotifyItemsAdded (items);
 			}
 		}
 		
@@ -156,13 +156,13 @@ namespace MonoDevelop.Projects
 			if (comesFromParent) {
 				if (subCollections != null) {
 					foreach (IItemListHandler col in subCollections)
-						col.InternalRemove (items.Where (i => col.CanHandle (i)), true);
+						col.InternalRemove (items.Where (col.CanHandle), true);
 				}
 			} else {
 				if (parentCollection != null)
 					parentCollection.InternalRemove (items, false);
 				if (parent != null)
-					parent.OnItemsRemoved (items);
+					parent.NotifyItemsRemoved (items);
 			}
 		}
 	}

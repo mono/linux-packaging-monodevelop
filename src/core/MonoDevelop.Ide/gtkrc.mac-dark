@@ -30,14 +30,14 @@ gtk-toolbar-icon-size = large-toolbar
 gtk-auto-mnemonics = 1
 gtk-error-bell = 0
 gtk-show-input-method-menu = 0
-gtk-font-name = "Helvetica Neue 12"
+gtk-font-name = "-apple-system-font 12"
 
 
 style "default" {
     xthickness = 1
     ythickness = 1
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     ### colours
 
@@ -84,6 +84,9 @@ style "default" {
 
     GtkCheckButton::indicator-size = 14
     GtkCheckButton::indicator-spacing = 4
+    GtkCheckButton::interior-focus = 1
+
+    GtkRadioButton::interior-focus = 1
 
     GtkTreeView::odd-row-color = "#3b3b3b"
 
@@ -137,7 +140,7 @@ style "button" = "default" {
     xthickness = 2
     ythickness = 4
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     bg[NORMAL] = "#595959"
     bg[PRELIGHT] = "#595959" # Mac buttons have no hover state
@@ -158,7 +161,6 @@ style "button" = "default" {
         contrast = 1.0
         focus_color = shade(1.4, @bg_color)
         focusstyle = 3
-        border_colors = { @bg_color, @bg_color }
         textstyle = 0
         highlight_shade = 1.0
         lightborder_shade = 1.0
@@ -192,7 +194,7 @@ style "menu" {
     xthickness = 1
     # ythickness = 0
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     bg[PRELIGHT] = @selected_fg_color
     fg[PRELIGHT] = @selected_fg_color
@@ -235,7 +237,7 @@ style "tooltip"
     bg[NORMAL] = @tooltip_bg_color
     bg[SELECTED] = @tooltip_border_color
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     engine "xamarin" {
         roundness = 0
@@ -244,16 +246,13 @@ style "tooltip"
 
 style "treeview" = "default"
 {
-    base[SELECTED] = @selected_bg_color
-    base[ACTIVE] = @selected_bg_color
-    text[SELECTED] = @selected_fg_color
+    base[ACTIVE] = "#a0a0a0"
     text[ACTIVE] = @selected_fg_color
 
     engine "xamarin" {
         roundness = 0
         gradient_shades = { 1.01, 1.01, 1.01, 1.01 }
         glazestyle = 1
-        focusstyle = 3
     }
 }
 
@@ -296,7 +295,7 @@ style "wizard-dialog"
 }
 
 style "combo-box-menu" = "menu" {
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 }
 
 style "notebook" = "default"
@@ -312,27 +311,27 @@ style "notebook" = "default"
     }
 }
 
-style "quartz-radio-or-check-box" = "default"
+style "quartz-radio-or-check-box" = "button"
 {
-    ythickness = 6
+    GtkCheckButton::indicator-size = 17
+    base[ACTIVE] = "#99999e"
+    base[SELECTED] = "#fff"
+    base[PRELIGHT] = @base_color
+    text[ACTIVE] = @selected_fg_color
+    text[SELECTED] = @selected_fg_color
+    text[PRELIGHT] = @selected_fg_color
+    text[NORMAL] = @selected_fg_color
 
-    engine "quartz" {
+    engine "xamarin" {
+        focusstyle = 0
+        border_shades = { 1.0, 1.0 }
     }
 }
 
-style "propertygrid-radio-or-check-box" = "default"
+style "propertygrid-radio-or-check-box" = "quartz-radio-or-check-box"
 {
     GtkCheckButton::indicator-spacing = 0
-
-    base[NORMAL] = "#fff"
-    base[ACTIVE] = "#fff"
-    base[SELECTED] = "#fff"
-    base[PRELIGHT] = "#fff"
-    text[SELECTED] = @base_color
-
-    engine "xamarin" {
-        border_shades = { 1.33, 1.33 }
-    }
+    GtkCheckButton::indicator-size = 15
 }
 
 style "entry" = "default"
@@ -376,7 +375,7 @@ style "scrollbar" = "default"
     {
         roundness = 1
         contrast = 0.0
-        trough_shades = { 0.975, 0.975 }
+        trough_shades = { 1.0, 1.0 }
         stepperstyle = 1
     }
 }
@@ -388,9 +387,10 @@ style "completion_scrollbar" = "scrollbar"
 
 style "progressbar" = "default"
 {
-    bg[SELECTED] = "#62b3ec"
-    fg[SELECTED] = "#3a67a6"
-
+    GtkWidget::draw-border = { 0, 0, 0, 0 }
+    bg[ACTIVE] = @base_color
+    fg[SELECTED] = @selected_bg_color
+    fg[PRELIGHT] = @selected_fg_color
     xthickness = 0
     ythickness = 0
 }

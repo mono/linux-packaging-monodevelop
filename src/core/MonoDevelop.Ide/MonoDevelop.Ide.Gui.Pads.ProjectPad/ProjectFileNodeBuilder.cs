@@ -79,7 +79,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 
 			nodeInfo.Label = GLib.Markup.EscapeText (file.Link.IsNullOrEmpty ? file.FilePath.FileName : file.Link.FileName);
 			if (!File.Exists (file.FilePath)) {
-				nodeInfo.Label = "<span foreground='red'>" + nodeInfo.Label + "</span>";
+				nodeInfo.Label = "<span foreground='" + Styles.ErrorForegroundColor.ToHexString (false) + "'>" + nodeInfo.Label + "</span>";
 			}
 			
 			nodeInfo.Icon = DesktopService.GetIconForFile (file.FilePath, Gtk.IconSize.Menu);
@@ -109,9 +109,6 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		
 		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
 		{
-			if (otherNode.DataItem is ProjectFolder)
-				return 1;
-
 			if (!(thisNode.DataItem is ProjectFile))
 				return DefaultSort;
 			if (!(otherNode.DataItem is ProjectFile))
@@ -143,8 +140,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			base.BuildChildNodes (treeBuilder, dataObject);
 			ProjectFile file = (ProjectFile) dataObject;
 			if (file.HasChildren)
-				foreach (ProjectFile pf in file.DependentChildren)
-					treeBuilder.AddChild (pf);
+				treeBuilder.AddChildren (file.DependentChildren);
 		}
 	}
 	
@@ -182,7 +178,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 
 				if (!FileService.IsValidPath (newPath) || ProjectFolderCommandHandler.ContainsDirectorySeparator (newName)) {
 					MessageService.ShowWarning (GettextCatalog.GetString ("The name you have chosen contains illegal characters. Please choose a different name."));
-				} else if ((newProjectFile != null && newProjectFile != file) || File.Exists (file.FilePath.ParentDirectory.Combine (newName))) {
+				} else if ((newProjectFile != null && newProjectFile != file) || FileExistsCaseSensitive (file.FilePath.ParentDirectory, newName)) {
 					// If there is already a file under the newPath which is *different*, then throw an exception
 					MessageService.ShowWarning (GettextCatalog.GetString ("File or directory name is already in use. Please choose a different one."));
 				} else {
@@ -195,6 +191,15 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			} catch (IOException ex) {
 				MessageService.ShowError (GettextCatalog.GetString ("There was an error renaming the file."), ex);
 			}
+		}
+
+		static bool FileExistsCaseSensitive (FilePath parentDirectory, string fileName)
+		{
+			if (!Directory.Exists (parentDirectory))
+				return false;
+
+			return Directory.EnumerateFiles (parentDirectory, fileName)
+				.Any (file => Path.GetFileName (file) == fileName);
 		}
 		
 		public override void ActivateItem ()

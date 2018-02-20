@@ -33,10 +33,21 @@ using Gdk;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageSourceCellRenderer : CellRenderer
+	internal class PackageSourceCellRenderer : CellRenderer
 	{
 		[GLib.Property("package-source")]
 		public PackageSourceViewModel PackageSourceViewModel { get; set; }
+
+		[GLib.Property("text")]
+		public string Text {
+			get {
+				if (PackageSourceViewModel == null) {
+					return "";
+				}
+
+				return PackageSourceViewModel.Name + " - " + PackageSourceViewModel.Source;
+			}
+		}
 
 		static Xwt.Drawing.Image warningImage = ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.Warning, Gtk.IconSize.Menu);
 		const int imageSpacing = 5;
@@ -109,7 +120,7 @@ namespace MonoDevelop.PackageManagement
 			return MarkupString.Format (
 				"<b>{0}</b>\n<span foreground='{2}'>{1}</span>",
 				PackageSourceViewModel.Name,
-				PackageSourceViewModel.SourceUrl,
+				PackageSourceViewModel.Source,
 				Ide.Gui.Styles.ColorGetHex (flags.HasFlag (CellRendererState.Selected) ? Styles.PackageSourceUrlSelectedTextColor : Styles.PackageSourceUrlTextColor));
 		}
 

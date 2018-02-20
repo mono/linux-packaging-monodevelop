@@ -32,11 +32,11 @@ using GLib;
 
 namespace MonoDevelop.PackageManagement
 {
-	public static class MarkupString
+	internal static class MarkupString
 	{
 		public static string Format (string format, params string[] args)
 		{
-			string[] escapedArgs = args.Select (s => Markup.EscapeText (s)).ToArray();
+			string[] escapedArgs = args.Select (Markup.EscapeText).ToArray();
 			return String.Format (format, escapedArgs);
 		}
 	}

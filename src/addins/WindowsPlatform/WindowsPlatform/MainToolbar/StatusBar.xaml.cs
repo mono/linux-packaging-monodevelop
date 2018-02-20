@@ -22,6 +22,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Animation;
 using MonoDevelop.Ide.Gui.Components;
+using System.Threading;
 
 namespace WindowsPlatform.MainToolbar
 {
@@ -74,6 +75,7 @@ namespace WindowsPlatform.MainToolbar
 			};
 			TaskService.Errors.TasksAdded += updateHandler;
 			TaskService.Errors.TasksRemoved += updateHandler;
+			BrandingService.ApplicationNameChanged += ApplicationNameChanged;
 
 			StatusText.ToolTipOpening += (o, e) => {
 				e.Handled = !TextTrimmed ();
@@ -119,6 +121,7 @@ namespace WindowsPlatform.MainToolbar
 		{
 			TaskService.Errors.TasksAdded -= updateHandler;
 			TaskService.Errors.TasksRemoved -= updateHandler;
+			BrandingService.ApplicationNameChanged -= ApplicationNameChanged;
 		}
 
 		public void EndProgress ()
@@ -223,7 +226,14 @@ namespace WindowsPlatform.MainToolbar
 		public void ShowReady ()
 		{
 			Status = StatusBarStatus.Ready;
-			ShowMessage (BrandingService.StatusSteadyIconId, BrandingService.ApplicationName);
+			ShowMessage (BrandingService.StatusSteadyIconId, BrandingService.ApplicationLongName);
+			SetMessageSourcePad (null);
+		}
+
+		void ApplicationNameChanged (object sender, EventArgs e)
+		{
+			if (Status == StatusBarStatus.Ready)
+				ShowReady ();
 		}
 
 		public StatusBarIcon ShowStatusIcon (Xwt.Drawing.Image pixbuf)
@@ -298,6 +308,10 @@ namespace WindowsPlatform.MainToolbar
 			set { buildResultPanelVisibility = value; RaisePropertyChanged (); }
 		}
 
+		public void SetCancellationTokenSource (CancellationTokenSource source)
+		{
+		}
+
 		void RaisePropertyChanged ([CallerMemberName] string propName = null)
 		{
 			if (PropertyChanged != null)
@@ -331,6 +345,9 @@ namespace WindowsPlatform.MainToolbar
 			get { return (string)base.ToolTip; }
 			set { base.ToolTip = value; }
 		}
+
+		public string Title { get; set; }
+		public string Help { get; set; }
 
 		protected override void OnMouseUp (MouseButtonEventArgs e)
 		{

@@ -134,12 +134,15 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandArrayInfo info)
 		{
+			var windows = IdeApp.CommandService.TopLevelWindowStack.ToArray (); // enumerate only once
+			if (windows.Length <= 1)
+				return;
 			int i = 0;
-			foreach (Gtk.Window window in IdeApp.CommandService.TopLevelWindowStack) {
+			foreach (Gtk.Window window in windows) {
 
 				//Create CommandInfo object
 				CommandInfo commandInfo = new CommandInfo ();
-				commandInfo.Text = window.Title.Replace ("_", "__");
+				commandInfo.Text = window.Title.Replace ("_", "__").Replace("-","\u2013").Replace(" \u2013 " + BrandingService.ApplicationName, "");
 				if (window.HasToplevelFocus)
 					commandInfo.Checked = true;
 				commandInfo.Description = GettextCatalog.GetString ("Activate window '{0}'", commandInfo.Text);
@@ -268,6 +271,33 @@ namespace MonoDevelop.Ide.Commands
 	}
 	
 	internal class SwitchPreviousDocument : SwitchNextDocument
+	{
+		protected override void Run ()
+		{
+			Switch (false);
+		}
+	}
+
+	internal class SwitchNextPad : CommandHandler
+	{
+		protected static void Switch (bool next)
+		{
+			if (!IdeApp.Preferences.EnableDocumentSwitchDialog)
+				return;
+
+			var toplevel = Window.ListToplevels ().FirstOrDefault (w => w.HasToplevelFocus)
+				?? IdeApp.Workbench.RootWindow;
+			var sw = new DocumentSwitcher (toplevel, GettextCatalog.GetString ("Pads"), next);
+			sw.Present ();
+		}
+
+		protected override void Run ()
+		{
+			Switch (true);
+		}
+	}
+
+	internal class SwitchPreviousPad : SwitchNextPad
 	{
 		protected override void Run ()
 		{

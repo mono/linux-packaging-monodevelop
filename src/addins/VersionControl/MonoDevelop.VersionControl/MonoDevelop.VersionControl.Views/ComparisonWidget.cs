@@ -35,11 +35,12 @@ using MonoDevelop.Components;
 using System.ComponentModel;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
+using MonoDevelop.Ide.Gui.Content;
 
 namespace MonoDevelop.VersionControl.Views
 {
 	[ToolboxItem (true)]
-	public class ComparisonWidget : EditorCompareWidgetBase
+	class ComparisonWidget : EditorCompareWidgetBase
 	{
 		internal DropDownBox originalComboBox, diffComboBox;
 		
@@ -55,7 +56,7 @@ namespace MonoDevelop.VersionControl.Views
 			}
 		}
 
-		protected internal override MonoTextEditor MainEditor {
+		internal override MonoTextEditor MainEditor {
 			get {
 				return editors[1];
 			}
@@ -68,21 +69,22 @@ namespace MonoDevelop.VersionControl.Views
 		
 		protected override void CreateComponents ()
 		{
+			var options = GetTextEditorOptions ();
 			this.editors = new [] {
-				new MonoTextEditor (new TextDocument (), CommonTextEditorOptions.Instance),
-				new MonoTextEditor (new TextDocument (), CommonTextEditorOptions.Instance),
+				new MonoTextEditor (new TextDocument (), options),
+				new MonoTextEditor (new TextDocument (), options),
 			};
 
 			if (!viewOnly) {
 				originalComboBox = new DropDownBox ();
 				originalComboBox.WindowRequestFunc = CreateComboBoxSelector;
-				originalComboBox.Text = "Loading...";
+				originalComboBox.Text = GettextCatalog.GetString ("Loading…");
 				originalComboBox.Sensitive = false;
 				originalComboBox.Tag = editors[1];
 			
 				diffComboBox = new DropDownBox ();
 				diffComboBox.WindowRequestFunc = CreateComboBoxSelector;
-				diffComboBox.Text = "Loading...";
+				diffComboBox.Text = GettextCatalog.GetString ("Loading…");
 				diffComboBox.Sensitive = false;
 				diffComboBox.Tag = editors[0];
 			
@@ -93,14 +95,14 @@ namespace MonoDevelop.VersionControl.Views
 		protected override void OnSetVersionControlInfo (VersionControlDocumentInfo info)
 		{
 			info.Updated += OnInfoUpdated;
-			MainEditor.Document.ReadOnly = false;
+			MainEditor.Document.IsReadOnly = false;
 			base.OnSetVersionControlInfo (info);
 		}
 
 		void OnInfoUpdated (object sender, EventArgs args)
 		{
-			originalComboBox.Text = "Local";
-			diffComboBox.Text = "Base";
+			originalComboBox.Text = GettextCatalog.GetString ("Local");
+			diffComboBox.Text = GettextCatalog.GetString ("Base");
 			originalComboBox.Sensitive = diffComboBox.Sensitive = true;
 		}
 
@@ -186,7 +188,7 @@ namespace MonoDevelop.VersionControl.Views
 			};
 			
 			worker.RunWorkerCompleted += delegate(object sender, RunWorkerCompletedEventArgs e) {
-				Application.Invoke (delegate {
+				Application.Invoke ((o, args) => {
 					var result = (KeyValuePair<Revision, string>)e.Result;
 					var box = toEditor == editors[0] ? diffComboBox : originalComboBox;
 					RemoveLocal (toEditor.GetTextEditorData ());
@@ -236,9 +238,9 @@ namespace MonoDevelop.VersionControl.Views
 			public string GetMarkup (int n)
 			{
 				if (n == 0)
-					return "Local";
+					return GettextCatalog.GetString ("Local");
 				if (n == 1)
-					return "Base";
+					return GettextCatalog.GetString ("Base");
 				Revision rev = widget.info.History[n - 2];
 				return GLib.Markup.EscapeText (string.Format ("{0}\t{1}\t{2}", rev, rev.Time, rev.Author));
 			}
@@ -258,14 +260,14 @@ namespace MonoDevelop.VersionControl.Views
 			public void ActivateItem (int n)
 			{
 				if (n == 0) {
-					box.SetItem ("Local", null, new object());
+					box.SetItem (GettextCatalog.GetString ("Local"), null, new object());
 					widget.SetLocal (((MonoTextEditor)box.Tag).GetTextEditorData ());
 					return;
 				}
 				widget.RemoveLocal (((MonoTextEditor)box.Tag).GetTextEditorData ());
-				((MonoTextEditor)box.Tag).Document.ReadOnly = true;
+				((MonoTextEditor)box.Tag).Document.IsReadOnly = true;
 				if (n == 1) {
-					box.SetItem ("Base", null, new object());
+					box.SetItem (GettextCatalog.GetString ("Base"), null, new object());
 					if (((MonoTextEditor)box.Tag) == widget.editors[0]) {
 						widget.diffRevision = null;
 					} else {

@@ -1,7 +1,7 @@
-#Autosave files
+# Autosave files
 *~
 
-#build
+# build
 [Oo]bj/
 [Bb]in/
 packages/
@@ -27,14 +27,15 @@ autom4te.cache/
 tarballs/
 test-results/
 Thumbs.db
+.vs/
 
-#Mac bundle stuff
+# Mac bundle stuff
 *.dmg
 *.app
 
-#resharper
+# resharper
 *_Resharper.*
 *.Resharper
 
-#dotCover
+# dotCover
 *.dotCover

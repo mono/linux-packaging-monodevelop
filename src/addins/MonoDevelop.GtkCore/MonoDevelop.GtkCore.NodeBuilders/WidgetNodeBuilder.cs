@@ -81,9 +81,7 @@ namespace MonoDevelop.GtkCore.NodeBuilders
 		public override void BuildChildNodes (ITreeBuilder builder, object dataObject)
 		{
 			GuiBuilderWindow win = (GuiBuilderWindow) dataObject;
-			foreach (Stetic.ActionGroupInfo agroup in win.RootWidget.ActionGroups) {
-				builder.AddChild (agroup);
-			}
+			builder.AddChildren (win.RootWidget.ActionGroups);
 		}
 		
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
@@ -120,7 +118,7 @@ namespace MonoDevelop.GtkCore.NodeBuilders
 			if (w.SourceCodeFile == FilePath.Null && !w.BindToClass ())
 				return;
 			
-			Document doc = await IdeApp.Workbench.OpenDocument (w.SourceCodeFile, true);
+			Document doc = await IdeApp.Workbench.OpenDocument (w.SourceCodeFile, null, true);
 			if (doc != null) {
 				GuiBuilderView view = doc.GetContent<GuiBuilderView> ();
 				if (view != null)

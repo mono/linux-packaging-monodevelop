@@ -8,12 +8,11 @@ using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Formatting;
-using Microsoft.CodeAnalysis.Simplification;
 using Microsoft.CodeAnalysis.Text;
 
 namespace RefactoringEssentials.CSharp.CodeRefactorings
 {
-    [ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = "Merge nested 'if'")]    
+	[ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = "Merge nested 'if'")]    
     public class MergeNestedIfAction : SpecializedCodeRefactoringProvider<IfStatementSyntax>
     {
         protected override IEnumerable<CodeAction> GetActions(Document document, SemanticModel semanticModel, SyntaxNode root, TextSpan span, IfStatementSyntax node, CancellationToken cancellationToken)
@@ -22,39 +21,39 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
 
             if (outerIf != null)
             {
-                return HandleInnerIf(span, document, root, node, outerIf);
+                return HandleInnerIf(span, document, semanticModel, root, node, outerIf);
             }
 
             var innerIf = GetInnerIf(node.Statement);
 
             if (innerIf != null)
             {
-                return HandleInnerIf(span, document, root, innerIf, node);
+                return HandleInnerIf(span, document, semanticModel, root, innerIf, node);
             }
 
             return Enumerable.Empty<CodeAction>();
         }
 
-        private IEnumerable<CodeAction> HandleInnerIf(TextSpan span, Document document, SyntaxNode root, IfStatementSyntax innerIf, IfStatementSyntax outerIf)
+        private IEnumerable<CodeAction> HandleInnerIf(TextSpan span, Document document, SemanticModel semanticModel, SyntaxNode root, IfStatementSyntax innerIf, IfStatementSyntax outerIf)
         {
             if (innerIf.Else != null || outerIf.Else != null)
             {
                 yield break;
             }
 
-            yield return CodeActionFactory.Create(span, DiagnosticSeverity.Info, "Merged nested 'if'", ct =>
+            yield return CodeActionFactory.Create(span, DiagnosticSeverity.Info, "Merge nested 'if'", ct =>
             {
                 var innerCondition = SyntaxFactory.ParenthesizedExpression(innerIf.Condition);
                 var outerCondition = SyntaxFactory.ParenthesizedExpression(outerIf.Condition);
 
                 var newCondition = SyntaxFactory.BinaryExpression(SyntaxKind.LogicalAndExpression, outerCondition, innerCondition);
 
-                if (((ParenthesizedExpressionSyntax)newCondition.Right).CanRemoveParentheses())
+                if (((ParenthesizedExpressionSyntax)newCondition.Right).CanRemoveParentheses(semanticModel))
                 {
                     newCondition = newCondition.ReplaceNode(newCondition.Right, innerCondition.Expression);
                 }
 
-                if (((ParenthesizedExpressionSyntax)newCondition.Left).CanRemoveParentheses())
+                if (((ParenthesizedExpressionSyntax)newCondition.Left).CanRemoveParentheses(semanticModel))
                 {
                     newCondition = newCondition.ReplaceNode(newCondition.Left, outerCondition.Expression);
                 }

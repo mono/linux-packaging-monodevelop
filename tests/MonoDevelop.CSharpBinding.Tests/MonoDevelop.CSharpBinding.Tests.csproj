@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\MonoDevelop.props" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -9,7 +10,9 @@
     <OutputType>Library</OutputType>
     <RootNamespace>MonoDevelop.CSharpBinding.Tests</RootNamespace>
     <AssemblyName>MonoDevelop.CSharpBinding.Tests</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TestRunnerCommand>..\..\build\bin\mdtool.exe</TestRunnerCommand>
+    <TestRunnerArgs>run-md-tests</TestRunnerArgs>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -30,88 +33,63 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CodeAnalysis.CSharp">
-      <HintPath>..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+      <HintPath>..\..\build\bin\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis.CSharp.Workspaces">
-      <HintPath>..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.CSharp.Workspaces.dll</HintPath>
+      <HintPath>..\..\build\bin\Microsoft.CodeAnalysis.CSharp.Workspaces.dll</HintPath>
     </Reference>
     <Reference Include="System.Collections.Immutable">
-      <HintPath>..\..\external\roslyn\Binaries\Release\System.Collections.Immutable.dll</HintPath>
+      <HintPath>..\..\build\bin\System.Collections.Immutable.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis.Workspaces">
-      <HintPath>..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.Workspaces.dll</HintPath>
+      <HintPath>..\..\build\bin\Microsoft.CodeAnalysis.Workspaces.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.CodeAnalysis.Workspaces.Desktop">
-      <HintPath>..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.Workspaces.Desktop.dll</HintPath>
+    <Reference Include="System.ComponentModel.Composition">
+      <Private>True</Private>
     </Reference>
     <Reference Include="System.Composition.Runtime">
-      <HintPath>..\..\external\roslyn\Binaries\Release\System.Composition.Runtime.dll</HintPath>
+      <HintPath>..\..\build\bin\System.Composition.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="System.Reflection.Metadata">
-      <HintPath>..\..\external\roslyn\Binaries\Release\System.Reflection.Metadata.dll</HintPath>
+      <HintPath>..\..\build\bin\System.Reflection.Metadata.dll</HintPath>
     </Reference>
     <Reference Include="System.Composition.AttributedModel">
-      <HintPath>..\..\external\roslyn\Binaries\Release\System.Composition.AttributedModel.dll</HintPath>
+      <HintPath>..\..\build\bin\System.Composition.AttributedModel.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis">
-      <HintPath>..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.dll</HintPath>
+      <HintPath>..\..\build\bin\Microsoft.CodeAnalysis.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml" />
     <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
       <SpecificVersion>False</SpecificVersion>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="MonoDevelop.Debugger, Version=2.6.0.0, Culture=neutral">
-      <Package>monodevelop-core-addins</Package>
-      <Private>True</Private>
+    <Reference Include="Microsoft.CodeAnalysis.Workspaces.Desktop">
+      <HintPath>..\..\build\bin\Microsoft.CodeAnalysis.Workspaces.Desktop.dll</HintPath>
     </Reference>
+    <Reference Include="System.Composition.TypedParts">
+      <HintPath>..\..\build\bin\System.Composition.TypedParts.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.CSharp.Features">
+      <HintPath>..\..\build\bin\Microsoft.CodeAnalysis.CSharp.Features.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.Features">
+      <HintPath>..\..\build\bin\Microsoft.CodeAnalysis.Features.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cairo" />
+    <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Features\CodeCompletion\NR5\BrowsableAttributeTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\CodeCompletionAccessibleTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\CodeCompletionBugTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\CodeCompletionCSharp3Tests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\CodeCompletionCSharpTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\CodeCompletionOperatorTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\CompletionDataList.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\DelegateContextTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\DocumentationContextTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\EnumContextTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\FormatItemTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\GetCurrentParameterIndexTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\ImportCompletionTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\KeywordTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\NameContextTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\ObjectInitializerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\PreProcessorTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\TestBase.cs" />
-    <Compile Include="Features\CodeCompletion\NR5\VariableDeclarationStatementTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\CastCompletionContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\DelegateCreationContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\EnumMemberContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\KeywordCompletionContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\MiscTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\ObjectCreationCompletionContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\OverrideCompletionContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\PartialCompletionContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\SenderCompletionContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\SpeculativeNameContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\AttributeNamedParameterCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\CompletionTestBase.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\CrefCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\EnumAndCompletionListTagCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\ExplicitInterfaceCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\ExternAliasCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\KeywordCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\NamedParameterCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\ObjectCreationCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\ObjectInitializerCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\OverrideCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\PartialCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\SpeculativeTCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\SymbolCompletionHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\SymbolCompletionHandlerTests_NoInteractive.cs" />
-    <Compile Include="Features\CodeCompletion\PortedRoslynTests\XmlDocCompletionHandlerTests.cs" />
     <Compile Include="Features\ParameterHinting\ParameterHintingTests.cs" />
     <Compile Include="Features\InspectionActionTestBase.cs" />
     <Compile Include="Features\IndentationTests\AlignmentTests.cs" />
@@ -122,10 +100,32 @@
     <Compile Include="Features\IndentationTests\PreProcessorTests.cs" />
     <Compile Include="Features\IndentationTests\StringTests.cs" />
     <Compile Include="Features\IndentationTests\TextPasteIndentEngineTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\RegexContextHandlerTests.cs" />
-    <Compile Include="Features\CodeCompletion\NR6\ProtocolMemberContextHandlerTests.cs" />
     <Compile Include="Features\TestBase.cs" />
     <Compile Include="Features\Util.cs" />
+    <Compile Include="Features\Completion\CastCompletionProviderTests.cs" />
+    <Compile Include="Features\Completion\EnumMemberCompletionProviderTests.cs" />
+    <Compile Include="Features\Completion\DelegateCompletionProviderTests.cs" />
+    <Compile Include="Features\Completion\EventSenderCompletionProviderTests.cs" />
+    <Compile Include="Features\Completion\RegexCompletionProviderTests.cs" />
+    <Compile Include="Features\Completion\FormatItemCompletionProviderTests.cs" />
+    <Compile Include="Features\Completion\AbstractCSharpCompletionProviderTests.cs" />
+    <Compile Include="Features\Completion\ProtocolMemberCompletionTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\CSharpCompletionTextEditorTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\CSharpProjectPropertiesTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\CSharpTextEditorIndentationTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\FindMemberVisitorTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\FoldingParserTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\MonodevelopWorkspaceTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\NamedArgumentCompletionTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\OnTheFlyFormatterTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\TypeSystemServiceTestExtensions.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\UnitTesteditorIntegrationTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding.Refactoring\CSharpFindReferencesProviderTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding.Refactoring\GenerateNewMemberTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\PolicyTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\CSharpAutoInsertBracketHandlerTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding\ExpandSelectionHandlerTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding.Parser\CSharpParsedDocumentTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\addins\CSharpBinding\CSharpBinding.csproj">
@@ -152,9 +152,52 @@
       <Project>{C465A5DC-AD28-49A2-89C0-F81838814A7E}</Project>
       <Name>RefactoringEssentials</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\src\addins\MonoDevelop.Debugger\MonoDevelop.Debugger.csproj">
+      <Project>{2357AABD-08C7-4808-A495-8FF2D3CDFDB0}</Project>
+      <Name>MonoDevelop.Debugger</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Ide.Tests\MonoDevelop.Ide.Tests.csproj">
+      <Project>{73D4CC8B-BAB9-4A29-841B-F25C6311F067}</Project>
+      <Name>MonoDevelop.Ide.Tests</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\UnitTests\UnitTests.csproj">
+      <Project>{1497D0A8-AFF1-4938-BC22-BE79B358BA5B}</Project>
+      <Name>UnitTests</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\external\nrefactory\ICSharpCode.NRefactory\ICSharpCode.NRefactory.csproj">
+      <Project>{3B2A5653-EC97-4001-BB9B-D90F1AF2C371}</Project>
+      <Name>ICSharpCode.NRefactory</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\external\mono-addins\Mono.Addins\Mono.Addins.csproj">
+      <Project>{91DD5A2D-9FE3-4C3C-9253-876141874DAD}</Project>
+      <Name>Mono.Addins</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\addins\MonoDevelop.UnitTesting\MonoDevelop.UnitTesting.csproj">
+      <Project>{A7A4246D-CEC4-42DF-A3C1-C31B9F51C4EC}</Project>
+      <Name>MonoDevelop.UnitTesting</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\addins\MonoDevelop.Refactoring\MonoDevelop.Refactoring.csproj">
+      <Project>{100568FC-F4E8-439B-94AD-41D11724E45B}</Project>
+      <Name>MonoDevelop.Refactoring</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\addins\MonoDevelop.SourceEditor2\MonoDevelop.SourceEditor.csproj">
+      <Project>{F8F92AA4-A376-4679-A9D4-60E7B7FBF477}</Project>
+      <Name>MonoDevelop.SourceEditor</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Features\IndentEngine\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MonoDevelop.CSharpBinding\AutomaticBracketInsertionTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="MonoDevelop.CSharpBinding.Parser\" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

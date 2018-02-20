@@ -33,9 +33,54 @@ using MonoDevelop.Core;
 using System;
 using MonoDevelop.Core.Text;
 using System.Threading.Tasks;
+using MonoDevelop.Ide.Editor;
 
 namespace MonoDevelop.Ide.FindInFiles
 {
+	class OpenFileProvider : FileProvider
+	{
+		readonly TextEditor editor;
+
+		public OpenFileProvider (TextEditor editor, Project project) : this(editor, project, -1, -1)
+		{
+		}
+
+		public OpenFileProvider (TextEditor editor, Project project, int selectionStartPostion, int selectionEndPosition) : base (editor.FileName, project, selectionStartPostion, selectionEndPosition)
+		{
+			this.editor = editor;
+		}
+
+		public override TextReader ReadString (bool readBinaryFiles)
+		{
+			return editor.CreateReader ();
+		}
+		IDisposable undoGroup;
+
+		public override void BeginReplace (string content, Encoding encoding)
+		{
+			Gtk.Application.Invoke ((o, args) => {
+				undoGroup = editor.OpenUndoGroup ();
+			});
+		}
+
+		public override void Replace (int offset, int length, string replacement)
+		{
+			Gtk.Application.Invoke ((o, args) => {
+				editor.ReplaceText (offset, length, replacement);
+			});
+		}
+
+		public override void EndReplace ()
+		{
+			Gtk.Application.Invoke ((o, args) => {
+				if (undoGroup != null) {
+					undoGroup.Dispose ();
+					undoGroup = null;
+				}
+			});
+		}
+	}
+
 	public class FileProvider
 	{
 		public string FileName {
@@ -60,6 +105,8 @@ namespace MonoDevelop.Ide.FindInFiles
 			set;
 		}
 
+		public Encoding CurrentEncoding { get; private set; }
+
 		public FileProvider(string fileName) : this(fileName, null)
 		{
 		}
@@ -76,22 +123,15 @@ namespace MonoDevelop.Ide.FindInFiles
 			SelectionEndPosition = selectionEndPosition;
 		}
 		
-		public string ReadString ()
+		public TextReader ReadString ()
 		{
 			return ReadString (false);
 		}
 
-		WeakReference cachedText;
-
-		public string ReadString (bool readBinaryFiles)
+		public virtual TextReader ReadString (bool readBinaryFiles)
 		{
-			string result = cachedText != null ? cachedText.Target as string : null;
-			if (result != null) {
-				return result;
-			}
-
 			if (buffer != null) {
-				result = buffer.ToString ();
+				return new StringReader (buffer.ToString ());
 			} else {
 				Document doc = null;
 
@@ -100,71 +140,72 @@ namespace MonoDevelop.Ide.FindInFiles
 					doc = task.Result;
 
 				if (doc != null && doc.Editor != null) {
-					result = doc.Editor.Text;
-					encoding = doc.Editor.Encoding;
-					hadBom = doc.Editor.UseBOM;
+					return doc.Editor.CreateReader ();
 				} else {
-					try {
-						if (!File.Exists (FileName))
-							return null;
-						var content = File.ReadAllBytes (FileName);
-						if (!readBinaryFiles && TextFileUtility.IsBinary (content))
-							return null;
-						result = TextFileUtility.GetText (content, out encoding, out hadBom);
-					} catch (Exception e) {
-						LoggingService.LogError ("Error while opening " + FileName, e);
-						return null;
-					}
+					return GetReaderForFileName (readBinaryFiles);
 				}
 			}
-			cachedText = new WeakReference (result);
-			return result;
 		}
-		
-		async Task<Document> SearchDocument ()
+
+		internal TextReader GetReaderForFileName (bool readBinaryFiles = false)
 		{
-			Document result = null;
-			await Runtime.RunInMainThread (() => result = IdeApp.Workbench.Documents.FirstOrDefault(d => !string.IsNullOrEmpty (d.FileName) &&  Path.GetFullPath (d.FileName) == Path.GetFullPath (FileName)));
-			return result;
+			try {
+				if (!File.Exists (FileName))
+					return null;
+				if (!readBinaryFiles && TextFileUtility.IsBinary (FileName))
+					return null;
+				var sr =  TextFileUtility.OpenStream (FileName);
+				CurrentEncoding = sr.CurrentEncoding;
+				return sr;
+			} catch (Exception e) {
+				LoggingService.LogError ("Error while opening " + FileName, e);
+				return null;
+			}
+		}
+
+		Task<Document> SearchDocument ()
+		{
+			string fullPath = Path.GetFullPath (FileName);
+			return Runtime.RunInMainThread (() => IdeApp.Workbench.Documents.FirstOrDefault (d => !string.IsNullOrEmpty (d.FileName) && Path.GetFullPath (d.FileName) == fullPath));
 		}
 
 		Document document;
 		StringBuilder buffer = null;
 		bool somethingReplaced;
 		IDisposable undoGroup;
-		bool hadBom;
 		Encoding encoding;
 
-		public async void BeginReplace (string content)
+		public virtual async void BeginReplace (string content, Encoding encoding)
 		{
 			somethingReplaced = false;
 			buffer = new StringBuilder (content);
 			document = await SearchDocument ();
+			this.encoding = encoding; 
 			if (document != null) {
-				Gtk.Application.Invoke (delegate {
+				Gtk.Application.Invoke ((o, args) => {
 					undoGroup = document.Editor.OpenUndoGroup ();
 				});
 				return;
 			}
 		}
 		
-		public void Replace (int offset, int length, string replacement)
+		public virtual void Replace (int offset, int length, string replacement)
 		{
 			somethingReplaced = true;
 			buffer.Remove (offset, length);
 			buffer.Insert (offset, replacement);
 			if (document != null) {
-				Gtk.Application.Invoke (delegate {
+				Gtk.Application.Invoke ((o, args) => {
 					document.Editor.ReplaceText (offset, length, replacement);
 				});
 				return;
 			}
 		}
 		
-		public void EndReplace ()
+		public virtual void EndReplace ()
 		{
 			if (document != null) {
-				Gtk.Application.Invoke (delegate { 
+				Gtk.Application.Invoke ((o, args) => {
 					if (undoGroup != null) {
 						undoGroup.Dispose ();
 						undoGroup = null;
@@ -175,7 +216,7 @@ namespace MonoDevelop.Ide.FindInFiles
 			}
 			if (buffer != null && somethingReplaced) {
 				object attributes = DesktopService.GetFileAttributes (FileName);
-				TextFileUtility.WriteText (FileName, buffer.ToString (), encoding ?? Encoding.UTF8, hadBom);
+				TextFileUtility.WriteText (FileName, buffer.ToString (), encoding ?? Encoding.UTF8);
 				DesktopService.SetFileAttributes (FileName, attributes);
 			}
 			FileService.NotifyFileChanged (FileName);

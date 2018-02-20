@@ -46,7 +46,7 @@ namespace MonoDevelop.VersionControl
 		static List<VersionControlSystem> handlers = new List<VersionControlSystem> ();
 		static VersionControlConfiguration configuration;
 		static DataContext dataContext = new DataContext ();
-		
+
 		public static event FileUpdateEventHandler FileStatusChanged;
 		public static event CommitEventHandler PrepareCommit;
 		public static event CommitEventHandler BeginCommit;
@@ -91,6 +91,11 @@ namespace MonoDevelop.VersionControl
 			};
 
 			AddinManager.AddExtensionNodeHandler ("/MonoDevelop/VersionControl/VersionControlSystems", OnExtensionChanged);
+		}
+
+		// This exists for the sole purpose of calling the static constructor.
+		public static void Initialize ()
+		{
 		}
 
 		static void OnExtensionChanged (object s, ExtensionNodeEventArgs args)
@@ -181,8 +186,9 @@ namespace MonoDevelop.VersionControl
 			
 			switch (status & VersionStatus.LocalChangesMask) {
 				case VersionStatus.Modified:
-				case VersionStatus.ScheduledReplace:
 					return GettextCatalog.GetString ("Modified");
+				case VersionStatus.ScheduledReplace:
+					return GettextCatalog.GetString ("Renamed");
 				case VersionStatus.Conflicted:
 					return GettextCatalog.GetString ("Conflict");
 				case VersionStatus.ScheduledAdd:
@@ -381,56 +387,51 @@ namespace MonoDevelop.VersionControl
 		internal static void NotifyPrepareCommit (Repository repo, ChangeSet changeSet)
 		{
 			if (!Runtime.IsMainThread) {
-				Gtk.Application.Invoke (delegate {
+				Gtk.Application.Invoke ((o, args) => {
 					NotifyPrepareCommit (repo, changeSet);
 				});
 				return;
 			}
 
-			if (PrepareCommit != null) {
-				try {
-					PrepareCommit (null, new CommitEventArgs (repo, changeSet, false));
-				} catch (Exception ex) {
-					LoggingService.LogInternalError (ex);
-				}
+			try {
+				PrepareCommit?.Invoke (null, new CommitEventArgs (repo, changeSet, false));
+			} catch (Exception ex) {
+				LoggingService.LogInternalError (ex);
 			}
 		}
 		
 		internal static void NotifyBeforeCommit (Repository repo, ChangeSet changeSet)
 		{
 			if (!Runtime.IsMainThread) {
-				Gtk.Application.Invoke (delegate {
+				Gtk.Application.Invoke ((o, args) => {
 					NotifyBeforeCommit (repo, changeSet);
 				});
 				return;
 			}
 
-			if (BeginCommit != null) {
-				try {
-					BeginCommit (null, new CommitEventArgs (repo, changeSet, false));
-				} catch (Exception ex) {
-					LoggingService.LogInternalError (ex);
-				}
+			try {
+				BeginCommit?.Invoke (null, new CommitEventArgs (repo, changeSet, false));
+			} catch (Exception ex) {
+				LoggingService.LogInternalError (ex);
 			}
 		}
 		
 		internal static void NotifyAfterCommit (Repository repo, ChangeSet changeSet, bool success)
 		{
 			if (!Runtime.IsMainThread) {
-				Gtk.Application.Invoke (delegate {
+				Gtk.Application.Invoke ((o, args) => {
 					NotifyAfterCommit (repo, changeSet, success);
 				});
 				return;
 			}
 
-			if (EndCommit != null) {
-				try {
-					EndCommit (null, new CommitEventArgs (repo, changeSet, success));
-				} catch (Exception ex) {
-					LoggingService.LogInternalError (ex);
-					return;
-				}
+			try {
+				EndCommit?.Invoke (null, new CommitEventArgs (repo, changeSet, success));
+			} catch (Exception ex) {
+				LoggingService.LogInternalError (ex);
+				return;
 			}
+
 			if (success) {
 				foreach (ChangeSetItem it in changeSet.Items)
 					SetCommitComment (it.LocalPath, null, false);
@@ -448,12 +449,11 @@ namespace MonoDevelop.VersionControl
 		public static void NotifyFileStatusChanged (FileUpdateEventArgs args) 
 		{
 			if (!Runtime.IsMainThread)
-				Gtk.Application.Invoke (delegate {
+				Gtk.Application.Invoke ((o2, a2) => {
 					NotifyFileStatusChanged (args);
 				});
 			else {
-				if (FileStatusChanged != null)
-					FileStatusChanged (null, args);
+				FileStatusChanged?.Invoke (null, args);
 			}
 		}
 
@@ -605,18 +605,31 @@ namespace MonoDevelop.VersionControl
 		
 		public static ProgressMonitor GetProgressMonitor (string operation, VersionControlOperationType op)
 		{
-			IconId icon;
+			IconId padIcon, statusIcon;
+			bool cancellable;
 			switch (op) {
-			case VersionControlOperationType.Pull: icon = Stock.StatusDownload; break;
-			case VersionControlOperationType.Push: icon = Stock.StatusUpload; break;
-			default: icon = "md-version-control"; break;
+			case VersionControlOperationType.Pull:
+				padIcon = Stock.PadDownload;
+				statusIcon = Stock.StatusDownload;
+				cancellable = true;
+				break;
+			case VersionControlOperationType.Push:
+				padIcon = Stock.PadUpload;
+				statusIcon = Stock.StatusUpload;
+				cancellable = true;
+				break;
+			default:
+				padIcon = "md-version-control";
+				statusIcon = "md-version-control";
+				cancellable = false;
+				break;
 			}
 
-			ProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor ("MonoDevelop.VersionControlOutput", "Version Control", "md-version-control", false, true);
+			ProgressMonitor monitor = IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor ("MonoDevelop.VersionControlOutput", GettextCatalog.GetString ("Version Control"), padIcon, false, true);
 			Pad outPad = IdeApp.Workbench.ProgressMonitors.GetPadForMonitor (monitor);
 			
 			AggregatedProgressMonitor mon = new AggregatedProgressMonitor (monitor);
-			mon.AddSlaveMonitor (IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (operation, icon, true, true, false, outPad));
+			mon.AddFollowerMonitor (IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (operation, statusIcon, true, true, false, outPad, cancellable));
 			return mon;
 		}
 		
@@ -781,8 +794,7 @@ namespace MonoDevelop.VersionControl
 	
 	class InternalRepositoryReference: IDisposable
 	{
-		Repository repo;
-		
+		readonly Repository repo;
 		public InternalRepositoryReference (Repository repo)
 		{
 			this.repo = repo;

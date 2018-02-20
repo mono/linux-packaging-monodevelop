@@ -33,7 +33,7 @@ using System.Collections.Generic;
 
 namespace MonoDevelop.Ide.Editor.Projection
 {
-	public sealed class Projection
+	public sealed class Projection : IDisposable
 	{
 		public ITextDocument Document { get; private set; }
 
@@ -117,10 +117,13 @@ namespace MonoDevelop.Ide.Editor.Projection
 
 		void HandleTextChanging (object sender, TextChangeEventArgs e)
 		{
-			foreach (var segment in originalProjections) {
-				if (segment.Contains (e.Offset)) {
-					var projectedOffset = e.Offset - segment.Offset + segment.LinkedTo.Offset;
-					projectedEditor.ReplaceText (projectedOffset, e.RemovalLength, e.InsertedText);
+			for (int i = 0; i < e.TextChanges.Count; ++i) {
+				var change = e.TextChanges[i];
+				foreach (var segment in originalProjections) {
+					if (segment.Contains (change.Offset)) {
+						var projectedOffset = change.Offset - segment.Offset + segment.LinkedTo.Offset;
+						projectedEditor.ReplaceText (projectedOffset, change.RemovalLength, change.InsertedText);
+					}
 				}
 			}
 
@@ -149,6 +152,14 @@ namespace MonoDevelop.Ide.Editor.Projection
 			}
 			projectedOffset = -1;
 			return false;
+		}
+
+		public void Dispose ()
+		{
+			if (projectedEditor != null) {
+				projectedEditor.Dispose ();
+				projectedEditor = null;
+			}
 		}
 	}
 }

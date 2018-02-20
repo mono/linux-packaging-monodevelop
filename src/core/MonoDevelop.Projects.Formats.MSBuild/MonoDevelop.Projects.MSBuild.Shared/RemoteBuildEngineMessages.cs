@@ -39,6 +39,9 @@ namespace MonoDevelop.Projects.MSBuild
 		public string CultureName { get; set; }
 
 		[MessageDataProperty]
+		public string BinDir { get; set; }
+
+		[MessageDataProperty]
 		public Dictionary<string, string> GlobalProperties { get; set; }
 	}
 
@@ -90,13 +93,6 @@ namespace MonoDevelop.Projects.MSBuild
 	}
 
 	[MessageDataTypeAttribute]
-	class DisposeProjectRequest: BinaryMessage
-	{
-		[MessageDataProperty]
-		public int ProjectId { get; set; }
-	}
-
-	[MessageDataTypeAttribute]
 	class RefreshProjectRequest: BinaryMessage
 	{
 		[MessageDataProperty]
@@ -127,6 +123,9 @@ namespace MonoDevelop.Projects.MSBuild
 
 		[MessageDataProperty]
 		public int LogWriterId { get; set; }
+
+		[MessageDataProperty]
+		public MSBuildEvent EnabledLogEvents { get; set; }
 
 		[MessageDataProperty]
 		public MSBuildVerbosity Verbosity { get; set; }
@@ -161,7 +160,20 @@ namespace MonoDevelop.Projects.MSBuild
 		public int LoggerId { get; set; }
 
 		[MessageDataProperty]
-		public string Text { get; set; }
+		public string LogText { get; set; }
+
+		[MessageDataProperty]
+		public LogEvent[] Events { get; set; }
+	}
+
+	[MessageDataType]
+	class LogEvent
+	{
+		[MessageDataProperty]
+		public MSBuildEvent Event { get; set; }
+
+		[MessageDataProperty]
+		public string Message { get; set; }
 	}
 
 	public enum MSBuildVerbosity
@@ -190,6 +202,40 @@ namespace MonoDevelop.Projects.MSBuild
 
 		[MessageDataProperty]
 		public bool Enabled { get; set; }
+	}
+
+	[MessageDataType]
+	class LoggerInfo
+	{
+		[MessageDataProperty]
+		public string Id { get; set; }
+
+		[MessageDataProperty]
+		public bool ConsoleLog { get; set; }
+
+		[MessageDataProperty]
+		public MSBuildEvent EventsFilter { get; set; }
+	}
+
+	[MessageDataType]
+	class BeginBuildRequest : BinaryMessage
+	{
+		[MessageDataProperty]
+		public int LogWriterId { get; set; }
+
+		[MessageDataProperty]
+		public MSBuildEvent EnabledLogEvents { get; set; }
+
+		[MessageDataProperty]
+		public MSBuildVerbosity Verbosity { get; set; }
+
+		[MessageDataProperty]
+		public ProjectConfigurationInfo [] Configurations { get; set; }
+	}
+
+	[MessageDataType]
+	class EndBuildRequest : BinaryMessage
+	{
 	}
 }
 

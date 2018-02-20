@@ -1,12 +1,11 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
     public class XmlDocTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact]
         public void TestBeforeNamespace()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -15,7 +14,7 @@ $namespace Foo {}
 ");
         }
 
-        [Test]
+        [Fact]
         public void TestBeforeUsing()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -24,7 +23,7 @@ $using System;
 ");
         }
 
-        [Test]
+        [Fact]
         public void TestBeforeUsingAlias()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -33,7 +32,7 @@ $using A = System;
 ");
         }
 
-        [Test]
+        [Fact]
         public void TestBeforeExternAlias()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -42,7 +41,7 @@ $extern alias System;
 ");
         }
 
-        [Test]
+        [Fact]
         public void TestTypeParameter()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -54,7 +53,7 @@ class Foo2<T> {}
 ");
         }
 
-        [Test]
+        [Fact]
         public void TestWrongMethodParameter()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -73,7 +72,7 @@ class Foo {
 ");
         }
 
-        [Test]
+        [Fact]
         public void TestSeeCref()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -92,7 +91,7 @@ class Foo2 {}
 ");
         }
 
-        [Test]
+        [Fact]
         public void TestValidCref()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -109,9 +108,9 @@ namespace Foo {
         }
 
         /// <summary>
-        /// Bug 17729 - Incorrect XML-docs warning about 'value' paramref 
+        /// Bug 17729 - Incorrect XML-docs warning about 'value' paramref
         /// </summary>
-        [Test]
+        [Fact]
         public void TestBug17729()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -127,7 +126,7 @@ class Foo {
         }
 
 
-        [Test]
+        [Fact]
         public void TestSeeCRefMember()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -138,7 +137,7 @@ namespace Foo
 	public interface IGroupingProvider
 	{
 		IGroupingProvider Next { get; set; }
-		
+
         /// <summary>
         /// Occurs when <see cref=""Next""/> changes.
         /// </summary>
@@ -153,7 +152,7 @@ namespace Foo
 ");
         }
 
-        [Test]
+        [Fact]
         public void TestEventComment()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -172,7 +171,7 @@ $$		event EventHandler<EventArgs> NextChanged;
         /// <summary>
         /// XmlDocAnalyzer causes unexpected exception which crashes Visual Studio #180
         /// </summary>
-        [Test]
+        [Fact]
         public void TestIssue180()
         {
             Analyze<XmlDocAnalyzer>(@"
@@ -184,8 +183,24 @@ class Foo {
 }
 ");
         }
+
+        [Fact]
+        public void TestDelegateDeclaration()
+        {
+            Analyze<XmlDocAnalyzer>(@"
+class Foo {
+    /// <summary>
+    /// </summary>
+    /// <param name=""$message$"">The data.</param>
+    public delegate void FooEventHandler(byte[] data);
+
+    /// <summary>
+    /// </summary>
+    /// <param name=""data"">The data.</param>
+    public delegate void BarEventHandler(byte[] data);
+}
+");
+        }
     }
-
-
 }
 

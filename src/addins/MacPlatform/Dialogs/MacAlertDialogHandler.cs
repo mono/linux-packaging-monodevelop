@@ -65,7 +65,7 @@ namespace MonoDevelop.MacIntegration
 					// HACK: VK The icon is not rendered in dark style correctly
 					//       Use light variant and reder it here
 					//       as long as NSAppearance.NameVibrantDark is broken
-					if (IdeTheme.UserInterfaceSkin == Skin.Dark)
+					if (IdeTheme.UserInterfaceTheme == Theme.Dark)
 						alert.Icon = img.WithStyles ("-dark").ToBitmap (GtkWorkarounds.GetScaleFactor ()).ToNSImage ();
 					else
 						alert.Icon = img.ToNSImage ();
@@ -149,15 +149,20 @@ namespace MonoDevelop.MacIntegration
 					data.Message.CancellationToken.Register (delegate {
 						alert.InvokeOnMainThread (() => {
 							if (!completed) {
-								NSApplication.SharedApplication.AbortModal ();
+								if (alert.Window.IsSheet && alert.Window.SheetParent != null)
+									alert.Window.SheetParent.EndSheet (alert.Window);
+								else
+									NSApplication.SharedApplication.AbortModal ();
 							}
 						});
 					});
 				}
 				
 				if (!data.Message.CancellationToken.IsCancellationRequested) {
-
-					var result = (int)alert.RunModal () - (long)(int)NSAlertButtonReturn.First;
+					NSWindow parent = null;
+					if (IdeTheme.UserInterfaceTheme != Theme.Dark || MacSystemInformation.OsVersion < MacSystemInformation.HighSierra) // sheeting is broken on High Sierra with dark NSAppearance
+						parent = data.TransientFor ?? IdeApp.Workbench.RootWindow;
+					var result = (int)(parent == null ? alert.RunModal () : alert.RunSheetModal (parent)) - (long)(int)NSAlertButtonReturn.First;
 					
 					completed = true;
 					if (result >= 0 && result < buttons.Count) {

@@ -25,6 +25,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 nodeContext =>
                 {
@@ -58,9 +60,6 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         static void GetDiagnostics(SyntaxNodeAnalysisContext nodeContext, SeparatedSyntaxList<ArgumentSyntax>? arguments)
         {
-            if (nodeContext.IsFromGeneratedCode())
-                return;
-
             if (!arguments.HasValue)
                 return;
 
@@ -70,9 +69,6 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         static void GetDiagnostics(SyntaxNodeAnalysisContext nodeContext, SeparatedSyntaxList<AttributeArgumentSyntax>? arguments)
         {
-            if (nodeContext.IsFromGeneratedCode())
-                return;
-
             if (!arguments.HasValue)
                 return;
 

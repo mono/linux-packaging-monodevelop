@@ -108,11 +108,27 @@ namespace Mono.Debugging.Client
 			}
 		}
 
+		ObjectValue helpLinkObject;
+		public string HelpLink {
+			get {
+				if (helpLinkObject == null) {
+					helpLinkObject = exception.GetChild ("HelpLink");
+					if (helpLinkObject != null && helpLinkObject.IsEvaluating) {
+						helpLinkObject.ValueChanged += delegate {
+							NotifyChanged ();
+						};
+					}
+				}
+				return helpLinkObject != null ? helpLinkObject.Value : null;
+			}
+		}
+
 		public ObjectValue Instance {
 			get {
 				if (instance == null)
 					instance = exception.GetChild ("Instance");
-
+				if (instance == null)
+					return exception;
 				return instance;
 			}
 		}
@@ -137,7 +153,7 @@ namespace Mono.Debugging.Client
 					return frames;
 				
 				var stackTrace = exception.GetChild ("StackTrace");
-				if (stackTrace == null)
+				if (stackTrace == null || stackTrace.IsNull)
 					return frames = new ExceptionStackFrame [0];
 				
 				if (stackTrace.IsEvaluating) {
@@ -146,9 +162,17 @@ namespace Mono.Debugging.Client
 					return frames;
 				}
 
+				if (stackTrace.TypeName == "string") {
+					stackTrace = Debugging.Evaluation.ExceptionInfoSource.GetStackTrace (stackTrace.Value);
+				}
+
+				if (!stackTrace.IsArray) {
+					return frames = new ExceptionStackFrame [0];
+				}
+
 				var list = new List<ExceptionStackFrame> ();
-				foreach (var val in stackTrace.GetAllChildren ())
-					list.Add (new ExceptionStackFrame (val));
+				for (int i = 0; i < stackTrace.ArrayCount; i++)
+					list.Add (new ExceptionStackFrame (stackTrace.GetArrayItem (i, EvaluationOptions.DefaultOptions)));
 
 				frames = list.ToArray ();
 
@@ -160,7 +184,7 @@ namespace Mono.Debugging.Client
 			get {
 				if (innerException == null) {
 					ObjectValue innerVal = exception.GetChild ("InnerException");
-					if (innerVal == null || innerVal.IsError || innerVal.IsUnknown)
+					if (innerVal == null || innerVal.IsNull || innerVal.IsError || innerVal.IsUnknown)
 						return null;
 					if (innerVal.IsEvaluating) {
 						innerVal.ValueChanged += delegate { NotifyChanged (); };
@@ -261,7 +285,7 @@ namespace Mono.Debugging.Client
 
 		public string File {
 			get {
-				ObjectValue file = frame.GetChild ("File");
+				ObjectValue file = frame.GetChild ("File", EvaluationOptions.DefaultOptions);
 				if (file != null)
 					return file.Value;
 
@@ -271,7 +295,7 @@ namespace Mono.Debugging.Client
 
 		public int Line {
 			get {
-				ObjectValue val = frame.GetChild ("Line");
+				ObjectValue val = frame.GetChild ("Line", EvaluationOptions.DefaultOptions);
 				if (val != null)
 					return int.Parse (val.Value);
 
@@ -281,7 +305,7 @@ namespace Mono.Debugging.Client
 
 		public int Column {
 			get {
-				ObjectValue val = frame.GetChild ("Column");
+				ObjectValue val = frame.GetChild ("Column", EvaluationOptions.DefaultOptions);
 				if (val != null)
 					return int.Parse (val.Value);
 

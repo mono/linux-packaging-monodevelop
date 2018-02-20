@@ -51,7 +51,7 @@ namespace MonoDevelop.Ide.Updater
 
 		public static bool AutoCheckForUpdates {
 			get {
-				return PropertyService.Get ("MonoDevelop.Ide.AddinUpdater.CheckForUpdates", true);
+				return PropertyService.Get ("MonoDevelop.Ide.AddinUpdater.CheckForUpdates", true) && Runtime.Preferences.EnableUpdaterForCurrentSession;
 			}
 			set {
 				PropertyService.Set ("MonoDevelop.Ide.AddinUpdater.CheckForUpdates", value);
@@ -96,7 +96,7 @@ namespace MonoDevelop.Ide.Updater
 		}
 
 		public static bool TestModeEnabled {
-			get { return TestMode.Length > 0 && TestMode.ToLower () != "false"; }
+			get { return TestMode.Length > 0 && !string.Equals (TestMode, "false", StringComparison.OrdinalIgnoreCase); }
 		}
 
 		public static bool NotifyAddinUpdates { get; set; }

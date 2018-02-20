@@ -29,18 +29,22 @@ using Xwt.Drawing;
 using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace Xwt
 {
 	public sealed class Toolkit: IFrontend
 	{
 		static Toolkit currentEngine;
+		static Toolkit nativeEngine;
 		static Dictionary<Type, Toolkit> toolkits = new Dictionary<Type, Toolkit> ();
 
 		ToolkitEngineBackend backend;
 		ApplicationContext context;
 		XwtTaskScheduler scheduler;
 		ToolkitType toolkitType;
+		ToolkitDefaults defaults;
+		XwtSynchronizationContext synchronizationContext;
 
 		int inUserCode;
 		Queue<Action> exitActions = new Queue<Action> ();
@@ -50,7 +54,7 @@ namespace Xwt
 			new KnownBackend { Type = ToolkitType.Gtk3, TypeName = "Xwt.GtkBackend.GtkEngine, Xwt.Gtk3" },
 			new KnownBackend { Type = ToolkitType.Gtk, TypeName = "Xwt.GtkBackend.GtkEngine, Xwt.Gtk" },
 			new KnownBackend { Type = ToolkitType.XamMac, TypeName = "Xwt.Mac.MacEngine, Xwt.XamMac" },
-			new KnownBackend { Type = ToolkitType.Cocoa, TypeName = "Xwt.Mac.MacEngine, Xwt.Mac" },
+			new KnownBackend { Type = ToolkitType.Cocoa, TypeName = "Xwt.Mac.MacEngine, Xwt.XamMac" },
 			new KnownBackend { Type = ToolkitType.Wpf, TypeName = "Xwt.WPFBackend.WPFEngine, Xwt.WPF" },
 		};
 
@@ -74,6 +78,35 @@ namespace Xwt
 		/// <value>The engine currently used by Xwt.</value>
 		public static Toolkit CurrentEngine {
 			get { return currentEngine; }
+		}
+
+		/// <summary>
+		/// Gets the native platform toolkit engine.
+		/// </summary>
+		/// <value>The native engine.</value>
+		public static Toolkit NativeEngine {
+			get {
+				if (nativeEngine == null) {
+					switch (Desktop.DesktopType) {
+						case DesktopType.Linux:
+							// don't mix Gtk2 and Gtk3
+							if (CurrentEngine != null && (CurrentEngine.Type == ToolkitType.Gtk || CurrentEngine.Type == ToolkitType.Gtk3))
+								nativeEngine = CurrentEngine;
+							else if (!TryLoad (ToolkitType.Gtk3, out nativeEngine))
+								TryLoad (ToolkitType.Gtk, out nativeEngine);
+							break;
+						case DesktopType.Windows:
+							TryLoad (ToolkitType.Wpf, out nativeEngine);
+							break;
+						case DesktopType.Mac:
+							TryLoad (ToolkitType.XamMac, out nativeEngine);
+							break;
+					}
+				}
+				if (nativeEngine == null)
+					nativeEngine = CurrentEngine;
+				return nativeEngine;
+			}
 		}
 
 		/// <summary>
@@ -120,8 +153,17 @@ namespace Xwt
 
 		private Toolkit ()
 		{
+			synchronizationContext = new XwtSynchronizationContext (this);
 			context = new ApplicationContext (this);
 			scheduler = new XwtTaskScheduler (this);
+		}
+
+		/// <summary>
+		/// Gets a synchronization context for this toolkit.
+		/// </summary>
+		/// <value>The synchronization context.</value>
+		public XwtSynchronizationContext SynchronizationContext {
+			get { return synchronizationContext; }
 		}
 
 		/// <summary>
@@ -251,7 +293,6 @@ namespace Xwt
 			catch (Exception ex) {
 				if (throwIfFails)
 					throw new Exception ("Toolkit could not be loaded", ex);
-				Application.NotifyException (ex);
 			}
 			if (throwIfFails)
 				throw new Exception ("Toolkit could not be loaded");
@@ -299,6 +340,18 @@ namespace Xwt
 		}
 
 		/// <summary>
+		/// Gets the defaults for the current toolkit.
+		/// </summary>
+		/// <value>The toolkit defaults.</value>
+		public ToolkitDefaults Defaults {
+			get {
+				if (defaults == null)
+					defaults = new ToolkitDefaults ();
+				return defaults;
+			}
+		}
+
+		/// <summary>
 		/// Gets a reference to the native widget wrapped by an Xwt widget
 		/// </summary>
 		/// <returns>The native widget currently used by Xwt for the specific widget.</returns>
@@ -308,6 +361,36 @@ namespace Xwt
 			ValidateObject (w);
 			w.SetExtractedAsNative ();
 			return backend.GetNativeWidget (w);
+		}
+
+		/// <summary>
+		/// Gets a reference to the native window wrapped by an Xwt window
+		/// </summary>
+		/// <returns>The native window currently used by Xwt for the specific window, or null.</returns>
+		/// <param name="w">The Xwt window.</param>
+		/// <remarks>
+		/// If the window backend belongs to a different toolkit and the current toolkit is the
+		/// native toolkit for the current platform, GetNativeWindow will return the underlying
+		/// native window, or null if the operation is not supported for the current toolkit.
+		/// </remarks>
+		public object GetNativeWindow (WindowFrame w)
+		{
+			return backend.GetNativeWindow (w);
+		}
+
+		/// <summary>
+		/// Gets a reference to the native platform window used by the specified backend.
+		/// </summary>
+		/// <returns>The native window currently used by Xwt for the specific window, or null.</returns>
+		/// <param name="w">The Xwt window.</param>
+		/// <remarks>
+		/// If the window backend belongs to a different toolkit and the current toolkit is the
+		/// native toolkit for the current platform, GetNativeWindow will return the underlying
+		/// native window, or null if the operation is not supported for the current toolkit.
+		/// </remarks>
+		public object GetNativeWindow (IWindowFrameBackend w)
+		{
+			return backend.GetNativeWindow (w);
 		}
 
 		/// <summary>
@@ -338,14 +421,51 @@ namespace Xwt
 		}
 
 		/// <summary>
-		/// Invokes the specified action on the GUI Thread.
+		/// Switches the current context to the context of this toolkit
 		/// </summary>
-		/// <param name="a">The action to invoke on the main GUI thread.</param>
+		ToolkitContext SwitchContext ()
+		{
+			var current = System.Threading.SynchronizationContext.Current;
+
+			// Store the current engine and the current context (which is not necessarily the context of the engine)
+			var currentContext = new ToolkitContext {
+				SynchronizationContext = current,
+				Engine = currentEngine
+			};
+
+			currentEngine = this;
+			if ((current as XwtSynchronizationContext)?.TargetToolkit != this)
+				System.Threading.SynchronizationContext.SetSynchronizationContext (SynchronizationContext);
+			return currentContext;
+		}
+
+		struct ToolkitContext
+		{
+			public SynchronizationContext SynchronizationContext;
+			public Toolkit Engine;
+
+			public void Restore ()
+			{
+				Toolkit.currentEngine = Engine;
+				System.Threading.SynchronizationContext.SetSynchronizationContext (SynchronizationContext);
+			}
+		}
+
+		/// <summary>
+		/// Invokes the specified action using this toolkit.
+		/// </summary>
+		/// <param name="a">The action to invoke in the context of this toolkit.</param>
+		/// <remarks>
+		/// Invoke allows dynamic toolkit switching. It will set <see cref="CurrentEngine"/> to this toolkit and reset
+		/// it back to its original value after the action has been executed.
+		/// 
+		/// Invoke must be executed on the UI thread. The action will not be synchronized with the main UI thread automatically.
+		/// </remarks>
+		/// <returns><c>true</c> if the action has been executed sucessfully; otherwise, <c>false</c>.</returns>
 		public bool Invoke (Action a)
 		{
-			var oldEngine = currentEngine;
+			ToolkitContext currentContext = SwitchContext ();
 			try {
-				currentEngine = this;
 				EnterUserCode ();
 				a ();
 				ExitUserCode (null);
@@ -354,10 +474,51 @@ namespace Xwt
 				ExitUserCode (ex);
 				return false;
 			} finally {
-				currentEngine = oldEngine;
+				currentContext.Restore ();
 			}
 		}
-		
+
+		public T Invoke<T> (Func<T> func)
+		{
+			ToolkitContext currentContext = SwitchContext ();
+			try {
+				EnterUserCode ();
+				var res = func ();
+				ExitUserCode (null);
+				return res;
+			} catch (Exception ex) {
+				ExitUserCode (ex);
+				return default (T);
+			} finally {
+				currentContext.Restore ();
+			}
+		}
+
+		internal void InvokeAndThrow (Action a)
+		{
+			var currentContext = SwitchContext ();
+			try {
+				EnterUserCode ();
+				a ();
+			} finally {
+				ExitUserCode (null);
+				currentContext.Restore ();
+			}
+		}
+
+		internal T InvokeAndThrow<T> (Func<T> func)
+		{
+			var currentContext = SwitchContext ();
+			try {
+				currentEngine = this;
+				EnterUserCode ();
+				return func ();
+			} finally {
+				ExitUserCode (null);
+				currentContext.Restore ();
+			}
+		}
+
 		/// <summary>
 		/// Invokes an action after the user code has been processed.
 		/// </summary>
@@ -365,12 +526,15 @@ namespace Xwt
 		internal void InvokePlatformCode (Action a)
 		{
 			int prevCount = inUserCode;
+			inUserCode = 1;
+			ExitUserCode (null);
+			var currentContext = Application.MainLoop.Engine.SwitchContext ();
+
 			try {
-				inUserCode = 1;
-				ExitUserCode (null);
-				a ();
+				a();
 			} finally {
 				inUserCode = prevCount;
+				currentContext.Restore ();
 			}
 		}
 		
@@ -461,7 +625,7 @@ namespace Xwt
 		/// </summary>
 		/// <returns>An Xwt widget with the specified native widget backend.</returns>
 		/// <param name="nativeWidget">The native widget.</param>
-		public Widget WrapWidget (object nativeWidget, NativeWidgetSizing preferredSizing = NativeWidgetSizing.External)
+		public Widget WrapWidget (object nativeWidget, NativeWidgetSizing preferredSizing = NativeWidgetSizing.External, bool reparent = true)
 		{
 			var externalWidget = nativeWidget as Widget;
 			if (externalWidget != null) {
@@ -470,7 +634,7 @@ namespace Xwt
 				nativeWidget = externalWidget.Surface.ToolkitEngine.GetNativeWidget (externalWidget);
 			}
 			var embedded = CreateObject<EmbeddedNativeWidget> ();
-			embedded.Initialize (nativeWidget, externalWidget, preferredSizing);
+			embedded.Initialize (nativeWidget, externalWidget, preferredSizing, reparent);
 			return embedded;
 		}
 
@@ -495,6 +659,11 @@ namespace Xwt
 			return new Context (backend.GetBackendForContext (nativeWidget, nativeContext), this);
 		}
 
+		public Accessibility.Accessible WrapAccessible (object nativeAccessibleObject)
+		{
+			return new Accessibility.Accessible (nativeAccessibleObject);
+		}
+
 		/// <summary>
 		/// Validates that the backend of an Xwt component belongs to the currently loaded toolkit.
 		/// </summary>
@@ -514,14 +683,14 @@ namespace Xwt
 				// to not corrupt the backend of the singletons
 				if (font.ToolkitEngine != this) {
 					var fbh = font.ToolkitEngine.FontBackendHandler;
-					if (font == fbh.SystemFont)
-						font = FontBackendHandler.SystemFont;
-					if (font == fbh.SystemMonospaceFont)
-						font = FontBackendHandler.SystemMonospaceFont;
-					if (font == fbh.SystemSansSerifFont)
-						font = FontBackendHandler.SystemSansSerifFont;
-					if (font == fbh.SystemSerifFont)
-						font = FontBackendHandler.SystemSerifFont;
+					if (font.Family == fbh.SystemFont.Family)
+						font = FontBackendHandler.SystemFont.WithSettings (font);
+					if (font.Family == fbh.SystemMonospaceFont.Family)
+						font = FontBackendHandler.SystemMonospaceFont.WithSettings (font);
+					if (font.Family == fbh.SystemSansSerifFont.Family)
+						font = FontBackendHandler.SystemSansSerifFont.WithSettings (font);
+					if (font.Family == fbh.SystemSerifFont.Family)
+						font = FontBackendHandler.SystemSerifFont.WithSettings (font);
 				}
 
 				font.InitForToolkit (this);
@@ -544,8 +713,7 @@ namespace Xwt
 		/// <exception cref="InvalidOperationException">The component belongs to a different toolkit</exception>
 		public object GetSafeBackend (object obj)
 		{
-			ValidateObject (obj);
-			return GetBackend (obj);
+			return GetBackend (ValidateObject (obj));
 		}
 
 		/// <summary>
@@ -562,6 +730,21 @@ namespace Xwt
 				return null;
 			else
 				throw new InvalidOperationException ("Object doesn't have a backend");
+		}
+
+		/// <summary>
+		/// Gets the bounds of a native widget in screen coordinates.
+		/// </summary>
+		/// <returns>The screen bounds relative to <see cref="P:Xwt.Desktop.Bounds"/>.</returns>
+		/// <param name="nativeWidget">The native widget.</param>
+		/// <exception cref="ArgumentNullException"><paramref name="nativeWidget"/> is <c>null</c>.</exception>
+		/// <exception cref="NotSupportedException">This toolkit does not support this operation.</exception>
+		/// <exception cref="InvalidOperationException"><paramref name="nativeWidget"/> does not belong to this toolkit.</exception>
+		public Rectangle GetScreenBounds (object nativeWidget)
+		{
+			if (nativeWidget == null)
+				throw new ArgumentNullException (nameof(nativeWidget));
+			return backend.GetScreenBounds(nativeWidget);
 		}
 
 		/// <summary>

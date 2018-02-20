@@ -28,6 +28,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 (nodeContext) =>
                 {
@@ -48,8 +50,6 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             var cancellationToken = nodeContext.CancellationToken;
 
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
             var obj = AnalyzeBinaryExpression(node.Condition);
             if (obj == null)
                 return false;
@@ -111,6 +111,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         static bool CanBeNull(SemanticModel semanticModel, ExpressionSyntax expression, CancellationToken cancellationToken)
         {
             var info = semanticModel.GetTypeInfo(expression, cancellationToken);
+            if (info.ConvertedType == null)
+                return false;
             if (info.ConvertedType.IsReferenceType || info.ConvertedType.IsNullableType())
                 return true;
             return false;
@@ -122,7 +124,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             if (!expr.IsKind(SyntaxKind.SimpleMemberAccessExpression))
                 return expression;
             var info = semanticModel.GetTypeInfo(((MemberAccessExpressionSyntax)expr).Expression, cancellationToken);
-            if (!info.ConvertedType.IsNullableType())
+            if (info.ConvertedType != null && !info.ConvertedType.IsNullableType())
                 return expression;
             return ((MemberAccessExpressionSyntax)expr).Expression;
         }

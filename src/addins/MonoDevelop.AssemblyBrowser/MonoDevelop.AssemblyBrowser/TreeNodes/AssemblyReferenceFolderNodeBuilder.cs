@@ -72,20 +72,18 @@ namespace MonoDevelop.AssemblyBrowser
 					//	ctx.AddChild (new Error (MonoDevelop.Core.GettextCatalog.GetString ("Error while loading:") + assemblyNameReference.FullName + "/" + e.Message));
 				}
 			}
-			
-			foreach (ModuleReference moduleRef in referenceFolder.ModuleReferences) {
-				ctx.AddChild (moduleRef);
-			}
+
+			ctx.AddChildren (referenceFolder.ModuleReferences);
 		}
 		
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
 		{
 			return true;
 		}
-		
-		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
+
+		public override int GetSortIndex (ITreeNavigator node)
 		{
-			return -1;
+			return -200;
 		}
 	}
 }

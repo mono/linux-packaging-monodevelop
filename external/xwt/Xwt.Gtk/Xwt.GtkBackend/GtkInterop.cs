@@ -62,6 +62,7 @@ namespace Xwt.GtkBackend
 	internal class FastPangoAttrList : IDisposable
 	{
 		IntPtr list;
+		public Gdk.Color DefaultLinkColor = Toolkit.CurrentEngine.Defaults.FallbackLinkColor.ToGtkValue ();
 
 		public FastPangoAttrList ()
 		{
@@ -108,8 +109,9 @@ namespace Xwt.GtkBackend
 				AddFontAttribute ((Pango.FontDescription)Toolkit.GetBackend (xa.Font), start, end);
 			}
 			else if (attr is LinkTextAttribute) {
+				// TODO: support "link-color" style prop for TextLayoutBackendHandler and CellRendererText
 				AddUnderlineAttribute (Pango.Underline.Single, start, end);
-				AddForegroundAttribute (Colors.Blue.ToGtkValue (), start, end);
+				AddForegroundAttribute (DefaultLinkColor, start, end);
 			}
 		}
 
@@ -226,10 +228,12 @@ namespace Xwt.GtkBackend
 		}
 	}
 
-	internal class TextIndexer
+	public class TextIndexer
 	{
-		int[] indexToByteIndex;
-		int[] byteIndexToIndex;
+		static readonly List<int> emptyList = new List<int> ();
+		static readonly int [] emptyArray = new int [0];
+		int [] indexToByteIndex;
+		List<int> byteIndexToIndex;
 
 		public TextIndexer (string text)
 		{
@@ -239,7 +243,10 @@ namespace Xwt.GtkBackend
 		public int IndexToByteIndex (int i)
 		{
 			if (i >= indexToByteIndex.Length)
-				return i;
+				// if the index exceeds the byte index range, return the last byte index + 1
+				// telling pango to span the attribute to the end of the string
+				// this happens if the string contains multibyte characters
+				return indexToByteIndex[i-1] + 1;
 			return indexToByteIndex[i];
 		}
 
@@ -250,24 +257,27 @@ namespace Xwt.GtkBackend
 
 		public void SetupTables (string text)
 		{
-			if (text == null) {
-				this.indexToByteIndex = new int[0];
-				this.byteIndexToIndex = new int[0];
+			if (string.IsNullOrEmpty (text)) {
+				this.indexToByteIndex = emptyArray;
+				this.byteIndexToIndex = emptyList;
 				return;
 			}
 
-			var arr = text.ToCharArray ();
 			int byteIndex = 0;
-			int[] indexToByteIndex = new int[arr.Length];
-			var byteIndexToIndex = new List<int> ();
-			for (int i = 0; i < arr.Length; i++) {
-				indexToByteIndex[i] = byteIndex;
-				byteIndex += System.Text.Encoding.UTF8.GetByteCount (arr, i, 1);
-				while (byteIndexToIndex.Count < byteIndex)
-					byteIndexToIndex.Add (i);
+			int [] indexToByteIndex = new int [text.Length];
+			var byteIndexToIndex = new System.Collections.Generic.List<int> (text.Length);
+			unsafe {
+				fixed (char* p = text) {
+					for (int i = 0; i < text.Length; i++) {
+						indexToByteIndex[i] = byteIndex;
+						byteIndex += System.Text.Encoding.UTF8.GetByteCount (p + i, 1);
+						while (byteIndexToIndex.Count < byteIndex)
+							byteIndexToIndex.Add (i);
+					}
+				}
 			}
 			this.indexToByteIndex = indexToByteIndex;
-			this.byteIndexToIndex = byteIndexToIndex.ToArray ();
+			this.byteIndexToIndex = byteIndexToIndex;
 		}
 	}
 }

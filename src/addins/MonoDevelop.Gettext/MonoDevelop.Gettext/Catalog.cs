@@ -395,7 +395,7 @@ namespace MonoDevelop.Gettext
 		{
 			foreach (EncodingInfo info in Encoding.GetEncodings ()) {
 				try {
-					if (info.Name.ToLower () == charset.ToLower ())
+					if (string.Equals (info.Name, charset, StringComparison.OrdinalIgnoreCase))
 						return true;
 				} catch (Exception) {
 					// info.Name may fail.
@@ -429,7 +429,7 @@ namespace MonoDevelop.Gettext
 		{
 			foreach (EncodingInfo info in Encoding.GetEncodings ()) {
 				try {
-					if (info.Name.ToLower () == charset.ToLower ())
+					if (string.Equals (info.Name, charset, StringComparison.OrdinalIgnoreCase))
 						return info.GetEncoding ();
 				} catch (Exception) {
 					// info.Name may fail.
@@ -976,7 +976,8 @@ namespace MonoDevelop.Gettext
 				foreach (string line in value.Split (new string[] {Environment.NewLine}, StringSplitOptions.None)) {
 					if (sb.Length != 0)
 						sb.AppendLine ();
-					sb.Append ("# " + line);
+					sb.Append ("# ");
+					sb.Append (line);
 				}
 				this.Comment = sb.ToString ();
 			}

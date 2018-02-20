@@ -26,14 +26,14 @@
 
 using System;
 using System.Collections.Generic;
-using MonoDevelop.PackageManagement;
+using System.Threading.Tasks;
 using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
-	public class FakeBackgroundPackageActionRunner : IBackgroundPackageActionRunner
+	class FakeBackgroundPackageActionRunner : IBackgroundPackageActionRunner
 	{
-		public IEnumerable<InstallPackageAction> PendingInstallActionsForProject (DotNetProject project)
+		public IEnumerable<IInstallNuGetPackageAction> PendingInstallActionsForProject (DotNetProject project)
 		{
 			throw new NotImplementedException ();
 		}
@@ -46,6 +46,11 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 
 		public void Run (ProgressMonitorStatusMessage progressMessage, IPackageAction action)
 		{
+			Run (progressMessage, action, true);
+		}
+
+		public void Run (ProgressMonitorStatusMessage progressMessage, IPackageAction action, bool clearConsole)
+		{
 			RunProgressMessage = progressMessage;
 			ActionRun = action;
 
@@ -53,6 +58,10 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 		}
 
 		public void Run (ProgressMonitorStatusMessage progressMessage, IEnumerable<IPackageAction> actions)
+		{
+		}
+
+		public void Run (ProgressMonitorStatusMessage progressMessage, IEnumerable<IPackageAction> actions, bool clearConsole)
 		{
 		}
 
@@ -68,11 +77,30 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 			ShowErrorMessage = message;
 		}
 
+		public Task RunAsync (ProgressMonitorStatusMessage progressMessage, IEnumerable<IPackageAction> actions)
+		{
+			throw new NotImplementedException ();
+		}
+
+		public Task RunAsync (ProgressMonitorStatusMessage progressMessage, IEnumerable<IPackageAction> actions, bool clearConsole)
+		{
+			throw new NotImplementedException ();
+		}
+
+		public void Cancel ()
+		{
+		}
+
+		public PendingPackageActionsInformation GetPendingActionsInfo ()
+		{
+			throw new NotImplementedException ();
+		}
+
 		public ProgressMonitorStatusMessage ShowErrorProgressMessage;
 		public string ShowErrorMessage;
 		public Exception ShowErrorException;
 
-		public IEnumerable<InstallPackageAction> PendingInstallActions {
+		public IEnumerable<IInstallNuGetPackageAction> PendingInstallActions {
 			get {
 				throw new NotImplementedException ();
 			}

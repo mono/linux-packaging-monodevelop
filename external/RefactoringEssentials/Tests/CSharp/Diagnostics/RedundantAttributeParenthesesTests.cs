@@ -1,22 +1,21 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
     public class RedundantAttributeParenthesesTests : CSharpDiagnosticTestBase
     {
-        [Test]
-        public void Test()
+        [Fact]
+        public void DefaultCase()
         {
             Analyze<RedundantAttributeParenthesesAnalyzer>(@"
-[$Test()$]
+[Test$()$]
 class TestClass { }", @"
 [Test]
 class TestClass { }");
         }
 
-        [Test]
+        [Fact]
         public void IgnoreNoParentheses()
         {
             Analyze<RedundantAttributeParenthesesAnalyzer>(@"
@@ -25,7 +24,7 @@ class TestClass { }");
 
         }
 
-        [Test]
+        [Fact]
         public void IgnoreParameters()
         {
             Analyze<RedundantAttributeParenthesesAnalyzer>(@"
@@ -34,7 +33,7 @@ class TestClass { }");
 
         }
 
-        [Test]
+        [Fact]
         public void TestDisable()
         {
             Analyze<RedundantAttributeParenthesesAnalyzer>(@"

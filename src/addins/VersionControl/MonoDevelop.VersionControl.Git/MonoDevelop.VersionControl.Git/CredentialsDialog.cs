@@ -28,6 +28,7 @@ using Gtk;
 using System;
 using LibGit2Sharp;
 using MonoDevelop.Components;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.VersionControl.Git
 {
@@ -40,7 +41,7 @@ namespace MonoDevelop.VersionControl.Git
 
 			this.UseNativeContextMenus ();
 
-			labelTop1.Text = string.Format (labelTop1.Text, uri);
+			labelTop1.LabelProp = string.Format (labelTop1.LabelProp, uri);
 
 			var table = new Table (0, 0, false);
 			table.ColumnSpacing = 6;
@@ -50,12 +51,12 @@ namespace MonoDevelop.VersionControl.Git
 			switch (type) {
 			case SupportedCredentialTypes.UsernamePassword:
 				upcred = (UsernamePasswordCredentials)cred;
-				firstEditor = CreateEntry (table, "Username:", false);
-				CreateEntry (table, "Password:", true);
+				firstEditor = CreateEntry (table, GettextCatalog.GetString ("Username:"), false);
+				CreateEntry (table, GettextCatalog.GetString ("Password:"), true);
 				break;
 			case SupportedCredentialTypes.Ssh:
 				sshcred = (SshUserKeyCredentials)cred;
-				firstEditor = CreateEntry (table, "Passphrase:", true);
+				firstEditor = CreateEntry (table, GettextCatalog.GetString ("Passphrase:"), true);
 				break;
 			}
 			table.ShowAll ();

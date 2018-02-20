@@ -55,10 +55,13 @@ namespace MonoDevelop.Components.Mac
 
 			AutoEnablesItems = false;
 
-			Title = (ces.Name ?? "").Replace ("_", "");
+			var label = ces.Name ?? "";
+			Title = ContextMenuItem.SanitizeMnemonics (label);
 			foreach (CommandEntry ce in ces) {
 				if (ce.CommandId == Command.Separator) {
 					AddItem (NSMenuItem.SeparatorItem);
+					if (!string.IsNullOrEmpty (ce.OverrideLabel))
+						AddItem (new MDMenuHeaderItem (ce));
 					continue;
 				}
 
@@ -101,25 +104,30 @@ namespace MonoDevelop.Components.Mac
 		}
 
 		// http://lists.apple.com/archives/cocoa-dev/2008/Apr/msg01696.html
-		void FlashMenu ()
+		NSMenuItem blink;
+		void FlashMenu (MDMenuItem item)
 		{
 			var f35 = ((char)0xF726).ToString ();
-			var blink = new NSMenuItem ("* blink *") {
+			if (blink != null) {
+				RemoveItem(blink);
+			}
+			blink = new NSMenuItem(item.CommandEntry.GetCommand(item.Manager).DisplayName) {
 				KeyEquivalent = f35,
 			};
+
+			AddItem(blink);
+
 			var f35Event = NSEvent.KeyEvent (
 				NSEventType.KeyDown, CGPoint.Empty, NSEventModifierMask.CommandKeyMask, 0, 0,
 				NSGraphicsContext.CurrentContext, f35, f35, false, 0);
-			AddItem (blink);
 			PerformKeyEquivalent (f35Event);
-			RemoveItem (blink);
 		}
 
 		public bool FlashIfContainsCommand (object command)
 		{
 			foreach (var item in ItemArray ().OfType<MDMenuItem> ()) {
 				if (item.CommandEntry.CommandId == command) {
-					FlashMenu ();
+					FlashMenu (item);
 					return true;
 				}
 				var submenu = item.Submenu as MDMenu;
@@ -146,13 +154,34 @@ namespace MonoDevelop.Components.Mac
 
 				var mdItem = item as IUpdatableMenuItem;
 				if (mdItem != null) {
-					mdItem.Update (this, ref lastSeparator, ref i);
+					mdItem.Update (this, ref i);
 					continue;
 				}
 
 				//hide unknown builtins
 				item.Hidden = true;
 			}
+			UpdateSeparators ();
+		}
+
+		public void UpdateSeparators ()
+		{
+			bool previousWasSeparator = true;
+			NSMenuItem lastSeparator = null;
+
+			for (int i = 0; i < Count; i++) {
+				var item = this.ItemAt (i);
+
+				if (item.IsSeparatorItem) {
+					item.Hidden = previousWasSeparator;
+					previousWasSeparator = true;
+					lastSeparator = item;
+				} else if (!item.Hidden) {
+					previousWasSeparator = false;
+				}
+			}
+			if (previousWasSeparator && lastSeparator != null)
+				lastSeparator.Hidden = true;
 		}
 
 		[Export ("menuNeedsUpdate:")]
@@ -170,11 +199,42 @@ namespace MonoDevelop.Components.Mac
 				UpdateCommands ();
 		}
 
+		[Export ("menuWillOpen:")]
+		void MenuWillOpen (NSMenu menu)
+		{
+			Ide.IdeApp.DisableIdleActions ();
+			StartBumpingGtkLoop ();
+		}
+
 		[Export ("menuDidClose:")]
 		void MenuDidClose (NSMenu menu)
 		{
+			Ide.IdeApp.EnableIdleActions ();
+			EndBumpingGtkLoop ();
 			if (CloseHandler != null) {
 				CloseHandler (this, null);
+			}
+		}
+
+		static int bumperCount;
+		static NSTimer bumperTimer;
+
+		static void StartBumpingGtkLoop ()
+		{
+			if (bumperCount++ == 0) {
+				var runLoop = NSRunLoop.Current;
+				bumperTimer = NSTimer.CreateRepeatingTimer (0.1d, delegate {
+					Gtk.Application.RunIteration (false);
+				});
+				runLoop.AddTimer (bumperTimer, NSRunLoop.NSRunLoopCommonModes);
+			}
+		}
+
+		static void EndBumpingGtkLoop ()
+		{
+			if (--bumperCount == 0) {
+				bumperTimer.Invalidate ();
+				bumperTimer = null;
 			}
 		}
 
@@ -189,7 +249,7 @@ namespace MonoDevelop.Components.Mac
 
 	interface IUpdatableMenuItem
 	{
-		void Update (MDMenu parent, ref NSMenuItem lastSeparator, ref int index);
+		void Update (MDMenu parent, ref int index);
 	}
 }
 #endif

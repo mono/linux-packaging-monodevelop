@@ -24,18 +24,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
 using System.Threading;
-using MonoDevelop.Core.ProgressMonitoring;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageManagementProgressMonitor : ProgressMonitor
+	internal class PackageManagementProgressMonitor : ProgressMonitor
 	{
 		OutputProgressMonitor consoleMonitor;
 		CancellationTokenRegistration consoleMonitorReg;
@@ -49,9 +46,13 @@ namespace MonoDevelop.PackageManagement
 			get { return consoleMonitor.Console; }
 		}
 
-		public PackageManagementProgressMonitor (OutputProgressMonitor consoleMonitor, ProgressMonitor statusMonitor)
+		public PackageManagementProgressMonitor (
+			OutputProgressMonitor consoleMonitor,
+			ProgressMonitor statusMonitor,
+			CancellationTokenSource cancellationTokenSource)
+			: base (cancellationTokenSource)
 		{
-			AddSlaveMonitor (statusMonitor);
+			AddFollowerMonitor (statusMonitor);
 			this.consoleMonitor = consoleMonitor;
 
 			consoleMonitorReg = consoleMonitor.CancellationToken.Register (OnCancelRequested);
@@ -117,6 +118,7 @@ namespace MonoDevelop.PackageManagement
 
 		void OnCancelRequested ()
 		{
+			consoleMonitor.Log.WriteLine (GettextCatalog.GetString ("Cancelling operation..."));
 			CancellationTokenSource.Cancel ();
 		}
 	}

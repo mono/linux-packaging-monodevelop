@@ -5,11 +5,10 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using RefactoringEssentials.CSharp.CodeRefactorings;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
-    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+	[DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class ConvertIfStatementToSwitchStatementAnalyzer : DiagnosticAnalyzer
     {
         static readonly DiagnosticDescriptor descriptor = new DiagnosticDescriptor(
@@ -26,6 +25,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 (nodeContext) =>
                 {
@@ -46,8 +47,6 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             var cancellationToken = nodeContext.CancellationToken;
 
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
             if (node.Parent is IfStatementSyntax || node.Parent is ElseClauseSyntax)
                 return false;
 
@@ -104,7 +103,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 ExpressionSyntax switchExpr = null;
                 if (IsConstantExpression(context, binaryOp.Right))
                     switchExpr = binaryOp.Left;
-                if (IsConstantExpression(context, binaryOp.Left))
+                else if (IsConstantExpression(context, binaryOp.Left))
                     switchExpr = binaryOp.Right;
                 if (switchExpr != null && IsValidSwitchType(context.GetTypeInfo(switchExpr).Type))
                     return switchExpr;
@@ -120,23 +119,22 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             var labels = new List<SwitchLabelSyntax>();
             if (!CollectCaseLabels(labels, context, ifStatement.Condition, switchExpr))
                 return false;
+            if (ifStatement.Statement.DescendantNodes().OfType<BreakStatementSyntax> ().Any())
+                return false;
+
             var statements = new List<StatementSyntax>();
             CollectSwitchSectionStatements(statements, context, ifStatement.Statement);
             result.Add(SyntaxFactory.SwitchSection(new SyntaxList<SwitchLabelSyntax>().AddRange(labels), new SyntaxList<StatementSyntax>().AddRange(statements)));
-
-            if (ifStatement.Statement.DescendantNodes().Any(n => n is BreakStatementSyntax))
-                return false;
-
             if (ifStatement.Else == null)
                 return true;
 
+            if (ifStatement.Else.Statement.DescendantNodes().OfType<BreakStatementSyntax>().Any())
+                return false;
+
             // else if
-            var falseStatement = ifStatement.Else.Statement as IfStatementSyntax;
-            if (falseStatement != null)
+            if (ifStatement.Else.Statement is IfStatementSyntax falseStatement)
                 return CollectSwitchSections(result, context, falseStatement, switchExpr);
 
-            if (ifStatement.Else.Statement.DescendantNodes().Any(n => n is BreakStatementSyntax))
-                return false;
             // else (default label)
             labels = new List<SwitchLabelSyntax>();
             labels.Add(SyntaxFactory.DefaultSwitchLabel());

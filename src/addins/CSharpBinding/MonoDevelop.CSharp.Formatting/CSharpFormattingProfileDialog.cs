@@ -33,6 +33,7 @@ using System.Linq;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Editor;
 using MonoDevelop.Ide.Gui.Content;
+using Microsoft.CodeAnalysis.CSharp.Formatting;
 
 
 namespace MonoDevelop.CSharp.Formatting
@@ -87,6 +88,10 @@ namespace MonoDevelop.CSharp.Formatting
 		{
 			// ReSharper disable once DoNotCallOverridableMethodsInConstructor
 			this.Build ();
+			this.DefaultWidth = 1400;
+			this.DefaultHeight = 600;
+			this.hpaned1.Position = (int)(DefaultWidth * 0.618);
+
 			this.profile = profile;
 			this.Title = profile.IsBuiltIn ? GettextCatalog.GetString ("Show built-in profile") : GettextCatalog.GetString ("Edit Profile");
 			
@@ -133,7 +138,7 @@ namespace MonoDevelop.CSharp.Formatting
 			texteditor.Options = DefaultSourceEditorOptions.PlainEditor;
 			texteditor.IsReadOnly = true;
 			texteditor.MimeType = CSharpFormatter.MimeType;
-			scrolledwindow.Child = texteditor;
+			scrolledwindow.AddWithViewport (texteditor);
 			ShowAll ();
 			
 			#region Indent options
@@ -152,11 +157,10 @@ namespace MonoDevelop.CSharp.Formatting
 			column.SetAttributes (cellRendererText, "text", 1);
 			 
 			treeviewIndentOptions.Model = indentationOptions;
+			treeviewIndentOptions.SearchColumn = -1; // disable the interactive search
 			treeviewIndentOptions.HeadersVisible = false;
 			treeviewIndentOptions.Selection.Changed += TreeSelectionChanged;
-			treeviewIndentOptions.AppendColumn (column);
-			
-			column = new TreeViewColumn ();
+
 			var cellRendererCombo = new CellRendererCombo ();
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
@@ -181,11 +185,56 @@ namespace MonoDevelop.CSharp.Formatting
 			treeviewIndentOptions.AppendColumn (column);
 
 
-			AddOption (indentationOptions, "IndentBlock", GettextCatalog.GetString ("Indent block contents"), "namespace Test { class AClass { void Method () { int x; int y; } } }");
-			AddOption (indentationOptions, "IndentBraces", GettextCatalog.GetString ("Indent open and close braces"), "class AClass { int aField; void AMethod () {}}");
-			AddOption (indentationOptions, "IndentSwitchSection", GettextCatalog.GetString ("Indent switch sections"), "class AClass { void Method (int x) { switch (x) { case 1: break; } } }");
-			AddOption (indentationOptions, "IndentSwitchCaseSection", GettextCatalog.GetString ("Indent case sections"), "class AClass { void Method (int x) { switch (x) { case 1: break; } } }");
-			AddOption (indentationOptions, "LabelPositioning", GettextCatalog.GetString ("Label indentation"), "enum AEnum { A, B, C }");
+			AddOption (indentationOptions, "IndentBlock", GettextCatalog.GetString ("Indent block contents"), @"namespace Test
+{
+	class AClass
+	{
+		void Method ()
+		{
+			int x;
+			int y;
+		}
+	}
+}");
+			AddOption (indentationOptions, "IndentBraces", GettextCatalog.GetString ("Indent open and close braces"), @"class AClass
+{
+	int aField;
+
+	void AMethod()
+	{
+	}
+}");
+			AddOption (indentationOptions, "IndentSwitchSection", GettextCatalog.GetString ("Indent switch sections"), @"class AClass
+{
+	void Method(int x)
+	{
+		switch (x)
+		{
+			case 1:
+			break;
+		}
+	}
+}");
+			AddOption (indentationOptions, "IndentSwitchCaseSection", GettextCatalog.GetString ("Indent case sections"), @"class AClass
+{
+	void Method(int x)
+	{
+		switch (x)
+		{
+			case 1:
+			break;
+		}
+	}
+}");
+			AddOption (indentationOptions, "LabelPositioning", GettextCatalog.GetString ("Label indentation"), @"class Test
+{
+	void Method()
+	{
+	label:
+		Console.WriteLine (""Hello World"");
+	}
+
+}");
 			treeviewIndentOptions.ExpandAll ();
 			#endregion
 			
@@ -204,11 +253,10 @@ namespace MonoDevelop.CSharp.Formatting
 			column.SetAttributes (cellRendererText, "text", 1);
 			
 			treeviewNewLines.Model = newLineOptions;
+			treeviewNewLines.SearchColumn = -1; // disable the interactive search
 			treeviewNewLines.HeadersVisible = false;
 			treeviewNewLines.Selection.Changed += TreeSelectionChanged;
-			treeviewNewLines.AppendColumn (column);
-			
-			column = new TreeViewColumn ();
+
 			cellRendererCombo = new CellRendererCombo ();
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
@@ -324,21 +372,20 @@ namespace MonoDevelop.CSharp.Formatting
 			AddOption (newLineOptions, category, "NewLineForMembersInObjectInit", GettextCatalog.GetString ("Place members in object initializers on new line"), @"void Example()
 {
 	new MyObject {
-		A = 1,
-		B = 2
+		A = 1, B = 2
 	};
 }");
 			AddOption (newLineOptions, category, "NewLineForMembersInAnonymousTypes", GettextCatalog.GetString ("Place members in anonymous types on new line"), @"void Example()
 {
 	var c = new
 	{
-		A = 1,
-		B = 2
+		A = 1, B = 2
 	};
 }");
 			AddOption (newLineOptions, category, "NewLineForClausesInQuery", GettextCatalog.GetString ("Place query expression clauses on new line"), @"void Example()
 {
-	from o in col select o.Foo;
+    var q = from a in e
+            from b in e select a * b;
 }");
 			treeviewNewLines.ExpandAll ();
 			#endregion
@@ -357,11 +404,10 @@ namespace MonoDevelop.CSharp.Formatting
 			column.SetAttributes (cellRendererText, "text", 1);
 
 			treeviewSpacing.Model = spacingOptions;
+			treeviewSpacing.SearchColumn = -1; // disable the interactive search
 			treeviewSpacing.HeadersVisible = false;
 			treeviewSpacing.Selection.Changed += TreeSelectionChanged;
-			treeviewSpacing.AppendColumn (column);
 
-			column = new TreeViewColumn ();
 			cellRendererCombo = new CellRendererCombo ();
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
@@ -459,15 +505,13 @@ namespace MonoDevelop.CSharp.Formatting
 	i[5] = 3;
 }");
 
-			category = AddOption (spacingOptions, null, GettextCatalog.GetString ("Set spacing for brackets"), null);
+			category = AddOption (spacingOptions, null, GettextCatalog.GetString ("Other"), null);
 			AddOption (spacingOptions, category, "SpaceAfterColonInBaseTypeDeclaration", GettextCatalog.GetString ("Insert space after colon for base or interface in type declaration"), @"class Foo : Bar
 {
 }");
 			AddOption (spacingOptions, category, "SpaceAfterComma", GettextCatalog.GetString ("Insert space after comma"), @"void Example()
 {
-	for (int i =0; i < 10, i >5;i++)
-	{
-	}
+	var array = { 1,2,3,4 };
 }");
 			AddOption (spacingOptions, category, "SpaceAfterDot", GettextCatalog.GetString ("Insert space after dot"), @"void Example()
 {
@@ -484,9 +528,7 @@ namespace MonoDevelop.CSharp.Formatting
 }");
 			AddOption (spacingOptions, category, "SpaceBeforeComma", GettextCatalog.GetString ("Insert space before comma"), @"void Example()
 {
-	for (int i =0; i < 10, i >5;i++)
-	{
-	}
+	var array = { 1,2,3,4 };
 }");
 			AddOption (spacingOptions, category, "SpaceBeforeDot", GettextCatalog.GetString ("Insert space before dot"), @"void Example()
 {
@@ -522,11 +564,10 @@ namespace MonoDevelop.CSharp.Formatting
 
 
 			treeviewStyle.Model = styleOptions;
+			treeviewStyle.SearchColumn = -1; // disable the interactive search
 			treeviewStyle.HeadersVisible = false;
 			treeviewStyle.Selection.Changed += TreeSelectionChanged;
-			treeviewStyle.AppendColumn (column);
 
-			column = new TreeViewColumn ();
 			cellRendererCombo = new CellRendererCombo ();
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
@@ -572,11 +613,10 @@ namespace MonoDevelop.CSharp.Formatting
 			column.SetAttributes (cellRendererText, "text", 1);
 
 			treeviewWrapping.Model = wrappingOptions;
+			treeviewWrapping.SearchColumn = -1; // disable the interactive search
 			treeviewWrapping.HeadersVisible = false;
 			treeviewWrapping.Selection.Changed += TreeSelectionChanged;
-			treeviewWrapping.AppendColumn (column);
 
-			column = new TreeViewColumn ();
 			cellRendererCombo = new CellRendererCombo ();
 			cellRendererCombo.Ypad = 1;
 			cellRendererCombo.Mode = CellRendererMode.Editable;
@@ -696,7 +736,7 @@ namespace MonoDevelop.CSharp.Formatting
 			return info.GetValue (profile, null);
 		}
 		
-		static void RenderIcon (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter) 
+		static void RenderIcon (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			var pixbufCellRenderer = (CellRendererImage)cell;
 			if (model.IterHasChild (iter)) {
@@ -706,7 +746,7 @@ namespace MonoDevelop.CSharp.Formatting
 			}
 		}
 		
-		void ComboboxDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter) 
+		static void ComboboxDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			var cellRenderer = (CellRendererCombo)cell;
 			var info = GetProperty (model, iter);
@@ -714,17 +754,21 @@ namespace MonoDevelop.CSharp.Formatting
 				cellRenderer.Text = "<invalid>";
 				return;
 			}
+
+			var profile = ((CSharpFormattingProfileDialog)col.TreeView.Toplevel).profile;
 			object value = info.GetValue (profile, null);
 			
 			cellRenderer.Text = value is Enum ? TranslateValue (value) : value.ToString ();
 		}
 		
-		void ToggleDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter) 
+		static void ToggleDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			var cellRenderer = (CellRendererToggle)cell;
 			var info = GetProperty (model, iter);
 			if (info == null || info.PropertyType != typeof(bool)) 
 				return;
+
+			var profile = ((CSharpFormattingProfileDialog)col.TreeView.Toplevel).profile;
 			bool value = (bool)info.GetValue (profile, null);
 			cellRenderer.Active = value;
 		}

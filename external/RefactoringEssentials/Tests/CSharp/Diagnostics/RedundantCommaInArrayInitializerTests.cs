@@ -1,13 +1,12 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
     public class RedundantCommaInArrayInitializerTests : CSharpDiagnosticTestBase
     {
-        [Test]
-        public void Test()
+        [Fact]
+        public void Test_RedundantCommaInArrayInitializerAnalyzer()
         {
             var input = @"
 class TestClass
@@ -28,7 +27,7 @@ class TestClass
             Analyze<RedundantCommaInArrayInitializerAnalyzer>(input, output);
         }
 
-        [Test]
+        [Fact]
         public void TestArrayInitializerNoRedundance()
         {
             Analyze<RedundantCommaInArrayInitializerAnalyzer>(@"
@@ -41,7 +40,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestArrayInitializerDescription()
         {
             Analyze<RedundantCommaInArrayInitializerAnalyzer>(@"
@@ -54,7 +53,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestObjectInitializerDescription()
         {
             Analyze<RedundantCommaInArrayInitializerAnalyzer>(@"
@@ -68,7 +67,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestCollectionInitializerDescrition()
         {
             Analyze<RedundantCommaInArrayInitializerAnalyzer>(@"
@@ -81,7 +80,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestDisable()
         {
             var input = @"
@@ -94,6 +93,32 @@ class TestClass
 	}
 }";
             Analyze<RedundantCommaInArrayInitializerAnalyzer>(input);
+        }
+
+        [Fact]
+        public void TestPreserveTrivia()
+        {
+            Analyze<RedundantCommaInArrayInitializerAnalyzer>(@"
+class TestClass
+{
+	void TestMethod()
+	{
+		var a = new int[] {
+			1,
+			2$,$
+		};
+	}
+}", @"
+class TestClass
+{
+	void TestMethod()
+	{
+		var a = new int[] {
+			1,
+			2
+		};
+	}
+}");
         }
     }
 }

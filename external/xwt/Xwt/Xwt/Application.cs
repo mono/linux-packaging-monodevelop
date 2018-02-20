@@ -37,6 +37,7 @@ namespace Xwt
 		static Toolkit toolkit;
 		static ToolkitEngineBackend engine;
 		static UILoop mainLoop;
+		static ITranslationCatalog translationCatalog;
 
 		/// <summary>
 		/// Gets the task scheduler of the current engine.
@@ -60,6 +61,17 @@ namespace Xwt
 		internal static System.Threading.Thread UIThread {
 			get;
 			private set;
+		}
+
+		public static ITranslationCatalog TranslationCatalog {
+			get {
+				if (translationCatalog == null)
+					translationCatalog = new DefaultTranslationCatalog();
+				return translationCatalog;
+			}
+			set {
+				translationCatalog = value;
+			}
 		}
 
 		/// <summary>
@@ -133,13 +145,11 @@ namespace Xwt
 		public static void Run ()
 		{
 			if (XwtSynchronizationContext.AutoInstall)
-			if (SynchronizationContext.Current == null || 
-			    (!((engine.IsGuest) || (SynchronizationContext.Current is XwtSynchronizationContext))))
-				SynchronizationContext.SetSynchronizationContext (new XwtSynchronizationContext ());
+			if (SynchronizationContext.Current == null ||
+				(!((engine.IsGuest) || (SynchronizationContext.Current is XwtSynchronizationContext))))
+					SynchronizationContext.SetSynchronizationContext (toolkit.SynchronizationContext);
 
-			toolkit.InvokePlatformCode (delegate {
-				engine.RunApplication ();
-			});
+			toolkit.InvokePlatformCode (engine.RunApplication);
 		}
 		
 		/// <summary>
@@ -147,9 +157,7 @@ namespace Xwt
 		/// </summary>
 		public static void Exit ()
 		{
-			toolkit.InvokePlatformCode (delegate {
-				engine.ExitApplication ();
-			});
+			toolkit.InvokePlatformCode (engine.ExitApplication);
 
 			if (SynchronizationContext.Current is XwtSynchronizationContext)
 				XwtSynchronizationContext.Uninstall ();
@@ -174,18 +182,77 @@ namespace Xwt
 		/// </param>
 		public static void Invoke (Action action)
 		{
-			if (action == null)
-				throw new ArgumentNullException ("action");
+			Invoke (action, toolkit);
+		}
 
-			engine.InvokeAsync (delegate {
-				try {
-					toolkit.EnterUserCode ();
-					action ();
-					toolkit.ExitUserCode (null);
-				} catch (Exception ex) {
-					toolkit.ExitUserCode (ex);
-				}
+		internal static void Invoke (Action action, Toolkit targetToolkit)
+		{
+			if (action == null)
+				throw new ArgumentNullException (nameof (action));
+
+			if (targetToolkit == null)
+				targetToolkit = toolkit;
+
+			targetToolkit.Backend.InvokeAsync (delegate {
+				targetToolkit.Invoke (action);
 			});
+		}
+
+		/// <summary>
+		/// Invokes an action in the GUI thread.
+		/// </summary>
+		public static Task InvokeAsync(Action action)
+		{
+			if (action == null)
+				throw new ArgumentNullException(nameof (action));
+
+			// Capture the current toolkit. It will be used in the invocation
+			var targetToolkit = toolkit;
+
+			var ts = new TaskCompletionSource<int> ();
+
+			Action actionCall = () => {
+				try {
+					targetToolkit.InvokeAndThrow (action);
+					ts.SetResult (0);
+				} catch (Exception ex) {
+					ts.SetException (ex);
+				}
+			};
+
+			if (UIThread == Thread.CurrentThread)
+				actionCall();
+			else
+				engine.InvokeAsync(actionCall);
+			return ts.Task;
+		}
+
+		/// <summary>
+		/// Invokes a function in the GUI thread.
+		/// </summary>
+		public static Task<T> InvokeAsync<T>(Func<T> func)
+		{
+			if (func == null)
+				throw new ArgumentNullException(nameof(func));
+
+			// Capture the current toolkit. It will be used in the invocation
+			var targetToolkit = toolkit;
+
+			var ts = new TaskCompletionSource<T>();
+
+			Action funcCall = () => {
+				try {
+					ts.SetResult (targetToolkit.InvokeAndThrow (func));
+				} catch (Exception ex) {
+					ts.SetException(ex);
+				}
+			};
+
+			if (UIThread == Thread.CurrentThread)
+				funcCall();
+			else
+				engine.InvokeAsync(funcCall);
+			return ts.Task;
 		}
 		
 		/// <summary>
@@ -231,21 +298,16 @@ namespace Xwt
 		public static IDisposable TimeoutInvoke (TimeSpan timeSpan, Func<bool> action)
 		{
 			if (action == null)
-				throw new ArgumentNullException ("action");
+				throw new ArgumentNullException (nameof (action));
 			if (timeSpan.Ticks < 0)
 				throw new ArgumentException ("timeSpan can't be negative");
 
+			// Capture the current toolkit. It will be used in the invocation
+			var targetToolkit = Toolkit.CurrentEngine;
+
 			Timer t = new Timer ();
 			t.Id = engine.TimerInvoke (delegate {
-				bool res = false;
-				try {
-					toolkit.EnterUserCode ();
-					res = action ();
-					toolkit.ExitUserCode (null);
-				} catch (Exception ex) {
-					toolkit.ExitUserCode (ex);
-				}
-				return res;
+				return targetToolkit.Invoke (action);
 			}, timeSpan);
 			return t;
 		}
@@ -299,6 +361,7 @@ namespace Xwt
 	public class UILoop
 	{
 		Toolkit toolkit;
+		public Toolkit Engine { get { return toolkit; }}
 
 		internal UILoop (Toolkit toolkit)
 		{
@@ -310,12 +373,9 @@ namespace Xwt
 		/// </summary>
 		public void DispatchPendingEvents ()
 		{
-			try {
-				toolkit.ExitUserCode (null);
+			Toolkit.CurrentEngine.InvokePlatformCode (delegate {
 				toolkit.Backend.DispatchPendingEvents ();
-			} finally {
-				toolkit.EnterUserCode ();
-			}
+			});
 		}
 
 		/// <summary>

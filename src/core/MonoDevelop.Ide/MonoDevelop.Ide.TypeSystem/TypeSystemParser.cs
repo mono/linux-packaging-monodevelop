@@ -58,6 +58,7 @@ namespace MonoDevelop.Ide.TypeSystem
 
 		public Document RoslynDocument { get; set; }
 		public ParsedDocument OldParsedDocument { get; internal set; }
+		public bool IsAdhocProject { get; internal set; }
 	}
 
 	[Flags]
@@ -114,6 +115,11 @@ namespace MonoDevelop.Ide.TypeSystem
 		/// <param name="buildAction">Build action.</param>
 		/// <param name="supportedLanguages">Supported languages.</param>
 		public virtual bool CanGenerateProjection (string mimeType, string buildAction, string[] supportedLanguages)
+		{
+			return false;
+		}
+
+		public virtual bool CanGenerateAnalysisDocument (string mimeType, string buildAction, string [] supportedLanguages)
 		{
 			return false;
 		}

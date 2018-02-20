@@ -1,0 +1,11 @@
+/home/directhex/Projects/monodevelop/main/build/AddIns/VersionControl/GitIgnore.txt
+/home/directhex/Projects/monodevelop/main/build/AddIns/VersionControl/libgit2.license.txt
+/home/directhex/Projects/monodevelop/main/build/AddIns/VersionControl/libssh2.license.txt
+/home/directhex/Projects/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Git.xml
+/home/directhex/Projects/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Git.dll
+/home/directhex/Projects/monodevelop/main/build/AddIns/VersionControl/MonoDevelop.VersionControl.Git.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.csprojResolveAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/GeneratedInternalsVisibleTo.cs
+/home/directhex/Projects/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.dll
+/home/directhex/Projects/monodevelop/main/src/addins/VersionControl/MonoDevelop.VersionControl.Git/obj/Debug/MonoDevelop.VersionControl.Git.pdb

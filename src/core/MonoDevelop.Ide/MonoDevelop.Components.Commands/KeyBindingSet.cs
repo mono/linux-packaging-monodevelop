@@ -33,6 +33,7 @@ using System.Xml;
 using System.Text;
 using MonoDevelop.Core;
 using Unix = Mono.Unix.Native;
+using System.Linq;
 
 namespace MonoDevelop.Components.Commands
 {
@@ -58,30 +59,29 @@ namespace MonoDevelop.Components.Commands
 
 			// Load all bindings
 			foreach (Command cmd in commands) {
-				string key = GetBinding (cmd);
-				if (key.Length == 0)
-					continue;
-				List<Command> clist;
-				if (!bindings.TryGetValue (key, out clist)) {
-					clist = new List<Command> ();
-					bindings.Add (key, clist);
+				foreach (var key in GetBindings (cmd)) {
+					if (key.Length == 0)
+						continue;
+					List<Command> clist;
+					if (!bindings.TryGetValue (key, out clist)) {
+						clist = new List<Command> ();
+						bindings.Add (key, clist);
+					}
+					clist.Add (cmd);
+					if (clist.Count == 2)
+						// We have a conflict
+						conflicts.Add (new KeyBindingConflict (key, clist));
 				}
-				clist.Add (cmd);
-				if (clist.Count == 2)
-					// We have a conflict
-					conflicts.Add (new KeyBindingConflict (key, clist));
 			}
 
 			// Check if there are conflicts with key combinations prefixes.
 			// For example, ctrl+X would conflict with ctrl+X|A
 			foreach (Command cmd in commands) {
-				string key = GetBinding (cmd);
-				int i = key.IndexOf ('|');
-				if (i != -1) {
-					key = key.Substring (0, i);
+				foreach (var key in GetBindings (cmd).Where (key => key.Contains ('|')).Select (key => key.Substring (0, key.IndexOf ('|')))) {
 					List<Command> clist;
 					if (bindings.TryGetValue (key, out clist)) {
-						clist.Add (cmd);
+						if (!clist.Contains (cmd))
+							clist.Add (cmd);
 						if (clist.Count == 2)
 							// We have a conflict
 							conflicts.Add (new KeyBindingConflict (key, clist));
@@ -100,14 +100,39 @@ namespace MonoDevelop.Components.Commands
 
 		public bool Equals (KeyBindingSet other)
 		{
-			if (bindings.Count != other.bindings.Count)
+			// TODO: full IEquatable<KeyBindingSet> implementation
+			// the current solutions is just enough to detect whether a custom set equals a predefined one
+			// and is not a real equality check. See KeyBindingsPanel.SelectCurrentScheme().
+			if (other == null)
 				return false;
-			foreach (KeyValuePair<string, string> binding in bindings) {
+
+			var otherSet = other.GetAllBindings ();
+			var allBindings = GetAllBindings ();
+			if (otherSet.Count != allBindings.Count)
+				return false;
+			foreach (var binding in allBindings) {
 				string accel;
-				if (!other.bindings.TryGetValue (binding.Key, out accel) || accel != binding.Value)
+				if (!otherSet.TryGetValue (binding.Key, out accel) || accel != binding.Value)
 					return false;
 			}
 			return true;
+		}
+
+		IDictionary<string, string> GetAllBindings ()
+		{
+			if (parent == null)
+				return bindings.Where (b => !string.IsNullOrEmpty (b.Value)).ToDictionary (b => b.Key, b => b.Value);
+
+			var pbindings = parent.GetAllBindings ();
+			var allBindings = new Dictionary<string, string> ();
+			foreach (var cmd in bindings.Keys.Concat (pbindings.Keys).Distinct ()) {
+				var accel = string.Empty;
+				if (!bindings.TryGetValue (cmd, out accel))
+					pbindings.TryGetValue (cmd, out accel);
+				if (!string.IsNullOrEmpty (accel))
+					allBindings [cmd] = accel;
+			}
+			return allBindings;
 		}
 
 		public void ClearBindings ()
@@ -117,46 +142,59 @@ namespace MonoDevelop.Components.Commands
 		
 		public void StoreBinding (Command cmd)
 		{
-			SetBinding (cmd, cmd.AccelKey);
+			if (cmd.AlternateAccelKeys != null)
+				SetBinding (cmd, new [] { cmd.AccelKey }.Concat (cmd.AlternateAccelKeys).ToArray ());
+			else
+				SetBinding (cmd, cmd.AccelKey);
 		}
 		
-		public void SetBinding (Command cmd, string accelKey)
+		public void SetBinding (Command cmd, params string[] accelKeys)
 		{
 			string key = KeyBindingService.GetCommandKey (cmd);
-			if (accelKey == null) {
-				bindings.Remove (key);
-				return;
-			}
-			
-			if (parent == null)
-				bindings [key] = accelKey;
-			else {
-				// If the key is the same as the default, remove it from the scheme
-				string pbind = parent.GetBinding (cmd);
-				if ((accelKey == pbind) || (string.IsNullOrEmpty (accelKey) && string.IsNullOrEmpty (pbind)))
+			accelKeys = accelKeys?.Distinct ().ToArray () ?? new string [0];
+			if (parent == null) {
+				if (accelKeys.Length == 0)
 					bindings.Remove (key);
 				else
-					bindings[key] = accelKey;
+					bindings [key] = string.Join (" ", accelKeys);
+			} else {
+				// If the key is the same as the default, remove it from the scheme
+				var pbind = parent.GetBindings (cmd).Distinct ();
+				if (new HashSet<string> (accelKeys).SetEquals (pbind))
+					bindings.Remove (key);
+				else
+					bindings [key] = string.Join (" ", accelKeys);
 			}
 		}
 		
 		public void LoadBinding (Command cmd)
 		{
-			cmd.AccelKey = GetBinding (cmd);
+			var cmdAccesls = GetBindings (cmd);
+			if (cmdAccesls == null || cmdAccesls.Length == 0) {
+				cmd.AccelKey = String.Empty;
+				cmd.AlternateAccelKeys = null;
+				return;
+			}
+			
+			cmd.AccelKey = cmdAccesls [0];
+			if (cmdAccesls.Length > 1)
+				cmd.AlternateAccelKeys = cmdAccesls.Skip (1).ToArray ();
+			else
+				cmd.AlternateAccelKeys = null;
 		}
 		
-		public string GetBinding (Command cmd)
+		public string [] GetBindings (Command cmd)
 		{
 			string key = KeyBindingService.GetCommandKey (cmd);
 
 			// Schemes use default key bindings when not explicitly overriden
 			string accel;
 			if (bindings.TryGetValue (key, out accel))
-				return accel;
+				return (accel ?? "").Split (new char [] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 			else if (parent != null)
-				return parent.GetBinding (cmd);
+				return parent.GetBindings (cmd);
 			else
-				return string.Empty;
+				return new string[0];
 		}
 		
 		const string commandAttr = "command";
@@ -201,9 +239,20 @@ namespace MonoDevelop.Components.Commands
 					case "binding":
 						command = reader.GetAttribute (commandAttr);
 						binding = reader.GetAttribute (shortcutAttr);
+
+						if (string.IsNullOrEmpty (command))
+							continue;
+
+						if (!string.IsNullOrEmpty (binding))
+							binding = KeyBindingManager.FixChordSeparators (binding);
+
+						string pbind;
+						if (parent?.bindings != null && parent.bindings.TryGetValue (command, out pbind)) {
+							if (binding == pbind)
+								continue;
+						}
 						
-						if (!string.IsNullOrEmpty (command))
-							bindings.Add (command, binding);
+						bindings.Add (command, binding);
 						
 						break;
 					}
@@ -218,7 +267,15 @@ namespace MonoDevelop.Components.Commands
 			writer.WriteStartElement ("scheme");
 			writer.WriteAttributeString ("name", id);
 			
-			foreach (KeyValuePair<string, string> binding in bindings) { 
+			foreach (KeyValuePair<string, string> binding in bindings) {
+
+				string pbind;
+				if (parent?.bindings != null && parent.bindings.TryGetValue (binding.Key, out pbind)) {
+					if (binding.Value == pbind)
+						continue;
+				} else if (string.IsNullOrEmpty (binding.Value))
+					continue;
+
 				writer.WriteStartElement ("binding");
 				writer.WriteAttributeString (commandAttr, binding.Key);
 				writer.WriteAttributeString (shortcutAttr, binding.Value);

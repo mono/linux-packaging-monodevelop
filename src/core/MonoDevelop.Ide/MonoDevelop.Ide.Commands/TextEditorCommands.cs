@@ -27,6 +27,7 @@
 
 using System;
 using MonoDevelop.Components.Commands;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Ide.Commands
 {
@@ -34,6 +35,7 @@ namespace MonoDevelop.Ide.Commands
 	{
 		ShowCompletionWindow,
 		ShowCodeTemplateWindow,
+		ShowCodeSurroundingsWindow,
 		LineEnd,
 		LineStart,
 		DeleteLeftChar,
@@ -50,6 +52,8 @@ namespace MonoDevelop.Ide.Commands
 		ScrollLineDown,
 		ScrollPageUp,
 		ScrollPageDown,
+		ScrollTop,
+		ScrollBottom,
 		DeleteLine,
 		DeleteToLineStart,
 		DeleteToLineEnd,
@@ -70,6 +74,8 @@ namespace MonoDevelop.Ide.Commands
 		SelectionMoveToDocumentStart,
 		SelectionMoveToDocumentEnd,
 		ExpandSelectionToLine,
+		ExpandSelection,
+		ShrinkSelection,
 		SwitchCaretMode,
 		InsertTab,
 		RemoveTab,
@@ -96,7 +102,9 @@ namespace MonoDevelop.Ide.Commands
 
 		DynamicAbbrev,
 
-		PulseCaret
+		PulseCaret,
+
+		ShowQuickInfo
 	}
 	
 	public class ToggleCompletionSuggestionModeHandler : CommandHandler
@@ -104,6 +112,15 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Run ()
 		{
 			IdeApp.Preferences.ForceSuggestionMode.Value = !IdeApp.Preferences.ForceSuggestionMode;
+		}
+
+		protected override void Update (CommandInfo info)
+		{
+			info.Enabled = IdeApp.Workbench.ActiveDocument?.Editor != null;
+			if (IdeApp.Preferences.ForceSuggestionMode)
+				info.Text = GettextCatalog.GetString ("Switch to Completion Mode");
+			else
+				info.Text = GettextCatalog.GetString ("Switch to Suggestion Mode");
 		}
 	}
 }

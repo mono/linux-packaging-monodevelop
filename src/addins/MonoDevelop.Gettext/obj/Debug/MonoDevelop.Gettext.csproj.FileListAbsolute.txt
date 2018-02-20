@@ -1,0 +1,7 @@
+/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/Gettext/MonoDevelop.Gettext.xml
+/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/Gettext/MonoDevelop.Gettext.dll
+/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/Gettext/MonoDevelop.Gettext.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Gettext/obj/Debug/MonoDevelop.Gettext.csprojResolveAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Gettext/obj/Debug/MonoDevelop.Gettext.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Gettext/obj/Debug/MonoDevelop.Gettext.dll
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Gettext/obj/Debug/MonoDevelop.Gettext.pdb

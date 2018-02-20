@@ -1,28 +1,20 @@
-using System;
+﻿using AppKit;
 using Xwt.Backends;
-using Xwt.Drawing;
-
-#if MONOMAC
-using nint = System.Int32;
-using nfloat = System.Single;
-using MonoMac.Foundation;
-using MonoMac.AppKit;
-using MonoMac.ObjCRuntime;
-#else
-using Foundation;
-using AppKit;
-using ObjCRuntime;
-#endif
 
 namespace Xwt.Mac
 {
 	public class EmbedNativeWidgetBackend : ViewBackend, IEmbeddedWidgetBackend
 	{
 		NSView innerView;
+		bool reparent;
 
 		public EmbedNativeWidgetBackend ()
 		{
 
+		}
+
+		public NSView EmbeddedView {
+			get { return innerView; }
 		}
 
 		public override void Initialize ()
@@ -31,13 +23,15 @@ namespace Xwt.Mac
 			if (innerView != null) {
 				var aView = innerView;
 				innerView = null;
+
 				SetNativeView (aView);
 			}
 		}
 
-		public void SetContent (object nativeWidget)
+		public void SetContent (object nativeWidget, bool reparent)
 		{
 			if (nativeWidget is NSView) {
+				this.reparent = reparent;
 				if (ViewObject == null)
 					innerView = (NSView)nativeWidget;
 				else
@@ -47,9 +41,13 @@ namespace Xwt.Mac
 
 		void SetNativeView (NSView aView)
 		{
-			if (innerView != null)
+			if (innerView != null && reparent)
 				innerView.RemoveFromSuperview ();
+			
 			innerView = aView;
+			if (!reparent)
+				return;
+			
 			innerView.Frame = Widget.Bounds;
 
 			innerView.AutoresizingMask = NSViewResizingMask.WidthSizable | NSViewResizingMask.HeightSizable;

@@ -93,9 +93,8 @@ namespace MonoDevelop.Gettext.NodeBuilders
 			TranslationProject project = dataObject as TranslationProject;
 			if (project == null)
 				return;
-				
-			foreach (Translation translation in project.Translations)
-				builder.AddChild (translation);
+
+			builder.AddChildren (project.Translations);
 		}
 
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
@@ -163,8 +162,8 @@ namespace MonoDevelop.Gettext.NodeBuilders
 			void UpdateTranslationsAsync (ProgressMonitor monitor, TranslationProject project)
 			{
 				try {
-					project.UpdateTranslations (monitor);
-					Gtk.Application.Invoke (delegate {
+					project.UpdateTranslations (monitor, false);
+					Gtk.Application.Invoke ((o, args) => {
 						POEditorWidget.ReloadWidgets ();
 					});
 				} catch (Exception ex) {

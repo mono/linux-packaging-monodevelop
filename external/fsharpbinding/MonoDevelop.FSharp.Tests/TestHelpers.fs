@@ -7,13 +7,17 @@ open MonoDevelop.Ide.TypeSystem
 open MonoDevelop.Core
 open MonoDevelop.Core.Text
 
-type FixtureSetup() =
-    static let firstRun = ref true
+module FixtureSetup =
+    let firstRun = ref true
 
-    member x.Initialise() =
+    let initialiseMonoDevelop() =
         if !firstRun then
             firstRun := false
+            //Environment.SetEnvironmentVariable ("MONO_ADDINS_REGISTRY", "/tmp")
+            //Environment.SetEnvironmentVariable ("XDG_CONFIG_HOME", "/tmp")
             MonoDevelop.FSharp.MDLanguageService.DisableVirtualFileSystem()
+            Xwt.Application.Initialize (Xwt.ToolkitType.Gtk)
+            Runtime.Initialize (true)
             MonoDevelop.Ide.DesktopService.Initialize()
 
             GuiUnit.TestRunner.ExitCode |> ignore // hack to get GuiUnit into the AppDomain
@@ -25,7 +29,7 @@ module TestHelpers =
         async {
             try
                 let checker = FSharpChecker.Create()
-                let! projOptions = checker.GetProjectOptionsFromScript(filename, source)
+                let! projOptions, _errors = checker.GetProjectOptionsFromScript(filename, source)
                 let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(filename, 0, source , projOptions)
 
                 // Construct new typed parse result if the task succeeded
@@ -35,24 +39,34 @@ module TestHelpers =
                       ParseAndCheckResults(Some checkResults, Some parseResults)
                   | FSharpCheckFileAnswer.Aborted ->
                       ParseAndCheckResults(None, Some parseResults)
-
+                if parseResults.Errors.Length > 0 then
+                    printfn "%A" parseResults.Errors
                 return results
             with exn ->
                 printf "%A" exn
                 return ParseAndCheckResults(None, None) }
 
-    let createDoc source compilerDefines =
-        FixtureSetup().Initialise()
+    let createDocWithParseResults source compilerDefines (parseFile:string -> ParseAndCheckResults) =
+        FixtureSetup.initialiseMonoDevelop()
 
-        let results = parseAndCheckFile source |> Async.RunSynchronously
+        let results = parseFile source
+
+        results.CheckResults |> Option.iter(fun r -> if r.Errors.Length > 0 then printfn "%A" r.Errors)
         let options = ParseOptions(FileName = filename, Content = StringTextSource(source))
+
         let parsedDocument =
-            ParsedDocument.create options results [compilerDefines] |> Async.RunSynchronously
+            ParsedDocument.create options results [compilerDefines] (Some (new DocumentLocation(0,0))) |> Async.RunSynchronously
 
         let doc = TextEditorFactory.CreateNewReadonlyDocument(StringTextSource(source), filename, "text/fsharp")
         let editor = MonoDevelop.Ide.Editor.TextEditorFactory.CreateNewEditor (doc)
 
         TestDocument(filename, parsedDocument, editor)
+
+    let createDoc source compilerDefines =
+        createDocWithParseResults source compilerDefines (fun source -> parseAndCheckFile source |> Async.RunSynchronously)
+
+    let createDocWithoutParsing source compilerDefines =
+        createDocWithParseResults source compilerDefines (fun _ -> ParseAndCheckResults(None, None))
 
     let getAllSymbols source =
         async {

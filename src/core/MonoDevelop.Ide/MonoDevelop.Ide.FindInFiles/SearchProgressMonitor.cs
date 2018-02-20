@@ -39,9 +39,17 @@ namespace MonoDevelop.Ide.FindInFiles
 	{
 		SearchResultPad outputPad;
 
-		internal SearchProgressMonitor (Pad pad, CancellationTokenSource cancellationTokenSource = null): base (Runtime.MainSynchronizationContext, cancellationTokenSource)
+		internal SearchResultPad ResultPad {
+			get {
+				return outputPad;
+			}
+		}
+
+		internal SearchProgressMonitor (Pad pad, CancellationTokenSource cancellationTokenSource = null) : base (Runtime.MainSynchronizationContext, cancellationTokenSource)
 		{
-			AddSlaveMonitor (IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (GettextCatalog.GetString ("Searching..."), Stock.StatusSearch, false, true, false, pad));
+			var stMon = IdeApp.Workbench.ProgressMonitors.GetStatusProgressMonitor (GettextCatalog.GetString ("Searching..."), Stock.StatusSearch, false, true, false, pad, true);
+			stMon.CancellationToken.Register (() => { CancellationTokenSource.Cancel (); });
+			AddFollowerMonitor (stMon);
 
 			outputPad = (SearchResultPad) pad.Content;
 			outputPad.CancellationTokenSource = CancellationTokenSource;
@@ -93,16 +101,20 @@ namespace MonoDevelop.Ide.FindInFiles
 		protected override void OnCompleted ()
 		{
 			if (outputPad == null) throw GetDisposedException ();
+
 			outputPad.WriteText ("\n");
 			
 			foreach (string msg in SuccessMessages)
 				outputPad.WriteText (msg + "\n");
 			
+			if (CancellationToken.IsCancellationRequested)
+				ReportWarning (GettextCatalog.GetString ("Search operation canceled"));
+
 			foreach (string msg in Warnings)
 				outputPad.WriteText (msg + "\n");
-			
+
 			foreach (var msg in Errors)
-				outputPad.WriteText (msg.Message + "\n");
+				outputPad.WriteText (msg.DisplayMessage + "\n");
 			
 			outputPad.EndProgress ();
 			base.OnCompleted ();

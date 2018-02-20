@@ -26,6 +26,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 (nodeContext) =>
                 {
@@ -42,13 +44,11 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
             var ifElseStatement = nodeContext.Node as IfStatementSyntax;
             if (ifElseStatement == null)
                 return false;
 
-            if (!ElseIsRedundantControlFlow(ifElseStatement, nodeContext) || HasConflictingNames(nodeContext, ifElseStatement))
+            if (HasConflictingNames(nodeContext, ifElseStatement) || !ElseIsRedundantControlFlow(ifElseStatement, nodeContext))
                 return false;
 
             diagnostic = Diagnostic.Create(descriptor, ifElseStatement.Else.ElseKeyword.GetLocation());
@@ -70,13 +70,13 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         static bool HasConflictingNames(SyntaxNodeAnalysisContext nodeContext, IfStatementSyntax ifElseStatement)
         {
-            var block = ifElseStatement.Else.Statement as BlockSyntax;
+            var block = ifElseStatement.Else?.Statement as BlockSyntax;
             if (block == null || block.Statements.Count == 0)
                 return false;
 
             var member = ifElseStatement.Ancestors().FirstOrDefault(a => a is MemberDeclarationSyntax);
 
-            var priorLocalDeclarations = new List<string>();
+            var priorLocalDeclarations = new HashSet<string>();
             foreach (var localDecl in member.DescendantNodes().Where(n => n.SpanStart < ifElseStatement.Else.SpanStart).OfType<LocalDeclarationStatementSyntax>()) {
                 foreach (var v in localDecl.Declaration.Variables)
                     priorLocalDeclarations.Add(v.Identifier.ValueText);
@@ -87,9 +87,10 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 var decl = sym as LocalDeclarationStatementSyntax;
                 if (decl == null)
                     continue;
-                
-                if (priorLocalDeclarations.Contains(s => decl.Declaration.Variables.Any(v => v.Identifier.ValueText == s)))
-                    return true;
+
+                foreach (var variable in decl.Declaration.Variables)
+                    if (priorLocalDeclarations.Contains(variable.Identifier.ValueText))
+                        return true;
             }
             return false;
         }

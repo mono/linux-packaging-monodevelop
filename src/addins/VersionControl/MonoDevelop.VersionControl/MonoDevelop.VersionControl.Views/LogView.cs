@@ -4,10 +4,8 @@ using Gtk;
 using MonoDevelop.Core;
 using MonoDevelop.Components;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide;
 using System.Linq;
-using MonoDevelop.Components;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -19,8 +17,6 @@ namespace MonoDevelop.VersionControl.Views
 	{
 		LogWidget widget;
 		VersionInfo vinfo;
-		
-		ListStore changedpathstore;
 		
 		public LogWidget LogWidget {
 			get {
@@ -34,7 +30,7 @@ namespace MonoDevelop.VersionControl.Views
 		}
 		
 		VersionControlDocumentInfo info;
-		public LogView (VersionControlDocumentInfo info) : base (GettextCatalog.GetString ("Log"))
+		public LogView (VersionControlDocumentInfo info) : base (GettextCatalog.GetString ("Log"), GettextCatalog.GetString ("Shows the source control log for the current file"))
 		{
 			this.info = info;
 		}
@@ -101,10 +97,6 @@ namespace MonoDevelop.VersionControl.Views
 				widget.Destroy ();
 				widget = null;
 			}
-			if (changedpathstore != null) {
-				changedpathstore.Dispose ();
-				changedpathstore = null;
-			}
 			if (info != null) {
 				info.Updated -= OnInfoUpdated;
 				info = null;
@@ -120,13 +112,10 @@ namespace MonoDevelop.VersionControl.Views
 			}
 		}
 
-		#region IAttachableViewContent implementation
 		protected override void OnSelected ()
 		{
 			Init ();
 		}
-
-		#endregion
 
 		[CommandHandler (MonoDevelop.Ide.Commands.EditCommands.Copy)]
 		protected void OnCopy ()

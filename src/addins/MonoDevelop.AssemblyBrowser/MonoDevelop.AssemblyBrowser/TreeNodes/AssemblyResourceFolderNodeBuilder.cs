@@ -54,22 +54,18 @@ namespace MonoDevelop.AssemblyBrowser
 		public override void BuildChildNodes (ITreeBuilder ctx, object dataObject)
 		{
 			var resourceFolder = (AssemblyResourceFolder)dataObject;
-			foreach (object resource in resourceFolder.Resources) {
-				ctx.AddChild (resource);
-			}
+			ctx.AddChildren (resourceFolder.Resources);
 		}
 		
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
 		{
 			return true;
 		}
-		
-		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
+
+		public override int GetSortIndex (ITreeNavigator node)
 		{
-			if (otherNode.DataItem is AssemblyReferenceFolder)
-				return 1;
-			return -1;
+			return -100;
 		}
-		
+
 	}
 }

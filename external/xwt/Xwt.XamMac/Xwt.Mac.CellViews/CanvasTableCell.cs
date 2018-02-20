@@ -24,26 +24,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 using System;
-using System.Drawing;
-using Xwt.Backends;
-
-#if MONOMAC
-using nint = System.Int32;
-using nfloat = System.Single;
-using CGRect = System.Drawing.RectangleF;
-using CGPoint = System.Drawing.PointF;
-using CGSize = System.Drawing.SizeF;
-using MonoMac.CoreGraphics;
-using MonoMac.AppKit;
-#else
-using CoreGraphics;
 using AppKit;
-#endif
+using CoreGraphics;
+using Xwt.Backends;
 
 namespace Xwt.Mac
 {
 	class CanvasTableCell: NSCell, ICellRenderer
 	{
+		bool visible = true;
+
 		public CanvasTableCell (IntPtr p): base (p)
 		{
 		}
@@ -62,6 +52,7 @@ namespace Xwt.Mac
 
 		public void Fill ()
 		{
+			visible = Frontend.Visible;
 		}
 		
 		ICanvasCellViewFrontend Frontend {
@@ -73,6 +64,8 @@ namespace Xwt.Mac
 
 		public override CGSize CellSizeForBounds (CGRect bounds)
 		{
+			if (!visible)
+				return CGSize.Empty;
 			var size = new CGSize ();
 			Frontend.ApplicationContext.InvokeUserCode (delegate {
 				var s = Frontend.GetRequiredSize ();
@@ -87,6 +80,8 @@ namespace Xwt.Mac
 
 		public override void DrawInteriorWithFrame (CGRect cellFrame, NSView inView)
 		{
+			if (!visible)
+				return;
 			CGContext ctx = NSGraphicsContext.CurrentContext.GraphicsPort;
 			
 			var backend = new CGContextBackend {

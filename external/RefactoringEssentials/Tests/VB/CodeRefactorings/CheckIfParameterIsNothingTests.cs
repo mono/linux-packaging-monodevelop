@@ -1,19 +1,16 @@
-using System;
-using NUnit.Framework;
 using Microsoft.CodeAnalysis.VisualBasic;
 using Microsoft.CodeAnalysis;
-using System.Collections.Immutable;
 using RefactoringEssentials.VB.CodeRefactorings;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.VB.CodeRefactorings
 {
-    [TestFixture]
     public class CheckIfParameterIsNothingTests : VBCodeRefactoringTestBase
     {
         // always need to check for System.ArgumentNullException in the generated code, because the Simplifier is not working
         // see https://github.com/dotnet/roslyn/issues/473
-        [Test]
-        public void Test()
+        [Fact]
+        public void Test_CheckIfParameterIsNothingCodeRefactoringProvider()
         {
             Test<CheckIfParameterIsNothingCodeRefactoringProvider>(@"
 Imports System
@@ -34,7 +31,7 @@ Class TestClass
 End Class");
         }
 
-        [Test]
+        [Fact]
         public void TestWithComment()
         {
             Test<CheckIfParameterIsNothingCodeRefactoringProvider>(@"
@@ -57,7 +54,7 @@ Class TestClass
 End Class");
         }
 
-        [Test]
+        [Fact]
         public void TestLambda()
         {
             Test<CheckIfParameterIsNothingCodeRefactoringProvider>(@"
@@ -80,7 +77,7 @@ Class TestClass
 End Class");
         }
 
-        [Test]
+        [Fact]
         public void TestNullCheckAlreadyThere_StringName()
         {
             TestWrongContext<CheckIfParameterIsNothingCodeRefactoringProvider>(@"
@@ -95,7 +92,7 @@ Class TestClass
 End Class");
         }
 
-        [Test]
+        [Fact]
         public void TestNullCheckAlreadyThere_NameOf()
         {
             TestWrongContext<CheckIfParameterIsNothingCodeRefactoringProvider>(@"
@@ -110,7 +107,7 @@ Class TestClass
 End Class");
         }
 
-        [Test]
+        [Fact]
         public void TestNullCheckAlreadyThere_SingleLineIf()
         {
             TestWrongContext<CheckIfParameterIsNothingCodeRefactoringProvider>(@"
@@ -123,7 +120,7 @@ Class TestClass
 End Class");
         }
 
-        [Test]
+        [Fact]
         public void TestPopupOnlyOnName()
         {
             TestWrongContext<CheckIfParameterIsNothingCodeRefactoringProvider>(@"
@@ -134,7 +131,7 @@ End Class");
         }
 
 
-        [Test]
+        [Fact]
         public void Test_OldVB()
         {
             var parseOptions = new VisualBasicParseOptions(

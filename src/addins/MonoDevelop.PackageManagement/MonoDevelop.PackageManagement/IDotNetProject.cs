@@ -25,14 +25,16 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement
 {
-	public interface IDotNetProject : IProject
+	internal interface IDotNetProject : IProject
 	{
 		event EventHandler<ProjectModifiedEventArgs> Modified;
+		event EventHandler Saved;
 
 		DotNetProject DotNetProject { get; }
 		TargetFrameworkMoniker TargetFrameworkMoniker { get; }
@@ -48,6 +50,8 @@ namespace MonoDevelop.PackageManagement
 		bool Equals (IDotNetProject project);
 		void RefreshProjectBuilder ();
 		void DisposeProjectBuilder ();
+		void RefreshReferenceStatus ();
+		IEnumerable<ProjectPackageReference> GetPackageReferences ();
 	}
 }
 

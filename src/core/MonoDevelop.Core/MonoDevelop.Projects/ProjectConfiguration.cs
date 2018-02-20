@@ -55,7 +55,13 @@ namespace MonoDevelop.Projects
 			outputDirectory = pset.GetPathValue ("OutputPath", defaultValue:"." + Path.DirectorySeparatorChar);
 			debugMode = pset.GetValue<bool> ("DebugSymbols", false);
 			pauseConsoleOutput = pset.GetValue ("ConsolePause", true);
-			externalConsole = pset.GetValue<bool> ("ExternalConsole");
+			if (pset.HasProperty ("Externalconsole")) {//for backward compatiblity before version 6.0 it was lowercase
+				writeExternalConsoleLowercase = true;
+				externalConsole = pset.GetValue<bool> ("Externalconsole");
+			} else {
+				writeExternalConsoleLowercase = false;
+				externalConsole = pset.GetValue<bool> ("ExternalConsole");
+			}
 			commandLineParameters = pset.GetValue ("Commandlineparameters", "");
 			runWithWarnings = pset.GetValue ("RunWithWarnings", true);
 
@@ -84,12 +90,27 @@ namespace MonoDevelop.Projects
 			}
 			var vars = XElement.Parse (xml);
 			if (vars != null) {
-				foreach (var val in vars.Elements (XName.Get ("Variable", MSBuildProject.Schema))) {
+				foreach (var val in vars.Elements (XName.Get ("Variable", GetProjectNamespace ()))) {
 					var name = (string)val.Attribute ("name");
 					if (name != null)
 						dict [name] = (string)val.Attribute ("value");
 				}
 			}
+		}
+
+		string GetProjectNamespace ()
+		{
+			var msbuildProject = ParentItem?.MSBuildProject;
+			if (msbuildProject == null) {
+				var projectObject = properties as IMSBuildProjectObject;
+				if (projectObject != null)
+					msbuildProject = projectObject.ParentProject;
+			}
+
+			if (msbuildProject != null)
+				return msbuildProject.Namespace;
+
+			return MSBuildProject.Schema;
 		}
 
 		internal protected virtual void Write (IPropertySet pset)
@@ -111,7 +132,10 @@ namespace MonoDevelop.Projects
 			
 			pset.SetValue ("OutputPath", outputDirectory, defaultValue:new FilePath ("." + Path.DirectorySeparatorChar));
 			pset.SetValue ("ConsolePause", pauseConsoleOutput, true);
-			pset.SetValue ("ExternalConsole", externalConsole, false);
+			if (writeExternalConsoleLowercase)
+				pset.SetValue ("Externalconsole", externalConsole, false);
+			else
+				pset.SetValue ("ExternalConsole", externalConsole, false);
 			pset.SetValue ("Commandlineparameters", commandLineParameters, "");
 			pset.SetValue ("RunWithWarnings", runWithWarnings, true);
 
@@ -122,9 +146,10 @@ namespace MonoDevelop.Projects
 
 			if (loadedEnvironmentVariables == null || loadedEnvironmentVariables.Count != environmentVariables.Count || loadedEnvironmentVariables.Any (e => !environmentVariables.ContainsKey (e.Key) || environmentVariables[e.Key] != e.Value)) {
 				if (environmentVariables.Count > 0) {
-					XElement e = new XElement (XName.Get ("EnvironmentVariables", MSBuildProject.Schema));
+					string xmlns = GetProjectNamespace ();
+					XElement e = new XElement (XName.Get ("EnvironmentVariables", xmlns));
 					foreach (var v in environmentVariables) {
-						var val = new XElement (XName.Get ("Variable", MSBuildProject.Schema));
+						var val = new XElement (XName.Get ("Variable", xmlns));
 						val.SetAttributeValue ("name", v.Key);
 						val.SetAttributeValue ("value", v.Value);
 						e.Add (val);
@@ -214,6 +239,7 @@ namespace MonoDevelop.Projects
 			set { pauseConsoleOutput = value; }
 		}
 
+		bool writeExternalConsoleLowercase = false;
 		bool externalConsole = false;
 		public bool ExternalConsole {
 			get { return externalConsole; }

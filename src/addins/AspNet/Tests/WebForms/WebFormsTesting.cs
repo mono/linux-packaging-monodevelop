@@ -24,14 +24,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using MonoDevelop.AspNet.Projects;
 using MonoDevelop.AspNet.WebForms;
 using MonoDevelop.Core.Text;
-using MonoDevelop.CSharpBinding;
-using MonoDevelop.CSharpBinding.Tests;
 using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.TypeSystem;
@@ -53,9 +49,9 @@ namespace MonoDevelop.AspNet.Tests.WebForms
 			var ctx = textEditorCompletion.GetCodeCompletionContext (sev);
 
 			if (isCtrlSpace)
-				return await textEditorCompletion.CodeCompletionCommand (ctx) as CompletionDataList;
+				return await textEditorCompletion.HandleCodeCompletionAsync (ctx, CompletionTriggerInfo.CodeCompletionCommand) as CompletionDataList;
 			else {
-				var task = textEditorCompletion.HandleCodeCompletionAsync (ctx, editorText [cursorPosition - 1]);
+				var task = textEditorCompletion.HandleCodeCompletionAsync (ctx, new CompletionTriggerInfo (CompletionTriggerReason.CharTyped, editorText [cursorPosition - 1]));
 				if (task != null) {
 					return await task as CompletionDataList;
 				}

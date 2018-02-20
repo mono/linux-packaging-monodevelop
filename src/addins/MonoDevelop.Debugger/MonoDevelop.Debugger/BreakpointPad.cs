@@ -37,6 +37,8 @@ using Mono.Debugging.Client;
 using MonoDevelop.Components.Docking;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
+using MonoDevelop.Components.AutoTest;
+using System.ComponentModel;
 
 namespace MonoDevelop.Debugger
 {
@@ -75,17 +77,17 @@ namespace MonoDevelop.Debugger
 			// Toolbar and menu definitions
 			
 			ActionCommand gotoCmd = new ActionCommand (LocalCommands.GoToFile, GettextCatalog.GetString ("Go to File"));
-			ActionCommand propertiesCmd = new ActionCommand (LocalCommands.Properties, GettextCatalog.GetString ("Properties"), Stock.Properties);
+			ActionCommand propertiesCmd = new ActionCommand (LocalCommands.Properties, GettextCatalog.GetString ("Edit Breakpoint…"), Stock.Properties);
 			
 			menuSet = new CommandEntrySet ();
+			menuSet.Add (propertiesCmd);
 			menuSet.Add (gotoCmd);
 			menuSet.AddSeparator ();
 			menuSet.AddItem (DebugCommands.EnableDisableBreakpoint);
-			menuSet.AddItem (DebugCommands.ClearAllBreakpoints);
 			menuSet.AddItem (DebugCommands.DisableAllBreakpoints);
-			menuSet.AddItem (EditCommands.DeleteKey);
 			menuSet.AddSeparator ();
-			menuSet.Add (propertiesCmd);
+			menuSet.AddItem (EditCommands.DeleteKey);
+			menuSet.AddItem (DebugCommands.ClearAllBreakpoints);
 			
 			CommandEntrySet toolbarSet = new CommandEntrySet ();
 			toolbarSet.AddItem (DebugCommands.EnableDisableBreakpoint);
@@ -101,6 +103,9 @@ namespace MonoDevelop.Debugger
 			// The breakpoint list
 			
 			store = new TreeStore (typeof(string), typeof (bool), typeof(string), typeof(object), typeof(string), typeof(string), typeof(string), typeof(string));
+			SemanticModelAttribute modelAttr = new SemanticModelAttribute ("store__Icon", "store__Selected","store_FileName",
+				"store_Breakpoint", "store_Condition", "store_TraceExp", "store_HitCount", "store_LastTrace");
+			TypeDescriptor.AddAttributes (store, modelAttr);
 
 			tree = new PadTreeView ();
 			tree.Model = store;
@@ -189,7 +194,7 @@ namespace MonoDevelop.Debugger
 
 		void ShowPopup (Gdk.EventButton evt)
 		{
-			IdeApp.CommandService.ShowContextMenu (tree, evt, menuSet, tree);
+			tree.ShowContextMenu (evt, menuSet, tree);
 		}
 		
 		[CommandHandler (LocalCommands.Properties)]
@@ -265,7 +270,7 @@ namespace MonoDevelop.Debugger
 				var bp = be as Breakpoint;
 				if (bp != null) {
 					if (!string.IsNullOrEmpty (bp.FileName))
-						IdeApp.Workbench.OpenDocument (bp.FileName, bp.Line, 1);
+						IdeApp.Workbench.OpenDocument (bp.FileName, null, bp.Line, 1);
 				}
 			}
 		}
@@ -331,10 +336,45 @@ namespace MonoDevelop.Debugger
 		
 		[CommandUpdateHandler (EditCommands.Delete)]
 		[CommandUpdateHandler (EditCommands.DeleteKey)]
-		[CommandUpdateHandler (DebugCommands.EnableDisableBreakpoint)]
-		protected void UpdateMultiBpCommand (CommandInfo cmd)
+		protected void UpdateDeleteCommand (CommandInfo cmd)
 		{
-			cmd.Enabled = tree.Selection.CountSelectedRows () > 0;
+			var selectedCount = tree.Selection.CountSelectedRows ();
+			cmd.Enabled = selectedCount > 0;
+			cmd.Text = cmd.Description = GettextCatalog.GetPluralString ("Remove Breakpoint", "Remove Breakpoints", selectedCount);
+		}
+
+		[CommandUpdateHandler (DebugCommands.EnableDisableBreakpoint)]
+		[CommandUpdateHandler (DebugCommands.DisableAllBreakpoints)]
+		protected void UpdateEnableDisableBreakpointCommand (CommandInfo cmd)
+		{
+			var selectedCount = tree.Selection.CountSelectedRows ();
+			cmd.Enabled = selectedCount > 0;
+			bool enable = false;
+
+			foreach (var path in tree.Selection.GetSelectedRows ()) {
+				TreeIter iter;
+
+				if (!store.GetIter (out iter, path))
+					continue;
+
+				BreakEvent bp = (BreakEvent)store.GetValue (iter, (int)Columns.Breakpoint);
+				if (!bp.Enabled) {
+					enable = true;
+					break;
+				}
+			}
+
+			if (cmd.Command.Id.Equals (CommandManager.ToCommandId (DebugCommands.DisableAllBreakpoints))) {
+				if (enable)
+					cmd.Text = GettextCatalog.GetString ("Enable All Breakpoints");
+				else
+					cmd.Text = GettextCatalog.GetString ("Disable All Breakpoints");
+			} else {
+				if (enable)
+					cmd.Text = GettextCatalog.GetPluralString ("Enable Breakpoint", "Enable Breakpoints", selectedCount);
+				else
+					cmd.Text = GettextCatalog.GetPluralString ("Disable Breakpoint", "Disable Breakpoints", selectedCount);
+			}
 		}
 
 		[GLib.ConnectBefore]

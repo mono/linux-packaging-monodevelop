@@ -33,7 +33,6 @@ using AppKit;
 using CoreGraphics;
 using Foundation;
 using MonoDevelop.Ide;
-using MonoDevelop.MacIntegration;
 using Xwt;
 
 namespace MonoDevelop.MacIntegration.MainToolbar
@@ -46,6 +45,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		internal NSToolbar widget;
 		internal Gtk.Window gtkWindow;
 
+		public static bool IsFullscreen { get; private set; }
 		AwesomeBar awesomeBar;
 
 		RunButton runButton {
@@ -71,22 +71,46 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		void AttachToolbarEvents (SearchBar bar)
 		{
 			bar.Changed += (o, e) => {
-				bar.LogMessage("Text changed");
-				if (SearchEntryChanged != null)
-					SearchEntryChanged (o, e);
+				SearchEntryChanged?.Invoke (o, e);
 			};
 			bar.KeyPressed += (o, e) => {
-				if (SearchEntryKeyPressed != null)
-					SearchEntryKeyPressed (o, e);
+				SearchEntryKeyPressed?.Invoke (o, e);
 			};
 			bar.LostFocus += (o, e) => {
-				if (SearchEntryLostFocus != null)
-					SearchEntryLostFocus (o, e);
+				SearchEntryLostFocus?.Invoke (o, e);
 			};
 			bar.SelectionActivated += (o, e) => {
-				if (SearchEntryActivated != null)
-					SearchEntryActivated (o, e);
+				SearchEntryActivated?.Invoke (o, e);
 			};
+			bar.LostFocus += (sender, e) => {
+				exitAction?.Invoke ();
+			};
+		}
+
+		void OnKeyPressed (object sender, KeyEventArgs args)
+		{
+			var searchField = sender as NSSearchField;
+
+			if (searchField == null || searchEntry.Window == null)
+				return;
+
+			var isNSTextView = searchField.Window.FirstResponder is NSTextView;
+			var isTabPressedInsideSearchBar = (args.Key == Key.Tab && isNSTextView);
+
+			if(isTabPressedInsideSearchBar)
+				SearchEntryKeyPressed?.Invoke (sender, args);
+		}
+
+		public void Focus()
+		{
+			awesomeBar.Window.MakeFirstResponder (awesomeBar.RunButton);
+		}
+
+		Action exitAction;
+		public void Focus(Action exitAction)
+		{
+			this.exitAction = exitAction;
+			Focus();
 		}
 
 		public MainToolbar (Gtk.Window window)
@@ -102,6 +126,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 					RunButtonClicked (o, e);
 			};
 
+
 			// Remove the focus from the Gtk system when Cocoa has focus
 			// Fixes BXC #29601
 			awesomeBar.SearchBar.GainedFocus += (o, e) => IdeApp.Workbench.RootWindow.Focus = null;
@@ -111,6 +136,11 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			selectorView.ConfigurationChanged += (sender, e) => {
 				if (ConfigurationChanged != null)
 					ConfigurationChanged (sender, e);
+			};
+
+			selectorView.RunConfigurationChanged += (sender, e) => {
+				if (RunConfigurationChanged != null)
+					RunConfigurationChanged (sender, e);
 			};
 
 			selectorView.RuntimeChanged += (sender, ea) => {
@@ -124,7 +154,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 					return new NSToolbarItem (AwesomeBarId) {
 						View = awesomeBar,
 						MinSize = new CGSize (1024, AwesomeBar.ToolbarWidgetHeight),
-						MaxSize = new CGSize (1024, AwesomeBar.ToolbarWidgetHeight)
+						MaxSize = new CGSize (float.PositiveInfinity, AwesomeBar.ToolbarWidgetHeight)
 					};
 
 				default:
@@ -141,15 +171,22 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				var item = widget.Items[0];
 
 				var abFrameInWindow = awesomeBar.ConvertRectToView (awesomeBar.Frame, null);
-				var awesomebarHeight = AwesomeBar.ToolbarWidgetHeight;//MacSystemInformation.OsVersion >= MacSystemInformation.ElCapitan ? 24 : 22;
+				var awesomebarHeight = AwesomeBar.ToolbarWidgetHeight;
 				var size = new CGSize (win.Frame.Width - abFrameInWindow.X - 4, awesomebarHeight);
-				item.MinSize = size;
-				item.MaxSize = size;
+
+				if (item.MinSize != size) {
+					item.MinSize = size;
+				}
 			});
 
+			// We can't use the events that Xamarin.Mac adds for delegate methods as they will overwrite
+			// the delegate that Gtk has added
 			NSWindow nswin = GtkMacInterop.GetNSWindow (window);
 			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResizeNotification, resizeAction, nswin);
 			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidEndLiveResizeNotification, resizeAction, nswin);
+
+			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.WillEnterFullScreenNotification, (note) => IsFullscreen = true, nswin);
+			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.WillExitFullScreenNotification, (note) => IsFullscreen = false, nswin);
 		}
 
 		internal void Initialize ()
@@ -178,20 +215,14 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			}
 		}
 
-		public void RebuildToolbar (IEnumerable<IButtonBarButton> buttons)
+		public void RebuildToolbar (IEnumerable<ButtonBarGroup> groups)
 		{
-			List<IButtonBarButton> barItems = new List<IButtonBarButton> ();
-			List<ButtonBar> buttonBars = new List<ButtonBar> ();
-
-			foreach (var item in buttons) {
-				if (item.IsSeparator) {
-					var bar = new ButtonBar (barItems);
-					buttonBars.Add (bar);
-
-					barItems.Clear ();
-				} else {
-					barItems.Add (item);
-				}
+			var buttonBars = new List<ButtonBar> ();
+			foreach (var g in groups) {
+				var bar = new ButtonBar (g.Buttons) {
+					Title = g.Title
+				};
+				buttonBars.Add (bar);
 			}
 
 			awesomeBar.ButtonBarContainer.ButtonBars = buttonBars;
@@ -211,19 +242,29 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			set { selectorView.Enabled = value; }
 		}
 
+		public bool RunConfigurationVisible {
+			get { return selectorView.RunConfigurationVisible; }
+			set { selectorView.RunConfigurationVisible = value; }
+		}
+
 		public event EventHandler ConfigurationChanged;
+		public event EventHandler RunConfigurationChanged;
 		public event EventHandler<HandledEventArgs> RuntimeChanged;
 
 		public bool PlatformSensitivity {
 			set {
-				var cell = (NSPathCell)selectorView.Cell;
-				cell.PathComponentCells [SelectorView.RuntimeIdx].Enabled = value;
+				selectorView.PlatformSensitivity = value;
 			}
 		}
 
 		public IConfigurationModel ActiveConfiguration {
 			get { return selectorView.ActiveConfiguration; }
 			set { selectorView.ActiveConfiguration = value; }
+		}
+
+		public IRunConfigurationModel ActiveRunConfiguration {
+			get { return selectorView.ActiveRunConfiguration; }
+			set { selectorView.ActiveRunConfiguration = value; }
 		}
 
 		public IRuntimeModel ActiveRuntime {
@@ -234,6 +275,11 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		public IEnumerable<IConfigurationModel> ConfigurationModel {
 			get { return selectorView.ConfigurationModel; }
 			set { selectorView.ConfigurationModel = value; }
+		}
+
+		public IEnumerable<IRunConfigurationModel> RunConfigurationModel {
+			get { return selectorView.RunConfigurationModel; }
+			set { selectorView.RunConfigurationModel = value; }
 		}
 
 		public IEnumerable<IRuntimeModel> RuntimeModel {
@@ -267,7 +313,6 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		public string SearchCategory {
 			set {
 				var entry = searchEntry;
-				entry.LogMessage ("Selecting text '${value}'");
 				entry.SelectText (entry);
 				entry.StringValue = value;
 				entry.CurrentEditor.SelectedRange = new Foundation.NSRange (value.Length, 0);
@@ -279,11 +324,10 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				return searchEntry.StringValue;
 			}
 			set {
-				searchEntry.LogMessage ($"Setting text to '{value}'");
 				searchEntry.StringValue = value;
 			}
 		}
-
+					
 		public Gtk.Widget PopupAnchor {
 			get {
 				var entry = searchEntry;

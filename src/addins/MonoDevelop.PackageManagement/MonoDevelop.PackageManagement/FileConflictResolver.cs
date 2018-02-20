@@ -26,16 +26,16 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-using System;
+using MonoDevelop.Core;
 using MonoDevelop.Ide;
-using NuGet;
+using NuGet.ProjectManagement;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class FileConflictResolver : IFileConflictResolver
+	internal class FileConflictResolver : IFileConflictResolver
 	{
-		static AlertButton YesToAllButton = new AlertButton ("Yes to All");
-		static AlertButton NoToAllButton = new AlertButton ("No to All");
+		static AlertButton YesToAllButton = new AlertButton (GettextCatalog.GetString ("Yes to All"));
+		static AlertButton NoToAllButton = new AlertButton (GettextCatalog.GetString ("No to All"));
 		
 		AlertButton[] buttons = new AlertButton[] {
 			AlertButton.Yes,
@@ -49,26 +49,26 @@ namespace MonoDevelop.PackageManagement
 		const int NoButtonIndex = 2;
 		const int NoToAllButtonIndex = 3;
 		
-		public FileConflictResolution ResolveFileConflict(string message)
+		public FileConflictAction ResolveFileConflict (string message)
 		{
 			AlertButton result = MessageService.AskQuestion(
-				"File Conflict",
+				GettextCatalog.GetString ("File Conflict"),
 				message,
 				NoButtonIndex, // "No" is default accept button.
 				buttons);
 			return MapResultToFileConflictResolution(result);
 		}
 		
-		FileConflictResolution MapResultToFileConflictResolution(AlertButton result)
+		FileConflictAction MapResultToFileConflictResolution (AlertButton result)
 		{
 			if (result == AlertButton.Yes) {
-				return FileConflictResolution.Overwrite;
+				return FileConflictAction.Overwrite;
 			} else if (result == YesToAllButton) {
-				return FileConflictResolution.OverwriteAll;
+				return FileConflictAction.OverwriteAll;
 			} else if (result == NoToAllButton) {
-				return FileConflictResolution.IgnoreAll;
+				return FileConflictAction.IgnoreAll;
 			} else {
-				return FileConflictResolution.Ignore;
+				return FileConflictAction.Ignore;
 			}
 		}
 	}

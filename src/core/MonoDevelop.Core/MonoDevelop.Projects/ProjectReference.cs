@@ -96,6 +96,8 @@ namespace MonoDevelop.Projects
 				package = value;
 			}
 		}
+
+		public string ProjectGuid { get => projectGuid; }
 		
 		public ProjectReference ()
 		{
@@ -211,7 +213,7 @@ namespace MonoDevelop.Projects
 			}
 
 			this.referenceType = referenceType;
-			this.reference = reference;
+			this.reference = reference.Trim ();
 			this.hintPath = hintPath;
 			this.projectGuid = projectGuid;
 			UpdatePackageReference ();
@@ -229,7 +231,7 @@ namespace MonoDevelop.Projects
 			else if (buildItem.Name == "ProjectReference")
 				ReadProjectReference (project, buildItem);
 
-			LocalCopy = buildItem.Metadata.GetValue ("Private", DefaultLocalCopy);
+			localCopy = buildItem.Metadata.GetValue<bool?> ("Private", null);
 			ReferenceOutputAssembly = buildItem.Metadata.GetValue ("ReferenceOutputAssembly", true);
 		}
 
@@ -442,9 +444,19 @@ namespace MonoDevelop.Projects
 				return true;
 			}
 		}
+		string aliases = "";
 
-		[ItemProperty ("Aliases", DefaultValue="")]
-		public string Aliases { get; set; }
+		[ItemProperty ("Aliases", DefaultValue = "")]
+		public string Aliases {
+			get {
+				return aliases;
+			}
+			set {
+				aliases = value;
+				if (ownerProject != null)
+					ownerProject.NotifyModified ("References");
+			}
+		}
 
 		public bool IsValid {
 			get { return string.IsNullOrEmpty (ValidationErrorMessage); }
@@ -480,11 +492,15 @@ namespace MonoDevelop.Projects
 					}
 				} else if (ReferenceType == ReferenceType.Project) {
 					if (ownerProject != null && ownerProject.ParentSolution != null && ReferenceOutputAssembly) {
-						DotNetProject p = ResolveProject (ownerProject.ParentSolution) as DotNetProject;
-						if (p != null) {
-							if (!ownerProject.TargetFramework.CanReferenceAssembliesTargetingFramework (p.TargetFramework))
-								return GettextCatalog.GetString ("Incompatible target framework ({0})", p.TargetFramework.Name);
-						}
+						var p = ResolveProject (ownerProject.ParentSolution);
+						var dotNetProject = p as DotNetProject;
+						if (dotNetProject != null) {
+							string reason;
+
+							if (!ownerProject.CanReferenceProject (dotNetProject, out reason))
+								return reason;
+						} else if (p == null)
+							return GettextCatalog.GetString ("Project not found");
 					}
 				} else if (ReferenceType == ReferenceType.Assembly) {
 					if (!File.Exists (hintPath))

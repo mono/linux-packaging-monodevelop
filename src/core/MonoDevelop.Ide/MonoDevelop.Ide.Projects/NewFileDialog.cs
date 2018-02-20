@@ -30,6 +30,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Templates;
 using MonoDevelop.Projects;
@@ -79,8 +80,50 @@ namespace MonoDevelop.Ide.Projects
 
 			nameEntry.GrabFocus ();
 
-		}
+			// Accessibility
+			Accessible.Name = "NewFileDialog";
+			Accessible.Description = GettextCatalog.GetString ("Add a new file to the project");
 
+			okButton.Accessible.Name = "NewFileDialog.OkButton";
+			okButton.Accessible.Description = GettextCatalog.GetString ("Create the new file and close the dialog");
+
+			cancelButton.Accessible.Name = "NewFileDialog.CancelButton";
+			cancelButton.Accessible.Description = GettextCatalog.GetString ("Close the dialog without creating a new file");
+
+			catView.Accessible.Name = "NewFileDialog.CategoryView";
+			catView.Accessible.Description = GettextCatalog.GetString ("Select a category for the new file");
+			catView.Accessible.SetTitle (GettextCatalog.GetString ("Categories"));
+
+			labelTemplateTitle.Accessible.Name = "NewFileDialog.TemplateTitleLabel";
+			labelTemplateTitle.Accessible.Description = GettextCatalog.GetString ("The name of the selected template");
+
+			infoLabel.Accessible.Name = "NewFileDialog.InfoLabel";
+			infoLabel.Accessible.Description = GettextCatalog.GetString ("The description of the selected template");
+
+			iconView.Accessible.Name = "NewFileDialog.TemplateList";
+			iconView.Accessible.Description = GettextCatalog.GetString ("Select a template for the new file");
+			iconView.Accessible.SetTitle (GettextCatalog.GetString ("Templates"));
+
+			nameEntry.SetCommonAccessibilityAttributes ("NewFileDialog.NameEntry",
+														GettextCatalog.GetString ("Name"),
+														GettextCatalog.GetString ("Enter the name of the new file"));
+			nameEntry.Accessible.SetTitleUIElement (label1.Accessible);
+
+			label1.Accessible.Name = "NewFileDialog.NameLabel";
+			label1.Accessible.SetTitleFor (nameEntry.Accessible);
+
+			projectAddCheckbox.Accessible.Name = "NewFileDialog.AddCheckbox";
+			projectAddCheckbox.Accessible.Description = GettextCatalog.GetString ("Select whether to add this new file to an existing project");
+			projectAddCheckbox.Accessible.AddLinkedUIElement (projectAddCombo.Accessible);
+
+			projectAddCombo.Accessible.Name = "NewFileDialog.AddProjectCombo";
+			projectAddCombo.Accessible.Description = GettextCatalog.GetString ("Select which project to add the file to");
+			projectAddCombo.Accessible.SetTitleUIElement (projectAddCombo.Accessible);
+
+			projectFolderEntry.Accessible.Name = "NewFileDialog.ProjectFolderEntry";
+			projectFolderEntry.Accessible.Description = GettextCatalog.GetString ("Select which the project folder to add the file");
+			projectFolderEntry.Accessible.SetLabel (GettextCatalog.GetString ("Project Folder"));
+		}
 
 		void InitializeView ()
 		{
@@ -129,9 +172,9 @@ namespace MonoDevelop.Ide.Projects
 			TreeIter treeIter;
 
 			if (catView.Selection.GetSelected (out treeModel, out treeIter)) {
-				okButton.Sensitive = false;
 				FillCategoryTemplates (treeIter);
 				catView.ExpandRow (treeModel.GetPath (treeIter), false);
+				UpdateOkStatus ();
 			}
 		}
 
@@ -152,16 +195,6 @@ namespace MonoDevelop.Ide.Projects
 				iconView.Clear ();
 				InitializeView ();
 			}
-		}
-
-
-		protected override void OnDestroyed ()
-		{
-			if (catStore != null) {
-				catStore.Dispose ();
-				catStore = null;
-			}
-			base.OnDestroyed ();
 		}
 
 		static string GetCategoryPropertyKey (Project proj)
@@ -265,7 +298,9 @@ namespace MonoDevelop.Ide.Projects
 				project = parentProject;
 			
 			var templates = FileTemplate.GetFileTemplates (project, basePath);
-			templates.Sort ((FileTemplate t, FileTemplate u) => string.Compare (t.Name, u.Name));
+
+			// stable sort, to ensure the template ordering is maintained among templates with the same name
+			templates = templates.OrderBy(t => t.Name).ToList();
 			
 			foreach (var template in templates) {
 				List<string> langs = template.GetCompatibleLanguages (project, basePath);
@@ -351,8 +386,11 @@ namespace MonoDevelop.Ide.Projects
 		{
 			iconView.Clear ();
 			var list = (List<TemplateItem>)(catStore.GetValue (iter, 2));
+			var itemNames = new HashSet<string>();
 			foreach (TemplateItem item in list) {
-				iconView.Add (item);
+				if (itemNames.Add(item.Name)) {
+					iconView.Add(item);
+				}
 			}
 
 			// select first template
@@ -366,8 +404,8 @@ namespace MonoDevelop.Ide.Projects
 			FileTemplate template = iconView.CurrentlySelected != null ? iconView.CurrentlySelected.Template : null;
 			
 			if (template != null) {
-				labelTemplateTitle.Markup = "<b>" + GettextCatalog.GetString (template.Name) + "</b>";
-				infoLabel.Text = GettextCatalog.GetString (template.Description);
+				labelTemplateTitle.Markup = "<b>" + template.Name + "</b>";
+				infoLabel.Text = template.Description;
 				
 				string filename = GetFileNameFromEntry ();
 				string name = null;
@@ -493,7 +531,7 @@ namespace MonoDevelop.Ide.Projects
 						return;
 				} catch (Exception ex) {
 					LoggingService.LogError ("Error creating file", ex);
-					MessageService.ShowException (ex);
+					MessageService.ShowError (GettextCatalog.GetString ("Error creating file"), ex);
 					return;
 				}
 
@@ -604,6 +642,7 @@ namespace MonoDevelop.Ide.Projects
 
 			catStore.SetSortColumnId (0, SortType.Ascending);
 			catView.Model = catStore;
+			catView.SearchColumn = -1; // disable the interactive search
 
 			okButton.Clicked += new EventHandler (OpenEvent);
 			cancelButton.Clicked += new EventHandler (cancelClicked);
@@ -764,6 +803,7 @@ namespace MonoDevelop.Ide.Projects
 				HeadersVisible = false;
 				templateStore = new ListStore (typeof(string), typeof(string), typeof(TemplateItem));
 				Model = templateStore;
+				SearchColumn = -1; // disable the interactive search
 
 				SemanticModelAttribute modelAttr = new SemanticModelAttribute ("templateStore__Icon", "templateStore__Name", "templateStore__Template");
 				TypeDescriptor.AddAttributes (templateStore, modelAttr);

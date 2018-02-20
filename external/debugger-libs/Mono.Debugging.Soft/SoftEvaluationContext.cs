@@ -29,6 +29,7 @@ using Mono.Debugging.Evaluation;
 using Mono.Debugger.Soft;
 using DC = Mono.Debugging.Client;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace Mono.Debugging.Soft
 {
@@ -112,7 +113,7 @@ namespace Mono.Debugging.Soft
 			Domain = other.Domain;
 		}
 
-		static bool IsValueTypeOrPrimitive (TypeMirror type)
+		internal static bool IsValueTypeOrPrimitive (TypeMirror type)
 		{
 			return type != null && (type.IsValueType || type.IsPrimitive);
 		}
@@ -144,7 +145,7 @@ namespace Mono.Debugging.Soft
 				
 				for (int n = 0; n < mparams.Length; n++) {
 					var tm = mparams[n].ParameterType;
-					if (tm.IsValueType || tm.IsPrimitive)
+					if (tm.IsValueType || tm.IsPrimitive || tm.FullName.StartsWith ("System.Nullable`1", StringComparison.Ordinal))
 						continue;
 
 					var type = Adapter.GetValueType (this, values[n]);
@@ -184,7 +185,11 @@ namespace Mono.Debugging.Soft
 				return method.Evaluate (target is TypeMirror ? null : (Value) target, values);
 			} catch (NotSupportedException) {
 				AssertTargetInvokeAllowed ();
-
+				var threadState = Thread.ThreadState;
+				if ((threadState & ThreadState.WaitSleepJoin) == ThreadState.WaitSleepJoin) {
+					DC.DebuggerLoggingService.LogMessage ("Thread state before evaluation is {0}", threadState);
+					throw new EvaluatorException ("Evaluation is not allowed when the thread is in 'Wait' state");
+				}
 				var mc = new MethodCall (this, method, target, values, enableOutArgs);
 				//Since runtime is returning NOT_SUSPENDED error if two methods invokes are executed
 				//at same time we have to lock invoking to prevent this...

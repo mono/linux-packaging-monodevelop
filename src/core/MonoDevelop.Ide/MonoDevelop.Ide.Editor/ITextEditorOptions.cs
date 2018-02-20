@@ -91,12 +91,15 @@ namespace MonoDevelop.Ide.Editor
 
 		string GutterFontName { get; }
 
-		string ColorScheme { get;  }
+		string EditorTheme { get;  }
 
 		string DefaultEolMarker { get; }
 
 		bool GenerateFormattingUndoStep { get; }
+
 		bool EnableSelectionWrappingKeys { get; }
+
+		bool SmartBackspace { get; }
 
 		ShowWhitespaces ShowWhitespaces { get; }
 
@@ -105,11 +108,11 @@ namespace MonoDevelop.Ide.Editor
 
 	public static class TextEditorOptionsExtension
 	{
-		public static ColorScheme GetColorStyle (this ITextEditorOptions options)
+		public static EditorTheme GetEditorTheme (this ITextEditorOptions options)
 		{
 			if (options == null)
 				throw new ArgumentNullException ("options");
-			return SyntaxModeService.GetColorStyle (options.ColorScheme);
+			return SyntaxHighlightingService.GetEditorTheme (options.EditorTheme);
 		}
 
 		/// <summary>

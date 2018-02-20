@@ -26,11 +26,11 @@
 
 using System;
 using MonoDevelop.Core;
-using NuGet;
+using NuGet.Common;
 
 namespace MonoDevelop.PackageManagement
 {
-	public static class FilePathExtensions
+	internal static class FilePathExtensions
 	{
 		public static bool IsPackagesConfigFileName (this FilePath filePath)
 		{
@@ -38,14 +38,31 @@ namespace MonoDevelop.PackageManagement
 				return false;
 			}
 
-			return Constants.PackageReferenceFile.Equals (filePath.FileName, StringComparison.OrdinalIgnoreCase) ||
-				IsProjectSpecificPackagesConfigFile (filePath.FileName);
+			return IsValidPackagesConfigFileName (filePath.FileName);
 		}
 
-		static bool IsProjectSpecificPackagesConfigFile (FilePath filePath)
+		static bool IsValidPackagesConfigFileName (string fileName)
 		{
-			return filePath.Extension.Equals (".config", StringComparison.OrdinalIgnoreCase) &&
-				filePath.FileNameWithoutExtension.StartsWith ("packages.", StringComparison.OrdinalIgnoreCase);
+			return fileName.StartsWith ("packages.", StringComparison.OrdinalIgnoreCase) &&
+			 fileName.EndsWith (".config", StringComparison.OrdinalIgnoreCase);
+		}
+
+		public static bool IsProjectJsonFileName (this FilePath filePath)
+		{
+			if (filePath == null) {
+				return false;
+			}
+
+			return ProjectJsonPathUtilities.IsProjectConfig (filePath);
+		}
+
+		public static bool IsPackagesConfigOrProjectJsonFileName (this FilePath filePath)
+		{
+			if (filePath == null) {
+				return false;
+			}
+
+			return IsPackagesConfigFileName (filePath) || IsProjectJsonFileName (filePath);
 		}
 	}
 }

@@ -29,14 +29,14 @@ gtk-toolbar-icon-size = large-toolbar
 gtk-auto-mnemonics = 1
 gtk-error-bell = 0
 gtk-show-input-method-menu = 0
-gtk-font-name = "Helvetica Neue 12"
+gtk-font-name = "-apple-system-font 12"
 
 
 style "default" {
     xthickness = 1
     ythickness = 1
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     ### colours
 
@@ -83,6 +83,9 @@ style "default" {
 
     GtkCheckButton::indicator-size = 14
     GtkCheckButton::indicator-spacing = 4
+    GtkCheckButton::interior-focus = 0
+
+    GtkRadioButton::interior-focus = 0
 
     GtkTreeView::odd-row-color = "#fafafa"
 
@@ -135,7 +138,7 @@ style "button" = "default" {
     xthickness = 2
     ythickness = 4
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     bg[NORMAL] = @base_color
     bg[PRELIGHT] = @base_color # Mac buttons have no hover state
@@ -177,7 +180,7 @@ style "menu" {
     xthickness = 1
     # ythickness = 0
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     bg[PRELIGHT] = @selected_fg_color
     fg[PRELIGHT] = @selected_fg_color
@@ -232,7 +235,7 @@ style "tooltip"
     bg[NORMAL] = @tooltip_bg_color
     bg[SELECTED] = @tooltip_border_color
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     engine "xamarin" {
         roundness = 0
@@ -241,16 +244,13 @@ style "tooltip"
 
 style "treeview" = "default"
 {
-    base[SELECTED] = @selected_bg_color
-    base[ACTIVE] = @selected_bg_color
-    text[SELECTED] = @selected_fg_color
+    base[ACTIVE] = "#a0a0a0"
     text[ACTIVE] = @selected_fg_color
 
     engine "xamarin" {
         roundness = 0
         gradient_shades = { 1.01, 1.01, 1.01, 1.01 }
         glazestyle = 1
-        focusstyle = 3
     }
 }
 
@@ -286,26 +286,31 @@ style "toolbar-combo-box" = "default"
 style "combo-box" = "button"
 {
     bg[PRELIGHT] = @base_color
-    base[NORMAL] = "#6cb2f7"
+    base[NORMAL] = "#cccccc"
     base[ACTIVE] = "#6cb2f7"
-    base[PRELIGHT] = "#6cb2f7"
+    base[PRELIGHT] = "#cccccc"
     fg[NORMAL] = @base_color
     fg[PRELIGHT] = @base_color
 
     engine "xamarin" {
         arrowstyle = 3
-        fill_shade = 0.7
+        fill_shade = 0.85
     }
 }
 
 style "combo-box-entry-button" = "combo-box"
 {
-    bg[NORMAL] = "#6cb2f7"
+    bg[NORMAL] = "#cccccc"
     bg[ACTIVE] = "#6cb2f7"
-    bg[PRELIGHT] = "#6cb2f7"
+    bg[PRELIGHT] = "#cccccc"
     fg[NORMAL] = @base_color
     fg[ACTIVE] = @fg_color
     fg[PRELIGHT] = @base_color
+
+    engine "xamarin" {
+        arrowstyle = 3
+        fill_shade = 0.85
+    }
 }
 
 style "wizard-dialog"
@@ -314,7 +319,7 @@ style "wizard-dialog"
 }
 
 style "combo-box-menu" = "menu" {
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 }
 
 style "notebook" = "default"
@@ -330,24 +335,27 @@ style "notebook" = "default"
     }
 }
 
-style "radio-or-check-box" = "default"
+style "radio-or-check-box" = "button"
 {
-    ythickness = 6
+    GtkCheckButton::indicator-size = 17
+    base[ACTIVE] = "#419bf9"
+    base[SELECTED] = "#419bf9"
+    base[PRELIGHT] = @base_color
+    text[ACTIVE] = @base_color
+    text[SELECTED] = @base_color
+    text[PRELIGHT] = @base_color
+    text[NORMAL] = @base_color
 
-    engine "quartz" {
+    engine "xamarin" {
+        focusstyle = 0
+        border_shades = { 1.0, 1.0 }
     }
 }
 
 style "propertygrid-radio-or-check-box" = "radio-or-check-box"
 {
-    base[ACTIVE] = @base_color
-    base[SELECTED] = @base_color
-    base[PRELIGHT] = @base_color
-    text[SELECTED] = @fg_color
     GtkCheckButton::indicator-spacing = 0
-
-    engine "xamarin" {
-    }
+    GtkCheckButton::indicator-size = 15
 }
 
 style "entry" = "default"
@@ -392,7 +400,7 @@ style "scrollbar" = "default"
         roundness = 1
         contrast = 0.0
         border_colors = { "#C0C0C0", "#C0C0C0" }
-        trough_shades = { 1.026, 1.026 }
+        trough_shades = { 1.0, 1.0 }
         stepperstyle = 1
     }
 }
@@ -404,9 +412,10 @@ style "completion_scrollbar" = "scrollbar"
 
 style "progressbar" = "default"
 {
-    bg[SELECTED] = "#62b3ec"
-    fg[SELECTED] = "#3a67a6"
+    GtkWidget::draw-border = { 0, 0, 0, 0 }
     bg[ACTIVE] = @base_color
+    fg[SELECTED] = @selected_bg_color
+    fg[PRELIGHT] = @selected_fg_color
     xthickness = 0
     ythickness = 0
 }

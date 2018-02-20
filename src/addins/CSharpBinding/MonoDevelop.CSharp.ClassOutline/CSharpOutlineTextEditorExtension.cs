@@ -68,7 +68,6 @@ namespace MonoDevelop.CSharp.ClassOutline
 		TreeStore outlineTreeStore;
 		TreeModelSort outlineTreeModelSort;
 		Widget[] toolbarWidgets;
-		AstAmbience astAmbience;
 
 		OutlineNodeComparer comparer;
 		OutlineSettings settings;
@@ -89,7 +88,6 @@ namespace MonoDevelop.CSharp.ClassOutline
 
 			if (DocumentContext != null)
 				DocumentContext.DocumentParsed += UpdateDocumentOutline;
-			astAmbience = new AstAmbience (TypeSystemService.Workspace.Options);
 		}
 
 		public override void Dispose ()
@@ -227,9 +225,14 @@ namespace MonoDevelop.CSharp.ClassOutline
 			} else {
 				Editor.CaretOffset = ((SyntaxTrivia)o).SpanStart;
 			}
+			Editor.CenterToCaret ();
 
-			if (focusEditor)
-				Editor.GrabFocus ();
+			if (focusEditor) {
+				GLib.Timeout.Add (10, delegate {
+					Editor.GrabFocus ();
+					return false;
+				});
+			}
 		}
 
 		static void OutlineTreeIconFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
@@ -243,8 +246,9 @@ namespace MonoDevelop.CSharp.ClassOutline
 			}
 		}
 
-		void OutlineTreeTextFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
+		static void OutlineTreeTextFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
+			var astAmbience = new AstAmbience (TypeSystemService.Workspace.Options);
 			var txtRenderer = (CellRendererText)cell;
 			object o = model.GetValue (iter, 0);
 			var syntaxNode = o as SyntaxNode;
@@ -261,15 +265,8 @@ namespace MonoDevelop.CSharp.ClassOutline
 				return;
 			var w = (ScrolledWindow)outlineTreeView.Parent;
 			w.Destroy ();
-			if (outlineTreeModelSort != null) {
-				outlineTreeModelSort.Dispose ();
-				outlineTreeModelSort = null;
-			}
-			if (outlineTreeStore != null) {
-				outlineTreeStore.Dispose ();
-				outlineTreeStore = null;
-			}
 			outlineTreeView = null;
+			RemoveRefillOutlineStoreTimeout ();
 			settings = null;
 			foreach (var tw in toolbarWidgets)
 				tw.Destroy ();
@@ -304,7 +301,7 @@ namespace MonoDevelop.CSharp.ClassOutline
 			Runtime.AssertMainThread ();
 			Gdk.Threads.Enter ();
 			refreshingOutline = false;
-			if (outlineTreeStore == null || !outlineTreeView.IsRealized) {
+			if (outlineTreeStore == null || outlineTreeView == null || !outlineTreeView.IsRealized) {
 				refillOutlineStoreId = 0;
 				return false;
 			}
@@ -506,6 +503,7 @@ namespace MonoDevelop.CSharp.ClassOutline
 			} else {
 				outlineTreeView.Model = outlineTreeStore;
 			}
+			outlineTreeView.SearchColumn = -1; // disable the interactive search
 
 			// Because sorting the tree by setting the sort function also collapses the tree view we expand
 			// the whole tree.

@@ -1,12 +1,12 @@
-using NUnit.Framework;
+using System;
 using RefactoringEssentials.CSharp.CodeRefactorings;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 {
-    [TestFixture]
     public class ConvertStringFormatToInterpolatedStringTests : CSharpCodeRefactoringTestBase
     {
-        [Test]
+        [Fact]
         public void TestSimpleStringFormat()
         {
             Test<ConvertStringFormatToInterpolatedStringCodeRefactoringProvider>(@"
@@ -28,7 +28,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestComplexStringFormat()
         {
             Test<ConvertStringFormatToInterpolatedStringCodeRefactoringProvider>(@"
@@ -51,7 +51,7 @@ class TestClass
         /// <summary>
         /// Newline character handling for "To interpolated string" #182
         /// </summary>
-        [Test]
+        [Fact]
         public void TestIssue182()
         {
             Test<ConvertStringFormatToInterpolatedStringCodeRefactoringProvider>(@"
@@ -73,12 +73,11 @@ class TestClass
 }");
         }
 
-
-        [Test]
+        [Fact]
         public void TestVerbatimStringFormat()
         {
-            Test<ConvertStringFormatToInterpolatedStringCodeRefactoringProvider>(@"
-class TestClass
+            Test<ConvertStringFormatToInterpolatedStringCodeRefactoringProvider>(
+               @"class TestClass
 {
     void Foo ()
     {
@@ -86,13 +85,13 @@ class TestClass
         var str = $string.Format (@""Hello """" {0}
 !"", world);
     }
-}", @"
-class TestClass
+}", 
+                @"class TestClass
 {
     void Foo ()
     {
         var world = ""World"";
-        var str = $""Hello \"" {world}\n!"";
+        var str = $""Hello \"" {world}" + Environment.NewLine.Replace("\r", "\\r").Replace("\n", "\\n") +  @"!"";
     }
 }");
         }

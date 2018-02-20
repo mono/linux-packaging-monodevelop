@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class RedundantAssignmentTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestVariableInitializerNotUsed()
         {
             var input = @"
@@ -28,7 +27,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 1, output);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestVariableInitializerNotUsedVar()
         {
             var input = @"
@@ -49,7 +48,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 1, output);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestVariableAssignmentNotUsed()
         {
             var input = @"
@@ -76,7 +75,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 1, output);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestParameterAssignmentNotUsed()
         {
             var input = @"
@@ -101,7 +100,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 1, output);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentInExpression()
         {
             var input = @"
@@ -125,7 +124,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 1, output);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestOutArgument()
         {
             var input = @"
@@ -159,7 +158,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 1, output);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestOutArgument2()
         {
             var input = @"
@@ -180,7 +179,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestRefArgument()
         {
             var input = @"
@@ -194,7 +193,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentOperator()
         {
             var input = @"
@@ -210,7 +209,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestIf()
         {
             var input = @"
@@ -229,7 +228,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestConditionalExpression()
         {
             var input = @"
@@ -244,7 +243,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestLoop()
         {
             var input = @"
@@ -266,7 +265,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestForeach()
         {
             var input = @"
@@ -286,7 +285,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentInTryCatch()
         {
             var input = @"using System;
@@ -307,7 +306,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentInTryCatchFinally()
         {
             var input = @"
@@ -328,7 +327,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentInCatch()
         {
             var input = @"using System;
@@ -349,7 +348,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentBeforeTry()
         {
             var input = @"using System;
@@ -370,7 +369,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentInUsing()
         {
             var input = @"using System;
@@ -386,7 +385,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentWithFunction()
         {
             var input = @"using System;
@@ -410,7 +409,7 @@ class TestClass
             Test<RedundantAssignmentAnalyzer>(input, output);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentWithFunctionUsedLater()
         {
             var input = @"using System;
@@ -441,7 +440,7 @@ class TestClass
         /// <summary>
         /// Bug 11795 - Use of regex in linq statement not being recognized. 
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug11795()
         {
             Analyze<RedundantAssignmentAnalyzer>(@"
@@ -472,7 +471,7 @@ public class Test
         /// <summary>
         /// Bug 14929 - Assignment greyed out (meaning "redundant") when it should not be
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug14929()
         {
             Analyze<RedundantAssignmentAnalyzer>(@"
@@ -497,7 +496,7 @@ public class Test
 
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestMultipleVariableInitializers()
         {
             Test<RedundantAssignmentAnalyzer>(@"using System;
@@ -521,4 +520,4 @@ public class MyClass
 ", 0);
         }
     }
-}
+}*/

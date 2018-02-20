@@ -161,7 +161,7 @@ namespace Mono.Debugging.Evaluation
 				if (baseIndices.Length > 0)
 					curIndexStr += ",";
 				curIndex [curIndex.Length - 1] = initalIndex + firstItemIndex;
-				var elems = array.GetElements (curIndex, System.Math.Min (values.Length, upperBound + 1));
+				var elems = array.GetElements (curIndex, System.Math.Min (values.Length, upperBound - lowerBound + 1));
 
 				for (int n = 0; n < values.Length; n++) {
 					int index = n + initalIndex + firstItemIndex;
@@ -226,7 +226,7 @@ namespace Mono.Debugging.Evaluation
 				var list = new List<ObjectValue> ();
 				while (i < len) {
 					int end = i + div - 1;
-					if (end > len)
+					if (end >= len)
 						end = len - 1;
 					ArrayElementGroup grp = new ArrayElementGroup (cctx, array, baseIndices, i, end);
 					list.Add (grp.CreateObjectValue ());

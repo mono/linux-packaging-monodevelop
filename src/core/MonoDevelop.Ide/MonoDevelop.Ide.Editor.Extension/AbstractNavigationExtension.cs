@@ -62,7 +62,7 @@ namespace MonoDevelop.Ide.Editor.Extension
 
 		public static event EventHandler LinksShownChanged;
 
-		static uint snooperId;
+		//static uint snooperId;
 
 
 		public class NavigationSegment : ISegment
@@ -89,7 +89,10 @@ namespace MonoDevelop.Ide.Editor.Extension
 
 		static AbstractNavigationExtension ()
 		{
-			snooperId = Gtk.Key.SnooperInstall (TooltipKeySnooper);
+			if (IdeApp.Workbench?.RootWindow == null)
+				return;
+			// snooperId =
+				Gtk.Key.SnooperInstall (TooltipKeySnooper);
 			//if (snooperId != 0)
 			//	Gtk.Key.SnooperRemove (snooperId);
 			IdeApp.Workbench.RootWindow.FocusOutEvent += RootWindow_FocusOutEvent;
@@ -177,11 +180,13 @@ namespace MonoDevelop.Ide.Editor.Extension
 				y = e.Y;
 			}
 			CancelRequestLinks ();
+			if (!IsHoverNavigationValid (Editor))
+				return;
 			var token = src.Token;
 			if (LinksShown) {
 				var lineNumber = Editor.PointToLocation (x, y).Line;
 				var line = Editor.GetLine (lineNumber);
-				if (visibleLines.Any (l => l.Equals (line))) {
+				if (visibleLines.Any (line.Equals)) {
 					return;
 				}
 				visibleLines.Add (line);
@@ -195,9 +200,9 @@ namespace MonoDevelop.Ide.Editor.Extension
 					LoggingService.LogError ("Error while requestling navigation links", ex);
 					return;
 				}
-				if (segments == null)
+				if (segments == null || token.IsCancellationRequested)
 					return;
-				await Runtime.RunInMainThread (delegate {
+				await Runtime.RunInMainThread(delegate {
 					try {
 						foreach (var segment in segments) {
 							if (token.IsCancellationRequested) {
@@ -213,6 +218,11 @@ namespace MonoDevelop.Ide.Editor.Extension
 					}
 				});
 			}
+		}
+
+		internal static bool IsHoverNavigationValid (TextEditor editor)
+		{
+			return !editor.IsSomethingSelected;
 		}
 
 		void CancelRequestLinks ()
@@ -232,8 +242,10 @@ namespace MonoDevelop.Ide.Editor.Extension
 
 		void RemoveTimer ()
 		{
-			if (timerId != 0)
+			if (timerId != 0) {
 				GLib.Source.Remove (timerId);
+				timerId = 0;
+			}
 		}
 
 		public override void Dispose ()

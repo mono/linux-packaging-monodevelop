@@ -250,14 +250,6 @@ namespace MonoDevelop.Ide.Editor.Projection
 			return projectedExtension.CanRunCompletionCommand ();
 		}
 
-		public override Task<MonoDevelop.Ide.CodeCompletion.ICompletionDataList> CodeCompletionCommand (MonoDevelop.Ide.CodeCompletion.CodeCompletionContext completionContext)
-		{
-			var projectedExtension = GetExtensionAt (completionContext.TriggerOffset);
-			if (projectedExtension == null)
-				return null;
-			return projectedExtension.CodeCompletionCommand (ConvertContext (completionContext));
-		}
-
 		public override bool CanRunParameterCompletionCommand ()
 		{
 			var projectedExtension = GetCurrentExtension ();
@@ -302,21 +294,21 @@ namespace MonoDevelop.Ide.Editor.Projection
 			return projectedExtension.GuessBestMethodOverload (provider, currentOverload, token);
 		}
 
-		public override System.Threading.Tasks.Task<MonoDevelop.Ide.CodeCompletion.ICompletionDataList> HandleCodeCompletionAsync (MonoDevelop.Ide.CodeCompletion.CodeCompletionContext completionContext, char completionChar, System.Threading.CancellationToken token)
+		public override System.Threading.Tasks.Task<MonoDevelop.Ide.CodeCompletion.ICompletionDataList> HandleCodeCompletionAsync (MonoDevelop.Ide.CodeCompletion.CodeCompletionContext completionContext, CompletionTriggerInfo triggerInfo, System.Threading.CancellationToken token)
 		{
 			var projectedExtension = GetExtensionAt (completionContext.TriggerOffset);
 			if (projectedExtension == null)
 				return null;
 
-			return projectedExtension.HandleCodeCompletionAsync (ConvertContext (completionContext), completionChar, token);
+			return projectedExtension.HandleCodeCompletionAsync (ConvertContext (completionContext), triggerInfo, token);
 		}
 
-		public override Task<ParameterHintingResult> HandleParameterCompletionAsync (MonoDevelop.Ide.CodeCompletion.CodeCompletionContext completionContext, char completionChar, System.Threading.CancellationToken token)
+		public override Task<ParameterHintingResult> HandleParameterCompletionAsync (MonoDevelop.Ide.CodeCompletion.CodeCompletionContext completionContext, SignatureHelpTriggerInfo triggerInfo, System.Threading.CancellationToken token)
 		{
 			var projectedExtension = GetExtensionAt (completionContext.TriggerOffset);
 			if (projectedExtension == null)
 				return Task.FromResult<ParameterHintingResult> (null);
-			return projectedExtension.HandleParameterCompletionAsync (ConvertContext (completionContext), completionChar, token);
+			return projectedExtension.HandleParameterCompletionAsync (ConvertContext (completionContext), triggerInfo, token);
 		}
 
 		public override bool KeyPress (KeyDescriptor descriptor)

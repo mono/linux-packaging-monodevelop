@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class RedundantLogicalConditionalExpressionOperandTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestTrue()
         {
             Test<RedundantLogicalConditionalExpressionOperandAnalyzer>(@"
@@ -31,7 +30,7 @@ class Test
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestTrueCase2()
         {
             Test<RedundantLogicalConditionalExpressionOperandAnalyzer>(@"
@@ -55,7 +54,7 @@ class Test
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestFalse()
         {
             Test<RedundantLogicalConditionalExpressionOperandAnalyzer>(@"
@@ -79,7 +78,7 @@ class Test
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestFalseCase2()
         {
             Test<RedundantLogicalConditionalExpressionOperandAnalyzer>(@"
@@ -104,7 +103,7 @@ class Test
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestInvalid()
         {
             Analyze<RedundantLogicalConditionalExpressionOperandAnalyzer>(@"
@@ -122,7 +121,7 @@ class Test
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestDisable()
         {
             Analyze<RedundantLogicalConditionalExpressionOperandAnalyzer>(@"
@@ -141,3 +140,4 @@ class Test
     }
 }
 
+*/

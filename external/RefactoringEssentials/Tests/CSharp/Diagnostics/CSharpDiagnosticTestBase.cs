@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    public class CSharpDiagnosticTestBase : DiagnosticTestBase
+	public class CSharpDiagnosticTestBase : DiagnosticTestBase
     {
         public static CSharpCompilation CreateCompilation(
             IEnumerable<SyntaxTree> trees,
@@ -16,7 +16,7 @@ namespace RefactoringEssentials.Tests.CSharp.Diagnostics
         {
             if (compOptions == null)
             {
-                compOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, "a.dll");
+                compOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, false, "a.dll");
             }
 
             return CSharpCompilation.Create(

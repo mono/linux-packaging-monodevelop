@@ -114,6 +114,9 @@ namespace Xwt.GtkBackend
 			RegisterBackend<ICalendarBackend, CalendarBackend> ();
 			RegisterBackend<IFontSelectorBackend, FontSelectorBackend> ();
 			RegisterBackend<ISelectFontDialogBackend, SelectFontDialogBackend> ();
+			RegisterBackend<IAccessibleBackend, AccessibleBackend> ();
+			RegisterBackend<IPopupWindowBackend, PopupWindowBackend> ();
+			RegisterBackend<IUtilityWindowBackend, UtilityWindowBackend> ();
 
 			string typeName = null;
 			string asmName = null;
@@ -152,8 +155,8 @@ namespace Xwt.GtkBackend
 
 		public override void Dispose ()
 		{
-			base.Dispose ();
 			GtkTextLayoutBackendHandler.DisposeResources ();
+			base.Dispose();
 		}
 
 		public override void RunApplication ()
@@ -225,7 +228,8 @@ namespace Xwt.GtkBackend
 			if (action == null)
 				throw new ArgumentNullException ("action");
 
-			Gtk.Application.Invoke (delegate {
+			// Switch to no Invoke(Action) once a gtk# release is done.
+			Gtk.Application.Invoke ((o, args) => {
 				action ();
 			});
 		}
@@ -237,9 +241,7 @@ namespace Xwt.GtkBackend
 			if (timeSpan.TotalMilliseconds < 0)
 				throw new ArgumentException ("Timer period must be >=0", "timeSpan");
 
-			return GLib.Timeout.Add ((uint) timeSpan.TotalMilliseconds, delegate {
-				return action ();
-			});
+			return GLib.Timeout.Add ((uint) timeSpan.TotalMilliseconds, action.Invoke);
 		}
 
 		public override void CancelTimerInvoke (object id)
@@ -267,6 +269,15 @@ namespace Xwt.GtkBackend
 			var win = new WindowFrameBackend ();
 			win.Window = (Gtk.Window) nativeWindow;
 			return win;
+		}
+
+		public override object GetNativeWindow (IWindowFrameBackend backend)
+		{
+			if (backend.Window is Gtk.Window)
+				return backend.Window;
+			if (Platform.IsMac)
+				return GtkMacInterop.GetGtkWindow (backend.Window);
+			return null;
 		}
 
 		public override object GetBackendForImage (object nativeImage)
@@ -338,6 +349,20 @@ namespace Xwt.GtkBackend
 				gim.Draw (ApplicationContext, ctx, Util.GetScaleFactor (w), x, y, img);
 		}
 
+		public override Rectangle GetScreenBounds (object nativeWidget)
+		{
+			var widget = nativeWidget as Gtk.Widget;
+			if (widget == null)
+				throw new InvalidOperationException ("Widget belongs to a different toolkit");
+
+			int x = 0, y = 0;
+			widget.GdkWindow?.GetOrigin (out x, out y);
+			var a = widget.Allocation;
+			x += a.X;
+			y += a.Y;
+			return new Rectangle (x, y, widget.Allocation.Width, widget.Allocation.Height);
+		}
+
 		public override ToolkitFeatures SupportedFeatures {
 			get {
 				var f = ToolkitFeatures.All;
@@ -350,6 +375,17 @@ namespace Xwt.GtkBackend
 					f &= ~ToolkitFeatures.WindowOpacity;
 				return f;
 			}
+		}
+
+
+		protected override Type GetBackendImplementationType (Type backendType)
+		{
+			if (platformBackend != null) {
+				var bt = platformBackend.GetBackendImplementationType (backendType);
+				if (bt != null)
+					return bt;
+			}
+			return base.GetBackendImplementationType (backendType);
 		}
 	}
 	

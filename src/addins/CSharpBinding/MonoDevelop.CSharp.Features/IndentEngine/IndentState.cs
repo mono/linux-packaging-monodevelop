@@ -201,7 +201,6 @@ namespace ICSharpCode.NRefactory6.CSharp
 				while (NextLineIndent.CurIndent - ThisLineIndent.CurIndent > delta &&
 					   NextLineIndent.PopIf(IndentType.Continuation));
 				ThisLineIndent = NextLineIndent.Clone();
-
 			}
 		}
 
@@ -294,17 +293,17 @@ namespace ICSharpCode.NRefactory6.CSharp
 			base.Push(ch);
 			switch (ch) {
 				case '#':
-					if (Engine.isLineStart)
-						ChangeState<PreProcessorState>();
-					break;
+				if (Engine.isLineStart)
+					ChangeState<PreProcessorState> ();
+				break;
 				case '/':
-					if (Engine.previousChar == '/')
-						ChangeState<LineCommentState>();
-					break;
+				if (Engine.previousChar == '/')
+					ChangeState<LineCommentState> ();
+				break;
 				case '*':
-					if (Engine.previousChar == '/')
-						ChangeState<MultiLineCommentState>();
-					break;
+				if (Engine.previousChar == '/')
+					ChangeState<MultiLineCommentState> ();
+				break;
 				case '"':
 					if (Engine.previousChar == '@')
 					{
@@ -481,7 +480,7 @@ namespace ICSharpCode.NRefactory6.CSharp
 				if (true /*Engine.options.AlignToMemberReferenceDot*/ && !Engine.isLineStart)
 				{
 					IsMemberReferenceDotHandled = true;
-					NextLineIndent.RemoveAlignment();
+					NextLineIndent.RemoveAlignment ();
 					NextLineIndent.SetAlignment(Engine.column - NextLineIndent.CurIndent - 1, true);
 				}
 				else if (Engine.isLineStart)
@@ -503,6 +502,10 @@ namespace ICSharpCode.NRefactory6.CSharp
 			else if (ch == Engine.newLineChar)
 			{
 				PreviousLineIndent = ThisLineIndent.CurIndent;
+			}
+			else if (ch == ',') {
+				if (IsMemberReferenceDotHandled)
+					NextLineIndent.RemoveAlignment ();
 			}
 
 			if (Engine.wordToken.ToString() == "else")
@@ -864,11 +867,6 @@ namespace ICSharpCode.NRefactory6.CSharp
 //						return false;
 //					style = Engine.options.EnumBraceStyle;
 //					return true;
-//				case Body.Switch:
-//					if (!Engine.options.IndentSwitchBody)
-//						return false;
-//					style = Engine.options.StatementBraceStyle;
-//					return true;
 //				case Body.Try:
 //				case Body.Catch:
 //				case Body.Finally:
@@ -884,7 +882,19 @@ namespace ICSharpCode.NRefactory6.CSharp
 		/// </summary>
 		void AddIndentation(Body body)
 		{
-			NextLineIndent.Push(IndentType.Block);
+			switch (body) {
+			case Body.Switch:
+				if (!Engine.options.GetOption (CSharpFormattingOptions.IndentSwitchSection)) {
+					NextLineIndent.Push (IndentType.Empty);
+					break;
+				}
+				NextLineIndent.Push (IndentType.Block);
+				break;
+			default:
+				NextLineIndent.Push (IndentType.Block);
+				break;
+			}
+
 
 //			BraceStyle style;
 //			if (TryGetBraceStyle (body, out style)) {
@@ -995,19 +1005,16 @@ namespace ICSharpCode.NRefactory6.CSharp
 		public override void InitializeState()
 		{
 			ThisLineIndent = Parent.ThisLineIndent.Clone();
-			NextLineIndent = ThisLineIndent.Clone();
 
 			// remove all continuations and extra spaces
 			ThisLineIndent.RemoveAlignment(); 
 			ThisLineIndent.PopWhile(IndentType.Continuation);
 
-			NextLineIndent.RemoveAlignment();
-			NextLineIndent.PopWhile(IndentType.Continuation);
-			
+			NextLineIndent = ThisLineIndent.Clone ();
 
-			if (Engine.options.GetOption(CSharpFormattingOptions.IndentSwitchSection))
+			if (Engine.options.GetOption (CSharpFormattingOptions.IndentSwitchCaseSection)) 
 			{
-				NextLineIndent.Push(IndentType.Block);
+				NextLineIndent.Push (IndentType.Block);
 			}
 			else
 			{
@@ -1039,7 +1046,7 @@ namespace ICSharpCode.NRefactory6.CSharp
 				// OPTION: Engine.formattingOptions.IndentBreakStatements
 				if (true/*!Engine.options.IndentBreakStatements*/)
 				{
-					ThisLineIndent = Parent.ThisLineIndent.Clone();
+					// ThisLineIndent = Parent.ThisLineIndent.Clone();
 				}
 			}
 
@@ -1859,6 +1866,7 @@ namespace ICSharpCode.NRefactory6.CSharp
 			if (ch == '/' && Engine.previousChar == '*' && IsAnyCharPushed)
 			{
 				ExitState();
+				Engine.currentChar = '\0';
 			}
 
 			IsAnyCharPushed = true;

@@ -37,7 +37,7 @@ using MonoDevelop.Ide;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class SearchPackagesSearchCategory : SearchCategory
+	internal class SearchPackagesSearchCategory : SearchCategory
 	{
 		public SearchPackagesSearchCategory ()
 			: base (GettextCatalog.GetString("Search"))
@@ -48,7 +48,7 @@ namespace MonoDevelop.PackageManagement
 			if (IsProjectSelected ()) {
 				searchResultCallback.ReportResult (new SearchPackageSearchResult (pattern));
 			}
-			return SpecializedTasks.EmptyTask;
+			return Task.CompletedTask;
 		}
 
 		class SearchPackageSearchResult : SearchResult

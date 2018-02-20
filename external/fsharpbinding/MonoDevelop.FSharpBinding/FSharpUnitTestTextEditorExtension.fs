@@ -1,35 +1,39 @@
 namespace MonoDevelop.FSharp
 
-#if MDVERSION_5_5
-#else
 open System
 open System.Collections.Generic
+open MonoDevelop
 open MonoDevelop.Core
-open MonoDevelop.Ide
 open MonoDevelop.Ide.Editor
 open MonoDevelop.UnitTesting
 open MonoDevelop.Projects
-open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
 module unitTestGatherer =
-    let hasAttributeNamed name (att:FSharpAttribute) =
-        att.AttributeType.FullName.Contains name
-   
+    let hasAttributeNamed (att:FSharpAttribute) (unitTestMarkers: IUnitTestMarkers[]) (filter:  string -> IUnitTestMarkers -> bool) =
+        let attributeName = att.AttributeType.TryFullName
+        match attributeName with
+        | Some name ->
+            unitTestMarkers
+            |> Seq.exists (filter name)
+        | None -> false
+
     let createTestCase (tc:FSharpAttribute) =
         let sb = Text.StringBuilder()
-        sb.Append "(" |> ignore
+        let print format = Printf.bprintf sb format
+        print "%s" "("
         tc.ConstructorArguments 
         |> Seq.iteri (fun i (_,arg) ->
-            if i > 0 then sb.Append ", " |> ignore
+            if i > 0 then print "%s" ", "
             match arg with
-            | :? string as s -> sb.AppendFormat ("\"{0}\"", s) |> ignore
-            | :? char as c -> sb.AppendFormat ("\"{0}\"", c) |> ignore
-            | other -> sb.Append (other) |> ignore )
-        sb.Append ")" |> ignore
-        sb.ToString ()
+            | :? string as s -> print "\"%s\"" s
+            | :? char as c -> print "\"%c\"" c
+            | other -> print "%s" (other |> string))
+        print "%s" ")"
+        sb |> string
 
-    let gatherUnitTests (editor: TextEditor, allSymbols:FSharpSymbolUse [] option) =
+    let gatherUnitTests (unitTestMarkers: IUnitTestMarkers[], editor: TextEditor, allSymbols:FSharpSymbolUse [] option) =
+        let hasAttribute a = hasAttributeNamed a unitTestMarkers
         let tests = ResizeArray<UnitTestLocation>()
         
         let testSymbols = 
@@ -41,11 +45,11 @@ module unitTestGatherer =
                     (fun s -> match s.Symbol with
                               | :? FSharpMemberOrFunctionOrValue as fom -> 
                                   fom.Attributes
-                                  |> Seq.exists (fun a -> hasAttributeNamed "NUnit.Framework.TestAttribute" a || 
-                                                          hasAttributeNamed "NUnit.Framework.TestCaseAttribute" a)
-                              | :? FSharpEntity as fse ->
-                                  fse.Attributes
-                                  |> Seq.exists (hasAttributeNamed "NUnit.Framework.TestFixtureAttribute")
+                                  |> Seq.exists (fun a -> hasAttribute a (fun attributeName m -> m.TestMethodAttributeMarker = attributeName || m.TestCaseMethodAttributeMarker = attributeName) )
+                              | :? FSharpEntity as fse -> 
+                                      fse.MembersFunctionsAndValues
+                                      |> Seq.exists (fun fom -> fom.Attributes
+                                                                |> Seq.exists (fun a -> hasAttribute a (fun attributeName m -> m.TestMethodAttributeMarker = attributeName || m.TestCaseMethodAttributeMarker = attributeName) ))
                               | _ -> false )
                 |> Seq.distinctBy (fun su -> su.RangeAlternate)
                 |> Seq.choose
@@ -56,31 +60,30 @@ module unitTestGatherer =
                         match symbolUse.Symbol with
                         | :? FSharpMemberOrFunctionOrValue as func -> 
                             let typeName =
-                                match func.EnclosingEntitySafe with
+                                match func.EnclosingEntity with
                                 | Some ent -> ent.QualifiedName
                                 | None _ ->
                                     MonoDevelop.Core.LoggingService.LogWarning(sprintf "F# GatherUnitTests: found a unit test method with no qualified name: %s" func.FullName)
                                     func.CompiledName
-                            let methName = PrettyNaming.QuoteIdentifierIfNeeded func.CompiledName
+                            let methName = func.CompiledName
                             let isIgnored =
                                 func.Attributes
-                                |> Seq.exists (hasAttributeNamed "NUnit.Framework.IgnoreAttribute")
+                                |> Seq.exists (fun a -> hasAttribute a (fun attributeName m -> m.IgnoreTestMethodAttributeMarker = attributeName))
                             //add test cases
                             let testCases =
                                 func.Attributes
-                                |> Seq.filter (hasAttributeNamed "NUnit.Framework.TestCaseAttribute")
+                                |> Seq.filter (fun a -> hasAttribute a (fun attributeName m -> m.TestCaseMethodAttributeMarker = attributeName))
                             testCases
                             |> Seq.map createTestCase
                             |> test.TestCases.AddRange
                             test.UnitTestIdentifier <- typeName + "." + methName
-        
                             test.IsIgnored <- isIgnored
                             Some test
                         | :? FSharpEntity as entity ->
                             let typeName = entity.QualifiedName
                             let isIgnored =
                                 entity.Attributes
-                                |> Seq.exists (hasAttributeNamed "NUnit.Framework.IgnoreAttribute")
+                                |> Seq.exists (fun a -> hasAttribute a (fun attributeName m -> m.IgnoreTestMethodAttributeMarker = attributeName))
                             test.UnitTestIdentifier <- typeName
                             test.IsIgnored <- isIgnored
                             test.IsFixture <- true
@@ -99,6 +102,7 @@ module unitTestGatherer =
                 dnp.GetReferencedAssemblies(MonoDevelop.getConfig())
                 |> Async.AwaitTask
                 |> Async.RunSynchronously
+                |> Seq.map (fun a -> a.FilePath.FileName)
                 |> Seq.exists (fun r -> r.EndsWith ("nunit.framework.dll", StringComparison.InvariantCultureIgnoreCase)
                                         || r.EndsWith ("GuiUnit.exe", StringComparison.InvariantCultureIgnoreCase)) 
             with ex ->
@@ -109,57 +113,60 @@ module unitTestGatherer =
 type FSharpUnitTestTextEditorExtension() =
     inherit AbstractUnitTestTextEditorExtension()
 
+    let emptyResult = ResizeArray<UnitTestLocation>() :> IList<_>
     override x.GatherUnitTests (unitTestMarkers, cancellationToken) =
-        let tests = ResizeArray<UnitTestLocation>()
-
         if x.DocumentContext = null || 
             x.DocumentContext.ParsedDocument = null || 
             not (unitTestGatherer.hasNUnitReference x.DocumentContext.Project) then
-                Threading.Tasks.Task.FromResult (tests :> IList<_>)
+                Threading.Tasks.Task.FromResult emptyResult
         else
         Async.StartAsTask (
             cancellationToken = cancellationToken,
             computation = async {
-                match x.DocumentContext.ParsedDocument.Ast with
-                | :? ParseAndCheckResults as ast ->
+                match x.DocumentContext.TryGetAst() with
+                | Some ast ->
                     let! symbols = ast.GetAllUsesOfAllSymbolsInFile()
-                    tests.AddRange (unitTestGatherer.gatherUnitTests (x.Editor, symbols))
-                | _ -> ()
-                return tests :> IList<_>})
-    #endif
+                    return unitTestGatherer.gatherUnitTests (unitTestMarkers, x.Editor, symbols) :> IList<_>
+                | None -> return emptyResult })
+
+module nunitSourceCodeLocationFinder =
+    let tryFindTest fixtureNamespace fixtureTypeName testName (topmostEntity:FSharpEntity) = 
+        let matchesType (ent:FSharpEntity) =
+            let matchesNamespace() = 
+                match topmostEntity.Namespace with
+                | Some ns -> ns = fixtureNamespace
+                | None -> fixtureNamespace = null
+
+            ent.DisplayName = fixtureTypeName && matchesNamespace()
+
+        let rec getEntityAndNestedEntities (entity:FSharpEntity) =
+            seq { yield entity
+                  for child in entity.NestedEntities do
+                      yield! getEntityAndNestedEntities child }
+
+        getEntityAndNestedEntities topmostEntity
+        |> Seq.filter matchesType
+        |> Seq.collect (fun e -> e.MembersFunctionsAndValues)
+        |> Seq.tryFind (fun m -> m.CompiledName = testName)
+
+open nunitSourceCodeLocationFinder
 
 type FSharpNUnitSourceCodeLocationFinder() =
     inherit NUnitSourceCodeLocationFinder()
 
     override x.GetSourceCodeLocationAsync(_project, fixtureNamespace, fixtureTypeName, testName, token) =
+        let tryFindTest' = tryFindTest fixtureNamespace fixtureTypeName testName 
         let computation =
             async {
-                let idx = testName.IndexOf("<") //reasons
-                let testName =
-                    if idx > - 1 then
-                        testName.Substring(0, idx)
-                    else
-                        testName
-
-                let matchesType (entity:FSharpEntity) =
-                    let matchesNamespace() = 
-                        match entity.Namespace with
-                        | Some ns -> ns = fixtureNamespace
-                        | _ -> fixtureNamespace = null
-
-                    entity.DisplayName = fixtureTypeName && matchesNamespace()
-
                 let symbol = 
                     Search.getAllFSharpProjects()
                     |> Seq.filter unitTestGatherer.hasNUnitReference
                     |> Seq.map languageService.GetCachedProjectCheckResult
-                    |> Seq.choose (fun c -> c)
-                    |> Seq.filter (fun c -> not c.HasCriticalErrors)       
+                    |> Seq.choose id
+                    |> Seq.filter (fun c -> not c.HasCriticalErrors)
                     |> Seq.collect (fun c -> c.AssemblySignature.Entities)
-                    |> Seq.filter matchesType
-                    |> Seq.collect (fun e -> e.MembersFunctionsAndValues)
-                    |> Seq.tryFind (fun m -> m.CompiledName = testName)
-                             
+                    |> Seq.tryPick tryFindTest'
+
                 match symbol with
                 | Some sym ->
                     let location = sym.ImplementationLocation
@@ -170,4 +177,3 @@ type FSharpNUnitSourceCodeLocationFinder() =
                 | _ -> return null //?
             } 
         Async.StartAsTask(computation = computation, cancellationToken = token)
-

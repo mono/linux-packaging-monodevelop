@@ -26,6 +26,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 using Gtk;
 
@@ -41,14 +42,14 @@ using Mono.Addins;
 using MonoDevelop.Projects.Text;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.CodeFormatting;
-using ICSharpCode.NRefactory.TypeSystem;
 using MonoDevelop.Ide.TypeSystem;
-using ICSharpCode.NRefactory.Semantics;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Editor.Extension;
 using MonoDevelop.Ide.Editor;
 using MonoDevelop.Ide.Editor.Highlighting;
 using MonoDevelop.SourceEditor.Wrappers;
+using MonoDevelop.Core.Text;
+using System.Threading;
 
 namespace MonoDevelop.SourceEditor
 {
@@ -83,16 +84,26 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 
+		public ISyntaxHighlighting SyntaxHighlighting {
+			get {
+				return Document.SyntaxMode;
+			}
+			internal set {
+				Document.SyntaxMode = value;
+			} 
+		}
+
+
 		void UpdateSemanticHighlighting ()
 		{
 			var oldSemanticHighighting = Document.SyntaxMode as SemanticHighlightingSyntaxMode;
-
 			if (semanticHighlighting == null) {
 				if (oldSemanticHighighting != null)
-					Document.MimeType = Document.MimeType;
+					Document.SyntaxMode = oldSemanticHighighting.UnderlyingSyntaxMode;
 			} else {
 				if (oldSemanticHighighting == null) {
-					Document.SyntaxMode = new SemanticHighlightingSyntaxMode (this, Document.SyntaxMode, semanticHighlighting);
+					var def = SyntaxHighlightingService.GetSyntaxHighlightingDefinition (FileName, this.MimeType);
+					Document.SyntaxMode = new SemanticHighlightingSyntaxMode (this, def != null ? (ISyntaxHighlighting)new SyntaxHighlighting (def, Document) : DefaultSyntaxHighlighting.Instance, semanticHighlighting);
 				} else {
 					oldSemanticHighighting.UpdateSemanticHighlighting (semanticHighlighting);
 				}
@@ -124,7 +135,7 @@ namespace MonoDevelop.SourceEditor
 			var icon = Xwt.Drawing.Image.FromResource ("gutter-bookmark-15.png");
 
 			BookmarkMarker.DrawBookmarkFunc = delegate(Mono.TextEditor.MonoTextEditor editor, Cairo.Context cr, DocumentLine lineSegment, double x, double y, double width, double height) {
-				if (!lineSegment.IsBookmarked)
+				if (!editor.Document.IsBookmarked (lineSegment))
 					return;
 				cr.DrawImage (
 					editor, 
@@ -199,11 +210,7 @@ namespace MonoDevelop.SourceEditor
 			IsDestroyed = true;
 			UnregisterAdjustments ();
 			view = null;
-			var disposableSyntaxMode = Document.SyntaxMode as IDisposable;
-			if (disposableSyntaxMode != null)  {
-				disposableSyntaxMode.Dispose ();
-				Document.SyntaxMode = null;
-			}
+			Document.SyntaxMode = null;
 			base.OnDestroyed ();
 			if (Options != null) {
 				Options.Dispose ();
@@ -226,11 +233,11 @@ namespace MonoDevelop.SourceEditor
 			base.OptionsChanged (sender, args);
 		}
 
-		protected override string GetIdeColorStyleName ()
+		protected internal override string GetIdeColorStyleName ()
 		{
-			var scheme = Ide.Editor.Highlighting.SyntaxModeService.GetColorStyle (IdeApp.Preferences.ColorScheme);
-			if (!scheme.FitsIdeSkin (IdeApp.Preferences.UserInterfaceSkin))
-				scheme = Ide.Editor.Highlighting.SyntaxModeService.GetDefaultColorStyle (IdeApp.Preferences.UserInterfaceSkin);
+			var scheme = Ide.Editor.Highlighting.SyntaxHighlightingService.GetEditorTheme (IdeApp.Preferences.ColorScheme);
+			if (!scheme.FitsIdeTheme (IdeApp.Preferences.UserInterfaceTheme))
+				scheme = Ide.Editor.Highlighting.SyntaxHighlightingService.GetDefaultColorStyle (IdeApp.Preferences.UserInterfaceTheme);
 			return scheme.Name;
 		}
 		
@@ -296,7 +303,7 @@ namespace MonoDevelop.SourceEditor
 						if (isInBlockComment) {
 							if (pos > 0 && doc.GetCharAt (pos - 1) == '*') 
 								isInBlockComment = false;
-						} else  if (!isInString && !isInChar && pos + 1 < doc.TextLength) {
+						} else  if (!isInString && !isInChar && pos + 1 < doc.Length) {
 							char nextChar = doc.GetCharAt (pos + 1);
 							if (nextChar == '/')
 								isInLineComment = true;
@@ -328,7 +335,7 @@ namespace MonoDevelop.SourceEditor
 		}
 
 
-		protected override bool OnIMProcessedKeyPressEvent (Gdk.Key key, uint ch, Gdk.ModifierType state)
+		protected internal override bool OnIMProcessedKeyPressEvent (Gdk.Key key, uint ch, Gdk.ModifierType state)
 		{
 			bool result = true;
 			if (key == Gdk.Key.Escape) {
@@ -408,18 +415,27 @@ namespace MonoDevelop.SourceEditor
 			if (line == null)
 				return null;
 
-			var error = Document.GetTextSegmentMarkersAt (offset).OfType<ErrorMarker> ().FirstOrDefault ();
-			
-			if (error != null) {
+			var errors = Document.GetTextSegmentMarkersAt(offset).OfType<ErrorMarker>();
+			StringBuilder sb = null;
+
+			foreach (var error in errors)
+			{
+				if (sb != null)
+					sb.AppendLine();
+				else
+					sb = new StringBuilder();
+
 				if (error.Error.ErrorType == MonoDevelop.Ide.TypeSystem.ErrorType.Warning)
-					return GettextCatalog.GetString ("<b>Warning</b>: {0}",
-						GLib.Markup.EscapeText (error.Error.Message));
-				return GettextCatalog.GetString ("<b>Error</b>: {0}",
-					GLib.Markup.EscapeText (error.Error.Message));
+					sb.Append(GettextCatalog.GetString("<b>Warning</b>: {0}",
+						GLib.Markup.EscapeText(error.Error.Message)));
+				else
+					sb.Append(GettextCatalog.GetString("<b>Error</b>: {0}",
+						GLib.Markup.EscapeText(error.Error.Message)));
 			}
-			return null;
+
+			return sb?.ToString();
 		}
-		
+
 		public MonoDevelop.Projects.Project Project {
 			get {
 				var doc = IdeApp.Workbench.ActiveDocument;
@@ -477,10 +493,10 @@ namespace MonoDevelop.SourceEditor
 			int start = offset;
 			while (start > 0 && IsIdChar (Document.GetCharAt (start)))
 				start--;
-			while (offset < Document.TextLength && IsIdChar (Document.GetCharAt (offset)))
+			while (offset < Document.Length && IsIdChar (Document.GetCharAt (offset)))
 				offset++;
 			start++;
-			if (offset - start > 0 && start < Document.TextLength)
+			if (offset - start > 0 && start < Document.Length)
 				return Document.GetTextAt (start, offset - start);
 			else
 				return string.Empty;
@@ -497,25 +513,35 @@ namespace MonoDevelop.SourceEditor
 			ParameterInformationWindowManager.HideWindow (null, view);
 			return base.OnFocusOutEvent (evnt); 
 		}
-		
+
+		string menuPath = "/MonoDevelop/SourceEditor2/ContextMenu/Editor";
+
+		internal string ContextMenuPath {
+			get {
+				return menuPath;
+			}
+
+			set {
+				menuPath = value;
+			}
+		}
+
 		void ShowPopup (Gdk.EventButton evt)
 		{
 			view.FireCompletionContextChanged ();
 			CompletionWindowManager.HideWindow ();
 			ParameterInformationWindowManager.HideWindow (null, view);
 			HideTooltip ();
-			const string menuPath = "/MonoDevelop/SourceEditor2/ContextMenu/Editor";
+			if (string.IsNullOrEmpty (menuPath))
+				return;
 			var ctx = view.WorkbenchWindow?.ExtensionContext ?? AddinManager.AddinEngine;
-
 			CommandEntrySet cset = IdeApp.CommandService.CreateCommandEntrySet (ctx, menuPath);
 
 			if (Platform.IsMac) {
 				if (evt == null) {
-					int x, y;
 					var pt = LocationToPoint (this.Caret.Location);
-					TranslateCoordinates (Toplevel, pt.X, pt.Y, out x, out y);
 
-					IdeApp.CommandService.ShowContextMenu (this, x, y, cset, this);
+					IdeApp.CommandService.ShowContextMenu (this, pt.X, pt.Y, cset, this);
 				} else {
 					IdeApp.CommandService.ShowContextMenu (this, evt, cset, this);
 				}
@@ -550,11 +576,11 @@ namespace MonoDevelop.SourceEditor
 		
 #region Templates
 
-		public bool IsTemplateKnown ()
+		public bool IsTemplateKnown (ExtensibleTextEditor instance)
 		{
 			string shortcut = CodeTemplate.GetTemplateShortcutBeforeCaret (EditorExtension.Editor);
 			bool result = false;
-			foreach (CodeTemplate template in CodeTemplateService.GetCodeTemplates (Document.MimeType)) {
+			foreach (CodeTemplate template in CodeTemplateService.GetCodeTemplatesAsync (EditorExtension.Editor).WaitAndGetResult (CancellationToken.None)) {
 				if (template.Shortcut == shortcut) {
 					result = true;
 				} else if (template.Shortcut.StartsWith (shortcut)) {
@@ -568,9 +594,14 @@ namespace MonoDevelop.SourceEditor
 		public bool DoInsertTemplate ()
 		{
 			string shortcut = CodeTemplate.GetTemplateShortcutBeforeCaret (EditorExtension.Editor);
-			foreach (CodeTemplate template in CodeTemplateService.GetCodeTemplates (Document.MimeType)) {
+			foreach (CodeTemplate template in CodeTemplateService.GetCodeTemplatesAsync (EditorExtension.Editor).WaitAndGetResult (CancellationToken.None)) {
 				if (template.Shortcut == shortcut) {
-					InsertTemplate (template, view.WorkbenchWindow.Document.Editor, view.WorkbenchWindow.Document);
+					var doc = view.WorkbenchWindow?.Document ?? IdeApp.Workbench.ActiveDocument;
+					if (doc != null) {
+						InsertTemplate (template, doc.Editor, doc);
+					} else {
+						LoggingService.LogError ("DoInsertTemplate(): Can't find valid document");
+					}
 					return true;
 				}
 			}
@@ -584,9 +615,10 @@ namespace MonoDevelop.SourceEditor
 				var result = template.InsertTemplateContents (editor, context);
 
 				var links = result.TextLinks.Select (l => new Mono.TextEditor.TextLink (l.Name) {
-					Links = l.Links.Select (s => new TextSegment (s.Offset, s.Length)).ToList (),
+					Links = l.Links.Select (s => (ISegment)new TextSegment (s.Offset, s.Length)).ToList (),
 					IsEditable = l.IsEditable,
-					IsIdentifier = l.IsIdentifier
+					IsIdentifier = l.IsIdentifier,
+					GetStringFunc = l.GetStringFunc != null ? (Func<Func<string, string>, Mono.TextEditor.PopupWindow.IListDataProvider<string>>)(arg => new ListDataProviderWrapper (l.GetStringFunc (arg))) : null
 				}).ToList ();
 				var tle = new TextLinkEditMode (this, result.InsertPosition, links);
 				tle.TextLinkMode = TextLinkMode.General;
@@ -594,6 +626,10 @@ namespace MonoDevelop.SourceEditor
 					tle.OldMode = CurrentMode;
 					tle.StartMode ();
 					CurrentMode = tle;
+					GLib.Timeout.Add (10, delegate {
+						tle.UpdateTextLinks ();
+						return false;
+					}); 
 				}
 			}
 		}
@@ -631,6 +667,68 @@ namespace MonoDevelop.SourceEditor
 #endregion
 		
 #region Key bindings
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.CharLeft)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.CharRight)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DeleteLeftChar)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DeleteLine)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DeleteNextSubword)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DeleteNextWord)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DeletePrevSubword)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DeletePrevWord)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DeleteRightChar)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DeleteToLineEnd)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DeleteToLineStart)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DocumentEnd)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DocumentStart)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.DuplicateLine)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ExpandSelection)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ExpandSelectionToLine)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.GotoMatchingBrace)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.InsertNewLine)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.InsertNewLineAtEnd)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.InsertNewLinePreserveCaretPosition)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.InsertTab)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.LineDown)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.LineEnd)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.LineStart)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.LineUp)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.MoveBlockDown)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.MoveBlockUp)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.MoveNextSubword)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.MoveNextWord)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.MovePrevSubword)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.MovePrevWord)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.PageDown)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.PageUp)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.RemoveTab)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollBottom)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollLineDown)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollLineUp)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollPageDown)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollPageUp)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollTop)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveDown)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveEnd)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveHome)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveLeft)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveNextSubword)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveNextWord)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMovePrevSubword)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMovePrevWord)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveRight)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveToDocumentEnd)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveToDocumentStart)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveUp)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionPageDownAction)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionPageUpAction)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ShrinkSelection)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SwitchCaretMode)]
+		[CommandUpdateHandler (MonoDevelop.Ide.Commands.TextEditorCommands.TransposeCharacters)]
+		protected void OnUpdateEditorCommand (CommandInfo info)
+		{
+			// ignore command if the editor has no focus
+			info.Bypass = HasFocus == false;
+		}
 
 		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.LineEnd)]
 		internal void OnLineEnd ()
@@ -746,10 +844,16 @@ namespace MonoDevelop.SourceEditor
 			RunAction (ScrollActions.PageDown);
 		}
 
-		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.GotoMatchingBrace)]
-		internal void OnGotoMatchingBrace ()
+		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollTop)]
+		internal void OnScrollTop ()
 		{
-			RunAction (MiscActions.GotoMatchingBracket);
+			RunAction (ScrollActions.Top);
+		}
+
+		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollBottom)]
+		internal void OnScrollBottom ()
+		{
+			RunAction (ScrollActions.Bottom);
 		}
 
 		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.SelectionMoveLeft)]

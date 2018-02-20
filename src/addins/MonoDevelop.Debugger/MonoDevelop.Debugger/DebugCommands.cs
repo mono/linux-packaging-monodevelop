@@ -74,31 +74,7 @@ namespace MonoDevelop.Debugger
 	{
 		internal static IBuildTarget GetRunTarget ()
 		{
-			return IdeApp.ProjectOperations.CurrentSelectedSolution != null && IdeApp.ProjectOperations.CurrentSelectedSolution.StartupItem != null ? 
-				IdeApp.ProjectOperations.CurrentSelectedSolution.StartupItem : 
-				IdeApp.ProjectOperations.CurrentSelectedBuildTarget;
-		}
-
-		internal async static void BuildAndDebug ()
-		{
-			if (!DebuggingService.IsDebuggingSupported && !IdeApp.ProjectOperations.CurrentRunOperation.IsCompleted) {
-				MonoDevelop.Ide.Commands.StopHandler.StopBuildOperations ();
-				await IdeApp.ProjectOperations.CurrentRunOperation.Task;
-			}
-
-			if (IdeApp.Workspace.IsOpen) {
-				var it = GetRunTarget ();
-				ExecuteSolution (it);
-				return;
-			}
-		}
-
-		static void ExecuteSolution (IBuildTarget target)
-		{
-			if (IdeApp.ProjectOperations.CanDebug (target))
-				IdeApp.ProjectOperations.Debug (target);
-			else
-				IdeApp.ProjectOperations.Execute (target);
+			return IdeApp.ProjectOperations.CurrentSelectedSolution ?? IdeApp.ProjectOperations.CurrentSelectedBuildTarget;
 		}
 
 		protected override void Run ()
@@ -108,41 +84,32 @@ namespace MonoDevelop.Debugger
 				return;
 			}
 
-			BuildAndDebug ();
+			if (IdeApp.Workspace.IsOpen) {
+				var target = GetRunTarget ();
+				if (target != null)
+					IdeApp.ProjectOperations.Debug (target);
+			}
 		}
-		
+
 		protected override void Update (CommandInfo info)
 		{
-			if (DebuggingService.IsRunning) {
+			if (!IdeApp.Workspace.IsOpen || !DebuggingService.IsDebuggingSupported) {
 				info.Enabled = false;
 				return;
 			}
-			
 			if (DebuggingService.IsPaused) {
 				info.Enabled = true;
 				info.Text = GettextCatalog.GetString ("_Continue Debugging");
 				info.Description = GettextCatalog.GetString ("Continue the execution of the application");
 				return;
 			}
-			
-			// If there are no debugger installed, this command will not debug, it will
-			// just run, so the label has to be changed accordingly.
-			if (!DebuggingService.IsDebuggingSupported) {
-				info.Text = IdeApp.ProjectOperations.CurrentRunOperation.IsCompleted ? GettextCatalog.GetString ("Start Without Debugging") : GettextCatalog.GetString ("Restart Without Debugging");
-				info.Icon = Stock.RunProgramIcon;
-			}
-
-			if (IdeApp.Workspace.IsOpen) {
-				var target = GetRunTarget ();
-				bool canExecute = target != null && (
-					IdeApp.ProjectOperations.CanDebug (target) ||
-					(!DebuggingService.IsDebuggingSupported && IdeApp.ProjectOperations.CanExecute (target))
-				);
-
-				info.Enabled = canExecute && (IdeApp.ProjectOperations.CurrentRunOperation.IsCompleted || !DebuggingService.IsDebuggingSupported);
-			} else {
+			if (DebuggingService.IsDebugging) {
 				info.Enabled = false;
+				return;
 			}
+
+			var target = GetRunTarget ();
+			info.Enabled = target != null && IdeApp.ProjectOperations.CanDebug (target);
 		}
 	}
 	
@@ -158,9 +125,7 @@ namespace MonoDevelop.Debugger
 		protected override void Update (CommandInfo info)
 		{
 			IBuildTarget target = IdeApp.ProjectOperations.CurrentSelectedBuildTarget;
-			info.Enabled = target != null &&
-					!(target is Workspace) && IdeApp.ProjectOperations.CanDebug (target) &&
-					IdeApp.ProjectOperations.CurrentRunOperation.IsCompleted;
+			info.Enabled = target != null && !(target is Workspace) && IdeApp.ProjectOperations.CanDebug (target);
 		}
 	}
 	
@@ -209,8 +174,7 @@ namespace MonoDevelop.Debugger
 		
 		protected override void Update (CommandInfo info)
 		{
-			info.Enabled = IdeApp.ProjectOperations.CurrentRunOperation.IsCompleted;
-			info.Visible = DebuggingService.IsFeatureSupported (DebuggerFeatures.DebugFile);
+			info.Enabled = info.Visible = DebuggingService.IsFeatureSupported (DebuggerFeatures.DebugFile);
 		}
 	}
 	
@@ -231,8 +195,7 @@ namespace MonoDevelop.Debugger
 		
 		protected override void Update (CommandInfo info)
 		{
-			info.Enabled = IdeApp.ProjectOperations.CurrentRunOperation.IsCompleted;
-			info.Visible = DebuggingService.IsFeatureSupported (DebuggerFeatures.Attaching);
+			info.Enabled = info.Visible = DebuggingService.IsFeatureSupported (DebuggerFeatures.Attaching);
 		}
 	}
 	
@@ -317,7 +280,7 @@ namespace MonoDevelop.Debugger
 		
 		protected override void Update (CommandInfo info)
 		{
-			info.Visible = !DebuggingService.IsRunning;
+			info.Visible = DebuggingService.IsPaused;
 			info.Enabled = DebuggingService.IsConnected && DebuggingService.IsPaused;
 		}
 	}
@@ -391,8 +354,16 @@ namespace MonoDevelop.Debugger
 			    IdeApp.Workbench.ActiveDocument.Editor != null &&
 			    IdeApp.Workbench.ActiveDocument.FileName != FilePath.Null &&
 			    !breakpoints.IsReadOnly) {
-				lock (breakpoints)
-					info.Enabled = breakpoints.GetBreakpointsAtFileLine (IdeApp.Workbench.ActiveDocument.FileName, IdeApp.Workbench.ActiveDocument.Editor.CaretLine).Count > 0;
+				lock (breakpoints) {
+					var bpInLine = breakpoints.GetBreakpointsAtFileLine (IdeApp.Workbench.ActiveDocument.FileName, IdeApp.Workbench.ActiveDocument.Editor.CaretLine);
+					info.Enabled = bpInLine.Count > 0;
+					info.Text = GettextCatalog.GetString ("Disable Breakpoint");
+					foreach (var bp in bpInLine) {
+						if (!bp.Enabled)
+							info.Text = GettextCatalog.GetString ("Enable Breakpoint");
+						break;
+					}
+				}
 			} else {
 				info.Enabled = false;
 			}
@@ -424,8 +395,20 @@ namespace MonoDevelop.Debugger
 		{
 			var breakpoints = DebuggingService.Breakpoints;
 
-			lock (breakpoints)
+			lock (breakpoints) {
 				info.Enabled = !breakpoints.IsReadOnly && breakpoints.Count > 0;
+				bool enable = false;
+				foreach (BreakEvent bp in breakpoints) {
+					if (!bp.Enabled) {
+						enable = true;
+						break;
+					}
+				}
+				if (enable)
+					info.Text = GettextCatalog.GetString ("Enable All Breakpoints");
+				else
+					info.Text = GettextCatalog.GetString ("Disable All Breakpoints");
+			}
 			info.Visible = DebuggingService.IsFeatureSupported (DebuggerFeatures.Breakpoints);
 		}
 	}
@@ -559,33 +542,34 @@ namespace MonoDevelop.Debugger
 				return;
 			}
 
-			var bp = new RunToCursorBreakpoint (doc.FileName, doc.Editor.CaretLine, doc.Editor.CaretColumn);
-			DebuggingService.Breakpoints.Add (bp);
-			DebugHandler.BuildAndDebug ();
+			if (IdeApp.Workspace.IsOpen) {
+				var bp = new RunToCursorBreakpoint (doc.FileName, doc.Editor.CaretLine, doc.Editor.CaretColumn);
+				DebuggingService.Breakpoints.Add (bp);
+				var target = DebugHandler.GetRunTarget ();
+				if (target != null)
+					IdeApp.ProjectOperations.Debug (target);
+			}
 		}
 
 		protected override void Update (CommandInfo info)
 		{
 			info.Visible = true;
 
-			if (!DebuggingService.IsDebuggingSupported || !DebuggingService.IsFeatureSupported (DebuggerFeatures.Breakpoints) || DebuggingService.Breakpoints.IsReadOnly) {
+			if (!IdeApp.Workspace.IsOpen || !DebuggingService.IsDebuggingSupported || !DebuggingService.IsFeatureSupported (DebuggerFeatures.Breakpoints) || DebuggingService.Breakpoints.IsReadOnly) {
 				info.Enabled = false;
 				return;
 			}
 
 			var doc = IdeApp.Workbench.ActiveDocument;
 
-			if (doc != null && doc.Editor != null && doc.FileName != FilePath.Null) {
-				if (IdeApp.Workspace.IsOpen) {
-					var target = DebugHandler.GetRunTarget ();
-
-					info.Enabled =  target != null && IdeApp.ProjectOperations.CanDebug (target);
-				} else {
-					info.Enabled = false;
+			if (doc?.Editor != null && doc.FileName != FilePath.Null) {
+				var target = DebugHandler.GetRunTarget ();
+				if (target != null && IdeApp.ProjectOperations.CanDebug (target)) {
+					info.Enabled = true;
+					return;
 				}
-			} else {
-				info.Enabled = false;
 			}
+			info.Enabled = false;
 		}
 	}
 	
@@ -689,7 +673,15 @@ namespace MonoDevelop.Debugger
 				DebuggingService.SetNextStatement (doc.FileName, doc.Editor.CaretLine, doc.Editor.CaretColumn);
 			} catch (Exception e) {
 				if (e is NotSupportedException || e.InnerException is NotSupportedException) {
-					MessageService.ShowError ("Unable to set the next statement to this location.");
+					string message;
+					if (e is NotSupportedException)
+						message = e.Message;
+					else
+						message = e.InnerException.Message;
+					if (message == "Unable to set the next statement. The next statement cannot be set to another function.")
+						MessageService.ShowError (GettextCatalog.GetString ("Unable to set the next statement. The next statement cannot be set to another function."));
+					else
+						MessageService.ShowError (GettextCatalog.GetString ("Unable to set the next statement to this location."));
 				} else {
 					throw;
 				}

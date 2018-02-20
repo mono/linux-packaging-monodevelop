@@ -1,24 +1,30 @@
-using System;
-using System.IO;
 using MonoDevelop.Ide.Gui;
-using System.Text;
-using Gtk;
-using System.Threading.Tasks;
-using MonoDevelop.Components;
 
 namespace MonoDevelop.VersionControl
 {
 	public abstract class BaseView : ViewContent
 	{
-		string name;
-		
-		protected BaseView (string name)
+		readonly string name;
+		readonly string accessibilityDescription;
+
+		protected BaseView (string name) :this (name, "")
+		{
+		}
+
+		protected BaseView (string name, string description)
 		{
 			ContentName = this.name = name;
+			accessibilityDescription = description;
 		}
 
 		public override string TabPageLabel {
 			get { return name; }
+		}
+
+		public override string TabAccessibilityDescription {
+			get {
+				return accessibilityDescription;
+			}
 		}
 	}
 }

@@ -28,18 +28,16 @@ using AppKit;
 using Foundation;
 using CoreGraphics;
 using MonoDevelop.Components.MainToolbar;
+using MonoDevelop.Core;
 using MonoDevelop.Ide;
-using MonoDevelop.Components;
 using Xwt.Mac;
-using CoreImage;
 
 namespace MonoDevelop.MacIntegration.MainToolbar
 {
-	[Register]
-	class RunButton : NSButton
+	[Register ("RunButton")]
+	class RunButton : NSFocusButton, INSAccessibilityButton, INSAccessibility
 	{
 		NSImage stopIcon, continueIcon, buildIcon;
-
 
 		public RunButton ()
 		{
@@ -54,6 +52,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			BezelStyle = NSBezelStyle.TexturedRounded;
 
 			Enabled = false;
+			UpdateAccessibilityValues ();
 		}
 
 		void UpdateIcons (object sender = null, EventArgs e = null)
@@ -63,13 +62,13 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			buildIcon = MultiResImage.CreateMultiResImage ("build", "");
 
 			// We can use Template images supported by NSButton, thus no reloading
-			// on theme/skin change is required.
+			// on theme change is required.
 			stopIcon.Template = continueIcon.Template = buildIcon.Template = true;
 		}
 
 		void UpdateCell ()
 		{
-			Appearance = NSAppearance.GetAppearance (IdeApp.Preferences.UserInterfaceSkin == Skin.Dark ? NSAppearance.NameVibrantDark : NSAppearance.NameAqua);
+			Appearance = NSAppearance.GetAppearance (IdeApp.Preferences.UserInterfaceTheme == Theme.Dark ? NSAppearance.NameVibrantDark : NSAppearance.NameAqua);
 			NeedsDisplay = true;
 		}
 
@@ -86,6 +85,27 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			throw new InvalidOperationException ();
 		}
 
+		void GetTitleAndHelpForIcon (out string title, out string help)
+		{
+			title = "";
+			help = "";
+
+			switch (icon) {
+			case OperationIcon.Stop:
+				title = GettextCatalog.GetString ("Stop");
+				help = GettextCatalog.GetString ("Stop the executing solution");
+				break;
+			case OperationIcon.Run:
+				title = GettextCatalog.GetString ("Run");
+				help = GettextCatalog.GetString ("Build and run the current solution");
+				break;
+			case OperationIcon.Build:
+				title = GettextCatalog.GetString ("Build");
+				help = GettextCatalog.GetString ("Build the current solution");
+				break;
+			}
+		}
+
 		public override bool Enabled {
 			get {
 				return base.Enabled;
@@ -93,6 +113,8 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			set {
 				base.Enabled = value;
 				Image = GetIcon ();
+
+				UpdateAccessibilityValues ();
 			}
 		}
 
@@ -104,7 +126,34 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 					return;
 				icon = value;
 				Image = GetIcon ();
+
+				UpdateAccessibilityValues ();
 			}
+		}
+
+		void UpdateAccessibilityValues ()
+		{
+			var nsa = (INSAccessibility) this;
+			nsa.AccessibilityIdentifier = "MainToolbar.RunButton";
+
+			string help, title;
+			GetTitleAndHelpForIcon (out title, out help);
+
+			AccessibilityHelp = help;
+			AccessibilityTitle = title;
+			AccessibilityEnabled = Enabled;
+			AccessibilitySubrole = NSAccessibilitySubroles.ToolbarButtonSubrole;
+
+			// FIXME: Setting this doesn't appear to change anything.
+			// Nor does overriding the INSAccessibilityButton.AccessibilityLabel getter
+			nsa.AccessibilityLabel = title;
+		}
+
+		// This method override is required so that Cocoa will pick up that our button subclass
+		// has a PerformPress action.
+		public override bool AccessibilityPerformPress ()
+		{
+			return base.AccessibilityPerformPress ();
 		}
 
 		public override CGSize IntrinsicContentSize {
@@ -118,7 +167,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 	{
 		public override void DrawBezelWithFrame (CGRect frame, NSView controlView)
 		{
-			if (IdeApp.Preferences.UserInterfaceSkin == Skin.Dark) {
+			if (IdeApp.Preferences.UserInterfaceTheme == Theme.Dark) {
 				var inset = frame.Inset (0.25f, 0.25f);
 
 				var path = NSBezierPath.FromRoundedRect (inset, 3, 3);
@@ -131,10 +180,17 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				//
 				// However after switching theme this filter is removed and the colour set here is the actual colour
 				// displayed onscreen.
-				Styles.DarkBorderBrokenColor.ToNSColor ().SetStroke ();
+
+				// This also seems to happen in fullscreen mode and always on High Sierra
+				if (MainToolbar.IsFullscreen || MacSystemInformation.OsVersion >= MacSystemInformation.HighSierra) {
+					Styles.DarkBorderColor.ToNSColor ().SetStroke ();
+				} else {
+					Styles.DarkBorderBrokenColor.ToNSColor ().SetStroke ();
+				}
+
 				path.Stroke ();
 			} else {
-				if (controlView.Window.Screen.BackingScaleFactor == 2) {
+				if (controlView.Window?.Screen?.BackingScaleFactor == 2) {
 					frame = new CGRect (frame.X, frame.Y + 0.5f, frame.Width, frame.Height);
 				}
 				base.DrawBezelWithFrame (frame, controlView);
@@ -144,7 +200,18 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		public override void DrawInteriorWithFrame (CGRect cellFrame, NSView inView)
 		{
 			cellFrame = new CGRect (cellFrame.X, cellFrame.Y + 0.5f, cellFrame.Width, cellFrame.Height);
+
+			var old = Enabled;
+
+			// In fullscreen mode with dark theme on El Capitan, the disabled icon picked is for the
+			// normal appearance so it is too dark. Hack this so it comes up lighter.
+			// This also happens in all modes on High Sierra.
+			// For further information see the comment in AwesomeBar.cs
+			if (IdeApp.Preferences.UserInterfaceTheme == Theme.Dark && (MainToolbar.IsFullscreen || MacSystemInformation.OsVersion >= MacSystemInformation.HighSierra)) {
+				Enabled = true;
+			}
 			base.DrawInteriorWithFrame (cellFrame, inView);
+			Enabled = old;
 		}
 	}
 }

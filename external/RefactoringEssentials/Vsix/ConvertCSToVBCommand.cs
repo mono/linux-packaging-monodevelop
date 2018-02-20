@@ -1,24 +1,14 @@
 ﻿using System;
 using System.ComponentModel.Design;
-using System.Globalization;
 using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.VisualStudio.TextManager.Interop;
-using Microsoft.VisualStudio.Text.Editor;
-using Microsoft.VisualStudio.Editor;
-using System.Windows;
-using Microsoft.VisualStudio.Text;
-using RefactoringEssentials.Converter;
-using Microsoft.VisualStudio;
-using System.Runtime.InteropServices;
 using System.IO;
 
 namespace RefactoringEssentials.VsExtension
 {
-    /// <summary>
-    /// Command handler
-    /// </summary>
-    internal sealed class ConvertCSToVBCommand
+	/// <summary>
+	/// Command handler
+	/// </summary>
+	internal sealed class ConvertCSToVBCommand
     {
         public const int MainMenuCommandId = 0x0100;
         public const int CtxMenuCommandId = 0x0101;
@@ -32,7 +22,7 @@ namespace RefactoringEssentials.VsExtension
         /// <summary>
         /// VS Package that provides this command, not null.
         /// </summary>
-        readonly Package package;
+        readonly REConverterPackage package;
 
         /// <summary>
         /// Gets the instance of the command.
@@ -58,7 +48,7 @@ namespace RefactoringEssentials.VsExtension
         /// Initializes the singleton instance of the command.
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
-        public static void Initialize(Package package)
+        public static void Initialize(REConverterPackage package)
         {
             Instance = new ConvertCSToVBCommand(package);
         }
@@ -68,7 +58,7 @@ namespace RefactoringEssentials.VsExtension
         /// Adds our command handlers for menu (commands must exist in the command table file)
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
-        ConvertCSToVBCommand(Package package)
+        ConvertCSToVBCommand(REConverterPackage package)
         {
             if (package == null)
             {
@@ -105,7 +95,14 @@ namespace RefactoringEssentials.VsExtension
             var menuItem = sender as OleMenuCommand;
             if (menuItem != null)
             {
-                menuItem.Visible = !CodeConversion.GetCSSelectionInCurrentView(ServiceProvider)?.StreamSelectionSpan.IsEmpty ?? false;
+                if (!package.DisableConverterInContextMenu)
+                {
+                    menuItem.Visible = !CodeConversion.GetCSSelectionInCurrentView(ServiceProvider)?.StreamSelectionSpan.IsEmpty ?? false;
+                }
+                else
+                {
+                    menuItem.Visible = false;
+                }
             }
         }
 
@@ -117,13 +114,16 @@ namespace RefactoringEssentials.VsExtension
                 menuItem.Visible = false;
                 menuItem.Enabled = false;
 
-                string itemPath = VisualStudioInteraction.GetSingleSelectedItemPath();
-                var fileInfo = new FileInfo(itemPath);
-                if (!CodeConversion.IsCSFileName(fileInfo.Name))
-                    return;
+                if (!package.DisableConverterInContextMenu)
+                {
+                    string itemPath = VisualStudioInteraction.GetSingleSelectedItemPath();
+                    var fileInfo = new FileInfo(itemPath);
+                    if (!CodeConversion.IsCSFileName(fileInfo.Name))
+                        return;
 
-                menuItem.Visible = true;
-                menuItem.Enabled = true;
+                    menuItem.Visible = true;
+                    menuItem.Enabled = true;
+                }
             }
         }
 

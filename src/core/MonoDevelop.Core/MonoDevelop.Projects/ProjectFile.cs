@@ -471,8 +471,10 @@ namespace MonoDevelop.Projects
 		protected override void OnProjectSet ()
 		{
 			base.OnProjectSet ();
-			if (Project != null)
+			if (Project != null) {
+				base.Include = Include;
 				OnVirtualPathChanged (FilePath.Null, ProjectVirtualPath);
+			}
 		}
 
 		public override string ToString ()
@@ -489,6 +491,7 @@ namespace MonoDevelop.Projects
 			pf.VirtualPathChanged = null;
 			pf.PathChanged = null;
 			pf.BackingItem = null;
+			pf.BackingEvalItem = null;
 			return pf;
 		}
 

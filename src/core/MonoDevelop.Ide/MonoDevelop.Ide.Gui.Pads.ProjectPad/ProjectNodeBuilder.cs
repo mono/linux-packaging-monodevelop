@@ -55,12 +55,15 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		
 		protected override void Initialize ()
 		{
+			base.Initialize ();
+
 			IdeApp.Workspace.FileAddedToProject += OnAddFile;
 			IdeApp.Workspace.FileRemovedFromProject += OnRemoveFile;
 			IdeApp.Workspace.FileRenamedInProject += OnRenameFile;
 			IdeApp.Workspace.FilePropertyChangedInProject += OnFilePropertyChanged;
 			IdeApp.Workspace.ActiveConfigurationChanged += IdeAppWorkspaceActiveConfigurationChanged;
 			FileService.FileRemoved += OnSystemFileDeleted;
+			FileService.FileCreated += OnSystemFileCreated;
 		}
 
 		public override void Dispose ()
@@ -71,6 +74,9 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			IdeApp.Workspace.FilePropertyChangedInProject -= OnFilePropertyChanged;
 			IdeApp.Workspace.ActiveConfigurationChanged -= IdeAppWorkspaceActiveConfigurationChanged;
 			FileService.FileRemoved -= OnSystemFileDeleted;
+			FileService.FileCreated -= OnSystemFileCreated;
+
+			base.Dispose ();
 		}
 
 		public override void OnNodeAdded (object dataObject)
@@ -123,9 +129,10 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			}
 
 			nodeInfo.Icon = Context.GetIcon (p.StockIcon);
-			if (p.ParentSolution != null && p.ParentSolution.SingleStartup && p.ParentSolution.StartupItem == p)
+			var sc = p.ParentSolution?.StartupConfiguration;
+			if (sc != null && IsStartupProject (p, sc)) {
 				nodeInfo.Label = "<b>" + escapedProjectName + "</b>";
-			else
+			} else
 				nodeInfo.Label = escapedProjectName;
 
 			// Gray out the project name if it is not selected in the current build configuration
@@ -144,6 +151,15 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 					nodeInfo.StatusMessage = GettextCatalog.GetString ("Project not built in active configuration");
 				}
 			}
+		}
+
+		bool IsStartupProject (Project p, SolutionRunConfiguration sc)
+		{
+			var single = sc as SingleItemSolutionRunConfiguration;
+			if (single != null)
+				return single.Item == p;
+			var multi = sc as MultiItemSolutionRunConfiguration;
+			return multi != null && multi.Items.Any (si => si.SolutionItem == p);
 		}
 
 		public override void BuildChildNodes (ITreeBuilder builder, object dataObject)
@@ -202,6 +218,30 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				foreach (var dir in dirs) {
 					if (tb.MoveToObject (new ProjectFolder (dir, p)) && tb.MoveToParent ())
 						tb.UpdateAll ();
+				}
+			}
+		}
+
+		void OnSystemFileCreated (object sender, FileEventArgs args)
+		{
+			if (!args.Any (f => f.IsDirectory))
+				return;
+
+			// When a folder is created, we need to refresh the parent if the folder was created externally.
+			ITreeBuilder tb = Context.GetTreeBuilder ();
+			var dirs = args.Where (d => d.IsDirectory).Select (d => d.FileName).ToArray ();
+
+			foreach (var p in IdeApp.Workspace.GetAllProjects ()) {
+				foreach (var dir in dirs) {
+					if (tb.MoveToObject (new ProjectFolder (dir, p))) {
+						if (tb.MoveToParent ())
+							tb.UpdateAll ();
+					} else if (tb.MoveToObject (new ProjectFolder (dir.ParentDirectory, p))) {
+						tb.UpdateAll ();
+					} else if (dir.ParentDirectory == p.BaseDirectory) {
+						if (tb.MoveToObject (p))
+							tb.UpdateAll ();
+					}
 				}
 			}
 		}
@@ -296,12 +336,25 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				} else {
 					// We can't use IsExternalToProject here since the ProjectFile has
 					// already been removed from the project
-					string parentPath = file.IsLink
+					FilePath parentPath = file.IsLink
 						? project.BaseDirectory.Combine (file.Link.IsNullOrEmpty? file.FilePath.FileName : file.Link.ToString ()).ParentDirectory
 						: file.FilePath.ParentDirectory;
 					
-					if (!tb.MoveToObject (new ProjectFolder (parentPath, project)))
-						return;
+					if (!tb.MoveToObject (new ProjectFolder (parentPath, project))) {
+						if (project.UseFileWatcher && parentPath.IsChildPathOf (project.BaseDirectory)) {
+							// Keep looking for folder higher up the tree so any empty folders
+							// can be removed.
+							while (parentPath != project.BaseDirectory) {
+								parentPath = parentPath.ParentDirectory;
+								if (tb.MoveToObject (new ProjectFolder (parentPath, project))) {
+									tb.UpdateAll ();
+									break;
+								}
+							}
+						} else {
+							return;
+						}
+					}
 				}
 			}
 			
@@ -309,8 +362,15 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				ProjectFolder f = (ProjectFolder) tb.DataItem;
 				if (!Directory.Exists (f.Path) && !project.Files.GetFilesInVirtualPath (f.Path.ToRelative (project.BaseDirectory)).Any ())
 					tb.Remove (true);
-				else
+				else if (project.UseFileWatcher) {
+					// Ensure empty folders are removed if they are not part of the project.
+					while (!tb.HasChildren () && tb.MoveToParent ()) {
+						tb.UpdateAll ();
+					}
 					break;
+				} else {
+					break;
+				}
 			}
 		}
 		
@@ -389,11 +449,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		{
 			Project project = CurrentNode.DataItem as Project;
 			project.ParentSolution.StartupItem = project;
-			if (!project.ParentSolution.SingleStartup) {
-				project.ParentSolution.SingleStartup = true;
-				await IdeApp.ProjectOperations.SaveAsync (project.ParentSolution);
-			} else
-				await project.ParentSolution.SaveUserProperties ();
+			await project.ParentSolution.SaveUserProperties ();
 		}
 		
 		public override void DeleteItem ()

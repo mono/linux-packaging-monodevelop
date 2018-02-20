@@ -38,9 +38,11 @@ using System.Xml;
 using Gtk;
 using Mono.Addins;
 using MonoDevelop.Core;
+using MonoDevelop.Core.AddIns;
 using MonoDevelop.Ide.Codons;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
+using MonoDevelop.Projects.Extensions;
 
 namespace MonoDevelop.Ide.Templates
 {
@@ -59,8 +61,6 @@ namespace MonoDevelop.Ide.Templates
 		public string Description { get; private set; } = String.Empty;
 
 		public List<FileDescriptionTemplate> Files { get; private set; } = new List<FileDescriptionTemplate> ();
-
-		public static List<FileTemplate> fileTemplates = new List<FileTemplate> ();
 
 		public IconId Icon { get; private set; } = String.Empty;
 
@@ -106,7 +106,7 @@ namespace MonoDevelop.Ide.Templates
 			fileTemplate.LastModified = xmlDocument.DocumentElement.GetAttribute ("LastModified");
 
 			if (xmlNodeConfig ["_Name"] != null) {
-				fileTemplate.Name = xmlNodeConfig ["_Name"].InnerText;
+				fileTemplate.Name = Localize (addin, xmlNodeConfig ["_Name"].InnerText);
 			} else {
 				throw new InvalidOperationException (string.Format ("Missing element '_Name' in file template: {0}", templateId));
 			}
@@ -141,7 +141,7 @@ namespace MonoDevelop.Ide.Templates
 			}
 
 			if (xmlNodeConfig ["_Description"] != null) {
-				fileTemplate.Description = xmlNodeConfig ["_Description"].InnerText;
+				fileTemplate.Description = Localize (addin, xmlNodeConfig ["_Description"].InnerText);
 			}
 
 			if (xmlNodeConfig ["Icon"] != null) {
@@ -191,58 +191,57 @@ namespace MonoDevelop.Ide.Templates
 			return fileTemplate;
 		}
 
-		static FileTemplate ()
+		static FileTemplate LoadTemplate (ProjectTemplateCodon codon)
 		{
-			AddinManager.AddExtensionNodeHandler ("/MonoDevelop/Ide/FileTemplates", OnExtensionChanged);
+			try {
+				FileTemplate t = LoadFileTemplate (codon.Addin, codon);
+				t.Id = codon.Id;
+				return t;
+			} catch (Exception e) {
+				string extId = null, addinId = null;
+				if (codon != null) {
+					if (codon.HasId)
+						extId = codon.Id;
+					if (codon.Addin != null)
+						addinId = codon.Addin.Id;
+				}
+				LoggingService.LogError ("Error loading template id {0} in addin {1}:\n{2}",
+					extId ?? "(null)", addinId ?? "(null)", e.ToString ());
+			}
+			return null;
 		}
 
-		static void OnExtensionChanged (object s, ExtensionNodeEventArgs args)
-		{
-			if (args.Change == ExtensionChange.Add) {
-				var codon = (ProjectTemplateCodon)args.ExtensionNode;
-				try {
-					FileTemplate t = LoadFileTemplate (codon.Addin, codon);
-					t.Id = codon.Id;
-					fileTemplates.Add (t);
-				} catch (Exception e) {
-					string extId = null, addinId = null;
-					if (codon != null) {
-						if (codon.HasId)
-							extId = codon.Id;
-						if (codon.Addin != null)
-							addinId = codon.Addin.Id;
-					}
-					LoggingService.LogError ("Error loading template id {0} in addin {1}:\n{2}",
-						extId ?? "(null)", addinId ?? "(null)", e.ToString ());
-				}
-			} else {
-				var codon = (ProjectTemplateCodon)args.ExtensionNode;
-				foreach (FileTemplate t in fileTemplates) {
-					if (t.Id == codon.Id) {
-						fileTemplates.Remove (t);
-						break;
-					}
-				}
-			}
-		}
+		static string EXTENSION_PATH = "/MonoDevelop/Ide/FileTemplates";
 
 		internal static List<FileTemplate> GetFileTemplates (Project project, string projectPath)
 		{
-			var list = new List<FileTemplate> ();
-			foreach (var t in fileTemplates) {
-				if (t.IsValidForProject (project, projectPath))
-					list.Add (t);
+			var extensionContext = AddinManager.CreateExtensionContext ();
+			if (project != null) {
+				extensionContext.RegisterCondition ("AppliesTo", new AppliesToCondition (project));
+				extensionContext.RegisterCondition ("FlavorType", new FlavorTypeCondition (project));
+				extensionContext.RegisterCondition ("ProjectTypeId", new ProjectTypeIdCondition (project));
+			} else {
+				extensionContext.RegisterCondition ("AppliesTo", TrueCondition.Instance);
+				extensionContext.RegisterCondition ("FlavorType", TrueCondition.Instance);
+				extensionContext.RegisterCondition ("ProjectTypeId", TrueCondition.Instance);
 			}
+
+			var list = new List<FileTemplate> ();
+			foreach (var node in extensionContext.GetExtensionNodes<ProjectTemplateCodon> (EXTENSION_PATH)) {
+				var template = LoadTemplate (node); 
+				if (template != null && template.IsValidForProject (project, projectPath)) {
+					list.Add (template);
+				}
+			}
+
 			return list;
 		}
 
 		internal static FileTemplate GetFileTemplateByID (string templateID)
 		{
-			foreach (FileTemplate t in fileTemplates)
-				if (t.Id == templateID)
-					return t;
-
-			return null;
+			var node = AddinManager.GetExtensionNodes<ProjectTemplateCodon> (EXTENSION_PATH)
+								   .FirstOrDefault (n => n.Id == templateID);
+			return node == null ? null : LoadTemplate (node);
 		}
 
 		public virtual bool Create (SolutionFolderItem policyParent, Project project, string directory, string language, string name)
@@ -444,6 +443,17 @@ namespace MonoDevelop.Ide.Templates
 					list.Remove ("*");
 				}
 			}
+		}
+
+		/// <summary>
+		/// The addin may be null if the file template is loaded by a unit test.
+		/// </summary>
+		static string Localize (RuntimeAddin addin, string s)
+		{
+			if (addin != null)
+				return addin.Localizer.GetString (s);
+
+			return GettextCatalog.GetString (s);
 		}
 	}
 }

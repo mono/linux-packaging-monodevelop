@@ -28,6 +28,7 @@ using System.Collections.Generic;
 using AppKit;
 using CoreGraphics;
 using MonoDevelop.Ide;
+using System.Linq;
 
 namespace MonoDevelop.MacIntegration.MainToolbar
 {
@@ -59,12 +60,45 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			}
 		}
 
+		public override void KeyDown (NSEvent theEvent)
+        {
+            if (theEvent.Characters == "\t" && NextKeyView != null) {
+				var success = buttonBars.FirstOrDefault ().IncreaseFocusIndex(); //TODO
+				if(!success)
+					Window.MakeFirstResponder (NextKeyView);
+				return; 
+            }
+
+			if (theEvent.Characters == " " && NextKeyView != null) {
+				var buttonBar = buttonBars.FirstOrDefault ();
+				buttonBar.ExecuteFocused ();
+			}
+
+			base.KeyDown (theEvent);
+        }
+
+		public override bool BecomeFirstResponder ()
+		{
+			if (buttonBars.Any ())
+				buttonBars.FirstOrDefault ().HasFocus = true;
+			else
+				Window.MakeFirstResponder (NextKeyView);
+			return base.BecomeFirstResponder ();
+		}
+
+		public override bool ResignFirstResponder ()
+		{
+			if (buttonBars.Any ()) 
+				buttonBars.FirstOrDefault ().HasFocus = false;
+			return base.ResignFirstResponder ();
+		}  
+
 		public ButtonBarContainer ()
 		{
 			Ide.Gui.Styles.Changed += (o, e) => LayoutButtonBars ();
 		}
 
-		const float segmentWidth = 33.0f;
+		internal const float SegmentWidth = 33.0f;
 		const float buttonBarSpacing = 8.0f;
 		const float extraPadding = 6.0f;
 
@@ -79,7 +113,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			nfloat y = 0;
 			nfloat height = AwesomeBar.ToolbarWidgetHeight;
 
-			if (IdeApp.Preferences.UserInterfaceSkin == Skin.Dark) {
+			if (IdeApp.Preferences.UserInterfaceTheme == Theme.Dark) {
 				y = 2;
 				height += 2;
 			} else {
@@ -88,7 +122,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			}
 
 			foreach (ButtonBar bar in buttonBars) {
-				var frame = new CGRect (nextX, y, extraPadding + (bar.SegmentCount * segmentWidth), height);
+				var frame = new CGRect (nextX, y, extraPadding + (bar.SegmentCount * SegmentWidth), height);
 				bar.Frame = frame;
 
 				nextX = frame.GetMaxX () + buttonBarSpacing;

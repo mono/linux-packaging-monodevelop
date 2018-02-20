@@ -30,6 +30,7 @@ using MonoDevelop.Ide.FindInFiles;
 using MonoDevelop.Ide.TypeSystem;
 using MonoDevelop.Core;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Refactoring;
 using System.Threading.Tasks;
@@ -48,8 +49,15 @@ namespace MonoDevelop.CSharp.Navigation
 				using (var monitor = IdeApp.Workbench.ProgressMonitors.GetSearchProgressMonitor (true, true)) {
 					var foundSymbol = sym.OverriddenMember ();
 					while (foundSymbol != null) {
-						foreach (var loc in foundSymbol.Locations)
+						foreach (var loc in foundSymbol.Locations) {
+							if (monitor.CancellationToken.IsCancellationRequested)
+								return;
+
+							if (loc.SourceTree == null)
+								continue;
+							
 							monitor.ReportResult (new MemberReference (foundSymbol, loc.SourceTree.FilePath, loc.SourceSpan.Start, loc.SourceSpan.Length));
+						}
 						foundSymbol = foundSymbol.OverriddenMember ();
 					}
 				}

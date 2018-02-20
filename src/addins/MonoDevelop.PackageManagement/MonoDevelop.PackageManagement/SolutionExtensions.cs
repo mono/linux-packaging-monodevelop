@@ -34,7 +34,7 @@ using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement
 {
-	public static class SolutionExtensions
+	internal static class SolutionExtensions
 	{
 		public static IEnumerable<DotNetProject> GetAllDotNetProjects (this Solution solution)
 		{
@@ -45,7 +45,7 @@ namespace MonoDevelop.PackageManagement
 		{
 			return solution
 				.GetAllDotNetProjects ()
-				.Where (project => project.HasPackages ());
+				.Where (DotNetProjectExtensions.HasPackages);
 		}
 
 		public static bool HasAnyProjectWithPackages (this Solution solution)

@@ -38,7 +38,7 @@ using MonoDevelop.Projects;
 using MonoDevelop.Projects.Extensions;
 using MonoDevelop.Core.Serialization;
 using System.Threading.Tasks;
-using System.Collections.Immutable;
+using MonoDevelop.Projects.MSBuild;
 
 namespace MonoDevelop.Projects
 {
@@ -51,6 +51,7 @@ namespace MonoDevelop.Projects
 		
 		public SolutionFolder ()
 		{
+			Initialize (this);
 		}
 		
 		public SolutionFolderItemCollection Items {
@@ -218,7 +219,7 @@ namespace MonoDevelop.Projects
 				try {
 					if (ParentSolution.IsSolutionItemEnabled (item.FileName)) {
 						using (var ctx = new SolutionLoadContext (ParentSolution))
-							newItem = await Services.ProjectService.ReadSolutionItem (monitor, item.FileName, null, ctx: ctx);
+							newItem = await Services.ProjectService.ReadSolutionItem (monitor, item.FileName, null, ctx: ctx, itemGuid: item.ItemId);
 					}
 					else {
 						UnknownSolutionItem e = new UnloadedSolutionItem () {
@@ -294,6 +295,7 @@ namespace MonoDevelop.Projects
 				folder.FileRenamedInProject += NotifyFileRenamedInProject;
 				folder.ReferenceRemovedFromProject += NotifyReferenceRemovedFromProject;
 				folder.ReferenceAddedToProject += NotifyReferenceAddedToProject;
+				folder.ItemSaved += NotifyItemSaved;
 			}
 			
 			if (item is SolutionItem) {
@@ -380,6 +382,7 @@ namespace MonoDevelop.Projects
 				cce.FileRenamedInProject -= NotifyFileRenamedInProject;
 				cce.ReferenceRemovedFromProject -= NotifyReferenceRemovedFromProject;
 				cce.ReferenceAddedToProject -= NotifyReferenceAddedToProject;
+				cce.ItemSaved -= NotifyItemSaved;
 			}
 			
 			if (entry is SolutionItem) {
@@ -577,10 +580,13 @@ namespace MonoDevelop.Projects
 		public async Task<BuildResult> Clean (ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext = null)
 		{
 			if (ParentSolution == null)
-				return new BuildResult ();
+				return new BuildResult();
 			SolutionConfiguration conf = ParentSolution.GetConfiguration (configuration);
 			if (conf == null)
-				return new BuildResult ();
+				return new BuildResult();
+
+			if (operationContext == null)
+				operationContext = new OperationContext ();
 
 			ReadOnlyCollection<SolutionItem> allProjects;
 			try {
@@ -591,12 +597,20 @@ namespace MonoDevelop.Projects
 			}
 
 			monitor.BeginTask (GettextCatalog.GetString ("Cleaning Solution: {0} ({1})", Name, configuration.ToString ()), allProjects.Count);
+
+			bool operationStarted = false;
+			BuildResult result = null;
+
 			try {
-				return await RunParallelBuildOperation (monitor, configuration, allProjects, (ProgressMonitor m, SolutionItem item) => {
+				operationStarted = ParentSolution != null && await ParentSolution.BeginBuildOperation (monitor, configuration, operationContext);
+
+				return result = await RunParallelBuildOperation (monitor, configuration, allProjects, (ProgressMonitor m, SolutionItem item) => {
 					return item.Clean (m, configuration, operationContext);
 				}, false);
 			}
 			finally {
+				if (operationStarted)
+					await ParentSolution.EndBuildOperation (monitor, configuration, operationContext, result);
 				monitor.EndTask ();
 			}
 		}
@@ -619,15 +633,31 @@ namespace MonoDevelop.Projects
 				return new BuildResult ("", 1, 1);
 			}
 
+			if (operationContext == null)
+				operationContext = new OperationContext ();
+
+			bool operationStarted = false;
+			BuildResult result = null;
+
 			try {
-				
+
+				if (Runtime.Preferences.SkipBuildingUnmodifiedProjects)
+					allProjects = allProjects.Where (si => {
+						if (si is Project p)
+							return p.FastCheckNeedsBuild (configuration);
+						return true;//Don't filter things that don't have FastCheckNeedsBuild
+					}).ToList ().AsReadOnly ();
 				monitor.BeginTask (GettextCatalog.GetString ("Building Solution: {0} ({1})", Name, configuration.ToString ()), allProjects.Count);
 
-				return await RunParallelBuildOperation (monitor, configuration, allProjects, (ProgressMonitor m, SolutionItem item) => {
+				operationStarted = ParentSolution != null && await ParentSolution.BeginBuildOperation (monitor, configuration, operationContext);
+
+				return result = await RunParallelBuildOperation (monitor, configuration, allProjects, (ProgressMonitor m, SolutionItem item) => {
 					return item.Build (m, configuration, false, operationContext);
 				}, false);
 
 			} finally {
+				if (operationStarted)
+					await ParentSolution.EndBuildOperation (monitor, configuration, operationContext, result);
 				monitor.EndTask ();
 			}
         }
@@ -638,11 +668,15 @@ namespace MonoDevelop.Projects
 			BuildResult cres = new BuildResult ();
 			cres.BuildCount = 0;
 
+			// Limit the number of concurrent builders to processors / 2
+
+			var slotScheduler = new TaskSlotScheduler (Environment.ProcessorCount / 2);
+
 			// Create a dictionary with the status objects of all items
 
-			var buildStatus = ImmutableDictionary<SolutionItem, BuildStatus>.Empty;
+			var buildStatus = new Dictionary<SolutionItem, BuildStatus> ();
 			foreach (var it in toBuild)
-				buildStatus = buildStatus.Add (it, new BuildStatus ());
+				buildStatus.Add (it, new BuildStatus ());
 
 			// Start the build tasks for all itemsw
 
@@ -672,7 +706,8 @@ namespace MonoDevelop.Projects
 					if (!ignoreFailed && (refStatus.Any (bs => bs.Failed) || t.IsFaulted)) {
 						myStatus.Failed = true;
 					} else {
-						myStatus.Result = await buildAction (myMonitor, item);
+						using (await slotScheduler.GetTaskSlot ())
+							myStatus.Result = await buildAction (myMonitor, item);
 						myStatus.Failed = myStatus.Result != null && myStatus.Result.ErrorCount > 0;
 					}
 					myMonitor.Dispose ();
@@ -697,6 +732,7 @@ namespace MonoDevelop.Projects
 			return cres;
 		}
 
+		[Obsolete("This method will be removed in future releases")]
 		public bool NeedsBuilding (ConfigurationSelector configuration)
 		{
 			return Items.OfType<IBuildTarget>().Any (t => t.NeedsBuilding (configuration));
@@ -830,7 +866,7 @@ namespace MonoDevelop.Projects
 			OnItemModified (e);
 		}
 		
-		internal void NotifyItemSaved (object sender, SolutionItemEventArgs e)
+		internal void NotifyItemSaved (object sender, SolutionItemSavedEventArgs e)
 		{
 			OnItemSaved (e);
 		}
@@ -971,7 +1007,7 @@ namespace MonoDevelop.Projects
 				ItemModified (this, e);
 		}
 		
-		void OnItemSaved (SolutionItemEventArgs e)
+		void OnItemSaved (SolutionItemSavedEventArgs e)
 		{
 			if (ParentFolder == null && ParentSolution != null)
 				ParentSolution.OnEntrySaved (e);
@@ -1012,7 +1048,7 @@ namespace MonoDevelop.Projects
 		public event ProjectReferenceEventHandler ReferenceAddedToProject;
 		public event ProjectReferenceEventHandler ReferenceRemovedFromProject;
 		public event SolutionItemModifiedEventHandler ItemModified;
-		public event SolutionItemEventHandler ItemSaved;
+		public event SolutionItemSavedEventHandler ItemSaved;
 		public event EventHandler<SolutionItemFileEventArgs> SolutionItemFileAdded;
 		public event EventHandler<SolutionItemFileEventArgs> SolutionItemFileRemoved;
 //		public event EventHandler<SolutionItemEventArgs> ItemReloadRequired;
@@ -1109,6 +1145,66 @@ namespace MonoDevelop.Projects
 
 		public FilePath File {
 			get { return this.file; }
+		}
+	}
+
+	/// <summary>
+	/// Keeps track of slots available for executing an operation
+	/// </summary>
+	class TaskSlotScheduler
+	{
+		int freeSlots;
+		Queue<TaskCompletionSource<IDisposable>> waitQueue = new Queue<TaskCompletionSource<IDisposable>> ();
+
+		class Slot: IDisposable
+		{
+			public TaskSlotScheduler TaskSlotScheduler;
+
+			public void Dispose ()
+			{
+				if (TaskSlotScheduler != null) {
+					TaskSlotScheduler.FreeSlot ();
+					TaskSlotScheduler = null;
+				}
+			}
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:MonoDevelop.Projects.TaskSlotScheduler"/> class.
+		/// </summary>
+		/// <param name="slots">Initial number of slots available</param>
+		public TaskSlotScheduler (int slots)
+		{
+			freeSlots = Math.Max (slots, 1);
+		}
+
+		/// <summary>
+		/// Gets a slot, to be disposed when done with the operation
+		/// </summary>
+		/// <returns>The task slot.</returns>
+		public Task<IDisposable> GetTaskSlot ()
+		{
+			lock (waitQueue) {
+				if (freeSlots > 0) {
+					freeSlots--;
+					return Task.FromResult ((IDisposable)new Slot { TaskSlotScheduler = this });
+				} else {
+					var cs = new TaskCompletionSource<IDisposable> ();
+					waitQueue.Enqueue (cs);
+					return cs.Task;
+				}
+			}
+		}
+
+		void FreeSlot ()
+		{
+			lock (waitQueue) {
+				if (waitQueue.Count > 0) {
+					var cs = waitQueue.Dequeue ();
+					cs.SetResult (new Slot { TaskSlotScheduler = this });
+				} else
+					freeSlots++;
+			}
 		}
 	}
 }

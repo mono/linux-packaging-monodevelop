@@ -56,6 +56,9 @@ namespace MonoDevelop.Ide.Codons
 		
 		[NodeAttribute("icon", "Icon of the pad. It can be a stock icon or a resource icon (use 'res:' as prefix in the last case).")]
 		string icon = null;
+
+		[NodeAttribute ("group", "Name of the group, used to group Pads inside Category menus.")]
+		string group = null;
 		
 		[NodeAttribute("defaultPlacement",
 		               "Default placement of the pad inside the workbench. " +
@@ -85,13 +88,12 @@ namespace MonoDevelop.Ide.Codons
 		{
 			if (content == null) {
 				content = CreatePad ();
-				content.Init (window);
-				ApplyPreferences ();
-			} else if (!initializeCalled) {
-				content.Init (window);
-				ApplyPreferences ();
 			}
-			initializeCalled = true;
+			if (!initializeCalled) {
+				content.Init (window);
+				ApplyPreferences ();
+				initializeCalled = true;
+			}
 			return content;
 		}
 			
@@ -106,6 +108,10 @@ namespace MonoDevelop.Ide.Codons
 		
 		public IconId Icon {
 			get { return !string.IsNullOrEmpty (icon) ? icon : "md-generic-pad"; }
+		}
+
+		public string Group {
+			get { return !string.IsNullOrEmpty (group) ? group : "YOther"; }
 		}
 		
 		public string ClassName {

@@ -207,6 +207,10 @@ namespace MonoDevelop.UnitTesting.NUnit
 			ld.TestInfoCachePath = cacheLoaded ? null : TestInfoCachePath;
 			ld.Callback = delegate {
 				Runtime.RunInMainThread (delegate {
+					if (ld.Error != null)
+						this.ErrorMessage = ld.Error.Message;
+					else
+						ErrorMessage = string.Empty;
 					AsyncCreateTests (ld);
 				});
 			};
@@ -332,9 +336,13 @@ namespace MonoDevelop.UnitTesting.NUnit
 						runner.Connect (ld.NUnitVersion).Wait ();
 						ld.Info = runner.GetTestInfo (ld.Path, ld.SupportAssemblies).Result;
 					}
-				} catch (Exception ex) {
-					Console.WriteLine (ex);
-					ld.Error = ex;
+				} catch (AggregateException exception){
+					var baseException = exception.GetBaseException ();
+					Console.WriteLine (baseException);
+					ld.Error = baseException;
+				} catch (Exception exception) {
+					Console.WriteLine (exception);
+					ld.Error = exception;
 				}
 				finally {
 					try {
@@ -385,7 +393,8 @@ namespace MonoDevelop.UnitTesting.NUnit
 			if (runnerExe != null)
 				return RunWithConsoleRunner (runnerExe, test, suiteName, pathName, testName, testContext);
 
-			var console = testContext.ExecutionContext.ConsoleFactory.CreateConsole ();
+			var console = testContext.ExecutionContext.ConsoleFactory.CreateConsole (
+				OperationConsoleFactory.CreateConsoleOptions.Default.WithTitle (GettextCatalog.GetString ("Unit Tests")));
 
 			ExternalTestRunner runner = new ExternalTestRunner ();
 			runner.Connect (NUnitVersion, testContext.ExecutionContext.ExecutionHandler, console).Wait ();
@@ -444,10 +453,12 @@ namespace MonoDevelop.UnitTesting.NUnit
 					result = UnitTestResult.CreateFailure (GettextCatalog.GetString ("Canceled"), null);
 				}
 			} finally {
+				// Dispose the runner before the console, to make sure the console is available until the runner is disposed.
+				runner.Disconnect ().Wait ();
+				runner.Dispose ();
 				if (console != null)
 					console.Dispose ();
 				cancelReg.Dispose ();
-				runner.Dispose ();
 				File.Delete (crashLogFile);
 			}
 			
@@ -480,7 +491,8 @@ namespace MonoDevelop.UnitTesting.NUnit
 		{
 			var outFile = Path.GetTempFileName ();
 			var xmlOutputConsole = new LocalConsole ();
-			var appDebugOutputConsole = testContext.ExecutionContext.ConsoleFactory.CreateConsole ();
+			var appDebugOutputConsole = testContext.ExecutionContext.ConsoleFactory.CreateConsole (
+				OperationConsoleFactory.CreateConsoleOptions.Default.WithTitle (GettextCatalog.GetString ("Unit Tests")));
 			OperationConsole cons;
 			if (appDebugOutputConsole != null) {
 				cons = new MultipleOperationConsoles (appDebugOutputConsole, xmlOutputConsole);
@@ -502,6 +514,7 @@ namespace MonoDevelop.UnitTesting.NUnit
 					tcpListener = new MonoDevelop.UnitTesting.NUnit.External.TcpTestListener (localMonitor, suiteName);
 					cmd.Arguments += " -port=" + tcpListener.Port;
 				}
+				cmd.WorkingDirectory = Path.GetDirectoryName (AssemblyPath);
 
 				// Note that we always dispose the tcp listener as we don't want it listening
 				// forever if the test runner does not try to connect to it

@@ -1,5 +1,6 @@
 ﻿
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 [assembly: AssemblyProduct ("MonoDevelop")]
 [assembly: AssemblyTitle("MonoDevelop.PackageManagement")]

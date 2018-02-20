@@ -160,14 +160,6 @@ namespace MonoDevelop.VersionControl.Views
 			}
 		}
 
-		public bool UnderlineErrors {
-			get {
-				return MonoDevelop.Ide.Editor.DefaultSourceEditorOptions.Instance.UnderlineErrors; 
-			}
-			set {
-			}
-		}
-
 		public override IndentStyle IndentStyle {
 			get {
 				return (IndentStyle)MonoDevelop.Ide.Editor.DefaultSourceEditorOptions.Instance.IndentStyle;
@@ -361,9 +353,9 @@ namespace MonoDevelop.VersionControl.Views
 			}
 		}
 
-		public override string ColorScheme {
+		public override string EditorThemeName {
 			get {
-				return MonoDevelop.Ide.Editor.DefaultSourceEditorOptions.Instance.ColorScheme;
+				return MonoDevelop.Ide.Editor.DefaultSourceEditorOptions.Instance.EditorTheme;
 			}
 			set {
 			}
@@ -372,6 +364,14 @@ namespace MonoDevelop.VersionControl.Views
 		public override bool GenerateFormattingUndoStep {
 			get {
 				return MonoDevelop.Ide.Editor.DefaultSourceEditorOptions.Instance.GenerateFormattingUndoStep;
+			}
+			set {
+			}
+		}
+
+		public override bool SmartBackspace {
+			get {
+				return MonoDevelop.Ide.Editor.DefaultSourceEditorOptions.Instance.SmartBackspace;
 			}
 			set {
 			}

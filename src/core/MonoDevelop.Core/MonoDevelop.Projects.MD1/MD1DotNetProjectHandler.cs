@@ -34,7 +34,6 @@ using System.Text.RegularExpressions;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Projects.Extensions;
-using Microsoft.Build.BuildEngine;
 using System.Threading.Tasks;
 using MonoDevelop.Projects.MSBuild.Conditions;
 	
@@ -86,7 +85,7 @@ namespace MonoDevelop.Projects.MD1
 			
 			if (project.LanguageBinding == null) {
 				BuildResult langres = new BuildResult ();
-				string msg = GettextCatalog.GetString ("Unknown language '{0}'. You may need to install an additional add-in to support this language.", project.LanguageName);
+				string msg = GettextCatalog.GetString ("Unknown language '{0}'. You may need to install an additional extension to support this language.", project.LanguageName);
 				langres.AddError (msg);
 				monitor.ReportError (msg, null);
 				return langres;
@@ -418,6 +417,7 @@ namespace MonoDevelop.Projects.MD1
 	{
 		Project project;
 		DotNetProjectConfiguration config;
+		string directoryName;
 		
 		public ProjectParserContext (Project project, DotNetProjectConfiguration config)
 		{
@@ -430,11 +430,30 @@ namespace MonoDevelop.Projects.MD1
 				return project.FileName;
 			}
 		}
+
+		public string FullDirectoryName {
+			get {
+				if (FullFileName == String.Empty)
+					return null;
+				
+				if (directoryName == null)
+					directoryName = Path.GetDirectoryName (FullFileName);
+
+				return directoryName;
+			}
+		}
 		
 		public string EvaluateString (string value)
 		{
-			string val = value.Replace ("$(Configuration)", config.Name).Replace ("$(Platform)", config.Platform);
-			return val;
+			string res;
+			if (ConfigPlatformCache.TryGetValue (value, out res))
+				return res;
+
+			ConfigPlatformCache[value] = res = value.Replace ("$(Configuration)", config.Name).Replace ("$(Platform)", config.Platform);
+			return res;
 		}
+
+		Dictionary<string, string> ConfigPlatformCache { get; } = new Dictionary<string, string> ();
+		public Dictionary<string, bool> ExistsEvaluationCache { get; } = new Dictionary<string, bool> ();
 	}
 }

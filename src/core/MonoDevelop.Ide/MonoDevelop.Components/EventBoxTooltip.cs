@@ -27,16 +27,28 @@
 
 using Gtk;
 using System;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Ide.Tasks;
+using MonoDevelop.Ide;
+using Gdk;
 
 namespace MonoDevelop.Components
 {
 	public class EventBoxTooltip : IDisposable
 	{
 		EventBox eventBox;
-		string tip;
 		TooltipPopoverWindow tooltipWindow;
+		ImageView image;
+		Pixbuf normalPixbuf;
+		Pixbuf activePixbuf;
+		string tip;
 		bool mouseOver;
+
+		public Atk.Object Accessible {
+			get {
+				return eventBox.Accessible;
+			}
+		}
 
 		/// <summary>
 		/// The EventBox should have Visible set to false otherwise the tooltip pop window
@@ -45,11 +57,35 @@ namespace MonoDevelop.Components
 		public EventBoxTooltip (EventBox eventBox)
 		{
 			this.eventBox = eventBox;
+			eventBox.CanFocus = true;
 
 			eventBox.EnterNotifyEvent += HandleEnterNotifyEvent;
 			eventBox.LeaveNotifyEvent += HandleLeaveNotifyEvent;
+			eventBox.FocusInEvent += HandleFocusInEvent;
+			eventBox.FocusOutEvent += HandleFocusOutEvent;
+
+			image = eventBox.Child as ImageView;
+
+			if (image != null) {
+				normalPixbuf = image.Image.ToPixbuf ();
+				activePixbuf = normalPixbuf.ColorShiftPixbuf ();
+			}
+
+			eventBox.FocusGrabbed += (sender, e) => {
+				if (image != null)
+					image.Image = activePixbuf.ToXwtImage ();
+			};
+
+			eventBox.Focused += (o, args) => {
+				if (image != null)
+					image.Image = normalPixbuf.ToXwtImage ();
+			};
 
 			Position = PopupPosition.TopLeft;
+
+			// Accessibility: Disguise this eventbox as a label
+			eventBox.Accessible.SetRole (AtkCocoa.Roles.AXStaticText);
+			eventBox.CanFocus = true;
 		}
 
 		[GLib.ConnectBefore]
@@ -66,11 +102,30 @@ namespace MonoDevelop.Components
 			ShowTooltip ();
 		}
 
+		[GLib.ConnectBefore]
+		void HandleFocusOutEvent (object sender, EventArgs e)
+		{
+			mouseOver = false;
+			HideTooltip ();
+		}
+
+		[GLib.ConnectBefore]
+		void HandleFocusInEvent (object sender, EventArgs e)
+		{
+			mouseOver = true;
+			ShowTooltip ();
+		}
+
+		void UpdateAccessibility ()
+		{
+			eventBox.Accessible.SetLabel (tip);
+		}
+
 		bool ShowTooltip ()
 		{
 			if (!string.IsNullOrEmpty (tip)) {
 				HideTooltip ();
-				tooltipWindow = new TooltipPopoverWindow ();
+				tooltipWindow = TooltipPopoverWindow.Create ();
 				tooltipWindow.ShowArrow = true;
 				tooltipWindow.Text = tip;
 				tooltipWindow.Severity = Severity;
@@ -93,6 +148,8 @@ namespace MonoDevelop.Components
 			HideTooltip ();
 			eventBox.EnterNotifyEvent -= HandleEnterNotifyEvent;
 			eventBox.LeaveNotifyEvent -= HandleLeaveNotifyEvent;
+			eventBox.FocusInEvent -= HandleFocusInEvent;
+			eventBox.FocusOutEvent -= HandleFocusOutEvent;
 		}
 
 		public string ToolTip {
@@ -106,6 +163,7 @@ namespace MonoDevelop.Components
 						HideTooltip ();
 				} else if (!string.IsNullOrEmpty (tip) && mouseOver)
 					ShowTooltip ();
+				UpdateAccessibility ();
 			}
 		}
 

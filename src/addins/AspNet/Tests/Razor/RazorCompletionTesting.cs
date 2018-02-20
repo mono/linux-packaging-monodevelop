@@ -24,16 +24,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using ICSharpCode.NRefactory.Completion;
-using MonoDevelop.AspNet.Projects;
 using MonoDevelop.AspNet.Razor;
-using MonoDevelop.AspNet.Razor.Parser;
 using MonoDevelop.Core.Text;
-using MonoDevelop.CSharpBinding;
-using MonoDevelop.CSharpBinding.Tests;
+using MonoDevelop.Ide;
 using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.TypeSystem;
@@ -60,18 +55,18 @@ namespace MonoDevelop.AspNet.Tests.Razor
 
 			var ctx = GetCodeCompletionContext (isInCSharpContext, ed.View, ed.Extension.hiddenInfo.UnderlyingDocument);
 
+			Task<ICompletionDataList> task;
 			if (isCtrlSpace) {
-				var result = await ed.Extension.CodeCompletionCommand (ctx) as CompletionDataList;
-				TypeSystemServiceTestExtensions.UnloadSolution (solution);
-				return result;
+				task = ed.Extension.HandleCodeCompletionAsync (ctx, CompletionTriggerInfo.CodeCompletionCommand, default (CancellationToken));
 			} else {
-				var task = ed.Extension.HandleCodeCompletionAsync (ctx, ed.EditorText [cursorPosition - 1], default(CancellationToken));
-				TypeSystemServiceTestExtensions.UnloadSolution (solution);
-				if (task != null) {
-					return await task as CompletionDataList;
-				}
-				return null;
+				task = ed.Extension.HandleCodeCompletionAsync (ctx, new CompletionTriggerInfo (CompletionTriggerReason.CharTyped, ed.EditorText [cursorPosition - 1]), default (CancellationToken));
 			}
+
+			TypeSystemServiceTestExtensions.UnloadSolution (solution);
+			if (task != null) {
+				return await task as CompletionDataList;
+			}
+			return null;
 		}
 
 		static CodeCompletionContext GetCodeCompletionContext (bool cSharpContext, TestViewContent sev, UnderlyingDocument underlyingDocument)

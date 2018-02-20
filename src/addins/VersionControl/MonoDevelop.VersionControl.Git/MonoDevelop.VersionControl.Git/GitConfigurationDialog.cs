@@ -54,6 +54,7 @@ namespace MonoDevelop.VersionControl.Git
 
 			storeBranches = new ListStore (typeof(Branch), typeof(string), typeof(string), typeof(string));
 			listBranches.Model = storeBranches;
+			listBranches.SearchColumn = -1; // disable the interactive search
 			listBranches.HeadersVisible = true;
 
 			SemanticModelAttribute modelAttr = new SemanticModelAttribute ("storeBranches__Branch", "storeBranches__DisplayName", "storeBranches__Tracking", "storeBranches__Name");
@@ -80,13 +81,14 @@ namespace MonoDevelop.VersionControl.Git
 
 			storeRemotes = new TreeStore (typeof(Remote), typeof(string), typeof(string), typeof(string), typeof(string));
 			treeRemotes.Model = storeRemotes;
+			treeRemotes.SearchColumn = -1; // disable the interactive search
 			treeRemotes.HeadersVisible = true;
 
 			SemanticModelAttribute remotesModelAttr = new SemanticModelAttribute ("storeRemotes__Remote", "storeRemotes__Name", "storeRemotes__Url", "storeRemotes__BranchName", "storeRemotes__FullName");
 			TypeDescriptor.AddAttributes (storeRemotes, remotesModelAttr);
 
-			treeRemotes.AppendColumn ("Remote Source / Branch", new CellRendererText (), "markup", 1);
-			treeRemotes.AppendColumn ("Url", new CellRendererText (), "text", 2);
+			treeRemotes.AppendColumn (GettextCatalog.GetString ("Remote Source / Branch"), new CellRendererText (), "markup", 1);
+			treeRemotes.AppendColumn (GettextCatalog.GetString ("Url"), new CellRendererText (), "text", 2);
 
 			treeRemotes.Selection.Changed += delegate {
 				TreeIter it;
@@ -105,6 +107,7 @@ namespace MonoDevelop.VersionControl.Git
 
 			storeTags = new ListStore (typeof(string));
 			listTags.Model = storeTags;
+			listTags.SearchColumn = -1; // disable the interactive search
 			listTags.HeadersVisible = true;
 
 			SemanticModelAttribute tagsModelAttr = new SemanticModelAttribute ("storeTags__Name");
@@ -369,7 +372,7 @@ namespace MonoDevelop.VersionControl.Git
 			if (remoteName == null)
 				return;
 
-			repo.Fetch (VersionControlService.GetProgressMonitor ("Fetching remote..."), remoteName);
+			repo.Fetch (VersionControlService.GetProgressMonitor (GettextCatalog.GetString ("Fetching remote...")), remoteName);
 			FillRemotes ();
 		}
 	}

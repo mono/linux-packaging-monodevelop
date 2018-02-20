@@ -37,11 +37,10 @@ namespace MonoDevelop.SourceEditor
 {
 	class MessageBubbleCache : IDisposable
 	{
-		internal Xwt.Drawing.Image errorPixbuf;
-		internal Xwt.Drawing.Image warningPixbuf;
+		internal static Xwt.Drawing.Image errorPixbuf = Xwt.Drawing.Image.FromResource ("gutter-error-15.png");
+		internal static Xwt.Drawing.Image warningPixbuf = Xwt.Drawing.Image.FromResource ("gutter-warning-15.png");
 		
 		internal Dictionary<string, LayoutDescriptor> textWidthDictionary = new Dictionary<string, LayoutDescriptor> ();
-		internal Dictionary<DocumentLine, double> lineWidthDictionary = new Dictionary<DocumentLine, double> ();
 		
 		internal MonoTextEditor editor;
 
@@ -54,8 +53,6 @@ namespace MonoDevelop.SourceEditor
 		public MessageBubbleCache (MonoTextEditor editor)
 		{
 			this.editor = editor;
-			errorPixbuf = Xwt.Drawing.Image.FromResource ("gutter-error-15.png");
-			warningPixbuf = Xwt.Drawing.Image.FromResource ("gutter-warning-15.png");
 			
 			editor.EditorOptionsChanged += HandleEditorEditorOptionsChanged;
 			editor.TextArea.LeaveNotifyEvent += HandleLeaveNotifyEvent;
@@ -129,7 +126,7 @@ namespace MonoDevelop.SourceEditor
 						int h;
 						drawingLayout.GetPixelSize (out w, out h);
 						if (marker.Layouts.Count > 1) 
-							w += (int)cache.warningPixbuf.Width + iconTextSpacing;
+							w += (int)warningPixbuf.Width + iconTextSpacing;
 
 						requisition.Width = Math.Max (w + textBorder * 2, requisition.Width);
 						y += h + verticalTextSpace - 3;
@@ -148,7 +145,7 @@ namespace MonoDevelop.SourceEditor
 			protected override void OnDrawContent (Gdk.EventExpose evnt, Cairo.Context g)
 			{
 				g.Rectangle (0, 0, Allocation.Width, Allocation.Height);
-				g.SetSourceColor (marker.TooltipColor.Color);
+				g.SetSourceColor (marker.TooltipColor);
 				g.Fill ();
 
 				using (var drawingLayout = new Pango.Layout (this.PangoContext)) {
@@ -158,7 +155,7 @@ namespace MonoDevelop.SourceEditor
 					var showBulletedList = marker.Errors.Count > 1;
 
 					foreach (var msg in marker.Errors) {
-						var icon = msg.IsError ? cache.errorPixbuf : cache.warningPixbuf;
+						var icon = msg.IsError ? errorPixbuf : warningPixbuf;
 						int w, h;
 
 						if (!showBulletedList)
@@ -178,7 +175,7 @@ namespace MonoDevelop.SourceEditor
 						g.Save ();
 
 						g.Translate (showBulletedList ? textBorder + iconTextSpacing + icon.Width: textBorder, y + verticalTextSpace / 2);
-						g.SetSourceColor (marker.TagColor.SecondColor);
+						g.SetSourceColor (marker.TagColor2);
 						g.ShowLayout (drawingLayout);
 
 						g.Restore ();
@@ -203,8 +200,10 @@ namespace MonoDevelop.SourceEditor
 
 				DestroyPopoverWindow ();
 
-				if (marker.Layouts == null || marker.Layouts.Count < 2 && !isReduced)
+				hoverTimeout = 0;
+				if (marker.Layouts == null || marker.Layouts.Count < 2 && !isReduced) {
 					return false;
+				}
 
 				popoverWindow = new MessageBubblePopoverWindow (this, marker);
 				popoverWindow.ShowWindowShadow = false;
@@ -250,14 +249,6 @@ namespace MonoDevelop.SourceEditor
 				return;
 			CurrentSelectedTextMarker = null;
 			editor.QueueDraw ();
-		}
-
-		public bool RemoveLine (DocumentLine line)
-		{
-			if (!lineWidthDictionary.ContainsKey (line))
-				return false;
-			lineWidthDictionary.Remove (line);
-			return true;
 		}
 
 		internal void DestroyPopoverWindow ()
@@ -311,7 +302,6 @@ namespace MonoDevelop.SourceEditor
 
 		void HandleEditorEditorOptionsChanged (object sender, EventArgs e)
 		{
-			lineWidthDictionary.Clear ();
 			OnChanged (EventArgs.Empty);
 		}	
 

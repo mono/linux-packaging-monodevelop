@@ -28,64 +28,24 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
-using ICSharpCode.NRefactory6.CSharp.Completion;
 using System.Linq;
-using ICSharpCode.NRefactory6.CSharp.CodeCompletion;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.SignatureHelp;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using System;
+using MonoDevelop.Ide.TypeSystem;
+using Microsoft.CodeAnalysis.Host.Mef;
 
 namespace ICSharpCode.NRefactory6.CSharp.ParameterHinting
 {
+	[Ignore("Fixme")]
 	[TestFixture]
 	class ParameterHintingTests : TestBase
 	{
-		internal class TestFactory : IParameterHintingDataFactory
-		{
-			#region IParameterHintingDataFactory implementation
-
-			IParameterHintingData IParameterHintingDataFactory.CreateConstructorProvider(Microsoft.CodeAnalysis.IMethodSymbol constructor)
-			{
-				return new ParameterHintingData(constructor);
-			}
-
-			IParameterHintingData IParameterHintingDataFactory.CreateMethodDataProvider(Microsoft.CodeAnalysis.IMethodSymbol method)
-			{
-				return new ParameterHintingData(method);
-			}
-
-			IParameterHintingData IParameterHintingDataFactory.CreateDelegateDataProvider(Microsoft.CodeAnalysis.ITypeSymbol delegateType)
-			{
-				return new DelegateParameterHintingData (delegateType);
-			}
-
-			IParameterHintingData IParameterHintingDataFactory.CreateIndexerParameterDataProvider(Microsoft.CodeAnalysis.IPropertySymbol indexer, Microsoft.CodeAnalysis.SyntaxNode resolvedNode)
-			{
-				return new ParameterHintingData(indexer);
-			}
-
-			IParameterHintingData IParameterHintingDataFactory.CreateTypeParameterDataProvider(Microsoft.CodeAnalysis.INamedTypeSymbol type)
-			{
-				return new TypeParameterHintingData(type);
-			}
-
-			IParameterHintingData IParameterHintingDataFactory.CreateTypeParameterDataProvider(Microsoft.CodeAnalysis.IMethodSymbol method)
-			{
-				return new TypeParameterHintingData(method);
-			}
-			
-			IParameterHintingData IParameterHintingDataFactory.CreateArrayDataProvider(Microsoft.CodeAnalysis.IArrayTypeSymbol arrayType)
-			{
-				return new ArrayParameterHintingData(arrayType);
-			}
-			#endregion
-
-			
-		}
-		
-		internal static ParameterHintingResult CreateProvider(string text)
+		internal static MonoDevelop.Ide.CodeCompletion.ParameterHintingResult CreateProvider(string text, bool force = false)
 		{
 			string parsedText;
 			string editorText;
@@ -144,7 +104,7 @@ namespace ICSharpCode.NRefactory6.CSharp.ParameterHinting
 					)
 			);
 			
-			var engine = new ParameterHintingEngine (workspace, new TestFactory ());
+			var engine = new MonoDevelop.CSharp.Completion.RoslynParameterHintingEngine ();
 			
 			var compilation = workspace.CurrentSolution.GetProject(projectId).GetCompilationAsync().Result;
 			
@@ -153,8 +113,14 @@ namespace ICSharpCode.NRefactory6.CSharp.ParameterHinting
 			}
 			var document = workspace.CurrentSolution.GetDocument(documentId);
 			var semanticModel = document.GetSemanticModelAsync().Result;
-
-			return engine.GetParameterDataProviderAsync(document, semanticModel, cursorPosition).Result;
+			if (force) {
+				var workspace1 = TypeSystemService.Workspace;
+				var mefExporter = (IMefHostExportProvider)workspace1.Services.HostServices;
+				var helpProviders = mefExporter.GetExports<ISignatureHelpProvider, LanguageMetadata> ()
+					.FilterToSpecificLanguage (LanguageNames.CSharp).ToList ();
+				return engine.GetParameterDataProviderAsync (helpProviders, document, cursorPosition, new SignatureHelpTriggerInfo (SignatureHelpTriggerReason.InvokeSignatureHelpCommand)).Result;
+			} else
+				return engine.GetParameterDataProviderAsync (document, cursorPosition).Result;
 		}
 		
 		/// <summary>
@@ -490,47 +456,7 @@ class TestClass
 			Assert.IsNotNull (provider, "provider was not created.");
 			Assert.IsTrue (provider.Count > 0);
 		}
-		
-		[Test]
-		public void TestBug3307FollowUp ()
-		{
-			var provider = CodeCompletionBugTests.CreateProvider (
-@"using System;
-using System.Linq;
 
-public class MainClass
-{
-	static void TestMe (Action<int> act)
-	{
-	}
-	
-	public static void Main (string[] args)
-	{
-		$TestMe (x$
-	}
-}");
-			Assert.IsNotNull (provider, "provider was not created.");
-			Assert.IsFalse (provider.AutoSelect, "auto select enabled !");
-		}
-		
-		[Test]
-		public void TestBug3307FollowUp2 ()
-		{
-			var provider = CodeCompletionBugTests.CreateProvider (
-@"using System;
-using System.Linq;
-
-public class MainClass
-{
-	public static void Main (string[] args)
-	{
-		$args.Select (x$
-	}
-}");
-			Assert.IsNotNull (provider, "provider was not created.");
-			Assert.IsFalse (provider.AutoSelect, "auto select enabled !");
-		}
-		
 		[Test]
 		public void TestConstructor ()
 		{
@@ -765,7 +691,7 @@ namespace Test
 	}
 }");
 			Assert.IsNotNull (provider, "provider was not created.");
-			Assert.AreEqual (1, provider.Count);
+			Assert.AreEqual (2, provider.Count);
 		}
 		
 		/// <summary>
@@ -1046,30 +972,6 @@ class NUnitTestClass {
 		}
 
 		/// <summary>
-		/// Bug 12824 - Invalid argument intellisense inside lambda
-		/// </summary>
-		[Test]
-		public void TestBug12824 ()
-		{
-			var provider = CreateProvider (
-				@"using System.Threading.Tasks;
-using System;
-
-public class MyEventArgs 
-{
-	public static void Main (string[] args)
-	{
-		Task.Factory.StartNew (() => {
-				$throw new Exception ($
-		});
-	}
-}");
-			string name = provider[0].Symbol.Name;
-			Assert.AreEqual (".ctor", name);
-			Assert.AreEqual ("Exception", provider[0].Symbol.ContainingType.Name);
-		}
-
-		/// <summary>
 		/// Bug 474199 - Code completion not working for a nested class
 		/// </summary>
 		[Test]
@@ -1246,33 +1148,7 @@ class TestClass
 	}
 }");
 			Assert.IsNotNull (provider, "provider was not created.");
-			Assert.AreEqual (1, provider.Count);
-		}
-
-		/// <summary>
-		/// Bug 19561 - Wrong completion for default parameter used with generics
-		/// </summary>
-		[Test]
-		public void TestBug19561 ()
-		{
-			var provider = CreateProvider (
-				@"using System;
-
-public static class Lib
-{
-	public static T Foo<T>(T x = default(T))
-	{
-		return x;
-	}
-		
-	public static void Foo2<U> () where U : struct
-	{
-		Console.WriteLine(""{0}"", $Lib.Foo<U>($));
-	}
-}");
-			Assert.IsNotNull (provider, "provider was not created.");
-			Assert.AreEqual (1, provider.Count);
-			Assert.AreEqual ("M:Lib.Foo``1(``0)", provider[0].Symbol.GetDocumentationCommentId ());
+			Assert.AreEqual (2, provider.Count);
 		}
 
 		[Test]
@@ -1303,25 +1179,209 @@ class TestClass
 			Assert.AreEqual (0, provider.Count);
 		}
 
-
+		/// <summary>
+		/// Bug 40018 - Autocomplete shows different list before and after typing "("
+		/// </summary>
 		[Test]
-		public void TestHintingToParentInvocation ()
+		public void TestBug40018 ()
 		{
 			var provider = CreateProvider (
-				@"using System;
-class TestClass
+				@"
+namespace Test40018
 {
-	static string SS(string s) {}
-	static string ZZ(string s) {}
+    static class ExtMethods
+    {
+        public static void Foo(this MyClass c, int i)
+        {
 
-	public static void Main ()
+        }
+    }
+	
+    class MyClass
+    {
+        public void Foo(string str)
+        {
+        }
+
+        public void Foo()
+        {
+        }
+
+        public void Test()
+        {
+            this.Foo($$);
+        }
+    }
+}				
+");
+			Assert.IsNotNull (provider, "provider was not created.");
+			Assert.AreEqual (3, provider.Count);
+		}
+
+		/// <summary>
+		/// Bug 41245 - Attribute code completion not showing all constructors and showing too many things
+		/// </summary>
+		[Test]
+		public void TestBug41245 ()
+		{
+			var provider = CreateProvider (
+				@"
+using System;
+
+namespace cp654fz7
+{
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Parameter, AllowMultiple = false)]
+	public sealed class JsonPropertyAttribute : Attribute
 	{
-		SS($ZZ $());
+		internal bool? _isReference;
+		internal int? _order;
+		public bool IsReference
+		{
+			get { return _isReference ?? default(bool); }
+			set { _isReference = value; }
+		}
+		public int Order
+		{
+			get { return _order ?? default(int); }
+			set { _order = value; }
+		}
+		public string PropertyName { get; set; }
+		public JsonPropertyAttribute()
+		{
+		}
+
+		public JsonPropertyAttribute(string propertyName)
+		{
+			PropertyName = propertyName;
+		}
 	}
-}");
+
+	class MainClass
+	{
+		[JsonProperty($$)]
+		public object MyProperty { get; set; }
+
+		public static void Main(string[] args)
+		{
+		}
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider was not created.");
+			Assert.AreEqual (2, provider.Count);
+		}
+
+
+		/// <summary>
+		/// Bug 41351 - No arguments code completion for methods called via ?. operator
+		/// </summary>
+		[Test]
+		public void TestBug41351 ()
+		{
+			var provider = CreateProvider (
+				@"
+using System;
+
+class test
+{
+	public event EventHandler Handler;
+
+	public test()
+	{
+		Handler?.Invoke($$);
+	}
+}
+
+");
 			Assert.IsNotNull (provider, "provider was not created.");
 			Assert.AreEqual (1, provider.Count);
-			Assert.AreEqual ("M:TestClass.SS(System.String)", provider[0].Symbol.GetDocumentationCommentId ());
+		}
+
+		/// <summary>
+		/// Bug 42952 - Parameter info not working for extension methods in different namespace
+		/// </summary>
+		[Test]
+		public void TestBug42952 ()
+		{
+			var provider = CreateProvider (
+				@"
+using System;
+using DifferentNamespace.ha;
+
+namespace parametersInfoBug
+{
+    class MainClass
+    {
+        public static void Main(string[] args)
+        {
+            new Class1().Test1($$);
+        }
+    }
+}
+
+
+namespace DifferentNamespace.ha
+{
+    public static class Extensions
+    {
+        public static void Test1(this Class1 class1, string stringParam)
+        {
+
+        }
+    }
+
+    public class Class1
+    {
+
+    }
+}
+");
+			Assert.IsNotNull (provider, "provider was not created.");
+			Assert.AreEqual (1, provider.Count);
+		}
+
+
+		/// <summary>
+		/// Bug 52886 - Base class constructor tooltip doesn't contain all constructor definition.
+		/// </summary>
+		[Test]
+		public void TestBug52886 ()
+		{
+			var provider = CreateProvider (
+				@"
+class Foo
+{
+	public Foo ()
+	{
+	}
+	public Foo (int a)
+	{
+	}
+}
+class Bar : Foo
+{
+	public Bar () : base($$
+}
+");
+			Assert.IsNotNull (provider, "provider was not created.");
+			Assert.AreEqual (2, provider.Count);
+		}
+
+		[Test]
+		public void TestConstructorInsideMethodCall()
+		{
+			var provider = CreateProvider (
+				@"
+class MainClass
+{
+	public static void Main(string[] args)
+	{
+		System.Console.WriteLine(new string($));
+	}
+}
+", true);
+			Assert.IsNotNull (provider, "provider was not created.");
+			Assert.AreEqual (8, provider.Count);
 		}
 	}
 }

@@ -328,7 +328,7 @@ namespace MonoDevelop.Ide.Templates
 		public IEnumerable<SolutionItem> CreateProjects (SolutionFolderItem policyParent, ProjectCreateInformation cInfo)
 		{
 			if (solutionDescriptor.EntryDescriptors.Length == 0)
-				throw new InvalidOperationException ("Solution template doesn't have any project templates");
+				throw new InvalidOperationException (GettextCatalog.GetString ("Solution template doesn't have any project templates"));
 
 			var solutionEntryItems = new List<SolutionItem> ();
 			packageReferencesForCreatedProjects = new List<PackageReferencesForCreatedProject> ();
@@ -336,13 +336,11 @@ namespace MonoDevelop.Ide.Templates
 			foreach (ISolutionItemDescriptor solutionItemDescriptor in GetItemsToCreate (solutionDescriptor, cInfo)) {
 				ProjectCreateInformation itemCreateInfo = GetItemSpecificCreateInfo (solutionItemDescriptor, cInfo);
 				itemCreateInfo = new ProjectTemplateCreateInformation (itemCreateInfo, cInfo.ProjectName);
+				itemCreateInfo.TemplateInitializationCallback = p => solutionItemDescriptor.InitializeItem (policyParent, itemCreateInfo, this.languagename, p);
 
 				SolutionItem solutionEntryItem = solutionItemDescriptor.CreateItem (itemCreateInfo, this.languagename);
 				if (solutionEntryItem != null) {
-					solutionItemDescriptor.InitializeItem (policyParent, itemCreateInfo, this.languagename, solutionEntryItem);
-
 					SavePackageReferences (solutionEntryItem, solutionItemDescriptor, itemCreateInfo);
-
 					solutionEntryItems.Add (solutionEntryItem);
 				}
 			}

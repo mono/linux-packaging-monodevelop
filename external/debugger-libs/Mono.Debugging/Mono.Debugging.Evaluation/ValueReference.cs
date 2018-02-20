@@ -96,9 +96,11 @@ namespace Mono.Debugging.Evaluation
 		
 		public ObjectValue CreateObjectValue (EvaluationOptions options)
 		{
-			if (!CanEvaluate (options))
+			if (!CanEvaluate (options)) {
+				if (options.AllowTargetInvoke)//If it can't evaluate and target invoke is allowed, mark it as not supported.
+					return DC.ObjectValue.CreateNotSupported (this, new ObjectPath (Name), Context.Adapter.GetDisplayTypeName (GetContext (options), Type), "Can not evaluate", Flags);
 				return DC.ObjectValue.CreateImplicitNotSupported (this, new ObjectPath (Name), Context.Adapter.GetDisplayTypeName (GetContext (options), Type), Flags);
-			
+			}
 			Connect ();
 			try {
 				return OnCreateObjectValue (options);
@@ -107,7 +109,7 @@ namespace Mono.Debugging.Evaluation
 			} catch (NotSupportedExpressionException ex) {
 				return DC.ObjectValue.CreateNotSupported (this, new ObjectPath (Name), Context.Adapter.GetDisplayTypeName (GetContext (options), Type), ex.Message, Flags);
 			} catch (EvaluatorException ex) {
-				return DC.ObjectValue.CreateError (this, new ObjectPath (Name), "", ex.Message, Flags);
+				return DC.ObjectValue.CreateError (this, new ObjectPath (Name), Context.Adapter.GetDisplayTypeName (GetContext (options), Type), ex.Message, Flags);
 			} catch (Exception ex) {
 				Context.WriteDebuggerError (ex);
 				return DC.ObjectValue.CreateUnknown (Name);
@@ -132,7 +134,7 @@ namespace Mono.Debugging.Evaluation
 			// so we need to override our context temporarily to do the evaluation.
 			val = GetValue (ctx);
 
-			if (val != null)
+			if (val != null && !ctx.Adapter.IsNull (ctx, val))
 				return ctx.Adapter.CreateObjectValue (ctx, this, new ObjectPath (name), val, Flags);
 
 			return Mono.Debugging.Client.ObjectValue.CreateNullObject (this, name, ctx.Adapter.GetDisplayTypeName (ctx.Adapter.GetTypeName (ctx, Type)), Flags);
@@ -243,7 +245,7 @@ namespace Mono.Debugging.Evaluation
 			return new ValueReference [0];
 		}
 		
-		public IObjectSource ParentSource { get; internal set; }
+		public IObjectSource ParentSource { get; set; }
 
 		protected EvaluationContext GetChildrenContext (EvaluationOptions options)
 		{
@@ -286,7 +288,7 @@ namespace Mono.Debugging.Evaluation
 			}
 			
 			if (Context.Adapter.IsClassInstance (Context, obj))
-				return Context.Adapter.GetMember (GetChildrenContext (options), this, obj, name);
+				return Context.Adapter.GetMember (GetChildrenContext (options), this, Type, obj, name);
 
 			return null;
 		}

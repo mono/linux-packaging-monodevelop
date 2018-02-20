@@ -34,6 +34,7 @@ using Gdk;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide.Editor.Extension;
 using System.Threading;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Ide.CodeCompletion
 {
@@ -45,6 +46,12 @@ namespace MonoDevelop.Ide.CodeCompletion
 		
 		public static bool IsWindowVisible {
 			get { return currentMethodGroup != null; }
+		}
+
+		internal static MethodData CurrentMethodGroup {
+			get {
+				return currentMethodGroup;
+			}
 		}
 
 		static ParameterInformationWindowManager ()
@@ -123,29 +130,39 @@ namespace MonoDevelop.Ide.CodeCompletion
 			// Called after the key has been processed by the editor
 			if (currentMethodGroup == null)
 				return;
-	
 			var actualMethodGroup = new MethodData ();
 			actualMethodGroup.CompletionContext = widget.CurrentCodeCompletionContext;
-			actualMethodGroup.MethodProvider = await ext.ParameterCompletionCommand (widget.CurrentCodeCompletionContext);
-			if (actualMethodGroup.MethodProvider != null && !actualMethodGroup.MethodProvider.Equals (currentMethodGroup.MethodProvider)) 
-				currentMethodGroup = actualMethodGroup;
-
-			int pos = await ext.GetCurrentParameterIndex (currentMethodGroup.MethodProvider.StartOffset, token);
-			if (pos == -1) {
-				if (actualMethodGroup.MethodProvider == null) {
-					currentMethodGroup = null;
-				} else {
-					pos = await ext.GetCurrentParameterIndex (actualMethodGroup.MethodProvider.StartOffset, token);
-					currentMethodGroup = pos >= 0 ? actualMethodGroup : null;
-				}
+			if (!currentMethodGroup.MethodProvider.ApplicableSpan.Contains (ext.Editor.CaretOffset)) {
+				actualMethodGroup.MethodProvider = await ext.ParameterCompletionCommand (widget.CurrentCodeCompletionContext);
+				if (actualMethodGroup.MethodProvider == null)
+					HideWindow (ext, widget);
 			}
+			if (actualMethodGroup.MethodProvider != null && (currentMethodGroup == null || !actualMethodGroup.MethodProvider.Equals (currentMethodGroup.MethodProvider)))
+				currentMethodGroup = actualMethodGroup;
+			try {
+				
+				int pos = await ext.GetCurrentParameterIndex (currentMethodGroup.MethodProvider.ApplicableSpan.Start, token);
+				if (pos == -1) {
+					if (actualMethodGroup.MethodProvider == null) {
+						currentMethodGroup = null;
+					} else {
+						pos = await ext.GetCurrentParameterIndex (actualMethodGroup.MethodProvider.ApplicableSpan.Start, token);
+						currentMethodGroup = pos >= 0 ? actualMethodGroup : null;
+					}
+				}
 
-			// If the user enters more parameters than the current overload has,
-			// look for another overload with more parameters.
-			UpdateOverload (ext, widget, token);
-			
-			// Refresh.
-			UpdateWindow (ext, widget);
+				// If the user enters more parameters than the current overload has,
+				// look for another overload with more parameters.
+				UpdateOverload (ext, widget, token);
+
+				// Refresh.
+				UpdateWindow (ext, widget);
+			}
+			catch (OperationCanceledException) { 
+			}
+			catch(Exception e) {
+				LoggingService.LogError ("Error while updating cursor position for parameter info window.", e);
+			}
 		}
 
 		internal static void RepositionWindow (CompletionTextEditorExtension ext, ICompletionWidget widget)
@@ -212,10 +229,14 @@ namespace MonoDevelop.Ide.CodeCompletion
 		public static int X { get; private set; }
 		public static int Y { get; private set; }
 		public static bool wasAbove = false;
-		static bool wasVisi;
+		/// <summary>
+		/// This stores information about code completion window(not about Parameter information window)
+		/// at time of last showing of Parameter window, so we know if we have reposition
+		/// </summary>
+		static bool wasCompletionWindowVisible;
 		static int lastW = -1, lastH = -1;
 
-		internal static async void UpdateWindow (CompletionTextEditorExtension textEditorExtension, ICompletionWidget completionWidget)
+		internal static void UpdateWindow (CompletionTextEditorExtension textEditorExtension, ICompletionWidget completionWidget)
 		{
 			// Updates the parameter information window from the information
 			// of the current method overload
@@ -224,11 +245,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 					window = new ParameterInformationWindow ();
 					window.Ext = textEditorExtension;
 					window.Widget = completionWidget;
-					window.SizeAllocated += delegate(object o, SizeAllocatedArgs args) {
-						if (args.Allocation.Width == lastW && args.Allocation.Height == lastH && wasVisi == CompletionWindowManager.IsVisible)
-							return;
-						PositionParameterInfoWindow (args.Allocation);
-					};
+					window.BoundsChanged += WindowBoundsChanged;
 					window.Hidden += delegate {
 						lastW = -1;
 						lastH = -1;
@@ -237,11 +254,9 @@ namespace MonoDevelop.Ide.CodeCompletion
 					window.Ext = textEditorExtension;
 					window.Widget = completionWidget;
 				}
+
 				wasAbove = false;
-				int curParam = window.Ext != null ? await window.Ext.GetCurrentParameterIndex (currentMethodGroup.MethodProvider.StartOffset) : 0;
-				var geometry2 = DesktopService.GetUsableMonitorGeometry (window.Screen.Number, window.Screen.GetMonitorAtPoint (X, Y));
-				window.ShowParameterInfo (currentMethodGroup.MethodProvider, currentMethodGroup.CurrentOverload, curParam - 1, (int)geometry2.Width);
-				PositionParameterInfoWindow (window.Allocation);
+				PositionParameterInfoWindow ();
 			}
 			
 			if (currentMethodGroup == null) {
@@ -249,7 +264,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 					window.HideParameterInfo ();
 //					DestroyWindow ();
 					wasAbove = false;
-					wasVisi = false;
+					wasCompletionWindowVisible = false;
 					lastW = -1;
 					lastH = -1;
 				}
@@ -257,48 +272,23 @@ namespace MonoDevelop.Ide.CodeCompletion
 			}
 		}
 
-	
-		static async void PositionParameterInfoWindow (Rectangle allocation)
+		static void WindowBoundsChanged (object sender, EventArgs e)
 		{
-			lastW = allocation.Width;
-			lastH = allocation.Height;
-			wasVisi = CompletionWindowManager.IsVisible;
-			var ctx = window.Widget.CurrentCodeCompletionContext;
-			int cparam = window.Ext != null ? await window.Ext.GetCurrentParameterIndex (currentMethodGroup.MethodProvider.StartOffset) : 0;
+			if (window.Size.Width == lastW && window.Size.Height == lastH && wasCompletionWindowVisible == (CompletionWindowManager.Wnd?.Visible ?? false))
+				return;
+			window.BoundsChanged -= WindowBoundsChanged;
+			PositionParameterInfoWindow ();
+			window.BoundsChanged += WindowBoundsChanged;
+		}
 
-			X = currentMethodGroup.CompletionContext.TriggerXCoord;
-			if (CompletionWindowManager.IsVisible) {
-				// place above
-				Y = ctx.TriggerYCoord - ctx.TriggerTextHeight - allocation.Height - 10;
-			} else {
-				// place below
-				Y = ctx.TriggerYCoord;
-			}
-
-			var geometry = DesktopService.GetUsableMonitorGeometry (window.Screen.Number, window.Screen.GetMonitorAtPoint (X, Y));
-
+		static async void PositionParameterInfoWindow ()
+		{
+			var geometry = window.Visible ? window.Screen.VisibleBounds : Xwt.MessageDialog.RootWindow.Screen.VisibleBounds;
+			int cparam = window.Ext != null ? await window.Ext.GetCurrentParameterIndex (currentMethodGroup.MethodProvider.ParameterListStart) : 0;
 			window.ShowParameterInfo (currentMethodGroup.MethodProvider, currentMethodGroup.CurrentOverload, cparam - 1, (int)geometry.Width);
-
-			if (X + allocation.Width > geometry.Right)
-				X = (int)geometry.Right - allocation.Width;
-			if (Y < geometry.Top)
-				Y = ctx.TriggerYCoord;
-			if (wasAbove || Y + allocation.Height > geometry.Bottom) {
-				Y = Y - ctx.TriggerTextHeight - allocation.Height - 4;
-				wasAbove = true;
-			}
-
-			if (CompletionWindowManager.IsVisible) {
-				var completionWindow = new Rectangle (CompletionWindowManager.X, CompletionWindowManager.Y, CompletionWindowManager.Wnd.Allocation.Width, CompletionWindowManager.Wnd.Allocation.Height);
-				if (completionWindow.IntersectsWith (new Rectangle (X, Y, allocation.Width, allocation.Height))) {
-					X = completionWindow.X;
-					Y = completionWindow.Y - allocation.Height - 6;
-					if (Y < 0)
-						Y = completionWindow.Bottom + 6;
-				}
-			}
-
-			window.Move (X, Y);
+			window.UpdateParameterInfoLocation ();
+			lastW = (int)window.Width;
+			lastH = (int)window.Height;
 		}		
 	}
 		

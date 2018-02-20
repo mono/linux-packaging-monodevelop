@@ -188,6 +188,7 @@ namespace MonoDevelop.Deployment
 							while ((nr = s.Read (buffer, 0, buffer.Length)) > 0)
 								zs.Write (buffer, 0, nr);
 						}
+						zs.CloseEntry ();
 					}
 					zs.Finish ();
 					zs.Close ();
@@ -332,13 +333,13 @@ namespace MonoDevelop.Deployment
 				string tag = text.Substring (pos + 1, ep - pos - 1);
 				string dir = ctx.GetDirectory (tag);
 				if (dir != null) {
-					sb.Append (text.Substring (lastPos, pos - lastPos));
+					sb.Append (text, lastPos, pos - lastPos);
 					sb.Append (dir);
 					lastPos = ep + 1;
 				}
 				pos = text.IndexOf ('@', ep+1);
 			}
-			sb.Append (text.Substring (lastPos, text.Length - lastPos));
+			sb.Append (text, lastPos, text.Length - lastPos);
 			string tmp = ctx.CreateTempFile ();
 			TextFile.WriteFile (tmp, sb.ToString (), tf.SourceEncoding);
 			return tmp;

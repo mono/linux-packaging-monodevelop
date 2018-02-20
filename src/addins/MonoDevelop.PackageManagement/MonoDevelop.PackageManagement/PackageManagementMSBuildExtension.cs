@@ -25,15 +25,19 @@
 // THE SOFTWARE.
 
 using System;
+using System.Threading.Tasks;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.MSBuild;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageManagementMSBuildExtension : ProjectExtension
+	internal class PackageManagementMSBuildExtension : ProjectExtension
 	{
 		public static EnsureNuGetPackageBuildImportsTargetUpdater Updater;
+		public static NuGetPackageNewImportsHandler NewImportsHandler;
+		public static NuGetPackageForcedImportsRemover ForcedImportsRemover;
+		public static Task PackageRestoreTask;
 
 		protected override void OnWriteProject (ProgressMonitor monitor, MSBuildProject msproject)
 		{
@@ -43,10 +47,41 @@ namespace MonoDevelop.PackageManagement
 
 		public void UpdateProject (MSBuildProject msproject)
 		{
+			NuGetPackageForcedImportsRemover importsRemover = ForcedImportsRemover;
+			if (importsRemover != null) {
+				importsRemover.UpdateProject (msproject);
+			}
+
 			EnsureNuGetPackageBuildImportsTargetUpdater currentUpdater = Updater;
 			if (currentUpdater != null) {
 				currentUpdater.UpdateProject (msproject);
 			}
+
+			NuGetPackageNewImportsHandler importsHandler = NewImportsHandler;
+			if (importsHandler != null) {
+				importsHandler.UpdateProject (msproject);
+			}
+		}
+
+		protected override Task<BuildResult> OnBuild (ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext)
+		{
+			Task restoreTask = PackageRestoreTask;
+			if (restoreTask != null) {
+				return WaitForRestoreThenBuild (restoreTask, monitor, configuration, operationContext);
+			}
+			return base.OnBuild (monitor, configuration, operationContext);
+		}
+
+		async Task<BuildResult> WaitForRestoreThenBuild (Task restoreTask, ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext)
+		{
+			try {
+				await restoreTask;
+			} catch (Exception ex) {
+				var result = new BuildResult ();
+				result.AddError (GettextCatalog.GetString ("{0}. Please see the Package Console for more details.", ex.Message));
+				return result;
+			}
+			return await base.OnBuild (monitor, configuration, operationContext);
 		}
 	}
 }

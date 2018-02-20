@@ -1,12 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
     public class StringCompareIsCultureSpecificTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact]
         public void TestCase1()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -26,7 +26,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestInvalidCase1()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -39,7 +39,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestCase2()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -59,7 +59,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestInvalidCase2()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -72,7 +72,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestCase3()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -92,7 +92,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestCase4()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -112,7 +112,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestInvalidCase4()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -125,7 +125,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestCase5()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -145,7 +145,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestCase6()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -165,7 +165,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestInvalid()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -178,7 +178,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestComplex()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -198,7 +198,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestDisable()
         {
             Analyze<StringCompareIsCultureSpecificAnalyzer>(@"
@@ -213,3 +213,4 @@ class Test
         }
     }
 }
+*/

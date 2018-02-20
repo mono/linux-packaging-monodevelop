@@ -43,6 +43,7 @@ using System.Diagnostics;
 using MonoDevelop.Core.Execution;
 using System.Text;
 using MonoDevelop.Core;
+using Microsoft.WindowsAPICodePack.InternetExplorer;
 using Microsoft.WindowsAPICodePack.Taskbar;
 using MonoDevelop.Ide;
 using MonoDevelop.Components.Windows;
@@ -89,9 +90,8 @@ namespace MonoDevelop.Platform
         internal override void AttachMainToolbar (Gtk.VBox parent, Components.MainToolbar.IMainToolbarView toolbar)
 		{
 			titleBar = new TitleBar ();
-			var topMenu = new GtkWPFWidget (titleBar) {
-				HeightRequest = System.Windows.Forms.SystemInformation.CaptionHeight,
-			};
+			var topMenu = new WPFTitlebar (titleBar);
+
 			//commandManager.IncompleteKeyPressed += (sender, e) => {
 			//	if (e.Key == Gdk.Key.Alt_L) {
 			//		Keyboard.Focus(titleBar.DockTitle.Children[0]);
@@ -135,6 +135,29 @@ namespace MonoDevelop.Platform
 		}
 		#endregion
 
+		public override bool GetIsFullscreen (Components.Window window)
+		{
+			WINDOWPLACEMENT lpwndpl = new WINDOWPLACEMENT ();
+			lpwndpl.length = Marshal.SizeOf (lpwndpl);
+
+			Gtk.Window controlWindow = window;
+			IntPtr handle = GdkWin32.HgdiobjGet (controlWindow.GdkWindow);
+			Win32.GetWindowPlacement (handle, ref lpwndpl);
+			return lpwndpl.showCmd == Win32.SW_SHOWMAXIMIZED;
+		}
+
+		public override void SetIsFullscreen (Components.Window window, bool isFullscreen)
+		{
+			WINDOWPLACEMENT lpwndpl = new WINDOWPLACEMENT ();
+			lpwndpl.length = Marshal.SizeOf (lpwndpl);
+
+			Gtk.Window controlWindow = window;
+			IntPtr handle = GdkWin32.HgdiobjGet (controlWindow.GdkWindow);
+			Win32.GetWindowPlacement (handle, ref lpwndpl);
+			lpwndpl.showCmd = isFullscreen ? Win32.SW_SHOWMAXIMIZED : Win32.SW_SHOWNORMAL;
+			Win32.SetWindowPlacement (handle, ref lpwndpl);
+		}
+
 		internal static Xwt.Toolkit WPFToolkit;
 
 		public override void Initialize ()
@@ -143,13 +166,20 @@ namespace MonoDevelop.Platform
 			if (TaskbarManager.IsPlatformSupported) {
 				TaskbarManager.Instance.ApplicationId = BrandingService.ApplicationName;
 			}
+			// Set InternetExplorer emulation mode
+			InternetExplorer.EmulationMode = IEEmulationMode.IE11;
 		}
 
 		public override Xwt.Toolkit LoadNativeToolkit ()
 		{
 			var path = Path.GetDirectoryName (GetType ().Assembly.Location);
 			System.Reflection.Assembly.LoadFrom (Path.Combine (path, "Xwt.WPF.dll"));
-			return WPFToolkit = Xwt.Toolkit.Load (Xwt.ToolkitType.Wpf);
+			WPFToolkit = Xwt.Toolkit.Load (Xwt.ToolkitType.Wpf);
+
+			WPFToolkit.RegisterBackend<Xwt.Backends.IDialogBackend, ThemedWpfDialogBackend> ();
+			WPFToolkit.RegisterBackend<Xwt.Backends.IWindowBackend, ThemedWpfWindowBackend> ();
+
+			return WPFToolkit;
 		}
 
 		internal override void SetMainWindowDecorations (Gtk.Window window)
@@ -336,13 +366,13 @@ namespace MonoDevelop.Platform
 			if (command != null) {
 				sb.Append ("/C \"");
 				if (title != null)
-					sb.Append ("title " + title + " && ");
-				sb.Append ("\"" + command + "\" " + arguments);
+					sb.Append ("title ").Append (title).Append (" && ");
+				sb.Append ("\"").Append (command).Append ("\" ").Append (arguments);
 				if (pauseWhenFinished)
 					sb.Append (" & pause");
 				sb.Append ("\"");
 			} else if (title != null) {
-				sb.Append ("/K \"title " + title + "\"");
+				sb.Append ("/K \"title ").Append (title).Append ("\"");
 			}
 			var psi = new ProcessStartInfo ("cmd.exe", sb.ToString ()) {
 				CreateNoWindow = false,
@@ -521,7 +551,8 @@ namespace MonoDevelop.Platform
 					SHOpenFolderAndSelectItems (dir, (uint)files.Length, files, 0);
 				} finally {
 					ILFree (dir);
-					files.ToList ().ForEach (ILFree);
+					foreach (var file in files)
+						ILFree (file);
 				}
 			}
 		}
@@ -541,6 +572,34 @@ namespace MonoDevelop.Platform
 			{
 				foreach (string file in files)
 					Process.Start (ExePath, ProcessArgumentBuilder.Quote (file));
+			}
+		}
+
+		static void ApplyTheme (System.Windows.Window window)
+		{
+			var color = System.Windows.Media.Color.FromArgb (
+				(byte)(MonoDevelop.Ide.Gui.Styles.BackgroundColor.Alpha * 255.0),
+				(byte)(MonoDevelop.Ide.Gui.Styles.BackgroundColor.Red * 255.0),
+				(byte)(MonoDevelop.Ide.Gui.Styles.BackgroundColor.Green * 255.0),
+				(byte)(MonoDevelop.Ide.Gui.Styles.BackgroundColor.Blue * 255.0));
+			window.Background = new System.Windows.Media.SolidColorBrush (color);
+		}
+
+		public class ThemedWpfWindowBackend : Xwt.WPFBackend.WindowBackend
+		{
+			public override void Initialize ()
+			{
+				base.Initialize ();
+				ApplyTheme (Window);
+			}
+		}
+
+		public class ThemedWpfDialogBackend : Xwt.WPFBackend.DialogBackend
+		{
+			public override void Initialize ()
+			{
+				base.Initialize ();
+				ApplyTheme (Window);
 			}
 		}
 	}

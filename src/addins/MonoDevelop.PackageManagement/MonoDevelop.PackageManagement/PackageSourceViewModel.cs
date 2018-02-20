@@ -27,32 +27,54 @@
 //
 
 using System;
-using NuGet;
+using NuGet.Configuration;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageSourceViewModel : ViewModelBase<PackageSourceViewModel>
+	internal class PackageSourceViewModel : ViewModelBase<PackageSourceViewModel>
 	{
-		RegisteredPackageSource packageSource;
+		PackageSource packageSource;
+
+		public PackageSourceViewModel ()
+			: this (new PackageSource (""))
+		{
+		}
 		
 		public PackageSourceViewModel(PackageSource packageSource)
 		{
-			this.packageSource = new RegisteredPackageSource(packageSource);
+			this.packageSource = packageSource.Clone ();
+
+			Name = packageSource.Name;
+			UserName = packageSource.Credentials?.Username;
+			Password = packageSource.Credentials?.Password;
 			IsValid = true;
 			ValidationFailureMessage = "";
 		}
 		
 		public PackageSource GetPackageSource()
 		{
-			return packageSource.ToPackageSource();
+			return new PackageSource (Source, Name, IsEnabled) {
+				Credentials = GetCredential (),
+				ProtocolVersion = packageSource.ProtocolVersion
+			};
+		}
+
+		PackageSourceCredential GetCredential ()
+		{
+			if (HasUserName () || HasPassword ()) {
+				return PackageSourceCredential.FromUserInput (
+					Source,
+					UserName ?? string.Empty,
+					Password ?? string.Empty,
+					storePasswordInClearText: false
+				);
+			}
+			return null;
 		}
 		
-		public string Name {
-			get { return packageSource.Name; }
-			set { packageSource.Name = value; }
-		}
+		public string Name { get; set; }
 		
-		public string SourceUrl {
+		public string Source {
 			get { return packageSource.Source; }
 			set { packageSource.Source = value; }
 		}
@@ -62,15 +84,14 @@ namespace MonoDevelop.PackageManagement
 			set { packageSource.IsEnabled = value; }
 		}
 
-		public string UserName {
-			get { return packageSource.UserName; }
-			set { packageSource.UserName = value; }
+		public string UserName { get; set; }
+
+		public bool HasUserName ()
+		{
+			return !String.IsNullOrEmpty (UserName);
 		}
 
-		public string Password {
-			get { return packageSource.Password; }
-			set { packageSource.Password = value; }
-		}
+		public string Password { get; set; }
 
 		public bool HasPassword ()
 		{

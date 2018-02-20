@@ -37,27 +37,22 @@ namespace MonoDevelop.CSharp.UnitTests
 	{
 		public override async System.Threading.Tasks.Task<SourceCodeLocation> GetSourceCodeLocationAsync (MonoDevelop.Projects.Project project, string fixtureTypeNamespace, string fixtureTypeName, string testName, System.Threading.CancellationToken cancellationToken)
 		{
-			var csc = new CancellationTokenSource ();
-			var ctx = await TypeSystemService.GetCompilationAsync (project, csc.Token).ConfigureAwait (false);
+			var ctx = await TypeSystemService.GetCompilationAsync (project, cancellationToken).ConfigureAwait (false);
 			var cls = ctx?.Assembly?.GetTypeByMetadataName (string.IsNullOrEmpty (fixtureTypeNamespace) ? fixtureTypeName : fixtureTypeNamespace + "." + fixtureTypeName);
 			if (cls == null)
 				return null;
 			if (cls.Name != testName) {
-				foreach (var met in cls.GetMembers ().OfType<IMethodSymbol> ()) {
-					if (met.Name == testName) {
-						var loc = met.Locations.FirstOrDefault (l => l.IsInSource);
-						return ConvertToSourceCodeLocation (loc);
-					}
+				foreach (var met in cls.GetMembers (testName).OfType<IMethodSymbol> ()) {
+					var loc = met.Locations.FirstOrDefault (l => l.IsInSource);
+					return ConvertToSourceCodeLocation (loc);
 				}
 
 				int idx = testName != null ? testName.IndexOf ('(') : -1;
 				if (idx > 0) {
 					testName = testName.Substring (0, idx);
-					foreach (var met in cls.GetMembers ().OfType<IMethodSymbol> ()) {
-						if (met.Name == testName){
-							var loc = met.Locations.FirstOrDefault (l => l.IsInSource);
-							return ConvertToSourceCodeLocation (loc);
-						}
+					foreach (var met in cls.GetMembers (testName).OfType<IMethodSymbol> ()) {
+						var loc = met.Locations.FirstOrDefault (l => l.IsInSource);
+						return ConvertToSourceCodeLocation (loc);
 					}
 				}
 			}

@@ -33,6 +33,19 @@ namespace MonoDevelop.Debugger.PreviewVisualizers
 {
 	public class GenericPreviewVisualizer : PreviewVisualizer
 	{
+		Label label;
+		string value;
+
+		public void Copy()
+		{
+			string text;
+			if (label.GetSelectionBounds (out int start, out int end))
+				text = label.Text.Substring (start, end - start);
+			else
+				text = value;//put full value into clipboard, not ellipsized one
+			Clipboard.Get (Gdk.Selection.Clipboard).Text = text;
+		}
+
 		#region implemented abstract members of PreviewVisualizer
 
 		public override bool CanVisualize (ObjectValue val)
@@ -42,15 +55,18 @@ namespace MonoDevelop.Debugger.PreviewVisualizers
 
 		public override Control GetVisualizerWidget (ObjectValue val)
 		{
-			string value = val.Value;
+			var ops = DebuggingService.DebuggerSession.EvaluationOptions.Clone ();
+			ops.AllowTargetInvoke = true;
+			ops.ChunkRawStrings = true;
+			ops.EllipsizedLength = 5000;//Preview window can hold aprox. 4700 chars
+			val.Refresh (ops);//Refresh DebuggerDisplay/String value with full length instead of ellipsized
+			value = val.Value;
 			Gdk.Color col = Styles.PreviewVisualizerTextColor.ToGdkColor ();
 
-			if (!val.IsNull && (val.TypeName == "string" || val.TypeName == "char[]"))
-				value = '"' + GetString (val) + '"';
 			if (DebuggingService.HasInlineVisualizer (val))
 				value = DebuggingService.GetInlineVisualizer (val).InlineVisualize (val);
-
-			var label = new Gtk.Label ();
+			
+			label = new Label ();
 			label.Text = value;
 			label.ModifyFont (FontService.SansFont.CopyModified (Ide.Gui.Styles.FontScale11));
 			label.ModifyFg (StateType.Normal, col);
@@ -66,45 +82,19 @@ namespace MonoDevelop.Debugger.PreviewVisualizers
 
 			if (label.Layout.GetLine (1) != null) {
 				label.Justify = Gtk.Justification.Left;
-				var line15 = label.Layout.GetLine (15);
-				if (line15 != null) {
-					label.Text = value.Substring (0, line15.StartIndex).TrimEnd ('\r', '\n') + "\n…";
+				var trimmedLine = label.Layout.GetLine (50);
+				if (trimmedLine != null) {
+					label.Text = value.Substring (0, trimmedLine.StartIndex).TrimEnd ('\r', '\n') + "\n…";
 				}
 			}
-
+			label.Selectable = true;
+			label.CanFocus = false;
 			label.Show ();
 
 			return label;
 		}
 
 		#endregion
-
-		string GetString (ObjectValue val)
-		{
-			var ops = DebuggingService.DebuggerSession.EvaluationOptions.Clone ();
-			ops.AllowTargetInvoke = true;
-			ops.ChunkRawStrings = true;
-			if (val.TypeName == "string") {
-				var rawString = val.GetRawValue (ops) as RawValueString;
-				var length = rawString.Length;
-				if (length > 0) {
-					return rawString.Substring (0, Math.Min (length, 4096));
-				} else {
-					return "";
-				}
-			} else if (val.TypeName == "char[]") {
-				var rawArray = val.GetRawValue (ops) as RawValueArray;
-				var length = rawArray.Length;
-				if (length > 0) {
-					return new string (rawArray.GetValues (0, Math.Min (length, 4096)) as char[]);
-				} else {
-					return "";
-				}
-
-			} else {
-				throw new InvalidOperationException ();
-			}
-		}
 	}
 }
 

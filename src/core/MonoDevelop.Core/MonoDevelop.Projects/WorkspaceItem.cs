@@ -293,10 +293,10 @@ namespace MonoDevelop.Projects
 		/// <summary>
 		/// Called when a load operation for this item has started
 		/// </summary>
-		internal protected async virtual Task OnBeginLoad ()
+		internal protected virtual Task OnBeginLoad ()
 		{
 			Loading = true;
-			await LoadUserProperties ();
+			return LoadUserProperties ();
 		}
 		
 		/// <summary>
@@ -334,14 +334,17 @@ namespace MonoDevelop.Projects
 				await OnLoadUserProperties ();
 		}
 
-		protected virtual async Task OnLoadUserProperties ()
+		protected virtual Task OnLoadUserProperties ()
 		{
 			userProperties.Dispose ();
 			userProperties = new PropertyBag ();
 
+			string oldPreferencesFileName = GetLegacyPreferencesFileName ();
 			string preferencesFileName = GetPreferencesFileName ();
 
-			await Task.Run (() => {
+			return Task.Run (() => {
+				MigrateLegacyUserPreferencesFile (oldPreferencesFileName, preferencesFileName);
+
 				if (!File.Exists (preferencesFileName))
 					return;
 
@@ -373,7 +376,7 @@ namespace MonoDevelop.Projects
 
 		protected virtual Task OnSaveUserProperties ()
 		{
-			string file = GetPreferencesFileName ();
+			FilePath file = GetPreferencesFileName ();
 			var userProps = userProperties;
 
 			return Task.Run (() => {
@@ -385,6 +388,8 @@ namespace MonoDevelop.Projects
 			
 				XmlTextWriter writer = null;
 				try {
+					Directory.CreateDirectory (file.ParentDirectory);
+
 					writer = new XmlTextWriter (file, System.Text.Encoding.UTF8);
 					writer.Formatting = Formatting.Indented;
 					XmlDataSerializer ser = new XmlDataSerializer (new DataContext ());
@@ -399,9 +404,31 @@ namespace MonoDevelop.Projects
 			});
 		}
 		
-		string GetPreferencesFileName ()
+		string GetLegacyPreferencesFileName ()
 		{
 			return FileName.ChangeExtension (".userprefs");
+		}
+
+		static void MigrateLegacyUserPreferencesFile (string legacyPreferencesFileName, FilePath preferencesFileName)
+		{
+			if (!File.Exists (legacyPreferencesFileName))
+				return;
+
+			if (!File.Exists (preferencesFileName)) {
+				Directory.CreateDirectory (preferencesFileName.ParentDirectory);
+
+				File.Move (legacyPreferencesFileName, preferencesFileName);
+			}
+		}
+
+		public FilePath GetPreferencesDirectory ()
+		{
+			return BaseDirectory.Combine (".vs", Name, "xs");
+		}
+
+		internal string GetPreferencesFileName ()
+		{
+			return GetPreferencesDirectory ().Combine ("UserPrefs.xml");
 		}
 
 		public virtual StringTagModelDescription GetStringTagModelDescription ()

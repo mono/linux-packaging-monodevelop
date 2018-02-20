@@ -28,6 +28,7 @@ using System;
 using MonoDevelop.Ide;
 using Gtk;
 using System.Text;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Ide.Fonts;
 
 namespace MonoDevelop.Components
@@ -77,12 +78,16 @@ namespace MonoDevelop.Components
 
 		public DropDownBoxListWindow (IListDataProvider provider, WindowType windowType) : base (windowType)
 		{
+			Accessible.Name = "DropDownBoxListWindow";
+
 			this.DataProvider = provider;
 			this.TransientFor = IdeApp.Workbench.RootWindow;
-			this.TypeHint = Gdk.WindowTypeHint.Menu;
+			this.TypeHint = Gdk.WindowTypeHint.DropdownMenu;
 			this.Decorated = false;
 			this.BorderWidth = 1;
 			list = new ListWidget (this);
+			list.Accessible.Name = "DropDownBoxListWindow.List";
+
 			list.SelectItem += delegate {
 				var sel = list.Selection;
 				if (sel >= 0 && sel < DataProvider.IconCount) {
@@ -105,7 +110,8 @@ namespace MonoDevelop.Components
 
 		public void SelectItem (object item)
 		{
-			for (int i = 0; i < DataProvider.IconCount; i++) {
+			int count = DataProvider.IconCount;
+			for (int i = 0; i < count; i++) {
 				if (DataProvider.GetTag (i) == item) {
 					list.Selection = i;
 					vScrollbar.Vadjustment.Value = Math.Max (0, i * list.RowHeight - vScrollbar.Vadjustment.PageSize / 2);
@@ -117,7 +123,8 @@ namespace MonoDevelop.Components
 		void SwitchToSeletedWord ()
 		{
 			string selection = list.WordSelection.ToString ();
-			for (int i = 0; i < DataProvider.IconCount; i++) {
+			int count = DataProvider.IconCount;
+			for (int i = 0; i < count; i++) {
 				if (DataProvider.GetMarkup (i).StartsWith (selection, StringComparison.OrdinalIgnoreCase)) {
 					list.Selection = i;
 					list.WordSelection.Append (selection);
@@ -235,12 +242,58 @@ namespace MonoDevelop.Components
 
 			public ListWidget (DropDownBoxListWindow win)
 			{
+				Accessible.Role = Atk.Role.List;
 				this.win = win;
 				this.Events = Gdk.EventMask.ButtonPressMask | Gdk.EventMask.ButtonReleaseMask | Gdk.EventMask.PointerMotionMask | Gdk.EventMask.LeaveNotifyMask;
 				this.CanFocus = true;
-				layout = new Pango.Layout (this.PangoContext);
-				CalcRowHeight ();
-				CalcVisibleRows ();
+				UpdateStyle ();
+
+				CalcAccessibility ();
+			}
+
+			class TextElement : AtkCocoaHelper.AccessibilityElementProxy
+			{
+				public int RowIndex { get; set; }
+				internal TextElement ()
+				{
+				}
+			}
+
+			TextElement[] textElements;
+			void CalcAccessibility ()
+			{
+				var columnElement = new AtkCocoaHelper.AccessibilityElementProxy ();
+				columnElement.GtkParent = this;
+				columnElement.SetRole (AtkCocoa.Roles.AXColumn);
+				Accessible.AddAccessibleElement (columnElement);
+
+				int count = win.DataProvider.IconCount;
+				textElements = new TextElement[count];
+				for (int i = 0; i < count; i++) {
+					var rowElement = new AtkCocoaHelper.AccessibilityElementProxy ();
+					rowElement.GtkParent = this;
+					rowElement.SetRole (AtkCocoa.Roles.AXRow);
+					Accessible.AddAccessibleElement (rowElement);
+
+					var cellElement = new AtkCocoaHelper.AccessibilityElementProxy ();
+					cellElement.GtkParent = this;
+					cellElement.SetRole (AtkCocoa.Roles.AXCell);
+					columnElement.AddAccessibleChild (cellElement);
+					rowElement.AddAccessibleChild (cellElement);
+
+					var textElement = textElements[i] = new TextElement ();
+					textElement.RowIndex = i;
+					textElement.PerformPress += PerformPress;
+					textElement.GtkParent = this;
+					textElement.Value = win.DataProvider.GetMarkup (i);
+					cellElement.AddAccessibleChild (textElement);
+				}
+			}
+
+			void PerformPress (object sender, EventArgs args)
+			{
+				var element = (TextElement)sender;
+				win.DataProvider.ActivateItem (element.RowIndex);
 			}
 
 			internal void CalcRowHeight ()
@@ -265,6 +318,13 @@ namespace MonoDevelop.Components
 
 			protected override void OnDestroyed ()
 			{
+				if (textElements != null) {
+					foreach (var textElement in textElements) {
+						textElement.PerformPress -= PerformPress;
+					}
+					textElements = null;
+				}
+
 				if (layout != null) {
 					layout.Dispose ();
 					layout = null;
@@ -401,7 +461,7 @@ namespace MonoDevelop.Components
 					int iconWidth = icon != null ? (int)icon.Width : 0;
 
 					layout.Ellipsize = Pango.EllipsizeMode.End;
-					layout.Width = (Allocation.Width - xpos - iconWidth - iconTextDistance) * (int)Pango.Scale.PangoScale;
+					layout.Width = (Allocation.Width - xpos - padding - iconWidth - iconTextDistance) * (int)Pango.Scale.PangoScale;
 					layout.SetMarkup (PathBar.GetFirstLineFromMarkup (text));
 
 					int wi, he, typos, iypos;
@@ -479,21 +539,22 @@ namespace MonoDevelop.Components
 					return 0;
 				int longest = 0;
 				string longestText = win.DataProvider.GetMarkup (0) ?? "";
-				
-				for (int i = 1; i < win.DataProvider.IconCount; i++) {
+
+				int count = win.DataProvider.IconCount;
+				for (int i = 1; i < count; i++) {
 					string curText = win.DataProvider.GetMarkup (i) ?? "";
 					if (curText.Length > longestText.Length) {
 						longestText = curText;
 						longest = i;
 					}
 				}
-				layout.SetMarkup (win.DataProvider.GetMarkup (longest) ?? "&lt;null&gt;");
-				Pango.Rectangle inkRec, logRect;
-				layout.GetExtents (out inkRec, out logRect);
+				layout.Width = -1;
+				layout.SetMarkup (longestText ?? "&lt;null&gt;");
+				int w, h;
+				layout.GetPixelSize(out w, out h);
 				var icon = win.DataProvider.GetIcon (longest);
 				int iconWidth = icon != null ? (int) icon.Width : 24;
-				return iconWidth + iconTextDistance + padding * 2 + leftXAlignment +
-					(int)(inkRec.Width / Pango.Scale.PangoScale);
+				return iconWidth + iconTextDistance + (padding * 2) + leftXAlignment + w;
 			}
 
 
@@ -530,7 +591,8 @@ namespace MonoDevelop.Components
 
 			void UpdateStyle ()
 			{
-				GdkWindow.Background = Style.Base (StateType.Normal);
+				if (IsRealized)
+					GdkWindow.Background = Style.Base (StateType.Normal);
 				if (layout != null)
 					layout.Dispose ();
 				layout = new Pango.Layout (PangoContext);

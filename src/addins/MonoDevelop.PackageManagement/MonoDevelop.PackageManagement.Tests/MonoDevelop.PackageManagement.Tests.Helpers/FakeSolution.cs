@@ -26,12 +26,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
-	public class FakeSolution : ISolution
+	class FakeSolution : ISolution
 	{
 		public FilePath BaseDirectory { get; set; }
 		public FilePath FileName { get; set; }
@@ -74,6 +75,20 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 				ProjectRemoved (this, new DotNetProjectEventArgs (project));
 			}
 		}
+
+		public bool Equals (ISolution solution)
+		{
+			return this == solution;
+		}
+
+		public IDotNetProject ResolveProject (ProjectReference projectReference)
+		{
+			if (OnResolveProject != null)
+				return OnResolveProject (projectReference);
+			return Projects.FirstOrDefault (project => project.Name == projectReference.Include);
+		}
+
+		public Func<ProjectReference, IDotNetProject> OnResolveProject;
 	}
 }
 

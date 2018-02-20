@@ -1,20 +1,17 @@
 using System.Linq;
-using System.Threading;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Simplification;
 using Microsoft.CodeAnalysis.Formatting;
-using System.Diagnostics.Contracts;
 
 namespace RefactoringEssentials.CSharp.CodeRefactorings
 {
-    [ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = "Add a Contract to specify the return value must not be null")]
+	[ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = "Add a Contract to specify the return value must not be null")]
     /// <summary>
     /// Creates a 'Contract.Ensures(return != null);' contract for a method return value.
     /// </summary>
@@ -23,7 +20,7 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
         #region ICodeActionProvider implementation
         public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
         {
-            var codeContractsContext = await CodeContractsContext(context);
+            var codeContractsContext = await CodeContractsContext(context).ConfigureAwait(false);
             if (codeContractsContext == null)
                 return;
 
@@ -51,7 +48,7 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
 
         protected IEnumerable<CodeAction> GetActions(Document document, SyntaxNode root, AccessorDeclarationSyntax node)
         {
-            var propertyOrIndexerDeclaration = node.Ancestors().Where(n => n.GetType().Equals(typeof(PropertyDeclarationSyntax)) || n.GetType().Equals(typeof(IndexerDeclarationSyntax))).FirstOrDefault();
+            var propertyOrIndexerDeclaration = node.Ancestors().FirstOrDefault(n => n.GetType().Equals(typeof(PropertyDeclarationSyntax)) || n.GetType().Equals(typeof(IndexerDeclarationSyntax)));
 
             var nullableType = propertyOrIndexerDeclaration.ChildNodes().OfType<NullableTypeSyntax>().FirstOrDefault();
             
@@ -102,19 +99,68 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             return SyntaxFactory.ParseStatement($"Contract.Ensures(Contract.Result<{returnType}>() != null);\r\n").WithAdditionalAnnotations(Formatter.Annotation, Simplifier.Annotation);
         }
 
+        static bool ValidateContractAccess(MemberAccessExpressionSyntax access, string method, string genericTypeName)
+        {
+            if (access == null)
+                return false;
+
+            var className = access.Expression.GetRightmostName() as SimpleNameSyntax;
+            if (className == null || className.Identifier.ValueText != "Contract")
+                return false;
+
+            var ensures = access.GetRightmostName() as SimpleNameSyntax;
+            if (ensures == null || ensures.Identifier.ValueText != method)
+                return false;
+
+            if (genericTypeName!= null)
+            {
+                var generic = ensures as GenericNameSyntax;
+                if (generic == null || generic.Arity != 1)
+                    return false;
+
+                var typeName = generic.TypeArgumentList.Arguments[0].GetRightmostName() as SimpleNameSyntax;
+                if (typeName == null || typeName.Identifier.ValueText != genericTypeName)
+                    return false;
+            }
+            return true;
+        }
+
         static bool HasReturnContract(BlockSyntax bodyStatement, string returnType)
         {
-            var workspace = new AdhocWorkspace();
-
+            var rhsEnsures = SyntaxFactory.ParseStatement($"Contract.Ensures(Contract.Result<{returnType}>() != null);");
+            var lhsEnsures = SyntaxFactory.ParseStatement($"Contract.Ensures(null != Contract.Result<{returnType}>());");
             foreach (var expression in bodyStatement.DescendantNodes().OfType<ExpressionStatementSyntax>())
             {
-                var formatted = Formatter.Format(expression, workspace).ToString();
+                var ies = expression.Expression as InvocationExpressionSyntax;
+                if (ies == null)
+                    continue;
 
-                if (formatted == $"Contract.Ensures(Contract.Result<{returnType}>() != null);")
-                    return true;
+                var access = ies.Expression as MemberAccessExpressionSyntax;
+                if (access == null)
+                    continue;
 
-                if (formatted == $"Contract.Ensures(null != Contract.Result<{returnType}>());")
-                    return true;
+                if (!ValidateContractAccess(access, "Ensures", null))
+                    continue;
+
+                if (ies.ArgumentList.Arguments.Count != 1)
+                    continue;
+
+                var arg = ies.ArgumentList.Arguments[0].Expression as BinaryExpressionSyntax;
+                if (arg == null || !arg.OperatorToken.IsKind(SyntaxKind.ExclamationEqualsToken))
+                    continue;
+
+                if (arg.Left.IsKind(SyntaxKind.NullLiteralExpression))
+                {
+                    ies = arg.Right as InvocationExpressionSyntax;
+                }
+                else if (arg.Right.IsKind(SyntaxKind.NullLiteralExpression))
+                {
+                    ies = arg.Left as InvocationExpressionSyntax;
+                }
+                access = ies?.Expression as MemberAccessExpressionSyntax;
+                if (!ValidateContractAccess(access, "Result", returnType))
+                    continue;
+                return true;
             }
             return false;
         }

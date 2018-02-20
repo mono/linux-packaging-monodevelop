@@ -52,6 +52,7 @@ namespace MonoDevelop.Core.Assemblies
 		object initLock = new object ();
 		object initEventLock = new object ();
 		bool initialized;
+		bool frameworksInitialized;
 		bool initializing;
 		bool backgroundInitialize;
 		bool extensionInitialized;
@@ -63,7 +64,9 @@ namespace MonoDevelop.Core.Assemblies
 		ComposedAssemblyContext composedAssemblyContext;
 		ITimeTracker timer;
 		TargetFramework[] customFrameworks = new TargetFramework[0];
-		
+
+		static int internalIdCounter;
+
 		protected bool ShuttingDown { get; private set; }
 		
 		public TargetRuntime ()
@@ -72,6 +75,8 @@ namespace MonoDevelop.Core.Assemblies
 			composedAssemblyContext = new ComposedAssemblyContext ();
 			composedAssemblyContext.Add (Runtime.SystemAssemblyService.UserAssemblyContext);
 			composedAssemblyContext.Add (assemblyContext);
+
+			InternalId = Interlocked.Increment (ref internalIdCounter);
 			
 			Runtime.ShuttingDown += delegate {
 				ShuttingDown = true;
@@ -140,6 +145,12 @@ namespace MonoDevelop.Core.Assemblies
 		/// Returns 'true' if this runtime is the one currently running MonoDevelop.
 		/// </summary>
 		public abstract bool IsRunning { get; }
+
+		/// <summary>
+		/// Internal id, to be used at run time
+		/// </summary>
+		/// <value>The internal identifier.</value>
+		internal int InternalId { get; private set; }
 		
 		public virtual IEnumerable<FilePath> GetReferenceFrameworkDirectories ()
 		{
@@ -178,10 +189,7 @@ namespace MonoDevelop.Core.Assemblies
 			}
 		}
 
-		/// <summary>
-		/// Given an assembly file name, returns the corresponding debug information file name.
-		/// (.mdb for Mono, .pdb for MS.NET)
-		/// </summary>
+		[Obsolete ("Use DotNetProject.GetAssemblyDebugInfoFile()")]
 		public abstract string GetAssemblyDebugInfoFile (string assemblyPath);
 		
 		/// <summary>
@@ -230,22 +238,6 @@ namespace MonoDevelop.Core.Assemblies
 		/// </returns>
 		public virtual Process ExecuteAssembly (ProcessStartInfo pinfo, TargetFramework fx)
 		{
-			if (fx == null) {
-				TargetFrameworkMoniker fxId = Runtime.SystemAssemblyService.GetTargetFrameworkForAssembly (this, pinfo.FileName);
-				fx = Runtime.SystemAssemblyService.GetTargetFramework (fxId);
-				if (!IsInstalled (fx)) {
-					// Look for a compatible framework which is installed
-					foreach (TargetFramework f in Runtime.SystemAssemblyService.GetTargetFrameworks ()) {
-						if (IsInstalled (f) && f.CanReferenceAssembliesTargetingFramework (fx)) {
-							fx = f;
-							break;
-						}
-					}
-				}
-				if (!IsInstalled (fx))
-					throw new InvalidOperationException (string.Format ("No compatible framework found for assembly '{0}' (required framework: {1})", pinfo.FileName, fxId));
-			}
-			
 			ConvertAssemblyProcessStartInfo (pinfo);
 			return Process.Start (pinfo);
 		}
@@ -261,12 +253,7 @@ namespace MonoDevelop.Core.Assemblies
 				TargetFrameworkBackend backend;
 				if (frameworkBackends.TryGetValue (fx.Id, out backend))
 					return backend;
-				backend = fx.CreateBackendForRuntime (this);
-				if (backend == null) {
-					backend = CreateBackend (fx);
-					if (backend == null)
-						backend = new NotSupportedFrameworkBackend ();
-				}
+				backend = CreateBackend (fx) ?? new NotSupportedFrameworkBackend ();
 				backend.Initialize (this, fx);
 				frameworkBackends[fx.Id] = backend;
 				return backend;
@@ -290,7 +277,7 @@ namespace MonoDevelop.Core.Assemblies
 				if (!Directory.Exists (facades))
 					continue;
 
-				return Directory.GetFiles (facades, "*.dll");
+				return Directory.EnumerateFiles (facades, "*.dll");
 			}
 
 			//MonoDroid is special case because it's keeping Fascades in v1.0 folder
@@ -299,7 +286,7 @@ namespace MonoDevelop.Core.Assemblies
 				if (frameworkFolder != null) {
 					var facades = Path.Combine (Path.Combine (Path.GetDirectoryName (frameworkFolder), "v1.0"), "Facades");
 					if (Directory.Exists (facades))
-						return Directory.GetFiles (facades, "*.dll");
+						return Directory.EnumerateFiles (facades, "*.dll");
 				}
 			}
 
@@ -339,7 +326,12 @@ namespace MonoDevelop.Core.Assemblies
 		/// Returns the MSBuild bin path for this runtime.
 		/// </summary>
 		public abstract string GetMSBuildBinPath (string toolsVersion);
-		
+
+		/// <summary>
+		/// Returns the MSBuild bin path for this runtime.
+		/// </summary>
+		public abstract string GetMSBuildToolsPath (string toolsVersion);
+
 		/// <summary>
 		/// Returns the MSBuild extensions path.
 		/// </summary>
@@ -351,6 +343,7 @@ namespace MonoDevelop.Core.Assemblies
 		internal protected abstract IEnumerable<string> GetGacDirectories ();
 		
 		EventHandler initializedEvent;
+		EventHandler frameworksInitializedEvent;
 
 		/// <summary>
 		/// This event is fired when the runtime has finished initializing. Runtimes are initialized
@@ -372,6 +365,24 @@ namespace MonoDevelop.Core.Assemblies
 			remove {
 				lock (initEventLock) {
 					initializedEvent -= value;
+				}
+			}
+		}
+		
+		internal event EventHandler FrameworksInitialized {
+			add {
+				lock (initEventLock) {
+					if (frameworksInitialized) {
+						if (!ShuttingDown)
+							value (this, EventArgs.Empty);
+					}
+					else
+						frameworksInitializedEvent += value;
+				}
+			}
+			remove {
+				lock (initEventLock) {
+					frameworksInitializedEvent -= value;
 				}
 			}
 		}
@@ -445,6 +456,16 @@ namespace MonoDevelop.Core.Assemblies
 			if (ShuttingDown)
 				return;
 			
+			lock (initEventLock) {
+				frameworksInitialized = true;
+				try {
+					if (frameworksInitializedEvent != null && !ShuttingDown)
+						frameworksInitializedEvent (this, EventArgs.Empty);
+				} catch (Exception ex) {
+					LoggingService.LogError ("Error while initializing the runtime: " + Id, ex);
+				}
+			}
+
 			timer.Trace ("Initializing frameworks");
 			OnInitialize ();
 		}
@@ -600,9 +621,9 @@ namespace MonoDevelop.Core.Assemblies
 
 		protected static IEnumerable<TargetFramework> FindTargetFrameworks (FilePath frameworksDirectory, bool rescanKnownFrameworks)
 		{
-			foreach (FilePath idDir in Directory.GetDirectories (frameworksDirectory)) {
+			foreach (FilePath idDir in Directory.EnumerateDirectories(frameworksDirectory)) {
 				var id = idDir.FileName;
-				foreach (FilePath versionDir in Directory.GetDirectories (idDir)) {
+				foreach (FilePath versionDir in Directory.EnumerateDirectories (idDir)) {
 					var version = versionDir.FileName;
 					var moniker = new TargetFrameworkMoniker (id, version);
 					if (rescanKnownFrameworks || !Runtime.SystemAssemblyService.IsKnownFramework (moniker)) {
@@ -613,7 +634,7 @@ namespace MonoDevelop.Core.Assemblies
 					var profileListDir = versionDir.Combine ("Profile");
 					if (!Directory.Exists (profileListDir))
 						continue;
-					foreach (FilePath profileDir in Directory.GetDirectories (profileListDir)) {
+					foreach (FilePath profileDir in Directory.EnumerateDirectories (profileListDir)) {
 						var profile = profileDir.FileName;
 						moniker = new TargetFrameworkMoniker (id, version, profile);
 						if (rescanKnownFrameworks || !Runtime.SystemAssemblyService.IsKnownFramework (moniker)) {

@@ -33,7 +33,7 @@ using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement
 {
-	public interface IPackageManagementProjectService
+	internal interface IPackageManagementProjectService
 	{
 		event EventHandler SolutionLoaded;
 		event EventHandler SolutionUnloaded;
@@ -43,9 +43,7 @@ namespace MonoDevelop.PackageManagement
 		ISolution OpenSolution { get; }
 
 		IEnumerable<IDotNetProject> GetOpenProjects ();
-		
-		IProjectBrowserUpdater CreateProjectBrowserUpdater();
-		
+
 		string GetDefaultCustomToolForFileName(ProjectFile projectItem);
 	}
 }

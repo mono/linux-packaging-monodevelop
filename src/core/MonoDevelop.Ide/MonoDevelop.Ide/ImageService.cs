@@ -39,6 +39,7 @@ using System.Threading.Tasks;
 using System.Net;
 using Xwt.Backends;
 using Gtk;
+using Gdk;
 
 namespace MonoDevelop.Ide
 {
@@ -69,9 +70,6 @@ namespace MonoDevelop.Ide
 		static ImageService ()
 		{
 			iconFactory.AddDefault ();
-			IconId.IconNameRequestHandler = delegate (string stockId) {
-				EnsureStockIconIsLoaded (stockId);
-			};
 
 			AddinManager.AddExtensionNodeHandler (IconsExtensionPath, delegate (object sender, ExtensionNodeEventArgs args) {
 				StockIconCodon iconCodon = (StockIconCodon)args.ExtensionNode;
@@ -170,6 +168,21 @@ namespace MonoDevelop.Ide
 			name = GetStockIdForImageSpec (name, size);
 			return GetIcon (name).WithSize (size);
 		}
+
+		public static void AddIcon (string iconId, Xwt.Drawing.Image icon)
+		{
+			if (iconId == null)
+				throw new ArgumentNullException (nameof (iconId));
+			if (icon == null)
+				throw new ArgumentNullException (nameof (icon));
+			icons.Add (iconId, icon);
+		}
+
+		public static bool HasIcon (string iconId)
+		{
+			return icons.ContainsKey (iconId);
+		}
+
 
 		public static Xwt.Drawing.Image GetIcon (string name)
 		{
@@ -447,7 +460,6 @@ namespace MonoDevelop.Ide
 			return GetStockIdForImageSpec (addin, filename, iconSize);
 		}
 
-
 		static void AddToAnimatedIconFactory (string stockId, AnimatedIcon aicon)
 		{
 			animationFactory [stockId] = aicon;
@@ -479,7 +491,7 @@ namespace MonoDevelop.Ide
 
 		static string InternalGetStockIdFromAnimation (RuntimeAddin addin, string id, Gtk.IconSize size)
 		{
-			if (!id.StartsWith ("animation:"))
+			if (!id.StartsWith ("animation:", StringComparison.Ordinal))
 				return id;
 
 			id = id.Substring (10);
@@ -577,10 +589,10 @@ namespace MonoDevelop.Ide
 
 		static string PrivGetStockId (RuntimeAddin addin, string filename, Gtk.IconSize size)
 		{
-			if (addin != null && filename.StartsWith ("res:"))
+			if (addin != null && filename.StartsWith ("res:", StringComparison.Ordinal))
 				return InternalGetStockIdFromResource (addin, filename, size);
 
-			if (filename.StartsWith ("animation:"))
+			if (filename.StartsWith ("animation:", StringComparison.Ordinal))
 				return InternalGetStockIdFromAnimation (addin, filename, size);
 
 			return filename;
@@ -826,6 +838,41 @@ namespace MonoDevelop.Ide
 					image.Pixbuf = gravatar.Image.ToPixbuf ();
 			};
 		}
+
+		public static Pixbuf ColorShiftPixbuf (this Pixbuf src, byte shift = 120)
+		{
+			var dest = new Gdk.Pixbuf (src.Colorspace, src.HasAlpha, src.BitsPerSample, src.Width, src.Height);
+
+			unsafe
+			{
+
+				byte* src_pixels_orig = (byte*)src.Pixels;
+				byte* dest_pixels_orig = (byte*)dest.Pixels;
+
+				for (int i = 0; i < src.Height; i++) {
+					byte* src_pixels = src_pixels_orig + i * src.Rowstride;
+					byte* dest_pixels = dest_pixels_orig + i * dest.Rowstride;
+
+					for (int j = 0; j < src.Width; j++) {
+						*(dest_pixels++) = PixelClamp (*(src_pixels++) + shift);
+						*(dest_pixels++) = PixelClamp (*(src_pixels++) + shift);
+						*(dest_pixels++) = PixelClamp (*(src_pixels++) + shift);
+
+						if (src.HasAlpha) {
+							*(dest_pixels++) = *(src_pixels++);
+						}
+					}
+				}
+			}
+			return dest;
+		}
+
+		static byte PixelClamp (int val)
+		{
+			return (byte)System.Math.Max (0, System.Math.Min (255, val));
+		}
+
+
 	}
 
 	class CustomImageLoader : Xwt.Drawing.IImageLoader

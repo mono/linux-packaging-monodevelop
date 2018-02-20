@@ -1,14 +1,20 @@
 ﻿namespace MonoDevelop.FSharp
 open System
 open System.Collections.Generic
+open System.IO
 open System.Text
+open System.Threading
 open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open Mono.TextEditor
+open Mono.TextEditor.Highlighting
 open MonoDevelop.Core
 open MonoDevelop.Ide
 open MonoDevelop.Ide.CodeCompletion
+open MonoDevelop.Ide.Editor
+open MonoDevelop.Ide.Editor.Highlighting
 open MonoDevelop.Components
+open MonoDevelop.FSharp.Shared
 open ExtCore.Control
 
 module Symbols =
@@ -24,7 +30,7 @@ module Symbols =
 
     ///Given a column and line string returns the identifier portion of the string
     let lastIdent column lineString =
-        match Parsing.findLongIdents(column, lineString) with
+        match Parsing.findIdents column lineString SymbolLookupKind.ByLongIdent with
         | Some (_col, identIsland) -> Seq.last identIsland
         | None -> ""
 
@@ -35,6 +41,11 @@ module Symbols =
 
         let startOffset = doc.LocationToOffset(start.Line, start.Column+1)
         let endOffset = doc.LocationToOffset(finish.Line, finish.Column+1)
+        let startOffset =
+            if startOffset = endOffset then 
+                endOffset-symbolUse.Symbol.DisplayName.Length
+            else
+                startOffset
         MonoDevelop.Core.Text.TextSegment.FromBounds(startOffset, endOffset)
 
     let getEditorDataForFileName (fileName:string) =
@@ -183,7 +194,10 @@ module SymbolUse =
         | _ -> None
 
     let inline private notCtorOrProp (symbol:FSharpMemberOrFunctionOrValue) =
-        not symbol.IsConstructor && not symbol.IsPropertyGetterMethod && not symbol.IsPropertySetterMethod
+        not symbol.IsConstructor && 
+        not symbol.IsPropertyGetterMethod && 
+        not symbol.IsPropertySetterMethod &&
+        not (symbol.LogicalName = ".ctor")
 
     let (|Method|_|) (symbolUse:FSharpSymbolUse) =
         match symbolUse with
@@ -236,6 +250,7 @@ module SymbolUse =
             | _ -> None
         | _ -> None
 
+    
     let (|Val|_|) = function
         | MemberFunctionOrValue symbol when notCtorOrProp symbol &&
                                             not symbol.IsOperatorOrActivePattern ->
@@ -275,59 +290,95 @@ module SymbolUse =
     let (|ComputationExpression|_|) (symbol:FSharpSymbolUse) =
         if symbol.IsFromComputationExpression then Some symbol
         else None
+        
+    let (|Attribute|_|) = function
+        | Entity ent ->
+            if ent.AllBaseTypes
+               |> Seq.exists (fun t ->
+                                  if t.HasTypeDefinition then
+                                      t.TypeDefinition.TryFullName
+                                      |> Option.exists ((=) "System.Attribute" )
+                                  else false)
+            then Some ent
+            else None
+        | _ -> None
 
-type XmlDoc =
-  ///A full xmldoc tooltip
-| Full of string
-  ///A lookup of key, filename
-| Lookup of string * string option
-  ///No xmldoc
-| EmptyDoc
+    let symbolToIcon (symbolUse:FSharpSymbolUse) =
+        match symbolUse with
+        | ActivePatternCase _ -> "ActivePatternCase"
+        | Field _ -> "Field"
+        | UnionCase _ -> "UnionCase"
+        | Class _ -> "Class"
+        | Delegate _ -> "Delegate"
+        | Constructor _  -> "Constructor"
+        | Event _ -> "Event"
+        | Property _ -> "Property"
+        | Function f ->
+            if f.IsExtensionMember then "ExtensionMethod"
+            elif f.IsMember then "Method"
+            else "Field"
+        | Operator _ -> "Operator"
+        | ClosureOrNestedFunction _ -> "ClosureOrNestedFunction"
+        | Val _ -> "Val"
+        | Enum _ -> "Enum"
+        | Interface _ -> "Interface"
+        | Module _ -> "Module"
+        | Namespace _ -> "Namespace"
+        | Record _ -> "Record"
+        | Union _ -> "Union"
+        | ValueType _ -> "ValueType"
+        | Entity _ -> "Entity"
+        | _ -> "Event"
 
-type ToolTips =
-  ///A ToolTip of signature, summary
-  | ToolTip of signature:string * doc:XmlDoc * footer:string
-    ///A empty tip
-  | EmptyTip
+//type XmlDoc =
+//  ///A full xmldoc tooltip
+//| Full of string
+//  ///A lookup of key, filename
+//| Lookup of string * string option
+//  ///No xmldoc
+//| EmptyDoc
 
+//type ToolTips =
+//  ///A ToolTip of signature, summary
+//  | ToolTip of signature:string * doc:XmlDoc * footer:string
+//    ///A empty tip
+//  | EmptyTip
+[<AutoOpen>]
+module PrintParameter =
+    let print sb = Printf.bprintf sb "%s"
 
 [<AutoOpen>]
-module internal Highlight =
+module Highlight =
     type HighlightType =
     | Symbol | Brackets | Keyword | UserType | Number
-
-    let getColourScheme () =
-        Highlighting.SyntaxModeService.GetColorStyle (IdeApp.Preferences.ColorScheme.Value)
 
     let getColourPart x = round(x * 255.0) |> int
 
     let argbToHex (c : Cairo.Color) =
         sprintf "#%02X%02X%02X" (getColourPart c.R) (getColourPart c.G) (getColourPart c.B)
 
-    let hl str (style: Highlighting.ChunkStyle) =
-        let color = getColourScheme().GetForeground (style) |> argbToHex
-        String.Format ("""<span foreground="{0}">{1}</span>""", color, str)
+    let getEditor() =
+        let editor = TextEditorFactory.CreateNewEditor()
+        editor.MimeType <- "text/x-fsharp"
+        let assembly = typeof<SyntaxHighlighting>.Assembly
+        use stream = assembly.GetManifestResourceStream("F#.sublime-syntax")
+        use reader = new StreamReader(stream)
+        let highlighting = Sublime3Format.ReadHighlighting(reader)
+        highlighting.PrepareMatches()
+        editor.SyntaxHighlighting <- new SyntaxHighlighting(highlighting, editor)
+        editor
 
-    let asType t s =
-        let cs = getColourScheme ()
-        match t with
-        | Symbol -> hl s cs.KeywordOperators
-        | Brackets -> hl s cs.PunctuationForBrackets
-        | Keyword -> hl s cs.KeywordTypes
-        | UserType -> hl s cs.UserTypes
-        | Number -> hl s cs.Number
+    let private editor =
+        Runtime.RunInMainThread getEditor
+        |> Async.AwaitTask 
+        |> Async.RunSynchronously
 
-    let asSymbol = asType Symbol
-    let asKeyword = asType Keyword
-    let asBrackets = asType Brackets
-    let asUserType = asType UserType
-    let asUnderline = sprintf "<u>%s</u>"
+    let syntaxHighlight s =
+        Runtime.RunInMainThread(fun() -> editor.Text <- s) |> Async.AwaitTask |> Async.RunSynchronously
+        let data = editor.GetContent<ITextEditorDataProvider>().GetTextEditorData()
+        data.GetMarkup(0, s.Length, false, true, false, true)
 
-
-[<AutoOpen>]
-module PrintParameter =
-    let print sb = Printf.bprintf sb "%s"
-
+    let asUnderline = sprintf "_STARTUNDERLINE_%s_ENDUNDERLINE_" // we replace with real markup after highlighting
 
 module SymbolTooltips =
     let maxPadding = 20
@@ -336,8 +387,6 @@ module SymbolTooltips =
     | TupleParam of IList<FSharpType>
     | NamedType of FSharpType
 
-    let internal escapeText = GLib.Markup.EscapeText
-
     /// Concat two strings with a space between if both a and b are not IsNullOrWhiteSpace
     let internal (++) (a:string) (b:string) =
         match String.IsNullOrEmpty a, String.IsNullOrEmpty b with
@@ -345,9 +394,9 @@ module SymbolTooltips =
         | false, true -> a
         | true, false -> b
         | false, false -> a + " " + b
-
+         
     let getKeywordTooltip (keyword:string) =
-        let signatureline = asKeyword keyword ++ "(keyword)"
+        let signatureline = syntaxHighlight keyword ++ "(keyword)"
         let summary =
             match KeywordList.keywordDescriptions.TryGetValue keyword with
             | true, description -> Full description
@@ -366,17 +415,29 @@ module SymbolTooltips =
             | _ -> ResizeArray() :> IList<_>, ""
 
         if xmlDoc.Count > 0
-        then Full (String.Join( "\n", xmlDoc |> Seq.map escapeText))
+        then Full (String.Join( "\n", xmlDoc))
         else Lookup(xmlDocSig, symbol.Assembly.FileName)
+    
+    let formatSummary (summary:XmlDoc) =
+        match summary with
+        | Full(summary) ->
+            TooltipsXml.getTooltipSummary Styles.simpleMarkup summary
+
+        | Lookup(key, potentialFilename) ->
+            maybe { let! filename = potentialFilename
+                    let! markup = TooltipXmlDoc.findDocForEntity(filename, key)
+                    let summary = TooltipsXml.getTooltipSummary Styles.simpleMarkup markup
+                    return summary } |> Option.fill ""
+        | EmptyDoc -> ""
 
     let getUnioncaseSignature displayContext (unionCase:FSharpUnionCase) =
         if unionCase.UnionCaseFields.Count > 0 then
             let typeList =
                 unionCase.UnionCaseFields
-                |> Seq.map (fun unionField -> unionField.Name ++ asSymbol ":" ++ asUserType (escapeText (unionField.FieldType.Format displayContext)))
-                |> String.concat (asSymbol " * " )
-            unionCase.Name ++ asKeyword "of" ++ typeList
-         else unionCase.Name
+                |> Seq.map (fun unionField -> unionField.Name ++ ":" ++ ((unionField.FieldType.Format displayContext)))
+                |> String.concat " * "
+            unionCase.DisplayName ++ "of" ++ typeList
+         else unionCase.DisplayName
 
     let formatGenericParameter displayContext (param:FSharpGenericParameter) =
         let chopStringTo (s:string) (c:char) =
@@ -401,7 +462,7 @@ module SymbolTooltips =
                 Some(s.Substring(4,s.Length - 4))
 
         let asGenericParamName (param: FSharpGenericParameter) =
-            asSymbol (if param.IsSolveAtCompileTime then "^" else "'") + param.Name
+            (if param.IsSolveAtCompileTime then "^" else "'") + param.Name
 
         let sb = new StringBuilder()
 
@@ -417,80 +478,80 @@ module SymbolTooltips =
                     | _, _ -> c.MemberName, false
 
                 seq {
-                    yield asSymbol " : ("
-                    if c.MemberIsStatic then yield asKeyword "static "
+                    yield " : ("
+                    if c.MemberIsStatic then yield "static "
 
-                    yield asKeyword "member "
-                    yield asUserType formattedMemberName
-                    yield asSymbol " : "
+                    yield "member "
+                    yield formattedMemberName
+                    yield " : "
 
                     if isProperty then
-                        yield asUserType (c.MemberReturnType.Format displayContext)
+                        yield (c.MemberReturnType.Format displayContext)
                     else
                         if c.MemberArgumentTypes.Count <= 1 then
-                            yield asUserType "unit"
+                            yield "unit"
                         else
                             yield asGenericParamName param
-                        yield asSymbol " -> "
-                        yield asUserType ((c.MemberReturnType.Format displayContext).TrimStart())
+                        yield " -> "
+                        yield ((c.MemberReturnType.Format displayContext).TrimStart())
 
-                    yield asBrackets ")"
+                    yield ")"
                 }
 
             let typeConstraint (tc: FSharpType) =
                 seq {
-                    yield asSymbol " :> "
-                    yield asUserType (tc.Format displayContext)
+                    yield " :> "
+                    yield (tc.Format displayContext)
                 }
 
             let constructorConstraint () =
                 seq {
-                    yield asSymbol " : "
-                    yield asBrackets "("
-                    yield asKeyword "new"
-                    yield asSymbol " : "
-                    yield asKeyword "unit"
-                    yield asSymbol " -> '"
+                    yield " : "
+                    yield "("
+                    yield "new"
+                    yield " : "
+                    yield "unit"
+                    yield " -> '"
                     yield param.DisplayName
-                    yield asBrackets ")"
+                    yield ")"
                 }
             let enumConstraint (ec: FSharpType) =
                 seq {
-                    yield asSymbol " : "
-                    yield asKeyword "enum"
-                    yield asBrackets (escapeText "<")
-                    yield asUserType (ec.Format displayContext)
-                    yield asBrackets (escapeText ">")
+                    yield " : "
+                    yield "enum"
+                    yield "<"
+                    yield ec.Format displayContext
+                    yield ">"
                 }
 
             let delegateConstraint (tc: FSharpGenericParameterDelegateConstraint) =
                 seq {
-                    yield asSymbol " : "
-                    yield asKeyword "delegate"
-                    yield asBrackets (escapeText "<")
-                    yield asUserType (tc.DelegateTupledArgumentType.Format displayContext)
-                    yield asSymbol ", "
-                    yield asUserType (tc.DelegateReturnType.Format displayContext)
-                    yield asBrackets (escapeText ">")
+                    yield " : "
+                    yield "delegate"
+                    yield "<"
+                    yield tc.DelegateTupledArgumentType.Format displayContext
+                    yield ", "
+                    yield tc.DelegateReturnType.Format displayContext
+                    yield ">"
                 }
 
             let symbols =
                 match constrainedBy with
                 | _ when constrainedBy.IsCoercesToConstraint -> typeConstraint constrainedBy.CoercesToTarget
                 | _ when constrainedBy.IsMemberConstraint -> memberConstraint constrainedBy.MemberConstraintData
-                | _ when constrainedBy.IsSupportsNullConstraint -> seq { yield asSymbol " : "; yield asKeyword "null" }
+                | _ when constrainedBy.IsSupportsNullConstraint -> seq { yield " : "; yield "null" }
                 | _ when constrainedBy.IsRequiresDefaultConstructorConstraint -> constructorConstraint()
-                | _ when constrainedBy.IsReferenceTypeConstraint -> seq { yield asSymbol " : "; yield asKeyword "not struct" }
+                | _ when constrainedBy.IsReferenceTypeConstraint -> seq { yield " : "; yield "not struct" }
                 | _ when constrainedBy.IsEnumConstraint -> enumConstraint constrainedBy.EnumConstraintTarget
-                | _ when constrainedBy.IsComparisonConstraint -> seq { yield asSymbol " : "; yield asKeyword "comparison" }
-                | _ when constrainedBy.IsEqualityConstraint -> seq { yield asSymbol " : "; yield asKeyword "equality" }
+                | _ when constrainedBy.IsComparisonConstraint -> seq { yield " : "; yield "comparison" }
+                | _ when constrainedBy.IsEqualityConstraint -> seq { yield " : "; yield "equality" }
                 | _ when constrainedBy.IsDelegateConstraint -> delegateConstraint constrainedBy.DelegateConstraintData
-                | _ when constrainedBy.IsUnmanagedConstraint -> seq { yield asSymbol " : "; yield asKeyword "unmanaged"}
-                | _ when constrainedBy.IsNonNullableValueTypeConstraint -> seq { yield asSymbol " : "; yield asKeyword "struct" }
+                | _ when constrainedBy.IsUnmanagedConstraint -> seq { yield " : "; yield "unmanaged"}
+                | _ when constrainedBy.IsNonNullableValueTypeConstraint -> seq { yield " : "; yield "struct" }
                 | _ -> Seq.empty
 
             seq {
-                yield asKeyword " when "
+                yield " when "
                 yield asGenericParamName param
                 yield! symbols
             }
@@ -511,25 +572,27 @@ module SymbolTooltips =
         let functionName =
             let name =
                 if func.IsConstructor then
-                    match func.EnclosingEntitySafe with
+                    match func.EnclosingEntity with
                     | Some ent -> ent.DisplayName
                     | _ ->
                         LoggingService.LogWarning(sprintf "getFuncSignatureWithFormat: No enclosing entity found for: %s" func.DisplayName)
                         func.DisplayName
+                elif func.IsOperatorOrActivePattern then func.DisplayName
+                elif func.DisplayName.StartsWith "( " then PrettyNaming.QuoteIdentifierIfNeeded func.LogicalName
                 else func.DisplayName
-            name |> escapeText
+            name
 
         let modifiers =
             let accessibility =
                 match func.Accessibility with
-                | a when a.IsInternal -> asKeyword "internal"
-                | a when a.IsPrivate -> asKeyword "private"
+                | a when a.IsInternal -> "internal"
+                | a when a.IsPrivate -> "private"
                 | _ -> ""
 
             let modifier =
                 //F# types are prefixed with new, should non F# types be too for consistancy?
                 if func.IsConstructor then
-                    match func.EnclosingEntitySafe with
+                    match func.EnclosingEntity with
                     | Some ent -> if ent.IsFSharp then "new" ++ accessibility
                                   else accessibility
                     | _ ->
@@ -554,12 +617,12 @@ module SymbolTooltips =
         let retType =
             //This try block will be removed when FCS updates
             try
-                asUserType (escapeText(func.ReturnParameter.Type.Format displayContext))
+                func.ReturnParameter.Type.Format displayContext
             with _ex ->
                 try
                     if func.FullType.GenericArguments.Count > 0 then
                         let lastArg = func.FullType.GenericArguments |> Seq.last
-                        asUserType (escapeText(lastArg.Format displayContext))
+                        lastArg.Format displayContext
                     else "Unknown"
                 with _ -> "Unknown"
 
@@ -577,56 +640,56 @@ module SymbolTooltips =
             match format.Highlight with
             | Some paramName when paramName = name ->
                 match padding - name.Length with
-                | i when i > 0 -> indent + asUnderline name + String.replicate i " " + asSymbol ":"
-                | _ -> indent + asUnderline name + asSymbol ":"
-            | _ -> indent + name.PadRight padding + asSymbol ":"
+                | i when i > 0 -> indent + asUnderline name + String.replicate i " " + ":"
+                | _ -> indent + asUnderline name + ":"
+            | _ -> indent + name.PadRight padding + ":"
 
         let isDelegate =
-            match func.EnclosingEntitySafe with
+            match func.EnclosingEntity with
             | Some ent -> ent.IsDelegate
             | _ ->
-                LoggingService.LogWarning(sprintf "getFuncSignatureWithFormat: No enclosing entity found for: %s" func.DisplayName)
+                LoggingService.logWarning "getFuncSignatureWithFormat: No enclosing entity found for: %s" func.DisplayName
                 false
 
         match argInfos with
         | [] ->
             //When does this occur, val type within  module?
             if isDelegate then retType
-            else asKeyword modifiers ++ functionName ++ asSymbol ":" ++ retType
+            else modifiers ++ functionName ++ ":" ++ retType
 
         | [[]] ->
             //A ctor with () parameters seems to be a list with an empty list
             if isDelegate then retType
-            else asKeyword modifiers ++ functionName ++ asSymbol "() :" ++ retType
+            else modifiers ++ functionName ++ "() :" ++ retType
         | many ->
               let allParamsLengths =
                   many |> List.map (List.map (fun p -> (p.Type.Format displayContext).Length) >> List.sum)
               let maxLength = (allParamsLengths |> List.maxUnderThreshold maxPadding)+1
 
               let parameterTypeWithPadding (p: FSharpParameter) length =
-                  escapeText (p.Type.Format displayContext) + (String.replicate (if length >= maxLength then 1 else maxLength - length) " ")
+                  (p.Type.Format displayContext) + (String.replicate (if length >= maxLength then 1 else maxLength - length) " ")
 
               let allParams =
                   List.zip many allParamsLengths
                   |> List.map(fun (paramTypes, length) ->
                                   paramTypes
-                                  |> List.map(fun p -> formatName indent padLength p ++ asUserType (parameterTypeWithPadding p length))
-                                  |> String.concat (asSymbol " *" ++ "\n"))
-                  |> String.concat (asSymbol "->" + "\n")
+                                  |> List.map(fun p -> formatName indent padLength p ++ (parameterTypeWithPadding p length))
+                                  |> String.concat (" *" ++ "\n"))
+                  |> String.concat ("->\n")
 
               let typeArguments =
-                  allParams +  "\n" + indent + (String.replicate (max (padLength-1) 0) " ") +  asSymbol "->" ++ retType
+                  allParams +  "\n" + indent + (String.replicate (max (padLength-1) 0) " ") + "->" ++ retType
 
               if isDelegate then typeArguments
-              else asKeyword modifiers ++ functionName ++ asSymbol ":" + "\n" + typeArguments
+              else modifiers ++ functionName ++ ":" + "\n" + typeArguments
 
     let getFuncSignature f c = getFuncSignatureWithFormat f c FormatOptions.Default
 
     let getEntitySignature displayContext (fse: FSharpEntity) =
         let modifier =
             match fse.Accessibility with
-            | a when a.IsInternal -> asKeyword "internal "
-            | a when a.IsPrivate -> asKeyword "private "
+            | a when a.IsInternal -> "internal "
+            | a when a.IsPrivate -> "private "
             | _ -> ""
 
         let typeName =
@@ -638,68 +701,67 @@ module SymbolTooltips =
             | _                         -> "type"
 
         let enumtip () =
-            asSymbol " =" + "\n" +
-            asSymbol "|" ++
+            " =\n" +
+            "|" ++
             (fse.FSharpFields
             |> Seq.filter (fun f -> not f.IsCompilerGenerated)
             |> Seq.map (fun field -> match field.LiteralValue with
-                                     | Some lv -> field.Name + asSymbol " = " + asType Number (string lv)
+                                     | Some lv -> field.Name + " = " + (string lv)
                                      | None -> field.Name )
-            |> String.concat ("\n" + asSymbol "| " ) )
+            |> String.concat ("\n" + "| " ) )
 
         let uniontip () =
-            asSymbol " =" + "\n" +
-            asSymbol "|" ++ (fse.UnionCases
+            " =" + "\n" +
+            "|" ++ (fse.UnionCases
                                   |> Seq.map (getUnioncaseSignature displayContext)
-                                  |> String.concat ("\n" + asSymbol "| " ) )
+                                  |> String.concat ("\n" + "| " ) )
 
         let delegateTip () =
             let invoker =
                 fse.MembersFunctionsAndValues |> Seq.find (fun f -> f.DisplayName = "Invoke")
             let invokerSig = getFuncSignatureWithFormat displayContext invoker {Indent=6;Highlight=None}
-            asSymbol " =" + "\n" +
-            "   " + asKeyword "delegate" + " of\n" + invokerSig
+            " =" + "\n" +
+            "   " + "delegate" + " of\n" + invokerSig
 
         let typeDisplay =
             let name =
                 if fse.GenericParameters.Count > 0 then
                     let p = fse.GenericParameters |> Seq.map (formatGenericParameter displayContext) |> String.concat ","
-                    asUserType fse.DisplayName + asBrackets (escapeText "<") + asUserType p + asBrackets (escapeText ">")
-                else asUserType fse.DisplayName
+                    fse.DisplayName + ("<") + p + (">")
+                else fse.DisplayName
 
-            let basicName = modifier + asKeyword typeName ++ name
+            let basicName = modifier + typeName ++ name
 
             if fse.IsFSharpAbbreviation then
-                basicName ++ asBrackets "=" ++ asKeyword (fse.AbbreviatedType.Format displayContext)
+                basicName ++ "=" ++ (fse.AbbreviatedType.Format displayContext)
             else
                 basicName
 
-        let fullName =
-            match fse.TryGetFullNameWithUnderScoreTypes() with
-            | Some fullname -> "\n\n<small>Full name: " + escapeText fullname + "</small>"
-            | None -> "\n\n<small>Full name: " + fse.QualifiedName + "</small>"
-
-        if fse.IsFSharpUnion then typeDisplay + uniontip () + fullName
-        elif fse.IsEnum then typeDisplay + enumtip () + fullName
-        elif fse.IsDelegate then typeDisplay + delegateTip () + fullName
-        else typeDisplay + fullName
+        if fse.IsFSharpUnion then typeDisplay + uniontip ()
+        elif fse.IsEnum then typeDisplay + enumtip ()
+        elif fse.IsDelegate then typeDisplay + delegateTip ()
+        else typeDisplay
 
     let getValSignature displayContext (v:FSharpMemberOrFunctionOrValue) =
-        let retType = asUserType (escapeText(v.FullType.Format(displayContext)))
+        let retType = v.FullType.Format displayContext
         let prefix =
-            if v.IsMutable then asKeyword "val" ++ asKeyword "mutable"
-            else asKeyword "val"
-        prefix ++ v.DisplayName ++ asSymbol ":" ++ retType
+            if v.IsMutable then "val" ++ "mutable"
+            else "val"
+        let name =
+            if v.DisplayName.StartsWith "( "
+            then PrettyNaming.QuoteIdentifierIfNeeded v.LogicalName
+            else v.DisplayName
+        prefix ++ name ++ ":" ++ retType
 
     let getFieldSignature displayContext (field: FSharpField) =
-        let retType = asUserType (escapeText(field.FieldType.Format displayContext))
+        let retType = field.FieldType.Format displayContext
         match field.LiteralValue with
-        | Some lv -> field.DisplayName ++ asSymbol ":" ++ retType ++ asSymbol "=" ++ asType Number (string lv)
+        | Some lv -> field.DisplayName ++ ":" ++ retType ++ "=" ++ (string lv)
         | None ->
             let prefix =
-                if field.IsMutable then asKeyword "val" ++ asKeyword "mutable"
-                else asKeyword "val"
-            prefix ++ field.DisplayName ++ asSymbol ":" ++ retType
+                if field.IsMutable then "val" ++ "mutable"
+                else "val"
+            prefix ++ field.DisplayName ++ ":" ++ retType
 
     let getAPCaseSignature displayContext (apc:FSharpActivePatternCase) =
       let findVal =
@@ -711,6 +773,14 @@ module SymbolTooltips =
       match findVal with
       | Some v -> v
       | None -> apc.Group.OverallType.Format displayContext
+    
+    let returnType (symbol:FSharpSymbolUse) =
+        match symbol with
+        | MemberFunctionOrValue m ->
+            try
+                Some m.ReturnParameter.Type
+            with _ -> None
+        | _ -> None
 
     let footerForType (entity:FSharpSymbolUse) =
         match entity with
@@ -718,7 +788,7 @@ module SymbolTooltips =
             if m.FullType.HasTypeDefinition then
                 let ent = m.FullType.TypeDefinition
                 let parent = ent.UnAnnotate()
-                let parentType = parent.DisplayName |> escapeText
+                let parentType = parent.DisplayName
                 let parentDesc = if parent.IsFSharpModule then "module" else "type"
                 sprintf "<small>From %s:\t%s</small>%s<small>Assembly:\t%s</small>" parentDesc parentType Environment.NewLine ent.Assembly.SimpleName
             else
@@ -726,7 +796,12 @@ module SymbolTooltips =
       
         | Entity c ->
             let ns = c.Namespace |> Option.getOrElse (fun () -> c.AccessPath)
-            sprintf "<small>Namespace:\t%s</small>%s<small>Assembly:\t%s</small>" ns Environment.NewLine c.Assembly.SimpleName
+            let fullName =
+                match c.TryGetFullNameWithUnderScoreTypes() with
+                | Some fullname -> "<small>Full name: " + fullname + "</small>"
+                | None -> "<small>Full name: " + c.QualifiedName + "</small>"
+
+            sprintf "%s%s<small>Namespace:\t%s</small>%s<small>Assembly:\t%s</small>" fullName Environment.NewLine ns Environment.NewLine c.Assembly.SimpleName
       
         | Field f ->
             let parent = f.DeclaringEntity.UnAnnotate().DisplayName
@@ -735,12 +810,12 @@ module SymbolTooltips =
         | ActivePatternCase ap ->
           let parent =
               ap.Group.EnclosingEntity
-              |> Option.map (fun enclosing -> enclosing.UnAnnotate().DisplayName |> escapeText)
+              |> Option.map (fun enclosing -> enclosing.UnAnnotate().DisplayName)
               |> Option.fill "None"
           sprintf "<small>From type:\t%s</small>%s<small>Assembly:\t%s</small>" parent Environment.NewLine ap.Assembly.SimpleName
       
         |  UnionCase uc ->
-            let parent = uc.ReturnType.TypeDefinition.UnAnnotate().DisplayName |> escapeText
+            let parent = uc.ReturnType.TypeDefinition.UnAnnotate().DisplayName
             sprintf "<small>From type:\t%s</small>%s<small>Assembly:\t%s</small>" parent Environment.NewLine uc.Assembly.SimpleName
         | _ -> ""
 
@@ -755,7 +830,7 @@ module SymbolTooltips =
                 None
 
         | Constructor func ->
-            match func.EnclosingEntitySafe with
+            match func.EnclosingEntity with
             | Some ent when ent.IsValueType || ent.IsEnum ->
                   //ValueTypes
                   let signature = getFuncSignature symbol.DisplayContext func
@@ -814,24 +889,23 @@ module SymbolTooltips =
             Some(signature, getSummaryFromSymbol gp, footerForType symbol)
             
         | other ->
-            MonoDevelop.Core.LoggingService.LogWarning (sprintf "F# Tooltip not rendered for: %A" other.Symbol)
+            LoggingService.logWarning "F# Tooltip not rendered for: %A" other.Symbol
             None
 
     let getTooltipFromParameter (p:FSharpParameter) context =
-      let typ = asUserType (escapeText(p.Type.Format(context)))
+      let typ = p.Type.Format context
       let signature =
           match p.Name with
-          | Some name -> name ++ asSymbol ":" ++ typ
+          | Some name -> name ++ ":" ++ typ
           | None -> typ
 
       signature, getSummaryFromSymbol p
 
-    let getTooltipInformation symbol =
+    let getTooltipInformationFromTip tip =
       async {
-          try
-            let tip = getTooltipFromSymbolUse symbol
-            match tip  with
-            | Some (signature, xmldoc, footer) ->
+            try
+                let signature, xmldoc, footer = tip
+                let signature = syntaxHighlight signature
                 let toolTipInfo = new TooltipInformation(SignatureMarkup = signature, FooterMarkup=footer)
                 let result =
                   match xmldoc with
@@ -847,10 +921,44 @@ module SymbolTooltips =
                       toolTipInfo
                   | EmptyDoc -> toolTipInfo
                 return result
+            with ex ->
+                LoggingService.LogError ("F# Tooltip error", ex)
+                return TooltipInformation() }
+
+    let getTooltipInformation symbol =
+        async {
+            let tip = getTooltipFromSymbolUse symbol
+            match tip with
+            | Some tip' -> return! getTooltipInformationFromTip tip'
             | _ -> return TooltipInformation()
-          with ex ->
-              MonoDevelop.Core.LoggingService.LogError ("F# Tooltip error", ex)
-              return TooltipInformation() }
+        }
+
+    let getTooltipInformationFromSignature summary signature parameterName =
+        let summary, parameterInfo =
+            match summary with
+            | Full(summary) ->
+              let parameterMarkup =
+                match TooltipsXml.getParameterTip Styles.simpleMarkup summary parameterName with
+                | Some p -> parameterName ++ ":" ++ p
+                | None -> ""
+              summary, parameterMarkup
+            | Lookup(key, filename) ->
+                let summaryAndparameterInfo =
+                  maybe { let! filename = filename
+                          let! markup = TooltipXmlDoc.findDocForEntity(filename, key)
+                          let parameterMarkup =
+                              match TooltipsXml.getParameterTip Styles.simpleMarkup markup parameterName with
+                              | Some p -> parameterName ++ ":" ++ p
+                              | None -> ""
+                          let summary = TooltipsXml.getTooltipSummary Styles.simpleMarkup markup
+                          return (summary, parameterMarkup) }
+
+                summaryAndparameterInfo |> Option.getOrElse (fun () -> "", "")
+            | EmptyDoc -> "", ""
+        let toolTipInfo = TooltipInformation(SignatureMarkup = signature, SummaryMarkup=summary)
+        if not (String.isNullOrEmpty parameterInfo) then
+            toolTipInfo.AddCategory("Parameter", parameterInfo)
+        toolTipInfo
 
     let getParameterTooltipInformation symbol parameterIndex =
         match symbol with
@@ -863,32 +971,9 @@ module SymbolTooltips =
                 | Some n -> n
                 | _ -> param.DisplayName
             | _ -> ""
-          let signature = getFuncSignatureWithFormat symbol.DisplayContext m {Indent=3;Highlight=Some(parameterName)}
+          let signature = syntaxHighlight (getFuncSignatureWithFormat symbol.DisplayContext m {Indent=3;Highlight=Some(parameterName)})
+          let signature = signature.Replace("_STARTUNDERLINE_", "<u>").Replace("_ENDUNDERLINE_", "</u>")
           let summary = getSummaryFromSymbol m
 
-          let summary, parameterInfo =
-              match summary with
-              | Full(summary) ->
-                let parameterMarkup =
-                  match TooltipsXml.getParameterTip Styles.simpleMarkup summary parameterName with
-                  | Some p -> parameterName ++ ":" ++ p
-                  | None -> ""
-                summary, parameterMarkup
-              | Lookup(key, filename) ->
-                  let summaryAndparameterInfo =
-                    maybe { let! filename = filename
-                            let! markup = TooltipXmlDoc.findDocForEntity(filename, key)
-                            let parameterMarkup =
-                                match TooltipsXml.getParameterTip Styles.simpleMarkup markup parameterName with
-                                | Some p -> parameterName ++ ":" ++ p
-                                | None -> ""
-                            let summary = TooltipsXml.getTooltipSummary Styles.simpleMarkup markup
-                            return (summary, parameterMarkup) }
-
-                  summaryAndparameterInfo |> Option.getOrElse (fun () -> "", "")
-              | EmptyDoc -> "", ""
-          let toolTipInfo = TooltipInformation(SignatureMarkup = signature, SummaryMarkup=summary)
-          if not (String.isNullOrEmpty parameterInfo) then
-              toolTipInfo.AddCategory("Parameter", parameterInfo)
-          toolTipInfo
+          getTooltipInformationFromSignature summary signature parameterName
         | _ -> TooltipInformation()

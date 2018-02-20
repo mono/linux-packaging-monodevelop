@@ -53,9 +53,19 @@
 		<Import file = "Templates/MvcCommon/_Layout.cshtml"/>
 		<Import file = "Templates/MvcCommon/_ViewStart.cshtml"/>
 
+		<Import file = "Templates/EmptyCssFile.xft.xml"/>
+		<Import file = "Templates/EmptyLessFile.xft.xml"/>
+		<Import file = "Templates/EmptyScssFile.xft.xml"/>
+		<Import file = "Templates/EmptyJsonFile.xft.xml"/>
+		<Import file = "Templates/EmptyTypeScriptFile.xft.xml"/>
 		<Import file = "Templates/GlobalAsax.xft.xml"/>
+		<Import file = "Templates/JsonFileTemplate.json"/>
+		<Import file = "Templates/TypeScriptFileTemplate.ts"/>
 		<Import file = "Templates/PreprocessedRazorTemplate.xft.xml" />
 		<Import file = "Templates/RouteConfig.cs"/>
+		<Import file = "Templates/StylesheetTemplate.css"/>
+		<Import file = "Templates/StylesheetTemplate.less"/>
+		<Import file = "Templates/StylesheetTemplate.scss"/>
 		<Import file = "Templates/WebApiConfig.cs"/>
 		<Import file = "Templates/WebConfig-Application.xft.xml"/>
 		<Import file = "Templates/WebConfig-SubDir.xft.xml"/>
@@ -81,11 +91,11 @@
 	</ExtensionPoint>
 
 	<Extension path = "/MonoDevelop/Ide/ProjectTemplates">
-		<ProjectTemplate id   = "AspNet-EmptyProject"
+		<ProjectTemplate id   = "MonoDevelop.AspNet.EmptyProject"
 		                 file = "Templates/Projects/EmptyProject.xpt.xml" />
-		<ProjectTemplate id   = "AspNet-MvcProject"
+		<ProjectTemplate id   = "MonoDevelop.AspNet.MvcProject"
 		                 file = "Templates/Projects/MvcProject.xpt.xml" />
-		<ProjectTemplate id   = "AspNet-WebApplication"
+		<ProjectTemplate id   = "MonoDevelop.AspNet.WebApplication"
 		                 file = "Templates/Projects/WebFormsProject.xpt.xml"/>
 	</Extension>
 
@@ -153,6 +163,18 @@
 		              file     = "Templates/Mvc/PartialViewPageRazor.xft.xml" />
 		<FileTemplate id       = "PreprocessedRazorTemplate"
 		              file     = "Templates/PreprocessedRazorTemplate.xft.xml" />
+
+		<FileTemplate id   = "EmptyCSSFile"
+		              file = "Templates/EmptyCssFile.xft.xml"/>
+		<FileTemplate id   = "EmptyLESSFile"
+		              file = "Templates/EmptyLessFile.xft.xml"/>
+		<FileTemplate id   = "EmptySCSSFile"
+		              file = "Templates/EmptyScssFile.xft.xml"/>
+		<FileTemplate id   = "EmptyJSONFile"
+		              file = "Templates/EmptyJsonFile.xft.xml"/>
+		<FileTemplate id   = "EmptyTypeScriptFile"
+		              file = "Templates/EmptyTypeScriptFile.xft.xml"/>
+		
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/FileTemplateTypes">
@@ -226,26 +248,26 @@
 		         type="array" />
 		<Command id = "MonoDevelop.AspNet.Commands.AspNetCommands.AddController"
 		         _label = "Controller..."
+		         _displayName = "Add Controller..."
 		         _description = "Add an ASP.NET MVC controller" />
 		<Command id = "MonoDevelop.AspNet.Commands.AspNetCommands.AddView"
 		         _label = "View..."
+		         _displayName = "Add View..."
 		         _description = "Add an ASP.NET MVC view" />
-		</Category>
-	</Extension>
-
-	<Extension path = "/MonoDevelop/Ide/Commands/TextEditor">
 		<Command id = "MonoDevelop.AspNet.Commands.AspNetCommands.GoToView"
-				_label = "Go To View"
+				_label = "Go to View"
 				defaultHandler = "MonoDevelop.AspNet.Commands.GoToViewCommandHandler"
 				description = "Go to the corresponding view file" />
 		<Command id = "MonoDevelop.AspNet.Commands.AspNetCommands.AddViewFromController"
 				_label = "Add View..."
+				_displayName = "Add View from Controller..."
 				defaultHandler = "MonoDevelop.AspNet.Commands.AddViewFromControllerCommandHandler"
 				description = "Add an ASP.NET MVC view" />
 		<Command id = "MonoDevelop.AspNet.Commands.AspNetCommands.GoToController"
-				_label = "Go To Controller"
+				_label = "Go to Controller"
 				defaultHandler = "MonoDevelop.AspNet.Commands.GoToControllerCommandHandler"
 				description = "Go to the corresponding controller file" />
+		</Category>
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/ContextMenu/ProjectPad/Add">
@@ -263,10 +285,6 @@
 	<Extension path = "/MonoDevelop/Ide/Pads/ProjectPad">
 		<NodeBuilder id="AspNetProjectNodeBuilderExtension" class = "MonoDevelop.AspNet.ProjectPad.AspNetProjectNodeBuilderExtension"/>
 		<NodeBuilder id="AspNetFolderNodeBuilderExtension" class = "MonoDevelop.AspNet.ProjectPad.AspNetFolderNodeBuilderExtension"/>
-	</Extension>
-
-	<Extension path = "/MonoDevelop/SourceEditor2/CustomModes">
-		<SyntaxMode mimeTypes="application/x-aspx" class="MonoDevelop.AspNet.WebForms.WebFormsSyntaxMode"/>
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Core/MimeTypes">
@@ -291,11 +309,20 @@
 		<MimeType id="application/x-master-page" _description="ASP.NET master page" icon="md-html-file-icon" isText="true">
 			<File pattern="*.master|*.Master" />
 		</MimeType>
-		<MimeType id="application/javascript" _description="Javascript source code" icon="md-html-file-icon" isText="true">
+		<MimeType id="application/javascript" _description="Javascript source code" icon="md-file-js" isText="true">
 			<File pattern="*.js" />
 		</MimeType>
-		<MimeType id="text/x-less" _description="LESS, CSS document" icon="md-html-file-icon" isText="true">
+		<MimeType id="text/css" _description="CSS document" icon="md-file-css" isText="true">
+			<File pattern="*.css" />
+		</MimeType>
+		<MimeType id="text/x-less" _description="LESS, CSS document" icon="md-file-less" isText="true">
 			<File pattern="*.less" />
+		</MimeType>
+		<MimeType id="text/x-sass" _description="SASS, CSS document" icon="md-file-scss" isText="true">
+			<File pattern="*.sass" />
+		</MimeType>
+		<MimeType id="text/x-scss" _description="SCSS, CSS document" icon="md-file-scss" isText="true">
+			<File pattern="*.scss" />
 		</MimeType>
 		<MimeType id="text/html" _description="HTML document" icon="md-html-file-icon" isText="true">
 			<File pattern="*.html|*.htm" />
@@ -304,7 +331,7 @@
 			baseType="text/html">
 			<File pattern="*.spark" />
 		</MimeType>
-		<MimeType id="application/typescript" _description="Typescript source code" icon="md-html-file-icon" isText="true">
+		<MimeType id="application/typescript" _description="Typescript source code" icon="md-file-ts" isText="true">
 			<File pattern="*.ts" />
 		</MimeType>
 		<MimeType id="text/x-cshtml" _description="Razor template" icon="md-html-file-icon" isText="true">
@@ -314,7 +341,7 @@
 
 	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
 		<Class fileExtensions=".aspx, .ascx, .master" class = "MonoDevelop.AspNet.WebForms.WebFormsEditorExtension" />
-		<Class fileExtensions=".html, .htm, .spark" class = "MonoDevelop.AspNet.Html.HtmlEditorExtension" />
+		<Class mimeTypes="text/html,application/x-spark" class = "MonoDevelop.AspNet.Html.HtmlEditorExtension" />
 		<Class fileExtensions=".cshtml" class = "MonoDevelop.AspNet.Razor.RazorCSharpEditorExtension" />
 	</Extension>
 
@@ -379,6 +406,10 @@
 	</Extension>
 
 	<Extension path="/MonoDevelop/Ide/TemplateImages">
-		<Image id="md-aspnet-empty-project" resource="aspnet-empty-project.png" />
+		<Image id="md-aspnet-empty-project" resource="project-aspnet-template.png" />
+	</Extension>
+	
+	<Extension path="/MonoDevelop/Core/StockIcons">
+		<StockIcon stockid="md-aspnet-empty-project" resource="project-aspnet-32.png" size="Dnd" />
 	</Extension>
 </ExtensionModel>

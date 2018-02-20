@@ -26,6 +26,7 @@
 //
 
 using System.Collections.Generic;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui.Dialogs;
@@ -59,8 +60,23 @@ namespace MonoDevelop.Ide.Projects
 				createChildrenCheck.Visible = false;
 				DefaultHeight = 0;
 			}
+
+			SetupAccessibility ();
 		}
-		
+
+		void SetupAccessibility ()
+		{
+			comboName.SetCommonAccessibilityAttributes ("NewConfiguration.Name", label1,
+			                                            GettextCatalog.GetString ("Select or enter the name of the new configuration"));
+
+			comboPlatform.SetCommonAccessibilityAttributes ("NewConfiguration.Platform",
+			                                                label2,
+			                                                GettextCatalog.GetString ("Select or enter the platform for the new configuration"));
+
+			createChildrenCheck.SetCommonAccessibilityAttributes ("NewConfiguration.CreateCheck", "",
+			                                                      GettextCatalog.GetString ("Check to create configurations for all the solution items"));
+		}
+
 		public string ConfigName {
 			get {
 				string plat = MultiConfigItemOptionsPanel.GetPlatformId (comboPlatform.Entry.Text.Trim ());

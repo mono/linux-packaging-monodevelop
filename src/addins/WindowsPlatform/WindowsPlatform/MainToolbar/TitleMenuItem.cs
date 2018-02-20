@@ -61,7 +61,7 @@ namespace WindowsPlatform.MainToolbar
 
 				// FIXME: Use proper keybinding text.
 				if (actionCommand.KeyBinding != null)
-					InputGestureText = actionCommand.KeyBinding.ToString ();
+					InputGestureText = KeyBindingManager.BindingToDisplayLabel (actionCommand.KeyBinding, true);
 				
 				try {
 					if (!actionCommand.Icon.IsNull)
@@ -130,17 +130,18 @@ namespace WindowsPlatform.MainToolbar
 
 					int count = 1;
 					int indexOfThis = parent.Items.IndexOf (this);
-					foreach (var child in info.ArrayInfo) {
-						Control toAdd;
-						if (child.IsArraySeparator) {
-							toAdd = new Separator ();
-						} else {
-							toAdd = new TitleMenuItem (manager, menuEntry, child, menu: menu);
-						}
+					if (info.ArrayInfo != null)
+						foreach (var child in info.ArrayInfo) {
+							Control toAdd;
+							if (child.IsArraySeparator) {
+								toAdd = new Separator ();
+							} else {
+								toAdd = new TitleMenuItem (manager, menuEntry, child, menu: menu);
+							}
 
-						toRemoveFromParent.Add (toAdd);
-						parent.Items.Insert (indexOfThis + (count++), toAdd);
-					}
+							toRemoveFromParent.Add (toAdd);
+							parent.Items.Insert (indexOfThis + (count++), toAdd);
+						}
 					return;
 				}
 			}

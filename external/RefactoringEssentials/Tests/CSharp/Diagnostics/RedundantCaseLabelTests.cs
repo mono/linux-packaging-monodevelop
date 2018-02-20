@@ -1,13 +1,12 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
     public class RedundantCaseLabelTests : CSharpDiagnosticTestBase
     {
-        [Test]
-        public void Test()
+        [Fact]
+        public void Test_RedundantCaseLabel()
         {
             var input = @"
 class TestClass
@@ -37,7 +36,7 @@ class TestClass
         }
 
 
-        [Test]
+        [Fact]
         public void TestLabelAfterDefault()
         {
             var input = @"
@@ -67,7 +66,7 @@ class TestClass
         }
 
 
-        [Test]
+        [Fact]
         public void TestDisable()
         {
             var input = @"

@@ -1,4 +1,4 @@
-﻿//
+//
 // ITextEditorImpl.cs
 //
 // Author:
@@ -32,6 +32,8 @@ using MonoDevelop.Ide.Editor.Highlighting;
 using MonoDevelop.Components;
 using Xwt;
 using System.Collections.Immutable;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.Ide.Editor
 {
@@ -48,19 +50,23 @@ namespace MonoDevelop.Ide.Editor
 
 		string ContentName { get; set; }
 
+		string ContextMenuPath { get; set; }
+
 		EditMode EditMode { get; }
 
 		ITextEditorOptions Options { get; set; }
 
 		IReadonlyTextDocument Document { get; }
 
-		DocumentLocation CaretLocation { get; set; }
-
 		SemanticHighlighting SemanticHighlighting { get; set; }
 
+		ISyntaxHighlighting SyntaxHighlighting { get; set; }
+	
 		int CaretOffset { get; set; }
 
 		bool IsSomethingSelected { get; }
+
+		IEnumerable<Selection> Selections { get; }
 
 		SelectionMode SelectionMode { get; }
 
@@ -103,6 +109,8 @@ namespace MonoDevelop.Ide.Editor
 		object CreateNativeControl ();
 
 		void RunWhenLoaded (Action action);
+
+		void RunWhenRealized (Action action);
 
 		string FormatString (int offset, string code);
 
@@ -166,13 +174,11 @@ namespace MonoDevelop.Ide.Editor
 
 		string GetPangoMarkup (int offset, int length, bool fitIdeStyle = false);
 
-		void SetIndentationTracker (IndentationTracker indentationTracker);
-		void SetSelectionSurroundingProvider (SelectionSurroundingProvider surroundingProvider);
-		void SetTextPasteHandler (TextPasteHandler textPasteHandler);
+		string GetMarkup (int offset, int length, MarkupOptions options);
 
-		event EventHandler<LineEventArgs> LineChanged;
-		event EventHandler<LineEventArgs> LineInserted;
-		event EventHandler<LineEventArgs> LineRemoved;
+        IndentationTracker IndentationTracker { get; set; }
+        void SetSelectionSurroundingProvider (SelectionSurroundingProvider surroundingProvider);
+		void SetTextPasteHandler (TextPasteHandler textPasteHandler);
 
 		#region Internal use only API (do not mirror in TextEditor)
 
@@ -212,8 +218,17 @@ namespace MonoDevelop.Ide.Editor
 		void UpdateBraceMatchingResult (BraceMatchingResult? result);
 
 		IEnumerable<IDocumentLine> VisibleLines { get; }
+		IReadOnlyList<Caret> Carets { get; }
 
-		event EventHandler<LineEventArgs> LineShown;
+		void GrabFocus ();
+		bool HasFocus { get; }
+
+		event EventHandler<LineEventArgs> LineShowing;
 		event EventHandler FocusLost;
+
+		void ShowTooltipWindow (Components.Window window, TooltipWindowOptions options);
+		Task<ScopeStack> GetScopeStackAsync (int offset, CancellationToken cancellationToken);
+
+		double GetLineHeight (int line);
 	}
 }

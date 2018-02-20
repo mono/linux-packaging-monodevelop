@@ -33,6 +33,8 @@ using System;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Instrumentation;
 using Mono.Addins;
+using Mono.Addins.Gui;
+using Mono.Addins.Setup;
 using MonoDevelop.Components.Commands;
 
 using MonoDevelop.Projects;
@@ -46,6 +48,7 @@ using MonoDevelop.Components.AutoTest;
 using MonoDevelop.Ide.TypeSystem;
 using MonoDevelop.Ide.Extensions;
 using MonoDevelop.Ide.Templates;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.Ide
 {
@@ -61,7 +64,8 @@ namespace MonoDevelop.Ide
 		static IdePreferences preferences;
 
 		public const int CurrentRevision = 5;
-		
+
+		static bool isMainRunning;
 		static bool isInitialRun;
 		static bool isInitialRunAfterUpgrade;
 		static int upgradedFromRevision;
@@ -72,11 +76,15 @@ namespace MonoDevelop.Ide
 		static EventHandler initializedEvent;
 		public static event EventHandler Initialized {
 			add {
-				if (isInitialized) value (null, EventArgs.Empty);
-				else initializedEvent += value;
+				Runtime.RunInMainThread (() => {
+					if (isInitialized) value (null, EventArgs.Empty);
+					else initializedEvent += value;
+				});
 			}
-			remove { 
-				initializedEvent -= value;
+			remove {
+				Runtime.RunInMainThread (() => {
+					initializedEvent -= value;
+				});
 			}
 		}
 
@@ -194,10 +202,15 @@ namespace MonoDevelop.Ide
 			
 			FileService.ErrorHandler = FileServiceErrorHandler;
 		
-			monitor.BeginTask (GettextCatalog.GetString("Loading Workbench"), 5);
+			monitor.BeginTask (GettextCatalog.GetString("Loading Workbench"), 6);
 			Counters.Initialization.Trace ("Loading Commands");
 			
 			commandService.LoadCommands ("/MonoDevelop/Ide/Commands");
+			monitor.Step (1);
+
+			// Before startup commands.
+			Counters.Initialization.Trace ("Running Pre-Startup Commands");
+			AddinManager.AddExtensionNodeHandler ("/MonoDevelop/Ide/PreStartupHandlers", OnExtensionChanged);
 			monitor.Step (1);
 
 			Counters.Initialization.Trace ("Initializing Workbench");
@@ -218,6 +231,7 @@ namespace MonoDevelop.Ide
 			Counters.Initialization.Trace ("Flushed GUI events");
 			
 			MessageService.RootWindow = workbench.RootWindow;
+			Xwt.MessageDialog.RootWindow = Xwt.Toolkit.CurrentEngine.WrapWindow (workbench.RootWindow);
 		
 			commandService.EnableIdleUpdate = true;
 
@@ -299,11 +313,17 @@ namespace MonoDevelop.Ide
 
 		static void KeyBindingFailed (object sender, KeyBindingFailedEventArgs e)
 		{
-			Ide.IdeApp.Workbench.StatusBar.ShowMessage (e.Message);
+			Ide.IdeApp.Workbench.StatusBar.ShowWarning (e.Message);
 		}
 		
 		//this method is MIT/X11, 2009, Michael Hutchinson / (c) Novell
 		public static void OpenFiles (IEnumerable<FileOpenInformation> files)
+		{
+			OpenFiles (files, null);
+		}
+
+		//this method is MIT/X11, 2009, Michael Hutchinson / (c) Novell
+		internal static async void OpenFiles (IEnumerable<FileOpenInformation> files, IDictionary<string, string> metadata)
 		{
 			if (!files.Any ())
 				return;
@@ -312,44 +332,51 @@ namespace MonoDevelop.Ide
 				EventHandler onInit = null;
 				onInit = delegate {
 					Initialized -= onInit;
-					OpenFiles (files);
+					OpenFiles (files, metadata);
 				};
 				Initialized += onInit;
 				return;
 			}
 			
 			var filteredFiles = new List<FileOpenInformation> ();
-			
-			//open the firsts sln/workspace file, and remove the others from the list
-		 	//FIXME: can we handle multiple slns?
-			bool foundSln = false;
+			bool closeCurrent = true;
+
 			foreach (var file in files) {
 				if (Services.ProjectService.IsWorkspaceItemFile (file.FileName) ||
 				    Services.ProjectService.IsSolutionItemFile (file.FileName)) {
-					if (!foundSln) {
-						try {
-							Workspace.OpenWorkspaceItem (file.FileName);
-							foundSln = true;
-						} catch (Exception ex) {
-							MessageService.ShowError (GettextCatalog.GetString ("Could not load solution: {0}", file.FileName), ex);
-						}
+					try {
+						// Close the current solution, but only for the first solution we open.
+						// If more than one solution is specified in the list we want to open all them together.
+						await Workspace.OpenWorkspaceItem (file.FileName, closeCurrent, true, metadata);
+						closeCurrent = false;
+					} catch (Exception ex) {
+						MessageService.ShowError (GettextCatalog.GetString ("Could not load solution: {0}", file.FileName), ex);
 					}
+				} else if (file.FileName.HasExtension ("mpack")) {
+					var service = new SetupService (AddinManager.Registry);
+					AddinManagerWindow.RunToInstallFile (Workbench.RootWindow,
+					                                     service,
+					                                     file.FileName.FullPath);
 				} else {
 					filteredFiles.Add (file);
 				}
 			}
-			
+
+			// Wait for active load operations to be finished (there might be a solution already being loaded
+			// when OpenFiles was called). This will ensure that files opened as part of the solution status
+			// restoration won't steal the focus from the files we are explicitly loading here.
+			await Workspace.CurrentWorkspaceLoadTask;
+
 			foreach (var file in filteredFiles) {
-				try {
-					Workbench.OpenDocument (file.FileName, null, file.Line, file.Column, file.Options);
-				} catch (Exception ex) {
-					MessageService.ShowError (GettextCatalog.GetString ("Could not open file: {0}", file.FileName), ex);
-				}
+				Workbench.OpenDocument (file.FileName, null, file.Line, file.Column, file.Options).ContinueWith (t => {
+					if (t.IsFaulted)
+						MessageService.ShowError (GettextCatalog.GetString ("Could not open file: {0}", file.FileName), t.Exception);
+				}, TaskScheduler.FromCurrentSynchronizationContext ()).Ignore ();
 			}
-			
+
 			Workbench.Present ();
 		}
-		
+
 		static bool FileServiceErrorHandler (string message, Exception ex)
 		{
 			MessageService.ShowError (message, ex);
@@ -373,21 +400,140 @@ namespace MonoDevelop.Ide
 		public static void Run ()
 		{
 			// finally run the workbench window ...
+			isMainRunning = true;
 			Gtk.Application.Run ();
 		}
-		
-		
+
+		public static bool IsRunning {
+			get { return isMainRunning; }
+		}
+
 		/// <summary>
 		/// Exits MonoDevelop. Returns false if the user cancels exiting.
 		/// </summary>
-		public static bool Exit ()
+		public static async Task<bool> Exit ()
 		{
-			if (workbench.Close ()) {
+			if (await workbench.Close ()) {
 				Gtk.Application.Quit ();
+				isMainRunning = false;
 				return true;
 			}
 			return false;
 		}
+
+		/// <summary>
+		/// Restarts MonoDevelop
+		/// </summary>
+		/// <returns> false if the user cancels exiting. </returns>
+		/// <param name="reopenWorkspace"> true to reopen current workspace. </param>
+		/// <remarks>
+		/// Starts a new MonoDevelop instance in a new process and 
+		/// stops the current MonoDevelop instance.
+		/// </remarks>
+		public static async Task<bool> Restart (bool reopenWorkspace = false)
+		{
+			if (await Exit ()) {
+				try {
+					DesktopService.RestartIde (reopenWorkspace);
+				} catch (Exception ex) {
+					LoggingService.LogError ("Restarting IDE failed", ex);
+				}
+				// return true here even if DesktopService.RestartIde has failed,
+				// because the Ide has already been closed.
+				return true;
+			}
+			return false;
+		}
+
+		static int idleActionsDisabled = 0;
+		static Queue<Action> idleActions = new Queue<Action> ();
+
+		/// <summary>
+		/// Runs an action when the IDE is idle, that is, when the user is not performing any action.
+		/// </summary>
+		/// <param name="action">Action to execute</param>
+		/// <remarks>
+		/// This method should be used, for example, to show a notification to the user. The method will ensure
+		/// that the dialog is shown when the user is not interacting with the IDE.
+		/// </remarks>
+		public static void RunWhenIdle (Action action)
+		{
+			Runtime.AssertMainThread ();
+			idleActions.Enqueue (action);
+
+			if (idleActionsDisabled == 0)
+				DispatchIdleActions ();
+		}
+
+		/// <summary>
+		/// Prevents the execution of idle actions
+		/// </summary>
+		public static void DisableIdleActions ()
+		{
+			Runtime.AssertMainThread ();
+			idleActionsDisabled++;
+		}
+
+		/// <summary>
+		/// Resumes the execution of idle actions
+		/// </summary>
+		public static void EnableIdleActions ()
+		{
+			Runtime.AssertMainThread ();
+
+			if (idleActionsDisabled == 0) {
+				LoggingService.LogError ("EnableIdleActions() call without corresponding DisableIdleActions() call");
+				return;
+			}
+
+			if (--idleActionsDisabled == 0 && idleActions.Count > 0) {
+				// After enabling idle actions, run them after a short pause, so for example if they were disabled
+				// by the main menu, the actions won't execute right away after closing
+				DispatchIdleActions (500);
+			}
+		}
+
+		static void DispatchIdleActions (int withMsDelay = 0)
+		{
+			if (withMsDelay > 0) {
+				Xwt.Application.TimeoutInvoke (withMsDelay, () => { DispatchIdleActions (0); return false; });
+				return;
+			}
+
+			// If idle actions are disabled, this method will be called again when they are re-enabled.
+			if (idleActionsDisabled > 0 || idleActions.Count == 0)
+				return;
+
+			// If a modal dialog is open, try again later
+			if (DesktopService.IsModalDialogRunning ()) {
+				DispatchIdleActions (1000);
+				return;
+			}
+
+			// If the user interacted with the IDE just a moment ago, wait a bit more time before
+			// running the action
+			var interactionSpan = (int)(DateTime.Now - commandService.LastUserInteraction).TotalMilliseconds;
+			if (interactionSpan < 500) {
+				DispatchIdleActions (500 - interactionSpan);
+				return;
+			}
+
+			var action = idleActions.Dequeue ();
+
+			// Disable idle actions while running an idle action
+			idleActionsDisabled++;
+			try {
+				action ();
+			} catch (Exception ex) {
+				LoggingService.LogError ("Idle action execution failed", ex);
+			}
+			idleActionsDisabled--;
+
+			// If there are more actions to execute, do it after a short pause
+			if (idleActions.Count > 0)
+				DispatchIdleActions (500);
+		}
+
 		
 		internal static bool OnExit ()
 		{
@@ -452,7 +598,9 @@ namespace MonoDevelop.Ide
 			if (IdeApp.Preferences.EnableInstrumentation) {
 				if (instrumentationStatusIcon == null) {
 					instrumentationStatusIcon = IdeApp.Workbench.StatusBar.ShowStatusIcon (ImageService.GetIcon (MonoDevelop.Ide.Gui.Stock.StatusInstrumentation));
-					instrumentationStatusIcon.ToolTip = "Instrumentation service enabled";
+					instrumentationStatusIcon.Title = GettextCatalog.GetString ("Instrumentation");
+					instrumentationStatusIcon.ToolTip = GettextCatalog.GetString ("Instrumentation service enabled");
+					instrumentationStatusIcon.Help = GettextCatalog.GetString ("Information about the Instrumentation Service");
 					instrumentationStatusIcon.Clicked += delegate {
 						InstrumentationService.StartMonitor ();
 					};
@@ -465,14 +613,14 @@ namespace MonoDevelop.Ide
 	
 	public class IdeServices
 	{
-		readonly TemplatingService templatingService = new TemplatingService ();
+		readonly Lazy<TemplatingService> templatingService = new Lazy<TemplatingService> (() => new TemplatingService ());
 
 		public ProjectService ProjectService {
 			get { return MonoDevelop.Projects.Services.ProjectService; }
 		}
 
 		public TemplatingService TemplatingService {
-			get { return templatingService; }
+			get { return templatingService.Value; }
 		}
 	}
 }

@@ -44,6 +44,7 @@ using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Projects.Extensions;
 using System.Collections.Immutable;
 using System.Threading;
+using Microsoft.CodeAnalysis;
 
 namespace MonoDevelop.Projects
 {
@@ -61,24 +62,27 @@ namespace MonoDevelop.Projects
 
 		string[] buildActions;
 		MSBuildProject sourceProject;
+		MSBuildProject userProject;
 
 		string productVersion;
 		string schemaVersion;
 		bool modifiedInMemory;
-		bool msbuildUpdatePending;
 		ProjectExtension projectExtension;
+		RunConfigurationCollection runConfigurations;
+		bool defaultRunConfigurationCreated;
 
 		List<string> defaultImports;
 
 		ProjectItemCollection items;
+		List<string> projectCapabilities;
 
 		IEnumerable<string> loadedAvailableItemNames = ImmutableList<string>.Empty;
 
 		protected Project ()
 		{
+			runConfigurations = new RunConfigurationCollection (this);
 			items = new ProjectItemCollection (this);
 			FileService.FileChanged += HandleFileChanged;
-			Runtime.SystemAssemblyService.DefaultRuntimeChanged += OnDefaultRuntimeChanged;
 			files = new ProjectFileCollection ();
 			Items.Bind (files);
 			DependencyResolutionEnabled = true;
@@ -86,6 +90,13 @@ namespace MonoDevelop.Projects
 
 		public ProjectItemCollection Items {
 			get { return items; }
+		}
+
+		public RunConfigurationCollection RunConfigurations {
+			get {
+				CreateDefaultConfiguration ();
+				return runConfigurations; 
+			}
 		}
 
 		protected Project (params string[] flavorGuids): this()
@@ -153,6 +164,9 @@ namespace MonoDevelop.Projects
 
 				if (creationContext.Project != null) {
 					this.sourceProject = creationContext.Project;
+					// Configure target framework here for projects that target multiple frameworks so the
+					// project capabilities are correct when they are initialized in InitBeforeProjectExtensionLoad.
+					ConfigureActiveTargetFramework ();
 					projectTypeGuids = sourceProject.EvaluatedProperties.GetValue ("ProjectTypeGuids");
 					if (projectTypeGuids != null) {
 						var subtypeGuids = new List<string> ();
@@ -175,6 +189,15 @@ namespace MonoDevelop.Projects
 				sourceProject.FileName = FileName;
 			}
 
+			// Loads minimal data required to instantiate extensions and prepare for project loading
+			InitBeforeProjectExtensionLoad ();
+		}
+
+		/// <summary>
+		/// Initialization to be done before extensions are loaded
+		/// </summary>
+		void InitBeforeProjectExtensionLoad ()
+		{
 			var ggroup = sourceProject.GetGlobalPropertyGroup ();
 			// Avoid crash if there is not global group
 			if (ggroup == null)
@@ -182,6 +205,9 @@ namespace MonoDevelop.Projects
 
 			// Load the evaluated properties
 			InitMainGroupProperties (ggroup);
+
+			// Capabilities have to be loaded here since extensions may be activated or deactivated depending on them
+			LoadProjectCapabilities ();
 		}
 
 		void InitMainGroupProperties (MSBuildPropertyGroup globalGroup)
@@ -203,13 +229,6 @@ namespace MonoDevelop.Projects
 
 			MSBuildEngineSupport = MSBuildProjectService.GetMSBuildSupportForProject (this);
 			InitFormatProperties ();
-		}
-
-		void OnDefaultRuntimeChanged (object o, EventArgs args)
-		{
-			// If the default runtime changes, the project builder for this project may change
-			// so it has to be created again.
-			CleanupProjectBuilder ();
 		}
 
 		public IEnumerable<string> FlavorGuids {
@@ -289,6 +308,75 @@ namespace MonoDevelop.Projects
 			base.OnConfigurationRemoved (args);
 		}
 
+		protected override void OnItemReady ()
+		{
+			base.OnItemReady ();
+		}
+
+		internal virtual void ImportDefaultRunConfiguration (ProjectRunConfiguration config)
+		{
+		}
+
+		public ProjectRunConfiguration CreateRunConfiguration (string name)
+		{
+			var c = CreateRunConfigurationInternal (name);
+
+			// When creating a ProcessRunConfiguration, set the value of ExternalConsole and PauseConsoleOutput from the default configuration
+			var pc = c as ProcessRunConfiguration;
+			if (pc != null) {
+				var dc = RunConfigurations.FirstOrDefault (rc => rc.IsDefaultConfiguration) as ProcessRunConfiguration;
+				if (dc != null) {
+					pc.ExternalConsole = dc.ExternalConsole;
+					pc.PauseConsoleOutput = dc.PauseConsoleOutput;
+				}
+			}
+			return c;
+		}
+
+		ProjectRunConfiguration CreateRunConfigurationInternal (string name)
+		{
+			var c = CreateUninitializedRunConfiguration (name);
+			c.Initialize (this);
+			return c;
+		}
+
+		public ProjectRunConfiguration CreateUninitializedRunConfiguration (string name)
+		{
+			return ProjectExtension.OnCreateRunConfiguration (name);
+		}
+
+		public ProjectRunConfiguration CloneRunConfiguration (ProjectRunConfiguration runConfig)
+		{
+			var clone = CreateUninitializedRunConfiguration (runConfig.Name);
+			clone.CopyFrom (runConfig, false);
+			return clone;
+		}
+
+		public ProjectRunConfiguration CloneRunConfiguration (ProjectRunConfiguration runConfig, string newName)
+		{
+			var clone = CreateUninitializedRunConfiguration (newName);
+			clone.CopyFrom (runConfig, true);
+			return clone;
+		}
+
+		void CreateDefaultConfiguration ()
+		{
+			// If the project doesn't have a Default run configuration, create one
+			if (!defaultRunConfigurationCreated) {
+				defaultRunConfigurationCreated = true;
+				if (!runConfigurations.Any (c => c.IsDefaultConfiguration)) {
+					var rc = CreateRunConfigurationInternal ("Default");
+					ImportDefaultRunConfiguration (rc);
+					runConfigurations.Insert (0, rc);
+				}
+			}
+		}
+
+		protected override IEnumerable<SolutionItemRunConfiguration> OnGetRunConfigurations ()
+		{
+			return RunConfigurations;
+		}
+
 		protected virtual void OnGetDefaultImports (List<string> imports)
 		{
 		}
@@ -297,7 +385,7 @@ namespace MonoDevelop.Projects
 
 		internal bool CheckAllFlavorsSupported ()
 		{
-			return FlavorGuids.All (g => ProjectExtension.SupportsFlavor (g));
+			return FlavorGuids.All (ProjectExtension.SupportsFlavor);
 		}
 
 		ProjectExtension ProjectExtension {
@@ -314,7 +402,7 @@ namespace MonoDevelop.Projects
 		{
 			if (!Loading) {
 				modifiedInMemory = true;
-				msbuildUpdatePending = true;
+				ClearCachedData ().Ignore ();
 			}
 			base.OnModified (args);
 		}
@@ -322,22 +410,32 @@ namespace MonoDevelop.Projects
 		protected override Task OnLoad (ProgressMonitor monitor)
 		{
 			return Task.Run (async delegate {
-				if (sourceProject == null || sourceProject.IsNewProject) {
-					sourceProject = await MSBuildProject.LoadAsync (FileName);
-					if (MSBuildEngineSupport == MSBuildSupport.NotSupported)
-						sourceProject.UseMSBuildEngine = false;
-					sourceProject.Evaluate ();
-				}
-
-				IMSBuildPropertySet globalGroup = sourceProject.GetGlobalPropertyGroup ();
-				// Avoid crash if there is not global group
-				if (globalGroup == null)
-					sourceProject.AddNewPropertyGroup (false);
-
-				ProjectExtension.OnPrepareForEvaluation (sourceProject);
-
-				ReadProject (monitor, sourceProject);
+				await LoadAsync (monitor);
 			});
+		}
+
+		async Task LoadAsync (ProgressMonitor monitor)
+		{
+			if (sourceProject == null || sourceProject.IsNewProject) {
+				sourceProject = await MSBuildProject.LoadAsync (FileName).ConfigureAwait (false);
+				if (MSBuildEngineSupport == MSBuildSupport.NotSupported)
+					sourceProject.UseMSBuildEngine = false;
+				sourceProject.Evaluate ();
+			}
+
+			IMSBuildPropertySet globalGroup = sourceProject.GetGlobalPropertyGroup ();
+			// Avoid crash if there is not global group
+			if (globalGroup == null)
+				sourceProject.AddNewPropertyGroup (false);
+
+			ProjectExtension.OnPrepareForEvaluation (sourceProject);
+
+			ReadProject (monitor, sourceProject);
+		}
+
+		void LoadProjectCapabilities ()
+		{
+			projectCapabilities = sourceProject.EvaluatedItems.Where (it => it.Name == "ProjectCapability").Select (it => it.Include.Trim ()).Where (s => s.Length > 0).Distinct ().ToList ();
 		}
 
 		/// <summary>
@@ -378,6 +476,7 @@ namespace MonoDevelop.Projects
 			foreach (var projectFile in projectFiles) {
 				var info = new FileInfo (projectFile.FilePath);
 				infoList.Add (info);
+				info.Refresh ();
 			}
 
 			return infoList;
@@ -416,12 +515,12 @@ namespace MonoDevelop.Projects
 			if (sourceProject == null)
 				return Task.FromResult (new ProjectFile [0]);
 
-			return BindTask<ProjectFile []> (async cancelToken => {
+			return BindTask<ProjectFile []> (cancelToken => {
 				var cancelSource = new CancellationTokenSource ();
 				cancelToken.Register (() => cancelSource.Cancel ());
 
 				using (var monitor = new ProgressMonitor (cancelSource)) {
-					return await GetSourceFilesAsync (monitor, configuration);
+					return GetSourceFilesAsync (monitor, configuration);
 				}
 			});
 		}
@@ -429,7 +528,15 @@ namespace MonoDevelop.Projects
 		/// <summary>
 		/// Gets the source files that are included in the project, including any that are added by `CoreCompileDependsOn`
 		/// </summary>
-		public async Task<ProjectFile[]> GetSourceFilesAsync (ProgressMonitor monitor, ConfigurationSelector configuration)
+		public Task<ProjectFile []> GetSourceFilesAsync (ProgressMonitor monitor, ConfigurationSelector configuration)
+		{
+			return ProjectExtension.OnGetSourceFiles (monitor, configuration);
+		}
+
+		/// <summary>
+		/// Gets the source files that are included in the project, including any that are added by `CoreCompileDependsOn`
+		/// </summary>
+		protected virtual async Task<ProjectFile[]> OnGetSourceFiles (ProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			// pre-load the results with the current list of files in the project
 			var results = new List<ProjectFile> ();
@@ -449,54 +556,71 @@ namespace MonoDevelop.Projects
 			return results.ToArray ();
 		}
 
-		bool evaluatedCoreCompileDependencies;
-		readonly TaskCompletionSource<ProjectFile[]> evaluatedCompileItemsTask = new TaskCompletionSource<ProjectFile[]> ();
+		object evaluatedCompileItemsLock = new object ();
+		string evaluatedCompileItemsConfiguration;
+		TaskCompletionSource<ProjectFile[]> evaluatedCompileItemsTask;
 
 		/// <summary>
 		/// Gets the list of files that are included as Compile items from the evaluation of the CoreCompile dependecy targets
 		/// </summary>
 		async Task<ProjectFile[]> GetCompileItemsFromCoreCompileDependenciesAsync (ProgressMonitor monitor, ConfigurationSelector configuration)
 		{
-			List<ProjectFile> result = null;
-			lock (evaluatedCompileItemsTask) {
-				if (!evaluatedCoreCompileDependencies) {
-					result = new List<ProjectFile> ();
-					evaluatedCoreCompileDependencies = true;
+			var config = configuration != null ? GetConfiguration (configuration) : DefaultConfiguration;
+			if (config == null)
+				return new ProjectFile [0];
+
+			// Check if there is already a task for getting the items for the provided configuration
+
+			TaskCompletionSource<ProjectFile []> currentTask = null;
+			bool startTask = false;
+
+			lock (evaluatedCompileItemsLock) {
+				if (evaluatedCompileItemsConfiguration != config.Id) {
+					// The configuration changed or query not yet done
+					evaluatedCompileItemsConfiguration = config.Id;
+					evaluatedCompileItemsTask = new TaskCompletionSource<ProjectFile []> ();
+					startTask = true;
 				}
+				currentTask = evaluatedCompileItemsTask;
 			}
 
-			if (result != null) {
+			if (startTask) {
 				var coreCompileDependsOn = sourceProject.EvaluatedProperties.GetValue<string> ("CoreCompileDependsOn");
 
 				if (string.IsNullOrEmpty (coreCompileDependsOn)) {
-					evaluatedCompileItemsTask.SetResult (new ProjectFile [0]);
-					return evaluatedCompileItemsTask.Task.Result;
+					currentTask.SetResult (new ProjectFile [0]);
+					return currentTask.Task.Result;
 				}
 
-				var dependsList = coreCompileDependsOn.Split (new [] { ";" }, StringSplitOptions.RemoveEmptyEntries);
-				foreach (var dependTarget in dependsList) {
-					try {
-						// evaluate the Compile targets
-						var ctx = new TargetEvaluationContext ();
-						ctx.ItemsToEvaluate.Add ("Compile");
+				ProjectFile [] result = null;
+				var dependsList = string.Join (";", coreCompileDependsOn.Split (new [] { ";" }, StringSplitOptions.RemoveEmptyEntries).Select (s => s.Trim ()).Where (s => s.Length > 0));
+				try {
+					// evaluate the Compile targets
+					var ctx = new TargetEvaluationContext ();
+					ctx.ItemsToEvaluate.Add ("Compile");
+					ctx.BuilderQueue = BuilderQueue.ShortOperations;
 
-						var evalResult = await this.RunTarget (monitor, dependTarget, configuration, ctx);
-						if (evalResult != null && !evalResult.BuildResult.HasErrors) {
-							var evalItems = evalResult
-								.Items
-								.Select (i => CreateProjectFile (i))
-								.ToList ();
-
-							result.AddRange (evalItems);
-						}
-					} catch (Exception ex) {
-						LoggingService.LogInternalError (string.Format ("Error running target {0}", dependTarget), ex);
+					var evalResult = await this.RunTarget (monitor, dependsList, config.Selector, ctx);
+					if (evalResult != null && evalResult.Items != null) {
+						result = evalResult
+							.Items
+							.Select (CreateProjectFile)
+							.ToArray ();
 					}
+				} catch (Exception ex) {
+					LoggingService.LogInternalError (string.Format ("Error running target {0}", dependsList), ex);
 				}
-				evaluatedCompileItemsTask.SetResult (result.ToArray ());
+				currentTask.SetResult (result ?? new ProjectFile [0]);
 			}
 
-			return await evaluatedCompileItemsTask.Task;
+			return await currentTask.Task;
+		}
+
+		void ResetCachedCompileItems ()
+		{
+			lock (evaluatedCompileItemsLock) {
+				evaluatedCompileItemsConfiguration = null;
+			}
 		}
 
 		ProjectFile CreateProjectFile (IMSBuildItemEvaluated item)
@@ -522,18 +646,19 @@ namespace MonoDevelop.Projects
 			SetFastBuildCheckDirty ();
 			modifiedInMemory = false;
 
-			await WriteProjectAsync (monitor);
+			string content = await WriteProjectAsync (monitor);
 
 			// Doesn't save the file to disk if the content did not change
-			if (await sourceProject.SaveAsync (FileName)) {
-				var pb = GetCachedProjectBuilder ();
-				if (pb != null) {
-					try {
-						await pb.Refresh ();
-					} finally {
-						pb.ReleaseReference ();
-					}
+			if (await sourceProject.SaveAsync (FileName, content)) {
+				if (userProject != null) {
+					if (!userProject.GetAllObjects ().Any ())
+						File.Delete (userProject.FileName);
+					else
+						await userProject.SaveAsync (userProject.FileName);
 				}
+
+				await ClearCachedData ();
+				RefreshProjectBuilder ().Ignore ();
 			}
 		}
 
@@ -568,6 +693,8 @@ namespace MonoDevelop.Projects
 			base.OnEndLoad ();
 
 			ProjectOpenedCounter.Inc (1, null, GetProjectEventMetadata (null));
+
+			InitializeFileWatcher ();
 		}
 
 		/// <summary>
@@ -668,6 +795,32 @@ namespace MonoDevelop.Projects
 		internal IEnumerable<ProjectExtension> GetFlavors ()
 		{
 			return ExtensionChain.GetAllExtensions ().OfType<ProjectExtension> ();
+		}
+
+		public IEnumerable<string> GetProjectCapabilities ()
+		{
+			return (IEnumerable<string>)projectCapabilities ?? ImmutableList<string>.Empty;
+		}
+
+		/// <summary>
+		/// Checks if the project has a capability or a combination of capabilities (including AND, OR, NOT logic).
+		/// </summary>
+		/// <returns><c>true</c> if the project has the required capabilities.</returns>
+		/// <param name="capabilityExpression">Expression of capabilities</param>
+		/// <remarks>The expression can be something like "(VisualC | CSharp) + (MSTest | NUnit)".
+		/// The "|" is the OR operator. The "&amp;" and "+" characters are both AND operators.
+		/// The "!" character is the NOT operator. Parentheses force evaluation precedence order.
+		/// A null or empty expression is evaluated as a match.</remarks>
+		public bool IsCapabilityMatch (string capabilityExpression)
+		{
+			return SimpleExpressionEvaluator.Evaluate (capabilityExpression, (IList<string>)projectCapabilities ?? ImmutableList<string>.Empty);
+		}
+
+		public event EventHandler ProjectCapabilitiesChanged;
+
+		void NotifyProjectCapabilitiesChanged ()
+		{
+			ProjectCapabilitiesChanged?.Invoke (this, EventArgs.Empty);
 		}
 
 		/// <summary>
@@ -865,8 +1018,10 @@ namespace MonoDevelop.Projects
 
 		protected override void OnDispose ()
 		{
+			DisposeFileWatcher ();
+
 			foreach (ProjectConfiguration c in Configurations)
-				c.ProjectInstance.Dispose ();
+				c.ProjectInstance?.Dispose ();
 			
 			foreach (var item in items) {
 				IDisposable disp = item as IDisposable;
@@ -875,8 +1030,7 @@ namespace MonoDevelop.Projects
 			}
 
 			FileService.FileChanged -= HandleFileChanged;
-			Runtime.SystemAssemblyService.DefaultRuntimeChanged -= OnDefaultRuntimeChanged;
-			CleanupProjectBuilder ();
+			RemoteBuildEngineManager.UnloadProject (FileName).Ignore ();
 
 			if (sourceProject != null) {
 				sourceProject.Dispose ();
@@ -900,9 +1054,14 @@ namespace MonoDevelop.Projects
 		/// <param name='configuration'>
 		/// Configuration to use to run the target
 		/// </param>
-		public async Task<TargetEvaluationResult> RunTarget (ProgressMonitor monitor, string target, ConfigurationSelector configuration, TargetEvaluationContext context = null)
+		public Task<TargetEvaluationResult> RunTarget (ProgressMonitor monitor, string target, ConfigurationSelector configuration, TargetEvaluationContext context = null)
 		{
-			return await ProjectExtension.OnRunTarget (monitor, target, configuration, context);
+			// Initialize the evaluation context. This initialization is shared with FastCheckNeedsBuild.
+			// Extenders will override OnConfigureTargetEvaluationContext to add custom properties and do other
+			// initializations required by MSBuild.
+			context = ProjectExtension.OnConfigureTargetEvaluationContext (target, configuration, context ?? new TargetEvaluationContext ());
+
+			return ProjectExtension.OnRunTarget (monitor, target, configuration, context);
 		}
 
 		public bool SupportsTarget (string target)
@@ -913,6 +1072,29 @@ namespace MonoDevelop.Projects
 		protected virtual bool OnGetSupportsTarget (string target)
 		{
 			return sourceProject.EvaluatedTargetsIgnoringCondition.Any (t => t.Name == target);
+		}
+
+		protected virtual bool OnGetSupportsImportedItem (IMSBuildItemEvaluated buildItem)
+		{
+			return false;
+		}
+
+		/// <summary>
+		/// Initialize the evaluation context that is going to be used to execute an MSBuild target.
+		/// </summary>
+		/// <returns>The updated context.</returns>
+		/// <param name="target">Target.</param>
+		/// <param name="configuration">Configuration.</param>
+		/// <param name="context">Context.</param>
+		/// <remarks>
+		/// This method can be overriden to add custom properties and do other initializations on the evaluation
+		/// context. The method is always called before executing OnRunTarget and other methods that do
+		/// target evaluations. The method can modify the provided context instance and return it, or it can
+		/// create a new instance.
+		/// </remarks>
+		protected virtual TargetEvaluationContext OnConfigureTargetEvaluationContext (string target, ConfigurationSelector configuration, TargetEvaluationContext context)
+		{
+			return context;
 		}
 
 		/// <summary>
@@ -947,6 +1129,9 @@ namespace MonoDevelop.Projects
 
 		async Task<TargetEvaluationResult> DoRunTarget (ProgressMonitor monitor, string target, ConfigurationSelector configuration, TargetEvaluationContext context)
 		{
+			if (configuration == null) {
+				throw new ArgumentNullException ("configuration");
+			}
 			if (target == ProjectService.BuildTarget) {
 				SolutionItemConfiguration conf = GetConfiguration (configuration);
 				if (conf != null && conf.CustomCommands.HasCommands (CustomCommandType.Build)) {
@@ -981,7 +1166,8 @@ namespace MonoDevelop.Projects
 
 			try {
 				var tr = await OnRunTarget (monitor, target, configuration, context);
-				tr.BuildResult.SourceTarget = this;
+				if (tr != null)
+					tr.BuildResult.SourceTarget = this;
 				return tr;
 			} finally {
 				// If any of the project generated files changes, notify it
@@ -995,13 +1181,13 @@ namespace MonoDevelop.Projects
 		async Task<TargetEvaluationResult> RunMSBuildTarget (ProgressMonitor monitor, string target, ConfigurationSelector configuration, TargetEvaluationContext context)
 		{
 			if (CheckUseMSBuildEngine (configuration)) {
-				LogWriter logWriter = new LogWriter (monitor.Log);
-				var configs = GetConfigurations (configuration);	
+				var includeReferencedProjects = context != null ? context.LoadReferencedProjects : false;
+				var configs = GetConfigurations (configuration, includeReferencedProjects);	
 
 				string [] evaluateItems = context != null ? context.ItemsToEvaluate.ToArray () : new string [0];
 				string [] evaluateProperties = context != null ? context.PropertiesToEvaluate.ToArray () : new string [0];
 
-				var globalProperties = new Dictionary<string, string> ();
+				var globalProperties = CreateGlobalProperties ();
 				if (context != null) {
 					var md = (ProjectItemMetadata)context.GlobalProperties;
 					md.SetProject (sourceProject);
@@ -1012,50 +1198,47 @@ namespace MonoDevelop.Projects
 				MSBuildResult result = null;
 				await Task.Run (async delegate {
 
+					bool operationRequiresExclusiveLock = context.BuilderQueue == BuilderQueue.LongOperations;
 					TimerCounter buildTimer = null;
 					switch (target) {
 					case "Build": buildTimer = Counters.BuildMSBuildProjectTimer; break;
 					case "Clean": buildTimer = Counters.CleanMSBuildProjectTimer; break;
 					}
 
-					var t1 = Counters.RunMSBuildTargetTimer.BeginTiming (GetProjectEventMetadata (configuration));
-					var t2 = buildTimer != null ? buildTimer.BeginTiming (GetProjectEventMetadata (configuration)) : null;
+					var metadata = GetProjectEventMetadata (configuration);
+					var t1 = Counters.RunMSBuildTargetTimer.BeginTiming (metadata);
+					var t2 = buildTimer != null ? buildTimer.BeginTiming (metadata) : null;
 
-					bool newBuilderRequested = false;
+					IRemoteProjectBuilder builder = await GetProjectBuilder (monitor.CancellationToken, context, setBusy:operationRequiresExclusiveLock).ConfigureAwait (false);
 
-					RemoteProjectBuilder builder = await GetProjectBuilder ();
-					if (builder.IsBusy) {
-						builder.ReleaseReference ();
-						newBuilderRequested = true;
-						builder = await RequestLockedBuilder ();
-					}
+					string [] targets;
+					if (target.IndexOf (';') != -1)
+						targets = target.Split (new [] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 					else
-						builder.Lock ();
+						targets = new string [] { target };
 
+					var logger = context.Loggers.Count != 1 ? new ProxyLogger (this, context.Loggers) : context.Loggers.First ();
+					
 					try {
-						result = await builder.Run (configs, logWriter, MSBuildProjectService.DefaultMSBuildVerbosity, new [] { target }, evaluateItems, evaluateProperties, globalProperties, monitor.CancellationToken);
+						result = await builder.Run (configs, monitor.Log, logger, context.LogVerbosity, targets, evaluateItems, evaluateProperties, globalProperties, monitor.CancellationToken).ConfigureAwait (false);
 					} finally {
-						builder.Unlock ();
-						builder.ReleaseReference ();
-						if (newBuilderRequested) {
-							// Dispose the builder after a while, so that it can be reused
-							#pragma warning disable 4014
-							Task.Delay (10000).ContinueWith (t => builder.Dispose ());
-							#pragma warning restore 4014
-						}
+						builder.Dispose ();
 						t1.End ();
-						if (t2 != null)
+						if (t2 != null) {
+							AddRunMSBuildTargetTimerMetadata (metadata, result, target, configuration);
 							t2.End ();
+							if (IsFirstBuild && target == "Build") {
+								await Runtime.RunInMainThread (() => IsFirstBuild = false);
+							}
+						}
 					}
-
-					System.Runtime.Remoting.RemotingServices.Disconnect (logWriter);
 				});
 
 				var br = new BuildResult ();
 				foreach (var err in result.Errors) {
 					FilePath file = null;
 					if (err.File != null)
-						file = Path.Combine (Path.GetDirectoryName (err.ProjectFile), err.File);
+						file = Path.Combine (Path.GetDirectoryName (err.ProjectFile ?? ItemDirectory.ToString ()), err.File);
 
 					br.Append (new BuildError (file, err.LineNumber, err.ColumnNumber, err.Code, err.Message) {
 						Subcategory = err.Subcategory,
@@ -1093,13 +1276,126 @@ namespace MonoDevelop.Projects
 				return new TargetEvaluationResult (br, evItems, props);
 			}
 			else {
-				CleanupProjectBuilder ();
+				RemoteBuildEngineManager.UnloadProject (FileName).Ignore ();
 				if (this is DotNetProject) {
 					var handler = new MonoDevelop.Projects.MD1.MD1DotNetProjectHandler ((DotNetProject)this);
 					return new TargetEvaluationResult (await handler.RunTarget (monitor, target, configuration));
 				}
 			}
 			return null;
+		}
+
+		/// <summary>
+		/// Gets or sets the FirstBuild user property. This is true if this is a new
+		/// project and has not yet been built.
+		/// </summary>
+		internal bool IsFirstBuild {
+			get {
+				return UserProperties.GetValue ("FirstBuild", false);
+			}
+			set {
+				if (value) {
+					UserProperties.SetValue ("FirstBuild", value);
+				} else {
+					UserProperties.RemoveValue ("FirstBuild");
+				}
+			}
+		}
+
+		void AddRunMSBuildTargetTimerMetadata (
+			IDictionary<string, string> metadata,
+			MSBuildResult result,
+			string target,
+			ConfigurationSelector configuration)
+		{
+			if (target == "Build") {
+				metadata ["BuildType"] = "4";
+			} else if (target == "Clean") {
+				metadata ["BuildType"] = "1";
+			}
+			metadata ["BuildTypeString"] = target;
+
+			metadata ["FirstBuild"] = IsFirstBuild.ToString ();
+			metadata ["ProjectID"] = ItemId;
+			metadata ["ProjectType"] = TypeGuid;
+			metadata ["ProjectFlavor"] = FlavorGuids.FirstOrDefault () ?? TypeGuid;
+
+			var c = GetConfiguration (configuration);
+			if (c != null) {
+				metadata ["Configuration"] = c.Id;
+				metadata ["Platform"] = GetExplicitPlatform (c);
+			}
+
+			bool success = false;
+			bool cancelled = false;
+
+			if (result != null) {
+				success = !result.Errors.Any (error => !error.IsWarning);
+
+				if (!success) {
+					cancelled = result.Errors [0].Message == "Build cancelled";
+				}
+			}
+
+			metadata ["Success"] = success.ToString ();
+			metadata ["Cancelled"] = cancelled.ToString ();
+		}
+
+		string activeTargetFramework;
+
+		void ConfigureActiveTargetFramework ()
+		{
+			activeTargetFramework = GetActiveTargetFramework ();
+			if (activeTargetFramework != null) {
+				MSBuildProject.SetGlobalProperty ("TargetFramework", activeTargetFramework);
+				MSBuildProject.Evaluate ();
+			}
+		}
+
+		/// <summary>
+		/// If an SDK project targets multiple target frameworks then this returns the first
+		/// target framework. Otherwise it returns null. This also handles the odd case if
+		/// the TargetFrameworks property is being used but only one framework is defined
+		/// there. Since here an active target framework must be returned even though multiple
+		/// target frameworks are not being used.
+		/// </summary>
+		string GetActiveTargetFramework ()
+		{
+			var frameworks = GetTargetFrameworks (MSBuildProject);
+			if (frameworks != null && frameworks.Any ())
+				return frameworks.FirstOrDefault ();
+
+			return null;
+		}
+
+		/// <summary>
+		/// Returns target frameworks defined in the TargetFrameworks property for SDK projects
+		/// if the TargetFramework property is not defined. It returns null otherwise.
+		/// </summary>
+		static string[] GetTargetFrameworks (MSBuildProject project)
+		{
+			if (string.IsNullOrEmpty (project.Sdk))
+				return null;
+
+			var propertyGroup = project.GetGlobalPropertyGroup ();
+			string propertyValue = propertyGroup.GetValue ("TargetFramework", null);
+			if (propertyValue != null)
+				return null;
+
+			propertyValue = project.EvaluatedProperties.GetValue ("TargetFrameworks", null);
+			if (propertyValue != null)
+				return propertyValue.Split (new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+			return null;
+		}
+
+		internal Dictionary<string, string> CreateGlobalProperties ()
+		{
+			var properties = new Dictionary<string, string> ();
+			string framework = activeTargetFramework;
+			if (framework != null)
+				properties ["TargetFramework"] = framework;
+			return properties;
 		}
 
 		internal ProjectConfigurationInfo [] GetConfigurations (ConfigurationSelector configuration, bool includeReferencedProjects = true)
@@ -1150,67 +1446,9 @@ namespace MonoDevelop.Projects
 
 		#region Project builder management
 
-		RemoteProjectBuilder projectBuilder;
-		string lastBuildToolsVersion;
-		string lastBuildRuntime;
-		string lastFileName;
-		string lastSlnFileName;
 		AsyncCriticalSection builderLock = new AsyncCriticalSection ();
 
-		internal async Task<RemoteProjectBuilder> GetProjectBuilder ()
-		{
-			//FIXME: we can't really have per-project runtimes, has to be per-solution
-			TargetRuntime runtime = null;
-			var ap = this as IAssemblyProject;
-			runtime = ap != null ? ap.TargetRuntime : Runtime.SystemAssemblyService.CurrentRuntime;
-
-			var sln = ParentSolution;
-			var slnFile = sln != null ? sln.FileName : null;
-
-			RemoteProjectBuilder result = null;
-
-			using (await builderLock.EnterAsync ()) {
-				bool refAdded = false;
-				if (projectBuilder == null || !(refAdded = projectBuilder.AddReference ()) || lastBuildToolsVersion != ToolsVersion || lastBuildRuntime != runtime.Id || lastFileName != FileName || lastSlnFileName != slnFile) {
-					if (projectBuilder != null && refAdded) {
-						projectBuilder.Shutdown ();
-						projectBuilder.ReleaseReference ();
-					}
-					var pb = await MSBuildProjectService.GetProjectBuilder (runtime, ToolsVersion, FileName, slnFile, 0);
-					pb.AddReference ();
-					pb.Disconnected += delegate {
-						CleanupProjectBuilder ();
-					};
-					projectBuilder = pb;
-					lastBuildToolsVersion = ToolsVersion;
-					lastBuildRuntime = runtime.Id;
-					lastFileName = FileName;
-					lastSlnFileName = slnFile;
-				}
-				if (modifiedInMemory) {
-					try {
-						modifiedInMemory = false;
-						await WriteProjectAsync (new ProgressMonitor ());
-						await projectBuilder.RefreshWithContent (sourceProject.SaveToString ());
-					} catch {
-						projectBuilder.ReleaseReference ();
-						throw;
-					}
-				}
-				result = projectBuilder;
-			}
-			return result;
-		}
-
-		RemoteProjectBuilder GetCachedProjectBuilder ()
-		{
-			var pb = projectBuilder;
-			if (pb != null && pb.AddReference ())
-				return pb;
-			return null;
-		}
-
-		async Task<RemoteProjectBuilder> RequestLockedBuilder ()
+		internal async Task<IRemoteProjectBuilder> GetProjectBuilder (CancellationToken token, OperationContext context, bool setBusy = false, bool allowBusy = false)
 		{
 			TargetRuntime runtime = null;
 			var ap = this as IAssemblyProject;
@@ -1219,40 +1457,60 @@ namespace MonoDevelop.Projects
 			var sln = ParentSolution;
 			var slnFile = sln != null ? sln.FileName : null;
 
-			var pb = await MSBuildProjectService.GetProjectBuilder (runtime, ToolsVersion, FileName, slnFile, 0, true);
-			pb.AddReference ();
+			// Extract the session ID from the current build context, if there is one
+			object buildSessionId = null;
+			if (context != null)
+				context.SessionData.TryGetValue (MSBuildSolutionExtension.MSBuildProjectOperationId, out buildSessionId);
+
+			var builder = await RemoteBuildEngineManager.GetRemoteProjectBuilder (FileName, slnFile, runtime, ToolsVersion, RequiresMicrosoftBuild, buildSessionId, setBusy, allowBusy);
+
 			if (modifiedInMemory) {
+				modifiedInMemory = false;
+				string content = await WriteProjectAsync (new ProgressMonitor ());
 				try {
-					await WriteProjectAsync (new ProgressMonitor ());
-					await pb.RefreshWithContent (sourceProject.SaveToString ());
+					await RemoteBuildEngineManager.RefreshProjectWithContent (FileName, content);
 				} catch {
-					pb.Dispose ();
+					builder.Dispose ();
 					throw;
 				}
 			}
-			return pb;
+			return builder;
 		}
 
-		void CleanupProjectBuilder ()
+		void GetReferencedSDKs (Project project, ref HashSet<string> sdks, HashSet<string> traversedProjects)
 		{
-			var pb = GetCachedProjectBuilder ();
-			if (pb != null) {
-				pb.Shutdown ();
-				pb.ReleaseReference ();
+			traversedProjects.Add (project.ItemId);
+
+			var projectSdks = project.MSBuildProject.GetReferencedSDKs ();
+			if (projectSdks.Length > 0) {
+				if (sdks == null)
+					sdks = new HashSet<string> ();
+				sdks.UnionWith (projectSdks);
+			}
+
+			var dotNetProject = project as DotNetProject;
+			if (dotNetProject == null)
+				return;
+
+			// Check project references.
+			foreach (var projectReference in dotNetProject.References.Where (pr => pr.ReferenceType == ReferenceType.Project)) {
+				if (traversedProjects.Contains (projectReference.ProjectGuid))
+					continue;
+
+				var p = projectReference.ResolveProject (ParentSolution);
+				if (p != null)
+					GetReferencedSDKs (p, ref sdks, traversedProjects);
 			}
 		}
 
 		public Task RefreshProjectBuilder ()
 		{
-			var pb = GetCachedProjectBuilder ();
-			if (pb != null)
-				return pb.Refresh ().ContinueWith (t => pb.ReleaseReference ());
-			return Task.FromResult (true);
+			return RemoteBuildEngineManager.RefreshProject (FileName);
 		}
 
 		public void ReloadProjectBuilder ()
 		{
-			CleanupProjectBuilder ();
+			RemoteBuildEngineManager.RefreshProject (FileName).Ignore ();
 		}
 
 		#endregion
@@ -1274,6 +1532,17 @@ namespace MonoDevelop.Projects
 			return MSBuildEngineSupport.HasFlag (MSBuildSupport.Supported) && (
 				!checkReferences || GetReferencedItems (sel).OfType<Project>().All (i => i.CheckUseMSBuildEngine (sel, false))
 			);
+		}
+
+		bool requiresMicrosoftBuild;
+
+		internal protected bool RequiresMicrosoftBuild {
+			get {
+				return requiresMicrosoftBuild || ProjectExtension.IsMicrosoftBuildRequired;
+			}
+			set {
+				requiresMicrosoftBuild = value;
+			}
 		}
 
 		/// <summary>
@@ -1409,9 +1678,11 @@ namespace MonoDevelop.Projects
 			StringParserService.Properties["Project"] = Name;
 			
 			if (UsingMSBuildEngine (configuration)) {
+				// Build is always a long operation. Make sure we build the project in the right builder.
+				context.BuilderQueue = BuilderQueue.LongOperations;
 				var result = await RunMSBuildTarget (monitor, "Build", configuration, context);
 				if (!result.BuildResult.Failed)
-					SetFastBuildCheckClean (configuration);
+					SetFastBuildCheckClean (configuration, context);
 				return result;			
 			}
 			
@@ -1428,7 +1699,7 @@ namespace MonoDevelop.Projects
 			//copy references and files marked to "CopyToOutputDirectory"
 			CopySupportFiles (monitor, configuration);
 		
-			monitor.Log.WriteLine ("Performing main compilation...");
+			monitor.Log.WriteLine (GettextCatalog.GetString ("Performing main compilation…"));
 			
 			BuildResult res = await DoBuild (monitor, configuration);
 
@@ -1444,21 +1715,86 @@ namespace MonoDevelop.Projects
 
 		bool disableFastUpToDateCheck;
 
-		//the configuration of the last build that completed successfully
-		//null if any file in the project has since changed
+		// The configuration of the last build that completed successfully,
+		// null if any file in the project has since changed
 		string fastUpToDateCheckGoodConfig;
+
+		// The global properties used in the last build
+		IPropertySet fastUpToDateCheckGlobalProperties;
+
+		// Timestamp of the last build
+		DateTime fastUpToDateTimestamp;
 
 		public bool FastCheckNeedsBuild (ConfigurationSelector configuration)
 		{
-			return ProjectExtension.OnFastCheckNeedsBuild (configuration);
+			return FastCheckNeedsBuild (configuration, new TargetEvaluationContext ());
 		}
-		
+
+		public bool FastCheckNeedsBuild (ConfigurationSelector configuration, TargetEvaluationContext context)
+		{
+			// Initialize the evaluation context. This initialization is shared with RunTarget.
+			// Extenders will override OnConfigureTargetEvaluationContext to add custom properties and do other
+			// initializations required by MSBuild.
+			context = ProjectExtension.OnConfigureTargetEvaluationContext ("Build", configuration, context ?? new TargetEvaluationContext ());
+			return ProjectExtension.OnFastCheckNeedsBuild (configuration, context);
+		}
+
+		[Obsolete ("Use OnFastCheckNeedsBuild (configuration, TargetEvaluationContext)")]
 		protected virtual bool OnFastCheckNeedsBuild (ConfigurationSelector configuration)
 		{
 			if (disableFastUpToDateCheck || fastUpToDateCheckGoodConfig == null)
 				return true;
 			var cfg = GetConfiguration (configuration);
-			return cfg == null || cfg.Id != fastUpToDateCheckGoodConfig;
+			if (cfg == null || cfg.Id != fastUpToDateCheckGoodConfig)
+				return true;
+
+			return false;
+		}
+
+		/// <summary>
+		/// Checks if this project needs to be built.
+		/// </summary>
+		/// <returns><c>true</c>, if the project is dirty and needs to be rebuilt, <c>false</c> otherwise.</returns>
+		/// <param name="configuration">Build configuration.</param>
+		/// <param name="context">Evaluation context.</param>
+		/// <remarks>
+		/// This method can be overriden to provide custom logic for checking if a project needs to be built, either
+		/// due to changes in the content or in the configuration.
+		/// </remarks>
+		protected virtual bool OnFastCheckNeedsBuild (ConfigurationSelector configuration, TargetEvaluationContext context)
+		{
+			// Chain the new OnFastCheckNeedsBuild override to the old one, so that extensions
+			// using the old API keep working
+#pragma warning disable 618
+			if (ProjectExtension.OnFastCheckNeedsBuild (configuration))
+				return true;
+#pragma warning restore 618
+
+			// Shouldn't need to build, but if a dependency was changed since this project build flag was reset,
+			// the project needs to be rebuilt
+
+			foreach (var dep in GetReferencedItems (configuration).OfType<Project> ()) {
+				if (dep.FastCheckNeedsBuild (configuration, context) || dep.fastUpToDateTimestamp >= fastUpToDateTimestamp) {
+					fastUpToDateCheckGoodConfig = null;
+					return true;
+				}
+			}
+
+			// Check if global properties have changed
+
+			var cachedCount = fastUpToDateCheckGlobalProperties != null ? fastUpToDateCheckGlobalProperties.GetProperties ().Count () : 0;
+
+			if (cachedCount != context.GlobalProperties.GetProperties ().Count ())
+				return true;
+
+			if (cachedCount == 0)
+				return false;
+			
+			foreach (var p in context.GlobalProperties.GetProperties ()) {
+				if (fastUpToDateCheckGlobalProperties.GetValue (p.Name) != p.Value)
+					return true;
+			}
+			return false;
 		}
 
 		protected void SetFastBuildCheckDirty ()
@@ -1466,10 +1802,12 @@ namespace MonoDevelop.Projects
 			fastUpToDateCheckGoodConfig = null;
 		}
 		
-		void SetFastBuildCheckClean (ConfigurationSelector configuration)
+		void SetFastBuildCheckClean (ConfigurationSelector configuration, TargetEvaluationContext context)
 		{
 			var cfg = GetConfiguration (configuration);
 			fastUpToDateCheckGoodConfig = cfg != null ? cfg.Id : null;
+			fastUpToDateCheckGlobalProperties = context.GlobalProperties;
+			fastUpToDateTimestamp = DateTime.Now;
 		}
 
 		/// <summary>
@@ -1616,6 +1954,9 @@ namespace MonoDevelop.Projects
 		/// </remarks>
 		public List<FilePath> GetOutputFiles (ConfigurationSelector configuration)
 		{
+			if (configuration == null) {
+				throw new ArgumentNullException ("configuration");
+			}
 			List<FilePath> list = new List<FilePath> ();
 			PopulateOutputFileList (list, configuration);
 			return list;
@@ -1703,6 +2044,8 @@ namespace MonoDevelop.Projects
 			}
 			
 			if (UsingMSBuildEngine (configuration)) {
+				// Clean is considered a long operation. Make sure we build the project in the right builder.
+				context.BuilderQueue = BuilderQueue.LongOperations;
 				return await RunMSBuildTarget (monitor, "Clean", configuration, context);
 			}
 			
@@ -1715,7 +2058,7 @@ namespace MonoDevelop.Projects
 				foreach (FilePath file in filesToDelete) {
 					if (File.Exists (file)) {
 						file.Delete ();
-						if (file.ParentDirectory.CanonicalPath != config.OutputDirectory.CanonicalPath && Directory.GetFiles (file.ParentDirectory).Length == 0)
+						if (file.ParentDirectory.CanonicalPath != config.OutputDirectory.CanonicalPath && !Directory.EnumerateFiles (file.ParentDirectory).Any ())
 							file.ParentDirectory.Delete ();
 					}
 				}
@@ -1733,33 +2076,14 @@ namespace MonoDevelop.Projects
 			return Task.FromResult (BuildResult.CreateSuccess ());
 		}
 
-		protected async override Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
+		protected override Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
 		{
 			ProjectConfiguration config = GetConfiguration (configuration) as ProjectConfiguration;
-			if (config == null) {
+			if (config == null)
 				monitor.ReportError (GettextCatalog.GetString ("Configuration '{0}' not found in project '{1}'", configuration, Name), null);
-				return;
-			}
-			await DoExecute (monitor, context, configuration);
+			return Task.FromResult (0);
 		}
 		
-		/// <summary>
-		/// Executes the project
-		/// </summary>
-		/// <param name='monitor'>
-		/// Progress monitor.
-		/// </param>
-		/// <param name='context'>
-		/// Execution context.
-		/// </param>
-		/// <param name='configuration'>
-		/// Configuration to execute.
-		/// </param>
-		protected virtual Task DoExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
-		{
-			return new Task (delegate {});
-		}
-
 		/// <summary>
 		/// Gets the absolute path to the output file generated by this project.
 		/// </summary>
@@ -1887,22 +2211,40 @@ namespace MonoDevelop.Projects
 			return baseFiles;
 		}
 
-		protected internal override void OnItemsAdded (IEnumerable<ProjectItem> objs)
+		internal void NotifyItemsAdded (IEnumerable<ProjectItem> objs)
 		{
-			base.OnItemsAdded (objs);
+			ProjectExtension.OnItemsAdded (objs);
+		}
+
+		internal void NotifyItemsRemoved (IEnumerable<ProjectItem> objs)
+		{
+			ProjectExtension.OnItemsRemoved (objs);
+		}
+
+		protected virtual void OnItemsAdded (IEnumerable<ProjectItem> objs)
+		{
 			foreach (var it in objs) {
 				if (it.Project != null)
 					throw new InvalidOperationException (it.GetType ().Name + " already belongs to a project");
 				it.Project = this;
 			}
+		
+			NotifyModified ("Items");
+			if (ProjectItemAdded != null)
+				ProjectItemAdded (this, new ProjectItemEventArgs (objs.Select (pi => new ProjectItemEventInfo (this, pi))));
+		
 			NotifyFileAddedToProject (objs.OfType<ProjectFile> ());
 		}
 
-		protected internal override void OnItemsRemoved (IEnumerable<ProjectItem> objs)
+		protected virtual void OnItemsRemoved (IEnumerable<ProjectItem> objs)
 		{
-			base.OnItemsRemoved (objs);
 			foreach (var it in objs)
 				it.Project = null;
+		
+			NotifyModified ("Items");
+			if (ProjectItemRemoved != null)
+				ProjectItemRemoved (this, new ProjectItemEventArgs (objs.Select (pi => new ProjectItemEventInfo (this, pi))));
+		
 			NotifyFileRemovedFromProject (objs.OfType<ProjectFile> ());
 		}
 
@@ -2012,23 +2354,29 @@ namespace MonoDevelop.Projects
 
 		void ReadProject (ProgressMonitor monitor, MSBuildProject msproject)
 		{
+			if (File.Exists (msproject.FileName + ".user")) {
+				userProject = new MSBuildProject (msproject.EngineManager);
+				userProject.Load (msproject.FileName + ".user");
+			}
 			ProjectExtension.OnReadProjectHeader (monitor, msproject);
 			modifiedInMemory = false;
-			msbuildUpdatePending = false;
 			ProjectExtension.OnReadProject (monitor, msproject);
 			NeedsReload = false;
 		}
 
 		AsyncCriticalSection writeProjectLock = new AsyncCriticalSection ();
 
-		internal async Task WriteProjectAsync (ProgressMonitor monitor)
+		internal async Task<string> WriteProjectAsync (ProgressMonitor monitor)
 		{
 			using (await writeProjectLock.EnterAsync ().ConfigureAwait (false)) {
-				await Task.Run (() => {
+				return await Task.Run (() => {
 					WriteProject (monitor);
+					return sourceProject.SaveToString ();
 				}).ConfigureAwait (false);
 			}
 		}
+
+		ITimeTracker writeTimer;
 
 		void WriteProject (ProgressMonitor monitor)
 		{
@@ -2039,11 +2387,15 @@ namespace MonoDevelop.Projects
 			
 			saving = true;
 
+			writeTimer = Counters.WriteMSBuildProject.BeginTiming ();
+
 			try {
-				msbuildUpdatePending = false;
 				sourceProject.FileName = FileName;
 
+				writeTimer.Trace ("Writing project header");
 				OnWriteProjectHeader (monitor, sourceProject);
+
+				writeTimer.Trace ("Writing project content");
 				ProjectExtension.OnWriteProject (monitor, sourceProject);
 
 				var globalGroup = sourceProject.GetGlobalPropertyGroup ();
@@ -2058,10 +2410,14 @@ namespace MonoDevelop.Projects
 					InitMainGroupProperties (globalGroup);
 					foreach (ProjectConfiguration conf in Configurations)
 						InitConfiguration (conf);
+					foreach (var es in runConfigurations)
+						InitRunConfiguration ((ProjectRunConfiguration)es);
 				}
 
 				sourceProject.IsNewProject = false;
+				writeTimer.Trace ("Project written");
 			} finally {
+				writeTimer.End ();
 				saving = false;
 			}
 		}
@@ -2070,7 +2426,7 @@ namespace MonoDevelop.Projects
 
 		class ConfigData
 		{
-			public ConfigData (string conf, string plt, IMSBuildPropertySet grp)
+			public ConfigData (string conf, string plt, MSBuildPropertyGroup grp)
 			{
 				Config = conf;
 				Platform = plt;
@@ -2079,7 +2435,7 @@ namespace MonoDevelop.Projects
 
 			public string Config;
 			public string Platform;
-			public IMSBuildPropertySet Group;
+			public MSBuildPropertyGroup Group;
 			public bool Exists;
 			public bool IsNew; // The group did not exist in the original file
 		}
@@ -2098,18 +2454,20 @@ namespace MonoDevelop.Projects
 			productVersion = msproject.EvaluatedProperties.GetValue ("ProductVersion");
 			schemaVersion = msproject.EvaluatedProperties.GetValue ("SchemaVersion");
 
-			// Get the project ID
+			if (!IsReevaluating) {
+				// Get the project ID
 
-			string itemGuid = msproject.EvaluatedProperties.GetValue ("ProjectGuid");
-			if (itemGuid == null)
-				throw new UserException ("Project file doesn't have a valid ProjectGuid");
+				string itemGuid = msproject.EvaluatedProperties.GetValue ("ProjectGuid");
+				if (itemGuid == null)
+					itemGuid = defaultItemId ?? Guid.NewGuid ().ToString ("B").ToUpper ();
 
-			// Workaround for a VS issue. VS doesn't include the curly braces in the ProjectGuid
-			// of shared projects.
-			if (!itemGuid.StartsWith ("{", StringComparison.Ordinal))
-				itemGuid = "{" + itemGuid + "}";
+				// Workaround for a VS issue. VS doesn't include the curly braces in the ProjectGuid
+				// of shared projects.
+				if (!itemGuid.StartsWith ("{", StringComparison.Ordinal))
+					itemGuid = "{" + itemGuid + "}";
 
-			ItemId = itemGuid.ToUpper ();
+				ItemId = itemGuid.ToUpper ();
+			}
 
 			// Get the project GUIDs
 
@@ -2140,21 +2498,36 @@ namespace MonoDevelop.Projects
 			disableFastUpToDateCheck = msproject.EvaluatedProperties.GetValue ("DisableFastUpToDateCheck", false);
 
 			msproject.EvaluatedProperties.ReadObjectProperties (this, GetType (), true);
-
-			RemoveDuplicateItems (msproject);
 		}
 
 		protected virtual void OnReadProject (ProgressMonitor monitor, MSBuildProject msproject)
 		{
 			timer.Trace ("Read project items");
 			LoadProjectItems (msproject, ProjectItemFlags.None, usedMSBuildItems);
+			loadedProjectItems = new HashSet<ProjectItem> (Items);
 
 			timer.Trace ("Read configurations");
 
 			List<ConfigData> configData = GetConfigData (msproject, true);
 
+			var configs = new List<ProjectConfiguration> ();
 			foreach (var cgrp in configData)
-				LoadConfiguration (monitor, cgrp, cgrp.Config, cgrp.Platform);
+				configs.Add (LoadConfiguration (monitor, cgrp, cgrp.Config, cgrp.Platform));
+
+			Configurations.SetItems (configs);
+
+			timer.Trace ("Read run configurations");
+
+			List<ConfigData> runConfigData = new List<ConfigData> ();
+			GetRunConfigData (runConfigData, msproject, true);
+			GetRunConfigData (runConfigData, userProject, true);
+
+			var runConfigs = new List<ProjectRunConfiguration> ();
+			foreach (var cgrp in runConfigData)
+				runConfigs.Add (LoadRunConfiguration (monitor, cgrp, cgrp.Config));
+
+			defaultRunConfigurationCreated = false;
+			runConfigurations.SetItems (runConfigs);
 
 			// Read extended properties
 
@@ -2263,15 +2636,26 @@ namespace MonoDevelop.Projects
 			return config.IndexOf ('\'') == -1;
 		}
 
-		void LoadConfiguration (ProgressMonitor monitor, ConfigData cgrp, string conf, string platform)
+		ProjectConfiguration LoadConfiguration (ProgressMonitor monitor, ConfigData cgrp, string conf, string platform)
 		{
-			ProjectConfiguration config = (ProjectConfiguration) CreateConfiguration (conf + "|" + (platform  != "AnyCPU" ? platform : ""));
+			ProjectConfiguration config = null;
+			if (platform == "AnyCPU")
+				platform = "";
+			
+			string id = string.IsNullOrEmpty (platform) ? conf : conf + "|" + platform;
+
+			if (IsReevaluating)
+				config = Configurations.OfType<ProjectConfiguration> ().FirstOrDefault (c => c.Id == id);
+
+			if (config == null)
+				config = CreateConfiguration (id);
+			
 			if (cgrp.Group != null)
 				config.MainPropertyGroup = (MSBuildPropertyGroup) cgrp.Group;
 			config.MainPropertyGroup.ResetIsNewFlags ();
 			InitConfiguration (config);
 			projectExtension.OnReadConfiguration (monitor, config, config.Properties);
-			Configurations.Add (config);
+			return config;
 		}
 
 		MSBuildProjectInstance CreateProjectInstaceForConfiguration (string conf, string platform, bool onlyEvaluateProperties = true)
@@ -2304,64 +2688,137 @@ namespace MonoDevelop.Projects
 			return pi;
 		}
 
+		protected override SolutionItemConfiguration OnCreateConfiguration (string id, ConfigurationKind kind = ConfigurationKind.Blank)
+		{
+			return new ProjectConfiguration (id);
+		}
+
 		protected virtual void OnReadConfiguration (ProgressMonitor monitor, ProjectConfiguration config, IPropertySet grp)
 		{
 			config.Read (grp);
 		}
 
-		void RemoveDuplicateItems (MSBuildProject msproject)
+		void GetRunConfigData (List<ConfigData> configData, MSBuildProject msproject, bool includeEvaluated)
 		{
-/*			timer.Trace ("Checking for duplicate items");
-
-			var uniqueIncludes = new Dictionary<string,object> ();
-			var toRemove = new List<MSBuildItem> ();
-			foreach (MSBuildItem bi in msproject.GetAllItems ()) {
-				object existing;
-				string key = bi.Name + "<" + bi.Include;
-				if (!uniqueIncludes.TryGetValue (key, out existing)) {
-					uniqueIncludes[key] = bi;
-					continue;
-				}
-				var exBi = existing as MSBuildItem;
-				if (exBi != null) {
-					if (exBi.Condition != bi.Condition || exBi.Element.InnerXml != bi.Element.InnerXml) {
-						uniqueIncludes[key] = new List<MSBuildItem> { exBi, bi };
-					} else {
-						toRemove.Add (bi);
-					}
-					continue;
-				}
-
-				var exList = (List<MSBuildItem>)existing;
-				bool found = false;
-				foreach (var m in (exList)) {
-					if (m.Condition == bi.Condition && m.Element.InnerXml == bi.Element.InnerXml) {
-						found = true;
-						break;
-					}
-				}
-				if (!found) {
-					exList.Add (bi);
-				} else {
-					toRemove.Add (bi);
+			if (msproject == null)
+				return;
+			
+			foreach (MSBuildPropertyGroup cgrp in msproject.PropertyGroups) {
+				string configName;
+				if (ParseRunConfigurationCondition (cgrp.Condition, out configName)) {
+					// If a group for this configuration already was found, set the new group. If there are changes we want to modify the last group.
+					var existing = configData.FirstOrDefault (cd => cd.Config == configName);
+					if (existing == null)
+						configData.Add (new ConfigData (configName, null, cgrp));
+					else
+						existing.Group = cgrp;
 				}
 			}
-			if (toRemove.Count == 0)
-				return;
+			if (includeEvaluated) {
+				var configValues = msproject.ConditionedProperties.GetAllPropertyValues ("RunConfiguration");
 
-			timer.Trace ("Removing duplicate items");
+				foreach (var c in configValues) {
+					if (!configData.Any (cd => cd.Config == c))
+						configData.Add (new ConfigData (c, "", null));
+				}
+			}
+		}
 
-			foreach (var t in toRemove)
-				msproject.RemoveItem (t);*/
+		bool ParseRunConfigurationCondition (string cond, out string configName)
+		{
+			configName = null;
+			int i = cond.IndexOf ("==", StringComparison.Ordinal);
+			if (i == -1)
+				return false;
+			if (cond.Substring (0, i).Trim () == "'$(RunConfiguration)'")
+				return ExtractConfigName (cond.Substring (i + 2), out configName);
+			return false;
+		}
+
+		ProjectRunConfiguration LoadRunConfiguration (ProgressMonitor monitor, ConfigData cgrp, string configName)
+		{
+			ProjectRunConfiguration runConfig = null;
+
+			if (IsReevaluating)
+				runConfig = runConfigurations.FirstOrDefault (c => c.Id == configName);
+
+			if (runConfig == null)
+				runConfig = CreateUninitializedRunConfiguration (configName);
+			
+			if (cgrp.Group != null) {
+				runConfig.MainPropertyGroup = cgrp.Group;
+				runConfig.StoreInUserFile = cgrp.Group.ParentProject == userProject;
+			}
+			runConfig.MainPropertyGroup.ResetIsNewFlags ();
+			InitRunConfiguration (runConfig);
+			projectExtension.OnReadRunConfiguration (monitor, runConfig, runConfig.Properties);
+			return runConfig;
+		}
+
+		void InitRunConfiguration (ProjectRunConfiguration config)
+		{
+			var pi = CreateProjectInstaceForRunConfiguration (config.Name);
+			config.Properties = pi.GetPropertiesLinkedToGroup (config.MainPropertyGroup);
+			config.ProjectInstance = pi;
+		}
+
+		MSBuildProjectInstance CreateProjectInstaceForRunConfiguration (string name, bool onlyEvaluateProperties = true)
+		{
+			var pi = PrepareProjectInstaceForRunConfiguration (name, onlyEvaluateProperties);
+			pi.Evaluate ();
+			return pi;
+		}
+
+		async Task<MSBuildProjectInstance> CreateProjectInstaceForRunConfigurationAsync (string name, bool onlyEvaluateProperties = true)
+		{
+			var pi = PrepareProjectInstaceForRunConfiguration (name, onlyEvaluateProperties);
+			await pi.EvaluateAsync ();
+			return pi;
+		}
+
+		MSBuildProjectInstance PrepareProjectInstaceForRunConfiguration (string name, bool onlyEvaluateProperties)
+		{
+			var pi = sourceProject.CreateInstance ();
+			pi.SetGlobalProperty ("BuildingInsideVisualStudio", "true");
+			pi.SetGlobalProperty ("RunConfiguration", name);
+			pi.OnlyEvaluateProperties = onlyEvaluateProperties;
+			return pi;
+		}
+
+		protected virtual ProjectRunConfiguration OnCreateRunConfiguration (string name)
+		{
+			return new ProjectRunConfiguration (name);
+		}
+
+		protected virtual void OnReadRunConfiguration (ProgressMonitor monitor, ProjectRunConfiguration runConfig, IPropertySet grp)
+		{
+			runConfig.Read (grp);
+		}
+
+		internal void OnRunConfigurationsAdded (IEnumerable<SolutionItemRunConfiguration> items)
+		{
+			// Initialize the property group only if the project is not being loaded (in which case it will
+			// be initialized by the ReadProject method) or if the project is new (because it will be initialized
+			// after the project is fully written, since only then all imports are in place
+			if (!Loading && !sourceProject.IsNewProject) {
+				foreach (var s in items)
+					InitRunConfiguration ((ProjectRunConfiguration)s);
+			}
+		}
+
+		internal void OnRunConfigurationRemoved (IEnumerable<SolutionItemRunConfiguration> items)
+		{
+
 		}
 
 		internal void LoadProjectItems (MSBuildProject msproject, ProjectItemFlags flags, HashSet<MSBuildItem> loadedItems)
 		{
 			if (loadedItems != null)
 				loadedItems.Clear ();
-			
+
+			var localItems = new List<ProjectItem> ();
 			foreach (var buildItem in msproject.EvaluatedItemsIgnoringCondition) {
-				if (buildItem.IsImported)
+				if (buildItem.IsImported && !ProjectExtension.OnGetSupportsImportedItem (buildItem))
 					continue;
 				if (BuildAction.ReserverIdeActions.Contains (buildItem.Name))
 					continue;
@@ -2369,10 +2826,14 @@ namespace MonoDevelop.Projects
 				if (it == null)
 					continue;
 				it.Flags = flags;
-				Items.Add (it);
+				localItems.Add (it);
 				if (loadedItems != null)
 					loadedItems.Add (buildItem.SourceItem);
 			}
+			if (IsReevaluating)
+				Items.SetItems (localItems);
+			else
+				Items.AddRange (localItems);
 		}
 
 		protected override void OnSetFormat (MSBuildFileFormat format)
@@ -2394,6 +2855,16 @@ namespace MonoDevelop.Projects
 
 		internal ProjectItem ReadItem (IMSBuildItemEvaluated buildItem)
 		{
+			if (IsReevaluating) {
+				// If this item already exists in the current collection of items, reuse it
+				var eit = Items.FirstOrDefault (it => it.BackingItem != null && it.BackingEvalItem != null && it.BackingEvalItem.Name == buildItem.Name && it.BackingEvalItem.Include == buildItem.Include && ItemsAreEqual (buildItem, it.BackingEvalItem));
+				if (eit != null) {
+					eit.BackingItem = buildItem.SourceItem;
+					eit.BackingEvalItem = buildItem;
+					return eit;
+				}
+			}
+
 			var item = CreateProjectItem (buildItem);
 			item.Read (this, buildItem);
 			item.BackingItem = buildItem.SourceItem;
@@ -2446,6 +2917,20 @@ namespace MonoDevelop.Projects
 				}
 			}
 
+/*			if (runConfigurations.Count > 0) {
+				// Set the default configuration of the project.
+				// First of the properties that defines the default run configuration
+				var defaultConfProp = globalGroup.GetProperties ().FirstOrDefault (p => p.Name == "RunConfiguration" && IsDefaultSetter (p));
+
+				if (msproject.IsNewProject || (defaultConfProp != null)) {
+					// If there is no run configuration property, or if the configuration doesn't exist anymore, give it a new value
+					if (defaultConfProp == null || !runConfigurations.Any (c => c.Name == defaultConfProp.UnevaluatedValue)) {
+						var runConfig = runConfigurations.FirstOrDefault (c => c.Name == "Default") ?? runConfigurations [0];
+						globalGroup.SetValue ("RunConfiguration", runConfig.Name, condition: " '$(RunConfiguration)' == '' ");
+					}
+				}
+			}*/
+
 			if (TypeGuid == MSBuildProjectService.GenericItemGuid) {
 				DataType dt = MSBuildProjectService.DataContext.GetConfigurationDataType (GetType ());
 				globalGroup.SetValue ("ItemType", dt.Name);
@@ -2484,10 +2969,44 @@ namespace MonoDevelop.Projects
 		{
 			IMSBuildPropertySet globalGroup = msproject.GetGlobalPropertyGroup ();
 
-			// Configurations
+			writeTimer.Trace ("Writing configurations");
+			WriteConfigurations (monitor, msproject, globalGroup);
+			writeTimer.Trace ("Done writing configurations");
 
+			writeTimer.Trace ("Writing run configurations");
+			WriteRunConfigurations (monitor, msproject, globalGroup);
+			writeTimer.Trace ("Done writing run configurations");
+
+			writeTimer.Trace ("Saving project items");
+			SaveProjectItems (monitor, msproject, usedMSBuildItems);
+			writeTimer.Trace ("Done saving project items");
+
+			if (msproject.IsNewProject) {
+				foreach (var im in DefaultImports)
+					msproject.AddNewImport (im);
+			}
+
+			foreach (var im in importsAdded) {
+				if (msproject.GetImport (im.Name, im.Condition) == null)
+					msproject.AddNewImport (im.Name, im.Condition);
+			}
+			foreach (var im in importsRemoved) {
+				var i = msproject.GetImport (im.Name, im.Condition);
+				if (i != null)
+					msproject.RemoveImport (i);
+			}
+			importsAdded.Clear ();
+			importsRemoved.Clear ();
+
+			writeTimer.Trace ("Writing external properties");
+			msproject.WriteExternalProjectProperties (this, GetType (), true);
+			writeTimer.Trace ("Done writing external properties");
+		}
+
+		void WriteConfigurations (ProgressMonitor monitor, MSBuildProject msproject, IMSBuildPropertySet globalGroup)
+		{
 			if (Configurations.Count > 0) {
-				
+
 				List<ConfigData> configData = GetConfigData (msproject, false);
 
 				// Write configuration data, creating new property groups if necessary
@@ -2503,7 +3022,7 @@ namespace MonoDevelop.Projects
 						int i = Configurations.IndexOf (conf);
 						if (i != -1 && i + 1 < Configurations.Count)
 							nextConf = ((ProjectConfiguration)Configurations [i + 1]).MainPropertyGroup;
-						
+
 						msproject.AddPropertyGroup (pg, true, nextConf);
 						pg.Condition = BuildConfigCondition (conf.Name, conf.Platform);
 						cdata = new ConfigData (conf.Name, conf.Platform, pg);
@@ -2530,7 +3049,7 @@ namespace MonoDevelop.Projects
 					ConfigData cdata = FindPropertyGroup (configData, conf);
 					var propGroup = (MSBuildPropertyGroup)cdata.Group;
 
-					// Get properties wit the MergeToProject flag, and check that the value they have matches the
+					// Get properties with the MergeToProject flag, and check that the value they have matches the
 					// value all the other groups have so far. If one of the groups have a different value for
 					// the same property, then the property is discarded as mergeable to parent.
 					CollectMergetoprojectProperties (propGroup, mergeToProjectProperties, mergeToProjectPropertyValues);
@@ -2566,28 +3085,115 @@ namespace MonoDevelop.Projects
 
 				foreach (ProjectConfiguration config in Configurations)
 					config.MainPropertyGroup.ResetIsNewFlags ();
+
+
+				// For properties that have changed in the main group, set the
+				// dirty flag for the corresponding properties in the evaluated
+				// project instances. The evaluated values of those properties
+				// can't be used anymore to decide wether or not a property
+				// needs to be saved. The ideal solution would be to re-evaluate
+				// the instance and get the new evaluated values, but that
+				// would have a high impact in performance.
+
+				foreach (var p in globalGroup.GetProperties ()) {
+					if (p.Modified) {
+						foreach (ProjectConfiguration config in Configurations)
+							if (config.ProjectInstance != null)
+								config.ProjectInstance.SetPropertyValueStale (p.Name);
+					}
+				}
+			}
+		}
+
+		ProjectRunConfiguration defaultBlankRunConfiguration;
+
+		void WriteRunConfigurations (ProgressMonitor monitor, MSBuildProject msproject, IMSBuildPropertySet globalGroup)
+		{
+			List<ConfigData> configData = new List<ConfigData> ();
+			GetRunConfigData (configData, msproject, false);
+			GetRunConfigData (configData, userProject, false);
+
+			if (RunConfigurations.Count > 0) {
+
+				// Write configuration data, creating new property groups if necessary
+
+				// Create the default configuration just once, and reuse it for comparing in subsequent writes
+				if (defaultBlankRunConfiguration == null)
+					defaultBlankRunConfiguration = CreateRunConfigurationInternal ("Default");
+
+				foreach (ProjectRunConfiguration runConfig in RunConfigurations) {
+
+					MSBuildPropertyGroup pg = runConfig.MainPropertyGroup;
+					ConfigData cdata = configData.FirstOrDefault (cd => cd.Group == pg);
+					var targetProject = runConfig.StoreInUserFile ? userProject : msproject;
+
+					if (runConfig.IsDefaultConfiguration && runConfig.Equals (defaultBlankRunConfiguration)) {
+						// If the default configuration has the default values, then there is no need to save it.
+						// If this configuration was added after loading the project, we are not adding it to the msproject and we are done.
+						// If this configuration was loaded from the project and later modified to the default values, we dont set cdata.Exists=true,
+						// so it will be removed from the msproject below.
+						continue;
+					}
+
+					// Create the user project file if it doesn't yet exist
+					if (targetProject == null)
+						targetProject = userProject = CreateUserProject (msproject);
+
+					if (cdata == null) {
+						// Try to keep the groups in the same order as the config list
+						MSBuildObject nextConfig = null;
+						int i = runConfigurations.IndexOf (runConfig);
+						if (i != -1 && i + 1 < runConfigurations.Count)
+							nextConfig = runConfigurations.Skip (i).Cast<ProjectRunConfiguration> ().FirstOrDefault (s => s.MainPropertyGroup.ParentProject == targetProject)?.MainPropertyGroup;
+						targetProject.AddPropertyGroup (pg, true, nextConfig);
+						pg.Condition = BuildRunConfigurationCondition (runConfig.Name);
+						cdata = new ConfigData (runConfig.Name, null, pg);
+						cdata.IsNew = true;
+						configData.Add (cdata);
+					} else {
+						// The configuration name may have changed
+						if (cdata.Config != runConfig.Name) {
+							((MSBuildPropertyGroup)cdata.Group).Condition = BuildRunConfigurationCondition (runConfig.Name);
+							cdata.Config = runConfig.Name;
+						}
+						var groupInUserProject = cdata.Group.ParentProject == userProject;
+						if (groupInUserProject != runConfig.StoreInUserFile) {
+							cdata.Group.ParentProject.Remove (cdata.Group);
+							targetProject.AddPropertyGroup (cdata.Group);
+						}
+					}
+
+					cdata.Exists = true;
+					ProjectExtension.OnWriteRunConfiguration (monitor, runConfig, runConfig.Properties);
+					runConfig.MainPropertyGroup.PurgeDefaultProperties ();
+				}
 			}
 
-			SaveProjectItems (monitor, msproject, usedMSBuildItems);
-
-			if (msproject.IsNewProject) {
-				foreach (var im in DefaultImports)
-					msproject.AddNewImport (im);
+			// Remove groups corresponding to configurations that have been removed
+			foreach (ConfigData cd in configData) {
+				if (!cd.Exists)
+					cd.Group.ParentProject.Remove (cd.Group);
 			}
 
-			foreach (var im in importsAdded) {
-				if (msproject.GetImport (im.Name, im.Condition) == null)
-					msproject.AddNewImport (im.Name, im.Condition);
-			}
-			foreach (var im in importsRemoved) {
-				var i = msproject.GetImport (im.Name, im.Condition);
-				if (i != null)
-					msproject.RemoveImport (i);
-			}
-			msproject.WriteExternalProjectProperties (this, GetType (), true);
+			foreach (ProjectRunConfiguration runConfig in runConfigurations)
+				runConfig.MainPropertyGroup.ResetIsNewFlags ();
+		}
+
+		MSBuildProject CreateUserProject (MSBuildProject msproject)
+		{
+			var p = new MSBuildProject (msproject.EngineManager);
+			// Remove the main property group
+			p.Remove (p.PropertyGroups.First ());
+			p.FileName = msproject.FileName + ".user";
+			return p;
 		}
 
 		protected virtual void OnWriteConfiguration (ProgressMonitor monitor, ProjectConfiguration config, IPropertySet pset)
+		{
+			config.Write (pset);
+		}
+
+		protected virtual void OnWriteRunConfiguration (ProgressMonitor monitor, ProjectRunConfiguration config, IPropertySet pset)
 		{
 			config.Write (pset);
 		}
@@ -2653,9 +3259,24 @@ namespace MonoDevelop.Projects
 		{
 			public ProjectItem ProjectItem;
 			public MSBuildItem MSBuildItem;
+			public ExpandedItemAction Action;
 		}
 
+		enum ExpandedItemAction
+		{
+			None,
+			Exclude,
+			AddUpdateItem
+		}
+
+		/// <summary>
+		/// When set to true, the project will make use of improved globbing logic to avoid expanding glob in multiple items when
+		/// there are changes. Requires the latest version of msbuild to work.
+		/// </summary>
+		public bool UseAdvancedGlobSupport { get; set; }
+
 		HashSet<MSBuildItem> usedMSBuildItems = new HashSet<MSBuildItem> ();
+		HashSet<ProjectItem> loadedProjectItems = new HashSet<ProjectItem> ();
 
 		internal virtual void SaveProjectItems (ProgressMonitor monitor, MSBuildProject msproject, HashSet<MSBuildItem> loadedItems, string pathPrefix = null)
 		{
@@ -2670,12 +3291,39 @@ namespace MonoDevelop.Projects
 			// Process items generated from wildcards
 
 			foreach (var itemInfo in expandedItems) {
-				if (itemInfo.Value.Modified || msproject.EvaluatedItemsIgnoringCondition.Where (i => i.SourceItem == itemInfo.Key).Count () != itemInfo.Value.Count) {
-					// Expand the list
-					unusedItems.Add (itemInfo.Key);
-					foreach (var it in itemInfo.Value) {
-						it.ProjectItem.BackingItem = it.MSBuildItem;
-						msproject.AddItem (it.MSBuildItem);
+				var expandedList = itemInfo.Value;
+				var globItem = itemInfo.Key;
+				if (expandedList.Modified || loadedProjectItems.Where (i => i.WildcardItem == globItem).Count () != expandedList.Count) {
+					if (UseAdvancedGlobSupport) {
+						// Add remove items if necessary
+						foreach (var removed in loadedProjectItems.Where (i => i.WildcardItem == globItem && !expandedList.Any (newItem => newItem.ProjectItem.Include == i.Include))) {
+							var file = removed as ProjectFile;
+							if (file == null || File.Exists (file.FilePath)) {
+								var removeItem = new MSBuildItem (removed.ItemName) { Remove = removed.Include };
+								msproject.AddItem (removeItem);
+							}
+							unusedItems.UnionWith (FindUpdateItemsForItem (globItem, removed.Include));
+						}
+
+						// Exclude modified items
+						foreach (var it in expandedList) {
+							if (it.Action == ExpandedItemAction.Exclude) {
+								globItem.AddExclude (it.ProjectItem.Include);
+								it.ProjectItem.BackingItem = it.MSBuildItem;
+								it.ProjectItem.BackingEvalItem = CreateFakeEvaluatedItem (msproject, it.MSBuildItem, it.MSBuildItem.Include, null);
+								msproject.AddItem (it.MSBuildItem);
+							} else if (it.Action == ExpandedItemAction.AddUpdateItem) {
+								msproject.AddItem (it.MSBuildItem);
+							}
+						}
+					} else {
+						// Expand the list
+						unusedItems.Add (globItem);
+						foreach (var it in expandedList) {
+							it.ProjectItem.BackingItem = it.MSBuildItem;
+							it.ProjectItem.BackingEvalItem = CreateFakeEvaluatedItem (msproject, it.MSBuildItem, it.MSBuildItem.Include, null);
+							msproject.AddItem (it.MSBuildItem);
+						}
 					}
 				}
 			}
@@ -2683,53 +3331,231 @@ namespace MonoDevelop.Projects
 			// Remove unused items
 
 			foreach (var it in unusedItems) {
-				if (it.ParentGroup != null) // It may already have been deleted
-					msproject.RemoveItem (it);
+				if (it.ParentGroup != null) { // It may already have been deleted
+					// Remove wildcard item if it is not imported.
+					if (!it.IsWildcardItem || it.ParentProject == msproject) {
+						msproject.RemoveItem (it);
+
+						if (!UseAdvancedGlobSupport)
+							continue;
+
+						var file = loadedProjectItems.FirstOrDefault (i => {
+							return i.ItemName == it.Name && (i.Include == it.Include || i.Include == it.Update);
+						}) as ProjectFile;
+						if (file != null && !file.IsLink) {
+							if (File.Exists (file.FilePath)) {
+								AddRemoveItemIfMissing (msproject, file);
+							} else if (!string.IsNullOrEmpty (it.Include)) {
+								// Remove any "Remove" items that match if the file has been deleted.
+								var toRemove = msproject.GetAllItems ().Where (i => i.Remove == it.Include).ToList ();
+								foreach (var item in toRemove) {
+									msproject.RemoveItem (item);
+								}
+							}
+						}
+					} else if (it.IsWildcardItem && UseAdvancedGlobSupport) {
+						// Add "Remove" items if the file is not deleted.
+						foreach (var file in loadedProjectItems.Where (i => i.WildcardItem == it).OfType<ProjectFile> ()) {
+							if (File.Exists (file.FilePath)) {
+								AddRemoveItemIfMissing (msproject, file);
+							}
+							// Ensure "Update" items are removed from the project. If there are no
+							// files left in the project for the glob then the "Update" item will
+							// not have been removed.
+							RemoveUpdateItemsForFile (msproject, it, file);
+						}
+					}
+				}
 				loadedItems.Remove (it);
 			}
+			loadedProjectItems = new HashSet<ProjectItem> (Items);
 		}
 
 		void SaveProjectItem (ProgressMonitor monitor, MSBuildProject msproject, ProjectItem item, Dictionary<MSBuildItem,ExpandedItemList> expandedItems, HashSet<MSBuildItem> unusedItems, HashSet<MSBuildItem> loadedItems, string pathPrefix = null)
 		{
-			if (item.IsFromWildcardItem) {
+			if (item.IsFromWildcardItem && item.ItemName == item.WildcardItem.Name) {
+				var globItem = item.WildcardItem;
 				// Store the item in the list of expanded items
 				ExpandedItemList items;
-				if (!expandedItems.TryGetValue (item.BackingItem, out items))
-					items = expandedItems [item.BackingItem] = new ExpandedItemList ();
+				if (!expandedItems.TryGetValue (globItem, out items))
+					items = expandedItems [globItem] = new ExpandedItemList ();
 
 				// We need to check if the item has changed, in which case all the items included by the wildcard
 				// must be individually included
 				var bitem = msproject.CreateItem (item.ItemName, GetPrefixedInclude (pathPrefix, item.Include));
 				item.Write (this, bitem);
-				items.Add (new ExpandedItemInfo {
+
+				var einfo = new ExpandedItemInfo {
 					ProjectItem = item,
 					MSBuildItem = bitem
-				});
+				};
+				items.Add (einfo);
 
-				unusedItems.Remove (item.BackingItem);
+				foreach (var it in item.BackingEvalItem.SourceItems)
+					unusedItems.Remove (it);
 
-				if (!items.Modified && (item.Metadata.PropertyCountHasChanged || !ItemsAreEqual (bitem, item.BackingEvalItem)))
+				if (UseAdvancedGlobSupport) {
+					einfo.Action = GenerateItemDiff (globItem, bitem, item.BackingEvalItem);
+					if (einfo.Action != ExpandedItemAction.None)
+						items.Modified = true;
+				} else if (!items.Modified && (item.Metadata.PropertyCountHasChanged || !ItemsAreEqual (bitem, item.BackingEvalItem))) {
 					items.Modified = true;
+				}
 				return;
 			}
 
 			var include = GetPrefixedInclude (pathPrefix, item.UnevaluatedInclude ?? item.Include);
 
-			MSBuildItem buildItem;
-			if (item.BackingItem != null && item.BackingItem.Name == item.ItemName) {
+			MSBuildItem buildItem = null;
+			IEnumerable<MSBuildItem> sourceItems = null;
+			MSBuildEvaluationContext context = null;
+
+			if (item.BackingItem?.ParentObject != null && item.BackingItem.Name == item.ItemName) {
 				buildItem = item.BackingItem;
+				sourceItems = item.BackingEvalItem.SourceItems;
 			} else {
-				buildItem = msproject.AddNewItem (item.ItemName, include);
+				if (UseAdvancedGlobSupport) {
+					// It is a new item. Before adding it, check if there is a Remove for the item. If there is, it is likely the file was excluded from a glob.
+					var toRemove = msproject.GetAllItems ().Where (it => it.Name == item.ItemName && it.Remove == include).ToList ();
+					if (toRemove.Count > 0) {
+						// Remove the "Remove" items
+						foreach (var it in toRemove)
+							msproject.RemoveItem (it);
+					}
+					// Check if the file is included in a glob.
+					var matchingGlobItems = msproject.FindGlobItemsIncludingFile (item.Include).ToList ();
+					var globItem = matchingGlobItems.FirstOrDefault (gi => gi.Name == item.ItemName);
+
+					if (globItem != null) {
+						var updateGlobItems = msproject.FindUpdateGlobItemsIncludingFile (item.Include, globItem).ToList ();
+						// Globbing magic can only be done if there is no metadata (for now)
+						if (globItem.Metadata.GetProperties ().Count () == 0 && !updateGlobItems.Any ()) {
+							var it = new MSBuildItem (item.ItemName);
+							item.Write (this, it);
+							if (it.Metadata.GetProperties ().Count () == 0)
+								buildItem = globItem;
+
+							// Add an expanded item so a Remove item does not
+							// get added back again.
+							ExpandedItemList items;
+							if (!expandedItems.TryGetValue (globItem, out items))
+								items = expandedItems [globItem] = new ExpandedItemList ();
+
+							var einfo = new ExpandedItemInfo {
+								ProjectItem = item,
+								MSBuildItem = it
+							};
+							items.Add (einfo);
+
+							if (buildItem == null && item.BackingItem != null && globItem.Name != item.BackingItem.Name) {
+								it.Update = item.Include;
+								sourceItems = new [] { globItem };
+								item.BackingItem = globItem;
+								item.BackingEvalItem = CreateFakeEvaluatedItem (msproject, it, globItem.Include, sourceItems);
+								einfo.Action = ExpandedItemAction.AddUpdateItem;
+								items.Modified = true;
+								return;
+							} else if (buildItem == null) {
+								buildItem = new MSBuildItem (item.ItemName) { Update = item.Include };
+								msproject.AddItem (buildItem);
+							}
+						} else if (updateGlobItems.Any ()) {
+							// Multiple update items not supported yet.
+							buildItem = updateGlobItems [0];
+							sourceItems = new [] { globItem, buildItem };
+							context = CreateEvaluationContext (item);
+						} else {
+							buildItem = globItem;
+						}
+					} else if (item.IsFromWildcardItem && item.ItemName != item.WildcardItem.Name) {
+						include = item.Include;
+						var removeItem = new MSBuildItem (item.WildcardItem.Name) { Remove = include };
+						msproject.AddItem (removeItem);
+					}
+
+					// Add remove item if file is included in a glob with a different MSBuild item type.
+					// But do not add the remove item if the item is already removed with another glob.
+					var removeGlobItem = matchingGlobItems.FirstOrDefault (gi => gi.Name != item.ItemName);
+					var alreadyRemovedGlobItem = matchingGlobItems.FirstOrDefault (gi => gi.Name == item.ItemName);
+					if (removeGlobItem != null && alreadyRemovedGlobItem == null) {
+						// Do not add the remove item if one already exists or if the Items contains
+						// an include for the item.
+						if (!msproject.GetAllItems ().Any (it => it.Name == removeGlobItem.Name && it.Remove == item.Include) &&
+							!Items.Any (it => it.ItemName == removeGlobItem.Name && it.Include == item.Include)) {
+							var removeItem = new MSBuildItem (removeGlobItem.Name) { Remove = item.Include };
+							msproject.AddItem (removeItem);
+						}
+					}
+				}
+				if (buildItem == null)
+					buildItem = msproject.AddNewItem (item.ItemName, include);
 				item.BackingItem = buildItem;
-				item.BackingEvalItem = null;
+				item.BackingEvalItem = CreateFakeEvaluatedItem (msproject, buildItem, include, sourceItems, context);
 			}
 
 			loadedItems.Add (buildItem);
 			unusedItems.Remove (buildItem);
 
-			item.Write (this, buildItem);
-			if (buildItem.Include != include)
-				buildItem.Include = include;
+			if (!buildItem.IsWildcardItem) {
+				if (buildItem.IsUpdate) {
+					var propertiesAlreadySet = new HashSet<string> (buildItem.Metadata.GetProperties ().Select (p => p.Name));
+					item.Write (this, buildItem);
+					PurgeUpdatePropertiesSetInSourceItems (buildItem, item.BackingEvalItem.SourceItems, propertiesAlreadySet);
+				} else {
+					item.Write (this, buildItem);
+					if (buildItem.Include != include)
+						buildItem.Include = include;
+				}
+			}
+		}
+
+		static void AddRemoveItemIfMissing (MSBuildProject msproject, ProjectFile file)
+		{
+			if (!msproject.GetAllItems ().Where (i => i.Remove == file.Include).Any ()) {
+				var removeItem = new MSBuildItem (file.ItemName) { Remove = file.Include };
+				msproject.AddItem (removeItem);
+			}
+		}
+
+		void RemoveUpdateItemsForFile (MSBuildProject msproject, MSBuildItem globItem, ProjectFile file)
+		{
+			foreach (var updateItem in FindUpdateItemsForItem (globItem, file.Include).ToList ()) {
+				if (updateItem.ParentGroup != null) {
+					msproject.RemoveItem (updateItem);
+				}
+			}
+		}
+
+		void PurgeUpdatePropertiesSetInSourceItems (MSBuildItem buildItem, IEnumerable<MSBuildItem> sourceItems, HashSet<string> propertiesAlreadySet)
+		{
+			// When the project item is saved to an Update item, it will write values that were set by the Include item and other Update items defined before this Update item.
+			// We need to go back to those  items and check if any of the values they set is the same that has
+			// been written. In that case, the property doesn't need to be set again in the Update item, and can be removed.
+			// We ignore properties that were already set in the original file. We always set those.
+			var itemsToCheck = sourceItems.ToList ();
+			List<string> propsToRemove = null;
+
+			foreach (var p in buildItem.Metadata.GetProperties ().Where (pr => !propertiesAlreadySet.Contains (pr.Name))) {
+				// The last item of the sourceItems list is supposed to be buildItem, so we need to skip it.
+				// Also traverse in reverse order, so we check the last property value set.
+				for (int n = itemsToCheck.Count - 2; n >= 0; n++) {
+					var it = itemsToCheck [n];
+					var prop = it.Metadata.GetProperty (p.Name);
+					if (prop != null) {
+						if (p.ValueType.Equals (p.Value, prop.Value)) {
+							// This item defines the same metadata, so that metadata doesn't need to be set in the Update item
+							if (propsToRemove == null)
+								propsToRemove = new List<string> ();
+							propsToRemove.Add (p.Name);
+						}
+						break;
+					}
+				}
+			}
+			if (propsToRemove != null) {
+				foreach (var name in propsToRemove)
+					buildItem.Metadata.RemoveProperty (name);
+			}
 		}
 
 		bool ItemsAreEqual (MSBuildItem item, IMSBuildItemEvaluated evalItem)
@@ -2745,9 +3571,189 @@ namespace MonoDevelop.Projects
 					return false;
 				n++;
 			}
-			if (evalItem.SourceItem.Metadata.GetProperties ().Count () != n)
+			if (evalItem.Metadata.GetProperties ().Count () != n)
 				return false;
 			return true;
+		}
+
+		ExpandedItemAction GenerateItemDiff (MSBuildItem globItem, MSBuildItem item, IMSBuildItemEvaluated evalItem)
+		{
+			// This method compares the evaluated item that was used to load a project item with the msbuild
+			// item that has now been saved. If there are changes, it saves the changes in an item with Update
+			// attribute.
+
+			MSBuildItem updateItem = null;
+			HashSet<MSBuildItem> itemsToDelete = null;
+			List <MSBuildItem> updateItems = null;
+			List<MSBuildProperty> unchangedProperties = null;
+			bool generateNewUpdateItem = false;
+
+			foreach (var p in item.Metadata.GetProperties ()) {
+				var p2 = evalItem.Metadata.GetProperty (p.Name);
+				if (p2 == null || !p.ValueType.Equals (p.Value, p2.UnevaluatedValue)) {
+					if (generateNewUpdateItem)
+						continue;
+					if (updateItem == null) {
+						updateItems = FindUpdateItemsForItem (globItem, item.Include).ToList ();
+						updateItem = updateItems.LastOrDefault ();
+						if (updateItem == null) {
+							// There is no existing update item. A new one will be generated.
+							generateNewUpdateItem = true;
+							continue;
+						}
+					}
+
+					var globProp = globItem.Metadata.GetProperty (p.Name);
+					if (globProp != null && p.ValueType.Equals (globProp.Value, p.Value)) {
+						// The custom value of the item is defined in the glob item that creates it,
+						// so we are actually reverting a custom metadata value. The update item
+						// can probably be removed.
+						foreach (var upi in updateItems) {
+							upi.Metadata.RemoveProperty (p.Name);
+							if (!upi.Metadata.GetProperties ().Any ()) {
+								if (itemsToDelete == null)
+									itemsToDelete = new HashSet<MSBuildItem> ();
+								itemsToDelete.Add (upi);
+							}
+						}
+						continue;
+					}
+
+					updateItem.Metadata.SetValue (p.Name, p.Value);
+					if (itemsToDelete != null)
+						itemsToDelete.Remove (updateItem);
+				} else {
+					if (unchangedProperties == null)
+						unchangedProperties = new List<MSBuildProperty> ();
+					unchangedProperties.Add (p);
+				}
+			}
+
+			if (generateNewUpdateItem) {
+				// Convert the item into an update item
+				item.Update = item.Include;
+				item.Include = "";
+				if (unchangedProperties != null) {
+					// Remove properties that have not changed, so they don't have to
+					// be included in the update item.
+					foreach (var p in unchangedProperties)
+						item.Metadata.RemoveProperty (p.Name);
+				}
+				return ExpandedItemAction.AddUpdateItem;
+			}
+
+			if (itemsToDelete != null) {
+				foreach (var it in itemsToDelete)
+					it.ParentProject.RemoveItem (it);
+			}
+			
+			foreach (var p in evalItem.Metadata.GetProperties ()) {
+				var p2 = item.Metadata.GetProperty (p.Name);
+				if (p2 == null) {
+					// The evaluated item has a property that the msbuild item doesn't have. If that metadata is
+					// set by the glob item, the only option is to exclude it from the glob. If the metadata was set by
+					// an update item, we have to remove that metadata definition
+
+					if (updateItems == null)
+						updateItems = FindUpdateItemsForItem (globItem, item.Include).ToList ();
+					foreach (var it in updateItems.Where (i => i.ParentNode != null)) {
+						if (it.Metadata.RemoveProperty (p.Name) && !it.Metadata.GetProperties ().Any ())
+							it.ParentProject.RemoveItem (it);
+					}
+					// If this metadata is defined in the glob item, the only option is to exclude the item from the glob.
+					if (globItem.Metadata.HasProperty (p.Name)) {
+						// Get rid of all update items, not needed anymore since a full new item will be added
+						foreach (var it in updateItems) {
+							if (it.ParentNode != null)
+								it.ParentGroup.RemoveItem (it);
+						}
+						return ExpandedItemAction.Exclude;
+					}
+				}
+			}
+
+			if (!evalItem.Metadata.GetProperties ().Any () && !item.Metadata.GetProperties ().Any ()) {
+				updateItems = FindUpdateItemsForItem (globItem, item.Include).ToList ();
+				foreach (var it in updateItems) {
+					if (it.ParentNode != null)
+						it.ParentProject.RemoveItem (it);
+				}
+			}
+			return ExpandedItemAction.None;
+		}
+
+		IEnumerable<MSBuildItem> FindUpdateItemsForItem (MSBuildItem globItem, string include)
+		{
+			bool globItemFound = false;
+			foreach (var it in globItem.ParentProject.GetAllItems ()) {
+				if (!globItemFound)
+					globItemFound = (it == globItem);
+				else {
+					if (it.Update == include)
+						yield return it;
+				}
+			}
+
+			if (globItemFound && globItem.ParentProject != MSBuildProject) {
+				foreach (var it in MSBuildProject.GetAllItems ()) {
+					if (it.Update == include)
+						yield return it;
+				}
+			}
+		}
+
+		bool ItemsAreEqual (IMSBuildItemEvaluated item1, IMSBuildItemEvaluated item2)
+		{
+			// Compare only metadata, since item name and include can't change
+
+			if (item1.SourceItem == null || item2.SourceItem == null || item1.Metadata.GetProperties ().Count () != item2.Metadata.GetProperties ().Count ())
+				return false;
+
+			foreach (var p1 in item1.Metadata.GetProperties ()) {
+				var p2 = item2.Metadata.GetProperty (p1.Name);
+				if (p2 == null || p2 == null)
+					return false;
+				if (p1.Value != p2.Value)
+					return false;
+			}
+			return true;
+		}
+
+		MSBuildEvaluationContext CreateEvaluationContext (ProjectItem item)
+		{
+			if (item is ProjectFile file) {
+				var context = new MSBuildEvaluationContext ();
+				context.SetItemContext (item.Include, file.FilePath, null);
+				return context;
+			}
+
+			return null;
+		}
+
+		IMSBuildItemEvaluated CreateFakeEvaluatedItem (MSBuildProject msproject, MSBuildItem item, string include, IEnumerable<MSBuildItem> sourceItems, MSBuildEvaluationContext context = null)
+		{
+			// Create the item
+			var eit = new MSBuildItemEvaluated (msproject, item.Name, item.Include, include);
+
+			// Copy the metadata
+			var md = new Dictionary<string, IMSBuildPropertyEvaluated> ();
+			var col = (MSBuildPropertyGroupEvaluated)eit.Metadata;
+			foreach (var p in item.Metadata.GetProperties ()) {
+				// Use evaluated value for value and unevaluated value. Otherwise
+				// an Update item will be generated for a '%(FileName)' property
+				// when GenerateItemDiff is called since it compares the value with
+				// the unevaluated value. If the project file is loaded from disk
+				// the unevaluated value would be the evaluated filename.
+				string evaluatedValue = context?.EvaluateString (p.Value) ?? p.Value;
+				md [p.Name] = new MSBuildPropertyEvaluated (msproject, p.Name, evaluatedValue, evaluatedValue);
+			}
+			((MSBuildPropertyGroupEvaluated)eit.Metadata).SetProperties (md);
+			if (sourceItems != null) {
+				foreach (var s in sourceItems)
+					eit.AddSourceItem (s);
+			} else
+				eit.AddSourceItem (item);
+			return eit;
 		}
 
 		string GetPrefixedInclude (string pathPrefix, string include)
@@ -2767,11 +3773,25 @@ namespace MonoDevelop.Projects
 			return null;
 		}
 
+		ConfigData FindPropertyGroup (List<ConfigData> configData, ProjectRunConfiguration config)
+		{
+			foreach (ConfigData data in configData) {
+				if (data.Config == config.Name)
+					return data;
+			}
+			return null;
+		}
+
 		string BuildConfigCondition (string config, string platform)
 		{
 			if (platform.Length == 0)
 				platform = "AnyCPU";
 			return " '$(Configuration)|$(Platform)' == '" + config + "|" + platform + "' ";
+		}
+
+		string BuildRunConfigurationCondition (string name)
+		{
+			return " '$(RunConfiguration)' == '" + name + "' ";
 		}
 
 		bool IsMergeToProjectProperty (ItemProperty prop)
@@ -2781,6 +3801,97 @@ namespace MonoDevelop.Projects
 					return true;
 			}
 			return false;
+		}
+
+		/// <summary>
+		/// Reevaluates the MSBuild project
+		/// </summary>
+		/// <remarks>
+		/// Reevaluates the underlying msbuild project and updates the project information acording to the new items and properties.
+		/// </remarks>
+		public Task ReevaluateProject (ProgressMonitor monitor)
+		{
+			return BindTask (ct => Runtime.RunInMainThread (async () => {
+				using (await writeProjectLock.EnterAsync ()) {
+					var oldCapabilities = new HashSet<string> (projectCapabilities);
+					bool oldSupportsExecute = SupportsExecute ();
+
+					try {
+						IsReevaluating = true;
+
+						// Reevaluate the msbuild project
+						await sourceProject.EvaluateAsync ();
+
+						// Loads minimal data required to instantiate extensions and prepare for project loading
+						InitBeforeProjectExtensionLoad ();
+
+						// Activate / deactivate extensions based on the new status
+						RefreshExtensions ();
+
+						await ProjectExtension.OnReevaluateProject (monitor);
+
+					} finally {
+						IsReevaluating = false;
+					}
+
+					ResetCachedCompileItems ();
+
+					if (!oldCapabilities.SetEquals (projectCapabilities))
+						NotifyProjectCapabilitiesChanged ();
+
+					NotifyExecutionTargetsChanged (); // Maybe...
+
+					if (oldSupportsExecute != SupportsExecute ()) {
+						OnSupportsExecuteChanged (!oldSupportsExecute);
+					}
+				}
+			}));
+		}
+
+		/// <summary>
+		/// If the project's SupportsExecute has changed then check if the solution's startup
+		/// configuration needs to be refreshed. If the solution has no startup item and
+		/// the project can now be executed then refresh the startup configuration since a
+		/// startup item can now be set for the solution. If the solution's startup item is
+		/// this project and can no longer be executed then refresh the startup configuration
+		/// so another startup item can be selected.
+		/// </summary>
+		void OnSupportsExecuteChanged (bool supportsExecute)
+		{
+			if (ParentSolution == null)
+				return;
+
+			if ((!supportsExecute && ParentSolution.StartupItem == this) ||
+				(supportsExecute && ParentSolution.StartupConfiguration == null)) {
+				ParentSolution.RefreshStartupConfiguration ();
+			}
+		}
+
+		protected virtual async Task OnReevaluateProject (ProgressMonitor monitor)
+		{
+			await LoadAsync (monitor);
+		}
+
+		public bool IsReevaluating { get; private set; }
+
+		/// <summary>
+		/// Checks if a file is included in any project item glob, and in this case it adds the require project files.
+		/// </summary>
+		/// <returns><c>true</c>, if any item was added, <c>false</c> otherwise.</returns>
+		/// <param name="file">File path</param>
+		/// <remarks>This method is useful to add items for a file that has been created in the project directory,
+		/// when the file is included in a glob defined by a project item.
+		/// Project items that define custom metadata will be ignored.</remarks>
+		public IEnumerable<ProjectItem> AddItemsForFileIncludedInGlob (FilePath file)
+		{
+			var include = MSBuildProjectService.ToMSBuildPath (ItemDirectory, file);
+			foreach (var it in sourceProject.FindGlobItemsIncludingFile (include).Where (it => it.Metadata.GetProperties ().Count () == 0)) {
+				var eit = CreateFakeEvaluatedItem (sourceProject, it, include, null);
+				var pi = CreateProjectItem (eit);
+				pi.Read (this, eit);
+				Items.Add (pi);
+				yield return pi;
+			}
 		}
 
 		public void AddImportIfMissing (string name, string condition)
@@ -2805,11 +3916,149 @@ namespace MonoDevelop.Projects
 			get { return importsRemoved; }
 		}
 
-		void ImportsSaved ()
-		{
-			importsAdded.Clear ();
-			importsRemoved.Clear ();
+		bool useFileWatcher;
+
+		/// <summary>
+		/// When set to true with UseAdvancedGlobSupport also true then changes made to files inside the project externally
+		/// will be monitored and used to update the project.
+		/// </summary>
+		public bool UseFileWatcher {
+			get { return useFileWatcher; }
+			set {
+				if (useFileWatcher != value) {
+					useFileWatcher = value;
+
+					// File watcher will be created in OnEndLoad.
+					if (Loading) {
+						if (!useFileWatcher) {
+							DisposeFileWatcher ();
+						}
+					} else {
+						OnUseFileWatcherChanged ();
+					}
+				}
+			}
 		}
+
+		void OnUseFileWatcherChanged ()
+		{
+			if (useFileWatcher && UseAdvancedGlobSupport) {
+				CreateFileWatcher ();
+			} else {
+				DisposeFileWatcher ();
+			}
+		}
+
+		void InitializeFileWatcher ()
+		{
+			if (useFileWatcher) {
+				OnUseFileWatcherChanged ();
+			}
+		}
+
+		FSW.FileSystemWatcher watcher;
+
+		void CreateFileWatcher ()
+		{
+			DisposeFileWatcher ();
+
+			if (!Directory.Exists (BaseDirectory))
+				return;
+
+			watcher = new FSW.FileSystemWatcher (BaseDirectory);
+			watcher.IncludeSubdirectories = true;
+			watcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName;
+			watcher.Created += OnFileCreated;
+			watcher.Deleted += OnFileDeleted;
+			watcher.Renamed += OnFileRenamed;
+			watcher.Error += OnFileWatcherError;
+			watcher.EnableRaisingEvents = true;
+		}
+
+		void DisposeFileWatcher ()
+		{
+			if (watcher != null) {
+				watcher.Dispose ();
+				watcher = null;
+			}
+		}
+
+		void OnFileWatcherError (object sender, ErrorEventArgs e)
+		{
+			LoggingService.LogError ("FileWatcher error", e.GetException ());
+		}
+
+		void OnFileRenamed (object sender, RenamedEventArgs e)
+		{
+			Runtime.RunInMainThread (() => {
+				if (Directory.Exists (e.FullPath)) {
+					OnDirectoryRenamedExternally (e.OldFullPath, e.FullPath);
+				} else {
+					OnFileCreatedExternally (e.FullPath);
+					OnFileDeletedExternally (e.OldFullPath);
+				}
+			});
+		}
+
+		void OnFileCreated (object sender, FileSystemEventArgs e)
+		{
+			if (Directory.Exists (e.FullPath))
+				return;
+
+			FilePath filePath = e.FullPath;
+			if (filePath.FileName == ".DS_Store")
+				return;
+
+			Runtime.RunInMainThread (() => {
+				OnFileCreatedExternally (e.FullPath);
+			});
+		}
+
+		void OnFileDeleted (object sender, FileSystemEventArgs e)
+		{
+			Runtime.RunInMainThread (() => {
+				OnFileDeletedExternally (e.FullPath);
+			});
+		}
+
+		/// <summary>
+		/// Move all project files in the old directory to the new directory.
+		/// </summary>
+		void OnDirectoryRenamedExternally (string oldDirectory, string newDirectory)
+		{
+			FileService.NotifyDirectoryRenamed (oldDirectory, newDirectory);
+		}
+
+		void OnFileCreatedExternally (string fileName)
+		{
+			if (Files.Any (file => file.FilePath == fileName)) {
+				// File exists in project. This can happen if the file was added
+				// in the IDE and not externally.
+				return;
+			}
+
+			string include = MSBuildProjectService.ToMSBuildPath (ItemDirectory, fileName);
+			foreach (var it in sourceProject.FindGlobItemsIncludingFile (include).Where (it => it.Metadata.GetProperties ().Count () == 0)) {
+				var eit = CreateFakeEvaluatedItem (sourceProject, it, include, null);
+				var pi = CreateProjectItem (eit);
+				pi.Read (this, eit);
+				Items.Add (pi);
+			}
+		}
+
+		void OnFileDeletedExternally (string fileName)
+		{
+			if (File.Exists (fileName)) {
+				// File has not been deleted. The delete event could have been due to
+				// the file being saved. Saving with TextFileUtility will result in
+				// FileService.SystemRename being called to move a temporary file
+				// to the file being saved which deletes and then creates the file.
+				return;
+			}
+
+			Files.Remove (fileName);
+		}
+
 		internal void NotifyFileRenamedInProject (ProjectFileRenamedEventArgs args)
 		{
 			NotifyModified ("Files");
@@ -2889,6 +4138,10 @@ namespace MonoDevelop.Projects
 			}
 		}
 
+		public event EventHandler<ProjectItemEventArgs> ProjectItemAdded;
+
+		public event EventHandler<ProjectItemEventArgs> ProjectItemRemoved;
+	
 		/// <summary>
 		/// Occurs when a file is removed from this project.
 		/// </summary>
@@ -2935,6 +4188,26 @@ namespace MonoDevelop.Projects
 			internal protected override void OnGetTypeTags (HashSet<string> types)
 			{
 				Project.OnGetTypeTags (types);
+			}
+
+			internal protected override ProjectRunConfiguration OnCreateRunConfiguration (string name)
+			{
+				return Project.OnCreateRunConfiguration (name);
+			}
+
+			internal protected override void OnReadRunConfiguration (ProgressMonitor monitor, ProjectRunConfiguration runConfig, IPropertySet properties)
+			{
+				Project.OnReadRunConfiguration (monitor, runConfig, properties);
+			}
+
+			internal protected override void OnWriteRunConfiguration (ProgressMonitor monitor, ProjectRunConfiguration runConfig, IPropertySet properties)
+			{
+				Project.OnWriteRunConfiguration (monitor, runConfig, properties);
+			}
+
+			internal protected override TargetEvaluationContext OnConfigureTargetEvaluationContext (string target, ConfigurationSelector configuration, TargetEvaluationContext context)
+			{
+				return Project.OnConfigureTargetEvaluationContext (target, configuration, context);
 			}
 
 			internal protected override Task<TargetEvaluationResult> OnRunTarget (ProgressMonitor monitor, string target, ConfigurationSelector configuration, TargetEvaluationContext context)
@@ -3038,6 +4311,11 @@ namespace MonoDevelop.Projects
 				Project.OnWriteConfiguration (monitor, config, grp);
 			}
 
+			internal protected override Task OnReevaluateProject (ProgressMonitor monitor)
+			{
+				return Project.OnReevaluateProject (monitor);
+			}
+
 			internal protected override void OnGetDefaultImports (List<string> imports)
 			{
 				Project.OnGetDefaultImports (imports);
@@ -3048,9 +4326,36 @@ namespace MonoDevelop.Projects
 				Project.OnPrepareForEvaluation (project);
 			}
 
+#pragma warning disable 672, 618
 			internal protected override bool OnFastCheckNeedsBuild (ConfigurationSelector configuration)
 			{
 				return Project.OnFastCheckNeedsBuild (configuration);
+			}
+#pragma warning restore 672, 618
+
+			internal protected override bool OnFastCheckNeedsBuild (ConfigurationSelector configuration, TargetEvaluationContext context)
+			{
+				return Project.OnFastCheckNeedsBuild (configuration, context);
+			}
+
+			internal protected override Task<ProjectFile []> OnGetSourceFiles (ProgressMonitor monitor, ConfigurationSelector configuration)
+			{
+				return Project.OnGetSourceFiles (monitor, configuration);
+			}
+
+			internal protected override bool OnGetSupportsImportedItem (IMSBuildItemEvaluated buildItem)
+			{
+				return Project.OnGetSupportsImportedItem (buildItem);
+			}
+
+			internal protected override void OnItemsAdded (IEnumerable<ProjectItem> objs)
+			{
+				Project.OnItemsAdded (objs);
+			}
+
+			internal protected override void OnItemsRemoved (IEnumerable<ProjectItem> objs)
+			{
+				Project.OnItemsRemoved (objs);
 			}
 		}
 	}

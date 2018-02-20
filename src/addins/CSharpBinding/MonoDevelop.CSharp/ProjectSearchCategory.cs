@@ -1,4 +1,4 @@
-// 
+﻿// 
 // ProjectSearchCategory.cs
 //  
 // Author:
@@ -23,231 +23,101 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FindSymbols;
+using Microsoft.CodeAnalysis.LanguageServices;
+using Microsoft.CodeAnalysis.NavigateTo;
+using Microsoft.CodeAnalysis.Shared.Extensions;
+using MonoDevelop.Components.MainToolbar;
 using MonoDevelop.Core;
-using System.Collections.Generic;
 using MonoDevelop.Core.Instrumentation;
-using MonoDevelop.Projects;
-using MonoDevelop.Ide.Gui;
+using MonoDevelop.Core.Text;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.TypeSystem;
-using MonoDevelop.Core.Text;
-using Gtk;
-using System.Linq;
-using ICSharpCode.NRefactory6.CSharp;
-using Microsoft.CodeAnalysis;
-using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Collections.Concurrent;
-using MonoDevelop.Components.MainToolbar;
 
 namespace MonoDevelop.CSharp
 {
 	class ProjectSearchCategory : SearchCategory
 	{
-		internal static void Init ()
-		{
-			MonoDevelopWorkspace.LoadingFinished += async delegate {
-				await UpdateSymbolInfos ();
-			};
-			if (IdeApp.IsInitialized) {
-				IdeApp.Workspace.LastWorkspaceItemClosed += async delegate {
-					await DisposeSymbolInfoTask ();
-				};
-			}
-		}
-
 		public ProjectSearchCategory () : base (GettextCatalog.GetString ("Solution"))
 		{
 			sortOrder = FirstCategory;
 		}
 
-		public override void Initialize (Components.PopoverWindow popupWindow)
+		static bool IsType (INavigateToSearchResult result)
 		{
-			lastResult = new WorkerResult ();
+			switch (result.Kind) {
+			case NavigateToItemKind.Class:
+			case NavigateToItemKind.Delegate:
+			case NavigateToItemKind.Enum:
+			case NavigateToItemKind.Structure:
+			case NavigateToItemKind.Interface:
+				return true;
+			}
+			return false;
 		}
 
-		internal static Task<SymbolCache> SymbolInfoTask;
-
-		static TimerCounter getTypesTimer = InstrumentationService.CreateTimerCounter ("Time to get all types", "NavigateToDialog");
-
-		static CancellationTokenSource symbolInfoTokenSrc = new CancellationTokenSource();
-		public static async Task UpdateSymbolInfos ()
+		static bool IsMember (INavigateToSearchResult result)
 		{
-			await DisposeSymbolInfoTask ();
-			CancellationToken token = symbolInfoTokenSrc.Token;
-			SymbolInfoTask = Task.Run (delegate {
-				return GetSymbolInfos (token);
-			}, token);
+			switch (result.Kind) {
+			case NavigateToItemKind.Constant:
+			case NavigateToItemKind.Event:
+			case NavigateToItemKind.Field:
+			case NavigateToItemKind.Method:
+			case NavigateToItemKind.Property:
+				return true;
+			}
+			return false;
 		}
 
-		static async Task DisposeSymbolInfoTask ()
+		static bool MatchesTag (string tag, INavigateToSearchResult result)
 		{
-			symbolInfoTokenSrc.Cancel ();
-			if (SymbolInfoTask != null) {
-				try {
-					var old = await SymbolInfoTask;
-					if (old != null)
-						old.Dispose ();
-				} catch (OperationCanceledException) {
-					// Ignore
-				} catch (Exception ex) {
-					LoggingService.LogError ("UpdateSymbolInfos failed", ex);
-				}
+			if (string.IsNullOrWhiteSpace (tag))
+				return true;
+
+			switch (tag) {
+			case "type":
+			case "t":
+				return IsType (result);
+			case "class":
+				return result.Kind == NavigateToItemKind.Class;
+			case "struct":
+				return result.Kind == NavigateToItemKind.Structure;
+			case "interface":
+				return result.Kind == NavigateToItemKind.Interface;
+			case "delegate":
+				return result.Kind == NavigateToItemKind.Delegate;
+			case "member":
+			case "m":
+				return IsMember (result);
+			case "method":
+				return result.Kind == NavigateToItemKind.Method;
+			case "property":
+				return result.Kind == NavigateToItemKind.Property;
+			case "field":
+				return result.Kind == NavigateToItemKind.Field || result.Kind == NavigateToItemKind.Constant;
+			case "event":
+				return result.Kind == NavigateToItemKind.Event;
 			}
-			symbolInfoTokenSrc = new CancellationTokenSource();
-			lastResult = new WorkerResult ();
-			SymbolInfoTask = null;
+
+			return false;
 		}
-
-		internal class SymbolCache : IDisposable
-		{
-			public static readonly SymbolCache Empty = new SymbolCache ();
-
-			List<Microsoft.CodeAnalysis.Workspace> workspaces = new List<Microsoft.CodeAnalysis.Workspace> ();
-			ConcurrentDictionary<Microsoft.CodeAnalysis.DocumentId, List<DeclaredSymbolInfo>> documentInfos = new ConcurrentDictionary<Microsoft.CodeAnalysis.DocumentId, List<DeclaredSymbolInfo>> ();
-
-			public void AddWorkspace (Microsoft.CodeAnalysis.Workspace ws, CancellationToken token)
-			{
-				workspaces.Add (ws);
-				ws.WorkspaceChanged += Ws_WorkspaceChanged;
-
-				foreach (var p in ws.CurrentSolution.Projects) {
-					if (p.FilePath.EndsWith ("csproj", StringComparison.Ordinal))
-						SearchAsync (documentInfos, p, token);
-				}
-			}
-
-			public List<DeclaredSymbolInfo> AllTypes {
-				get {
-					var result = new List<DeclaredSymbolInfo> ();
-					foreach (var infos in documentInfos.Values)
-						result.AddRange (infos);
-					return result;
-				}
-			}
-
-			static async void SearchAsync (ConcurrentDictionary<Microsoft.CodeAnalysis.DocumentId, List<DeclaredSymbolInfo>> result, Microsoft.CodeAnalysis.Project project, CancellationToken cancellationToken)
-			{
-				if (project == null)
-					throw new ArgumentNullException (nameof (project));
-				try {
-					foreach (var document in project.Documents) {
-						cancellationToken.ThrowIfCancellationRequested ();
-						await UpdateDocument (result, document, cancellationToken);
-					}
-				} catch (AggregateException ae) {
-					ae.Flatten ().Handle (ex => ex is OperationCanceledException);
-				} catch (OperationCanceledException) {
-				}
-			}
-
-			static async Task UpdateDocument (ConcurrentDictionary<DocumentId, List<DeclaredSymbolInfo>> result, Microsoft.CodeAnalysis.Document document, CancellationToken cancellationToken)
-			{
-				var root = await document.GetSyntaxRootAsync (cancellationToken).ConfigureAwait (false);
-				var infos = new List<DeclaredSymbolInfo> ();
-				foreach (var current in root.DescendantNodesAndSelf (CSharpSyntaxFactsService.DescentIntoSymbolForDeclarationSearch)) {
-					cancellationToken.ThrowIfCancellationRequested ();
-					DeclaredSymbolInfo declaredSymbolInfo;
-					if (current.TryGetDeclaredSymbolInfo (out declaredSymbolInfo)) {
-						declaredSymbolInfo.DocumentId = document.Id;
-						infos.Add (declaredSymbolInfo);
-					}
-				}
-				RemoveDocument (result, document.Id);
-				result.TryAdd (document.Id, infos);
-			}
-
-			static void RemoveDocument (ConcurrentDictionary<DocumentId, List<DeclaredSymbolInfo>> result, Microsoft.CodeAnalysis.DocumentId documentId)
-			{
-				if (result.ContainsKey (documentId)) {
-					List<DeclaredSymbolInfo> val;
-					result.TryRemove (documentId, out val);
-				}
-			}
-
-			public void Dispose ()
-			{
-				if (workspaces == null)
-					return;
-				foreach (var ws in workspaces)
-					ws.WorkspaceChanged -= Ws_WorkspaceChanged;
-				workspaces = null;
-				documentInfos = null;
-			}
-
-			async void Ws_WorkspaceChanged (object sender, WorkspaceChangeEventArgs e)
-			{
-				var ws = (Microsoft.CodeAnalysis.Workspace)sender;
-				var currentSolution = ws.CurrentSolution;
-				if (currentSolution == null)
-					return;
-				try {
-					switch (e.Kind) {
-					case WorkspaceChangeKind.ProjectAdded:
-						var project1 = currentSolution.GetProject (e.ProjectId);
-						if (project1 != null)
-							SearchAsync (documentInfos, project1, default (CancellationToken));
-						break;
-					case WorkspaceChangeKind.ProjectRemoved:
-						var project = currentSolution.GetProject (e.ProjectId);
-						if (project != null) {
-							foreach (var docId in project.DocumentIds)
-								RemoveDocument (documentInfos, docId);
-						}
-						break;
-					case WorkspaceChangeKind.DocumentAdded:
-						var document = currentSolution.GetDocument (e.DocumentId);
-						if (document != null)
-							await UpdateDocument (documentInfos, document, default (CancellationToken));
-						break;
-					case WorkspaceChangeKind.DocumentRemoved:
-						RemoveDocument (documentInfos, e.DocumentId);
-						break;
-					case WorkspaceChangeKind.DocumentChanged:
-						var doc = currentSolution.GetDocument (e.DocumentId);
-						if (doc != null) {
-							await Task.Run (async delegate {
-								await UpdateDocument (documentInfos, doc, default (CancellationToken));
-							}).ConfigureAwait (false);
-						}
-						break;
-					}
-				} catch (AggregateException ae) {
-					ae.Flatten ().Handle (ex => ex is OperationCanceledException);
-				} catch (OperationCanceledException) {
-				} catch (Exception ex) {
-					LoggingService.LogError ("Error while updating navigation symbol cache.", ex);
-				}
-			}
-		}
-
-		static SymbolCache GetSymbolInfos (CancellationToken token)
-		{
-			getTypesTimer.BeginTiming ();
-			try {
-				var result = new SymbolCache ();
-				foreach (var workspace in TypeSystemService.AllWorkspaces) {
-					result.AddWorkspace (workspace, token);
-				}
-				return result;
-			} catch (AggregateException ae) {
-				ae.Flatten ().Handle (ex => ex is OperationCanceledException);
-				return SymbolCache.Empty;
-			} catch (OperationCanceledException) {
-				return SymbolCache.Empty;
-			} finally {
-				getTypesTimer.EndTiming ();
-			}
-		}
-
-
-		static WorkerResult lastResult;
-		static readonly string[] typeTags = new [] { "type", "t", "class", "struct", "interface", "enum", "delegate" };
-		static readonly string[] memberTags = new [] { "member", "m", "method", "property", "field", "event" };
-		static readonly string[] tags = typeTags.Concat(memberTags).ToArray();
+		static readonly string [] tags = new [] {
+				// Types
+				"type", "t", "class", "struct", "interface", "enum", "delegate",
+				// Members
+				"member", "m", "method", "property", "field", "event"
+		};
 
 		public override string[] Tags {
 			get {
@@ -257,186 +127,71 @@ namespace MonoDevelop.CSharp
 
 		public override bool IsValidTag (string tag)
 		{
-			return typeTags.Any (t => t == tag) || memberTags.Any (t => t == tag);
+			return tags.Contains (tag);
 		}
 
 		public override Task GetResults (ISearchResultCallback searchResultCallback, SearchPopupSearchPattern searchPattern, CancellationToken token)
 		{
 			return Task.Run (async delegate {
-				if (searchPattern.Tag != null && !(typeTags.Contains (searchPattern.Tag) || memberTags.Contains (searchPattern.Tag)) || searchPattern.HasLineNumber)
-					return null;
+				if (searchPattern.Tag != null && !tags.Contains (searchPattern.Tag) || searchPattern.HasLineNumber)
+					return;
 				try {
-					var newResult = new WorkerResult ();
-					newResult.pattern = searchPattern.Pattern;
-					newResult.Tag = searchPattern.Tag;
-					List<DeclaredSymbolInfo> allTypes;
-					if (SymbolInfoTask == null)
-						SymbolInfoTask = Task.FromResult (GetSymbolInfos (token));
-					var cache = await SymbolInfoTask.ConfigureAwait (false);
-					allTypes = cache.AllTypes;
-					string toMatch = searchPattern.Pattern;
-					newResult.matcher = StringMatcher.GetMatcher (toMatch, false);
-					newResult.FullSearch = toMatch.IndexOf ('.') > 0;
-					var oldLastResult = lastResult;
-					if (newResult.FullSearch && oldLastResult != null && !oldLastResult.FullSearch)
-						oldLastResult = new WorkerResult ();
-//					var now = DateTime.Now;
+					// Maybe use language services instead of AbstractNavigateToSearchService
+					var aggregatedResults = await Task.WhenAll (TypeSystemService.AllWorkspaces
+										.Select (ws => ws.CurrentSolution)
+										.SelectMany (s => s.Projects)
+										.Select (proj => AbstractNavigateToSearchService.SearchProjectInCurrentProcessAsync (
+												proj,
+												searchPattern.Pattern,
+												token))
+					).ConfigureAwait (false);
 
-					AllResults (searchResultCallback, oldLastResult, newResult, allTypes, token);
-					//newResult.results.SortUpToN (new DataItemComparer (token), resultsCount);
-					lastResult = newResult;
-//					Console.WriteLine ((now - DateTime.Now).TotalMilliseconds);
-					return (ISearchDataSource)newResult.results;
+					foreach (var results in aggregatedResults) {
+						foreach (var result in results) {
+							if (!MatchesTag (searchPattern.Tag, result))
+								continue;
+
+							int laneLength = result.NameMatchSpans.Length;
+							int index = laneLength > 0 ? result.NameMatchSpans [0].Start : -1;
+
+							int rank = 0;
+							if (result.MatchKind == NavigateToMatchKind.Exact) {
+								rank = int.MaxValue;
+							} else {
+								int patternLength = searchPattern.Pattern.Length;
+								rank = searchPattern.Pattern.Length - result.Name.Length;
+								rank -= index;
+
+								rank -= laneLength * 100;
+
+								// Favor matches with less splits. That is, 'abc def' is better than 'ab c def'.
+								int baseRank = (patternLength - laneLength - 1) * 5000;
+
+								// First matching letter close to the begining is better
+								// The more matched letters the better
+								rank = baseRank - (index + (laneLength - patternLength));
+
+								// rank up matches which start with a filter substring
+								if (index == 0)
+									rank += result.NameMatchSpans [0].Length * 50;
+							}
+
+							if (!result.IsCaseSensitive)
+								rank /= 2;
+
+							searchResultCallback.ReportResult (new DeclaredSymbolInfoResult (
+								searchPattern.Pattern,
+								result.Name,
+								rank,
+								result
+							));
+						}
+					}
 				} catch {
 					token.ThrowIfCancellationRequested ();
 					throw;
 				}
 			}, token);
-		}
-
-		void AllResults (ISearchResultCallback searchResultCallback, WorkerResult lastResult, WorkerResult newResult, IReadOnlyList<DeclaredSymbolInfo> completeTypeList, CancellationToken token)
-		{
-			// Search Types
-			newResult.filteredSymbols = new List<DeclaredSymbolInfo> ();
-			bool startsWithLastFilter = lastResult.pattern != null && newResult.pattern.StartsWith (lastResult.pattern, StringComparison.Ordinal) && lastResult.filteredSymbols != null;
-			var allTypes = startsWithLastFilter ? lastResult.filteredSymbols : completeTypeList;
-			foreach (var type in allTypes) {
-				if (token.IsCancellationRequested) {
-					newResult.filteredSymbols = null;
-					return;
-				}
-
-				if (type.Kind == DeclaredSymbolInfoKind.Constructor ||
-				    type.Kind == DeclaredSymbolInfoKind.Module ||
-				    type.Kind == DeclaredSymbolInfoKind.Indexer)
-					continue;
-				
-				if (newResult.Tag != null) {
-					if ((newResult.Tag == "type" || newResult.Tag == "t") && type.Kind != DeclaredSymbolInfoKind.Class && type.Kind != DeclaredSymbolInfoKind.Struct && type.Kind != DeclaredSymbolInfoKind.Interface && type.Kind != DeclaredSymbolInfoKind.Enum && type.Kind != DeclaredSymbolInfoKind.Delegate)
-					    continue;
-					
-					if (newResult.Tag == "class" && type.Kind != DeclaredSymbolInfoKind.Class)
-						continue;
-				    if (newResult.Tag == "struct" && type.Kind != DeclaredSymbolInfoKind.Struct)
-						continue;
-				    if (newResult.Tag == "interface" && type.Kind != DeclaredSymbolInfoKind.Interface)
-						continue;
-				    if (newResult.Tag == "enum" && type.Kind != DeclaredSymbolInfoKind.Enum)
-						continue;
-				    if (newResult.Tag == "delegate" && type.Kind != DeclaredSymbolInfoKind.Delegate)
-						continue;
-
-					if ((newResult.Tag == "member" || newResult.Tag == "m") && type.Kind != DeclaredSymbolInfoKind.Method && type.Kind != DeclaredSymbolInfoKind.Property && type.Kind != DeclaredSymbolInfoKind.Field && type.Kind != DeclaredSymbolInfoKind.Event)
-					    continue;
-					if (newResult.Tag == "method" && type.Kind != DeclaredSymbolInfoKind.Method)
-						continue;
-					if (newResult.Tag == "property" && type.Kind != DeclaredSymbolInfoKind.Property)
-						continue;
-					if (newResult.Tag == "field" && type.Kind != DeclaredSymbolInfoKind.Field)
-						continue;
-					if (newResult.Tag == "event" && type.Kind != DeclaredSymbolInfoKind.Event)
-						continue;
-					
-				}
-				SearchResult curResult = newResult.CheckType (type);
-				if (curResult != null) {
-					newResult.filteredSymbols.Add (type);
-					newResult.results.AddResult (curResult);
-					searchResultCallback.ReportResult (curResult);
-				}
-			}
-		}
-
-		class WorkerResult
-		{
-			public string Tag {
-				get;
-				set;
-			}
-
-			public List<DeclaredSymbolInfo> filteredSymbols;
-
-			string pattern2;
-			char firstChar;
-			char[] firstChars;
-
-			public string pattern {
-				get {
-					return pattern2;
-				}
-				set {
-					pattern2 = value;
-					if (pattern2.Length == 1) {
-						firstChar = pattern2 [0];
-						firstChars = new [] { char.ToUpper (firstChar), char.ToLower (firstChar) };
-					} else {
-						firstChars = null;
-					}
-				}
-			}
-
-			public ResultsDataSource results;
-			public bool FullSearch;
-			public StringMatcher matcher;
-
-			public WorkerResult ()
-			{
-				results = new ResultsDataSource ();
-			}
-
-			internal SearchResult CheckType (DeclaredSymbolInfo symbol)
-			{
-				int rank;
-				var name = symbol.Name;
-				if (MatchName(name, out rank)) {
-//					if (type.ContainerDisplayName != null)
-//						rank--;
-					return new DeclaredSymbolInfoResult (pattern, symbol.Name, rank, symbol, false);
-				}
-				if (!FullSearch)
-					return null;
-				name = symbol.FullyQualifiedContainerName;
-				if (MatchName(name, out rank)) {
-//					if (type.ContainingType != null)
-//						rank--;
-					return new DeclaredSymbolInfoResult (pattern, name, rank, symbol, true);
-				}
-				return null;
-			}
-
-			Dictionary<string, MatchResult> savedMatches = new Dictionary<string, MatchResult> (StringComparer.Ordinal);
-
-			bool MatchName (string name, out int matchRank)
-			{
-				if (name == null) {
-					matchRank = -1;
-					return false;
-				}
-
-				MatchResult savedMatch;
-				if (!savedMatches.TryGetValue (name, out savedMatch)) {
-					bool doesMatch;
-					if (firstChars != null) {
-						int idx = name.IndexOfAny (firstChars);
-						doesMatch = idx >= 0;
-						if (doesMatch) {
-							matchRank = int.MaxValue - (name.Length - 1) * 10 - idx;
-							if (name [idx] != firstChar)
-								matchRank /= 2;
-							savedMatches [name] = savedMatch = new MatchResult (true, matchRank);
-							return true;
-						}
-						matchRank = -1;
-						savedMatches [name] = savedMatch = new MatchResult (false, -1);
-						return false;
-					}
-					doesMatch = matcher.CalcMatchRank (name, out matchRank);
-					savedMatches [name] = savedMatch = new MatchResult (doesMatch, matchRank);
-				}
-				
-				matchRank = savedMatch.Rank;
-				return savedMatch.Match;
-			}
 		}
 	}
 }

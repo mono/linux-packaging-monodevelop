@@ -26,20 +26,18 @@
 
 using System;
 using System.Collections.Generic;
-using MonoDevelop.PackageManagement;
-using MonoDevelop.Ide;
+using System.Threading.Tasks;
 using MonoDevelop.Core;
-using NuGet;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
-	public class TestablePackageManagementEventsMonitor : PackageManagementEventsMonitor
+	class TestablePackageManagementEventsMonitor : PackageManagementEventsMonitor
 	{
 		public TestablePackageManagementEventsMonitor (
 			ProgressMonitor progressMonitor,
 			IPackageManagementEvents packageManagementEvents,
-			IProgressProvider progressProvider)
-			: base (progressMonitor, packageManagementEvents, progressProvider)
+			TaskCompletionSource<bool> taskCompletionSource)
+			: base (progressMonitor, packageManagementEvents, taskCompletionSource)
 		{
 		}
 
@@ -63,15 +61,6 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 
 		public bool IsPackageConsoleShown;
 		public ProgressMonitor ProgressMonitorPassedToShowPackageConsole;
-
-		protected override void ReconnectAssemblyReferences (IPackageManagementProject project)
-		{
-			ProjectsPassedToReconnectAssemblyReferences.Add (project);
-			IsTypeSystemRefreshed = true;
-		}
-
-		public List<IPackageManagementProject> ProjectsPassedToReconnectAssemblyReferences = new List<IPackageManagementProject> ();
-		public bool IsTypeSystemRefreshed;
 	}
 }
 

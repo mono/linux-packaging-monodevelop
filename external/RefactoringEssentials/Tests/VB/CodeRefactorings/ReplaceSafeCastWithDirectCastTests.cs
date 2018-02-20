@@ -1,13 +1,12 @@
-using NUnit.Framework;
 using RefactoringEssentials.VB.CodeRefactorings;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.VB.CodeRefactorings
 {
-    [TestFixture]
     public class ReplaceSafeCastWithDirectCastTests : VBCodeRefactoringTestBase
     {
-        [Test]
-        public void Test()
+        [Fact]
+        public void Test_ReplaceSafeCastWithDirectCastCodeRefactoringProvider()
         {
             Test<ReplaceSafeCastWithDirectCastCodeRefactoringProvider>(@"
 Class TestClass
@@ -22,7 +21,7 @@ Class TestClass
 End Class");
         }
 
-        [Test]
+        [Fact]
         public void TestWithComment1()
         {
             Test<ReplaceSafeCastWithDirectCastCodeRefactoringProvider>(@"
@@ -40,7 +39,7 @@ Class TestClass
 End Class");
         }
 
-        [Test]
+        [Fact]
         public void TestWithComment2()
         {
             Test<ReplaceSafeCastWithDirectCastCodeRefactoringProvider>(@"

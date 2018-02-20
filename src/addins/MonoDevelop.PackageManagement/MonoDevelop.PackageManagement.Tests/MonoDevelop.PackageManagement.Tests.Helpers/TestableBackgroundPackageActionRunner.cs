@@ -26,51 +26,51 @@
 
 using System;
 using System.Collections.Generic;
-using MonoDevelop.PackageManagement;
+using System.Threading.Tasks;
 using MonoDevelop.Core;
-using MonoDevelop.Ide;
-using NuGet;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
-	public class TestableBackgroundPackageActionRunner : BackgroundPackageActionRunner
+	class TestableBackgroundPackageActionRunner : BackgroundPackageActionRunner
 	{
-		public List<Action> BackgroundActionsQueued = new List<Action> ();
+		public Queue<Action> BackgroundActionsQueued = new Queue<Action> ();
 
 		public TestableBackgroundPackageActionRunner (
 			IPackageManagementProgressMonitorFactory progressMonitorFactory,
 			IPackageManagementEvents packageManagementEvents,
-			IProgressProvider progressProvider)
-			: base (progressMonitorFactory, packageManagementEvents, progressProvider)
+			PackageManagementInstrumentationService instrumentationService)
+			: base (
+				progressMonitorFactory,
+				packageManagementEvents,
+				instrumentationService)
 		{
 			Init ();
 		}
 
 		void Init ()
 		{
-			CreateEventMonitorAction = (monitor, packageManagementEvents, progressProvider) => {
-				EventsMonitor = new TestablePackageManagementEventsMonitor (monitor, packageManagementEvents, progressProvider);
+			CreateEventMonitorAction = (monitor, packageManagementEvents, completionSource) => {
+				EventsMonitor = new TestablePackageManagementEventsMonitor (monitor, packageManagementEvents, completionSource);
 				return EventsMonitor;
 			};
 		}
 
 		public void ExecuteSingleBackgroundDispatch ()
 		{
-			BackgroundActionsQueued [0].Invoke ();
-			BackgroundActionsQueued.RemoveAt (0);
+			var action = BackgroundActionsQueued.Dequeue ();
+			action.Invoke ();
 		}
 
 		public void ExecuteBackgroundDispatch ()
 		{
-			foreach (Action action in BackgroundActionsQueued) {
-				action ();
+			while (BackgroundActionsQueued.Count > 0) {
+				ExecuteSingleBackgroundDispatch ();
 			}
-			BackgroundActionsQueued.Clear ();
 		}
 
 		protected override void BackgroundDispatch (Action action)
 		{
-			BackgroundActionsQueued.Add (action);
+			BackgroundActionsQueued.Enqueue (action);
 		}
 
 		protected override void GuiDispatch (Action action)
@@ -78,17 +78,29 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 			action ();
 		}
 
+		protected override void ClearDispatcher ()
+		{
+			BackgroundActionsQueued.Clear ();
+		}
+
+		public bool DispatcherIsDispatchingReturns;
+
+		protected override bool DispatcherIsDispatching ()
+		{
+			return DispatcherIsDispatchingReturns;
+		}
+
 		public Func<ProgressMonitor,
 			IPackageManagementEvents,
-			IProgressProvider,
+			TaskCompletionSource<bool>,
 			PackageManagementEventsMonitor> CreateEventMonitorAction;
 
 		protected override PackageManagementEventsMonitor CreateEventMonitor (
 			ProgressMonitor monitor,
 			IPackageManagementEvents packageManagementEvents,
-			IProgressProvider progressProvider)
+			TaskCompletionSource<bool> taskCompletionSource)
 		{
-			return CreateEventMonitorAction (monitor, packageManagementEvents, progressProvider);
+			return CreateEventMonitorAction (monitor, packageManagementEvents, taskCompletionSource);
 		}
 
 		public TestablePackageManagementEventsMonitor EventsMonitor;

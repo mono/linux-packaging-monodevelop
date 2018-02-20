@@ -26,27 +26,39 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using MonoDevelop.Core;
 using MonoDevelop.Ide;
-using MonoDevelop.PackageManagement;
-using NuGet;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class LicenseAcceptanceService : ILicenseAcceptanceService
+	internal class LicenseAcceptanceService : ILicenseAcceptanceService
 	{
-		public bool AcceptLicenses(IEnumerable<IPackage> packages)
+		public Task<bool> AcceptLicenses (IEnumerable<NuGetPackageLicense> licenses)
 		{
-			using (LicenseAcceptanceDialog dialog = CreateLicenseAcceptanceDialog (packages)) {
-				int result = MessageService.ShowCustomDialog (dialog);
-				return result == (int)Gtk.ResponseType.Ok;
-			}
+			if (Runtime.IsMainThread)
+				return ShowLicenseAcceptanceDialog (licenses);
+
+			return Runtime.RunInMainThread (() => ShowLicenseAcceptanceDialog (licenses));
 		}
-		
-		LicenseAcceptanceDialog CreateLicenseAcceptanceDialog(IEnumerable<IPackage> packages)
+
+		Task<bool> ShowLicenseAcceptanceDialog (IEnumerable<NuGetPackageLicense> licenses)
 		{
-			var viewModel = new LicenseAcceptanceViewModel(packages);
+			var res = new TaskCompletionSource<bool> ();
+			IdeApp.RunWhenIdle (() => {
+				Xwt.Toolkit.NativeEngine.Invoke (delegate {
+					using (LicenseAcceptanceDialog dialog = CreateLicenseAcceptanceDialog (licenses)) {
+						res.SetResult (dialog.Run (Xwt.MessageDialog.RootWindow));
+					}
+				});
+			});
+			return res.Task;
+		}
+
+		LicenseAcceptanceDialog CreateLicenseAcceptanceDialog (IEnumerable<NuGetPackageLicense> licenses)
+		{
+			var viewModel = new LicenseAcceptanceViewModel (licenses);
 			return new LicenseAcceptanceDialog(viewModel);
 		}
 	}

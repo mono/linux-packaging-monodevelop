@@ -48,8 +48,12 @@ using MonoDevelop.Ide.Desktop;
 using MonoDevelop.MacInterop;
 using MonoDevelop.Components;
 using MonoDevelop.Components.MainToolbar;
-using MonoDevelop.MacIntegration.MacMenu;
 using MonoDevelop.Components.Extensions;
+using System.Runtime.InteropServices;
+using ObjCRuntime;
+using System.Diagnostics;
+using Xwt.Mac;
+using MonoDevelop.Components.Mac;
 
 namespace MonoDevelop.MacIntegration
 {
@@ -64,6 +68,20 @@ namespace MonoDevelop.MacIntegration
 		bool setupFail, initedApp;
 
 		Lazy<Dictionary<string, string>> mimemap;
+
+		static string applicationMenuName;
+
+		public static string ApplicationMenuName {
+			get {
+				return applicationMenuName ?? BrandingService.ApplicationName;
+			}
+			set {
+				if (applicationMenuName != value) {
+					applicationMenuName = value;
+					OnApplicationMenuNameChanged ();
+				}
+			}
+		}
 
 		public MacPlatformService ()
 		{
@@ -125,10 +143,42 @@ namespace MonoDevelop.MacIntegration
 			System.Reflection.Assembly.LoadFrom (Path.Combine (path, "Xwt.XamMac.dll"));
 			var loaded = Xwt.Toolkit.Load (Xwt.ToolkitType.XamMac);
 
+			loaded.RegisterBackend<Xwt.Backends.IDialogBackend, ThemedMacDialogBackend> ();
+			loaded.RegisterBackend<Xwt.Backends.IWindowBackend, ThemedMacWindowBackend> ();
+			loaded.RegisterBackend<Xwt.Backends.IAlertDialogBackend, ThemedMacAlertDialogBackend> ();
+
+
 			// We require Xwt.Mac to initialize MonoMac before we can execute any code using MonoMac
 			timer.Trace ("Installing App Event Handlers");
 			GlobalSetup ();
 			timer.EndTiming ();
+
+			var appDelegate = NSApplication.SharedApplication.Delegate as Xwt.Mac.AppDelegate;
+			if (appDelegate != null) {
+				appDelegate.Terminating += (object o, TerminationEventArgs e) => {
+					if (MonoDevelop.Ide.IdeApp.IsRunning) {
+						// If GLib the mainloop is still running that means NSApplication.Terminate() was called
+						// before Gtk.Application.Quit(). Cancel Cocoa termination and exit the mainloop.
+						e.Reply = NSApplicationTerminateReply.Cancel;
+						Gtk.Main.Quit ();
+					} else {
+						// The mainloop has already exited and we've already cleaned up our application state
+						// so it's now safe to terminate Cocoa.
+						e.Reply = NSApplicationTerminateReply.Now;
+					}
+				};
+			}
+
+			// Now that Cocoa has been initialized we can check whether the keyboard focus mode is turned on
+			// See System Preferences - Keyboard - Shortcuts - Full Keyboard Access
+			var keyboardMode = NSUserDefaults.StandardUserDefaults.IntForKey ("AppleKeyboardUIMode");
+			// 0 - Text boxes and lists only
+			// 2 - All controls
+			// 3 - All controls + keyboard access
+			if (keyboardMode != 0) {
+				Gtk.Rc.ParseString ("style \"default\" { engine \"xamarin\" { focusstyle = 2 } }");
+				Gtk.Rc.ParseString ("style \"radio-or-check-box\" { engine \"xamarin\" { focusstyle = 2 } } ");
+			}
 
 			return loaded;
 		}
@@ -149,14 +199,14 @@ namespace MonoDevelop.MacIntegration
 
 		internal static void OpenUrl (string url)
 		{
-			Gtk.Application.Invoke (delegate {
+			Gtk.Application.Invoke ((o, args) => {
 				NSWorkspace.SharedWorkspace.OpenUrl (new NSUrl (url));
 			});
 		}
 
 		public override void OpenFile (string filename)
 		{
-			Gtk.Application.Invoke (delegate {
+			Gtk.Application.Invoke ((o, args) => {
 				NSWorkspace.SharedWorkspace.OpenFile (filename);
 			});
 		}
@@ -212,7 +262,7 @@ namespace MonoDevelop.MacIntegration
 
 				CommandEntrySet ces = commandManager.CreateCommandEntrySet (commandMenuAddinPath);
 				foreach (CommandEntry ce in ces) {
-					rootMenu.AddItem (new MDSubMenuItem (commandManager, (CommandEntrySet) ce));
+					rootMenu.AddItem (new MDSubMenuItem (commandManager, (CommandEntrySet)ce));
 				}
 			} catch (Exception ex) {
 				try {
@@ -226,6 +276,7 @@ namespace MonoDevelop.MacIntegration
 				setupFail = true;
 				return false;
 			}
+
 			return true;
 		}
 
@@ -252,10 +303,10 @@ namespace MonoDevelop.MacIntegration
 
 			//mac-ify these command names
 			commandManager.GetCommand (EditCommands.MonodevelopPreferences).Text = GettextCatalog.GetString ("Preferences...");
-			commandManager.GetCommand (EditCommands.DefaultPolicies).Text = GettextCatalog.GetString ("Custom Policies...");
-			commandManager.GetCommand (HelpCommands.About).Text = GettextCatalog.GetString ("About {0}", BrandingService.ApplicationName);
-			commandManager.GetCommand (MacIntegrationCommands.HideWindow).Text = GettextCatalog.GetString ("Hide {0}", BrandingService.ApplicationName);
-			commandManager.GetCommand (ToolCommands.AddinManager).Text = GettextCatalog.GetString ("Add-in Manager...");
+			commandManager.GetCommand (EditCommands.DefaultPolicies).Text = GettextCatalog.GetString ("Policies...");
+			commandManager.GetCommand (HelpCommands.About).Text = GetAboutCommandText ();
+			commandManager.GetCommand (MacIntegrationCommands.HideWindow).Text = GetHideWindowCommandText ();
+			commandManager.GetCommand (ToolCommands.AddinManager).Text = GettextCatalog.GetString ("Extensions...");
 
 			initedApp = true;
 
@@ -269,14 +320,61 @@ namespace MonoDevelop.MacIntegration
 			}
 
 			PatchGtkTheme ();
-			NSNotificationCenter.DefaultCenter.AddObserver (NSCell.ControlTintChangedNotification, notif => Runtime.RunInMainThread (
+			NSNotificationCenter.DefaultCenter.AddObserver (NSCell.ControlTintChangedNotification, notif => Core.Runtime.RunInMainThread (
 				delegate {
 					Styles.LoadStyle();
 					PatchGtkTheme();
 				}));
+
+
+			Styles.Changed += (s, a) => {
+				var colorPanel = NSColorPanel.SharedColorPanel;
+				if (colorPanel.ContentView?.Superview?.Window == null)
+					LoggingService.LogWarning ("Updating shared color panel appearance failed, no valid window.");
+				IdeTheme.ApplyTheme (colorPanel.ContentView.Superview.Window);
+				var appearance = colorPanel.ContentView.Superview.Window.Appearance;
+				if (appearance == null)
+					appearance = NSAppearance.GetAppearance (IdeApp.Preferences.UserInterfaceTheme == Theme.Light ? NSAppearance.NameAqua : NSAppearance.NameVibrantDark);
+				// The subviews of the shared NSColorPanel do not inherit the appearance of the main panel window
+				// and need to be updated recursively.
+				UpdateColorPanelSubviewsAppearance (colorPanel.ContentView.Superview, appearance);
+			};
 			
 			// FIXME: Immediate theme switching disabled, until NSAppearance issues are fixed 
 			//IdeApp.Preferences.UserInterfaceTheme.Changed += (s,a) => PatchGtkTheme ();
+		}
+
+		static void UpdateColorPanelSubviewsAppearance (NSView view, NSAppearance appearance)
+		{
+			if (view.Class.Name == "NSPageableTableView")
+					((NSTableView)view).BackgroundColor = Xwt.Mac.Util.ToNSColor (Styles.BackgroundColor);
+			view.Appearance = appearance;
+
+			foreach (var subview in view.Subviews)
+				UpdateColorPanelSubviewsAppearance (subview, appearance);
+		}
+
+		static string GetAboutCommandText ()
+		{
+			return GettextCatalog.GetString ("About {0}", ApplicationMenuName);
+		}
+
+		static string GetHideWindowCommandText ()
+		{
+			return GettextCatalog.GetString ("Hide {0}", ApplicationMenuName);
+		}
+
+		static void OnApplicationMenuNameChanged ()
+		{
+			Command aboutCommand = IdeApp.CommandService.GetCommand (HelpCommands.About);
+			if (aboutCommand != null)
+				aboutCommand.Text = GetAboutCommandText ();
+
+			Command hideCommand = IdeApp.CommandService.GetCommand (MacIntegrationCommands.HideWindow);
+			if (hideCommand != null)
+				hideCommand.Text = GetHideWindowCommandText ();
+
+			Carbon.SetProcessName (ApplicationMenuName);
 		}
 
 		// VV/VK: Disable tint based color generation
@@ -327,7 +425,7 @@ namespace MonoDevelop.MacIntegration
 				{
 					// We can only attempt to quit safely if all windows are GTK windows and not modal
 					if (!IsModalDialogRunning ()) {
-						e.UserCancelled = !IdeApp.Exit ();
+						e.UserCancelled = !IdeApp.Exit ().Result; // FIXME: could this block in rare cases?
 						e.Handled = true;
 						return;
 					}
@@ -361,7 +459,7 @@ namespace MonoDevelop.MacIntegration
 					//OpenFiles may pump the mainloop, but can't do that from an AppleEvent, so use a brief timeout
 					GLib.Timeout.Add (10, delegate {
 						IdeApp.OpenFiles (e.Documents.Select (
-							doc => new FileOpenInformation (doc.Key, doc.Value, 1, OpenDocumentOptions.DefaultInternal))
+							doc => new FileOpenInformation (doc.Key, null, doc.Value, 1, OpenDocumentOptions.DefaultInternal))
 						);
 						return false;
 					});
@@ -387,7 +485,7 @@ namespace MonoDevelop.MacIntegration
 								if (!Int32.TryParse (qs ["column"], out column))
 									column = 1;
 
-								return new FileOpenInformation (Uri.UnescapeDataString(fileUri.AbsolutePath),
+								return new FileOpenInformation (Uri.UnescapeDataString(fileUri.AbsolutePath), null,
 									line, column, OpenDocumentOptions.DefaultInternal);
 							} catch (Exception ex) {
 								LoggingService.LogError ("Invalid TextMate URI: " + url, ex);
@@ -401,10 +499,46 @@ namespace MonoDevelop.MacIntegration
 				//if not running inside an app bundle (at dev time), need to do some additional setup
 				if (NSBundle.MainBundle.InfoDictionary ["CFBundleIdentifier"] == null) {
 					SetupWithoutBundle ();
+				} else {
+					SetupDockIcon ();
 				}
 			} catch (Exception ex) {
 				LoggingService.LogError ("Could not install app event handlers", ex);
 				setupFail = true;
+			}
+		}
+
+		[DllImport ("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+		public extern static IntPtr IntPtr_objc_msgSend_IntPtr (IntPtr receiver, IntPtr selector, IntPtr arg1);
+
+		static void SetupDockIcon ()
+		{
+			NSObject initialBundleIconFileValue;
+
+			// Don't do anything if we're inside an app bundle.
+			if (NSBundle.MainBundle.InfoDictionary.TryGetValue (new NSString ("CFBundleIconFile"), out initialBundleIconFileValue)) {
+				return;
+			}
+
+			// Setup without bundle.
+			FilePath exePath = System.Reflection.Assembly.GetExecutingAssembly ().Location;
+			string iconName = BrandingService.GetString ("ApplicationIcon");
+			string iconFile = null;
+
+			if (iconName != null) {
+				iconFile = BrandingService.GetFile (iconName);
+			} else {
+				// assume running from build directory
+				var mdSrcMain = exePath.ParentDirectory.ParentDirectory.ParentDirectory;
+				iconFile = mdSrcMain.Combine ("theme-icons", "Mac", "monodevelop.icns");
+			}
+
+			if (File.Exists (iconFile)) {
+				var image = new NSImage ();
+				var imageFile = new NSString (iconFile);
+
+				IntPtr p = IntPtr_objc_msgSend_IntPtr (image.Handle, Selector.GetHandle ("initByReferencingFile:"), imageFile.Handle);
+				NSApplication.SharedApplication.ApplicationIconImage = ObjCRuntime.Runtime.GetNSObject<NSImage> (p);
 			}
 		}
 
@@ -414,26 +548,7 @@ namespace MonoDevelop.MacIntegration
 			// https://bugzilla.xamarin.com/show_bug.cgi?id=8850
 			NSBundle.MainBundle.InfoDictionary ["CFBundleIdentifier"] = new NSString ("com.xamarin.monodevelop");
 
-			FilePath exePath = System.Reflection.Assembly.GetExecutingAssembly ().Location;
-			string iconFile;
-			iconFile = BrandingService.GetString ("ApplicationIcon");
-			if (iconFile != null) {
-				iconFile = BrandingService.GetFile (iconFile);
-			} else {
-				var bundleRoot = GetAppBundleRoot (exePath);
-				if (bundleRoot.IsNotNull) {
-					//running from inside an app bundle, use its icon
-					iconFile = bundleRoot.Combine ("Contents", "Resources", "monodevelop.icns");
-				} else {
-					// assume running from build directory
-					var mdSrcMain = exePath.ParentDirectory.ParentDirectory.ParentDirectory;
-					iconFile = mdSrcMain.Combine ("theme-icons", "Mac", "monodevelop.icns");
-				}
-			}
-
-			if (File.Exists (iconFile)) {
-				NSApplication.SharedApplication.ApplicationIconImage = new NSImage (iconFile);
-			}
+			SetupDockIcon ();
 		}
 
 		static FilePath GetAppBundleRoot (FilePath path)
@@ -713,6 +828,18 @@ namespace MonoDevelop.MacIntegration
 			return (int)(frame.Height - rect.Height);
 		}
 
+		internal static int GetTitleBarHeight (NSWindow w)
+		{
+			int height = 0;
+			if (w.StyleMask.HasFlag (NSWindowStyle.Titled))
+				height += GetTitleBarHeight ();
+			if (w.Toolbar != null) {
+				var rect = NSWindow.ContentRectFor (w.Frame, w.StyleMask);
+				height += (int)(rect.Height - w.ContentView.Frame.Height);
+			}
+			return height;
+		}
+
 
 		internal static NSImage LoadImage (string resource)
 		{
@@ -786,7 +913,11 @@ namespace MonoDevelop.MacIntegration
 			var toplevels = GtkQuartz.GetToplevels ();
 
 			// Check GtkWindow's Modal flag or for a visible NSPanel
-			return toplevels.Any (t => (t.Value != null && t.Value.Modal && t.Value.Visible) || (t.Key.IsVisible && (t.Key is NSPanel)));
+			var ret = toplevels
+				.Where (x => !x.Key.DebugDescription.StartsWith ("<_NSFullScreenTileDividerWindow", StringComparison.Ordinal))
+				.Any (t => (t.Value != null && t.Value.Modal && t.Value.Visible));
+
+			return ret;
 		}
 
 		internal override void AddChildWindow (Gtk.Window parent, Gtk.Window child)
@@ -804,6 +935,7 @@ namespace MonoDevelop.MacIntegration
 				return; // Not yet realized
 
 			NSWindow w = GtkQuartz.GetWindow (window);
+			y += GetTitleBarHeight (w);
 			var dr = FromDesktopRect (new Gdk.Rectangle (x, y, width, height));
 			var r = w.FrameRectFor (dr);
 			w.SetFrame (r, true);
@@ -836,6 +968,64 @@ namespace MonoDevelop.MacIntegration
 			} else {
 				NSWorkspace.SharedWorkspace.ActivateFileViewer (selectFiles.Select ((f) => NSUrl.FromFilename (f)).ToArray ());
 			}
+		}
+
+		internal override void RestartIde (bool reopenWorkspace)
+		{
+			FilePath bundlePath = NSBundle.MainBundle.BundlePath;
+
+			if (bundlePath.Extension != ".app") {
+				base.RestartIde (reopenWorkspace);
+				return;
+			}
+
+			var reopen = reopenWorkspace && IdeApp.Workspace != null && IdeApp.Workspace.Items.Count > 0;
+
+			var proc = new Process ();
+
+			var path = bundlePath.Combine ("Contents", "MacOS");
+			//assume renames of mdtool end with "tool"
+			var mdtool = Directory.EnumerateFiles (path, "*tool").Single();
+			var psi = new ProcessStartInfo (mdtool) {
+				CreateNoWindow = true,
+				UseShellExecute = false,
+				WorkingDirectory = path,
+				Arguments = "--start-app-bundle",
+			};
+
+			var recentWorkspace = reopen ? DesktopService.RecentFiles.GetProjects ().FirstOrDefault ()?.FileName : string.Empty;
+			if (!string.IsNullOrEmpty (recentWorkspace))
+				psi.Arguments += " " + recentWorkspace;
+
+			proc.StartInfo = psi;
+			proc.Start ();
+		}
+	}
+
+	public class ThemedMacWindowBackend : Xwt.Mac.WindowBackend
+	{
+		public override void InitializeBackend (object frontend, Xwt.Backends.ApplicationContext context)
+		{
+			base.InitializeBackend (frontend, context);
+			IdeTheme.ApplyTheme (this);
+		}
+	}
+
+	public class ThemedMacDialogBackend : Xwt.Mac.DialogBackend
+	{
+		public override void InitializeBackend (object frontend, Xwt.Backends.ApplicationContext context)
+		{
+			base.InitializeBackend (frontend, context);
+			IdeTheme.ApplyTheme (this);
+		}
+	}
+
+	public class ThemedMacAlertDialogBackend : Xwt.Mac.AlertDialogBackend
+	{
+		public override void Initialize (Xwt.Backends.ApplicationContext actx)
+		{
+			base.Initialize (actx);
+			IdeTheme.ApplyTheme (this.Window);
 		}
 	}
 }

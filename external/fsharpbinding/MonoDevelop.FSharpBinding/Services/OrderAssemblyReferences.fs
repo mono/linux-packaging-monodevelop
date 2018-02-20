@@ -1,6 +1,5 @@
 namespace MonoDevelop.FSharp
 
-open System.Reflection
 open System
 open Mono.Cecil
 
@@ -111,5 +110,4 @@ type OrderAssemblyReferences () =
         let asmRefs = Array.map mkAssemblyRef rs
         let graph = mkGraph asmRefs
         let ordering = Digraph.topSort graph
-        let str = List.toStringWithDelims "#r @\"" "\"\n#r @\"" "\"" ordering
-        str
+        ordering

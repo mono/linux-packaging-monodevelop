@@ -8,6 +8,7 @@ using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Components;
+using System.Linq;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -55,7 +56,8 @@ namespace MonoDevelop.VersionControl.Views
 		/// Fired when content difference data is loaded
 		/// </summary>
 		event DiffDataHandler DiffDataLoaded;
-		
+
+		static Xwt.Drawing.Image commitImage = Xwt.Drawing.Image.FromResource ("commit-16.png");
 		public ChangeSetView ()
 		{
 			ShadowType = Gtk.ShadowType.In;
@@ -74,7 +76,7 @@ namespace MonoDevelop.VersionControl.Views
 			crc.StockId = "vc-comment";
 			colCommit = new TreeViewColumn ();
 			colCommit.Spacing = 2;
-			colCommit.Widget = new Xwt.ImageView (Xwt.Drawing.Image.FromResource ("commit-16.png")).ToGtkWidget ();
+			colCommit.Widget = new Xwt.ImageView (commitImage).ToGtkWidget ();
 			colCommit.Widget.Show ();
 			colCommit.PackStart (cellToggle, false);
 			colCommit.PackStart (crc, false);
@@ -111,6 +113,7 @@ namespace MonoDevelop.VersionControl.Views
 			
 			filestore = new TreeStore (typeof (Xwt.Drawing.Image), typeof (string), typeof (string[]), typeof(bool), typeof(bool), typeof(string), typeof(bool), typeof (bool), typeof(Xwt.Drawing.Image), typeof(bool), typeof(string));
 			filelist.Model = filestore;
+			filelist.SearchColumn = -1; // disable the interactive search
 			filelist.TestExpandRow += new Gtk.TestExpandRowHandler (OnTestExpandRow);
 			
 			ShowAll();
@@ -175,11 +178,7 @@ namespace MonoDevelop.VersionControl.Views
 				colCommit.Destroy ();
 				colCommit = null;
 			}
-			
-			if (filestore != null) {
-				filestore.Dispose ();
-				filestore = null;
-			}
+
 			if (this.diffRenderer != null) {
 				this.diffRenderer.Destroy ();
 				this.diffRenderer = null;
@@ -300,13 +299,16 @@ namespace MonoDevelop.VersionControl.Views
 					if (line == -1)
 						line = 1;
 				}
-				IdeApp.Workbench.OpenDocument (files [0], line, 0);
+				var proj = IdeApp.Workspace.GetProjectsContainingFile (files [0]).FirstOrDefault ();
+				IdeApp.Workbench.OpenDocument (files [0], proj, line, 0);
 			}
 			else {
 				AlertButton openAll = new AlertButton (GettextCatalog.GetString ("_Open All")); 
 				if (MessageService.AskQuestion (GettextCatalog.GetString ("Do you want to open all {0} files?", files.Length), AlertButton.Cancel, openAll) == openAll) {
-					for (int n=0; n<files.Length; n++)
-						IdeApp.Workbench.OpenDocument (files[n], n==0);
+					for (int n=0; n<files.Length; n++) {
+						var proj = IdeApp.Workspace.GetProjectsContainingFile (files [n]).FirstOrDefault ();
+						IdeApp.Workbench.OpenDocument (files [n], proj, n == 0);
+					}
 				}
 			}
 		}
@@ -337,7 +339,7 @@ namespace MonoDevelop.VersionControl.Views
 						ddata.diffRequested = true;
 						ddata.diffRunning = false;
 						if (null != DiffDataLoaded) {
-							Gtk.Application.Invoke (delegate {
+							Gtk.Application.Invoke ((o, args) => {
 								DiffDataLoaded (ddata);
 								DiffDataLoaded = null;
 							});

@@ -73,8 +73,8 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
 
         static bool IsEmptyComputedProperty(PropertyDeclarationSyntax property)
         {
-            var getter = property.AccessorList.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.GetAccessorDeclaration));
-            var setter = property.AccessorList.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.SetAccessorDeclaration));
+			var getter = property.AccessorList?.Accessors.FirstOrDefault (a => a.IsKind (SyntaxKind.GetAccessorDeclaration));
+			var setter = property.AccessorList?.Accessors.FirstOrDefault (a => a.IsKind (SyntaxKind.SetAccessorDeclaration));
             return getter != null && setter != null && IsNotImplemented(getter.Body) && IsNotImplemented(setter.Body);
         }
         static bool IsNotImplemented(BlockSyntax body)
@@ -86,9 +86,13 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
 
 
         static PropertyDeclarationSyntax CreateNewProperty(PropertyDeclarationSyntax property)
-        {
-            // create new auto property
-            var accessorDeclList = new SyntaxList<AccessorDeclarationSyntax>().Add(SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration).WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken))).Add(SyntaxFactory.AccessorDeclaration(SyntaxKind.SetAccessorDeclaration).WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)));
+		{
+			var getter = property.AccessorList.Accessors.FirstOrDefault (a => a.IsKind (SyntaxKind.GetAccessorDeclaration));
+			var setter = property.AccessorList.Accessors.FirstOrDefault (a => a.IsKind (SyntaxKind.SetAccessorDeclaration));
+
+			// create new auto property
+			var accessorDeclList = new SyntaxList<AccessorDeclarationSyntax>().Add(SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration).WithModifiers (getter.Modifiers).WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)))
+			                                                                  .Add(SyntaxFactory.AccessorDeclaration(SyntaxKind.SetAccessorDeclaration).WithModifiers (setter.Modifiers).WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)));
             var newProperty = property.WithAccessorList(SyntaxFactory.AccessorList(accessorDeclList)).WithTrailingTrivia(property.GetTrailingTrivia()).WithAdditionalAnnotations(Formatter.Annotation);
             return newProperty;
         }
@@ -123,11 +127,14 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
 
         internal static IFieldSymbol GetBackingField(SemanticModel model, PropertyDeclarationSyntax property)
         {
-            var getter = property.AccessorList.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.GetAccessorDeclaration));
-            var setter = property.AccessorList.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.SetAccessorDeclaration));
+            if (property == null)
+                return null;
+
+            var getter = property.AccessorList?.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.GetAccessorDeclaration));
+            var setter = property.AccessorList?.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.SetAccessorDeclaration));
 
             // automatic properties always need getter & setter
-            if (property == null || getter == null || setter == null || getter.Body == null || setter.Body == null)
+            if (getter == null || setter == null || getter.Body == null || setter.Body == null)
                 return null;
             //todo: check version?
             if (property.Modifiers.Any(m => m.IsKind(SyntaxKind.AbstractKeyword)) || property.Parent is InterfaceDeclarationSyntax)

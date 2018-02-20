@@ -1,12 +1,11 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
     public class LocalVariableHidesMemberTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact]
         public void TestField()
         {
             const string input = @"
@@ -35,7 +34,7 @@ class TestClass
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void TestMethod()
         {
             var input = @"
@@ -49,7 +48,7 @@ class TestClass
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void TestForeach()
         {
             var input = @"
@@ -65,7 +64,7 @@ class TestClass
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void TestStatic()
         {
             var input = @"
@@ -80,7 +79,7 @@ class TestClass
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void TestStaticNoIssue()
         {
             var input = @"
@@ -100,7 +99,7 @@ class TestClass
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void TestAccessiblePrivate()
         {
             var input = @"
@@ -116,7 +115,7 @@ class TestClass
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void TestAccessiblePrivateDueToTypeNesting()
         {
             var input = @"
@@ -145,7 +144,7 @@ class RootClass
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void TestInternalAccessibility()
         {
             var input = @"
@@ -163,7 +162,7 @@ class TestClass : BaseClass
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void TestInaccessiblePrivate()
         {
             var input = @"
@@ -181,7 +180,7 @@ class TestClass : BaseClass
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void SuppressIssueIfVariableInitializedFromField()
         {
             var input = @"
@@ -196,6 +195,39 @@ class TestClass
 }";
             // Given the initializer, member hiding is obviously intended in this case;
             // so we suppress the warning.
+            Analyze<LocalVariableHidesMemberAnalyzer>(input);
+        }
+
+        [Fact]
+        public void TestClashWithTypeName1()
+        {
+            var input = @"
+class i
+{
+}
+class TestClass
+{
+	void Method ()
+	{
+		int i = 0;
+	}
+}";
+            Analyze<LocalVariableHidesMemberAnalyzer>(input);
+        }
+
+        [Fact]
+        public void TestClashWithTypeName2()
+        {
+            var input = @"
+delegate int i();
+
+class TestClass
+{
+	void Method ()
+	{
+		int i = 0;
+	}
+}";
             Analyze<LocalVariableHidesMemberAnalyzer>(input);
         }
     }

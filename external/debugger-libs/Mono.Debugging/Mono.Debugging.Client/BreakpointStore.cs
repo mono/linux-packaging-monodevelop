@@ -143,13 +143,18 @@ namespace Mono.Debugging.Client
 		
 		public Catchpoint AddCatchpoint (string exceptionName)
 		{
+			return AddCatchpoint (exceptionName, true);
+		}
+
+		public Catchpoint AddCatchpoint (string exceptionName, bool includeSubclasses)
+		{
 			if (exceptionName == null)
 				throw new ArgumentNullException ("exceptionName");
 
 			if (IsReadOnly)
 				return null;
 
-			var cp = new Catchpoint (exceptionName);
+			var cp = new Catchpoint (exceptionName, includeSubclasses);
 			Add (cp);
 
 			return cp;
@@ -280,7 +285,9 @@ namespace Mono.Debugging.Client
 				throw new ArgumentNullException ("filename");
 
 			var list = new List<Breakpoint> ();
-			
+			if (string.IsNullOrEmpty (filename))
+				return list.AsReadOnly ();
+
 			try {
 				filename = Path.GetFullPath (filename);
 			} catch {
@@ -386,27 +393,27 @@ namespace Mono.Debugging.Client
 			}
 		}
 		
-		public XmlElement Save ()
+		public XmlElement Save (string baseDir = null)
 		{
 			XmlDocument doc = new XmlDocument ();
 			XmlElement elem = doc.CreateElement ("BreakpointStore");
 			foreach (BreakEvent ev in this) {
 				if (ev.NonUserBreakpoint)
 					continue;
-				XmlElement be = ev.ToXml (doc);
+				XmlElement be = ev.ToXml (doc, baseDir);
 				elem.AppendChild (be);
 			}
 			return elem;
 		}
 		
-		public void Load (XmlElement rootElem)
+		public void Load (XmlElement rootElem, string baseDir = null)
 		{
 			Clear ();
 			foreach (XmlNode n in rootElem.ChildNodes) {
 				XmlElement elem = n as XmlElement;
 				if (elem == null)
 					continue;
-				BreakEvent ev = BreakEvent.FromXml (elem);
+				BreakEvent ev = BreakEvent.FromXml (elem, baseDir);
 				if (ev != null)
 					Add (ev);
 			}

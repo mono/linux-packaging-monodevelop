@@ -55,6 +55,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		
 		protected override void Initialize ()
 		{
+			base.Initialize ();
+
 			IdeApp.Workspace.ReferenceAddedToProject += OnAddReference;
 			IdeApp.Workspace.ReferenceRemovedFromProject += OnRemoveReference;
 		}
@@ -63,6 +65,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		{
 			IdeApp.Workspace.ReferenceAddedToProject -= OnAddReference;
 			IdeApp.Workspace.ReferenceRemovedFromProject -= OnRemoveReference;
+
+			base.Dispose ();
 		}
 		
 		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
@@ -75,13 +79,16 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		public override void BuildChildNodes (ITreeBuilder ctx, object dataObject)
 		{
 			ProjectReferenceCollection refs = (ProjectReferenceCollection) dataObject;
-			foreach (ProjectReference pref in refs)
-				ctx.AddChild (pref);
+			ctx.AddChildren (refs);
 
 			// For portable libraries, add node that represents all framework assemblies
 			var project = (DotNetProject) ctx.GetParentDataItem (typeof(DotNetProject), false);
-			if (project != null && project.IsPortableLibrary)
-				ctx.AddChild (new PortableFrameworkSubset (project));
+			if (project != null) {
+				var tfm = project.TargetFramework.Id;
+				if (tfm.Identifier == MonoDevelop.Core.Assemblies.TargetFrameworkMoniker.ID_PORTABLE && tfm.Version != "5.0") {
+					ctx.AddChild (new PortableFrameworkSubset (project));
+				}
+			}
 		}
 		
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
@@ -92,10 +99,10 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			var p = (DotNetProject) builder.GetParentDataItem (typeof(DotNetProject), true);
 			return p != null && p.IsPortableLibrary;
 		}
-		
-		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
+
+		public override int GetSortIndex (ITreeNavigator node)
 		{
-			return -1;
+			return -1000;
 		}
 
 		void OnRemoveReference (object sender, ProjectReferenceEventArgs e)

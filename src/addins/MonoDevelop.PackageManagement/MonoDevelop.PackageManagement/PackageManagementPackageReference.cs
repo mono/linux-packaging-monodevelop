@@ -24,20 +24,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
-
 namespace MonoDevelop.PackageManagement
 {
 	public class PackageManagementPackageReference
 	{
 		public PackageManagementPackageReference (string id, string version)
+			: this (id, version, null)
+		{
+		}
+
+		internal PackageManagementPackageReference (string id, string version, string installPath)
 		{
 			Id = id;
 			Version = version;
+			InstallPath = installPath;
 		}
 
 		public string Id { get; set; }
 		public string Version { get; set; }
+
+		/// <summary>
+		/// Returns the directory where the NuGet package is installed.
+		/// </summary>
+		public string InstallPath { get; private set; }
 	}
 }
 

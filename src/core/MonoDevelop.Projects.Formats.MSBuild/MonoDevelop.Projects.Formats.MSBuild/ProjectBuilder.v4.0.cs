@@ -28,6 +28,7 @@
 
 using System;
 using System.IO;
+using Microsoft.Build.Construction;
 using Microsoft.Build.Evaluation;
 using Microsoft.Build.Framework;
 using System.Collections.Generic;
@@ -38,7 +39,7 @@ using System.Xml;
 
 namespace MonoDevelop.Projects.MSBuild
 {
-	public partial class ProjectBuilder: MarshalByRefObject, IProjectBuilder
+	partial class ProjectBuilder
 	{
 		readonly ProjectCollection engine;
 		readonly string file;
@@ -53,37 +54,46 @@ namespace MonoDevelop.Projects.MSBuild
 		}
 
 		public MSBuildResult Run (
-			ProjectConfigurationInfo[] configurations, ILogWriter logWriter, MSBuildVerbosity verbosity,
+			ProjectConfigurationInfo[] configurations, IEngineLogWriter logWriter, MSBuildVerbosity verbosity,
 			string[] runTargets, string[] evaluateItems, string[] evaluateProperties, Dictionary<string,string> globalProperties, int taskId)
 		{
 			if (runTargets == null || runTargets.Length == 0)
 				throw new ArgumentException ("runTargets is empty");
 
 			MSBuildResult result = null;
-			BuildEngine.RunSTA (taskId, delegate {
-				try {
-					var project = SetupProject (configurations);
-					InitLogger (logWriter);
 
-					ILogger[] loggers;
-					var logger = new LocalLogger (file);
-					if (logWriter != null) {
-						var consoleLogger = new ConsoleLogger (GetVerbosity (verbosity), LogWriteLine, null, null);
-						loggers = new ILogger[] { logger, consoleLogger };
-					} else {
-						loggers = new ILogger[] { logger };
+			BuildEngine.RunSTA (taskId, delegate {
+				Project project = null;
+				Dictionary<string, string> originalGlobalProperties = null;
+
+				MSBuildLoggerAdapter loggerAdapter;
+
+				if (buildEngine.BuildOperationStarted) {
+					loggerAdapter = buildEngine.StartProjectSessionBuild (logWriter);
+				}
+				else
+					loggerAdapter = new MSBuildLoggerAdapter (logWriter, verbosity);
+
+				try {
+					project = SetupProject (configurations);
+
+					if (globalProperties != null) {
+						originalGlobalProperties = new Dictionary<string, string> ();
+						foreach (var p in project.GlobalProperties)
+							originalGlobalProperties [p.Key] = p.Value;
+						if (globalProperties != null) {
+							foreach (var p in globalProperties)
+								project.SetGlobalProperty (p.Key, p.Value);
+						}
+						project.ReevaluateIfNecessary ();
 					}
 
-					//building the project will create items and alter properties, so we use a new instance
+					// Building the project will create items and alter properties, so we use a new instance
 					var pi = project.CreateProjectInstance ();
 
-					if (globalProperties != null)
-						foreach (var p in globalProperties)
-							pi.SetProperty (p.Key, p.Value);
-					
-					pi.Build (runTargets, loggers);
+					Build (pi, runTargets, loggerAdapter.Loggers);
 
-					result = new MSBuildResult (logger.BuildResult.ToArray ());
+					result = new MSBuildResult (loggerAdapter.BuildResult.ToArray ());
 
 					if (evaluateProperties != null) {
 						foreach (var name in evaluateProperties) {
@@ -98,12 +108,12 @@ namespace MonoDevelop.Projects.MSBuild
 							var list = new List<MSBuildEvaluatedItem> ();
 							foreach (var item in grp) {
 								var evItem = new MSBuildEvaluatedItem (name, UnescapeString (item.EvaluatedInclude));
-								foreach (var m in item.Metadata) {
-									evItem.Metadata [m.Name] = UnescapeString (m.EvaluatedValue);
+								foreach (var metadataName in item.MetadataNames) {
+									evItem.Metadata [metadataName] = UnescapeString (item.GetMetadataValue (metadataName));
 								}
 								list.Add (evItem);
 							}
-							result.Items[name] = list;
+							result.Items[name] = list.ToArray ();
 						}
 					}
 				} catch (Microsoft.Build.Exceptions.InvalidProjectFileException ex) {
@@ -111,10 +121,21 @@ namespace MonoDevelop.Projects.MSBuild
 						file, false, ex.ErrorSubcategory, ex.ErrorCode, ex.ProjectFile,
 						ex.LineNumber, ex.ColumnNumber, ex.EndLineNumber, ex.EndColumnNumber,
 						ex.BaseMessage, ex.HelpKeyword);
-					LogWriteLine (r.ToString ());
+					loggerAdapter.LogWriteLine (r.ToString ());
 					result = new MSBuildResult (new [] { r });
 				} finally {
-					DisposeLogger ();
+					if (buildEngine.BuildOperationStarted)
+						buildEngine.EndProjectSessionBuild ();
+					else
+						loggerAdapter.Dispose ();
+					
+					if (project != null && globalProperties != null) {
+						foreach (var p in globalProperties)
+							project.RemoveGlobalProperty (p.Key);
+						foreach (var p in originalGlobalProperties)
+							project.SetGlobalProperty (p.Key, p.Value);
+						project.ReevaluateIfNecessary ();
+					}
 				}
 			});
 			return result;
@@ -132,7 +153,16 @@ namespace MonoDevelop.Projects.MSBuild
 					project = p;
 			}
 
-			Environment.CurrentDirectory = Path.GetDirectoryName (file);
+			// Reload referenced projects if they have changed in disk. ProjectCollection doesn't do it automatically.
+
+			foreach (var p in project.Imports) {
+				if (File.Exists (p.ImportedProject.FullPath) && p.ImportedProject.LastWriteTimeWhenRead != File.GetLastWriteTime (p.ImportedProject.FullPath))
+					p.ImportedProject.Reload (false);
+			}
+
+			var projectDir = Path.GetDirectoryName (file);
+			if (!string.IsNullOrEmpty (projectDir) && Directory.Exists (projectDir))
+				Environment.CurrentDirectory = projectDir;
 			return project;
 		}
 
@@ -140,22 +170,74 @@ namespace MonoDevelop.Projects.MSBuild
 		{			
 			var p = engine.GetLoadedProjects (file).FirstOrDefault ();
 			if (p == null) {
+				var projectDir = Path.GetDirectoryName (file);
+
+				// HACK: workaround to MSBuild bug #53019. We need to ensure that $(BaseIntermediateOutputPath) exists before
+				// loading the project.
+				if (!string.IsNullOrEmpty (projectDir))
+					Directory.CreateDirectory (Path.Combine (projectDir, "obj"));
+
 				var content = buildEngine.GetUnsavedProjectContent (file);
 				if (content == null)
 					p = engine.LoadProject (file);
 				else {
-					Environment.CurrentDirectory = Path.GetDirectoryName (file);
-					p = engine.LoadProject (new XmlTextReader (new StringReader (content)));
-					p.FullPath = file;
+					if (!string.IsNullOrEmpty (projectDir) && Directory.Exists (projectDir))
+						Environment.CurrentDirectory = projectDir;
+					var projectRootElement = ProjectRootElement.Create (new XmlTextReader (new StringReader (content)));
+					projectRootElement.FullPath = file;
+
+					// Use the engine's default tools version to load the project. We want to build with the latest
+					// tools version.
+					string toolsVersion = engine.DefaultToolsVersion;
+					p = new Project (projectRootElement, engine.GlobalProperties, toolsVersion, engine);
 				}
 			}
-			p.SetProperty ("CurrentSolutionConfigurationContents", slnConfigContents);
-			p.SetProperty ("Configuration", configuration);
-			if (!string.IsNullOrEmpty (platform))
-				p.SetProperty ("Platform", platform);
-			else
-				p.SetProperty ("Platform", "");
+
+			bool reevaluate = false;
+
+			if (p.GetPropertyValue ("Configuration") != configuration || (p.GetPropertyValue ("Platform") ?? "") != (platform ?? "")) {
+				p.SetGlobalProperty ("Configuration", configuration);
+				if (!string.IsNullOrEmpty (platform))
+					p.SetGlobalProperty ("Platform", platform);
+				else
+					p.RemoveGlobalProperty ("Platform");
+				reevaluate = true;
+			}
+
+			// The CurrentSolutionConfigurationContents property only needs to be set once
+			// for the project actually being built
+			// If a build session was started, that property is already set at engine level
+
+			if (!buildEngine.BuildOperationStarted && this.file == file && p.GetPropertyValue ("CurrentSolutionConfigurationContents") != slnConfigContents) {
+				p.SetGlobalProperty ("CurrentSolutionConfigurationContents", slnConfigContents);
+				reevaluate = true;
+			}
+
+			if (reevaluate)
+				p.ReevaluateIfNecessary ();
+
 			return p;
+		}
+
+
+		/// <summary>
+		/// Builds a list of targets with the specified loggers.
+		/// </summary>
+		internal void Build (ProjectInstance pi, string [] targets, IEnumerable<ILogger> loggers)
+		{
+			BuildResult results;
+
+			if (!buildEngine.BuildOperationStarted) {
+				BuildParameters parameters = new BuildParameters (engine);
+				parameters.ResetCaches = false;
+				parameters.EnableNodeReuse = true;
+				BuildRequestData data = new BuildRequestData (pi, targets, parameters.HostServices);
+				parameters.Loggers = loggers;
+				results = BuildManager.DefaultBuildManager.Build (parameters, data);
+			} else {
+				BuildRequestData data = new BuildRequestData (pi, targets);
+				results = BuildManager.DefaultBuildManager.BuildRequest (data);
+			}
 		}
 	}
 }

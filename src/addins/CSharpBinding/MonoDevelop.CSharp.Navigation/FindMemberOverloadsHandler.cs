@@ -23,15 +23,16 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-using System;
+
 using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Extensions;
+using Microsoft.CodeAnalysis.Shared.Extensions;
+using MonoDevelop.Components.Commands;
+using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.FindInFiles;
-using Microsoft.CodeAnalysis;
-using MonoDevelop.Core;
-using MonoDevelop.Components.Commands;
 using MonoDevelop.Refactoring;
-using ICSharpCode.NRefactory6.CSharp;
 
 namespace MonoDevelop.CSharp.Navigation
 {
@@ -58,14 +59,22 @@ namespace MonoDevelop.CSharp.Navigation
 				switch (symbol.Kind) {
 				case SymbolKind.Method:
 					foreach (var method in symbol.ContainingType.GetMembers (symbol.Name).OfType<IMethodSymbol> ()) {
-						foreach (var loc in method.Locations)
+						foreach (var loc in method.Locations) {
+							if (monitor.CancellationToken.IsCancellationRequested)
+								return;
+							
 							monitor.ReportResult (new MemberReference (method, loc.SourceTree.FilePath, loc.SourceSpan.Start, loc.SourceSpan.Length));
+						}
 					}
 					break;
 				case SymbolKind.Property:
 					foreach (var property in symbol.ContainingType.GetMembers ().OfType<IPropertySymbol> () .Where (p => p.IsIndexer)) {
-						foreach (var loc in property.Locations)
+						foreach (var loc in property.Locations) {
+							if (monitor.CancellationToken.IsCancellationRequested)
+								return;
+							
 							monitor.ReportResult (new MemberReference (property, loc.SourceTree.FilePath, loc.SourceSpan.Start, loc.SourceSpan.Length));
+						}
 					}
 					break;
 

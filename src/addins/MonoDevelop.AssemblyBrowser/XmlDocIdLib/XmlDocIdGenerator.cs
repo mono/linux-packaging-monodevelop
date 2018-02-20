@@ -73,8 +73,9 @@ namespace XmlDocIdLib
             if (declaringTypeDef == null || declaringTypeDef.IsInterface)
                 return string.Empty;
 
-            foreach (TypeReference tempIfaceRef in declaringTypeDef.Interfaces)
+            foreach (InterfaceImplementation tempIface in declaringTypeDef.Interfaces)
             {
+                var tempIfaceRef = tempIface.InterfaceType;
                 // check whether this member name begins with interface name (plus generic arguments)
                 if (Member.Name.StartsWith(this.StripInterfaceName(tempIfaceRef.FullName)))
                 {
@@ -269,18 +270,19 @@ namespace XmlDocIdLib
                 // check whether this is constructor method, or explicitly implemented method
                 strExplicitPath = GetXmlDocExplicitIfaceImplPath(Member);
 
-                //if (thisMethodDef.IsStatic && thisMethodDef.IsConstructor)
-                //    stbTempPath.Append(".#cctor");
-                //if (!thisMethodDef.IsStatic && thisMethodDef.IsConstructor)
-                //    stbTempPath.Append(".#ctor");
-                if (strExplicitPath.Length > 0)
-                    stbTempPath.Append("." + strExplicitPath);
+				//if (thisMethodDef.IsStatic && thisMethodDef.IsConstructor)
+				//    stbTempPath.Append(".#cctor");
+				//if (!thisMethodDef.IsStatic && thisMethodDef.IsConstructor)
+				//    stbTempPath.Append(".#ctor");
+				stbTempPath.Append (".");
+				if (strExplicitPath.Length > 0)
+					stbTempPath.Append (strExplicitPath);
                 else
-                    stbTempPath.Append("." + thisMethodDef.Name);
+					stbTempPath.Append (thisMethodDef.Name);
 
                 // check whether this method is generic
                 if (thisMethodDef.GenericParameters.Count > 0)
-                    stbTempPath.Append("``" + thisMethodDef.GenericParameters.Count);
+					stbTempPath.Append("``").Append (thisMethodDef.GenericParameters.Count);
 
                 if (thisMethodDef.Parameters.Count > 0)
                     stbTempPath.Append("(");
@@ -334,10 +336,11 @@ namespace XmlDocIdLib
                 // property's path
                 // check whether this is explicitly implemented property
                 strExplicitPath = GetXmlDocExplicitIfaceImplPath(Member);
+				stbTempPath.Append (".");
                 if (strExplicitPath.Length > 0)
-                    stbTempPath.Append("." + strExplicitPath);
+                    stbTempPath.Append (strExplicitPath);
                 else
-                    stbTempPath.Append("." + Member.Name);
+                    stbTempPath.Append (Member.Name);
 
                 // is it an indexer ?
                 bool firstAppend = true;
@@ -426,7 +429,7 @@ namespace XmlDocIdLib
                         ((CanAppendSpecialExplicitChar() && ExplicitMode) ? "#" : ".");
                 }
 
-                CurrPath.Append(strNamespace + StripGenericName(thisGenericType.Name));
+				CurrPath.Append(strNamespace).Append (StripGenericName(thisGenericType.Name));
 
                 // list parameters or types
                 bool firstAppend = true;
@@ -465,9 +468,9 @@ namespace XmlDocIdLib
                         }
                     }
                     if (thisGenParam.Owner is MethodReference)
-                        CurrPath.Append("``" + paramOrder);
+						CurrPath.Append("``").Append (paramOrder);
                     else
-                        CurrPath.Append("`" + paramOrder);
+						CurrPath.Append("`").Append (paramOrder);
                 }
             }
             else if (tpType is PointerType)
@@ -590,8 +593,7 @@ namespace XmlDocIdLib
                 }
 
                 // concrete type
-                CurrPath.Append(
-                    strNamespace +
+				CurrPath.Append(strNamespace).Append (
                     ((CanAppendSpecialExplicitChar() && ExplicitMode) ? tpType.Name.Replace(".", "#") : tpType.Name));
             }
         }

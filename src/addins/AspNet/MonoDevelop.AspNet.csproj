@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <Import Project="..\..\..\MonoDevelop.props" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -9,7 +10,7 @@
     <OutputType>Library</OutputType>
     <AssemblyName>MonoDevelop.AspNet</AssemblyName>
     <RootNamespace>MonoDevelop.AspNet</RootNamespace>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>True</DebugSymbols>
@@ -56,11 +57,6 @@
       <Name>MonoDevelop.DesignerSupport</Name>
       <Private>False</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\core\Mono.Texteditor\Mono.TextEditor.csproj">
-      <Project>{A2329308-3751-4DBD-9A75-5F7B8B024625}</Project>
-      <Name>Mono.TextEditor</Name>
-      <Private>False</Private>
-    </ProjectReference>
     <ProjectReference Include="..\MonoDevelop.Refactoring\MonoDevelop.Refactoring.csproj">
       <Project>{100568FC-F4E8-439B-94AD-41D11724E45B}</Project>
       <Name>MonoDevelop.Refactoring</Name>
@@ -94,11 +90,6 @@
     <ProjectReference Include="..\TextTemplating\MonoDevelop.TextTemplating\MonoDevelop.TextTemplating.csproj">
       <Project>{8CCA39DD-8412-4547-BE7F-0C3D3ACC6FAC}</Project>
       <Name>MonoDevelop.TextTemplating</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\TextTemplating\Mono.TextTemplating\Mono.TextTemplating.csproj">
-      <Project>{A2364D6A-00EF-417C-80A6-815726C70032}</Project>
-      <Name>Mono.TextTemplating</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\Xml\MonoDevelop.Xml.csproj">
@@ -140,27 +131,31 @@
       <Private>False</Private>
     </ProjectReference>
     <Reference Include="System.Reflection.Metadata">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\System.Reflection.Metadata.dll</HintPath>
+      <HintPath>..\..\..\build\bin\System.Reflection.Metadata.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System.Collections.Immutable">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\System.Collections.Immutable.dll</HintPath>
+      <HintPath>..\..\..\build\bin\System.Collections.Immutable.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis.Workspaces">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.Workspaces.dll</HintPath>
+      <HintPath>..\..\..\build\bin\Microsoft.CodeAnalysis.Workspaces.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.dll</HintPath>
+      <HintPath>..\..\..\build\bin\Microsoft.CodeAnalysis.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis.CSharp.Workspaces">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.CSharp.Workspaces.dll</HintPath>
+      <HintPath>..\..\..\build\bin\Microsoft.CodeAnalysis.CSharp.Workspaces.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis.CSharp">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+      <HintPath>..\..\..\build\bin\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Mono.TextTemplating">
+      <HintPath>..\..\..\packages\Mono.TextTemplating.1.3.1\lib\net45\Mono.TextTemplating.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -198,17 +193,41 @@
     <EmbeddedResource Include="Properties\MonoDevelop.AspNet.addin.xml">
       <LogicalName>MonoDevelop.AspNet.addin.xml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Templates\images\aspnet-empty-project.png">
-      <LogicalName>aspnet-empty-project.png</LogicalName>
+    <EmbeddedResource Include="Templates\images\project-aspnet-template.png">
+      <LogicalName>project-aspnet-template.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Templates\images\aspnet-empty-project%402x.png">
-      <LogicalName>aspnet-empty-project@2x.png</LogicalName>
+    <EmbeddedResource Include="Templates\images\project-aspnet-template%402x.png">
+      <LogicalName>project-aspnet-template@2x.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Templates\images\aspnet-empty-project~dark.png">
-      <LogicalName>aspnet-empty-project~dark.png</LogicalName>
+    <EmbeddedResource Include="Templates\images\project-aspnet-template~dark.png">
+      <LogicalName>project-aspnet-template~dark.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Templates\images\aspnet-empty-project~dark%402x.png">
-      <LogicalName>aspnet-empty-project~dark@2x.png</LogicalName>
+    <EmbeddedResource Include="Templates\images\project-aspnet-template~dark%402x.png">
+      <LogicalName>project-aspnet-template~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Templates\images\project-aspnet-32.png">
+      <LogicalName>project-aspnet-32.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Templates\images\project-aspnet-32%402x.png">
+      <LogicalName>project-aspnet-32@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Templates\images\project-aspnet-32~dark.png">
+      <LogicalName>project-aspnet-32~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Templates\images\project-aspnet-32~dark%402x.png">
+      <LogicalName>project-aspnet-32~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Templates\images\project-aspnet-32~sel.png">
+      <LogicalName>project-aspnet-32~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Templates\images\project-aspnet-32~sel%402x.png">
+      <LogicalName>project-aspnet-32~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Templates\images\project-aspnet-32~dark~sel.png">
+      <LogicalName>project-aspnet-32~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Templates\images\project-aspnet-32~dark~sel%402x.png">
+      <LogicalName>project-aspnet-32~dark~sel@2x.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="gtk-gui\gui.stetic">
       <LogicalName>gui.stetic</LogicalName>
@@ -229,7 +248,6 @@
     <Compile Include="Html\ElementTypes.cs" />
     <Compile Include="Razor\Parser\RazorSymbols.cs" />
     <Compile Include="Razor\Parser\RazorUtils.cs" />
-    <Compile Include="Razor\RazorSyntaxMode.cs" />
     <Compile Include="Razor\RazorCSharpFormatter.cs" />
     <Compile Include="Razor\EditorParserFixed\BackgroundParser.cs" />
     <Compile Include="Razor\EditorParserFixed\CommonResources.Designer.cs" />
@@ -534,6 +552,36 @@
     <None Include="Templates\Projects\Files\Test.cs">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="Templates\EmptyCssFile.xft.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Templates\EmptyLessFile.xft.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Templates\EmptyScssFile.xft.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Templates\EmptyJsonFile.xft.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Templates\EmptyTypeScriptFile.xft.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Templates\StylesheetTemplate.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Templates\StylesheetTemplate.less">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Templates\StylesheetTemplate.scss">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Templates\JsonFileTemplate.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Templates\TypeScriptFileTemplate.ts">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Content Include="Html\Schemas\readme.txt">
@@ -551,6 +599,10 @@
     <Content Include="Html\Schemas\xhtml1-transitional.xsd">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="MonoDevelop.AspNet.Tests" />
+    <InternalsVisibleTo Include="MonoDevelop.CSharpBinding.AspNet" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ProjectExtensions>
@@ -580,11 +632,4 @@
     <Folder Include="Templates\images\" />
     <Folder Include="WebForms\CSharp\" />
   </ItemGroup>
-  <Target Name="BeforeBuild">
-    <PropertyGroup>
-      <NuGet>$(SolutionDir)\external\nuget-binary\NuGet.exe</NuGet>
-      <NuGet Condition="$(OS)=='Unix'">mono $(NuGet)</NuGet>
-    </PropertyGroup>
-    <Exec Condition="Exists('$(SolutionDir)\..\.git')" Command="$(NuGet) restore -SolutionDirectory $(SolutionDir)" />
-  </Target>
 </Project>

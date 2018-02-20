@@ -57,6 +57,8 @@ namespace MonoDevelop.VersionControl
 			public Color DiffHighlightColor { get; internal set; }
 			public Color DiffBoxBorderColor { get; internal set; }
 			public Color DiffBoxSplitterColor { get; internal set; }
+			// TODO: End up having this as Color at some point or cache the string in Xwt.Color.
+			public string SearchSnippetTextColor { get; internal set; }
 		}
 
 		public class DiffViewStyle
@@ -77,7 +79,7 @@ namespace MonoDevelop.VersionControl
 
 		public static void LoadStyles ()
 		{
-			if (IdeApp.Preferences.UserInterfaceSkin == Skin.Light) {
+			if (IdeApp.Preferences.UserInterfaceTheme == Theme.Light) {
 				BlameView = new BlameViewStyle {
 					AnnotationMarkColor = Color.FromName ("#e5f1ff"),
 					AnnotationMarkModifiedColor = Color.FromName ("#ffff00"),
@@ -90,6 +92,7 @@ namespace MonoDevelop.VersionControl
 					DiffRemoveBackgroundColor = Color.FromName ("#c88c8c").AddLight (0.1),
 					DiffHighlightColor = Color.FromName ("#000000").WithAlpha (0.05),
 					DiffBoxBorderColor = Color.FromName ("#eaeaea"),
+					SearchSnippetTextColor = "#f1c40f",
 				};
 
 				DiffView = new DiffViewStyle {
@@ -113,6 +116,7 @@ namespace MonoDevelop.VersionControl
 					DiffRemoveBackgroundColor = Color.FromName ("#c88c8c").AddLight (-0.1),
 					DiffHighlightColor = MonoDevelop.Ide.Gui.Styles.BackgroundColor.AddLight (0.1),
 					DiffBoxBorderColor = Color.FromName ("#4c4c4c"),
+					SearchSnippetTextColor = "#f9d33c",
 				};
 
 				DiffView = new DiffViewStyle {
@@ -131,7 +135,7 @@ namespace MonoDevelop.VersionControl
 			BlameView.AnnotationHighlightColor = MonoDevelop.Ide.Gui.Styles.SecondaryBackgroundLighterColor;
 			BlameView.AnnotationBackgroundColor = MonoDevelop.Ide.Gui.Styles.SecondaryBackgroundDarkerColor;
 			BlameView.AnnotationSplitterColor = MonoDevelop.Ide.Gui.Styles.SeparatorColor;
-			BlameView.AnnotationSummaryTextColor = MonoDevelop.Ide.Gui.Styles.DimTextColor;
+			BlameView.AnnotationSummaryTextColor = MonoDevelop.Ide.Gui.Styles.SecondaryTextColor;
 
 			LogView.CommitDescBackgroundColor = MonoDevelop.Ide.Gui.Styles.SecondaryBackgroundDarkerColor;
 			LogView.DiffBoxSplitterColor = MonoDevelop.Ide.Gui.Styles.PrimaryBackgroundColor;

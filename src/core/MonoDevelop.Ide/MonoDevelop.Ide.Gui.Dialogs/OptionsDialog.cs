@@ -33,6 +33,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Ide.Extensions;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Components;
+using MonoDevelop.Components.AtkCocoaHelper;
 
 namespace MonoDevelop.Ide.Gui.Dialogs
 {
@@ -87,21 +88,32 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 		public OptionsDialog (MonoDevelop.Components.Window parentWindow, object dataObject, string extensionPath, bool removeEmptySections)
 		{
 			buttonCancel = new Gtk.Button (Gtk.Stock.Cancel);
+			buttonCancel.Accessible.Name = "Dialogs.Options.Cancel";
+			buttonCancel.Accessible.Description = GettextCatalog.GetString ("Close the options dialog and discard any changes");
 			AddActionWidget (this.buttonCancel, ResponseType.Cancel);
 
 			buttonOk = new Gtk.Button (Gtk.Stock.Ok);
+			buttonOk.Accessible.Name = "Dialogs.Options.Ok";
+			buttonOk.Accessible.Description = GettextCatalog.GetString ("Close the options dialog and keep the changes");
 			this.ActionArea.PackStart (buttonOk);
 			buttonOk.Clicked += OnButtonOkClicked;
 
 			mainHBox = new HBox ();
+			mainHBox.Accessible.SetShouldIgnore (true);
 			tree = new TreeView ();
+			tree.Accessible.Name = "Dialogs.Options.Categories";
+			tree.Accessible.Description = GettextCatalog.GetString ("The categories of options that are available in this dialog");
+
 			var sw = new ScrolledWindow ();
+			sw.Accessible.SetShouldIgnore (true);
 			sw.Add (tree);
 			sw.HscrollbarPolicy = PolicyType.Never;
 			sw.VscrollbarPolicy = PolicyType.Automatic;
 			sw.ShadowType = ShadowType.None;
 
 			var fboxTree = new HeaderBox ();
+			fboxTree.Accessible.SetShouldIgnore (true);
+
 			fboxTree.SetMargins (0, 1, 0, 1);
 			fboxTree.SetPadding (0, 0, 0, 0);
 			fboxTree.BackgroundColor = new Gdk.Color (255, 255, 255);
@@ -113,21 +125,28 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			};
 
 			var vbox = new VBox ();
+			vbox.Accessible.SetShouldIgnore (true);
 			mainHBox.PackStart (vbox, true, true, 0);
 			var headerBox = new HBox (false, 6);
+			headerBox.Accessible.SetShouldIgnore (true);
 
 			labelTitle = new Label ();
+			labelTitle.Accessible.Name = "Dialogs.Options.PageTitle";
 			labelTitle.Xalign = 0;
 			textHeader = new Alignment (0, 0, 1, 1);
+			textHeader.Accessible.SetShouldIgnore (true);
 			textHeader.Add (labelTitle);
 			textHeader.BorderWidth = 12;
 			headerBox.PackStart (textHeader, true, true, 0);
 
 			imageHeader = new OptionsDialogHeader ();
 			imageHeader.Hide ();
-			headerBox.PackStart (imageHeader.ToGtkWidget ());
+			var imageHeaderWidget = imageHeader.ToGtkWidget ();
+			imageHeaderWidget.Accessible.SetShouldIgnore (true);
+			headerBox.PackStart (imageHeaderWidget);
 
 			var fboxHeader = new HeaderBox ();
+			fboxHeader.Accessible.SetShouldIgnore (true);
 			fboxHeader.SetMargins (0, 1, 0, 0);
 			fboxHeader.Add (headerBox);
 //			fbox.GradientBackround = true;
@@ -147,7 +166,9 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			vbox.PackStart (fboxHeader, false, false, 0);
 
 			pageFrame = new HBox ();
+			pageFrame.Accessible.SetShouldIgnore (true);
 			var fbox = new HeaderBox ();
+			fbox.Accessible.SetShouldIgnore (true);
 			fbox.SetMargins (0, 1, 0, 0);
 			fbox.ShowTopShadow = true;
 			fbox.Add (pageFrame);
@@ -194,6 +215,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			
 			FillTree ();
 			ExpandCategories ();
+			RestoreLastPanel ();
 			this.DefaultResponse = Gtk.ResponseType.Ok;
 
 			buttonOk.CanDefault = true;
@@ -202,8 +224,8 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			DefaultWidth = 960;
 			DefaultHeight = 680;
 		}
-		
-		void PixbufCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
+
+		static void PixbufCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			TreeIter parent;
 			bool toplevel = !model.IterParent (out parent, iter);
@@ -233,7 +255,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			}
 		}
 		
-		void TextCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
+		static void TextCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			TreeIter parent;
 			bool toplevel = !model.IterParent (out parent, iter);
@@ -295,7 +317,6 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 				if (disp != null)
 					disp.Dispose ();
 			}
-			store.Dispose ();
 			base.OnDestroyed ();
 		}
 
@@ -331,7 +352,20 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 				}
 			}
 		}
-		
+
+		internal void ExpandChildren (IOptionsPanel parent)
+		{
+			foreach (SectionPage page in pages.Values) {
+				foreach (PanelInstance pi in page.Panels) {
+					if (pi.Panel == parent) {
+						tree.ExpandToPath (store.GetPath (page.Iter));
+						tree.ExpandRow (store.GetPath (page.Iter), false);
+						return;
+					}
+				}
+			}
+		}
+
 		internal void AddChildSection (IOptionsPanel parent, OptionsDialogSection section, object dataObject)
 		{
 			foreach (SectionPage page in pages.Values) {
@@ -410,6 +444,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			TreeIter cit;
 			if (removeEmptySections && page.Panels.Count == 0 && !store.IterChildren (out cit, it)) {
 				store.Remove (ref it);
+				pages.Remove (section);
 				return TreeIter.Zero;
 			}
 			return it;
@@ -537,7 +572,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 				CreatePageWidget (page);
 
 			if (section.HeaderImage == null) {
-				labelTitle.Markup = "<span weight=\"bold\" size=\"large\">" + GLib.Markup.EscapeText (section.Label) + "</span>";
+				labelTitle.Markup = "<span weight=\"bold\" size=\"large\">" + GLib.Markup.EscapeText (section.HeaderLabel) + "</span>";
 				textHeader.Show ();
 				imageHeader.Hide ();
 			} else {
@@ -749,16 +784,46 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			// Validate changes before saving
 			if (!ValidateChanges ())
 				return;
-			
+
 			// Now save
-			ApplyChanges ();
-			
+			try {
+				ApplyChanges ();
+			} catch (Exception ex) {
+				LoggingService.LogError ("Error saving options changes", ex);
+				MessageService.ShowError (null, GettextCatalog.GetString ("There was an error saving the changes"), null, null, false);
+			}
+
+			StoreLastPanel ();
+
 			if (DataObject != null)
 				modifiedObjects.Add (DataObject);
 			
 			this.Respond (ResponseType.Ok);
 		}
-		
+
+		#region Restore
+
+		void RestoreLastPanel ()
+		{
+			string id = PropertyService.Get<string> (extensionPath + "-lastPanel");
+			if (string.IsNullOrEmpty (id)) {
+				return;
+			}
+
+			SelectPanel (id);
+		}
+
+		void StoreLastPanel ()
+		{
+			TreeIter it;
+			if (tree.Selection.GetSelected (out it)) {
+				OptionsDialogSection section = (OptionsDialogSection)store.GetValue (it, 0);
+				PropertyService.Set (extensionPath + "-lastPanel", section.Id);
+			}
+		}
+
+		#endregion
+
 		class PanelInstance
 		{
 			public IOptionsPanel Panel;

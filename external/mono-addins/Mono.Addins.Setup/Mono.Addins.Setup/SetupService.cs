@@ -28,15 +28,16 @@
 
 
 using System;
-using System.Xml;
-using System.IO;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Xml;
 using ICSharpCode.SharpZipLib.Zip;
+using Mono.Addins.Database;
 using Mono.Addins.Description;
 using Mono.Addins.Setup.ProgressMonitoring;
-using Microsoft.Win32;
-using System.Diagnostics;
 using Mono.PkgConfig;
 
 namespace Mono.Addins.Setup
@@ -338,16 +339,42 @@ namespace Mono.Addins.Setup
 		/// </remarks>
 		public string[] BuildPackage (IProgressStatus statusMonitor, string targetDirectory, params string[] filePaths)
 		{
+			return BuildPackage (statusMonitor, false, targetDirectory, filePaths);
+		}
+
+		/// <summary>
+		/// Packages an add-in
+		/// </summary>
+		/// <param name="statusMonitor">
+		/// Progress monitor where to show progress status
+		/// </param>
+		/// <param name="debugSymbols">
+		/// True if debug symbols (.pdb or .mdb) should be included in the package, if they exist
+		/// </param>
+		/// <param name="targetDirectory">
+		/// Directory where to generate the package
+		/// </param>
+		/// <param name="filePaths">
+		/// Paths to the add-ins to be packaged. Paths can be either the main assembly of an add-in, or an add-in
+		/// manifest (.addin or .addin.xml).
+		/// </param>
+		/// <remarks>
+		/// This method can be used to create a package for an add-in, which can then be pushed to an on-line
+		/// repository. The package will include the main assembly or manifest of the add-in and any external
+		/// file declared in the add-in metadata.
+		/// </remarks>
+		public string[] BuildPackage (IProgressStatus statusMonitor, bool debugSymbols, string targetDirectory, params string[] filePaths)
+		{
 			List<string> outFiles = new List<string> ();
 			foreach (string file in filePaths) {
-				string f = BuildPackageInternal (statusMonitor, targetDirectory, file);
+				string f = BuildPackageInternal (statusMonitor, debugSymbols, targetDirectory, file);
 				if (f != null)
 					outFiles.Add (f);
 			}
 			return outFiles.ToArray ();
 		}
 		
-		string BuildPackageInternal (IProgressStatus monitor, string targetDirectory, string filePath)
+		string BuildPackageInternal (IProgressStatus monitor, bool debugSymbols, string targetDirectory, string filePath)
 		{
 			AddinDescription conf = registry.GetAddinDescription (monitor, filePath);
 			if (conf == null) {
@@ -355,7 +382,7 @@ namespace Mono.Addins.Setup
 				return null;
 			}
 			
-			string basePath = Path.GetDirectoryName (filePath);
+			string basePath = Path.GetDirectoryName (Path.GetFullPath (filePath));
 			
 			if (targetDirectory == null)
 				targetDirectory = basePath;
@@ -388,46 +415,110 @@ namespace Mono.Addins.Setup
 			doc.WriteTo (tw);
 			tw.Flush ();
 			byte[] data = ms.ToArray ();
-			
-			ZipEntry infoEntry = new ZipEntry ("addin.info");
+
+			var infoEntry = new ZipEntry ("addin.info") { Size = data.Length };
 			s.PutNextEntry (infoEntry);
 			s.Write (data, 0, data.Length);
-			
+			s.CloseEntry ();
+
 			// Now add the add-in files
-			
-			ArrayList list = new ArrayList ();
-			if (!conf.AllFiles.Contains (Path.GetFileName (filePath)))
-				list.Add (Path.GetFileName (filePath));
+
+			var files = new HashSet<string> ();
+
+			files.Add (Path.GetFileName (Util.NormalizePath (filePath)));
+
 			foreach (string f in conf.AllFiles) {
-				list.Add (f);
+				var file = Util.NormalizePath (f);
+				files.Add (file);
+				if (debugSymbols) {
+					if (File.Exists (Path.ChangeExtension (file, ".pdb")))
+						files.Add (Path.ChangeExtension (file, ".pdb"));
+					else if (File.Exists (file + ".mdb"))
+						files.Add (file + ".mdb");
+				}
 			}
 			
 			foreach (var prop in conf.Properties) {
 				try {
-					if (File.Exists (Path.Combine (basePath, prop.Value)))
-						list.Add (prop.Value);
+					var file = Util.NormalizePath (prop.Value);
+					if (File.Exists (Path.Combine (basePath, file))) {
+						files.Add (file);
+					}
 				} catch {
 					// Ignore errors
+				}
+			}
+
+			//add satellite assemblies for assemblies in the list
+			var satelliteFinder = new SatelliteAssemblyFinder ();
+			foreach (var f in files.ToList ()) {
+				foreach (var satellite in satelliteFinder.FindSatellites (Path.Combine (basePath, f))) {
+					var relativeSatellite = satellite.Substring (basePath.Length + 1);
+					files.Add (relativeSatellite);
 				}
 			}
 			
 			monitor.Log ("Creating package " + Path.GetFileName (outFilePath));
 			
-			foreach (string file in list) {
+			foreach (string file in files) {
 				string fp = Path.Combine (basePath, file);
 				using (FileStream fs = File.OpenRead (fp)) {
 					byte[] buffer = new byte [fs.Length];
 					fs.Read (buffer, 0, buffer.Length);
-					
-					ZipEntry entry = new ZipEntry (file);
+
+					var fileName = Path.PathSeparator == '\\' ? file.Replace ('\\', '/') : file;
+					var entry = new ZipEntry (fileName) { Size = fs.Length };
 					s.PutNextEntry (entry);
 					s.Write (buffer, 0, buffer.Length);
+					s.CloseEntry ();
 				}
 			}
 			
 			s.Finish();
 			s.Close();		
 			return outFilePath;
+		}
+
+		class SatelliteAssemblyFinder
+		{
+			Dictionary<string, List<string>> cultureSubdirCache = new Dictionary<string, List<string>> ();
+			HashSet<string> cultureNames = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
+
+			public SatelliteAssemblyFinder ()
+			{
+				foreach (var cultureName in CultureInfo.GetCultures (CultureTypes.AllCultures)) {
+					cultureNames.Add (cultureName.Name);
+				}
+			}
+
+			List<string> GetCultureSubdirectories (string directory)
+			{
+				if (!cultureSubdirCache.TryGetValue (directory, out List<string> cultureDirs)) {
+					cultureDirs = Directory.EnumerateDirectories (directory)
+						.Where (d => cultureNames.Contains (Path.GetFileName ((d))))
+						.ToList ();
+
+					cultureSubdirCache [directory] = cultureDirs;
+				}
+				return cultureDirs;
+			}
+
+			public IEnumerable<string> FindSatellites (string assemblyPath)
+			{
+				if (!assemblyPath.EndsWith (".dll", StringComparison.OrdinalIgnoreCase)) {
+					yield break;
+				}
+
+				var satelliteName = Path.GetFileNameWithoutExtension (assemblyPath) + ".resources.dll";
+
+				foreach (var cultureDir in GetCultureSubdirectories (Path.GetDirectoryName (assemblyPath))) {
+					string cultureName = Path.GetFileName (cultureDir);
+					string satellitePath = Path.Combine (cultureDir, satelliteName);
+					if (File.Exists (satellitePath)) {
+						yield return satellitePath;
+					}
+				}
+			}
 		}
 		
 		void CleanDescription (XmlElement parent)
@@ -580,29 +671,33 @@ namespace Mono.Addins.Setup
 		{
 			Random r = new Random ();
 			ZipFile zfile = new ZipFile (file);
-			foreach (var prop in ainfo.Properties) {
-				ZipEntry ze = zfile.GetEntry (prop.Value);
-				if (ze != null) {
-					string fname;
-					do {
-						fname = Path.Combine (targetDir, r.Next().ToString ("x") + Path.GetExtension (prop.Value));
-					} while (File.Exists (fname));
-					
-					if (!Directory.Exists (targetDir))
-						Directory.CreateDirectory (targetDir);
-					
-					using (var f = File.OpenWrite (fname)) {
-						using (Stream s = zfile.GetInputStream (ze)) {
-							byte[] buffer = new byte [8092];
-							int nr = 0;
-							while ((nr = s.Read (buffer, 0, buffer.Length)) > 0)
-								f.Write (buffer, 0, nr);
+			try {
+				foreach (var prop in ainfo.Properties) {
+					ZipEntry ze = zfile.GetEntry (prop.Value);
+					if (ze != null) {
+						string fname;
+						do {
+							fname = Path.Combine (targetDir, r.Next ().ToString ("x") + Path.GetExtension (prop.Value));
+						} while (File.Exists (fname));
+
+						if (!Directory.Exists (targetDir))
+							Directory.CreateDirectory (targetDir);
+
+						using (var f = File.OpenWrite (fname)) {
+							using (Stream s = zfile.GetInputStream (ze)) {
+								byte [] buffer = new byte [8092];
+								int nr = 0;
+								while ((nr = s.Read (buffer, 0, buffer.Length)) > 0)
+									f.Write (buffer, 0, nr);
+							}
 						}
+						prop.Value = Path.Combine (addinFilesDir, Path.GetFileName (fname));
 					}
-					prop.Value = Path.Combine (addinFilesDir, Path.GetFileName (fname));
 				}
+			} finally {
+				zfile.Close ();
 			}
-		}
+ 		}
 		
 		void GenerateIndexPage (Repository rep, ArrayList addins, string basePath)
 		{

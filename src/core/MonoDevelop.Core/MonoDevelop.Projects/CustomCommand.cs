@@ -77,7 +77,7 @@ namespace MonoDevelop.Projects
 		
 		public string Command {
 			get { return command; }
-			set { command = value; }
+			set { command = value ?? string.Empty; }
 		}
 		
 		public string WorkingDir {
@@ -159,7 +159,21 @@ namespace MonoDevelop.Projects
 
 			return cmd;
 		}
-		
+
+		public bool Equals (CustomCommand cmd)
+		{
+			if (command != cmd.command || workingdir != cmd.workingdir || externalConsole != cmd.externalConsole || pauseExternalConsole != cmd.pauseExternalConsole || type != cmd.type)
+				return false;
+			if (environmentVariables.Count != cmd.environmentVariables.Count)
+				return false;
+			foreach (var e in environmentVariables) {
+				string val;
+				if (!cmd.environmentVariables.TryGetValue (e.Key, out val) || e.Value != val)
+					return false;
+			}
+			return true;
+		}
+
 		StringTagModel GetTagModel (WorkspaceObject entry, ConfigurationSelector configuration)
 		{
 			if (entry is SolutionFolderItem)
@@ -172,18 +186,23 @@ namespace MonoDevelop.Projects
 		
 		void ParseCommand (StringTagModel tagSource, out string cmd, out string args)
 		{
+			ParseCommand (out cmd, out args);
+			cmd = StringParserService.Parse (cmd, tagSource);
+			args = StringParserService.Parse (args, tagSource);
+		}
+		
+		internal void ParseCommand (out string cmd, out string args)
+		{
 			if (command.Length > 0 && command [0] == '"') {
 				int n = command.IndexOf ('"', 1);
 				if (n != -1) {
 					cmd = command.Substring (1, n - 1);
 					args = command.Substring (n + 1).Trim ();
-				}
-				else {
+				} else {
 					cmd = command;
 					args = string.Empty;
 				}
-			}
-			else {
+			} else {
 				int i = command.IndexOf (' ');
 				if (i != -1) {
 					cmd = command.Substring (0, i);
@@ -193,10 +212,8 @@ namespace MonoDevelop.Projects
 					args = string.Empty;
 				}
 			}
-			cmd = StringParserService.Parse (cmd, tagSource);
-			args = StringParserService.Parse (args, tagSource);
 		}
-		
+
 		public ProcessExecutionCommand CreateExecutionCommand (WorkspaceObject entry, ConfigurationSelector configuration)
 		{
 			if (string.IsNullOrEmpty (command))
@@ -276,7 +293,7 @@ namespace MonoDevelop.Projects
 					oper = context.ExecutionHandler.Execute (cmd, console);
 				} else {
 					if (externalConsole) {
-						console = context.ExternalConsoleFactory.CreateConsole (!pauseExternalConsole, monitor.CancellationToken);
+						console = ExternalConsoleFactory.Instance.CreateConsole (!pauseExternalConsole, monitor.CancellationToken);
 						oper = Runtime.ProcessService.StartConsoleProcess (cmd.Command, cmd.Arguments,
 							cmd.WorkingDirectory, console, null);
 					} else {
@@ -292,7 +309,7 @@ namespace MonoDevelop.Projects
 				stopper.Dispose ();
 
 				if (oper.ExitCode != 0) {
-					monitor.ReportError ("Custom command failed (exit code: " + oper.ExitCode + ")", null);
+					monitor.ReportError (GettextCatalog.GetString ("Custom command failed (exit code: {0})", oper.ExitCode), null);
 				}
 			} catch (Win32Exception w32ex) {
 				monitor.ReportError (GettextCatalog.GetString ("Failed to execute custom command '{0}': {1}",

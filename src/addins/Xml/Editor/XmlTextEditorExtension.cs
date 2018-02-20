@@ -29,6 +29,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Xml;
 using System.Xml.Schema;
 
@@ -38,7 +39,6 @@ using MonoDevelop.Ide;
 using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide.Tasks;
-using MonoDevelop.Ide;
 using MonoDevelop.Ide.CodeFormatting;
 using MonoDevelop.Ide.Editor;
 using MonoDevelop.Xml.Completion;
@@ -72,9 +72,8 @@ namespace MonoDevelop.Xml.Editor
 			XmlSchemaManager.UserSchemaAdded += UserSchemaAdded;
 			XmlSchemaManager.UserSchemaRemoved += UserSchemaRemoved;
 			SetDefaultSchema ();
-			
-			//var view = Document.GetContent<MonoDevelop.SourceEditor.SourceEditorView> ();
-			if (string.IsNullOrEmpty (Editor.MimeType)) {
+
+			if (string.IsNullOrEmpty (Editor.MimeType) || Editor.MimeType == "text/plain" || Editor.MimeType == "application/octet-stream") {
 				Editor.MimeType = ApplicationXmlMimeType;
 				DocumentContext.ReparseDocument ();
 			}
@@ -96,12 +95,24 @@ namespace MonoDevelop.Xml.Editor
 				XmlSchemaManager.UserSchemaAdded -= UserSchemaAdded;
 
 				XmlSchemaManager.UserSchemaRemoved -= UserSchemaRemoved;
+				ClearTasksForStandaloneXmlFile ();
 				base.Dispose ();
 			}
 		}
-		
+
+		void ClearTasksForStandaloneXmlFile ()
+		{
+			var tasks = TaskService.Errors
+				.GetOwnerTasks (this)
+				.Where (t => t.WorkspaceObject == null)
+				.ToList ();
+
+			if (tasks.Any ())
+				TaskService.Errors.RemoveRange (tasks);
+		}
+
 		#region Code completion
-		
+
 		XmlElementPath GetElementPath ()
 		{
 			return XmlElementPath.Resolve (
@@ -113,7 +124,7 @@ namespace MonoDevelop.Xml.Editor
 		
 		protected override async Task<CompletionDataList> GetElementCompletions (CancellationToken token)
 		{
-			var list = new CompletionDataList ();
+			CompletionDataList list = null;
 			var path = GetElementPath ();
 
 			if (path.Elements.Count > 0) {
@@ -125,14 +136,17 @@ namespace MonoDevelop.Xml.Editor
 
 					var completionData = await schema.GetChildElementCompletionData (path, token);
 					if (completionData != null)
-						list.AddRange (completionData);
+						list = completionData;
 				}
 
 			} else if (defaultSchemaCompletionData != null) {
-				list.AddRange (await defaultSchemaCompletionData.GetElementCompletionData (defaultNamespacePrefix, token));
+				list = await defaultSchemaCompletionData.GetElementCompletionData (defaultNamespacePrefix, token);
 
 			} else if (inferredCompletionData != null) {
-				list.AddRange (await inferredCompletionData.GetElementCompletionData (token));
+				list = await inferredCompletionData.GetElementCompletionData (token);
+			}
+			if (list == null) {
+				list = new CompletionDataList ();
 			}
 			AddMiscBeginTags (list);
 			return list;
@@ -676,7 +690,7 @@ namespace MonoDevelop.Xml.Editor
 
 				string xml = Editor.Text;
 				using (ProgressMonitor monitor = XmlEditorService.GetMonitor ()) {
-					XmlDocument doc = XmlEditorService.ValidateWellFormedness (monitor, xml, FileName);
+					XmlDocument doc = XmlEditorService.ValidateWellFormedness (monitor, xml, FileName, DocumentContext.Project);
 					if (doc == null)
 						return;
 					monitor.BeginTask (GettextCatalog.GetString ("Creating schema..."), 0);
@@ -712,7 +726,7 @@ namespace MonoDevelop.Xml.Editor
 
 				} catch (Exception ex) {
 					LoggingService.LogError ("Could not open document.", ex);
-					MessageService.ShowException (ex, "Could not open document.");
+					MessageService.ShowError ("Could not open document.", ex);
 				}
 			}
 		}
@@ -748,7 +762,7 @@ namespace MonoDevelop.Xml.Editor
 				}
 			} catch (Exception ex) {
 				MonoDevelop.Core.LoggingService.LogError ("Could not open document.", ex);
-				MessageService.ShowException (ex, "Could not open document.");
+				MessageService.ShowError ("Could not open document.", ex);
 			}
 		}
 		
@@ -758,10 +772,9 @@ namespace MonoDevelop.Xml.Editor
 			TaskService.Errors.Clear ();
 			using (ProgressMonitor monitor = XmlEditorService.GetMonitor()) {
 				if (IsSchema)
-					XmlEditorService.ValidateSchema (monitor, Editor.Text, FileName);
+					XmlEditorService.ValidateSchema (monitor, Editor.Text, FileName, DocumentContext.Project);
 				else
-
-					XmlEditorService.ValidateXml (monitor, Editor.Text, FileName);
+					XmlEditorService.ValidateXml (monitor, Editor.Text, FileName, DocumentContext.Project);
 			}
 		}
 		
@@ -799,11 +812,11 @@ namespace MonoDevelop.Xml.Editor
 						return;
 					}
 					System.Xml.Xsl.XslCompiledTransform xslt = 
-						XmlEditorService.ValidateStylesheet (monitor, xsltContent, stylesheetFileName);
+						XmlEditorService.ValidateStylesheet (monitor, xsltContent, stylesheetFileName, DocumentContext.Project);
 					if (xslt == null)
 						return;
 					
-					XmlDocument doc = XmlEditorService.ValidateXml (monitor, Editor.Text, FileName);
+					XmlDocument doc = XmlEditorService.ValidateXml (monitor, Editor.Text, FileName, DocumentContext.Project);
 					if (doc == null)
 						return;
 					

@@ -40,9 +40,12 @@ namespace MonoDevelop.Projects.MSBuild.Conditions {
 		string	inputString = null;
 		int	position = 0;
 		int	tokenPosition = 0;
+		int tokenLength = 0;
+		int nextChar = -1;
 		
 		Token	token;
-		Token	putback = null;
+		bool	hasPutback;
+		Token	putback;
 		
 //		bool	ignoreWhiteSpace = true;
 		
@@ -73,6 +76,8 @@ namespace MonoDevelop.Projects.MSBuild.Conditions {
 		
 			this.inputString = s;
 			this.position = 0;
+			if (position < inputString.Length)
+				this.nextChar = inputString [position];
 			this.token = new Token (null, TokenType.BOF, 0);
 
 			GetNextToken ();
@@ -91,18 +96,19 @@ namespace MonoDevelop.Projects.MSBuild.Conditions {
 		
 		int PeekChar ()
 		{
-			if (position < inputString.Length)
-				return (int) inputString [position];
-			else
-				return -1;
+			return nextChar;
 		}
 		
 		int ReadChar ()
 		{
-			if (position < inputString.Length)
-				return (int) inputString [position++];
-			else
-				return -1;
+			try {
+				return nextChar;
+			} finally {
+				if (++position < inputString.Length)
+					nextChar = (int)inputString [position];
+				else
+					nextChar = -1;
+			}
 		}
 		
 		public void Expect (TokenType type)
@@ -137,14 +143,15 @@ namespace MonoDevelop.Projects.MSBuild.Conditions {
 		// FIXME test this
 		public void Putback (Token token)
 		{
+			hasPutback = true;
 			putback = token;
 		}
-		
+
 		public void GetNextToken ()
 		{
-			if (putback != null) {
+			if (hasPutback) {
 				token = putback;
-				putback = null;
+				hasPutback = false;
 				return;
 			}
 		
@@ -156,6 +163,7 @@ namespace MonoDevelop.Projects.MSBuild.Conditions {
 			SkipWhiteSpace ();
 			
 			tokenPosition = position;
+			tokenLength = 0;
 			
 //			int i = PeekChar ();
 			int i = ReadChar ();
@@ -167,32 +175,30 @@ namespace MonoDevelop.Projects.MSBuild.Conditions {
 			
 			char ch = (char) i;
 
-			
 			// FIXME: looks like a hack: if '-' is here '->' won't be tokenized
 			// maybe we should treat item reference as a token
 			if (ch == '-' && PeekChar () == '>') {
 				ReadChar ();
 				token = new Token ("->", TokenType.Transform, tokenPosition);
 			} else if (Char.IsDigit (ch) || ch == '-') {
-				StringBuilder sb = new StringBuilder ();
-				
-				sb.Append (ch);
-				
+
+				tokenLength++;
+
 				while ((i = PeekChar ()) != -1) {
 					ch = (char) i;
 					
-					if (Char.IsDigit (ch) || ch == '.')
-						sb.Append ((char) ReadChar ());
-					else
+					if (Char.IsDigit (ch) || ch == '.') {
+						ReadChar ();
+						tokenLength++;
+					} else
 						break;
 				}
 				
-				token = new Token (sb.ToString (), TokenType.Number, tokenPosition);
+				token = new Token (inputString.Substring(tokenPosition, tokenLength), TokenType.Number, tokenPosition);
 			} else if (ch == '\'' && position < inputString.Length) {
-				StringBuilder sb = new StringBuilder ();
-				string temp;
-				
-				sb.Append (ch);
+
+				tokenLength++;
+
 				bool is_itemref = (PeekChar () == '@');
 				int num_open_braces = 0;
 				bool in_literal = false;
@@ -203,33 +209,31 @@ namespace MonoDevelop.Projects.MSBuild.Conditions {
 						num_open_braces ++;
 					if (ch == ')' && !in_literal && is_itemref)
 						num_open_braces --;
-					
-					sb.Append ((char) ReadChar ());
-					
+
+					ReadChar ();
+					tokenLength++;
+
 					if (ch == '\'') {
 						if (num_open_braces == 0)
 							break;
 						in_literal = !in_literal;
 					}
 				}
-				
-				temp = sb.ToString ();
-				
-				token = new Token (temp.Substring (1, temp.Length - 2), TokenType.String, tokenPosition);
+
+				token = new Token (inputString.Substring (tokenPosition + 1, tokenLength - 2), TokenType.String, tokenPosition);
 				
 			} else 	if (ch == '_' || Char.IsLetter (ch)) {
-				StringBuilder sb = new StringBuilder ();
-				
-				sb.Append ((char) ch);
-				
+				tokenLength++;
+
 				while ((i = PeekChar ()) != -1) {
-					if ((char) i == '_' || Char.IsLetterOrDigit ((char) i))
-						sb.Append ((char) ReadChar ());
-					else
+					if ((char) i == '_' || Char.IsLetterOrDigit ((char) i)) {
+						ReadChar ();
+						tokenLength++;
+					} else
 						break;
 				}
 				
-				string temp = sb.ToString ();
+				string temp = inputString.Substring(tokenPosition, tokenLength);
 				
 				if (keywords.ContainsKey (temp))
 					token = new Token (temp, keywords [temp], tokenPosition);
@@ -256,6 +260,29 @@ namespace MonoDevelop.Projects.MSBuild.Conditions {
 					throw new ExpressionParseException (String.Format ("Invalid punctuation: {0}", ch));
 			} else
 				throw new ExpressionParseException (String.Format ("Invalid token: {0}", ch));
+		}
+
+		public void ScanForClosingParens (int parensCounter = 1)
+		{
+			tokenPosition = position;
+			int start = position;
+			int ch;
+			while ((ch = PeekChar ()) >= 0) {
+				switch (ch) {
+				case ')':
+					if (--parensCounter == 0) {
+						token = new Token (inputString.Substring (start, position - start), TokenType.String, tokenPosition);
+						return;
+					}
+					break;
+				case '(':
+					++parensCounter;
+					break;
+				}
+				ReadChar ();
+			}
+
+			token = new Token (null, TokenType.EOF, tokenPosition);
 		}
 		
 		public int TokenPosition {

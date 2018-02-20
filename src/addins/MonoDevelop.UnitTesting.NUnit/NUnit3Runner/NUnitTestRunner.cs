@@ -31,18 +31,12 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.IO;
-using System.Collections;
-using System.Collections.Generic;
-using System.Threading;
 
-using NUnit.Framework;
-using NUnit.Framework.Interfaces;
 using NUnit.Engine;
 using System.Xml;
-using NUnit.Common;
-using NUnit.Engine.Internal;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.UnitTesting.NUnit;
+using System.Text.RegularExpressions;
 
 namespace NUnit3Runner
 {
@@ -55,15 +49,6 @@ namespace NUnit3Runner
 		public NUnitTestRunner (RemoteProcessServer server)
 		{
 			this.server = server;
-
-			// Note: We need to load all nunit.*.dll assemblies before we do *anything* else in this class
-			// This is to ensure that we always load the assemblies from the monodevelop directory and not
-			// from the directory of the assembly under test. For example we wnat to load
-			// /Applications/MonoDevelop/lib/Addins/nunit.framework.dll and not /user/app/foo/bin/debug/nunit.framework.dll
-			var path = Path.GetDirectoryName (GetType ().Assembly.Location);
-			string nunitPath = Path.Combine (path, "nunit.framework.dll");
-			Assembly.LoadFrom (nunitPath);
-
 			Initialize ();
 		}
 
@@ -100,13 +85,21 @@ namespace NUnit3Runner
 			return new GetTestInfoResponse { Result = r };
 		}
 
-		TestPackage CreatePackage (string path)
+		TestPackage CreatePackage (string path, bool useAppDomain)
 		{
 			TestPackage package = new TestPackage (path);
 			package.AddSetting ("ShadowCopyFiles", false);
 			package.AddSetting ("ProcessModel", "InProcess");
-			package.AddSetting ("DomainUsage", "Single");
+			package.AddSetting ("DomainUsage", useAppDomain ? "Single" : "None");
 			return package;
+		}
+
+		static bool ShouldUseAppDomain (string[] supportAssemblies)
+		{
+			// In the case of nunit.framework not being locally copied, as in, it's marked as a support assembly
+			// we need to force the app to not use app domains, otherwise nunit3's internal runner will not find
+			// the framework dll, thus fail to run anything.
+			return !supportAssemblies.Any (asm => asm.EndsWith ("nunit.framework.dll", StringComparison.OrdinalIgnoreCase));
 		}
 		
 		public XmlNode Run (ITestEventListener listener, string[] nameFilter, string path, string suiteName, string[] supportAssemblies, string testRunnerType, string testRunnerAssembly)
@@ -129,7 +122,7 @@ namespace NUnit3Runner
 				tr = (ITestRunner)Activator.CreateInstance (runnerType);
 			}
 
-			TestPackage package = CreatePackage (path);
+			TestPackage package = CreatePackage (path, ShouldUseAppDomain (supportAssemblies));
 
 			if (tr == null)
 				tr = engine.GetRunner (package);
@@ -140,14 +133,41 @@ namespace NUnit3Runner
 		public NunitTestInfo GetTestInfo (string path, string[] supportAssemblies)
 		{
 			InitSupportAssemblies (supportAssemblies);
-			TestPackage package = CreatePackage (path);
+			TestPackage package = CreatePackage (path, ShouldUseAppDomain (supportAssemblies));
 			var tr = engine.GetRunner (package);
 			var r = tr.Explore (TestFilter.Empty);
 			var root = r.SelectSingleNode ("test-suite") as XmlElement;
-			if (root != null)
+
+			if (root != null) {
+				if(CheckXmlForError (root, out string errorString))
+					throw new Exception (errorString);
 				return BuildTestInfo (root);
+			}
 			else
 				return null;
+		}
+
+		bool CheckXmlForError(XmlElement root, out string result)
+		{
+			if (root.GetAttribute ("type") != "Assembly" || root.GetAttribute ("runstate") != "NotRunnable") {
+				// Only interested in _SKIPREASON if the test-suite is an assembly and the
+				// state is NotRunnable. This will indicate a load failure. This check
+				// prevents Ignore attributes incorrectly indicating an error since these
+				// also have a _SKIPREASON.
+				result = null;
+				return false;
+			}
+
+			var elements = root.GetElementsByTagName ("properties");
+			var skipReasonString = string.Empty;
+			foreach (XmlElement element in elements)
+				if (element?.FirstChild is XmlElement nestedElement)
+					if ("_SKIPREASON" == nestedElement.GetAttribute ("name")) {
+						skipReasonString = nestedElement.GetAttribute ("value");
+						break;
+					}
+			result = skipReasonString;
+			return !string.IsNullOrEmpty (skipReasonString);
 		}
 		
 		internal NunitTestInfo BuildTestInfo (XmlElement test)

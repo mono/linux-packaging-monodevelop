@@ -29,6 +29,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Pads;
@@ -44,8 +45,8 @@ namespace MonoDevelop.Ide.Gui
 {
 	public class ProgressMonitorManager : GuiSyncObject
 	{
-		ArrayList searchMonitors = new ArrayList ();
-		ArrayList outputMonitors = new ArrayList ();
+		List<Pad> searchMonitors = new List<Pad> ();
+		List<Pad> outputMonitors = new List<Pad> ();
 		
 		/******************************/
 
@@ -73,18 +74,23 @@ namespace MonoDevelop.Ide.Gui
 			Pad pad = IdeApp.Workbench.GetPad<ErrorListPad> ();
 			ErrorListPad errorPad = (ErrorListPad) pad.Content;
 			AggregatedProgressMonitor mon = new AggregatedProgressMonitor (errorPad.GetBuildProgressMonitor ());
-			mon.AddSlaveMonitor (GetStatusProgressMonitor (statusText, Stock.StatusBuild, false, true, false, pad));
+			mon.AddFollowerMonitor (GetStatusProgressMonitor (statusText, Stock.StatusBuild, false, true, false, pad, true));
 			return mon;
 		}
-		
+
 		public OutputProgressMonitor GetRunProgressMonitor ()
 		{
-			return GetOutputProgressMonitor ("MonoDevelop.Ide.ApplicationOutput", GettextCatalog.GetString ("Application Output"), Stock.RunProgramIcon, false, true);
+			return GetRunProgressMonitor (null);
+		}
+		
+		public OutputProgressMonitor GetRunProgressMonitor (string titleSuffix)
+		{
+			return GetOutputProgressMonitor ("MonoDevelop.Ide.ApplicationOutput", GettextCatalog.GetString ("Application Output"), Stock.PadExecute, false, true, titleSuffix);
 		}
 		
 		public OutputProgressMonitor GetToolOutputProgressMonitor (bool bringToFront, CancellationTokenSource cs = null)
 		{
-			return GetOutputProgressMonitor ("MonoDevelop.Ide.ToolOutput", GettextCatalog.GetString ("Tool Output"), Stock.RunProgramIcon, bringToFront, true);
+			return GetOutputProgressMonitor ("MonoDevelop.Ide.ToolOutput", GettextCatalog.GetString ("Tool Output"), Stock.PadExecute, bringToFront, true);
 		}
 		
 		public ProgressMonitor GetLoadProgressMonitor (bool lockGui)
@@ -116,16 +122,19 @@ namespace MonoDevelop.Ide.Gui
 		{
 			protected override OperationConsole OnCreateConsole (CreateConsoleOptions options)
 			{
-				return ((OutputProgressMonitor)IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor ("MonoDevelop.Ide.ApplicationOutput", GettextCatalog.GetString ("Application Output"), Stock.MessageLog, options.BringToFront, true)).Console;
+				return ((OutputProgressMonitor)IdeApp.Workbench.ProgressMonitors.GetOutputProgressMonitor ("MonoDevelop.Ide.ApplicationOutput", GettextCatalog.GetString ("Application Output"), Stock.MessageLog, options.BringToFront, true, titleSuffix:options.Title)).Console;
 			}
 		}
 
 		/******************************/
-		
+		public ProgressMonitor GetStatusProgressMonitor (string title, IconId icon, bool showErrorDialogs, bool showTaskTitle, bool lockGui, Pad statusSourcePad, bool showCancelButton)
+		{
+			return new StatusProgressMonitor (title, icon, showErrorDialogs, showTaskTitle, lockGui, statusSourcePad, showCancelButton);
+		}
 		
 		public ProgressMonitor GetStatusProgressMonitor (string title, IconId icon, bool showErrorDialogs, bool showTaskTitle = true, bool lockGui = false, Pad statusSourcePad = null)
 		{
-			return new StatusProgressMonitor (title, icon, showErrorDialogs, showTaskTitle, lockGui, statusSourcePad);
+			return GetStatusProgressMonitor (title, icon, showErrorDialogs, showTaskTitle, lockGui, statusSourcePad, showCancelButton: false);
 		}
 		
 		public ProgressMonitor GetBackgroundProgressMonitor (string title, IconId icon)
@@ -137,9 +146,17 @@ namespace MonoDevelop.Ide.Gui
 		{
 			return GetOutputProgressMonitor (null, title, icon, bringToFront, allowMonitorReuse, visible);
 		}
-		
+
 		public OutputProgressMonitor GetOutputProgressMonitor (string id, string title, IconId icon, bool bringToFront, bool allowMonitorReuse, bool visible = true)
 		{
+			return GetOutputProgressMonitor (id, title, icon, bringToFront, allowMonitorReuse, null, visible);
+		}
+		
+		public OutputProgressMonitor GetOutputProgressMonitor (string id, string title, IconId icon, bool bringToFront, bool allowMonitorReuse, string titleSuffix, bool visible = true)
+		{
+			if (!string.IsNullOrEmpty (titleSuffix)) {
+				title += " - " + titleSuffix;
+			}
 			Pad pad = CreateMonitorPad (id, title, icon, bringToFront, allowMonitorReuse, true);
 			pad.Visible = visible;
 			return ((DefaultMonitorPad) pad.Content).BeginProgress (title);
@@ -157,6 +174,8 @@ namespace MonoDevelop.Ide.Gui
 		/// </remarks>
 		public Pad GetPadForMonitor (ProgressMonitor monitor)
 		{
+			Runtime.AssertMainThread ();
+
 			foreach (Pad pad in outputMonitors) {
 				DefaultMonitorPad p = (DefaultMonitorPad) pad.Content;
 				if (p.CurrentMonitor == monitor)
@@ -165,49 +184,64 @@ namespace MonoDevelop.Ide.Gui
 			return null;
 		}
 		
-		Pad CreateMonitorPad (string id, string title, string icon, bool bringToFront, bool allowMonitorReuse, bool show)
+		internal Pad CreateMonitorPad (string id, string title, string icon, bool bringToFront, bool allowMonitorReuse, bool show)
 		{
 			Pad pad = null;
 			if (icon == null)
 				icon = Stock.OutputIcon;
-			
+
+			string originalTitle = title;
 			if (id == null)
-				id = title;
+				id = originalTitle;
 
 			int instanceCount = -1;
+			int titleInstanceCount = 0;
 			if (allowMonitorReuse) {
+				var usedTitleIds = new List<int> ();
 				lock (outputMonitors) {
 					// Look for an available pad
 					for (int n=0; n<outputMonitors.Count; n++) {
-						Pad mpad = (Pad) outputMonitors [n];
+						var mpad = outputMonitors [n];
 						DefaultMonitorPad mon = (DefaultMonitorPad) mpad.Content;
 						if (mon.TypeTag == id) {
 							if (mon.InstanceNum > instanceCount)
 								instanceCount = mon.InstanceNum;
-							if (mon.AllowReuse) {
+							if (mon.Title == originalTitle && !mon.AllowReuse)
+								usedTitleIds.Add (mon.TitleInstanceNum);
+							if (mon.AllowReuse &&
+							   (pad == null ||
+							    mon.Title == originalTitle)) {//Prefer reusing output with same title(project)
 								pad = mpad;
-								break;
 							}
 						}
 					}
 				}
+				titleInstanceCount = usedTitleIds.Count;//Set pesimisticly to largest possible number
+				for (int i = 0; i < usedTitleIds.Count; i++) {
+					if (!usedTitleIds.Contains (i)) {
+						titleInstanceCount = i;//Find smallest free number
+						break;
+					}
+				}
+				if (titleInstanceCount > 0)
+					title = originalTitle + $" ({titleInstanceCount})";
+				else
+					title = originalTitle;
 				if (pad != null) {
 					if (bringToFront) pad.BringToFront ();
+					pad.Window.Title = title;
+					var mon = (DefaultMonitorPad)pad.Content;
+					mon.Title = originalTitle;
+					mon.TitleInstanceNum = titleInstanceCount;
 					return pad;
 				}
 			}
 
 			instanceCount++;
-			DefaultMonitorPad monitorPad = new DefaultMonitorPad (id, icon, instanceCount);
+			DefaultMonitorPad monitorPad = new DefaultMonitorPad (id, icon, instanceCount, originalTitle, titleInstanceCount);
 			
 			string newPadId = "OutputPad-" + id + "-" + instanceCount;
 			string basePadId = "OutputPad-" + id + "-0";
-			
-			if (instanceCount > 0) {
-				// Translate the title before adding the count
-				title = GettextCatalog.GetString (title);
-				title += " (" + (instanceCount+1) + ")";
-			}
 
 			if (show)
 				pad = IdeApp.Workbench.ShowPad (monitorPad, newPadId, title, basePadId + "/Center Bottom", DockItemStatus.AutoHide, icon);
@@ -216,14 +250,17 @@ namespace MonoDevelop.Ide.Gui
 			
 			monitorPad.StatusSourcePad = pad;
 			pad.Sticky = true;
-			outputMonitors.Add (pad);
+			lock (outputMonitors) {
+				outputMonitors.Add (pad);
+			}
 			
 			if (instanceCount > 0) {
 				// Additional output pads will be destroyed when hidden
-				pad.Window.PadHidden += delegate {
+				pad.Window.PadHidden += (s,a) => {
 					// Workaround for crash reported in bug #18096. Look like MS.NET can't access private fields
 					// when the delegate is invoked through the remoting chain.
-					DestroyPad (pad);
+					if (!a.SwitchingLayout)
+						DestroyPad (pad);
 				};
 			}
 			
@@ -237,7 +274,9 @@ namespace MonoDevelop.Ide.Gui
 
 		void DestroyPad (Pad pad)
 		{
-			outputMonitors.Remove (pad);
+			lock (outputMonitors) {
+				outputMonitors.Remove (pad);
+			}
 			pad.Destroy ();
 		}
 		
@@ -281,10 +320,12 @@ namespace MonoDevelop.Ide.Gui
 				searchMonitors.Add (pad);
 
 				if (searchMonitors.Count > 1) {
+					// This is needed due to ContextBoundObject not being able to do a reflection access on private fields
+					var searchMonitorsCopy = searchMonitors;
 					// Additional search pads will be destroyed when hidden
 					pad.Window.PadHidden += delegate {
-						lock (searchMonitors) {
-							searchMonitors.Remove (pad);
+						lock (searchMonitorsCopy) {
+							searchMonitorsCopy.Remove (pad);
 						}
 						pad.Destroy ();
 					};

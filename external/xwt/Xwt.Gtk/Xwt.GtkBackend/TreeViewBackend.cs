@@ -171,6 +171,7 @@ namespace Xwt.GtkBackend
 					GLib.Source.Remove (expandTimer);
 				if (path != null) {
 					expandTimer = GLib.Timeout.Add (600, delegate {
+						expandTimer = 0;
 						Widget.ExpandRow (path, false);
 						return false;
 					});
@@ -342,7 +343,7 @@ namespace Xwt.GtkBackend
 
 			TreePosition toggledItem = null;
 
-			var pathParts = path.Split (':').Select (part => int.Parse (part));
+			var pathParts = path.Split (':').Select (int.Parse);
 
 			foreach (int pathPart in pathParts) {
 				toggledItem = treeFrontend.DataSource.GetChild (toggledItem, pathPart);

@@ -24,25 +24,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using System.Collections;
-using MonoDevelop.Core;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MonoDevelop.Core;
+using MonoDevelop.Projects.MSBuild;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
-	public class FakeProject : IProject
+	class FakeProject : IProject
 	{
 		public string Name { get; set; }
 		public FilePath FileName { get; set; }
 		public FilePath BaseDirectory { get; set; }
+		public FilePath BaseIntermediateOutputPath { get; set; }
 		public ISolution ParentSolution { get; set; }
 		public IDictionary ExtendedProperties { get; set; }
+
+		List<string> flavorGuids;
 
 		public FakeProject ()
 		{
 			ExtendedProperties = new Hashtable ();
+			flavorGuids = new List<string> ();
 		}
 
 		public FakeProject (string fileName)
@@ -55,6 +59,7 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 		{
 			FileName = new FilePath (fileName.ToNativePath ());
 			BaseDirectory = FileName.ParentDirectory;
+			BaseIntermediateOutputPath = BaseDirectory.Combine ("obj");
 		}
 
 		public bool IsSaved;
@@ -66,7 +71,18 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 		}
 
 		public IEnumerable<string> FlavorGuids {
-			get { yield break; }
+			get { return flavorGuids; }
+		}
+
+		public void AddFlavorGuid (string guid)
+		{
+			flavorGuids.Add (guid);
+		}
+
+		public FakeMSBuildEvaluatedPropertyCollection FakeEvaluatedProperties = new FakeMSBuildEvaluatedPropertyCollection ();
+
+		public IMSBuildEvaluatedPropertyCollection EvaluatedProperties {
+			get { return FakeEvaluatedProperties; }
 		}
 	}
 }

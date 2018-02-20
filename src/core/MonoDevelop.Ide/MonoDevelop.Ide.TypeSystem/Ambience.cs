@@ -30,7 +30,6 @@ using System;
 using System.Text;
 using System.Collections.Generic;
 using MonoDevelop.Core;
-using Mono.Cecil;
 using System.Linq;
 using MonoDevelop.Ide.CodeCompletion;
 using Microsoft.CodeAnalysis;
@@ -108,7 +107,7 @@ namespace MonoDevelop.Ide.TypeSystem
 				return string.Empty;
 			
 			StringBuilder sb = new StringBuilder (str.Length);
-			MarkupUtilities.AppendEscapedString (sb, str);
+			MarkupUtilities.AppendEscapedString (sb, str, 0, str.Length);
 			return sb.ToString (); 
 		}
 
@@ -247,7 +246,7 @@ namespace MonoDevelop.Ide.TypeSystem
 				LoggingService.LogWarning ("Invalid cref:" + cref, e);
 			}
 
-			if (cref.Substring (1, 1) == ":")
+			if (cref[1] == ':')
 				return cref.Substring (2, cref.Length - 2);
 			
 			return cref;
@@ -308,7 +307,7 @@ namespace MonoDevelop.Ide.TypeSystem
 		{
 			if (text == null)
 				return null;
-			StringBuilder result = new StringBuilder ();
+			StringBuilder result = new StringBuilder (text.Length);
 			foreach (char ch in text) {
 				switch (ch) {
 				case '<':
@@ -341,7 +340,7 @@ namespace MonoDevelop.Ide.TypeSystem
 		
 		public static string UnescapeText (string text)
 		{
-			var sb = new StringBuilder ();
+			var sb = new StringBuilder (text.Length);
 			for (int i = 0; i < text.Length; i++) {
 				char ch = text[i];
 				if (ch == '&') {
@@ -408,7 +407,7 @@ namespace MonoDevelop.Ide.TypeSystem
 						break;
 					case "term": {
 						string inner = "<root>" + xml.ReadInnerXml () + "</root>";
-						result.Append ("<i>" + ParseBody (member, new XmlTextReader (new StringReader (inner)), "root", options) + " </i>");
+						result.Append ("<i>").Append (ParseBody (member, new XmlTextReader (new StringReader (inner)), "root", options)).Append (" </i>");
 						break;
 					}
 					case "description": {
@@ -430,7 +429,8 @@ namespace MonoDevelop.Ide.TypeSystem
 							prefix = "    ";
 							break;
 						}
-						result.AppendLine (prefix + ParseBody (member, new XmlTextReader (new StringReader (inner)), "root", options));
+						result.Append (prefix);
+						result.AppendLine (ParseBody (member, new XmlTextReader (new StringReader (inner)), "root", options));
 						break;
 					}
 					case "item": {
@@ -447,7 +447,8 @@ namespace MonoDevelop.Ide.TypeSystem
 								prefix = "  \u2022 ";
 								break;
 							}
-							result.AppendLine (prefix + ParseBody (member, new XmlTextReader (new StringReader (inner)), "root", options));
+							result.Append (prefix);
+							result.AppendLine (ParseBody (member, new XmlTextReader (new StringReader (inner)), "root", options));
 						break;
 					}
 					case "see":
@@ -457,9 +458,7 @@ namespace MonoDevelop.Ide.TypeSystem
 						}
 						result.Append ("<i>");
 						string name = (xml ["cref"] + xml ["langword"]).Trim ();
-						// if (options.Ambience != null)
-						// 	name = options.Ambience.GetIntrinsicTypeName (name);
-						result.Append (EscapeText (name));
+						result.Append (EscapeText (FormatCref(name)));
 						result.Append ("</i>");
 						wasWhiteSpace = false;
 						appendSpace = true;
@@ -501,7 +500,14 @@ namespace MonoDevelop.Ide.TypeSystem
 		end:
 			return result.ToString ().Trim ();
 		}
-		
+
+		static string FormatCref (string cref)
+		{
+			if (cref.Length > 2 && cref [1] == ':')
+				return cref.Substring (2);
+			return cref;
+		}
+
 		public static string GetDocumentationMarkup (ISymbol member, string doc, DocumentationFormatOptions options)
 		{
 			if (string.IsNullOrEmpty (doc))
@@ -524,6 +530,7 @@ namespace MonoDevelop.Ide.TypeSystem
 							if (summaryEnd < 0)
 								summaryEnd = ret.Length;
 							break;
+						case "member":
 						case "summary":
 							var summary = options.FormatBody (ParseBody (member, xml, xml.Name, options));
 							if (!IsEmptyDocumentation (summary)) {
@@ -598,7 +605,9 @@ namespace MonoDevelop.Ide.TypeSystem
 						case "seealso":
 							if (string.IsNullOrEmpty (options.HighlightParameter)) {
 								ret.Append (options.FormatHeading (GettextCatalog.GetString ("See also:")));
-								ret.Append (" " + EscapeText (xml ["cref"] + xml ["langword"]));
+								ret.Append (" ");
+								ret.Append (EscapeText (xml ["cref"]));
+								ret.Append (EscapeText (xml ["langword"]));
 							}
 							break;
 						}

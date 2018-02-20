@@ -11,6 +11,13 @@ namespace Xwt.WPFBackend
     {
         public void QueueDraw()
         {
+            CurrentElement.InvalidateVisual ();
+        }
+
+        public bool IsHighlighted {
+            get {
+                return false;
+            }
         }
     }
 }

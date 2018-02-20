@@ -60,7 +60,7 @@ namespace MonoDevelop.Components.AutoTest
 			}
 		}
 				
-		public void StartApplication (string file = null, string args = null, IDictionary<string, string> environment = null)
+		public int StartApplication (string file = null, string args = null, IDictionary<string, string> environment = null)
 		{
 			if (file == null) {
 				var binDir = Path.GetDirectoryName (typeof(AutoTestClientSession).Assembly.Location);
@@ -98,6 +98,8 @@ namespace MonoDevelop.Components.AutoTest
 				} catch { }
 				throw new Exception ("Could not connect to application");
 			}
+
+			return process.Id;
 		}
 
 		public void AttachApplication ()
@@ -191,7 +193,8 @@ namespace MonoDevelop.Components.AutoTest
 
 		public T GetGlobalValue<T> (string name)
 		{
-			return (T) session.GetGlobalValue (name);
+			var val = (T)session.GetGlobalValue(name);
+			return val;
 		}
 
 		public void SetGlobalValue (string name, object value)
@@ -299,6 +302,16 @@ namespace MonoDevelop.Components.AutoTest
 			AppResult[] results = Query (query);
 			if (results.Length > 0) {
 				return session.Click (results [0], wait);
+			}
+
+			return false;
+		}
+
+		public bool ClickElement (Func<AppQuery, AppQuery> query, double x, double y, bool wait = true)
+		{
+			AppResult [] results = Query (query);
+			if (results.Length > 0) {
+				return session.Click (results [0], x, y, wait);
 			}
 
 			return false;

@@ -26,7 +26,10 @@
 
 using System;
 using System.Collections.Generic;
+
+using MonoDevelop.Components.AtkCocoaHelper;
 using Gtk;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Components
 {
@@ -42,13 +45,30 @@ namespace MonoDevelop.Components
 			
 			store = new ListStore (typeof(String));
 			dirList.Model = store;
+			dirList.SearchColumn = -1; // disable the interactive search
 			dirList.AppendColumn ("", new CellRendererText (), "text", 0);
 			dirList.Selection.Changed += delegate {
 				UpdateStatus ();
 			};
 			UpdateStatus ();
+
+			SetupAccessibility ();
 		}
-		
+
+		void SetupAccessibility ()
+		{
+			buttonAdd.SetCommonAccessibilityAttributes ("FolderListSelector.add", "",
+			                                            GettextCatalog.GetString ("Add the folder to the list"));
+			buttonRemove.SetCommonAccessibilityAttributes ("FolderListSelector.remove", "",
+			                                               GettextCatalog.GetString ("Remove the selected folder from the list"));
+			buttonUp.SetCommonAccessibilityAttributes ("FolderListSelector.up", "",
+			                                           GettextCatalog.GetString ("Move the selected folder up the list"));
+			buttonDown.SetCommonAccessibilityAttributes ("FolderListSelector.down", "",
+			                                             GettextCatalog.GetString ("Move the selected folder down the list"));
+			dirList.SetCommonAccessibilityAttributes ("FolderListSelector.dirList", GettextCatalog.GetString ("Folder List"),
+			                                          GettextCatalog.GetString ("The list of folders"));
+		}
+
 		public List<string> Directories {
 			get {
 				return directories;
@@ -158,6 +178,12 @@ namespace MonoDevelop.Components
 			directories [i - 1] = dir;
 			directories [i] = prevDir;
 			FocusRow (it);
+		}
+
+		internal Atk.Object EntryAccessible {
+			get {
+				return folderentry.EntryAccessible;
+			}
 		}
 	}
 }

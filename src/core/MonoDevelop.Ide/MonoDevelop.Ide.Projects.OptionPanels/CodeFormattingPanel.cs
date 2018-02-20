@@ -41,6 +41,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 	class CodeFormattingPanel: OptionsPanel
 	{
 		PolicyContainer policyContainer;
+		PolicyContainer defaultPolicyContainer;
 		Dictionary<string,MimeTypePanelData> typeSections = new Dictionary<string, MimeTypePanelData> ();
 		List<string> globalMimeTypes;
 		HashSet<string> mimeTypesWithPolicies = new HashSet<string> ();
@@ -55,8 +56,11 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 				mimeTypesWithPolicies.Add (node.MimeType);
 			
 			var provider = dataObject as IPolicyProvider;
-			if (provider == null)
+			if (provider == null) {
 				provider = PolicyService.GetUserDefaultPolicySet ();
+				// When editing the global user preferences, the default values for policies are the IDE default values.
+				defaultPolicyContainer = PolicyService.SystemDefaultPolicies;
+			}
 			
 			policyContainer = provider.Policies;
 			if (!(dataObject is SolutionFolderItem) && !(dataObject is Solution)) {
@@ -109,7 +113,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 		
 		MimeTypePanelData AddPanel (string mt)
 		{
-			var chain = new List<string> (DesktopService.GetMimeTypeInheritanceChain (mt).Where (x => mimeTypesWithPolicies.Contains (x)));
+			var chain = new List<string> (DesktopService.GetMimeTypeInheritanceChain (mt).Where (mimeTypesWithPolicies.Contains));
 			if (chain.Count == 0)
 				return null;
 			MimeTypePanelData data = new MimeTypePanelData ();
@@ -171,7 +175,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 				
 				IMimeTypePolicyOptionsPanel panel = (IMimeTypePolicyOptionsPanel) node.CreateInstance (typeof(IMimeTypePolicyOptionsPanel));
 				panel.Initialize (ParentDialog, DataObject);
-				panel.InitializePolicy (policyContainer, mimeType, mimeType == node.MimeType);
+				panel.InitializePolicy (policyContainer, defaultPolicyContainer, mimeType, mimeType == node.MimeType);
 				panel.Label = GettextCatalog.GetString (node.Label);
 				if (!panel.IsVisible ())
 					continue;
@@ -246,6 +250,10 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 				}
 			}
 		}
+
+		public bool IsCustomUserPolicy {
+			get { return ParentDialog is MonoDevelop.Ide.Projects.DefaultPolicyOptionsDialog; }
+		}
 	}
 	
 	class MimetypeOptionsDialogSection : OptionsDialogSection
@@ -265,6 +273,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 		CodeFormattingPanel panel;
 		Gtk.ListStore store;
 		OptionsDialog dialog;
+		CellRendererComboBox comboCell = new CellRendererComboBox();
 		
 		public CodeFormattingPanelWidget (CodeFormattingPanel panel, OptionsDialog dialog)
 		{
@@ -274,7 +283,8 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 			
 			store = new Gtk.ListStore (typeof(MimeTypePanelData), typeof(Xwt.Drawing.Image), typeof(string));
 			tree.Model = store;
-			
+			tree.SearchColumn = -1; // disable the interactive search
+
 			boxButtons.Visible = panel.DataObject is PolicySet;
 			Gtk.CellRendererText crt = new Gtk.CellRendererText ();
 			CellRendererImage crp = new CellRendererImage ();
@@ -287,8 +297,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 			col.AddAttribute (crt, "text", 2);
 			tree.AppendColumn (col);
 			store.SetSortColumnId (2, Gtk.SortType.Ascending);
-			
-			CellRendererComboBox comboCell = new CellRendererComboBox ();
+
 			comboCell.Changed += OnPolicySelectionChanged;
 			Gtk.TreeViewColumn polCol = tree.AppendColumn (GettextCatalog.GetString ("Policy"), comboCell, new Gtk.TreeCellDataFunc (OnSetPolicyData));
 			
@@ -309,19 +318,26 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 				UpdateButtons ();
 			};
 		}
-		
+
+		// "System Default" is shown when editing custom user policies in the policy manager.
+		// "Inherited Policy" is shown when editing policies on a project or solution.
+		// Both have the same meaning: the policy is undefined, so it should be used
+		// whatever default policy that is inherited.
+
+		static readonly string systemPolicyText = GettextCatalog.GetString ("(System Default)");
 		static readonly string parentPolicyText = GettextCatalog.GetString ("(Inherited Policy)");
+
 		static readonly string customPolicyText = GettextCatalog.GetString ("(Custom)");
 		
 		void OnSetPolicyData (Gtk.TreeViewColumn treeColumn, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
 		{
 			MimeTypePanelData mt = (MimeTypePanelData) store.GetValue (iter, 0);
-			
+
 			string selection;
 			if (mt.UseParentPolicy)
-				selection = parentPolicyText;
+				selection = panel.IsCustomUserPolicy ? systemPolicyText : parentPolicyText;
 			else {
-				PolicySet matchingSet = mt.GetMatchingSet (null);
+				PolicySet matchingSet = mt.GetMatchingSet (GetCandidateSets (mt));
 				if (matchingSet != null)
 					selection = matchingSet.Name;
 				else
@@ -336,17 +352,32 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 		string[] GetComboOptions (MimeTypePanelData mt)
 		{
 			List<string> values = new List<string> ();
-			
-			if (!this.panel.PolicyContainer.IsRoot)
-				values.Add (parentPolicyText);
-			
-			foreach (PolicySet set in mt.GetSupportedPolicySets ())
-				values.Add (set.Name);
+
+			if (!this.panel.PolicyContainer.IsRoot || panel.IsCustomUserPolicy)
+				values.Add (panel.IsCustomUserPolicy ? systemPolicyText : parentPolicyText);
+
+			values.AddRange (GetCandidateSets (mt).Select (p => p.Name));
 
 			values.Add (customPolicyText);
 			return values.ToArray ();
 		}
 		
+		IEnumerable<PolicySet> GetCandidateSets (MimeTypePanelData mt)
+		{
+			var pset = mt.PolicyContainer as PolicySet;
+
+			foreach (PolicySet set in mt.GetSupportedPolicySets ()) {
+				// The combo already has the System Default option, so no need to show the Defaut policy set.
+				if (panel.IsCustomUserPolicy && set.Name == "Default")
+					continue;
+
+				// Don't allow selecting the set that is being edited
+				if (pset != null && set.Name == pset.Name)
+					continue;
+				yield return set;
+			}
+		}
+
 		void OnPolicySelectionChanged (object s, ComboSelectionChangedArgs args)
 		{
 			Gtk.TreeIter iter;
@@ -354,7 +385,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 				MimeTypePanelData mt = (MimeTypePanelData) store.GetValue (iter, 0);
 				if (args.Active != -1) {
 					string sel = args.ActiveText;
-					if (sel == parentPolicyText)
+					if (sel == (panel.IsCustomUserPolicy ? systemPolicyText : parentPolicyText))
 						mt.UseParentPolicy = true;
 					else if (sel != customPolicyText) {
 						PolicySet pset = PolicyService.GetPolicySet (sel);
@@ -424,10 +455,12 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 			buttonRemove.Sensitive = buttonEdit.Sensitive = false;
 		}
 
-		public override void Destroy ()
+		protected override void OnDestroyed()
 		{
-			store.Clear ();
-			base.Destroy ();
+			store.Clear();
+			comboCell.Changed -= OnPolicySelectionChanged;
+			
+			base.OnDestroyed();
 		}
 	}
 }

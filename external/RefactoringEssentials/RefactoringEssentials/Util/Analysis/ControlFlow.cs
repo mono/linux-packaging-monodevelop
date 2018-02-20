@@ -18,7 +18,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -27,10 +26,10 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace RefactoringEssentials.Util.Analysis
 {
-    /// <summary>
-    /// Represents a node in the control flow graph of a C# method.
-    /// </summary>
-    public class ControlFlowNode
+	/// <summary>
+	/// Represents a node in the control flow graph of a C# method.
+	/// </summary>
+	public class ControlFlowNode
     {
         public readonly StatementSyntax PreviousStatement;
         public readonly StatementSyntax NextStatement;
@@ -394,7 +393,7 @@ namespace RefactoringEssentials.Util.Analysis
             {
                 CreateConnectedEndNode(node);
             }
-
+            
             public override void VisitExpressionStatement(ExpressionStatementSyntax node)
             {
                 CreateConnectedEndNode(node);
@@ -770,6 +769,11 @@ namespace RefactoringEssentials.Util.Analysis
             {
                 HandleEmbeddedStatement(node.Statement, curNode);
                 CreateConnectedEndNode(node);
+            }
+
+            public override void VisitLocalFunctionStatement(LocalFunctionStatementSyntax node)
+            {
+                // not connected to the control flow
             }
         }
 

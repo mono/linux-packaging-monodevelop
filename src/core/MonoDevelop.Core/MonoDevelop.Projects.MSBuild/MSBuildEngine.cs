@@ -25,17 +25,6 @@
 // THE SOFTWARE.
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Xml;
-using System.IO;
-using System.Text;
-
-using Microsoft.Build.Evaluation;
-using EvalProject = Microsoft.Build.Evaluation.Project;
-using EvalProjectItem = Microsoft.Build.Evaluation.ProjectItem;
-
-using Microsoft.Build.BuildEngine;
-using MSProject = Microsoft.Build.BuildEngine.Project;
 using MonoDevelop.Core;
 
 namespace MonoDevelop.Projects.MSBuild
@@ -85,6 +74,8 @@ namespace MonoDevelop.Projects.MSBuild
 
 		public abstract string GetEvaluatedItemMetadata (object item, string name);
 
+		public abstract IEnumerable<string> GetItemMetadataNames (object item);
+
 		public abstract IEnumerable<object> GetImports (object projectInstance);
 
 		public abstract string GetImportEvaluatedProjectPath (object projectInstance, object import);
@@ -99,7 +90,7 @@ namespace MonoDevelop.Projects.MSBuild
 
 		public abstract void GetEvaluatedItemInfo (object item, out string name, out string include, out string finalItemSpec, out bool imported);
 
-		public abstract void GetPropertyInfo (object property, out string name, out string value, out string finalValue);
+		public abstract void GetPropertyInfo (object property, out string name, out string value, out string finalValue, out bool definedMultipleTimes);
 
 		public abstract IEnumerable<MSBuildTarget> GetTargets (object projectInstance);
 
@@ -110,6 +101,10 @@ namespace MonoDevelop.Projects.MSBuild
 		public abstract void RemoveGlobalProperty (object projectInstance, string property);
 
 		public abstract ConditionedPropertyCollection GetConditionedProperties (object projectInstance);
+
+		public abstract IEnumerable<MSBuildItem> FindGlobItemsIncludingFile  (object projectInstance, string include);
+
+		internal abstract IEnumerable<MSBuildItem> FindUpdateGlobItemsIncludingFile (object projectInstance, string include, MSBuildItem globItem);
 	}
 }
 

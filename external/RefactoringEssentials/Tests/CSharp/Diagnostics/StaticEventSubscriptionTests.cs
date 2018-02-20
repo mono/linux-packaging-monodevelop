@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class StaticEventSubscriptionTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
 
         public void TestAnonymousMethodSubscription()
         {
@@ -28,7 +27,7 @@ class Foo
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAnonymousMethodSubscription_ValidCase()
         {
             Analyze<StaticEventSubscriptionAnalyzer>(@"
@@ -49,7 +48,7 @@ class Foo
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestIssue()
         {
             TestIssue<StaticEventSubscriptionAnalyzer>(@"
@@ -70,7 +69,7 @@ class Foo
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestNoIssue()
         {
             Analyze<StaticEventSubscriptionAnalyzer>(@"
@@ -96,7 +95,7 @@ class Foo
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestNonStatic()
         {
             Analyze<StaticEventSubscriptionAnalyzer>(@"
@@ -118,7 +117,7 @@ class Foo
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestNullAssignment()
         {
             Analyze<StaticEventSubscriptionAnalyzer>(@"
@@ -146,3 +145,4 @@ class Foo
     }
 }
 
+*/

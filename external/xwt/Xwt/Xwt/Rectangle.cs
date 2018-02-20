@@ -31,7 +31,7 @@ using System.Globalization;
 namespace Xwt
 {
 	[Serializable]
-	public struct Rectangle
+	public struct Rectangle : IEquatable<Rectangle>
 	{
 		public double X { get; set; }
 		public double Y { get; set; }
@@ -56,6 +56,14 @@ namespace Xwt
 		
 		public Rectangle (Point loc, Size sz) : this (loc.X, loc.Y, sz.Width, sz.Height) {}
 		
+		public Rectangle (Point point1, Point point2)
+		{
+			X = Math.Min (point1.X, point2.X);
+			Y = Math.Min (point1.Y, point2.Y);
+			Width = Math.Max (Math.Max (point1.X, point2.X) - X, 0);
+			Height = Math.Max (Math.Max (point1.Y, point2.Y) - Y, 0);
+		}
+
 		public static Rectangle FromLTRB (double left, double top, double right, double bottom)
 		{
 			return new Rectangle (left, top, right - left, bottom - top);
@@ -68,6 +76,11 @@ namespace Xwt
 				return false;
 		
 			return (this == (Rectangle) o);
+		}
+
+		public bool Equals(Rectangle other)
+		{
+			return this == other;
 		}
 		
 		public override int GetHashCode ()
@@ -162,6 +175,26 @@ namespace Xwt
 		public double Left {
 			get { return X; }
 			set { X = value; }
+		}
+		public Point TopLeft {
+			get {
+				return new Point (Left, Top);
+			}
+		}
+		public Point TopRight {
+			get {
+				return new Point (Right, Top);
+			}
+		}
+		public Point BottomLeft {
+			get {
+				return new Point (Left, Bottom);
+			}
+		}
+		public Point BottomRight {
+			get {
+				return new Point (Right, Bottom);
+			}
 		}
 		
 		public bool IsEmpty {

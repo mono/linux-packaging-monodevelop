@@ -26,14 +26,13 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-using System;
 using System.Collections.Generic;
-using NuGet;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.PackageManagement
 {
-	public interface ILicenseAcceptanceService
+	internal interface ILicenseAcceptanceService
 	{
-		bool AcceptLicenses(IEnumerable<IPackage> packages);
+		Task<bool> AcceptLicenses (IEnumerable<NuGetPackageLicense> licenses);
 	}
 }

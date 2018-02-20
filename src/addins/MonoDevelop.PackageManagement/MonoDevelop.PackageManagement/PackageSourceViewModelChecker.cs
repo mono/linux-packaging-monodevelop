@@ -28,29 +28,23 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
-using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
-using NuGet;
+using NuGet.Credentials;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageSourceViewModelChecker : IDisposable
+	internal class PackageSourceViewModelChecker : IDisposable
 	{
-		PackageManagementTaskFactory taskFactory = new PackageManagementTaskFactory ();
-		List<ITask<PackageSourceViewModelCheckedEventArgs>> tasks = new List<ITask<PackageSourceViewModelCheckedEventArgs>>();
+		CancellationTokenSource cancellationTokenSource = new CancellationTokenSource ();
 
 		public event EventHandler<PackageSourceViewModelCheckedEventArgs> PackageSourceChecked;
 
 		public void Dispose ()
 		{
-			foreach (PackageManagementTask<PackageSourceViewModelCheckedEventArgs> task in tasks) {
-				if (task.IsCompleted || task.IsFaulted || task.IsCancelled) {
-					// Do nothing.
-				} else {
-					task.Cancel ();
-				}
-			}
+			cancellationTokenSource.Cancel ();
 		}
 
 		public void Check(IEnumerable<PackageSourceViewModel> packageSources)
@@ -62,73 +56,70 @@ namespace MonoDevelop.PackageManagement
 
 		public void Check(PackageSourceViewModel packageSource)
 		{
-			ITask<PackageSourceViewModelCheckedEventArgs> task = taskFactory.CreateTask (
-				() => CheckPackageSourceUrl (packageSource),
-				(t) => OnPackageSourceChecked (this, t));
-
-			tasks.Add (task);
-			task.Start ();
+			Task.Run (() => CheckPackageSourceUrl (packageSource), cancellationTokenSource.Token)
+				.ContinueWith (OnPackageSourceChecked, TaskScheduler.FromCurrentSynchronizationContext ());
 		}
 
-		PackageSourceViewModelCheckedEventArgs CheckPackageSourceUrl (PackageSourceViewModel packageSource)
+		Task<PackageSourceViewModelCheckedEventArgs> CheckPackageSourceUrl (PackageSourceViewModel packageSource)
 		{
-			if (IsHttpPackageSource (packageSource.SourceUrl)) {
+			if (IsHttpPackageSource (packageSource.Source)) {
 				return CheckHttpPackageSource (packageSource);
 			}
-			return CheckFileSystemPackageSource (packageSource);
+			return Task.FromResult (CheckFileSystemPackageSource (packageSource));
 		}
 
-		PackageSourceViewModelCheckedEventArgs CheckHttpPackageSource (PackageSourceViewModel packageSource)
+		async Task<PackageSourceViewModelCheckedEventArgs> CheckHttpPackageSource (PackageSourceViewModel packageSource)
 		{
-			HttpClient httpClient = CreateHttpClient (packageSource);
 			try {
-				using (var response = (HttpWebResponse)httpClient.GetResponse ()) {
-					if (response.StatusCode == HttpStatusCode.OK) {
+				using (HttpClient httpClient = CreateHttpClient (packageSource)) {
+					var result = await httpClient.GetAsync (packageSource.Source);
+					if (result.StatusCode == HttpStatusCode.OK) {
 						return new PackageSourceViewModelCheckedEventArgs (packageSource);
 					} else {
-						LoggingService.LogInfo ("Status code {0} returned from package source url '{1}'", response.StatusCode, packageSource.SourceUrl);
-						return new PackageSourceViewModelCheckedEventArgs (packageSource, GettextCatalog.GetString ("Unreachable"));
+						return CreatePackageSourceViewModelCheckedEventArgs (packageSource, result.StatusCode);
 					}
 				}
-			} catch (WebException ex) {
-				return CreatePackageSourceViewModelCheckedEventArgs (packageSource, ex);
 			} catch (Exception ex) {
-				LogPackageSourceException (packageSource, ex);
-				return new PackageSourceViewModelCheckedEventArgs (packageSource, ex.Message);
+				return CreatePackageSourceViewModelCheckedEventArgs (packageSource, ex);
 			}
 		}
 
-		/// <summary>
-		/// Do not use cached credentials for the first request sent to a package source.
-		/// 
-		/// Once NuGet has a valid credential for a package source it is used from that point
-		/// onwards. So if the user changes a valid username/password in Preferences
-		/// to a non-valid username/password they will not see the 'Invalid credentials'
-		/// warning. To workaround this caching we remove the credentials for the request
-		/// the first time it is sent. Also the UseDefaultCredentials is set to true.
-		/// This forces NuGet to get the credentials from the IPackageSourceProvider,
-		/// which is implemented by the RegisteredPackageSourcesViewModel, and will 
-		/// contain the latest usernames and passwords for all package sources.
-		/// </summary>
+		PackageSourceViewModelCheckedEventArgs CreatePackageSourceViewModelCheckedEventArgs (PackageSourceViewModel packageSource, HttpStatusCode statusCode)
+		{
+			string errorMessage = GetErrorForStatusCode (statusCode);
+			if (errorMessage == null) {
+				LoggingService.LogInfo ("Status code {0} returned from package source url '{1}'", statusCode, packageSource.Source);
+				errorMessage = GettextCatalog.GetString ("Unreachable");
+			}
+			return new PackageSourceViewModelCheckedEventArgs (packageSource, errorMessage);
+		}
+
+		PackageSourceViewModelCheckedEventArgs CreatePackageSourceViewModelCheckedEventArgs (PackageSourceViewModel packageSource, Exception ex)
+		{
+			if (ex is AggregateException) {
+				ex = ex.GetBaseException ();
+			}
+
+			var webException = ex.InnerException as WebException;
+			if (webException != null) {
+				return CreatePackageSourceViewModelCheckedEventArgs (packageSource, webException);
+			}
+
+			LogPackageSourceException (packageSource, ex);
+			return new PackageSourceViewModelCheckedEventArgs (packageSource, ex.Message);
+		}
+
 		HttpClient CreateHttpClient(PackageSourceViewModel packageSource)
 		{
-			var httpClient = new HttpClient (new Uri (packageSource.SourceUrl));
-
-			bool resetCredentials = true;
-			httpClient.SendingRequest += (sender, e) => {
-				if (resetCredentials && packageSource.HasPassword ()) {
-					resetCredentials = false;
-					e.Request.Credentials = null;
-					e.Request.UseDefaultCredentials = true;
-				}
-			};
-
-			return httpClient;
+			var credentialService = new CredentialService (new ICredentialProvider[0], true);
+			return HttpClientFactory.CreateHttpClient (
+				packageSource.GetPackageSource (),
+				credentialService);
 		}
 
 		PackageSourceViewModelCheckedEventArgs CheckFileSystemPackageSource (PackageSourceViewModel packageSource)
 		{
-			var dir = packageSource.SourceUrl;
+			var dir = packageSource.Source;
 			if (dir.StartsWith ("file://", StringComparison.OrdinalIgnoreCase)) {
 				dir = new Uri (dir).LocalPath;
 			}
@@ -143,21 +134,7 @@ namespace MonoDevelop.PackageManagement
 			string errorMessage = ex.Message;
 			var response = ex.Response as HttpWebResponse;
 			if (response != null) {
-				switch (response.StatusCode) {
-				case HttpStatusCode.Unauthorized:
-					errorMessage = GettextCatalog.GetString ("Invalid credentials");
-					break;
-				case HttpStatusCode.NotFound:
-					errorMessage = GettextCatalog.GetString ("Not found");
-					break;
-				case HttpStatusCode.GatewayTimeout:
-				case HttpStatusCode.RequestTimeout:
-					errorMessage = GettextCatalog.GetString ("Unreachable");
-					break;
-				case HttpStatusCode.ProxyAuthenticationRequired:
-					errorMessage = GettextCatalog.GetString ("Proxy authentication required");
-					break;
-				}
+				errorMessage = GetErrorForStatusCode (response.StatusCode, errorMessage);
 			}
 
 			LogPackageSourceException (packageSource, ex);
@@ -175,12 +152,35 @@ namespace MonoDevelop.PackageManagement
 			return new PackageSourceViewModelCheckedEventArgs (packageSource, errorMessage);
 		}
 
-		void LogPackageSourceException (PackageSourceViewModel packageSource, Exception ex)
+		static string GetErrorForStatusCode (HttpStatusCode statusCode, string defaultErrorMessage = null)
 		{
-			LoggingService.LogInfo (String.Format ("Package source '{0}' returned exception.", packageSource.SourceUrl), ex);
+			switch (statusCode) {
+				case HttpStatusCode.Unauthorized:
+				return GettextCatalog.GetString ("Invalid credentials");
+
+				case HttpStatusCode.NotFound:
+				return GettextCatalog.GetString ("Not found");
+
+				case HttpStatusCode.GatewayTimeout:
+				case HttpStatusCode.RequestTimeout:
+				return GettextCatalog.GetString ("Unreachable");
+
+				case HttpStatusCode.ProxyAuthenticationRequired:
+				return GettextCatalog.GetString ("Proxy authentication required");
+
+				case HttpStatusCode.BadRequest:
+				return GettextCatalog.GetString ("Bad request");
+			}
+
+			return defaultErrorMessage;
 		}
 
-		void OnPackageSourceChecked (object sender, ITask<PackageSourceViewModelCheckedEventArgs> task)
+		void LogPackageSourceException (PackageSourceViewModel packageSource, Exception ex)
+		{
+			LoggingService.LogInfo (String.Format ("Package source '{0}' returned exception.", packageSource.Source), ex);
+		}
+
+		void OnPackageSourceChecked (Task<PackageSourceViewModelCheckedEventArgs> task)
 		{
 			PackageSourceViewModelCheckedEventArgs eventArgs = CreateEventArgs (task);
 			if (eventArgs != null && PackageSourceChecked != null) {
@@ -188,12 +188,12 @@ namespace MonoDevelop.PackageManagement
 			}
 		}
 
-		PackageSourceViewModelCheckedEventArgs CreateEventArgs (ITask<PackageSourceViewModelCheckedEventArgs> task)
+		PackageSourceViewModelCheckedEventArgs CreateEventArgs (Task<PackageSourceViewModelCheckedEventArgs> task)
 		{
 			if (task.IsFaulted) {
 				LoggingService.LogError ("Package source check failed.", task.Exception);
 				return null;
-			} else if (task.IsCancelled) {
+			} else if (task.IsCanceled) {
 				// Do nothing.
 				return null;
 			}

@@ -30,9 +30,12 @@ using System.Threading.Tasks;
 using System.IO;
 using MonoDevelop.Core;
 using System.Threading;
+using System.Reflection;
+using System.Globalization;
 
 namespace MonoDevelop.Ide.TypeSystem
 {
+	//FIXME: this mechanism is not correct, we should be implementing IMetadataService instead
 	static class MetadataReferenceCache
 	{
 		static Dictionary<string, MetadataReferenceCacheItem> cache = new Dictionary<string, MetadataReferenceCacheItem> ();
@@ -87,11 +90,13 @@ namespace MonoDevelop.Ide.TypeSystem
 			}
 		}
 
-		//static Timer timer;
+		#pragma warning disable 414
+		static Timer timer;
+		#pragma warning restore 414
 
 		static MetadataReferenceCache ()
 		{
-			//timer = new Timer ((o) => CheckForChanges (), null, 10000, 10000);
+			timer = new Timer ((o) => Runtime.RunInMainThread ((Action)CheckForChanges), null, 5000, 5000);
 		}
 
 		//TODO: Call this method when focus returns to MD or even better use FileSystemWatcher
@@ -163,13 +168,48 @@ namespace MonoDevelop.Ide.TypeSystem
 				timeStamp = File.GetLastWriteTimeUtc (path);
 				if (timeStamp == NonExistentFile) {
 					Reference = null;
-					LoggingService.LogError ("Error while loading reference " + path + ": File doesn't exist"); 
 				} else {
 					try {
-						Reference = MetadataReference.CreateFromFile (path, MetadataReferenceProperties.Assembly);
+						DocumentationProvider provider = null;
+						try {
+							string xmlName = Path.ChangeExtension (path, ".xml");
+							if (File.Exists (xmlName)) {
+								provider = Microsoft.CodeAnalysis.XmlDocumentationProvider.CreateFromFile (xmlName);
+							} else {
+								provider = RoslynDocumentationProvider.Instance;
+							}
+						} catch (Exception e) {
+							LoggingService.LogError ("Error while creating xml documentation provider for: " + path, e);
+						}
+						Reference = MetadataReference.CreateFromFile (path, MetadataReferenceProperties.Assembly, provider);
 					} catch (Exception e) {
 						LoggingService.LogError ("Error while loading reference " + path + ": " + e.Message, e); 
 					}
+				}
+			}
+
+
+			class RoslynDocumentationProvider : DocumentationProvider
+			{
+				internal static readonly DocumentationProvider Instance = new RoslynDocumentationProvider ();
+
+				RoslynDocumentationProvider ()
+				{
+				}
+
+				public override bool Equals (object obj)
+				{
+					return ReferenceEquals (this, obj);
+				}
+
+				public override int GetHashCode ()
+				{
+					return 42; // singleton
+				}
+
+				protected override string GetDocumentationForSymbol (string documentationMemberID, CultureInfo preferredCulture, CancellationToken cancellationToken = default (CancellationToken))
+				{
+					return MonoDocDocumentationProvider.GetDocumentation (documentationMemberID);
 				}
 			}
 		}

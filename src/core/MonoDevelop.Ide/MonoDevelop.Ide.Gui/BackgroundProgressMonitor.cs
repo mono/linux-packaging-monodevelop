@@ -42,9 +42,11 @@ namespace MonoDevelop.Ide.Gui
 		{
 			this.title = title;
 			if (!iconName.IsNull) {
-				Application.Invoke (delegate {
+				Application.Invoke ((o, args) => {
 					var img = ImageService.GetIcon (iconName, IconSize.Menu);
 					icon = IdeApp.Workbench.StatusBar.ShowStatusIcon (img);
+					icon.Title = GettextCatalog.GetString ("Background Progress");
+					icon.Help = GettextCatalog.GetString ("An operation is occuring in the background");
 					if (icon == null)
 						LoggingService.LogError ("Icon '" + iconName + "' not found.");
 				});
@@ -61,7 +63,7 @@ namespace MonoDevelop.Ide.Gui
 			else
 				tip = string.Format ("{0} ({1}%)\n{2}", title, (int)(Progress * 100), CurrentTaskName);
 				
-			Application.Invoke (delegate {
+			Application.Invoke ((o, args) => {
 				if (icon != null)
 					icon.ToolTip = tip;
 			});
@@ -70,7 +72,7 @@ namespace MonoDevelop.Ide.Gui
 		public override void Dispose()
 		{
 			base.Dispose ();
-			Application.Invoke (delegate {
+			Application.Invoke ((o, args) => {
 				if (icon != null) {
 					icon.Dispose ();
 					icon = null;

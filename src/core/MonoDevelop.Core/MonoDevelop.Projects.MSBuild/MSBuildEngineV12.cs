@@ -1,4 +1,4 @@
-//
+﻿//
 // MSBuildEngineV12.cs
 //
 // Author:
@@ -126,6 +126,11 @@ namespace MonoDevelop.Projects.MSBuild
 			return ((MSProjectItem)item).GetMetadataValue (name);
 		}
 
+		public override IEnumerable<string> GetItemMetadataNames (object item)
+		{
+			return ((MSProjectItem)item).Metadata.Select (m => m.Name);
+		}
+
 		public override IEnumerable<object> GetEvaluatedItems (object project)
 		{
 			return ((MSProject)project).AllEvaluatedItems;
@@ -141,12 +146,13 @@ namespace MonoDevelop.Projects.MSBuild
 			return ((MSProject)project).AllEvaluatedProperties;
 		}
 
-		public override void GetPropertyInfo (object property, out string name, out string value, out string finalValue)
+		public override void GetPropertyInfo (object property, out string name, out string value, out string finalValue, out bool definedMultipleTimes)
 		{
 			var p = (ProjectProperty)property;
 			name = p.Name;
 			value = p.UnevaluatedValue;
 			finalValue = p.EvaluatedValue;
+			definedMultipleTimes = true;
 		}
 
 		public override IEnumerable<MSBuildTarget> GetTargets (object project)
@@ -181,6 +187,16 @@ namespace MonoDevelop.Projects.MSBuild
 		}
 
 		public override ConditionedPropertyCollection GetConditionedProperties (object project)
+		{
+			throw new NotImplementedException ();
+		}
+
+		public override IEnumerable<MSBuildItem> FindGlobItemsIncludingFile (object projectInstance, string filePath)
+		{
+			throw new NotImplementedException ();
+		}
+
+		internal override IEnumerable<MSBuildItem> FindUpdateGlobItemsIncludingFile (object projectInstance, string include, MSBuildItem globItem)
 		{
 			throw new NotImplementedException ();
 		}

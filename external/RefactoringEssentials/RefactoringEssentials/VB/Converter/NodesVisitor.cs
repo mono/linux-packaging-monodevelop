@@ -1,18 +1,15 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.VisualBasic;
 using Microsoft.CodeAnalysis.VisualBasic.Syntax;
-using RefactoringEssentials.VB.CodeRefactorings;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using CS = Microsoft.CodeAnalysis.CSharp;
 using CSS = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace RefactoringEssentials.VB.Converter
 {
-    public partial class CSharpConverter
+	public partial class CSharpConverter
     {
         class NodesVisitor : CS.CSharpSyntaxVisitor<VisualBasicSyntaxNode>
         {
@@ -160,10 +157,6 @@ End Function";
                 foreach (var @extern in node.Externs)
                     @extern.Accept(this);
                 var members = node.Members.Select(m => (StatementSyntax)m.Accept(this));
-
-                IList<string> names;
-                if (!node.Name.TryGetNameParts(out names))
-                    throw new NotSupportedException();
 
                 return SyntaxFactory.NamespaceBlock(
                     SyntaxFactory.NamespaceStatement((NameSyntax)node.Name.Accept(this)),
@@ -919,12 +912,12 @@ End Function";
 
             public override VisualBasicSyntaxNode VisitMemberAccessExpression(CSS.MemberAccessExpressionSyntax node)
             {
-                return SyntaxFactory.MemberAccessExpression(
+                return WrapTypedNameIfNecessary(SyntaxFactory.MemberAccessExpression(
                     SyntaxKind.SimpleMemberAccessExpression,
                     (ExpressionSyntax)node.Expression.Accept(this),
                     SyntaxFactory.Token(SyntaxKind.DotToken),
                     (SimpleNameSyntax)node.Name.Accept(this)
-                );
+                ), node);
             }
 
             public override VisualBasicSyntaxNode VisitImplicitElementAccess(CSS.ImplicitElementAccessSyntax node)
@@ -1113,7 +1106,7 @@ End Function";
             public override VisualBasicSyntaxNode VisitArrayCreationExpression(CSS.ArrayCreationExpressionSyntax node)
             {
                 var upperBoundArguments = node.Type.RankSpecifiers.First()?.Sizes.Where(s => !(s is CSS.OmittedArraySizeExpressionSyntax)).Select(
-                    s => (ArgumentSyntax) SyntaxFactory.SimpleArgument(ReduceArrayUpperBoundExpression((ExpressionSyntax)s.Accept(this))));
+                    s => (ArgumentSyntax) SyntaxFactory.SimpleArgument(ReduceArrayUpperBoundExpression(s)));
                 var rankSpecifiers = node.Type.RankSpecifiers.Select(rs => (ArrayRankSpecifierSyntax)rs.Accept(this));
 
                 return SyntaxFactory.ArrayCreationExpression(
@@ -1133,19 +1126,15 @@ End Function";
                 );
             }
 
-            ExpressionSyntax ReduceArrayUpperBoundExpression(ExpressionSyntax expr)
+            ExpressionSyntax ReduceArrayUpperBoundExpression(CSS.ExpressionSyntax expr)
             {
-                if (expr.IsKind(SyntaxKind.NumericLiteralExpression))
-                {
-                    var numericLiteral = expr as LiteralExpressionSyntax;
-                    int? upperBound = numericLiteral.Token.Value as int?;
-                    if (upperBound.HasValue)
-                        return SyntaxFactory.NumericLiteralExpression(SyntaxFactory.Literal(upperBound.Value - 1));
-                }
+				var constant = semanticModel.GetConstantValue(expr);
+				if (constant.HasValue && constant.Value is int)
+					return SyntaxFactory.NumericLiteralExpression(SyntaxFactory.Literal((int)constant.Value - 1));
 
                 return SyntaxFactory.BinaryExpression(
                     SyntaxKind.SubtractExpression,
-                    expr, SyntaxFactory.Token(SyntaxKind.MinusToken), SyntaxFactory.NumericLiteralExpression(SyntaxFactory.Literal(1)));
+                    (ExpressionSyntax)expr.Accept(this), SyntaxFactory.Token(SyntaxKind.MinusToken), SyntaxFactory.NumericLiteralExpression(SyntaxFactory.Literal(1)));
             }
 
             public override VisualBasicSyntaxNode VisitInitializerExpression(CSS.InitializerExpressionSyntax node)
@@ -1428,7 +1417,7 @@ End Function";
 
             public override VisualBasicSyntaxNode VisitTypeConstraint(CSS.TypeConstraintSyntax node)
             {
-                return SyntaxFactory.TypeConstraint((TypeSyntax)node.Accept(this));
+                return SyntaxFactory.TypeConstraint((TypeSyntax)node.Type.Accept(this));
             }
 
             public override VisualBasicSyntaxNode VisitConstructorConstraint(CSS.ConstructorConstraintSyntax node)
@@ -1504,14 +1493,6 @@ End Function";
 
             #region NameSyntax
 
-            SyntaxToken ConvertIdentifier(SyntaxToken id)
-            {
-                var keywordKind = SyntaxFacts.GetKeywordKind(id.ValueText);
-                if (keywordKind != SyntaxKind.None && !SyntaxFacts.IsPredefinedType(keywordKind))
-                    return SyntaxFactory.Identifier("[" + id.ValueText + "]");
-                return SyntaxFactory.Identifier(id.ValueText);
-            }
-
             public override VisualBasicSyntaxNode VisitIdentifierName(CSS.IdentifierNameSyntax node)
             {
                 return WrapTypedNameIfNecessary(SyntaxFactory.IdentifierName(ConvertIdentifier(node.Identifier)), node);
@@ -1537,18 +1518,18 @@ End Function";
                 return SyntaxFactory.TypeArgumentList(SyntaxFactory.SeparatedList(node.Arguments.Select(a => (TypeSyntax)a.Accept(this))));
             }
 
-            VisualBasicSyntaxNode WrapTypedNameIfNecessary(NameSyntax name, CSS.NameSyntax originalName)
+            VisualBasicSyntaxNode WrapTypedNameIfNecessary(ExpressionSyntax name, CSS.ExpressionSyntax originalName)
             {
-                if (originalName.Parent is CSS.NameSyntax || originalName.Parent is CSS.AttributeSyntax) return name;
-                CSS.ExpressionSyntax parent = originalName;
-                while (parent.Parent is CSS.MemberAccessExpressionSyntax || parent.Parent is CSS.MemberBindingExpressionSyntax)
-                    parent = (CSS.ExpressionSyntax)parent.Parent;
-                if (parent != null && parent.Parent is CSS.InvocationExpressionSyntax)
+                if (originalName.Parent is CSS.NameSyntax || originalName.Parent is CSS.AttributeSyntax || originalName.Parent is CSS.MemberAccessExpressionSyntax || originalName.Parent is CSS.MemberBindingExpressionSyntax) return name;
+                if (originalName != null && originalName.Parent is CSS.InvocationExpressionSyntax)
                     return name;
 
-                var symbol = semanticModel.GetSymbolInfo(originalName).Symbol;
+                var symbolInfo = semanticModel.GetSymbolInfo(originalName);
+                var symbol = symbolInfo.Symbol ?? symbolInfo.CandidateSymbols.FirstOrDefault();
                 if (symbol.IsKind(SymbolKind.Method))
                     return SyntaxFactory.AddressOfExpression(name);
+
+
                 return name;
             }
 

@@ -31,25 +31,53 @@ using System.Linq;
 using System.IO;
 using System.Security.Cryptography;
 using MonoDevelop.Components;
-using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui.Dialogs;
+using NuGet.Common;
+using NuGet.Configuration;
 
 namespace MonoDevelop.PackageManagement.Gui
 {
-	public class PackageSourcesOptionsPanel : OptionsPanel
+	internal class PackageSourcesOptionsPanel : OptionsPanel
 	{
-		PackageManagementViewModels viewModels;
+		RegisteredPackageSourcesViewModel viewModel;
 		PackageSourcesWidget packageSourcesWidget;
+		bool loadError;
 
 		public override Control CreatePanelWidget()
 		{
-			viewModels = new PackageManagementViewModels ();
-			viewModels.RegisteredPackageSourcesViewModel.Load ();
+			try {
+				return CreatePackageSourcesWidget ();
+			} catch (Exception ex) {
+				LoggingService.LogError ("Unable to show package sources in NuGet.Config file.", ex);
+
+				loadError = true;
+
+				return new PackageSourcesLoadErrorWidget (
+					GetLoadErrorMessage (ex),
+					ex.Message,
+					GetGlobalNuGetConfigFileName ());
+			}
+		}
+
+		PackageSourcesWidget CreatePackageSourcesWidget ()
+		{
+			var settings = SettingsLoader.LoadDefaultSettings (throwError: true);
+			var repositoryProvider = SourceRepositoryProviderFactory.CreateSourceRepositoryProvider (settings);
+			viewModel = new RegisteredPackageSourcesViewModel (repositoryProvider);
+			viewModel.Load ();
 			
-			packageSourcesWidget = new PackageSourcesWidget (viewModels.RegisteredPackageSourcesViewModel);
+			packageSourcesWidget = new PackageSourcesWidget (viewModel);
 			return packageSourcesWidget;
+		}
+
+		string GetLoadErrorMessage (Exception ex)
+		{
+			if (ex is CryptographicException)
+				return GettextCatalog.GetString ("Unable to decrypt passwords stored in the NuGet.Config file.");
+
+			return GettextCatalog.GetString ("Unable to read the NuGet.Config file.");
 		}
 
 		/// <summary>
@@ -70,7 +98,7 @@ namespace MonoDevelop.PackageManagement.Gui
 		/// </summary>
 		public override bool ValidateChanges ()
 		{
-			if (Platform.IsWindows) {
+			if (Platform.IsWindows || loadError) {
 				return true;
 			}
 
@@ -92,8 +120,7 @@ namespace MonoDevelop.PackageManagement.Gui
 
 		bool AnyPasswordsToBeEncrypted ()
 		{
-			return viewModels
-				.RegisteredPackageSourcesViewModel
+			return viewModel
 				.PackageSourceViewModels
 				.Any (packageSource => packageSource.HasPassword ());
 		}
@@ -123,13 +150,17 @@ namespace MonoDevelop.PackageManagement.Gui
 
 		public override void ApplyChanges()
 		{
+			if (loadError)
+				return;
+
 			try {
 				if (packageSourcesWidget.HasPackageSourcesOrderChanged) {
-					viewModels.RegisteredPackageSourcesViewModel.Save (
+					viewModel.Save (
 						packageSourcesWidget.GetOrderedPackageSources ());
 				} else {
-					viewModels.RegisteredPackageSourcesViewModel.Save ();
+					viewModel.Save ();
 				}
+				PackageManagementServices.Workspace.ReloadSettings ();
 			} catch (Exception ex) {
 				LoggingService.LogError ("Unable to save NuGet.config changes", ex);
 				MessageService.ShowError (
@@ -161,6 +192,21 @@ namespace MonoDevelop.PackageManagement.Gui
 			if (packageSourcesWidget != null) {
 				packageSourcesWidget.Dispose ();
 			}
+			base.Dispose ();
+		}
+
+		string GetGlobalNuGetConfigFileName ()
+		{
+			try {
+				FilePath fileName = GlobalNuGetConfigFilePath.GetFileName ();
+				if (fileName.IsNotNull) {
+					if (File.Exists (fileName))
+						return fileName;
+				}
+			} catch (Exception ex) {
+				LoggingService.LogError ("Failed to get global NuGet.Config filename.", ex);
+			}
+			return null;
 		}
 	}
 }

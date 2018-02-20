@@ -1,12 +1,11 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.CodeFixes;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.CodeFixes
 {
-    [TestFixture]
     public class CS1520MethodMustHaveAReturnTypeTests : CSharpCodeFixTestBase
     {
-        [Test]
+        [Fact]
         public void TestMethod()
         {
             Test<CS1520MethodMustHaveAReturnTypeCodeFixProvider>(
@@ -24,7 +23,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeFixes
 }", 1, true);
         }
 
-        [Test]
+        [Fact]
         public void TestConstructor()
         {
             Test<CS1520MethodMustHaveAReturnTypeCodeFixProvider>(
@@ -42,7 +41,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeFixes
 }", 0, true);
         }
 
-        [Test]
+        [Fact]
         public void TestConstructorWithBase()
         {
             Test<CS1520MethodMustHaveAReturnTypeCodeFixProvider>(
@@ -54,7 +53,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeFixes
 }",
                 @"class Foo
 {
-    static Foo(string str) : base (str)
+    static Foo(string str) : base(str)
     {
     }
 }", 0, true);

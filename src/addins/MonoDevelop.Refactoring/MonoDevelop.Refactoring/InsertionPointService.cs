@@ -30,7 +30,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using MonoDevelop.Ide.Editor;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using System.Threading;
 using Microsoft.CodeAnalysis.Text;
 using MonoDevelop.Ide.TypeSystem;
@@ -105,9 +105,9 @@ namespace MonoDevelop.Refactoring
 			if (result.Count > 1) {
 				result.RemoveAt (result.Count - 1); 
 				NewLineInsertion insertLine;
-				var typeSyntaxReference = type.DeclaringSyntaxReferences.FirstOrDefault (r => r.Span.Contains (sourceSpan));
+				var typeSyntaxReference = type.DeclaringSyntaxReferences.FirstOrDefault (r => r.SyntaxTree.FilePath == data.FileName && r.Span.Contains (sourceSpan));
 
-				var lineBefore = data.GetLineByOffset (typeSyntaxReference.Span.End).PreviousLine;
+				var lineBefore = data.GetLineByOffset (typeSyntaxReference.Span.End)?.PreviousLine;
 				if (lineBefore != null && lineBefore.Length == lineBefore.GetIndentation (data).Length) {
 					insertLine = NewLineInsertion.None;
 				} else {

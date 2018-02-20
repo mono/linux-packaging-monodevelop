@@ -1,13 +1,9 @@
 ﻿namespace MonoDevelopTests
-open System.Text.RegularExpressions
-open System.Threading
 open NUnit.Framework
 open FsUnit
 open MonoDevelop.FSharp.MonoDevelop
-open MonoDevelop.FSharp
-open ExtCore
-open ExtCore.Control
-open ExtCore.Control.Collections
+open MonoDevelop.FSharp.Shared
+
 [<TestFixture>]
 type HighlightUsagesTests() =
     let assertUsages (source:string, expectedCount) =
@@ -15,9 +11,8 @@ type HighlightUsagesTests() =
         let source = source.Replace("|", "")
         let doc = TestHelpers.createDoc source ""
         let line, col, lineStr = doc.Editor.GetLineInfoFromOffset offset
-        //doc.Ast
 
-        match Parsing.findLongIdents(col, lineStr)  with
+        match Parsing.findIdents col lineStr SymbolLookupKind.ByLongIdent with
         | None -> Assert.Fail "Could not find ident"
         | Some(colu, ident) -> let symbolUse = doc.Ast.GetSymbolAtLocation(line, col, lineStr) |> Async.RunSynchronously
                                match symbolUse with

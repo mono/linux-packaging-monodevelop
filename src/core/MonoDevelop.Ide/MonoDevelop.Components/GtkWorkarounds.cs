@@ -1,4 +1,4 @@
-//
+﻿//
 // GtkWorkarounds.cs
 //
 // Authors: Jeffrey Stedfast <jeff@xamarin.com>
@@ -34,6 +34,14 @@ using Gtk;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Editor.Highlighting;
 using System.Text.RegularExpressions;
+
+#if MAC
+using AppKit;
+using MonoDevelop.Components.Mac;
+#endif
+#if WIN32
+using System.Windows.Input;
+#endif
 
 namespace MonoDevelop.Components
 {
@@ -75,11 +83,11 @@ namespace MonoDevelop.Components
 		[DllImport (LIBOBJC, EntryPoint = "objc_msgSend_stret")]
 		static extern void objc_msgSend_CGRect64 (out CGRect64 rect, IntPtr klass, IntPtr selector);
 
-		[DllImport (PangoUtil.LIBQUARTZ)]
-		static extern IntPtr gdk_quartz_window_get_nswindow (IntPtr window);
+		[DllImport (LIBOBJC, EntryPoint = "objc_msgSend")]
+		static extern void objc_msgSend_NSInt64_NSInt32 (IntPtr klass, IntPtr selector, int arg);
 
 		[DllImport (PangoUtil.LIBQUARTZ)]
-		static extern bool gdk_window_has_embedded_nsview_focus (IntPtr window);
+		static extern IntPtr gdk_quartz_window_get_nswindow (IntPtr window);
 
 		struct CGRect32
 		{
@@ -101,7 +109,7 @@ namespace MonoDevelop.Components
 
 		static IntPtr cls_NSScreen;
 		static IntPtr sel_screens, sel_objectEnumerator, sel_nextObject, sel_frame, sel_visibleFrame,
-		sel_requestUserAttention, sel_setHasShadow, sel_invalidateShadow;
+		sel_requestUserAttention, sel_setHasShadow, sel_invalidateShadow, sel_terminate;
 		static IntPtr sharedApp;
 		static IntPtr cls_NSEvent;
 		static IntPtr sel_modifierFlags;
@@ -166,7 +174,19 @@ namespace MonoDevelop.Components
 			sel_modifierFlags = sel_registerName ("modifierFlags");
 			sel_setHasShadow = sel_registerName ("setHasShadow:");
 			sel_invalidateShadow = sel_registerName ("invalidateShadow");
+			sel_terminate = sel_registerName ("terminate:");
 			sharedApp = objc_msgSend_IntPtr (objc_getClass ("NSApplication"), sel_registerName ("sharedApplication"));
+		}
+
+		static void MacTerminate ()
+		{
+			objc_msgSend_NSInt64_NSInt32 (sharedApp, sel_terminate, 0);
+		}
+
+		public static void Terminate ()
+		{
+			if (Platform.IsMac)
+				MacTerminate ();
 		}
 
 		static Gdk.Rectangle MacGetUsableMonitorGeometry (Gdk.Screen screen, int monitor)
@@ -374,6 +394,19 @@ namespace MonoDevelop.Components
 
 		public static Gdk.ModifierType GetCurrentKeyModifiers ()
 		{
+			#if WIN32
+			Gdk.ModifierType mtype = Gdk.ModifierType.None;
+			ModifierKeys mod = Keyboard.Modifiers;
+			if ((mod & ModifierKeys.Shift) > 0)
+				mtype |= Gdk.ModifierType.ShiftMask;
+			if ((mod & ModifierKeys.Control) > 0)
+				mtype |= Gdk.ModifierType.ControlMask;
+			if ((mod & ModifierKeys.Alt) > 0)
+				mtype |= Gdk.ModifierType.Mod1Mask; // Alt key
+			if ((mod & ModifierKeys.Windows) > 0)
+				mtype |= Gdk.ModifierType.Mod2Mask; // Command key
+			return mtype;
+			#else
 			if (Platform.IsMac) {
 				Gdk.ModifierType mtype = Gdk.ModifierType.None;
 				ulong mod;
@@ -397,6 +430,7 @@ namespace MonoDevelop.Components
 				Gtk.Global.GetCurrentEventState (out mtype);
 				return mtype;
 			}
+			#endif
 		}
 
 		public static void GetPageScrollPixelDeltas (this Gdk.EventScroll evt, double pageSizeX, double pageSizeY,
@@ -740,6 +774,21 @@ namespace MonoDevelop.Components
 			return mod;
 		}
 
+		public static Gdk.Key[] KeysForMod (Gdk.ModifierType mod)
+		{
+			switch (mod) {
+			case Gdk.ModifierType.ControlMask:
+				return new Gdk.Key [] { Gdk.Key.Control_R, Gdk.Key.Control_L };
+			case Gdk.ModifierType.Mod1Mask:
+				return new Gdk.Key [] { Gdk.Key.Alt_R, Gdk.Key.Alt_L };
+			case Gdk.ModifierType.ShiftMask:
+				return new Gdk.Key [] { Gdk.Key.Shift_R, Gdk.Key.Shift_L };
+			case Gdk.ModifierType.MetaMask:
+				return new Gdk.Key [] { Gdk.Key.Meta_R, Gdk.Key.Meta_L };
+			}
+			return new Gdk.Key [0];
+		}
+
 		static void AddIfNotDuplicate<T> (List<T> list, T item) where T : IEquatable<T>
 		{
 			for (int i = 0; i < list.Count; i++) {
@@ -844,19 +893,6 @@ namespace MonoDevelop.Components
 
 			var ptr = gdk_quartz_window_get_nswindow (window.GdkWindow.Handle);
 			objc_msgSend_IntPtr (ptr, sel_invalidateShadow);
-		}
-
-		public static bool HasNSTextFieldFocus (Gdk.Window window)
-		{
-			if (Platform.IsMac) {
-				try {
-					return gdk_window_has_embedded_nsview_focus (window.Handle);
-				} catch (Exception) {
-					return false;
-				}
-			} else {
-				return false;
-			}
 		}
 
 		[DllImport (PangoUtil.LIBGTKGLUE, CallingConvention = CallingConvention.Cdecl)]
@@ -1084,6 +1120,7 @@ namespace MonoDevelop.Components
 			} catch (DllNotFoundException) {
 			} catch (EntryPointNotFoundException) {
 			}
+			canSetOverlayScrollbarPolicy = false;
 		}
 
 		public static void GetOverlayScrollbarPolicy (Gtk.ScrolledWindow sw, out Gtk.PolicyType hpolicy, out Gtk.PolicyType vpolicy)
@@ -1137,8 +1174,21 @@ namespace MonoDevelop.Components
 		[DllImport (PangoUtil.LIBGOBJECT, CallingConvention = CallingConvention.Cdecl)]
 		static extern IntPtr g_object_get_data (IntPtr source, string name);
 
+		[DllImport (PangoUtil.LIBGOBJECT, CallingConvention = CallingConvention.Cdecl)]
+		static extern void g_object_set_data (IntPtr source, string name, IntPtr dataHandle);
+
 		[DllImport (PangoUtil.LIBGTK, CallingConvention = CallingConvention.Cdecl)]
 		static extern IntPtr gtk_icon_set_render_icon_scaled (IntPtr handle, IntPtr style, int direction, int state, int size, IntPtr widget, IntPtr intPtr, ref double scale);
+
+		public static IntPtr GetData (GLib.Object o, string name)
+		{
+			return g_object_get_data (o.Handle, name);
+		}
+
+		public static void SetData (GLib.Object o, string name, IntPtr dataHandle)
+		{
+			g_object_set_data (o.Handle, name, dataHandle);
+		}
 
 		public static bool SetSourceScale (Gtk.IconSource source, double scale)
 		{
@@ -1225,21 +1275,6 @@ namespace MonoDevelop.Components
 			return GetScaleFactor (Gdk.Screen.Default, 0);
 		}
 
-		public static double GetPixelScale ()
-		{
-			if (Platform.IsWindows)
-				return GetScaleFactor ();
-			else
-				return 1d;
-		}
-
-		public static int ConvertToPixelScale (int size)
-		{
-			double scale = GetPixelScale ();
-
-			return (int)(size * scale);
-		}
-
 		public static Gdk.Pixbuf RenderIcon (this Gtk.IconSet iconset, Gtk.Style style, Gtk.TextDirection direction, Gtk.StateType state, Gtk.IconSize size, Gtk.Widget widget, string detail, double scale)
 		{
 			if (scale == 1d)
@@ -1278,6 +1313,215 @@ namespace MonoDevelop.Components
 		public static void SetTransparentBgHint (this Widget widget, bool enable)
 		{
 			SetData (widget, "transparent-bg-hint", enable);
+		}
+
+		public static void SetMarkup (this Gtk.TextView view, string pangoMarkup)
+		{
+			view.Buffer.Clear ();
+			view.Buffer.InsertMarkup (view.Buffer.StartIter, pangoMarkup);
+		}
+
+		public static void InsertMarkup (this Gtk.TextBuffer buffer, TextIter iter, string pangoMarkup)
+		{
+			Pango.AttrList attrList;
+			string text;
+			char accel_char;
+			if (Pango.Global.ParseMarkup (pangoMarkup, (char)0, out attrList, out text, out accel_char)) {
+				buffer.Clear ();
+				var mark = buffer.CreateMark (null, iter, false);
+				var attrIter = attrList.Iterator;
+				//HACK: the parsed attribute indexes are byte based and need to be converted
+				//      to char indexes. Otherwise they won't match multibyte characters.
+				var indexer = new TextIndexer (text);
+
+				do {
+					int start, end;
+
+					attrIter.Range (out start, out end);
+
+					if (end == int.MaxValue) // last chunk
+						end = indexer.IndexToByteIndex (text.Length - 1);
+					if (end <= start)
+						break;
+
+					start = indexer.ByteIndexToIndex (start);
+					end = indexer.ByteIndexToIndex (end);
+
+					TextTag tag;
+					if (attrIter.GetTagForAttributes (null, out tag)) {
+						using (tag) {
+							buffer.TagTable.Add (tag);
+							buffer.InsertWithTags (ref iter, text.Substring (start, end - start), tag);
+						}
+					} else
+						buffer.Insert (ref iter, text.Substring (start, end - start));
+
+					iter = buffer.GetIterAtMark (mark);
+				}
+				while (attrIter.Next ());
+
+				attrList.Dispose ();
+			}
+		}
+
+		public static bool GetTagForAttributes (this Pango.AttrIterator iter, string name, out TextTag tag)
+		{
+			tag = new TextTag (name);
+			bool result = false;
+			Pango.Attribute attr;
+
+			if (iter.SafeGet (Pango.AttrType.Family, out attr)) {
+				tag.Family = ((Pango.AttrFamily)attr).Family;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Style, out attr)) {
+				tag.Style = ((Pango.AttrStyle)attr).Style;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Style, out attr)) {
+				tag.Style = ((Pango.AttrStyle)attr).Style;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Weight, out attr)) {
+				tag.Weight = ((Pango.AttrWeight)attr).Weight;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Variant, out attr)) {
+				tag.Variant = ((Pango.AttrVariant)attr).Variant;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Stretch, out attr)) {
+				tag.Stretch = ((Pango.AttrStretch)attr).Stretch;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.FontDesc, out attr)) {
+				tag.FontDesc = ((Pango.AttrFontDesc)attr).Desc;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Foreground, out attr)) {
+				tag.Foreground = ((Pango.AttrForeground)attr).Color.ToString ();
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Background, out attr)) {
+				tag.Background = ((Pango.AttrBackground)attr).Color.ToString ();
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Underline, out attr)) {
+				tag.Underline = ((Pango.AttrUnderline)attr).Underline;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Strikethrough, out attr)) {
+				tag.Strikethrough = ((Pango.AttrStrikethrough)attr).Strikethrough;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Strikethrough, out attr)) {
+				tag.Strikethrough = ((Pango.AttrStrikethrough)attr).Strikethrough;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Rise, out attr)) {
+				tag.Rise = ((Pango.AttrRise)attr).Rise;
+				result = true;
+			}
+
+			if (iter.SafeGet (Pango.AttrType.Scale, out attr)) {
+				tag.Scale = ((Pango.AttrScale)attr).Scale;
+				result = true;
+			}
+
+			return result;
+		}
+
+		[DllImport (PangoUtil.LIBPANGO, CallingConvention = CallingConvention.Cdecl)]
+		private static extern IntPtr pango_attr_iterator_get (IntPtr raw, int type);
+
+		public static bool SafeGet (this Pango.AttrIterator iter, Pango.AttrType type, out Pango.Attribute attr)
+		{
+			attr = null;
+			try {
+				IntPtr raw = pango_attr_iterator_get (iter.Handle, (int)type);
+				if (raw != IntPtr.Zero) {
+					attr = Pango.Attribute.GetAttribute (raw);
+					return true;
+				} else
+					return false;
+			} catch {
+				return false;
+			}
+		}
+
+		public static bool IsChildOf (this Gtk.Widget child, Gtk.Widget widget)
+		{
+			var parent = child.Parent;
+			while (parent != null) {
+				if (parent == widget)
+					return true;
+				parent = parent.Parent;
+			};
+			return false;
+		}
+
+#if MAC
+		static void OnMappedDisableButtons (object sender, EventArgs args)
+		{
+			var window = (Gtk.Window)sender;
+
+			DisableButtonsInternal (window);
+
+			window.Mapped -= OnMappedDisableButtons;
+		}
+
+		static void DisableButtonsInternal (Gtk.Window window)
+		{
+			// GtkQuartz appears to ignore any attempts to set the window's type hint or window functions to disable
+			// minimize/maximize buttons. This may be because on Cocoa these are set at window creation and can only
+			// be changed afterwards by directly accessing the window button and disabling it like so.
+			NSWindow nsWindow = GtkMacInterop.GetNSWindow (window);
+
+			nsWindow.StandardWindowButton (NSWindowButton.MiniaturizeButton).Enabled = false;
+			nsWindow.StandardWindowButton (NSWindowButton.ZoomButton).Enabled = false;
+		}
+#endif
+
+		public static void DisableMinimizeMaximizeButtons (Gtk.Window window)
+		{
+#if MAC
+			if (window.IsMapped) {
+				DisableButtonsInternal (window);
+				return;
+			}
+
+			window.Mapped += OnMappedDisableButtons;
+#endif
+		}
+
+
+		public static void EmitAddSignal(Container container, Widget child)
+		{
+#if MAC
+			// On Mac if we add a widget to a parent by hand, we need to inform the accessibility system of the fact
+			// If this is called from Linux or Windows custom Gtk then it will trigger warnings because we've protected
+			// for the situation in the Mac version of Gtk
+			GLib.Signal.Emit(container, "add", child);
+#endif
+		}
+
+		public static void EmitRemoveSignal(Container container, Widget child)
+		{
+#if MAC
+			GLib.Signal.Emit(container, "remove", child);
+#endif
 		}
 	}
 

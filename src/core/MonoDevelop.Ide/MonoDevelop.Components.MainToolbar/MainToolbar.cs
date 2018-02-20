@@ -54,6 +54,9 @@ namespace MonoDevelop.Components.MainToolbar
 		ComboBox configurationCombo;
 		TreeStore configurationStore = new TreeStore (typeof(string), typeof(IConfigurationModel));
 
+		ComboBox runConfigurationCombo;
+		TreeStore runConfigurationStore = new TreeStore (typeof (string), typeof (IRunConfigurationModel));
+	
 		ComboBox runtimeCombo;
 		TreeStore runtimeStore = new TreeStore (typeof(IRuntimeModel));
 
@@ -133,14 +136,24 @@ namespace MonoDevelop.Components.MainToolbar
 			AddWidget (button);
 			AddSpace (8);
 
-			configurationCombo = new Gtk.ComboBox ();
-			configurationCombo.Model = configurationStore;
-			var ctx = new Gtk.CellRendererText ();
-			configurationCombo.PackStart (ctx, true);
-			configurationCombo.AddAttribute (ctx, "text", 0);
-
 			configurationCombosBox = new HBox (false, 8);
 
+			var ctx = new Gtk.CellRendererText ();
+
+			runConfigurationCombo = new Gtk.ComboBox ();
+			runConfigurationCombo.Model = runConfigurationStore;
+			runConfigurationCombo.PackStart (ctx, true);
+			runConfigurationCombo.AddAttribute (ctx, "text", 0);
+
+			var runConfigurationComboVBox = new VBox ();
+			runConfigurationComboVBox.PackStart (runConfigurationCombo, true, false, 0);
+			configurationCombosBox.PackStart (runConfigurationComboVBox, false, false, 0);
+		
+			configurationCombo = new Gtk.ComboBox ();
+			configurationCombo.Model = configurationStore;
+			configurationCombo.PackStart (ctx, true);
+			configurationCombo.AddAttribute (ctx, "text", 0);
+		
 			var configurationComboVBox = new VBox ();
 			configurationComboVBox.PackStart (configurationCombo, true, false, 0);
 			configurationCombosBox.PackStart (configurationComboVBox, false, false, 0);
@@ -182,12 +195,10 @@ namespace MonoDevelop.Components.MainToolbar
 				if (toplevel == null)
 					return;
 
-				var pixel_scale = GtkWorkarounds.GetPixelScale ();
-
 				int windowWidth = toplevel.Allocation.Width;
 				int center = windowWidth / 2;
-				int left = Math.Max (center - (int)(300 * pixel_scale), args.Allocation.Left);
-				int right = Math.Min (left + (int)(600 * pixel_scale), args.Allocation.Right);
+				int left = Math.Max (center - 300, args.Allocation.Left);
+				int right = Math.Min (left + 600, args.Allocation.Right);
 				uint left_padding = (uint) (left - args.Allocation.Left);
 				uint right_padding = (uint) (args.Allocation.Right - right);
 
@@ -229,11 +240,15 @@ namespace MonoDevelop.Components.MainToolbar
 			align.Add (contentBox);
 
 			Add (align);
-			SetDefaultSizes (-1, (int)(21 * GtkWorkarounds.GetPixelScale ()));
+			SetDefaultSizes (-1, 21);
 
 			configurationCombo.Changed += (o, e) => {
 				if (ConfigurationChanged != null)
 					ConfigurationChanged (o, e);
+			};
+			runConfigurationCombo.Changed += (o, e) => {
+				if (RunConfigurationChanged != null)
+					RunConfigurationChanged (o, e);
 			};
 			runtimeCombo.Changed += (o, e) => {
 				var ea = new HandledEventArgs ();
@@ -275,6 +290,7 @@ namespace MonoDevelop.Components.MainToolbar
 		void SetDefaultSizes (int comboHeight, int height)
 		{
 			configurationCombo.SetSizeRequest (150, comboHeight);
+			runConfigurationCombo.SetSizeRequest (150, comboHeight);
 			// make the windows runtime slightly wider to accomodate select devices text
 			runtimeCombo.SetSizeRequest (Platform.IsWindows ? 175 : 150, comboHeight);
 			statusArea.SetSizeRequest (32, 32);
@@ -396,6 +412,17 @@ namespace MonoDevelop.Components.MainToolbar
 			set { configurationCombosBox.Sensitive = value; }
 		}
 
+		static bool FindIter<T> (TreeStore store, Func<T, bool> match, out TreeIter iter)
+		{
+			if (store.GetIterFirst (out iter)) {
+				do {
+					if (match((T)store.GetValue (iter, 1)))
+						return true;
+				} while (store.IterNext (ref iter));
+			}
+			return false;
+		}
+
 		public IConfigurationModel ActiveConfiguration {
 			get {
 				TreeIter iter;
@@ -406,19 +433,27 @@ namespace MonoDevelop.Components.MainToolbar
 			}
 			set {
 				TreeIter iter;
-				bool found = false;
-				if (configurationStore.GetIterFirst (out iter)) {
-					do {
-						if (value.OriginalId == ((IConfigurationModel)configurationStore.GetValue (iter, 1)).OriginalId) {
-							found = true;
-							break;
-						}
-					} while (configurationStore.IterNext (ref iter));
-				}
-				if (found)
+				if (FindIter<IConfigurationModel> (configurationStore, it => value.OriginalId == it.OriginalId, out iter))
 					configurationCombo.SetActiveIter (iter);
 				else
 					configurationCombo.Active = 0;
+			}
+		}
+
+		public IRunConfigurationModel ActiveRunConfiguration {
+			get {
+				TreeIter iter;
+				if (!runConfigurationCombo.GetActiveIter (out iter))
+					return null;
+
+				return (IRunConfigurationModel)runConfigurationStore.GetValue (iter, 1);
+			}
+			set {
+				TreeIter iter;
+				if (FindIter<IRunConfigurationModel> (runConfigurationStore, it => value.OriginalId == it.OriginalId, out iter))
+					runConfigurationCombo.SetActiveIter (iter);
+				else
+					runConfigurationCombo.Active = 0;
 			}
 		}
 
@@ -464,6 +499,18 @@ namespace MonoDevelop.Components.MainToolbar
 			}
 		}
 
+		IEnumerable<IRunConfigurationModel> runConfigurationModel;
+		public IEnumerable<IRunConfigurationModel> RunConfigurationModel {
+			get { return runConfigurationModel; }
+			set {
+				runConfigurationModel = value;
+				runConfigurationStore.Clear ();
+				foreach (var item in value) {
+					runConfigurationStore.AppendValues (item.DisplayString, item);
+				}
+			}
+		}
+
 		IEnumerable<IRuntimeModel> runtimeModel;
 		public IEnumerable<IRuntimeModel> RuntimeModel {
 			get { return runtimeModel; }
@@ -471,14 +518,16 @@ namespace MonoDevelop.Components.MainToolbar
 				runtimeModel = value;
 				runtimeStore.Clear ();
 				foreach (var item in value) {
-					if (item.HasParent)
-						continue;
-
 					var iter = runtimeStore.AppendValues (item);
 					foreach (var subitem in item.Children)
 						runtimeStore.AppendValues (iter, subitem);
 				}
 			}
+		}
+
+		public bool RunConfigurationVisible {
+			get { return runConfigurationCombo.Visible; }
+			set { runConfigurationCombo.Visible = value; }
 		}
 
 		public bool SearchSensivitity {
@@ -529,23 +578,27 @@ namespace MonoDevelop.Components.MainToolbar
 			set { matchEntry.EmptyMessage = value; }
 		}
 
-		public void RebuildToolbar (IEnumerable<IButtonBarButton> buttons)
+		public void RebuildToolbar (IEnumerable<ButtonBarGroup> groups)
 		{
-			if (!buttons.Any ()) {
+			if (!groups.Any ()) {
 				buttonBarBox.Hide ();
 				return;
 			}
 
 			buttonBarBox.Show ();
 			buttonBar.ShowAll ();
-			buttonBar.Buttons = buttons;
+			buttonBar.Groups = groups;
 		}
+
+		public void Focus (){}
+		public void Focus (System.Action exitAction) {}
 
 		public bool ButtonBarSensitivity {
 			set { buttonBar.Sensitive = value; }
 		}
 
 		public event EventHandler ConfigurationChanged;
+		public event EventHandler RunConfigurationChanged;
 		public event EventHandler<HandledEventArgs> RuntimeChanged;
 
 		#endregion

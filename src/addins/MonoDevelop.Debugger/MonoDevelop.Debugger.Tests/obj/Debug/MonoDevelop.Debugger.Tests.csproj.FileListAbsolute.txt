@@ -1,0 +1,7 @@
+/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Debugger.Tests.xml
+/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Debugger.Tests.dll
+/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Debugger.Tests.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests/obj/Debug/MonoDevelop.Debugger.Tests.csprojResolveAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests/obj/Debug/MonoDevelop.Debugger.Tests.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests/obj/Debug/MonoDevelop.Debugger.Tests.dll
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests/obj/Debug/MonoDevelop.Debugger.Tests.pdb

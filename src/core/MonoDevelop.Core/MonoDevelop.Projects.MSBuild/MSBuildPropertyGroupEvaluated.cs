@@ -32,8 +32,7 @@ namespace MonoDevelop.Projects.MSBuild
 {
 	class MSBuildPropertyGroupEvaluated: MSBuildNode, IMSBuildPropertyGroupEvaluated, IMSBuildProjectObject
 	{
-		protected Dictionary<string,IMSBuildPropertyEvaluated> properties = new Dictionary<string, IMSBuildPropertyEvaluated> ();
-		object sourceItem;
+		protected Dictionary<string,IMSBuildPropertyEvaluated> properties = new Dictionary<string, IMSBuildPropertyEvaluated> (StringComparer.OrdinalIgnoreCase);
 		MSBuildEngine engine;
 
 		internal MSBuildPropertyGroupEvaluated (MSBuildProject parent)
@@ -45,30 +44,27 @@ namespace MonoDevelop.Projects.MSBuild
 		{
 			properties.Clear ();
 			this.engine = engine;
-			sourceItem = item;
+			foreach (var propName in engine.GetItemMetadataNames (item)) {
+				var prop = new MSBuildPropertyEvaluated (ParentProject, propName, engine.GetItemMetadata (item, propName), engine.GetEvaluatedItemMetadata (item, propName));
+				properties [propName] = prop;
+			}
 		}
 
 		public bool HasProperty (string name)
 		{
-			if (properties.ContainsKey (name))
-				return true;
-			if (sourceItem != null)
-				return engine.GetItemHasMetadata (sourceItem, name);
-			return false;
+			return properties.ContainsKey (name);
 		}
 
 		public IMSBuildPropertyEvaluated GetProperty (string name)
 		{
 			IMSBuildPropertyEvaluated prop;
-			if (!properties.TryGetValue (name, out prop)) {
-				if (sourceItem != null) {
-					if (engine.GetItemHasMetadata (sourceItem, name)) {
-						prop = new MSBuildPropertyEvaluated (ParentProject, name, engine.GetItemMetadata (sourceItem, name), engine.GetEvaluatedItemMetadata (sourceItem, name));
-						properties [name] = prop;
-					}
-				}
-			}
+			properties.TryGetValue (name, out prop);
 			return prop;
+		}
+
+		internal void SetProperty (string key, IMSBuildPropertyEvaluated value)
+		{
+			properties [key] = value;
 		}
 
 		internal void SetProperties (Dictionary<string,IMSBuildPropertyEvaluated> properties)
@@ -76,11 +72,14 @@ namespace MonoDevelop.Projects.MSBuild
 			this.properties = properties;
 		}
 
+		public IEnumerable<IMSBuildPropertyEvaluated> GetProperties ()
+		{
+			return properties.Values;
+		}
+
 		internal bool RemoveProperty (string name)
 		{
-			if (properties != null)
-				return properties.Remove (name);
-			return false;
+			return properties.Remove (name);
 		}
 
 		public string GetValue (string name, string defaultValue = null)
@@ -154,9 +153,9 @@ namespace MonoDevelop.Projects.MSBuild
 		{
 			properties.Clear ();
 			foreach (var p in e.GetEvaluatedProperties (project)) {
-				string name, value, finalValue;
-				e.GetPropertyInfo (p, out name, out value, out finalValue);
-				properties [name] = new MSBuildPropertyEvaluated (ParentProject, name, value, finalValue);
+				string name, value, finalValue; bool definedMultipleTimes;
+				e.GetPropertyInfo (p, out name, out value, out finalValue, out definedMultipleTimes);
+				properties [name] = new MSBuildPropertyEvaluated (ParentProject, name, value, finalValue, definedMultipleTimes);
 			}
 		}
 
@@ -170,6 +169,18 @@ namespace MonoDevelop.Projects.MSBuild
 					ep = AddProperty (p.Name);
 				ep.LinkToProperty (p);
 			}
+		}
+
+		/// <summary>
+		/// Notifies that a property has been modified in the project, so that the evaluated
+		/// value for that property in this instance *may* be out of date.
+		/// </summary>
+		internal void SetPropertyValueStale (string name)
+		{
+			var p = (MSBuildPropertyEvaluated)GetProperty (name);
+			if (p == null)
+				p = AddProperty (name);
+			p.EvaluatedValueIsStale = true;
 		}
 
 		public void RemoveRedundantProperties ()

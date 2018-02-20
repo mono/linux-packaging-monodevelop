@@ -59,6 +59,12 @@ namespace MonoDevelop.Ide.Gui
 			}
 		}
 
+		public virtual string TabAccessibilityDescription {
+			get {
+				return string.Empty;
+			}
+		}
+
 		public virtual bool CanReuseView (string fileName)
 		{
 			return false;
@@ -147,6 +153,12 @@ namespace MonoDevelop.Ide.Gui
 				return ProjectReloadCapability.None;
 			}
 		}
+
+		/// <summary>
+		/// Gets the display binding of this view.
+		/// </summary>
+		/// <value>The display binding used to create this view.</value>
+		public IDisplayBinding Binding { get; internal set; }
 	}
 
 	public enum ProjectReloadCapability

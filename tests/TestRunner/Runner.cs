@@ -64,13 +64,16 @@ namespace MonoDevelop.Tests.TestRunner
 					}
 				}
 			}
+
+			// Make sure the updater is disabled while running tests
+			Runtime.Preferences.EnableUpdaterForCurrentSession = false;
+
 			if (guiUnitAsm != null) {
 				Xwt.XwtSynchronizationContext.AutoInstall = false;
 				var sc = new Xwt.XwtSynchronizationContext ();
 				System.Threading.SynchronizationContext.SetSynchronizationContext (sc);
 				Runtime.MainSynchronizationContext = sc;
-				var runnerType = guiUnitAsm.GetType ("GuiUnit.TestRunner");
-				var method = runnerType.GetMethod ("Main", BindingFlags.Public | BindingFlags.Static);
+				var method = guiUnitAsm.EntryPoint;
 				return Task.FromResult ((int)method.Invoke (null, new [] { args.ToArray () }));
 			}
 			args.RemoveAll (a => a.StartsWith ("-port=", StringComparison.Ordinal));

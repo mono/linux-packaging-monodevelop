@@ -52,7 +52,11 @@ namespace MonoDevelop.VersionControl.Tests
 		protected int CommitNumber = 0;
 
 		[SetUp]
-		public abstract void Setup ();
+		public virtual void Setup ()
+		{
+			var vcs = Repo.VersionControlSystem;
+			Console.WriteLine ("Running tests for {0} (v{1})", vcs.Name, vcs.Version);
+		}
 
 		[TearDown]
 		public virtual void TearDown ()
@@ -269,11 +273,8 @@ namespace MonoDevelop.VersionControl.Tests
 
 		[Test]
 		// Tests Repository.GetHistory.
-		public void LogIsProper ()
+		public virtual void LogIsProper ()
 		{
-			if (!Platform.IsWindows)
-				Assert.Ignore ("Linux/Mac Svn seems to hiccup on symlinks.");
-
 			AddFile ("testfile", null, true, true);
 			AddFile ("testfile2", null, true, true);
 			AddFile ("testfile3", null, true, true);
@@ -651,6 +652,89 @@ namespace MonoDevelop.VersionControl.Tests
 
 			Assert.AreEqual (VersionStatus.Versioned, Repo.GetVersionInfo (added, VersionInfoQueryFlags.IgnoreCache).Status);
 		}
+
+		[Test]
+		public virtual void MoveAndMoveBackCaseOnly ()
+		{
+			string srcFile = LocalPath.Combine ("testfile");
+			string dstFile = LocalPath.Combine ("TESTFILE");
+			AddFile ("testfile", "test", true, true);
+
+			Repo.MoveFile (srcFile, dstFile, true, new ProgressMonitor ());
+			Assert.AreEqual (VersionStatus.ScheduledAdd, Repo.GetVersionInfo (dstFile, VersionInfoQueryFlags.IgnoreCache).Status & VersionStatus.ScheduledAdd);
+			Assert.AreEqual (VersionStatus.ScheduledDelete, Repo.GetVersionInfo (srcFile, VersionInfoQueryFlags.IgnoreCache).Status & VersionStatus.ScheduledDelete);
+
+			Repo.MoveFile (dstFile, srcFile, true, new ProgressMonitor ());
+			Assert.AreEqual (VersionStatus.Unversioned, Repo.GetVersionInfo (dstFile, VersionInfoQueryFlags.IgnoreCache).Status);
+			Assert.AreEqual (VersionStatus.Versioned, Repo.GetVersionInfo (srcFile, VersionInfoQueryFlags.IgnoreCache).Status);
+			
+		}
+
+		[Test]
+		public void RevisionFormatMessageChangelogStyle()
+		{
+			var res = RevisionHelpers.FormatMessage(
+@"2009-11-23 Test Author
+
+	* MonoDevelop.CSharp/CSharpBindingCompilerManager.cs: Emit the
+	  target platform option. Fixes bug #557146.");
+
+			var expected =
+@"Emit the target platform option. Fixes bug #557146.";
+			
+			Assert.AreEqual (expected, res);
+		}
+
+		[Test]
+		public void RevisionFormatMessageChangelogStyleMultipleLines ()
+		{
+			var res = RevisionHelpers.FormatMessage (
+@"2005-09-22 Test Author
+	* Services/NUnitService.cs:
+	* Services/CombineTestGroup.cs:
+	* Services/NUnitProjectTestSuite.cs:
+	* Services/SystemTestProvider.cs: Only generate a test suite for
+	projects that reference the nunit.framework assembly.");
+
+			var expected =
+@"* Services/CombineTestGroup.cs:
+ * Services/NUnitProjectTestSuite.cs:
+ * Services/SystemTestProvider.cs: Only generate a test suite for
+ projects that reference the nunit.framework assembly.";
+//			var expected =
+//@"Only generate a test suite for projects that reference the nunit.framework assembly.";
+
+			Assert.AreEqual (expected, res);
+		}
+
+		[Test]
+		public void RevisionFormatMessageChangelogStyleMultipleMessages ()
+		{
+			var res = RevisionHelpers.FormatMessage (
+@"2005-08-22 Test Author
+	* Commands/ViewCommands.cs: Implemented delete layout command.
+	* Gui/Workbench/Layouts/SdiWorkspaceLayout.cs: Properly load saved
+	layouts. Added DeleteLayout method.
+	* Gui/IWorkbenchLayout.cs: Added DeleteLayout method.
+	* MonoDevelopCore.addin.xml: Added Delete Layout command.");
+
+//			var expected =
+//@"Implemented delete layout command.
+// Properly load saved layouts. Added DeleteLayout method.
+// Added DeleteLayout method.
+// Added Delete Layout command.
+
+			var expected =
+@"Implemented delete layout command. * Gui/Workbench/Layouts/SdiWorkspaceLayout.cs: Properly load saved
+ layouts. Added DeleteLayout method.
+ * Gui/IWorkbenchLayout.cs: Added DeleteLayout method.
+ * MonoDevelopCore.addin.xml: Added Delete Layout command.";
+
+			Assert.AreEqual (expected, res);
+		}
+
+
+
 		#region Util
 
 		protected void Checkout (string path, string url)

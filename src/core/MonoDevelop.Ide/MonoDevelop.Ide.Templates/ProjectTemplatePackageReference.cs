@@ -26,6 +26,7 @@
 
 using System;
 using System.Xml;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.Ide.Templates
 {
@@ -33,10 +34,18 @@ namespace MonoDevelop.Ide.Templates
 	{
 		public static ProjectTemplatePackageReference Create (XmlElement xmlElement)
 		{
+			return Create (xmlElement, FilePath.Null);
+		}
+
+		internal static ProjectTemplatePackageReference Create (XmlElement xmlElement, FilePath baseDirectory)
+		{
 			return new ProjectTemplatePackageReference {
 				Id = GetAttribute (xmlElement, "id"),
 				Version = GetAttribute (xmlElement, "version"),
-				CreateCondition = GetAttribute (xmlElement, "if")
+				CreateCondition = GetAttribute (xmlElement, "if"),
+				RequireLicenseAcceptance = GetLocalOrParentBoolAttribute (xmlElement, "requireLicenseAcceptance", true),
+				IsLocalPackage = GetBoolAttribute (xmlElement, "local"),
+				Directory = GetPath (xmlElement, "directory", baseDirectory)
 			};
 		}
 
@@ -44,14 +53,60 @@ namespace MonoDevelop.Ide.Templates
 		public string Version { get; private set; }
 		public string CreateCondition { get; private set; }
 
-		static string GetAttribute (XmlElement xmlElement, string attributeName)
+		internal bool IsLocalPackage { get; private set; }
+		internal bool RequireLicenseAcceptance { get; private set; }
+		internal FilePath Directory { get; private set; }
+
+		static string GetAttribute (XmlElement xmlElement, string attributeName, string defaultValue = "")
 		{
 			foreach (XmlAttribute attribute in xmlElement.Attributes) {
 				if (attributeName.Equals (attribute.Name, StringComparison.OrdinalIgnoreCase)) {
 					return attribute.Value;
 				}
 			}
-			return "";
+			return defaultValue;
+		}
+
+		static bool GetBoolAttribute (XmlElement xmlElement, string attributeName)
+		{
+			string attributeValue = GetAttribute (xmlElement, attributeName);
+			return GetBoolValue (attributeValue);
+		}
+
+		static bool GetBoolValue (string value, bool defaultValue = false)
+		{
+			bool result = false;
+			if (bool.TryParse (value, out result))
+				return result;
+
+			return defaultValue;
+		}
+
+		static bool GetLocalOrParentBoolAttribute (XmlElement xmlElement, string attributeName, bool defaultValue = false)
+		{
+			string attributeValue = GetLocalOrParentAttribute (xmlElement, attributeName);
+			return GetBoolValue (attributeValue, defaultValue);
+		}
+
+		/// <summary>
+		/// Local attribute value overrides parent attribute value.
+		/// </summary>
+		static string GetLocalOrParentAttribute (XmlElement xmlElement, string attributeName)
+		{
+			string attributeValue = GetAttribute (xmlElement, attributeName, null);
+			if (attributeValue != null)
+				return attributeValue;
+
+			return GetAttribute ((XmlElement)xmlElement.ParentNode, attributeName);
+		}
+
+		static FilePath GetPath (XmlElement xmlElement, string attributeName, FilePath baseDirectory)
+		{
+			string directory = GetAttribute (xmlElement, attributeName, null);
+			if (directory == null)
+				return FilePath.Null;
+
+			return baseDirectory.Combine (directory).FullPath;
 		}
 	}
 }

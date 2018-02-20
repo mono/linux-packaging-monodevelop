@@ -27,29 +27,32 @@
 //
 
 using System;
-using NuGet;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageLicenseViewModel : ViewModelBase<PackageLicenseViewModel>
+	internal class PackageLicenseViewModel : ViewModelBase<PackageLicenseViewModel>
 	{
-		IPackage package;
+		NuGetPackageLicense packageLicense;
 		
-		public PackageLicenseViewModel(IPackage package)
+		public PackageLicenseViewModel (NuGetPackageLicense packageLicense)
 		{
-			this.package = package;
+			this.packageLicense = packageLicense;
 		}
 		
 		public string Id {
-			get { return package.Id; }
-		}
-		
-		public string Summary {
-			get { return package.SummaryOrDescription(); }
+			get { return packageLicense.PackageId; }
 		}
 		
 		public Uri LicenseUrl {
-			get { return package.LicenseUrl; }
+			get { return packageLicense.LicenseUrl; }
+		}
+
+		public string Author {
+			get { return packageLicense.PackageAuthor; }
+		}
+
+		public Uri IconUrl {
+			get { return packageLicense.IconUrl; }
 		}
 	}
 }

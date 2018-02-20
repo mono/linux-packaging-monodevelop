@@ -36,6 +36,7 @@ using System.Reflection;
 using System.Xaml;
 using System.Linq;
 using Xwt.Motion;
+using Xwt.Accessibility;
 
 namespace Xwt
 {
@@ -319,6 +320,16 @@ namespace Xwt
 					foreach (var c in DirectChildren)
 						c.Dispose ();
 				}
+			}
+		}
+
+		Accessible accessible;
+		public Accessible Accessible {
+			get {
+				if (accessible == null) {
+					accessible = new Accessible (this);
+				}
+				return accessible;
 			}
 		}
 		
@@ -790,6 +801,42 @@ namespace Xwt
 		}
 
 		/// <summary>
+		/// Converts widget relative coordinates to its parent widget coordinates.
+		/// </summary>
+		/// <returns>The parent widget coordinates.</returns>
+		/// <param name="widgetCoordinates">The relative widget coordinates.</param>
+		public Point ConvertToParentCoordinates (Point widgetCoordinates)
+		{
+			return Backend.ConvertToParentCoordinates (widgetCoordinates);
+		}
+
+		/// <summary>
+		/// Gets the bounds of the widget in its parent window coordinates
+		/// </summary>
+		/// <value>The widget bounds.</value>
+		public Rectangle ParentBounds {
+			get { return new Rectangle (ConvertToParentCoordinates (new Point (0, 0)), Size); }
+		}
+
+		/// <summary>
+		/// Converts widget relative coordinates to its parent window coordinates.
+		/// </summary>
+		/// <returns>The window coordinates.</returns>
+		/// <param name="widgetCoordinates">The relative widget coordinates.</param>
+		public Point ConvertToWindowCoordinates (Point widgetCoordinates)
+		{
+			return Backend.ConvertToWindowCoordinates (widgetCoordinates);
+		}
+
+		/// <summary>
+		/// Gets the bounds of the widget in its parent widgets coordinates
+		/// </summary>
+		/// <value>The widget bounds.</value>
+		public Rectangle WindowBounds {
+			get { return new Rectangle (ConvertToWindowCoordinates (new Point (0, 0)), Size); }
+		}
+
+		/// <summary>
 		/// Converts widget relative coordinates to screen coordinates.
 		/// </summary>
 		/// <returns>The screen coordinates.</returns>
@@ -860,7 +907,7 @@ namespace Xwt
 		/// <param name='types'>Types of data that can be dropped on this widget.</param>
 		public void SetDragDropTarget (params Type[] types)
 		{
-			Backend.SetDragTarget (types.Select (t => TransferDataType.FromType (t)).ToArray (), DragDropAction.All);
+			Backend.SetDragTarget (types.Select (TransferDataType.FromType).ToArray (), DragDropAction.All);
 		}
 		
 		/// <summary>
@@ -880,7 +927,7 @@ namespace Xwt
 		/// <param name='dragAction'>Bitmask of possible actions for a drop on this widget</param>
 		public void SetDragDropTarget (DragDropAction dragAction, params Type[] types)
 		{
-			Backend.SetDragTarget (types.Select (t => TransferDataType.FromType (t)).ToArray(), dragAction);
+			Backend.SetDragTarget (types.Select (TransferDataType.FromType).ToArray(), dragAction);
 		}
 		
 		/// <summary>
@@ -898,7 +945,7 @@ namespace Xwt
 		/// <param name='types'>Types of data that can be dragged from this widget</param>
 		public void SetDragSource (params Type[] types)
 		{
-			Backend.SetDragSource (types.Select (t => TransferDataType.FromType (t)).ToArray(), DragDropAction.All);
+			Backend.SetDragSource (types.Select (TransferDataType.FromType).ToArray(), DragDropAction.All);
 		}
 		
 		/// <summary>
@@ -918,7 +965,7 @@ namespace Xwt
 		/// <param name='dragAction'>Bitmask of possible actions for a drag from this widget</param>
 		public void SetDragSource (DragDropAction dragAction, params Type[] types)
 		{
-			Backend.SetDragSource (types.Select (t => TransferDataType.FromType (t)).ToArray(), dragAction);
+			Backend.SetDragSource (types.Select (TransferDataType.FromType).ToArray(), dragAction);
 		}
 		
 		/// <summary>
@@ -1703,7 +1750,7 @@ namespace Xwt
 				return;
 
 			if (w.Surface.ToolkitEngine != Surface.ToolkitEngine)
-				throw new InvalidOperationException ("Widget belongs to a different toolkit");
+				throw new InvalidOperationException (string.Format ("Widget belongs to toolkit '{0}' but it should belong to '{1}'.", w.Surface.ToolkitEngine, Surface.ToolkitEngine));
 
 			var wback = w.Backend as XwtWidgetBackend;
 

@@ -28,7 +28,10 @@ using System.Collections.Generic;
 
 namespace MonoDevelop.Ide.CodeCompletion
 {
-	class MruCache
+	/// <summary>
+	/// A cache that keeps a list of the most recently used completion items
+	/// </summary>
+	public class MruCache
 	{
 		const int MaxItems = 42;
 

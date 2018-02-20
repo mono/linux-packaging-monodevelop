@@ -192,16 +192,78 @@ namespace Mono.MHex.Rendering
 					handleNotSelected (startOffset, endOffset);
 			}
 		}
-		
-		protected static uint TranslateToUTF8Index (char[] charArray, uint textIndex, ref uint curIndex, ref uint byteIndex)
+
+		protected delegate void HandleSelectionArgsDelegate<T> (long start, long end, Margin margin, T arg);
+		protected struct LayoutOffsetPair
 		{
-			if (textIndex < curIndex) {
-				byteIndex = (uint)Encoding.UTF8.GetByteCount (charArray, 0, (int)textIndex);
+			public readonly long StartOffset;
+			public readonly TextLayout Layout;
+
+			public LayoutOffsetPair (long startOffset, TextLayout layout)
+			{
+				StartOffset = startOffset;
+				Layout = layout;
+			}
+		}
+		protected static void HandleSelection<T> (long selectionStart, long selectionEnd, long startOffset, long endOffset, Margin margin, T args, HandleSelectionArgsDelegate<T> handleNotSelected, HandleSelectionArgsDelegate<T> handleSelected)
+		{
+			if (startOffset >= selectionStart && endOffset <= selectionEnd) {
+				if (handleSelected != null)
+					handleSelected (startOffset, endOffset, margin, args);
+			} else if (startOffset >= selectionStart && startOffset < selectionEnd && endOffset > selectionEnd) {
+				if (handleSelected != null)
+					handleSelected (startOffset, selectionEnd, margin, args);
+				if (handleNotSelected != null)
+					handleNotSelected (selectionEnd, endOffset, margin, args);
+			} else if (startOffset < selectionStart && endOffset > selectionStart && endOffset <= selectionEnd) {
+				if (handleNotSelected != null)
+					handleNotSelected (startOffset, selectionStart, margin, args);
+				if (handleSelected != null)
+					handleSelected (selectionStart, endOffset, margin, args);
+			} else if (startOffset < selectionStart && endOffset > selectionEnd) {
+				if (handleNotSelected != null)
+					handleNotSelected (startOffset, selectionStart, margin, args);
+				if (handleSelected != null)
+					handleSelected (selectionStart, selectionEnd, margin, args);
+				if (handleNotSelected != null)
+					handleNotSelected (selectionEnd, endOffset, margin, args);
 			} else {
-				int count = System.Math.Min ((int)(textIndex - curIndex), charArray.Length - (int)curIndex);
-				
-				if (count > 0)
-					byteIndex += (uint)Encoding.UTF8.GetByteCount (charArray, (int)curIndex, count);
+				if (handleNotSelected != null)
+					handleNotSelected (startOffset, endOffset, margin, args);
+			}
+		}
+		
+		protected static uint TranslateToUTF8Index (string text, uint textIndex, ref uint curIndex, ref uint byteIndex)
+		{
+			if (text == null)
+				throw new ArgumentNullException (nameof (text));
+
+			if (textIndex < 0)
+				throw new ArgumentOutOfRangeException (nameof (textIndex));
+
+			if (textIndex < curIndex) {
+				if (textIndex > text.Length)
+					throw new ArgumentOutOfRangeException (nameof (curIndex));
+
+				unsafe {
+					fixed (char* p = text)
+						byteIndex = (uint)Encoding.UTF8.GetByteCount (p, (int)textIndex);
+				}
+			} else {
+				int count = System.Math.Min ((int)(textIndex - curIndex), text.Length - (int)curIndex);
+
+				if (curIndex < 0)
+					throw new ArgumentOutOfRangeException (nameof (textIndex));
+
+				if (count - curIndex > text.Length)
+					throw new ArgumentOutOfRangeException (nameof (curIndex));
+
+				if (count > 0) {
+					unsafe {
+						fixed (char *p = text)
+							byteIndex += (uint)Encoding.UTF8.GetByteCount (p + curIndex, count);
+					}
+				}
 			}
 			curIndex = textIndex;
 			return byteIndex;

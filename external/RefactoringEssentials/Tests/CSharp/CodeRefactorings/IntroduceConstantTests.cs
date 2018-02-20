@@ -1,12 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.CodeRefactorings;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 {
-    [TestFixture, Ignore("Not implemented!")]
     public class IntroduceConstantTests : CSharpCodeRefactoringTestBase
     {
-        [Test]
+        [Fact(Skip="Not implemented!")]
         public void TestLocalConstant()
         {
             Test<IntroduceConstantAction>(@"class TestClass
@@ -25,7 +25,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 }");
         }
 
-        [Test]
+        [Fact(Skip="Not implemented!")]
         public void TestLocalConstantHexNumber()
         {
             Test<IntroduceConstantAction>(@"class TestClass
@@ -44,7 +44,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 }");
         }
 
-        [Test]
+        [Fact(Skip="Not implemented!")]
         public void TestFieldConstant()
         {
             Test<IntroduceConstantAction>(@"class TestClass
@@ -63,7 +63,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 }", 1);
         }
 
-        [Test]
+        [Fact(Skip="Not implemented!")]
         public void TestLocalConstantReplaceAll()
         {
             Test<IntroduceConstantAction>(@"class TestClass
@@ -86,7 +86,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 }", 2);
         }
 
-        [Test]
+        [Fact(Skip="Not implemented!")]
         public void TestAlreadyConstant()
         {
             TestWrongContext<IntroduceConstantAction>(@"class TestClass
@@ -98,7 +98,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 }");
         }
 
-        [Test]
+        [Fact(Skip="Not implemented!")]
         public void TestAlreadyConstantCase2()
         {
             TestWrongContext<IntroduceConstantAction>(@"class TestClass
@@ -107,7 +107,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 }");
         }
 
-        [Test]
+        [Fact(Skip="Not implemented!")]
         public void TestIntroduceConstantInInitializer()
         {
             Test<IntroduceConstantAction>(@"class TestClass
@@ -120,4 +120,4 @@ namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 }");
         }
     }
-}
+}*/

@@ -2,11 +2,9 @@
 namespace MonoDevelop.FSharp
 open Microsoft.FSharp.Compiler.AbstractIL.Internal.Library
 open System.IO
-open System.Threading
 open MonoDevelop.Ide
 open MonoDevelop.Ide.Gui
 open MonoDevelop.Core
-open MonoDevelop.Ide.TypeSystem
 open ExtCore.Control
 type Version = int
 
@@ -68,9 +66,12 @@ module FileService =
     
     /// Is the specified extension supported F# file?
     let supportedFileName fileName =
-        let ext = Path.GetExtension(fileName).ToLower()
-        supportedFileExtensions
-        |> List.exists ((=) ext)
+        if fileName = null then
+            false
+        else
+            let ext = Path.GetExtension(fileName).ToLower()
+            supportedFileExtensions
+            |> List.exists ((=) ext)
     
     let isInsideFSharpFile () =
         if IdeApp.Workbench.ActiveDocument = null ||

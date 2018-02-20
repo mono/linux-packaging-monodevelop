@@ -1,8 +1,74 @@
 ﻿namespace MonoDevelopTests
 open System
-open NUnit.Framework
-open MonoDevelop.FSharp
 open FsUnit
+open MonoDevelop
+open MonoDevelop.FSharp
+open MonoDevelop.FSharp.MonoDevelop
+open MonoDevelop.UnitTesting
+open NUnit.Framework
+open nunitSourceCodeLocationFinder
+
+[<TestFixture>]
+module ``Source code location finder`` =
+    let findTest (source: string) fixtureNamespace fixtureTypeName testName =
+        let offset = source.IndexOf("$")
+        let source = source.Replace("$", "")
+
+        let doc = TestHelpers.createDoc source ""
+        let line, col, lineStr = doc.Editor.GetLineInfoFromOffset offset
+
+        let symbolUse = doc.Ast.GetSymbolAtLocation(line, col - 1, lineStr) |> Async.RunSynchronously
+        match symbolUse with
+        | Some symbolUse' ->
+            match symbolUse' with
+            | Entity entity ->
+                match tryFindTest fixtureNamespace fixtureTypeName testName entity with
+                | Some _ -> Assert.Pass()
+                | None -> failwith "No test found in entity"
+            | _ -> failwith "No entity found at location"
+        | _ -> failwith "No symbol found at location"
+
+    [<Test>]
+    let ``Can find test without namespace``() =
+        let source =
+            """
+            module myT$ests =
+                [<Test>] let myTest() = ()
+            """
+        findTest source null "myTests" "myTest"
+
+    [<Test>]
+    let ``Can find test with namespace``() =
+        let source =
+            """
+            namespace TestNamespace
+            module myT$ests =
+                [<Test>] let myTest() = ()
+            """
+        findTest source "TestNamespace" "myTests" "myTest"
+
+    [<Test>]
+    let ``Can find test in nested module``() =
+        let source =
+            """
+            namespace TestNamespace
+            module par$ent =
+              module myTests =
+                [<Test>] let myTest() = ()
+            """
+        findTest source "TestNamespace" "myTests" "myTest"
+
+    [<Test>]
+    let ``Can find test in deeply nested module``() =
+        let source =
+            """
+            namespace TestNamespace
+            module grand$parent =
+              module parent =
+                module myTests =
+                  [<Test>] let myTest() = ()
+            """
+        findTest source "TestNamespace" "myTests" "myTest"
 
 [<TestFixture>]
 type FSharpUnitTestTextEditorExtensionTests() =
@@ -11,7 +77,15 @@ type FSharpUnitTestTextEditorExtensionTests() =
         let ast = editor.Ast
         let symbols = ast.GetAllUsesOfAllSymbolsInFile() |> Async.RunSynchronously
 
-        unitTestGatherer.gatherUnitTests (editor.Editor, symbols)
+        let markers =
+            [|{ new IUnitTestMarkers
+                with
+                    member x.TestMethodAttributeMarker = "NUnit.Framework.TestAttribute"
+                    member x.TestCaseMethodAttributeMarker = "NUnit.Framework.TestCaseAttribute"
+                    member x.IgnoreTestMethodAttributeMarker = "NUnit.Framework.IgnoreAttribute"
+                    member x.IgnoreTestClassAttributeMarker = "NUnit.Framework.IgnoreAttribute" }|]
+
+        unitTestGatherer.gatherUnitTests (markers, editor.Editor, symbols)
         |> Seq.toList
 
     let gatherTestsWithReference (text:string) =
@@ -56,7 +130,7 @@ type Test() =
             t1.UnitTestIdentifier |> should equal "NUnit.Framework.Test.TestOne"
             t1.IsIgnored |> should equal false
 
-            t2.UnitTestIdentifier |> should equal "NUnit.Framework.Test.``Test Two``"
+            t2.UnitTestIdentifier |> should equal "NUnit.Framework.Test.Test Two"
             t2.IsIgnored |> should equal true
         | _ -> NUnit.Framework.Assert.Fail "invalid number of tests returned"
 
@@ -86,7 +160,7 @@ module someModule =
 """
 
         let tests = gatherTestsWithReference noTests
-        tests.Length |> should equal 1
+        tests.Length |> should equal 2
 
     [<Test>]
     member x.NestedTestCoveringNormalAndDoubleQuotedTestsInATestFixture () =
@@ -113,7 +187,7 @@ module Test =
             t1.UnitTestIdentifier |> should equal "NUnit.Framework.Test+Test.TestOne"
             t1.IsIgnored |> should equal false
 
-            t2.UnitTestIdentifier |> should equal "NUnit.Framework.Test+Test.``Test Two``"
+            t2.UnitTestIdentifier |> should equal "NUnit.Framework.Test+Test.Test Two"
             t2.IsIgnored |> should equal true
         | _ -> NUnit.Framework.Assert.Fail "invalid number of tests returned"
 
@@ -153,3 +227,4 @@ module Test =
             t1.UnitTestIdentifier |> should equal "NUnit.Framework.Test+Test.TestOne"
             t1.IsIgnored |> should equal false
         | _ -> NUnit.Framework.Assert.Fail "invalid number of tests returned"
+  

@@ -27,6 +27,7 @@
 
 
 using System;
+using System.Linq;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
@@ -57,6 +58,7 @@ namespace MonoDevelop.Ide.Commands
 		ZoomOut,
 		ZoomReset,
 		FocusCurrentDocument,
+		CenterAndFocusCurrentDocument,
 		ShowWelcomePage
 	}
 
@@ -65,13 +67,15 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandArrayInfo info)
 		{
-			for (int i = 0; i < IdeApp.Workbench.Pads.Count; i++) {
-				Pad pad = IdeApp.Workbench.Pads[i];
+			string group;
+			var lastListGroup = new Dictionary <CommandArrayInfo, string>();
+			var descFormat = GettextCatalog.GetString ("Show {0}");
+			foreach (Pad pad in IdeApp.Workbench.Pads.OrderBy (p => p.Group, StringComparer.InvariantCultureIgnoreCase)) {
 
 				CommandInfo ci = new CommandInfo(pad.Title);
 				ci.Icon = pad.Icon;
 				ci.UseMarkup = true;
-				ci.Description = GettextCatalog.GetString ("Show {0}", pad.Title);
+				ci.Description = string.Format (descFormat, pad.Title);
 
 				ActionCommand cmd = IdeApp.CommandService.GetActionCommand ("Pad|" + pad.Id);
 				if (cmd != null) ci.AccelKey = cmd.AccelKey; 
@@ -90,20 +94,31 @@ namespace MonoDevelop.Ide.Commands
 						if (!found) {
 							CommandInfoSet set = new CommandInfoSet();
 							set.Text = pad.Categories[j];
-							set.Description = GettextCatalog.GetString ("Show {0}", set.Text);
+							set.Description = string.Format (descFormat, set.Text);
 							list.Add (set);
 							list = set.CommandInfos;
 						}
 					}
 				}
+
+				int atIndex = 0;
 				for (int j = list.Count - 1; j >= 0; j--) {
-					if (!(list[j] is CommandInfoSet)) {
-						list.Insert (j + 1, ci, pad);
-						pad = null;
+					if (!(list [j] is CommandInfoSet)) {
+						atIndex = j + 1;
 						break;
 					}
 				}
-				if (pad != null) list.Insert (0, ci, pad); 
+
+				list.Insert (atIndex, ci, pad);
+				lastListGroup.TryGetValue (list, out group);
+				if (group != pad.Group) {
+					lastListGroup [list] = pad.Group;
+					if (atIndex > 0) {
+						CommandInfo sep = new CommandInfo ("-");
+						sep.IsArraySeparator = true;
+						list.Insert (atIndex, sep, null);
+					}
+				}
 			}
 		}
 
@@ -121,10 +136,24 @@ namespace MonoDevelop.Ide.Commands
 	// MonoDevelop.Ide.Commands.ViewCommands.LayoutList
 	public class LayoutListHandler : CommandHandler
 	{
+		static internal readonly Dictionary<string, string> NameMapping;
+
+		static LayoutListHandler ()
+		{
+			NameMapping = new Dictionary<string, string> ();
+			NameMapping ["Solution"] = GettextCatalog.GetString ("Code");
+			NameMapping ["Visual Design"] = GettextCatalog.GetString ("Design");
+			NameMapping ["Debug"] = GettextCatalog.GetString ("Debug");
+			NameMapping ["Unit Testing"] = GettextCatalog.GetString ("Test");
+		}
+
 		protected override void Update (CommandArrayInfo info)
 		{
+			string text;
 			foreach (var name in IdeApp.Workbench.Layouts) {
-				CommandInfo item = new CommandInfo(GettextCatalog.GetString (name));
+				if (!NameMapping.TryGetValue (name, out text))
+					text = name;
+				CommandInfo item = new CommandInfo (text);
 				item.Checked = IdeApp.Workbench.CurrentLayout == name;
 				item.Description = GettextCatalog.GetString ("Switch to layout '{0}'", name);
 				info.Add (item, name);
@@ -162,10 +191,20 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Update (CommandInfo info)
 		{
 			info.Enabled = !String.Equals ("Solution", IdeApp.Workbench.CurrentLayout, StringComparison.OrdinalIgnoreCase);
+			string itemName;
+			if (!LayoutListHandler.NameMapping.TryGetValue (IdeApp.Workbench.CurrentLayout, out itemName))
+				itemName = IdeApp.Workbench.CurrentLayout;
+			if (info.Enabled)
+				info.Text = GettextCatalog.GetString ("_Delete \u201C{0}\u201D Layout", itemName);
+			else
+				info.Text = GettextCatalog.GetString ("_Delete Current Layout");
 		}
 		protected override void Run ()
 		{
-			if (MessageService.Confirm (GettextCatalog.GetString ("Are you sure you want to delete the active layout?"), AlertButton.Delete)) {
+			string itemName;
+			if (!LayoutListHandler.NameMapping.TryGetValue (IdeApp.Workbench.CurrentLayout, out itemName))
+				itemName = IdeApp.Workbench.CurrentLayout;
+			if (MessageService.Confirm (GettextCatalog.GetString ("Are you sure you want to delete the \u201C{0}\u201D layout?", itemName), AlertButton.Delete)) {
 				string clayout = IdeApp.Workbench.CurrentLayout;
 				IdeApp.Workbench.CurrentLayout = "Solution";
 				IdeApp.Workbench.DeleteLayout (clayout);
@@ -290,11 +329,17 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandInfo info)
 		{
-			info.Enabled = DockNotebook.ActiveNotebook != null && DockNotebook.ActiveNotebook.TabCount > 1 && DockNotebook.ActiveNotebook.Container.AllowRightInsert;
+			info.Checked = DockNotebook.ActiveNotebook?.Container?.SplitCount > 0;
+			info.Enabled = (DockNotebook.ActiveNotebook?.TabCount > 1 &&
+			                DockNotebook.ActiveNotebook?.Container?.AllowRightInsert == true) || DockNotebook.ActiveNotebook?.Container?.SplitCount > 0;
 		}
 
 		protected override void Run ()
 		{
+			// Already in 2-column mode?
+			if (DockNotebook.ActiveNotebook?.Container?.SplitCount > 0)
+				return;
+			
 			IdeApp.Workbench.LockActiveWindowChangeEvent ();
 			var container = DockNotebook.ActiveNotebook.Container;
 			var tab = DockNotebook.ActiveNotebook.CurrentTab;
@@ -310,7 +355,9 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Update (CommandInfo info)
 		{
-			info.Enabled = DockNotebook.ActiveNotebook != null && DockNotebook.ActiveNotebook.Container.SplitCount > 0;
+			info.Checked = DockNotebook.ActiveNotebook?.Container?.SplitCount < 1;
+			info.Enabled = (DockNotebook.ActiveNotebook?.TabCount > 1 &&
+			                DockNotebook.ActiveNotebook?.Container?.AllowRightInsert == true) || DockNotebook.ActiveNotebook?.Container?.SplitCount > 0;
 		}
 
 		protected override void Run ()
@@ -369,7 +416,7 @@ namespace MonoDevelop.Ide.Commands
 			window.MoveToPreviousNotebook ();
 		}
 	}
-	
+
 	public class FocusCurrentDocumentHandler : CommandHandler
 	{
 		protected override void Update (CommandInfo info)
@@ -379,8 +426,24 @@ namespace MonoDevelop.Ide.Commands
 
 		protected override void Run ()
 		{
+			IdeApp.Workbench.ActiveDocument.Select ();
 			IdeApp.Workbench.ActiveDocument.Editor.StartCaretPulseAnimation ();
 		}
 
+	}
+
+	public class CenterAndFocusCurrentDocumentHandler : CommandHandler
+	{
+		protected override void Update (CommandInfo info)
+		{
+			info.Enabled = IdeApp.Workbench.ActiveDocument != null && IdeApp.Workbench.ActiveDocument.Editor != null;
+		}
+
+		protected override void Run ()
+		{
+			IdeApp.Workbench.ActiveDocument.Select ();
+			IdeApp.Workbench.ActiveDocument.Editor.CenterToCaret ();
+			IdeApp.Workbench.ActiveDocument.Editor.StartCaretPulseAnimation ();
+		}
 	}
 }

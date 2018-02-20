@@ -42,7 +42,9 @@ namespace MonoDevelop.Projects
 		SolutionItemExtension next;
 
 		internal string FlavorGuid { get; set; }
+		internal string ProjectCapability { get; set; }
 		internal string TypeAlias { get; set; }
+		internal string LanguageName { get; set; }
 
 		internal protected override void InitializeChain (ChainedExtension next)
 		{
@@ -52,11 +54,29 @@ namespace MonoDevelop.Projects
 
 		internal protected override bool SupportsObject (WorkspaceObject item)
 		{
+			if (!base.SupportsObject (item))
+				return false;
+			
 			var p = item as SolutionItem;
 			if (p == null)
 				return false;
 
-			return FlavorGuid == null || p.GetItemTypeGuids ().Any (id => id.Equals (FlavorGuid, StringComparison.OrdinalIgnoreCase));
+			var pr = item as Project;
+
+			if (pr != null && ProjectCapability != null) {
+				if (!pr.IsCapabilityMatch (ProjectCapability))
+					return false;
+			}
+			if (FlavorGuid != null) {
+				if (!p.GetItemTypeGuids ().Any (id => id.Equals (FlavorGuid, StringComparison.OrdinalIgnoreCase)))
+					return false;
+			}
+
+			var dnp = item as DotNetProject;
+			if (LanguageName == null || dnp == null)
+				return true;
+			
+			return LanguageName == dnp.LanguageName;
 		}
 
 		public SolutionItem Item {
@@ -206,23 +226,55 @@ namespace MonoDevelop.Projects
 			return next.OnCheckHasSolutionData ();
 		}
 
+		internal protected virtual Task OnClearCachedData ()
+		{
+			return next.OnClearCachedData ();
+		}
+
 		#endregion
 
 		#region Execution
 
+		[Obsolete ("Use overload that takes a RunConfiguration")]
 		internal protected virtual Task OnPrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
 		{
-			return next.OnPrepareExecution (monitor, context, configuration);
+			return next.OnPrepareExecution (monitor, context, configuration, (SolutionItemRunConfiguration)context.RunConfiguration);
 		}
 
+		[Obsolete ("Use overload that takes a RunConfiguration")]
 		internal protected virtual Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
 		{
-			return next.OnExecute (monitor, context, configuration);
+			return next.OnExecute (monitor, context, configuration, (SolutionItemRunConfiguration)context.RunConfiguration);
 		}
 
+		[Obsolete ("Use overload that takes a RunConfiguration")]
 		internal protected virtual bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration)
 		{
-			return next.OnGetCanExecute (context, configuration);
+			return next.OnGetCanExecute (context, configuration, (SolutionItemRunConfiguration)context.RunConfiguration);
+		}
+
+		internal protected virtual Task OnPrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+			context.RunConfiguration = runConfiguration;
+#pragma warning disable 618 // Type or member is obsolete
+			return OnPrepareExecution (monitor, context, configuration);
+#pragma warning restore 618 // Type or member is obsolete
+		}
+
+		internal protected virtual Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+			context.RunConfiguration = runConfiguration;
+#pragma warning disable 618 // Type or member is obsolete
+			return OnExecute (monitor, context, configuration);
+#pragma warning restore 618 // Type or member is obsolete
+		}
+
+		internal protected virtual bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
+		{
+			context.RunConfiguration = runConfiguration;
+#pragma warning disable 618 // Type or member is obsolete
+			return OnGetCanExecute (context, configuration);
+#pragma warning restore 618 // Type or member is obsolete
 		}
 
 		internal protected virtual IEnumerable<ExecutionTarget> OnGetExecutionTargets (ConfigurationSelector configuration)
@@ -230,9 +282,24 @@ namespace MonoDevelop.Projects
 			return next.OnGetExecutionTargets (configuration);
 		}
 
+		internal protected virtual IEnumerable<ExecutionTarget> OnGetExecutionTargets (OperationContext ctx, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfig)
+		{
+			return next.OnGetExecutionTargets (ctx, configuration, runConfig);
+		}
+
 		internal protected virtual void OnExecutionTargetsChanged ()
 		{
 			next.OnExecutionTargetsChanged ();
+		}
+
+		internal protected virtual IEnumerable<SolutionItemRunConfiguration> OnGetRunConfigurations (OperationContext ctx)
+		{
+			return next.OnGetRunConfigurations (ctx);
+		}
+
+		internal protected virtual void OnRunConfigurationsChanged (OperationContext ctx)
+		{
+			next.OnRunConfigurationsChanged (ctx);
 		}
 
 		#endregion
@@ -242,16 +309,6 @@ namespace MonoDevelop.Projects
 		internal protected virtual void OnReloadRequired (SolutionItemEventArgs args)
 		{
 			next.OnReloadRequired (args);
-		}
-
-		internal protected virtual void OnItemsAdded (IEnumerable<ProjectItem> objs)
-		{
-			next.OnItemsAdded (objs);
-		}
-
-		internal protected virtual void OnItemsRemoved (IEnumerable<ProjectItem> objs)
-		{
-			next.OnItemsRemoved (objs);
 		}
 
 		internal protected virtual void OnDefaultConfigurationChanged (ConfigurationEventArgs args)

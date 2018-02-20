@@ -262,6 +262,7 @@ namespace MonoDevelop.Ide.WelcomePage
 
 		protected override void OnDestroyed ()
 		{
+			this.AbortAnimation ("FadeOut");
 			if (backgroundSurface != null)
 				backgroundSurface.Dispose ();
 			if (titleSurface != null)
@@ -279,10 +280,11 @@ namespace MonoDevelop.Ide.WelcomePage
 		Gdk.Size TitleSize {
 			get {
 				if (titleSize == null) {
-					var layout = TitleLayout (PangoContext);
-					int w, h;
-					layout.GetPixelSize (out w, out h);
-					titleSize = new Gdk.Size (w, h);
+					using (var layout = TitleLayout (PangoContext)) {
+						int w, h;
+						layout.GetPixelSize (out w, out h);
+						titleSize = new Gdk.Size (w, h);
+					}
 				}
 				return titleSize.Value;
 			}
@@ -292,10 +294,11 @@ namespace MonoDevelop.Ide.WelcomePage
 		Gdk.Size TextSize {
 			get {
 				if (textSize == null) {
-					var layout = TextLayout (PangoContext);
-					int w, h;
-					layout.GetPixelSize (out w, out h);
-					textSize = new Gdk.Size (w, h);
+					using (var layout = TextLayout (PangoContext)) {
+						int w, h;
+						layout.GetPixelSize (out w, out h);
+						textSize = new Gdk.Size (w, h);
+					}
 				}
 				return textSize.Value;
 			}

@@ -38,6 +38,7 @@ using MonoDevelop.Ide.FindInFiles;
 using MonoDevelop.Ide.Tasks;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using MonoDevelop.CSharp.Highlighting;
 
 namespace MonoDevelop.CSharp.Refactoring
 {
@@ -47,7 +48,7 @@ namespace MonoDevelop.CSharp.Refactoring
 		{
 			public static LookupResult Failure = new LookupResult ();
 
-			public bool Success  { get; private set; }
+			public bool Success { get; private set; }
 			public ISymbol Symbol { get; private set; }
 			public Solution Solution { get; private set; }
 			public MonoDevelop.Projects.Project MonoDevelopProject { get; internal set; }
@@ -70,37 +71,43 @@ namespace MonoDevelop.CSharp.Refactoring
 		{
 			if (string.IsNullOrEmpty (documentationCommentId))
 				return LookupResult.Failure;
-			bool searchNs = documentationCommentId[0] == 'N';
-			bool searchType = documentationCommentId[0] == 'T';
+			bool searchNs = documentationCommentId [0] == 'N';
+			bool searchType = documentationCommentId [0] == 'T';
 			int reminderIndex = 2;
 			var comp = await prj.GetCompilationAsync (token).ConfigureAwait (false);
-			var current = LookupNamespace (documentationCommentId, ref reminderIndex, comp.GlobalNamespace);
-			if (current == null)
-				return LookupResult.Failure;
-			if (searchNs) {
-				if (current.GetDocumentationCommentId () == documentationCommentId)
-					return new LookupResult (current, prj.Solution, comp);
-				return LookupResult.Failure;
-			}
-			
-			INamedTypeSymbol type = null;
-			foreach (var t in current.GetAllTypes ()) {
-				type = LookupType (documentationCommentId, reminderIndex, t);
-				if (type != null) {
-					if (searchType) {
-						return new LookupResult(type, prj.Solution, comp);
+			return await Task.Run (() => {
+				var current = LookupNamespace (documentationCommentId, ref reminderIndex, comp.GlobalNamespace, token);
+				if (current == null)
+					return LookupResult.Failure;
+				if (searchNs) {
+					if (current.GetDocumentationCommentId () == documentationCommentId)
+						return new LookupResult (current, prj.Solution, comp);
+					return LookupResult.Failure;
+				}
+				INamedTypeSymbol type = null;
+				foreach (var t in current.GetTypeMembers ()) {
+					if (token.IsCancellationRequested)
+						return LookupResult.Failure;
+					type = LookupType (documentationCommentId, reminderIndex, t, token);
+					if (type != null) {
+						if (searchType) {
+							return new LookupResult (type, prj.Solution, comp);
+						}
+						break;
 					}
-					break;
 				}
-			}
-			if (type == null)
+				if (type == null)
+					return LookupResult.Failure;
+				foreach (var member in type.GetMembers ()) {
+					if (token.IsCancellationRequested)
+						return LookupResult.Failure;
+
+					if (member.GetDocumentationCommentId () == documentationCommentId) {
+						return new LookupResult (member, prj.Solution, comp);
+					}
+				}
 				return LookupResult.Failure;
-			foreach (var member in type.GetMembers ()) {
-				if (member.GetDocumentationCommentId () == documentationCommentId) {
-					return new LookupResult(member, prj.Solution, comp);
-				}
-			}
-			return LookupResult.Failure;
+			}, token);
 		}
 
 		internal static async Task<LookupResult> TryLookupSymbol (string documentationCommentId, MonoDevelop.Projects.Project hintProject, CancellationToken token)
@@ -137,7 +144,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			return result;
 		}
 
-		static INamedTypeSymbol LookupType (string documentationCommentId, int reminder, INamedTypeSymbol current)
+		static INamedTypeSymbol LookupType (string documentationCommentId, int reminder, INamedTypeSymbol current, CancellationToken token)
 		{
 			var idx = documentationCommentId.IndexOf ('.', reminder);
 			var exact = idx < 0;
@@ -154,32 +161,38 @@ namespace MonoDevelop.CSharp.Refactoring
 				if (typeId.Length > idx)
 					return null;
 				foreach (var subType in current.GetTypeMembers ()) {
-					var child = LookupType (documentationCommentId, idx  + 1, subType);
+					if (token.IsCancellationRequested)
+						return null;
+
+					var child = LookupType (documentationCommentId, idx + 1, subType, token);
 					if (child != null) {
 						return child;
 					}
 				}
 				return current;
-				
+
 			}
 			return null;
 		}
 
-		static INamespaceSymbol LookupNamespace (string documentationCommentId, ref int reminder, INamespaceSymbol current)
+		static INamespaceSymbol LookupNamespace (string documentationCommentId, ref int reminder, INamespaceSymbol current, CancellationToken token)
 		{
 			var exact = documentationCommentId.IndexOf ('.', reminder) < 0;
 
 			foreach (var subNamespace in current.GetNamespaceMembers ()) {
+				if (token.IsCancellationRequested)
+					return null;
+
 				if (exact) {
 					if (subNamespace.Name.Length == documentationCommentId.Length - reminder &&
-					    string.CompareOrdinal (documentationCommentId, reminder, subNamespace.Name, 0, subNamespace.Name.Length) == 0)
+						string.CompareOrdinal (documentationCommentId, reminder, subNamespace.Name, 0, subNamespace.Name.Length) == 0)
 						return subNamespace;
 				} else {
 					if (subNamespace.Name.Length < documentationCommentId.Length - reminder - 1 &&
 						string.CompareOrdinal (documentationCommentId, reminder, subNamespace.Name, 0, subNamespace.Name.Length) == 0 &&
 						documentationCommentId [reminder + subNamespace.Name.Length] == '.') {
 						reminder += subNamespace.Name.Length + 1;
-						return LookupNamespace (documentationCommentId, ref reminder, subNamespace);
+						return LookupNamespace (documentationCommentId, ref reminder, subNamespace, token);
 					}
 				}
 			}
@@ -192,20 +205,18 @@ namespace MonoDevelop.CSharp.Refactoring
 			return Task.Run (async delegate {
 				var result = new List<SearchResult> ();
 				var antiDuplicatesSet = new HashSet<SearchResult> (new SearchResultComparer ());
-				foreach (var workspace in TypeSystemService.AllWorkspaces.OfType<MonoDevelopWorkspace> ()) {
-					LookupResult lookup = null;
+				var lookup = await TryLookupSymbol (documentationCommentId, hintProject, token);
+				if (lookup == null || !lookup.Success)
+					return Enumerable.Empty<SearchResult> ();
 
-					foreach (var project in workspace.CurrentSolution.Projects) {
-						lookup = await TryLookupSymbolInProject (project, documentationCommentId, token);
-						if (lookup.Success)
+				var workspace = TypeSystemService.AllWorkspaces.FirstOrDefault (w => w.CurrentSolution == lookup.Solution) as MonoDevelopWorkspace;
+				if (workspace == null)
+					return Enumerable.Empty<SearchResult> ();
+				foreach (var sym in await GatherSymbols (lookup.Symbol, lookup.Solution, token)) {
+					foreach (var loc in sym.Locations) {
+						if (token.IsCancellationRequested)
 							break;
-					}
 
-					if (lookup == null || !lookup.Success) {
-						continue;
-					}
-
-					foreach (var loc in lookup.Symbol.Locations) {
 						if (!loc.IsInSource)
 							continue;
 						var fileName = loc.SourceTree.FilePath;
@@ -216,13 +227,16 @@ namespace MonoDevelop.CSharp.Refactoring
 							fileName = projectedName;
 							offset = projectedOffset;
 						}
-						var sr = new SearchResult (new FileProvider (fileName), offset, loc.SourceSpan.Length);
+						var sr = new MemberReference (sym, fileName, offset, loc.SourceSpan.Length);
+						sr.ReferenceUsageType = ReferenceUsageType.Declaration;
 						antiDuplicatesSet.Add (sr);
 						result.Add (sr);
 					}
 
-					foreach (var mref in await SymbolFinder.FindReferencesAsync (lookup.Symbol, lookup.Solution).ConfigureAwait (false)) {
+					foreach (var mref in await SymbolFinder.FindReferencesAsync (sym, lookup.Solution, token).ConfigureAwait (false)) {
 						foreach (var loc in mref.Locations) {
+							if (token.IsCancellationRequested)
+								break;
 							var fileName = loc.Document.FilePath;
 							var offset = loc.Location.SourceSpan.Start;
 							string projectedName;
@@ -231,8 +245,14 @@ namespace MonoDevelop.CSharp.Refactoring
 								fileName = projectedName;
 								offset = projectedOffset;
 							}
-							var sr = new SearchResult (new FileProvider (fileName), offset, loc.Location.SourceSpan.Length);
+							var sr = new MemberReference (sym, fileName, offset, loc.Location.SourceSpan.Length);
+
+
 							if (antiDuplicatesSet.Add (sr)) {
+								var root = loc.Location.SourceTree.GetRoot ();
+								var node = root.FindNode (loc.Location.SourceSpan);
+								var trivia = root.FindTrivia (loc.Location.SourceSpan.Start);
+								sr.ReferenceUsageType = HighlightUsagesExtension.GetUsage (node);
 								result.Add (sr);
 							}
 						}
@@ -242,49 +262,70 @@ namespace MonoDevelop.CSharp.Refactoring
 			});
 		}
 
+		public static async Task<IEnumerable<ISymbol>> GatherSymbols (ISymbol symbol, Solution solution, CancellationToken token)
+		{
+			var implementations = await SymbolFinder.FindImplementationsAsync (symbol, solution, null, token);
+			var result = new List<ISymbol> ();
+			result.Add (symbol);
+			result.AddRange (implementations);
+			return result;
+		}
+
 		public override Task<IEnumerable<SearchResult>> FindAllReferences (string documentationCommentId, MonoDevelop.Projects.Project hintProject, CancellationToken token)
 		{
-			var workspace = TypeSystemService.Workspace as MonoDevelopWorkspace;
-			if (workspace == null)
-				return Task.FromResult (Enumerable.Empty<SearchResult> ());
 			return Task.Run (async delegate {
 				var antiDuplicatesSet = new HashSet<SearchResult> (new SearchResultComparer ());
 				var result = new List<SearchResult> ();
 				var lookup = await TryLookupSymbol (documentationCommentId, hintProject, token);
 				if (!lookup.Success)
 					return result;
-
-				foreach (var simSym in SymbolFinder.FindSimilarSymbols (lookup.Symbol, lookup.Compilation)) {
-					foreach (var loc in simSym.Locations) {
-						if (!loc.IsInSource)
-							continue;
-						var sr = new SearchResult (new FileProvider (loc.SourceTree.FilePath), loc.SourceSpan.Start, loc.SourceSpan.Length);
-						if (antiDuplicatesSet.Add (sr)) {
-							result.Add (sr);
-						}
-					}
-
-					foreach (var mref in await SymbolFinder.FindReferencesAsync (simSym, lookup.Solution).ConfigureAwait (false)) {
-						foreach (var loc in mref.Locations) {
-							var fileName = loc.Document.FilePath;
-							var offset = loc.Location.SourceSpan.Start;
-							string projectedName;
-							int projectedOffset;
-							if (workspace.TryGetOriginalFileFromProjection (fileName, offset, out projectedName, out projectedOffset)) {
-								fileName = projectedName;
-								offset = projectedOffset;
-							}
-
-							var sr = new SearchResult (new FileProvider (fileName), offset, loc.Location.SourceSpan.Length);
-							if (antiDuplicatesSet.Add (sr)) {
-								result.Add (sr);
+				var workspace = TypeSystemService.AllWorkspaces.FirstOrDefault (w => w.CurrentSolution == lookup.Solution) as MonoDevelopWorkspace;
+				if (workspace == null)
+					return Enumerable.Empty<SearchResult> ();
+				if (lookup.Symbol.Kind == SymbolKind.Method) {
+					foreach (var curSymbol in lookup.Symbol.ContainingType.GetMembers ().Where (m => m.Kind == lookup.Symbol.Kind && m.Name == lookup.Symbol.Name)) {
+						foreach (var sym in SymbolFinder.FindSimilarSymbols (curSymbol, lookup.Compilation)) {
+							foreach (var simSym in await GatherSymbols (sym, lookup.Solution, token)) {
+								await FindSymbolReferencesAsync (antiDuplicatesSet, result, lookup, workspace, simSym);
 							}
 						}
 					}
+				} else {
+					await FindSymbolReferencesAsync (antiDuplicatesSet, result, lookup, workspace, lookup.Symbol);
 				}
 				return (IEnumerable<SearchResult>)result;
 			});
 		}
+
+		static async Task FindSymbolReferencesAsync (HashSet<SearchResult> antiDuplicatesSet, List<SearchResult> result, LookupResult lookup, MonoDevelopWorkspace workspace, ISymbol simSym)
+		{
+			foreach (var loc in simSym.Locations) {
+				if (!loc.IsInSource)
+					continue;
+				var sr = new SearchResult (new FileProvider (loc.SourceTree.FilePath), loc.SourceSpan.Start, loc.SourceSpan.Length);
+				if (antiDuplicatesSet.Add (sr)) {
+					result.Add (sr);
+				}
+			}
+
+			foreach (var mref in await SymbolFinder.FindReferencesAsync (simSym, lookup.Solution).ConfigureAwait (false)) {
+				foreach (var loc in mref.Locations) {
+					var fileName = loc.Document.FilePath;
+					var offset = loc.Location.SourceSpan.Start;
+					string projectedName;
+					int projectedOffset;
+					if (workspace.TryGetOriginalFileFromProjection (fileName, offset, out projectedName, out projectedOffset)) {
+						fileName = projectedName;
+						offset = projectedOffset;
+					}
+
+					var sr = new SearchResult (new FileProvider (fileName), offset, loc.Location.SourceSpan.Length);
+					if (antiDuplicatesSet.Add (sr)) {
+						result.Add (sr);
+					}
+				}
+			}
+		}
 	}
-	
+
 }

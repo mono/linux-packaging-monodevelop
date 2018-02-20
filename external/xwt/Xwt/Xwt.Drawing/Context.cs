@@ -40,13 +40,13 @@ namespace Xwt.Drawing
 
 		static HashSet<string> registeredStyles = new HashSet<string> ();
 		static StyleSet globalStyles = StyleSet.Empty;
-
-		Stack<SavedContext> contextStack = new Stack<SavedContext> ();
+		SavedContext stackTop;
 
 		class SavedContext
 		{
 			public double Alpha;
 			public StyleSet Styles;
+			public SavedContext Previous;
 		}
 		
 		internal Context (object backend, Toolkit toolkit): this (backend, toolkit, toolkit.ContextBackendHandler)
@@ -80,17 +80,21 @@ namespace Xwt.Drawing
 		public void Save ()
 		{
 			handler.Save (Backend);
-			contextStack.Push (new SavedContext {
+
+			stackTop = new SavedContext {
 				Alpha = globalAlpha,
 				Styles = styles,
-			});
+				Previous = stackTop,
+			};
 		}
 		
 		public void Restore ()
 		{
 			handler.Restore (Backend);
-			if (contextStack.Count > 0) {
-				var info = contextStack.Pop ();
+			if (stackTop != null) {
+				var info = stackTop;
+				stackTop = stackTop.Previous;
+
 				globalAlpha = info.Alpha;
 				if (styles != info.Styles) {
 					styles = info.Styles;
@@ -110,6 +114,7 @@ namespace Xwt.Drawing
 		internal void SetStyles (StyleSet styles)
 		{
 			this.styles = this.styles.AddRange (styles.Intersect (RegisteredStyles).ToArray ());
+			this.styles = this.styles.RemoveAll (styles.Where (s => s.StartsWith ("-", StringComparison.Ordinal)).Select (s => s.TrimStart ('-')).ToArray ());
 			handler.SetStyles (Backend, this.styles);
 		}
 

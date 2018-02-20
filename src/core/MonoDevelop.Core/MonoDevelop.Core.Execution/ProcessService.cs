@@ -206,7 +206,7 @@ namespace MonoDevelop.Core.Execution
 						dict[kvp.Key] = kvp.Value;
 				
 				var p = externalConsoleHandler (command, arguments, workingDirectory, dict,
-					GettextCatalog.GetString ("{0} External Console", BrandingService.ApplicationName),
+					externalConsole?.Title ?? GettextCatalog.GetString ("{0} External Console", BrandingService.ApplicationName),
 					externalConsole != null ? !externalConsole.CloseOnDispose : false);
 
 				if (p != null) {
@@ -222,9 +222,17 @@ namespace MonoDevelop.Core.Execution
 			if (environmentVariables != null)
 				foreach (KeyValuePair<string, string> kvp in environmentVariables)
 					psi.EnvironmentVariables [kvp.Key] = kvp.Value;
-			ProcessWrapper pw = StartProcess (psi, console.Out, console.Error, null);
-			new ProcessMonitor (console, pw.ProcessAsyncOperation, exited);
-			return pw.ProcessAsyncOperation;
+			try {
+				ProcessWrapper pw = StartProcess (psi, console.Out, console.Error, null);
+				new ProcessMonitor (console, pw.ProcessAsyncOperation, exited);
+				return pw.ProcessAsyncOperation;
+			} catch (Exception ex) {
+				// If the process can't be started, dispose the console now since ProcessMonitor won't do it
+				console.Error.WriteLine (GettextCatalog.GetString ("The application could not be started"));
+				LoggingService.LogError ("Could not start process for command: " + psi.FileName + " " + psi.Arguments, ex);
+				console.Dispose ();
+				return NullProcessAsyncOperation.Failure;
+			}
 		}
 		
 		public IExecutionHandler GetDefaultExecutionHandler (ExecutionCommand command)
@@ -269,8 +277,12 @@ namespace MonoDevelop.Core.Execution
 		public IExecutionModeSet GetDebugExecutionMode ()
 		{
 			foreach (ExtensionNode node in AddinManager.GetExtensionNodes (ExecutionModesExtensionPath)) {
-				if (node.Id == "MonoDevelop.Debugger")
-					return (IExecutionModeSet) ((TypeExtensionNode)node).GetInstance (typeof (IExecutionModeSet));
+				if (node.Id == "Debug") {
+					foreach (ExtensionNode childNode in node.ChildNodes) {
+						if (childNode.Id == "MonoDevelop.Debugger")
+							return (IExecutionModeSet) ((TypeExtensionNode)childNode).GetInstance (typeof (IExecutionModeSet));
+					}
+				}
 			}
 			return null;
 		}
@@ -410,11 +422,14 @@ namespace MonoDevelop.Core.Execution
 					Runtime.RunInMainThread (() => {
 						exited (operation, EventArgs.Empty);
 					});
-				
+
 				if (!Platform.IsWindows && Mono.Unix.Native.Syscall.WIFSIGNALED (operation.ExitCode))
 					console.Log.WriteLine (GettextCatalog.GetString ("The application was terminated by a signal: {0}"), Mono.Unix.Native.Syscall.WTERMSIG (operation.ExitCode));
 				else if (operation.ExitCode != 0)
 					console.Log.WriteLine (GettextCatalog.GetString ("The application exited with code: {0}"), operation.ExitCode);
+			} catch (ArgumentException ex) {
+				// ArgumentException comes from Syscall.WTERMSIG when an unknown signal is encountered
+				console.Error.WriteLine (GettextCatalog.GetString ("The application was terminated by an unknown signal: {0}"), ex.Message);
 			} finally {
 				console.Dispose ();
 			}

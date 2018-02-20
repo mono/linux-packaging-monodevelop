@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class ParameterCanBeDeclaredWithBaseTypeTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void BasicTest()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -43,7 +42,7 @@ class C
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void IgnoresUnusedParameters()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -55,7 +54,7 @@ class A
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void IgnoresDirectionalParameters()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -71,7 +70,7 @@ class A : IA
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void IgnoresOverrides()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -100,7 +99,7 @@ class TestClass : TestBase
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void IgnoresOverridables()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -122,7 +121,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void HandlesNeededProperties()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -144,7 +143,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void InterfaceTest()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -182,7 +181,7 @@ class C
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void RespectsExpectedTypeInIfStatement()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -196,7 +195,7 @@ class C
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void MultipleInterfaceTest()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -271,8 +270,7 @@ class E : D, IC
 	void IC.Foo() {}
 }";
 
-        [Ignore("TODO")]
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void FindsTopInterface()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(baseInput + @"
@@ -292,7 +290,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void DoesNotChangeOverload()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(baseInput + @"
@@ -313,7 +311,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void AssignmentToExplicitlyTypedVariable()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(baseInput + @"
@@ -328,7 +326,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void GenericMethod()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(baseInput + @"
@@ -345,7 +343,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void VariableDeclarationWithTypeInference()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(baseInput + @"
@@ -363,7 +361,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void RespectsOutgoingCallsTypeRestrictions()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(baseInput + @"
@@ -393,7 +391,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void AccountsForNonInvocationMethodGroupUsageInMethodCall()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -420,7 +418,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void AccountsForNonInvocationMethodGroupUsageInVariableDeclaration()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -443,7 +441,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void AccountsForNonInvocationMethodGroupUsageInAssignmentExpression()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -467,8 +465,7 @@ class TestClass
 }");
         }
 
-        [Ignore("TODO")]
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void AccountsForIndexers()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -490,7 +487,7 @@ class TestClass
 }", 1, 1);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void AccountsForArrays()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -508,7 +505,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void LimitsParamsParametersToArrays()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -521,7 +518,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void DoesNotSuggestProgramEntryPointChanges()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -535,7 +532,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void IgnoresImplicitInterfaceImplementations()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -552,7 +549,7 @@ class TestClass : IHasFoo
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void IgnoresEnumParameters()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -570,7 +567,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void CallToOverriddenMember()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -610,7 +607,7 @@ class Test : TestBase
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void CallToShadowingMember()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -633,7 +630,7 @@ class Test : TestBase
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void CallToShadowingMember2()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -685,7 +682,7 @@ class Test : TestBase
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void CallToShadowingMemberWithBaseInterface()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -748,7 +745,7 @@ class Test : TestBase
         /// <summary>
         /// Bug 9617 - Incorrect "parameter can be demoted to base class" warning for arrays
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug9617()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"class Test
@@ -766,7 +763,7 @@ class Test : TestBase
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug9617Case2()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"class Test
@@ -784,7 +781,7 @@ class Test : TestBase
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void DoNotDemoteStringComparisonToReferenceComparison_WithinLambda()
         {
             Test<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"using System; using System.Linq; using System.Collections.Generic;
@@ -802,7 +799,7 @@ class User {
 ", 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestMicrosoftSuppressMessage()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -824,7 +821,7 @@ class C
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestDisableAll()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"// ReSharper disable All
@@ -850,7 +847,7 @@ class C
         /// <summary>
         /// Bug 14099 - Do not suggest demoting Exception to _Exception
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug14099()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"
@@ -867,7 +864,7 @@ public class Test
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestPreferGenerics()
         {
             Analyze<ParameterCanBeDeclaredWithBaseTypeAnalyzer>(@"using System.Collections.Generic;
@@ -885,3 +882,4 @@ class Test
     }
 }
 
+*/

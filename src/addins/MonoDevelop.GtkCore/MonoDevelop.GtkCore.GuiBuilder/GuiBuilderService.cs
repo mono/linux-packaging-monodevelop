@@ -176,7 +176,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 				file = ActionGroupDisplayBinding.BindToClass (project, group);
 			}
 			
-			Document doc = await IdeApp.Workbench.OpenDocument (file, true);
+			Document doc = await IdeApp.Workbench.OpenDocument (file, null, true);
 			if (doc != null) {
 				ActionGroupView view = doc.GetContent<ActionGroupView> ();
 				if (view != null) {
@@ -543,7 +543,7 @@ namespace MonoDevelop.GtkCore.GuiBuilder
 				
 				// Make sure the generated files are added to the project
 				if (info.UpdateGtkFolder ()) {
-					Gtk.Application.Invoke (delegate {
+					Gtk.Application.Invoke ((o, args) => {
 						IdeApp.ProjectOperations.SaveAsync (project);
 					});
 				}

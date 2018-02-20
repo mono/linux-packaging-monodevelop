@@ -32,9 +32,9 @@ using MonoDevelop.Projects;
 
 namespace MonoDevelop.Ide.Templates
 {
-	public class SolutionTemplate
+	public class SolutionTemplate : IEquatable<SolutionTemplate>
 	{
-		public static readonly string DefaultImageId = "md-generic-project";
+		public static readonly string DefaultImageId = "md-project";
 
 		string imageId;
 		string language;
@@ -114,10 +114,19 @@ namespace MonoDevelop.Ide.Templates
 		public void AddGroupTemplate (SolutionTemplate template)
 		{
 			groupedTemplates.Add (template);
+			template.Parent = this;
 
 			if (!availableLanguages.Contains (template.Language)) {
 				availableLanguages.Add (template.Language);
 			}
+		}
+
+		internal SolutionTemplate Parent { get; set; }
+
+		internal void ClearGroupedTemplates ()
+		{
+			Parent = null;
+			groupedTemplates.Clear ();
 		}
 
 		public SolutionTemplate GetTemplate (string language)
@@ -135,6 +144,9 @@ namespace MonoDevelop.Ide.Templates
 			if (predicate (this)) {
 				return this;
 			}
+
+			if (Parent != null)
+				return Parent.GetTemplate (predicate);
 
 			return groupedTemplates.FirstOrDefault (template => predicate (template));
 		}
@@ -209,6 +221,52 @@ namespace MonoDevelop.Ide.Templates
 		internal bool IsMatch (SolutionTemplateVisibility visibility)
 		{
 			return (Visibility == visibility) || (Visibility == SolutionTemplateVisibility.All);
+		}
+
+		public static bool operator == (SolutionTemplate template1, SolutionTemplate template2)
+		{
+			if (ReferenceEquals (template1, template2))
+				return true;
+			
+			if (((object)template1 == null) || ((object)template2 == null))
+				return false;
+			
+			return template1.Equals (template2);
+		}
+
+		public static bool operator != (SolutionTemplate template1, SolutionTemplate template2)
+		{
+			return !(template1 == template2);
+		}
+
+		public bool Equals (SolutionTemplate other)
+		{
+			return other != null && Id == other.Id && Name == other.Name && Category == other.Category;
+		}
+
+		public override bool Equals (object obj)
+		{
+			return Equals (obj as SolutionTemplate);
+		}
+
+		public override int GetHashCode ()
+		{
+			return (Id != null ? Id.GetHashCode () : 0)
+				^ (Name != null ? Name.GetHashCode () : 0)
+				^ (Category != null ? Category.GetHashCode () : 0);
+		}
+
+		/// <summary>
+		/// Returns all other templates in the group. Does not include this template.
+		/// </summary>
+		internal IEnumerable<SolutionTemplate> GetGroupedTemplates ()
+		{
+			if (Parent != null)
+				return Parent.groupedTemplates
+					.Where (template => template != this)
+					.Concat (Parent);
+
+			return groupedTemplates;
 		}
 	}
 }

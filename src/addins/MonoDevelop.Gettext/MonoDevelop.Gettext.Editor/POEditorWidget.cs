@@ -45,6 +45,7 @@ using System.Threading;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Editor;
 using MonoDevelop.Core.Text;
+using MonoDevelop.Ide.Gui;
 
 namespace MonoDevelop.Gettext
 {
@@ -183,10 +184,10 @@ namespace MonoDevelop.Gettext
 				string file = foundInStore.GetValue (iter, (int)FoundInColumns.FullFileName) as string;
 				int lineNr = 1;
 				try {
-					lineNr = 1 + int.Parse (line);
+					lineNr = Math.Max(1, int.Parse (line));
 				} catch {
 				}
-				IdeApp.Workbench.OpenDocument (file, lineNr, 1);
+				IdeApp.Workbench.OpenDocument (new FileOpenInformation (file, project, lineNr, 1, OpenDocumentOptions.Default));
 			};
 			this.notebookTranslated.RemovePage (0);
 			this.searchEntryFilter.Entry.Text = "";
@@ -648,7 +649,7 @@ namespace MonoDevelop.Gettext
 						if (textView == null)
 							continue;
 						textView.ClearSelection ();
-						textView.Text = entry != null ?  entry.GetTranslation (i) : "";
+						textView.Text = entry.GetTranslation (i);
 						EditActions.MoveCaretToDocumentEnd (textView);
 					}
 					
@@ -751,9 +752,7 @@ namespace MonoDevelop.Gettext
 			if (RegexSearch)
 				return regex.IsMatch (text);
 		
-			if (!IsCaseSensitive)
-				text = text.ToUpper ();
-			int idx = text.IndexOf (filter);
+			int idx = text.IndexOf (filter, IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
 			if (idx >= 0) {
 				if (IsWholeWordOnly) {
 					return (idx == 0 || char.IsWhiteSpace (text[idx - 1])) &&
@@ -803,8 +802,6 @@ namespace MonoDevelop.Gettext
 		void UpdateFromCatalog ()
 		{
 			filter = this.searchEntryFilter.Entry.Text;
-			if (!IsCaseSensitive && filter != null)
-				filter = filter.ToUpper ();
 			if (RegexSearch) {
 				try {
 					RegexOptions options = RegexOptions.Compiled;
@@ -851,7 +848,6 @@ namespace MonoDevelop.Gettext
 				return entry1.GetTranslation (0).CompareTo (entry2.GetTranslation (0));
 			});
 			IdeApp.Workbench.StatusBar.ShowMessage (string.Format (GettextCatalog.GetPluralString ("Found {0} catalog entry.", "Found {0} catalog entries.", found), found));
-			store.Dispose ();
 			treeviewEntries.Model = store = newStore;
 		}
 		
@@ -881,7 +877,7 @@ namespace MonoDevelop.Gettext
 			TreeIter iter;
 			if (store.GetIterFirst (out iter)) {
 				do {
-					CatalogEntry curEntry = store.GetValue (iter, 4) as CatalogEntry;
+					CatalogEntry curEntry = store.GetValue (iter, 0) as CatalogEntry;
 					if (entry == curEntry) {
 						this.treeviewEntries.Selection.SelectIter (iter);
 						TreePath iterPath = store.GetPath (iter);
@@ -950,16 +946,6 @@ namespace MonoDevelop.Gettext
 		{
 			MonoDevelop.Ide.Gui.Styles.Changed -= HandleStylesChanged;
 			StopTaskWorkerThread ();
-		
-			if (store != null) {
-				store.Dispose ();
-				store = null;
-			}
-			
-			if (foundInStore != null) {
-				foundInStore.Dispose ();
-				foundInStore = null;
-			}
 			
 			widgets.Remove (this);
 			ClearTasks ();
@@ -1152,9 +1138,11 @@ namespace MonoDevelop.Gettext
 			}
 			
 			if (!CompareTasks (tasks, currentTasks)) {
-				ClearTasks ();
-				currentTasks = tasks;
-				TaskService.Errors.AddRange (tasks);
+				Runtime.RunInMainThread (() => {
+					ClearTasks ();
+					currentTasks = tasks;
+					TaskService.Errors.AddRange (tasks);
+				});
 			}
 		}
 		

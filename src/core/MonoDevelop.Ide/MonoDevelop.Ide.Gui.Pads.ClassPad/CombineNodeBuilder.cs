@@ -62,8 +62,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ClassPad
 		{
 			SolutionFolder combine = (SolutionFolder) dataObject;
 			if (builder.Options ["ShowProjects"]) {
-				foreach (SolutionFolderItem entry in combine.Items)
-					builder.AddChild (entry);
+				builder.AddChildren (combine.Items);
 			} else {
 				AddClasses (builder, combine);
 			}
@@ -83,15 +82,12 @@ namespace MonoDevelop.Ide.Gui.Pads.ClassPad
 		{
 			return ((SolutionFolder) dataObject).Items.Count > 0;
 		}
-		
-		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
-		{
-			if (otherNode.DataItem is SolutionFolder)
-				return DefaultSort;
-			else
-				return -1;
-		}
 
+		public override int GetSortIndex (ITreeNavigator node)
+		{
+			return -100;
+		}
+		
 		public override void OnNodeAdded (object dataObject)
 		{
 			SolutionFolder combine = (SolutionFolder) dataObject;

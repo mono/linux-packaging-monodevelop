@@ -30,9 +30,8 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Roslyn.Utilities;
 using MonoDevelop.Ide.Editor;
-using ICSharpCode.NRefactory6.CSharp;
+using Roslyn.Utilities;
 
 namespace MonoDevelop.CSharp.Features.AutoInsertBracket
 {
@@ -70,17 +69,15 @@ namespace MonoDevelop.CSharp.Features.AutoInsertBracket
 					return false;
 				}
 			}
-
-			if (editor[start] != '$')
+			if (editor [start] != '$')
 			{
 				return false;
 			}
 
-			var tree = ctx.AnalysisDocument.GetSyntaxTreeAsync (cancellationToken).WaitAndGetResult(cancellationToken);
-			var token = tree.GetRoot(cancellationToken).FindTokenOnLeftOfPosition(start);
-
-			return tree.IsExpressionContext(start, token, attributes: false, cancellationToken: cancellationToken)
-				       || tree.IsStatementContext(start, token, cancellationToken);
+			var root = ctx.AnalysisDocument.GetSyntaxRootSynchronously (cancellationToken);
+			var token = root.FindTokenOnLeftOfPosition (start);
+			return root.SyntaxTree.IsExpressionContext (start, token, attributes: false, cancellationToken: cancellationToken)
+				|| root.SyntaxTree.IsStatementContext (start, token, cancellationToken);
 		}
 	}
 }

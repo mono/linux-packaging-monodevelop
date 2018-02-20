@@ -1,18 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <Import Project="..\..\..\MonoDevelop.props" />
+  <PropertyGroup>
+    <ReferencesVSEditorCopyToOutput>true</ReferencesVSEditorCopyToOutput>
+    <ReferencesRoslynCopyToOutput>true</ReferencesRoslynCopyToOutput>
+  </PropertyGroup>
+  <Import Project="$(ReferencesRoslyn)" />
+  <Import Project="$(ReferencesVSEditor)" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>8.0.30703</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{7525BB88-6142-4A26-93B9-A30C6983390A}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AssemblyName>MonoDevelop.Core</AssemblyName>
     <RootNamespace>MonoDevelop.Core</RootNamespace>
     <BuildInfo>..\..\..\build\bin\buildinfo</BuildInfo>
     <VcRevision>..\..\..\vcrevision</VcRevision>
+    <ConfigureScript>$(MSBuildProjectDirectory)\..\..\..\..\scripts\configure.cs</ConfigureScript>
+    <ConfigureScriptExe>$(MSBuildProjectDirectory)\..\..\..\..\scripts\configure.exe</ConfigureScriptExe>
+    <FullBuildInfo>fullbuildinfo</FullBuildInfo>
     <MonoLauncher Condition=" '$(VisualStudioVersion)' == '' ">mono </MonoLauncher>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
   </PropertyGroup>
   <Choose>
     <When Condition=" Exists('c:\Program Files\Git\bin\git.exe') ">
@@ -85,38 +93,167 @@
     <NoWarn>1591;1573</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+  <PropertyGroup>
+    <MSBuild_OSS_BinDir Condition="'$(OS)' == 'Windows_NT'">$(MSBuildToolsPath)\</MSBuild_OSS_BinDir>
+    <!-- when building with xbuild on Unix, $(MSBuildToolsPath) is like `$prefix/lib/mono/xbuild/*/bin`
+	 when building with msbuild on Unix, $(MSBuildToolsPath) is like `$prefix/lib/mono/msbuild/*/bin`
+	 Prefer referencing msbuild 15.* assemblies over 14.1 . At runtime, we use correct one anyway
+	 -->
+    <MSBuild_OSS_BinDir Condition="'$(OS)' == 'Unix' and '$(MSBuild_OSS_BinDir)' == '' and Exists('$(MSBuildToolsPath)\..\..\..\msbuild\15.0\bin\MSBuild.exe')">$(MSBuildToolsPath)\..\..\..\msbuild\15.0\bin\</MSBuild_OSS_BinDir>
+    <MSBuild_OSS_BinDir Condition="'$(OS)' == 'Unix' and '$(MSBuild_OSS_BinDir)' == '' and Exists('$(MSBuildToolsPath)\..\..\..\msbuild\15.0\bin\MSBuild.dll')">$(MSBuildToolsPath)\..\..\..\msbuild\15.0\bin\</MSBuild_OSS_BinDir>
+  </PropertyGroup>
   <ItemGroup>
+    <Reference Include="ICSharpCode.Decompiler">
+      <HintPath>..\..\..\packages\ICSharpCode.Decompiler.3.0.0.3403-beta4\lib\net46\ICSharpCode.Decompiler.dll</HintPath>
+    </Reference>
+    <Reference Include="Humanizer.Core">
+      <HintPath>..\..\..\packages\Humanizer.Core.2.2.0\lib\netstandard1.0\Humanizer.dll</HintPath>
+    </Reference>
+    <Reference Include="Esent.Interop, Version=1.9.4.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\ManagedEsent.1.9.4\lib\net40\Esent.Interop.dll</HintPath>
+    </Reference>
+    <Reference Include="SQLitePCLRaw.batteries_e_sqlite3, Version=1.0.0.0, Culture=neutral, PublicKeyToken=17faffbb2a73a73f, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\SQLitePCLRaw.bundle_e_sqlite3.1.1.6\lib\net45\SQLitePCLRaw.batteries_e_sqlite3.dll</HintPath>
+    </Reference>
+    <Reference Include="SQLitePCLRaw.batteries_v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=8226ea5df37bcae9, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\SQLitePCLRaw.bundle_e_sqlite3.1.1.6\lib\net45\SQLitePCLRaw.batteries_v2.dll</HintPath>
+    </Reference>
+    <Reference Include="SQLitePCLRaw.core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=1488e028ca7ab535, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\SQLitePCLRaw.core.1.1.6\lib\net45\SQLitePCLRaw.core.dll</HintPath>
+    </Reference>
+    <Reference Include="SQLitePCLRaw.provider.e_sqlite3, Version=1.0.0.0, Culture=neutral, PublicKeyToken=9c301db686d0bd12, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\SQLitePCLRaw.provider.e_sqlite3.net45.1.1.6\lib\net45\SQLitePCLRaw.provider.e_sqlite3.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="Mono.Posix" />
+    <Reference Include="System.Composition.AttributedModel, Version=1.0.31.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\System.Composition.AttributedModel.1.0.31\lib\portable-net45+win8+wp8+wpa81\System.Composition.AttributedModel.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Composition.Hosting, Version=1.0.31.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\System.Composition.Hosting.1.0.31\lib\portable-net45+win8+wp8+wpa81\System.Composition.Hosting.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Composition.Runtime, Version=1.0.31.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\System.Composition.Runtime.1.0.31\lib\portable-net45+win8+wp8+wpa81\System.Composition.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Composition.TypedParts, Version=1.0.31.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\..\..\packages\System.Composition.TypedParts.1.0.31\lib\portable-net45+win8+wp8+wpa81\System.Composition.TypedParts.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml" />
     <Reference Include="System.Runtime.Remoting" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
-    <Reference Include="ICSharpCode.SharpZipLib" />
-    <Reference Include="monodoc, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756">
-    </Reference>
+    <Reference Include="monodoc, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Web" />
     <Reference Include="System.ServiceModel" />
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="Microsoft.Build.Engine" />
-    <Reference Include="Microsoft.Build" />
-    <Reference Include="Microsoft.Build.Utilities.v12.0, Version=12.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Reflection.Metadata">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\System.Reflection.Metadata.dll</HintPath>
+    <Reference Include="Microsoft.Build">
+      <HintPath>$(MSBuild_OSS_BinDir)Microsoft.Build.dll</HintPath>
       <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.Build.Framework">
+      <HintPath>$(MSBuild_OSS_BinDir)Microsoft.Build.Framework.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.Build.Utilities.Core">
+      <HintPath>$(MSBuild_OSS_BinDir)Microsoft.Build.Utilities.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.Build.Tasks.Core">
+      <HintPath>$(MSBuild_OSS_BinDir)Microsoft.Build.Tasks.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Mono.Cecil">
+      <HintPath>..\..\..\packages\Mono.Cecil.0.10.0-beta6\lib\net40\Mono.Cecil.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Mdb">
+      <HintPath>..\..\..\packages\Mono.Cecil.0.10.0-beta6\lib\net40\Mono.Cecil.Mdb.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Pdb">
+      <HintPath>..\..\..\packages\Mono.Cecil.0.10.0-beta6\lib\net40\Mono.Cecil.Pdb.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Rocks">
+      <HintPath>..\..\..\packages\Mono.Cecil.0.10.0-beta6\lib\net40\Mono.Cecil.Rocks.dll</HintPath>
+    </Reference>
+    <Reference Include="monodoc, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756" />
+    <Reference Include="Mono.Posix" />
+    <Reference Include="mscorlib" />
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\..\packages\Newtonsoft.Json.10.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.AppContext">
+      <HintPath>..\..\..\packages\System.AppContext.4.3.0\lib\net46\System.AppContext.dll</HintPath>
     </Reference>
     <Reference Include="System.Collections.Immutable">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\System.Collections.Immutable.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>..\..\..\packages\System.Collections.Immutable.1.3.1\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.CodeAnalysis">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.dll</HintPath>
-      <Private>False</Private>
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Console">
+      <HintPath>..\..\..\packages\System.Console.4.3.0\lib\net46\System.Console.dll</HintPath>
     </Reference>
+    <Reference Include="System.Core" />
+    <Reference Include="System.Diagnostics.FileVersionInfo">
+      <HintPath>..\..\..\packages\System.Diagnostics.FileVersionInfo.4.3.0\lib\net46\System.Diagnostics.FileVersionInfo.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Diagnostics.StackTrace">
+      <HintPath>..\..\..\packages\System.Diagnostics.StackTrace.4.3.0\lib\net46\System.Diagnostics.StackTrace.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.Compression">
+      <HintPath>..\..\..\packages\System.IO.Compression.4.3.0\lib\net46\System.IO.Compression.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.FileSystem">
+      <HintPath>..\..\..\packages\System.IO.FileSystem.4.3.0\lib\net46\System.IO.FileSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.FileSystem.Primitives">
+      <HintPath>..\..\..\packages\System.IO.FileSystem.Primitives.4.3.0\lib\net46\System.IO.FileSystem.Primitives.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.Remoting" />
+    <!-- NOTE: NuGet installs the PCL version of System.Reflection.Metadata by default but it is windows-specific. Use netstandard version instead. -->
+    <Reference Include="System.Reflection.Metadata">
+      <HintPath>..\..\..\packages\System.Reflection.Metadata.1.4.2\lib\netstandard1.1\System.Reflection.Metadata.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.InteropServices.RuntimeInformation">
+      <HintPath>..\..\..\packages\System.Runtime.InteropServices.RuntimeInformation.4.3.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.Algorithms">
+      <HintPath>..\..\..\packages\System.Security.Cryptography.Algorithms.4.3.0\lib\net461\System.Security.Cryptography.Algorithms.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.Encoding">
+      <HintPath>..\..\..\packages\System.Security.Cryptography.Encoding.4.3.0\lib\net46\System.Security.Cryptography.Encoding.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.Primitives">
+      <HintPath>..\..\..\packages\System.Security.Cryptography.Primitives.4.3.0\lib\net46\System.Security.Cryptography.Primitives.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Cryptography.X509Certificates">
+      <HintPath>..\..\..\packages\System.Security.Cryptography.X509Certificates.4.3.0\lib\net461\System.Security.Cryptography.X509Certificates.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Text.Encoding.CodePages">
+      <HintPath>..\..\..\packages\System.Text.Encoding.CodePages.4.3.0\lib\net46\System.Text.Encoding.CodePages.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Thread">
+      <HintPath>..\..\..\packages\System.Threading.Thread.4.3.0\lib\net46\System.Threading.Thread.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ValueTuple">
+      <HintPath>..\..\..\packages\System.ValueTuple.4.4.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml.ReaderWriter">
+      <HintPath>..\..\..\packages\System.Xml.ReaderWriter.4.3.0\lib\net46\System.Xml.ReaderWriter.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml.XmlDocument">
+      <HintPath>..\..\..\packages\System.Xml.XmlDocument.4.3.0\lib\net46\System.Xml.XmlDocument.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml.XPath">
+      <HintPath>..\..\..\packages\System.Xml.XPath.4.3.0\lib\net46\System.Xml.XPath.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml.XPath.XDocument">
+      <HintPath>..\..\..\packages\System.Xml.XPath.XDocument.4.3.0\lib\net46\System.Xml.XPath.XDocument.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MonoDevelop.Core\StringParserService.cs" />
@@ -210,7 +347,6 @@
     <Compile Include="MonoDevelop.Core.Assemblies\SystemAssemblyService.cs" />
     <Compile Include="MonoDevelop.Core.Assemblies\MonoRuntimeInfo.cs" />
     <Compile Include="MonoDevelop.Core.Execution\IExecutionModeSet.cs" />
-    <Compile Include="MonoDevelop.Core.Assemblies\CustomRuntimeExecutionModeSet.cs" />
     <Compile Include="MonoDevelop.Core.Execution\ExecutionMode.cs" />
     <Compile Include="MonoDevelop.Core.Execution\ExecutionCommand.cs" />
     <Compile Include="MonoDevelop.Core.Execution\DotNetExecutionCommand.cs" />
@@ -221,7 +357,6 @@
     <Compile Include="MonoDevelop.Core.Assemblies\MsNetTargetRuntimeFactory.cs" />
     <Compile Include="MonoDevelop.Core.Execution\MsNetExecutionHandler.cs" />
     <Compile Include="MonoDevelop.Core.Assemblies\PcFileCache.cs" />
-    <Compile Include="MonoDevelop.Core.AddIns\TargetFrameworkNode.cs" />
     <Compile Include="MonoDevelop.Core.Assemblies\TargetFrameworkBackend.cs" />
     <Compile Include="MonoDevelop.Core.Assemblies\MonoFrameworkBackend.cs" />
     <Compile Include="MonoDevelop.Core.Assemblies\MsNetFrameworkBackend.cs" />
@@ -243,12 +378,14 @@
     <Compile Include="MonoDevelop.Core.Logging\RemoteLogger.cs" />
     <Compile Include="MonoDevelop.Core.Instrumentation\TimeCounter.cs" />
     <Compile Include="MonoDevelop.Core.AddIns\PlatformCondition.cs" />
+    <Compile Include="MonoDevelop.Core.AddIns\BrandingCondition.cs" />
     <Compile Include="MonoDevelop.Core.Serialization\BinaryDataSerializer.cs" />
     <Compile Include="MonoDevelop.Core.Execution\LocalConsole.cs" />
     <Compile Include="MonoDevelop.Core\IconId.cs" />
     <Compile Include="Mono.Options.cs" />
     <Compile Include="MonoDevelop.Core.Logging\InstrumentationLogger.cs" />
     <Compile Include="MonoDevelop.Core.Instrumentation\TimerCounter.cs" />
+    <Compile Include="MonoDevelop.Projects\AppliesToAttribute.cs" />
     <Compile Include="MonoDevelop.Projects\ProjectService.cs" />
     <Compile Include="MonoDevelop.Projects\ProjectPathItemPropertyAttribute.cs" />
     <Compile Include="MonoDevelop.Projects\SolutionConfiguration.cs" />
@@ -324,6 +461,7 @@
     <Compile Include="MonoDevelop.Projects.Extensions\IAssemblyReferenceHandler.cs" />
     <Compile Include="MonoDevelop.Projects.MD1\MD1DotNetProjectHandler.cs" />
     <Compile Include="MonoDevelop.Projects.MD1\MD1FileFormat.cs" />
+    <Compile Include="MonoDevelop.Projects.MSBuild\ConfigFileUtilities.cs" />
     <Compile Include="MonoDevelop.Projects.MSBuild\MSBuildFileFormat.cs" />
     <Compile Include="MonoDevelop.Projects.MSBuild\SlnFileFormat.cs" />
     <Compile Include="MonoDevelop.Projects.MSBuild\MSBuildProjectService.cs" />
@@ -522,7 +660,6 @@
     <Compile Include="MonoDevelop.Projects\ExportProjectItemTypeAttribute.cs" />
     <Compile Include="MonoDevelop.Projects.MSBuild\MSBuildProjectInstance.cs" />
     <Compile Include="MonoDevelop.Projects.MSBuild\MSBuildEngineV12.cs" />
-    <Compile Include="MonoDevelop.Projects.MSBuild\MSBuildEngineV4.cs" />
     <Compile Include="MonoDevelop.Projects.MSBuild\MSBuildEngineManager.cs" />
     <Compile Include="MonoDevelop.Projects.MSBuild.Conditions\ExpressionEvaluationException.cs" />
     <Compile Include="MonoDevelop.Projects.MSBuild\MSBuildValueType.cs" />
@@ -560,10 +697,80 @@
     <Compile Include="MonoDevelop.Core.Execution\BinaryMessage.cs" />
     <Compile Include="MonoDevelop.Core.Execution\RemoteProcessConnection.cs" />
     <Compile Include="MonoDevelop.Core.Execution\RemoteProcessServer.cs" />
+    <Compile Include="MonoDevelop.Projects\AssemblyReference.cs" />
+    <Compile Include="MonoDevelop.Projects\SolutionItemRunConfiguration.cs" />
+    <Compile Include="MonoDevelop.Projects\ProjectRunConfiguration.cs" />
+    <Compile Include="MonoDevelop.Projects\RunConfigurationCollection.cs" />
+    <Compile Include="MonoDevelop.Projects\AssemblyRunConfiguration.cs" />
+    <Compile Include="MonoDevelop.Projects\MonoExecutionParameters.cs" />
+    <Compile Include="MonoDevelop.Projects\SolutionRunConfiguration.cs" />
+    <Compile Include="MonoDevelop.Projects\SingleItemSolutionRunConfiguration.cs" />
+    <Compile Include="MonoDevelop.Projects\MultiItemSolutionRunConfiguration.cs" />
+    <Compile Include="MonoDevelop.Projects\SolutionRunConfigurationCollection.cs" />
+    <Compile Include="MonoDevelop.Projects\EnvironmentVariableCollection.cs" />
+    <Compile Include="MonoDevelop.Projects\RunConfiguration.cs" />
+    <Compile Include="MonoDevelop.Projects\IRunTarget.cs" />
+    <Compile Include="MonoDevelop.Projects\ProcessRunConfiguration.cs" />
+    <Compile Include="MonoDevelop.Core\ErrorHelper.cs" />
+    <Compile Include="MonoDevelop.Projects\DotNetProjectRunConfiguration.cs" />
+    <Compile Include="MonoDevelop.Core\StructEqualityComparer.cs" />
+    <Compile Include="MonoDevelop.Projects\SimpleExpressionEvaluator.cs" />
+    <Compile Include="MonoDevelop.Projects\PackageDependency.cs" />
+    <Compile Include="..\MonoDevelop.Projects.Formats.MSBuild\MonoDevelop.Projects.MSBuild.Shared\RemoteBuildEngineMessages.cs">
+      <Link>MonoDevelop.Projects.MSBuild\RemoteBuildEngineMessages.cs</Link>
+    </Compile>
+    <Compile Include="..\MonoDevelop.Projects.Formats.MSBuild\MonoDevelop.Projects.MSBuild.Shared\MSBuildEvaluatedItem.cs">
+      <Link>MonoDevelop.Projects.MSBuild\MSBuildEvaluatedItem.cs</Link>
+    </Compile>
+    <Compile Include="..\MonoDevelop.Projects.Formats.MSBuild\MonoDevelop.Projects.MSBuild.Shared\MSBuildResult.cs">
+      <Link>MonoDevelop.Projects.MSBuild\MSBuildResult.cs</Link>
+    </Compile>
+    <Compile Include="..\MonoDevelop.Projects.Formats.MSBuild\MonoDevelop.Projects.MSBuild.Shared\MSBuildTargetResult.cs">
+      <Link>MonoDevelop.Projects.MSBuild\MSBuildTargetResult.cs</Link>
+    </Compile>
+    <Compile Include="MonoDevelop.Projects.MSBuild\MSBuildEvent.cs" />
+    <Compile Include="MonoDevelop.Projects\MSBuildLogger.cs" />
+    <Compile Include="MonoDevelop.Projects.Extensions\ImportSearchPathExtensionNode.cs" />
+    <Compile Include="MonoDevelop.Projects.Extensions\AppliesToCondition.cs" />
+    <Compile Include="MonoDevelop.Projects.MSBuild\DefaultSdkResolver.cs" />
+    <Compile Include="MonoDevelop.Projects.MSBuild\SdkResolution.cs" />
+    <Compile Include="..\MonoDevelop.Projects.Formats.MSBuild\MonoDevelop.MSBuildResolver\Resolver.cs">
+      <Link>MonoDevelop.Projects.MSBuild\Resolver.cs</Link>
+    </Compile>
+    <Compile Include="MonoDevelop.Projects.MSBuild\SdkVersion.cs" />
+    <Compile Include="MonoDevelop.Projects\ProjectConfigurationItem.cs" />
+    <Compile Include="MonoDevelop.Core\StringInternPool.cs" />
+    <Compile Include="MonoDevelop.Core\Hash.cs" />
+    <Compile Include="MonoDevelop.Core\StringTable.cs" />
+    <Compile Include="MonoDevelop.Core.AddIns\FalseCondition.cs" />
+    <Compile Include="MonoDevelop.Core.AddIns\TrueCondition.cs" />
+    <Compile Include="MonoDevelop.Projects.MSBuild\MSBuildSolutionExtension.cs" />
+    <Compile Include="MonoDevelop.Projects.MSBuild\RemoteBuildEngine.cs" />
+    <Compile Include="MonoDevelop.Projects.MSBuild\RemoteBuildEngineManager.cs" />
+    <Compile Include="MonoDevelop.Projects.MSBuild\FileUtilities.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\FileSystemWatcher.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\FileSystemWatcher.OSX.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\Interop.CoreFoundation.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\Interop.Error.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\Interop.EventStream.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\Interop.IOError.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\Interop.Libraries.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\Interop.PathConf.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\Interop.RealPath.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\Interop.RunLoop.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\Interop.Sync.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\PathInternal.CaseSensitivity.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\PathInternal.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\PathInternal.Unix.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\PatternMatcher.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\SafeCreateHandle.OSX.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\SafeEventStreamHandle.OSX.cs" />
+    <Compile Include="MonoDevelop.FSW\OSX\SR.cs" />
+    <Compile Include="MonoDevelop.FSW\FileSystemWatcher.cs" />
+    <Compile Include="MonoDevelop.FSW\Mono\FileSystemWatcher.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile.am" />
-    <None Include="MonoDevelop.Projects.MSBuild.Conditions\InvalidProjectFileException.cs" />
     <None Include="BuildVariables.cs.in" />
     <None Include="packages.config" />
     <None Include="MSBuild\CodeSharing.Common.props">
@@ -575,72 +782,17 @@
     <None Include="MSBuild\CodeSharing.CSharp.targets">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.CSharp.dll">
-      <Link>Microsoft.CodeAnalysis.CSharp.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.CSharp.Features.dll">
-      <Link>Microsoft.CodeAnalysis.CSharp.Features.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.CSharp.Workspaces.dll">
-      <Link>Microsoft.CodeAnalysis.CSharp.Workspaces.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.Workspaces.Desktop.dll">
-      <Link>Microsoft.CodeAnalysis.Workspaces.Desktop.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.VisualBasic.dll">
-      <Link>Microsoft.CodeAnalysis.VisualBasic.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="MonoDevelop.Core.addin.xml">
       <LogicalName>MonoDevelop.Core.addin.xml</LogicalName>
       <SubType>Designer</SubType>
     </EmbeddedResource>
-    <EmbeddedResource Include="frameworks\framework_NET_1_1.xml">
-      <LogicalName>framework_NET_1_1.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="frameworks\framework_NET_2_0.xml">
-      <LogicalName>framework_NET_2_0.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="frameworks\framework_NET_3_0.xml">
-      <LogicalName>framework_NET_3_0.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="frameworks\framework_NET_3_5.xml">
-      <LogicalName>framework_NET_3_5.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="frameworks\framework_NET_4_0.xml">
-      <LogicalName>framework_NET_4_0.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="frameworks\framework_NET_4_5.xml">
-      <LogicalName>framework_NET_4_5.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="frameworks\framework_NET_3_5_client.xml">
-      <LogicalName>framework_NET_3_5_client.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="frameworks\framework_NET_4_0_client.xml">
-      <LogicalName>framework_NET_4_0_client.xml</LogicalName>
+    <EmbeddedResource Include="MonoDevelop.Projects.Policies\DefaultDotNetNamingPolicy.xml">
+      <LogicalName>DefaultDotNetNamingPolicy.xml</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
-  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
-    <ProjectReference Include="..\MonoDevelop.Projects.Formats.MSBuild\MonoDevelop.Projects.Formats.MSBuild.csproj">
-      <Project>{A437F1A3-78DF-4F00-8053-D32A8B1EB679}</Project>
-      <Name>MonoDevelop.Projects.Formats.MSBuild</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\external\cecil\Mono.Cecil.csproj">
-      <Project>{D68133BD-1E63-496E-9EDE-4FBDBF77B486}</Project>
-      <Name>Mono.Cecil</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\external\cecil\symbols\mdb\Mono.Cecil.Mdb.csproj">
-      <Project>{8559DD7F-A16F-46D0-A05A-9139FAEBA8FD}</Project>
-      <Name>Mono.Cecil.Mdb</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\..\external\mono-addins\Mono.Addins\Mono.Addins.csproj">
       <Project>{91DD5A2D-9FE3-4C3C-9253-876141874DAD}</Project>
       <Name>Mono.Addins</Name>
@@ -649,34 +801,38 @@
       <Project>{A85C9721-C054-4BD8-A1F3-0227615F0A36}</Project>
       <Name>Mono.Addins.Setup</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\external\mono-addins\Mono.Addins.Gui\Mono.Addins.Gui.csproj">
-      <Project>{FEC19BDA-4904-4005-8C09-68E82E8BEF6A}</Project>
-      <Name>Mono.Addins.Gui</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\external\ikvm\reflect\IKVM.Reflection.csproj">
-      <Project>{4CB170EF-DFE6-4A56-9E1B-A85449E827A7}</Project>
-      <Name>IKVM.Reflection</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\external\cecil\symbols\pdb\Mono.Cecil.Pdb.csproj">
-      <Project>{63E6915C-7EA4-4D76-AB28-0D7191EEA626}</Project>
-      <Name>Mono.Cecil.Pdb</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="MonoDevelop.Core.dll.config">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="MonoDevelop.Projects.SharedAssetsProjects\" />
-    <Folder Include="MSBuild\" />
+    <InternalsVisibleTo Include="MonoDevelop.Core.Tests" />
+    <InternalsVisibleTo Include="MonoDevelop.Ide.Tests" />
   </ItemGroup>
-  <Target Name="BeforeBuild" Inputs="BuildVariables.cs.in; $(MSBuildProjectDirectory)\..\..\..\..\version.config" Outputs="BuildVariables.cs">
-    <Csc Sources="BuildVariables.gen.cs" OutputAssembly="BuildVariables.gen.exe" />
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Target Name="BeforeBuild" Inputs="BuildVariables.cs.in; $(MSBuildProjectDirectory)\..\..\..\..\version.config" Outputs="BuildVariables.cs" Condition="Exists('$(MSBuildProjectDirectory)\..\..\..\..\version.config')" >
+    <MakeDir Directories="$(FullBuildInfo)" />
+    <Csc Sources="$(ConfigureScript)" OutputAssembly="$(ConfigureScriptExe)" ToolExe="$(CscToolExe)" ToolPath="$(CscToolPath)" Condition="!Exists('$(ConfigureScriptExe)')" />
+    <Exec Command="$(MonoLauncher)$(ConfigureScriptExe) gen-buildinfo $(FullBuildInfo)" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Csc Sources="BuildVariables.gen.cs" OutputAssembly="BuildVariables.gen.exe" ToolExe="$(CscToolExe)" ToolPath="$(CscToolPath)" />
     <Exec Command="$(MonoLauncher)$(MSBuildProjectDirectory)\BuildVariables.gen.exe ." WorkingDirectory="$(MSBuildProjectDirectory)" />
     <Delete Files="BuildVariables.gen.exe" />
     <MakeDir Directories="$(OutputPath)" />
     <Exec Command="&quot;$(Git)&quot; rev-parse HEAD &gt; $(BuildInfo)" WorkingDirectory="$(MSBuildProjectDirectory)" IgnoreExitCode="True" />
     <Exec Command="&quot;$(Git)&quot; rev-parse HEAD &gt; $(VcRevision)" WorkingDirectory="$(MSBuildProjectDirectory)" IgnoreExitCode="True" />
+    <RemoveDir Directories="$(FullBuildInfo)" />
   </Target>
+  <Import Project="..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.linux.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.linux.targets" Condition="Exists('..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.linux.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.linux.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.linux.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.linux.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.linux.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.linux.targets'))" />
+    <Error Condition="!Exists('..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.osx.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.osx.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.osx.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.osx.targets'))" />
+    <Error Condition="!Exists('..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.v110_xp.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.v110_xp.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.v110_xp.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.v110_xp.targets'))" />
+  </Target>
+  <Import Project="..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.osx.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.osx.targets" Condition="Exists('..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.osx.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.osx.targets')" />
+  <Import Project="..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.v110_xp.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.v110_xp.targets" Condition="Exists('..\..\..\packages\SQLitePCLRaw.lib.e_sqlite3.v110_xp.1.1.6\build\net35\SQLitePCLRaw.lib.e_sqlite3.v110_xp.targets')" />
 </Project>

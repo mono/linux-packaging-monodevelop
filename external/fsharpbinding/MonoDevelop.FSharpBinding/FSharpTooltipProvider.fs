@@ -9,6 +9,7 @@ open System.Threading.Tasks
 open MonoDevelop
 open MonoDevelop.Core
 open MonoDevelop.Components
+open MonoDevelop.FSharp.Shared
 open MonoDevelop.Ide
 open MonoDevelop.Ide.CodeCompletion
 open MonoDevelop.Ide.Editor
@@ -16,9 +17,10 @@ open Microsoft.FSharp.Compiler.SourceCodeServices
 open ExtCore.Control
 
 module TooltipImpl =
-    let extraKeywords = ["let!";"do!";"return!";"use!";"yield!";"->"]
+    let extraKeywords = ["let!";"do!";"return!";"use!";"yield!";"->";"<-";"<@";"@>";"<@@";"@@>";":>";":?>"]
     let tryKeyword col lineStr =
-        maybe {let! keyword = Parsing.findKeyword(col, lineStr)
+        maybe {let! (_col, keyword) = Parsing.findIdents col lineStr SymbolLookupKind.Simple
+               let! keyword = keyword |> List.tryHead
                if PrettyNaming.KeywordNames |> List.contains keyword || extraKeywords |> List.contains keyword
                then return keyword
                else return! None }
@@ -60,18 +62,24 @@ type FSharpTooltipProvider() =
                 asyncChoice {
                     try
                         LoggingService.LogDebug "TooltipProvider: Getting tool tip"
-                        let projectFile = context.Project |> function null -> file | project -> project.FileName.ToString()
-                        let! parseAndCheckResults =
-                            languageService.GetTypedParseResultIfAvailable (projectFile, file, source, AllowStaleResults.MatchingSource)
-                            |> Choice.ofOptionWith "TooltipProvider: ParseAndCheckResults not found"
-                        let! symbol = parseAndCheckResults.GetSymbolAtLocation(line, col, lineStr) |> AsyncChoice.ofOptionWith "TooltipProvider: ParseAndCheckResults not found"
-                        let! tip = SymbolTooltips.getTooltipFromSymbolUse symbol
-                                   |> Choice.ofOptionWith (sprintf "TooltipProvider: TootipText not returned\n   %s\n   %s" lineStr (String.replicate col "-" + "^"))
-                      
-                        //get the TextSegment the the symbols range occupies
-                        let textSeg = Symbols.getTextSegment editor symbol col lineStr
-                        let tooltipItem = TooltipItem(tip, textSeg)
-                        return tooltipItem
+
+                        let parseAndCheckResults = context.TryGetAst()
+                        match parseAndCheckResults with
+                        | Some ast ->
+                            let! symbol = ast.GetSymbolAtLocation(line, col, lineStr) |> AsyncChoice.ofOptionWith "TooltipProvider: ParseAndCheckResults not found"
+                            let! signature, xmldoc, footer =
+                                SymbolTooltips.getTooltipFromSymbolUse symbol
+                                |> Choice.ofOptionWith (sprintf "TooltipProvider: TootipText not returned\n   %s\n   %s" lineStr (String.replicate col "-" + "^"))
+
+                            let highlightedTip = syntaxHighlight signature, xmldoc, footer
+
+                            //get the TextSegment the the symbols range occupies
+                            let textSeg = Symbols.getTextSegment editor symbol col lineStr
+
+                            let tooltipItem = TooltipItem(highlightedTip, textSeg)
+                            return tooltipItem
+                        | None ->
+                            return! AsyncChoice.error "TooltipProvider: ParseAndCheckResults not found"
 
                     with
                     | :? TimeoutException -> return! AsyncChoice.error "TooltipProvider: timeout"
@@ -102,19 +110,12 @@ type FSharpTooltipProvider() =
             let (signature, summary, footer) = unbox item.Item
             let result = new TooltipInformationWindow(ShowArrow = true)
             let toolTipInfo = new TooltipInformation(SignatureMarkup=signature, FooterMarkup=footer)
-            match summary with
-            | Full(summary) -> toolTipInfo.SummaryMarkup <- summary
-            | Lookup(key, potentialFilename) ->
-                let summary =
-                    maybe { let! filename = potentialFilename
-                            let! markup = TooltipXmlDoc.findDocForEntity(filename, key)
-                            let summary = TooltipsXml.getTooltipSummary Styles.simpleMarkup markup
-                            return summary }
-                summary |> Option.iter (fun summary -> toolTipInfo.SummaryMarkup <- summary)
-            | EmptyDoc -> ()
+            let formattedSummary = SymbolTooltips.formatSummary summary
+            if not (String.IsNullOrWhiteSpace formattedSummary) then
+                toolTipInfo.SummaryMarkup <- formattedSummary
             result.AddOverload(toolTipInfo)
             result.RepositionWindow ()
-            Control.op_Implicit result
+            Window.op_Implicit result
 
     interface IDisposable with
         member x.Dispose() = killTooltipWindow()
