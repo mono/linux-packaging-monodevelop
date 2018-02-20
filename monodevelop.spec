@@ -20,6 +20,7 @@ Name:           monodevelop
 BuildRequires:  mono-devel >= 5.8
 BuildRequires:  monodoc-core >= 5.8
 BuildRequires:  mono-data
+BuildRequires:  fsharp >= 4.1.25
 BuildRequires:  mono-mvc
 BuildRequires:  pkgconfig(glib-sharp-2.0) >= 2.12.20
 BuildRequires:  pkgconfig(gtk-sharp-2.0) >= 2.12.20
