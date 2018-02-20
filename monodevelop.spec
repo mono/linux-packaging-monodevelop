@@ -46,8 +46,8 @@ BuildRequires:  pkgconfig(wcf)
 # Mono.Cecil.dll requires rsync after it's build
 BuildRequires:  rsync
 Url:            http://www.monodevelop.com/
-%define __majorver 6.0.0
-%define __minorver 4761
+%define __majorver 7.4.0
+%define __minorver 1026
 Version:	%{__majorver}.%{__minorver}
 Release:	0.xamarin.1
 Summary:        Full-Featured IDE for Mono and Gtk-Sharp
