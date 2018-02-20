@@ -111,6 +111,9 @@ mv %{buildroot}%{_prefix}/lib/pkgconfig/* %{buildroot}%{_datadir}/pkgconfig
 %if 0%{?suse_version} > 1220
 %fdupes %buildroot/%{_prefix}
 %endif
+%ifarch %{ix86}
+cp packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-x86/native/libe_sqlite3.so %{buildroot}%{_prefix}/lib/monodevelop/bin/
+%endif
 
 %post
 %if 0%{?rhel}%{?fedora}%{?centos}
