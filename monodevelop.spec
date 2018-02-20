@@ -142,7 +142,7 @@ mv %{buildroot}%{_prefix}/lib/pkgconfig/* %{buildroot}%{_datadir}/pkgconfig
 %files -f %{name}.lang
 %defattr(-,root,root)
 %{_bindir}/*
-%defattr(0644,root,root)
+%defattr(0644,root,root,0644)
 %{_datadir}/applications/monodevelop.desktop
 %{_datadir}/icons/hicolor/*/apps/monodevelop.png
 %{_datadir}/icons/hicolor/scalable/apps/monodevelop.svg
@@ -150,6 +150,7 @@ mv %{buildroot}%{_prefix}/lib/pkgconfig/* %{buildroot}%{_datadir}/pkgconfig
 %{_mandir}/man1/mdtool.1.gz
 %{_mandir}/man1/monodevelop.1.gz
 %{_datadir}/mime/packages/monodevelop.xml
+%{_datadir}/appdata/monodevelop.appdata.xml
 
 %files devel
 %defattr(-,root,root)
