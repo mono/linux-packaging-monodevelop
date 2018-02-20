@@ -17,19 +17,11 @@ Build-Depends: debhelper (>= 7.0.50),
                gtk-sharp2-gapi (>= 2.12.8),
                intltool,
                libapr1-dev,
-               libgconf2.0-cil-dev,
-               libglade2.0-cil-dev,
-               libgnome2.0-cil-dev,
                libgtk2.0-cil-dev,
                libgtkspell-dev,
-               libwebkitgtk-dev,
-               libnuget-core-cil-dev,
-               libmono-addins-cil-dev (>= 0.6),
-               libmono-addins-gui-cil-dev (>= 0.6),
-               libmono-cecil-cil-dev,
-               libnunit-cil-dev (>= 2.6.3),
                libsvn-dev,
-               mono-devel (>= 4.0~),
+               mono-devel (>= 5.8~),
+               msbuild,
                monodoc-base (>= 1.1.9)
 Standards-Version: 3.9.2
 Homepage: http://www.monodevelop.com/
@@ -51,7 +43,7 @@ Suggests: exuberant-ctags,
           monodevelop-versioncontrol,
           monodoc-browser,
           zip
-Recommends: libglade2.0-cil-dev, libgtk2.0-cil-dev, mono-devel
+Recommends: libgtk2.0-cil-dev, mono-devel
 Depends: gnome-icon-theme (>= 1.1.3),
          monodoc-manual (>= 1.1.9),
          pkg-config,

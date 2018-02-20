@@ -3,11 +3,6 @@
 
 MAKEFILE = $(firstword $(MAKEFILE_LIST))
 DEBIAN_DIR = $(dir $(MAKEFILE))
-SOURCE_DIR = $(DEBIAN_DIR)/..
-
-DEB_VERSION = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^Version | cut -d" " -f2)   
-DEB_SOURCE_NAME = $(shell dpkg-parsechangelog -l$(DEBIAN_DIR)/changelog | grep ^Source | cut -d" " -f2)
-VERSION = $(shell echo $(DEB_VERSION) | cut -d"-" -f1 | sed 's/+dfsg.*//')
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
@@ -15,19 +10,12 @@ override_dh_auto_configure:
 	  --disable-update-desktopdb \
 	  --disable-monoextensions \
 	  --enable-git --enable-subversion \
-	  --enable-gnomeplatform \
-	  MCS=/usr/bin/mono-csc CSC=/usr/bin/mono-csc
+	  --enable-gnomeplatform
 
 override_dh_auto_clean:
 	dh_auto_clean
-	find external/ -name "*.dll" -delete
-	find external/ -name "*.exe" -delete
-	find external/ -name "*.mdb" -delete
-	find external/ -name "*.FilesWrittenAbsolute.txt" -delete
-	rm -f external/ngit/NGit/obj/Debug/NGit.resources.JGitText.properties
 
 override_dh_auto_build:
-	cd ./external/libgit2sharp/Lib/CustomBuildTasks && xbuild CustomBuildTasks.csproj && mv bin/Debug/* .
 	XDG_CONFIG_HOME=$(DEBIAN_DIR) dh_auto_build
 
 override_dh_clideps:
@@ -55,10 +43,6 @@ override_dh_auto_test:
 
 override_dh_auto_install:
 	XDG_CONFIG_HOME=$(DEBIAN_DIR) dh_auto_install
-	# install missing DLL maps
-	cp debian/MonoDevelop.SourceEditor2.dll.config debian/tmp/usr/lib/monodevelop/AddIns/DisplayBindings/SourceEditor/
-	cp debian/MonoDevelop.Gettext.dll.config debian/tmp/usr/lib/monodevelop/AddIns/DisplayBindings/Gettext/
-	cp `pkg-config --variable=Libraries nuget-core` debian/tmp/usr/lib/monodevelop/AddIns/MonoDevelop.PackageManagement/
 	# fix permissions of .mo files
 	cd $(CURDIR)/debian/tmp/usr/share/locale && find -name "*.mo" -exec chmod -x {} \;
 
@@ -71,33 +55,5 @@ override_dh_install:
 	# remove ChangeLogAddIn files (shipped in monodevelop-versioncontrol)
 	rm -rf debian/monodevelop/usr/lib/monodevelop/AddIns/ChangeLogAddIn/
 
-get-orig-source:
-	uscan \
-		--package $(DEB_SOURCE_NAME) \
-		--watchfile $(DEBIAN_DIR)/watch \
-		--upstream-version $(VERSION) \
-		--download-version $(VERSION) \
-		--destdir . \
-		--force-download \
-		--rename \
-		--repack
-	if [ -d $(DEB_SOURCE_NAME)-$(VERSION) ]; then \
-		echo "$(DEB_SOURCE_NAME)-$(VERSION) is in the way, bailing out!"; \
-		exit 1; \
-	fi
-	tar -xzf $(DEB_SOURCE_NAME)_$(VERSION).orig.tar.gz
-	rm $(DEB_SOURCE_NAME)_$(VERSION).orig.tar.gz
-	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.dll"
-	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.dll" -delete
-	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.exe"
-	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.exe" -delete
-	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.mdb"
-	find $(DEB_SOURCE_NAME)-$(VERSION) -name "*.mdb" -delete
-	tar --mtime=@1252623600 -cf ./$(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar $(DEB_SOURCE_NAME)-$(VERSION)
-	gzip -9fn ./$(DEB_SOURCE_NAME)_$(VERSION)+dfsg.orig.tar
-	rm -r $(DEB_SOURCE_NAME)-$(VERSION)
-
 %:
-	dh $@ --with cli,autoreconf
-
-.PHONY: get-orig-source
+	dh $@ --with cli
