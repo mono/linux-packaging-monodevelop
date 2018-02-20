@@ -24,7 +24,7 @@ BuildRequires:  fsharp >= 4.1.25
 BuildRequires:  mono-mvc
 BuildRequires:  pkgconfig(glib-sharp-2.0) >= 2.12.20
 BuildRequires:  pkgconfig(gtk-sharp-2.0) >= 2.12.20
-BuildRequires:  pkgconfig(gconf-sharp-2.0) >= 2.12.20
+BuildRequires:  pkgconfig(glade-sharp-2.0) >= 2.12.20
 BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  cmake
