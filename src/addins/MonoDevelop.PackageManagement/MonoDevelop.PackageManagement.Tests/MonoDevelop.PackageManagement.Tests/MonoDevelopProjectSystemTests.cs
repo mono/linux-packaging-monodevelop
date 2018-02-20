@@ -1,5 +1,5 @@
 ﻿//
-// MonoDevelopProjectSystemTests.cs
+// MonoDevelopMSBuildNuGetProjectSystemTests.cs
 //
 // Author:
 //       Matt Ward <matt.ward@xamarin.com>
@@ -28,31 +28,31 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.Versioning;
-using MonoDevelop.PackageManagement;
+using System.Threading.Tasks;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.PackageManagement.Tests.Helpers;
 using MonoDevelop.Projects;
 using MonoDevelop.Projects.MSBuild;
-using NuGet;
+using NuGet.ProjectManagement;
 using NUnit.Framework;
 
 namespace MonoDevelop.PackageManagement.Tests
 {
 	[TestFixture]
-	public class MonoDevelopProjectSystemTests
+	public class MonoDevelopMSBuildNuGetProjectSystemTests
 	{
 		TestableMonoDevelopProjectSystem projectSystem;
 		FakeDotNetProject project;
 
-		void CreateProjectSystem (IDotNetProject project)
+		void CreateProjectSystem (IDotNetProject dotNetProject)
 		{
-			projectSystem = new TestableMonoDevelopProjectSystem (project);
+			projectSystem = new TestableMonoDevelopProjectSystem (dotNetProject);
 		}
 
 		void CreateTestProject ()
 		{
-			project = new FakeDotNetProject ();
+			project = new FakeDotNetProject (@"d:\Projects\Test\MyProject.csproj");
 		}
 
 		void CreateTestWebApplicationProject ()
@@ -87,26 +87,38 @@ namespace MonoDevelop.PackageManagement.Tests
 
 		void AssertLastMSBuildChildElementHasProjectAttributeValue (string expectedImport)
 		{
-			ImportAndCondition import = project.ImportsAdded.Last ();
+			ImportAndCondition import = projectSystem.NewImportsHandler.ImportsAdded.Last ();
 			Assert.AreEqual (expectedImport, import.Name);
 		}
 
 		void AssertLastImportHasCondition (string expectedCondition)
 		{
-			ImportAndCondition import = project.ImportsAdded.Last ();
+			ImportAndCondition import = projectSystem.NewImportsHandler.ImportsAdded.Last ();
 			Assert.AreEqual (expectedCondition, import.Condition);
+		}
+
+		void AssertLastImportHasImportLocation (ImportLocation expectedLocation)
+		{
+			ImportAndCondition import = projectSystem.NewImportsHandler.ImportsAdded.Last ();
+			Assert.AreEqual (expectedLocation, import.Location);
 		}
 
 		void AssertFirstMSBuildChildElementHasProjectAttributeValue (string expectedImport)
 		{
-			ImportAndCondition import = project.ImportsAdded.First ();
+			ImportAndCondition import = projectSystem.NewImportsHandler.ImportsAdded.First ();
 			Assert.AreEqual (expectedImport, import.Name);
 		}
 
 		void AssertFirstImportHasCondition (string expectedCondition)
 		{
-			ImportAndCondition import = project.ImportsAdded.First ();
+			ImportAndCondition import = projectSystem.NewImportsHandler.ImportsAdded.First ();
 			Assert.AreEqual (expectedCondition, import.Condition);
+		}
+
+		void AssertFirstImportHasImportLocation (ImportLocation expectedLocation)
+		{
+			ImportAndCondition import = projectSystem.NewImportsHandler.ImportsAdded.First ();
+			Assert.AreEqual (expectedLocation, import.Location);
 		}
 
 		void AssertImportRemoved (string expectedImportRemoved)
@@ -127,8 +139,8 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 
-			string expectedRoot = @"d:\projects\MyProject\".ToNativePath ();
-			Assert.AreEqual (expectedRoot, projectSystem.Root);
+			string expectedRoot = @"d:\projects\MyProject".ToNativePath ();
+			Assert.AreEqual (expectedRoot, projectSystem.ProjectFullPath);
 		}
 
 		[Test]
@@ -177,7 +189,7 @@ namespace MonoDevelop.PackageManagement.Tests
 
 			FrameworkName expectedName = new FrameworkName (".NETFramework, Version=v4.0");
 
-			Assert.AreEqual (expectedName, projectSystem.TargetFramework);
+			Assert.AreEqual (expectedName.ToString (), projectSystem.TargetFramework.ToString ());
 		}
 
 		[Test]
@@ -189,7 +201,7 @@ namespace MonoDevelop.PackageManagement.Tests
 
 			FrameworkName expectedName = new FrameworkName (".NETFramework, Profile=Client, Version=v3.5");
 
-			Assert.AreEqual (expectedName, projectSystem.TargetFramework);
+			Assert.AreEqual (expectedName.ToString (), projectSystem.TargetFramework.ToString ());
 		}
 
 		[Test]
@@ -201,7 +213,7 @@ namespace MonoDevelop.PackageManagement.Tests
 
 			FrameworkName expectedName = new FrameworkName ("Silverlight, Version=v2.0");
 
-			Assert.AreEqual (expectedName, projectSystem.TargetFramework);
+			Assert.AreEqual (expectedName.ToString (), projectSystem.TargetFramework.ToString ());
 		}
 
 		[Test]
@@ -301,104 +313,104 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void ReferenceExists_ProjectHasReferenceAndFullPathToAssemblyPassedToMethod_ReturnsTrue ()
+		public async Task ReferenceExists_ProjectHasReferenceAndFullPathToAssemblyPassedToMethod_ReturnsTrue ()
 		{
 			CreateTestProject (@"D:\Projects\Test\MyProject.csproj");
 			ProjectHelper.AddReference (project, "MyAssembly", @"d:\Projects\Test\MyAssembly.dll".ToNativePath ());
 			CreateProjectSystem (project);
 			string fileName = @"D:\Projects\Test\MyAssembly.dll".ToNativePath ();
 
-			bool result = projectSystem.ReferenceExists (fileName);
+			bool result = await projectSystem.ReferenceExistsAsync (fileName);
 
 			Assert.IsTrue (result);
 		}
 
 		[Test]
-		public void ReferenceExists_ProjectHasNoReferences_ReturnsFalse ()
+		public async Task ReferenceExists_ProjectHasNoReferences_ReturnsFalse ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
 			string fileName = @"D:\Projects\Test\MyAssembly.dll".ToNativePath ();
 
-			bool result = projectSystem.ReferenceExists (fileName);
+			bool result = await projectSystem.ReferenceExistsAsync (fileName);
 
 			Assert.IsFalse (result);
 		}
 
 		[Test]
-		public void ReferenceExists_ProjectReferenceNameHasDifferentCase_ReturnsTrue ()
+		public async Task ReferenceExistsAsync_ProjectReferenceNameHasDifferentCase_ReturnsTrue ()
 		{
 			CreateTestProject (@"D:\Projects\Test\MyProject.csproj");
 			ProjectHelper.AddReference (project, "myassembly", @"d:\Projects\Test\myassembly.dll".ToNativePath ());
 			CreateProjectSystem (project);
 			string fileName = @"D:\Projects\Test\MYASSEMBLY.dll".ToNativePath ();
 
-			bool result = projectSystem.ReferenceExists (fileName);
+			bool result = await projectSystem.ReferenceExistsAsync (fileName);
 
 			Assert.IsTrue (result);
 		}
 
 		[Test]
-		public void ReferenceExists_ReferenceNamePassedIsInProjectAndIsReferenceNameWithNoFileExtension_ReturnsTrue ()
+		public async Task ReferenceExistsAsync_ReferenceNamePassedIsInProjectAndIsReferenceNameWithNoFileExtension_ReturnsTrue ()
 		{
 			CreateTestProject ();
 			ProjectHelper.AddGacReference (project, "System.ComponentModel.Composition");
 			CreateProjectSystem (project);
 			string referenceName = "System.ComponentModel.Composition";
 
-			bool result = projectSystem.ReferenceExists (referenceName);
+			bool result = await projectSystem.ReferenceExistsAsync (referenceName);
 
 			Assert.IsTrue (result);
 		}
 
 		[Test]
-		public void ReferenceExists_ReferenceIsInProjectAndProjectReferenceSearchedForHasExeFileExtension_ReturnsTrue ()
+		public async Task ReferenceExistsAsync_ReferenceIsInProjectAndProjectReferenceSearchedForHasExeFileExtension_ReturnsTrue ()
 		{
 			CreateTestProject (@"D:\Projects\Test\MyProject.csproj");
 			ProjectHelper.AddReference (project, "myassembly", @"d:\Projects\Test\myassembly.exe".ToNativePath ());
 			CreateProjectSystem (project);
 			string fileName = @"D:\Projects\Test\myassembly.exe".ToNativePath ();
 
-			bool result = projectSystem.ReferenceExists (fileName);
+			bool result = await projectSystem.ReferenceExistsAsync (fileName);
 
 			Assert.IsTrue (result);
 		}
 
 		[Test]
-		public void ReferenceExists_ReferenceIsInProjectAndProjectReferenceSearchedForHasExeFileExtensionInUpperCase_ReturnsTrue ()
+		public async Task ReferenceExistsAsync_ReferenceIsInProjectAndProjectReferenceSearchedForHasExeFileExtensionInUpperCase_ReturnsTrue ()
 		{
 			CreateTestProject (@"D:\Projects\Test\MyProject.csproj");
 			ProjectHelper.AddReference (project, "myassembly", @"d:\Projects\Test\myassembly.exe".ToNativePath ());
 			CreateProjectSystem (project);
 			string fileName = @"D:\Projects\Test\MYASSEMBLY.EXE".ToNativePath ();
 
-			bool result = projectSystem.ReferenceExists (fileName);
+			bool result = await projectSystem.ReferenceExistsAsync (fileName);
 
 			Assert.IsTrue (result);
 		}
 
 		[Test]
-		public void AddReference_AddReferenceToNUnitFramework_ProjectIsSavedAfterAddingReference ()
+		public async Task AddReferenceAsync_AddReferenceToNUnitFramework_ProjectIsSavedAfterAddingReference ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
 			project.IsSaved = false;
 
 			string fileName = @"d:\projects\packages\nunit\nunit.framework.dll".ToNativePath ();
-			projectSystem.AddReference (fileName, null);
+			await projectSystem.AddReferenceAsync (fileName);
 
 			Assert.AreEqual (1, project.ReferencesWhenSavedCount);
 		}
 
 		[Test]
-		public void AddReference_AddReferenceToNUnitFramework_ReferenceAddedToProject ()
+		public async Task AddReferenceAsync_AddReferenceToNUnitFramework_ReferenceAddedToProject ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
 			project.IsSaved = false;
 
 			string fileName = @"d:\projects\packages\nunit\nunit.framework.dll".ToNativePath ();
-			projectSystem.AddReference (fileName, null);
+			await projectSystem.AddReferenceAsync (fileName);
 
 			ProjectReference actualReference = project.References [0];
 			Assert.AreEqual ("nunit.framework", actualReference.Reference);
@@ -406,14 +418,14 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void AddReference_ReferenceFileNameIsRelativePath_ReferenceAddedToProject ()
+		public async Task AddReferenceAsync_ReferenceFileNameIsRelativePath_ReferenceAddedToProject ()
 		{
 			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 			project.IsSaved = false;
 			string relativeFileName = @"packages\nunit\nunit.framework.dll".ToNativePath ();
 			string fullFileName = @"d:\projects\MyProject\packages\nunit\nunit.framework.dll".ToNativePath ();
-			projectSystem.AddReference (relativeFileName, null);
+			await projectSystem.AddReferenceAsync (relativeFileName);
 
 			ProjectReference actualReference = project.References [0];
 			Assert.AreEqual ("nunit.framework", actualReference.Reference);
@@ -421,14 +433,14 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void AddReference_AddReferenceToNUnitFramework_AddingReferenceIsLogged ()
+		public async Task AddReferenceAsync_AddReferenceToNUnitFramework_AddingReferenceIsLogged ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
 			project.Name = "MyTestProject";
 
 			string fileName = @"d:\projects\packages\nunit\nunit.framework.dll".ToNativePath ();
-			projectSystem.AddReference (fileName, null);
+			await projectSystem.AddReferenceAsync (fileName);
 
 			var expectedReferenceAndProjectName = new ReferenceAndProjectName () {
 				Reference = "nunit.framework",
@@ -439,14 +451,14 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void RemoveReference_ReferenceBeingRemovedHasFileExtension_ReferenceRemovedFromProject ()
+		public async Task RemoveReferenceAsync_ReferenceBeingRemovedHasFileExtension_ReferenceRemovedFromProject ()
 		{
 			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
 			string fileName = @"d:\projects\MyProject\packages\nunit\nunit.framework.dll".ToNativePath ();
 			ProjectHelper.AddReference (project, fileName);
 			CreateProjectSystem (project);
 
-			projectSystem.RemoveReference (fileName);
+			await projectSystem.RemoveReferenceAsync (fileName);
 
 			ProjectReference referenceItem = ProjectHelper.GetReference (project, "nunit.framework");
 
@@ -454,14 +466,14 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void RemoveReference_ReferenceCaseAddedToProjectDifferentToReferenceNameBeingRemoved_ReferenceRemovedFromProject ()
+		public async Task RemoveReferenceAsync_ReferenceCaseAddedToProjectDifferentToReferenceNameBeingRemoved_ReferenceRemovedFromProject ()
 		{
 			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
 			ProjectHelper.AddReference (project, @"d:\projects\MyProject\packages\nunit\nunit.framework.dll".ToNativePath ());
 			CreateProjectSystem (project);
 
 			string fileName = @"NUNIT.FRAMEWORK.DLL";
-			projectSystem.RemoveReference (fileName);
+			await projectSystem.RemoveReferenceAsync (fileName);
 
 			ProjectReference referenceItem = ProjectHelper.GetReference (project, "nunit.framework");
 
@@ -469,30 +481,34 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void RemoveReference_ProjectHasNoReference_ArgumentNullExceptionNotThrown ()
+		public async Task RemoveReferenceAsync_ProjectHasNoReference_ArgumentNullExceptionNotThrown ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
 
 			string fileName = @"NUNIT.FRAMEWORK.DLL";
-			Assert.DoesNotThrow (() => projectSystem.RemoveReference (fileName));
+			try {
+				await projectSystem.RemoveReferenceAsync (fileName);
+			} catch (Exception ex) {
+				Assert.Fail ("Exception thrown: {0}", ex);
+			}
 		}
 
 		[Test]
-		public void RemoveReference_ReferenceExistsInProject_ProjectIsSavedAfterReferenceRemoved ()
+		public async Task RemoveReferenceAsync_ReferenceExistsInProject_ProjectIsSavedAfterReferenceRemoved ()
 		{
 			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
 			string fileName = @"d:\projects\packages\nunit\nunit.framework.dll".ToNativePath ();
 			ProjectHelper.AddReference (project, fileName);
 			CreateProjectSystem (project);
 
-			projectSystem.RemoveReference (fileName);
+			await projectSystem.RemoveReferenceAsync (fileName);
 
 			Assert.AreEqual (0, project.ReferencesWhenSavedCount);
 		}
 
 		[Test]
-		public void RemoveReference_ReferenceBeingRemovedHasFileExtension_ReferenceRemovalIsLogged ()
+		public async Task RemoveReferenceAsync_ReferenceBeingRemovedHasFileExtension_ReferenceRemovalIsLogged ()
 		{
 			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
 			project.Name = "MyTestProject";
@@ -500,7 +516,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			ProjectHelper.AddReference (project, fileName);
 			CreateProjectSystem (project);
 
-			projectSystem.RemoveReference (fileName);
+			await projectSystem.RemoveReferenceAsync (fileName);
 
 			var expectedReferenceAndProjectName = new ReferenceAndProjectName {
 				Reference = "nunit.framework",
@@ -679,62 +695,62 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void DeleteFile_DeletesFileFromFileSystem_CallsFileServiceRemoveFile ()
+		public void RemoveFile_DeletesFileFromFileSystem_CallsFileServiceRemoveFile ()
 		{
 			CreateTestProject (@"d:\temp\MyProject.csproj");
 			AddFileToProject (@"d:\temp\test.cs");
 			CreateProjectSystem (project);
 
-			projectSystem.DeleteFile ("test.cs");
+			projectSystem.RemoveFile ("test.cs");
 
 			Assert.AreEqual (@"d:\temp\test.cs".ToNativePath (), projectSystem.FakeFileService.PathPassedToRemoveFile);
 		}
 
 		[Test]
-		public void DeleteFile_DeletesFileFromFileSystem_ProjectIsSavedAfterFileRemoved ()
+		public void RemoveFile_DeletesFileFromFileSystem_ProjectIsSavedAfterFileRemoved ()
 		{
 			CreateTestProject (@"d:\temp\MyProject.csproj");
 			project.IsSaved = false;
 			AddFileToProject (@"d:\temp\test.cs");
 			CreateProjectSystem (project);
 
-			projectSystem.DeleteFile ("test.cs");
+			projectSystem.RemoveFile ("test.cs");
 
 			Assert.AreEqual (0, project.FilesInProjectWhenSavedCount);
 		}
 
 		[Test]
-		public void DeleteFile_DeletesFileFromFileSystem_FileDeletionLogged ()
+		public void RemoveFile_DeletesFileFromFileSystem_FileDeletionLogged ()
 		{
 			CreateTestProject (@"d:\temp\MyProject.csproj");
 			AddFileToProject (@"d:\temp\test.cs");
 			CreateProjectSystem (project);
 
-			projectSystem.DeleteFile ("test.cs");
+			projectSystem.RemoveFile ("test.cs");
 
 			Assert.AreEqual ("test.cs", projectSystem.FileNamePassedToLogDeletedFile);
 		}
 
 		[Test]
-		public void DeleteFile_DeletesFileFromFileSystem_FolderInformationNotLogged ()
+		public void RemoveFile_DeletesFileFromFileSystem_FolderInformationNotLogged ()
 		{
 			CreateTestProject (@"d:\temp\MyProject.csproj");
 			AddFileToProject (@"d:\temp\test.cs");
 			CreateProjectSystem (project);
 
-			projectSystem.DeleteFile ("test.cs");
+			projectSystem.RemoveFile ("test.cs");
 
 			Assert.IsNull (projectSystem.FileNameAndDirectoryPassedToLogDeletedFileFromDirectory);
 		}
 
 		[Test]
-		public void DeleteFile_DeletesFileFromSubFolder_FileDeletionLogged ()
+		public void RemoveFile_DeletesFileFromSubFolder_FileDeletionLogged ()
 		{
 			CreateTestProject (@"d:\temp\MyProject.csproj");
 			AddFileToProject (@"d:\temp\src\Files\test.cs");
 			CreateProjectSystem (project);
 
-			projectSystem.DeleteFile (@"src\Files\test.cs".ToNativePath ());
+			projectSystem.RemoveFile (@"src\Files\test.cs".ToNativePath ());
 
 			var expectedFileNameAndFolder = new FileNameAndDirectory () {
 				FileName = "test.cs",
@@ -747,13 +763,13 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void DeleteFile_DeletesFileFromSubFolder_FileDeletionWithoutFolderInformationIsNotLogged ()
+		public void RemoveFile_DeletesFileFromSubFolder_FileDeletionWithoutFolderInformationIsNotLogged ()
 		{
 			CreateTestProject (@"d:\temp\MyProject.csproj");
 			AddFileToProject (@"d:\temp\src\Files\test.cs");
 			CreateProjectSystem (project);
 
-			projectSystem.DeleteFile (@"src\Files\test.cs".ToNativePath ());
+			projectSystem.RemoveFile (@"src\Files\test.cs".ToNativePath ());
 
 			Assert.IsNull (projectSystem.FileNamePassedToLogDeletedFile);
 		}
@@ -765,7 +781,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			AddFileToProject (@"d:\temp\test\test.cs");
 			CreateProjectSystem (project);
 
-			projectSystem.DeleteDirectory ("test");
+			projectSystem.DeleteDirectory ("test", false);
 
 			string path = @"d:\temp\test".ToNativePath ();
 			Assert.AreEqual (path, projectSystem.FakeFileService.PathPassedToRemoveDirectory);
@@ -779,7 +795,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			AddFileToProject (@"d:\temp\test\test.cs");
 			CreateProjectSystem (project);
 
-			projectSystem.DeleteDirectory ("test");
+			projectSystem.DeleteDirectory ("test", false);
 
 			Assert.AreEqual (0, project.FilesInProjectWhenSavedCount);
 			Assert.IsTrue (project.IsSaved);
@@ -793,18 +809,18 @@ namespace MonoDevelop.PackageManagement.Tests
 			AddFileToProject (@"d:\temp\test\test.cs");
 			CreateProjectSystem (project);
 
-			projectSystem.DeleteDirectory ("test");
+			projectSystem.DeleteDirectory ("test", false);
 
 			Assert.AreEqual ("test", projectSystem.DirectoryPassedToLogDeletedDirectory);
 		}
 
 		[Test]
-		public void AddFrameworkReference_SystemXmlToBeAdded_ReferenceAddedToProject ()
+		public async Task AddFrameworkReferenceAsync_SystemXmlToBeAdded_ReferenceAddedToProject ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
 
-			projectSystem.AddFrameworkReference ("System.Xml");
+			await projectSystem.AddFrameworkReferenceAsync ("System.Xml", "MyPackage");
 
 			ProjectReference referenceItem = ProjectHelper.GetReference (project, "System.Xml");
 
@@ -813,12 +829,12 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void AddFrameworkReference_SystemXmlToBeAdded_ProjectIsSaved ()
+		public async Task AddFrameworkReferenceAsync_SystemXmlToBeAdded_ProjectIsSaved ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
 
-			projectSystem.AddFrameworkReference ("System.Xml");
+			await projectSystem.AddFrameworkReferenceAsync ("System.Xml", "MyPackage");
 
 			bool saved = project.IsSaved;
 
@@ -826,13 +842,13 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void AddFrameworkReference_SystemXmlToBeAdded_AddedReferenceIsLogged ()
+		public async Task AddFrameworkReferenceAsync_SystemXmlToBeAdded_AddedReferenceIsLogged ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
 			project.Name = "MyTestProject";	
 
-			projectSystem.AddFrameworkReference ("System.Xml");
+			await projectSystem.AddFrameworkReferenceAsync ("System.Xml", "MyPackage");
 
 			var expectedReferenceAndProjectName = new ReferenceAndProjectName () {
 				Reference = "System.Xml",
@@ -896,9 +912,10 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
 
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
 
 			AssertLastMSBuildChildElementHasProjectAttributeValue (@"..\packages\Foo.0.1\build\Foo.targets");
+			AssertLastImportHasImportLocation (ImportLocation.Bottom);
 		}
 
 		[Test]
@@ -908,9 +925,10 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
 
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
 
 			AssertLastMSBuildChildElementHasProjectAttributeValue (@"packages\Foo.0.1\build\Foo.targets");
+			AssertLastImportHasImportLocation (ImportLocation.Bottom);
 		}
 
 		[Test]
@@ -920,9 +938,10 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
 
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
 
 			AssertLastImportHasCondition ("Exists('..\\packages\\Foo.0.1\\build\\Foo.targets')");
+			AssertLastImportHasImportLocation (ImportLocation.Bottom);
 		}
 
 		[Test]
@@ -931,11 +950,12 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateTestProject (@"d:\projects\MyProject\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
 
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
+			Assert.AreEqual (1, projectSystem.NewImportsHandler.ImportsAdded.Count);
 
-			Assert.AreEqual (2, project.ImportsAdded.Count);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
+			Assert.AreEqual (1, projectSystem.NewImportsHandler.ImportsAdded.Count);
 		}
 
 		[Test]
@@ -945,11 +965,12 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateProjectSystem (project);
 			string targetPath1 = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
 			string targetPath2 = @"d:\projects\MyProject\packages\Foo.0.1\BUILD\FOO.TARGETS".ToNativePath ();
-			projectSystem.AddImport (targetPath1, ProjectImportLocation.Bottom);
 
-			projectSystem.AddImport (targetPath2, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath1, ImportLocation.Bottom);
+			Assert.AreEqual (1, projectSystem.NewImportsHandler.ImportsAdded.Count);
 
-			Assert.AreEqual (2, project.ImportsAdded.Count);
+			projectSystem.AddImport (targetPath2, ImportLocation.Bottom);
+			Assert.AreEqual (1, projectSystem.NewImportsHandler.ImportsAdded.Count);
 		}
 
 		[Test]
@@ -959,7 +980,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
 
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
 
 			Assert.IsTrue (project.IsSaved);
 		}
@@ -970,7 +991,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateTestProject (@"d:\projects\MyProject\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
 
 			projectSystem.RemoveImport (targetPath);
 
@@ -983,12 +1004,12 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateTestProject (@"d:\projects\MyProject\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 			string targetPath1 = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
-			projectSystem.AddImport (targetPath1, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath1, ImportLocation.Bottom);
 			string targetPath2 = @"d:\projects\MyProject\packages\Foo.0.1\BUILD\FOO.TARGETS".ToNativePath ();
 
 			projectSystem.RemoveImport (targetPath2);
 
-			Assert.AreEqual (1, project.ImportsAdded.Count);
+			Assert.AreEqual (1, projectSystem.NewImportsHandler.ImportsAdded.Count);
 			Assert.AreEqual (2, project.ImportsRemoved.Count);
 		}
 
@@ -1010,9 +1031,10 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
 
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Top);
+			projectSystem.AddImport (targetPath, ImportLocation.Top);
 
 			AssertFirstMSBuildChildElementHasProjectAttributeValue (@"..\packages\Foo.0.1\build\Foo.targets");
+			AssertFirstImportHasImportLocation (ImportLocation.Top);
 		}
 
 		[Test]
@@ -1022,9 +1044,10 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
 
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Top);
+			projectSystem.AddImport (targetPath, ImportLocation.Top);
 
 			AssertFirstImportHasCondition ("Exists('..\\packages\\Foo.0.1\\build\\Foo.targets')");
+			AssertFirstImportHasImportLocation (ImportLocation.Top);
 		}
 
 		[Test]
@@ -1033,49 +1056,17 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateTestProject (@"d:\projects\MyProject\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Top);
 
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Top);
+			projectSystem.AddImport (targetPath, ImportLocation.Top);
+			Assert.AreEqual (1, projectSystem.NewImportsHandler.ImportsAdded.Count);
 
-			Assert.AreEqual (2, project.ImportsAdded.Count);
+			projectSystem.AddImport (targetPath, ImportLocation.Top);
+
+			Assert.AreEqual (1, projectSystem.NewImportsHandler.ImportsAdded.Count);
 		}
 
 		[Test]
-		public void AddFile_NewFileAddedWithAction_AddsFileToFileSystem ()
-		{
-			CreateTestProject ();
-			CreateProjectSystem (project);
-
-			string expectedPath = @"d:\temp\abc.cs".ToNativePath ();
-			Action<Stream> expectedAction = stream => {
-			};
-			projectSystem.AddFile (expectedPath, expectedAction);
-
-			Assert.AreEqual (expectedPath, projectSystem.PathPassedToPhysicalFileSystemAddFile);
-			Assert.AreEqual (expectedAction, projectSystem.ActionPassedToPhysicalFileSystemAddFile);
-		}
-
-		[Test]
-		public void AddFile_NewFileAddedWithAction_AddsFileToProject ()
-		{
-			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
-			string fileName = @"d:\projects\MyProject\src\NewFile.cs".ToNativePath ();
-			project.AddDefaultBuildAction (BuildAction.Compile, fileName);
-			CreateProjectSystem (project);
-
-			Action<Stream> action = stream => {
-			};
-			projectSystem.AddFile (fileName, action);
-
-			ProjectFile fileItem = ProjectHelper.GetFile (project, fileName);
-			var expectedFileName = new FilePath (fileName);
-
-			Assert.AreEqual (expectedFileName, fileItem.FilePath);
-			Assert.AreEqual (BuildAction.Compile, fileItem.BuildAction);
-		}
-
-		[Test]
-		public void ReferenceExists_ReferenceIsInProjectButIncludesAssemblyVersion_ReturnsTrue ()
+		public async Task ReferenceExistsAsync_ReferenceIsInProjectButIncludesAssemblyVersion_ReturnsTrue ()
 		{
 			CreateTestProject ();
 			string include = "MyAssembly, Version=0.1.0.0, Culture=neutral, PublicKeyToken=8cc8392e8503e009";
@@ -1083,13 +1074,13 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateProjectSystem (project);
 			string fileName = @"D:\Projects\Test\myassembly.dll".ToNativePath ();
 
-			bool result = projectSystem.ReferenceExists (fileName);
+			bool result = await projectSystem.ReferenceExistsAsync (fileName);
 
 			Assert.IsTrue (result);
 		}
 
 		[Test]
-		public void RemoveReference_ReferenceBeingRemovedHasFileExtensionAndProjectHasReferenceIncludingAssemblyVersion_ReferenceRemovedFromProject ()
+		public async Task RemoveReferenceAsync_ReferenceBeingRemovedHasFileExtensionAndProjectHasReferenceIncludingAssemblyVersion_ReferenceRemovedFromProject ()
 		{
 			CreateTestProject ();
 			string include = "nunit.framework, Version=2.6.2.0, Culture=neutral, PublicKeyToken=8cc8392e8503e009";
@@ -1097,7 +1088,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateProjectSystem (project);
 			string fileName = @"d:\projects\packages\nunit\nunit.framework.dll".ToNativePath ();
 
-			projectSystem.RemoveReference (fileName);
+			await projectSystem.RemoveReferenceAsync (fileName);
 
 			ProjectReference referenceItem = ProjectHelper.GetReference (project, "nunit.framework");
 			Assert.IsNull (referenceItem);
@@ -1109,7 +1100,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateTestProject (@"d:\projects\MyProject\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
 			string expectedImportRemoved = @"..\packages\Foo.0.1\build\Foo.targets";
 
 			projectSystem.RemoveImport (targetPath.ToNativePath ());
@@ -1125,7 +1116,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
 
 			projectSystem.RemoveImport (targetPath);
 
@@ -1138,7 +1129,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateTestProject (@"d:\projects\MyProject\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
 			const string expectedImportRemoved = @"..\packages\Foo.0.1\build\Foo.targets";
 			DotNetProjectImportEventArgs eventArgs = null;
 			projectSystem.PackageManagementEvents.ImportRemoved += (sender, e) => {
@@ -1159,7 +1150,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
 			CreateProjectSystem (project);
 			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
-			projectSystem.AddImport (targetPath, ProjectImportLocation.Bottom);
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
 			MSBuildProject msbuildProject = CreateMSBuildProject (
 				"<Project ToolsVersion=\"12.0\" DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\r\n" +
 				"  <Target Name=\"EnsureNuGetPackageBuildImports\" BeforeTargets=\"PrepareForBuild\">\r\n" +
@@ -1183,7 +1174,7 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void AddReference_AddReferenceToNUnitFramework_ReferenceAddingEventIsFired ()
+		public async Task AddReferenceAsync_AddReferenceToNUnitFramework_ReferenceAddingEventIsFired ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
@@ -1193,14 +1184,14 @@ namespace MonoDevelop.PackageManagement.Tests
 			};
 
 			string fileName = @"d:\projects\packages\nunit\nunit.framework.dll".ToNativePath ();
-			projectSystem.AddReference (fileName, null);
+			await projectSystem.AddReferenceAsync (fileName);
 
 			Assert.AreEqual (fileName, referenceBeingAdded.HintPath.ToString ());
 			Assert.IsTrue (referenceBeingAdded.LocalCopy);
 		}
 
 		[Test]
-		public void RemoveReference_RemoveReferenceToNUnitFramework_ReferenceRemovingEventIsFired ()
+		public async Task RemoveReferenceAsync_RemoveReferenceToNUnitFramework_ReferenceRemovingEventIsFired ()
 		{
 			CreateTestProject ();
 			CreateProjectSystem (project);
@@ -1213,10 +1204,86 @@ namespace MonoDevelop.PackageManagement.Tests
 				projectIsSaved = project.IsSaved;
 			};
 
-			projectSystem.RemoveReference (fileName);
+			await projectSystem.RemoveReferenceAsync (fileName);
 
 			Assert.AreEqual (fileName, referenceBeingRemoved.HintPath.ToString ());
 			Assert.IsFalse (projectIsSaved);
+		}
+
+		[Test]
+		public void AddImport_FullImportFilePathAndBottomOfProject_ImportHandlerIsDisposed ()
+		{
+			CreateTestProject (@"d:\projects\MyProject\MyProject\MyProject.csproj");
+			CreateProjectSystem (project);
+			string targetPath = @"d:\projects\MyProject\packages\Foo.0.1\build\Foo.targets".ToNativePath ();
+
+			projectSystem.AddImport (targetPath, ImportLocation.Bottom);
+
+			Assert.IsTrue (projectSystem.NewImportsHandler.IsDisposed);
+		}
+
+		[Test]
+		public void AddExistingFile_FileExists_AddsFileToProject ()
+		{
+			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
+			string fileName = @"d:\projects\MyProject\src\NewFile.cs".ToNativePath ();
+			project.AddDefaultBuildAction (BuildAction.Compile, fileName);
+			CreateProjectSystem (project);
+
+			projectSystem.AddExistingFile (fileName);
+
+			ProjectFile fileItem = ProjectHelper.GetFile (project, fileName);
+			var expectedFileName = new FilePath (fileName);
+			Assert.AreEqual (expectedFileName, fileItem.FilePath);
+			Assert.AreEqual (BuildAction.Compile, fileItem.BuildAction);
+			Assert.IsNull (projectSystem.PathPassedToPhysicalFileSystemAddFile);
+			Assert.IsTrue (project.IsSaved);
+			Assert.AreEqual (1, project.FilesAddedWhenSavedCount);
+		}
+
+		[Test]
+		public void GetDirectories_TwoDirectories_ReturnsTwoDirectories ()
+		{
+			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
+			CreateProjectSystem (project);
+			var expectedDirectories = new string[] {
+				@"d:\projects\MyProject\Scripts\One".ToNativePath (),
+				@"d:\projects\MyProject\Scripts\Two".ToNativePath (),
+			};
+			projectSystem.AddDirectoriesForPath (@"d:\projects\MyProject\Scripts".ToNativePath (), expectedDirectories);
+
+			string[] directories = projectSystem.GetDirectories (@"Scripts").ToArray ();
+
+			CollectionAssert.AreEqual (expectedDirectories, directories);
+		}
+
+		[Test]
+		public void GetFiles_Recursive_ThrowsNotImplementedException ()
+		{
+			CreateTestProject ();
+			CreateProjectSystem (project);
+
+			Assert.Throws<NotImplementedException> (() => projectSystem.GetFiles ("", "*.*", true));
+		}
+
+		[Test]
+		public void GetFiles_TwoFiles_ReturnsTwoFiles ()
+		{
+			CreateTestProject (@"d:\projects\MyProject\MyProject.csproj");
+			CreateProjectSystem (project);
+			var expectedFiles = new string[] {
+				@"d:\projects\MyProject\Scripts\one.js".ToNativePath (),
+				@"d:\projects\MyProject\Scripts\two.js".ToNativePath (),
+			};
+			projectSystem.AddFilesForPath (
+				@"d:\projects\MyProject\Scripts".ToNativePath (),
+				"*.*",
+				SearchOption.TopDirectoryOnly,
+				expectedFiles);
+
+			string[] files = projectSystem.GetFiles (@"Scripts", "*.*", false).ToArray ();
+
+			CollectionAssert.AreEqual (expectedFiles, files);
 		}
 	}
 }

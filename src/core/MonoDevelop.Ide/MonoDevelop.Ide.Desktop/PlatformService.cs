@@ -109,7 +109,18 @@ namespace MonoDevelop.Ide.Desktop
 				if (mt != null)
 					return mt.Id;
 			}
-			return OnGetMimeTypeForUri (uri) ?? "application/octet-stream";
+			var mime = OnGetMimeTypeForUri (uri);
+			if (mime != null) {
+				return mime;
+			}
+
+			try {
+				if (Path.IsPathRooted (uri) && File.Exists (uri) && !Core.Text.TextFileUtility.IsBinary (uri)) {
+					return "text/plain";
+				}
+			} catch (IOException) {}
+
+			return "application/octet-stream";
 		}
 
 		public string GetMimeTypeDescription (string mimeType)
@@ -156,6 +167,15 @@ namespace MonoDevelop.Ide.Desktop
 				}
 				yield return mimeType;
 			}
+		}
+
+		public string GetMimeTypeForRoslynLanguage (string language)
+		{
+			foreach (MimeTypeNode mt in mimeTypeNodes) {
+				if (mt.RoslynName == language)
+					return mt.Id;
+			}
+			return null;
 		}
 		
 		public Xwt.Drawing.Image GetIconForFile (string filename)
@@ -506,6 +526,37 @@ namespace MonoDevelop.Ide.Desktop
 		{
 			window.Move (x, y);
 			window.Resize (width, height);
+		}
+
+		/// <summary>
+		/// Restarts MonoDevelop
+		/// </summary>
+		/// <param name="reopenWorkspace"> true to reopen current workspace. </param>
+		internal virtual void RestartIde (bool reopenWorkspace)
+		{
+			var reopen = reopenWorkspace && IdeApp.Workspace != null && IdeApp.Workspace.Items.Count > 0;
+
+			FilePath path = Environment.GetCommandLineArgs ()[0];
+			if (Platform.IsMac && path.Extension == ".exe")
+				path = path.ChangeExtension (null);
+
+			if (!File.Exists (path))
+				throw new Exception (path + " not found");
+
+			var proc = new Process ();
+				
+			var psi = new ProcessStartInfo (path) {
+				CreateNoWindow = true,
+				UseShellExecute = false,
+				WorkingDirectory = Environment.CurrentDirectory,
+			};
+
+			var recentWorkspace = reopen ? DesktopService.RecentFiles.GetProjects ().FirstOrDefault ()?.FileName : string.Empty;
+			if (!string.IsNullOrEmpty (recentWorkspace))
+				psi.Arguments = recentWorkspace;
+			
+			proc.StartInfo = psi;
+			proc.Start ();
 		}
 	}
 }

@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class PossibleAssignmentToReadonlyFieldTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestTypeParameter()
         {
             TestIssue<PossibleAssignmentToReadonlyFieldAnalyzer>(@"
@@ -28,7 +27,7 @@ class FooBar<T> where T : IFoo
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestClassTypeParameter()
         {
             Analyze<PossibleAssignmentToReadonlyFieldAnalyzer>(@"
@@ -49,7 +48,7 @@ class FooBar<T> where T : class, IFoo
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestValueType()
         {
             TestIssue<PossibleAssignmentToReadonlyFieldAnalyzer>(@"
@@ -71,7 +70,7 @@ class FooBar
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestConstructor()
         {
             Analyze<PossibleAssignmentToReadonlyFieldAnalyzer>(@"
@@ -96,7 +95,7 @@ class FooBar<T> where T : IFoo
         /// <summary>
         /// Bug 15038 - readonly member property is incorrectly underlined in the .ctor when initialized 
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug15038()
         {
             Analyze<PossibleAssignmentToReadonlyFieldAnalyzer>(@"
@@ -115,7 +114,7 @@ public class Multipart
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestDisable()
         {
             Analyze<PossibleAssignmentToReadonlyFieldAnalyzer>(@"
@@ -146,7 +145,7 @@ class FooBar<T> where T : IFoo
         /// <summary>
         /// Bug 15109 - Incorrect "Readonly field cannot be used as assignment target" error
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug15109()
         {
             Analyze<PossibleAssignmentToReadonlyFieldAnalyzer>(@"
@@ -171,3 +170,4 @@ namespace TestProject
 
 }
 
+*/

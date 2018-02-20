@@ -10,11 +10,10 @@ using Microsoft.CodeAnalysis.VisualBasic.Syntax;
 using RefactoringEssentials.VB.CodeRefactorings;
 using RefactoringEssentials.Converter;
 using Microsoft.CodeAnalysis.Text;
-using System.Diagnostics.Contracts;
 
 namespace RefactoringEssentials.VB.Converter
 {
-    public partial class CSharpConverter
+	public partial class CSharpConverter
     {
         enum TokenContext
         {
@@ -155,17 +154,17 @@ namespace RefactoringEssentials.VB.Converter
             return SyntaxFactory.ModifiedIdentifier(ConvertIdentifier(v.Identifier));
         }
 
-        static SyntaxToken ConvertIdentifier(SyntaxToken t)
-        {
-            return SyntaxFactory.Identifier(t.ValueText, SyntaxFacts.IsKeywordKind(t.Kind()), t.GetIdentifierText(), TypeCharacter.None);
-        }
+		static SyntaxToken ConvertIdentifier(SyntaxToken id)
+		{
+			var keywordKind = SyntaxFacts.GetKeywordKind(id.ValueText);
+			if (keywordKind != SyntaxKind.None && !SyntaxFacts.IsPredefinedType(keywordKind))
+				return SyntaxFactory.Identifier("[" + id.ValueText + "]");
+			return SyntaxFactory.Identifier(id.ValueText);
+		}
 
-        static ExpressionSyntax Literal(object o)
-        {
-            return ComputeConstantValueCodeRefactoringProvider.GetLiteralExpression(o);
-        }
+		static ExpressionSyntax Literal(object o) => ComputeConstantValueCodeRefactoringProvider.GetLiteralExpression(o);
 
-        static SyntaxKind ConvertToken(CS.SyntaxKind t, TokenContext context = TokenContext.Global)
+		static SyntaxKind ConvertToken(CS.SyntaxKind t, TokenContext context = TokenContext.Global)
         {
             switch (t)
             {

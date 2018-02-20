@@ -61,19 +61,46 @@ namespace MonoDevelop.Projects
 			return next.Clean (monitor, configuration, operationContext);
 		}
 
+		[Obsolete("Use the overload that takes a SolutionRunConfiguration argument")]
 		internal protected virtual Task Execute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
 		{
-			return next.Execute (monitor, context, configuration);
+			return next.Execute (monitor, context, configuration, (SolutionRunConfiguration)context.RunConfiguration);
 		}
 
+		[Obsolete ("Use the overload that takes a SolutionRunConfiguration argument")]
 		internal protected virtual Task PrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
 		{
-			return next.PrepareExecution (monitor, context, configuration);
+			return next.PrepareExecution (monitor, context, configuration, (SolutionRunConfiguration)context.RunConfiguration);
 		}
 
+		[Obsolete ("Use the overload that takes a SolutionRunConfiguration argument")]
 		internal protected virtual bool CanExecute (ExecutionContext context, ConfigurationSelector configuration)
 		{
-			return next.CanExecute (context, configuration);
+			return next.CanExecute (context, configuration, (SolutionRunConfiguration)context.RunConfiguration);
+		}
+
+		internal protected virtual Task Execute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionRunConfiguration runConfiguration)
+		{
+			context.RunConfiguration = runConfiguration;
+#pragma warning disable 618 // Type or member is obsolete
+			return Execute (monitor, context, configuration);
+#pragma warning restore 618 // Type or member is obsolete
+		}
+
+		internal protected virtual Task PrepareExecution (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionRunConfiguration runConfiguration)
+		{
+			context.RunConfiguration = runConfiguration;
+#pragma warning disable 618 // Type or member is obsolete
+			return PrepareExecution (monitor, context, configuration);
+#pragma warning restore 618 // Type or member is obsolete
+		}
+
+		internal protected virtual bool CanExecute (ExecutionContext context, ConfigurationSelector configuration, SolutionRunConfiguration runConfiguration)
+		{
+			context.RunConfiguration = runConfiguration;
+#pragma warning disable 618 // Type or member is obsolete
+			return CanExecute (context, configuration);
+#pragma warning restore 618 // Type or member is obsolete
 		}
 
 		internal protected virtual IEnumerable<ExecutionTarget> GetExecutionTargets (Solution solution, ConfigurationSelector configuration)
@@ -81,6 +108,17 @@ namespace MonoDevelop.Projects
 			return next.GetExecutionTargets (solution, configuration);
 		}
 
+		internal protected virtual IEnumerable<ExecutionTarget> GetExecutionTargets (Solution solution, ConfigurationSelector configuration, SolutionRunConfiguration runConfiguration)
+		{
+			return next.GetExecutionTargets (solution, configuration, runConfiguration);
+		}
+
+		internal protected virtual IEnumerable<SolutionRunConfiguration> OnGetRunConfigurations ()
+		{
+			return next.OnGetRunConfigurations ();
+		}
+
+		[Obsolete("This method will be removed in future releases")]
 		internal protected virtual bool NeedsBuilding (ConfigurationSelector configuration)
 		{
 			return next.NeedsBuilding (configuration);
@@ -150,6 +188,16 @@ namespace MonoDevelop.Projects
 		internal protected virtual bool OnGetSupportsFormat (MSBuildFileFormat format)
 		{
 			return OnGetSupportsFormat (format);
+		}
+
+		internal protected virtual Task OnBeginBuildOperation (ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext)
+		{
+			return next.OnBeginBuildOperation (monitor, configuration, operationContext);
+		}
+
+		internal protected virtual Task OnEndBuildOperation (ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext, BuildResult result)
+		{
+			return next.OnEndBuildOperation (monitor, configuration, operationContext, result);
 		}
 	}
 }

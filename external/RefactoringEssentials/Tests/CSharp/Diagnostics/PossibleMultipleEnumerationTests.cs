@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class PossibleMultipleEnumerationTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestVariableInvocation()
         {
             var input = @"
@@ -42,7 +41,7 @@ class TestClass
 }", 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestVariableForeach()
         {
             var input = @"
@@ -75,7 +74,7 @@ class TestClass
 }", 1, 1);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestVariableMixed()
         {
             var input = @"
@@ -93,7 +92,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestParameter()
         {
             var input = @"
@@ -110,7 +109,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestObjectMethodInvocation()
         {
             var input = @"
@@ -128,7 +127,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestIf()
         {
             var input = @"
@@ -150,7 +149,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestIf2()
         {
             var input = @"
@@ -172,7 +171,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 3);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestIf3()
         {
             var input = @"
@@ -193,7 +192,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestFor()
         {
             var input = @"
@@ -212,7 +211,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 1);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestWhile()
         {
             var input = @"
@@ -232,7 +231,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 1);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestWhile2()
         {
             var input = @"
@@ -251,7 +250,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 1);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestWhile3()
         {
             var input = @"
@@ -275,7 +274,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestWhile4()
         {
             var input = @"
@@ -297,7 +296,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestDo()
         {
             var input = @"
@@ -319,7 +318,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestDo2()
         {
             var input = @"
@@ -340,7 +339,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestLambda()
         {
             var input = @"
@@ -362,7 +361,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestLambda2()
         {
             var input = @"
@@ -381,7 +380,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestLambda3()
         {
             var input = @"
@@ -403,7 +402,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestLambda4()
         {
             var input = @"
@@ -422,7 +421,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestConditionalExpression()
         {
             var input = @"
@@ -440,7 +439,7 @@ class TestClass
 }";
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestConditionalExpression2()
         {
             var input = @"
@@ -459,7 +458,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestConstantConditionalExpression()
         {
             var input = @"
@@ -478,7 +477,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentInConditionalExpression()
         {
             var input = @"
@@ -499,7 +498,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignmentInConditionalExpression2()
         {
             var input = @"
@@ -520,7 +519,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignment()
         {
             var input = @"
@@ -538,7 +537,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAssignment2()
         {
             var input = @"
@@ -559,7 +558,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestNoIssue()
         {
             var input = @"
@@ -576,7 +575,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestExpression()
         {
             var input = @"
@@ -595,7 +594,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestExpression2()
         {
             var input = @"
@@ -614,7 +613,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestOutArgument()
         {
             var input = @"
@@ -637,7 +636,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestOutArgument2()
         {
             var input = @"
@@ -661,7 +660,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestOutArgument3()
         {
             var input = @"
@@ -682,7 +681,7 @@ class TestClass
             Test<PossibleMultipleEnumerationAnalyzer>(input, 2);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestDisable()
         {
             var input = @"
@@ -704,3 +703,4 @@ class TestClass
         }
     }
 }
+*/

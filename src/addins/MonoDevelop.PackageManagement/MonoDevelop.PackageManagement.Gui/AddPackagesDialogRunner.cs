@@ -25,22 +25,28 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.PackageManagement;
 using MonoDevelop.Ide;
-using Xwt;
 using MonoDevelop.Core;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class AddPackagesDialogRunner
+	internal class AddPackagesDialogRunner
 	{
+		static RecentNuGetPackagesRepository recentPackagesRepository = new RecentNuGetPackagesRepository ();
+
 		public void Run (string initialSearch = null)
 		{
-			try {
+			Run (null, initialSearch);
+		}
 
+		public void Run (DotNetProject project, string initialSearch = null)
+		{
+			try {
+				PackageManagementCredentialService.Reset ();
 				bool configurePackageSources = false;
 				do {
-					using (AddPackagesDialog dialog = CreateDialog (initialSearch)) {
+					using (AddPackagesDialog dialog = CreateDialog (project, initialSearch)) {
 						dialog.ShowWithParent ();
 						configurePackageSources = dialog.ShowPreferencesForPackageSources;
 						initialSearch = dialog.SearchText;
@@ -55,11 +61,11 @@ namespace MonoDevelop.PackageManagement
 			}
 		}
 
-		AddPackagesDialog CreateDialog (string initialSearch)
+		AddPackagesDialog CreateDialog (DotNetProject project, string initialSearch)
 		{
-			var viewModels = new PackageManagementViewModels ();
+			var viewModel = AllPackagesViewModel.Create (project, recentPackagesRepository);
 			return new AddPackagesDialog (
-				viewModels.ManagePackagesViewModel,
+				viewModel,
 				initialSearch);
 		}
 

@@ -1,15 +1,14 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-	[TestFixture]
-	public class RedundantCheckBeforeAssignmentTests : CSharpDiagnosticTestBase
-	{
-		[Test]
-		public void TestResharperDisableRestore()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+    public class RedundantCheckBeforeAssignmentTests : CSharpDiagnosticTestBase
+    {
+        [Fact]
+        public void TestResharperDisableRestore()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 public class RedundantCheckBeforeAssignmentTests
 {
     public void Method()
@@ -27,12 +26,12 @@ public class RedundantCheckBeforeAssignmentTests
     }
 }
 ");
-		}
+        }
 
-		[Test]
-		public void TestFix()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestFix()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -68,12 +67,12 @@ class RedundantCheckBeforeAssignmentTests
     }
 }
 ");
-		}
+        }
 
-		[Test]
-		public void TestFixWithElse()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestFixWithElse()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -111,12 +110,12 @@ class RedundantCheckBeforeAssignmentTests
     }
 }
 ");
-		}
+        }
 
-		[Test]
-		public void TestQualifiedField()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestQualifiedField()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -134,12 +133,12 @@ class RedundantCheckBeforeAssignmentTests
         }
     }
 }");
-		}
+        }
 
-		[Test]
-		public void TestFlippedOperands()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestFlippedOperands()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -157,12 +156,12 @@ class RedundantCheckBeforeAssignmentTests
         }
     }
 }");
-		}
+        }
 
-		[Test]
-		public void TestConstantExpr()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestConstantExpr()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     public void Test()
@@ -172,12 +171,12 @@ class RedundantCheckBeforeAssignmentTests
             q = 1;
     }
 }");
-		}
+        }
 
-		[Test]
-		public void TestConstantExprFlipped()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestConstantExprFlipped()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     public void Test()
@@ -187,12 +186,12 @@ class RedundantCheckBeforeAssignmentTests
             q = 1;
     }
 }");
-		}
+        }
 
-		[Test]
-		public void TestBlock()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestBlock()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -212,12 +211,12 @@ class RedundantCheckBeforeAssignmentTests
         }
     }
 }");
-		}
+        }
 
-		[Test]
-		public void TestIgnoreMultipleStatementsBlock()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestIgnoreMultipleStatementsBlock()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -240,16 +239,16 @@ class RedundantCheckBeforeAssignmentTests
 
     void RaiseOnPropertyChanged(string name) { /* stub */ }
 }");
-		}
+        }
 
-		[TestCase("==")]
-		[TestCase("<")]
-		[TestCase(">")]
-		[TestCase(">=")]
-		[TestCase("<=")]
-		public void TestIgnoreOtherComparisonOperators(string op)
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [InlineData("==")]
+        [InlineData("<")]
+        [InlineData(">")]
+        [InlineData(">=")]
+        [InlineData("<=")]
+        public void TestIgnoreOtherComparisonOperators(string op)
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 public class RE_Issue104
 {
     public void Method(int expiryYear)
@@ -261,15 +260,15 @@ public class RE_Issue104
     }
 }
 ");
-		}
+        }
 
-		[Test]
-		public void TestIgnoreComplexExpression()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestIgnoreComplexExpression()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 public class RedundantCheckBeforeAssignmentTests
 {
-	int expiryYear;
+    int expiryYear;
 
     public void Method()
     {
@@ -279,15 +278,15 @@ public class RedundantCheckBeforeAssignmentTests
         }
     }
 
-	int SomeHellOfAComplexAlgorithm(int arg) { return 0; }
+    int SomeHellOfAComplexAlgorithm(int arg) { return 0; }
 }
 ");
-		}
+        }
 
-		[Test]
-		public void TestIgnoreREIssue_104()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestIgnoreREIssue_104()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 public class RedundantCheckBeforeAssignmentTests
 {
     public void Method(int expiryYear)
@@ -299,12 +298,12 @@ public class RedundantCheckBeforeAssignmentTests
     }
 }
 ");
-		}
+        }
 
-		[Test]
-		public void TestIgnoreWithElseBlock()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestIgnoreWithElseBlock()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -328,13 +327,13 @@ class RedundantCheckBeforeAssignmentTests
         }
     }
 }");
-		}
+        }
 
 
-		[Test]
-		public void TestIgnoreWithElseIfBlock()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestIgnoreWithElseIfBlock()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -358,12 +357,12 @@ class RedundantCheckBeforeAssignmentTests
         }
     }
 }");
-		}
+        }
 
-		[Test]
-		public void TestWithEmptyElseBlock()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestWithEmptyElseBlock()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -384,12 +383,12 @@ class RedundantCheckBeforeAssignmentTests
         }
     }
 }");
-		}
+        }
 
-		[Test]
-		public void TestIgnoreWithElseStmt()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestIgnoreWithElseStmt()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -409,12 +408,12 @@ class RedundantCheckBeforeAssignmentTests
         }
     }
 }");
-		}
+        }
 
-		[Test]
-		public void TestWithEmptyStmt()
-		{
-			Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+        [Fact]
+        public void TestWithEmptyStmt()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
 class RedundantCheckBeforeAssignmentTests
 {
     int test;
@@ -435,6 +434,27 @@ class RedundantCheckBeforeAssignmentTests
         }
     }
 }");
-		}
-	}
+        }
+
+        [Fact]
+        public void TestStringEmptyComparison()
+        {
+            Analyze<RedundantCheckBeforeAssignmentAnalyzer>(@"using System;
+class RedundantCheckBeforeAssignmentTests
+{
+    public void TestMethod(bool fileExists)
+    {
+        string Message = string.Empty;
+
+        if (!fileExists) {
+            Message = ""File doesn't exist"";
+        }
+
+        if (Message != string.Empty) {
+            Message += ""(empty)"";
+        }
+    }
+}");
+        }
+    }
 }

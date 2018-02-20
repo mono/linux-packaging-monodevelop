@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <Import Project="..\..\..\MonoDevelop.props" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -37,25 +38,26 @@
     <Reference Include="Microsoft.Build.Framework" />
     <Reference Include="Microsoft.Build.Utilities.v4.0" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.ValueTuple">
+      <HintPath>..\..\..\packages\System.ValueTuple.4.4.0\lib\portable-net40+sl4+win8+wp8\System.ValueTuple.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.cs" />
     <Compile Include="MonoDevelop.Projects.Formats.MSBuild\ProjectBuilder.cs" />
     <Compile Include="MonoDevelop.Projects.Formats.MSBuild\LocalLogger.cs" />
-    <Compile Include="MonoDevelop.Projects.Formats.MSBuild\ILogWriter.cs" />
-    <Compile Include="MonoDevelop.Projects.Formats.MSBuild\IProjectBuilder.cs" />
     <Compile Include="MonoDevelop.Projects.Formats.MSBuild\BuildEngine.cs" />
-    <Compile Include="MonoDevelop.Projects.Formats.MSBuild\IBuildEngine.cs" />
     <Compile Include="MonoDevelop.Projects.Formats.MSBuild\ConsoleLogger.cs" />
     <Compile Include="AssemblyInfo.v4.0.cs" />
-    <Compile Include="MonoDevelop.Projects.Formats.MSBuild\MSBuildTargetResult.cs" />
-    <Compile Include="MonoDevelop.Projects.Formats.MSBuild\MSBuildResult.cs" />
-    <Compile Include="MonoDevelop.Projects.Formats.MSBuild\MSBuildEvaluatedItem.cs" />
-    <Compile Include="MonoDevelop.Projects.Formats.MSBuild\ProjectBuilder.Shared.cs" />
-    <Compile Include="MonoDevelop.Projects.Formats.MSBuild\BuildEngine.Shared.cs" />
   </ItemGroup>
+  <Import Project="MonoDevelop.Projects.MSBuild.Shared\MonoDevelop.Projects.MSBuild.Shared.projitems" Label="Shared" Condition="Exists('MonoDevelop.Projects.MSBuild.Shared\MonoDevelop.Projects.MSBuild.Shared.projitems')" />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
     <Folder Include="MonoDevelop.Projects.Formats.MSBuild\" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

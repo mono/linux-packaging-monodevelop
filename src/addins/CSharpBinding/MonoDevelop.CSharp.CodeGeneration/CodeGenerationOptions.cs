@@ -23,25 +23,23 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-using System.Linq;
-using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide;
-using MonoDevelop.Ide.TypeSystem;
-using MonoDevelop.Core;
-using System;
 using System.Threading;
+using System.Threading.Tasks;
+using ICSharpCode.NRefactory6.CSharp;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.Text;
-using Microsoft.CodeAnalysis.Simplification;
-using MonoDevelop.Ide.Editor;
-using Microsoft.CodeAnalysis.Options;
-using MonoDevelop.Ide.Gui.Content;
 using Microsoft.CodeAnalysis.Formatting;
-using System.Diagnostics;
-using ICSharpCode.NRefactory6.CSharp;
+using Microsoft.CodeAnalysis.Options;
+using Microsoft.CodeAnalysis.Simplification;
+using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.CSharp.Extensions;
+using MonoDevelop.Core;
 using MonoDevelop.CSharp.Completion;
+using MonoDevelop.Ide;
+using MonoDevelop.Ide.Editor;
+using MonoDevelop.Ide.Gui.Content;
+using MonoDevelop.Ide.TypeSystem;
+using System;
 
 namespace MonoDevelop.CodeGeneration
 {
@@ -138,7 +136,7 @@ namespace MonoDevelop.CodeGeneration
 
 		public string CreateShortType (ITypeSymbol fullType)
 		{
-			return RoslynCompletionData.SafeMinimalDisplayString (fullType, CurrentState, offset);
+			return CSharp.CSharpAmbience.SafeMinimalDisplayString (fullType, CurrentState, offset);
 		}
 
 		public static CodeGenerationOptions CreateCodeGenerationOptions (TextEditor document, DocumentContext ctx)

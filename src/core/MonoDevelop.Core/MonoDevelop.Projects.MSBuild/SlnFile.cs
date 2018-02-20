@@ -75,8 +75,11 @@ namespace MonoDevelop.Projects.MSBuild
 			string strVersion;
 			using (var reader = new StreamReader (file)) {
 				var strInput = reader.ReadLine();
-				if (strInput == null)
-					return null;
+				while (string.IsNullOrWhiteSpace (strInput)) {
+					if (strInput == null)
+						return null;
+					strInput = reader.ReadLine ();
+				}
 
 				var match = slnVersionRegex.Match (strInput);
 				if (!match.Success) {
@@ -176,8 +179,8 @@ namespace MonoDevelop.Projects.MSBuild
 							var sec = new SlnSection ();
 							sec.Read (reader, line, ref curLineNum);
 							sections.Add (sec);
-						} else
-							throw new InvalidSolutionFormatException (curLineNum);
+						} else // Ignore text that's out of place
+							continue;
 					}
 					if (line == null)
 						throw new InvalidSolutionFormatException (curLineNum, "Global section not closed");
@@ -552,14 +555,15 @@ namespace MonoDevelop.Projects.MSBuild
 		{
 			if (Line == 0)
 				Line = currentLine;
-			line = line.Trim ();
 			int k = line.IndexOf ('=');
 			if (k != -1) {
 				var name = line.Substring (0, k).Trim ();
 				var val = line.Substring (k + 1).Trim ();
 				values [name] = val;
 			} else {
-				values.Add (line, null);
+				line = line.Trim ();
+				if (!string.IsNullOrWhiteSpace (line))
+					values.Add (line, null);
 			}
 		}
 

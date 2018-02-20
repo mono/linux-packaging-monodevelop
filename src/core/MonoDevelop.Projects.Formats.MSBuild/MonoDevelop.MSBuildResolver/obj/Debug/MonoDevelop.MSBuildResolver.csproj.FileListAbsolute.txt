@@ -1,0 +1,6 @@
+/home/directhex/Projects/monodevelop/main/build/bin/MSBuild/MonoDevelop.MSBuildResolver.dll
+/home/directhex/Projects/monodevelop/main/build/bin/MSBuild/MonoDevelop.MSBuildResolver.pdb
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/MonoDevelop.MSBuildResolver/obj/Debug/MonoDevelop.MSBuildResolver.csprojResolveAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/MonoDevelop.MSBuildResolver/obj/Debug/MonoDevelop.MSBuildResolver.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/MonoDevelop.MSBuildResolver/obj/Debug/MonoDevelop.MSBuildResolver.dll
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/MonoDevelop.MSBuildResolver/obj/Debug/MonoDevelop.MSBuildResolver.pdb

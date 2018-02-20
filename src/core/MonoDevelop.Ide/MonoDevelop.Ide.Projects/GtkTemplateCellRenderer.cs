@@ -38,33 +38,23 @@ namespace MonoDevelop.Ide.Projects
 {
 	class GtkTemplateCellRenderer : CellRendererText
 	{
-		Rectangle languageRect;
-		int dropdownTriangleWidth = 8;
-		int dropdownTriangleHeight = 5;
-		const int dropdownTriangleRightHandPadding = 8;
-		const int languageRightHandPadding = 4;
-		const int languageLeftHandPadding = 9;
 		const int iconTextPadding = 9;
 		int groupTemplateHeadingTotalYPadding = 24;
+		int recentTemplateHeadingTotalYPadding = 30;
 		const int groupTemplateHeadingYOffset = 4;
 		const int categoryTextPaddingX = 4;
-
-		int minLanguageRectWidth;
 
 		public SolutionTemplate Template { get; set; }
 		public string SelectedLanguage { get; set; }
 		public Xwt.Drawing.Image TemplateIcon { get; set; }
 		public string TemplateCategory { get; set; }
+		public bool RenderRecentTemplate { get; set; }
 
 		public GtkTemplateCellRenderer ()
 		{
-			minLanguageRectWidth = languageLeftHandPadding +
-				dropdownTriangleWidth +
-				dropdownTriangleRightHandPadding +
-				languageRightHandPadding + 10;
-
 			if (IsYosemiteOrHigher ()) {
 				groupTemplateHeadingTotalYPadding -= 1;
+				recentTemplateHeadingTotalYPadding -= 1;
 			}
 		}
 
@@ -73,23 +63,13 @@ namespace MonoDevelop.Ide.Projects
 			return Platform.IsMac && (Platform.OSVersion >= MacSystemInformation.Yosemite);
 		}
 
-		public bool IsLanguageButtonPressed (EventButton button)
-		{
-			return languageRect.Contains ((int)button.X, (int)button.Y);
-		}
-
-		public Rectangle GetLanguageRect ()
-		{
-			return languageRect;
-		}
-
 		public override void GetSize (Widget widget, ref Rectangle cell_area, out int x_offset, out int y_offset, out int width, out int height)
 		{
 			base.GetSize (widget, ref cell_area, out x_offset, out y_offset, out width, out height);
 			if (TemplateIcon != null) {
 				height = (int)TemplateIcon.Height + ((int)Ypad * 2);
 			} else {
-				height += groupTemplateHeadingTotalYPadding;
+				height += RenderRecentTemplate ? recentTemplateHeadingTotalYPadding : groupTemplateHeadingTotalYPadding;
 			}
 		}
 
@@ -103,59 +83,13 @@ namespace MonoDevelop.Ide.Projects
 			using (var ctx = CairoHelper.Create (window)) {
 				using (var layout = new Pango.Layout (widget.PangoContext)) {
 
-					Rectangle iconRect = DrawIcon (window, widget, cell_area, flags);
+					Rectangle iconRect = DrawIcon (ctx, widget, cell_area, flags);
 
-					if (!Template.AvailableLanguages.Any () || !IsTemplateRowSelected (widget, flags)) {
-						DrawTemplateNameText (window, widget, cell_area, iconRect, Rectangle.Zero, flags);
-						return;
-					}
-
-					int textHeight = 0;
-					int textWidth = 0;
-
-					SetMarkup (layout, GetSelectedLanguage ());
-					layout.GetPixelSize (out textWidth, out textHeight);
-
-					double scale = GtkWorkarounds.GetPixelScale ();
-					languageRect = GetLanguageButtonRectangle (window, widget, cell_area, textHeight, textWidth, scale);
-
-					DrawTemplateNameText (window, widget, cell_area, iconRect, languageRect, flags);
-
-					RoundBorder (ctx, languageRect.X, languageRect.Y, languageRect.Width, languageRect.Height);
-					SetSourceColor (ctx, Styles.NewProjectDialog.TemplateLanguageButtonBackground.ToCairoColor ());
-					ctx.Fill ();
-
-					int languageTextX = languageRect.X + GetLanguageLeftHandPadding (scale);
-					if (!TemplateHasMultipleLanguages ()) {
-						languageTextX = languageRect.X + (languageRect.Width - textWidth) / 2;
-					}
-					int languageTextY = languageRect.Y + (languageRect.Height - textHeight) / 2;
-
-					window.DrawLayout (widget.Style.TextGC (StateType.Normal), languageTextX, languageTextY, layout);
-
-					if (TemplateHasMultipleLanguages ()) {
-						int triangleX = languageTextX + textWidth + GetLanguageRightHandPadding (scale);
-						int triangleY = languageRect.Y + (languageRect.Height - ((int)(scale * dropdownTriangleHeight))) / 2;
-						DrawTriangle (ctx, triangleX, triangleY, scale);
-					}
+					DrawTemplateNameText (window, widget, cell_area, iconRect, flags);
+					if (RenderRecentTemplate)
+						DrawCategoryText (ctx, widget, cell_area, iconRect, flags);
 				}
 			}
-		}
-
-		int GetLanguageLeftHandPadding (double scale)
-		{
-			if (Platform.IsWindows && scale > 1.0) {
-				return (int)(scale * (languageLeftHandPadding + 3));
-			}
-			return languageLeftHandPadding;
-		}
-
-		int GetLanguageRightHandPadding (double scale)
-		{
-			if (Platform.IsWindows && scale > 1.0) {
-				return (int)(scale * languageRightHandPadding);
-			}
-			return languageRightHandPadding;
 		}
 
 		void DrawTemplateCategoryText (Drawable window, Widget widget, Rectangle cell_area, CellRendererState flags)
@@ -179,44 +113,60 @@ namespace MonoDevelop.Ide.Projects
 			}
 		}
 
-		Rectangle DrawIcon (Drawable window, Widget widget, Rectangle cell_area, CellRendererState flags)
+		Rectangle DrawIcon (Cairo.Context ctx, Widget widget, Rectangle cell_area, CellRendererState flags)
 		{
 			var iconRect = new Rectangle (cell_area.X + (int)Xpad, cell_area.Y + (int)Ypad, (int)TemplateIcon.Width, (int)TemplateIcon.Height);
 
 			var img = TemplateIcon;
 			if ((flags & Gtk.CellRendererState.Selected) != 0)
 				img = img.WithStyles ("sel");
-			using (var ctx = CairoHelper.Create (window)) {
-				ctx.DrawImage (widget, img, iconRect.X, iconRect.Y);
-			}
+			ctx.DrawImage (widget, img, iconRect.X, iconRect.Y);
 
 			return iconRect;
 		}
 
-		void DrawTemplateNameText (Drawable window, Widget widget, Rectangle cell_area, Rectangle iconRect, Rectangle languageRect, CellRendererState flags)
+		void DrawTemplateNameText (Drawable window, Widget widget, Rectangle cell_area, Rectangle iconRect, CellRendererState flags)
 		{
 			StateType state = GetState (widget, flags);
 
 			using (var layout = new Pango.Layout (widget.PangoContext)) {
 
 				layout.Ellipsize = Pango.EllipsizeMode.End;
-				int textPixelWidth = widget.Allocation.Width - ((int)Xpad * 2) - iconRect.Width - iconTextPadding - languageRect.Width;
+				int textPixelWidth = cell_area.Width - ((int)Xpad * 2) - iconRect.Width - iconTextPadding;
 				layout.Width = (int)(textPixelWidth * Pango.Scale.PangoScale);
 
 				layout.SetMarkup (GLib.Markup.EscapeText (Template.Name));
 
 				int w, h;
 				layout.GetPixelSize (out w, out h);
-				int textY = cell_area.Y + (cell_area.Height - h) / 2;
+				int textY = cell_area.Y + (RenderRecentTemplate ? (2) : (cell_area.Height - h) / 2);
 
 				window.DrawLayout (widget.Style.TextGC (state), iconRect.Right + iconTextPadding, textY, layout);
 			}
 		}
 
-		static bool IsTemplateRowSelected (Widget widget, CellRendererState flags)
+		void DrawCategoryText (Cairo.Context ctx, Widget widget, Rectangle cell_area, Rectangle iconRect, CellRendererState flags)
 		{
-			StateType stateType = GetState (widget, flags);
-			return (stateType == StateType.Selected) || (stateType == StateType.Active);
+			StateType state = GetState (widget, flags);
+			var isSelected = state == StateType.Selected || state == StateType.Active;
+
+			using (var layout = new Pango.Layout (widget.PangoContext)) {
+
+				layout.Ellipsize = Pango.EllipsizeMode.End;
+				int textPixelWidth = cell_area.Width - ((int)Xpad * 2) - iconRect.Width - iconTextPadding;
+				layout.Width = (int)(textPixelWidth * Pango.Scale.PangoScale);
+				layout.FontDescription = Fonts.FontExtensions.CopyModified (widget.Style.FontDesc, -1);
+
+				layout.SetMarkup (GLib.Markup.EscapeText (TemplateCategory));
+
+				int w, h;
+				layout.GetPixelSize (out w, out h);
+				int textY = cell_area.Y + ((cell_area.Height - h) - 2);
+
+				ctx.MoveTo (iconRect.Right + iconTextPadding, textY);
+				ctx.SetSourceColor ((isSelected ? Styles.BaseSelectionTextColor : Styles.SecondaryTextColor).ToCairoColor ());
+				ctx.ShowLayout (layout);
+			}
 		}
 
 		static StateType GetState (Widget widget, CellRendererState flags)
@@ -231,81 +181,6 @@ namespace MonoDevelop.Ide.Projects
 			if ((flags & CellRendererState.Selected) != 0)
 				stateType = widget.HasFocus ? StateType.Selected : StateType.Active;
 			return stateType;
-		}
-
-		string GetSelectedLanguage ()
-		{
-			if (!Template.AvailableLanguages.Any ()) {
-				return String.Empty;
-			} else if (Template.AvailableLanguages.Contains (SelectedLanguage)) {
-				return SelectedLanguage;
-			}
-
-			return Template.AvailableLanguages.First ();
-		}
-
-		void SetMarkup (Pango.Layout layout, string text)
-		{
-			string markup = "<span size='smaller'>" + text + "</span>";
-			layout.SetMarkup (markup);
-		}
-
-		Rectangle GetLanguageButtonRectangle (Drawable window, Widget widget, Rectangle cell_area, int textHeight, int textWidth, double scale)
-		{
-			int languageRectangleHeight = cell_area.Height - 8;
-			int languageRectangleWidth = textWidth + languageLeftHandPadding;
-			if (TemplateHasMultipleLanguages ()) {
-				languageRectangleWidth += languageRightHandPadding + dropdownTriangleWidth + dropdownTriangleRightHandPadding;
-			} else {
-				languageRectangleWidth += languageLeftHandPadding;
-				languageRectangleWidth = Math.Max (languageRectangleWidth, minLanguageRectWidth);
-			}
-
-			languageRectangleWidth = (int)(scale * languageRectangleWidth);
-
-			var dy = (cell_area.Height - languageRectangleHeight) / 2 - 1;
-			var y = cell_area.Y + dy;
-			var x = widget.Allocation.Width - languageRectangleWidth - (int)Xpad;
-
-			return new Rectangle (x, y, languageRectangleWidth, languageRectangleHeight);
-		}
-
-		bool TemplateHasMultipleLanguages ()
-		{
-			return Template.AvailableLanguages.Count > 1;
-		}
-
-		void DrawTriangle (Cairo.Context ctx, int x, int y, double scale)
-		{
-			int width = (int)(scale * dropdownTriangleWidth);
-			int height = (int)(scale * dropdownTriangleHeight);
-
-			SetSourceColor (ctx, Styles.NewProjectDialog.TemplateLanguageButtonTriangle.ToCairoColor ());
-			ctx.MoveTo (x, y);
-			ctx.LineTo (x + width, y);
-			ctx.LineTo (x + (width / 2), y + height);
-			ctx.LineTo (x, y);
-			ctx.Fill ();
-		}
-
-		// Taken from MonoDevelop.Components.SearchEntry.
-		static void RoundBorder (Cairo.Context ctx, double x, double y, double w, double h)
-		{
-			double r = h / 2;
-			ctx.Arc (x + r, y + r, r, Math.PI / 2, Math.PI + Math.PI / 2);
-			ctx.LineTo (x + w - r, y);
-
-			ctx.Arc (x + w - r, y + r, r, Math.PI + Math.PI / 2, Math.PI + Math.PI + Math.PI / 2);
-
-			ctx.LineTo (x + r, y + h);
-
-			ctx.ClosePath ();
-		}
-
-		// Taken from Mono.TextEditor.HelperMethods.
-		public static void SetSourceColor (Cairo.Context cr, Cairo.Color color)
-		{
-			cr.SetSourceRGBA (color.R, color.G, color.B, color.A);
 		}
 	}
 }

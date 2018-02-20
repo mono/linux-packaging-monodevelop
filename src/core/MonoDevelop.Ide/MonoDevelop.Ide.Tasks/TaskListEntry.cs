@@ -235,11 +235,39 @@ namespace MonoDevelop.Ide.Tasks
 			}
 		}
 
-		public virtual void JumpToPosition()
+		public string DocumentationLink {
+			get; set;
+		}
+
+		public bool HasDocumentationLink ()
+		{
+			foreach (Extensions.ErrorDocumentationProvider ext in Mono.Addins.AddinManager.GetExtensionNodes ("/MonoDevelop/Ide/ErrorDocumentationProvider")) {
+				var link = ext.GetDocumentationLink (description);
+				if (!string.IsNullOrEmpty (link)) {
+					DocumentationLink = link;
+					return true;
+				}
+			}
+			return false;
+		}
+
+		void ShowDocumentation ()
+		{
+			if (HasDocumentationLink ())
+				DesktopService.ShowUrl (DocumentationLink);
+		}
+
+		public virtual void JumpToPosition ()
 		{
 			if (!file.IsNullOrEmpty) {
-				var project = WorkspaceObject as Project;
-				IdeApp.Workbench.OpenDocument (file, project, Math.Max (1, line), Math.Max (1, column));
+				if (System.IO.File.Exists (file)) {
+					var project = WorkspaceObject as Project;
+					IdeApp.Workbench.OpenDocument (file, project, Math.Max (1, line), Math.Max (1, column));
+				} else {
+					var pad = IdeApp.Workbench.GetPad<ErrorListPad> ()?.Content as ErrorListPad;
+					pad?.FocusOutputView ();
+					ShowDocumentation ();
+				}
 			} else if (parentObject != null) {
 				Pad pad = IdeApp.Workbench.GetPad<ProjectSolutionPad> ();
 				ProjectSolutionPad spad = pad.Content as ProjectSolutionPad;
@@ -249,6 +277,7 @@ namespace MonoDevelop.Ide.Tasks
 					nav.Selected = true;
 					nav.Expanded = true;
 				}
+				ShowDocumentation ();
 			}
 			TaskService.InformJumpToTask (this);
 		}

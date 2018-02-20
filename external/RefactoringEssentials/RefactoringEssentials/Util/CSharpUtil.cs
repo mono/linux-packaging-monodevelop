@@ -6,14 +6,6 @@ using Microsoft.CodeAnalysis;
 
 namespace RefactoringEssentials
 {
-    class ReflectionNamespaces
-    {
-        public const string WorkspacesAsmName = ", Microsoft.CodeAnalysis.Workspaces";
-        public const string CSWorkspacesAsmName = ", Microsoft.CodeAnalysis.CSharp.Workspaces";
-        public const string CAAsmName = ", Microsoft.CodeAnalysis";
-        public const string CACSharpAsmName = ", Microsoft.CodeAnalysis.CSharp";
-    }
-
     static class CSharpUtil
     {
         /// <summary>
@@ -27,16 +19,13 @@ namespace RefactoringEssentials
 
         static ExpressionSyntax InvertConditionInternal(ExpressionSyntax condition)
         {
-            if (condition is ParenthesizedExpressionSyntax)
-            {
+            if (condition is ParenthesizedExpressionSyntax) {
                 return SyntaxFactory.ParenthesizedExpression(InvertCondition(((ParenthesizedExpressionSyntax)condition).Expression));
             }
 
-            if (condition is PrefixUnaryExpressionSyntax)
-            {
+            if (condition is PrefixUnaryExpressionSyntax) {
                 var uOp = (PrefixUnaryExpressionSyntax)condition;
-                if (uOp.IsKind(SyntaxKind.LogicalNotExpression))
-                {
+                if (uOp.IsKind(SyntaxKind.LogicalNotExpression)) {
                     if (!(uOp.Parent is ExpressionSyntax))
                         return uOp.Operand.SkipParens();
                     return uOp.Operand;
@@ -44,8 +33,7 @@ namespace RefactoringEssentials
                 return SyntaxFactory.PrefixUnaryExpression(SyntaxKind.LogicalNotExpression, uOp);
             }
 
-            if (condition is BinaryExpressionSyntax)
-            {
+            if (condition is BinaryExpressionSyntax) {
                 var bOp = (BinaryExpressionSyntax)condition;
 
                 if (bOp.IsKind(SyntaxKind.LogicalAndExpression) || bOp.IsKind(SyntaxKind.LogicalOrExpression))
@@ -62,14 +50,12 @@ namespace RefactoringEssentials
                 return SyntaxFactory.PrefixUnaryExpression(SyntaxKind.LogicalNotExpression, SyntaxFactory.ParenthesizedExpression(condition));
             }
 
-            if (condition is ConditionalExpressionSyntax)
-            {
+            if (condition is ConditionalExpressionSyntax) {
                 var cEx = condition as ConditionalExpressionSyntax;
                 return cEx.WithCondition(InvertCondition(cEx.Condition));
             }
 
-            if (condition is LiteralExpressionSyntax)
-            {
+            if (condition is LiteralExpressionSyntax) {
                 if (condition.Kind() == SyntaxKind.TrueLiteralExpression)
                     return SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression);
                 if (condition.Kind() == SyntaxKind.FalseLiteralExpression)
@@ -77,6 +63,60 @@ namespace RefactoringEssentials
             }
 
             return SyntaxFactory.PrefixUnaryExpression(SyntaxKind.LogicalNotExpression, AddParensIfRequired(condition, false));
+        }
+
+
+        public static SyntaxKind GetExpressionOperatorTokenKind(SyntaxKind op)
+        {
+            switch (op) {
+                case SyntaxKind.EqualsExpression:
+                    return SyntaxKind.EqualsEqualsToken;
+                case SyntaxKind.NotEqualsExpression:
+                    return SyntaxKind.ExclamationEqualsToken;
+                case SyntaxKind.GreaterThanExpression:
+                    return SyntaxKind.GreaterThanToken;
+                case SyntaxKind.GreaterThanOrEqualExpression:
+                    return SyntaxKind.GreaterThanEqualsToken;
+                case SyntaxKind.LessThanExpression:
+                    return SyntaxKind.LessThanToken;
+                case SyntaxKind.LessThanOrEqualExpression:
+                    return SyntaxKind.LessThanEqualsToken;
+                case SyntaxKind.BitwiseOrExpression:
+                    return SyntaxKind.BarToken;
+                case SyntaxKind.LogicalOrExpression:
+                    return SyntaxKind.BarBarToken;
+                case SyntaxKind.BitwiseAndExpression:
+                    return SyntaxKind.AmpersandToken;
+                case SyntaxKind.LogicalAndExpression:
+                    return SyntaxKind.AmpersandAmpersandToken;
+                case SyntaxKind.AddExpression:
+                    return SyntaxKind.PlusToken;
+                case SyntaxKind.SubtractExpression:
+                    return SyntaxKind.MinusToken;
+                case SyntaxKind.MultiplyExpression:
+                    return SyntaxKind.AsteriskToken;
+                case SyntaxKind.DivideExpression:
+                    return SyntaxKind.SlashToken;
+                case SyntaxKind.ModuloExpression:
+                    return SyntaxKind.PercentToken;
+                // assignments
+                case SyntaxKind.SimpleAssignmentExpression:
+                    return SyntaxKind.EqualsToken;
+                case SyntaxKind.AddAssignmentExpression:
+                    return SyntaxKind.PlusEqualsToken;
+                case SyntaxKind.SubtractAssignmentExpression:
+                    return SyntaxKind.MinusEqualsToken;
+                // unary
+                case SyntaxKind.UnaryPlusExpression:
+                    return SyntaxKind.PlusToken;
+                case SyntaxKind.UnaryMinusExpression:
+                    return SyntaxKind.MinusToken;
+                case SyntaxKind.LogicalNotExpression:
+                    return SyntaxKind.ExclamationToken;
+                case SyntaxKind.BitwiseNotExpression:
+                    return SyntaxKind.TildeToken;
+            }
+            throw new ArgumentOutOfRangeException(nameof(op));
         }
 
         /// <summary>
@@ -90,15 +130,13 @@ namespace RefactoringEssentials
                 (expression is CastExpressionSyntax) ||
                 (expression is ParenthesizedLambdaExpressionSyntax) ||
                 (expression is SimpleLambdaExpressionSyntax) ||
-                (expression is ConditionalExpressionSyntax))
-            {
+                (expression is ConditionalExpressionSyntax)) {
                 return SyntaxFactory.ParenthesizedExpression(expression);
             }
 
             if (parenthesesRequiredForUnaryExpressions &&
                 ((expression is PostfixUnaryExpressionSyntax) ||
-                (expression is PrefixUnaryExpressionSyntax)))
-            {
+                (expression is PrefixUnaryExpressionSyntax))) {
                 return SyntaxFactory.ParenthesizedExpression(expression);
             }
 
@@ -113,8 +151,7 @@ namespace RefactoringEssentials
         /// </returns>
         public static SyntaxKind NegateRelationalOperator(SyntaxKind op)
         {
-            switch (op)
-            {
+            switch (op) {
                 case SyntaxKind.EqualsExpression:
                     return SyntaxKind.NotEqualsExpression;
                 case SyntaxKind.NotEqualsExpression:
@@ -140,8 +177,7 @@ namespace RefactoringEssentials
         /// </summary>
         public static bool IsRelationalOperator(SyntaxKind op)
         {
-            switch (op)
-            {
+            switch (op) {
                 case SyntaxKind.EqualsExpression:
                 case SyntaxKind.NotEqualsExpression:
                 case SyntaxKind.GreaterThanExpression:
@@ -163,8 +199,7 @@ namespace RefactoringEssentials
         /// </returns>
         public static SyntaxKind NegateConditionOperator(SyntaxKind op)
         {
-            switch (op)
-            {
+            switch (op) {
                 case SyntaxKind.LogicalOrExpression:
                     return SyntaxKind.LogicalAndExpression;
                 case SyntaxKind.LogicalAndExpression:
@@ -178,6 +213,39 @@ namespace RefactoringEssentials
             if (cond1 == null || cond2 == null)
                 return false;
             return cond1.SkipParens().IsEquivalentTo(cond2.SkipParens(), true);
+        }
+
+        public static ExpressionSyntax ExtractUnaryOperand(this ExpressionSyntax expr)
+        {
+            if (expr == null)
+                throw new ArgumentNullException(nameof(expr));
+            if (expr is PostfixUnaryExpressionSyntax)
+                return ((PostfixUnaryExpressionSyntax)expr).Operand;
+            if (expr is PrefixUnaryExpressionSyntax)
+                return ((PrefixUnaryExpressionSyntax)expr).Operand;
+            return null;
+        }
+
+        public static T WithBody<T>(this T method, BlockSyntax body) where T : BaseMethodDeclarationSyntax
+        {
+            if (method == null)
+                throw new ArgumentNullException(nameof(method));
+            var m = method as MethodDeclarationSyntax;
+            if (m != null)
+                return (T)((BaseMethodDeclarationSyntax)m.WithBody(body));
+            var d = method as DestructorDeclarationSyntax;
+            if (d != null)
+                return (T)((BaseMethodDeclarationSyntax)d.WithBody(body));
+            throw new NotSupportedException();
+        }
+
+        public static TypeSyntax ToSyntax(this ITypeSymbol type, SemanticModel model, TypeSyntax typeSyntax)
+        {
+            if (type == null)
+                throw new ArgumentNullException(nameof(type));
+            return SyntaxFactory.ParseTypeName(type.ToMinimalDisplayString(model, typeSyntax.SpanStart))
+                .WithLeadingTrivia(typeSyntax.GetLeadingTrivia())
+                .WithTrailingTrivia(typeSyntax.GetTrailingTrivia());
         }
     }
 }

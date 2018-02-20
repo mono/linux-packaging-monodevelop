@@ -34,7 +34,7 @@ using System.Threading.Tasks;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
-	public class FakeDotNetProject : FakeProject, IDotNetProject
+	class FakeDotNetProject : FakeProject, IDotNetProject
 	{
 		public FakeDotNetProject ()
 		{
@@ -49,6 +49,7 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 		{
 			References = new ProjectReferenceCollection ();
 			Files = new ProjectFileCollection ();
+			TargetFrameworkMoniker = new TargetFrameworkMoniker ("v4.5");
 			CreateEqualsAction ();
 		}
 
@@ -73,7 +74,7 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 
 		public void AddProjectType (Guid guid)
 		{
-			ExtendedProperties.Add ("ProjectTypeGuids", guid.ToString ());
+			AddFlavorGuid (guid.ToString ());
 		}
 
 		public int ReferencesWhenSavedCount;
@@ -105,11 +106,9 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 			return buildAction;
 		}
 
-		public List<ImportAndCondition> ImportsAdded = new List<ImportAndCondition> ();
-
 		public void AddImportIfMissing (string name, string condition)
 		{
-			ImportsAdded.Add (new ImportAndCondition (name, condition));
+			throw new ApplicationException ("Obsolete should not be called.");
 		}
 
 		public List<string> ImportsRemoved = new List <string> ();
@@ -125,6 +124,15 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 		{
 			if (Modified != null) {
 				Modified (this, new ProjectModifiedEventArgs (project, propertyName));
+			}
+		}
+
+		public event EventHandler Saved;
+
+		public void RaiseSavedEvent ()
+		{
+			if (Saved != null) {
+				Saved (this, new EventArgs ());
 			}
 		}
 
@@ -151,6 +159,35 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 		public void DisposeProjectBuilder ()
 		{
 			IsProjectBuilderDisposed = true;
+		}
+
+		public bool IsReferenceStatusRefreshed;
+
+		public void RefreshReferenceStatus ()
+		{
+			IsReferenceStatusRefreshed = true;
+		}
+
+		public List<ProjectPackageReference> PackageReferences = new List<ProjectPackageReference> ();
+
+		public IEnumerable<ProjectPackageReference> GetPackageReferences ()
+		{
+			return PackageReferences;
+		}
+
+		public void AddTargetFramework (string targetFramework)
+		{
+			FakeEvaluatedProperties.PropertiesDictionary["TargetFramework"] = targetFramework;
+		}
+
+		public void AddPackageTargetFallback (string fallback)
+		{
+			FakeEvaluatedProperties.PropertiesDictionary["PackageTargetFallback"] = fallback;
+		}
+
+		public void AddProperty (string name, string value)
+		{
+			FakeEvaluatedProperties.PropertiesDictionary[name] = value;
 		}
 	}
 }

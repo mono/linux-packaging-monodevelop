@@ -57,7 +57,7 @@ namespace MonoDevelop.Ide.Projects
 			: base (parentWindow, new PolicySet (),
 			        "/MonoDevelop/ProjectModel/Gui/DefaultPolicyPanels")
 		{
-			this.Title = GettextCatalog.GetString ("Custom Policies");
+			this.Title = GettextCatalog.GetString ("Policies");
 			editingSet = (PolicySet) DataObject;
 			
 			HBox topBar = new HBox ();
@@ -356,7 +356,7 @@ namespace MonoDevelop.Ide.Projects
 					} else {
 						// There are validation errors. Cancel the policy switch
 						int last = policiesCombo.Active;
-						Application.Invoke (delegate {
+						Application.Invoke ((o, args) => {
 							loading = true;
 							policiesCombo.Active = last;
 							loading = false;

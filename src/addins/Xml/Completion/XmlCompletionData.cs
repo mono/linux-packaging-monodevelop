@@ -30,20 +30,45 @@ using System;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Ide;
-using MonoDevelop.Ide.CodeCompletion;
 using MonoDevelop.Ide.Commands;
-using MonoDevelop.Ide.Gui.Content;
 using MonoDevelop.Xml.Editor;
 using MonoDevelop.Ide.Editor.Extension;
 using MonoDevelop.Ide.Editor;
+using System.Linq;
 
 namespace MonoDevelop.Xml.Completion
 {
+	public class BaseXmlCompletionData : CompletionData
+	{
+		const string commitChars = " <>()[]{}=+*%~&^|.,;:?\"'";
+
+		public BaseXmlCompletionData ()
+		{
+		}
+
+		public BaseXmlCompletionData (string text) : base (text)
+		{
+		}
+
+		public BaseXmlCompletionData (string text, string description) : base (text, IconId.Null, description)
+		{
+		}
+
+		public BaseXmlCompletionData (string text, IconId icon, string description) : base (text, icon, description)
+		{
+		}
+
+		public override bool IsCommitCharacter (char keyChar, string partialWord)
+		{
+			return commitChars.IndexOf (keyChar) >= 0;
+		}
+
+	}
 	/// <summary>
 	/// Holds the text for  namespace, child element or attribute 
 	/// autocomplete (intellisense).
 	/// </summary>
-	public class XmlCompletionData : CompletionData
+	public class XmlCompletionData : BaseXmlCompletionData
 	{
 		string text;
 		DataType dataType = DataType.XmlElement;
@@ -72,14 +97,20 @@ namespace MonoDevelop.Xml.Completion
 		public XmlCompletionData(string text, DataType dataType)
 			: this(text, String.Empty, dataType)
 		{
-		}		
+		}
 
-		public XmlCompletionData(string text, string description, DataType dataType)
+		public XmlCompletionData (string text, string description, DataType dataType)
+			: this (text, description, dataType, IconId.Null)
+		{
+		}
+
+		public XmlCompletionData (string text, string description, DataType dataType, IconId icon)
+			: base (text, icon, description)
 		{
 			this.text = text;
 			this.description = description;
-			this.dataType = dataType;  
-		}		
+			this.dataType = dataType;
+		}
 		
 		public DataType XmlCompletionDataType {
 			get { return dataType; }
@@ -136,5 +167,6 @@ namespace MonoDevelop.Xml.Completion
 		public override string Description {
 			get { return description; }
 		}
+
 	}
 }

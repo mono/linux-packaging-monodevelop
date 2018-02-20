@@ -124,6 +124,9 @@ namespace RefactoringEssentials
             var property = symbol as IPropertySymbol;
             if (property != null)
                 return property.Parameters;
+            var ev = symbol as IEventSymbol;
+            if (ev != null)
+                return ev.Type.GetDelegateInvokeMethod().Parameters;
             return ImmutableArray<IParameterSymbol>.Empty;
         }
 
@@ -688,7 +691,7 @@ namespace RefactoringEssentials
 
             public override bool DefaultVisit(ISymbol node)
             {
-                throw new NotImplementedException();
+                return false;
             }
 
             public override bool VisitArrayType(IArrayTypeSymbol symbol)

@@ -1,0 +1,7 @@
+/home/directhex/Projects/monodevelop/main/build/AddIns/CSharpBinding/MonoDevelop.CSharpBinding.Autotools.xml
+/home/directhex/Projects/monodevelop/main/build/AddIns/CSharpBinding/MonoDevelop.CSharpBinding.Autotools.dll
+/home/directhex/Projects/monodevelop/main/build/AddIns/CSharpBinding/MonoDevelop.CSharpBinding.Autotools.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/CSharpBinding/Autotools/obj/Debug/Autotools.csprojResolveAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/addins/CSharpBinding/Autotools/obj/Debug/Autotools.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/CSharpBinding/Autotools/obj/Debug/MonoDevelop.CSharpBinding.Autotools.dll
+/home/directhex/Projects/monodevelop/main/src/addins/CSharpBinding/Autotools/obj/Debug/MonoDevelop.CSharpBinding.Autotools.pdb

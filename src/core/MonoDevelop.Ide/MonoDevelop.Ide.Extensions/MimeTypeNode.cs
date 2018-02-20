@@ -51,7 +51,7 @@ namespace MonoDevelop.Ide.Extensions
 		
 		[NodeAttribute (Required=false)]
 		protected bool isText;
-		
+
 		IFileNameEvaluator regex;
 		
 		public IconId Icon {
@@ -80,6 +80,12 @@ namespace MonoDevelop.Ide.Extensions
 					return baseType;
 			}
 		}
+
+		/// <summary>
+		/// The name used by Roslyn to identify this language.
+		/// </summary>
+		[NodeAttribute ("roslynName", "The name used by Roslyn to identify this language", Required=false)]
+		public string RoslynName { get; private set; }
 		
 		interface IFileNameEvaluator
 		{
@@ -109,7 +115,7 @@ namespace MonoDevelop.Ide.Extensions
 						globalPattern.Append ('|');
 					globalPattern.Append (pattern);
 				}
-				return new Regex (globalPattern.ToString ());
+				return new Regex (globalPattern.ToString (), RegexOptions.IgnoreCase);
 			}
 			public bool SupportsFile (string fileName)
 			{
@@ -140,7 +146,7 @@ namespace MonoDevelop.Ide.Extensions
 			public bool SupportsFile (string fileName)
 			{
 				foreach (var ending in endings)
-					if (fileName.EndsWith (ending, StringComparison.Ordinal))
+					if (fileName.EndsWith (ending, StringComparison.OrdinalIgnoreCase))
 						return true;
 				return false;
 			}

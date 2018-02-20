@@ -17,7 +17,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             GettextCatalog.GetString("Unsafe modifier in redundant in unsafe context or when no unsafe constructs are used"),
             GettextCatalog.GetString("'unsafe' modifier is redundant"),
             DiagnosticAnalyzerCategories.RedundanciesInCode,
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Hidden,
             isEnabledByDefault: true,
             helpLinkUri: HelpLink.CreateFor(CSharpDiagnosticIDs.RedundantUnsafeContextAnalyzerID),
             customTags: DiagnosticCustomTags.Unnecessary
@@ -28,21 +28,23 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterCompilationStartAction(compilationContext =>
             {
                 var compilation = compilationContext.Compilation;
-                compilationContext.RegisterSyntaxTreeAction(async delegate (SyntaxTreeAnalysisContext ctx)
+                compilationContext.RegisterSyntaxTreeAction(delegate (SyntaxTreeAnalysisContext ctx)
                 {
                     try
                     {
                         if (!compilation.SyntaxTrees.Contains(ctx.Tree))
                             return;
                         var semanticModel = compilation.GetSemanticModel(ctx.Tree);
-                        var root = await ctx.Tree.GetRootAsync(ctx.CancellationToken).ConfigureAwait(false);
+                        var root = ctx.Tree.GetRoot(ctx.CancellationToken);
                         var model = compilationContext.Compilation.GetSemanticModel(ctx.Tree);
                         if (model.IsFromGeneratedCode(compilationContext.CancellationToken))
                             return;
-                        new GatherVisitor(ctx).Visit(root);
+                        new GatherVisitor(ctx, semanticModel).Visit(root);
                     }
                     catch (OperationCanceledException) { }
                 });
@@ -52,10 +54,12 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         class GatherVisitor : CSharpSyntaxWalker
         {
             SyntaxTreeAnalysisContext ctx;
+            SemanticModel semanticModel;
 
-            public GatherVisitor(SyntaxTreeAnalysisContext ctx)
+            public GatherVisitor(SyntaxTreeAnalysisContext ctx, SemanticModel semanticModel)
             {
                 this.ctx = ctx;
+                this.semanticModel = semanticModel;
             }
 
             class UnsafeState
@@ -159,8 +163,40 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                     MarkUnsafe();
             }
 
+            public override void VisitIdentifierName(IdentifierNameSyntax node)
+            {
+                base.VisitIdentifierName(node);
+
+                ISymbol symbol = semanticModel.GetSymbolInfo(node).Symbol;
+                if (symbol != null)
+                {
+                    switch (symbol.Kind)
+                    {
+                        case SymbolKind.ArrayType:
+                        case SymbolKind.DynamicType:
+                        case SymbolKind.ErrorType:
+                        case SymbolKind.Event:
+                        case SymbolKind.Field:
+                        case SymbolKind.Method:
+                        case SymbolKind.NamedType:
+                        case SymbolKind.Parameter:
+                        case SymbolKind.PointerType:
+                        case SymbolKind.Property:
+                        case SymbolKind.RangeVariable:
+                            if (symbol.IsUnsafe())
+                                MarkUnsafe();
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+
             public override void VisitUnsafeStatement(UnsafeStatementSyntax node)
             {
+                if (unsafeStateStack.Count == 0)
+                    return;
+
                 MarkUnsafe();
                 bool isRedundant = unsafeStateStack.Peek().InUnsafeContext;
                 unsafeStateStack.Push(new UnsafeState(true));

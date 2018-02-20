@@ -15,7 +15,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             GettextCatalog.GetString("Redundant comma in array initializer"),
             GettextCatalog.GetString("Redundant comma in array initializer"),
             DiagnosticAnalyzerCategories.RedundanciesInCode,
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Hidden,
             isEnabledByDefault: true,
             helpLinkUri: HelpLink.CreateFor(CSharpDiagnosticIDs.RedundantCommaInArrayInitializerAnalyzerID),
             customTags: DiagnosticCustomTags.Unnecessary
@@ -29,6 +29,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 (nodeContext) =>
                 {
@@ -45,21 +47,17 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
 
             var node = nodeContext.Node as InitializerExpressionSyntax;
             if (node == null)
                 return false;
 
             var elementCount = node.Expressions.Count;
-            if (elementCount > node.Expressions.GetSeparators().Count())
+            var separatorCount = node.Expressions.SeparatorCount;
+            if (elementCount > separatorCount || separatorCount <= 0)
                 return false;
 
-            var tokens = node.ChildTokens().ToArray();
-            if (tokens.Length < 2)
-                return false;
-            var commaToken = tokens[tokens.Length - 2];
+            var commaToken = node.Expressions.GetSeparator(separatorCount - 1);
             if (!commaToken.IsKind(SyntaxKind.CommaToken))
                 return false;
 

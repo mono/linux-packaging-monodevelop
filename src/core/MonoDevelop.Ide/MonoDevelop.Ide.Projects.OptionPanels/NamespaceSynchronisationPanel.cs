@@ -34,6 +34,7 @@ using MonoDevelop.Projects.Policies;
 using MonoDevelop.Ide.Gui.Dialogs;
 using System.Linq;
 using MonoDevelop.Components;
+using MonoDevelop.Components.AtkCocoaHelper;
 
 namespace MonoDevelop.Ide.Projects.OptionPanels
 {
@@ -81,11 +82,9 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 		{
 			if (ConfiguredSolution != null && widget.ResourceNamingChanged) {
 				string msg = GettextCatalog.GetString ("The resource naming policy has changed");
-				string detail = "Changing the resource naming policy may cause run-time errors if the code using resources is not properly updated. There are two options:\n\n";
-				detail += GettextCatalog.GetString ("Update all resource identifiers to match the new policy. This will require changes in the source code that references resources using the old policy. Identifiers explicitly set using the file properties pad won't be changed.\n\n");
-				detail += "Keep curent resource identifiers. It doesn't require source code changes. Resources added from now on will use the new policy)";
-				AlertButton update = new AlertButton ("Update Identifiers");
-				AlertButton keep = new AlertButton ("Keep Current Identifiers");
+				string detail = GettextCatalog.GetString ("Changing the resource naming policy may cause run-time errors if the code using resources is not properly updated. There are two options:\n\nUpdate all resource identifiers to match the new policy. This will require changes in the source code that references resources using the old policy. Identifiers explicitly set using the file properties pad won't be changed.\n\nKeep curent resource identifiers. It doesn't require source code changes. Resources added from now on will use the new policy.");
+				AlertButton update = new AlertButton (GettextCatalog.GetString ("Update Identifiers"));
+				AlertButton keep = new AlertButton (GettextCatalog.GetString ("Keep Current Identifiers"));
 				AlertButton res = MessageService.AskQuestion (msg, detail, AlertButton.Cancel, update, keep);
 				if (res == AlertButton.Cancel)
 					return false;
@@ -168,8 +167,25 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 			previewFrame.ShowAll ();
 			
 			UpdatePreview (null, EventArgs.Empty);
+
+			SetupAccessibility ();
 		}
-		
+
+		void SetupAccessibility ()
+		{
+			checkAssociateNamespacesDirectories.SetCommonAccessibilityAttributes ("NamespaceOptions.AssociateNamespace",
+			                                                                      "",
+			                                                                      GettextCatalog.GetString ("Check to associate namespaces with directory names"));
+			checkDefaultAsRoot.SetCommonAccessibilityAttributes ("NamespaceOptions.DefaultRoot", "",
+			                                                     GettextCatalog.GetString ("Check to use the default namespace as the root of all namespaces"));
+			radioFlat.SetCommonAccessibilityAttributes ("NamespaceOptions.Flat", "",
+			                                            GettextCatalog.GetString ("Check to use a flat folder structure"));
+			radioHierarch.SetCommonAccessibilityAttributes ("NamespaceOptions.Hierarchy", "",
+			                                                GettextCatalog.GetString ("Check to use a hierarchical folder structure"));
+			checkVSStyleResourceNames.SetCommonAccessibilityAttributes ("NamespaceOptions.VSNames", "",
+			                                                            GettextCatalog.GetString ("Check to use Visual Studio style resource names"));
+		}
+
 		public void LoadFrom (DotNetNamingPolicy policy)
 		{
 			checkAssociateNamespacesDirectories.Active = (policy.DirectoryNamespaceAssociation != DirectoryNamespaceAssociation.None);

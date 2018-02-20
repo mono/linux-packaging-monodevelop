@@ -1,4 +1,4 @@
-// 
+﻿// 
 // ProjectService.cs
 //  
 // Author:
@@ -54,7 +54,7 @@ namespace MonoDevelop.Projects
 		TargetFramework defaultTargetFramework;
 		
 		string defaultPlatformTarget = "x86";
-		static readonly TargetFrameworkMoniker DefaultTargetFrameworkId = TargetFrameworkMoniker.NET_4_5;
+		static readonly TargetFrameworkMoniker DefaultTargetFrameworkId = TargetFrameworkMoniker.NET_4_6_1;
 		
 		public const string BuildTarget = "Build";
 		public const string CleanTarget = "Clean";
@@ -117,17 +117,63 @@ namespace MonoDevelop.Projects
 				if (!File.Exists (file))
 					throw new IOException (GettextCatalog.GetString ("File not found: {0}", file));
 				file = Path.GetFullPath (file);
-				using (Counters.ReadSolutionItem.BeginTiming ("Read project " + file)) {
+				var metadata = GetReadSolutionItemMetadata (file, typeGuid, itemGuid);
+				using (Counters.ReadSolutionItem.BeginTiming ("Read project " + file, metadata)) {
 					file = GetTargetFile (file);
 					var r = GetObjectReaderForFile (file, typeof(SolutionItem));
 					if (r == null)
 						throw new UnknownSolutionItemTypeException ();
 					SolutionItem loadedItem = await r.LoadSolutionItem (monitor, ctx, file, format, typeGuid, itemGuid);
-					if (loadedItem != null)
+					if (loadedItem != null) {
 						loadedItem.NeedsReload = false;
+						UpdateReadSolutionItemMetadata (metadata, loadedItem);
+					}
 					return loadedItem;
 				}
 			});
+		}
+
+		static IDictionary<string, string> GetReadSolutionItemMetadata (string file, string typeGuid, string itemGuid)
+		{
+			var metadata = new Dictionary<string, string> ();
+
+			string extension = Path.GetExtension (file);
+			if (!string.IsNullOrEmpty (extension) && extension [0] == '.') {
+				extension = extension.Substring (1);
+			}
+
+			metadata ["FileNameExtension"] = extension;
+
+			// Will be set to true later after a successful load
+			metadata ["LoadSucceed"] = bool.FalseString;
+
+			if (typeGuid != null)
+				metadata ["ProjectType"] = typeGuid;
+
+			if (itemGuid != null)
+				metadata ["ProjectID"] = itemGuid;
+
+			return metadata;
+		}
+
+		static void UpdateReadSolutionItemMetadata (IDictionary<string, string> metadata, SolutionItem item)
+		{
+			metadata ["ProjectType"] = item.TypeGuid;
+			metadata ["ProjectID"] = item.ItemId;
+			metadata ["LoadSucceed"] = bool.TrueString;
+
+			var project = item as Project;
+			if (project == null)
+				return;
+
+			// Use TypeGuid by default for ProjectFlavor.
+			metadata ["ProjectFlavor"] = project.FlavorGuids.FirstOrDefault () ?? item.TypeGuid;
+			metadata ["Flavors"] =  string.Join (";", project.GetItemTypeGuids ());
+
+			var capabilities = project.GetProjectCapabilities ();
+			if (capabilities.Any ()) {
+				metadata ["Capabilities"] = string.Join (" ", capabilities);
+			}
 		}
 
 		public Task<SolutionFolderItem> ReadSolutionItem (ProgressMonitor monitor, SolutionItemReference reference, params WorkspaceItem[] workspaces)
@@ -171,7 +217,7 @@ namespace MonoDevelop.Projects
 		{
 			return Runtime.RunInMainThread (async delegate {
 				if (!File.Exists (file))
-					throw new IOException (GettextCatalog.GetString ("File not found: {0}", file));
+					throw new UserException (GettextCatalog.GetString ("File not found: {0}", file));
 				string fullpath = file.ResolveLinks ().FullPath;
 				using (Counters.ReadWorkspaceItem.BeginTiming ("Read solution " + file)) {
 					fullpath = GetTargetFile (fullpath);
@@ -238,9 +284,9 @@ namespace MonoDevelop.Projects
 					foreach (FilePath f in newFiles) {
 						if (!f.IsChildPathOf (resolvedTargetPath)) {
 							if (obj is Solution)
-								monitor.ReportError ("The solution '" + obj.Name + "' is referencing the file '" + f.FileName + "' which is located outside the root solution directory.", null);
+								monitor.ReportError (GettextCatalog.GetString ("The solution '{0}' is referencing the file '{1}' which is located outside the root solution directory.", obj.Name, f.FileName), null);
 							else
-								monitor.ReportError ("The project '" + obj.Name + "' is referencing the file '" + f.FileName + "' which is located outside the project directory.", null);
+								monitor.ReportError (GettextCatalog.GetString ("The project '{0}' is referencing the file '{1}' which is located outside the project directory.", obj.Name, f.FileName), null);
 						}
 						oldFiles.Remove (f);
 					}
@@ -252,7 +298,7 @@ namespace MonoDevelop.Projects
 						
 							// Exclude empty directories
 							FilePath dir = file.ParentDirectory;
-							if (Directory.GetFiles (dir).Length == 0 && Directory.GetDirectories (dir).Length == 0) {
+							if (!Directory.EnumerateFileSystemEntries (dir).Any ()) {
 								try {
 									Directory.Delete (dir);
 								} catch (Exception ex) {
@@ -308,9 +354,9 @@ namespace MonoDevelop.Projects
 					if (ignoreExternalFiles)
 						continue;
 					if (obj is Solution)
-						monitor.ReportError ("The solution '" + obj.Name + "' is referencing the file '" + Path.GetFileName (file) + "' which is located outside the root solution directory.", null);
+						monitor.ReportError (GettextCatalog.GetString ("The solution '{0}' is referencing the file '{1}' which is located outside the root solution directory.", obj.Name, Path.GetFileName (file)), null);
 					else
-						monitor.ReportError ("The project '" + obj.Name + "' is referencing the file '" + Path.GetFileName (file) + "' which is located outside the project directory.", null);
+						monitor.ReportError (GettextCatalog.GetString ("The project '{0}' is referencing the file '{1}' which is located outside the project directory.", obj.Name, Path.GetFileName (file)), null);
 					return false;
 				}
 

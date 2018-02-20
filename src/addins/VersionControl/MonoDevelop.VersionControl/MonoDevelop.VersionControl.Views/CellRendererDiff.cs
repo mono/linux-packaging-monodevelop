@@ -58,7 +58,7 @@ namespace MonoDevelop.VersionControl.Views
 			this.lines = lines;
 			this.diffMode = diffMode;
 			this.path = path;
-			
+
 			if (diffMode) {
 				if (lines != null && lines.Length > 0) {
 					int maxlen = -1;
@@ -95,9 +95,9 @@ namespace MonoDevelop.VersionControl.Views
 			if (diffMode) {
 				layout.FontDescription = FontService.MonospaceFont;
 				layout.SetText (text);
-			}
-			else
+			} else {
 				layout.SetMarkup (text);
+			}
 			return layout;
 		}
 		
@@ -247,9 +247,10 @@ namespace MonoDevelop.VersionControl.Views
 						string s = ProcessLine (lines [n]);
 						if (n > block.FirstLine)
 							sb.Append ('\n');
-						if (block.Type != BlockType.Info && s.Length > 0)
+						if ((block.Type == BlockType.Added || block.Type == BlockType.Removed) && s.Length > 0) {
+							sb.Append (' ');
 							sb.Append (s, 1, s.Length - 1);
-						else
+						} else
 							sb.Append (s);
 					}
 					
@@ -361,7 +362,7 @@ namespace MonoDevelop.VersionControl.Views
 			ctx.Stroke ();
 			
 			string text = lines[firstBlock.FirstLine].Replace ("@","").Replace ("-","");
-			text = "<span size='x-small'>" + text.Replace ("+","</span><span size='small'>➜</span><span size='x-small'> ") + "</span>";
+			text = "<span size='x-small'>" + text.Replace ("+","</span><span size='small'>→</span><span size='x-small'> ") + "</span>";
 			
 			layout.SetText ("");
 			layout.SetMarkup (text);

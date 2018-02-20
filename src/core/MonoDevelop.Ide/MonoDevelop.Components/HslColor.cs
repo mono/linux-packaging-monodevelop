@@ -30,18 +30,18 @@ using System.Collections.Generic;
 
 namespace MonoDevelop.Components
 {
-	public struct HslColor
+	public struct HslColor : IEquatable<HslColor>
 	{
 		public double H {
 			get;
 			set;
 		}
-		
+
 		public double S {
 			get;
 			set;
 		}
-		
+
 		public double L {
 			get;
 			set;
@@ -51,52 +51,70 @@ namespace MonoDevelop.Components
 			get;
 			set;
 		}
-		
-		void ToRgb(out double r, out double g, out double b)
+
+		public bool Equals (HslColor other)
+		{
+			return this.H == other.H && this.S == other.S && this.L == other.L && this.Alpha == other.Alpha;
+		}
+
+		public override bool Equals (object obj)
+		{
+			if (!(obj is HslColor))
+				return false;
+
+			return Equals ((HslColor)obj);
+		}
+
+		public override int GetHashCode ()
+		{
+			unchecked {
+				return H.GetHashCode () ^ S.GetHashCode () ^ L.GetHashCode () ^ Alpha.GetHashCode ();
+			}
+		}
+
+		void ToRgb (out double r, out double g, out double b)
 		{
 			if (L == 0) {
 				r = g = b = 0;
 				return;
 			}
-			
+
 			if (S == 0) {
 				r = g = b = L;
 			} else {
-				double temp2 = L <= 0.5 ? L * (1.0 + S) : L + S -(L * S);
+				double temp2 = L <= 0.5 ? L * (1.0 + S) : L + S - (L * S);
 				double temp1 = 2.0 * L - temp2;
-				
-				double[] t3 = new double[] { H + 1.0 / 3.0, H, H - 1.0 / 3.0};
-				double[] clr= new double[] { 0, 0, 0};
-				for (int i = 0; i < 3; i++) {
-					if (t3[i] < 0)
-						t3[i] += 1.0;
-					if (t3[i] > 1)
-						t3[i]-=1.0;
-					if (6.0 * t3[i] < 1.0)
-						clr[i] = temp1 + (temp2 - temp1) * t3[i] * 6.0;
-					else if (2.0 * t3[i] < 1.0)
-						clr[i] = temp2;
-					else if (3.0 * t3[i] < 2.0)
-						clr[i] = (temp1 + (temp2 - temp1) * ((2.0 / 3.0) - t3[i]) * 6.0);
-					else
-						clr[i] = temp1;
-				}
-				
-				r = clr[0];
-				g = clr[1];
-				b = clr[2];
+
+				r = ConvertVector (temp2, temp1, H + 1.0 / 3.0);
+				g = ConvertVector (temp2, temp1, H);
+				b = ConvertVector (temp2, temp1, H - 1.0 / 3.0);
 			}
 		}
-		
+
+		static double ConvertVector (double temp2, double temp1, double x)
+		{
+			if (x < 0)
+				x += 1.0;
+			if (x > 1)
+				x -= 1.0;
+			if (6.0 * x < 1.0)
+				return temp1 + (temp2 - temp1) * x * 6.0;
+			if (2.0 * x < 1.0)
+				return temp2;
+			if (3.0 * x < 2.0)
+				return (temp1 + (temp2 - temp1) * ((2.0 / 3.0) - x) * 6.0);
+			return temp1;
+		}
+
 		public static implicit operator Color (HslColor hsl)
 		{
 			double r = 0, g = 0, b = 0;
 			hsl.ToRgb (out r, out g, out b);
-			return new Color ((byte)(255 * r), 
-			                  (byte)(255 * g), 
-			                  (byte)(255 * b));
+			return new Color ((byte)(255 * r),
+							  (byte)(255 * g),
+							  (byte)(255 * b));
 		}
-		
+
 		public static implicit operator Cairo.Color (HslColor hsl)
 		{
 			double r = 0, g = 0, b = 0;
@@ -104,17 +122,24 @@ namespace MonoDevelop.Components
 			return new Cairo.Color (r, g, b, hsl.Alpha);
 		}
 
+		public static implicit operator Xwt.Drawing.Color (HslColor hsl)
+		{
+			double r = 0, g = 0, b = 0;
+			hsl.ToRgb (out r, out g, out b);
+			return new Xwt.Drawing.Color (r, g, b, hsl.Alpha);
+		}
+
 		public static implicit operator HslColor (Color color)
 		{
 			return new HslColor (color);
 		}
-		
+
 		public static implicit operator HslColor (Cairo.Color color)
 		{
 			return new HslColor (color);
 		}
 
-		#if MAC
+#if MAC
 
 		public static implicit operator HslColor (AppKit.NSColor color)
 		{
@@ -135,9 +160,9 @@ namespace MonoDevelop.Components
 			hsl.ToRgb (out r, out g, out b);
 			return new CoreGraphics.CGColor ((nfloat)r, (nfloat)g, (nfloat)b, (nfloat)hsl.Alpha);
 		}
-		#endif
+#endif
 
-		
+
 		public static HslColor FromHsl (double h, double s, double l)
 		{
 			return new HslColor {
@@ -151,7 +176,7 @@ namespace MonoDevelop.Components
 		public uint ToPixel ()
 		{
 			double r, g, b;
-			ToRgb(out r, out g, out b);
+			ToRgb (out r, out g, out b);
 			uint rv = (uint)(r * 255);
 			uint gv = (uint)(g * 255);
 			uint bv = (uint)(b * 255);
@@ -165,31 +190,33 @@ namespace MonoDevelop.Components
 			var b = (pixel & 0xFF) / 255.0;
 			return new HslColor (r, g, b);
 		}
-		
+
 		public HslColor (double r, double g, double b, double a = 1.0) : this ()
 		{
+			this.Alpha = a;
+
 			double v = System.Math.Max (r, g);
 			v = System.Math.Max (v, b);
 
 			double m = System.Math.Min (r, g);
 			m = System.Math.Min (m, b);
-			
+
 			this.L = (m + v) / 2.0;
 			if (this.L <= 0.0)
 				return;
 			double vm = v - m;
 			this.S = vm;
-			
+
 			if (this.S > 0.0) {
 				this.S /= (this.L <= 0.5) ? (v + m) : (2.0 - v - m);
 			} else {
 				return;
 			}
-			
+
 			double r2 = (v - r) / vm;
 			double g2 = (v - g) / vm;
 			double b2 = (v - b) / vm;
-			
+
 			if (r == v) {
 				this.H = (g == m ? 5.0 + b2 : 1.0 - g2);
 			} else if (g == v) {
@@ -199,20 +226,27 @@ namespace MonoDevelop.Components
 			}
 			this.H /= 6.0;
 
-			this.Alpha = a;
 		}
-		
+
 		public HslColor (Color color) : this (color.Red / (double)ushort.MaxValue, color.Green / (double)ushort.MaxValue, color.Blue / (double)ushort.MaxValue)
 		{
 			Alpha = 1.0;
 		}
-		
+
 		public HslColor (Cairo.Color color) : this (color.R, color.G, color.B, color.A)
 		{
 		}
-		
+
 		public static HslColor Parse (string color)
 		{
+			if (color.Length == 9 && color.StartsWith ("#", StringComparison.Ordinal)) {
+				double r = ((double)int.Parse (color.Substring (1, 2), System.Globalization.NumberStyles.HexNumber)) / 255.0;
+				double g = ((double)int.Parse (color.Substring (3, 2), System.Globalization.NumberStyles.HexNumber)) / 255.0;
+				double b = ((double)int.Parse (color.Substring (5, 2), System.Globalization.NumberStyles.HexNumber)) / 255.0;
+				double a = ((double)int.Parse (color.Substring (7, 2), System.Globalization.NumberStyles.HexNumber)) / 255.0;
+				return new HslColor (r, g, b, a);
+			}
+
 			Gdk.Color col = new Gdk.Color (0, 0, 0);
 			Gdk.Color.Parse (color, ref col);
 			return (HslColor)col;
@@ -238,21 +272,21 @@ namespace MonoDevelop.Components
 			double b = c.Blue / (double)ushort.MaxValue;
 			return System.Math.Sqrt (r * .241 + g * .691 + b * .068);
 		}
-		
+
 		public static List<HslColor> GenerateHighlightColors (HslColor backGround, HslColor foreGround, int n)
 		{
 			double bgH = (backGround.H == 0 && backGround.S == 0) ? 2 / 3.0 : backGround.H;
 			var result = new List<HslColor> ();
 			for (int i = 0; i < n; i++) {
 				double h = bgH + (i + 1.0) / (double)n;
-				
+
 				// for monochromatic backround the h value doesn't matter
 				if (i + 1 == n && !(backGround.H == 0 && backGround.S == 0))
 					h = bgH + 0.5;
-				
+
 				if (h > 1.0)
 					h -= 1.0;
-					
+
 				double s = 0.85;
 				double l = 0.5;
 				if (backGround.H == 0 && backGround.S == 0 && backGround.L < 0.5)
@@ -261,7 +295,7 @@ namespace MonoDevelop.Components
 			}
 			return result;
 		}
-		
+
 		public override string ToString ()
 		{
 			return string.Format ("[HslColor: H={0}, S={1}, L={2}, A={3}]", H, S, L, Alpha);
@@ -270,10 +304,10 @@ namespace MonoDevelop.Components
 		public string ToPangoString ()
 		{
 			var resultColor = (Cairo.Color)this;
-			return string.Format ("#{0:x2}{1:x2}{2:x2}",
-				(int)(resultColor.R * 255),
-				(int)(resultColor.G * 255), 
-				(int)(resultColor.B * 255));
+			return string.Format ("#{0}{1}{2}",
+				((int)(resultColor.R * 255)).ToString ("x2"),
+				((int)(resultColor.G * 255)).ToString ("x2"),
+				((int)(resultColor.B * 255)).ToString ("x2"));
 		}
 
 
@@ -282,11 +316,16 @@ namespace MonoDevelop.Components
 			if (Alpha == 1.0)
 				return ToPangoString ();
 			var resultColor = (Cairo.Color)this;
-			return string.Format ("#{0:x2}{1:x2}{2:x2}{3:x2}",
-				(int)(resultColor.R * 255),
-				(int)(resultColor.G * 255), 
-				(int)(resultColor.B * 255), 
-				(int)(resultColor.A * 255));
+			return string.Format ("#{0}{1}{2}{3}",
+				((int)(resultColor.R * 255)).ToString ("x2"),
+				((int)(resultColor.G * 255)).ToString ("x2"),
+				((int)(resultColor.B * 255)).ToString ("x2"),
+				((int)(resultColor.A * 255)).ToString ("x2"));
+		}
+
+		internal Gdk.GC CreateGC (Gdk.Drawable drawable)
+		{
+			return new Gdk.GC (drawable) { RgbBgColor = this, RgbFgColor = this };
 		}
 	}
 }

@@ -85,10 +85,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		public override void BuildChildNodes (ITreeBuilder ctx, object dataObject)
 		{
 			Solution solution = (Solution) dataObject;
-			foreach (SolutionFolderItem entry in solution.RootFolder.Items)
-				ctx.AddChild (entry);
-			foreach (FilePath file in solution.RootFolder.Files)
-				ctx.AddChild (new SolutionFolderFileNode (file, solution.RootFolder));
+			ctx.AddChildren (solution.RootFolder.Items);
+			ctx.AddChildren (solution.RootFolder.Files.Select (f => new SolutionFolderFileNode (f, solution.RootFolder)));
 		}
 
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
@@ -107,6 +105,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			Solution solution = (Solution) dataObject;
 			solution.NameChanged += OnCombineRenamed;
 			solution.StartupItemChanged += OnStartupChanged;
+			solution.RunConfigurationsChanged += OnStartupChanged;
+			solution.StartupConfigurationChanged += OnStartupChanged;
 			solution.RootFolder.ItemAdded += OnEntryAdded;
 			solution.RootFolder.ItemRemoved += OnEntryRemoved;
 			solution.RootFolder.SolutionItemFileAdded += OnFileAdded;
@@ -118,6 +118,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			Solution solution = (Solution) dataObject;
 			solution.NameChanged -= OnCombineRenamed;
 			solution.StartupItemChanged -= OnStartupChanged;
+			solution.RunConfigurationsChanged -= OnStartupChanged;
+			solution.StartupConfigurationChanged -= OnStartupChanged;
 			solution.RootFolder.ItemAdded -= OnEntryAdded;
 			solution.RootFolder.ItemRemoved -= OnEntryRemoved;
 			solution.RootFolder.SolutionItemFileAdded -= OnFileAdded;
@@ -369,7 +371,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		{
 			foreach (ITreeNavigator node in CurrentNodes) {
 				Solution solution = (Solution) node.DataItem;
-				IdeApp.Workspace.CloseWorkspaceItem (solution);
+				IdeApp.Workspace.CloseWorkspaceItem (solution).Ignore();
 			}
 		}
 		

@@ -35,12 +35,15 @@ using Xwt.Backends;
 
 namespace Xwt.WPFBackend
 {
+	using Keyboard = System.Windows.Input.Keyboard;
+
 	public class ExTreeViewItem
 		: TreeViewItem
 	{
 		public ExTreeViewItem()
 		{
 			Loaded += OnLoaded;
+			HorizontalContentAlignment = HorizontalAlignment.Stretch;
 		}
 
 		public ExTreeViewItem (ExTreeView view)
@@ -126,10 +129,35 @@ namespace Xwt.WPFBackend
 			return new ExTreeViewItem (this.view);
 		}
 
-		protected override void OnMouseLeftButtonDown (MouseButtonEventArgs e) {
-			view.SelectItem(this);
+		protected override void OnMouseLeftButtonDown (MouseButtonEventArgs e)
+		{
+			if (!view.SelectedItems.Contains (this.DataContext) || CtrlPressed)
+				view.SelectItem (this);
+			view.Backend.WidgetMouseDownForDragHandler (this, e);
 			e.Handled = true;
-			base.OnMouseLeftButtonDown(e);
+			base.OnMouseLeftButtonDown (e);
+		}
+
+		protected override void OnMouseLeftButtonUp (MouseButtonEventArgs e)
+		{
+			if (view.SelectedItems.Contains (this.DataContext) && !CtrlPressed)
+				view.SelectItem (this);
+			view.Backend.WidgetMouseUpForDragHandler(this, e);
+			e.Handled = true;
+			base.OnMouseLeftButtonUp (e);
+		}
+
+		protected override void OnMouseDoubleClick (MouseButtonEventArgs e)
+		{
+			if ((view.Backend as TreeViewBackend)?.RowActivatedEventEnabled == true && IsSelected)
+			{
+				var node = (TreeStoreNode)DataContext;
+				view.Backend.Context.InvokeUserCode(delegate
+				{
+					((ITreeViewEventSink)view.Backend.EventSink).OnRowActivated(node);
+				});
+			}
+			base.OnMouseDoubleClick(e);
 		}
 
 		private ExTreeView TreeView
@@ -180,6 +208,14 @@ namespace Xwt.WPFBackend
 		{
 			BringIntoView();
 			//We can't allow TreeViewItem(our base class) to get this message(OnGotFocus) because it will also select this item which we don't want
+		}
+
+		private bool CtrlPressed
+		{
+			get
+			{
+				return Keyboard.IsKeyDown (WKey.RightCtrl) || Keyboard.IsKeyDown (WKey.LeftCtrl);
+			}
 		}
 	}
 }

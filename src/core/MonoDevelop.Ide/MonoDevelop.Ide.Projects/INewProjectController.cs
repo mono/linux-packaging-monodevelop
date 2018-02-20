@@ -29,15 +29,20 @@ using System.Collections.Generic;
 using MonoDevelop.Ide.Templates;
 using Xwt.Drawing;
 using System.Threading.Tasks;
+using System;
 
 namespace MonoDevelop.Ide.Projects
 {
 	interface INewProjectDialogController
 	{
+		event EventHandler ProjectCreationFailed;
+		event EventHandler ProjectCreated;
 		IEnumerable<TemplateCategory> TemplateCategories { get; }
+		List<SolutionTemplate> RecentTemplates { get; }
 		TemplateCategory SelectedSecondLevelCategory { get; }
 		SolutionTemplate SelectedTemplate { get; set; }
 		string SelectedLanguage { get; set; }
+		bool ShowTemplateSelection { get; set; }
 		FinalProjectConfigurationPage FinalConfiguration { get; }
 		bool IsNewSolution { get; }
 
@@ -60,6 +65,7 @@ namespace MonoDevelop.Ide.Projects
 		Task Create ();
 
 		Image GetImage (SolutionTemplate template);
+		string GetCategoryPathText (SolutionTemplate template);
 
 		IEnumerable<ProjectConfigurationControl> GetFinalPageControls ();
 	}

@@ -3,13 +3,11 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Linq;
-using Microsoft.CodeAnalysis.FindSymbols;
 using System.Collections.Generic;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
-    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+	[DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class UnusedTypeParameterAnalyzer : DiagnosticAnalyzer
     {
         static readonly DiagnosticDescriptor descriptor = new DiagnosticDescriptor(
@@ -29,6 +27,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 AnalyzeParameterList,
                 new SyntaxKind[] { SyntaxKind.TypeParameterList }
@@ -37,8 +37,6 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         static void AnalyzeParameterList(SyntaxNodeAnalysisContext nodeContext)
         {
-            if (nodeContext.IsFromGeneratedCode())
-                return;
             var node = nodeContext.Node as TypeParameterListSyntax;
 
             var member = node.Parent;
@@ -46,7 +44,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 return;
 
             var memberSymbol = nodeContext.SemanticModel.GetDeclaredSymbol(member);
-            if (memberSymbol.IsAbstract || memberSymbol.IsVirtual || memberSymbol.IsOverride)
+            if (memberSymbol == null || memberSymbol.IsAbstract || memberSymbol.IsVirtual || memberSymbol.IsOverride)
                 return;
             if (memberSymbol.ExplicitInterfaceImplementations().Length > 0)
                 return;

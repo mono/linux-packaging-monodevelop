@@ -38,6 +38,7 @@ using System.Linq;
 using MonoDevelop.Ide.Editor;
 using MonoDevelop.Ide.Editor.Extension;
 using System.Web.SessionState;
+using System.Threading;
 
 namespace MonoDevelop.Ide.CodeTemplates
 {
@@ -50,10 +51,7 @@ namespace MonoDevelop.Ide.CodeTemplates
 		
 		public SemanticModel Compilation {
 			get {
-				var analysisDocument = DocumentContext.ParsedDocument;
-				if (analysisDocument == null)
-					return null;
-				return analysisDocument.GetAst<SemanticModel> ();
+				return DocumentContext.AnalysisDocument.GetSemanticModelAsync (default (CancellationToken)).WaitAndGetResult (default (CancellationToken));
 			}
 		}
 
@@ -61,6 +59,8 @@ namespace MonoDevelop.Ide.CodeTemplates
 			get;
 			set;
 		}
+
+		public int InsertOffset { get; set; }
 		
 		public string SelectedText {
 			get;
@@ -123,20 +123,19 @@ namespace MonoDevelop.Ide.CodeTemplates
 		
 		public string GetLengthProperty (Func<string, string> callback, string varName)
 		{
-			if (callback == null)
+			SemanticModel semanticModel;
+			if (!CurrentContext.DocumentContext.AnalysisDocument.TryGetSemanticModel (out semanticModel))
+				semanticModel = CurrentContext.Compilation;
+			if (callback == null || semanticModel == null)
 				return "Count";
-			
 			string var = callback (varName);
-			
-			ITextEditorResolver textEditorResolver = CurrentContext.DocumentContext.GetContent <ITextEditorResolver> ();
-			if (textEditorResolver != null) {
-				var result = textEditorResolver.GetLanguageItem (CurrentContext.Editor.LocationToOffset (CurrentContext.InsertPosition), var);
-				if (result != null) {
-					var returnType = result.GetReturnType ();
-					if (returnType != null && !returnType.IsReferenceType)
-						return "Length";
-				}
-			}
+			var offset = CurrentContext.Editor.CaretOffset;
+			var sym = semanticModel.LookupSymbols (offset, name: var).FirstOrDefault ();
+			if (sym == null)
+				return "Count";
+			var returnType = sym.GetReturnType ();
+			if (returnType?.Kind == SymbolKind.ArrayType)
+				return "Length";
 			return "Count";
 		}
 		
@@ -157,72 +156,75 @@ namespace MonoDevelop.Ide.CodeTemplates
 		
 		public string GetComponentTypeOf (Func<string, string> callback, string varName)
 		{
-			if (callback == null)
-				return "var";
-			var compilation = CurrentContext.Compilation;
+			//if (callback == null)
+			return "var";
+			/*var compilation = CurrentContext.Compilation;
 			if (compilation == null)
 				return null;
 		
 			string var = callback (varName);
 
 			var offset = CurrentContext.Editor.CaretOffset;
-			var sym = compilation.LookupSymbols (offset).First (s => s.Name == var);
+			var sym = compilation.LookupSymbols (offset, name: var).FirstOrDefault ();
 			if (sym == null)
 				return "var";
 			var rt = sym.GetReturnType ();
 			if (rt != null)
 				return rt.ToMinimalDisplayString (compilation, offset);
-			return "var";
+			return "var";*/
 		}
 
-		ICompletionDataList list;
+		//ICompletionDataList list;
+		static CodeTemplateListDataProvider empty = new CodeTemplateListDataProvider (new List<CodeTemplateVariableValue> ());
 		public IListDataProvider<string> GetCollections ()
 		{
-			var result = new List<CodeTemplateVariableValue> ();
-			var ext = CurrentContext.DocumentContext.GetContent <CompletionTextEditorExtension> ();
-			var analysisProject = TypeSystemService.GetCodeAnalysisProject (CurrentContext.DocumentContext.Project);
-			var compilation = analysisProject != null ? analysisProject.GetCompilationAsync ().Result : null;
+			return empty;
+			//var result = new List<CodeTemplateVariableValue> ();
+			//var ext = CurrentContext.DocumentContext.GetContent <CompletionTextEditorExtension> ();
+			//var analysisProject = TypeSystemService.GetCodeAnalysisProject (CurrentContext.DocumentContext.Project);
+			//var compilation = analysisProject != null ? analysisProject.GetCompilationAsync ().Result : null;
 
-			if (ext != null) {
-				if (list == null)
-					list = ext.CodeCompletionCommand (
-						CurrentContext.DocumentContext.GetContent <MonoDevelop.Ide.CodeCompletion.ICompletionWidget> ().CurrentCodeCompletionContext).Result;
+			//if (ext != null) {
+				//if (list == null)
+					//list = ext.HandleCodeCompletionAsync (
+						//CurrentContext.DocumentContext.GetContent <MonoDevelop.Ide.CodeCompletion.ICompletionWidget> ().CurrentCodeCompletionContext,
+						//CompletionTriggerInfo.CodeCompletionCommand).Result;
 				
-				foreach (var data in list.OfType<ISymbolCompletionData> ()) {
-					if (data.Symbol == null)
-						continue;
-					var type = data.Symbol.GetReturnType ();
-					if (type == null)
-						continue;
-					if (GetElementType (compilation, type) != null) {
-						var method = data as IMethodSymbol;
-						if (method != null) {
-							if (method.Parameters.Length == 0)
-								result.Add (new CodeTemplateVariableValue (data.Symbol.Name + " ()", ((CompletionData)data).Icon));
-							continue;
-						}
-
-						result.Add (new CodeTemplateVariableValue (data.Symbol.Name, ((CompletionData)data).Icon));
-					}
-				}
+				//foreach (var data in list.OfType<ISymbolCompletionData> ()) {
+				//	if (data.Symbol == null)
+				//		continue;
+				//	var type = data.Symbol.GetReturnType ();
+				//	if (type == null)
+				//		continue;
+				//	if (GetElementType (compilation, type) != null) {
+				//		var method = data as IMethodSymbol;
+				//		if (method != null) {
+				//			if (method.Parameters.Length == 0)
+				//				result.Add (new CodeTemplateVariableValue (data.Symbol.Name + " ()", ((CompletionData)data).Icon));
+				//			continue;
+				//		}
+				//		if (!result.Any (r => r.Text == data.Symbol.Name))
+				//			result.Add (new CodeTemplateVariableValue (data.Symbol.Name, ((CompletionData)data).Icon));
+				//	}
+				//}
 				
-				foreach (var data in list.OfType<ISymbolCompletionData> ()) {
-					var m = data.Symbol as IParameterSymbol;
-					if (m != null) {
-						if (GetElementType (compilation, m.Type) != null)
-							result.Add (new CodeTemplateVariableValue (m.Name, ((CompletionData)data).Icon));
-					}
-				}
+				//foreach (var data in list.OfType<ISymbolCompletionData> ()) {
+				//	var m = data.Symbol as IParameterSymbol;
+				//	if (m != null) {
+				//		if (GetElementType (compilation, m.Type) != null && !result.Any (r => r.Text == m.Name))
+				//			result.Add (new CodeTemplateVariableValue (m.Name, ((CompletionData)data).Icon));
+				//	}
+				//}
 				
-				foreach (var sym in list.OfType<ISymbolCompletionData> ()) {
-					var m = sym.Symbol as ILocalSymbol;
-					if (m == null)
-						continue;
-					if (GetElementType (compilation, m.Type) != null)
-						result.Add (new CodeTemplateVariableValue (m.Name, ((CompletionData)sym).Icon));
-				}
-			}
-			return new CodeTemplateListDataProvider (result);
+				//foreach (var sym in list.OfType<ISymbolCompletionData> ()) {
+				//	var m = sym.Symbol as ILocalSymbol;
+				//	if (m == null)
+				//		continue;
+				//	if (GetElementType (compilation, m.Type) != null && !result.Any (r => r.Text == m.Name))
+				//		result.Add (new CodeTemplateVariableValue (m.Name, ((CompletionData)sym).Icon));
+				//}
+			//}
+			//return new CodeTemplateListDataProvider (empty);
 		}
 		
 		public string GetSimpleTypeName (string fullTypeName)
@@ -251,7 +253,7 @@ namespace MonoDevelop.Ide.CodeTemplates
 			var metadataName = string.IsNullOrEmpty (ns) ? name : ns + "." + name;
 			var type = compilation.Compilation.GetTypeByMetadataName (metadataName);
 			if (type != null) {
-				var minimalName = type.ToMinimalDisplayString (compilation, CurrentContext.Editor.CaretOffset);
+				var minimalName = type.ToMinimalDisplayString (compilation, CurrentContext.InsertOffset);
 				return string.IsNullOrEmpty (member) ? minimalName :  minimalName + "." + member;
 			}
 			return fullTypeName.Replace ("#", ".");
@@ -290,7 +292,6 @@ namespace MonoDevelop.Ide.CodeTemplates
 				return new CodeTemplateListDataProvider (GetCurrentClassName ());
 			case "GetConstructorModifier":
 				return new CodeTemplateListDataProvider (GetConstructorModifier ());
-				
 			case "GetSimpleTypeName":
 				return new CodeTemplateListDataProvider (GetSimpleTypeName (match.Groups[2].Value.Trim ('"')));
 			case "GetLengthProperty":

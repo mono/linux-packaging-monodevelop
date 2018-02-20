@@ -25,20 +25,20 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterCompilationStartAction(compilationContext =>
             {
                 var compilation = compilationContext.Compilation;
-                compilationContext.RegisterSyntaxTreeAction(async delegate (SyntaxTreeAnalysisContext ctx)
+                compilationContext.RegisterSyntaxTreeAction(delegate (SyntaxTreeAnalysisContext ctx)
                 {
                     try
                     {
                         if (!compilation.SyntaxTrees.Contains(ctx.Tree))
                             return;
                         var semanticModel = compilation.GetSemanticModel(ctx.Tree);
-                        var root = await ctx.Tree.GetRootAsync(ctx.CancellationToken).ConfigureAwait(false);
+                        var root = ctx.Tree.GetRoot(ctx.CancellationToken);
                         var model = compilationContext.Compilation.GetSemanticModel(ctx.Tree);
-                        if (model.IsFromGeneratedCode(compilationContext.CancellationToken))
-                            return;
                         new GatherVisitor(ctx, semanticModel).Visit(root);
                     }
                     catch (OperationCanceledException) { }

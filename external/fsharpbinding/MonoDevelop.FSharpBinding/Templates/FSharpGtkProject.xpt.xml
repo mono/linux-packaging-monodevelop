@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 
 <Template originator="Ihor Sihuta" created="2012/08/05">
 
@@ -6,8 +6,8 @@
 		<_Name>Gtk# 2.0 Project</_Name>
 		<_Description>Create an F# desktop application (using Gtk# 2.0 and .NET 4.0)</_Description>
 		<Category>other/net/general</Category>
-		<Icon>md-project-gui</Icon>
-		<Image id="md-gtk2-project" />
+		<Icon>md-gui-project</Icon>
+		<Image id="md-gui-project" />
 		<LanguageName>F#</LanguageName>
 		<GroupId>md-gtk-project</GroupId>
 	</TemplateConfiguration>
@@ -22,11 +22,10 @@
 		</Options>
 
 		<Project name = "${ProjectName}" directory = ".">
-			<Options Target = "WinExe" TargetFrameworkVersion="4.5" />
+			<Options Target = "WinExe" TargetFrameworkVersion="4.5.1" />
 
 			<References>
         <Reference type="Package" refto="mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-        <Reference type="Gac" refto="FSharp.Core" />
 				<Reference type="Package" refto="System, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
         <Reference type="Package" refto="System.Core, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
 				<Reference type="Package" SpecificVersion="false" refto="gtk-sharp, Version=2.4.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
@@ -37,12 +36,15 @@
 				<Reference type="Package" SpecificVersion="false" refto="atk-sharp, Version=2.4.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
 			</References>
 
+      <Packages requireLicenseAcceptance="false">
+        <Package Id="FSharp.Core" Version="4.1.0.2" local="true" /> 
+      </Packages>
 			<Files>
 
 			<!-- A window template -->
 
 				<FileTemplateReference TemplateID="FSharpAssemblyInfo" name="AssemblyInfo.fs" />
-                <UnformattedFile name="MainWindow.fs">
+                <File name="MainWindow.fs">
 <![CDATA[namespace ${Namespace}
 
     module MainWindow =
@@ -60,9 +62,9 @@
             member this.OnDeleteEvent(o,e:DeleteEventArgs) = 
                 Application.Quit ()
                 e.RetVal <- true]]>
-				</UnformattedFile>
+				</File>
              
-             <UnformattedFile name="Main.fs">
+             <File name="Main.fs">
                 <![CDATA[namespace ${ProjectName}
     module Main =
         
@@ -77,7 +79,7 @@
             Application.Run()
             0
 ]]>
-             </UnformattedFile>
+             </File>
 			</Files>
 		</Project>
 	</Combine>

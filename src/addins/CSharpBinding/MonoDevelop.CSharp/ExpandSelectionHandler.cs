@@ -28,6 +28,7 @@ using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.CSharp
 {
@@ -37,7 +38,7 @@ namespace MonoDevelop.CSharp
 		ShrinkSelection
 	}
 	
-	class ExpandSelectionHandler : CommandHandler
+	static class ExpandSelectionHandler
 	{
 		internal class ExpandSelectionAnnotation
 		{
@@ -69,11 +70,16 @@ namespace MonoDevelop.CSharp
 			return result;
 		}
 
-		protected override void Run ()
+		internal static void Run ()
 		{
 			var doc = IdeApp.Workbench.ActiveDocument;
 			if (doc == null)
 				return;
+			Run (doc);
+		}
+
+		internal static void Run (Ide.Gui.Document doc)
+		{
 			var selectionRange = doc.Editor.SelectionRange;
 			var parsedDocument = doc.ParsedDocument;
 			if (parsedDocument == null)
@@ -85,7 +91,7 @@ namespace MonoDevelop.CSharp
 			var node = unit.FindNode (Microsoft.CodeAnalysis.Text.TextSpan.FromBounds (selectionRange.Offset, selectionRange.EndOffset));
 			if (node == null)
 				return;
-			
+
 			if (doc.Editor.IsSomethingSelected) {
 				while (node != null && ShrinkSelectionHandler.IsSelected (doc.Editor, node.Span)) {
 					node = node.Parent;
@@ -100,7 +106,7 @@ namespace MonoDevelop.CSharp
 		}
 	}
 	
-	class ShrinkSelectionHandler : CommandHandler
+	static class ShrinkSelectionHandler
 	{
 		internal static bool IsSelected (MonoDevelop.Ide.Editor.TextEditor editor, Microsoft.CodeAnalysis.Text.TextSpan span)
 		{
@@ -108,11 +114,16 @@ namespace MonoDevelop.CSharp
 			return selection.Offset == span.Start && selection.Length == span.Length;
 		}
 
-		protected async override void Run ()
+		internal static async void Run ()
 		{
 			var doc = IdeApp.Workbench.ActiveDocument;
 			if (doc == null)
 				return;
+			await Run (doc);
+		}
+
+		internal static async Task Run (Ide.Gui.Document doc)
+		{
 			var selectionRange = doc.Editor.CaretOffset;
 			var analysisDocument = doc.AnalysisDocument;
 			if (analysisDocument == null)
@@ -125,6 +136,8 @@ namespace MonoDevelop.CSharp
 				return;
 
 			var selectionAnnotation = ExpandSelectionHandler.GetSelectionAnnotation (doc.Editor);
+			if (selectionAnnotation.Stack.Count == 0)
+				return;
 			selectionAnnotation.Stack.Pop ();
 			if (selectionAnnotation.Stack.Count > 0) {
 				var node = selectionAnnotation.Stack.Peek ();

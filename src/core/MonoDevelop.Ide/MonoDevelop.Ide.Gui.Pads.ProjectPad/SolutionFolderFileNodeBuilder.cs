@@ -57,7 +57,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			SolutionFolderFileNode file = (SolutionFolderFileNode) dataObject;
 			nodeInfo.Label = file.FileName.FileName;
 			if (!System.IO.File.Exists (file.FileName))
-				nodeInfo.Label = "<span foreground='red'>" + nodeInfo.Label + "</span>";
+				nodeInfo.Label = "<span foreground='" + Styles.ErrorForegroundColor.ToHexString (false) + "'>" + nodeInfo.Label + "</span>";
 			nodeInfo.Icon = DesktopService.GetIconForFile (file.FileName, Gtk.IconSize.Menu);
 		}
 		
@@ -68,14 +68,6 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 				return file.Parent.ParentSolution;
 			else
 				return file.Parent;
-		}
-		
-		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
-		{
-			if (otherNode.DataItem is SolutionFolderFileNode)
-				return DefaultSort;
-			else
-				return -1;
 		}
 	}
 	
@@ -126,6 +118,21 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		{
 			return DragOperation.Copy | DragOperation.Move;
 		}
+
+		[CommandHandler (ViewCommands.OpenWithList)]
+		public void OnOpenWith (object ob)
+		{
+			var finfo = (SolutionFolderFileNode)CurrentNode.DataItem;
+			((FileViewer)ob).OpenFile (finfo.FileName);
+		}
+
+		[CommandUpdateHandler (ViewCommands.OpenWithList)]
+		public void OnOpenWithUpdate (CommandArrayInfo info)
+		{
+			var pf = (SolutionFolderFileNode)CurrentNode.DataItem;
+			ProjectFileNodeCommandHandler.PopulateOpenWithViewers (info, null, pf.FileName);
+		}
+
 	}
 	
 	class SolutionFolderFileNode: IFileItem

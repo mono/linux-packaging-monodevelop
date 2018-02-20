@@ -44,6 +44,7 @@ namespace Xwt.GtkBackend
 			base.Initialize ();
 
 			view = new WebKit.WebView ();
+			view.ContextMenu += HandleContextMenuRequest;
 			Widget = view;
 			Widget.Show ();
 		}
@@ -78,6 +79,28 @@ namespace Xwt.GtkBackend
 				return view.CanGoForward ();
 			}
 		}
+
+		public bool ContextMenuEnabled { get; set; }
+
+		public bool DrawsBackground {
+			get {
+				return !view.Transparent;
+			}
+			set {
+				view.Transparent = !value;
+			}
+		}
+
+		public bool ScrollBarsEnabled {
+			get {
+				return view.SelfScrolling;
+			}
+			set {
+				view.SelfScrolling = value;
+			}
+		}
+
+		public string CustomCss { get; set; }
 
 		public void GoBack ()
 		{
@@ -144,23 +167,22 @@ namespace Xwt.GtkBackend
 
 		void HandleLoadStarted (object o, EventArgs args)
 		{
-			ApplicationContext.InvokeUserCode (delegate {
-				EventSink.OnLoading ();
-			});
+			ApplicationContext.InvokeUserCode (EventSink.OnLoading);
 		}
 
 		void HandleLoadFinished (object o, EventArgs args)
 		{
-			ApplicationContext.InvokeUserCode (delegate {
-				EventSink.OnLoaded ();
-			});
+			ApplicationContext.InvokeUserCode (EventSink.OnLoaded);
 		}
 
 		void HandleTitleChanged (object sender, WebKit.TitleChangedArgs e)
 		{
-			ApplicationContext.InvokeUserCode (delegate {
-				EventSink.OnTitleChanged ();
-			});
+			ApplicationContext.InvokeUserCode (EventSink.OnTitleChanged);
+		}
+
+		void HandleContextMenuRequest (object sender, ContextMenuArgs e)
+		{
+			e.RetVal = !ContextMenuEnabled;
 		}
 	}
 }

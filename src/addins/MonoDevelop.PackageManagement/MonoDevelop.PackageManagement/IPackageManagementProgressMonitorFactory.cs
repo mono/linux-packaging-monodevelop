@@ -24,14 +24,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
+using System.Threading;
 using MonoDevelop.Core;
 
 namespace MonoDevelop.PackageManagement
 {
-	public interface IPackageManagementProgressMonitorFactory
+	internal interface IPackageManagementProgressMonitorFactory
 	{
 		ProgressMonitor CreateProgressMonitor (string statusText);
+		ProgressMonitor CreateProgressMonitor (string statusText, bool clearConsole);
+		ProgressMonitor CreateProgressMonitor (
+			string statusText,
+			bool clearConsole,
+			CancellationTokenSource cancellationTokenSource);
 	}
 }
 

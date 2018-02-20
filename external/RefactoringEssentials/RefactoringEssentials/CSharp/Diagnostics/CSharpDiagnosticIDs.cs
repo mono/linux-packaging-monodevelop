@@ -157,7 +157,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         public const string ConvertToConstantAnalyzerID = "RECS0153";
         public const string UnusedParameterAnalyzerID = "RECS0154";
         public const string FormatStringProblemAnalyzerID = "RECS0155";
-        public const string LocalVariableNotUsedAnalyzerID = "RECS0156";
+//        public const string LocalVariableNotUsedAnalyzerID = "RECS0156";
         public const string ThreadStaticAtInstanceFieldAnalyzerID = "RECS0157";
         public const string RedundantUnsafeContextAnalyzerID = "RECS0158";
         public const string RedundantOverriddenMemberAnalyzerID = "RECS0159";
@@ -166,6 +166,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         public const string NotResolvedInTextAnalyzer_SwapID = "RECS0162";
         public const string NameOfSuggestionAnalyzerID = "RECS0163";
         public const string RedundantDelegateCreationAnalyzerID = "RECS0164";
+        public const string AvoidAsyncVoidAnalyzerID = "RECS0165";
         public const string SampleAnalyzerID = "RECSSAMPLE";
         public const string RoslynReflectionUsageAnalyzerID = "RECS9000";
     }

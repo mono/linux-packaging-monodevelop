@@ -29,6 +29,7 @@ using System.IO;
 using System.Linq;
 using Gtk;
 using MonoDevelop.Components;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Tasks;
 using MonoDevelop.Ide.Gui;
@@ -70,7 +71,49 @@ namespace MonoDevelop.Ide.Projects
 
 			defaultTableRows = projectConfigurationTable.NRows;
 
+			// Disable width request for the event box otherwise the New Project dialog
+			// does not resize to fit. Set a width request for the project name text box
+			// instead so the project folder preview widget does not take up more width.
+			projectConfigurationTableEventBox.WidthRequest = -1;
+			projectNameTextBox.WidthRequest = 335;
+
 			RegisterEvents ();
+
+			// Accessibility
+			projectNameLabel.Accessible.Name = "ProjectConfigurationWidget.ProjectNameLabel";
+			projectNameLabel.Accessible.SetTitleFor (projectNameTextBox.Accessible);
+
+			projectNameTextBox.Accessible.Name = "ProjectConfigurationWidget.ProjectNameTextBox";
+			projectNameTextBox.Accessible.Description = GettextCatalog.GetString ("Enter the name for the new project");
+			projectNameTextBox.Accessible.SetTitleUIElement (projectNameLabel.Accessible);
+
+			locationLabel.Accessible.Name = "ProjectConfigurationWidget.LocationLabel";
+			locationLabel.Accessible.SetTitleFor (locationTextBox.Accessible, browseButton.Accessible);
+
+			locationTextBox.Accessible.Name = "ProjectConfigurationWidget.LocationTextBox";
+			locationTextBox.Accessible.Description = GettextCatalog.GetString ("Enter the filepath for the new project");
+			locationTextBox.Accessible.SetTitleUIElement (locationLabel.Accessible);
+
+			browseButton.Accessible.Name = "ProjectConfigurationWidget.BrowseButton";
+			browseButton.Accessible.Description = GettextCatalog.GetString ("Open a file selector to select the project path");
+			browseButton.Accessible.SetTitleUIElement (locationLabel.Accessible);
+
+			createProjectWithinSolutionDirectoryCheckBox.Accessible.Name = "ProjectConfigurationWidget.CreateProjectDirectoryCheckBox";
+			createProjectWithinSolutionDirectoryCheckBox.Accessible.Description = GettextCatalog.GetString ("Select whether a folder for the new project should be created inside the solution folder");
+
+			versionControlLabel.Accessible.Name = "ProjectConfigurationWidget.VersionControl";
+			versionControlLabel.Accessible.AddLinkedUIElement (useGitCheckBox.Accessible);
+			versionControlLabel.Accessible.AddLinkedUIElement (createGitIgnoreFileCheckBox.Accessible);
+
+			useGitCheckBox.Accessible.Name = "ProjectConfigurationWidget.UseGitCheckBox";
+			useGitCheckBox.Accessible.Description = GettextCatalog.GetString ("Select whether to use Git source control");
+
+			createGitIgnoreFileCheckBox.Accessible.Name = "ProjectConfigurationWidget.CreateGitIgnoreCheckBox";
+			createGitIgnoreFileCheckBox.Accessible.Description = GettextCatalog.GetString ("Select whether to create a .gitignore file to ignore common files");
+
+			projectFolderPreviewWidget.Accessible.Name = "ProjectConfigurationWidget.ProjectFolderPreview";
+			projectFolderPreviewWidget.Accessible.SetLabel (GettextCatalog.GetString ("Folder Layout Preview"));
+			projectFolderPreviewWidget.Accessible.Description = GettextCatalog.GetString ("A preview of the folder layout for the new project");
 		}
 
 		protected override void OnFocusGrabbed ()
@@ -204,7 +247,7 @@ namespace MonoDevelop.Ide.Projects
 			solutionNameTextBox.Sensitive = projectConfiguration.IsSolutionNameEnabled;
 			projectNameTextBox.Sensitive = projectConfiguration.IsProjectNameEnabled;
 			createProjectWithinSolutionDirectoryCheckBox.Sensitive = projectConfiguration.IsCreateProjectDirectoryInsideSolutionDirectoryEnabled;
-			createProjectWithinSolutionDirectoryCheckBox.Active = projectConfiguration.CreateProjectDirectoryInsideSolutionDirectory;
+			createProjectWithinSolutionDirectoryCheckBox.Active = projectConfiguration.IsCreateProjectDirectoryInsideSolutionDirectoryEnabled ? projectConfiguration.CreateProjectDirectoryInsideSolutionDirectory : true;
 			useGitCheckBox.Sensitive = projectConfiguration.IsUseGitEnabled;
 			useGitCheckBox.Active = projectConfiguration.UseGit;
 			createGitIgnoreFileCheckBox.Sensitive = projectConfiguration.IsGitIgnoreEnabled;
@@ -335,7 +378,7 @@ namespace MonoDevelop.Ide.Projects
 
 		EventBoxTooltip CreateTooltip (EventBox eventBox, string tooltipText)
 		{
-			Xwt.Drawing.Image image = ImageService.GetIcon ("md-information");
+			Xwt.Drawing.Image image = ImageService.GetIcon ("md-help");
 			eventBox.ModifyBg (StateType.Normal, leftHandBackgroundColor);
 			eventBox.Add (new ImageView (image));
 			eventBox.ShowAll ();
@@ -361,10 +404,16 @@ namespace MonoDevelop.Ide.Projects
 				0,
 				0);
 
+			uint rightAttach = 2;
+			if (extraRow.InformationTooltipWidget == null) {
+				// Allow control to extend all the way across if it has no information tooltip.
+				rightAttach = 3;
+			}
+
 			projectConfigurationTable.Attach (
 				extraRow.MainWidget,
 				1,
-				2,
+				rightAttach,
 				extraRow.Row,
 				extraRow.Row + 1,
 				AttachOptions.Fill,

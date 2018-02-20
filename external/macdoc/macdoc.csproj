@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>10.0.0</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{87641BCE-5461-4802-BEA4-53D1BCAC3D06}</ProjectGuid>
+    <ProjectTypeGuids>{A3F8F2AB-B479-4A4A-A458-A89E7DC349F1};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>macdoc</RootNamespace>
+    <AssemblyName>macdoc</AssemblyName>
+    <LastXamMacNagTime>12/11/2012 10:17:55 PM</LastXamMacNagTime>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>True</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>False</Optimize>
+    <OutputPath>bin\Debug</OutputPath>
+    <DefineConstants>DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>False</ConsolePause>
+    <EnableCodeSigning>False</EnableCodeSigning>
+    <CreatePackage>False</CreatePackage>
+    <EnablePackageSigning>False</EnablePackageSigning>
+    <IncludeMonoRuntime>False</IncludeMonoRuntime>
+    <UseSGen>False</UseSGen>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>none</DebugType>
+    <Optimize>False</Optimize>
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>False</ConsolePause>
+    <EnableCodeSigning>False</EnableCodeSigning>
+    <CreatePackage>False</CreatePackage>
+    <EnablePackageSigning>False</EnablePackageSigning>
+    <IncludeMonoRuntime>False</IncludeMonoRuntime>
+    <UseSGen>False</UseSGen>
+    <MonoBundlingExtraArgs>--embed-mono=false --registrar=dynamic</MonoBundlingExtraArgs>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="monodoc">
+      <HintPath>lib\monodoc.dll</HintPath>
+    </Reference>
+    <Reference Include="Xamarin.Mac" />
+    <Reference Include="System.Configuration" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="MyDocument.cs">
+      <DependentUpon>MyDocument.xib</DependentUpon>
+    </Compile>
+    <Compile Include="MyDocument.xib.designer.cs">
+      <DependentUpon>MyDocument.xib</DependentUpon>
+    </Compile>
+    <Compile Include="Main.cs" />
+    <Compile Include="AppDelegate.cs">
+      <DependentUpon>MainMenu.xib</DependentUpon>
+    </Compile>
+    <Compile Include="MainMenu.xib.designer.cs">
+      <DependentUpon>MainMenu.xib</DependentUpon>
+    </Compile>
+    <Compile Include="DocTools.cs" />
+    <Compile Include="history.cs" />
+    <Compile Include="MonodocDocumentController.cs" />
+    <Compile Include="IndexUpdateManager.cs" />
+    <Compile Include="BookmarkPopover.cs">
+      <DependentUpon>BookmarkPopover.xib</DependentUpon>
+    </Compile>
+    <Compile Include="BookmarkPopoverController.cs" />
+    <Compile Include="BookmarkPopover.designer.cs">
+      <DependentUpon>BookmarkPopover.xib</DependentUpon>
+    </Compile>
+    <Compile Include="BookmarkManager.cs" />
+    <Compile Include="BookmarkAssistant.cs">
+      <DependentUpon>BookmarkAssistant.xib</DependentUpon>
+    </Compile>
+    <Compile Include="BookmarkAssistantController.cs" />
+    <Compile Include="BookmarkAssistant.designer.cs">
+      <DependentUpon>BookmarkAssistant.xib</DependentUpon>
+    </Compile>
+    <Compile Include="IndexSearcher.cs" />
+    <Compile Include="MonodocDataSources.cs" />
+    <Compile Include="RootLauncher.cs" />
+    <Compile Include="WebViewExtraordinaire.cs" />
+    <Compile Include="WebViewExtraordinaire.designer.cs">
+      <DependentUpon>WebViewExtraordinaire.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FindBarExtraordinaire.cs" />
+    <Compile Include="FindBarExtraordinaireController.cs" />
+    <Compile Include="FindBarExtraordinaire.designer.cs">
+      <DependentUpon>FindBarExtraordinaire.cs</DependentUpon>
+    </Compile>
+    <Compile Include="ProcessUtils.cs" />
+    <Compile Include="AppleDocMergeWindow.cs" />
+    <Compile Include="AppleDocMergeWindowController.cs" />
+    <Compile Include="AppleDocMergeWindow.designer.cs">
+      <DependentUpon>AppleDocMergeWindow.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Logger.cs" />
+    <Compile Include="Product.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterfaceDefinition Include="MyDocument.xib" />
+    <InterfaceDefinition Include="MainMenu.xib" />
+    <InterfaceDefinition Include="BookmarkPopover.xib" />
+    <InterfaceDefinition Include="BookmarkAssistant.xib" />
+    <InterfaceDefinition Include="FindBarExtraordinaire.xib" />
+    <InterfaceDefinition Include="AppleDocMergeWindow.xib" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Info.plist" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="monodoc.icns" />
+    <Content Include="Credits.rtf" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath)\Xamarin\Mac\Xamarin.Mac.CSharp.targets" />
+
+  <!--Since monodoc.dll is using System.Configuration.dll, we can't use Mobile profile + Linker.
+      Which results in 34MB MacDoc.app file size which increases Xamarin Studio.dmg file.
+      Way to reduce this size we use system mono and -embed-mono=false.
+      To furter reduce this size we invoke DeleteGacFiles target to remove all GAC dlls.
+      Which gets us down to 16.6MB of which Xamarin.Mac.dll is 14.1MB-->
+  <PropertyGroup>
+    <CreateAppBundleDependsOn>$(CreateAppBundleDependsOn);DeleteGacFiles</CreateAppBundleDependsOn>
+  </PropertyGroup>
+  <Target Name="DeleteGacFiles">
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/ICSharpCode.SharpZipLib.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/Mono.Posix.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/Mono.Security.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/mscorlib.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/System.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/System.Configuration.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/System.Core.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/System.Net.Http.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/System.Runtime.Serialization.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/System.Security.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/System.ServiceModel.Internals.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/System.Xml.dll" />
+      <Delete Files="$(AppBundleDir)/Contents/MonoBundle/System.Xml.Linq.dll" />
+  </Target>
+</Project>

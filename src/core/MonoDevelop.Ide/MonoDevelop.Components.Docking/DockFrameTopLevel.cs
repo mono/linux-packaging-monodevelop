@@ -128,7 +128,7 @@ namespace MonoDevelop.Components.Docking
 			if (ContainerWindow != null) {
 				if (!repositionRequested && width != 0 && height != 0) {
 					repositionRequested = true;
-					Application.Invoke (delegate {
+					Application.Invoke ((o, args) => {
 						var pos = frame.GetScreenCoordinates (new Gdk.Point (x, y));
 						DesktopService.PlaceWindow (ContainerWindow, pos.X, pos.Y, width, height);
 						repositionRequested = false;
@@ -139,6 +139,12 @@ namespace MonoDevelop.Components.Docking
 		}
 
 		internal Gtk.Window ContainerWindow { get; set; }
-	}
 
+		internal string Title {
+			set {
+				if (ContainerWindow != null)
+					ContainerWindow.Title = value;
+			}
+		}
+	}
 }

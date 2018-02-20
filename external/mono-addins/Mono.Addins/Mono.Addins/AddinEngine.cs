@@ -45,8 +45,8 @@ namespace Mono.Addins
 	/// </summary>
 	/// <remarks>
 	/// This class allows hosting several independent add-in engines in a single application domain.
-	/// In general, applications use the AddinManager class to query and manage extensions. This class is static,
-	/// so the API is easily accessible. However, some kind applications may need to use several isolated
+	/// In general, applications use the AddinManager class to query and manage extensions. Most of the API is
+	/// static, so easily accessible. However, some kind applications may need to use several isolated
 	/// add-in engines, and in this case the AddinManager class can't be used, because it is bound to a single
 	/// add-in engine. Those applications can instead create several instances of the AddinEngine class. Each
 	/// add-in engine can be independently initialized with different add-in registries and extension models.
@@ -587,8 +587,6 @@ namespace Mono.Addins
 			if (depCheck.Contains (id))
 				throw new InvalidOperationException ("A cyclic addin dependency has been detected.");
 
-			depCheck.Push (id);
-
 			Addin iad = Registry.GetAddin (id);
 			if (iad == null || !iad.Enabled) {
 				if (optional)
@@ -603,34 +601,38 @@ namespace Mono.Addins
 			// of the list, so it is loaded earlier than before.
 			addins.Remove (iad);
 			addins.Add (iad);
-			
-			foreach (Dependency dep in iad.AddinInfo.Dependencies) {
-				AddinDependency adep = dep as AddinDependency;
-				if (adep != null) {
-					try {
-						string adepid = Addin.GetFullId (iad.AddinInfo.Namespace, adep.AddinId, adep.Version);
-						ResolveLoadDependencies (addins, depCheck, adepid, false);
-					} catch (MissingDependencyException) {
-						if (optional)
-							return false;
-						else
-							throw;
-					}
-				}
-			}
-			
-			if (iad.AddinInfo.OptionalDependencies != null) {
-				foreach (Dependency dep in iad.AddinInfo.OptionalDependencies) {
+
+			depCheck.Push (id);
+
+			try {
+				foreach (Dependency dep in iad.AddinInfo.Dependencies) {
 					AddinDependency adep = dep as AddinDependency;
 					if (adep != null) {
-						string adepid = Addin.GetFullId (iad.Namespace, adep.AddinId, adep.Version);
-						if (!ResolveLoadDependencies (addins, depCheck, adepid, true))
-						return false;
+						try {
+							string adepid = Addin.GetFullId (iad.AddinInfo.Namespace, adep.AddinId, adep.Version);
+							ResolveLoadDependencies (addins, depCheck, adepid, false);
+						} catch (MissingDependencyException) {
+							if (optional)
+								return false;
+							else
+								throw;
+						}
 					}
 				}
+
+				if (iad.AddinInfo.OptionalDependencies != null) {
+					foreach (Dependency dep in iad.AddinInfo.OptionalDependencies) {
+						AddinDependency adep = dep as AddinDependency;
+						if (adep != null) {
+							string adepid = Addin.GetFullId (iad.Namespace, adep.AddinId, adep.Version);
+							if (!ResolveLoadDependencies (addins, depCheck, adepid, true))
+								return false;
+						}
+					}
+				}
+			} finally {
+				depCheck.Pop ();
 			}
-				
-			depCheck.Pop ();
 			return true;
 		}
 		

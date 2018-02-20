@@ -1,4 +1,4 @@
-// 
+﻿// 
 // TargetFrameworkMoniker.cs
 //  
 // Author:
@@ -174,12 +174,17 @@ namespace MonoDevelop.Core.Assemblies
 				val = val + ",Profile=" + profile;
 			return val;
 		}
-		
+
+		string cachedAssemblyDirectoryName;
 		public string GetAssemblyDirectoryName ()
 		{
-			if (profile != null)
-				return System.IO.Path.Combine (identifier, "v" + version, "Profile", profile);
-			return System.IO.Path.Combine (identifier, "v" + version);
+			// PERF: This is queried a lot, so cache it.
+			if (cachedAssemblyDirectoryName == null) {
+				if (profile != null)
+					cachedAssemblyDirectoryName = System.IO.Path.Combine (identifier, "v" + version, "Profile", profile);
+				cachedAssemblyDirectoryName = System.IO.Path.Combine (identifier, "v" + version);
+			}
+			return cachedAssemblyDirectoryName;
 		}
 		
 		public bool Equals (TargetFrameworkMoniker other)
@@ -245,7 +250,19 @@ namespace MonoDevelop.Core.Assemblies
 		public static TargetFrameworkMoniker NET_4_5 {
 			get { return new TargetFrameworkMoniker ("4.5"); }
 		}
-		
+
+		public static TargetFrameworkMoniker NET_4_6 {
+			get { return new TargetFrameworkMoniker ("4.6"); }
+		}
+
+		public static TargetFrameworkMoniker NET_4_6_1 {
+			get { return new TargetFrameworkMoniker ("4.6.1"); }
+		}
+
+		public static TargetFrameworkMoniker NET_4_6_2 {
+			get { return new TargetFrameworkMoniker ("4.6.2"); }
+		}
+
 		public static TargetFrameworkMoniker PORTABLE_4_0 {
 			get { return new TargetFrameworkMoniker (ID_PORTABLE, "4.0", "Profile1"); }
 		}

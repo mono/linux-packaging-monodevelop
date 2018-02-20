@@ -6,12 +6,11 @@ using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Formatting;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
 
-    [ExportCodeFixProvider(LanguageNames.CSharp), System.Composition.Shared]
+	[ExportCodeFixProvider(LanguageNames.CSharp), System.Composition.Shared]
     public class RedundantCommaInArrayInitializerCodeFixProvider : CodeFixProvider
     {
         public override ImmutableArray<string> FixableDiagnosticIds
@@ -33,7 +32,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             var cancellationToken = context.CancellationToken;
             var span = context.Span;
             var diagnostics = context.Diagnostics;
-            var root = await document.GetSyntaxRootAsync(cancellationToken);
+            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
             var diagnostic = diagnostics.First();
             var node = root.FindNode(context.Span) as InitializerExpressionSyntax;
             //if (!node.IsKind(SyntaxKind.BaseList))
@@ -46,11 +45,15 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 return;
 
             var redundantComma = node.Expressions.GetSeparator(elementCount - 1);
+            var newSeparatedExpList = new List<SyntaxNodeOrToken>(node.Expressions.GetWithSeparators().Where(t => t != redundantComma));
+            var lastExp = newSeparatedExpList.Last();
+            newSeparatedExpList.RemoveAt(newSeparatedExpList.Count - 1);
+            newSeparatedExpList.Add(lastExp.WithTrailingTrivia(redundantComma.TrailingTrivia));
+
             var newRoot = root.ReplaceNode(
                 node,
                 node
-                .WithExpressions(SyntaxFactory.SeparatedList(node.Expressions.ToArray()))
-                .WithAdditionalAnnotations(Formatter.Annotation));
+                .WithExpressions(SyntaxFactory.SeparatedList<ExpressionSyntax>(SyntaxFactory.NodeOrTokenList(newSeparatedExpList))));
 
             context.RegisterCodeFix(CodeActionFactory.Create(node.Span, diagnostic.Severity, "Remove ','", document.WithSyntaxRoot(newRoot)), diagnostic);
         }

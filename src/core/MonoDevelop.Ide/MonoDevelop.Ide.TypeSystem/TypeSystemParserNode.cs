@@ -28,6 +28,8 @@ using Mono.Addins;
 using System.Collections.Generic;
 using System.Linq;
 using MonoDevelop.Core.StringParsing;
+using MonoDevelop.Core;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.Ide.TypeSystem
 {
@@ -71,18 +73,33 @@ namespace MonoDevelop.Ide.TypeSystem
 		public bool CanParse (string mimeType, string buildAction)
 		{
 			if (mimeTypes == null)
-				mimeTypes  = this.mimeType != null ? new HashSet<string> (this.mimeType.Split (',').Select (s => s.Trim ())) : new HashSet<string> ();
-			if (!mimeTypes.Contains (mimeType, StringComparer.Ordinal))
+				mimeTypes  = this.mimeType != null ? new HashSet<string> (this.mimeType.Split (',').Select (s => s.Trim ()), StringComparer.Ordinal) : new HashSet<string> (StringComparer.Ordinal);
+			if (!mimeTypes.Contains (mimeType))
 				return false;
-			return buildActions.Any (action => string.Equals (action, buildAction, StringComparison.OrdinalIgnoreCase));
+
+			foreach (var action in buildActions) {
+ 				if (string.Equals (action, buildAction, StringComparison.OrdinalIgnoreCase) || action == "*")
+					return true;
+			}
+			return false;
 		}
 
-		public static bool IsCompileBuildAction(string buildAction)
+		public static bool IsCompileableFile(ProjectFile file, out Microsoft.CodeAnalysis.SourceCodeKind sck)
 		{
+			var ext = file.FilePath.Extension;
+			if (FilePath.PathComparer.Equals (ext, ".cs")) {
+				sck = Microsoft.CodeAnalysis.SourceCodeKind.Regular;
+			} else if (FilePath.PathComparer.Equals (ext, ".sketchcs"))
+				sck = Microsoft.CodeAnalysis.SourceCodeKind.Script;
+			else {
+				sck = default (Microsoft.CodeAnalysis.SourceCodeKind);
+				return false;
+			}
 			return
-				buildAction == MonoDevelop.Projects.BuildAction.Compile ||
-				buildAction == ApiDefinitionBuildAction || 
-				buildAction == "BMacInputs";
+				file.BuildAction == MonoDevelop.Projects.BuildAction.Compile ||
+				file.BuildAction == ApiDefinitionBuildAction ||
+				file.BuildAction == "BundleResource" ||
+				file.BuildAction == "BMacInputs";
 		}
 	}
 }

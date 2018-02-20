@@ -139,10 +139,6 @@ namespace GuiUnit
 
 		void ExecuteWithListener (string[] args, TcpWriter tcpWriter)
 		{
-			// NOTE: Execute must be directly called from the
-			// test assembly in order for the mechanism to work.
-			Assembly callingAssembly = Assembly.GetCallingAssembly();
-
 			if (!commandLineOptions.NoHeader)
 				WriteHeader(this.writer);
 
@@ -184,7 +180,7 @@ namespace GuiUnit
 					}
 
 					if (assemblies.Count == 0)
-						assemblies.Add(callingAssembly);
+						assemblies.Add (Assembly.GetEntryAssembly ());
 
 					// TODO: For now, ignore all but first assembly
 					Assembly assembly = assemblies[0] as Assembly;
@@ -227,8 +223,13 @@ namespace GuiUnit
 						} else {
 							MainLoop.InitializeToolkit ();
 							System.Threading.ThreadPool.QueueUserWorkItem (d => {
-								RunTests (filter);
-								Shutdown ();
+								try {
+									RunTests (filter);
+								} catch (Exception ex) {
+									Console.WriteLine ("Unexpected error while running the tests: {0}", ex);
+								} finally {
+									Shutdown ();
+								}
 							});
 							MainLoop.RunMainLoop ();
 						}
@@ -265,9 +266,14 @@ namespace GuiUnit
 			// Run the shutdown method on the main thread
 			var helper = new InvokerHelper {
 				Func = () => {
-					if (BeforeShutdown != null)
-						BeforeShutdown (null, EventArgs.Empty);
-					MainLoop.Shutdown ();
+					try {
+						if (BeforeShutdown != null)
+							BeforeShutdown (null, EventArgs.Empty);
+					} catch (Exception ex) {
+						Console.WriteLine ("Unexpected error during `BeforeShutdown`: {0}", ex);
+					} finally {
+						MainLoop.Shutdown ();
+					}
 					return null;
 				}
 			};
@@ -339,7 +345,7 @@ namespace GuiUnit
 		private void RunTests(ITestFilter filter)
 		{
 			ITestResult result = runner.Run(this, filter);
-			ExitCode = result.FailCount;
+			ExitCode = result.FailCount > 0 ? 1 : 0;
 			new ResultReporter(result, writer).ReportResults();
 			if (commandLineOptions.ResultFile != null)
 			{

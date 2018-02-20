@@ -25,31 +25,15 @@
 // THE SOFTWARE.
 
 using System;
-using System.Collections.Generic;
 using System.Text;
-using Xwt.Backends;
-using Xwt.Drawing;
-
-#if MONOMAC
-using nfloat = System.Single;
-using CGRect = System.Drawing.RectangleF;
-using CGPoint = System.Drawing.PointF;
-using CGSize = System.Drawing.SizeF;
-using MonoMac.AppKit;
-using MonoMac.CoreGraphics;
-using MonoMac.CoreImage;
-using MonoMac.Foundation;
-using MonoMac.ObjCRuntime;
-#else
 using AppKit;
 using CoreGraphics;
 using CoreImage;
+using CoreText;
 using Foundation;
 using ObjCRuntime;
-#endif
-
-using RectangleF = System.Drawing.RectangleF;
-using SizeF = System.Drawing.SizeF;
+using Xwt.Backends;
+using Xwt.Drawing;
 
 namespace Xwt.Mac
 {
@@ -98,6 +82,11 @@ namespace Xwt.Mac
 		{
 			return new Rectangle (v.WidgetX(), v.WidgetY(), v.WidgetWidth(), v.WidgetHeight());
 		}
+
+		public static Point WidgetLocation (this NSView v)
+		{
+			return new Point (v.WidgetX (), v.WidgetY ());
+		}
 		
 		public static void SetWidgetBounds (this NSView v, Rectangle rect)
 		{
@@ -141,14 +130,23 @@ namespace Xwt.Mac
 
 		public static Color ToXwtColor (this NSColor col)
 		{
-			col = col.UsingColorSpace (DeviceRGBString);
-			return new Color (col.RedComponent, col.GreenComponent, col.BlueComponent, col.AlphaComponent);
+			var calibrated = col.UsingColorSpace (DeviceRGBString);
+			if (calibrated != null)
+				return new Color (calibrated.RedComponent, calibrated.GreenComponent, calibrated.BlueComponent, calibrated.AlphaComponent);
+			// some system colors can not be calibrated and UsingColorSpace returns null.
+			// Use CGColor in this case, which should match the device already.
+			return col.CGColor.ToXwtColor();
 		}
 		
 		public static Color ToXwtColor (this CGColor col)
 		{
 			var cs = col.Components;
 			return new Color (cs[0], cs[1], cs[2], col.Alpha);
+		}
+
+		public static CGSize ToCGSize (this Size s)
+		{
+			return new CGSize ((nfloat)s.Width, (nfloat)s.Height);
 		}
 
 		public static Size ToXwtSize (this CGSize s)
@@ -159,6 +157,21 @@ namespace Xwt.Mac
 		public static CGRect ToCGRect (this Rectangle r)
 		{
 			return new CGRect ((nfloat)r.X, (nfloat)r.Y, (nfloat)r.Width, (nfloat)r.Height);
+		}
+
+		public static Rectangle ToXwtRect (this CGRect r)
+		{
+			return new Rectangle (r.X, r.Y, r.Width, r.Height);
+		}
+
+		public static CGPoint ToCGPoint (this Point r)
+		{
+			return new CGPoint ((nfloat)r.X, (nfloat)r.Y);
+		}
+
+		public static Point ToXwtPoint (this CGPoint p)
+		{
+			return new Point (p.X, p.Y);
 		}
 
 		// /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Headers/IconsCore.h
@@ -184,13 +197,13 @@ namespace Xwt.Mac
 		}
 		*/
 
-		public static SizeF ToIconSize (IconSize size)
+		public static CGSize ToIconSize (IconSize size)
 		{
 			switch (size) {
-			case IconSize.Small: return new SizeF (16f, 16f);
-			case IconSize.Large: return new SizeF (64f, 64f);
+			case IconSize.Small: return new CGSize (16f, 16f);
+			case IconSize.Large: return new CGSize (64f, 64f);
 			}
-			return new SizeF (32f, 32f);
+			return new CGSize (32f, 32f);
 		}
 
 		public static string ToUTI (this TransferDataType dt)
@@ -208,73 +221,14 @@ namespace Xwt.Mac
 
 			return dt.Id;
 		}
-
-#if MONOMAC
-		static Selector selCopyWithZone = new Selector ("copyWithZone:");
-		static DateTime lastCopyPoolDrain = DateTime.Now;
-		static List<object> copyPool = new List<object> ();
-
-		/// <summary>
-		/// Implements the NSCopying protocol in a class. The class must implement ICopiableObject.
-		/// The method ICopiableObject.CopyFrom will be called to make the copy of the object
-		/// </summary>
-		/// <typeparam name="T">Type for which to enable copying</typeparam>
-		public static void MakeCopiable<T> () where T:ICopiableObject
-		{
-			Class c = new Class (typeof(T));
-			c.AddMethod (selCopyWithZone.Handle, new Func<IntPtr, IntPtr, IntPtr, IntPtr> (MakeCopy), "i@:@");
-		}
-		
-		static IntPtr MakeCopy (IntPtr sender, IntPtr sel, IntPtr zone)
-		{
-			var thisOb = (ICopiableObject) Runtime.GetNSObject (sender);
-
-			// Makes a copy of the object by calling the default implementation of copyWithZone
-			IntPtr copyHandle = Messaging.IntPtr_objc_msgSendSuper_IntPtr(((NSObject)thisOb).SuperHandle, selCopyWithZone.Handle, zone);
-			var copyOb = (ICopiableObject) Runtime.GetNSObject (copyHandle);
-
-			// Copy of managed data
-			copyOb.CopyFrom (thisOb);
-
-			// Copied objects are for internal use of the Cocoa framework. We need to keep a reference of the
-			// managed object until the the framework doesn't need it anymore.
-
-			if ((DateTime.Now - lastCopyPoolDrain).TotalSeconds > 2)
-				DrainObjectCopyPool ();
-
-			copyPool.Add (copyOb);
-
-			return ((NSObject)copyOb).Handle;
-		}
-
-		public static void DrainObjectCopyPool ()
-		{
-			// Objects in the pool have been created by Cocoa, so there should be no managed references
-			// other than the ones we keep in the pool. An object can be removed from the pool if it
-			// has only 1 reference left (the managed one)
-
-			List<NSObject> markedForDelete = new List<NSObject> ();
-			
-			foreach (NSObject ob in copyPool) {
-				var count = ob.RetainCount;
-				if (count == 1)
-					markedForDelete.Add (ob);
-			}
-			foreach (NSObject ob in markedForDelete)
-				copyPool.Remove (ob);
-
-			lastCopyPoolDrain = DateTime.Now;
-		}
-#else
-		public static void MakeCopiable<T> () where T:ICopiableObject
+		/*public static void MakeCopiable<T> () where T:ICopiableObject
 		{
 			// Nothing to do for XamMac
 		}
 		public static void DrainObjectCopyPool ()
 		{
 			// Nothing to do for XamMac
-		}
-#endif
+		}*/
 
 		public static NSBitmapImageFileType ToMacFileType (this ImageFileType type)
 		{
@@ -285,6 +239,21 @@ namespace Xwt.Mac
 			default:
 				throw new NotSupportedException ();
 			}
+		}
+
+		public static bool TriggersContextMenu (this NSEvent theEvent)
+		{
+			if (theEvent.ButtonNumber == 1 &&
+					(NSEvent.CurrentPressedMouseButtons & 1 | NSEvent.CurrentPressedMouseButtons & 4) == 0) {
+				return true;
+			}
+
+			if (theEvent.ButtonNumber == 0 && (theEvent.ModifierFlags & NSEventModifierMask.ControlKeyMask) != 0 &&
+					(NSEvent.CurrentPressedMouseButtons & 2 | NSEvent.CurrentPressedMouseButtons & 4) == 0) {
+				return true;
+			}
+
+			return false;
 		}
 
 		public static NSImage ToNSImage (this ImageDescription idesc)
@@ -308,9 +277,48 @@ namespace Xwt.Mac
 			return 1;
 		}
 
+		public static int ToMacValue (this FontWeight weight)
+		{
+			switch (weight) {
+			case FontWeight.Thin:
+				return 1;
+			case FontWeight.Ultralight:
+				return 2;
+			case FontWeight.Light:
+				return 3;
+			case FontWeight.Book:
+				return 4;
+			case FontWeight.Normal:
+				return 5;
+			case FontWeight.Medium:
+				return 6;
+			case FontWeight.Semibold:
+				return 8;
+			case FontWeight.Bold:
+				return 9;
+			case FontWeight.Ultrabold:
+				return 10;
+			case FontWeight.Heavy:
+				return 11;
+			case FontWeight.Ultraheavy:
+				return 12;
+			default:
+				return 13;
+			}
+		}
+
+		public static NSFont WithWeight (this NSFont font, FontWeight weight)
+		{
+			int w = weight.ToMacValue ();
+			var traits = NSFontManager.SharedFontManager.TraitsOfFont (font);
+			traits |= weight >= FontWeight.Bold? NSFontTraitMask.Bold : NSFontTraitMask.Unbold;
+			traits &= weight >= FontWeight.Bold? ~NSFontTraitMask.Unbold : ~NSFontTraitMask.Bold;
+			return NSFontManager.SharedFontManager.FontWithFamily (font.FamilyName, traits, w, font.PointSize);
+		}
+
 		static Selector applyFontTraits = new Selector ("applyFontTraits:range:");
 
-		public static NSAttributedString ToAttributedString (this FormattedText ft)
+		public static NSMutableAttributedString ToAttributedString (this FormattedText ft)
 		{
 			NSMutableAttributedString ns = new NSMutableAttributedString (ft.Text);
 			ns.BeginEditing ();
@@ -347,8 +355,9 @@ namespace Xwt.Mac
 				}
 				else if (att is LinkTextAttribute) {
 					var xa = (LinkTextAttribute)att;
-					ns.AddAttribute (NSStringAttributeKey.Link, new NSUrl (xa.Target.ToString ()), r);
-					ns.AddAttribute (NSStringAttributeKey.ForegroundColor, NSColor.Blue, r);
+					if (xa.Target != null)
+						ns.AddAttribute (NSStringAttributeKey.Link, new NSUrl (xa.Target.ToString ()), r);
+					ns.AddAttribute (NSStringAttributeKey.ForegroundColor, Toolkit.CurrentEngine.Defaults.FallbackLinkColor.ToNSColor (), r);
 					ns.AddAttribute (NSStringAttributeKey.UnderlineStyle, NSNumber.FromInt32 ((int)NSUnderlineStyle.Single), r);
 				}
 				else if (att is StrikethroughTextAttribute) {
@@ -362,6 +371,22 @@ namespace Xwt.Mac
 					ns.AddAttribute (NSStringAttributeKey.Font, nf, r);
 				}
 			}
+			ns.EndEditing ();
+			return ns;
+		}
+
+
+		public static NSMutableAttributedString WithAlignment (this NSMutableAttributedString ns, NSTextAlignment alignment)
+		{
+			if (ns == null)
+				return null;
+			
+			ns.BeginEditing ();
+			var r = new NSRange (0, ns.Length);
+			ns.RemoveAttribute (NSStringAttributeKey.ParagraphStyle, r);
+			var pstyle = NSParagraphStyle.DefaultParagraphStyle.MutableCopy () as NSMutableParagraphStyle;
+			pstyle.Alignment = alignment;
+			ns.AddAttribute (NSStringAttributeKey.ParagraphStyle, pstyle, r);
 			ns.EndEditing ();
 			return ns;
 		}
@@ -490,21 +515,31 @@ namespace Xwt.Mac
 			}
 		}
 
+		static readonly Selector selConvertSizeToBacking = new Selector ("convertSizeToBacking:");
+
 		public static void DrawWithColorTransform (this NSView view, Color? color, Action drawDelegate)
 		{
 			if (color.HasValue) {
-				if (view.Frame.Size.Width <= 0 || view.Frame.Size.Height <= 0)
+				var size = view.Frame.Size;
+				if (size.Width <= 0 || size.Height <= 0)
 					return;
 
 				// render view to image
-				var image = new NSImage(view.Frame.Size);
+				var image = new NSImage(size);
 				image.LockFocusFlipped(!view.IsFlipped);
 				drawDelegate ();
 				image.UnlockFocus();
 
 				// create Core image for transformation
-				var rr = new CGRect(0, 0, view.Frame.Size.Width, view.Frame.Size.Height);
-				var ciImage = CIImage.FromCGImage(image.AsCGImage (ref rr, NSGraphicsContext.CurrentContext, null));
+				var ciImage = CIImage.FromCGImage(image.CGImage);
+
+				CGSize displaySize;
+				#pragma warning disable iOSAndMacApiUsageIssue
+				if (view.RespondsToSelector (selConvertSizeToBacking))
+					displaySize = view.ConvertSizeToBacking (size);
+				else
+					displaySize = view.ConvertSizeToBase (size);
+				#pragma warning restore iOSAndMacApiUsageIssue
 
 				// apply color matrix
 				var transformColor = new CIColorMatrix();
@@ -516,9 +551,253 @@ namespace Xwt.Mac
 				ciImage = (CIImage)transformColor.ValueForKey(new NSString("outputImage"));
 
 				var ciCtx = CIContext.FromContext(NSGraphicsContext.CurrentContext.GraphicsPort, null);
-				ciCtx.DrawImage (ciImage, rr, rr);
+				ciCtx.DrawImage (ciImage, new CGRect (CGPoint.Empty, size), new CGRect (CGPoint.Empty, displaySize));
 			} else
 				drawDelegate();
+		}
+
+		public static CGPoint ConvertPointFromEvent(this NSView view, NSEvent theEvent)
+		{
+			var point = theEvent.LocationInWindow;
+			if (theEvent.WindowNumber != view.Window.WindowNumber)
+			{
+				point = theEvent.Window.ConvertBaseToScreen(point);
+				point = view.Window.ConvertScreenToBase(point);
+			}
+			return view.ConvertPointFromView(point, null);
+		}
+
+		public static Accessibility.Role GetXwtRole (INSAccessibility widget)
+		{
+			var r = widget.AccessibilityRole;
+			var sr = widget.AccessibilitySubrole;
+			if (r == NSAccessibilityRoles.ButtonRole) {
+				if (sr == NSAccessibilitySubroles.CloseButtonSubrole)
+					return Accessibility.Role.ButtonClose;
+				if (sr == NSAccessibilitySubroles.MinimizeButtonSubrole)
+					return Accessibility.Role.ButtonMinimize;
+				if (sr == NSAccessibilitySubroles.ZoomButtonSubrole)
+					return Accessibility.Role.ButtonMaximize;
+				if (sr == NSAccessibilitySubroles.FullScreenButtonSubrole)
+					return Accessibility.Role.ButtonFullscreen;
+				return Accessibility.Role.Button;
+			}
+			if (r == NSAccessibilityRoles.CellRole)
+				return Accessibility.Role.Cell;
+			if (r == NSAccessibilityRoles.CheckBoxRole)
+				return Accessibility.Role.CheckBox;
+			if (r == NSAccessibilityRoles.ColorWellRole)
+				return Accessibility.Role.ColorChooser;
+			if (r == NSAccessibilityRoles.ColumnRole)
+				return Accessibility.Role.Column;
+			if (r == NSAccessibilityRoles.ComboBoxRole)
+				return Accessibility.Role.ComboBox;
+			if (r == NSAccessibilityRoles.ComboBoxRole)
+				return Accessibility.Role.ComboBox;
+			if (r == NSAccessibilityRoles.DisclosureTriangleRole)
+				return Accessibility.Role.Disclosure;
+			if (r == NSAccessibilityRoles.GroupRole)
+				return Accessibility.Role.Group;
+			if (r == NSAccessibilityRoles.ImageRole)
+				return Accessibility.Role.Image;
+			if (r == NSAccessibilityRoles.LevelIndicatorRole)
+				return Accessibility.Role.LevelIndicator;
+			if (r == NSAccessibilityRoles.LinkRole)
+				return Accessibility.Role.Link;
+			if (r == NSAccessibilityRoles.ListRole)
+				return Accessibility.Role.List;
+			if (r == "NSAccessibilityMenuBarRole")
+				return Accessibility.Role.MenuBar;
+			if (r == NSAccessibilityRoles.MenuBarItemRole)
+				return Accessibility.Role.MenuBarItem;
+			if (r == NSAccessibilityRoles.MenuItemRole)
+				return Accessibility.Role.MenuItem;
+			if (r == NSAccessibilityRoles.MenuRole)
+				return Accessibility.Role.Menu;
+			if (r == NSAccessibilityRoles.OutlineRole)
+				return Accessibility.Role.Tree;
+			if (r == NSAccessibilityRoles.PopUpButtonRole)
+				return Accessibility.Role.MenuButton;
+			if (r == NSAccessibilityRoles.PopoverRole)
+				return Accessibility.Role.Popup;
+			if (r == NSAccessibilityRoles.ProgressIndicatorRole)
+				return Accessibility.Role.ProgressBar;
+			if (r == NSAccessibilityRoles.RadioButtonRole)
+				return Accessibility.Role.RadioButton;
+			if (r == NSAccessibilityRoles.RadioGroupRole)
+				return Accessibility.Role.RadioGroup;
+			if (r == NSAccessibilityRoles.RowRole)
+				return Accessibility.Role.Row;
+			if (r == NSAccessibilityRoles.ScrollAreaRole)
+				return Accessibility.Role.ScrollView;
+			if (r == NSAccessibilityRoles.ScrollBarRole)
+				return Accessibility.Role.ScrollBar;
+			if (r == NSAccessibilityRoles.SliderRole)
+				return Accessibility.Role.Slider;
+			if (r == NSAccessibilityRoles.SplitGroupRole)
+				return Accessibility.Role.Paned;
+			if (r == NSAccessibilityRoles.SplitterRole)
+				return Accessibility.Role.PanedSplitter;
+			if (r == NSAccessibilityRoles.StaticTextRole)
+				return Accessibility.Role.Label;
+			if (r == NSAccessibilityRoles.TabGroupRole)
+				return Accessibility.Role.Notebook;
+			if (r == NSAccessibilityRoles.TableRole)
+				return Accessibility.Role.Table;
+			if (r == NSAccessibilityRoles.TextAreaRole)
+				return Accessibility.Role.TextEntry;
+			if (r == NSAccessibilityRoles.TextFieldRole) {
+				if (sr == NSAccessibilitySubroles.SearchFieldSubrole)
+					return Accessibility.Role.TextEntrySearch;
+				if (sr == NSAccessibilitySubroles.SecureTextFieldSubrole)
+					return Accessibility.Role.TextEntryPassword;
+				return Accessibility.Role.TextEntry;
+			}
+			if (r == NSAccessibilityRoles.ToolbarRole)
+				return Accessibility.Role.ToolBar;
+			if (r == NSAccessibilityRoles.ValueIndicatorRole)
+				return Accessibility.Role.SpinButton;
+			//if (r == NSAccessibilityRoles.WindowRole)
+			//	return Accessibility.Role.Window;
+			
+			return Accessibility.Role.Custom;
+
+			// TODO:
+			//NSAccessibilityRoles.ApplicationRole;
+			//NSAccessibilityRoles.BrowserRole;
+			//NSAccessibilityRoles.BusyIndicatorRole;
+			//NSAccessibilityRoles.DrawerRole;
+			//NSAccessibilityRoles.GridRole;
+			//NSAccessibilityRoles.GrowAreaRole;
+			//NSAccessibilityRoles.HandleRole;
+			//NSAccessibilityRoles.HelpTagRole;
+			//NSAccessibilityRoles.IncrementorRole;
+			//NSAccessibilityRoles.LayoutAreaRole;
+			//NSAccessibilityRoles.LayoutItemRole;
+			//NSAccessibilityRoles.IncrementorRole
+			//NSAccessibilityRoles.MatteRole;
+			//NSAccessibilityRoles.MenuButtonRole;
+			//NSAccessibilityRoles.RelevanceIndicatorRole;
+			//NSAccessibilityRoles.RulerMarkerRole;
+			//NSAccessibilityRoles.RulerRole;
+			//NSAccessibilityRoles.SheetRole;
+			//NSAccessibilityRoles.UnknownRole;
+		}
+
+		public static NSString GetMacRole (this Accessibility.Role role)
+		{
+			switch (role) {
+				case Accessibility.Role.Button:
+					return NSAccessibilityRoles.ButtonRole;
+				//case Accessibility.Role.Calendar:
+				//	break;
+				case Accessibility.Role.Cell:
+					return NSAccessibilityRoles.CellRole;
+				case Accessibility.Role.CheckBox:
+					return NSAccessibilityRoles.CheckBoxRole;
+				case Accessibility.Role.ColorChooser:
+					return NSAccessibilityRoles.ColorWellRole;
+				case Accessibility.Role.Column:
+					return NSAccessibilityRoles.ColumnRole;
+				case Accessibility.Role.ComboBox:
+					return NSAccessibilityRoles.ComboBoxRole;
+				//case Accessibility.Role.Custom:
+				//	break;
+				//case Accessibility.Role.Dialog:
+				//	return NSAccessibilityRoles.WindowRole;
+				case Accessibility.Role.Disclosure:
+					return NSAccessibilityRoles.DisclosureTriangleRole;
+				//case Accessibility.Role.Grid:
+				//	break;
+				case Accessibility.Role.Group:
+					return NSAccessibilityRoles.GroupRole;
+				case Accessibility.Role.Image:
+					return NSAccessibilityRoles.ImageRole;
+				case Accessibility.Role.Label:
+					return NSAccessibilityRoles.StaticTextRole;
+				case Accessibility.Role.LevelIndicator:
+					return NSAccessibilityRoles.LevelIndicatorRole;
+				case Accessibility.Role.Link:
+					return NSAccessibilityRoles.LinkRole;
+				case Accessibility.Role.List:
+					return NSAccessibilityRoles.ListRole;
+				case Accessibility.Role.Menu:
+					return NSAccessibilityRoles.MenuRole;
+				case Accessibility.Role.MenuBar:
+					return new NSString ("NSAccessibilityMenuBarRole");
+				case Accessibility.Role.MenuBarItem:
+					return NSAccessibilityRoles.MenuBarItemRole;
+				case Accessibility.Role.MenuButton:
+					return NSAccessibilityRoles.PopUpButtonRole;
+				case Accessibility.Role.MenuItem:
+				case Accessibility.Role.MenuItemCheckBox:
+				case Accessibility.Role.MenuItemRadio:
+					return NSAccessibilityRoles.MenuItemRole;
+				case Accessibility.Role.Notebook:
+					return NSAccessibilityRoles.TabGroupRole;
+				//case Accessibility.Role.NotebookTab:
+				//	break;
+				case Accessibility.Role.Popup:
+					return NSAccessibilityRoles.PopoverRole;
+				case Accessibility.Role.ProgressBar:
+					return NSAccessibilityRoles.ProgressIndicatorRole;
+				case Accessibility.Role.RadioButton:
+					return NSAccessibilityRoles.RadioButtonRole;
+				case Accessibility.Role.RadioGroup:
+					return NSAccessibilityRoles.RadioGroupRole;
+				case Accessibility.Role.Row:
+					return NSAccessibilityRoles.RowRole;
+				case Accessibility.Role.ScrollBar:
+					return NSAccessibilityRoles.ScrollBarRole;
+				case Accessibility.Role.ScrollView:
+					return NSAccessibilityRoles.ScrollAreaRole;
+				//case Accessibility.Role.Separator:
+				//	break;
+				case Accessibility.Role.Slider:
+					return NSAccessibilityRoles.SliderRole;
+				case Accessibility.Role.SpinButton:
+					return NSAccessibilityRoles.ValueIndicatorRole;
+				case Accessibility.Role.Paned:
+					return NSAccessibilityRoles.SplitGroupRole;
+				case Accessibility.Role.PanedSplitter:
+					return NSAccessibilityRoles.SplitterRole;
+				case Accessibility.Role.Table:
+					return NSAccessibilityRoles.TableRole;
+				case Accessibility.Role.TextArea:
+					return NSAccessibilityRoles.TextAreaRole;
+				case Accessibility.Role.TextEntry:
+					return NSAccessibilityRoles.TextFieldRole;
+				case Accessibility.Role.ToggleButton:
+					return NSAccessibilityRoles.ButtonRole;
+				case Accessibility.Role.ToolBar:
+					return NSAccessibilityRoles.ToolbarRole;
+				//case Accessibility.Role.ToolTip:
+				//	break;
+				case Accessibility.Role.Tree:
+					return NSAccessibilityRoles.OutlineRole;
+				//case Accessibility.Role.Window:
+				//	return NSAccessibilityRoles.WindowRole;
+			}
+			return NSAccessibilityRoles.UnknownRole;
+		}
+
+		public static NSString GetMacSubrole (this Accessibility.Role role)
+		{
+			switch (role) {
+			case Accessibility.Role.ButtonClose:
+				return NSAccessibilitySubroles.CloseButtonSubrole;
+			case Accessibility.Role.ButtonMaximize:
+				return NSAccessibilitySubroles.ZoomButtonSubrole;
+			case Accessibility.Role.ButtonMinimize:
+				return NSAccessibilitySubroles.MinimizeButtonSubrole;
+			case Accessibility.Role.ButtonFullscreen:
+				return NSAccessibilitySubroles.FullScreenButtonSubrole;
+			case Accessibility.Role.TextEntrySearch:
+				return NSAccessibilitySubroles.SearchFieldSubrole;
+			case Accessibility.Role.TextEntryPassword:
+				return NSAccessibilitySubroles.SecureTextFieldSubrole;
+			}
+			return null;
 		}
 	}
 

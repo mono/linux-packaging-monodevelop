@@ -94,7 +94,7 @@ namespace UserInterfaceTests
 			takeScreenshot ("NuGet-Update-Is-"+isUpdate);
 			try {
 				WaitForNuGet.Success (packageOptions.PackageName, isUpdate ? NuGetOperations.Update : NuGetOperations.Add);
-			} catch (TimeoutException e) {
+			} catch (TimeoutException) {
 				takeScreenshot ("Wait-For-NuGet-Operation-Failed");
 				throw;
 			}
@@ -115,7 +115,7 @@ namespace UserInterfaceTests
 		public void Open ()
 		{
 			Session.WaitForElement (IdeQuery.DefaultWorkbench);
-			Session.ExecuteCommand ("MonoDevelop.PackageManagement.Commands.AddNuGetPackages", source: CommandSource.MainMenu);
+			Session.ExecuteCommand ("MonoDevelop.PackageManagement.Commands.AddPackages", source: CommandSource.MainMenu);
 			WaitForAddButton ();
 			takeScreenshot ("NuGet-Dialog-Opened");
 		}

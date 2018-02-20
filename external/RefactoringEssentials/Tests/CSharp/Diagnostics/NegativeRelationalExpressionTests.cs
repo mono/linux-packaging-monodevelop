@@ -1,10 +1,9 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class NegativeRelationalExpressionTests : CSharpDiagnosticTestBase
     {
 
@@ -29,43 +28,43 @@ class TestClass
             Test<NegativeRelationalExpressionAnalyzer>(input, 1, output);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestEquality()
         {
             Test("==", "!=");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestInEquality()
         {
             Test("!=", "==");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestGreaterThan()
         {
             Test(">", "<=");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestGreaterThanOrEqual()
         {
             Test(">=", "<");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestLessThan()
         {
             Test("<", ">=");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestLessThanOrEqual()
         {
             Test("<=", ">");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestFloatingPoint()
         {
             var input = @"
@@ -79,7 +78,7 @@ class TestClass
             Test<NegativeRelationalExpressionAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestFloatingPointEquality()
         {
             var input = @"
@@ -93,7 +92,7 @@ class TestClass
             Test<NegativeRelationalExpressionAnalyzer>(input, 1);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestUserDefinedOperator()
         {
             var input = @"
@@ -112,7 +111,7 @@ struct LineChangeInfo
             Test<NegativeRelationalExpressionAnalyzer>(input, 0);
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug()
         {
             var input = @"
@@ -128,3 +127,4 @@ class TestClass
 
     }
 }
+*/

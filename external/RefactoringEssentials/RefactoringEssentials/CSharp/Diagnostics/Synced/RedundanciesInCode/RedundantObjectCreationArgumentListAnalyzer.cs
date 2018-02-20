@@ -3,11 +3,10 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
-using System.Linq;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
-    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+	[DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class RedundantObjectCreationArgumentListAnalyzer : DiagnosticAnalyzer
     {
         private static readonly DiagnosticDescriptor descriptor = new DiagnosticDescriptor(
@@ -15,7 +14,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             GettextCatalog.GetString("When object creation uses object or collection initializer, empty argument list is redundant"),
             GettextCatalog.GetString("Empty argument list is redundant"),
             DiagnosticAnalyzerCategories.RedundanciesInCode,
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Hidden,
             isEnabledByDefault: true,
             helpLinkUri: HelpLink.CreateFor(CSharpDiagnosticIDs.RedundantObjectCreationArgumentListAnalyzerID),
             customTags: DiagnosticCustomTags.Unnecessary
@@ -25,6 +24,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 (nodeContext) =>
                 {
@@ -41,8 +42,6 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         private static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
 
             var objectCreation = nodeContext.Node as ObjectCreationExpressionSyntax;
             if (objectCreation?.Initializer == null ||

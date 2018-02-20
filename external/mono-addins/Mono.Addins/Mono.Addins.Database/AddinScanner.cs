@@ -1,4 +1,4 @@
-//
+﻿//
 // AddinScanner.cs
 //
 // Author:
@@ -278,9 +278,8 @@ namespace Mono.Addins.Database
 					    
 					if (errors.Count > 0) {
 						scanSuccessful = false;
-						monitor.ReportError ("Errors found in add-in '" + file + ":", null);
 						foreach (string err in errors)
-							monitor.ReportError (err, null);
+							monitor.ReportError (string.Format ("{0}: {1}", file, err), null);
 					}
 				
 					// Make sure all extensions sets are initialized with the correct add-in id
@@ -336,7 +335,7 @@ namespace Mono.Addins.Database
 						if (config.IsRoot && scanResult.HostIndex != null) {
 							// If the add-in is a root, register its assemblies
 							foreach (string f in config.MainModule.Assemblies) {
-								string asmFile = Path.Combine (config.BasePath, f);
+								string asmFile = Path.Combine (config.BasePath, Util.NormalizePath (f));
 								scanResult.HostIndex.RegisterAssembly (asmFile, config.AddinId, config.AddinFile, config.Domain);
 							}
 						}
@@ -363,7 +362,7 @@ namespace Mono.Addins.Database
 				if (scanSuccessful && config != null) {
 					// Update the ignore list in the folder info object. To be used in the next scan
 					foreach (string df in config.AllIgnorePaths) {
-						string path = Path.Combine (config.BasePath, df);
+						string path = Path.Combine (config.BasePath, Util.NormalizePath (df));
 						ainfo.AddPathToIgnore (Path.GetFullPath (path));
 					}
 				}
@@ -505,10 +504,11 @@ namespace Mono.Addins.Database
 		bool ScanConfigAssemblies (IProgressStatus monitor, string filePath, AddinScanResult scanResult, out AddinDescription config)
 		{
 			config = null;
-			
+
+			IAssemblyReflector reflector = null;
 			try {
-				IAssemblyReflector reflector = GetReflector (monitor, scanResult, filePath);
-				
+				reflector = GetReflector (monitor, scanResult, filePath);
+
 				string basePath = Path.GetDirectoryName (filePath);
 				
 				using (var s = fs.OpenFile (filePath)) {
@@ -538,14 +538,16 @@ namespace Mono.Addins.Database
 			}
 			return reflector;
 		}
-		
+
 		bool ScanAssembly (IProgressStatus monitor, string filePath, AddinScanResult scanResult, out AddinDescription config)
 		{
 			config = null;
-				
+
+			IAssemblyReflector reflector = null;
+			object asm = null;
 			try {
-				IAssemblyReflector reflector = GetReflector (monitor, scanResult, filePath);
-				object asm = reflector.LoadAssembly (filePath);
+				reflector = GetReflector (monitor, scanResult, filePath);
+				asm = reflector.LoadAssembly (filePath);
 				if (asm == null)
 					throw new Exception ("Could not load assembly: " + filePath);
 				
@@ -559,6 +561,7 @@ namespace Mono.Addins.Database
 					AddinAttribute att = (AddinAttribute) reflector.GetCustomAttribute (asm, typeof(AddinAttribute), false);
 					if (att == null) {
 						config = null;
+						reflector.UnloadAssembly (asm);
 						return true;
 					}
 
@@ -573,9 +576,14 @@ namespace Mono.Addins.Database
 				if (!config.MainModule.Assemblies.Contains (rasmFile))
 					config.MainModule.Assemblies.Add (rasmFile);
 				
-				return ScanDescription (monitor, reflector, config, asm, scanResult);
+				bool res = ScanDescription (monitor, reflector, config, asm, scanResult);
+				if (!res)
+					reflector.UnloadAssembly (asm);
+				return res;
 			}
 			catch (Exception ex) {
+				if (asm != null)
+					reflector.UnloadAssembly (asm);
 				// Something went wrong while scanning the assembly. We'll ignore it for now.
 				monitor.ReportError ("There was an error while scanning assembly: " + filePath, ex);
 				return false;
@@ -625,7 +633,7 @@ namespace Mono.Addins.Database
 				// we use a for loop instead of a foreach
 				for (int n=0; n<config.MainModule.Assemblies.Count; n++) {
 					string s = config.MainModule.Assemblies [n];
-					string asmFile = Path.GetFullPath (Path.Combine (config.BasePath, s));
+					string asmFile = Path.GetFullPath (Path.Combine (config.BasePath, Util.NormalizePath (s)));
 					scanResult.AddPathToIgnore (asmFile);
 					if (s == rootAsmFile || config.MainModule.IgnorePaths.Contains (s))
 						continue;
@@ -638,11 +646,11 @@ namespace Mono.Addins.Database
 				// Add all data files to the ignore file list. It avoids scanning assemblies
 				// which are included as 'data' in an add-in.
 				foreach (string df in config.MainModule.DataFiles) {
-					string file = Path.Combine (config.BasePath, df);
+					string file = Path.Combine (config.BasePath, Util.NormalizePath (df));
 					scanResult.AddPathToIgnore (Path.GetFullPath (file));
 				}
 				foreach (string df in config.MainModule.IgnorePaths) {
-					string path = Path.Combine (config.BasePath, df);
+					string path = Path.Combine (config.BasePath, Util.NormalizePath (df));
 					scanResult.AddPathToIgnore (Path.GetFullPath (path));
 				}
 				
@@ -683,7 +691,7 @@ namespace Mono.Addins.Database
 							string s = mod.Assemblies [n];
 							if (mod.IgnorePaths.Contains (s))
 								continue;
-							string asmFile = Path.Combine (config.BasePath, s);
+							string asmFile = Path.Combine (config.BasePath, Util.NormalizePath (s));
 							object asm = reflector.LoadAssembly (asmFile);
 							asmList.Add (new Tuple<string,object> (asmFile,asm));
 							scanResult.AddPathToIgnore (Path.GetFullPath (asmFile));
@@ -692,11 +700,11 @@ namespace Mono.Addins.Database
 						// Add all data files to the ignore file list. It avoids scanning assemblies
 						// which are included as 'data' in an add-in.
 						foreach (string df in mod.DataFiles) {
-							string file = Path.Combine (config.BasePath, df);
+							string file = Path.Combine (config.BasePath, Util.NormalizePath (df));
 							scanResult.AddPathToIgnore (Path.GetFullPath (file));
 						}
 						foreach (string df in mod.IgnorePaths) {
-							string path = Path.Combine (config.BasePath, df);
+							string path = Path.Combine (config.BasePath, Util.NormalizePath (df));
 							scanResult.AddPathToIgnore (Path.GetFullPath (path));
 						}
 						
@@ -843,10 +851,18 @@ namespace Mono.Addins.Database
 			AddinLocalizerGettextAttribute locat = (AddinLocalizerGettextAttribute) reflector.GetCustomAttribute (asm, typeof(AddinLocalizerGettextAttribute), false);
 			if (locat != null) {
 				ExtensionNodeDescription node = new ExtensionNodeDescription ();
+				node.SetAttribute ("type", "Gettext");
 				if (!string.IsNullOrEmpty (locat.Catalog))
 					node.SetAttribute ("catalog", locat.Catalog);
 				if (!string.IsNullOrEmpty (locat.Location))
-					node.SetAttribute ("location", locat.Catalog);
+					node.SetAttribute ("location", locat.Location);
+				config.Localizer = node;
+			}
+
+			var customLocat = (AddinLocalizerAttribute) reflector.GetCustomAttribute (asm, typeof(AddinLocalizerAttribute), false);
+			if (customLocat != null) {
+				var node = new ExtensionNodeDescription ();
+				node.SetAttribute ("type", customLocat.TypeName);
 				config.Localizer = node;
 			}
 			
@@ -918,16 +934,20 @@ namespace Mono.Addins.Database
 			// Look for extension nodes declared using assembly attributes
 			
 			foreach (CustomAttribute att in reflector.GetRawCustomAttributes (asm, typeof(CustomExtensionAttribute), true))
-				AddCustomAttributeExtension (module, att, "Type");
+				AddCustomAttributeExtension (module, att, "Type", null);
 			
 			// Get extensions or extension points applied to types
 			
 			foreach (object t in reflector.GetAssemblyTypes (asm)) {
 				
 				string typeFullName = reflector.GetTypeFullName (t);
-				
+
+				//condition attributes apply independently but identically to all extension attributes on this node
+				//depending on ordering is too messy due to inheritance etc
+				var conditionAtts = new Lazy<List<CustomAttribute>> (() => reflector.GetRawCustomAttributes (t, typeof (CustomConditionAttribute), false));
+
 				// Look for extensions
-				
+
 				object[] extensionAtts = reflector.GetCustomAttributes (t, typeof(ExtensionAttribute), false);
 				if (extensionAtts.Length > 0) {
 					Dictionary<string,ExtensionNodeDescription> nodes = new Dictionary<string, ExtensionNodeDescription> ();
@@ -950,7 +970,7 @@ namespace Mono.Addins.Database
 							path = eatt.Path;
 						}
 
-						ExtensionNodeDescription elem = module.AddExtensionNode (path, nodeName);
+						ExtensionNodeDescription elem = AddConditionedExtensionNode (module, path, nodeName, conditionAtts.Value);
 						nodes [path] = elem;
 						uniqueNode = elem;
 						
@@ -1015,7 +1035,7 @@ namespace Mono.Addins.Database
 					else {
 						// Look for custom extension attribtues
 						foreach (CustomAttribute att in reflector.GetRawCustomAttributes (t, typeof(CustomExtensionAttribute), false)) {
-							ExtensionNodeDescription elem = AddCustomAttributeExtension (module, att, "Type");
+							ExtensionNodeDescription elem = AddCustomAttributeExtension (module, att, "Type", conditionAtts.Value);
 							elem.SetAttribute ("type", typeFullName);
 							if (string.IsNullOrEmpty (elem.GetAttribute ("id")))
 								elem.SetAttribute ("id", typeFullName);
@@ -1024,14 +1044,77 @@ namespace Mono.Addins.Database
 				}
 			}
 		}
-		
-		ExtensionNodeDescription AddCustomAttributeExtension (ModuleDescription module, CustomAttribute att, string nameName)
+
+		static ExtensionNodeDescription AddConditionedExtensionNode (ModuleDescription module, string path, string nodeName, List<CustomAttribute> conditionAtts)
+		{
+			if (conditionAtts == null || conditionAtts.Count == 0) {
+				return module.AddExtensionNode (path, nodeName);
+			}
+
+			ExtensionNodeDescription conditionNode;
+
+			if (conditionAtts.Count == 1) {
+				conditionNode = CreateConditionNode (conditionAtts[0]);
+				module.GetExtension (path).ExtensionNodes.Add (conditionNode);
+			}
+			else {
+				conditionNode = new ExtensionNodeDescription ("ComplexCondition");
+				ExtensionNodeDescription andNode = new ExtensionNodeDescription ("And");
+				conditionNode.ChildNodes.Add (andNode);
+				foreach (var catt in conditionAtts) {
+					var cnode = CreateConditionNode (catt);
+					andNode.ChildNodes.Add (cnode);
+				}
+			}
+
+			var node = new ExtensionNodeDescription (nodeName);
+			conditionNode.ChildNodes.Add (node);
+			return node;
+		}
+
+		static ExtensionNodeDescription CreateConditionNode (CustomAttribute conditionAtt)
+		{
+			var conditionNode = new ExtensionNodeDescription ("Condition");
+
+			var id = GetConditionId (conditionAtt);
+			conditionNode.SetAttribute ("id", id);
+
+			foreach (KeyValuePair<string, string> prop in conditionAtt) {
+				if (string.IsNullOrEmpty (prop.Key)) {
+					throw new Exception ("Empty key in attribute '" + conditionAtt.TypeName + "'.");
+				}
+				conditionNode.SetAttribute (prop.Key, prop.Value);
+			}
+
+			return conditionNode;
+		}
+
+		static string GetConditionId (CustomAttribute conditionAtt)
+		{
+			var id = conditionAtt.TypeName;
+			var start = id.LastIndexOf ('.') + 1;
+			int length = id.Length - start;
+
+			if (id.EndsWith ("ConditionAttribute", StringComparison.Ordinal)) {
+				length -= "ConditionAttribute".Length;
+			} else if (id.EndsWith ("Attribute", StringComparison.Ordinal)) {
+				length -= "Attribute".Length;
+			}
+
+			id = id.Substring (start, length);
+			return id;
+		}
+
+		ExtensionNodeDescription AddCustomAttributeExtension (ModuleDescription module, CustomAttribute att, string nameName, List<CustomAttribute> conditionAtts)
 		{
 			string path;
 			if (!att.TryGetValue (CustomExtensionAttribute.PathFieldKey, out path))
 				path = "%" + att.TypeName;
-			ExtensionNodeDescription elem = module.AddExtensionNode (path, nameName);
+			ExtensionNodeDescription elem = AddConditionedExtensionNode (module, path, nameName, conditionAtts);
 			foreach (KeyValuePair<string,string> prop in att) {
+				if (string.IsNullOrEmpty (prop.Key)) {
+					throw new Exception ("Empty key in attribute '" + att.TypeName + "'.");
+				}
 				if (prop.Key != CustomExtensionAttribute.PathFieldKey)
 					elem.SetAttribute (prop.Key, prop.Value);
 			}
@@ -1202,6 +1285,11 @@ namespace Mono.Addins.Database
 		internal string GetDefaultTypeExtensionPath (AddinDescription desc, string typeFullName)
 		{
 			return "/" + Addin.GetIdName (desc.AddinId) + "/TypeExtensions/" + typeFullName;
+		}
+
+		internal void CleanupReflector()
+		{
+			fs.CleanupReflector ();
 		}
 	}
 }

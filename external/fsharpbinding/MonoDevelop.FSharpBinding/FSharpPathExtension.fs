@@ -3,7 +3,6 @@
 open System
 open System.Collections.Generic
 open System.Linq
-open System.Diagnostics
 open MonoDevelop.Core
 open MonoDevelop.Projects
 open MonoDevelop.Components
@@ -51,13 +50,18 @@ type FSharpPathExtension() as x =
         |> Option.bind (Option.condition ownerProjects.Contains)
         |> Option.iter x.DocumentContext.AttachToProject)
 
+    let getSolutions() =
+        ownerProjects |> Seq.choose (fun p -> p.ParentSolution |> Option.ofNull) |> Seq.distinct
+
     let untrackStartupProjectChanges () =
-        for sol in (ownerProjects |> Seq.map (fun p -> p.ParentSolution) |> Seq.distinct) do
-            sol.StartupItemChanged.RemoveHandler handleStartupProjectChanged
+        getSolutions()
+        |> Seq.choose (fun s -> s.StartupItemChanged |> Option.ofNull)
+        |> Seq.iter (fun e -> e.RemoveHandler handleStartupProjectChanged)
 
     let trackStartupProjectChanges() =
-        for sol in (ownerProjects |> Seq.map (fun p -> p.ParentSolution) |> Seq.distinct) do
-            sol.StartupItemChanged.AddHandler handleStartupProjectChanged
+        getSolutions()
+        |> Seq.choose (fun s -> s.StartupItemChanged |> Option.ofNull)
+        |> Seq.iter (fun e -> e.AddHandler handleStartupProjectChanged)
 
     let setOwnerProjects (projects) =
         untrackStartupProjectChanges ()
@@ -91,9 +95,12 @@ type FSharpPathExtension() as x =
             x.FindBestDefaultProject () |> Option.iter x.DocumentContext.AttachToProject
 
     let updateOwnerProjectsWithReset () =
-        updateOwnerProjects (IdeApp.Workspace.GetAllItems<DotNetProject> ())
+        IdeApp.Workspace
+        |> Option.ofObj
+        |> Option.iter(fun w -> updateOwnerProjects (w.GetAllItems<DotNetProject> ()))
+
         x.DocumentContext
-        |> Option.ofNull
+        |> Option.ofObj
         |> Option.iter (fun context ->
             match context.Project with
             | null -> resetOwnerProject ()
@@ -168,18 +175,24 @@ type FSharpPathExtension() as x =
         Gtk.Application.Invoke (fun _ _ -> updateOwnerProjectsWithReset()
                                            caretPositionChanged() )
 
+        let workspace = IdeApp.Workspace |> Option.ofObj
         subscriptions.AddRange
-            [ x.Editor.TextChanging.Subscribe(textChanging)
-              x.DocumentContext.DocumentParsed.Subscribe(docParsed)
-              IdeApp.Workspace.FileAddedToProject.Subscribe(projectChanged)
-              IdeApp.Workspace.FileRemovedFromProject.Subscribe(projectChanged)
-              IdeApp.Workspace.ItemAddedToSolution.Subscribe(projectChanged)
-              IdeApp.Workspace.WorkspaceItemUnloaded.Subscribe(workspaceItemUnloaded)
-              IdeApp.Workspace.WorkspaceItemLoaded.Subscribe(workspaceItemLoaded)
-              IdeApp.Workspace.ActiveConfigurationChanged.Subscribe(activeConfigurationChanged) ]
+            [ yield x.Editor.TextChanging.Subscribe(textChanging)
+              yield x.DocumentContext.DocumentParsed.Subscribe(docParsed)
+              if workspace.IsSome then
+                  let ws = workspace.Value
+                  yield ws.FileAddedToProject.Subscribe(projectChanged)
+                  yield ws.FileRemovedFromProject.Subscribe(projectChanged)
+                  yield ws.ItemAddedToSolution.Subscribe(projectChanged)
+                  yield ws.WorkspaceItemUnloaded.Subscribe(workspaceItemUnloaded)
+                  yield ws.WorkspaceItemLoaded.Subscribe(workspaceItemLoaded)
+                  yield ws.ActiveConfigurationChanged.Subscribe(activeConfigurationChanged) ]
         subscribeCaretChange()
 
     member private x.Update() =
+        match IdeApp.Workbench with
+        | null -> ()
+        | _ ->
         match IdeApp.Workbench.ActiveDocument with
         | null -> ()
         | context when context.Name <> x.DocumentContext.Name -> ()
@@ -218,9 +231,9 @@ type FSharpPathExtension() as x =
       
             if ownerProjects.Count > 1 then
                 let p = x.DocumentContext.Project
-                newPath.Add (PathEntry(icon = ImageService.GetIcon(p.StockIcon.Name, Gtk.IconSize.Menu),
-                                      markup = GLib.Markup.EscapeText (p.Name),
-                                      Tag=p))
+                newPath.Add (new PathEntry(icon = ImageService.GetIcon(p.StockIcon.Name, Gtk.IconSize.Menu),
+                                           markup = GLib.Markup.EscapeText (p.Name),
+                                           Tag=p))
       
             for top in topLevelTypesInsideCursor do
                 let name = top.Declaration.Name
@@ -230,9 +243,9 @@ type FSharpPathExtension() as x =
                         toplevel |> Array.filter (fun decl -> decl.Declaration.Name.StartsWith(nameparts))
                     else toplevel
       
-                newPath.Add(PathEntry(icon = ImageService.GetIcon(ServiceUtils.getIcon top.Declaration, Gtk.IconSize.Menu),
-                                      markup =x.GetEntityMarkup(top.Declaration),
-                                      Tag = navitems))
+                newPath.Add(new PathEntry(icon = ImageService.GetIcon(ServiceUtils.getIcon top.Declaration, Gtk.IconSize.Menu),
+                                          markup =x.GetEntityMarkup(top.Declaration),
+                                          Tag = navitems))
       
             if topLevelTypesInsideCursor.Length > 0 then
                 let lastToplevel = topLevelTypesInsideCursor.Last()
@@ -242,16 +255,16 @@ type FSharpPathExtension() as x =
                     |> Array.tryFind (fun tl -> let range = tl.Range
                                                 isInside caretLocation ((range.StartColumn, range.StartLine),(range.EndColumn, range.EndLine)))
                 match child with
-                | Some(c) -> newPath.Add(PathEntry(icon = ImageService.GetIcon(ServiceUtils.getIcon c, Gtk.IconSize.Menu),
-                                                   markup = x.GetEntityMarkup(c),
-                                                   Tag = lastToplevel))
-                | None -> newPath.Add(PathEntry("No selection", Tag = lastToplevel))
+                | Some(c) -> newPath.Add(new PathEntry(icon = ImageService.GetIcon(ServiceUtils.getIcon c, Gtk.IconSize.Menu),
+                                                       markup = x.GetEntityMarkup(c),
+                                                       Tag = lastToplevel))
+                | None -> newPath.Add(new PathEntry("No selection", Tag = lastToplevel))
       
             let previousPath = currentPath
             //ensure the path has changed from the previous one before setting and raising event.
             let samePath = Seq.forall2 (fun (p1:PathEntry) (p2:PathEntry) -> p1.Markup = p2.Markup) previousPath newPath
             if not samePath then
-                if newPath.Count = 0 then currentPath <- [|PathEntry("No selection", Tag = null)|]
+                if newPath.Count = 0 then currentPath <- [|new PathEntry("No selection", Tag = null)|]
                 else currentPath <- newPath.ToArray()
       
                 //invoke pathChanged

@@ -32,7 +32,7 @@ using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class SolutionProxy : ISolution
+	internal class SolutionProxy : ISolution
 	{
 		Solution solution;
 		EventHandler<DotNetProjectEventArgs> projectAdded;
@@ -107,6 +107,23 @@ namespace MonoDevelop.PackageManagement
 			if (project != null) {
 				projectRemoved (this, new DotNetProjectEventArgs (project));
 			}
+		}
+
+		public bool Equals (ISolution solution)
+		{
+			if (solution == null)
+				return false;
+
+			return Solution == solution.Solution;
+		}
+
+		public IDotNetProject ResolveProject (ProjectReference projectReference)
+		{
+			var project = projectReference.ResolveProject (solution) as DotNetProject;
+			if (project != null)
+				return new DotNetProjectProxy (project);
+
+			return null;
 		}
 	}
 }

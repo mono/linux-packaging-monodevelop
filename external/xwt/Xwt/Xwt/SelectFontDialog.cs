@@ -32,8 +32,8 @@ namespace Xwt
 	public sealed class SelectFontDialog
 	{
 		Font font = Font.SystemFont;
-		string title = "Select a font";
-		string previewText = "The quick brown fox jumps over the lazy dog.";
+		string title = Application.TranslationCatalog.GetString("Select a font");
+		string previewText = Application.TranslationCatalog.GetString("The quick brown fox jumps over the lazy dog.");
 
 		public SelectFontDialog ()
 		{
@@ -95,7 +95,11 @@ namespace Xwt
 				backend.SelectedFont = SelectedFont;
 				backend.Title = Title;
 				backend.PreviewText = PreviewText;
-				return backend.Run ((IWindowFrameBackend)Toolkit.CurrentEngine.GetSafeBackend (parentWindow));
+				bool result = false;
+				Toolkit.CurrentEngine.InvokePlatformCode (delegate {
+					result = backend.Run ((IWindowFrameBackend)Toolkit.GetBackend (parentWindow));
+				});
+				return result;
 			} catch (Exception ex) {
 				Console.WriteLine (ex);
 				return false;

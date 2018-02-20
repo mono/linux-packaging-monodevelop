@@ -25,33 +25,23 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.PackageManagement;
-using NuGet;
 using MonoDevelop.Core;
-using MonoDevelop.Ide;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
-	public class TestablePackageCompatibilityRunner : PackageCompatibilityRunner
+	class TestablePackageCompatibilityRunner : PackageCompatibilityRunner
 	{
 		Action backgroundDispatcher;
 
 		public TestablePackageCompatibilityRunner (
 			IDotNetProject project,
-			IPackageManagementSolution solution,
-			IRegisteredPackageRepositories registeredRepositories,
 			IPackageManagementProgressMonitorFactory progressMonitorFactory,
-			IPackageManagementEvents packageManagementEvents,
-			IProgressProvider progressProvider)
+			IPackageManagementEvents packageManagementEvents)
 			: base (
 				project,
-				solution,
-				registeredRepositories,
 				progressMonitorFactory,
-				packageManagementEvents,
-				progressProvider)
+				packageManagementEvents)
 		{
-			PackageReferenceFile = new PackageReferenceFile (FileSystem, "packages.config");
 		}
 
 		public void ExecuteBackgroundDispatch ()
@@ -66,10 +56,9 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 
 		protected override PackageManagementEventsMonitor CreateEventMonitor (
 			ProgressMonitor monitor,
-			IPackageManagementEvents packageManagementEvents,
-			IProgressProvider progressProvider)
+			IPackageManagementEvents packageManagementEvents)
 		{
-			EventsMonitor = new TestablePackageManagementEventsMonitor (monitor, packageManagementEvents, progressProvider);
+			EventsMonitor = new TestablePackageManagementEventsMonitor (monitor, packageManagementEvents, null);
 			return EventsMonitor;
 		}
 
@@ -83,17 +72,12 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 
 		public ProgressMonitorStatusMessage ProgressStatusMessage;
 
-		protected override PackageCompatibilityChecker CreatePackageCompatibilityChecker (
-			IPackageManagementSolution solution,
-			IRegisteredPackageRepositories registeredRepositories)
-		{
-			return new TestablePackageCompatibilityChecker (solution, registeredRepositories) {
-				PackageReferenceFile = PackageReferenceFile
-			};
-		}
+		public TestablePackageCompatibilityChecker PackageCompatibilityChecker = new TestablePackageCompatibilityChecker ();
 
-		public PackageReferenceFile PackageReferenceFile;
-		public FakeFileSystem FileSystem = new FakeFileSystem ();
+		protected override PackageCompatibilityChecker CreatePackageCompatibilityChecker ()
+		{
+			return PackageCompatibilityChecker;
+		}
 
 		public bool PackageConsoleIsShown;
 

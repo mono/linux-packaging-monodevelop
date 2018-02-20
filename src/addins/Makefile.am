@@ -25,11 +25,18 @@ SUBDIRS = \
 	ChangeLogAddIn \
 	MonoDevelop.WebReferences \
 	MonoDevelop.RegexToolkit \
-	CBinding \
 	MonoDevelop.AssemblyBrowser \
 	MonoDevelop.Debugger.Soft \
 	WindowsPlatform \
 	MonoDevelop.HexEditor \
 	MonoDevelop.DocFood \
+	MonoDevelop.AspNetCore \
+	MonoDevelop.AzureFunctions \
+	MonoDevelop.DotNetCore \
+	MonoDevelop.ConnectedServices \
+	MonoDevelop.Packaging \
+	MonoDevelop.Debugger.Win32 \
+	PerformanceDiagnostics \
+	MonoDevelop.Debugger.VSCodeDebugProtocol \
 	MonoDevelop.PackageManagement
 

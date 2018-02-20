@@ -38,14 +38,14 @@ namespace MonoDevelop.Ide.TypeSystem
 		static string EscapedAmpersand = "&amp;";
 		static string EscapedApostrophe = "&apos;";
 		static string EscapedQuote = "&quot;";
-		
-		public static void AppendEscapedString (StringBuilder builder, string toEscape)
+
+		public static void AppendEscapedString (StringBuilder builder, string toEscape, int start, int count)
 		{
 			if (toEscape == null)
 				return;
 			
-			for (int i = 0; i < toEscape.Length; i++) {
-				char c = toEscape[i];
+			for (int i = 0; i < count; i++) {
+				char c = toEscape[start + i];
 				switch (c) {
 				case '<':
 					builder.Append (EscapedLessThan);
@@ -67,6 +67,17 @@ namespace MonoDevelop.Ide.TypeSystem
 					break;
 				}
 			}
+		}
+
+		public static string UnescapeString (string text)
+		{
+			if (string.IsNullOrEmpty (text))
+				return text;
+			return text.Replace (EscapedLessThan, "<")
+				       .Replace (EscapedGreaterThan, ">")
+				       .Replace (EscapedAmpersand, "&")
+				       .Replace (EscapedApostrophe, "'")
+				       .Replace (EscapedQuote, "\"");
 		}
 	}
 }

@@ -26,19 +26,9 @@
 // THE SOFTWARE.
 
 using System;
-using Xwt.Backends;
-
-#if MONOMAC
-using nint = System.Int32;
-using nfloat = System.Single;
-using MonoMac.CoreGraphics;
-using MonoMac.AppKit;
-using CGRect = System.Drawing.RectangleF;
-using CGSize = System.Drawing.SizeF;
-#else
 using AppKit;
 using CoreGraphics;
-#endif
+using Xwt.Backends;
 
 namespace Xwt.Mac
 {
@@ -104,11 +94,14 @@ namespace Xwt.Mac
 
 		public override void RightMouseDown (NSEvent theEvent)
 		{
-			var p = ConvertPointFromView (theEvent.LocationInWindow, null);
+			CGPoint p = this.ConvertPointFromEvent(theEvent);
+			if (!Bounds.Contains(p))
+				return;
 			ButtonEventArgs args = new ButtonEventArgs ();
 			args.X = p.X;
 			args.Y = p.Y;
 			args.Button = PointerButton.Right;
+			args.IsContextMenuTrigger = theEvent.TriggersContextMenu ();
 			context.InvokeUserCode (delegate {
 				eventSink.OnButtonPressed (args);
 			});
@@ -116,7 +109,9 @@ namespace Xwt.Mac
 
 		public override void RightMouseUp (NSEvent theEvent)
 		{
-			var p = ConvertPointFromView (theEvent.LocationInWindow, null);
+			CGPoint p = this.ConvertPointFromEvent(theEvent);
+			if (!Bounds.Contains(p))
+				return;
 			ButtonEventArgs args = new ButtonEventArgs ();
 			args.X = p.X;
 			args.Y = p.Y;
@@ -128,11 +123,14 @@ namespace Xwt.Mac
 
 		public override void MouseDown (NSEvent theEvent)
 		{
-			var p = ConvertPointFromView (theEvent.LocationInWindow, null);
+			CGPoint p = this.ConvertPointFromEvent(theEvent);
+			if (!Bounds.Contains(p))
+				return;
 			ButtonEventArgs args = new ButtonEventArgs ();
 			args.X = p.X;
 			args.Y = p.Y;
 			args.Button = PointerButton.Left;
+			args.IsContextMenuTrigger = theEvent.TriggersContextMenu ();
 			context.InvokeUserCode (delegate {
 				eventSink.OnButtonPressed (args);
 			});
@@ -140,7 +138,9 @@ namespace Xwt.Mac
 
 		public override void MouseUp (NSEvent theEvent)
 		{
-			var p = ConvertPointFromView (theEvent.LocationInWindow, null);
+			CGPoint p = this.ConvertPointFromEvent(theEvent);
+			if (!Bounds.Contains(p))
+				return;
 			ButtonEventArgs args = new ButtonEventArgs ();
 			args.X = p.X;
 			args.Y = p.Y;
@@ -152,21 +152,19 @@ namespace Xwt.Mac
 
 		public override void MouseEntered (NSEvent theEvent)
 		{
-			context.InvokeUserCode (delegate {
-				eventSink.OnMouseEntered ();
-			});
+			context.InvokeUserCode (eventSink.OnMouseEntered);
 		}
 
 		public override void MouseExited (NSEvent theEvent)
 		{
-			context.InvokeUserCode (delegate {
-				eventSink.OnMouseExited ();
-			});
+			context.InvokeUserCode (eventSink.OnMouseExited);
 		}
 
 		public override void MouseMoved (NSEvent theEvent)
 		{
-			var p = ConvertPointFromView (theEvent.LocationInWindow, null);
+			CGPoint p = this.ConvertPointFromEvent(theEvent);
+			if (!Bounds.Contains(p))
+				return;
 			MouseMovedEventArgs args = new MouseMovedEventArgs ((long) TimeSpan.FromSeconds (theEvent.Timestamp).TotalMilliseconds, p.X, p.Y);
 			context.InvokeUserCode (delegate {
 				eventSink.OnMouseMoved (args);
@@ -175,7 +173,9 @@ namespace Xwt.Mac
 
 		public override void MouseDragged (NSEvent theEvent)
 		{
-			var p = ConvertPointFromView (theEvent.LocationInWindow, null);
+			CGPoint p = this.ConvertPointFromEvent(theEvent);
+			if (!Bounds.Contains(p))
+				return;
 			MouseMovedEventArgs args = new MouseMovedEventArgs ((long) TimeSpan.FromSeconds (theEvent.Timestamp).TotalMilliseconds, p.X, p.Y);
 			context.InvokeUserCode (delegate {
 				eventSink.OnMouseMoved (args);
@@ -217,9 +217,7 @@ namespace Xwt.Mac
 			bool changed = !newSize.Equals (Frame.Size);
 			base.SetFrameSize (newSize);
 			if (changed) {
-				context.InvokeUserCode (delegate {
-					eventSink.OnBoundsChanged ();
-				});
+				context.InvokeUserCode (eventSink.OnBoundsChanged);
 			}
 		}
 

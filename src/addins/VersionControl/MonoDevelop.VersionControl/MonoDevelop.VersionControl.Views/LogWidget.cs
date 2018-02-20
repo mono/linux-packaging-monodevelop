@@ -1,21 +1,21 @@
-// 
+//
 // LogWidget.cs
-//  
+//
 // Author:
 //       Mike Krüger <mkrueger@novell.com>
-// 
+//
 // Copyright (c) 2010 Novell, Inc (http://www.novell.com)
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -33,6 +33,9 @@ using System.Text;
 using System.Threading;
 using MonoDevelop.Components;
 using Mono.TextEditor;
+using System.Linq;
+using MonoDevelop.Ide.Editor;
+using MonoDevelop.Ide.Fonts;
 
 namespace MonoDevelop.VersionControl.Views
 {
@@ -171,8 +174,7 @@ namespace MonoDevelop.VersionControl.Views
 			treeviewLog.AppendColumn (colRevMessage);
 			colRevMessage.MinWidth = 350;
 			colRevMessage.Resizable = true;
-			
-			
+
 			TreeViewColumn colRevDate = new TreeViewColumn (GettextCatalog.GetString ("Date"), textRenderer);
 			colRevDate.SetCellDataFunc (textRenderer, DateFunc);
 			colRevDate.Resizable = true;
@@ -227,7 +229,7 @@ namespace MonoDevelop.VersionControl.Views
 			
 			TreeViewColumn colChangedPath = new TreeViewColumn ();
 			colChangedPath.Title = GettextCatalog.GetString ("Path");
-			
+
 			diffRenderer.DrawLeft = true;
 			colChangedPath.PackStart (diffRenderer, true);
 			colChangedPath.SetCellDataFunc (diffRenderer, SetDiffCellData);
@@ -237,7 +239,7 @@ namespace MonoDevelop.VersionControl.Views
 			treeviewFiles.Events |= Gdk.EventMask.PointerMotionMask;
 			
 			textviewDetails.WrapMode = Gtk.WrapMode.Word;
-			
+
 			labelAuthor.Text = "";
 			labelDate.Text = "";
 			labelRevision.Text = "";
@@ -328,7 +330,7 @@ namespace MonoDevelop.VersionControl.Views
 			Revision d = SelectedRevision;
 			if (RevertRevisionsCommands.RevertToRevision (info.Repository, info.Item.Path, d, false))
 				VersionControlService.SetCommitComment (info.Item.Path, 
-				  string.Format ("(Revert to revision {0})", d.ToString ()), true);
+				  GettextCatalog.GetString ("(Revert to revision {0})", d.ToString ()), true);
 		}
 		
 		void RevertRevisionClicked (object src, EventArgs args)
@@ -336,7 +338,7 @@ namespace MonoDevelop.VersionControl.Views
 			Revision d = SelectedRevision;
 			if (RevertRevisionsCommands.RevertRevision (info.Repository, info.Item.Path, d, false))
 				VersionControlService.SetCommitComment (info.Item.Path, 
-				  string.Format ("(Revert revision {0})", d.ToString ()), true);
+				  GettextCatalog.GetString ("(Revert revision {0})", d.ToString ()), true);
 		}
 
 		void RefreshClicked (object src, EventArgs args)
@@ -360,7 +362,9 @@ namespace MonoDevelop.VersionControl.Views
 			int line = diffRenderer.GetSelectedLine (paths[0]);
 			if (line == -1)
 				line = 1;
-			var doc = await IdeApp.Workbench.OpenDocument (fileName, line, 0, OpenDocumentOptions.Default | OpenDocumentOptions.OnlyInternalViewer);
+
+			var proj = IdeApp.Workspace.GetProjectsContainingFile (fileName).FirstOrDefault ();
+			var doc = await IdeApp.Workbench.OpenDocument (fileName, proj, line, 0, OpenDocumentOptions.Default | OpenDocumentOptions.OnlyInternalViewer);
 			int i = 1;
 			foreach (var content in doc.Window.SubViewContents) {
 				DiffView diffView = content as DiffView;
@@ -370,7 +374,7 @@ namespace MonoDevelop.VersionControl.Views
 						diffView.ComparisonWidget.SetRevision (diffView.ComparisonWidget.OriginalEditor, SelectedRevision.GetPrevious ());
 						diffView.ComparisonWidget.SetRevision (diffView.ComparisonWidget.DiffEditor, SelectedRevision);
 						
-						diffView.ComparisonWidget.DiffEditor.Caret.Location = new Mono.TextEditor.DocumentLocation (line, 1);
+						diffView.ComparisonWidget.DiffEditor.Caret.Location = new DocumentLocation (line, 1);
 						diffView.ComparisonWidget.DiffEditor.CenterToCaret ();
 					});
 					break;
@@ -400,9 +404,12 @@ namespace MonoDevelop.VersionControl.Views
 					try {
 						text = info.Repository.GetTextAtRevision (path, rev);
 					} catch (Exception e) {
-						Application.Invoke (delegate {
+						Application.Invoke ((o2, a2) => {
 							LoggingService.LogError ("Error while getting revision text", e);
-							MessageService.ShowError ("Error while getting revision text.", "The file may not be part of the working copy.");
+							MessageService.ShowError (
+								GettextCatalog.GetString ("Error while getting revision text."),
+								GettextCatalog.GetString ("The file may not be part of the working copy.")
+							);
 						});
 						return;
 					}
@@ -410,15 +417,15 @@ namespace MonoDevelop.VersionControl.Views
 					try {
 						prevRev = rev.GetPrevious ();
 					} catch (Exception e) {
-						Application.Invoke (delegate {
-							MessageService.ShowError ("Error while getting previous revision.", e);
+						Application.Invoke ((o2, a2) => {
+							MessageService.ShowError (GettextCatalog.GetString ("Error while getting previous revision."), e);
 						});
 						return;
 					}
 					string[] lines;
 					// Indicator that the file was binary
 					if (text == null) {
-						lines = new [] { " Binary files differ" };
+						lines = new [] { GettextCatalog.GetString (" Binary files differ") };
 					} else {
 						var changedDocument = Mono.TextEditor.TextDocument.CreateImmutableDocument (text);
 						if (prevRev == null) {
@@ -431,9 +438,12 @@ namespace MonoDevelop.VersionControl.Views
 							try {
 								prevRevisionText = info.Repository.GetTextAtRevision (path, prevRev);
 							} catch (Exception e) {
-								Application.Invoke (delegate {
+								Application.Invoke ((o2, a2) => {
 									LoggingService.LogError ("Error while getting revision text", e);
-									MessageService.ShowError ("Error while getting revision text.", "The file may not be part of the working copy.");
+									MessageService.ShowError (
+										GettextCatalog.GetString ("Error while getting revision text."),
+										GettextCatalog.GetString ("The file may not be part of the working copy.")
+									);
 								});
 								return;
 							}
@@ -448,12 +458,12 @@ namespace MonoDevelop.VersionControl.Views
 							}
 
 							var originalDocument = Mono.TextEditor.TextDocument.CreateImmutableDocument (prevRevisionText);
-							originalDocument.FileName = "Revision " + prevRev;
-							changedDocument.FileName = "Revision " + rev;
+							originalDocument.FileName = GettextCatalog.GetString ("Revision {0}", prevRev);
+							changedDocument.FileName = GettextCatalog.GetString ("Revision {0}", rev);
 							lines = Mono.TextEditor.Utils.Diff.GetDiffString (originalDocument, changedDocument).Split ('\n');
 						}
 					}
-					Application.Invoke (delegate {
+					Application.Invoke ((o2, a2) => {
 						changedpathstore.SetValue (iter, colDiff, lines);
 					});
 				});
@@ -491,9 +501,6 @@ namespace MonoDevelop.VersionControl.Views
 			revertToButton.Clicked -= RevertToRevisionClicked;
 			refreshButton.Clicked -= RefreshClicked;
 			Ide.Gui.Styles.Changed -= HandleStylesChanged;
-
-			logstore.Dispose ();
-			changedpathstore.Dispose ();
 
 			diffRenderer.Dispose ();
 			messageRenderer.Dispose ();
@@ -552,7 +559,7 @@ namespace MonoDevelop.VersionControl.Views
 			if (string.IsNullOrEmpty (rev.Message)) {
 				renderer.Text = GettextCatalog.GetString ("(No message)");
 			} else {
-				string message = Revision.FormatMessage (rev.Message);
+				string message = RevisionHelpers.FormatMessage (rev.Message);
 				int idx = message.IndexOf ('\n');
 				if (idx > 0)
 					message = message.Substring (0, idx);
@@ -710,7 +717,7 @@ namespace MonoDevelop.VersionControl.Views
 			} else
 				currentRevisionShortened = false;
 			
-			labelRevision.Text = GettextCatalog.GetString ("revision: {0}", rev);
+			labelRevision.Text = GettextCatalog.GetString ("Revision: {0}", rev);
 			textviewDetails.Buffer.Text = d.Message;
 			
 			if (select) {
@@ -730,7 +737,7 @@ namespace MonoDevelop.VersionControl.Views
 				return;
 			foreach (var rev in h) {
 				if (MatchesFilter (rev))
-					logstore.AppendValues (rev, string.Empty);
+					logstore.InsertWithValues (-1, rev, string.Empty);
 			}
 			SetLogSearchFilter (logstore, currentFilter);
 			treeviewLog.ThawChildNotify ();
@@ -766,7 +773,7 @@ namespace MonoDevelop.VersionControl.Views
 			int last = 0;
 			while (i != -1) {
 				sb.Append (GLib.Markup.EscapeText (txt.Substring (last, i - last)));
-				sb.Append ("<span color='blue'>").Append (txt.Substring (i, filter.Length)).Append ("</span>");
+				sb.Append ("<span color='").Append (Styles.LogView.SearchSnippetTextColor).Append ("'>").Append (txt, i, filter.Length).Append ("</span>");
 				last = i + filter.Length;
 				i = txt.IndexOf (filter, last, StringComparison.CurrentCultureIgnoreCase);
 			}
@@ -780,7 +787,7 @@ namespace MonoDevelop.VersionControl.Views
 		{
 			if (currentRevisionShortened) {
 				Revision d = SelectedRevision;
-				labelRevision.Text = GettextCatalog.GetString ("revision: {0}", d.Name);
+				labelRevision.Text = GettextCatalog.GetString ("Revision: {0}", d.Name);
 				currentRevisionShortened = false;
 			}
 		}

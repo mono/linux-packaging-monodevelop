@@ -45,38 +45,44 @@ using Mono.Debugger.Soft;
 using Mono.Debugging.Evaluation;
 using MDB = Mono.Debugger.Soft;
 using System.Security.Cryptography;
+using Mono.Cecil.Cil;
 
 namespace Mono.Debugging.Soft
 {
 	public class SoftDebuggerSession : DebuggerSession
 	{
-		class MdbSourceFileInfo
+		class SourceFileDebugInfo
 		{
 			public string FullFilePath { get; set; }
 			public int FileID { get; set; }
-			public byte[] Hash { get; set; }
-			public List<MethodMdbInfo> Methods { get; private set; }
+			public byte [] Hash { get; set; }
+			public Guid HashAlgorithem { get; set; }
+			//To avoid wasting time and memory transforming from Mdb/Pdb parser to some internal format
+			//we keep in original format
+			public readonly List<LineNumberEntry []> MdbMethods;
+			public readonly List<SequencePoint []> PdbMethods;
 
-			public MdbSourceFileInfo()
+			public SourceFileDebugInfo (List<LineNumberEntry []> methods)
 			{
-				Methods = new List<MethodMdbInfo>();
+				MdbMethods = methods;
+			}
+
+			public SourceFileDebugInfo (List<SequencePoint []> methods)
+			{
+				PdbMethods = methods;
 			}
 		}
 
-		class MethodMdbInfo
-		{
-			public LineNumberEntry[] SequencePoints { get; set; }
-		}
-
-		readonly Dictionary<string, Dictionary<string, List<MdbSourceFileInfo>>> mdbsSourceFileInfos = new Dictionary<string, Dictionary<string, List<MdbSourceFileInfo>>>();
+		readonly Dictionary<string, Dictionary<string, List<SourceFileDebugInfo>>> sourceFilesDebugInfo = new Dictionary<string, Dictionary<string, List<SourceFileDebugInfo>>>();
+		readonly Dictionary<AppDomainMirror, HashSet<AssemblyMirror>> domainAssembliesToUnload = new Dictionary<AppDomainMirror, HashSet<AssemblyMirror>> ();
 		readonly Dictionary<Tuple<TypeMirror, string>, MethodMirror[]> overloadResolveCache = new Dictionary<Tuple<TypeMirror, string>, MethodMirror[]> ();
 		readonly Dictionary<string, List<TypeMirror>> source_to_type = new Dictionary<string, List<TypeMirror>> (PathComparer);
 		readonly Dictionary<long,ObjectMirror> activeExceptionsByThread = new Dictionary<long, ObjectMirror> ();
 		readonly Dictionary<EventRequest, BreakInfo> breakpoints = new Dictionary<EventRequest, BreakInfo> ();
 		readonly Dictionary<TypeMirror, string[]> type_to_source = new Dictionary<TypeMirror, string[]> ();
 		readonly Dictionary<string, long> symbolFilesTimestamps = new Dictionary<string, long>();
-		readonly Dictionary<string, TypeMirror> aliases = new Dictionary<string, TypeMirror>();
-		readonly Dictionary<string, TypeMirror> types = new Dictionary<string, TypeMirror> ();
+		readonly Dictionary<string, List<TypeMirror>> aliases = new Dictionary<string, List<TypeMirror>> ();
+		readonly Dictionary<string, List<TypeMirror>> types = new Dictionary<string, List<TypeMirror>> ();
 		readonly LinkedList<List<Event>> queuedEventSets = new LinkedList<List<Event>> ();
 		readonly Dictionary<long,long> localThreadIds = new Dictionary<long, long> ();
 		readonly List<BreakInfo> pending_bes = new List<BreakInfo> ();
@@ -92,10 +98,10 @@ namespace Mono.Debugging.Soft
 		SoftDebuggerStartArgs startArgs;
 		List<string> userAssemblyNames;
 		ThreadInfo[] current_threads;
-		TextWriter ideSideLogWriter;
 		string remoteProcessName;
 		long currentAddress = -1;
 		IAsyncResult connection;
+		int currentStackDepth;
 		ProcessInfo[] procs;
 		Thread eventHandler;
 		VirtualMachine vm;
@@ -132,6 +138,7 @@ namespace Mono.Debugging.Soft
 			
 			var dsi = (SoftDebuggerStartInfo) startInfo;
 			if (dsi.StartArgs is SoftDebuggerLaunchArgs) {
+				remoteProcessName = Path.GetFileNameWithoutExtension (dsi.Command);
 				StartLaunching (dsi);
 			} else if (dsi.StartArgs is SoftDebuggerConnectArgs) {
 				StartConnecting (dsi);
@@ -195,7 +202,7 @@ namespace Mono.Debugging.Soft
 			RegisterUserAssemblies (dsi);
 			
 			var psi = new System.Diagnostics.ProcessStartInfo (runtime) {
-				Arguments = string.Format ("\"{0}\" {1}", dsi.Command, dsi.Arguments),
+				Arguments = string.Format ("{2} \"{0}\" {1}", dsi.Command, dsi.Arguments, dsi.RuntimeArguments),
 				WorkingDirectory = dsi.WorkingDirectory,
 				RedirectStandardOutput = true,
 				RedirectStandardError = true,
@@ -211,15 +218,11 @@ namespace Mono.Debugging.Soft
 				psi.RedirectStandardOutput = false;
 				psi.RedirectStandardError = false;
 			}
-			var ideSideLogFile = DebuggerLoggingService.CustomLogger.GetNewDebuggerLogFilename ();
-			if (ideSideLogFile != null) {
-				ideSideLogWriter = new StreamWriter (ideSideLogFile);
-			}
-			var runtimeSideLogFile = DebuggerLoggingService.CustomLogger.GetNewDebuggerLogFilename ();
 
-			if (!string.IsNullOrEmpty (runtimeSideLogFile)) {
+			var sdbLog = Environment.GetEnvironmentVariable ("MONODEVELOP_SDB_LOG");
+			if (!string.IsNullOrEmpty (sdbLog)) {
 				options = options ?? new LaunchOptions ();
-				options.AgentArgs = string.Format ("loglevel=10,logfile='{0}',setpgid=y", runtimeSideLogFile);
+				options.AgentArgs = string.Format ("loglevel=10,logfile='{0}',setpgid=y", sdbLog);
 			}
 			
 			foreach (var env in args.MonoRuntimeEnvironmentVariables)
@@ -232,7 +235,7 @@ namespace Mono.Debugging.Soft
 				OnDebuggerOutput (false, dsi.LogMessage + Environment.NewLine);
 			
 			var callback = HandleConnectionCallbackErrors (ar => ConnectionStarted (VirtualMachineManager.EndLaunch (ar)));
-			ConnectionStarting (VirtualMachineManager.BeginLaunch (psi, callback, options, ideSideLogWriter), dsi, true, 0);
+			ConnectionStarting (VirtualMachineManager.BeginLaunch (psi, callback, options), dsi, true, 0);
 		}
 		
 		/// <summary>Starts the debugger listening for a connection over TCP/IP</summary>
@@ -255,13 +258,8 @@ namespace Mono.Debugging.Soft
 			IPEndPoint dbgEP, conEP;
 			InitForRemoteSession (dsi, out dbgEP, out conEP);
 
-			var ideSideLogFile = DebuggerLoggingService.CustomLogger.GetNewDebuggerLogFilename ();
-			if (ideSideLogFile != null) {
-				ideSideLogWriter = new StreamWriter (ideSideLogFile);
-			}
-
 			var callback = HandleConnectionCallbackErrors (ar => ConnectionStarted (VirtualMachineManager.EndListen (ar)));
-			var a = VirtualMachineManager.BeginListen (dbgEP, conEP, callback, out assignedDebugPort, out assignedConsolePort, ideSideLogWriter);
+			var a = VirtualMachineManager.BeginListen (dbgEP, conEP, callback, out assignedDebugPort, out assignedConsolePort);
 			ConnectionStarting (a, dsi, true, 0);
 		}
 
@@ -289,11 +287,6 @@ namespace Mono.Debugging.Soft
 			IPEndPoint dbgEP, conEP;
 			InitForRemoteSession (dsi, out dbgEP, out conEP);
 
-			var ideSideLogFile = DebuggerLoggingService.CustomLogger.GetNewDebuggerLogFilename ();
-			if (ideSideLogFile != null) {
-				ideSideLogWriter = new StreamWriter (ideSideLogFile);
-			}
-
 			AsyncCallback callback = null;
 			int attemptNumber = 0;
 			callback = delegate (IAsyncResult ar) {
@@ -311,14 +304,14 @@ namespace Mono.Debugging.Soft
 					if (timeBetweenAttempts > 0)
 						Thread.Sleep (timeBetweenAttempts);
 					
-					ConnectionStarting (VirtualMachineManager.BeginConnect (dbgEP, conEP, callback, ideSideLogWriter), dsi, false, attemptNumber);
+					ConnectionStarting (VirtualMachineManager.BeginConnect (dbgEP, conEP, callback), dsi, false, attemptNumber);
 					
 				} catch (Exception ex2) {
 					OnConnectionError (ex2);
 				}
 			};
 			
-			ConnectionStarting (VirtualMachineManager.BeginConnect (dbgEP, conEP, callback, ideSideLogWriter), dsi, false, 0);
+			ConnectionStarting (VirtualMachineManager.BeginConnect (dbgEP, conEP, callback), dsi, false, 0);
 		}
 		
 		void InitForRemoteSession (SoftDebuggerStartInfo dsi, out IPEndPoint dbgEP, out IPEndPoint conEP)
@@ -376,12 +369,18 @@ namespace Mono.Debugging.Soft
 				throw new InvalidOperationException ("Already connecting");
 			
 			connection = connectionHandle;
-			
-			if (ConnectionDialogCreator != null && attemptNumber == 0) {
-				connectionDialog = ConnectionDialogCreator ();
-				connectionDialog.UserCancelled += delegate {
-					EndSession ();
-				};
+
+			if (attemptNumber == 0) {
+				if (ConnectionDialogCreatorExtended != null)
+					connectionDialog = ConnectionDialogCreatorExtended (dsi);
+				else if (ConnectionDialogCreator != null)
+					connectionDialog = ConnectionDialogCreator ();
+
+				if (connectionDialog != null) {
+					connectionDialog.UserCancelled += delegate {
+						EndSession ();
+					};
+				}
 			}
 
 			if (connectionDialog != null)
@@ -453,7 +452,7 @@ namespace Mono.Debugging.Soft
 			HideConnectionDialog ();
 			
 			machine.EnableEvents (EventType.AssemblyLoad, EventType.ThreadStart, EventType.ThreadDeath,
-				EventType.AssemblyUnload, EventType.UserBreak, EventType.UserLog);
+				EventType.AppDomainUnload, EventType.UserBreak, EventType.UserLog);
 			try {
 				unhandledExceptionRequest = machine.CreateExceptionRequest (null, false, true);
 				unhandledExceptionRequest.Enable ();
@@ -554,17 +553,23 @@ namespace Mono.Debugging.Soft
 		
 		public TypeMirror GetType (string fullName)
 		{
-			TypeMirror tm;
+			List<TypeMirror> typesList;
 
-			if (!types.TryGetValue (fullName, out tm))
-				aliases.TryGetValue (fullName, out tm);
-
-			return tm;
+			if (!types.TryGetValue (fullName, out typesList))
+				aliases.TryGetValue (fullName, out typesList);
+			if (typesList == null)
+				return null;
+			if (typesList.Count == 1)
+				return typesList [0];
+			//Idea here is... If we have multiple types with same name... they must be in different .dlls
+			//so find 1st matching assembly with stackframes and then return type that belongs to that assembly
+			var assembly = current_thread.GetFrames ().Select (f => f.Method.DeclaringType.Assembly).FirstOrDefault (asm => typesList.Select (t => t.Assembly).Contains (asm));
+			return typesList.FirstOrDefault (t => t.Assembly == assembly) ?? typesList.FirstOrDefault ();
 		}
-		
+
 		public IEnumerable<TypeMirror> GetAllTypes ()
 		{
-			return types.Values;
+			return types.Values.SelectMany (l => l);
 		}
 
 		protected override bool AllowBreakEventChanges {
@@ -585,7 +590,7 @@ namespace Mono.Debugging.Soft
 
 			symbolFilesTimestamps.Clear ();
 
-			mdbsSourceFileInfos.Clear ();
+			sourceFilesDebugInfo.Clear ();
 
 			if (!HasExited) {
 				if (vm != null) {
@@ -601,9 +606,6 @@ namespace Mono.Debugging.Soft
 			}
 
 			Adaptor.Dispose ();
-
-			if (ideSideLogWriter != null)
-				ideSideLogWriter.Dispose ();
 		}
 
 		protected override void OnAttachToProcess (long processId)
@@ -628,7 +630,7 @@ namespace Mono.Debugging.Soft
 
 		protected override void OnDetach ()
 		{
-			throw new NotSupportedException ();
+			vm.Detach ();
 		}
 
 		protected override void OnExit ()
@@ -713,11 +715,13 @@ namespace Mono.Debugging.Soft
 		protected override ProcessInfo[] OnGetProcesses ()
 		{
 			if (procs == null) {
-				if (remoteProcessName != null || vm.TargetProcess == null) {
+				if (vm == null)//process didn't start yet
+					return new ProcessInfo [0];
+				if (vm.TargetProcess == null) {
 					procs = new [] { new ProcessInfo (0, remoteProcessName ?? "mono") };
 				} else {
 					try {
-						procs = new [] { new ProcessInfo (vm.TargetProcess.Id, vm.TargetProcess.ProcessName) };
+						procs = new [] { new ProcessInfo (vm.TargetProcess.Id, remoteProcessName ?? vm.TargetProcess.ProcessName) };
 					} catch (Exception ex) {
 						if (!loggedSymlinkedRuntimesBug) {
 							loggedSymlinkedRuntimesBug = true;
@@ -728,6 +732,22 @@ namespace Mono.Debugging.Soft
 				}
 			}
 			return new [] { new ProcessInfo (procs[0].Id, procs[0].Name) };
+		}
+
+		internal PortablePdbData GetPdbData (AssemblyMirror asm)
+		{
+			string assemblyFileName;
+			if (!assemblyPathMap.TryGetValue (asm.GetName ().FullName, out assemblyFileName))
+				assemblyFileName = asm.Location;
+			var pdbFileName = Path.ChangeExtension (assemblyFileName, ".pdb");
+			if (!PortablePdbData.IsPortablePdb (pdbFileName))
+				return null;
+			return new PortablePdbData (pdbFileName);
+		}
+
+		internal PortablePdbData GetPdbData (MethodMirror method)
+		{
+			return GetPdbData (method.DeclaringType.Assembly);
 		}
 
 		protected override Backtrace OnGetThreadBacktrace (long processId, long threadId)
@@ -829,11 +849,11 @@ namespace Mono.Debugging.Soft
 			bool dummy = false;
 			var location = FindLocationByMethod (frames[0].Method, fileName, line, column, ref dummy);
 			if (location == null)
-				throw new NotSupportedException ();
-
+				throw new NotSupportedException ("Unable to set the next statement. The next statement cannot be set to another function.");
 			try {
 				thread.SetIP (location);
 				currentAddress = location.ILOffset;
+				currentStackDepth = frames.Length;
 			} catch (ArgumentException) {
 				throw new NotSupportedException ();
 			}
@@ -858,6 +878,8 @@ namespace Mono.Debugging.Soft
 
 			try {
 				thread.SetIP (location);
+				StackVersion++;
+				RaiseStopEvent ();
 			} catch (ArgumentException) {
 				throw new NotSupportedException ();
 			}
@@ -874,37 +896,32 @@ namespace Mono.Debugging.Soft
 
 			if (breakEvent is FunctionBreakpoint) {
 				var fb = (FunctionBreakpoint) breakEvent;
-				bool resolved = false;
 
 				foreach (var method in FindMethodsByName (fb.FunctionName, fb.ParamTypes)) {
-					if (ResolveFunctionBreakpoint (bi, fb, method)) {
-						resolved = true;
+					if (!ResolveFunctionBreakpoint (bi, fb, method)) {
+						bi.SetStatus (BreakEventStatus.NotBound, null);
 					}
 				}
 
-				if (!resolved) {
-					// FIXME: handle types like GenericType<>, GenericType<SomeOtherType>, and GenericType<...>+NestedGenricType<...>
-					var bracket = fb.FunctionName.IndexOf ('(');
-					int dot;
-					if (bracket != -1) {
-						//Handle stuff like SomeNamespace.SomeType.Method(SomeOtherNamespace.SomeOtherType)
-						dot = fb.FunctionName.LastIndexOf ('.', bracket);
-					} else {
-						dot = fb.FunctionName.LastIndexOf ('.');
-					}
-					if (dot != -1)
-						bi.TypeName = fb.FunctionName.Substring (0, dot);
+				// FIXME: handle types like GenericType<>, GenericType<SomeOtherType>, and GenericType<...>+NestedGenricType<...>
+				var bracket = fb.FunctionName.IndexOf ('(');
+				int dot;
+				if (bracket != -1) {
+					//Handle stuff like SomeNamespace.SomeType.Method(SomeOtherNamespace.SomeOtherType)
+					dot = fb.FunctionName.LastIndexOf ('.', bracket);
+				} else {
+					dot = fb.FunctionName.LastIndexOf ('.');
+				}
+				if (dot != -1)
+					bi.TypeName = fb.FunctionName.Substring (0, dot);
 
-					bi.SetStatus (BreakEventStatus.NotBound, null);
-					lock (pending_bes) {
-						pending_bes.Add (bi);
-					}
+				lock (pending_bes) {
+					pending_bes.Add (bi);
 				}
 			} else if (breakEvent is InstructionBreakpoint) {
 				var bp = (InstructionBreakpoint) breakEvent;
 
 				var insideTypeRange = true;
-				var resolved = false;
 				bool generic;
 
 				bi.FileName = bp.FileName;
@@ -914,55 +931,37 @@ namespace Mono.Debugging.Soft
 					bi.Location = location;
 					InsertBreakpoint (bp, bi);
 					bi.SetStatus (BreakEventStatus.Bound, null);
-					resolved = true;
-				}
+				} else if (insideTypeRange)
+					bi.SetStatus (BreakEventStatus.Invalid, null);
+				else
+					bi.SetStatus (BreakEventStatus.NotBound, null);
 
-				if (resolved) {
-					// Note: if the type or method is generic, there may be more instances so don't assume we are done resolving the breakpoint
-					if (generic) {
-						lock (pending_bes) {
-							pending_bes.Add (bi);
-						}
-					}
-				} else {
-					lock (pending_bes) {
-						pending_bes.Add (bi);
-					}
-					if (insideTypeRange)
-						bi.SetStatus (BreakEventStatus.Invalid, null);
-					else
-						bi.SetStatus (BreakEventStatus.NotBound, null);
+				lock (pending_bes) {
+					pending_bes.Add (bi);
 				}
 
 			} else if (breakEvent is Breakpoint) {
 				var bp = (Breakpoint) breakEvent;
 				bool insideLoadedRange;
-				bool resolved = false;
 				bool generic;
 
 				bi.FileName = bp.FileName;
-
+				bool found = false;
 				foreach (var location in FindLocationsByFile (bp.FileName, bp.Line, bp.Column, out generic, out insideLoadedRange)) {
 					OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint at '{0}:{1},{2}' to {3} [0x{4:x5}].\n",
 					                                        bp.FileName, bp.Line, bp.Column, GetPrettyMethodName (location.Method), location.ILOffset));
 
 					bi.Location = location;
 					InsertBreakpoint (bp, bi);
+					found = true;
 					bi.SetStatus (BreakEventStatus.Bound, null);
-					resolved = true;
 				}
 
-				if (resolved) {
-					// Note: if the type or method is generic, there may be more instances so don't assume we are done resolving the breakpoint
-					if (generic) {
-						lock (pending_bes) {
-							pending_bes.Add (bi);
-						}
-					}
-				} else {
-					lock (pending_bes) {
-						pending_bes.Add (bi);
-					}
+				lock (pending_bes) {
+					pending_bes.Add (bi);
+				}
+
+				if (!found) {
 					if (insideLoadedRange)
 						bi.SetStatus (BreakEventStatus.Invalid, null);
 					else
@@ -970,9 +969,8 @@ namespace Mono.Debugging.Soft
 				}
 			} else if (breakEvent is Catchpoint) {
 				var cp = (Catchpoint) breakEvent;
-				TypeMirror type;
 
-				if (!types.TryGetValue (cp.ExceptionName, out type)) {
+				if (!types.ContainsKey (cp.ExceptionName)) {
 					//
 					// Same as in FindLocationByFile (), fetch types matching the type name
 					if (vm.Version.AtLeast (2, 9)) {
@@ -981,18 +979,26 @@ namespace Mono.Debugging.Soft
 					}
 				}
 
-				if (types.TryGetValue (cp.ExceptionName, out type)) {
-					InsertCatchpoint (cp, bi, type);
+				List<TypeMirror> typesList;
+				if (types.TryGetValue (cp.ExceptionName, out typesList)) {
+					foreach (var type in typesList)
+						InsertCatchpoint (cp, bi, type);
 					bi.SetStatus (BreakEventStatus.Bound, null);
 				} else {
-					bi.TypeName = cp.ExceptionName;
-					lock (pending_bes) {
-						pending_bes.Add (bi);
-					}
 					bi.SetStatus (BreakEventStatus.NotBound, null);
 				}
-			}
 
+				bi.TypeName = cp.ExceptionName;
+				lock (pending_bes) {
+					pending_bes.Add (bi);
+				}
+			}
+			UpdateTypeLoadFilters ();
+			return bi;
+		}
+
+		void UpdateTypeLoadFilters()
+		{
 			/*
 			 * TypeLoad events lead to too much wire traffic + suspend/resume work, so
 			 * filter them using the file names used by pending breakpoints.
@@ -1040,8 +1046,6 @@ namespace Mono.Debugging.Soft
 					typeLoadTypeNameReq.Enabled = true;
 				}
 			}
-
-			return bi;
 		}
 
 		private Location FindLocationByILOffset (InstructionBreakpoint bp, string filename, out bool isGeneric, out bool insideTypeRange)
@@ -1077,7 +1081,7 @@ namespace Mono.Debugging.Soft
 
 			var bi = (BreakInfo) eventInfo;
 			if (bi.Requests.Count != 0) {
-				foreach (var request in bi.Requests) {
+				foreach (var request in bi.Requests.Keys) {
 					request.Enabled = false;
 					breakpoints.Remove (request);
 				}
@@ -1097,7 +1101,7 @@ namespace Mono.Debugging.Soft
 			
 			var bi = (BreakInfo) eventInfo;
 			if (bi.Requests.Count != 0) {
-				foreach (var request in bi.Requests)
+				foreach (var request in bi.Requests.Keys)
 					request.Enabled = enable;
 
 				if (!enable)
@@ -1120,7 +1124,7 @@ namespace Mono.Debugging.Soft
 
 			request = vm.SetBreakpoint (method, ilOffset);
 			request.Enabled = bp.Enabled;
-			bi.Requests.Add (request);
+			bi.Requests.Add (request, method.DeclaringType.Assembly);
 
 			breakpoints [request] = bi;
 
@@ -1141,7 +1145,7 @@ namespace Mono.Debugging.Soft
 			if (vm.Version.AtLeast (2, 25))
 				request.IncludeSubclasses = cp.IncludeSubclasses; // Note: need to set IncludeSubclasses *before* enabling
 			request.Enabled = cp.Enabled;
-			bi.Requests.Add (request);
+			bi.Requests.Add (request, excType.Assembly);
 
 			breakpoints[request] = bi;
 		}
@@ -1419,7 +1423,13 @@ namespace Mono.Debugging.Soft
 						req.Filter |= StepFilter.DebuggerNonUserCode;
 					if (assemblyFilters != null && assemblyFilters.Count > 0)
 						req.AssemblyFilter = assemblyFilters;
-					req.Enabled = true;
+					try {
+						req.Enabled = true;
+					}
+					catch (NotSupportedException e) {
+						if (vm.Version.AtLeast (2, 19)) //catch NotSupportedException thrown by old version of protocol
+							throw e;
+					}
 					currentStepRequest = req;
 					OnResumed ();
 					vm.Resume ();
@@ -1529,8 +1539,8 @@ namespace Mono.Debugging.Soft
 			case EventType.AssemblyLoad:
 				HandleAssemblyLoadEvents (Array.ConvertAll (es.Events, item => (AssemblyLoadEvent)item));
 				break;
-			case EventType.AssemblyUnload:
-				HandleAssemblyUnloadEvents (Array.ConvertAll (es.Events, item => (AssemblyUnloadEvent)item));
+			case EventType.AppDomainUnload:
+				HandleDomainUnloadEvents (Array.ConvertAll (es.Events, item => (AppDomainUnloadEvent)item));
 				break;
 			case EventType.VMStart:
 				HandleVMStartEvents (Array.ConvertAll (es.Events, item => (VMStartEvent)item));
@@ -1671,9 +1681,6 @@ namespace Mono.Debugging.Soft
 
 		bool IgnoreBreakpoint (MethodMirror method)
 		{
-			if (Options.ProjectAssembliesOnly && !IsUserAssembly (method.DeclaringType.Assembly))
-				return true;
-
 			if (vm.Version.AtLeast (2, 21)) {
 				foreach (var attr in method.GetCustomAttributes (false)) {
 					var attrName = attr.Constructor.DeclaringType.FullName;
@@ -1760,20 +1767,23 @@ namespace Mono.Debugging.Soft
 				foreach (Event e in es) {
 					if (e.EventType == EventType.Breakpoint) {
 						var be = (BreakpointEvent) e;
+						var hasBreakInfo = breakpoints.TryGetValue (be.Request, out binfo);
 
 						if (!HandleBreakpoint (e.Thread, be.Request)) {
 							etype = TargetEventType.TargetHitBreakpoint;
 							autoStepInto = false;
 							resume = false;
+							if (hasBreakInfo)
+								breakEvent = binfo.BreakEvent;
 						}
 						
-						if (breakpoints.TryGetValue (be.Request, out binfo)) {
+						if (hasBreakInfo) {
 							if (currentStepRequest != null &&
+							    currentStepRequest.Depth != StepDepth.Out &&
 							    binfo.Location.ILOffset == currentAddress && 
-							    e.Thread.Id == currentStepRequest.Thread.Id)
+							    e.Thread.Id == currentStepRequest.Thread.Id &&
+								currentStackDepth == e.Thread.GetFrames ().Length)
 								redoCurrentStep = true;
-							
-							breakEvent = binfo.BreakEvent;
 						}
 					} else if (e.EventType == EventType.Step) {
 						var stepRequest = e.Request as StepEventRequest;
@@ -1802,6 +1812,7 @@ namespace Mono.Debugging.Soft
 				Step (depth, size);
 			} else if (resume) {
 				// all breakpoints were conditional and evaluated as false
+				current_thread = null;
 				vm.Resume ();
 				DequeueEventsForFirstThread ();
 			} else {
@@ -1822,9 +1833,11 @@ namespace Mono.Debugging.Soft
 				if (backtrace.FrameCount > 0) {
 					var frame = backtrace.GetFrame (0) as SoftDebuggerStackFrame;
 					currentAddress = frame != null ? frame.Address : -1;
+					currentStackDepth = backtrace.FrameCount;
 
 					if (frame != null && steppedInto) {
 						if (ContinueOnStepInto (frame.StackFrame.Method)) {
+							current_thread = null;
 							vm.Resume ();
 							DequeueEventsForFirstThread ();
 							return;
@@ -1851,6 +1864,7 @@ namespace Mono.Debugging.Soft
 							stepOut = true;
 						}
 					} else if (etype == TargetEventType.TargetHitBreakpoint && breakEvent != null && !breakEvent.NonUserBreakpoint && IgnoreBreakpoint (frame.StackFrame.Method)) {
+						current_thread = null;
 						vm.Resume ();
 						DequeueEventsForFirstThread ();
 						return;
@@ -1881,7 +1895,7 @@ namespace Mono.Debugging.Soft
 			var asm = events [0].Assembly;
 			if (events.Length > 1 && events.Any (a => a.Assembly != asm))
 				throw new InvalidOperationException ("Simultaneous AssemblyLoadEvent for multiple assemblies");
-
+			RegisterAssembly (asm);
 			bool isExternal;
 			isExternal = !UpdateAssemblyFilters (asm) && userAssemblyNames != null;
 
@@ -1889,54 +1903,84 @@ namespace Mono.Debugging.Soft
 			OnDebuggerOutput (false, string.Format ("Loaded assembly: {0}{1}\n", asm.Location, flagExt));
 		}
 
-		void HandleAssemblyUnloadEvents (AssemblyUnloadEvent[] events)
+		void RegisterAssembly (AssemblyMirror asm)
 		{
-			var asm = events [0].Assembly;
-			if (events.Length > 1 && events.Any (a => a.Assembly != asm))
-				throw new InvalidOperationException ("Simultaneous AssemblyUnloadEvents for multiple assemblies");
-			
-			if (assemblyFilters != null) {
-				int index = assemblyFilters.IndexOf (asm);
-				if (index != -1)
-					assemblyFilters.RemoveAt (index);
+			var domain = vm.Version.AtLeast (2, 45) ? asm.Domain : asm.GetAssemblyObject ().Domain;
+			if (domainAssembliesToUnload.TryGetValue (domain, out var asmList)) {
+				asmList.Add (asm);
+			} else {
+				domainAssembliesToUnload.Add (domain, new HashSet<AssemblyMirror> (new [] { asm }));
 			}
-			// Mark affected breakpoints as pending again
-			var affectedBreakpoints = new List<KeyValuePair<EventRequest, BreakInfo>> (breakpoints.Where (x => x.Value != null && x.Value.Location != null &&
-				x.Value.Location.Method != null && x.Value.Location.Method.DeclaringType != null &&  x.Value.Location.Method.DeclaringType.Assembly != null &&
-				PathComparer.Equals (x.Value.Location.Method.DeclaringType.Assembly.Location, asm.Location)
-			));
-			foreach (var breakpoint in affectedBreakpoints) {
-				string file = breakpoint.Value.Location.SourceFile;
-				int line = breakpoint.Value.Location.LineNumber;
-				OnDebuggerOutput (false, string.Format ("Re-pending breakpoint at {0}:{1}\n", file, line));
-				breakpoints.Remove (breakpoint.Key);
-				breakpoint.Value.Requests.Clear ();
+		}
 
-				lock (pending_bes) {
-					pending_bes.Add (breakpoint.Value);
+		void HandleDomainUnloadEvents (AppDomainUnloadEvent [] events)
+		{
+			var domain = events [0].Domain;
+			if (events.Length > 1 && events.Any (a => a.Domain != domain))
+				throw new InvalidOperationException ("Simultaneous DomainUnloadEvents for multiple domains");
+			if (domainAssembliesToUnload.TryGetValue (domain, out var asmList)) {
+				foreach (var asm in asmList) {
+					HandleAssemblyUnloadEvents (asm);
+				}
+			}
+		}
+
+		void HandleAssemblyUnloadEvents (AssemblyMirror asm)
+		{
+			assemblyFilters?.Remove (asm);
+
+			// Mark affected breakpoints as pending again
+			var affectedBreakpoints = new List<KeyValuePair<EventRequest, BreakInfo>> (breakpoints.Where (x => x.Value.Requests.TryGetValue (x.Key, out var a) && a == asm));
+			foreach (var breakpoint in affectedBreakpoints) {
+				var affectedRequests = breakpoint.Value.Requests.Where (r => r.Value == asm).ToArray ();
+				foreach (var item in affectedRequests) {
+					breakpoint.Value.Requests.Remove (item.Key);
+					breakpoints.Remove (breakpoint.Key);
+				}
+				if (!breakpoint.Value.Requests.Any ()) {
+					string file = breakpoint.Value.Location.SourceFile;
+					int line = breakpoint.Value.Location.LineNumber;
+					OnDebuggerOutput (false, string.Format ("Re-pending breakpoint at {0}:{1}\n", file, line));
+					breakpoint.Value.SetStatus (BreakEventStatus.NotBound, "Assembly unloaded");
 				}
 			}
 
 			// Remove affected types from the loaded types list
-			var affectedTypes = new List<string> (from pair in types
-				 where PathComparer.Equals (pair.Value.Assembly.Location, asm.Location)
-				 select pair.Key);
+			var affectedTypes = types.SelectMany (l => l.Value).Where (t => t.Assembly == asm).ToArray ();
 
-			foreach (string typeName in affectedTypes) {
-				TypeMirror tm;
-
-				if (types.TryGetValue (typeName, out tm)) {
-					if (tm.IsNested)
-						aliases.Remove (NestedTypeNameToAlias (typeName));
-
-					types.Remove (typeName);
+			foreach (var tm in affectedTypes) {
+				List<TypeMirror> typesList;
+				if (tm.IsNested) {
+					if (aliases.TryGetValue (NestedTypeNameToAlias (tm.FullName), out typesList)) {
+						typesList.Remove (tm);
+						if (typesList.Count == 0)
+							aliases.Remove (NestedTypeNameToAlias (tm.FullName));
+					}
+				}
+				if (types.TryGetValue (tm.FullName, out typesList)) {
+					typesList.Remove (tm);
+					if (typesList.Count == 0)
+						types.Remove (tm.FullName);
 				}
 			}
 
 			foreach (var pair in source_to_type) {
-				pair.Value.RemoveAll (m => PathComparer.Equals (m.Assembly.Location, asm.Location));
+				pair.Value.RemoveAll (m => m.Assembly == asm);
 			}
-			OnDebuggerOutput (false, string.Format ("Unloaded assembly: {0}\n", asm.Location));
+			OnDebuggerOutput (false, string.Format ("Unloaded assembly: {0}\n", GetAssemblyLocation (asm) ?? "<unknown>"));
+		}
+
+		static string GetAssemblyLocation (AssemblyMirror asm)
+		{
+			if (asm == null)
+				return null;
+			try {
+				return asm.Location;
+			} catch (CommandException ex) {
+				if (ex.ErrorCode != ErrorCode.ERR_UNLOADED)
+					throw ex;
+				return null;
+			}
 		}
 
 		void HandleVMStartEvents (VMStartEvent[] events)
@@ -1958,8 +2002,9 @@ namespace Mono.Debugging.Soft
 			var type = events [0].Type;
 			if (events.Length > 1 && events.Any (a => a.Type != type))
 				throw new InvalidOperationException ("Simultaneous TypeLoadEvents for multiple types");
-			
-			if (!types.ContainsKey (type.FullName))
+
+			List<TypeMirror> typesList;
+			if (!(types.TryGetValue (type.FullName, out typesList) && typesList.Contains (type)))
 				ResolveBreakpoints (type);
 		}
 
@@ -1981,7 +2026,18 @@ namespace Mono.Debugging.Soft
 		void HandleThreadDeathEvents (ThreadDeathEvent[] events)
 		{
 			current_threads = null;
-			var thread = events [0].Thread;
+			ThreadMirror thread;
+			try {
+				thread = events [0].Thread;
+			} catch (ObjectCollectedException) {
+				// A 2.1 debugger-agent can send a ThreadDeath event for a ThreadMirror
+				// already collected, in that case just allow the session to continue
+				if (!vm.Version.AtLeast (2, 2))
+					return;
+
+				// Otherwise just report the error
+				throw;
+			}
 			if (events.Length > 1 && events.Any (a => a.Thread != thread))
 				throw new InvalidOperationException ("Simultaneous ThreadDeathEvents for multiple threads");
 
@@ -2017,7 +2073,7 @@ namespace Mono.Debugging.Soft
 			}
 		}
 		
-		void RemoveQueuedBreakEvents (List<EventRequest> requests)
+		void RemoveQueuedBreakEvents (Dictionary<EventRequest, AssemblyMirror> requests)
 		{
 			int resume = 0;
 			
@@ -2028,7 +2084,7 @@ namespace Mono.Debugging.Soft
 					List<Event> q = node.Value;
 					
 					for (int i = 0; i < q.Count; i++) {
-						foreach (var request in requests) {
+						foreach (var request in requests.Keys) {
 							if (q[i].Request == request) {
 								q.RemoveAt (i--);
 								break;
@@ -2130,6 +2186,10 @@ namespace Mono.Debugging.Soft
 				return binfo.RunCustomBreakpointAction (bp.CustomActionId);
 			}
 
+			if ((bp.HitAction & HitAction.PrintTrace) != HitAction.None) {
+				OnTargetDebug (0, "", "Breakpoint reached: " + binfo.FileName + ":" + binfo.Location.LineNumber + Environment.NewLine);
+			}
+
 			if ((bp.HitAction & HitAction.PrintExpression) != HitAction.None) {
 				string exp = EvaluateTrace (thread, bp.TraceExpression);
 				binfo.UpdateLastTraceValue (exp);
@@ -2146,7 +2206,7 @@ namespace Mono.Debugging.Soft
 			int i = exp.IndexOf ('{');
 			while (i != -1) {
 				if (i < exp.Length - 1 && exp [i+1] == '{') {
-					sb.Append (exp.Substring (last, i - last + 1));
+					sb.Append (exp, last, i - last + 1);
 					last = i + 2;
 					i = exp.IndexOf ('{', i + 2);
 					continue;
@@ -2156,12 +2216,12 @@ namespace Mono.Debugging.Soft
 					break;
 				string se = exp.Substring (i + 1, j - i - 1);
 				se = EvaluateExpression (thread, se, null);
-				sb.Append (exp.Substring (last, i - last));
+				sb.Append (exp, last, i - last);
 				sb.Append (se);
 				last = j + 1;
 				i = exp.IndexOf ('{', last);
 			}
-			sb.Append (exp.Substring (last, exp.Length - last));
+			sb.Append (exp, last, exp.Length - last);
 			return sb.ToString ();
 		}
 
@@ -2206,6 +2266,7 @@ namespace Mono.Debugging.Soft
 
 				EvaluationOptions ops = Options.EvaluationOptions.Clone ();
 				ops.AllowTargetInvoke = true;
+				ops.EllipsizedLength = 1000;
 
 				var ctx = new SoftEvaluationContext (this, frames[0], ops);
 
@@ -2279,13 +2340,23 @@ namespace Mono.Debugging.Soft
 		{
 			string typeName = t.FullName;
 
-			if (types.ContainsKey (typeName))
+			List<TypeMirror> typesList;
+			if (types.TryGetValue (typeName, out typesList) && typesList.Contains (t))
 				return;
 
-			if (t.IsNested)
-				aliases[NestedTypeNameToAlias (typeName)] = t;
+			RegisterAssembly (t.Assembly);
 
-			types[typeName] = t;
+			if (t.IsNested) {
+				var alias = NestedTypeNameToAlias (typeName);
+				List<TypeMirror> aliasesList;
+				if (aliases.TryGetValue (alias, out aliasesList)) {
+					aliasesList.Add (t);
+				} else {
+					aliases [alias] = new List<TypeMirror> (new [] { t });
+				}
+			}
+			types [typeName] = typesList ?? new List<TypeMirror> ();
+			types [typeName].Add (t);
 
 			//get the source file paths
 			//full paths, from GetSourceFiles (true), are only supported by sdb protocol 2.2 and later
@@ -2309,8 +2380,6 @@ namespace Mono.Debugging.Soft
 				sourceFiles[n] = NormalizePath (sourceFiles[n]);
 
 			foreach (string s in sourceFiles) {
-				List<TypeMirror> typesList;
-				
 				if (source_to_type.TryGetValue (s, out typesList)) {
 					typesList.Add (t);
 				} else {
@@ -2380,7 +2449,6 @@ namespace Mono.Debugging.Soft
 
 		void ResolveBreakpoints (TypeMirror type)
 		{
-			var resolved = new List<BreakInfo> ();
 			Location loc;
 			
 			ProcessType (type);
@@ -2394,17 +2462,10 @@ namespace Mono.Debugging.Soft
 				if (CheckTypeName (type, bi.TypeName)) {
 					var bp = (FunctionBreakpoint)bi.BreakEvent;
 					foreach (var method in FindMethodsByName (bp.FunctionName, bp.ParamTypes)) {
-						if(ResolveFunctionBreakpoint (bi, bp, method))
-							resolved.Add (bi);
+						ResolveFunctionBreakpoint (bi, bp, method);
 					}
 				}
 			}
-			
-			foreach (var be in resolved)
-				lock (pending_bes) {
-					pending_bes.Remove (be);
-				}
-			resolved.Clear ();
 
 			// Now resolve normal Breakpoints
 			foreach (string s in type_to_source [type]) {
@@ -2426,10 +2487,6 @@ namespace Mono.Debugging.Soft
 							OnDebuggerOutput (false, string.Format ("Resolved pending breakpoint at '{0}:{1},{2}' to {3} [0x{4:x5}].\n",
 							                                        s, bp.Line, bp.Column, GetPrettyMethodName (loc.Method), loc.ILOffset));
 							ResolvePendingBreakpoint (bi, loc);
-							
-							// Note: if the type or method is generic, there may be more instances so don't assume we are done resolving the breakpoint
-							if (!genericMethod && !type.IsGenericType)
-								resolved.Add (bi);
 						} else {
 							if (insideLoadedRange) {
 								bi.SetStatus (BreakEventStatus.Invalid, null);
@@ -2437,12 +2494,6 @@ namespace Mono.Debugging.Soft
 						}
 					}
 				}
-				
-				foreach (var be in resolved)
-					lock (pending_bes) {
-						pending_bes.Remove (be);
-					}
-				resolved.Clear ();
 			}
 
 			// Thirdly, resolve pending catchpoints
@@ -2453,14 +2504,8 @@ namespace Mono.Debugging.Soft
 				var cp = (Catchpoint) bi.BreakEvent;
 				if (cp.ExceptionName == type.FullName) {
 					ResolvePendingCatchpoint (bi, type);
-					resolved.Add (bi);
 				}
 			}
-			
-			foreach (var be in resolved)
-				lock (pending_bes) {
-					pending_bes.Remove (be);
-				}
 		}
 
 		bool ResolveFunctionBreakpoint (BreakInfo bi, FunctionBreakpoint bp, MethodMirror method)
@@ -2484,7 +2529,7 @@ namespace Mono.Debugging.Soft
 
 		internal static string NormalizePath (string path)
 		{
-			if (!IsWindows && path.StartsWith ("\\", StringComparison.Ordinal))
+			if (!IsWindows && (path.StartsWith ("\\", StringComparison.Ordinal) || (path.Length > 3 && path [1] == ':' && path [2] == '\\')))
 				return path.Replace ('\\', '/');
 
 			return path;
@@ -2517,9 +2562,19 @@ namespace Mono.Debugging.Soft
 				return path;
 
 			if (IsWindows)
-				return Path.GetFullPath (path);
+				return ResolveWindowsSymbolicLink (path);
 
-			try {
+            return ResolveUnixSymbolicLink (path);
+		}
+
+        static string ResolveWindowsSymbolicLink (string path)
+        {
+            return Path.GetFullPath (path);
+        }
+
+        static string ResolveUnixSymbolicLink (string path)
+        {
+   			try {
 				var alreadyVisted = new HashSet<string> ();
 
 				while (true) {
@@ -2548,7 +2603,7 @@ namespace Mono.Debugging.Soft
 			} catch {
 				return path;
 			}
-		}
+        }
 		
 		static bool PathsAreEqual (string p1, string p2)
 		{
@@ -2564,113 +2619,168 @@ namespace Mono.Debugging.Soft
 			return PathComparer.Compare (rp1, rp2) == 0;
 		}
 
-		bool LoadMdbFile(string mdbFileName)
+		bool LoadPdbFile (string assemblyFileName, string pdbFileName)
+		{
+			if (!File.Exists (pdbFileName))
+				return false;
+
+			var fileToSourceFileInfos = new Dictionary<string, List<SourceFileDebugInfo>>(StringComparer.InvariantCultureIgnoreCase);
+			sourceFilesDebugInfo[pdbFileName] = fileToSourceFileInfos;
+
+			using (var module = Cecil.ModuleDefinition.ReadModule(assemblyFileName))
+			{
+				var symbolReaderProvider = new Cecil.Cil.DefaultSymbolReaderProvider(false);
+				module.ReadSymbols(symbolReaderProvider.GetSymbolReader(module, pdbFileName));
+
+				var methodMapping = new Dictionary<Document, List<SequencePoint[]>>();
+				foreach (var type in module.GetTypes())
+					LoadPdbType(type, fileToSourceFileInfos);
+			}
+
+			return true;
+		}
+
+		private void LoadPdbType(Cecil.TypeDefinition type, Dictionary<string, List<SourceFileDebugInfo>> fileToSourceFileInfos)
+		{
+			foreach (var method in type.Methods)
+			{
+				var documents = method.DebugInformation.SequencePoints.GroupBy(t => t.Document, t => t);
+
+				foreach (var document in documents)
+				{
+					AddSequencePointsToFileSource(fileToSourceFileInfos, document.Key, document, document.Key.Url);
+					AddSequencePointsToFileSource(fileToSourceFileInfos, document.Key, document, Path.GetFileName(document.Key.Url));
+				}
+			}
+		}
+
+		private static void AddSequencePointsToFileSource(Dictionary<string, List<SourceFileDebugInfo>> fileToSourceFileInfos, Document document, IEnumerable<SequencePoint> sequencePoints, string name)
+		{
+			if (!fileToSourceFileInfos.ContainsKey(name))
+			{
+				List<SequencePoint[]> list = new List<SequencePoint[]> { sequencePoints.ToArray() };
+				SourceFileDebugInfo info = new SourceFileDebugInfo(list);
+
+				info.Hash = document.Hash;
+				info.FileID = 0;
+				info.FullFilePath = document.Url;
+
+				fileToSourceFileInfos.Add(name, new List<SourceFileDebugInfo> { info });
+			}
+			else
+			{
+				fileToSourceFileInfos[name][0].PdbMethods.Add(sequencePoints.ToArray());
+			}
+		}
+
+		bool LoadMdbFile (string assemblyFileName, string mdbFileName)
 		{
 			if (!File.Exists (mdbFileName))
 				return false;
 
-			var fileToSourceFileInfos = new Dictionary<string, List<MdbSourceFileInfo>>();
-			mdbsSourceFileInfos[mdbFileName] = fileToSourceFileInfos;
+			var fileToSourceFileInfos = new Dictionary<string, List<SourceFileDebugInfo>> (StringComparer.InvariantCultureIgnoreCase);
+			sourceFilesDebugInfo [mdbFileName] = fileToSourceFileInfos;
 
-			using(MonoSymbolFile mdb = MonoSymbolFile.ReadSymbolFile(mdbFileName))
-			{
-				foreach (var src in mdb.Sources) 
-				{
-					MdbSourceFileInfo info = new MdbSourceFileInfo ();
+			using (MonoSymbolFile mdb = MonoSymbolFile.ReadSymbolFile (mdbFileName)) {
+				// Create a mapping by CompileUnitIndex.
+				var methodMapping = new Dictionary<int, List<LineNumberEntry []>> (mdb.CompileUnitCount);
+				foreach (var method in mdb.Methods) {
+					List<LineNumberEntry []> list;
+					if (!methodMapping.TryGetValue (method.CompileUnitIndex, out list))
+						methodMapping [method.CompileUnitIndex] = list = new List<LineNumberEntry []> ();
 
+					list.Add (method.GetLineNumberTable ().LineNumbers);
+				}
+
+				foreach (var cu in mdb.CompileUnits) {
+					// A CompileUnit may not have methods, so guard against this.
+					List<LineNumberEntry []> list;
+					if (!methodMapping.TryGetValue (cu.Index, out list))
+						list = new List<LineNumberEntry []> ();
+
+					SourceFileDebugInfo info = new SourceFileDebugInfo (list);
+
+					var src = cu.SourceFile;
 					info.Hash = src.Checksum;
 					info.FileID = src.Index;
 					info.FullFilePath = src.FileName;
 
-					foreach (var method in mdb.Methods) 
-						info.Methods.Add (new MethodMdbInfo{ SequencePoints = method.GetLineNumberTable ().LineNumbers });
-
-					fileToSourceFileInfos [src.FileName] = new List<MdbSourceFileInfo> ();
+					fileToSourceFileInfos [src.FileName] = new List<SourceFileDebugInfo> ();
 
 					if (!fileToSourceFileInfos.ContainsKey (Path.GetFileName (src.FileName)))
-						fileToSourceFileInfos [Path.GetFileName (src.FileName)] = new List<MdbSourceFileInfo> ();
+						fileToSourceFileInfos [Path.GetFileName (src.FileName)] = new List<SourceFileDebugInfo> ();
 
 					fileToSourceFileInfos [src.FileName].Add (info);
-					fileToSourceFileInfos [Path.GetFileName(src.FileName)].Add (info);
+					fileToSourceFileInfos [Path.GetFileName (src.FileName)].Add (info);
 				}
 			}
 
 			return true;
 		}
 
-		void UnloadMdbFile(string mdbFileName)
+		bool LoadDebugFile (string assemblyFileName, string debugFileName, Func<string,string,bool> loadDebugFile)
 		{
-			if (!mdbsSourceFileInfos.ContainsKey(mdbFileName))
-				return;
+			long debugFileTicks;
+			// Check if there is a previously saved timestamp for this debug file.
+			if (!symbolFilesTimestamps.TryGetValue (debugFileName, out debugFileTicks))
+				debugFileTicks = 0;
 
-			mdbsSourceFileInfos.Remove(mdbFileName);
-		}
+			long currentMdbFileNameTicks = File.GetLastWriteTimeUtc (debugFileName).Ticks;
 
-		bool ReloadMdbFile(string mdbFilename)
-		{
-			UnloadMdbFile (mdbFilename);
-			return LoadMdbFile (mdbFilename);
+			// Check if debug file has been updated and if so, reload it.
+			if (currentMdbFileNameTicks > debugFileTicks) {
+				sourceFilesDebugInfo.Remove (debugFileName);
+				if (!loadDebugFile (assemblyFileName, debugFileName))
+					return false;
+
+				symbolFilesTimestamps [debugFileName] = currentMdbFileNameTicks;
+			}
+			return true;
 		}
 
 		bool CheckBetterMatch (TypeMirror type, string file, int line, int column, Location found)
 		{
 			if (type.Assembly == null)
 				return false;
-			
+
 			string assemblyFileName;
 			if (!assemblyPathMap.TryGetValue (type.Assembly.GetName ().FullName, out assemblyFileName))
 				assemblyFileName = type.Assembly.Location;
-			
+
 			if (assemblyFileName == null)
 				return false;
-			
-			string mdbFileName = assemblyFileName + ".mdb";
-			long mdbFileNameTicks;
-
-			// Check if there is a previously saved timestamp for this .mdb file.
-			if(!symbolFilesTimestamps.TryGetValue(mdbFileName, out mdbFileNameTicks))
-				mdbFileNameTicks = 0;							
-
-			long currentMdbFileNameTicks = File.GetLastWriteTimeUtc(mdbFileName).Ticks;
-
-			// Check if .mdb file has been updated and if so, reload it.
-			if(currentMdbFileNameTicks > mdbFileNameTicks)
-			{
-				if(!ReloadMdbFile(mdbFileName))
-					return false;
-
-				symbolFilesTimestamps[mdbFileName] = currentMdbFileNameTicks;
+			string debugFile = assemblyFileName + ".mdb";
+			if (!LoadDebugFile (assemblyFileName, debugFile, LoadMdbFile)) {
+				debugFile = Path.ChangeExtension (assemblyFileName, ".pdb");
+				if (!LoadDebugFile (assemblyFileName, debugFile, LoadPdbFile)) {
+						return false;
+				}
 			}
+			Dictionary<string, List<SourceFileDebugInfo>> fileToSourceFileInfos;
 
-			Dictionary<string, List<MdbSourceFileInfo>> fileToSourceFileInfos;
+			if (!sourceFilesDebugInfo.TryGetValue (debugFile, out fileToSourceFileInfos))
+				throw new Exception ("Unable to retrieve DebugSourceFileInfo's for  '" + debugFile + "'");
 
-			if (!mdbsSourceFileInfos.TryGetValue(mdbFileName, out fileToSourceFileInfos))
-				throw new Exception("Unable to retrieve MdbSourceFileInfo's for  '" + mdbFileName + "'");
-
-			// Try to find MdbSourceFileInfo for file
-			MdbSourceFileInfo sourceInfo = null;
-			List<MdbSourceFileInfo> mdbInfos;
+			// Try to find SourceFileInfo for file
+			SourceFileDebugInfo sourceInfo = null;
+			List<SourceFileDebugInfo> sourceInfos;
 
 			// Search by full path
-			if (fileToSourceFileInfos.TryGetValue (file, out mdbInfos)) 
-			{
-				if (mdbInfos.Count != 1)
-					throw new Exception ("mdbInfos.Count is " + mdbInfos.Count + " for file: '" + file + "'");
+			if (fileToSourceFileInfos.TryGetValue (file, out sourceInfos)) {
+				if (sourceInfos.Count != 1)
+					throw new Exception ("sourceInfos.Count is " + sourceInfos.Count + " for file: '" + file + "'");
 
-				sourceInfo = mdbInfos [0];
-			}
-			else
-			{
+				sourceInfo = sourceInfos [0];
+			} else {
 				if (!File.Exists (file))
 					return false;
 
 				// Search by filename and hash
-				if (fileToSourceFileInfos.TryGetValue (Path.GetFileName (file), out mdbInfos))
-				{
+				if (fileToSourceFileInfos.TryGetValue (Path.GetFileName (file), out sourceInfos)) {
 					using (var fs = File.OpenRead (file)) {
 						using (var md5 = MD5.Create ()) {
 							var hash = md5.ComputeHash (fs);
-							foreach (var info in mdbInfos) {
+							foreach (var info in sourceInfos) {
 								if (hash.SequenceEqual (info.Hash)) {
 									sourceInfo = info;
 									break;
@@ -2681,8 +2791,7 @@ namespace Mono.Debugging.Soft
 				}
 			}
 
-			if (sourceInfo == null)
-			{
+			if (sourceInfo == null) {
 				// Search by symlink resolving
 				var resolvedFile = ResolveSymbolicLink (file);
 
@@ -2690,27 +2799,21 @@ namespace Mono.Debugging.Soft
 					return false;
 
 				// Check if we have already added the symlink in a previous lookup
-				if (fileToSourceFileInfos.TryGetValue (resolvedFile, out mdbInfos))
-				{
-					if (mdbInfos.Count != 1)
-						throw new Exception ("mdbInfos.Count is " + mdbInfos.Count + " for resolved file: '" + resolvedFile + "'");
+				if (fileToSourceFileInfos.TryGetValue (resolvedFile, out sourceInfos)) {
+					if (sourceInfos.Count != 1)
+						throw new Exception ("sourceInfos.Count is " + sourceInfos.Count + " for resolved file: '" + resolvedFile + "'");
 
-					sourceInfo = mdbInfos [0];
-				}
-				else 
-				{
-					foreach (var entry in fileToSourceFileInfos)
-					{
-						foreach (var info in entry.Value)
-						{
-							var resolvedFullFilePath = ResolveSymbolicLink(info.FullFilePath);
+					sourceInfo = sourceInfos [0];
+				} else {
+					foreach (var entry in fileToSourceFileInfos) {
+						foreach (var info in entry.Value) {
+							var resolvedFullFilePath = ResolveSymbolicLink (info.FullFilePath);
 
-							if (PathComparer.Compare(resolvedFile, resolvedFullFilePath) == 0)
-							{
+							if (PathComparer.Compare (resolvedFile, resolvedFullFilePath) == 0) {
 								sourceInfo = info;
 
 								// Add symlink so subsequent lookups are faster
-								fileToSourceFileInfos[resolvedFile] = fileToSourceFileInfos[info.FullFilePath];
+								fileToSourceFileInfos [resolvedFile] = fileToSourceFileInfos [info.FullFilePath];
 
 								break;
 							}
@@ -2724,30 +2827,47 @@ namespace Mono.Debugging.Soft
 
 			int foundDelta = found.LineNumber - line;
 
-			foreach(var methodInfo in sourceInfo.Methods)
-			{
-				foreach (var entry in methodInfo.SequencePoints) 
-				{
-					if (entry.File != sourceInfo.FileID)
-						continue;
+			if (sourceInfo.MdbMethods != null) {
+				foreach (var methodInfo in sourceInfo.MdbMethods) {
+					foreach (var entry in methodInfo) {
+						if (entry.File != sourceInfo.FileID)
+							continue;
 
-					if ((entry.Row >= line && (entry.Row - line) < foundDelta))
-						return true;
-					if (entry.Row == line && column >= entry.Column && entry.Column > found.ColumnNumber)
-						return true;
+						if ((entry.Row >= line && (entry.Row - line) < foundDelta))
+							return true;
+						if (entry.Row == line && column >= entry.Column && entry.Column > found.ColumnNumber)
+							return true;
+					}
+				}
+			}
+			else if (sourceInfo.PdbMethods != null) {
+				foreach (var methodInfo in sourceInfo.PdbMethods) {
+					foreach (var entry in methodInfo) {
+						if ((entry.StartLine >= line && (entry.StartLine - line) < foundDelta))
+							return true;
+						if (entry.StartLine == line && column >= entry.StartColumn && entry.StartColumn > found.ColumnNumber)
+							return true;
+					}
 				}
 			}
 
 			return false;
 		}
 
-		bool CheckFileMd5 (string file, byte[] hash)
+		bool CheckFileHash (string file, byte[] hash)
 		{
 			if (hash == null)
 				return false;
 
 			if (File.Exists (file)) {
 				using (var fs = File.OpenRead (file)) {
+					// Roslyn SHA1 checksum always starts with 20
+					if (hash.Length > 0 && hash [0] == 20)
+						using (var sha1 = SHA1.Create ()) {
+							if (sha1.ComputeHash (fs).Take (15).SequenceEqual (hash.Skip (1))) {
+								return true;
+							}
+						}
 					using (var md5 = MD5.Create ()) {
 						if (md5.ComputeHash (fs).SequenceEqual (hash)) {
 							return true;
@@ -2770,12 +2890,12 @@ namespace Mono.Debugging.Soft
 				//Console.WriteLine ("\tExamining {0}:{1}...", srcFile, location.LineNumber);
 
 				//Check if file names match
-				if (srcFile != null && PathComparer.Compare (Path.GetFileName (srcFile), Path.GetFileName (file)) == 0) {
+				if (srcFile != null && PathComparer.Compare (Path.GetFileName (NormalizePath(srcFile)), Path.GetFileName (file)) == 0) {
 					//Check if full path match(we don't care about md5 if full path match):
 					//1. For backward compatibility
 					//2. If full path matches user himself probably modified code and is aware of modifications
 					//OR if md5 match, useful for alternative location files with breakpoints
-					if (!PathsAreEqual (NormalizePath (srcFile), file) && !CheckFileMd5 (file, location.SourceFileHash))
+					if (!PathsAreEqual (NormalizePath (srcFile), file) && !CheckFileHash (file, location.SourceFileHash))
 						continue;
 					if (location.LineNumber < rangeFirstLine)
 						rangeFirstLine = location.LineNumber;
@@ -3168,6 +3288,8 @@ namespace Mono.Debugging.Soft
 			string oper;
 			if (ins.Operand is MethodMirror)
 				oper = ((MethodMirror)ins.Operand).FullName;
+			else if (ins.Operand is FieldInfoMirror)
+				oper = ((FieldInfoMirror)ins.Operand).FullName;
 			else if (ins.Operand is TypeMirror)
 				oper = ((TypeMirror)ins.Operand).FullName;
 			else if (ins.Operand is ILInstruction)
@@ -3244,7 +3366,7 @@ namespace Mono.Debugging.Soft
 	class BreakInfo: BreakEventInfo
 	{
 		public Location Location;
-		public List<EventRequest> Requests = new List<EventRequest> ();
+		public Dictionary<EventRequest, AssemblyMirror> Requests = new Dictionary<EventRequest, AssemblyMirror> ();
 		public string LastConditionValue;
 		public string FileName;
 		public string TypeName;

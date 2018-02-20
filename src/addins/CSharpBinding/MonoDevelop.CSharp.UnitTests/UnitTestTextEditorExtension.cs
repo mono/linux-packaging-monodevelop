@@ -38,12 +38,24 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ICSharpCode.NRefactory6.CSharp;
 using MonoDevelop.Ide.Editor;
 using MonoDevelop.Ide.TypeSystem;
+using ICSharpCode.NRefactory.CSharp.Refactoring;
+using System.Collections.Immutable;
 
 namespace MonoDevelop.CSharp
 {
 	class UnitTestTextEditorExtension : AbstractUnitTestTextEditorExtension
 	{
 		static readonly IList<UnitTestLocation> emptyList = new UnitTestLocation[0];
+
+		static bool HasMethodMarkerAttribute (SemanticModel model, IUnitTestMarkers[] markers)
+		{
+			var compilation = model.Compilation;
+			foreach (var marker in markers)
+				if (compilation.GetTypeByMetadataName (marker.TestMethodAttributeMarker) != null)
+					return true;
+			return false;
+		}
+
 		public override Task<IList<UnitTestLocation>> GatherUnitTests (IUnitTestMarkers[] unitTestMarkers, CancellationToken token)
 		{
 			var parsedDocument = DocumentContext.ParsedDocument;
@@ -52,6 +64,9 @@ namespace MonoDevelop.CSharp
 			
 			var semanticModel = parsedDocument.GetAst<SemanticModel> ();
 			if (semanticModel == null)
+				return Task.FromResult (emptyList);
+
+			if (!HasMethodMarkerAttribute (semanticModel, unitTestMarkers))
 				return Task.FromResult (emptyList);
 
 			var visitor = new NUnitVisitor (semanticModel, unitTestMarkers, token);
@@ -122,17 +137,36 @@ namespace MonoDevelop.CSharp
 			static string BuildArguments (AttributeData attr)
 			{
 				var sb = new StringBuilder ();
-				foreach (var arg in attr.ConstructorArguments) {
-					if (sb.Length > 0)
+				ImmutableArray<TypedConstant> args;
+				if (attr.ConstructorArguments.Length == 1 && attr.ConstructorArguments [0].Kind == TypedConstantKind.Array)
+					args = attr.ConstructorArguments [0].Values;
+				else
+					args = attr.ConstructorArguments;
+
+				for (int i = 0; i < args.Length; i++)
+				{
+					if (i > 0)
 						sb.Append (", ");
-//					var cr = arg as ConversionResolveResult;
-//					if (cr != arg.Value) {
-//						AppendConstant (sb, cr.Input.ConstantValue);
-//						continue;
-//					}
-					AppendConstant (sb, arg.Value);
+
+					AddArgument (args [i], sb);
 				}
 				return sb.ToString ();
+			}
+
+			static void AddArgument(TypedConstant arg, StringBuilder sb)
+			{
+				if (arg.Kind == TypedConstantKind.Array) {
+					sb.Append ("[");
+					for (int i = 0; i < arg.Values.Length; i++)
+					{
+						if (i > 0)
+							sb.Append (", ");
+						
+						AddArgument (arg.Values [i], sb);
+					}
+					sb.Append ("]");
+				} else
+					AppendConstant (sb, arg.Value);
 			}
 
 			public override void VisitMethodDeclaration (MethodDeclarationSyntax node)
@@ -147,7 +181,7 @@ namespace MonoDevelop.CSharp
 				IUnitTestMarkers markers = null;
 				foreach (var attr in method.GetAttributes ()) {
 					var cname = attr.AttributeClass.GetFullName ();
-					markers = unitTestMarkers.FirstOrDefault (m => m.TestMethodAttributeMarker == cname);
+					markers = unitTestMarkers.FirstOrDefault (m => (m.TestMethodAttributeMarker == cname || m.TestCaseMethodAttributeMarker == cname));
 					if (markers != null) {
 						if (test == null) {
 							TagClass (parentClass, markers);
@@ -155,6 +189,7 @@ namespace MonoDevelop.CSharp
 							test.UnitTestIdentifier = GetFullName (parentClass) + "." + method.Name;
 							foundTests.Add (test);
 						}
+						break;
 					}
 				}
 				if (test != null) {

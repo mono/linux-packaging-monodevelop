@@ -70,6 +70,8 @@ namespace MonoDevelop.Components.AutoTest
 		[Serializable]
 		public struct MemoryStats {
 			public long PrivateMemory;
+			public long VirtualMemory;
+			public long WorkingSet;
 			public long PeakVirtualMemory;
 			public long PagedSystemMemory;
 			public long PagedMemory;
@@ -82,6 +84,8 @@ namespace MonoDevelop.Components.AutoTest
 			using (Process proc = Process.GetCurrentProcess ()) {
 				stats = new MemoryStats {
 					PrivateMemory = proc.PrivateMemorySize64,
+					VirtualMemory = proc.VirtualMemorySize64,
+					WorkingSet = proc.WorkingSet64,
 					PeakVirtualMemory = proc.PeakVirtualMemorySize64,
 					PagedSystemMemory = proc.PagedSystemMemorySize64,
 					PagedMemory = proc.PagedMemorySize64,
@@ -98,7 +102,7 @@ namespace MonoDevelop.Components.AutoTest
 
 		public void ExecuteCommand (object cmd, object dataItem = null, CommandSource source = CommandSource.Unknown)
 		{
-			Gtk.Application.Invoke (delegate {
+			Gtk.Application.Invoke ((o, args) => {
 				AutoTestService.CommandManager.DispatchCommand (cmd, dataItem, null, source);
 			});
 		}
@@ -114,7 +118,7 @@ namespace MonoDevelop.Components.AutoTest
 			}
 
 			syncEvent.Reset ();
-			Gtk.Application.Invoke (delegate {
+			Gtk.Application.Invoke ((o, args) => {
 				try {
 					res = del ();
 				} catch (Exception ex) {
@@ -147,11 +151,10 @@ namespace MonoDevelop.Components.AutoTest
 		public void ExitApp ()
 		{
 			Sync (delegate {
-				try {
-					IdeApp.Exit ();
-				} catch (Exception e) {
-					Console.WriteLine (e);
-				}
+				IdeApp.Exit ().ContinueWith ((arg) => {
+					if (arg.IsFaulted)
+						Console.WriteLine (arg.Exception);
+				});
 				return true;
 			});
 		}
@@ -249,7 +252,7 @@ namespace MonoDevelop.Components.AutoTest
 				Description = x.Description,
 				File = x.FileName.FileName,
 				Path = x.FileName.FullPath,
-				Project = x.WorkspaceObject.Name
+				Project = x.WorkspaceObject?.Name
 			}).ToList ();
 		}
 
@@ -504,6 +507,21 @@ namespace MonoDevelop.Components.AutoTest
 			try {
 				ExecuteOnIdle (() => {
 					success = result.Click ();
+				}, wait);
+			} catch (TimeoutException e) {
+				ThrowOperationTimeoutException ("Click", result.SourceQuery, result, e);
+			}
+
+			return success;
+		}
+
+		public bool Click (AppResult result, double x, double y, bool wait = true)
+		{
+			bool success = false;
+
+			try {
+				ExecuteOnIdle (() => {
+					success = result.Click (x, y);
 				}, wait);
 			} catch (TimeoutException e) {
 				ThrowOperationTimeoutException ("Click", result.SourceQuery, result, e);

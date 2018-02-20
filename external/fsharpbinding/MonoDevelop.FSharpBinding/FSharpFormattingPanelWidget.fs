@@ -1,11 +1,8 @@
 ﻿namespace MonoDevelop.FSharp
 
-open System
 open Gtk
 open MonoDevelop.Core
-open MonoDevelop.Ide
 open MonoDevelop.Components.PropertyGrid
-open Mono.Unix
 
 // Handwritten GUI, feel free to edit
 
@@ -14,7 +11,8 @@ type FSharpFormattingPolicyPanelWidget() =
     inherit Gtk.Bin()
 
     let store = new ListStore (typedefof<string>, typedefof<FSharpFormattingSettings>)
-    let mutable policy = FSharpFormattingPolicy()
+
+    let mutable policy = DefaultFSharpFormatting.policy
     let mutable vbox2 : Gtk.VBox = null
     let mutable hbox1 : Gtk.HBox = null
     let mutable boxScopes : Gtk.VBox = null
@@ -30,7 +28,7 @@ type FSharpFormattingPolicyPanelWidget() =
             GettextCatalog.GetString ("Default")
         else
             let i = policy.Formats.IndexOf (format) + 1
-            String.Format(GettextCatalog.GetString ("Format #{0}"), i)
+            GettextCatalog.GetString ("Format #{0}", i)
 
     let updateCurrentName() =
         let it : TreeIter ref = ref Unchecked.defaultof<_>

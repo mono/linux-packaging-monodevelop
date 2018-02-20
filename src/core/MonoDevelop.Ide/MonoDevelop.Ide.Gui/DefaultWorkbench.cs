@@ -29,6 +29,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Diagnostics;
 using System.Linq;
+using System.Timers;
 
 using MonoDevelop.Projects;
 using Mono.Addins;
@@ -41,9 +42,11 @@ using MonoDevelop.Components.Docking;
 using GLib;
 using Gtk;
 using MonoDevelop.Components;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Ide.Extensions;
 using MonoDevelop.Components.MainToolbar;
 using MonoDevelop.Components.DockNotebook;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -98,6 +101,7 @@ namespace MonoDevelop.Ide.Gui
 #endif
 		
 		public event EventHandler ActiveWorkbenchWindowChanged;
+		public event EventHandler WorkbenchTabsChanged;
 		
 		public MonoDevelop.Ide.StatusBar StatusBar {
 			get {
@@ -204,19 +208,28 @@ namespace MonoDevelop.Ide.Gui
 		
 		public DefaultWorkbench()
 		{
-			Title = BrandingService.ApplicationName;
+			Title = BrandingService.ApplicationLongName;
 			LoggingService.LogInfo ("Creating DefaultWorkbench");
 			
 			WidthRequest = normalBounds.Width;
 			HeightRequest = normalBounds.Height;
 
 			DeleteEvent += new Gtk.DeleteEventHandler (OnClosing);
+			BrandingService.ApplicationNameChanged += ApplicationNameChanged;
 			
 			SetAppIcons ();
 
 			IdeApp.CommandService.SetRootWindow (this);
+			DockNotebook.NotebookChanged += NotebookPagesChanged;
+
+			Accessible.SetIsMainWindow (true);
 		}
-		
+
+		void NotebookPagesChanged (object sender, EventArgs e)
+		{
+			WorkbenchTabsChanged?.Invoke (this, EventArgs.Empty);
+		}
+
 		void SetAppIcons ()
 		{
 			//first try to get the icon from the GTK icon theme
@@ -232,8 +245,11 @@ namespace MonoDevelop.Ide.Gui
 				var iconsEl = BrandingService.GetElement ("ApplicationIcons");
 				if (iconsEl != null) {
 					try {
-						Gtk.Window.DefaultIconList = iconsEl.Elements ("Icon")
+						var icons = iconsEl.Elements ("Icon")
 							.Select (el => new Gdk.Pixbuf (BrandingService.GetFile ((string)el))).ToArray ();
+						Gtk.Window.DefaultIconList = icons;
+						foreach (var icon in icons)
+							icon.Dispose ();
 						return;
 					} catch (Exception ex) {
 						LoggingService.LogError ("Could not load app icons", ex);
@@ -257,6 +273,7 @@ namespace MonoDevelop.Ide.Gui
 			IdeApp.ProjectOperations.CurrentProjectChanged += (s,a) => SetWorkbenchTitle ();
 
 			FileService.FileRemoved += CheckRemovedFile;
+			FileService.FileMoved += CheckRenamedFile;
 			FileService.FileRenamed += CheckRenamedFile;
 			
 //			TopMenu.Selected   += new CommandHandler(OnTopMenuSelected);
@@ -462,7 +479,7 @@ namespace MonoDevelop.Ide.Gui
 				string lab = content.Label.Length > 0 ? GettextCatalog.GetString (content.Label) : "";
 				ActionCommand cmd = new ActionCommand ("Pad|" + content.PadId, lab, null);
 				cmd.DefaultHandler = new PadActivationHandler (this, content);
-				cmd.Category = GettextCatalog.GetString ("View");
+				cmd.Category = GettextCatalog.GetString ("View (Pads)");
 				cmd.Description = GettextCatalog.GetString ("Show {0}", cmd.Text);
 				IdeApp.CommandService.RegisterCommand (cmd);
 			}
@@ -528,11 +545,26 @@ namespace MonoDevelop.Ide.Gui
 				post = "*";
 			}
 			if (window.ViewContent.Project != null) {
-				return window.ViewContent.Project.Name + " - " + window.ViewContent.PathRelativeToProject + post + " - " + BrandingService.ApplicationName;
+				return window.ViewContent.Project.Name + " – " + window.ViewContent.PathRelativeToProject + post + " – " + BrandingService.ApplicationLongName;
 			}
-			return window.ViewContent.ContentName + post + " - " + BrandingService.ApplicationName;
+			return window.ViewContent.ContentName + post + " – " + BrandingService.ApplicationLongName;
 		}
-		
+
+		void SetAccessibilityDetails (IWorkbenchWindow window)
+		{
+			string documentUrl, filename;
+			if (window.ViewContent.Project != null) {
+				documentUrl = "file://" + window.ViewContent.Project.FileName;
+				filename = System.IO.Path.GetFileName (window.ViewContent.PathRelativeToProject);
+			} else {
+				documentUrl = string.Empty;
+				filename = string.Empty;
+			}
+
+			Accessible.SetDocument (documentUrl);
+			Accessible.SetFilename (filename);
+		}
+
 		void SetWorkbenchTitle ()
 		{
 			try {
@@ -540,21 +572,33 @@ namespace MonoDevelop.Ide.Gui
 				if (window != null) {
 					if (window.ActiveViewContent.Control.GetNativeWidget<Gtk.Widget> ().Toplevel == this)
 						Title = GetTitle (window);
+
+					SetAccessibilityDetails (window);
 				} else {
 					Title = GetDefaultTitle ();
 					if (IsInFullViewMode)
 						this.ToggleFullViewMode ();
+					Accessible.SetDocument ("");
+					Accessible.SetUrl ("");
 				}
+
 			} catch (Exception) {
 				Title = GetDefaultTitle ();
+				Accessible.SetDocument ("");
+				Accessible.SetFilename ("");
 			}
 		}
 		
 		static string GetDefaultTitle ()
 		{
 			if (IdeApp.ProjectOperations.CurrentSelectedProject != null)
-				return IdeApp.ProjectOperations.CurrentSelectedProject.Name + " - " + BrandingService.ApplicationName;
-			return BrandingService.ApplicationName;
+				return IdeApp.ProjectOperations.CurrentSelectedProject.Name + " – " + BrandingService.ApplicationLongName;
+			return BrandingService.ApplicationLongName;
+		}
+
+		void ApplicationNameChanged (object sender, EventArgs e)
+		{
+			SetWorkbenchTitle ();
 		}
 		
 		public Properties GetStoredMemento (ViewContent content)
@@ -596,8 +640,7 @@ namespace MonoDevelop.Ide.Gui
 					WorkbenchMemento memento = new WorkbenchMemento ((Properties)value);
 					
 					normalBounds = memento.Bounds;
-					Move (normalBounds.X, normalBounds.Y);
-					Resize (normalBounds.Width, normalBounds.Height);
+					DesktopService.PlaceWindow (this, normalBounds.X, normalBounds.Y, normalBounds.Width, normalBounds.Height);
 					
 					// HACK: don't restore Gdk.WindowState.Maximized on OS X, because there's a bug in 
 					// GdkWindow.State that means it doesn't reflect the real state, it only reflects values set
@@ -627,7 +670,7 @@ namespace MonoDevelop.Ide.Gui
 								content.UntitledName = content.ContentName;
 								content.ContentName = null;
 							} else {
-								((SdiWorkspaceWindow)content.WorkbenchWindow).CloseWindow (true, true);
+								((SdiWorkspaceWindow)content.WorkbenchWindow).CloseWindow (true, true).Ignore();
 							}
 						}
 					}
@@ -639,7 +682,7 @@ namespace MonoDevelop.Ide.Gui
 								content.UntitledName = content.ContentName;
 								content.ContentName = null;
 							} else {
-								((SdiWorkspaceWindow)content.WorkbenchWindow).CloseWindow (true, true);
+								((SdiWorkspaceWindow)content.WorkbenchWindow).CloseWindow (true, true).Ignore();
 							}
 							return;
 						}
@@ -668,13 +711,21 @@ namespace MonoDevelop.Ide.Gui
 				}
 			}
 		}
-		
-		protected /*override*/ void OnClosing(object o, Gtk.DeleteEventArgs e)
+
+		bool closing;
+		protected /*override*/ async void OnClosing(object o, Gtk.DeleteEventArgs e)
 		{
-			if (Close()) {
+			// close the window in case DeleteEvent fires again after a successful close
+			if (closing) 
+				return;
+			
+			// don't allow Gtk to close the workspace, in case Close() leaves the synchronization context
+			// Gtk.Application.Quit () will handle it for us.
+			e.RetVal = true;
+			if (await Close ()) {
+				closing = true;
+				Destroy (); // default delete action
 				Gtk.Application.Quit ();
-			} else {
-				e.RetVal = true;
 			}
 		}
 		
@@ -701,7 +752,7 @@ namespace MonoDevelop.Ide.Gui
 			Destroy ();
 		}
 		
-		public bool Close() 
+		public async Task<bool> Close()
 		{
 			if (!IdeApp.OnExit ())
 				return false;
@@ -726,10 +777,12 @@ namespace MonoDevelop.Ide.Gui
 				}
 			}
 			
-			if (!IdeApp.Workspace.Close (false, false))
+			if (!await IdeApp.Workspace.Close (false, false))
 				return false;
 			
 			CloseAllViews ();
+
+			BrandingService.ApplicationNameChanged -= ApplicationNameChanged;
 			
 			PropertyService.Set ("SharpDevelop.Workbench.WorkbenchMemento", this.Memento);
 			IdeApp.OnExited ();
@@ -808,9 +861,29 @@ namespace MonoDevelop.Ide.Gui
 			initializing = false;
 		}
 
+		Task layoutChangedTask;
+		async void LayoutChanged (object o, EventArgs e)
+		{
+			if (layoutChangedTask != null) {
+				return;
+			}
+
+			layoutChangedTask = Task.Delay (10000);
+			await layoutChangedTask;
+			layoutChangedTask = null;
+
+			dock.SaveLayouts (configFile);
+		}
+
 		void CreateComponents ()
 		{
+			Accessible.Name = "MainWindow";
+
 			fullViewVBox = new VBox (false, 0);
+			fullViewVBox.Accessible.Name = "MainWindow.Root";
+			fullViewVBox.Accessible.SetLabel ("Label");
+			fullViewVBox.Accessible.SetShouldIgnore (true);
+
 			rootWidget = fullViewVBox;
 			
 			InstallMenuBar ();
@@ -819,12 +892,15 @@ namespace MonoDevelop.Ide.Gui
 			DesktopService.SetMainWindowDecorations (this);
 			DesktopService.AttachMainToolbar (fullViewVBox, toolbar);
 			toolbarFrame = new CommandFrame (IdeApp.CommandService);
+			toolbarFrame.Accessible.Name = "MainWindow.Root.ToolbarFrame";
+			toolbarFrame.Accessible.SetShouldIgnore (true);
 
 			fullViewVBox.PackStart (toolbarFrame, true, true, 0);
 
 			// Create the docking widget and add it to the window.
 			dock = new DockFrame ();
-			
+			dock.LayoutChanged += LayoutChanged;
+
 			dock.CompactGuiLevel = ((int)IdeApp.Preferences.WorkbenchCompactness.Value) + 1;
 			IdeApp.Preferences.WorkbenchCompactness.Changed += delegate {
 				dock.CompactGuiLevel = ((int)IdeApp.Preferences.WorkbenchCompactness.Value) + 1;
@@ -1027,7 +1103,7 @@ namespace MonoDevelop.Ide.Gui
 			IdeApp.CommandService.ShowContextMenu (notebook, evt, "/MonoDevelop/Ide/ContextMenu/DocumentTab");
 		}
 		
-		internal void OnTabsReordered (Widget widget, int oldPlacement, int newPlacement)
+		internal void OnTabsReordered (DockNotebookTab widget, int oldPlacement, int newPlacement)
 		{
 			IdeApp.Workbench.ReorderDocuments (oldPlacement, newPlacement);
 		}
@@ -1057,6 +1133,40 @@ namespace MonoDevelop.Ide.Gui
 			return base.OnFocusInEvent (evnt);
 		}
 
+		bool haveFocusedToolbar = false;
+		protected override bool OnFocused (DirectionType direction)
+		{
+			// If the toolbar is not focused, focus it, and focus the next child once it loses focus
+			switch (direction) {
+			case DirectionType.TabForward:
+				if (!haveFocusedToolbar) {
+					haveFocusedToolbar = true;
+					toolbar.ToolbarView.Focus(() => {
+						if (!dock.ChildFocus(direction)) {
+							haveFocusedToolbar = false;
+							OnFocused(direction);
+						}
+					});
+				} else {
+					if (!dock.ChildFocus(direction)) {
+						haveFocusedToolbar = false;
+						OnFocused(direction);
+					}
+				}
+				break;
+
+			case DirectionType.TabBackward:
+				if (!dock.ChildFocus(direction)) {
+					haveFocusedToolbar = false;
+					OnFocused(DirectionType.TabForward);
+				}
+				break;
+
+			default:
+				return base.OnFocused(direction);
+			}
+			return true;
+		}
 
 		/// <summary>
 		/// Sets the current active document widget.
@@ -1202,7 +1312,7 @@ namespace MonoDevelop.Ide.Gui
 		
 		internal void CloseClicked (object o, TabEventArgs e)
 		{
-			((SdiWorkspaceWindow)e.Tab.Content).CloseWindow (false, true);
+			((SdiWorkspaceWindow)e.Tab.Content).CloseWindow (false, true).Ignore();
 		}
 
 		internal void RemoveTab (DockNotebook tabControl, int pageNum, bool animate)
@@ -1353,11 +1463,11 @@ namespace MonoDevelop.Ide.Gui
 				};
 			}
 			
-			item.VisibleChanged += delegate {
+			item.VisibleChanged += (s,a) => {
 				if (item.Visible)
-					window.NotifyShown ();
+					window.NotifyShown (a);
 				else
-					window.NotifyHidden ();
+					window.NotifyHidden (a);
 			};
 			
 			item.ContentVisibleChanged += delegate {
@@ -1376,15 +1486,17 @@ namespace MonoDevelop.Ide.Gui
 			PadCodon codon = padCodons [window];
 			DockItem item = GetDockItem (codon);
 			if (item != null) {
-				string windowTitle = GettextCatalog.GetString (window.Title); 
+				string windowTitle = GettextCatalog.GetString (window.Title);
+				var windowIcon = ImageService.GetIcon (window.Icon).WithSize (IconSize.Menu);
 				if (String.IsNullOrEmpty (windowTitle)) 
 					windowTitle = GettextCatalog.GetString (codon.Label);
-				if (window.HasErrors && !window.ContentVisible)
-					windowTitle = "<span foreground='red'>" + windowTitle + "</span>";
-				else if (window.HasNewData && !window.ContentVisible)
+				if (window.HasErrors && !window.ContentVisible) {
+					windowTitle = "<span foreground='" + Styles.ErrorForegroundColor.ToHexString (false) + "'>" + windowTitle + "</span>";
+					windowIcon = windowIcon.WithStyles ("error");
+				} else if (window.HasNewData && !window.ContentVisible)
 					windowTitle = "<b>" + windowTitle + "</b>";
 				item.Label = windowTitle;
-				item.Icon  = ImageService.GetIcon (window.Icon).WithSize (IconSize.Menu);
+				item.Icon = windowIcon;
 			}
 		}
 		
@@ -1444,7 +1556,6 @@ namespace MonoDevelop.Ide.Gui
 				window.ToggleFullViewMode ();
 			};
 			TabsReordered += window.OnTabsReordered;
-			CanFocus = true;
 			
 			DoPopupMenu = window.ShowPopup;
 			Events |= Gdk.EventMask.FocusChangeMask | Gdk.EventMask.KeyPressMask;

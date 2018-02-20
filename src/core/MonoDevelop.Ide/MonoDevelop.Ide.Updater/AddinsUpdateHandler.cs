@@ -78,9 +78,9 @@ namespace MonoDevelop.Ide.Updater
 		{
 			if (!UpdateService.NotifyAddinUpdates)
 				return;
-
-			updateIcon = IdeApp.Workbench.StatusBar.ShowStatusIcon (ImageService.GetIcon ("md-updates", IconSize.Menu));
-			string s = GettextCatalog.GetString ("New add-in updates are available:");
+			
+			updateIcon = IdeApp.Workbench.StatusBar.ShowStatusIcon (ImageService.GetIcon (Gui.Stock.Updates, IconSize.Menu));
+			string s = GettextCatalog.GetString ("New extension updates are available:");
 			for (int n=0; n<updates.Length && n < 10; n++)
 				s += "\n" + updates [n].Addin.Name;
 
@@ -88,6 +88,8 @@ namespace MonoDevelop.Ide.Updater
 				s += "\n...";
 
 			updateIcon.ToolTip = s;
+			updateIcon.Title = GettextCatalog.GetString ("Updates");
+			updateIcon.Help = GettextCatalog.GetString ("Indicates that there are updates available to be installed");
 			updateIcon.SetAlertMode (20);
 			updateIcon.Clicked += OnUpdateClicked;
 		}
@@ -106,7 +108,7 @@ namespace MonoDevelop.Ide.Updater
 
 			if (t != null && t.IsCompleted) {
 				AggregatedProgressMonitor monitor = new AggregatedProgressMonitor (Instance.updateMonitor);
-				monitor.AddSlaveMonitor (new MessageDialogProgressMonitor (true, true, false));
+				monitor.AddFollowerMonitor (new MessageDialogProgressMonitor (true, true, false));
 				await t;
 			}
 			HideAlert ();

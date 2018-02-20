@@ -31,6 +31,7 @@ using System.Reflection;
 using Mono.Debugging.Client;
 
 using ICSharpCode.NRefactory.CSharp;
+using System.Linq;
 
 namespace Mono.Debugging.Evaluation
 {
@@ -106,20 +107,25 @@ namespace Mono.Debugging.Evaluation
 
 		static Type GetCommonType (object v1, object v2)
 		{
-			int s1 = Marshal.SizeOf (v1);
-			if (IsUnsigned (s1))
-				s1 += 8;
-			int s2 = Marshal.SizeOf (v2);
-			if (IsUnsigned (s2))
-				s2 += 8;
-			if (s1 > s2)
-				return v1.GetType ();
-			return v2.GetType ();
-		}
-
-		static bool IsUnsigned (object v)
-		{
-			return (v is byte) || (v is ushort) || (v is uint) || (v is ulong);
+			var t1 = Type.GetTypeCode (v1.GetType ());
+			var t2 = Type.GetTypeCode (v2.GetType ());
+			if (t1 < TypeCode.Int32 && t2 < TypeCode.Int32)
+				return typeof (int);
+			else
+				switch ((TypeCode)Math.Max ((int)t1, (int)t2)) {
+				case TypeCode.Byte: return typeof (byte);
+				case TypeCode.Decimal: return typeof (decimal);
+				case TypeCode.Double: return typeof (double);
+				case TypeCode.Int16: return typeof (short);
+				case TypeCode.Int32: return typeof (int);
+				case TypeCode.Int64: return typeof (long);
+				case TypeCode.SByte: return typeof (sbyte);
+				case TypeCode.Single: return typeof (float);
+				case TypeCode.UInt16: return typeof (ushort);
+				case TypeCode.UInt32: return typeof (uint);
+				case TypeCode.UInt64: return typeof (ulong);
+				default: throw new Exception (((TypeCode)Math.Max ((int)t1, (int)t2)).ToString ());
+				}
 		}
 
 		static object EvaluateOperation (BinaryOperatorType op, double v1, double v2)
@@ -538,7 +544,33 @@ namespace Mono.Debugging.Evaluation
 
 		public ValueReference VisitArrayCreateExpression (ArrayCreateExpression arrayCreateExpression)
 		{
-			throw NotSupported ();
+			var type = arrayCreateExpression.Type.AcceptVisitor<ValueReference> (this) as TypeValueReference;
+			if (type == null)
+				throw ParseError ("Invalid type in array creation.");
+			var lengths = new int [arrayCreateExpression.Arguments.Count];
+			for (int i = 0; i < lengths.Length; i++) {
+				lengths [i] = (int)Convert.ChangeType (arrayCreateExpression.Arguments.ElementAt (i).AcceptVisitor<ValueReference> (this).ObjectValue, typeof (int));
+			}
+			var array = ctx.Adapter.CreateArray (ctx, type.Type, lengths);
+			if (arrayCreateExpression.Initializer.Elements.Any ()) {
+				var arrayAdaptor = ctx.Adapter.CreateArrayAdaptor (ctx, array);
+				int index = 0;
+				foreach (var el in LinearElements(arrayCreateExpression.Initializer.Elements)) {
+					arrayAdaptor.SetElement (new int [] { index++ }, el.AcceptVisitor<ValueReference> (this).Value);
+				}
+			}
+			return LiteralValueReference.CreateTargetObjectLiteral (ctx, expression, array);
+		}
+
+		IEnumerable<Expression> LinearElements (AstNodeCollection<Expression> elements)
+		{
+			foreach (var el in elements) {
+				if (el is ArrayInitializerExpression)
+					foreach (var el2 in LinearElements (((ArrayInitializerExpression)el).Elements)) {
+						yield return el2;
+					} else
+					yield return el;
+			}
 		}
 
 		public ValueReference VisitArrayInitializerExpression (ArrayInitializerExpression arrayInitializerExpression)
@@ -558,19 +590,24 @@ namespace Mono.Debugging.Evaluation
 			if (result == null)
 				return new NullValueReference (ctx, type.Type);
 
-			return LiteralValueReference.CreateTargetObjectLiteral (ctx, expression, result);
+			return LiteralValueReference.CreateTargetObjectLiteral (ctx, expression, result, type.Type);
 		}
 
 		public ValueReference VisitAssignmentExpression (AssignmentExpression assignmentExpression)
 		{
 			if (!options.AllowMethodEvaluation)
-				throw NotSupported ();
+				throw new ImplicitEvaluationDisabledException ();
 
 			var left = assignmentExpression.Left.AcceptVisitor<ValueReference> (this);
 
 			if (assignmentExpression.Operator == AssignmentOperatorType.Assign) {
 				var right = assignmentExpression.Right.AcceptVisitor<ValueReference> (this);
-				left.Value = right.Value;
+				if (left is UserVariableReference) {
+					left.Value = right.Value;
+				} else {
+					var castedValue = ctx.Adapter.TryCast (ctx, right.Value, left.Type);
+					left.Value = castedValue;
+				}
 			} else {
 				BinaryOperatorType op;
 
@@ -623,7 +660,7 @@ namespace Mono.Debugging.Evaluation
 			if (result == null)
 				throw ParseError ("Invalid cast.");
 
-			return LiteralValueReference.CreateTargetObjectLiteral (ctx, expression, result);
+			return LiteralValueReference.CreateTargetObjectLiteral (ctx, expression, result, type.Type);
 		}
 
 		public ValueReference VisitCheckedExpression (CheckedExpression checkedExpression)
@@ -645,7 +682,30 @@ namespace Mono.Debugging.Evaluation
 
 		public ValueReference VisitDefaultValueExpression (DefaultValueExpression defaultValueExpression)
 		{
-			throw NotSupported ();
+			var type = defaultValueExpression.Type.AcceptVisitor<ValueReference> (this) as TypeValueReference;
+			if (type == null)
+				throw ParseError ("Invalid type in 'default' expression.");
+			if (ctx.Adapter.IsClass (ctx, type.Type))
+				return LiteralValueReference.CreateTargetObjectLiteral (ctx, expression, ctx.Adapter.CreateNullValue (ctx, type.Type), type.Type);
+			else if(ctx.Adapter.IsValueType (type.Type))
+				return LiteralValueReference.CreateTargetObjectLiteral (ctx, expression, ctx.Adapter.CreateValue (ctx, type.Type, new object [0]), type.Type);
+			else
+				switch (ctx.Adapter.GetTypeName (ctx, type.Type)) {
+				case "System.Boolean": return LiteralValueReference.CreateObjectLiteral (ctx, expression, false);
+				case "System.Char": return LiteralValueReference.CreateObjectLiteral (ctx, expression, '\0');
+				case "System.Byte": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (byte)0);
+				case "System.SByte": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (sbyte)0);
+				case "System.Int16": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (short)0);
+				case "System.UInt16": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (ushort)0);
+				case "System.Int32": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (int)0);
+				case "System.UInt32": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (uint)0);
+				case "System.Int64": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (long)0);
+				case "System.UInt64": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (ulong)0);
+				case "System.Decimal": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (decimal)0);
+				case "System.Single": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (float)0);
+				case "System.Double": return LiteralValueReference.CreateObjectLiteral (ctx, expression, (double)0);
+				default: throw new Exception ($"Unexpected type {ctx.Adapter.GetTypeName (ctx, type.Type)}");
+				}
 		}
 
 		public ValueReference VisitDirectionExpression (DirectionExpression directionExpression)
@@ -747,7 +807,7 @@ namespace Mono.Debugging.Evaluation
 			foreach (var arg in indexerExpression.Arguments)
 				args[n++] = arg.AcceptVisitor<ValueReference> (this).Value;
 
-			var indexer = ctx.Adapter.GetIndexerReference (ctx, target.Value, args);
+			var indexer = ctx.Adapter.GetIndexerReference (ctx, target.Value, target.Type, args);
 			if (indexer == null)
 				throw NotSupported ();
 
@@ -793,7 +853,7 @@ namespace Mono.Debugging.Evaluation
 		public ValueReference VisitInvocationExpression (InvocationExpression invocationExpression)
 		{
 			if (!options.AllowMethodEvaluation)
-				throw NotSupported ();
+				throw new ImplicitEvaluationDisabledException ();
 
 			bool invokeBaseMethod = false;
 			ValueReference target = null;
@@ -896,8 +956,21 @@ namespace Mono.Debugging.Evaluation
 
 		public ValueReference VisitIsExpression (IsExpression isExpression)
 		{
-			// FIXME: we could probably implement this one...
-			throw NotSupported ();
+			var type = (isExpression.Type.AcceptVisitor<ValueReference> (this) as TypeValueReference)?.Type;
+			if (type == null)
+				throw ParseError ("Invalid type in 'is' expression.");
+			if (ctx.Adapter.IsNullableType (ctx, type))
+				type = ctx.Adapter.GetGenericTypeArguments (ctx, type).Single ();
+			var val = isExpression.Expression.AcceptVisitor<ValueReference> (this).Value;
+			if (ctx.Adapter.IsNull (ctx, val))
+				return LiteralValueReference.CreateObjectLiteral (ctx, expression, false);
+			var valueIsPrimitive = ctx.Adapter.IsPrimitive (ctx, val);
+			var typeIsPrimitive = ctx.Adapter.IsPrimitiveType (type);
+			if (valueIsPrimitive != typeIsPrimitive)
+				return LiteralValueReference.CreateObjectLiteral (ctx, expression, false);
+			if (typeIsPrimitive)
+				return LiteralValueReference.CreateObjectLiteral (ctx, expression, ctx.Adapter.GetTypeName (ctx, type) == ctx.Adapter.GetValueTypeName (ctx, val));
+			return LiteralValueReference.CreateObjectLiteral (ctx, expression, ctx.Adapter.TryCast (ctx, val, type) != null);
 		}
 
 		public ValueReference VisitLambdaExpression (LambdaExpression lambdaExpression)
@@ -1045,6 +1118,10 @@ namespace Mono.Debugging.Evaluation
 			case UnaryOperatorType.Minus:
 				if (val is decimal) {
 					val = -(decimal)val;
+				} else if (val is double) {
+					val = -(double)val;
+				} else if (val is float) {
+					val = -(float)val;
 				} else {
 					num = -GetInteger (val);
 					val = Convert.ChangeType (num, val.GetType ());
@@ -1057,23 +1134,55 @@ namespace Mono.Debugging.Evaluation
 				val = !(bool) val;
 				break;
 			case UnaryOperatorType.PostDecrement:
-				num = GetInteger (val) - 1;
-				newVal = Convert.ChangeType (num, val.GetType ());
+				if (val is decimal) {
+					newVal = ((decimal)val) - 1;
+				} else if (val is double) {
+					newVal = ((double)val) - 1;
+				} else if (val is float) {
+					newVal = ((float)val) - 1;
+				} else {
+					num = GetInteger (val) - 1;
+					newVal = Convert.ChangeType (num, val.GetType ());
+				}
 				vref.Value = ctx.Adapter.CreateValue (ctx, newVal);
 				break;
 			case UnaryOperatorType.Decrement:
-				num = GetInteger (val) - 1;
-				val = Convert.ChangeType (num, val.GetType ());
+				if (val is decimal) {
+					val = ((decimal)val) - 1;
+				} else if (val is double) {
+					val = ((double)val) - 1;
+				} else if (val is float) {
+					val = ((float)val) - 1;
+				} else {
+					num = GetInteger (val) - 1;
+					val = Convert.ChangeType (num, val.GetType ());
+				}
 				vref.Value = ctx.Adapter.CreateValue (ctx, val);
 				break;
 			case UnaryOperatorType.PostIncrement:
-				num = GetInteger (val) + 1;
-				newVal = Convert.ChangeType (num, val.GetType ());
+				if (val is decimal) {
+					newVal = ((decimal)val) + 1;
+				} else if (val is double) {
+					newVal = ((double)val) + 1;
+				} else if (val is float) {
+					newVal = ((float)val) + 1;
+				} else {
+					num = GetInteger (val) + 1;
+					newVal = Convert.ChangeType (num, val.GetType ());
+				}
 				vref.Value = ctx.Adapter.CreateValue (ctx, newVal);
 				break;
 			case UnaryOperatorType.Increment:
-				num = GetInteger (val) + 1;
-				val = Convert.ChangeType (num, val.GetType ());
+				if (val is decimal) {
+					val = ((decimal)val) + 1;
+				} else if (val is double) {
+					val = ((double)val) + 1;
+				} else if (val is float) {
+					val = ((float)val) + 1;
+				} else {
+					num = GetInteger (val) + 1;
+					val = Convert.ChangeType (num, val.GetType ());
+				}
 				vref.Value = ctx.Adapter.CreateValue (ctx, val);
 				break;
 			case UnaryOperatorType.Plus:

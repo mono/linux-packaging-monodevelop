@@ -25,19 +25,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 using System;
-using Xwt.Backends;
-
-#if MONOMAC
-using MonoMac.Foundation;
-using MonoMac.AppKit;
-
-
-
-
-#else
-using Foundation;
 using AppKit;
-#endif
+using Foundation;
+using Xwt.Backends;
 
 namespace Xwt.Mac
 {
@@ -119,9 +109,7 @@ namespace Xwt.Mac
 
 		void HandleValueChanged (object sender, EventArgs e)
 		{
-			ApplicationContext.InvokeUserCode (delegate {
-				EventSink.OnValueChanged ();
-			});
+			ApplicationContext.InvokeUserCode (EventSink.OnValueChanged);
 		}
 	}
 

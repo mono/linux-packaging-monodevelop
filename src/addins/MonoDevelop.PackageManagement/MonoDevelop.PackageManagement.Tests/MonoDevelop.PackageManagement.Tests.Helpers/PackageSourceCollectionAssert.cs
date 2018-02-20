@@ -26,12 +26,11 @@
 
 using System;
 using System.Collections.Generic;
-using MonoDevelop.PackageManagement;
-using NuGet;
+using NuGet.Configuration;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
-	public class PackageSourceCollectionAssert
+	class PackageSourceCollectionAssert
 	{
 		public static void AreEqual (IEnumerable<PackageSource> expectedSources, IEnumerable<PackageSourceViewModel> actualViewModels)
 		{
@@ -51,7 +50,7 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 
 		static List<string> ConvertToStrings (IEnumerable<PackageSource> sources)
 		{
-			List<string> convertedSources = new List<string> ();
+			var convertedSources = new List<string> ();
 			foreach (PackageSource source in sources) {
 				convertedSources.Add (ConvertToString (source));
 			}

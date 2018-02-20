@@ -39,32 +39,25 @@ namespace MonoDevelop.Core.Assemblies
 	{
 		[ItemProperty]
 		string prefix;
-
-		[ItemProperty]
-		bool? force64or32bit;
 		
 		string monoVersion = "Unknown";
 		Dictionary<string,string> envVars = new Dictionary<string, string> ();
 		bool initialized;
 		bool isValidRuntime;
+		Version runtimeVersion;
 		
 		internal MonoRuntimeInfo ()
 		{
 		}
-
-		public MonoRuntimeInfo (string prefix, bool? force64or32bit = null)
+		
+		public MonoRuntimeInfo (string prefix)
 		{
-			this.force64or32bit = force64or32bit;
 			this.prefix = prefix;
 			Initialize ();
 		}
-
+		
 		public string Prefix {
 			get { return prefix; }
-		}
-
-		public bool? Force64or32bit {
-			get { return force64or32bit; }
 		}
 		
 		/// <summary>
@@ -77,11 +70,18 @@ namespace MonoDevelop.Core.Assemblies
 			}
 		}
 		
-		public string DisplayName {
+		/// <summary>
+		/// Runtime version reported by Mono
+		/// </summary>
+		public Version RuntimeVersion {
 			get {
-				return "Mono " + MonoVersion + " (" + prefix + ")" +
-					(force64or32bit.HasValue ? (force64or32bit.Value ? " (64 bit)" : " (32 bit)") : "");
+				Initialize ();
+				return runtimeVersion;
 			}
+		}
+		
+		public string DisplayName {
+			get { return "Mono " + MonoVersion + " (" + prefix + ")"; }
 		}
 		
 		public bool IsValidRuntime {
@@ -114,7 +114,7 @@ namespace MonoDevelop.Core.Assemblies
 			StringWriter output = new StringWriter ();
 			try {
 				string monoPath = Path.Combine (prefix, "bin");
-				monoPath = Path.Combine (monoPath, force64or32bit.HasValue ? (force64or32bit.Value ? "mono64" : "mono32") : "mono");
+				monoPath = Path.Combine (monoPath, "mono");
 				ProcessStartInfo pi = new ProcessStartInfo (monoPath, "--version");
 				pi.UseShellExecute = false;
 				pi.RedirectStandardOutput = true;
@@ -140,6 +140,8 @@ namespace MonoDevelop.Core.Assemblies
 				return false;
 
 			monoVersion = ver.Substring (i, j - i);
+			if (!Version.TryParse (monoVersion, out runtimeVersion))
+				runtimeVersion = new Version (1, 0, 0, 0);
 
 			i = ver.IndexOf ('(');
 			if (i != -1) {
@@ -200,6 +202,9 @@ namespace MonoDevelop.Core.Assemblies
 				else
 					rt.monoVersion = ver.Substring (i+1);
 			}
+
+			if (!Version.TryParse (rt.monoVersion, out rt.runtimeVersion))
+				rt.runtimeVersion = new Version (1, 0, 0, 0);
 
 			//Pull up assemblies from the installed mono system.
 			rt.prefix = PathUp (typeof (int).Assembly.Location, 4);

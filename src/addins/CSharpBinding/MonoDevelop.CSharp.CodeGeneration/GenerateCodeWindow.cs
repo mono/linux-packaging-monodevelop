@@ -97,7 +97,7 @@ namespace MonoDevelop.CodeGeneration
 			
 			treeviewSelection.Submit += delegate {
 				if (curInitializeObject != null) {
-					curInitializeObject.GenerateCode ();
+					curInitializeObject.GenerateCode (treeviewSelection);
 					curInitializeObject = null;
 				}
 				Destroy ();
@@ -109,6 +109,8 @@ namespace MonoDevelop.CodeGeneration
 			
 			treeviewGenerateActions.HeadersVisible = false;
 			treeviewGenerateActions.Model = generateActionsStore;
+			treeviewGenerateActions.SearchColumn = -1; // disable the interactive search
+
 			TreeViewColumn column = new TreeViewColumn ();
 			var pixbufRenderer = new CellRendererImage ();
 			column.PackStart (pixbufRenderer, false);

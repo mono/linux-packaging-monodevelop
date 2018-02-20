@@ -13,6 +13,8 @@ using off_t = System.Int64;
 using MonoDevelop.Projects.Text;
 using System.Threading;
 using System.Linq;
+using MonoDevelop.Ide;
+using System.Diagnostics;
 
 namespace MonoDevelop.VersionControl.Subversion.Unix
 {
@@ -198,11 +200,21 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			return new UnixSvnBackend ();
 		}
 
+		static bool FallbackProbeDirectoryDotSvn (FilePath path)
+		{
+			while (!path.IsNullOrEmpty) {
+				if (Directory.Exists (path.Combine (".svn")))
+					return true;
+				path = path.ParentDirectory;
+			}
+			return false;
+		}
+
 		public override string GetDirectoryDotSvn (FilePath path)
 		{
 			if (path.IsNullOrEmpty)
 				return string.Empty;
-
+			
 			if (Pre_1_7)
 				return base.GetDirectoryDotSvn (path);
 
@@ -406,7 +418,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			IntPtr localpool = newpool (IntPtr.Zero);
 			var error = new LibSvnClient.svn_error_t {
 				apr_err = LibApr.APR_OS_START_USEERR,
-				message = "Operation cancelled.",
+				message = GettextCatalog.GetString ("Operation cancelled."),
 				pool = localpool,
 			};
 
@@ -934,7 +946,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			
 				CheckError (svn.client_unlock (array, breakLock, ctx, localpool));
 				if (paths.Length != lockFileList.Count)
-					throw new SubversionException ("Lock operation failed.");
+					throw new SubversionException ("Unlock operation failed.");
 			} finally {
 				lockFileList = null;
 				TryEndOperation (localpool);
@@ -1128,7 +1140,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 				return TextFile.ReadFile (sourcefile, data).Text;
 				// This outputs the contents of the base revision
 				// of a file to a stream.
-			} catch (SubversionException e) {
+			} catch (SubversionException) {
 				// This occurs when we don't have a base file for
 				// the target file. We have no way of knowing if
 				// a file has a base version therefore this will do.
@@ -1169,7 +1181,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			if (ent.RemoteTextStatus != LibSvnClient.svn_wc_status_kind.EMPTY) {
 				rs = ConvertStatus (LibSvnClient.NodeSchedule.Normal, ent.RemoteTextStatus);
 				rr = new SvnRevision (repo, ent.LastCommitRevision, ent.LastCommitDate,
-				                      ent.LastCommitAuthor, "(unavailable)", null);
+				                      ent.LastCommitAuthor, GettextCatalog.GetString ("(unavailable)"), null);
 			}
 
 			VersionStatus status = ConvertStatus (ent.Schedule, ent.TextStatus);
@@ -1199,7 +1211,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			}
 			
 			switch (status) {
-			case LibSvnClient.svn_wc_status_kind.None: return VersionStatus.Versioned;
+			case LibSvnClient.svn_wc_status_kind.None: return VersionStatus.Unversioned;
 			case LibSvnClient.svn_wc_status_kind.Normal: return VersionStatus.Versioned;
 			case LibSvnClient.svn_wc_status_kind.Unversioned: return VersionStatus.Unversioned;
 			case LibSvnClient.svn_wc_status_kind.Modified: return VersionStatus.Versioned | VersionStatus.Modified;
@@ -1233,7 +1245,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			IntPtr localpool = newpool (IntPtr.Zero);
 			var err = new LibSvnClient.svn_error_t {
 				apr_err = 200015,
-				message = "The operation was interrupted",
+				message = GettextCatalog.GetString ("The operation was interrupted"),
 				pool = localpool
 			};
 
@@ -1253,11 +1265,11 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 		static string BytesToSize (long kbytes)
 		{
 			if (kbytes < 1024)
-				return String.Format ("{0} KBytes", kbytes);
+				return GettextCatalog.GetString ("{0} KBytes", kbytes);
 			// 16 * 1024
 			if (kbytes < 16384)
-				return String.Format ("{0:0.0} MBytes", kbytes / 1024.0);
-			return String.Format ("{0} MBytes", kbytes / 1024);
+				return GettextCatalog.GetString ("{0:0.0} MBytes", kbytes / 1024.0);
+			return GettextCatalog.GetString ("{0} MBytes", kbytes / 1024);
 		}
 
 		ProgressData progressData;
@@ -1291,7 +1303,9 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			progressData.LogTimer.Interval = 1000;
 			progressData.LogTimer.Elapsed += delegate {
 				progressData.Seconds += 1;
-				updatemonitor.Log.WriteLine ("Transferred {0} in {1} seconds.", BytesToSize (progressData.KBytes), progressData.Seconds);
+				Runtime.RunInMainThread (() => {
+					updatemonitor.Log.WriteLine (GettextCatalog.GetString ("Transferred {0} in {1} seconds.", BytesToSize (progressData.KBytes), progressData.Seconds));
+				});
 			};
 			progressData.LogTimer.Start ();
 		}
@@ -1454,7 +1468,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 //				actiondesc = string.Format (GettextCatalog.GetString ("Path '{0}' is no longer a member of a changelist."), file);
 //				break;
 			default:
-				System.Console.WriteLine("untranslated action:" + data.action);
+				LoggingService.LogDebug ("untranslated action:" + data.action);
 				actiondesc = data.action.ToString () + " " + file;
 				break;
 				/*
@@ -1540,7 +1554,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			try {
 				localpool = TryStartOperation (null);
 				CheckError (svn.client_upgrade (path, ctx, localpool));
-			} catch (Exception e) {
+			} catch (Exception) {
 				tryParent = true;
 			} finally {
 				TryEndOperation (localpool);

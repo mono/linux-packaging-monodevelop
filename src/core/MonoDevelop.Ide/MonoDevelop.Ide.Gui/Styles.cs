@@ -1,4 +1,4 @@
- //
+//
 // Styles.cs
 //
 // Author:
@@ -27,6 +27,7 @@ using System;
 using MonoDevelop.Components;
 using Xwt.Drawing;
 using System.Security.Policy;
+using MonoDevelop.Core.StringParsing;
 
 #if MAC
 using AppKit;
@@ -38,6 +39,8 @@ namespace MonoDevelop.Ide.Gui
 	{
 		public static event EventHandler Changed;
 
+		public static Theme CurrentStyle { get { return IdeTheme.UserInterfaceTheme; } }
+
 		public static Color BackgroundColor { get; internal set; }        // must be the bg color from Gtkrc
 		public static Color BaseBackgroundColor { get; internal set; }    // must be the base color from Gtkrc
 		public static Color BaseForegroundColor { get; internal set; }    // must be the text color from Gtkrc
@@ -45,6 +48,12 @@ namespace MonoDevelop.Ide.Gui
 		public static Color BaseSelectionTextColor { get; internal set; }
 		public static Color BaseIconColor { get; internal set; }
 		public static Color LinkForegroundColor { get; internal set; }
+		public static Color BorderColor { get; internal set; }
+		public static Color SecondaryTextColor { get; internal set; }
+		public static string SecondaryTextColorHexString { get; internal set; }
+		public static Color SecondarySelectionTextColor { get; internal set; }
+
+		public static Color FocusColor { get; internal set; }
 
 		public static Color ErrorForegroundColor { get; internal set; }
 		public static Color WarningForegroundColor { get; internal set; }
@@ -70,7 +79,13 @@ namespace MonoDevelop.Ide.Gui
 		public static Color PrimaryBackgroundColor { get; internal set; }
 		public static Color SecondaryBackgroundLighterColor { get; internal set; }
 		public static Color SecondaryBackgroundDarkerColor { get; internal set; }
-		public static Color DimTextColor { get; internal set; }
+
+		[Obsolete ("Please use SecondaryTextColor")]
+		public static Color DimTextColor { get => SecondaryTextColor; }
+
+		[Obsolete ("Please use SecondaryTextColorHexString")]
+		public static string DimTextColorHexString { get => SecondaryTextColorHexString; }
+
 		public static Color StatusInformationBackgroundColor { get; internal set; }
 		public static Color StatusInformationTextColor { get; internal set; }
 		public static Color StatusWarningBackgroundColor { get; internal set; }
@@ -143,20 +158,10 @@ namespace MonoDevelop.Ide.Gui
 
 		public static readonly Pango.FontDescription StatusFont = Pango.FontDescription.FromString ("Normal");
 
-		public static int StatusFontPixelHeight { get { return (int)(11 * PixelScale); } }
-		public static int ProgressBarHeight { get { return (int)(18 * PixelScale); } }
-		public static int ProgressBarInnerPadding { get { return (int)(4 * PixelScale); } }
-		public static int ProgressBarOuterPadding { get { return (int)(4 * PixelScale); } }
-
-		static double? pixelScale = null;
-
-		static double PixelScale {
-			get {
-				if (!pixelScale.HasValue)
-					pixelScale = GtkWorkarounds.GetPixelScale ();
-				return (double)pixelScale;
-			}
-		}
+		public static int StatusFontPixelHeight { get { return 11; } }
+		public static int ProgressBarHeight { get { return 18; } }
+		public static int ProgressBarInnerPadding { get { return 4; } }
+		public static int ProgressBarOuterPadding { get { return 4; } }
 
 		// Toolbar
 
@@ -184,6 +189,7 @@ namespace MonoDevelop.Ide.Gui
 			public static Color InformationTextColor { get; internal set; }
 
 			public static Color ShadowColor { get; internal set; }
+			public static Color BorderColor { get; internal set; }
 
 			public static class ParamaterWindows
 			{
@@ -242,6 +248,22 @@ namespace MonoDevelop.Ide.Gui
 			public static Color ProjectConfigurationSeparatorColor { get; internal set; }
 		}
 
+		// Wizards
+
+		public static class Wizard
+		{
+			public static Color BannerBackgroundColor { get; internal set; }
+			public static Color BannerShadowColor { get; internal set; }
+			public static Color BannerForegroundColor { get; internal set; }
+			public static Color BannerSecondaryForegroundColor { get; internal set; }
+			public static Color PageBackgroundColor { get; internal set; }
+			public static Color PageSeparatorColor { get; internal set; }
+			public static Color RightSideBackgroundColor { get; internal set; }
+			public static Color ContentShadowColor { get; internal set; }
+			public static Color ContentSeparatorColor { get; internal set; }
+		}
+
+
 		// Editor
 
 		public static class Editor
@@ -249,6 +271,16 @@ namespace MonoDevelop.Ide.Gui
 			public static Color SmartTagMarkerColorLight { get; internal set; }
 			public static Color SmartTagMarkerColorDark { get; internal set; }
 			public static Color SearchErrorForegroundColor { get; internal set; }
+		}
+
+		public static class KeyBindingsPanel
+		{
+			public static Color KeyBackgroundColor { get; internal set; }
+			public static Color KeyForegroundColor { get; internal set; }
+			public static Color KeyDuplicateBackgroundColor { get; internal set; }
+			public static Color KeyDuplicateForegroundColor { get; internal set; }
+			public static Color KeyConflictBackgroundColor { get; internal set; }
+			public static Color KeyConflictForegroundColor { get; internal set; }
 		}
 
 		// Helper methods
@@ -320,7 +352,7 @@ namespace MonoDevelop.Ide.Gui
 			DefaultFont = defaultStyle.FontDescription.Copy ();
 			DefaultFontName = DefaultFont.ToString ();
 
-			if (IdeApp.Preferences == null || IdeApp.Preferences.UserInterfaceSkin == Skin.Light)
+			if (IdeApp.Preferences == null || IdeApp.Preferences.UserInterfaceTheme == Theme.Light)
 				LoadLightStyle ();
 			else
 				LoadDarkStyle ();
@@ -371,11 +403,11 @@ namespace MonoDevelop.Ide.Gui
 
 			GlobalSearch.BackgroundColor = PrimaryBackgroundColor;
 			GlobalSearch.HeaderBackgroundColor = SecondaryBackgroundLighterColor;
-			GlobalSearch.HeaderTextColor = DimTextColor;
+			GlobalSearch.HeaderTextColor = SecondaryTextColor;
 			GlobalSearch.SeparatorLineColor = SeparatorColor;
 			GlobalSearch.SelectionBackgroundColor = BaseSelectionBackgroundColor;
 			GlobalSearch.ResultTextColor = BaseForegroundColor;
-			GlobalSearch.ResultDescriptionTextColor = DimTextColor;
+			GlobalSearch.ResultDescriptionTextColor = SecondaryTextColor;
 			GlobalSearch.SelectedResultTextColor = BaseSelectionTextColor;
 			GlobalSearch.SelectedResultDescriptionTextColor = BaseSelectionTextColor;
 			GlobalSearch.SelectedResultMatchTextColor = BaseSelectionTextColor;
@@ -389,11 +421,30 @@ namespace MonoDevelop.Ide.Gui
 			NewProjectDialog.ProjectConfigurationLeftHandBackgroundColor = SecondaryBackgroundDarkerColor;
 			NewProjectDialog.ProjectConfigurationRightHandBackgroundColor = PrimaryBackgroundColor;
 
+			// Wizards
+
+			Wizard.PageBackgroundColor = SecondaryBackgroundDarkerColor;
+			Wizard.RightSideBackgroundColor = PrimaryBackgroundColor;
+
 			// Editor
 
 			Editor.SmartTagMarkerColorLight = Color.FromName ("#ff70fe").WithAlpha (.5);
 			Editor.SmartTagMarkerColorDark = Color.FromName ("#ffffff").WithAlpha (.5);
 			Editor.SearchErrorForegroundColor = ErrorForegroundColor;
+
+			// Key Bindings Preferences
+
+			KeyBindingsPanel.KeyBackgroundColor = BackgroundColor;
+			KeyBindingsPanel.KeyForegroundColor = BaseForegroundColor;
+			KeyBindingsPanel.KeyDuplicateBackgroundColor = StatusWarningBackgroundColor;
+			KeyBindingsPanel.KeyDuplicateForegroundColor = StatusWarningTextColor;
+			KeyBindingsPanel.KeyConflictBackgroundColor = StatusErrorBackgroundColor;
+			KeyBindingsPanel.KeyConflictForegroundColor = StatusErrorTextColor;
+
+			// Tooltips
+			StatusInformationBackgroundColor = Color.FromName ("#eeeeee");
+			StatusInformationTextColor = Color.FromName ("#272727");
+			InformationBoxForegroundColor = Color.FromName ("#272727");
 
 			if (Changed != null)
 				Changed (null, EventArgs.Empty);
@@ -402,12 +453,15 @@ namespace MonoDevelop.Ide.Gui
 		internal static void LoadLightStyle ()
 		{
 			BaseIconColor = Color.FromName ("#575757");
+			BorderColor = Color.FromName ("#eeeeee");
 			ThinSplitterColor = Color.FromName ("#dadada");
 			SeparatorColor = Color.FromName ("#f2f2f4");
 			PrimaryBackgroundColor = BaseBackgroundColor;
 			SecondaryBackgroundDarkerColor = Color.FromName ("#e7eaee");
 			SecondaryBackgroundLighterColor = Color.FromName ("#f9f9fb");
-			DimTextColor = Color.FromName ("#888888");
+			SecondaryTextColorHexString = "#888888";
+			SecondaryTextColor = Color.FromName (SecondaryTextColorHexString);
+			SecondarySelectionTextColor = Color.FromName ("#93cbff");
 			PadBackground = Color.FromName ("#fafafa");
 			InactivePadBackground = Color.FromName ("#e8e8e8");
 			InactivePadLabelColor = Color.FromName ("#777777");
@@ -416,12 +470,10 @@ namespace MonoDevelop.Ide.Gui
 			DockBarPrelightColor = Color.FromName ("#eeeeee");
 			BrowserPadBackground = Color.FromName ("#ebedf0");
 			PropertyPadDividerColor = Color.FromName ("#efefef");
+			FocusColor = Color.FromName ("#4b4b4b");
 
 			// these colors need to match colors from status icons
-			StatusInformationBackgroundColor = Color.FromName ("#87b6f0");
-			StatusInformationTextColor = BaseBackgroundColor;
 			InformationBoxBackgroundColor = StatusInformationBackgroundColor;
-			InformationBoxForegroundColor = Color.FromName ("#000000");
 			InformationForegroundColor = Color.FromName ("#5785bd");
 
 			StatusWarningBackgroundColor = Color.FromName ("#f1c40f");
@@ -481,6 +533,7 @@ namespace MonoDevelop.Ide.Gui
 			PopoverWindow.DefaultBackgroundColor = Color.FromName ("#f2f2f2"); // gtkrc @tooltip_bg_color
 			PopoverWindow.DefaultTextColor = Color.FromName ("#555555");
 			PopoverWindow.ShadowColor = Color.FromName ("#000000").WithAlpha (.05);
+			PopoverWindow.BorderColor = Colors.Transparent; // disable border drawing
 
 			PopoverWindow.ParamaterWindows.GradientStartColor = Color.FromName ("#fffee6");
 			PopoverWindow.ParamaterWindows.GradientEndColor = Color.FromName ("#fffcd1");
@@ -489,7 +542,7 @@ namespace MonoDevelop.Ide.Gui
 
 			CodeCompletion.BackgroundColor = Color.FromName ("#eef1f2");
 			CodeCompletion.TextColor = Color.FromName ("#646566");
-			CodeCompletion.CategoryColor = DimTextColor;
+			CodeCompletion.CategoryColor = SecondaryTextColor;
 			CodeCompletion.HighlightColor = Color.FromName ("#ba3373");
 			CodeCompletion.SelectionBackgroundInactiveColor = Color.FromName ("#7e96c0");
 			CodeCompletion.SelectionHighlightColor = CodeCompletion.HighlightColor;
@@ -503,17 +556,30 @@ namespace MonoDevelop.Ide.Gui
 			NewProjectDialog.TemplateSectionSeparatorColor = Color.FromName ("#e2e2e2");
 			NewProjectDialog.TemplateLanguageButtonBackground = BaseBackgroundColor;
 			NewProjectDialog.ProjectConfigurationSeparatorColor = Color.FromName ("#d2d5d9");
+
+			// Wizards
+
+			Wizard.BannerBackgroundColor = Color.FromName ("#77828c");
+			Wizard.BannerShadowColor = Color.FromName ("#707a83");
+			Wizard.BannerForegroundColor = BaseBackgroundColor;
+			Wizard.BannerSecondaryForegroundColor = SecondaryTextColor;
+			Wizard.PageSeparatorColor = ThinSplitterColor;
+			Wizard.ContentSeparatorColor = Color.FromName ("#d2d5d9");
+			Wizard.ContentShadowColor = ThinSplitterColor;
 		}
 
 		internal static void LoadDarkStyle ()
 		{
 			BaseIconColor = Color.FromName ("#bfbfbf");
-			ThinSplitterColor = Color.FromName ("#2e2e2e");
+			BorderColor = Color.FromName ("#2e2e2e");
+			ThinSplitterColor = BorderColor;
 			SeparatorColor = Color.FromName ("#4b4b4b");
 			PrimaryBackgroundColor = BaseBackgroundColor;
 			SecondaryBackgroundDarkerColor = Color.FromName ("#484848");
 			SecondaryBackgroundLighterColor = SeparatorColor;
-			DimTextColor = Color.FromName ("#777777");
+			SecondaryTextColorHexString = "#777777";
+			SecondaryTextColor = Color.FromName (SecondaryTextColorHexString);
+			SecondarySelectionTextColor = Color.FromName ("#93cbff");
 			PadBackground = Color.FromName ("#525252");
 			InactivePadBackground = Color.FromName ("#474747");
 			InactivePadLabelColor = Color.FromName ("#999999");
@@ -522,12 +588,10 @@ namespace MonoDevelop.Ide.Gui
 			DockBarPrelightColor = Color.FromName ("#666666");
 			BrowserPadBackground = Color.FromName ("#484b55");
 			PropertyPadDividerColor = SeparatorColor;
+			FocusColor = Color.FromName ("#f2f2f4");
 
 			// these colors need to match colors from status icons
-			StatusInformationBackgroundColor = Color.FromName ("#8fc1ff");
-			StatusInformationTextColor = Color.FromName ("#394d66");
 			InformationBoxBackgroundColor = StatusInformationBackgroundColor;
-			InformationBoxForegroundColor = Color.FromName ("#000000");
 			InformationForegroundColor = Color.FromName ("#9cc8ff");
 
 			StatusWarningBackgroundColor = Color.FromName ("#ffcf0f");
@@ -584,7 +648,8 @@ namespace MonoDevelop.Ide.Gui
 
 			PopoverWindow.DefaultBackgroundColor = Color.FromName ("#5e5e5e");
 			PopoverWindow.DefaultTextColor = Color.FromName ("#bdc1c1");
-			PopoverWindow.ShadowColor = Color.FromName ("#000000").WithAlpha (0); // transparent since dark skin doesn't need shadows
+			PopoverWindow.ShadowColor = Color.FromName ("#000000").WithAlpha (0); // transparent since dark theme doesn't need shadows
+			PopoverWindow.BorderColor = Colors.Transparent; // disable border drawing
 
 			PopoverWindow.ParamaterWindows.GradientStartColor = Color.FromName ("#fffee6");
 			PopoverWindow.ParamaterWindows.GradientEndColor = Color.FromName ("#fffcd1");
@@ -607,6 +672,25 @@ namespace MonoDevelop.Ide.Gui
 			NewProjectDialog.TemplateSectionSeparatorColor = ThinSplitterColor;
 			NewProjectDialog.TemplateLanguageButtonBackground = SecondaryBackgroundDarkerColor;
 			NewProjectDialog.ProjectConfigurationSeparatorColor = Color.FromName ("#6e6e6e");
+
+			// Wizards
+
+			Wizard.BannerBackgroundColor = Color.FromName ("#6a737e");
+			Wizard.BannerShadowColor = Wizard.BannerBackgroundColor;
+			Wizard.BannerForegroundColor = Color.FromName ("#ffffff");
+			Wizard.BannerSecondaryForegroundColor = SecondaryTextColor;
+			Wizard.PageSeparatorColor = ThinSplitterColor;
+			Wizard.ContentSeparatorColor = Color.FromName ("#6e6e6e");
+			Wizard.ContentShadowColor = ThinSplitterColor;
+		}
+
+		static StylesStringTagModel tagModel;
+
+		public static IStringTagModel GetStringTagModel ()
+		{
+			if (tagModel == null)
+				tagModel = new StylesStringTagModel ();
+			return tagModel;
 		}
 	}
 }

@@ -42,22 +42,30 @@ namespace MonoDevelop.Core.Assemblies
 			this.runtime = runtime;
 			this.framework = framework;
 		}
-		
+
+		bool? isInstalled;
 		public virtual bool IsInstalled {
 			get {
-				if (framework.Assemblies.Length == 0)
-					return false;
-
+				if (isInstalled != null)
+					return isInstalled.Value;
+				
 				foreach (string dir in GetFrameworkFolders ()) {
 					if (Directory.Exists (dir)) {
 						string manifest = Path.Combine (dir, "RedistList", "FrameworkList.xml");
-						if (File.Exists (manifest))
+						if (File.Exists (manifest)) {
+							isInstalled = true;
 							return true;
-						string firstAsm = Path.Combine (dir, framework.Assemblies [0].Name) + ".dll";
-						if (File.Exists (firstAsm))
-							return true;
+						}
+						if (framework.Assemblies.Length > 0) {
+							string firstAsm = Path.Combine (dir, framework.Assemblies [0].Name) + ".dll";
+							if (File.Exists (firstAsm)) {
+								isInstalled = true;
+								return true;
+							}
+						}
 					}
 				}
+				isInstalled = false;
 				return false;
 			}
 		}

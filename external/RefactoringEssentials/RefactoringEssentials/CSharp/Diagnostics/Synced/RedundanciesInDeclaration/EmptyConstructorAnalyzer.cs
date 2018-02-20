@@ -12,7 +12,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
     {
         static readonly DiagnosticDescriptor descriptor = new DiagnosticDescriptor(
             CSharpDiagnosticIDs.EmptyConstructorAnalyzerID,
-            GettextCatalog.GetString("An empty public constructor without paramaters is redundant."),
+            GettextCatalog.GetString("An empty public constructor without parameters is redundant."),
             GettextCatalog.GetString("Empty constructor is redundant"),
             DiagnosticAnalyzerCategories.RedundanciesInDeclarations,
             DiagnosticSeverity.Info,
@@ -25,6 +25,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 nodeContext =>
                 {
@@ -42,8 +44,6 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         {
             var constructorDeclaration = nodeContext.Node as ConstructorDeclarationSyntax;
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
 
             if (!IsEmpty(constructorDeclaration) || !constructorDeclaration.Modifiers.Any(m => m.IsKind(SyntaxKind.PublicKeyword)))
                 return false;
@@ -64,6 +64,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 return false;
 
             return constructorDeclaration.ParameterList.Parameters.Count == 0 &&
+                constructorDeclaration.ExpressionBody == null &&
                 EmptyDestructorAnalyzer.IsEmpty(constructorDeclaration.Body);
         }
     }

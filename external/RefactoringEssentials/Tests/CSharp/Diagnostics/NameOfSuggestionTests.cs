@@ -1,12 +1,11 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
     public class NameOfSuggestionTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact]
         public void TestArgumentNullException()
         {
             Analyze<NameOfSuggestionAnalyzer>(@"
@@ -28,7 +27,7 @@ class A
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestArgumentException()
         {
             Analyze<NameOfSuggestionAnalyzer>(@"
@@ -52,7 +51,7 @@ class A
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestArgumentOutOfRangeExceptionSwap()
         {
             Analyze<NameOfSuggestionAnalyzer>(@"
@@ -74,6 +73,51 @@ class A
 }", 0);
         }
 
+        [Fact]
+        public void TestFullyQualifiedArgumentException()
+        {
+            Analyze<NameOfSuggestionAnalyzer>(@"
+class A
+{
+	void F(object foo)
+	{
+		if(foo != null)
+			throw new System.ArgumentException(""bar"", $""foo""$);
+	}
+}", @"
+class A
+{
+	void F(object foo)
+	{
+		if(foo != null)
+			throw new System.ArgumentException(""bar"", nameof(foo));
+	}
+}");
+        }
+
+        [Fact]
+        public void TestFullyQualifiedWithAliasArgumentException()
+        {
+            Analyze<NameOfSuggestionAnalyzer>(@"
+using ss = System;
+class A
+{
+	void F(object foo)
+	{
+		if(foo != null)
+			throw new ss::ArgumentException(""bar"", $""foo""$);
+	}
+}", @"
+using ss = System;
+class A
+{
+	void F(object foo)
+	{
+		if(foo != null)
+			throw new ss::ArgumentException(""bar"", nameof(foo));
+	}
+}");
+        }
     }
 }
 

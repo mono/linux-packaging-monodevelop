@@ -26,12 +26,13 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-using System;
-using NuGet;
+using System.Threading.Tasks;
+using NuGet.Common;
+using NuGet.ProjectManagement;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageManagementLogger : ILogger
+	internal class PackageManagementLogger : ILogger
 	{
 		IPackageManagementEvents packageManagementEvents;
 		
@@ -44,10 +45,91 @@ namespace MonoDevelop.PackageManagement
 		{
 			packageManagementEvents.OnPackageOperationMessageLogged(level, message, args);
 		}
-		
-		public FileConflictResolution ResolveFileConflict(string message)
+
+		public void LogDebug (string data)
 		{
-			return packageManagementEvents.OnResolveFileConflict(message);
+			Log (MessageLevel.Debug, data);
+		}
+
+		public void LogError (string data)
+		{
+			Log (MessageLevel.Error, data);
+		}
+
+		public void LogInformation (string data)
+		{
+			Log (MessageLevel.Info, data);
+		}
+
+		public void LogVerbose (string data)
+		{
+			Log (MessageLevel.Debug, data);
+		}
+
+		public void LogWarning (string data)
+		{
+			Log (MessageLevel.Warning, data);
+		}
+
+		public void LogMinimal (string data)
+		{
+			LogInformation (data);
+		}
+
+		public void LogInformationSummary (string data)
+		{
+			LogDebug (data);
+		}
+
+		public void LogErrorSummary (string data)
+		{
+			LogDebug (data);
+		}
+
+		public void Log (ILogMessage message)
+		{
+			Log (message.Level, message.Message);
+		}
+
+		public Task LogAsync (LogLevel level, string data)
+		{
+			Log (level, data);
+			return Task.FromResult (true);
+		}
+
+		public Task LogAsync (ILogMessage message)
+		{
+			Log (message);
+			return Task.FromResult (true);
+		}
+
+		public void Log (LogLevel level, string data)
+		{
+			switch (level) {
+			case LogLevel.Debug:
+				LogDebug (data);
+				break;
+
+			case LogLevel.Error:
+				LogError(data);
+				break;
+
+			case LogLevel.Information:
+				LogInformation (data);
+				break;
+
+			case LogLevel.Minimal:
+				LogMinimal (data);
+				break;
+
+			case LogLevel.Verbose:
+				LogVerbose (data);
+				break;
+
+			case LogLevel.Warning:
+				LogWarning (data);
+				break;
+			}
 		}
 	}
 }

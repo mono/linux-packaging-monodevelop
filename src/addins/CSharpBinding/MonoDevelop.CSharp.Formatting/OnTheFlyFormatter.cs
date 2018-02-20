@@ -24,21 +24,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using MonoDevelop.Ide;
 using System;
 using System.Collections.Generic;
-using MonoDevelop.Projects.Policies;
 using System.Linq;
-using MonoDevelop.CSharp.Completion;
-using MonoDevelop.CSharp.Refactoring;
-using MonoDevelop.CSharp.Parser;
-using MonoDevelop.Core;
-using MonoDevelop.Ide.Editor;
+using System.Threading;
 using Microsoft.CodeAnalysis.Formatting;
-using Microsoft.CodeAnalysis.Text;
-using MonoDevelop.Ide.Gui.Content;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Options;
+using Microsoft.CodeAnalysis.Text;
+using MonoDevelop.Core;
+using MonoDevelop.Ide;
+using MonoDevelop.Ide.Editor;
+using MonoDevelop.Ide.Gui.Content;
+using MonoDevelop.Projects.Policies;
 
 namespace MonoDevelop.CSharp.Formatting
 {
@@ -78,18 +75,17 @@ namespace MonoDevelop.CSharp.Formatting
 				return;
 			using (var undo = editor.OpenUndoGroup (/*OperationType.Format*/)) {
 				try {
-					var syntaxTree = analysisDocument.GetSyntaxTreeAsync ().Result;
-
+					var syntaxTree = analysisDocument.GetSyntaxTreeAsync ().WaitAndGetResult (default (CancellationToken));
+					var root = syntaxTree.GetRoot ();
 					if (formatLastStatementOnly) {
-						var root = syntaxTree.GetRoot ();
 						var token = root.FindToken (endOffset);
-						var tokens = ICSharpCode.NRefactory6.CSharp.FormattingRangeHelper.FindAppropriateRange (token);
+						var tokens = Microsoft.CodeAnalysis.CSharp.Utilities.FormattingRangeHelper.FindAppropriateRange (token);
 						if (tokens.HasValue) {
-							span = new TextSpan (tokens.Value.Item1.SpanStart, tokens.Value.Item2.Span.End - tokens.Value.Item1.SpanStart);
+							span = new TextSpan (tokens.Value.Item1.SpanStart, editor.CaretOffset - tokens.Value.Item1.SpanStart);
 						} else {
 							var parent = token.Parent;
 							if (parent != null)
-								span = parent.FullSpan;
+								span = new TextSpan (parent.FullSpan.Start, editor.CaretOffset - parent.FullSpan.Start);
 						}
 					}
 
@@ -98,29 +94,13 @@ namespace MonoDevelop.CSharp.Formatting
 						var textPolicy = policyParent.Get<TextStylePolicy> (mimeTypeChain);
 						optionSet = policy.CreateOptions (textPolicy);
 					}
-
-					var doc = Formatter.FormatAsync (analysisDocument, span, optionSet).Result;
-					var newTree = doc.GetSyntaxTreeAsync ().Result;
-					var caretOffset = editor.CaretOffset;
-
-					int delta = 0;
-					foreach (var change in newTree.GetChanges (syntaxTree)) {
-						if (!exact && change.Span.Start + delta >= caretOffset)
-							continue;
-						var newText = change.NewText;
-						editor.ReplaceText (delta + change.Span.Start, change.Span.Length, newText);
-						delta = delta - change.Span.Length + newText.Length;
-					}
-					if (startOffset < caretOffset) {
-						var caretEndOffset = caretOffset + delta;
-						if (0 <= caretEndOffset && caretEndOffset < editor.Length)
-							editor.CaretOffset = caretEndOffset;
-						if (editor.CaretColumn == 1) {
-							if (editor.CaretLine > 1 && editor.GetLine (editor.CaretLine - 1).Length == 0)
-								editor.CaretLine--;
-							editor.CaretColumn = editor.GetVirtualIndentationColumn (editor.CaretLine);
-						}
-					}
+					var rules = Formatter.GetDefaultFormattingRules (analysisDocument);
+					var changes = Formatter.GetFormattedTextChanges (root, Roslyn.Utilities.SpecializedCollections.SingletonEnumerable (span), context.RoslynWorkspace, optionSet, rules, default(CancellationToken));
+					editor.ApplyTextChanges (changes.Where(c => {
+						if (!exact)
+							return true;
+						return span.Contains (c.Span.Start);
+					}));
 				} catch (Exception e) {
 					LoggingService.LogError ("Error in on the fly formatter", e);
 				}

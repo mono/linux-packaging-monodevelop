@@ -56,6 +56,9 @@ namespace ICSharpCode.NRefactory6.CSharp
 		///     Text editor options.
 		/// </summary>
 		internal readonly OptionSet options;
+
+		internal bool InUnitTestMode { get; set; }
+
 		#endregion
 
 		#region Constructors
@@ -105,7 +108,6 @@ namespace ICSharpCode.NRefactory6.CSharp
 				return TextPasteUtils.StringLiteralStrategy.Encode (text);
 
 			} else if (engine.IsInsideVerbatimString) {
-
 				int idx = text.IndexOf ('"');
 				if (idx > 0) {
 					var o = offset;
@@ -122,13 +124,10 @@ namespace ICSharpCode.NRefactory6.CSharp
 				return TextPasteUtils.VerbatimStringStrategy.Encode (text);
 			}
 
+
 			// on the fly formatting is done in post formatting, if turned off just correct indenting.
-			try {
-				if (DefaultSourceEditorOptions.Instance.OnTheFlyFormatting) {
-					return text;
-				}
-			} catch {
-				// may happen in unit tests -> ignore
+			if (!InUnitTestMode && DefaultSourceEditorOptions.Instance.OnTheFlyFormatting) {
+				return text;
 			}
 
 			var line = sourceText.Lines.GetLineFromPosition (offset);
@@ -197,7 +196,6 @@ namespace ICSharpCode.NRefactory6.CSharp
 		byte [] ITextPasteHandler.GetCopyData (SourceText sourceText, TextSpan segment)
 		{
 			engine.Update (sourceText, segment.Start);
-
 			if (engine.IsInsideStringLiteral) {
 				return new [] { (byte)PasteStrategy.StringLiteral };
 			} else if (engine.IsInsideVerbatimString) {
@@ -355,8 +353,9 @@ namespace ICSharpCode.NRefactory6.CSharp
 			public TextPasteStrategies ()
 			{
 				strategies = new Dictionary<PasteStrategy, IPasteStrategy> ();
-				strategies [PlainTextPasteStrategy.Instance.Type] = PlainTextPasteStrategy.Instance;
-				strategies [StringLiteralPasteStrategy.Instance.Type] = StringLiteralPasteStrategy.Instance;
+				strategies [PasteStrategy.PlainText] = PlainTextPasteStrategy.Instance;
+				strategies [PasteStrategy.StringLiteral] = StringLiteralPasteStrategy.Instance;
+				strategies [PasteStrategy.VerbatimString] = VerbatimStringPasteStrategy.Instance;
 			}
 
 			/// <summary>

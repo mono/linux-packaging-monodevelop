@@ -25,50 +25,34 @@
 // THE SOFTWARE.
 
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
-using MonoDevelop.Ide;
-using NuGet;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageCompatibilityRunner
+	internal class PackageCompatibilityRunner
 	{
 		IDotNetProject project;
-		IPackageManagementSolution solution;
-		IRegisteredPackageRepositories registeredRepositories;
 		IPackageManagementProgressMonitorFactory progressMonitorFactory;
 		ProgressMonitorStatusMessage progressMessage;
 		ProgressMonitor progressMonitor;
 		IPackageManagementEvents packageManagementEvents;
-		IProgressProvider progressProvider;
 
 		public PackageCompatibilityRunner (
 			IDotNetProject project,
-			IPackageManagementSolution solution,
-			IRegisteredPackageRepositories registeredRepositories,
 			IPackageManagementProgressMonitorFactory progressMonitorFactory,
-			IPackageManagementEvents packageManagementEvents,
-			IProgressProvider progressProvider)
+			IPackageManagementEvents packageManagementEvents)
 		{
 			this.project = project;
-			this.solution = solution;
-			this.registeredRepositories = registeredRepositories;
 			this.progressMonitorFactory = progressMonitorFactory;
 			this.packageManagementEvents = packageManagementEvents;
-			this.progressProvider = progressProvider;
 		}
 
 		public PackageCompatibilityRunner (IDotNetProject project)
 			: this (
 				project,
-				PackageManagementServices.Solution,
-				PackageManagementServices.RegisteredPackageRepositories,
 				PackageManagementServices.ProgressMonitorFactory,
-				PackageManagementServices.PackageManagementEvents,
-				PackageManagementServices.ProgressProvider)
+				PackageManagementServices.PackageManagementEvents)
 		{
 		}
 
@@ -89,7 +73,7 @@ namespace MonoDevelop.PackageManagement
 			using (progressMonitor = CreateProgressMonitor ()) {
 				using (PackageManagementEventsMonitor eventMonitor = CreateEventMonitor (progressMonitor)) {
 					try {
-						CheckCompatibility ();
+						CheckCompatibility ().Wait ();
 					} catch (Exception ex) {
 						eventMonitor.ReportError (progressMessage, ex);
 					}
@@ -109,21 +93,20 @@ namespace MonoDevelop.PackageManagement
 
 		PackageManagementEventsMonitor CreateEventMonitor (ProgressMonitor monitor)
 		{
-			return CreateEventMonitor (monitor, packageManagementEvents, progressProvider);
+			return CreateEventMonitor (monitor, packageManagementEvents);
 		}
 
 		protected virtual PackageManagementEventsMonitor CreateEventMonitor (
 			ProgressMonitor monitor,
-			IPackageManagementEvents packageManagementEvents,
-			IProgressProvider progressProvider)
+			IPackageManagementEvents packageManagementEvents)
 		{
-			return new PackageManagementEventsMonitor (monitor, packageManagementEvents, progressProvider);
+			return new PackageManagementEventsMonitor (monitor, packageManagementEvents);
 		}
 
-		void CheckCompatibility ()
+		async Task CheckCompatibility ()
 		{
-			PackageCompatibilityChecker checker = CreatePackageCompatibilityChecker (solution, registeredRepositories);
-			checker.CheckProjectPackages (project);
+			PackageCompatibilityChecker checker = CreatePackageCompatibilityChecker ();
+			await checker.CheckProjectPackages (project);
 
 			if (checker.AnyPackagesRequireReinstallation ()) {
 				MarkPackagesForReinstallation (checker);
@@ -136,9 +119,9 @@ namespace MonoDevelop.PackageManagement
 			}
 		}
 
-		protected virtual PackageCompatibilityChecker CreatePackageCompatibilityChecker (IPackageManagementSolution solution, IRegisteredPackageRepositories registeredRepositories)
+		protected virtual PackageCompatibilityChecker CreatePackageCompatibilityChecker ()
 		{
-			return new PackageCompatibilityChecker (solution, registeredRepositories);
+			return new PackageCompatibilityChecker ();
 		}
 
 		void MarkPackagesForReinstallation (PackageCompatibilityChecker checker)

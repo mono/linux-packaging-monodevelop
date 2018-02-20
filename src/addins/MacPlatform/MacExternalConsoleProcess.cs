@@ -80,7 +80,12 @@ using exec -a to name the process has problems because the terminal can get into
 where running an explicit exec causes it to quit after the exec runs, so we can't use the 
 bash pause on exit trick
 */ 
-		string tabId, windowId;
+
+		//use full path to fix command failure when users have another app called "Terminal"
+		//this happens with Parallels exporting a stub for the Unbuntu "Terminal"
+		const string TERMINAL_APP = "/Applications/Utilities/Terminal.app";
+
+		string windowId;
 
 		public MacExternalConsoleProcess (string command, string arguments, string workingDirectory,
 			IDictionary<string, string> environmentVariables,
@@ -90,7 +95,7 @@ bash pause on exit trick
 			CancellationTokenSource.Token.Register (CloseTerminal);
 
 			// FIXME set value of ProcessId, if possible
-
+			string tabId;
 			var intTask = RunTerminal (
 				command, arguments, workingDirectory, environmentVariables, title, pauseWhenFinished,
 				out tabId, out windowId, CancellationTokenSource.Token
@@ -124,6 +129,7 @@ bash pause on exit trick
 					sb.AppendFormat ("export {0}=\"{1}\"; ", env, val);
 				}
 			}
+
 			if (command != null) {
 				sb.AppendFormat ("\"{0}\" {1}", Escape (command), arguments);
 				var tempFileName = Path.GetTempFileName ();
@@ -140,19 +146,27 @@ bash pause on exit trick
 				};
 				
 				if (pauseWhenFinished)
-					sb.Append ("; echo; read -p 'Press any key to continue...' -n1");
+					sb.Append ("; echo; read -p \"Press any key to continue...\" -n1");
 				sb.Append ("; exit");
 			}
 
 			//run the command in Terminal.app and extract tab and window IDs
-			var ret = AppleScript.Run ("tell app \"Terminal\" to do script \"{0}\"", Escape (sb.ToString ()));
+			string appleScript;
+			if (string.IsNullOrEmpty (command)) {
+				appleScript = string.Format ("tell app \"{0}\" to do script \"{1}\"", TERMINAL_APP, Escape (sb.ToString ()));
+			} else {
+				// run the command inside Bash because we do echo $? and that is a bash extension and breaks when people
+				// use other shells such as zsh or fish. https://bugzilla.xamarin.com/show_bug.cgi?id=56053
+				appleScript = string.Format ("tell app \"{0}\" to do script \"bash -c '{1}'; exit\"", TERMINAL_APP, Escape (sb.ToString ()));
+			}
+			var ret = AppleScript.Run (appleScript);
 			int i = ret.IndexOf ("of", StringComparison.Ordinal);
 			tabId = ret.Substring (0, i -1);
 			windowId = ret.Substring (i + 3);
 
 			//rename tab and give it focus
 			sb.Clear ();
-			sb.Append ("tell app \"Terminal\"\n");
+			sb.AppendFormat ("tell app \"{0}\"\n", TERMINAL_APP);
 			if (!string.IsNullOrEmpty (title))
 				sb.AppendFormat ("\tset custom title of {0} of {1} to \"{2}\"\n", tabId, windowId, Escape (title));
 			sb.AppendFormat ("\tset frontmost of {0} to true\n", windowId);
@@ -174,16 +188,16 @@ bash pause on exit trick
 			return str.Replace ("\\","\\\\").Replace ("\"", "\\\"");
 		}
 
-		static void CloseTerminalWindow (string tabId, string windowId)
+		static void CloseTerminalWindow (string windowId)
 		{
 			try {
 				AppleScript.Run (
-@"tell application ""Terminal""
+@"tell application ""{0}""
 	activate
 	set frontmost of {1} to true
 	close {1}
-	tell application ""System Events"" to tell process ""Terminal"" to keystroke return
-end tell", tabId, windowId);
+	tell application ""System Events"" to tell process ""{0}"" to keystroke return
+end tell", TERMINAL_APP, windowId);
 			} catch (AppleScriptException) {
 				//it may already have closed
 			}
@@ -191,7 +205,7 @@ end tell", tabId, windowId);
 
 		static bool TabExists (string tabId, string windowId)
 		{
-			return AppleScript.Run ("tell app \"Terminal\" to get exists of {0} of {1}", tabId, windowId) == "true";
+			return AppleScript.Run ("tell app \"{0}\" to get exists of {1} of {2}", TERMINAL_APP, tabId, windowId) == "true";
 		}
 
 		#endregion
@@ -201,7 +215,7 @@ end tell", tabId, windowId);
 		void CloseTerminal ()
 		{
 			//FIXME: try to kill the process without closing the window, if pauseWhenFinished is true
-			CloseTerminalWindow (tabId, windowId);
+			CloseTerminalWindow (windowId);
 		}
 
 		#endregion

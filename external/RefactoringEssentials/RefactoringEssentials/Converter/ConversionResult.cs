@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace RefactoringEssentials.Converter
 {
-    public class ConversionResult
+	public class ConversionResult
     {
         public bool Success { get; private set; }
         public string ConvertedCode { get; private set; }
@@ -32,7 +30,7 @@ namespace RefactoringEssentials.Converter
             var builder = new StringBuilder();
             for (int i = 0; i < Exceptions.Count; i++)
             {
-                builder.AppendFormat("----- Exception {0} of {1} -----\r\n", i + 1, Exceptions.Count);
+                builder.AppendFormat("----- Exception {0} of {1} -----" + Environment.NewLine, i + 1, Exceptions.Count);
                 builder.AppendLine(Exceptions[i].ToString());
             }
             return builder.ToString();

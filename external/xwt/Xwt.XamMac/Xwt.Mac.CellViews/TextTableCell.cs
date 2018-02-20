@@ -26,20 +26,16 @@
 
 
 using System;
-using Xwt.Backends;
-
-#if MONOMAC
-using nint = System.Int32;
-using nfloat = System.Single;
-using MonoMac.AppKit;
-#else
 using AppKit;
-#endif
+using Xwt.Backends;
 
 namespace Xwt.Mac
 {
 	class TextTableCell: NSCell, ICellRenderer
 	{
+		bool visible = true;
+
+
 		public TextTableCell (): base ("")
 		{
 			Wraps = false;
@@ -63,6 +59,20 @@ namespace Xwt.Mac
 				AttributedStringValue = FormattedText.FromMarkup (Frontend.Markup).ToAttributedString ();
 			else
 				StringValue = Frontend.Text ?? "";
+			visible = Frontend.Visible;
+		}
+
+		public override CoreGraphics.CGSize CellSizeForBounds (CoreGraphics.CGRect bounds)
+		{
+			if (visible)
+				return base.CellSizeForBounds (bounds);
+			return CoreGraphics.CGSize.Empty;
+		}
+
+		public override void DrawInteriorWithFrame (CoreGraphics.CGRect cellFrame, NSView inView)
+		{
+			if (visible)
+				base.DrawInteriorWithFrame (cellFrame, inView);
 		}
 
 		public void CopyFrom (object other)

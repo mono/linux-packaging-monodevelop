@@ -25,15 +25,18 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class DotNetProjectProxy : ProjectProxy, IDotNetProject
+	internal class DotNetProjectProxy : ProjectProxy, IDotNetProject
 	{
 		DotNetProject project;
 		EventHandler<ProjectModifiedEventArgs> projectModifiedHandler;
+		EventHandler projectSavedHandler;
 
 		public DotNetProjectProxy (DotNetProject project)
 			: base (project)
@@ -108,6 +111,26 @@ namespace MonoDevelop.PackageManagement
 			}
 		}
 
+		public event EventHandler Saved {
+			add {
+				if (projectSavedHandler == null) {
+					project.Saved += ProjectSaved;
+				}
+				projectSavedHandler += value;
+			}
+			remove {
+				projectSavedHandler -= value;
+				if (projectSavedHandler == null) {
+					project.Saved -= ProjectSaved;
+				}
+			}
+		}
+
+		void ProjectSaved (object sender, SolutionItemEventArgs e)
+		{
+			projectSavedHandler (this, new EventArgs ());
+		}
+
 		public bool Equals (IDotNetProject project)
 		{
 			return DotNetProject == project.DotNetProject;
@@ -121,6 +144,30 @@ namespace MonoDevelop.PackageManagement
 		public void DisposeProjectBuilder ()
 		{
 			DotNetProject.ReloadProjectBuilder ();
+		}
+
+		public void RefreshReferenceStatus ()
+		{
+			DotNetProject.RefreshReferenceStatus ();
+		}
+
+		/// <summary>
+		/// Returns imported package references (e.g. NETStandard.Library) from the
+		/// evaluated items and package references defined directly in the project file.
+		/// Only imported package references are taken from the evaluated items to
+		/// avoid duplicate package references and also to avoid old versions being
+		/// returned since the evaluated items may still have old values if the
+		/// package references have just been updated. This avoids the wrong value being
+		/// added to the project.assets.json file.
+		/// </summary>
+		public IEnumerable<ProjectPackageReference> GetPackageReferences ()
+		{
+			foreach (var item in DotNetProject.MSBuildProject.GetImportedPackageReferences (DotNetProject)) {
+				yield return item;
+			}
+			foreach (var item in DotNetProject.Items.OfType<ProjectPackageReference> ()) {
+				yield return item;
+			}
 		}
 	}
 }

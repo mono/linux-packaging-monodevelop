@@ -27,14 +27,10 @@
 //
 
 using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-using NuGet;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class PackageManagementTaskFactory : ITaskFactory
+	internal class PackageManagementTaskFactory : ITaskFactory
 	{
 		public ITask<TResult> CreateTask<TResult>(
 			Func<TResult> function,

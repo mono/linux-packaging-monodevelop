@@ -27,6 +27,7 @@
 using Gdk;
 using Gtk;
 using MonoDevelop.Components;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Templates;
@@ -69,6 +70,7 @@ namespace MonoDevelop.Ide.Projects
 		GtkProjectConfigurationWidget projectConfigurationWidget;
 		GtkTemplateCellRenderer templateTextRenderer;
 		GtkTemplateCategoryCellRenderer categoryTextRenderer;
+		LanguageCellRenderer languageCellRenderer;
 
 		static GtkNewProjectDialogBackend ()
 		{
@@ -99,8 +101,8 @@ namespace MonoDevelop.Ide.Projects
 		void Build ()
 		{
 			BorderWidth = 0;
-			WidthRequest = GtkWorkarounds.ConvertToPixelScale (901);
-			HeightRequest = GtkWorkarounds.ConvertToPixelScale (632);
+			DefaultWidth = 901;
+			DefaultHeight = 632;
 
 			Name = "wizard_dialog";
 			Title = GettextCatalog.GetString ("New Project");
@@ -112,19 +114,22 @@ namespace MonoDevelop.Ide.Projects
 
 			// Top banner of dialog.
 			var topLabelEventBox = new EventBox ();
+			topLabelEventBox.Accessible.SetShouldIgnore (true);
 			topLabelEventBox.Name = "topLabelEventBox";
-			topLabelEventBox.HeightRequest = GtkWorkarounds.ConvertToPixelScale (52);
+			topLabelEventBox.HeightRequest = 52;
 			topLabelEventBox.ModifyBg (StateType.Normal, bannerBackgroundColor);
 			topLabelEventBox.ModifyFg (StateType.Normal, whiteColor);
 			topLabelEventBox.BorderWidth = 0;
 
 			var topBannerTopEdgeLineEventBox = new EventBox ();
+			topBannerTopEdgeLineEventBox.Accessible.SetShouldIgnore (true);
 			topBannerTopEdgeLineEventBox.Name = "topBannerTopEdgeLineEventBox";
 			topBannerTopEdgeLineEventBox.HeightRequest = 1;
 			topBannerTopEdgeLineEventBox.ModifyBg (StateType.Normal, bannerLineColor);
 			topBannerTopEdgeLineEventBox.BorderWidth = 0;
 
 			var topBannerBottomEdgeLineEventBox = new EventBox ();
+			topBannerBottomEdgeLineEventBox.Accessible.SetShouldIgnore (true);
 			topBannerBottomEdgeLineEventBox.Name = "topBannerBottomEdgeLineEventBox";
 			topBannerBottomEdgeLineEventBox.HeightRequest = 1;
 			topBannerBottomEdgeLineEventBox.ModifyBg (StateType.Normal, bannerLineColor);
@@ -132,11 +137,13 @@ namespace MonoDevelop.Ide.Projects
 
 			topBannerLabel = new Label ();
 			topBannerLabel.Name = "topBannerLabel";
+			topBannerLabel.Accessible.Name = "topBannerLabel";
 			Pango.FontDescription font = topBannerLabel.Style.FontDescription.Copy (); // UNDONE: VV: Use FontService?
 			font.Size = (int)(font.Size * 1.8);
 			topBannerLabel.ModifyFont (font);
 			topBannerLabel.ModifyFg (StateType.Normal, whiteColor);
 			var topLabelHBox = new HBox ();
+			topLabelHBox.Accessible.SetShouldIgnore (true);
 			topLabelHBox.Name = "topLabelHBox";
 			topLabelHBox.PackStart (topBannerLabel, false, false, 20);
 			topLabelEventBox.Add (topLabelHBox);
@@ -147,18 +154,21 @@ namespace MonoDevelop.Ide.Projects
 
 			// Main templates section.
 			centreVBox = new VBox ();
+			centreVBox.Accessible.SetShouldIgnore (true);
 			centreVBox.Name = "centreVBox";
 			VBox.PackStart (centreVBox, true, true, 0);
 			templatesHBox = new HBox ();
+			templatesHBox.Accessible.SetShouldIgnore (true);
 			templatesHBox.Name = "templatesHBox";
 			centreVBox.PackEnd (templatesHBox, true, true, 0);
 
 			// Template categories.
 			var templateCategoriesBgBox = new EventBox ();
+			templateCategoriesBgBox.Accessible.SetShouldIgnore (true);
 			templateCategoriesBgBox.Name = "templateCategoriesVBox";
 			templateCategoriesBgBox.BorderWidth = 0;
 			templateCategoriesBgBox.ModifyBg (StateType.Normal, categoriesBackgroundColor);
-			templateCategoriesBgBox.WidthRequest = GtkWorkarounds.ConvertToPixelScale (220);
+			templateCategoriesBgBox.WidthRequest = 220;
 			var templateCategoriesScrolledWindow = new ScrolledWindow ();
 			templateCategoriesScrolledWindow.Name = "templateCategoriesScrolledWindow";
 			templateCategoriesScrolledWindow.HscrollbarPolicy = PolicyType.Never;
@@ -166,9 +176,13 @@ namespace MonoDevelop.Ide.Projects
 			// Template categories tree view.
 			templateCategoriesTreeView = new TreeView ();
 			templateCategoriesTreeView.Name = "templateCategoriesTreeView";
+			templateCategoriesTreeView.Accessible.Name = "templateCategoriesTreeView";
+			templateCategoriesTreeView.Accessible.SetTitle (GettextCatalog.GetString ("Project Categories"));
+			templateCategoriesTreeView.Accessible.Description = GettextCatalog.GetString ("Select the project category to see all possible project templates");
 			templateCategoriesTreeView.BorderWidth = 0;
 			templateCategoriesTreeView.HeadersVisible = false;
 			templateCategoriesTreeView.Model = templateCategoriesListStore;
+			templateCategoriesTreeView.SearchColumn = -1; // disable the interactive search
 			templateCategoriesTreeView.AppendColumn (CreateTemplateCategoriesTreeViewColumn ());
 			templateCategoriesScrolledWindow.Add (templateCategoriesTreeView);
 			templateCategoriesBgBox.Add (templateCategoriesScrolledWindow);
@@ -176,9 +190,10 @@ namespace MonoDevelop.Ide.Projects
 
 			// Templates.
 			var templatesBgBox = new EventBox ();
+			templatesBgBox.Accessible.SetShouldIgnore (true);
 			templatesBgBox.ModifyBg (StateType.Normal, templateListBackgroundColor);
 			templatesBgBox.Name = "templatesVBox";
-			templatesBgBox.WidthRequest = GtkWorkarounds.ConvertToPixelScale (400);
+			templatesBgBox.WidthRequest = 400;
 			templatesHBox.PackStart (templatesBgBox, false, false, 0);
 			var templatesScrolledWindow = new ScrolledWindow ();
 			templatesScrolledWindow.Name = "templatesScrolledWindow";
@@ -187,18 +202,27 @@ namespace MonoDevelop.Ide.Projects
 			// Templates tree view.
 			templatesTreeView = new TreeView ();
 			templatesTreeView.Name = "templatesTreeView";
+			templatesTreeView.Accessible.Name = "templatesTreeView";
+			templatesTreeView.Accessible.SetTitle (GettextCatalog.GetString ("Project Templates"));
+			templatesTreeView.Accessible.Description = GettextCatalog.GetString ("Select the project template");
 			templatesTreeView.HeadersVisible = false;
 			templatesTreeView.Model = templatesListStore;
+			templatesTreeView.SearchColumn = -1; // disable the interactive search
 			templatesTreeView.AppendColumn (CreateTemplateListTreeViewColumn ());
 			templatesScrolledWindow.Add (templatesTreeView);
 			templatesBgBox.Add (templatesScrolledWindow);
 
+			// Accessibilityy
+			templateCategoriesTreeView.Accessible.AddLinkedUIElement (templatesTreeView.Accessible);
+
 			// Template
 			var templateEventBox = new EventBox ();
+			templateEventBox.Accessible.SetShouldIgnore (true);
 			templateEventBox.Name = "templateEventBox";
 			templateEventBox.ModifyBg (StateType.Normal, templateBackgroundColor);
 			templatesHBox.PackStart (templateEventBox, true, true, 0);
 			templateVBox = new VBox ();
+			templateVBox.Accessible.SetShouldIgnore (true);
 			templateVBox.Visible = false;
 			templateVBox.BorderWidth = 20;
 			templateVBox.Spacing = 10;
@@ -206,29 +230,41 @@ namespace MonoDevelop.Ide.Projects
 
 			// Template large image.
 			templateImage = new ImageView ();
+			templateImage.Accessible.SetShouldIgnore (true);
 			templateImage.Name = "templateImage";
-			templateImage.HeightRequest = GtkWorkarounds.ConvertToPixelScale (140);
-			templateImage.WidthRequest = GtkWorkarounds.ConvertToPixelScale (240);
+			templateImage.HeightRequest = 140;
+			templateImage.WidthRequest = 240;
 			templateVBox.PackStart (templateImage, false, false, 10);
 
 			// Template description.
 			templateNameLabel = new Label ();
 			templateNameLabel.Name = "templateNameLabel";
-			templateNameLabel.WidthRequest = GtkWorkarounds.ConvertToPixelScale (240);
+			templateNameLabel.Accessible.Name = "templateNameLabel";
+			templateNameLabel.Accessible.Description = GettextCatalog.GetString ("The name of the selected template");
+			templateNameLabel.WidthRequest = 240;
 			templateNameLabel.Wrap = true;
 			templateNameLabel.Xalign = 0;
 			templateNameLabel.Markup = MarkupTemplateName ("TemplateName");
 			templateVBox.PackStart (templateNameLabel, false, false, 0);
 			templateDescriptionLabel = new Label ();
 			templateDescriptionLabel.Name = "templateDescriptionLabel";
-			templateDescriptionLabel.WidthRequest = GtkWorkarounds.ConvertToPixelScale (240);
+			templateDescriptionLabel.Accessible.Name = "templateDescriptionLabel";
+			templateDescriptionLabel.Accessible.SetLabel (GettextCatalog.GetString ("The description of the selected template"));
+			templateDescriptionLabel.WidthRequest = 240;
 			templateDescriptionLabel.Wrap = true;
 			templateDescriptionLabel.Xalign = 0;
 			templateVBox.PackStart (templateDescriptionLabel, false, false, 0);
-			templateVBox.PackStart (new Label (), true, true, 0);
+
+			var tempLabel = new Label ();
+			tempLabel.Accessible.SetShouldIgnore (true);
+			templateVBox.PackStart (tempLabel, true, true, 0);
+
+			templatesTreeView.Accessible.AddLinkedUIElement (templateNameLabel.Accessible);
+			templatesTreeView.Accessible.AddLinkedUIElement (templateDescriptionLabel.Accessible);
 
 			// Template - button separator.
 			var templateSectionSeparatorEventBox = new EventBox ();
+			templateSectionSeparatorEventBox.Accessible.SetShouldIgnore (true);
 			templateSectionSeparatorEventBox.Name = "templateSectionSeparatorEventBox";
 			templateSectionSeparatorEventBox.HeightRequest = 1;
 			templateSectionSeparatorEventBox.ModifyBg (StateType.Normal, templateSectionSeparatorColor);
@@ -236,15 +272,19 @@ namespace MonoDevelop.Ide.Projects
 
 			// Buttons at bottom of dialog.
 			var bottomHBox = new HBox ();
+			bottomHBox.Accessible.SetShouldIgnore (true);
 			bottomHBox.Name = "bottomHBox";
 			VBox.PackStart (bottomHBox, false, false, 0);
 
 			// Cancel button - bottom left.
 			var cancelButtonBox = new HButtonBox ();
+			cancelButtonBox.Accessible.SetShouldIgnore (true);
 			cancelButtonBox.Name = "cancelButtonBox";
 			cancelButtonBox.BorderWidth = 16;
 			cancelButton = new Button ();
 			cancelButton.Name = "cancelButton";
+			cancelButton.Accessible.Name = "cancelButton";
+			cancelButton.Accessible.Description = GettextCatalog.GetString ("Cancel the dialog");
 			cancelButton.Label = "gtk-cancel";
 			cancelButton.UseStock = true;
 			cancelButtonBox.PackStart (cancelButton, false, false, 0);
@@ -252,6 +292,7 @@ namespace MonoDevelop.Ide.Projects
 
 			// Previous button - bottom right.
 			var previousNextButtonBox = new HButtonBox ();
+			previousNextButtonBox.Accessible.SetShouldIgnore (true);
 			previousNextButtonBox.Name = "previousNextButtonBox";
 			previousNextButtonBox.BorderWidth = 16;
 			previousNextButtonBox.Spacing = 9;
@@ -260,6 +301,8 @@ namespace MonoDevelop.Ide.Projects
 
 			previousButton = new Button ();
 			previousButton.Name = "previousButton";
+			previousButton.Accessible.Name = "previousButton";
+			previousButton.Accessible.Description = GettextCatalog.GetString ("Return to the previous page");
 			previousButton.Label = GettextCatalog.GetString ("Previous");
 			previousButton.Sensitive = false;
 			previousNextButtonBox.PackEnd (previousButton);
@@ -267,6 +310,8 @@ namespace MonoDevelop.Ide.Projects
 			// Next button - bottom right.
 			nextButton = new Button ();
 			nextButton.Name = "nextButton";
+			nextButton.Accessible.Name = "nextButton";
+			nextButton.Accessible.Description = GettextCatalog.GetString ("Move to the next page");
 			nextButton.Label = GettextCatalog.GetString ("Next");
 			previousNextButtonBox.PackEnd (nextButton);
 
@@ -315,7 +360,29 @@ namespace MonoDevelop.Ide.Projects
 
 			column.SetCellDataFunc (templateTextRenderer, SetTemplateTextCellData);
 
+			languageCellRenderer = new LanguageCellRenderer ();
+			languageCellRenderer.CellBackgroundGdk = templateListBackgroundColor;
+
+			column.PackEnd (languageCellRenderer, false);
+			column.SetCellDataFunc (languageCellRenderer, SetLanguageCellData);
 			return column;
+		}
+
+		/// <summary>
+		/// When the dialog has Resizable set to false then the DefaultHeight and
+		/// DefaultWidth are ignored and the size for the dialog changes to fit the
+		/// widgets which will sometimes shrink the dialog. The size also changes
+		/// on moving from page to page so override the requisition if it is too small.
+		/// </summary>
+		protected override void OnSizeRequested (ref Requisition requisition)
+		{
+			base.OnSizeRequested (ref requisition);
+
+			if (requisition.Height < DefaultHeight)
+				requisition.Height = DefaultHeight;
+
+			if (requisition.Width < DefaultWidth)
+				requisition.Width = DefaultWidth;
 		}
 	}
 }

@@ -2,13 +2,12 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp;
-using System;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Linq;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
-    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+	[DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class ForControlVariableIsNeverModifiedAnalyzer : DiagnosticAnalyzer
     {
         static readonly DiagnosticDescriptor descriptor = new DiagnosticDescriptor(
@@ -25,6 +24,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 AnalyzeForStatement, 
                 new SyntaxKind[] { SyntaxKind.ForStatement }
@@ -33,8 +34,6 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         void AnalyzeForStatement(SyntaxNodeAnalysisContext nodeContext)
         {
-            if (nodeContext.IsFromGeneratedCode())
-                return;
             var node = nodeContext.Node as ForStatementSyntax;
             if (node?.Declaration?.Variables == null)
                 return;
@@ -42,7 +41,9 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 var local = nodeContext.SemanticModel.GetDeclaredSymbol(variable);
                 if (local == null)
                     return;
-                if (!node.Condition.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(n => n.Identifier.ValueText == local.Name))
+                if ((node.Condition == null) || !node.Condition.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().Any(n => n.Identifier.ValueText == local.Name))
+                    continue;
+                if (!IsLoopVariable(node.Condition, local.Name))
                     continue;
                 bool wasModified = false;
                 foreach (var identifier in node.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()) {
@@ -52,7 +53,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                     if (!IsModified(identifier))
                         continue;
 
-                    if (nodeContext.SemanticModel.GetSymbolInfo(identifier).Symbol == local) {
+                    if (nodeContext.SemanticModel.GetSymbolInfo(identifier).Symbol.Equals(local)) {
                         wasModified = true;
                         break;
                     }
@@ -62,6 +63,25 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                     nodeContext.ReportDiagnostic(Diagnostic.Create(descriptor, variable.Identifier.GetLocation()));
                 }
             }
+        }
+
+        bool IsLoopVariable (ExpressionSyntax condition, string name)
+        {
+            var identifier = condition as IdentifierNameSyntax;
+            if ((identifier != null) && (identifier.Identifier.ValueText == name))
+                return true;
+
+            foreach (var n in condition.DescendantNodesAndSelf ()) {
+                var binOp = n as BinaryExpressionSyntax;
+                if (binOp != null && binOp.Left.DescendantNodesAndSelf ().OfType<IdentifierNameSyntax> ().Any (i => i.Identifier.ValueText == name))
+                    return true;
+                if (n is PrefixUnaryExpressionSyntax || n is PostfixUnaryExpressionSyntax) {
+                    if (n.DescendantNodesAndSelf ().OfType<IdentifierNameSyntax> ().Any (i => i.Identifier.ValueText == name))
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         bool IsModified(IdentifierNameSyntax identifier)

@@ -141,6 +141,14 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		public bool AlwaysUseShortTypeNames { get; set; }
 		
 		/// <summary>
+		/// Determines the name lookup mode for converting a type name.
+		/// 
+		/// The default value is <c>NameLookupMode.Expression</c>, which means the name is disambiguated
+		/// for use in expression context.
+		/// </summary>
+		public NameLookupMode NameLookupMode { get; set; }
+		
+		/// <summary>
 		/// Controls whether to generate a body that throws a <c>System.NotImplementedException</c>.
 		/// The default value is <c>false</c>.
 		/// </summary>
@@ -162,7 +170,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 		/// Controls if aliases should be used inside the type name or not.
 		/// The default value is <c>true</c>.
 		/// </summary>
-		public bool UseAliases { get; set;}
+		public bool UseAliases { get; set; }
 		#endregion
 		
 		#region Convert Type
@@ -209,6 +217,8 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 					return ConvertType(typeWithElementType.ElementType).MakePointerType();
 				} else if (typeWithElementType is ArrayType) {
 					return ConvertType(typeWithElementType.ElementType).MakeArrayType(((ArrayType)type).Dimensions);
+				} else if (typeWithElementType is ByReferenceType) {
+					return ConvertType(typeWithElementType.ElementType).MakeRefType();
 				} else {
 					// e.g. ByReferenceType; not supported as type in C#
 					return ConvertType(typeWithElementType.ElementType);
@@ -274,7 +284,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 				} else {
 					localTypeArguments = EmptyList<IType>.Instance;
 				}
-				ResolveResult rr = resolver.ResolveSimpleName(typeDef.Name, localTypeArguments);
+				ResolveResult rr = resolver.LookupSimpleNameOrTypeName(typeDef.Name, localTypeArguments, NameLookupMode);
 				TypeResolveResult trr = rr as TypeResolveResult;
 				if (trr != null || (localTypeArguments.Count == 0 && resolver.IsVariableReferenceWithSameType(rr, typeDef.Name, out trr))) {
 					if (!trr.IsError && TypeMatches(trr.Type, typeDef, typeArguments)) {
@@ -576,7 +586,12 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			if (ShowAttributes) {
 				decl.Attributes.AddRange (parameter.Attributes.Select ((a) => new AttributeSection (ConvertAttribute (a))));
 			}
-			decl.Type = ConvertType(parameter.Type);
+			if (parameter.Type.Kind == TypeKind.ByReference) {
+				// avoid 'out ref'
+				decl.Type = ConvertType(((ByReferenceType)parameter.Type).ElementType);
+			} else {
+				decl.Type = ConvertType(parameter.Type);
+			}
 			if (this.ShowParameterNames) {
 				decl.Name = parameter.Name;
 			}
@@ -739,11 +754,16 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 					AttributeTarget = "return"
 				}));
 			}
+			if (AddResolveResultAnnotations) {
+				decl.AddAnnotation(new TypeResolveResult(d));
+			}
 			decl.ReturnType = ConvertType(invokeMethod.ReturnType);
 			decl.Name = d.Name;
 			
+			int outerTypeParameterCount = (d.DeclaringTypeDefinition == null) ? 0 : d.DeclaringTypeDefinition.TypeParameterCount;
+			
 			if (this.ShowTypeParameters) {
-				foreach (ITypeParameter tp in d.TypeParameters) {
+				foreach (ITypeParameter tp in d.TypeParameters.Skip(outerTypeParameterCount)) {
 					decl.TypeParameters.Add(ConvertTypeParameter(tp));
 				}
 			}
@@ -753,7 +773,7 @@ namespace ICSharpCode.NRefactory.CSharp.Refactoring
 			}
 			
 			if (this.ShowTypeParameters && this.ShowTypeParameterConstraints) {
-				foreach (ITypeParameter tp in d.TypeParameters) {
+				foreach (ITypeParameter tp in d.TypeParameters.Skip(outerTypeParameterCount)) {
 					var constraint = ConvertTypeParameterConstraint(tp);
 					if (constraint != null)
 						decl.Constraints.Add(constraint);

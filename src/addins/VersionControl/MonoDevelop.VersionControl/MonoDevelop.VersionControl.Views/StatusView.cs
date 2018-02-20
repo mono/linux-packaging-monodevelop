@@ -11,11 +11,8 @@ using MonoDevelop.Core;
 using MonoDevelop.Components;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Projects;
-using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide;
-using MonoDevelop.Ide.Gui;
 using Mono.TextEditor;
-using MonoDevelop.Components;
 using System.Text;
 
 namespace MonoDevelop.VersionControl.Views
@@ -279,7 +276,7 @@ namespace MonoDevelop.VersionControl.Views
 		}
 
 		public StatusView (string filepath, Repository vc, VersionControlItemList list)
-			: base (Path.GetFileName (filepath) + " Status")
+			: base (GettextCatalog.GetString ("{0} Status", Path.GetFileName (filepath)))
 		{
 			this.vc = vc;
 			this.filepath = Directory.Exists (filepath) ? filepath : Path.GetDirectoryName (filepath);
@@ -401,10 +398,6 @@ namespace MonoDevelop.VersionControl.Views
 				colFile.Destroy ();
 				colFile = null;
 			}
-			if (filestore != null) {
-				filestore.Dispose ();
-				filestore = null;
-			}
 			if (filelist != null) {
 				filelist.DoPopupMenu = null;
 				filelist.RowActivated -= OnRowActivated;
@@ -479,7 +472,7 @@ namespace MonoDevelop.VersionControl.Views
 
 		void LoadStatus (List<VersionInfo> newList)
 		{
-			statuses = newList.Where (f => FileVisible (f)).ToList ();
+			statuses = newList.Where (FileVisible).ToList ();
 
 			// Remove from the changeset files/folders which have been deleted
 			var toRemove = new List<ChangeSetItem> ();
@@ -819,7 +812,7 @@ namespace MonoDevelop.VersionControl.Views
 				} else
 					opset.AddSeparator ();
 			}
-			IdeApp.CommandService.ShowContextMenu (filelist, evnt, opset, commandChain);
+			filelist.ShowContextMenu (evnt, opset, commandChain);
 		}
 
 		public VersionControlItemList GetSelectedItems ()
@@ -935,13 +928,16 @@ namespace MonoDevelop.VersionControl.Views
 					if (line == -1)
 						line = 1;
 				}
-				IdeApp.Workbench.OpenDocument (files [0], line, 0);
+				var proj = IdeApp.Workspace.GetProjectsContainingFile (files [0]).FirstOrDefault ();
+				IdeApp.Workbench.OpenDocument (files [0], proj, line, 0);
 			}
 			else {
 				AlertButton openAll = new AlertButton (GettextCatalog.GetString ("_Open All"));
 				if (MessageService.AskQuestion (GettextCatalog.GetString ("Do you want to open all {0} files?", files.Length), AlertButton.Cancel, openAll) == openAll) {
-					for (int n=0; n<files.Length; n++)
-						IdeApp.Workbench.OpenDocument (files[n], n==0);
+					for (int n = 0; n < files.Length; n++) {
+						var proj = IdeApp.Workspace.GetProjectsContainingFile (files [n]).FirstOrDefault ();
+						IdeApp.Workbench.OpenDocument (files [n], proj, n == 0);
+					}
 				}
 			}
 		}
@@ -1085,10 +1081,11 @@ namespace MonoDevelop.VersionControl.Views
 					// the value. Do not capture the TreeIter as it may invalidate
 					// before the diff data has asyncronously loaded.
 					GC.KeepAlive (info.Diff.Value);
-					Gtk.Application.Invoke (delegate { if (!disposed) FillDifs (); });
+					Gtk.Application.Invoke ((o, args) => { if (!disposed) FillDifs (); });
 				});
 			} else if (info.Exception != null) {
-				text = new [] { GettextCatalog.GetString ("Could not get diff information. ") + info.Exception.Message };
+				text = new [] { GettextCatalog.GetString ("Could not get diff information. ") };
+				LoggingService.LogError ("Could not get diff information", info.Exception);
 			} else if (info.Diff.Value == null || string.IsNullOrEmpty (info.Diff.Value.Content)) {
 				text = new [] { GettextCatalog.GetString ("No differences found") };
 			} else {
@@ -1193,14 +1190,13 @@ namespace MonoDevelop.VersionControl.Views
 				return true;
 			}
 
-			if (evnt.Key == Gdk.Key.space && CommitSelectionToggled != null) {
-				CommitSelectionToggled (this, EventArgs.Empty);
+			if (evnt.Key == Gdk.Key.space) {
+				CommitSelectionToggled?.Invoke (this, EventArgs.Empty);
 				return true;
 			}
 
 			if (evnt.Key == Gdk.Key.Return || evnt.Key == Gdk.Key.KP_Enter) {
-				if (DiffLineActivated != null)
-					DiffLineActivated (this, EventArgs.Empty);
+				DiffLineActivated?.Invoke (this, EventArgs.Empty);
 				return true;
 			}
 
@@ -1222,8 +1218,8 @@ namespace MonoDevelop.VersionControl.Views
 					vpos = Vadjustment.Value;
 					keepPos = true;
 					if (Selection.PathIsSelected (path) && Selection.GetSelectedRows ().Length == 1 && evnt.Button == 1) {
-						if (evnt.Type == Gdk.EventType.TwoButtonPress && DiffLineActivated != null)
-							DiffLineActivated (this, EventArgs.Empty);
+						if (evnt.Type == Gdk.EventType.TwoButtonPress)
+							DiffLineActivated?.Invoke (this, EventArgs.Empty);
 						handled = true;
 					}
 				}
@@ -1259,8 +1255,7 @@ namespace MonoDevelop.VersionControl.Views
 
 		protected override bool OnPopupMenu()
 		{
-			if (DoPopupMenu != null)
-				DoPopupMenu (null);
+			DoPopupMenu?.Invoke (null);
 			return true;
 		}
 

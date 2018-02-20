@@ -42,16 +42,16 @@ namespace MonoDevelop.CSharp.Parser
 		{
 			var fileName = options.FileName;
 			var project = options.Project;
-			var result = new CSharpParsedDocument (fileName);
+			var result = new CSharpParsedDocument (options, fileName);
 
 			if (project != null) {
 				
 				var projectFile = project.Files.GetFile (fileName);
-				if (projectFile != null && !TypeSystemParserNode.IsCompileBuildAction (projectFile.BuildAction))
+				SourceCodeKind kind;
+				if (projectFile != null && !TypeSystemParserNode.IsCompileableFile (projectFile, out kind))
 					result.Flags |= ParsedDocumentFlags.NonSerializable;
 			}
 
-			var compilerArguments = GetCompilerArguments (project);
 			SyntaxTree unit = null;
 
 			if (project != null) {
@@ -81,6 +81,7 @@ namespace MonoDevelop.CSharp.Parser
 			}
 
 			if (unit == null) {
+				var compilerArguments = GetCompilerArguments (project);
 				unit = CSharpSyntaxTree.ParseText (SourceText.From (options.Content.Text), compilerArguments, fileName);
 			} 
 
@@ -118,7 +119,7 @@ namespace MonoDevelop.CSharp.Parser
 
 			 
 			// compilerArguments.AllowUnsafeBlocks = par.UnsafeCode;
-			compilerArguments = compilerArguments.WithLanguageVersion (ConvertLanguageVersion (par.LangVersion));
+			compilerArguments = compilerArguments.WithLanguageVersion (par.LangVersion);
 //			compilerArguments.CheckForOverflow = par.GenerateOverflowChecks;
 
 //			compilerArguments.WarningLevel = par.WarningLevel;
@@ -136,27 +137,6 @@ namespace MonoDevelop.CSharp.Parser
 //			}
 			
 			return compilerArguments;
-		}
-		
-		internal static Microsoft.CodeAnalysis.CSharp.LanguageVersion ConvertLanguageVersion (LangVersion ver)
-		{
-			switch (ver) {
-			case LangVersion.ISO_1:
-				return Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp1;
-			case LangVersion.ISO_2:
-				return Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp2;
-			case LangVersion.Version3:
-				return Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp3;
-			case LangVersion.Version4:
-				return Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp4;
-			case LangVersion.Version5:
-				return Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp5;
-			case LangVersion.Version6:
-				return Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp6;
-			case LangVersion.Default:
-				break;
-			}
-			return Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp6;
 		}
 	}
 }

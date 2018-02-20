@@ -86,6 +86,21 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		/// <c>true</c> if this instance has references to the cecil objects; otherwise, <c>false</c>.
 		/// </value>
 		public bool HasCecilReferences { get { return typeSystemTranslationTable != null; } }
+		
+		bool shortenInterfaceImplNames = true;
+		
+		/// <summary>
+		/// Specifies whether method names of explicit interface-implementations should be shortened.
+		/// </summary>
+		/// <remarks>This is important when working with parser-initialized type-systems in order to be consistent.</remarks>
+		public bool ShortenInterfaceImplNames {
+			get {
+				return shortenInterfaceImplNames;
+			}
+			set {
+				shortenInterfaceImplNames = value;
+			}
+		}
 		#endregion
 		
 		ModuleDefinition currentModule;
@@ -121,6 +136,7 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			this.IncludeInternalMembers = loader.IncludeInternalMembers;
 			this.LazyLoad = loader.LazyLoad;
 			this.OnEntityLoaded = loader.OnEntityLoaded;
+			this.ShortenInterfaceImplNames = loader.ShortenInterfaceImplNames;
 			this.currentModule = loader.currentModule;
 			this.currentAssembly = loader.currentAssembly;
 			// don't use interning - the interning provider is most likely not thread-safe
@@ -293,6 +309,10 @@ namespace ICSharpCode.NRefactory.TypeSystem
 		// used to prevent Cecil from loading referenced assemblies
 		sealed class DummyAssemblyResolver : IAssemblyResolver
 		{
+			public void Dispose ()
+			{
+			}
+
 			public AssemblyDefinition Resolve(AssemblyNameReference name)
 			{
 				return null;
@@ -915,7 +935,8 @@ namespace ICSharpCode.NRefactory.TypeSystem
 					baseTypes.Add(ReadTypeReference(typeDefinition.BaseType));
 				}
 				if (typeDefinition.HasInterfaces) {
-					foreach (TypeReference iface in typeDefinition.Interfaces) {
+					foreach (InterfaceImplementation ii in typeDefinition.Interfaces) {
+						var iface = ii.InterfaceType;
 						baseTypes.Add(ReadTypeReference(iface));
 					}
 				}
@@ -1370,7 +1391,8 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			int lastDot = method.Name.LastIndexOf('.');
 			if (lastDot >= 0 && method.HasOverrides) {
 				// To be consistent with the parser-initialized type system, shorten the method name:
-				m.Name = method.Name.Substring(lastDot + 1);
+				if (ShortenInterfaceImplNames)
+					m.Name = method.Name.Substring(lastDot + 1);
 				m.IsExplicitInterfaceImplementation = true;
 				foreach (var or in method.Overrides) {
 					m.ExplicitInterfaceImplementations.Add(new DefaultMemberReference(
@@ -1660,7 +1682,8 @@ namespace ICSharpCode.NRefactory.TypeSystem
 
 			var accessor = p.Getter ?? p.Setter;
 			if (accessor != null && accessor.IsExplicitInterfaceImplementation) {
-				p.Name = property.Name.Substring(property.Name.LastIndexOf('.') + 1);
+				if (ShortenInterfaceImplNames)
+					p.Name = property.Name.Substring(property.Name.LastIndexOf('.') + 1);
 				p.IsExplicitInterfaceImplementation = true;
 				foreach (var mr in accessor.ExplicitInterfaceImplementations) {
 					p.ExplicitInterfaceImplementations.Add(new AccessorOwnerMemberReference(mr));
@@ -1693,7 +1716,8 @@ namespace ICSharpCode.NRefactory.TypeSystem
 			
 			var accessor = e.AddAccessor ?? e.RemoveAccessor ?? e.InvokeAccessor;
 			if (accessor != null && accessor.IsExplicitInterfaceImplementation) {
-				e.Name = ev.Name.Substring(ev.Name.LastIndexOf('.') + 1);
+				if (ShortenInterfaceImplNames)
+					e.Name = ev.Name.Substring(ev.Name.LastIndexOf('.') + 1);
 				e.IsExplicitInterfaceImplementation = true;
 				foreach (var mr in accessor.ExplicitInterfaceImplementations) {
 					e.ExplicitInterfaceImplementations.Add(new AccessorOwnerMemberReference(mr));

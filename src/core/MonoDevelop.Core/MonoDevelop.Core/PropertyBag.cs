@@ -232,14 +232,16 @@ namespace MonoDevelop.Core
 		{
 			if (data.Count == 0)
 				return;
-			
-			properties = ImmutableDictionary<string,object>.Empty;
+
+			var propertiesBuilder = ImmutableDictionary.CreateBuilder<string, object> ();
 			context = handler.SerializationContext.Serializer.DataContext;
 			sourceFile = handler.SerializationContext.BaseFile;
 			foreach (DataNode nod in data) {
 				if (nod.Name != "ctype")
-					properties = properties.SetItem (UnescapeName (nod.Name), new DataNodeInfo { DataNode = nod });
+					propertiesBuilder.Add (UnescapeName (nod.Name), new DataNodeInfo { DataNode = nod });
 			}
+
+			properties = propertiesBuilder.ToImmutable ();
 		}
 		
 		string EscapeName (string str)
@@ -251,7 +253,7 @@ namespace MonoDevelop.Core
 					sb.Append ("__");
 				else if (c != '.' && c != '-' && !char.IsLetter (c) && (!char.IsNumber (c) || n==0)) {
 					string s = ((int)c).ToString ("X");
-					sb.Append ("_" + s.Length.ToString ());
+					sb.Append ("_").Append (s.Length.ToString ());
 					sb.Append (s);
 				}
 				else

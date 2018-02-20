@@ -121,6 +121,8 @@ namespace Xwt.WPFBackend
 			RegisterBackend<IWebViewBackend, WebViewBackend> ();
 			RegisterBackend<KeyboardHandler, WpfKeyboardHandler> ();
 			RegisterBackend<ICalendarBackend, CalendarBackend> ();
+			RegisterBackend<IPopupWindowBackend, WindowBackend>();
+			RegisterBackend<IUtilityWindowBackend, WindowBackend>();
 		}
 
 		public override void DispatchPendingEvents()
@@ -167,6 +169,11 @@ namespace Xwt.WPFBackend
 			return new WindowFrameBackend () {
 				Window = (System.Windows.Window) nativeWindow
 			};
+		}
+
+		public override object GetNativeWindow (IWindowFrameBackend backend)
+		{
+			return backend?.Window as System.Windows.Window;
 		}
 
 		public override object GetBackendForImage (object nativeImage)
@@ -237,6 +244,15 @@ namespace Xwt.WPFBackend
 			FrameworkElement w = (FrameworkElement)nativeWidget;
 			if (dc != null)
 				im.Draw (ApplicationContext, dc, Util.GetScaleFactor (w), x, y, img);
+		}
+
+		public override Rectangle GetScreenBounds (object nativeWidget)
+		{
+			var widget = nativeWidget as FrameworkElement;
+			if (widget == null)
+				throw new InvalidOperationException("Widget belongs to a different toolkit");
+			var p = widget.PointToScreenDpiAware (new System.Windows.Point(0, 0)).ToXwtPoint ();
+			return new Rectangle(p, new Size (widget.RenderSize.Width, widget.RenderSize.Height));
 		}
 	}
 }

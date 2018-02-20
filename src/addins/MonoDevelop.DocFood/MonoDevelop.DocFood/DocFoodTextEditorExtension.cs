@@ -24,11 +24,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 using System;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using MonoDevelop.CSharp.Completion;
 using MonoDevelop.Ide.Editor;
 using MonoDevelop.Ide.Editor.Extension;
+using System.Threading;
+using Microsoft.CodeAnalysis.CSharp;
+using MonoDevelop.Core;
 
 namespace MonoDevelop.DocFood
 {
@@ -72,9 +77,10 @@ namespace MonoDevelop.DocFood
 			if (l != null && Editor.GetTextAt (l).TrimStart ().StartsWith ("///", StringComparison.Ordinal))
 				return base.KeyPress (descriptor);
 
-			var member = GetMemberToDocument ();
-			if (member == null)
+			var memberTask = GetMemberToDocument ();
+			if (!memberTask.Wait (250) || memberTask.Result == null)
 				return base.KeyPress (descriptor);
+			var member = memberTask.Result;
 			
 			string documentation = GenerateDocumentation (member, Editor.GetLineIndent (line));
 			if (string.IsNullOrEmpty (documentation))
@@ -156,38 +162,56 @@ namespace MonoDevelop.DocFood
 			return true;
 		}	
 		
-		ISymbol GetMemberToDocument ()
+		async Task<ISymbol> GetMemberToDocument (CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var parsedDocument = DocumentContext.ParsedDocument;
 			if (parsedDocument == null)
 				return null;
-			var semanticModel = parsedDocument.GetAst<SemanticModel> ();
-			if (semanticModel == null)
-				return null;
-			var caretOffset = Editor.CaretOffset;
-			var offset = caretOffset;
-			var root = semanticModel.SyntaxTree.GetRoot ();
-			while (offset < Editor.Length) {
-				var node = root.FindNode (TextSpan.FromBounds (offset, offset));
-				if (node == null || node.GetLastToken ().SpanStart < caretOffset) {
-					offset++;
-					continue;
-				}
-                var fieldDeclarationSyntax = node as FieldDeclarationSyntax;
-                if (fieldDeclarationSyntax != null) {
-					node = fieldDeclarationSyntax.Declaration.Variables.First ();
-				}
 
-				var eventDeclaration = node as EventFieldDeclarationSyntax;
-				if (eventDeclaration != null) {
-					node = eventDeclaration.Declaration.Variables.First ();
+			try {
+				var analysisDoc = DocumentContext.AnalysisDocument;
+				if (analysisDoc == null)
+					return null;
+				var partialDoc = await CSharpCompletionTextEditorExtension.WithFrozenPartialSemanticsAsync (analysisDoc, cancellationToken).ConfigureAwait (false);
+				var semanticModel = await partialDoc.GetSemanticModelAsync ();
+				if (semanticModel == null)
+					return null;
+				var caretOffset = Editor.CaretOffset;
+				var offset = caretOffset;
+				var root = semanticModel.SyntaxTree.GetRoot ();
+				var tokenAtCaret = root.FindTrivia (offset - 1, true);
+				if (!tokenAtCaret.IsKind (SyntaxKind.SingleLineCommentTrivia))
+					return null;
+				while (offset < Editor.Length) {
+					var node = root.FindNode (TextSpan.FromBounds (offset, offset));
+
+					if (node == null || node.GetLastToken ().SpanStart < caretOffset) {
+						offset++;
+						continue;
+					}
+	                var fieldDeclarationSyntax = node as FieldDeclarationSyntax;
+	                if (fieldDeclarationSyntax != null) {
+						node = fieldDeclarationSyntax.Declaration.Variables.First ();
+					}
+
+					var eventDeclaration = node as EventFieldDeclarationSyntax;
+					if (eventDeclaration != null) {
+						node = eventDeclaration.Declaration.Variables.First ();
+					}
+
+					if (node.Span.Contains (caretOffset))
+						return null;
+
+					var declaredSymbol = semanticModel.GetDeclaredSymbol (node); 
+					if (declaredSymbol != null)
+						return declaredSymbol;
+					offset = node.FullSpan.End + 1;
 				}
-				var declaredSymbol = semanticModel.GetDeclaredSymbol (node); 
-				if (declaredSymbol != null)
-					return declaredSymbol;
-				offset = node.FullSpan.End + 1;
+				return null;
+			} catch (Exception e) {
+				LoggingService.LogError("Error wihle getting member to document.", e);
+				return null;
 			}
-			return null;
 		}
 	}
 }

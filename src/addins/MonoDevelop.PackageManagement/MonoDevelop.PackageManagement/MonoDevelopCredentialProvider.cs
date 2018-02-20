@@ -28,19 +28,89 @@
 
 using System;
 using System.Net;
-using NuGet;
+using System.Threading;
+using System.Threading.Tasks;
+using MonoDevelop.Core;
+using MonoDevelop.Core.Web;
+using NuGet.Configuration;
+using NuGet.Credentials;
 
 namespace MonoDevelop.PackageManagement
 {
-	class MonoDevelopCredentialProvider : ICredentialProvider
+	class MonoDevelopCredentialProvider : NuGet.Credentials.ICredentialProvider
 	{
-		public ICredentials GetCredentials(Uri uri, IWebProxy proxy, CredentialType credentialType, bool retrying)
+		public string Id {
+			get { return "MonoDevelop.PackageManagement.CredentialProvider"; }
+		}
+
+		public Task<CredentialResponse> GetAsync (Uri uri, IWebProxy proxy, CredentialRequestType type, string message, bool isRetry, bool nonInteractive, CancellationToken cancellationToken)
 		{
-			var cp = MonoDevelop.Core.WebRequestHelper.CredentialProvider;
+			if (nonInteractive) {
+				return Task.FromResult (GetExistingCredential (uri, proxy, type));
+			}
+
+			var cp = WebRequestHelper.CredentialProvider;
 			if (cp == null)
 				return null;
 
-			return cp.GetCredentials (uri, proxy, (MonoDevelop.Core.Web.CredentialType)credentialType, retrying);
+			CredentialType credentialType = GetCredentialType (type);
+
+			return Task.Run (() => {
+				ICredentials credentials = cp.GetCredentials (uri, proxy, credentialType, isRetry);
+				if (credentials != null) {
+					return new CredentialResponse (credentials);
+				}
+				return new CredentialResponse (CredentialStatus.UserCanceled);
+			});
+		}
+
+		CredentialType GetCredentialType (CredentialRequestType type)
+		{
+			switch (type) {
+				case CredentialRequestType.Proxy:
+					return CredentialType.ProxyCredentials;
+
+				default:
+					return CredentialType.RequestCredentials;
+			}
+		}
+
+		/// <summary>
+		/// Gets an existing credential without prompting the user.
+		/// </summary>
+		CredentialResponse GetExistingCredential (Uri uri, IWebProxy proxy, CredentialRequestType type)
+		{
+			CredentialType credentialType = GetCredentialType (type);
+
+			Tuple<string, string> existing = null;
+
+			if (credentialType == CredentialType.ProxyCredentials) {
+				Uri proxyUri = proxy?.GetProxy (uri);
+				if (proxyUri != null) {
+					existing = PasswordService.GetWebUserNameAndPassword (proxyUri);
+				}
+			}
+
+			if (existing == null) {
+				var rootUri = new Uri (uri.GetComponents (UriComponents.SchemeAndServer, UriFormat.SafeUnescaped));
+				existing =
+					PasswordService.GetWebUserNameAndPassword (uri) ??
+					PasswordService.GetWebUserNameAndPassword (rootUri);
+			}
+
+			if (existing != null && existing.Item1 != null && existing.Item2 != null) {
+				var credentials = new NetworkCredential (existing.Item1, existing.Item2);
+
+				// For some reason even though the proxy.Credentials is assigned the
+				// ProxyCache.Instance the credentials are not found so they are
+				// explicitly set on the proxy here.
+				if (credentialType == CredentialType.ProxyCredentials && proxy != null)
+					proxy.Credentials = credentials;
+				return new CredentialResponse (credentials);
+			}
+
+			return new CredentialResponse (CredentialStatus.ProviderNotApplicable);
 		}
 	}
 }
+

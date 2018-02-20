@@ -31,19 +31,22 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Completion;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Editor.Extension;
+using MonoDevelop.Core.Text;
 
 namespace MonoDevelop.Ide.CodeCompletion
 {
 	public class CompletionData : IComparable
 	{
-		protected CompletionData () {}
-		
+		protected CompletionData () { }
+
 		public virtual IconId Icon { get; set; }
 		public virtual string DisplayText { get; set; }
 		public virtual string Description { get; set; }
 		public virtual string CompletionText { get; set; }
+		public virtual CompletionItemRules Rules { get { return CompletionItemRules.Default; } }
 
 		/// <summary>
 		/// int.MaxValue == highest prioriy,
@@ -97,21 +100,22 @@ namespace MonoDevelop.Ide.CodeCompletion
 		public virtual IReadOnlyList<CompletionData> OverloadedData {
 			get {
 				if (overloads == null)
-					return new CompletionData[] { this };
+					return new CompletionData [] { this };
 
 				if (sorted == null) {
-					sorted = new List<CompletionData> (overloads);
+					sorted = new List<CompletionData> ();
 					sorted.Add (this);
+					sorted.AddRange (overloads);
 					// sorted.Sort (new OverloadSorter ());
 				}
 				return sorted;
 			}
 		}
 
-		public CompletionData (string text) : this (text, null, null) {}
-		public CompletionData (string text, IconId icon) : this (text, icon, null) {}
-		public CompletionData (string text, IconId icon, string description) : this (text, icon, description, text) {}
-		
+		public CompletionData (string text) : this (text, null, null) { }
+		public CompletionData (string text, IconId icon) : this (text, icon, null) { }
+		public CompletionData (string text, IconId icon, string description) : this (text, icon, description, text) { }
+
 		public CompletionData (string displayText, IconId icon, string description, string completionText)
 		{
 			this.DisplayText = displayText;
@@ -139,7 +143,7 @@ namespace MonoDevelop.Ide.CodeCompletion
 			var currentWord = GetCurrentWord (window, descriptor);
 			window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, currentWord, CompletionText);
 		}
-		
+
 		public override string ToString ()
 		{
 			return string.Format ("[CompletionData: Icon={0}, DisplayText={1}, Description={2}, CompletionText={3}, DisplayFlags={4}]", Icon, DisplayText, Description, CompletionText, DisplayFlags);
@@ -149,30 +153,57 @@ namespace MonoDevelop.Ide.CodeCompletion
 
 		public virtual int CompareTo (object obj)
 		{
-			if (!(obj is CompletionData))
-				return 0;
-			return Compare (this, (CompletionData)obj);
+			return Compare (this, obj as CompletionData);
+		}
+
+		public static IComparer<CompletionData> Comparer { get; } = new CompletionDataComparer ();
+
+		private class CompletionDataComparer : IComparer<CompletionData>
+		{
+			int IComparer<CompletionData>.Compare (CompletionData a, CompletionData b)
+			{
+				if (a == b)
+					return 0;
+				if (a != null && b == null)
+					return -1;
+				if (a == null && b != null)
+					return 1;
+				return a.CompareTo (b);
+			}
 		}
 
 		public static int Compare (CompletionData a, CompletionData b)
 		{
-			var result =  ((a.DisplayFlags & DisplayFlags.Obsolete) == (b.DisplayFlags & DisplayFlags.Obsolete)) ? StringComparer.OrdinalIgnoreCase.Compare (a.DisplayText, b.DisplayText) : (a.DisplayFlags & DisplayFlags.Obsolete) != 0 ? 1 : -1;
-			if (result == 0) {
-				var aIsImport = (a.DisplayFlags & DisplayFlags.IsImportCompletion) != 0;
-				var bIsImport = (b.DisplayFlags & DisplayFlags.IsImportCompletion) != 0;
-				if (!aIsImport && bIsImport)
-					return -1;
-				if (aIsImport && !bIsImport)
-					return 1;
-				if (aIsImport && bIsImport)
-					return StringComparer.Ordinal.Compare (((CompletionData)a).Description, ((CompletionData)b).Description);
-				var ca = a as CompletionData;
-				var cb = b as CompletionData;
-				if (ca != null && cb != null && !ca.Icon.IsNull && !cb.Icon.IsNull) {
-					return string.Compare(cb.Icon.Name, ca.Icon.Name, StringComparison.Ordinal);
+			if (a == b)
+				return 0;
+			if (a != null && b == null)
+				return -1;
+			if (a == null && b != null)
+				return 1;
+			if (a.Rules != null && b.Rules != null) {
+				if (a.Rules.MatchPriority != b.Rules.MatchPriority) {
+					return b.Rules.MatchPriority.CompareTo (a.Rules.MatchPriority);
 				}
 			}
-			return result;
+			bool aIsObsolete = (a.DisplayFlags & DisplayFlags.Obsolete) != 0;
+			bool bIsObsolete = (b.DisplayFlags & DisplayFlags.Obsolete) != 0;
+			if (!aIsObsolete && bIsObsolete)
+				return -1;
+			if (aIsObsolete && !bIsObsolete)
+				return 1;
+
+			var result = StringComparer.OrdinalIgnoreCase.Compare (a.DisplayText, b.DisplayText);
+			if (result != 0)
+				return result;
+
+			var aIsImport = (a.DisplayFlags & DisplayFlags.IsImportCompletion) != 0;
+			var bIsImport = (b.DisplayFlags & DisplayFlags.IsImportCompletion) != 0;
+			if (!aIsImport && bIsImport)
+				return -1;
+			if (aIsImport && !bIsImport)
+				return 1;
+
+			return 0;
 		}
 
 		#endregion
@@ -191,37 +222,105 @@ namespace MonoDevelop.Ide.CodeCompletion
 			return ApplyDiplayFlagsFormatting (GLib.Markup.EscapeText (DisplayText));
 		}
 
+		[Obsolete ("Use OverloadGroupEquals and GetOverloadGroupHashCode")]
 		public virtual bool IsOverload (CompletionData other)
 		{
+			return true;
+		}
+
+		public virtual bool OverloadGroupEquals (CompletionData other)
+		{
+#pragma warning disable CS0618 // Type or member is obsolete
+			if (!IsOverload (other))
+#pragma warning restore CS0618 // Type or member is obsolete
+				return false;
 			return DisplayText == other.DisplayText;
 		}
+
+		public virtual int GetOverloadGroupHashCode ()
+		{
+			return DisplayText.GetHashCode ();
+		}
+
+		const string commitChars = " <>()[]{}=+-*/%~&^|!.,;:?\"'";
+
+		public virtual bool IsCommitCharacter (char keyChar, string partialWord)
+		{
+			return commitChars.Contains (keyChar);
+		}
+
+		public virtual bool MuteCharacter (char keyChar, string partialWord)
+		{
+			return false;
+		}
+
+		#region Matching helpers
+		internal int CurrentRank { get; set; }
+		internal RankStatus CurrentRankStatus { get; set; }
+		internal int LastMatcherId { get; set; }
+		#endregion
 	}
 
-	public class ISymbolCompletionData : CompletionData
+	internal enum RankStatus
 	{
-		public virtual Microsoft.CodeAnalysis.ISymbol Symbol {
-			get;
-			protected set;
+		NotCalculated,
+		HasNoRank,
+		HasRank
+	}
+
+	/// <summary>
+	/// This class uses a StringMatcher to check for matches and for calculating
+	/// ranks. It caches the results on CompletionData objects, so that
+	/// several calls on the matching methods will be able to reuse
+	/// calculated data.
+	/// </summary>
+	internal class CompletionDataMatcher
+	{
+		public int MatcherId { get; set; }
+		public string MatchString { get; set; }
+		public StringMatcher StringMatcher { get; set; }
+
+		public CompletionDataMatcher Clone ()
+		{
+			return new CompletionDataMatcher {
+				MatcherId = MatcherId,
+				MatchString = MatchString,
+				StringMatcher = StringMatcher.Clone ()
+			};
 		}
 
-		public ISymbolCompletionData ()
+		public bool CalcMatchRank (CompletionData data, out int matchRank)
 		{
+			// Calculate the rank, and reuse the calculated value if possible.
+			// We compare matcher Ids instead of actual matcher instances
+			// because different but equivalent matchers may be created
+			// by different threads.
+
+			if (data.CurrentRankStatus == RankStatus.NotCalculated || data.LastMatcherId != MatcherId) {
+				data.LastMatcherId = MatcherId;
+				if (StringMatcher.CalcMatchRank (data.DisplayText, out matchRank)) {
+					data.CurrentRank = matchRank;
+					data.CurrentRankStatus = RankStatus.HasRank;
+					return true;
+				}
+				data.CurrentRankStatus = RankStatus.HasNoRank;
+				return false;
+			} else if (data.CurrentRankStatus == RankStatus.HasRank) {
+				matchRank = data.CurrentRank;
+				return true;
+			} else {
+				matchRank = int.MinValue;
+				return false;
+			}
 		}
 
-		public ISymbolCompletionData (string text) : base (text)
+		public bool IsMatch (CompletionData data)
 		{
-		}
-
-		public ISymbolCompletionData (string text, MonoDevelop.Core.IconId icon) : base (text, icon)
-		{
-		}
-
-		public ISymbolCompletionData (string text, MonoDevelop.Core.IconId icon, string description) : base (text, icon, description)
-		{
-		}
-
-		public ISymbolCompletionData (string displayText, MonoDevelop.Core.IconId icon, string description, string completionText) : base (displayText, icon, description, completionText)
-		{
+			// Even though StringMatcher.CalcMatchRank() does a bit more work than
+			// IsMatch, CalcMatchRank will end being called anyway since we need
+			// it to sort the list by rank. So we call it now and we avoid
+			// an additional IsMatch call.
+			return CalcMatchRank (data, out int matchRank);
 		}
 	}
 }

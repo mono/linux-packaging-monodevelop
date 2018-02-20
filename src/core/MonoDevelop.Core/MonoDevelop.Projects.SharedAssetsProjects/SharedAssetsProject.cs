@@ -82,9 +82,24 @@ namespace MonoDevelop.Projects.SharedAssetsProjects
 
 		protected override void OnInitializeFromTemplate (ProjectCreateInformation projectCreateInfo, XmlElement projectOptions)
 		{
-			base.OnInitializeFromTemplate (projectCreateInfo, projectOptions);
+			// Get the language before calling OnInitializeFromTemplate so the language binding
+			// is available when adding new files to the project if the project is added to
+			// an existing solution.
 			languageName = projectOptions.GetAttribute ("language");
-			DefaultNamespace = projectCreateInfo.ProjectName;
+
+			base.OnInitializeFromTemplate (projectCreateInfo, projectOptions);
+
+			string templateDefaultNamespace = GetDefaultNamespace (projectCreateInfo, projectOptions);
+			DefaultNamespace = templateDefaultNamespace ?? projectCreateInfo.ProjectName;
+		}
+
+		static string GetDefaultNamespace (ProjectCreateInformation projectCreateInfo, XmlElement projectOptions)
+		{
+			string defaultNamespace = projectOptions.Attributes["DefaultNamespace"]?.Value;
+			if (defaultNamespace != null)
+				return StringParserService.Parse (defaultNamespace, projectCreateInfo.Parameters);
+
+			return null;
 		}
 
 		protected override void OnReadProject (ProgressMonitor monitor, MSBuildProject msproject)
@@ -233,7 +248,7 @@ namespace MonoDevelop.Projects.SharedAssetsProjects
 
 		public LanguageBinding LanguageBinding {
 			get {
-				if (languageBinding == null)
+				if (languageBinding == null && languageName != null) 
 					languageBinding = LanguageBindingService.GetBindingPerLanguageName (languageName);
 				return languageBinding;
 			}
@@ -241,7 +256,7 @@ namespace MonoDevelop.Projects.SharedAssetsProjects
 
 		protected override bool OnGetIsCompileable (string fileName)
 		{
-			return LanguageBinding.IsSourceCodeFile (fileName);
+			return LanguageBinding != null && LanguageBinding.IsSourceCodeFile (fileName);
 		}
 
 		protected override Task<BuildResult> OnBuild (MonoDevelop.Core.ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext)
@@ -259,7 +274,7 @@ namespace MonoDevelop.Projects.SharedAssetsProjects
 			return ProjectFeatures.None;
 		}
 
-		protected override bool OnFastCheckNeedsBuild (ConfigurationSelector configuration)
+		protected override bool OnFastCheckNeedsBuild (ConfigurationSelector configuration, TargetEvaluationContext context)
 		{
 			return false;
 		}
@@ -339,7 +354,7 @@ namespace MonoDevelop.Projects.SharedAssetsProjects
 			if (e.ProjectReference.ReferenceType == ReferenceType.Project && e.ProjectReference.Reference == Name) {
 				foreach (var f in Files) {
 					var pf = e.Project.GetProjectFile (f.FilePath);
-					if ((pf.Flags & ProjectItemFlags.DontPersist) != 0)
+					if (pf != null && (pf.Flags & ProjectItemFlags.DontPersist) != 0)
 						e.Project.Files.Remove (pf.FilePath);
 				}
 			}

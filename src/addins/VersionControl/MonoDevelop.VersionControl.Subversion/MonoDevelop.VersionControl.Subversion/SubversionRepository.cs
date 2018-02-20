@@ -132,7 +132,7 @@ namespace MonoDevelop.VersionControl.Subversion
 			if (toLock.Count == 0)
 				return true;
 
-			AlertButton but = new AlertButton ("Lock File");
+			AlertButton but = new AlertButton (GettextCatalog.GetString ("Lock File"));
 			if (!MessageService.Confirm (GettextCatalog.GetString ("The following files must be locked before editing."),
 				String.Join ("\n", toLock.Select (u => u.ToString ())), but))
 				return false;
@@ -212,6 +212,9 @@ namespace MonoDevelop.VersionControl.Subversion
 
 		protected override void OnCheckout (FilePath targetLocalPath, Revision rev, bool recurse, ProgressMonitor monitor)
 		{
+			if (!VersionControlSystem.InstallDependencies ()) {
+				throw new SubversionException (GettextCatalog.GetString ("Restart {0} after the installation process has completed", BrandingService.ApplicationName));
+			};
 			Svn.Checkout (this.Url, targetLocalPath, rev, recurse, monitor);
 		}
 
@@ -311,9 +314,14 @@ namespace MonoDevelop.VersionControl.Subversion
 		protected override void OnMoveFile (FilePath localSrcPath, FilePath localDestPath, bool force, ProgressMonitor monitor)
 		{
 			bool destIsVersioned = false;
-			
-			if (File.Exists (localDestPath))
+
+			if (File.Exists (localDestPath)) {
+				if (string.Equals (localSrcPath, localDestPath, StringComparison.OrdinalIgnoreCase)) {
+					Svn.Move (localSrcPath, localDestPath, true, monitor);
+					return;
+				}
 				throw new InvalidOperationException ("Cannot move file. Destination file already exist.");
+			}
 
 			if (IsVersioned (localDestPath)) {
 				// Revert to the original status
@@ -554,7 +562,7 @@ namespace MonoDevelop.VersionControl.Subversion
 		{
 			SvnRevision sinceRev = since != null ? (SvnRevision)since : null;
 			List<Annotation> annotations = new List<Annotation> (Svn.GetAnnotations (this, repositoryPath, SvnRevision.First, sinceRev ?? SvnRevision.Base));
-			Annotation nextRev = new Annotation (null, "<uncommitted>", DateTime.MinValue, null, GettextCatalog.GetString ("working copy"));
+			Annotation nextRev = new Annotation (null, GettextCatalog.GetString ("<uncommitted>"), DateTime.MinValue, null, GettextCatalog.GetString ("working copy"));
 			var baseDocument = Mono.TextEditor.TextDocument.CreateImmutableDocument (GetBaseText (repositoryPath));
 			var workingDocument = Mono.TextEditor.TextDocument.CreateImmutableDocument (File.ReadAllText (repositoryPath));
 
@@ -588,7 +596,7 @@ namespace MonoDevelop.VersionControl.Subversion
 					else
 						relpath = diff.FileName;
 					relpath = relpath.Replace (Path.DirectorySeparatorChar, '/');
-					patch.AppendLine ("Index: " + relpath);
+					patch.Append ("Index: ").AppendLine (relpath);
 					patch.AppendLine (new string ('=', 67));
 					patch.AppendLine (diff.Content);
 				}

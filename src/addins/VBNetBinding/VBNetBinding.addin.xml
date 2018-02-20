@@ -23,9 +23,8 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/ProjectTemplates">
-		<ProjectTemplate id = "EmptyVBProject" resource = "EmptyVBProject.xpt.xml"/>
-		<ProjectTemplate id = "VBConsoleApplicationProject" resource = "VBConsoleApplicationProject.xpt.xml"/>
-		<ProjectTemplate id = "VBGtkSharp2Project" resource = "VBGtkSharp2Project.xpt.xml"/>
+		<ProjectTemplate id = "MonoDevelop.VBNet.EmptyProject" resource = "EmptyVBProject.xpt.xml"/>
+		<ProjectTemplate id = "MonoDevelop.VBNet.ConsoleProject" resource = "VBConsoleApplicationProject.xpt.xml"/>
 	</Extension>
   
 	<Extension path = "/MonoDevelop/ProjectModel/Gui/ItemOptionPanels/Build/General">
@@ -52,7 +51,7 @@
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Core/MimeTypes">
-		<MimeType id="text/x-vb" _description="Visual Basic source code" icon="md-vb-file" isText="true">
+		<MimeType id="text/x-vb" _description="Visual Basic source code" icon="md-vb-file" isText="true" roslynName="Visual Basic">
 			<File pattern="*.vb" />
 		</MimeType>
 	</Extension>
@@ -68,9 +67,22 @@
 		<DataType class = "MonoDevelop.VBNetBinding.VBCompilerParameters" />
 		<DataType class = "MonoDevelop.VBNetBinding.Import" />
 	</Extension>
+
+	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
+		<Class fileExtensions = ".vb" class = "MonoDevelop.VBNet.VBNetTextEditorExtension" />
+	</Extension>
+
 	<!--
 	<Extension path = "/MonoDevelop/ProjectModel/DomParser">
 		<Parser class = "MonoDevelop.VBNetBinding.DomParser" fileExtensions=".vb" />
 	</Extension>-->
-	
+	<Module>
+		<!-- The GTK# template should only be available if the GTK add-in is enabled -->
+		<Dependencies>
+			<Addin id="GtkCore" version="$(Version)" />
+		</Dependencies>
+		<Extension path = "/MonoDevelop/Ide/ProjectTemplates">
+			<ProjectTemplate id = "MonoDevelop.VBNet.GtkSharp2Project" resource = "VBGtkSharp2Project.xpt.xml"/>
+		</Extension>
+	</Module>
 </ExtensionModel>

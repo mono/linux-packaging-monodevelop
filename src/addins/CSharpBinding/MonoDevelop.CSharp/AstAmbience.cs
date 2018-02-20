@@ -36,7 +36,7 @@ using Microsoft.CodeAnalysis.CSharp.Formatting;
 
 namespace MonoDevelop.CSharp
 {
-	class AstAmbience
+	struct AstAmbience
 	{
 //		OptionSet options;
 		
@@ -101,7 +101,13 @@ namespace MonoDevelop.CSharp
 					} else {
 						first = false;
 					}
-					AppendEscaped (sb, param.ToString ());
+					foreach (var mod in param.Modifiers) {
+						sb.Append (mod.ToString ());
+						sb.Append (" ");
+					}
+					AppendEscaped (sb, StripTrivia(param.Type.ToString ()));
+					sb.Append (" ");
+					AppendEscaped (sb, param.Identifier.ToString ());
 				}
 			}
 
@@ -110,7 +116,18 @@ namespace MonoDevelop.CSharp
 			//	sb.Append (" ");
 			sb.Append (")");
 		}
-		
+
+		string StripTrivia (string str)
+		{
+			var result = new StringBuilder ();
+			foreach (char ch in str) {
+				if (char.IsWhiteSpace (ch))
+					continue;
+				result.Append (ch);
+			}
+			return result.ToString ();
+		}
+
 		static void AppendEscaped (StringBuilder result, string text)
 		{
 			if (text == null)
@@ -147,11 +164,11 @@ namespace MonoDevelop.CSharp
 			}
 			if (e is TypeDeclarationSyntax) {
 				var type = e as TypeDeclarationSyntax;
-				sb.Append (type.Identifier);
+				sb.Append (type.Identifier.ToString ());
 				AppendTypeParameter (sb, type.TypeParameterList);
 			} else if (e is DelegateDeclarationSyntax) {
 				var del = e as DelegateDeclarationSyntax;
-				sb.Append (del.Identifier);
+				sb.Append (del.Identifier.ToString ());
 				AppendTypeParameter (sb, del.TypeParameterList);
 				AppendParameter (sb, del.ParameterList);
 			} else if (e is AccessorDeclarationSyntax) {
@@ -169,30 +186,39 @@ namespace MonoDevelop.CSharp
 				sb.Append ("operator ");
 				AppendEscaped (sb, op.OperatorToken.ToString ());
 				AppendParameter (sb, op.ParameterList);
+			} else if (e is ConversionOperatorDeclarationSyntax) {
+				var op = (ConversionOperatorDeclarationSyntax)e;
+				sb.Append (op.ImplicitOrExplicitKeyword.IsKind (SyntaxKind.ImplicitKeyword) ? "implicit " : "explicit ");
+				sb.Append ("operator ");
+				AppendEscaped (sb, op.Type.ToString ());
+				AppendParameter (sb, op.ParameterList);
 			} else if (e is MethodDeclarationSyntax) {
 				var method = (MethodDeclarationSyntax)e;
 				if (method.ExplicitInterfaceSpecifier != null)
 					AppendEscaped (sb, method.ExplicitInterfaceSpecifier + ".");
-				sb.Append (method.Identifier);
+				sb.Append (method.Identifier.ToString ());
 				AppendTypeParameter (sb, method.TypeParameterList);
 				AppendParameter (sb, method.ParameterList);
 				if (method.Body != null && !method.Body.IsMissing) {
 					string tag = null;
 					if (method.Modifiers.Any (m => m.Kind () == SyntaxKind.AbstractKeyword))
-						tag = GettextCatalog.GetString ("(abstract)");
+						tag = "(abstract)";
 					if (method.Modifiers.Any (m => m.Kind () == SyntaxKind.PartialKeyword))
-						tag = GettextCatalog.GetString ("(partial)");
-					if (tag != null)
-						sb.Append (" <small>" + tag + "</small>");
+						tag = "(partial)";
+					if (tag != null) {
+						sb.Append (" <small>");
+						sb.Append (tag);
+						sb.Append ("</small>");
+					}
 				}
 			} else if (e is ConstructorDeclarationSyntax) {
 				var constructor = e as ConstructorDeclarationSyntax;
-				sb.Append (constructor.Identifier);
+				sb.Append (constructor.Identifier.ToString ());
 				AppendParameter (sb, constructor.ParameterList);
 			} else if (e is DestructorDeclarationSyntax) {
 				var destructror = e as DestructorDeclarationSyntax;
 				sb.Append ("~");
-				sb.Append (destructror.Identifier);
+				sb.Append (destructror.Identifier.ToString ());
 				//				if (options.SpaceBeforeMethodDeclarationParentheses)
 				//	sb.Append (" ");
 				sb.Append ("()");
@@ -223,45 +249,50 @@ namespace MonoDevelop.CSharp
 				sb.Append ("]");
 			} else if (e is VariableDeclaratorSyntax) {
 				var initializer = (VariableDeclaratorSyntax)e;
-				sb.Append (initializer.Identifier);
+				sb.Append (initializer.Identifier.ToString ());
 				if (IsObsolete (initializer.Parent as MemberDeclarationSyntax))
 					return "<s>" + sb.ToString () + "</s>";
 			} else if (e is FieldDeclarationSyntax) {
 				var field = (FieldDeclarationSyntax)e;
 				if (!field.Declaration.Variables.Any ())
 					return "";
-				sb.Append (field.Declaration.Variables.First ().Identifier);
+				sb.Append (field.Declaration.Variables.First ().Identifier.ToString ());
 			} else if (e is EventFieldDeclarationSyntax) {
 				var evt = (EventFieldDeclarationSyntax)e;
 				if (!evt.Declaration.Variables.Any ())
 					return "";
-				sb.Append (evt.Declaration.Variables.First ().Identifier);
+				sb.Append (evt.Declaration.Variables.First ().Identifier.ToString ());
 			} else if (e is PropertyDeclarationSyntax) {
 				var property = (PropertyDeclarationSyntax)e;
-				if (property.ExplicitInterfaceSpecifier != null)
-					AppendEscaped (sb, property.ExplicitInterfaceSpecifier + ".");
-				sb.Append (property.Identifier);
+				if (property.ExplicitInterfaceSpecifier != null) {
+					AppendEscaped (sb, property.ExplicitInterfaceSpecifier.ToString ());
+					sb.Append (".");
+				}
+				sb.Append (property.Identifier.ToString ());
 			} else if (e is EventDeclarationSyntax) {
 				var customEvent = (EventDeclarationSyntax)e;
-				if (customEvent.ExplicitInterfaceSpecifier != null)
-					AppendEscaped (sb, customEvent.ExplicitInterfaceSpecifier + ".");
-				sb.Append (customEvent.Identifier);
+				if (customEvent.ExplicitInterfaceSpecifier != null) {
+					AppendEscaped (sb, customEvent.ExplicitInterfaceSpecifier.ToString ());
+					sb.Append (".");
+				}
+				sb.Append (customEvent.Identifier.ToString ());
 			} else if (e is EnumDeclarationSyntax) {
 				var enumDecl = (EnumDeclarationSyntax)e;
-				sb.Append (enumDecl.Identifier);
+				sb.Append (enumDecl.Identifier.ToString ());
 			} else if (e is EnumMemberDeclarationSyntax) {
 				var enumMemberDecl = (EnumMemberDeclarationSyntax)e;
-				sb.Append (enumMemberDecl.Identifier);
+				sb.Append (enumMemberDecl.Identifier.ToString ());
 			} /*else if (e is MemberDeclarationSyntax) {
 				LoggingService.LogWarning ("can't display : " + e);
 				//				var entity = (MemberDeclarationSyntax)e;
 				// sb.Append (entity.Name);
 			}*/
 
-			string markup = sb.ToString ();
-			if (IsObsolete (e as MemberDeclarationSyntax))
-				return "<s>" + markup + "</s>";
-			return markup;
+			if (IsObsolete (e as MemberDeclarationSyntax)) {
+				sb.Append ("</s>");
+				sb.Insert (0, "<s>");
+			}
+			return sb.ToString ();
 		}
 	}
 }

@@ -367,22 +367,23 @@ namespace MonoDevelop.Autotools
 			return BuildResult.CreateSuccess ();
 		}
 
-		protected override bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration)
+		protected override bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
 		{
 			if (data != null && data.SupportsIntegration && !String.IsNullOrEmpty (data.ExecuteTargetName))
 				return true;
-			return base.OnGetCanExecute (context, configuration);
+			return base.OnGetCanExecute (context, configuration, runConfiguration);
 		}
 
 
-		protected async override Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
+		protected async override Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
 		{
 			if (data == null || !data.SupportsIntegration || String.IsNullOrEmpty (data.ExecuteTargetName)) {
-				await base.OnExecute (monitor, context, configuration);
+				await base.OnExecute (monitor, context, configuration, runConfiguration);
 				return;
 			}
 
-			OperationConsole console = context.ConsoleFactory.CreateConsole ();
+			OperationConsole console = context.ConsoleFactory.CreateConsole (
+				OperationConsoleFactory.CreateConsoleOptions.Default.WithTitle (Project.Name));
 			monitor.BeginTask (GettextCatalog.GetString ("Executing {0}", Project.Name), 1);
 			try
 			{

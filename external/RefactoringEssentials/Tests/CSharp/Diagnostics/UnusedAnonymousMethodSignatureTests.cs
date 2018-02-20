@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class UnusedAnonymousMethodSignatureTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestSimpleUsage()
         {
             Test<UnusedAnonymousMethodSignatureAnalyzer>(@"
@@ -31,7 +30,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestNecessaryParameter()
         {
             Analyze<UnusedAnonymousMethodSignatureAnalyzer>(@"
@@ -45,7 +44,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestVisitChild()
         {
             Test<UnusedAnonymousMethodSignatureAnalyzer>(@"
@@ -75,7 +74,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestAmbiguousCase()
         {
             Analyze<UnusedAnonymousMethodSignatureAnalyzer>(@"
@@ -95,7 +94,7 @@ class TestClass
         /// <summary>
         /// Bug 15058 - Wrong context for unused parameter list 
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug15058()
         {
             Analyze<UnusedAnonymousMethodSignatureAnalyzer>(@"
@@ -113,3 +112,4 @@ class TestClass
         }
     }
 }
+*/

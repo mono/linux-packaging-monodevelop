@@ -59,6 +59,11 @@ namespace MonoDevelop.UnitTesting.NUnit.External
 			return connection.Connect ();
 		}
 
+		public Task Disconnect ()
+		{
+			return connection.Disconnect ();
+		}
+
 		public async Task<UnitTestResult> Run (IRemoteEventListener listener, string[] nameFilter, string path, string suiteName, List<string> supportAssemblies, string testRunnerType, string testRunnerAssembly, string crashLogFile)
 		{
 			this.listener = listener;
@@ -139,7 +144,7 @@ namespace MonoDevelop.UnitTesting.NUnit.External
 
 		public void Dispose ()
 		{
-			connection.Dispose ();
+			connection.Disconnect ().Ignore ();
 		}
 	}
 
@@ -190,16 +195,18 @@ namespace MonoDevelop.UnitTesting.NUnit.External
 			t.Status = TestStatus.Running;
 		}
 
+		static readonly string FailedMessage = GettextCatalog.GetString ("Test failed");
+		static readonly string IgnoredMessage = GettextCatalog.GetString ("Test ignored");
+		static readonly string SuccededMessage = GettextCatalog.GetString ("Test successful") + "\n\n";
 		void ProcessResult (UnitTestResult res)
 		{
 			if (string.IsNullOrEmpty (res.Message)) {
 				if (res.IsFailure)
-					res.Message = GettextCatalog.GetString ("Test failed");
+					res.Message = SuccededMessage;
 				else if (res.IsNotRun)
-					res.Message = GettextCatalog.GetString ("Test ignored");
+					res.Message = IgnoredMessage;
 				else {
-					res.Message = GettextCatalog.GetString ("Test successful") + "\n\n";
-					res.Message += GettextCatalog.GetString ("Execution time: {0:0.00}ms", res.Time.TotalMilliseconds);
+					res.Message = SuccededMessage + GettextCatalog.GetString ("Execution time: {0:0.00}ms", res.Time.TotalMilliseconds);
 				}
 			}
 		}

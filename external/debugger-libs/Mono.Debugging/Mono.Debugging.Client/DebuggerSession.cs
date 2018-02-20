@@ -42,6 +42,7 @@ namespace Mono.Debugging.Client
 	public delegate string TypeResolverHandler (string identifier, SourceLocation location);
 	public delegate void BreakpointTraceHandler (BreakEvent be, string trace);
 	public delegate IExpressionEvaluator GetExpressionEvaluatorHandler (string extension);
+	public delegate IConnectionDialog ConnectionDialogCreatorExtended (DebuggerStartInfo dsi);
 	public delegate IConnectionDialog ConnectionDialogCreator ();
 	
 	public abstract class DebuggerSession: IDisposable
@@ -170,6 +171,11 @@ namespace Mono.Debugging.Client
 		public ConnectionDialogCreator ConnectionDialogCreator { get; set; }
 
 		/// <summary>
+		/// Gets or sets the connection dialog creator callback.
+		/// </summary>
+		public ConnectionDialogCreatorExtended ConnectionDialogCreatorExtended { get; set; }
+
+		/// <summary>
 		/// Gets or sets the breakpoint trace handler.
 		/// </summary>
 		/// <remarks>
@@ -259,31 +265,28 @@ namespace Mono.Debugging.Client
 		}
 
 		readonly Queue<Action> actionsQueue = new Queue<Action>();
+		bool threadExecuting = false;
 
 		void Dispatch (Action action)
 		{
 			if (UseOperationThread) {
 				lock (actionsQueue) {
 					actionsQueue.Enqueue (action);
-					if (actionsQueue.Count == 1) {
+					if (!threadExecuting) {
+						threadExecuting = true;
 						ThreadPool.QueueUserWorkItem (delegate {
 							while (true) {
 								Action actionToExecute = null;
 								lock (actionsQueue) {
 									if (actionsQueue.Count > 0) {
-										actionToExecute = actionsQueue.Peek ();
+										actionToExecute = actionsQueue.Dequeue ();
 									} else {
+										threadExecuting = false;
 										return;
 									}
 								}
-								try {
-									lock (slock) {
-										actionToExecute ();
-									}
-								} finally {
-									lock (actionsQueue) {
-										actionsQueue.Dequeue ();
-									}
+								lock (slock) {
+									actionToExecute ();
 								}
 							}
 						});
@@ -322,8 +325,10 @@ namespace Mono.Debugging.Client
 					try {
 						OnRun (startInfo);
 					} catch (Exception ex) {
+						// should handle exception before raising Exit event because HandleException may ignore exceptions in Exited state
+						var exceptionHandled = HandleException (ex);
 						ForceExit ();
-						if (!HandleException (ex))
+						if (!exceptionHandled)
 							throw;
 					}
 				});
@@ -354,11 +359,13 @@ namespace Mono.Debugging.Client
 				OnRunning ();
 				Dispatch (delegate {
 					try {
-						OnAttachToProcess (proc.Id);
+						OnAttachToProcess (proc);
 						attached = true;
 					} catch (Exception ex) {
+						// should handle exception before raising Exit event because HandleException may ignore exceptions in Exited state
+						var exceptionHandled = HandleException (ex);
 						ForceExit ();
-						if (!HandleException (ex))
+						if (!exceptionHandled)
 							throw;
 					}
 				});
@@ -371,12 +378,18 @@ namespace Mono.Debugging.Client
 		public void Detach ()
 		{
 			lock (slock) {
-				try {
-					OnDetach ();
-				} catch (Exception ex) {
-					if (!HandleException (ex))
-						throw;
-				}
+				Dispatch (delegate {
+					try {
+						OnDetach ();
+					}
+					catch (Exception ex) {
+						if (!HandleException (ex))
+							throw;
+					}
+					finally {
+						IsConnected = false;
+					}
+				});
 			}
 		}
 		
@@ -503,8 +516,10 @@ namespace Mono.Debugging.Client
 					try {
 						OnFinish ();
 					} catch (Exception ex) {
+						// should handle exception before raising Exit event because HandleException may ignore exceptions in Exited state
+						var exceptionHandled = HandleException (ex);
 						ForceExit ();
-						if (!HandleException (ex))
+						if (!exceptionHandled)
 							throw;
 					}
 				});
@@ -954,7 +969,13 @@ namespace Mono.Debugging.Client
 			return result.Evaluator;
 		}
 		
-		
+		protected void RaiseStopEvent ()
+		{
+			EventHandler<TargetEventArgs> targetEvent = TargetEvent;
+			if (targetEvent != null)
+				targetEvent (this, new TargetEventArgs (TargetEventType.TargetStopped));
+		}
+
 		/// <summary>
 		/// Called when an expression needs to be resolved
 		/// </summary>
@@ -969,7 +990,11 @@ namespace Mono.Debugging.Client
 		/// </returns>
 		protected virtual string OnResolveExpression (string expression, SourceLocation location)
 		{
-			return defaultResolver.Resolve (this, location, expression);
+			var resolver = defaultResolver;
+			if (GetExpressionEvaluator != null)
+				resolver = GetExpressionEvaluator(System.IO.Path.GetExtension(location.FileName))?.Evaluator ?? defaultResolver;
+
+			return resolver.Resolve(this, location, expression);
 		}
 		
 		internal protected string ResolveIdentifierAsType (string identifier, SourceLocation location)
@@ -1018,10 +1043,8 @@ namespace Mono.Debugging.Client
 			
 			if (args.Process != null)
 				args.Process.Attach (this);
-			if (args.Thread != null) {
+			if (args.Thread != null)
 				args.Thread.Attach (this);
-				activeThread = args.Thread;
-			}
 			if (args.Backtrace != null)
 				args.Backtrace.Attach (this);
 
@@ -1087,7 +1110,13 @@ namespace Mono.Debugging.Client
 				evnt = TargetThreadStopped;
 				break;
 			}
-
+			// Set activeThread only when event is IsStopEvent(stopping execution)
+			// otherwise ThreadDeath(as example) event can set activeThread to dying thread
+			// resulting in invalid activeThread being set while process is paused.
+			// This happens often when using ThreadPool because after breakpoint is hit and
+			// process is paused threadpool kills threads since they are not in use...
+			if (args.Thread != null && args.IsStopEvent)
+				activeThread = args.Thread;
 			if (evnt != null)
 				evnt (this, args);
 
@@ -1328,6 +1357,17 @@ namespace Mono.Debugging.Client
 		/// Process identifier.
 		/// </param>
 		protected abstract void OnAttachToProcess (long processId);
+
+		/// <summary>
+		/// Called to attach the debugger to a running process
+		/// </summary>
+		/// <param name='processInfo'>
+		/// Process identifier.
+		/// </param>
+		protected virtual void OnAttachToProcess (ProcessInfo processInfo)
+		{
+			OnAttachToProcess (processInfo.Id);
+		}
 
 		/// <summary>
 		/// Called to detach the debugging session from the running process

@@ -73,12 +73,14 @@ namespace MonoDevelop.Debugger.Soft
 		{
 			var cmd = (DotNetExecutionCommand) c;
 			var runtime = (MonoTargetRuntime)cmd.TargetRuntime;
-			var dsi = new SoftDebuggerStartInfo (runtime.Prefix, runtime.EnvironmentVariables) {
+			var dsi = new SoftDebuggerStartInfo (null, runtime.EnvironmentVariables) {
 				Command = cmd.Command,
 				Arguments = cmd.Arguments,
+				RuntimeArguments = cmd.RuntimeArguments,
 				WorkingDirectory = cmd.WorkingDirectory,
 			};
-			
+			((SoftDebuggerLaunchArgs)dsi.StartArgs).MonoExecutableFileName = runtime.GetMonoExecutableForAssembly (cmd.Command);
+
 			SetUserAssemblyNames (dsi, cmd.UserAssemblyPaths);
 			
 			foreach (KeyValuePair<string,string> var in cmd.EnvironmentVariables)
@@ -92,7 +94,7 @@ namespace MonoDevelop.Debugger.Soft
 					ExternalConsoleFactory.Instance.CreateConsole (dsi.CloseExternalConsoleOnExit), varsCopy);
 				return new ProcessAdapter (oper, Path.GetFileName (info.FileName));
 			};
-			startArgs.MonoExecutableFileName = runtime.MonoRuntimeInfo.Force64or32bit.HasValue ? runtime.MonoRuntimeInfo.Force64or32bit.Value ? "mono64" : "mono32" : "mono";
+
 			return dsi;
 		}
 		
@@ -117,14 +119,15 @@ namespace MonoDevelop.Debugger.Soft
 				}
 				
 				try {
-					var asm = Mono.Cecil.AssemblyDefinition.ReadAssembly (file);
-					if (string.IsNullOrEmpty (asm.Name.Name))
-						throw new InvalidOperationException ("Assembly has no assembly name");
-					
-					AssemblyName name = new AssemblyName (asm.Name.FullName);
-					if (!pathMap.ContainsKey (asm.Name.FullName))
-						pathMap.Add (asm.Name.FullName, file);
-					names.Add (name);
+					using (var asm = Mono.Cecil.AssemblyDefinition.ReadAssembly (file)) {
+						if (string.IsNullOrEmpty (asm.Name.Name))
+							throw new InvalidOperationException ("Assembly has no assembly name");
+
+						AssemblyName name = new AssemblyName (asm.Name.FullName);
+						if (!pathMap.ContainsKey (asm.Name.FullName))
+							pathMap.Add (asm.Name.FullName, file);
+						names.Add (name);
+					}
 				} catch (Exception ex) {
 					dsi.LogMessage = GettextCatalog.GetString ("Could not get assembly name for user assembly '{0}'. " +
 						"Debugger will now debug all code, not just user code.", file);

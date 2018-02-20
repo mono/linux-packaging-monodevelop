@@ -60,7 +60,7 @@ namespace MonoDevelop.Ide.Gui
 		}
 
 		public bool IsUntitled {
-			get { return (contentName == null); }
+			get { return (ContentName == null); }
 		}
 
 		public virtual bool IsDirty {
@@ -89,6 +89,15 @@ namespace MonoDevelop.Ide.Gui
 			get { return true; }
 		}
 
+		public virtual object GetDocumentObject ()
+		{
+			string path = IsUntitled ? UntitledName : ContentName;
+			if (IsFile && !string.IsNullOrEmpty (path) && Project != null) {
+					return Project.Files.GetFile (path);
+			}
+			return null;
+		}
+
 		public virtual string StockIconId {
 			get { return null; }
 		}
@@ -99,7 +108,7 @@ namespace MonoDevelop.Ide.Gui
 
 		public virtual Task Save ()
 		{
-			return Save (contentName);
+			return Save (ContentName);
 		}
 		
 		public Task Save (FilePath fileName)
@@ -153,7 +162,7 @@ namespace MonoDevelop.Ide.Gui
 
 	public abstract class AbstractXwtViewContent : ViewContent
 	{
-		public override Control Control {
+		public sealed override Control Control {
 			get {
 				return (Gtk.Widget)Toolkit.CurrentEngine.GetNativeWidget (Widget);
 			}

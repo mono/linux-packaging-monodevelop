@@ -25,11 +25,7 @@
 // THE SOFTWARE.
 
 using System;
-using System.Xml;
-using Microsoft.Build.BuildEngine;
-using System.Xml.Linq;
 using MonoDevelop.Core;
-using System.Globalization;
 
 namespace MonoDevelop.Projects.MSBuild
 {
@@ -53,6 +49,8 @@ namespace MonoDevelop.Projects.MSBuild
 		FilePath GetPathValue (bool relativeToProject = true, FilePath relativeToPath = default(FilePath));
 
 		bool TryGetPathValue (out FilePath value, bool relativeToProject = true, FilePath relativeToPath = default(FilePath));
+
+		string Condition { get; }
 	}
 	
 }

@@ -24,20 +24,27 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
+using NuGet.ProjectManagement;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
 	public class ImportAndCondition
 	{
 		public ImportAndCondition (string name, string condition)
+			: this (name, condition, ImportLocation.Bottom)
+		{
+		}
+
+		public ImportAndCondition (string name, string condition, ImportLocation location)
 		{
 			Name = name;
 			Condition = condition;
+			Location = location;
 		}
 
 		public string Name { get; set; }
 		public string Condition { get; set; }
+		public ImportLocation Location { get; set; }
 	}
 }
 

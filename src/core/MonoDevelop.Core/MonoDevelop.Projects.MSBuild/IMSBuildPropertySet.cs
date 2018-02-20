@@ -31,12 +31,8 @@ using System.Collections.Generic;
 using System.Xml;
 using System.Text;
 
-using Microsoft.Build.BuildEngine;
 using MonoDevelop.Core;
-using System.Xml.Linq;
-using System.Reflection;
 using MonoDevelop.Core.Serialization;
-using System.Globalization;
 
 namespace MonoDevelop.Projects.MSBuild
 {
@@ -57,6 +53,7 @@ namespace MonoDevelop.Projects.MSBuild
 			DataSerializer ser = new DataSerializer (Services.ProjectService.DataContext);
 			var props = Services.ProjectService.DataContext.GetProperties (ser.SerializationContext, ob);
 			XmlConfigurationWriter cwriter = null;
+			XmlDocument xdoc = null;
 
 			var mso = pset as IMSBuildProjectObject;
 			if (mso != null && mso.ParentProject != null)
@@ -76,21 +73,23 @@ namespace MonoDevelop.Projects.MSBuild
 					FilePath def = (string)prop.DefaultValue;
 					pset.SetValue (prop.Name, val, def, mergeToMainGroup: merge);
 				} else if (prop.PropertyType == typeof(string)) {
-					pset.SetValue (prop.Name, (string)prop.GetValue (ob), (string)prop.DefaultValue, merge);
+					pset.SetValue (prop.Name, (string)prop.GetValue (ob), (string)prop.DefaultValue, mergeToMainGroup:merge);
 				} else if (prop.DataType.IsSimpleType) {
-					pset.SetValue (prop.Name, prop.GetValue (ob), prop.DefaultValue, merge);
+					pset.SetValue (prop.Name, prop.GetValue (ob), prop.DefaultValue, mergeToMainGroup:merge);
 				} else if (prop.PropertyType.IsGenericType && prop.PropertyType.GetGenericTypeDefinition () == typeof(Nullable<>)) {
-					pset.SetValue (prop.Name, prop.GetValue (ob), prop.DefaultValue, merge);
+					pset.SetValue (prop.Name, prop.GetValue (ob), prop.DefaultValue, mergeToMainGroup:merge);
 				} else {
 					var val = prop.GetValue (ob);
 					if (val != null) {
-						if (cwriter == null)
-							cwriter = new XmlConfigurationWriter { Namespace = MSBuildProject.Schema };
-						var w = new StringWriter ();
+						if (cwriter == null) {
+							string xmlns = (mso?.ParentProject != null) ? mso.ParentProject.Namespace : MSBuildProject.Schema;
+							cwriter = new XmlConfigurationWriter { Namespace = xmlns, StoreAllInElements = true };
+							xdoc = new XmlDocument ();
+						}
 						var data = prop.Serialize (ser.SerializationContext, ob, val);
 						if (data != null) {
-							cwriter.Write (new XmlTextWriter (w), data);
-							pset.SetValue (prop.Name, w.ToString ());
+							var elem = cwriter.Write (xdoc, data);
+							pset.SetValue (prop.Name, prop.WrapObject ? elem.OuterXml : elem.InnerXml);
 						} else
 							pset.RemoveProperty (prop.Name);
 					} else
@@ -130,6 +129,8 @@ namespace MonoDevelop.Projects.MSBuild
 					var val = pset.GetValue (prop.Name);
 					if (!string.IsNullOrEmpty (val)) {
 						try {
+							if (!prop.WrapObject)
+								val = "<a>" + val + "</a>";
 							var data = XmlConfigurationReader.DefaultReader.Read (new XmlTextReader (new StringReader (val)));
 							if (prop.HasSetter && prop.DataType.CanCreateInstance) {
 								readVal = prop.Deserialize (ser.SerializationContext, ob, data);
@@ -231,7 +232,7 @@ namespace MonoDevelop.Projects.MSBuild
 				if (i != -1) {
 					int fi = val.IndexOf ('\\');
 					if (fi != -1 && fi < i) i = fi;
-					sb.Append (val.Substring (0,i));
+					sb.Append (val, 0,i);
 				} else
 					i = 0;
 				for (int n = i; n < val.Length; n++) {
@@ -258,14 +259,32 @@ namespace MonoDevelop.Projects.MSBuild
 
 		static string DecodeString (string val)
 		{
-			val = val.Trim (' ', '\t');
-			if (val.Length == 0)
-				return val;
-			if (val [0] == '\"')
-				val = val.Substring (1, val.Length - 2);
-			if (val [0] == '@') {
+			int start = 0;
+			int end = val.Length;
+
+			for (; start < val.Length; ++start) {
+				if (val [start] == ' ' || val [start] == '\t')
+					continue;
+				break;
+			}
+			for (int i = end - 1; i >= start; --i) {
+				if (val [i] == ' ' || val [i] == '\t') {
+					end--;
+					continue;
+				}
+				break;
+			}
+
+			if (end == start)
+				return string.Empty;
+			
+			if (val [start] == '\"') {
+				start++;
+				end--;
+			}
+			if (val [start] == '@') {
 				StringBuilder sb = new StringBuilder (val.Length);
-				for (int n = 1; n < val.Length; n++) {
+				for (int n = start + 1; n < end; n++) {
 					char c = val [n];
 					if (c == '\\') {
 						c = val [++n];
@@ -278,7 +297,7 @@ namespace MonoDevelop.Projects.MSBuild
 				return sb.ToString ();
 			}
 			else
-				return val;
+				return val.Substring (start, end - start);
 		}
 
 		static DataItem ReadDataItem (SlnSection pset)
@@ -359,7 +378,7 @@ namespace MonoDevelop.Projects.MSBuild
 					if (data != null) {
 						data.Name = prop.Name;
 						if (writer == null)
-							writer = new XmlConfigurationWriter { Namespace = MSBuildProject.Schema };
+							writer = new XmlConfigurationWriter { Namespace = project.Namespace };
 
 						XmlDocument doc = new XmlDocument ();
 						var elem = writer.Write (doc, data);

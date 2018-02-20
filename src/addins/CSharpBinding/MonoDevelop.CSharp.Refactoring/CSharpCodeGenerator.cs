@@ -35,10 +35,12 @@ using System.Collections.Generic;
 using MonoDevelop.CSharp.Formatting;
 using Microsoft.CodeAnalysis.Options;
 using MonoDevelop.CSharp.Completion;
+using System.Threading;
+using ICSharpCode.NRefactory;
 
 namespace MonoDevelop.CSharp.Refactoring
 {
-	class CSharpCodeGenerator // : CodeGenerator
+	class CSharpCodeGenerator : CodeGenerator
 	{
 		//		static CSharpAmbience ambience = new CSharpAmbience ();
 		//		
@@ -112,7 +114,7 @@ namespace MonoDevelop.CSharp.Refactoring
 					return ns + "." + name;
 
 
-				return RoslynCompletionData.SafeMinimalDisplayString (type, model, Editor.CaretOffset, Ambience.LabelFormat);
+				return CSharpAmbience.SafeMinimalDisplayString (type, model, Editor.CaretOffset, Ambience.LabelFormat);
 			}
 		}
 
@@ -121,19 +123,19 @@ namespace MonoDevelop.CSharp.Refactoring
 			sb.AppendLine();
 		}
 
-		//		public override string WrapInRegions (string regionName, string text)
-		//		{
-		//			StringBuilder result = new StringBuilder ();
-		//			AppendIndent (result);
-		//			result.Append ("#region ");
-		//			result.Append (regionName);
-		//			AppendLine (result);
-		//			result.Append (text);
-		//			AppendLine (result);
-		//			AppendIndent (result);
-		//			result.Append ("#endregion");
-		//			return result.ToString ();
-		//		}
+		public override string WrapInRegions (string regionName, string text)
+		{
+			StringBuilder result = new StringBuilder ();
+			AppendIndent (result);
+			result.Append ("#region ");
+			result.Append (regionName);
+			AppendLine (result);
+			result.Append (text);
+			AppendLine (result);
+			AppendIndent (result);
+			result.Append ("#endregion");
+			return result.ToString ();
+		}
 
 		static void AppendObsoleteAttribute(StringBuilder result, CodeGenerationOptions options, ISymbol entity)
 		{
@@ -328,7 +330,7 @@ namespace MonoDevelop.CSharp.Refactoring
 		{
 			if (type == null)
 				throw new ArgumentNullException("type");
-			result.Append(RoslynCompletionData.SafeMinimalDisplayString (type, options.SemanticModel, options.Part.SourceSpan.Start, Ambience.LabelFormat));
+			result.Append(CSharpAmbience.SafeMinimalDisplayString (type, options.SemanticModel, options.Part.SourceSpan.Start, Ambience.LabelFormat));
 
 			//			var implementingType = options.Part;
 			//			var loc = implementingType.Region.End;
@@ -449,7 +451,7 @@ namespace MonoDevelop.CSharp.Refactoring
 			AppendIndent (result);
 			bodyStartOffset = result.Length;
 			foreach (var cmt in MonoTouchComments) {
-				result.AppendLine("//" + cmt);
+				result.Append("//").AppendLine (cmt);
 				AppendIndent (result);
 			}
 			result.Append("throw new ");
@@ -725,17 +727,17 @@ namespace MonoDevelop.CSharp.Refactoring
 						} else {
 							result.Append ("(");
 							AppendReturnType (result, options, p.Type);
-							result.Append (")" + p.ExplicitDefaultValue);
+							result.Append (")").Append (p.ExplicitDefaultValue);
 						}
 					} else if (p.ExplicitDefaultValue is char) {
-						result.Append ("'" + p.ExplicitDefaultValue + "'");
+						result.Append ("'").Append (p.ExplicitDefaultValue).Append ("'");
 					} else if (p.ExplicitDefaultValue is string) {
-						result.Append ("\"" + CSharpTextEditorIndentation.ConvertToStringLiteral ((string)p.ExplicitDefaultValue) + "\"");
+						result.Append ("\"").Append (CSharpTextEditorIndentation.ConvertToStringLiteral ((string)p.ExplicitDefaultValue)).Append ("\"");
 					} else if (p.ExplicitDefaultValue is bool) {
 						result.Append ((bool)p.ExplicitDefaultValue ? "true" : "false");
 					} else if (p.ExplicitDefaultValue == null) {
 						if (p.Type.IsValueType && p.Type.SpecialType != SpecialType.System_String) {
-							result.Append ("default(" + p.Type.ToMinimalDisplayString (options.SemanticModel, options.Part.SourceSpan.Start) + ")");
+							result.Append ("default(").Append (p.Type.ToMinimalDisplayString (options.SemanticModel, options.Part.SourceSpan.Start)).Append (")");
 						} else {
 							result.Append ("null");
 						}
@@ -1000,19 +1002,16 @@ namespace MonoDevelop.CSharp.Refactoring
 		//			var builder = new ICSharpCode.NRefactory.CSharp.Refactoring.TypeSystemAstBuilder (csResolver);
 		//			return builder.ConvertType (fullType);			
 		//		}
-		//		
-		//		public override void CompleteStatement (MonoDevelop.Ide.Gui.Document doc)
-		//		{
-		//			//  TODO: BROKEN DUE ROSLYN PORT - needs to be ported to NR6
-		////			var fixer = new ConstructFixer (doc.GetFormattingOptions (), doc.Editor.CreateNRefactoryTextEditorOptions ());
-		////			int newOffset;
-		////			if (fixer.TryFix (new DocumentWrapper (doc.Editor), doc.Editor.CaretOffset, out newOffset)) {
-		////				doc.Editor.CaretOffset = newOffset;
-		////			}
-		//		}
+		//
 
-
-
+		public override async void CompleteStatement (MonoDevelop.Ide.Gui.Document doc)
+		{
+			var fixer = new ConstructFixer (doc.GetFormattingOptions ());
+			int newOffset = await fixer.TryFix (doc, doc.Editor.CaretOffset, default(CancellationToken));
+			if (newOffset != -1) {
+				doc.Editor.CaretOffset = newOffset;
+			}
+		}
 
 		static CodeGeneratorMemberResult GenerateProtocolCode(IMethodSymbol method, CodeGenerationOptions options)
 		{
@@ -1061,5 +1060,14 @@ namespace MonoDevelop.CSharp.Refactoring
 			return new CodeGeneratorMemberResult(result.ToString (), bodyStartOffset, bodyEndOffset);
 		}
 
+		public override void AddGlobalNamespaceImport (TextEditor editor, DocumentContext context, string nsName)
+		{
+			// not used anymore
+		}
+
+		public override void AddLocalNamespaceImport (TextEditor editor, DocumentContext context, string nsName, TextLocation caretLocation)
+		{
+			// not used anymore
+		}
 	}
 }

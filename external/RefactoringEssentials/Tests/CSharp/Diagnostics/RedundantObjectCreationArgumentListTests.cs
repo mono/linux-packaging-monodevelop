@@ -1,13 +1,12 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
     public class RedundantObjectCreationArgumentListTests : CSharpDiagnosticTestBase
     {
-        [Test]
-        public void Test()
+        [Fact]
+        public void Test_RedundantObjectCreationArgumentListAnalyzer()
         {
             var input = @"
 class TestClass
@@ -34,7 +33,7 @@ class TestClass
             Analyze<RedundantObjectCreationArgumentListAnalyzer>(input, output);
         }
 
-        [Test]
+        [Fact]
         public void TestNoIssue()
         {
             var input = @"
@@ -52,7 +51,7 @@ class TestClass
             Analyze<RedundantObjectCreationArgumentListAnalyzer>(input);
         }
 
-        [Test]
+        [Fact]
         public void TestDisable()
         {
             var input = @"

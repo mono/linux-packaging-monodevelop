@@ -59,9 +59,11 @@ namespace MonoDevelop.CSharp.Parser
 		{
 			tagComments = MonoDevelop.Ide.Tasks.CommentTag.SpecialCommentTags.Select (t => t.Tag).ToArray ();
 		}
+		bool isAdHocProject;
 
-		public CSharpParsedDocument (string fileName) : base (fileName)
+		public CSharpParsedDocument (Ide.TypeSystem.ParseOptions options,  string fileName) : base (fileName)
 		{
+			isAdHocProject = options.IsAdhocProject;
 		}
 		
 
@@ -78,7 +80,10 @@ namespace MonoDevelop.CSharp.Parser
 						if (comments == null) {
 							var visitor = new CommentVisitor (cancellationToken);
 							if (Unit != null)
-								visitor.Visit (Unit.GetRoot (cancellationToken));
+								try {
+									visitor.Visit (Unit.GetRoot (cancellationToken));
+								} catch (OperationCanceledException) {
+								}
 							comments = visitor.Comments;
 						}
 					}
@@ -100,14 +105,14 @@ namespace MonoDevelop.CSharp.Parser
 				this.cancellationToken = cancellationToken;
 			}
 
-			static DocumentRegion GetRegion (SyntaxTrivia trivia)
+			DocumentRegion GetRegion (SyntaxTrivia trivia)
 			{
 				var fullSpan = trivia.FullSpan;
-				var text = trivia.ToString ();
-				if (text.Length > 2) {
-					if (text [text.Length - 2] == '\r' && text [text.Length - 1] == '\n')
+				if (fullSpan.Length > 2) {
+					var text = trivia.SyntaxTree.GetText (cancellationToken);
+					if (text [fullSpan.End - 2] == '\r' && text [fullSpan.End - 1] == '\n')
 						fullSpan = new Microsoft.CodeAnalysis.Text.TextSpan (fullSpan.Start, fullSpan.Length - 2);
-					else if (NewLine.IsNewLine (text [text.Length - 1]))
+					else if (NewLine.IsNewLine (text [fullSpan.End - 1]))
 						fullSpan = new Microsoft.CodeAnalysis.Text.TextSpan (fullSpan.Start, fullSpan.Length - 1);
 				}
 				try {
@@ -146,22 +151,45 @@ namespace MonoDevelop.CSharp.Parser
 				return true;
 			}
 
-			static string CropStart (string text, string crop)
+			string CropStart (SyntaxTrivia trivia, string crop)
 			{
-				text = text.Trim ();
-				if (text.StartsWith (crop))
-					return text.Substring (crop.Length).TrimStart ();
-				return text;
+				var sourceText = trivia.SyntaxTree.GetText (cancellationToken);
+				var span = trivia.Span;
+				int i = span.Start;
+				int end = span.End;
+
+				// Trim leading whitespace.
+				while (char.IsWhiteSpace (sourceText[i]) && i < end)
+					i++;
+				
+				while (char.IsWhiteSpace (sourceText[end - 1]) && end - 1 > i)
+					end--;
+
+				// Poor man's allocation-less offset-ed startswith
+				int j;
+				for (j = 0; j < crop.Length && i < end; ++j)
+					if (sourceText[i] == crop[j])
+						i++;
+
+				// Go back if we didn't do a full match, else trim leading whitespace again
+				if (j != crop.Length)
+					i -= j;
+				else
+					while (char.IsWhiteSpace (sourceText[i]) && i < end)
+						i++;
+
+				return sourceText.ToString (new Microsoft.CodeAnalysis.Text.TextSpan (i, end - i));
 			}
 
 			public override void VisitTrivia (SyntaxTrivia trivia)
 			{
+				cancellationToken.ThrowIfCancellationRequested ();
 				base.VisitTrivia (trivia);
 				switch (trivia.Kind ()) {
 				case SyntaxKind.MultiLineCommentTrivia:
 				case SyntaxKind.MultiLineDocumentationCommentTrivia:
 					{
-						var cmt = new Comment (CropStart (trivia.ToString (), "/*"));
+						var cmt = new Comment (CropStart (trivia, "/*"));
 						cmt.CommentStartsLine = StartsLine(trivia);
 						cmt.CommentType = CommentType.Block;
 						cmt.OpenTag = "/*";
@@ -172,7 +200,7 @@ namespace MonoDevelop.CSharp.Parser
 					}
 				case SyntaxKind.SingleLineCommentTrivia:
 					{
-						var cmt = new Comment (CropStart (trivia.ToString (), "//"));
+						var cmt = new Comment (CropStart (trivia, "//"));
 						cmt.CommentStartsLine = StartsLine(trivia);
 						cmt.CommentType = CommentType.SingleLine;
 						cmt.OpenTag = "//";
@@ -182,12 +210,12 @@ namespace MonoDevelop.CSharp.Parser
 					}
 				case SyntaxKind.SingleLineDocumentationCommentTrivia:
 					{
-						var cmt = new Comment (CropStart (trivia.ToString (), "///"));
+						var cmt = new Comment (CropStart (trivia, "///"));
 						cmt.CommentStartsLine = StartsLine(trivia);
 						cmt.IsDocumentation = true;
 						cmt.CommentType = CommentType.Documentation;
 						cmt.OpenTag = "///";
-						cmt.ClosingTag = "*/";
+						cmt.ClosingTag = "///";
 						cmt.Region = GetRegion (trivia);
 						Comments.Add (cmt);
 						break;
@@ -279,15 +307,22 @@ namespace MonoDevelop.CSharp.Parser
 		}
 
 		IReadOnlyList<FoldingRegion> foldings;
-		object foldingLock = new object ();
+		SemaphoreSlim foldingsSemaphore = new SemaphoreSlim (1, 1);
 
 		public override Task<IReadOnlyList<FoldingRegion>> GetFoldingsAsync (CancellationToken cancellationToken = default(CancellationToken))
 		{
 			if (foldings == null) {
-				return Task.Run (delegate {
-					lock (foldingLock) {
+				return Task.Run (async delegate {
+					bool locked = false;
+					try {
+						locked = await foldingsSemaphore.WaitAsync (Timeout.Infinite, cancellationToken);
 						if (foldings == null)
-							foldings = GenerateFoldings (cancellationToken).ToList ();
+							foldings = (await GenerateFoldings (cancellationToken)).ToList ();
+					} catch (OperationCanceledException) {
+						return new List<FoldingRegion> ();
+					} finally {
+						if (locked)
+							foldingsSemaphore.Release ();
 					}
 					return foldings;
 				});
@@ -296,10 +331,21 @@ namespace MonoDevelop.CSharp.Parser
 			return Task.FromResult (foldings);
 		}
 
-		IEnumerable<FoldingRegion> GenerateFoldings (CancellationToken cancellationToken)
+		async Task<IEnumerable<FoldingRegion>> GenerateFoldings (CancellationToken cancellationToken)
 		{
-			foreach (var fold in GetCommentsAsync().Result.ToFolds ())
+			return GenerateFoldingsInternal (await GetCommentsAsync (cancellationToken), cancellationToken);
+		}
+
+		IEnumerable<FoldingRegion> GenerateFoldingsInternal (IReadOnlyList<Comment> comments, CancellationToken cancellationToken)
+		{
+			if (cancellationToken.IsCancellationRequested)
+				yield break;
+
+			foreach (var fold in comments.ToFolds ())
 				yield return fold;
+
+			if (cancellationToken.IsCancellationRequested)
+				yield break;
 
 			var visitor = new FoldingVisitor (cancellationToken);
 			if (Unit != null) {
@@ -307,6 +353,9 @@ namespace MonoDevelop.CSharp.Parser
 					visitor.Visit (Unit.GetRoot (cancellationToken));
 				} catch (Exception) { }
 			}
+
+			if (cancellationToken.IsCancellationRequested)
+				yield break;
 			foreach (var fold in visitor.Foldings)
 				yield return fold;
 		}
@@ -325,6 +374,7 @@ namespace MonoDevelop.CSharp.Parser
 			{
 				SyntaxNode firstChild = null, lastChild = null;
 				foreach (var child in parent.ChildNodes ()) {
+					cancellationToken.ThrowIfCancellationRequested ();
 					if (child is UsingDirectiveSyntax) {
 						if (firstChild == null) {
 							firstChild = child;
@@ -346,12 +396,14 @@ namespace MonoDevelop.CSharp.Parser
 
 			public override void VisitCompilationUnit (Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax node)
 			{
+				cancellationToken.ThrowIfCancellationRequested ();
 				AddUsings (node);
 				base.VisitCompilationUnit (node);
 			}
 
 			void AddFolding (SyntaxToken openBrace, SyntaxToken closeBrace, FoldType type)
 			{
+				cancellationToken.ThrowIfCancellationRequested ();
 				openBrace = openBrace.GetPreviousToken (false, false, true, true);
 
 				try {
@@ -366,6 +418,7 @@ namespace MonoDevelop.CSharp.Parser
 			Stack<SyntaxTrivia> regionStack = new Stack<SyntaxTrivia> ();
 			public override void VisitTrivia (SyntaxTrivia trivia)
 			{
+				cancellationToken.ThrowIfCancellationRequested ();
 				base.VisitTrivia (trivia);
 				if (trivia.IsKind (SyntaxKind.RegionDirectiveTrivia)) {
 					regionStack.Push (trivia);
@@ -387,6 +440,7 @@ namespace MonoDevelop.CSharp.Parser
 
 			public override void VisitNamespaceDeclaration (Microsoft.CodeAnalysis.CSharp.Syntax.NamespaceDeclarationSyntax node)
 			{
+				cancellationToken.ThrowIfCancellationRequested ();
 				AddUsings (node);
 				AddFolding (node.OpenBraceToken, node.CloseBraceToken, FoldType.Undefined);
 				base.VisitNamespaceDeclaration (node);
@@ -394,24 +448,28 @@ namespace MonoDevelop.CSharp.Parser
 
 			public override void VisitClassDeclaration (Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax node)
 			{
+				cancellationToken.ThrowIfCancellationRequested ();
 				AddFolding (node.OpenBraceToken, node.CloseBraceToken, FoldType.Type);
 				base.VisitClassDeclaration (node);
 			}
 
 			public override void VisitStructDeclaration (Microsoft.CodeAnalysis.CSharp.Syntax.StructDeclarationSyntax node)
 			{
+				cancellationToken.ThrowIfCancellationRequested ();
 				AddFolding (node.OpenBraceToken, node.CloseBraceToken, FoldType.Type);
 				base.VisitStructDeclaration (node);
 			}
 
 			public override void VisitInterfaceDeclaration (Microsoft.CodeAnalysis.CSharp.Syntax.InterfaceDeclarationSyntax node)
 			{
+				cancellationToken.ThrowIfCancellationRequested ();
 				AddFolding (node.OpenBraceToken, node.CloseBraceToken, FoldType.Type);
 				base.VisitInterfaceDeclaration (node);
 			}
 
 			public override void VisitEnumDeclaration (Microsoft.CodeAnalysis.CSharp.Syntax.EnumDeclarationSyntax node)
 			{
+				cancellationToken.ThrowIfCancellationRequested ();
 				AddFolding (node.OpenBraceToken, node.CloseBraceToken, FoldType.Type);
 				base.VisitEnumDeclaration (node);
 			}
@@ -425,37 +483,65 @@ namespace MonoDevelop.CSharp.Parser
 		}
 
 		static readonly IReadOnlyList<Error> emptyErrors = new Error[0];
-		IReadOnlyList<Error> errors;
-		object errorLock = new object ();
 
-		public override Task<IReadOnlyList<Error>> GetErrorsAsync (CancellationToken cancellationToken = default(CancellationToken))
+		SemaphoreSlim errorLock = new SemaphoreSlim (1, 1);
+
+		static string [] lexicalError = {
+			"CS0594", // ERR_FloatOverflow
+			"CS0595", // ERR_InvalidReal
+			"CS1009", // ERR_IllegalEscape
+			"CS1010", // ERR_NewlineInConst
+			"CS1011", // ERR_EmptyCharConst
+			"CS1012", // ERR_TooManyCharsInConst
+			"CS1015", // ERR_TypeExpected
+			"CS1021", // ERR_IntOverflow
+			"CS1032", // ERR_PPDefFollowsTokenpp
+			"CS1035", // ERR_OpenEndedComment
+			"CS1039", // ERR_UnterminatedStringLit
+			"CS1040", // ERR_BadDirectivePlacementpp
+			"CS1056", // ERR_UnexpectedCharacter
+			"CS1056", // ERR_UnexpectedCharacter_EscapedBackslash
+			"CS1646", // ERR_ExpectedVerbatimLiteral
+			"CS0078", // WRN_LowercaseEllSuffix
+			"CS1002", // ; expected
+			"CS1519", // Invalid token ';' in class, struct, or interface member declaration
+			"CS1031", // Type expected
+			"CS0106", // The modifier 'readonly' is not valid for this item
+			"CS1576", // The line number specified for #line directive is missing or invalid
+			"CS1513" // } expected
+		};
+
+		static bool SkipError (bool isAdhocProject, string errorId)
+		{
+			return isAdhocProject && !lexicalError.Contains (errorId);
+		}
+
+		public override async Task<IReadOnlyList<Error>> GetErrorsAsync (CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var model = GetAst<SemanticModel> ();
 			if (model == null)
-				return Task.FromResult (emptyErrors);
+				return emptyErrors;
+
+			bool locked = await errorLock.WaitAsync (Timeout.Infinite, cancellationToken).ConfigureAwait (false);
+			IReadOnlyList<Error> errors;
+			try {
+				try {
+					errors = model
+						.GetDiagnostics (null, cancellationToken)
+						.Where (diag => !SkipError(isAdHocProject, diag.Id) && (diag.Severity == DiagnosticSeverity.Error || diag.Severity == DiagnosticSeverity.Warning))
+						.Select ((Diagnostic diag) => new Error (GetErrorType (diag.Severity), diag.Id, diag.GetMessage (), GetRegion (diag)) { Tag = diag })
+						.ToList ();
+				} catch (OperationCanceledException) {
+					errors = emptyErrors;
+				} catch (Exception e) {
+					LoggingService.LogError ("Error while getting diagnostics.", e);
+					errors = emptyErrors;
+				}
+			} finally {
+				if (locked)
+					errorLock.Release ();			}
 			
-			if (errors == null) {
-				return Task.Run (delegate {
-					lock (errorLock) {
-						if (errors == null) {
-							try {
-								errors = model
-									.GetDiagnostics (null, cancellationToken)
-									.Where (diag => diag.Severity == DiagnosticSeverity.Error || diag.Severity == DiagnosticSeverity.Warning)
-									.Select ((Diagnostic diag) => new Error (GetErrorType (diag.Severity), diag.Id, diag.GetMessage (), GetRegion (diag)) { Tag = diag })
-									.ToList ();
-							} catch (OperationCanceledException) {
-								errors = emptyErrors;
-							} catch (Exception e) {
-								LoggingService.LogError ("Error while getting diagnostics.", e);
-								errors = emptyErrors;
-							}
-						}
-					}
-					return errors;
-				});
-			}
-			return Task.FromResult (errors);
+			return errors;
 		}
 
 		static DocumentRegion GetRegion (Diagnostic diagnostic)

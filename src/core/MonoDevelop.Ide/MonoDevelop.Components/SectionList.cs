@@ -183,6 +183,12 @@ namespace MonoDevelop.Components
 			layout = null;
 		}
 
+		protected override void OnDestroyed ()
+		{
+			KillLayout ();
+			base.OnDestroyed ();
+		}
+
 		protected override void OnAdded (Widget widget)
 		{
 			throw new InvalidOperationException ("Cannot add widget directly, must add a section");
@@ -384,7 +390,7 @@ namespace MonoDevelop.Components
 		{
 			trackingHover = false;
 			SetHoverIndex (-1);
-			return base.OnEnterNotifyEvent (evnt);
+			return base.OnLeaveNotifyEvent (evnt);
 		}
 		
 		protected override bool OnMotionNotifyEvent (EventMotion evnt)

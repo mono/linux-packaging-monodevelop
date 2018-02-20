@@ -39,19 +39,8 @@ namespace MonoDevelop.Core.Assemblies
 {
 	public class TargetFramework
 	{
-		[ItemProperty(SerializationDataType=typeof(TargetFrameworkMonikerDataType))]
 		TargetFrameworkMoniker id;
-		
-		[ItemProperty ("_name")]
 		string name;
-		
-#pragma warning disable 0649
-		[ItemProperty]
-		bool hidden;
-#pragma warning restore 0649
-		
-		[ItemProperty]
-		ClrVersion clrVersion;
 
 		List<TargetFrameworkMoniker> includedFrameworks = new List<TargetFrameworkMoniker> ();
 		List<SupportedFramework> supportedFrameworks = new List<SupportedFramework> ();
@@ -59,7 +48,6 @@ namespace MonoDevelop.Core.Assemblies
 		internal bool RelationsBuilt;
 		
 		string corlibVersion;
-		TargetFrameworkToolsVersion toolsVersion;
 
 		public static TargetFramework Default {
 			get { return Runtime.SystemAssemblyService.GetTargetFramework (TargetFrameworkMoniker.Default); }
@@ -75,12 +63,7 @@ namespace MonoDevelop.Core.Assemblies
 			this.name = id.Profile == null
 				? string.Format ("{0} {1}", id.Identifier, id.Version)
 				: string.Format ("{0} {1} {2} Profile", id.Identifier, id.Version, id.Profile);
-			clrVersion = ClrVersion.Default;
 			Assemblies = new AssemblyInfo[0];
-		}
-		
-		public bool Hidden {
-			get { return hidden; }
 		}
 		
 		public string Name {
@@ -99,50 +82,13 @@ namespace MonoDevelop.Core.Assemblies
 				return id;
 			}
 		}
-		
-		public ClrVersion ClrVersion {
-			get {
-				// Always return a concrete ClrVersion, nothing that uses this can deal with ClrVersion.Default
-				// If the framework didn't specify one, assume the same default as the ToolsVersion.
-				if (clrVersion == ClrVersion.Default) {
-					return ClrVersion.Net_4_0;
-				}
-				return clrVersion;
-			}
-		}
-		
-		//FIXME: this isn't really valid/useful. anything using MSBuild custom frameworks should use 4.0 tools
-		internal TargetFrameworkToolsVersion GetToolsVersion ()
-		{
-			if (toolsVersion != TargetFrameworkToolsVersion.Unspecified)
-				return toolsVersion;
-			
-			if (Id.Identifier == TargetFrameworkMoniker.ID_NET_FRAMEWORK) {
-				switch (id.Version) {
-				case "4.0":
-					return TargetFrameworkToolsVersion.V4_0;
-				case "3.5":
-					return TargetFrameworkToolsVersion.V3_5;
-				case "3.0":
-				case "2.0":
-					return TargetFrameworkToolsVersion.V2_0;
-				case "1.1":
-					return TargetFrameworkToolsVersion.V1_1;
-				}
-			}
-			
-			switch (clrVersion) {
-			case MonoDevelop.Core.ClrVersion.Net_1_1:
-				return TargetFrameworkToolsVersion.V1_1;
-			case MonoDevelop.Core.ClrVersion.Net_2_0:
-				return TargetFrameworkToolsVersion.V2_0;
-			case MonoDevelop.Core.ClrVersion.Net_4_0:
-				return TargetFrameworkToolsVersion.V4_0;
-			}
-			
-			return TargetFrameworkToolsVersion.V4_0;
-		}
 
+		[Obsolete("It is no longer possible to define a hidden framework")]
+		public bool Hidden { get; } = false;
+		
+		[Obsolete("This value is no longer meaningful")]
+		public ClrVersion ClrVersion { get; } = ClrVersion.Net_4_0;
+		
 		static bool ProfileMatchesPattern (string profile, string pattern)
 		{
 			if (string.IsNullOrEmpty (pattern))
@@ -191,6 +137,30 @@ namespace MonoDevelop.Core.Assemblies
 					return true;
 			}
 
+			// HACK: allow referencing NetStandard projects
+			//
+			//.NETPortable,Version=v5.0 is a dummy framework. In this case, the TFM is not available
+			//to MSBuild, its is only available to NuGet from the project.json.
+			//
+			//Additionally, there is no equivalent of SupportedFrameworks for these TFMs, the
+			//relationships are hardcoded into NuGet.
+			//
+			//Until this is fixed, we will be very lax about what we consider compatible.
+			//
+			if (fx.Id.Identifier == TargetFrameworkMoniker.ID_PORTABLE && fx.Id.Version == "5.0") {
+				//.NetFramework < 4.5 isn't compatible with any netstandard version
+				if (Id.Identifier == TargetFrameworkMoniker.ID_NET_FRAMEWORK) {
+					return new Version (Id.Version).CompareTo (new Version (4, 5)) >= 0;
+				}
+
+				//PCL < 4.5 isn't compatible with any netstandard version
+				if (Id.Identifier == TargetFrameworkMoniker.ID_PORTABLE) {
+					return new Version (Id.Version).CompareTo (new Version (4, 5)) >= 0;
+				}
+
+				return true;
+			}
+
 			return fx.Id.Identifier == id.Identifier && new Version (fx.Id.Version).CompareTo (new Version (id.Version)) <= 0;
 		}
 		
@@ -206,26 +176,6 @@ namespace MonoDevelop.Core.Assemblies
 			return corlibVersion = string.Empty;
 		}
 
-		internal TargetFrameworkNode FrameworkNode { get; set; }
-		
-		internal TargetFrameworkBackend CreateBackendForRuntime (TargetRuntime runtime)
-		{
-			if (FrameworkNode == null)
-				return null;
-			
-			lock (FrameworkNode) {
-				if (FrameworkNode.ChildNodes == null)
-					return null;
-			}
-			
-			foreach (TypeExtensionNode node in FrameworkNode.ChildNodes) {
-				TargetFrameworkBackend backend = (TargetFrameworkBackend) node.CreateInstance (typeof (TargetFrameworkBackend));
-				if (backend.SupportsRuntime (runtime))
-					return backend;
-			}
-			return null;
-		}
-		
 		public bool IncludesFramework (TargetFrameworkMoniker id)
 		{
 			return id == this.id || includedFrameworks.Contains (id);
@@ -235,7 +185,6 @@ namespace MonoDevelop.Core.Assemblies
 			get { return includedFrameworks; }
 		}
 
-		[ItemProperty (Name="IncludesFramework")]
 		#pragma warning disable 649
 		string includesFramework;
 		#pragma warning restore 649
@@ -256,8 +205,6 @@ namespace MonoDevelop.Core.Assemblies
 			get { return supportedFrameworks; }
 		}
 		
-		[ItemProperty]
-		[ItemProperty ("Assembly", Scope="*")]
 		internal AssemblyInfo[] Assemblies {
 			get;
 			set;
@@ -265,8 +212,7 @@ namespace MonoDevelop.Core.Assemblies
 		
 		public override string ToString ()
 		{
-			return string.Format ("[TargetFramework: Hidden={0}, Name={1}, Id={2}, ClrVersion={3}]",
-				Hidden, Name, Id, ClrVersion);
+			return $"[TargetFramework: Name={Name}, Id={Id}]";
 		}
 		
 		public static TargetFramework FromFrameworkDirectory (TargetFrameworkMoniker moniker, FilePath dir)
@@ -287,48 +233,6 @@ namespace MonoDevelop.Core.Assemblies
 				
 				if (reader.MoveToAttribute ("Name") && reader.ReadAttributeValue ())
 					fx.name = reader.ReadContentAsString ();
-				
-				if (reader.MoveToAttribute ("RuntimeVersion") && reader.ReadAttributeValue ()) {
-					string runtimeVersion = reader.ReadContentAsString ();
-					switch (runtimeVersion) {
-					case "2.0":
-						fx.clrVersion = ClrVersion.Net_2_0;
-						break;
-					case "4.0":
-						fx.clrVersion = ClrVersion.Net_4_0;
-						break;
-					case "4.5":
-					case "4.5.1":
-					// PCL 4.6 uses 4.6 as the "Rutime version", not sure why, since it has nothing to do with .NET 4.6
-					case "4.6":
-						fx.clrVersion = ClrVersion.Net_4_5;
-						break;
-					default:
-						LoggingService.LogInfo ("Framework {0} has unknown RuntimeVersion {1}", moniker, runtimeVersion);
-						return null;
-					}
-				}
-				
-				if (reader.MoveToAttribute ("ToolsVersion") && reader.ReadAttributeValue ()) {
-					string toolsVersion = reader.ReadContentAsString ();
-					switch (toolsVersion) {
-					case "2.0":
-						fx.toolsVersion = TargetFrameworkToolsVersion.V2_0;
-						break;
-					case "3.5":
-						fx.toolsVersion = TargetFrameworkToolsVersion.V3_5;
-						break;
-					case "4.0":
-						fx.toolsVersion = TargetFrameworkToolsVersion.V4_0;
-						break;
-					case "4.5":
-						fx.toolsVersion = TargetFrameworkToolsVersion.V4_5;
-						break;
-					default:
-						LoggingService.LogInfo ("Framework {0} has unknown ToolsVersion {1}", moniker, toolsVersion);
-						return null;
-					}
-				}
 				
 				if (reader.MoveToAttribute ("IncludeFramework") && reader.ReadAttributeValue ()) {
 					string include = reader.ReadContentAsString ();
@@ -367,21 +271,18 @@ namespace MonoDevelop.Core.Assemblies
 							ainfo.InGac = reader.ReadContentAsBoolean ();
 					} while (reader.ReadToFollowing ("File"));
 				} else if (Directory.Exists (dir)) {
-
-					// HACK: we were using EnumerateFiles but it's broken in some Mono releases
-					// https://bugzilla.xamarin.com/show_bug.cgi?id=2975
-					var files = Directory.GetFiles (dir, "*.dll");
-					foreach (var f in files) {
+					
+					foreach (var f in Directory.EnumerateFiles (dir, "*.dll")) {
 						try {
 							var an = SystemAssemblyService.GetAssemblyNameObj (dir.Combine (f));
 							var ainfo = new AssemblyInfo ();
 							ainfo.Update (an);
 							assemblies.Add (ainfo);
 						} catch (BadImageFormatException ex) {
-							LoggingService.LogError ("Invalid assembly in framework '{0}': {1}", fx.Id, f);
+							LoggingService.LogError ("Invalid assembly in framework '{0}': {1}{2}{3}", fx.Id, f, Environment.NewLine, ex.ToString ());
 						} catch (Exception ex) {
-							LoggingService.LogError ("Error reading assembly '{0}' in framework '{1}':\n{2}",
-								f, fx.Id, ex.ToString ());
+							LoggingService.LogError ("Error reading assembly '{0}' in framework '{1}':{2}{3}",
+								f, fx.Id, Environment.NewLine, ex.ToString ());
 						}
 					}
 				}
@@ -446,7 +347,7 @@ namespace MonoDevelop.Core.Assemblies
 			Culture = aname.CultureInfo.Name;
 			string fn = aname.ToString ();
 			string key = "publickeytoken=";
-			int i = fn.ToLower().IndexOf (key) + key.Length;
+			int i = fn.IndexOf (key, StringComparison.OrdinalIgnoreCase) + key.Length;
 			int j = fn.IndexOf (',', i);
 			if (j == -1) j = fn.Length;
 			PublicKeyToken = fn.Substring (i, j - i);
@@ -456,15 +357,5 @@ namespace MonoDevelop.Core.Assemblies
 		{
 			return (AssemblyInfo) MemberwiseClone ();
 		}
-	}
-	
-	public enum TargetFrameworkToolsVersion
-	{
-		Unspecified,
-		V1_1, //not a real MSBuild ToolsVersion, but MD internal build supports it
-		V2_0,
-		V3_5,
-		V4_0,
-		V4_5
 	}
 }

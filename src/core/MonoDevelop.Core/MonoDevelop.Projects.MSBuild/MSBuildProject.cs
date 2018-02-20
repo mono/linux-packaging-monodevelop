@@ -36,6 +36,7 @@ using MonoDevelop.Projects.Utility;
 using System.Linq;
 using MonoDevelop.Projects.Text;
 using System.Threading.Tasks;
+using MonoDevelop.Core.Assemblies;
 
 namespace MonoDevelop.Projects.MSBuild
 {
@@ -48,6 +49,8 @@ namespace MonoDevelop.Projects.MSBuild
 		bool hadXmlDeclaration;
 		bool isShared;
 		ConditionedPropertyCollection conditionedProperties = new ConditionedPropertyCollection ();
+		Dictionary<string, string[]> knownItemAttributes;
+		Dictionary<string,string> globalProperties = new Dictionary<string, string> ();
 
 		MSBuildEngineManager engineManager;
 		bool engineManagerIsLocal;
@@ -59,7 +62,7 @@ namespace MonoDevelop.Projects.MSBuild
 
 		TextFormatInfo format = new TextFormatInfo { NewLine = "\r\n" };
 
-		static readonly string [] knownAttributes = { "DefaultTargets", "ToolsVersion", "xmlns" };
+		static readonly string [] knownAttributes = { "Sdk", "DefaultTargets", "ToolsVersion", "xmlns" };
 
 		public static XmlNamespaceManager XmlNamespaceManager
 		{
@@ -84,7 +87,18 @@ namespace MonoDevelop.Projects.MSBuild
 			get { return file.ParentDirectory; }
 		}
 
-		public FilePath SolutionDirectory { get; set; }
+		FilePath solutionDirectory;
+
+		public FilePath SolutionDirectory {
+			get { return solutionDirectory; }
+			set {
+				solutionDirectory = value;
+				if (!solutionDirectory.IsNullOrEmpty)
+					SetGlobalProperty ("SolutionDir", solutionDirectory.ToString () + Path.DirectorySeparatorChar);
+				else
+					RemoveGlobalProperty ("SolutionDir");
+			}
+		}
 
 		public MSBuildFileFormat Format
 		{
@@ -188,6 +202,8 @@ namespace MonoDevelop.Projects.MSBuild
 				engineManager = value;
 			}
 		}
+
+		public TargetRuntime TargetRuntime { get; set; } = Runtime.SystemAssemblyService.DefaultRuntime;
 
 		public static Task<MSBuildProject> LoadAsync (string file)
 		{
@@ -295,6 +311,7 @@ namespace MonoDevelop.Projects.MSBuild
 			switch (name) {
 				case "DefaultTargets": defaultTargets = value; return;
 				case "ToolsVersion": toolsVersion = value; return;
+				case "Sdk": Sdk = value; return;
 			}
 			base.ReadAttribute (name, value);
 		}
@@ -304,7 +321,8 @@ namespace MonoDevelop.Projects.MSBuild
 			switch (name) {
 				case "DefaultTargets": return defaultTargets;
 				case "ToolsVersion": return toolsVersion;
-				case "xmlns": return Schema;
+				case "xmlns": return string.IsNullOrEmpty (Namespace) ? null : Namespace;
+				case "Sdk": return Sdk;
 			}
 			return base.WriteAttribute (name);
 		}
@@ -361,6 +379,13 @@ namespace MonoDevelop.Projects.MSBuild
 		{
 			return Task.Run (() => {
 				string content = SaveToString ();
+				return TextFile.WriteFile (fileName, content, format.ByteOrderMark, true);
+			});
+		}
+
+		internal Task<bool> SaveAsync (string fileName, string content)
+		{
+			return Task.Run (() => {
 				return TextFile.WriteFile (fileName, content, format.ByteOrderMark, true);
 			});
 		}
@@ -514,6 +539,24 @@ namespace MonoDevelop.Projects.MSBuild
 			}
 		}
 
+		string sdk;
+		string[] sdkArray;
+		public string Sdk {
+			get => sdk;
+			set {
+				sdk = value;
+				sdkArray = null;
+			}
+		}
+
+		public override string Namespace {
+			get {
+				if (Sdk != null)
+					return string.Empty;
+				return Schema;
+			}
+		}
+
 		public string [] ProjectTypeGuids
 		{
 			get { return GetGlobalPropertyGroup ().GetValue ("ProjectTypeGuids", "").Split (new [] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select (t => t.Trim ()).ToArray (); }
@@ -595,7 +638,7 @@ namespace MonoDevelop.Projects.MSBuild
 			AssertCanModify ();
 			if (import.ParentProject != this)
 				throw new InvalidOperationException ("Import object does not belong to this project");
-			
+
 			if (import.ParentObject == this) {
 				import.RemoveIndent ();
 				ChildNodes = ChildNodes.Remove (import);
@@ -635,6 +678,16 @@ namespace MonoDevelop.Projects.MSBuild
 			get { return mainProjectInstance.TargetsIgnoringCondition; }
 		}
 
+		public IEnumerable<MSBuildItem> FindGlobItemsIncludingFile (string include)
+		{
+			return mainProjectInstance.FindGlobItemsIncludingFile (include);
+		}
+
+		internal IEnumerable<MSBuildItem> FindUpdateGlobItemsIncludingFile (string include, MSBuildItem globItem)
+		{
+			return mainProjectInstance.FindUpdateGlobItemsIncludingFile (include, globItem);
+		}
+
 		public MSBuildPropertyGroup GetGlobalPropertyGroup ()
 		{
 			return PropertyGroups.FirstOrDefault (g => g.Condition.Length == 0);
@@ -648,7 +701,7 @@ namespace MonoDevelop.Projects.MSBuild
 		public MSBuildPropertyGroup AddNewPropertyGroup (bool insertAtEnd = true, MSBuildObject beforeObject = null)
 		{
 			var group = new MSBuildPropertyGroup ();
-			AddPropertyGroup (group, insertAtEnd);
+			AddPropertyGroup (group, insertAtEnd, beforeObject);
 			return group;
 		}
 
@@ -747,6 +800,11 @@ namespace MonoDevelop.Projects.MSBuild
 
 		public MSBuildItemGroup AddNewItemGroup ()
 		{
+			return AddNewItemGroup (null);
+		}
+
+		public MSBuildItemGroup AddNewItemGroup (MSBuildObject beforeObject)
+		{
 			AssertCanModify ();
 			var group = new MSBuildItemGroup ();
 
@@ -761,7 +819,9 @@ namespace MonoDevelop.Projects.MSBuild
 			}
 
 			group.ParentNode = this;
-			if (refNode != null)
+			if (beforeObject != null)
+				ChildNodes = ChildNodes.Insert (ChildNodes.IndexOf (beforeObject), group);
+			else if (refNode != null)
 				ChildNodes = ChildNodes.Insert (ChildNodes.IndexOf (refNode) + 1, group);
 			else
 				ChildNodes = ChildNodes.Add (group);
@@ -773,8 +833,19 @@ namespace MonoDevelop.Projects.MSBuild
 
 		public MSBuildItem AddNewItem (string name, string include)
 		{
-			MSBuildItemGroup grp = FindBestGroupForItem (name);
-			return grp.AddNewItem (name, include);
+			return AddNewItem (name, include, null);
+		}
+
+		public MSBuildItem AddNewItem (string name, string include, MSBuildItem beforeItem)
+		{
+			if (beforeItem != null) {
+				var group = beforeItem.ParentNode as MSBuildItemGroup;
+				if (group != null)
+					return group.AddNewItem (name, include, beforeItem);
+			}
+			MSBuildItem it = CreateItem (name, include);
+			AddItem (it);
+			return it;
 		}
 
 		public MSBuildItem CreateItem (string name, string include)
@@ -786,34 +857,78 @@ namespace MonoDevelop.Projects.MSBuild
 
 		public void AddItem (MSBuildItem it)
 		{
+			AddItem (it, null);
+		}
+
+		public void AddItem (MSBuildItem it, MSBuildItem beforeItem)
+		{
 			if (string.IsNullOrEmpty (it.Name))
 				throw new InvalidOperationException ("Item doesn't have a name");
-			MSBuildItemGroup grp = FindBestGroupForItem (it.Name);
+
+			if (beforeItem != null) {
+				var group = beforeItem.ParentNode as MSBuildItemGroup;
+				if (group != null) {
+					group.AddItem (it, beforeItem);
+					return;
+				}
+			}
+			MSBuildItemGroup grp = FindBestGroupForItem (it);
 			grp.AddItem (it);
 		}
 
-		MSBuildItemGroup FindBestGroupForItem (string itemName)
+		MSBuildItemGroup FindBestGroupForItem (MSBuildItem newItem)
 		{
+			string groupId = GetBestGroupId (newItem);
 			MSBuildItemGroup group;
 
 			if (bestGroups == null)
 				bestGroups = new Dictionary<string, MSBuildItemGroup> ();
 			else {
-				if (bestGroups.TryGetValue (itemName, out group))
+				if (bestGroups.TryGetValue (groupId, out group))
 					return group;
 			}
 
+			MSBuildItemGroup insertBefore = null;
 			foreach (MSBuildItemGroup grp in ItemGroups) {
 				foreach (MSBuildItem it in grp.Items) {
-					if (it.Name == itemName) {
-						bestGroups [itemName] = grp;
+					if (ShouldAddItemToGroup (it, newItem)) {
+						bestGroups [groupId] = grp;
 						return grp;
+					} else if (insertBefore == null && ShouldInsertItemGroupBefore (it, newItem)) {
+						insertBefore = grp;
 					}
 				}
 			}
-			group = AddNewItemGroup ();
-			bestGroups [itemName] = group;
+			group = AddNewItemGroup (insertBefore);
+			bestGroups [groupId] = group;
 			return group;
+		}
+
+		static string GetBestGroupId (MSBuildItem it)
+		{
+			if (it.IsRemove)
+				return it.Name + ":Remove";
+			else if (it.IsUpdate)
+				return it.Name + ":Update";
+			return it.Name;
+		}
+
+		static bool ShouldAddItemToGroup (MSBuildItem existingItem, MSBuildItem newItem)
+		{
+			return existingItem.Name == newItem.Name &&
+				existingItem.IsRemove == newItem.IsRemove &&
+				existingItem.IsUpdate == newItem.IsUpdate;
+		}
+
+		static bool ShouldInsertItemGroupBefore (MSBuildItem existing, MSBuildItem newItem)
+		{
+			if (existing.Name != newItem.Name)
+				return false;
+			if (newItem.IsInclusion)
+				return existing.IsUpdate;
+			if (newItem.IsRemove)
+				return existing.IsUpdate || (existing.IsInclusion && !existing.IsWildcardItem);
+			return false;
 		}
 
 		public XmlElement GetProjectExtension (string section)
@@ -828,9 +943,33 @@ namespace MonoDevelop.Projects.MSBuild
 		{
 			var elem = GetProjectExtension ("MonoDevelop");
 			if (elem != null)
-				return elem.SelectSingleNode ("tns:Properties/tns:" + section, XmlNamespaceManager) as XmlElement;
+				return elem.SelectSingleNode ("tns:Properties/tns:" + section, GetNamespaceManagerForProject ()) as XmlElement;
 			else
 				return null;
+		}
+
+		/// <summary>
+		/// Returns a list of SDKs referenced by this project
+		/// </summary>
+		public string[] GetReferencedSDKs ()
+		{
+			if (!string.IsNullOrEmpty (Sdk)) {
+				if (sdkArray == null)
+					sdkArray = Sdk.Split (new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+				return sdkArray;
+			}
+			else
+				return Array.Empty<string> ();
+		}
+
+		XmlNamespaceManager GetNamespaceManagerForProject ()
+		{
+			if (Namespace == Schema)
+				return XmlNamespaceManager;
+
+			var namespaceManager = new XmlNamespaceManager (new NameTable ());
+			namespaceManager.AddNamespace ("tns", Namespace);
+			return namespaceManager;
 		}
 
 		public void SetProjectExtension (XmlElement value)
@@ -853,13 +992,13 @@ namespace MonoDevelop.Projects.MSBuild
 			var elem = GetProjectExtension ("MonoDevelop");
 			if (elem == null) {
 				XmlDocument doc = new XmlDocument ();
-				elem = doc.CreateElement (null, "MonoDevelop", MSBuildProject.Schema);
+				elem = doc.CreateElement (null, "MonoDevelop", Namespace);
 			}
 			value = (XmlElement) elem.OwnerDocument.ImportNode (value, true);
 			var parent = elem;
-			elem = parent ["Properties", MSBuildProject.Schema];
+			elem = parent ["Properties", Namespace];
 			if (elem == null) {
-				elem = parent.OwnerDocument.CreateElement (null, "Properties", MSBuildProject.Schema);
+				elem = parent.OwnerDocument.CreateElement (null, "Properties", Namespace);
 				parent.AppendChild (elem);
 				XmlUtil.Indent (format, elem, true);
 			}
@@ -872,7 +1011,7 @@ namespace MonoDevelop.Projects.MSBuild
 			}
 			XmlUtil.Indent (format, value, false);
 			var xmlns = value.GetAttribute ("xmlns");
-			if (xmlns == Schema)
+			if (xmlns == Namespace)
 				value.RemoveAttribute ("xmlns");
 			SetProjectExtension (parent);
 			NotifyChanged ();
@@ -895,7 +1034,7 @@ namespace MonoDevelop.Projects.MSBuild
 			var md = GetProjectExtension ("MonoDevelop");
 			if (md == null)
 				return;
-			XmlElement elem = md.SelectSingleNode ("tns:Properties/tns:" + section, XmlNamespaceManager) as XmlElement;
+			XmlElement elem = md.SelectSingleNode ("tns:Properties/tns:" + section, GetNamespaceManagerForProject ()) as XmlElement;
 			if (elem != null) {
 				var parent = (XmlElement)elem.ParentNode;
 				XmlUtil.RemoveElementAndIndenting (elem);
@@ -926,10 +1065,49 @@ namespace MonoDevelop.Projects.MSBuild
 				g.RemoveItem (item);
 				if (removeEmptyParentGroup && !g.Items.Any ()) {
 					Remove (g);
-					if (bestGroups != null)
-						bestGroups.Remove (item.Name);
+					if (bestGroups != null) {
+						string groupId = GetBestGroupId (item);
+						bestGroups.Remove (groupId);
+					}
 				}
 			}
+		}
+
+		public void AddKnownItemAttribute (string itemName, params string[] attributes)
+		{
+			AssertCanModify ();
+
+			if (knownItemAttributes == null)
+				knownItemAttributes = new Dictionary<string, string[]> ();
+
+			var mergedAttributes = MSBuildItem.KnownAttributes.Union (attributes).ToArray ();
+			knownItemAttributes [itemName] = mergedAttributes;
+		}
+
+		internal string[] GetKnownItemAttributes (string itemName)
+		{
+			if (knownItemAttributes == null)
+				return MSBuildItem.KnownAttributes;
+
+			string[] attributes = null;
+			if (knownItemAttributes.TryGetValue (itemName, out attributes))
+				return attributes;
+
+			return MSBuildItem.KnownAttributes;
+		}
+
+		internal void SetGlobalProperty (string property, string value)
+		{
+			globalProperties [property] = value;
+		}
+
+		internal void RemoveGlobalProperty (string property)
+		{
+			globalProperties.Remove (property);
+		}
+
+		internal Dictionary<string, string> GlobalProperties {
+			get { return globalProperties; }
 		}
 	}
 
@@ -984,7 +1162,7 @@ namespace MonoDevelop.Projects.MSBuild
 					if (i == -1) {
 						res.Append (t);
 					} else {
-						res.Append (t.Substring (i + 1));
+						res.Append (t, i + 1, t.Length - i - 1);
 						return res.ToString ();
 					}
 				} else
@@ -992,19 +1170,6 @@ namespace MonoDevelop.Projects.MSBuild
 				node = node.PreviousSibling;
 			}
 			return res.ToString ();
-		}
-
-		public static void FormatElement (TextFormatInfo format, XmlElement elem)
-		{
-			// Remove duplicate namespace declarations
-			var nsa = elem.Attributes ["xmlns"];
-			if (nsa != null && nsa.Value == MSBuildProject.Schema)
-				elem.Attributes.Remove (nsa);
-
-			foreach (var e in elem.ChildNodes.OfType<XmlElement> ().ToArray ()) {
-				Indent (format, e, false);
-				FormatElement (format, e);
-			}
 		}
 
 		public static void Indent (TextFormatInfo format, XmlElement elem, bool closeInNewLine)

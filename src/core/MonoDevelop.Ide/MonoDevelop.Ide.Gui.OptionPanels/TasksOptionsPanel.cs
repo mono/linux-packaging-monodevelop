@@ -33,6 +33,7 @@ using System.Text;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Components;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Ide.Tasks;
 using Gtk;
 
@@ -59,7 +60,8 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			tokensTreeView.AppendColumn (String.Empty, new CellRendererText (), "text", 0);
 			tokensTreeView.Selection.Changed += new EventHandler (OnTokenSelectionChanged);
 			tokensTreeView.Model = tokensStore;
-			
+			tokensTreeView.SearchColumn = -1; // disable the interactive search
+
 			OnTokenSelectionChanged (null, null);
 			
 			buttonAdd.Clicked += new EventHandler (AddToken);
@@ -67,7 +69,36 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			buttonRemove.Clicked += new EventHandler (RemoveToken);
 			entryToken.Changed += new EventHandler (Validate);
 
-			Styles.Changed += HandleUserInterfaceSkinChanged;
+			Styles.Changed += HandleUserInterfaceThemeChanged;
+			SetupAccessibility ();
+		}
+
+		void SetupAccessibility ()
+		{
+			comboPriority.SetCommonAccessibilityAttributes ("TasksPanel.priorityCombo", label113,
+			                                                GettextCatalog.GetString ("Select the priority for this token"));
+
+			entryToken.SetCommonAccessibilityAttributes ("TasksPanel.tokenEntry", label112,
+			                                             GettextCatalog.GetString ("Enter a word to detect as a token"));
+
+			tokensTreeView.SetCommonAccessibilityAttributes ("TasksPanel.tokensList", labelTokens,
+			                                                 GettextCatalog.GetString ("A list of recognised tokens"));
+
+			buttonAdd.SetCommonAccessibilityAttributes ("TasksPanel.addButton", "",
+			                                            GettextCatalog.GetString ("Add a new token"));
+			buttonChange.SetCommonAccessibilityAttributes ("TasksPanel.changeButton", "",
+			                                               GettextCatalog.GetString ("Edit the currently selected token"));
+			buttonRemove.SetCommonAccessibilityAttributes ("TasksPanel.removeButton", "",
+			                                               GettextCatalog.GetString ("Remove the currently selected token"));
+
+			colorbuttonLowPrio.SetCommonAccessibilityAttributes ("TasksPanel.lowColor", label12,
+			                                                     GettextCatalog.GetString ("Select the foreground color for low priority tasks"));
+
+			colorbuttonHighPrio.SetCommonAccessibilityAttributes ("TasksPanel.hiColor", label10,
+			                                                      GettextCatalog.GetString ("Select the foreground color for the high priority tasks"));
+
+			colorbuttonNormalPrio.SetCommonAccessibilityAttributes ("TasksPanel.normalColor", label11,
+			                                                        GettextCatalog.GetString ("Select the foreground color for the normal priority tasks"));
 		}
 		
 		void Validate (object sender, EventArgs args)
@@ -173,7 +204,7 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			LoadColors ();
 		}
 
-		void HandleUserInterfaceSkinChanged (object sender, EventArgs e)
+		void HandleUserInterfaceThemeChanged (object sender, EventArgs e)
 		{
 			LoadColors ();
 		}
@@ -222,10 +253,10 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			return color;
 		}
 
-		public override void Destroy ()
+		protected override void OnDestroyed ()
 		{
-			Styles.Changed -= HandleUserInterfaceSkinChanged;
-			base.Destroy ();
+			Styles.Changed -= HandleUserInterfaceThemeChanged;
+			base.OnDestroyed ();
 		}
 	}
 	

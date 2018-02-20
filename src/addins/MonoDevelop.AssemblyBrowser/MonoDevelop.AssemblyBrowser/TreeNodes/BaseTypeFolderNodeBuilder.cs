@@ -100,18 +100,16 @@ namespace MonoDevelop.AssemblyBrowser
 		public override void BuildChildNodes (ITreeBuilder builder, object dataObject)
 		{
 			var baseTypeFolder = (BaseTypeFolder)dataObject;
-			foreach (var type in baseTypeFolder.Type.BaseTypes) {
-				builder.AddChild (type);
-			}
+			builder.AddChildren (baseTypeFolder.Type.BaseTypes);
 		}
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
 		{
 			return true;
 		}
-		
-		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
+
+		public override int GetSortIndex (ITreeNavigator node)
 		{
-			return -1;
+			return -100;
 		}
 	}
 }

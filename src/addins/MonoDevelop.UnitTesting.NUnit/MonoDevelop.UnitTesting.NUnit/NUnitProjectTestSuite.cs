@@ -43,6 +43,8 @@ using System.Reflection;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Core;
+using MonoDevelop.PackageManagement;
+using System.Text;
 
 namespace MonoDevelop.UnitTesting.NUnit
 {
@@ -77,11 +79,14 @@ namespace MonoDevelop.UnitTesting.NUnit
 
 		public static NUnitProjectTestSuite CreateTest (DotNetProject project)
 		{
+			if (project.TargetFramework.Id.Identifier == ".NETCoreApp")
+				return null;
+
 			if (!project.ParentSolution.GetConfiguration (IdeApp.Workspace.ActiveConfiguration).BuildEnabledForItem (project))
 				return null;
 
-			foreach (var p in project.References) {
-				var nv = GetNUnitVersion (p);
+			foreach (var item in project.Items) {
+				var nv = GetNUnitVersion (item);
 				if (nv != null)
 					return new NUnitProjectTestSuite (project, nv.Value);
 			}
@@ -93,9 +98,20 @@ namespace MonoDevelop.UnitTesting.NUnit
 			return GetNUnitVersion (p).HasValue;
 		}
 
+		public static NUnitVersion? GetNUnitVersion (ProjectItem item)
+		{
+			switch (item) {
+			case ProjectReference pr:
+				return GetNUnitVersion (pr);
+			case ProjectPackageReference ppr:
+				return GetNUnitVersion (ppr);
+			}
+			return null;
+		}
+
 		public static NUnitVersion? GetNUnitVersion (ProjectReference p)
 		{
-			if (p.Reference.IndexOf ("GuiUnit", StringComparison.OrdinalIgnoreCase) != -1 || p.Reference.IndexOf ("nunitlite", StringComparison.OrdinalIgnoreCase) != -1)
+			if (p.Reference.IndexOf ("GuiUnit", StringComparison.OrdinalIgnoreCase) != -1 || p.Reference.StartsWith ("nunitlite", StringComparison.OrdinalIgnoreCase))
 				return NUnitVersion.NUnit2;
 			if (p.Reference.IndexOf ("nunit.framework", StringComparison.OrdinalIgnoreCase) != -1) {
 				var selector = p.Project?.DefaultConfiguration.Selector;
@@ -118,9 +134,18 @@ namespace MonoDevelop.UnitTesting.NUnit
 			return null;
 		}
 
+		internal static NUnitVersion? GetNUnitVersion (ProjectPackageReference p)
+		{
+			if (p.Include.IndexOf ("GuiUnit", StringComparison.OrdinalIgnoreCase) != -1)
+				return NUnitVersion.NUnit2;
+			if (p.Include.IndexOf ("nunit", StringComparison.OrdinalIgnoreCase) != -1)
+				return p.IsAtLeastVersion (new Version (3, 0)) ? NUnitVersion.NUnit3 : NUnitVersion.NUnit2;
+			return null;
+		}
+
 		protected override SourceCodeLocation GetSourceCodeLocation (string fixtureTypeNamespace, string fixtureTypeName, string testName)
 		{
-			if (string.IsNullOrEmpty (fixtureTypeName) || string.IsNullOrEmpty (fixtureTypeName))
+			if (string.IsNullOrEmpty (fixtureTypeName))
 				return null;
 			var task = NUnitSourceCodeLocationFinder.TryGetSourceCodeLocationAsync (project, fixtureTypeNamespace, fixtureTypeName, testName);
 			if (!task.Wait (2000))

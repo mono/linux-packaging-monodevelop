@@ -1,4 +1,4 @@
-//
+﻿//
 // MSBuildProperty.cs
 //
 // Author:
@@ -26,7 +26,6 @@
 
 using System;
 using System.Xml;
-using Microsoft.Build.BuildEngine;
 using System.Xml.Linq;
 using MonoDevelop.Core;
 using System.Globalization;
@@ -44,7 +43,31 @@ namespace MonoDevelop.Projects.MSBuild
 		string rawValue, textValue;
 		string name;
 		string unevaluatedValue;
+		string originalEvaluatedValue;
 		LinkedPropertyFlags flags;
+		bool fromAttribute;
+		string afterAttribute;
+
+		internal bool FromAttribute {
+			get {
+				return fromAttribute;
+			}
+			set {
+				fromAttribute = value;
+			}
+		}
+
+		internal string AfterAttribute {
+			get {
+				return afterAttribute;
+			}
+		}
+
+		internal override bool SkipSerialization {
+			get {
+				return fromAttribute;
+			}
+		}
 
 		static readonly string EmptyElementMarker = new string ('e', 1);
 
@@ -58,18 +81,28 @@ namespace MonoDevelop.Projects.MSBuild
 			this.name = name;
 		}
 
-		internal MSBuildProperty (MSBuildNode parentNode, string name, string value, string evaluatedValue): this ()
+		internal MSBuildProperty (MSBuildNode parentNode, string name, string value, string evaluatedValue, bool fromAttribute, string afterAttribute): this ()
 		{
 			ParentNode = parentNode;
 			this.name = name;
 			this.unevaluatedValue = value;
 			this.value = evaluatedValue;
+			this.fromAttribute = fromAttribute;
+			this.afterAttribute = afterAttribute;
 		}
 
 		internal override void Read (MSBuildXmlReader reader)
 		{
 			name = reader.LocalName;
 			base.Read (reader);
+		}
+
+		internal override void ReadUnknownAttribute (MSBuildXmlReader reader, string lastAttr)
+		{
+			fromAttribute = true;
+			afterAttribute = lastAttr;
+			name = reader.LocalName;
+			value = unevaluatedValue = reader.Value;
 		}
 
 		internal override void ReadContent (MSBuildXmlReader reader)
@@ -168,7 +201,7 @@ namespace MonoDevelop.Projects.MSBuild
 						elem.Read (cr);
 					}
 					elem.ParentNode = this;
-					elem.SetNamespace (MSBuildProject.Schema);
+					elem.SetNamespace (Namespace);
 
 					elem.StartWhitespace = StartWhitespace;
 					elem.EndWhitespace = EndWhitespace;
@@ -267,7 +300,7 @@ namespace MonoDevelop.Projects.MSBuild
 				if (value)
 					flags |= LinkedPropertyFlags.IsNew;
 				else
-					flags &= ~LinkedPropertyFlags.IsNew; 
+					flags &= ~LinkedPropertyFlags.IsNew;
 			}
 		}
 
@@ -349,21 +382,31 @@ namespace MonoDevelop.Projects.MSBuild
 				SetValue (Convert.ToString (value, CultureInfo.InvariantCulture), false, mergeToMainGroup);
 		}
 
-		internal void InitEvaluatedValue (string value)
+		internal void InitEvaluatedValue (string value, bool definedMultipleTimes)
 		{
 			this.value = value;
+			this.originalEvaluatedValue = value;
+			if (definedMultipleTimes)
+				flags |= LinkedPropertyFlags.DefinedMultipleTimes;
 		}
 
-		internal virtual void SetPropertyValue (string value)
+		internal virtual void SetPropertyValue (string newValue)
 		{
-			if (this.value == null || !valueType.Equals (this.value, value)) {
+			if (this.value == null || !valueType.Equals (this.value, newValue)) {
 				// If the property has an initial evaluated value, then set the EvaluatedValueModified flag
-				if (!Modified && this.value != null)
+				if (!Modified && this.value != null && (flags & LinkedPropertyFlags.DefinedMultipleTimes) != 0)
 					EvaluatedValueModified = true;
+
+				// If the value is the same as the one that was originally evaluated, then reset the EvaluatedValueModified flag.
+				// The case is: load a default value, change to non-default, save. At this point EvaluatedValueModified=true
+				// because we set a value different from the evaluated one. Now we set default value again. Since value is same
+				// as the one evaluated, EvaluatedValueModified should now be brought back to false.
+				if (originalEvaluatedValue != null && newValue != null && valueType.Equals (originalEvaluatedValue, newValue))
+				    EvaluatedValueModified = false;
 				
 				Modified = true;
-				this.value = value;
-				this.unevaluatedValue = value;
+				this.value = newValue;
+				this.unevaluatedValue = newValue;
 				this.rawValue = null;
 				this.textValue = null;
 				StartInnerWhitespace = null;

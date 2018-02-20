@@ -45,7 +45,7 @@ namespace MonoDevelop.Components
 		internal static string DefaultGtkDataFolder;
 		internal static string DefaultGtk2RcFiles;
 
-		public static Skin UserInterfaceSkin { get; private set; }
+		public static Theme UserInterfaceTheme { get; private set; }
 
 		static IdeTheme ()
 		{
@@ -67,16 +67,39 @@ namespace MonoDevelop.Components
 			if (!Platform.IsLinux)
 				UpdateGtkTheme ();
 
+#if MAC
+			// Early init Cocoa through xwt
+			var path = Path.GetDirectoryName (typeof (IdeTheme).Assembly.Location);
+			System.Reflection.Assembly.LoadFrom (Path.Combine (path, "Xwt.XamMac.dll"));
+			var loaded = Xwt.Toolkit.Load (Xwt.ToolkitType.XamMac);
+
+			var disableA11y = Environment.GetEnvironmentVariable ("DISABLE_ATKCOCOA");
+			if (Platform.IsMac && (NSUserDefaults.StandardUserDefaults.BoolForKey ("com.monodevelop.AccessibilityEnabled") && string.IsNullOrEmpty (disableA11y))) {
+				// Load a private version of AtkCocoa stored in the XS app directory
+				var appDir = Directory.GetParent (AppDomain.CurrentDomain.BaseDirectory);
+				var gtkPath = $"{appDir.Parent.FullName}/lib/gtk-2.0";
+
+				LoggingService.LogInfo ($"Loading modules from {gtkPath}");
+				Environment.SetEnvironmentVariable ("GTK_MODULES", $"{gtkPath}/libatkcocoa.so");
+			} else {
+				// If we are restarted from a running instance when changing the accessibility setting then
+				// we inherit the environment from it
+				Environment.SetEnvironmentVariable ("GTK_MODULES", null);
+				LoggingService.LogInfo ("Accessibility disabled");
+			}
+#endif
 			Gtk.Application.Init (BrandingService.ApplicationName, ref args);
 
 			// Reset our environment after initialization on Mac
-			if (Platform.IsMac)
+			if (Platform.IsMac) {
+				Environment.SetEnvironmentVariable ("GTK_MODULES", null);
 				Environment.SetEnvironmentVariable ("GTK2_RC_FILES", DefaultGtk2RcFiles);
+			}
 		}
 
 		internal static void SetupXwtTheme ()
 		{
-			Xwt.Drawing.Context.RegisterStyles ("dark", "disabled");
+			Xwt.Drawing.Context.RegisterStyles ("dark", "disabled", "error");
 
 			if (Core.Platform.IsMac) {
 				Xwt.Drawing.Context.RegisterStyles ("mac", "sel");
@@ -100,7 +123,7 @@ namespace MonoDevelop.Components
 			
 			if (Platform.IsLinux) {
 				DefaultTheme = Gtk.Settings.Default.ThemeName;
-				string theme = IdeApp.Preferences.UserInterfaceTheme;
+				string theme = IdeApp.Preferences.UserInterfaceThemeName;
 				if (string.IsNullOrEmpty (theme))
 					theme = DefaultTheme;
 				ValidateGtkTheme (ref theme);
@@ -123,12 +146,12 @@ namespace MonoDevelop.Components
 			if (DefaultTheme == null)
 				SetupGtkTheme ();
 
-			string current_theme = IdeApp.Preferences.UserInterfaceTheme;
+			string current_theme = IdeApp.Preferences.UserInterfaceThemeName;
 
 			if (!Platform.IsLinux) {
-				UserInterfaceSkin = IdeApp.Preferences.UserInterfaceTheme == "Dark" ? Skin.Dark : Skin.Light;
-				if (current_theme != UserInterfaceSkin.ToString ()) // Only Skin names allowed on Win/Mac
-					current_theme = UserInterfaceSkin.ToString ();
+				UserInterfaceTheme = IdeApp.Preferences.UserInterfaceThemeName == "Dark" ? Theme.Dark : Theme.Light;
+				if (current_theme != UserInterfaceTheme.ToString ()) // Only theme names allowed on Win/Mac
+					current_theme = UserInterfaceTheme.ToString ();
 			}
 
 			var use_bundled_theme = false;
@@ -183,7 +206,7 @@ namespace MonoDevelop.Components
 				} else if (Platform.IsMac) {
 					
 					var gtkrc = "gtkrc.mac";
-					if (IdeApp.Preferences.UserInterfaceSkin == Skin.Dark)
+					if (IdeApp.Preferences.UserInterfaceTheme == Theme.Dark)
 						gtkrc += "-dark";
 					gtkrc = PropertyService.EntryAssemblyPath.Combine (gtkrc);
 
@@ -219,18 +242,47 @@ namespace MonoDevelop.Components
 			if (Platform.IsLinux) {
 				var defaultStyle = Gtk.Rc.GetStyle (IdeApp.Workbench.RootWindow);
 				var bgColor = defaultStyle.Background (Gtk.StateType.Normal);
-				UserInterfaceSkin = HslColor.Brightness (bgColor) < 0.5 ? Skin.Dark : Skin.Light;
+				UserInterfaceTheme = HslColor.Brightness (bgColor) < 0.5 ? Theme.Dark : Theme.Light;
 			}
 
-			if (UserInterfaceSkin == Skin.Dark)
+			if (UserInterfaceTheme == Theme.Dark)
 				Xwt.Drawing.Context.SetGlobalStyle ("dark");
 			else
 				Xwt.Drawing.Context.ClearGlobalStyle ("dark");
 
 			Styles.LoadStyle ();
+			UpdateXwtDefaults ();
 			#if MAC
 			UpdateMacWindows ();
 			#endif
+		}
+
+		static void UpdateXwtDefaults ()
+		{
+			// Xwt default dialog icons
+			Xwt.Toolkit.CurrentEngine.Defaults.MessageDialog.InformationIcon = ImageService.GetIcon ("gtk-dialog-info", Gtk.IconSize.Dialog);
+			Xwt.Toolkit.CurrentEngine.Defaults.MessageDialog.WarningIcon = ImageService.GetIcon ("gtk-dialog-warning", Gtk.IconSize.Dialog);
+			Xwt.Toolkit.CurrentEngine.Defaults.MessageDialog.ErrorIcon = ImageService.GetIcon ("gtk-dialog-error", Gtk.IconSize.Dialog);
+			Xwt.Toolkit.CurrentEngine.Defaults.MessageDialog.QuestionIcon = ImageService.GetIcon ("gtk-dialog-question", Gtk.IconSize.Dialog);
+			Xwt.Toolkit.CurrentEngine.Defaults.MessageDialog.ConfirmationIcon = ImageService.GetIcon ("gtk-dialog-question", Gtk.IconSize.Dialog);
+
+			if (Platform.IsMac && UserInterfaceTheme == Theme.Dark) {
+				// dark NSAppearance can not handle custom drawn images in dialogs
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.InformationIcon = ImageService.GetIcon ("gtk-dialog-info", Gtk.IconSize.Dialog).ToBitmap (GtkWorkarounds.GetScaleFactor ());
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.WarningIcon = ImageService.GetIcon ("gtk-dialog-warning", Gtk.IconSize.Dialog).ToBitmap (GtkWorkarounds.GetScaleFactor ());
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.ErrorIcon = ImageService.GetIcon ("gtk-dialog-error", Gtk.IconSize.Dialog).ToBitmap (GtkWorkarounds.GetScaleFactor ());
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.QuestionIcon = ImageService.GetIcon ("gtk-dialog-question", Gtk.IconSize.Dialog).ToBitmap (GtkWorkarounds.GetScaleFactor ());
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.ConfirmationIcon = ImageService.GetIcon ("gtk-dialog-question", Gtk.IconSize.Dialog).ToBitmap (GtkWorkarounds.GetScaleFactor ());
+			} else {
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.InformationIcon = ImageService.GetIcon ("gtk-dialog-info", Gtk.IconSize.Dialog);
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.WarningIcon = ImageService.GetIcon ("gtk-dialog-warning", Gtk.IconSize.Dialog);
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.ErrorIcon = ImageService.GetIcon ("gtk-dialog-error", Gtk.IconSize.Dialog);
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.QuestionIcon = ImageService.GetIcon ("gtk-dialog-question", Gtk.IconSize.Dialog);
+				Xwt.Toolkit.NativeEngine.Defaults.MessageDialog.ConfirmationIcon = ImageService.GetIcon ("gtk-dialog-question", Gtk.IconSize.Dialog);
+			}
+
+			Xwt.Toolkit.CurrentEngine.Defaults.FallbackLinkColor = Styles.LinkForegroundColor;
+			Xwt.Toolkit.NativeEngine.Defaults.FallbackLinkColor = Styles.LinkForegroundColor;
 		}
 
 		internal static string[] gtkThemeFallbacks = new string[] {
@@ -287,19 +339,22 @@ namespace MonoDevelop.Components
 
 		static void SetTheme (NSWindow window)
 		{
-			if (IdeApp.Preferences.UserInterfaceSkin == Skin.Light)
+			if (IdeApp.Preferences.UserInterfaceTheme == Theme.Light)
 				window.Appearance = NSAppearance.GetAppearance (NSAppearance.NameAqua);
 			else
 				window.Appearance = NSAppearance.GetAppearance (NSAppearance.NameVibrantDark);
 
-			if (IdeApp.Preferences.UserInterfaceSkin == Skin.Light) {
+			if (IdeApp.Preferences.UserInterfaceTheme == Theme.Light) {
 				window.StyleMask &= ~NSWindowStyle.TexturedBackground;
+				window.BackgroundColor = MonoDevelop.Ide.Gui.Styles.BackgroundColor.ToNSColor ();
 				return;
 			}
 
-			if (window is NSPanel || window.ContentView.Class.Name != "GdkQuartzView")
+			if (window is NSPanel || window.ContentView.Class.Name != "GdkQuartzView") {
 				window.BackgroundColor = MonoDevelop.Ide.Gui.Styles.BackgroundColor.ToNSColor ();
-			else {
+				if (MacSystemInformation.OsVersion <= MacSystemInformation.Sierra)
+					window.StyleMask |= NSWindowStyle.TexturedBackground;
+			} else {
 				object[] platforms = Mono.Addins.AddinManager.GetExtensionObjects ("/MonoDevelop/Core/PlatformService");
 				if (platforms.Length > 0) {
 					var platformService = (MonoDevelop.Ide.Desktop.PlatformService)platforms [0];
@@ -308,8 +363,10 @@ namespace MonoDevelop.Components
 					window.IsOpaque = false;
 					window.BackgroundColor = NSColor.FromPatternImage (image.ToBitmap().ToNSImage());
 				}
+				window.StyleMask |= NSWindowStyle.TexturedBackground;
 			}
-			window.StyleMask |= NSWindowStyle.TexturedBackground;
+			if (MacSystemInformation.OsVersion >= MacSystemInformation.HighSierra && !window.IsSheet)
+				window.TitlebarAppearsTransparent = true;
 		}
 
 		static void OnClose (NSNotification note)

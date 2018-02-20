@@ -33,7 +33,7 @@ namespace MonoDevelop.Projects.Extensions
 	public class SolutionItemExtensionNode: ProjectModelExtensionNode
 	{
 		[NodeAttribute (Description = "GUID of the extension. The extension will be loaded if the project has this GUID in the project type GUID list. " +
-			"If not specified, the extension will be applied to all projects.")]
+			"If no guid and no projectCapability is specified, the extension will be applied to all projects.")]
 		string guid;
 
 		public string Guid {
@@ -41,11 +41,17 @@ namespace MonoDevelop.Projects.Extensions
 			set { guid = value; }
 		}
 
+		[NodeAttribute ("projectCapability", "Capabilities that the project must have in order for this extension to be loaded. " +
+			"It can be a single capability name or an expression like \"(VisualC | CSharp) & (MSTest | NUnit).")]
+		public string ProjectCapability { get; set; }
+
 		[NodeAttribute]
 		bool migrationRequired = true;
 
 		[NodeAttribute]
+#pragma warning disable CS0649
 		string migrationHandler;
+#pragma warning restore CS0649
 
 		[NodeAttribute ("msbuildSupport")]
 		public MSBuildSupport MSBuildSupport { get; set; }
@@ -54,6 +60,9 @@ namespace MonoDevelop.Projects.Extensions
 
 		[NodeAttribute ("alias", Description = "Friendly id of the extension")]
 		public string TypeAlias { get; set; }
+
+		[NodeAttribute ("language", Description = "Language name of the extension (C#/F# etc.)")]
+ 		public string LanguageName { get; set; }
 
 		public SolutionItemExtensionNode ()
 		{
@@ -86,11 +95,18 @@ namespace MonoDevelop.Projects.Extensions
 			if (p == null)
 				return false;
 
-			if (guid == null)
-				return true;
+			var pr = ob as Project;
 
-			var typeGuids = p.GetItemTypeGuids ();
-			return typeGuids.Any (g => string.Equals (g, guid, StringComparison.InvariantCultureIgnoreCase));
+			if (pr != null && ProjectCapability != null) {
+				if (!pr.IsCapabilityMatch (ProjectCapability))
+					return false;
+			}
+			if (guid != null) {
+				var typeGuids = p.GetItemTypeGuids ();
+				if (!typeGuids.Any (g => string.Equals (g, guid, StringComparison.InvariantCultureIgnoreCase)))
+					return false;
+			}
+			return true;
 		}
 
 		public override WorkspaceObjectExtension CreateExtension ()
@@ -98,6 +114,7 @@ namespace MonoDevelop.Projects.Extensions
 			var ext = (SolutionItemExtension) CreateInstance (typeof(SolutionItemExtension));
 			ext.FlavorGuid = Guid;
 			ext.TypeAlias = TypeAlias;
+			ext.LanguageName = LanguageName;
 			return ext;
 		}
 	}

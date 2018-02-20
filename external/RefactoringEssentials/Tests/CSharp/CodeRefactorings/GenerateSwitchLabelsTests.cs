@@ -1,13 +1,12 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.CodeRefactorings;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 {
-    [TestFixture]
     public class GenerateSwitchLabelsTests : CSharpCodeRefactoringTestBase
     {
-        [Test]
-        public void Test()
+        [Fact]
+        public void Test_GenerateSwitchLabels()
         {
             Test<GenerateSwitchLabelsCodeRefactoringProvider>(@"
 using System;
@@ -42,7 +41,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestAddMissing()
         {
             Test<GenerateSwitchLabelsCodeRefactoringProvider>(@"

@@ -34,6 +34,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Components;
+using MonoDevelop.Components.AtkCocoaHelper;
 
 namespace MonoDevelop.Ide.Gui.OptionPanels
 {
@@ -65,6 +66,8 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 		{
 			this.Build();
 			
+			textview1.SetMarkup (textview1.Buffer.Text);
+			
 			labelRunning.Markup = GettextCatalog.GetString (
 				"{0} is currently running on <b>{1}</b>.",
 				BrandingService.ApplicationName,
@@ -72,16 +75,17 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			);
 			store = new ListStore (typeof(string), typeof(object));
 			tree.Model = store;
-			
+			tree.SearchColumn = -1; // disable the interactive search
+
 			CellRendererText crt = new CellRendererText ();
-			tree.AppendColumn ("Runtime", crt, "markup", 0);
+			tree.AppendColumn (GettextCatalog.GetString ("Runtime"), crt, "markup", 0);
 			TargetRuntime defRuntime = IdeApp.Preferences.DefaultTargetRuntime;
 			
 			foreach (TargetRuntime tr in Runtime.SystemAssemblyService.GetTargetRuntimes ()) {
 				string name = tr.DisplayName;
 				TreeIter it;
 				if (tr == defRuntime) {
-					name = "<b>" + name + " (Default)</b>";
+					name = string.Format ("<b>{0} {1}</b>", name, GettextCatalog.GetString ("(Default)"));
 					defaultIter = it = store.AppendValues (name, tr);
 				} else
 					it = store.AppendValues (name, tr);
@@ -91,6 +95,20 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			
 			tree.Selection.Changed += HandleChanged;
 			UpdateButtons ();
+
+			SetupAccessibility ();
+		}
+
+		void SetupAccessibility ()
+		{
+			tree.SetCommonAccessibilityAttributes ("MonoRuntimePanel.tree", GettextCatalog.GetString ("Available Runtimes"),
+			                                       GettextCatalog.GetString ("A list of available runtimes"));
+			buttonAdd.SetCommonAccessibilityAttributes ("MonoRuntimePanel.add", "",
+			                                            GettextCatalog.GetString ("Click to install a new runtime"));
+			buttonRemove.SetCommonAccessibilityAttributes ("MonoRuntimePanel.remove", "",
+			                                               GettextCatalog.GetString ("Click to remove the currently selected runtime"));
+			buttonDefault.SetCommonAccessibilityAttributes ("MonoRuntimePanel.default", "",
+			                                                GettextCatalog.GetString ("Click to set the currently selected runtime as default"));
 		}
 
 		void HandleChanged(object sender, EventArgs e)
@@ -122,13 +140,13 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			return Environment.GetFolderPath (IntPtr.Size == 8?
 				Environment.SpecialFolder.ProgramFilesX86 : Environment.SpecialFolder.ProgramFiles);
 		}
-
+		
 		protected virtual void OnButtonAddClicked (object sender, System.EventArgs e)
 		{
 			var dlg = new SelectFolderDialog (GettextCatalog.GetString ("Select the mono installation prefix")) {
 				TransientFor = this.Toplevel as Gtk.Window,
 			};
-
+			
 			//set a platform-dependent default folder for the dialog if possible
 			if (Platform.IsWindows) {
 				// ProgramFilesX86 is broken on 32-bit WinXP
@@ -139,32 +157,17 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 				if (System.IO.Directory.Exists ("/usr"))
 					dlg.CurrentFolder = "/usr";
 			}
-
+			
 			if (!dlg.Run ())
 				return;
-
-			var rinfo64 = new MonoRuntimeInfo (dlg.SelectedFile, true);
-			var rinfo32 = new MonoRuntimeInfo (dlg.SelectedFile, false);
-			if (rinfo64.IsValidRuntime && rinfo32.IsValidRuntime) {
-				newInfos.Add (rinfo64);
-				store.AppendValues (rinfo64.DisplayName, rinfo64);
-				newInfos.Add (rinfo32);
-				store.AppendValues (rinfo32.DisplayName, rinfo32);
-			} else if (rinfo64.IsValidRuntime) {
-				newInfos.Add (rinfo64);
-				store.AppendValues (rinfo64.DisplayName, rinfo64);
-			} else if (rinfo32.IsValidRuntime) {
-				newInfos.Add (rinfo32);
-				store.AppendValues (rinfo32.DisplayName, rinfo32);
-			} else {
-				var rinfo = new MonoRuntimeInfo (dlg.SelectedFile, null);
-				if (rinfo.IsValidRuntime) {
-					newInfos.Add (rinfo);
-					store.AppendValues (rinfo.DisplayName, rinfo);
-				} else {
-					MessageService.ShowError (GettextCatalog.GetString ("Mono runtime not found"), GettextCatalog.GetString ("Please provide a valid directory prefix where mono is installed (for example, /usr)"));
-				}
+			
+			var rinfo = new MonoRuntimeInfo (dlg.SelectedFile);
+			if (!rinfo.IsValidRuntime) {
+				MessageService.ShowError (GettextCatalog.GetString ("Mono runtime not found"), GettextCatalog.GetString ("Please provide a valid directory prefix where mono is installed (for example, /usr)"));
+				return;
 			}
+			newInfos.Add (rinfo);
+			store.AppendValues (rinfo.DisplayName, rinfo);
 		}
 	
 		protected virtual void OnButtonRemoveClicked (object sender, System.EventArgs e)
@@ -208,7 +211,7 @@ namespace MonoDevelop.Ide.Gui.OptionPanels
 			else
 				text = ((TargetRuntime)ob).DisplayName;
 			if (store.GetPath (it).Equals (store.GetPath (defaultIter)))
-				text = "<b>" + text + " (Default)</b>";
+				text = string.Format ("<b>{0} {1}</b>", text, GettextCatalog.GetString ("(Default)"));
 			store.SetValue (it, 0, text);
 		}
 		

@@ -4,15 +4,10 @@ using System;
 using System.Threading;
 using System.Net.Sockets;
 using System.Net;
-using System.Diagnostics;
 using System.IO;
 using System.Collections.Generic;
-
-using System.Linq;
 using System.Threading.Tasks;
-using System.Text;
-using MonoDevelop.Core.Assemblies;
-using System.Reflection;
+using System.Linq;
 
 namespace MonoDevelop.Core.Execution
 {
@@ -20,7 +15,6 @@ namespace MonoDevelop.Core.Execution
 	{
 		bool initializationDone;
 		TaskCompletionSource<bool> processConnectedEvent = new TaskCompletionSource<bool> ();
-		ManualResetEvent processDisconnectedEvent = new ManualResetEvent (false);
 		ProcessAsyncOperation process;
 		ConnectionStatus status;
 		bool disposed;
@@ -133,7 +127,7 @@ namespace MonoDevelop.Core.Execution
 
 		public void Dispose ()
 		{
-			Disconnect (false);
+			Disconnect ().Ignore ();
 		}
 
 		public void AddListener (MessageListener listener)
@@ -155,34 +149,60 @@ namespace MonoDevelop.Core.Execution
 			}
 		}
 
+		[Obsolete ("Use Disconnect()")]
 		public void Disconnect (bool waitUntilDone)
 		{
+			if (waitUntilDone)
+				Disconnect ().Wait (TimeSpan.FromSeconds (7));
+			else
+				Disconnect ().Ignore ();
+		}
+
+		public async Task Disconnect ()
+		{
+			StopPinger ();
+		
+			if (process == null)
+				return;
+			
+			try {
+				// Send a stop message to try a graceful stop. Don't wait more than 2s for a response
+				var timeout = Task.Delay (2000);
+				if (await Task.WhenAny (SendMessage (new BinaryMessage ("Stop", "Process")), timeout) != timeout) {
+					// Wait for at most two seconds for the process to end
+					timeout = Task.Delay (4000);
+					if (await Task.WhenAny (process.Task, timeout) != timeout)
+						return; // All done!
+				}
+			} catch {
+			}
+
 			mainCancelSource.Cancel ();
 			mainCancelSource = new CancellationTokenSource ();
+
+			// The process did not gracefully stop. Kill the process.
 
 			try {
 				StopRemoteProcess ();
 			} catch {
 				// Ignore
 			}
-			if (waitUntilDone)
-				processDisconnectedEvent.WaitOne (TimeSpan.FromSeconds (7));
+			await process.Task;
 		}
 
-		public Task Connect ()
+		public async Task Connect ()
 		{
 			initializationDone = false;
 			AbortPendingMessages ();
 			if (listener != null && !disposed) {
 				// Disconnect the current session and reconnect
-				Disconnect (true);
+				await Disconnect ();
 			}
-			return StartConnecting ();
+			await StartConnecting ();
 		}
 
 		Task StartConnecting ()
 		{
-			processDisconnectedEvent.Reset ();
 			disposed = false;
 			SetStatus (ConnectionStatus.Connecting, "Connecting");
 			return DoConnect (mainCancelSource.Token);
@@ -225,8 +245,7 @@ namespace MonoDevelop.Core.Execution
 				var timeout = Task.Delay (ProcessInitializationTimeout, token).ContinueWith (t => {
 					if (t.IsCanceled)
 						return;
-					if (!processConnectedEvent.Task.IsCompleted)
-						processConnectedEvent.SetException (new Exception ("Could not start process"));
+					processConnectedEvent.TrySetException (new Exception ("Could not start process"));
 				});
 
 				await Task.WhenAny (timeout, processConnectedEvent.Task).ConfigureAwait (false);
@@ -257,7 +276,6 @@ namespace MonoDevelop.Core.Execution
 			token.ThrowIfCancellationRequested ();
 			StopRemoteProcess ();
 			SetStatus (ConnectionStatus.ConnectionFailed, ex.Message, ex);
-			processDisconnectedEvent.Set ();
 		}
 
 		Task StartRemoteProcess ()
@@ -265,6 +283,11 @@ namespace MonoDevelop.Core.Execution
 			return Task.Run (() => {
 				var cmd = Runtime.ProcessService.CreateCommand (exePath);
 				cmd.Arguments = ((IPEndPoint)listener.LocalEndpoint).Port + " " + DebugMode;
+
+				// Explicitly propagate the PATH var to the process. It ensures that tools required
+				// to run XS are also in the PATH for remote processes.
+				cmd.EnvironmentVariables ["PATH"] = Environment.GetEnvironmentVariable ("PATH");
+
 				process = executionHandler.Execute (cmd, console);
 				process.Task.ContinueWith (t => ProcessExited ());
 			});
@@ -275,7 +298,6 @@ namespace MonoDevelop.Core.Execution
 		{
 			if (!stopping)
 				AbortConnection (isAsync: true);
-			processDisconnectedEvent.Set ();
 		}
 
 		public async Task<RT> SendMessage<RT> (BinaryMessage<RT> message) where RT:BinaryMessage
@@ -395,7 +417,7 @@ namespace MonoDevelop.Core.Execution
 		void AbortConnection (string message = null, bool isAsync = false)
 		{
 			if (message == null)
-				message = "Disconnected from layout renderer";
+				message = "Disconnected from remote process";
 			AbortPendingMessages ();
 			disposed = true;
 			processConnectedEvent.TrySetResult (true);
@@ -410,7 +432,16 @@ namespace MonoDevelop.Core.Execution
 			lock (messageWaiters) {
 				foreach (var m in messageWaiters.Values)
 					NotifyResponse (m, m.Request.CreateErrorResponse ("Connection closed"));
+				messageWaiters.Clear ();
 				messageQueue.Clear ();
+			}
+		}
+
+		void StopPinger ()
+		{
+			if (pinger != null) {
+				pinger.Dispose ();
+				pinger = null;
 			}
 		}
 
@@ -420,11 +451,8 @@ namespace MonoDevelop.Core.Execution
 				stopping = true;
 
 			AbortConnection (isAsync: isAsync);
+			StopPinger ();
 
-			if (pinger != null) {
-				pinger.Dispose ();
-				pinger = null;
-			}
 			if (listener != null) {
 				listener.Stop ();
 				listener = null;
@@ -437,7 +465,7 @@ namespace MonoDevelop.Core.Execution
 				connection.Close ();
 				connection = null;
 			}
-			process.Cancel ();
+			process?.Cancel ();
 		}
 
 		void OnConnected (IAsyncResult res)
@@ -472,7 +500,7 @@ namespace MonoDevelop.Core.Execution
 				try {
 					int nr = await connectionStream.ReadAsync (buffer, 0, 1, mainCancelSource.Token).ConfigureAwait (false);
 					if (nr == 0) {
-						StopRemoteProcess (isAsync: true);
+						// Connection closed. Remote process should die by itself.
 						return;
 					}
 					type = buffer [0];
@@ -482,31 +510,66 @@ namespace MonoDevelop.Core.Execution
 						return;
 					LoggingService.LogError ("ReadMessage failed", ex);
 					StopRemoteProcess (isAsync: true);
-					PostSetStatus (ConnectionStatus.ConnectionFailed, "Connection to layout renderer failed.");
+					PostSetStatus (ConnectionStatus.ConnectionFailed, "Connection to remote process failed.");
 					return;
 				}
 
-				lock (pendingMessageTasks) {
-					var t = Task.Run (() => {
-						msg = LoadMessageData (msg);
-						if (type == 0)
-							ProcessResponse (msg);
-						else
-							ProcessRemoteMessage (msg);
-					});
-					t.ContinueWith (ta => {
-						pendingMessageTasks.Remove (ta);
-					});
+				HandleMessage (msg, type);
+			}
+		}
+
+		async void HandleMessage (BinaryMessage msg, byte type)
+		{
+			var t = Task.Run (() => {
+				msg = LoadMessageData (msg);
+				if (type == 0)
+					ProcessResponse (msg);
+				else
+					ProcessRemoteMessage (msg);
+			});
+
+			try {
+				lock (pendingMessageTasks)
 					pendingMessageTasks.Add (t);
-				}
+
+				await t.ConfigureAwait (false);
+			} catch (Exception e) {
+				LoggingService.LogError ("RemoteProcessConnection.HandleMessage failed", e);
+			} finally {
+				lock (pendingMessageTasks)
+					pendingMessageTasks.Remove (t);
 			}
 		}
 
 		List<Task> pendingMessageTasks = new List<Task> ();
 
+		/// <summary>
+		/// Waits for all messages received from the server to be processed.
+		/// Useful for example to ensure that all logging messages sent by
+		/// the server during a build operation are processed before closing the
+		/// connection.
+		/// </summary>
+		/// <returns>The pending messages.</returns>
 		public Task ProcessPendingMessages ()
 		{
-			return Task.WhenAll (pendingMessageTasks.ToArray ());
+			lock (pendingMessageTasks)
+				return Task.WhenAll (pendingMessageTasks.ToArray ());
+		}
+
+		/// <summary>
+		/// Waits for all queued messages to be processed. That is, when the
+		/// returned task completes, all messages in progess will have received
+		/// a response and all responses will have been processed.
+		/// </summary>
+		/// <returns>The queued messages.</returns>
+		public async Task ProcessQueuedMessages ()
+		{
+			Task[] waiters;
+			lock (messageWaiters)
+				waiters = messageWaiters.Values.Select (w => w.TaskSource.Task).ToArray ();
+
+			await Task.WhenAll (waiters);
+			await ProcessPendingMessages ();
 		}
 
 		BinaryMessage LoadMessageData (BinaryMessage msg)
@@ -523,9 +586,9 @@ namespace MonoDevelop.Core.Execution
 		void ProcessResponse (BinaryMessage msg)
 		{
 			DateTime respTime = DateTime.Now;
+			MessageRequest req;
 
 			lock (messageWaiters) {
-				MessageRequest req;
 				if (messageWaiters.TryGetValue (msg.Id, out req)) {
 					messageWaiters.Remove (msg.Id);
 					try {
@@ -544,12 +607,15 @@ namespace MonoDevelop.Core.Execution
 						LogMessage (MessageType.Response, msg, time);
 					}
 
-					if (!req.Request.OneWay)
-						NotifyResponse (req, msg);
-				}
-				else if (DebugMode)
+				} else if (DebugMode) {
+					req = null;
 					LogMessage (MessageType.Response, msg, -1);
+				}
 			}
+
+			// Notify the response outside the lock to avoid deadlocks
+			if (req != null && !req.Request.OneWay)
+				NotifyResponse (req, msg);
 		}
 
 		void NotifyResponse (MessageRequest req, BinaryMessage res)
@@ -574,14 +640,15 @@ namespace MonoDevelop.Core.Execution
 				LogMessage (MessageType.Message, msg);
 
 			if (msg.Name == "Connect") {
-				processConnectedEvent.SetResult (true);
+				processConnectedEvent.TrySetResult (true);
 				return;
 			}
 
-			Runtime.RunInMainThread (delegate {
-				if (MessageReceived != null)
-					MessageReceived (null, new MessageEventArgs () { Message = msg });
-			});
+			if (MessageReceived != null) {
+				Runtime.RunInMainThread (delegate {
+					MessageReceived?.Invoke (null, new MessageEventArgs () { Message = msg });
+				});
+			}
 
 			try {
 				foreach (var li in listeners) {

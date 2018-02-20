@@ -24,6 +24,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 nodeContext =>
                 {
@@ -41,10 +43,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         {
             var destructorDeclaration = nodeContext.Node as DestructorDeclarationSyntax;
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
 
-            if (!IsEmpty(destructorDeclaration.Body))
+            if (destructorDeclaration.ExpressionBody == null && !IsEmpty(destructorDeclaration.Body))
                 return false;
 
             diagnostic = Diagnostic.Create(

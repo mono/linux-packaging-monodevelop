@@ -33,7 +33,7 @@ using MonoDevelop.PackageManagement.Commands;
 
 namespace MonoDevelop.PackageManagement.NodeBuilders
 {
-	public class PackageReferenceNodeBuilder : TypeNodeBuilder
+	internal class PackageReferenceNodeBuilder : TypeNodeBuilder
 	{
 		public override Type NodeDataType {
 			get { return typeof(PackageReferenceNode); }
@@ -57,6 +57,7 @@ namespace MonoDevelop.PackageManagement.NodeBuilders
 		{
 			var packageReferenceNode = (PackageReferenceNode)dataObject;
 			nodeInfo.Label = packageReferenceNode.GetLabel ();
+			nodeInfo.SecondaryLabel = packageReferenceNode.GetSecondaryLabel ();
 			nodeInfo.Icon = Context.GetIcon (packageReferenceNode.GetIconId ());
 			nodeInfo.StatusSeverity = packageReferenceNode.GetStatusSeverity ();
 			nodeInfo.StatusMessage = packageReferenceNode.GetStatusMessage ();

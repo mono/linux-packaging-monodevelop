@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class UseMethodIsInstanceOfTypeTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBasicUsage()
         {
             Test<UseMethodIsInstanceOfTypeAnalyzer>(@"using System;
@@ -33,7 +32,7 @@ class FooBar
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestDisable()
         {
             Analyze<UseMethodIsInstanceOfTypeAnalyzer>(@"using System;
@@ -53,3 +52,4 @@ class FooBar
     }
 }
 
+*/

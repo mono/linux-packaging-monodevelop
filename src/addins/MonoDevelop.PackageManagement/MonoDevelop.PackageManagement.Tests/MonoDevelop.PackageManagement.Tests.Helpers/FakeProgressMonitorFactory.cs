@@ -24,8 +24,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using System;
 using MonoDevelop.Core;
+using System.Threading;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
@@ -33,10 +33,26 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 	{
 		public FakeProgressMonitor ProgressMonitor = new FakeProgressMonitor ();
 		public string StatusText;
+		public bool ClearConsole;
 
 		public ProgressMonitor CreateProgressMonitor (string statusText)
 		{
+			return CreateProgressMonitor (statusText, true);
+		}
+
+		public ProgressMonitor CreateProgressMonitor (string statusText, bool clearConsole)
+		{
+			return CreateProgressMonitor (statusText, clearConsole, null);
+		}
+
+		public ProgressMonitor CreateProgressMonitor (
+			string statusText,
+			bool clearConsole,
+			CancellationTokenSource cancellationTokenSource)
+		{
 			StatusText = statusText;
+			ClearConsole = clearConsole;
+			ProgressMonitor.SetCancellationTokenSource (cancellationTokenSource);
 			return ProgressMonitor;
 		}
 	}

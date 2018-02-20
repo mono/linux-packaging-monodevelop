@@ -36,7 +36,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
 using MonoDevelop.Projects;
-using Mono.Cecil.Cil;
 using MonoDevelop.Ide.Editor;
 using MonoDevelop.Core.Text;
 using Gtk;
@@ -45,7 +44,7 @@ using System.Threading.Tasks;
 
 namespace MonoDevelop.SourceEditor
 {
-	class LanguageItemTooltipProvider: TooltipProvider, IDisposable
+	class LanguageItemTooltipProvider : TooltipProvider, IDisposable
 	{
 		#region ITooltipProvider implementation 
 		public override async Task<TooltipItem> GetItem (TextEditor editor, DocumentContext ctx, int offset, CancellationToken token = default(CancellationToken))
@@ -68,14 +67,26 @@ namespace MonoDevelop.SourceEditor
 			}
 			if (!syntaxToken.Span.IntersectsWith (offset))
 				return null;
-			var symbolInfo = unit.GetSymbolInfo (syntaxToken.Parent, token);
-			var symbol = symbolInfo.Symbol ?? unit.GetDeclaredSymbol (syntaxToken.Parent, token);
+			var node = GetBestFitResolveableNode (syntaxToken.Parent);
+			var symbolInfo = unit.GetSymbolInfo (node, token);
+			var symbol = symbolInfo.Symbol ?? unit.GetDeclaredSymbol (node, token);
 			var tooltipInformation = await CreateTooltip (symbol, syntaxToken, editor, ctx, offset);
 			if (tooltipInformation == null || string.IsNullOrEmpty (tooltipInformation.SignatureMarkup))
 				return null;
 			return new TooltipItem (tooltipInformation, syntaxToken.Span.Start, syntaxToken.Span.Length);
 		}
-		
+
+		static SyntaxNode GetBestFitResolveableNode (SyntaxNode node)
+		{
+			// case constructor name : new Foo (); 'Foo' only resolves to the type not to the constructor
+			if (node.Parent.IsKind (SyntaxKind.ObjectCreationExpression)) {
+				var oce = (ObjectCreationExpressionSyntax)node.Parent;
+				if (oce.Type == node)
+					return oce;
+			}
+			return node;
+		}
+
 		static TooltipInformationWindow lastWindow = null;
 
 		static void DestroyLastTooltipWindow ()
@@ -99,7 +110,7 @@ namespace MonoDevelop.SourceEditor
 		#endregion
 
 
-		public override Control CreateTooltipWindow (TextEditor editor, DocumentContext ctx, TooltipItem item, int offset, Xwt.ModifierKeys modifierState)
+		public override Components.Window CreateTooltipWindow (TextEditor editor, DocumentContext ctx, TooltipItem item, int offset, Xwt.ModifierKeys modifierState)
 		{
 			var doc = ctx;
 			if (doc == null)
@@ -128,7 +139,7 @@ namespace MonoDevelop.SourceEditor
 					return result;
 				
 				if (symbol != null) {
-					result = await RoslynSymbolCompletionData.CreateTooltipInformation (CancellationToken.None, editor, doc, symbol, false, true);
+					result = await QuickInfoProvider.GetQuickInfoAsync (editor, doc, symbol);
 				}
 				
 				return result;
@@ -138,14 +149,53 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 
-		public override void GetRequiredPosition (TextEditor editor, Control tipWindow, out int requiredWidth, out double xalign)
+		public override void GetRequiredPosition (TextEditor editor, Components.Window tipWindow, out int requiredWidth, out double xalign)
 		{
 			var win = (TooltipInformationWindow)tipWindow;
-			requiredWidth = win.Allocation.Width;
+			requiredWidth = (int)win.Width;
 			xalign = 0.5;
 		}
 
-		#endregion 
+		public override bool IsInteractive(TextEditor editor, Components.Window tipWindow)
+		{
+			return true;
+		}
+		#endregion
 
+		public static Task<TooltipInformation> CreateTooltipInformation (CancellationToken ctoken, MonoDevelop.Ide.Editor.TextEditor editor, MonoDevelop.Ide.Editor.DocumentContext ctx, ISymbol entity, bool smartWrap, bool createFooter = false, SemanticModel model = null)
+		{
+			var tooltipInfo = new TooltipInformation ();
+
+			var sig = new SignatureMarkupCreator (ctx, editor != null ? editor.CaretOffset : 0);
+			sig.SemanticModel = model;
+			sig.BreakLineAfterReturnType = smartWrap;
+
+			return Task.Run (() => {
+				if (ctoken.IsCancellationRequested)
+					return null;
+				try {
+					tooltipInfo.SignatureMarkup = sig.GetMarkup (entity);
+				} catch (Exception e) {
+					LoggingService.LogError ("Got exception while creating markup for :" + entity, e);
+					return new TooltipInformation ();
+				}
+
+				if (ctoken.IsCancellationRequested)
+					return null;
+
+				tooltipInfo.SummaryMarkup = Ambience.GetSummaryMarkup (entity) ?? "";
+
+				if (entity is IMethodSymbol) {
+					var method = (IMethodSymbol)entity;
+					if (method.IsExtensionMethod) {
+						tooltipInfo.AddCategory (GettextCatalog.GetString ("Extension Method from"), method.ContainingType.Name);
+					}
+				}
+				if (createFooter) {
+					tooltipInfo.FooterMarkup = sig.CreateFooter (entity);
+				}
+				return tooltipInfo;
+			});
+		}
 	}
 }

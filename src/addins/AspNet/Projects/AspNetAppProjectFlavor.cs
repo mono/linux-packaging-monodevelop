@@ -125,7 +125,7 @@ namespace MonoDevelop.AspNet.Projects
 
 		protected override ProjectFeatures OnGetSupportedFeatures ()
 		{
-			return base.OnGetSupportedFeatures () | ProjectFeatures.Execute;
+			return (base.OnGetSupportedFeatures () | ProjectFeatures.Execute) & ~ProjectFeatures.RunConfigurations;
 		}
 
 		protected override Task<BuildResult> OnBuild (ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext)
@@ -159,19 +159,19 @@ namespace MonoDevelop.AspNet.Projects
 			};
 		}
 
-		protected override bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration)
+		protected override bool OnGetCanExecute (ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
 		{
 			var cmd = CreateExecutionCommand (configuration, GetConfiguration (configuration));
 			return context.ExecutionHandler.CanExecute (cmd);
 		}
 
-		protected async override Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration)
+		protected async override Task OnExecute (ProgressMonitor monitor, ExecutionContext context, ConfigurationSelector configuration, SolutionItemRunConfiguration runConfiguration)
 		{
 			//check XSP is available
 
 			var cfg = GetConfiguration (configuration);
 			var cmd = CreateExecutionCommand (configuration, cfg);
-			var browserExcTarget = (BrowserExecutionTarget) context.ExecutionTarget;
+			var browserExcTarget = context.ExecutionTarget as BrowserExecutionTarget;
 
 			OperationConsole console = null;
 
@@ -190,10 +190,7 @@ namespace MonoDevelop.AspNet.Projects
 					}
 				}
 
-				if (cfg.ExternalConsole)
-					console = context.ExternalConsoleFactory.CreateConsole (!cfg.PauseConsoleOutput, monitor.CancellationToken);
-				else
-					console = context.ConsoleFactory.CreateConsole (monitor.CancellationToken);
+				console = context.ConsoleFactory.CreateConsole (monitor.CancellationToken);
 
 				// The running Port value is now captured in the XspBrowserLauncherConsole object
 				string url = String.Format ("http://{0}", XspParameters.Address);
@@ -208,7 +205,7 @@ namespace MonoDevelop.AspNet.Projects
 					});
 				}
 
-				monitor.Log.WriteLine ("Running web server...");
+				monitor.Log.WriteLine (GettextCatalog.GetString ("Running web server..."));
 
 				var op = context.ExecutionHandler.Execute (cmd, console);
 
@@ -222,13 +219,13 @@ namespace MonoDevelop.AspNet.Projects
 				using (monitor.CancellationToken.Register (op.Cancel))
 					await op.Task;
 
-				monitor.Log.WriteLine ("The web server exited with code: {0}", op.ExitCode);
+				monitor.Log.WriteLine (GettextCatalog.GetString ("The web server exited with code: {0}", op.ExitCode));
 
 			} catch (Exception ex) {
 				if (!(ex is UserException)) {
 					LoggingService.LogError ("Could not launch ASP.NET web server.", ex);
 				}
-				monitor.ReportError ("Could not launch web server.", ex);
+				monitor.ReportError (GettextCatalog.GetString ("Could not launch web server."), ex);
 			} finally {
 				if (console != null)
 					console.Dispose ();

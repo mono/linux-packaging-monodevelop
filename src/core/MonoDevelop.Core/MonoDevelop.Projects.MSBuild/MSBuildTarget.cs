@@ -212,7 +212,13 @@ namespace MonoDevelop.Projects.MSBuild
 		public bool IsImported { get; internal set; }
 
 		public IEnumerable<MSBuildTask> Tasks {
-			get { return ChildNodes.OfType<MSBuildTask> (); }
+			get {
+				foreach (var node in ChildNodes) {
+					var task = node as MSBuildTask;
+					if (task != null)
+						yield return task;
+				}
+			}
 		}
 
 		public void RemoveTask (MSBuildTask task)
@@ -222,6 +228,11 @@ namespace MonoDevelop.Projects.MSBuild
 				throw new InvalidOperationException ("Task doesn't belong to the target");
 			task.RemoveIndent ();
 			ChildNodes = ChildNodes.Remove (task);
+		}
+
+		public override string ToString ()
+		{
+			return string.Format ("<Target Name='{0}'>", Name);
 		}
 	}
 

@@ -121,7 +121,7 @@ namespace MonoDevelop.Core
 		{
 			if (!File.Exists (path) || IsFolderCaseSensitive (path.ParentDirectory))
 				return path.FileName;
-			var file = Directory.GetFiles (path.ParentDirectory).FirstOrDefault (f => string.Equals (path.FileName, Path.GetFileName (f), StringComparison.CurrentCultureIgnoreCase));
+			var file = Directory.EnumerateFiles (path.ParentDirectory).FirstOrDefault (f => string.Equals (path.FileName, Path.GetFileName (f), StringComparison.CurrentCultureIgnoreCase));
 			return file ?? path.FileName;
 		}
 		
@@ -339,6 +339,17 @@ namespace MonoDevelop.Core
 			}
 		}
 
+		internal static void NotifyDirectoryRenamed (string oldPath, string newPath)
+		{
+			try {
+				OnFileRenamed (new FileCopyEventArgs (oldPath, newPath, true));
+				OnFileCreated (new FileEventArgs (newPath, true));
+				OnFileRemoved (new FileEventArgs (oldPath, true));
+			} catch (Exception ex) {
+				LoggingService.LogError ("Directory rename notification failed", ex);
+			}
+		}
+
 		internal static FileSystemExtension GetFileSystemForPath (string path, bool isDirectory)
 		{
 			Debug.Assert (!String.IsNullOrEmpty (path));
@@ -454,7 +465,7 @@ namespace MonoDevelop.Core
 				// handle case a: some/path b: some/path/deeper...
 				if (a >= aEnd) {
 					if (IsSeparator (*b)) {
-						lastStartA = a + 1;
+						lastStartA = aEnd;
 						lastStartB = b;
 					}
 				}
@@ -466,7 +477,16 @@ namespace MonoDevelop.Core
 						goUpCount++;
 					lastStartB++;
 				}
-				var size = goUpCount * 2 + goUpCount + aEnd - lastStartA;
+				int remainingPathLength = (int)(aEnd - lastStartA);
+				int size = 0;
+				if (goUpCount > 0)
+					size = goUpCount * 2 + goUpCount - 1;
+				if (remainingPathLength > 0) {
+					if (goUpCount > 0)
+						size++;
+					size += remainingPathLength;
+				}
+				
 				var result = new char [size];
 				fixed (char* rPtr = result) {
 					// go paths up
@@ -474,7 +494,8 @@ namespace MonoDevelop.Core
 					for (int i = 0; i < goUpCount; i++) {
 						*(r++) = '.';
 						*(r++) = '.';
-						*(r++) = Path.DirectorySeparatorChar;
+						if (i != goUpCount - 1 || remainingPathLength > 0) // If there is no remaining path, there is no need for a trailing slash
+							*(r++) = Path.DirectorySeparatorChar;
 					}
 					// copy the remaining absulute path
 					while (lastStartA < aEnd)
@@ -491,7 +512,7 @@ namespace MonoDevelop.Core
 
 		public static bool IsValidPath (string fileName)
 		{
-			if (String.IsNullOrEmpty (fileName) || fileName.Trim() == string.Empty)
+			if (string.IsNullOrWhiteSpace (fileName))
 				return false;
 			if (fileName.IndexOfAny (FilePath.GetInvalidPathChars ()) >= 0)
 				return false;
@@ -501,7 +522,7 @@ namespace MonoDevelop.Core
 
 		public static bool IsValidFileName (string fileName)
 		{
-			if (String.IsNullOrEmpty (fileName) || fileName.Trim() == string.Empty)
+			if (string.IsNullOrWhiteSpace (fileName))
 				return false;
 			if (fileName.IndexOfAny (FilePath.GetInvalidFileNameChars ()) >= 0)
 				return false;
@@ -544,12 +565,37 @@ namespace MonoDevelop.Core
 
 		public static string NormalizeRelativePath (string path)
 		{
-			string result = path.Trim (Path.DirectorySeparatorChar, ' ');
-			while (result.StartsWith ("." + Path.DirectorySeparatorChar)) {
-				result = result.Substring (2);
-				result = result.Trim (Path.DirectorySeparatorChar);
+			if (path.Length == 0)
+				return string.Empty;
+			
+			int i;
+			for (i = 0; i < path.Length; ++i) {
+				if (path [i] != Path.DirectorySeparatorChar && path [i] != ' ')
+					break;
 			}
-			return result == "." ? "" : result;
+
+			var maxLen = path.Length - 1;
+			while (i < maxLen) {
+				if (path [i] != '.' || path [i + 1] != Path.DirectorySeparatorChar)
+					break;
+				
+				i += 2;
+				while (i < maxLen && i == Path.DirectorySeparatorChar)
+					i++;
+			}
+
+			int j;
+			for (j = maxLen; j > i; --j) {
+				if (path [j] != Path.DirectorySeparatorChar) {
+					j++;
+					break;
+				}
+			}
+
+			if (j - i == 1 && path [i] == '.')
+				return string.Empty;
+
+			return path.Substring (i, j - i);
 		}
 
 		// Atomic rename of a file. It does not fire events.
@@ -561,55 +607,44 @@ namespace MonoDevelop.Core
 			if (string.IsNullOrEmpty (destFile))
 				throw new ArgumentException ("destFile");
 
-			//FIXME: use the atomic System.IO.File.Replace on NTFS
 			if (Platform.IsWindows) {
-				string wtmp = null;
-				if (File.Exists (destFile)) {
-					do {
-						wtmp = Path.Combine (Path.GetTempPath (), Guid.NewGuid ().ToString ());
-					} while (File.Exists (wtmp));
+				WindowsRename (sourceFile, destFile);
+			} else {
+				UnixRename (sourceFile, destFile);
+			}
+		}
 
-					File.Move (destFile, wtmp);
-				}
+		static void WindowsRename (string sourceFile, string destFile)
+		{
+			//Replace fails if the target file doesn't exist, so in that case try a simple move
+			if (!File.Exists (destFile)) {
 				try {
 					File.Move (sourceFile, destFile);
-				}
-				catch {
-					try {
-						if (wtmp != null)
-							File.Move (wtmp, destFile);
-					}
-					catch {
-						wtmp = null;
-					}
-					throw;
-				}
-				finally {
-					if (wtmp != null) {
-						try {
-							File.Delete (wtmp);
-						}
-						catch { }
-					}
+					return;
+				} catch {
 				}
 			}
-			else {
-				if (Syscall.rename (sourceFile, destFile) != 0) {
-					switch (Stdlib.GetLastError ()) {
-					case Errno.EACCES:
-					case Errno.EPERM:
-						throw new UnauthorizedAccessException ();
-					case Errno.EINVAL:
-						throw new InvalidOperationException ();
-					case Errno.ENOTDIR:
-						throw new DirectoryNotFoundException ();
-					case Errno.ENOENT:
-						throw new FileNotFoundException ();
-					case Errno.ENAMETOOLONG:
-						throw new PathTooLongException ();
-					default:
-						throw new IOException ();
-					}
+
+			File.Replace (sourceFile, destFile, null);
+		}
+
+		static void UnixRename (string sourceFile, string destFile)
+		{
+			if (Stdlib.rename (sourceFile, destFile) != 0) {
+				switch (Stdlib.GetLastError ()) {
+				case Errno.EACCES:
+				case Errno.EPERM:
+					throw new UnauthorizedAccessException ();
+				case Errno.EINVAL:
+					throw new InvalidOperationException ();
+				case Errno.ENOTDIR:
+					throw new DirectoryNotFoundException ();
+				case Errno.ENOENT:
+					throw new FileNotFoundException ();
+				case Errno.ENAMETOOLONG:
+					throw new PathTooLongException ();
+				default:
+					throw new IOException ();
 				}
 			}
 		}
@@ -626,7 +661,7 @@ namespace MonoDevelop.Core
 		{
 			if (Directory.Exists (destDir) && string.Equals (Path.GetFullPath (sourceDir), Path.GetFullPath (destDir), StringComparison.CurrentCultureIgnoreCase)) {
 				// If the destination directory exists but we can't find it with the provided name casing, then it means we are just changing the case
-				var existingDir = Directory.GetDirectories (Path.GetDirectoryName (destDir), Path.GetFileName (destDir)).FirstOrDefault ();
+				var existingDir = Directory.EnumerateDirectories (Path.GetDirectoryName (destDir), Path.GetFileName (destDir)).FirstOrDefault ();
 				if (existingDir == null || (Path.GetFileName (existingDir) == Path.GetFileName (sourceDir))) {
 					var temp = destDir + ".renaming";
 					int n = 0;
@@ -649,9 +684,7 @@ namespace MonoDevelop.Core
 		/// </summary>
 		public static void RemoveDirectoryIfEmpty (string directory)
 		{
-			// HACK: we should use EnumerateFiles but it's broken in some Mono releases
-			// https://bugzilla.xamarin.com/show_bug.cgi?id=2975
-			if (Directory.Exists (directory) && !Directory.GetFiles (directory).Any ())
+			if (Directory.Exists (directory) && !Directory.EnumerateFiles (directory).Any ())
 				Directory.Delete (directory);
 		}
 
@@ -696,19 +729,19 @@ namespace MonoDevelop.Core
 					Counters.FilesCreated++;
 			}
 
-			eventQueue.RaiseEvent (() => FileCreated, args);
+			eventQueue.RaiseEvent (FileCreated, args);
 		}
 
 		public static event EventHandler<FileCopyEventArgs> FileCopied;
 		static void OnFileCopied (FileCopyEventArgs args)
 		{
-			eventQueue.RaiseEvent (() => FileCopied, args);
+			eventQueue.RaiseEvent (FileCopied, args);
 		}
 
 		public static event EventHandler<FileCopyEventArgs> FileMoved;
 		static void OnFileMoved (FileCopyEventArgs args)
 		{
-			eventQueue.RaiseEvent (() => FileMoved, args);
+			eventQueue.RaiseEvent (FileMoved, args);
 		}
 
 		public static event EventHandler<FileCopyEventArgs> FileRenamed;
@@ -721,7 +754,7 @@ namespace MonoDevelop.Core
 					Counters.FilesRenamed++;
 			}
 
-			eventQueue.RaiseEvent (() => FileRenamed, args);
+			eventQueue.RaiseEvent (FileRenamed, args);
 		}
 
 		public static event EventHandler<FileEventArgs> FileRemoved;
@@ -734,14 +767,14 @@ namespace MonoDevelop.Core
 					Counters.FilesRemoved++;
 			}
 
-			eventQueue.RaiseEvent (() => FileRemoved, args);
+			eventQueue.RaiseEvent (FileRemoved, args);
 		}
 
 		public static event EventHandler<FileEventArgs> FileChanged;
 		static void OnFileChanged (FileEventArgs args)
 		{
 			Counters.FileChangeNotifications++;
-			eventQueue.RaiseEvent (() => FileChanged, null, args);
+			eventQueue.RaiseEvent (FileChanged, null, args);
 		}
 
 		public static Task<bool> UpdateDownloadedCacheFile (string url, string cacheFile,
@@ -816,14 +849,45 @@ namespace MonoDevelop.Core
 
 	class EventQueue
 	{
-		class EventData
+		class EventData<TArgs> : EventData where TArgs:EventArgs
 		{
-			public Func<Delegate> Delegate;
+			public EventHandler<TArgs> Delegate;
+			public TArgs Args;
 			public object ThisObject;
-			public EventArgs Args;
+
+			public override void Invoke ()
+			{
+				Delegate?.Invoke (ThisObject, Args);
+			}
+
+			public override bool ShouldMerge (EventData other)
+			{
+				var next = (EventData<TArgs>)other;
+				return (next.Args.GetType () == Args.GetType ()) && next.Delegate == Delegate && next.ThisObject == ThisObject;
+			}
+
+			public override bool IsChainArgs ()
+			{
+				return Args is IEventArgsChain;
+			}
+
+			public override void MergeArgs (EventData other)
+			{
+				var next = (EventData<TArgs>)other;
+				((IEventArgsChain)next.Args).MergeWith ((IEventArgsChain)Args);
+			}
+		}
+
+		abstract class EventData
+		{
+			public abstract void Invoke ();
+			public abstract bool ShouldMerge (EventData other);
+			public abstract void MergeArgs (EventData other);
+			public abstract bool IsChainArgs ();
 		}
 
 		List<EventData> events = new List<EventData> ();
+		readonly object lockObject = new object ();
 
 		int frozen;
 		object defaultSourceObject;
@@ -839,7 +903,7 @@ namespace MonoDevelop.Core
 
 		public void Freeze ()
 		{
-			lock (events) {
+			lock (lockObject) {
 				frozen++;
 			}
 		}
@@ -856,32 +920,29 @@ namespace MonoDevelop.Core
 			if (pendingEvents != null) {
 				for (int n=0; n<pendingEvents.Count; n++) {
 					EventData ev = pendingEvents [n];
-					Delegate del = ev.Delegate ();
-					if (ev.Args is IEventArgsChain) {
+					if (ev.IsChainArgs ()) {
 						EventData next = n < pendingEvents.Count - 1 ? pendingEvents [n + 1] : null;
-						if (next != null && (next.Args.GetType() == ev.Args.GetType ()) && next.Delegate() == del && next.ThisObject == ev.ThisObject) {
-							((IEventArgsChain)next.Args).MergeWith ((IEventArgsChain)ev.Args);
+						if (next != null && ev.ShouldMerge (next)) {
+							next.MergeArgs (ev);
 							continue;
 						}
 					}
-					if (del != null)
-						del.DynamicInvoke (ev.ThisObject, ev.Args);
+					ev.Invoke ();
 				}
 			}
 		}
 
-		public void RaiseEvent (Func<Delegate> d, EventArgs args)
+		public void RaiseEvent<TArgs> (EventHandler<TArgs> del, TArgs args) where TArgs : EventArgs
 		{
-			RaiseEvent (d, defaultSourceObject, args);
+			RaiseEvent (del, defaultSourceObject, args);
 		}
 
-		public void RaiseEvent (Func<Delegate> d, object thisObj, EventArgs args)
+		public void RaiseEvent<TArgs> (EventHandler<TArgs> del, object thisObj, TArgs args) where TArgs:EventArgs
 		{
-			Delegate del = d ();
-			lock (events) {
+			lock (lockObject) {
 				if (frozen > 0) {
-					EventData ed = new EventData ();
-					ed.Delegate = d;
+					var ed = new EventData<TArgs> ();
+					ed.Delegate = del;
 					ed.ThisObject = thisObj;
 					ed.Args = args;
 					events.Add (ed);
@@ -889,9 +950,13 @@ namespace MonoDevelop.Core
 				}
 			}
 			if (del != null) {
-				Runtime.MainSynchronizationContext.Post (delegate {
-					del.DynamicInvoke (thisObj, args);
-				}, null);
+				if (Runtime.IsMainThread) {
+					del.Invoke (thisObj, args);
+				} else {
+					Runtime.MainSynchronizationContext.Post (delegate {
+						del.Invoke (thisObj, args);
+					}, null);
+				}
 			}
 		}
 	}

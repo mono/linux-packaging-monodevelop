@@ -26,6 +26,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.IO;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
@@ -147,7 +148,8 @@ namespace MonoDevelop.Core
 				return Path.GetExtension (fileName);
 			}
 		}
-		
+
+		[Pure]
 		public bool HasExtension (string extension)
 		{
 			return fileName.Length > extension.Length
@@ -171,12 +173,20 @@ namespace MonoDevelop.Core
 			get { return Path.IsPathRooted (fileName); }
 		}
 
+		[Pure]
 		public bool IsChildPathOf (FilePath basePath)
 		{
-			if (basePath.fileName [basePath.fileName.Length - 1] != Path.DirectorySeparatorChar)
-				return fileName.StartsWith (basePath.fileName + Path.DirectorySeparatorChar, PathComparison);
-			else
-				return fileName.StartsWith (basePath.fileName, PathComparison);
+			bool startsWith = fileName.StartsWith (basePath.fileName, PathComparison);
+			if (startsWith && basePath.fileName [basePath.fileName.Length - 1] != Path.DirectorySeparatorChar) {
+				// If the last character isn't a path separator character, check whether the string we're searching in
+				// has more characters than the string we're looking for then check the character.
+				// Otherwise, if the path lengths are equal, we return false.
+				if (fileName.Length > basePath.fileName.Length)
+					startsWith &= fileName [basePath.fileName.Length] == Path.DirectorySeparatorChar;
+				else
+					startsWith = false;
+			}
+			return startsWith;
 		}
 
 		public FilePath ChangeExtension (string ext)
@@ -189,11 +199,13 @@ namespace MonoDevelop.Core
 		/// </summary>
 		/// <returns>The new file path</returns>
 		/// <param name="newName">New file name</param>
+		[Pure]
 		public FilePath ChangeName (string newName)
 		{
 			return ParentDirectory.Combine (newName) + Extension;
 		}
 
+		[Pure]
 		public FilePath Combine (params FilePath[] paths)
 		{
 			string path = fileName;
@@ -202,9 +214,34 @@ namespace MonoDevelop.Core
 			return new FilePath (path);
 		}
 
+		[Pure]
+		public FilePath Combine (FilePath path)
+		{
+			return new FilePath (Path.Combine (fileName, path.fileName));
+		}
+
+		[Pure]
+		public FilePath Combine (FilePath path1, FilePath path2)
+		{
+			return new FilePath (Path.Combine (fileName, path1.fileName, path2.fileName));
+		}
+
+		[Pure]
 		public FilePath Combine (params string[] paths)
 		{
 			return new FilePath (Path.Combine (fileName, Path.Combine (paths)));
+		}
+
+		[Pure]
+		public FilePath Combine (string path)
+		{
+			return new FilePath (Path.Combine (fileName, path));
+		}
+
+		[Pure]
+		public FilePath Combine (string path1, string path2)
+		{
+			return new FilePath (Path.Combine (fileName, path1, path2));
 		}
 		
 		public Task DeleteAsync ()
@@ -264,11 +301,25 @@ namespace MonoDevelop.Core
 		/// <summary>
 		/// Builds a path by combining all provided path sections
 		/// </summary>
+		[Pure]
 		public static FilePath Build (params string[] paths)
 		{
 			return Empty.Combine (paths);
 		}
-		
+
+		[Pure]
+		public static FilePath Build (string path)
+		{
+			return Empty.Combine (path);
+		}
+
+		[Pure]
+		public static FilePath Build (string path1, string path2)
+		{
+			return Empty.Combine (path1, path2);
+		}
+
+		[Pure]
 		public static FilePath GetCommonRootPath (IEnumerable<FilePath> paths)
 		{
 			FilePath root = FilePath.Null;
@@ -355,7 +406,7 @@ namespace MonoDevelop.Core
 
 		#region IEquatable<FilePath> Members
 
-		bool IEquatable<FilePath>.Equals (FilePath other)
+		public bool Equals (FilePath other)
 		{
 			return this == other;
 		}

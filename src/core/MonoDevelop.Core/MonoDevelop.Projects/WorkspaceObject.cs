@@ -37,6 +37,7 @@ using System.Threading.Tasks;
 using System.Runtime.Remoting.Messaging;
 using MonoDevelop.Core.StringParsing;
 using System.Threading;
+using MonoDevelop.Core.AddIns;
 
 
 namespace MonoDevelop.Projects
@@ -66,8 +67,7 @@ namespace MonoDevelop.Projects
 			if (!initializeCalled) {
 				initializeCalled = true;
 
-				extensionContext = AddinManager.CreateExtensionContext ();
-				extensionContext.RegisterCondition ("ItemType", new ItemTypeCondition (GetType ()));
+				extensionContext = CreateExtensionContext (this);
 
 				OnInitialize ();
 				InitializeExtensionChain ();
@@ -378,10 +378,10 @@ namespace MonoDevelop.Projects
 			foreach (ProjectModelExtensionNode node in GetModelExtensions (extensionContext)) {
 				if (node.CanHandleObject (this)) {
 					var ext = node.CreateExtension ();
-					if (ext.SupportsObject (this))
+					if (ext.SupportsObject (this)) {
+						ext.SourceExtensionNode = node;
 						extensions.Add (ext);
-					else
-						ext.Dispose ();
+					}
 				}
 			}
 
@@ -391,7 +391,10 @@ namespace MonoDevelop.Projects
 			// Now create the final extension chain
 
 			extensions.Reverse ();
-			extensions.AddRange (CreateDefaultExtensions ().Reverse ());
+			var defaultExts = CreateDefaultExtensions ().ToList ();
+			defaultExts.Reverse ();
+			extensionChain.SetDefaultInsertionPosition (defaultExts.FirstOrDefault ());
+			extensions.AddRange (defaultExts);
 			extensionChain = ExtensionChain.Create (extensions.ToArray ());
 			foreach (var e in extensions)
 				e.Init (this);
@@ -407,7 +410,7 @@ namespace MonoDevelop.Projects
 		internal static IEnumerable<ProjectModelExtensionNode> GetModelExtensions (ExtensionContext ctx)
 		{
 			if (ctx != null) {
-				return Runtime.RunInMainThread (() => ctx.GetExtensionNodes (ProjectService.ProjectModelExtensionsPath).Cast<ProjectModelExtensionNode> ().Concat (customNodes).ToArray ()).Result;
+				return Runtime.RunInMainThread (() => ctx.GetExtensionNodes (ProjectService.ProjectModelExtensionsPath)).Result.Cast<ProjectModelExtensionNode> ().Concat (customNodes).ToArray ();
 			}
 			else {
 				if (modelExtensions == null)
@@ -430,7 +433,93 @@ namespace MonoDevelop.Projects
 
 		static void LoadExtensions ()
 		{
-			modelExtensions = AddinManager.GetExtensionNodes<ProjectModelExtensionNode> (ProjectService.ProjectModelExtensionsPath).Concat (customNodes).ToArray ();
+			// Create a context for loading the default extensions. The context is necessary because
+			// the conditions declared in the extension point must always be present.
+			var extensionContext = CreateExtensionContext (null);
+			modelExtensions = extensionContext.GetExtensionNodes<ProjectModelExtensionNode> (ProjectService.ProjectModelExtensionsPath).Concat (customNodes).ToArray ();
+		}
+
+		static ExtensionContext CreateExtensionContext (WorkspaceObject targetObject)
+		{
+			var extensionContext = AddinManager.CreateExtensionContext ();
+			if (targetObject == null) {
+				extensionContext.RegisterCondition ("ItemType", FalseCondition.Instance);
+				extensionContext.RegisterCondition ("AppliesTo", FalseCondition.Instance);
+			} else {
+				extensionContext.RegisterCondition ("ItemType", new ItemTypeCondition (targetObject.GetType ()));
+				extensionContext.RegisterCondition ("AppliesTo", new AppliesToCondition (targetObject));
+			}
+			return extensionContext;
+		}
+
+		/// <summary>
+		/// Ensures that this project has the extensions it requires according to its current state
+		/// </summary>
+		/// <remarks>
+		/// This method will load new extensions that this project supports and will unload extensions that are not supported anymore.
+		/// The set of extensions that a project supports may change over time, depending on the status of the project.
+		/// </remarks>
+		public void RefreshExtensions ()
+		{
+			// First of all look for new extensions that should be attached
+
+			// Get the list of nodes for which an extension has been created
+
+			var allExtensions = extensionChain.GetAllExtensions ().OfType<WorkspaceObjectExtension> ().ToList ();
+			var loadedNodes = allExtensions.Where (ex => ex.SourceExtensionNode != null)
+				.Select (ex => ex.SourceExtensionNode.Id).ToList ();
+			var newExtensions = new List <WorkspaceObjectExtension> ();
+
+			ProjectModelExtensionNode lastAddedNode = null;
+
+			// Ensure conditions are re-evaluated.
+			extensionContext = CreateExtensionContext (this);
+
+			foreach (ProjectModelExtensionNode node in GetModelExtensions (extensionContext)) {
+				// If the node already generated an extension, skip it
+				if (loadedNodes.Contains (node.Id)) {
+					lastAddedNode = node;
+					loadedNodes.Remove (node.Id);
+					continue;
+				}
+
+				// Maybe the node can now generate an extension for this project
+				if (node.CanHandleObject (this)) {
+					var ext = node.CreateExtension ();
+					if (ext.SupportsObject (this)) {
+						ext.SourceExtensionNode = node;
+						newExtensions.Add (ext);
+						if (lastAddedNode != null) {
+							// There is an extension before this one. Find it and add the new extension after it.
+							var prevExtension = allExtensions.FirstOrDefault (ex => ex.SourceExtensionNode?.Id == lastAddedNode.Id);
+							extensionChain.AddExtension (ext, prevExtension);
+						} else
+							extensionChain.AddExtension (ext);
+						ext.Init (this);
+					}
+				}
+			}
+
+			// Now dispose extensions that are not supported anymore
+
+			foreach (var ext in allExtensions) {
+				if (!ext.SupportsObject (this))
+					ext.Dispose ();
+			}
+
+			if (loadedNodes.Any ()) {
+				foreach (var ext in allExtensions.Where (ex => ex.SourceExtensionNode != null)) {
+					if (loadedNodes.Contains (ext.SourceExtensionNode.Id)) {
+						ext.Dispose ();
+						loadedNodes.Remove (ext.SourceExtensionNode.Id);
+					}
+				}
+			}
+
+			foreach (var e in newExtensions)
+				e.OnExtensionChainCreated ();
+			foreach (var e in newExtensions)
+				OnExtensionActivated (e);
 		}
 
 		static List<ProjectModelExtensionNode> customNodes = new List<ProjectModelExtensionNode> ();
@@ -464,6 +553,18 @@ namespace MonoDevelop.Projects
 		/// to do initializations on the object that require access to the extension chain
 		/// </summary>
 		protected virtual void OnExtensionChainInitialized ()
+		{
+		}
+
+		/// <summary>
+		/// Called when an extension is dynamically loaded after object initialization
+		/// </summary>
+		/// <param name="extension">The extension.</param>
+		/// <remarks>
+		/// This method is called when an extension is loaded after the object initialization process.
+		/// This may happen for example when calling RefreshExtensions.
+		/// </remarks>
+		protected virtual void OnExtensionActivated (WorkspaceObjectExtension extension)
 		{
 		}
 

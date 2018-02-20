@@ -183,7 +183,7 @@ namespace MonoDevelop.Ide.Tasks
 			var file = doc.FileName;
 			Task.Run (async () => {
 				try {
-					tags.UpdateTags (project, file, await pd.GetTagCommentsAsync (token));
+					tags.UpdateTags (project, file, await pd.GetTagCommentsAsync (token).ConfigureAwait (false));
 				} catch (TaskCanceledException) {
 				} catch (AggregateException ae) {
 					ae.Flatten ().Handle (x => x is TaskCanceledException);
@@ -296,7 +296,7 @@ namespace MonoDevelop.Ide.Tasks
 
 		void OnCommentTasksChanged (object sender, CommentTasksChangedEventArgs args)
 		{
-			Application.Invoke (delegate {
+			Application.Invoke ((o, a) => {
 				foreach (var e in args.Changes) {
 					//because of parse queueing, it's possible for this event to come in after the solution is closed
 					//so we track which solutions are currently open so that we don't leak memory by holding 

@@ -93,7 +93,7 @@ namespace Xwt.GtkBackend
 			}
 		}
 		
-		public bool ShowFrame {
+		public virtual bool ShowFrame {
 			get {
 				return Widget.HasFrame;
 			}
@@ -173,6 +173,12 @@ namespace Xwt.GtkBackend
 
 		public bool MultiLine {
 			get; set;
+		}
+
+		public bool HasCompletions {
+			get {
+				return Widget?.Completion?.Model != null;
+			}
 		}
 
 		/// <summary>
@@ -271,18 +277,14 @@ namespace Xwt.GtkBackend
 
 		void HandleActivated (object sender, EventArgs e)
 		{
-			ApplicationContext.InvokeUserCode (delegate {
-				EventSink.OnActivated ();
-			});
+			ApplicationContext.InvokeUserCode (EventSink.OnActivated);
 		}
 
 		bool enableSelectionChangedEvent;
 		void HandleSelectionChanged ()
 		{
 			if (enableSelectionChangedEvent)
-				ApplicationContext.InvokeUserCode (delegate {
-					EventSink.OnSelectionChanged ();
-				});
+				ApplicationContext.InvokeUserCode (EventSink.OnSelectionChanged);
 		}
 
 		void HandleMoveCursor (object sender, EventArgs e)

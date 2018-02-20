@@ -117,11 +117,11 @@ namespace MonoDevelop.Ide.Editor
 		{
 			if (tree.Root == null)
 				yield break;
-			var intervalStack = new Stack<Interval> ();
-			intervalStack.Push (new Interval (tree.Root, offset, offset + length));
-			while (intervalStack.Count > 0) {
-				var interval = intervalStack.Pop ();
-				if (interval.end < 0) 
+			var intervalStack = new Interval (null, tree.Root, offset, offset + length);
+			while (intervalStack != null) {
+				var interval = intervalStack;
+				intervalStack = intervalStack.tail;
+				if (interval.end < 0)
 					continue;
 
 				var node = interval.node;
@@ -133,21 +133,21 @@ namespace MonoDevelop.Ide.Editor
 					nodeEnd -= leftNode.TotalLength;
 				}
 
-				if (node.DistanceToMaxEnd < nodeStart) 
+				if (node.DistanceToMaxEnd < nodeStart)
 					continue;
 
 				if (leftNode != null)
-					intervalStack.Push (new Interval (leftNode, interval.start, interval.end));
+					intervalStack = new Interval (intervalStack, leftNode, interval.start, interval.end);
 
-				if (nodeEnd < 0) 
+				if (nodeEnd < 0)
 					continue;
 
 				if (nodeStart <= node.Length)
 					yield return (T)node;
 
 				var rightNode = node.Right;
-				if (rightNode != null) 
-					intervalStack.Push (new Interval (rightNode, nodeStart, nodeEnd));
+				if (rightNode != null)
+					intervalStack = new Interval (intervalStack, rightNode, nodeStart, nodeEnd);
 			}
 		}
 
@@ -169,43 +169,46 @@ namespace MonoDevelop.Ide.Editor
 
 		internal void UpdateOnTextReplace (object sender, TextChangeEventArgs e)
 		{
-			if (e.RemovalLength == 0) {
-				var length = e.InsertionLength;
-				foreach (var segment in GetSegmentsAt (e.Offset).Where (s => s.Offset < e.Offset && e.Offset < s.EndOffset)) {
-					segment.Length += length;
-					segment.UpdateAugmentedData ();
-				}
-				var node = SearchFirstSegmentWithStartAfter (e.Offset);
-				if (node != null) {
-					node.DistanceToPrevNode += length;
-					node.UpdateAugmentedData ();
-				}
-				return;
-			}
-			int delta = e.ChangeDelta;
-			foreach (var segment in new List<T> (GetSegmentsOverlapping (e.Offset, e.RemovalLength))) {
-				if (segment.Offset < e.Offset) {
-					if (segment.EndOffset >= e.Offset + e.RemovalLength) {
-						segment.Length += delta;
-					} else {
-						segment.Length = e.Offset - segment.Offset;
+			for (int i = 0; i < e.TextChanges.Count; ++i) {
+				var change = e.TextChanges[i];
+				if (change.RemovalLength == 0) {
+					var length = change.InsertionLength;
+					foreach (var segment in GetSegmentsAt (change.Offset).Where (s => s.Offset < change.Offset && change.Offset < s.EndOffset)) {
+						segment.Length += length;
+						segment.UpdateAugmentedData ();
 					}
-					segment.UpdateAugmentedData ();
+					var node = SearchFirstSegmentWithStartAfter (change.Offset + 1);
+					if (node != null) {
+						node.DistanceToPrevNode += length;
+						node.UpdateAugmentedData ();
+					}
 					continue;
 				}
-				int remainingLength = segment.EndOffset - (e.Offset + e.RemovalLength);
-				InternalRemove (segment);
-				if (remainingLength > 0) {
-					segment.Offset = e.Offset + e.RemovalLength;
-					segment.Length = remainingLength;
-					InternalAdd (segment);
+				int delta = change.ChangeDelta;
+				foreach (var segment in new List<T> (GetSegmentsOverlapping (change.Offset, change.RemovalLength))) {
+					if (segment.Offset < change.Offset) {
+						if (segment.EndOffset >= change.Offset + change.RemovalLength) {
+							segment.Length += delta;
+						} else {
+							segment.Length = change.Offset - segment.Offset;
+						}
+						segment.UpdateAugmentedData ();
+						continue;
+					}
+					int remainingLength = segment.EndOffset - (change.Offset + change.RemovalLength);
+					InternalRemove (segment);
+					if (remainingLength > 0) {
+						segment.Offset = change.Offset + change.RemovalLength;
+						segment.Length = remainingLength;
+						InternalAdd (segment);
+					}
 				}
-			}
-			var next = SearchFirstSegmentWithStartAfter (e.Offset + 1);
+				var next = SearchFirstSegmentWithStartAfter (change.Offset + 1);
 
-			if (next != null) {
-				next.DistanceToPrevNode += delta;
-				next.UpdateAugmentedData ();
+				if (next != null) {
+					next.DistanceToPrevNode += delta;
+					next.UpdateAugmentedData ();
+				}
 			}
 		}
 
@@ -313,14 +316,17 @@ namespace MonoDevelop.Ide.Editor
 		
 		const bool Black = false;
 		const bool Red = true;
-		
-		struct Interval 
+
+		class Interval
 		{
+			internal Interval tail;
+
 			internal TreeSegment node;
 			internal int start, end;
 
-			public Interval (TreeSegment node,int start,int end)
+			public Interval (Interval tail, TreeSegment node, int start, int end)
 			{
+				this.tail = tail;
 				this.node = node;
 				this.start = start;
 				this.end = end;
@@ -590,8 +596,8 @@ namespace MonoDevelop.Ide.Editor
 
 			static void AppendNode (StringBuilder builder, TreeSegment node, int indent)
 			{
-				builder.Append (GetIndent (indent) + "Node (" + (node.Color == Red ? "r" : "b") + "):" + node + Environment.NewLine);
-				builder.Append (GetIndent (indent) + "Left: ");
+				builder.Append (GetIndent (indent)).Append ("Node (").Append ((node.Color == Red ? "r" : "b")).Append ("):").AppendLine (node.ToString ());
+				builder.Append (GetIndent (indent)).Append ("Left: ");
 				if (node.Left != null) {
 					builder.Append (Environment.NewLine);
 					AppendNode (builder, node.Left, indent + 1);
@@ -600,7 +606,7 @@ namespace MonoDevelop.Ide.Editor
 				}
 
 				builder.Append (Environment.NewLine);
-				builder.Append (GetIndent (indent) + "Right: ");
+				builder.Append (GetIndent (indent)).Append ("Right: ");
 				if (node.Right != null) {
 					builder.Append (Environment.NewLine);
 					AppendNode (builder, node.Right, indent + 1);

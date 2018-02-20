@@ -60,7 +60,6 @@ namespace MonoDevelop.Ide.Editor
 		readonly TextEditor textEditor;
 		readonly ITextEditorImpl textEditorImpl;
 
-		DocumentContext currentContext;
 		MonoDevelop.Projects.Policies.PolicyContainer policyContainer;
 
 		public TextEditorViewContent (TextEditor textEditor, ITextEditorImpl textEditorImpl)
@@ -73,12 +72,29 @@ namespace MonoDevelop.Ide.Editor
 			this.textEditorImpl = textEditorImpl;
 			this.textEditor.MimeTypeChanged += UpdateTextEditorOptions;
 			DefaultSourceEditorOptions.Instance.Changed += UpdateTextEditorOptions;
-			this.textEditor.DocumentContextChanged += HandleDocumentContextChanged;
+			textEditorImpl.ViewContent.ContentNameChanged += ViewContent_ContentNameChanged;
+			textEditorImpl.ViewContent.DirtyChanged += ViewContent_DirtyChanged; ;
+
 		}
 
-		void HandleDocumentContextChanged (object sender, EventArgs e)
+		protected override void OnContentNameChanged ()
 		{
-			currentContext = textEditor.DocumentContext;
+			base.OnContentNameChanged ();
+			if (ContentName != textEditorImpl.ContentName && !string.IsNullOrEmpty (textEditorImpl.ContentName))
+				AutoSave.RemoveAutoSaveFile (textEditorImpl.ContentName);
+			textEditorImpl.ContentName = this.ContentName;
+			if (this.WorkbenchWindow?.Document != null)
+				textEditor.InitializeExtensionChain (this.WorkbenchWindow.Document);
+		}
+
+		void ViewContent_ContentNameChanged (object sender, EventArgs e)
+		{
+			this.ContentName = textEditorImpl.ViewContent.ContentName;
+		}
+
+		void ViewContent_DirtyChanged (object sender, EventArgs e)
+		{
+			OnDirtyChanged ();
 		}
 
 		void HandleDirtyChanged (object sender, EventArgs e)
@@ -105,11 +121,11 @@ namespace MonoDevelop.Ide.Editor
 				return;
 			RemoveAutoSaveTimer ();
 			autoSaveTimer = GLib.Timeout.Add (500, delegate {
+				autoSaveTimer = 0;
 				if (autoSaveTask != null && !autoSaveTask.IsCompleted)
 					return false;
 
 				autoSaveTask = AutoSave.InformAutoSaveThread (textEditor.CreateSnapshot (), textEditor.FileName, IsDirty);
-				autoSaveTimer = 0;
 				return false;
 			});
 		}
@@ -188,13 +204,6 @@ namespace MonoDevelop.Ide.Editor
 			}
 		}
 
-		protected override void OnContentNameChanged ()
-		{
-			base.OnContentNameChanged ();
-			textEditorImpl.ContentName = ContentName;
-		}
-
-
 		#region IViewFContent implementation
 
 		public override async Task Load (FileOpenInformation fileOpenInformation)
@@ -216,7 +225,6 @@ namespace MonoDevelop.Ide.Editor
 				var res = await TextFileUtility.GetTextAsync (content);
 				text = textEditor.Text = res.Text;
 				textEditor.Encoding = res.Encoding;
-				textEditor.UseBOM = res.HasBom;
 			}
 			await RunFirstTimeFoldUpdate (text);
 			textEditorImpl.InformLoadComplete ();
@@ -265,18 +273,22 @@ namespace MonoDevelop.Ide.Editor
 
 		protected override IEnumerable<object> OnGetContents (Type type)
 		{
-			var res = base.OnGetContents (type);
-
-			if (type == typeof (TextEditor))
-				return res.Concat (textEditor);
+			foreach (var r in base.OnGetContents (type))
+				yield return r;
+			if (type.IsAssignableFrom (typeof (TextEditor))) {
+				yield return textEditor;
+				yield break;
+			}
 
 			var ext = textEditorImpl.EditorExtension;
 			while (ext != null) {
-				res = res.Concat (ext.OnGetContents (type));
+				foreach (var r in ext.OnGetContents (type))
+					yield return r;
 				ext = ext.Next;
 			}
-			res = res.Concat (textEditorImpl.ViewContent.GetContents (type));
-			return res;
+
+			foreach (var r in textEditorImpl.ViewContent.GetContents (type))
+				yield return r;
 		}
 
 		protected override void OnWorkbenchWindowChanged ()
@@ -297,6 +309,20 @@ namespace MonoDevelop.Ide.Editor
 			}
 		}
 
+		public override string TabAccessibilityDescription {
+			get {
+				return textEditorImpl.ViewContent.TabAccessibilityDescription;
+			}
+		}
+
+		public override bool IsDirty {
+			get { return textEditorImpl.ViewContent.IsDirty; }
+			set {
+				textEditorImpl.ViewContent.IsDirty = value;
+			}
+		}
+
+
 		#endregion
 
 		#region IDisposable implementation
@@ -314,11 +340,13 @@ namespace MonoDevelop.Ide.Editor
 			textEditorImpl.ViewContent.DirtyChanged -= HandleDirtyChanged;
 			textEditor.MimeTypeChanged -= UpdateTextEditorOptions;
 			textEditor.TextChanged -= HandleTextChanged;
-			textEditor.DocumentContextChanged -= HandleDocumentContextChanged;
+			textEditorImpl.ViewContent.ContentNameChanged -= ViewContent_ContentNameChanged;
+			textEditorImpl.ViewContent.DirtyChanged -= ViewContent_DirtyChanged; ;
 
 			DefaultSourceEditorOptions.Instance.Changed -= UpdateTextEditorOptions;
 			RemovePolicyChangeHandler ();
 			RemoveAutoSaveTimer ();
+			textEditor.Dispose ();
 		}
 
 		#endregion
@@ -327,7 +355,7 @@ namespace MonoDevelop.Ide.Editor
 
 		object ICommandRouter.GetNextCommandTarget ()
 		{
-			return textEditorImpl;
+			return textEditor;
 		}
 
 		#endregion

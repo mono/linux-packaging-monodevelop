@@ -14,7 +14,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             GettextCatalog.GetString("Parentheses are redundant if attribute has no arguments"),
             GettextCatalog.GetString("Parentheses are redundant if attribute has no arguments"),
             DiagnosticAnalyzerCategories.RedundanciesInCode,
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Hidden,
             isEnabledByDefault: true,
             helpLinkUri: HelpLink.CreateFor(CSharpDiagnosticIDs.RedundantAttributeParenthesesAnalyzerID),
             customTags: DiagnosticCustomTags.Unnecessary
@@ -24,6 +24,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 nodeContext =>
                 {
@@ -40,13 +42,11 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
 
             var node = nodeContext.Node as AttributeSyntax;
             if (node.ArgumentList == null || node.ArgumentList.Arguments.Count > 0)
                 return false;
-            diagnostic = Diagnostic.Create(descriptor, node.GetLocation());
+            diagnostic = Diagnostic.Create(descriptor, node.ArgumentList.GetLocation());
             return true;
         }
     }

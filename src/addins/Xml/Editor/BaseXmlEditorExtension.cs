@@ -1,4 +1,4 @@
-// 
+﻿// 
 // BaseXmlEditorExtension.cs
 // 
 // Author:
@@ -52,6 +52,8 @@ using System.Threading.Tasks;
 using System.Threading;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide.Commands;
+using MonoDevelop.Ide.Gui;
+using MonoDevelop.Core.Text;
 
 namespace MonoDevelop.Xml.Editor
 {
@@ -71,7 +73,8 @@ namespace MonoDevelop.Xml.Editor
 		public override bool IsValidInContext (DocumentContext context)
 		{
 			//can only attach if there is not already an attached BaseXmlEditorExtension
-			return context.GetContent<BaseXmlEditorExtension> () == null;
+			var other = context.GetContent<BaseXmlEditorExtension> ();
+			return other == null || other == this;
 		}
 		
 		protected virtual XmlRootState CreateRootState ()
@@ -85,7 +88,7 @@ namespace MonoDevelop.Xml.Editor
 			// Delay the execution of UpdateOwnerProjects since it may end calling Document.AttachToProject,
 			// which shouldn't be called while the extension chain is being initialized.
 			// TODO: Move handling of owner projects to Document
-			Application.Invoke (delegate {
+			Application.Invoke ((o, args) => {
 				UpdateOwnerProjects ();
 			});
 
@@ -120,6 +123,9 @@ namespace MonoDevelop.Xml.Editor
 			if (DocumentContext == null) {
 				return;//This can happen if this object is disposed
 			}
+			var view = DocumentContext.GetContent<BaseViewContent> ();
+			if (view != null && view.ProjectReloadCapability == ProjectReloadCapability.None)
+				return;
 			var projects = new HashSet<DotNetProject> (IdeApp.Workspace.GetAllItems<DotNetProject> ().Where (p => p.IsFileInProject (DocumentContext.Name)));
 			if (ownerProjects == null || !projects.SetEquals (ownerProjects)) {
 				ownerProjects = projects.OrderBy (p => p.Name).ToList ();
@@ -233,45 +239,99 @@ namespace MonoDevelop.Xml.Editor
 		protected virtual void OnDocTypeChanged ()
 		{
 		}
-		
+
+		void FixIndent (int line)
+		{
+			var indent = GetLineIndent (line);
+			var oldIndent = Editor.GetLineIndent (line);
+			var seg = Editor.GetLine (line);
+			if (oldIndent != indent) {
+				Editor.ReplaceText (seg.Offset, oldIndent.Length, indent);
+			}
+		}
+
 		public override bool KeyPress (KeyDescriptor descriptor)
 		{
+			Tracker.UpdateEngine ();
+			bool returnInsideEmptyElement =
+					descriptor.SpecialKey == SpecialKey.Return &&
+					descriptor.ModifierKeys == ModifierKeys.None &&
+					Editor.CaretOffset > 0 && Editor.CaretOffset + 1 < Editor.Length &&
+					Editor.GetCharAt (Editor.CaretOffset - 1) == '>' &&
+					Editor.GetCharAt (Editor.CaretOffset) == '<' &&
+					Editor.GetCharAt (Editor.CaretOffset + 1) == '/' &&
+					Tracker.Engine.CurrentState is XmlRootState;
+			if (returnInsideEmptyElement) {
+				var elementClosingText = new System.Text.StringBuilder ();
+				// Collect name of element in closing tag after </
+				for (int i = Editor.CaretOffset + 2; i < Editor.Length; i++) {
+					var c = Editor.GetCharAt (i);
+					if (char.IsWhiteSpace (c) || c == '>')
+						break;
+					elementClosingText.Append (c);
+				}
+				// and compare with current element to make sure it matches
+				if (Tracker.Engine.Nodes.Peek () is XElement element && element.Name.FullName == elementClosingText.ToString ()) {
+					for (int i = Editor.LocationToOffset (element.Region.Begin) + 1; i < Editor.CaretOffset; i++) {
+						// Make sure there is no child elements(e.g. <a><b></b>$</a>
+						if (Editor.GetCharAt (i) == '<') {
+							returnInsideEmptyElement = false;
+							break;
+						}
+					}
+				} else
+					returnInsideEmptyElement = false;
+			}
+			var newLine = Editor.CaretLine + 1;
+			var ret = base.KeyPress (descriptor);
 			if (Editor.Options.IndentStyle == IndentStyle.Smart) {
-				var newLine = Editor.CaretLine + 1;
-				var ret = base.KeyPress (descriptor);
 				if (descriptor.SpecialKey == SpecialKey.Return && Editor.CaretLine == newLine) {
-					string indent = GetLineIndent (newLine);
-					var oldIndent = Editor.GetLineIndent (newLine);
-					var seg = Editor.GetLine (newLine);
-					if (oldIndent != indent) {
-						using (var undo = Editor.OpenUndoGroup ()) {
-							Editor.ReplaceText (seg.Offset, oldIndent.Length, indent);
+					using (var undo = Editor.OpenUndoGroup ()) {
+						FixIndent (newLine);
+						if (returnInsideEmptyElement) {
+							var oldOffset = Editor.CaretOffset;
+							Editor.ReplaceText (oldOffset, 0, Editor.EolMarker);
+							Editor.CaretOffset = oldOffset;
+							FixIndent (newLine);
+							FixIndent (newLine + 1);
 						}
 					}
 				}
-				return ret;
 			}
-			return base.KeyPress (descriptor);
+			Tracker.UpdateEngine ();
+			if (descriptor.KeyChar == '>' && XmlEditorOptions.AutoCompleteElements && tracker.Engine.CurrentState is XmlRootState) {
+				var el = tracker.Engine.Nodes.Peek () as XElement;
+				var buf = Editor;
+				if (el != null && el.Region.End >= buf.CaretLocation && !el.IsClosed && el.IsNamed) {
+					var tag = $"</{ el.Name.FullName}>";
+					using (var undo = buf.OpenUndoGroup ()) {
+						buf.InsertText (buf.CaretOffset, tag);
+						buf.CaretOffset -= tag.Length;
+					}
+				}
+			}
+			return ret;
 		}
 		
 		#region Code completion
 
-		public override Task<ICompletionDataList> CodeCompletionCommand (CodeCompletionContext completionContext)
-		{
-			int pos = completionContext.TriggerOffset;
-			if (pos <= 0)
-				return null;
-			tracker.UpdateEngine ();
-			return HandleCodeCompletion (completionContext, true, default(CancellationToken));
-		}
 
-		public override Task<ICompletionDataList> HandleCodeCompletionAsync (CodeCompletionContext completionContext, char completionChar, CancellationToken token = default(CancellationToken))
+		public override Task<ICompletionDataList> HandleCodeCompletionAsync (CodeCompletionContext completionContext, CompletionTriggerInfo triggerInfo, CancellationToken token = default(CancellationToken))
 		{
-			int pos = completionContext.TriggerOffset;
-			char ch = CompletionWidget != null ? CompletionWidget.GetChar (pos - 1) : Editor.GetCharAt (pos - 1);
-			if (pos > 0 && ch == completionChar) {
+			if (triggerInfo.CompletionTriggerReason == CompletionTriggerReason.CharTyped) {
+				int pos = completionContext.TriggerOffset;
+				char ch = CompletionWidget != null ? CompletionWidget.GetChar (pos - 1) : Editor.GetCharAt (pos - 1);
+				if (pos > 0 && ch == triggerInfo.TriggerCharacter.Value) {
+					tracker.UpdateEngine ();
+					return HandleCodeCompletion (completionContext, false, token);
+				}
+			} else if (triggerInfo.CompletionTriggerReason == CompletionTriggerReason.CompletionCommand) {
+				int pos = completionContext.TriggerOffset;
+				if (pos <= 0)
+					return null;
 				tracker.UpdateEngine ();
-				return HandleCodeCompletion (completionContext, false, token);
+				return HandleCodeCompletion (completionContext, true, default (CancellationToken));
+
 			}
 			return null;
 		}
@@ -308,19 +368,19 @@ namespace MonoDevelop.Xml.Editor
 				var list = new CompletionDataList ();
 				
 				//TODO: need to tweak semicolon insertion
-				list.Add ("apos").Description = "'";
-				list.Add ("quot").Description = "\"";
-				list.Add ("lt").Description = "<";
-				list.Add ("gt").Description = ">";
-				list.Add ("amp").Description = "&";
-				
+				list.Add (new BaseXmlCompletionData ("apos", "'"));
+				list.Add (new BaseXmlCompletionData ("quot", "\""));
+				list.Add (new BaseXmlCompletionData ("lt", "<"));
+				list.Add (new BaseXmlCompletionData ("gt", ">"));
+				list.Add (new BaseXmlCompletionData ("amp", "&"));
+
 				//not sure about these "completions". they're more like
 				//shortcuts than completions but they're pretty useful
-				list.Add ("'").CompletionText = "apos;";
-				list.Add ("\"").CompletionText = "quot;";
-				list.Add ("<").CompletionText = "lt;";
-				list.Add (">").CompletionText = "gt;";
-				list.Add ("&").CompletionText = "amp;";
+				list.Add (new BaseXmlCompletionData ("'") { CompletionText = "apos;" });
+				list.Add (new BaseXmlCompletionData ("\"") { CompletionText = "quot;" });
+				list.Add (new BaseXmlCompletionData ("<") { CompletionText = "lt;" });
+				list.Add (new BaseXmlCompletionData (">") { CompletionText = "gt;" });
+				list.Add (new BaseXmlCompletionData ("&") { CompletionText = "amp;" });
 				
 				var ecList = await GetEntityCompletions (token);
 				list.AddRange (ecList);
@@ -339,11 +399,7 @@ namespace MonoDevelop.Xml.Editor
 
 			//attribute value completion
 			//determine whether to trigger completion within attribute values quotes
-			if ((Tracker.Engine.CurrentState is XmlAttributeValueState)
-			    //trigger on the opening quote
-			    && ((Tracker.Engine.CurrentStateLength == 1 && (currentChar == '\'' || currentChar == '"'))
-			    //or trigger on first letter of value, if unforced
-			    || (forced || Tracker.Engine.CurrentStateLength == 2))) {
+			if (Tracker.Engine.CurrentState is XmlAttributeValueState) {
 				var att = (XAttribute)Tracker.Engine.Nodes.Peek ();
 
 				if (att.IsNamed) {
@@ -355,7 +411,10 @@ namespace MonoDevelop.Xml.Editor
 
 					var result = await GetAttributeValueCompletions (attributedOb, att, token);
 					if (result != null) {
-						result.TriggerWordLength = Tracker.Engine.CurrentStateLength - 1;
+						if (GetCompletionCommandOffset (out var cpos, out var wlen))
+							result.TriggerWordLength = wlen;
+						else
+							result.TriggerWordLength = 0;
 						return result;
 					}
 					return null;
@@ -363,45 +422,59 @@ namespace MonoDevelop.Xml.Editor
 			}
 			
 			//attribute name completion
-			if ((forced && Tracker.Engine.Nodes.Peek () is IAttributedXObject && !tracker.Engine.Nodes.Peek ().IsEnded)
+			if ((forced && Tracker.Engine.Nodes.Peek () is XAttribute && !tracker.Engine.Nodes.Peek ().IsEnded)
 			     || ((Tracker.Engine.CurrentState is XmlNameState
 			    && Tracker.Engine.CurrentState.Parent is XmlAttributeState) ||
-			    Tracker.Engine.CurrentState is XmlTagState)
-			    && (Tracker.Engine.CurrentStateLength == 1 || forced)) {
+			    Tracker.Engine.CurrentState is XmlTagState)) {
 				IAttributedXObject attributedOb = (Tracker.Engine.Nodes.Peek () as IAttributedXObject) ?? 
 					Tracker.Engine.Nodes.Peek (1) as IAttributedXObject;
-				if (attributedOb == null)
-					return null;
 				
-				//attributes
-				if (attributedOb.Name.IsValid && (forced ||
-					(char.IsWhiteSpace (previousChar) && char.IsLetter (currentChar))))
-				{
-					var existingAtts = new Dictionary<string,string> (StringComparer.OrdinalIgnoreCase);
-					
-					foreach (XAttribute att in attributedOb.Attributes) {
-						existingAtts [att.Name.FullName] = att.Value ?? string.Empty;
-					}
-					var result = await GetAttributeCompletions (attributedOb, existingAtts, token);
-					if (result != null) {
-						if (!forced)
-							result.TriggerWordLength = 1;
-						return result;
-					}
+				if (attributedOb == null || !attributedOb.Name.IsValid)
 					return null;
+
+				// Parse rest of element to get all attributes
+				for (int i = Tracker.Engine.Position; i < Editor.Length; i++) {
+					Tracker.Engine.Push (Editor.GetCharAt (i));
+					var currentState = Tracker.Engine.CurrentState;
+					if (currentState is XmlAttributeState ||
+						currentState is XmlAttributeValueState ||
+						currentState is XmlTagState ||
+						(currentState is XmlNameState && currentState.Parent is XmlAttributeState))
+						continue;
+					break;
+				}
+				var existingAtts = new Dictionary<string, string> (StringComparer.OrdinalIgnoreCase);
+				foreach (XAttribute att in attributedOb.Attributes) {
+					existingAtts [att.Name.FullName] = att.Value ?? string.Empty;
+				}
+				// Update engine to Caret position(revert parsed attributes from above)
+				Tracker.UpdateEngine ();
+				var result = await GetAttributeCompletions (attributedOb, existingAtts, token);
+				if (result != null) {
+					if (GetCompletionCommandOffset (out var cpos, out var wlen))
+						result.TriggerWordLength = wlen;
+					else
+						result.TriggerWordLength = 0;
+					result.AutoSelect = !char.IsWhiteSpace (currentChar);
+					result.AddKeyHandler (new AttributeKeyHandler());
+					return result;
 				}
 			}
-			
-//			if (Tracker.Engine.CurrentState is XmlRootState) {
-//				if (line < 3) {
-//				cp.Add ("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>");
-//			}
 
 			//element completion
-			if (currentChar == '<' && tracker.Engine.CurrentState is XmlRootState ||
-				(tracker.Engine.CurrentState is XmlNameState && forced)) {
+			if ((currentChar == '<' && tracker.Engine.CurrentState is XmlRootState) ||
+				tracker.Engine.CurrentState is XmlNameState) {
 				var list = await GetElementCompletions (token);
+				if (completionContext.TriggerLine == 1 && completionContext.TriggerOffset == 1) {
+					var encoding = Editor.Encoding.WebName;
+					list.Add (new BaseXmlCompletionData($"?xml version=\"1.0\" encoding=\"{encoding}\" ?>"));
+				}
 				AddCloseTag (list, Tracker.Engine.Nodes);
+				if (tracker.Engine.CurrentState is XmlNameState)
+					if (GetCompletionCommandOffset (out var cpos, out var wlen))
+						list.TriggerWordLength = wlen;
+					else
+						list.TriggerWordLength = 0;
 				return list.Count > 0 ? list : null;
 			}
 
@@ -414,66 +487,41 @@ namespace MonoDevelop.Xml.Editor
 			return null;
 		}
 
-
-
-		protected virtual ICompletionDataList ClosingTagCompletion (TextEditor buf, DocumentLocation currentLocation)
-
+		class AttributeKeyHandler : ICompletionKeyHandler
 		{
-
-			//get name of current node in document that's being ended
-
-			var el = tracker.Engine.Nodes.Peek () as XElement;
-
-			if (el != null && el.Region.End >= currentLocation && !el.IsClosed && el.IsNamed) {
-
-				string tag = String.Concat ("</", el.Name.FullName, ">");
-
-				if (XmlEditorOptions.AutoCompleteElements) {
-
-
-
-					//						//make sure we have a clean atomic undo so the user can undo the tag insertion
-
-					//						//independently of the >
-
-					//						bool wasInAtomicUndo = this.Editor.Document.IsInAtomicUndo;
-
-					//						if (wasInAtomicUndo)
-
-					//							this.Editor.Document.EndAtomicUndo ();
-
-
-
-					using (var undo = buf.OpenUndoGroup ()) {
-
-						buf.InsertText (buf.CaretOffset, tag);
-
-						buf.CaretOffset -= tag.Length;
-
-					}
-
-
-
-					//						if (wasInAtomicUndo)
-
-					//							this.Editor.Document.BeginAtomicUndo ();
-
-
-
-					return null;
-
-				} else {
-
-					var cp = new CompletionDataList ();
-
-					cp.Add (new XmlTagCompletionData (tag, 0, true));
-
-					return cp;
-
-				}
-
+			public bool PostProcessKey (CompletionListWindow listWindow, KeyDescriptor descriptor, out KeyActions keyAction)
+			{
+				keyAction = KeyActions.None;
+				return false;
 			}
 
+			public bool PreProcessKey (CompletionListWindow listWindow, KeyDescriptor descriptor, out KeyActions keyAction)
+			{
+				if (!listWindow.AutoSelect && char.IsLetterOrDigit (descriptor.KeyChar)) {
+					listWindow.AutoSelect = true;
+				}
+				if (XmlEditorOptions.AutoInsertFragments && (descriptor.KeyChar == '=' || descriptor.KeyChar == '"')) {
+					keyAction = KeyActions.CloseWindow | KeyActions.Complete | KeyActions.Ignore;
+					return true;
+				}
+				keyAction = KeyActions.None;
+				return false;
+			}
+		}
+
+		protected virtual ICompletionDataList ClosingTagCompletion (TextEditor buf, DocumentLocation currentLocation)
+		{
+			// This is handled sooner in UI thread before it's offloaded to background thread by code completion
+			if (XmlEditorOptions.AutoCompleteElements)
+				return null;
+			//get name of current node in document that's being ended
+			var el = tracker.Engine.Nodes.Peek () as XElement;
+			if (el != null && el.Region.End >= currentLocation && !el.IsClosed && el.IsNamed) {
+				string tag = String.Concat ("</", el.Name.FullName, ">");
+				var cp = new CompletionDataList ();
+				cp.Add (new XmlTagCompletionData (tag, 0, true));
+				return cp;
+			}
 			return null;
 		}
 		
@@ -502,17 +550,22 @@ namespace MonoDevelop.Xml.Editor
 		{
 			return Task.FromResult (new CompletionDataList ());
 		}
-		
+
+
 		protected string GetLineIndent (int line)
 		{
 			var seg = Editor.GetLine (line);
 			
 			//reset the tracker to the beginning of the line
 			Tracker.UpdateEngine (seg.Offset);
-			
+			var attributeDepth = GetAttributeIndentDepth (Tracker.Engine.Nodes);
+			if (attributeDepth > 0) {
+				if (Editor.Options.TabsToSpaces)
+					return new string (' ', attributeDepth);
+				return new string ('\t', attributeDepth / Editor.Options.TabSize) + new string (' ', attributeDepth % Editor.Options.TabSize);
+			}
 			//calculate the indentation
 			var startElementDepth = GetElementIndentDepth (Tracker.Engine.Nodes);
-			var attributeDepth = GetAttributeIndentDepth (Tracker.Engine.Nodes);
 			
 			//update the tracker to the end of the line 
 			Tracker.UpdateEngine (seg.Offset + seg.Length);
@@ -521,23 +574,38 @@ namespace MonoDevelop.Xml.Editor
 			//because that means there are closing tags on the line, and they de-indent the line they're on
 			var endElementDepth = GetElementIndentDepth (Tracker.Engine.Nodes);
 			var elementDepth = Math.Min (endElementDepth, startElementDepth);
-			
-			//FIXME: use policies
-			return new string ('\t', elementDepth + attributeDepth);
+			if (Editor.Options.TabsToSpaces)
+				return new string (' ', elementDepth * Editor.Options.TabSize);
+			return new string ('\t', elementDepth /*+ attributeDepth*/);
 		}
 		
 		static int GetElementIndentDepth (NodeStack nodes)
 		{
 			return nodes.OfType<XElement> ().Count (el => !el.IsClosed);
 		}
-		
-		static int GetAttributeIndentDepth (NodeStack nodes)
+
+		int GetAttributeIndentDepth (NodeStack nodes)
 		{
+			if (!(Tracker.Engine.CurrentState is XmlTagState))
+				return 0;
 			var node = nodes.Peek ();
-			if (node is XElement && !node.IsEnded)
-				return 1;
-			if (node is XAttribute)
-				return node.IsEnded? 1 : 2;
+			if (node is XElement e) {
+				var firstAttribute = e.Attributes.FirstOrDefault ();
+				if (firstAttribute == null)
+					return 0;
+				// We are simulating VS here which aligns attributes only if 1st is on same line as element
+				if (firstAttribute.Region.BeginLine != e.Region.BeginLine)
+					return 0;
+				var textFromBegining = Editor.GetTextBetween (firstAttribute.Region.BeginLine, 0, firstAttribute.Region.BeginLine, firstAttribute.Region.BeginColumn);
+				int pos = 0;
+				foreach (var c in textFromBegining) {
+					if (c == '\t')
+						pos += Editor.Options.TabSize - pos % Editor.Options.TabSize;
+					else
+						pos++;
+				}
+				return pos;
+			}
 			return 0;
 		}
 		
@@ -593,8 +661,8 @@ namespace MonoDevelop.Xml.Editor
 				
 				if (elements.Count == 0) {
 					string name = el.Name.FullName;
-					completionList.Add ("/" + name + ">", Gtk.Stock.GoBack,
-					                    GettextCatalog.GetString ("Closing tag for '{0}'", name));
+					completionList.Add (new BaseXmlCompletionData("/" + name + ">", Gtk.Stock.GoBack,
+					                                              GettextCatalog.GetString ("Closing tag for '{0}'", name)));
 				} else {
 					foreach (XElement listEl in elements) {
 						if (listEl.Name == el.Name)
@@ -633,9 +701,9 @@ namespace MonoDevelop.Xml.Editor
 		/// </summary>
 		protected static void AddMiscBeginTags (CompletionDataList list)
 		{
-			list.Add ("!--",  "md-literal", GettextCatalog.GetString ("Comment"));
+			list.Add (new BaseXmlCompletionData ("!--",  "md-literal", GettextCatalog.GetString ("Comment")));
 			list.AddKeyHandler (new IgnoreDashKeyHandler ());
-			list.Add ("![CDATA[", "md-literal", GettextCatalog.GetString ("Character data"));
+			list.Add (new BaseXmlCompletionData ("![CDATA[", "md-literal", GettextCatalog.GetString ("Character data")));
 		}
 
 		public override bool GetCompletionCommandOffset (out int cpos, out int wlen)
@@ -921,7 +989,7 @@ namespace MonoDevelop.Xml.Editor
 			var path = new List<PathEntry> ();
 			if (ownerProjects.Count > 1) {
 				// Current project if there is more than one
-				path.Add (new PathEntry (ImageService.GetIcon (DocumentContext.Project.StockIcon), GLib.Markup.EscapeText (DocumentContext.Project.Name)) { Tag = DocumentContext.Project });
+				path.Add (new PathEntry (ImageService.GetIcon (DocumentContext.Project.StockIcon, Gtk.IconSize.Menu), GLib.Markup.EscapeText (DocumentContext.Project.Name)) { Tag = DocumentContext.Project });
 			}
 			if (l != null) {
 				for (int i = 0; i < l.Count; i++) {
@@ -1161,14 +1229,16 @@ namespace MonoDevelop.Xml.Editor
 			} else {
 				using (Editor.OpenUndoGroup ()) {
 					if (Editor.IsSomethingSelected) {
-						//end variable is also used because inserting start deselectes text and Editor.SelectionRange.EndOffset becomes invalid
-						var end = Editor.SelectionRange.EndOffset + 4;//+4 equals "<!--" inserted in next line
-						Editor.InsertText (Editor.SelectionRange.Offset, "<!--");
-						Editor.InsertText (end, "-->");
+						Editor.ApplyTextChanges (new [] {
+							new Microsoft.CodeAnalysis.Text.TextChange (new Microsoft.CodeAnalysis.Text.TextSpan(Editor.SelectionRange.Offset, 0), "<!--"),
+							new Microsoft.CodeAnalysis.Text.TextChange (new Microsoft.CodeAnalysis.Text.TextSpan(Editor.SelectionRange.EndOffset, 0), "-->")
+						});
 					} else {
 						var currentLine = Editor.GetLine (Editor.CaretLine);
-						Editor.InsertText (currentLine.Offset, "<!--");
-						Editor.InsertText (currentLine.EndOffset, "-->");//currentLine.EndOffset updates automaticlly
+						Editor.ApplyTextChanges (new [] {
+							new Microsoft.CodeAnalysis.Text.TextChange (new Microsoft.CodeAnalysis.Text.TextSpan(currentLine.Offset, 0), "<!--"),
+							new Microsoft.CodeAnalysis.Text.TextChange (new Microsoft.CodeAnalysis.Text.TextSpan(currentLine.EndOffset, 0), "-->")
+						});
 					}
 				}
 			}

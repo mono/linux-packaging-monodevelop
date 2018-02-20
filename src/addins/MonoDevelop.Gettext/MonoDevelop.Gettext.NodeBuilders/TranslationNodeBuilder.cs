@@ -92,7 +92,7 @@ namespace MonoDevelop.Gettext.NodeBuilders
 				Translation        translation = CurrentNode.DataItem as Translation;
 				if (project == null || translation == null)
 					return;
-				IdeApp.Workbench.OpenDocument (Path.Combine (project.BaseDirectory, translation.FileName));
+				IdeApp.Workbench.OpenDocument (Path.Combine (project.BaseDirectory, translation.FileName), project);
 			}
 			
 			public override void DeleteItem ()
@@ -131,8 +131,8 @@ namespace MonoDevelop.Gettext.NodeBuilders
 			void UpdateTranslationsAsync (ProgressMonitor monitor, TranslationProject project, Translation translation)
 			{
 				try {
-					project.UpdateTranslations (monitor, translation);
-					Gtk.Application.Invoke (delegate {
+					project.UpdateTranslations (monitor, false, translation);
+					Gtk.Application.Invoke ((o, args) => {
 						POEditorWidget.ReloadWidgets ();
 					});
 				} catch (Exception ex) {

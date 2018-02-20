@@ -29,9 +29,9 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             var cancellationToken = context.CancellationToken;
             var span = context.Span;
             var diagnostics = context.Diagnostics;
-            var root = await document.GetSyntaxRootAsync(cancellationToken);
+            var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
             var diagnostic = diagnostics.First();
-            var node = root.FindNode(context.Span) as AttributeSyntax;
+            var node = (root.FindNode(context.Span) as AttributeArgumentListSyntax)?.Parent as AttributeSyntax;
             if (node == null)
                 return;
             var newRoot = root.ReplaceNode((SyntaxNode)node, node.WithArgumentList(null));

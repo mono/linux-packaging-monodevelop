@@ -39,10 +39,11 @@ using MonoDevelop.Ide;
 using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide.Tasks;
 using MonoDevelop.Components.Mac;
+using System.Threading;
 
 namespace MonoDevelop.MacIntegration.MainToolbar
 {
-	class StatusIcon : NSView, StatusBarIcon
+	class StatusIcon : NSView, StatusBarIcon, INSAccessibilityButton
 	{
 		StatusBar bar;
 		NSImageView imageView;
@@ -50,6 +51,8 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		public StatusIcon (StatusBar bar) : base (CGRect.Empty)
 		{
 			imageView = new NSImageView (CGRect.Empty);
+			// Hide this image from the accessibility tree
+			imageView.AccessibilityElement = false;
 			AddSubview (imageView);
 
 			var trackingArea = new NSTrackingArea (CGRect.Empty, NSTrackingAreaOptions.ActiveInKeyWindow | NSTrackingAreaOptions.InVisibleRect | NSTrackingAreaOptions.MouseEnteredAndExited, this, null);
@@ -80,9 +83,36 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			base.Dispose ();
 		}
 
+		string tooltip;
 		public new string ToolTip {
-			get;
-			set;
+			get {
+				return tooltip;
+			}
+
+			set {
+				tooltip = value;
+				AccessibilityTitle = tooltip;
+				AccessibilityValue = new NSString (tooltip);
+			}
+		}
+
+		string help;
+		public string Help {
+			get {
+				return help;
+			}
+
+			set {
+				help = value;
+				AccessibilityHelp = value;
+			}
+		}
+
+		public string Title { get; set; }
+		string INSAccessibilityButton.AccessibilityLabel {
+			get {
+				return Title;
+			}
 		}
 
 		Xwt.Drawing.Image image;
@@ -122,16 +152,33 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				});
 		}
 
+		public override bool AccessibilityPerformPress ()
+		{
+			Clicked?.Invoke (this, new StatusBarIconClickedEventArgs {
+				Button = Xwt.PointerButton.Left
+			});
+
+			return true;
+		}
+
 		public event EventHandler<StatusBarIconClickedEventArgs> Clicked;
 		public event EventHandler<EventArgs> Entered;
 		public event EventHandler<EventArgs> Exited;
 	}
 
-	class BuildResultsView : NSView
+	class BuildResultsView : NSView, INSAccessibilityStaticText
 	{
+		public enum ResultsType
+		{
+			Warning,
+			Error
+		};
+
+		public ResultsType Type { get; set; }
+
 		NSAttributedString resultString;
 		int resultCount;
-		public int ResultCount { 
+		public int ResultCount {
 			get {
 				return resultCount;
 			}
@@ -156,6 +203,8 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 
 		public BuildResultsView () : base (new CGRect (0, 0, 0, 0))
 		{
+			AccessibilityIdentifier = "MainToolbar.StatusDisplay.BuildResults";
+			AccessibilityHelp = "Number of errors or warnings in the current project";
 		}
 
 		public override void DrawRect (CGRect dirtyRect)
@@ -183,11 +232,21 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		{
 			IdeApp.Workbench.GetPad<MonoDevelop.Ide.Gui.Pads.ErrorListPad> ().BringToFront ();
 		}
+
+		string INSAccessibilityStaticText.AccessibilityValue {
+			get {
+				if (Type == ResultsType.Warning) {
+					return GettextCatalog.GetPluralString ("{0} warning", "%d warnings", resultCount, resultCount);
+				} else {
+					return GettextCatalog.GetPluralString ("{0} error", "%d errors", resultCount, resultCount);
+				}
+			}
+		}
 	}
 
 	// We need a separate layer backed view to put over the NSTextFields because the NSTextField draws itself differently
 	// if it is layer backed so we can't make it or its superview layer backed.
-	class ProgressView : NSView
+	class ProgressView : NSView, INSAccessibilityProgressIndicator
 	{
 		const string ProgressLayerFadingId = "ProgressLayerFading";
 		const string growthAnimationKey = "bounds";
@@ -198,9 +257,15 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		double oldFraction;
 
 		const int barHeight = 2;
+		const int barY = 0;
 
 		public ProgressView ()
 		{
+			int barWidth = 0;
+
+#if DEBUG_PROGRESSBAR
+			barWidth = 100;
+#endif
 			WantsLayer = true;
 			Layer.CornerRadius = MacSystemInformation.OsVersion >= MacSystemInformation.ElCapitan ? 3 : 4;
 
@@ -212,20 +277,46 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			progressLayer.BackgroundColor = xamBlue.CGColor;
 			progressLayer.BorderWidth = 0;
 			progressLayer.FillMode = CAFillMode.Forwards;
-			progressLayer.Frame = new CGRect (0, 0, 0, barHeight);
+			progressLayer.Frame = new CGRect (0, barY, barWidth, barHeight);
 			progressLayer.AnchorPoint = new CGPoint (0, 0);
+
+			AccessibilityIdentifier = "MainToolbar.StatusDisplay.Progress";
+			AccessibilityHelp = "The progress of the current action";
+			AccessibilityHidden = true;
+		}
+
+		NSNumber INSAccessibilityProgressIndicator.AccessibilityValue {
+			get {
+				// Convert the number to a percentage
+				var percent = (int)(oldFraction * 100.0f);
+				return new NSNumber (percent);
+			}
+		}
+
+		void SetProgressValue (double p)
+		{
+			oldFraction = p;
+			var percent = (int)(oldFraction * 100.0f);
+			((INSAccessibility)this).AccessibilityValue = new NSNumber (percent);
 		}
 
 		public void BeginProgress ()
 		{
-			oldFraction = 0.0;
+			SetProgressValue (0.0);
+			progressLayer.RemoveAllAnimations ();
+
 			progressLayer.Hidden = false;
 			progressLayer.Opacity = 1;
-			progressLayer.Frame = new CGRect (0, 0, 0, barHeight);
+			progressLayer.Frame = new CGRect (0, barY, 0, barHeight);
+
+			AccessibilityHidden = false;
 		}
 
 		public void SetProgressFraction (double work)
 		{
+			if (oldFraction == work)
+				return;
+
 			progressMarks.Push (work);
 			if (!inProgress) {
 				inProgress = true;
@@ -239,24 +330,23 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			if (progressLayer != null) {
 				progressLayer.RemoveAnimation (growthAnimationKey);
 				progressLayer.Hidden = true;
+				AccessibilityHidden = true;
+
+				// We don't set the progress to 0 here, because EndProgress can be called many times
+				// for a single task, and if we do then the progress bar pulses from 0 every time
 			}
 			inProgress = false;
 		}
 
 		CAAnimation CreateMoveAndGrowAnimation (CALayer progress, double growToFraction)
 		{
-			CAAnimationGroup grp = CAAnimationGroup.CreateAnimation ();
-			grp.Duration = 0.2;
-			grp.FillMode = CAFillMode.Forwards;
-			grp.RemovedOnCompletion = false;
-
 			CABasicAnimation grow = CABasicAnimation.FromKeyPath ("bounds");
-			grow.From = NSValue.FromCGRect (new CGRect (0, 0, Frame.Width * (nfloat)oldFraction, barHeight));
-			grow.To = NSValue.FromCGRect (new CGRect (0, 0, Frame.Width * (nfloat)growToFraction, barHeight));
-			grp.Animations = new [] {
-				grow,
-			};
-			return grp;
+			grow.Duration = 0.2;
+			grow.FillMode = CAFillMode.Forwards;
+			grow.RemovedOnCompletion = false;
+			grow.From = NSValue.FromCGRect (new CGRect (0, barY, Frame.Width * (nfloat)oldFraction, barHeight));
+			grow.To = NSValue.FromCGRect (new CGRect (0, barY, Frame.Width * (nfloat)growToFraction, barHeight));
+			return grow;
 		}
 
 		CAAnimation CreateAutoPulseAnimation ()
@@ -273,8 +363,13 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		void AttachFadeoutAnimation (CALayer progress, CAAnimation animation, Func<bool> fadeoutVerifier)
 		{
 			animation.AnimationStopped += (sender, e) => {
-				if (!fadeoutVerifier ())
+				if (!fadeoutVerifier ()) {
 					return;
+				}
+
+				if (!e.Finished) {
+					return;
+				}
 
 				CABasicAnimation fadeout = CABasicAnimation.FromKeyPath ("opacity");
 				fadeout.From = NSNumber.FromDouble (1);
@@ -286,9 +381,17 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 					if (!e2.Finished)
 						return;
 
+					// Reset all the properties.
 					inProgress = false;
-					progress.Opacity = 0;
+
+					progress.Hidden = true;
+
+					progress.Opacity = 1;
+					progress.Frame = new CGRect (0, barY, 0, barHeight);
 					progress.RemoveAllAnimations ();
+					SetProgressValue (0.0);
+
+					progress.Hidden = false;
 				};
 				progress.Name = ProgressLayerFadingId;
 				progress.AddAnimation (fadeout, "opacity");
@@ -300,7 +403,8 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		{
 			progressMarks.Clear ();
 			var grp = CreateMoveAndGrowAnimation (progressLayer, newFraction);
-			oldFraction = newFraction;
+
+			SetProgressValue (newFraction);
 
 			AttachFadeoutAnimation (progressLayer, grp, () => {
 				if (oldFraction < 1 && inProgress) {
@@ -316,6 +420,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		}
 
 		const double frameAutoPulseWidth = 100;
+
 		public void StartProgressAutoPulse ()
 		{
 			var move = CreateAutoPulseAnimation ();
@@ -323,8 +428,35 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		}
 	}
 
+	class CancelButton : NSButton, INSAccessibilityButton
+	{
+		readonly NSImage stopIcon = MultiResImage.CreateMultiResImage ("status-stop-16", string.Empty);
+
+		public CancelButton ()
+		{
+			Image = stopIcon;
+			Hidden = true;
+			Bordered = false;
+			ImagePosition = NSCellImagePosition.ImageOnly;
+			SetButtonType (NSButtonType.MomentaryChange);
+			AddTrackingArea (new NSTrackingArea (CGRect.Empty, NSTrackingAreaOptions.MouseEnteredAndExited | NSTrackingAreaOptions.ActiveAlways | NSTrackingAreaOptions.InVisibleRect, this, null));
+
+			AccessibilityHelp = GettextCatalog.GetString ("Cancel the current operation");
+			AccessibilityTitle = GettextCatalog.GetString ("Cancel");
+
+			var nsa = (INSAccessibility) this;
+			nsa.AccessibilityIdentifier = "MainToolbar.StatusDisplay.Cancel";
+		}
+
+		string INSAccessibilityButton.AccessibilityLabel {
+			get {
+				return GettextCatalog.GetString ("Cancel");
+			}
+		}
+	}
+
 	[Register]
-	class StatusBar : NSButton, MonoDevelop.Ide.StatusBar
+	class StatusBar : NSFocusButton, MonoDevelop.Ide.StatusBar
 	{
 		public enum MessageType
 		{
@@ -337,8 +469,6 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		const string ProgressLayerFadingId = "ProgressLayerFading";
 		const string growthAnimationKey = "bounds";
 		StatusBarContextHandler ctxHandler;
-		Stack<double> progressMarks = new Stack<double> ();
-		bool currentTextIsMarkup;
 		string text;
 		MessageType messageType;
 		NSColor textColor;
@@ -347,11 +477,12 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		AnimatedIcon iconAnimation;
 		IDisposable xwtAnimation;
 		readonly BuildResultsView buildResults;
+		readonly CancelButton cancelButton;
 
 		NSAttributedString GetStatusString (string text, NSColor color)
 		{
 			nfloat fontSize = NSFont.SystemFontSize;
-			if (Window != null) {
+			if (Window != null && Window.Screen != null) {
 				fontSize -= Window.Screen.BackingScaleFactor == 2 ? 2 : 1;
 			} else {
 				fontSize -= 1;
@@ -386,6 +517,12 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		TaskEventHandler updateHandler;
 		public StatusBar ()
 		{
+			var nsa = (INSAccessibility)this;
+
+			// Pretend that this button is a Group
+			AccessibilityRole = NSAccessibilityRoles.GroupRole;
+			nsa.AccessibilityIdentifier = "MainToolbar.StatusDisplay";
+
 			Cell = new ColoredButtonCell ();
 			BezelStyle = NSBezelStyle.TexturedRounded;
 			Title = "";
@@ -398,7 +535,15 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 
 			textField.Cell = new VerticallyCenteredTextFieldCell (0f);
 			textField.Cell.StringValue = "";
-			textField.Cell.PlaceholderAttributedString = GetStatusString (BrandingService.ApplicationName, ColorForType (MessageType.Ready));
+
+			textField.AccessibilityRole = NSAccessibilityRoles.StaticTextRole;
+			textField.AccessibilityEnabled = true;
+			textField.AccessibilityHelp = GettextCatalog.GetString ("Status of the current operation");
+
+			var tfNSA = (INSAccessibility)textField;
+			tfNSA.AccessibilityIdentifier = "MainToolbar.StatusDisplay.Status";
+
+			UpdateApplicationNamePlaceholderText ();
 
 			// The rect is empty because we use InVisibleRect to track the whole of the view.
 			textFieldArea = new NSTrackingArea (CGRect.Empty, NSTrackingAreaOptions.MouseEnteredAndExited | NSTrackingAreaOptions.ActiveInKeyWindow | NSTrackingAreaOptions.InVisibleRect, this, null);
@@ -407,8 +552,16 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			imageView.Frame = new CGRect (0.5, 0, 0, 0);
 			imageView.Image = ImageService.GetIcon (Stock.StatusSteady).ToNSImage ();
 
+			// Hide this image from accessibility
+			imageView.AccessibilityElement = false;
+
 			buildResults = new BuildResultsView ();
 			buildResults.Hidden = true;
+
+			cancelButton = new CancelButton ();
+			cancelButton.Activated += (o, e) => {
+				cts?.Cancel ();
+			};
 
 			ctxHandler = new StatusBarContextHandler (this);
 
@@ -425,6 +578,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				Runtime.RunInMainThread (delegate {
 					buildResults.Hidden = (ec == 0 && wc == 0);
 					buildResults.ResultCount = ec > 0 ? ec : wc;
+					buildResults.Type = ec > 0 ? BuildResultsView.ResultsType.Error : BuildResultsView.ResultsType.Warning;
 
 					buildImageId = ec > 0 ? "md-status-error-count" : "md-status-warning-count";
 					buildResults.IconImage = ImageService.GetIcon (buildImageId, Gtk.IconSize.Menu).ToNSImage ();
@@ -437,13 +591,33 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 
 			TaskService.Errors.TasksAdded += updateHandler;
 			TaskService.Errors.TasksRemoved += updateHandler;
+			BrandingService.ApplicationNameChanged += ApplicationNameChanged;
 
+			AddSubview (cancelButton);
 			AddSubview (buildResults);
 			AddSubview (imageView);
 			AddSubview (textField);
 
 			progressView = new ProgressView ();
 			AddSubview (progressView);
+
+			var newChildren = new NSObject [] {
+				textField, buildResults, progressView
+			};
+			AccessibilityChildren = newChildren;
+		}
+
+		void UpdateApplicationNamePlaceholderText ()
+		{
+			textField.Cell.PlaceholderAttributedString = GetStatusString (BrandingService.ApplicationLongName, ColorForType (MessageType.Ready));
+
+			var nsa = (INSAccessibility)textField;
+			nsa.AccessibilityValue = new NSString (BrandingService.ApplicationLongName);
+		}
+
+		void ApplicationNameChanged (object sender, EventArgs e)
+		{
+			UpdateApplicationNamePlaceholderText ();
 		}
 
 		public override void DidChangeBackingProperties ()
@@ -455,13 +629,13 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 
 		void LoadStyles (object sender = null, EventArgs args = null)
 		{
-			if (IdeApp.Preferences.UserInterfaceSkin == Skin.Dark) {
+			if (IdeApp.Preferences.UserInterfaceTheme == Theme.Dark) {
 				Appearance = NSAppearance.GetAppearance (NSAppearance.NameVibrantDark);
 			} else {
 				Appearance = NSAppearance.GetAppearance (NSAppearance.NameAqua);
 			}
 
-			textField.Cell.PlaceholderAttributedString = GetStatusString (BrandingService.ApplicationName, ColorForType (MessageType.Ready));
+			UpdateApplicationNamePlaceholderText ();
 			textColor = ColorForType (messageType);
 			ReconstructString ();
 		}
@@ -471,25 +645,32 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			TaskService.Errors.TasksAdded -= updateHandler;
 			TaskService.Errors.TasksRemoved -= updateHandler;
 			Ide.Gui.Styles.Changed -= LoadStyles;
+			BrandingService.ApplicationNameChanged -= ApplicationNameChanged;
 			base.Dispose (disposing);
+		}
+
+		static void DrawSeparator (nfloat x, CGRect dirtyRect)
+		{
+			var sepRect = new CGRect (x - 6.5, MacSystemInformation.OsVersion >= MacSystemInformation.ElCapitan ? 4 : 3, 1, 16);
+			if (sepRect.IntersectsWith (dirtyRect)) {
+				NSColor.LightGray.SetFill ();
+				NSBezierPath.FillRect (sepRect);
+			}
 		}
 
 		public override void DrawRect (CGRect dirtyRect)
 		{
 			base.DrawRect (dirtyRect);
 
-			if (statusIcons.Count == 0 || buildResults.Hidden) {
-				return;
-			}
+			if (statusIcons.Count != 0 && !buildResults.Hidden)
+				DrawSeparator (LeftMostStatusItemX (), dirtyRect);
 
-			var x = LeftMostStatusItemX ();
-			var sepRect = new CGRect (x - 6.5, MacSystemInformation.OsVersion >= MacSystemInformation.ElCapitan ? 4 : 3, 1, 16);
-			if (!sepRect.IntersectsWith (dirtyRect)) {
-				return;
-			}
+			if (statusIcons.Count != 0 || !buildResults.Hidden) {
+				if (cancelButton.Hidden)
+					return;
 
-			NSColor.LightGray.SetFill ();
-			NSBezierPath.FillRect (sepRect);
+				DrawSeparator (LeftMostBuildResultX (), dirtyRect);
+			}
 		}
 
 		public override void ViewDidMoveToWindow ()
@@ -499,19 +680,31 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			RepositionContents ();
 		}
 
+		NSImage statusReadyImage = ImageService.GetIcon (Stock.StatusSteady).ToNSImage ();
 		void ReconstructString ()
 		{
+			var updatePopover = popoverForStatus && popover != null;
 			if (string.IsNullOrEmpty (text)) {
 				textField.AttributedStringValue = new NSAttributedString ("");
-				textField.Cell.PlaceholderAttributedString = GetStatusString (BrandingService.ApplicationName, ColorForType (MessageType.Ready));
-				imageView.Image = ImageService.GetIcon (Stock.StatusSteady).ToNSImage ();
+				UpdateApplicationNamePlaceholderText ();
+				imageView.Image = statusReadyImage;
+				if (updatePopover) {
+					DestroyPopover (null, null);
+				}
 			} else {
 				textField.AttributedStringValue = GetStatusString (text, textColor);
 				imageView.Image = image;
+				if (updatePopover) {
+					DestroyPopover (null, null);
+					ShowPopoverForStatusBar ();
+				}
 			}
 		}
 
 		readonly List<StatusIcon> statusIcons = new List<StatusIcon> ();
+
+		// Used by AutoTest.
+		internal string[] StatusIcons => statusIcons.Select(x => x.ToolTip).ToArray ();
 
 		internal void RemoveStatusIcon (StatusIcon icon)
 		{
@@ -520,6 +713,9 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			icon.Entered -= ShowPopoverForIcon;
 			icon.Exited -= DestroyPopover;
 			icon.Clicked -= DestroyPopover;
+
+			if (!popoverForStatus && popover != null)
+				DestroyPopover (null, null);
 
 			RepositionStatusIcons ();
 		}
@@ -533,7 +729,15 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			return statusIcons.Last ().Frame.X;
 		}
 
-		nfloat DrawSeparatorIfNeeded (nfloat right)
+		nfloat LeftMostBuildResultX ()
+		{
+			if (buildResults.Hidden)
+				return LeftMostStatusItemX ();
+
+			return buildResults.Frame.X;
+		}
+
+		nfloat DrawSeparatorIfNeededBuildResults (nfloat right)
 		{
 			NeedsDisplay = true;
 
@@ -544,13 +748,33 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			return right - 12;
 		}
 
+		nfloat DrawSeparatorIfNeededCancelButton (nfloat right)
+		{
+			NeedsDisplay = true;
+
+			if (!buildResults.Hidden)
+				return buildResults.Frame.X - 12;
+
+			if (statusIcons.Count == 0)
+				return right;
+
+			return right - 12;
+		}
+
 		IconId buildImageId;
 
 		void PositionBuildResults (nfloat right)
 		{
-			right = DrawSeparatorIfNeeded (right);
+			right = DrawSeparatorIfNeededBuildResults (right);
 			right -= buildResults.Frame.Width;
 			buildResults.SetFrameOrigin (new CGPoint (right, buildResults.Frame.Y));
+		}
+
+		void PositionCancelButton (nfloat right)
+		{
+			right = DrawSeparatorIfNeededCancelButton (right);
+			right -= cancelButton.Frame.Width;
+			cancelButton.SetFrameOrigin (new CGPoint (right, cancelButton.Frame.Y));
 		}
 
 		internal void RepositionStatusIcons ()
@@ -563,13 +787,17 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			}
 
 			PositionBuildResults (right);
+			PositionCancelButton (right);
 
 			right -= 2;
 
-			if (!buildResults.Hidden) { // We have a build result layer.
-				textField.SetFrameSize (new CGSize (buildResults.Frame.X - 3 - textField.Frame.Left, Frame.Height));
-			} else
-				textField.SetFrameSize (new CGSize (right - 3 - textField.Frame.Left, Frame.Height));
+			if (!cancelButton.Hidden) { // We have a cancel button.
+				right = cancelButton.Frame.X;
+			} else if (!buildResults.Hidden) { // We have a build result layer.
+				right = buildResults.Frame.X;
+			}
+
+			textField.SetFrameSize (new CGSize (right - 3 - textField.Frame.Left, Frame.Height));
 		}
 
 		public StatusBarIcon ShowStatusIcon (Xwt.Drawing.Image pixbuf)
@@ -599,6 +827,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		public void ShowReady ()
 		{
 			ShowMessage (null, "", false, MessageType.Ready);
+			SetMessageSourcePad (null);
 		}
 
 		static Pad sourcePad;
@@ -657,9 +886,11 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				return false;
 
 			text = message;
-			currentTextIsMarkup = isMarkup;
 			messageType = statusType;
 			textColor = ColorForType (statusType);
+
+			var nsa = (INSAccessibility)textField;
+			nsa.AccessibilityValue = new NSString (message);
 
 			return true;
 		}
@@ -767,6 +998,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		}
 
 		NSPopover popover;
+		bool popoverForStatus;
 
 		void CreatePopoverCommon (nfloat width, string text)
 		{
@@ -810,6 +1042,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			if (popover != null)
 				return;
 
+			popoverForStatus = false;
 			var icon = (StatusIcon) sender;
 
 			if (!CreatePopoverForIcon (icon))
@@ -823,6 +1056,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			if (popover != null)
 				return;
 
+			popoverForStatus = true;
 			CreatePopoverForStatusBar ();
 			popover.Show (textField.Frame, this, NSRectEdge.MinYEdge);
 		}
@@ -889,6 +1123,19 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			}
 		}
 
+		CancellationTokenSource cts;
+		public void SetCancellationTokenSource (CancellationTokenSource source)
+		{
+			cts = source;
+
+			bool willHide = cts == null;
+			cancelButton.ToolTip = willHide ? string.Empty : GettextCatalog.GetString ("Cancel operation");
+			if (cancelButton.Hidden != willHide) {
+				cancelButton.Hidden = willHide;
+				RepositionStatusIcons ();
+			}
+		}
+
 		void RepositionContents ()
 		{
 			nfloat yOffset = 0f;
@@ -900,9 +1147,10 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			textField.Frame = new CGRect (imageView.Frame.Right, yOffset, Frame.Width - 16, Frame.Height);
 
 			buildResults.Frame = new CGRect (buildResults.Frame.X, buildResults.Frame.Y, buildResults.Frame.Width, Frame.Height);
+			cancelButton.Frame = new CGRect (cancelButton.Frame.X, cancelButton.Frame.Y, 16, Frame.Height);
 			RepositionStatusIcons ();
 
-			progressView.Frame = new CGRect (0.5f, MacSystemInformation.OsVersion >= MacSystemInformation.ElCapitan ? 1f : 2f, Frame.Width - 2, Frame.Height - 2);
+			progressView.Frame = new CGRect (0.5f, Frame.Height - 2f, Frame.Width - 2, 2);
 		}
 	}
 }

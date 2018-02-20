@@ -65,7 +65,10 @@ namespace MonoDevelop.Components
 
 		public static string GetHex (this Gdk.Color color)
 		{
-			return String.Format("#{0:x2}{1:x2}{2:x2}", (byte)(color.Red), (byte)(color.Green), (byte)(color.Blue));
+			return String.Format("#{0:x2}{1:x2}{2:x2}",
+			                     (byte)(((double)color.Red / ushort.MaxValue) * 255),
+			                     (byte)(((double)color.Green / ushort.MaxValue) * 255),
+			                     (byte)(((double)color.Blue / ushort.MaxValue) * 255));
 		}
 
 		public static Gdk.Color ToGdkColor (this Cairo.Color color)
@@ -175,9 +178,10 @@ namespace MonoDevelop.Components
 
 		public static Xwt.Size GetSize (this IconSize size)
 		{
+			var displayScale = Platform.IsWindows ? GtkWorkarounds.GetScaleFactor () : 1.0;
 			int w, h;
 			size.GetSize (out w, out h);
-			return new Xwt.Size (w, h);
+			return new Xwt.Size ((double)w / displayScale, (double)h / displayScale);
 		}
 
 		public static void GetSize (this IconSize size, out int width, out int height)
@@ -186,6 +190,100 @@ namespace MonoDevelop.Components
 				return;
 			if (size == IconSize.Menu)
 				width = height = 16;
+		}
+
+		public static Gdk.Rectangle ToGdkRectangle (this Xwt.Rectangle rect)
+		{
+			return new Gdk.Rectangle ((int)rect.X, (int)rect.Y, (int)rect.Width, (int)rect.Height);
+		}
+
+		public static Xwt.Rectangle ToXwtRectangle (this Gdk.Rectangle rect)
+		{
+			return new Xwt.Rectangle (rect.X, rect.Y, rect.Width, rect.Height);
+		}
+
+		public static Gdk.Point ToGdkPoint (this Xwt.Point point)
+		{
+			return new Gdk.Point ((int)point.X, (int)point.Y);
+		}
+
+		public static Xwt.Point ToXwtPoint (this Gdk.Point point)
+		{
+			return new Xwt.Point (point.X, point.Y);
+		}
+
+		#if MAC
+		static Gdk.Point ConvertToGdkCoordinates (this AppKit.NSScreen screen, Gdk.Point screenPoint)
+		{
+			if (screen == null)
+				return Gdk.Point.Zero;
+			var monitor = AppKit.NSScreen.Screens.IndexOf (screen);
+			var macgeometry = screen.Frame;
+			Gdk.Rectangle geometry = Gdk.Screen.Default.GetMonitorGeometry (monitor);
+
+			// HACK: Cocoa screen frames are always relative to the main monitor 0, but we need absolute
+			// coordinates in the Gdk system (origin is top-left corner of the left screen).
+
+			// x position is relative to main monitor 0,
+			// calculate X pos relative to current monitor first
+			screenPoint.X = (int)Math.Abs (macgeometry.X - screenPoint.X);
+			screenPoint.X += geometry.X;
+			return screenPoint;
+		}
+
+		public static Gdk.Rectangle GetSceenBounds (this AppKit.NSView widget)
+		{
+			var frame = widget.Frame;
+			var point = ConvertToGdkCoordinates (widget.Window?.Screen, new Gdk.Point ((int)frame.Location.X, (int)frame.Location.Y));
+			frame.X = point.X;
+			frame.Y = point.Y;
+			return new Gdk.Rectangle ((int)frame.X, (int)frame.Y, (int)frame.Width, (int)frame.Height);
+		}
+		#endif
+
+		public static Gdk.Rectangle GetSceenBounds (this Xwt.Widget widget)
+		{
+			var wbounds = widget.ScreenBounds.ToGdkRectangle ();
+			#if MAC
+			// Xwt.Widget.ScreenBounds is toolkit specific and Cocoa uses a different screen coordinate system.
+			var view = widget.Surface.NativeWidget as AppKit.NSView;
+			if (view != null) {
+				var point = ConvertToGdkCoordinates (view.Window?.Screen, wbounds.Location);
+				wbounds.X = point.X;
+				wbounds.Y = point.Y;
+
+				//var monitor = AppKit.NSScreen.Screens.IndexOf (view.Window.Screen);
+				//var macgeometry = view.Window.Screen.Frame;
+				//Gdk.Rectangle geometry = Gdk.Screen.Default.GetMonitorGeometry (monitor);
+
+				//// HACK: Cocoa screen frames are always relative to the main monitor 0, but we need absolute
+				//// coordinates in the Gdk system (origin is top-left corner of the left screen).
+
+				//// x position is relative to main monitor 0,
+				//// calculate X pos relative to current monitor first
+				//wbounds.X = (int) Math.Abs (macgeometry.X - wbounds.X);
+				//wbounds.X += geometry.X;
+			}
+			#endif
+			return wbounds;
+		}
+
+		public static Gdk.Point ToScreenCoordinates (this Xwt.Widget widget, Xwt.Point point)
+		{
+			var spoint = widget.ConvertToScreenCoordinates (point).ToGdkPoint ();
+			#if MAC
+			// Xwt.Widget.ScreenBounds is toolkit specific and Cocoa uses a different screen coordinate system.
+			var view = widget.Surface.NativeWidget as AppKit.NSView;
+			if (view != null) {
+				spoint = ConvertToGdkCoordinates (view.Window?.Screen, spoint);
+			}
+			#endif
+			return spoint;
+		}
+
+		public static Gdk.Rectangle ToScreenCoordinates (Xwt.Widget widget, Xwt.Rectangle rect)
+		{
+			return new Gdk.Rectangle (ToScreenCoordinates (widget, rect.Location), new Gdk.Size ((int)rect.Width, (int)rect.Height));
 		}
 
 		public static Gdk.Point GetScreenCoordinates (this Gtk.Widget w, Gdk.Point p)
@@ -354,6 +452,21 @@ namespace MonoDevelop.Components
 			}
 		}
 
+		public static bool GetCellForegroundSet (this Gtk.CellRendererText cell)
+		{
+			GLib.Value property = cell.GetProperty ("foreground-set");
+			bool result = (bool)property;
+			property.Dispose ();
+			return result;
+		}
+
+		public static void SetCellForegroundSet (this Gtk.CellRendererText cell, bool value)
+		{
+			GLib.Value val = new GLib.Value (value);
+			cell.SetProperty ("foreground-set", val);
+			val.Dispose ();
+		}
+
 		public static Gdk.Rectangle ToScreenCoordinates (Gtk.Widget widget, Gdk.Window w, Gdk.Rectangle rect)
 		{
 			return new Gdk.Rectangle (ToScreenCoordinates (widget, w, rect.X, rect.Y), rect.Size);
@@ -492,15 +605,20 @@ namespace MonoDevelop.Components
 
 		public static Gdk.EventKey CreateKeyEvent (uint keyval, Gdk.ModifierType state, Gdk.EventType eventType, Gdk.Window win)
 		{
-			return CreateKeyEvent (keyval, -1, state, eventType, win);
+			return CreateKeyEvent (keyval, -1, state, eventType, win, null);
 		}
 
 		public static Gdk.EventKey CreateKeyEventFromKeyCode (ushort keyCode, Gdk.ModifierType state, Gdk.EventType eventType, Gdk.Window win)
 		{
-			return CreateKeyEvent (0, keyCode, state, eventType, win);
+			return CreateKeyEvent (0, keyCode, state, eventType, win, null);
 		}
 
-		static Gdk.EventKey CreateKeyEvent (uint keyval, int keyCode, Gdk.ModifierType state, Gdk.EventType eventType, Gdk.Window win)
+		public static Gdk.EventKey CreateKeyEventFromKeyCode (ushort keyCode, Gdk.ModifierType state, Gdk.EventType eventType, Gdk.Window win, uint time)
+		{
+			return CreateKeyEvent (0, keyCode, state, eventType, win, time);
+		}
+
+		static Gdk.EventKey CreateKeyEvent (uint keyval, int keyCode, Gdk.ModifierType state, Gdk.EventType eventType, Gdk.Window win, uint? time)
 		{
 			int effectiveGroup, level;
 			Gdk.ModifierType cmods;
@@ -520,7 +638,7 @@ namespace MonoDevelop.Components
 				group = (byte)keyms [0].Group,
 				hardware_keycode = keyCode == -1 ? (ushort)keyms [0].Keycode : (ushort)keyCode,
 				length = 0,
-				time = Gtk.Global.CurrentEventTime
+				time = time ?? Gtk.Global.CurrentEventTime
 			};
 
 			IntPtr ptr = GLib.Marshaller.StructureToPtrAlloc (nativeEvent); 
@@ -549,8 +667,15 @@ namespace MonoDevelop.Components
 			#if MAC
 			var entries = window.FindAllChildWidgets ().OfType<Gtk.Entry> ();
 			foreach (var entry in entries) {
-				entry.ButtonPressEvent += EntryButtonPressHandler;
+				entry.UseNativeContextMenus ();
 			}
+			#endif
+		}
+
+		public static void UseNativeContextMenus (this Gtk.Entry entry)
+		{
+			#if MAC
+			entry.ButtonPressEvent += EntryButtonPressHandler;
 			#endif
 		}
 
@@ -667,6 +792,32 @@ namespace MonoDevelop.Components
 				args.RetVal = true;
 			}
 		}
+
+		/// <summary>
+		/// Shows the context menu for a TreeView.
+		/// </summary>
+		/// <returns><c>true</c>, if context menu was shown, <c>false</c> otherwise.</returns>
+		/// <param name="tree">Gtk TreeView for which the context menu is shown</param>
+		/// <param name="evt">The current mouse event, or <c>null</c>.</param>
+		/// <param name="entrySet">Entry set with the command definitions</param>
+		/// <param name="initialCommandTarget">Initial command target.</param>
+		public static bool ShowContextMenu (this Gtk.TreeView tree, Gdk.EventButton evt, Commands.CommandEntrySet entrySet,
+			object initialCommandTarget = null)
+		{
+			if (evt == null) {
+				var paths = tree.Selection.GetSelectedRows ();
+				if (paths != null) {
+					var area = tree.GetCellArea (paths [0], tree.Columns [0]);
+					return Ide.IdeApp.CommandService.ShowContextMenu (tree, area.Left, area.Top, entrySet, initialCommandTarget);
+				} else
+					return Ide.IdeApp.CommandService.ShowContextMenu (tree, 0, 0, entrySet, initialCommandTarget);
+			} else {
+				int x = (int)evt.X, y = (int)evt.Y;
+				if (Platform.IsMac && tree.BinWindow == evt.Window)
+					tree.ConvertBinWindowToWidgetCoords (x, y, out x, out y);
+				return Ide.IdeApp.CommandService.ShowContextMenu (tree, x, y, entrySet, initialCommandTarget);
+			}
+		}
 	}
 
 	class EventKeyWrapper: Gdk.EventKey
@@ -775,7 +926,7 @@ namespace MonoDevelop.Components
 
 			// Delay the call to the leave handler since the pointer may be
 			// entering a child widget, in which case the event doesn't have to be fired
-			Gtk.Application.Invoke (delegate {
+			Gtk.Application.Invoke ((o2, a2) => {
 				if (!Inside)
 					LeaveHandler ();
 			});
@@ -837,6 +988,7 @@ namespace MonoDevelop.Components
 
 			Gdk.Rectangle expose = Allocation;
 			Gdk.Color save = Gdk.Color.Zero;
+			bool hasFgColor = false;
 			int x = 1;
 
 			col.CellSetCellData (tree.Model, iter, false, false);
@@ -846,6 +998,7 @@ namespace MonoDevelop.Components
 					continue;
 
 				if (cr is CellRendererText) {
+					hasFgColor = ((CellRendererText)cr).GetCellForegroundSet ();
 					save = ((CellRendererText)cr).ForegroundGdk;
 					((CellRendererText)cr).ForegroundGdk = Style.Foreground (State);
 				}
@@ -862,6 +1015,7 @@ namespace MonoDevelop.Components
 
 				if (cr is CellRendererText) {
 					((CellRendererText)cr).ForegroundGdk = save;
+					((CellRendererText)cr).SetCellForegroundSet (hasFgColor);
 				}
 			}
 

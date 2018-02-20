@@ -59,15 +59,13 @@ namespace MonoDevelop.Deployment.NodeBuilders
 		{
 			PackagingProject project = dataObject as PackagingProject;
 			nodeInfo.Label = project.Name;
-			nodeInfo.Icon = Context.GetIcon ("md-packaging-project");
+			nodeInfo.Icon = Context.GetIcon ("md-package-project");
 		}
 
 		public override void BuildChildNodes (ITreeBuilder builder, object dataObject)
 		{
 			PackagingProject project = dataObject as PackagingProject;
-				
-			foreach (Package p in project.Packages)
-				builder.AddChild (p);
+			builder.AddChildren (project.Packages);
 		}
 
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)

@@ -698,6 +698,28 @@ namespace Mono.Addins.Description
 			if (val != null)
 				flags = (AddinFlags) Enum.Parse (typeof(AddinFlags), val);
 		}
+
+		bool TryGetVariableValue (string name, out string value)
+		{
+			if (variables != null && variables.TryGetValue (name, out value))
+				return true;
+			
+			switch (name) {
+				case "Id": value = id; return true;
+				case "Namespace": value = ns; return true;
+				case "Version": value = version; return true;
+				case "CompatVersion": value = compatVersion; return true;
+				case "DefaultEnabled": value = defaultEnabled.ToString (); return true;
+				case "IsRoot": value = isroot.ToString (); return true;
+				case "Flags": value = flags.ToString (); return true;
+			}
+			if (properties != null && properties.HasProperty (name)) {
+				value = properties.GetPropertyValue (name);
+				return true;
+			}
+			value = null;
+			return false;
+		}
 		
 		/// <summary>
 		/// Saves the add-in description.
@@ -1002,14 +1024,15 @@ namespace Mono.Addins.Description
 
 		internal string ParseString (string input)
 		{
-			if (input == null || input.Length < 4 || variables == null || variables.Count == 0)
+			if (input == null || input.Length < 4)
 				return input;
 
 			int i = input.IndexOf ("$(");
 			if (i == -1)
 				return input;
 
-			StringBuilder result = new StringBuilder (input.Substring (0, i), input.Length);
+			StringBuilder result = new StringBuilder (input.Length);
+			result.Append (input, 0, i);
 
 			while (i < input.Length) {
 				if (input [i] == '$') {
@@ -1028,7 +1051,7 @@ namespace Mono.Addins.Description
 					string tag = input.Substring (start, i - start);
 
 					string tagValue;
-					if (variables.TryGetValue (tag, out tagValue))
+					if (TryGetVariableValue (tag, out tagValue))
 						result.Append (tagValue);
 					else {
 						result.Append ('$');
@@ -1121,7 +1144,7 @@ namespace Mono.Addins.Description
 				
 			if (bp != null) {
 				foreach (string file in AllFiles) {
-					string asmFile = Path.Combine (bp, file);
+					string asmFile = Path.Combine (bp, Util.NormalizePath (file));
 					if (!fs.FileExists (asmFile))
 						errors.Add ("The file '" + asmFile + "' referenced in the manifest could not be found.");
 				}

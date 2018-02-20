@@ -33,7 +33,7 @@ using System.Linq;
 
 namespace MonoDevelop.PackageManagement.NodeBuilders
 {
-	public class ProjectReferencesFromPackagesFolderNodeBuilder : TypeNodeBuilder
+	internal class ProjectReferencesFromPackagesFolderNodeBuilder : TypeNodeBuilder
 	{
 		public override Type NodeDataType {
 			get { return typeof(ProjectReferencesFromPackagesFolderNode); }
@@ -41,7 +41,7 @@ namespace MonoDevelop.PackageManagement.NodeBuilders
 
 		public override string GetNodeName (ITreeNavigator thisNode, object dataObject)
 		{
-			return "From Packages";
+			return ProjectReferencesFromPackagesFolderNode.NodeName;
 		}
 
 		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
@@ -50,12 +50,9 @@ namespace MonoDevelop.PackageManagement.NodeBuilders
 			nodeInfo.Icon = Context.GetIcon ("md-reference-package");
 		}
 
-		public override int CompareObjects (ITreeNavigator thisNode, ITreeNavigator otherNode)
+		public override int GetSortIndex (ITreeNavigator node)
 		{
-			if (otherNode.NodeName == ".NET Portable Subset") {
-				return 1;
-			}
-			return -1;
+			return -500;
 		}
 
 		public override bool HasChildNodes (ITreeBuilder builder, object dataObject)
@@ -65,9 +62,7 @@ namespace MonoDevelop.PackageManagement.NodeBuilders
 
 		public override void BuildChildNodes (ITreeBuilder treeBuilder, object dataObject)
 		{
-			foreach (ProjectReference projectReference in GetReferencesFromPackages (dataObject)) {
-				treeBuilder.AddChild (projectReference);
-			}
+			treeBuilder.AddChildren (GetReferencesFromPackages (dataObject));
 		}
 
 		IEnumerable<ProjectReference> GetReferencesFromPackages (object dataObject)

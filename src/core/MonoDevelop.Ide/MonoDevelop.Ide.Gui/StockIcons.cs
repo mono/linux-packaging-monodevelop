@@ -138,16 +138,17 @@ namespace MonoDevelop.Ide.Gui
 		public static readonly IconId SolutionFolderOpen = "md-solution-folder-open";
 		public static readonly IconId SolutionFolderClosed = "md-solution-folder-closed";
 		public static readonly IconId Package = "md-package";
-		public static readonly IconId StatusSolutionOperation = "md-status-open";
+		public static readonly IconId StatusSolutionOperation = "md-status-waiting";
 		public static readonly IconId StatusDownload = "md-status-download";
 		public static readonly IconId StatusUpload = "md-status-upload";
 		public static readonly IconId StatusSearch = "md-status-search";
-		public static readonly IconId StatusBuild = "md-status-build";
+		public static readonly IconId StatusBuild = "md-status-waiting";
 		public static readonly IconId StatusSteady = BrandingService.StatusSteadyIconId;
 		public static readonly IconId StatusSuccess = "md-status-success";
 		public static readonly IconId StatusWarning = "md-status-warning";
 		public static readonly IconId StatusError = "md-status-error";
 		public static readonly IconId StatusConnecting = "md-status-connecting";
+		public static readonly IconId StatusDeviceDeploying = "md-status-device-deploying";
 		public static readonly IconId StatusWorking = "md-status-waiting";
 		public static readonly IconId StatusUpdatesDownloading = "md-status-updates-downloading";
 		public static readonly IconId StatusUpdatesPaused = "md-status-updates-paused";
@@ -163,5 +164,10 @@ namespace MonoDevelop.Ide.Gui
 		public static readonly IconId Clear = "md-clear";
 		public static readonly IconId Execute = Gtk.Stock.Execute;
 		public static readonly IconId SearchboxSearch = "md-searchbox-search";
+		public static readonly IconId Updates = "md-updates";
+		public static readonly IconId PadDownload = "md-pad-download";
+		public static readonly IconId PadUpload = "md-pad-upload";
+		public static readonly IconId PadDeviceDeployment = "md-pad-device-deployment";
+		public static readonly IconId PadExecute = "md-pad-execute";
 	}
 }

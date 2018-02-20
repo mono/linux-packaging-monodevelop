@@ -33,6 +33,7 @@ namespace MonoDevelop.Projects
 	{
 		Dictionary<Type,ChainedExtension> chains = new Dictionary<Type, ChainedExtension> ();
 		ChainedExtension[] extensions;
+		ChainedExtension defaultInsertBefore;
 
 		public static ExtensionChain Create<T> (T[] extensions) where T:ChainedExtension
 		{
@@ -56,20 +57,42 @@ namespace MonoDevelop.Projects
 			return (T)e;
 		}
 
+		internal void SetDefaultInsertionPosition (ChainedExtension insertBefore)
+		{
+			defaultInsertBefore = insertBefore;
+		}
+
 		public IEnumerable<ChainedExtension> GetAllExtensions ()
 		{
 			return extensions;
 		}
 
-		internal void AddExtension (ChainedExtension ext)
+		internal void AddExtension (ChainedExtension ext, ChainedExtension insertAfter = null, ChainedExtension insertBefore = null)
 		{
+			int index;
+			if (insertBefore != null) {
+				index = Array.IndexOf (extensions, insertBefore);
+			} else if (insertAfter != null) {
+				index = Array.IndexOf (extensions, insertAfter);
+				if (index != -1)
+					index++;
+			} else if (defaultInsertBefore != null) {
+				index = Array.IndexOf (extensions, defaultInsertBefore);
+			} else
+				index = extensions.Length;
+			
 			Array.Resize (ref extensions, extensions.Length + 1);
-			extensions [extensions.Length - 1] = ext;
+			for (int n = extensions.Length - 1; n > index; n--)
+				extensions [n] = extensions [n - 1];
+			extensions [index] = ext;
 			Rechain ();
 		}
 
 		internal void RemoveExtension (ChainedExtension ext)
 		{
+			if (extensions == null)
+				return;
+
 			extensions = extensions.Where (e => e != ext).ToArray ();
 			Rechain ();
 		}
@@ -88,7 +111,9 @@ namespace MonoDevelop.Projects
 
 		public void Dispose ()
 		{
-			extensions[0].DisposeChain ();
+			var first = extensions [0];
+			extensions = null;
+			first.DisposeChain ();
 		}
 	}
 }

@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class ForCanBeConvertedToForeachTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestArrayCase()
         {
             Test<ForCanBeConvertedToForeachAnalyzer>(@"
@@ -32,7 +31,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestIListCase()
         {
             Test<ForCanBeConvertedToForeachAnalyzer>(@"
@@ -61,7 +60,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestInvalid()
         {
             Analyze<ForCanBeConvertedToForeachAnalyzer>(@"
@@ -78,7 +77,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestInvalidCase2()
         {
             Analyze<ForCanBeConvertedToForeachAnalyzer>(@"
@@ -95,7 +94,7 @@ class Test
 }");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestInvalidCase3()
         {
             Analyze<ForCanBeConvertedToForeachAnalyzer>(@"
@@ -113,7 +112,7 @@ class Test
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestComplexExpression()
         {
             Test<ForCanBeConvertedToForeachAnalyzer>(@"
@@ -147,7 +146,7 @@ class Test
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestOptimizedFor()
         {
             Test<ForCanBeConvertedToForeachAnalyzer>(@"
@@ -182,7 +181,7 @@ class Test
 
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestDisable()
         {
             Analyze<ForCanBeConvertedToForeachAnalyzer>(@"
@@ -201,3 +200,4 @@ class Test
     }
 }
 
+*/

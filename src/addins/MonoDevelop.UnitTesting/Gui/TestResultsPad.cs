@@ -1,4 +1,4 @@
-//
+﻿//
 // TestResultsPad.cs
 //
 // Author:
@@ -35,6 +35,7 @@ using Gtk;
 using Gdk;
 
 using MonoDevelop.Core;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.UnitTesting.Commands;
 using MonoDevelop.Ide.Gui;
@@ -45,6 +46,8 @@ using MonoDevelop.Components;
 using System.Threading;
 using MonoDevelop.Ide.Commands;
 using MonoDevelop.Ide.Fonts;
+using MonoDevelop.Components.AutoTest;
+using System.ComponentModel;
 
 namespace MonoDevelop.UnitTesting
 {
@@ -105,19 +108,23 @@ namespace MonoDevelop.UnitTesting
 		{
 			UnitTestService.TestSuiteChanged += new EventHandler (OnTestSuiteChanged);
 			IdeApp.Workspace.WorkspaceItemClosed += OnWorkspaceItemClosed;
-			
-			panel = new VBox ();
+
+			panel = new VBox { Name = "testResultBox" };
 			
 			// Results notebook
 			
 			book = new HPaned ();
 			panel.PackStart (book, true, true, 0);
 			panel.FocusChain = new Gtk.Widget [] { book };
-			
+
 			// Failures tree
-			failuresTreeView = new MonoDevelop.Ide.Gui.Components.PadTreeView ();
+			failuresTreeView = new MonoDevelop.Ide.Gui.Components.PadTreeView { Name = "testResultsTree" };
 			failuresTreeView.HeadersVisible = false;
 			failuresStore = new TreeStore (typeof(Xwt.Drawing.Image), typeof(string), typeof(object), typeof(string), typeof(int), typeof(int));
+			SemanticModelAttribute modelAttr = new SemanticModelAttribute ("store__Image", "store__Message","store__RootTest",
+				"store__FileName", "store__FileNumber", "store__ErrorOrStackTrace");
+			TypeDescriptor.AddAttributes (failuresStore, modelAttr);
+			
 			var pr = new CellRendererImage ();
 			CellRendererText tr = new CellRendererText ();
 			TreeViewColumn col = new TreeViewColumn ();
@@ -132,8 +139,8 @@ namespace MonoDevelop.UnitTesting
 			sw.ShadowType = ShadowType.None;
 			sw.Add (failuresTreeView);
 			book.Pack1 (sw, true, true);
-			
-			outputView = new MonoDevelop.Ide.Gui.Components.LogView.LogTextView ();
+
+			outputView = new MonoDevelop.Ide.Gui.Components.LogView.LogTextView { Name = "testResultOutput" };
 			outputView.ModifyFont (FontService.MonospaceFont);
 			outputView.Editable = false;
 			bold = new TextTag ("bold");
@@ -165,6 +172,8 @@ namespace MonoDevelop.UnitTesting
 			
 			buttonSuccess = new ToggleButton ();
 			buttonSuccess.Label = GettextCatalog.GetString ("Successful Tests");
+			buttonSuccess.Accessible.Name = "TestResultsPad.SuccessfulTests";
+			buttonSuccess.Accessible.Description = GettextCatalog.GetString ("Show the results for the successful tests");
 			buttonSuccess.Active = false;
 			buttonSuccess.Image = new ImageView (TestStatusIcon.Success);
 			buttonSuccess.Image.Show ();
@@ -174,6 +183,8 @@ namespace MonoDevelop.UnitTesting
 
 			buttonInconclusive = new ToggleButton ();
 			buttonInconclusive.Label = GettextCatalog.GetString ("Inconclusive Tests");
+			buttonInconclusive.Accessible.Name = "TestResultsPad.InconclusiveTests";
+			buttonInconclusive.Accessible.Description = GettextCatalog.GetString ("Show the results for the inconclusive tests");
 			buttonInconclusive.Active = true;
 			buttonInconclusive.Image = new ImageView (TestStatusIcon.Inconclusive);
 			buttonInconclusive.Image.Show ();
@@ -183,6 +194,8 @@ namespace MonoDevelop.UnitTesting
 			
 			buttonFailures = new ToggleButton ();
 			buttonFailures.Label = GettextCatalog.GetString ("Failed Tests");
+			buttonFailures.Accessible.Name = "TestResultsPad.FailedTests";
+			buttonFailures.Accessible.Description = GettextCatalog.GetString ("Show the results for the failed tests");
 			buttonFailures.Active = true;
 			buttonFailures.Image = new ImageView (TestStatusIcon.Failure);
 			buttonFailures.Image.Show ();
@@ -192,6 +205,8 @@ namespace MonoDevelop.UnitTesting
 
 			buttonIgnored = new ToggleButton ();
 			buttonIgnored.Label = GettextCatalog.GetString ("Ignored Tests");
+			buttonIgnored.Accessible.Name = "TestResultsPad.IgnoredTests";
+			buttonIgnored.Accessible.Description = GettextCatalog.GetString ("Show the results for the ignored tests");
 			buttonIgnored.Active = true;
 			buttonIgnored.Image = new ImageView (TestStatusIcon.NotRun);
 			buttonIgnored.Image.Show ();
@@ -201,6 +216,8 @@ namespace MonoDevelop.UnitTesting
 			
 			buttonOutput = new ToggleButton ();
 			buttonOutput.Label = GettextCatalog.GetString ("Output");
+			buttonOutput.Accessible.Name = "TestResultsPad.Output";
+			buttonOutput.Accessible.Description = GettextCatalog.GetString ("Show the test output");
 			buttonOutput.Active = false;
 			buttonOutput.Image = new ImageView (MonoDevelop.Ide.Gui.Stock.OutputIcon, IconSize.Menu);
 			buttonOutput.Image.Show ();
@@ -212,12 +229,17 @@ namespace MonoDevelop.UnitTesting
 			
 			buttonRun = new Button ();
 			buttonRun.Label = GettextCatalog.GetString ("Rerun Tests");
+			buttonRun.Accessible.Name = "TestResultsPad.Run";
+			buttonRun.Accessible.Description = GettextCatalog.GetString ("Start a test run and run all the tests");
 			buttonRun.Image = new ImageView ("md-execute-all", IconSize.Menu);
 			buttonRun.Image.Show ();
 			buttonRun.Sensitive = false;
 			toolbar.Add (buttonRun);
 			
 			buttonStop = new Button (new ImageView (Ide.Gui.Stock.Stop, Gtk.IconSize.Menu));
+			buttonStop.Accessible.Name = "TestResultsPad.Stop";
+			buttonStop.Accessible.SetTitle (GettextCatalog.GetString ("Stop"));
+			buttonStop.Accessible.Description = GettextCatalog.GetString ("Stop the current test run");
 			toolbar.Add (buttonStop);
 			toolbar.ShowAll ();
 			
@@ -319,11 +341,14 @@ namespace MonoDevelop.UnitTesting
 		public void InitializeTestRun (UnitTest test, CancellationTokenSource cs)
 		{
 			rootTest = test;
+
 			cancellationSource = cs;
-			cs.Token.Register (OnCancel);
+			if (cs != null)
+				cs.Token.Register (OnCancel);
+			
 			results.Clear ();
 
-			testsToRun = test.CountTestCases ();
+			testsToRun = test != null ? test.CountTestCases () : 0;
 			error = null;
 			errorMessage = null;
 			
@@ -394,7 +419,13 @@ namespace MonoDevelop.UnitTesting
 			TreeIter row = failuresStore.AppendValues (testRow, null, GettextCatalog.GetString ("Stack Trace"), null, null, 0);
 			AddStackTrace (row, error.StackTrace, null);
 		}
-		
+
+		public void ReportExecutionError (string message)
+		{
+			var stock = ImageService.GetIcon (Ide.Gui.Stock.Error, Gtk.IconSize.Menu);
+			TreeIter testRow = failuresStore.AppendValues (stock, message, null, null, 0);
+		}
+
 		readonly static Regex stackTraceLineRegex = new Regex (@".*\s(?<file>.*)\:\D*\s?(?<line>\d+)", RegexOptions.Compiled);
 		
 		public static bool TryParseLocationFromStackTrace (string stackTraceLine, out string fileName, out int lineNumber)
@@ -473,7 +504,7 @@ namespace MonoDevelop.UnitTesting
 				int line = (int)failuresStore.GetValue (iter, 4);
 				try {
 					if (file != null && File.Exists (file)) {
-						IdeApp.Workbench.OpenDocument (file, line, -1);
+						IdeApp.Workbench.OpenDocument (file, null, line, -1);
 						return;
 					}
 				} catch (Exception) {
@@ -521,7 +552,7 @@ namespace MonoDevelop.UnitTesting
 					clipboard.Text = last.StackTrace;
 					break;
 					default:
-					clipboard.Text = last.Message + Environment.NewLine + "Stack trace:" + Environment.NewLine + last.StackTrace;
+					clipboard.Text = last.Message + Environment.NewLine + GettextCatalog.GetString("Stack trace:") + Environment.NewLine + last.StackTrace;
 					break;
 				}
 			} else {
@@ -544,7 +575,7 @@ namespace MonoDevelop.UnitTesting
 					clipboard.Text = error.StackTrace;
 					break;
 				default:
-					clipboard.Text = error.Message + Environment.NewLine + "Stack trace:" + Environment.NewLine + error.StackTrace;
+					clipboard.Text = error.Message + Environment.NewLine + GettextCatalog.GetString("Stack trace:") + Environment.NewLine + error.StackTrace;
 					break;
 				}
 			}
@@ -607,10 +638,10 @@ namespace MonoDevelop.UnitTesting
 			if (loc == null)
 				loc = test.SourceCodeLocation;
 			if (loc != null) {
-				IdeApp.Workbench.OpenDocument (loc.FileName, loc.Line, loc.Column);
+				IdeApp.Workbench.OpenDocument (loc.FileName, null, loc.Line, loc.Column);
 			} else {
 				LoggingService.LogError ("Can't get source code location for test : "+ test);
-				MessageService.ShowError (GettextCatalog.GetString ("Can't get source code location for :" + test.Name));
+				MessageService.ShowError (GettextCatalog.GetString ("Can't get source code location for : {0}", test.Name));
 			}
 		}
 
@@ -622,10 +653,10 @@ namespace MonoDevelop.UnitTesting
 				return;
 			SourceCodeLocation loc = test.SourceCodeLocation;
 			if (loc != null) {
-				IdeApp.Workbench.OpenDocument (loc.FileName, loc.Line, loc.Column);
+				IdeApp.Workbench.OpenDocument (loc.FileName, null, loc.Line, loc.Column);
 			}  else {
 				LoggingService.LogError ("Can't get source code location for test : "+ test);
-				MessageService.ShowError (GettextCatalog.GetString ("Can't get source code location for :" + test.Name));
+				MessageService.ShowError (GettextCatalog.GetString ("Can't get source code location for : {0}", test.Name));
 			}
 		}
 
@@ -803,7 +834,7 @@ namespace MonoDevelop.UnitTesting
 
 		void OnCancel ()
 		{
-			Gtk.Application.Invoke (delegate {
+			Gtk.Application.Invoke ((o, args) => {
 				failuresStore.AppendValues (TestStatusIcon.Failure, GettextCatalog.GetString ("Test execution cancelled."), null);
 			});
 		}

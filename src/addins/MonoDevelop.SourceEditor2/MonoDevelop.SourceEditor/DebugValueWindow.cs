@@ -38,36 +38,9 @@ using MonoDevelop.Ide.Editor;
 
 namespace MonoDevelop.SourceEditor
 {
-	class BaseWindow : Gtk.Window
-	{
-		public BaseWindow () : base (Gtk.WindowType.Toplevel)
-		{
-			this.SkipPagerHint = true;
-			this.SkipTaskbarHint = true;
-			this.Decorated = false;
-			this.BorderWidth = 2;
-			//HACK: this should be WindowTypeHint.Tooltip, but GTK on mac is buggy and doesn't allow keyboard
-			//input to WindowType.Toplevel windows with WindowTypeHint.Tooltip hint
-			this.TypeHint = WindowTypeHint.PopupMenu;
-			this.AllowShrink = false;
-			this.AllowGrow = false;
-		}
-
-		protected override bool OnExposeEvent (Gdk.EventExpose evnt)
-		{
-			int winWidth, winHeight;
-			this.GetSize (out winWidth, out winHeight);
-			evnt.Window.DrawRectangle (Style.BaseGC (StateType.Normal), true, 0, 0, winWidth - 1, winHeight - 1);
-			evnt.Window.DrawRectangle (Style.MidGC (StateType.Normal), false, 0, 0, winWidth - 1, winHeight - 1);
-			foreach (var child in this.Children)
-				this.PropagateExpose (child, evnt);
-			return false;
-		}
-	}
-
 	class DebugValueWindow : PopoverWindow
 	{
-		ObjectValueTreeView tree;
+		internal ObjectValueTreeView tree;
 		ScrolledWindow sw;
 
 		static readonly string innerTreeName = "MonoDevelop.SourceEditor.DebugValueWindow.ObjectValueTreeView";
@@ -87,7 +60,7 @@ namespace MonoDevelop.SourceEditor
 			if (bgColor == currentBgColor)
 				return;
 
-			if (IdeApp.Preferences.UserInterfaceSkin == Skin.Light)
+			if (IdeApp.Preferences.UserInterfaceTheme == Ide.Theme.Light)
 				oddRowColor = CairoExtensions.ColorGetHex (newBgColor.AddLight (-0.02));
 			else
 				oddRowColor = CairoExtensions.ColorGetHex (newBgColor.AddLight (-0.02));
@@ -109,7 +82,7 @@ namespace MonoDevelop.SourceEditor
 			this.AllowGrow = false;
 			this.Decorated = false;
 
-			TransientFor = (Gtk.Window) ((Gtk.Widget)editor).Toplevel;
+			TransientFor = (Gtk.Window) (editor.GetNativeWidget <Gtk.Widget> ()).Toplevel;
 			// Avoid getting the focus when the window is shown. We'll get it when the mouse enters the window
 			AcceptFocus = false;
 
@@ -148,6 +121,7 @@ namespace MonoDevelop.SourceEditor
 
 			ShowArrow = true;
 			Theme.CornerRadius = 3;
+			PreviewWindowManager.WindowClosed += PreviewWindowManager_WindowClosed;
 		}
 
 		void OnStartEditing (object sender, EventArgs args)
@@ -171,6 +145,7 @@ namespace MonoDevelop.SourceEditor
 			tree.EndEditing -= OnEndEditing;
 			tree.PinStatusChanged -= OnPinStatusChanged;
 			tree.SizeAllocated -= OnTreeSizeChanged;
+			PreviewWindowManager.WindowClosed -= PreviewWindowManager_WindowClosed;
 
 			base.OnDestroyed ();
 		}
@@ -193,7 +168,7 @@ namespace MonoDevelop.SourceEditor
 
 			if (dy > 0 && sw.VscrollbarPolicy == PolicyType.Never) {
 				sw.VscrollbarPolicy = PolicyType.Always;
-				sw.HeightRequest = h - dy - 10;
+				sw.HeightRequest = h - dy - 20;
 			} else if (sw.VscrollbarPolicy == PolicyType.Always && sw.Vadjustment.Upper == sw.Vadjustment.PageSize) {
 				sw.VscrollbarPolicy = PolicyType.Never;
 				sw.HeightRequest = -1;
@@ -201,7 +176,7 @@ namespace MonoDevelop.SourceEditor
 
 			if (dx > 0 && sw.HscrollbarPolicy == PolicyType.Never) {
 				sw.HscrollbarPolicy = PolicyType.Always;
-				sw.WidthRequest = w - dx - 10;
+				sw.WidthRequest = w - dx - 20;
 			} else if (sw.HscrollbarPolicy == PolicyType.Always && sw.Hadjustment.Upper == sw.Hadjustment.PageSize) {
 				sw.HscrollbarPolicy = PolicyType.Never;
 				sw.WidthRequest = -1;
@@ -234,6 +209,14 @@ namespace MonoDevelop.SourceEditor
 				}
 			}
 			base.OnSizeAllocated (allocation);
+		}
+
+		void PreviewWindowManager_WindowClosed (object sender, EventArgs e)
+		{
+			// When Preview window is closed we want to put focus(IsActive=true) back on DebugValueWindow
+			// otherwise CommandManager will think IDE doesn't have any window Active/Focused and think
+			// user switched to another app and DebugValueWindow will closed itself on "FocusOut" event
+			this.Present ();
 		}
 	}
 }

@@ -31,7 +31,7 @@ namespace ICSharpCode.NRefactory6.CSharp
 
 		public CSharpEditorFormattingService()
 		{
-			_autoFormattingTriggerChars = ImmutableHashSet.CreateRange<char>(";}");
+			_autoFormattingTriggerChars = ImmutableHashSet.CreateRange<char>(";}#nte");
 
 			// add all auto formatting trigger to supported char
 			_supportedChars = _autoFormattingTriggerChars.Union("{}#nte:)");
@@ -41,7 +41,7 @@ namespace ICSharpCode.NRefactory6.CSharp
 				{
 					new KeyValuePair<char, ImmutableHashSet<SyntaxKind>> ('n', ImmutableHashSet.Create(SyntaxKind.RegionKeyword, SyntaxKind.EndRegionKeyword)),
 					new KeyValuePair<char, ImmutableHashSet<SyntaxKind>> ('t', ImmutableHashSet.Create(SyntaxKind.SelectKeyword)),
-					new KeyValuePair<char, ImmutableHashSet<SyntaxKind>> ('e', ImmutableHashSet.Create(SyntaxKind.WhereKeyword)),
+					new KeyValuePair<char, ImmutableHashSet<SyntaxKind>> ('e', ImmutableHashSet.Create(SyntaxKind.WhereKeyword, SyntaxKind.ElseKeyword)),
 				});
 		}
 
@@ -55,14 +55,7 @@ namespace ICSharpCode.NRefactory6.CSharp
 
 		public bool SupportsFormattingOnTypedCharacter(Document document, char ch)
 		{
-			var optionsService = document.Project.Solution.Workspace.Options;
-			//			if ((ch == '}' && !optionsService.GetOption(FeatureOnOffOptions.AutoFormattingOnCloseBrace, document.Project.Language)) ||
-			//				(ch == ';' && !optionsService.GetOption(FeatureOnOffOptions.AutoFormattingOnSemicolon, document.Project.Language)))
-			//			{
-			//				return false;
-			//			}
-
-			return _supportedChars.Contains(ch);
+			return _autoFormattingTriggerChars.Contains(ch);
 		}
 
 		//		public async Task<IList<TextChange>> GetFormattingChangesAsync(Document document, TextSpan? textSpan, CancellationToken cancellationToken)

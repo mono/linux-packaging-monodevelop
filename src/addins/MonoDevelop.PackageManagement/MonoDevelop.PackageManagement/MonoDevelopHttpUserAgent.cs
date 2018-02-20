@@ -29,11 +29,11 @@
 using System;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
-using NuGet;
+using NuGet.Protocol.Core.Types;
 
 namespace MonoDevelop.PackageManagement
 {
-	public class MonoDevelopHttpUserAgent
+	internal class MonoDevelopHttpUserAgent
 	{
 		public MonoDevelopHttpUserAgent()
 		{
@@ -42,23 +42,29 @@ namespace MonoDevelop.PackageManagement
 		
 		public string Client { get; private set; }
 		public string Host { get; private set; }
-		public string UserAgent { get; private set; }
-		
+
 		void CreateUserAgent()
 		{
-			Client = BrandingService.ApplicationName;
+			Client = GetClient ();
 			Host = GetHost();
-			UserAgent = HttpUtility.CreateUserAgentString(Client, Host);
+
+			var builder = new UserAgentStringBuilder (Client).WithVisualStudioSKU (Host);
+			UserAgent.SetUserAgentString (builder);
+		}
+
+		static string GetClient ()
+		{
+			string client = BrandingService.ApplicationName;
+			if (client.StartsWith ("Xamarin Studio", StringComparison.OrdinalIgnoreCase)) {
+				return "Xamarin Studio";
+			}
+
+			return client;
 		}
 		
 		string GetHost()
 		{
-			return String.Format("{0}/{1}", Client, IdeApp.Version);
-		}
-		
-		public override string ToString()
-		{
-			return UserAgent;
+			return String.Format ("{0}/{1}", BrandingService.ApplicationName, IdeApp.Version);
 		}
 	}
 }

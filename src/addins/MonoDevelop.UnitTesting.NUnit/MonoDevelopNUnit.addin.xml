@@ -7,8 +7,8 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/ProjectTemplates">
-		<ProjectTemplate id = "NUnitProject" resource = "NUnitProject.xpt.xml"/>
-		<ProjectTemplate id = "NUnitProjectVBNet" resource = "NUnitProjectVBNet.xpt.xml"/>
+		<ProjectTemplate id = "MonoDevelop.CSharp.NUnitLibraryProject" resource = "NUnitProject.xpt.xml"/>
+		<ProjectTemplate id = "MonoDevelop.VBNet.NUnitLibraryProject" resource = "NUnitProjectVBNet.xpt.xml"/>
 	</Extension>
 
   	<Extension path = "/MonoDevelop/Ide/FileTemplates">
@@ -16,7 +16,11 @@
 	</Extension>
 
 	<Extension path="/MonoDevelop/Ide/TemplateImages">
-		<Image id="md-nunit-library-project" resource="nunit-library-project.png" />
+		<Image id="md-test-project" resource="project-test-template.png" />
+	</Extension>
+	
+	<Extension path="/MonoDevelop/Core/StockIcons">
+		<StockIcon stockid="md-test-project" resource="project-test-32.png" size="Dnd" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/UnitTesting/UnitTestMarkers">

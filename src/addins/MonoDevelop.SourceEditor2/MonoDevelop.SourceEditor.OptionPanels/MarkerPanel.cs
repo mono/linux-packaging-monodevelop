@@ -26,6 +26,7 @@
 using System;
 using MonoDevelop.Ide.Gui.Dialogs;
 using MonoDevelop.Components;
+using MonoDevelop.Components.AtkCocoaHelper;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Editor;
 using MonoDevelop.Ide;
@@ -33,12 +34,10 @@ using MonoDevelop.Ide;
 namespace MonoDevelop.SourceEditor.OptionPanels
 {
 	
-	public partial class MarkerPanel : Gtk.Bin, IOptionsPanel
+	partial class MarkerPanel : Gtk.Bin, IOptionsPanel
 	{
 
 		bool showLineNumbers;
-
-		bool underlineErrors;
 
 		bool highlightMatchingBracket;
 
@@ -56,13 +55,14 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 
 		bool enableQuickDiff;
 
+		bool showProcedureLineSeparators;
+
 		IncludeWhitespaces includeWhitespaces;
 
 		public MarkerPanel()
 		{
 			this.Build();
 			showLineNumbers = DefaultSourceEditorOptions.Instance.ShowLineNumberMargin;
-			underlineErrors = DefaultSourceEditorOptions.Instance.UnderlineErrors;
 			highlightMatchingBracket = DefaultSourceEditorOptions.Instance.HighlightMatchingBracket;
 			highlightCurrentLine = DefaultSourceEditorOptions.Instance.HighlightCaretLine;
 			showRuler = DefaultSourceEditorOptions.Instance.ShowRuler;
@@ -72,6 +72,37 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			showWhitespaces = DefaultSourceEditorOptions.Instance.ShowWhitespaces;
 			includeWhitespaces = DefaultSourceEditorOptions.Instance.IncludeWhitespaces;
 			enableQuickDiff = DefaultSourceEditorOptions.Instance.EnableQuickDiff;
+			showProcedureLineSeparators = DefaultSourceEditorOptions.Instance.ShowProcedureLineSeparators;
+			SetupAccessibility ();
+		}
+
+		void SetupAccessibility ()
+		{
+			checkbuttonTabs.SetCommonAccessibilityAttributes ("MarkerPanel.tabs", "",
+			                                                  GettextCatalog.GetString ("Check to show tabs when showing invisible characters"));
+			checkbuttonSpaces.SetCommonAccessibilityAttributes ("MarkerPanel.spaces", "",
+			                                                    GettextCatalog.GetString ("Check to show spaces when showing invisible characters"));
+			checkbuttonLineEndings.SetCommonAccessibilityAttributes ("MarkerPanel.lineEndings", "",
+			                                                         GettextCatalog.GetString ("Check to show line endings when showing invisible characters"));
+			showRulerCheckbutton.SetCommonAccessibilityAttributes ("MarkerPanel.showRuler", "",
+			                                                       GettextCatalog.GetString ("Check to show the column ruler"));
+			showLineNumbersCheckbutton.SetCommonAccessibilityAttributes ("MarkerPanel.showLineNumbers", "",
+			                                                             GettextCatalog.GetString ("Check to show line numbers"));
+			highlightCurrentLineCheckbutton.SetCommonAccessibilityAttributes ("MarkerPanel.highlightCurrentLine", "",
+			                                                                  GettextCatalog.GetString ("Check to highlight to current line"));
+			highlightMatchingBracketCheckbutton.SetCommonAccessibilityAttributes ("MarkerPanel.highlightMatching", "",
+			                                                                      GettextCatalog.GetString ("Check to highlight the matching bracket"));
+			enableHighlightUsagesCheckbutton.SetCommonAccessibilityAttributes ("MarkerPanel.highlightUsages", "",
+			                                                                   GettextCatalog.GetString ("Check to highlight identifier references"));
+			enableAnimationCheckbutton1.SetCommonAccessibilityAttributes ("MarkerPanel.enableAnim", "",
+			                                                              GettextCatalog.GetString ("Check to enable animations in the text editor"));
+			enableQuickDiffCheckbutton.SetCommonAccessibilityAttributes ("MarkerPanel.quickDiff", "",
+			                                                             GettextCatalog.GetString ("Check to highlight changed line"));
+			drawIndentMarkersCheckbutton.SetCommonAccessibilityAttributes ("MarkerPanel.drawIndent", "",
+			                                                               GettextCatalog.GetString ("Check to draw indentation markers"));
+
+			showWhitespacesCombobox.SetCommonAccessibilityAttributes ("MarkerPanel.showWhitespace", label1,
+			                                                          GettextCatalog.GetString ("Select when to show invisible characters"));
 		}
 		
 		public virtual Control CreatePanelWidget ()
@@ -79,14 +110,6 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			this.showLineNumbersCheckbutton.Active = showLineNumbers = DefaultSourceEditorOptions.Instance.ShowLineNumberMargin;
 			this.showLineNumbersCheckbutton.Toggled += delegate {
 				DefaultSourceEditorOptions.Instance.ShowLineNumberMargin = this.showLineNumbersCheckbutton.Active;
-			};
-
-			this.underlineErrorsCheckbutton.Active = underlineErrors = DefaultSourceEditorOptions.Instance.UnderlineErrors;
-			this.underlineErrorsCheckbutton.Toggled += delegate {
-				DefaultSourceEditorOptions.Instance.UnderlineErrors = this.underlineErrorsCheckbutton.Active;
-				foreach (var doc in IdeApp.Workbench.Documents)
-					doc.StartReparseThread ();
-
 			};
 
 			this.highlightMatchingBracketCheckbutton.Active = highlightMatchingBracket = DefaultSourceEditorOptions.Instance.HighlightMatchingBracket;
@@ -139,6 +162,9 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			this.enableQuickDiffCheckbutton.Toggled += delegate {
 				DefaultSourceEditorOptions.Instance.EnableQuickDiff = this.enableQuickDiffCheckbutton.Active;
 			};
+
+			this.showProcedureLineSeparatorsCheckbutton.Active = showProcedureLineSeparators = DefaultSourceEditorOptions.Instance.ShowProcedureLineSeparators;
+
 			return this;
 		}
 
@@ -157,7 +183,6 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 		public virtual void ApplyChanges ()
 		{
 			showLineNumbers = this.showLineNumbersCheckbutton.Active;
-			underlineErrors = this.underlineErrorsCheckbutton.Active;
 			highlightMatchingBracket = this.highlightMatchingBracketCheckbutton.Active;
 			highlightCurrentLine = this.highlightCurrentLineCheckbutton.Active;
 			showRuler = this.showRulerCheckbutton.Active;
@@ -166,6 +191,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			drawIndentMarkers = this.drawIndentMarkersCheckbutton.Active;
 			showWhitespaces = (ShowWhitespaces) this.showWhitespacesCombobox.Active;
 			enableQuickDiff = this.enableQuickDiffCheckbutton.Active;
+			showProcedureLineSeparators = this.showProcedureLineSeparatorsCheckbutton.Active;
 
 			var include = IncludeWhitespaces.None;
 			if (checkbuttonSpaces.Active)
@@ -180,7 +206,6 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 		protected override void OnDestroyed ()
 		{
 			DefaultSourceEditorOptions.Instance.ShowLineNumberMargin = showLineNumbers;
-			DefaultSourceEditorOptions.Instance.UnderlineErrors = underlineErrors;
 			DefaultSourceEditorOptions.Instance.HighlightMatchingBracket = highlightMatchingBracket;
 			DefaultSourceEditorOptions.Instance.HighlightCaretLine = highlightCurrentLine;
 			DefaultSourceEditorOptions.Instance.ShowRuler = showRuler;
@@ -190,6 +215,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 			DefaultSourceEditorOptions.Instance.ShowWhitespaces = showWhitespaces;
 			DefaultSourceEditorOptions.Instance.EnableQuickDiff = enableQuickDiff;
 			DefaultSourceEditorOptions.Instance.IncludeWhitespaces = includeWhitespaces;
+			DefaultSourceEditorOptions.Instance.ShowProcedureLineSeparators = showProcedureLineSeparators;
 			base.OnDestroyed ();
 		}
 

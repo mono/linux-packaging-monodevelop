@@ -1,12 +1,11 @@
-using NUnit.Framework;
 using RefactoringEssentials.CSharp.CodeRefactorings;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.CodeRefactorings
 {
-    [TestFixture]
     public class ConvertLambdaBodyExpressionToStatementTests : CSharpCodeRefactoringTestBase
     {
-        [Test]
+        [Fact]
         public void TestReturn()
         {
             Test<ConvertLambdaBodyExpressionToStatementCodeRefactoringProvider>(@"
@@ -29,7 +28,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestExprStatement()
         {
             Test<ConvertLambdaBodyExpressionToStatementCodeRefactoringProvider>(@"
@@ -52,7 +51,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestExprStatementWithComment()
         {
             Test<ConvertLambdaBodyExpressionToStatementCodeRefactoringProvider>(@"
@@ -77,7 +76,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestParenthesizedLambdaExprStatement()
         {
             Test<ConvertLambdaBodyExpressionToStatementCodeRefactoringProvider>(@"
@@ -100,8 +99,8 @@ class TestClass
 }");
         }
 
-        [Test]
-        public void TestWrongContext()
+        [Fact]
+        public void TestWrongContext_ConvertLambdaBodyExpressionToStatement()
         {
             TestWrongContext<ConvertLambdaBodyExpressionToStatementCodeRefactoringProvider>(@"
 class TestClass
@@ -116,7 +115,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestParenthesis()
         {
             Test<ConvertLambdaBodyExpressionToStatementCodeRefactoringProvider>(@"
@@ -138,7 +137,7 @@ class TestClass
 }");
         }
 
-        [Test]
+        [Fact]
         public void TestInvocation()
         {
             Test<ConvertLambdaBodyExpressionToStatementCodeRefactoringProvider>(@"

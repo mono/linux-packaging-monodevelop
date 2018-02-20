@@ -23,38 +23,46 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-using System;
-using System.Linq;
 using MonoDevelop.Ide.CodeCompletion;
 using Microsoft.CodeAnalysis;
-using GLib;
-using System.Collections.Generic;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.TypeSystem;
-using MonoDevelop.Components.PropertyGrid.PropertyEditors;
 using MonoDevelop.Ide.Editor;
 using System.Text;
-using ICSharpCode.NRefactory.MonoCSharp;
+using Microsoft.CodeAnalysis.Completion;
 
 namespace MonoDevelop.CSharp.Completion
 {
-	class ImportSymbolCompletionData : RoslynSymbolCompletionData
+	class ImportSymbolCompletionData : CompletionData
 	{
-		CSharpCompletionTextEditorExtension ext;
+		CSharpCompletionTextEditorExtension completionExt;
 		ISymbol type;
+		string displayText;//This is just for caching, because Sorting completion list can call DisplayText many times
 		bool useFullName;
+
+		public ISymbol Symbol { get { return type; } }
 
 		public override IconId Icon {
 			get {
 				return type.GetStockIcon ();
 			}
 		}
+		static CompletionItemRules rules = CompletionItemRules.Create (matchPriority: -10000);
+        public override CompletionItemRules Rules => rules;
+		public override string DisplayText {
+			get {
+				if (displayText == null)
+					displayText = type.Name;
+				return displayText;
+			}
+		}
+		public override string CompletionText { get =>  useFullName ? type.ContainingNamespace.GetFullName () + "." + type.Name : type.Name; }
 
-		public override int PriorityGroup { get { return int.MinValue; } }
+        public override int PriorityGroup { get { return int.MinValue; } }
 
-		public ImportSymbolCompletionData (CSharpCompletionTextEditorExtension ext, RoslynCodeCompletionFactory factory, ISymbol type, bool useFullName) : base (null, factory, type)
+		public ImportSymbolCompletionData (CSharpCompletionTextEditorExtension ext, ISymbol type, bool useFullName) 
 		{
-			this.ext = ext;
+			this.completionExt = ext;
 			this.useFullName = useFullName;
 			this.type = type;
 			this.DisplayFlags |= DisplayFlags.IsImportCompletion;
@@ -74,6 +82,11 @@ namespace MonoDevelop.CSharp.Completion
 			insertNamespace = useFullName;
 		}
 
+		public override string GetDisplayTextMarkup ()
+		{
+			return useFullName ? type.ToDisplayString (Ambience.NameFormat) : type.Name;
+		}
+
 		static string GetDefaultDisplaySelection (string description, bool isSelected)
 		{
 			if (!isSelected)
@@ -87,7 +100,7 @@ namespace MonoDevelop.CSharp.Completion
 			if (displayDescription == null) {
 				Initialize ();
 				if (generateUsing || insertNamespace) {
-					displayDescription = string.Format (GettextCatalog.GetString ("(from '{0}')"), type.ContainingNamespace.Name);
+					displayDescription = string.Format (GettextCatalog.GetString ("(from '{0}')"), type.ContainingNamespace.GetFullName ());
 				} else {
 					displayDescription = "";
 				}
@@ -100,13 +113,19 @@ namespace MonoDevelop.CSharp.Completion
 		public override void InsertCompletionText (CompletionListWindow window, ref KeyActions ka, MonoDevelop.Ide.Editor.Extension.KeyDescriptor descriptor)
 		{
 			Initialize ();
-			var doc = ext.DocumentContext;
-
+			var doc = completionExt.DocumentContext;
+			var offset = completionExt.CurrentCompletionContext.TriggerOffset;
 			base.InsertCompletionText (window, ref ka, descriptor);
 
-			using (var undo = ext.Editor.OpenUndoGroup ()) {
+			using (var undo = completionExt.Editor.OpenUndoGroup ()) {
 				if (!window.WasShiftPressed && generateUsing) {
-					AddGlobalNamespaceImport (ext.Editor, doc, type.ContainingNamespace.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat));
+					AddGlobalNamespaceImport (completionExt.Editor, doc, type.ContainingNamespace.ToDisplayString (SymbolDisplayFormat.CSharpErrorMessageFormat));
+				} else {
+					doc.AnalysisDocument.GetSemanticModelAsync ().ContinueWith (t => {
+						Runtime.RunInMainThread (delegate {
+							completionExt.Editor.InsertText (offset, type.ContainingNamespace.ToMinimalDisplayString (t.Result, offset, SymbolDisplayFormat.CSharpErrorMessageFormat) + ".");
+						});
+					});
 				}
 			}
 			ka |= KeyActions.Ignore;

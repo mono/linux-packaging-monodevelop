@@ -67,6 +67,7 @@ namespace MonoDevelop.CodeActions
 			}
 		}
 
+		CellRendererToggle togRender = new CellRendererToggle ();
 		public ContextActionPanelWidget (string mimeType)
 		{
 			this.mimeType = mimeType;
@@ -91,15 +92,7 @@ namespace MonoDevelop.CodeActions
 			searchentryFilter.Visible = true;
 			searchentryFilter.Entry.Changed += ApplyFilter;
 
-			var togRender = new CellRendererToggle ();
-			togRender.Toggled += delegate(object o, ToggledArgs args) {
-				TreeIter iter;
-				if (!treeStore.GetIterFromString (out iter, args.Path)) 
-					return;
-				var provider = (CodeRefactoringDescriptor)treeStore.GetValue (iter, 2);
-				providerStates [provider] = !providerStates [provider];
-				treeStore.SetValue (iter, 1, providerStates [provider]);
-			};
+			togRender.Toggled += OnActionToggled;
 			col.PackStart (togRender, false);
 			col.AddAttribute (togRender, "active", 1);
 			
@@ -112,10 +105,21 @@ namespace MonoDevelop.CodeActions
 			treeviewContextActions.AppendColumn (col);
 			treeviewContextActions.HeadersVisible = false;
 			treeviewContextActions.Model = treeStore;
+			treeviewContextActions.SearchColumn = -1; // disable the interactive search
 			GetAllProviderStates ();
 			FillTreeStore (null);
 			treeviewContextActions.TooltipColumn = 3;
 			treeviewContextActions.HasTooltip = true;
+		}
+
+		void OnActionToggled (object sender, ToggledArgs args)
+		{
+			TreeIter iter;
+			if (!treeStore.GetIterFromString (out iter, args.Path))
+				return;
+			var provider = (CodeRefactoringDescriptor)treeStore.GetValue (iter, 2);
+			providerStates [provider] = !providerStates [provider];
+			treeStore.SetValue (iter, 1, providerStates [provider]);
 		}
 
 		void ApplyFilter (object sender, EventArgs e)
@@ -141,6 +145,12 @@ namespace MonoDevelop.CodeActions
 			foreach (var kv in providerStates) {
 				kv.Key.IsEnabled = kv.Value;
 			}
+		}
+
+		protected override void OnDestroyed()
+		{
+			togRender.Toggled -= OnActionToggled;
+			base.OnDestroyed();
 		}
 	}
 }

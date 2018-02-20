@@ -54,6 +54,7 @@ namespace MonoDevelop.UnitTesting
 		{
 			UnitTestResult res = new UnitTestResult ();
 			res.status = ResultStatus.Failure;
+			ex = ex.FlattenAggregate ();
 			res.Message = ex.Message;
 			res.stackTrace = ex.StackTrace;
 			return res;
@@ -64,8 +65,10 @@ namespace MonoDevelop.UnitTesting
 			UnitTestResult res = new UnitTestResult ();
 			res.status = ResultStatus.Failure;
 			res.Message = message;
-			if (ex != null)
+			if (ex != null) {
+				ex = ex.FlattenAggregate ();
 				res.stackTrace = ex.Message + "\n" + ex.StackTrace;
+			}
 			return res;
 		}
 		
@@ -221,6 +224,42 @@ namespace MonoDevelop.UnitTesting
 			Inconclusive += res.Inconclusive;
 			Skipped += res.Skipped;
 		}
+
+		public override int GetHashCode ()
+		{
+			var unknowObject = new {
+				Status,
+				Passed,
+				Errors,
+				Failures,
+				Inconclusive,
+				NotRunnable,
+				Skipped,
+				Ignored
+			};
+			return unknowObject.GetHashCode ();
+		}
+
+		public override bool Equals (object obj)
+		{
+			var unitTestResult =  obj as UnitTestResult;
+			if (unitTestResult == null)
+				return false;
+			return EqualsHelper (this, unitTestResult);
+		}
+
+		bool EqualsHelper (UnitTestResult firstResult, UnitTestResult secondResult)
+		{
+			return  firstResult.Status == secondResult.Status &&
+					firstResult.Passed == secondResult.Passed &&
+					firstResult.Errors == secondResult.Errors &&
+					firstResult.Failures == secondResult.Failures &&
+					firstResult.Inconclusive == secondResult.Inconclusive &&
+					firstResult.NotRunnable == secondResult.NotRunnable &&
+					firstResult.Skipped == secondResult.Skipped &&
+					firstResult.Ignored == secondResult.Ignored;
+		}
+
 	}
 }
 

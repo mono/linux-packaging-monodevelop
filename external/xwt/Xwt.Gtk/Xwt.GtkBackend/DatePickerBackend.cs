@@ -80,10 +80,10 @@ namespace Xwt.GtkBackend
 
 		public DatePickerStyle Style {
 			get {
-				return Widget.Style;
+				return Widget.DatePickerStyle;
 			}
 			set {
-				Widget.Style = value;
+				Widget.DatePickerStyle = value;
 			}
 		}
 		
@@ -107,9 +107,7 @@ namespace Xwt.GtkBackend
 
 		void HandleValueChanged (object sender, EventArgs e)
 		{
-			ApplicationContext.InvokeUserCode (delegate {
-				EventSink.ValueChanged ();
-			});
+			ApplicationContext.InvokeUserCode (EventSink.ValueChanged);
 		}
 		
 		public class GtkDatePickerEntry : Gtk.SpinButton
@@ -171,7 +169,7 @@ namespace Xwt.GtkBackend
 			}
 
 			DatePickerStyle style;
-			public DatePickerStyle Style {
+			public DatePickerStyle DatePickerStyle {
 				get {
 					return style;
 				}
@@ -215,7 +213,7 @@ namespace Xwt.GtkBackend
 			                                                          DateTime.MaxValue.Ticks,
 			                                                          TimeSpan.TicksPerSecond)
 			{
-				Style = style;
+				DatePickerStyle = style;
 
 				Adjustment.PageIncrement = TimeSpan.TicksPerDay;
 				IsEditable = true;
@@ -237,11 +235,17 @@ namespace Xwt.GtkBackend
 				else if (Adjustment.Value < currentValue.Ticks)
 					DateTime = currentValue.AddComponent (selectedComponent, -1);
 			}
-			
+
+			protected override void OnDestroyed()
+			{
+				Adjustment.ValueChanged -= HandleValueChanged;
+				base.OnDestroyed();
+			}
+
 			protected override int OnOutput ()
 			{
 				DateTime dateTime = new DateTime ((long)Adjustment.Value);
-				string format = styleFormats [(int)Style];
+				string format = styleFormats [(int)DatePickerStyle];
 
 				Text = dateTime.ToString (format);
 				return 1;

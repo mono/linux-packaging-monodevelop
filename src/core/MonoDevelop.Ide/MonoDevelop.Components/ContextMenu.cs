@@ -81,11 +81,7 @@ namespace MonoDevelop.Components
 		{
 			#if MAC
 			if (Platform.IsMac) {
-				int tx, ty;
-
-				// x, y are in gtk coordinates, so they need to be translated for Cocoa.
-				parent.TranslateCoordinates (parent.Toplevel, x, y, out tx, out ty);
-				ContextMenuExtensionsMac.ShowContextMenu (parent, tx, ty, this, closeHandler, selectFirstItem);
+				ContextMenuExtensionsMac.ShowContextMenu (parent, x, y, this, closeHandler, selectFirstItem);
 				return;
 			}
 			#endif
@@ -99,11 +95,16 @@ namespace MonoDevelop.Components
 			Show (parent, x, y, null);
 		}
 
-
-
 		public void Add (ContextMenuItem menuItem)
 		{
 			items.Add (menuItem);
+		}
+
+		public event EventHandler Closed;
+
+		internal void FireClosedEvent ()
+		{
+			Closed?.Invoke (this, EventArgs.Empty);
 		}
 	}
 }

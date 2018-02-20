@@ -19,7 +19,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             GettextCatalog.GetString("Use 'var' keyword when possible"),
             GettextCatalog.GetString("Use 'var' keyword"),
             DiagnosticAnalyzerCategories.Opportunities,
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Hidden,
             isEnabledByDefault: true,
             helpLinkUri: HelpLink.CreateFor(CSharpDiagnosticIDs.SuggestUseVarKeywordEvidentAnalyzerID)
         );
@@ -28,6 +28,8 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterSyntaxNodeAction(
                 (nodeContext) =>
                 {
@@ -42,14 +44,16 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
             diagnostic = default(Diagnostic);
-            if (nodeContext.IsFromGeneratedCode())
-                return false;
 
             var localVariableStatement = nodeContext.Node as LocalDeclarationStatementSyntax;
 
             if (localVariableStatement != null)
             {
                 var localVariableSyntax = localVariableStatement.Declaration;
+
+                // 'var' is not allowed with more than one variable declarator
+                if (localVariableSyntax.Variables.Count > 1)
+                    return false;
 
                 if (!TryValidateLocalVariableType(localVariableStatement, localVariableSyntax))
                     return false;
@@ -91,8 +95,9 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 return false;
             return IsArrayTypeSomeObviousTypeCase(nodeContext, initializerExpression, variableType, localVariable) ||
                 IsObjectCreationSomeObviousTypeCase(nodeContext, initializerExpression, variableType) ||
-                IsCastingSomeObviousTypeCase(nodeContext, initializerExpression, variableType) /*||
-				IsPropertyAccessSomeObviousTypeCase(nodeContext, initializerExpression, variableType)*/;
+                IsCastingSomeObviousTypeCase(nodeContext, initializerExpression, variableType) ||
+                IsInvocationSomeObviousTypeCase(nodeContext, initializerExpression, variableType) /*||
+                IsPropertyAccessSomeObviousTypeCase(nodeContext, initializerExpression, variableType)*/;
         }
 
         static bool IsArrayTypeSomeObviousTypeCase(SyntaxNodeAnalysisContext nodeContext, ExpressionSyntax initializerExpression, ITypeSymbol variableType, LocalDeclarationStatementSyntax localVariable)
@@ -150,6 +155,18 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                     var castExpressionType = nodeContext.SemanticModel.GetTypeInfo(castExpression, nodeContext.CancellationToken).Type;
                     return castExpressionType != null && castExpressionType.Equals(variableType);
                 }
+            }
+
+            return false;
+        }
+
+        protected static bool IsInvocationSomeObviousTypeCase(SyntaxNodeAnalysisContext nodeContext, ExpressionSyntax initializerExpression, ITypeSymbol variableType)
+        {
+            var invocationExpression = initializerExpression as InvocationExpressionSyntax;
+            if (invocationExpression != null)
+            {
+                var invokedMethod = nodeContext.SemanticModel.GetSymbolInfo(invocationExpression, nodeContext.CancellationToken).Symbol as IMethodSymbol;
+                return invokedMethod != null && variableType.Equals(invokedMethod.ReturnType);
             }
 
             return false;

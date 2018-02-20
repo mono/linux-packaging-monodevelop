@@ -1,13 +1,12 @@
-using NUnit.Framework;
+/*
 using RefactoringEssentials.CSharp.Diagnostics;
+using Xunit;
 
 namespace RefactoringEssentials.Tests.CSharp.Diagnostics
 {
-    [TestFixture]
-    [Ignore("TODO: Issue not ported yet")]
     public class ConvertToAutoPropertyTests : CSharpDiagnosticTestBase
     {
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBasicCase()
         {
             Analyze<ConvertToAutoPropertyAnalyzer>(@"
@@ -22,7 +21,7 @@ class FooBar
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestThisSyntaxCase()
         {
             Analyze<ConvertToAutoPropertyAnalyzer>(@"
@@ -37,7 +36,7 @@ class FooBar
 ");
         }
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestDisable()
         {
             Analyze<ConvertToAutoPropertyAnalyzer>(@"
@@ -55,7 +54,7 @@ class FooBar
         }
 
 
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestArrayBug()
         {
             Analyze<ConvertToAutoPropertyAnalyzer>(@"
@@ -77,7 +76,7 @@ class FooBar
         /// <summary>
         /// Bug 16108 - Convert to autoproperty issues
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug16108Case1()
         {
             Analyze<ConvertToAutoPropertyAnalyzer>(@"
@@ -96,7 +95,7 @@ class MyClass
         /// <summary>
         /// Bug 16108 - Convert to autoproperty issues
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug16108Case2()
         {
             Analyze<ConvertToAutoPropertyAnalyzer>(@"
@@ -115,7 +114,7 @@ class MyClass
         /// <summary>
         /// Bug 16448 - Refactor incorrectly suggesting "Convert to Auto Property" on property containing custom logic
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug16448()
         {
             Analyze<ConvertToAutoPropertyAnalyzer>(@"
@@ -140,7 +139,7 @@ public class Foo
         /// <summary>
         /// Bug 17107 - Source Analysis ignores volatile keyword
         /// </summary>
-        [Test]
+        [Fact(Skip="TODO: Issue not ported yet")]
         public void TestBug17107()
         {
             Analyze<ConvertToAutoPropertyAnalyzer>(@"
@@ -161,3 +160,4 @@ public class Foo
     }
 }
 
+*/

@@ -65,7 +65,7 @@ namespace MonoDevelop.Ide.CodeTemplates
 			checkbuttonSurroundWith.Active = (template.CodeTemplateType & CodeTemplateType.SurroundsWith) == CodeTemplateType.SurroundsWith;
 			
 			Gtk.Widget control = textEditor;
-			scrolledwindow1.Child = control;
+			scrolledwindow1.AddWithViewport (control);
 			control.ShowAll ();
 			textEditor.CaretPositionChanged += CaretPositionChanged;
 			textEditor.Options = DefaultSourceEditorOptions.PlainEditor;
@@ -113,6 +113,13 @@ namespace MonoDevelop.Ide.CodeTemplates
 			vbox4.PackEnd (grid, true, true, 0);
 			
 			UpdateVariables ();
+		}
+
+		protected override void OnDestroyed ()
+		{
+			textEditor.TextChanged -= DocumentTextReplaced;
+			textEditor.CaretPositionChanged -= CaretPositionChanged;
+			base.OnDestroyed ();
 		}
 
 		void ComboboxVariablesChanged (object sender, EventArgs e)

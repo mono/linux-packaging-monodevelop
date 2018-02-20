@@ -31,7 +31,7 @@ using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
-	public class FakePackageManagementProjectService : IPackageManagementProjectService
+	class FakePackageManagementProjectService : IPackageManagementProjectService
 	{
 		public IProject CurrentProject { get; set; }
 		public ISolution OpenSolution { get; set; }
@@ -48,11 +48,6 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 		public IEnumerable<IDotNetProject> GetOpenProjects ()
 		{
 			return OpenProjects;
-		}
-
-		public IProjectBrowserUpdater CreateProjectBrowserUpdater ()
-		{
-			throw new NotImplementedException ();
 		}
 
 		Dictionary<string, string> defaultCustomTools = new Dictionary<string, string> ();

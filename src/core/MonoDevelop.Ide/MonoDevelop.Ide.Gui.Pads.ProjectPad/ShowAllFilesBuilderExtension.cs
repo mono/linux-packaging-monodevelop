@@ -35,6 +35,7 @@ using MonoDevelop.Projects;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Components;
+using System.Linq;
 
 namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 {
@@ -56,6 +57,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		
 		protected override void Initialize ()
 		{
+			base.Initialize ();
+
 			IdeApp.Workspace.FileAddedToProject += OnAddFile;
 			IdeApp.Workspace.FileRemovedFromProject += OnRemoveFile;
 			
@@ -71,6 +74,8 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 			FileService.FileRenamed -= OnSystemFileRenamed;
 			FileService.FileRemoved -= OnSystemFileDeleted;
 			FileService.FileCreated -= OnSystemFileAdded;
+
+			base.Dispose ();
 		}
 
 		public override void OnNodeAdded (object dataObject)
@@ -135,15 +140,14 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 					folderFiles = ((Solution)dataObject).RootFolder.Files;
 				else if (dataObject is SolutionFolder)
 					folderFiles = ((SolutionFolder)dataObject).Files;
-				
-				foreach (string file in Directory.GetFiles (path)) {
-					if ((project == null || project.Files.GetFile (file) == null) && (folderFiles == null || !folderFiles.Contains (file)))
-						builder.AddChild (new SystemFile (file, project));
-				}
-				
-				foreach (string folder in Directory.GetDirectories (path))
-					if (!builder.HasChild (Path.GetFileName (folder), typeof(ProjectFolder)))
-						builder.AddChild (new ProjectFolder (folder, project));
+
+				builder.AddChildren (Directory.EnumerateFiles (path)
+									 .Where (file => (project == null || project.Files.GetFile (file) == null) && (folderFiles == null || !folderFiles.Contains (file)))
+									 .Select (file => new SystemFile (file, project)));
+
+				builder.AddChildren (Directory.EnumerateDirectories (path)
+									 .Where (folder => !builder.HasChild (Path.GetFileName (folder), typeof (ProjectFolder)))
+									 .Select (folder => new ProjectFolder (folder, project)));
 			}
 		}
 		
@@ -151,7 +155,7 @@ namespace MonoDevelop.Ide.Gui.Pads.ProjectPad
 		{
 			if (builder.Options ["ShowAllFiles"]) {
 				string path = GetFolderPath (dataObject);
-				return Directory.Exists (path) && (Directory.GetFiles (path).Length > 0 || Directory.GetDirectories (path).Length > 0);
+				return Directory.Exists (path) && (Directory.EnumerateFileSystemEntries (path).Any ());
 			}
 			else
 				return false;

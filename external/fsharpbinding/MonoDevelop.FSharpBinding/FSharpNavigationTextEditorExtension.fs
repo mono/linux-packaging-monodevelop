@@ -1,14 +1,10 @@
 ﻿namespace MonoDevelop.FSharp
 
-open System.Threading.Tasks
 open MonoDevelop
-open MonoDevelop.Core
-open MonoDevelop.Ide
 open MonoDevelop.Ide.Editor
 open MonoDevelop.Ide.Editor.Extension
 open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.SourceCodeServices
-open ExtCore.Control
 
 type FSharpNavigationTextEditorExtension() =
     inherit AbstractNavigationExtension()
@@ -19,6 +15,8 @@ type FSharpNavigationTextEditorExtension() =
         let documentContext = base.DocumentContext
 
         let computation = async {
+            if documentContext :? FsiDocumentContext then return Seq.empty
+            else
             match documentContext.ParsedDocument |> Option.tryCast<FSharpParsedDocument> with
             | Some doc ->
                 match doc.TryGetAst () with

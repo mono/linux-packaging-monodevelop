@@ -1,19 +1,32 @@
 ﻿namespace MonoDevelop.FSharp
 
 open System
+open System.Threading.Tasks
 open MonoDevelop.Core
 open MonoDevelop.Ide.Editor
 open MonoDevelop.Ide.Editor.Extension
 
 type FSharpTextPasteHandler(editor:TextEditor) =
     inherit TextPasteHandler()
-    override x.GetCopyData(offset, _length) =
+
+    let rec getNextNonBlankLineNumber lineNumber endOffset=
+        let line = editor.GetLine lineNumber
+        if line.Length <> 0 || line.EndOffset > endOffset then
+            lineNumber
+        else
+            getNextNonBlankLineNumber (lineNumber+1) endOffset
+
+    override x.GetCopyData(offset, length) =
         // get the indent level the line was originally at
-        let line = editor.OffsetToLineNumber offset
-        let indent = editor.GetLineIndent line
+        let lineNumber = editor.OffsetToLineNumber offset
+        let endOffset = offset + length
+
+        let nonBlankLineNumber = getNextNonBlankLineNumber lineNumber endOffset
+
+        let indent = editor.GetLineIndent nonBlankLineNumber
         [|byte indent.Length|]
 
-    override x.PostFomatPastedText (_offset, _length) = ()
+    override x.PostFomatPastedText (_offset, _length) = Task.FromResult None :> Task
 
 
     override x.FormatPlainText(offset, text, copyData) =
@@ -27,20 +40,24 @@ type FSharpTextPasteHandler(editor:TextEditor) =
                     line.Length - (String.trimStart [|' '|] line).Length
 
                 let fixIndent (line:string, indentDifference:int) =
-                    if indentDifference > 0 then
-                        (String(' ', indentDifference)) + line
+                    if line.Length = 0 then
+                        line
                     else
-                        line.Substring -indentDifference
+                        if indentDifference > 0 then
+                            (String(' ', indentDifference)) + line
+                        else
+                            line.Substring -indentDifference
 
                 let line = location.Line
 
                 let insertionIndent = editor.GetLineIndent line
                 let lines = String.getLines text
                 let firstLine = lines.[0]
-                let firstLineIndent = if copyData.Length > 0 then
-                                          int copyData.[0]
-                                      else
-                                          getIndent firstLine
+                let copyData = copyData |> Option.ofObj
+                let firstLineIndent =
+                    match copyData with
+                    | Some data when data.Length > 0 -> int data.[0]
+                    | _ -> getIndent firstLine
 
                 let indentDifference = insertionIndent.Length - firstLineIndent
                 let remainingLines = lines |> Seq.skip (1)
@@ -48,7 +65,6 @@ type FSharpTextPasteHandler(editor:TextEditor) =
                 let lines = remainingLines
                             |> Seq.append (seq [(String.trimStart [|' '|] firstLine)])
                 let res = String.Join (editor.Options.DefaultEolMarker, lines)
-
                 res
             else
                 text
@@ -113,4 +129,4 @@ type FSharpIndentationTracker(editor:TextEditor) =
         | ex -> LoggingService.LogError ("FSharpIndentationTracker", ex)
                 ""
 
-    override x.SupportedFeatures = IndentatitonTrackerFeatures.None
+    override x.SupportedFeatures = IndentationTrackerFeatures.None ||| IndentationTrackerFeatures.CustomIndentationEngine

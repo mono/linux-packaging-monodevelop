@@ -66,11 +66,6 @@ namespace MonoDevelop.Projects.Policies
 			}
 		}
 		
-		bool DirectHas (Type type, string scope)
-		{
-			return policies != null && policies.ContainsKey (new PolicyKey (type, scope));
-		}
-		
 		DataCollection ICustomDataItem.Serialize (ITypeSerializer handler)
 		{
 			if (policies == null)
@@ -78,7 +73,7 @@ namespace MonoDevelop.Projects.Policies
 			
 			DataCollection dc = new DataCollection ();
 			foreach (KeyValuePair<PolicyKey,object> p in policies)
-				dc.Add (PolicyService.DiffSerialize (p.Key.PolicyType, p.Value, p.Key.Scope));
+				dc.Add (PolicyService.DiffSerialize (p.Key.PolicyType, p.Value, p.Key.Scope, keepDeletedNodes: true));
 			return dc;
 		}
 

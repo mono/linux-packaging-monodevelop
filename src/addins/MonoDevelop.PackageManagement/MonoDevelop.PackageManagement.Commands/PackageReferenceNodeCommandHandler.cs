@@ -35,7 +35,7 @@ using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement.Commands
 {
-	public class PackageReferenceNodeCommandHandler : NodeCommandHandler
+	internal class PackageReferenceNodeCommandHandler : NodeCommandHandler
 	{
 		public override void DeleteItem ()
 		{
@@ -51,21 +51,39 @@ namespace MonoDevelop.PackageManagement.Commands
 
 		void RemovePackage (PackageReferenceNode packageReferenceNode, ProgressMonitorStatusMessage progressMessage)
 		{
-			IPackageManagementProject project = PackageManagementServices.Solution.GetProject (packageReferenceNode.Project);
-			UninstallPackageAction action = project.CreateUninstallPackageAction ();
-			action.Package = project.FindPackage (packageReferenceNode.Id);
-
-			if (action.Package != null) {
-				PackageManagementServices.BackgroundPackageActionRunner.Run (progressMessage, action);
-			} else {
-				ShowMissingPackageError (progressMessage, packageReferenceNode);
-			}
+			IPackageAction action = CreateUninstallPackageAction (packageReferenceNode);
+			PackageManagementServices.BackgroundPackageActionRunner.Run (progressMessage, action);
 		}
 
-		void ShowMissingPackageError (ProgressMonitorStatusMessage progressMessage, PackageReferenceNode packageReferenceNode)
+		IPackageAction CreateUninstallPackageAction (PackageReferenceNode packageReferenceNode)
 		{
-			string message = GettextCatalog.GetString ("Unable to find package {0} {1} to remove it from the project. Please restore the package first.", packageReferenceNode.Id, packageReferenceNode.Version);
-			PackageManagementServices.BackgroundPackageActionRunner.ShowError (progressMessage, message);
+			var solutionManager = PackageManagementServices.Workspace.GetSolutionManager (packageReferenceNode.Project.ParentSolution);
+			if (packageReferenceNode.NeedsRestoreBeforeUninstall ()) {
+				return new RestoreAndUninstallNuGetPackageAction (solutionManager, packageReferenceNode.Project) {
+					PackageId = packageReferenceNode.Id,
+					Version = packageReferenceNode.Version
+				};
+			}
+
+			return new UninstallNuGetPackageAction (solutionManager, packageReferenceNode.Project) {
+				PackageId = packageReferenceNode.Id
+			};
+		}
+
+		static internal IPackageAction CreateUninstallPackageAction (DotNetProject project, string packageId)
+		{
+			var solutionManager = PackageManagementServices.Workspace.GetSolutionManager (project.ParentSolution);
+			return new UninstallNuGetPackageAction (solutionManager, new DotNetProjectProxy (project)) {
+				PackageId = packageId
+			};
+		}
+
+		internal static IPackageAction CreateUninstallPackagesAction (DotNetProject project, string[] packageIds)
+		{
+			var solutionManager = PackageManagementServices.Workspace.GetSolutionManager (project.ParentSolution);
+			var action = new UninstallNuGetPackagesAction (solutionManager, new DotNetProjectProxy (project));
+			action.AddPackageIds (packageIds);
+			return action;
 		}
 
 		[CommandUpdateHandler (EditCommands.Delete)]
@@ -85,24 +103,30 @@ namespace MonoDevelop.PackageManagement.Commands
 		{
 			var packageReferenceNode = (PackageReferenceNode)CurrentNode.DataItem;
 
-			try {
-				IPackageManagementProject project = PackageManagementServices.Solution.GetProject (packageReferenceNode.Project);
-				ProgressMonitorStatusMessage progressMessage = ProgressMonitorStatusMessageFactory.CreateUpdatingSinglePackageMessage (packageReferenceNode.Id, project);
-				UpdatePackageAction action = project.CreateUpdatePackageAction ();
-				action.PackageId = packageReferenceNode.Id;
-				action.AllowPrereleaseVersions = !packageReferenceNode.IsReleaseVersion ();
+			UpdatePackage (
+				packageReferenceNode.Project,
+				packageReferenceNode.Id,
+				!packageReferenceNode.IsReleaseVersion ());
+		}
 
-				IPackageManagementSolution solution = GetPackageManagementSolution ();
-				RestoreBeforeUpdateAction.Restore (solution, project, () => {
-					UpdatePackage (progressMessage, action);
-				});
+		internal static void UpdatePackage (IDotNetProject project, string packageId, bool includePrerelease)
+		{
+			try {
+				var solutionManager = PackageManagementServices.Workspace.GetSolutionManager (project.ParentSolution);
+				var action = new UpdateNuGetPackageAction (solutionManager, project) {
+					PackageId = packageId,
+					IncludePrerelease = includePrerelease
+				};
+
+				ProgressMonitorStatusMessage progressMessage = ProgressMonitorStatusMessageFactory.CreateUpdatingSinglePackageMessage (packageId, project);
+				UpdatePackage (progressMessage, action);
 			} catch (Exception ex) {
-				ProgressMonitorStatusMessage progressMessage = ProgressMonitorStatusMessageFactory.CreateUpdatingSinglePackageMessage (packageReferenceNode.Id);
+				ProgressMonitorStatusMessage progressMessage = ProgressMonitorStatusMessageFactory.CreateUpdatingSinglePackageMessage (packageId);
 				PackageManagementServices.BackgroundPackageActionRunner.ShowError (progressMessage, ex);
 			}
 		}
 
-		void UpdatePackage (ProgressMonitorStatusMessage progressMessage, UpdatePackageAction action)
+		static void UpdatePackage (ProgressMonitorStatusMessage progressMessage, IPackageAction action)
 		{
 			try {
 				PackageManagementServices.BackgroundPackageActionRunner.Run (progressMessage, action);
@@ -141,15 +165,6 @@ namespace MonoDevelop.PackageManagement.Commands
 				return project.ParentSolution;
 			}
 			return IdeApp.ProjectOperations.CurrentSelectedSolution;
-		}
-
-		IPackageManagementSolution GetPackageManagementSolution ()
-		{
-			Solution solution = GetSelectedSolution ();
-			if (solution != null) {
-				return new PackageManagementSolution (new PackageManagementSolutionProjectService (solution));
-			}
-			return null;
 		}
 	}
 }

@@ -34,6 +34,7 @@ using Microsoft.CodeAnalysis;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Text;
 using MonoDevelop.Ide.TypeSystem;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.Ide.Editor.Extension
 {
@@ -80,9 +81,9 @@ namespace MonoDevelop.Ide.Editor.Extension
 					var ctx = DocumentContext;
 					if (ctx == null)
 						return;
-					await UpdateErrorUndelines (ctx, parsedDocument, token);
+					await UpdateErrorUndelines (ctx, parsedDocument, token).ConfigureAwait (false);
 					token.ThrowIfCancellationRequested ();
-					await UpdateQuickTasks (ctx, parsedDocument, token);
+					await UpdateQuickTasks (ctx, parsedDocument, token).ConfigureAwait (false);
 				} catch (OperationCanceledException) {
 					// ignore
 				}
@@ -114,38 +115,14 @@ namespace MonoDevelop.Ide.Editor.Extension
 			errors.Add (error);
 		}
 
-		static string [] lexicalError = {
-			"CS0594", // ERR_FloatOverflow
-			"CS0595", // ERR_InvalidReal
-			"CS1009", // ERR_IllegalEscape
-			"CS1010", // ERR_NewlineInConst
-			"CS1011", // ERR_EmptyCharConst
-			"CS1012", // ERR_TooManyCharsInConst
-			"CS1015", // ERR_TypeExpected
-			"CS1021", // ERR_IntOverflow
-			"CS1032", // ERR_PPDefFollowsTokenpp
-			"CS1035", // ERR_OpenEndedComment
-			"CS1039", // ERR_UnterminatedStringLit
-			"CS1040", // ERR_BadDirectivePlacementpp
-			"CS1056", // ERR_UnexpectedCharacter
-			"CS1056", // ERR_UnexpectedCharacter_EscapedBackslash
-			"CS1646", // ERR_ExpectedVerbatimLiteral
-			"CS0078", // WRN_LowercaseEllSuffix
-			"CS1002", // ; expected
-			"CS1519", // Invalid token ';' in class, struct, or interface member declaration
-			"CS1031", // Type expected
-			"CS0106", // The modifier 'readonly' is not valid for this item
-			"CS1576", // The line number specified for #line directive is missing or invalid
-			"CS1513" // } expected
-		};
 
 		async Task UpdateErrorUndelines (DocumentContext ctx, ParsedDocument parsedDocument, CancellationToken token)
 		{
-			if (!DefaultSourceEditorOptions.Instance.UnderlineErrors || parsedDocument == null || isDisposed)
+			if (parsedDocument == null || isDisposed)
 				return;
 			try {
 				var errors = await parsedDocument.GetErrorsAsync(token).ConfigureAwait (false);
-				Application.Invoke (delegate {
+				Application.Invoke ((o, args) => {
 					if (token.IsCancellationRequested || isDisposed)
 						return;
 					RemoveErrorUndelinesResetTimerId ();
@@ -159,8 +136,6 @@ namespace MonoDevelop.Ide.Editor.Extension
 						// Else we underline the error
 						if (errors != null) {
 							foreach (var error in errors) {
-								if (ctx.IsAdHocProject && !lexicalError.Contains (error.Id))
-									continue;
 								UnderLineError (error);
 							}
 						}
@@ -212,8 +187,6 @@ namespace MonoDevelop.Ide.Editor.Extension
 				foreach (var error in await doc.GetErrorsAsync(token).ConfigureAwait (false)) {
 					if (token.IsCancellationRequested)
 						return;
-					if (ctx.IsAdHocProject && !lexicalError.Contains (error.Id))
-						continue;
 					int offset;
 					try {
 						offset = Editor.LocationToOffset (error.Region.Begin.Line, error.Region.Begin.Column);
@@ -226,14 +199,15 @@ namespace MonoDevelop.Ide.Editor.Extension
 			}
 			if (token.IsCancellationRequested)
 				return;
-			Application.Invoke (delegate {
+			Application.Invoke ((o, args) => {
 				if (token.IsCancellationRequested || isDisposed)
 					return;
 				tasks = newTasks.ToImmutable ();
 				OnTasksUpdated (EventArgs.Empty);
 			});
 		}
-		#endregion
+
+	#endregion
 
 	}
 }

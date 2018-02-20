@@ -16,6 +16,9 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             var document = context.Document;
             if (document.Project.Solution.Workspace.Kind == WorkspaceKind.MiscellaneousFiles)
                 return;
+            var options = document.Project.ParseOptions as CSharpParseOptions;
+            if (options != null && options.LanguageVersion < LanguageVersion.CSharp6)
+                return;
             var span = context.Span;
             if (!span.IsEmpty)
                 return;
@@ -33,7 +36,7 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             var token = root.FindToken(span.Start);
             var method = GetDeclaration<MethodDeclarationSyntax>(token);
             if (method != null)
-                HandleMethodCase(context, root, token, method);
+                HandleMethodCase(context, model, root, token, method);
 
             var property = GetDeclaration<PropertyDeclarationSyntax>(token);
             if (property != null)
@@ -61,11 +64,20 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             return null;
         }
 
-        static void HandleMethodCase(CodeRefactoringContext context, SyntaxNode root, SyntaxToken token, MethodDeclarationSyntax method)
+        static void HandleMethodCase(CodeRefactoringContext context, SemanticModel model, SyntaxNode root, SyntaxToken token, MethodDeclarationSyntax method)
         {
             ExpressionSyntax expr;
             if (!IsExpressionBody(method.Body, method.ExpressionBody, out expr))
                 return;
+
+            var methodSymbol = model.GetDeclaredSymbol(method);
+            if (methodSymbol == null)
+                return;
+            
+            BlockSyntax methodBody =  methodSymbol.ReturnsVoid ?
+                SyntaxFactory.Block(SyntaxFactory.ExpressionStatement(expr)) :
+                SyntaxFactory.Block(SyntaxFactory.ReturnStatement(expr));
+
             context.RegisterRefactoring(
                 CodeActionFactory.Create(
                     token.Span,
@@ -76,7 +88,7 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
                         var newRoot = root.ReplaceNode((SyntaxNode)
                             method,
                             method
-                            .WithBody(SyntaxFactory.Block(SyntaxFactory.ReturnStatement(expr)))
+                            .WithBody(methodBody)
                             .WithExpressionBody(null)
                             .WithSemicolonToken(SyntaxFactory.MissingToken(SyntaxKind.SemicolonToken))
                             .WithAdditionalAnnotations(Formatter.Annotation)

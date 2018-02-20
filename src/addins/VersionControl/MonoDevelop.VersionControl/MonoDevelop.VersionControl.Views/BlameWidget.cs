@@ -1,21 +1,21 @@
-// 
+//
 // BlameWidget.cs
-//  
+//
 // Author:
 //       Mike Krüger <mkrueger@novell.com>
-// 
+//
 // Copyright (c) 2010 Novell, Inc (http://www.novell.com)
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -35,7 +35,6 @@ using System.Threading;
 using MonoDevelop.Core;
 using MonoDevelop.Components;
 using MonoDevelop.Components.Commands;
-using MonoDevelop.Components;
 using MonoDevelop.Ide.Fonts;
 
 namespace MonoDevelop.VersionControl.Views
@@ -47,7 +46,7 @@ namespace MonoDevelop.VersionControl.Views
 		ShowBlameBefore
 	}
 	
-	public class BlameWidget : Bin
+	class BlameWidget : Bin
 	{
 		Revision revision;
 		Adjustment vAdjustment;
@@ -129,7 +128,7 @@ namespace MonoDevelop.VersionControl.Views
 			AddChild (hScrollBar);
 
 			var doc = new TextDocument (sourceEditor.TextEditor.Document.Text) {
-				ReadOnly = true,
+				IsReadOnly = true,
 				MimeType = sourceEditor.TextEditor.Document.MimeType,
 			};
 			editor = new MonoTextEditor (doc, sourceEditor.TextEditor.Options);
@@ -337,7 +336,7 @@ namespace MonoDevelop.VersionControl.Views
 		void JumpOverFoldings (ref int line)
 		{
 			int lastFold = -1;
-			foreach (FoldSegment fs in Editor.Document.GetStartFoldings (line).Where (fs => fs.IsFolded)) {
+			foreach (FoldSegment fs in Editor.Document.GetStartFoldings (line).Where (fs => fs.IsCollapsed)) {
 				lastFold = System.Math.Max (fs.EndOffset, lastFold);
 			}
 			if (lastFold > 0) 
@@ -518,14 +517,7 @@ namespace MonoDevelop.VersionControl.Views
 			protected void OnShowBlameBefore ()
 			{
 				var current = menuAnnotation?.Revision;
-				Revision rev;
-
-				if (current == null) {
-					rev = widget.info.History.FirstOrDefault ();
-				} else {
-					rev = current?.GetPrevious ();
-				}
-
+				Revision rev = current?.GetPrevious () ?? widget.info.History.FirstOrDefault ();
 				if (rev == null)
 					return;
 				
@@ -603,7 +595,7 @@ namespace MonoDevelop.VersionControl.Views
 					foreach (Revision rev in history) {
 						if (rev == annotation.Revision) {
 							if (tooltip && annotation.HasEmail)
-								return String.Format ("Email: {0}{1}{2}", annotation.Email, Environment.NewLine, rev.Message);
+								return GettextCatalog.GetString ("Email: {0}{1}{2}", annotation.Email, Environment.NewLine, rev.Message);
 							return rev.Message;
 						}
 					}
@@ -756,7 +748,7 @@ namespace MonoDevelop.VersionControl.Views
 						if (ann != null && line - lineStart > 1) {
 							string msg = GetCommitMessage (lineStart, false);
 							if (!string.IsNullOrEmpty (msg)) {
-								msg = Revision.FormatMessage (msg);
+								msg = RevisionHelpers.FormatMessage (msg);
 
 								layout.SetText (msg);
 								layout.Width = (int)(Allocation.Width * Pango.Scale.PangoScale);

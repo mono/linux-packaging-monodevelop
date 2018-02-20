@@ -25,11 +25,13 @@
 // THE SOFTWARE.
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Gtk;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Text;
+using MonoDevelop.Ide.Editor.Highlighting;
 using MonoDevelop.Ide.TypeSystem;
 
 namespace MonoDevelop.Ide.Editor.Extension
@@ -69,17 +71,17 @@ namespace MonoDevelop.Ide.Editor.Extension
 			Task.Run (async () => {
 				try {
 					if (!isDisposed)
-						await UpdateFoldings (Editor, parsedDocument, caretLocation, false, token);
+						await UpdateFoldings (Editor, parsedDocument, caretLocation, false, token).ConfigureAwait (false);
 				} catch (OperationCanceledException) {}
 			}, token);
 		}
 
 		internal static async Task UpdateFoldings (TextEditor Editor, ParsedDocument parsedDocument, DocumentLocation caretLocation, bool firstTime = false, CancellationToken token = default (CancellationToken))
 		{
-			if (parsedDocument == null || !Editor.Options.ShowFoldMargin)
+			if (parsedDocument == null || !Editor.Options.ShowFoldMargin || parsedDocument.Flags.HasFlag (ParsedDocumentFlags.SkipFoldings))
 				return;
 			// don't update parsed documents that contain errors - the foldings from there may be invalid.
-			if (parsedDocument.HasErrors)
+			if (await parsedDocument.HasErrorsAsync (token))
 				return;
 
 			try {
@@ -137,11 +139,12 @@ namespace MonoDevelop.Ide.Editor.Extension
 				if (firstTime) {
 					Editor.SetFoldings (foldSegments);
 				} else {
-					Application.Invoke (delegate {
+					Application.Invoke ((o, args) => {
 						if (!token.IsCancellationRequested)
 							Editor.SetFoldings (foldSegments);
 					});
 				}
+			} catch (OperationCanceledException) {
 			} catch (Exception ex) {
 				LoggingService.LogError ("Unhandled exception in ParseInformationUpdaterWorkerThread", ex);
 			}

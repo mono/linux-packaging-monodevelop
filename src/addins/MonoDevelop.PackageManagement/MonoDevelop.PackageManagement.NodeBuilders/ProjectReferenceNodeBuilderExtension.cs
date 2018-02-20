@@ -25,16 +25,13 @@
 // THE SOFTWARE.
 
 using System;
-using System.IO;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui.Components;
-using MonoDevelop.Ide.Gui.Pads.ProjectPad;
 using MonoDevelop.Projects;
-using MonoDevelop.PackageManagement;
 
 namespace MonoDevelop.PackageManagement.NodeBuilders
 {
-	public class ProjectReferenceNodeBuilderExtension : NodeBuilderExtension
+	internal class ProjectReferenceNodeBuilderExtension : NodeBuilderExtension
 	{
 		public override bool CanBuildNode (Type dataType)
 		{

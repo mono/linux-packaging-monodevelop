@@ -30,16 +30,14 @@ using System.Collections.Generic;
 using System.Xml;
 
 using MonoDevelop.Core;
-using System.Xml.Linq;
-using Microsoft.Build.BuildEngine;
 using System.Collections.Immutable;
 
 namespace MonoDevelop.Projects.MSBuild
 {
 	public class MSBuildPropertyGroup: MSBuildElement, IMSBuildPropertySet, IMSBuildEvaluatedPropertyCollection
 	{
-		Dictionary<string,MSBuildProperty> properties = new Dictionary<string, MSBuildProperty> ();
-
+		Dictionary<string,MSBuildProperty> properties = new Dictionary<string, MSBuildProperty> (StringComparer.OrdinalIgnoreCase);
+		internal List<MSBuildProperty> PropertiesAttributeOrder { get; } = new List<MSBuildProperty> ();
 		public MSBuildPropertyGroup ()
 		{
 		}
@@ -61,6 +59,21 @@ namespace MonoDevelop.Projects.MSBuild
 			get {
 				return (MSBuildObject) (ParentNode as MSBuildItem) ?? this;
 			}
+		}
+
+		internal override void ReadUnknownAttribute (MSBuildXmlReader reader, string lastAttr)
+		{
+			MSBuildProperty prevSameName;
+			if (properties.TryGetValue (reader.LocalName, out prevSameName))
+				prevSameName.Overwritten = true;
+
+			var prop = new MSBuildProperty ();
+			prop.ParentNode = PropertiesParent;
+			prop.Owner = this;
+			prop.ReadUnknownAttribute (reader, lastAttr);
+			ChildNodes = ChildNodes.Add (prop);
+			properties [prop.Name] = prop; // If a property is defined more than once, we only care about the last registered value
+			PropertiesAttributeOrder.Add (prop);
 		}
 
 		internal override void ReadChildElement (MSBuildXmlReader reader)
@@ -106,7 +119,6 @@ namespace MonoDevelop.Projects.MSBuild
 					properties [cp.Name] = cp;
 					cp.ParentNode = PropertiesParent;
 					cp.Owner = this;
-					cp.ResetIndent (false);
 				} else
 					ChildNodes = ChildNodes.Add (node);
 			}
@@ -134,7 +146,12 @@ namespace MonoDevelop.Projects.MSBuild
 
 		IEnumerable<IMetadataProperty> IPropertySet.GetProperties ()
 		{
-			return GetProperties ().Cast<IMetadataProperty> ();
+			return GetProperties ();
+		}
+
+		IEnumerable<IMSBuildPropertyEvaluated> IMSBuildPropertyGroupEvaluated.GetProperties ()
+		{
+			return GetProperties ();
 		}
 
 		IMSBuildPropertyEvaluated IMSBuildPropertyGroupEvaluated.GetProperty (string name)
@@ -155,12 +172,20 @@ namespace MonoDevelop.Projects.MSBuild
 		{
 			MSBuildProperty prop;
 			properties.TryGetValue (name, out prop);
+			if (!string.IsNullOrEmpty (condition) && prop != null && prop.Condition != condition) {
+				// There may be more than one property with the same name and different condition. Try to find the correct one.
+				prop = ChildNodes.OfType<MSBuildProperty> ().FirstOrDefault (pr => pr.Name == name && pr.Condition == condition) ?? prop;
+			}
 			return prop;
 		}
 		
 		public IEnumerable<MSBuildProperty> GetProperties ()
 		{
-			return ChildNodes.OfType<MSBuildProperty> ();
+			foreach (var node in ChildNodes) {
+				var prop = node as MSBuildProperty;
+				if (prop != null)
+					yield return prop;
+			}
 		}
 
 		public string GetValue (string name, string defaultValue = null)
@@ -259,6 +284,11 @@ namespace MonoDevelop.Projects.MSBuild
 		}
 
 		internal IPropertyGroupListener PropertyGroupListener { get; set; }
+
+		internal void UnlinkFromProjectInstance ()
+		{
+			PropertyGroupListener = null;
+		}
 
 		MSBuildProperty FindExistingProperty (int index, int inc)
 		{
@@ -379,14 +409,6 @@ namespace MonoDevelop.Projects.MSBuild
 			NotifyChanged ();
 		}
 
-		internal void SetLoadedValues (IMSBuildPropertyGroupEvaluated loadedProps)
-		{
-			foreach (var p in GetProperties ()) {
-				var ep = loadedProps.GetProperty (p.Name);
-				p.InitEvaluatedValue (ep.Value);
-			}
-		}
-
 		internal void ResetIsNewFlags ()
 		{
 			foreach (MSBuildProperty prop in GetProperties ()) {
@@ -448,5 +470,7 @@ namespace MonoDevelop.Projects.MSBuild
 		bool HasProperty (string name);
 
 		IMSBuildPropertyEvaluated GetProperty (string name);
+
+		IEnumerable<IMSBuildPropertyEvaluated> GetProperties ();
 	}
 }

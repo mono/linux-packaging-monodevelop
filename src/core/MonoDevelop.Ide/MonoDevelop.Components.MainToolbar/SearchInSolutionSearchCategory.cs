@@ -34,6 +34,7 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Core.Text;
 using MonoDevelop.Ide.TypeSystem;
 using MonoDevelop.Ide.CodeCompletion;
+using Roslyn.Utilities;
 using MonoDevelop.Ide;
 
 namespace MonoDevelop.Components.MainToolbar
@@ -48,7 +49,7 @@ namespace MonoDevelop.Components.MainToolbar
 		{
 			if (IdeApp.ProjectOperations.CurrentSelectedSolution != null)
 				searchResultCallback.ReportResult (new SearchInSolutionSearchResult (pattern));
-			return SpecializedTasks.EmptyTask;
+			return Task.CompletedTask;
 		}
 
 		//public override Task<ISearchDataSource> GetResults (SearchPopupSearchPattern searchPattern, int resultsCount, CancellationToken token)
@@ -89,8 +90,8 @@ namespace MonoDevelop.Components.MainToolbar
 			{
 				var options = new FilterOptions ();
 				if (PropertyService.Get ("AutoSetPatternCasing", true))
-					options.CaseSensitive = pattern.Pattern.Any (c => char.IsUpper (c));
-				FindInFilesDialog.SearchReplace (pattern.Pattern, null, new WholeSolutionScope (), options, null);
+					options.CaseSensitive = pattern.Pattern.Any (char.IsUpper);
+				FindInFilesDialog.SearchReplace (pattern.Pattern, null, new WholeSolutionScope (), options, null, null);
 			}
 
 			public override string GetMarkupText (bool selected)

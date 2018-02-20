@@ -185,6 +185,25 @@ namespace Xwt.Backends
 		/// A native window reference.
 		/// </param>
 		public abstract IWindowFrameBackend GetBackendForWindow (object nativeWindow);
+
+		/// <summary>
+		/// Gets a native window reference from an Xwt window.
+		/// </summary>
+		/// <returns> The native window object. </returns>
+		/// <param name='window'> The Xwt window. </param>
+		public virtual object GetNativeWindow (WindowFrame window)
+		{
+			if (window == null)
+				return null;
+			return GetNativeWindow (window.GetBackend () as IWindowFrameBackend);
+		}
+
+		/// <summary>
+		/// Gets a native window reference from an Xwt window backend.
+		/// </summary>
+		/// <returns> The native window object. </returns>
+		/// <param name='backend'> The Xwt window backend. </param>
+		public abstract object GetNativeWindow (IWindowFrameBackend backend);
 		
 		/// <summary>
 		/// Gets the native parent window of a widget
@@ -256,7 +275,7 @@ namespace Xwt.Backends
 					throw new InvalidOperationException ("Backend type not specified for type: " + frontendType);
 				if (!typeof(IBackend).IsAssignableFrom (attr.Type))
 					throw new InvalidOperationException ("Backend type for frontend '" + frontendType + "' is not a IBackend implementation");
-				backendTypes.TryGetValue (attr.Type, out bt);
+				bt = GetBackendImplementationType (attr.Type);
 				backendTypesByFrontend [frontendType] = bt;
 			}
 			if (bt == null)
@@ -272,9 +291,8 @@ namespace Xwt.Backends
 		internal object CreateBackend (Type backendType)
 		{
 			CheckInitialized ();
-			Type bt = null;
-			
-			if (!backendTypes.TryGetValue (backendType, out bt))
+			Type bt = GetBackendImplementationType (backendType);
+			if (bt == null)
 				return null;
 			var res = Activator.CreateInstance (bt);
 			if (!backendType.IsInstanceOfType (res))
@@ -282,6 +300,18 @@ namespace Xwt.Backends
 			if (res is BackendHandler)
 				((BackendHandler)res).Initialize (toolkit);
 			return res;
+		}
+
+		/// <summary>
+		/// Gets the type that implements the provided backend interface
+		/// </summary>
+		/// <returns>The backend implementation type.</returns>
+		/// <param name="backendType">Backend interface type.</param>
+		protected virtual Type GetBackendImplementationType (Type backendType)
+		{
+			Type bt;
+			backendTypes.TryGetValue (backendType, out bt);
+			return bt;
 		}
 
 		/// <summary>
@@ -358,6 +388,18 @@ namespace Xwt.Backends
 		/// <param name="y">The y coordinate.</param>
 		public virtual void RenderImage (object nativeWidget, object nativeContext, ImageDescription img, double x, double y)
 		{
+		}
+
+		/// <summary>
+		/// Gets the bounds of a native widget in screen coordinates.
+		/// </summary>
+		/// <returns>The screen bounds relative to <see cref="P:Xwt.Desktop.Bounds"/>.</returns>
+		/// <param name="nativeWidget">The native widget.</param>
+		/// <exception cref="NotSupportedException">This toolkit does not support this operation.</exception>
+		/// <exception cref="InvalidOperationException"><paramref name="nativeWidget"/> does not belong to this toolkit.</exception>
+		public virtual Rectangle GetScreenBounds (object nativeWidget)
+		{
+			throw new NotSupportedException();
 		}
 
 		/// <summary>

@@ -35,6 +35,7 @@ using Mono.Debugging.Client;
 using MonoDevelop.Ide.Gui;
 using Mono.Debugging;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace MonoDevelop.Debugger
 {
@@ -56,14 +57,23 @@ namespace MonoDevelop.Debugger
 	class DebugAsyncOperation: ProcessAsyncOperation
 	{
 		TaskCompletionSource<int> taskSource;
+		DebuggerSession session;
 
-		public DebugAsyncOperation ()
+		public DebugAsyncOperation (DebuggerSession session)
 		{
+			this.session = session;
 			taskSource = new TaskCompletionSource<int> ();
 			DebuggingService.StoppedEvent += OnStopDebug;
 			CancellationTokenSource = new CancellationTokenSource ();
 			CancellationTokenSource.Token.Register (DebuggingService.Stop);
 			Task = taskSource.Task;
+			session.TargetReady += TargetReady;
+		}
+
+		private void TargetReady(object sender, EventArgs e)
+		{
+			session.TargetReady -= TargetReady;
+			ProcessId = (int)(session.GetProcesses().FirstOrDefault()?.Id ?? 0);
 		}
 
 		public void Cleanup ()
@@ -73,11 +83,12 @@ namespace MonoDevelop.Debugger
 				taskSource = null;
 			}
 			DebuggingService.StoppedEvent -= OnStopDebug;
+			session = null;
 		}
 
 		void OnStopDebug (object sender, EventArgs args)
 		{
-			if (taskSource != null) {
+			if (taskSource != null && session == sender) {
 				taskSource.SetResult (0);
 				taskSource = null;
 			}

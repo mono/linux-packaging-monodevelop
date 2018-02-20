@@ -75,7 +75,12 @@ namespace MonoDevelop.AssemblyBrowser
 		public override Task Load (FileOpenInformation fileOpenInformation)
 		{
 			ContentName = GettextCatalog.GetString ("Assembly Browser");
-			widget.AddReferenceByFileName (fileOpenInformation.FileName);
+			var loader = widget.AddReferenceByFileName (fileOpenInformation.FileName);
+			if (loader == null)
+				return Task.FromResult (true);
+			loader.LoadingTask.ContinueWith (delegate {
+				widget.SelectAssembly (loader);
+			});
 			return Task.FromResult (true);
 		}
 
@@ -165,10 +170,10 @@ namespace MonoDevelop.AssemblyBrowser
 					var netProject = project as DotNetProject;
 					if (netProject == null)
 						continue;
-					foreach (string file in await netProject.GetReferencedAssemblies (ConfigurationSelector.Default, false)) {
-						if (!System.IO.File.Exists (file))
+					foreach (var file in await netProject.GetReferencedAssemblies (ConfigurationSelector.Default, false)) {
+						if (!System.IO.File.Exists (file.FilePath))
 							continue;
-						Widget.AddReferenceByFileName (file); 
+						Widget.AddReferenceByFileName (file.FilePath); 
 					}
 				}
 			}

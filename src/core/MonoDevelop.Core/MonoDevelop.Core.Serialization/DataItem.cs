@@ -28,6 +28,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MonoDevelop.Core.Serialization
 {
@@ -69,15 +70,23 @@ namespace MonoDevelop.Core.Serialization
 
 		internal void UpdateFromItem (DataItem item, HashSet<DataItem> removedItems)
 		{
+			var counter = new Dictionary<string, int> ();
 			foreach (var d in item.ItemData) {
-				var current = ItemData[d.Name];
+				DataNode current = null;
+				DataCollection col;
+				if (!counter.ContainsKey (d.Name))
+					counter [d.Name] = 0;
+				var index = ItemData.FindData (d.Name, out col, false, counter[d.Name]);
+				counter [d.Name]++;
+				if (index != -1) {
+					current = col [index];
+				}
 				if (current != null) {
 					if (d.IsDefaultValue || d is DataDeletedNode) {
 						if (current is DataItem)
 							removedItems.Add ((DataItem)current);
 						ItemData.Remove (current);
-					}
-					else if (current.GetType () != d.GetType () || current is DataValue) {
+					} else if (current.GetType () != d.GetType () || current is DataValue) {
 						var i = ItemData.IndexOf (current);
 						ItemData [i] = d;
 						if (current is DataItem)
@@ -86,7 +95,17 @@ namespace MonoDevelop.Core.Serialization
 						((DataItem)current).UpdateFromItem ((DataItem)d, removedItems);
 					}
 				} else if (!d.IsDefaultValue && !(d is DataDeletedNode)) {
-					ItemData.Add (d);
+					var dataItem = d as DataItem;
+					if (dataItem != null) {
+						var newDataItem = new DataItem () {
+							Name = d.Name,
+							UniqueNames = dataItem.UniqueNames
+						};
+						newDataItem.UpdateFromItem (dataItem, removedItems);
+						ItemData.Add (newDataItem);
+					} else {
+						ItemData.Add (d);
+					}
 				}
 			}
 		}

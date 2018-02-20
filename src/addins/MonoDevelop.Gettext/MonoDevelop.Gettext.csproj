@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <Import Project="..\..\..\MonoDevelop.props" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -10,7 +11,7 @@
     <AssemblyName>MonoDevelop.Gettext</AssemblyName>
     <CodePage>65001</CodePage>
     <RootNamespace>MonoDevelop.Gettext</RootNamespace>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>True</DebugSymbols>
@@ -60,15 +61,15 @@
     </Reference>
     <Reference Include="System.Core" />
     <Reference Include="System.Reflection.Metadata">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\System.Reflection.Metadata.dll</HintPath>
+      <HintPath>..\..\..\build\bin\System.Reflection.Metadata.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System.Collections.Immutable">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\System.Collections.Immutable.dll</HintPath>
+      <HintPath>..\..\..\build\bin\System.Collections.Immutable.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis">
-      <HintPath>..\..\..\external\roslyn\Binaries\Release\Microsoft.CodeAnalysis.dll</HintPath>
+      <HintPath>..\..\..\build\bin\Microsoft.CodeAnalysis.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -262,8 +263,8 @@
     <EmbeddedResource Include="templates\Makefile.template">
       <LogicalName>Makefile.template</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="templates\Makefile.am.template">
-      <LogicalName>Makefile.am.template</LogicalName>
+    <EmbeddedResource Include="templates\Makefile_am.template">
+      <LogicalName>Makefile.am_template</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="icons\prefs-language-16.png">
       <LogicalName>prefs-language-16.png</LogicalName>
@@ -288,6 +289,43 @@
     </EmbeddedResource>
     <EmbeddedResource Include="icons\prefs-language-16~sel%402x.png">
       <LogicalName>prefs-language-16~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+	
+    <EmbeddedResource Include="templates\images\project-locale-template.png">
+      <LogicalName>project-locale-template.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-template%402x.png">
+      <LogicalName>project-locale-template@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-template~dark.png">
+      <LogicalName>project-locale-template~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-template~dark%402x.png">
+      <LogicalName>project-locale-template~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-32.png">
+      <LogicalName>project-locale-32.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-32%402x.png">
+      <LogicalName>project-locale-32@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-32~dark.png">
+      <LogicalName>project-locale-32~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-32~dark%402x.png">
+      <LogicalName>project-locale-32~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-32~sel.png">
+      <LogicalName>project-locale-32~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-32~sel%402x.png">
+      <LogicalName>project-locale-32~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-32~dark~sel.png">
+      <LogicalName>project-locale-32~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="templates\images\project-locale-32~dark~sel%402x.png">
+      <LogicalName>project-locale-32~dark~sel@2x.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

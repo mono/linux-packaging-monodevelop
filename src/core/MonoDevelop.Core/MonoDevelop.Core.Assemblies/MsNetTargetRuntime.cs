@@ -1,4 +1,4 @@
-// 
+﻿// 
 // MsNetTargetRuntime.cs
 //  
 // Author:
@@ -55,7 +55,8 @@ namespace MonoDevelop.Core.Assemblies
 			
 			string programFilesX86 = GetProgramFilesX86 ();
 			newFxDir = programFilesX86 + "\\Reference Assemblies\\Microsoft\\Framework";
-			msbuildDir = programFilesX86 + "\\MSBuild";
+			msbuildDir = GetMSBuildBinPath ("15.0"); // C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\MSBuild\15.0\bin
+			msbuildDir = Path.GetDirectoryName (Path.GetDirectoryName (msbuildDir)); // C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\MSBuild
 			
 			this.running = running;
 			execHandler = new MsNetExecutionHandler ();
@@ -87,7 +88,8 @@ namespace MonoDevelop.Core.Assemblies
 		{
 			yield return newFxDir;
 		}
-		
+
+		[Obsolete("Use DotNetProject.GetAssemblyDebugInfoFile()")]
 		public override string GetAssemblyDebugInfoFile (string assemblyPath)
 		{
 			return Path.ChangeExtension (assemblyPath, ".pdb");
@@ -125,8 +127,8 @@ namespace MonoDevelop.Core.Assemblies
 					fxKey.Close ();
 				}
 
-				string clrVer = MsNetFrameworkBackend.GetClrVersion (fx.ClrVersion);
-				if (clrVer.StartsWith ("v" + fx.Id.Version, StringComparison.Ordinal)) {
+				string clrVer = GetClrVersion (fx.Id);
+				if (clrVer != null && clrVer.StartsWith ("v" + fx.Id.Version, StringComparison.Ordinal)) {
 					// Several frameworks can share the same clr version. Make sure only one registers the assemblies.
 					fxKey = Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Microsoft\.NETFramework\" + clrVer + @"\AssemblyFoldersEx", false);
 					if (fxKey != null) {
@@ -134,6 +136,21 @@ namespace MonoDevelop.Core.Assemblies
 						fxKey.Close ();
 					}
 				}
+			}
+		}
+		
+		static string GetClrVersion (TargetFrameworkMoniker id)
+		{
+			if (id.Identifier != TargetFrameworkMoniker.ID_NET_FRAMEWORK) {
+				return null;
+			}
+
+			switch (id.Version) {
+				case "2.0": return "v2.0.50727";
+				// The 4.5 binaries have the same version as the 4.0 binaries
+				case "4.0":
+				case "4.5": return "v4.0.30319";
+				default: return null;
 			}
 		}
 
@@ -153,6 +170,17 @@ namespace MonoDevelop.Core.Assemblies
 		
 		public override string GetMSBuildBinPath (string toolsVersion)
 		{
+			// Probe for Dev15 location and use MSBuild from there.
+			using (RegistryKey vsReg = Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Microsoft\VisualStudio\SxS\VS7", false)) {
+				if (vsReg != null) {
+					string vsPath = (string)vsReg.GetValue ("15.0");
+					string path = Path.Combine (vsPath, "MSBuild", toolsVersion, "Bin");
+					if (File.Exists (Path.Combine (path, "MSBuild.exe"))) {
+						return path;
+					}
+				}
+			}
+
 			using (RegistryKey msb = Registry.LocalMachine.OpenSubKey (@"SOFTWARE\Microsoft\MSBuild\ToolsVersions\" + toolsVersion, false)) {
 				if (msb != null) {
 					string path = msb.GetValue ("MSBuildToolsPath") as string;
@@ -161,6 +189,11 @@ namespace MonoDevelop.Core.Assemblies
 				}
 				return null;
 			}
+		}
+
+		public override string GetMSBuildToolsPath (string toolsVersion)
+		{
+			return GetMSBuildBinPath (toolsVersion);
 		}
 		
 		public override string GetMSBuildExtensionsPath ()

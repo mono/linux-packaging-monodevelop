@@ -1,0 +1,8 @@
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libstetic.dll.config
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libstetic.xml
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libstetic.dll
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/libstetic.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/libstetic/obj/Debug/libstetic.csprojResolveAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/libstetic/obj/Debug/libstetic.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/libstetic/obj/Debug/libstetic.dll
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/libstetic/obj/Debug/libstetic.pdb

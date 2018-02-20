@@ -37,7 +37,9 @@ using MonoDevelop.Ide.Gui.Components;
 using MonoDevelop.Ide.TypeSystem;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Project = MonoDevelop.Projects.Project;
+using System.Threading;
 
 namespace MonoDevelop.Ide.Gui.Pads.ClassPad
 {
@@ -105,17 +107,15 @@ namespace MonoDevelop.Ide.Gui.Pads.ClassPad
 
 		void AddProjectContent (ITreeBuilder builder, Project p)
 		{
-			foreach (var ns in namesp.GetNamespaceMembers ()) {
-				if (!builder.HasChild (ns.Name, typeof (NamespaceData)))
-					builder.AddChild (new ProjectNamespaceData (project, ns));
-			}
+			builder.AddChildren (namesp.GetNamespaceMembers ()
+								 .Where (ns => !builder.HasChild (ns.Name, typeof (NamespaceData)))
+								 .Select (ns => new ProjectNamespaceData (project, ns)));
 			//			bool nestedNs = builder.Options ["NestedNamespaces"];
 			bool publicOnly = builder.Options ["PublicApiOnly"];
 
-			foreach (var type in namesp.GetAllTypes ()) {
-				if (!publicOnly || type.DeclaredAccessibility == Accessibility.Public)
-					builder.AddChild (new ClassData (project, type));
-			}
+			builder.AddChildren (namesp.GetAllTypes (CancellationToken.None)
+								 .Where (type => !publicOnly || type.DeclaredAccessibility == Accessibility.Public)
+								 .Select (type => new ClassData (project, type)));
 		}
 
 

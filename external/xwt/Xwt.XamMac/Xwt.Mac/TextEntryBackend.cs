@@ -24,20 +24,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using Xwt.Backends;
 using System;
-
-#if MONOMAC
-using nint = System.Int32;
-using nfloat = System.Single;
-using CGRect = System.Drawing.RectangleF;
-using MonoMac.Foundation;
-using MonoMac.AppKit;
-#else
+using AppKit;
 using CoreGraphics;
 using Foundation;
-using AppKit;
-#endif
+using Xwt.Backends;
 
 namespace Xwt.Mac
 {
@@ -126,6 +117,8 @@ namespace Xwt.Mac
 			}
 			set {
 				Widget.Editable = !value;
+				if (value)
+					Widget.AbortEditing ();
 			}
 		}
 
@@ -235,10 +228,12 @@ namespace Xwt.Mac
 			    cacheSelectionLength != SelectionLength) {
 				cacheSelectionStart = SelectionStart;
 				cacheSelectionLength = SelectionLength;
-				ApplicationContext.InvokeUserCode (delegate {
-					EventSink.OnSelectionChanged ();
-				});
+                ApplicationContext.InvokeUserCode (EventSink.OnSelectionChanged);
 			}
+		}
+
+		public bool HasCompletions {
+			get { return false; }
 		}
 
 		public void SetCompletions (string[] completions)
@@ -294,7 +289,9 @@ namespace Xwt.Mac
 	{
 		ITextEntryEventSink eventSink;
 		ApplicationContext context;
+		#pragma warning disable CS0414 // The private field is assigned but its value is never used
 		CustomCell cell;
+		#pragma warning disable CS0414
 
 		public CustomTextField (ITextEntryEventSink eventSink, ApplicationContext context)
 		{
@@ -324,6 +321,22 @@ namespace Xwt.Mac
 				eventSink.OnChanged ();
 				eventSink.OnSelectionChanged ();
 			});
+		}
+
+		public override string StringValue
+		{
+			get { return base.StringValue; }
+			set {
+				if (base.StringValue != value)
+				{
+					base.StringValue = value;
+					context.InvokeUserCode (delegate
+					{
+						eventSink.OnChanged ();
+						eventSink.OnSelectionChanged ();
+					});
+				}
+			}
 		}
 
 		class CustomCell : NSTextFieldCell
@@ -359,9 +372,7 @@ namespace Xwt.Mac
 
 			void HandleSelectionDidChange (NSNotification notif)
 			{
-				Context.InvokeUserCode (delegate {
-					EventSink.OnSelectionChanged ();
-				});
+				Context.InvokeUserCode (EventSink.OnSelectionChanged);
 			}
 
 			public override void DrawInteriorWithFrame (CGRect cellFrame, NSView inView)

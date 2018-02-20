@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+﻿<?xml version="1.0"?>
 <Template originator   = "Dave Thomas"
           created      = "29/10/2015"
           lastModified = "29/10/2015">
@@ -7,8 +7,8 @@
 	<TemplateConfiguration>
 		<_Name>Shared Project</_Name>
 		<Category>crossplat/library/general</Category>
-		<Icon>md-project-shared-assets</Icon>
-		<Image id="md-shared-project" />
+		<Icon>md-crossplatform-shared-project</Icon>
+		<Image id="md-crossplatform-shared-project" />
 		<_Description>Creates a project that allows sharing files between projects</_Description>
 		<DefaultFilename>Shared</DefaultFilename>
     <GroupId>md-project-shared-library</GroupId>
@@ -24,12 +24,12 @@
 	<Combine name = "${ProjectName}" directory = ".">
 		<Project name = "${ProjectName}" directory = "." type = "SharedAssetsProject">
 			<Files>
-				 <UnformattedFile name = "MyType.fs" AddStandardHeader="True">
+				 <File name = "MyType.fs" AddStandardHeader="True">
 <![CDATA[namespace ${Namespace}
 
 type Class1() = 
     member this.X = "F#"
-]]></UnformattedFile>
+]]></File>
 			</Files>
 		</Project>
 	</Combine>

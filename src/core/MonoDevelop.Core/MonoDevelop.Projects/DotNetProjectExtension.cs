@@ -28,6 +28,7 @@ using System.Collections.Generic;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Core;
+using System.Threading;
 using System.Threading.Tasks;
 using MonoDevelop.Projects.MSBuild;
 
@@ -72,9 +73,14 @@ namespace MonoDevelop.Projects
 			return next.OnGetDefaultTargetPlatform (projectCreateInfo);
 		}
 
-		internal protected virtual Task<List<string>> OnGetReferencedAssemblies (ConfigurationSelector configuration)
+		internal protected virtual Task<List<AssemblyReference>> OnGetReferencedAssemblies (ConfigurationSelector configuration)
 		{
 			return next.OnGetReferencedAssemblies (configuration);
+		}
+
+		internal protected virtual Task<List<AssemblyReference>> OnGetReferences (ConfigurationSelector configuration, CancellationToken token)
+		{
+			return next.OnGetReferences (configuration, token);
 		}
 
 		internal protected virtual IEnumerable<DotNetProject> OnGetReferencedAssemblyProjects (ConfigurationSelector configuration)
@@ -82,9 +88,15 @@ namespace MonoDevelop.Projects
 			return next.OnGetReferencedAssemblyProjects (configuration);
 		}
 
+		[Obsolete("User overload that takes a RunConfiguration")]
 		internal protected virtual ExecutionCommand OnCreateExecutionCommand (ConfigurationSelector configSel, DotNetProjectConfiguration configuration)
 		{
 			return next.OnCreateExecutionCommand (configSel, configuration);
+		}
+
+		internal protected virtual ExecutionCommand OnCreateExecutionCommand (ConfigurationSelector configSel, DotNetProjectConfiguration configuration, ProjectRunConfiguration runConfiguration)
+		{
+			return next.OnCreateExecutionCommand (configSel, configuration, runConfiguration);
 		}
 
 		internal protected virtual void OnReferenceRemovedFromProject (ProjectReferenceEventArgs e)

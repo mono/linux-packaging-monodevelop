@@ -29,6 +29,7 @@ using System;
 using AppKit;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
+using MonoDevelop.Ide.Navigation;
 using System.Text;
 using Foundation;
 using ObjCRuntime;
@@ -48,6 +49,7 @@ namespace MonoDevelop.Components.Mac
 		bool isArrayItem;
 		object initialCommandTarget;
 		CommandSource commandSource;
+		CommandInfo lastInfo;
 
 		public MDMenuItem (CommandManager manager, CommandEntry ce, ActionCommand command, CommandSource commandSource, object initialCommandTarget)
 		{
@@ -62,6 +64,18 @@ namespace MonoDevelop.Components.Mac
 			Action = ActionSel;
 		}
 
+		protected override void Dispose (bool disposing)
+		{
+			if (lastInfo != null) {
+				lastInfo.CancelAsyncUpdate ();
+				lastInfo.Changed -= OnLastInfoChanged;
+				lastInfo = null;
+			}
+			initialCommandTarget = null;
+			base.Dispose (disposing);
+		}
+
+		public CommandManager Manager { get { return manager; } }
 		public CommandEntry CommandEntry { get { return ce; } }
 
 		[Export (ActionSelName)]
@@ -71,9 +85,9 @@ namespace MonoDevelop.Components.Mac
 			//if the command opens a modal subloop, give cocoa a chance to unhighlight the menu item
 			GLib.Timeout.Add (1, () => {
 				if (a != null) {
-					manager.DispatchCommand (ce.CommandId, a.Info.DataItem, initialCommandTarget, commandSource);
+					manager.DispatchCommand (ce.CommandId, a.Info.DataItem, initialCommandTarget, commandSource, lastInfo);
 				} else {
-					manager.DispatchCommand (ce.CommandId, null, initialCommandTarget, commandSource);
+					manager.DispatchCommand (ce.CommandId, null, initialCommandTarget, commandSource, lastInfo);
 				}
 				return false;
 			});
@@ -87,14 +101,44 @@ namespace MonoDevelop.Components.Mac
 			}
 		}
 
-		public void Update (MDMenu parent, ref NSMenuItem lastSeparator, ref int index)
+		int FindMeInParent (NSMenu parent)
+		{
+			for (int n = 0; n < parent.Count; n++)
+				if (parent.ItemAt (n) == this)
+					return n;
+			return -1;
+		}
+
+		public void Update (MDMenu parent, ref int index)
 		{
 			var info = manager.GetCommandInfo (ce.CommandId, new CommandTargetRoute (initialCommandTarget));
+			if (lastInfo != info) {
+				if (lastInfo != null) {
+					lastInfo.CancelAsyncUpdate ();
+					lastInfo.Changed -= OnLastInfoChanged;
+				}
+				lastInfo = info;
+				if (lastInfo.IsUpdatingAsynchronously) {
+					lastInfo.Changed += OnLastInfoChanged;
+				}
+			}
+			Update (parent, ref index, info);
+		}
 
+		void OnLastInfoChanged (object sender, EventArgs args)
+		{
+			if (lastInfo != sender)
+				return;
+			var parent = Menu;
+			var ind = FindMeInParent (parent);
+			Update (parent, ref ind, lastInfo);
+			(parent as MDMenu)?.UpdateSeparators ();
+		}
+
+		void Update (NSMenu parent, ref int index, CommandInfo info)
+		{
 			if (!isArrayItem) {
-				SetItemValues (this, info, ce.DisabledVisible);
-				if (!Hidden)
-					MDMenu.ShowLastSeparator (ref lastSeparator);
+				SetItemValues (this, info, ce.DisabledVisible, ce.OverrideLabel);
 				return;
 			}
 
@@ -110,10 +154,11 @@ namespace MonoDevelop.Components.Mac
 				}
 			}
 
-			PopulateArrayItems (info.ArrayInfo, parent, ref lastSeparator, ref index);
+			index++;
+			PopulateArrayItems (info.ArrayInfo, parent, ref index);
 		}
 
-		void PopulateArrayItems (CommandArrayInfo infos, NSMenu parent, ref NSMenuItem lastSeparator, ref int index)
+		void PopulateArrayItems (CommandArrayInfo infos, NSMenu parent, ref int index)
 		{
 			if (infos == null)
 				return;
@@ -123,8 +168,11 @@ namespace MonoDevelop.Components.Mac
 					var n = NSMenuItem.SeparatorItem;
 					n.Hidden = true;
 					n.Target = this;
-					lastSeparator = n;
-					parent.InsertItem (n, index++);
+					if (parent.Count > index)
+						parent.InsertItem (n, index);
+					else
+						parent.AddItem (n);
+					index++;
 					continue;
 				}
 
@@ -137,15 +185,17 @@ namespace MonoDevelop.Components.Mac
 				if (ci is CommandInfoSet) {
 					item.Submenu = new NSMenu ();
 					int i = 0;
-					NSMenuItem sep = null;
-					PopulateArrayItems (((CommandInfoSet)ci).CommandInfos, item.Submenu, ref sep, ref i);
+					PopulateArrayItems (((CommandInfoSet)ci).CommandInfos, item.Submenu, ref i);
 				}
 				SetItemValues (item, ci, true);
 
-				if (!item.Hidden)
-					MDMenu.ShowLastSeparator (ref lastSeparator);
-				parent.InsertItem (item, index++);
+				if (parent.Count > index)
+					parent.InsertItem (item, index);
+				else
+					parent.AddItem (item);
+				index++;
 			}
+			index--;
 		}
 
 		class MDExpandedArrayItem : NSMenuItem
@@ -153,17 +203,56 @@ namespace MonoDevelop.Components.Mac
 			public CommandInfo Info;
 		}
 
-		void SetItemValues (NSMenuItem item, CommandInfo info, bool disabledVisible)
+		void SetItemValues (NSMenuItem item, CommandInfo info, bool disabledVisible, string overrideLabel = null)
 		{
-			item.SetTitleWithMnemonic (GetCleanCommandText (info));
-			if (!string.IsNullOrEmpty (info.Description) && item.ToolTip != info.Description)
-				item.ToolTip = info.Description;
+			item.SetTitleWithMnemonic (GetCleanCommandText (info, overrideLabel));
 
 			bool enabled = info.Enabled && (!IsGloballyDisabled || commandSource == CommandSource.ContextMenu);
 			bool visible = info.Visible && (disabledVisible || info.Enabled);
 
 			item.Enabled = enabled;
 			item.Hidden = !visible;
+
+			string fileName = null;
+			var doc = info.DataItem as Ide.Gui.Document;
+			if (doc != null) {
+				if (doc.IsFile)
+					fileName = doc.FileName;
+				else {
+					// Designer documents have no file bound to them, but the document name
+					// could be a valid path
+					var docName = doc.Name;
+					if (!string.IsNullOrEmpty (docName) && System.IO.Path.IsPathRooted (docName) && System.IO.File.Exists (docName))
+						fileName = docName;
+				}
+			} else if (info.DataItem is NavigationHistoryItem) {
+					var navDoc = ((NavigationHistoryItem)info.DataItem).NavigationPoint as DocumentNavigationPoint;
+					if (navDoc != null)
+						fileName = navDoc.FileName;
+			} else {
+				var str = info.DataItem as string;
+				if (str != null && System.IO.Path.IsPathRooted (str) && System.IO.File.Exists (str))
+					fileName = str;
+			}
+
+			if (!String.IsNullOrWhiteSpace (fileName)) {
+				item.ToolTip = fileName;
+				Xwt.Drawing.Image icon = null;
+				if (!info.Icon.IsNull)
+					icon = Ide.ImageService.GetIcon (info.Icon, Gtk.IconSize.Menu);
+				if (icon == null)
+					icon = Ide.DesktopService.GetIconForFile (fileName, Gtk.IconSize.Menu);
+				if (icon != null) {
+					var scale = GtkWorkarounds.GetScaleFactor (Ide.IdeApp.Workbench.RootWindow);
+
+					if (NSUserDefaults.StandardUserDefaults.StringForKey ("AppleInterfaceStyle") == "Dark")
+						icon = icon.WithStyles ("dark");
+					else
+						icon = icon.WithStyles ("-dark");
+					item.Image = icon.ToBitmap (scale).ToNSImage ();
+					item.Image.Template = true;
+				}
+			}
 
 			SetAccel (item, info.AccelKey);
 
@@ -228,6 +317,10 @@ namespace MonoDevelop.Components.Mac
 
 		static string GetKeyEquivalent (Gdk.Key key)
 		{
+			// Gdk.Keyval.ToUnicode returns NULL for TAB, fix it
+			if (key == Gdk.Key.Tab)
+				return "\t";
+			
 			char c = (char) Gdk.Keyval.ToUnicode ((uint) key);
 			if (c != 0)
 				return c.ToString ();
@@ -236,21 +329,27 @@ namespace MonoDevelop.Components.Mac
 			if (fk != 0)
 				return ((char) fk).ToString ();
 
-			LoggingService.LogError ("Mac menu cannot display key '{0}", key);
+			LoggingService.LogError ("Mac menu cannot display key '{0}'", key);
 			return "";
 		}
 
-		static string GetCleanCommandText (CommandInfo ci)
+		static string GetCleanCommandText (CommandInfo ci, string overrideLabel = null)
 		{
-			string txt = ci.Text;
+			string txt = overrideLabel ?? ci.Text;
 			if (txt == null)
 				return "";
 
+			bool isSpecial = ContextMenuItem.ContainsSpecialMnemonics;
 			//FIXME: markup stripping could be done better
 			var sb = new StringBuilder ();
 			for (int i = 0; i < txt.Length; i++) {
 				char ch = txt[i];
-				if (ch == '_') {
+
+				if (isSpecial && ch == '(') {
+					if (i + 3 < txt.Length && txt [i + 1] == '_' && txt [i + 3] == ')') {
+						i += 3;
+					}
+				} else if (ch == '_') {
 					if (i + 1 < txt.Length && txt[i + 1] == '_') {
 						sb.Append ('_');
 						i++;

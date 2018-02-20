@@ -7,6 +7,11 @@ ADDINS=$(MAC_APP_LIB_DIR)/AddIns
 EXTRAS=$(top_srcdir)/../extras
 ARTIFACTS=$(top_srcdir)/../../artifacts
 MD_CONFIGURE=$(top_srcdir)/../scripts/configure.sh
+EXTERNAL=../../external
+MONOSTUB_DEFINES=-DXM_REGISTRAR
+MONOSTUB_STATIC_LINK=$(EXTERNAL)/Xamarin.Mac.registrar.full.a
+EXTERN_C_XM_REGISTRAR_DEFINE=$(shell ./check-xm-extern.sh)
+
 #SDK_PATH=$(shell xcrun --sdk macosx10.8 --show-sdk-path)
 
 PACKAGE_UPDATE_ID=$(shell $(MD_CONFIGURE) get-releaseid)
@@ -16,7 +21,6 @@ CLEANFILES = render.exe monostub monostub-test
 #DISTCLEANFILES =
 EXTRA_DIST = dmg-bg.png DS_Store Info.plist.in make-dmg-bundle.sh render.cs
 
-FSHARP_BIN=../../external/fsharpbinding/bin/
 MONOSTUB_EXTRA_SOURCES = monostub-utils.h
 
 all: monostub monostub-test
@@ -27,8 +31,12 @@ render.exe: render.cs
 dmg: render.exe app
 	./make-dmg-bundle.sh
 
-monostub: monostub.m $(MONOSTUB_EXTRA_SOURCES)
-	gcc -Wall -mmacosx-version-min=10.10 -m$(MONOSTUB_ARCH) -o $@ monostub.m -framework AppKit
+System_Native.o: System_Native.cpp
+	g++ -std=c++14 -c -Wall -mmacosx-version-min=10.10 -o $@ $<
+monostub.o: monostub.mm $(MONOSTUB_EXTRA_SOURCES) $(MONOSTUB_STATIC_LINK)
+	g++ $(EXTERN_C_XM_REGISTRAR_DEFINE) $(MONOSTUB_DEFINES) -c -Wall -mmacosx-version-min=10.10 -m$(MONOSTUB_ARCH) -o $@ $<
+monostub:  monostub.o System_Native.o
+	clang++ -Wall -mmacosx-version-min=10.10 -m$(MONOSTUB_ARCH) -o $@ $^ -framework AppKit -framework Quartz $(MONOSTUB_STATIC_LINK) -undefined dynamic_lookup
 #	gcc -Wall -mmacosx-version-min=10.10 -m$(MONOSTUB_ARCH) -o $@ monostub.m -framework AppKit -isysroot $(SDK_PATH)
 	cp monostub ../bin/MonoDevelop
 	cp monostub ../bin/mdtool
@@ -40,6 +48,7 @@ monostub-test: monostub-test.m $(MONOSTUB_EXTRA_SOURCES)
 clean-local:
 	rm -rf MonoDevelop.app
 	rm -f MonoDevelop*.dmg
+	rm -f *.o
 
 app: monostub monostub-test
 	@echo ""
@@ -63,7 +72,6 @@ app: monostub monostub-test
 	@echo "Copying MonoDevelop into app bundle"
 	@echo ""
 	cp -pR ../AddIns $(MAC_APP_LIB_DIR)
-	cp -pR $(FSHARP_BIN) $(MAC_APP_LIB_DIR)/AddIns/fsharpbinding
 	cp -pR ../data $(MAC_APP_LIB_DIR)
 	cp -pR ../bin $(MAC_APP_LIB_DIR)
 	cp -pR ../locale $(MAC_APP_DIR)/Contents/MacOS/share

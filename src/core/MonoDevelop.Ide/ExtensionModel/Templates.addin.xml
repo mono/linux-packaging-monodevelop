@@ -4,6 +4,15 @@
 <ExtensionPoint path = "/MonoDevelop/Ide/FileTemplates" name = "File templates">
 	<Description>File templates to be shown in the New File dialog.</Description>
 	<ExtensionNode name="FileTemplate" type="MonoDevelop.Ide.Codons.ProjectTemplateCodon"/>
+	<ConditionType id="FlavorType" type="MonoDevelop.Projects.Extensions.FlavorTypeCondition">
+		<Description>Type of a flavor that a project must have. If no namespace is provided, MonoDevelop.Projects is assumed.</Description>
+	</ConditionType>
+	<ConditionType id="ProjectTypeId" type="MonoDevelop.Projects.Extensions.ProjectTypeIdCondition">
+		<Description>The id can be a project type guid or a flavor guid, or the corresponding type alias</Description>
+	</ConditionType>
+	<ConditionType id="AppliesTo" type="MonoDevelop.Projects.Extensions.AppliesToCondition">
+		<Description>Project capability expression.</Description>
+	</ConditionType>
 </ExtensionPoint>
 
 <ExtensionPoint path = "/MonoDevelop/Ide/FileTemplateTypes" name = "File template types">
@@ -19,6 +28,11 @@
 <ExtensionPoint path = "/MonoDevelop/Ide/ProjectTemplates" name = "File template types">
 	<Description>Project templates to be shown in the New Project dialog.</Description>
 	<ExtensionNode name="ProjectTemplate" type="MonoDevelop.Ide.Codons.ProjectTemplateCodon"/>
+</ExtensionPoint>
+
+<ExtensionPoint path = "/MonoDevelop/Ide/Templates" name = "Microsoft Templating Engine templates">
+	<Description>Microsoft templating engine project templates to be shown in the New Project dialog.</Description>
+	<ExtensionNode name="Template" type="MonoDevelop.Ide.Codons.TemplateExtensionNode"/>
 </ExtensionPoint>
 
 <ExtensionPoint path = "/MonoDevelop/Ide/ProjectTemplatePackageInstallers" name = "Project template package installers">
@@ -87,9 +101,12 @@
 </Extension>
 
 <Extension path = "/MonoDevelop/Ide/FileTemplateConditionTypes">
+	<FileTemplateConditionType name = "HasReference" class = "MonoDevelop.Ide.Templates.HasReferenceFileTemplateCondition"/>
 	<FileTemplateConditionType name = "ClrVersion" class = "MonoDevelop.Ide.Templates.ClrVersionFileTemplateCondition"/>
 	<FileTemplateConditionType name = "PartialTypeSupport" class = "MonoDevelop.Ide.Templates.PartialTypeFileTemplateCondition"/>
 	<FileTemplateConditionType name = "ParentProject" class = "MonoDevelop.Ide.Templates.ParentProjectFileTemplateCondition"/>
+	<FileTemplateConditionType name = "ProjectCapability" class = "MonoDevelop.Ide.Templates.ProjectCapabilityFileTemplateCondition"/>
+	<FileTemplateConditionType name = "Or" class = "MonoDevelop.Ide.Templates.OrFileTemplateCondition"/>
 </Extension>
 
 <Extension path = "/MonoDevelop/Ide/ProjectTemplates">
@@ -99,39 +116,42 @@
 </Extension>
 
 <Extension path="/MonoDevelop/Ide/ProjectTemplateCategories">
-	<Category id="multiplat" name="Multiplatform" icon="md-platform-crossplatform">
-			<Category id="library" name="Library">
-				<Category id="general" name="General" mappedCategories="crossplat/library/general" />
+	<Category id="multiplat" _name="Multiplatform" icon="md-platform-crossplatform">
+			<Category id="library" _name="Library">
+				<Category id="general" _name="General" mappedCategories="crossplat/library/general" />
 			</Category>
 		</Category>
-	<Category id="other" name="Other" icon="md-platform-other">
-		<Category id="net" name=".NET">
-			<Category id="general" name="General" mappedCategories="C#" />
+	<Category id="other" _name="Other" icon="md-platform-other">
+		<Category id="net" _name=".NET">
+			<Category id="general" _name="General" mappedCategories="C#" />
+			<Category id="aspnet" _name="ASP.NET" mappedCategories="C#/ASP.NET" />
 		</Category>
-		<Category id="aspnet" name="ASP.NET">
-			<Category id="general" name="General" mappedCategories="C#/ASP.NET" />
-		</Category>
-		<Category id="misc" name="Miscellaneous">
-			<Category id="generic" name="Generic" />
-			<Category id="c" name="C/C++" />
-			<Category id="general" name="General" default="true" />
+		<Category id="misc" _name="Miscellaneous">
+			<Category id="generic" _name="Generic" />
+			<Category id="c" _name="C/C++" />
+			<Category id="general" _name="General" default="true" />
 		</Category>
 	</Category>
 </Extension>
 
 <Extension path="/MonoDevelop/Ide/ProjectTemplatingProviders">
 	<Class id="MonoDevelop.ProjectTemplatingProvider" class="MonoDevelop.Ide.Templates.ProjectTemplatingProvider" />
+	<Class id="MonoDevelop.MicrosoftTemplateEngineProjectTemplatingProvider" class="MonoDevelop.Ide.Templates.MicrosoftTemplateEngineProjectTemplatingProvider" />
 </Extension>
 
 <Extension path="/MonoDevelop/Ide/TemplateImages">
-	<Image id="md-generic-project" resource="project.png" />
-	<Image id="md-blank-solution" resource="solution.png" />
-	<Image id="md-console-project" resource="console-project.png" />
-	<Image id="md-library-project" resource="library-project.png" />
-	<Image id="md-pcl-project" resource="pcl-project.png" />
-	<Image id="md-shared-project" resource="shared-project.png" />
-	<Image id="md-workspace" resource="workspace.png" />
-	<Image id="md-gtk2-project" resource="gtk2-project.png" />
+	<Image id="md-workspace" resource="workspace-template.png" />
+	<Image id="md-solution" resource="solution-template.png" />
+	<Image id="md-project" resource="project-template.png" />
+	
+	<Image id="md-library-project" resource="project-library-template.png" />
+	<Image id="md-gui-project" resource="project-gui-template.png" />
+	<Image id="md-console-project" resource="project-console-template.png" />
+	<Image id="md-test-project" resource="project-test-template.png" />
+	<Image id="md-package-project" resource="project-package-template.png" />
+	
+	<Image id="md-crossplatform-pcl-project" resource="project-crossplatform-pcl-template.png" />
+	<Image id="md-crossplatform-shared-project" resource="project-crossplatform-shared-template.png" />
 </Extension>
 
 </ExtensionModel>

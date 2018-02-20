@@ -23,27 +23,32 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
 using System;
 using System.Collections.Generic;
-using MonoDevelop.Core;
-using MonoDevelop.Ide.FindInFiles;
-using System.Threading;
-using MonoDevelop.SourceEditor;
-using Microsoft.CodeAnalysis;
-using MonoDevelop.Ide;
-using MonoDevelop.Refactoring;
-using Microsoft.CodeAnalysis.FindSymbols;
-using MonoDevelop.Ide.TypeSystem;
-using System.Threading.Tasks;
 using System.Collections.Immutable;
-using MonoDevelop.Ide.Editor;
-using MonoDevelop.Ide.Editor.Extension;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+using ICSharpCode.NRefactory6.CSharp;
+
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Linq;
-using ICSharpCode.NRefactory6.CSharp;
-using Microsoft.CodeAnalysis.Editor.CSharp.KeywordHighlighting.KeywordHighlighters;
+using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.Editor.Implementation.Highlighting;
+using Microsoft.CodeAnalysis.FindSymbols;
+using Roslyn.Utilities;
+
+using MonoDevelop.Core;
+using MonoDevelop.Ide;
+using MonoDevelop.Ide.Editor.Extension;
+using MonoDevelop.Ide.FindInFiles;
+using MonoDevelop.Ide.TypeSystem;
+using MonoDevelop.Refactoring;
+using MonoDevelop.CSharp.Refactoring;
+using MonoDevelop.Ide.Editor.Highlighting;
 
 namespace MonoDevelop.CSharp.Highlighting
 {
@@ -57,37 +62,63 @@ namespace MonoDevelop.CSharp.Highlighting
 			get { return SymbolInfo != null ? SymbolInfo.Symbol ?? SymbolInfo.DeclaredSymbol : null; }
 		}
 	}
-	
+
 	class HighlightUsagesExtension : AbstractUsagesExtension<UsageData>
 	{
-		CSharpSyntaxMode syntaxMode;
 		static IHighlighter [] highlighters;
 
 		static HighlightUsagesExtension ()
 		{
-			highlighters = typeof (HighlightUsagesExtension).Assembly
-				.GetTypes ()
-				.Where (t => !t.IsAbstract && typeof (IHighlighter).IsAssignableFrom (t))
-				.Select (t => (IHighlighter)Activator.CreateInstance (t)).ToArray ();
+			try {
+				highlighters = typeof (HighlightUsagesExtension).Assembly
+					.GetTypes ()
+					.Where (t => !t.IsAbstract && typeof (IHighlighter).IsAssignableFrom (t))
+					.Select (Activator.CreateInstance)
+					.Cast<IHighlighter> ()
+					.ToArray ();
+			} catch (Exception e) {
+				LoggingService.LogError ("Error while loading highlighters.", e);
+				highlighters = Array.Empty<IHighlighter> ();
+			}
 		}
 		protected override void Initialize ()
 		{
 			base.Initialize ();
 			Editor.SetSelectionSurroundingProvider (new CSharpSelectionSurroundingProvider (Editor, DocumentContext));
-			syntaxMode = new CSharpSyntaxMode (Editor, DocumentContext);
-			Editor.SemanticHighlighting = syntaxMode;
+			fallbackHighlighting = Editor.SyntaxHighlighting;
+			UpdateHighlighting ();
+			DocumentContext.AnalysisDocumentChanged += HandleAnalysisDocumentChanged;
+		}
+
+		void HandleAnalysisDocumentChanged (object sender, EventArgs args)
+		{
+			Runtime.RunInMainThread (delegate {
+				UpdateHighlighting ();
+			});
+		}
+
+		ISyntaxHighlighting fallbackHighlighting;
+		void UpdateHighlighting ()
+		{
+			if (DocumentContext?.AnalysisDocument == null) {
+				if (Editor.SyntaxHighlighting != fallbackHighlighting)
+					Editor.SyntaxHighlighting = fallbackHighlighting;
+				return;
+			}
+			var old = Editor.SyntaxHighlighting as RoslynClassificationHighlighting;
+			if (old == null || old.DocumentId != DocumentContext.AnalysisDocument.Id) {
+				Editor.SyntaxHighlighting = new RoslynClassificationHighlighting ((MonoDevelopWorkspace)DocumentContext.RoslynWorkspace,
+																				  DocumentContext.AnalysisDocument.Id, "source.cs");
+			}
 		}
 
 		public override void Dispose ()
 		{
-			if (syntaxMode != null) {
-				Editor.SemanticHighlighting = null;
-				syntaxMode.Dispose ();
-				syntaxMode = null;
-			}
+			DocumentContext.AnalysisDocumentChanged -= HandleAnalysisDocumentChanged;
+			Editor.SyntaxHighlighting = fallbackHighlighting;
 			base.Dispose ();
 		}
-		
+
 		protected async override Task<UsageData> ResolveAsync (CancellationToken token)
 		{
 			var doc = IdeApp.Workbench.ActiveDocument;
@@ -103,8 +134,8 @@ namespace MonoDevelop.CSharp.Highlighting
 					Document = analysisDocument,
 					Offset = doc.Editor.CaretOffset
 				};
-			
-			if (symbolInfo.Symbol != null && !symbolInfo.Node.IsKind (SyntaxKind.IdentifierName) && !symbolInfo.Node.IsKind (SyntaxKind.GenericName)) 
+
+			if (symbolInfo.Symbol != null && !symbolInfo.Node.IsKind (SyntaxKind.IdentifierName) && !symbolInfo.Node.IsKind (SyntaxKind.GenericName))
 				return new UsageData ();
 
 			return new UsageData {
@@ -122,10 +153,12 @@ namespace MonoDevelop.CSharp.Highlighting
 					return result;
 				var root = await resolveResult.Document.GetSyntaxRootAsync (token).ConfigureAwait (false);
 				var doc2 = resolveResult.Document;
-
+				var offset = resolveResult.Offset;
+				if (!root.Span.Contains (offset))
+					return result;
 				foreach (var highlighter in highlighters) {
 					try {
-						foreach (var span in highlighter.GetHighlights (root, resolveResult.Offset, token)) {
+						foreach (var span in highlighter.GetHighlights (root, offset, token)) {
 							result.Add (new MemberReference (span, doc2.FilePath, span.Start, span.Length) {
 								ReferenceUsageType = ReferenceUsageType.Keyword
 							});
@@ -138,42 +171,40 @@ namespace MonoDevelop.CSharp.Highlighting
 			}
 
 			var doc = resolveResult.Document;
-			var documents = ImmutableHashSet.Create (doc); 
-			var symbol = resolveResult.Symbol;
-			foreach (var loc in symbol.Locations) {
-				if (loc.IsInSource && loc.SourceTree.FilePath == doc.FilePath)
+			var documents = ImmutableHashSet.Create (doc);
+
+			foreach (var symbol in await CSharpFindReferencesProvider.GatherSymbols (resolveResult.Symbol, resolveResult.Document.Project.Solution, token)) {
+				foreach (var loc in symbol.Locations) {
+					if (loc.IsInSource && loc.SourceTree.FilePath == doc.FilePath)
+						result.Add (new MemberReference (symbol, doc.FilePath, loc.SourceSpan.Start, loc.SourceSpan.Length) {
+							ReferenceUsageType = ReferenceUsageType.Declaration
+						});
+				}
+
+				foreach (var mref in await SymbolFinder.FindReferencesAsync (symbol, DocumentContext.AnalysisDocument.Project.Solution, documents, token)) {
+					foreach (var loc in mref.Locations) {
+						Microsoft.CodeAnalysis.Text.TextSpan span = loc.Location.SourceSpan;
+						var root = loc.Location.SourceTree.GetRoot ();
+						var node = root.FindNode (loc.Location.SourceSpan);
+						var trivia = root.FindTrivia (loc.Location.SourceSpan.Start);
+						if (!trivia.IsKind (SyntaxKind.SingleLineDocumentationCommentTrivia)) {
+							span = node.Span;
+						}
+
+						if (span.Start != loc.Location.SourceSpan.Start) {
+							span = loc.Location.SourceSpan;
+						}
+						result.Add (new MemberReference (symbol, doc.FilePath, span.Start, span.Length) {
+							ReferenceUsageType = GetUsage (node)
+						});
+					}
+				}
+
+				foreach (var loc in await GetAdditionalReferencesAsync (doc, symbol, token)) {
 					result.Add (new MemberReference (symbol, doc.FilePath, loc.SourceSpan.Start, loc.SourceSpan.Length) {
-						ReferenceUsageType = ReferenceUsageType.Declariton	
-					});
-			}
-
-			foreach (var mref in await SymbolFinder.FindReferencesAsync (symbol, TypeSystemService.Workspace.CurrentSolution, documents, token)) {
-				foreach (var loc in mref.Locations) {
-					Microsoft.CodeAnalysis.Text.TextSpan span = loc.Location.SourceSpan;
-					var root = loc.Location.SourceTree.GetRoot ();
-					var node = root.FindNode (loc.Location.SourceSpan);
-					var trivia = root.FindTrivia (loc.Location.SourceSpan.Start);
-					if (!trivia.IsKind (SyntaxKind.SingleLineDocumentationCommentTrivia)) {
-						span = node.Span;
-					}
-
-
-
-
-
-					if (span.Start != loc.Location.SourceSpan.Start) {
-						span = loc.Location.SourceSpan;
-					}
-					result.Add (new MemberReference (symbol, doc.FilePath, span.Start, span.Length) {
-						ReferenceUsageType = GetUsage (node)
+						ReferenceUsageType = ReferenceUsageType.Write
 					});
 				}
-			}
-
-			foreach (var loc in await GetAdditionalReferencesAsync (doc, symbol, token)) {
-				result.Add (new MemberReference (symbol, doc.FilePath, loc.SourceSpan.Start, loc.SourceSpan.Length) {
-					ReferenceUsageType = ReferenceUsageType.Write
-				});
 			}
 
 			return result;
@@ -223,12 +254,12 @@ namespace MonoDevelop.CSharp.Highlighting
 			return results ?? SpecializedCollections.EmptyEnumerable<Location> ();
 		}
 
-		static ReferenceUsageType GetUsage (SyntaxNode node)
+		internal static ReferenceUsageType GetUsage (SyntaxNode node)
 		{
 			if (node == null)
 				return ReferenceUsageType.Read;
-			
-			var parent = node.AncestorsAndSelf ().OfType<ExpressionSyntax> ().FirstOrDefault();
+
+			var parent = node.AncestorsAndSelf ().OfType<ExpressionSyntax> ().FirstOrDefault ();
 			if (parent == null)
 				return ReferenceUsageType.Read;
 			if (parent.IsOnlyWrittenTo ())

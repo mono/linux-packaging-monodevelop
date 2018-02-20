@@ -57,7 +57,7 @@ namespace MonoDevelop.VersionControl.Subversion.Gui
 					};
 				}
 
-				if (MessageDialog.AskQuestion (primary, secondary, commands) != DisableCommand)
+				if (MessageDialog.AskQuestion (primary, secondary, Toolkit.CurrentEngine.Defaults.MessageDialog.QuestionIcon, commands) != DisableCommand)
 					action();
 			};
 

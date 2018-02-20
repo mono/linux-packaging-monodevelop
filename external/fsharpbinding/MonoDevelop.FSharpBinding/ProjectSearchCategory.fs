@@ -1,8 +1,5 @@
 ﻿namespace MonoDevelop.FSharp
-open System
 open System.Collections.Generic
-open System.Linq
-open System.Threading
 open System.Threading.Tasks
 open MonoDevelop.Core
 open MonoDevelop.Core.Text
@@ -80,8 +77,8 @@ module Search =
     /// constructors have a display name of ( .ctor ) use the enclosing entities display name
     let correctDisplayName (symbol:FSharpSymbolUse) =
         match symbol with
-        | Constructor c ->
-            match c.EnclosingEntitySafe with
+        | SymbolUse.Constructor c ->
+            match c.EnclosingEntity with
             | Some ent -> ent.DisplayName
             | _ -> LoggingService.LogError(sprintf "Constructor with no EnclosingEntity: %s" c.DisplayName)
                    c.DisplayName
@@ -115,35 +112,35 @@ type SymbolSearchResult(match', matchedString, rank, symbol:FSharpSymbolUse) =
 
     override x.SearchResultType =
         match symbol with
-        | Record _ | Module _ | ValueType _ | Delegate _ | Union _  | Class _
-        | Namespace _ | Interface _ | Enum _ | ActivePattern _ -> SearchResultType.Type
+        | SymbolUse.Record _ | SymbolUse.Module _ | SymbolUse.ValueType _ | SymbolUse.Delegate _ | SymbolUse.Union _  | SymbolUse.Class _
+        | SymbolUse.Namespace _ | SymbolUse.Interface _ | SymbolUse.Enum _ | SymbolUse.ActivePattern _ -> SearchResultType.Type
 
-        | ActivePatternCase _ | Field _ | UnionCase _ | Property _
-        | Event _ | Operator _ | Constructor _ | Function _ | Val _-> SearchResultType.Member
+        | SymbolUse.ActivePatternCase _ | SymbolUse.Field _ | SymbolUse.UnionCase _ | SymbolUse.Property _
+        | SymbolUse.Event _ | SymbolUse.Operator _ | SymbolUse.Constructor _ | SymbolUse.Function _ | SymbolUse.Val _-> SearchResultType.Member
         | _ -> SearchResultType.Unknown
 
     override x.Description =
         let cat =
             match symbol with
-            | Record _ -> "record"
-            | Module _ -> "module"
-            | ValueType _ -> "struct"
-            | Delegate _ -> "delegate"
-            | Union _ -> "union"
-            | Class c -> if c.IsFSharp then "type" else "class"
-            | Namespace _ -> "namespace"
-            | Interface _ -> "interface"
-            | Enum _ -> "enum"
-            | ActivePattern _ -> "active pattern"
-            | Field _ -> "field"
-            | UnionCase _ -> "union case"
-            | Property _ -> "property"
-            | Event _ -> "event"
-            | Operator _ -> "operator"
-            | Constructor _ -> "constructor"
-            | Method _ -> "method"
-            | Function _ -> "function"
-            | Val _ -> "val"
+            | SymbolUse.Record _ -> "record"
+            | SymbolUse.Module _ -> "module"
+            | SymbolUse.ValueType _ -> "struct"
+            | SymbolUse.Delegate _ -> "delegate"
+            | SymbolUse.Union _ -> "union"
+            | SymbolUse.Class c -> if c.IsFSharp then "type" else "class"
+            | SymbolUse.Namespace _ -> "namespace"
+            | SymbolUse.Interface _ -> "interface"
+            | SymbolUse.Enum _ -> "enum"
+            | SymbolUse.ActivePattern _ -> "active pattern"
+            | SymbolUse.Field _ -> "field"
+            | SymbolUse.UnionCase _ -> "union case"
+            | SymbolUse.Property _ -> "property"
+            | SymbolUse.Event _ -> "event"
+            | SymbolUse.Operator _ -> "operator"
+            | SymbolUse.Constructor _ -> "constructor"
+            | SymbolUse.Method _ -> "method"
+            | SymbolUse.Function _ -> "function"
+            | SymbolUse.Val _ -> "val"
             | _ -> "symbol"
         sprintf "%s (file %s)" cat symbol.RangeAlternate.FileName
 
@@ -152,30 +149,32 @@ type SymbolSearchResult(match', matchedString, rank, symbol:FSharpSymbolUse) =
     override x.File = symbol.RangeAlternate.FileName
     override x.Icon =
         match symbol with
-        | Record _ -> getImage "md-type"
-        | Module _ -> getImage "md-module"
-        | ValueType s -> s |> getImageFromAccessibility Stock.Struct.Name Stock.InternalStruct.Name Stock.PrivateStruct.Name
-        | Delegate d -> d |> getImageFromAccessibility Stock.Delegate.Name Stock.InternalDelegate.Name Stock.PrivateDelegate.Name
-        | Union _ -> getImage "md-type"
-        | Class c -> if c.IsFSharp then getImage "md-type" else c |> getImageFromAccessibility Stock.Class.Name Stock.InternalClass.Name Stock.PrivateClass.Name
-        | Namespace _ -> getImage Stock.NameSpace.Name
-        | Interface i -> i |> getImageFromAccessibility Stock.Interface.Name Stock.InternalInterface.Name Stock.PrivateInterface.Name
-        | Enum e -> e |> getImageFromAccessibility Stock.Enum.Name Stock.InternalEnum.Name Stock.PrivateEnum.Name
-        | ActivePattern _ -> getImage "md-type"
-        | Field f ->f |> getImageFromAccessibility Stock.Field.Name Stock.InternalField.Name Stock.PrivateField.Name
-        | UnionCase _ -> getImage "md-type"
-        | Property p -> p |> getImageFromAccessibility Stock.Property.Name Stock.InternalProperty.Name Stock.PrivateProperty.Name
-        | Event e -> e |> getImageFromAccessibility Stock.Event.Name Stock.InternalEvent.Name Stock.PrivateEvent.Name
-        | Operator _ -> getImage "md-fs-field"
-        | Constructor c -> c |> getImageFromAccessibility Stock.Method.Name Stock.InternalMethod.Name Stock.PrivateMethod.Name
-        | Function mfv ->
+        | SymbolUse.Record _ -> getImage "md-type"
+        | SymbolUse.Module _ -> getImage "md-module"
+        | SymbolUse.ValueType s -> s |> getImageFromAccessibility Stock.Struct.Name Stock.InternalStruct.Name Stock.PrivateStruct.Name
+        | SymbolUse.Delegate d -> d |> getImageFromAccessibility Stock.Delegate.Name Stock.InternalDelegate.Name Stock.PrivateDelegate.Name
+        | SymbolUse.Union _ -> getImage "md-type"
+        | SymbolUse.Class c -> if c.IsFSharp then getImage "md-type" else c |> getImageFromAccessibility Stock.Class.Name Stock.InternalClass.Name Stock.PrivateClass.Name
+        | SymbolUse.Namespace _ -> getImage Stock.NameSpace.Name
+        | SymbolUse.Interface i -> i |> getImageFromAccessibility Stock.Interface.Name Stock.InternalInterface.Name Stock.PrivateInterface.Name
+        | SymbolUse.Enum e -> e |> getImageFromAccessibility Stock.Enum.Name Stock.InternalEnum.Name Stock.PrivateEnum.Name
+        | SymbolUse.ActivePattern _ -> getImage "md-type"
+        | SymbolUse.Field f ->f |> getImageFromAccessibility Stock.Field.Name Stock.InternalField.Name Stock.PrivateField.Name
+        | SymbolUse.UnionCase _ -> getImage "md-type"
+        | SymbolUse.Property p -> p |> getImageFromAccessibility Stock.Property.Name Stock.InternalProperty.Name Stock.PrivateProperty.Name
+        | SymbolUse.Event e -> e |> getImageFromAccessibility Stock.Event.Name Stock.InternalEvent.Name Stock.PrivateEvent.Name
+        | SymbolUse.Operator _ -> getImage "md-fs-field"
+        | SymbolUse.Constructor c -> c |> getImageFromAccessibility Stock.Method.Name Stock.InternalMethod.Name Stock.PrivateMethod.Name
+        | SymbolUse.Function mfv ->
             if mfv.IsExtensionMember then mfv |> getImageFromAccessibility "md-extensionmethod" "md-internal-extensionmethod" "md-private-extensionmethod"
             elif mfv.IsMember then mfv |> getImageFromAccessibility Stock.Method.Name Stock.InternalMethod.Name Stock.PrivateMethod.Name
             else getImage "md-fs-field"
-        | Val _ -> getImage "md-fs-field" //NOTE: Maybe make this a normal field icon?
+        | SymbolUse.Val _ -> getImage "md-fs-field" //NOTE: Maybe make this a normal field icon?
         | _ -> getImage Stock.Event.Name
 
-    override x.GetTooltipInformation(token) = Async.StartAsTask(SymbolTooltips.getTooltipInformation symbol, cancellationToken = token)
+    override x.GetTooltipInformation(_token) = 
+        SymbolTooltips.getTooltipInformation symbol |> Async.StartAsTask
+        
     override x.Offset = fst (offsetAndLength.Force())
     override x.Length = snd (offsetAndLength.Force())
 
@@ -200,20 +199,19 @@ type ProjectSearchCategory() =
             (fun () -> async {
                 for projFile in Search.getAllFSharpProjects() do
                     try
-                        let shortName = projFile.FileName |> string |> IO.Path.GetFileName
-                        LoggingService.LogInfo(sprintf "F# Global Search: Getting all project symbols for %s" shortName )
+                        //LoggingService.LogInfo(sprintf "F# Global Search: Getting all project symbols for %s" shortName )
                         let! allProjectSymbols = Search.getAllProjectSymbols projFile
             
-                        LoggingService.LogInfo(sprintf "F# Global Search: Filtering %i project symbols from %s, for definitions" (allProjectSymbols |> Seq.length) shortName )
+                        //LoggingService.LogInfo(sprintf "F# Global Search: Filtering %i project symbols from %s, for definitions" (allProjectSymbols |> Seq.length) shortName )
                         let definitions = allProjectSymbols |> Seq.filter (fun s -> s.IsFromDefinition)
             
-                        LoggingService.LogInfo(sprintf "F# Global Search: Filtering %i matching tag %s for %s" (definitions |> Seq.length) pattern.Tag shortName )
+                        //LoggingService.LogInfo(sprintf "F# Global Search: Filtering %i matching tag %s for %s" (definitions |> Seq.length) pattern.Tag shortName )
                         let tagFiltered = definitions |> Search.byTag pattern.Tag
             
-                        LoggingService.LogInfo(sprintf "F# Global Search: Caching search on %i typeFilteredSymbols for matching pattern %s on %s" (tagFiltered |> Seq.length) pattern.Pattern shortName )
+                        //LoggingService.LogInfo(sprintf "F# Global Search: Caching search on %i typeFilteredSymbols for matching pattern %s on %s" (tagFiltered |> Seq.length) pattern.Pattern shortName )
                         let matchedSymbols = tagFiltered |> cachingSearch pattern.Pattern
             
-                        LoggingService.LogInfo(sprintf "F# Global Search: Matched %i symbols from %s" (matchedSymbols |> Seq.length) shortName )
+                        //LoggingService.LogInfo(sprintf "F# Global Search: Matched %i symbols from %s" (matchedSymbols |> Seq.length) shortName )
                         for symbol:FSharpSymbolUse, rank in matchedSymbols do
                             let sr = SymbolSearchResult(pattern.Pattern, symbol.Symbol.DisplayName, rank, symbol)
                             callback.ReportResult sr
