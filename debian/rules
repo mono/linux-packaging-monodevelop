@@ -48,7 +48,7 @@ override_dh_clideps:
 			--exclude-moduleref=e_sqlite3.dll \
 			--exclude-moduleref=clr \
 			--exclude-moduleref=Microsoft.DiaSymReader.Native.amd64.dll \
-			--exclude-moduelref=Microsoft.DiaSymReader.Native.x86.dll \
+			--exclude-moduleref=Microsoft.DiaSymReader.Native.x86.dll \
 			--exclude-moduleref=api-ms-win-core-sysinfo-l1-1-0.dll \
 			--exclude-moduleref=api-ms-win-core-sysinfo-l1-2-0.dll \
 			--exclude-moduleref=/System/Library/Frameworks/CoreServices.framework/CoreServices \
@@ -57,9 +57,10 @@ override_dh_clideps:
 			--exclude-moduleref=dl \
 			--exclude-moduleref=libwebkitgtk-1.0.so.0 \
 			--exclude-moduleref=libwebkitgtk-1.0-0.dll \
-			-X Microsoft.Azure.Documents.ServiceInterop.dll \
-			-X DocumentDB.Spatial.Sql.dll \
-			-X msdia140.dll
+			--exclude-moduleref=wintrust.dll \
+			--exclude-moduleref=libgtkspell \
+			--exclude=/usr/lib/monodevelop/AddIns/MonoDevelop.UnitTesting/VsTestConsole/ \
+			--exclude=/usr/lib/monodevelop/AddIns/MonoDevelop.AzureFunctions/
 
 override_dh_makeclilibs:
 	dh_makeclilibs 	-X Microsoft.Azure.Documents.ServiceInterop.dll \
