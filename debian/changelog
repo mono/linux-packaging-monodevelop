@@ -1,3 +1,15 @@
+monodevelop (7.4.0.1026-0xamarin7) preview; urgency=medium
+
+  [ Xamarin Public Jenkins (auto-signing) ]
+  * Packaging bugfix:
+
+  [ Ubuntu ]
+  * [9f17fb6] Remove ARM entirely for now [a916c73] Fix typo [ca8216f]
+    Make packages arch-specific, since we depend on an arch-specific .so
+    in core [61d18ef] Don't try to run dh_makeclilibs on Windows .dlls
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Wed, 21 Feb 2018 16:13:16 +0000
+
 monodevelop (7.4.0.1026-0xamarin6) preview; urgency=medium
 
   * Packaging bugfix:
