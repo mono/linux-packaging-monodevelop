@@ -59,6 +59,7 @@ override_dh_clideps:
 			--exclude-moduleref=libwebkitgtk-1.0-0.dll \
 			--exclude-moduleref=wintrust.dll \
 			--exclude-moduleref=libgtkspell \
+			--exclude-moduleref=msdia140.dll \
 			--exclude=/usr/lib/monodevelop/AddIns/MonoDevelop.UnitTesting/VsTestConsole/ \
 			--exclude=/usr/lib/monodevelop/AddIns/MonoDevelop.AzureFunctions/
 
