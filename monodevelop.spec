@@ -29,7 +29,8 @@ BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  cmake
 BuildRequires:  msbuild
-BuildRequires:  libmono-2_0-devel
+BuildRequires:  libmonosgen-2_0-1
+BuildRequires:  libmono-2_0-1
 BuildRequires:  libssh2-devel
 BuildRequires:  fdupes
 BuildRequires:  git
