@@ -31,7 +31,7 @@ Vcs-Git: git://git.debian.org/pkg-cli-apps/packages/monodevelop.git
 Vcs-Browser: http://git.debian.org/?p=pkg-cli-apps/packages/monodevelop.git
 
 Package: monodevelop
-Architecture: all
+Architecture: i386 amd64 armel armhf
 Suggests: exuberant-ctags,
           gcc,
           gettext,
@@ -84,7 +84,7 @@ Description: NUnit plugin for MonoDevelop
  This package enables NUnit integration for MonoDevelop.
 
 Package: monodevelop-versioncontrol
-Architecture: any
+Architecture: i386 amd64 armel armhf
 Replaces: monodevelop (<< 0.13.1)
 Depends: monodevelop (= ${source:Version}),
          ${cli:Depends},

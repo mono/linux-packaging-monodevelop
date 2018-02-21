@@ -51,19 +51,13 @@ override_dh_auto_install:
 	HOME=$(DEBIAN_DIR) XDG_CONFIG_HOME=$(DEBIAN_DIR) dh_auto_install
 	# broken SQLitePCL targets only ever does x64
 ifeq ($(DEB_HOST_ARCH), armel)
-	cp packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-armel/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/mono/bin/
+	cp $(CURDIR)/packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-armel/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/mono/bin/
 endif
 ifeq ($(DEB_HOST_ARCH), armhf)
-	cp packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-arm/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/mono/bin/
+	cp $(CURDIR)/packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-arm/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/mono/bin/
 endif
 ifeq ($(DEB_HOST_ARCH), i386)
-	cp packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-x86/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/mono/bin/
-endif
-ifeq ($(DEB_HOST_ARCH), arm64)
-	rm $(CURDIR)/debian/tmp/usr/lib/mono/bin/libe_sqlite3.so
-endif
-ifeq ($(DEB_HOST_ARCH), ppc64el)
-	rm $(CURDIR)/debian/tmp/usr/lib/mono/bin/libe_sqlite3.so
+	cp $(CURDIR)/packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-x86/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/mono/bin/
 endif
 	# fix permissions of .mo files
 	cd $(CURDIR)/debian/tmp/usr/share/locale && find -name "*.mo" -exec chmod -x {} \;
