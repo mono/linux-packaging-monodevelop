@@ -50,12 +50,6 @@ override_dh_auto_test:
 override_dh_auto_install:
 	HOME=$(DEBIAN_DIR) XDG_CONFIG_HOME=$(DEBIAN_DIR) dh_auto_install
 	# broken SQLitePCL targets only ever does x64
-ifeq ($(DEB_HOST_ARCH), armel)
-	cp $(CURDIR)/packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-armel/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/monodevelop/bin/
-endif
-ifeq ($(DEB_HOST_ARCH), armhf)
-	cp $(CURDIR)/packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-arm/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/monodevelop/bin/
-endif
 ifeq ($(DEB_HOST_ARCH), i386)
 	cp $(CURDIR)/packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-x86/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/monodevelop/bin/
 endif
