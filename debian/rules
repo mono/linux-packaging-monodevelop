@@ -39,6 +39,10 @@ override_dh_clideps:
 			--exclude-moduleref=/System/Library/Frameworks/QuartzCore.framework/QuartzCore \
 			--exclude-moduleref=/System/Library/Frameworks/ApplicationServices.framework/Versions/Current/ApplicationServices \
 
+override_dh_makeclilibs:
+	dh_makeclilibs 	-X Microsoft.Azure.Documents.ServiceInterop.dll \
+			-X DocumentDB.Spatial.Sql.dll \
+			-X msdia140.dll
 
 override_dh_auto_test:
 	# skip "make test"
