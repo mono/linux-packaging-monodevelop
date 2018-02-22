@@ -1,3 +1,9 @@
+monodevelop (7.4.0.1026-0xamarin21) preview; urgency=medium
+
+  * Packaging bugfix:
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Thu, 22 Feb 2018 05:57:30 +0000
+
 monodevelop (7.4.0.1026-0xamarin20) preview; urgency=medium
 
   * Packaging bugfix:
