@@ -1,9 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.AzureFunctions/Templates/Microsoft.AzureFunctions.ProjectTemplates.nupkg
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.AzureFunctions/Templates/Azure.Functions.Templates.nupkg
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.AzureFunctions/MonoDevelop.AzureFunctions.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.AzureFunctions/MonoDevelop.AzureFunctions.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.AzureFunctions/MonoDevelop.AzureFunctions.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.AzureFunctions/obj/Debug/MonoDevelop.AzureFunctions.csprojResolveAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.AzureFunctions/obj/Debug/MonoDevelop.AzureFunctions.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.AzureFunctions/obj/Debug/MonoDevelop.AzureFunctions.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.AzureFunctions/obj/Debug/MonoDevelop.AzureFunctions.pdb

@@ -1,8 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/bin/MSBuild/12.0/MonoDevelop.Projects.Formats.MSBuild.exe.config
-/home/directhex/Projects/monodevelop/main/build/bin/MSBuild/12.0/MonoDevelop.Projects.Formats.MSBuild.xml
-/home/directhex/Projects/monodevelop/main/build/bin/MSBuild/12.0/MonoDevelop.Projects.Formats.MSBuild.exe
-/home/directhex/Projects/monodevelop/main/build/bin/MSBuild/12.0/MonoDevelop.Projects.Formats.MSBuild.pdb
-/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/obj/12.0/x86/Debug/MonoDevelop.Projects.Formats.MSBuild.v12.0.csprojResolveAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/obj/12.0/x86/Debug/MonoDevelop.Projects.Formats.MSBuild.v12.0.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/obj/12.0/x86/Debug/MonoDevelop.Projects.Formats.MSBuild.exe
-/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Projects.Formats.MSBuild/obj/12.0/x86/Debug/MonoDevelop.Projects.Formats.MSBuild.pdb

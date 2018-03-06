@@ -1,8 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/bin/mdhost.exe.config
-/home/directhex/Projects/monodevelop/main/build/bin/mdhost.xml
-/home/directhex/Projects/monodevelop/main/build/bin/mdhost.exe
-/home/directhex/Projects/monodevelop/main/build/bin/mdhost.pdb
-/home/directhex/Projects/monodevelop/main/src/tools/mdhost/obj/x86/Debug/mdhost.csprojResolveAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/tools/mdhost/obj/x86/Debug/mdhost.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/tools/mdhost/obj/x86/Debug/mdhost.exe
-/home/directhex/Projects/monodevelop/main/src/tools/mdhost/obj/x86/Debug/mdhost.pdb

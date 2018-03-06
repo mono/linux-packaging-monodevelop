@@ -1,7 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.DesignerSupport/MonoDevelop.DesignerSupport.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DesignerSupport/obj/Debug/MonoDevelop.DesignerSupport.csprojResolveAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DesignerSupport/obj/Debug/MonoDevelop.DesignerSupport.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DesignerSupport/obj/Debug/MonoDevelop.DesignerSupport.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.DesignerSupport/obj/Debug/MonoDevelop.DesignerSupport.pdb
