@@ -1,3 +1,9 @@
+monodevelop (7.4.0.1033-0xamarin1) preview; urgency=medium
+
+  * New release - monodevelop-7.4.0.1033.tar.bz2
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Tue, 06 Mar 2018 17:40:32 +0000
+
 monodevelop (7.4.0.1026-0xamarin43nightly30) preview; urgency=medium
 
   * Packaging bugfix:
