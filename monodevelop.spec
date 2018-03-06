@@ -50,9 +50,9 @@ BuildRequires:  pkgconfig(wcf)
 BuildRequires:  rsync
 Url:            http://www.monodevelop.com/
 %define __majorver 7.4.0
-%define __minorver 1026
+%define __minorver 1033
 Version:	%{__majorver}.%{__minorver}
-Release:	0.xamarin.13
+Release:	0.xamarin.1
 Summary:        Full-Featured IDE for Mono and Gtk-Sharp
 License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
