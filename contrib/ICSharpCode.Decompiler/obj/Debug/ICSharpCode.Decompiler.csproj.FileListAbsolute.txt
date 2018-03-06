@@ -1,6 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/bin/ICSharpCode.Decompiler.dll
-/home/directhex/Projects/monodevelop/main/build/bin/ICSharpCode.Decompiler.pdb
-/home/directhex/Projects/monodevelop/main/contrib/ICSharpCode.Decompiler/obj/Debug/ICSharpCode.Decompiler.csprojResolveAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/contrib/ICSharpCode.Decompiler/obj/Debug/ICSharpCode.Decompiler.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/contrib/ICSharpCode.Decompiler/obj/Debug/ICSharpCode.Decompiler.dll
-/home/directhex/Projects/monodevelop/main/contrib/ICSharpCode.Decompiler/obj/Debug/ICSharpCode.Decompiler.pdb

@@ -1,7 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/tests/UnitTests.xml
-/home/directhex/Projects/monodevelop/main/build/tests/UnitTests.dll
-/home/directhex/Projects/monodevelop/main/build/tests/UnitTests.pdb
-/home/directhex/Projects/monodevelop/main/tests/UnitTests/obj/Debug/UnitTests.csprojResolveAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/tests/UnitTests/obj/Debug/UnitTests.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/tests/UnitTests/obj/Debug/UnitTests.dll
-/home/directhex/Projects/monodevelop/main/tests/UnitTests/obj/Debug/UnitTests.pdb

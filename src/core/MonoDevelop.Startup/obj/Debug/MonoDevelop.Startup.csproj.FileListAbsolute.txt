@@ -1,9 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.exe.addins
-/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.exe.config
-/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.xml
-/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.exe
-/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.pdb
-/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.Startup.csprojResolveAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.Startup.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.exe
-/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Startup/obj/Debug/MonoDevelop.pdb

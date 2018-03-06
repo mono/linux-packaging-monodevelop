@@ -1,7 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/MonoDevelop.GtkCore.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/MonoDevelop.GtkCore.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.GtkCore/MonoDevelop.GtkCore.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/obj/Debug/MonoDevelop.GtkCore.csprojResolveAssemblyReference.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/obj/Debug/MonoDevelop.GtkCore.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/obj/Debug/MonoDevelop.GtkCore.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.GtkCore/obj/Debug/MonoDevelop.GtkCore.pdb

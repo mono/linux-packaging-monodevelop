@@ -2633,7 +2633,7 @@ ASSEMBLY_VERSION=4.0.0.0
 # the C# side of things. It should be one of the following two formats:
 # 1) "VERSION_NUMBER"					"2.0"
 # 2) "VERSION_NUMBER BUILD_TYPE BUILD_NUMBER"		"2.0 Alpha 1"
-PACKAGE_VERSION_LABEL="7.4 Preview"
+PACKAGE_VERSION_LABEL="7.4"
 
 COMPAT_ADDIN_VERSION=7.0
 
