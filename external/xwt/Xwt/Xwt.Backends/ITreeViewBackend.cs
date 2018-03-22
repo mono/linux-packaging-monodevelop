@@ -43,9 +43,11 @@ namespace Xwt.Backends
 		void CollapseRow (TreePosition pos);
 		void ScrollToRow (TreePosition pos);
 		void ExpandToRow (TreePosition pos);
-		
+
+		bool BorderVisible { get; set; }
 		bool HeadersVisible { get; set; }
 		GridLines GridLinesVisible { get; set; }
+		bool UseAlternatingRowColors { get; set; }
 		
 		bool GetDropTargetRow (double x, double y, out RowDropPosition pos, out TreePosition nodePosition);
 

@@ -602,7 +602,7 @@ namespace MonoDevelop.VersionControl.Git
 		protected override void OnUpdate (FilePath[] localPaths, bool recurse, ProgressMonitor monitor)
 		{
 			// TODO: Make it work differently for submodules.
-			monitor.BeginTask (GettextCatalog.GetString (GettextCatalog.GetString ("Updating")), 5);
+			monitor.BeginTask (GettextCatalog.GetString ("Updating"), 5);
 
 			if (RootRepository.Head.IsTracking) {
 				Fetch (monitor, RootRepository.Head.Remote.Name);
@@ -673,6 +673,7 @@ namespace MonoDevelop.VersionControl.Git
 
 		public void Fetch (ProgressMonitor monitor, string remote)
 		{
+			monitor.BeginTask (GettextCatalog.GetString ("Fetching"), 1);
 			monitor.Log.WriteLine (GettextCatalog.GetString ("Fetching from '{0}'", remote));
 			int progress = 0;
 			RetryUntilSuccess (monitor, credType => RootRepository.Fetch (remote, new FetchOptions {
@@ -680,6 +681,7 @@ namespace MonoDevelop.VersionControl.Git
 				OnTransferProgress = tp => OnTransferProgress (tp, monitor, ref progress),
 			}));
 			monitor.Step (1);
+			monitor.EndTask ();
 		}
 
 		bool CommonPreMergeRebase (GitUpdateOptions options, ProgressMonitor monitor, out int stashIndex)

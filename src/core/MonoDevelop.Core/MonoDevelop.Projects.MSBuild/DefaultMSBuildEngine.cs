@@ -489,11 +489,14 @@ namespace MonoDevelop.Projects.MSBuild
 		static void AddRemoveToGlobInclude (ProjectInfo project, MSBuildItem item, string remove)
 		{
 			var exclude = ExcludeToRegex (remove);
-			foreach (var globInclude in project.GlobIncludes.Where (g => g.Item.Name == item.Name)) {
-				if (globInclude.RemoveRegex != null)
-					exclude = globInclude.RemoveRegex + "|" + exclude;
-				globInclude.RemoveRegex = new Regex (exclude);
-			}
+			do {
+				foreach (var globInclude in project.GlobIncludes.Where (g => g.Item.Name == item.Name)) {
+					if (globInclude.RemoveRegex != null)
+						exclude = globInclude.RemoveRegex + "|" + exclude;
+					globInclude.RemoveRegex = new Regex (exclude);
+				}
+				project = project.Parent;
+			} while (project != null);
 		}
 
 		static void RemoveEvaluatedItemFromAllProjects (ProjectInfo project, MSBuildItem item, string include, bool trueCond)
@@ -645,18 +648,18 @@ namespace MonoDevelop.Projects.MSBuild
 					items = result;
 					return true;
 				} else if (ExecuteTransformItemListFunction (ref transformItems, itemFunction, itemFunctionArgs, out ignoreMetadata)) {
-					var sb = new StringBuilder ();
+					var sb = StringBuilderCache.Allocate ();
 					for (int n = 0; n < transformItems.Length; n++) {
 						if (n > 0)
 							sb.Append (';');
 						sb.Append (transformItems[n].Include);
 					}	
-					items = sb.ToString ();
+					items = StringBuilderCache.ReturnAndFree (sb);
 					return true;
 				}
 			}
 
-			var sbi = new StringBuilder ();
+			var sbi = StringBuilderCache.Allocate ();
 
 			int count = 0;
 			foreach (var eit in transformItems) {
@@ -678,7 +681,7 @@ namespace MonoDevelop.Projects.MSBuild
 					context.ClearItemContext ();
 				}
 			}
-			items = sbi.ToString ();
+			items = Core.StringBuilderCache.ReturnAndFree (sbi);
 			return true;
 		}
 
@@ -943,7 +946,7 @@ namespace MonoDevelop.Projects.MSBuild
 		static string ExcludeToRegex (string exclude, bool excludeDirectoriesOnly = false)
 		{
 			exclude = exclude.Replace ('/', '\\').Replace (@"\\", @"\");
-			var sb = new StringBuilder ();
+			var sb = StringBuilderCache.Allocate ();
 			foreach (var ep in exclude.Split (new char [] { ';' }, StringSplitOptions.RemoveEmptyEntries)) {
 				var ex = ep.Trim ();
 				if (excludeDirectoriesOnly) {
@@ -977,7 +980,7 @@ namespace MonoDevelop.Projects.MSBuild
 				}
 				sb.Append ('$');
 			}
-            return sb.ToString ();
+			return Core.StringBuilderCache.ReturnAndFree (sb);
         }
 
 		static char [] regexEscapeChars = { '\\', '^', '$', '{', '}', '[', ']', '(', ')', '.', '*', '+', '?', '|', '<', '>', '-', '&' };
@@ -1247,13 +1250,13 @@ namespace MonoDevelop.Projects.MSBuild
 						conditionCache [condition] = ce;
 					}
 
-					if (!ce.CanEvaluateToBool (context))
-						throw new InvalidProjectFileException (String.Format ("Can not evaluate \"{0}\" to bool.", condition));
-
 					if (collectConditionedProperties)
 						ce.CollectConditionProperties (project.ConditionedProperties);
 
-					return ce.BoolEvaluate (context);
+					if (!ce.TryEvaluateToBool (context, out bool value))
+						throw new InvalidProjectFileException (String.Format ("Can not evaluate \"{0}\" to bool.", condition));
+
+					return value;
 				} catch (ExpressionParseException epe) {
 					throw new InvalidProjectFileException (
 						String.Format ("Unable to parse condition \"{0}\" : {1}", condition, epe.Message),

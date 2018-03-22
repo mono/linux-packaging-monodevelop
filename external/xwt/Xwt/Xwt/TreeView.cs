@@ -125,7 +125,17 @@ namespace Xwt
 		ITreeViewBackend Backend {
 			get { return (ITreeViewBackend) BackendHost.Backend; }
 		}
-		
+
+		public bool BorderVisible {
+			get { return Backend.BorderVisible; }
+			set { Backend.BorderVisible = value; }
+		}
+
+		public bool UseAlternatingRowColors {
+			get { return Backend.UseAlternatingRowColors; }
+			set { Backend.UseAlternatingRowColors = value; }
+		}
+
 		public ScrollPolicy VerticalScrollPolicy {
 			get { return Backend.VerticalScrollPolicy; }
 			set { Backend.VerticalScrollPolicy = value; }

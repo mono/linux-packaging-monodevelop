@@ -236,7 +236,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 TARBALL_PATH = ../../tarballs/external
-XAMMAC_PATH = /Library/Frameworks/Xamarin.Mac.framework/Versions/Current/lib
+XAMMAC_PATH = /Library/Frameworks/Xamarin.Mac.framework/Versions/Current
+XAMMAC_LIB_PATH = $(XAMMAC_PATH)/lib
+XAMMAC_PDB = $(XAMMAC_LIB_PATH)/@MAC_ARCHITECTURE@/full/Xamarin.Mac.pdb
 all: all-am
 
 .SUFFIXES:
@@ -390,17 +392,21 @@ all:
 
 clean:
 
-@ENABLE_MACPLATFORM_TRUE@all: Xamarin.Mac.dll Xamarin.Mac.registrar.full.a libxammac.dylib
+@ENABLE_MACPLATFORM_TRUE@all: Xamarin.Mac.dll Xamarin.Mac.registrar.full.a libxammac.dylib Xamarin.Mac.buildinfo
 @ENABLE_MACPLATFORM_TRUE@	$(MAKE) -C monomac/src
 
-@ENABLE_MACPLATFORM_TRUE@Xamarin.Mac.dll: $(XAMMAC_PATH)/@MAC_ARCHITECTURE@/full/Xamarin.Mac.dll
+@ENABLE_MACPLATFORM_TRUE@Xamarin.Mac.dll: $(XAMMAC_LIB_PATH)/@MAC_ARCHITECTURE@/full/Xamarin.Mac.dll
 @ENABLE_MACPLATFORM_TRUE@	cp -p $< $@
-@ENABLE_MACPLATFORM_TRUE@	cp -p $<.mdb $@.mdb
+@ENABLE_MACPLATFORM_TRUE@	if [[ -f $<.mdb ]]; then cp -p $<.mdb $@.mdb; fi;
+@ENABLE_MACPLATFORM_TRUE@	if [[ -f $(XAMMAC_PDB) ]]; then cp -p $(XAMMAC_PDB) Xamarin.Mac.pdb; fi;
 
-@ENABLE_MACPLATFORM_TRUE@Xamarin.Mac.registrar.full.a: $(XAMMAC_PATH)/mmp/Xamarin.Mac.registrar.full.a
+@ENABLE_MACPLATFORM_TRUE@Xamarin.Mac.registrar.full.a: $(XAMMAC_LIB_PATH)/mmp/Xamarin.Mac.registrar.full.a
 @ENABLE_MACPLATFORM_TRUE@	cp -p $< $@
 
-@ENABLE_MACPLATFORM_TRUE@libxammac.dylib: $(XAMMAC_PATH)/libxammac.dylib
+@ENABLE_MACPLATFORM_TRUE@libxammac.dylib: $(XAMMAC_LIB_PATH)/libxammac.dylib
+@ENABLE_MACPLATFORM_TRUE@	cp -p $< $@
+
+@ENABLE_MACPLATFORM_TRUE@Xamarin.Mac.buildinfo: $(XAMMAC_PATH)/buildinfo
 @ENABLE_MACPLATFORM_TRUE@	cp -p $< $@
 
 @ENABLE_MACPLATFORM_TRUE@clean:
