@@ -95,7 +95,7 @@ a port of SharpDevelop 0.98.
 This package contains development files for the IDE and plugins.
 
 %prep
-%setup -q -n monodevelop-7.4
+%setup -q -n monodevelop-7.5
 
 %build
 %{?env_options}
