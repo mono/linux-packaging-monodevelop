@@ -132,7 +132,7 @@ COMPAT_ADDIN_VERSION = 7.0
 CSC = /usr/bin/dmcs
 CSC_FLAGS = -debug -codepage:utf8
 CYGPATH_W = echo
-DEFS = -DPACKAGE_NAME=\"monodevelop\" -DPACKAGE_TARNAME=\"monodevelop\" -DPACKAGE_VERSION=\"7.4\" -DPACKAGE_STRING=\"monodevelop\ 7.4\" -DPACKAGE_BUGREPORT=\"monodevelop-list@lists.ximian.com\" -DPACKAGE_URL=\"\" -DPACKAGE=\"monodevelop\" -DVERSION=\"7.4\" -DGETTEXT_PACKAGE=\"monodevelop\"
+DEFS = -DPACKAGE_NAME=\"monodevelop\" -DPACKAGE_TARNAME=\"monodevelop\" -DPACKAGE_VERSION=\"7.5\" -DPACKAGE_STRING=\"monodevelop\ 7.5\" -DPACKAGE_BUGREPORT=\"monodevelop-list@lists.ximian.com\" -DPACKAGE_URL=\"\" -DPACKAGE=\"monodevelop\" -DVERSION=\"7.5\" -DGETTEXT_PACKAGE=\"monodevelop\"
 ECHO_C = 
 ECHO_N = -n
 ECHO_T = 
@@ -175,11 +175,11 @@ MSGMERGE = /usr/bin/msgmerge
 PACKAGE = monodevelop
 PACKAGE_BUGREPORT = monodevelop-list@lists.ximian.com
 PACKAGE_NAME = monodevelop
-PACKAGE_STRING = monodevelop 7.4
+PACKAGE_STRING = monodevelop 7.5
 PACKAGE_TARNAME = monodevelop
 PACKAGE_URL = 
-PACKAGE_VERSION = 7.4
-PACKAGE_VERSION_LABEL = 7.4
+PACKAGE_VERSION = 7.5
+PACKAGE_VERSION_LABEL = 7.5 Preview
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
@@ -194,7 +194,7 @@ UNMANAGED_DEPENDENCIES_MONO_CFLAGS =
 UNMANAGED_DEPENDENCIES_MONO_LIBS = 
 UPDATE_DESKTOP_DB = 
 UPDATE_MIME_DB = /usr/bin/update-mime-database
-VERSION = 7.4
+VERSION = 7.5
 abs_builddir = /home/directhex/Projects/monodevelop/main/po
 abs_srcdir = /home/directhex/Projects/monodevelop/main/po
 abs_top_builddir = /home/directhex/Projects/monodevelop/main
@@ -495,12 +495,14 @@ print_extradist:
 
 .PHONY: all clean csproj_build csproj_clean sln_build sln_clean
 
-all: $(GMO_FILES) post-strip-mnemonics
+all: | strip-mnemonics update-locale post-strip-mnemonics
+
+update-locale: $(GMO_FILES)
 
 update-po:
 	$(MDTOOL_RUN) gettext-update --sort -f:$(top_srcdir)/Main.sln
 
-$(GMO_FILES): $(LC_BUILD)/%/LC_MESSAGES/$(PACKAGE).mo: %.po strip-mnemonics
+$(GMO_FILES): $(LC_BUILD)/%/LC_MESSAGES/$(PACKAGE).mo: %.po
 	$(MKDIR_P) $(dir $@)
 	msgfmt '$<' -o '$@'
 

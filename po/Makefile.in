@@ -495,12 +495,14 @@ print_extradist:
 
 .PHONY: all clean csproj_build csproj_clean sln_build sln_clean
 
-all: $(GMO_FILES) post-strip-mnemonics
+all: | strip-mnemonics update-locale post-strip-mnemonics
+
+update-locale: $(GMO_FILES)
 
 update-po:
 	$(MDTOOL_RUN) gettext-update --sort -f:$(top_srcdir)/Main.sln
 
-$(GMO_FILES): $(LC_BUILD)/%/LC_MESSAGES/$(PACKAGE).mo: %.po strip-mnemonics
+$(GMO_FILES): $(LC_BUILD)/%/LC_MESSAGES/$(PACKAGE).mo: %.po
 	$(MKDIR_P) $(dir $@)
 	msgfmt '$<' -o '$@'
 

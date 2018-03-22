@@ -394,5 +394,13 @@ namespace MonoDevelop.Ide
 		{
 			PlatformService.RestartIde (reopenWorkspace);
 		}
+
+		public static bool AccessibilityInUse {
+			get {
+				return PlatformService.AccessibilityInUse;
+			}
+		}
+
+		internal static string GetNativeRuntimeDescription () => PlatformService.GetNativeRuntimeDescription ();
 	}
 }

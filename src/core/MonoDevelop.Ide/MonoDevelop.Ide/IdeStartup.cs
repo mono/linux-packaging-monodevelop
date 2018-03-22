@@ -96,6 +96,9 @@ namespace MonoDevelop.Ide
 				return 1;
 			SetupExceptionManager ();
 
+			// explicit GLib type system initialization for GLib < 2.36 before any other type system access
+			GLib.GType.Init ();
+
 			IdeApp.Customizer = options.IdeCustomizer ?? new IdeCustomizer ();
 			try {
 				IdeApp.Customizer.Initialize ();
@@ -240,7 +243,7 @@ namespace MonoDevelop.Ide
 				// load previous combine
 				RecentFile openedProject = null;
 				if (IdeApp.Preferences.LoadPrevSolutionOnStartup && !startupInfo.HasSolutionFile && !IdeApp.Workspace.WorkspaceItemIsOpening && !IdeApp.Workspace.IsOpen) {
-					openedProject = DesktopService.RecentFiles.GetProjects ().FirstOrDefault ();
+					openedProject = DesktopService.RecentFiles.MostRecentlyUsedProject;
 					if (openedProject != null) {
 						var metadata = GetOpenWorkspaceOnStartupMetadata ();
 						IdeApp.Workspace.OpenWorkspaceItem (openedProject.FileName, true, true, metadata).ContinueWith (t => IdeApp.OpenFiles (startupInfo.RequestedFileList, metadata), TaskScheduler.FromCurrentSynchronizationContext ());

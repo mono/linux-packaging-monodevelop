@@ -37,6 +37,7 @@ using MonoDevelop.Ide.Gui;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace MonoDevelop.Ide
 {
@@ -46,11 +47,85 @@ namespace MonoDevelop.Ide
 
 		class GtkSynchronizationContext: SynchronizationContext
 		{
+			[UnmanagedFunctionPointer (CallingConvention.Cdecl)]
+			internal delegate bool GSourceFuncInternal (IntPtr ptr);
+
+			internal class TimeoutProxy
+			{
+				internal SendOrPostCallback d;
+				object state;
+				ManualResetEventSlim resetEvent;
+
+				public TimeoutProxy (SendOrPostCallback d, object state) : this (d, state, null)
+				{
+				}
+
+				public TimeoutProxy (SendOrPostCallback d, object state, ManualResetEventSlim lockObject)
+				{
+					this.d = d;
+					this.state = state;
+					this.resetEvent = lockObject;
+				}
+
+				internal static readonly GSourceFuncInternal SourceHandler = HandlerInternal;
+
+				static bool HandlerInternal (IntPtr data)
+				{
+					var proxy = (TimeoutProxy)((GCHandle)data).Target;
+
+					try {
+						proxy.d (proxy.state);
+					} catch (Exception e) {
+						GLib.ExceptionManager.RaiseUnhandledException (e, false);
+					} finally {
+						proxy.resetEvent?.Set ();
+					}
+					return false;
+				}
+			}
+
+			const int defaultPriority = 0;
+
+			[DllImport ("libglib-2.0-0.dll", CallingConvention = CallingConvention.Cdecl)]
+			static extern uint g_timeout_add_full (int priority, uint interval, GSourceFuncInternal d, IntPtr data, GLib.DestroyNotify notify);
+
+			class ExceptionWithStackTraceWithoutThrowing : Exception
+			{
+				readonly string stacktrace;
+
+				public ExceptionWithStackTraceWithoutThrowing (string message) : base (message)
+				{
+					stacktrace = Environment.StackTrace;
+				}
+
+				public override string StackTrace => stacktrace;
+			}
+
+			static void AddTimeout (TimeoutProxy proxy)
+			{
+				if (proxy.d == null) {
+					// Create an exception without throwing it, as throwing is expensive and these exceptions can be
+					// hit a lot of times.
+
+					const string exceptionMessage = "Unexpected null delegate sent to synchronization context";
+					LoggingService.LogInternalError (exceptionMessage,
+					                                 new ExceptionWithStackTraceWithoutThrowing (exceptionMessage));
+
+					// Return here without queueing the UI operation. Async calls which await on the given callback
+					// will continue immediately, but at least we won't crash.
+					// Having a null continuation won't do anything anyway.
+					return;
+				}
+
+				var gch = GCHandle.Alloc (proxy);
+
+				g_timeout_add_full (defaultPriority, 0, TimeoutProxy.SourceHandler, (IntPtr)gch, GLib.DestroyHelper.NotifyHandler);
+			}
+
 			public override void Post (SendOrPostCallback d, object state)
 			{
-				Gtk.Application.Invoke ((o, args) => {
-					d (state);
-				});
+				var proxy = new TimeoutProxy (d, state);
+				AddTimeout (proxy);
 			}
 
 			public override void Send (SendOrPostCallback d, object state)
@@ -59,16 +134,12 @@ namespace MonoDevelop.Ide
 					d (state);
 					return;
 				}
-				var ob = new object ();
-				lock (ob) {
-					Gtk.Application.Invoke ((o, args) => {
-						try {
-							d (state);
-						} finally {
-							Monitor.Pulse (ob);
-						}
-					});
-					Monitor.Wait (ob);
+
+				using (var ob = new ManualResetEventSlim (false)) {
+					var proxy = new TimeoutProxy (d, state, ob);
+
+					AddTimeout (proxy);
+					ob.Wait ();
 				}
 			}
 
