@@ -394,7 +394,7 @@ EXTRA_DIST = $(bin_SCRIPTS) $(desktop_DATA) $(appdata_DATA) $(pixmap_DATA) \
 	Main.sln MonoDevelop.props Directory.Build.props \
 	md.targets
 
-SUBDIRS = external . contrib src po man theme-icons msbuild build tests
+SUBDIRS = external . src po man theme-icons msbuild build tests
 MD_CONFIGURE = $(top_srcdir)/../scripts/configure.sh
 
 #capture aclocal flags for autoreconf
