@@ -1,0 +1,6 @@
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.WebReferences/MonoDevelop.WebReferences.xml
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.WebReferences/MonoDevelop.WebReferences.dll
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.WebReferences/MonoDevelop.WebReferences.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.dll
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.WebReferences/obj/Debug/MonoDevelop.WebReferences.pdb
