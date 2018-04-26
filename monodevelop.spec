@@ -32,6 +32,8 @@ BuildRequires:  msbuild
 BuildRequires:  libmonosgen-2_0-1
 BuildRequires:  libmono-2_0-1
 BuildRequires:  libssh2-devel
+BuildRequires:  libcurl-devel
+BuildRequires:  openssl-devel
 BuildRequires:  fdupes
 BuildRequires:  git
 BuildRequires:  hicolor-icon-theme
