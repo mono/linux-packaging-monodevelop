@@ -22,9 +22,12 @@ Build-Depends: debhelper (>= 7.0.50),
                libglade2.0-cil-dev,
                libgtkspell-dev,
                libsvn-dev,
+               libcurl4-gnutls-dev,
+               libssl-dev (<< 1.1) | libssl1.0-dev,
                mono-devel (>= 5.8~),
                msbuild,
                monodoc-base (>= 1.1.9)
+Build-Conflicts: libssl-dev (>= 1.1)
 Standards-Version: 3.9.2
 Homepage: http://www.monodevelop.com/
 Vcs-Git: git://git.debian.org/pkg-cli-apps/packages/monodevelop.git
