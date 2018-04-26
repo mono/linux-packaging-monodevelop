@@ -1,0 +1,7 @@
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.xml
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.dll
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.csprojResolveAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.dll
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.Debugger.Soft/MonoDevelop.Debugger.Soft/obj/Debug/MonoDevelop.Debugger.Soft.pdb

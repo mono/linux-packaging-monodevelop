@@ -1,0 +1,7 @@
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDeveloperExtensions/MonoDeveloperExtensions_nunit.xml
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDeveloperExtensions/MonoDeveloperExtensions_nunit.dll
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDeveloperExtensions/MonoDeveloperExtensions_nunit.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDeveloperExtensions/NUnit/obj/Debug/NUnit.csprojResolveAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDeveloperExtensions/NUnit/obj/Debug/NUnit.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDeveloperExtensions/NUnit/obj/Debug/MonoDeveloperExtensions_nunit.dll
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDeveloperExtensions/NUnit/obj/Debug/MonoDeveloperExtensions_nunit.pdb

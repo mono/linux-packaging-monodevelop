@@ -1,0 +1,7 @@
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.UnitTesting/NUnit3/NUnitRunner.xml
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.UnitTesting/NUnit3/NUnitRunner.exe
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.UnitTesting/NUnit3/NUnitRunner.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.UnitTesting.NUnit/NUnit3Runner/obj/Debug/NUnit3Runner.csprojResolveAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.UnitTesting.NUnit/NUnit3Runner/obj/Debug/NUnit3Runner.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.UnitTesting.NUnit/NUnit3Runner/obj/Debug/NUnitRunner.exe
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.UnitTesting.NUnit/NUnit3Runner/obj/Debug/NUnitRunner.pdb

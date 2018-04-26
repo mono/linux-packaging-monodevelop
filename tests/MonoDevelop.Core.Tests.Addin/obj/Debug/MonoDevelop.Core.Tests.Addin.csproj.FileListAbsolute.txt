@@ -1,0 +1,5 @@
+/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Core.Tests.Addin.dll
+/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.Core.Tests.Addin.pdb
+/home/directhex/Projects/monodevelop/main/tests/MonoDevelop.Core.Tests.Addin/obj/Debug/MonoDevelop.Core.Tests.Addin.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/tests/MonoDevelop.Core.Tests.Addin/obj/Debug/MonoDevelop.Core.Tests.Addin.dll
+/home/directhex/Projects/monodevelop/main/tests/MonoDevelop.Core.Tests.Addin/obj/Debug/MonoDevelop.Core.Tests.Addin.pdb
