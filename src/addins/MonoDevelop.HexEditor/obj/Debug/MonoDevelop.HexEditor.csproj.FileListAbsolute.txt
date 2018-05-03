@@ -1,6 +1,0 @@
-/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/HexEditor/MonoDevelop.HexEditor.xml
-/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/HexEditor/MonoDevelop.HexEditor.dll
-/home/directhex/Projects/monodevelop/main/build/AddIns/DisplayBindings/HexEditor/MonoDevelop.HexEditor.pdb
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MonoDevelop.HexEditor.csproj.CoreCompileInputs.cache
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MonoDevelop.HexEditor.dll
-/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.HexEditor/obj/Debug/MonoDevelop.HexEditor.pdb
