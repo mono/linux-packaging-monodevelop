@@ -1,3 +1,9 @@
+monodevelop (7.5.0.1244-0xamarin2) preview; urgency=medium
+
+  * Packaging bugfix:
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Fri, 04 May 2018 14:39:57 +0000
+
 monodevelop (7.5.0.1244-0xamarin1) preview; urgency=medium
 
   * New release - monodevelop-7.5.0.1244.tar.bz2
