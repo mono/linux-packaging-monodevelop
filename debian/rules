@@ -84,6 +84,9 @@ endif
 ifeq ($(DEB_HOST_ARCH), armhf)
 	cp $(CURDIR)/packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-arm/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/monodevelop/bin/
 endif
+ifeq ($(DEB_HOST_ARCH), arm64)
+	cp $(CURDIR)/packages/SQLitePCLRaw.lib.e_sqlite3.linux.*/runtimes/linux-arm64/native/libe_sqlite3.so $(CURDIR)/debian/tmp/usr/lib/monodevelop/bin/
+endif
 	# fix permissions of .mo files
 	cd $(CURDIR)/debian/tmp/usr/share/locale && find -name "*.mo" -exec chmod -x {} \;
 
