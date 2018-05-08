@@ -60,8 +60,7 @@ namespace MonoDevelop.Projects.MSBuild
 		public const string GenericItemGuid = "{9344BDBB-3E7F-41FC-A0DD-8665D75EE146}";
 		public const string FolderTypeGuid = "{2150E333-8FDC-42A3-9474-1A3956D46DE8}";
 
-		//NOTE: default toolsversion should match the default format.
-		// remember to update the builder process' app.config too
+		[Obsolete ("This no longer has any purpose")]
 		public const string DefaultFormat = "MSBuild12";
 
 		static DataContext dataContext;
@@ -560,17 +559,19 @@ namespace MonoDevelop.Projects.MSBuild
 			return copy ?? types;
 		}
 
-		internal static MSBuildSupport GetMSBuildSupportForFlavors (IEnumerable<string> flavorGuids)
+		internal static bool GetMSBuildSupportForFlavors (IEnumerable<string> flavorGuids)
 		{
+			#pragma warning disable 612
 			foreach (var fid in flavorGuids) {
 				var node = WorkspaceObject.GetModelExtensions (null).OfType<SolutionItemExtensionNode> ().FirstOrDefault (n => n.Guid != null && n.Guid.Equals (fid, StringComparison.InvariantCultureIgnoreCase));
 				if (node != null) {
-					if (node.MSBuildSupport != MSBuildSupport.Supported)
-						return node.MSBuildSupport;
+					if (node.MSBuildSupport == MSBuildSupport.NotSupported)
+						return false;
 				} else if (!IsKnownTypeGuid (fid))
 					throw new UnknownSolutionItemTypeException (fid);
 			}
-			return MSBuildSupport.Supported;
+			return true;
+			#pragma warning restore 612
 		}
 
 		internal static List<SolutionItemExtensionNode> GetMigrableFlavors (string[] flavorGuids)
@@ -700,15 +701,10 @@ namespace MonoDevelop.Projects.MSBuild
 			return null;
 		}
 
+		[Obsolete]
 		public static void CheckHandlerUsesMSBuildEngine (SolutionFolderItem item, out bool useByDefault, out bool require)
 		{
-			var handler = item as Project;
-			if (handler == null) {
-				useByDefault = require = false;
-				return;
-			}
-			useByDefault = handler.MSBuildEngineSupport.HasFlag (MSBuildSupport.Supported);
-			require = handler.MSBuildEngineSupport.HasFlag (MSBuildSupport.Required);
+			useByDefault = require = item is Project proj && proj.MSBuildProject.UseMSBuildEngine;
 		}
 
 		static IEnumerable<SolutionItemTypeNode> GetItemTypeNodes ()
@@ -763,19 +759,21 @@ namespace MonoDevelop.Projects.MSBuild
 			return GenericItemGuid;
 		}
 
-		internal static MSBuildSupport GetMSBuildSupportForProject (Project project)
+		internal static bool UseMSBuildEngineForProject (Project project)
 		{
-			if (project is UnknownProject)
-				return MSBuildSupport.NotSupported;
+			#pragma warning disable 612
+			if (project is UnknownProject || project is GenericProject)
+				return false;
 			
 			foreach (var node in GetItemTypeNodes ().OfType<ProjectTypeNode> ()) {
 				if (node.Guid.Equals (project.TypeGuid, StringComparison.OrdinalIgnoreCase)) {
 					if (node.MSBuildSupport != MSBuildSupport.Supported)
-						return node.MSBuildSupport;
+						return false;
 					return GetMSBuildSupportForFlavors (project.FlavorGuids);
 				}
 			}
-			return MSBuildSupport.NotSupported;
+			return false;
+			#pragma warning restore 612
 		}
 
 		public static void RegisterGenericProjectType (string projectId, Type type)
@@ -1219,7 +1217,9 @@ namespace MonoDevelop.Projects.MSBuild
 		{
 			Guid = MSBuildProjectService.GenericItemGuid;
 			Extension = "mdproj";
+			#pragma warning disable 612
 			MSBuildSupport = MSBuildSupport.NotSupported;
+			#pragma warning restore 612
 			TypeAlias = "GenericProject";
 		}
 

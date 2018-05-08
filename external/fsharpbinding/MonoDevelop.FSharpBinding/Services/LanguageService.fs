@@ -484,7 +484,7 @@ type LanguageService(dirtyNotify, _extraProjectInfo) as x =
                             return Some(result)
                         with
                         | :? System.TimeoutException ->
-                            LoggingService.logDebug "LanguageService: GetTypedParseResultWithTimeout: No stale results - typechecking with timeout - timeout exception occured"
+                            LoggingService.logDebug "LanguageService: GetTypedParseResultWithTimeout: No stale results - typechecking with timeout - timeout exception occurred"
                             return None
                     | None ->
                           LoggingService.logDebug "LanguageService: GetTypedParseResultWithTimeout: No stale results - typechecking without timeout"
@@ -552,9 +552,9 @@ type LanguageService(dirtyNotify, _extraProjectInfo) as x =
                         let isOverrideOrDefault = mfv.IsOverrideOrExplicitInterfaceImplementation
                         let baseTypeMatch() =
                             maybe {
-                                let! ent = mfv.EnclosingEntity
+                                let! ent = mfv.DeclaringEntity
                                 let! bt = ent.BaseType
-                                let! carentEncEnt = caretmfv.EnclosingEntity
+                                let! carentEncEnt = caretmfv.DeclaringEntity
                                 return carentEncEnt.IsEffectivelySameAs bt.TypeDefinition }
 
                         let nameMatch = mfv.DisplayName = caretmfv.DisplayName
@@ -623,7 +623,7 @@ type LanguageService(dirtyNotify, _extraProjectInfo) as x =
 
         let isAnExtensionMethod (mfv:FSharpMemberOrFunctionOrValue) (parentEntity:FSharpSymbol) =
             let isExt = mfv.IsExtensionMember
-            let extslogicalEntity = mfv.LogicalEnclosingEntity
+            let extslogicalEntity = mfv.ApparentEnclosingEntity
             let sameLogicalParent = parentEntity.IsEffectivelySameAs extslogicalEntity
             isExt && sameLogicalParent
 

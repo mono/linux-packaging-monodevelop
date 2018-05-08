@@ -62,6 +62,9 @@ namespace Mono.TextEditor
 		protected ActionMargin     actionMargin;
 		protected GutterMargin     gutterMargin;
 		protected FoldMarkerMargin foldMarkerMargin;
+
+		internal MdTextViewLineCollection TextViewLines { get; set; }
+
 		protected TextViewMargin   textViewMargin;
 
 		DocumentLine longestLine      = null;
@@ -190,7 +193,7 @@ namespace Mono.TextEditor
 					try {
 						textEditorData.HeightTree.SetLineHeight (lineNumber, GetLineHeight (e.Line));
 					} catch (Exception ex) {
-						Console.WriteLine (ex);
+						LoggingService.LogError ("HandleTextEditorDataDocumentMarkerChange error", ex);
 					}
 				}
 			}
@@ -241,7 +244,13 @@ namespace Mono.TextEditor
 			double delta = value - this.oldVadjustment;
 			oldVadjustment = value;
 			TextViewMargin.caretY -= delta;
-			
+
+			int startLine = YToLine (this.textEditorData.VAdjustment.Value);
+			TextViewLines?.RemoveLinesBefore (startLine);
+
+			int endlLine = YToLine (this.textEditorData.VAdjustment.Value + Allocation.Height);
+			TextViewLines?.RemoveLinesAfter (endlLine);
+
 			if (System.Math.Abs (delta) >= Allocation.Height - this.LineHeight * 2 || this.TextViewMargin.InSelectionDrag) {
 				this.QueueDraw ();
 				OnVScroll (EventArgs.Empty);
@@ -452,7 +461,7 @@ namespace Mono.TextEditor
 			try {
 				action (GetTextEditorData ());
 			} catch (Exception e) {
-				Console.WriteLine ("Error while executing " + action + " :" + e);
+				LoggingService.LogError ("Error while executing " + action, e);
 			}
 		}
 
@@ -680,7 +689,7 @@ namespace Mono.TextEditor
 		{
 			CommitString (ca.Str);
 		}
-
+		
 		enum FocusMargin {
 			None,
 			Icon,
@@ -1669,8 +1678,6 @@ namespace Mono.TextEditor
 			mx = x - textViewMargin.XOffset;
 			my = y;
 
-			ShowTooltip (state);
-
 			double startPos;
 			Margin margin;
 			if (textViewMargin.InSelectionDrag) {
@@ -1689,14 +1696,21 @@ namespace Mono.TextEditor
 				}
 			}
 
+			var location = textViewMargin.PointToLocation (x - startPos, y, snapCharacters: true);
 			if (oldMargin != margin && oldMargin != null)
 				oldMargin.MouseLeft ();
-			
-			if (margin != null) 
-				margin.MouseHover (new MarginMouseEventArgs (textEditorData.Parent, EventType.MotionNotify,
-					mouseButtonPressed, x - startPos, y, state));
+
+			ShowTooltip (state, location);
+			if (margin != null) {
+				var args = new MarginMouseEventArgs (textEditorData.Parent, EventType.MotionNotify,
+				                                     mouseButtonPressed, x - startPos, y, state);
+				args.Location = location;
+				margin.MouseHover (args);
+			}
+			MouseHover?.Invoke (this, new MarginEventArgs (margin));
 			oldMargin = margin;
 		}
+		internal event EventHandler<MarginEventArgs> MouseHover;
 
 		#region CustomDrag (for getting dnd data from toolbox items for example)
 		string     customText;
@@ -1732,8 +1746,11 @@ namespace Mono.TextEditor
 		{
 			IsMouseTrapped = false;
 			if (tipWindow != null && currentTooltipProvider != null) {
-				if (!currentTooltipProvider.IsInteractive (textEditorData.Parent, tipWindow))
+				if (!currentTooltipProvider.IsInteractive (textEditorData.Parent, tipWindow)) {
 					DelayedHideTooltip ();
+				} else {
+					currentTooltipProvider.TakeMouseControl (textEditorData.Parent, tipWindow);
+				}
 			} else {
 				HideTooltip ();
 			}
@@ -1743,9 +1760,11 @@ namespace Mono.TextEditor
 				SetCursor (null);
 			if (oldMargin != null)
 				oldMargin.MouseLeft ();
-			
+			MouseLeft?.Invoke (this, EventArgs.Empty);
 			return base.OnLeaveNotifyEvent (e); 
 		}
+
+		internal event EventHandler MouseLeft;
 
 		public double LineHeight {
 			get {
@@ -2183,7 +2202,7 @@ namespace Mono.TextEditor
 					if (wrapper.IsUncached)
 						wrapper.Dispose ();
 				}
-
+				TextViewLines?.Add (logicalLineNumber, line);
 				double lineHeight = GetLineHeight (line);
 				foreach (var margin in this.margins) {
 					if (!margin.IsVisible)
@@ -2191,7 +2210,7 @@ namespace Mono.TextEditor
 					try {
 						margin.Draw (margin == textViewMargin ? textViewCr : cr, cairoRectangle, line, logicalLineNumber, margin.XOffset, curY, lineHeight);
 					} catch (Exception e) {
-						System.Console.WriteLine (e);
+						LoggingService.LogError ("Error while drawing margin " + margin, e);
 					}
 				}
 				// take the line real render width from the text view margin rendering (a line can consist of more than 
@@ -3077,7 +3096,7 @@ namespace Mono.TextEditor
 	
 		#region Tooltips
 		// Tooltip fields
-		const int TooltipTimeout = 650;
+		const int TooltipTimeout = 200;
 		TooltipItem tipItem;
 		
 		int tipX, tipY, tipOffset;
@@ -3092,28 +3111,27 @@ namespace Mono.TextEditor
 		Gdk.ModifierType nextTipModifierState = ModifierType.None;
 		DateTime nextTipScheduledTime; // Time at which we want the tooltip to show
 		
-		void ShowTooltip (Gdk.ModifierType modifierState)
+		void ShowTooltip (Gdk.ModifierType modifierState, DocumentLocation location)
 		{
 			if (mx < TextViewMargin.TextStartPosition) {
 				HideTooltip ();
 				return;
 			}
 
-			var loc = PointToLocation (mx, my, true);
-			if (loc.IsEmpty) {
+			if (location.IsEmpty) {
 				HideTooltip ();
 				return;
 			}
 
 			// Hide editor tooltips for text marker extended regions (message bubbles)
-			double y = LineToY (loc.Line);
+			double y = LineToY (location.Line);
 			if (y + LineHeight < my) {
 				HideTooltip ();
 				return;
 			}
 			
 			ShowTooltip (modifierState, 
-			             Document.LocationToOffset (loc),
+			             Document.LocationToOffset (location),
 			             (int)mx,
 			             (int)my);
 		}
@@ -3175,8 +3193,7 @@ namespace Mono.TextEditor
 					item = await tp.GetItem (editor, nextTipOffset, token);
 				} catch (OperationCanceledException) {
 				} catch (Exception e) {
-					System.Console.WriteLine ("Exception in tooltip provider " + tp + " GetItem:");
-					System.Console.WriteLine (e);
+					LoggingService.LogError ("Exception in tooltip provider " + tp + " GetItem:", e);
 				}
 				if (token.IsCancellationRequested) {
 					return;
@@ -3203,8 +3220,7 @@ namespace Mono.TextEditor
 					if (tw != null)
 						provider.ShowTooltipWindow (editor, tw, nextTipOffset, nextTipModifierState, tipX + (int) TextViewMargin.XOffset, tipY, item);
 				} catch (Exception e) {
-					Console.WriteLine ("-------- Exception while creating tooltip: " + provider);
-					Console.WriteLine (e);
+					LoggingService.LogError ("-------- Exception while creating tooltip: " + provider, e);
 				}
 				if (tw == tipWindow)
 					return;

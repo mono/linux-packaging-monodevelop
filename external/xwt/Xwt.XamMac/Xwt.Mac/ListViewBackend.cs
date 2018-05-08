@@ -61,9 +61,10 @@ namespace Xwt.Mac
 			public override NSView GetViewForItem (NSTableView tableView, NSTableColumn tableColumn, nint row)
 			{
 				var col = tableColumn as TableColumn;
-				var cell = tableView.MakeView (tableColumn.Identifier, this);
+				var cell = tableView.MakeView (tableColumn.Identifier, this) as CompositeCell;
 				if (cell == null)
 					cell = col.CreateNewView ();
+				cell.ObjectValue = NSNumber.FromNInt (row);
 				return cell;
 			}
 
@@ -84,6 +85,11 @@ namespace Xwt.Mac
 				}
 				return width;
 			}
+
+			public override NSIndexSet GetSelectionIndexes(NSTableView tableView, NSIndexSet proposedSelectionIndexes)
+			{
+				return Backend.SelectionMode != SelectionMode.None ? proposedSelectionIndexes : new NSIndexSet();
+			}
 		}
 
 		IListDataSource source;
@@ -91,7 +97,7 @@ namespace Xwt.Mac
 
 		protected override NSTableView CreateView ()
 		{
-			var listView = new NSTableViewBackend (EventSink, ApplicationContext);
+			var listView = new NSTableViewBackend (this);
 			listView.Delegate = new ListDelegate { Backend = this };
 			return listView;
 		}
@@ -163,6 +169,11 @@ namespace Xwt.Mac
 			};
 			source.RowsReordered += (sender, e) => { RowHeights.Clear (); Table.ReloadData (); };
 		}
+
+		public override void InvalidateRowHeight (object pos)
+		{
+			UpdateRowHeight((int)pos);
+		}
 		
 		List<nfloat> RowHeights = new List<nfloat> ();
 		bool updatingRowHeight;
@@ -181,12 +192,12 @@ namespace Xwt.Mac
 
 			for (int i = 0; i < Columns.Count; i++) {
 				CompositeCell cell = tryReuse ? Table.GetView (i, row, false) as CompositeCell : null;
-				if (cell == null)
+				if (cell == null) {
 					cell = (Columns [i] as TableColumn)?.DataView as CompositeCell;
-
-				if (cell != null) {
 					cell.ObjectValue = NSNumber.FromNInt (row);
 					height = (nfloat)Math.Max (height, cell.FittingSize.Height);
+				} else {
+					height = (nfloat)Math.Max (height, cell.GetRequiredHeightForWidth (cell.Frame.Width));
 				}
 			}
 			updatingRowHeight = false;

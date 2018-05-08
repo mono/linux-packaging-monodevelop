@@ -135,7 +135,6 @@ namespace Xwt.GtkBackend
 			}
 			set {
 				if (widget.Accessible is AtkValue) {
-					GLib.Value val = GLib.Value.Empty;
 					(widget.Accessible as AtkValue)?.SetCurrentValue (new GLib.Value (value));
 				} else if (widget.Accessible is AtkEditableText) {
 					var atkText = (widget.Accessible as AtkEditableText);
@@ -155,6 +154,21 @@ namespace Xwt.GtkBackend
 				//if (widget.Accessible != null)
 				//	return widget.Accessible.Role = Atk.Role.Invalid;
 			}
+		}
+
+		public virtual void AddChild (object nativeChild)
+		{
+			// TODO
+		}
+
+		public virtual void RemoveChild (object nativeChild)
+		{
+			// TODO
+		}
+
+		public virtual void RemoveAllChildren ()
+		{
+			// TODO
 		}
 
 		public void DisableEvent (object eventId)

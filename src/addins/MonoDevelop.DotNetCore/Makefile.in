@@ -304,7 +304,7 @@ MAIN_SLN = $(top_builddir)/Main.sln
 @ENABLE_WINDOWSPLATFORM_TRUE@@RELEASE_BUILDS_FALSE@PROFILE_NAME = DebugWin32
 @ENABLE_WINDOWSPLATFORM_TRUE@@RELEASE_BUILDS_TRUE@PROFILE_NAME = ReleaseWin32
 XBUILD = msbuild
-XBUILD_ARGS = /verbosity:$(XBUILD_VERBOSITY) /nologo /property:CodePage=65001
+XBUILD_ARGS = /verbosity:$(XBUILD_VERBOSITY) /nologo /property:CodePage=65001 /property:RestorePackages=false /property:DownloadPaket=false
 XBUILD_PROFILE = /property:Configuration=$(PROFILE_NAME)
 
 # Figure out how far we are from top_builddir

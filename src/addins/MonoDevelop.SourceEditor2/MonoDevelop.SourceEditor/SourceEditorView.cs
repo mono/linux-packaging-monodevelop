@@ -3300,6 +3300,8 @@ namespace MonoDevelop.SourceEditor
 
 			case TextSegmentMarkerEffect.GrayOut:
 				return new GrayOutMarker (new TextSegment (offset, length));
+			case TextSegmentMarkerEffect.Background:
+				return new BackgroundTextMarker (new TextSegment (offset, length), color);
 			default:
 				throw new ArgumentOutOfRangeException ();
 			}
@@ -3398,6 +3400,11 @@ namespace MonoDevelop.SourceEditor
 			var p = TextEditor.LocationToPoint (caret.Location);
 			Mono.TextEditor.TooltipProvider.ShowAndPositionTooltip (TextEditor, tooltipWindow, p.X, p.Y, (int)tooltipWindow.Width, 0.5);
 			TextEditor.TextArea.SetTooltip (tooltipWindow);
+		}
+
+		void ITextEditorImpl.HideTooltipWindow ()
+		{
+			TextEditor.TextArea.HideTooltip ();
 		}
 
 		Task<ScopeStack> ITextEditorImpl.GetScopeStackAsync (int offset, CancellationToken cancellationToken)

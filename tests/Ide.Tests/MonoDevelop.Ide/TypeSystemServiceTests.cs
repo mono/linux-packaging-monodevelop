@@ -90,10 +90,10 @@ namespace MonoDevelop.Ide
 		public async Task ProjectReferencingOutputTrackedReference()
 		{
 			string solFile = Util.GetSampleProject("csharp-app-fsharp-lib", "csappfslib.sln");
-			Solution sol = (Solution)await Services.ProjectService.ReadWorkspaceItem(Util.GetMonitor(), solFile);
-			var fsharpLibrary = sol.Items.FirstOrDefault(pr => pr.Name == "fslib") as DotNetProject;
-			Assert.IsTrue(TypeSystemService.IsOutputTrackedProject(fsharpLibrary));
-			sol.Dispose();
+			using (Solution sol = (Solution)await Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solFile)) {
+				var fsharpLibrary = sol.Items.FirstOrDefault (pr => pr.Name == "fslib") as DotNetProject;
+				Assert.IsTrue (TypeSystemService.IsOutputTrackedProject (fsharpLibrary));
+			}
 		}
 
 		[Test]
@@ -162,8 +162,12 @@ namespace MonoDevelop.Ide
 				workspace.Dispose ();
 				tcs.SetResult (true);
 			};
-			await IdeApp.Workspace.OpenWorkspaceItem (solFile);
-			await tcs.Task;
+			try {
+				await IdeApp.Workspace.OpenWorkspaceItem (solFile);
+				await tcs.Task;
+			} finally {
+				await IdeApp.Workspace.Close (false);
+			}
 		}
 	}
 }
