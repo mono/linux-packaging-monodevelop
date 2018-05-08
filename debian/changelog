@@ -1,3 +1,15 @@
+monodevelop (7.6.0.711-0xamarin2) preview; urgency=medium
+
+  [ Xamarin Public Jenkins (auto-signing) ]
+  * Packaging bugfix:
+
+  [ Ubuntu ]
+  * [3efbd84] Merge branch 'master' of github.com:mono/linux-packaging-
+    monodevelop [1d84983] Revert "Workaround for broken sqlite. Patch in
+    rules/ because CRLF,LF disaster"
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Tue, 08 May 2018 17:06:00 +0000
+
 monodevelop (7.6.0.711-0xamarin1) preview; urgency=medium
 
   * New release - monodevelop-7.6.0.711.tar.bz2
