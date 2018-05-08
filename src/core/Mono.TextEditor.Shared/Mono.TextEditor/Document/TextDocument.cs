@@ -160,7 +160,11 @@ namespace Mono.TextEditor
 
 		void SyntaxMode_HighlightingStateChanged (object sender, MonoDevelop.Ide.Editor.LineEventArgs e)
 		{
-			CommitMultipleLineUpdate (e.Line.LineNumber, e.Line.LineNumber);
+			if (e == MonoDevelop.Ide.Editor.LineEventArgs.AllLines) {
+				CommitUpdateAll (true);
+			} else { 
+				CommitMultipleLineUpdate (e.Line.LineNumber, e.Line.LineNumber, true);
+			}
 		}
 
 		void OnSyntaxModeChanged (SyntaxModeChangeEventArgs e)
@@ -229,7 +233,7 @@ namespace Mono.TextEditor
 			(this.TextBuffer as Microsoft.VisualStudio.Text.Implementation.BaseBuffer).ChangedImmediate += OnTextBufferChangedImmediate;
 			this.TextBuffer.ContentTypeChanged += this.OnTextBufferContentTypeChanged;
 
-			this.VsTextDocument.FileActionOccurred += this.OnTextDocumentFileActionOccured;
+			this.VsTextDocument.FileActionOccurred += this.OnTextDocumentFileActionOccurred;
 
 			foldSegmentTree.tree.NodeRemoved += HandleFoldSegmentTreetreeNodeRemoved;
 			this.diffTracker.SetTrackDocument(this);
@@ -237,10 +241,11 @@ namespace Mono.TextEditor
 
 		public void Dispose()
 		{
+			(this.TextBuffer as Microsoft.VisualStudio.Text.Implementation.BaseBuffer).ChangedImmediate -= OnTextBufferChangedImmediate;
 			this.TextBuffer.Changed -= this.OnTextBufferChanged;
 			this.TextBuffer.ContentTypeChanged -= this.OnTextBufferContentTypeChanged;
 			this.TextBuffer.Properties.RemoveProperty(typeof(ITextDocument));
-			this.VsTextDocument.FileActionOccurred -= this.OnTextDocumentFileActionOccured;
+			this.VsTextDocument.FileActionOccurred -= this.OnTextDocumentFileActionOccurred;
 			SyntaxMode = null;
 		}
 
@@ -302,7 +307,7 @@ namespace Mono.TextEditor
 			this.MimeTypeChanged?.Invoke(this, EventArgs.Empty);
 		}
 
-		void OnTextDocumentFileActionOccured(object sender, Microsoft.VisualStudio.Text.TextDocumentFileActionEventArgs args)
+		void OnTextDocumentFileActionOccurred(object sender, Microsoft.VisualStudio.Text.TextDocumentFileActionEventArgs args)
 		{
 			if (args.FileActionType == Microsoft.VisualStudio.Text.FileActionTypes.DocumentRenamed)
 			{
@@ -1876,6 +1881,13 @@ namespace Mono.TextEditor
 		public void CommitUpdateAll ()
 		{
 			RequestUpdate (new UpdateAll ());
+			CommitDocumentUpdate ();
+		}
+
+		// TODO: Merge with CommitUpdateAll (ABI break!)
+		public void CommitUpdateAll (bool removeLineCache)
+		{
+			RequestUpdate (new UpdateAll () { RemoveLineCache = removeLineCache});
 			CommitDocumentUpdate ();
 		}
 

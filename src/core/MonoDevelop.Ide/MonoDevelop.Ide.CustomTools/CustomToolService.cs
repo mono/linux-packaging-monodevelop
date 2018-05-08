@@ -168,13 +168,7 @@ namespace MonoDevelop.Ide.CustomTools
 			//we could emit a warning but this would get very annoying for Xamarin Forms + SAP
 			//in future we could consider running the MSBuild generator in context of every referencing project
 			if (tool is MSBuildCustomTool) {
-				if (!project.SupportsBuild ()) {
-					return false;
-				}
-				bool byDefault, require;
-				MonoDevelop.Projects.MSBuild.MSBuildProjectService.CheckHandlerUsesMSBuildEngine (project, out byDefault, out require);
-				var usesMSBuild = require || (project.UseMSBuildEngine ?? byDefault);
-				if (!usesMSBuild) {
+				if (!project.SupportsBuild () || !project.MSBuildProject.UseMSBuildEngine) {
 					return false;
 				}
 			}
@@ -223,7 +217,7 @@ namespace MonoDevelop.Ide.CustomTools
 					errors++;
 				}
 
-				//check that we can process further. If UpdateCompleted returns `true` this means no errors or non-fatal errors occured
+				//check that we can process further. If UpdateCompleted returns `true` this means no errors or non-fatal errors occurred
 				if (UpdateCompleted (monitor, file, genFile, result, true) && fileEnumerator.MoveNext ())
 					await Update (monitor, fileEnumerator, force, succeeded, warnings, errors);
 				else

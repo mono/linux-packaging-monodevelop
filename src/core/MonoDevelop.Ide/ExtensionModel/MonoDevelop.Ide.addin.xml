@@ -95,7 +95,7 @@
 	
 	<ExtensionPoint path = "/MonoDevelop/Ide/TextEditorExtensions" name = "Text editor extensions" defaultInsertAfter = "MidStep">
 		<Description>Extensions to the text editor. Classes must be a subclass of TextEditorExtension.</Description>
-		<ExtensionNode name="Class" type="MonoDevelop.Ide.Extensions.TextEditorExtensionNode"/>
+		<ExtensionNode name="Class" type="MonoDevelop.Ide.Extensions.TextEditorExtensionNode" objectType="MonoDevelop.Ide.Editor.Extension.TextEditorExtension" />
 	</ExtensionPoint>
 
 	<ExtensionPoint path = "/MonoDevelop/Ide/CompletionCharacters" name = "Code completion commit characters">
@@ -213,7 +213,7 @@
 
 	<ExtensionPoint path = "/MonoDevelop/Ide/AutoInsertBracketHandler" name = "Automatic bracket handler">
 		<Description>Algorithm for providing automatic bracket insertion.</Description>
-		<ExtensionNode name="Class"/>
+		<ExtensionNode name="Handler" type="MonoDevelop.Ide.Extensions.TextEditorExtensionNode" objectType="MonoDevelop.Ide.Editor.Extension.AutoInsertBracketHandler" />
 	</ExtensionPoint>
 
 	<ExtensionPoint path = "/MonoDevelop/Ide/ErrorDocumentationProvider" name = "Link to documentation">
@@ -318,9 +318,11 @@
 		<Class class = "MonoDevelop.Ide.Editor.Extension.BraceMatcherTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.Extension.DefaultCommandTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.Extension.FoldingTextEditorExtension" />
+		<Class class = "MonoDevelop.Ide.Editor.Extension.BlockStructureFoldingTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.Extension.ErrorHandlerTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.Extension.AutoInsertBracketTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.Extension.HighlightUrlExtension" />
+		<Class class = "MonoDevelop.Ide.Editor.Extension.TagCommentsTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.TextMate.TextMateFoldingTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.TextMate.TextMateIndentationTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.TextMate.TextMateCompletionTextEditorExtension" />
@@ -407,6 +409,7 @@
 	<Extension path="/MonoDevelop/Ide/Composition">
 		<Assembly file="Microsoft.CodeAnalysis.CSharp.EditorFeatures.dll"/>
 		<Assembly file="Microsoft.CodeAnalysis.EditorFeatures.dll"/>
+		<Assembly file="Microsoft.CodeAnalysis.EditorFeatures.Text.dll"/>
 		<Assembly file="Microsoft.CodeAnalysis.Features.dll" />
 		<Assembly file="Microsoft.CodeAnalysis.Workspaces.dll" />
 		<Assembly file="Microsoft.CodeAnalysis.Workspaces.Desktop.dll" />
