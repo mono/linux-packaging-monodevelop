@@ -7,7 +7,6 @@ DEBIAN_DIR = $(dir $(MAKEFILE))
 DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
 override_dh_auto_configure:
-	patch -p1 -l --binary < debian/patches/4647.diff
 	dh_auto_configure -- \
 	  --disable-update-mimedb \
 	  --disable-update-desktopdb \
