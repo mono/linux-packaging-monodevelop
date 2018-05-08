@@ -30,6 +30,7 @@ using AppKit;
 using CoreGraphics;
 using Foundation;
 using Xwt.Backends;
+using Xwt.Drawing;
 
 namespace Xwt.Mac
 {
@@ -41,6 +42,8 @@ namespace Xwt.Mac
 		ScrollView scroll;
 		NSObject selChangeObserver;
 		NormalClipView clipView;
+
+		NSTableView ICellSource.TableView { get { return Table; } }
 
 		List<NSTableColumn> ICellSource.Columns {
 			get { return cols; }
@@ -178,10 +181,15 @@ namespace Xwt.Mac
 		{
 			ApplicationContext.InvokeUserCode (EventSink.OnSelectionChanged);
 		}
+
+		public SelectionMode SelectionMode { get; private set; }
 		
 		public void SetSelectionMode (SelectionMode mode)
 		{
+			SelectionMode = mode;
 			Table.AllowsMultipleSelection = mode == SelectionMode.Multiple;
+			if (mode == SelectionMode.None && Table.SelectedRowCount > 0)
+				UnselectAll ();
 		}
 
 		public virtual NSTableColumn AddColumn (ListViewColumn col)
@@ -263,6 +271,8 @@ namespace Xwt.Mac
 
 		public abstract void SetCurrentEventRow (object pos);
 
+		public abstract void InvalidateRowHeight (object pos);
+
 		public bool BorderVisible {
 			get { return scroll.BorderType == NSBorderType.BezelBorder;}
 			set {
@@ -293,6 +303,12 @@ namespace Xwt.Mac
 		{
 			get { return Table.GridStyleMask.ToXwtValue (); }
 			set { Table.GridStyleMask = value.ToMacValue (); }
+		}
+
+		public override Color BackgroundColor
+		{
+			get { return Table.BackgroundColor.ToXwtColor (); }
+			set { Table.BackgroundColor = value.ToNSColor (); }
 		}
 	}
 
@@ -335,7 +351,7 @@ namespace Xwt.Mac
 				if (cached.IsAlive) {
 					var view = cached.Target as CompositeCell;
 					if (view?.IsDisposed == false)
-						CellUtil.UpdateCellView (view, TableView, cells, col);
+						CellUtil.UpdateCellView (view, backend, cells, col);
 				}
 			}
 
@@ -364,7 +380,7 @@ namespace Xwt.Mac
 			HeaderCell = hc;
 			HeaderCell.Alignment = col.Alignment.ToNSTextAlignment ();
 
-			DataView = CellUtil.CreateCellView (context, TableView, backend, col.Views, backend.Columns.IndexOf (this));
+			DataView = CellUtil.CreateCellView (context, backend, col.Views, backend.Columns.IndexOf (this));
 			DataView.Identifier = Identifier;
 			UpdateCachedViews (col.Views);
 
@@ -398,7 +414,7 @@ namespace Xwt.Mac
 					ResizingMask &= ~NSTableColumnResizing.Autoresizing;
 				break;
 			case ListViewColumnChange.Cells:
-				DataView = CellUtil.CreateCellView (context, TableView, backend, col.Views, backend.Columns.IndexOf (this));
+				DataView = CellUtil.CreateCellView (context, backend, col.Views, backend.Columns.IndexOf (this));
 				DataView.Identifier = Identifier;
 				UpdateCachedViews (col.Views);
 				TableView.ReloadData ();

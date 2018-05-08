@@ -66,7 +66,7 @@ namespace Xwt.Mac
 			{
 				nfloat height;
 				var treeItem = (TreeItem)item;
-				if (!Backend.RowHeights.TryGetValue (treeItem, out height))
+				if (!Backend.RowHeights.TryGetValue (treeItem, out height) || height <= 0)
 					height = Backend.RowHeights [treeItem] = Backend.CalcRowHeight (treeItem, false);
 				
 				return height;
@@ -80,9 +80,11 @@ namespace Xwt.Mac
 			public override NSView GetView (NSOutlineView outlineView, NSTableColumn tableColumn, NSObject item)
 			{
 				var col = tableColumn as TableColumn;
-				var cell = outlineView.MakeView (tableColumn.Identifier, this);
+				var cell = outlineView.MakeView (tableColumn.Identifier, this) as CompositeCell;
 				if (cell == null)
 					cell = col.CreateNewView ();
+				if (cell.ObjectValue != item)
+					cell.ObjectValue = item;
 				return cell;
 			}
 
@@ -108,17 +110,31 @@ namespace Xwt.Mac
 				}
 				return width;
 			}
+
+			public override NSIndexSet GetSelectionIndexes(NSOutlineView outlineView, NSIndexSet proposedSelectionIndexes)
+			{
+				return Backend.SelectionMode != SelectionMode.None ? proposedSelectionIndexes : new NSIndexSet();
+			}
 		}
 		
-		NSOutlineView Tree {
-			get { return (NSOutlineView) Table; }
+		OutlineViewBackend Tree {
+			get { return (OutlineViewBackend) Table; }
 		}
 		
 		protected override NSTableView CreateView ()
 		{
-			var t = new OutlineViewBackend (EventSink, ApplicationContext);
+			var t = new OutlineViewBackend (this);
 			t.Delegate = new TreeDelegate () { Backend = this };
 			return t;
+		}
+
+		public bool AnimationsEnabled {
+			get {
+				return Tree.AnimationsEnabled;
+			}
+			set {
+				Tree.AnimationsEnabled = value;
+			}
 		}
 		
 		protected override string SelectionChangeEventName {
@@ -142,15 +158,33 @@ namespace Xwt.Mac
 			tsource = new TreeSource (source);
 			Tree.DataSource = tsource;
 
-			source.NodeInserted += (sender, e) => Tree.ReloadItem (tsource.GetItem (source.GetParent(e.Node)), true);
-			source.NodeDeleted += (sender, e) => Tree.ReloadItem (tsource.GetItem (e.Node), true);
+			source.NodeInserted += (sender, e) => {
+				var parent = tsource.GetItem (source.GetParent (e.Node));
+				Tree.ReloadItem (parent, parent == null || Tree.IsItemExpanded (parent));
+			};
+			source.NodeDeleted += (sender, e) => {
+				var parent = tsource.GetItem (e.Node);
+				var item = tsource.GetItem(e.Child);
+				if (item != null)
+					RowHeights.Remove (null);
+				Tree.ReloadItem (parent, parent == null || Tree.IsItemExpanded (parent));
+			};
 			source.NodeChanged += (sender, e) => {
 				var item = tsource.GetItem (e.Node);
-				Tree.ReloadItem (item, false);
-				UpdateRowHeight (item);
+				if (item != null) {
+					Tree.ReloadItem (item, false);
+					UpdateRowHeight (item);
+				}
 			};
-			source.NodesReordered += (sender, e) => Tree.ReloadItem (tsource.GetItem (e.Node), true);
-			source.Cleared += (sender, e) => Tree.ReloadData ();
+			source.NodesReordered += (sender, e) => {
+				var parent = tsource.GetItem (e.Node);
+				Tree.ReloadItem (parent, parent == null || Tree.IsItemExpanded (parent));
+			};
+			source.Cleared += (sender, e) =>
+			{
+				Tree.ReloadData ();
+				RowHeights.Clear ();
+			};
 		}
 		
 		public override object GetValue (object pos, int nField)
@@ -163,6 +197,11 @@ namespace Xwt.Mac
 			source.SetValue ((TreePosition)pos, nField, value);
 		}
 
+		public override void InvalidateRowHeight (object pos)
+		{
+			UpdateRowHeight (tsource.GetItem((TreePosition)pos));
+		}
+
 		Dictionary<TreeItem, nfloat> RowHeights = new Dictionary<TreeItem, nfloat> ();
 		bool updatingRowHeight;
 
@@ -171,10 +210,13 @@ namespace Xwt.Mac
 			if (updatingRowHeight)
 				return;
 			var row = Tree.RowForItem (pos);
-			if (row < 0)
-				return;
-			RowHeights[pos] = CalcRowHeight (pos);
-			Table.NoteHeightOfRowsWithIndexesChanged (NSIndexSet.FromIndex (row));
+			if (row >= 0) {
+				// calculate new height now by reusing the visible cell to avoid using the template cell with unnecessary data reloads
+				// NOTE: cell reusing is not supported in Delegate.GetRowHeight and would require an other data reload to the template cell
+				RowHeights[pos] = CalcRowHeight (pos);
+				Table.NoteHeightOfRowsWithIndexesChanged (NSIndexSet.FromIndex (row));
+			} else // Invalidate the height, to force recalculation in Delegate.GetRowHeight
+				RowHeights[pos] = -1;
 		}
 
 		nfloat CalcRowHeight (TreeItem pos, bool tryReuse = true)
@@ -184,13 +226,13 @@ namespace Xwt.Mac
 			var row = Tree.RowForItem (pos);
 
 			for (int i = 0; i < Columns.Count; i++) {
-				CompositeCell cell = tryReuse ? Tree.GetView (i, row, false) as CompositeCell : null;
-				if (cell == null)
+				CompositeCell cell = tryReuse && row >= 0 ? Tree.GetView (i, row, false) as CompositeCell : null;
+				if (cell == null) {
 					cell = (Columns [i] as TableColumn)?.DataView as CompositeCell;
-
-				if (cell != null) {
 					cell.ObjectValue = pos;
 					height = (nfloat)Math.Max (height, cell.FittingSize.Height);
+				} else {
+					height = (nfloat)Math.Max (height, cell.GetRequiredHeightForWidth (cell.Frame.Width));
 				}
 			}
 			updatingRowHeight = false;
@@ -218,6 +260,7 @@ namespace Xwt.Mac
 			}
 			set {
 				SelectRow (value);
+				ScrollToRow (value);
 			}
 		}
 
@@ -276,12 +319,19 @@ namespace Xwt.Mac
 		public void ExpandToRow (TreePosition pos)
 		{
 			var p = source.GetParent (pos);
+			if (p == null)
+				return;
+			var s = new Stack<TreePosition> ();
 			while (p != null) {
-				var it = tsource.GetItem (p);
+				s.Push (p);
+				p = source.GetParent (p);
+			}
+
+			while (s.Count > 0) {
+				var it = tsource.GetItem (s.Pop ());
 				if (it == null)
 					break;
 				Tree.ExpandItem (it, false);
-				p = source.GetParent (p);
 			}
 		}
 
@@ -370,10 +420,9 @@ namespace Xwt.Mac
 	class TreeSource: NSOutlineViewDataSource
 	{
 		ITreeDataSource source;
-		
-		// TODO: remove unused positions
+
 		Dictionary<TreePosition,TreeItem> items = new Dictionary<TreePosition, TreeItem> ();
-		
+
 		public TreeSource (ITreeDataSource source)
 		{
 			this.source = source;
@@ -381,6 +430,12 @@ namespace Xwt.Mac
 			source.NodeInserted += (sender, e) => {
 				if (!items.ContainsKey (e.Node))
 					items.Add (e.Node, new TreeItem { Position = e.Node });
+			};
+			source.NodeDeleted += (sender, e) => {
+				items.Remove (e.Child);
+			};
+			source.Cleared += (sender, e) => {
+				items.Clear ();
 			};
 		}
 		

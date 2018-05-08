@@ -430,7 +430,7 @@ namespace Mono.TextEditor
 				try {
 					result = args.Engine.SearchForward (worker, args, offset);
 				} catch (Exception ex) {
-					Console.WriteLine ("Got exception while search forward:" + ex);
+					LoggingService.LogError ("Got exception while search forward",  ex);
 					break;
 				}
 				if (worker.CancellationPending)
@@ -1123,7 +1123,7 @@ namespace Mono.TextEditor
 						goto restart;
 					}
 					var theme = textEditor.GetTextEditorData ().EditorTheme;
-					var chunkStyle = theme.GetChunkStyle(chunk.ScopeStack);
+					var chunkStyle = theme.GetChunkStyle (chunk.ScopeStack);
 					foreach (TextLineMarker marker in textEditor.Document.GetMarkers (line))
 						chunkStyle = marker.GetStyle (chunkStyle);
 
@@ -1725,8 +1725,6 @@ namespace Mono.TextEditor
 			if (text.IndexOf (spaceOrTab) == -1)
 				return;
 			var chunks = layout.Chunks;
-			if (chunks == null)
-				return;
 
 			uint curIndex = 0, byteIndex = 0;
 			bool first = true, oldSelected = false;
@@ -1747,9 +1745,6 @@ namespace Mono.TextEditor
 			}
 
 			var showOnlySelected = textEditor.Options.ShowWhitespaces != ShowWhitespaces.Always;
-
-			var lastColor = new Cairo.Color ();
-			bool firstDraw = true;
 			var foregroundColor = SyntaxHighlightingService.GetColor (textEditor.EditorTheme, EditorThemeColors.Foreground);
 
 			int lastIndex = -1;
@@ -1780,38 +1775,26 @@ namespace Mono.TextEditor
 				lastPosX = posX;
 				lastIndex = i + 1;
 				double xpos2 = x + posX / Pango.Scale.PangoScale;
-				var col = new Cairo.Color (0, 0, 0);
-				//if (SelectionColor.TransparentForeground) {
-				while (curchunk + 1 < chunks.Count && chunks [curchunk].Offset < offset + i)
-					curchunk++;
-					/*if (curchunk != null && curchunk.SpanStack.Count > 0 && curchunk.SpanStack.Peek ().Color != "Plain Text") {
-						var chunkStyle = ColorStyle.GetChunkStyle (curchunk.SpanStack.Peek ().Color);
-						if (chunkStyle != null)
-							col = ColorStyle.GetForeground (chunkStyle);
-					} else */{
-					col = foregroundColor;
+				var col = (Cairo.Color)foregroundColor;
+				if (chunks != null) {
+					while (curchunk + 1 < chunks.Count) {
+						if (offset + i < chunks [curchunk].EndOffset)
+							break;
+						curchunk++;
+					}
+					if (curchunk < chunks.Count) {
+						var chunkStyle = EditorTheme.GetChunkStyle (chunks [curchunk].ScopeStack);
+						col = chunkStyle.Foreground;
+					}
 				}
-				// } else {
-				//	col = selected ? SelectionColor.Foreground : foregroundColor;
-				// }
-
-				if (firstDraw || (lastColor.R != col.R && lastColor.G != col.G && lastColor.B != col.B)) {
-					ctx.SetSourceRGBA (col.R, col.G, col.B, whitespaceMarkerAlpha);
-					lastColor = col;
-					firstDraw = false;
-				}
+				ctx.SetSourceRGBA (col.R, col.G, col.B, whitespaceMarkerAlpha);
 
 				if (spaceOrTab == ' ') {
 					ctx.Rectangle (xpos + (xpos2 - xpos - dotThickness) / 2, ypos, dotThickness, dotThickness);
+					ctx.Fill ();
 				} else {
 					ctx.MoveTo (0.5 + xpos, ypos);
 					ctx.LineTo (0.5 + xpos2 - charWidth / 2, ypos);
-				}
-			}
-			if (!firstDraw) {//Atleast one draw was called
-				if (spaceOrTab == ' ') {
-					ctx.Fill ();
-				} else {
 					ctx.Stroke ();
 				}
 			}
@@ -2674,7 +2657,7 @@ namespace Mono.TextEditor
 
 		protected internal override void MouseHover (MarginMouseEventArgs args)
 		{
-			var loc = PointToLocation (args.X, args.Y, snapCharacters: true);
+			var loc = args.Location;
 			if (loc.Line < DocumentLocation.MinLine || loc.Column < DocumentLocation.MinColumn)
 				return;
 			var line = Document.GetLine (loc.Line);

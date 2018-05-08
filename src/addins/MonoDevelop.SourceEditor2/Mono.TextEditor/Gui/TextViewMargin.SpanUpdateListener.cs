@@ -75,14 +75,10 @@ namespace Mono.TextEditor
 
 			void Document_TextChanging (object sender, TextChangeEventArgs e)
 			{
-				try {
-					HasUpdatedMultilineSpan = false;
-					foreach (var change in e.TextChanges) {
-						var layout = textEditor.TextViewMargin.GetLayout (textEditor.GetLineByOffset (change.Offset));
-						lines.Add (layout.HighlightedLine);
-					}
-				}
-				catch {
+				HasUpdatedMultilineSpan = false;
+				foreach (var change in e.TextChanges) {
+					var layout = textEditor.TextViewMargin.GetLayout (textEditor.GetLineByOffset (change.Offset));
+					lines.Add (layout.HighlightedLine);
 				}
 			}
 
@@ -90,20 +86,15 @@ namespace Mono.TextEditor
 			{
 				int i = 0;
 
-				try {
-					foreach (var change in e.TextChanges) {
-						if (i >= lines.Count)
-							break; // should never happen
-						var oldHighlightedLine = lines[i++];
-						var curLine = textEditor.GetLineByOffset (change.Offset);
-						var curLayout = textEditor.TextViewMargin.GetLayout (curLine);
-						if (!UpdateLineHighlight (curLine.LineNumber, oldHighlightedLine, curLayout.HighlightedLine))
-							break;
-					}
+				foreach (var change in e.TextChanges) {
+					if (i >= lines.Count)
+						break; // should never happen
+					var oldHighlightedLine = lines [i++];
+					var curLine = textEditor.GetLineByOffset (change.Offset);
+					var curLayout = textEditor.TextViewMargin.GetLayout (curLine);
+					if (!UpdateLineHighlight (curLine.LineNumber, oldHighlightedLine, curLayout.HighlightedLine))
+						break;
 				}
-				catch {
-				}
-
 				lines.Clear ();
 			}
 

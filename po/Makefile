@@ -132,7 +132,7 @@ COMPAT_ADDIN_VERSION = 7.0
 CSC = /usr/bin/dmcs
 CSC_FLAGS = -debug -codepage:utf8
 CYGPATH_W = echo
-DEFS = -DPACKAGE_NAME=\"monodevelop\" -DPACKAGE_TARNAME=\"monodevelop\" -DPACKAGE_VERSION=\"7.5\" -DPACKAGE_STRING=\"monodevelop\ 7.5\" -DPACKAGE_BUGREPORT=\"monodevelop-list@lists.ximian.com\" -DPACKAGE_URL=\"\" -DPACKAGE=\"monodevelop\" -DVERSION=\"7.5\" -DGETTEXT_PACKAGE=\"monodevelop\"
+DEFS = -DPACKAGE_NAME=\"monodevelop\" -DPACKAGE_TARNAME=\"monodevelop\" -DPACKAGE_VERSION=\"7.6\" -DPACKAGE_STRING=\"monodevelop\ 7.6\" -DPACKAGE_BUGREPORT=\"monodevelop-list@lists.ximian.com\" -DPACKAGE_URL=\"\" -DPACKAGE=\"monodevelop\" -DVERSION=\"7.6\" -DGETTEXT_PACKAGE=\"monodevelop\"
 ECHO_C = 
 ECHO_N = -n
 ECHO_T = 
@@ -175,11 +175,11 @@ MSGMERGE = /usr/bin/msgmerge
 PACKAGE = monodevelop
 PACKAGE_BUGREPORT = monodevelop-list@lists.ximian.com
 PACKAGE_NAME = monodevelop
-PACKAGE_STRING = monodevelop 7.5
+PACKAGE_STRING = monodevelop 7.6
 PACKAGE_TARNAME = monodevelop
 PACKAGE_URL = 
-PACKAGE_VERSION = 7.5
-PACKAGE_VERSION_LABEL = 7.5
+PACKAGE_VERSION = 7.6
+PACKAGE_VERSION_LABEL = 7.6 Preview
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
@@ -194,7 +194,7 @@ UNMANAGED_DEPENDENCIES_MONO_CFLAGS =
 UNMANAGED_DEPENDENCIES_MONO_LIBS = 
 UPDATE_DESKTOP_DB = 
 UPDATE_MIME_DB = /usr/bin/update-mime-database
-VERSION = 7.5
+VERSION = 7.6
 abs_builddir = /home/directhex/Projects/monodevelop/main/po
 abs_srcdir = /home/directhex/Projects/monodevelop/main/po
 abs_top_builddir = /home/directhex/Projects/monodevelop/main
@@ -245,7 +245,7 @@ PROFILE_NAME = DebugGnome
 #PROFILE_NAME = DebugWin32
 ##PROFILE_NAME = ReleaseWin32
 XBUILD = msbuild
-XBUILD_ARGS = /verbosity:$(XBUILD_VERBOSITY) /nologo /property:CodePage=65001
+XBUILD_ARGS = /verbosity:$(XBUILD_VERBOSITY) /nologo /property:CodePage=65001 /property:RestorePackages=false /property:DownloadPaket=false
 XBUILD_PROFILE = /property:Configuration=$(PROFILE_NAME)
 
 # Figure out how far we are from top_builddir

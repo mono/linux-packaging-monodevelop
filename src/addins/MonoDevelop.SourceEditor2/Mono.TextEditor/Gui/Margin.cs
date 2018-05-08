@@ -200,7 +200,17 @@ namespace Mono.TextEditor
 		public event EventHandler<MarginMouseEventArgs> MouseMoved;
 		public event EventHandler MouseLeave;
 	}
-	
+
+	class MarginEventArgs : EventArgs
+	{
+		public Margin Margin { get; private set; }
+
+		public MarginEventArgs (Margin margin)
+		{
+			Margin = margin;
+		}
+	}
+
 	class MarginMouseEventArgs : EventArgs
 	{
 		public double X {
@@ -232,7 +242,12 @@ namespace Mono.TextEditor
 			get;
 			private set;
 		}
-		
+
+		public DocumentLocation Location {
+			get;
+			internal set;
+		}
+
 		public bool TriggersContextMenu ()
 		{
 			var evt = RawEvent as Gdk.EventButton;
