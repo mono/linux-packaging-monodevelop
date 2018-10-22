@@ -145,13 +145,13 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		static void AssertCounterIncrementedForPackage (
-			IDictionary<string, string> metadata,
+			PackageMetadata metadata,
 			string packageId,
 			string packageVersion)
 		{
 			string fullInfo = packageId + " v" + packageVersion;
-			Assert.AreEqual (packageId, metadata["PackageId"]);
-			Assert.AreEqual (fullInfo, metadata["Package"]);
+			Assert.AreEqual (packageId, metadata.PackageId);
+			Assert.AreEqual (fullInfo, metadata.Package);
 		}
 
 		void AssertUninstallCounterIncrementedForPackage (string packageId, string packageVersion)
@@ -161,9 +161,9 @@ namespace MonoDevelop.PackageManagement.Tests
 
 		void AssertUninstallCounterIncrementedForPackage (string packageId)
 		{
-			Assert.AreEqual (packageId, instrumentationService.UninstallPackageMetadata["PackageId"]);
-			Assert.IsFalse (instrumentationService.UninstallPackageMetadata.ContainsKey ("PackageVersion"));
-			Assert.IsFalse (instrumentationService.UninstallPackageMetadata.ContainsKey ("Package"));
+			Assert.AreEqual (packageId, instrumentationService.UninstallPackageMetadata.PackageId);
+			Assert.IsFalse (instrumentationService.UninstallPackageMetadata.HasPackageVersion);
+			Assert.IsFalse (instrumentationService.UninstallPackageMetadata.HasPackage);
 		}
 
 		void AddInstallPackageIntoProjectAction (FakeNuGetPackageManager packageManager, string packageId, string version)
@@ -405,25 +405,6 @@ namespace MonoDevelop.PackageManagement.Tests
 			Run ();
 
 			progressMonitor.AssertMessageIsLogged ("Message");
-		}
-
-		[Test]
-		public void Run_ActionChangesTwoFiles_FileServiceNotifiedOfFileChanges ()
-		{
-			CreateRunner ();
-			string file1 = @"d:\projects\MyProject\packages.config".ToNativePath ();
-			string file2 = @"d:\projects\MyProject\Scripts\jquery.js".ToNativePath ();
-			AddInstallActionWithCustomExecuteAction (() => {
-				packageManagementEvents.OnFileChanged (file1);
-				packageManagementEvents.OnFileChanged (file2);
-			});
-
-			Run ();
-
-			List<FilePath> filesChanged = runner.EventsMonitor.FilesChanged;
-			Assert.AreEqual (2, filesChanged.Count);
-			Assert.That (filesChanged, Contains.Item (new FilePath (file1)));
-			Assert.That (filesChanged, Contains.Item (new FilePath (file2)));
 		}
 
 		[Test]

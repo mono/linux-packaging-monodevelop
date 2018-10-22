@@ -77,6 +77,8 @@ namespace MonoDevelop.VersionControl.Git
 					else
 						name = GettextCatalog.GetString ("Local changes of branch '{0}'", branch);
 				}
+				if (!string.IsNullOrEmpty (s.Message))
+					name += ": " + s.Message.Trim ();
 				store.AppendValues (s, s.Index.Author.When.LocalDateTime.ToString (), name);
 			}
 			tvs.Load ();
@@ -107,9 +109,12 @@ namespace MonoDevelop.VersionControl.Git
 
 		async Task ApplyStashAndRemove(int s)
 		{
-			using (IdeApp.Workspace.GetFileStatusTracker ()) {
+			try {
+				FileService.FreezeEvents ();
 				if (await GitService.ApplyStash (repository, s))
 					stashes.Remove (s);
+			} finally {
+				FileService.ThawEvents ();
 			}
 		}
 
@@ -117,7 +122,12 @@ namespace MonoDevelop.VersionControl.Git
 		{
 			int s = GetSelectedIndex ();
 			if (s != -1) {
-				await GitService.ApplyStash (repository, s);
+				try {
+					FileService.FreezeEvents ();
+					await GitService.ApplyStash (repository, s);
+				} finally {
+					FileService.ThawEvents ();
+				}
 				Respond (ResponseType.Ok);
 			}
 		}

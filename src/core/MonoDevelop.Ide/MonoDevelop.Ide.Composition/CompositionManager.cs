@@ -89,18 +89,22 @@ namespace MonoDevelop.Ide.Composition
 		/// <summary>
 		/// Returns an instance of type T that is exported by some composition part. The instance is shared (singleton).
 		/// </summary>
-		public static T GetExportedValue<T> ()
-		{
-			return Instance.ExportProvider.GetExportedValue<T> ();
-		}
+		public static T GetExportedValue<T> () => Instance.ExportProvider.GetExportedValue<T> ();
 
 		/// <summary>
-		/// Returns all instance of type T that are exported by some composition part. The instances are shared (singletons).
+		/// Returns all instances of type T that are exported by some composition part. The instances are shared (singletons).
 		/// </summary>
-		public static IEnumerable<T> GetExportedValues<T> ()
-		{
-			return Instance.ExportProvider.GetExportedValues<T> ();
-		}
+		public static IEnumerable<T> GetExportedValues<T> () => Instance.ExportProvider.GetExportedValues<T> ();
+
+		/// <summary>
+		/// Returns a lazy holding the instance of type T that is exported by some composition part. The instance is shared (singleton).
+		/// </summary>
+		public static Lazy<T> GetExport<T> () => new Lazy<T> (() => Instance.ExportProvider.GetExportedValue<T> ());
+
+		/// <summary>
+		/// Returns a lazy holding all instances of type T that are exported by some composition part. The instances are shared (singletons).
+		/// </summary>
+		public static Lazy<IEnumerable<T>> GetExports<T> () => new Lazy<IEnumerable<T>> (() => Instance.ExportProvider.GetExportedValues<T> ());
 
 		public RuntimeComposition RuntimeComposition { get; private set; }
 		public IExportProviderFactory ExportProviderFactory { get; private set; }
@@ -119,15 +123,13 @@ namespace MonoDevelop.Ide.Composition
 			return compositionManager;
 		}
 
-		const string cacheEnabledVar = "MONODEVELOP_ENABLE_MEF_CACHE";
-		static bool cacheEnabled = !string.IsNullOrEmpty (Environment.GetEnvironmentVariable (cacheEnabledVar));
 		async Task InitializeInstanceAsync ()
 		{
 			var assemblies = ReadAssembliesFromAddins ();
 			var caching = new Caching (assemblies);
 
 			// Try to use cached MEF data
-			if (cacheEnabled && caching.CanUse ()) {
+			if (caching.CanUse ()) {
 				RuntimeComposition = await TryCreateRuntimeCompositionFromCache (caching);
 			}
 
@@ -169,7 +171,6 @@ namespace MonoDevelop.Ide.Composition
 
 				ComposableCatalog catalog = ComposableCatalog.Create (StandardResolver)
 					.WithCompositionService ()
-					.WithDesktopSupport ()
 					.AddParts (parts);
 
 				var discoveryErrors = catalog.DiscoveredParts.DiscoveryErrors;
@@ -205,7 +206,7 @@ namespace MonoDevelop.Ide.Composition
 		internal static HashSet<Assembly> ReadAssembliesFromAddins ()
 		{
 			using (var timer = Counters.CompositionAddinLoad.BeginTiming ()) {
-				HashSet<Assembly> assemblies = new HashSet<Assembly> ();
+				var assemblies = new HashSet<Assembly> ();
 				ReadAssemblies (assemblies, "/MonoDevelop/Ide/TypeService/PlatformMefHostServices", timer);
 				ReadAssemblies (assemblies, "/MonoDevelop/Ide/TypeService/MefHostServices", timer);
 				ReadAssemblies (assemblies, "/MonoDevelop/Ide/Composition", timer);
@@ -218,18 +219,19 @@ namespace MonoDevelop.Ide.Composition
 					if (node is AssemblyExtensionNode assemblyNode) {
 						try {
 							string id = assemblyNode.Addin.Id;
-							timer.Trace ("Start: " + id);
+							string assemblyName = assemblyNode.FileName;
+							timer.Trace ("Start: " + assemblyName);
 							// Make sure the add-in that registered the assembly is loaded, since it can bring other
 							// other assemblies required to load this one
 							AddinManager.LoadAddin (null, id);
 
 							var assemblyFilePath = assemblyNode.Addin.GetFilePath (assemblyNode.FileName);
-							var assembly = Runtime.SystemAssemblyService.LoadAssemblyFrom (assemblyFilePath);
+							var assembly = Runtime.LoadAssemblyFrom (assemblyFilePath);
 							assemblies.Add (assembly);
 
-							timer.Trace ("Loaded: " + id);
+							timer.Trace ("Loaded: " + assemblyName);
 						} catch (Exception e) {
-							LoggingService.LogError ("Composition can't load assembly " + assemblyNode.FileName, e);
+							LoggingService.LogError ("Composition can't load assembly: " + assemblyNode.FileName, e);
 						}
 					}
 				}

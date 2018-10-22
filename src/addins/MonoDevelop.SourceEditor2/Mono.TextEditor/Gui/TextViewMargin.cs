@@ -62,9 +62,6 @@ namespace Mono.TextEditor
 
 		internal double charWidth;
 		bool isMonospacedFont;
-		SpanUpdateListener spanUpdateListener;
-
-		internal SpanUpdateListener SpanUpdater { get => spanUpdateListener; }
 
 		double LineHeight {
 			get {
@@ -298,7 +295,6 @@ namespace Mono.TextEditor
 			}
 
 			this.textEditor = textEditor;
-			spanUpdateListener = new SpanUpdateListener (textEditor);
 			textEditor.Document.TextChanged += HandleTextReplaced;
 			textEditor.HighlightSearchPatternChanged += TextEditor_HighlightSearchPatternChanged;
 			textEditor.GetTextEditorData ().SearchChanged += HandleSearchChanged;
@@ -314,8 +310,10 @@ namespace Mono.TextEditor
 
 		void HandleSyntaxModeChanged(object sender, EventArgs e)
 		{
-			PurgeLayoutCache ();
-			textEditor.Document.CommitUpdateAll ();
+			Runtime.RunInMainThread (() => {
+				PurgeLayoutCache ();
+				textEditor.Document.CommitUpdateAll ();
+			});
 		}
 
 		void TextEditor_HighlightSearchPatternChanged (object sender, EventArgs e)
@@ -727,10 +725,6 @@ namespace Mono.TextEditor
 				foreach (var marker in eolMarkerLayout)
 					marker.Dispose ();
 				eolMarkerLayout = null;
-			}
-			if (spanUpdateListener != null) {
-				spanUpdateListener.Dispose ();
-				spanUpdateListener = null;
 			}
 			DisposeLayoutDict ();
 			if (tabArray != null)
@@ -3058,6 +3052,9 @@ namespace Mono.TextEditor
 		{
 //			double xStart = System.Math.Max (area.X, XOffset);
 //			xStart = System.Math.Max (0, xStart);
+			cr.Rectangle (XOffset, 0, textEditor.Allocation.Width - XOffset, textEditor.Allocation.Height);
+			cr.Clip ();
+
 			var correctedXOffset = System.Math.Floor (XOffset) - 1;
 			var extendingMarker = line != null ? (IExtendingTextLineMarker)textEditor.Document.GetMarkers (line).FirstOrDefault (l => l is IExtendingTextLineMarker) : null;
 			isSpaceAbove = extendingMarker != null ? extendingMarker.IsSpaceAbove : false;

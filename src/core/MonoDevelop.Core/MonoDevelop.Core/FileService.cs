@@ -55,9 +55,6 @@ namespace MonoDevelop.Core
 
 		static FileServiceErrorHandler errorHandler;
 
-		static FileSystemExtension fileSystemChain;
-		static readonly FileSystemExtension defaultExtension = new DefaultFileSystemExtension ();
-
 		static readonly EventQueue eventQueue = new EventQueue ();
 
 		static readonly string applicationRootPath = Path.Combine (PropertyService.EntryAssemblyPath, "..");
@@ -67,32 +64,40 @@ namespace MonoDevelop.Core
 			}
 		}
 
-		static FileService()
+		static class FileSystemExtensions
 		{
-			AddinManager.ExtensionChanged += delegate (object sender, ExtensionEventArgs args) {
-				if (args.PathChanged (addinFileSystemExtensionPath))
-					UpdateExtensions ();
-			};
-			UpdateExtensions ();
-		}
+			public static FileSystemExtension Chain => fileSystemChain;
 
-		static void UpdateExtensions ()
-		{
-			if (!Runtime.Initialized) {
-				fileSystemChain = defaultExtension;
-				return;
+			static FileSystemExtension fileSystemChain;
+			static readonly FileSystemExtension defaultExtension = new DefaultFileSystemExtension ();
+
+			static FileSystemExtensions ()
+			{
+				AddinManager.ExtensionChanged += delegate (object sender, ExtensionEventArgs args) {
+					if (args.PathChanged (addinFileSystemExtensionPath))
+						UpdateExtensions ();
+				};
+				UpdateExtensions ();
 			}
 
-			var extensions = AddinManager.GetExtensionObjects (addinFileSystemExtensionPath, typeof(FileSystemExtension)).Cast<FileSystemExtension> ().ToArray ();
-			for (int n=0; n<extensions.Length - 1; n++) {
-				extensions [n].Next = extensions [n + 1];
-			}
+			static void UpdateExtensions ()
+			{
+				if (!Runtime.Initialized) {
+					fileSystemChain = defaultExtension;
+					return;
+				}
 
-			if (extensions.Length > 0) {
-				extensions [extensions.Length - 1].Next = defaultExtension;
-				fileSystemChain = extensions [0];
-			} else {
-				fileSystemChain = defaultExtension;
+				var extensions = AddinManager.GetExtensionObjects (addinFileSystemExtensionPath, typeof (FileSystemExtension)).Cast<FileSystemExtension> ().ToArray ();
+				for (int n = 0; n < extensions.Length - 1; n++) {
+					extensions [n].Next = extensions [n + 1];
+				}
+
+				if (extensions.Length > 0) {
+					extensions [extensions.Length - 1].Next = defaultExtension;
+					fileSystemChain = extensions [0];
+				} else {
+					fileSystemChain = defaultExtension;
+				}
 			}
 		}
 
@@ -353,7 +358,7 @@ namespace MonoDevelop.Core
 		internal static FileSystemExtension GetFileSystemForPath (string path, bool isDirectory)
 		{
 			Debug.Assert (!String.IsNullOrEmpty (path));
-			FileSystemExtension nx = fileSystemChain;
+			FileSystemExtension nx = FileSystemExtensions.Chain;
 			while (nx != null && !nx.CanHandlePath (path, isDirectory))
 				nx = nx.Next;
 			return nx;
@@ -580,7 +585,7 @@ namespace MonoDevelop.Core
 					break;
 				
 				i += 2;
-				while (i < maxLen && i == Path.DirectorySeparatorChar)
+				while (i < maxLen && path [i] == Path.DirectorySeparatorChar)
 					i++;
 			}
 
@@ -862,7 +867,9 @@ namespace MonoDevelop.Core
 
 			public override bool ShouldMerge (EventData other)
 			{
-				var next = (EventData<TArgs>)other;
+				var next = other as EventData<TArgs>;
+				if (next == null)
+					return false;
 				return (next.Args.GetType () == Args.GetType ()) && next.Delegate == Delegate && next.ThisObject == ThisObject;
 			}
 
@@ -918,17 +925,19 @@ namespace MonoDevelop.Core
 				}
 			}
 			if (pendingEvents != null) {
-				for (int n=0; n<pendingEvents.Count; n++) {
-					EventData ev = pendingEvents [n];
-					if (ev.IsChainArgs ()) {
-						EventData next = n < pendingEvents.Count - 1 ? pendingEvents [n + 1] : null;
-						if (next != null && ev.ShouldMerge (next)) {
-							next.MergeArgs (ev);
-							continue;
+				Runtime.RunInMainThread (() => {
+					for (int n=0; n<pendingEvents.Count; n++) {
+						EventData ev = pendingEvents [n];
+						if (ev.IsChainArgs ()) {
+							EventData next = n < pendingEvents.Count - 1 ? pendingEvents [n + 1] : null;
+							if (next != null && ev.ShouldMerge (next)) {
+								ev.MergeArgs (next);
+								continue;
+							}
 						}
+						ev.Invoke ();
 					}
-					ev.Invoke ();
-				}
+				}).Ignore ();
 			}
 		}
 

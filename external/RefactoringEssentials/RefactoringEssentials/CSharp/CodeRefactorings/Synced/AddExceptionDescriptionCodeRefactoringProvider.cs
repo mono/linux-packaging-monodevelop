@@ -32,7 +32,9 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
                 var catchClause = node.FirstAncestorOrSelf<CatchClauseSyntax>();
                 if (catchClause != null)
                 {
-                    exceptionType = semanticModel.GetTypeInfo(catchClause.Declaration.Type).Type;
+                    var catchType = catchClause.Declaration?.Type;
+                    if (catchType != null)
+                        exceptionType = semanticModel.GetTypeInfo(catchType).Type;
                 }
             }
             else
@@ -84,4 +86,3 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
         }
     }
 }
-

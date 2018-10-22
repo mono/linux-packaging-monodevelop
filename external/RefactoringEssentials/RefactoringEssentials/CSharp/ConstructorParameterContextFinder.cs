@@ -29,14 +29,17 @@ namespace RefactoringEssentials.CSharp
             var token = root.FindToken(span.Start);
             var parameter = token.Parent as ParameterSyntax;
 
-            if (parameter == null)
+            if (parameter == null || parameter.Identifier.IsMissing)
                 return null;
 
             var ctor = parameter.Parent.Parent as ConstructorDeclarationSyntax;
             if (ctor == null)
                 return null;
 
-            return new ConstructorParameterContext(document, parameter.Identifier.ToString(), GetPropertyName(parameter.Identifier.ToString()), parameter.Type, ctor, span, root);
+            string parameterName = parameter.Identifier.ToString();
+            if (string.IsNullOrEmpty(parameterName))
+                return null;
+            return new ConstructorParameterContext(document, parameterName, GetPropertyName(parameterName), parameter.Type, ctor, span, root);
         }
 
         static string GetPropertyName(string v)

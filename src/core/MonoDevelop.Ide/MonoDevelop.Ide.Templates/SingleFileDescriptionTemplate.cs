@@ -44,6 +44,8 @@ using MonoDevelop.Ide.Editor;
 using MonoDevelop.Projects.SharedAssetsProjects;
 using MonoDevelop.Core.StringParsing;
 using System.Threading.Tasks;
+using MonoDevelop.Core.Text;
+using Gtk;
 
 namespace MonoDevelop.Ide.Templates
 {
@@ -248,9 +250,11 @@ namespace MonoDevelop.Ide.Templates
 			if (!suppressAutoOpen)
 				IdeApp.Workbench.OpenDocument (generatedFile, project: null);
 		}
-		
-		// Creates a file and saves it to disk. Returns the path to the new file
-		// All parameters are optional (can be null)
+
+		/// <summary>
+		/// Creates a file and saves it to disk. All parameters are optional (can be null)
+		/// </summary>
+		/// <returns>The path to the new file.</returns>
 		public async Task<string> SaveFileAsync (SolutionFolderItem policyParent, Project project, string language, string baseDirectory, string entryName)
 		{
 			string file = GetFileName (policyParent, project, language, baseDirectory, entryName);
@@ -299,7 +303,9 @@ namespace MonoDevelop.Ide.Templates
 		{
 			createFileContentFromDerivedClass = true;
 			try {
+				#pragma warning disable 618 // back-compat for obsolete API
 				return CreateFileContent (policyParent, project, language, fileName, identifier);
+				#pragma warning restore 618
 			} finally {
 				createFileContentFromDerivedClass = false;
 			}
@@ -461,13 +467,15 @@ namespace MonoDevelop.Ide.Templates
 
 			string mime = DesktopService.GetMimeTypeForUri (fileName);
 			var formatter = !string.IsNullOrEmpty (mime) ? CodeFormatterService.GetFormatter (mime) : null;
-			
+
 			if (formatter != null) {
-				var formatted = formatter.FormatText (policyParent != null ? policyParent.Policies : null, content);
+				var document = TextEditorFactory.CreateNewReadonlyDocument (new StringTextSource (content), fileName);
+				// Avoid possible UI thread deadlock in CSharpFormatter by running the formatter with Task.Run.
+				var formatted = await Task.Run (() => formatter.Format (policyParent?.Policies, document));
 				if (formatted != null)
-					content = formatted;
+					content = formatted.Text;
 			}
-			
+
 			var ms = new MemoryStream ();
 			Encoding encoding = null; 
 			TextStylePolicy textPolicy = policyParent != null ? policyParent.Policies.Get<TextStylePolicy> (mime ?? "text/plain")
@@ -498,8 +506,17 @@ namespace MonoDevelop.Ide.Templates
 			
 
 			byte[] eolMarkerBytes = encoding.GetBytes (eolMarker);
-			
-			var tabToSpaces = textPolicy.TabsToSpaces? new string (' ', textPolicy.TabWidth) : null;
+			bool convertTabsToSpaces = textPolicy.TabsToSpaces;
+			int tabWidth = textPolicy.TabWidth;
+
+			if (ctx != null) {
+				if (ctx.CurrentConventions.UniversalConventions.TryGetIndentStyle (out Microsoft.VisualStudio.CodingConventions.IndentStyle result))
+					convertTabsToSpaces = result == Microsoft.VisualStudio.CodingConventions.IndentStyle.Spaces;
+				if (ctx.CurrentConventions.UniversalConventions.TryGetTabWidth (out int editorConfigTabWidth))
+					tabWidth = editorConfigTabWidth;
+			}
+			var tabToSpaces = convertTabsToSpaces ? new string (' ', tabWidth) : null;
+
 			IDocumentLine lastLine = null;
 			foreach (var line in doc.GetLines ()) {
 				var lineText = doc.GetTextAt (line.Offset, line.Length);

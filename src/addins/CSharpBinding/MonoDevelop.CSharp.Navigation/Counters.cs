@@ -27,43 +27,52 @@
 using System.Collections.Generic;
 using System.Threading;
 using MonoDevelop.Core.Instrumentation;
+using System.Net.Configuration;
 
 namespace MonoDevelop.CSharp.Navigation
 {
 	internal static class Counters
 	{
-		public static TimerCounter NavigateTo = InstrumentationService.CreateTimerCounter ("Navigate to", "Code Navigation", id: "CodeNavigation.NavigateTo");
+		public static TimerCounter<NavigationMetadata> NavigateTo = InstrumentationService.CreateTimerCounter<NavigationMetadata> ("Navigate to", "Code Navigation", id: "CodeNavigation.NavigateTo");
 
-		public static IDictionary<string, string> CreateNavigateToMetadata (string navigationType)
+		public static NavigationMetadata CreateNavigateToMetadata (string navigationType)
 		{
-			var metadata = new Dictionary<string, string> ();
-			metadata ["Type"] = navigationType;
-			metadata ["Result"] = "Failure"; // Will be updated when navigation finishes.
+			var metadata = new NavigationMetadata (navigationType);
+			metadata.SetResult (false);
 			return metadata;
 		}
 
-		public static void UpdateUserCancellation (IDictionary<string, string> metadata, CancellationToken cancellationToken)
+		public class NavigationMetadata: CounterMetadata
 		{
-			if (cancellationToken.IsCancellationRequested) {
-				metadata ["Result"] = "UserCancel";
+			public NavigationMetadata ()
+			{
 			}
-		}
 
-		public static void UpdateNavigateResult (IDictionary<string, string> metadata, bool result)
-		{
-			metadata ["Result"] = result ? "Success" : "Failure";
-		}
+			public NavigationMetadata (string type)
+			{
+				Type = type;
+				SetFailure ();// Will be updated when navigation finishes.
+			}
 
-		/// <summary>
-		/// Distinguish between IDE errors and a failure due to the user selecting an invalid item.
-		/// Some navigation menus are enabled even if they are not valid. For example, right clicking
-		/// on a method and selecting Navigate - Extension Methods will find no class at the caret and
-		/// will not attempt to find any extension methods. Note that the CommandInfo is disabled for
-		/// the menu but this does not seem to have any affect presumably because the method is async.
-		/// </summary>
-		public static void UpdateUserFault (IDictionary<string, string> metadata)
-		{
-			metadata ["Result"] = "UserFault";
+			public string Type {
+				get => ContainsProperty () ? GetProperty<string> () : null;
+				set => SetProperty (value);
+			}
+
+			public void SetResult (bool result)
+			{
+				if (result) {
+					SetSuccess ();
+				} else {
+					SetFailure ();
+				}
+			}
+
+			public void UpdateUserCancellation (CancellationToken cancellationToken)
+			{
+				if (cancellationToken.IsCancellationRequested)
+					SetUserCancel ();
+			}
 		}
 	}
 }

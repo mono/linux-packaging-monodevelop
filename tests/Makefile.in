@@ -386,7 +386,7 @@ EXTRA_DIST = \
 	test-projects/console-project/ConsoleProject/Program.cs \
 	test-projects/console-project/ConsoleProject.sln
 
-SUBDIRS = UnitTests MacPlatform.Tests UserInterfaceTests TestRunner Ide.Tests MonoDevelop.CSharpBinding.Tests WindowsPlatform.Tests MonoDevelop.Core.Tests MonoDevelop.Core.Tests.Addin MonoDevelop.Refactoring.Tests
+SUBDIRS = UnitTests IdeUnitTests MacPlatform.Tests UserInterfaceTests TestRunner Ide.Tests MonoDevelop.CSharpBinding.Tests WindowsPlatform.Tests MonoDevelop.Core.Tests MonoDevelop.Core.Tests.Addin MonoDevelop.Refactoring.Tests
 RUN_TEST = $(MDTOOL_RUN) run-md-tests
 TEST_DIR = $(top_builddir)/build/tests
 EXTERNAL = $(top_builddir)/external
@@ -396,6 +396,7 @@ TEST_PROJECTS_MAC = \
 	MacPlatform.Tests/MacPlatform.Tests.csproj
 
 TEST_PROJECTS_COMMON = \
+	IdeUnitTests/IdeUnitTests.csproj \
 	UnitTests/UnitTests.csproj \
 	$(top_srcdir)/src/addins/MonoDevelop.Debugger/MonoDevelop.Debugger.Tests/MonoDevelop.Debugger.Tests.csproj
 

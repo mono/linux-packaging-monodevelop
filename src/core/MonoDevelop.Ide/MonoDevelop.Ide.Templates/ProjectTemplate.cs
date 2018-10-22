@@ -41,12 +41,14 @@ using System.CodeDom;
 using System.CodeDom.Compiler;
 
 using MonoDevelop.Core;
+using MonoDevelop.Core.Instrumentation;
 using Mono.Addins;
 using MonoDevelop.Ide.Codons;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui;
 using System.Linq;
 using System.Threading.Tasks;
+using YamlDotNet.Core.Tokens;
 
 namespace MonoDevelop.Ide.Templates
 {
@@ -54,7 +56,7 @@ namespace MonoDevelop.Ide.Templates
 	{
 		public static List<ProjectTemplate> ProjectTemplates = new List<ProjectTemplate> ();
 
-		static MonoDevelop.Core.Instrumentation.Counter TemplateCounter = MonoDevelop.Core.Instrumentation.InstrumentationService.CreateCounter ("Template Instantiated", "Project Model", id:"Core.Template.Instantiated");
+		static Counter<TemplateMetadata> TemplateCounter = InstrumentationService.CreateCounter<TemplateMetadata> ("Template Instantiated", "Project Model", id:"Core.Template.Instantiated");
 
 		private List<string> actions = new List<string> ();
 
@@ -306,20 +308,21 @@ namespace MonoDevelop.Ide.Templates
 		{
 		}
 
-		public WorkspaceItem CreateWorkspaceItem (ProjectCreateInformation cInfo)
+		public async Task<WorkspaceItem> CreateWorkspaceItem (ProjectCreateInformation cInfo)
 		{
-			WorkspaceItemCreatedInformation workspaceItemInfo = solutionDescriptor.CreateEntry (cInfo, this.languagename);
+			WorkspaceItemCreatedInformation workspaceItemInfo = await solutionDescriptor.CreateEntry (cInfo, this.languagename);
 
 			this.createdSolutionName = workspaceItemInfo.WorkspaceItem.FileName;
 			this.packageReferencesForCreatedProjects = workspaceItemInfo.PackageReferencesForCreatedProjects;
 
 			var pDesc = this.solutionDescriptor.EntryDescriptors.OfType<ProjectDescriptor> ().ToList ();
 
-			var metadata = new Dictionary<string, string> ();
-			metadata ["Id"] = this.Id;
-			metadata ["Name"] = this.nonLocalizedName;
-			metadata ["Language"] = this.LanguageName;
-			metadata ["Platform"] = pDesc.Count == 1 ? pDesc[0].ProjectType : "Multiple";
+			var metadata = new TemplateMetadata {
+				Id = Id,
+				Name = nonLocalizedName,
+				Language = LanguageName ?? string.Empty,
+				Platform = pDesc.Count == 1 ? pDesc[0].ProjectType : "Multiple"
+			};
 			TemplateCounter.Inc (1, null, metadata);
 
 			return workspaceItemInfo.WorkspaceItem;
@@ -336,7 +339,18 @@ namespace MonoDevelop.Ide.Templates
 			foreach (ISolutionItemDescriptor solutionItemDescriptor in GetItemsToCreate (solutionDescriptor, cInfo)) {
 				ProjectCreateInformation itemCreateInfo = GetItemSpecificCreateInfo (solutionItemDescriptor, cInfo);
 				itemCreateInfo = new ProjectTemplateCreateInformation (itemCreateInfo, cInfo.ProjectName);
-				itemCreateInfo.TemplateInitializationCallback = p => solutionItemDescriptor.InitializeItem (policyParent, itemCreateInfo, this.languagename, p);
+				itemCreateInfo.TemplateInitializationCallback = async p => {
+					try {
+						await solutionItemDescriptor.InitializeItem (policyParent, itemCreateInfo, this.languagename, p);
+						// Handle the case where InitializeItem has to wait for a Task to complete and the project
+						// is saved before all the files are added to the project. Otherwise the project will not contain
+						// the files even though the solution pad shows them.
+						// TODO: Investigate making the InitializeFromTemplate methods Task based.
+						await p.SaveAsync (new ProgressMonitor ());
+					} catch (Exception ex) {
+						LoggingService.LogError ("TemplateInitializationCallback error.", ex);
+					}
+				};
 
 				SolutionItem solutionEntryItem = solutionItemDescriptor.CreateItem (itemCreateInfo, this.languagename);
 				if (solutionEntryItem != null) {
@@ -346,11 +360,12 @@ namespace MonoDevelop.Ide.Templates
 			}
 
 			var pDesc = this.solutionDescriptor.EntryDescriptors.OfType<ProjectDescriptor> ().FirstOrDefault ();
-			var metadata = new Dictionary<string, string> ();
-			metadata ["Id"] = this.Id;
-			metadata ["Name"] = this.nonLocalizedName;
-			metadata ["Language"] = this.LanguageName;
-			metadata ["Platform"] = pDesc != null ? pDesc.ProjectType : "Unknown";
+			var metadata = new TemplateMetadata {
+				Id = Id,
+				Name = nonLocalizedName,
+				Language = LanguageName,
+				Platform = pDesc != null ? pDesc.ProjectType : "Unknown"
+			};
 			TemplateCounter.Inc (1, null, metadata);
 
 			return solutionEntryItems;

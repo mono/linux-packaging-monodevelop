@@ -104,7 +104,7 @@ namespace MonoDevelop.Ide.Completion.Presentation
 
 		private void FinishInitialization ()
 		{
-			var document = LanguageBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges ();
+			var document = LanguageBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChangesSafe ();
 			var project = document.Project;
 
 			_workspace = project.Solution.Workspace;
@@ -315,7 +315,8 @@ namespace MonoDevelop.Ide.Completion.Presentation
 				var ch = text[i];
 				switch (ch) {
 				case ' ':
-					if (!TextAt (text, i - 1, ' ')) {
+				case '\t':
+					if (!TextAt (text, i - 1, ' ') && !TextAt (text, i - 1, '\t')) {
 						start = i;
 					}
 
@@ -326,7 +327,7 @@ namespace MonoDevelop.Ide.Completion.Presentation
 					if (i == 0) {
 						groups.Add (TextSpan.FromBounds (0, 0));
 					}
-					else if (TextAt (text, i - 1, ' ')) {
+					else if (TextAt (text, i - 1, ' ') || TextAt (text, i - 1, '\t')) {
 						groups.Add (TextSpan.FromBounds (start, i));
 					}
 					else if (TextAt (text, i - 1, '\n')) {
@@ -450,7 +451,7 @@ namespace MonoDevelop.Ide.Completion.Presentation
 
 		private IHierarchicalDifferenceCollection DiffStrings (string leftTextWithReplacement, string rightTextWithReplacement)
 		{
-			var document = LanguageBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges (); ;
+			var document = LanguageBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChangesSafe ();
 
 			var diffService = _differenceSelectorService.GetTextDifferencingService (
 				_workspace.Services.GetLanguageServices (document.Project.Language).GetService<IContentTypeLanguageService> ().GetDefaultContentType ());

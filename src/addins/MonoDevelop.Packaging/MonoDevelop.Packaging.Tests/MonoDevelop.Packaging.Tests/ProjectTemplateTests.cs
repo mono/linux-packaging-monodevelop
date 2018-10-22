@@ -27,6 +27,8 @@
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using MonoDevelop.Core;
+using MonoDevelop.Ide;
 using MonoDevelop.Ide.Templates;
 using MonoDevelop.PackageManagement.Tests.Helpers;
 using MonoDevelop.Projects;
@@ -38,19 +40,8 @@ using UnitTests;
 namespace MonoDevelop.Packaging.Tests
 {
 	[TestFixture]
-	public class ProjectTemplateTests : TestBase
+	public class ProjectTemplateTests : IdeTestBase
 	{
-		public ProjectTemplateTests ()
-		{
-			Simulate ();
-
-			#pragma warning disable 219
-			// Ensure MSBuildSdksPath is registered otherwise the project builders are recycled
-			// when we try to build the packaging project which breaks the tests.
-			string directory = DotNetCore.DotNetCoreSdk.MSBuildSDKsPath;
-			#pragma warning restore 219
-		}
-
 		[Test]
 		public async Task CreatePackagingProjectFromTemplate ()
 		{
@@ -64,7 +55,7 @@ namespace MonoDevelop.Packaging.Tests
 				SolutionPath = dir
 			};
 
-			var workspaceItem = template.CreateWorkspaceItem (cinfo);
+			var workspaceItem = await template.CreateWorkspaceItem (cinfo);
 			string solutionFileName = Path.Combine (dir, "SolutionName.sln");
 			await workspaceItem.SaveAsync (solutionFileName, Util.GetMonitor ());
 
@@ -85,7 +76,6 @@ namespace MonoDevelop.Packaging.Tests
 		}
 
 		[Test]
-		[Ignore ("Build does not work with project.json on Mono")]
 		public async Task BuildPackagingProjectFromTemplate ()
 		{
 			string templateId = "MonoDevelop.Packaging.Project";
@@ -102,13 +92,17 @@ namespace MonoDevelop.Packaging.Tests
 			cinfo.Parameters["PackageDescription"] = "Description";
 			cinfo.Parameters["PackageVersion"] = "1.0.0";
 
-			var workspaceItem = template.CreateWorkspaceItem (cinfo);
+			var workspaceItem = await template.CreateWorkspaceItem (cinfo);
 			string solutionFileName = Path.Combine (dir, "SolutionName.sln");
 			await workspaceItem.SaveAsync (solutionFileName, Util.GetMonitor ());
 
 			await NuGetPackageInstaller.InstallPackages ((Solution)workspaceItem, template.PackageReferencesForCreatedProjects);
 
-			var solution = (Solution)await Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solutionFileName);
+			var solution = (Solution)await Ide.Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solutionFileName);
+
+			// Ensure readme.txt has metadata to include it in the NuGet package.
+			var wizard = new TestablePackagingProjectTemplateWizard ();
+			wizard.ItemsCreated (new [] { solution });
 
 			BuildResult cr = await solution.Build (Util.GetMonitor (), "Debug");
 			Assert.IsNotNull (cr);
@@ -121,9 +115,11 @@ namespace MonoDevelop.Packaging.Tests
 		}
 
 		[Test]
-		[Platform (Exclude = "Linux")]
 		public async Task CreateMultiPlatformProjectFromTemplateWithAndroidOnly ()
 		{
+			if (!Platform.IsMac)
+				Assert.Ignore ("Platform not Mac - Ignoring CreateMultiPlatformProjectFromTemplateWithAndroidOnly");
+
 			string templateId = "MonoDevelop.Packaging.CrossPlatformLibrary";
 			var template = ProjectTemplate.ProjectTemplates.FirstOrDefault (t => t.Id == templateId);
 			var dir = Util.CreateTmpDir (template.Id);
@@ -137,19 +133,17 @@ namespace MonoDevelop.Packaging.Tests
 			cinfo.Parameters["CreateSharedProject"] = bool.TrueString;
 			cinfo.Parameters["CreateNuGetProject"] = bool.TrueString;
 
-			var workspaceItem = template.CreateWorkspaceItem (cinfo);
+			var workspaceItem = await template.CreateWorkspaceItem (cinfo);
 			string solutionFileName = Path.Combine (dir, "SolutionName.sln");
 			await workspaceItem.SaveAsync (solutionFileName, Util.GetMonitor ());
 
-			var solution = (Solution) await Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solutionFileName);
+			var solution = (Solution) await Ide.Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solutionFileName);
 
 			var project = solution.GetAllProjects ().OfType<DotNetProject> ().FirstOrDefault (p => p.FileName.FileName == "ProjectName.NuGet.nuproj");
 			Assert.IsNotNull (project);
-			Assert.IsTrue (project.GetFlavor<DotNetProjectPackagingExtension> ().GetRequiresMSBuild ());
 
 			var androidProject = solution.GetAllProjects ().OfType<DotNetProject> ().FirstOrDefault (p => p.FileName.FileName == "ProjectName.Android.csproj");
 			Assert.IsNotNull (androidProject);
-			Assert.IsTrue (androidProject.GetFlavor<DotNetProjectPackagingExtension> ().GetRequiresMSBuild ());
 
 			var sharedProject = solution.GetAllProjects ().OfType<SharedAssetsProject> ().FirstOrDefault (p => p.FileName.FileName == "ProjectName.Shared.shproj");
 			Assert.IsNotNull (sharedProject);
@@ -162,6 +156,7 @@ namespace MonoDevelop.Packaging.Tests
 		}
 
 		[Test]
+		[Ignore] // https://github.com/mono/monodevelop/issues/5602
 		public async Task CreateMultiPlatformProjectFromTemplateWithPCLOnly ()
 		{
 			string templateId = "MonoDevelop.Packaging.CrossPlatformLibrary";
@@ -180,7 +175,7 @@ namespace MonoDevelop.Packaging.Tests
 			cinfo.Parameters["PackageDescription"] = "Description";
 			cinfo.Parameters["PackageVersion"] = "1.0.0";
 
-			var workspaceItem = template.CreateWorkspaceItem (cinfo);
+			var workspaceItem = await template.CreateWorkspaceItem (cinfo);
 
 			var wizard = new TestableCrossPlatformLibraryTemplateWizard ();
 			wizard.Parameters = cinfo.Parameters;
@@ -193,7 +188,7 @@ namespace MonoDevelop.Packaging.Tests
 
 			await NuGetPackageInstaller.InstallPackages ((Solution)workspaceItem, template.PackageReferencesForCreatedProjects);
 
-			var solution = (Solution)await Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solutionFileName);
+			var solution = (Solution)await Ide.Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solutionFileName);
 			project = solution.GetAllProjects ().First ();
 			BuildResult cr = await solution.Build (Util.GetMonitor (), "Debug");
 			Assert.IsNotNull (cr);

@@ -16,9 +16,9 @@ namespace RefactoringEssentials
 	static class TypeExtensions
     {
         [RoslynReflectionUsage(RoslynReflectionAllowedContext.CodeFixes)]
-        public static TypeSyntax GenerateTypeSyntax(this ITypeSymbol typeSymbol, SyntaxAnnotation simplifierAnnotation = null)
+        public static TypeSyntax GenerateTypeSyntax(this ITypeSymbol typeSymbol, SyntaxAnnotation simplifierAnnotation = null, bool allowVar = false)
         {
-            var typeSyntax = (TypeSyntax)RoslynReflection.CSharpITypeSymbolExtensions.GenerateTypeSyntaxMethod.Invoke(null, new object[] { typeSymbol });
+            var typeSyntax = (TypeSyntax)RoslynReflection.CSharpITypeSymbolExtensions.GenerateTypeSyntaxMethod.Invoke(null, new object[] { typeSymbol, allowVar });
             if (simplifierAnnotation != null)
                 return typeSyntax.WithAdditionalAnnotations(simplifierAnnotation);
             return typeSyntax;
@@ -110,6 +110,7 @@ namespace RefactoringEssentials
         /// </summary>
         /// <returns>The all base classes.</returns>
         /// <param name="type">Type.</param>
+        /// <param name="includeSuperType">Whether to include the type as well as its base types.</param>
         public static IEnumerable<INamedTypeSymbol> GetAllBaseClasses(this INamedTypeSymbol type, bool includeSuperType = false)
         {
             if (!includeSuperType)
@@ -126,6 +127,7 @@ namespace RefactoringEssentials
         /// </summary>
         /// <returns>All classes and interfaces.</returns>
         /// <param name="type">Type.</param>
+        /// <param name="includeSuperType">Whether to include the type as well as its base types.</param>
         public static IEnumerable<INamedTypeSymbol> GetAllBaseClassesAndInterfaces(this INamedTypeSymbol type, bool includeSuperType = false)
         {
             if (!includeSuperType)
@@ -230,4 +232,3 @@ namespace RefactoringEssentials
         }
     }
 }
-

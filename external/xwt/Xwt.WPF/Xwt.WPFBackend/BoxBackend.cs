@@ -33,6 +33,7 @@ using SWC = System.Windows.Controls;
 
 using Xwt.Backends;
 using Xwt.Drawing;
+using System.Windows.Automation.Peers;
 
 namespace Xwt.WPFBackend
 {
@@ -129,11 +130,29 @@ namespace Xwt.WPFBackend
 					if (force) {
 						// Don't recalculate the size unless a relayout is being forced
 						element.InvalidateMeasure ();
+						element.Measure (new SW.Size (r.Width, r.Height));
 					}
-					element.Measure (new SW.Size (r.Width, r.Height));
+					
 					element.Arrange (r.ToWpfRect ());
 				//	element.UpdateLayout ();
 				}
+			}
+		}
+
+		protected override AutomationPeer OnCreateAutomationPeer ()
+		{
+			return new CustomPanelAutomationPeer (this);
+		}
+
+		class CustomPanelAutomationPeer : FrameworkElementAutomationPeer
+		{
+			public CustomPanelAutomationPeer (CustomPanel panel) : base (panel)
+			{
+			}
+
+			protected override AutomationControlType GetAutomationControlTypeCore ()
+			{
+				return AutomationControlType.Pane;
 			}
 		}
 	}

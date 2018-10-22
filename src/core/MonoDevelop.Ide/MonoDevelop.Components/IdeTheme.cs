@@ -333,6 +333,15 @@ namespace MonoDevelop.Components
 #if MAC
 		static Dictionary<NSWindow, NSObject> nsWindows = new Dictionary<NSWindow, NSObject> ();
 
+		internal static NSAppearance GetAppearance ()
+		{
+			return IdeApp.Preferences.UserInterfaceTheme == Theme.Light
+				? NSAppearance.GetAppearance (NSAppearance.NameAqua)
+				: MacSystemInformation.OsVersion < MacSystemInformation.Mojave
+					? NSAppearance.GetAppearance (NSAppearance.NameVibrantDark)
+					: NSAppearance.GetAppearance (new NSString ("NSAppearanceNameDarkAqua"));
+		}
+
 		public static void ApplyTheme (NSWindow window)
 		{
 			if (!nsWindows.ContainsKey(window)) {
@@ -343,10 +352,7 @@ namespace MonoDevelop.Components
 
 		static void SetTheme (NSWindow window)
 		{
-			if (IdeApp.Preferences.UserInterfaceTheme == Theme.Light)
-				window.Appearance = NSAppearance.GetAppearance (NSAppearance.NameAqua);
-			else
-				window.Appearance = NSAppearance.GetAppearance (NSAppearance.NameVibrantDark);
+			window.Appearance = GetAppearance ();
 
 			if (IdeApp.Preferences.UserInterfaceTheme == Theme.Light) {
 				window.StyleMask &= ~NSWindowStyle.TexturedBackground;
@@ -376,8 +382,13 @@ namespace MonoDevelop.Components
 		static void OnClose (NSNotification note)
 		{
 			var w = (NSWindow)note.Object;
-			NSNotificationCenter.DefaultCenter.RemoveObserver(nsWindows[w]);
+			if (MacSystemInformation.OsVersion < MacSystemInformation.HighSierra)
+				// Since HighSierra observers don't need to be removed manually, doing so
+				// after a window has been released might even lead to a native crash
+				// see: https://developer.apple.com/library/archive/releasenotes/Foundation/RN-Foundation/index.html#10_11NotificationCenter
+				NSNotificationCenter.DefaultCenter.RemoveObserver(nsWindows[w]);
 			nsWindows.Remove (w);
+
 		}
 
 		static void UpdateMacWindows ()

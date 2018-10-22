@@ -73,9 +73,6 @@ namespace MonoDevelop.VersionControl.Git
 			Disposed = true;
 			base.Dispose ();
 
-			if (VersionControlSystem != null)
-				((GitVersionControl)VersionControlSystem).UnregisterRepo (this);
-
 			if (RootRepository != null)
 				RootRepository.Dispose ();
 			foreach (var rep in cachedSubmodules)
@@ -159,7 +156,6 @@ namespace MonoDevelop.VersionControl.Git
 					if (doc != null)
 						doc.Reload ();
 				}
-				FileService.NotifyFileChanged (fp);
 				VersionControlService.NotifyFileStatusChanged (new FileUpdateEventArgs (this, fp, false));
 			});
 			return true;
@@ -210,18 +206,6 @@ namespace MonoDevelop.VersionControl.Git
 			}
 		}
 
-		void NotifyFilesChangedForStash (Stash stash)
-		{
-			// HACK: Notify file changes.
-			foreach (var entry in RootRepository.Diff.Compare<TreeChanges> (stash.WorkTree.Tree, stash.Base.Tree)) {
-				if (entry.Status == ChangeKind.Deleted || entry.Status == ChangeKind.Renamed) {
-					FileService.NotifyFileRemoved (RootRepository.FromGitPath (entry.OldPath));
-				} else {
-					FileService.NotifyFileChanged (RootRepository.FromGitPath (entry.Path));
-				}
-			}
-		}
-
 		public StashApplyStatus ApplyStash (ProgressMonitor monitor, int stashIndex)
 		{
 			if (monitor != null)
@@ -236,7 +220,6 @@ namespace MonoDevelop.VersionControl.Git
 				},
 			});
 
-			NotifyFilesChangedForStash (RootRepository.Stashes [stashIndex]);
 			if (monitor != null)
 				monitor.EndTask ();
 
@@ -257,7 +240,7 @@ namespace MonoDevelop.VersionControl.Git
 					CheckoutNotifyFlags = refreshFlags,
 				},
 			});
-			NotifyFilesChangedForStash (stash);
+
 			if (monitor != null)
 				monitor.EndTask ();
 
@@ -619,6 +602,15 @@ namespace MonoDevelop.VersionControl.Git
 			monitor.EndTask ();
 		}
 
+		static bool HandleAuthenticationException (AuthenticationException e)
+		{
+			var ret = MessageService.AskQuestion (
+								GettextCatalog.GetString ("Remote server error: {0}", e.Message),
+								GettextCatalog.GetString ("Retry authentication?"),
+								AlertButton.Yes, AlertButton.No);
+			return ret == AlertButton.Yes;
+		}
+
 		static void RetryUntilSuccess (ProgressMonitor monitor, Action<GitCredentialsType> func, Action onRetry = null)
 		{
 			bool retry;
@@ -631,10 +623,7 @@ namespace MonoDevelop.VersionControl.Git
 						retry = false;
 					} catch (AuthenticationException e) {
 						GitCredentials.InvalidateCredentials (credType);
-						retry = AlertButton.Yes == MessageService.AskQuestion (
-							GettextCatalog.GetString ("Remote server error: {0}", e.Message),
-							GettextCatalog.GetString ("Retry authentication?"),
-							AlertButton.Yes, AlertButton.No);
+						retry = Runtime.RunInMainThread (() => HandleAuthenticationException (e)).Result;
 						if (!retry)
 							monitor?.ReportError (e.Message, null);
 					} catch (VersionControlException e) {
@@ -1058,9 +1047,7 @@ namespace MonoDevelop.VersionControl.Git
 						CheckoutModifiers = CheckoutModifiers.Force,
 						CheckoutNotifyFlags = refreshFlags,
 						OnCheckoutNotify = delegate (string path, CheckoutNotifyFlags notifyFlags) {
-							if ((notifyFlags & CheckoutNotifyFlags.Untracked) != 0)
-								FileService.NotifyFileRemoved (repository.FromGitPath (path));
-							else
+							if ((notifyFlags & CheckoutNotifyFlags.Untracked) == 0)
 								RefreshFile (path, notifyFlags);
 							return true;
 						}
@@ -1400,30 +1387,13 @@ namespace MonoDevelop.VersionControl.Git
 					monitor.Step (1);
 				}
 			}
-			// Notify file changes
-			NotifyFileChanges (monitor, statusList);
 
-			BranchSelectionChanged?.Invoke (this, EventArgs.Empty);
+			Runtime.RunInMainThread (() => {
+				BranchSelectionChanged?.Invoke (this, EventArgs.Empty);
+			}).Ignore ();
 
 			monitor.EndTask ();
 			return true;
-		}
-
-		void NotifyFileChanges (ProgressMonitor monitor, TreeChanges statusList)
-		{
-			// Files added to source branch not present to target branch.
-			var removed = statusList.Where (c => c.Status == ChangeKind.Added).Select (c => GetRepository (c.Path).FromGitPath (c.Path)).ToList ();
-			var modified = statusList.Where (c => c.Status != ChangeKind.Added).Select (c => GetRepository (c.Path).FromGitPath (c.Path)).ToList ();
-
-			monitor.BeginTask (GettextCatalog.GetString ("Updating solution"), removed.Count + modified.Count);
-
-			FileService.NotifyFilesChanged (modified, true);
-			monitor.Step (modified.Count);
-
-			FileService.NotifyFilesRemoved (removed);
-			monitor.Step (removed.Count);
-
-			monitor.EndTask ();
 		}
 
 		static string GetStashName (string branchName)

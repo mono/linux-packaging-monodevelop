@@ -34,6 +34,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 
 using AppKit;
+using CoreFoundation;
 using Foundation;
 using CoreGraphics;
 
@@ -55,6 +56,7 @@ using System.Diagnostics;
 using Xwt.Mac;
 using MonoDevelop.Components.Mac;
 using System.Reflection;
+using MacPlatform;
 
 namespace MonoDevelop.MacIntegration
 {
@@ -271,9 +273,8 @@ namespace MonoDevelop.MacIntegration
 
 			var nc = NSNotificationCenter.DefaultCenter;
 			nc.AddObserver ((NSString)"AtkCocoaAccessibilityEnabled", (NSNotification) => {
-				Console.WriteLine ($"VoiceOver on {IdeTheme.AccessibilityEnabled}");
+				LoggingService.LogInfo ($"VoiceOver on {IdeTheme.AccessibilityEnabled}");
 				if (!IdeTheme.AccessibilityEnabled) {
-					Console.WriteLine ("Showing notice");
 					ShowVoiceOverNotice ();
 				}
 			}, NSApplication.SharedApplication);
@@ -466,20 +467,22 @@ namespace MonoDevelop.MacIntegration
 				}));
 
 
-			Styles.Changed += (s, a) => {
-				var colorPanel = NSColorPanel.SharedColorPanel;
-				if (colorPanel.ContentView?.Superview?.Window == null)
-					LoggingService.LogWarning ("Updating shared color panel appearance failed, no valid window.");
-				IdeTheme.ApplyTheme (colorPanel.ContentView.Superview.Window);
-				var appearance = colorPanel.ContentView.Superview.Window.Appearance;
-				if (appearance == null)
-					appearance = NSAppearance.GetAppearance (IdeApp.Preferences.UserInterfaceTheme == Theme.Light ? NSAppearance.NameAqua : NSAppearance.NameVibrantDark);
-				// The subviews of the shared NSColorPanel do not inherit the appearance of the main panel window
-				// and need to be updated recursively.
-				UpdateColorPanelSubviewsAppearance (colorPanel.ContentView.Superview, appearance);
-			};
-			
-			// FIXME: Immediate theme switching disabled, until NSAppearance issues are fixed 
+			if (MacSystemInformation.OsVersion < MacSystemInformation.Mojave) { // the shared color panel has full automatic theme support on Mojave
+				Styles.Changed += (s, a) => {
+					var colorPanel = NSColorPanel.SharedColorPanel;
+					if (colorPanel.ContentView?.Superview?.Window == null)
+						LoggingService.LogWarning ("Updating shared color panel appearance failed, no valid window.");
+					IdeTheme.ApplyTheme (colorPanel.ContentView.Superview.Window);
+					var appearance = colorPanel.ContentView.Superview.Window.Appearance;
+					if (appearance == null)
+						appearance = IdeTheme.GetAppearance ();
+					// The subviews of the shared NSColorPanel do not inherit the appearance of the main panel window
+					// and need to be updated recursively.
+					UpdateColorPanelSubviewsAppearance (colorPanel.ContentView.Superview, appearance);
+				};
+			}
+
+			// FIXME: Immediate theme switching disabled, until NSAppearance issues are fixed
 			//IdeApp.Preferences.UserInterfaceTheme.Changed += (s,a) => PatchGtkTheme ();
 		}
 
@@ -597,6 +600,7 @@ namespace MonoDevelop.MacIntegration
 				ApplicationEvents.OpenDocuments += delegate (object sender, ApplicationDocumentEventArgs e) {
 					//OpenFiles may pump the mainloop, but can't do that from an AppleEvent, so use a brief timeout
 					GLib.Timeout.Add (10, delegate {
+						IdeApp.ReportTimeToCode = true;
 						IdeApp.OpenFiles (e.Documents.Select (
 							doc => new FileOpenInformation (doc.Key, null, doc.Value, 1, OpenDocumentOptions.DefaultInternal))
 						);
@@ -607,6 +611,7 @@ namespace MonoDevelop.MacIntegration
 
 				ApplicationEvents.OpenUrls += delegate (object sender, ApplicationUrlEventArgs e) {
 					GLib.Timeout.Add (10, delegate {
+						IdeApp.ReportTimeToCode = true;
 						// Open files via the monodevelop:// URI scheme, compatible with the
 						// common TextMate scheme: http://blog.macromates.com/2007/the-textmate-url-scheme/
 						IdeApp.OpenFiles (e.Urls.Select (url => {
@@ -1031,7 +1036,7 @@ namespace MonoDevelop.MacIntegration
 				return base.GetIsFullscreen (window);
 			}
 
-			NSWindow nswin = GtkQuartz.GetWindow (window);
+			NSWindow nswin = window;
 			return (nswin.StyleMask & NSWindowStyle.FullScreenWindow) != 0;
 		}
 
@@ -1141,6 +1146,108 @@ namespace MonoDevelop.MacIntegration
 
 			proc.StartInfo = psi;
 			proc.Start ();
+		}
+
+		internal override IPlatformTelemetryDetails CreatePlatformTelemetryDetails ()
+		{
+			return MacTelemetryDetails.CreateTelemetryDetails ();
+		}
+
+		internal override MemoryMonitor CreateMemoryMonitor () => new MacMemoryMonitor ();
+
+		internal class MacMemoryMonitor : MemoryMonitor, IDisposable
+		{
+			const MemoryPressureFlags notificationFlags = MemoryPressureFlags.Critical | MemoryPressureFlags.Warn | MemoryPressureFlags.Normal;
+			internal DispatchSource.MemoryPressure DispatchSource { get; private set; }
+
+			public MacMemoryMonitor ()
+			{
+				DispatchSource = new DispatchSource.MemoryPressure (notificationFlags, DispatchQueue.DefaultGlobalQueue);
+				DispatchSource.SetEventHandler (() => {
+					var metadata = CreateMemoryMetadata (DispatchSource.PressureFlags);
+
+					var args = new PlatformMemoryStatusEventArgs (metadata);
+					OnStatusChanged (args);
+				});
+				DispatchSource.Resume ();
+			}
+
+			static MacPlatformMemoryMetadata CreateMemoryMetadata (MemoryPressureFlags flags)
+			{
+				var platformMemoryStatus = GetPlatformMemoryStatus (flags);
+				Interop.SysCtl ("vm.compressor_bytes_used", out long osCompressedMemory);
+				Interop.SysCtl ("vm.vm_page_free_target", out long osFreePagesTarget);
+				Interop.SysCtl ("vm.page_free_count", out long osFreePages);
+				Interop.SysCtl ("vm.pagesize", out long pagesize);
+
+				KernelInterop.GetCompressedMemoryInfo (out ulong appCompressedMemory, out ulong appVirtualMemory);
+
+				return new MacPlatformMemoryMetadata {
+					MemoryStatus = platformMemoryStatus,
+					OSVirtualMemoryFreeTarget = osFreePagesTarget * pagesize,
+					OSTotalFreeVirtualMemory = osFreePages * pagesize,
+					OSTotalCompressedMemory = osCompressedMemory,
+					ApplicationVirtualMemory = appVirtualMemory,
+					ApplicationCompressedMemory = appCompressedMemory,
+				};
+			}
+
+			static PlatformMemoryStatus GetPlatformMemoryStatus (MemoryPressureFlags flags)
+			{
+				switch (flags) {
+				case MemoryPressureFlags.Critical:
+					return PlatformMemoryStatus.Critical;
+				case MemoryPressureFlags.Warn:
+					return PlatformMemoryStatus.Low;
+				case MemoryPressureFlags.Normal:
+					return PlatformMemoryStatus.Normal;
+				default:
+					LoggingService.LogError ("Unknown MemoryPressureFlags value {0}", flags.ToString ());
+					return PlatformMemoryStatus.Normal;
+				}
+			}
+
+			public void Dispose ()
+			{
+				if (DispatchSource != null) {
+					DispatchSource.Cancel ();
+					DispatchSource.Dispose ();
+					DispatchSource = null;
+				}
+			}
+
+			class MacPlatformMemoryMetadata : PlatformMemoryMetadata
+			{
+				// sysctl - vm.vm_page_free_target
+				public long OSVirtualMemoryFreeTarget {
+					get => GetProperty<long> ();
+					set => SetProperty (value);
+				}
+
+				// sysctl - vm.compressor_bytes_used
+				public long OSTotalCompressedMemory {
+					get => GetProperty<long> ();
+					set => SetProperty (value);
+				}
+
+				// sysctl - vm.page_free_count
+				public long OSTotalFreeVirtualMemory {
+					get => GetProperty<long> ();
+					set => SetProperty (value);
+				}
+
+				// task_vm_info_t.compressed
+				public ulong ApplicationCompressedMemory {
+					get => GetProperty<ulong> ();
+					set => SetProperty (value);
+				}
+
+				// task_vm_info_t.virtual_size
+				public ulong ApplicationVirtualMemory {
+					get => GetProperty<ulong> ();
+					set => SetProperty (value);
+				}
+			}
 		}
 	}
 

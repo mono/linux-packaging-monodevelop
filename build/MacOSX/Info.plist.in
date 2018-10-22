@@ -61,6 +61,20 @@
 			<true/>
 		</dict>
 		<dict>
+			<key>CFBundleTypeIconFile</key>
+			<string>monodevelop.sln.icns</string>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>binlog</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>@APP_NAME@ MSBuild Binary Log</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSIsAppleDefaultForType</key>
+			<true/>
+		</dict>
+		<dict>
 			<key>CFBundleTypeExtensions</key>
 			<array>
 				<string>cs</string>
@@ -274,11 +288,11 @@
 		<string>ja</string>
 		<string>ko</string>
 		<string>pl</string>
-		<string>pt_BR</string>
+		<string>pt-BR</string>
 		<string>ru</string>
 		<string>tr</string>
-		<string>zh_TW</string>
-		<string>zh_CN</string>
+		<string>zh-Hans</string>
+		<string>zh-Hant</string>
 	</array>
 </dict>
 </plist>

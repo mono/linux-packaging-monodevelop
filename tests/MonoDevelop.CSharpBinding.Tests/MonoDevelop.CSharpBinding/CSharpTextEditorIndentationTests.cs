@@ -44,28 +44,19 @@ using MonoDevelop.Ide.Editor.Extension;
 using MonoDevelop.Projects;
 using System.Threading.Tasks;
 using MonoDevelop.Core;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.CSharpBinding
 {
 	[TestFixture]
-	class CSharpTextEditorIndentationTests : TestBase
+	class CSharpTextEditorIndentationTests : TextEditorExtensionTestBase
 	{
 		const string eolMarker = "\n";
 
-		internal static TestViewContent Create (string input, Ide.Editor.ITextEditorOptions options = null, bool createWithProject = false)
+		protected override EditorExtensionTestData GetContentData () => EditorExtensionTestData.CSharp;
+	
+		internal async Task<TextEditorExtensionTestCase> Create (string input, Ide.Editor.ITextEditorOptions options = null, bool createWithProject = false)
 		{
-			TestWorkbenchWindow tww = new TestWorkbenchWindow ();
-			var content = new TestViewContent ();
-			content.Data.Options = options ?? new CustomEditorOptions {
-				DefaultEolMarker = eolMarker,
-				IndentStyle = IndentStyle.Smart
-			};
-			tww.ViewContent = content;
-			content.ContentName = "/a.cs";
-			content.Data.MimeType = "text/x-csharp";
-			  
-			var doc = new Document (tww);
-
 			var sb = new StringBuilder ();
 			int caretIndex = -1, selectionStart = -1, selectionEnd = -1;
 			var foldSegments = new List<IFoldSegment> ();
@@ -73,10 +64,10 @@ namespace MonoDevelop.CSharpBinding
 			for (int i = 0; i < input.Length; i++) {
 				var ch = input [i];
 				switch (ch) {
-					case '$':
+				case '$':
 					caretIndex = sb.Length;
 					break;
-					case '<':
+				case '<':
 					if (i + 1 < input.Length) {
 						if (input [i + 1] == '-') {
 							selectionStart = sb.Length;
@@ -85,7 +76,7 @@ namespace MonoDevelop.CSharpBinding
 						}
 					}
 					goto default;
-					case '-':
+				case '-':
 					if (i + 1 < input.Length) {
 						var next = input [i + 1];
 						if (next == '>') {
@@ -102,7 +93,7 @@ namespace MonoDevelop.CSharpBinding
 						}
 					}
 					goto default;
-					case '+':
+				case '+':
 					if (i + 1 < input.Length) {
 						var next = input [i + 1];
 						if (next == '[') {
@@ -114,7 +105,7 @@ namespace MonoDevelop.CSharpBinding
 						}
 					}
 					goto default;
-					case ']':
+				case ']':
 					if (foldStack.Count > 0) {
 						var segment = foldStack.Pop ();
 						segment.Length = sb.Length - segment.Offset;
@@ -122,36 +113,35 @@ namespace MonoDevelop.CSharpBinding
 						break;
 					}
 					goto default;
-					default:
+				default:
 					sb.Append (ch);
 					break;
 				}
 			}
-			content.Data.Text = sb.ToString ();
+
+			var testCase = await SetupTestCase (sb.ToString ());
+			var doc = testCase.Document;
+			var data = doc.Editor;
+
+			data.Options = options ?? new CustomEditorOptions {
+				DefaultEolMarker = eolMarker,
+				IndentStyle = IndentStyle.Smart,
+			};
 
 			if (caretIndex >= 0)
-				content.Data.CaretOffset = caretIndex;
+				data.CaretOffset = caretIndex;
 			if (selectionStart >= 0) {
 				if (caretIndex == selectionStart) {
-					content.Data.SetSelection (selectionEnd, selectionStart);
+					data.SetSelection (selectionEnd, selectionStart);
 				} else {
-					content.Data.SetSelection (selectionStart, selectionEnd);
+					data.SetSelection (selectionStart, selectionEnd);
 					if (caretIndex < 0)
-						content.Data.CaretOffset = selectionEnd;
+						data.CaretOffset = selectionEnd;
 				}
 			}
 			if (foldSegments.Count > 0)
-				content.Data.SetFoldings (foldSegments);
-
-			if (createWithProject) {
-				var project = Services.ProjectService.CreateProject ("C#");
-				project.Name = "test";
-				project.FileName = "test.csproj";
-				project.Files.Add (new ProjectFile (content.ContentName, BuildAction.Compile));
-				project.Policies.Set (Projects.Policies.PolicyService.InvariantPolicies.Get<CSharpFormattingPolicy> (), CSharpFormatter.MimeType);
-				doc.SetProject (project);
-			}
-			return content;
+				data.SetFoldings (foldSegments);
+			return testCase;
 		}
 
 		ICSharpCode.NRefactory6.CSharp.IStateMachineIndentEngine CreateTracker (TextEditor data)
@@ -164,8 +154,9 @@ namespace MonoDevelop.CSharpBinding
 			return result;
 		}
 
-		void CheckOutput (TextEditor data, string output, CSharpTextEditorIndentation engine = null)
+		void CheckOutput (TextEditorExtensionTestCase testCase, string output, CSharpTextEditorIndentation engine = null)
 		{
+			TextEditor data = testCase.Document.Editor;
 			if (engine == null)
 				engine = new CSharpTextEditorIndentation ();
 			engine.FixLineStart (data, CreateTracker (data), data.CaretLine);
@@ -179,105 +170,113 @@ namespace MonoDevelop.CSharpBinding
 				Console.WriteLine (data.Text.Replace ("\t", "\\t").Replace (" ", "."));
 			}
 			Assert.AreEqual (output, data.Text);
-			Assert.AreEqual (idx, data.CaretOffset, "Caret offset mismatch.");
+			if (idx >= 0)
+				Assert.AreEqual (idx, data.CaretOffset, "Caret offset mismatch.");
 		}
 
 		[Test]
-		public void TestXmlDocumentContinuation ()
+		public async Task TestXmlDocumentContinuationAsync ()
 		{
-			var data = Create (
-				"\t\t///" + eolMarker + 
+			using (var data = await Create (
+				"\t\t///" + eolMarker +
 					"\t\t/// Hello$" + eolMarker +
 					"\t\tclass Foo {}"
-			).Data;
+			)) {
+			
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			EditActions.InsertNewLine (data);
-
-			CheckOutput (data,
-				"\t\t///" + eolMarker +
-				"\t\t/// Hello" + eolMarker +
-				"\t\t/// $" + eolMarker +
-				"\t\tclass Foo {}");
+				CheckOutput (data,
+					"\t\t///" + eolMarker +
+					"\t\t/// Hello" + eolMarker +
+					"\t\t/// $" + eolMarker +
+					"\t\tclass Foo {}");
+			}
 		}
 
 		[Test]
-		public void TestXmlDocumentContinuationCase2 ()
+		public async Task TestXmlDocumentContinuationCase2 ()
 		{
-			var data = Create ("\t\t///" + eolMarker +
+			using (var data = await Create ("\t\t///" + eolMarker +
 "\t\t/// Hel$lo" + eolMarker +
-"\t\tclass Foo {}").Data;
-			EditActions.InsertNewLine (data);
+											"\t\tclass Foo {}")) {
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			CheckOutput (data, "\t\t///" + eolMarker +
-"\t\t/// Hel" + eolMarker +
-"\t\t/// $lo" + eolMarker +
-				"\t\tclass Foo {}");
+				CheckOutput (data, "\t\t///" + eolMarker +
+	"\t\t/// Hel" + eolMarker +
+	"\t\t/// $lo" + eolMarker +
+					"\t\tclass Foo {}");
+			}
 		}
 
 		[Test]
-		public void TestMultiLineCommentContinuation ()
+		public async Task TestMultiLineCommentContinuationAsync ()
 		{
-			var data = Create ("\t\t/*$" + eolMarker + "\t\tclass Foo {}").Data;
-			EditActions.InsertNewLine (data);
+			using (var data = await Create ("\t\t/*$" + eolMarker + "\t\tclass Foo {}")) {
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			CheckOutput (data, "\t\t/*" + eolMarker + "\t\t * $" + eolMarker + "\t\tclass Foo {}");
+				CheckOutput (data, "\t\t/*" + eolMarker + "\t\t * $" + eolMarker + "\t\tclass Foo {}");
+			}
 		}
 
 		[Test]
-		public void TestMultiLineCommentContinuationCase2 ()
+		public async Task TestMultiLineCommentContinuationCase2Async ()
 		{
-			var data = Create (
+			using (var data = await Create (
 				"\t\t/*" + eolMarker +
 				"\t\t * Hello$" + eolMarker +
-				"\t\tclass Foo {}").Data;
-			EditActions.InsertNewLine (data);
-			CheckOutput (data, 
-			             "\t\t/*" + eolMarker +
-			             "\t\t * Hello" + eolMarker +
-			             "\t\t * $" + eolMarker +
-			             "\t\tclass Foo {}");
+				"\t\tclass Foo {}")) {
+				EditActions.InsertNewLine (data.Document.Editor);
+				CheckOutput (data,
+							 "\t\t/*" + eolMarker +
+							 "\t\t * Hello" + eolMarker +
+							 "\t\t * $" + eolMarker +
+							 "\t\tclass Foo {}");
+			}
 		}
 
 		[Test]
-		public void TestMultiLineCommentContinuationCase3 ()
+		public async Task TestMultiLineCommentContinuationCase3Async ()
 		{
-			var data = Create ("\t\t/*" + eolMarker +
-			             "\t\t * Hel$lo" + eolMarker +
-			             "class Foo {}").Data;
-			EditActions.InsertNewLine (data);
+			using (var data = await Create ("\t\t/*" + eolMarker +
+						 "\t\t * Hel$lo" + eolMarker +
+											"class Foo {}")) {
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			CheckOutput (data,
-			             "\t\t/*" + eolMarker +
-			             "\t\t * Hel" + eolMarker +
-			             "\t\t * $lo" + eolMarker +
-			             "class Foo {}");
+				CheckOutput (data,
+							 "\t\t/*" + eolMarker +
+							 "\t\t * Hel" + eolMarker +
+							 "\t\t * $lo" + eolMarker +
+							 "class Foo {}");
+			}
 		}
 
 		[Test]
-		public void TestStringContination ()
+		public async Task TestStringContinationAsync ()
 		{
-			var data = Create ("\t\t\"Hello$World\"").Data;
-			EditActions.InsertNewLine (data);
+			using (var data = await Create ("\t\t\"Hello$World\"")) {
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			var engine = new CSharpTextEditorIndentation {
-				wasInStringLiteral = true
-			};
-			CheckOutput (data, "\t\t\"Hello\" +" + eolMarker + "\t\t\"$World\"", engine);
+				var engine = new CSharpTextEditorIndentation {
+					wasInStringLiteral = true
+				};
+				CheckOutput (data, "\t\t\"Hello\" +" + eolMarker + "\t\t\"$World\"", engine);
+			}
 		}
 
 		/// <summary>
 		/// Bug 17896 - Adding line break inside string removes forward whitespace.
 		/// </summary>
 		[Test]
-		public void TestBug17896 ()
+		public async Task TestBug17896Async ()
 		{
-			var data = Create ("\t\t\"This is a long test string.$        It contains spaces.\"").Data;
-			EditActions.InsertNewLine (data);
+			using (var data = await Create ("\t\t\"This is a long test string.$        It contains spaces.\"")) {
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			var engine = new CSharpTextEditorIndentation {
-				wasInStringLiteral = true
-			};
-			CheckOutput (data, "\t\t\"This is a long test string.\" +" + eolMarker + "\t\t\"$        It contains spaces.\"", engine);
+				var engine = new CSharpTextEditorIndentation {
+					wasInStringLiteral = true
+				};
+				CheckOutput (data, "\t\t\"This is a long test string.\" +" + eolMarker + "\t\t\"$        It contains spaces.\"", engine);
+			}
 		}
 
 
@@ -285,12 +284,13 @@ namespace MonoDevelop.CSharpBinding
 		/// Bug 3214 - Unclosed String causes 'Enter' key to produce appended String line.
 		/// </summary>
 		[Test]
-		public void TestBug3214 ()
+		public async Task TestBug3214Async ()
 		{
-			var data = Create ("\"Hello\n\t$");
-			EditActions.InsertNewLine (data.Data);
+			using (var data = await Create ("\"Hello\n\t$")) {
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			CheckOutput (data.Data, "\"Hello\n\t" + eolMarker + "\t$");
+				CheckOutput (data, "\"Hello\n\t" + eolMarker + "\t$");
+			}
 		}
 
 		void TestGuessSemicolonInsertionOffset (string fooBar, bool expected = true)
@@ -377,23 +377,25 @@ namespace MonoDevelop.CSharpBinding
 		/// Bug 11966 - Code Completion Errors with /// Comments
 		/// </summary>
 		[Test]
-		public void TestBug11966 ()
+		public async Task TestBug11966Async ()
 		{
-			var data = Create ("///<summary>This is a long comment $ </summary>").Data;
-			EditActions.InsertNewLine (data);
+			using (var data = await Create ("///<summary>This is a long comment $ </summary>")) {
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			CheckOutput (data, @"///<summary>This is a long comment 
+				CheckOutput (data, @"///<summary>This is a long comment 
 /// $ </summary>");
+			}
 		}
 
 
 		[Test]
-		public void TestEnterSelectionBehavior ()
+		public async Task TestEnterSelectionBehaviorAsync ()
 		{
-			var data = Create ("\tfirst\n<-\tsecond\n->$\tthird").Data;
-			EditActions.InsertNewLine (data);
+			using (var data = await Create ("\tfirst\n<-\tsecond\n->$\tthird")) {
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			CheckOutput (data, "\tfirst\n\t$third");
+				CheckOutput (data, "\tfirst\n\t$third");
+			}
 		}
 
 
@@ -401,12 +403,13 @@ namespace MonoDevelop.CSharpBinding
 		/// Bug 15335 - In a multiline comment, pressing Enter jumps way ahead
 		/// </summary>
 		[Test]
-		public void TestBug15335 ()
+		public async Task TestBug15335Async ()
 		{
-			var data = Create ("namespace Foo\n{\n\tpublic class Bar\n\t{\n\t\tvoid Test()\r\n\t\t{\r\n\t\t\t/* foo$\n\t\t}\n\t}\n}\n").Data;
-			EditActions.InsertNewLine (data);
+			using (var data = await Create ("namespace Foo\n{\n\tpublic class Bar\n\t{\n\t\tvoid Test()\r\n\t\t{\r\n\t\t\t/* foo$\n\t\t}\n\t}\n}\n")) {
+				EditActions.InsertNewLine (data.Document.Editor);
 
-			CheckOutput (data, "namespace Foo\n{\n\tpublic class Bar\n\t{\n\t\tvoid Test()\r\n\t\t{\r\n\t\t\t/* foo\n\t\t\t * $\n\t\t}\n\t}\n}\n");
+				CheckOutput (data, "namespace Foo\n{\n\tpublic class Bar\n\t{\n\t\tvoid Test()\r\n\t\t{\r\n\t\t\t/* foo\n\t\t\t * $\n\t\t}\n\t}\n}\n");
+			}
 		}
 
 
@@ -436,18 +439,18 @@ namespace MonoDevelop.CSharpBinding
 		/// Bug 17766 - Decreasing tab on single line bounces back to formatting spot.
 		/// </summary>
 		[Test]
-		public void TestBug17766 ()
+		public async Task TestBug17766Async ()
 		{
-			var content = Create (@"
+			using (var content = await Create (@"
 class Foo 
 {
 	$void Bar ()
 	{
 	}
 }
-");
-			EditActions.RemoveTab (content.Data);
-			CheckOutput (content.Data, @"
+")) {
+				EditActions.RemoveTab (content.Document.Editor);
+				CheckOutput (content, @"
 class Foo 
 {
 $void Bar ()
@@ -455,6 +458,7 @@ $void Bar ()
 	}
 }
 ", content.GetContent<CSharpTextEditorIndentation> ());
+			}
 		}
 
 		/// <summary>
@@ -462,9 +466,9 @@ $void Bar ()
 		/// </summary>
 		[Ignore("Fixme")]
 		[Test]
-		public void TestBug55907 ()
+		public async Task TestBug55907Async ()
 		{
-			var content = Create (@"
+			using (var content = await Create (@"
 class Foo 
 {
 	void Bar ()
@@ -476,11 +480,11 @@ class Foo
 		}
 	}
 }
-", createWithProject: true);
-			var indent = content.GetTextEditorData ().GetContent<CSharpTextEditorIndentation> ();
-			indent.KeyPress (KeyDescriptor.FromGtk ((Gdk.Key)':', ':', Gdk.ModifierType.None));
+", createWithProject: true)) {
+				var indent = content.GetContent<CSharpTextEditorIndentation> ();
+				indent.KeyPress (KeyDescriptor.FromGtk ((Gdk.Key)':', ':', Gdk.ModifierType.None));
 
-			CheckOutput (content.Data, @"
+				CheckOutput (content, @"
 class Foo 
 {
 	void Bar ()
@@ -493,7 +497,70 @@ class Foo
 	}
 }
 ", indent);
+			}
+		}
+		[Test]
+		public async Task TestVSTS567503 ()
+		{
+			using (var testCase = await Create (@"
+class Foo 
+{
+	/// <exception cref="""">$
+	void Bar ()
+	{
+	}
+}
+", createWithProject: true)) {
+				var indent = new CSharpTextEditorIndentation ();
+				indent.Initialize (testCase.Document.Editor, testCase.Document);
+				indent.KeyPress (KeyDescriptor.FromGtk ((Gdk.Key)'>', '>', Gdk.ModifierType.None));
+
+				CheckOutput (testCase, @"
+class Foo 
+{
+	/// <exception cref="""">$</exception>
+	void Bar ()
+	{
+	}
+}
+", indent);
+
+			}
 		}
 
+
+		/// <summary>
+		/// Bug 634797: Pasted text indents with extra whitespace
+		/// </summary>
+		[Test]
+		public async Task TestVSTS634797 ()
+		{
+			using (var testCase = await Create (@"
+class Foo 
+{
+    void Bar()
+    {
+        $    int a;
+    }
+}
+", createWithProject: true)) {
+				var indent = new CSharpTextEditorIndentation ();
+				indent.Initialize (testCase.Document.Editor, testCase.Document);
+				var offset = testCase.Document.Editor.CaretOffset;
+				indent.SafeUpdateIndentEngine (offset);
+				var pasteHandler = new CSharpTextPasteHandler (indent, indent.stateTracker, null);
+				await pasteHandler.PostFomatPastedText (offset, "	int a;".Length);
+				CheckOutput (testCase, @"
+class Foo 
+{
+    void Bar()
+    {
+        int a;
+    }
+}
+", indent);
+
+			}
+		}
 	}
 }

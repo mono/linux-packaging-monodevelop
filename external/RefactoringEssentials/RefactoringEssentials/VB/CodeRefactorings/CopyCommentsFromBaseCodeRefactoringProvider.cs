@@ -42,11 +42,17 @@ namespace RefactoringEssentials.VB.CodeRefactorings
             var baseMember = GetBaseMember(declaredSymbol, out documentation, cancellationToken);
             if (baseMember == null || string.IsNullOrEmpty(documentation))
                 return;
-            XDocument doc = XDocument.Parse(documentation);
-            var rootElement = doc.Elements().First();
-            var inner = string.Join(System.Environment.NewLine, rootElement.Nodes().Select(n => n.ToString())).Trim();
-            if (string.IsNullOrEmpty(inner))
+            string inner;
+            try {
+                XDocument doc = XDocument.Parse(documentation);
+                var rootElement = doc.Elements().First();
+                inner = string.Join(System.Environment.NewLine, rootElement.Nodes().Select(n => n.ToString())).Trim();
+                if (string.IsNullOrEmpty(inner))
+                    return;
+            } catch {
+                // ignore malformed xml.
                 return;
+            }
 
             // "Copy comments from interface"
             context.RegisterRefactoring(

@@ -410,6 +410,7 @@ uninstall-am:
 @ENABLE_MACPLATFORM_TRUE@	$(MAKE) -C monomac/src clean
 @ENABLE_MACPLATFORM_TRUE@	rm -f Xamarin.Mac.Registrar.full.a
 @ENABLE_MACPLATFORM_TRUE@	rm -f Xamarin.Mac.dll*
+@ENABLE_MACPLATFORM_TRUE@	rm -f Xamarin.Mac.pdb
 @ENABLE_MACPLATFORM_TRUE@	rm -f libxammac.dylib
 
 @ENABLE_MACPLATFORM_FALSE@all:

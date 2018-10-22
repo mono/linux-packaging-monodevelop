@@ -295,7 +295,6 @@ namespace MonoDevelop.Projects
 			sol.Dispose ();
 		}
 
-		//[Ignore ("xbuild bug. It is not returning correct values for evaluated-items-without-condition list")]
 		[Test]
 		public async Task EvaluatePropertiesWithConditionalGroup ()
 		{
@@ -1382,6 +1381,17 @@ namespace MonoDevelop.Projects
 			Assert.AreEqual (Util.ToSystemEndings (File.ReadAllText (p.FileName + ".saved2")), File.ReadAllText (p.FileName));
 
 			p.Dispose ();
+		}
+
+		[Test]
+		public async Task LoadProject_ImportHasCircularDependency ()
+		{
+			string solFile = Util.GetSampleProject ("ImportCircularDependency", "ImportCircularDependency.sln");
+
+			using (var item = (Solution)await Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solFile)) {
+				var p = item.Items [0] as UnknownSolutionItem;
+				Assert.That (p.LoadError, Contains.Substring ("circular dependency"));
+			}
 		}
 	}
 

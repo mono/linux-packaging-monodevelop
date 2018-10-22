@@ -127,6 +127,7 @@ namespace MonoDevelop.Ide.Completion.Presentation
 
 		protected override void OnDestroyed ()
 		{
+			HideDescription ();
 			base.OnDestroyed ();
 			if (layout != null) {
 				layout.Dispose ();
@@ -176,6 +177,9 @@ namespace MonoDevelop.Ide.Completion.Presentation
 
 		public CompletionItem SelectedItem {
 			get {
+				if (SelectedItemIndex < 0 || SelectedItemIndex >= filteredItems.Count) {
+					return null;
+				}
 				return filteredItems [SelectedItemIndex];
 			}
 		}
@@ -295,6 +299,8 @@ namespace MonoDevelop.Ide.Completion.Presentation
 
 		protected override bool OnExposeEvent (Gdk.EventExpose args)
 		{
+			bool needsRefresh = false;
+
 			using (var context = Gdk.CairoHelper.Create (args.Window)) {
 				var scalef = GtkWorkarounds.GetScaleFactor (this);
 				context.LineWidth = 1;
@@ -446,13 +452,13 @@ namespace MonoDevelop.Ide.Completion.Presentation
 
 					if (Math.Min (maxListWidth, wi + xpos + iconWidth + 2) > listWidth) {
 						box.WidthRequest = listWidth = Math.Min (maxListWidth, wi + xpos + iconWidth + 2 + iconTextSpacing);
-						textView.QueueSpaceReservationStackRefresh ();
+						needsRefresh = true;
 					} else {
 						//workaround for the vscrollbar display - the calculated width needs to be the width ofthe render region.
 						if (Allocation.Width < listWidth) {
 							if (listWidth - Allocation.Width < 30) {
 								box.WidthRequest = listWidth + listWidth - Allocation.Width;
-								textView.QueueSpaceReservationStackRefresh ();
+								needsRefresh = true;
 							}
 						}
 					}
@@ -460,8 +466,22 @@ namespace MonoDevelop.Ide.Completion.Presentation
 					return true;
 				});
 
+				if (needsRefresh) {
+					QueueSpaceReservationStackRefresh ();
+				}
+
 				return false;
 			}
+		}
+
+		/// <summary>
+		/// Need to postpone this after the current painting on the UI thread is done,
+		/// otherwise the stack refresh will close the current completion while it's mid-painting.
+		/// See VSTS 662457.
+		/// </summary>
+		void QueueSpaceReservationStackRefresh ()
+		{
+			Task.Run (() => textView.QueueSpaceReservationStackRefresh ());
 		}
 
 		public int TextOffset {
@@ -605,10 +625,7 @@ namespace MonoDevelop.Ide.Completion.Presentation
 			textView.LostAggregateFocus -= CloseOnTextviewLostFocus;
 			Instance = null;
 			textView.Properties ["RoslynCompletionPresenterSession.IsCompletionActive"] = false;
-			if (descriptionWindow != null) {
-				descriptionWindow.Destroy ();
-				descriptionWindow = null;
-			}
+			HideDescription ();
 			var manager = textView.GetSpaceReservationManager ("completion");
 			if (agent != null)
 				manager.RemoveAgent (agent);
@@ -618,42 +635,37 @@ namespace MonoDevelop.Ide.Completion.Presentation
 		XwtThemedPopup descriptionWindow;
 		private async Task UpdateDescription ()
 		{
-			if (descriptionWindow != null) {
-				descriptionWindow.Destroy ();
-				descriptionWindow = null;
-			}
-			descriptionCts.Cancel ();
+			HideDescription ();
+
 			if (SelectedItemIndex == -1)
 				return;
 			var completionItem = SelectedItem;
-			descriptionCts = new CancellationTokenSource ();
 			var token = descriptionCts.Token;
 
 
 			TooltipInformation description = null;
 			try {
-				var document = _subjectBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChanges ();
+				var document = _subjectBuffer.CurrentSnapshot.GetOpenDocumentInCurrentContextWithChangesSafe ();
 				description = await RoslynCompletionData.CreateTooltipInformation (document, completionItem, false, token);
+				Runtime.CheckMainThread ();
 			} catch {
 			}
-			if (token.IsCancellationRequested)
+			if (token.IsCancellationRequested || completionItem != SelectedItem)
 				return;
-			if (descriptionWindow != null) {
-				descriptionWindow.Destroy ();
-				descriptionWindow = null;
+			ShowDescription (description);
+		}
+
+		void ShowDescription (TooltipInformation description)
+		{
+			HideDescription ();
+
+			if (description == null) {
+				return;
 			}
-			if (description == null)
-				return;
+
 			var window = new TooltipInformationWindow ();
 			window.AddOverload (description);
 			descriptionWindow = window;
-			ShowDescription ();
-		}
-
-		void ShowDescription ()
-		{
-			if (descriptionWindow == null)
-				return;
 			var rect = GetRowArea (SelectedItemIndex);
 			int y = rect.Y + Theme.Padding - (int)vadj.Value;
 			descriptionWindow.ShowPopup (this, new Gdk.Rectangle (0, Math.Min (Allocation.Height, Math.Max (0, y)), Allocation.Width, rect.Height), PopupPosition.Left);
@@ -662,15 +674,20 @@ namespace MonoDevelop.Ide.Completion.Presentation
 
 		void HideDescription ()
 		{
-			descriptionWindow.Hide ();
-		}
+			Runtime.CheckMainThread ();
 
-		public new void Hide ()
-		{
+			descriptionCts.Cancel ();
+			descriptionCts = new CancellationTokenSource ();
+
 			if (descriptionWindow != null) {
 				descriptionWindow.Destroy ();
 				descriptionWindow = null;
 			}
+		}
+
+		public new void Hide ()
+		{
+			HideDescription ();
 			agent.Hide ();
 		}
 

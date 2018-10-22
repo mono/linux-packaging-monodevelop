@@ -291,6 +291,15 @@ namespace MonoDevelop.Ide.TypeSystem
 		{
 			if (project == null)
 				throw new ArgumentNullException (nameof(project));
+
+			var roslynProject = GetProject (project, cancellationToken);
+			if (roslynProject != null)
+				return roslynProject.GetCompilationAsync (cancellationToken);
+			return Task.FromResult (default(Compilation));
+		}
+
+		internal static Microsoft.CodeAnalysis.Project GetProject (MonoDevelop.Projects.Project project, CancellationToken cancellationToken = default (CancellationToken))
+		{
 			foreach (var w in workspaces) {
 				var projectId = w.GetProjectId (project);
 				if (projectId == null)
@@ -298,9 +307,9 @@ namespace MonoDevelop.Ide.TypeSystem
 				var roslynProject = w.CurrentSolution.GetProject (projectId);
 				if (roslynProject == null)
 					continue;
-				return roslynProject.GetCompilationAsync (cancellationToken);
+				return roslynProject;
 			}
-			return Task.FromResult<Compilation> (null);
+			return null;
 		}
 
 		static void OnWorkspaceItemAdded (object s, MonoDevelop.Projects.WorkspaceItemEventArgs args)
@@ -421,10 +430,6 @@ namespace MonoDevelop.Ide.TypeSystem
 			if (project == null)
 				throw new ArgumentNullException (nameof(project));
 			if (IsOutputTrackedProject (project)) {
-				var fileName = project.GetOutputFileName (IdeApp.Workspace.ActiveConfiguration);
-				if (!File.Exists (fileName))
-					return;
-				FileService.NotifyFileChanged (fileName);
 				if (autoUpdate) {
 					// update documents
 					foreach (var openDocument in IdeApp.Workbench.Documents) {

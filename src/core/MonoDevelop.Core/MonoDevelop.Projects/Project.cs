@@ -46,6 +46,8 @@ using System.Collections.Immutable;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using MonoDevelop.Core.Collections;
+using ICSharpCode.Decompiler.TypeSystem.Implementation;
+using System.Runtime.CompilerServices;
 
 namespace MonoDevelop.Projects
 {
@@ -59,7 +61,7 @@ namespace MonoDevelop.Projects
 	public class Project : SolutionItem
 	{
 		string[] flavorGuids = new string[0];
-		static Counter ProjectOpenedCounter = InstrumentationService.CreateCounter ("Project Opened", "Project Model", id:"Ide.Project.Open");
+		static Counter<ProjectEventMetadata> ProjectOpenedCounter = InstrumentationService.CreateCounter<ProjectEventMetadata> ("Project Opened", "Project Model", id:"Ide.Project.Open");
 
 		string[] buildActions;
 		MSBuildProject sourceProject;
@@ -199,10 +201,7 @@ namespace MonoDevelop.Projects
 		/// </summary>
 		void InitBeforeProjectExtensionLoad ()
 		{
-			var ggroup = sourceProject.GetGlobalPropertyGroup ();
-			// Avoid crash if there is not global group
-			if (ggroup == null)
-				ggroup = sourceProject.AddNewPropertyGroup (false);
+			var ggroup = sourceProject.GetOrCreateGlobalPropertyGroup ();
 
 			// Load the evaluated properties
 			InitMainGroupProperties (ggroup);
@@ -457,55 +456,9 @@ namespace MonoDevelop.Projects
 		/// <summary>
 		/// Runs the generator target and sends file change notifications if any files were modified, returns the build result
 		/// </summary>
-		public async Task<TargetEvaluationResult> PerformGeneratorAsync (ProgressMonitor monitor, ConfigurationSelector configuration, string generatorTarget)
+		public Task<TargetEvaluationResult> PerformGeneratorAsync (ProgressMonitor monitor, ConfigurationSelector configuration, string generatorTarget)
 		{
-			var fileInfo = await GetProjectFileTimestamps (monitor, configuration);
-			var evalResult = await this.RunTarget (monitor, generatorTarget, configuration);
-			SendFileChangeNotifications (monitor, configuration, fileInfo);
-
-			return evalResult;
-		}
-
-		/// <summary>
-		/// Returns a list containing FileInfo for all the source files in the project
-		/// </summary>
-		async Task<List<FileInfo>> GetProjectFileTimestamps (ProgressMonitor monitor, ConfigurationSelector configuration)
-		{
-			var infoList = new List<FileInfo> ();
-			var projectFiles = await this.GetSourceFilesAsync (monitor, configuration);
-
-			foreach (var projectFile in projectFiles) {
-				var info = new FileInfo (projectFile.FilePath);
-				infoList.Add (info);
-				info.Refresh ();
-			}
-
-			return infoList;
-		}
-
-		/// <summary>
-		/// Sends a file change notification via FileService for any file that has changed since the timestamps in beforeFileInfo
-		/// </summary>
-		void SendFileChangeNotifications (ProgressMonitor monitor, ConfigurationSelector configuration, List<FileInfo> beforeFileInfo)
-		{
-			var changedFiles = new List<FileInfo> ();
-
-			foreach (var file in beforeFileInfo) {
-				var info = new FileInfo (file.FullName);
-
-				if (file.Exists && info.Exists) {
-					if (file.LastWriteTime != info.LastWriteTime) {
-						changedFiles.Add (info);
-					}
-				} else if (info.Exists) {
-					changedFiles.Add (info);
-				} else if (file.Exists) {
-					// not sure if this should or could happen, it doesn't really make much sense
-					FileService.NotifyFileRemoved (file.FullName);
-				}
-			}
-
-			FileService.NotifyFilesChanged (changedFiles.Select (cf => new FilePath (cf.FullName)));
+			return this.RunTarget (monitor, generatorTarget, configuration);
 		}
 
 		/// <summary>
@@ -542,12 +495,8 @@ namespace MonoDevelop.Projects
 			// pre-load the results with the current list of files in the project
 			var results = new List<ProjectFile> ();
 
-			var buildActions = GetBuildActions ().Where (a => a != "Folder" && a != "--").ToArray ();
-
-			var config = configuration != null ? GetConfiguration (configuration) : null;
-			var pri = await CreateProjectInstaceForConfigurationAsync (config?.Name, config?.Platform, false);
-			foreach (var it in pri.EvaluatedItems.Where (i => buildActions.Contains (i.Name)))
-				results.Add (CreateProjectFile (it));
+			var evaluatedItems = await GetEvaluatedSourceFiles (configuration);
+			results.AddRange (evaluatedItems);
 
 			// add in any compile items that we discover from running the CoreCompile dependencies
 			var evaluatedCompileItems = await GetCompileItemsFromCoreCompileDependenciesAsync (monitor, configuration);
@@ -555,6 +504,49 @@ namespace MonoDevelop.Projects
 			results.AddRange (addedItems);
 
 			return results.ToArray ();
+		}
+
+		object evaluatedSourceFilesLock = new object ();
+		string evaluatedSourceFilesConfiguration;
+		TaskCompletionSource<ImmutableArray<ProjectFile>> evaluatedSourceFilesTask;
+
+		async Task<ImmutableArray<ProjectFile>> GetEvaluatedSourceFiles (ConfigurationSelector configuration)
+		{
+			bool startTask = false;
+			TaskCompletionSource<ImmutableArray<ProjectFile>> currentTask = null;
+			var config = configuration != null ? GetConfiguration (configuration) : null;
+
+			lock (evaluatedSourceFilesLock) {
+				if (evaluatedSourceFilesTask == null || evaluatedSourceFilesConfiguration != config?.Id) {
+					// The configuration changed or query not yet done
+					evaluatedSourceFilesConfiguration = config?.Id;
+					evaluatedSourceFilesTask = new TaskCompletionSource<ImmutableArray<ProjectFile>> ();
+					startTask = true;
+				}
+				currentTask = evaluatedSourceFilesTask;
+			}
+
+			if (startTask) {
+				var buildActions = GetBuildActions ().Where (a => a != "Folder" && a != "--").ToArray ();
+				var results = ImmutableArray.CreateBuilder<ProjectFile> ();
+
+				var pri = await CreateProjectInstaceForConfigurationAsync (config?.Name, config?.Platform, false);
+				foreach (var it in pri.EvaluatedItems.Where (i => buildActions.Contains (i.Name)))
+					results.Add (CreateProjectFile (it));
+
+				currentTask.SetResult (results.ToImmutable ());
+			}
+
+			return await currentTask.Task;
+		}
+
+		protected override Task OnClearCachedData ()
+		{
+			lock (evaluatedSourceFilesLock) {
+				evaluatedSourceFilesConfiguration = null;
+				evaluatedSourceFilesTask = null;
+			}
+			return base.OnClearCachedData ();
 		}
 
 		/// <summary>
@@ -566,6 +558,9 @@ namespace MonoDevelop.Projects
 		/// </summary>
 		void OnMSBuildProjectImportChanged (object sender, EventArgs args)
 		{
+			// Ensure MSBuild tasks used when building are up to date after imports changed.
+			ShutdownProjectBuilder ();
+
 			lock (evaluatedCompileItemsLock) {
 				// Do not re-evaluate if the compile items have never been evaluated.
 				if (evaluatedCompileItemsTask != null)
@@ -629,7 +624,9 @@ namespace MonoDevelop.Projects
 					// evaluate the Compile targets
 					var ctx = new TargetEvaluationContext ();
 					ctx.ItemsToEvaluate.Add ("Compile");
+					ctx.LoadReferencedProjects = false;
 					ctx.BuilderQueue = BuilderQueue.ShortOperations;
+					ctx.LogVerbosity = MSBuildVerbosity.Quiet;
 
 					var evalResult = await this.RunTarget (monitor, dependsList, config.Selector, ctx);
 					if (evalResult != null && evalResult.Items != null) {
@@ -717,7 +714,39 @@ namespace MonoDevelop.Projects
 				sb.Append (p);
 				first = false;
 			}
-			metadata ["ProjectTypes"] = sb.ToString ();
+			metadata["ProjectTypes"] = sb.ToString ();
+		}
+
+		protected override ProjectEventMetadata OnGetProjectEventMetadata (ConfigurationSelector configurationSelector)
+		{
+			var metadata = base.OnGetProjectEventMetadata (configurationSelector);
+			var sb = new System.Text.StringBuilder ();
+			var first = true;
+
+			var projectTypes = this.GetTypeTags ().ToList ();
+			foreach (var p in projectTypes.Where (x => (x != "DotNet") || projectTypes.Count == 1)) {
+				if (!first)
+					sb.Append (", ");
+				sb.Append (p);
+				first = false;
+			}
+			metadata.ProjectTypes = sb.ToString ();
+
+			metadata.ProjectID = ItemId;
+			metadata.ProjectType = TypeGuid;
+			metadata.ProjectFlavor = FlavorGuids.FirstOrDefault () ?? TypeGuid;
+
+			var capabilities = GetProjectCapabilities ();
+			if (capabilities.Any ())
+				metadata.Capabilities = string.Join (" ", capabilities);
+
+			var c = GetConfiguration (configurationSelector);
+			if (c != null) {
+				metadata.Configuration = c.Id;
+				metadata.Platform = GetExplicitPlatform (c);
+			}
+
+			return metadata;
 		}
 
 		protected override void OnEndLoad ()
@@ -1221,23 +1250,10 @@ namespace MonoDevelop.Projects
 				}
 			}
 
-			// Collect last write times for the files generated by this project
-			var fileTimes = new Dictionary<FilePath, DateTime> ();
-			foreach (var f in GetOutputFiles (configuration))
-				fileTimes [f] = File.GetLastWriteTime (f);
-
-			try {
-				var tr = await OnRunTarget (monitor, target, configuration, context);
-				if (tr != null)
-					tr.BuildResult.SourceTarget = this;
-				return tr;
-			} finally {
-				// If any of the project generated files changes, notify it
-				foreach (var e in fileTimes) {
-					if (File.GetLastWriteTime (e.Key) != e.Value)
-						FileService.NotifyFileChanged (e.Key);
-				}
-			}
+			var tr = await OnRunTarget (monitor, target, configuration, context);
+			if (tr != null)
+				tr.BuildResult.SourceTarget = this;
+			return tr;
 		}
 
 		async Task<TargetEvaluationResult> RunMSBuildTarget (ProgressMonitor monitor, string target, ConfigurationSelector configuration, TargetEvaluationContext context)
@@ -1261,13 +1277,13 @@ namespace MonoDevelop.Projects
 				await Task.Run (async delegate {
 
 					bool operationRequiresExclusiveLock = context.BuilderQueue == BuilderQueue.LongOperations;
-					TimerCounter buildTimer = null;
+					TimerCounter<ProjectEventMetadata> buildTimer = null;
 					switch (target) {
 					case "Build": buildTimer = Counters.BuildMSBuildProjectTimer; break;
 					case "Clean": buildTimer = Counters.CleanMSBuildProjectTimer; break;
 					}
 
-					var metadata = GetProjectEventMetadata (configuration);
+					var metadata = CreateProjectEventMetadata (configuration);
 					var t1 = Counters.RunMSBuildTargetTimer.BeginTiming (metadata);
 					var t2 = buildTimer != null ? buildTimer.BeginTiming (metadata) : null;
 
@@ -1365,28 +1381,19 @@ namespace MonoDevelop.Projects
 		}
 
 		void AddRunMSBuildTargetTimerMetadata (
-			IDictionary<string, string> metadata,
+			ProjectEventMetadata metadata,
 			MSBuildResult result,
 			string target,
 			ConfigurationSelector configuration)
 		{
 			if (target == "Build") {
-				metadata ["BuildType"] = "4";
+				metadata.BuildType = 4;
 			} else if (target == "Clean") {
-				metadata ["BuildType"] = "1";
+				metadata.BuildType = 1;
 			}
-			metadata ["BuildTypeString"] = target;
+			metadata.BuildTypeString = target;
 
-			metadata ["FirstBuild"] = IsFirstBuild.ToString ();
-			metadata ["ProjectID"] = ItemId;
-			metadata ["ProjectType"] = TypeGuid;
-			metadata ["ProjectFlavor"] = FlavorGuids.FirstOrDefault () ?? TypeGuid;
-
-			var c = GetConfiguration (configuration);
-			if (c != null) {
-				metadata ["Configuration"] = c.Id;
-				metadata ["Platform"] = GetExplicitPlatform (c);
-			}
+			metadata.FirstBuild = IsFirstBuild;
 
 			bool success = false;
 			bool cancelled = false;
@@ -1399,8 +1406,8 @@ namespace MonoDevelop.Projects
 				}
 			}
 
-			metadata ["Success"] = success.ToString ();
-			metadata ["Cancelled"] = cancelled.ToString ();
+			metadata.Success = success;
+			metadata.Cancelled = cancelled;
 		}
 
 		string activeTargetFramework;
@@ -1440,7 +1447,7 @@ namespace MonoDevelop.Projects
 				return null;
 
 			var propertyGroup = project.GetGlobalPropertyGroup ();
-			string propertyValue = propertyGroup.GetValue ("TargetFramework", null);
+			string propertyValue = propertyGroup?.GetValue ("TargetFramework", null);
 			if (propertyValue != null)
 				return null;
 
@@ -1524,7 +1531,7 @@ namespace MonoDevelop.Projects
 			if (context != null)
 				context.SessionData.TryGetValue (MSBuildSolutionExtension.MSBuildProjectOperationId, out buildSessionId);
 
-			var builder = await RemoteBuildEngineManager.GetRemoteProjectBuilder (FileName, slnFile, runtime, ToolsVersion, RequiresMicrosoftBuild, buildSessionId, setBusy, allowBusy);
+			var builder = await RemoteBuildEngineManager.GetRemoteProjectBuilder (FileName, slnFile, runtime, ToolsVersion, buildSessionId, setBusy, allowBusy);
 
 			if (modifiedInMemory) {
 				modifiedInMemory = false;
@@ -1575,17 +1582,23 @@ namespace MonoDevelop.Projects
 			RemoteBuildEngineManager.RefreshProject (FileName).Ignore ();
 		}
 
+		public void ShutdownProjectBuilder ()
+		{
+			// Unload the remote build engine so new MSBuild task assemblies can be used.
+			// This prevents the old MSBuild task assemblies from being used at build time
+			// after a NuGet package has been updated.
+			RemoteBuildEngineManager.UnloadProject (FileName).Ignore ();
+			string solutionFileName = ParentSolution?.FileName;
+			if (solutionFileName != null)
+				RemoteBuildEngineManager.UnloadSolution (solutionFileName).Ignore ();
+		}
+
 		#endregion
 
-		bool requiresMicrosoftBuild;
-
+		[Obsolete ("This property is ignored, msbuild is now always used")]
 		internal protected bool RequiresMicrosoftBuild {
-			get {
-				return requiresMicrosoftBuild || ProjectExtension.IsMicrosoftBuildRequired;
-			}
-			set {
-				requiresMicrosoftBuild = value;
-			}
+			get { return true; }
+			set { }
 		}
 
 		/// <summary>
@@ -1735,7 +1748,8 @@ namespace MonoDevelop.Projects
 
 		protected override async Task<BuildResult> OnBuild (ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext)
 		{
-			return (await RunTarget (monitor, "Build", configuration, new TargetEvaluationContext (operationContext))).BuildResult;
+			var newContext = operationContext as TargetEvaluationContext ?? new TargetEvaluationContext (operationContext);
+			return (await RunTarget (monitor, "Build", configuration, newContext)).BuildResult;
 		}
 
 		async Task<TargetEvaluationResult> RunBuildTarget (ProgressMonitor monitor, ConfigurationSelector configuration, TargetEvaluationContext context)
@@ -2105,7 +2119,8 @@ namespace MonoDevelop.Projects
 
 		protected override async Task<BuildResult> OnClean (ProgressMonitor monitor, ConfigurationSelector configuration, OperationContext operationContext)
 		{
-			return (await RunTarget (monitor, "Clean", configuration, new TargetEvaluationContext (operationContext))).BuildResult;
+			var newContext = operationContext as TargetEvaluationContext ?? new TargetEvaluationContext (operationContext);
+			return (await RunTarget (monitor, "Clean", configuration, newContext)).BuildResult;
 		}
 
 		async Task<TargetEvaluationResult> RunCleanTarget (ProgressMonitor monitor, ConfigurationSelector configuration, TargetEvaluationContext context)
@@ -2373,6 +2388,7 @@ namespace MonoDevelop.Projects
 			}
 			NotifyModified ("Files");
 			OnFileRemovedFromProject (args);
+			ParentSolution?.OnRootDirectoriesChanged ();
 		}
 
 		void NotifyFileAddedToProject (IEnumerable<ProjectFile> objs)
@@ -2389,6 +2405,9 @@ namespace MonoDevelop.Projects
 
 			NotifyModified ("Files");
 			OnFileAddedToProject (args);
+
+			if (!Loading)
+				ParentSolution?.OnRootDirectoriesChanged ();
 		}
 
 		internal void UpdateDependency (ProjectFile file, FilePath oldPath)
@@ -4055,6 +4074,8 @@ namespace MonoDevelop.Projects
 					var oldCapabilities = new HashSet<string> (projectCapabilities);
 					bool oldSupportsExecute = SupportsExecute ();
 
+					var solutionStartupProjectRunConfig = GetSolutionStartupProjectRunConfigurationForThisProject ();
+
 					try {
 						IsReevaluating = true;
 
@@ -4089,8 +4110,31 @@ namespace MonoDevelop.Projects
 					if (oldSupportsExecute != SupportsExecute ()) {
 						OnSupportsExecuteChanged (!oldSupportsExecute);
 					}
+
+					if (solutionStartupProjectRunConfig != null && !runConfigurations.Contains (solutionStartupProjectRunConfig)) {
+						// Need to refresh solution startup run configuration since the re-evaluation
+						// removed it from the project's run configurations but the solution still refers
+						// to the old project run configuration.
+						ParentSolution.RefreshStartupConfiguration ();
+					}
 				}
 			}));
+		}
+
+		/// <summary>
+		/// If the solution's startup run configuration is a run configuration for this
+		/// project then the project run configuration will be returned.
+		/// </summary>
+		SolutionItemRunConfiguration GetSolutionStartupProjectRunConfigurationForThisProject ()
+		{
+			var config = ParentSolution?.StartupConfiguration as SingleItemSolutionRunConfiguration;
+			if (config == null)
+				return null;
+
+			if (runConfigurations.Contains (config.RunConfiguration))
+				return config.RunConfiguration;
+
+			return null;
 		}
 
 		/// <summary>
@@ -4247,16 +4291,22 @@ namespace MonoDevelop.Projects
 
 		void OnFileCreated (object sender, FileSystemEventArgs e)
 		{
-			if (Directory.Exists (e.FullPath))
-				return;
+			try {
+				if (Directory.Exists (e.FullPath))
+					return;
 
-			FilePath filePath = e.FullPath;
-			if (filePath.FileName == ".DS_Store")
-				return;
+				FilePath filePath = e.FullPath;
+				if (filePath.FileName == ".DS_Store")
+					return;
 
-			Runtime.RunInMainThread (() => {
+				// Ignore temporary files created when saving a file in the editor.
+				if (filePath.FileName.StartsWith (".#", StringComparison.OrdinalIgnoreCase))
+					return;
+
 				OnFileCreatedExternally (e.FullPath);
-			});
+			} catch (Exception ex) {
+				LoggingService.LogError ("OnFileCreated error.", ex);
+			}
 		}
 
 		void OnFileDeleted (object sender, FileSystemEventArgs e)
@@ -4294,7 +4344,16 @@ namespace MonoDevelop.Projects
 				var eit = CreateFakeEvaluatedItem (sourceProject, it, include, null);
 				var pi = CreateProjectItem (eit);
 				pi.Read (this, eit);
-				Items.Add (pi);
+				if (Runtime.IsMainThread) {
+					Items.Add (pi);
+				} else {
+					Runtime.RunInMainThread (() => {
+						// Double check the file has not been added on the UI thread by the IDE.
+						if (!Files.Any (file => file.FilePath == fileName)) {
+							Items.Add (pi);
+						}
+					}).Ignore ();
+				}
 			}
 		}
 

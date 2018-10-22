@@ -77,6 +77,8 @@ namespace MonoDevelop.Ide.Gui
 				foreach (var view in openFiles) {
 					if (SkipView (view.Document) || !string.Equals (view.Document.FileName, file.FileName, FilePath.PathComparison))
 						continue;
+					if (view.LastSaveTimeUtc == File.GetLastWriteTimeUtc (file.FileName))
+						continue;
 					if (!view.Document.IsDirty)
 						view.Document.Reload ();
 					else
@@ -214,6 +216,7 @@ namespace MonoDevelop.Ide.Gui
 				LastSaveTimeUtc = DateTime.UtcNow;
 				doc.Saved += Doc_Saved;
 				doc.Reloaded += Doc_Saved;
+				doc.FileNameChanged += Doc_Saved;
 			}
 
 
@@ -231,6 +234,7 @@ namespace MonoDevelop.Ide.Gui
 			{
 				Document.Saved -= Doc_Saved;
 				Document.Reloaded -= Doc_Saved;
+				Document.FileNameChanged -= Doc_Saved;
 			}
 		}
 

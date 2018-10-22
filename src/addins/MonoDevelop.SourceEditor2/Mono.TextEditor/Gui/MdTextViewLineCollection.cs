@@ -41,17 +41,25 @@ namespace Mono.TextEditor
 	{
 		readonly MonoTextEditor textEditor;
 		readonly ITextSourceVersion version;
+		ITextSnapshot textSnapshot;
 
 		public MdTextViewLineCollection (MonoTextEditor textEditor) : base (64)
 		{
 			this.textEditor = textEditor;
 			this.version = this.textEditor.Document.Version;
+			textEditor.TextViewModel.VisualBuffer.ChangedLowPriority += OnVisualBufferChanged;
 		}
 
 		internal void Add (int logicalLineNumber, DocumentLine line)
 		{
 			if (line == null)
 				return;
+
+			if (Count == 0)
+				this.textSnapshot = textEditor.TextSnapshot;
+			else
+				System.Diagnostics.Debug.Assert (this.textSnapshot == textEditor.TextSnapshot);
+
 			var newLine = new MdTextViewLine (this, textEditor, line, logicalLineNumber, textEditor.TextViewMargin.GetLayout (line));
 			for (int i = 0; i < Count; i++) {
 				if (((MdTextViewLine)this [i]).LineNumber == logicalLineNumber) {
@@ -59,7 +67,12 @@ namespace Mono.TextEditor
 					return;
 				}
 			}
-			Add (newLine);
+			int index = 0;
+			for (; index < Count; index++) {
+				if (this [index].Start.Position > newLine.Start.Position)
+					break;
+			}
+			Insert (index, newLine);
 		}
 
 		internal void RemoveLinesBefore (int lineNumber)
@@ -84,7 +97,72 @@ namespace Mono.TextEditor
 
 		public ITextViewLine LastVisibleLine => this.LastOrDefault ();
 
-		public SnapshotSpan FormattedSpan => new SnapshotSpan (this [0].Start, this.Last ().EndIncludingLineBreak);
+		public SnapshotSpan FormattedSpan {
+			get {
+				if (this.Count == 0)
+					return new SnapshotSpan (textEditor.TextSnapshot, 0, 0);
+				var start = this [0].Start;
+				var end = this [Count - 1].EndIncludingLineBreak;
+				if (start.Snapshot.Version.VersionNumber == end.Snapshot.Version.VersionNumber) {
+					return new SnapshotSpan (start, end);
+				} else if (start.Snapshot.Version.VersionNumber > end.Snapshot.Version.VersionNumber) {
+					return new SnapshotSpan (start, end.TranslateTo (start.Snapshot, PointTrackingMode.Positive));
+				} else {
+					return new SnapshotSpan (start.TranslateTo (end.Snapshot, PointTrackingMode.Negative), end);
+				}
+			}
+		}
+
+		private readonly HashSet<int> modifiedLinesCache = new HashSet<int> ();
+		private readonly List<MdTextViewLine> reusedLinesCache = new List<MdTextViewLine> ();
+
+		internal void OnVisualBufferChanged (object sender, TextContentChangedEventArgs e)
+		{
+			if (textSnapshot != null) {
+				foreach (ITextChange textChange in e.Changes) {
+					Span textChangeCurrentSpan;
+					if (e.Before == textSnapshot) {
+						textChangeCurrentSpan = textChange.OldSpan;
+					} else if (e.After == textSnapshot) {
+						textChangeCurrentSpan = textChange.NewSpan;
+					} else {
+						ITrackingSpan textChangeOldSpan = e.Before.CreateTrackingSpan (textChange.OldSpan, SpanTrackingMode.EdgeInclusive);
+						textChangeCurrentSpan = textChangeOldSpan.GetSpan (textSnapshot);
+					}
+
+					var startLine = textSnapshot.GetLineFromPosition (textChangeCurrentSpan.Start);
+					var endLine = startLine;
+					if (startLine.EndIncludingLineBreak.Position < textChangeCurrentSpan.End) {
+						endLine = textSnapshot.GetLineFromPosition (textChangeCurrentSpan.End);
+					}
+
+					for (int i = startLine.LineNumber; i <= endLine.LineNumber; i++) {
+						modifiedLinesCache.Add (i);
+					}
+				}
+			}
+
+			// Recreate MdTextViewLine for the current snapshot for all lines except those
+			// modified as those will get recreated during render
+			foreach (MdTextViewLine line in this) {
+				int lineNumber = line.LineNumber;
+				if (!modifiedLinesCache.Contains(lineNumber - 1)) {
+					reusedLinesCache.Add (line);
+				}
+			}
+
+			this.Clear ();
+
+			foreach(MdTextViewLine line in reusedLinesCache) {
+				int lineNumber = line.LineNumber;
+				Add (lineNumber, textEditor.Document.GetLine (lineNumber));
+			}
+
+			modifiedLinesCache.Clear ();
+			reusedLinesCache.Clear ();
+
+			textSnapshot = e.After;
+		}
 
 		public bool IsValid => version.CompareAge (textEditor.Document.Version) == 0;
 

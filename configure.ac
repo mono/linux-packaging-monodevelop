@@ -298,7 +298,6 @@ src/core/Mono.TextEditor.Platform/Makefile
 src/core/Mono.TextEditor.Shared/Makefile
 src/core/MonoDevelop.Core/Makefile
 src/core/MonoDevelop.Projects.Formats.MSBuild/Makefile
-src/core/MonoDevelop.Projects.Formats.MSBuild/MonoDevelop.Projects.MSBuild.Shared/Makefile
 src/core/MonoDevelop.Ide/Makefile
 src/core/MonoDevelop.Ide/MonoDevelop.Ide.Editor.Highlighting/Makefile
 src/core/MonoDevelop.Startup/Makefile
@@ -379,6 +378,7 @@ src/addins/MonoDevelop.PackageManagement/Makefile
 src/addins/MonoDevelop.PackageManagement/MonoDevelop.PackageManagement.Tests/Makefile
 tests/Makefile
 tests/UnitTests/Makefile
+tests/IdeUnitTests/Makefile
 tests/UserInterfaceTests/Makefile
 tests/TestRunner/Makefile
 tests/Ide.Tests/Makefile
