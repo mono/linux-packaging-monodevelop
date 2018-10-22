@@ -1,3 +1,9 @@
+monodevelop (7.6.9.22-0xamarin1) preview; urgency=medium
+
+  * New release - monodevelop-7.6.9.22.tar.bz2
+
+ -- Xamarin Public Jenkins (auto-signing) <releng@xamarin.com>  Mon, 22 Oct 2018 14:49:07 +0000
+
 monodevelop (7.6.0.711-0xamarin5) preview; urgency=medium
 
   * Packaging bugfix:
