@@ -62,9 +62,9 @@ namespace MonoDevelop.MacIntegration
 
 				if (!stockIcon && !string.IsNullOrEmpty (data.Message.Icon)) {
 					var img = ImageService.GetIcon (data.Message.Icon, Gtk.IconSize.Dialog);
-					// HACK: VK The icon is not rendered in dark style correctly
-					//       Use light variant and reder it here
-					//       as long as NSAppearance.NameVibrantDark is broken
+					// HACK: The icon is not rendered in dark mode (VibrantDark or DarkAqua) correctly.
+					//       Use light variant and reder it here.
+					// TODO: Recheck rendering issues with DarkAqua on final Mojave
 					if (IdeTheme.UserInterfaceTheme == Theme.Dark)
 						alert.Icon = img.WithStyles ("-dark").ToBitmap (GtkWorkarounds.GetScaleFactor ()).ToNSImage ();
 					else
@@ -160,15 +160,20 @@ namespace MonoDevelop.MacIntegration
 
 				int response = -1000;
 
+				var parent = data.TransientFor ?? IdeApp.Workbench.RootWindow;
+				NSWindow nativeParent;
+				try {
+					nativeParent = parent;
+				} catch (NotSupportedException) {
+					nativeParent = null;
+				}
 				if (!data.Message.CancellationToken.IsCancellationRequested) {
-					NSWindow parent = null;
-					if (IdeTheme.UserInterfaceTheme != Theme.Dark || MacSystemInformation.OsVersion < MacSystemInformation.HighSierra) // sheeting is broken on High Sierra with dark NSAppearance
-						parent = data.TransientFor ?? IdeApp.Workbench.RootWindow;
-
-					if (parent == null) {
+					// sheeting is broken on High Sierra with dark NSAppearance
+					var sheet = IdeTheme.UserInterfaceTheme != Theme.Dark || MacSystemInformation.OsVersion != MacSystemInformation.HighSierra;
+					if (!sheet || nativeParent == null) {
 						response = (int)alert.RunModal ();
 					} else {
-						alert.BeginSheet (parent, (modalResponse) => {
+						alert.BeginSheet (nativeParent, (modalResponse) => {
 							response = (int)modalResponse;
 							NSApplication.SharedApplication.StopModal ();
 						});
@@ -201,9 +206,11 @@ namespace MonoDevelop.MacIntegration
 				if (applyToAllCheck != null && applyToAllCheck.State != 0)
 					data.ApplyToAll = true;
 
+				if (nativeParent != null)
+					nativeParent.MakeKeyAndOrderFront (nativeParent);
+				else
+					GtkQuartz.FocusWindow (parent);
 
-
-				GtkQuartz.FocusWindow (data.TransientFor ?? MessageService.RootWindow);
 			}
 			
 			return true;

@@ -880,7 +880,16 @@ namespace MonoDevelop.Ide
 		
 		public bool CreateProjectFile (Project parentProject, string basePath, string selectedTemplateId)
 		{
-			using (NewFileDialog nfd = new NewFileDialog (parentProject, basePath)) {
+			using (var nfd = new NewFileDialog (parentProject, basePath)) {
+				if (selectedTemplateId != null)
+					nfd.SelectTemplate (selectedTemplateId);
+				return MessageService.ShowCustomDialog (nfd) == (int)Gtk.ResponseType.Ok;
+			}
+		}
+
+		public bool CreateSolutionFolderFile (SolutionFolder parentSolutionFolder,string selectedTemplateId = null)
+		{
+			using (var nfd = new NewFileDialog (null, parentSolutionFolder.BaseDirectory, parentSolutionFolder)) {
 				if (selectedTemplateId != null)
 					nfd.SelectTemplate (selectedTemplateId);
 				return MessageService.ShowCustomDialog (nfd) == (int)Gtk.ResponseType.Ok;
@@ -1066,6 +1075,32 @@ namespace MonoDevelop.Ide
 
 		async Task ExecuteAsync (IBuildTarget entry, ExecutionContext context, CancellationTokenSource cs, ConfigurationSelector configuration, RunConfiguration runConfiguration, bool buildBeforeExecuting)
 		{
+			ProjectEventMetadata eventMetadata = null;
+
+			if (entry is Solution solution) {
+				SolutionItem solutionItem = null;
+				if (runConfiguration == null) {
+					solutionItem = solution.StartupItem;
+				} else if (runConfiguration is SingleItemSolutionRunConfiguration singleItemSolution) {
+					solutionItem = singleItemSolution.Item;
+				}
+
+				if (solutionItem != null) {
+					eventMetadata = solutionItem.CreateProjectEventMetadata (configuration);
+				}
+			} else if (entry is SolutionItem item) {
+				eventMetadata = item.CreateProjectEventMetadata (configuration);
+			}
+
+			var metadata = new BuildAndDeployMetadata (eventMetadata);
+
+			// CheckAndBuildForExecute may open a dialog, so track that here if it does
+			metadata.BuildWithoutPrompting = IdeApp.Preferences.BuildBeforeExecuting;
+
+			metadata.SetSuccess ();
+			Counters.BuildAndDeploy.BeginTiming ("Execute", metadata);
+			Counters.TrackingBuildAndDeploy = true;
+
 			if (configuration == null)
 				configuration = IdeApp.Workspace.ActiveConfiguration;
 			
@@ -1073,14 +1108,29 @@ namespace MonoDevelop.Ide
 			var rt = entry as IRunTarget;
 			if (bth != null && rt != null) {
 				var h = await bth.Configure (rt, context, configuration, runConfiguration);
-				if (h == null)
+				if (h == null) {
+					metadata.SetFailure ();
+					Counters.TrackingBuildAndDeploy = false;
+					Counters.BuildAndDeploy.EndTiming ();
 					return;
+				}
 				context = new ExecutionContext (h, context.ConsoleFactory, context.ExecutionTarget);
 			}
 			
 			if (buildBeforeExecuting) {
-				if (!await CheckAndBuildForExecute (entry, context, configuration, runConfiguration))
+				Stopwatch buildTimer = new Stopwatch ();
+				buildTimer.Start ();
+
+				if (!await CheckAndBuildForExecute (entry, context, configuration, runConfiguration)) {
+					metadata.SetFailure ();
+					Counters.TrackingBuildAndDeploy = false;
+					Counters.BuildAndDeploy.EndTiming ();
+					buildTimer.Stop ();
 					return;
+				}
+
+				buildTimer.Stop ();
+				metadata.BuildTime = buildTimer.ElapsedMilliseconds;
 			}
 
 			ProgressMonitor monitor = new ProgressMonitor (cs);
@@ -1094,8 +1144,12 @@ namespace MonoDevelop.Ide
 			await t;
 
 			var error = monitor.Errors.FirstOrDefault ();
-			if (error != null)
+			if (error != null) {
 				IdeApp.Workbench.StatusBar.ShowError (error.DisplayMessage);
+				metadata.SetFailure ();
+				Counters.TrackingBuildAndDeploy = false;
+				Counters.BuildAndDeploy.EndTiming ();
+			}
 			currentRunOperationOwners.Remove (entry);
 		}
 		

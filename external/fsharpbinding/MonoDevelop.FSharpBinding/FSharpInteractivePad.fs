@@ -65,7 +65,7 @@ type ImageRendererMarker(line, image:Xwt.Drawing.Image) =
 type FsiDocumentContext() =
     inherit DocumentContext()
     let name = "__FSI__.fsx"
-    let pd = new FSharpParsedDocument(name, None) :> ParsedDocument
+    let pd = new FSharpParsedDocument(name, None, None) :> ParsedDocument
     let project = Services.ProjectService.CreateDotNetProject ("F#")
 
     let mutable completionWidget:ICompletionWidget = null
@@ -139,6 +139,35 @@ type FsiPrompt(icon: Xwt.Drawing.Image) =
         let deltaY = size / 2.0 - icon.Height / 2.0 + 0.5
         cairoContext.DrawImage (editor, icon, Math.Round (x + deltaX), Math.Round (y + deltaY));
 
+type ShellHistory() =
+    let history = ResizeArray<string>()
+    let mutable nextUp = 0
+    let mutable nextDown = 0
+
+    member x.Push command =
+        history.Add command
+        nextUp <- history.Count - 1
+        nextDown <- history.Count - 1
+
+    member x.Up() =
+        match nextUp with
+        | -1 -> None
+        | index ->
+            nextDown <- nextUp
+            nextUp <- nextUp - 1
+            Some history.[index]
+
+    member x.Down() =
+        if nextDown = history.Count then
+            None
+        else
+            nextUp <- nextDown
+            nextDown <- nextDown + 1
+            if nextDown = history.Count then
+                None
+            else
+                Some history.[nextDown]
+
 type FSharpInteractivePad(editor:TextEditor) as this =
     inherit MonoDevelop.Ide.Gui.PadContent()
    
@@ -158,19 +187,19 @@ type FSharpInteractivePad(editor:TextEditor) as this =
     let mutable promptReceived = false
     let mutable activeDoc : IDisposable option = None
     let mutable lastLineOutput = None
-    let commandHistoryPast = new Stack<string> ()
-    let commandHistoryFuture = new Stack<string> ()
 
     let promptIcon = ImageService.GetIcon("md-breadcrumb-next")
     let newLineIcon = ImageService.GetIcon("md-template")
 
-    let getCorrectDirectory () =
-        ctx.WorkingFolder <-
-            if IdeApp.Workbench.ActiveDocument <> null && FileService.isInsideFSharpFile() then
-                let doc = IdeApp.Workbench.ActiveDocument.FileName.ToString()
-                if doc <> null then Path.GetDirectoryName(doc) |> Some else None
+    let getActiveDocumentFileName () =
+        if IdeApp.Workbench.ActiveDocument <> null && FileService.isInsideFSharpFile() then
+            let docFileName = IdeApp.Workbench.ActiveDocument.FileName.ToString()
+            if docFileName <> null then
+                let directoryName = Path.GetDirectoryName docFileName
+                ctx.WorkingFolder <- Some directoryName
+                Some docFileName
             else None
-        ctx.WorkingFolder
+        else None
 
     let nonBreakingSpace = "\u00A0" // used to disable editor syntax highlighting for output
 
@@ -227,21 +256,10 @@ type FSharpInteractivePad(editor:TextEditor) as this =
 
             ses.StartReceiving()
             editor.GrabFocus()
-            // Make sure we're in the correct directory after a start/restart. No ActiveDocument event then.
-            getCorrectDirectory() |> Option.iter (fun dir -> ses.SetSourceDirectory dir)
             Some(ses)
         with _exn -> None
 
     let mutable session = None
-
-    let getCaretLine() =
-        let line = 
-            editor.CaretLine 
-            |> editor.GetLine 
-        if line.Length > 0 then 
-            editor.GetLineText line
-        else
-            ""
 
     let setCaretLine (s: string) =
         let line = editor.GetLineByOffset editor.CaretOffset
@@ -253,6 +271,7 @@ type FSharpInteractivePad(editor:TextEditor) as this =
             session |> Option.iter (fun (ses: InteractiveSession) -> ses.Kill())
             if intent = Restart then session <- setupSession()
 
+    let history = ShellHistory()
     new() =
         let ctx = FsiDocumentContext()
         let doc = TextEditorFactory.CreateNewDocument()
@@ -288,20 +307,20 @@ type FSharpInteractivePad(editor:TextEditor) as this =
         resetFsi Kill
 
     member x.SendCommandAndStore command =
+        let fileName = getActiveDocumentFileName()
         input.Add command
-        session 
+        session
         |> Option.iter(fun ses ->
-            commandHistoryPast.Push command
-            ses.SendInput (command + "\n"))
+            history.Push command
+            ses.SendInput (command + "\n") fileName)
 
     member x.SendCommand command =
-        input.Add command
-        session 
-        |> Option.iter(fun ses -> ses.SendInput (command + ";;"))
+        let fileName = getActiveDocumentFileName()
 
-    member x.SetSourceDirectory directory =
+        input.Add command
         session
-        |> Option.iter(fun ses -> ses.SetSourceDirectory directory)
+        |> Option.iter(fun ses ->
+            ses.SendInput (command + ";;") fileName)
 
     member x.RequestCompletions lineStr column =
         session 
@@ -318,21 +337,12 @@ type FSharpInteractivePad(editor:TextEditor) as this =
             ses.SendParameterHintRequest lineStr (column + 1))
 
     member x.ProcessCommandHistoryUp () =
-        if commandHistoryPast.Count > 0 then
-            if commandHistoryFuture.Count = 0 then
-                commandHistoryFuture.Push (getCaretLine())
-            else
-                if commandHistoryPast.Count = 0 then ()
-                else commandHistoryFuture.Push (commandHistoryPast.Pop ())
-            setCaretLine (commandHistoryPast.Peek ())
+        history.Up()
+        |> Option.iter setCaretLine
 
     member x.ProcessCommandHistoryDown () =
-        if commandHistoryFuture.Count > 0 then
-            if commandHistoryFuture.Count = 0 then
-                setCaretLine (commandHistoryFuture.Pop ())
-            else
-                commandHistoryPast.Push (commandHistoryFuture.Pop ())
-                setCaretLine (commandHistoryPast.Peek ())
+        history.Down()
+        |> function Some c -> setCaretLine c | None -> setCaretLine ""
 
     override x.Dispose() =
         LoggingService.LogDebug ("Interactive: disposing pad...")
@@ -370,9 +380,6 @@ type FSharpInteractivePad(editor:TextEditor) as this =
     member x.SendSelection() =
         if x.IsSelectionNonEmpty then
             let sel = IdeApp.Workbench.ActiveDocument.Editor.SelectedText
-            getCorrectDirectory()
-            |> Option.iter x.SetSourceDirectory
-
             x.SendCommand sel
         else
           //if nothing is selected send the whole line
@@ -381,9 +388,6 @@ type FSharpInteractivePad(editor:TextEditor) as this =
     member x.SendLine() =
         if isNull IdeApp.Workbench.ActiveDocument then ()
         else
-            getCorrectDirectory()
-            |> Option.iter x.SetSourceDirectory
-
             let line = IdeApp.Workbench.ActiveDocument.Editor.CaretLine
             let text = IdeApp.Workbench.ActiveDocument.Editor.GetLineText(line)
             x.SendCommand text
@@ -393,9 +397,6 @@ type FSharpInteractivePad(editor:TextEditor) as this =
 
     member x.SendFile() =
         let text = IdeApp.Workbench.ActiveDocument.Editor.Text
-        getCorrectDirectory()
-        |> Option.iter x.SetSourceDirectory
-
         x.SendCommand text
 
     member x.IsSelectionNonEmpty =
@@ -408,9 +409,6 @@ type FSharpInteractivePad(editor:TextEditor) as this =
     member x.LoadReferences(project:FSharpProject) =
         LoggingService.LogDebug ("FSI:  #LoadReferences")
         let orderedreferences = project.GetOrderedReferences()
-
-        getCorrectDirectory()
-        |> Option.iter x.SetSourceDirectory
 
         orderedreferences
         |> List.iter (fun a -> x.SendCommand (sprintf  @"#r ""%s""" a.Path))

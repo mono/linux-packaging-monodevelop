@@ -47,7 +47,8 @@ namespace RefactoringEssentials
         [RoslynReflectionUsage(RoslynReflectionAllowedContext.CodeFixes)]
         public static TypeSyntax GenerateTypeSyntax(this ITypeSymbol typeSymbol)
         {
-            return (TypeSyntax)RoslynReflection.CSharpITypeSymbolExtensions.GenerateTypeSyntaxMethod.Invoke(null, new[] { typeSymbol });
+			bool allowVar = true;
+			return (TypeSyntax)RoslynReflection.CSharpITypeSymbolExtensions.GenerateTypeSyntaxMethod.Invoke(null, new object[] { typeSymbol, allowVar });
         }
 
         [RoslynReflectionUsage(RoslynReflectionAllowedContext.CodeFixes)]

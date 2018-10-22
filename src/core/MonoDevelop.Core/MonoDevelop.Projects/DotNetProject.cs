@@ -268,6 +268,9 @@ namespace MonoDevelop.Projects
 
 		public bool SupportsRoslyn { get; protected set; }
 
+		// TODO: slightly differs from LanguageName we should unify those at some point.
+		public string RoslynLanguageName { get; protected set; }
+
 		protected virtual DotNetProjectFlags OnGetDotNetProjectFlags ()
 		{
 			return DotNetProjectFlags.GeneratesDebugInfoFile;
@@ -948,35 +951,38 @@ namespace MonoDevelop.Projects
 						result.Add (ar);
 				}
 			}
-			var addFacadeAssemblies = false;
-			foreach (var r in GetReferencedAssemblyProjects (configuration)) {
-				// Facade assemblies need to be referenced if this project is referencing a PCL or .NET Standard project.
-				if (r.IsPortableLibrary || r.TargetFramework.Id.Identifier == ".NETStandard") {
-					addFacadeAssemblies = true;
-					break;
-				}
-			}
-			if (!addFacadeAssemblies) {
-				foreach (var refFilename in result) {
-					string fullPath = null;
-					if (!Path.IsPathRooted (refFilename.FilePath)) {
-						fullPath = Path.Combine (Path.GetDirectoryName (FileName), refFilename.FilePath);
-					} else {
-						fullPath = Path.GetFullPath (refFilename.FilePath);
-					}
-					if (await SystemAssemblyService.ContainsReferenceToSystemRuntimeAsync (fullPath)) {
+			var expandDesignTimeFacades = MSBuildProject.EvaluatedProperties.GetValue ("ImplicitlyExpandDesignTimeFacades", true);
+			if (expandDesignTimeFacades) {
+				var addFacadeAssemblies = false;
+				foreach (var r in GetReferencedAssemblyProjects (configuration)) {
+					// Facade assemblies need to be referenced if this project is referencing a PCL or .NET Standard project.
+					if (r.IsPortableLibrary || r.TargetFramework.Id.Identifier == ".NETStandard") {
 						addFacadeAssemblies = true;
 						break;
 					}
 				}
-			}
+				if (!addFacadeAssemblies) {
+					foreach (var refFilename in result) {
+						string fullPath = null;
+						if (!Path.IsPathRooted (refFilename.FilePath)) {
+							fullPath = Path.Combine (Path.GetDirectoryName (FileName), refFilename.FilePath);
+						} else {
+							fullPath = Path.GetFullPath (refFilename.FilePath);
+						}
+						if (await SystemAssemblyService.RequiresFacadeAssembliesAsync (fullPath)) {
+							addFacadeAssemblies = true;
+							break;
+						}
+					}
+				}
 
-			if (addFacadeAssemblies) {
-				var facades = await ProjectExtension.OnGetFacadeAssemblies ();
-				if (facades != null) {
-					foreach (var facade in facades) {
-						if (!result.Contains (facade))
-							result.Add (facade);
+				if (addFacadeAssemblies) {
+					var facades = await ProjectExtension.OnGetFacadeAssemblies ();
+					if (facades != null) {
+						foreach (var facade in facades) {
+							if (!result.Contains (facade))
+								result.Add (facade);
+						}
 					}
 				}
 			}
@@ -1031,6 +1037,7 @@ namespace MonoDevelop.Projects
 				context.BuilderQueue = BuilderQueue.ShortOperations;
 				context.LoadReferencedProjects = false;
 				context.LogVerbosity = MSBuildVerbosity.Quiet;
+				context.GlobalProperties.SetValue ("Silent", true);
 
 				var result = await RunTarget (monitor, "ResolveAssemblyReferences", configuration, context);
 

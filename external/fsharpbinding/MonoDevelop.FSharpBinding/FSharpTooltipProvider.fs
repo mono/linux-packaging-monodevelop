@@ -56,12 +56,12 @@ type FSharpTooltipProvider() =
 
             let line, col, lineStr = editor.GetLineInfoFromOffset offset
 
-            if Tokens.isInvalidTipTokenAtPoint editor context offset then noTooltip else
+            if Tokens.isInvalidTipTokenAtPoint editor offset then noTooltip else
 
             let tooltipComputation =
                 asyncChoice {
                     try
-                        LoggingService.LogDebug "TooltipProvider: Getting tool tip"
+                        LoggingService.logDebug "TooltipProvider: Getting tool tip"
 
                         let parseAndCheckResults = context.TryGetAst()
                         match parseAndCheckResults with

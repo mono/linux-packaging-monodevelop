@@ -175,7 +175,7 @@ namespace RefactoringEssentials
 
                 // Since Roslyn 2.0 the parameter has the new type INamespaceOrTypeSymbol,
                 // which has become a parent type of ITypeSymbol.
-                GenerateTypeSyntaxMethod = typeInfo.GetMethod("GenerateTypeSyntax", new[] { typeof(INamespaceOrTypeSymbol) });
+                GenerateTypeSyntaxMethod = typeInfo.GetMethod("GenerateTypeSyntax", new[] { typeof(INamespaceOrTypeSymbol), typeof(bool) });
                 ContainingTypesOrSelfHasUnsafeKeywordMethod =
                     typeInfo.GetMethod("ContainingTypesOrSelfHasUnsafeKeyword", BindingFlags.Public | BindingFlags.Static);
             }

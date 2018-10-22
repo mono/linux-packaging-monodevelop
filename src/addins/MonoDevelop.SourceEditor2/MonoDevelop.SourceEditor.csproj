@@ -129,7 +129,6 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.VisualStudio.Text.Implementation">
-      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\build\bin\Microsoft.VisualStudio.Text.Implementation.dll</HintPath>
       <Private>False</Private>
     </Reference>
@@ -137,11 +136,11 @@
     <Reference Include="System.Xml" />
     <Reference Include="Mono.Posix" />
     <Reference Include="System.ComponentModel.Composition" />
-    <Reference Include="glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
+    <Reference Include="glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
     <Reference Include="System.Core" />
     <Reference Include="Mono.Cairo" />
     <Reference Include="System.Reflection.Metadata">
@@ -163,6 +162,10 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="mscorlib" />
+    <Reference Include="Xamarin.Mac" Condition=" '$(Configuration)' == 'DebugMac' Or '$(Configuration)' == 'ReleaseMac' ">
+      <HintPath>..\..\..\external\Xamarin.Mac.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <None Include="MonoDevelop.SourceEditor.dll.config">
@@ -276,7 +279,6 @@
     <Compile Include="VSEditor\TextSelection.cs" />
     <Compile Include="VSEditor\TextViewRoleSet.cs" />
     <Compile Include="VSEditor\VacuousTextDataModel.cs" />
-    <Compile Include="MonoDevelop.SourceEditor\TextEditorKeyPressTimings.cs" />
     <Compile Include="VSEditor\FakeWpf\Geometry.cs" />
     <Compile Include="VSEditor\FakeWpf\Mouse.cs" />
     <Compile Include="VSEditor\FakeWpf\SimulatingExtensions.cs" />
@@ -343,10 +345,11 @@
     <Compile Include="Gui\MonoDevelop.SourceEditor.SearchAndReplaceWidget.cs" />
     <Compile Include="Gui\MonoDevelop.SourceEditor.SearchWidget.cs" />
     <Compile Include="MonoDevelop.SourceEditor\TextMarker\BackgroundTextMarker.cs" />
-    <Compile Include="Mono.TextEditor\Gui\TextViewMargin.SpanUpdateListener.cs" />
     <Compile Include="Mono.TextEditor\Gui\FoldMarkerMargin.FoldMarkerMarginDrawer.cs" />
     <Compile Include="Mono.TextEditor\Gui\FoldMarkerMargin.VSNetFoldMarkerMarginDrawer.cs" />
     <Compile Include="Mono.TextEditor\Gui\FoldMarkerMargin.VSCodeFoldMarkerMarginDrawer.cs" />
+    <Compile Include="VSEditor\Text\Impl\WpfToolTipAdornment\ViewElementFactories\WpfObjectViewElementFactory.cs" />
+    <Compile Include="Mono.TextEditor\Gui\TextEditorKeyPressTimings.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="MonoDevelop.SourceEditor.addin.xml">

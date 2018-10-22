@@ -25,14 +25,9 @@
 // THE SOFTWARE.
 
 using System;
-using System.Linq;
-using MonoDevelop.Core.Text;
-using MonoDevelop.Ide.Editor;
-using System;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Formatting;
-using Mono.TextEditor;
 using MonoDevelop.Ide.Editor;
 
 namespace Mono.TextEditor
@@ -44,7 +39,13 @@ namespace Mono.TextEditor
 		VirtualSnapshotPoint insertionPoint;
 		PositionAffinity _caretAffinity;
 
-		ITextViewLine ITextCaret.ContainingTextViewLine => TextEditor.GetTextViewLineContainingBufferPosition (((ITextCaret)this).Position.VirtualBufferPosition.Position);
+		ITextViewLine ITextCaret.ContainingTextViewLine {
+			get {
+				var position = ((ITextCaret)this).Position.BufferPosition;
+				var line = TextEditor.GetTextViewLineContainingBufferPosition (position);
+				return line;
+			}
+		}
 
 		double ITextCaret.Left => TextEditor.TextArea.TextViewMargin.caretX;
 
@@ -226,9 +227,15 @@ namespace Mono.TextEditor
 			int col;
 			if (bufferPosition.IsInVirtualSpace) {
 				col = bufferPosition.VirtualSpaces;
+
+				if (!TextEditor.Options.TabsToSpaces) {
+					col = col / TextEditor.Options.TabSize;
+				}
 			} else {
-				col = requestedPosition - snapshotLine.Start + 1;
+				col = requestedPosition - snapshotLine.Start;
 			}
+
+			col += 1;
 
 			TextEditor.SetCaretTo (line, col, false, false);
 		}

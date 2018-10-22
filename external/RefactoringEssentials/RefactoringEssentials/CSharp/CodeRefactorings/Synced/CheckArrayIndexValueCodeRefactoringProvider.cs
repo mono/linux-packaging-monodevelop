@@ -35,7 +35,7 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             if (bracketedList == null)
                 return;
             var elementAccess = bracketedList.AncestorsAndSelf().OfType<ElementAccessExpressionSyntax>().FirstOrDefault();
-            if (elementAccess == null)
+            if (elementAccess == null || elementAccess.ArgumentList.Arguments.Count != 1)
                 return;
             var elementType = model.GetTypeInfo(elementAccess.Expression);
             if (elementType.Type == null || elementType.Type.TypeKind != TypeKind.Array)

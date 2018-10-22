@@ -82,6 +82,16 @@ namespace MonoDevelop.Refactoring.Rename
 		public async Task Rename (ISymbol symbol)
 		{
 			var ws = IdeApp.Workbench.ActiveDocument.RoslynWorkspace;
+			if (!symbol.IsDefinedInSource ())
+				return;
+			foreach (var location in symbol.Locations)
+			{
+				if (location.IsInSource && ws.CurrentSolution.GetDocument (location.SourceTree) == null) {
+					LoggingService.LogError ("Error location.SourceTree document not found.");
+					MessageService.ShowError ("Can't rename " + symbol.Name + ". If a retry doesn't work please file a bug.");
+					return;
+				}
+			}
 
 			var currentSolution = ws.CurrentSolution;
 			var cts = new CancellationTokenSource ();
@@ -113,38 +123,7 @@ namespace MonoDevelop.Refactoring.Rename
 			var editor = doc.Editor;
 			var oldVersion = editor.Version;
 
-			var links = new List<TextLink> ();
-			var link = new TextLink ("name");
-
-			var documents = ImmutableHashSet.Create (doc.AnalysisDocument);
-
-			foreach (var loc in symbol.Locations) {
-				if (loc.IsInSource && FilePath.PathComparer.Equals (loc.SourceTree.FilePath, doc.FileName)) {
-					link.AddLink (new TextSegment (loc.SourceSpan.Start, loc.SourceSpan.Length));
-				}
-			}
-
-			foreach (var mref in await SymbolFinder.FindReferencesAsync (symbol, doc.AnalysisDocument.Project.Solution, documents, default (CancellationToken))) {
-				foreach (var loc in mref.Locations) {
-					TextSpan span = loc.Location.SourceSpan;
-					var root = loc.Location.SourceTree.GetRoot ();
-					var node = root.FindNode (loc.Location.SourceSpan);
-					var trivia = root.FindTrivia (loc.Location.SourceSpan.Start);
-					if (!trivia.IsKind (SyntaxKind.SingleLineDocumentationCommentTrivia)) {
-						span = node.Span;
-					}
-					if (span.Start != loc.Location.SourceSpan.Start) {
-						span = loc.Location.SourceSpan;
-					}
-					var segment = new TextSegment (span.Start, span.Length);
-					if (segment.Offset <= editor.CaretOffset && editor.CaretOffset <= segment.EndOffset) {
-						link.Links.Insert (0, segment);
-					} else {
-						link.AddLink (segment);
-					}
-				}
-			}
-			links.Add (link);
+			var links = await GetTextLinksAsync (doc, editor.CaretOffset, symbol);
 
 			editor.StartTextLinkMode (new TextLinkModeOptions (links, (arg) => {
 				//If user cancel renaming revert changes
@@ -161,6 +140,34 @@ namespace MonoDevelop.Refactoring.Rename
 					}
 				}
 			}) { TextLinkPurpose = TextLinkPurpose.Rename });
+		}
+
+		internal static async Task<List<TextLink>> GetTextLinksAsync (Ide.Gui.Document doc, int caretOffset, ISymbol symbol)
+		{
+			var links = new List<TextLink> ();
+			var link = new TextLink ("name");
+
+			var documents = ImmutableHashSet.Create (doc.AnalysisDocument);
+
+			foreach (var loc in symbol.Locations) {
+				if (loc.IsInSource && FilePath.PathComparer.Equals (loc.SourceTree.FilePath, doc.FileName)) {
+					link.AddLink (new TextSegment (loc.SourceSpan.Start, loc.SourceSpan.Length));
+				}
+			}
+
+			foreach (var mref in await SymbolFinder.FindReferencesAsync (symbol, doc.AnalysisDocument.Project.Solution, documents, default (CancellationToken))) {
+				foreach (var loc in mref.Locations) {
+					var span = loc.Location.SourceSpan;
+					var segment = new TextSegment (span.Start, span.Length);
+					if (segment.Offset <= caretOffset && caretOffset <= segment.EndOffset) {
+						link.Links.Insert (0, segment);
+					} else {
+						link.AddLink (segment);
+					}
+				}
+			}
+			links.Add (link);
+			return links;
 		}
 
 		public class RenameProperties
@@ -184,9 +191,8 @@ namespace MonoDevelop.Refactoring.Rename
 		public async Task<List<Change>> PerformChangesAsync (ISymbol symbol, RenameProperties properties)
 		{
 			var ws = IdeApp.Workbench.ActiveDocument.RoslynWorkspace;
-
-			var newSolution = await Renamer.RenameSymbolAsync (ws.CurrentSolution, symbol, properties.NewName, ws.Options);
 			var changes = new List<Change> ();
+			var newSolution = await Renamer.RenameSymbolAsync (ws.CurrentSolution, symbol, properties.NewName, ws.Options);
 			var documents = new List<Microsoft.CodeAnalysis.Document> ();
 			foreach (var projectChange in newSolution.GetChanges (ws.CurrentSolution).GetProjectChanges ()) {
 				documents.AddRange (projectChange.GetChangedDocuments ().Select(d => newSolution.GetDocument (d)));

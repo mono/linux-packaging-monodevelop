@@ -30,6 +30,7 @@ using Gtk;
 using MonoDevelop.Components;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
+using Microsoft.CodeAnalysis;
 
 namespace MonoDevelop.AnalysisCore.Gui
 {
@@ -39,9 +40,10 @@ namespace MonoDevelop.AnalysisCore.Gui
 		
 		public override Control CreatePanelWidget ()
 		{
-			return widget = new AnalysisOptionsWidget () {
+			return widget = new AnalysisOptionsWidget (LanguageNames.CSharp) {
 				AnalysisEnabled = AnalysisOptions.AnalysisEnabled,
-				UnitTestIntegrationEnabled = AnalysisOptions.EnableUnitTestEditorIntegration
+				UnitTestIntegrationEnabled = AnalysisOptions.EnableUnitTestEditorIntegration,
+				FullAnalysisEnabled = IdeApp.Preferences.Roslyn.For (LanguageNames.CSharp).SolutionCrawlerClosedFileDiagnostic && IdeApp.Preferences.Roslyn.FullSolutionAnalysisRuntimeEnabled,
 			};
 		}
 		
@@ -49,27 +51,43 @@ namespace MonoDevelop.AnalysisCore.Gui
 		{
 			AnalysisOptions.AnalysisEnabled.Set (widget.AnalysisEnabled);
 			AnalysisOptions.EnableUnitTestEditorIntegration.Set (widget.UnitTestIntegrationEnabled);
+			IdeApp.Preferences.Roslyn.For (LanguageNames.CSharp).SolutionCrawlerClosedFileDiagnostic.Value = widget.FullAnalysisEnabled;
 		}
 	}
 	
 	class AnalysisOptionsWidget : VBox
 	{
 		CheckButton enabledCheck;
+		CheckButton enabledFullCheck;
 		CheckButton enabledTest;
 
-		public AnalysisOptionsWidget ()
+		public AnalysisOptionsWidget (string languageName)
 		{
 			enabledCheck = new CheckButton (GettextCatalog.GetString ("Enable source analysis of open files"));
 			PackStart (enabledCheck, false, false, 0);
+			enabledFullCheck = new CheckButton (GettextCatalog.GetString ("Enable source analysis of whole solution"));
+			PackStart (enabledFullCheck, false, false, 0);
 			enabledTest = new CheckButton (GettextCatalog.GetString ("Enable text editor unit test integration"));
 			PackStart (enabledTest, false, false, 0);
 
 			ShowAll ();
 		}
-		
+
 		public bool AnalysisEnabled {
 			get { return enabledCheck.Active; }
-			set { enabledCheck.Active = value; }
+			set {
+				enabledCheck.Active = value;
+
+				enabledFullCheck.Sensitive = value;
+				if (!value) {
+					enabledFullCheck.Active = false;
+				}
+			}
+		}
+
+		public bool FullAnalysisEnabled {
+			get { return enabledFullCheck.Active; }
+			set { enabledFullCheck.Active = value; }
 		}
 
 		public bool UnitTestIntegrationEnabled {

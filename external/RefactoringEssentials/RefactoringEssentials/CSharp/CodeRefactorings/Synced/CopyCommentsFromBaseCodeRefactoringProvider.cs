@@ -42,12 +42,6 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             var baseMember = GetBaseMember(declaredSymbol, out documentation, cancellationToken);
             if (baseMember == null || string.IsNullOrEmpty(documentation))
                 return;
-            XDocument doc = XDocument.Parse(documentation);
-            var rootElement = doc.Elements().First();
-            var inner = string.Join(System.Environment.NewLine, rootElement.Nodes().Select(n => n.ToString())).Trim();
-            if (string.IsNullOrEmpty(inner))
-                return;
-
             // "Copy comments from interface"
             context.RegisterRefactoring(
                 CodeActionFactory.Create(
@@ -56,6 +50,9 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
                     baseMember.ContainingType != null && baseMember.ContainingType.TypeKind == TypeKind.Interface ? GettextCatalog.GetString("Copy comments from interface") : GettextCatalog.GetString("Copy comments from base"),
                     t2 =>
                     {
+                        string inner = StripRootNode(documentation);
+                        if (inner == null)
+                            return Task.FromResult(document);
                         var triva = node.GetLeadingTrivia();
 
                         var indentTrivia = triva.FirstOrDefault(t => t.IsKind(SyntaxKind.WhitespaceTrivia));
@@ -78,6 +75,22 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
                     }
                 )
             );
+        }
+
+        static string StripRootNode(string outerXml)
+        {
+            var idx1 = outerXml.IndexOf(">", System.StringComparison.Ordinal);
+            var idx2 = outerXml.LastIndexOf("<", System.StringComparison.Ordinal);
+            if (idx1 < 0 || idx2 < 0)
+                return null;
+            idx1++;
+            while (idx1 < outerXml.Length && char.IsWhiteSpace(outerXml[idx1]))
+                idx1++;
+            while (idx2 > 0 && char.IsWhiteSpace(outerXml[idx2 - 1]))
+                idx2--;
+            if (idx1 >= idx2)
+                return null;
+            return outerXml.Substring(idx1, idx2 - idx1);
         }
 
         static string RemoveLineBreaksFromXml(string innerXml)

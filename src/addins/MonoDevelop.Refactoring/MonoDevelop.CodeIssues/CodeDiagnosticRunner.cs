@@ -48,21 +48,12 @@ namespace MonoDevelop.CodeIssues
 {
 	static class CodeDiagnosticRunner
 	{
-		static MonoDevelopWorkspaceDiagnosticAnalyzerProviderService.OptionsTable options =
-			((MonoDevelopWorkspaceDiagnosticAnalyzerProviderService)Ide.Composition.CompositionManager.GetExportedValue<IWorkspaceDiagnosticAnalyzerProviderService> ()).Options; 
-		
-		static TraceListener consoleTraceListener = new ConsoleTraceListener ();
-
 		public static async Task<IEnumerable<Result>> Check (AnalysisDocument analysisDocument, CancellationToken cancellationToken, ImmutableArray<DiagnosticData> results)
 		{
 			var input = analysisDocument.DocumentContext;
 			if (!AnalysisOptions.EnableFancyFeatures || input.Project == null || !input.IsCompileableInProject || input.AnalysisDocument == null)
 				return Enumerable.Empty<Result> ();
 			try {
-#if DEBUG
-				Debug.Listeners.Add (consoleTraceListener);
-#endif
-
 				var resultList = new List<Result> (results.Length);
 				foreach (var data in results) {
 					if (input.IsAdHocProject && SkipError (data.Id))
@@ -73,7 +64,7 @@ namespace MonoDevelop.CodeIssues
 
 					if (DataHasTag (data, WellKnownDiagnosticTags.EditAndContinue))
 						continue;
-
+					var options = await ((MonoDevelopWorkspaceDiagnosticAnalyzerProviderService)Ide.Composition.CompositionManager.GetExportedValue<IWorkspaceDiagnosticAnalyzerProviderService> ()).GetOptionsAsync ();
 					if (options.TryGetDiagnosticDescriptor (data.Id, out var desc) && !desc.GetIsEnabled (data.Id, data.IsEnabledByDefault))
 						continue;
 

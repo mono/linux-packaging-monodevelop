@@ -54,7 +54,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Test.cs" />
     <Compile Include="MonoDevelop.Core\BacktrackingStringMatcherTests.cs" />
     <Compile Include="MonoDevelop.Core\BaseCredentialsProviderTests.cs" />
     <Compile Include="MonoDevelop.Core\CoreExtensionsTests.cs" />
@@ -108,6 +107,12 @@
     <Compile Include="MonoDevelop.Core.Execution\BinaryMessageTests.cs" />
     <Compile Include="MonoDevelop.Core\ProgressMonitorTests.cs" />
     <Compile Include="MonoDevelop.Projects\DotNetCoreFileWatcherTests.cs" />
+    <Compile Include="MonoDevelop.Projects\FileWatcherTests.cs" />
+    <Compile Include="MonoDevelop.Core\InstrumentationTests.cs" />
+    <Compile Include="MonoDevelop.FSW\PathTreeNodeTests.cs" />
+    <Compile Include="MonoDevelop.FSW\PathTreeTests.cs" />
+    <Compile Include="MonoDevelop.Core\PropertyTests.cs" />
+    <Compile Include="MonoDevelop.Core.Instrumentation\BucketTimingsTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="MonoDevelop.Core\" />
@@ -142,6 +147,10 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="MonoDevelop.FSW\" />
+    <Folder Include="MonoDevelop.Core.Instrumentation\" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

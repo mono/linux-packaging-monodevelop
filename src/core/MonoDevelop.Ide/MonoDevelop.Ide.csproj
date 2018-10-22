@@ -102,11 +102,11 @@
     <NoWarn>1591;1573</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
+    <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
     <Reference Include="ICSharpCode.SharpZipLib">
       <HintPath>..\..\..\packages\JetBrains.SharpZipLib.Stripped.0.87.20170615.10\lib\net40\ICSharpCode.SharpZipLib.dll</HintPath>
     </Reference>
@@ -199,6 +199,22 @@
     </Reference>
     <Reference Include="System.ValueTuple">
       <HintPath>..\..\..\packages\System.ValueTuple.4.4.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <!-- when building with xbuild on Unix, $(MSBuildToolsPath) is like `$prefix/lib/mono/xbuild/*/bin`
+    when building with msbuild on Unix, $(MSBuildToolsPath) is like `$prefix/lib/mono/msbuild/*/bin`
+    Prefer referencing msbuild 15.* assemblies over 14.1 . At runtime, we use correct one anyway
+    -->
+    <Reference Include="Microsoft.Build">
+      <HintPath>$(MSBuildToolsPath)\Microsoft.Build.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.Build.Framework">
+      <HintPath>$(MSBuildToolsPath)\Microsoft.Build.Framework.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.Build.Utilities.Core">
+      <HintPath>$(MSBuildToolsPath)\Microsoft.Build.Utilities.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.VisualStudio.CodingConventions">
@@ -704,30 +720,6 @@
     </EmbeddedResource>
     <EmbeddedResource Include="icons\breakpoint-on-off-16~dark~disabled%402x.png">
       <LogicalName>breakpoint-on-off-16~dark~disabled@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\build-project-16.png">
-      <LogicalName>build-project-16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\build-project-16%402x.png">
-      <LogicalName>build-project-16@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\build-project-16~dark.png">
-      <LogicalName>build-project-16~dark.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\build-project-16~dark%402x.png">
-      <LogicalName>build-project-16~dark@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\build-solution-16.png">
-      <LogicalName>build-solution-16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\build-solution-16%402x.png">
-      <LogicalName>build-solution-16@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\build-solution-16~dark.png">
-      <LogicalName>build-solution-16~dark.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\build-solution-16~dark%402x.png">
-      <LogicalName>build-solution-16~dark@2x.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="icons\element-template-16.png">
       <LogicalName>element-template-16.png</LogicalName>
@@ -2045,6 +2037,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="MonoDevelop.Ide.Gui.Pads.ClassPad\ClassPadContextMenu.addin.xml">
       <LogicalName>ClassPadContextMenu.addin.xml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="MonoDevelop.Ide.BuildOutputView\BuildOutputExtension.addin.xml">
+      <LogicalName>BuildOutputExtension.addin.xml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="icons\feedback-16.png">
       <LogicalName>feedback-16.png</LogicalName>
@@ -6417,6 +6412,126 @@
     <EmbeddedResource Include="icons\spinner-18-5~sel%402x.png">
       <LogicalName>spinner-18-5~sel@2x.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-1.png">
+      <LogicalName>spinner-36-1.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-1%402x.png">
+      <LogicalName>spinner-36-1@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-1~dark.png">
+      <LogicalName>spinner-36-1~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-1~dark%402x.png">
+      <LogicalName>spinner-36-1~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-1~dark~sel.png">
+      <LogicalName>spinner-36-1~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-1~dark~sel%402x.png">
+      <LogicalName>spinner-36-1~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-1~sel.png">
+      <LogicalName>spinner-36-1~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-1~sel%402x.png">
+      <LogicalName>spinner-36-1~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-2.png">
+      <LogicalName>spinner-36-2.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-2%402x.png">
+      <LogicalName>spinner-36-2@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-2~dark.png">
+      <LogicalName>spinner-36-2~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-2~dark%402x.png">
+      <LogicalName>spinner-36-2~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-2~dark~sel.png">
+      <LogicalName>spinner-36-2~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-2~dark~sel%402x.png">
+      <LogicalName>spinner-36-2~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-2~sel.png">
+      <LogicalName>spinner-36-2~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-2~sel%402x.png">
+      <LogicalName>spinner-36-2~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-3.png">
+      <LogicalName>spinner-36-3.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-3%402x.png">
+      <LogicalName>spinner-36-3@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-3~dark.png">
+      <LogicalName>spinner-36-3~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-3~dark%402x.png">
+      <LogicalName>spinner-36-3~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-3~dark~sel.png">
+      <LogicalName>spinner-36-3~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-3~dark~sel%402x.png">
+      <LogicalName>spinner-36-3~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-3~sel.png">
+      <LogicalName>spinner-36-3~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-3~sel%402x.png">
+      <LogicalName>spinner-36-3~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-4.png">
+      <LogicalName>spinner-36-4.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-4%402x.png">
+      <LogicalName>spinner-36-4@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-4~dark.png">
+      <LogicalName>spinner-36-4~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-4~dark%402x.png">
+      <LogicalName>spinner-36-4~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-4~dark~sel.png">
+      <LogicalName>spinner-36-4~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-4~dark~sel%402x.png">
+      <LogicalName>spinner-36-4~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-4~sel.png">
+      <LogicalName>spinner-36-4~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-4~sel%402x.png">
+      <LogicalName>spinner-36-4~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-5.png">
+      <LogicalName>spinner-36-5.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-5%402x.png">
+      <LogicalName>spinner-36-5@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-5~dark.png">
+      <LogicalName>spinner-36-5~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-5~dark%402x.png">
+      <LogicalName>spinner-36-5~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-5~dark~sel.png">
+      <LogicalName>spinner-36-5~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-5~dark~sel%402x.png">
+      <LogicalName>spinner-36-5~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-5~sel.png">
+      <LogicalName>spinner-36-5~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\spinner-36-5~sel%402x.png">
+      <LogicalName>spinner-36-5~sel@2x.png</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="icons\bug-16.png">
       <LogicalName>bug-16.png</LogicalName>
     </EmbeddedResource>
@@ -8538,6 +8653,198 @@
     <EmbeddedResource Include="MonoDevelop.Ide.Editor.Highlighting\VSCodeImport\xml\syntaxes\xaml.json">
       <LogicalName>xaml.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-small-16~dark%402x.png">
+      <LogicalName>build-error-small-16~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-small-16~dark.png">
+      <LogicalName>build-error-small-16~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-small-16%402x.png">
+      <LogicalName>build-error-small-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-small-16.png">
+      <LogicalName>build-error-small-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-16~dark%402x.png">
+      <LogicalName>build-error-16~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-16~dark.png">
+      <LogicalName>build-error-16~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-16%402x.png">
+      <LogicalName>build-error-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-16.png">
+      <LogicalName>build-error-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-small-16~dark%402x.png">
+      <LogicalName>build-warning-small-16~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-small-16~dark.png">
+      <LogicalName>build-warning-small-16~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-small-16%402x.png">
+      <LogicalName>build-warning-small-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-small-16.png">
+      <LogicalName>build-warning-small-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-16~dark%402x.png">
+      <LogicalName>build-warning-16~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-16~dark.png">
+      <LogicalName>build-warning-16~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-16%402x.png">
+      <LogicalName>build-warning-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-16.png">
+      <LogicalName>build-warning-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-target-16~dark%402x.png">
+      <LogicalName>build-target-16~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-target-16~dark.png">
+      <LogicalName>build-target-16~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-target-16%402x.png">
+      <LogicalName>build-target-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-target-16.png">
+      <LogicalName>build-target-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-small-16~sel%402x.png">
+      <LogicalName>build-warning-small-16~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-small-16~sel.png">
+      <LogicalName>build-warning-small-16~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-small-16~dark~sel%402x.png">
+      <LogicalName>build-warning-small-16~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-small-16~dark~sel.png">
+      <LogicalName>build-warning-small-16~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-16~sel%402x.png">
+      <LogicalName>build-warning-16~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-16~sel.png">
+      <LogicalName>build-warning-16~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-16~dark~sel%402x.png">
+      <LogicalName>build-warning-16~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-warning-16~dark~sel.png">
+      <LogicalName>build-warning-16~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-target-16~sel%402x.png">
+      <LogicalName>build-target-16~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-target-16~sel.png">
+      <LogicalName>build-target-16~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-target-16~dark~sel%402x.png">
+      <LogicalName>build-target-16~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-target-16~dark~sel.png">
+      <LogicalName>build-target-16~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-small-16~sel%402x.png">
+      <LogicalName>build-error-small-16~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-small-16~sel.png">
+      <LogicalName>build-error-small-16~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-small-16~dark~sel%402x.png">
+      <LogicalName>build-error-small-16~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-small-16~dark~sel.png">
+      <LogicalName>build-error-small-16~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-16~sel%402x.png">
+      <LogicalName>build-error-16~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-16~sel.png">
+      <LogicalName>build-error-16~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-16~dark~sel%402x.png">
+      <LogicalName>build-error-16~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-error-16~dark~sel.png">
+      <LogicalName>build-error-16~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-failed-16.png">
+      <LogicalName>build-task-failed-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-failed-16%402x.png">
+      <LogicalName>build-task-failed-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-failed-16~dark.png">
+      <LogicalName>build-task-failed-16~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-failed-16~dark%402x.png">
+      <LogicalName>build-task-failed-16~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-failed-16~dark~sel.png">
+      <LogicalName>build-task-failed-16~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-failed-16~dark~sel%402x.png">
+      <LogicalName>build-task-failed-16~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-failed-16~sel.png">
+      <LogicalName>build-task-failed-16~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-failed-16~sel%402x.png">
+      <LogicalName>build-task-failed-16~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-success-16.png">
+      <LogicalName>build-task-success-16.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-success-16%402x.png">
+      <LogicalName>build-task-success-16@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-success-16~dark.png">
+      <LogicalName>build-task-success-16~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-success-16~dark%402x.png">
+      <LogicalName>build-task-success-16~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-success-16~dark~sel.png">
+      <LogicalName>build-task-success-16~dark~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-success-16~dark~sel%402x.png">
+      <LogicalName>build-task-success-16~dark~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-success-16~sel.png">
+      <LogicalName>build-task-success-16~sel.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\build-task-success-16~sel%402x.png">
+      <LogicalName>build-task-success-16~sel@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\tree-chevron-open~dark%402x.png">
+      <LogicalName>tree-chevron-open~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\tree-chevron-open~dark.png">
+      <LogicalName>tree-chevron-open~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\tree-chevron-open%402x.png">
+      <LogicalName>tree-chevron-open@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\tree-chevron-open.png">
+      <LogicalName>tree-chevron-open.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\tree-chevron-closed~dark%402x.png">
+      <LogicalName>tree-chevron-closed~dark@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\tree-chevron-closed~dark.png">
+      <LogicalName>tree-chevron-closed~dark.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\tree-chevron-closed%402x.png">
+      <LogicalName>tree-chevron-closed@2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="icons\tree-chevron-closed.png">
+      <LogicalName>tree-chevron-closed.png</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MonoDevelop.Ide.Commands\CustomStringTagProvider.cs" />
@@ -9061,8 +9368,6 @@
     <Compile Include="MonoDevelop.Ide.Gui.Pads.ClassPad\PropertyNodeBuilder.cs" />
     <Compile Include="MonoDevelop.Ide.Gui.Pads.ClassPad\SolutionNodeBuilder.cs" />
     <Compile Include="MonoDevelop.Ide.Gui.Pads.ClassPad\ReferenceNodeBuilder.cs" />
-    <Compile Include="MonoDevelop.Ide.Gui.Dialogs\FeedbackDialog.cs" />
-    <Compile Include="MonoDevelop.Ide\FeedbackService.cs" />
     <Compile Include="MonoDevelop.Ide.Updater\UpdateService.cs" />
     <Compile Include="MonoDevelop.Ide.Updater\IUpdateHandler.cs" />
     <Compile Include="MonoDevelop.Ide.Updater\AddinsUpdateHandler.cs" />
@@ -9085,7 +9390,6 @@
     <Compile Include="MonoDevelop.Ide\LogReportingStartup.cs" />
     <Compile Include="MonoDevelop.Ide.Projects\ExportSolutionDialog.cs" />
     <Compile Include="MonoDevelop.Components.Commands\CustomCommandTargetAttribute.cs" />
-    <Compile Include="MonoDevelop.Ide.Extensions\ServiceUrlExtensionNode.cs" />
     <Compile Include="MonoDevelop.Ide\ProjectCreatedEventArgs.cs" />
     <Compile Include="MonoDevelop.Ide.TypeSystem\TypeSystemService.cs" />
     <Compile Include="MonoDevelop.Ide.TypeSystem\Ambience.cs" />
@@ -9195,7 +9499,6 @@
     <Compile Include="MonoDevelop.Ide.Templates\PackageReferencesForCreatedProject.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\ProjectTemplatePackageInstaller.cs" />
     <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopTextLoader.cs" />
-    <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopSourceTextContainer.cs" />
     <Compile Include="MonoDevelop.Ide.CustomTools\PublicResXFileCodeGenerator.cs" />
     <Compile Include="MonoDevelop.Components\ImageLoader.cs" />
     <Compile Include="MonoDevelop.Ide.CodeCompletion\ParameterHintingData.cs" />
@@ -9337,7 +9640,7 @@
     <Compile Include="MonoDevelop.Ide.Editor\MessageBubbles\MessageBubbleCommands.cs" />
     <Compile Include="MonoDevelop.Ide.Editor\LineEventArgs.cs" />
     <Compile Include="MonoDevelop.Ide.TypeSystem\Error.cs" />
-    <Compile Include="MonoDevelop.Ide.TypeSystem\MetadataReferenceCache.cs" />
+    <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopMetadataReferenceManager.cs" />
     <Compile Include="MonoDevelop.Ide.TypeSystem\IFoldingParser.cs" />
     <Compile Include="MonoDevelop.Ide.TypeSystem\TypeSystemService_WorkspaceHandling.cs" />
     <Compile Include="MonoDevelop.Ide.Editor\Projection\ProjectedSegment.cs" />
@@ -9528,14 +9831,12 @@
     <Compile Include="MonoDevelop.Ide.CodeCompletion\CompletionTriggerReason.cs" />
     <Compile Include="MonoDevelop.Ide.CodeCompletion\CompletionSelectionStatus.cs" />
     <Compile Include="MonoDevelop.Ide.TypeSystem\EditorNotificationServiceFactory.cs" />
-    <Compile Include="MonoDevelop.Ide.TypeSystem\GlobalOptionPersister.cs" />
     <Compile Include="MonoDevelop.Ide.TypeSystem\TextPolicyDocumentOptionsProvider.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\MicrosoftTemplateEngineProjectTemplatingProvider.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\MicrosoftTemplateEngineSolutionTemplate.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\MicrosoftTemplateEngineProcessedTemplateResult.cs" />
     <Compile Include="MonoDevelop.Ide.Codons\TemplateExtensionNode.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\HasReferenceFileTemplateCondition.cs" />
-    <Compile Include="MonoDevelop.Ide.Editor.Highlighting\RoslynClassificationHighlighting.cs" />
     <Compile Include="MonoDevelop.Ide.Projects\LanguageCellRenderer.cs" />
     <Compile Include="MonoDevelop.Components\RestartPanel.cs" />
     <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopSourceText.cs" />
@@ -9547,6 +9848,12 @@
     <Compile Include="MonoDevelop.Ide.Editor.Extension\LineSeparatorTextEditorExtension.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\ProjectCapabilityFileTemplateCondition.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\OrFileTemplateCondition.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\BuildLogDisplayBinding.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\BuildOutputProcessor.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\BuildOutputViewContent.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\BuildOutputWidget.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\BuildOutput.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\MSBuildOutputProcessor.cs" />
     <Compile Include="MonoDevelop.Ide.CodeCompletion\CompletionController.cs" />
     <Compile Include="MonoDevelop.Ide.CodeCompletion\ICompletionView.cs" />
     <Compile Include="MonoDevelop.Ide.CodeCompletion\ICompletionViewEventSink.cs" />
@@ -9557,6 +9864,9 @@
     <Compile Include="MonoDevelop.Ide.Editor\EditorConfigService.cs" />
     <Compile Include="MonoDevelop.Ide.Gui\StartupAssetType.cs" />
     <Compile Include="MonoDevelop.Ide.Gui\DocumentRegistry.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\BuildOutputNode.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\BuildOutputTreeCellView.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\IBuildOutputContextProvider.cs" />
     <Compile Include="MonoDevelop.Ide.Codons\ItemTemplateExtensionNode.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\MicrosoftTemplateEngineItemTemplatingProvider.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\ItemTemplate.cs" />
@@ -9640,6 +9950,35 @@
     <Compile Include="MonoDevelop.Ide.Tasks\CommentTasksProvider.Legacy.cs" />
     <Compile Include="MonoDevelop.Ide.Editor.Extension\TagCommentsTextEditorExtension.cs" />
     <Compile Include="MonoDevelop.Ide.Composition\CompositionManager.Caching.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices\MonoDevelopDocumentTrackingService.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices\MonoDevelopProjectCacheHostServiceFactory.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices\MonoDevelopWorkspaceCacheService.cs" />
+    <Compile Include="MonoDevelop.Components.MainToolbar\RoslynSearchCategory.cs" />
+    <Compile Include="MonoDevelop.Components.MainToolbar\RoslynSearchCategory.DeclaredSymbolInfoResult.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices\RoslynService.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices.Options\MonoDevelopGlobalOptionPersister.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices.Options\RoslynPreferences.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices.Options\OptionsExtensions.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices.Options\RoslynPreferences.Properties.cs" />
+    <Compile Include="MonoDevelop.Ide.Desktop\IPlatformTelemetryDetails.cs" />
+    <Compile Include="MonoDevelop.Ide.Editor.Extension\CompletionStatistics.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices\MonoDevelopNotificationServiceFactory.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices\MonoDevelopTaskSchedulerFactory.cs" />
+    <Compile Include="MonoDevelop.Ide.Editor.Highlighting\IEditorThemeProvider.cs" />
+    <Compile Include="MonoDevelop.Ide.Editor.Highlighting\ISyntaxHighlightingDefinitionProvider.cs" />
+    <Compile Include="MonoDevelop.Ide\PlatformMemoryStatusEventArgs.cs" />
+    <Compile Include="MonoDevelop.Ide.Desktop\MemoryMonitor.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices\MonoDevelopErrorReportingService.cs" />
+    <Compile Include="MonoDevelop.Ide.RoslynServices\MonoDevelopInfoBarService.cs" />
+    <Compile Include="MonoDevelop.Ide.Gui.Components\InfoBar.cs" />
+    <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopAddMetadataReferenceCodeActionOperationFactoryWorkspaceService.cs" />
+    <Compile Include="MonoDevelop.Ide.BuildOutputView\Counters.cs" />
+    <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopMetadataServiceFactory.cs" />
+    <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopMetadataReference.Snapshot.cs" />
+    <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopMetadataReference.cs" />
+    <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopMetadataReferenceManager.MetadataCache.cs" />
+    <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopMetadataReferenceManager.RecoverableMetadataValueSource.cs" />
+    <Compile Include="MonoDevelop.Ide.TypeSystem\MonoDevelopMetadataReferenceManager.MetadataReferenceCache.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile.am" />
@@ -9685,8 +10024,11 @@
     <Folder Include="MonoDevelop.Components\Xwt\" />
     <Folder Include="MonoDevelop.Components.AtkCocoaHelper\" />
     <Folder Include="MonoDevelop.Ide.Editor.Highlighting\syntaxes\Markdown\" />
+    <Folder Include="MonoDevelop.Ide.BuildOutputView\" />
     <Folder Include="MonoDevelop.Ide.EditorConfig\" />
     <Folder Include="Gui\" />
+    <Folder Include="MonoDevelop.Ide.RoslynServices\" />
+    <Folder Include="MonoDevelop.Ide.RoslynServices.Options\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="gtkrc">
@@ -9711,6 +10053,7 @@
     <InternalsVisibleTo Include="MonoDevelop.Debugger" />
     <InternalsVisibleTo Include="MonoDevelop.DesignerSupport" />
     <InternalsVisibleTo Include="MonoDevelop.Ide.Tests" />
+    <InternalsVisibleTo Include="IdeUnitTests" />
     <InternalsVisibleTo Include="MonoDevelop.SourceEditor" />
     <InternalsVisibleTo Include="Xamarin.OSXEditor" />
     <InternalsVisibleTo Include="MonoDevelop.Refactoring" />

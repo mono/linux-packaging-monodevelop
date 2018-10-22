@@ -45,7 +45,9 @@ namespace Mono.TextEditor.Tests
 	{
 		class TestSyntaxMode : ISyntaxHighlighting
 		{
+			#pragma warning disable 67 // unused
 			public event EventHandler<MonoDevelop.Ide.Editor.LineEventArgs> HighlightingStateChanged;
+			#pragma warning restore 67
 
 			public void Dispose ()
 			{
@@ -70,70 +72,5 @@ namespace Mono.TextEditor.Tests
 				return Task.FromResult (ScopeStack.Empty);
 			}
 		}
-
-		[Test]
-		public void TestFirstTimeUpdate ()
-		{
-			var editor = new MonoTextEditor ();
-			editor.GetTextEditorData ().Document.SyntaxMode = new TestSyntaxMode ();
-			editor.Text = @"1
-2
-3
-4
-5";
-			editor.Caret.Location = new DocumentLocation (2, 1);
-			editor.InsertAtCaret ("a");
-			Assert.IsTrue (editor.TextViewMargin.SpanUpdater.HasUpdatedMultilineSpan);
-		}
-
-		[Test]
-		public void TestSubsequentUpdate ()
-		{
-			var editor = new MonoTextEditor ();
-			editor.GetTextEditorData ().Document.SyntaxMode = new TestSyntaxMode ();
-			editor.Text = @"1
-2
-3
-4
-5";
-			editor.Caret.Location = new DocumentLocation (2, 1);
-			editor.InsertAtCaret ("a");
-			Assert.IsTrue (editor.TextViewMargin.SpanUpdater.HasUpdatedMultilineSpan);
-			editor.InsertAtCaret ("a");
-			Assert.IsFalse (editor.TextViewMargin.SpanUpdater.HasUpdatedMultilineSpan);
-		}
-
-		[Test]
-		public void TestBackspace ()
-		{
-			var editor = new MonoTextEditor ();
-			editor.GetTextEditorData ().Document.SyntaxMode = new TestSyntaxMode ();
-			editor.Text = @"1
-2
-3
-4
-5";
-			editor.Caret.Location = new DocumentLocation (2, 1);
-			editor.InsertAtCaret ("a");
-			Assert.IsTrue (editor.TextViewMargin.SpanUpdater.HasUpdatedMultilineSpan);
-			DeleteActions.Backspace (editor.GetTextEditorData ());
-			Assert.IsTrue (editor.TextViewMargin.SpanUpdater.HasUpdatedMultilineSpan);
-		}
-
-		[Test]
-		public void TestDeleteNoUpdate ()
-		{
-			var editor = new MonoTextEditor ();
-			editor.GetTextEditorData ().Document.SyntaxMode = new TestSyntaxMode ();
-			editor.Text = @"1
-2
-3
-4
-5";
-			editor.Caret.Location = new DocumentLocation (2, 1);
-			DeleteActions.Delete (editor.GetTextEditorData ());
-			Assert.IsFalse (editor.TextViewMargin.SpanUpdater.HasUpdatedMultilineSpan);
-		}
-
 	}
 }

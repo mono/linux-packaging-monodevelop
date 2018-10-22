@@ -31,7 +31,7 @@ namespace MonoDevelop.Ide.Editor.Highlighting
 
 		public SyntaxHighlighting (SyntaxHighlightingDefinition definition, IReadonlyTextDocument document)
 		{
-			this.definition = definition;
+			this.definition = definition ?? throw new ArgumentNullException (nameof (definition));
 			Document = document;
 			if (document is ITextDocument)
 				((ITextDocument)document).TextChanged += Handle_TextChanged;
@@ -128,9 +128,14 @@ namespace MonoDevelop.Ide.Editor.Highlighting
 
 			public static HighlightState CreateNewState (SyntaxHighlighting highlighting)
 			{
+				if (highlighting == null)
+					throw new ArgumentNullException (nameof (highlighting));
+				var definition = highlighting.definition;
+				if (definition == null)
+					throw new NullReferenceException ("HighlightState.CreateNewState null reference exception highlighting.definition == null.");
 				return new HighlightState {
-					ContextStack = ImmutableStack<SyntaxContext>.Empty.Push (highlighting.definition.MainContext),
-					ScopeStack = new ScopeStack (highlighting.definition.Scope),
+					ContextStack = ImmutableStack<SyntaxContext>.Empty.Push (definition.MainContext),
+					ScopeStack = new ScopeStack (definition.Scope),
 					MatchStack = ImmutableStack<SyntaxMatch>.Empty
 				};
 			}
@@ -179,7 +184,6 @@ namespace MonoDevelop.Ide.Editor.Highlighting
 				if (ContextStack.IsEmpty)
 					return Task.FromResult (new HighlightedLine (new TextSegment (startOffset, length), new [] { new ColoredSegment (0, length, ScopeStack.Empty) }));
 				SyntaxContext currentContext = null;
-				List<SyntaxContext> lastContexts = new List<SyntaxContext> ();
 				Match match = null;
 				SyntaxMatch curMatch = null;
 				var segments = new List<ColoredSegment> ();
@@ -195,17 +199,6 @@ namespace MonoDevelop.Ide.Editor.Highlighting
 					timeoutOccursAt = Environment.TickCount + (int)matchTimeout.TotalMilliseconds;
 				}
 			restart:
-				if (lastMatch == offset) {
-					if (lastContexts.Contains (currentContext)) {
-						offset++;
-						length--;
-					} else {
-						lastContexts.Add (currentContext);
-					}
-				} else {
-					lastContexts.Clear ();
-					lastContexts.Add (currentContext);
-				}
 				if (offset >= lineText.Length)
 					goto end;
 				lastMatch = offset;

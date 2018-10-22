@@ -87,9 +87,25 @@ namespace MonoDevelop.Ide.TypeSystem
 		{
 			var message = item.Message;
 			var index = message.IndexOf (':');
-			var tag = message.Substring (0, index);
 
-			return new Tag (tag, message, new Editor.DocumentRegion (item.MappedLine, item.MappedColumn, item.MappedLine, item.MappedColumn));
+			string tag = string.Empty;
+
+			// Slow path if we don't have a colon
+			if (index == -1) {
+				foreach (var tagComment in Tasks.CommentTag.SpecialCommentTags) {
+					if (message.StartsWith (tagComment.Tag, StringComparison.OrdinalIgnoreCase)) {
+						tag = message;
+						break;
+					}
+				}
+			} else {
+				tag = message.Substring (0, index);
+			}
+
+			int line = item.MappedLine + 1;
+			int column = item.MappedColumn + 1;
+
+			return new Tag (tag, message, new Editor.DocumentRegion (line, column, line, column));
 		}
 	}
 }

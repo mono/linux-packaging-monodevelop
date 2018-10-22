@@ -16,8 +16,6 @@ namespace MonoDevelop.VersionControl
 	[DataItem (FallbackType=typeof(UnknownRepository))]
 	public abstract class Repository: IDisposable
 	{
-		static Counter Repositories = InstrumentationService.CreateCounter ("VersionControl.RepositoryOpened", "Version Control", id:"VersionControl.RepositoryOpened");
-
 		string name;
 		VersionControlSystem vcs;
 		
@@ -42,10 +40,6 @@ namespace MonoDevelop.VersionControl
 		protected Repository (VersionControlSystem vcs): this ()
 		{
 			VersionControlSystem = vcs;
-			Repositories.SetValue (Repositories.Count + 1, string.Format ("Repository #{0}", Repositories.Count + 1), new Dictionary<string, string> {
-				{ "Type", vcs.Name },
-				{ "Type+Version", string.Format ("{0} {1}", vcs.Name, vcs.Version) },
-			});
 		}
 
 		public override bool Equals (object obj)

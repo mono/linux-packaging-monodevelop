@@ -191,6 +191,16 @@ namespace Microsoft.VisualStudio.Language.Intellisense.Implementation
 			public const string StructName = "struct name";
 			public const string TypeParameterName = "type parameter name";
 
+			public const string FieldName = "field name";
+			public const string EnumMemberName = "enum member name";
+			public const string ConstantName = "constant name";
+			public const string LocalName = "local name";
+			public const string ParameterName = "parameter name";
+			public const string MethodName = "method name";
+			public const string ExtensionMethodName = "extension method name";
+			public const string PropertyName = "property name";
+			public const string EventName = "event name";
+ 
 			public const string XmlDocCommentAttributeName = "xml doc comment - attribute name";
 			public const string XmlDocCommentAttributeQuotes = "xml doc comment - attribute quotes";
 			public const string XmlDocCommentAttributeValue = "xml doc comment - attribute value";
@@ -214,5 +224,45 @@ namespace Microsoft.VisualStudio.Language.Intellisense.Implementation
 			public const string XmlLiteralProcessingInstruction = "xml literal - processing instruction";
 			public const string XmlLiteralText = "xml literal - text";
 		}
+
+		/// <summary>
+		/// Gets a snapshot point out of a monodevelop line/column pair or null.
+		/// </summary>
+		/// <returns>The snapshot point or null if the coordinate is invalid.</returns>
+		/// <param name="snapshot">The snapshot.</param>
+		/// <param name="line">Line number (1 based).</param>
+		/// <param name="column">Column number (1 based).</param>
+		public static SnapshotPoint? GetSnapshotPoint (this ITextSnapshot snapshot, int line, int column)
+		{
+			if (TryGetSnapshotPoint (snapshot, line, column, out var snapshotPoint)) 
+				return snapshotPoint;
+			return null;
+		}
+
+		/// <summary>
+		/// Tries to get a snapshot point out of a monodevelop line/column pair.
+		/// </summary>
+		/// <returns><c>true</c>, if get snapshot point was set, <c>false</c> otherwise.</returns>
+		/// <param name="snapshot">The snapshot.</param>
+		/// <param name="line">Line number (1 based).</param>
+		/// <param name="column">Column number (1 based).</param>
+		/// <param name="snapshotPoint">The snapshot point if return == true.</param>
+		public static bool TryGetSnapshotPoint (this ITextSnapshot snapshot, int line, int column, out SnapshotPoint snapshotPoint)
+		{
+			if (line < 1 || line > snapshot.LineCount) {
+				snapshotPoint = default (SnapshotPoint);
+				return false;
+			}
+
+			var lineSegment = snapshot.GetLineFromLineNumber (line - 1);
+			if (column < 1 || column > lineSegment.LengthIncludingLineBreak) {
+				snapshotPoint = default (SnapshotPoint);
+				return false;
+			}
+
+			snapshotPoint = new SnapshotPoint (snapshot, lineSegment.Start.Position + column - 1);
+			return true;
+		}
 	}
+
 }

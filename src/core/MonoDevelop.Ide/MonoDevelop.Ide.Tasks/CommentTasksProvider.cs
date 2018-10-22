@@ -83,7 +83,7 @@ namespace MonoDevelop.Ide.Tasks
 					return;
 
 				if (triggerLoad == null || triggerLoad.Invoke (cachedUntilViewCreated.Count)) {
-					var changes = cachedUntilViewCreated.Values.Select (x => x.ToCommentTaskChange ()).ToList ();
+					var changes = cachedUntilViewCreated.Values.Select (x => x.ToCommentTaskChange ()).Where (x => x != null).ToList ();
 					TaskService.InformCommentTasks (new CommentTasksChangedEventArgs (changes));
 					cachedUntilViewCreated = null;
 					triggerLoad = null;
@@ -146,7 +146,8 @@ namespace MonoDevelop.Ide.Tasks
 				return;
 
 			var change = ToCommentTaskChange (args);
-			TaskService.InformCommentTasks (new CommentTasksChangedEventArgs (new [] { change }));
+			if (change != null)
+				TaskService.InformCommentTasks (new CommentTasksChangedEventArgs (new [] { change }));
 		}
 
 		static async void OnSolutionLoaded (object sender, SolutionEventArgs args)
@@ -159,13 +160,12 @@ namespace MonoDevelop.Ide.Tasks
 		{
 			if (args.Item is MonoDevelop.Projects.Solution sol) {
 				var ws = await TypeSystemService.GetWorkspaceAsync (sol);
-				var solId = ws.GetSolutionId (sol);
 
 				lock (lockObject) {
 					if (cachedUntilViewCreated == null)
 						return;
 
-					cachedUntilViewCreated = cachedUntilViewCreated.Where (x => x.Value.Solution.Id != solId).ToDictionary (x => x.Key, x => x.Value);
+					cachedUntilViewCreated = cachedUntilViewCreated.Where (x => x.Value.Workspace != ws).ToDictionary (x => x.Key, x => x.Value);
 				}
 			}
 		}

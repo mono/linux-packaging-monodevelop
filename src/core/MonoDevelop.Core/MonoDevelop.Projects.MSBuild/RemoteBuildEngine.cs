@@ -89,7 +89,7 @@ namespace MonoDevelop.Projects.MSBuild
 		/// <summary>
 		/// Occurs when the remote process shuts down
 		/// </summary>
-		public event EventHandler Disconnected;
+		public event AsyncEventHandler Disconnected;
 
 		/// <summary>
 		/// Handle of the currently active build session, or null if there is no build session.
@@ -216,15 +216,23 @@ namespace MonoDevelop.Projects.MSBuild
 		/// <summary>
 		/// Indicates that a build session is starting
 		/// </summary>
-		public async Task BeginBuildOperation (TextWriter logWriter, MSBuildLogger logger, MSBuildVerbosity verbosity, ProjectConfigurationInfo[] configurations)
+		public async Task BeginBuildOperation (ProgressMonitor monitor, MSBuildLogger logger, MSBuildVerbosity verbosity, ProjectConfigurationInfo[] configurations)
 		{
-			buildSessionLoggerId = RegisterLogger (logWriter, logger);
+			buildSessionLoggerId = RegisterLogger (monitor.Log, logger);
 			try {
+				var binLogPath = Path.ChangeExtension (Path.GetTempFileName (), "binlog");
 				await connection.SendMessage (new BeginBuildRequest {
+					BinLogFilePath = binLogPath,
 					LogWriterId = buildSessionLoggerId,
 					EnabledLogEvents = logger != null ? logger.EnabledEvents : MSBuildEvent.None,
 					Verbosity = verbosity,
 					Configurations = configurations
+				});
+
+				monitor.LogObject (new BuildSessionStartedEvent {
+					SessionId = buildSessionLoggerId,
+					LogFile = binLogPath,
+					TimeStamp = DateTime.Now
 				});
 			} catch {
 				UnregisterLogger (buildSessionLoggerId);
@@ -237,11 +245,16 @@ namespace MonoDevelop.Projects.MSBuild
 		/// Indicates that a build session has finished.
 		/// </summary>
 		/// <returns>The build operation.</returns>
-		public async Task EndBuildOperation ()
+		public async Task EndBuildOperation (ProgressMonitor monitor)
 		{
 			try {
 				await connection.SendMessage (new EndBuildRequest ());
 				await connection.ProcessPendingMessages ();
+
+				monitor.LogObject (new BuildSessionFinishedEvent {
+					SessionId = buildSessionLoggerId,
+					TimeStamp = DateTime.Now
+				});
 			} catch {
 				await CheckDisconnected ();
 				throw;
@@ -276,8 +289,8 @@ namespace MonoDevelop.Projects.MSBuild
 		internal async Task<bool> CheckDisconnected ()
 		{
 			if (!await CheckAlive ()) {
-				if (Disconnected != null)
-					Disconnected (this, EventArgs.Empty);
+				foreach (AsyncEventHandler d in Disconnected.GetInvocationList ())
+					await d (this, EventArgs.Empty);
 				return true;
 			}
 			return false;

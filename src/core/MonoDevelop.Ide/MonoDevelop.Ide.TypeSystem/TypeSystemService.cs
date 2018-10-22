@@ -72,6 +72,7 @@ namespace MonoDevelop.Ide.TypeSystem
 
 		static TypeSystemService ()
 		{
+			RoslynServices.RoslynService.Initialize ();
 			CleanupCache ();
 			parsers = AddinManager.GetExtensionNodes<TypeSystemParserNode> ("/MonoDevelop/TypeSystem/Parser");
 			bool initialLoad = true;
@@ -228,6 +229,9 @@ namespace MonoDevelop.Ide.TypeSystem
 			var t = Counters.ParserService.FileParsed.BeginTiming (options.FileName);
 			try {
 				var result = await parser.GenerateParsedDocumentProjection (options, cancellationToken);
+				if (cancellationToken.IsCancellationRequested)
+					return null;
+
 				if (options.Project != null) {
 					var ws = workspaces.First () ;
 					var projectId = ws.GetProjectId (options.Project);
@@ -649,11 +653,11 @@ namespace MonoDevelop.Ide.TypeSystem
 			}
 		}
 
-		internal static void InformDocumentOpen (Microsoft.CodeAnalysis.DocumentId analysisDocument, TextEditor editor)
+		internal static void InformDocumentOpen (Microsoft.CodeAnalysis.DocumentId analysisDocument, TextEditor editor, DocumentContext context)
 		{
 			foreach (var w in workspaces) {
 				if (w.Contains (analysisDocument.ProjectId)) {
-					w.InformDocumentOpen (analysisDocument, editor); 
+					w.InformDocumentOpen (analysisDocument, editor, context); 
 					return;
 				}
 			}
@@ -663,7 +667,7 @@ namespace MonoDevelop.Ide.TypeSystem
 			}
 		}
 
-		internal static void InformDocumentOpen (Microsoft.CodeAnalysis.Workspace ws, Microsoft.CodeAnalysis.DocumentId analysisDocument, TextEditor editor)
+		internal static void InformDocumentOpen (Microsoft.CodeAnalysis.Workspace ws, Microsoft.CodeAnalysis.DocumentId analysisDocument, TextEditor editor, DocumentContext context)
 		{
 			if (ws == null)
 				throw new ArgumentNullException (nameof (ws));
@@ -671,7 +675,7 @@ namespace MonoDevelop.Ide.TypeSystem
 				throw new ArgumentNullException (nameof (analysisDocument));
 			if (editor == null)
 				throw new ArgumentNullException (nameof (editor));
-			((MonoDevelopWorkspace)ws).InformDocumentOpen (analysisDocument, editor); 
+			((MonoDevelopWorkspace)ws).InformDocumentOpen (analysisDocument, editor, context); 
 		}
 
 		static bool gotDocumentRequestError = false;
@@ -741,7 +745,7 @@ namespace MonoDevelop.Ide.TypeSystem
 					return;
 
 				if (IdeApp.IsInitialized)
-					statusIcon = IdeApp.Workbench?.StatusBar.ShowStatusIcon (ImageService.GetIcon ("md-parser"));
+					statusIcon = IdeApp.Workbench?.StatusBar.ShowStatusIcon (ImageService.GetIcon (Gui.Stock.Parser));
 				if (statusIcon != null)
 					statusIcon.ToolTip = GettextCatalog.GetString ("Gathering class information");
 			});

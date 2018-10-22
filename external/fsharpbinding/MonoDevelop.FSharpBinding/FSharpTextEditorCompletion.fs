@@ -21,6 +21,54 @@ open MonoDevelop.Ide.Gui
 open MonoDevelop.Ide.TypeSystem
 open ExtCore.Control
 
+type FSharpCompletionContext(editor:TextEditor, baseContext:CodeCompletionContext) =
+    inherit CodeCompletionContext()
+
+    override x.GetCoordinatesAsync() =
+        let line = editor.GetLine editor.CaretLine
+        let marker = editor.GetLineMarkers line |> Seq.tryPick(Option.tryCast<SignatureHelpMarker>)
+
+        let task = baseContext.GetCoordinatesAsync()
+
+        match marker with
+        | Some m ->
+            let struct (x, y, lineHeight) = task.Result
+            // We need to add the height of the signature help marker to the Y coordinate
+            // The line height is the height of the text plus the height of the marker
+            Task.FromResult struct (x, y + (lineHeight / 2), lineHeight)
+        | None -> task
+
+type FSharpCompletionWidget(editor:TextEditor, completionWidget:ICompletionWidget) =
+    interface ICompletionWidget with
+        member x.CaretOffset
+            with get() = completionWidget.CaretOffset
+            and set(offset) = completionWidget.CaretOffset <- offset
+        member x.TextLength = completionWidget.TextLength
+        member x.SelectedLength = completionWidget.SelectedLength
+        member x.GetText(startOffset, endOffset) =
+            completionWidget.GetText(startOffset, endOffset)
+        member x.GetChar offset = completionWidget.GetChar offset
+        member x.Replace(offset, count, text) = completionWidget.Replace(offset, count, text)
+        member x.GtkStyle = completionWidget.GtkStyle
+        member x.ZoomLevel = completionWidget.ZoomLevel
+        member x.CreateCodeCompletionContext triggerOffset =
+            let context = completionWidget.CreateCodeCompletionContext triggerOffset
+            FSharpCompletionContext(editor, context,
+                TriggerOffset = triggerOffset,
+                TriggerLine = context.TriggerLine,
+                TriggerLineOffset = context.TriggerLineOffset,
+                TriggerWordLength = context.TriggerWordLength) :> _
+
+        member x.CurrentCodeCompletionContext
+            with get() = completionWidget.CurrentCodeCompletionContext
+        member x.GetCompletionText ctx = completionWidget.GetCompletionText ctx
+        member x.SetCompletionText (ctx, partialWord, completeWord) =
+            completionWidget.SetCompletionText (ctx, partialWord, completeWord)
+        member x.SetCompletionText (ctx, partialWord, completeWord, completeWordOffset) =
+            completionWidget.SetCompletionText (ctx, partialWord, completeWord, completeWordOffset)
+        [<CLIEvent>]
+        member x.CompletionContextChanged = completionWidget.CompletionContextChanged
+
 type FSharpMemberCompletionData(name, icon, symbol:FSharpSymbolUse, overloads:FSharpSymbolUse list) =
     inherit CompletionData(CompletionText = PrettyNaming.QuoteIdentifierIfNeeded name,
                            DisplayText = name,
@@ -52,6 +100,7 @@ type FSharpMemberCompletionData(name, icon, symbol:FSharpSymbolUse, overloads:FS
         |> ResizeArray.ofList :> _
 
     override x.CreateTooltipInformation (_smartWrap, cancel) =
+
         MonoDevelop.FSharp.SymbolTooltips.getTooltipInformation symbol
         |> StartAsyncAsTask cancel
 
@@ -64,7 +113,17 @@ type FSharpMemberCompletionData(name, icon, symbol:FSharpSymbolUse, overloads:FS
     /// switched on. This is a good default for C#, but a bad default for F#.)
     ///
     /// This behaviour roughly matches both VS on Windows and VS Code
-    override x.IsCommitCharacter (_keyChar, _partialWord) = false
+    override x.IsCommitCharacter (keyChar, _partialWord) = keyChar = '.'
+
+    override x.MuteCharacter(keyChar, _partialWord) =
+        match keyChar with
+        | ' ' ->
+            // If the space bar is pressed, then we want to
+            // cancel completion and insert the space character.
+            // This matches VS2017 F# behaviour
+            IdeApp.Workbench.ActiveDocument.Editor.InsertAtCaret " "
+            true
+        | _ -> false
 
     type SimpleCategory(text) =
         inherit CompletionCategory(text, null)
@@ -146,7 +205,7 @@ module Completion =
     }
 
     let (|InvalidToken|_|) context =
-        let token = Tokens.getTokenAtPoint context.editor context.editor.DocumentContext context.triggerOffset
+        let token = Tokens.getTokenAtPoint context.editor context.triggerOffset
         if Tokens.isInvalidCompletionToken token then
             Some InvalidToken
         else
@@ -164,7 +223,7 @@ module Completion =
                 None
 
     let (|InvalidCompletionChar|_|) context =
-        if Char.IsLetter context.completionChar || context.ctrlSpace || context.completionChar = '.' || context.completionChar = '#' then
+        if Char.IsLetter context.completionChar || context.ctrlSpace || context.completionChar = '.' || context.completionChar = '#' || context.completionChar = ' ' then
             None
         else
             Some InvalidCompletionChar
@@ -207,7 +266,7 @@ module Completion =
             None
 
     let (|OtherIdentifier|_|) context =
-        if Regex.IsMatch(context.lineToCaret, "\s?(let!?|Some|override|member|for)\s+[^=:]+$", RegexOptions.Compiled) then
+        if Regex.IsMatch(context.lineToCaret, "\s?(let!?|Some|override|member|for)\s+[^=:]*$", RegexOptions.Compiled) then
              Some OtherIdentifier
         else
             None
@@ -391,9 +450,6 @@ module Completion =
 
     let parseLock = obj()
 
-    let filterResults (data: seq<CompletionData>) residue =
-        data |> Seq.filter(fun c -> residue = "" || (Char.ToLowerInvariant c.DisplayText.[0]) = (Char.ToLowerInvariant residue.[0]))
-
     let getFsiCompletions context =
 
         async {
@@ -427,8 +483,8 @@ module Completion =
                     if Regex.IsMatch(lineToCaret, "(^|\s+|\()\w+$", RegexOptions.Compiled) then
                         // Add the code templates and compiler generated identifiers if the completion char is not '.'
                         CodeTemplates.CodeTemplateService.AddCompletionDataForMime ("text/x-fsharp", result)
-                        result.AddRange (filterResults compilerIdentifiers residue)
-                        result.AddRange (filterResults keywordCompletionData residue)
+                        result.AddRange compilerIdentifiers
+                        result.AddRange keywordCompletionData
                     return result
                 | None -> return result
             | None -> return result
@@ -444,24 +500,33 @@ module Completion =
                     lineToCaret = lineToCaret
                     completionChar = completionChar
                     editor = editor
+                    ctrlSpace = ctrlSpace
                     } = context
 
                 let! typedParseResults =
                     asyncMaybe {
                         let! document = documentContext.TryGetFSharpParsedDocument() |> async.Return
-                        let! location = document.ParsedLocation |> async.Return
-                        let trimmedLine = lineToCaret.TrimEnd()
-                        let reparse = trimmedLine.EndsWith("->") || trimmedLine.Contains(").") || trimmedLine.EndsWith("].")
-                        if location.Line = context.line && not reparse then
-                            LoggingService.logDebug "Completion: got parse results from cache"
-                            return! document.TryGetAst() |> async.Return
-                        else
+
+                        let shouldReparse() =
+                            lineToCaret.Contains "=" || lineToCaret.Contains "->"
+
+                        let isContiguousIdentifierCharSeq() =
+                            let l = lineToCaret.LastIndexOf " "
+                            seq { l+1..column-1 }
+                            |> Seq.map(fun i -> lineToCaret.[i])
+                            |> Seq.forall (fun c -> Char.IsLetterOrDigit c || c = '.' || c = '(')
+
+                        if ctrlSpace || shouldReparse() || (isContiguousIdentifierCharSeq() |> not) then
                             LoggingService.logDebug "Completion: syncing parse results"
-                            // force sync
                             let projectFile = documentContext.Project |> function null -> document.FileName| proj -> proj.FileName.ToString()
+                            document.ParsedLocation <- DocumentLocation(line, column) |> Some
+                            document.ParsedLine <- editor.GetLineText(editor.CaretLine) |> Some
                             let! ast = languageService.ParseAndCheckFileInProject(projectFile, document.FileName, 0, editor.Text, true) |> Async.map Some
                             document.Ast <- ast
                             return ast
+                        else
+                            LoggingService.logDebug "Completion: got parse results from cache"
+                            return! document.TryGetAst() |> async.Return
                     }
 
                 let result = CompletionDataList()
@@ -483,7 +548,7 @@ module Completion =
                                 |> List.filter (fun token -> token.TokenName = "IDENT")
                                 |> List.map tokenToCompletion
 
-                            result.AddRange (filterResults lineCompletions residue
+                            result.AddRange (lineCompletions
                                              |> Seq.filter(fun r -> not (result.Exists(fun e -> e.DisplayText = r.DisplayText))))
                         result.DefaultCompletionString <- residue
                         result.TriggerWordLength <- residue.Length
@@ -501,8 +566,18 @@ module Completion =
                             | Attribute -> true
                             | _ -> false
 
+                        let residue =
+                            if residue = "" then
+                                // Residue returned by GetDeclarationSymbols
+                                // can be empty when it comes after an application
+                                // such as DateTime.Now.ToString().Subs <-
+                                // Here, we do a simple lookup for `Subs` in the above example.
+                                Parsing.findResidue lineToCaret
+                            else
+                                residue
+
                         let data = getCompletionData symbols isInAttribute
-                        result.AddRange (filterResults data residue)
+                        result.AddRange data
 
                         if completionChar <> '.' && result.Count > 0 then
                             LoggingService.logDebug "Completion: residue %s" residue
@@ -514,9 +589,9 @@ module Completion =
                         if Regex.IsMatch(lineToCaret, "(^|\s+|\()\w+$", RegexOptions.Compiled) then
                             // Add the code templates and compiler generated identifiers if the completion char is not '.'
                             CodeTemplates.CodeTemplateService.AddCompletionDataForMime ("text/x-fsharp", result)
-                            result.AddRange (filterResults compilerIdentifiers residue)
+                            result.AddRange compilerIdentifiers
 
-                            result.AddRange (filterResults keywordCompletionData residue)
+                            result.AddRange keywordCompletionData
                     | None -> addIdentCompletions()
 
                 return result
@@ -600,7 +675,6 @@ module Completion =
                     else
                         return! getCompletions completionContext
             }
-
             results.IsSorted <- true
             results.AutoCompleteEmptyMatch <- false
             results.AutoCompleteUniqueMatch <- ctrlSpace
@@ -766,6 +840,7 @@ module ParameterHinting =
             return ParameterHintingResult.Empty
         }
 
+
     // Returns the index of the parameter where the cursor is currently positioned.
     // -1 means the cursor is outside the method parameter list
     // 0 means no parameter entered
@@ -803,9 +878,12 @@ type FSharpTextEditorCompletion() =
         c = '(' || c = ',' || c = '<'
 
 
+    let emptyResult = Task.FromResult null
+
     override x.CompletionLanguage = "F#"
     override x.Initialize() =
-        do x.Editor.IndentationTracker <- FSharpIndentationTracker(x.Editor)
+        x.Editor.IndentationTracker <- FSharpIndentationTracker(x.Editor)
+        x.CompletionWidget <- FSharpCompletionWidget(x.Editor, x.Editor.GetContent<ICompletionWidget>())
         base.Initialize()
 
     /// Provide parameter and method overload information when you type '(', '<' or ','
@@ -824,11 +902,13 @@ type FSharpTextEditorCompletion() =
 
     override x.HandleCodeCompletionAsync(context, triggerInfo, token) =
         let ctrlSpace = triggerInfo.CompletionTriggerReason = CompletionTriggerReason.CompletionCommand
-        if IdeApp.Preferences.EnableAutoCodeCompletion.Value || ctrlSpace then
+        if triggerInfo.CompletionTriggerReason = CompletionTriggerReason.CharTyped && triggerInfo.TriggerCharacter.Value = ' ' then
+            emptyResult
+        elif IdeApp.Preferences.EnableAutoCodeCompletion.Value || ctrlSpace then
             Completion.codeCompletionCommandImpl(x.Editor, x.DocumentContext, context, ctrlSpace)
             |> StartAsyncAsTask token
         else
-            Task.FromResult null
+            emptyResult
 
 
     override x.GetCurrentParameterIndex (startOffset: int, token) =

@@ -25,7 +25,9 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using MonoDevelop.Ide.Editor;
+using MonoDevelop.Ide.Editor.Extension;
 using NUnit.Framework;
 
 namespace Mono.TextEditor.Tests.Actions
@@ -218,32 +220,6 @@ namespace Mono.TextEditor.Tests.Actions
 		}
 
 		[Test]
-		public void AdvancedBackspaceTests ()
-		{
-			var data = Create (@"($)", mimeType: "text/x-csharp");
-			DefaultSourceEditorOptions.Instance.AutoInsertMatchingBracket = true;
-			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
-			Check (data, @"$");
-			data = Create (@"[$]", mimeType:"text/x-csharp");
-			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
-			Check (data, @"$");
-			data = Create ("\"$\"", mimeType:"text/x-csharp");
-			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
-			Check (data, @"$");
-			data = Create ("'$'", mimeType: "text/x-csharp");
-			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
-			Check (data, @"$");
-
-			data = Create (@"// ($)", mimeType: "text/x-csharp");
-			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
-			Check (data, @"// $)");
-
-			data = Create (@""" ($)", mimeType: "text/x-csharp");
-			MonoDevelop.SourceEditor.EditActions.AdvancedBackspace (data);
-			Check (data, @""" $)");
-		}
-
-		[Test]
 		public void TestBackspaceUTF32 ()
 		{
 			var data = Create (@"12🚀$34");
@@ -258,5 +234,21 @@ namespace Mono.TextEditor.Tests.Actions
 			DeleteActions.Delete (data);
 			Check (data, @"12$34");
 		}
+
+		// Bug 624076: No backspace on any smart-indented line in web editors
+		[Test]
+		public void TestVSTS624076 ()
+		{
+			var data = Create ("    \n$");
+			// set indent tracker without smart backspace functionality.
+			data.IndentationTracker = new SmartIndentModeTests.TestIndentTracker("     ", IndentationTrackerFeatures.None);
+			data.Options.IndentStyle = IndentStyle.Virtual;
+			data.Caret.Location = new DocumentLocation (2, 5);
+
+			DeleteActions.Backspace (data);
+			// behavior : virtual indent is converted into real indent and 1 space of the real indent is deleted 
+			Check (data, "    \n    $");
+		}
+
 	}
 }

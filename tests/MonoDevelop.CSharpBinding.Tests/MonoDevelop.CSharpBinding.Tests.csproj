@@ -74,9 +74,9 @@
       <HintPath>..\..\build\bin\Microsoft.CodeAnalysis.Features.dll</HintPath>
     </Reference>
     <Reference Include="Mono.Cairo" />
-    <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
-    <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f"/>
+    <Reference Include="gtk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="atk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
+    <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
     <Reference Include="gdk-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
     <Reference Include="glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
     <Reference Include="System.ValueTuple">
@@ -96,7 +96,6 @@
     <Compile Include="Features\IndentationTests\StringTests.cs" />
     <Compile Include="Features\IndentationTests\TextPasteIndentEngineTests.cs" />
     <Compile Include="Features\TestBase.cs" />
-    <Compile Include="Features\Util.cs" />
     <Compile Include="Features\Completion\CastCompletionProviderTests.cs" />
     <Compile Include="Features\Completion\EnumMemberCompletionProviderTests.cs" />
     <Compile Include="Features\Completion\DelegateCompletionProviderTests.cs" />
@@ -113,7 +112,6 @@
     <Compile Include="MonoDevelop.CSharpBinding\MonodevelopWorkspaceTests.cs" />
     <Compile Include="MonoDevelop.CSharpBinding\NamedArgumentCompletionTests.cs" />
     <Compile Include="MonoDevelop.CSharpBinding\OnTheFlyFormatterTests.cs" />
-    <Compile Include="MonoDevelop.CSharpBinding\TypeSystemServiceTestExtensions.cs" />
     <Compile Include="MonoDevelop.CSharpBinding\UnitTesteditorIntegrationTests.cs" />
     <Compile Include="MonoDevelop.CSharpBinding.Refactoring\CSharpFindReferencesProviderTests.cs" />
     <Compile Include="MonoDevelop.CSharpBinding.Refactoring\GenerateNewMemberTests.cs" />
@@ -123,6 +121,8 @@
     <Compile Include="MonoDevelop.CSharpBinding.Parser\CSharpParsedDocumentTests.cs" />
     <Compile Include="MonoDevelop.CSharpBinding\CSharpLanguageVersionHelperTests.cs" />
     <Compile Include="Features\Completion\PreProcessorCompletionProviderTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding.Refactoring\CSharpCodeActionEditorExtensionTests.cs" />
+    <Compile Include="MonoDevelop.CSharpBinding.Refactoring\CSharpResultsEditorExtensionTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\addins\CSharpBinding\CSharpBinding.csproj">
@@ -187,12 +187,27 @@
       <Name>MonoDevelop.SourceEditor</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\MonoDevelop.Refactoring.Tests\MonoDevelop.Refactoring.Tests.csproj">
+      <Project>{BCC3A6AE-EC45-40AD-BA3E-59F6401D588C}</Project>
+      <Name>MonoDevelop.Refactoring.Tests</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\external\debugger-libs\Mono.Debugging\Mono.Debugging.csproj">
+      <Project>{90C99ADB-7D4B-4EB4-98C2-40BD1B14C7D2}</Project>
+      <Name>Mono.Debugging</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\IdeUnitTests\IdeUnitTests.csproj">
+      <Project>{F7B2B155-7CF4-42C4-B5AF-63C0667D2E4F}</Project>
+      <Name>IdeUnitTests</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
   </ItemGroup>
   <ItemGroup>
-    <None Include="MonoDevelop.CSharpBinding\AutomaticBracketInsertionTests.cs" />
     <None Include="packages.config" />
+    <None Include="MonoDevelop.CSharpBinding\AutomaticBracketInsertionTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="MonoDevelop.CSharpBinding.Parser\" />

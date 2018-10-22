@@ -53,6 +53,10 @@ using MonoDevelop.Components.AtkCocoaHelper;
 using System.Linq;
 using MonoDevelop.Components.AutoTest;
 using System.ComponentModel;
+using MonoDevelop.Ide.BuildOutputView;
+using System.Threading.Tasks;
+using MonoDevelop.Core.ProgressMonitoring;
+using MonoDevelop.Core.Instrumentation;
 
 namespace MonoDevelop.Ide.Gui.Pads
 {
@@ -61,11 +65,15 @@ namespace MonoDevelop.Ide.Gui.Pads
 		HPaned control;
 		ScrolledWindow sw;
 		PadTreeView view;
-		LogView outputView;
+		BuildOutputViewContent buildOutputViewContent;
+		BuildOutput buildOutput;
+		LogView logView;
 		TreeStore store;
 		TreeModelFilter filter;
 		TreeModelSort sort;
-		ToggleButton errorBtn, warnBtn, msgBtn, logBtn;
+		ToggleButton errorBtn, warnBtn, msgBtn;
+		Button buildLogBtn;
+		ToggleButton logBtn;
 		Label errorBtnLbl, warnBtnLbl, msgBtnLbl, logBtnLbl;
 		SearchEntry searchEntry;
 		string currentSearchPattern = null;
@@ -109,6 +117,11 @@ namespace MonoDevelop.Ide.Gui.Pads
 			internal const int Category = 7;
 		}
 
+		static class Counters
+		{
+			public static Counter BuildLogShown = InstrumentationService.CreateCounter ("Build log opened", "Build Output", id: "ErrorListPad.BuildLogShown");
+		}
+
 		public override Control Control {
 			get {
 				if (control == null)
@@ -123,6 +136,26 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 		ToggleButton MakeButton (string image, string name, bool active, out Label label)
 		{
+			var btnBox = MakeHBox (image, out label);
+
+			var btn = new ToggleButton { Name = name, Active = active };
+			btn.Child = btnBox;
+
+			return btn;
+		}
+
+		Button MakeButton (string image, string name, out Label label)
+		{
+			var btnBox = MakeHBox (image, out label);
+
+			var btn = new Button { Name = name };
+			btn.Child = btnBox;
+
+			return btn;
+		}
+
+		HBox MakeHBox (string image, out Label label)
+		{
 			var btnBox = new HBox (false, 2);
 			btnBox.Accessible.SetShouldIgnore (true);
 			var imageView = new ImageView (image, Gtk.IconSize.Menu);
@@ -133,11 +166,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			label.Accessible.SetShouldIgnore (true);
 			btnBox.PackStart (label);
 
-			var btn = new ToggleButton { Name = name };
-			btn.Active = active;
-			btn.Child = btnBox;
-
-			return btn;
+			return btnBox;
 		}
 
 		protected override void Initialize (IPadWindow window)
@@ -153,7 +182,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			errorBtn = MakeButton (Stock.Error, "toggleErrors", ShowErrors, out errorBtnLbl);
 			errorBtn.Accessible.Name = "ErrorPad.ErrorButton";
 
-			errorBtn.Toggled += new EventHandler (FilterChanged);
+			errorBtn.Toggled += FilterChanged;
 			errorBtn.TooltipText = GettextCatalog.GetString ("Show Errors");
 			errorBtn.Accessible.Description = GettextCatalog.GetString ("Show Errors");
 			UpdateErrorsNum ();
@@ -161,7 +190,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 			warnBtn = MakeButton (Stock.Warning, "toggleWarnings", ShowWarnings, out warnBtnLbl);
 			warnBtn.Accessible.Name = "ErrorPad.WarningButton";
-			warnBtn.Toggled += new EventHandler (FilterChanged);
+			warnBtn.Toggled += FilterChanged;
 			warnBtn.TooltipText = GettextCatalog.GetString ("Show Warnings");
 			warnBtn.Accessible.Description = GettextCatalog.GetString ("Show Warnings");
 			UpdateWarningsNum ();
@@ -169,7 +198,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 			msgBtn = MakeButton (Stock.Information, "toggleMessages", ShowMessages, out msgBtnLbl);
 			msgBtn.Accessible.Name = "ErrorPad.MessageButton";
-			msgBtn.Toggled += new EventHandler (FilterChanged);
+			msgBtn.Toggled += FilterChanged;
 			msgBtn.TooltipText = GettextCatalog.GetString ("Show Messages");
 			msgBtn.Accessible.Description = GettextCatalog.GetString ("Show Messages");
 			UpdateMessagesNum ();
@@ -181,14 +210,27 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 			logBtn = MakeButton ("md-message-log", "toggleBuildOutput", false, out logBtnLbl);
 			logBtn.Accessible.Name = "ErrorPad.LogButton";
-			logBtn.TooltipText = GettextCatalog.GetString ("Show build output");
-			logBtn.Accessible.Description = GettextCatalog.GetString ("Show build output");
-
+			logBtn.TooltipText = GettextCatalog.GetString ("Build Output");
+			logBtn.Accessible.Description = GettextCatalog.GetString ("Build Output");
 			logBtnLbl.Text = GettextCatalog.GetString ("Build Output");
 			logBtn.Accessible.SetTitle (logBtnLbl.Text);
-
-			logBtn.Toggled += HandleLogBtnToggled;
+			logBtn.Toggled += HandleTextLogToggled;
 			toolbar.Add (logBtn);
+
+#if ENABLE_BUILD_OUTPUT
+			buildLogBtn = MakeButton ("md-message-log", "toggleBuildOutput", out logBtnLbl);
+			buildLogBtn.Accessible.Name = "ErrorPad.BuildLogButton";
+			buildLogBtn.TooltipText = GettextCatalog.GetString ("Structured Build Output");
+			buildLogBtn.Accessible.Description = GettextCatalog.GetString ("Structured Build Output");
+
+			logBtnLbl.Text = GettextCatalog.GetString ("Structured Build Output");
+			buildLogBtn.Accessible.SetTitle (logBtnLbl.Text);
+
+			buildLogBtn.Clicked += HandleBinLogClicked;
+			toolbar.Add (buildLogBtn);
+#endif
+
+			buildOutput = new BuildOutput ();
 
 			//Dummy widget to take all space between "Build Output" button and SearchEntry
 			var spacer = new HBox ();
@@ -207,6 +249,9 @@ namespace MonoDevelop.Ide.Gui.Pads
 			toolbar.ShowAll ();
 
 			UpdatePadIcon ();
+
+			IdeApp.ProjectOperations.StartBuild += OnBuildStarted;
+			IdeApp.ProjectOperations.StartClean += OnBuildStarted;
 		}
 
 		void searchPatternChanged (object sender, EventArgs e)
@@ -229,7 +274,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			TreeModelFilterVisibleFunc filterFunct = new TreeModelFilterVisibleFunc (FilterTasks);
 			filter = new TreeModelFilter (store, null);
 			filter.VisibleFunc = filterFunct;
-			
+
 			sort = new TreeModelSort (filter);
 			sort.SetSortFunc (VisibleColumns.Type, SeverityIterSort);
 			sort.SetSortFunc (VisibleColumns.Project, ProjectIterSort);
@@ -261,7 +306,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			IdeApp.Workspace.FirstWorkspaceItemOpened += OnCombineOpen;
 			IdeApp.Workspace.LastWorkspaceItemClosed += OnCombineClosed;
 
-			view.RowActivated += new RowActivatedHandler (OnRowActivated);
+			view.RowActivated += OnRowActivated;
 
 			iconWarning = ImageService.GetIcon (Ide.Gui.Stock.Warning, Gtk.IconSize.Menu);
 			iconError = ImageService.GetIcon (Ide.Gui.Stock.Error, Gtk.IconSize.Menu);
@@ -270,39 +315,62 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 			control.Add1 (sw);
 
-			outputView = new LogView { Name = "buildOutput" };
-			control.Add2 (outputView);
+			logView = new LogView { Name = "buildOutput" };
+			control.Add2 (logView);
 
 			control.ShowAll ();
 
 			control.SizeAllocated += HandleControlSizeAllocated;
-
-			bool outputVisible = OutputViewVisible;
-			if (outputVisible) {
-				outputView.Visible = true;
-				logBtn.Active = true;
-			} else {
-				outputView.Hide ();
-			}
-
 			sw.SizeAllocated += HandleSwSizeAllocated;
+
+			logView.Visible = OutputViewVisible;
+			logBtn.Active = OutputViewVisible;
 
 			// Load existing tasks
 			foreach (TaskListEntry t in TaskService.Errors) {
 				AddTask (t);
 			}
 
-			control.FocusChain = new Gtk.Widget [] { outputView, sw };
+			control.FocusChain = new Gtk.Widget [] { logView };
 		}
 
 		public override void Dispose ()
 		{
+			errorBtn.Toggled -= FilterChanged;
+			warnBtn.Toggled -= FilterChanged;
+			msgBtn.Toggled -= FilterChanged;
+			logBtn.Toggled -= HandleTextLogToggled;
+#if ENABLE_BUILD_OUTPUT
+			buildLogBtn.Clicked -= HandleBinLogClicked;
+#endif
+			searchEntry.Entry.Changed -= searchPatternChanged;
+
 			IdeApp.Workspace.FirstWorkspaceItemOpened -= OnCombineOpen;
 			IdeApp.Workspace.LastWorkspaceItemClosed -= OnCombineClosed;
+			IdeApp.ProjectOperations.StartBuild -= OnBuildStarted;
+			IdeApp.ProjectOperations.StartClean -= OnBuildStarted;
+
+			TaskService.Errors.TasksRemoved -= ShowResults;
+			TaskService.Errors.TasksAdded -= TaskAdded;
+			TaskService.Errors.TasksChanged -= TaskChanged;
+			TaskService.Errors.CurrentLocationTaskChanged -= HandleTaskServiceErrorsCurrentLocationTaskChanged;
+
+			buildOutput?.Dispose ();
+			buildOutputViewContent?.Dispose ();
+			buildOutputDoc?.Close ();
 
 			// Set the model to null as it makes Gtk clean up faster
 			if (view != null) {
+				view.RowActivated -= OnRowActivated;
 				view.Model = null;
+			}
+
+			if (control != null) {
+				control.SizeAllocated -= HandleControlSizeAllocated;
+			}
+
+			if (sw != null) {
+				sw.SizeAllocated -= HandleSwSizeAllocated;
 			}
 
 			base.Dispose ();
@@ -310,7 +378,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 		void HandleSwSizeAllocated (object o, SizeAllocatedArgs args)
 		{
-			if (!initialLogShow && outputView.Visible) {
+			if (!initialLogShow && OutputViewVisible) {
 				var val = (double)((double)control.Position / (double)control.Allocation.Width);
 				LogSeparatorPosition.Value = val;
 			}
@@ -319,7 +387,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 		[GLib.ConnectBefore]
 		void HandleControlSizeAllocated (object o, SizeAllocatedArgs args)
 		{
-			if (initialLogShow && outputView.Visible) {
+			if (initialLogShow && OutputViewVisible) {
 				SetInitialOutputViewSize (args.Allocation.Width);
 				initialLogShow = false;
 			}
@@ -329,7 +397,12 @@ namespace MonoDevelop.Ide.Gui.Pads
 		{
 			if (control == null)
 				CreateControl ();
-			return outputView.GetProgressMonitor ();
+
+			var monitor = new AggregatedProgressMonitor ();
+			monitor.AddFollowerMonitor (buildOutput.GetProgressMonitor ());
+			monitor.AddFollowerMonitor (logView.GetProgressMonitor ());
+
+			return monitor;
 		}
 
 		void HandleTaskServiceErrorsCurrentLocationTaskChanged (object sender, EventArgs e)
@@ -385,13 +458,15 @@ namespace MonoDevelop.Ide.Gui.Pads
 		{
 			var menu = new ContextMenu ();
 
-			var help = new ContextMenuItem (GettextCatalog.GetString ("Show Error Reference"));
+			var help = new ContextMenuItem (GettextCatalog.GetString ("Go to _Reference"));
 			help.Clicked += OnShowReference;
 			menu.Add (help);
 
-			var copy = new ContextMenuItem (GettextCatalog.GetString ("_Copy"));
-			copy.Clicked += OnTaskCopied;
-			menu.Add (copy);
+#if ENABLE_BUILD_OUTPUT
+			var goBuild = new ContextMenuItem (GettextCatalog.GetString ("Go to _Log"));
+			goBuild.Clicked += async (s, e) => await OnGoToLog (s, e);
+			menu.Add (goBuild);
+#endif
 
 			var jump = new ContextMenuItem (GettextCatalog.GetString ("_Go to Task"));
 			jump.Clicked += OnTaskJumpto;
@@ -401,6 +476,15 @@ namespace MonoDevelop.Ide.Gui.Pads
 			                                          restoreID,
 			                                          GettextCatalog.GetString ("Type"),
 			                                          GettextCatalog.GetString ("Validity"));
+
+			menu.Add (new SeparatorContextMenuItem ());
+
+			var copy = new ContextMenuItem (GettextCatalog.GetString ("_Copy"));
+			copy.Clicked += OnTaskCopied;
+			menu.Add (copy);
+
+
+			menu.Add (new SeparatorContextMenuItem ());
 
 			var columns = new ContextMenuItem (GettextCatalog.GetString ("Columns"));
 			columns.SubMenu = columnsMenu;
@@ -421,6 +505,32 @@ namespace MonoDevelop.Ide.Gui.Pads
 			help.Sensitive &= GetSelectedErrorReference (out dummyString);
 
 			menu.Show (view, evt);
+		}
+
+		async Task OnGoToLog (object o, EventArgs args)
+		{
+			var rows = view.Selection.GetSelectedRows ();
+			if (!rows.Any ())
+				return;
+
+			TreeIter iter, sortedIter;
+			if (view.Model.GetIter (out sortedIter, rows [0])) {
+				iter = filter.ConvertIterToChildIter (sort.ConvertIterToChildIter (sortedIter));
+
+				store.SetValue (iter, DataColumns.Read, true);
+
+				TaskListEntry task = store.GetValue (iter, DataColumns.Task) as TaskListEntry;
+				if (task != null) {
+					OpenBuildOutputViewDocument ();
+					if (task.Severity == TaskSeverity.Error) {
+						await buildOutputViewContent.GoToError (task.Message, task.GetProjectWithExtension ());
+					} else if (task.Severity == TaskSeverity.Warning) {
+						await buildOutputViewContent.GoToWarning (task.Message, task.GetProjectWithExtension ());
+					} else if (task.Severity == TaskSeverity.Information) {
+						await buildOutputViewContent.GoToMessage (task.Message, task.GetProjectWithExtension ());
+					}
+				}
+			}
 		}
 
 		TaskListEntry SelectedTask {
@@ -633,25 +743,8 @@ namespace MonoDevelop.Ide.Gui.Pads
 				textRenderer.Text = "";
 				return;
 			}
-			
-			string tmpPath = "";
-			string fileName = "";
-			try {
-				tmpPath = GetPath (task);
-				fileName = Path.GetFileName (tmpPath);
-			} catch (Exception) { 
-				fileName =  tmpPath;
-			}
-			
-			SetText (textRenderer, model, iter, task, fileName);
-		}
-		
-		static string GetPath (TaskListEntry task)
-		{
-			if (task.WorkspaceObject != null)
-				return FileService.AbsoluteToRelativePath (task.WorkspaceObject.BaseDirectory, task.FileName);
-			
-			return task.FileName;
+
+			SetText (textRenderer, model, iter, task, task.GetFile ());
 		}
 		
 		static void ProjectDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
@@ -662,12 +755,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 				textRenderer.Text = "";
 				return;
 			}
-			SetText (textRenderer, model, iter, task, GetProject(task));
-		}
-		
-		static string GetProject (TaskListEntry task)
-		{
-			return (task != null && task.WorkspaceObject is SolutionFolderItem)? task.WorkspaceObject.Name: string.Empty;
+			SetText (textRenderer, model, iter, task, task.GetProject ());
 		}
 		
 		static void PathDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
@@ -678,7 +766,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 				textRenderer.Text = "";
 				return;
 			}
-			SetText (textRenderer, model, iter, task, GetPath (task));
+			SetText (textRenderer, model, iter, task, task.GetPath ());
 		}
 
 		static void CategoryDataFunc (Gtk.TreeViewColumn column, Gtk.CellRenderer cell, Gtk.TreeModel model, Gtk.TreeIter iter)
@@ -707,6 +795,21 @@ namespace MonoDevelop.Ide.Gui.Pads
 		void OnCombineClosed(object sender, EventArgs e)
 		{
 			Clear();
+
+			buildOutput.Dispose ();
+			if (buildOutputViewContent != null) {
+				buildOutputViewContent.Dispose ();
+				buildOutputViewContent = null;
+			}
+
+			buildOutputDoc?.Close ();
+
+			buildOutput = new BuildOutput ();
+		}
+
+		void OnBuildStarted (object sender, EventArgs e)
+		{
+			buildOutput.Clear ();
 		}
 		
 		void OnRowActivated (object o, RowActivatedArgs args)
@@ -903,7 +1006,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			     zTask = model.GetValue (z, DataColumns.Task) as TaskListEntry;
 			     
 			return (aTask != null && zTask != null) ?
-			       string.Compare (GetProject (aTask), GetProject (zTask), StringComparison.Ordinal) :
+			       string.Compare (aTask.GetProject (), zTask.GetProject (), StringComparison.Ordinal) :
 			       0;
 		}
 		
@@ -929,28 +1032,54 @@ namespace MonoDevelop.Ide.Gui.Pads
 
 		internal void FocusOutputView ()
 		{
-			logBtn.Active = true;
-			HandleLogBtnToggled (this, EventArgs.Empty);
+			HandleBinLogClicked (this, EventArgs.Empty);
 		}
-		
-		void HandleLogBtnToggled (object sender, EventArgs e)
+
+		void HandleTextLogToggled (object sender, EventArgs e)
 		{
 			var visible = logBtn.Active;
 			OutputViewVisible.Value = visible;
-			outputView.Visible = visible;
-			
-			if (initialLogShow && visible && control.IsRealized) {
-				initialLogShow = false;
-				SetInitialOutputViewSize (control.Allocation.Width);
+			logView.Visible = visible;
+
+			SetInitialOutputViewSize (control.Allocation.Width);
+			if (visible) {
+				Counters.BuildLogShown++;
 			}
 		}
-		
+
 		void SetInitialOutputViewSize (int controlWidth)
 		{
 			double relPos = LogSeparatorPosition;
-			int pos = (int) (controlWidth * relPos);
-			pos = Math.Max (30, Math.Min (pos, controlWidth - 30));
+			int pos = (int)(controlWidth * relPos);
+			pos = Math.Max(30, Math.Min(pos, controlWidth - 30));
 			control.Position = pos;
+		}
+
+		Document buildOutputDoc;
+		void HandleBinLogClicked (object sender, EventArgs e)
+		{
+#if ENABLE_BUILD_OUTPUT
+			OpenBuildOutputViewDocument ();
+#endif
+		}
+
+		void OpenBuildOutputViewDocument () 
+		{
+			if (buildOutputViewContent == null) {
+				buildOutputViewContent = new BuildOutputViewContent (buildOutput);
+				buildOutputDoc = IdeApp.Workbench.OpenDocument (buildOutputViewContent, true);
+				buildOutputDoc.Closed += BuildOutputDocClosed;
+			} else if (buildOutputDoc != null) {
+				buildOutputDoc.Select ();
+			}
+		}
+
+		void BuildOutputDocClosed (object sender, EventArgs e)
+		{
+			buildOutputViewContent?.Dispose ();
+			buildOutputDoc.Closed -= BuildOutputDocClosed;
+			buildOutputViewContent = null;
+			buildOutputDoc = null;
 		}
 
 		class DescriptionCellRendererText : CellRendererText
@@ -974,6 +1103,40 @@ namespace MonoDevelop.Ide.Gui.Pads
 				}
 				width = Math.Min (oneLineWidth, PreferedMaxWidth);
 			}
+		}
+	}
+
+	internal static class TaskListEntryExtensions
+	{
+		public static string GetPath (this TaskListEntry task)
+		{
+			if (task.WorkspaceObject != null)
+				return FileService.AbsoluteToRelativePath (task.WorkspaceObject.BaseDirectory, task.FileName);
+
+			return task.FileName;
+		}
+
+		public static string GetProject (this TaskListEntry task)
+		{
+			return (task != null && task.WorkspaceObject is SolutionFolderItem) ? task.WorkspaceObject.Name : string.Empty;
+		}
+
+		public static string GetProjectWithExtension (this TaskListEntry task)
+		{
+			return (task != null && task.WorkspaceObject is SolutionItem) ? Path.GetFileName (((SolutionItem)task.WorkspaceObject).FileName) : string.Empty;
+		}
+
+		public static string GetFile (this TaskListEntry task)
+		{
+			string tmpPath = "";
+			string fileName = "";
+			try {
+				tmpPath = GetPath (task);
+				fileName = Path.GetFileName (tmpPath);
+			} catch (Exception) {
+				fileName = tmpPath;
+			}
+			return fileName;
 		}
 	}
 }

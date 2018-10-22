@@ -46,6 +46,7 @@ using MonoDevelop.Ide;
 using MonoDevelop.Projects;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
+using MonoDevelop.Ide.CodeCompletion;
 
 namespace MonoDevelop.Refactoring
 { 
@@ -126,7 +127,6 @@ namespace MonoDevelop.Refactoring
 			var rctx = new RefactoringOptions (null, null);
 			var handler = new RenameHandler (changes);
 			FileService.FileRenamed += handler.FileRename;
-			var fileNames = new HashSet<FilePath> ();
 			var ws = TypeSystemService.Workspace as MonoDevelopWorkspace;
 			string originalName;
 			int originalOffset;
@@ -137,7 +137,6 @@ namespace MonoDevelop.Refactoring
 						continue;
 
 					if (ws.TryGetOriginalFileFromProjection (change.FileName, change.Offset, out originalName, out originalOffset)) {
-						fileNames.Add (change.FileName);
 						change.FileName = originalName;
 						change.Offset = originalOffset;
 					}
@@ -160,8 +159,6 @@ namespace MonoDevelop.Refactoring
 						if (change == null)
 							continue;
 
-						fileNames.Add (change.FileName);
-
 						if (replaceChange.Offset >= 0 && change.Offset >= 0 && replaceChange.FileName == change.FileName) {
 							if (replaceChange.Offset < change.Offset) {
 								change.Offset -= replaceChange.RemovedChars;
@@ -174,22 +171,9 @@ namespace MonoDevelop.Refactoring
 						}
 					}
 				}
-
-				foreach (var renameChange in changes.OfType<RenameFileChange> ()) {
-					if (fileNames.Contains (renameChange.OldName)) {
-						fileNames.Remove (renameChange.OldName);
-						fileNames.Add (renameChange.NewName);
-					}
-				}
-
-				foreach (var doc in IdeApp.Workbench.Documents) {
-					fileNames.Remove (doc.FileName);
-				}
-
 			} catch (Exception e) {
 				LoggingService.LogError ("Error while applying refactoring changes", e);
 			} finally {
-				FileService.NotifyFilesChanged (fileNames);
 				FileService.FileRenamed -= handler.FileRename;
 				TextReplaceChange.FinishRefactoringOperation ();
 			}
@@ -255,10 +239,10 @@ namespace MonoDevelop.Refactoring
 					try {
 						tasks.Add ((provider.FindReferences (documentIdString, hintProject, monitor), provider));
 					} catch (OperationCanceledException) {
-						Counters.SetUserCancel (metadata);
+						metadata.SetUserCancel ();
 						return;
 					} catch (Exception ex) {
-						Counters.SetFailure (metadata);
+						metadata.SetFailure ();
 						if (monitor != null)
 							monitor.ReportError ("Error finding references", ex);
 						LoggingService.LogError ("Error finding references", ex);
@@ -269,10 +253,10 @@ namespace MonoDevelop.Refactoring
 					try {
 						await task.task;
 					} catch (OperationCanceledException) {
-						Counters.SetUserCancel (metadata);
+						metadata.SetUserCancel ();
 						return;
 					} catch (Exception ex) {
-						Counters.SetFailure (metadata);
+						metadata.SetFailure ();
 						if (monitor != null)
 							monitor.ReportError ("Error finding references", ex);
 						LoggingService.LogError ("Error finding references", ex);
@@ -301,10 +285,10 @@ namespace MonoDevelop.Refactoring
 					try {
 						tasks.Add ((provider.FindAllReferences (documentIdString, hintProject, monitor), provider));
 					} catch (OperationCanceledException) {
-						Counters.SetUserCancel (metadata);
+						metadata.SetUserCancel ();
 						return;
 					} catch (Exception ex) {
-						Counters.SetFailure (metadata);
+						metadata.SetFailure ();
 						if (monitor != null)
 							monitor.ReportError ("Error finding references", ex);
 						LoggingService.LogError ("Error finding references", ex);
@@ -315,10 +299,10 @@ namespace MonoDevelop.Refactoring
 					try {
 						await task.task;
 					} catch (OperationCanceledException) {
-						Counters.SetUserCancel (metadata);
+						metadata.SetUserCancel ();
 						return;
 					} catch (Exception ex) {
-						Counters.SetFailure (metadata);
+						metadata.SetFailure ();
 						if (monitor != null)
 							monitor.ReportError ("Error finding references", ex);
 						LoggingService.LogError ("Error finding references", ex);
@@ -354,23 +338,35 @@ namespace MonoDevelop.Refactoring
 
 	internal static class Counters
 	{
-		public static TimerCounter FindReferences = InstrumentationService.CreateTimerCounter ("Find references", "Code Navigation", id: "CodeNavigation.FindReferences");
+		public static TimerCounter<FindReferencesMetadata> FindReferences = InstrumentationService.CreateTimerCounter<FindReferencesMetadata> ("Find references", "Code Navigation", id: "CodeNavigation.FindReferences");
+		public static TimerCounter<FixesMenuMetadata> FixesMenu = InstrumentationService.CreateTimerCounter<FixesMenuMetadata> ("Show fixes", "Code Actions", id: "CodeActions.ShowFixes");
 
-		public static IDictionary<string, string> CreateFindReferencesMetadata ()
+		public static FindReferencesMetadata CreateFindReferencesMetadata ()
 		{
-			var metadata = new Dictionary<string, string> ();
-			metadata ["Result"] = "Success";
+			var metadata = new FindReferencesMetadata {
+				ResultString = "Success"
+			};
 			return metadata;
 		}
 
-		public static void SetFailure (IDictionary<string, string> metadata)
+		public class FindReferencesMetadata : CounterMetadata
 		{
-			metadata ["Result"] = "Failure";
+			public string ResultString {
+				get => (string)Properties["Result"];
+				set => Properties["Result"] = value;
+			}
 		}
 
-		public static void SetUserCancel (IDictionary<string, string> metadata)
+		public class FixesMenuMetadata : CounterMetadata
 		{
-			metadata ["Result"] = "UserCancel";
+			public FixesMenuMetadata ()
+			{
+			}
+
+			public bool TriggeredBySmartTag {
+				get => GetProperty<bool> ();
+				set => SetProperty (value);
+			}
 		}
 	}
 }

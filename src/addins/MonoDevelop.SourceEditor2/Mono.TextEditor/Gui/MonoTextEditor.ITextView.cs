@@ -47,7 +47,7 @@ namespace Mono.TextEditor
 	{
 		#region Private Members
 
-		public Gtk.Container VisualElement { get => this; }
+		public Gtk.Container VisualElement { get => textArea; }
 
 		ITextBuffer textBuffer;
 
@@ -96,13 +96,15 @@ namespace Mono.TextEditor
 		internal void Initialize (ITextViewModel textViewModel, ITextViewRoleSet roles, IEditorOptions parentOptions, TextEditorFactoryService factoryService, bool initialize = true)
 		{
 			this.roles = roles;
-			this.textArea.TextViewLines = new MdTextViewLineCollection (this);
 			this.factoryService = factoryService;
             GuardedOperations = this.factoryService.GuardedOperations;
             _spaceReservationStack = new SpaceReservationStack(this.factoryService.OrderedSpaceReservationManagerDefinitions, this);
 
 			this.TextDataModel = textViewModel.DataModel;
 			this.TextViewModel = textViewModel;
+
+			this.textArea.TextViewLines = new MdTextViewLineCollection (this);
+			textArea.LayoutChanged += TextAreaLayoutChanged;
 
 			textBuffer = textViewModel.EditBuffer;
             //			_visualBuffer = textViewModel.VisualBuffer;
@@ -115,6 +117,13 @@ namespace Mono.TextEditor
 
 			if (initialize)
 				this.Initialize ();
+		}
+
+		static List<ITextViewLine> emptyTextViewLineList = new List<ITextViewLine> (0);
+		void TextAreaLayoutChanged(object sender, EventArgs args)
+		{
+			//TODO: Properly implement LayoutChanged with all data
+			LayoutChanged?.Invoke (this, new TextViewLayoutChangedEventArgs (new ViewState (this), new ViewState (this), emptyTextViewLineList, emptyTextViewLineList));
 		}
 
 		internal bool IsTextViewInitialized { get { return hasInitializeBeenCalled; } }
@@ -299,8 +308,8 @@ namespace Mono.TextEditor
 		public event EventHandler Closed;
 		public event EventHandler GotAggregateFocus;
 		public event EventHandler LostAggregateFocus;
-#pragma warning disable CS0067
 		public event EventHandler<TextViewLayoutChangedEventArgs> LayoutChanged;
+#pragma warning disable CS0067
 		public event EventHandler ViewportLeftChanged;
 		public event EventHandler ViewportHeightChanged;
 		public event EventHandler ViewportWidthChanged;

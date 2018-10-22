@@ -94,7 +94,7 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             var assignmentTargetType = model.GetTypeInfo(trueAssignment.Left).Type;
             var trueAssignmentExprType = model.GetTypeInfo(trueAssignment.Right).Type;
             var falseAssignmentExprType = model.GetTypeInfo(falseAssignment.Right).Type;
-            if ((trueAssignmentExprType == null) || (falseAssignmentExprType == null))
+            if (assignmentTargetType == null || trueAssignmentExprType == null || falseAssignmentExprType == null)
                 return;
             if (assignmentTargetType.CompareTo(trueAssignmentExprType) != 0)
             {

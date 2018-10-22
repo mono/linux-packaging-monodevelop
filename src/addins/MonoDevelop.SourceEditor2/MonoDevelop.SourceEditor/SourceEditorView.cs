@@ -66,7 +66,7 @@ using System.Collections.Immutable;
 namespace MonoDevelop.SourceEditor
 {	
 	partial class SourceEditorView : ViewContent, IBookmarkBuffer, IClipboardHandler, ITextFile,
-		ICompletionWidget,  ISplittable, IFoldable, IToolboxDynamicProvider,
+		ICompletionWidget2,  ISplittable, IFoldable, IToolboxDynamicProvider,
 		ICustomFilteringToolboxConsumer, IZoomable, ITextEditorResolver, ITextEditorDataProvider,
 		ICodeTemplateHandler, ICodeTemplateContextProvider, IPrintable,
 	ITextEditorImpl, ITextMarkerFactory, IUndoHandler
@@ -1848,33 +1848,48 @@ namespace MonoDevelop.SourceEditor
 		{
 			widget.TextEditor.GetTextEditorData ().Replace (offset, count, text);
 		}
-		
+
+		class EditorCodeCompletionContext : CodeCompletionContext
+		{
+			MonoTextEditor editor;
+			DocumentLocation loc;
+
+			public EditorCodeCompletionContext (MonoTextEditor editor, DocumentLocation loc)
+			{
+				this.editor = editor;
+				this.loc = loc;
+			}
+
+			public override Task<(int x, int y, int textHeight)> GetCoordinatesAsync ()
+			{
+				var p = editor.LocationToPoint (loc);
+				int tx, ty;
+				var parentWindow = editor.ParentWindow;
+				if (parentWindow != null) {
+					parentWindow.GetOrigin (out tx, out ty);
+				} else {
+					tx = ty = 0;
+				}
+				tx += editor.Allocation.X + p.X;
+				ty += editor.Allocation.Y + p.Y + (int)editor.LineHeight;
+
+				return Task.FromResult ((tx, ty, (int)editor.GetLineHeight (loc.Line)));
+			}
+		}
+
 		public CodeCompletionContext CreateCodeCompletionContext (int triggerOffset)
 		{
-			var result = new CodeCompletionContext ();
 			if (widget == null)
-				return result;
+				return CodeCompletionContext.Invalid;
 			var editor = widget.TextEditor;
 			if (editor == null)
-				return result;
-			result.TriggerOffset = triggerOffset;
+				return CodeCompletionContext.Invalid;
 			var loc = editor.Caret.Location;
+
+			var result = new EditorCodeCompletionContext (editor, loc);
+			result.TriggerOffset = triggerOffset;
 			result.TriggerLine = loc.Line;
 			result.TriggerLineOffset = loc.Column - 1;
-			var p = widget.TextEditor.LocationToPoint (loc);
-			int tx, ty;
-			var parentWindow = editor.ParentWindow;
-			if (parentWindow != null) {
-				parentWindow.GetOrigin (out tx, out ty);
-			} else {
-				tx = ty = 0;
-			}
-			tx += editor.Allocation.X + p.X;
-			ty += editor.Allocation.Y + p.Y + (int)editor.LineHeight;
-
-			result.TriggerXCoord = tx;
-			result.TriggerYCoord = ty;
-			result.TriggerTextHeight = (int)TextEditor.GetLineHeight (loc.Line);
 			return result;
 		}
 		
@@ -1995,6 +2010,12 @@ namespace MonoDevelop.SourceEditor
 		}
 		
 		public event EventHandler CompletionContextChanged;
+
+		void ICompletionWidget2.NotifyCompletionWindowClosed ()
+		{
+			GetTextEditorData ().FixVirtualIndentation ();
+		}
+
 		#endregion
 		
 		#region commenting and indentation
@@ -2680,7 +2701,23 @@ namespace MonoDevelop.SourceEditor
 			var helpWindow = new Mono.TextEditor.PopupWindow.InsertionCursorLayoutModeHelpWindow ();
 			helpWindow.TitleText = insertionModeOptions.Operation;
 			mode.HelpWindow = helpWindow;
-			mode.CurIndex = insertionModeOptions.FirstSelectedInsertionPoint;
+			if (insertionModeOptions.FirstSelectedInsertionPoint >= 0) {
+				mode.CurIndex = insertionModeOptions.FirstSelectedInsertionPoint;
+			} else {
+				// no first point given - place the default insertion point at the first location below the caret
+				// or at the last top of it.
+				var caretLocation = this.GetTextEditorData ().Caret.Location;
+				for (int i = 0; i < mode.InsertionPoints.Count; i++) {
+					var point = mode.InsertionPoints [i];
+					if (point.Location < caretLocation) {
+						mode.CurIndex = i;
+					} else {
+						mode.CurIndex = i;
+						break;
+					}
+ 				}
+
+			}
 			mode.StartMode ();
 			mode.Exited += delegate(object s, Mono.TextEditor.InsertionCursorEventArgs iCArgs) {
 				if (insertionModeOptions.ModeExitedAction != null) {
@@ -3283,18 +3320,11 @@ namespace MonoDevelop.SourceEditor
 			switch (effect) {
 			case TextSegmentMarkerEffect.DottedLine:
 			case TextSegmentMarkerEffect.WavedLine:
-				{
-					var result = new GenericUnderlineMarker (new TextSegment (offset, length), effect);
-					if (color.HasValue)
-						result.Color = color.Value;
-					return result;
-				}
 			case TextSegmentMarkerEffect.Underline:
 				{
 					var result = new GenericUnderlineMarker (new TextSegment (offset, length), effect);
 					if (color.HasValue)
 						result.Color = color.Value;
-					result.Wave = false;
 					return result;
 				}
 
@@ -3422,5 +3452,8 @@ namespace MonoDevelop.SourceEditor
 				return this.TextEditor.HasFocus;
 			}
 		}
+
+		bool ITextEditorImpl.LockFixIndentation { get => TextEditor.GetTextEditorData ().LockFixIndentation; set => TextEditor.GetTextEditorData ().LockFixIndentation = value; }
+
 	}
 } 

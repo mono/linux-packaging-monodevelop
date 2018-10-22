@@ -29,6 +29,7 @@ using System;
 using MonoDevelop.Ide.CodeCompletion;
 using Gtk;
 using MonoDevelop.Ide.Editor.Extension;
+using System.Threading;
 
 namespace MonoDevelop.Debugger
 {
@@ -97,20 +98,25 @@ namespace MonoDevelop.Debugger
 		{
 			return char.IsLetter (c) || c == '_' || c == '.';
 		}
-
-		void PopupCompletion (Entry entry)
+		CancellationTokenSource cts = new CancellationTokenSource ();
+		async void PopupCompletion (Entry entry)
 		{
-			char c = (char)Gdk.Keyval.ToUnicode (keyValue);
-			if (currentCompletionData == null && IsCompletionChar (c)) {
-				string expr = entry.Text.Substring (0, entry.CursorPosition);
-				currentCompletionData = GetCompletionData (expr);
-				if (currentCompletionData != null) {
-					DebugCompletionDataList dataList = new DebugCompletionDataList (currentCompletionData);
-					ctx = ((ICompletionWidget)this).CreateCodeCompletionContext (expr.Length - currentCompletionData.ExpressionLength);
-					CompletionWindowManager.ShowWindow (null, c, dataList, this, ctx);
-				} else {
-					currentCompletionData = null;
+			try {
+				char c = (char)Gdk.Keyval.ToUnicode (keyValue);
+				if (currentCompletionData == null && IsCompletionChar (c)) {
+					string expr = entry.Text.Substring (0, entry.CursorPosition);
+					cts.Cancel ();
+					cts = new CancellationTokenSource ();
+					if (valueTree.Frame == null)
+						return;
+					currentCompletionData = await DebuggingService.GetCompletionDataAsync (valueTree.Frame, expr, cts.Token);
+					if (currentCompletionData != null) {
+						DebugCompletionDataList dataList = new DebugCompletionDataList (currentCompletionData);
+						ctx = ((ICompletionWidget)this).CreateCodeCompletionContext (expr.Length - currentCompletionData.ExpressionLength);
+						CompletionWindowManager.ShowWindow (null, c, dataList, this, ctx);
+					}
 				}
+			} catch (OperationCanceledException) {
 			}
 		}
 
@@ -144,14 +150,6 @@ namespace MonoDevelop.Debugger
 		void OnEditFocusOut (object sender, FocusOutEventArgs args)
 		{
 			CompletionWindowManager.HideWindow ();
-		}
-
-		Mono.Debugging.Client.CompletionData GetCompletionData (string exp)
-		{
-			if (valueTree.Frame != null)
-				return valueTree.Frame.GetExpressionCompletionData (exp);
-
-			return null;
 		}
 
 		#region ICompletionWidget implementation 
@@ -204,25 +202,19 @@ namespace MonoDevelop.Debugger
 		
 		CodeCompletionContext ICompletionWidget.CreateCodeCompletionContext (int triggerOffset)
 		{
-			CodeCompletionContext c = new CodeCompletionContext ();
-			c.TriggerLine = 0;
-			c.TriggerOffset = triggerOffset;
-			c.TriggerLineOffset = c.TriggerOffset;
-			c.TriggerTextHeight = entry.SizeRequest ().Height;
-			c.TriggerWordLength = currentCompletionData.ExpressionLength;
-			
 			int x, y;
-			int tx, ty;
 			entry.GdkWindow.GetOrigin (out x, out y);
-			entry.GetLayoutOffsets (out tx, out ty);
+			entry.GetLayoutOffsets (out var tx, out var ty);
 			int cp = entry.TextIndexToLayoutIndex (entry.Position);
 			Pango.Rectangle rect = entry.Layout.IndexToPos (cp);
-			tx += Pango.Units.ToPixels (rect.X) + x;
+			x += Pango.Units.ToPixels (rect.X) + tx;
 			y += entry.Allocation.Height;
-			
-			c.TriggerXCoord = tx;
-			c.TriggerYCoord = y;
-			return c;
+
+			return new CodeCompletionContext (
+				x, y, entry.SizeRequest ().Height,
+				triggerOffset, 0, triggerOffset,
+				currentCompletionData.ExpressionLength
+			);
 		}
 		
 		string ICompletionWidget.GetCompletionText (CodeCompletionContext ctx)

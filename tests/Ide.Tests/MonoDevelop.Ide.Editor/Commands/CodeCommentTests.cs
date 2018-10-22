@@ -27,17 +27,28 @@ using System.Text;
 using NUnit.Framework;
 using MonoDevelop.Ide.Editor.Extension;
 using MonoDevelop.Ide.Gui;
+using System.Threading.Tasks;
+using MonoDevelop.Core;
+using System.Collections.Generic;
+using System;
 
 namespace MonoDevelop.Ide.Editor
 {
 	[TestFixture]
-	public class CodeCommentTests : IdeTestBase
+	public class CodeCommentTests : TextEditorExtensionTestBase
 	{
-		internal static TextEditor CreateTextEditor (string input)
+		protected override EditorExtensionTestData GetContentData () => EditorExtensionTestData.CSharp;
+
+		protected override IEnumerable<TextEditorExtension> GetEditorExtensions ()
 		{
-			var editor = TextEditorFactory.CreateNewEditor ();
-			editor.FileName = "a.cs";
-			editor.MimeType = "text/x-csharp";
+			foreach (var ext in base.GetEditorExtensions ())
+				yield return ext;
+			yield return new DefaultCommandTextEditorExtension ();
+		}
+
+		internal static void SetupInput (TextEditor editor, string input)
+		{
+			editor.Options = new CustomEditorOptions ();
 
 			var sb = new StringBuilder ();
 			int cursorPosition = 0, selectionStart = -1, selectionEnd = -1;
@@ -76,7 +87,6 @@ namespace MonoDevelop.Ide.Editor
 			editor.CaretOffset = cursorPosition;
 			if (selectionStart >= 0 && selectionEnd >= 0)
 				editor.SetSelection (selectionStart, selectionEnd);
-			return editor;
 		}
 
 		static void AssertEditorState (TextEditor editor, string input)
@@ -123,133 +133,194 @@ namespace MonoDevelop.Ide.Editor
 			Assert.AreEqual (sb.ToString (), editor.Text, "Editor text doesn't match.");
 		}
 
-		[Test]
-		public void TestAddComment()
+		async Task Run (string input, string expected, Action<DefaultCommandTextEditorExtension> cb)
 		{
-			var editor = CreateTextEditor (@"class Foo
+			using (var testCase = await SetupTestCase ("")) {
+				var editor = testCase.Document.Editor;
+				SetupInput (editor, input);
+				cb (testCase.GetContent<DefaultCommandTextEditorExtension> ());
+				AssertEditorState (editor, expected);
+			}
+		}
+
+		[Test]
+		public async Task TestAddComment()
+		{
+			const string input = @"class Foo
 {
 	<-void Bar ()
 	{
 
 	}->
-}");
-			GetExtension (editor).AddCodeComment ();
-			AssertEditorState (editor, @"class Foo
+}";
+			const string expected = @"class Foo
 {
 	//<-void Bar ()
 	//{
 
 	//}->
-}");
-		}
-
-		static DefaultCommandTextEditorExtension GetExtension (TextEditor editor)
-		{
-			var ext = new DefaultCommandTextEditorExtension ();
-			var tww = new TestWorkbenchWindow { ViewContent = new TestViewContent () };
-			ext.Initialize (editor, new TestDocument (tww)); 
-			return ext;
+}";
+			await Run (input, expected, ext => ext.AddCodeComment ());
 		}
 
 		[Test]
-		public void TestRemoveComment()
+		public async Task TestRemoveComment()
 		{
-			var editor = CreateTextEditor ( @"class Foo
+			const string input = @"class Foo
 {
 	//<-void Bar ()
 	//{
 
 	//}->
-}");
-			GetExtension (editor).RemoveCodeComment ();
-			AssertEditorState (editor,@"class Foo
+}";
+			const string expected = @"class Foo
 {
 	<-void Bar ()
 	{
 
 	}->
-}");
+}";
+			await Run (input, expected, ext => ext.RemoveCodeComment ());
 		}
 
 		[Test]
-		public void TestToggle_Add()
+		public async Task TestToggle_Visible ()
 		{
-			var editor = CreateTextEditor (@"class Foo
+			//We need to create full document and not just editor
+			//so extensions are initialized which set custom C#
+			//tagger based syntax highligthing
+			const string input = @"class Foo
+{
+	void Bar ()
+	{
+		//$test
+	}
+}";
+			using (var testCase = await SetupTestCase ("", wrap: true)) {
+				var editor = testCase.Document.Editor;
+				SetupInput (editor, input);
+
+				//Call UpdateParseDocument so AdHock Roslyn Workspace is created for file
+				await testCase.Document.UpdateParseDocument ();
+			
+				//Finnaly call command Update so it sets values which we assert
+				var info = new Components.Commands.CommandInfo ();
+				testCase.GetContent<DefaultCommandTextEditorExtension> ().OnUpdateToggleComment (info);
+				Assert.AreEqual (true, info.Visible);
+				Assert.AreEqual (true, info.Enabled);
+			}
+		}
+
+
+
+		[Test]
+		public async Task TestToggle_Visible_StartOfLine ()
+		{
+			//We need to create full document and not just editor
+			//so extensions are initialized which set custom C#
+			//tagger based syntax highligthing
+			const string input = @"class Foo
+{
+	void Bar ()
+$	{
+		//test
+	}
+}";
+			using (var testCase = await SetupTestCase ("", wrap: true)) {
+				var editor = testCase.Document.Editor;
+				SetupInput (editor, input);
+
+				//Call UpdateParseDocument so AdHock Roslyn Workspace is created for file
+				await testCase.Document.UpdateParseDocument ();
+
+				//Finnaly call command Update so it sets values which we assert
+				var info = new Components.Commands.CommandInfo ();
+				testCase.GetContent<DefaultCommandTextEditorExtension> ().OnUpdateToggleComment (info);
+				Assert.AreEqual (true, info.Visible);
+				Assert.AreEqual (true, info.Enabled);
+			}
+		}
+
+		[Test]
+		public async Task TestToggle_AddAsync ()
+		{
+			const string input = @"class Foo
 {
 	<-void Bar ()
 	{
 
 	}->
-}");
-			GetExtension (editor).ToggleCodeComment ();
-			AssertEditorState (editor, @"class Foo
+}";
+			const string expected = @"class Foo
 {
 	//<-void Bar ()
 	//{
 
 	//}->
-}");
+}";
+			await Run (input, expected, ext => ext.ToggleCodeComment ());
 		}
 	
 		[Test]
-		public void TestToggle_Remove()
+		public async Task TestToggle_RemoveAsync ()
 		{
-			var editor = CreateTextEditor ( @"class Foo
+			const string input = @"class Foo
 {
 	//<-void Bar ()
 	//{
 
 	//}->
-}");
-			GetExtension (editor).ToggleCodeComment ();
-			AssertEditorState (editor,@"class Foo
+}";
+			const string expected = @"class Foo
 {
 	<-void Bar ()
 	{
 
 	}->
-}");
+}";
+			await Run (input, expected, ext => ext.ToggleCodeComment ());
 		}
 
 
 		[Test]
-		public void TestToggle_Bug()
+		public async Task TestToggle_BugAsync ()
 		{
-			var editor = CreateTextEditor (@"<-class Foo
+			const string input = @"<-class Foo
 {
 	void Bar ()
 	{
 
 	}
 }
-->");
-			GetExtension (editor).ToggleCodeComment ();
-			AssertEditorState (editor, @"//class Foo
+->";
+			const string expected = @"//class Foo
 //{
 //	void Bar ()
 //	{
 
 //	}
 //}
-");
+";
+			await Run (input, expected, ext => ext.ToggleCodeComment ());
 		}
 
 		[Test]
-		public void TestToggleWithoutSelection()
+		public async Task TestToggleWithoutSelectionAsync ()
 		{
-			var editor = CreateTextEditor ( @"class Foo
+			const string input = @"class Foo
 {
 	$void Bar ()
 	{
 	}
-}");
-			GetExtension (editor).ToggleCodeComment ();
-			AssertEditorState (editor,@"class Foo
+}";
+			const string expected = @"class Foo
 {
 	//void Bar ()
 	{
 	}
-}");
+}";
+
+			await Run (input, expected, ext => ext.ToggleCodeComment ());
 		}
 
 
@@ -257,25 +328,25 @@ namespace MonoDevelop.Ide.Editor
 		/// Bug 38355 - comment selected lines puts a comment on too many lines! 
 		/// </summary>
 		[Test]
-		public void TestBug38355()
+		public async Task TestBug38355Async ()
 		{
-			var editor = CreateTextEditor (@"class Foo
+			const string input = @"class Foo
 {
 <-	void Bar ()
 	{
 ->		Bar();
 	}
-}");
-			GetExtension (editor).ToggleCodeComment ();
-			AssertEditorState (editor, @"class Foo
+}";
+			const string expected = @"class Foo
 {
 	//void Bar ()
 	//{
 		Bar();
 	}
-}");
-		}
+}";
 
+			await Run (input, expected, ext => ext.ToggleCodeComment ());
+		}
 	}
 }
 
