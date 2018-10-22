@@ -46,6 +46,7 @@ override_dh_clideps:
 			--exclude-moduleref=api-ms-win-core-file-l1-1-0.dll \
 			--exclude-moduleref=esent.dll \
 			--exclude-moduleref=e_sqlite3.dll \
+			--exclude-moduleref=libsystemnative.dylib \
 			--exclude-moduleref=clr \
 			--exclude-moduleref=Microsoft.DiaSymReader.Native.amd64.dll \
 			--exclude-moduleref=Microsoft.DiaSymReader.Native.x86.dll \
