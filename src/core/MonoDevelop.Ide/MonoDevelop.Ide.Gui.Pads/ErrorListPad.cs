@@ -1042,6 +1042,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			logView.Visible = visible;
 
 			SetInitialOutputViewSize (control.Allocation.Width);
+
 			if (visible) {
 				Counters.BuildLogShown++;
 			}

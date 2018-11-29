@@ -221,6 +221,7 @@ namespace MonoDevelop.Ide.BuildOutputView
 					LastRenderExpanderBounds = LastRenderExpanderBounds.Offset (-LastRenderBounds.X, -LastRenderBounds.Y).Offset (cellArea.X, cellArea.Y);
 					LastRenderLayoutBounds = LastRenderLayoutBounds.Offset (-LastRenderBounds.X, -LastRenderBounds.Y).Offset (cellArea.X, cellArea.Y);
 					LastRenderImageBounds = LastRenderImageBounds.Offset (-LastRenderBounds.X, -LastRenderBounds.Y).Offset (cellArea.X, cellArea.Y);
+
 					LastRenderBounds = cellArea;
 					return true; // no resize is required
 				}
@@ -254,6 +255,7 @@ namespace MonoDevelop.Ide.BuildOutputView
 				layoutBounds.Width -= startX - cellArea.X + DefaultInformationContainerWidth;
 
 				textLayout.Width = layoutBounds.Width;
+
 				if (needsExpander) {
 					textLayout.Height = Expanded ? -1 : cellArea.Height;
 					textSize = textLayout.GetSize ();

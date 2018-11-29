@@ -31,10 +31,10 @@ namespace MonoDevelop.Ide.TypeSystem
 				Assert.AreSame (item, item2, "Item that is in cache should be returned");
 
 				// Create one with custom properties
-				var item3 = cache.GetOrCreate (manager, asm, MetadataReferenceProperties.Assembly.WithAliases (new[] { "a" }));
+				var item3 = cache.GetOrCreate (manager, asm, MetadataReferenceProperties.Assembly.WithAliases (new [] { "a" }));
 				Assert.IsNotNull (item3);
 
-				var item4 = cache.GetOrCreate (manager, asm, MetadataReferenceProperties.Assembly.WithAliases (new[] { "a" }));
+				var item4 = cache.GetOrCreate (manager, asm, MetadataReferenceProperties.Assembly.WithAliases (new [] { "a" }));
 				Assert.AreSame (item3, item4, "Item that is in cache should be returned");
 
 				// Clear the cache, new items should be returned from now on.
@@ -45,7 +45,7 @@ namespace MonoDevelop.Ide.TypeSystem
 
 				Assert.AreNotSame (item, item5, "Cache was cleared, so new item should be returned");
 
-				var item6 = cache.GetOrCreate (manager, asm, MetadataReferenceProperties.Assembly.WithAliases (new[] { "a" }));
+				var item6 = cache.GetOrCreate (manager, asm, MetadataReferenceProperties.Assembly.WithAliases (new [] { "a" }));
 				Assert.AreNotSame (item3, item6, "Cache was cleared, so new item should be returned");
 
 				cache.ClearCache ();

@@ -94,7 +94,7 @@ class TestClass {
 class TestClass {
     void TestMethod ()
     {
-        System.Action<int> a = delegate (int $i$) {
+        System.Action<int> a = delegate (int i) {
         };
     }
 }";
@@ -128,19 +128,6 @@ class TestClass {
         }
 
         [Fact]
-        public void TestMethodUsedAsDelegateInOtherPart()
-        {
-            // This test doesn't add the second part;
-            // but the issue doesn't look at other files after all;
-            // we just rely on heuristics if the class is partial
-            var input = @"using System;
-partial class TestClass {
-    void FooBar (object sender, EventArgs e) {}
-}";
-            Analyze<UnusedParameterAnalyzer>(input);
-        }
-
-        [Fact]
         public void UnusedParameterInConstructor()
         {
             var input = @"
@@ -169,7 +156,7 @@ class TestClass {
         {
             var input = @"
 class TestClass {
-    public new void TestMethod (int i)
+    public new void TestMethod (int $i$)
     {
     }
 }";
@@ -181,7 +168,7 @@ class TestClass {
         {
             var input = @"
 partial class TestClass {
-    partial void TestMethod (int i)
+    partial void TestMethod (int $i$)
     {
     }
 }";

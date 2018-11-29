@@ -289,7 +289,6 @@ namespace MonoDevelop.Core.Instrumentation
 
 		protected bool ContainsProperty ([CallerMemberName]string propName = null)
 		{
-			
 			return properties.ContainsKey (propName);
 		}
 	}

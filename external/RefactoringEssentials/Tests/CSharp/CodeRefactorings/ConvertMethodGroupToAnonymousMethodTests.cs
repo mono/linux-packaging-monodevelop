@@ -23,10 +23,7 @@ public class Test
 {
     void Foo ()
     {
-        Action act = delegate
-        {
-            Foo();
-        };
+        Action act = delegate { Foo(); };
     }
 }
 ");
@@ -52,10 +49,7 @@ public class Test
     void Foo ()
     {
 		// Some comment
-        Action act = delegate
-        {
-            Foo();
-        };
+        Action act = delegate { Foo(); };
     }
 }
 ");
@@ -79,10 +73,7 @@ public class Test
 {
     void Foo (int x, int y)
     {
-        Action<int,int> act = delegate (int arg1, int arg2)
-        {
-            Foo(arg1, arg2);
-        };
+        Action<int,int> act = delegate (int arg1, int arg2) { Foo(arg1, arg2); };
     }
 }
 ");
@@ -106,10 +97,7 @@ public class Test
 {
     bool Foo (int x, int y)
     {
-        Func<int,int,bool> act = delegate (int arg1, int arg2)
-        {
-            return Foo(arg1, arg2);
-        };
+        Func<int,int,bool> act = delegate (int arg1, int arg2) { return Foo(arg1, arg2); };
     }
 }
 ");
@@ -140,10 +128,7 @@ public class Test
 
     void Bar ()
     {
-        Action<int, int> act = delegate (int arg1, int arg2)
-        {
-            Test.Foo(arg1, arg2);
-        };
+        Action<int, int> act = delegate (int arg1, int arg2) { Test.Foo(arg1, arg2); };
     }
 }");
         }

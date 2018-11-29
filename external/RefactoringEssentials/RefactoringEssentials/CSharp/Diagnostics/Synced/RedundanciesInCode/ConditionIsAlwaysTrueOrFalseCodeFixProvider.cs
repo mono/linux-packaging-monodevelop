@@ -35,7 +35,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             var node = root.FindNode(context.Span, false, true) as ExpressionSyntax;
             if (node == null)
                 return;
-            bool isTrue = diagnostic.GetMessage().IndexOf("'true'", System.StringComparison.Ordinal) >= 0;
+            bool isTrue = diagnostic.GetMessage().IndexOf("'True'", System.StringComparison.Ordinal) >= 0;
             var newRoot = root.ReplaceNode(
                 node,
                 SyntaxFactory.LiteralExpression(isTrue ? SyntaxKind.TrueLiteralExpression : SyntaxKind.FalseLiteralExpression)

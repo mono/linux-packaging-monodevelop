@@ -1,10 +1,11 @@
 include $(top_srcdir)/xbuild.include
 
-SUBDIRS=UnitTests IdeUnitTests MacPlatform.Tests UserInterfaceTests TestRunner Ide.Tests MonoDevelop.CSharpBinding.Tests WindowsPlatform.Tests MonoDevelop.Core.Tests MonoDevelop.Core.Tests.Addin MonoDevelop.Refactoring.Tests
+SUBDIRS=UnitTests IdeUnitTests MacPlatform.Tests UserInterfaceTests TestRunner Ide.Tests MonoDevelop.CSharpBinding.Tests WindowsPlatform.Tests MonoDevelop.Core.Tests MonoDevelop.Core.Tests.Addin MonoDevelop.Refactoring.Tests performance ui
 
 MONO=mono$(SGEN_SUFFIX)
 RUN_TEST=$(MDTOOL_RUN) run-md-tests
 TEST_DIR=$(top_builddir)/build/tests
+TEST_SRC_DIR=$(top_srcdir)/tests
 EXTERNAL=$(top_builddir)/external
 MACOS_10_10=$(shell (test `sw_vers -productVersion | cut -f1 -d.` = 10 && test `sw_vers -productVersion | cut -f2 -d.` -ge 10) && echo yes)
 TEST_DEPLOY_DIR=$(top_builddir)/build/test-deploy
@@ -37,8 +38,11 @@ TEST_ASSEMBLIES_COMMON = \
 	$(TEST_DIR)/MonoDevelop.AspNet.Tests.dll \
 	$(TEST_DIR)/MonoDevelop.CSharpBinding.Tests.dll \
 	$(TEST_DIR)/MonoDevelop.DotNetCore.Tests.dll \
+	$(TEST_DIR)/MonoDevelop.AspNetCore.Tests.dll \
 	$(TEST_DIR)/MonoDevelop.UnitTesting.Tests.dll \
-	$(TEST_DIR)/MonoDevelop.Refactoring.Tests.dll
+	$(TEST_DIR)/MonoDevelop.Refactoring.Tests.dll \
+	$(TEST_DIR)/MonoDevelop.Ide.PerfTests.dll \
+	$(TEST_DIR)/PerfTool.exe
 
 if RELEASE_BUILDS
 TEST_ASSEMBLIES_COMMON += $(EXTERNAL)/nrefactory/bin/Release/ICSharpCode.NRefactory.Tests.dll
@@ -135,6 +139,12 @@ deploy-tests:
 			cp -r `dirname $$asm`/* "$(TEST_DEPLOY_DIR)/tests"; \
 		fi \
 	done;
+
+performance-tests:
+	rm -rf $(TEST_DIR)/TestSolutions/ExampleFormsSolution
+	cd $(TEST_DIR)/TestSolutions; unzip ExampleFormsSolution.zip
+	$(RUN_TEST) -xml=TestResult_PerfTest.xml -labels $(TEST_DIR)/MonoDevelop.Ide.PerfTests.dll || exit $?;
+	mono $(TEST_DIR)/PerfTool.exe generate-results $(TEST_DIR)/Baseline_MonoDevelop.Ide.PerfTests.xml $(TEST_SRC_DIR)/TestResult_PerfTest.xml $(TEST_DIR)/PerformanceTestReport.xml
 
 include $(top_srcdir)/Makefile.include
 

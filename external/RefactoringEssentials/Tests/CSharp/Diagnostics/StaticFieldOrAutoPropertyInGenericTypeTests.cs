@@ -16,6 +16,16 @@ class Foo<T>
 }");
         }
 
+        [Fact]
+        public void GenericClassField()
+        {
+            Analyze<StaticFieldOrAutoPropertyInGenericTypeAnalyzer>(@"
+class Foo<T>
+{
+    static T Data;
+}");
+        }
+
 
         [Fact]
         public void AutoProperty()

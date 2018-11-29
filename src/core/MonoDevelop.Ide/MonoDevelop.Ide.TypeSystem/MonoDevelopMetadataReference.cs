@@ -70,7 +70,6 @@ namespace MonoDevelop.Ide.TypeSystem
 		string GetDebuggerDisplay () => Path.GetFileName (FilePath);
 	}
 
-
 	class MetadataReferenceUpdatedEventArgs : EventArgs
 	{
 		public PortableExecutableReference OldSnapshot { get; }

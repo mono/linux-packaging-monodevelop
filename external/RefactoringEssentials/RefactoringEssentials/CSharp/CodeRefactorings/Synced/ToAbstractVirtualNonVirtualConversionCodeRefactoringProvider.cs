@@ -53,7 +53,8 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
                 return;
 
             var containingType = symbol.ContainingType;
-            if (symbol.DeclaredAccessibility == Accessibility.Private || containingType.IsInterfaceType())
+            if (symbol.DeclaredAccessibility == Accessibility.Private || symbol.IsKind (SymbolKind.NamedType) ||
+                containingType == null || containingType.IsInterfaceType())
                 return;
 
             var explicitInterface = declaration.GetExplicitInterfaceSpecifierSyntax();

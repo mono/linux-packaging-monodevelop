@@ -36,14 +36,12 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             var diagnostic = diagnostics.First();
             var token = root.FindToken(context.Span.Start);
             var node = token.Parent;
-            if (node.IsKind(SyntaxKind.ClassDeclaration)) {
-                var decl = node as ClassDeclarationSyntax;
-                var newRoot = root.ReplaceNode(decl, decl.WithModifiers(SyntaxFactory.TokenList(decl.Modifiers.Where(m => !m.IsKind(SyntaxKind.UnsafeKeyword)))));
+            if (node is MemberDeclarationSyntax memberDecl) {
+                var newRoot = root.ReplaceNode(memberDecl, memberDecl.WithModifiers(SyntaxFactory.TokenList(memberDecl.GetModifiers().Where(m => !m.IsKind(SyntaxKind.UnsafeKeyword)))));
                 context.RegisterCodeFix(CodeActionFactory.Create(token.Span, diagnostic.Severity, "Remove redundant 'unsafe' modifier", document.WithSyntaxRoot(newRoot)), diagnostic);
             }
-            if (node.IsKind(SyntaxKind.StructDeclaration)) {
-                var decl = node as StructDeclarationSyntax;
-                var newRoot = root.ReplaceNode(decl, decl.WithModifiers(SyntaxFactory.TokenList(decl.Modifiers.Where(m => !m.IsKind(SyntaxKind.UnsafeKeyword)))));
+            if (node is TypeDeclarationSyntax typeDecl) {
+                var newRoot = root.ReplaceNode(typeDecl, typeDecl.WithModifiers(SyntaxFactory.TokenList(typeDecl.Modifiers.Where(m => !m.IsKind(SyntaxKind.UnsafeKeyword)))));
                 context.RegisterCodeFix(CodeActionFactory.Create(token.Span, diagnostic.Severity, "Remove redundant 'unsafe' modifier", document.WithSyntaxRoot(newRoot)), diagnostic);
             }
             if (node.IsKind(SyntaxKind.UnsafeStatement)) {

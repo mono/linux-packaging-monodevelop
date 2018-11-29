@@ -171,7 +171,7 @@ namespace MonoDevelop.PackageManagement
 
 		public static bool IsDotNetCoreProject (this Project project)
 		{
-			return project.MSBuildProject.Sdk != null;
+			return project.MSBuildProject.GetReferencedSDKs ().Any ();
 		}
 
 		public static bool HasPackageReferences (this DotNetProject project)
@@ -313,6 +313,15 @@ namespace MonoDevelop.PackageManagement
 		{
 			return projectReference.ReferenceType == ReferenceType.Project &&
 				projectReference.ReferenceOutputAssembly;
+		}
+
+		public static bool CanUpdatePackages (this DotNetProject project)
+		{
+			var nugetAwareProject = project as INuGetAwareProject;
+			if (nugetAwareProject != null)
+				return nugetAwareProject.HasPackages ();
+
+			return HasPackages (project.BaseDirectory, project.Name) || project.Items.OfType<ProjectPackageReference> ().Any ();
 		}
 	}
 }

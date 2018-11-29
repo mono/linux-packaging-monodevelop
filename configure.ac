@@ -357,7 +357,6 @@ src/addins/MonoDevelop.SourceEditor2/Makefile
 src/addins/Xml/Makefile
 src/addins/MonoDevelop.Refactoring/Makefile
 src/addins/MonoDevelop.AspNetCore/Makefile
-src/addins/MonoDevelop.AzureFunctions/Makefile
 src/addins/MonoDevelop.ConnectedServices/Makefile
 src/addins/MonoDevelop.DotNetCore/Makefile
 src/addins/MonoDevelop.DotNetCore/MonoDevelop.DotNetCore.Tests/Makefile
@@ -388,6 +387,12 @@ tests/MonoDevelop.Core.Tests.Addin/Makefile
 tests/MonoDevelop.CSharpBinding.Tests/Makefile
 tests/MonoDevelop.Refactoring.Tests/Makefile
 tests/WindowsPlatform.Tests/Makefile
+tests/performance/Makefile
+tests/performance/PerfTool/Makefile
+tests/performance/MonoDevelop.Ide.PerfTests/Makefile
+tests/performance/MonoDevelop.PerformanceTesting/Makefile
+tests/ui/Makefile
+tests/ui/MonoDevelop.UserInterfaceTesting/Makefile
 Makefile
 monodevelop
 mdtool

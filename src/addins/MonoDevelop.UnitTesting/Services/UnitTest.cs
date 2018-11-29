@@ -196,9 +196,11 @@ namespace MonoDevelop.UnitTesting
 		public TestStatus Status {
 			get { return status; }
 			set {
+				if (status == value)
+					return;
+
 				status = value;
 				OnTestStatusChanged ();
-				(Parent as UnitTestGroup)?.UpdateStatusFromChildren ();
 			}
 		}
 
@@ -417,6 +419,9 @@ namespace MonoDevelop.UnitTesting
 		
 		protected virtual void OnTestStatusChanged ()
 		{
+			if (parent is UnitTestGroup) {
+				parent.OnTestStatusChanged ();
+			}
 			Gtk.Application.Invoke ((o, args) => {
 				// Run asynchronously in the UI thread
 				if (TestStatusChanged != null)

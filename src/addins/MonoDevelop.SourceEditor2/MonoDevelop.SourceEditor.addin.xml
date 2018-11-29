@@ -84,12 +84,9 @@
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/Commands/TextEditor">
-		<Command id = "MonoDevelop.SourceEditor.QuickTasks.ScrollbarCommand.ShowTasks"
-				_label = "Show _Tasks"
-				type="radio"/>
 		<Command id = "MonoDevelop.SourceEditor.QuickTasks.ScrollbarCommand.ShowMinimap"
 				_label = "Show _Minimap"
-				type="radio"/>
+				type = "check"/>
 	</Extension>
 
 	<Extension path = "/MonoDevelop/SourceEditor2/ContextMenu/Editor">
@@ -120,7 +117,6 @@
 		<CommandItem id = "MonoDevelop.SourceEditor.QuickTasks.ScrollbarCommand.PgUp" />
 		<CommandItem id = "MonoDevelop.SourceEditor.QuickTasks.ScrollbarCommand.PgDown" />
 		<SeparatorItem id = "Separator2" />
-		<CommandItem id = "MonoDevelop.SourceEditor.QuickTasks.ScrollbarCommand.ShowTasks" />
 		<CommandItem id = "MonoDevelop.SourceEditor.QuickTasks.ScrollbarCommand.ShowMinimap" />
 	</Extension>
 
@@ -190,7 +186,12 @@
 		<StockIcon stockid="md-prefs-completion" resource="prefs-completion-16.png" size="Menu" />
 	</Extension>
 
-	<Extension path="/MonoDevelop/Ide/TypeService/PlatformMefHostServices">
+	<Extension path="/MonoDevelop/Ide/Composition">
 		<Assembly file="MonoDevelop.SourceEditor.dll"/>
 	</Extension>
+
+	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
+		<Class class = "MonoDevelop.SourceEditor.Braces.BraceCompletionEditorExtension" />
+	</Extension>
+
 </ExtensionModel>

@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Linq;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
@@ -30,55 +31,53 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         {
             context.EnableConcurrentExecution();
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterSyntaxNodeAction(
-                AnalyzeBinaryExpression,
-                new SyntaxKind[] { SyntaxKind.AddExpression }
-            );
+			context.RegisterOperationAction(
+				ctx => AnalyzeBinaryExpression (ctx),
+				OperationKind.BinaryOperator
+			);
 
-            context.RegisterSyntaxNodeAction(
-                AnalyzeInvocationExpression,
-                new SyntaxKind[] { SyntaxKind.InvocationExpression }
+            context.RegisterOperationAction(
+				ctx => AnalyzeInvocationExpression (ctx),
+				OperationKind.Invocation
             );
-
         }
 
-        static void AnalyzeBinaryExpression(SyntaxNodeAnalysisContext nodeContext)
+        static void AnalyzeBinaryExpression(OperationAnalysisContext nodeContext)
         {
-            var node = nodeContext.Node as BinaryExpressionSyntax;
-            var visitor = new BinaryExpressionVisitor(nodeContext);
-            visitor.Visit(node);
-        }
+            var node = (IBinaryOperation)nodeContext.Operation;
+			if (node.OperatorKind == BinaryOperatorKind.Add)
+			{
+				var visitor = new BinaryExpressionVisitor(nodeContext);
+				visitor.Visit(node);
+			}
+		}
 
-        static void AnalyzeInvocationExpression(SyntaxNodeAnalysisContext nodeContext)
+        static void AnalyzeInvocationExpression(OperationAnalysisContext nodeContext)
         {
-            var invocationExpression = nodeContext.Node as InvocationExpressionSyntax;
+            var invocationExpression = (IInvocationOperation)nodeContext.Operation;
+			if (invocationExpression.Parent is IBinaryOperation)
+				return;
 
-            if (invocationExpression.Parent is BinaryExpressionSyntax)
-                return;
-
-            var member = nodeContext.SemanticModel.GetSymbolInfo(invocationExpression).Symbol;
-            if (member == null)
-                return;
             // "".ToString()
-            CheckTargetedObject(nodeContext, invocationExpression, member);
+            CheckTargetedObject(nodeContext, invocationExpression);
 
             // Check list of members that call ToString() automatically
-            CheckAutomaticToStringCallers(nodeContext, invocationExpression, member);
+            CheckAutomaticToStringCallers(nodeContext, invocationExpression);
 
             // Check formatting calls
-            CheckFormattingCall(nodeContext, invocationExpression, member);
+            CheckFormattingCall(nodeContext, invocationExpression);
         }
 
 
-        class BinaryExpressionVisitor : CSharpSyntaxWalker
+        class BinaryExpressionVisitor : OperationWalker
         {
-            readonly SyntaxNodeAnalysisContext nodeContext;
+            readonly OperationAnalysisContext nodeContext;
 
             int stringExpressionCount;
-            ExpressionSyntax firstStringExpression;
-            HashSet<SyntaxNode> processedNodes = new HashSet<SyntaxNode>();
+            IOperation firstStringExpression;
+            HashSet<IOperation> processedNodes = new HashSet<IOperation>();
 
-            public BinaryExpressionVisitor(SyntaxNodeAnalysisContext nodeContext)
+            public BinaryExpressionVisitor(OperationAnalysisContext nodeContext)
             {
                 this.nodeContext = nodeContext;
             }
@@ -89,11 +88,11 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 firstStringExpression = null;
             }
 
-            void Check(ExpressionSyntax expression)
+            void Check(IOperation expression)
             {
                 if (stringExpressionCount <= 1)
                 {
-                    var resolvedType = nodeContext.SemanticModel.GetTypeInfo(expression).Type;
+					var resolvedType = expression.Type;
                     if (resolvedType != null && resolvedType.SpecialType == SpecialType.System_String)
                     {
                         stringExpressionCount++;
@@ -112,170 +111,182 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 }
             }
 
-            public override void VisitBinaryExpression(BinaryExpressionSyntax node)
-            {
-                Check(node.Left);
-                Check(node.Right);
-            }
+			public override void VisitBinaryOperator(IBinaryOperation operation)
+			{
+				Check(operation.LeftOperand);
+				Check(operation.RightOperand);
+			}
 
-            public override void VisitBaseExpression(BaseExpressionSyntax node)
+            void CheckExpressionInAutoCallContext(IOperation expression)
             {
-                base.VisitBaseExpression(node);
-            }
-
-            void CheckExpressionInAutoCallContext(ExpressionSyntax expression)
-            {
-                if (expression is InvocationExpressionSyntax && !processedNodes.Contains(expression))
+                if (expression is IInvocationOperation invocationOperation && !processedNodes.Contains(expression))
                 {
-                    CheckInvocationInAutoCallContext((InvocationExpressionSyntax)expression);
+					CheckInvocationInAutoCallContext(invocationOperation);
                 }
             }
 
-            void CheckInvocationInAutoCallContext(InvocationExpressionSyntax invocationExpression)
+            void CheckInvocationInAutoCallContext(IInvocationOperation invocationExpression)
             {
-                var memberExpression = invocationExpression.Expression as MemberAccessExpressionSyntax;
-                if (memberExpression == null)
-                {
-                    return;
-                }
-                if (memberExpression.Name.ToString() != "ToString" || invocationExpression.ArgumentList.Arguments.Any())
-                {
-                    return;
-                }
+				if (invocationExpression.Arguments.Length != 0)
+					return;
 
-                var resolveResult = nodeContext.SemanticModel.GetSymbolInfo(invocationExpression).Symbol;
-                if (resolveResult == null)
-                {
+				var method = invocationExpression.TargetMethod;
+				if (method.Name != "ToString")
+				{
+					return;
+				}
+
+                if (!OverridesObjectToStringMethod(method))
                     return;
-                }
-                if (!OverridesObjectToStringMethod(resolveResult))
-                    return;
-                var type = nodeContext.SemanticModel.GetTypeInfo(memberExpression.Expression).Type;
-                if ((type != null) && type.IsValueType)
+
+				var type = invocationExpression.Instance?.Type;
+                if (type != null && type.IsValueType)
                     return;
                 
-                AddRedundantToStringIssue(memberExpression, invocationExpression);
+                AddRedundantToStringIssue(invocationExpression);
             }
 
-            void AddRedundantToStringIssue(MemberAccessExpressionSyntax memberExpression, InvocationExpressionSyntax invocationExpression)
+            void AddRedundantToStringIssue(IInvocationOperation invocationExpression)
             {
                 // Simon Lindgren 2012-09-14: Previously there was a check here to see if the node had already been processed
                 // This has been moved out to the callers, to check it earlier for a 30-40% run time reduction
                 processedNodes.Add(invocationExpression);
-                nodeContext.ReportDiagnostic(Diagnostic.Create(descriptor1, GetLocation (invocationExpression)));
-            }
 
+				if (TryGetLocation (invocationExpression, out var location))
+		            nodeContext.ReportDiagnostic(Diagnostic.Create(descriptor1, location));
+            }
         }
 
         #region Invocation expression
 
-        static bool OverridesObjectToStringMethod(ISymbol toStringSymbol)
+        static bool OverridesObjectToStringMethod(IMethodSymbol toStringSymbol)
         {
-            ISymbol currentSymbol = toStringSymbol;
-            while (currentSymbol != null)
+            IMethodSymbol currentMethodSymbol = toStringSymbol;
+            while (currentMethodSymbol != null)
             {
-                var currentMethodSymbol = currentSymbol as IMethodSymbol;
-                if ((currentMethodSymbol != null)
-                    && (currentSymbol.ContainingType != null)
-                    && (currentSymbol.ContainingType.SpecialType == SpecialType.System_Object))
+                if (currentMethodSymbol.ContainingType != null && currentMethodSymbol.ContainingType.SpecialType == SpecialType.System_Object)
                 {
                     // Found object.ToString()
                     return true;
                 }
-                currentSymbol = currentSymbol.OverriddenMember();
+				currentMethodSymbol = currentMethodSymbol.OverriddenMethod;
             }
 
             return false;
         }
 
-        static void CheckTargetedObject(SyntaxNodeAnalysisContext nodeContext, InvocationExpressionSyntax invocationExpression, ISymbol member)
+        static void CheckTargetedObject(OperationAnalysisContext nodeContext, IInvocationOperation invocationExpression)
         {
-            var memberExpression = invocationExpression.Expression as MemberAccessExpressionSyntax;
-            if (memberExpression != null)
-            {
-                var type = nodeContext.SemanticModel.GetTypeInfo(memberExpression.Expression).Type;
-
-                if (type.SpecialType == SpecialType.System_String && member.Name == "ToString")
-                {
-                    nodeContext.ReportDiagnostic(Diagnostic.Create(descriptor1, GetLocation (invocationExpression)));
-                }
-            }
+			var method = invocationExpression.TargetMethod;
+			if (method != null)
+			{
+				if (method.ContainingType.SpecialType == SpecialType.System_String && method.Name == "ToString")
+				{
+					if (TryGetLocation (invocationExpression, out var location))
+			            nodeContext.ReportDiagnostic(Diagnostic.Create(descriptor1, location));
+				}
+			}
         }
-        static string [] membersCallingToString = { "M:System.IO.TextWriter.Write", "M:System.Console.Write" };
         
-        static void CheckAutomaticToStringCallers(SyntaxNodeAnalysisContext nodeContext, InvocationExpressionSyntax invocationExpression, ISymbol member)
+        static void CheckAutomaticToStringCallers(OperationAnalysisContext nodeContext, IInvocationOperation invocationExpression)
         {
-            if (member.IsOverride)
+			var method = invocationExpression.TargetMethod;
+            if (method.IsOverride)
             {
-                member = member.OverriddenMember();
-                if (member == null)
+                method = method.OverriddenMethod;
+                if (method == null)
                 {
                     return;
                 }
             }
 
-            var method = member as IMethodSymbol;
-            if (method == null)
-                return;
-            var id = method.GetDocumentationCommentId ();
-            if (!membersCallingToString.Any (m => id.StartsWith (m, StringComparison.Ordinal)))
+			bool methodDoesToString = false;
+			if (method.Name.StartsWith ("Write", StringComparison.Ordinal))
+			{
+				var typeSymbol = method.ContainingType;
+				if (typeSymbol.Name == "TextWriter")
+				{
+					var ioNs = typeSymbol.ContainingNamespace;
+					if (ioNs.Name == "IO" && ioNs.ContainingNamespace?.Name == "System")
+						methodDoesToString = true;
+				}
+				else if (typeSymbol.Name == "Console")
+				{
+					var systemNs = typeSymbol.ContainingNamespace;
+					if (systemNs.Name == "System")
+						methodDoesToString = true;
+				}
+			}
+			if (methodDoesToString == false)
                 return;
 
-            var arguments = invocationExpression.ArgumentList.Arguments;
-            for (int i = 0; i < arguments.Count; ++i)
+            var arguments = invocationExpression.Arguments;
+            for (int i = 0; i < arguments.Length; ++i)
             {
-                CheckExpressionInAutoCallContext(nodeContext, arguments[i].Expression);
+                CheckExpressionInAutoCallContext(nodeContext, arguments[i]);
             }
         }
 
-        static void CheckExpressionInAutoCallContext(SyntaxNodeAnalysisContext nodeContext, ExpressionSyntax expression)
+        static void CheckExpressionInAutoCallContext(OperationAnalysisContext nodeContext, IArgumentOperation expression)
         {
-            var invocationExpressionSyntax = expression as InvocationExpressionSyntax;
-            if (invocationExpressionSyntax != null)
-            {
-                CheckInvocationInAutoCallContext(nodeContext, invocationExpressionSyntax);
-            }
+			var value = expression.Value;
+
+			IInvocationOperation invocationOperation;
+			if (value is IConversionOperation conversion)
+			{
+				invocationOperation = conversion.Operand as IInvocationOperation;
+			}
+			else
+			{
+				invocationOperation = value as IInvocationOperation;
+			}
+
+			if (invocationOperation != null)
+			{
+				CheckInvocationInAutoCallContext(nodeContext, invocationOperation);
+			}
         }
 
-        static void CheckInvocationInAutoCallContext(SyntaxNodeAnalysisContext nodeContext, InvocationExpressionSyntax invocationExpression)
+        static void CheckInvocationInAutoCallContext(OperationAnalysisContext nodeContext, IInvocationOperation invocationExpression)
         {
-            var memberExpression = invocationExpression.Expression as MemberAccessExpressionSyntax;
-            if (memberExpression == null)
-            {
-                return;
-            }
-            if (memberExpression.Name.ToString() != "ToString" || invocationExpression.ArgumentList.Arguments.Any())
-            {
-                return;
-            }
+			if (invocationExpression.Arguments.Length != 0)
+				return;
 
-            var resolveResult = nodeContext.SemanticModel.GetSymbolInfo(invocationExpression).Symbol;
-            if (resolveResult == null)
-            {
+			var method = invocationExpression.TargetMethod;
+			if (method == null || method.Name != "ToString")
+				return;
+
+			var targetType = invocationExpression.Instance?.Type;
+            if (targetType != null && targetType.IsValueType)
                 return;
-            }
-            if (!OverridesObjectToStringMethod(resolveResult))
+
+            if (!OverridesObjectToStringMethod(method))
                 return;
-            var type = nodeContext.SemanticModel.GetTypeInfo(memberExpression.Expression).Type;
-            if ((type != null) && type.IsValueType)
-                return;
-            nodeContext.ReportDiagnostic(Diagnostic.Create(descriptor1, GetLocation(invocationExpression)));
+
+			if (TryGetLocation (invocationExpression, out var location))
+	            nodeContext.ReportDiagnostic(Diagnostic.Create(descriptor1, location));
         }
 
-        static Location GetLocation(InvocationExpressionSyntax invocationExpression)
-        {
-            var memberExpression = invocationExpression.Expression as MemberAccessExpressionSyntax;
+		static bool TryGetLocation (IInvocationOperation operation, out Location location)
+		{
+			location = null;
+			if (!(operation.Syntax is InvocationExpressionSyntax syntax))
+				return false;
 
-            return Location.Create(invocationExpression.SyntaxTree, TextSpan.FromBounds(memberExpression.Expression.Span.End, invocationExpression.Span.End));
-        }
+			if (!(syntax.Expression is MemberAccessExpressionSyntax access))
+				return false;
 
-        static void CheckFormattingCall(SyntaxNodeAnalysisContext nodeContext, InvocationExpressionSyntax invocationExpression, ISymbol member)
+			location = Location.Create(syntax.SyntaxTree, TextSpan.FromBounds(access.Expression.Span.End, syntax.Span.End));
+			return true;
+		}
+
+		static void CheckFormattingCall(OperationAnalysisContext nodeContext, IInvocationOperation invocationExpression)
         {
-            ExpressionSyntax formatArgument;
-            IList<ExpressionSyntax> formatArguments;
+            IArgumentOperation formatArgument;
+            IList<IArgumentOperation> formatArguments;
             // Only check parameters that are of type object: String means it is neccessary, others
             // means that there is another problem (ie no matching overload of the method).
-            Func<IParameterSymbol, ExpressionSyntax, bool> predicate = (parameter, argument) =>
+            Func<IParameterSymbol, IOperation, bool> predicate = (parameter, argument) =>
             {
                 var type = parameter.Type;
 /*                if (type is TypeWithElementType && parameter.IsParams)
@@ -285,8 +296,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                 return type.SpecialType == SpecialType.System_Object;
             };
 
-            if (FormatStringHelper.TryGetFormattingParameters(nodeContext.SemanticModel, invocationExpression,
-                                                              out formatArgument, out formatArguments, predicate))
+            if (FormatStringHelper.TryGetFormattingParameters(invocationExpression, out formatArgument, out formatArguments, predicate))
             {
                 foreach (var argument in formatArguments)
                 {

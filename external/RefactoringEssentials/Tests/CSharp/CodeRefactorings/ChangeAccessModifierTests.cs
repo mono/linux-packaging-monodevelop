@@ -219,6 +219,29 @@ class Foo
 }");
         }
 
+        [Fact]
+        public void TestBodyContext()
+        {
+            TestWrongContext<ChangeAccessModifierAction>(@"
+class Foo
+{
+    public void DoStuff()
+    {
+        int $x;
+    }
+}");
+        }
+
+        [Fact]
+        public void TestExpressionBodyContext()
+        {
+            TestWrongContext<ChangeAccessModifierAction>(@"
+class Foo
+{
+    int x;
+    public int DoStuff() => $x;
+}");
+        }
     }
 
         

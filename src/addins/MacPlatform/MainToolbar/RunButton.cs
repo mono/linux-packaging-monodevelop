@@ -32,6 +32,7 @@ using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using Xwt.Mac;
 using MonoDevelop.Components;
+using MonoDevelop.MacInterop;
 
 namespace MonoDevelop.MacIntegration.MainToolbar
 {
@@ -98,11 +99,11 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				break;
 			case OperationIcon.Run:
 				title = GettextCatalog.GetString ("Run");
-				help = GettextCatalog.GetString ("Build and run the current solution");
+				help = GettextCatalog.GetString ("Run the project or projects in the active run configuration. Builds the projects in the active solution build configuration if necessary.");
 				break;
 			case OperationIcon.Build:
 				title = GettextCatalog.GetString ("Build");
-				help = GettextCatalog.GetString ("Build the current solution");
+				help = GettextCatalog.GetString ("Build the projects in the active solution build configuration.");
 				break;
 			}
 		}
@@ -140,7 +141,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			string help, title;
 			GetTitleAndHelpForIcon (out title, out help);
 
-			AccessibilityHelp = help;
+			ToolTip = AccessibilityHelp = help;
 			AccessibilityTitle = title;
 			AccessibilityEnabled = Enabled;
 			AccessibilitySubrole = NSAccessibilitySubroles.ToolbarButtonSubrole;
@@ -161,6 +162,19 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			get {
 				return new CGSize (38, 25);
 			}
+		}
+
+		internal event EventHandler<EventArgs> UnfocusToolbar;
+		public override void KeyDown (NSEvent theEvent)
+		{
+			// 0x30 is Tab
+			if (theEvent.KeyCode == KeyCodes.Tab) {
+				if ((theEvent.ModifierFlags & NSEventModifierMask.ShiftKeyMask) == NSEventModifierMask.ShiftKeyMask) {
+					UnfocusToolbar?.Invoke (this, EventArgs.Empty);
+					return;
+				}
+			}
+			base.KeyDown (theEvent);
 		}
 	}
 

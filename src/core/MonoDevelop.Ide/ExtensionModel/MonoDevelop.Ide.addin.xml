@@ -1,9 +1,16 @@
 <ExtensionModel>
 	<Runtime>
+		<Import assembly="Microsoft.VisualStudio.CodingConventions.dll" />
+		<Import assembly="Microsoft.VisualStudio.Composition.dll" />
 		<Import assembly="Microsoft.VisualStudio.CoreUtility.dll" />
+		<Import assembly="Microsoft.VisualStudio.Language.dll" />
+		<Import assembly="Microsoft.VisualStudio.Language.Intellisense.dll" />
+		<Import assembly="Microsoft.VisualStudio.Language.StandardClassification.dll" />
 		<Import assembly="Microsoft.VisualStudio.Text.Data.dll" />
 		<Import assembly="Microsoft.VisualStudio.Text.Logic.dll" />
 		<Import assembly="Microsoft.VisualStudio.Text.UI.dll" />
+		<Import assembly="Microsoft.VisualStudio.Threading.dll" />
+		<Import assembly="Microsoft.VisualStudio.Validation.dll" />
 	</Runtime>
 	
 	<!-- Extension ponts -->
@@ -247,6 +254,7 @@
 	
 	<Extension path = "/MonoDevelop/Core/SystemInformation">
 		<Class class = "MonoDevelop.Ide.IdeVersionInfo" />
+		<Class class = "MonoDevelop.Ide.RuntimeVersionInfo" />
 	</Extension>
 
 	<Extension path = "/MonoDevelop/Ide/DisplayBindings">
@@ -310,6 +318,7 @@
 	<Extension path = "/MonoDevelop/Ide/TextEditorExtensions">
 		<Class id="InitialStep" class = "MonoDevelop.Ide.Editor.Extension.TextEditorExtensionMarker" />
 		<Class id="MidStep" class = "MonoDevelop.Ide.Editor.Extension.TextEditorExtensionMarker" />
+		<Class class = "MonoDevelop.Ide.Editor.Extension.EditorFormattingServiceTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.Extension.BraceMatcherTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.Extension.DefaultCommandTextEditorExtension" />
 		<Class class = "MonoDevelop.Ide.Editor.Extension.FoldingTextEditorExtension" />
@@ -394,10 +403,6 @@
 
 	<Extension path = "/MonoDevelop/ProjectModel/ProjectModelExtensions">
 		<Class class = "MonoDevelop.Ide.GettingStarted.GettingStartedProjectExtension"/>
-	</Extension>
-
-	<Extension path="/MonoDevelop/Ide/TypeService/PlatformMefHostServices">
-		<Assembly file="Microsoft.VisualStudio.Text.Logic.dll"/>
 	</Extension>
 
 	<Extension path="/MonoDevelop/Ide/Composition">

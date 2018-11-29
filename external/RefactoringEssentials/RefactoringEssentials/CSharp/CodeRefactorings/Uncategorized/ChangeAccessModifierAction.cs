@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,47 +17,45 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
     [ExportCodeRefactoringProvider(LanguageNames.CSharp, Name = "Change access level")]
     public class ChangeAccessModifierAction : CodeRefactoringProvider
     {
-        public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
-        {
-            var document = context.Document;
-            if (document.Project.Solution.Workspace.Kind == WorkspaceKind.MiscellaneousFiles)
-                return;
-            var span = context.Span;
-            if (!span.IsEmpty)
-                return;
-            var cancellationToken = context.CancellationToken;
-            if (cancellationToken.IsCancellationRequested)
-                return;
-            var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
-            if (model.IsFromGeneratedCode(cancellationToken))
-                return;
-            var root = await model.SyntaxTree.GetRootAsync(cancellationToken).ConfigureAwait(false);
-            var token = root.FindToken(span.Start);
-            if (!token.IsIdentifierOrAccessorOrAccessibilityModifier())
-                return;
-            var node = token.Parent;
-            while (node != null && !(node is MemberDeclarationSyntax || node is AccessorDeclarationSyntax))
-                node = node.Parent;
+		public override async Task ComputeRefactoringsAsync(CodeRefactoringContext context)
+		{
+			var document = context.Document;
+			if (document.Project.Solution.Workspace.Kind == WorkspaceKind.MiscellaneousFiles)
+				return;
+			var span = context.Span;
+			if (!span.IsEmpty)
+				return;
+			var cancellationToken = context.CancellationToken;
+			if (cancellationToken.IsCancellationRequested)
+				return;
+			var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+			if (model.IsFromGeneratedCode(cancellationToken))
+				return;
+			var root = await model.SyntaxTree.GetRootAsync(cancellationToken).ConfigureAwait(false);
+			var token = root.FindToken(span.Start);
+			if (!token.IsIdentifierOrAccessorOrAccessibilityModifier())
+				return;
+			var node = token.Parent;
+			while (node != null && !(node is MemberDeclarationSyntax || node is AccessorDeclarationSyntax))
+			{
+				if (node is StatementSyntax || node is ExpressionSyntax)
+					return;
+				node = node.Parent;
+			}
             if (node == null || node.IsKind(SyntaxKind.InterfaceDeclaration, SyntaxKind.EnumMemberDeclaration))
                 return;
 
             ISymbol symbol = null;
-            var field = node as FieldDeclarationSyntax;
-            if (field != null)
-                symbol = model.GetDeclaredSymbol(field.Declaration.Variables.First(), cancellationToken);
-            else
-            {
-                var member = node as MemberDeclarationSyntax;
-                if (member != null)
-                    symbol = model.GetDeclaredSymbol(member, cancellationToken);
-                else
-                {
-                    var accessor = node as AccessorDeclarationSyntax;
-                    if (accessor != null)
-                        symbol = model.GetDeclaredSymbol(accessor, cancellationToken);
-                }
-            }
-            if (!symbol.AccessibilityChangeable())
+			if (node is FieldDeclarationSyntax field)
+				symbol = model.GetDeclaredSymbol(field.Declaration.Variables.First(), cancellationToken);
+			else
+			{
+				if (node is MemberDeclarationSyntax member)
+					symbol = model.GetDeclaredSymbol(member, cancellationToken);
+				else if (node is AccessorDeclarationSyntax accessor)
+					symbol = model.GetDeclaredSymbol(accessor, cancellationToken);
+			}
+			if (!symbol.AccessibilityChangeable())
                 return;
 
             foreach (var accessibility in GetPossibleAccessibilities(model, symbol, node, cancellationToken))
@@ -77,33 +76,25 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             }
         }
 
-        static IEnumerable<Accessibility> GetPossibleAccessibilities(SemanticModel model, ISymbol member, SyntaxNode declaration, CancellationToken cancellationToken)
+		static ImmutableArray<Accessibility> notContained = ImmutableArray.Create(Accessibility.Public);
+		static ImmutableArray<Accessibility> containedInValueType = ImmutableArray.Create(Accessibility.Private, Accessibility.Internal, Accessibility.Public);
+		static ImmutableArray<Accessibility> containedInClass = ImmutableArray.Create(Accessibility.Private, Accessibility.Protected, Accessibility.Internal, Accessibility.ProtectedOrInternal, Accessibility.Public);
+
+		static IEnumerable<Accessibility> GetPossibleAccessibilities(SemanticModel model, ISymbol member, SyntaxNode declaration, CancellationToken cancellationToken)
         {
             IEnumerable<Accessibility> result = null;
             var containingType = member.ContainingType;
             if (containingType == null)
             {
-                result = new[] { Accessibility.Public };
+				result = notContained;
             }
             else if (containingType.IsValueType)
             {
-                result = new[]
-                {
-                    Accessibility.Private,
-                    Accessibility.Internal,
-                    Accessibility.Public
-                };
-            }
+				result = containedInValueType;
+			}
             else
             {
-                result = new[]
-                {
-                    Accessibility.Private,
-                    Accessibility.Protected,
-                    Accessibility.Internal,
-                    Accessibility.ProtectedOrInternal,
-                    Accessibility.Public
-                };
+				result = containedInClass;
                 if (member.IsAccessorMethod())
                 {
                     var propertyDeclaration = declaration.Ancestors().OfType<PropertyDeclarationSyntax>().FirstOrDefault();

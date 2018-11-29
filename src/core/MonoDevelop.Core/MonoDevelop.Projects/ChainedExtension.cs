@@ -42,19 +42,28 @@ namespace MonoDevelop.Projects
 			return first;
 		}
 
-		internal protected static T FindNextImplementation<T> (ChainedExtension next) where T:ChainedExtension
+		internal protected static T FindNextImplementation<T> (ChainedExtension next) where T : ChainedExtension
 		{
-			return (T)FindNextImplementation (typeof(T), next);
+			return (T)FindNextImplementation(typeof (T), next, out _);
 		}
 
-		internal static ChainedExtension FindNextImplementation (Type type, ChainedExtension next)
+		internal static ChainedExtension FindNextImplementation (Type type, ChainedExtension next, out int position)
 		{
-			if (next == null)
+			position = -1;
+			return FindNextImplementation_Internal (type, next, ref position);
+		}
+
+		static ChainedExtension FindNextImplementation_Internal (Type type, ChainedExtension next, ref int position)
+		{
+			if (next == null) {
 				return null;
+			}
 
+			position++;
 			if (!type.IsInstanceOfType (next))
-				return FindNextImplementation (type, next.nextInChain);
+				return FindNextImplementation_Internal (type, next.nextInChain, ref position);
 
+			// Maybe it would make sense to cache these, but not sure if we should.
 			foreach (var method in type.GetMethods (BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)) {
 				if (method != null && method.IsVirtual && method.Name != "InitializeChain") {
 					var paramArray = method.GetParameters ();
@@ -76,13 +85,14 @@ namespace MonoDevelop.Projects
 					return next;
 			}
 
-			return FindNextImplementation (type, next.nextInChain);
+			return FindNextImplementation_Internal (type, next.nextInChain, ref position);
 		}
 
 		internal void InitChain (ExtensionChain chain, ChainedExtension next)
 		{
 			this.chain = chain;
 			nextInChain = next;
+
 			InitializeChain (next);
 		}
 

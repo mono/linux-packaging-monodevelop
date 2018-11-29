@@ -54,12 +54,11 @@ class Foo
         [Fact]
         public void TestNestedUnsafeStatement()
         {
-            Analyze<RedundantUnsafeContextAnalyzer>(@"
-unsafe class Program
+            Analyze<RedundantUnsafeContextAnalyzer>(@"$unsafe$ class Program
 {
     static void Main(string str)
     {
-        $unsafe$
+        unsafe
         {
             fixed (char* charPtr = &str)
             {
@@ -68,14 +67,51 @@ unsafe class Program
         }
     }
 }
-", @"
-unsafe class Program
+", @"class Program
 {
     static void Main(string str)
     {
-        fixed (char* charPtr = &str)
+        unsafe
         {
-            *charPtr = 'A';
+            fixed (char* charPtr = &str)
+            {
+                *charPtr = 'A';
+            }
+        }
+    }
+}
+");
+        }
+
+        [Fact]
+        public void TestNestedUnsafeStatements()
+        {
+            Analyze<RedundantUnsafeContextAnalyzer>(@"class Program
+{
+    static void Main(string str)
+    {
+        $unsafe$
+        {
+            unsafe
+            {
+                fixed (char* charPtr = &str)
+                {
+                    *charPtr = 'A';
+                }
+            }
+        }
+    }
+}
+", @"class Program
+{
+    static void Main(string str)
+    {
+        unsafe
+        {
+            fixed (char* charPtr = &str)
+            {
+                *charPtr = 'A';
+            }
         }
     }
 }
@@ -161,6 +197,103 @@ class Foo
                 }
             }
         }
+    }
+}
+");
+        }
+
+        [Fact]
+        public void TestField()
+        {
+            Analyze<RedundantUnsafeContextAnalyzer>(@"$unsafe$ class Foo
+{
+    int field;
+}
+", @"class Foo
+{
+    int field;
+}
+");
+        }
+
+        [Fact]
+        public void TestPtrField()
+        {
+            Analyze<RedundantUnsafeContextAnalyzer>(@"unsafe class Foo
+{
+    int* field;
+}
+");
+        }
+
+        [Fact]
+        public void TestMemberFieldPositive()
+        {
+            Analyze<RedundantUnsafeContextAnalyzer>(@"class Foo
+{
+    $unsafe$ int field;
+}
+",@"class Foo
+{
+int field;
+}
+");
+        }
+
+        [Fact]
+        public void TestMemberFieldNegative()
+        {
+            Analyze<RedundantUnsafeContextAnalyzer>(@"
+class Foo
+{
+    unsafe int *field;
+}
+");
+        }
+
+        [Fact]
+        public void TestUnsafeDelegatePositive()
+        {
+            Analyze<RedundantUnsafeContextAnalyzer>(@"$unsafe$ class Foo
+{
+    delegate int del();
+}
+", @"class Foo
+{
+    delegate int del();
+}
+");
+        }
+
+        [Fact]
+        public void TestUnsafeDelegateNegative()
+        {
+            Analyze<RedundantUnsafeContextAnalyzer>(@"unsafe class Foo
+{
+    delegate int* del();
+}
+");
+        }
+
+        [Fact]
+        public void TestUnsafeMethod()
+        {
+            Analyze<RedundantUnsafeContextAnalyzer>(@"
+class Foo
+{
+    public static $unsafe$ void Main(string[] args)
+    {
+        System.Console.WriteLine(""Hello World1!"");
+        System.Console.WriteLine(""Hello World2!"");
+    }
+}
+", @"
+class Foo
+{
+    public static void Main(string[] args)
+    {
+        System.Console.WriteLine(""Hello World1!"");
+        System.Console.WriteLine(""Hello World2!"");
     }
 }
 ");

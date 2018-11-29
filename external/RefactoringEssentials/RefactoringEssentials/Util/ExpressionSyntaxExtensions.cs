@@ -2163,34 +2163,40 @@ namespace RefactoringEssentials
             }
         }
 
-        public static NameSyntax GetRightmostName(this ExpressionSyntax node)
+        public static SimpleNameSyntax GetRightmostName(this ExpressionSyntax node)
         {
-            var memberAccess = node as MemberAccessExpressionSyntax;
-            if (memberAccess != null && memberAccess.Name != null)
-            {
-                return memberAccess.Name;
-            }
+			if (node is MemberAccessExpressionSyntax memberAccess && memberAccess.Name != null)
+			{
+				return memberAccess.Name;
+			}
 
-            var qualified = node as QualifiedNameSyntax;
-            if (qualified != null && qualified.Right != null)
-            {
-                return qualified.Right;
-            }
+			if (node is QualifiedNameSyntax qualified && qualified.Right != null)
+			{
+				return qualified.Right;
+			}
 
-            var simple = node as SimpleNameSyntax;
-            if (simple != null)
-            {
-                return simple;
-            }
+			if (node is SimpleNameSyntax simple)
+			{
+				return simple;
+			}
 
-            var conditional = node as ConditionalAccessExpressionSyntax;
-            if (conditional != null)
-            {
-                return conditional.WhenNotNull.GetRightmostName();
-            }
+			if (node is ConditionalAccessExpressionSyntax conditional)
+			{
+				return conditional.WhenNotNull.GetRightmostName();
+			}
 
-            return null;
-        }
+			if (node is MemberBindingExpressionSyntax memberBinding)
+			{
+				return memberBinding.Name;
+			}
+
+			if (node is AliasQualifiedNameSyntax aliasQualifiedName && aliasQualifiedName.Name != null)
+			{
+				return aliasQualifiedName.Name;
+			}
+
+			return null;
+		}
 
         public static OperatorPrecedence GetOperatorPrecedence(this ExpressionSyntax expression)
         {

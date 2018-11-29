@@ -136,33 +136,39 @@ namespace MonoDevelop.CSharp.Project
 
 			var options = new CSharpCompilationOptions (
 				OutputKind.ConsoleApplication,
-				false,
-				null,
-				project.MainClass,
-				"Script",
-				null,
-				OptimizationLevel.Debug,
-				GenerateOverflowChecks,
-				UnsafeCode,
-				null,
-				ParentConfiguration.SignAssembly ? ParentConfiguration.AssemblyKeyFile : null,
-				ImmutableArray<byte>.Empty,
-				null,
-				Microsoft.CodeAnalysis.Platform.AnyCpu,
-				ReportDiagnostic.Default,
-				WarningLevel,
-				null,
-				false,
+				mainTypeName: project.MainClass,
+				scriptClassName: "Script",
+				optimizationLevel: Optimize ? OptimizationLevel.Release : OptimizationLevel.Debug,
+				checkOverflow: GenerateOverflowChecks,
+				allowUnsafe: UnsafeCode,
+				cryptoKeyFile: ParentConfiguration.SignAssembly ? ParentConfiguration.AssemblyKeyFile : null,
+				cryptoPublicKey: ImmutableArray<byte>.Empty,
+				platform: GetPlatform (),
+				generalDiagnosticOption: TreatWarningsAsErrors ? ReportDiagnostic.Error : ReportDiagnostic.Default,
+				warningLevel: WarningLevel,
+				specificDiagnosticOptions: GetSpecificDiagnosticOptions (),
+				concurrentBuild: true,
 				metadataReferenceResolver: metadataReferenceResolver,
 				assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default,
 				strongNameProvider: new DesktopStrongNameProvider ()
 			);
 
-			return options.WithPlatform (GetPlatform ())
-				.WithGeneralDiagnosticOption (TreatWarningsAsErrors ? ReportDiagnostic.Error : ReportDiagnostic.Default)
-				.WithOptimizationLevel (Optimize ? OptimizationLevel.Release : OptimizationLevel.Debug)
-				.WithSpecificDiagnosticOptions (GetSuppressedWarnings ().ToDictionary (
-					suppress => suppress, _ => ReportDiagnostic.Suppress));
+			return options;
+		}
+
+		Dictionary<string, ReportDiagnostic> GetSpecificDiagnosticOptions ()
+		{
+			var result = new Dictionary<string, ReportDiagnostic> ();
+			foreach (var warning in GetSuppressedWarnings ())
+				result [warning] = ReportDiagnostic.Suppress;
+
+			var globalRuleSet = Ide.TypeSystem.TypeSystemService.RuleSetManager.GetGlobalRuleSet ();
+			if (globalRuleSet != null) {
+				foreach (var kv in globalRuleSet.SpecificDiagnosticOptions) {
+					result [kv.Key] = kv.Value;
+				}
+			}
+			return result;
 		}
 
 		Microsoft.CodeAnalysis.Platform GetPlatform ()
@@ -193,8 +199,7 @@ namespace MonoDevelop.CSharp.Project
 			var symbols = GetDefineSymbols ();
 			if (configuration != null)
 				symbols = symbols.Concat (configuration.GetDefineSymbols ()).Distinct ();
-
-			langVersion.TryParse (out LanguageVersion lv);
+			LanguageVersionFacts.TryParse (langVersion, out LanguageVersion lv);
 
 			return new CSharpParseOptions (
 				lv,
@@ -207,7 +212,7 @@ namespace MonoDevelop.CSharp.Project
 
 		public LanguageVersion LangVersion {
 			get {
-				if (!langVersion.TryParse (out LanguageVersion val)) {
+				if (!LanguageVersionFacts.TryParse (langVersion, out LanguageVersion val)) {
 					throw new Exception ("Unknown LangVersion string '" + langVersion + "'");
 				}
 				return val;

@@ -37,6 +37,62 @@ class C
         }
 
         [Fact]
+        public void ReducedExtensionsAreNotReported()
+        {
+            Analyze<AccessToStaticMemberViaDerivedTypeAnalyzer>(@"
+using System.Collections.Generic;
+using System.Linq;
+
+class Container
+{
+    public List<int> MyList;
+}
+
+class A
+{
+    public static void F()
+    {
+        var list = new List<int>();
+        var result = list.Any(x => x == 0);
+
+        var result2 = new Container ().MyList.Any (x => x == 0);
+    }
+}"
+            );
+        }
+
+        [Fact]
+        public void MemberInvocationQualified()
+        {
+            Analyze<AccessToStaticMemberViaDerivedTypeAnalyzer>(@"
+class A
+{
+    public static void F() { }
+}
+class B : A { }
+class C
+{
+    void Main()
+    {
+        $global::B$.F ();
+    }
+}", @"
+class A
+{
+    public static void F() { }
+}
+class B : A { }
+class C
+{
+    void Main()
+    {
+        A.F ();
+    }
+}"
+            );
+        }
+
+        [Fact]
         public void MemberInvocationWithComment()
         {
             Analyze<AccessToStaticMemberViaDerivedTypeAnalyzer>(@"

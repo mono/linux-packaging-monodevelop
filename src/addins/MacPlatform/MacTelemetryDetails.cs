@@ -23,21 +23,23 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-using System;
-using MonoDevelop.Ide.Desktop;
 
-using Foundation;
+using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+
 using CoreFoundation;
-using System.Linq;
-using System.Threading.Tasks;
+using Foundation;
+
 using MonoDevelop.Core;
+using MonoDevelop.Ide.Desktop;
 
 namespace MacPlatform
 {
 	internal class MacTelemetryDetails : IPlatformTelemetryDetails
 	{
 		int family;
+		int coreCount;
 		long freq;
 		string arch;
 		ulong size;
@@ -57,6 +59,7 @@ namespace MacPlatform
 			Interop.SysCtl ("hw.machine", out result.arch);
 			Interop.SysCtl ("hw.cpufamily", out result.family);
 			Interop.SysCtl ("hw.cpufrequency", out result.freq);
+			Interop.SysCtl ("hw.physicalcpu", out result.coreCount);
 
 			var attrs = NSFileManager.DefaultManager.GetFileSystemAttributes ("/");
 			result.size = attrs.Size;
@@ -80,7 +83,7 @@ namespace MacPlatform
 			return result;
 		}
 
-		public TimeSpan TimeSinceMachineStart => TimeSpan.FromSeconds (NSProcessInfo.ProcessInfo.SystemUptime);
+		public TimeSpan TimeSinceMachineStart => FromNSTimeInterval (NSProcessInfo.ProcessInfo.SystemUptime);
 
 		public TimeSpan TimeSinceLogin => sinceLogin;
 
@@ -94,6 +97,8 @@ namespace MacPlatform
 
 		public int CpuCount => (int)NSProcessInfo.ProcessInfo.ActiveProcessorCount;
 
+		public int PhysicalCpuCount => coreCount;
+
 		public int CpuFamily => family;
 
 		public long CpuFrequency => freq;
@@ -105,8 +110,6 @@ namespace MacPlatform
 		public ulong RamTotal => NSProcessInfo.ProcessInfo.PhysicalMemory;
 
 		public PlatformHardDriveMediaType HardDriveOsMediaType => osType;
-
-
 
 		static PlatformHardDriveMediaType GetMediaType (string path)
 		{
@@ -216,5 +219,42 @@ namespace MacPlatform
 
 		[DllImport ("libc")]
 		extern static IntPtr getlastlogxbyname (string name, ref LastLogX ll);
+
+		public bool TrySampleHostCpuLoad (out double value)
+		{
+			return KernelInterop.TrySampleHostCpu (out value);
+		}
+
+		public TimeSpan GetEventTime (Gdk.EventKey eventKey)
+		{
+			// If this GDK event is the current Gtk.Application event, assume that NSApplication's
+			// current event is the event from which the GDK event was created and use its timestamp
+			// instead, which has a much higher precision than the GDK time.
+			if (Gtk.Application.CurrentEvent == eventKey)
+				return FromNSTimeInterval (AppKit.NSApplication.SharedApplication.CurrentEvent.Timestamp);
+
+			return TimeSpan.FromMilliseconds (eventKey.Time);
+		}
+
+		/// <summary>
+		/// <para>
+		/// Converts a high precision <c>NSTimeInterval</c> to a <see cref="TimeSpan"/>,
+		/// preserving as much precision as <see cref="TimeSpan"/> allows.
+		/// </para>
+		/// <para>
+		/// n.b. An <c>NSTimeInterval</c> value is always specified in seconds; it yields
+		/// sub-millisecond precision over a range of 10,000 years.
+		/// </para>
+		/// </summary>
+		/// <remarks>
+		/// Uses <see cref="TimeSpan.FromTicks"/> and not <see cref="TimeSpan.FromTicks"/>
+		/// (which truncates the time value).
+		/// </remarks>
+		[MethodImpl (MethodImplOptions.AggressiveInlining)]
+		static TimeSpan FromNSTimeInterval (double nsTimeInterval)
+		{
+			const double ticksPerSecond = 1e7;
+			return TimeSpan.FromTicks ((long)(nsTimeInterval * ticksPerSecond));
+		}
 	}
 }

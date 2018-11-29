@@ -84,6 +84,8 @@ namespace MonoDevelop.SourceEditor
 		bool writeAllowed;
 		bool writeAccessChecked;
 
+		internal BreakpointStore Breakpoints => breakpoints;
+
 		public ViewContent ViewContent {
 			get {
 				return this;
@@ -199,6 +201,7 @@ namespace MonoDevelop.SourceEditor
 		private SourceEditorView(DocumentAndLoaded doc)
 		{
 			Counters.LoadedEditors++;
+			breakpoints = DebuggingService.Breakpoints;
 
 			widget = new SourceEditorWidget (this, doc.Document);
 			loadedInCtor = doc.Loaded;
@@ -226,7 +229,6 @@ namespace MonoDevelop.SourceEditor
 			TextEditorService.FileExtensionAdded += HandleFileExtensionAdded;
 			TextEditorService.FileExtensionRemoved += HandleFileExtensionRemoved;
 
-			breakpoints = DebuggingService.Breakpoints;
 			DebuggingService.DebugSessionStarted += OnDebugSessionStarted;
 			DebuggingService.StoppedEvent += HandleTargetExited;
 			DebuggingService.ExecutionLocationChanged += OnExecutionLocationChanged;
@@ -802,6 +804,11 @@ namespace MonoDevelop.SourceEditor
 			} catch (UnauthorizedAccessException e) {
 				LoggingService.LogError ("Error while saving file", e);
 				MessageService.ShowError (GettextCatalog.GetString ("Can't save file - access denied"), e.Message);
+				return;
+			} catch (IOException e) {
+				LoggingService.LogError ("Error while saving file", e);
+				MessageService.ShowError (e.Message);
+				return;
 			}
 
 			//			if (encoding != null)
@@ -3379,28 +3386,16 @@ namespace MonoDevelop.SourceEditor
 			widget.QuickTaskStrip.GotoPgDown ();
 		}
 
-		[CommandUpdateHandler (ScrollbarCommand.ShowTasks)]
-		void UpdateShowMap (CommandInfo info)
-		{
-			widget.QuickTaskStrip.UpdateShowMap (info);
-		}
-
-		[CommandHandler (ScrollbarCommand.ShowTasks)]
-		void ShowMap ()
-		{
-			widget.QuickTaskStrip.ShowMap ();
-		}
-
 		[CommandUpdateHandler (ScrollbarCommand.ShowMinimap)]
-		void UpdateShowFull (CommandInfo info)
+		void UpdateShowMinimap (CommandInfo info)
 		{
-			widget.QuickTaskStrip.UpdateShowFull (info);
+			widget.QuickTaskStrip.UpdateShowMinimap (info);
 		}
 
 		[CommandHandler (ScrollbarCommand.ShowMinimap)]
-		void ShowFull ()
+		void ShowShowMinimap ()
 		{
-			widget.QuickTaskStrip.ShowFull ();
+			widget.QuickTaskStrip.ShowShowMinimap ();
 		}
 
 		#endregion

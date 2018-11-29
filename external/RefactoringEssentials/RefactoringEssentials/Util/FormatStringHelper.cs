@@ -30,69 +30,75 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Threading;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace RefactoringEssentials
 {
-    static class FormatStringHelper
-    {
-        static readonly string[] parameterNames = { "format", "frmt", "fmt" };
+	static class FormatStringHelper
+	{
+		static readonly string[] parameterNames = { "format", "frmt", "fmt" };
 
-        public static bool TryGetFormattingParameters(
-            SemanticModel semanticModel,
-            InvocationExpressionSyntax invocationExpression,
-            out ExpressionSyntax formatArgument, out IList<ExpressionSyntax> arguments,
-            Func<IParameterSymbol, ExpressionSyntax, bool> argumentFilter,
-            CancellationToken cancellationToken = default (CancellationToken))
-        {
-            if (semanticModel == null)
-                throw new ArgumentNullException(nameof(semanticModel));
-            if (invocationExpression == null)
-                throw new ArgumentNullException(nameof(invocationExpression));
-            var symbolInfo = semanticModel.GetSymbolInfo(invocationExpression.Expression, cancellationToken);
-            if (argumentFilter == null)
-                argumentFilter = (p, e) => true;
+		public static bool TryGetFormattingParameters(
+			IInvocationOperation invocationExpression,
+			out IArgumentOperation formatArgument, out IList<IArgumentOperation> arguments,
+			Func<IParameterSymbol, IOperation, bool> argumentFilter,
+			CancellationToken cancellationToken = default(CancellationToken))
+		{
+			if (invocationExpression == null)
+				throw new ArgumentNullException(nameof(invocationExpression));
 
-            var symbol = symbolInfo.Symbol;
-            formatArgument = null;
-            arguments = new List<ExpressionSyntax>();
-            var method = symbol as IMethodSymbol;
+			if (argumentFilter == null)
+				argumentFilter = (p, e) => true;
 
-            if (method == null || method.Kind != SymbolKind.Method)
-                return false;
+			formatArgument = null;
+			arguments = new List<IArgumentOperation>();
+			var method = invocationExpression.TargetMethod;
+			if (method == null || method.Kind != SymbolKind.Method)
+				return false;
 
-            // Search for method of type: void Name(string format, params object[] args);
-            var methods = method.ContainingType.GetMembers (method.Name).OfType<IMethodSymbol>();
-            if (!methods.Any(m => m.Parameters.Length == 2 && 
-                             m.Parameters[0].Type.SpecialType == SpecialType.System_String && parameterNames.Contains(m.Parameters[0].Name) && 
-                             m.Parameters[1].IsParams))
-                return false;
+			// Search for method of type: void Name(string format, params object[] args);
+			var methods = method.ContainingType.GetMembers(method.Name).OfType<IMethodSymbol>();
+			if (!methods.Any(m => m.Parameters.Length == 2 &&
+							 m.Parameters[0].Type.SpecialType == SpecialType.System_String && parameterNames.Contains(m.Parameters[0].Name) &&
+							 m.Parameters[1].IsParams))
+				return false;
 
-            // TODO: Handle argument -> parameter mapping.
-            //var argumentToParameterMap = invocationResolveResult.GetArgumentToParameterMap();
-            //var resolvedParameters = invocationResolveResult.Member.Parameters;
-            int i = 0;
-            foreach (var argument in invocationExpression.ArgumentList.Arguments) {
-                var parameterIndex = i++; //argumentToParameterMap[i];
-                if (parameterIndex < 0 || parameterIndex >= method.Parameters.Length) {
-                    // No valid mapping for this argument, skip it
-                    continue;
-                }
-                var parameter = method.Parameters[parameterIndex];
-                if (parameterIndex == 0 && parameter.Type.SpecialType == SpecialType.System_String && parameterNames.Contains(parameter.Name)) {
-                    formatArgument = argument.Expression;
-                } else if (formatArgument != null && parameter.IsParams /*&& !invocationResolveResult.IsExpandedForm*/) {
-                    var ace = argument.Expression as ArrayCreationExpressionSyntax;
-                    if (ace == null || ace.Initializer == null)
-                        return false;
-                    foreach (var element in ace.Initializer.Expressions) {
-                        if (argumentFilter(parameter, element))
-                            arguments.Add(argument.Expression);
-                    }
-                } else if (formatArgument != null && argumentFilter(parameter, argument.Expression)) {
-                    arguments.Add(argument.Expression);
-                }
-            }
-            return formatArgument != null;
-        }
-    }
+			// TODO: Handle argument -> parameter mapping.
+			//var argumentToParameterMap = invocationResolveResult.GetArgumentToParameterMap();
+			//var resolvedParameters = invocationResolveResult.Member.Parameters;
+			int i = 0;
+			foreach (var argument in invocationExpression.Arguments)
+			{
+				var parameterIndex = i++; //argumentToParameterMap[i];
+				if (parameterIndex < 0 || parameterIndex >= method.Parameters.Length)
+				{
+					// No valid mapping for this argument, skip it
+					continue;
+				}
+				var parameter = argument.Parameter;
+				if (parameterIndex == 0 && parameter.Type.SpecialType == SpecialType.System_String && parameterNames.Contains(parameter.Name))
+				{
+					formatArgument = argument;
+				}
+				else if (formatArgument != null && parameter.IsParams /*&& !invocationResolveResult.IsExpandedForm*/)
+				{
+					if (argument.Value is IArrayCreationOperation ace)
+					{
+						foreach (var element in ace.Initializer?.ElementValues)
+						{
+							if (argumentFilter(parameter, element))
+								arguments.Add(argument);
+						}
+					}
+					else
+						return false;
+				}
+				else if (formatArgument != null && argumentFilter(parameter, argument.Value))
+				{
+					arguments.Add(argument);
+				}
+			}
+			return formatArgument != null;
+		}
+	}
 }

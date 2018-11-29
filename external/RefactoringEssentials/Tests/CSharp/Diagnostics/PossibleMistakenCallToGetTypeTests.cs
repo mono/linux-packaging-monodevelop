@@ -32,6 +32,22 @@ public class Bar
         }
 
         [Fact]
+        public void TestGetTypeNonType()
+        {
+            Analyze<PossibleMistakenCallToGetTypeAnalyzer>(@"
+using System;
+
+public class Bar
+{
+    public void FooBar(object a)
+    {
+        Console.WriteLine(a.GetType());
+    }
+}
+");
+        }
+
+        [Fact]
         public void TestStaticCall()
         {
             Analyze<PossibleMistakenCallToGetTypeAnalyzer>(@"

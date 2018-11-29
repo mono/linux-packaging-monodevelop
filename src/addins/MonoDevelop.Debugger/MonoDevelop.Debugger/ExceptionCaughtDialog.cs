@@ -112,12 +112,14 @@ namespace MonoDevelop.Debugger
 }
 widget ""*.exception_help_link_label"" style ""exception-help-link-label""
 ");
-			ExceptionHelpLinkLabel.ModifyBase (StateType.Prelight, new Gdk.Color (119, 130, 140));
 
+			var textColor = Styles.ExceptionCaughtDialog.HeaderTextColor.ToGdkColor ();
+
+			ExceptionHelpLinkLabel.ModifyBase (StateType.Prelight, Styles.ExceptionCaughtDialog.HeaderBackgroundColor.ToGdkColor ());
 			ExceptionHelpLinkLabel.SetLinkHandler ((str) => DesktopService.ShowUrl (str));
-			ExceptionTypeLabel.ModifyFg (StateType.Normal, new Gdk.Color (255, 255, 255));
-			ExceptionMessageLabel.ModifyFg (StateType.Normal, new Gdk.Color (255, 255, 255));
-			ExceptionHelpLinkLabel.ModifyFg (StateType.Normal, new Gdk.Color (255, 255, 255));
+			ExceptionTypeLabel.ModifyFg (StateType.Normal, textColor);
+			ExceptionMessageLabel.ModifyFg (StateType.Normal, textColor);
+			ExceptionHelpLinkLabel.ModifyFg (StateType.Normal, textColor);
 
 			if (Platform.IsWindows) {
 				ExceptionTypeLabel.ModifyFont (Pango.FontDescription.FromString ("bold 19"));
@@ -151,7 +153,7 @@ widget ""*.exception_help_link_label"" style ""exception-help-link-label""
 
 			eventBox.Add (frame);
 			eventBox.ShowAll ();
-			eventBox.ModifyBg (StateType.Normal, new Gdk.Color (119, 130, 140));
+			eventBox.ModifyBg (StateType.Normal, Styles.ExceptionCaughtDialog.HeaderBackgroundColor.ToGdkColor ());
 
 			return eventBox;
 		}
@@ -730,13 +732,13 @@ widget ""*.exception_dialog_expander"" style ""exception-dialog-expander""
 			}
 		}
 
-		protected override bool OnKeyReleaseEvent (Gdk.EventKey evnt)
+		protected override bool OnKeyPressEvent (Gdk.EventKey evnt)
 		{
 			if (evnt.Key == Gdk.Key.Escape) {
 				this.Destroy ();
 				return true;
 			}
-			return base.OnKeyReleaseEvent (evnt);
+			return base.OnKeyPressEvent (evnt);
 		}
 	}
 

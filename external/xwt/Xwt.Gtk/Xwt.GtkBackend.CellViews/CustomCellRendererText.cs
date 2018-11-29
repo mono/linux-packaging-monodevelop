@@ -58,6 +58,8 @@ namespace Xwt.GtkBackend
 					cellRenderer.Attributes = new Pango.AttrList ();
 			}
 			cellRenderer.Editable = view.Editable;
+			if (!cellRenderer.Editable)
+				cellRenderer.Mode = CellRendererMode.Activatable;
 			cellRenderer.Ellipsize = view.Ellipsize.ToGtkValue ();
 		}
 		

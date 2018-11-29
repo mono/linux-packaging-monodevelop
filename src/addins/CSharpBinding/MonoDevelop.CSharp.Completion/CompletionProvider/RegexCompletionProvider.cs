@@ -102,8 +102,7 @@ namespace MonoDevelop.CSharp.Completion.Provider
 						}
 					}
 				} else {
-					var ma = ctx.TargetToken.Parent as MemberAccessExpressionSyntax;
-					if (ma != null) {
+					if (ctx.TargetToken.Parent is MemberAccessExpressionSyntax ma) {
 						var symbolInfo = semanticModel.GetSymbolInfo (ma.Expression);
 						var typeInfo = semanticModel.GetTypeInfo (ma.Expression);
 						var type = typeInfo.Type;
@@ -144,7 +143,7 @@ namespace MonoDevelop.CSharp.Completion.Provider
 						if (targetNode == null)
 							continue;
 						var objectCreation = targetNode.Initializer.Value as ObjectCreationExpressionSyntax;
-						if (objectCreation == null)
+						if (objectCreation == null || objectCreation.ArgumentList.OpenParenToken.IsMissing)
 							continue;
 						var targetNodeSymbol = ctx.SemanticModel.GetSymbolInfo (objectCreation).Symbol;
 						if (IsRegexType (targetNodeSymbol.ContainingType)) {
@@ -173,7 +172,7 @@ namespace MonoDevelop.CSharp.Completion.Provider
 			}
 		}
 
-		static readonly CompletionItem [] formatItems =  {
+		static readonly CompletionItem [] verbatimFormatItems =  {
 			FormatItemCompletionProvider.CreateCompletionItem("d", "Digit character", null),
 			FormatItemCompletionProvider.CreateCompletionItem("D", "Non-digit character", null),
 			FormatItemCompletionProvider.CreateCompletionItem("b", "Word boundary", null),
@@ -189,7 +188,7 @@ namespace MonoDevelop.CSharp.Completion.Provider
 			FormatItemCompletionProvider.CreateCompletionItem("p{name}", "Unicode category or unicode block", null)
 		};
 
-		static readonly CompletionItem [] verbatimFormatItems =  {
+		static readonly CompletionItem [] formatItems =  {
 			FormatItemCompletionProvider.CreateCompletionItem("\\d", "Digit character", null),
 			FormatItemCompletionProvider.CreateCompletionItem("\\D", "Non-digit character", null),
 			FormatItemCompletionProvider.CreateCompletionItem("\\b", "Word boundary", null),

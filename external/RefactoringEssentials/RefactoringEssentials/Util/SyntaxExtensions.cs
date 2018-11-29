@@ -496,16 +496,15 @@ namespace RefactoringEssentials
         {
             if (member == null)
                 throw new ArgumentNullException("member");
-            var method = member as BaseMethodDeclarationSyntax;
-            if (method != null)
-                return method.Modifiers;
-            var property = member as BasePropertyDeclarationSyntax;
-            if (property != null)
-                return property.Modifiers;
-            var field = member as BaseFieldDeclarationSyntax;
-            if (field != null)
-                return field.Modifiers;
-            return new SyntaxTokenList();
+			if (member is BaseMethodDeclarationSyntax method)
+				return method.Modifiers;
+			if (member is BasePropertyDeclarationSyntax property)
+				return property.Modifiers;
+			if (member is BaseFieldDeclarationSyntax field)
+				return field.Modifiers;
+			if (member is DelegateDeclarationSyntax del)
+				return del.Modifiers;
+			return new SyntaxTokenList();
         }
 
         public static ExplicitInterfaceSpecifierSyntax GetExplicitInterfaceSpecifierSyntax(this MemberDeclarationSyntax member)

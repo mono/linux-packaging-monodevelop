@@ -277,12 +277,7 @@ class TestClass
     private void TestMethod()
     {
         var test = a => a * 2;
-        var test2 = (a, b) =>
-        {
-            if (b > 0)
-                return a / b;
-            return 0;
-        };
+        var test2 = (a, b) => { if (b > 0) return a / b; return 0; };
         var test3 = (a, b) => a % b;
         test(3);
     }

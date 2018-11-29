@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
@@ -25,37 +26,29 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         {
             context.EnableConcurrentExecution();
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterSyntaxNodeAction(
-                (nodeContext) =>
-                {
-                    Diagnostic diagnostic;
-                    if (TryGetDiagnostic(nodeContext, out diagnostic))
-                        nodeContext.ReportDiagnostic(diagnostic);
-                },
-                SyntaxKind.InvocationExpression
-            );
-        }
+			context.RegisterCompilationStartAction(compilationContext =>
+			{
+				var systemType = compilationContext.Compilation.GetTypeByMetadataName("System.Type");
+				if (systemType == null)
+					return;
 
-        static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
-        {
-            diagnostic = default(Diagnostic);
-            var node = nodeContext.Node as InvocationExpressionSyntax;
-            var memberExpr = node.Expression as MemberAccessExpressionSyntax;
-            if (memberExpr == null || memberExpr.Name.Identifier.ValueText != "GetType")
-                return false;
-            var methodSymbol = nodeContext.SemanticModel.GetSymbolInfo(memberExpr);
-            if (methodSymbol.Symbol == null || !IsSystemType(methodSymbol.Symbol.ContainingType) || methodSymbol.Symbol.IsStatic)
-                return false;
-            diagnostic = Diagnostic.Create(
-                descriptor,
-                node.GetLocation()
-            );
-            return true;
-        }
+				compilationContext.RegisterOperationAction(
+					(nodeContext) =>
+					{
+						var invoke = (IInvocationOperation)nodeContext.Operation;
+						var method = invoke.TargetMethod;
 
-        static bool IsSystemType(INamedTypeSymbol type)
-        {
-            return type.Name == "Type" && type.ContainingNamespace.ToDisplayString() == "System";
+						if (method.IsStatic || method.Name != "GetType" || method.ContainingType != systemType)
+							return;
+
+						nodeContext.ReportDiagnostic(Diagnostic.Create(
+							descriptor,
+							invoke.Syntax.GetLocation ()
+						));
+					},
+					OperationKind.Invocation
+				);
+			});
         }
     }
 }

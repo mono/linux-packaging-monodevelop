@@ -51,6 +51,39 @@ namespace MonoDevelop.DotNetCore
 		public DotNetCoreProjectExtension ()
 		{
 			DotNetCoreProjectReloadMonitor.Initialize ();
+			if (IsDotNetCoreSdk22Installed ())
+				DotNetProjectProxy.ModifyImplicitPackageReferenceVersion = ModifyImplicitPackageReference;
+		}
+
+		static bool IsDotNetCoreSdk22Installed ()
+		{
+			return DotNetCoreSdk.Versions.Any (version => version.Major == 2 && version.Minor == 2);
+		}
+
+		/// <summary>
+		/// HACK: Handle implicit package versions defined by .NET Core 2.2 SDK.
+		/// </summary>
+		static void ModifyImplicitPackageReference (ProjectPackageReference packageReference, DotNetProject project)
+		{
+			bool targetLatestRuntimePatch = project.MSBuildProject.EvaluatedProperties.GetValue ("TargetLatestRuntimePatch", false);
+			string targetFrameworkVersion = project.TargetFramework.Id.Version;
+
+			foreach (IMSBuildItemEvaluated item in project.MSBuildProject.EvaluatedItems) {
+				if (!IsImplicitPackageReferenceMatch (item, packageReference, targetFrameworkVersion))
+					continue;
+
+				string versionProperty = targetLatestRuntimePatch ? "LatestVersion" : "DefaultVersion";
+				string version = item.Metadata.GetValue (versionProperty) ?? string.Empty;
+				packageReference.Metadata.SetValue ("Version", version);
+				return;
+			}
+		}
+
+		static bool IsImplicitPackageReferenceMatch (IMSBuildItemEvaluated item, ProjectPackageReference packageReference, string targetFrameworkVersion)
+		{
+			return item.Name == "ImplicitPackageReferenceVersion" &&
+				StringComparer.OrdinalIgnoreCase.Equals (item.Include, packageReference.Include) &&
+				targetFrameworkVersion == item.Metadata.GetValue ("TargetFrameworkVersion");
 		}
 
 		protected override bool SupportsObject (WorkspaceObject item)
@@ -78,7 +111,7 @@ namespace MonoDevelop.DotNetCore
 		/// </summary>
 		bool IsSdkProject (DotNetProject project)
 		{
-			return project.MSBuildProject.Sdk != null;
+			return project.MSBuildProject.GetReferencedSDKs ().Any ();
 		}
 
 		protected override bool OnGetCanReferenceProject (DotNetProject targetProject, out string reason)
@@ -227,6 +260,7 @@ namespace MonoDevelop.DotNetCore
 
 				using (var dialog = new DotNetCoreNotInstalledDialog ()) {
 					dialog.IsUnsupportedVersion = unsupportedSdkVersion;
+					dialog.RequiresDotNetCore22 = Project.TargetFramework.IsNetCoreApp22 ();
 					dialog.RequiresDotNetCore21 = Project.TargetFramework.IsNetCoreApp21 ();
 					dialog.RequiresDotNetCore20 = Project.TargetFramework.IsNetStandard20OrNetCore20 ();
 					dialog.Show ();
@@ -400,6 +434,8 @@ namespace MonoDevelop.DotNetCore
 				return GettextCatalog.GetString (".NET Core 2.0 SDK is not installed. This is required to build .NET Core 2.0 projects. {0}", DotNetCoreNotInstalledDialog.DotNetCore20DownloadUrl);
 			else if (targetFramework.IsNetCoreApp21 ())
 				return GettextCatalog.GetString (".NET Core 2.1 SDK is not installed. This is required to build .NET Core 2.1 projects. {0}", DotNetCoreNotInstalledDialog.DotNetCore21DownloadUrl);
+			else if (targetFramework.IsNetCoreApp22 ())
+				return GettextCatalog.GetString (".NET Core 2.2 SDK is not installed. This is required to build .NET Core 2.2 projects. {0}", DotNetCoreNotInstalledDialog.DotNetCore22DownloadUrl);
 
 			return GettextCatalog.GetString (".NET Core SDK is not installed. This is required to build .NET Core projects. {0}", DotNetCoreNotInstalledDialog.DotNetCoreDownloadUrl);
 		}
@@ -416,7 +452,7 @@ namespace MonoDevelop.DotNetCore
 
 		protected bool IsWebProject (DotNetProject project)
 		{
-			return (project.MSBuildProject.Sdk?.IndexOf ("Microsoft.NET.Sdk.Web", System.StringComparison.OrdinalIgnoreCase) ?? -1) != -1;
+			return (project.MSBuildProject.GetReferencedSDKs ().FirstOrDefault (x => x.IndexOf ("Microsoft.NET.Sdk.Web", StringComparison.OrdinalIgnoreCase) != -1) != null);
 		}
 
 		public bool IsWeb {
