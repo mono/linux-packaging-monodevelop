@@ -218,8 +218,8 @@ namespace MonoDevelop.Ide.BuildOutputView
 
 			metadata.Verbosity = showDiagnostics ? MSBuildVerbosity.Diagnostic : MSBuildVerbosity.Normal;
 			metadata.BuildCount = projects.Count;
- 			metadata.OnDiskSize = projects.Sum (x => new FileInfo (x.FileName).Length);
- 			metadata.RootNodesCount = projects.Sum (x => x.RootNodes.Count);
+			metadata.OnDiskSize = projects.Sum (x => new FileInfo (x.FileName).Length);
+			metadata.RootNodesCount = projects.Sum (x => x.RootNodes.Count);
 		}
 
 		bool disposed = false;

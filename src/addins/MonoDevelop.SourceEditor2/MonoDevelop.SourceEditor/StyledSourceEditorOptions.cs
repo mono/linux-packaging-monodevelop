@@ -228,7 +228,7 @@ namespace MonoDevelop.SourceEditor
 
 		public override bool EnableQuickDiff {
 			get {
-				return DefaultSourceEditorOptions.Instance.EnableQuickDiff;
+				return optionsCore.EnableQuickDiff;
 			}
 			set {
 				throw new NotSupportedException ();
@@ -289,18 +289,18 @@ namespace MonoDevelop.SourceEditor
 			}
 		}
 
-		public override Mono.TextEditor.ShowWhitespaces ShowWhitespaces {
+		public override ShowWhitespaces ShowWhitespaces {
 			get {
-				return (Mono.TextEditor.ShowWhitespaces)optionsCore.ShowWhitespaces;
+				return optionsCore.ShowWhitespaces;
 			}
 			set {
 				throw new NotSupportedException ();
 			}
 		}
 
-		public override Mono.TextEditor.IncludeWhitespaces IncludeWhitespaces {
+		public override IncludeWhitespaces IncludeWhitespaces {
 			get {
-				return (Mono.TextEditor.IncludeWhitespaces)optionsCore.IncludeWhitespaces;
+				return optionsCore.IncludeWhitespaces;
 			}
 			set {
 				throw new NotSupportedException ();

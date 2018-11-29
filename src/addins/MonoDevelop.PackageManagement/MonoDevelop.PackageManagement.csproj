@@ -1,54 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
   <Import Project="..\..\..\MonoDevelop.props" />
   <PropertyGroup>
     <ProjectGuid>{F218643D-2E74-4309-820E-206A54B7133F}</ProjectGuid>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <OutputType>Library</OutputType>
-    <RootNamespace>MonoDevelop.PackageManagement</RootNamespace>
-    <AssemblyName>MonoDevelop.PackageManagement</AssemblyName>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
-    <NoStdLib>False</NoStdLib>
-    <WarningLevel>4</WarningLevel>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <ProductVersion>8.0.30703</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Platform)' == 'AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <RegisterForComInterop>False</RegisterForComInterop>
-    <GenerateSerializationAssemblies>Auto</GenerateSerializationAssemblies>
-    <BaseAddress>4194304</BaseAddress>
-    <FileAlignment>4096</FileAlignment>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-    <OutputPath>..\..\bin</OutputPath>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>Full</DebugType>
-    <Optimize>False</Optimize>
+    <TargetFrameworkVersion>$(MDFrameworkVersion)</TargetFrameworkVersion>
     <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-    <OutputPath>..\..\bin</OutputPath>
-    <DebugSymbols>false</DebugSymbols>
-    <DebugType>None</DebugType>
-    <Optimize>True</Optimize>
-    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
     <DefineConstants>TRACE</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <OutputPath>..\..\..\build\AddIns\MonoDevelop.PackageManagement</OutputPath>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <OutputPath>..\..\..\build\AddIns\MonoDevelop.PackageManagement</OutputPath>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>pdbonly</DebugType>
-    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
-  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' " />
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' " />
   <ItemGroup>
     <Reference Include="pango-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f" />
     <Reference Include="System" />
@@ -62,60 +24,65 @@
     <Reference Include="Mono.Cairo" />
     <Reference Include="System.Security" />
     <Reference Include="Microsoft.Web.XmlTransform">
-      <HintPath>..\..\..\external\nuget-binary\Microsoft.Web.XmlTransform.dll</HintPath>
+      <HintPath>..\..\..\packages\Microsoft.Web.Xdt.2.1.2\lib\net40\Microsoft.Web.XmlTransform.dll</HintPath>
     </Reference>
     <Reference Include="NuGet.Versioning">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Versioning.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Versioning.4.7.0\lib\net46\NuGet.Versioning.dll</HintPath>
     </Reference>
-    <Reference Include="mscorlib" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="NuGet.LibraryModel">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.LibraryModel.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.LibraryModel.4.7.0\lib\net46\NuGet.LibraryModel.dll</HintPath>
     </Reference>
     <Reference Include="NuGet.Frameworks">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Frameworks.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Frameworks.4.7.0\lib\net46\NuGet.Frameworks.dll</HintPath>
     </Reference>
     <Reference Include="NuGet.Packaging.Core">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Packaging.Core.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Packaging.Core.4.7.0\lib\net46\NuGet.Packaging.Core.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression">
+      <HintPath>..\..\..\packages\System.IO.Compression.4.3.0\lib\net46\System.IO.Compression.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="NuGet.Packaging">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Packaging.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Packaging.4.7.0\lib\net46\NuGet.Packaging.dll</HintPath>
     </Reference>
     <Reference Include="NuGet.Configuration">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Configuration.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Configuration.4.7.0\lib\net46\NuGet.Configuration.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Http" />
     <Reference Include="System.IdentityModel" />
     <Reference Include="System.Net.Http.WebRequest" />
     <Reference Include="System.ServiceModel" />
     <Reference Include="NuGet.DependencyResolver.Core">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.DependencyResolver.Core.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.DependencyResolver.Core.4.7.0\lib\net46\NuGet.DependencyResolver.Core.dll</HintPath>
     </Reference>
     <Reference Include="NuGet.ProjectModel">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.ProjectModel.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.ProjectModel.4.7.0\lib\net46\NuGet.ProjectModel.dll</HintPath>
     </Reference>
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="NuGet.Commands">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Commands.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Commands.4.7.0\lib\net46\NuGet.Commands.dll</HintPath>
     </Reference>
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="WindowsBase" />
     <Reference Include="NuGet.Resolver">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Resolver.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Resolver.4.7.0\lib\net46\NuGet.Resolver.dll</HintPath>
     </Reference>
     <Reference Include="NuGet.PackageManagement">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.PackageManagement.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.PackageManagement.4.7.0\lib\net46\NuGet.PackageManagement.dll</HintPath>
     </Reference>
     <Reference Include="NuGet.Common">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Common.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Common.4.7.0\lib\net46\NuGet.Common.dll</HintPath>
     </Reference>
     <Reference Include="NuGet.Protocol">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Protocol.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Protocol.4.7.0\lib\net46\NuGet.Protocol.dll</HintPath>
     </Reference>
     <Reference Include="NuGet.Indexing">
-      <HintPath>..\..\..\external\nuget-binary\NuGet.Indexing.dll</HintPath>
+      <HintPath>..\..\..\packages\NuGet.Indexing.4.7.0\lib\net46\NuGet.Indexing.dll</HintPath>
+    </Reference>
+    <Reference Include="NuGet.Credentials">
+      <HintPath>..\..\..\packages\NuGet.Credentials.4.7.0\lib\net46\NuGet.Credentials.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\..\..\packages\Newtonsoft.Json.10.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
@@ -126,8 +93,11 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="System.ValueTuple">
-      <HintPath>..\..\..\packages\System.ValueTuple.4.4.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
+      <HintPath>..\..\..\packages\System.ValueTuple.4.4.0\lib\net47\System.ValueTuple.dll</HintPath>
       <Private>False</Private>
+    </Reference>
+    <Reference Include="Lucene.Net">
+      <HintPath>..\..\..\packages\Lucene.Net.3.0.3\lib\NET40\Lucene.Net.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -374,11 +344,6 @@
     <Compile Include="MonoDevelop.PackageManagement\GlobalNuGetConfigFilePath.cs" />
     <Compile Include="MonoDevelop.PackageManagement\NuGetConfigFileChangedMonitor.cs" />
     <Compile Include="NuGet.Credentials\CredentialService.cs" />
-    <Compile Include="NuGet.Credentials\ICredentialProvider.cs" />
-    <Compile Include="NuGet.Credentials\CredentialResponse.cs" />
-    <Compile Include="NuGet.Credentials\CredentialStatus.cs" />
-    <Compile Include="NuGet.Credentials\ProviderException.cs" />
-    <Compile Include="NuGet.Credentials\DefaultCredentialsCredentialProvider.cs" />
     <Compile Include="MonoDevelop.PackageManagement\IPackageFilesReader.cs" />
     <Compile Include="MonoDevelop.PackageManagement\PackageFilesReader.cs" />
     <Compile Include="MonoDevelop.PackageManagement\IPackageCompatibilityNuGetProject.cs" />
@@ -414,155 +379,57 @@
     <Compile Include="Gui\MonoDevelop.PackageManagement.PackageSourcesWidget.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="MonoDevelop.PackageManagement.addin.xml">
-      <LogicalName>MonoDevelop.PackageManagement.addin.xml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-source-32.png">
-      <LogicalName>package-source-32.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-source-32%402x.png">
-      <LogicalName>package-source-32@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-source-32~dark.png">
-      <LogicalName>package-source-32~dark.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-source-32~dark%402x.png">
-      <LogicalName>package-source-32~dark@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-source-32~sel.png">
-      <LogicalName>package-source-32~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-source-32~sel%402x.png">
-      <LogicalName>package-source-32~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-source-32~dark~sel.png">
-      <LogicalName>package-source-32~dark~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-source-32~dark~sel%402x.png">
-      <LogicalName>package-source-32~dark~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-16.png">
-      <LogicalName>prefs-package-16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-16%402x.png">
-      <LogicalName>prefs-package-16@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-16~dark.png">
-      <LogicalName>prefs-package-16~dark.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-16~dark%402x.png">
-      <LogicalName>prefs-package-16~dark@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-16~sel.png">
-      <LogicalName>prefs-package-16~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-16~sel%402x.png">
-      <LogicalName>prefs-package-16~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-16~dark~sel.png">
-      <LogicalName>prefs-package-16~dark~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-16~dark~sel%402x.png">
-      <LogicalName>prefs-package-16~dark~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-source-16.png">
-      <LogicalName>prefs-package-source-16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-source-16%402x.png">
-      <LogicalName>prefs-package-source-16@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-source-16~dark.png">
-      <LogicalName>prefs-package-source-16~dark.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-source-16~dark%402x.png">
-      <LogicalName>prefs-package-source-16~dark@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-source-16~sel.png">
-      <LogicalName>prefs-package-source-16~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-source-16~sel%402x.png">
-      <LogicalName>prefs-package-source-16~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-source-16~dark~sel.png">
-      <LogicalName>prefs-package-source-16~dark~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\prefs-package-source-16~dark~sel%402x.png">
-      <LogicalName>prefs-package-source-16~dark~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\framework-16.png">
-      <LogicalName>framework-16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\framework-16%402x.png">
-      <LogicalName>framework-16@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\framework-16~dark.png">
-      <LogicalName>framework-16~dark.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\framework-16~dark%402x.png">
-      <LogicalName>framework-16~dark@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\framework-16~dark~sel.png">
-      <LogicalName>framework-16~dark~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\framework-16~dark~sel%402x.png">
-      <LogicalName>framework-16~dark~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\framework-16~sel.png">
-      <LogicalName>framework-16~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\framework-16~sel%402x.png">
-      <LogicalName>framework-16~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\nuget-16.png">
-      <LogicalName>nuget-16.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\nuget-16%402x.png">
-      <LogicalName>nuget-16@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\nuget-16~dark.png">
-      <LogicalName>nuget-16~dark.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\nuget-16~dark%402x.png">
-      <LogicalName>nuget-16~dark@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\nuget-16~dark~sel.png">
-      <LogicalName>nuget-16~dark~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\nuget-16~dark~sel%402x.png">
-      <LogicalName>nuget-16~dark~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\nuget-16~sel.png">
-      <LogicalName>nuget-16~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\nuget-16~sel%402x.png">
-      <LogicalName>nuget-16~sel@2x.png</LogicalName>
-    </EmbeddedResource>
+    <EmbeddedResource Include="MonoDevelop.PackageManagement.addin.xml" />
+    <EmbeddedResource Include="icons\package-source-32.png" />
+    <EmbeddedResource Include="icons\package-source-32%402x.png" />
+    <EmbeddedResource Include="icons\package-source-32~dark.png" />
+    <EmbeddedResource Include="icons\package-source-32~dark%402x.png" />
+    <EmbeddedResource Include="icons\package-source-32~sel.png" />
+    <EmbeddedResource Include="icons\package-source-32~sel%402x.png" />
+    <EmbeddedResource Include="icons\package-source-32~dark~sel.png" />
+    <EmbeddedResource Include="icons\package-source-32~dark~sel%402x.png" />
+    <EmbeddedResource Include="icons\prefs-package-16.png" />
+    <EmbeddedResource Include="icons\prefs-package-16%402x.png" />
+    <EmbeddedResource Include="icons\prefs-package-16~dark.png" />
+    <EmbeddedResource Include="icons\prefs-package-16~dark%402x.png" />
+    <EmbeddedResource Include="icons\prefs-package-16~sel.png" />
+    <EmbeddedResource Include="icons\prefs-package-16~sel%402x.png" />
+    <EmbeddedResource Include="icons\prefs-package-16~dark~sel.png" />
+    <EmbeddedResource Include="icons\prefs-package-16~dark~sel%402x.png" />
+    <EmbeddedResource Include="icons\prefs-package-source-16.png" />
+    <EmbeddedResource Include="icons\prefs-package-source-16%402x.png" />
+    <EmbeddedResource Include="icons\prefs-package-source-16~dark.png" />
+    <EmbeddedResource Include="icons\prefs-package-source-16~dark%402x.png" />
+    <EmbeddedResource Include="icons\prefs-package-source-16~sel.png" />
+    <EmbeddedResource Include="icons\prefs-package-source-16~sel%402x.png" />
+    <EmbeddedResource Include="icons\prefs-package-source-16~dark~sel.png" />
+    <EmbeddedResource Include="icons\prefs-package-source-16~dark~sel%402x.png" />
+    <EmbeddedResource Include="icons\framework-16.png" />
+    <EmbeddedResource Include="icons\framework-16%402x.png" />
+    <EmbeddedResource Include="icons\framework-16~dark.png" />
+    <EmbeddedResource Include="icons\framework-16~dark%402x.png" />
+    <EmbeddedResource Include="icons\framework-16~dark~sel.png" />
+    <EmbeddedResource Include="icons\framework-16~dark~sel%402x.png" />
+    <EmbeddedResource Include="icons\framework-16~sel.png" />
+    <EmbeddedResource Include="icons\framework-16~sel%402x.png" />
+    <EmbeddedResource Include="icons\nuget-16.png" />
+    <EmbeddedResource Include="icons\nuget-16%402x.png" />
+    <EmbeddedResource Include="icons\nuget-16~dark.png" />
+    <EmbeddedResource Include="icons\nuget-16~dark%402x.png" />
+    <EmbeddedResource Include="icons\nuget-16~dark~sel.png" />
+    <EmbeddedResource Include="icons\nuget-16~dark~sel%402x.png" />
+    <EmbeddedResource Include="icons\nuget-16~sel.png" />
+    <EmbeddedResource Include="icons\nuget-16~sel%402x.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="icons\package-48.png">
-      <LogicalName>package-48.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-48%402x.png">
-      <LogicalName>package-48@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-48~dark.png">
-      <LogicalName>package-48~dark.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-48~dark%402x.png">
-      <LogicalName>package-48~dark@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-48~sel.png">
-      <LogicalName>package-48~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-48~sel%402x.png">
-      <LogicalName>package-48~sel@2x.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-48~dark~sel.png">
-      <LogicalName>package-48~dark~sel.png</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="icons\package-48~dark~sel%402x.png">
-      <LogicalName>package-48~dark~sel@2x.png</LogicalName>
-    </EmbeddedResource>
+    <EmbeddedResource Include="icons\package-48.png" />
+    <EmbeddedResource Include="icons\package-48%402x.png" />
+    <EmbeddedResource Include="icons\package-48~dark.png" />
+    <EmbeddedResource Include="icons\package-48~dark%402x.png" />
+    <EmbeddedResource Include="icons\package-48~sel.png" />
+    <EmbeddedResource Include="icons\package-48~sel%402x.png" />
+    <EmbeddedResource Include="icons\package-48~dark~sel.png" />
+    <EmbeddedResource Include="icons\package-48~dark~sel%402x.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\core\MonoDevelop.Core\MonoDevelop.Core.csproj">
@@ -602,10 +469,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="MonoDevelop.PackageManagement.NodeBuilders\" />
-    <Folder Include="NuGet.PackageManagement.UI\" />
-    <Folder Include="NuGet.Commands\" />
-    <Folder Include="Gui\" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\external\nuget-binary\NuGet-LICENSE.txt">

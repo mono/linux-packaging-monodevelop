@@ -98,7 +98,6 @@ namespace MonoDevelop.CSharp.OptionProvider
 
 			public bool TryGetDocumentOption (OptionKey option, OptionSet underlyingOptions, out object value)
 			{
-
 				if (codingConventionsSnapshot != null) {
 					var editorConfigPersistence = option.Option.StorageLocations.OfType<IEditorConfigStorageLocation> ().SingleOrDefault ();
 					if (editorConfigPersistence != null) {
@@ -114,7 +113,6 @@ namespace MonoDevelop.CSharp.OptionProvider
 				}
 
 				var result = optionSet.GetOption (option);
-
 				if (result == underlyingOptions.GetOption (option)) {
 					value = null;
 					return false;

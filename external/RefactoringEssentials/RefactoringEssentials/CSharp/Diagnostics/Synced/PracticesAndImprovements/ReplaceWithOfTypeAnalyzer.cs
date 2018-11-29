@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
@@ -25,65 +26,90 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         {
             context.EnableConcurrentExecution();
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterSyntaxNodeAction(
-                (nodeContext) =>
-                {
-                    Diagnostic diagnostic;
-                    if (TryGetDiagnostic(nodeContext, out diagnostic))
-                        nodeContext.ReportDiagnostic(diagnostic);
-                },
-                SyntaxKind.InvocationExpression
-            );
-        }
+			context.RegisterCompilationStartAction(compilationContext =>
+			{
+				var compilation = compilationContext.Compilation;
 
-        static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
-        {
-            diagnostic = default(Diagnostic);
-            var node = nodeContext.Node as InvocationExpressionSyntax;
+				var enumerableType = compilation.GetTypeByMetadataName("System.Linq.Enumerable");
+				var queryableType = compilation.GetTypeByMetadataName("System.Linq.Queryable");
+				var parallelEnumerableType = compilation.GetTypeByMetadataName("System.Linq.ParallelEnumerable");
+				if (enumerableType == null || queryableType == null || parallelEnumerableType == null)
+					return;
 
-            ExpressionSyntax target;
-            TypeSyntax type;
-            if (!MatchWhereSelect(node, out target, out type))
-                return false;
+				compilationContext.RegisterOperationAction(nodeContext =>
+				{
+					var selectInvoke = (IInvocationOperation)nodeContext.Operation;
+					var selectMethod = selectInvoke.TargetMethod;
+					if (!IsLinqExtension(selectMethod) || selectMethod.Name != "Select")
+						return;
 
-            diagnostic = Diagnostic.Create(
-                descriptor,
-                node.GetLocation()
-            );
-            return true;
-        }
+					if (!(selectInvoke.Arguments[0].Value is IInvocationOperation whereInvoke))
+						return;
 
-        //		internal static readonly AstNode wherePatternCase1 =
-        //			new InvocationExpression(
-        //				new MemberReferenceExpression(
-        //					new InvocationExpression(
-        //						new MemberReferenceExpression(new AnyNode("target"), "Where"),
-        //						new LambdaExpression {
-        //							Parameters = { PatternHelper.NamedParameter ("param1", PatternHelper.AnyType ("paramType", true), Pattern.AnyString) },
-        //							Body = PatternHelper.OptionalParentheses (new IsExpression(new AnyNode("expr1"), new AnyNode("type")))
-        //						}
-        //					), "Select"),
-        //				new LambdaExpression {
-        //					Parameters = { PatternHelper.NamedParameter ("param2", PatternHelper.AnyType ("paramType", true), Pattern.AnyString) },
-        //					Body = PatternHelper.OptionalParentheses (new AsExpression(PatternHelper.OptionalParentheses (new AnyNode("expr2")), new Backreference("type")))
-        //				}
-        //		);
-        //
-        //		internal static readonly AstNode wherePatternCase2 =
-        //			new InvocationExpression(
-        //				new MemberReferenceExpression(
-        //					new InvocationExpression(
-        //						new MemberReferenceExpression(new AnyNode("target"), "Where"),
-        //						new LambdaExpression {
-        //							Parameters = { PatternHelper.NamedParameter ("param1", PatternHelper.AnyType ("paramType", true), Pattern.AnyString) },
-        //							Body = PatternHelper.OptionalParentheses (new IsExpression(PatternHelper.OptionalParentheses (new AnyNode("expr1")), new AnyNode("type")))
-        //						}
-        //					), "Select"),
-        //				new LambdaExpression {
-        //					Parameters = { PatternHelper.NamedParameter ("param2", PatternHelper.AnyType ("paramType", true), Pattern.AnyString) },
-        //					Body = PatternHelper.OptionalParentheses (new CastExpression(new Backreference("type"), PatternHelper.OptionalParentheses (new AnyNode("expr2"))))
-        //				}
-        //		);
+					if (selectInvoke.Arguments.Length != 2 || whereInvoke.Arguments.Length != 2)
+						return;
+
+					var whereMethod = whereInvoke.TargetMethod;
+					if (!IsLinqExtension(whereMethod) || whereMethod.Name != "Where")
+						return;
+
+					if (!ReplaceWithOfTypeLinqAnalyzer.TryGetLambdaFromArgument(selectInvoke, out var selectLambda) ||
+						!ReplaceWithOfTypeLinqAnalyzer.TryGetLambdaFromArgument(whereInvoke, out var whereLambda))
+						return;
+
+					// Check that this is a simple cast
+					if (!ReplaceWithOfTypeLinqAnalyzer.TryGetSingleReturnValue<IConversionOperation>(selectLambda, out var selectConversion) ||
+						!(selectConversion.Operand is IParameterReferenceOperation selectParameter) ||
+						selectParameter.Parameter != selectLambda.Symbol.Parameters[0])
+						return;
+
+					// Check that this is an is check
+					if (!ReplaceWithOfTypeLinqAnalyzer.TryGetSingleReturnValue<IIsTypeOperation>(whereLambda, out var whereIsType) ||
+						!(whereIsType.ValueOperand is IParameterReferenceOperation whereParameter) ||
+						whereParameter.Parameter != whereLambda.Symbol.Parameters[0])
+						return;
+
+					if (selectConversion.Type != whereIsType.TypeOperand)
+						return;
+
+					nodeContext.ReportDiagnostic(
+						Diagnostic.Create(
+							descriptor,
+							selectInvoke.Syntax.GetLocation()
+						)
+					);
+				},
+					OperationKind.Invocation
+				);
+
+				bool IsAnyAParameterNullCheck(IOperation operation, IParameterSymbol parameter)
+				{
+					if (!(operation is IBinaryOperation binaryOperation))
+						return false;
+
+					if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalAnd)
+						return IsAnyAParameterNullCheck(binaryOperation.LeftOperand, parameter) || IsAnyAParameterNullCheck(binaryOperation.RightOperand, parameter);
+
+					return binaryOperation.OperatorKind == BinaryOperatorKind.NotEquals &&
+						(IsParameterReference(binaryOperation.LeftOperand, parameter) || IsParameterReference(binaryOperation.RightOperand, parameter));
+				}
+
+				bool IsParameterReference(IOperation operation, IParameterSymbol symbol)
+				{
+					if (operation is IConversionOperation conversion)
+						operation = conversion.Operand;
+
+					return operation is IParameterReferenceOperation parameterReference && parameterReference.Parameter == symbol;
+				}
+
+				bool IsLinqExtension(IMethodSymbol symbol)
+				{
+					var methodType = symbol.ContainingType;
+					return methodType == enumerableType || methodType == queryableType || methodType == parallelEnumerableType;
+				}
+			});
+		}
+
         static bool MatchWhereSelect(InvocationExpressionSyntax selectInvoke, out ExpressionSyntax target, out TypeSyntax type)
         {
             target = null;

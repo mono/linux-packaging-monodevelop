@@ -8,7 +8,7 @@ using System.Linq;
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
-    public class ParameterOnlyAssignedAnalyzer : VariableOnlyAssignedAnalyzer
+    public class ParameterOnlyAssignedAnalyzer : DiagnosticAnalyzer
     {
         private static readonly DiagnosticDescriptor descriptor = new DiagnosticDescriptor(
             CSharpDiagnosticIDs.ParameterOnlyAssignedAnalyzerID,

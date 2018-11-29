@@ -315,5 +315,19 @@ abstract class Test
 "
             );
         }
+
+
+
+        /// <summary>
+        /// ToAbstractVirtualNonVirtualConversionCodeRefactoringProvider fails and gets disabled #5765
+        /// </summary>
+        [Fact]
+        public void TestIssue5765()
+        {
+            var actions = GetActions<ToAbstractVirtualNonVirtualConversionCodeRefactoringProvider>(
+                                      @"using System;
+public delegate bool $FileServiceErrorHandler (string message, Exception ex);
+");
+        }
     }
 }

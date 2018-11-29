@@ -38,6 +38,7 @@ using MonoDevelop.Ide.Editor;
 using MonoDevelop.Ide.Editor.Extension;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
+using MonoDevelop.Components;
 
 namespace MonoDevelop.SourceEditor.QuickTasks
 {
@@ -122,8 +123,11 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 			}
 		}
 
-		public QuickTaskStrip ()
+		internal SourceEditorView SourceEditorView { get; private set; }
+
+		public QuickTaskStrip (SourceEditorView parentView)
 		{
+			SourceEditorView = parentView ?? throw new ArgumentNullException (nameof (parentView));
 			ScrollBarMode = PropertyService.Get ("ScrollBar.Mode", ScrollBarMode.Overview);
 			PropertyService.AddPropertyHandler ("ScrollBar.Mode", ScrollBarModeChanged);
 			EnableFancyFeatures.Changed += HandleChanged;
@@ -188,6 +192,12 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 			providerTasks = null;
 			PropertyService.RemovePropertyHandler ("ScrollBar.Mode", ScrollBarModeChanged);
 			EnableFancyFeatures.Changed -= HandleChanged;
+
+			if (updateAccessibilityId != 0) {
+				GLib.Source.Remove (updateAccessibilityId);
+				updateAccessibilityId = 0;
+			}
+
 			base.OnDestroyed ();
 		}
 
@@ -197,15 +207,35 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 			this.ScrollBarMode = newMode;
 		}
 
+
+		uint updateAccessibilityId = 0;
 		void UpdateAccessibility ()
 		{
+			if (!IdeTheme.AccessibilityEnabled) {
+				return;
+			}
+
+			// If a timer is already scheduled then ignore this update
+			if (updateAccessibilityId != 0) {
+				return;
+			}
+
+			updateAccessibilityId = GLib.Timeout.Add (5000, UpdateAccessibilityTimer);
+		}
+
+
+		bool UpdateAccessibilityTimer ()
+		{
 			AccessibilityElementProxy [] children = null;
+			updateAccessibilityId = 0;
 
 			if (overviewMode != null && AccessibilityElementProxy.Enabled) {
 				children = overviewMode.UpdateAccessibility ();
 			}
 
 			Accessible.SetAccessibleChildren (children);
+
+			return false;
 		}
 
 		public void Update (IQuickTaskProvider provider)
@@ -288,30 +318,20 @@ namespace MonoDevelop.SourceEditor.QuickTasks
 			VAdjustment.Value = Math.Min (VAdjustment.Upper, VAdjustment.Value + VAdjustment.PageSize);
 		}
 
-		[CommandUpdateHandler (ScrollbarCommand.ShowTasks)]
-		internal void UpdateShowMap (CommandInfo info)
-		{
-			info.Visible = EnableFancyFeatures;
-			info.Checked = ScrollBarMode == ScrollBarMode.Overview;
-		}
-
-		[CommandHandler (ScrollbarCommand.ShowTasks)]
-		internal void ShowMap ()
-		{
-			ScrollBarMode = ScrollBarMode.Overview;
-		}
-
 		[CommandUpdateHandler (ScrollbarCommand.ShowMinimap)]
-		internal void UpdateShowFull (CommandInfo info)
+		internal void UpdateShowMinimap (CommandInfo info)
 		{
 			info.Visible = EnableFancyFeatures;
 			info.Checked = ScrollBarMode == ScrollBarMode.Minimap;
 		}
 
 		[CommandHandler (ScrollbarCommand.ShowMinimap)]
-		internal void ShowFull ()
+		internal void ShowShowMinimap ()
 		{
-			ScrollBarMode = ScrollBarMode.Minimap;
+			if (ScrollBarMode == ScrollBarMode.Overview)
+				ScrollBarMode = ScrollBarMode.Minimap;
+			else
+				ScrollBarMode = ScrollBarMode.Overview;
 		}
 
 		#endregion

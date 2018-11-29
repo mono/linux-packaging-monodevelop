@@ -654,7 +654,10 @@ namespace RefactoringEssentials
 
         public static ImmutableArray<ITypeSymbol> GetAllTypeArguments(this ISymbol symbol)
         {
-            var results = new List<ITypeSymbol>(symbol.GetTypeArguments());
+			var initialArguments = symbol.GetTypeArguments();
+			var results = ImmutableArray.CreateBuilder<ITypeSymbol> (initialArguments.Length);
+
+			results.AddRange(initialArguments);
 
             var containingType = symbol.ContainingType;
             while (containingType != null)
@@ -663,7 +666,7 @@ namespace RefactoringEssentials
                 containingType = containingType.ContainingType;
             }
 
-            return ImmutableArray.CreateRange(results);
+			return results.ToImmutable();
         }
 
         public static bool IsAttribute(this ISymbol symbol)

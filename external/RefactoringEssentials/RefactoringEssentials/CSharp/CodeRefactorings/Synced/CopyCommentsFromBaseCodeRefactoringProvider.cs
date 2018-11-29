@@ -32,8 +32,11 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
                 return;
 
             var node = token.Parent as MemberDeclarationSyntax;
-            if (node == null)
+            if (node == null) 
                 return;
+            if (node is BaseTypeDeclarationSyntax cdex && cdex.BaseList == null)
+                return;
+
             var declaredSymbol = model.GetDeclaredSymbol(node, cancellationToken);
             if (declaredSymbol == null || !string.IsNullOrEmpty(declaredSymbol.GetDocumentationCommentXml(null, false, cancellationToken)))
                 return;
@@ -42,6 +45,13 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             var baseMember = GetBaseMember(declaredSymbol, out documentation, cancellationToken);
             if (baseMember == null || string.IsNullOrEmpty(documentation))
                 return;
+            if (baseMember is INamedTypeSymbol typeSymbol)
+            {
+                if (typeSymbol.SpecialType == SpecialType.System_Object ||
+                    typeSymbol.SpecialType == SpecialType.System_ValueType ||
+                    typeSymbol.SpecialType == SpecialType.System_Enum)
+                    return;
+            }
             // "Copy comments from interface"
             context.RegisterRefactoring(
                 CodeActionFactory.Create(

@@ -110,7 +110,10 @@ namespace MonoDevelop.Xml.Editor
 
 		void HandleProjectChanged (object sender, ProjectFileEventArgs e)
 		{
-			if (e.Any (f => f.ProjectFile.FilePath == DocumentContext.Name))
+			if (DocumentContext.IsDisposed)
+				return;
+			var documentName = DocumentContext.Name;
+			if (e.Any (f => f.ProjectFile.FilePath == documentName))
 				UpdateOwnerProjects ();
 		}
 
@@ -1267,6 +1270,33 @@ namespace MonoDevelop.Xml.Editor
 					}
 				}
 			}
+		}
+
+		[CommandHandler (TextEditorCommands.ExpandSelection)]
+		public virtual void ExpandSelection ()
+		{
+			Tracker.UpdateEngine ();
+			XmlExpandSelectionHandler.ExpandSelection (Editor, Tracker.Engine.GetTreeParser);
+		}
+
+		[CommandUpdateHandler (TextEditorCommands.ExpandSelection)]
+		public void UpdateExpandSelection (CommandInfo info)
+		{
+			info.Enabled = XmlExpandSelectionHandler.CanExpandSelection (Editor);
+
+		}
+
+		[CommandHandler (TextEditorCommands.ShrinkSelection)]
+		public virtual void ShrinkSelection ()
+		{
+			Tracker.UpdateEngine ();
+			XmlExpandSelectionHandler.ShrinkSelection (Editor, Tracker.Engine.GetTreeParser);
+		}
+
+		[CommandUpdateHandler (TextEditorCommands.ShrinkSelection)]
+		public void UpdateShrinkSelection (CommandInfo info)
+		{
+			info.Enabled = XmlExpandSelectionHandler.CanShrinkSelection (Editor);
 		}
 	}
 }

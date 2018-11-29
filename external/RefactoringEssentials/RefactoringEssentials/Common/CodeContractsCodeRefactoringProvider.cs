@@ -26,8 +26,6 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
         public Context(Document document, TextSpan textSpan, CancellationToken cancellationToken, SemanticModel semanticModel, SyntaxNode root, SyntaxNode node)
         {
             Contract.Requires(document != null);
-            Contract.Requires(textSpan != null);
-            Contract.Requires(cancellationToken != null);
             Contract.Requires(semanticModel != null);
             Contract.Requires(root != null);
             Contract.Requires(node != null);
@@ -53,7 +51,6 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
         {
             get
             {
-                Contract.Ensures(Contract.Result<TextSpan>() != null);
                 return textSpan;
             }
         }
@@ -62,7 +59,6 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
         {
             get
             {
-                Contract.Ensures(Contract.Result<CancellationToken>() != null);
                 return cancellationToken;
             }
         }

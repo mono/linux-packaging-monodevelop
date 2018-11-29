@@ -548,7 +548,7 @@ class Foo
 				indent.Initialize (testCase.Document.Editor, testCase.Document);
 				var offset = testCase.Document.Editor.CaretOffset;
 				indent.SafeUpdateIndentEngine (offset);
-				var pasteHandler = new CSharpTextPasteHandler (indent, indent.stateTracker, null);
+				var pasteHandler = new CSharpTextPasteHandler (indent, null);
 				await pasteHandler.PostFomatPastedText (offset, "	int a;".Length);
 				CheckOutput (testCase, @"
 class Foo 
@@ -561,6 +561,46 @@ class Foo
 ", indent);
 
 			}
+	}
+
+		[Test]
+		public async Task TestIssue5951 ()
+		{
+			using (var data = await Create (@"
+using System;
+
+namespace MyLibrary
+{
+	public class MyClass
+	{
+		public MyClass()
+		{
 		}
+$
+	}
+}")) {
+				data.Document.Editor.Options = new CustomEditorOptions (data.Document.Editor.Options) {
+					IndentStyle = IndentStyle.Smart,
+					RemoveTrailingWhitespaces = false
+				};
+				var indent = new CSharpTextEditorIndentation ();
+				indent.Initialize (data.Document.Editor, data.Document);
+				indent.KeyPress (KeyDescriptor.FromGtk (Gdk.Key.Return, '\n', Gdk.ModifierType.None));
+				CheckOutput (data, @"
+using System;
+
+namespace MyLibrary
+{
+	public class MyClass
+	{
+		public MyClass()
+		{
+		}
+		$
+	}
+}", indent);
+			}
+		}
+
 	}
 }

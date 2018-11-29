@@ -57,7 +57,7 @@ namespace RefactoringEssentials.CSharp.CodeFixes
 
             if (diagnostic.Id == CS0127)
             {
-                var method = node.Parent.AncestorsAndSelf().OfType<MethodDeclarationSyntax>().First();
+                var method = node.Parent.AncestorsAndSelf().OfType<MethodDeclarationSyntax>().FirstOrDefault();
                 if (method != null)
                 {
                     context.RegisterCodeFix(CodeActionFactory.Create(

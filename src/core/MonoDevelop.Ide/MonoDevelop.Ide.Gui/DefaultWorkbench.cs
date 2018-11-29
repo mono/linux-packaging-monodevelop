@@ -80,7 +80,6 @@ namespace MonoDevelop.Ide.Gui
 
 		bool closeAll;
 
-		bool fullscreen;
 		Rectangle normalBounds = new Rectangle(0, 0, MinimumWidth, MinimumHeight);
 		
 		Gtk.Container rootWidget;
@@ -332,21 +331,28 @@ namespace MonoDevelop.Ide.Gui
 			topMenu = null;
 		}
 
-		public void AddInfoBar (string description, params InfoBarItem [] items)
+		readonly HashSet<object> deduplicationMap = new HashSet<object> ();
+		public void AddInfoBar (InfoBarOptions options)
 		{
+			var dedupId = options.Id ?? options.Description;
+			if (!deduplicationMap.Add (dedupId))
+				return;
+
 #if NATIVE_INFO_BAR
 			// disabled for now, needs a patch in gtk.
 			Xwt.Widget infoBar = null;
 			Xwt.Toolkit.NativeEngine.Invoke (() => {
-				infoBar = new XwtInfoBar (description, items);
+				infoBar = new XwtInfoBar (options.Description, OnDispose, options.Items);
 			});
 			var widget = Xwt.Toolkit.CurrentEngine.WrapWidget (infoBar);
 			var gtkWidget = widget.ToGtkWidget ();
 			infoBarFrame.Add (gtkWidget);
 #else
-			var infoBar = new XwtInfoBar (description, items);
+			var infoBar = new XwtInfoBar (options.Description, OnDispose, options.Items);
 			infoBarFrame.Add (infoBar.ToGtkWidget ());
 #endif
+
+			void OnDispose () => deduplicationMap.Remove (dedupId);
 		}
 		
 		public void CloseContent (ViewContent content)
@@ -641,10 +647,9 @@ namespace MonoDevelop.Ide.Gui
 		
 		public ICustomXmlSerializer Memento {
 			get {
-				WorkbenchMemento memento   = new WorkbenchMemento (new Properties ());
-				int x, y, width, height;
-				GetPosition (out x, out y);
-				GetSize (out width, out height);
+				var memento  = new WorkbenchMemento (new Properties ());
+				GetPosition (out int x, out int y);
+				GetSize (out int width, out int height);
 				// HACK: always capture bounds on OS X because we don't restore Gdk.WindowState.Maximized due to
 				// the bug mentioned below. So we simular Maximized by capturing the Maximized size.
 				if (GdkWindow.State == 0 || Platform.IsMac) {
@@ -653,7 +658,7 @@ namespace MonoDevelop.Ide.Gui
 					memento.Bounds = normalBounds;
 				}
 				memento.WindowState = GdkWindow.State;
-				memento.FullScreen  = fullscreen;
+				memento.FullScreen  = FullScreen;
 				return memento.ToProperties ();
 			}
 			set {
@@ -1173,10 +1178,10 @@ namespace MonoDevelop.Ide.Gui
 			case DirectionType.TabForward:
 				if (!haveFocusedToolbar) {
 					haveFocusedToolbar = true;
-					toolbar.ToolbarView.Focus(() => {
-						if (!dock.ChildFocus(direction)) {
-							haveFocusedToolbar = false;
-							OnFocused(direction);
+					toolbar.ToolbarView.Focus(direction, (d) => {
+						haveFocusedToolbar = false;
+						if (!dock.ChildFocus(d)) {
+							OnFocused(d);
 						}
 					});
 				} else {
@@ -1189,8 +1194,13 @@ namespace MonoDevelop.Ide.Gui
 
 			case DirectionType.TabBackward:
 				if (!dock.ChildFocus(direction)) {
-					haveFocusedToolbar = false;
-					OnFocused(DirectionType.TabForward);
+					haveFocusedToolbar = true;
+					toolbar.ToolbarView.Focus (direction, (d) => {
+						haveFocusedToolbar = false;
+						if (!dock.ChildFocus (d)) {
+							OnFocused (d);
+						}
+					});
 				}
 				break;
 
@@ -1344,7 +1354,15 @@ namespace MonoDevelop.Ide.Gui
 		
 		internal void CloseClicked (object o, TabEventArgs e)
 		{
-			((SdiWorkspaceWindow)e.Tab.Content).CloseWindow (false, true).Ignore();
+			if (e.Tab.Content != null) {
+				if (e.Tab.Content is SdiWorkspaceWindow sdiWorkspace) {
+					sdiWorkspace.CloseWindow (false, true).Ignore ();
+				} else {
+					LoggingService.LogError ($"Tab content is not an SdiWorkspaceWindow, is {e.Tab.Content.GetType ()}");
+				}
+			} else {
+				LoggingService.LogError ("Tab content is null");
+			}
 		}
 
 		internal void RemoveTab (DockNotebook tabControl, int pageNum, bool animate)

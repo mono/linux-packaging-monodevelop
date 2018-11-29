@@ -291,6 +291,22 @@ class Test
         }
 
         [Fact]
+        public void ContractInsideBody()
+        {
+            TestWrongContext<ContractEnsuresNotNullReturnCodeRefactoringProvider>(
+                @"class Test
+{
+    public Cedd this[int index]
+    {
+        get
+        {
+            $return null;
+        }
+    }
+}");
+        }
+
+        [Fact]
         public void UsingStatementAlreadyThereForPropertyIndexer()
         {
             Test<ContractEnsuresNotNullReturnCodeRefactoringProvider>(

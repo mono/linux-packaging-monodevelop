@@ -20,10 +20,7 @@ class TestClass
 {
     void TestMethod ()
     {
-        System.Func<int, int> f = i =>
-        {
-            return i + 1;
-        };
+        System.Func<int, int> f = i => { return i + 1; };
     }
 }");
         }
@@ -43,10 +40,7 @@ class TestClass
 {
     void TestMethod ()
     {
-        System.Action<int> f = i =>
-        {
-            i++;
-        };
+        System.Action<int> f = i => { i++; };
     }
 }");
         }
@@ -68,10 +62,7 @@ class TestClass
     void TestMethod ()
     {
 		// Some comment
-        System.Action<int> f = i =>
-        {
-            i++;
-        };
+        System.Action<int> f = i => { i++; };
     }
 }");
         }
@@ -91,10 +82,7 @@ class TestClass
 {
     void TestMethod ()
     {
-        System.Action<int> f = (i) =>
-        {
-            i++;
-        };
+        System.Action<int> f = (i) => { i++; };
     }
 }");
         }
@@ -107,10 +95,7 @@ class TestClass
 {
     void TestMethod ()
     {
-        System.Func<int, int> f = i $=>
-        {
-            return i + 1;
-        };
+        System.Func<int, int> f = i $=> { return i + 1; };
     }
 }");
         }

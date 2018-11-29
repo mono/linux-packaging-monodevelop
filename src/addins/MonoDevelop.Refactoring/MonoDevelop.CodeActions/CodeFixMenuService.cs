@@ -36,6 +36,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeFixes.Suppression;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Host.Mef;
@@ -83,7 +84,7 @@ namespace MonoDevelop.CodeActions
 
 				foreach (var fix in cfa.Fixes) {
 					var diag = fix.PrimaryDiagnostic;
-					if (options.TryGetDiagnosticDescriptor (diag.Id, out var descriptor) && !descriptor.GetIsEnabled (diag.Descriptor))
+					if (options.TryGetDiagnosticDescriptor (diag.Id, out var descriptor) && !diag.Descriptor.IsEnabledByDefault)
 						continue;
 					
 					bool isSuppress = fix.Action is TopLevelSuppressionCodeAction;
@@ -96,7 +97,6 @@ namespace MonoDevelop.CodeActions
 					} else {
 						fixMenu = menu;
 						fixState = state;
-						AddConfigurationMenuEntry (diag, descriptor, fix, configureMenu);
 					}
 
 					AddFixMenuItem (editor, fixMenu, fixAllMenu, ref mnemonic, fix.Action, fixState, cancellationToken);
@@ -125,7 +125,18 @@ namespace MonoDevelop.CodeActions
 			AddMenuWithSeparatorIfNeeded (suppressMenu, menu, ref first);
 			AddMenuWithSeparatorIfNeeded (configureMenu, menu, ref first);
 
+			if (!AnalysisOptions.AnalysisEnabled) {
+				if (first)
+					menu.Add (CodeFixMenuEntry.Separator);
+
+				var enableLabel = GettextCatalog.GetString ("Enable Source Analysis");
+				menu.Add (new CodeFixMenuEntry (enableLabel, enableAction));
+				first = false;
+			}
+
 			return menu;
+
+			void enableAction () => AnalysisOptions.AnalysisEnabled.Value = true;
 		}
 
 		static void AddMenuWithSeparatorIfNeeded (CodeFixMenu toAdd, CodeFixMenu into, ref bool first)
@@ -142,24 +153,6 @@ namespace MonoDevelop.CodeActions
 		static bool DescriptorHasTag (DiagnosticDescriptor desc, string tag)
 		{
 			return desc.CustomTags.Any (c => CultureInfo.InvariantCulture.CompareInfo.Compare (c, tag) == 0);
-		}
-
-		static void AddConfigurationMenuEntry (Diagnostic diag, CodeDiagnosticDescriptor descriptor, Microsoft.CodeAnalysis.CodeFixes.CodeFix fix, CodeFixMenu configureMenu)
-		{
-			var configurable = !DescriptorHasTag (diag.Descriptor, WellKnownDiagnosticTags.NotConfigurable);
-			if (descriptor != null && configurable) {
-				var optionsMenuItem = new CodeFixMenuEntry (GettextCatalog.GetString ("_Configure Rule \u2018{0}\u2019", diag.Descriptor.Title),
-					delegate {
-						IdeApp.Workbench.ShowGlobalPreferencesDialog (null, "C#", dialog => {
-							var panel = dialog.GetPanel<CodeIssuePanel> ("C#");
-							if (panel == null)
-								return;
-							var title = GettextCatalog.GetString ("{0} ({1})", fix.PrimaryDiagnostic.Descriptor.Title, fix.PrimaryDiagnostic.Descriptor.Id);
-							panel.Widget.SelectCodeIssue (title);
-						});
-					});
-				configureMenu.Add (optionsMenuItem);
-			}
 		}
 
 		static CodeFixMenuEntry CreateFixMenuEntry (TextEditor editor, CodeAction fix, ref int mnemonic)
@@ -181,17 +174,41 @@ namespace MonoDevelop.CodeActions
 			var provider = fixState?.FixAllProvider;
 			if (provider == null)
 				return null;
-			
-			var context = fixState.CreateFixAllContext (new RoslynProgressTracker (), token);
+
+			var doc = editor.DocumentContext;
+			var workspace = doc?.RoslynWorkspace;
+			if (workspace == null)
+				return null;
 
 			var title = fixState.GetDefaultFixAllTitle ();
 			var label = mnemonic < 0 ? title : CreateLabel (title, ref mnemonic);
 
 			var item = new CodeFixMenuEntry (label, async delegate {
-				// Task.Run here so we don't end up binding the whole document on popping the menu, also there is no cancellation token support
-				var fix = Task.Run (() => provider.GetFixAsync (context));
 
-				await new ContextActionRunner (editor, await fix).Run ();
+				// Task.Run here so we don't end up binding the whole document on popping the menu, also there is no cancellation token support
+				var fix = await Task.Run (() => {
+					var context = fixState.CreateFixAllContext (new RoslynProgressTracker (), token);
+					return provider.GetFixAsync (context);
+				});
+				Microsoft.CodeAnalysis.Text.TextChange[] result = await Task.Run (async () => {
+					var previewOperations = await fix.GetPreviewOperationsAsync (token);
+					return await Runtime.RunInMainThread (() => {
+						var engine = Xwt.Toolkit.CurrentEngine; // NativeEngine
+						return engine.Invoke (async () => {
+							using (var dialog = new FixAllPreviewDialog (string.Join (", ", fixState.DiagnosticIds), doc.Name, fixState.Scope, previewOperations, editor)) {
+								await dialog.InitializeEditor ();
+								var parent = Xwt.Toolkit.CurrentEngine.WrapWindow (IdeApp.Workbench.RootWindow);
+								var changes = dialog.Run (parent) == Xwt.Command.Apply ? dialog.GetApplicableChanges ().ToArray () : Array.Empty<Microsoft.CodeAnalysis.Text.TextChange> ();
+								return changes;
+							}
+						});
+					});
+				});
+
+				if (result.Length == 0)
+					return;
+
+				editor.ApplyTextChanges (result);
 			});
 
 			return item;
@@ -221,8 +238,10 @@ namespace MonoDevelop.CodeActions
 			// TODO: Add support for more than doc when we have global undo.
 			fixState = fixState?.WithScopeAndEquivalenceKey (FixAllScope.Document, fix.EquivalenceKey);
 			var fixAllMenuEntry = CreateFixAllMenuEntry (editor, fixState, ref mnemonic, token);
-			if (fixAllMenuEntry != null)
+			if (fixAllMenuEntry != null) {
+				fixAllMenu.Add (new CodeFixMenuEntry (fix.Message, null));
 				fixAllMenu.Add (fixAllMenuEntry);
+			}
 		}
 
 		static void AddNestedFixMenu (TextEditor editor, CodeFixMenu menu, CodeFixMenu fixAllMenu, CodeAction.CodeActionWithNestedActions fixes, FixAllState fixState, CancellationToken token)

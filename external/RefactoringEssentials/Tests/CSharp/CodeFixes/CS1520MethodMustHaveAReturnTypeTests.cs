@@ -5,7 +5,7 @@ namespace RefactoringEssentials.Tests.CSharp.CodeFixes
 {
     public class CS1520MethodMustHaveAReturnTypeTests : CSharpCodeFixTestBase
     {
-        [Fact]
+        [Fact(Skip = "Ignore.")]
         public void TestMethod()
         {
             Test<CS1520MethodMustHaveAReturnTypeCodeFixProvider>(

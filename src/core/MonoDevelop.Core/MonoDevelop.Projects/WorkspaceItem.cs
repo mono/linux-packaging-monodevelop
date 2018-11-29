@@ -45,6 +45,8 @@ using Mono.Addins;
 using System.Linq;
 using System.Threading.Tasks;
 using MonoDevelop.Projects.MD1;
+using MonoDevelop.Core.Text;
+using System.Text;
 
 namespace MonoDevelop.Projects
 {
@@ -207,8 +209,11 @@ namespace MonoDevelop.Projects
 
 			var directories = new HashSet<FilePath> ();
 			foreach (FilePath file in GetItemFiles (true)) {
+				var parentDirectory = file.ParentDirectory;
+				if (parentDirectory.IsNullOrEmpty)
+					continue;
 				if (!directories.Any (directory => file.IsChildPathOf (directory)))
-					directories.Add (file.ParentDirectory);
+					directories.Add (parentDirectory);
 			}
 
 			rootDirectories = directories;
@@ -311,9 +316,10 @@ namespace MonoDevelop.Projects
 		}
 
 		[ThreadSafe]
+		[Obsolete ("This should be implemented by subclasses that implement IBuildTarget")]
 		public IEnumerable<IBuildTarget> GetExecutionDependencies ()
 		{
-			yield break;
+			throw new InvalidOperationException ("Must be reimplemented by subclasses");
 		}
 
 		protected bool Loading { get; private set; }
@@ -413,21 +419,22 @@ namespace MonoDevelop.Projects
 						File.Delete (file);
 					return;
 				}
-			
-				XmlTextWriter writer = null;
-				try {
-					Directory.CreateDirectory (file.ParentDirectory);
+				using (var sw = new StringWriter ()) {
 
-					writer = new XmlTextWriter (file, System.Text.Encoding.UTF8);
-					writer.Formatting = Formatting.Indented;
-					XmlDataSerializer ser = new XmlDataSerializer (new DataContext ());
-					ser.SerializationContext.BaseFile = file;
-					ser.Serialize (writer, userProps, typeof(PropertyBag));
-				} catch (Exception e) {
-					LoggingService.LogWarning ("Could not save solution preferences: " + file, e);
-				} finally {
-					if (writer != null)
-						writer.Close ();
+					XmlTextWriter writer = null;
+					try {
+						writer = new XmlTextWriter (sw);
+						writer.Formatting = Formatting.Indented;
+						XmlDataSerializer ser = new XmlDataSerializer (new DataContext ());
+						ser.SerializationContext.BaseFile = file;
+						ser.Serialize (writer, userProps, typeof (PropertyBag));
+						TextFileUtility.WriteText (file, sw.ToString (), Encoding.UTF8);
+					} catch (Exception e) {
+						LoggingService.LogWarning ("Could not save solution preferences: " + file, e);
+					} finally {
+						if (writer != null)
+							writer.Close ();
+					}
 				}
 			});
 		}

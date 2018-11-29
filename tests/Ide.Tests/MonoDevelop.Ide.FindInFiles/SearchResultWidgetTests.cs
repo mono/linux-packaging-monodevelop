@@ -138,6 +138,7 @@ namespace MonoDevelop.Ide.FindInFiles
 			}
 		}
 
+
 		/// <summary>
 		/// Find references shows invalid search results #6015
 		/// </summary>
@@ -195,6 +196,5 @@ namespace MyLibrary
 				File.Delete (fileName);
 			}
 		}
-
 	}
 }

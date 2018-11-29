@@ -160,7 +160,7 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             if (!IsPossibleExpression(retStatement.Expression))
                 return null;
             var retSymbol = model.GetSymbolInfo(retStatement.Expression).Symbol;
-            return ((IFieldSymbol)retSymbol);
+            return retSymbol as IFieldSymbol;
         }
 
         internal static IFieldSymbol ScanSetter(SemanticModel model, AccessorDeclarationSyntax setter)
@@ -177,7 +177,7 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             if (!IsPossibleExpression(assignment.Left))
                 return null;
             var retSymbol = model.GetSymbolInfo(assignment.Left).Symbol;
-            return ((IFieldSymbol)retSymbol);
+            return retSymbol as IFieldSymbol;
 
         }
 

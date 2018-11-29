@@ -68,7 +68,6 @@ End Class", @"
 Class TestClass
     Sub Test(param As String)
         Dim lambda = Sub (sender, e)
-
                          If sender Is Nothing Then
                              Throw New System.ArgumentNullException(NameOf(sender))
                          End If

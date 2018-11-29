@@ -7,10 +7,14 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
 using System.Threading;
+using System.Collections.Concurrent;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
-    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+	using UnusedParameterDictionary = IDictionary<IMethodSymbol, ISet<IParameterSymbol>>;
+
+	[DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class UnusedParameterAnalyzer : DiagnosticAnalyzer
     {
         static readonly DiagnosticDescriptor descriptor = new DiagnosticDescriptor(
@@ -27,236 +31,457 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 
         public override void Initialize(AnalysisContext context)
         {
-            context.EnableConcurrentExecution();
-            context.RegisterCompilationStartAction(nodeContext => Analyze(nodeContext));
+			// TODO: Consider making this analyzer thread-safe.
+			//context.EnableConcurrentExecution();
+
+			context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+
+			context.RegisterCompilationStartAction(compilationStartContext =>
+			{
+				var compilation = compilationStartContext.Compilation;
+				INamedTypeSymbol eventsArgSymbol = compilation.GetTypeByMetadataName("System.EventArgs");
+
+				INamedTypeSymbol streamingContext = compilation.GetTypeByMetadataName("System.Runtime.Serialization.StreamingContext");
+				INamedTypeSymbol serializationInfo = compilation.GetTypeByMetadataName("System.Runtime.Serialization.SerializationInfo");
+
+				// Ignore conditional methods (FxCop compat - One conditional will often call another conditional method as its only use of a parameter)
+				INamedTypeSymbol conditionalAttributeSymbol = compilation.GetTypeByMetadataName("System.Diagnostics.ConditionalAttribute");
+
+				// Ignore methods with special serialization attributes (FxCop compat - All serialization methods need to take 'StreamingContext')
+				INamedTypeSymbol onDeserializingAttribute = compilation.GetTypeByMetadataName("System.Runtime.Serialization.OnDeserializingAttribute");
+				INamedTypeSymbol onDeserializedAttribute = compilation.GetTypeByMetadataName("System.Runtime.Serialization.OnDeserializedAttribute");
+				INamedTypeSymbol onSerializingAttribute = compilation.GetTypeByMetadataName("System.Runtime.Serialization.OnSerializingAttribute");
+				INamedTypeSymbol onSerializedAttribute = compilation.GetTypeByMetadataName("System.Runtime.Serialization.OnSerializedAttribute");
+				INamedTypeSymbol obsoleteAttribute = compilation.GetTypeByMetadataName("System.ObsoleteAttribute");
+				INamedTypeSymbol exportXamMacIosAttribute = compilation.GetTypeByMetadataName("Foundation.ExportAttribute");
+				INamedTypeSymbol exportXamAndroidAttribute = compilation.GetTypeByMetadataName("Java.Interop.ExportAttribute");
+
+				ImmutableHashSet<INamedTypeSymbol> attributeSetForMethodsToIgnore = ImmutableHashSet.Create(
+					conditionalAttributeSymbol,
+					onDeserializedAttribute,
+					onDeserializingAttribute,
+					onSerializedAttribute,
+					onSerializingAttribute,
+					obsoleteAttribute,
+					exportXamMacIosAttribute,
+					exportXamAndroidAttribute);
+
+				UnusedParameterDictionary unusedMethodParameters = new ConcurrentDictionary<IMethodSymbol, ISet<IParameterSymbol>>();
+				ISet<IMethodSymbol> methodsUsedAsDelegates = new HashSet<IMethodSymbol>();
+
+				// Create a list of functions to exclude from analysis. We assume that any function that is used in an IMethodBindingExpression
+				// cannot have its signature changed, and add it to the list of methods to be excluded from analysis.
+				compilationStartContext.RegisterOperationAction(operationContext =>
+				{
+					var methodBinding = (IMethodReferenceOperation)operationContext.Operation;
+					methodsUsedAsDelegates.Add(methodBinding.Method.OriginalDefinition);
+				}, OperationKind.MethodReference);
+
+				compilationStartContext.RegisterOperationBlockStartAction(startOperationBlockContext =>
+				{
+					// We only care about methods.
+					if (startOperationBlockContext.OwningSymbol.Kind != SymbolKind.Method)
+					{
+						return;
+					}
+
+					// We only care about methods with parameters.
+					var method = (IMethodSymbol)startOperationBlockContext.OwningSymbol;
+					if (method.Parameters.IsEmpty)
+					{
+						return;
+					}
+
+					// Ignore implicitly declared methods, extern methods, abstract methods, virtual methods, interface implementations and finalizers (FxCop compat).
+					if (method.IsImplicitlyDeclared ||
+						method.IsExtern ||
+						method.IsAbstract ||
+						method.IsVirtual ||
+						method.IsOverride ||
+						method.IsImplementationOfAnyInterfaceMember() ||
+						method.IsFinalizer())
+					{
+						return;
+					}
+
+					// Ignore property accessors.
+					if (method.IsPropertyAccessor())
+					{
+						return;
+					}
+
+					// RE fixup: Added ISerializable support
+					if (serializationInfo != null && streamingContext != null &&
+						method.Parameters.Length == 2 &&
+						method.Parameters[0].Type == serializationInfo &&
+						method.Parameters[1].Type == streamingContext)
+					{
+						return;
+					}
+
+					// Ignore methods with any attributes in 'attributeSetForMethodsToIgnore'.
+					if (method.GetAttributes().Any(a => a.AttributeClass != null && attributeSetForMethodsToIgnore.Contains(a.AttributeClass)))
+					{
+						return;
+					}
+
+					// Ignore methods that were used as delegates
+					if (methodsUsedAsDelegates.Contains(method))
+					{
+						return;
+					}
+
+					// RE fixup: Don't do this, we already look at methods used as delegates.
+					//// Ignore event handler methods "Handler(object, MyEventArgs)"
+					//if (eventsArgSymbol != null &&
+					//	method.Parameters.Length == 2 &&
+					//	method.Parameters[0].Type.SpecialType == SpecialType.System_Object &&
+					//	method.Parameters[1].Type.Inherits(eventsArgSymbol))
+					//{
+					//	return;
+					//}
+
+					// Initialize local mutable state in the start action.
+					var analyzer = new UnusedParametersAnalyzer(method, unusedMethodParameters);
+
+					// Register an intermediate non-end action that accesses and modifies the state.
+					startOperationBlockContext.RegisterOperationAction(analyzer.AnalyzeOperation, OperationKind.ParameterReference);
+
+					// Register an end action to add unused parameters to the unusedMethodParameters dictionary
+					startOperationBlockContext.RegisterOperationBlockEndAction(analyzer.OperationBlockEndAction);
+				});
+
+				// Register a compilation end action to filter all methods used as delegates and report any diagnostics
+				compilationStartContext.RegisterCompilationEndAction(compilationAnalysisContext =>
+				{
+					// Report diagnostics for unused parameters.
+					var unusedParameters = unusedMethodParameters.Where(kvp => !methodsUsedAsDelegates.Contains(kvp.Key)).SelectMany(kvp => kvp.Value);
+					foreach (var parameter in unusedParameters)
+					{
+						var diagnostic = Diagnostic.Create(descriptor, parameter.Locations[0], parameter.Name);
+						compilationAnalysisContext.ReportDiagnostic(diagnostic);
+					}
+				});
+			});
         }
 
-        void Analyze(CompilationStartAnalysisContext compilationContext)
-        {
-            var compilation = compilationContext.Compilation;
-            compilationContext.RegisterSyntaxTreeAction(delegate (SyntaxTreeAnalysisContext context) {
-                try {
-                    if (!compilation.SyntaxTrees.Contains(context.Tree))
-                        return;
-                    var semanticModel = compilation.GetSemanticModel(context.Tree);
-                    var root = context.Tree.GetRoot(context.CancellationToken);
-                    var model = compilationContext.Compilation.GetSemanticModel(context.Tree);
-                    if (model.IsFromGeneratedCode(compilationContext.CancellationToken))
-                        return;
-                    var usageVisitor = new GetDelgateUsagesVisitor(semanticModel, context.CancellationToken);
-                    usageVisitor.Visit(root);
+		private class UnusedParametersAnalyzer
+		{
+			#region Per-CodeBlock mutable state
 
-                    var analyzer = new NodeAnalyzer(context, model, usageVisitor);
-                    analyzer.Visit(root);
-                } catch (OperationCanceledException) { }
-            });
-        }
+			private readonly HashSet<IParameterSymbol> _unusedParameters;
+			private readonly UnusedParameterDictionary _finalUnusedParameters;
+			private readonly IMethodSymbol _method;
 
-        // Collect all methods that are used as delegate
-        class GetDelgateUsagesVisitor : CSharpSyntaxWalker
-        {
-            SemanticModel ctx;
-            public readonly List<ISymbol> UsedMethods = new List<ISymbol>();
-            readonly CancellationToken token;
+			#endregion
 
-            public GetDelgateUsagesVisitor(SemanticModel ctx, CancellationToken token)
-            {
-                this.token = token;
-                this.ctx = ctx;
-            }
+			#region State intialization
 
-            public override void VisitBlock(BlockSyntax node)
-            {
-                token.ThrowIfCancellationRequested();
-                base.VisitBlock(node);
-            }
+			public UnusedParametersAnalyzer(IMethodSymbol method, UnusedParameterDictionary finalUnusedParameters)
+			{
+				// Initialization: Assume all parameters are unused.
+				_unusedParameters = new HashSet<IParameterSymbol>(method.Parameters);
+				_finalUnusedParameters = finalUnusedParameters;
+				_method = method;
+			}
 
-            public override void VisitIdentifierName(IdentifierNameSyntax node)
-            {
-                base.VisitIdentifierName(node);
-                if (!IsTargetOfInvocation(node)) {
-                    var mgr = ctx.GetSymbolInfo(node);
-                    if (mgr.Symbol is IDiscardSymbol) // work around for roslyn bug https://github.com/dotnet/roslyn/issues/24206
-                        return;
-                    if (mgr.Symbol?.IsKind(SymbolKind.Method) == true)
-                        UsedMethods.Add(mgr.Symbol);
-                }
-            }
+			#endregion
 
-            public override void VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
-            {
-                base.VisitMemberAccessExpression(node);
-                if (!IsTargetOfInvocation(node)) {
-                    var mgr = ctx.GetSymbolInfo(node);
-                    if (mgr.Symbol?.IsKind(SymbolKind.Method) == true)
-                        UsedMethods.Add(mgr.Symbol);
-                }
-            }
+			#region Intermediate actions
 
-            static bool IsTargetOfInvocation(SyntaxNode node)
-            {
-                return node.Parent is InvocationExpressionSyntax;
-            }
-        }
+			public void AnalyzeOperation(OperationAnalysisContext context)
+			{
+				// Check if we have any pending unreferenced parameters.
+				if (_unusedParameters.Count == 0)
+				{
+					return;
+				}
 
-        class NodeAnalyzer : CSharpSyntaxWalker
-        {
-            readonly SyntaxTreeAnalysisContext ctx;
-            readonly SemanticModel model;
-            readonly GetDelgateUsagesVisitor visitor;
+				// Mark this parameter as used.
+				IParameterSymbol parameter = ((IParameterReferenceOperation)context.Operation).Parameter;
+				_unusedParameters.Remove(parameter);
+			}
 
-            bool currentTypeIsPartial;
+			#endregion
 
-            public NodeAnalyzer(SyntaxTreeAnalysisContext ctx, SemanticModel model, GetDelgateUsagesVisitor visitor)
-            {
-                this.ctx = ctx;
-                this.model = model;
-                this.visitor = visitor;
-            }
+			#region End action
 
-            public override void Visit(SyntaxNode node)
-            {
-                base.Visit(node);
-            }
+			public void OperationBlockEndAction(OperationBlockAnalysisContext context)
+			{
+				// Check to see if the method just throws a NotImplementedException/NotSupportedException
+				// We shouldn't warn about parameters in that case
+				if (context.IsMethodNotImplementedOrSupported())
+				{
+					return;
+				}
 
-            public override void VisitBlock(BlockSyntax node)
-            {
-                ctx.CancellationToken.ThrowIfCancellationRequested();
-                base.VisitBlock(node);
-            }
+				// Do not raise warning for unused 'this' parameter of an extension method.
+				if (_method.IsExtensionMethod)
+				{
+					var thisParamter = _unusedParameters.Where(p => p.Ordinal == 0).FirstOrDefault();
+					_unusedParameters.Remove(thisParamter);
+				}
 
-            public override void VisitClassDeclaration(ClassDeclarationSyntax node)
-            {
-                bool outerTypeIsPartial = currentTypeIsPartial;
-                currentTypeIsPartial = node.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
-                base.VisitClassDeclaration(node);
-                currentTypeIsPartial = outerTypeIsPartial;
-            }
+				_finalUnusedParameters.Add(_method, _unusedParameters);
+			}
 
-            static INamedTypeSymbol GetImplementingInterface(ISymbol enclosingSymbol, INamedTypeSymbol containingType)
-            {
-                INamedTypeSymbol result = null;
-                foreach (var iface in containingType.AllInterfaces) {
-                    foreach (var member in iface.GetMembers()) {
-                        var implementation = containingType.FindImplementationForInterfaceMember(member);
-                        if (implementation == enclosingSymbol) {
-                            if (result != null)
-                                return null;
-                            result = iface;
-                        }
-                    }
-                }
-                return result;
-            }
+			#endregion
+		}
+	}
 
+	static class Extensions
+	{
+		public static bool IsFinalizer(this IMethodSymbol method)
+		{
+			if (method.MethodKind == MethodKind.Destructor)
+			{
+				return true; // for C#
+			}
 
-            public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
-            {
-                base.VisitMethodDeclaration(node);
+			if (method.Name != WellKnownMemberNames.DestructorName || method.Parameters.Length != 0 || !method.ReturnsVoid)
+			{
+				return false;
+			}
 
-                if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.VirtualKeyword) || m.IsKind(SyntaxKind.NewKeyword) || m.IsKind(SyntaxKind.PartialKeyword)))
-                    return;
-                if ((node.Body == null) && (node.ExpressionBody == null))
-                    return;
+			IMethodSymbol overridden = method.OverriddenMethod;
 
-                var member = model.GetDeclaredSymbol(node);
-                if (member.IsOverride)
-                    return;
-                if (member.ExplicitInterfaceImplementations().Length > 0)
-                    return;
-                if (GetImplementingInterface(member, member.ContainingType) != null)
-                    return;
+			if (method.ContainingType.SpecialType == SpecialType.System_Object)
+			{
+				// This is object.Finalize
+				return true;
+			}
 
-                foreach (var attr in member.GetAttributes()) {
-                    if (attr.AttributeClass.Name == "ExportAttribute")
-                        return;
-                }
+			if (overridden == null)
+			{
+				return false;
+			}
 
-                if (visitor.UsedMethods.Contains(member))
-                    return;
-                if (currentTypeIsPartial && member.Parameters.Length == 2) {
-                    if (member.Parameters[0].Name == "sender") {
-                        // Looks like an event handler; the registration might be in the designer part
-                        return;
-                    }
-                }
+			for (IMethodSymbol o = overridden.OverriddenMethod; o != null; o = o.OverriddenMethod)
+			{
+				overridden = o;
+			}
 
-                Analyze(node.ParameterList.Parameters, new SyntaxNode[] { node.Body, node.ExpressionBody }, node.Kind());
-            }
+			return overridden.ContainingType.SpecialType == SpecialType.System_Object; // it is object.Finalize
+		}
 
-            public override void VisitConstructorDeclaration(ConstructorDeclarationSyntax node)
-            {
-                base.VisitConstructorDeclaration(node);
-                if (node.ParameterList.Parameters.Count == 0)
-                    return;
+		public static bool IsImplementationOfAnyInterfaceMember(this ISymbol symbol)
+		{
+			return symbol.IsImplementationOfAnyExplicitInterfaceMember() || symbol.IsImplementationOfAnyImplicitInterfaceMember();
+		}
 
-                Analyze(node.ParameterList.Parameters, new SyntaxNode[] { node.Body, node.Initializer, node.ExpressionBody }, node.Kind());
-            }
+		public static bool IsImplementationOfAnyExplicitInterfaceMember(this ISymbol symbol)
+		{
+			if (symbol is IMethodSymbol methodSymbol && methodSymbol.ExplicitInterfaceImplementations.Any())
+			{
+				return true;
+			}
 
-            public override void VisitAnonymousMethodExpression(AnonymousMethodExpressionSyntax node)
-            {
-                base.VisitAnonymousMethodExpression(node);
-                if (node.ParameterList != null)
-                    Analyze(node.ParameterList.Parameters, new[] { node.Block }, node.Kind());
-            }
+			if (symbol is IPropertySymbol propertySymbol && propertySymbol.ExplicitInterfaceImplementations.Any())
+			{
+				return true;
+			}
 
-            public override void VisitIndexerDeclaration(IndexerDeclarationSyntax node)
-            {
-                base.VisitIndexerDeclaration(node);
-                if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.VirtualKeyword) || m.IsKind(SyntaxKind.NewKeyword) || m.IsKind(SyntaxKind.PartialKeyword)))
-                    return;
-                if (node.GetBodies().IsEmpty())
-                    return;
-                var member = model.GetDeclaredSymbol(node);
-                if (member.IsOverride)
-                    return;
+			if (symbol is IEventSymbol eventSymbol && eventSymbol.ExplicitInterfaceImplementations.Any())
+			{
+				return true;
+			}
 
-                if (member.ExplicitInterfaceImplementations().Length > 0)
-                    return;
-                if (GetImplementingInterface(member, member.ContainingType) != null)
-                    return;
-                Analyze(node.ParameterList.Parameters, node.GetBodies(), node.Kind());
-            }
+			return false;
+		}
 
-            void Analyze(SeparatedSyntaxList<ParameterSyntax> parameterList, IEnumerable<SyntaxNode> nodesToAnalyze, SyntaxKind containerKind)
-            {
-                var parameters = new List<IParameterSymbol>();
-                var parameterNodes = new List<ParameterSyntax>();
-                foreach (var param in parameterList) {
-                    var resolveResult = model.GetDeclaredSymbol(param);
-                    if (resolveResult == null)
-                        continue;
-                    if (containerKind == SyntaxKind.ConstructorDeclaration) {
-                        if (resolveResult.Type.Name == "StreamingContext" && resolveResult.Type.ContainingNamespace.ToDisplayString() == "System.Runtime.Serialization") {
-                            // commonly unused parameter in constructors associated with ISerializable
-                            return;
-                        }
-                    }
-                    parameters.Add(resolveResult);
-                    parameterNodes.Add(param);
-                }
-                foreach (var node in nodesToAnalyze) {
-                    if (node == null)
-                        continue;
-                    foreach (var child in node.DescendantNodes()) {
-                        var identifierNameSyntax = child as IdentifierNameSyntax;
-                        if (identifierNameSyntax == null) continue;
-                        var sym = model.GetSymbolInfo(identifierNameSyntax).Symbol as IParameterSymbol;
-                        if (sym == null || sym.Ordinal < 0) continue;
-                        int idx = parameters.IndexOf(param => param.Ordinal == sym.Ordinal);
-                        if (idx < 0) continue;
-                        if (sym.GetContainingMemberOrThis() == parameters[idx].GetContainingMemberOrThis()) {
-                            parameters.RemoveAt(idx);
-                            parameterNodes.RemoveAt(idx);
-                            if (parameters.Count == 0)
-                                return;
-                        }
-                    }
-                }
-                foreach (var param in parameterNodes) {
-                    ctx.ReportDiagnostic(Diagnostic.Create(descriptor, param.Identifier.GetLocation(), param.Identifier.ValueText));
-                }
-            }
-        }
-    }
+		public static bool IsImplementationOfAnyImplicitInterfaceMember(this ISymbol symbol)
+		{
+			return IsImplementationOfAnyImplicitInterfaceMember<ISymbol>(symbol);
+		}
+
+		public static bool IsImplementationOfAnyImplicitInterfaceMember<TSymbol>(this ISymbol symbol)
+		where TSymbol : ISymbol
+		{
+			if (symbol.ContainingType != null)
+			{
+				foreach (INamedTypeSymbol interfaceSymbol in symbol.ContainingType.AllInterfaces)
+				{
+					foreach (var interfaceMember in interfaceSymbol.GetMembers().OfType<TSymbol>())
+					{
+						if (IsImplementationOfInterfaceMember(symbol, interfaceMember))
+						{
+							return true;
+						}
+					}
+				}
+			}
+
+			return false;
+		}
+
+		public static bool IsImplementationOfInterfaceMember(this ISymbol symbol, ISymbol interfaceMember)
+		{
+			return interfaceMember != null &&
+				   symbol.Equals(symbol.ContainingType.FindImplementationForInterfaceMember(interfaceMember));
+		}
+
+		public static bool IsPropertyAccessor(this IMethodSymbol method)
+		{
+			// RE fixup.
+			if (method.Parameters.Length > 0)
+				return false;
+
+			return method.MethodKind == MethodKind.PropertyGet ||
+				   method.MethodKind == MethodKind.PropertySet;
+		}
+
+		public static bool Inherits(this ITypeSymbol type, ITypeSymbol possibleBase)
+		{
+			if (type == null || possibleBase == null)
+			{
+				return false;
+			}
+
+			switch (possibleBase.TypeKind)
+			{
+				case TypeKind.Class:
+					if (type.TypeKind == TypeKind.Interface)
+					{
+						return false;
+					}
+
+					return DerivesFrom(type, possibleBase, baseTypesOnly: true);
+
+				case TypeKind.Interface:
+					return DerivesFrom(type, possibleBase);
+
+				default:
+					return false;
+			}
+		}
+
+		public static bool DerivesFrom(this ITypeSymbol symbol, ITypeSymbol candidateBaseType, bool baseTypesOnly = false, bool checkTypeParameterConstraints = true)
+		{
+			if (candidateBaseType == null || symbol == null)
+			{
+				return false;
+			}
+
+			if (!baseTypesOnly && symbol.AllInterfaces.OfType<ITypeSymbol>().Contains(candidateBaseType))
+			{
+				return true;
+			}
+
+			if (checkTypeParameterConstraints && symbol.TypeKind == TypeKind.TypeParameter)
+			{
+				var typeParameterSymbol = (ITypeParameterSymbol)symbol;
+				foreach (var constraintType in typeParameterSymbol.ConstraintTypes)
+				{
+					if (constraintType.DerivesFrom(candidateBaseType, baseTypesOnly, checkTypeParameterConstraints))
+					{
+						return true;
+					}
+				}
+			}
+
+			while (symbol != null)
+			{
+				if (symbol.Equals(candidateBaseType))
+				{
+					return true;
+				}
+
+				symbol = symbol.BaseType;
+			}
+
+			return false;
+		}
+
+		public static bool IsMethodNotImplementedOrSupported(this OperationBlockAnalysisContext context)
+		{
+			// Note that VB method bodies with 1 action have 3 operations.
+			// The first is the actual operation, the second is a label statement, and the third is a return
+			// statement. The last two are implicit in these scenarios.
+
+			var operationBlocks = context.OperationBlocks.WhereAsArray(operation => !operation.IsOperationNoneRoot());
+
+			IBlockOperation methodBlock = null;
+			if (operationBlocks.Length == 1 && operationBlocks[0].Kind == OperationKind.Block)
+			{
+				methodBlock = (IBlockOperation)operationBlocks[0];
+			}
+			else if (operationBlocks.Length > 1)
+			{
+				foreach (var block in operationBlocks)
+				{
+					if (block.Kind == OperationKind.Block)
+					{
+						methodBlock = (IBlockOperation)block;
+						break;
+					}
+				}
+			}
+
+			if (methodBlock != null)
+			{
+				bool IsSingleStatementBody(IBlockOperation body)
+				{
+					return body.Operations.Length == 1 ||
+						(body.Operations.Length == 3 && body.Syntax.Language == LanguageNames.VisualBasic &&
+						 body.Operations[1] is ILabeledOperation labeledOp && labeledOp.IsImplicit &&
+						 body.Operations[2] is IReturnOperation returnOp && returnOp.IsImplicit);
+				}
+
+				if (IsSingleStatementBody(methodBlock))
+				{
+					var innerOperation = methodBlock.Operations.First();
+
+					// Because of https://github.com/dotnet/roslyn/issues/23152, there can be an expression-statement
+					// wrapping expression-bodied throw operations. Compensate by unwrapping if necessary.
+					if (innerOperation.Kind == OperationKind.ExpressionStatement &&
+						innerOperation is IExpressionStatementOperation exprStatement)
+					{
+						innerOperation = exprStatement.Operation;
+					}
+
+					if (innerOperation.Kind == OperationKind.Throw &&
+						innerOperation is IThrowOperation throwOperation &&
+						throwOperation.Exception.Kind == OperationKind.ObjectCreation &&
+						throwOperation.Exception is IObjectCreationOperation createdException)
+					{
+						if (context.Compilation.GetTypeByMetadataName("System.NotImplementedException") == createdException.Type.OriginalDefinition
+							|| context.Compilation.GetTypeByMetadataName("System.NotSupportedException") == createdException.Type.OriginalDefinition)
+						{
+							return true;
+						}
+					}
+				}
+			}
+
+			return false;
+		}
+
+		public static bool IsOperationNoneRoot(this IOperation operation)
+		{
+			return operation.Kind == OperationKind.None && operation.Parent == null;
+		}
+
+		public static ImmutableArray<TSource> WhereAsArray<TSource>(this IEnumerable<TSource> source, Func<TSource, bool> selector)
+		{
+			var builder = ImmutableArray.CreateBuilder<TSource>();
+			bool any = false;
+			foreach (var element in source)
+			{
+				if (selector(element))
+				{
+					any = true;
+					builder.Add(element);
+				}
+			}
+
+			if (any)
+			{
+				return builder.ToImmutable();
+			}
+			else
+			{
+				return ImmutableArray<TSource>.Empty;
+			}
+		}
+	}
 }

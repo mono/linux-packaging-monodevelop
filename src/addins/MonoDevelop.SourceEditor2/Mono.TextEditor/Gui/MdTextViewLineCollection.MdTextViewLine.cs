@@ -31,6 +31,9 @@ using Microsoft.VisualStudio.Language.Intellisense.Implementation;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Formatting;
 using Microsoft.VisualStudio.Text.Implementation;
+using MonoDevelop.Core.Text;
+using System.Threading;
+using MonoDevelop.Ide;
 
 namespace Mono.TextEditor
 {
@@ -180,7 +183,7 @@ namespace Mono.TextEditor
 
 			public TextBounds GetCharacterBounds(VirtualSnapshotPoint bufferPosition)
 			{
-				throw new System.NotImplementedException();
+				return GetCharacterBounds (bufferPosition.Position);
 			}
 
 			public TextBounds GetExtendedCharacterBounds(SnapshotPoint bufferPosition)
@@ -190,7 +193,13 @@ namespace Mono.TextEditor
 
 			public TextBounds GetExtendedCharacterBounds(VirtualSnapshotPoint bufferPosition)
 			{
-				throw new System.NotImplementedException();
+				// if the point is in virtual space, then it can't be next to any space negotiating adornments, 
+				// so just return its character bounds. If the point is not in virtual space, then use the regular
+				// GetExtendedCharacterBounds method for a non-virtual SnapshotPoint
+				if (bufferPosition.IsInVirtualSpace)
+					return this.GetCharacterBounds (bufferPosition);
+				else
+					return this.GetExtendedCharacterBounds (bufferPosition.Position);
 			}
 
 			public VirtualSnapshotPoint GetInsertionBufferPositionFromXCoordinate(double xCoordinate)
@@ -213,9 +222,33 @@ namespace Mono.TextEditor
 					return new Collection<TextBounds>();
 			}
 
-			public SnapshotSpan GetTextElementSpan(SnapshotPoint bufferPosition)
+			public SnapshotSpan GetTextElementSpan (SnapshotPoint bufferPosition)
 			{
-				throw new System.NotImplementedException();
+				bufferPosition = this.FixBufferPosition (bufferPosition);
+				if (!this.ContainsBufferPosition (bufferPosition))
+					throw new ArgumentOutOfRangeException (nameof (bufferPosition));
+
+				if (bufferPosition >= ExtentIncludingLineBreak.End - lineBreakLength) {
+					return new SnapshotSpan (ExtentIncludingLineBreak.End - lineBreakLength, lineBreakLength);
+				}
+				var line = textEditor.GetLineByOffset (bufferPosition.Position);
+				var lineOffset = line.Offset;
+
+				var highlightedLine = this.textEditor.Document.SyntaxMode.GetHighlightedLineAsync (line, default (CancellationToken)).WaitAndGetResult ();
+				if (highlightedLine != null) {
+					foreach (var seg in highlightedLine.Segments) {
+						if (seg.Contains (bufferPosition - lineOffset)) {
+							return new SnapshotSpan (bufferPosition.Snapshot, lineOffset + seg.Offset, seg.Length);
+						}
+					}
+				}
+
+				var c = textEditor.GetCharAt (bufferPosition.Position);
+				if ((c & CaretMoveActions.LowSurrogateMarker) == CaretMoveActions.LowSurrogateMarker)
+					return new SnapshotSpan (bufferPosition.Snapshot, bufferPosition.Position, 2);
+				if ((c & CaretMoveActions.HighSurrogateMarker) == CaretMoveActions.HighSurrogateMarker)
+					return new SnapshotSpan (bufferPosition.Snapshot, bufferPosition.Position - 1, 2);
+				return new SnapshotSpan (bufferPosition, 1);
 			}
 
 			public VirtualSnapshotPoint GetVirtualBufferPositionFromXCoordinate(double xCoordinate)

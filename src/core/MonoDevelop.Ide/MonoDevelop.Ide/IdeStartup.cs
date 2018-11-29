@@ -64,7 +64,7 @@ namespace MonoDevelop.Ide
 	public class IdeStartup: IApplication
 	{
 		Socket listen_socket   = null;
-		ArrayList errorsList = new ArrayList ();
+		List<AddinError> errorsList = new List<AddinError> ();
 		bool initialized;
 		static readonly int ipcBasePort = 40000;
 		static Stopwatch startupTimer = new Stopwatch ();
@@ -86,7 +86,7 @@ namespace MonoDevelop.Ide
 		{
 			LoggingService.LogInfo ("Starting {0} {1}", BrandingService.ApplicationLongName, IdeVersionInfo.MonoDevelopVersion);
 			LoggingService.LogInfo ("Build Information{0}{1}", Environment.NewLine, SystemInformation.GetBuildInformation ());
-			LoggingService.LogInfo ("Running on {0}", IdeVersionInfo.GetRuntimeInfo ());
+			LoggingService.LogInfo ("Running on {0}", RuntimeVersionInfo.GetRuntimeInfo ());
 
 			//ensure native libs initialized before we hit anything that p/invokes
 			Platform.Initialize ();
@@ -284,7 +284,7 @@ namespace MonoDevelop.Ide
 				startupSectionTimer.Restart ();
 
 				if (errorsList.Count > 0) {
-					using (AddinLoadErrorDialog dlg = new AddinLoadErrorDialog ((AddinError[]) errorsList.ToArray (typeof(AddinError)), false)) {
+					using (AddinLoadErrorDialog dlg = new AddinLoadErrorDialog (errorsList.ToArray (), false)) {
 						if (!dlg.Run ())
 							return 1;
 					}
@@ -328,7 +328,7 @@ namespace MonoDevelop.Ide
 			}
 
 			if (errorsList.Count > reportedFailures) {
-				using (AddinLoadErrorDialog dlg = new AddinLoadErrorDialog ((AddinError[]) errorsList.ToArray (typeof(AddinError)), true))
+				using (AddinLoadErrorDialog dlg = new AddinLoadErrorDialog (errorsList.ToArray (), true))
 					dlg.Run ();
 			}
 			
@@ -376,7 +376,8 @@ namespace MonoDevelop.Ide
 
 			// Start this timer to limit the time to decide if the app was opened by a file manager
 			IdeApp.StartFMOpenTimer (FMOpenTimerExpired);
-			IdeApp.Workspace.FirstWorkspaceItemOpened += CompleteTimeToCode;
+			IdeApp.Workspace.FirstWorkspaceItemOpened += CompleteSolutionTimeToCode;
+			IdeApp.Workbench.DocumentOpened += CompleteFileTimeToCode;
 
 			CreateStartupMetadata (startupInfo, sectionTimings);
 
@@ -402,13 +403,13 @@ namespace MonoDevelop.Ide
 
 		void FMOpenTimerExpired ()
 		{
-			IdeApp.Workspace.FirstWorkspaceItemOpened -= CompleteTimeToCode;
+			IdeApp.Workspace.FirstWorkspaceItemOpened -= CompleteSolutionTimeToCode;
+			IdeApp.Workbench.DocumentOpened -= CompleteFileTimeToCode;
+
 			timeToCodeTimer.Stop ();
 			timeToCodeTimer = null;
 
-			lock (ttcLock) {
-				ttcMetadata = null;
-			}
+			ttcMetadata = null;
 		}
 
 		/// <summary>
@@ -455,7 +456,6 @@ namespace MonoDevelop.Ide
 			return false;
 		}
 
-		static readonly object ttcLock = new object ();
 		async void CreateStartupMetadata (StartupInfo startupInfo, Dictionary<string, long> timings)
 		{
 			var result = await Task.Run (() => DesktopService.PlatformTelemetry);
@@ -466,34 +466,47 @@ namespace MonoDevelop.Ide
 			var startupMetadata = GetStartupMetadata (startupInfo, result, timings);
 			Counters.Startup.Inc (startupMetadata);
 
-			lock (ttcLock) {
-				if (ttcMetadata != null) {
-					ttcMetadata.AddProperties (startupMetadata);
-				}
+			if (ttcMetadata != null) {
+				ttcMetadata.AddProperties (startupMetadata);
 			}
 
 			IdeApp.OnStartupCompleted ();
 		}
 
-		static void CompleteTimeToCode (object sender, EventArgs args)
+		enum TimeToCodeFileType
 		{
-			IdeApp.Workspace.FirstWorkspaceItemOpened -= CompleteTimeToCode;
+			Solution,
+			Document
+		}
+
+		static void CompleteSolutionTimeToCode (object sender, EventArgs args)
+		{
+			CompleteTimeToCode (TimeToCodeMetadata.DocumentType.Solution);
+		}
+
+		static void CompleteFileTimeToCode (object sender, EventArgs args)
+		{
+			CompleteTimeToCode (TimeToCodeMetadata.DocumentType.File);
+		}
+
+		static void CompleteTimeToCode (TimeToCodeMetadata.DocumentType type)
+		{
+			IdeApp.Workspace.FirstWorkspaceItemOpened -= CompleteSolutionTimeToCode;
+			IdeApp.Workbench.DocumentOpened -= CompleteFileTimeToCode;
 
 			if (timeToCodeTimer == null) {
 				return;
 			}
 
 			timeToCodeTimer.Stop ();
-			lock (ttcLock) {
-				ttcMetadata.SolutionLoadTime = timeToCodeTimer.ElapsedMilliseconds;
+			ttcMetadata.SolutionLoadTime = timeToCodeTimer.ElapsedMilliseconds;
 
-				ttcMetadata.CorrectedDuration = ttcMetadata.StartupTime + ttcMetadata.SolutionLoadTime;
+			ttcMetadata.CorrectedDuration = ttcMetadata.StartupTime + ttcMetadata.SolutionLoadTime;
+			ttcMetadata.Type = type;
 
-
-				if (IdeApp.ReportTimeToCode) {
-					Counters.TimeToCode.Inc ("SolutionLoaded", ttcMetadata);
-					IdeApp.ReportTimeToCode = false;
-				}
+			if (IdeApp.ReportTimeToCode) {
+				Counters.TimeToCode.Inc ("SolutionLoaded", ttcMetadata);
+				IdeApp.ReportTimeToCode = false;
 			}
 			timeToCodeTimer = null;
 		}

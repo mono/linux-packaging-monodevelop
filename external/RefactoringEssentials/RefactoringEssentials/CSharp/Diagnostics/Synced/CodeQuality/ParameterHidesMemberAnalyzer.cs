@@ -26,7 +26,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         {
             context.EnableConcurrentExecution();
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterSyntaxNodeAction(AnalyzeParameterList, new SyntaxKind[] { SyntaxKind.ParameterList });
+            context.RegisterSyntaxNodeAction(ctx => AnalyzeParameterList (ctx), new SyntaxKind[] { SyntaxKind.ParameterList });
         }
 
         static void AnalyzeParameterList(SyntaxNodeAnalysisContext nodeContext)
@@ -45,12 +45,24 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             if (memberSymbol is IMethodSymbol && ((IMethodSymbol)memberSymbol).MethodKind == MethodKind.Constructor || memberSymbol.ExplicitInterfaceImplementations().Length > 0)
                 return;
 
-            var symbols = nodeContext.SemanticModel.LookupSymbols(node.SpanStart, memberSymbol.GetContainingTypeOrThis ());
+			var containingType = memberSymbol.GetContainingTypeOrThis();
+			var staticContext = memberSymbol.IsStatic;
+
             foreach (var param in node.Parameters)
             {
-                var hidingMember = symbols.FirstOrDefault(v => v.Name == param.Identifier.ValueText && ((memberSymbol.IsStatic && v.IsStatic) || !memberSymbol.IsStatic) && !v.IsKind(SymbolKind.Local) && !v.IsKind(SymbolKind.Parameter));
-                if (hidingMember == null)
-                    continue;
+				var name = param.Identifier.ValueText;
+
+				ISymbol hidingMember;
+				INamedTypeSymbol currentSymbolToSearch = containingType;
+				do
+				{
+					if (!LocalVariableHidesMemberAnalyzer.TryFindMember(name, currentSymbolToSearch, containingType, staticContext, out hidingMember))
+						currentSymbolToSearch = currentSymbolToSearch.BaseType;
+				} while (hidingMember == null && currentSymbolToSearch != null);
+
+				if (hidingMember == null)
+					continue;
+
                 string msg;
                 switch (hidingMember.Kind)
                 {

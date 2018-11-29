@@ -261,7 +261,8 @@ ALL_FILES := $(EXTS) \
 		$(wildcard templates/*)
 
 WILDCARDED_FILES := $(wildcard $(ALL_FILES))
-EXTRA_DIST = $(wildcard $(ALL_FILES)) $(wildcard Templates/*.cshtml)
+EXTRA_DIST = $(wildcard $(ALL_FILES)) $(wildcard Templates/*.cshtml) \
+	$(wildcard Templates/*.json)
 all: all-am
 
 .SUFFIXES:

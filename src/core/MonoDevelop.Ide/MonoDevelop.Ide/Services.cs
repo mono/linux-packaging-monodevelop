@@ -65,12 +65,14 @@ namespace MonoDevelop.Ide
 		internal static TimerCounter CompositionCacheControl = InstrumentationService.CreateTimerCounter ("MEF Composition Control Cache", "IDE", id: "Ide.Startup.Composition.ControlCache");
 		internal static TimerCounter CompositionCache = InstrumentationService.CreateTimerCounter ("MEF Composition From Cache", "IDE", id: "Ide.Startup.Composition.Cache");
 		internal static TimerCounter CompositionSave = InstrumentationService.CreateTimerCounter ("MEF Composition Save", "IDE", id: "Ide.CompositionSave");
+		internal static TimerCounter AnalysisTimer = InstrumentationService.CreateTimerCounter ("Code Analysis", "IDE", id:"Ide.CodeAnalysis");
 		internal static TimerCounter ProcessCodeCompletion = InstrumentationService.CreateTimerCounter ("Process Code Completion", "IDE", id: "Ide.ProcessCodeCompletion", logMessages:false);
 		internal static Counter<CompletionStatisticsMetadata> CodeCompletionStats = InstrumentationService.CreateCounter<CompletionStatisticsMetadata> ("Code Completion Statistics", "IDE", id:"Ide.CodeCompletionStatistics");
 		internal static Counter<TimeToCodeMetadata> TimeToCode = InstrumentationService.CreateCounter<TimeToCodeMetadata> ("Time To Code", "IDE", id: "Ide.TimeToCode");
 		internal static bool TrackingBuildAndDeploy;
 		internal static TimerCounter<BuildAndDeployMetadata> BuildAndDeploy = InstrumentationService.CreateTimerCounter<BuildAndDeployMetadata> ("Build and Deploy", "IDE", id: "Ide.BuildAndDeploy");
 		internal static Counter<PlatformMemoryMetadata> MemoryPressure = InstrumentationService.CreateCounter<PlatformMemoryMetadata> ("Memory Pressure", "IDE", id: "Ide.MemoryPressure");
+		internal static Counter<PlatformThermalMetadata> ThermalNotification = InstrumentationService.CreateCounter<PlatformThermalMetadata> ("Thermal Notification", "IDE", id: "Ide.ThermalNotification");
 
 		internal static Counter<UnhandledExceptionMetadata> UnhandledExceptions = InstrumentationService.CreateCounter<UnhandledExceptionMetadata> ("Unhandled Exceptions", "IDE", id: "Ide.UnhandledExceptions");
 		internal static class ParserService {
@@ -155,6 +157,11 @@ namespace MonoDevelop.Ide
 
 	class TimeToCodeMetadata : CounterMetadata
 	{
+		public enum DocumentType {
+			Solution,
+			File
+		};
+
 		public long CorrectedDuration {
 			get => GetProperty<long> ();
 			set => SetProperty (value);
@@ -167,6 +174,11 @@ namespace MonoDevelop.Ide
 
 		public long SolutionLoadTime {
 			get => GetProperty<long> ();
+			set => SetProperty (value);
+		}
+
+		public DocumentType Type {
+			get => GetProperty<DocumentType> ();
 			set => SetProperty (value);
 		}
 	}

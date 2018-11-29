@@ -1,5 +1,4 @@
-//
-//
+﻿//
 // Counters.cs
 //
 // Author:

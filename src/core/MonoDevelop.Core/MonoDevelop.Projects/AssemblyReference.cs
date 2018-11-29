@@ -25,11 +25,13 @@
 // THE SOFTWARE.
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using MonoDevelop.Core;
 using MonoDevelop.Projects.MSBuild;
 
 namespace MonoDevelop.Projects
 {
+	[DebuggerDisplay ("{FilePath}")]
 	public sealed class AssemblyReference
 	{
 		IReadOnlyPropertySet metadata;
@@ -79,6 +81,16 @@ namespace MonoDevelop.Projects
 		/// True if the assembly is from the target framework.
 		/// </summary>
 		public bool IsFrameworkFile => MetadataIsTrue ("FrameworkFile");
+
+		/// <summary>
+		/// Whether the assembly is a facade assembly.
+		/// </summary>
+		public bool IsFacade => ResolvedFrom == "ImplicitlyExpandDesignTimeFacades";
+
+		/// <summary>
+		/// The value of the ResolvedFrom metadata, for example '{GAC}' or 'ImplicitlyExpandDesignTimeFacades'.
+		/// </summary>
+		public string ResolvedFrom => GetMetadata ("ResolvedFrom");
 
 		public IReadOnlyPropertySet Metadata {
 			get { return metadata; }

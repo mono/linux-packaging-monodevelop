@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Linq;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
@@ -26,28 +27,24 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         {
             context.EnableConcurrentExecution();
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterSyntaxNodeAction(
-                (nodeContext) =>
-                {
-                    Diagnostic diagnostic;
-                    if (TryGetDiagnostic(nodeContext, out diagnostic))
-                    {
-                        nodeContext.ReportDiagnostic(diagnostic);
-                    }
-                },
-                new SyntaxKind[] { SyntaxKind.LocalDeclarationStatement }
-            );
-            context.RegisterSyntaxNodeAction(
-                (nodeContext) =>
-                {
-                    Diagnostic diagnostic;
-                    if (TryGetDiagnosticFromForeach(nodeContext, out diagnostic))
-                    {
-                        nodeContext.ReportDiagnostic(diagnostic);
-                    }
-                },
-                new SyntaxKind[] { SyntaxKind.ForEachStatement }
-            );
+
+			context.RegisterOperationAction(operationContext =>
+			{
+				Diagnostic diagnostic;
+				if (TryGetDiagnostic (operationContext, out diagnostic))
+				{
+					operationContext.ReportDiagnostic(diagnostic);
+				}
+			}, OperationKind.VariableDeclaration);
+
+			context.RegisterOperationAction(operationContext =>
+			{
+				Diagnostic diagnostic;
+				if (TryGetDiagnosticFromForeach(operationContext, out diagnostic))
+				{
+					operationContext.ReportDiagnostic(diagnostic);
+				}
+			}, OperationKind.Loop);
         }
 
         static string GetMemberType(SymbolKind symbolKind)
@@ -67,61 +64,107 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             return GettextCatalog.GetString("member");
         }
 
-        static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
+        static bool TryGetDiagnostic(OperationAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
             diagnostic = default(Diagnostic);
-            var node = nodeContext.Node as LocalDeclarationStatementSyntax;
-            var member = node.AncestorsAndSelf().FirstOrDefault(n => n is MemberDeclarationSyntax);
-            if (member == null)
-                return false;
-            var memberSymbol = nodeContext.SemanticModel.GetDeclaredSymbol(member);
-            if (memberSymbol == null)
-                return false;
-            var symbols = nodeContext.SemanticModel.LookupSymbols(member.SpanStart, memberSymbol.GetContainingTypeOrThis());
+            var node = (IVariableDeclarationOperation)nodeContext.Operation;
+			var containingSymbol = nodeContext.ContainingSymbol;
+			if (containingSymbol == null)
+				return false;
+			bool staticContext = containingSymbol.IsStatic;
+			var containingType = containingSymbol.GetContainingTypeOrThis ();
+			if (containingType == null)
+				return false;
 
-            foreach (var variable in node.Declaration.Variables)
-            {
-                var hidingMember = symbols.FirstOrDefault(v =>
-                    v.Name == variable.Identifier.ValueText 
-                        && ((memberSymbol.IsStatic && v.IsStatic) || !memberSymbol.IsStatic) 
-                        && !v.IsKind(SymbolKind.Local) 
-                        && !v.IsKind(SymbolKind.Parameter)
-                        && !v.IsType());
-                if (hidingMember == null)
-                    continue;
+			foreach (var variable in node.Declarators)
+			{
+				var name = variable.Symbol.Name;
 
-                var mre = variable.Initializer?.Value as MemberAccessExpressionSyntax;
-                if (mre != null && mre.Name.Identifier.ValueText == hidingMember.Name && mre.Expression.IsKind(SyntaxKind.ThisExpression))
-                {
-                    // Special case: the variable is initialized from the member it is hiding
-                    // In this case, the hiding is obviously intentional and we shouldn't show a warning.
-                    continue;
-                }
-                string memberType = GetMemberType(hidingMember.Kind);
-                diagnostic = Diagnostic.Create(descriptor, variable.Identifier.GetLocation(), variable.Identifier, memberType, hidingMember.Name);
-                return true;
-            }
-            return false;
+				var initializer = variable.Initializer;
+				if (initializer?.Value is IFieldReferenceOperation fieldReferenceOperation)
+				{
+					if (fieldReferenceOperation.Field.Name == name && fieldReferenceOperation.Instance?.Syntax.IsKind(SyntaxKind.ThisExpression) == true)
+					{
+						continue;
+					}
+				}
+
+				ISymbol hidingMember;
+				INamedTypeSymbol currentSymbolToSearch = containingType;
+				do
+				{
+					if (!TryFindMember(name, currentSymbolToSearch, containingType, staticContext, out hidingMember))
+						currentSymbolToSearch = currentSymbolToSearch.BaseType;
+				} while (hidingMember == null && currentSymbolToSearch != null);
+
+				if (hidingMember == null)
+					continue;
+
+				string memberType = GetMemberType(hidingMember.Kind);
+				if (variable.Syntax is VariableDeclaratorSyntax declaratorSyntax)
+				{
+					diagnostic = Diagnostic.Create(descriptor, declaratorSyntax.Identifier.GetLocation(), name, memberType, hidingMember.Name);
+					return true;
+				}
+			}
+			return false;
         }
 
-        static bool TryGetDiagnosticFromForeach(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
+		internal static bool TryFindMember (string name, INamedTypeSymbol inSymbol, INamedTypeSymbol accessibleWithin, bool staticContext, out ISymbol hidingMember)
+		{
+			hidingMember = null;
+
+			var members = inSymbol.GetMembers();
+			foreach (var memberMember in members)
+			{
+				if (memberMember.Name == name &&
+					memberMember.IsAccessibleWithin(accessibleWithin) &&
+					((staticContext && memberMember.IsStatic) || !staticContext))
+				{
+					hidingMember = memberMember;
+					break;
+				}
+			}
+
+			return hidingMember != null;
+		}
+
+		static bool TryGetDiagnosticFromForeach(OperationAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
             diagnostic = default(Diagnostic);
-            var node = nodeContext.Node as ForEachStatementSyntax;
-            var member = node.AncestorsAndSelf().FirstOrDefault(n => n is MemberDeclarationSyntax);
-            if (member == null)
-                return false;
-            var memberSymbol = nodeContext.SemanticModel.GetDeclaredSymbol(member);
-            if (memberSymbol == null)
-                return false;
-            var symbols = nodeContext.SemanticModel.LookupSymbols(member.SpanStart, memberSymbol.GetContainingTypeOrThis());
+			var node = (ILoopOperation)nodeContext.Operation;
+			if (!(node is IForEachLoopOperation forEachLoop))
+				return false;
 
-            var hidingMember = symbols.FirstOrDefault(v => v.Name == node.Identifier.ValueText && ((memberSymbol.IsStatic && v.IsStatic) || !memberSymbol.IsStatic) && !v.IsKind(SymbolKind.Local) && !v.IsKind(SymbolKind.Parameter));
-            if (hidingMember == null)
-                return false;
+			if (!(forEachLoop.Syntax is ForEachStatementSyntax syntax))
+				return false;
+			var location = syntax.Identifier.GetLocation();
+			var containingSymbol = nodeContext.ContainingSymbol;
+			if (containingSymbol == null)
+				return false;
+			bool staticContext = containingSymbol.IsStatic;
+			var containingType = containingSymbol.GetContainingTypeOrThis();
+			if (containingType == null)
+				return false;
 
+			if (node.Locals.Length != 1)
+				return false;
+
+			var name = node.Locals[0].Name;
+
+			ISymbol hidingMember;
+			INamedTypeSymbol currentSymbolToSearch = containingType;
+			do
+			{
+				if (!TryFindMember(name, currentSymbolToSearch, containingType, staticContext, out hidingMember))
+					currentSymbolToSearch = currentSymbolToSearch.BaseType;
+			} while (hidingMember == null && currentSymbolToSearch != null);
+
+			if (hidingMember == null)
+				return false;
+				
             string memberType = GetMemberType(hidingMember.Kind);
-            diagnostic = Diagnostic.Create(descriptor, node.Identifier.GetLocation(), node.Identifier, memberType, hidingMember.Name);
+            diagnostic = Diagnostic.Create(descriptor, location, name, memberType, hidingMember.Name);
             return true;
         }
     }

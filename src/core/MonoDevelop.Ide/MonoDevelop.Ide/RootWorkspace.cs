@@ -882,7 +882,7 @@ namespace MonoDevelop.Ide
 			}
 			
 			if (entry is SolutionFolder) {
-				ArrayList ens = new ArrayList ();
+				var ens = new List<SolutionFolderItem> ();
 				foreach (SolutionFolderItem ce in ((SolutionFolder)entry).Items)
 					ens.Add (ce);
 				foreach (SolutionFolderItem ce in ens)
@@ -1234,6 +1234,10 @@ namespace MonoDevelop.Ide
 		
 		void CheckFileRename(object sender, FileCopyEventArgs args)
 		{
+			// Do not rename the file or directory in the project for changes made outside the IDE.
+			if (args.IsExternal)
+				return;
+
 			foreach (Solution sol in GetAllSolutions ()) {
 				foreach (FileCopyEventInfo e in args)
 					sol.RootFolder.RenameFileInProjects (e.SourceFile, e.TargetFile);

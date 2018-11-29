@@ -60,9 +60,9 @@ namespace MonoDevelop.Projects
 			base.TearDown ();
 		}
 
-		async Task<DotNetProject> OpenProject ()
+		async Task<DotNetProject> OpenProject (string solutionName = "DotNetCoreFileWatcherTests.sln")
 		{
-			string solutionFileName = Util.GetSampleProject ("DotNetCoreFileWatcherTests", "DotNetCoreFileWatcherTests.sln");
+			string solutionFileName = Util.GetSampleProject ("DotNetCoreFileWatcherTests", solutionName);
 			solution = (Solution) await Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solutionFileName);
 			project = solution.GetAllProjects ().Single () as DotNetProject;
 
@@ -71,6 +71,8 @@ namespace MonoDevelop.Projects
 			Assert.AreEqual (0, project.Files.Count);
 
 			RunMSBuild ($"/t:Restore /p:RestoreDisableParallel=true \"{solution.FileName}\"");
+
+			await FileWatcherService.Add (solution);
 
 			return project;
 		}
@@ -218,6 +220,9 @@ namespace MonoDevelop.Projects
 
 		void FileServiceOnFileRenamed (object sender, FileCopyEventArgs e)
 		{
+			if (!e.IsExternal)
+				return;
+
 			FileService.FileRenamed -= FileServiceOnFileRenamed;
 
 			try {
@@ -232,8 +237,12 @@ namespace MonoDevelop.Projects
 			}
 		}
 
-		Task<FileEventArgs> WaitForSingleDirectoryCreated ()
+		FilePath directoryToBeCreated = FilePath.Null;
+
+		Task<FileEventArgs> WaitForSingleDirectoryCreated (FilePath directory)
 		{
+			directoryToBeCreated = directory;
+
 			directoryCreatedCompletionSource = new TaskCompletionSource<FileEventArgs> ();
 
 			FileService.FileCreated += FileServiceOnFileCreated;
@@ -243,6 +252,11 @@ namespace MonoDevelop.Projects
 
 		void FileServiceOnFileCreated (object sender, FileEventArgs e)
 		{
+			if (directoryToBeCreated.IsNotNull) {
+				if (!e.Any (file => file.FileName == directoryToBeCreated))
+					return;
+			}
+
 			FileService.FileCreated -= FileServiceOnFileCreated;
 
 			try {
@@ -266,7 +280,7 @@ namespace MonoDevelop.Projects
 			FileService.FileRemoved -= FileServiceOnFileRemoved;
 
 			try {
-				directoryRemovedCompletionSource.SetResult (e);
+				directoryRemovedCompletionSource.TrySetResult (e);
 			} catch (Exception ex) {
 				directoryRemovedCompletionSource.SetException (ex);
 			}
@@ -373,12 +387,12 @@ namespace MonoDevelop.Projects
 			await AssertFileAddedToProject (fileAdded, newCSharpFilePath, "Compile");
 
 			// Move directory
+			var renamedDirectory = project.BaseDirectory.Combine ("Files");
 			var directoryRenamed = WaitForSingleDirectoryRenamed ();
-			var directoryCreated = WaitForSingleDirectoryCreated ();
+			var directoryCreated = WaitForSingleDirectoryCreated (renamedDirectory);
 			var directoryRemoved = WaitForSingleDirectoryRemoved ();
 			var combinedDirectoryTask = Task.WhenAll (directoryRenamed, directoryCreated, directoryRemoved);
 
-			var renamedDirectory = project.BaseDirectory.Combine ("Files");
 			var renamedCSharpFileName = renamedDirectory.Combine ("NewCSharpFile.cs");
 			Directory.Move (directory, renamedDirectory);
 
@@ -468,6 +482,89 @@ namespace MonoDevelop.Projects
 
 			Assert.AreNotEqual (fileAdded, finishedTask);
 			Assert.AreNotEqual (fileRemoved, finishedTask);
+		}
+
+		/// <summary>
+		/// Tests that a file is added to the project when the file glob has extra MSBuild metadata. For example,
+		/// adding a .css file to an ASP.NET Core project in a wwwroot subdirectory which has the associated glob:
+		/// Content Include="wwwroot\**" CopyToPublishDirectory="PreserveNewest"
+		/// </summary>
+		[Test]
+		public async Task AddFileExternally_FileGlobHasMSBuildMetadata_FileAddedToProject ()
+		{
+			await OpenProject ("DotNetCoreMetadataTests.sln");
+			var wwwrootDirectory = project.BaseDirectory.Combine ("wwwroot");
+			Directory.CreateDirectory (wwwrootDirectory);
+
+			var fileAdded = WaitForSingleFileAdded (project);
+			var cssFilePath = WriteFile (wwwrootDirectory, "site.css");
+
+			await AssertFileAddedToProject (fileAdded, cssFilePath, "Content");
+		}
+
+		/// <summary>
+		/// File watcher service is being used which will monitor other directories, such as the solution directory,
+		/// so check that the project does not add files that are created externally outside the project directory.
+		/// </summary>
+		[Test]
+		public async Task FileCreatedOutsideProjectDirectory_FileNotAddedToProject ()
+		{
+			await OpenProject ();
+
+			// Create a file outside the project directory.
+			var fileAdded = WaitForSingleFileAdded (project);
+			var fileOutsideProjectDirectory = WriteFile (project.ParentSolution.BaseDirectory, "OutsideProjectInSolutionDirectory.cs");
+
+			var csharpFilePath = WriteFile (project.BaseDirectory, "CSharpFile.cs");
+			await AssertFileAddedToProject (fileAdded, csharpFilePath, "Compile");
+
+			Assert.IsTrue (project.Files.Any (file => file.FilePath == csharpFilePath), $"File not added to project '{csharpFilePath}'");
+			Assert.IsFalse (project.Files.Any (file => file.FilePath == fileOutsideProjectDirectory), $"File not removed from project '{fileOutsideProjectDirectory}'");
+		}
+
+		[Test]
+		public async Task MoveDirectoryOutsideProjectDirectory ()
+		{
+			await OpenProject ();
+
+			// Create new C# file in new subdirectory.
+			var fileAdded = WaitForSingleFileAdded (project);
+			var directory = project.BaseDirectory.Combine ("Src");
+			Directory.CreateDirectory (directory);
+			var newCSharpFilePath = WriteFile (directory, "NewCSharpFile.cs");
+
+			await AssertFileAddedToProject (fileAdded, newCSharpFilePath, "Compile");
+
+			// Move directory outside the project's directory.
+			var renamedDirectory = project.ParentSolution.BaseDirectory.Combine ("RenamedSrc");
+			var renamedCSharpFileName = renamedDirectory.Combine ("NewCSharpFile.cs");
+			Directory.Move (directory, renamedDirectory);
+
+			// Create new file in project directory.
+			fileAdded = WaitForSingleFileAdded (project);
+			var newCSharpFilePath2 = WriteFile (project.BaseDirectory, "NewCSharpFile2.cs");
+			await AssertFileAddedToProject (fileAdded, newCSharpFilePath2, "Compile");
+
+			Assert.IsFalse (project.Files.Any (file => file.FilePath.FileName == "NewCSharpFile.cs"), "File not removed from project");
+		}
+
+		[Test]
+		public async Task MoveDirectoryIntoProjectDirectory ()
+		{
+			await OpenProject ();
+
+			// Create new C# file in new subdirectory inside solution.
+			var fileAdded = WaitForSingleFileAdded (project);
+			var directory = solution.BaseDirectory.Combine ("Src");
+			Directory.CreateDirectory (directory);
+			var newCSharpFilePath = WriteFile (directory, "NewCSharpFile.cs");
+
+			// Move directory inside project
+			var renamedDirectory = project.BaseDirectory.Combine ("RenamedSrc");
+			var renamedCSharpFileName = renamedDirectory.Combine ("NewCSharpFile.cs");
+			Directory.Move (directory, renamedDirectory);
+
+			await AssertFileAddedToProject (fileAdded, renamedCSharpFileName, "Compile");
 		}
 	}
 }

@@ -170,6 +170,11 @@ namespace MonoDevelop.Projects
 			return next.OnReevaluateProject (monitor);
 		}
 
+		internal protected virtual Task<ImmutableArray<FilePath>> OnGetAnalyzerFiles (ProgressMonitor monitor, ConfigurationSelector configuration)
+		{
+			return next.OnGetAnalyzerFiles (monitor, configuration);
+		}
+
 		internal protected virtual Task<ProjectFile []> OnGetSourceFiles (ProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			return next.OnGetSourceFiles (monitor, configuration);
@@ -217,11 +222,13 @@ namespace MonoDevelop.Projects
 			return next.OnCreateProjectItem (item);
 		}
 
+		[Obsolete ("Use MSBuild")]
 		internal protected virtual void OnPopulateSupportFileList (FileCopySet list, ConfigurationSelector configuration)
 		{
 			next.OnPopulateSupportFileList (list, configuration);
 		}
 
+		[Obsolete ("Use MSBuild")]
 		internal protected virtual void OnPopulateOutputFileList (List<FilePath> list, ConfigurationSelector configuration)
 		{
 			next.OnPopulateOutputFileList (list, configuration);

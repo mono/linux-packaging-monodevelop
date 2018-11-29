@@ -52,7 +52,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             SyntaxTreeAnalysisContext ctx;
             SemanticModel semanticModel;
 
-            IList<ITypeParameterSymbol> availableTypeParameters = new List<ITypeParameterSymbol>();
+			ImmutableArray<ITypeParameterSymbol> availableTypeParameters = ImmutableArray<ITypeParameterSymbol>.Empty;
 
             public GatherVisitor(SyntaxTreeAnalysisContext ctx, SemanticModel semanticModel)
             {
@@ -66,31 +66,29 @@ namespace RefactoringEssentials.CSharp.Diagnostics
             }
 
             public override void VisitClassDeclaration(Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax node)
-            {
-                var type = semanticModel.GetDeclaredSymbol(node) as INamedTypeSymbol;
+			{
+				ctx.CancellationToken.ThrowIfCancellationRequested();
+				var type = semanticModel.GetDeclaredSymbol(node) as INamedTypeSymbol;
                 var oldTypeParameters = availableTypeParameters; 
                 if (type != null)
                 {
-                    availableTypeParameters = Concat(availableTypeParameters, type.TypeParameters);
+					availableTypeParameters = availableTypeParameters.AddRange(type.TypeParameters);
                 }
                 base.VisitClassDeclaration(node);
                 availableTypeParameters = oldTypeParameters;
             }
 
             public override void VisitStructDeclaration(Microsoft.CodeAnalysis.CSharp.Syntax.StructDeclarationSyntax node)
-            {
-                var type = semanticModel.GetDeclaredSymbol(node) as INamedTypeSymbol;
+			{
+				ctx.CancellationToken.ThrowIfCancellationRequested();
+				var type = semanticModel.GetDeclaredSymbol(node) as INamedTypeSymbol;
                 var oldTypeParameters = availableTypeParameters; 
                 if (type != null)
                 {
-                    availableTypeParameters = Concat(availableTypeParameters, type.TypeParameters);
-                }
+                    availableTypeParameters = availableTypeParameters.AddRange(type.TypeParameters);
+				}
                 base.VisitStructDeclaration(node);
                 availableTypeParameters = oldTypeParameters;
-            }
-            static IList<ITypeParameterSymbol> Concat(params IList<ITypeParameterSymbol>[] lists)
-            {
-                return lists.SelectMany(l => l).ToList();
             }
 
             public override void VisitEnumDeclaration(Microsoft.CodeAnalysis.CSharp.Syntax.EnumDeclarationSyntax node)
@@ -110,15 +108,21 @@ namespace RefactoringEssentials.CSharp.Diagnostics
 			{
                 if (type == null)
                     return false;
-				if (availableTypeParameters.Count == 0)
+				if (availableTypeParameters.Length == 0)
 					return true;
 
                 var fieldType = semanticModel.GetTypeInfo(type).Type;
 				if (fieldType == null)
 					return false;
 
+				if (fieldType is ITypeParameterSymbol parameterSymbol)
+				{
+					if (availableTypeParameters.Length == 1 && fieldType == availableTypeParameters[0])
+						return true;
+				}
+
 				// Check that all current type parameters are used in the field type
-                var fieldTypeParameters = fieldType.GetAllTypeArguments();
+				var fieldTypeParameters = fieldType.GetAllTypeArguments();
                 foreach (var typeParameter in availableTypeParameters) {
                     if (!fieldTypeParameters.Contains(typeParameter))
 						return false;

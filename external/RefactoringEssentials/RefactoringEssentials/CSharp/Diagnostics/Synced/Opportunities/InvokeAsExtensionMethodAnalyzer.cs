@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace RefactoringEssentials.CSharp.Diagnostics
 {
@@ -25,7 +26,7 @@ namespace RefactoringEssentials.CSharp.Diagnostics
         {
             context.EnableConcurrentExecution();
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterSyntaxNodeAction(
+            context.RegisterOperationAction(
                 (nodeContext) =>
                 {
                     Diagnostic diagnostic;
@@ -34,54 +35,75 @@ namespace RefactoringEssentials.CSharp.Diagnostics
                         nodeContext.ReportDiagnostic(diagnostic);
                     }
                 },
-                new SyntaxKind[] { SyntaxKind.InvocationExpression }
-            );
+				OperationKind.Invocation
+			);
         }
 
-        static bool TryGetDiagnostic(SyntaxNodeAnalysisContext nodeContext, out Diagnostic diagnostic)
+        static bool TryGetDiagnostic(OperationAnalysisContext nodeContext, out Diagnostic diagnostic)
         {
-            var node = nodeContext.Node as InvocationExpressionSyntax;
-            var semanticModel = nodeContext.SemanticModel;
-            var cancellationToken = nodeContext.CancellationToken;
+			diagnostic = default(Diagnostic);
 
-            diagnostic = default(Diagnostic);
-            var memberReference = node.Expression as MemberAccessExpressionSyntax;
-            if (memberReference == null)
-                return false;
-            var firstArgument = node.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
-            if (firstArgument == null|| firstArgument.IsKind(SyntaxKind.NullLiteralExpression))
-                return false;
-            if (firstArgument is AnonymousFunctionExpressionSyntax)
-                return false;
-            var expressionSymbol = semanticModel.GetSymbolInfo(node.Expression).Symbol as IMethodSymbol;
-            // Ignore non-extensions and reduced extensions (so a.Ext, as opposed to B.Ext(a))
-            if (expressionSymbol == null || !expressionSymbol.IsExtensionMethod || expressionSymbol.MethodKind == MethodKind.ReducedExtension)
-                return false;
+			var node = (IInvocationOperation)nodeContext.Operation;
+			var method = node.TargetMethod;
+			if (!method.IsExtensionMethod || method.MethodKind == MethodKind.ReducedExtension)
+				return false;
 
-            var extensionMethodDeclaringType = expressionSymbol.ContainingType;
-            if (extensionMethodDeclaringType.Name != memberReference.Expression.ToString())
-                return false;
+			if (!TryGetMemberAccess(node, out var access))
+				return false;
 
-            var firstArgumentType = semanticModel.GetTypeInfo(firstArgument).Type;
-            if (firstArgumentType != null)
-            {
-                if (!firstArgumentType.Equals(expressionSymbol.Parameters[0].Type))
-                    return false;
-            }
+			// Only report if it's not a qualified invocation
+			if (!(access.Expression is SimpleNameSyntax name) || name.Identifier.Text != method.ContainingType.Name)
+				return false;
 
-            // Don't allow conversion if first parameter is a method name instead of variable (extension method on delegate type)
-            if (firstArgument is IdentifierNameSyntax)
-            {
-                var extensionMethodTargetExpression = semanticModel.GetSymbolInfo(firstArgument).Symbol as IMethodSymbol;
-                if (extensionMethodTargetExpression != null)
-                    return false;
-            }
+			if (node.Arguments.Length < 1)
+				return false;
 
-            diagnostic = Diagnostic.Create(
-                descriptor,
-                memberReference.Name.GetLocation()
-            );
-            return true;
+			var firstArgument = node.Arguments[0].Value;
+			if (firstArgument is IConversionOperation conversion && conversion.IsImplicit)
+				firstArgument = conversion.Operand;
+
+			// Ignore null literals
+			if (firstArgument is ILiteralOperation literal && literal.ConstantValue.HasValue && literal.ConstantValue.Value == null)
+				return false;
+
+			// Ignore mismatched parameters
+			if (!firstArgument.Type.Equals (method.Parameters[0].Type))
+				return false;
+
+			// Ignore delegates.
+			if (node.Arguments[0].Value is IDelegateCreationOperation)
+				return false;
+
+            //// Don't allow conversion if first parameter is a method name instead of variable (extension method on delegate type)
+            //if (firstArgument is IdentifierNameSyntax)
+            //{
+            //    var extensionMethodTargetExpression = semanticModel.GetSymbolInfo(firstArgument).Symbol as IMethodSymbol;
+            //    if (extensionMethodTargetExpression != null)
+            //        return false;
+            //}
+
+			if (TryGetMemberAccess (node, out var location))
+			{
+				diagnostic = Diagnostic.Create(
+					descriptor,
+					access.Name.GetLocation()
+				);
+				return true;
+			}
+			return false;
         }
-    }
+
+		static bool TryGetMemberAccess(IInvocationOperation operation, out MemberAccessExpressionSyntax memberAccess)
+		{
+			memberAccess = default(MemberAccessExpressionSyntax);
+			if (!(operation.Syntax is InvocationExpressionSyntax syntax))
+				return false;
+
+			if (!(syntax.Expression is MemberAccessExpressionSyntax access))
+				return false;
+
+			memberAccess = access;
+			return true;
+		}
+	}
 }

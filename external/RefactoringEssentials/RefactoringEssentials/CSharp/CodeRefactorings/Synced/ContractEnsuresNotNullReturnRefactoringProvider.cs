@@ -24,9 +24,29 @@ namespace RefactoringEssentials.CSharp.CodeRefactorings
             if (codeContractsContext == null)
                 return;
 
-            var methodNode = (MethodDeclarationSyntax)codeContractsContext.Node.AncestorsAndSelf().FirstOrDefault(n => n is MethodDeclarationSyntax);
-            var getterNode = (AccessorDeclarationSyntax)codeContractsContext.Node.AncestorsAndSelf().FirstOrDefault(n => n is AccessorDeclarationSyntax && n.Kind() == SyntaxKind.GetAccessorDeclaration);
-                        
+			MethodDeclarationSyntax methodNode = null;
+			AccessorDeclarationSyntax getterNode = null;
+
+			foreach (var node in codeContractsContext.Node.AncestorsAndSelf ())
+			{
+				if (node is BlockSyntax || node is ExpressionSyntax)
+					return;
+
+				if (node is MethodDeclarationSyntax method)
+				{
+					methodNode = method;
+					break;
+				}
+				if (node is AccessorDeclarationSyntax accessor)
+				{
+					if (accessor.Kind() == SyntaxKind.GetAccessorDeclaration)
+					{
+						getterNode = accessor;
+						break;
+					}
+				}
+			}
+
             if (methodNode == null && getterNode == null)
                 return;
 
