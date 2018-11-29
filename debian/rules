@@ -50,6 +50,7 @@ override_dh_clideps:
 			--exclude-moduleref=clr \
 			--exclude-moduleref=Microsoft.DiaSymReader.Native.amd64.dll \
 			--exclude-moduleref=Microsoft.DiaSymReader.Native.x86.dll \
+			--exclude-moduleref=Microsoft.VisualStudio.Setup.Configuration.Native.dll \
 			--exclude-moduleref=api-ms-win-core-sysinfo-l1-1-0.dll \
 			--exclude-moduleref=api-ms-win-core-sysinfo-l1-2-0.dll \
 			--exclude-moduleref=/System/Library/Frameworks/CoreServices.framework/CoreServices \
