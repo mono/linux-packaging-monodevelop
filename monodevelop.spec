@@ -33,9 +33,11 @@ BuildRequires:  libmonosgen-2_0-1
 BuildRequires:  libmono-2_0-1
 %if 0%{?rhel} <= 7
 BuildRequires:  libssh2-devel
+BuildRequires:  openssl-devel
+%else
+BuildRequires:	compat-openssl10
 %endif
 BuildRequires:  libcurl-devel
-BuildRequires:  openssl-devel
 BuildRequires:  fdupes
 BuildRequires:  git
 BuildRequires:  hicolor-icon-theme
