@@ -31,7 +31,9 @@ BuildRequires:  cmake
 BuildRequires:  msbuild
 BuildRequires:  libmonosgen-2_0-1
 BuildRequires:  libmono-2_0-1
+%if 0%{?rhel} <= 7
 BuildRequires:  libssh2-devel
+%endif
 BuildRequires:  libcurl-devel
 BuildRequires:  openssl-devel
 BuildRequires:  fdupes
@@ -59,6 +61,7 @@ Summary:        Full-Featured IDE for Mono and Gtk-Sharp
 License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
 Source:         %{name}-%{version}.tar.bz2
+Patch0:		no-ssh-please-were-british.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 #BuildArch:      noarch
 Requires:       mono-basic
@@ -98,6 +101,9 @@ This package contains development files for the IDE and plugins.
 
 %prep
 %setup -q -n monodevelop-7.7
+%if 0%{?rhel} >= 8
+%patch0 -p1
+%endif
 
 %build
 %{?env_options}

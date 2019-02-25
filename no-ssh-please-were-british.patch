@@ -1,0 +1,26 @@
+diff --git a/configure.ac b/configure.ac
+index 156d036fb..7d63d6039 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -250,8 +250,6 @@ if test x$enable_gnomeplatform = xyes && test x$enable_git = xyes; then
+ 	        AC_MSG_ERROR([You need to install cmake for Git support to be built])
+ 	fi
+ 
+-	PKG_CHECK_MODULES(LIBSSH2, libssh2)
+-	AC_SUBST(LIBSSH2_LIBS)
+ fi
+ 
+ dnl Intl
+diff --git a/external/libgit-binary/build.libgit2.sh b/external/libgit-binary/build.libgit2.sh
+index 81feebac7..eab1e339d 100755
+--- a/external/libgit-binary/build.libgit2.sh
++++ b/external/libgit-binary/build.libgit2.sh
+@@ -89,7 +89,7 @@ then
+ else
+ 	cmake -DCMAKE_BUILD_TYPE:STRING=RelWithDebInfo \
+ 	      -DBUILD_CLAR:BOOL=OFF \
+-	      -DUSE_SSH=ON \
++	      -DUSE_SSH=OFF \
+ 	      -DENABLE_TRACE=ON \
+ 	      -DLIBGIT2_FILENAME=git2-$SHORTSHA \
+ 	      -DCMAKE_SKIP_RPATH=TRUE \
