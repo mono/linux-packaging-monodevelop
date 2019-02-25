@@ -112,7 +112,9 @@ This package contains development files for the IDE and plugins.
 %build
 %{?env_options}
 
+%if 0%{?rhel} >= 8
 autoreconf -vi
+%endif
 %configure --libdir=%{_prefix}/lib --disable-update-mimedb
 make
 
