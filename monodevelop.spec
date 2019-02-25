@@ -62,6 +62,7 @@ License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
 Source:         %{name}-%{version}.tar.bz2
 Patch0:		no-ssh-please-were-british.patch
+Patch1:		fixautoreconf.patch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 #BuildArch:      noarch
 Requires:       mono-basic
@@ -101,6 +102,7 @@ This package contains development files for the IDE and plugins.
 
 %prep
 %setup -q -n monodevelop-7.7
+%patch1 -p1
 %if 0%{?rhel} >= 8
 %patch0 -p1
 %endif

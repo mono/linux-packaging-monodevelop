@@ -1,0 +1,49 @@
+diff --git a/ChangeLog b/ChangeLog
+new file mode 100644
+index 000000000..ea30561d8
+--- /dev/null
++++ b/ChangeLog
+@@ -0,0 +1 @@
++#empty
+diff --git a/Makefile.am b/Makefile.am
+index d01b98fd4..185d6c90d 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -5,7 +5,7 @@ SUBDIRS = external . src po man theme-icons msbuild build tests
+ MD_CONFIGURE=$(top_srcdir)/../scripts/configure.sh
+ 
+ #capture aclocal flags for autoreconf
+-ACLOCAL_AMFLAGS=$(ACLOCAL_FLAGS)
++#ACLOCAL_AMFLAGS=$(ACLOCAL_FLAGS)
+ 
+ bin_SCRIPTS = monodevelop mdtool
+ 
+diff --git a/configure.ac b/configure.ac
+index 156d036fb..47fad4380 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1,10 +1,10 @@
+-AC_INIT([monodevelop], m4_esyscmd_s([grep ^Version ../version.config|cut -d '=' -f 2|tr -d '\n']), [monodevelop-list@lists.ximian.com])
++AC_INIT([monodevelop], m4_esyscmd_s([grep ^Version version.config|cut -d '=' -f 2|tr -d '\n']), [monodevelop-list@lists.ximian.com])
+ AC_PREREQ(2.53)
+ AM_INIT_AUTOMAKE([1.10 tar-ustar])
+ AM_MAINTAINER_MODE
+ 
+ #capture aclocal flags for autoreconf
+-AC_SUBST(ACLOCAL_FLAGS)
++#AC_SUBST(ACLOCAL_FLAGS)
+ 
+ ASSEMBLY_VERSION=4.0.0.0
+ 
+@@ -12,9 +12,9 @@ ASSEMBLY_VERSION=4.0.0.0
+ # the C# side of things. It should be one of the following two formats:
+ # 1) "VERSION_NUMBER"					"2.0"
+ # 2) "VERSION_NUMBER BUILD_TYPE BUILD_NUMBER"		"2.0 Alpha 1"
+-PACKAGE_VERSION_LABEL="m4_esyscmd_s([grep ^Label ../version.config|cut -d "=" -f 2|tr -d '\n'])"
++PACKAGE_VERSION_LABEL="m4_esyscmd_s([grep ^Label version.config|cut -d "=" -f 2|tr -d '\n'])"
+ 
+-COMPAT_ADDIN_VERSION=m4_esyscmd_s([grep ^CompatVersion ../version.config|cut -d "=" -f 2|tr -d '\n'])
++COMPAT_ADDIN_VERSION=m4_esyscmd_s([grep ^CompatVersion version.config|cut -d "=" -f 2|tr -d '\n'])
+ 
+ AC_PATH_PROG(MONO, mono)
+ AC_PATH_PROG(MCS, mcs)
