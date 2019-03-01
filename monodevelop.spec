@@ -103,7 +103,7 @@ a port of SharpDevelop 0.98.
 This package contains development files for the IDE and plugins.
 
 %prep
-%setup -q -n monodevelop-7.7
+%setup -q -n monodevelop-7.8
 %patch1 -p1
 %if 0%{?rhel} >= 8
 %patch0 -p1
