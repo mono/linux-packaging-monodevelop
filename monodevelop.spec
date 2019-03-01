@@ -58,7 +58,7 @@ Url:            http://www.monodevelop.com/
 %define __majorver 7.8.2
 %define __minorver 1
 Version:	%{__majorver}.%{__minorver}
-Release:	0.xamarin.1
+Release:	0.xamarin.2
 Summary:        Full-Featured IDE for Mono and Gtk-Sharp
 License:        LGPL-2.1 and MIT
 Group:          Development/Tools/IDE
