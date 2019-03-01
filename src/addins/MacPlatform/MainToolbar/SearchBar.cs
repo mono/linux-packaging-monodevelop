@@ -52,7 +52,9 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			public override void DrawWithFrame (CGRect cellFrame, NSView inView)
 			{
 				if (IdeApp.Preferences.UserInterfaceTheme == Theme.Dark) {
+#pragma warning disable EPS06 // Hidden struct copy operation
 					var inset = cellFrame.Inset (0.25f, 0.25f);
+#pragma warning restore EPS06 // Hidden struct copy operation
 					if (!ShowsFirstResponder) {
 						var path = NSBezierPath.FromRoundedRect (inset, 3, 3);
 						path.LineWidth = 0.5f;
@@ -229,17 +231,32 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 				var other = (NSWindow)notification.Object;
 
 				if (notification.Object == Window) {
-					if (LostFocus != null)
-						LostFocus (this, null);
+					if (IsFirstResponderOfWindow (Window)) {
+						if (LostFocus != null)
+							LostFocus (this, null);
+					}
 				}
 			}));
 			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResizeNotification, notification => Runtime.RunInMainThread (() => {
 				var other = (NSWindow)notification.Object;
 				if (notification.Object == Window) {
-					if (LostFocus != null)
-						LostFocus (this, null);
+					if (IsFirstResponderOfWindow (Window)) {
+						if (LostFocus != null)
+							LostFocus (this, null);
+					}
 				}
 			}));
+		}
+
+		bool IsFirstResponderOfWindow (NSWindow window)
+		{
+			if (window.FirstResponder is NSTextView tv) {
+				var field = tv.WeakDelegate;
+				if (field == this)
+					return true;
+			}
+
+			return false;
 		}
 
 		bool SendKeyPressed (Xwt.KeyEventArgs kargs)

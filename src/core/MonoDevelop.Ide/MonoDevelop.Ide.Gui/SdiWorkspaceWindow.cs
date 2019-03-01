@@ -262,9 +262,10 @@ namespace MonoDevelop.Ide.Gui
 		{
 			if (subViewToolbar != null)
 				subViewToolbar.Tabs [subViewToolbar.ActiveTab].Activate ();
+			ScheduleContentGrabFocus ();
 		}
-		
-		public void SelectWindow()
+
+		public void SelectWindow ()
 		{
 			var window = tabControl.Toplevel as Gtk.Window;
 			if (window != null) {
@@ -287,12 +288,24 @@ namespace MonoDevelop.Ide.Gui
 			// The tab change must be done now to ensure that the content is created
 			// before exiting this method.
 			tabControl.CurrentTabIndex = tab.Index;
-
 			// Focus the tab in the next iteration since presenting the window may take some time
 			Application.Invoke ((o, args) => {
 				DockNotebook.ActiveNotebook = tabControl;
-				DeepGrabFocus (this.ActiveViewContent.Control);
 			});
+			ScheduleContentGrabFocus ();
+		}
+
+		bool contentGrabFocusScheduled;
+		void ScheduleContentGrabFocus ()
+		{
+			if (contentGrabFocusScheduled)
+				return;
+			Application.Invoke ((o, args) => {
+				contentGrabFocusScheduled = false;
+				if (workbench.ActiveWorkbenchWindow == this)
+					ActiveViewContent.GrabFocus ();
+			});
+			contentGrabFocusScheduled = true;
 		}
 
 		public bool CanMoveToNextNotebook ()
@@ -341,64 +354,6 @@ namespace MonoDevelop.Ide.Gui
 			newTab.Content = this;
 			SetDockNotebook (nextNotebook, newTab);
 			SelectWindow ();
-		}
-		
-		static void DeepGrabFocus (Gtk.Widget widget)
-		{
-			Widget first = null;
-
-			foreach (var f in GetFocussableWidgets (widget)) {
-				if (f.HasFocus)
-					return;
-				
-				if (first == null)
-					first = f;
-			}
-			if (first != null) {
-				first.GrabFocus ();
-			}
-		}
-		
-		static IEnumerable<Gtk.Widget> GetFocussableWidgets (Gtk.Widget widget)
-		{
-			var c = widget as Container;
-
-			if (widget.CanFocus) {
-				yield return widget;
-			}
-
-			if (c != null) {
-				foreach (var f in c.FocusChain.SelectMany (GetFocussableWidgets).Where (y => y != null)) {
-					yield return f;
-				}
-			}
-
-			if (c?.Children?.Length != 0) {
-				foreach (var f in c.Children) {
-					var container = f as Container;
-					if (container != null) {
-						foreach (var child in GetFocussableChildren (container)) {
-							yield return child;
-						}
-					}
-				}
-			}
-		}
-
-		static IEnumerable<Gtk.Widget> GetFocussableChildren (Gtk.Container container)
-		{
-			if (container.CanFocus) {
-				yield return container;
-			}
-
-			foreach (var f in container.Children) {
-				var c = f as Container;
-				if (c != null) {
-					foreach (var child in GetFocussableChildren (c)) {
-						yield return child;
-					}
-				}
-			}
 		}
 
 		public DocumentToolbar GetToolbar (BaseViewContent targetView)

@@ -612,8 +612,8 @@ namespace Mono.TextEditor
 			markerLayout.FontDescription = markerLayoutFont;
 
 			// Gutter font may be bigger
-			GetFontMetrics (textEditor.Options.GutterFont, textEditor.Options.GutterFontName, out double gutterFontLineHeight, out double fontCharWidth, out underlinePosition, out underLineThickness);
-			GetFontMetrics (textEditor.Options.Font, textEditor.Options.FontName, out double fontLineHeight, out fontCharWidth, out underlinePosition, out underLineThickness);
+			GetFontMetrics (textEditor.Options.GutterFont, out double gutterFontLineHeight, out double fontCharWidth, out underlinePosition, out underLineThickness);
+			GetFontMetrics (textEditor.Options.Font, out double fontLineHeight, out fontCharWidth, out underlinePosition, out underLineThickness);
 			this.textEditor.GetTextEditorData ().LineHeight = fontLineHeight;
 			this.charWidth = fontCharWidth;
 
@@ -664,25 +664,29 @@ namespace Mono.TextEditor
 		public int UnderlinePosition => underlinePosition;
 		public int UnderLineThickness => underLineThickness;
 
-		void GetFontMetrics(Pango.FontDescription font, string fontName, out double lineHeight, out double charWidth, out int underlinePosition, out int underLineThickness)
+		void GetFontMetrics (Pango.FontDescription font, out double lineHeight, out double charWidth, out int underlinePosition, out int underLineThickness)
 		{
 			using (var metrics = textEditor.PangoContext.GetMetrics(font, textEditor.PangoContext.Language)) {
 #if MAC
-				double baseHeight;
-				if (fontName != null) {
-					baseHeight = OSXEditor.GetLineHeight(fontName) * textEditor.Options.Zoom;
-				} else {
-					baseHeight = (metrics.Ascent + metrics.Descent) / Pango.Scale.PangoScale;
+				try {
+					lineHeight = System.Math.Ceiling (0.5 + OSXEditor.GetLineHeight(font.ToString ()));
+					if (lineHeight < 0)
+						lineHeight = GetLineHeight (metrics);
+				} catch (Exception e) {
+					LoggingService.LogError ("Error while getting the macOS font metrics for " + font, e);
+					lineHeight = GetLineHeight (metrics);
 				}
-				lineHeight = System.Math.Ceiling (0.5 + baseHeight);
 #else
-				lineHeight = System.Math.Ceiling(0.5 + (metrics.Ascent + metrics.Descent) / Pango.Scale.PangoScale);
+				lineHeight = GetLineHeight (metrics);
 #endif
 				underlinePosition = metrics.UnderlinePosition;
 				underLineThickness = metrics.UnderlineThickness;
 				charWidth = metrics.ApproximateCharWidth / Pango.Scale.PangoScale;
 			}
 		}
+
+		static double GetLineHeight (Pango.FontMetrics metrics) => System.Math.Ceiling (0.5 + (metrics.Ascent + metrics.Descent) / Pango.Scale.PangoScale);
+
 		public override void Dispose ()
 		{
 			CancelCodeSegmentTooltip ();
@@ -2509,8 +2513,8 @@ namespace Mono.TextEditor
 			this.previewWindow.GdkWindow.GetOrigin (out x, out y);
 			int w = previewWindow.Allocation.Width;
 			int h = previewWindow.Allocation.Height;
-			if (!previewWindow.HideCodeSegmentPreviewInformString)
-				h -= previewWindow.PreviewInformStringHeight;
+			if (previewWindow.HasFooterText)
+				h -= previewWindow.FooterTextHeight;
 			CodeSegmentEditorWindow codeSegmentEditorWindow = new CodeSegmentEditorWindow (textEditor);
 			codeSegmentEditorWindow.Move (x, y);
 			codeSegmentEditorWindow.Resize (w, h);
@@ -2571,7 +2575,6 @@ namespace Mono.TextEditor
 
 				int x = hintRectangle.Right;
 				int y = hintRectangle.Bottom;
-				previewWindow.CalculateSize ();
 				var req = previewWindow.SizeRequest ();
 				int w = req.Width;
 				int h = req.Height;
@@ -3368,7 +3371,7 @@ namespace Mono.TextEditor
 
 						if (snapCharacters && !IsNearX1 (xp, xp1, xp2)) {
 							index++;
-							if (index < layoutWrapper.Text.Length  && (layoutWrapper.Text[index] & CaretMoveActions.LowSurrogateMarker) == CaretMoveActions.LowSurrogateMarker)
+							if (index < layoutWrapper.Text.Length  && CaretMoveActions.IsLowSurrogateMarkerSet (layoutWrapper.Text [index]))
 								index++;
 						}
 						return true;

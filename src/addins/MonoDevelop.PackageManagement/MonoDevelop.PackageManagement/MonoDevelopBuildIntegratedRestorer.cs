@@ -31,6 +31,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MonoDevelop.Core;
 using MonoDevelop.Projects;
+using NuGet.CommandLine;
 using NuGet.Commands;
 using NuGet.Common;
 using NuGet.Configuration;
@@ -51,6 +52,7 @@ namespace MonoDevelop.PackageManagement
 		ISettings settings;
 		IMonoDevelopSolutionManager solutionManager;
 		DependencyGraphCacheContext context;
+		PackageManagementLogger logger;
 
 		public MonoDevelopBuildIntegratedRestorer (IMonoDevelopSolutionManager solutionManager)
 			: this (
@@ -80,7 +82,7 @@ namespace MonoDevelop.PackageManagement
 			IEnumerable<BuildIntegratedNuGetProject> projects,
 			CancellationToken cancellationToken)
 		{
-			var spec = await DependencyGraphRestoreUtility.GetSolutionRestoreSpec (solutionManager, context);
+			var spec = await MonoDevelopDependencyGraphRestoreUtility.GetSolutionRestoreSpec (solutionManager, projects, context, cancellationToken);
 
 			var now = DateTime.UtcNow;
 			Action<SourceCacheContext> cacheContextModifier = c => c.MaxAge = now;
@@ -114,6 +116,8 @@ namespace MonoDevelop.PackageManagement
 			}
 
 			if (restoreFailed) {
+				logger.LogInformation (string.Empty);
+				logger.LogSavedErrors ();
 				throw new ApplicationException (GettextCatalog.GetString ("Restore failed."));
 			}
 
@@ -178,6 +182,9 @@ namespace MonoDevelop.PackageManagement
 			var now = DateTime.UtcNow;
 			Action<SourceCacheContext> cacheContextModifier = c => c.MaxAge = now;
 
+			var spec = await MonoDevelopDependencyGraphRestoreUtility.GetSolutionRestoreSpec (solutionManager, project, context, cancellationToken);
+			context.AddToCache (spec);
+
 			RestoreResult restoreResult = await DependencyGraphRestoreUtility.RestoreProjectAsync (
 				solutionManager,
 				project,
@@ -211,7 +218,9 @@ namespace MonoDevelop.PackageManagement
 
 		ILogger CreateLogger ()
 		{
-			return new PackageManagementLogger (packageManagementEvents);
+			logger = new PackageManagementLogger (packageManagementEvents);
+			logger.SaveErrors = true;
+			return logger;
 		}
 
 		DependencyGraphCacheContext CreateRestoreContext ()
@@ -221,12 +230,15 @@ namespace MonoDevelop.PackageManagement
 
 		void ReportRestoreError (RestoreResult restoreResult)
 		{
+			logger.LogInformation (string.Empty);
+
 			foreach (LibraryRange libraryRange in restoreResult.GetAllUnresolved ()) {
 				packageManagementEvents.OnPackageOperationMessageLogged (
 					MessageLevel.Info,
 					GettextCatalog.GetString ("Restore failed for '{0}'."),
 					libraryRange.ToString ());
 			}
+			logger.LogSavedErrors ();
 			throw new ApplicationException (GettextCatalog.GetString ("Restore failed."));
 		}
 

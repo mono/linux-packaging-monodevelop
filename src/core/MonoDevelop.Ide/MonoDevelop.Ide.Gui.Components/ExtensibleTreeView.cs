@@ -1528,7 +1528,7 @@ namespace MonoDevelop.Ide.Gui.Components
 				globalOptions[opt.Id] = val;
 			}
 			globalOptions.Pad = this;
-			RefreshTree ();
+			RefreshRoots ();
 		}
 
 		TypeNodeBuilder GetTypeNodeBuilder (Type type)
@@ -2188,6 +2188,15 @@ namespace MonoDevelop.Ide.Gui.Components
 		object ICommandRouter.GetNextCommandTarget ()
 		{
 			return widget.Parent;
+		}
+
+		/// <summary>
+		/// Forces the select on release feature to be disabled since the ContextMenuTreeView
+		/// does not always reset the SelectFunction for the tree.
+		/// </summary>
+		internal void ClearSelectOnRelease ()
+		{
+			tree.ClearSelectOnRelease ();
 		}
 
 		internal class PadCheckMenuItem: Gtk.CheckMenuItem

@@ -1,0 +1,7 @@
+/home/directhex/Projects/monodevelop/main/build/bin/mdtool.exe.config
+/home/directhex/Projects/monodevelop/main/build/bin/mdtool.xml
+/home/directhex/Projects/monodevelop/main/build/bin/mdtool.exe
+/home/directhex/Projects/monodevelop/main/build/bin/mdtool.pdb
+/home/directhex/Projects/monodevelop/main/src/tools/mdtool/obj/x86/Debug/mdtool.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/tools/mdtool/obj/x86/Debug/mdtool.exe
+/home/directhex/Projects/monodevelop/main/src/tools/mdtool/obj/x86/Debug/mdtool.pdb

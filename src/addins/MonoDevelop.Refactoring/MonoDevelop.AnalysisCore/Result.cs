@@ -27,6 +27,7 @@
 using System;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using MonoDevelop.Ide.Editor.Extension;
 
 namespace MonoDevelop.AnalysisCore
 {
@@ -67,5 +68,20 @@ namespace MonoDevelop.AnalysisCore
 		public TextSpan Region { get; private set; }
 		
 		public bool Underline { get; private set; }
+		internal QuickTask QuickTask { get; set; }
+
+		internal bool Equals (Result other, int correctedOffset)
+		{
+			if (ReferenceEquals (this, other))
+				return true;
+			if (other == null)
+				return false;
+			return Level == other.Level &&
+				InspectionMark == other.InspectionMark &&
+				Region.Start == correctedOffset &&
+				Region.Length == other.Region.Length &&
+				Message == other.Message;
+		}
+
 	}
 }

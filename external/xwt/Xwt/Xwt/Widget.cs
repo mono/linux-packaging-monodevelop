@@ -64,6 +64,7 @@ namespace Xwt
 		WidgetPlacement alignHorizontal = WidgetPlacement.Fill;
 		bool expandVertical;
 		bool expandHorizontal;
+		Accessible accessible;
 
 		EventHandler<DragOverCheckEventArgs> dragOverCheck;
 		EventHandler<DragOverEventArgs> dragOver;
@@ -323,7 +324,6 @@ namespace Xwt
 			}
 		}
 
-		Accessible accessible;
 		public Accessible Accessible {
 			get {
 				if (accessible == null) {
@@ -1677,12 +1677,14 @@ namespace Xwt
 				foreach (var w in toReallocate) {
 					// The widget may already have been reallocated as a result of reallocating the parent
 					// so we have to check if it is still in the queue
-					if (reallocationQueue.Contains (w))
+					if (!w.IsDisposed && reallocationQueue.Contains (w))
 						w.Surface.Reallocate ();
 				}
 				foreach (var w in resizeWindows.ToArray ()) {
-					w.AdjustSize ();
-					w.Reallocate ();
+					if (!w.IsDisposed) {
+						w.AdjustSize();
+						w.Reallocate();
+					}
 				}
 			} finally {
 				resizeRequestQueue.Clear ();

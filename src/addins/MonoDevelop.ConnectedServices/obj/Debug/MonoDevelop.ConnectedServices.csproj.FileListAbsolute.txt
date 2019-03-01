@@ -1,0 +1,6 @@
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.ConnectedServices/MonoDevelop.ConnectedServices.xml
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.ConnectedServices/MonoDevelop.ConnectedServices.dll
+/home/directhex/Projects/monodevelop/main/build/AddIns/MonoDevelop.ConnectedServices/MonoDevelop.ConnectedServices.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.ConnectedServices/obj/Debug/MonoDevelop.ConnectedServices.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.ConnectedServices/obj/Debug/MonoDevelop.ConnectedServices.dll
+/home/directhex/Projects/monodevelop/main/src/addins/MonoDevelop.ConnectedServices/obj/Debug/MonoDevelop.ConnectedServices.pdb

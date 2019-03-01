@@ -1,0 +1,5 @@
+/home/directhex/Projects/monodevelop/main/build/tests/PerfTool.exe
+/home/directhex/Projects/monodevelop/main/build/tests/PerfTool.pdb
+/home/directhex/Projects/monodevelop/main/tests/performance/PerfTool/obj/x86/Debug/PerfTool.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/tests/performance/PerfTool/obj/x86/Debug/PerfTool.exe
+/home/directhex/Projects/monodevelop/main/tests/performance/PerfTool/obj/x86/Debug/PerfTool.pdb

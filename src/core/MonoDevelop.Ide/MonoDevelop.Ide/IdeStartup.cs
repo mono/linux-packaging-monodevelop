@@ -71,6 +71,7 @@ namespace MonoDevelop.Ide
 		static Stopwatch startupSectionTimer = new Stopwatch ();
 		static Stopwatch timeToCodeTimer = new Stopwatch ();
 		static Dictionary<string, long> sectionTimings = new Dictionary<string, long> ();
+		static bool hideWelcomePage;
 
 		static TimeToCodeMetadata ttcMetadata;
 
@@ -278,8 +279,9 @@ namespace MonoDevelop.Ide
 				// which is then replaced with a second empty Apple menu.
 				// XBC #33699
 				Counters.Initialization.Trace ("Initializing IdeApp");
-				IdeApp.Initialize (monitor);
 
+				hideWelcomePage = startupInfo.HasFiles;
+				IdeApp.Initialize (monitor, hideWelcomePage);
 				sectionTimings ["AppInitialization"] = startupSectionTimer.ElapsedMilliseconds;
 				startupSectionTimer.Restart ();
 
@@ -322,6 +324,7 @@ namespace MonoDevelop.Ide
 			
 			if (error != null) {
 				string message = BrandingService.BrandApplicationName (GettextCatalog.GetString ("MonoDevelop failed to start"));
+				message = message + "\n\n" + error.Message;
 				MessageService.ShowFatalError (message, null, error);
 
 				return 1;
@@ -365,6 +368,13 @@ namespace MonoDevelop.Ide
 			AddinManager.AddExtensionNodeHandler("/MonoDevelop/Ide/InitCompleteHandlers", OnExtensionChanged);
 			StartLockupTracker ();
 
+			// This call is important so the current event loop is run before we run the main loop.
+			// On Mac, the OpenDocuments event gets handled here, so we need to get the timeout
+			// it queues before the OnIdle event so we can start opening a solution before
+			// we show the main window.
+			DispatchService.RunPendingEvents ();
+
+			sectionTimings ["PumpEventLoop"] = startupSectionTimer.ElapsedMilliseconds;
 			startupTimer.Stop ();
 			startupSectionTimer.Stop ();
 
@@ -453,12 +463,20 @@ namespace MonoDevelop.Ide
 		static bool OnIdle ()
 		{
 			Composition.CompositionManager.InitializeAsync ().Ignore ();
+
+			// OpenDocuments appears when the app is idle.
+			if (!hideWelcomePage) {
+				WelcomePage.WelcomePageService.ShowWelcomePage ();
+				Counters.Initialization.Trace ("Showed welcome page");
+			}
+
+			IdeApp.Workbench.Show ();
 			return false;
 		}
 
-		async void CreateStartupMetadata (StartupInfo startupInfo, Dictionary<string, long> timings)
+		void CreateStartupMetadata (StartupInfo startupInfo, Dictionary<string, long> timings)
 		{
-			var result = await Task.Run (() => DesktopService.PlatformTelemetry);
+			var result = DesktopService.PlatformTelemetry;
 			if (result == null) {
 				return;
 			}
@@ -899,8 +917,8 @@ namespace MonoDevelop.Ide
 				AssetTypeName = assetType.Name,
 				IsInitialRun = IdeApp.IsInitialRun,
 				IsInitialRunAfterUpgrade = IdeApp.IsInitialRunAfterUpgrade,
-				TimeSinceMachineStart = platformDetails.TimeSinceMachineStart.Seconds,
-				TimeSinceLogin = platformDetails.TimeSinceLogin.Seconds,
+				TimeSinceMachineStart = (long)platformDetails.TimeSinceMachineStart.TotalMilliseconds,
+				TimeSinceLogin = (long)platformDetails.TimeSinceLogin.TotalMilliseconds,
 				Timings = timings
 			};
 		}

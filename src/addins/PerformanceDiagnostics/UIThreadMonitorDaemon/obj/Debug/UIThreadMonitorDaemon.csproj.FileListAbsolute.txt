@@ -1,0 +1,6 @@
+/home/directhex/Projects/monodevelop/main/src/addins/PerformanceDiagnostics/UIThreadMonitorDaemon/bin/Debug/UIThreadMonitorDaemon.xml
+/home/directhex/Projects/monodevelop/main/src/addins/PerformanceDiagnostics/UIThreadMonitorDaemon/bin/Debug/UIThreadMonitorDaemon.exe
+/home/directhex/Projects/monodevelop/main/src/addins/PerformanceDiagnostics/UIThreadMonitorDaemon/bin/Debug/UIThreadMonitorDaemon.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/PerformanceDiagnostics/UIThreadMonitorDaemon/obj/Debug/UIThreadMonitorDaemon.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/PerformanceDiagnostics/UIThreadMonitorDaemon/obj/Debug/UIThreadMonitorDaemon.exe
+/home/directhex/Projects/monodevelop/main/src/addins/PerformanceDiagnostics/UIThreadMonitorDaemon/obj/Debug/UIThreadMonitorDaemon.pdb

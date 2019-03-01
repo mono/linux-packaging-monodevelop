@@ -1,0 +1,7 @@
+/home/directhex/Projects/monodevelop/main/build/bin/mdmonitor.xml
+/home/directhex/Projects/monodevelop/main/build/bin/mdmonitor.exe
+/home/directhex/Projects/monodevelop/main/build/bin/mdmonitor.pdb
+/home/directhex/Projects/monodevelop/main/src/tools/mdmonitor/obj/Debug/mdmonitor.csprojAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/tools/mdmonitor/obj/Debug/mdmonitor.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/tools/mdmonitor/obj/Debug/mdmonitor.exe
+/home/directhex/Projects/monodevelop/main/src/tools/mdmonitor/obj/Debug/mdmonitor.pdb

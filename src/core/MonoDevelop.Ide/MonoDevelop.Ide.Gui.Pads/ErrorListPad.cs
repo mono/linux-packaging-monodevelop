@@ -142,9 +142,9 @@ namespace MonoDevelop.Ide.Gui.Pads
 			btn.Child = btnBox;
 
 			return btn;
-		}
+		} 
 
-		Button MakeButton (string image, string name, out Label label)
+		Button MakeButton (string image, string name, out Label label) 
 		{
 			var btnBox = MakeHBox (image, out label);
 
@@ -217,18 +217,18 @@ namespace MonoDevelop.Ide.Gui.Pads
 			logBtn.Toggled += HandleTextLogToggled;
 			toolbar.Add (logBtn);
 
-#if ENABLE_BUILD_OUTPUT
-			buildLogBtn = MakeButton ("md-message-log", "toggleBuildOutput", out logBtnLbl);
-			buildLogBtn.Accessible.Name = "ErrorPad.BuildLogButton";
-			buildLogBtn.TooltipText = GettextCatalog.GetString ("Structured Build Output");
-			buildLogBtn.Accessible.Description = GettextCatalog.GetString ("Structured Build Output");
+			if (BuildOutput.IsFeatureEnabled) {
+				buildLogBtn = MakeButton ("md-message-log", "toggleBuildOutput", out logBtnLbl);
+				buildLogBtn.Accessible.Name = "ErrorPad.BuildLogButton";
+				buildLogBtn.TooltipText = GettextCatalog.GetString ("Structured Build Output");
+				buildLogBtn.Accessible.Description = GettextCatalog.GetString ("Structured Build Output");
 
-			logBtnLbl.Text = GettextCatalog.GetString ("Structured Build Output");
-			buildLogBtn.Accessible.SetTitle (logBtnLbl.Text);
+				logBtnLbl.Text = GettextCatalog.GetString ("Structured Build Output");
+				buildLogBtn.Accessible.SetTitle (logBtnLbl.Text);
 
-			buildLogBtn.Clicked += HandleBinLogClicked;
-			toolbar.Add (buildLogBtn);
-#endif
+				buildLogBtn.Clicked += HandleBinLogClicked;
+				toolbar.Add (buildLogBtn);
+			}
 
 			buildOutput = new BuildOutput ();
 
@@ -274,7 +274,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 			TreeModelFilterVisibleFunc filterFunct = new TreeModelFilterVisibleFunc (FilterTasks);
 			filter = new TreeModelFilter (store, null);
 			filter.VisibleFunc = filterFunct;
-
+			
 			sort = new TreeModelSort (filter);
 			sort.SetSortFunc (VisibleColumns.Type, SeverityIterSort);
 			sort.SetSortFunc (VisibleColumns.Project, ProjectIterSort);
@@ -330,8 +330,6 @@ namespace MonoDevelop.Ide.Gui.Pads
 			foreach (TaskListEntry t in TaskService.Errors) {
 				AddTask (t);
 			}
-
-			control.FocusChain = new Gtk.Widget [] { logView };
 		}
 
 		public override void Dispose ()
@@ -340,9 +338,8 @@ namespace MonoDevelop.Ide.Gui.Pads
 			warnBtn.Toggled -= FilterChanged;
 			msgBtn.Toggled -= FilterChanged;
 			logBtn.Toggled -= HandleTextLogToggled;
-#if ENABLE_BUILD_OUTPUT
-			buildLogBtn.Clicked -= HandleBinLogClicked;
-#endif
+			if (BuildOutput.IsFeatureEnabled)
+				buildLogBtn.Clicked -= HandleBinLogClicked;
 			searchEntry.Entry.Changed -= searchPatternChanged;
 
 			IdeApp.Workspace.FirstWorkspaceItemOpened -= OnCombineOpen;
@@ -394,7 +391,7 @@ namespace MonoDevelop.Ide.Gui.Pads
 		}
 
 		public ProgressMonitor GetBuildProgressMonitor ()
-		{
+		{ 
 			if (control == null)
 				CreateControl ();
 
@@ -462,11 +459,11 @@ namespace MonoDevelop.Ide.Gui.Pads
 			help.Clicked += OnShowReference;
 			menu.Add (help);
 
-#if ENABLE_BUILD_OUTPUT
-			var goBuild = new ContextMenuItem (GettextCatalog.GetString ("Go to _Log"));
-			goBuild.Clicked += async (s, e) => await OnGoToLog (s, e);
-			menu.Add (goBuild);
-#endif
+			if (BuildOutput.IsFeatureEnabled) {
+				var goBuild = new ContextMenuItem (GettextCatalog.GetString ("Go to _Log"));
+				goBuild.Clicked += async (s, e) => await OnGoToLog (s, e);
+				menu.Add (goBuild);
+			}
 
 			var jump = new ContextMenuItem (GettextCatalog.GetString ("_Go to Task"));
 			jump.Clicked += OnTaskJumpto;
@@ -1059,9 +1056,9 @@ namespace MonoDevelop.Ide.Gui.Pads
 		Document buildOutputDoc;
 		void HandleBinLogClicked (object sender, EventArgs e)
 		{
-#if ENABLE_BUILD_OUTPUT
-			OpenBuildOutputViewDocument ();
-#endif
+			if (BuildOutput.IsFeatureEnabled) {
+				OpenBuildOutputViewDocument ();
+			}
 		}
 
 		void OpenBuildOutputViewDocument () 
