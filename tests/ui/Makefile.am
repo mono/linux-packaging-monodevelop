@@ -1,1 +1,4 @@
-SUBDIRS = MonoDevelop.UserInterfaceTesting
+include $(top_srcdir)/xbuild.include
+
+SUBDIRS = \
+	MonoDevelop.UserInterfaceTesting

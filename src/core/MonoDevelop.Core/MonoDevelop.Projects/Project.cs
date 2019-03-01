@@ -532,18 +532,25 @@ namespace MonoDevelop.Projects
 		protected virtual async Task<ProjectFile[]> OnGetSourceFiles (ProgressMonitor monitor, ConfigurationSelector configuration)
 		{
 			// pre-load the results with the current list of files in the project
-			var results = new List<ProjectFile> ();
-
 			var evaluatedItems = await GetEvaluatedSourceFiles (configuration);
-			results.AddRange (evaluatedItems);
 
 			// add in any compile items that we discover from running the CoreCompile dependencies
 			var coreCompileResult = await compileEvaluator.GetItemsFromCoreCompileDependenciesAsync (this, monitor, configuration);
 			var evaluatedCompileItems = coreCompileResult.SourceFiles;
-			var addedItems = evaluatedCompileItems.Where (i => results.All (pi => pi.FilePath != i.FilePath)).ToList ();
-			results.AddRange (addedItems);
+
+			var results = new HashSet<ProjectFile> (evaluatedItems, ProjectFileFilePathComparer.Instance);
+			results.UnionWith (evaluatedCompileItems);
 
 			return results.ToArray ();
+		}
+
+		class ProjectFileFilePathComparer : IEqualityComparer<ProjectFile>
+		{
+			public readonly static ProjectFileFilePathComparer Instance = new ProjectFileFilePathComparer ();
+
+			public bool Equals (ProjectFile x, ProjectFile y) => x.FilePath == y.FilePath;
+
+			public int GetHashCode (ProjectFile obj) => obj.FilePath.GetHashCode ();
 		}
 
 		object evaluatedSourceFilesLock = new object ();
@@ -750,7 +757,6 @@ namespace MonoDevelop.Projects
 		internal protected override async Task OnSave (ProgressMonitor monitor)
 		{
 			SetFastBuildCheckDirty ();
-			modifiedInMemory = false;
 
 			string content = await WriteProjectAsync (monitor);
 
@@ -766,6 +772,15 @@ namespace MonoDevelop.Projects
 				await ClearCachedData ();
 				RefreshProjectBuilder ().Ignore ();
 			}
+
+			// Need to clear this flag at the end to prevent a race condition where the project is modified in memory
+			// then saved immediately afterwards. Clearing this flag was originally done at the beginning of this method
+			// which could cause the type system to get old reference information. The project modified event triggers
+			// the type system to get updated reference information. If the type system access the project when it is
+			// saving, after the modifiedInMemory flag is reset, but before the cached data is cleared or the project
+			// builder refreshed, then out of date information can be returned to the type system. One way to reproduce
+			// this was to update a NuGet package in a project that used a packages.config file.
+			modifiedInMemory = false;
 		}
 
 		protected override IEnumerable<WorkspaceObjectExtension> CreateDefaultExtensions ()
@@ -1620,7 +1635,7 @@ namespace MonoDevelop.Projects
 
 			if (modifiedInMemory) {
 				modifiedInMemory = false;
-				string content = await WriteProjectAsync (new ProgressMonitor ());
+				string content = await WriteProjectAsync (new ProgressMonitor (), inMemoryOnly: true);
 				try {
 					await RemoteBuildEngineManager.RefreshProjectWithContent (FileName, content);
 				} catch {
@@ -2581,11 +2596,11 @@ namespace MonoDevelop.Projects
 
 		AsyncCriticalSection writeProjectLock = new AsyncCriticalSection ();
 
-		internal async Task<string> WriteProjectAsync (ProgressMonitor monitor)
+		internal async Task<string> WriteProjectAsync (ProgressMonitor monitor, bool inMemoryOnly = false)
 		{
 			using (await writeProjectLock.EnterAsync ().ConfigureAwait (false)) {
 				return await Task.Run (() => {
-					WriteProject (monitor);
+					WriteProject (monitor, inMemoryOnly);
 					return sourceProject.SaveToString ();
 				}).ConfigureAwait (false);
 			}
@@ -2593,7 +2608,7 @@ namespace MonoDevelop.Projects
 
 		ITimeTracker writeTimer;
 
-		void WriteProject (ProgressMonitor monitor)
+		void WriteProject (ProgressMonitor monitor, bool inMemoryOnly)
 		{
 			if (saving) {
 				LoggingService.LogError ("WriteProject called while the project is already being written");
@@ -2630,6 +2645,10 @@ namespace MonoDevelop.Projects
 				}
 
 				sourceProject.IsNewProject = false;
+
+				// If saving to disk then clear any new remove items added in-memory.
+				if (!inMemoryOnly)
+					newMSBuildRemoveItems.Clear ();
 				writeTimer.Trace ("Project written");
 			} finally {
 				writeTimer.End ();
@@ -3588,6 +3607,7 @@ namespace MonoDevelop.Projects
 
 		HashSet<MSBuildItem> usedMSBuildItems = new HashSet<MSBuildItem> ();
 		HashSet<ProjectItem> loadedProjectItems = new HashSet<ProjectItem> ();
+		HashSet<(MSBuildItem MSBuildItem, FilePath FilePath)> newMSBuildRemoveItems = new HashSet<(MSBuildItem MSBuildItem, FilePath FilePath)> ();
 
 		internal virtual void SaveProjectItems (ProgressMonitor monitor, MSBuildProject msproject, HashSet<MSBuildItem> loadedItems, string pathPrefix = null)
 		{
@@ -3612,6 +3632,8 @@ namespace MonoDevelop.Projects
 							if (file == null || File.Exists (file.FilePath)) {
 								var removeItem = new MSBuildItem (removed.ItemName) { Remove = removed.Include };
 								msproject.AddItem (removeItem);
+								if (file != null)
+									newMSBuildRemoveItems.Add ((removeItem, file.FilePath));
 							}
 							unusedItems.UnionWith (FindUpdateItemsForItem (globItem, removed.Include));
 						}
@@ -3679,6 +3701,14 @@ namespace MonoDevelop.Projects
 				}
 				loadedItems.Remove (it);
 			}
+
+			// Remove any unused MSBuild Remove items that were added in memory only. These may have been added
+			// when an MSBuild target was run whilst a file was being deleted from a project.
+			foreach (var removeItem in newMSBuildRemoveItems) {
+				if (!File.Exists (removeItem.FilePath))
+					msproject.RemoveItem (removeItem.MSBuildItem);
+			}
+
 			loadedProjectItems = new HashSet<ProjectItem> (Items);
 		}
 
@@ -4174,7 +4204,7 @@ namespace MonoDevelop.Projects
 				using (await writeProjectLock.EnterAsync ()) {
 
 					if (modifiedInMemory) {
-						await Task.Run (() => WriteProject (monitor));
+						await Task.Run (() => WriteProject (monitor, inMemoryOnly: true));
 						modifiedInMemory = false;
 					}
 
@@ -4498,6 +4528,13 @@ namespace MonoDevelop.Projects
 
 		void OnFileCreatedExternally (FilePath fileName)
 		{
+			if (sourceProject == null) {
+				// sometimes this method is called after disposing this class. 
+				// (i.e. when quitting MD or creating a new project.)
+				LoggingService.LogWarning ("File created externally not processed. {0}", fileName);
+				return;
+			}
+
 			// Check file is inside the project directory. The file globs would exclude the file anyway
 			// if the relative path starts with "..\" but checking here avoids checking the file globs.
 			if (!fileName.IsChildPathOf (BaseDirectory))
@@ -4539,7 +4576,7 @@ namespace MonoDevelop.Projects
 
 		void OnFileDeletedExternally (string fileName)
 		{
-			if (File.Exists (fileName)) {
+			if (File.Exists (fileName) || Directory.Exists (fileName)) {
 				// File has not been deleted. The delete event could have been due to
 				// the file being saved. Saving with TextFileUtility will result in
 				// FileService.SystemRename being called to move a temporary file

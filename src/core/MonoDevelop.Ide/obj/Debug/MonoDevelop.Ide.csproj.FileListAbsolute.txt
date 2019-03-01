@@ -1,0 +1,16 @@
+/home/directhex/Projects/monodevelop/main/build/bin/Xwt.Gtk.dll.config
+/home/directhex/Projects/monodevelop/main/build/bin/gtkrc
+/home/directhex/Projects/monodevelop/main/build/bin/gtkrc.win32
+/home/directhex/Projects/monodevelop/main/build/bin/gtkrc.win32-dark
+/home/directhex/Projects/monodevelop/main/build/bin/gtkrc.mac
+/home/directhex/Projects/monodevelop/main/build/bin/gtkrc.mac-dark
+/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.Ide.dll.config
+/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.Ide.xml
+/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.Ide.dll
+/home/directhex/Projects/monodevelop/main/build/bin/MonoDevelop.Ide.pdb
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Ide/obj/Debug/MonoDevelop.Ide.csprojAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Ide/obj/Debug/MonoDevelop.Ide.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Ide/obj/Debug/GeneratedInternalsVisibleTo.cs
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Ide/obj/Debug/MonoDevelop.Ide.csproj.CopyComplete
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Ide/obj/Debug/MonoDevelop.Ide.dll
+/home/directhex/Projects/monodevelop/main/src/core/MonoDevelop.Ide/obj/Debug/MonoDevelop.Ide.pdb

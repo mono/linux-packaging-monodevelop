@@ -1675,7 +1675,7 @@ namespace Mono.TextEditor
 					dragContents.CopyData (textEditorData);
 					DragContext context = Gtk.Drag.Begin (this, ClipboardActions.CopyOperation.TargetList, DragAction.Move | DragAction.Copy, 1, e);
 					if (!Platform.IsMac) {
-						CodeSegmentPreviewWindow window = new CodeSegmentPreviewWindow (textEditorData.Parent, true, textEditorData.SelectionRange, 300, 300);
+						var window = new CodeSegmentPreviewWindow (textEditorData.Parent, true, textEditorData.SelectionRange);
 						Gtk.Drag.SetIconWidget (context, window, 0, 0);
 					}
 					selection = MainSelection;
@@ -2253,10 +2253,10 @@ namespace Mono.TextEditor
 				// Ensure that the correct line height is set.
 				if (line != null) {
 					var wrapper = textViewMargin.GetLayout (line);
+					TextViewLines?.Add (logicalLineNumber, line, wrapper);
 					if (wrapper.IsUncached)
 						wrapper.Dispose ();
 				}
-				TextViewLines?.Add (logicalLineNumber, line);
 				double lineHeight = GetLineHeight (line);
 				foreach (var margin in this.margins) {
 					if (!margin.IsVisible)
@@ -3368,6 +3368,11 @@ namespace Mono.TextEditor
 		void OnDocumentStateChanged (object s, TextChangeEventArgs args)
 		{
 			HideTooltip ();
+			if (editor.Document.SyntaxMode is ISyntaxHighlighting2 sh2) {
+				if (sh2.IsUpdatingOnTextChange)
+					return;
+			}
+
 			for (int i = 0; i < args.TextChanges.Count; ++i) {
 				var change = args.TextChanges[i];
 				var start = editor.Document.OffsetToLineNumber (change.NewOffset);

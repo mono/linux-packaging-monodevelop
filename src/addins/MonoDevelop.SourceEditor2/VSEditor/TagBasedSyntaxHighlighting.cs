@@ -31,30 +31,31 @@ using MonoDevelop.Ide.Tasks;
 
 namespace Microsoft.VisualStudio.Platform
 {
-	[Export (typeof (ITagBasedSyntaxHighlightingFactory))]
-	internal sealed class TagBasedSyntaxHighlightingFactory : ITagBasedSyntaxHighlightingFactory
-	{
-		public ISyntaxHighlighting CreateSyntaxHighlighting (ITextView textView)
-		{
-			return new TagBasedSyntaxHighlighting (textView, null);
-		}
+    [Export(typeof(ITagBasedSyntaxHighlightingFactory))]
+    internal sealed class TagBasedSyntaxHighlightingFactory : ITagBasedSyntaxHighlightingFactory
+    {
+        public ISyntaxHighlighting CreateSyntaxHighlighting(ITextView textView)
+        {
+            return new TagBasedSyntaxHighlighting(textView, null);
+        }
 
-		public ISyntaxHighlighting CreateSyntaxHighlighting (ITextView textView, string defaultScope)
-		{
-			return new TagBasedSyntaxHighlighting (textView, defaultScope);
-		}
-	}
+        public ISyntaxHighlighting CreateSyntaxHighlighting(ITextView textView, string defaultScope)
+        {
+            return new TagBasedSyntaxHighlighting(textView, defaultScope);
+        }
+    }
 
-	internal sealed class TagBasedSyntaxHighlighting : ISyntaxHighlighting
-	{
-		private ITextView textView { get; }
-		private IAccurateClassifier classifier { get; set; }
-		readonly Dictionary<string, ScopeStack> classificationMap;
-		Dictionary<IClassificationType, ScopeStack> classificationTypeToScopeCache = new Dictionary<IClassificationType, ScopeStack> ();
-		ScopeStack defaultScopeStack;
-		private MonoDevelop.Ide.Editor.ITextDocument textDocument { get; }
+    internal sealed class TagBasedSyntaxHighlighting : ISyntaxHighlighting2
+    {
+        private ITextView textView { get; }
+        private IAccurateClassifier classifier { get; set; }
+        readonly Dictionary<string, ScopeStack> classificationMap;
+        Dictionary<IClassificationType, ScopeStack> classificationTypeToScopeCache = new Dictionary<IClassificationType, ScopeStack>();
+        ScopeStack defaultScopeStack;
+        private MonoDevelop.Ide.Editor.ITextDocument textDocument { get; }
+        public bool IsUpdatingOnTextChange { get { return true; } }
 
-		internal TagBasedSyntaxHighlighting (ITextView textView, string defaultScope)
+        internal TagBasedSyntaxHighlighting (ITextView textView, string defaultScope)
 		{
 			this.textView = textView;
 			this.textDocument = textView.GetTextEditor ();
@@ -202,20 +203,11 @@ namespace Microsoft.VisualStudio.Platform
 			var handler = _highlightingStateChanged;
 			if (handler != null) {
 				foreach (Mono.TextEditor.MdTextViewLineCollection.MdTextViewLine line in textView.TextViewLines) {
-					if (line.Start.Position > args.ChangeSpan.End.Position || line.End.Position < args.ChangeSpan.Start)
-						continue;
-					var oldSegments = line.layoutWrapper.HighlightedLine.Segments;
-					var newSegments = GetHighlightedLineAsync (line.line, CancellationToken.None).Result.Segments;
-					if (oldSegments.Count != newSegments.Count) {
-						handler (this, new LineEventArgs (line.line));
-						continue;
-					}
-					for (int i = 0; i < oldSegments.Count; i++) {
-						if (newSegments [i].ColorStyleKey != oldSegments [i].ColorStyleKey) {
-							handler (this, new LineEventArgs (line.line));
-							break;
-						}
-					}
+					if (!line.HasDrawn) {
+                        line.HasDrawn = true;
+                        handler(this, new LineEventArgs(line.line));
+                        continue;
+                    }
 				}
 			}
 		}
@@ -396,8 +388,9 @@ namespace Microsoft.VisualStudio.Platform
 				[ClassificationTypeNames.Comment] = MakeScope (baseScopeStack, "comment." + scope),
 				[ClassificationTypeNames.ExcludedCode] = MakeScope (baseScopeStack, "comment.excluded." + scope),
 				[ClassificationTypeNames.Identifier] = MakeScope (baseScopeStack, scope),
-				[ClassificationTypeNames.Keyword] = MakeScope (baseScopeStack, "keyword." + scope),
-				[ClassificationTypeNames.NumericLiteral] = MakeScope (baseScopeStack, "constant.numeric." + scope),
+                [ClassificationTypeNames.Keyword] = MakeScope(baseScopeStack, "keyword." + scope),
+                ["identifier - keyword - (TRANSIENT)"] = MakeScope(baseScopeStack, "keyword." + scope), // required for highlighting of some context specific keywords like 'nameof'
+                [ClassificationTypeNames.NumericLiteral] = MakeScope (baseScopeStack, "constant.numeric." + scope),
 				[ClassificationTypeNames.Operator] = MakeScope (baseScopeStack, scope),
 				[ClassificationTypeNames.PreprocessorKeyword] = MakeScope (baseScopeStack, "meta.preprocessor." + scope),
 				[ClassificationTypeNames.StringLiteral] = MakeScope (baseScopeStack, "string." + scope),

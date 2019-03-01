@@ -122,7 +122,18 @@ namespace MonoDevelop.Projects.MSBuild
 				sessionLogWriter = logWriter;
 				loggerAdapter = new MSBuildLoggerAdapter (logWriter, verbosity);
 
-				parameters.Loggers = loggerAdapter.Loggers;
+				if (!string.IsNullOrEmpty (binLogFilePath)) {
+					var binaryLogger = new BinaryLogger {
+						Parameters = binLogFilePath,
+						Verbosity = LoggerVerbosity.Diagnostic
+					};
+
+					var loggers = new List<ILogger> (loggerAdapter.Loggers);
+					loggers.Add (binaryLogger);
+					parameters.Loggers = loggers;
+				} else {
+					parameters.Loggers = loggerAdapter.Loggers;
+				}
 
 				BuildManager.DefaultBuildManager.BeginBuild (parameters);
 			});

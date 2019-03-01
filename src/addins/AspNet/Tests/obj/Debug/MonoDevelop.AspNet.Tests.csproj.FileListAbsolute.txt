@@ -1,0 +1,8 @@
+/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.AspNet.Tests.xml
+/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.AspNet.Tests.dll
+/home/directhex/Projects/monodevelop/main/build/tests/MonoDevelop.AspNet.Tests.pdb
+/home/directhex/Projects/monodevelop/main/src/addins/AspNet/Tests/obj/Debug/MonoDevelop.AspNet.Tests.csprojAssemblyReference.cache
+/home/directhex/Projects/monodevelop/main/src/addins/AspNet/Tests/obj/Debug/MonoDevelop.AspNet.Tests.csproj.CoreCompileInputs.cache
+/home/directhex/Projects/monodevelop/main/src/addins/AspNet/Tests/obj/Debug/MonoDevelop.AspNet.Tests.csproj.CopyComplete
+/home/directhex/Projects/monodevelop/main/src/addins/AspNet/Tests/obj/Debug/MonoDevelop.AspNet.Tests.dll
+/home/directhex/Projects/monodevelop/main/src/addins/AspNet/Tests/obj/Debug/MonoDevelop.AspNet.Tests.pdb

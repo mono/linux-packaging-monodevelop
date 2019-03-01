@@ -25,17 +25,12 @@
 // THE SOFTWARE.
 
 using System;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using MonoDevelop.Core;
-using MonoDevelop.Ide;
-using MonoDevelop.Ide.Projects;
 using MonoDevelop.Ide.Templates;
 using MonoDevelop.Projects;
 using NUnit.Framework;
-using UnitTests;
+using IdeUnitTests;
 
 namespace MonoDevelop.DotNetCore.Tests
 {
@@ -45,9 +40,6 @@ namespace MonoDevelop.DotNetCore.Tests
 	[TestFixture]
 	class DotNetCoreProjectTemplateTests : DotNetCoreTestBase
 	{
-		TemplatingService templatingService;
-		Solution solution;
-
 		[TestFixtureSetUp]
 		public void SetUp ()
 		{
@@ -56,20 +48,8 @@ namespace MonoDevelop.DotNetCore.Tests
 				Assert.Ignore ("Ignoring DotNetCoreProjectTemplateTests");
 			}
 
-			templatingService = new TemplatingService ();
-
-			if (!IdeApp.IsInitialized) {
-				IdeApp.Initialize (Util.GetMonitor ());
-			}
-		}
-
-		[TearDown]
-		public override void TearDown ()
-		{
-			solution?.Dispose ();
-			solution = null;
-
-			base.TearDown ();
+			// Set environment variable to enable VB.NET support
+			Environment.SetEnvironmentVariable ("MD_FEATURES_ENABLED", "VBNetDotnetCoreTemplates");
 		}
 
 		[Test]
@@ -78,10 +58,7 @@ namespace MonoDevelop.DotNetCore.Tests
 		[TestCase ("Microsoft.Common.Library.FSharp", "UseNetStandard1x=true;Framework=netstandard1.6")]
 		public async Task NetStandard1x (string templateId, string parameters)
 		{
-			var config = CreateNewProjectConfig ("NetStandard1x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
-
-			await CreateAndBuild (template, config);
+			await CreateFromTemplateAndBuild ("NetStandard1x", templateId, parameters);
 		}
 
 		[Test]
@@ -111,10 +88,7 @@ namespace MonoDevelop.DotNetCore.Tests
 				Assert.Ignore (".NET Core runtime is not installed - required by project template.");
 			}
 
-			var config = CreateNewProjectConfig ("NetCore1x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
-
-			await CreateAndBuild (template, config);
+			await CreateFromTemplateAndBuild ("NetCore1x", templateId, parameters);
 		}
 
 		[Test]
@@ -126,10 +100,17 @@ namespace MonoDevelop.DotNetCore.Tests
 				Assert.Ignore (".NET Core 2 SDK is not installed - required by project template.");
 			}
 
-			var config = CreateNewProjectConfig ("NetStandard2x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
+			await CreateFromTemplateAndBuild ("NetStandard2x", templateId, parameters);
+		}
 
-			await CreateAndBuild (template, config);
+		[Test]
+		public async Task NetStandard20_VBNet ()
+		{
+			if (IsDotNetCoreSdk21Installed () || IsDotNetCoreSdk22Installed ()) {
+				await CreateFromTemplateAndBuild ("NetStandard2x", "Microsoft.Common.Library.VisualBasic", "UseNetStandard20=true");
+			} else {
+				Assert.Ignore (".NET Core >= 2.1 SDK is not installed - required by project template.");
+			}
 		}
 
 		[TestCase ("Microsoft.Common.Console.CSharp","UseNetCore20=true")]
@@ -147,10 +128,7 @@ namespace MonoDevelop.DotNetCore.Tests
 				Assert.Ignore (".NET Core 2.0 SDK is not installed - required by project template.");
 			}
 
-			var config = CreateNewProjectConfig ("NetCore2x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
-
-			await CreateAndBuild (template, config);
+			await CreateFromTemplateAndBuild ("NetCore2x", templateId, parameters);
 		}
 
 		[TestCase ("Microsoft.Common.Console.CSharp","UseNetCore21=true")]
@@ -162,16 +140,18 @@ namespace MonoDevelop.DotNetCore.Tests
 		[TestCase ("Microsoft.Common.Library.FSharp-netcoreapp", "UseNetCore21=true;Framework=netcoreapp2.1")]
 		[TestCase ("Microsoft.Test.xUnit.FSharp", "UseNetCore21=true")]
 		[TestCase ("Microsoft.Test.MSTest.FSharp", "UseNetCore21=true")]
+
+		[TestCase ("Microsoft.Common.Console.VisualBasic", "UseNetCore21=true")]
+		[TestCase ("Microsoft.Common.Library.VisualBasic-netcoreapp", "UseNetCore21=true;Framework=netcoreapp2.1")]
+		[TestCase ("Microsoft.Test.xUnit.VisualBasic", "UseNetCore21=true")]
+		[TestCase ("Microsoft.Test.MSTest.VisualBasic", "UseNetCore21=true")]
 		public async Task NetCore21 (string templateId, string parameters)
 		{
 			if (!IsDotNetCoreSdk21Installed ()) {
 				Assert.Ignore (".NET Core 2.1 SDK is not installed - required by project template.");
 			}
 
-			var config = CreateNewProjectConfig ("NetCore2x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
-
-			await CreateAndBuild (template, config);
+			await CreateFromTemplateAndBuild ("NetCore2x", templateId, parameters);
 		}
 
 		[TestCase ("Microsoft.Common.Console.CSharp", "UseNetCore22=true")]
@@ -183,16 +163,23 @@ namespace MonoDevelop.DotNetCore.Tests
 		[TestCase ("Microsoft.Common.Library.FSharp-netcoreapp", "UseNetCore22=true;Framework=netcoreapp2.2")]
 		[TestCase ("Microsoft.Test.xUnit.FSharp", "UseNetCore22=true")]
 		[TestCase ("Microsoft.Test.MSTest.FSharp", "UseNetCore22=true")]
+
+		[TestCase ("Microsoft.Common.Console.VisualBasic", "UseNetCore22=true")]
+		[TestCase ("Microsoft.Common.Library.VisualBasic-netcoreapp", "UseNetCore22=true;Framework=netcoreapp2.2")]
+		[TestCase ("Microsoft.Test.xUnit.VisualBasic", "UseNetCore22=true")]
+		[TestCase ("Microsoft.Test.MSTest.VisualBasic", "UseNetCore22=true")]
+
+		// NUnit3 templates come with .NET Core 2.2, but they only support .NET Core 2.1 framework
+		[TestCase ("NUnit3.DotNetNew.Template.CSharp", "UseNetCore21=true")]
+		[TestCase ("NUnit3.DotNetNew.Template.FSharp", "UseNetCore21=true")]
+		[TestCase ("NUnit3.DotNetNew.Template.VisualBasic", "UseNetCore21=true")]
 		public async Task NetCore22 (string templateId, string parameters)
 		{
 			if (!IsDotNetCoreSdk22Installed ()) {
 				Assert.Ignore (".NET Core 2.2 SDK is not installed - required by project template.");
 			}
 
-			var config = CreateNewProjectConfig ("NetCore2x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
-
-			await CreateAndBuild (template, config);
+			await CreateFromTemplateAndBuild ("NetCore2x", templateId, parameters);
 		}
 
 		[TestCase ("Microsoft.Web.Empty.CSharp", "UseNetCore1x=true;Framework=netcoreapp1.0")]
@@ -215,10 +202,7 @@ namespace MonoDevelop.DotNetCore.Tests
 				Assert.Ignore (".NET Core runtime is not installed - required by project template.");
 			}
 
-			var config = CreateNewProjectConfig ("AspNetCore1x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
-
-			await CreateAndBuild (template, config);
+			await CreateFromTemplateAndBuild ("AspNetCore1x", templateId, parameters);
 		}
 
 		[TestCase ("Microsoft.Web.Empty.CSharp", "UseNetCore20=true")]
@@ -234,10 +218,7 @@ namespace MonoDevelop.DotNetCore.Tests
 				Assert.Ignore (".NET Core 2.0 SDK is not installed - required by project template.");
 			}
 
-			var config = CreateNewProjectConfig ("NetCore2x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
-
-			await CreateAndBuild (template, config);
+			await CreateFromTemplateAndBuild ("NetCore2x", templateId, parameters);
 		}
 
 		[TestCase ("Microsoft.Web.Empty.CSharp", "UseNetCore21=true")]
@@ -253,10 +234,7 @@ namespace MonoDevelop.DotNetCore.Tests
 				Assert.Ignore (".NET Core 2.1 SDK is not installed - required by project template.");
 			}
 
-			var config = CreateNewProjectConfig ("NetCore2x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
-
-			await CreateAndBuild (template, config);
+			await CreateFromTemplateAndBuild ("NetCore2x", templateId, parameters);
 		}
 
 		[TestCase ("Microsoft.Web.Empty.CSharp", "UseNetCore22=true")]
@@ -272,10 +250,7 @@ namespace MonoDevelop.DotNetCore.Tests
 				Assert.Ignore (".NET Core 2.2 SDK is not installed - required by project template.");
 			}
 
-			var config = CreateNewProjectConfig ("NetCore2x", templateId, parameters);
-			SolutionTemplate template = FindTemplate (templateId, config);
-
-			await CreateAndBuild (template, config);
+			await CreateFromTemplateAndBuild ("NetCore2x", templateId, parameters);
 		}
 
 		static bool IsDotNetCoreSdk2xInstalled ()
@@ -299,95 +274,18 @@ namespace MonoDevelop.DotNetCore.Tests
 			return DotNetCoreSdk.Versions.Any (version => version.Major == 2 && version.Minor == 2);
 		}
 
-		NewProjectConfiguration CreateNewProjectConfig (string baseName, string templateId, string parameters)
+		static async Task CreateFromTemplateAndBuild (string basename, string templateId, string parameters)
 		{
-			FilePath solutionDirectory = Util.CreateTmpDir (baseName);
+			using (var ptt = new ProjectTemplateTest (basename, templateId)) {
 
-			CreateNuGetConfigFile (solutionDirectory);
+				foreach (var templateParameter in TemplateParameter.CreateParameters (parameters)) {
+					ptt.Config.Parameters [templateParameter.Name] = templateParameter.Value;
+				}
 
-			string projectName = GetProjectName (templateId);
+				var template = await ptt.CreateAndBuild ();
 
-			var config = new NewProjectConfiguration {
-				CreateSolution = true,
-				CreateProjectDirectoryInsideSolutionDirectory = true,
-				CreateGitIgnoreFile = false,
-				UseGit = false,
-				Location = solutionDirectory,
-				ProjectName = projectName,
-				SolutionName = projectName
-			};
-
-			foreach (var templateParameter in TemplateParameter.CreateParameters (parameters)) {
-				config.Parameters [templateParameter.Name] = templateParameter.Value;
+				CheckProjectTypeGuids (ptt.Solution, GetProjectTypeGuid (template));
 			}
-
-			Directory.CreateDirectory (config.ProjectLocation);
-
-			return config;
-		}
-
-		static string GetProjectName (string templateId)
-		{
-			return templateId.Replace ("Microsoft.Test.", "")
-				.Replace ("Microsoft.Common.", "")
-				.Replace ("Microsoft.", "")
-				.Replace (".", "");
-		}
-
-		SolutionTemplate FindTemplate (string templateId, NewProjectConfiguration config)
-		{
-			var categories = templatingService
-				.GetProjectTemplateCategories (t => MatchTemplate (t, templateId))
-				.ToList ();
-
-			var templates = categories.First ()
-				.Categories.First ()
-				.Categories.First ()
-				.Templates.ToList ();
-
-			var template = templates.Single ();
-
-			string language = GetLanguage (templateId);
-
-			return template.GetTemplate (language, config.Parameters);
-		}
-
-		static bool MatchTemplate (SolutionTemplate template, string templateId)
-		{
-			return template.Id == templateId;
-		}
-
-		static string GetLanguage (string templateId)
-		{
-			if (templateId.Contains ("FSharp")) {
-				return "F#";
-			}
-
-			return "C#";
-		}
-
-		async Task CreateAndBuild (
-			SolutionTemplate template,
-			NewProjectConfiguration config)
-		{
-			var result = await templatingService.ProcessTemplate (template, config, null);
-
-			solution = result.WorkspaceItems.FirstOrDefault () as Solution;
-			await solution.SaveAsync (Util.GetMonitor ());
-
-			// RestoreDisableParallel prevents parallel restores which sometimes cause
-			// the restore to fail on Mono.
-			RunMSBuild ($"/t:Restore /p:RestoreDisableParallel=true \"{solution.FileName}\"");
-			RunMSBuild ($"/t:Build \"{solution.FileName}\"");
-
-			CheckProjectTypeGuids (solution, GetProjectTypeGuid (template));
-		}
-
-		void RunMSBuild (string arguments)
-		{
-			var process = Process.Start ("msbuild", arguments);
-			Assert.IsTrue (process.WaitForExit (240000), "Timed out waiting for MSBuild.");
-			Assert.AreEqual (0, process.ExitCode, $"msbuild {arguments} failed");
 		}
 
 		static void CheckProjectTypeGuids (Solution solution, string expectedProjectTypeGuid)
@@ -399,9 +297,12 @@ namespace MonoDevelop.DotNetCore.Tests
 
 		static string GetProjectTypeGuid (SolutionTemplate template)
 		{
-			string language = GetLanguage (template.Id);
+			string language = ProjectTemplateTest.GetLanguage (template.Id);
 			if (language == "F#")
-				return "{f2a71f9b-5d33-465a-a702-920d77279786}";
+				return "{F2A71F9B-5D33-465A-A702-920D77279786}";
+
+			if (language == "VBNet")
+				return "{F184B08F-C81C-45F6-A57F-5ABD9991F28F}";
 
 			// C#
 			return "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
