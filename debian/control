@@ -23,7 +23,7 @@ Build-Depends: debhelper (>= 7.0.50),
                libgtkspell-dev,
                libsvn-dev,
                libcurl4-gnutls-dev,
-               libssl-dev (<< 1.1) | libssl1.0-dev,
+               libssl-dev (<< 1.1) | libssl1.0-dev | libc6-dev (>= 2.28),
                mono-devel (>= 5.8~),
                msbuild,
                monodoc-base (>= 1.1.9)
