@@ -31,7 +31,6 @@ override_dh_clideps:
 			--exclude-moduleref=libsvn_client-1.so.0 \
 			--exclude-moduleref=libapr-0.so.0 \
 			--exclude-moduleref=ole32.dll \
-			--exclude-moduleref=Ole32 \
 			--exclude-moduleref=fusion \
 			--exclude-moduleref=/System/Library/Frameworks/ApplicationServices.framework/Frameworks/CoreGraphics.framework/CoreGraphics \
 			--exclude-moduleref=libgtk-quartz-2.0.dylib \
